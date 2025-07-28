@@ -39,12 +39,12 @@ func BlockToMessage(h *flow.Block, signerIDs flow.IdentifierList) (
 
 	bh := entities.Block{
 		Id:                       IdentifierToMessage(id),
-		Height:                   h.Header.Height,
-		ParentId:                 IdentifierToMessage(h.Header.ParentID),
-		Timestamp:                BlockTimestamp2ProtobufTime(h.Header.Timestamp),
+		Height:                   h.Height,
+		ParentId:                 IdentifierToMessage(h.ParentID),
+		Timestamp:                BlockTimestamp2ProtobufTime(h.Timestamp),
 		CollectionGuarantees:     cg,
 		BlockSeals:               seals,
-		Signatures:               [][]byte{h.Header.ParentVoterSigData},
+		Signatures:               [][]byte{h.ParentVoterSigData},
 		ExecutionReceiptMetaList: ExecutionResultMetaListToMessages(h.Payload.Receipts),
 		ExecutionResultList:      execResults,
 		ProtocolStateId:          IdentifierToMessage(h.Payload.ProtocolStateID),
@@ -60,11 +60,11 @@ func BlockToMessageLight(h *flow.Block) *entities.Block {
 
 	return &entities.Block{
 		Id:                   id[:],
-		Height:               h.Header.Height,
-		ParentId:             h.Header.ParentID[:],
-		Timestamp:            BlockTimestamp2ProtobufTime(h.Header.Timestamp),
+		Height:               h.Height,
+		ParentId:             h.ParentID[:],
+		Timestamp:            BlockTimestamp2ProtobufTime(h.Timestamp),
 		CollectionGuarantees: cg,
-		Signatures:           [][]byte{h.Header.ParentVoterSigData},
+		Signatures:           [][]byte{h.ParentVoterSigData},
 	}
 }
 
@@ -80,8 +80,8 @@ func MessageToBlock(m *entities.Block) (*flow.Block, error) {
 	}
 	block, err := flow.NewBlock(
 		flow.UntrustedBlock{
-			Header:  header.HeaderBody,
-			Payload: *payload,
+			HeaderBody: header.HeaderBody,
+			Payload:    *payload,
 		},
 	)
 	if err != nil {

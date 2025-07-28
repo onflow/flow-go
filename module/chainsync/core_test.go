@@ -404,7 +404,7 @@ func (ss *SyncSuite) TestPrune() {
 		block := unittest.BlockFixture(
 			unittest.Block.WithHeight(uint64(i + 1)),
 		)
-		ss.core.heights[block.Header.Height] = ss.QueuedStatus()
+		ss.core.heights[block.Height] = ss.QueuedStatus()
 		prunableHeights = append(prunableHeights, block)
 	}
 	// add some un-finalized blocks by height
@@ -412,7 +412,7 @@ func (ss *SyncSuite) TestPrune() {
 		block := unittest.BlockFixture(
 			unittest.Block.WithHeight(final.Height + uint64(i+1)),
 		)
-		ss.core.heights[block.Header.Height] = ss.QueuedStatus()
+		ss.core.heights[block.Height] = ss.QueuedStatus()
 		unprunable = append(unprunable, block)
 	}
 
@@ -448,11 +448,11 @@ func (ss *SyncSuite) TestPrune() {
 		assert.False(ss.T(), exists)
 	}
 	for _, block := range prunableHeights {
-		_, exists := ss.core.heights[block.Header.Height]
+		_, exists := ss.core.heights[block.Height]
 		assert.False(ss.T(), exists)
 	}
 	for _, block := range unprunable {
-		_, heightExists := ss.core.heights[block.Header.Height]
+		_, heightExists := ss.core.heights[block.Height]
 		_, blockIDExists := ss.core.blockIDs[block.ID()]
 		assert.True(ss.T(), heightExists || blockIDExists)
 	}

@@ -476,7 +476,7 @@ func TestSkipChunkOfSealedBlock(t *testing.T) {
 	// creates a single chunk locator, and mocks its corresponding block sealed.
 	block := unittest.BlockFixture()
 	result := unittest.ExecutionResultFixture(unittest.WithExecutionResultBlockID(block.ID()))
-	statuses := unittest.ChunkStatusListFixture(t, block.Header.Height, result, 1)
+	statuses := unittest.ChunkStatusListFixture(t, block.Height, result, 1)
 	locators := unittest.ChunkStatusListToChunkLocatorFixture(statuses)
 	s.metrics.On("OnAssignedChunkReceivedAtFetcher").Return().Once()
 
@@ -802,9 +802,7 @@ func mockBlockSealingStatus(state *protocol.State, headers *storage.Headers, hea
 
 // mockBlocksStorage mocks blocks and headers storages for given block.
 func mockBlocksStorage(blocks *storage.Blocks, headers *storage.Headers, block *flow.Block) {
-	blockID := block.ID()
-	blocks.On("ByID", blockID).Return(block, nil)
-	headers.On("ByBlockID", blockID).Return(block.Header, nil)
+	blocks.On("ByID", block.ID()).Return(block, nil)
 }
 
 // mockRequester mocks the chunk data pack requester with the given chunk data pack requests.
@@ -993,7 +991,7 @@ func completeChunkStatusListFixture(t *testing.T, chunkCount int, statusCount in
 	result := unittest.ExecutionResultFixture(
 		unittest.WithBlock(block),
 		unittest.WithChunks(uint(chunkCount)))
-	statuses := unittest.ChunkStatusListFixture(t, block.Header.Height, result, statusCount)
+	statuses := unittest.ChunkStatusListFixture(t, block.Height, result, statusCount)
 	locators := unittest.ChunkStatusListToChunkLocatorFixture(statuses)
 
 	for _, status := range statuses {

@@ -309,8 +309,8 @@ func (s *ReceiptValidationSuite) TestReceiptForBlockWith0Collections() {
 	valSubgrph := s.ValidSubgraphFixture()
 	block, err := flow.NewBlock(
 		flow.UntrustedBlock{
-			Header:  valSubgrph.Block.Header,
-			Payload: unittest.PayloadFixture(),
+			HeaderBody: valSubgrph.Block.HeaderBody,
+			Payload:    unittest.PayloadFixture(),
 		},
 	)
 	s.Require().NoError(err)
@@ -1241,7 +1241,7 @@ func (s *ReceiptValidationSuite) TestException_SealsHighestInFork() {
 	// receiptValidator.seals yields exception on retrieving highest sealed block in fork up to candidate's parent
 	*s.SealsDB = *mock_storage.NewSeals(s.T()) // receiptValidator has pointer to this field, which we override with a new state mock
 	exception := errors.New("seals.HighestInFork(..) exception")
-	s.SealsDB.On("HighestInFork", candidate.Header.ParentID).Return(nil, exception)
+	s.SealsDB.On("HighestInFork", candidate.ParentID).Return(nil, exception)
 
 	err := s.receiptValidator.ValidatePayload(candidate)
 	s.Require().Error(err, "ValidatePayload should escalate exception")

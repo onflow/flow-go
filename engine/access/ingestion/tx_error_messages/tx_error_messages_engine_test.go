@@ -96,7 +96,7 @@ func (s *TxErrorMessagesEngineSuite) SetupTest() {
 		block := unittest.BlockWithParentFixture(parent)
 		// update for next iteration
 		parent = block.ToHeader()
-		s.blockMap[block.Header.Height] = block
+		s.blockMap[block.Height] = block
 	}
 
 	s.sealedBlock = parent
@@ -191,7 +191,7 @@ func (s *TxErrorMessagesEngineSuite) TestOnFinalizedBlockHandleTxErrorMessages()
 
 	block := unittest.BlockWithParentFixture(s.sealedBlock)
 
-	s.blockMap[block.Header.Height] = block
+	s.blockMap[block.Height] = block
 	s.sealedBlock = block.ToHeader()
 
 	hotstuffBlock := hotmodel.Block{

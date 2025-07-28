@@ -117,12 +117,12 @@ func executionResultForkFixture(t *testing.T) (*flow.Block,
 	statusA := &verification.ChunkStatus{
 		ChunkIndex:      0,
 		ExecutionResult: resultA,
-		BlockHeight:     block.Header.Height,
+		BlockHeight:     block.Height,
 	}
 	statusB := &verification.ChunkStatus{
 		ChunkIndex:      0,
 		ExecutionResult: resultB,
-		BlockHeight:     block.Header.Height,
+		BlockHeight:     block.Height,
 	}
 
 	// keeps collections of assigned chunks

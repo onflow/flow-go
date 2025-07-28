@@ -214,7 +214,7 @@ func (s *BackendScriptsSuite) TestExecuteScriptFromStorage_HappyPath() {
 	ctx := context.Background()
 
 	scriptExecutor := execmock.NewScriptExecutor(s.T())
-	scriptExecutor.On("ExecuteAtBlockHeight", mock.Anything, s.script, s.arguments, s.block.Header.Height).
+	scriptExecutor.On("ExecuteAtBlockHeight", mock.Anything, s.script, s.arguments, s.block.Height).
 		Return(expectedResponse, nil)
 
 	backend := s.defaultBackend()
@@ -272,7 +272,7 @@ func (s *BackendScriptsSuite) TestExecuteScriptFromStorage_Fails() {
 	}
 
 	for _, tt := range testCases {
-		scriptExecutor.On("ExecuteAtBlockHeight", mock.Anything, s.failingScript, s.arguments, s.block.Header.Height).
+		scriptExecutor.On("ExecuteAtBlockHeight", mock.Anything, s.failingScript, s.arguments, s.block.Height).
 			Return(nil, tt.err).Times(3)
 
 		s.Run(fmt.Sprintf("GetAccount - fails with %v", tt.err), func() {
@@ -314,7 +314,7 @@ func (s *BackendScriptsSuite) TestExecuteScriptWithFailover_HappyPath() {
 
 	for _, errToReturn := range errors {
 		// configure local script executor to fail
-		scriptExecutor.On("ExecuteAtBlockHeight", mock.Anything, s.script, s.arguments, s.block.Header.Height).
+		scriptExecutor.On("ExecuteAtBlockHeight", mock.Anything, s.script, s.arguments, s.block.Height).
 			Return(nil, errToReturn).Times(3)
 
 		s.Run(fmt.Sprintf("ExecuteScriptAtLatestBlock - recovers %v", errToReturn), func() {
@@ -358,7 +358,7 @@ func (s *BackendScriptsSuite) TestExecuteScriptWithFailover_SkippedForCorrectCod
 	}
 
 	for _, tt := range testCases {
-		scriptExecutor.On("ExecuteAtBlockHeight", mock.Anything, s.failingScript, s.arguments, s.block.Header.Height).
+		scriptExecutor.On("ExecuteAtBlockHeight", mock.Anything, s.failingScript, s.arguments, s.block.Height).
 			Return(nil, tt.err).
 			Times(3)
 
@@ -391,7 +391,7 @@ func (s *BackendScriptsSuite) TestExecuteScriptWithFailover_ReturnsENErrors() {
 
 	// configure local script executor to fail
 	scriptExecutor := execmock.NewScriptExecutor(s.T())
-	scriptExecutor.On("ExecuteAtBlockHeight", mock.Anything, mock.Anything, mock.Anything, s.block.Header.Height).
+	scriptExecutor.On("ExecuteAtBlockHeight", mock.Anything, mock.Anything, mock.Anything, s.block.Height).
 		Return(nil, storage.ErrHeightNotIndexed)
 
 	backend := s.defaultBackend()
@@ -469,7 +469,7 @@ func (s *BackendScriptsSuite) testExecuteScriptAtBlockID(ctx context.Context, ba
 }
 
 func (s *BackendScriptsSuite) testExecuteScriptAtBlockHeight(ctx context.Context, backend *backendScripts, statusCode codes.Code) {
-	height := s.block.Header.Height
+	height := s.block.Height
 	s.headers.On("ByHeight", height).Return(s.block.ToHeader(), nil).Once()
 
 	if statusCode == codes.OK {

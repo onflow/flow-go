@@ -137,14 +137,14 @@ func (s *BlocksProviderSuite) validBlockArgumentsTestCases() []testType {
 		{
 			name: "happy path with start_block_height argument",
 			arguments: wsmodels.Arguments{
-				"start_block_height": strconv.FormatUint(s.rootBlock.Header.Height, 10),
+				"start_block_height": strconv.FormatUint(s.rootBlock.Height, 10),
 				"block_status":       parser.Finalized,
 			},
 			setupBackend: func(sub *statestreamsmock.Subscription) {
 				s.api.On(
 					"SubscribeBlocksFromStartHeight",
 					mock.Anything,
-					s.rootBlock.Header.Height,
+					s.rootBlock.Height,
 					flow.BlockStatusFinalized,
 				).Return(sub).Once()
 			},
@@ -251,7 +251,7 @@ func (s *BlocksProviderSuite) invalidArgumentsTestCases() []testErrType {
 			arguments: wsmodels.Arguments{
 				"block_status":       parser.Finalized,
 				"start_block_id":     s.rootBlock.ID().String(),
-				"start_block_height": fmt.Sprintf("%d", s.rootBlock.Header.Height),
+				"start_block_height": fmt.Sprintf("%d", s.rootBlock.Height),
 			},
 			expectedErrorMsg: "can only provide either 'start_block_id' or 'start_block_height'",
 		},

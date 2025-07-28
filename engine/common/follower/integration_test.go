@@ -155,12 +155,12 @@ func TestFollowerHappyPath(t *testing.T) {
 
 		// ensure sequential block views - that way we can easily know which block will be finalized after the test
 		for i, proposal := range pendingBlocks {
-			proposal.Block.Header.View = proposal.Block.Header.Height
-			proposal.Block.Header.ParentView = proposal.Block.Header.View - 1
+			proposal.Block.View = proposal.Block.Height
+			proposal.Block.ParentView = proposal.Block.View - 1
 			block, err := flow.NewBlock(
 				flow.UntrustedBlock{
-					Header:  proposal.Block.Header,
-					Payload: unittest.PayloadFixture(unittest.WithProtocolStateID(rootProtocolStateID)),
+					HeaderBody: proposal.Block.HeaderBody,
+					Payload:    unittest.PayloadFixture(unittest.WithProtocolStateID(rootProtocolStateID)),
 				},
 			)
 			require.NoError(t, err)
@@ -168,8 +168,8 @@ func TestFollowerHappyPath(t *testing.T) {
 			proposal.Block = *block
 
 			if i > 0 {
-				proposal.Block.Header.ParentView = pendingBlocks[i-1].Block.Header.View
-				proposal.Block.Header.ParentID = pendingBlocks[i-1].Block.ID()
+				proposal.Block.ParentView = pendingBlocks[i-1].Block.View
+				proposal.Block.ParentID = pendingBlocks[i-1].Block.ID()
 			}
 		}
 
@@ -181,7 +181,7 @@ func TestFollowerHappyPath(t *testing.T) {
 		// Note: the HotStuff Follower does not see block Z (as there is no QC for X proving its validity). Instead, it sees the certified block
 		//  [◄(X) Y] ◄(Y)
 		// where ◄(B) denotes a QC for block B
-		targetBlockHeight := pendingBlocks[len(pendingBlocks)-3].Block.Header.Height
+		targetBlockHeight := pendingBlocks[len(pendingBlocks)-3].Block.Height
 
 		// emulate syncing logic, where we push same blocks over and over.
 		originID := unittest.IdentifierFixture()

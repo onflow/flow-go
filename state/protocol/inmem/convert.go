@@ -68,7 +68,7 @@ func ClusterFromEncodable(enc EncodableCluster) (*Cluster, error) {
 // root bootstrap state. This is used to bootstrap the protocol state for
 // genesis or post-spork states.
 func SnapshotFromBootstrapState(root *flow.Block, result *flow.ExecutionResult, seal *flow.Seal, qc *flow.QuorumCertificate) (*Snapshot, error) {
-	safetyParams, err := protocol.DefaultEpochSafetyParams(root.Header.ChainID)
+	safetyParams, err := protocol.DefaultEpochSafetyParams(root.ChainID)
 	if err != nil {
 		return nil, fmt.Errorf("could not get default epoch commit safety threshold: %w", err)
 	}
@@ -117,9 +117,9 @@ func SnapshotFromBootstrapStateWithParams(
 	}
 
 	params := EncodableParams{
-		ChainID:              root.Header.ChainID, // chain ID must match the root block
-		SporkID:              root.ID(),           // use root block ID as the unique spork identifier
-		SporkRootBlockHeight: root.Header.Height,  // use root block height as the spork root block height
+		ChainID:              root.ChainID, // chain ID must match the root block
+		SporkID:              root.ID(),    // use root block ID as the unique spork identifier
+		SporkRootBlockHeight: root.Height,  // use root block height as the spork root block height
 	}
 
 	rootMinEpochState, err := EpochProtocolStateFromServiceEvents(setup, commit)

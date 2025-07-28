@@ -41,7 +41,7 @@ func (s *blockSignerDecoderSuite) SetupTest() {
 	voterIndices, err := signature.EncodeSignersToIndices(s.allConsensus.NodeIDs(), s.allConsensus.NodeIDs())
 	require.NoError(s.T(), err)
 	s.block = unittest.BlockFixture()
-	s.block.Header.ParentVoterIndices = voterIndices
+	s.block.ParentVoterIndices = voterIndices
 
 	s.decoder = NewBlockSignerDecoder(s.committee)
 }
@@ -55,11 +55,11 @@ func (s *blockSignerDecoderSuite) Test_SuccessfulDecode() {
 
 // Test_RootBlock tests decoder accepts root block with empty signer indices
 func (s *blockSignerDecoderSuite) Test_RootBlock() {
-	s.block.Header.ParentVoterIndices = nil
-	s.block.Header.ParentVoterSigData = nil
-	s.block.Header.ParentView = 0
-	s.block.Header.ProposerID = flow.ZeroID
-	s.block.Header.View = 0
+	s.block.ParentVoterIndices = nil
+	s.block.ParentVoterSigData = nil
+	s.block.ParentView = 0
+	s.block.ProposerID = flow.ZeroID
+	s.block.View = 0
 
 	ids, err := s.decoder.DecodeSignerIDs(s.block.ToHeader())
 	require.NoError(s.T(), err)
@@ -99,8 +99,8 @@ func (s *blockSignerDecoderSuite) Test_CommitteeException() {
 // where the block is known - should return identities for block.
 func (s *blockSignerDecoderSuite) Test_UnknownEpoch_KnownBlock() {
 	*s.committee = *hotstuff.NewDynamicCommittee(s.T())
-	s.committee.On("IdentitiesByEpoch", s.block.Header.ParentView).Return(nil, model.ErrViewForUnknownEpoch)
-	s.committee.On("IdentitiesByBlock", s.block.Header.ParentID).Return(s.allConsensus, nil)
+	s.committee.On("IdentitiesByEpoch", s.block.ParentView).Return(nil, model.ErrViewForUnknownEpoch)
+	s.committee.On("IdentitiesByBlock", s.block.ParentID).Return(s.allConsensus, nil)
 
 	ids, err := s.decoder.DecodeSignerIDs(s.block.ToHeader())
 	require.NoError(s.T(), err)
@@ -111,8 +111,8 @@ func (s *blockSignerDecoderSuite) Test_UnknownEpoch_KnownBlock() {
 // where the block is unknown - should propagate state.ErrUnknownSnapshotReference.
 func (s *blockSignerDecoderSuite) Test_UnknownEpoch_UnknownBlock() {
 	*s.committee = *hotstuff.NewDynamicCommittee(s.T())
-	s.committee.On("IdentitiesByEpoch", s.block.Header.ParentView).Return(nil, model.ErrViewForUnknownEpoch)
-	s.committee.On("IdentitiesByBlock", s.block.Header.ParentID).Return(nil, state.ErrUnknownSnapshotReference)
+	s.committee.On("IdentitiesByEpoch", s.block.ParentView).Return(nil, model.ErrViewForUnknownEpoch)
+	s.committee.On("IdentitiesByBlock", s.block.ParentID).Return(nil, state.ErrUnknownSnapshotReference)
 
 	ids, err := s.decoder.DecodeSignerIDs(s.block.ToHeader())
 	require.ErrorIs(s.T(), err, state.ErrUnknownSnapshotReference)
@@ -123,7 +123,7 @@ func (s *blockSignerDecoderSuite) Test_UnknownEpoch_UnknownBlock() {
 // signature.InvalidSignerIndicesError if the signer indices in the provided header
 // are not a valid encoding.
 func (s *blockSignerDecoderSuite) Test_InvalidIndices() {
-	s.block.Header.ParentVoterIndices = unittest.RandomBytes(1)
+	s.block.ParentVoterIndices = unittest.RandomBytes(1)
 	ids, err := s.decoder.DecodeSignerIDs(s.block.ToHeader())
 	require.Empty(s.T(), ids)
 	require.True(s.T(), signature.IsInvalidSignerIndicesError(err))
@@ -138,8 +138,8 @@ func (s *blockSignerDecoderSuite) Test_EpochTransition() {
 	//
 	//   Epoch 1     Epoch 2
 	//   PARENT <- | -- B
-	blockView := s.block.Header.View
-	parentView := s.block.Header.ParentView
+	blockView := s.block.View
+	parentView := s.block.ParentView
 	epoch1Committee := s.allConsensus.ToSkeleton()
 	epoch2Committee, err := s.allConsensus.SamplePct(.8)
 	require.NoError(s.T(), err)

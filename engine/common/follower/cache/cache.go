@@ -94,17 +94,17 @@ func (c *Cache) handleEjectedBlock(proposal *flow.Proposal) {
 	blockID := proposal.Block.ID()
 
 	// remove block from the set of blocks for this view
-	blocksForView := c.byView[proposal.Block.Header.View]
+	blocksForView := c.byView[proposal.Block.View]
 	delete(blocksForView, blockID)
 	if len(blocksForView) == 0 {
-		delete(c.byView, proposal.Block.Header.View)
+		delete(c.byView, proposal.Block.View)
 	}
 
 	// remove block from the parent's set of its children
-	siblings := c.byParent[proposal.Block.Header.ParentID]
+	siblings := c.byParent[proposal.Block.ParentID]
 	delete(siblings, blockID)
 	if len(siblings) == 0 {
-		delete(c.byParent, proposal.Block.Header.ParentID)
+		delete(c.byParent, proposal.Block.ParentID)
 	}
 }
 
@@ -176,10 +176,10 @@ func (c *Cache) AddBlocks(batch []*flow.Proposal) (certifiedBatch []flow.Certifi
 	certifiedBatch = make([]flow.CertifiedBlock, 0, len(batch)-1)
 	for i, proposal := range batch[:len(batch)-1] {
 		child := batch[i+1].Block
-		if !child.Header.ContainsParentQC() {
+		if !child.ContainsParentQC() {
 			return nil, fmt.Errorf("could not retrieve ParentQC from block (id=%x)", child.ID())
 		}
-		certifiedBlock, err := flow.NewCertifiedBlock(proposal, child.Header.ParentQC())
+		certifiedBlock, err := flow.NewCertifiedBlock(proposal, child.ParentQC())
 		if err != nil {
 			return nil, fmt.Errorf("could not construct certified block: %w", err)
 		}
@@ -241,10 +241,10 @@ func (c *Cache) removeByView(view uint64, blocks BlocksByID) {
 	for blockID, block := range blocks {
 		c.backend.Remove(blockID)
 
-		siblings := c.byParent[block.Block.Header.ParentID]
+		siblings := c.byParent[block.Block.ParentID]
 		delete(siblings, blockID)
 		if len(siblings) == 0 {
-			delete(c.byParent, block.Block.Header.ParentID)
+			delete(c.byParent, block.Block.ParentID)
 		}
 	}
 
@@ -271,7 +271,7 @@ func (c *Cache) unsafeAtomicAdd(blockIDs []flow.Identifier, fullBlocks []*flow.P
 	defer c.lock.Unlock()
 
 	// check whether we have the parent of first block already in our cache:
-	if parent, ok := c.backend.Get(fullBlocks[0].Block.Header.ParentID); ok {
+	if parent, ok := c.backend.Get(fullBlocks[0].Block.ParentID); ok {
 		bc.batchParent = parent
 	}
 
@@ -308,7 +308,7 @@ func (c *Cache) unsafeAtomicAdd(blockIDs []flow.Identifier, fullBlocks []*flow.P
 // Repeated calls with the same block are no-ops.
 // CAUTION: not concurrency safe: execute within Cache's lock.
 func (c *Cache) cache(blockID flow.Identifier, block *flow.Proposal) (equivocation *flow.Proposal, stored bool) {
-	cachedBlocksAtView, haveCachedBlocksAtView := c.byView[block.Block.Header.View]
+	cachedBlocksAtView, haveCachedBlocksAtView := c.byView[block.Block.View]
 	// Check whether there is a block with the same view already in the cache.
 	// During happy-path operations `cachedBlocksAtView` contains usually zero blocks or exactly one block, which
 	// is our input `block` (duplicate). Larger sets of blocks can only be caused by slashable byzantine actions.
@@ -333,15 +333,15 @@ func (c *Cache) cache(blockID flow.Identifier, block *flow.Proposal) (equivocati
 	// populate `byView` index
 	if !haveCachedBlocksAtView {
 		cachedBlocksAtView = make(BlocksByID)
-		c.byView[block.Block.Header.View] = cachedBlocksAtView
+		c.byView[block.Block.View] = cachedBlocksAtView
 	}
 	cachedBlocksAtView[blockID] = block
 
 	// populate `byParent` index
-	siblings, ok := c.byParent[block.Block.Header.ParentID]
+	siblings, ok := c.byParent[block.Block.ParentID]
 	if !ok {
 		siblings = make(BlocksByID)
-		c.byParent[block.Block.Header.ParentID] = siblings
+		c.byParent[block.Block.ParentID] = siblings
 	}
 	siblings[blockID] = block
 
@@ -357,7 +357,7 @@ func enforceSequentialBlocks(batch []*flow.Proposal) ([]flow.Identifier, error) 
 	parentID := batch[0].Block.ID()
 	blockIDs = append(blockIDs, parentID)
 	for _, b := range batch[1:] {
-		if b.Block.Header.ParentID != parentID {
+		if b.Block.ParentID != parentID {
 			return nil, ErrDisconnectedBatch
 		}
 		parentID = b.Block.ID()
@@ -379,7 +379,7 @@ func enforceSequentialBlocks(batch []*flow.Proposal) ([]flow.Identifier, error) 
 func (c *Cache) trimLeadingBlocksBelowPruningThreshold(batch []*flow.Proposal) []*flow.Proposal {
 	lowestView := c.lowestView.Value()
 	for i, block := range batch {
-		if block.Block.Header.View >= lowestView {
+		if block.Block.View >= lowestView {
 			return batch[i:]
 		}
 	}

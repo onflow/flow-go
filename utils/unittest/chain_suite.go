@@ -185,7 +185,7 @@ func (bc *BaseChainSuite) SetupChain() {
 
 	findBlockByHeight := func(blocks map[flow.Identifier]*flow.Block, height uint64) (*flow.Block, bool) {
 		for _, block := range blocks {
-			if block.Header.Height == height {
+			if block.Height == height {
 				return block, true
 			}
 		}
@@ -219,7 +219,7 @@ func (bc *BaseChainSuite) SetupChain() {
 				snapshot.On("ProtocolState").Return(bc.KVStoreReader, nil)
 				return snapshot
 			}
-			panic(fmt.Sprintf("unknown height: %v, final: %v, sealed: %v", height, bc.LatestFinalizedBlock.Header.Height, bc.LatestSealedBlock.Header.Height))
+			panic(fmt.Sprintf("unknown height: %v, final: %v, sealed: %v", height, bc.LatestFinalizedBlock.Height, bc.LatestSealedBlock.Height))
 		},
 	)
 
@@ -280,7 +280,7 @@ func (bc *BaseChainSuite) SetupChain() {
 	bc.HeadersDB.On("ByHeight", mock.Anything).Return(
 		func(blockHeight uint64) *flow.Header {
 			for _, b := range bc.Blocks {
-				if b.Header.Height == blockHeight {
+				if b.Height == blockHeight {
 					return b.ToHeader()
 				}
 			}
@@ -288,7 +288,7 @@ func (bc *BaseChainSuite) SetupChain() {
 		},
 		func(blockHeight uint64) error {
 			for _, b := range bc.Blocks {
-				if b.Header.Height == blockHeight {
+				if b.Height == blockHeight {
 					return nil
 				}
 			}
@@ -536,7 +536,7 @@ func (bc *BaseChainSuite) ValidSubgraphFixture() subgraphFixture {
 func (bc *BaseChainSuite) Extend(block *flow.Block) {
 	blockID := block.ID()
 	bc.Blocks[blockID] = block
-	if seal, ok := bc.SealsIndex[block.Header.ParentID]; ok {
+	if seal, ok := bc.SealsIndex[block.ParentID]; ok {
 		bc.SealsIndex[block.ID()] = seal
 	}
 

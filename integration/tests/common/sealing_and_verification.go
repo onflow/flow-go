@@ -35,7 +35,7 @@ func SealingAndVerificationHappyPathTest(
 	// wait for next height finalized (potentially first height), called blockA, just to make sure consensus progresses.
 	currentFinalized := blockState.HighestFinalizedHeight()
 	blockA := blockState.WaitForHighestFinalizedProgress(t, currentFinalized)
-	t.Logf("blockA generated, height: %v ID: %v\n", blockA.Header.Height, blockA.ID())
+	t.Logf("blockA generated, height: %v ID: %v\n", blockA.Height, blockA.ID())
 
 	// sends a transaction
 	tx, err := accessClient.DeployContract(context.Background(), sdk.Identifier(rootBlockId), lib.CounterContract)

@@ -90,7 +90,7 @@ func (b *Store) IndexedHeight() (uint64, error) {
 		return 0, err
 	}
 
-	return block.Header.Height, nil
+	return block.Height, nil
 }
 
 // ByHeightFrom We don't have to do anything complex here, as emulator does not fork the chain
@@ -133,7 +133,7 @@ func (b *Store) LatestBlockHeight(ctx context.Context) (uint64, error) {
 		return 0, err
 	}
 
-	return block.Header.Height, nil
+	return block.Height, nil
 }
 
 func (b *Store) LatestBlock(_ context.Context) (flowgo.Block, error) {
@@ -155,11 +155,11 @@ func (b *Store) StoreBlock(_ context.Context, block *flowgo.Block) error {
 }
 
 func (b *Store) storeBlock(block *flowgo.Block) error {
-	b.blocks[block.Header.Height] = *block
-	b.blockIDToHeight[block.ID()] = block.Header.Height
+	b.blocks[block.Height] = *block
+	b.blockIDToHeight[block.ID()] = block.Height
 
-	if block.Header.Height > b.blockHeight {
-		b.blockHeight = block.Header.Height
+	if block.Height > b.blockHeight {
+		b.blockHeight = block.Height
 	}
 
 	return nil
@@ -242,13 +242,13 @@ func (b *Store) CommitBlock(
 	}
 
 	err = b.InsertExecutionSnapshot(
-		block.Header.Height,
+		block.Height,
 		executionSnapshot)
 	if err != nil {
 		return err
 	}
 
-	err = b.InsertEvents(block.Header.Height, events)
+	err = b.InsertEvents(block.Height, events)
 	if err != nil {
 		return err
 	}

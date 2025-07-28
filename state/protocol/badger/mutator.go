@@ -163,8 +163,8 @@ func (m *FollowerState) ExtendCertified(ctx context.Context, certified *flow.Cer
 	deferredDbOps := transaction.NewDeferredDbOps()
 
 	// sanity check if certifyingQC actually certifies candidate block
-	if certifyingQC.View != candidate.Header.View {
-		return fmt.Errorf("qc doesn't certify candidate block, expect %d view, got %d", candidate.Header.View, certifyingQC.View)
+	if certifyingQC.View != candidate.View {
+		return fmt.Errorf("qc doesn't certify candidate block, expect %d view, got %d", candidate.View, certifyingQC.View)
 	}
 	if certifyingQC.BlockID != blockID {
 		return fmt.Errorf("qc doesn't certify candidate block, expect %x blockID, got %x", blockID, certifyingQC.BlockID)
@@ -239,7 +239,7 @@ func (m *ParticipantState) Extend(ctx context.Context, candidateProposal *flow.P
 	}
 
 	// check if the block header is a valid extension of the finalized state
-	err = m.checkOutdatedExtension(candidate.Header)
+	err = m.checkOutdatedExtension(candidate.HeaderBody)
 	if err != nil {
 		if state.IsOutdatedExtensionError(err) {
 			return fmt.Errorf("candidate block is an outdated extension: %w", err)
@@ -307,32 +307,32 @@ func (m *FollowerState) headerExtend(ctx context.Context, candidate *flow.Propos
 	span, _ := m.tracer.StartSpanFromContext(ctx, trace.ProtoStateMutatorExtendCheckHeader)
 	defer span.End()
 	blockID := candidate.Block.ID()
-	header := candidate.Block.Header
+	headerBody := candidate.Block.HeaderBody
 
 	// STEP 1: check whether the candidate (i) connects to the known block tree and
 	// (ii) has the same chain ID as its parent and a height incremented by 1.
-	parent, err := m.headers.ByBlockID(header.ParentID) // (i) connects to the known block tree
+	parent, err := m.headers.ByBlockID(headerBody.ParentID) // (i) connects to the known block tree
 	if err != nil {
 		// The only sentinel error that can happen here is `storage.ErrNotFound`. However, by convention the
 		// protocol state must be extended in a parent-first order. This block's parent being unknown breaks
 		// with this API contract and results in an exception.
-		return irrecoverable.NewExceptionf("could not retrieve the candidate's parent block %v: %w", header.ParentID, err)
+		return irrecoverable.NewExceptionf("could not retrieve the candidate's parent block %v: %w", headerBody.ParentID, err)
 	}
-	if header.ChainID != parent.ChainID {
+	if headerBody.ChainID != parent.ChainID {
 		return state.NewInvalidExtensionErrorf("candidate built for invalid chain (candidate: %s, parent: %s)",
-			header.ChainID, parent.ChainID)
+			headerBody.ChainID, parent.ChainID)
 	}
-	if header.ParentView != parent.View {
+	if headerBody.ParentView != parent.View {
 		return state.NewInvalidExtensionErrorf("candidate build with inconsistent parent view (candidate: %d, parent %d)",
-			header.ParentView, parent.View)
+			headerBody.ParentView, parent.View)
 	}
-	if header.Height != parent.Height+1 {
+	if headerBody.Height != parent.Height+1 {
 		return state.NewInvalidExtensionErrorf("candidate built with invalid height (candidate: %d, parent: %d)",
-			header.Height, parent.Height)
+			headerBody.Height, parent.Height)
 	}
 
 	// STEP 2: check validity of block timestamp using parent's timestamp
-	err = m.blockTimer.Validate(parent.Timestamp, header.Timestamp)
+	err = m.blockTimer.Validate(parent.Timestamp, headerBody.Timestamp)
 	if err != nil {
 		if protocol.IsInvalidBlockTimestampError(err) {
 			return state.NewInvalidExtensionErrorf("candidate contains invalid timestamp: %w", err)
@@ -342,8 +342,8 @@ func (m *FollowerState) headerExtend(ctx context.Context, candidate *flow.Propos
 
 	// STEP 3: if a certifying QC is given (can be nil), sanity-check that it actually certifies the candidate block
 	if certifyingQC != nil {
-		if certifyingQC.View != header.View {
-			return fmt.Errorf("qc doesn't certify candidate block, expect %d view, got %d", header.View, certifyingQC.View)
+		if certifyingQC.View != headerBody.View {
+			return fmt.Errorf("qc doesn't certify candidate block, expect %d view, got %d", headerBody.View, certifyingQC.View)
 		}
 		if certifyingQC.BlockID != blockID {
 			return fmt.Errorf("qc doesn't certify candidate block, expect %x blockID, got %x", blockID, certifyingQC.BlockID)
@@ -351,7 +351,7 @@ func (m *FollowerState) headerExtend(ctx context.Context, candidate *flow.Propos
 	}
 
 	// STEP 4:
-	qc := candidate.Block.Header.ParentQC()
+	qc := candidate.Block.ParentQC()
 	deferredDbOps.AddDbOp(func(tx *transaction.Tx) error {
 		// STEP 4a: Store QC for parent block and emit `BlockProcessable` notification if and only if
 		//  - the QC for the parent has not been stored before (otherwise, we already emitted the notification) and
@@ -376,7 +376,7 @@ func (m *FollowerState) headerExtend(ctx context.Context, candidate *flow.Propos
 		if err != nil {
 			return fmt.Errorf("could not store candidate block: %w", err)
 		}
-		err = transaction.WithTx(procedure.IndexNewBlock(blockID, header.ParentID))(tx)
+		err = transaction.WithTx(procedure.IndexNewBlock(blockID, headerBody.ParentID))(tx)
 		if err != nil {
 			return fmt.Errorf("could not index new block: %w", err)
 		}
@@ -463,14 +463,14 @@ func (m *ParticipantState) guaranteeExtend(ctx context.Context, candidate *flow.
 	span, _ := m.tracer.StartSpanFromContext(ctx, trace.ProtoStateMutatorExtendCheckGuarantees)
 	defer span.End()
 
-	header := candidate.Header
+	headerBody := candidate.HeaderBody
 	payload := candidate.Payload
 
 	// we only look as far back for duplicates as the transaction expiry limit;
 	// if a guarantee was included before that, we will disqualify it on the
 	// basis of the reference block anyway
-	limit := header.Height - flow.DefaultTransactionExpiry
-	if limit > header.Height { // overflow check
+	limit := headerBody.Height - flow.DefaultTransactionExpiry
+	if limit > headerBody.Height { // overflow check
 		limit = 0
 	}
 	if limit < m.sporkRootBlockHeight {
@@ -478,12 +478,12 @@ func (m *ParticipantState) guaranteeExtend(ctx context.Context, candidate *flow.
 	}
 
 	// build a list of all previously used guarantees on this part of the chain
-	ancestorID := header.ParentID
+	ancestorID := headerBody.ParentID
 	lookup := make(map[flow.Identifier]struct{})
 	for {
 		ancestor, err := m.headers.ByBlockID(ancestorID)
 		if err != nil {
-			return fmt.Errorf("could not retrieve ancestor header (%x): %w", ancestorID, err)
+			return fmt.Errorf("could not retrieve ancestor headerBody (%x): %w", ancestorID, err)
 		}
 		index, err := m.index.ByBlockID(ancestorID)
 		if err != nil {
@@ -601,9 +601,9 @@ func (m *FollowerState) lastSealed(candidate *flow.Block, deferredDbOps *transac
 	// parent is also the latest seal as of the candidate block. Otherwise, we take the latest seal included in the candidate block.
 	// Note that seals might not be ordered in the block.
 	if len(payload.Seals) == 0 {
-		latestSeal, err = m.seals.HighestInFork(candidate.Header.ParentID)
+		latestSeal, err = m.seals.HighestInFork(candidate.ParentID)
 		if err != nil {
-			return nil, fmt.Errorf("could not retrieve parent seal (%x): %w", candidate.Header.ParentID, err)
+			return nil, fmt.Errorf("could not retrieve parent seal (%x): %w", candidate.ParentID, err)
 		}
 	} else {
 		ordered, err := protocol.OrderedSeals(payload.Seals, m.headers)
@@ -638,7 +638,7 @@ func (m *FollowerState) evolveProtocolState(ctx context.Context, candidate *flow
 
 	// Evolve the Protocol State starting from the parent block's state. Information that may change the state is:
 	// the candidate block's view and Service Events from execution results sealed in the candidate block.
-	updatedStateID, dbUpdates, err := m.protocolState.EvolveState(candidate.Header.ParentID, candidate.Header.View, candidate.Payload.Seals)
+	updatedStateID, dbUpdates, err := m.protocolState.EvolveState(candidate.ParentID, candidate.View, candidate.Payload.Seals)
 	if err != nil {
 		return fmt.Errorf("evolving protocol state failed: %w", err)
 	}
@@ -701,7 +701,7 @@ func (m *FollowerState) Finalize(ctx context.Context, blockID flow.Identifier) e
 
 	// We update metrics and emit protocol events for epoch state changes when
 	// the block corresponding to the state change is finalized
-	parentEpochState, err := m.protocolState.EpochStateAtBlockID(block.Header.ParentID)
+	parentEpochState, err := m.protocolState.EpochStateAtBlockID(block.ParentID)
 	if err != nil {
 		return fmt.Errorf("could not retrieve parent protocol state snapshot: %w", err)
 	}
@@ -976,7 +976,7 @@ func (m *FollowerState) versionBeaconOnBlockFinalized(
 			// Seal height to the current block height.
 			versionBeacons = append(versionBeacons, &flow.SealedVersionBeacon{
 				VersionBeacon: ev,
-				SealHeight:    finalized.Header.Height,
+				SealHeight:    finalized.Height,
 			})
 		}
 	}

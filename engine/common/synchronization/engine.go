@@ -331,8 +331,8 @@ func (e *Engine) onBlockResponse(originID flow.Identifier, res []*flow.Proposal)
 		return
 	}
 
-	first := res[0].Block.Header.Height
-	last := res[len(res)-1].Block.Header.Height
+	first := res[0].Block.Height
+	last := res[len(res)-1].Block.Height
 	e.log.Debug().Uint64("first", first).Uint64("last", last).Msg("received proposal")
 
 	filteredProposals := make([]*flow.Proposal, 0, len(res))

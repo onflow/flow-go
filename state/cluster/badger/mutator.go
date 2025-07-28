@@ -60,7 +60,7 @@ func (m *MutableState) getExtendCtx(candidate *cluster.Block) (extendContext, er
 	err := m.State.db.View(func(tx *badger.Txn) error {
 		// get the latest finalized cluster block and latest finalized consensus height
 		ctx.finalizedClusterBlock = new(flow.Header)
-		err := procedure.RetrieveLatestFinalizedClusterHeader(candidate.Header.ChainID, ctx.finalizedClusterBlock)(tx)
+		err := procedure.RetrieveLatestFinalizedClusterHeader(candidate.ChainID, ctx.finalizedClusterBlock)(tx)
 		if err != nil {
 			return fmt.Errorf("could not retrieve finalized cluster head: %w", err)
 		}
@@ -152,29 +152,27 @@ func (m *MutableState) Extend(proposal *cluster.Proposal) error {
 // Expected error returns:
 //   - state.InvalidExtensionError if the candidate header is invalid
 func (m *MutableState) checkHeaderValidity(candidate *cluster.Block) error {
-	header := candidate.Header
-
 	// check chain ID
-	if header.ChainID != m.State.clusterID {
-		return state.NewInvalidExtensionErrorf("new block chain ID (%s) does not match configured (%s)", header.ChainID, m.State.clusterID)
+	if candidate.ChainID != m.State.clusterID {
+		return state.NewInvalidExtensionErrorf("new block chain ID (%s) does not match configured (%s)", candidate.ChainID, m.State.clusterID)
 	}
 
 	// get the header of the parent of the new block
-	parent, err := m.headers.ByBlockID(header.ParentID)
+	parent, err := m.headers.ByBlockID(candidate.ParentID)
 	if err != nil {
 		return irrecoverable.NewExceptionf("could not retrieve latest finalized header: %w", err)
 	}
 
 	// extending block must have correct parent view
-	if header.ParentView != parent.View {
+	if candidate.ParentView != parent.View {
 		return state.NewInvalidExtensionErrorf("candidate build with inconsistent parent view (candidate: %d, parent %d)",
-			header.ParentView, parent.View)
+			candidate.ParentView, parent.View)
 	}
 
 	// the extending block must increase height by 1 from parent
-	if header.Height != parent.Height+1 {
+	if candidate.Height != parent.Height+1 {
 		return state.NewInvalidExtensionErrorf("extending block height (%d) must be parent height + 1 (%d)",
-			header.Height, parent.Height)
+			candidate.Height, parent.Height)
 	}
 	return nil
 }
@@ -184,17 +182,16 @@ func (m *MutableState) checkHeaderValidity(candidate *cluster.Block) error {
 // Expected error returns:
 //   - state.OutdatedExtensionError if the candidate extends an orphaned fork
 func (m *MutableState) checkConnectsToFinalizedState(ctx extendContext) error {
-	header := ctx.candidate.Header
+	parentID := ctx.candidate.ParentID
 	finalizedID := ctx.finalizedClusterBlock.ID()
 	finalizedHeight := ctx.finalizedClusterBlock.Height
 
 	// start with the extending block's parent
-	parentID := header.ParentID
 	for parentID != finalizedID {
 		// get the parent of current block
 		ancestor, err := m.headers.ByBlockID(parentID)
 		if err != nil {
-			return irrecoverable.NewExceptionf("could not get parent which must be known (%x): %w", header.ParentID, err)
+			return irrecoverable.NewExceptionf("could not get parent which must be known (%x): %w", parentID, err)
 		}
 
 		// if its height is below current boundary, the block does not connect
@@ -351,7 +348,7 @@ func (m *MutableState) checkPayloadTransactions(ctx extendContext) error {
 func (m *MutableState) checkDupeTransactionsInUnfinalizedAncestry(block *cluster.Block, includedTransactions map[flow.Identifier]struct{}, finalHeight uint64) ([]flow.Identifier, error) {
 
 	var duplicateTxIDs []flow.Identifier
-	err := fork.TraverseBackward(m.headers, block.Header.ParentID, func(ancestor *flow.Header) error {
+	err := fork.TraverseBackward(m.headers, block.ParentID, func(ancestor *flow.Header) error {
 		payload, err := m.payloads.ByBlockID(ancestor.ID())
 		if err != nil {
 			return fmt.Errorf("could not retrieve ancestor payload: %w", err)

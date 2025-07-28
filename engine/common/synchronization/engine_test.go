@@ -381,7 +381,7 @@ func (ss *SyncSuite) TestOnValidBlockResponse() {
 	ss.comp.On("OnSyncedBlocks", mock.Anything).Run(func(args mock.Arguments) {
 		res := args.Get(0).(flow.Slashable[[]*flow.Proposal])
 		actual := res.Message[0]
-		ss.Assert().Equal(processable.Block.Header, actual.Block.Header)
+		ss.Assert().Equal(processable.Block.HeaderBody, actual.Block.HeaderBody)
 		ss.Assert().Equal(processable.Block.Payload, actual.Block.Payload)
 		ss.Assert().Equal(originID, res.OriginID)
 	})

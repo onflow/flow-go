@@ -106,7 +106,7 @@ func (s *RequestTrackerTestSuite) TestTryUpdate_UpdateForInvalidResult() {
 func (s *RequestTrackerTestSuite) TestTryUpdate_UpdateForPrunedHeight() {
 	executedBlock := unittest.BlockFixture()
 	s.headers.On("ByBlockID", executedBlock.ID()).Return(executedBlock.ToHeader(), nil)
-	err := s.tracker.PruneUpToHeight(executedBlock.Header.Height + 1)
+	err := s.tracker.PruneUpToHeight(executedBlock.Height + 1)
 	require.NoError(s.T(), err)
 	result := unittest.ExecutionResultFixture(unittest.WithBlock(executedBlock))
 	_, updated, err := s.tracker.TryUpdate(result, executedBlock.ID(), uint64(0))
@@ -131,7 +131,7 @@ func (s *RequestTrackerTestSuite) TestPruneUpToHeight_Pruning() {
 		require.False(s.T(), updated)
 	}
 
-	err := s.tracker.PruneUpToHeight(nextExecutedBlock.Header.Height)
+	err := s.tracker.PruneUpToHeight(nextExecutedBlock.Height)
 	require.NoError(s.T(), err)
 
 	_, ok := s.tracker.index[result.ID()]

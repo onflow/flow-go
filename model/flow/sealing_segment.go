@@ -287,7 +287,7 @@ func (builder *SealingSegmentBuilder) AddBlock(block *Proposal) error {
 
 	// sanity check: block should be 1 height higher than current highest
 	if !builder.isValidHeight(&block.Block) {
-		return NewInvalidSealingSegmentError("invalid block height (%d)", block.Block.Header.Height)
+		return NewInvalidSealingSegmentError("invalid block height (%d)", block.Block.Height)
 	}
 	blockID := block.Block.ID()
 
@@ -385,11 +385,11 @@ func (builder *SealingSegmentBuilder) AddExtraBlock(block *Proposal) error {
 			return fmt.Errorf("cannot add extra blocks before adding lowest sealing segment block")
 		}
 		// first extra block has to match the lowest block of sealing segment
-		if (block.Block.Header.Height + 1) != builder.lowest().Header.Height {
-			return NewInvalidSealingSegmentError("invalid extra block height (%d), doesn't connect to sealing segment", block.Block.Header.Height)
+		if (block.Block.Height + 1) != builder.lowest().Height {
+			return NewInvalidSealingSegmentError("invalid extra block height (%d), doesn't connect to sealing segment", block.Block.Height)
 		}
-	} else if (block.Block.Header.Height + 1) != builder.extraBlocks[len(builder.extraBlocks)-1].Block.Header.Height {
-		return NewInvalidSealingSegmentError("invalid extra block height (%d), doesn't connect to last extra block", block.Block.Header.Height)
+	} else if (block.Block.Height + 1) != builder.extraBlocks[len(builder.extraBlocks)-1].Block.Height {
+		return NewInvalidSealingSegmentError("invalid extra block height (%d), doesn't connect to last extra block", block.Block.Height)
 	}
 
 	// if the block commits to an unseen ProtocolStateID, add the corresponding data entry
@@ -420,7 +420,7 @@ func (builder *SealingSegmentBuilder) SealingSegment() (*SealingSegment, error) 
 	// SealingSegment must store extra blocks in ascending order, builder stores them in descending.
 	// Apply a sort to reverse the slice and use correct ordering.
 	slices.SortFunc(builder.extraBlocks, func(lhs, rhs *Proposal) int {
-		return int(lhs.Block.Header.Height) - int(rhs.Block.Header.Height)
+		return int(lhs.Block.Height) - int(rhs.Block.Height)
 	})
 
 	return &SealingSegment{
@@ -439,7 +439,7 @@ func (builder *SealingSegmentBuilder) isValidHeight(block *Block) bool {
 		return true
 	}
 
-	return block.Header.Height == builder.highest().Header.Height+1
+	return block.Height == builder.highest().Height+1
 }
 
 // validateRootSegment will check that the current builder state represents a valid
@@ -456,8 +456,8 @@ func (builder *SealingSegmentBuilder) validateRootSegment() error {
 	if len(builder.extraBlocks) > 0 {
 		return NewInvalidSealingSegmentError("root segment cannot have extra blocks")
 	}
-	if builder.lowest().Header.View != 0 {
-		return NewInvalidSealingSegmentError("root block has unexpected view (%d != 0)", builder.lowest().Header.View)
+	if builder.lowest().View != 0 {
+		return NewInvalidSealingSegmentError("root block has unexpected view (%d != 0)", builder.lowest().View)
 	}
 	if len(builder.results) != 1 {
 		return NewInvalidSealingSegmentError("expected %d results, got %d", 1, len(builder.results))
@@ -477,7 +477,7 @@ func (builder *SealingSegmentBuilder) validateRootSegment() error {
 	for _, block := range builder.blocks {
 		if len(block.Block.Payload.Seals) > 0 {
 			return NewInvalidSealingSegmentError("root segment cannot contain blocks with seals (minimality requirement) - block (height=%d,id=%x) has %d seals",
-				block.Block.Header.Height, block.Block.ID(), len(block.Block.Payload.Seals))
+				block.Block.Height, block.Block.ID(), len(block.Block.Payload.Seals))
 		}
 	}
 	return nil
@@ -493,7 +493,7 @@ func (builder *SealingSegmentBuilder) validateSegment() error {
 	}
 
 	if len(builder.extraBlocks) > 0 {
-		if builder.extraBlocks[0].Block.Header.Height+1 != builder.lowest().Header.Height {
+		if builder.extraBlocks[0].Block.Height+1 != builder.lowest().Height {
 			return NewInvalidSealingSegmentError("extra blocks don't connect to lowest block in segment")
 		}
 	}

@@ -109,9 +109,9 @@ func (c *ComplianceCore) OnBlockRange(originID flow.Identifier, batch []*flow.Pr
 		return nil
 	}
 
-	firstBlock := batch[0].Block.Header
+	firstBlock := batch[0].Block
 	lastBlock := batch[len(batch)-1]
-	lastHeader := lastBlock.Block.Header
+	lastHeader := lastBlock.Block
 	hotstuffProposal := model.SignedProposalFromBlock(lastBlock)
 	log := c.log.With().
 		Hex("origin_id", originID[:]).

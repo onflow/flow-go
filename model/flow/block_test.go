@@ -114,8 +114,8 @@ func TestBlockMalleability(t *testing.T) {
 	unittest.RequireEntityNonMalleable(
 		t,
 		unittest.FullBlockFixture(),
-		unittest.WithFieldGenerator("Header.ParentView", func() uint64 {
-			return block.Header.View - 1 // ParentView must stay below View, so set it to View-1
+		unittest.WithFieldGenerator("HeaderBody.ParentView", func() uint64 {
+			return block.View - 1 // ParentView must stay below View, so set it to View-1
 		}),
 		unittest.WithFieldGenerator("Payload.Results", func() flow.ExecutionResultList {
 			return flow.ExecutionResultList{unittest.ExecutionResultFixture()}
@@ -147,7 +147,7 @@ func TestNewBlock(t *testing.T) {
 
 	t.Run("invalid input with invalid header body", func(t *testing.T) {
 		block := unittest.BlockFixture()
-		block.Header.ParentID = flow.ZeroID
+		block.ParentID = flow.ZeroID
 
 		res, err := flow.NewBlock(flow.UntrustedBlock(*block))
 		require.Error(t, err)
@@ -183,7 +183,7 @@ func TestNewRootBlock(t *testing.T) {
 	// validRootBlockFixture returns a new valid root flow.UntrustedBlock for use in tests.
 	validRootBlockFixture := func() flow.UntrustedBlock {
 		return flow.UntrustedBlock{
-			Header: flow.HeaderBody{
+			HeaderBody: flow.HeaderBody{
 				ChainID:            flow.Emulator,
 				ParentID:           unittest.IdentifierFixture(),
 				Height:             10,
@@ -207,7 +207,7 @@ func TestNewRootBlock(t *testing.T) {
 
 	t.Run("invalid input with invalid header body", func(t *testing.T) {
 		block := validRootBlockFixture()
-		block.Header.ParentView = 1
+		block.ParentView = 1
 
 		res, err := flow.NewRootBlock(block)
 		require.Error(t, err)
@@ -251,7 +251,7 @@ func TestNewProposal(t *testing.T) {
 
 	t.Run("invalid input with invalid block", func(t *testing.T) {
 		untrustedProposal := flow.UntrustedProposal(*unittest.ProposalFixture())
-		untrustedProposal.Block.Header.ParentID = flow.ZeroID
+		untrustedProposal.Block.ParentID = flow.ZeroID
 
 		res, err := flow.NewProposal(untrustedProposal)
 		require.Error(t, err)
@@ -301,7 +301,7 @@ func TestNewRootProposal(t *testing.T) {
 	// validRootProposalFixture returns a new valid root flow.UntrustedProposal for use in tests.
 	validRootProposalFixture := func() flow.UntrustedProposal {
 		block, err := flow.NewRootBlock(flow.UntrustedBlock{
-			Header: flow.HeaderBody{
+			HeaderBody: flow.HeaderBody{
 				ChainID:            flow.Emulator,
 				ParentID:           unittest.IdentifierFixture(),
 				Height:             10,
@@ -342,7 +342,7 @@ func TestNewRootProposal(t *testing.T) {
 
 	t.Run("invalid input with invalid block", func(t *testing.T) {
 		untrustedProposal := validRootProposalFixture()
-		untrustedProposal.Block.Header.ParentView = 1
+		untrustedProposal.Block.ParentView = 1
 
 		res, err := flow.NewRootProposal(untrustedProposal)
 		require.Error(t, err)

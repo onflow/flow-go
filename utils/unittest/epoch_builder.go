@@ -310,9 +310,9 @@ func (builder *EpochBuilder) BuildEpoch() *EpochBuilder {
 	builder.built[counter] = &EpochHeights{
 		Counter:        counter,
 		Staking:        A.Height,
-		Setup:          D.Header.Height,
-		Committed:      F.Header.Height,
-		CommittedFinal: F.Header.Height,
+		Setup:          D.Height,
+		Committed:      F.Height,
+		CommittedFinal: F.Height,
 	}
 
 	return builder
@@ -356,7 +356,7 @@ func (builder *EpochBuilder) CompleteEpoch() *EpochBuilder {
 			},
 		})
 	// first view is not necessarily exactly final view of previous epoch
-	A.Header.View = finalView + (rand.Uint64() % 4) + 1
+	A.View = finalView + (rand.Uint64() % 4) + 1
 	builder.addBlock(A)
 
 	return builder
@@ -365,7 +365,7 @@ func (builder *EpochBuilder) CompleteEpoch() *EpochBuilder {
 // addBlock adds the given block to the state by: extending the state,
 // finalizing the block, and caching the block.
 func (builder *EpochBuilder) addBlock(block *flow.Block) {
-	updatedStateId, dbUpdates, err := builder.mutableProtocolState.EvolveState(block.Header.ParentID, block.Header.View, block.Payload.Seals)
+	updatedStateId, dbUpdates, err := builder.mutableProtocolState.EvolveState(block.ParentID, block.View, block.Payload.Seals)
 	require.NoError(builder.t, err)
 	require.False(builder.t, dbUpdates.IsEmpty())
 
@@ -413,7 +413,7 @@ func (builder *EpochBuilder) AddBlocksWithSeals(n int, counter uint64) *EpochBui
 
 		// update cache information about the built epoch
 		// we have extended the commit phase
-		builder.built[counter].CommittedFinal = block.Header.Height
+		builder.built[counter].CommittedFinal = block.Height
 	}
 
 	return builder

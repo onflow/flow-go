@@ -56,7 +56,7 @@ func (suite *MutatorSuite) SetupTest() {
 
 	suite.genesis, err = unittest.ClusterBlock.Genesis()
 	require.NoError(suite.T(), err)
-	suite.chainID = suite.genesis.Header.ChainID
+	suite.chainID = suite.genesis.ChainID
 
 	suite.dbdir = unittest.TempDir(suite.T())
 	suite.db = unittest.BadgerDB(suite.T(), suite.dbdir)
@@ -71,11 +71,11 @@ func (suite *MutatorSuite) SetupTest() {
 	genesis, result, seal := unittest.BootstrapFixture(unittest.IdentityListFixture(5, unittest.WithAllRoles()))
 
 	// ensure we don't enter a new epoch for tests that build many blocks
-	result.ServiceEvents[0].Event.(*flow.EpochSetup).FinalView = genesis.Header.View + 100_000
+	result.ServiceEvents[0].Event.(*flow.EpochSetup).FinalView = genesis.View + 100_000
 
 	seal.ResultID = result.ID()
 	qc := unittest.QuorumCertificateFixture(unittest.QCWithRootBlockID(genesis.ID()))
-	safetyParams, err := protocol.DefaultEpochSafetyParams(genesis.Header.ChainID)
+	safetyParams, err := protocol.DefaultEpochSafetyParams(genesis.ChainID)
 	require.NoError(suite.T(), err)
 	minEpochStateEntry, err := inmem.EpochProtocolStateFromServiceEvents(
 		result.ServiceEvents[0].Event.(*flow.EpochSetup),
@@ -220,14 +220,14 @@ func TestMutator(t *testing.T) {
 }
 
 func (suite *MutatorSuite) TestBootstrap_InvalidHeight() {
-	suite.genesis.Header.Height = 1
+	suite.genesis.Height = 1
 
 	_, err := NewStateRoot(suite.genesis, unittest.QuorumCertificateFixture(), suite.epochCounter)
 	suite.Assert().Error(err)
 }
 
 func (suite *MutatorSuite) TestBootstrap_InvalidParentHash() {
-	suite.genesis.Header.ParentID = unittest.IdentifierFixture()
+	suite.genesis.ParentID = unittest.IdentifierFixture()
 
 	_, err := NewStateRoot(suite.genesis, unittest.QuorumCertificateFixture(), suite.epochCounter)
 	suite.Assert().Error(err)
@@ -264,15 +264,15 @@ func (suite *MutatorSuite) TestBootstrap_Successful() {
 
 		// should insert block height -> ID lookup
 		var blockID flow.Identifier
-		err = operation.LookupClusterBlockHeight(suite.genesis.Header.ChainID, suite.genesis.Header.Height, &blockID)(tx)
+		err = operation.LookupClusterBlockHeight(suite.genesis.ChainID, suite.genesis.Height, &blockID)(tx)
 		suite.Assert().Nil(err)
 		suite.Assert().Equal(suite.genesis.ID(), blockID)
 
 		// should insert boundary
 		var boundary uint64
-		err = operation.RetrieveClusterFinalizedHeight(suite.genesis.Header.ChainID, &boundary)(tx)
+		err = operation.RetrieveClusterFinalizedHeight(suite.genesis.ChainID, &boundary)(tx)
 		suite.Assert().Nil(err)
-		suite.Assert().Equal(suite.genesis.Header.Height, boundary)
+		suite.Assert().Equal(suite.genesis.Height, boundary)
 
 		return nil
 	})
@@ -290,7 +290,7 @@ func (suite *MutatorSuite) TestExtend_WithoutBootstrap() {
 func (suite *MutatorSuite) TestExtend_InvalidChainID() {
 	proposal := suite.Proposal()
 	// change the chain ID
-	proposal.Block.Header.ChainID = flow.ChainID(fmt.Sprintf("%s-invalid", proposal.Block.Header.ChainID))
+	proposal.Block.ChainID = flow.ChainID(fmt.Sprintf("%s-invalid", proposal.Block.ChainID))
 
 	err := suite.state.Extend(&proposal)
 	suite.Assert().Error(err)
@@ -300,7 +300,7 @@ func (suite *MutatorSuite) TestExtend_InvalidChainID() {
 func (suite *MutatorSuite) TestExtend_InvalidBlockHeight() {
 	proposal := suite.Proposal()
 	// change the block height
-	proposal.Block.Header.Height = proposal.Block.Header.Height + 1
+	proposal.Block.Height = proposal.Block.Height + 1
 
 	err := suite.state.Extend(&proposal)
 	suite.Assert().Error(err)
@@ -323,7 +323,7 @@ func (suite *MutatorSuite) TestExtend_InvalidParentView() {
 
 	proposal2 := suite.ProposalWithParentAndPayload(&proposal1.Block, suite.Payload(&tx2))
 	// change the block ParentView
-	proposal2.Block.Header.ParentView--
+	proposal2.Block.ParentView--
 
 	err = suite.state.Extend(&proposal2)
 	suite.Assert().Error(err)
@@ -592,11 +592,11 @@ func (suite *MutatorSuite) TestExtend_LargeHistory() {
 		// conflicting fork, build on the parent of the head
 		parent := *head
 		if conflicting {
-			err = suite.db.View(procedure.RetrieveClusterBlock(parent.Header.ParentID, &parent))
+			err = suite.db.View(procedure.RetrieveClusterBlock(parent.ParentID, &parent))
 			assert.NoError(t, err)
 			// add the transaction to the invalidated list
 			invalidatedTransactions = append(invalidatedTransactions, &tx)
-		} else if head.Header.Height < 50 {
+		} else if head.Height < 50 {
 			oldTransactions = append(oldTransactions, &tx)
 		}
 
@@ -618,7 +618,7 @@ func (suite *MutatorSuite) TestExtend_LargeHistory() {
 		// stop building blocks once we've built a history which exceeds the transaction
 		// expiry length - this tests that deduplication works properly against old blocks
 		// which nevertheless have a potentially conflicting reference block
-		if head.Header.Height > flow.DefaultTransactionExpiry+100 {
+		if head.Height > flow.DefaultTransactionExpiry+100 {
 			break
 		}
 	}

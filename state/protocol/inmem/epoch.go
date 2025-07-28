@@ -239,7 +239,7 @@ func (es *committedEpoch) Cluster(index uint) (protocol.Cluster, error) {
 		return nil, fmt.Errorf("could not generate canonical root block: %w", err)
 	}
 	rootQC, err := flow.NewQuorumCertificate(flow.UntrustedQuorumCertificate{
-		View:          rootBlock.Header.View,
+		View:          rootBlock.View,
 		BlockID:       rootBlock.ID(),
 		SignerIndices: signerIndices,
 		SigData:       rootQCVoteData.SigData,

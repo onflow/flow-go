@@ -2851,9 +2851,9 @@ func TestEVM(t *testing.T) {
 	blocks := new(envMock.Blocks)
 	block1 := unittest.BlockFixture()
 	blocks.On("ByHeightFrom",
-		block1.Header.Height,
-		block1.Header,
-	).Return(block1.Header, nil)
+		block1.Height,
+		block1.ToHeader(),
+	).Return(block1.ToHeader(), nil)
 
 	ctxOpts := []fvm.Option{
 		// default is testnet, but testnet has a special EVM storage contract location
@@ -3114,9 +3114,9 @@ func TestVMBridge(t *testing.T) {
 	blocks := new(envMock.Blocks)
 	block1 := unittest.BlockFixture()
 	blocks.On("ByHeightFrom",
-		block1.Header.Height,
-		block1.Header,
-	).Return(block1.Header, nil)
+		block1.Height,
+		block1.ToHeader(),
+	).Return(block1.ToHeader(), nil)
 
 	ctxOpts := []fvm.Option{
 		// default is testnet, but testnet has a special EVM storage contract location

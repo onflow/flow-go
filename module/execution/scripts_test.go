@@ -166,7 +166,7 @@ func (s *scriptTestSuite) SetupTest() {
 		fvm.WithAuthorizationChecksEnabled(false),
 		fvm.WithSequenceNumberCheckAndIncrementEnabled(false),
 	)
-	s.height = blockchain[0].Header.Height
+	s.height = blockchain[0].Height
 
 	s.dbDir = unittest.TempDir(s.T())
 	db := pebbleStorage.NewBootstrappedRegistersWithPathForTest(s.T(), s.dbDir, s.height, s.height)
@@ -380,7 +380,7 @@ func newAccountKey(
 func newBlockHeadersStorage(blocks []*flow.Block) storage.Headers {
 	blocksByHeight := make(map[uint64]*flow.Block)
 	for _, b := range blocks {
-		blocksByHeight[b.Header.Height] = b
+		blocksByHeight[b.Height] = b
 	}
 
 	return synctest.MockBlockHeaderStorage(synctest.WithByHeight(blocksByHeight))

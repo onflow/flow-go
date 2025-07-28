@@ -233,8 +233,8 @@ func (e *ComplianceEngine) Process(channel channels.Channel, originID flow.Ident
 			e.log.Warn().
 				Hex("origin_id", originID[:]).
 				Hex("block_id", logging.ID(msg.Block.ID())).
-				Uint64("block_height", msg.Block.Header.Height).
-				Uint64("block_view", msg.Block.Header.View).
+				Uint64("block_height", msg.Block.Height).
+				Uint64("block_view", msg.Block.View).
 				Err(err).Msgf("received invalid proposal message")
 			return nil
 		}
@@ -299,9 +299,9 @@ func (e *ComplianceEngine) processQueuedBlocks(doneSignal <-chan struct{}) error
 			proposalMsg := proposal.Message
 			log := e.log.With().
 				Hex("origin_id", proposal.OriginID[:]).
-				Str("chain_id", proposalMsg.Block.Header.ChainID.String()).
-				Uint64("view", proposalMsg.Block.Header.View).
-				Uint64("height", proposalMsg.Block.Header.Height).
+				Str("chain_id", proposalMsg.Block.ChainID.String()).
+				Uint64("view", proposalMsg.Block.View).
+				Uint64("height", proposalMsg.Block.Height).
 				Logger()
 			latestFinalizedView := e.finalizedBlockTracker.NewestBlock().View
 			e.submitConnectedBatch(log, latestFinalizedView, proposal.OriginID, []*flow.Proposal{proposalMsg})
@@ -324,15 +324,15 @@ func (e *ComplianceEngine) processQueuedBlocks(doneSignal <-chan struct{}) error
 		proposals := make([]*flow.Proposal, 0, len(batch.Message))
 		proposals = append(proposals, batch.Message...)
 
-		firstBlockHeader := proposals[0].Block.Header
-		lastBlockHeader := proposals[len(proposals)-1].Block.Header
+		firstBlock := proposals[0].Block
+		lastBlock := proposals[len(proposals)-1].Block
 		log := e.log.With().
 			Hex("origin_id", batch.OriginID[:]).
-			Str("chain_id", lastBlockHeader.ChainID.String()).
-			Uint64("first_block_height", firstBlockHeader.Height).
-			Uint64("first_block_view", firstBlockHeader.View).
-			Uint64("last_block_height", lastBlockHeader.Height).
-			Uint64("last_block_view", lastBlockHeader.View).
+			Str("chain_id", lastBlock.ChainID.String()).
+			Uint64("first_block_height", firstBlock.Height).
+			Uint64("first_block_view", lastBlock.View).
+			Uint64("last_block_height", lastBlock.Height).
+			Uint64("last_block_view", lastBlock.View).
 			Int("range_length", len(proposals)).
 			Logger()
 
@@ -342,7 +342,7 @@ func (e *ComplianceEngine) processQueuedBlocks(doneSignal <-chan struct{}) error
 		parentID := proposals[0].Block.ID()
 		indexOfLastConnected := 0
 		for i, block := range proposals {
-			if block.Block.Header.ParentID != parentID {
+			if block.Block.ParentID != parentID {
 				e.submitConnectedBatch(log, latestFinalizedView, batch.OriginID, proposals[indexOfLastConnected:i])
 				indexOfLastConnected = i
 			}
@@ -359,8 +359,8 @@ func (e *ComplianceEngine) submitConnectedBatch(log zerolog.Logger, latestFinali
 		return
 	}
 	// if latest block of batch is already finalized we can drop such input.
-	firstBlock := blocks[0].Block.Header
-	lastBlock := blocks[len(blocks)-1].Block.Header
+	firstBlock := blocks[0].Block
+	lastBlock := blocks[len(blocks)-1].Block
 	if lastBlock.View < latestFinalizedView {
 		log.Debug().Msgf("dropping range [%d, %d] below finalized view %d", firstBlock.View, lastBlock.View, latestFinalizedView)
 		return

@@ -64,7 +64,7 @@ func configureLedger(
 
 	latestLedger, err := store.LedgerByHeight(
 		context.Background(),
-		latestBlock.Header.Height,
+		latestBlock.Height,
 	)
 
 	if err != nil {
