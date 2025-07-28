@@ -68,7 +68,6 @@ import (
 	"github.com/onflow/flow-go/state/protocol/events/gadgets"
 	protocol_state "github.com/onflow/flow-go/state/protocol/protocol_state/state"
 	bstorage "github.com/onflow/flow-go/storage/badger"
-	"github.com/onflow/flow-go/storage/badger/operation"
 	"github.com/onflow/flow-go/utils/io"
 )
 
