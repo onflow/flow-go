@@ -654,7 +654,6 @@ func EntropyProviderFixture(source []byte) environment.EntropyProvider {
 	return &provider
 }
 
-
 // ProtocolStateWithSourceFixture returns a protocol state mock that only
 // supports AtBlockID to return a snapshot mock.
 // The snapshot mock only supports RandomSource().

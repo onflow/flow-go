@@ -43,7 +43,6 @@ func TestExecutionResultGroupBy(t *testing.T) {
 	assert.Equal(t, 0, unknown.Size())
 }
 
-
 // Tests that [ExecutionResult.ServiceEventsByChunk] method works in a variety of circumstances.
 func TestExecutionResult_ServiceEventsByChunk(t *testing.T) {
 	t.Run("no service events", func(t *testing.T) {
