@@ -115,7 +115,7 @@ func (committer *fakeCommitter) CommitView(
 		trieUpdate,
 		newStorageSnapshot,
 		nil
-	}
+}
 
 func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 	rag := &RandomAddressGenerator{}
