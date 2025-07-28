@@ -41,7 +41,7 @@ type SyncSuite struct {
 	suite.Suite
 	myID         flow.Identifier
 	participants flow.IdentityList
-	head         *flow.Header
+	head         *flow.UnsignedHeader
 	heights      map[uint64]*clustermodel.Proposal
 	blockIDs     map[flow.Identifier]*clustermodel.Proposal
 	net          *mocknetwork.Network
@@ -110,7 +110,7 @@ func (ss *SyncSuite) SetupTest() {
 	// set up the snapshot mock
 	ss.snapshot = &cluster.Snapshot{}
 	ss.snapshot.On("Head").Return(
-		func() *flow.Header {
+		func() *flow.UnsignedHeader {
 			return ss.head
 		},
 		nil,

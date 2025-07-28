@@ -31,7 +31,7 @@ type ComputationManager interface {
 		ctx context.Context,
 		script []byte,
 		arguments [][]byte,
-		blockHeader *flow.Header,
+		blockHeader *flow.UnsignedHeader,
 		snapshot snapshot.StorageSnapshot,
 	) (
 		[]byte,
@@ -52,7 +52,7 @@ type ComputationManager interface {
 	GetAccount(
 		ctx context.Context,
 		addr flow.Address,
-		header *flow.Header,
+		header *flow.UnsignedHeader,
 		snapshot snapshot.StorageSnapshot,
 	) (
 		*flow.Account,
@@ -194,7 +194,7 @@ func (e *Manager) ExecuteScript(
 	ctx context.Context,
 	code []byte,
 	arguments [][]byte,
-	blockHeader *flow.Header,
+	blockHeader *flow.UnsignedHeader,
 	snapshot snapshot.StorageSnapshot,
 ) ([]byte, uint64, error) {
 	return e.queryExecutor.ExecuteScript(ctx,
@@ -207,7 +207,7 @@ func (e *Manager) ExecuteScript(
 func (e *Manager) GetAccount(
 	ctx context.Context,
 	address flow.Address,
-	blockHeader *flow.Header,
+	blockHeader *flow.UnsignedHeader,
 	snapshot snapshot.StorageSnapshot,
 ) (
 	*flow.Account,

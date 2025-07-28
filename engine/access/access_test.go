@@ -71,9 +71,9 @@ type Suite struct {
 	collClient           *accessmock.AccessAPIClient
 	execClient           *accessmock.ExecutionAPIClient
 	me                   *mockmodule.Local
-	rootBlock            *flow.Header
-	sealedBlock          *flow.Header
-	finalizedBlock       *flow.Header
+	rootBlock            *flow.UnsignedHeader
+	sealedBlock          *flow.UnsignedHeader
+	finalizedBlock       *flow.UnsignedHeader
 	chainID              flow.ChainID
 	metrics              *metrics.NoopCollector
 	finalizedHeaderCache module.FinalizedHeaderCache
@@ -106,13 +106,13 @@ func (suite *Suite) SetupTest() {
 	suite.state.On("Final").Return(suite.finalSnapshot, nil).Maybe()
 	suite.finalSnapshot.On("Epochs").Return(suite.epochQuery).Maybe()
 	suite.sealedSnapshot.On("Head").Return(
-		func() *flow.Header {
+		func() *flow.UnsignedHeader {
 			return suite.sealedBlock
 		},
 		nil,
 	).Maybe()
 	suite.finalSnapshot.On("Head").Return(
-		func() *flow.Header {
+		func() *flow.UnsignedHeader {
 			return suite.finalizedBlock
 		},
 		nil,
@@ -402,7 +402,7 @@ func (suite *Suite) TestGetBlockByIDAndHeight() {
 		assertHeaderResp := func(
 			resp *accessproto.BlockHeaderResponse,
 			err error,
-			header *flow.Header,
+			header *flow.UnsignedHeader,
 		) {
 			require.NoError(suite.T(), err)
 			require.NotNil(suite.T(), resp)

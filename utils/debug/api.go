@@ -15,7 +15,7 @@ func GetExecutionAPIBlockHeader(
 	ctx context.Context,
 	blockID flow.Identifier,
 ) (
-	*flow.Header,
+	*flow.UnsignedHeader,
 	error,
 ) {
 	req := &execution.GetBlockHeaderByIDRequest{
@@ -35,7 +35,7 @@ func GetAccessAPIBlockHeader(
 	ctx context.Context,
 	blockID flow.Identifier,
 ) (
-	*flow.Header,
+	*flow.UnsignedHeader,
 	error,
 ) {
 	req := &access.GetBlockHeaderByIDRequest{

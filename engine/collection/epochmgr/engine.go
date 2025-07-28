@@ -61,10 +61,10 @@ type Engine struct {
 	inProgressQCVote *atomic.Pointer[context.CancelFunc] // tracks the cancel callback of the in progress QC vote
 
 	// internal event notifications
-	epochTransitionEvents        chan *flow.Header        // sends first block of new epoch
-	epochSetupPhaseStartedEvents chan *flow.Header        // sends first block of EpochSetup phase
-	epochStopEvents              chan uint64              // sends counter of epoch to stop
-	clusterIDUpdateDistributor   collection.ClusterEvents // sends cluster ID updates to consumers
+	epochTransitionEvents        chan *flow.UnsignedHeader // sends first block of new epoch
+	epochSetupPhaseStartedEvents chan *flow.UnsignedHeader // sends first block of EpochSetup phase
+	epochStopEvents              chan uint64               // sends counter of epoch to stop
+	clusterIDUpdateDistributor   collection.ClusterEvents  // sends cluster ID updates to consumers
 	cm                           *component.ComponentManager
 	component.Component
 }
@@ -92,8 +92,8 @@ func New(
 		heightEvents:                 heightEvents,
 		epochs:                       make(map[uint64]*RunningEpochComponents),
 		startupTimeout:               DefaultStartupTimeout,
-		epochTransitionEvents:        make(chan *flow.Header, 1),
-		epochSetupPhaseStartedEvents: make(chan *flow.Header, 1),
+		epochTransitionEvents:        make(chan *flow.UnsignedHeader, 1),
+		epochSetupPhaseStartedEvents: make(chan *flow.UnsignedHeader, 1),
 		epochStopEvents:              make(chan uint64, 1),
 		clusterIDUpdateDistributor:   clusterIDUpdateDistributor,
 		inProgressQCVote:             atomic.NewPointer[context.CancelFunc](nil),
@@ -301,14 +301,14 @@ func (e *Engine) createEpochComponents(epoch protocol.CommittedEpoch) (*EpochCom
 // NOTE: epochmgr.Engine will not restart trailing cluster consensus instances from previous epoch,
 // therefore no need to handle dropped protocol events here (see issue below).
 // TODO gracefully handle restarts in first 600 blocks of epoch https://github.com/dapperlabs/flow-go/issues/5659
-func (e *Engine) EpochTransition(_ uint64, first *flow.Header) {
+func (e *Engine) EpochTransition(_ uint64, first *flow.UnsignedHeader) {
 	e.epochTransitionEvents <- first
 }
 
 // EpochSetupPhaseStarted handles the epoch setup phase started protocol event.
 // NOTE: Ready will check if we start up in the EpochSetup phase at initialization and trigger QC voting.
 // This handles dropped protocol events and restarts interrupting QC voting.
-func (e *Engine) EpochSetupPhaseStarted(_ uint64, first *flow.Header) {
+func (e *Engine) EpochSetupPhaseStarted(_ uint64, first *flow.UnsignedHeader) {
 	e.epochSetupPhaseStartedEvents <- first
 }
 
@@ -374,7 +374,7 @@ func (e *Engine) handleEpochErrors(ctx irrecoverable.SignalerContext, errCh <-ch
 // to shut down the last epoch's components and starts up the new epoch's.
 //
 // No errors are expected during normal operation.
-func (e *Engine) onEpochTransition(ctx irrecoverable.SignalerContext, first *flow.Header) error {
+func (e *Engine) onEpochTransition(ctx irrecoverable.SignalerContext, first *flow.UnsignedHeader) error {
 	epoch, err := e.state.AtBlockID(first.ID()).Epochs().Current()
 	if err != nil {
 		return fmt.Errorf("could not get current epoch: %w", err)

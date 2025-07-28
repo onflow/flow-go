@@ -60,9 +60,9 @@ type HotStuffFollowerSuite struct {
 	headers       *mockstorage.Headers
 	finalizer     *mockmodule.Finalizer
 	notifier      *mockhotstuff.FollowerConsumer
-	rootHeader    *flow.Header
+	rootHeader    *flow.UnsignedHeader
 	rootQC        *flow.QuorumCertificate
-	finalized     *flow.Header
+	finalized     *flow.UnsignedHeader
 	pending       []*flow.ProposalHeader
 	follower      *hotstuff.FollowerLoop
 	mockConsensus *MockConsensus
@@ -90,7 +90,7 @@ func (s *HotStuffFollowerSuite) SetupTest() {
 	// root block and QC
 	parentID, err := flow.HexStringToIdentifier("aa7693d498e9a087b1cadf5bfe9a1ff07829badc1915c210e482f369f9a00a70")
 	require.NoError(s.T(), err)
-	s.rootHeader = &flow.Header{
+	s.rootHeader = &flow.UnsignedHeader{
 		HeaderBody: flow.HeaderBody{
 			ParentID:   parentID,
 			Timestamp:  uint64(time.Now().UnixMilli()),
@@ -274,7 +274,7 @@ func (s *HotStuffFollowerSuite) TestOutOfOrderBlocks() {
 	block14 := s.mockConsensus.extendBlock(rootView+14, block13)
 	block20 := s.mockConsensus.extendBlock(rootView+20, block14)
 
-	for _, b := range []*flow.Header{block01, block03, block05, block07, block09, block11, block13, block14} {
+	for _, b := range []*flow.UnsignedHeader{block01, block03, block05, block07, block09, block11, block13, block14} {
 		s.notifier.On("OnBlockIncorporated", blockWithID(b.ID())).Return().Once()
 	}
 
@@ -315,7 +315,7 @@ func blockID(expectedBlockID flow.Identifier) interface{} {
 	return mock.MatchedBy(func(blockID flow.Identifier) bool { return expectedBlockID == blockID })
 }
 
-func toCertifiedBlock(t *testing.T, block *flow.Header, qc *flow.QuorumCertificate) *model.CertifiedBlock {
+func toCertifiedBlock(t *testing.T, block *flow.UnsignedHeader, qc *flow.QuorumCertificate) *model.CertifiedBlock {
 	// adding b should not advance finality
 	certifiedBlock, err := model.NewCertifiedBlock(model.BlockFromFlow(block), qc)
 	require.NoError(t, err)
@@ -327,7 +327,7 @@ type MockConsensus struct {
 	identities flow.IdentityList
 }
 
-func (mc *MockConsensus) extendBlock(blockView uint64, parent *flow.Header) *flow.Header {
+func (mc *MockConsensus) extendBlock(blockView uint64, parent *flow.UnsignedHeader) *flow.UnsignedHeader {
 	nextBlock := unittest.BlockHeaderWithParentFixture(parent)
 	nextBlock.View = blockView
 	nextBlock.ProposerID = mc.identities[int(blockView)%len(mc.identities)].NodeID

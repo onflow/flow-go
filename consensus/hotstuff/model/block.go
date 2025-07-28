@@ -17,7 +17,7 @@ type Block struct {
 }
 
 // BlockFromFlow converts a flow header to a hotstuff block.
-func BlockFromFlow(header *flow.Header) *Block {
+func BlockFromFlow(header *flow.UnsignedHeader) *Block {
 	block := Block{
 		BlockID:    header.ID(),
 		View:       header.View,
@@ -31,7 +31,7 @@ func BlockFromFlow(header *flow.Header) *Block {
 
 // GenesisBlockFromFlow returns a HotStuff block model representing a genesis
 // block based on the given header.
-func GenesisBlockFromFlow(header *flow.Header) *Block {
+func GenesisBlockFromFlow(header *flow.UnsignedHeader) *Block {
 	genesis := &Block{
 		BlockID:    header.ID(),
 		View:       header.View,

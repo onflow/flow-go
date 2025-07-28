@@ -49,7 +49,7 @@ func (_m *ExecutionState) ChunkDataPackByChunkID(_a0 flow.Identifier) (*flow.Chu
 }
 
 // CreateStorageSnapshot provides a mock function with given fields: blockID
-func (_m *ExecutionState) CreateStorageSnapshot(blockID flow.Identifier) (snapshot.StorageSnapshot, *flow.Header, error) {
+func (_m *ExecutionState) CreateStorageSnapshot(blockID flow.Identifier) (snapshot.StorageSnapshot, *flow.UnsignedHeader, error) {
 	ret := _m.Called(blockID)
 
 	if len(ret) == 0 {
@@ -57,9 +57,9 @@ func (_m *ExecutionState) CreateStorageSnapshot(blockID flow.Identifier) (snapsh
 	}
 
 	var r0 snapshot.StorageSnapshot
-	var r1 *flow.Header
+	var r1 *flow.UnsignedHeader
 	var r2 error
-	if rf, ok := ret.Get(0).(func(flow.Identifier) (snapshot.StorageSnapshot, *flow.Header, error)); ok {
+	if rf, ok := ret.Get(0).(func(flow.Identifier) (snapshot.StorageSnapshot, *flow.UnsignedHeader, error)); ok {
 		return rf(blockID)
 	}
 	if rf, ok := ret.Get(0).(func(flow.Identifier) snapshot.StorageSnapshot); ok {
@@ -70,11 +70,11 @@ func (_m *ExecutionState) CreateStorageSnapshot(blockID flow.Identifier) (snapsh
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(flow.Identifier) *flow.Header); ok {
+	if rf, ok := ret.Get(1).(func(flow.Identifier) *flow.UnsignedHeader); ok {
 		r1 = rf(blockID)
 	} else {
 		if ret.Get(1) != nil {
-			r1 = ret.Get(1).(*flow.Header)
+			r1 = ret.Get(1).(*flow.UnsignedHeader)
 		}
 	}
 

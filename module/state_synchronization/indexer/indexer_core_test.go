@@ -87,7 +87,7 @@ func (i *indexCoreTest) useDefaultBlockByHeight() *indexCoreTest {
 
 	i.headers.
 		On("ByHeight", mocks.AnythingOfType("uint64")).
-		Return(func(height uint64) (*flow.Header, error) {
+		Return(func(height uint64) (*flow.UnsignedHeader, error) {
 			for _, b := range i.blocks {
 				if b.Height == height {
 					return b.ToHeader(), nil

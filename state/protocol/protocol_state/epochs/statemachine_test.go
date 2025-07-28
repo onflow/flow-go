@@ -40,7 +40,7 @@ type EpochStateMachineSuite struct {
 	happyPathStateMachine           *mock.StateMachine
 	happyPathStateMachineFactory    *mock.StateMachineFactoryMethod
 	fallbackPathStateMachineFactory *mock.StateMachineFactoryMethod
-	candidate                       *flow.Header
+	candidate                       *flow.UnsignedHeader
 
 	stateMachine *epochs.EpochStateMachine
 }

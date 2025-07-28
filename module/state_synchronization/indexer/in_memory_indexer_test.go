@@ -335,7 +335,7 @@ func TestInMemoryIndexer_IndexBlockData(t *testing.T) {
 
 // Helper functions
 
-func createInMemoryIndexer(executionResult *flow.ExecutionResult, header *flow.Header) *InMemoryIndexer {
+func createInMemoryIndexer(executionResult *flow.ExecutionResult, header *flow.UnsignedHeader) *InMemoryIndexer {
 	return NewInMemoryIndexer(zerolog.Nop(),
 		unsynchronized.NewRegisters(header.Height),
 		unsynchronized.NewEvents(),

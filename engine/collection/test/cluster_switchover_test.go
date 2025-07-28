@@ -263,7 +263,7 @@ func (tc *ClusterSwitchoverTestCase) StopNodes() {
 	unittest.RequireCloseBefore(tc.T(), util.AllDone(nodes...), time.Second, "could not stop nodes")
 }
 
-func (tc *ClusterSwitchoverTestCase) RootBlock() *flow.Header {
+func (tc *ClusterSwitchoverTestCase) RootBlock() *flow.UnsignedHeader {
 	head, err := tc.root.Head()
 	require.NoError(tc.T(), err)
 	return head
@@ -341,7 +341,7 @@ func (tc *ClusterSwitchoverTestCase) Clusters(epoch protocol.CommittedEpoch) []p
 
 // BlockInEpoch returns the highest block that exists within the bounds of the
 // epoch with the given epoch counter.
-func (tc *ClusterSwitchoverTestCase) BlockInEpoch(epochCounter uint64) *flow.Header {
+func (tc *ClusterSwitchoverTestCase) BlockInEpoch(epochCounter uint64) *flow.UnsignedHeader {
 	root := tc.RootBlock()
 
 	for height := root.Height; ; height++ {

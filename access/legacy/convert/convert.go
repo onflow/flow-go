@@ -127,7 +127,7 @@ func TransactionResultToMessage(result accessmodel.TransactionResult) *accesspro
 	}
 }
 
-func BlockHeaderToMessage(h *flow.Header) (*entitiesproto.BlockHeader, error) {
+func BlockHeaderToMessage(h *flow.UnsignedHeader) (*entitiesproto.BlockHeader, error) {
 	id := h.ID()
 
 	return &entitiesproto.BlockHeader{

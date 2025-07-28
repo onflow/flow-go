@@ -17,8 +17,8 @@ import (
 // Headers implements a simple read-only header storage around a badger DB.
 type Headers struct {
 	db *badger.DB
-	// cache is essentially an in-memory map from `UnsignedBlock.ID()` -> `Header`
-	cache       *Cache[flow.Identifier, *flow.Header]
+	// cache is essentially an in-memory map from `UnsignedBlock.ID()` -> `UnsignedHeader`
+	cache       *Cache[flow.Identifier, *flow.UnsignedHeader]
 	heightCache *Cache[uint64, flow.Identifier]
 	sigs        *proposalSignatures
 }
@@ -28,7 +28,7 @@ var _ storage.Headers = (*Headers)(nil)
 // NewHeaders creates a Headers instance, which stores block headers.
 // It supports storing, caching and retrieving by block ID and the additionally indexed by header height.
 func NewHeaders(collector module.CacheMetrics, db *badger.DB) *Headers {
-	store := func(blockID flow.Identifier, header *flow.Header) func(*transaction.Tx) error {
+	store := func(blockID flow.Identifier, header *flow.UnsignedHeader) func(*transaction.Tx) error {
 		return transaction.WithTx(operation.InsertHeader(blockID, header))
 	}
 
@@ -38,9 +38,9 @@ func NewHeaders(collector module.CacheMetrics, db *badger.DB) *Headers {
 		return transaction.WithTx(operation.IndexBlockHeight(height, id))
 	}
 
-	retrieve := func(blockID flow.Identifier) func(tx *badger.Txn) (*flow.Header, error) {
-		var header flow.Header
-		return func(tx *badger.Txn) (*flow.Header, error) {
+	retrieve := func(blockID flow.Identifier) func(tx *badger.Txn) (*flow.UnsignedHeader, error) {
+		var header flow.UnsignedHeader
+		return func(tx *badger.Txn) (*flow.UnsignedHeader, error) {
 			err := operation.RetrieveHeader(blockID, &header)(tx)
 			return &header, err
 		}
@@ -57,7 +57,7 @@ func NewHeaders(collector module.CacheMetrics, db *badger.DB) *Headers {
 	h := &Headers{
 		db: db,
 		cache: newCache(collector, metrics.ResourceHeader,
-			withLimit[flow.Identifier, *flow.Header](4*flow.DefaultTransactionExpiry),
+			withLimit[flow.Identifier, *flow.UnsignedHeader](4*flow.DefaultTransactionExpiry),
 			withStore(store),
 			withRetrieve(retrieve)),
 
@@ -72,7 +72,7 @@ func NewHeaders(collector module.CacheMetrics, db *badger.DB) *Headers {
 	return h
 }
 
-func (h *Headers) storeTx(blockID flow.Identifier, header *flow.Header, proposerSig []byte) func(*transaction.Tx) error {
+func (h *Headers) storeTx(blockID flow.Identifier, header *flow.UnsignedHeader, proposerSig []byte) func(*transaction.Tx) error {
 	return func(tx *transaction.Tx) error {
 		err := h.cache.PutTx(blockID, header)(tx)
 		if err != nil {
@@ -82,8 +82,8 @@ func (h *Headers) storeTx(blockID flow.Identifier, header *flow.Header, proposer
 	}
 }
 
-func (h *Headers) retrieveTx(blockID flow.Identifier) func(*badger.Txn) (*flow.Header, error) {
-	return func(tx *badger.Txn) (*flow.Header, error) {
+func (h *Headers) retrieveTx(blockID flow.Identifier) func(*badger.Txn) (*flow.UnsignedHeader, error) {
+	return func(tx *badger.Txn) (*flow.UnsignedHeader, error) {
 		val, err := h.cache.Get(blockID)(tx)
 		if err != nil {
 			return nil, err
@@ -121,13 +121,13 @@ func (h *Headers) Store(proposal *flow.ProposalHeader) error {
 	return operation.RetryOnConflictTx(h.db, transaction.Update, h.storeTx(proposal.Header.ID(), proposal.Header, proposal.ProposerSigData))
 }
 
-func (h *Headers) ByBlockID(blockID flow.Identifier) (*flow.Header, error) {
+func (h *Headers) ByBlockID(blockID flow.Identifier) (*flow.UnsignedHeader, error) {
 	tx := h.db.NewTransaction(false)
 	defer tx.Discard()
 	return h.retrieveTx(blockID)(tx)
 }
 
-func (h *Headers) ByHeight(height uint64) (*flow.Header, error) {
+func (h *Headers) ByHeight(height uint64) (*flow.UnsignedHeader, error) {
 	tx := h.db.NewTransaction(false)
 	defer tx.Discard()
 
@@ -174,13 +174,13 @@ func (h *Headers) BlockIDByHeight(height uint64) (flow.Identifier, error) {
 	return blockID, nil
 }
 
-func (h *Headers) ByParentID(parentID flow.Identifier) ([]*flow.Header, error) {
+func (h *Headers) ByParentID(parentID flow.Identifier) ([]*flow.UnsignedHeader, error) {
 	var blockIDs flow.IdentifierList
 	err := h.db.View(procedure.LookupBlockChildren(parentID, &blockIDs))
 	if err != nil {
 		return nil, fmt.Errorf("could not look up children: %w", err)
 	}
-	headers := make([]*flow.Header, 0, len(blockIDs))
+	headers := make([]*flow.UnsignedHeader, 0, len(blockIDs))
 	for _, blockID := range blockIDs {
 		header, err := h.ByBlockID(blockID)
 		if err != nil {
@@ -191,15 +191,15 @@ func (h *Headers) ByParentID(parentID flow.Identifier) ([]*flow.Header, error) {
 	return headers, nil
 }
 
-func (h *Headers) FindHeaders(filter func(header *flow.Header) bool) ([]flow.Header, error) {
-	blocks := make([]flow.Header, 0, 1)
+func (h *Headers) FindHeaders(filter func(header *flow.UnsignedHeader) bool) ([]flow.UnsignedHeader, error) {
+	blocks := make([]flow.UnsignedHeader, 0, 1)
 	err := h.db.View(operation.FindHeaders(filter, &blocks))
 	return blocks, err
 }
 
 // RollbackExecutedBlock update the executed block header to the given header.
 // only useful for execution node to roll back executed block height
-func (h *Headers) RollbackExecutedBlock(header *flow.Header) error {
+func (h *Headers) RollbackExecutedBlock(header *flow.UnsignedHeader) error {
 	return operation.RetryOnConflict(h.db.Update, func(txn *badger.Txn) error {
 		var blockID flow.Identifier
 		err := operation.RetrieveExecutedBlock(&blockID)(txn)
@@ -207,7 +207,7 @@ func (h *Headers) RollbackExecutedBlock(header *flow.Header) error {
 			return fmt.Errorf("cannot lookup executed block: %w", err)
 		}
 
-		var highest flow.Header
+		var highest flow.UnsignedHeader
 		err = operation.RetrieveHeader(blockID, &highest)(txn)
 		if err != nil {
 			return fmt.Errorf("cannot retrieve executed header: %w", err)

@@ -50,7 +50,7 @@ type BackendScriptsSuite struct {
 	state      *protocol.State
 	snapshot   *protocol.Snapshot
 	params     *protocol.Params
-	rootHeader *flow.Header
+	rootHeader *flow.UnsignedHeader
 
 	headers           *storagemock.Headers
 	receipts          *storagemock.ExecutionReceipts

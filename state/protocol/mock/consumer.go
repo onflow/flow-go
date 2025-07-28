@@ -13,42 +13,42 @@ type Consumer struct {
 }
 
 // BlockFinalized provides a mock function with given fields: block
-func (_m *Consumer) BlockFinalized(block *flow.Header) {
+func (_m *Consumer) BlockFinalized(block *flow.UnsignedHeader) {
 	_m.Called(block)
 }
 
 // BlockProcessable provides a mock function with given fields: block, certifyingQC
-func (_m *Consumer) BlockProcessable(block *flow.Header, certifyingQC *flow.QuorumCertificate) {
+func (_m *Consumer) BlockProcessable(block *flow.UnsignedHeader, certifyingQC *flow.QuorumCertificate) {
 	_m.Called(block, certifyingQC)
 }
 
 // EpochCommittedPhaseStarted provides a mock function with given fields: currentEpochCounter, first
-func (_m *Consumer) EpochCommittedPhaseStarted(currentEpochCounter uint64, first *flow.Header) {
+func (_m *Consumer) EpochCommittedPhaseStarted(currentEpochCounter uint64, first *flow.UnsignedHeader) {
 	_m.Called(currentEpochCounter, first)
 }
 
 // EpochExtended provides a mock function with given fields: epochCounter, header, extension
-func (_m *Consumer) EpochExtended(epochCounter uint64, header *flow.Header, extension flow.EpochExtension) {
+func (_m *Consumer) EpochExtended(epochCounter uint64, header *flow.UnsignedHeader, extension flow.EpochExtension) {
 	_m.Called(epochCounter, header, extension)
 }
 
 // EpochFallbackModeExited provides a mock function with given fields: epochCounter, header
-func (_m *Consumer) EpochFallbackModeExited(epochCounter uint64, header *flow.Header) {
+func (_m *Consumer) EpochFallbackModeExited(epochCounter uint64, header *flow.UnsignedHeader) {
 	_m.Called(epochCounter, header)
 }
 
 // EpochFallbackModeTriggered provides a mock function with given fields: epochCounter, header
-func (_m *Consumer) EpochFallbackModeTriggered(epochCounter uint64, header *flow.Header) {
+func (_m *Consumer) EpochFallbackModeTriggered(epochCounter uint64, header *flow.UnsignedHeader) {
 	_m.Called(epochCounter, header)
 }
 
 // EpochSetupPhaseStarted provides a mock function with given fields: currentEpochCounter, first
-func (_m *Consumer) EpochSetupPhaseStarted(currentEpochCounter uint64, first *flow.Header) {
+func (_m *Consumer) EpochSetupPhaseStarted(currentEpochCounter uint64, first *flow.UnsignedHeader) {
 	_m.Called(currentEpochCounter, first)
 }
 
 // EpochTransition provides a mock function with given fields: newEpochCounter, first
-func (_m *Consumer) EpochTransition(newEpochCounter uint64, first *flow.Header) {
+func (_m *Consumer) EpochTransition(newEpochCounter uint64, first *flow.UnsignedHeader) {
 	_m.Called(newEpochCounter, first)
 }
 

@@ -15,7 +15,7 @@ type SealingTracker struct {
 }
 
 // NewSealingObservation provides a mock function with given fields: finalizedBlock, seal, sealedBlock
-func (_m *SealingTracker) NewSealingObservation(finalizedBlock *flow.Header, seal *flow.Seal, sealedBlock *flow.Header) consensus.SealingObservation {
+func (_m *SealingTracker) NewSealingObservation(finalizedBlock *flow.UnsignedHeader, seal *flow.Seal, sealedBlock *flow.UnsignedHeader) consensus.SealingObservation {
 	ret := _m.Called(finalizedBlock, seal, sealedBlock)
 
 	if len(ret) == 0 {
@@ -23,7 +23,7 @@ func (_m *SealingTracker) NewSealingObservation(finalizedBlock *flow.Header, sea
 	}
 
 	var r0 consensus.SealingObservation
-	if rf, ok := ret.Get(0).(func(*flow.Header, *flow.Seal, *flow.Header) consensus.SealingObservation); ok {
+	if rf, ok := ret.Get(0).(func(*flow.UnsignedHeader, *flow.Seal, *flow.UnsignedHeader) consensus.SealingObservation); ok {
 		r0 = rf(finalizedBlock, seal, sealedBlock)
 	} else {
 		if ret.Get(0) != nil {

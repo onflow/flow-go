@@ -28,7 +28,7 @@ func (suite *BackendSuite) item() *item[*flow.Proposal] {
 	return suite.itemWithParent(parent)
 }
 
-func (suite *BackendSuite) itemWithParent(parent *flow.Header) *item[*flow.Proposal] {
+func (suite *BackendSuite) itemWithParent(parent *flow.UnsignedHeader) *item[*flow.Proposal] {
 	block := unittest.BlockWithParentFixture(parent)
 	return &item[*flow.Proposal]{
 		view:     block.View,

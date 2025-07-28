@@ -40,13 +40,13 @@ func (b *GenericBlock[T]) ID() Identifier {
 	return b.ToHeader().ID()
 }
 
-// ToHeader converts the block into a compact [flow.Header] representation,
+// ToHeader converts the block into a compact [flow.UnsignedHeader] representation,
 // where the payload is compressed to a hash reference.
 // The receiver UnsignedBlock must be well-formed (enforced by mutation protection on the type).
 // This function may panic if invoked on a malformed UnsignedBlock.
-func (b *GenericBlock[T]) ToHeader() *Header {
+func (b *GenericBlock[T]) ToHeader() *UnsignedHeader {
 	if !b.ContainsParentQC() {
-		rootHeader, err := NewRootHeader(UntrustedHeader{
+		rootHeader, err := NewRootHeader(UntrustedUnsignedHeader{
 			HeaderBody:  b.HeaderBody,
 			PayloadHash: b.Payload.Hash(),
 		})
@@ -56,7 +56,7 @@ func (b *GenericBlock[T]) ToHeader() *Header {
 		return rootHeader
 	}
 
-	header, err := NewHeader(UntrustedHeader{
+	header, err := NewHeader(UntrustedUnsignedHeader{
 		HeaderBody:  b.HeaderBody,
 		PayloadHash: b.Payload.Hash(),
 	})

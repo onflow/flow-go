@@ -7,8 +7,8 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-func DefaultRoot() *flow.Header {
-	header := &flow.Header{
+func DefaultRoot() *flow.UnsignedHeader {
+	header := &flow.UnsignedHeader{
 		HeaderBody: flow.HeaderBody{
 			ChainID:   "chain",
 			ParentID:  flow.ZeroID,

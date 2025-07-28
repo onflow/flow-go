@@ -24,14 +24,14 @@ func NewIdentityDeltas(cb func()) *IdentityDeltas {
 	return deltas
 }
 
-func (g *IdentityDeltas) EpochTransition(_ uint64, _ *flow.Header) {
+func (g *IdentityDeltas) EpochTransition(_ uint64, _ *flow.UnsignedHeader) {
 	g.callback()
 }
 
-func (g *IdentityDeltas) EpochSetupPhaseStarted(_ uint64, _ *flow.Header) {
+func (g *IdentityDeltas) EpochSetupPhaseStarted(_ uint64, _ *flow.UnsignedHeader) {
 	g.callback()
 }
 
-func (g *IdentityDeltas) EpochCommittedPhaseStarted(_ uint64, _ *flow.Header) {
+func (g *IdentityDeltas) EpochCommittedPhaseStarted(_ uint64, _ *flow.UnsignedHeader) {
 	g.callback()
 }

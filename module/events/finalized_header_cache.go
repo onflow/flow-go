@@ -21,7 +21,7 @@ import (
 // The FinalizedHeaderCache can be used in place of state.Final().Head() to avoid read contention with other components.
 type FinalizedHeaderCache struct {
 	state              protocol.State
-	val                *atomic.Pointer[flow.Header]
+	val                *atomic.Pointer[flow.UnsignedHeader]
 	*FinalizationActor // implement hotstuff.FinalizationConsumer
 }
 
@@ -30,7 +30,7 @@ var _ hotstuff.FinalizationConsumer = (*FinalizedHeaderCache)(nil)
 
 // Get returns the most recently finalized block.
 // Guaranteed to be non-nil after construction.
-func (cache *FinalizedHeaderCache) Get() *flow.Header {
+func (cache *FinalizedHeaderCache) Get() *flow.UnsignedHeader {
 	return cache.val.Load()
 }
 
@@ -53,7 +53,7 @@ func (cache *FinalizedHeaderCache) update() error {
 func NewFinalizedHeaderCache(state protocol.State) (*FinalizedHeaderCache, component.ComponentWorker, error) {
 	cache := &FinalizedHeaderCache{
 		state: state,
-		val:   new(atomic.Pointer[flow.Header]),
+		val:   new(atomic.Pointer[flow.UnsignedHeader]),
 	}
 	// initialize the cache with the current finalized header
 	if err := cache.update(); err != nil {

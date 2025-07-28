@@ -40,7 +40,7 @@ type RequesterSuite struct {
 	connFactory *connectionmock.ConnectionFactory
 
 	rootBlock      *flow.UnsignedBlock
-	finalizedBlock *flow.Header
+	finalizedBlock *flow.UnsignedHeader
 }
 
 func TestRequester(t *testing.T) {
@@ -62,7 +62,7 @@ func (s *RequesterSuite) SetupTest() {
 	s.proto.state.On("Params").Return(s.proto.params)
 
 	s.proto.snapshot.On("Head").Return(
-		func() *flow.Header {
+		func() *flow.UnsignedHeader {
 			return s.finalizedBlock
 		},
 		nil,

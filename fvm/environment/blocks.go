@@ -16,7 +16,7 @@ type Blocks interface {
 	// ByHeight returns the block at the given height in the chain ending in `header` (or finalized
 	// if `header` is nil). This enables querying un-finalized blocks by height with respect to the
 	// chain defined by the block we are executing.
-	ByHeightFrom(height uint64, header *flow.Header) (*flow.Header, error)
+	ByHeightFrom(height uint64, header *flow.UnsignedHeader) (*flow.UnsignedHeader, error)
 }
 
 // BlocksFinder finds blocks and return block headers
@@ -30,7 +30,7 @@ func NewBlockFinder(storage storage.Headers) Blocks {
 }
 
 // ByHeightFrom returns the block header by height.
-func (finder *BlocksFinder) ByHeightFrom(height uint64, header *flow.Header) (*flow.Header, error) {
+func (finder *BlocksFinder) ByHeightFrom(height uint64, header *flow.UnsignedHeader) (*flow.UnsignedHeader, error) {
 	if header == nil {
 		byHeight, err := finder.storage.ByHeight(height)
 		if err != nil {
@@ -86,15 +86,15 @@ func (finder *BlocksFinder) ByHeightFrom(height uint64, header *flow.Header) (*f
 // bootstrapping process.
 type NoopBlockFinder struct{}
 
-func (NoopBlockFinder) ByHeightFrom(_ uint64, _ *flow.Header) (*flow.Header, error) {
+func (NoopBlockFinder) ByHeightFrom(_ uint64, _ *flow.UnsignedHeader) (*flow.UnsignedHeader, error) {
 	return nil, nil
 }
 
-func runtimeBlockFromHeader(header *flow.Header) runtime.Block {
+func runtimeBlockFromHeader(header *flow.UnsignedHeader) runtime.Block {
 	return runtime.Block{
 		Height:    header.Height,
 		View:      header.View,
 		Hash:      stdlib.BlockHash(header.ID()),
-		Timestamp: int64(header.Timestamp * 1e6), // CAUTION: `runtime.UnsignedBlock` has time stamp in NANO-seconds, while `flow.Header` uses milliseconds
+		Timestamp: int64(header.Timestamp * 1e6), // CAUTION: `runtime.UnsignedBlock` has time stamp in NANO-seconds, while `flow.UnsignedHeader` uses milliseconds
 	}
 }

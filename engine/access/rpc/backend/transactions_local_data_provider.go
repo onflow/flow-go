@@ -69,7 +69,7 @@ type TransactionsLocalDataProvider struct {
 // getter or when deriving transaction status.
 func (t *TransactionsLocalDataProvider) GetTransactionResultFromStorage(
 	ctx context.Context,
-	block *flow.Header,
+	block *flow.UnsignedHeader,
 	transactionID flow.Identifier,
 	requiredEventEncodingVersion entities.EventEncodingVersion,
 ) (*accessmodel.TransactionResult, error) {

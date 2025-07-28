@@ -26,11 +26,11 @@ import (
 type BaseApprovalsTestSuite struct {
 	suite.Suite
 
-	ParentBlock         *flow.Header    // parent of sealing candidate
-	Block               *flow.Header    // candidate for sealing
-	IncorporatedBlock   *flow.Header    // block that incorporated result
-	VerID               flow.Identifier // for convenience, node id of first verifier
-	Chunks              flow.ChunkList  // list of chunks of execution result
+	ParentBlock         *flow.UnsignedHeader // parent of sealing candidate
+	Block               *flow.UnsignedHeader // candidate for sealing
+	IncorporatedBlock   *flow.UnsignedHeader // block that incorporated result
+	VerID               flow.Identifier      // for convenience, node id of first verifier
+	Chunks              flow.ChunkList       // list of chunks of execution result
 	ChunksAssignment    *chunks.Assignment
 	AuthorizedVerifiers map[flow.Identifier]*flow.Identity // map of authorized verifier identities for execution result
 	PublicKey           *module.PublicKey                  // public key used to mock signature verifications
@@ -86,14 +86,14 @@ type BaseAssignmentCollectorTestSuite struct {
 	BaseApprovalsTestSuite
 
 	WorkerPool        *workerpool.WorkerPool
-	Blocks            map[flow.Identifier]*flow.Header
+	Blocks            map[flow.Identifier]*flow.UnsignedHeader
 	State             *protocol.State
 	Snapshots         map[flow.Identifier]*protocol.Snapshot
 	Headers           *storage.Headers
 	Assigner          *module.ChunkAssigner
 	SealsPL           *mempool.IncorporatedResultSeals
 	Conduit           *mocknetwork.Conduit
-	FinalizedAtHeight map[uint64]*flow.Header
+	FinalizedAtHeight map[uint64]*flow.UnsignedHeader
 	IdentitiesCache   map[flow.Identifier]map[flow.Identifier]*flow.Identity // helper map to store identities for given block
 	RequestTracker    *RequestTracker
 }
@@ -110,12 +110,12 @@ func (s *BaseAssignmentCollectorTestSuite) SetupTest() {
 
 	s.RequestTracker = NewRequestTracker(s.Headers, 1, 3)
 
-	s.FinalizedAtHeight = make(map[uint64]*flow.Header)
+	s.FinalizedAtHeight = make(map[uint64]*flow.UnsignedHeader)
 	s.FinalizedAtHeight[s.ParentBlock.Height] = s.ParentBlock
 	s.FinalizedAtHeight[s.Block.Height] = s.Block
 
 	// setup blocks cache for protocol state
-	s.Blocks = make(map[flow.Identifier]*flow.Header)
+	s.Blocks = make(map[flow.Identifier]*flow.UnsignedHeader)
 	s.Blocks[s.ParentBlock.ID()] = s.ParentBlock
 	s.Blocks[s.Block.ID()] = s.Block
 	s.Blocks[s.IncorporatedBlock.ID()] = s.IncorporatedBlock
@@ -129,7 +129,7 @@ func (s *BaseAssignmentCollectorTestSuite) SetupTest() {
 		return s.ChunksAssignment
 	}, func(result *flow.ExecutionResult, blockID flow.Identifier) error { return nil })
 
-	s.Headers.On("ByBlockID", mock.Anything).Return(func(blockID flow.Identifier) *flow.Header {
+	s.Headers.On("ByBlockID", mock.Anything).Return(func(blockID flow.Identifier) *flow.UnsignedHeader {
 		return s.Blocks[blockID]
 	}, func(blockID flow.Identifier) error {
 		_, found := s.Blocks[blockID]
@@ -149,7 +149,7 @@ func (s *BaseAssignmentCollectorTestSuite) SetupTest() {
 		},
 	)
 	s.Headers.On("ByHeight", mock.Anything).Return(
-		func(height uint64) (*flow.Header, error) {
+		func(height uint64) (*flow.UnsignedHeader, error) {
 			if block, found := s.FinalizedAtHeight[height]; found {
 				return block, nil
 			} else {
@@ -176,7 +176,7 @@ func (s *BaseAssignmentCollectorTestSuite) SetupTest() {
 	s.SealsPL.On("PruneUpToHeight", mock.Anything).Return(nil).Maybe() // noop on pruning
 }
 
-func (s *BaseAssignmentCollectorTestSuite) MarkFinalized(block *flow.Header) {
+func (s *BaseAssignmentCollectorTestSuite) MarkFinalized(block *flow.UnsignedHeader) {
 	s.FinalizedAtHeight[block.Height] = block
 }
 

@@ -60,7 +60,7 @@ type AssignmentCollectorState interface {
 	// BlockID returns the ID of the executed block.
 	BlockID() flow.Identifier
 	// Block returns the header of the executed block.
-	Block() *flow.Header
+	Block() *flow.UnsignedHeader
 	// ResultID returns the ID of the result this assignment collector tracks.
 	ResultID() flow.Identifier
 	// Result returns the result this assignment collector tracks.

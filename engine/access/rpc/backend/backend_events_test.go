@@ -48,7 +48,7 @@ type BackendEventsSuite struct {
 	state      *protocol.State
 	snapshot   *protocol.Snapshot
 	params     *protocol.Params
-	rootHeader *flow.Header
+	rootHeader *flow.UnsignedHeader
 
 	eventsIndex       *index.EventsIndex
 	events            *storagemock.Events
@@ -60,7 +60,7 @@ type BackendEventsSuite struct {
 	executionNodes flow.IdentityList
 	execClient     *access.ExecutionAPIClient
 
-	sealedHead  *flow.Header
+	sealedHead  *flow.UnsignedHeader
 	blocks      []*flow.UnsignedBlock
 	blockIDs    []flow.Identifier
 	blockEvents []flow.Event
@@ -93,7 +93,7 @@ func (s *BackendEventsSuite) SetupTest() {
 	s.blockIDs = make([]flow.Identifier, blockCount)
 
 	for i := 0; i < blockCount; i++ {
-		var header *flow.Header
+		var header *flow.UnsignedHeader
 		if i == 0 {
 			header = unittest.BlockHeaderFixture()
 		} else {
@@ -151,7 +151,7 @@ func (s *BackendEventsSuite) SetupTest() {
 		return flow.ZeroID, storage.ErrNotFound
 	}).Maybe()
 
-	s.headers.On("ByBlockID", mock.Anything).Return(func(blockID flow.Identifier) (*flow.Header, error) {
+	s.headers.On("ByBlockID", mock.Anything).Return(func(blockID flow.Identifier) (*flow.UnsignedHeader, error) {
 		for _, block := range s.blocks {
 			if blockID == block.ID() {
 				return block.ToHeader(), nil
@@ -254,7 +254,7 @@ func (s *BackendEventsSuite) setupENSuccessResponse(eventType string, blocks []*
 }
 
 // setupENFailingResponse configures the execution node client to return an error
-func (s *BackendEventsSuite) setupENFailingResponse(eventType string, headers []*flow.Header, err error) {
+func (s *BackendEventsSuite) setupENFailingResponse(eventType string, headers []*flow.UnsignedHeader, err error) {
 	ids := make([][]byte, len(headers))
 	for i, header := range headers {
 		id := header.ID()

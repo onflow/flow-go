@@ -34,7 +34,7 @@ type AssignmentCollectorBase struct {
 
 	result        *flow.ExecutionResult // execution result
 	resultID      flow.Identifier       // ID of execution result
-	executedBlock *flow.Header          // header of the executed block
+	executedBlock *flow.UnsignedHeader  // header of the executed block
 }
 
 func NewAssignmentCollectorBase(logger zerolog.Logger,
@@ -71,9 +71,9 @@ func NewAssignmentCollectorBase(logger zerolog.Logger,
 	}, nil
 }
 
-func (cb *AssignmentCollectorBase) BlockID() flow.Identifier      { return cb.result.BlockID }
-func (cb *AssignmentCollectorBase) Block() *flow.Header           { return cb.executedBlock }
-func (cb *AssignmentCollectorBase) ResultID() flow.Identifier     { return cb.resultID }
+func (cb *AssignmentCollectorBase) BlockID() flow.Identifier    { return cb.result.BlockID }
+func (cb *AssignmentCollectorBase) Block() *flow.UnsignedHeader { return cb.executedBlock }
+func (cb *AssignmentCollectorBase) ResultID() flow.Identifier   { return cb.resultID }
 func (cb *AssignmentCollectorBase) Result() *flow.ExecutionResult { return cb.result }
 
 // OnInvalidApproval logs in invalid approval

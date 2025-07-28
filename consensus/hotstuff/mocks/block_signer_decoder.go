@@ -14,7 +14,7 @@ type BlockSignerDecoder struct {
 }
 
 // DecodeSignerIDs provides a mock function with given fields: header
-func (_m *BlockSignerDecoder) DecodeSignerIDs(header *flow.Header) (flow.IdentifierList, error) {
+func (_m *BlockSignerDecoder) DecodeSignerIDs(header *flow.UnsignedHeader) (flow.IdentifierList, error) {
 	ret := _m.Called(header)
 
 	if len(ret) == 0 {
@@ -23,10 +23,10 @@ func (_m *BlockSignerDecoder) DecodeSignerIDs(header *flow.Header) (flow.Identif
 
 	var r0 flow.IdentifierList
 	var r1 error
-	if rf, ok := ret.Get(0).(func(*flow.Header) (flow.IdentifierList, error)); ok {
+	if rf, ok := ret.Get(0).(func(*flow.UnsignedHeader) (flow.IdentifierList, error)); ok {
 		return rf(header)
 	}
-	if rf, ok := ret.Get(0).(func(*flow.Header) flow.IdentifierList); ok {
+	if rf, ok := ret.Get(0).(func(*flow.UnsignedHeader) flow.IdentifierList); ok {
 		r0 = rf(header)
 	} else {
 		if ret.Get(0) != nil {
@@ -34,7 +34,7 @@ func (_m *BlockSignerDecoder) DecodeSignerIDs(header *flow.Header) (flow.Identif
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(*flow.Header) error); ok {
+	if rf, ok := ret.Get(1).(func(*flow.UnsignedHeader) error); ok {
 		r1 = rf(header)
 	} else {
 		r1 = ret.Error(1)

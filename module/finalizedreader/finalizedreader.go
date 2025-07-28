@@ -44,6 +44,6 @@ func (r *FinalizedReader) FinalizedBlockIDAtHeight(height uint64) (flow.Identifi
 
 // BlockFinalized implements the protocol.Consumer interface, which allows FinalizedReader
 // to consume finalized blocks from the protocol
-func (r *FinalizedReader) BlockFinalized(h *flow.Header) {
+func (r *FinalizedReader) BlockFinalized(h *flow.UnsignedHeader) {
 	r.lastHeight.Store(h.Height)
 }

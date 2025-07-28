@@ -126,7 +126,7 @@ func (bc *BaseChainSuite) SetupChain() {
 	)
 	bc.FinalSnapshot = &protocol.Snapshot{}
 	bc.FinalSnapshot.On("Head").Return(
-		func() *flow.Header {
+		func() *flow.UnsignedHeader {
 			return bc.LatestFinalizedBlock.ToHeader()
 		},
 		nil,
@@ -177,7 +177,7 @@ func (bc *BaseChainSuite) SetupChain() {
 	bc.SealedSnapshot = &protocol.Snapshot{}
 	bc.SealedSnapshot.On("ProtocolState").Return(bc.KVStoreReader, nil)
 	bc.SealedSnapshot.On("Head").Return(
-		func() *flow.Header {
+		func() *flow.UnsignedHeader {
 			return bc.LatestSealedBlock.ToHeader()
 		},
 		nil,
@@ -211,7 +211,7 @@ func (bc *BaseChainSuite) SetupChain() {
 			if found {
 				snapshot := &protocol.Snapshot{}
 				snapshot.On("Head").Return(
-					func() *flow.Header {
+					func() *flow.UnsignedHeader {
 						return block.ToHeader()
 					},
 					nil,
@@ -255,7 +255,7 @@ func (bc *BaseChainSuite) SetupChain() {
 	// ~~~~~~~~~~~~~~~~~~~~ SETUP BLOCK HEADER STORAGE ~~~~~~~~~~~~~~~~~~~~~ //
 	bc.HeadersDB = &storage.Headers{}
 	bc.HeadersDB.On("ByBlockID", mock.Anything).Return(
-		func(blockID flow.Identifier) *flow.Header {
+		func(blockID flow.Identifier) *flow.UnsignedHeader {
 			block, found := bc.Blocks[blockID]
 			if !found {
 				return nil
@@ -278,7 +278,7 @@ func (bc *BaseChainSuite) SetupChain() {
 		func(blockID flow.Identifier) error { return nil },
 	)
 	bc.HeadersDB.On("ByHeight", mock.Anything).Return(
-		func(blockHeight uint64) *flow.Header {
+		func(blockHeight uint64) *flow.UnsignedHeader {
 			for _, b := range bc.Blocks {
 				if b.Height == blockHeight {
 					return b.ToHeader()
@@ -412,7 +412,7 @@ func StateSnapshotForUnknownBlock() *protocol.Snapshot {
 	return snapshot
 }
 
-func StateSnapshotForKnownBlock(block *flow.Header, identities map[flow.Identifier]*flow.Identity) *protocol.Snapshot {
+func StateSnapshotForKnownBlock(block *flow.UnsignedHeader, identities map[flow.Identifier]*flow.Identity) *protocol.Snapshot {
 	snapshot := &protocol.Snapshot{}
 	snapshot.On("Identity", mock.Anything).Return(
 		func(nodeID flow.Identifier) *flow.Identity {

@@ -207,7 +207,7 @@ func runTransaction(
 	txID flow.Identifier,
 	flowClient *client.Client,
 	blockSnapshot *blockSnapshot,
-	header *flow.Header,
+	header *flow.UnsignedHeader,
 	dumpRegisters bool,
 ) {
 

@@ -44,7 +44,7 @@ type TxErrorMessagesCoreSuite struct {
 
 	blockMap       map[uint64]*flow.UnsignedBlock
 	rootBlock      *flow.UnsignedBlock
-	finalizedBlock *flow.Header
+	finalizedBlock *flow.UnsignedHeader
 
 	ctx    context.Context
 	cancel context.CancelFunc
@@ -83,7 +83,7 @@ func (s *TxErrorMessagesCoreSuite) SetupTest() {
 	s.proto.params.On("FinalizedRoot").Return(s.rootBlock.ToHeader(), nil)
 
 	s.proto.snapshot.On("Head").Return(
-		func() *flow.Header {
+		func() *flow.UnsignedHeader {
 			return s.finalizedBlock
 		},
 		nil,

@@ -109,7 +109,7 @@ func NewMachine(
 }
 
 // Protocol Events implementation
-func (e *Machine) BlockProcessable(header *flow.Header, qc *flow.QuorumCertificate) {
+func (e *Machine) BlockProcessable(header *flow.UnsignedHeader, qc *flow.QuorumCertificate) {
 	err := e.throttle.OnBlock(qc.BlockID, header.Height)
 	if err != nil {
 		e.log.Fatal().Err(err).Msgf("error processing block %v (qc.BlockID: %v, blockID: %v)",
@@ -117,7 +117,7 @@ func (e *Machine) BlockProcessable(header *flow.Header, qc *flow.QuorumCertifica
 	}
 }
 
-func (e *Machine) BlockFinalized(b *flow.Header) {
+func (e *Machine) BlockFinalized(b *flow.UnsignedHeader) {
 	e.throttle.OnBlockFinalized(b.Height)
 }
 

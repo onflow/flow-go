@@ -36,7 +36,7 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-var signer = func(*flow.Header) ([]byte, error) { return unittest.SignatureFixture(), nil }
+var signer = func(*flow.UnsignedHeader) ([]byte, error) { return unittest.SignatureFixture(), nil }
 var setter = func(h *flow.HeaderBodyBuilder) error {
 	h.WithHeight(42).
 		WithChainID(flow.Emulator).
@@ -197,7 +197,7 @@ func (suite *BuilderSuite) InsertBlock(block *model.UnsignedBlock) {
 
 func (suite *BuilderSuite) FinalizeBlock(block model.UnsignedBlock) {
 	err := suite.db.Update(func(tx *badger.Txn) error {
-		var refBlock flow.Header
+		var refBlock flow.UnsignedHeader
 		err := operation.RetrieveHeader(block.Payload.ReferenceBlockID, &refBlock)(tx)
 		if err != nil {
 			return err
@@ -230,7 +230,7 @@ func (suite *BuilderSuite) Payload(transactions ...*flow.TransactionBody) model.
 }
 
 // ProtoStateRoot returns the root block of the protocol state.
-func (suite *BuilderSuite) ProtoStateRoot() *flow.Header {
+func (suite *BuilderSuite) ProtoStateRoot() *flow.UnsignedHeader {
 	return suite.protoState.Params().FinalizedRoot()
 }
 
@@ -300,7 +300,7 @@ func (suite *BuilderSuite) TestBuildOn_SetterErrorPassthrough() {
 func (suite *BuilderSuite) TestBuildOn_SignerErrorPassthrough() {
 	suite.T().Run("unexpected Exception", func(t *testing.T) {
 		exception := errors.New("exception")
-		sign := func(h *flow.Header) ([]byte, error) {
+		sign := func(h *flow.UnsignedHeader) ([]byte, error) {
 			return nil, exception
 		}
 		_, err := suite.builder.BuildOn(suite.genesis.ID(), setter, sign)
@@ -309,7 +309,7 @@ func (suite *BuilderSuite) TestBuildOn_SignerErrorPassthrough() {
 	suite.T().Run("NoVoteError", func(t *testing.T) {
 		// the EventHandler relies on this sentinel in particular to be passed through
 		sentinel := hotstuffmodel.NewNoVoteErrorf("not voting")
-		sign := func(h *flow.Header) ([]byte, error) {
+		sign := func(h *flow.UnsignedHeader) ([]byte, error) {
 			return nil, sentinel
 		}
 		_, err := suite.builder.BuildOn(suite.genesis.ID(), setter, sign)

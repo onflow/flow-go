@@ -20,19 +20,19 @@ func TestTraverse(t *testing.T) {
 type TraverseSuite struct {
 	suite.Suite
 
-	byID     map[flow.Identifier]*flow.Header
-	byHeight map[uint64]*flow.Header
+	byID     map[flow.Identifier]*flow.UnsignedHeader
+	byHeight map[uint64]*flow.UnsignedHeader
 	headers  *mockstorage.Headers
-	genesis  *flow.Header
+	genesis  *flow.UnsignedHeader
 }
 
 func (s *TraverseSuite) SetupTest() {
 	// create a storage.Headers mock with a backing map
-	s.byID = make(map[flow.Identifier]*flow.Header)
-	s.byHeight = make(map[uint64]*flow.Header)
+	s.byID = make(map[flow.Identifier]*flow.UnsignedHeader)
+	s.byHeight = make(map[uint64]*flow.UnsignedHeader)
 	s.headers = new(mockstorage.Headers)
 	s.headers.On("ByBlockID", mock.Anything).Return(
-		func(id flow.Identifier) *flow.Header {
+		func(id flow.Identifier) *flow.UnsignedHeader {
 			return s.byID[id]
 		},
 		func(id flow.Identifier) error {
@@ -66,7 +66,7 @@ func (s *TraverseSuite) SetupTest() {
 func (s *TraverseSuite) TestTraverse_MissingForkHead() {
 	unknownForkHead := unittest.IdentifierFixture()
 
-	visitor := func(_ *flow.Header) error {
+	visitor := func(_ *flow.UnsignedHeader) error {
 		s.Require().Fail("visitor should not be called")
 		return nil
 	}
@@ -90,7 +90,7 @@ func (s *TraverseSuite) TestTraverse_VisitorError() {
 	forkHead := s.byHeight[8].ID()
 
 	visitorError := errors.New("some visitor error")
-	visitor := func(_ *flow.Header) error { return visitorError }
+	visitor := func(_ *flow.UnsignedHeader) error { return visitorError }
 
 	s.Run("TraverseBackward with visitor error", func() {
 		err := TraverseBackward(s.headers, forkHead, visitor, IncludingHeight(1))
@@ -108,7 +108,7 @@ func (s *TraverseSuite) TestTraverse_VisitorError() {
 func (s *TraverseSuite) TestTraverse_UnknownTerminalBlock() {
 	forkHead := s.byHeight[8].ID()
 	unknownTerminal := unittest.IdentifierFixture()
-	visitor := func(_ *flow.Header) error {
+	visitor := func(_ *flow.UnsignedHeader) error {
 		s.Require().Fail("visitor should not be called")
 		return nil
 	}
@@ -143,7 +143,7 @@ func (s *TraverseSuite) TestTraverseBackward_DownToBlock() {
 		start := s.byHeight[5].ID()
 		end := s.byHeight[5].ID()
 
-		err := TraverseBackward(s.headers, start, func(header *flow.Header) error {
+		err := TraverseBackward(s.headers, start, func(header *flow.UnsignedHeader) error {
 			s.Require().Fail("visitor should not be called")
 			return nil
 		}, ExcludingBlock(end))
@@ -156,7 +156,7 @@ func (s *TraverseSuite) TestTraverseBackward_DownToBlock() {
 		end := s.byHeight[5].ID()
 
 		called := 0
-		err := TraverseBackward(s.headers, start, func(header *flow.Header) error {
+		err := TraverseBackward(s.headers, start, func(header *flow.UnsignedHeader) error {
 			// should call callback for single block in traversal path
 			s.Require().Equal(start, header.ID())
 			// track calls - should only be called once
@@ -178,7 +178,7 @@ func (s *TraverseSuite) TestTraverseBackward_DownToBlock() {
 
 		// assert that we are receiving the correct block at each height
 		height := startHeight
-		err := TraverseBackward(s.headers, start, func(header *flow.Header) error {
+		err := TraverseBackward(s.headers, start, func(header *flow.UnsignedHeader) error {
 			expectedID := s.byHeight[height].ID()
 			s.Require().Equal(expectedID, header.ID())
 			height--
@@ -199,7 +199,7 @@ func (s *TraverseSuite) TestTraverseBackward_DownToBlock() {
 
 		// assert that we are receiving the correct block at each height
 		height := startHeight
-		err := TraverseBackward(s.headers, start, func(header *flow.Header) error {
+		err := TraverseBackward(s.headers, start, func(header *flow.UnsignedHeader) error {
 			expectedID := s.byHeight[height].ID()
 			s.Require().Equal(expectedID, header.ID())
 			height--
@@ -214,7 +214,7 @@ func (s *TraverseSuite) TestTraverseBackward_DownToBlock() {
 		genesisID := s.genesis.ID()
 
 		called := 0
-		err := TraverseBackward(s.headers, genesisID, func(header *flow.Header) error {
+		err := TraverseBackward(s.headers, genesisID, func(header *flow.UnsignedHeader) error {
 			// should call callback for single block in traversal path
 			s.Require().Equal(genesisID, header.ID())
 			// track calls - should only be called once
@@ -235,7 +235,7 @@ func (s *TraverseSuite) TestTraverseBackward_DownToHeight() {
 		startHeight := uint64(5)
 		start := s.byHeight[startHeight].ID()
 
-		err := TraverseBackward(s.headers, start, func(header *flow.Header) error {
+		err := TraverseBackward(s.headers, start, func(header *flow.UnsignedHeader) error {
 			s.Require().Fail("visitor should not be called")
 			return nil
 		}, ExcludingHeight(startHeight))
@@ -248,7 +248,7 @@ func (s *TraverseSuite) TestTraverseBackward_DownToHeight() {
 		start := s.byHeight[startHeight].ID()
 
 		called := 0
-		err := TraverseBackward(s.headers, start, func(header *flow.Header) error {
+		err := TraverseBackward(s.headers, start, func(header *flow.UnsignedHeader) error {
 			// should call callback for single block in traversal path
 			s.Require().Equal(start, header.ID())
 			// track calls - should only be called once
@@ -268,7 +268,7 @@ func (s *TraverseSuite) TestTraverseBackward_DownToHeight() {
 
 		// assert that we are receiving the correct block at each height
 		height := startHeight
-		err := TraverseBackward(s.headers, start, func(header *flow.Header) error {
+		err := TraverseBackward(s.headers, start, func(header *flow.UnsignedHeader) error {
 			expectedID := s.byHeight[height].ID()
 			s.Require().Equal(expectedID, header.ID())
 			height--
@@ -287,7 +287,7 @@ func (s *TraverseSuite) TestTraverseBackward_DownToHeight() {
 
 		// assert that we are receiving the correct block at each height
 		height := startHeight
-		err := TraverseBackward(s.headers, start, func(header *flow.Header) error {
+		err := TraverseBackward(s.headers, start, func(header *flow.UnsignedHeader) error {
 			expectedID := s.byHeight[height].ID()
 			s.Require().Equal(expectedID, header.ID())
 			height--
@@ -302,7 +302,7 @@ func (s *TraverseSuite) TestTraverseBackward_DownToHeight() {
 		genesisID := s.genesis.ID()
 
 		called := 0
-		err := TraverseBackward(s.headers, genesisID, func(header *flow.Header) error {
+		err := TraverseBackward(s.headers, genesisID, func(header *flow.UnsignedHeader) error {
 			// should call callback for single block in traversal path
 			s.Require().Equal(genesisID, header.ID())
 			// track calls - should only be called once
@@ -323,7 +323,7 @@ func (s *TraverseSuite) TestTraverseForward_UpFromBlock() {
 		upperBlock := s.byHeight[5].ID()
 		lowerBlock := s.byHeight[5].ID()
 
-		err := TraverseForward(s.headers, upperBlock, func(header *flow.Header) error {
+		err := TraverseForward(s.headers, upperBlock, func(header *flow.UnsignedHeader) error {
 			s.Require().Fail("visitor should not be called")
 			return nil
 		}, ExcludingBlock(lowerBlock))
@@ -336,7 +336,7 @@ func (s *TraverseSuite) TestTraverseForward_UpFromBlock() {
 		lowerBlock := s.byHeight[5].ID()
 
 		called := 0
-		err := TraverseForward(s.headers, upperBlock, func(header *flow.Header) error {
+		err := TraverseForward(s.headers, upperBlock, func(header *flow.UnsignedHeader) error {
 			// should call callback for single block in traversal path
 			s.Require().Equal(upperBlock, header.ID())
 			// track calls - should only be called once
@@ -358,7 +358,7 @@ func (s *TraverseSuite) TestTraverseForward_UpFromBlock() {
 
 		// assert that we are receiving the correct block at each height
 		height := lowerHeight
-		err := TraverseForward(s.headers, upperBlock, func(header *flow.Header) error {
+		err := TraverseForward(s.headers, upperBlock, func(header *flow.UnsignedHeader) error {
 			expectedID := s.byHeight[height].ID()
 			s.Require().Equal(height, header.Height)
 			s.Require().Equal(expectedID, header.ID())
@@ -380,7 +380,7 @@ func (s *TraverseSuite) TestTraverseForward_UpFromBlock() {
 
 		// assert that we are receiving the correct block at each height
 		height := lowerHeight + 1
-		err := TraverseForward(s.headers, upperBlock, func(header *flow.Header) error {
+		err := TraverseForward(s.headers, upperBlock, func(header *flow.UnsignedHeader) error {
 			expectedID := s.byHeight[height].ID()
 			s.Require().Equal(height, header.Height)
 			s.Require().Equal(expectedID, header.ID())
@@ -396,7 +396,7 @@ func (s *TraverseSuite) TestTraverseForward_UpFromBlock() {
 		genesisID := s.genesis.ID()
 
 		called := 0
-		err := TraverseForward(s.headers, genesisID, func(header *flow.Header) error {
+		err := TraverseForward(s.headers, genesisID, func(header *flow.UnsignedHeader) error {
 			// should call callback for single block in traversal path
 			s.Require().Equal(genesisID, header.ID())
 			// track calls - should only be called once
@@ -417,7 +417,7 @@ func (s *TraverseSuite) TestTraverseForward_UpFromHeight() {
 		upperHeight := uint64(5)
 		upperBlock := s.byHeight[upperHeight].ID()
 
-		err := TraverseForward(s.headers, upperBlock, func(header *flow.Header) error {
+		err := TraverseForward(s.headers, upperBlock, func(header *flow.UnsignedHeader) error {
 			s.Require().Fail("visitor should not be called")
 			return nil
 		}, ExcludingHeight(upperHeight))
@@ -430,7 +430,7 @@ func (s *TraverseSuite) TestTraverseForward_UpFromHeight() {
 		upperBlock := s.byHeight[upperHeight].ID()
 
 		called := 0
-		err := TraverseForward(s.headers, upperBlock, func(header *flow.Header) error {
+		err := TraverseForward(s.headers, upperBlock, func(header *flow.UnsignedHeader) error {
 			// should call callback for single block in traversal path
 			s.Require().Equal(upperBlock, header.ID())
 			// track calls - should only be called once
@@ -450,7 +450,7 @@ func (s *TraverseSuite) TestTraverseForward_UpFromHeight() {
 
 		// assert that we are receiving the correct block at each height
 		height := lowerHeight
-		err := TraverseForward(s.headers, upperBlock, func(header *flow.Header) error {
+		err := TraverseForward(s.headers, upperBlock, func(header *flow.UnsignedHeader) error {
 			expectedID := s.byHeight[height].ID()
 			s.Require().Equal(height, header.Height)
 			s.Require().Equal(expectedID, header.ID())
@@ -470,7 +470,7 @@ func (s *TraverseSuite) TestTraverseForward_UpFromHeight() {
 
 		// assert that we are receiving the correct block at each height
 		height := lowerHeight + 1
-		err := TraverseForward(s.headers, upperBlock, func(header *flow.Header) error {
+		err := TraverseForward(s.headers, upperBlock, func(header *flow.UnsignedHeader) error {
 			expectedID := s.byHeight[height].ID()
 			s.Require().Equal(height, header.Height)
 			s.Require().Equal(expectedID, header.ID())
@@ -486,7 +486,7 @@ func (s *TraverseSuite) TestTraverseForward_UpFromHeight() {
 		genesisID := s.genesis.ID()
 
 		called := 0
-		err := TraverseForward(s.headers, genesisID, func(header *flow.Header) error {
+		err := TraverseForward(s.headers, genesisID, func(header *flow.UnsignedHeader) error {
 			// should call callback for single block in traversal path
 			s.Require().Equal(genesisID, header.ID())
 			// track calls - should only be called once
@@ -503,11 +503,11 @@ func (s *TraverseSuite) TestTraverseForward_UpFromHeight() {
 // when terminal block (lowest block) is specified by its ID.
 func (s *TraverseSuite) TestTraverse_OnDifferentForkThanTerminalBlock() {
 	forkHead := s.byHeight[8].ID()
-	noopVisitor := func(header *flow.Header) error { return nil }
+	noopVisitor := func(header *flow.UnsignedHeader) error { return nil }
 
 	// make other fork
 	otherForkHead := s.genesis
-	otherForkByHeight := make(map[uint64]*flow.Header)
+	otherForkByHeight := make(map[uint64]*flow.UnsignedHeader)
 	for i := 0; i < 10; i++ {
 		child := unittest.BlockHeaderWithParentFixture(otherForkHead)
 		s.byID[child.ID()] = child

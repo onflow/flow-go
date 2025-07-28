@@ -186,7 +186,7 @@ func (et *ExecutionTreeTestSuite) Test_AddResult_Bridge() {
 	et.addReceipts2ReceiptsForest(receipts, blocks)
 
 	// restrict traversal to B10 <- C11 <- C12 <- C13
-	blockFilter := func(h *flow.Header) bool {
+	blockFilter := func(h *flow.UnsignedHeader) bool {
 		for _, blockName := range []string{"B10", "C11", "C12", "C13"} {
 			if blocks[blockName].ID() == h.ID() {
 				return true
@@ -292,7 +292,7 @@ func (et *ExecutionTreeTestSuite) Test_RootBlockExcluded() {
 	blocks, _, receipts := et.createExecutionTree()
 	et.addReceipts2ReceiptsForest(receipts, blocks)
 
-	blockFilter := func(h *flow.Header) bool {
+	blockFilter := func(h *flow.UnsignedHeader) bool {
 		return blocks["B10"].ID() != h.ID()
 	}
 
@@ -307,7 +307,7 @@ func (et *ExecutionTreeTestSuite) Test_FilterChainForks() {
 	blocks, _, receipts := et.createExecutionTree()
 	et.addReceipts2ReceiptsForest(receipts, blocks)
 
-	blockFilter := func(h *flow.Header) bool {
+	blockFilter := func(h *flow.UnsignedHeader) bool {
 		return blocks["B11"].ID() != h.ID()
 	}
 
@@ -375,7 +375,7 @@ func (et *ExecutionTreeTestSuite) Test_Prune() {
 }
 
 func anyBlock() mempool.BlockFilter {
-	return func(*flow.Header) bool { return true }
+	return func(*flow.UnsignedHeader) bool { return true }
 }
 
 func anyReceipt() mempool.ReceiptFilter {

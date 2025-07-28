@@ -1259,7 +1259,7 @@ func (s *ReceiptValidationSuite) TestException_ProtocolStateHead() {
 	s.AddSubgraphFixtureToMempools(valSubgrph)
 	receipt := unittest.ExecutionReceiptFixture(unittest.WithExecutorID(s.ExeID), unittest.WithResult(valSubgrph.Result))
 
-	// receiptValidator.state yields exception on UnsignedBlock Header retrieval
+	// receiptValidator.state yields exception on UnsignedBlock UnsignedHeader retrieval
 	*s.State = *mock_protocol.NewState(s.T()) // receiptValidator has pointer to this field, which we override with a new state mock
 	snapshot := mock_protocol.NewSnapshot(s.T())
 	exception := errors.New("state.Head() exception")

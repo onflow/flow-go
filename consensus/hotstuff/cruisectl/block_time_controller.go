@@ -416,7 +416,7 @@ func (ctl *BlockTimeController) measureViewDuration(tb TimedBlock) error {
 // when there is no subsequent epoch that we could transition into but the current epoch is nearing
 // its end. Specifically, we memorize the updated timing information in the BlockTimeController.
 // No errors are expected during normal operation.
-func (ctl *BlockTimeController) processEpochExtended(first *flow.Header) error {
+func (ctl *BlockTimeController) processEpochExtended(first *flow.UnsignedHeader) error {
 	currentEpoch, err := ctl.state.AtHeight(first.Height).Epochs().Current()
 	if err != nil {
 		return fmt.Errorf("could not get current epoch: %w", err)
@@ -441,7 +441,7 @@ func (ctl *BlockTimeController) processEpochExtended(first *flow.Header) error {
 // the consensus component emits when we finalize the first block of the Epoch Committed phase.
 // Specifically, we memorize the next epoch's timing information in the BlockTimeController.
 // No errors are expected during normal operation.
-func (ctl *BlockTimeController) processEpochCommittedPhaseStarted(first *flow.Header) error {
+func (ctl *BlockTimeController) processEpochCommittedPhaseStarted(first *flow.UnsignedHeader) error {
 	snapshot := ctl.state.AtHeight(first.Height)
 	nextEpoch, err := snapshot.Epochs().NextCommitted()
 	if err != nil {
@@ -467,7 +467,7 @@ func (ctl *BlockTimeController) OnBlockIncorporated(block *model.Block) {
 
 // EpochExtended listens to `EpochExtended` protocol notifications. The notification is queued
 // for async processing by the worker. We must process _all_ `EpochExtended` notifications.
-func (ctl *BlockTimeController) EpochExtended(_ uint64, first *flow.Header, _ flow.EpochExtension) {
+func (ctl *BlockTimeController) EpochExtended(_ uint64, first *flow.UnsignedHeader, _ flow.EpochExtension) {
 	ctl.epochEvents <- func() error {
 		return ctl.processEpochExtended(first)
 	}
@@ -475,7 +475,7 @@ func (ctl *BlockTimeController) EpochExtended(_ uint64, first *flow.Header, _ fl
 
 // EpochCommittedPhaseStarted ingests the respective protocol notifications. The notification is
 // queued for async processing by the worker. We must process _all_ `EpochCommittedPhaseStarted` notifications.
-func (ctl *BlockTimeController) EpochCommittedPhaseStarted(_ uint64, first *flow.Header) {
+func (ctl *BlockTimeController) EpochCommittedPhaseStarted(_ uint64, first *flow.UnsignedHeader) {
 	ctl.epochEvents <- func() error {
 		return ctl.processEpochCommittedPhaseStarted(first)
 	}

@@ -29,7 +29,7 @@ func NewParticipant(
 	metrics module.HotstuffMetrics,
 	mempoolMetrics module.MempoolMetrics,
 	builder module.Builder,
-	finalized *flow.Header,
+	finalized *flow.UnsignedHeader,
 	pending []*flow.ProposalHeader,
 	modules *HotstuffModules,
 	options ...Option,
@@ -125,7 +125,7 @@ func NewValidator(metrics module.HotstuffMetrics, committee hotstuff.DynamicComm
 }
 
 // NewForks recovers trusted root and creates new forks manager
-func NewForks(final *flow.Header, headers storage.Headers, updater module.Finalizer, notifier hotstuff.FollowerConsumer, rootHeader *flow.Header, rootQC *flow.QuorumCertificate) (*forks.Forks, error) {
+func NewForks(final *flow.UnsignedHeader, headers storage.Headers, updater module.Finalizer, notifier hotstuff.FollowerConsumer, rootHeader *flow.UnsignedHeader, rootQC *flow.QuorumCertificate) (*forks.Forks, error) {
 	// recover the trusted root
 	trustedRoot, err := recoverTrustedRoot(final, headers, rootHeader, rootQC)
 	if err != nil {
@@ -142,7 +142,7 @@ func NewForks(final *flow.Header, headers storage.Headers, updater module.Finali
 }
 
 // recoverTrustedRoot based on our local state returns root block and QC that can be used to initialize base state
-func recoverTrustedRoot(final *flow.Header, headers storage.Headers, rootHeader *flow.Header, rootQC *flow.QuorumCertificate) (*model.CertifiedBlock, error) {
+func recoverTrustedRoot(final *flow.UnsignedHeader, headers storage.Headers, rootHeader *flow.UnsignedHeader, rootQC *flow.QuorumCertificate) (*model.CertifiedBlock, error) {
 	if final.View < rootHeader.View {
 		return nil, fmt.Errorf("finalized UnsignedBlock has older view than trusted root")
 	}
@@ -179,7 +179,7 @@ func recoverTrustedRoot(final *flow.Header, headers storage.Headers, rootHeader 
 	return &trustedRoot, nil
 }
 
-func makeCertifiedRootBlock(header *flow.Header, qc *flow.QuorumCertificate) (model.CertifiedBlock, error) {
+func makeCertifiedRootBlock(header *flow.UnsignedHeader, qc *flow.QuorumCertificate) (model.CertifiedBlock, error) {
 	// By convention of Forks, the trusted root block does not need to have a qc
 	// (as is the case for the genesis block). For simplify of the implementation, we always omit
 	// the QC of the root block. Thereby, we have one algorithm which handles all cases,

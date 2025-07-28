@@ -42,12 +42,12 @@ func (s *Snapshot) Collection() (*flow.Collection, error) {
 	return &collection, err
 }
 
-func (s *Snapshot) Head() (*flow.Header, error) {
+func (s *Snapshot) Head() (*flow.UnsignedHeader, error) {
 	if s.err != nil {
 		return nil, s.err
 	}
 
-	var head flow.Header
+	var head flow.UnsignedHeader
 	err := s.state.db.View(func(tx *badger.Txn) error {
 		return s.head(&head)(tx)
 	})
@@ -62,7 +62,7 @@ func (s *Snapshot) Pending() ([]flow.Identifier, error) {
 }
 
 // head finds the header referenced by the snapshot.
-func (s *Snapshot) head(head *flow.Header) func(*badger.Txn) error {
+func (s *Snapshot) head(head *flow.UnsignedHeader) func(*badger.Txn) error {
 	return func(tx *badger.Txn) error {
 
 		// get the snapshot header

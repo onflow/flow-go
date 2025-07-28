@@ -191,7 +191,7 @@ func (suite *MutatorSuite) Proposal() model.Proposal {
 
 func (suite *MutatorSuite) FinalizeBlock(block model.UnsignedBlock) {
 	err := suite.db.Update(func(tx *badger.Txn) error {
-		var refBlock flow.Header
+		var refBlock flow.UnsignedHeader
 		err := operation.RetrieveHeader(block.Payload.ReferenceBlockID, &refBlock)(tx)
 		if err != nil {
 			return err
@@ -257,7 +257,7 @@ func (suite *MutatorSuite) TestBootstrap_Successful() {
 		suite.Assert().Equal(suite.genesis.Payload.Collection.Light(), collection)
 
 		// should insert header
-		var header flow.Header
+		var header flow.UnsignedHeader
 		err = operation.RetrieveHeader(suite.genesis.ID(), &header)(tx)
 		suite.Assert().Nil(err)
 		suite.Assert().Equal(suite.genesis.ToHeader().ID(), header.ID())

@@ -654,11 +654,11 @@ func generateTestData(t *testing.T, blobstore blobs.Blobstore, blockCount int, s
 	var previousBlock *flow.UnsignedBlock
 	var previousResult *flow.ExecutionResult
 	for i := 0; i < blockCount; i++ {
-		var seals []*flow.Header
+		var seals []*flow.UnsignedHeader
 
 		if i >= firstSeal {
 			sealedBlock := blocksByHeight[uint64(i-firstSeal+1)]
-			seals = []*flow.Header{
+			seals = []*flow.UnsignedHeader{
 				sealedBlock.ToHeader(), // block 0 doesn't get sealed (it's pre-sealed in the genesis state)
 			}
 
@@ -721,7 +721,7 @@ func generateTestData(t *testing.T, blobstore blobs.Blobstore, blockCount int, s
 	}
 }
 
-func buildBlock(height uint64, parent *flow.UnsignedBlock, seals []*flow.Header) *flow.UnsignedBlock {
+func buildBlock(height uint64, parent *flow.UnsignedBlock, seals []*flow.UnsignedHeader) *flow.UnsignedBlock {
 	if parent == nil {
 		return unittest.Block.Genesis(flow.Emulator)
 	}
@@ -765,14 +765,14 @@ func verifyFetchedExecutionData(t *testing.T, actual receivedExecutionData, cfg 
 }
 
 type mockSnapshot struct {
-	header *flow.Header
+	header *flow.UnsignedHeader
 	err    error
 	mu     sync.Mutex
 }
 
 var _ protocol.Snapshot = &mockSnapshot{}
 
-func (m *mockSnapshot) set(header *flow.Header, err error) {
+func (m *mockSnapshot) set(header *flow.UnsignedHeader, err error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -780,7 +780,7 @@ func (m *mockSnapshot) set(header *flow.Header, err error) {
 	m.err = err
 }
 
-func (m *mockSnapshot) Head() (*flow.Header, error) {
+func (m *mockSnapshot) Head() (*flow.UnsignedHeader, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 

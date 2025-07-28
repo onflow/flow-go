@@ -41,7 +41,7 @@ type CommonSuite struct {
 
 	head *cluster.Proposal
 	// storage data
-	headerDB map[flow.Identifier]*flow.Header
+	headerDB map[flow.Identifier]*flow.UnsignedHeader
 
 	pendingDB  map[flow.Identifier]flow.Slashable[*cluster.Proposal]
 	childrenDB map[flow.Identifier][]flow.Slashable[*cluster.Proposal]
@@ -68,7 +68,7 @@ func (cs *CommonSuite) SetupTest() {
 	cs.head = unittest.ClusterProposalFromBlock(block)
 
 	// initialize the storage data
-	cs.headerDB = make(map[flow.Identifier]*flow.Header)
+	cs.headerDB = make(map[flow.Identifier]*flow.UnsignedHeader)
 	cs.pendingDB = make(map[flow.Identifier]flow.Slashable[*cluster.Proposal])
 	cs.childrenDB = make(map[flow.Identifier][]flow.Slashable[*cluster.Proposal])
 
@@ -78,7 +78,7 @@ func (cs *CommonSuite) SetupTest() {
 	// set up header storage mock
 	cs.headers = &storage.Headers{}
 	cs.headers.On("ByBlockID", mock.Anything).Return(
-		func(blockID flow.Identifier) *flow.Header {
+		func(blockID flow.Identifier) *flow.UnsignedHeader {
 			if header := cs.headerDB[blockID]; header != nil {
 				return cs.headerDB[blockID]
 			}
@@ -117,7 +117,7 @@ func (cs *CommonSuite) SetupTest() {
 	// set up protocol snapshot mock
 	cs.snapshot = &clusterstate.Snapshot{}
 	cs.snapshot.On("Head").Return(
-		func() *flow.Header {
+		func() *flow.UnsignedHeader {
 			return cs.head.Block.ToHeader()
 		},
 		nil,

@@ -21,7 +21,7 @@ func TestHeaderEncodingJSON(t *testing.T) {
 	headerID := header.ID()
 	data, err := json.Marshal(header)
 	require.NoError(t, err)
-	var decoded flow.Header
+	var decoded flow.UnsignedHeader
 	err = json.Unmarshal(data, &decoded)
 	require.NoError(t, err)
 	decodedID := decoded.ID()
@@ -34,7 +34,7 @@ func TestHeaderEncodingMsgpack(t *testing.T) {
 	headerID := header.ID()
 	data, err := msgpack.Marshal(header)
 	require.NoError(t, err)
-	var decoded flow.Header
+	var decoded flow.UnsignedHeader
 	err = msgpack.Unmarshal(data, &decoded)
 	require.NoError(t, err)
 	decodedID := decoded.ID()
@@ -47,7 +47,7 @@ func TestHeaderEncodingCBOR(t *testing.T) {
 	headerID := header.ID()
 	data, err := cbor.Marshal(header)
 	require.NoError(t, err)
-	var decoded flow.Header
+	var decoded flow.UnsignedHeader
 	err = cbor.Unmarshal(data, &decoded)
 	require.NoError(t, err)
 	decodedID := decoded.ID()
@@ -57,7 +57,7 @@ func TestHeaderEncodingCBOR(t *testing.T) {
 
 func TestHeaderMalleability(t *testing.T) {
 	header := unittest.BlockHeaderFixture()
-	// Require that LastViewTC (TimeoutCertificate) is not malleable, since its ID is incorporated in Header's ID
+	// Require that LastViewTC (TimeoutCertificate) is not malleable, since its ID is incorporated in UnsignedHeader's ID
 	unittest.RequireEntityNonMalleable(t, helper.MakeTC())
 	unittest.RequireEntityNonMalleable(t, header)
 }
@@ -391,7 +391,7 @@ func TestHeaderBodyBuilder_PresenceChecks(t *testing.T) {
 //
 // 1. Valid root input:
 //   - Embedded HeaderBody is a valid root body and PayloadHash is non-zero.
-//   - Ensures no error and returned Header has the correct fields.
+//   - Ensures no error and returned UnsignedHeader has the correct fields.
 //
 // 2. Valid root input with ParentID == ZeroID and PayloadHash non-zero:
 //   - Same as above but ParentID is zero.  Should still succeed.
@@ -420,7 +420,7 @@ func TestNewRootHeader(t *testing.T) {
 		u := UntrustedHeaderBodyFixture(
 			WithRootDefaults(),
 		)
-		h, err := flow.NewRootHeader(flow.UntrustedHeader{
+		h, err := flow.NewRootHeader(flow.UntrustedUnsignedHeader{
 			HeaderBody:  flow.HeaderBody(u),
 			PayloadHash: nonZeroHash,
 		})
@@ -436,7 +436,7 @@ func TestNewRootHeader(t *testing.T) {
 				u.ParentID = flow.ZeroID
 			},
 		)
-		h, err := flow.NewRootHeader(flow.UntrustedHeader{
+		h, err := flow.NewRootHeader(flow.UntrustedUnsignedHeader{
 			HeaderBody:  flow.HeaderBody(u),
 			PayloadHash: nonZeroHash,
 		})
@@ -451,7 +451,7 @@ func TestNewRootHeader(t *testing.T) {
 				u.ChainID = ""
 			},
 		)
-		h, err := flow.NewRootHeader(flow.UntrustedHeader{
+		h, err := flow.NewRootHeader(flow.UntrustedUnsignedHeader{
 			HeaderBody:  flow.HeaderBody(u),
 			PayloadHash: nonZeroHash,
 		})
@@ -462,7 +462,7 @@ func TestNewRootHeader(t *testing.T) {
 
 	t.Run("empty PayloadHash", func(t *testing.T) {
 		u := UntrustedHeaderBodyFixture(WithRootDefaults())
-		h, err := flow.NewRootHeader(flow.UntrustedHeader{
+		h, err := flow.NewRootHeader(flow.UntrustedUnsignedHeader{
 			HeaderBody:  flow.HeaderBody(u),
 			PayloadHash: flow.ZeroID,
 		})
@@ -478,7 +478,7 @@ func TestNewRootHeader(t *testing.T) {
 				u.ParentVoterIndices = unittest.SignerIndicesFixture(3)
 			},
 		)
-		h, err := flow.NewRootHeader(flow.UntrustedHeader{
+		h, err := flow.NewRootHeader(flow.UntrustedUnsignedHeader{
 			HeaderBody:  flow.HeaderBody(u),
 			PayloadHash: nonZeroHash,
 		})
@@ -494,7 +494,7 @@ func TestNewRootHeader(t *testing.T) {
 				u.ParentVoterSigData = unittest.QCSigDataFixture()
 			},
 		)
-		h, err := flow.NewRootHeader(flow.UntrustedHeader{
+		h, err := flow.NewRootHeader(flow.UntrustedUnsignedHeader{
 			HeaderBody:  flow.HeaderBody(u),
 			PayloadHash: nonZeroHash,
 		})
@@ -510,7 +510,7 @@ func TestNewRootHeader(t *testing.T) {
 				u.ProposerID = validID
 			},
 		)
-		h, err := flow.NewRootHeader(flow.UntrustedHeader{
+		h, err := flow.NewRootHeader(flow.UntrustedUnsignedHeader{
 			HeaderBody:  flow.HeaderBody(u),
 			PayloadHash: nonZeroHash,
 		})
@@ -525,7 +525,7 @@ func TestNewRootHeader(t *testing.T) {
 // Test Cases:
 //
 // 1. Valid input:
-//   - Ensures a Header is returned when HeaderBody is valid and PayloadHash is non-zero.
+//   - Ensures a UnsignedHeader is returned when HeaderBody is valid and PayloadHash is non-zero.
 //
 // 2. Empty ChainID:
 //   - Ensures an error is returned when the embedded HeaderBody.ChainID is empty.
@@ -553,7 +553,7 @@ func TestNewHeader(t *testing.T) {
 	t.Run("valid input", func(t *testing.T) {
 		// start from a fully-populated, valid untrusted header body
 		uBody := UntrustedHeaderBodyFixture()
-		u := flow.UntrustedHeader{
+		u := flow.UntrustedUnsignedHeader{
 			HeaderBody:  flow.HeaderBody(uBody),
 			PayloadHash: validHash,
 		}
@@ -568,7 +568,7 @@ func TestNewHeader(t *testing.T) {
 		uBody := UntrustedHeaderBodyFixture(func(u *flow.UntrustedHeaderBody) {
 			u.ChainID = ""
 		})
-		u := flow.UntrustedHeader{
+		u := flow.UntrustedUnsignedHeader{
 			HeaderBody:  flow.HeaderBody(uBody),
 			PayloadHash: validHash,
 		}
@@ -582,7 +582,7 @@ func TestNewHeader(t *testing.T) {
 		uBody := UntrustedHeaderBodyFixture(func(u *flow.UntrustedHeaderBody) {
 			u.ParentID = flow.ZeroID
 		})
-		u := flow.UntrustedHeader{
+		u := flow.UntrustedUnsignedHeader{
 			HeaderBody:  flow.HeaderBody(uBody),
 			PayloadHash: validHash,
 		}
@@ -596,7 +596,7 @@ func TestNewHeader(t *testing.T) {
 		uBody := UntrustedHeaderBodyFixture(func(u *flow.UntrustedHeaderBody) {
 			u.Timestamp = 0
 		})
-		u := flow.UntrustedHeader{
+		u := flow.UntrustedUnsignedHeader{
 			HeaderBody:  flow.HeaderBody(uBody),
 			PayloadHash: validHash,
 		}
@@ -615,7 +615,7 @@ func TestNewHeader(t *testing.T) {
 				u.ParentVoterSigData = []byte{}
 			},
 		)
-		u := flow.UntrustedHeader{
+		u := flow.UntrustedUnsignedHeader{
 			HeaderBody:  flow.HeaderBody(uBody),
 			PayloadHash: validHash,
 		}
@@ -629,7 +629,7 @@ func TestNewHeader(t *testing.T) {
 		uBody := UntrustedHeaderBodyFixture(func(u *flow.UntrustedHeaderBody) {
 			u.ParentVoterSigData = []byte{}
 		})
-		u := flow.UntrustedHeader{
+		u := flow.UntrustedUnsignedHeader{
 			HeaderBody:  flow.HeaderBody(uBody),
 			PayloadHash: validHash,
 		}
@@ -643,7 +643,7 @@ func TestNewHeader(t *testing.T) {
 		uBody := UntrustedHeaderBodyFixture(func(u *flow.UntrustedHeaderBody) {
 			u.ProposerID = flow.ZeroID
 		})
-		u := flow.UntrustedHeader{
+		u := flow.UntrustedUnsignedHeader{
 			HeaderBody:  flow.HeaderBody(uBody),
 			PayloadHash: validHash,
 		}
@@ -656,7 +656,7 @@ func TestNewHeader(t *testing.T) {
 	t.Run("missing PayloadHash", func(t *testing.T) {
 		// use a valid body but an empty payload hash
 		uBody := UntrustedHeaderBodyFixture()
-		u := flow.UntrustedHeader{
+		u := flow.UntrustedUnsignedHeader{
 			HeaderBody:  flow.HeaderBody(uBody),
 			PayloadHash: flow.ZeroID,
 		}

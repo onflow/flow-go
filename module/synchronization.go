@@ -16,7 +16,7 @@ type BlockRequester interface {
 	RequestHeight(height uint64)
 
 	// Prune manually prunes requests
-	Prune(final *flow.Header)
+	Prune(final *flow.UnsignedHeader)
 }
 
 // SyncCore represents state management for chain state synchronization.
@@ -25,19 +25,19 @@ type SyncCore interface {
 	// HandleBlock handles receiving a new block. It returns true if the block
 	// should be passed along to the rest of the system for processing, or false
 	// if it should be discarded.
-	HandleBlock(header *flow.Header) bool
+	HandleBlock(header *flow.UnsignedHeader) bool
 
 	// HandleHeight handles receiving a new highest finalized height from another node.
-	HandleHeight(final *flow.Header, height uint64)
+	HandleHeight(final *flow.UnsignedHeader, height uint64)
 
 	// ScanPending scans all pending block statuses for blocks that should be
 	// requested. It apportions requestable items into range and batch requests
 	// according to configured maximums, giving precedence to range requests.
-	ScanPending(final *flow.Header) ([]chainsync.Range, []chainsync.Batch)
+	ScanPending(final *flow.UnsignedHeader) ([]chainsync.Range, []chainsync.Batch)
 
 	// WithinTolerance returns whether or not the given height is within configured
 	// height tolerance, wrt the given local finalized header.
-	WithinTolerance(final *flow.Header, height uint64) bool
+	WithinTolerance(final *flow.UnsignedHeader, height uint64) bool
 
 	// RangeRequested updates sync state after a range is requested.
 	RangeRequested(ran chainsync.Range)

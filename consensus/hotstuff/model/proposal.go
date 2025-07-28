@@ -22,7 +22,7 @@ import (
 // proposer's own vote to a QC). In order to express this conceptual equivalence in code, the
 // voting logic in Safety Rules must also operate on an unsigned Proposal.
 //
-// TODO: atm, the flow.Header embeds the LastViewTC. However, for HotStuff we have `model.Block`
+// TODO: atm, the flow.UnsignedHeader embeds the LastViewTC. However, for HotStuff we have `model.Block`
 // and `model.Proposal`, where the latter was introduced when we added the PaceMaker to
 // vanilla HotStuff. It would be more consistent, if we added `LastViewTC` to `model.Block`,
 // or even better, introduce an interface for HotStuff's notion of a block (exposing
@@ -93,7 +93,7 @@ func SignedProposalFromClusterBlock(p *cluster.Proposal) *SignedProposal {
 }
 
 // ProposalFromFlow turns an unsigned flow header into a unsigned hotstuff block type.
-func ProposalFromFlow(header *flow.Header) *Proposal {
+func ProposalFromFlow(header *flow.UnsignedHeader) *Proposal {
 	proposal := Proposal{
 		Block:      BlockFromFlow(header),
 		LastViewTC: header.LastViewTC,

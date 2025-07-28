@@ -61,11 +61,11 @@ func (p *Params) EpochFallbackTriggered() (bool, error) {
 	return false, fmt.Errorf("not implemented")
 }
 
-func (p *Params) FinalizedRoot() *flow.Header {
+func (p *Params) FinalizedRoot() *flow.UnsignedHeader {
 	return p.state.root.ToHeader()
 }
 
-func (p *Params) SealedRoot() *flow.Header {
+func (p *Params) SealedRoot() *flow.UnsignedHeader {
 	return p.FinalizedRoot()
 }
 

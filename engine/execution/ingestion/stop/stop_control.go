@@ -55,7 +55,7 @@ type StopControl struct {
 	sync.RWMutex
 	component.Component
 
-	blockFinalizedChan chan *flow.Header
+	blockFinalizedChan chan *flow.UnsignedHeader
 
 	headers        StopControlHeaders
 	exeState       state.ReadOnlyExecutionState
@@ -164,13 +164,13 @@ func NewStopControl(
 	headers StopControlHeaders,
 	versionBeacons storage.VersionBeacons,
 	nodeVersion *semver.Version,
-	latestFinalizedBlock *flow.Header,
+	latestFinalizedBlock *flow.UnsignedHeader,
 	withStoppedExecution bool,
 	crashOnVersionBoundaryReached bool,
 ) *StopControl {
 	// We should not miss block finalized events, and we should be able to handle them
 	// faster than they are produced anyway.
-	blockFinalizedChan := make(chan *flow.Header, 1000)
+	blockFinalizedChan := make(chan *flow.UnsignedHeader, 1000)
 
 	sc := &StopControl{
 		unit:                    unit,
@@ -223,7 +223,7 @@ func NewStopControl(
 // BlockFinalized is called when a block is finalized.
 //
 // This is a protocol event consumer. See protocol.Consumer.
-func (s *StopControl) BlockFinalized(h *flow.Header) {
+func (s *StopControl) BlockFinalized(h *flow.UnsignedHeader) {
 	s.blockFinalizedChan <- h
 }
 
@@ -245,14 +245,14 @@ func (s *StopControl) processEvents(
 }
 
 // BlockFinalizedForTesting is used for testing	only.
-func (s *StopControl) BlockFinalizedForTesting(h *flow.Header) {
+func (s *StopControl) BlockFinalizedForTesting(h *flow.UnsignedHeader) {
 	s.blockFinalized(irrecoverable.MockSignalerContext{}, h)
 }
 
 func (s *StopControl) checkInitialVersionBeacon(
 	ctx irrecoverable.SignalerContext,
 	ready component.ReadyFunc,
-	latestFinalizedBlock *flow.Header,
+	latestFinalizedBlock *flow.UnsignedHeader,
 ) {
 	// component is not ready until we checked the initial version beacon
 	defer ready()
@@ -431,7 +431,7 @@ func (s *StopControl) ShouldExecuteBlock(blockID flow.Identifier, height uint64)
 // reached the stopHeight.
 func (s *StopControl) blockFinalized(
 	ctx irrecoverable.SignalerContext,
-	h *flow.Header,
+	h *flow.UnsignedHeader,
 ) {
 	s.Lock()
 	defer s.Unlock()
@@ -510,7 +510,7 @@ func (s *StopControl) blockFinalized(
 }
 
 // OnBlockExecuted should be called after a block has finished execution
-func (s *StopControl) OnBlockExecuted(h *flow.Header) {
+func (s *StopControl) OnBlockExecuted(h *flow.UnsignedHeader) {
 	s.Lock()
 	defer s.Unlock()
 

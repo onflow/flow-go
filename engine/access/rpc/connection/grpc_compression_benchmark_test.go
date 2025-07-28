@@ -111,8 +111,8 @@ func getEvents(n int) []flow.Event {
 }
 
 // getHeaders generates a slice of flow headers with a specified length.
-func getHeaders(n int) []*flow.Header {
-	headers := make([]*flow.Header, n)
+func getHeaders(n int) []*flow.UnsignedHeader {
+	headers := make([]*flow.UnsignedHeader, n)
 	for i := range headers {
 		b := unittest.BlockFixture()
 		headers[i] = b.ToHeader()

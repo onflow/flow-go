@@ -10,7 +10,7 @@ import (
 // Error returns:
 //   - storage.ErrAlreadyExists if the key already exists in the database.
 //   - generic error in case of unexpected failure from the database layer or encoding failure.
-func InsertHeader(blockID flow.Identifier, header *flow.Header) func(*badger.Txn) error {
+func InsertHeader(blockID flow.Identifier, header *flow.UnsignedHeader) func(*badger.Txn) error {
 	return insert(makePrefix(codeHeader, blockID), header)
 }
 
@@ -18,7 +18,7 @@ func InsertHeader(blockID flow.Identifier, header *flow.Header) func(*badger.Txn
 // Error returns:
 //   - storage.ErrNotFound if the key does not exist in the database
 //   - generic error in case of unexpected failure from the database layer
-func RetrieveHeader(blockID flow.Identifier, header *flow.Header) func(*badger.Txn) error {
+func RetrieveHeader(blockID flow.Identifier, header *flow.UnsignedHeader) func(*badger.Txn) error {
 	return retrieve(makePrefix(codeHeader, blockID), header)
 }
 
@@ -63,12 +63,12 @@ func LookupCollectionGuaranteeBlock(collID flow.Identifier, blockID *flow.Identi
 
 // FindHeaders iterates through all headers, calling `filter` on each, and adding
 // them to the `found` slice if `filter` returned true
-func FindHeaders(filter func(header *flow.Header) bool, found *[]flow.Header) func(*badger.Txn) error {
+func FindHeaders(filter func(header *flow.UnsignedHeader) bool, found *[]flow.UnsignedHeader) func(*badger.Txn) error {
 	return traverse(makePrefix(codeHeader), func() (checkFunc, createFunc, handleFunc) {
 		check := func(key []byte) bool {
 			return true
 		}
-		var val flow.Header
+		var val flow.UnsignedHeader
 		create := func() interface{} {
 			return &val
 		}

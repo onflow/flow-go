@@ -197,7 +197,7 @@ func (s *BaseSuite) AwaitFinalizedView(ctx context.Context, view uint64, waitFor
 }
 
 // GetLatestFinalizedHeader retrieves the latest finalized block, as reported in LatestSnapshot.
-func (s *BaseSuite) GetLatestFinalizedHeader(ctx context.Context) *flow.Header {
+func (s *BaseSuite) GetLatestFinalizedHeader(ctx context.Context) *flow.UnsignedHeader {
 	snapshot := s.GetLatestProtocolSnapshot(ctx)
 	finalized, err := snapshot.Head()
 	require.NoError(s.T(), err)

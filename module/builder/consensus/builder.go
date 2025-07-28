@@ -112,7 +112,7 @@ func NewBuilder(
 // However, it will pass through all errors returned by `setter` and `sign`.
 // Callers must be aware of possible error returns from the `setter` and `sign` arguments they provide,
 // and handle them accordingly when handling errors returned from BuildOn.
-func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.HeaderBodyBuilder) error, sign func(*flow.Header) ([]byte, error)) (*flow.ProposalHeader, error) {
+func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.HeaderBodyBuilder) error, sign func(*flow.UnsignedHeader) ([]byte, error)) (*flow.ProposalHeader, error) {
 
 	// since we don't know the blockID when building the block we track the
 	// time indirectly and insert the span directly at the end
@@ -207,7 +207,7 @@ func (b *Builder) repopulateExecutionTree() error {
 	}
 
 	// receiptCollector adds _all known_ receipts for the given block to the execution tree
-	receiptCollector := func(header *flow.Header) error {
+	receiptCollector := func(header *flow.UnsignedHeader) error {
 		receipts, err := b.receiptsDB.ByBlockID(header.ID())
 		if err != nil {
 			return fmt.Errorf("could not retrieve execution reciepts for block %x: %w", header.ID(), err)
@@ -290,7 +290,7 @@ func (b *Builder) getInsertableGuarantees(parentID flow.Identifier) ([]*flow.Col
 
 	// loop through the fork backwards, from parent to limit (inclusive),
 	// and keep track of blocks and collections visited on the way
-	forkScanner := func(header *flow.Header) error {
+	forkScanner := func(header *flow.UnsignedHeader) error {
 		ancestorID := header.ID()
 		blockLookup[ancestorID] = struct{}{}
 
@@ -385,7 +385,7 @@ func (b *Builder) getInsertableSeals(parentID flow.Identifier) ([]*flow.Seal, er
 	//  * A result can only be incorporated in a child of the block that it computes.
 	//    Therefore, we only have to inspect the results incorporated in unsealed blocks.
 	sealsSuperset := make(map[uint64][]*flow.IncorporatedResultSeal) // map: executedBlock.Height -> candidate Seals
-	sealCollector := func(header *flow.Header) error {
+	sealCollector := func(header *flow.UnsignedHeader) error {
 		blockID := header.ID()
 		if blockID == parentID {
 			// Important protocol edge case: There must be at least one block in between the block incorporating
@@ -528,7 +528,7 @@ func (b *Builder) getInsertableReceipts(parentID flow.Identifier) (*InsertableRe
 
 	// loop through the fork backwards, from parent to last sealed (including),
 	// and keep track of blocks and receipts visited on the way.
-	forkScanner := func(ancestor *flow.Header) error {
+	forkScanner := func(ancestor *flow.UnsignedHeader) error {
 		ancestorID := ancestor.ID()
 		ancestors[ancestorID] = struct{}{}
 
@@ -611,7 +611,7 @@ func (b *Builder) createProposal(parentID flow.Identifier,
 	seals []*flow.Seal,
 	insertableReceipts *InsertableReceipts,
 	setter func(*flow.HeaderBodyBuilder) error,
-	sign func(*flow.Header) ([]byte, error),
+	sign func(*flow.UnsignedHeader) ([]byte, error),
 ) (*flow.Proposal, error) {
 	parent, err := b.headers.ByBlockID(parentID)
 	if err != nil {
@@ -689,7 +689,7 @@ func (b *Builder) createProposal(parentID flow.Identifier,
 // isResultForBlock constructs a mempool.BlockFilter that accepts only blocks whose ID is part of the given set.
 func isResultForBlock(blockIDs map[flow.Identifier]struct{}) mempool.BlockFilter {
 	blockIdFilter := id.InSet(blockIDs)
-	return func(h *flow.Header) bool {
+	return func(h *flow.UnsignedHeader) bool {
 		return blockIdFilter(h.ID())
 	}
 }

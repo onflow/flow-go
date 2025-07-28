@@ -32,7 +32,7 @@ func TestFollowerEngine(t *testing.T) {
 type EngineSuite struct {
 	suite.Suite
 
-	finalized *flow.Header
+	finalized *flow.UnsignedHeader
 	net       *mocknetwork.Network
 	con       *mocknetwork.Conduit
 	me        *module.Local

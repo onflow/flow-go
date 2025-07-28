@@ -28,7 +28,7 @@ type ProtocolStateProviderTestSuite struct {
 	distributor  *events.Distributor
 	state        protocol.State
 	snapshot     protocol.Snapshot
-	head         *flow.Header
+	head         *flow.UnsignedHeader
 	participants flow.IdentityList
 	epochNum     uint64
 }
@@ -87,7 +87,7 @@ func (suite *ProtocolStateProviderTestSuite) triggerUpdate() {
 		return nil
 	}, nil)
 	snapshot.On("Head").Return(
-		func() *flow.Header {
+		func() *flow.UnsignedHeader {
 			return suite.head
 		},
 		nil,

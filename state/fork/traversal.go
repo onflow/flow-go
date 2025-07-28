@@ -8,7 +8,7 @@ import (
 )
 
 // functor that will be called on each block header when traversing blocks.
-type onVisitBlock = func(header *flow.Header) error
+type onVisitBlock = func(header *flow.UnsignedHeader) error
 
 // TraverseBackward traverses the given fork (specified by block ID `forkHead`)
 // in the order of decreasing height. The `terminal` defines when the traversal
@@ -60,10 +60,10 @@ func TraverseForward(
 		return nil
 	}
 
-	blocks := make([]*flow.Header, 0, startBlock.Height-lowestHeightToVisit+1)
+	blocks := make([]*flow.UnsignedHeader, 0, startBlock.Height-lowestHeightToVisit+1)
 	lowestBlock, err := unsafeTraverse(headers,
 		startBlock,
-		func(header *flow.Header) error {
+		func(header *flow.UnsignedHeader) error {
 			blocks = append(blocks, header)
 			return nil
 		},
@@ -97,7 +97,7 @@ func TraverseForward(
 // In other words, this unsafe function should only be called after the pre-check.
 // The `TraverseBackward` and `TraverseForward` are "safe" functions since they
 // do the pre-check before calling the `unsafeTraverse`
-func unsafeTraverse(headers storage.Headers, block *flow.Header, visitor onVisitBlock, lowestHeightToVisit uint64) (*flow.Header, error) {
+func unsafeTraverse(headers storage.Headers, block *flow.UnsignedHeader, visitor onVisitBlock, lowestHeightToVisit uint64) (*flow.UnsignedHeader, error) {
 	for {
 		err := visitor(block)
 		if err != nil {

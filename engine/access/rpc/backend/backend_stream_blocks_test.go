@@ -106,7 +106,7 @@ func (s *BackendBlocksSuite) SetupTest() {
 	}
 
 	s.headers.On("ByBlockID", mock.AnythingOfType("flow.Identifier")).Return(
-		func(blockID flow.Identifier) (*flow.Header, error) {
+		func(blockID flow.Identifier) (*flow.UnsignedHeader, error) {
 			for _, block := range s.blockMap {
 				if block.ID() == blockID {
 					return block.ToHeader(), nil
@@ -119,7 +119,7 @@ func (s *BackendBlocksSuite) SetupTest() {
 	s.headers.On("ByHeight", mock.AnythingOfType("uint64")).Return(
 		mocks.ConvertStorageOutput(
 			mocks.StorageMapGetter(s.blockMap),
-			func(block *flow.UnsignedBlock) *flow.Header { return block.ToHeader() },
+			func(block *flow.UnsignedBlock) *flow.UnsignedHeader { return block.ToHeader() },
 		),
 	).Maybe()
 
@@ -281,7 +281,7 @@ func (s *BackendBlocksSuite) setupBlockStatusesForTestCases(baseTests []testType
 // Parameters:
 //   - blockStatus: The status of the blocks being tracked (Sealed or Finalized).
 //   - highestHeader: The highest header that the block tracker should report.
-func (s *BackendBlocksSuite) setupBlockTrackerMock(blockStatus flow.BlockStatus, highestHeader *flow.Header) {
+func (s *BackendBlocksSuite) setupBlockTrackerMock(blockStatus flow.BlockStatus, highestHeader *flow.UnsignedHeader) {
 	s.blockTracker.On("GetHighestHeight", mock.Anything).Unset()
 	s.blockTracker.On("GetHighestHeight", blockStatus).Return(highestHeader.Height, nil)
 

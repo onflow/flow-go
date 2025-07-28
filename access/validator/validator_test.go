@@ -30,7 +30,7 @@ func TestTransactionValidatorSuite(t *testing.T) {
 type TransactionValidatorSuite struct {
 	suite.Suite
 	blocks           *validatormock.Blocks
-	header           *flow.Header
+	header           *flow.UnsignedHeader
 	chain            flow.Chain
 	validatorOptions validator.TransactionValidationOptions
 	metrics          module.TransactionValidationMetrics

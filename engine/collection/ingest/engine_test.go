@@ -102,7 +102,7 @@ func (suite *Suite) SetupTest() {
 	suite.snapshot = new(protocol.Snapshot)
 	suite.state.On("Final").Return(suite.snapshot)
 	suite.snapshot.On("Head").Return(
-		func() *flow.Header { return suite.final.ToHeader() },
+		func() *flow.UnsignedHeader { return suite.final.ToHeader() },
 		func() error { return nil },
 	)
 	suite.state.On("AtBlockID", mock.Anything).Return(

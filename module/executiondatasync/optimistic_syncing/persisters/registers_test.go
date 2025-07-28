@@ -19,7 +19,7 @@ type RegistersPersisterSuite struct {
 	persister         *RegistersPersister
 	inMemoryRegisters *unsynchronized.Registers
 	registers         *storagemock.RegisterIndex
-	header            *flow.Header
+	header            *flow.UnsignedHeader
 }
 
 func TestRegistersPersisterSuite(t *testing.T) {

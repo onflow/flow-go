@@ -63,8 +63,8 @@ type Suite struct {
 
 	conduit        *mocknetwork.Conduit
 	downloader     *downloadermock.Downloader
-	sealedBlock    *flow.Header
-	finalizedBlock *flow.Header
+	sealedBlock    *flow.UnsignedHeader
+	finalizedBlock *flow.UnsignedHeader
 	log            zerolog.Logger
 	blockMap       map[uint64]*flow.UnsignedBlock
 	rootBlock      *flow.UnsignedBlock
@@ -106,7 +106,7 @@ func (s *Suite) SetupTest() {
 	s.proto.state.On("Identity").Return(s.obsIdentity, nil)
 	s.proto.state.On("Params").Return(s.proto.params)
 	s.proto.snapshot.On("Head").Return(
-		func() *flow.Header {
+		func() *flow.UnsignedHeader {
 			return s.finalizedBlock
 		},
 		nil,
@@ -156,7 +156,7 @@ func (s *Suite) SetupTest() {
 	).Maybe()
 
 	s.proto.snapshot.On("Head").Return(
-		func() *flow.Header {
+		func() *flow.UnsignedHeader {
 			return s.finalizedBlock
 		},
 		nil,

@@ -33,7 +33,7 @@ type AccountStatusesProviderSuite struct {
 
 	chain          flow.Chain
 	rootBlock      *flow.UnsignedBlock
-	finalizedBlock *flow.Header
+	finalizedBlock *flow.UnsignedHeader
 
 	factory *DataProviderFactoryImpl
 }

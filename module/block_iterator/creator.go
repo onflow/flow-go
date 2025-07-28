@@ -70,8 +70,8 @@ func (c *Creator) IteratorState() module.IteratorStateReader {
 func NewHeightBasedCreator(
 	getBlockIDByHeight func(height uint64) (flow.Identifier, error),
 	progress storage.ConsumerProgressInitializer,
-	root *flow.Header,
-	latest func() (*flow.Header, error),
+	root *flow.UnsignedHeader,
+	latest func() (*flow.UnsignedHeader, error),
 ) (*Creator, error) {
 
 	return NewCreator(
@@ -103,8 +103,8 @@ func NewHeightBasedCreator(
 func NewViewBasedCreator(
 	getBlockIDByView func(view uint64) (blockID flow.Identifier, viewIndexed bool, exception error),
 	progress storage.ConsumerProgressInitializer,
-	root *flow.Header,
-	latest func() (*flow.Header, error),
+	root *flow.UnsignedHeader,
+	latest func() (*flow.UnsignedHeader, error),
 ) (*Creator, error) {
 	return NewCreator(
 		getBlockIDByView,

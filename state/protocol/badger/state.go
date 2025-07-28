@@ -25,9 +25,9 @@ import (
 // we can cache them together
 type cachedLatest struct {
 	finalizedID     flow.Identifier
-	finalizedHeader *flow.Header
+	finalizedHeader *flow.UnsignedHeader
 	sealedID        flow.Identifier
-	sealedHeader    *flow.Header
+	sealedHeader    *flow.UnsignedHeader
 }
 
 type State struct {

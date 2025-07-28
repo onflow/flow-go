@@ -64,7 +64,7 @@ func (s *EmulatorSuite) runTest(goodNodes int, emulatorProblems bool) {
 		FinalView:    600,
 	}
 
-	firstBlock := &flow.Header{
+	firstBlock := &flow.UnsignedHeader{
 		HeaderBody: flow.HeaderBody{
 			View: 100,
 		},

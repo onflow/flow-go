@@ -60,7 +60,7 @@ func NewReader(state protocol.State, blocks storage.Blocks, commits storage.Comm
 	}
 }
 
-func (r *Reader) getBlockByHeader(header *flow.Header) (*flow.UnsignedBlock, error) {
+func (r *Reader) getBlockByHeader(header *flow.UnsignedHeader) (*flow.UnsignedBlock, error) {
 	blockID := header.ID()
 	block, err := r.blocks.ByID(blockID)
 	if err != nil {

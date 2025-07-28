@@ -75,10 +75,10 @@ func (mr *MockEmulatorStorageMockRecorder) BlockByID(ctx, blockID any) *gomock.C
 }
 
 // ByHeightFrom mocks base method.
-func (m *MockEmulatorStorage) ByHeightFrom(height uint64, header *flow.Header) (*flow.Header, error) {
+func (m *MockEmulatorStorage) ByHeightFrom(height uint64, header *flow.UnsignedHeader) (*flow.UnsignedHeader, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "ByHeightFrom", height, header)
-	ret0, _ := ret[0].(*flow.Header)
+	ret0, _ := ret[0].(*flow.UnsignedHeader)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -134,10 +134,10 @@ func (mr *MockEmulatorStorageMockRecorder) EventsByHeight(ctx, blockHeight, even
 }
 
 // FinalizedHeader mocks base method.
-func (m *MockEmulatorStorage) FinalizedHeader() (*flow.Header, error) {
+func (m *MockEmulatorStorage) FinalizedHeader() (*flow.UnsignedHeader, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "FinalizedHeader")
-	ret0, _ := ret[0].(*flow.Header)
+	ret0, _ := ret[0].(*flow.UnsignedHeader)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -164,10 +164,10 @@ func (mr *MockEmulatorStorageMockRecorder) FullCollectionByID(ctx, collectionID 
 }
 
 // HeaderByID mocks base method.
-func (m *MockEmulatorStorage) HeaderByID(id flow.Identifier) (*flow.Header, error) {
+func (m *MockEmulatorStorage) HeaderByID(id flow.Identifier) (*flow.UnsignedHeader, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "HeaderByID", id)
-	ret0, _ := ret[0].(*flow.Header)
+	ret0, _ := ret[0].(*flow.UnsignedHeader)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -239,10 +239,10 @@ func (mr *MockEmulatorStorageMockRecorder) LedgerByHeight(ctx, blockHeight any) 
 }
 
 // SealedHeader mocks base method.
-func (m *MockEmulatorStorage) SealedHeader() (*flow.Header, error) {
+func (m *MockEmulatorStorage) SealedHeader() (*flow.UnsignedHeader, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "SealedHeader")
-	ret0, _ := ret[0].(*flow.Header)
+	ret0, _ := ret[0].(*flow.UnsignedHeader)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }

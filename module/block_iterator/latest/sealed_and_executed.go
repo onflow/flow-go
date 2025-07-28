@@ -10,13 +10,13 @@ import (
 )
 
 type LatestSealedAndExecuted struct {
-	root            *flow.Header
+	root            *flow.UnsignedHeader
 	state           protocol.State
 	executedBlockDB storage.DB
 }
 
 func NewLatestSealedAndExecuted(
-	root *flow.Header,
+	root *flow.UnsignedHeader,
 	state protocol.State,
 	executedBlockDB storage.DB,
 ) *LatestSealedAndExecuted {
@@ -28,7 +28,7 @@ func NewLatestSealedAndExecuted(
 }
 
 // BelowLatest returns the header at the given threshold below the latest sealed and executed block.
-func (l *LatestSealedAndExecuted) BelowLatest(threshold uint64) (*flow.Header, error) {
+func (l *LatestSealedAndExecuted) BelowLatest(threshold uint64) (*flow.UnsignedHeader, error) {
 
 	minHeight := l.root.Height + threshold
 	latest, err := l.Latest()
@@ -45,7 +45,7 @@ func (l *LatestSealedAndExecuted) BelowLatest(threshold uint64) (*flow.Header, e
 }
 
 // Latest returns the latest sealed and executed block.
-func (l *LatestSealedAndExecuted) Latest() (*flow.Header, error) {
+func (l *LatestSealedAndExecuted) Latest() (*flow.UnsignedHeader, error) {
 	height, err := LatestSealedAndExecutedHeight(l.state, l.executedBlockDB)
 	if err != nil {
 		return nil, err

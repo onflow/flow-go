@@ -34,7 +34,7 @@ type CoreSuite struct {
 	suite.Suite
 
 	originID         flow.Identifier
-	finalizedBlock   *flow.Header
+	finalizedBlock   *flow.UnsignedHeader
 	state            *protocol.FollowerState
 	follower         *module.HotStuffFollower
 	sync             *module.BlockRequester
@@ -57,7 +57,7 @@ func (s *CoreSuite) SetupTest() {
 	s.originID = unittest.IdentifierFixture()
 	s.finalizedBlock = unittest.BlockHeaderFixture()
 	finalSnapshot := protocol.NewSnapshot(s.T())
-	finalSnapshot.On("Head").Return(func() *flow.Header { return s.finalizedBlock }, nil).Once()
+	finalSnapshot.On("Head").Return(func() *flow.UnsignedHeader { return s.finalizedBlock }, nil).Once()
 	s.state.On("Final").Return(finalSnapshot).Once()
 
 	metrics := metrics.NewNoopCollector()

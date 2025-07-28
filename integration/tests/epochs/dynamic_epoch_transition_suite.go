@@ -403,7 +403,7 @@ func (s *DynamicEpochTransitionSuite) AwaitSealedView(ctx context.Context, thres
 }
 
 // LatestSealedBlockHeader retrieves the latest sealed block, as reported in LatestSnapshot.
-func (s *DynamicEpochTransitionSuite) LatestSealedBlockHeader(ctx context.Context) *flow.Header {
+func (s *DynamicEpochTransitionSuite) LatestSealedBlockHeader(ctx context.Context) *flow.UnsignedHeader {
 	snapshot, err := s.Client.GetLatestProtocolSnapshot(ctx)
 	require.NoError(s.T(), err)
 	segment, err := snapshot.SealingSegment()

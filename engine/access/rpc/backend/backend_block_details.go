@@ -19,7 +19,7 @@ type backendBlockDetails struct {
 }
 
 func (b *backendBlockDetails) GetLatestBlock(ctx context.Context, isSealed bool) (*flow.UnsignedBlock, flow.BlockStatus, error) {
-	var header *flow.Header
+	var header *flow.UnsignedHeader
 	var err error
 
 	if isSealed {

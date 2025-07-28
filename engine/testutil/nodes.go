@@ -838,7 +838,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity bootstrap.NodeInfo, ide
 	}
 }
 
-func getRoot(t *testing.T, node *testmock.GenericNode) (*flow.Header, *flow.QuorumCertificate) {
+func getRoot(t *testing.T, node *testmock.GenericNode) (*flow.UnsignedHeader, *flow.QuorumCertificate) {
 	rootHead := node.State.Params().FinalizedRoot()
 
 	signers, err := node.State.AtHeight(0).Identities(filter.HasRole[flow.Identity](flow.RoleConsensus))
@@ -917,7 +917,7 @@ func createFollowerCore(
 	node *testmock.GenericNode,
 	followerState *badgerstate.FollowerState,
 	notifier hotstuff.FollowerConsumer,
-	rootHead *flow.Header,
+	rootHead *flow.UnsignedHeader,
 	rootQC *flow.QuorumCertificate,
 ) (module.HotStuffFollower, *confinalizer.Finalizer) {
 	finalizer := confinalizer.NewFinalizer(node.PublicDB, node.Headers, followerState, trace.NewNoopTracer())

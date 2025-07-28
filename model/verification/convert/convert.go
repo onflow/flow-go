@@ -11,7 +11,7 @@ import (
 func FromChunkDataPack(
 	chunk *flow.Chunk,
 	chunkDataPack *flow.ChunkDataPack,
-	header *flow.Header,
+	header *flow.UnsignedHeader,
 	snapshot protocol.SnapshotExecutionSubset,
 	result *flow.ExecutionResult,
 ) (*verification.VerifiableChunkData, error) {

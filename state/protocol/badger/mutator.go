@@ -833,7 +833,7 @@ func isFirstBlockOfEpoch(parentEpochState, blockEpochState protocol.EpochProtoco
 //
 // This method must be called for each finalized block.
 // No errors are expected during normal operation.
-func (m *FollowerState) epochMetricsAndEventsOnBlockFinalized(parentEpochState, finalizedEpochState protocol.EpochProtocolState, finalized *flow.Header) (
+func (m *FollowerState) epochMetricsAndEventsOnBlockFinalized(parentEpochState, finalizedEpochState protocol.EpochProtocolState, finalized *flow.UnsignedHeader) (
 	metrics []func(),
 	events []func(),
 	err error,

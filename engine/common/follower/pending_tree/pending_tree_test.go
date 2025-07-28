@@ -22,7 +22,7 @@ func TestPendingTree(t *testing.T) {
 type PendingTreeSuite struct {
 	suite.Suite
 
-	finalized   *flow.Header
+	finalized   *flow.UnsignedHeader
 	pendingTree *PendingTree
 }
 
@@ -257,7 +257,7 @@ func (s *PendingTreeSuite) TestAddingBlocksWithSameHeight() {
 }
 
 // certifiedBlocksFixture builds a chain of certified blocks starting at some block.
-func certifiedBlocksFixture(t *testing.T, count int, parent *flow.Header) []flow.CertifiedBlock {
+func certifiedBlocksFixture(t *testing.T, count int, parent *flow.UnsignedHeader) []flow.CertifiedBlock {
 	result := make([]flow.CertifiedBlock, 0, count)
 	blocks := unittest.ProposalChainFixtureFrom(count, parent)
 	for i := 0; i < count-1; i++ {

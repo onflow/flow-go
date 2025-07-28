@@ -146,7 +146,7 @@ func (s *sealValidator) Validate(candidate *flow.UnsignedBlock) (*flow.Seal, err
 
 	// Traverse fork starting from the lowest unsealed block (included) up to the parent block (included).
 	// For each visited block collect: IncorporatedResults and block ID
-	forkCollector := func(header *flow.Header) error {
+	forkCollector := func(header *flow.UnsignedHeader) error {
 		blockID := header.ID()
 		if blockID == parentID {
 			// Important protocol edge case: There must be at least one block in between the block incorporating

@@ -292,7 +292,7 @@ func (suite *SnapshotSuite) TestPending_Grandchildren() {
 	parents[suite.genesis.ID()] = struct{}{}
 
 	for _, blockID := range pending {
-		var header flow.Header
+		var header flow.UnsignedHeader
 		err := suite.db.View(operation.RetrieveHeader(blockID, &header))
 		suite.Require().Nil(err)
 

@@ -67,7 +67,7 @@ func (v *Views) indexView(view uint64) {
 
 // BlockFinalized handles block finalized protocol events, triggering view
 // callbacks as needed.
-func (v *Views) BlockFinalized(block *flow.Header) {
+func (v *Views) BlockFinalized(block *flow.UnsignedHeader) {
 	v.Lock()
 	defer v.Unlock()
 

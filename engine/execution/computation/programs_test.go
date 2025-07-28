@@ -178,7 +178,7 @@ type blockProvider struct {
 	blocks map[uint64]*flow.UnsignedBlock
 }
 
-func (b blockProvider) ByHeightFrom(height uint64, _ *flow.Header) (*flow.Header, error) {
+func (b blockProvider) ByHeightFrom(height uint64, _ *flow.UnsignedHeader) (*flow.UnsignedHeader, error) {
 	block, has := b.blocks[height]
 	if has {
 		return block.ToHeader(), nil

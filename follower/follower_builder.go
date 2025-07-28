@@ -98,7 +98,7 @@ type FollowerServiceBuilder struct {
 	SyncCore            *synchronization.Core
 	FollowerDistributor *pubsub.FollowerDistributor
 	Committee           hotstuff.DynamicCommittee
-	Finalized           *flow.Header
+	Finalized           *flow.UnsignedHeader
 	Pending             []*flow.ProposalHeader
 	FollowerCore        module.HotStuffFollower
 	// for the observer, the sync engine participants provider is the libp2p peer store which is not

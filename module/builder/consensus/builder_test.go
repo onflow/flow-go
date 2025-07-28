@@ -57,7 +57,7 @@ type BuilderSuite struct {
 	pendingSeals      map[flow.Identifier]*flow.IncorporatedResultSeal // storage for the seal mempool
 
 	// storage for dbs
-	headers       map[flow.Identifier]*flow.Header
+	headers       map[flow.Identifier]*flow.UnsignedHeader
 	index         map[flow.Identifier]*flow.Index
 	blocks        map[flow.Identifier]*flow.UnsignedBlock
 	blockChildren map[flow.Identifier][]flow.Identifier // ids of children blocks
@@ -69,7 +69,7 @@ type BuilderSuite struct {
 	db       *badger.DB
 	sentinel uint64
 	setter   func(*flow.HeaderBodyBuilder) error
-	sign     func(*flow.Header) ([]byte, error)
+	sign     func(*flow.UnsignedHeader) ([]byte, error)
 
 	// mocked dependencies
 	state        *protocol.ParticipantState
@@ -206,7 +206,7 @@ func (bs *BuilderSuite) SetupTest() {
 
 	// initialise the dbs
 	bs.lastSeal = nil
-	bs.headers = make(map[flow.Identifier]*flow.Header)
+	bs.headers = make(map[flow.Identifier]*flow.UnsignedHeader)
 	bs.index = make(map[flow.Identifier]*flow.Index)
 	bs.blocks = make(map[flow.Identifier]*flow.UnsignedBlock)
 	bs.blockChildren = make(map[flow.Identifier][]flow.Identifier)
@@ -276,7 +276,7 @@ func (bs *BuilderSuite) SetupTest() {
 
 		return nil
 	}
-	bs.sign = func(_ *flow.Header) ([]byte, error) {
+	bs.sign = func(_ *flow.UnsignedHeader) ([]byte, error) {
 		return unittest.SignatureFixture(), nil
 	}
 
@@ -304,7 +304,7 @@ func (bs *BuilderSuite) SetupTest() {
 
 	bs.headerDB = &storage.Headers{}
 	bs.headerDB.On("ByBlockID", mock.Anything).Return(
-		func(blockID flow.Identifier) *flow.Header {
+		func(blockID flow.Identifier) *flow.UnsignedHeader {
 			return bs.headers[blockID]
 		},
 		func(blockID flow.Identifier) error {
@@ -485,7 +485,7 @@ func (bs *BuilderSuite) TestSetterErrorPassthrough() {
 func (bs *BuilderSuite) TestSignErrorPassthrough() {
 	bs.T().Run("unexpected Exception", func(t *testing.T) {
 		exception := errors.New("exception")
-		sign := func(header *flow.Header) ([]byte, error) {
+		sign := func(header *flow.UnsignedHeader) ([]byte, error) {
 			return nil, exception
 		}
 		_, err := bs.build.BuildOn(bs.parentID, bs.setter, sign)
@@ -494,7 +494,7 @@ func (bs *BuilderSuite) TestSignErrorPassthrough() {
 	bs.T().Run("NoVoteError", func(t *testing.T) {
 		// the EventHandler relies on this sentinel in particular to be passed through
 		sentinel := hotstuffmodel.NewNoVoteErrorf("not voting")
-		sign := func(header *flow.Header) ([]byte, error) {
+		sign := func(header *flow.UnsignedHeader) ([]byte, error) {
 			return nil, sentinel
 		}
 		_, err := bs.build.BuildOn(bs.parentID, bs.setter, sign)
@@ -1001,10 +1001,10 @@ func (bs *BuilderSuite) TestPayloadReceipts_IncludeOnlyReceiptsForCurrentFork() 
 	bs.recPool.On("ReachableReceipts", b1Seal.ResultID, mock.Anything, mock.Anything).Run(
 		func(args mock.Arguments) {
 			blockFilter := args[1].(mempoolAPIs.BlockFilter)
-			for _, h := range []*flow.Header{b1.ToHeader(), b2.ToHeader(), b3.ToHeader(), b4.ToHeader(), b5.ToHeader()} {
+			for _, h := range []*flow.UnsignedHeader{b1.ToHeader(), b2.ToHeader(), b3.ToHeader(), b4.ToHeader(), b5.ToHeader()} {
 				assert.True(bs.T(), blockFilter(h))
 			}
-			for _, h := range []*flow.Header{bs.blocks[bs.finalID].ToHeader(), x1.ToHeader(), y2.ToHeader(), a6.ToHeader(), c3.ToHeader(), c4.ToHeader(), d4.ToHeader()} {
+			for _, h := range []*flow.UnsignedHeader{bs.blocks[bs.finalID].ToHeader(), x1.ToHeader(), y2.ToHeader(), a6.ToHeader(), c3.ToHeader(), c4.ToHeader(), d4.ToHeader()} {
 				assert.False(bs.T(), blockFilter(h))
 			}
 		}).Return([]*flow.ExecutionReceipt{}, nil).Once()

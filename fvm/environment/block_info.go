@@ -66,7 +66,7 @@ func (info ParseRestrictedBlockInfo) GetBlockAtHeight(
 
 type BlockInfoParams struct {
 	Blocks      Blocks
-	BlockHeader *flow.Header
+	BlockHeader *flow.UnsignedHeader
 }
 
 func DefaultBlockInfoParams() BlockInfoParams {
@@ -80,14 +80,14 @@ type blockInfo struct {
 	tracer tracing.TracerSpan
 	meter  Meter
 
-	blockHeader *flow.Header
+	blockHeader *flow.UnsignedHeader
 	blocks      Blocks
 }
 
 func NewBlockInfo(
 	tracer tracing.TracerSpan,
 	meter Meter,
-	blockHeader *flow.Header,
+	blockHeader *flow.UnsignedHeader,
 	blocks Blocks,
 ) BlockInfo {
 	return &blockInfo{

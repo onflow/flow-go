@@ -9,7 +9,7 @@ import (
 // By using the same instance, we avoid GC overhead. All methods are essentially NoOps.
 type NoopSealingTracker struct{}
 
-func (t *NoopSealingTracker) NewSealingObservation(*flow.Header, *flow.Seal, *flow.Header) consensus.SealingObservation {
+func (t *NoopSealingTracker) NewSealingObservation(*flow.UnsignedHeader, *flow.Seal, *flow.UnsignedHeader) consensus.SealingObservation {
 	return t
 }
 

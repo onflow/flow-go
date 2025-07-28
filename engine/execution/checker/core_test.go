@@ -22,21 +22,21 @@ func makeCore(t *testing.T) (*checker.Core, *protocol.State, *stateMock.Executio
 	return core, state, execState
 }
 
-func mockFinalizedBlock(t *testing.T, state *protocol.State, finalized *flow.Header) *protocol.Snapshot {
+func mockFinalizedBlock(t *testing.T, state *protocol.State, finalized *flow.UnsignedHeader) *protocol.Snapshot {
 	finalizedSnapshot := protocol.NewSnapshot(t)
 	finalizedSnapshot.On("Head").Return(finalized, nil)
 	state.On("Final").Return(finalizedSnapshot)
 	return finalizedSnapshot
 }
 
-func mockAtBlockID(t *testing.T, state *protocol.State, header *flow.Header) *protocol.Snapshot {
+func mockAtBlockID(t *testing.T, state *protocol.State, header *flow.UnsignedHeader) *protocol.Snapshot {
 	snapshot := protocol.NewSnapshot(t)
 	snapshot.On("Head").Return(header, nil)
 	state.On("AtBlockID", header.ID()).Return(snapshot)
 	return snapshot
 }
 
-func mockSealedBlock(t *testing.T, state *protocol.State, finalized *protocol.Snapshot, sealed *flow.Header) (*flow.ExecutionResult, *flow.Seal) {
+func mockSealedBlock(t *testing.T, state *protocol.State, finalized *protocol.Snapshot, sealed *flow.UnsignedHeader) (*flow.ExecutionResult, *flow.Seal) {
 	lastSealResult := unittest.ExecutionResultFixture(func(r *flow.ExecutionResult) {
 		r.BlockID = sealed.ID()
 	})
@@ -45,12 +45,12 @@ func mockSealedBlock(t *testing.T, state *protocol.State, finalized *protocol.Sn
 	return lastSealResult, lastSeal
 }
 
-func mockFinalizedSealedBlock(t *testing.T, state *protocol.State, finalized *flow.Header, sealed *flow.Header) (*flow.ExecutionResult, *flow.Seal) {
+func mockFinalizedSealedBlock(t *testing.T, state *protocol.State, finalized *flow.UnsignedHeader, sealed *flow.UnsignedHeader) (*flow.ExecutionResult, *flow.Seal) {
 	finalizedSnapshot := mockFinalizedBlock(t, state, finalized)
 	return mockSealedBlock(t, state, finalizedSnapshot, sealed)
 }
 
-func mockSealedBlockAtHeight(t *testing.T, state *protocol.State, height uint64, lastSealed *flow.Header) (*flow.ExecutionResult, *flow.Seal) {
+func mockSealedBlockAtHeight(t *testing.T, state *protocol.State, height uint64, lastSealed *flow.UnsignedHeader) (*flow.ExecutionResult, *flow.Seal) {
 	snapshotAtHeight := protocol.NewSnapshot(t)
 	lastSealedResultAtHeight := unittest.ExecutionResultFixture(func(r *flow.ExecutionResult) {
 		r.BlockID = lastSealed.ID()
@@ -61,13 +61,13 @@ func mockSealedBlockAtHeight(t *testing.T, state *protocol.State, height uint64,
 	return lastSealedResultAtHeight, lastSealAtHeight
 }
 
-func mockExecutedBlock(t *testing.T, es *stateMock.ExecutionState, executed *flow.Header, result *flow.ExecutionResult) {
+func mockExecutedBlock(t *testing.T, es *stateMock.ExecutionState, executed *flow.UnsignedHeader, result *flow.ExecutionResult) {
 	commit, err := result.FinalStateCommitment()
 	require.NoError(t, err)
 	es.On("StateCommitmentByBlockID", executed.ID()).Return(commit, nil)
 }
 
-func mockUnexecutedBlock(t *testing.T, es *stateMock.ExecutionState, unexecuted *flow.Header) {
+func mockUnexecutedBlock(t *testing.T, es *stateMock.ExecutionState, unexecuted *flow.UnsignedHeader) {
 	es.On("StateCommitmentByBlockID", unexecuted.ID()).Return(nil, storage.ErrNotFound)
 }
 

@@ -99,7 +99,7 @@ func NewBuilder(
 // However, it will pass through all errors returned by `setter` and `sign`.
 // Callers must be aware of possible error returns from the `setter` and `sign` arguments they provide,
 // and handle them accordingly when handling errors returned from BuildOn.
-func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.HeaderBodyBuilder) error, sign func(*flow.Header) ([]byte, error)) (*flow.ProposalHeader, error) {
+func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.HeaderBodyBuilder) error, sign func(*flow.UnsignedHeader) ([]byte, error)) (*flow.ProposalHeader, error) {
 	parentSpan, ctx := b.tracer.StartSpanFromContext(context.Background(), trace.COLBuildOn)
 	defer parentSpan.End()
 
@@ -296,7 +296,7 @@ func (b *Builder) getBlockBuildContext(parentID flow.Identifier) (*blockBuildCon
 // The traversal begins with the block specified by parentID (the block we are
 // building on top of) and ends with the oldest unfinalized block in the ancestry.
 func (b *Builder) populateUnfinalizedAncestryLookup(ctx *blockBuildContext) error {
-	err := fork.TraverseBackward(b.clusterHeaders, ctx.parentID, func(ancestor *flow.Header) error {
+	err := fork.TraverseBackward(b.clusterHeaders, ctx.parentID, func(ancestor *flow.UnsignedHeader) error {
 		payload, err := b.payloads.ByBlockID(ancestor.ID())
 		if err != nil {
 			return fmt.Errorf("could not retrieve ancestor payload: %w", err)
@@ -519,7 +519,7 @@ func (b *Builder) buildHeader(
 	ctx *blockBuildContext,
 	payload *cluster.Payload,
 	setter func(header *flow.HeaderBodyBuilder) error,
-	sign func(header *flow.Header) ([]byte, error),
+	sign func(header *flow.UnsignedHeader) ([]byte, error),
 ) (*flow.ProposalHeader, error) {
 	// NOTE: we rely on the HotStuff-provided setter to set the other
 	// fields, which are related to signatures and HotStuff internals
@@ -538,7 +538,7 @@ func (b *Builder) buildHeader(
 	if err != nil {
 		return nil, irrecoverable.NewExceptionf("unexpected error when building header body: %w", err)
 	}
-	header, err := flow.NewHeader(flow.UntrustedHeader{
+	header, err := flow.NewHeader(flow.UntrustedUnsignedHeader{
 		HeaderBody:  *headerBody,
 		PayloadHash: payload.Hash(),
 	})

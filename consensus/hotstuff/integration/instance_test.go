@@ -58,7 +58,7 @@ type Instance struct {
 	// instance data
 	queue          chan interface{}
 	updatingBlocks sync.RWMutex
-	headers        map[flow.Identifier]*flow.Header
+	headers        map[flow.Identifier]*flow.UnsignedHeader
 	pendings       map[flow.Identifier]*model.SignedProposal // indexed by parent ID
 
 	// mocked dependencies
@@ -152,7 +152,7 @@ func NewInstance(t *testing.T, options ...Option) *Instance {
 
 		// instance data
 		pendings: make(map[flow.Identifier]*model.SignedProposal),
-		headers:  make(map[flow.Identifier]*flow.Header),
+		headers:  make(map[flow.Identifier]*flow.UnsignedHeader),
 		queue:    make(chan interface{}, 1024),
 
 		// instance mocks
@@ -190,7 +190,7 @@ func NewInstance(t *testing.T, options ...Option) *Instance {
 
 	// program the builder module behaviour
 	in.builder.On("BuildOn", mock.Anything, mock.Anything, mock.Anything).Return(
-		func(parentID flow.Identifier, setter func(builder *flow.HeaderBodyBuilder) error, sign func(*flow.Header) ([]byte, error)) *flow.ProposalHeader {
+		func(parentID flow.Identifier, setter func(builder *flow.HeaderBodyBuilder) error, sign func(*flow.UnsignedHeader) ([]byte, error)) *flow.ProposalHeader {
 			in.updatingBlocks.Lock()
 			defer in.updatingBlocks.Unlock()
 
@@ -207,7 +207,7 @@ func NewInstance(t *testing.T, options ...Option) *Instance {
 			require.NoError(t, setter(headerBuilder))
 			headerBody, err := headerBuilder.Build()
 			require.NoError(t, err)
-			header, err := flow.NewHeader(flow.UntrustedHeader{
+			header, err := flow.NewHeader(flow.UntrustedUnsignedHeader{
 				HeaderBody:  *headerBody,
 				PayloadHash: unittest.IdentifierFixture(),
 			})
@@ -221,7 +221,7 @@ func NewInstance(t *testing.T, options ...Option) *Instance {
 			in.headers[header.ID()] = header
 			return proposal
 		},
-		func(parentID flow.Identifier, _ func(*flow.HeaderBodyBuilder) error, _ func(*flow.Header) ([]byte, error)) error {
+		func(parentID flow.Identifier, _ func(*flow.HeaderBodyBuilder) error, _ func(*flow.UnsignedHeader) ([]byte, error)) error {
 			in.updatingBlocks.RLock()
 			_, ok := in.headers[parentID]
 			in.updatingBlocks.RUnlock()

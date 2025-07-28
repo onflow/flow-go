@@ -451,24 +451,24 @@ func (_m *API) GetBlockByID(ctx context.Context, id flow.Identifier) (*flow.Gene
 }
 
 // GetBlockHeaderByHeight provides a mock function with given fields: ctx, height
-func (_m *API) GetBlockHeaderByHeight(ctx context.Context, height uint64) (*flow.Header, flow.BlockStatus, error) {
+func (_m *API) GetBlockHeaderByHeight(ctx context.Context, height uint64) (*flow.UnsignedHeader, flow.BlockStatus, error) {
 	ret := _m.Called(ctx, height)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetBlockHeaderByHeight")
 	}
 
-	var r0 *flow.Header
+	var r0 *flow.UnsignedHeader
 	var r1 flow.BlockStatus
 	var r2 error
-	if rf, ok := ret.Get(0).(func(context.Context, uint64) (*flow.Header, flow.BlockStatus, error)); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, uint64) (*flow.UnsignedHeader, flow.BlockStatus, error)); ok {
 		return rf(ctx, height)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, uint64) *flow.Header); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, uint64) *flow.UnsignedHeader); ok {
 		r0 = rf(ctx, height)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*flow.Header)
+			r0 = ret.Get(0).(*flow.UnsignedHeader)
 		}
 	}
 
@@ -488,24 +488,24 @@ func (_m *API) GetBlockHeaderByHeight(ctx context.Context, height uint64) (*flow
 }
 
 // GetBlockHeaderByID provides a mock function with given fields: ctx, id
-func (_m *API) GetBlockHeaderByID(ctx context.Context, id flow.Identifier) (*flow.Header, flow.BlockStatus, error) {
+func (_m *API) GetBlockHeaderByID(ctx context.Context, id flow.Identifier) (*flow.UnsignedHeader, flow.BlockStatus, error) {
 	ret := _m.Called(ctx, id)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetBlockHeaderByID")
 	}
 
-	var r0 *flow.Header
+	var r0 *flow.UnsignedHeader
 	var r1 flow.BlockStatus
 	var r2 error
-	if rf, ok := ret.Get(0).(func(context.Context, flow.Identifier) (*flow.Header, flow.BlockStatus, error)); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, flow.Identifier) (*flow.UnsignedHeader, flow.BlockStatus, error)); ok {
 		return rf(ctx, id)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, flow.Identifier) *flow.Header); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, flow.Identifier) *flow.UnsignedHeader); ok {
 		r0 = rf(ctx, id)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*flow.Header)
+			r0 = ret.Get(0).(*flow.UnsignedHeader)
 		}
 	}
 
@@ -742,24 +742,24 @@ func (_m *API) GetLatestBlock(ctx context.Context, isSealed bool) (*flow.Generic
 }
 
 // GetLatestBlockHeader provides a mock function with given fields: ctx, isSealed
-func (_m *API) GetLatestBlockHeader(ctx context.Context, isSealed bool) (*flow.Header, flow.BlockStatus, error) {
+func (_m *API) GetLatestBlockHeader(ctx context.Context, isSealed bool) (*flow.UnsignedHeader, flow.BlockStatus, error) {
 	ret := _m.Called(ctx, isSealed)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetLatestBlockHeader")
 	}
 
-	var r0 *flow.Header
+	var r0 *flow.UnsignedHeader
 	var r1 flow.BlockStatus
 	var r2 error
-	if rf, ok := ret.Get(0).(func(context.Context, bool) (*flow.Header, flow.BlockStatus, error)); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, bool) (*flow.UnsignedHeader, flow.BlockStatus, error)); ok {
 		return rf(ctx, isSealed)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, bool) *flow.Header); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, bool) *flow.UnsignedHeader); ok {
 		r0 = rf(ctx, isSealed)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*flow.Header)
+			r0 = ret.Get(0).(*flow.UnsignedHeader)
 		}
 	}
 

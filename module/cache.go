@@ -6,5 +6,5 @@ import (
 
 // FinalizedHeaderCache is a cache of the latest finalized block header.
 type FinalizedHeaderCache interface {
-	Get() *flow.Header
+	Get() *flow.UnsignedHeader
 }

@@ -116,7 +116,7 @@ func createCore(t *testing.T, blocks []*flow.UnsignedBlock) (
 		headers,
 		nil,
 		nil,
-		&flow.Header{HeaderBody: flow.HeaderBody{Height: 1}},
+		&flow.UnsignedHeader{HeaderBody: flow.HeaderBody{Height: 1}},
 		false,
 		false,
 	)

@@ -8,12 +8,12 @@ import (
 
 // Status keeps track of a block download status.
 type Status struct {
-	BlockHeight uint64       // always present even if we haven't received the header
-	Queued      time.Time    // when we originally queued this block request
-	Requested   time.Time    // the last time we requested this block
-	Attempts    uint         // how many times we've requested this block
-	Header      *flow.Header // the requested header, if we've received it
-	Received    time.Time    // when we received a response
+	BlockHeight uint64               // always present even if we haven't received the header
+	Queued      time.Time            // when we originally queued this block request
+	Requested   time.Time            // the last time we requested this block
+	Attempts    uint                 // how many times we've requested this block
+	Header      *flow.UnsignedHeader // the requested header, if we've received it
+	Received    time.Time            // when we received a response
 }
 
 func (s *Status) WasQueued() bool {

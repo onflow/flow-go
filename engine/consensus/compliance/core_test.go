@@ -47,10 +47,10 @@ type CommonSuite struct {
 	// engine parameters
 	participants flow.IdentityList
 	myID         flow.Identifier
-	head         *flow.Header
+	head         *flow.UnsignedHeader
 
 	// storage data
-	headerDB   map[flow.Identifier]*flow.Header
+	headerDB   map[flow.Identifier]*flow.UnsignedHeader
 	payloadDB  map[flow.Identifier]*flow.Payload
 	pendingDB  map[flow.Identifier]flow.Slashable[*flow.Proposal]
 	childrenDB map[flow.Identifier][]flow.Slashable[*flow.Proposal]
@@ -89,7 +89,7 @@ func (cs *CommonSuite) SetupTest() {
 	cs.head = block.ToHeader()
 
 	// initialize the storage data
-	cs.headerDB = make(map[flow.Identifier]*flow.Header)
+	cs.headerDB = make(map[flow.Identifier]*flow.UnsignedHeader)
 	cs.payloadDB = make(map[flow.Identifier]*flow.Payload)
 	cs.pendingDB = make(map[flow.Identifier]flow.Slashable[*flow.Proposal])
 	cs.childrenDB = make(map[flow.Identifier][]flow.Slashable[*flow.Proposal])
@@ -109,13 +109,13 @@ func (cs *CommonSuite) SetupTest() {
 	// set up header storage mock
 	cs.headers = &storage.Headers{}
 	cs.headers.On("Store", mock.Anything).Return(
-		func(header *flow.Header) error {
+		func(header *flow.UnsignedHeader) error {
 			cs.headerDB[header.ID()] = header
 			return nil
 		},
 	)
 	cs.headers.On("ByBlockID", mock.Anything).Return(
-		func(blockID flow.Identifier) *flow.Header {
+		func(blockID flow.Identifier) *flow.UnsignedHeader {
 			return cs.headerDB[blockID]
 		},
 		func(blockID flow.Identifier) error {
@@ -137,7 +137,7 @@ func (cs *CommonSuite) SetupTest() {
 	// set up payload storage mock
 	cs.payloads = &storage.Payloads{}
 	cs.payloads.On("Store", mock.Anything, mock.Anything).Return(
-		func(header *flow.Header, payload *flow.Payload) error {
+		func(header *flow.UnsignedHeader, payload *flow.Payload) error {
 			cs.payloadDB[header.ID()] = payload
 			return nil
 		},
@@ -178,7 +178,7 @@ func (cs *CommonSuite) SetupTest() {
 		nil,
 	)
 	cs.snapshot.On("Head").Return(
-		func() *flow.Header {
+		func() *flow.UnsignedHeader {
 			return cs.head
 		},
 		nil,

@@ -268,15 +268,15 @@ func (*api) GetNodeVersionInfo(_ context.Context) (*accessmodel.NodeVersionInfo,
 	return nil, errors.New("unimplemented")
 }
 
-func (*api) GetLatestBlockHeader(_ context.Context, _ bool) (*flow.Header, flow.BlockStatus, error) {
+func (*api) GetLatestBlockHeader(_ context.Context, _ bool) (*flow.UnsignedHeader, flow.BlockStatus, error) {
 	return nil, flow.BlockStatusUnknown, errors.New("unimplemented")
 }
 
-func (*api) GetBlockHeaderByHeight(_ context.Context, _ uint64) (*flow.Header, flow.BlockStatus, error) {
+func (*api) GetBlockHeaderByHeight(_ context.Context, _ uint64) (*flow.UnsignedHeader, flow.BlockStatus, error) {
 	return nil, flow.BlockStatusUnknown, errors.New("unimplemented")
 }
 
-func (*api) GetBlockHeaderByID(_ context.Context, _ flow.Identifier) (*flow.Header, flow.BlockStatus, error) {
+func (*api) GetBlockHeaderByID(_ context.Context, _ flow.Identifier) (*flow.UnsignedHeader, flow.BlockStatus, error) {
 	return nil, flow.BlockStatusUnknown, errors.New("unimplemented")
 }
 

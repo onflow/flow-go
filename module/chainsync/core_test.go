@@ -48,7 +48,7 @@ func (ss *SyncSuite) RequestedStatus() *chainsync.Status {
 	}
 }
 
-func (ss *SyncSuite) ReceivedStatus(header *flow.Header) *chainsync.Status {
+func (ss *SyncSuite) ReceivedStatus(header *flow.UnsignedHeader) *chainsync.Status {
 	return &chainsync.Status{
 		BlockHeight: header.Height,
 		Queued:      time.Now().Add(-time.Second * 2),

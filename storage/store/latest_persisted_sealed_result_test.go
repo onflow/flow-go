@@ -243,7 +243,7 @@ func TestLatestPersistedSealedResult_ConcurrentAccess(t *testing.T) {
 	})
 }
 
-func getHeadersResults(t *testing.T, initialHeight uint64) (*flow.Header, *flow.ExecutionResult, *storagemock.Headers, *storagemock.ExecutionResults) {
+func getHeadersResults(t *testing.T, initialHeight uint64) (*flow.UnsignedHeader, *flow.ExecutionResult, *storagemock.Headers, *storagemock.ExecutionResults) {
 	header := unittest.BlockHeaderFixture(unittest.WithHeaderHeight(initialHeight))
 	result := unittest.ExecutionResultFixture(func(result *flow.ExecutionResult) {
 		result.BlockID = header.ID()

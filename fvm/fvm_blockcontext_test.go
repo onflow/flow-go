@@ -1683,7 +1683,7 @@ func TestBlockContext_GetAccount(t *testing.T) {
 
 func TestBlockContext_Random(t *testing.T) {
 	chain, vm := createChainAndVm(flow.Mainnet)
-	header := &flow.Header{HeaderBody: flow.HeaderBody{Height: 42}}
+	header := &flow.UnsignedHeader{HeaderBody: flow.HeaderBody{Height: 42}}
 	source := testutil.EntropyProviderFixture(nil)
 	ctx := fvm.NewContext(
 		fvm.WithChain(chain),

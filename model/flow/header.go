@@ -13,7 +13,7 @@ import (
 
 // ProposalHeader is a block header and the proposer's signature for the block.
 type ProposalHeader struct {
-	Header *Header
+	Header *UnsignedHeader
 	// ProposerSigData is a signature of the proposer over the new block. Not a single cryptographic
 	// signature since the data represents cryptographic signatures serialized in some way (concatenation or other)
 	ProposerSigData []byte
@@ -21,7 +21,7 @@ type ProposalHeader struct {
 
 // HeaderBody contains all block header metadata, except for the payload hash.
 // HeaderBody generally should not be used on its own. It is merely a container used by other
-// data structures in the code base. For example, it is embedded within [UnsignedBlock], [Header], and the
+// data structures in the code base. For example, it is embedded within [UnsignedBlock], [UnsignedHeader], and the
 // respective collector cluster structs - those types should be used in almost all circumstances.
 // CAUTION regarding security:
 //   - HeaderBody does not contain the hash of the block payload. Therefore, it is not a cryptographic digest
@@ -172,37 +172,37 @@ func (h HeaderBody) ContainsParentQC() bool {
 		h.ProposerID != ZeroID
 }
 
-// Header contains all meta-data for a block, as well as a hash of the block payload.
+// UnsignedHeader contains all meta-data for a block, as well as a hash of the block payload.
 // Headers are used when the metadata about a block is needed, but the payload is not.
-// Because [Header] includes the payload hash for the block, and the block ID is Merkle-ized
-// with the Payload field as a Merkle tree node, the block ID can be computed from the [Header].
+// Because [UnsignedHeader] includes the payload hash for the block, and the block ID is Merkle-ized
+// with the Payload field as a Merkle tree node, the block ID can be computed from the [UnsignedHeader].
 // CAUTION regarding security:
 //   - With a byzantine HeaderBody alone, an honest node cannot prove who created that faulty data structure,
 //     because HeaderBody does not include the proposer's signature.
 //
 //structwrite:immutable - mutations allowed only within the constructor
-type Header struct {
+type UnsignedHeader struct {
 	HeaderBody
 	// PayloadHash is a hash of the payload of this block.
 	PayloadHash Identifier
 }
 
-// UntrustedHeader is an untrusted input-only representation of a Header,
+// UntrustedUnsignedHeader is an untrusted input-only representation of a UnsignedHeader,
 // used for construction.
 //
 // This type exists to ensure that constructor functions are invoked explicitly
 // with named fields, which improves clarity and reduces the risk of incorrect field
 // ordering during construction.
 //
-// An instance of UntrustedHeader should be validated and converted into
-// a trusted Header using NewHeader constructor.
-type UntrustedHeader Header
+// An instance of UntrustedUnsignedHeader should be validated and converted into
+// a trusted UnsignedHeader using NewHeader constructor.
+type UntrustedUnsignedHeader UnsignedHeader
 
-// NewHeader creates a new instance of Header.
-// Construction of Header is allowed only within the constructor
+// NewHeader creates a new instance of UnsignedHeader.
+// Construction of UnsignedHeader is allowed only within the constructor
 //
-// All errors indicate a valid Header cannot be constructed from the input.
-func NewHeader(untrusted UntrustedHeader) (*Header, error) {
+// All errors indicate a valid UnsignedHeader cannot be constructed from the input.
+func NewHeader(untrusted UntrustedUnsignedHeader) (*UnsignedHeader, error) {
 	headerBody, err := NewHeaderBody(UntrustedHeaderBody(untrusted.HeaderBody))
 	if err != nil {
 		return nil, fmt.Errorf("invalid header body: %w", err)
@@ -212,7 +212,7 @@ func NewHeader(untrusted UntrustedHeader) (*Header, error) {
 		return nil, fmt.Errorf("PayloadHash must not be empty")
 	}
 
-	return &Header{
+	return &UnsignedHeader{
 		HeaderBody:  *headerBody,
 		PayloadHash: untrusted.PayloadHash,
 	}, nil
@@ -222,7 +222,7 @@ func NewHeader(untrusted UntrustedHeader) (*Header, error) {
 //
 // This constructor must be used **only** for constructing the root header,
 // which is the only case where zero values are allowed.
-func NewRootHeader(untrusted UntrustedHeader) (*Header, error) {
+func NewRootHeader(untrusted UntrustedUnsignedHeader) (*UnsignedHeader, error) {
 	rootHeaderBody, err := NewRootHeaderBody(UntrustedHeaderBody(untrusted.HeaderBody))
 	if err != nil {
 		return nil, fmt.Errorf("invalid root header body: %w", err)
@@ -232,15 +232,15 @@ func NewRootHeader(untrusted UntrustedHeader) (*Header, error) {
 		return nil, fmt.Errorf("PayloadHash must not be empty")
 	}
 
-	return &Header{
+	return &UnsignedHeader{
 		HeaderBody:  *rootHeaderBody,
 		PayloadHash: untrusted.PayloadHash,
 	}, nil
 }
 
 // Fingerprint defines custom encoding for the header to calculate its ID.
-// The hash of the LastViewTC is used instead of directly encoding the Header.
-func (h Header) Fingerprint() []byte {
+// The hash of the LastViewTC is used instead of directly encoding the UnsignedHeader.
+func (h UnsignedHeader) Fingerprint() []byte {
 	return fingerprint.Fingerprint(struct {
 		ChainID            ChainID
 		ParentID           Identifier
@@ -270,18 +270,18 @@ func (h Header) Fingerprint() []byte {
 
 // ID returns a unique ID to singularly identify the header and its block
 // within the flow system.
-func (h Header) ID() Identifier {
+func (h UnsignedHeader) ID() Identifier {
 	return MakeID(h)
 }
 
 // MarshalJSON makes sure the timestamp is encoded in UTC.
 //
 //nolint:structwrite
-func (h Header) MarshalJSON() ([]byte, error) {
+func (h UnsignedHeader) MarshalJSON() ([]byte, error) {
 
 	// we use an alias to avoid endless recursion; the alias will not have the
 	// marshal function and encode like a raw header
-	type Encodable Header
+	type Encodable UnsignedHeader
 	return json.Marshal(struct {
 		Encodable
 		ID string
@@ -294,11 +294,11 @@ func (h Header) MarshalJSON() ([]byte, error) {
 // UnmarshalJSON makes sure the timestamp is decoded in UTC.
 //
 //nolint:structwrite
-func (h *Header) UnmarshalJSON(data []byte) error {
+func (h *UnsignedHeader) UnmarshalJSON(data []byte) error {
 
 	// we use an alias to avoid endless recursion; the alias will not have the
 	// unmarshal function and decode like a raw header
-	type Decodable *Header
+	type Decodable *UnsignedHeader
 	err := json.Unmarshal(data, Decodable(h))
 
 	return err
@@ -307,27 +307,27 @@ func (h *Header) UnmarshalJSON(data []byte) error {
 // MarshalCBOR makes sure the timestamp is encoded in UTC.
 //
 //nolint:structwrite
-func (h Header) MarshalCBOR() ([]byte, error) {
+func (h UnsignedHeader) MarshalCBOR() ([]byte, error) {
 
 	// we use an alias to avoid endless recursion; the alias will not have the
 	// marshal function and encode like a raw header
-	type Encodable Header
+	type Encodable UnsignedHeader
 	return cborcodec.EncMode.Marshal(Encodable(h))
 }
 
 // UnmarshalCBOR makes sure the timestamp is decoded in UTC.
 //
 //nolint:structwrite
-func (h *Header) UnmarshalCBOR(data []byte) error {
+func (h *UnsignedHeader) UnmarshalCBOR(data []byte) error {
 
 	// we use an alias to avoid endless recursion; the alias will not have the
 	// unmarshal function and decode like a raw header
 	// NOTE: for some reason, the pointer alias works for JSON to not recurse,
 	// but msgpack will still recurse; we have to do an extra struct copy here
-	type Decodable Header
+	type Decodable UnsignedHeader
 	decodable := Decodable(*h)
 	err := cbor.Unmarshal(data, &decodable)
-	*h = Header(decodable)
+	*h = UnsignedHeader(decodable)
 
 	return err
 }
@@ -335,27 +335,27 @@ func (h *Header) UnmarshalCBOR(data []byte) error {
 // MarshalMsgpack makes sure the timestamp is encoded in UTC.
 //
 //nolint:structwrite
-func (h Header) MarshalMsgpack() ([]byte, error) {
+func (h UnsignedHeader) MarshalMsgpack() ([]byte, error) {
 
 	// we use an alias to avoid endless recursion; the alias will not have the
 	// marshal function and encode like a raw header
-	type Encodable Header
+	type Encodable UnsignedHeader
 	return msgpack.Marshal(Encodable(h))
 }
 
 // UnmarshalMsgpack makes sure the timestamp is decoded in UTC.
 //
 //nolint:structwrite
-func (h *Header) UnmarshalMsgpack(data []byte) error {
+func (h *UnsignedHeader) UnmarshalMsgpack(data []byte) error {
 
 	// we use an alias to avoid endless recursion; the alias will not have the
 	// unmarshal function and decode like a raw header
 	// NOTE: for some reason, the pointer alias works for JSON to not recurse,
 	// but msgpack will still recurse; we have to do an extra struct copy here
-	type Decodable Header
+	type Decodable UnsignedHeader
 	decodable := Decodable(*h)
 	err := msgpack.Unmarshal(data, &decodable)
-	*h = Header(decodable)
+	*h = UnsignedHeader(decodable)
 
 	return err
 }

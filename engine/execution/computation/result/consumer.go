@@ -8,7 +8,7 @@ import (
 
 type ExecutableCollection interface {
 	// BlockHeader returns the block header in which collection was included
-	BlockHeader() *flow.Header
+	BlockHeader() *flow.UnsignedHeader
 
 	// Collection returns the content of the collection
 	Collection() *flow.Collection
@@ -77,7 +77,7 @@ type AttestedCollectionConsumer interface {
 
 type ExecutedBlock interface {
 	// BlockHeader returns the block header in which collection was included
-	BlockHeader() *flow.Header
+	BlockHeader() *flow.UnsignedHeader
 
 	// Receipt returns the execution receipt
 	Receipt() *flow.ExecutionReceipt

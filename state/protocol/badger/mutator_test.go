@@ -58,7 +58,7 @@ func TestBootstrapValid(t *testing.T) {
 		err = db.View(operation.LookupBlockHeight(0, &genesisID))
 		require.NoError(t, err)
 
-		var header flow.Header
+		var header flow.UnsignedHeader
 		err = db.View(operation.RetrieveHeader(genesisID, &header))
 		require.NoError(t, err)
 

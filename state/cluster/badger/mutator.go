@@ -43,7 +43,7 @@ func NewMutableState(state *State, tracer module.Tracer, headers storage.Headers
 // extendContext encapsulates all state information required in order to validate a candidate cluster block.
 type extendContext struct {
 	candidate                *cluster.UnsignedBlock // the proposed candidate cluster block
-	finalizedClusterBlock    *flow.Header           // the latest finalized cluster block
+	finalizedClusterBlock    *flow.UnsignedHeader   // the latest finalized cluster block
 	finalizedConsensusHeight uint64                 // the latest finalized height on the main chain
 	epochFirstHeight         uint64                 // the first height of this cluster's operating epoch
 	epochLastHeight          uint64                 // the last height of this cluster's operating epoch (may be unknown)
@@ -59,7 +59,7 @@ func (m *MutableState) getExtendCtx(candidate *cluster.UnsignedBlock) (extendCon
 
 	err := m.State.db.View(func(tx *badger.Txn) error {
 		// get the latest finalized cluster block and latest finalized consensus height
-		ctx.finalizedClusterBlock = new(flow.Header)
+		ctx.finalizedClusterBlock = new(flow.UnsignedHeader)
 		err := procedure.RetrieveLatestFinalizedClusterHeader(candidate.ChainID, ctx.finalizedClusterBlock)(tx)
 		if err != nil {
 			return fmt.Errorf("could not retrieve finalized cluster head: %w", err)
@@ -348,7 +348,7 @@ func (m *MutableState) checkPayloadTransactions(ctx extendContext) error {
 func (m *MutableState) checkDupeTransactionsInUnfinalizedAncestry(block *cluster.UnsignedBlock, includedTransactions map[flow.Identifier]struct{}, finalHeight uint64) ([]flow.Identifier, error) {
 
 	var duplicateTxIDs []flow.Identifier
-	err := fork.TraverseBackward(m.headers, block.ParentID, func(ancestor *flow.Header) error {
+	err := fork.TraverseBackward(m.headers, block.ParentID, func(ancestor *flow.UnsignedHeader) error {
 		payload, err := m.payloads.ByBlockID(ancestor.ID())
 		if err != nil {
 			return fmt.Errorf("could not retrieve ancestor payload: %w", err)

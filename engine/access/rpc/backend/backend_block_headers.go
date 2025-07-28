@@ -15,8 +15,8 @@ type backendBlockHeaders struct {
 	state   protocol.State
 }
 
-func (b *backendBlockHeaders) GetLatestBlockHeader(ctx context.Context, isSealed bool) (*flow.Header, flow.BlockStatus, error) {
-	var header *flow.Header
+func (b *backendBlockHeaders) GetLatestBlockHeader(ctx context.Context, isSealed bool) (*flow.UnsignedHeader, flow.BlockStatus, error) {
+	var header *flow.UnsignedHeader
 	var err error
 
 	if isSealed {
@@ -53,7 +53,7 @@ func (b *backendBlockHeaders) GetLatestBlockHeader(ctx context.Context, isSealed
 	return header, stat, nil
 }
 
-func (b *backendBlockHeaders) GetBlockHeaderByID(ctx context.Context, id flow.Identifier) (*flow.Header, flow.BlockStatus, error) {
+func (b *backendBlockHeaders) GetBlockHeaderByID(ctx context.Context, id flow.Identifier) (*flow.UnsignedHeader, flow.BlockStatus, error) {
 	header, err := b.headers.ByBlockID(id)
 	if err != nil {
 		return nil, flow.BlockStatusUnknown, rpc.ConvertStorageError(err)
@@ -66,7 +66,7 @@ func (b *backendBlockHeaders) GetBlockHeaderByID(ctx context.Context, id flow.Id
 	return header, stat, nil
 }
 
-func (b *backendBlockHeaders) GetBlockHeaderByHeight(ctx context.Context, height uint64) (*flow.Header, flow.BlockStatus, error) {
+func (b *backendBlockHeaders) GetBlockHeaderByHeight(ctx context.Context, height uint64) (*flow.UnsignedHeader, flow.BlockStatus, error) {
 	header, err := b.headers.ByHeight(height)
 	if err != nil {
 		return nil, flow.BlockStatusUnknown, rpc.ConvertStorageError(resolveHeightError(b.state.Params(), height, err))
@@ -80,7 +80,7 @@ func (b *backendBlockHeaders) GetBlockHeaderByHeight(ctx context.Context, height
 }
 
 // No errors are expected during normal operations.
-func (b *backendBlockHeaders) getBlockStatus(ctx context.Context, header *flow.Header) (flow.BlockStatus, error) {
+func (b *backendBlockHeaders) getBlockStatus(ctx context.Context, header *flow.UnsignedHeader) (flow.BlockStatus, error) {
 	sealed, err := b.state.Sealed().Head()
 	if err != nil {
 		// In the RPC engine, if we encounter an error from the protocol state indicating state corruption,

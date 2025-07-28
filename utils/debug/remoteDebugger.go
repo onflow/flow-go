@@ -42,7 +42,7 @@ func NewRemoteDebugger(
 func (d *RemoteDebugger) RunTransaction(
 	txBody *flow.TransactionBody,
 	snapshot StorageSnapshot,
-	blockHeader *flow.Header,
+	blockHeader *flow.UnsignedHeader,
 ) (
 	resultSnapshot *snapshot.ExecutionSnapshot,
 	txErr error,
@@ -70,7 +70,7 @@ func (d *RemoteDebugger) RunScript(
 	code []byte,
 	arguments [][]byte,
 	snapshot StorageSnapshot,
-	blockHeader *flow.Header,
+	blockHeader *flow.UnsignedHeader,
 ) (
 	value cadence.Value,
 	scriptError error,

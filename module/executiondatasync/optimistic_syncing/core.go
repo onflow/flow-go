@@ -96,7 +96,7 @@ type CoreImpl struct {
 	workingData *workingData
 
 	executionResult *flow.ExecutionResult
-	header          *flow.Header
+	header          *flow.UnsignedHeader
 }
 
 // NewCoreImpl creates a new CoreImpl with all necessary dependencies
@@ -104,7 +104,7 @@ type CoreImpl struct {
 func NewCoreImpl(
 	logger zerolog.Logger,
 	executionResult *flow.ExecutionResult,
-	header *flow.Header,
+	header *flow.UnsignedHeader,
 	execDataRequester requester.ExecutionDataRequester,
 	txResultErrMsgsRequester tx_error_messages.Requester,
 	txResultErrMsgsRequestTimeout time.Duration,

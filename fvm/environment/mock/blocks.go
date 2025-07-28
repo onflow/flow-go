@@ -13,27 +13,27 @@ type Blocks struct {
 }
 
 // ByHeightFrom provides a mock function with given fields: height, header
-func (_m *Blocks) ByHeightFrom(height uint64, header *flow.Header) (*flow.Header, error) {
+func (_m *Blocks) ByHeightFrom(height uint64, header *flow.UnsignedHeader) (*flow.UnsignedHeader, error) {
 	ret := _m.Called(height, header)
 
 	if len(ret) == 0 {
 		panic("no return value specified for ByHeightFrom")
 	}
 
-	var r0 *flow.Header
+	var r0 *flow.UnsignedHeader
 	var r1 error
-	if rf, ok := ret.Get(0).(func(uint64, *flow.Header) (*flow.Header, error)); ok {
+	if rf, ok := ret.Get(0).(func(uint64, *flow.UnsignedHeader) (*flow.UnsignedHeader, error)); ok {
 		return rf(height, header)
 	}
-	if rf, ok := ret.Get(0).(func(uint64, *flow.Header) *flow.Header); ok {
+	if rf, ok := ret.Get(0).(func(uint64, *flow.UnsignedHeader) *flow.UnsignedHeader); ok {
 		r0 = rf(height, header)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*flow.Header)
+			r0 = ret.Get(0).(*flow.UnsignedHeader)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(uint64, *flow.Header) error); ok {
+	if rf, ok := ret.Get(1).(func(uint64, *flow.UnsignedHeader) error); ok {
 		r1 = rf(height, header)
 	} else {
 		r1 = ret.Error(1)

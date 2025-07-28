@@ -13,6 +13,6 @@ type LatestPrunable struct {
 	threshold uint64 // the number of blocks below the latest block
 }
 
-func (l *LatestPrunable) Latest() (*flow.Header, error) {
+func (l *LatestPrunable) Latest() (*flow.UnsignedHeader, error) {
 	return l.LatestSealedAndExecuted.BelowLatest(l.threshold)
 }

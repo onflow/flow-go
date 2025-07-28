@@ -34,7 +34,7 @@ func NewSnapshotf(msg string, args ...interface{}) *Snapshot {
 	return NewSnapshot(fmt.Errorf(msg, args...))
 }
 
-func (u *Snapshot) Head() (*flow.Header, error) {
+func (u *Snapshot) Head() (*flow.UnsignedHeader, error) {
 	return nil, u.err
 }
 

@@ -23,7 +23,7 @@ type BlockIDHeight struct {
 	Height uint64
 }
 
-func HeaderToBlockIDHeight(header *flow.Header) BlockIDHeight {
+func HeaderToBlockIDHeight(header *flow.UnsignedHeader) BlockIDHeight {
 	return BlockIDHeight{
 		ID:     header.ID(),
 		Height: header.Height,

@@ -36,7 +36,7 @@ func FinalizedProtocolStateWithParticipants(participants flow.IdentityList) (
 		return nil
 	}, nil)
 	snapshot.On("Head").Return(
-		func() *flow.Header {
+		func() *flow.UnsignedHeader {
 			return head
 		},
 		nil,
@@ -44,7 +44,7 @@ func FinalizedProtocolStateWithParticipants(participants flow.IdentityList) (
 
 	sealedSnapshot := &mockprotocol.Snapshot{}
 	sealedSnapshot.On("Head").Return(
-		func() *flow.Header {
+		func() *flow.UnsignedHeader {
 			return sealed.ToHeader()
 		},
 		nil,

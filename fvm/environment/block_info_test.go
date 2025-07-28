@@ -18,7 +18,7 @@ func TestBlockInfo(t *testing.T) {
 	tracer := tracing.NewMockTracerSpan()
 	meter := &util.NopMeter{}
 	blocks := &mockBlocks{
-		blocks: make(map[uint64]*flow.Header),
+		blocks: make(map[uint64]*flow.UnsignedHeader),
 	}
 	height := uint64(flow.DefaultTransactionExpiry)
 	header := unittest.BlockHeaderWithHeight(height)
@@ -53,10 +53,10 @@ func TestBlockInfo(t *testing.T) {
 }
 
 type mockBlocks struct {
-	blocks map[uint64]*flow.Header
+	blocks map[uint64]*flow.UnsignedHeader
 }
 
-func (m *mockBlocks) ByHeightFrom(height uint64, header *flow.Header) (*flow.Header, error) {
+func (m *mockBlocks) ByHeightFrom(height uint64, header *flow.UnsignedHeader) (*flow.UnsignedHeader, error) {
 	h, ok := m.blocks[height]
 	if !ok {
 		return nil, fmt.Errorf("block does not exist: %w", storageErr.ErrNotFound)
@@ -64,6 +64,6 @@ func (m *mockBlocks) ByHeightFrom(height uint64, header *flow.Header) (*flow.Hea
 	return h, nil
 }
 
-func (m *mockBlocks) Add(h *flow.Header) {
+func (m *mockBlocks) Add(h *flow.UnsignedHeader) {
 	m.blocks[h.Height] = h
 }

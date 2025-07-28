@@ -45,7 +45,7 @@ type AssignmentCollectorTree struct {
 	headers             storage.Headers
 }
 
-func NewAssignmentCollectorTree(lastSealed *flow.Header, headers storage.Headers, createCollector NewCollectorFactoryMethod) *AssignmentCollectorTree {
+func NewAssignmentCollectorTree(lastSealed *flow.UnsignedHeader, headers storage.Headers, createCollector NewCollectorFactoryMethod) *AssignmentCollectorTree {
 	return &AssignmentCollectorTree{
 		forest:              forest.NewLevelledForest(lastSealed.Height),
 		lock:                sync.RWMutex{},
@@ -80,7 +80,7 @@ func (t *AssignmentCollectorTree) GetCollector(resultID flow.Identifier) Assignm
 // FinalizeForkAtLevel orphans forks in the AssignmentCollectorTree and prunes levels below the
 // sealed finalized height. When a block is finalized we can mark results for conflicting forks as
 // orphaned and stop processing approvals for them. Eventually all forks will be cleaned up by height.
-func (t *AssignmentCollectorTree) FinalizeForkAtLevel(finalized *flow.Header, sealed *flow.Header) error {
+func (t *AssignmentCollectorTree) FinalizeForkAtLevel(finalized *flow.UnsignedHeader, sealed *flow.UnsignedHeader) error {
 	t.lock.Lock()
 	defer t.lock.Unlock()
 

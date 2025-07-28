@@ -31,9 +31,9 @@ import (
 const DefaultSealedIndexedHeightThreshold = 30
 
 type Blocks interface {
-	HeaderByID(id flow.Identifier) (*flow.Header, error)
-	FinalizedHeader() (*flow.Header, error)
-	SealedHeader() (*flow.Header, error)
+	HeaderByID(id flow.Identifier) (*flow.UnsignedHeader, error)
+	FinalizedHeader() (*flow.UnsignedHeader, error)
+	SealedHeader() (*flow.UnsignedHeader, error)
 	IndexedHeight() (uint64, error)
 }
 
@@ -49,7 +49,7 @@ func NewProtocolStateBlocks(state protocol.State, indexReporter state_synchroniz
 	}
 }
 
-func (b *ProtocolStateBlocks) HeaderByID(id flow.Identifier) (*flow.Header, error) {
+func (b *ProtocolStateBlocks) HeaderByID(id flow.Identifier) (*flow.UnsignedHeader, error) {
 	header, err := b.state.AtBlockID(id).Head()
 	if err != nil {
 		if errors.Is(err, state.ErrUnknownSnapshotReference) {
@@ -62,11 +62,11 @@ func (b *ProtocolStateBlocks) HeaderByID(id flow.Identifier) (*flow.Header, erro
 	return header, nil
 }
 
-func (b *ProtocolStateBlocks) FinalizedHeader() (*flow.Header, error) {
+func (b *ProtocolStateBlocks) FinalizedHeader() (*flow.UnsignedHeader, error) {
 	return b.state.Final().Head()
 }
 
-func (b *ProtocolStateBlocks) SealedHeader() (*flow.Header, error) {
+func (b *ProtocolStateBlocks) SealedHeader() (*flow.UnsignedHeader, error) {
 
 	return b.state.Sealed().Head()
 

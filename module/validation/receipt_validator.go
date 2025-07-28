@@ -319,7 +319,7 @@ func (v *receiptValidator) ValidatePayload(candidate *flow.UnsignedBlock) error 
 
 	// Start from the lowest unsealed block and walk the chain upwards until we
 	// hit the candidate's parent. For each visited block track:
-	bookKeeper := func(block *flow.Header) error {
+	bookKeeper := func(block *flow.UnsignedHeader) error {
 		blockID := block.ID()
 		// track encountered blocks
 		forkBlocks[blockID] = struct{}{}

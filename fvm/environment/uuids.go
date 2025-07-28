@@ -69,7 +69,7 @@ type uUIDGenerator struct {
 
 	txnState state.NestedTransactionPreparer
 
-	blockHeader *flow.Header
+	blockHeader *flow.UnsignedHeader
 	txnIndex    uint32
 
 	initialized bool
@@ -106,7 +106,7 @@ func NewUUIDGenerator(
 	log zerolog.Logger,
 	meter Meter,
 	txnState state.NestedTransactionPreparer,
-	blockHeader *flow.Header,
+	blockHeader *flow.UnsignedHeader,
 	txnIndex uint32,
 ) *uUIDGenerator {
 	return &uUIDGenerator{

@@ -61,7 +61,7 @@ type PendingTree struct {
 }
 
 // NewPendingTree creates new instance of PendingTree. Accepts finalized block to set up initial state.
-func NewPendingTree(finalized *flow.Header) *PendingTree {
+func NewPendingTree(finalized *flow.UnsignedHeader) *PendingTree {
 	return &PendingTree{
 		forest:          forest.NewLevelledForest(finalized.View),
 		lastFinalizedID: finalized.ID(),
@@ -173,7 +173,7 @@ func (t *PendingTree) connectsToFinalizedBlock(block flow.CertifiedBlock) bool {
 // returns these blocks. Returned blocks are ordered such that parents appear before their children.
 //
 // No errors are expected during normal operation.
-func (t *PendingTree) FinalizeFork(finalized *flow.Header) ([]flow.CertifiedBlock, error) {
+func (t *PendingTree) FinalizeFork(finalized *flow.UnsignedHeader) ([]flow.CertifiedBlock, error) {
 	var connectedBlocks []flow.CertifiedBlock
 
 	err := t.forest.PruneUpToLevel(finalized.View)

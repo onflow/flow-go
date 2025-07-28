@@ -1058,7 +1058,7 @@ func (suite *Suite) TestTransactionStatusTransition() {
 
 	suite.snapshot.
 		On("Head").
-		Return(func() *flow.Header {
+		Return(func() *flow.UnsignedHeader {
 			return headBlock.ToHeader()
 		}, nil)
 
@@ -1179,7 +1179,7 @@ func (suite *Suite) TestTransactionExpiredStatusTransition() {
 
 	suite.snapshot.
 		On("Head").
-		Return(func() *flow.Header {
+		Return(func() *flow.UnsignedHeader {
 			return headBlock.ToHeader()
 		}, nil)
 

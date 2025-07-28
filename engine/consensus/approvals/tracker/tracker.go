@@ -44,7 +44,7 @@ func NewSealingTracker(log zerolog.Logger, headersDB storage.Headers, receiptsDB
 // the respective ID.
 // In case the next unsealed block has not been finalized, we return the
 // False-filter (or if we encounter any problems).
-func (st *SealingTracker) nextUnsealedFinalizedBlock(sealedBlock *flow.Header) flow.IdentifierFilter {
+func (st *SealingTracker) nextUnsealedFinalizedBlock(sealedBlock *flow.UnsignedHeader) flow.IdentifierFilter {
 	nextUnsealedHeight := sealedBlock.Height + 1
 	nextUnsealed, err := st.headersDB.ByHeight(nextUnsealedHeight)
 	if err != nil {
@@ -56,7 +56,7 @@ func (st *SealingTracker) nextUnsealedFinalizedBlock(sealedBlock *flow.Header) f
 // NewSealingObservation constructs a SealingObservation, which capture information
 // about the progress of a _single_ go routine. Consequently, SealingObservations
 // don't need to be concurrency safe, as they are supposed to be thread-local structure.
-func (st *SealingTracker) NewSealingObservation(finalizedBlock *flow.Header, seal *flow.Seal, sealedBlock *flow.Header) consensus.SealingObservation {
+func (st *SealingTracker) NewSealingObservation(finalizedBlock *flow.UnsignedHeader, seal *flow.Seal, sealedBlock *flow.UnsignedHeader) consensus.SealingObservation {
 	return &SealingObservation{
 		SealingTracker:      st,
 		startTime:           time.Now(),
@@ -76,9 +76,9 @@ func (st *SealingTracker) NewSealingObservation(finalizedBlock *flow.Header, sea
 type SealingObservation struct {
 	*SealingTracker
 
-	finalizedBlock      *flow.Header
+	finalizedBlock      *flow.UnsignedHeader
 	latestFinalizedSeal *flow.Seal
-	latestSealedBlock   *flow.Header
+	latestSealedBlock   *flow.UnsignedHeader
 
 	startTime  time.Time                          // time when this instance was created
 	isRelevant flow.IdentifierFilter              // policy to determine for which blocks we want to track

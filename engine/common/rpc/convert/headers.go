@@ -8,9 +8,9 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-// BlockHeaderToMessage converts a flow.Header to a protobuf message
+// BlockHeaderToMessage converts a flow.UnsignedHeader to a protobuf message
 func BlockHeaderToMessage(
-	h *flow.Header,
+	h *flow.UnsignedHeader,
 	signerIDs flow.IdentifierList,
 ) (*entities.BlockHeader, error) {
 	id := h.ID()
@@ -50,8 +50,8 @@ func BlockHeaderToMessage(
 	}, nil
 }
 
-// MessageToBlockHeader converts a protobuf message to a flow.Header
-func MessageToBlockHeader(m *entities.BlockHeader) (*flow.Header, error) {
+// MessageToBlockHeader converts a protobuf message to a flow.UnsignedHeader
+func MessageToBlockHeader(m *entities.BlockHeader) (*flow.UnsignedHeader, error) {
 	chainId, err := MessageToChainId(m.ChainId)
 	if err != nil {
 		return nil, fmt.Errorf("failed to convert ChainId: %w", err)
@@ -105,7 +105,7 @@ func MessageToBlockHeader(m *entities.BlockHeader) (*flow.Header, error) {
 			return nil, fmt.Errorf("failed to create root header body: %w", err)
 		}
 
-		rootHeader, err := flow.NewRootHeader(flow.UntrustedHeader{
+		rootHeader, err := flow.NewRootHeader(flow.UntrustedUnsignedHeader{
 			HeaderBody:  *rootHeaderBody,
 			PayloadHash: MessageToIdentifier(m.PayloadHash),
 		})
@@ -131,7 +131,7 @@ func MessageToBlockHeader(m *entities.BlockHeader) (*flow.Header, error) {
 	if err != nil {
 		return nil, fmt.Errorf("could not build header body: %w", err)
 	}
-	header, err := flow.NewHeader(flow.UntrustedHeader{
+	header, err := flow.NewHeader(flow.UntrustedUnsignedHeader{
 		HeaderBody:  *headerBody,
 		PayloadHash: MessageToIdentifier(m.PayloadHash),
 	})
@@ -143,7 +143,7 @@ func MessageToBlockHeader(m *entities.BlockHeader) (*flow.Header, error) {
 }
 
 // IsRootBlockHeader reports whether this is a root block header.
-// It returns true only if all of the fields required to build a root Header are zero/nil.
+// It returns true only if all of the fields required to build a root UnsignedHeader are zero/nil.
 func IsRootBlockHeader(m *entities.BlockHeader) bool {
 	return m.ParentVoterIndices == nil &&
 		m.ParentVoterSigData == nil &&

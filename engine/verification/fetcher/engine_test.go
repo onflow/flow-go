@@ -791,7 +791,7 @@ func mockChunkConsumerNotifier(t *testing.T, notifier *module.ProcessingNotifier
 }
 
 // mockBlockSealingStatus mocks protocol state sealing status at height of given block.
-func mockBlockSealingStatus(state *protocol.State, headers *storage.Headers, header *flow.Header, sealed bool) {
+func mockBlockSealingStatus(state *protocol.State, headers *storage.Headers, header *flow.UnsignedHeader, sealed bool) {
 	headers.On("ByBlockID", header.ID()).Return(header, nil)
 	if sealed {
 		vertestutils.MockLastSealedHeight(state, header.Height+1)

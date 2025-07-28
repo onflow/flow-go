@@ -339,7 +339,7 @@ func (c *Consensus) handleProtocolEvents(ctx irrecoverable.SignalerContext, read
 
 // EpochCommittedPhaseStarted informs `committees.Consensus` that the first block in flow.EpochPhaseCommitted has been finalized.
 // This event consumer function enqueues an event handler function for the single event handler thread to execute.
-func (c *Consensus) EpochCommittedPhaseStarted(_ uint64, first *flow.Header) {
+func (c *Consensus) EpochCommittedPhaseStarted(_ uint64, first *flow.UnsignedHeader) {
 	c.epochEvents <- func() error {
 		return c.handleEpochCommittedPhaseStarted(first)
 	}
@@ -347,7 +347,7 @@ func (c *Consensus) EpochCommittedPhaseStarted(_ uint64, first *flow.Header) {
 
 // EpochExtended informs `committees.Consensus` that a block including a new epoch extension has been finalized.
 // This event consumer function enqueues an event handler function for the single event handler thread to execute.
-func (c *Consensus) EpochExtended(epochCounter uint64, _ *flow.Header, extension flow.EpochExtension) {
+func (c *Consensus) EpochExtended(epochCounter uint64, _ *flow.UnsignedHeader, extension flow.EpochExtension) {
 	c.epochEvents <- func() error {
 		return c.handleEpochExtended(epochCounter, extension)
 	}
@@ -381,7 +381,7 @@ func (c *Consensus) handleEpochExtended(epochCounter uint64, extension flow.Epoc
 // This function conforms to eventHandlerFunc.
 // When the next epoch is committed, we compute leader selection for the epoch and cache it.
 // No errors are expected during normal operation.
-func (c *Consensus) handleEpochCommittedPhaseStarted(refBlock *flow.Header) error {
+func (c *Consensus) handleEpochCommittedPhaseStarted(refBlock *flow.UnsignedHeader) error {
 	epoch, err := c.state.AtHeight(refBlock.Height).Epochs().NextCommitted()
 	if err != nil { // no expected errors since reference block is in EpochCommit phase
 		return fmt.Errorf("could not get next committed epoch: %w", err)

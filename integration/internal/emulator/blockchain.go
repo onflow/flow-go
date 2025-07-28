@@ -217,7 +217,7 @@ func (b *Blockchain) configureTransactionValidator() error {
 	return nil
 }
 
-func (b *Blockchain) setFVMContextFromHeader(header *flowgo.Header) fvm.Context {
+func (b *Blockchain) setFVMContextFromHeader(header *flowgo.UnsignedHeader) fvm.Context {
 	b.vmCtx = fvm.NewContextFromParent(
 		b.vmCtx,
 		fvm.WithBlockHeader(header),

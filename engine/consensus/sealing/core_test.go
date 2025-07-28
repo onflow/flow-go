@@ -43,7 +43,7 @@ type ApprovalProcessingCoreTestSuite struct {
 	approvals.BaseAssignmentCollectorTestSuite
 
 	sealsDB             *storage.Seals
-	finalizedRootHeader *flow.Header
+	finalizedRootHeader *flow.UnsignedHeader
 	core                *Core
 	setter              realmodule.SealingConfigsSetter
 }
@@ -62,7 +62,7 @@ func (s *ApprovalProcessingCoreTestSuite) SetupTest() {
 	s.State.On("Sealed").Return(unittest.StateSnapshotForKnownBlock(s.ParentBlock, nil)).Maybe()
 	s.State.On("Params").Return(params)
 	params.On("FinalizedRoot").Return(
-		func() *flow.Header { return s.finalizedRootHeader },
+		func() *flow.UnsignedHeader { return s.finalizedRootHeader },
 		func() error { return nil },
 	)
 

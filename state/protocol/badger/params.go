@@ -25,9 +25,9 @@ type InstanceParams struct {
 	db *badger.DB
 	// finalizedRoot marks the cutoff of the history this node knows about. It is the block at the tip
 	// of the root snapshot used to bootstrap this node - all newer blocks are synced from the network.
-	finalizedRoot *flow.Header
+	finalizedRoot *flow.UnsignedHeader
 	// sealedRoot is the latest sealed block with respect to `finalizedRoot`.
-	sealedRoot *flow.Header
+	sealedRoot *flow.UnsignedHeader
 	// rootSeal is the seal for block `sealedRoot` - the newest incorporated seal with respect to `finalizedRoot`.
 	rootSeal *flow.Seal
 }
@@ -100,13 +100,13 @@ func ReadInstanceParams(db *badger.DB, headers storage.Headers, seals storage.Se
 // FinalizedRoot returns the finalized root header of the current protocol state. This will be
 // the head of the protocol state snapshot used to bootstrap this state and
 // may differ from node to node for the same protocol state.
-func (p *InstanceParams) FinalizedRoot() *flow.Header {
+func (p *InstanceParams) FinalizedRoot() *flow.UnsignedHeader {
 	return p.finalizedRoot
 }
 
 // SealedRoot returns the sealed root block. If it's different from FinalizedRoot() block,
 // it means the node is bootstrapped from mid-spork.
-func (p *InstanceParams) SealedRoot() *flow.Header {
+func (p *InstanceParams) SealedRoot() *flow.UnsignedHeader {
 	return p.sealedRoot
 }
 
@@ -147,10 +147,10 @@ func ReadGlobalParams(db *badger.DB) (*inmem.Params, error) {
 
 // ReadFinalizedRoot retrieves the root block's header from the database.
 // This information is immutable for the runtime of the software and may be cached.
-func ReadFinalizedRoot(db *badger.DB) (*flow.Header, error) {
+func ReadFinalizedRoot(db *badger.DB) (*flow.UnsignedHeader, error) {
 	var finalizedRootHeight uint64
 	var rootID flow.Identifier
-	var rootHeader flow.Header
+	var rootHeader flow.UnsignedHeader
 	err := db.View(func(tx *badger.Txn) error {
 		err := operation.RetrieveRootHeight(&finalizedRootHeight)(tx)
 		if err != nil {

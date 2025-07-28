@@ -646,7 +646,7 @@ func (s *ChunkVerifierTestSuite) GetTestSetup(t *testing.T, script string, syste
 
 type testMetadata struct {
 	IsSystemChunk bool
-	Header        *flow.Header
+	Header        *flow.UnsignedHeader
 	Collection    *flow.Collection
 	TxResults     []flow.LightTransactionResult
 	ChunkEvents   flow.EventsList

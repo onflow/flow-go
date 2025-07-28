@@ -77,7 +77,7 @@ type BackendExecutionDataSuite struct {
 	registerID  flow.RegisterID
 
 	rootBlock          *flow.UnsignedBlock
-	highestBlockHeader *flow.Header
+	highestBlockHeader *flow.UnsignedHeader
 }
 
 type executionDataTestType struct {
@@ -207,7 +207,7 @@ func (s *BackendExecutionDataSuite) SetupTestMocks() {
 	).Maybe()
 
 	s.headers.On("ByBlockID", mock.AnythingOfType("flow.Identifier")).Return(
-		func(blockID flow.Identifier) (*flow.Header, error) {
+		func(blockID flow.Identifier) (*flow.UnsignedHeader, error) {
 			for _, block := range s.blockMap {
 				if block.ID() == blockID {
 					return block.ToHeader(), nil
@@ -220,7 +220,7 @@ func (s *BackendExecutionDataSuite) SetupTestMocks() {
 	s.headers.On("ByHeight", mock.AnythingOfType("uint64")).Return(
 		mocks.ConvertStorageOutput(
 			mocks.StorageMapGetter(s.blockMap),
-			func(block *flow.UnsignedBlock) *flow.Header { return block.ToHeader() },
+			func(block *flow.UnsignedBlock) *flow.UnsignedHeader { return block.ToHeader() },
 		),
 	).Maybe()
 
@@ -287,7 +287,7 @@ func (s *BackendExecutionDataSuite) SetupBackend(useEventsIndex bool) {
 
 // generateMockEvents generates a set of mock events for a block split into multiple tx with
 // appropriate indexes set
-func generateMockEvents(header *flow.Header, eventCount int) flow.BlockEvents {
+func generateMockEvents(header *flow.UnsignedHeader, eventCount int) flow.BlockEvents {
 	txCount := eventCount / 3
 
 	txID := unittest.IdentifierFixture()

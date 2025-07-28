@@ -28,7 +28,7 @@ func (m *viewsMachine) init(_ *rapid.T) {
 
 func (m *viewsMachine) OnView(t *rapid.T) {
 	view := rapid.Uint64().Draw(t, "view")
-	m.views.OnView(view, func(_ *flow.Header) {
+	m.views.OnView(view, func(_ *flow.UnsignedHeader) {
 		m.calls++ // count actual number of calls invoked by Views
 	})
 

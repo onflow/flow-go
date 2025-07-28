@@ -117,15 +117,15 @@ func makeBlocks(t *testing.T, start, count int) []*flow.UnsignedBlock {
 	return append([]*flow.UnsignedBlock{genesis}, blocks...)
 }
 
-func toHeaders(blocks []*flow.UnsignedBlock) []*flow.Header {
-	headers := make([]*flow.Header, len(blocks))
+func toHeaders(blocks []*flow.UnsignedBlock) []*flow.UnsignedHeader {
+	headers := make([]*flow.UnsignedHeader, len(blocks))
 	for i, block := range blocks {
 		headers[i] = block.ToHeader()
 	}
 	return headers
 }
 
-func createThrottle(t *testing.T, blocks []*flow.UnsignedBlock, headers []*flow.Header, lastExecuted, lastFinalized int) *BlockThrottle {
+func createThrottle(t *testing.T, blocks []*flow.UnsignedBlock, headers []*flow.UnsignedHeader, lastExecuted, lastFinalized int) *BlockThrottle {
 	log := unittest.Logger()
 	headerStore := newHeadersWithBlocks(headers)
 
@@ -183,15 +183,15 @@ func (c *processableConsumer) LastProcessable() BlockIDHeight {
 }
 
 type headerStore struct {
-	byID     map[flow.Identifier]*flow.Header
-	byHeight map[uint64]*flow.Header
+	byID     map[flow.Identifier]*flow.UnsignedHeader
+	byHeight map[uint64]*flow.UnsignedHeader
 }
 
 var _ storage.Headers = (*headerStore)(nil)
 
-func newHeadersWithBlocks(headers []*flow.Header) *headerStore {
-	byID := make(map[flow.Identifier]*flow.Header, len(headers))
-	byHeight := make(map[uint64]*flow.Header, len(headers))
+func newHeadersWithBlocks(headers []*flow.UnsignedHeader) *headerStore {
+	byID := make(map[flow.Identifier]*flow.UnsignedHeader, len(headers))
+	byHeight := make(map[uint64]*flow.UnsignedHeader, len(headers))
 	for _, header := range headers {
 		byID[header.ID()] = header
 		byHeight[header.Height] = header
@@ -210,7 +210,7 @@ func (h *headerStore) BlockIDByHeight(height uint64) (flow.Identifier, error) {
 	return header.ID(), nil
 }
 
-func (h *headerStore) ByBlockID(blockID flow.Identifier) (*flow.Header, error) {
+func (h *headerStore) ByBlockID(blockID flow.Identifier) (*flow.UnsignedHeader, error) {
 	header, ok := h.byID[blockID]
 	if !ok {
 		return nil, fmt.Errorf("block %v not found", blockID)
@@ -218,7 +218,7 @@ func (h *headerStore) ByBlockID(blockID flow.Identifier) (*flow.Header, error) {
 	return header, nil
 }
 
-func (h *headerStore) ByHeight(height uint64) (*flow.Header, error) {
+func (h *headerStore) ByHeight(height uint64) (*flow.UnsignedHeader, error) {
 	header, ok := h.byHeight[height]
 	if !ok {
 		return nil, fmt.Errorf("block %d not found", height)
@@ -231,7 +231,7 @@ func (h *headerStore) Exists(blockID flow.Identifier) (bool, error) {
 	return ok, nil
 }
 
-func (h *headerStore) ByParentID(parentID flow.Identifier) ([]*flow.Header, error) {
+func (h *headerStore) ByParentID(parentID flow.Identifier) ([]*flow.UnsignedHeader, error) {
 	return nil, nil
 }
 

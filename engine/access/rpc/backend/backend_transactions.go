@@ -653,7 +653,7 @@ func (b *backendTransactions) lookupBlock(txID flow.Identifier) (*flow.UnsignedB
 func (b *backendTransactions) lookupTransactionResult(
 	ctx context.Context,
 	txID flow.Identifier,
-	block *flow.Header,
+	block *flow.UnsignedHeader,
 	requiredEventEncodingVersion entities.EventEncodingVersion,
 ) (*accessmodel.TransactionResult, error) {
 	var txResult *accessmodel.TransactionResult
@@ -753,7 +753,7 @@ func (b *backendTransactions) registerTransactionForRetry(tx *flow.TransactionBo
 
 func (b *backendTransactions) GetTransactionResultFromExecutionNode(
 	ctx context.Context,
-	block *flow.Header,
+	block *flow.UnsignedHeader,
 	transactionID flow.Identifier,
 	requiredEventEncodingVersion entities.EventEncodingVersion,
 ) (*accessmodel.TransactionResult, error) {

@@ -359,7 +359,7 @@ func blockResponse(block *flow.UnsignedBlock) (*accessproto.BlockResponse, error
 	}, nil
 }
 
-func blockHeaderResponse(header *flow.Header) (*accessproto.BlockHeaderResponse, error) {
+func blockHeaderResponse(header *flow.UnsignedHeader) (*accessproto.BlockHeaderResponse, error) {
 	msg, err := convert.BlockHeaderToMessage(header)
 	if err != nil {
 		return nil, err

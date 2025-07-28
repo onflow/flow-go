@@ -30,7 +30,7 @@ var _ hotstuff.BlockSignerDecoder = (*BlockSignerDecoder)(nil)
 //   - signature.InvalidSignerIndicesError if signer indices included in the header do
 //     not encode a valid subset of the consensus committee
 //   - state.ErrUnknownSnapshotReference if the input header is not a known incorporated block.
-func (b *BlockSignerDecoder) DecodeSignerIDs(header *flow.Header) (flow.IdentifierList, error) {
+func (b *BlockSignerDecoder) DecodeSignerIDs(header *flow.UnsignedHeader) (flow.IdentifierList, error) {
 	// root block does not have signer indices
 	if header.ParentVoterIndices == nil && header.View == 0 {
 		return []flow.Identifier{}, nil
@@ -70,6 +70,6 @@ func NewNoopBlockSignerDecoder() *NoopBlockSignerDecoder {
 	return &NoopBlockSignerDecoder{}
 }
 
-func (b *NoopBlockSignerDecoder) DecodeSignerIDs(_ *flow.Header) (flow.IdentifierList, error) {
+func (b *NoopBlockSignerDecoder) DecodeSignerIDs(_ *flow.UnsignedHeader) (flow.IdentifierList, error) {
 	return nil, nil
 }

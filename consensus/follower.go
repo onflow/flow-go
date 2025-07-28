@@ -27,9 +27,9 @@ func NewFollower(log zerolog.Logger,
 	headers storage.Headers,
 	updater module.Finalizer,
 	notifier hotstuff.FollowerConsumer,
-	rootHeader *flow.Header,
+	rootHeader *flow.UnsignedHeader,
 	rootQC *flow.QuorumCertificate,
-	finalized *flow.Header,
+	finalized *flow.UnsignedHeader,
 	pending []*flow.ProposalHeader,
 ) (*hotstuff.FollowerLoop, error) {
 	forks, err := NewForks(finalized, headers, updater, notifier, rootHeader, rootQC)

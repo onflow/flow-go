@@ -71,7 +71,7 @@ func prepareStorehouseTest(f func(t *testing.T, es state.ExecutionState, l *ledg
 				finalized *testutil.MockFinalizedReader,
 				rootHeight uint64,
 				endHeight uint64,
-				finalizedHeaders map[uint64]*flow.Header,
+				finalizedHeaders map[uint64]*flow.UnsignedHeader,
 			) {
 
 				rootID, err := finalized.FinalizedBlockIDAtHeight(10)
@@ -110,7 +110,7 @@ func withRegisterStore(t *testing.T, fn func(
 	finalized *testutil.MockFinalizedReader,
 	rootHeight uint64,
 	endHeight uint64,
-	headers map[uint64]*flow.Header,
+	headers map[uint64]*flow.UnsignedHeader,
 )) {
 	// block 10 is executed block
 	pebble.RunWithRegistersStorageAtInitialHeights(t, 10, 10, func(diskStore *pebble.Registers) {

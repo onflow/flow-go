@@ -407,7 +407,7 @@ func readIntermediaryBootstrappingData() *IntermediaryBootstrappingData {
 // generateEmptyExecutionState generates a new empty execution state with the
 // given configuration. Sets the flagRootCommit variable for future reads.
 func generateEmptyExecutionState(
-	rootBlock *flow.Header,
+	rootBlock *flow.UnsignedHeader,
 	epochConfig epochs.EpochConfig,
 	nodes []bootstrap.NodeInfo,
 ) (commit flow.StateCommitment) {

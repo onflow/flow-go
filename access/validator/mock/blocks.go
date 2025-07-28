@@ -13,23 +13,23 @@ type Blocks struct {
 }
 
 // FinalizedHeader provides a mock function with no fields
-func (_m *Blocks) FinalizedHeader() (*flow.Header, error) {
+func (_m *Blocks) FinalizedHeader() (*flow.UnsignedHeader, error) {
 	ret := _m.Called()
 
 	if len(ret) == 0 {
 		panic("no return value specified for FinalizedHeader")
 	}
 
-	var r0 *flow.Header
+	var r0 *flow.UnsignedHeader
 	var r1 error
-	if rf, ok := ret.Get(0).(func() (*flow.Header, error)); ok {
+	if rf, ok := ret.Get(0).(func() (*flow.UnsignedHeader, error)); ok {
 		return rf()
 	}
-	if rf, ok := ret.Get(0).(func() *flow.Header); ok {
+	if rf, ok := ret.Get(0).(func() *flow.UnsignedHeader); ok {
 		r0 = rf()
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*flow.Header)
+			r0 = ret.Get(0).(*flow.UnsignedHeader)
 		}
 	}
 
@@ -43,23 +43,23 @@ func (_m *Blocks) FinalizedHeader() (*flow.Header, error) {
 }
 
 // HeaderByID provides a mock function with given fields: id
-func (_m *Blocks) HeaderByID(id flow.Identifier) (*flow.Header, error) {
+func (_m *Blocks) HeaderByID(id flow.Identifier) (*flow.UnsignedHeader, error) {
 	ret := _m.Called(id)
 
 	if len(ret) == 0 {
 		panic("no return value specified for HeaderByID")
 	}
 
-	var r0 *flow.Header
+	var r0 *flow.UnsignedHeader
 	var r1 error
-	if rf, ok := ret.Get(0).(func(flow.Identifier) (*flow.Header, error)); ok {
+	if rf, ok := ret.Get(0).(func(flow.Identifier) (*flow.UnsignedHeader, error)); ok {
 		return rf(id)
 	}
-	if rf, ok := ret.Get(0).(func(flow.Identifier) *flow.Header); ok {
+	if rf, ok := ret.Get(0).(func(flow.Identifier) *flow.UnsignedHeader); ok {
 		r0 = rf(id)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*flow.Header)
+			r0 = ret.Get(0).(*flow.UnsignedHeader)
 		}
 	}
 
@@ -101,23 +101,23 @@ func (_m *Blocks) IndexedHeight() (uint64, error) {
 }
 
 // SealedHeader provides a mock function with no fields
-func (_m *Blocks) SealedHeader() (*flow.Header, error) {
+func (_m *Blocks) SealedHeader() (*flow.UnsignedHeader, error) {
 	ret := _m.Called()
 
 	if len(ret) == 0 {
 		panic("no return value specified for SealedHeader")
 	}
 
-	var r0 *flow.Header
+	var r0 *flow.UnsignedHeader
 	var r1 error
-	if rf, ok := ret.Get(0).(func() (*flow.Header, error)); ok {
+	if rf, ok := ret.Get(0).(func() (*flow.UnsignedHeader, error)); ok {
 		return rf()
 	}
-	if rf, ok := ret.Get(0).(func() *flow.Header); ok {
+	if rf, ok := ret.Get(0).(func() *flow.UnsignedHeader); ok {
 		r0 = rf()
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*flow.Header)
+			r0 = ret.Get(0).(*flow.UnsignedHeader)
 		}
 	}
 

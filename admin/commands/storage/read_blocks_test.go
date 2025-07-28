@@ -38,10 +38,10 @@ func TestReadBlocks(t *testing.T) {
 	suite.Run(t, new(ReadBlocksSuite))
 }
 
-func createSnapshot(t *testing.T, head *flow.Header) *protocolmock.Snapshot {
+func createSnapshot(t *testing.T, head *flow.UnsignedHeader) *protocolmock.Snapshot {
 	snapshot := protocolmock.NewSnapshot(t)
 	snapshot.On("Head").Return(
-		func() *flow.Header {
+		func() *flow.UnsignedHeader {
 			return head
 		},
 		nil,

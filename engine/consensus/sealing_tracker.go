@@ -16,7 +16,7 @@ type SealingTracker interface {
 	// NewSealingObservation constructs a SealingObservation, which capture information
 	// about the progress of a _single_ go routine. Consequently, SealingObservations
 	// don't need to be concurrency safe, as they are supposed to be thread-local structure.
-	NewSealingObservation(finalizedBlock *flow.Header, seal *flow.Seal, sealedBlock *flow.Header) SealingObservation
+	NewSealingObservation(finalizedBlock *flow.UnsignedHeader, seal *flow.Seal, sealedBlock *flow.UnsignedHeader) SealingObservation
 }
 
 // SealingObservation captures information about the progress of a _single_ go routine.

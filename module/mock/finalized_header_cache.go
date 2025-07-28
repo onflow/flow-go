@@ -13,19 +13,19 @@ type FinalizedHeaderCache struct {
 }
 
 // Get provides a mock function with no fields
-func (_m *FinalizedHeaderCache) Get() *flow.Header {
+func (_m *FinalizedHeaderCache) Get() *flow.UnsignedHeader {
 	ret := _m.Called()
 
 	if len(ret) == 0 {
 		panic("no return value specified for Get")
 	}
 
-	var r0 *flow.Header
-	if rf, ok := ret.Get(0).(func() *flow.Header); ok {
+	var r0 *flow.UnsignedHeader
+	if rf, ok := ret.Get(0).(func() *flow.UnsignedHeader); ok {
 		r0 = rf()
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*flow.Header)
+			r0 = ret.Get(0).(*flow.UnsignedHeader)
 		}
 	}
 

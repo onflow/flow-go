@@ -11,7 +11,7 @@ import (
 )
 
 type MockFinalizedReader struct {
-	headerByHeight  map[uint64]*flow.Header
+	headerByHeight  map[uint64]*flow.UnsignedHeader
 	blockByHeight   map[uint64]*flow.UnsignedBlock
 	lowest          uint64
 	highest         uint64
@@ -19,10 +19,10 @@ type MockFinalizedReader struct {
 	finalizedCalled *atomic.Int64
 }
 
-func NewMockFinalizedReader(initHeight uint64, count int) (*MockFinalizedReader, map[uint64]*flow.Header, uint64) {
+func NewMockFinalizedReader(initHeight uint64, count int) (*MockFinalizedReader, map[uint64]*flow.UnsignedHeader, uint64) {
 	root := unittest.BlockHeaderFixture(unittest.WithHeaderHeight(initHeight))
 	blocks := unittest.ChainFixtureFrom(count, root)
-	headerByHeight := make(map[uint64]*flow.Header, len(blocks)+1)
+	headerByHeight := make(map[uint64]*flow.UnsignedHeader, len(blocks)+1)
 	headerByHeight[root.Height] = root
 
 	blockByHeight := make(map[uint64]*flow.UnsignedBlock, len(blocks)+1)

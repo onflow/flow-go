@@ -28,7 +28,7 @@ type MockBlockStore struct {
 	sync.Mutex
 	ResultByBlock map[flow.Identifier]*BlockResult
 	Executed      map[flow.Identifier]struct{}
-	RootBlock     *flow.Header
+	RootBlock     *flow.UnsignedHeader
 }
 
 func NewMockBlockStore(t *testing.T) *MockBlockStore {

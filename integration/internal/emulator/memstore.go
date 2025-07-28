@@ -55,7 +55,7 @@ var _ environment.Blocks = &Store{}
 var _ validator.Blocks = &Store{}
 var _ EmulatorStorage = &Store{}
 
-func (b *Store) HeaderByID(id flowgo.Identifier) (*flowgo.Header, error) {
+func (b *Store) HeaderByID(id flowgo.Identifier) (*flowgo.UnsignedHeader, error) {
 	block, err := b.BlockByID(context.Background(), id)
 	if err != nil {
 		if errors.Is(err, ErrNotFound) {
@@ -66,7 +66,7 @@ func (b *Store) HeaderByID(id flowgo.Identifier) (*flowgo.Header, error) {
 	return block.ToHeader(), nil
 }
 
-func (b *Store) FinalizedHeader() (*flowgo.Header, error) {
+func (b *Store) FinalizedHeader() (*flowgo.UnsignedHeader, error) {
 	block, err := b.LatestBlock(context.Background())
 	if err != nil {
 		return nil, err
@@ -75,7 +75,7 @@ func (b *Store) FinalizedHeader() (*flowgo.Header, error) {
 	return block.ToHeader(), nil
 }
 
-func (b *Store) SealedHeader() (*flowgo.Header, error) {
+func (b *Store) SealedHeader() (*flowgo.UnsignedHeader, error) {
 	block, err := b.LatestBlock(context.Background())
 	if err != nil {
 		return nil, err
@@ -94,7 +94,7 @@ func (b *Store) IndexedHeight() (uint64, error) {
 }
 
 // ByHeightFrom We don't have to do anything complex here, as emulator does not fork the chain
-func (b *Store) ByHeightFrom(height uint64, header *flowgo.Header) (*flowgo.Header, error) {
+func (b *Store) ByHeightFrom(height uint64, header *flowgo.UnsignedHeader) (*flowgo.UnsignedHeader, error) {
 	if height > header.Height {
 		return nil, ErrNotFound
 	}

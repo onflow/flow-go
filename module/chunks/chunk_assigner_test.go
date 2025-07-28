@@ -21,7 +21,7 @@ type PublicAssignmentTestSuite struct {
 }
 
 // Setup test with n verification nodes
-func (a *PublicAssignmentTestSuite) SetupTest(n int) (*flow.Header, *protocol.Snapshot, *protocol.State) {
+func (a *PublicAssignmentTestSuite) SetupTest(n int) (*flow.UnsignedHeader, *protocol.Snapshot, *protocol.State) {
 	nodes := make([]flow.Role, 0)
 	for i := 1; i < n; i++ {
 		nodes = append(nodes, flow.RoleVerification)
@@ -337,7 +337,7 @@ func (a *PublicAssignmentTestSuite) CreateChunks(num int, t *testing.T) flow.Chu
 	return list
 }
 
-func (a *PublicAssignmentTestSuite) CreateResult(head *flow.Header, num int, t *testing.T) *flow.ExecutionResult {
+func (a *PublicAssignmentTestSuite) CreateResult(head *flow.UnsignedHeader, num int, t *testing.T) *flow.ExecutionResult {
 	list := a.CreateChunks(5, a.T())
 	result := &flow.ExecutionResult{
 		BlockID: head.ID(),

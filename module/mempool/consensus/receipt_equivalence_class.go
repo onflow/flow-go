@@ -16,12 +16,12 @@ import (
 type ReceiptsOfSameResult struct {
 	receipts    map[flow.Identifier]*flow.ExecutionReceiptStub // map from ExecutionReceipt.ID -> ExecutionReceiptStub
 	result      *flow.ExecutionResult
-	resultID    flow.Identifier // precomputed ID of result to avoid expensive hashing on each call
-	blockHeader *flow.Header    // header of the block which the result is for
+	resultID    flow.Identifier      // precomputed ID of result to avoid expensive hashing on each call
+	blockHeader *flow.UnsignedHeader // header of the block which the result is for
 }
 
 // NewReceiptsOfSameResult instantiates an empty Equivalence Class (without any receipts)
-func NewReceiptsOfSameResult(result *flow.ExecutionResult, block *flow.Header) (*ReceiptsOfSameResult, error) {
+func NewReceiptsOfSameResult(result *flow.ExecutionResult, block *flow.UnsignedHeader) (*ReceiptsOfSameResult, error) {
 	//sanity check: initial result should be for block
 	if block.ID() != result.BlockID {
 		return nil, fmt.Errorf("initial result is for different block")

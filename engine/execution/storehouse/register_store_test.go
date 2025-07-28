@@ -30,7 +30,7 @@ func withRegisterStore(t *testing.T, fn func(
 	finalized *testutil.MockFinalizedReader,
 	rootHeight uint64,
 	endHeight uint64,
-	headers map[uint64]*flow.Header,
+	headers map[uint64]*flow.UnsignedHeader,
 	n *notifier,
 )) {
 	pebble.RunWithRegistersStorageAtInitialHeights(t, 10, 10, func(diskStore *pebble.Registers) {
@@ -58,7 +58,7 @@ func TestRegisterStoreGetRegisterFail(t *testing.T) {
 		finalized *testutil.MockFinalizedReader,
 		rootHeight uint64,
 		endHeight uint64,
-		headerByHeight map[uint64]*flow.Header,
+		headerByHeight map[uint64]*flow.UnsignedHeader,
 		n *notifier,
 	) {
 		// unknown block
@@ -98,7 +98,7 @@ func TestRegisterStoreSaveRegistersShouldFail(t *testing.T) {
 		finalized *testutil.MockFinalizedReader,
 		rootHeight uint64,
 		endHeight uint64,
-		headerByHeight map[uint64]*flow.Header,
+		headerByHeight map[uint64]*flow.UnsignedHeader,
 		n *notifier,
 	) {
 		wrongParent := unittest.BlockHeaderFixture(unittest.WithHeaderHeight(rootHeight + 1))
@@ -128,7 +128,7 @@ func TestRegisterStoreSaveRegistersShouldOK(t *testing.T) {
 		finalized *testutil.MockFinalizedReader,
 		rootHeight uint64,
 		endHeight uint64,
-		headerByHeight map[uint64]*flow.Header,
+		headerByHeight map[uint64]*flow.UnsignedHeader,
 		n *notifier,
 	) {
 		// not executed
@@ -181,7 +181,7 @@ func TestRegisterStoreIsBlockExecuted(t *testing.T) {
 		finalized *testutil.MockFinalizedReader,
 		rootHeight uint64,
 		endHeight uint64,
-		headerByHeight map[uint64]*flow.Header,
+		headerByHeight map[uint64]*flow.UnsignedHeader,
 		n *notifier,
 	) {
 		// save block 11
@@ -227,7 +227,7 @@ func TestRegisterStoreReadingFromDisk(t *testing.T) {
 		finalized *testutil.MockFinalizedReader,
 		rootHeight uint64,
 		endHeight uint64,
-		headerByHeight map[uint64]*flow.Header,
+		headerByHeight map[uint64]*flow.UnsignedHeader,
 		n *notifier,
 	) {
 
@@ -280,7 +280,7 @@ func TestRegisterStoreReadingFromInMemStore(t *testing.T) {
 		finalized *testutil.MockFinalizedReader,
 		rootHeight uint64,
 		endHeight uint64,
-		headerByHeight map[uint64]*flow.Header,
+		headerByHeight map[uint64]*flow.UnsignedHeader,
 		n *notifier,
 	) {
 
@@ -340,7 +340,7 @@ func TestRegisterStoreReadRegisterAtPrunedHeight(t *testing.T) {
 		finalized *testutil.MockFinalizedReader,
 		rootHeight uint64,
 		endHeight uint64,
-		headerByHeight map[uint64]*flow.Header,
+		headerByHeight map[uint64]*flow.UnsignedHeader,
 		n *notifier,
 	) {
 
@@ -391,7 +391,7 @@ func TestRegisterStoreExecuteFinalizedBlockOrFinalizeExecutedBlockShouldNotCallF
 		finalized *testutil.MockFinalizedReader,
 		rootHeight uint64,
 		endHeight uint64,
-		headerByHeight map[uint64]*flow.Header,
+		headerByHeight map[uint64]*flow.UnsignedHeader,
 		n *notifier,
 	) {
 
@@ -449,7 +449,7 @@ func TestRegisterStoreExecuteFirstFinalizeLater(t *testing.T) {
 		finalized *testutil.MockFinalizedReader,
 		rootHeight uint64,
 		endHeight uint64,
-		headerByHeight map[uint64]*flow.Header,
+		headerByHeight map[uint64]*flow.UnsignedHeader,
 		n *notifier,
 	) {
 		// save block 11
@@ -501,7 +501,7 @@ func TestRegisterStoreFinalizeFirstExecuteLater(t *testing.T) {
 		finalized *testutil.MockFinalizedReader,
 		rootHeight uint64,
 		endHeight uint64,
-		headerByHeight map[uint64]*flow.Header,
+		headerByHeight map[uint64]*flow.UnsignedHeader,
 		n *notifier,
 	) {
 		require.NoError(t, finalized.MockFinal(rootHeight+1))
@@ -550,7 +550,7 @@ func TestRegisterStoreConcurrentFinalizeAndExecute(t *testing.T) {
 		finalized *testutil.MockFinalizedReader,
 		rootHeight uint64,
 		endHeight uint64,
-		headerByHeight map[uint64]*flow.Header,
+		headerByHeight map[uint64]*flow.UnsignedHeader,
 		n *notifier,
 	) {
 

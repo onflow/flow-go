@@ -153,23 +153,23 @@ func (_m *Snapshot) Epochs() protocol.EpochQuery {
 }
 
 // Head provides a mock function with no fields
-func (_m *Snapshot) Head() (*flow.Header, error) {
+func (_m *Snapshot) Head() (*flow.UnsignedHeader, error) {
 	ret := _m.Called()
 
 	if len(ret) == 0 {
 		panic("no return value specified for Head")
 	}
 
-	var r0 *flow.Header
+	var r0 *flow.UnsignedHeader
 	var r1 error
-	if rf, ok := ret.Get(0).(func() (*flow.Header, error)); ok {
+	if rf, ok := ret.Get(0).(func() (*flow.UnsignedHeader, error)); ok {
 		return rf()
 	}
-	if rf, ok := ret.Get(0).(func() *flow.Header); ok {
+	if rf, ok := ret.Get(0).(func() *flow.UnsignedHeader); ok {
 		r0 = rf()
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*flow.Header)
+			r0 = ret.Get(0).(*flow.UnsignedHeader)
 		}
 	}
 

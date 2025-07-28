@@ -265,7 +265,7 @@ func deployContractBlock(
 	chain flow.Chain,
 	seq uint64,
 	parent *flow.UnsignedBlock,
-	ref *flow.Header,
+	ref *flow.UnsignedHeader,
 ) (
 	*flow.TransactionBody, *flow.Collection, *flow.UnsignedBlock, *flow.UntrustedProposal, uint64) {
 	// make tx
@@ -307,7 +307,7 @@ func deployContractBlock(
 	return tx, col, block, proposal, seq + 1
 }
 
-func makePanicBlock(t *testing.T, conID *flow.Identity, colID *flow.Identity, chain flow.Chain, seq uint64, parent *flow.UnsignedBlock, ref *flow.Header) (
+func makePanicBlock(t *testing.T, conID *flow.Identity, colID *flow.Identity, chain flow.Chain, seq uint64, parent *flow.UnsignedBlock, ref *flow.UnsignedHeader) (
 	*flow.TransactionBody, *flow.Collection, *flow.UnsignedBlock, *flow.UntrustedProposal, uint64) {
 	// make tx
 	tx := execTestutil.CreateCounterPanicTransaction(chain.ServiceAddress(), chain.ServiceAddress())
@@ -343,7 +343,7 @@ func makePanicBlock(t *testing.T, conID *flow.Identity, colID *flow.Identity, ch
 	return tx, col, block, proposal, seq + 1
 }
 
-func makeSuccessBlock(t *testing.T, conID *flow.Identity, colID *flow.Identity, chain flow.Chain, seq uint64, parent *flow.UnsignedBlock, ref *flow.Header) (
+func makeSuccessBlock(t *testing.T, conID *flow.Identity, colID *flow.Identity, chain flow.Chain, seq uint64, parent *flow.UnsignedBlock, ref *flow.UnsignedHeader) (
 	*flow.TransactionBody, *flow.Collection, *flow.UnsignedBlock, *flow.UntrustedProposal, uint64) {
 	tx := execTestutil.AddToCounterTransaction(chain.ServiceAddress(), chain.ServiceAddress())
 	err := execTestutil.SignTransactionAsServiceAccount(tx, seq, chain)

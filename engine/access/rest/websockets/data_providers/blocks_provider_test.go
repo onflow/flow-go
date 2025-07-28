@@ -36,7 +36,7 @@ type BlocksProviderSuite struct {
 	blocks []*flow.UnsignedBlock
 
 	rootBlock      *flow.UnsignedBlock
-	finalizedBlock *flow.Header
+	finalizedBlock *flow.UnsignedHeader
 
 	factory       *DataProviderFactoryImpl
 	linkGenerator *mockcommonmodels.LinkGenerator

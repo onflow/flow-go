@@ -91,7 +91,7 @@ func (r *ReadProtocolStateBlocksCommand) getBlockByID(blockID flow.Identifier) (
 	return block, nil
 }
 
-func (r *ReadProtocolStateBlocksCommand) getBlockByHeader(header *flow.Header) (*flow.UnsignedBlock, error) {
+func (r *ReadProtocolStateBlocksCommand) getBlockByHeader(header *flow.UnsignedHeader) (*flow.UnsignedBlock, error) {
 	blockID := header.ID()
 	block, err := r.blocks.ByID(blockID)
 	if err != nil {

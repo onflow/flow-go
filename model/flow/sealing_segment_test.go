@@ -111,7 +111,7 @@ func (suite *SealingSegmentSuite) PayloadFixture(opts ...func(payload *flow.Payl
 }
 
 // BlockWithParentFixture returns a UnsignedBlock fixtures with the default protocol state.
-func (suite *SealingSegmentSuite) BlockWithParentFixture(parent *flow.Header) *flow.UnsignedBlock {
+func (suite *SealingSegmentSuite) BlockWithParentFixture(parent *flow.UnsignedHeader) *flow.UnsignedBlock {
 	return unittest.BlockWithParentAndPayload(parent, suite.PayloadFixture())
 }
 

@@ -13,7 +13,7 @@ type BlockRequester struct {
 }
 
 // Prune provides a mock function with given fields: final
-func (_m *BlockRequester) Prune(final *flow.Header) {
+func (_m *BlockRequester) Prune(final *flow.UnsignedHeader) {
 	_m.Called(final)
 }
 

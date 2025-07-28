@@ -45,7 +45,7 @@ func BlockToJob(block *flow.UnsignedBlock) *BlockJob {
 // In current architecture, BlockHeaderJob represents a finalized block enqueued to be processed by
 // a consumer that implements the JobQueue interface.
 type BlockHeaderJob struct {
-	Header *flow.Header
+	Header *flow.UnsignedHeader
 }
 
 // ID converts block id into job id, which guarantees uniqueness.
@@ -54,7 +54,7 @@ func (j BlockHeaderJob) ID() module.JobID {
 }
 
 // JobToBlockHeader converts a block job into its corresponding block header.
-func JobToBlockHeader(job module.Job) (*flow.Header, error) {
+func JobToBlockHeader(job module.Job) (*flow.UnsignedHeader, error) {
 	headerJob, ok := job.(*BlockHeaderJob)
 	if !ok {
 		return nil, fmt.Errorf("could not assert job to block header, job id: %x", job.ID())
@@ -63,6 +63,6 @@ func JobToBlockHeader(job module.Job) (*flow.Header, error) {
 }
 
 // BlockHeaderToJob converts the block to a BlockHeaderJob.
-func BlockHeaderToJob(header *flow.Header) *BlockHeaderJob {
+func BlockHeaderToJob(header *flow.UnsignedHeader) *BlockHeaderJob {
 	return &BlockHeaderJob{Header: header}
 }

@@ -77,7 +77,7 @@ func parseBlocksRequest(block interface{}) (*blocksRequest, error) {
 	return req, nil
 }
 
-func getBlockHeader(state protocol.State, req *blocksRequest) (*flow.Header, error) {
+func getBlockHeader(state protocol.State, req *blocksRequest) (*flow.UnsignedHeader, error) {
 	switch req.requestType {
 	case blocksRequestByID:
 		return state.AtBlockID(req.value.(flow.Identifier)).Head()

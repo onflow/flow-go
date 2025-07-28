@@ -52,7 +52,7 @@ type TxErrorMessagesEngineSuite struct {
 
 	blockMap    map[uint64]*flow.UnsignedBlock
 	rootBlock   *flow.UnsignedBlock
-	sealedBlock *flow.Header
+	sealedBlock *flow.UnsignedHeader
 
 	db    *badger.DB
 	dbDir string
@@ -104,7 +104,7 @@ func (s *TxErrorMessagesEngineSuite) SetupTest() {
 	s.headers.On("ByHeight", mock.AnythingOfType("uint64")).Return(
 		mocks.ConvertStorageOutput(
 			mocks.StorageMapGetter(s.blockMap),
-			func(block *flow.UnsignedBlock) *flow.Header { return block.ToHeader() },
+			func(block *flow.UnsignedBlock) *flow.UnsignedHeader { return block.ToHeader() },
 		),
 	).Maybe()
 
@@ -115,7 +115,7 @@ func (s *TxErrorMessagesEngineSuite) SetupTest() {
 	s.proto.params.On("SealedRoot").Return(s.rootBlock.ToHeader(), nil)
 
 	s.proto.snapshot.On("Head").Return(
-		func() *flow.Header {
+		func() *flow.UnsignedHeader {
 			return s.sealedBlock
 		},
 		nil,

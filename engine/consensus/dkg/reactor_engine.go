@@ -126,14 +126,14 @@ func (e *ReactorEngine) Done() <-chan struct{} {
 // EpochSetupPhaseStarted handles the EpochSetupPhaseStarted protocol event by
 // starting the DKG process.
 // NOTE: ReactorEngine will not recover from mid-DKG crashes, therefore we do not need to handle dropped protocol events here.
-func (e *ReactorEngine) EpochSetupPhaseStarted(currentEpochCounter uint64, first *flow.Header) {
+func (e *ReactorEngine) EpochSetupPhaseStarted(currentEpochCounter uint64, first *flow.UnsignedHeader) {
 	e.startDKGForEpoch(currentEpochCounter, first)
 }
 
 // EpochCommittedPhaseStarted handles the EpochCommittedPhaseStarted protocol
 // event by checking the consistency of our locally computed key share.
 // NOTE: ReactorEngine will not recover from mid-DKG crashes, therefore we do not need to handle dropped protocol events here.
-func (e *ReactorEngine) EpochCommittedPhaseStarted(currentEpochCounter uint64, first *flow.Header) {
+func (e *ReactorEngine) EpochCommittedPhaseStarted(currentEpochCounter uint64, first *flow.UnsignedHeader) {
 	e.handleEpochCommittedPhaseStarted(currentEpochCounter, first)
 }
 
@@ -144,7 +144,7 @@ func (e *ReactorEngine) EpochCommittedPhaseStarted(currentEpochCounter uint64, f
 //
 // It starts a new controller for the epoch and registers the triggers to regularly
 // query the DKG smart-contract and transition between phases at the specified views.
-func (e *ReactorEngine) startDKGForEpoch(currentEpochCounter uint64, first *flow.Header) {
+func (e *ReactorEngine) startDKGForEpoch(currentEpochCounter uint64, first *flow.UnsignedHeader) {
 
 	firstID := first.ID()
 	nextEpochCounter := currentEpochCounter + 1
@@ -261,7 +261,7 @@ func (e *ReactorEngine) startDKGForEpoch(currentEpochCounter uint64, first *flow
 //
 // CAUTION: This function is not safe for concurrent use. This is not enforced within
 // the ReactorEngine - instead we rely on the protocol event emission being single-threaded
-func (e *ReactorEngine) handleEpochCommittedPhaseStarted(currentEpochCounter uint64, firstBlock *flow.Header) {
+func (e *ReactorEngine) handleEpochCommittedPhaseStarted(currentEpochCounter uint64, firstBlock *flow.UnsignedHeader) {
 
 	// the DKG we have just completed produces keys that we will use in the next epoch
 	nextEpochCounter := currentEpochCounter + 1
@@ -403,7 +403,7 @@ func (e *ReactorEngine) getDKGInfo(firstBlockID flow.Identifier) (*dkgInfo, erro
 // registerPoll instructs the engine to query the DKG smart-contract for new
 // broadcast messages at the specified view.
 func (e *ReactorEngine) registerPoll(view uint64) {
-	e.viewEvents.OnView(view, func(header *flow.Header) {
+	e.viewEvents.OnView(view, func(header *flow.UnsignedHeader) {
 		e.unit.Launch(func() {
 			e.unit.Lock()
 			defer e.unit.Unlock()
@@ -427,7 +427,7 @@ func (e *ReactorEngine) registerPoll(view uint64) {
 // registerPhaseTransition instructs the engine to change phases at the
 // specified view.
 func (e *ReactorEngine) registerPhaseTransition(view uint64, fromState dkgmodule.State, phaseTransition func() error) {
-	e.viewEvents.OnView(view, func(header *flow.Header) {
+	e.viewEvents.OnView(view, func(header *flow.UnsignedHeader) {
 		e.unit.Launch(func() {
 			e.unit.Lock()
 			defer e.unit.Unlock()

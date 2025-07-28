@@ -85,7 +85,7 @@ type Engine struct {
 	finalizationEventsNotifier engine.Notifier
 	blockIncorporatedNotifier  engine.Notifier
 	messageHandler             *engine.MessageHandler
-	rootHeader                 *flow.Header
+	rootHeader                 *flow.UnsignedHeader
 }
 
 // NewEngine constructs a new Sealing Engine which runs on its own component.

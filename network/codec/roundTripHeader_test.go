@@ -40,7 +40,7 @@ func roundTripHeaderViaCodec(t *testing.T, codec network.Codec) {
 		assert.Equal(t, *block.LastViewTC, *decodedBlock.LastViewTC)
 	}
 	// compare the rest of the header
-	// manually set LastViewTC fields to be equal to pass the Header pointer comparison
+	// manually set LastViewTC fields to be equal to pass the UnsignedHeader pointer comparison
 	decodedBlock.LastViewTC = block.LastViewTC
 	assert.Equal(t, *block.ToHeader(), *decodedBlock.ToHeader())
 }

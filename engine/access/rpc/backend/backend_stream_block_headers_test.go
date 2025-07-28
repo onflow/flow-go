@@ -79,7 +79,7 @@ func (s *BackendBlockHeadersSuite) TestSubscribeBlockHeadersFromLatest() {
 
 // requireBlockHeaders ensures that the received block header information matches the expected data.
 func (s *BackendBlockHeadersSuite) requireBlockHeaders(v interface{}, expectedBlock *flow.UnsignedBlock) {
-	actualHeader, ok := v.(*flow.Header)
+	actualHeader, ok := v.(*flow.UnsignedHeader)
 	require.True(s.T(), ok, "unexpected response type: %T", v)
 
 	s.Require().Equal(expectedBlock.Height, actualHeader.Height)

@@ -87,5 +87,5 @@ type complianceCore interface {
 	// and PendingTree.
 	// Caution: this method is allowed to block
 	// Implementors need to ensure that this function is safe to be used in concurrent environment.
-	OnFinalizedBlock(finalized *flow.Header)
+	OnFinalizedBlock(finalized *flow.UnsignedHeader)
 }

@@ -56,7 +56,7 @@ func (f *Finalizer) MakeFinal(blockID flow.Identifier) error {
 	return operation.RetryOnConflict(f.db.Update, func(tx *badger.Txn) error {
 
 		// retrieve the header of the block we want to finalize
-		var header flow.Header
+		var header flow.UnsignedHeader
 		err := operation.RetrieveHeader(blockID, &header)(tx)
 		if err != nil {
 			return fmt.Errorf("could not retrieve header: %w", err)
@@ -86,10 +86,10 @@ func (f *Finalizer) MakeFinal(blockID flow.Identifier) error {
 		// including the current, we first enumerate each of these blocks.
 		// We start at the youngest block and remember all visited blocks,
 		// while tracing back until we reach the finalized state
-		steps := []*flow.Header{&header}
+		steps := []*flow.UnsignedHeader{&header}
 		parentID := header.ParentID
 		for parentID != headID {
-			var parent flow.Header
+			var parent flow.UnsignedHeader
 			err = operation.RetrieveHeader(parentID, &parent)(tx)
 			if err != nil {
 				return fmt.Errorf("could not retrieve parent (%x): %w", parentID, err)
@@ -144,7 +144,7 @@ func (f *Finalizer) MakeFinal(blockID flow.Identifier) error {
 			}
 
 			// look up the reference block height to populate index
-			var refBlock flow.Header
+			var refBlock flow.UnsignedHeader
 			err = operation.RetrieveHeader(payload.ReferenceBlockID, &refBlock)(tx)
 			if err != nil {
 				return fmt.Errorf("could not retrieve reference block (id=%x): %w", payload.ReferenceBlockID, err)

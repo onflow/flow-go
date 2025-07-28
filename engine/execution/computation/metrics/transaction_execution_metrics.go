@@ -113,7 +113,7 @@ func NewTransactionExecutionMetricsProvider(
 	return p
 }
 
-func (p *transactionExecutionMetricsProvider) BlockFinalized(*flow.Header) {
+func (p *transactionExecutionMetricsProvider) BlockFinalized(*flow.UnsignedHeader) {
 	p.blockFinalizedNotifier.Notify()
 }
 

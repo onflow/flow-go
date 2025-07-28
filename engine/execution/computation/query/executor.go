@@ -34,7 +34,7 @@ type Executor interface {
 		ctx context.Context,
 		script []byte,
 		arguments [][]byte,
-		blockHeader *flow.Header,
+		blockHeader *flow.UnsignedHeader,
 		snapshot snapshot.StorageSnapshot,
 	) (
 		[]byte,
@@ -45,7 +45,7 @@ type Executor interface {
 	GetAccount(
 		ctx context.Context,
 		addr flow.Address,
-		header *flow.Header,
+		header *flow.UnsignedHeader,
 		snapshot snapshot.StorageSnapshot,
 	) (
 		*flow.Account,
@@ -55,7 +55,7 @@ type Executor interface {
 	GetAccountBalance(
 		ctx context.Context,
 		addr flow.Address,
-		header *flow.Header,
+		header *flow.UnsignedHeader,
 		snapshot snapshot.StorageSnapshot,
 	) (
 		uint64,
@@ -65,7 +65,7 @@ type Executor interface {
 	GetAccountAvailableBalance(
 		ctx context.Context,
 		addr flow.Address,
-		header *flow.Header,
+		header *flow.UnsignedHeader,
 		snapshot snapshot.StorageSnapshot,
 	) (
 		uint64,
@@ -75,7 +75,7 @@ type Executor interface {
 	GetAccountKeys(
 		ctx context.Context,
 		addr flow.Address,
-		header *flow.Header,
+		header *flow.UnsignedHeader,
 		snapshot snapshot.StorageSnapshot,
 	) (
 		[]flow.AccountPublicKey,
@@ -86,7 +86,7 @@ type Executor interface {
 		ctx context.Context,
 		addr flow.Address,
 		keyIndex uint32,
-		header *flow.Header,
+		header *flow.UnsignedHeader,
 		snapshot snapshot.StorageSnapshot,
 	) (
 		*flow.AccountPublicKey,
@@ -151,7 +151,7 @@ func (e *QueryExecutor) ExecuteScript(
 	ctx context.Context,
 	script []byte,
 	arguments [][]byte,
-	blockHeader *flow.Header,
+	blockHeader *flow.UnsignedHeader,
 	snapshot snapshot.StorageSnapshot,
 ) (
 	encodedValue []byte,
@@ -263,7 +263,7 @@ func summarizeLog(log string, limit int) string {
 func (e *QueryExecutor) GetAccount(
 	_ context.Context,
 	address flow.Address,
-	blockHeader *flow.Header,
+	blockHeader *flow.UnsignedHeader,
 	snapshot snapshot.StorageSnapshot,
 ) (
 	*flow.Account,
@@ -294,7 +294,7 @@ func (e *QueryExecutor) GetAccount(
 func (e *QueryExecutor) GetAccountBalance(
 	_ context.Context,
 	address flow.Address,
-	blockHeader *flow.Header,
+	blockHeader *flow.UnsignedHeader,
 	snapshot snapshot.StorageSnapshot,
 ) (uint64, error) {
 
@@ -324,7 +324,7 @@ func (e *QueryExecutor) GetAccountBalance(
 func (e *QueryExecutor) GetAccountAvailableBalance(
 	_ context.Context,
 	address flow.Address,
-	blockHeader *flow.Header,
+	blockHeader *flow.UnsignedHeader,
 	snapshot snapshot.StorageSnapshot,
 ) (uint64, error) {
 
@@ -354,7 +354,7 @@ func (e *QueryExecutor) GetAccountAvailableBalance(
 func (e *QueryExecutor) GetAccountKeys(
 	_ context.Context,
 	address flow.Address,
-	blockHeader *flow.Header,
+	blockHeader *flow.UnsignedHeader,
 	snapshot snapshot.StorageSnapshot,
 ) ([]flow.AccountPublicKey, error) {
 	// TODO(ramtin): utilize ctx
@@ -382,7 +382,7 @@ func (e *QueryExecutor) GetAccountKey(
 	_ context.Context,
 	address flow.Address,
 	keyIndex uint32,
-	blockHeader *flow.Header,
+	blockHeader *flow.UnsignedHeader,
 	snapshot snapshot.StorageSnapshot,
 ) (*flow.AccountPublicKey, error) {
 	// TODO(ramtin): utilize ctx

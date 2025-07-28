@@ -563,7 +563,7 @@ func (e *Engine) pushToVerifier(chunk *flow.Chunk,
 // The verifier engine, which is the last engine in the pipeline of verification, uses this verifiable
 // chunk data to verify it.
 func (e *Engine) makeVerifiableChunkData(chunk *flow.Chunk,
-	header *flow.Header,
+	header *flow.UnsignedHeader,
 	snapshot protocol.Snapshot,
 	result *flow.ExecutionResult,
 	chunkDataPack *flow.ChunkDataPack,

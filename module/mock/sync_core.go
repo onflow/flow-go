@@ -20,7 +20,7 @@ func (_m *SyncCore) BatchRequested(batch chainsync.Batch) {
 }
 
 // HandleBlock provides a mock function with given fields: header
-func (_m *SyncCore) HandleBlock(header *flow.Header) bool {
+func (_m *SyncCore) HandleBlock(header *flow.UnsignedHeader) bool {
 	ret := _m.Called(header)
 
 	if len(ret) == 0 {
@@ -28,7 +28,7 @@ func (_m *SyncCore) HandleBlock(header *flow.Header) bool {
 	}
 
 	var r0 bool
-	if rf, ok := ret.Get(0).(func(*flow.Header) bool); ok {
+	if rf, ok := ret.Get(0).(func(*flow.UnsignedHeader) bool); ok {
 		r0 = rf(header)
 	} else {
 		r0 = ret.Get(0).(bool)
@@ -38,7 +38,7 @@ func (_m *SyncCore) HandleBlock(header *flow.Header) bool {
 }
 
 // HandleHeight provides a mock function with given fields: final, height
-func (_m *SyncCore) HandleHeight(final *flow.Header, height uint64) {
+func (_m *SyncCore) HandleHeight(final *flow.UnsignedHeader, height uint64) {
 	_m.Called(final, height)
 }
 
@@ -48,7 +48,7 @@ func (_m *SyncCore) RangeRequested(ran chainsync.Range) {
 }
 
 // ScanPending provides a mock function with given fields: final
-func (_m *SyncCore) ScanPending(final *flow.Header) ([]chainsync.Range, []chainsync.Batch) {
+func (_m *SyncCore) ScanPending(final *flow.UnsignedHeader) ([]chainsync.Range, []chainsync.Batch) {
 	ret := _m.Called(final)
 
 	if len(ret) == 0 {
@@ -57,10 +57,10 @@ func (_m *SyncCore) ScanPending(final *flow.Header) ([]chainsync.Range, []chains
 
 	var r0 []chainsync.Range
 	var r1 []chainsync.Batch
-	if rf, ok := ret.Get(0).(func(*flow.Header) ([]chainsync.Range, []chainsync.Batch)); ok {
+	if rf, ok := ret.Get(0).(func(*flow.UnsignedHeader) ([]chainsync.Range, []chainsync.Batch)); ok {
 		return rf(final)
 	}
-	if rf, ok := ret.Get(0).(func(*flow.Header) []chainsync.Range); ok {
+	if rf, ok := ret.Get(0).(func(*flow.UnsignedHeader) []chainsync.Range); ok {
 		r0 = rf(final)
 	} else {
 		if ret.Get(0) != nil {
@@ -68,7 +68,7 @@ func (_m *SyncCore) ScanPending(final *flow.Header) ([]chainsync.Range, []chains
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(*flow.Header) []chainsync.Batch); ok {
+	if rf, ok := ret.Get(1).(func(*flow.UnsignedHeader) []chainsync.Batch); ok {
 		r1 = rf(final)
 	} else {
 		if ret.Get(1) != nil {
@@ -80,7 +80,7 @@ func (_m *SyncCore) ScanPending(final *flow.Header) ([]chainsync.Range, []chains
 }
 
 // WithinTolerance provides a mock function with given fields: final, height
-func (_m *SyncCore) WithinTolerance(final *flow.Header, height uint64) bool {
+func (_m *SyncCore) WithinTolerance(final *flow.UnsignedHeader, height uint64) bool {
 	ret := _m.Called(final, height)
 
 	if len(ret) == 0 {
@@ -88,7 +88,7 @@ func (_m *SyncCore) WithinTolerance(final *flow.Header, height uint64) bool {
 	}
 
 	var r0 bool
-	if rf, ok := ret.Get(0).(func(*flow.Header, uint64) bool); ok {
+	if rf, ok := ret.Get(0).(func(*flow.UnsignedHeader, uint64) bool); ok {
 		r0 = rf(final, height)
 	} else {
 		r0 = ret.Get(0).(bool)
