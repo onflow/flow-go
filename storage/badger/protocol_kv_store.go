@@ -33,7 +33,7 @@ type ProtocolKVStore struct {
 	// we expect single-digit number of unique snapshots within an epoch.
 	cache *Cache[flow.Identifier, *flow.PSKeyValueStoreData]
 
-	// byBlockIdCache is essentially an in-memory map from `Block.ID()` -> `KeyValueStore.ID()`. The full
+	// byBlockIdCache is essentially an in-memory map from `UnsignedBlock.ID()` -> `KeyValueStore.ID()`. The full
 	// kv-store snapshot can be retrieved from the `cache` above.
 	// `byBlockIdCache` will contain an entry for every block. We want to be able to cover a broad interval of views
 	// without cache misses, so a cache size of roughly 1000 entries is reasonable.

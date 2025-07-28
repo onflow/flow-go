@@ -659,7 +659,7 @@ func (b *Builder) createProposal(parentID flow.Identifier,
 	}
 
 	block, err := flow.NewBlock(
-		flow.UntrustedBlock{
+		flow.UntrustedUnsignedBlock{
 			HeaderBody: *headerBody,
 			Payload:    *payload,
 		},

@@ -21,7 +21,7 @@ import (
 const DefaultEntityCacheSize = 1000
 
 const SensitivityCaptureAll = 0
-const EntityTypeBlock = "Block"
+const EntityTypeBlock = "UnsignedBlock"
 const EntityTypeCollection = "Collection"
 const EntityTypeTransaction = "Transaction"
 

@@ -41,7 +41,7 @@ type indexCoreTest struct {
 	results          *storagemock.LightTransactionResults
 	headers          *storagemock.Headers
 	ctx              context.Context
-	blocks           []*flow.Block
+	blocks           []*flow.UnsignedBlock
 	data             *execution_data.BlockExecutionDataEntity
 	lastHeightStore  func(t *testing.T) uint64
 	firstHeightStore func(t *testing.T) uint64
@@ -52,7 +52,7 @@ type indexCoreTest struct {
 
 func newIndexCoreTest(
 	t *testing.T,
-	blocks []*flow.Block,
+	blocks []*flow.UnsignedBlock,
 	exeData *execution_data.BlockExecutionDataEntity,
 ) *indexCoreTest {
 
@@ -591,8 +591,8 @@ func TestExecutionState_RegisterValues(t *testing.T) {
 	})
 }
 
-func newBlockHeadersStorage(blocks []*flow.Block) storage.Headers {
-	blocksByID := make(map[flow.Identifier]*flow.Block, 0)
+func newBlockHeadersStorage(blocks []*flow.UnsignedBlock) storage.Headers {
+	blocksByID := make(map[flow.Identifier]*flow.UnsignedBlock, 0)
 	for _, b := range blocks {
 		blocksByID[b.ID()] = b
 	}

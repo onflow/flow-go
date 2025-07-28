@@ -11,7 +11,7 @@ const ExpandableFieldPayload = "payload"
 const ExpandableExecutionResult = "execution_result"
 
 func NewBlock(
-	block *flow.Block,
+	block *flow.UnsignedBlock,
 	execResult *flow.ExecutionResult,
 	link LinkGenerator,
 	blockStatus flow.BlockStatus,
@@ -73,7 +73,7 @@ func NewBlock(
 }
 
 func (b *Block) Build(
-	block *flow.Block,
+	block *flow.UnsignedBlock,
 	execResult *flow.ExecutionResult,
 	link LinkGenerator,
 	blockStatus flow.BlockStatus,

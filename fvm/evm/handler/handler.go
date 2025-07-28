@@ -353,7 +353,7 @@ func (h *ContractHandler) commitBlockProposal() error {
 		Int("tx_count", len(bp.TxHashes)).
 		Uint64("total_gas_used", bp.TotalGasUsed).
 		Uint64("total_supply", bp.TotalSupply.Uint64()).
-		Msg("EVM Block Committed")
+		Msg("EVM UnsignedBlock Committed")
 
 	return nil
 }

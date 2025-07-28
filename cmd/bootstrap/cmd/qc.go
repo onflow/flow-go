@@ -13,7 +13,7 @@ import (
 )
 
 // constructRootQC constructs root QC based on root block, votes and dkg info
-func constructRootQC(block *flow.Block, votes []*model.Vote, allNodes, internalNodes []bootstrap.NodeInfo, randomBeaconData dkg.ThresholdKeySet) *flow.QuorumCertificate {
+func constructRootQC(block *flow.UnsignedBlock, votes []*model.Vote, allNodes, internalNodes []bootstrap.NodeInfo, randomBeaconData dkg.ThresholdKeySet) *flow.QuorumCertificate {
 
 	identities := bootstrap.ToIdentityList(allNodes)
 	participantData, err := run.GenerateQCParticipantData(allNodes, internalNodes, randomBeaconData)
@@ -36,7 +36,7 @@ func constructRootQC(block *flow.Block, votes []*model.Vote, allNodes, internalN
 }
 
 // NOTE: allNodes must be in the same order as when generating the DKG
-func constructRootVotes(block *flow.Block, allNodes, internalNodes []bootstrap.NodeInfo, randomBeaconData dkg.ThresholdKeySet) {
+func constructRootVotes(block *flow.UnsignedBlock, allNodes, internalNodes []bootstrap.NodeInfo, randomBeaconData dkg.ThresholdKeySet) {
 	participantData, err := run.GenerateQCParticipantData(allNodes, internalNodes, randomBeaconData)
 	if err != nil {
 		log.Fatal().Err(err).Msg("failed to generate QC participant data")

@@ -570,13 +570,13 @@ func (s *WsControllerSuite) TestSubscribeBlocks() {
 
 		// Expect a valid block to be passed to WriteJSON.
 		// If we got to this point, the controller executed all its logic properly
-		var actualBlock flow.Block
+		var actualBlock flow.UnsignedBlock
 		conn.
 			On("WriteJSON", mock.Anything).
 			Return(func(msg interface{}) error {
 				defer close(done)
 
-				block, ok := msg.(flow.Block)
+				block, ok := msg.(flow.UnsignedBlock)
 				require.True(t, ok)
 				actualBlock = block
 				require.Equal(t, expectedBlock, actualBlock)
@@ -625,14 +625,14 @@ func (s *WsControllerSuite) TestSubscribeBlocks() {
 		s.expectSubscribeResponse(t, conn, subscriptionID)
 
 		i := 0
-		actualBlocks := make([]*flow.Block, len(expectedBlocks))
+		actualBlocks := make([]*flow.UnsignedBlock, len(expectedBlocks))
 
 		// Expect valid blocks to be passed to WriteJSON.
 		// If we got to this point, the controller executed all its logic properly
 		conn.
 			On("WriteJSON", mock.Anything).
 			Return(func(msg interface{}) error {
-				block, ok := msg.(flow.Block)
+				block, ok := msg.(flow.UnsignedBlock)
 				require.True(t, ok)
 
 				actualBlocks[i] = &block

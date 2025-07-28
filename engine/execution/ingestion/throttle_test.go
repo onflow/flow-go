@@ -17,7 +17,7 @@ import (
 
 // Given the following chain:
 // 1 <- 2 <- 3 <- 4 <- 5 <- 6 <- 7 <- 8 <- 9 <- 10
-// Block 6 is the last executed, block 7 is the last finalized,
+// UnsignedBlock 6 is the last executed, block 7 is the last finalized,
 // Then block 7, 8, 9, 10 will be loaded.
 // When 7, 8, 9, 10 are executed, no more block will be loaded
 func TestThrottleLoadAllBlocks(t *testing.T) {
@@ -47,7 +47,7 @@ func TestThrottleLoadAllBlocks(t *testing.T) {
 // Given the following chain:
 // 1 <- 2 <- 3 <- 4 <- 5 <- 6 <- 7 <- 8 <- 9 <- 10 <- 11
 // 10 and 11 are not received.
-// Block 1 is the last executed, Block 7 is the last finalized.
+// UnsignedBlock 1 is the last executed, UnsignedBlock 7 is the last finalized.
 // If threshold is 3, then block 2, 3, 4 will be loaded
 // When 2 is executed, block 5 will be loaded.
 // When 10 is received, no block will be loaded.
@@ -111,13 +111,13 @@ func TestThrottleFallBehindCatchUp(t *testing.T) {
 	require.NoError(t, throttle.Done())
 }
 
-func makeBlocks(t *testing.T, start, count int) []*flow.Block {
+func makeBlocks(t *testing.T, start, count int) []*flow.UnsignedBlock {
 	genesis := unittest.Block.Genesis(flow.Emulator)
 	blocks := unittest.ChainFixtureFrom(count, genesis.ToHeader())
-	return append([]*flow.Block{genesis}, blocks...)
+	return append([]*flow.UnsignedBlock{genesis}, blocks...)
 }
 
-func toHeaders(blocks []*flow.Block) []*flow.Header {
+func toHeaders(blocks []*flow.UnsignedBlock) []*flow.Header {
 	headers := make([]*flow.Header, len(blocks))
 	for i, block := range blocks {
 		headers[i] = block.ToHeader()
@@ -125,7 +125,7 @@ func toHeaders(blocks []*flow.Block) []*flow.Header {
 	return headers
 }
 
-func createThrottle(t *testing.T, blocks []*flow.Block, headers []*flow.Header, lastExecuted, lastFinalized int) *BlockThrottle {
+func createThrottle(t *testing.T, blocks []*flow.UnsignedBlock, headers []*flow.Header, lastExecuted, lastFinalized int) *BlockThrottle {
 	log := unittest.Logger()
 	headerStore := newHeadersWithBlocks(headers)
 

@@ -122,7 +122,7 @@ func runTransactionID(txID flow.Identifier, flowClient *client.Client, chain flo
 	}
 
 	for _, blockTx := range txsResult {
-		log.Info().Msgf("Block transaction: %s", blockTx.ID())
+		log.Info().Msgf("UnsignedBlock transaction: %s", blockTx.ID())
 	}
 
 	log.Info().Msg("Fetching block header ...")

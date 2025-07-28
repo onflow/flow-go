@@ -17,9 +17,9 @@ func BlockTimestamp2ProtobufTime(blockTimestamp uint64) *timestamppb.Timestamp {
 	return timestamppb.New(time.UnixMilli(int64(blockTimestamp)))
 }
 
-// BlockToMessage converts a flow.Block to a protobuf Block message.
+// BlockToMessage converts a flow.UnsignedBlock to a protobuf UnsignedBlock message.
 // signerIDs is a precomputed list of signer IDs for the block based on the block's signer indices.
-func BlockToMessage(h *flow.Block, signerIDs flow.IdentifierList) (
+func BlockToMessage(h *flow.UnsignedBlock, signerIDs flow.IdentifierList) (
 	*entities.Block,
 	error,
 ) {
@@ -53,8 +53,8 @@ func BlockToMessage(h *flow.Block, signerIDs flow.IdentifierList) (
 	return &bh, nil
 }
 
-// BlockToMessageLight converts a flow.Block to the light form of a protobuf Block message.
-func BlockToMessageLight(h *flow.Block) *entities.Block {
+// BlockToMessageLight converts a flow.UnsignedBlock to the light form of a protobuf UnsignedBlock message.
+func BlockToMessageLight(h *flow.UnsignedBlock) *entities.Block {
 	id := h.ID()
 	cg := CollectionGuaranteesToMessages(h.Payload.Guarantees)
 
@@ -68,8 +68,8 @@ func BlockToMessageLight(h *flow.Block) *entities.Block {
 	}
 }
 
-// MessageToBlock converts a protobuf Block message to a flow.Block.
-func MessageToBlock(m *entities.Block) (*flow.Block, error) {
+// MessageToBlock converts a protobuf UnsignedBlock message to a flow.UnsignedBlock.
+func MessageToBlock(m *entities.Block) (*flow.UnsignedBlock, error) {
 	payload, err := PayloadFromMessage(m)
 	if err != nil {
 		return nil, fmt.Errorf("failed to extract payload data from message: %w", err)
@@ -79,7 +79,7 @@ func MessageToBlock(m *entities.Block) (*flow.Block, error) {
 		return nil, fmt.Errorf("failed to convert block header: %w", err)
 	}
 	block, err := flow.NewBlock(
-		flow.UntrustedBlock{
+		flow.UntrustedUnsignedBlock{
 			HeaderBody: header.HeaderBody,
 			Payload:    *payload,
 		},
@@ -150,7 +150,7 @@ func MessagesToBlockSeals(m []*entities.BlockSeal) ([]*flow.Seal, error) {
 	return seals, nil
 }
 
-// PayloadFromMessage converts a protobuf Block message to a flow.Payload.
+// PayloadFromMessage converts a protobuf UnsignedBlock message to a flow.Payload.
 func PayloadFromMessage(m *entities.Block) (*flow.Payload, error) {
 	cgs, err := MessagesToCollectionGuarantees(m.CollectionGuarantees)
 	if err != nil {

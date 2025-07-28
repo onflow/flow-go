@@ -259,7 +259,7 @@ func (t TransactionHashes) RootHash() gethCommon.Hash {
 // this is being used to decode blocks that were stored
 // before block type changes. It allows us to still decode
 // a block that would otherwise be invalid if decoded into
-// latest version of the above Block type.
+// latest version of the above UnsignedBlock type.
 
 // before adding PrevRandao to the block
 type BlockV0 struct {

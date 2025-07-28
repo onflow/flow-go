@@ -106,7 +106,7 @@ func TestExecutionFlow(t *testing.T) {
 		[]flow.Identifier{colID.NodeID}, []flow.Identifier{colID.NodeID})
 	require.NoError(t, err)
 	block, err = flow.NewBlock(
-		flow.UntrustedBlock{
+		flow.UntrustedUnsignedBlock{
 			HeaderBody: block.HeaderBody,
 			Payload: flow.Payload{
 				Guarantees: []*flow.CollectionGuarantee{
@@ -131,7 +131,7 @@ func TestExecutionFlow(t *testing.T) {
 
 	child := unittest.BlockWithParentAndProposerFixture(t, block.ToHeader(), conID.NodeID) // sets field `ParentVoterIndices` such that `conID.NodeID` is the sole signer
 	child, err = flow.NewBlock(
-		flow.UntrustedBlock{
+		flow.UntrustedUnsignedBlock{
 			HeaderBody: child.HeaderBody,
 			Payload:    unittest.PayloadFixture(unittest.WithProtocolStateID(block.Payload.ProtocolStateID)),
 		},
@@ -264,10 +264,10 @@ func deployContractBlock(
 	colID *flow.Identity,
 	chain flow.Chain,
 	seq uint64,
-	parent *flow.Block,
+	parent *flow.UnsignedBlock,
 	ref *flow.Header,
 ) (
-	*flow.TransactionBody, *flow.Collection, *flow.Block, *flow.UntrustedProposal, uint64) {
+	*flow.TransactionBody, *flow.Collection, *flow.UnsignedBlock, *flow.UntrustedProposal, uint64) {
 	// make tx
 	tx := execTestutil.DeployCounterContractTransaction(chain.ServiceAddress(), chain)
 	err := execTestutil.SignTransactionAsServiceAccount(tx, seq, chain)
@@ -285,7 +285,7 @@ func deployContractBlock(
 	// make block
 	block := unittest.BlockWithParentAndProposerFixture(t, parent.ToHeader(), conID.NodeID) // sets field `ParentVoterIndices` such that `conID.NodeID` is the sole signer
 	block, err = flow.NewBlock(
-		flow.UntrustedBlock{
+		flow.UntrustedUnsignedBlock{
 			HeaderBody: block.HeaderBody,
 			Payload: flow.Payload{
 				Guarantees: []*flow.CollectionGuarantee{
@@ -307,8 +307,8 @@ func deployContractBlock(
 	return tx, col, block, proposal, seq + 1
 }
 
-func makePanicBlock(t *testing.T, conID *flow.Identity, colID *flow.Identity, chain flow.Chain, seq uint64, parent *flow.Block, ref *flow.Header) (
-	*flow.TransactionBody, *flow.Collection, *flow.Block, *flow.UntrustedProposal, uint64) {
+func makePanicBlock(t *testing.T, conID *flow.Identity, colID *flow.Identity, chain flow.Chain, seq uint64, parent *flow.UnsignedBlock, ref *flow.Header) (
+	*flow.TransactionBody, *flow.Collection, *flow.UnsignedBlock, *flow.UntrustedProposal, uint64) {
 	// make tx
 	tx := execTestutil.CreateCounterPanicTransaction(chain.ServiceAddress(), chain.ServiceAddress())
 	err := execTestutil.SignTransactionAsServiceAccount(tx, seq, chain)
@@ -326,7 +326,7 @@ func makePanicBlock(t *testing.T, conID *flow.Identity, colID *flow.Identity, ch
 	require.NoError(t, err)
 
 	block, err = flow.NewBlock(
-		flow.UntrustedBlock{
+		flow.UntrustedUnsignedBlock{
 			HeaderBody: block.HeaderBody,
 			Payload: flow.Payload{
 				Guarantees: []*flow.CollectionGuarantee{
@@ -343,8 +343,8 @@ func makePanicBlock(t *testing.T, conID *flow.Identity, colID *flow.Identity, ch
 	return tx, col, block, proposal, seq + 1
 }
 
-func makeSuccessBlock(t *testing.T, conID *flow.Identity, colID *flow.Identity, chain flow.Chain, seq uint64, parent *flow.Block, ref *flow.Header) (
-	*flow.TransactionBody, *flow.Collection, *flow.Block, *flow.UntrustedProposal, uint64) {
+func makeSuccessBlock(t *testing.T, conID *flow.Identity, colID *flow.Identity, chain flow.Chain, seq uint64, parent *flow.UnsignedBlock, ref *flow.Header) (
+	*flow.TransactionBody, *flow.Collection, *flow.UnsignedBlock, *flow.UntrustedProposal, uint64) {
 	tx := execTestutil.AddToCounterTransaction(chain.ServiceAddress(), chain.ServiceAddress())
 	err := execTestutil.SignTransactionAsServiceAccount(tx, seq, chain)
 	require.NoError(t, err)
@@ -357,7 +357,7 @@ func makeSuccessBlock(t *testing.T, conID *flow.Identity, colID *flow.Identity, 
 	col := &flow.Collection{Transactions: []*flow.TransactionBody{tx}}
 	block := unittest.BlockWithParentAndProposerFixture(t, parent.ToHeader(), conID.NodeID) // sets field `ParentVoterIndices` such that `conID.NodeID` is the sole signer
 	block, err = flow.NewBlock(
-		flow.UntrustedBlock{
+		flow.UntrustedUnsignedBlock{
 			HeaderBody: block.HeaderBody,
 			Payload: flow.Payload{
 				Guarantees: []*flow.CollectionGuarantee{
@@ -594,7 +594,7 @@ func TestBroadcastToMultipleVerificationNodes(t *testing.T) {
 	require.NoError(t, err)
 	block.ParentVoterIndices = voterIndices
 	block, err = flow.NewBlock(
-		flow.UntrustedBlock{
+		flow.UntrustedUnsignedBlock{
 			HeaderBody: block.HeaderBody,
 			Payload:    unittest.PayloadFixture(unittest.WithProtocolStateID(genesis.Payload.ProtocolStateID)),
 		},

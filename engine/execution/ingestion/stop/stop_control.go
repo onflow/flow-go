@@ -472,7 +472,7 @@ func (s *StopControl) blockFinalized(
 			Uint64("finalization_height", h.Height).
 			Stringer("block_id", h.ID()).
 			Stringer("stop", s.stopBoundary).
-			Msg("Block finalization already beyond stop.")
+			Msg("UnsignedBlock finalization already beyond stop.")
 
 		// Let's find the ID of the block that should be executed last
 		// which is the parent of the block at the stopHeight

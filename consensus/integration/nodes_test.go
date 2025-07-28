@@ -243,7 +243,7 @@ func createNodes(t *testing.T, participants *ConsensusParticipants, rootSnapshot
 	return nodes, hub, runFor
 }
 
-func createRootQC(t *testing.T, root *flow.Block, participantData *run.ParticipantData) *flow.QuorumCertificate {
+func createRootQC(t *testing.T, root *flow.UnsignedBlock, participantData *run.ParticipantData) *flow.QuorumCertificate {
 	consensusCluster := participantData.Identities()
 	votes, err := run.GenerateRootBlockVotes(root, participantData)
 	require.NoError(t, err)
@@ -255,7 +255,7 @@ func createRootQC(t *testing.T, root *flow.Block, participantData *run.Participa
 
 // createRootBlockData creates genesis block with first epoch and real data node identities.
 // This function requires all participants to pass DKG process.
-func createRootBlockData(t *testing.T, participantData *run.ParticipantData) (*flow.Block, *flow.ExecutionResult, *flow.Seal) {
+func createRootBlockData(t *testing.T, participantData *run.ParticipantData) (*flow.UnsignedBlock, *flow.ExecutionResult, *flow.Seal) {
 	rootHeaderBody := unittest.Block.Genesis(flow.Emulator).HeaderBody
 	consensusParticipants := participantData.Identities()
 
@@ -293,7 +293,7 @@ func createRootBlockData(t *testing.T, participantData *run.ParticipantData) (*f
 	rootProtocolState, err := kvstore.NewDefaultKVStore(safetyParams.FinalizationSafetyThreshold, safetyParams.EpochExtensionViewCount, epochProtocolStateID)
 	require.NoError(t, err)
 	root, err := flow.NewRootBlock(
-		flow.UntrustedBlock{
+		flow.UntrustedUnsignedBlock{
 			HeaderBody: rootHeaderBody,
 			Payload:    flow.Payload{ProtocolStateID: rootProtocolState.ID()},
 		},

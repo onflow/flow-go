@@ -158,7 +158,7 @@ func TestFollowerHappyPath(t *testing.T) {
 			proposal.Block.View = proposal.Block.Height
 			proposal.Block.ParentView = proposal.Block.View - 1
 			block, err := flow.NewBlock(
-				flow.UntrustedBlock{
+				flow.UntrustedUnsignedBlock{
 					HeaderBody: proposal.Block.HeaderBody,
 					Payload:    unittest.PayloadFixture(unittest.WithProtocolStateID(rootProtocolStateID)),
 				},

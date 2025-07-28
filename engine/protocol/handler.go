@@ -185,7 +185,7 @@ func (h *Handler) GetBlockByID(
 	return h.blockResponse(block, req.GetFullBlockResponse())
 }
 
-func (h *Handler) blockResponse(block *flow.Block, fullResponse bool) (*access.BlockResponse, error) {
+func (h *Handler) blockResponse(block *flow.UnsignedBlock, fullResponse bool) (*access.BlockResponse, error) {
 	signerIDs, err := h.signerIndicesDecoder.DecodeSignerIDs(block.ToHeader())
 	if err != nil {
 		return nil, err // the block was retrieved from local storage - so no errors are expected

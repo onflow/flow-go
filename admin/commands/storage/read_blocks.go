@@ -27,7 +27,7 @@ type ReadBlocksCommand struct {
 
 func (r *ReadBlocksCommand) Handler(ctx context.Context, req *admin.CommandRequest) (interface{}, error) {
 	data := req.ValidatorData.(*readBlocksRequest)
-	var result []*flow.Block
+	var result []*flow.UnsignedBlock
 	var blockID flow.Identifier
 
 	log.Info().Str("module", "admin-tool").Msgf("read blocks, data: %v", data)

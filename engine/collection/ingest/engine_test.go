@@ -51,11 +51,11 @@ type Suite struct {
 	state      *protocol.State
 	snapshot   *protocol.Snapshot
 	epochQuery *mocks.EpochQuery
-	root       *flow.Block
+	root       *flow.UnsignedBlock
 
 	// backend for mocks
-	blocks map[flow.Identifier]*flow.Block
-	final  *flow.Block
+	blocks map[flow.Identifier]*flow.UnsignedBlock
+	final  *flow.UnsignedBlock
 
 	engine *Engine
 }
@@ -95,7 +95,7 @@ func (suite *Suite) SetupTest() {
 
 	suite.root = unittest.Block.Genesis(flow.Emulator)
 	suite.final = suite.root
-	suite.blocks = make(map[flow.Identifier]*flow.Block)
+	suite.blocks = make(map[flow.Identifier]*flow.UnsignedBlock)
 	suite.blocks[suite.root.ID()] = suite.root
 
 	suite.state = new(protocol.State)

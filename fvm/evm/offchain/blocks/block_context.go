@@ -74,17 +74,17 @@ func UseBlockHashCorrection(chainID flow.ChainID, evmHeightOfCurrentBlock uint64
 }
 
 // Testnet52 - Height Coordinated Upgrade 4, Nov 21, 2024
-// Flow Block: 94361765 4c9edc817afeaaa6aeb5e63504ed3f5ba8bcbba3931e53f5437d911a1129b431
+// Flow UnsignedBlock: 94361765 4c9edc817afeaaa6aeb5e63504ed3f5ba8bcbba3931e53f5437d911a1129b431
 // PR: https://github.com/onflow/flow-go/pull/6734
 const blockHashListFixHCUEVMHeightMainnet = 8357079
 
 // Testnet52 - Height Coordinated Upgrade 4, Nov 20, 2024
-// Flow Block: 228025500 7eb808b77f02c3e77c36d57dc893ed63adc5ff6113bb0f4b141bb39e44d634e6
+// Flow UnsignedBlock: 228025500 7eb808b77f02c3e77c36d57dc893ed63adc5ff6113bb0f4b141bb39e44d634e6
 // PR: https://github.com/onflow/flow-go/pull/6734
 const blockHashListFixHCUEVMHeightTestnet = 16848829
 
 // Testnet51 - Height Coordinated Upgrade 1
-// Flow Block: 212562161 1a520608c5457f228405c4c30fc39c8a0af7cf915fb2ede7ec5ccffc2a000f57
+// Flow UnsignedBlock: 212562161 1a520608c5457f228405c4c30fc39c8a0af7cf915fb2ede7ec5ccffc2a000f57
 // PR: https://github.com/onflow/flow-go/pull/6380
 const coinbaseAddressChangeEVMHeightTestnet = 1385490
 

@@ -280,15 +280,15 @@ func (*api) GetBlockHeaderByID(_ context.Context, _ flow.Identifier) (*flow.Head
 	return nil, flow.BlockStatusUnknown, errors.New("unimplemented")
 }
 
-func (*api) GetLatestBlock(_ context.Context, _ bool) (*flow.Block, flow.BlockStatus, error) {
+func (*api) GetLatestBlock(_ context.Context, _ bool) (*flow.UnsignedBlock, flow.BlockStatus, error) {
 	return nil, flow.BlockStatusUnknown, errors.New("unimplemented")
 }
 
-func (*api) GetBlockByHeight(_ context.Context, _ uint64) (*flow.Block, flow.BlockStatus, error) {
+func (*api) GetBlockByHeight(_ context.Context, _ uint64) (*flow.UnsignedBlock, flow.BlockStatus, error) {
 	return nil, flow.BlockStatusUnknown, errors.New("unimplemented")
 }
 
-func (*api) GetBlockByID(_ context.Context, _ flow.Identifier) (*flow.Block, flow.BlockStatus, error) {
+func (*api) GetBlockByID(_ context.Context, _ flow.Identifier) (*flow.UnsignedBlock, flow.BlockStatus, error) {
 	return nil, flow.BlockStatusUnknown, errors.New("unimplemented")
 }
 

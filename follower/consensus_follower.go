@@ -258,7 +258,7 @@ func (cf *ConsensusFollowerImpl) Run(ctx context.Context) {
 		cf.logger.Info().Msg("Consensus follower shutting down")
 	}()
 
-	// Block here until all components have stopped or an irrecoverable error is received.
+	// UnsignedBlock here until all components have stopped or an irrecoverable error is received.
 	if err := util.WaitError(errChan, cf.Done()); err != nil {
 		cf.logger.Fatal().Err(err).Msg("A fatal error was encountered in consensus follower")
 	}

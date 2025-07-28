@@ -10,7 +10,7 @@ import (
 	"github.com/onflow/flow-go/module/signature"
 )
 
-// Validator is responsible for validating QC, Block and Vote
+// Validator is responsible for validating QC, UnsignedBlock and Vote
 type Validator struct {
 	committee hotstuff.Replicas
 	verifier  hotstuff.Verifier
@@ -227,8 +227,8 @@ func (v *Validator) ValidateProposal(proposal *model.SignedProposal) error {
 		return model.NewInvalidProposalErrorf(proposal, "proposer %s is not leader (%s) for view %d", block.ProposerID, leader, block.View)
 	}
 
-	// The Block must contain a proof that the primary legitimately entered the respective view.
-	// Transitioning to proposal.Block.View is possible either by observing a QC or a TC for the
+	// The UnsignedBlock must contain a proof that the primary legitimately entered the respective view.
+	// Transitioning to proposal.UnsignedBlock.View is possible either by observing a QC or a TC for the
 	// previous round. If and only if the QC is _not_ for the previous round we require a TC for
 	// the previous view to be present.
 	lastViewSuccessful := proposal.Block.View == proposal.Block.QC.View+1

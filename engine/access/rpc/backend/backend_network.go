@@ -65,7 +65,7 @@ func (b *backendNetwork) GetLatestProtocolStateSnapshot(_ context.Context) ([]by
 // The requested block must be finalized, otherwise an error is returned.
 // Expected errors during normal operation:
 //   - status.Error[codes.NotFound] - No block with the given ID was found
-//   - status.Error[codes.InvalidArgument] - Block ID is for an orphaned block and will never have a valid snapshot
+//   - status.Error[codes.InvalidArgument] - UnsignedBlock ID is for an orphaned block and will never have a valid snapshot
 //   - status.Error[codes.FailedPrecondition] - A block was found, but it is not finalized and is above the finalized height.
 //     The block may or may not be finalized in the future; the client can retry later.
 func (b *backendNetwork) GetProtocolStateSnapshotByBlockID(_ context.Context, blockID flow.Identifier) ([]byte, error) {

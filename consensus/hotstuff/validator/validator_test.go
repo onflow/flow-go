@@ -300,7 +300,7 @@ func (ps *ProposalSuite) TestProposalWithLastViewTC() {
 			),
 			helper.WithLastViewTC(helper.MakeTC(
 				helper.WithTCSigners(ps.indices),
-				helper.WithTCView(ps.block.View+10), // LastViewTC.View must be equal to Block.View-1
+				helper.WithTCView(ps.block.View+10), // LastViewTC.View must be equal to UnsignedBlock.View-1
 				helper.WithTCNewestQC(ps.block.QC))),
 		)))
 		err := ps.validator.ValidateProposal(proposal)
@@ -319,7 +319,7 @@ func (ps *ProposalSuite) TestProposalWithLastViewTC() {
 			helper.WithLastViewTC(helper.MakeTC(
 				helper.WithTCSigners(ps.indices),
 				helper.WithTCView(ps.block.View+1),
-				// proposal is not safe to extend because included QC.View is higher that Block.QC.View
+				// proposal is not safe to extend because included QC.View is higher that UnsignedBlock.QC.View
 				helper.WithTCNewestQC(helper.MakeQC(helper.WithQCView(ps.block.View+1))))),
 		)))
 		err := ps.validator.ValidateProposal(proposal)

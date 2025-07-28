@@ -362,7 +362,7 @@ func (b *backendTransactions) retrieveBlock(
 	blockID flow.Identifier,
 	collectionID flow.Identifier,
 	txID flow.Identifier,
-) (*flow.Block, error) {
+) (*flow.UnsignedBlock, error) {
 	if blockID != flow.ZeroID {
 		return b.blocks.ByID(blockID)
 	}
@@ -412,7 +412,7 @@ func (b *backendTransactions) GetTransactionResultsByBlockID(
 
 func (b *backendTransactions) getTransactionResultsByBlockIDFromExecutionNode(
 	ctx context.Context,
-	block *flow.Block,
+	block *flow.UnsignedBlock,
 	requiredEventEncodingVersion entities.EventEncodingVersion,
 ) ([]*accessmodel.TransactionResult, error) {
 	blockID := block.ID()
@@ -566,7 +566,7 @@ func (b *backendTransactions) GetTransactionResultByIndex(
 
 func (b *backendTransactions) getTransactionResultByIndexFromExecutionNode(
 	ctx context.Context,
-	block *flow.Block,
+	block *flow.UnsignedBlock,
 	index uint32,
 	requiredEventEncodingVersion entities.EventEncodingVersion,
 ) (*accessmodel.TransactionResult, error) {
@@ -636,7 +636,7 @@ func (b *backendTransactions) GetSystemTransactionResult(ctx context.Context, bl
 // Error returns:
 //   - `storage.ErrNotFound` - collection referenced by transaction or block by a collection has not been found.
 //   - all other errors are unexpected and potentially symptoms of internal implementation bugs or state corruption (fatal).
-func (b *backendTransactions) lookupBlock(txID flow.Identifier) (*flow.Block, error) {
+func (b *backendTransactions) lookupBlock(txID flow.Identifier) (*flow.UnsignedBlock, error) {
 	collection, err := b.collections.LightByTransactionID(txID)
 	if err != nil {
 		return nil, err

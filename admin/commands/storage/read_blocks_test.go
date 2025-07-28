@@ -28,9 +28,9 @@ type ReadBlocksSuite struct {
 	state   *protocolmock.State
 	blocks  *storagemock.Blocks
 
-	final     *flow.Block
-	sealed    *flow.Block
-	allBlocks []*flow.Block
+	final     *flow.UnsignedBlock
+	sealed    *flow.UnsignedBlock
+	allBlocks []*flow.UnsignedBlock
 }
 
 func TestReadBlocks(t *testing.T) {
@@ -53,7 +53,7 @@ func (suite *ReadBlocksSuite) SetupTest() {
 	suite.state = new(protocolmock.State)
 	suite.blocks = new(storagemock.Blocks)
 
-	var blocks []*flow.Block
+	var blocks []*flow.UnsignedBlock
 
 	genesis := unittest.Block.Genesis(flow.Emulator)
 	blocks = append(blocks, genesis)
@@ -93,7 +93,7 @@ func (suite *ReadBlocksSuite) SetupTest() {
 	)
 
 	suite.blocks.On("ByID", mock.Anything).Return(
-		func(blockID flow.Identifier) *flow.Block {
+		func(blockID flow.Identifier) *flow.UnsignedBlock {
 			for _, block := range blocks {
 				if block.ID() == blockID {
 					return block
@@ -188,7 +188,7 @@ func (suite *ReadBlocksSuite) TestValidateInvalidN() {
 	}))
 }
 
-func (suite *ReadBlocksSuite) getBlocks(reqData map[string]interface{}) []*flow.Block {
+func (suite *ReadBlocksSuite) getBlocks(reqData map[string]interface{}) []*flow.UnsignedBlock {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -199,7 +199,7 @@ func (suite *ReadBlocksSuite) getBlocks(reqData map[string]interface{}) []*flow.
 	result, err := suite.command.Handler(ctx, req)
 	require.NoError(suite.T(), err)
 
-	var blocks []*flow.Block
+	var blocks []*flow.UnsignedBlock
 	data, err := json.Marshal(result)
 	require.NoError(suite.T(), err)
 	require.NoError(suite.T(), json.Unmarshal(data, &blocks))

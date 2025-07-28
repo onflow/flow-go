@@ -215,7 +215,7 @@ func (fm *followerManager) onBlockFinalizedConsumer(block *model.Block) {
 }
 
 // getBlock checks if the underlying storage of the consensus follower has a block
-func (fm *followerManager) getBlock(blockID flow.Identifier) (*flow.Block, error) {
+func (fm *followerManager) getBlock(blockID flow.Identifier) (*flow.UnsignedBlock, error) {
 	// get the underlying storage that the follower is using
 	store := fm.follower.Storage
 	require.NotNil(fm.t, store)

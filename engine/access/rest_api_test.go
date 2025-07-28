@@ -232,7 +232,7 @@ func TestRestAPI(t *testing.T) {
 func (suite *RestAPITestSuite) TestGetBlock() {
 
 	testBlockIDs := make([]string, parser.MaxIDsLength)
-	testBlocks := make([]*flow.Block, parser.MaxIDsLength)
+	testBlocks := make([]*flow.UnsignedBlock, parser.MaxIDsLength)
 	for i := range testBlockIDs {
 		collections := unittest.CollectionListFixture(1)
 		block := unittest.BlockFixture(

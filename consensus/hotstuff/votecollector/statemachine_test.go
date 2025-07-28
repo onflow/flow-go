@@ -66,7 +66,7 @@ func (s *StateMachineTestSuite) SetupTest() {
 // to mock behavior of verifying vote processor.
 func (s *StateMachineTestSuite) prepareMockedProcessor(proposal *model.SignedProposal) *mocks.VerifyingVoteProcessor {
 	processor := &mocks.VerifyingVoteProcessor{}
-	processor.On("Block").Return(func() *model.Block {
+	processor.On("UnsignedBlock").Return(func() *model.Block {
 		return proposal.Block
 	}).Maybe()
 	processor.On("Status").Return(hotstuff.VoteCollectorStatusVerifying)

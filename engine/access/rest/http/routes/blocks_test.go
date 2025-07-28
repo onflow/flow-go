@@ -32,7 +32,7 @@ type testVector struct {
 func prepareTestVectors(t *testing.T,
 	blockIDs []string,
 	heights []string,
-	blocks []*flow.Block,
+	blocks []*flow.UnsignedBlock,
 	executionResults []*flow.ExecutionResult,
 	blkCnt int) []testVector {
 
@@ -234,10 +234,10 @@ func getByIDsCondensedWithSelectURL(t *testing.T, ids []string, selectedFields [
 	return requestURL(t, ids, "", "", false, selectedFields)
 }
 
-func generateMocks(backend *mock.API, count int) ([]string, []string, []*flow.Block, []*flow.ExecutionResult) {
+func generateMocks(backend *mock.API, count int) ([]string, []string, []*flow.UnsignedBlock, []*flow.ExecutionResult) {
 	blockIDs := make([]string, count)
 	heights := make([]string, count)
-	blocks := make([]*flow.Block, count)
+	blocks := make([]*flow.UnsignedBlock, count)
 	executionResults := make([]*flow.ExecutionResult, count)
 
 	for i := 0; i < count; i++ {
@@ -265,7 +265,7 @@ func generateMocks(backend *mock.API, count int) ([]string, []string, []*flow.Bl
 }
 
 func expectedBlockResponsesExpanded(
-	blocks []*flow.Block,
+	blocks []*flow.UnsignedBlock,
 	execResult []*flow.ExecutionResult,
 	expanded bool,
 	status flow.BlockStatus,
@@ -282,7 +282,7 @@ func expectedBlockResponsesExpanded(
 }
 
 func expectedBlockResponsesSelected(
-	blocks []*flow.Block,
+	blocks []*flow.UnsignedBlock,
 	execResult []*flow.ExecutionResult,
 	status flow.BlockStatus,
 	selectedFields []string,
@@ -291,7 +291,7 @@ func expectedBlockResponsesSelected(
 }
 
 func expectedBlockResponse(
-	block *flow.Block,
+	block *flow.UnsignedBlock,
 	execResult *flow.ExecutionResult,
 	expanded bool,
 	status flow.BlockStatus,

@@ -418,7 +418,7 @@ func (suite *Suite) TestGetBlockByIDAndHeight() {
 		assertBlockResp := func(
 			resp *accessproto.BlockResponse,
 			err error,
-			block *flow.Block,
+			block *flow.UnsignedBlock,
 		) {
 			require.NoError(suite.T(), err)
 			require.NotNil(suite.T(), resp)
@@ -434,7 +434,7 @@ func (suite *Suite) TestGetBlockByIDAndHeight() {
 		assertLightBlockResp := func(
 			resp *accessproto.BlockResponse,
 			err error,
-			block *flow.Block,
+			block *flow.UnsignedBlock,
 		) {
 			require.NoError(suite.T(), err)
 			require.NotNil(suite.T(), resp)
@@ -925,7 +925,7 @@ func (suite *Suite) TestGetTransactionResult() {
 		<-ingestEng.Ready()
 
 		processExecutionReceipts := func(
-			block *flow.Block,
+			block *flow.UnsignedBlock,
 			collection *flow.Collection,
 			enNodeIDs flow.IdentifierList,
 			originID flow.Identifier,

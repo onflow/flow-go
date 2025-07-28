@@ -53,7 +53,7 @@ func TestInogestionCoreExecuteBlock(t *testing.T) {
 	receiveBlock(t, throttle, state, headers, blocksDB, consumer, blocks[1], wg)
 	verifyBlockExecuted(t, consumer, wg, blocks[1])
 
-	// Receive Block 2 and 3, no block is executed
+	// Receive UnsignedBlock 2 and 3, no block is executed
 	receiveBlock(t, throttle, state, headers, blocksDB, consumer, blocks[2], wg)
 	time.Sleep(waitTime)
 	verifyBlockNotExecuted(t, consumer, blocks[2])
@@ -76,7 +76,7 @@ func TestInogestionCoreExecuteBlock(t *testing.T) {
 	verifyBlockExecuted(t, consumer, wg, blocks[4])
 }
 
-func createCore(t *testing.T, blocks []*flow.Block) (
+func createCore(t *testing.T, blocks []*flow.UnsignedBlock) (
 	*Core, Throttle, *unittestMocks.ProtocolState, *mocks.MockCollectionStore,
 	*storage.Blocks, *headerStore, *mockFetcher, *mockConsumer) {
 	headers := newHeadersWithBlocks(toHeaders(blocks))
@@ -129,14 +129,14 @@ func createCore(t *testing.T, blocks []*flow.Block) (
 	return core, throttle, state, collections, blocksDB, headers, collectionFetcher, consumer
 }
 
-func makeBlocksAndCollections(t *testing.T) ([]*flow.Block, []*flow.Collection) {
+func makeBlocksAndCollections(t *testing.T) ([]*flow.UnsignedBlock, []*flow.Collection) {
 	cs := unittest.CollectionListFixture(2)
 	col0, col1 := cs[0], cs[1]
 
 	genesis := unittest.Block.Genesis(flow.Emulator)
 	blocks := unittest.ChainFixtureFrom(4, genesis.ToHeader())
 
-	bs := append([]*flow.Block{genesis}, blocks...)
+	bs := append([]*flow.UnsignedBlock{genesis}, blocks...)
 	unittest.AddCollectionsToBlock(bs[2], []*flow.Collection{col0})
 	unittest.AddCollectionsToBlock(bs[4], []*flow.Collection{col1})
 	unittest.RechainBlocks(bs)
@@ -144,14 +144,14 @@ func makeBlocksAndCollections(t *testing.T) ([]*flow.Block, []*flow.Collection) 
 	return bs, cs
 }
 
-func receiveBlock(t *testing.T, throttle Throttle, state *unittestMocks.ProtocolState, headers *headerStore, blocksDB *storage.Blocks, consumer *mockConsumer, block *flow.Block, wg *sync.WaitGroup) {
+func receiveBlock(t *testing.T, throttle Throttle, state *unittestMocks.ProtocolState, headers *headerStore, blocksDB *storage.Blocks, consumer *mockConsumer, block *flow.UnsignedBlock, wg *sync.WaitGroup) {
 	require.NoError(t, state.Extend(block))
 	blocksDB.On("ByID", block.ID()).Return(block, nil)
 	require.NoError(t, throttle.OnBlock(block.ID(), block.Height))
 	consumer.WaitForExecuted(block.ID(), wg)
 }
 
-func verifyBlockExecuted(t *testing.T, consumer *mockConsumer, wg *sync.WaitGroup, blocks ...*flow.Block) {
+func verifyBlockExecuted(t *testing.T, consumer *mockConsumer, wg *sync.WaitGroup, blocks ...*flow.UnsignedBlock) {
 	// Wait until blocks are executed
 	unittest.AssertReturnsBefore(t, func() { wg.Wait() }, time.Millisecond*20)
 	for _, block := range blocks {
@@ -159,7 +159,7 @@ func verifyBlockExecuted(t *testing.T, consumer *mockConsumer, wg *sync.WaitGrou
 	}
 }
 
-func verifyBlockNotExecuted(t *testing.T, consumer *mockConsumer, blocks ...*flow.Block) {
+func verifyBlockNotExecuted(t *testing.T, consumer *mockConsumer, blocks ...*flow.UnsignedBlock) {
 	for _, block := range blocks {
 		require.False(t, consumer.MockIsBlockExecuted(block.ID()))
 	}

@@ -36,8 +36,8 @@ type ExecutionDataReaderSuite struct {
 
 	executionDataID flow.Identifier
 	executionData   *execution_data.BlockExecutionData
-	block           *flow.Block
-	blocksByHeight  map[uint64]*flow.Block
+	block           *flow.UnsignedBlock
+	blocksByHeight  map[uint64]*flow.UnsignedBlock
 
 	highestAvailableHeight func() uint64
 }
@@ -53,7 +53,7 @@ func (suite *ExecutionDataReaderSuite) SetupTest() {
 
 	parent := unittest.BlockHeaderFixture(unittest.WithHeaderHeight(1))
 	suite.block = unittest.BlockWithParentFixture(parent)
-	suite.blocksByHeight = map[uint64]*flow.Block{
+	suite.blocksByHeight = map[uint64]*flow.UnsignedBlock{
 		suite.block.Height: suite.block,
 	}
 

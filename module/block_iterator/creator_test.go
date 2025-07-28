@@ -74,7 +74,7 @@ func TestCanIterate(t *testing.T) {
 
 	// Verify all blocks were visited exactly once
 	for i, block := range blocks {
-		require.Equal(t, block.ID(), visitedBlocks[i], "Block %v was not visited", block.Height)
+		require.Equal(t, block.ID(), visitedBlocks[i], "UnsignedBlock %v was not visited", block.Height)
 	}
 
 	// Verify no extra blocks were visited
@@ -120,7 +120,7 @@ func TestCanIterate(t *testing.T) {
 
 	// Verify all additional blocks were visited exactly once
 	for i, block := range additionalBlocks {
-		require.Equal(t, block.ID(), visitedBlocks[i], "Block %v was not visited", block.Height)
+		require.Equal(t, block.ID(), visitedBlocks[i], "UnsignedBlock %v was not visited", block.Height)
 	}
 
 	// Verify no extra blocks were visited
@@ -230,7 +230,7 @@ func TestCanResume(t *testing.T) {
 
 	// verify all blocks are visited
 	for i, block := range blocks {
-		require.Equal(t, block.ID(), visitedBlocks[i], "Block %v was not visited", block.Height)
+		require.Equal(t, block.ID(), visitedBlocks[i], "UnsignedBlock %v was not visited", block.Height)
 	}
 
 	// Verify no extra blocks were visited
@@ -294,7 +294,7 @@ func TestCanSkipViewsIfNotIndexed(t *testing.T) {
 	// Verify all blocks were visited exactly once
 	for _, block := range blocks {
 		_, ok := visitedBlocks[block.ID()]
-		require.True(t, ok, "Block %v was not visited", block.View)
+		require.True(t, ok, "UnsignedBlock %v was not visited", block.View)
 		delete(visitedBlocks, block.ID())
 	}
 

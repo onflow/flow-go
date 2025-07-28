@@ -67,7 +67,7 @@ func ClusterFromEncodable(enc EncodableCluster) (*Cluster, error) {
 // SnapshotFromBootstrapState generates a protocol.Snapshot representing a
 // root bootstrap state. This is used to bootstrap the protocol state for
 // genesis or post-spork states.
-func SnapshotFromBootstrapState(root *flow.Block, result *flow.ExecutionResult, seal *flow.Seal, qc *flow.QuorumCertificate) (*Snapshot, error) {
+func SnapshotFromBootstrapState(root *flow.UnsignedBlock, result *flow.ExecutionResult, seal *flow.Seal, qc *flow.QuorumCertificate) (*Snapshot, error) {
 	safetyParams, err := protocol.DefaultEpochSafetyParams(root.ChainID)
 	if err != nil {
 		return nil, fmt.Errorf("could not get default epoch commit safety threshold: %w", err)
@@ -80,7 +80,7 @@ func SnapshotFromBootstrapState(root *flow.Block, result *flow.ExecutionResult, 
 // SnapshotFromBootstrapStateWithParams is SnapshotFromBootstrapState
 // with a caller-specified protocol version.
 func SnapshotFromBootstrapStateWithParams(
-	root *flow.Block,
+	root *flow.UnsignedBlock,
 	result *flow.ExecutionResult,
 	seal *flow.Seal,
 	qc *flow.QuorumCertificate,

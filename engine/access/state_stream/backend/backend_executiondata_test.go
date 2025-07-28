@@ -68,15 +68,15 @@ type BackendExecutionDataSuite struct {
 	backend                  *StateStreamBackend
 	executionDataTrackerReal tracker.ExecutionDataTracker
 
-	blocks      []*flow.Block
+	blocks      []*flow.UnsignedBlock
 	blockEvents map[flow.Identifier][]flow.Event
 	execDataMap map[flow.Identifier]*execution_data.BlockExecutionDataEntity
-	blockMap    map[uint64]*flow.Block
+	blockMap    map[uint64]*flow.UnsignedBlock
 	sealMap     map[flow.Identifier]*flow.Seal
 	resultMap   map[flow.Identifier]*flow.ExecutionResult
 	registerID  flow.RegisterID
 
-	rootBlock          *flow.Block
+	rootBlock          *flow.UnsignedBlock
 	highestBlockHeader *flow.Header
 }
 
@@ -164,10 +164,10 @@ func (s *BackendExecutionDataSuite) SetupTestSuite(blockCount int) {
 
 	s.execDataMap = make(map[flow.Identifier]*execution_data.BlockExecutionDataEntity, blockCount)
 	s.blockEvents = make(map[flow.Identifier][]flow.Event, blockCount)
-	s.blockMap = make(map[uint64]*flow.Block, blockCount)
+	s.blockMap = make(map[uint64]*flow.UnsignedBlock, blockCount)
 	s.sealMap = make(map[flow.Identifier]*flow.Seal, blockCount)
 	s.resultMap = make(map[flow.Identifier]*flow.ExecutionResult, blockCount)
-	s.blocks = make([]*flow.Block, 0, blockCount)
+	s.blocks = make([]*flow.UnsignedBlock, 0, blockCount)
 
 	// generate blockCount consecutive blocks with associated seal, result and execution data
 	s.rootBlock = unittest.BlockFixture()
@@ -220,14 +220,14 @@ func (s *BackendExecutionDataSuite) SetupTestMocks() {
 	s.headers.On("ByHeight", mock.AnythingOfType("uint64")).Return(
 		mocks.ConvertStorageOutput(
 			mocks.StorageMapGetter(s.blockMap),
-			func(block *flow.Block) *flow.Header { return block.ToHeader() },
+			func(block *flow.UnsignedBlock) *flow.Header { return block.ToHeader() },
 		),
 	).Maybe()
 
 	s.headers.On("BlockIDByHeight", mock.AnythingOfType("uint64")).Return(
 		mocks.ConvertStorageOutput(
 			mocks.StorageMapGetter(s.blockMap),
-			func(block *flow.Block) flow.Identifier { return block.ID() },
+			func(block *flow.UnsignedBlock) flow.Identifier { return block.ID() },
 		),
 	).Maybe()
 

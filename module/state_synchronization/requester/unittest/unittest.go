@@ -58,7 +58,7 @@ func MockBlobService(bs blockstore.Blockstore) *mocknetwork.BlobService {
 			return ch
 		}).Maybe()
 
-	bex.On("AddBlobs", mock.Anything, mock.AnythingOfType("[]blocks.Block")).Return(bs.PutMany).Maybe()
+	bex.On("AddBlobs", mock.Anything, mock.AnythingOfType("[]blocks.UnsignedBlock")).Return(bs.PutMany).Maybe()
 	bex.On("DeleteBlob", mock.Anything, mock.AnythingOfType("cid.Cid")).Return(bs.DeleteBlock).Maybe()
 
 	noop := module.NoopReadyDoneAware{}
@@ -111,7 +111,7 @@ func MockProtocolState(opts ...StateMockOptions) *statemock.State {
 
 type BlockHeaderMockOptions func(*storagemock.Headers)
 
-func WithByHeight(blocksByHeight map[uint64]*flow.Block) BlockHeaderMockOptions {
+func WithByHeight(blocksByHeight map[uint64]*flow.UnsignedBlock) BlockHeaderMockOptions {
 	return func(blocks *storagemock.Headers) {
 		blocks.On("ByHeight", mock.AnythingOfType("uint64")).Return(
 			func(height uint64) *flow.Header {
@@ -130,7 +130,7 @@ func WithByHeight(blocksByHeight map[uint64]*flow.Block) BlockHeaderMockOptions 
 	}
 }
 
-func WithByID(blocksByID map[flow.Identifier]*flow.Block) BlockHeaderMockOptions {
+func WithByID(blocksByID map[flow.Identifier]*flow.UnsignedBlock) BlockHeaderMockOptions {
 	return func(blocks *storagemock.Headers) {
 		blocks.On("ByBlockID", mock.AnythingOfType("flow.Identifier")).Return(
 			func(blockID flow.Identifier) *flow.Header {
@@ -149,7 +149,7 @@ func WithByID(blocksByID map[flow.Identifier]*flow.Block) BlockHeaderMockOptions
 	}
 }
 
-func WithBlockIDByHeight(blocksByHeight map[uint64]*flow.Block) BlockHeaderMockOptions {
+func WithBlockIDByHeight(blocksByHeight map[uint64]*flow.UnsignedBlock) BlockHeaderMockOptions {
 	return func(blocks *storagemock.Headers) {
 		blocks.On("BlockIDByHeight", mock.AnythingOfType("uint64")).Return(
 			func(height uint64) flow.Identifier {

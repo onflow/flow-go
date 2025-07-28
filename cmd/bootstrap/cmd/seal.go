@@ -10,7 +10,7 @@ import (
 
 func constructRootResultAndSeal(
 	rootCommit string,
-	block *flow.Block,
+	block *flow.UnsignedBlock,
 	epochSetup *flow.EpochSetup,
 	epochCommit *flow.EpochCommit,
 ) (*flow.ExecutionResult, *flow.Seal) {

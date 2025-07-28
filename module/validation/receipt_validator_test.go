@@ -308,7 +308,7 @@ func (s *ReceiptValidationSuite) TestReceiptForBlockWith0Collections() {
 	s.publicKey.On("Verify", mock.Anything, mock.Anything, mock.Anything).Return(true, nil).Maybe()
 	valSubgrph := s.ValidSubgraphFixture()
 	block, err := flow.NewBlock(
-		flow.UntrustedBlock{
+		flow.UntrustedUnsignedBlock{
 			HeaderBody: valSubgrph.Block.HeaderBody,
 			Payload:    unittest.PayloadFixture(),
 		},
@@ -453,7 +453,7 @@ func (s *ReceiptValidationSuite) TestReceiptNoPreviousResult() {
 // TestInvalidSubgraph is part of verifying that we reject a receipt, whose result
 // does not form a valid 'subgraph'. Formally, a subgraph is defined as
 //
-//	Result   -----------------------------------> Block
+//	Result   -----------------------------------> UnsignedBlock
 //	  |                                             |
 //	  |                                             v
 //	  |                                           ParentBlock
@@ -462,7 +462,7 @@ func (s *ReceiptValidationSuite) TestReceiptNoPreviousResult() {
 //
 // with the validity requirement that PreviousResult.BlockID == ParentBlock.ID().
 //
-// In our test case, we assume that `ParentResult` and `Block` are known, but
+// In our test case, we assume that `ParentResult` and `UnsignedBlock` are known, but
 // ParentResult.BlockID ≠ ParentBlock.ID(). The compliance layer guarantees that new elements are added
 // to the blockchain graph if and only if they are protocol compliant. In other words, we are testing
 // a byzantine receipt that references known and valid entities, but they do not form a valid subgraph.
@@ -749,7 +749,7 @@ func (s *ReceiptValidationSuite) TestValidationReceiptForIncorporatedResult() {
 //   - now receive the new block X: G <- A <- B <- X(ReceiptMeta[A])
 //     Note that X only contains the receipt for A, but _not_ the result.
 //
-// Block X must be considered invalid, because confirming validity of
+// UnsignedBlock X must be considered invalid, because confirming validity of
 // ReceiptMeta[A] requires information _not_ included in the fork.
 func (s *ReceiptValidationSuite) TestValidationReceiptWithoutIncorporatedResult() {
 	// assuming signatures are all good (if we get to checking signatures)
@@ -881,7 +881,7 @@ func (s *ReceiptValidationSuite) TestPayloadWithExecutionFork() {
 //   - now receive the new block X:
 //     S <- A <- B(Result[A], ReceiptMeta[A]) <- C(Result[B], ReceiptMeta[B]) <- X(Result[C], ReceiptMeta[C])
 //
-// Block X should be considered valid, as it extends the
+// UnsignedBlock X should be considered valid, as it extends the
 // Execution Tree with root latest sealed Result (i.e. result sealed for S)
 func (s *ReceiptValidationSuite) TestMultiLevelExecutionTree() {
 	// assuming signatures are all good
@@ -1259,7 +1259,7 @@ func (s *ReceiptValidationSuite) TestException_ProtocolStateHead() {
 	s.AddSubgraphFixtureToMempools(valSubgrph)
 	receipt := unittest.ExecutionReceiptFixture(unittest.WithExecutorID(s.ExeID), unittest.WithResult(valSubgrph.Result))
 
-	// receiptValidator.state yields exception on Block Header retrieval
+	// receiptValidator.state yields exception on UnsignedBlock Header retrieval
 	*s.State = *mock_protocol.NewState(s.T()) // receiptValidator has pointer to this field, which we override with a new state mock
 	snapshot := mock_protocol.NewSnapshot(s.T())
 	exception := errors.New("state.Head() exception")

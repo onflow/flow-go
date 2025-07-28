@@ -1478,7 +1478,7 @@ func TestExtendEpochSetupInvalid(t *testing.T) {
 	// * creates and finalizes a new block for the first seal to reference
 	// * creates a factory method for test cases to generated valid EpochSetup events
 	setupState := func(t *testing.T, db *badger.DB, state *protocol.ParticipantState) (
-		*flow.Block,
+		*flow.UnsignedBlock,
 		func(...func(*flow.EpochSetup)) (*flow.EpochSetup, *flow.ExecutionReceipt, *flow.Seal),
 	) {
 
@@ -1616,9 +1616,9 @@ func TestExtendEpochCommitInvalid(t *testing.T) {
 	// * creates a factory method for test cases to generated valid EpochSetup events
 	// * creates a factory method for test cases to generated valid EpochCommit events
 	setupState := func(t *testing.T, state *protocol.ParticipantState) (
-		*flow.Block,
-		func(*flow.Block) (*flow.EpochSetup, *flow.ExecutionReceipt, *flow.Seal),
-		func(*flow.Block, ...func(*flow.EpochCommit)) (*flow.EpochCommit, *flow.ExecutionReceipt, *flow.Seal),
+		*flow.UnsignedBlock,
+		func(*flow.UnsignedBlock) (*flow.EpochSetup, *flow.ExecutionReceipt, *flow.Seal),
+		func(*flow.UnsignedBlock, ...func(*flow.EpochCommit)) (*flow.EpochCommit, *flow.ExecutionReceipt, *flow.Seal),
 	) {
 		head, err := rootSnapshot.Head()
 		require.NoError(t, err)
@@ -1642,7 +1642,7 @@ func TestExtendEpochCommitInvalid(t *testing.T) {
 		).Sort(flow.Canonical[flow.Identity]).ToSkeleton()
 
 		// factory method to create a valid EpochSetup method w.r.t. the generated state
-		createSetup := func(block *flow.Block) (*flow.EpochSetup, *flow.ExecutionReceipt, *flow.Seal) {
+		createSetup := func(block *flow.UnsignedBlock) (*flow.EpochSetup, *flow.ExecutionReceipt, *flow.Seal) {
 			setup := unittest.EpochSetupFixture(
 				unittest.WithParticipants(epoch2Participants),
 				unittest.SetupWithCounter(epoch1Setup.Counter+1),
@@ -1655,7 +1655,7 @@ func TestExtendEpochCommitInvalid(t *testing.T) {
 		}
 
 		// factory method to create a valid EpochCommit method w.r.t. the generated state
-		createCommit := func(block *flow.Block, opts ...func(*flow.EpochCommit)) (*flow.EpochCommit, *flow.ExecutionReceipt, *flow.Seal) {
+		createCommit := func(block *flow.UnsignedBlock, opts ...func(*flow.EpochCommit)) (*flow.EpochCommit, *flow.ExecutionReceipt, *flow.Seal) {
 			commit := unittest.EpochCommitFixture(
 				unittest.CommitWithCounter(epoch1Setup.Counter+1),
 				unittest.WithDKGFromParticipants(epoch2Participants),
@@ -2186,7 +2186,7 @@ func TestRecoveryFromEpochFallbackMode(t *testing.T) {
 			assertEpochFallbackTriggered(t, state.Final(), true) // finalizing block 3 should have triggered EFM since it seals invalid setup event
 			assertInPhase(t, state.Final(), flow.EpochPhaseFallback)
 
-			// Block 4 incorporates Execution Result [ER] for block2, where the ER also includes EpochRecover event.
+			// UnsignedBlock 4 incorporates Execution Result [ER] for block2, where the ER also includes EpochRecover event.
 			// Only when ingesting block 5, which _seals_ the EpochRecover event, the state should switch back to
 			// `EpochFallbackTriggered` being false.
 			epochRecover := unittest.EpochRecoverFixture(
@@ -2256,7 +2256,7 @@ func TestRecoveryFromEpochFallbackMode(t *testing.T) {
 			epoch2NewParticipant := unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification))
 			epoch2Participants := append(participants, epoch2NewParticipant).Sort(flow.Canonical[flow.Identity]).ToSkeleton()
 
-			// Block 2 incorporates Execution Result [ER] for block1, where the ER also includes `EpochSetup` event.
+			// UnsignedBlock 2 incorporates Execution Result [ER] for block1, where the ER also includes `EpochSetup` event.
 			// Only when ingesting block 3, which _seals_ the `EpochSetup` event, the epoch moves to setup phase.
 			epoch1Setup := rootResult.ServiceEvents[0].Event.(*flow.EpochSetup)
 			epoch2Setup := unittest.EpochSetupFixture(
@@ -2278,7 +2278,7 @@ func TestRecoveryFromEpochFallbackMode(t *testing.T) {
 			require.NoError(t, err)
 			assertEpochFallbackTriggered(t, state.Final(), false) // EFM is not expected
 
-			// Block 4 incorporates Execution Result [ER] for block2, where the ER also includes invalid service event.
+			// UnsignedBlock 4 incorporates Execution Result [ER] for block2, where the ER also includes invalid service event.
 			// Only when ingesting block 5, which _seals_ the invalid service event, the state should switch to
 			// `EpochFallbackTriggered` being true.
 			invalidEpochCommit := unittest.EpochCommitFixture() // a random epoch commit event will be invalid
@@ -2302,7 +2302,7 @@ func TestRecoveryFromEpochFallbackMode(t *testing.T) {
 			assertEpochFallbackTriggered(t, state.Final(), true)     // finalizing block 5 should have triggered EFM
 			assertInPhase(t, state.Final(), flow.EpochPhaseFallback) // immediately enter fallback phase
 
-			// Block 6 incorporates Execution Result [ER] for block3, where the ER also includes EpochRecover event.
+			// UnsignedBlock 6 incorporates Execution Result [ER] for block3, where the ER also includes EpochRecover event.
 			// Only when ingesting block 7, which _seals_ the EpochRecover event, the state should switch back to
 			// `EpochFallbackTriggered` being false.
 			epochRecover := unittest.EpochRecoverFixture(
@@ -2380,9 +2380,9 @@ func TestRecoveryFromEpochFallbackMode(t *testing.T) {
 
 			// Constructing blocks
 			//   ... <- B1 <- B2(ER(B1, EpochSetup)) <- B3(S(ER(B1))) <- B4(ER(B2, EpochCommit)) <- B5(S(ER(B2))) <- ...
-			// B1 will be the first block that we will use as reference block for first seal. Block B2 incorporates the Execution Result [ER]
-			// for block 1 and the EpochSetup service event. Block B3 seals the EpochSetup event.
-			// Block B4 incorporates the Execution Result [ER] for block 2 and the EpochCommit service event. Block B5 seals the EpochCommit event.
+			// B1 will be the first block that we will use as reference block for first seal. UnsignedBlock B2 incorporates the Execution Result [ER]
+			// for block 1 and the EpochSetup service event. UnsignedBlock B3 seals the EpochSetup event.
+			// UnsignedBlock B4 incorporates the Execution Result [ER] for block 2 and the EpochCommit service event. UnsignedBlock B5 seals the EpochCommit event.
 			// We expect that the Protocol state at B5 enters `epoch committed` phase.
 
 			// add a block for the first seal to reference
@@ -2401,7 +2401,7 @@ func TestRecoveryFromEpochFallbackMode(t *testing.T) {
 			epoch2NewParticipant := unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification))
 			epoch2Participants := append(participants, epoch2NewParticipant).Sort(flow.Canonical[flow.Identity]).ToSkeleton()
 
-			// Block 2 incorporates Execution Result [ER] for block1, where the ER also includes `EpochSetup` event.
+			// UnsignedBlock 2 incorporates Execution Result [ER] for block1, where the ER also includes `EpochSetup` event.
 			// Only when ingesting block 3, which _seals_ the `EpochSetup` event, epoch moves to the setup phase.
 			epoch1Setup := rootResult.ServiceEvents[0].Event.(*flow.EpochSetup)
 			epoch2Setup := unittest.EpochSetupFixture(
@@ -2423,7 +2423,7 @@ func TestRecoveryFromEpochFallbackMode(t *testing.T) {
 			require.NoError(t, err)
 			assertEpochFallbackTriggered(t, state.Final(), false) // EFM is not expected
 
-			// Block 4 incorporates Execution Result [ER] for block2, where the ER also includes `EpochCommit` event.
+			// UnsignedBlock 4 incorporates Execution Result [ER] for block2, where the ER also includes `EpochCommit` event.
 			// Only when ingesting block 5, which _seals_ the `EpochCommit` event, the epoch moves to committed phase.
 			epoch2Commit := unittest.EpochCommitFixture(
 				unittest.CommitWithCounter(epoch2Setup.Counter),
@@ -2445,13 +2445,13 @@ func TestRecoveryFromEpochFallbackMode(t *testing.T) {
 
 			// Constructing blocks
 			//   ... <- B6(ER(B3, InvalidEpochCommit)) <- B7(S(ER(B3))) <- B8 <- B9 <- ...
-			// Block B6 incorporates the Execution Result [ER] for block 3 and the invalid service event.
-			// Block B7 seals the invalid service event.
+			// UnsignedBlock B6 incorporates the Execution Result [ER] for block 3 and the invalid service event.
+			// UnsignedBlock B7 seals the invalid service event.
 			// We expect that the Protocol state at B7 switches `EpochFallbackTriggered` to true.
 			// B8 will be the first block past the epoch boundary, which will trigger epoch transition to the next epoch.
 			// B9 will be the first block past the epoch commitment deadline, which will trigger construction of an epoch extension.
 
-			// Block 6 incorporates Execution Result [ER] for block3, where the ER also includes invalid service event.
+			// UnsignedBlock 6 incorporates Execution Result [ER] for block3, where the ER also includes invalid service event.
 			// Only when ingesting block 7, which _seals_ the invalid service event, the state should switch to
 			// `EpochFallbackTriggered` being true.
 			invalidCommit := unittest.EpochCommitFixture()
@@ -2536,8 +2536,8 @@ func TestRecoveryFromEpochFallbackMode(t *testing.T) {
 
 			// Constructing blocks
 			//   ... <- B10 <- B11(ER(B4, EpochRecover)) <- B12(S(ER(B4))) <- ...
-			// B10 will be the first block past the epoch extension. Block B11 incorporates the Execution Result [ER]
-			// for block 10 and the EpochRecover service event. Block B12 seals the EpochRecover event.
+			// B10 will be the first block past the epoch extension. UnsignedBlock B11 incorporates the Execution Result [ER]
+			// for block 10 and the EpochRecover service event. UnsignedBlock B12 seals the EpochRecover event.
 			// We expect that the Protocol state at B12 switches `EpochFallbackTriggered` back to false.
 
 			// B10 will be the first block past the epoch extension
@@ -2545,7 +2545,7 @@ func TestRecoveryFromEpochFallbackMode(t *testing.T) {
 			block10.View = epochExtensions[0].FirstView
 			unittest.InsertAndFinalize(t, state, block10)
 
-			// Block 11 incorporates Execution Result [ER] for block4, where the ER also includes EpochRecover event.
+			// UnsignedBlock 11 incorporates Execution Result [ER] for block4, where the ER also includes EpochRecover event.
 			// Only when ingesting block 12, which _seals_ the EpochRecover event, the state should switch back to
 			// `EpochFallbackTriggered` being false.
 			epochRecover := unittest.EpochRecoverFixture(
@@ -2819,13 +2819,13 @@ func TestExtendInvalidSealsInBlock(t *testing.T) {
 
 		sealValidator := mockmodule.NewSealValidator(t)
 		sealValidator.On("Validate", mock.Anything).
-			Return(func(candidate *flow.Block) *flow.Seal {
+			Return(func(candidate *flow.UnsignedBlock) *flow.Seal {
 				if candidate.ID() == block3.ID() {
 					return nil
 				}
 				seal, _ := all.Seals.HighestInFork(candidate.ParentID)
 				return seal
-			}, func(candidate *flow.Block) error {
+			}, func(candidate *flow.UnsignedBlock) error {
 				if candidate.ID() == block3.ID() {
 					return engine.NewInvalidInputErrorf("")
 				}
@@ -3208,7 +3208,7 @@ func TestExtendInvalidGuarantee(t *testing.T) {
 		}
 		payload.Guarantees[0].SignerIndices = checksumMismatch
 		block, err = flow.NewBlock(
-			flow.UntrustedBlock{
+			flow.UntrustedUnsignedBlock{
 				HeaderBody: block.HeaderBody,
 				Payload:    payload,
 			},
@@ -3228,7 +3228,7 @@ func TestExtendInvalidGuarantee(t *testing.T) {
 
 		payload.Guarantees[0].SignerIndices = wrongTailing
 		block, err = flow.NewBlock(
-			flow.UntrustedBlock{
+			flow.UntrustedUnsignedBlock{
 				HeaderBody: block.HeaderBody,
 				Payload:    payload,
 			},
@@ -3244,7 +3244,7 @@ func TestExtendInvalidGuarantee(t *testing.T) {
 		wrongbitVectorLength := validSignerIndices[0 : len(validSignerIndices)-1]
 		payload.Guarantees[0].SignerIndices = wrongbitVectorLength
 		block, err = flow.NewBlock(
-			flow.UntrustedBlock{
+			flow.UntrustedUnsignedBlock{
 				HeaderBody: block.HeaderBody,
 				Payload:    payload,
 			},
@@ -3262,7 +3262,7 @@ func TestExtendInvalidGuarantee(t *testing.T) {
 		// test the ReferenceBlockID is not found
 		payload.Guarantees[0].ReferenceBlockID = flow.ZeroID
 		block, err = flow.NewBlock(
-			flow.UntrustedBlock{
+			flow.UntrustedUnsignedBlock{
 				HeaderBody: block.HeaderBody,
 				Payload:    payload,
 			},
@@ -3284,7 +3284,7 @@ func TestExtendInvalidGuarantee(t *testing.T) {
 		// test the guarantee has wrong chain ID, and should return ErrClusterNotFound
 		payload.Guarantees[0].ChainID = flow.ChainID("some_bad_chain_ID")
 		block, err = flow.NewBlock(
-			flow.UntrustedBlock{
+			flow.UntrustedUnsignedBlock{
 				HeaderBody: block.HeaderBody,
 				Payload:    payload,
 			},

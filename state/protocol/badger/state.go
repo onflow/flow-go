@@ -290,7 +290,7 @@ func bootstrapSealingSegment(
 	blocks storage.Blocks,
 	qcs storage.QuorumCertificates,
 	segment *flow.SealingSegment,
-	head *flow.Block,
+	head *flow.UnsignedBlock,
 	rootSeal *flow.Seal,
 ) func(*transaction.Tx) error {
 	return func(tx *transaction.Tx) error {

@@ -26,7 +26,7 @@ type SealingSegmentSuite struct {
 	sealsByBlockID       map[flow.Identifier]*flow.Seal
 	protocolStateEntries map[flow.Identifier]*flow.ProtocolStateEntryWrapper
 	// bootstrap each test case with a block which is before, and receipt+seal for the block
-	priorBlock             *flow.Block
+	priorBlock             *flow.UnsignedBlock
 	priorReceipt           *flow.ExecutionReceipt
 	priorSeal              *flow.Seal
 	defaultProtocolStateID flow.Identifier
@@ -97,8 +97,8 @@ func (suite *SealingSegmentSuite) SetupTest() {
 	suite.priorSeal = priorSeal
 }
 
-// BlockFixture returns a Block fixture with the default protocol state ID.
-func (suite *SealingSegmentSuite) BlockFixture() *flow.Block {
+// BlockFixture returns a UnsignedBlock fixture with the default protocol state ID.
+func (suite *SealingSegmentSuite) BlockFixture() *flow.UnsignedBlock {
 	return unittest.BlockFixture(
 		unittest.Block.WithPayload(suite.PayloadFixture()),
 	)
@@ -110,8 +110,8 @@ func (suite *SealingSegmentSuite) PayloadFixture(opts ...func(payload *flow.Payl
 	return unittest.PayloadFixture(opts...)
 }
 
-// BlockWithParentFixture returns a Block fixtures with the default protocol state.
-func (suite *SealingSegmentSuite) BlockWithParentFixture(parent *flow.Header) *flow.Block {
+// BlockWithParentFixture returns a UnsignedBlock fixtures with the default protocol state.
+func (suite *SealingSegmentSuite) BlockWithParentFixture(parent *flow.Header) *flow.UnsignedBlock {
 	return unittest.BlockWithParentAndPayload(parent, suite.PayloadFixture())
 }
 
@@ -123,7 +123,7 @@ func (suite *SealingSegmentSuite) ProtocolStateEntryWrapperFixture() *flow.Proto
 
 // FirstBlock returns a first block which contains a seal and receipt referencing
 // priorBlock (this is the simplest case for a sealing segment).
-func (suite *SealingSegmentSuite) FirstBlock() *flow.Block {
+func (suite *SealingSegmentSuite) FirstBlock() *flow.UnsignedBlock {
 	block := unittest.BlockFixture(
 		unittest.Block.WithPayload(suite.PayloadFixture(
 			unittest.WithSeals(suite.priorSeal),
@@ -136,7 +136,7 @@ func (suite *SealingSegmentSuite) FirstBlock() *flow.Block {
 
 // AddBlocks is a short-hand for adding a sequence of blocks, in order.
 // No errors are expected.
-func (suite *SealingSegmentSuite) AddBlocks(blocks ...*flow.Block) {
+func (suite *SealingSegmentSuite) AddBlocks(blocks ...*flow.UnsignedBlock) {
 	latestSeal := suite.priorSeal
 	for _, block := range blocks {
 		// before adding block, ensure its latest seal is indexed in suite
@@ -180,7 +180,7 @@ func (suite *SealingSegmentSuite) TestBuild_MissingResultFromReceipt() {
 	require.NoError(suite.T(), err)
 	require.NoError(suite.T(), segment.Validate())
 
-	unittest.AssertEqualBlockSequences(suite.T(), []*flow.Block{block1, block2, block3}, segment.Blocks)
+	unittest.AssertEqualBlockSequences(suite.T(), []*flow.UnsignedBlock{block1, block2, block3}, segment.Blocks)
 	require.Equal(suite.T(), 1, segment.ExecutionResults.Size())
 	require.Equal(suite.T(), suite.priorReceipt.ExecutionResult.ID(), segment.ExecutionResults[0].ID())
 }
@@ -213,7 +213,7 @@ func (suite *SealingSegmentSuite) TestBuild_MissingFirstBlockSeal() {
 	require.NoError(suite.T(), err)
 	require.NoError(suite.T(), segment.Validate())
 
-	unittest.AssertEqualBlockSequences(suite.T(), []*flow.Block{block1, block2, block3}, segment.Blocks)
+	unittest.AssertEqualBlockSequences(suite.T(), []*flow.UnsignedBlock{block1, block2, block3}, segment.Blocks)
 	// should contain priorSeal as first seal
 	require.Equal(suite.T(), suite.priorSeal, segment.FirstSeal)
 	// should contain result referenced by first seal
@@ -252,7 +252,7 @@ func (suite *SealingSegmentSuite) TestBuild_MissingResultFromPayloadSeal() {
 	require.NoError(suite.T(), err)
 	require.NoError(suite.T(), segment.Validate())
 
-	unittest.AssertEqualBlockSequences(suite.T(), []*flow.Block{block1, block2, block3}, segment.Blocks)
+	unittest.AssertEqualBlockSequences(suite.T(), []*flow.UnsignedBlock{block1, block2, block3}, segment.Blocks)
 	require.Equal(suite.T(), 1, segment.ExecutionResults.Size())
 	require.Equal(suite.T(), pastResult.ID(), segment.ExecutionResults[0].ID())
 }
@@ -317,7 +317,7 @@ func (suite *SealingSegmentSuite) TestBuild_MultipleFinalBlockSeals() {
 	segment, err := suite.builder.SealingSegment()
 	require.NoError(suite.T(), err)
 
-	unittest.AssertEqualBlockSequences(suite.T(), []*flow.Block{block1, block2, block3}, segment.Blocks)
+	unittest.AssertEqualBlockSequences(suite.T(), []*flow.UnsignedBlock{block1, block2, block3}, segment.Blocks)
 	require.Equal(suite.T(), 1, segment.ExecutionResults.Size())
 	require.Equal(suite.T(), pastResult.ID(), segment.ExecutionResults[0].ID())
 	require.NoError(suite.T(), segment.Validate())
@@ -337,7 +337,7 @@ func (suite *SealingSegmentSuite) TestBuild_RootSegment() {
 	require.NoError(suite.T(), err)
 	require.NoError(suite.T(), segment.Validate())
 
-	unittest.AssertEqualBlockSequences(suite.T(), []*flow.Block{root}, segment.Blocks)
+	unittest.AssertEqualBlockSequences(suite.T(), []*flow.UnsignedBlock{root}, segment.Blocks)
 	require.Equal(suite.T(), segment.Highest().ID(), root.ID())
 	require.Equal(suite.T(), segment.Sealed().ID(), root.ID())
 }
@@ -348,7 +348,7 @@ func (suite *SealingSegmentSuite) TestBuild_RootSegmentWrongView() {
 
 	root, result, seal := unittest.BootstrapFixture(
 		unittest.IdentityListFixture(5, unittest.WithAllRoles()),
-		func(block *flow.Block) {
+		func(block *flow.UnsignedBlock) {
 			block.View = 10 // invalid root block view
 		})
 	suite.sealsByBlockID[root.ID()] = seal
@@ -388,7 +388,7 @@ func (suite *SealingSegmentSuite) TestBuild_HighestContainsNoSeals() {
 	require.NoError(suite.T(), err)
 	require.NoError(suite.T(), segment.Validate())
 
-	unittest.AssertEqualBlockSequences(suite.T(), []*flow.Block{block1, block2, block3, block4}, segment.Blocks)
+	unittest.AssertEqualBlockSequences(suite.T(), []*flow.UnsignedBlock{block1, block2, block3, block4}, segment.Blocks)
 }
 
 // Test that we should return InvalidSealingSegmentError if highest block contains
@@ -489,7 +489,7 @@ func (suite *SealingSegmentSuite) TestBuild_ChangingProtocolStateID_Blocks() {
 	require.NoError(suite.T(), err)
 	require.NoError(suite.T(), segment.Validate())
 
-	unittest.AssertEqualBlockSequences(suite.T(), []*flow.Block{block1, block2, block3}, segment.Blocks)
+	unittest.AssertEqualBlockSequences(suite.T(), []*flow.UnsignedBlock{block1, block2, block3}, segment.Blocks)
 	// resulting segment must contain both protocol state IDs
 	assert.Len(suite.T(), segment.ProtocolStateEntries, 2)
 	_, ok := segment.ProtocolStateEntries[suite.defaultProtocolStateID]
@@ -547,8 +547,8 @@ func (suite *SealingSegmentSuite) TestBuild_ChangingProtocolStateID_ExtraBlocks(
 	err = segment.Validate()
 	require.NoError(suite.T(), err)
 
-	unittest.AssertEqualBlockSequences(suite.T(), []*flow.Block{block1, block2, block3}, segment.Blocks)
-	unittest.AssertEqualBlockSequences(suite.T(), []*flow.Block{extraBlock2, extraBlock1}, segment.ExtraBlocks)
+	unittest.AssertEqualBlockSequences(suite.T(), []*flow.UnsignedBlock{block1, block2, block3}, segment.Blocks)
+	unittest.AssertEqualBlockSequences(suite.T(), []*flow.UnsignedBlock{extraBlock2, extraBlock1}, segment.ExtraBlocks)
 	// resulting segment must contain both protocol state IDs
 	assert.Len(suite.T(), segment.ProtocolStateEntries, 2)
 	_, ok := segment.ProtocolStateEntries[suite.defaultProtocolStateID]

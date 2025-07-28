@@ -39,7 +39,7 @@ type RequesterSuite struct {
 	execClient  *accessmock.ExecutionAPIClient
 	connFactory *connectionmock.ConnectionFactory
 
-	rootBlock      *flow.Block
+	rootBlock      *flow.UnsignedBlock
 	finalizedBlock *flow.Header
 }
 

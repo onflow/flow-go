@@ -520,7 +520,7 @@ func NewExecutionCollector(tracer module.Tracer) *ExecutionCollector {
 		Namespace: namespaceExecution,
 		Subsystem: subsystemBlockDataUploader,
 		Name:      "block_data_upload_in_progress",
-		Help:      "number of concurrently running Block Data upload operations",
+		Help:      "number of concurrently running UnsignedBlock Data upload operations",
 	})
 
 	blockDataUploadsDuration := promauto.NewHistogram(prometheus.HistogramOpts{

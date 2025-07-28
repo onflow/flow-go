@@ -308,7 +308,7 @@ func (b *backendSubscribeBlocks) getBlockHeader(height uint64, expectedBlockStat
 // getBlock returns the block for the given block height.
 // Expected errors during normal operation:
 // - subscription.ErrBlockNotReady: block for the given block height is not available.
-func (b *backendSubscribeBlocks) getBlock(height uint64, expectedBlockStatus flow.BlockStatus) (*flow.Block, error) {
+func (b *backendSubscribeBlocks) getBlock(height uint64, expectedBlockStatus flow.BlockStatus) (*flow.UnsignedBlock, error) {
 	err := b.validateHeight(height, expectedBlockStatus)
 	if err != nil {
 		return nil, err

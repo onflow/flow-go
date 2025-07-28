@@ -39,7 +39,7 @@ type ReadProtocolStateBlocksCommand struct {
 	blocks storage.Blocks
 }
 
-func (r *ReadProtocolStateBlocksCommand) getBlockByHeight(height uint64) (*flow.Block, error) {
+func (r *ReadProtocolStateBlocksCommand) getBlockByHeight(height uint64) (*flow.UnsignedBlock, error) {
 	header, err := r.state.AtHeight(height).Head()
 	if err != nil {
 		return nil, fmt.Errorf("could not get header by height: %v, %w", height, err)
@@ -52,7 +52,7 @@ func (r *ReadProtocolStateBlocksCommand) getBlockByHeight(height uint64) (*flow.
 	return block, nil
 }
 
-func (r *ReadProtocolStateBlocksCommand) getFinal() (*flow.Block, error) {
+func (r *ReadProtocolStateBlocksCommand) getFinal() (*flow.UnsignedBlock, error) {
 	header, err := r.state.Final().Head()
 	if err != nil {
 		return nil, fmt.Errorf("could not get finalized, %w", err)
@@ -65,7 +65,7 @@ func (r *ReadProtocolStateBlocksCommand) getFinal() (*flow.Block, error) {
 	return block, nil
 }
 
-func (r *ReadProtocolStateBlocksCommand) getSealed() (*flow.Block, error) {
+func (r *ReadProtocolStateBlocksCommand) getSealed() (*flow.UnsignedBlock, error) {
 	header, err := r.state.Sealed().Head()
 	if err != nil {
 		return nil, fmt.Errorf("could not get sealed block, %w", err)
@@ -78,7 +78,7 @@ func (r *ReadProtocolStateBlocksCommand) getSealed() (*flow.Block, error) {
 	return block, nil
 }
 
-func (r *ReadProtocolStateBlocksCommand) getBlockByID(blockID flow.Identifier) (*flow.Block, error) {
+func (r *ReadProtocolStateBlocksCommand) getBlockByID(blockID flow.Identifier) (*flow.UnsignedBlock, error) {
 	header, err := r.state.AtBlockID(blockID).Head()
 	if err != nil {
 		return nil, fmt.Errorf("could not get header by blockID: %v, %w", blockID, err)
@@ -91,7 +91,7 @@ func (r *ReadProtocolStateBlocksCommand) getBlockByID(blockID flow.Identifier) (
 	return block, nil
 }
 
-func (r *ReadProtocolStateBlocksCommand) getBlockByHeader(header *flow.Header) (*flow.Block, error) {
+func (r *ReadProtocolStateBlocksCommand) getBlockByHeader(header *flow.Header) (*flow.UnsignedBlock, error) {
 	blockID := header.ID()
 	block, err := r.blocks.ByID(blockID)
 	if err != nil {
@@ -102,8 +102,8 @@ func (r *ReadProtocolStateBlocksCommand) getBlockByHeader(header *flow.Header) (
 
 func (r *ReadProtocolStateBlocksCommand) Handler(_ context.Context, req *admin.CommandRequest) (interface{}, error) {
 	data := req.ValidatorData.(*requestData)
-	var result []*flow.Block
-	var block *flow.Block
+	var result []*flow.UnsignedBlock
+	var block *flow.UnsignedBlock
 	var err error
 
 	switch data.requestType {

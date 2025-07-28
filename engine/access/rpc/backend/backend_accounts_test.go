@@ -44,7 +44,7 @@ type BackendAccountsSuite struct {
 	executionNodes flow.IdentityList
 	execClient     *access.ExecutionAPIClient
 
-	block          *flow.Block
+	block          *flow.UnsignedBlock
 	account        *flow.Account
 	failingAddress flow.Address
 }
@@ -93,7 +93,7 @@ func (s *BackendAccountsSuite) defaultBackend() *backendAccounts {
 }
 
 // setupExecutionNodes sets up the mocks required to test against an EN backend
-func (s *BackendAccountsSuite) setupExecutionNodes(block *flow.Block) {
+func (s *BackendAccountsSuite) setupExecutionNodes(block *flow.UnsignedBlock) {
 	s.params.On("FinalizedRoot").Return(s.rootHeader, nil)
 	s.state.On("Params").Return(s.params)
 	s.state.On("Final").Return(s.snapshot)

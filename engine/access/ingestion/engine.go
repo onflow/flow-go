@@ -365,7 +365,7 @@ func (e *Engine) OnFinalizedBlock(*model.Block) {
 //   - storage.ErrAlreadyExists - if the collection within block or an execution result ID already exists in the database.
 //   - generic error in case of unexpected failure from the database layer, or failure
 //     to decode an existing database value.
-func (e *Engine) processFinalizedBlock(block *flow.Block) error {
+func (e *Engine) processFinalizedBlock(block *flow.UnsignedBlock) error {
 	// FIX: we can't index guarantees here, as we might have more than one block
 	// with the same collection as long as it is not finalized
 

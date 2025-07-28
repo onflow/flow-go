@@ -51,8 +51,8 @@ const DefaultConnectionPoolSize = 250
 //
 // Script related calls are handled by backendScripts.
 // Transaction related calls are handled by backendTransactions.
-// Block Header related calls are handled by backendBlockHeaders.
-// Block details related calls are handled by backendBlockDetails.
+// UnsignedBlock Header related calls are handled by backendBlockHeaders.
+// UnsignedBlock details related calls are handled by backendBlockDetails.
 // Event related calls are handled by backendEvents.
 // Account related calls are handled by backendAccounts.
 //

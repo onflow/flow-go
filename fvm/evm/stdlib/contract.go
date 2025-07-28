@@ -438,7 +438,7 @@ const InternalEVMTypeGetLatestBlockFunctionName = "getLatestBlock"
 
 var InternalEVMTypeGetLatestBlockFunctionType = &sema.FunctionType{
 	Parameters: []sema.Parameter{},
-	// Actually EVM.Block, but cannot refer to it here
+	// Actually EVM.UnsignedBlock, but cannot refer to it here
 	ReturnTypeAnnotation: sema.NewTypeAnnotation(sema.AnyStructType),
 }
 

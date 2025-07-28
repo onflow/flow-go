@@ -83,7 +83,7 @@ func (c *CollectionExecutedMetricImpl) CollectionExecuted(light flow.LightCollec
 }
 
 // BlockFinalized tracks finalized metric for block
-func (c *CollectionExecutedMetricImpl) BlockFinalized(block *flow.Block) {
+func (c *CollectionExecutedMetricImpl) BlockFinalized(block *flow.UnsignedBlock) {
 	// TODO: lookup actual finalization time by looking at the block finalizing `b`
 	now := time.Now().UTC()
 	blockID := block.ID()
@@ -155,7 +155,7 @@ func (c *CollectionExecutedMetricImpl) UpdateLastFullBlockHeight(height uint64) 
 }
 
 // blockExecuted tracks executed metric for block
-func (c *CollectionExecutedMetricImpl) blockExecuted(block *flow.Block, ti time.Time) {
+func (c *CollectionExecutedMetricImpl) blockExecuted(block *flow.UnsignedBlock, ti time.Time) {
 	// mark all transactions as executed
 	// TODO: sample to reduce performance overhead
 	for _, g := range block.Payload.Guarantees {

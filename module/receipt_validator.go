@@ -47,5 +47,5 @@ type ReceiptValidator interface {
 	// All other error are potential symptoms critical internal failures, such as bugs or state corruption.
 	// Note that module.UnknownResultError is not possible; we have either an invalid candidate block
 	// (yields engine.InvalidInputError) or a missing parent block (yields module.UnknownBlockError).
-	ValidatePayload(candidate *flow.Block) error
+	ValidatePayload(candidate *flow.UnsignedBlock) error
 }

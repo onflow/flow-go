@@ -21,7 +21,7 @@ type ProposalHeader struct {
 
 // HeaderBody contains all block header metadata, except for the payload hash.
 // HeaderBody generally should not be used on its own. It is merely a container used by other
-// data structures in the code base. For example, it is embedded within [Block], [Header], and the
+// data structures in the code base. For example, it is embedded within [UnsignedBlock], [Header], and the
 // respective collector cluster structs - those types should be used in almost all circumstances.
 // CAUTION regarding security:
 //   - HeaderBody does not contain the hash of the block payload. Therefore, it is not a cryptographic digest

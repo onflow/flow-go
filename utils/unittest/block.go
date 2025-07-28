@@ -10,8 +10,8 @@ var Block blockFactory
 
 type blockFactory struct{}
 
-// BlockFixture initializes and returns a new *flow.Block instance.
-func BlockFixture(opts ...func(*flow.Block)) *flow.Block {
+// BlockFixture initializes and returns a new *flow.UnsignedBlock instance.
+func BlockFixture(opts ...func(*flow.UnsignedBlock)) *flow.UnsignedBlock {
 	header := BlockHeaderFixture()
 	block := BlockWithParentFixture(header)
 	for _, opt := range opts {
@@ -20,51 +20,51 @@ func BlockFixture(opts ...func(*flow.Block)) *flow.Block {
 	return block
 }
 
-func (f *blockFactory) WithParent(parentID flow.Identifier, parentView uint64, parentHeight uint64) func(*flow.Block) {
-	return func(block *flow.Block) {
+func (f *blockFactory) WithParent(parentID flow.Identifier, parentView uint64, parentHeight uint64) func(*flow.UnsignedBlock) {
+	return func(block *flow.UnsignedBlock) {
 		block.ParentID = parentID
 		block.ParentView = parentView
 		block.Height = parentHeight + 1
 	}
 }
 
-func (f *blockFactory) WithView(view uint64) func(*flow.Block) {
-	return func(block *flow.Block) {
+func (f *blockFactory) WithView(view uint64) func(*flow.UnsignedBlock) {
+	return func(block *flow.UnsignedBlock) {
 		block.View = view
 	}
 }
 
-func (f *blockFactory) WithParentView(view uint64) func(*flow.Block) {
-	return func(block *flow.Block) {
+func (f *blockFactory) WithParentView(view uint64) func(*flow.UnsignedBlock) {
+	return func(block *flow.UnsignedBlock) {
 		block.ParentView = view
 	}
 }
 
-func (f *blockFactory) WithHeight(height uint64) func(*flow.Block) {
-	return func(block *flow.Block) {
+func (f *blockFactory) WithHeight(height uint64) func(*flow.UnsignedBlock) {
+	return func(block *flow.UnsignedBlock) {
 		block.Height = height
 	}
 }
 
-func (f *blockFactory) WithPayload(payload flow.Payload) func(*flow.Block) {
-	return func(b *flow.Block) {
+func (f *blockFactory) WithPayload(payload flow.Payload) func(*flow.UnsignedBlock) {
+	return func(b *flow.UnsignedBlock) {
 		b.Payload = payload
 	}
 }
 
-func (f *blockFactory) WithProposerID(proposerID flow.Identifier) func(*flow.Block) {
-	return func(b *flow.Block) {
+func (f *blockFactory) WithProposerID(proposerID flow.Identifier) func(*flow.UnsignedBlock) {
+	return func(b *flow.UnsignedBlock) {
 		b.ProposerID = proposerID
 	}
 }
 
-func (f *blockFactory) WithLastViewTC(lastViewTC *flow.TimeoutCertificate) func(*flow.Block) {
-	return func(block *flow.Block) {
+func (f *blockFactory) WithLastViewTC(lastViewTC *flow.TimeoutCertificate) func(*flow.UnsignedBlock) {
+	return func(block *flow.UnsignedBlock) {
 		block.LastViewTC = lastViewTC
 	}
 }
 
-func (f *blockFactory) Genesis(chainID flow.ChainID) *flow.Block {
+func (f *blockFactory) Genesis(chainID flow.ChainID) *flow.UnsignedBlock {
 	// create the raw content for the genesis block
 	payload := flow.Payload{
 		ProtocolStateID: IdentifierFixture(),
@@ -86,7 +86,7 @@ func (f *blockFactory) Genesis(chainID flow.ChainID) *flow.Block {
 
 	// combine to block
 	block, err := flow.NewRootBlock(
-		flow.UntrustedBlock{
+		flow.UntrustedUnsignedBlock{
 			HeaderBody: *headerBody,
 			Payload:    payload,
 		},

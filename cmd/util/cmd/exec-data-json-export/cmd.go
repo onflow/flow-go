@@ -33,7 +33,7 @@ func init() {
 	_ = Cmd.MarkFlagRequired("output-dir")
 
 	Cmd.Flags().StringVar(&flagBlockHash, "block-hash", "",
-		"Block hash (hex-encoded, 64 characters)")
+		"UnsignedBlock hash (hex-encoded, 64 characters)")
 	_ = Cmd.MarkFlagRequired("block-hash")
 
 	Cmd.Flags().StringVar(&flagDatadir, "datadir", "",

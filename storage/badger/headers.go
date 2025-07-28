@@ -17,7 +17,7 @@ import (
 // Headers implements a simple read-only header storage around a badger DB.
 type Headers struct {
 	db *badger.DB
-	// cache is essentially an in-memory map from `Block.ID()` -> `Header`
+	// cache is essentially an in-memory map from `UnsignedBlock.ID()` -> `Header`
 	cache       *Cache[flow.Identifier, *flow.Header]
 	heightCache *Cache[uint64, flow.Identifier]
 	sigs        *proposalSignatures

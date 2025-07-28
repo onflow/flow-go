@@ -94,7 +94,7 @@ func (p *BlocksDataProvider) createAndStartSubscription(
 	return p.api.SubscribeBlocksFromLatest(ctx, args.BlockStatus)
 }
 
-func (p *BlocksDataProvider) sendResponse(block *flow.Block) error {
+func (p *BlocksDataProvider) sendResponse(block *flow.UnsignedBlock) error {
 	expandPayload := map[string]bool{commonmodels.ExpandableFieldPayload: true}
 	blockPayload, err := commonmodels.NewBlock(
 		block,

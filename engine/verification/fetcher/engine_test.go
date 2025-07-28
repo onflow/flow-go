@@ -801,7 +801,7 @@ func mockBlockSealingStatus(state *protocol.State, headers *storage.Headers, hea
 }
 
 // mockBlocksStorage mocks blocks and headers storages for given block.
-func mockBlocksStorage(blocks *storage.Blocks, headers *storage.Headers, block *flow.Block) {
+func mockBlocksStorage(blocks *storage.Blocks, headers *storage.Headers, block *flow.UnsignedBlock) {
 	blocks.On("ByID", block.ID()).Return(block, nil)
 }
 
@@ -883,7 +883,7 @@ func chunkDataPackResponseFixture(t *testing.T,
 // verifiableChunksFixture is a test helper that creates verifiable chunks and chunk data responses.
 func verifiableChunksFixture(t *testing.T,
 	statuses verification.ChunkStatusList,
-	block *flow.Block,
+	block *flow.UnsignedBlock,
 	result *flow.ExecutionResult,
 	collMap map[flow.Identifier]*flow.Collection) (
 	map[flow.Identifier]*verification.ChunkDataPackResponse,
@@ -908,7 +908,7 @@ func verifiableChunksFixture(t *testing.T,
 // and collection fixtures for the given chunks list.
 func verifiableChunkFixture(t *testing.T,
 	chunk *flow.Chunk,
-	block *flow.Block,
+	block *flow.UnsignedBlock,
 	result *flow.ExecutionResult,
 	chunkDataPack *flow.ChunkDataPack) *verification.VerifiableChunkData {
 
@@ -970,7 +970,7 @@ func chunkRequestFixture(
 // and hence have chunk status associated with them, i.e., `statusCount` of them.
 //
 // It returns the block, result, assigned chunk statuses, their corresponding locators, and a map between chunks to their collections.
-func completeChunkStatusListFixture(t *testing.T, chunkCount int, statusCount int) (*flow.Block,
+func completeChunkStatusListFixture(t *testing.T, chunkCount int, statusCount int) (*flow.UnsignedBlock,
 	*flow.ExecutionResult,
 	verification.ChunkStatusList,
 	chunks.LocatorMap,

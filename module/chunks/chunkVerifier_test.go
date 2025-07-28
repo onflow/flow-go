@@ -380,7 +380,7 @@ func (s *ChunkVerifierTestSuite) TestEmptyCollection() {
 func (s *ChunkVerifierTestSuite) TestExecutionDataBlockMismatch() {
 	meta := s.GetTestSetup(s.T(), "", false, false)
 
-	// modify Block in the ExecutionDataRoot
+	// modify UnsignedBlock in the ExecutionDataRoot
 	meta.ExecDataBlockID = unittest.IdentifierFixture()
 
 	vch := meta.RefreshChunkData(s.T())
@@ -445,7 +445,7 @@ func newLedger(t *testing.T) *completeLedger.Ledger {
 	return f
 }
 
-func blockFixture(collection *flow.Collection) *flow.Block {
+func blockFixture(collection *flow.Collection) *flow.UnsignedBlock {
 	guarantee := &flow.CollectionGuarantee{CollectionID: collection.ID()}
 	block := unittest.BlockFixture(
 		unittest.Block.WithPayload(

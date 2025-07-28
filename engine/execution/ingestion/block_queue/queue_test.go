@@ -485,7 +485,7 @@ func TestNewMissingCollection(t *testing.T) {
 /* ==== Test utils ==== */
 
 // GetBlock("A") => A
-type GetBlock func(name string) *flow.Block
+type GetBlock func(name string) *flow.UnsignedBlock
 
 // GetCollection(1) => C1
 type GetCollection func(name int) *flow.Collection
@@ -523,7 +523,7 @@ func makeChainABCDEFG() (GetBlock, GetCollection, GetCommit) {
 	bs = unittest.ChainBlockFixtureWithRoot(blockE.ToHeader(), 1)
 	blockG := bs[0]
 
-	blockLookup := map[string]*flow.Block{
+	blockLookup := map[string]*flow.UnsignedBlock{
 		"R": blockR,
 		"A": blockA,
 		"B": blockB,
@@ -534,7 +534,7 @@ func makeChainABCDEFG() (GetBlock, GetCollection, GetCommit) {
 		"G": blockG,
 	}
 
-	getBlock := func(name string) *flow.Block {
+	getBlock := func(name string) *flow.UnsignedBlock {
 		return blockLookup[name]
 	}
 
@@ -586,7 +586,7 @@ func makeChainABCDEF() (GetBlock, GetCollection, GetCommit) {
 	unittest.AddCollectionsToBlock(blockF, []*flow.Collection{c1, c2, c3})
 	unittest.RechainBlocks(bs)
 
-	blockLookup := map[string]*flow.Block{
+	blockLookup := map[string]*flow.UnsignedBlock{
 		"R": blockR,
 		"A": blockA,
 		"B": blockB,
@@ -596,7 +596,7 @@ func makeChainABCDEF() (GetBlock, GetCollection, GetCommit) {
 		"F": blockF,
 	}
 
-	getBlock := func(name string) *flow.Block {
+	getBlock := func(name string) *flow.UnsignedBlock {
 		return blockLookup[name]
 	}
 
@@ -617,8 +617,8 @@ func makeChainABCDEF() (GetBlock, GetCollection, GetCommit) {
 	return getBlock, getCol, getCommit
 }
 
-func requireExecutableHas(t *testing.T, executables []*entity.ExecutableBlock, bs ...*flow.Block) {
-	blocks := make(map[flow.Identifier]*flow.Block, len(bs))
+func requireExecutableHas(t *testing.T, executables []*entity.ExecutableBlock, bs ...*flow.UnsignedBlock) {
+	blocks := make(map[flow.Identifier]*flow.UnsignedBlock, len(bs))
 	for _, b := range bs {
 		blocks[b.ID()] = b
 	}

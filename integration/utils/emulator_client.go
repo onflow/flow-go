@@ -120,7 +120,7 @@ func (c *EmulatorClient) CreateAccount(keys []*sdk.AccountKey, contracts []templ
 
 }
 
-func (c *EmulatorClient) Submit(tx *sdk.Transaction) (*flow.Block, error) {
+func (c *EmulatorClient) Submit(tx *sdk.Transaction) (*flow.UnsignedBlock, error) {
 	// submit the signed transaction
 	err := c.adapter.SendTransaction(context.Background(), *tx)
 	if err != nil {

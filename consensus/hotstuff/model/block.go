@@ -54,7 +54,7 @@ type CertifiedBlock struct {
 // NewCertifiedBlock constructs a new certified block. It checks the consistency
 // requirements and returns an exception otherwise:
 //
-//	Block.View == QC.View and Block.BlockID == QC.BlockID
+//	UnsignedBlock.View == QC.View and UnsignedBlock.BlockID == QC.BlockID
 func NewCertifiedBlock(block *Block, qc *flow.QuorumCertificate) (CertifiedBlock, error) {
 	if block.View != qc.View {
 		return CertifiedBlock{}, fmt.Errorf("block's view (%d) should equal the qc's view (%d)", block.View, qc.View)

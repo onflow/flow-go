@@ -31,10 +31,10 @@ func init() {
 	rootCmd.AddCommand(Cmd)
 
 	Cmd.Flags().Uint64Var(&flagHeight, "height", 0,
-		"Block height")
+		"UnsignedBlock height")
 
 	Cmd.Flags().StringVar(&flagBlockID, "block-id", "",
-		"Block ID (hex-encoded, 64 characters)")
+		"UnsignedBlock ID (hex-encoded, 64 characters)")
 
 	Cmd.Flags().BoolVar(&flagFinal, "final", false,
 		"get finalized block")
@@ -60,7 +60,7 @@ func NewReader(state protocol.State, blocks storage.Blocks, commits storage.Comm
 	}
 }
 
-func (r *Reader) getBlockByHeader(header *flow.Header) (*flow.Block, error) {
+func (r *Reader) getBlockByHeader(header *flow.Header) (*flow.UnsignedBlock, error) {
 	blockID := header.ID()
 	block, err := r.blocks.ByID(blockID)
 	if err != nil {
@@ -69,7 +69,7 @@ func (r *Reader) getBlockByHeader(header *flow.Header) (*flow.Block, error) {
 	return block, nil
 }
 
-func (r *Reader) GetBlockByHeight(height uint64) (*flow.Block, error) {
+func (r *Reader) GetBlockByHeight(height uint64) (*flow.UnsignedBlock, error) {
 	header, err := r.state.AtHeight(height).Head()
 	if err != nil {
 		return nil, fmt.Errorf("could not get header by height: %v, %w", height, err)
@@ -82,7 +82,7 @@ func (r *Reader) GetBlockByHeight(height uint64) (*flow.Block, error) {
 	return block, nil
 }
 
-func (r *Reader) GetFinal() (*flow.Block, error) {
+func (r *Reader) GetFinal() (*flow.UnsignedBlock, error) {
 	header, err := r.state.Final().Head()
 	if err != nil {
 		return nil, fmt.Errorf("could not get finalized, %w", err)
@@ -95,7 +95,7 @@ func (r *Reader) GetFinal() (*flow.Block, error) {
 	return block, nil
 }
 
-func (r *Reader) GetSealed() (*flow.Block, error) {
+func (r *Reader) GetSealed() (*flow.UnsignedBlock, error) {
 	header, err := r.state.Sealed().Head()
 	if err != nil {
 		return nil, fmt.Errorf("could not get sealed block, %w", err)
@@ -108,7 +108,7 @@ func (r *Reader) GetSealed() (*flow.Block, error) {
 	return block, nil
 }
 
-func (r *Reader) GetRoot() (*flow.Block, error) {
+func (r *Reader) GetRoot() (*flow.UnsignedBlock, error) {
 	header := r.state.Params().SealedRoot()
 
 	block, err := r.getBlockByHeader(header)
@@ -118,7 +118,7 @@ func (r *Reader) GetRoot() (*flow.Block, error) {
 	return block, nil
 }
 
-func (r *Reader) GetBlockByID(blockID flow.Identifier) (*flow.Block, error) {
+func (r *Reader) GetBlockByID(blockID flow.Identifier) (*flow.UnsignedBlock, error) {
 	header, err := r.state.AtBlockID(blockID).Head()
 	if err != nil {
 		return nil, fmt.Errorf("could not get header by blockID: %v, %w", blockID, err)

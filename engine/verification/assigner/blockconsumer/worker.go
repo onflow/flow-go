@@ -8,7 +8,7 @@ import (
 )
 
 // worker is an internal type of this package.
-// It receives block jobs from job consumer and converts it to Block and passes it to the
+// It receives block jobs from job consumer and converts it to UnsignedBlock and passes it to the
 // finalized block processor (i.e., assigner engine) to process.
 // In this sense, worker acts as a broker between the block consumer and block processor.
 // The worker is stateless, and is solely responsible for converting block jobs to blocks, passing them

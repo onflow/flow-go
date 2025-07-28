@@ -273,7 +273,7 @@ func (v *receiptValidator) Validate(receipt *flow.ExecutionReceipt) error {
 // All other error are potential symptoms of critical internal failures, such as bugs or state corruption.
 // Note that module.UnknownResultError is not possible; we have either an invalid candidate block
 // (yields engine.InvalidInputError) or a missing parent block (yields module.UnknownBlockError).
-func (v *receiptValidator) ValidatePayload(candidate *flow.Block) error {
+func (v *receiptValidator) ValidatePayload(candidate *flow.UnsignedBlock) error {
 	payload := candidate.Payload
 	parentID := candidate.ParentID
 

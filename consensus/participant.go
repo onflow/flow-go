@@ -144,13 +144,13 @@ func NewForks(final *flow.Header, headers storage.Headers, updater module.Finali
 // recoverTrustedRoot based on our local state returns root block and QC that can be used to initialize base state
 func recoverTrustedRoot(final *flow.Header, headers storage.Headers, rootHeader *flow.Header, rootQC *flow.QuorumCertificate) (*model.CertifiedBlock, error) {
 	if final.View < rootHeader.View {
-		return nil, fmt.Errorf("finalized Block has older view than trusted root")
+		return nil, fmt.Errorf("finalized UnsignedBlock has older view than trusted root")
 	}
 
 	// if finalized view is genesis block, then use genesis block as the trustedRoot
 	if final.View == rootHeader.View {
 		if final.ID() != rootHeader.ID() {
-			return nil, fmt.Errorf("finalized Block conflicts with trusted root")
+			return nil, fmt.Errorf("finalized UnsignedBlock conflicts with trusted root")
 		}
 		certifiedRoot, err := makeCertifiedRootBlock(rootHeader, rootQC)
 		if err != nil {

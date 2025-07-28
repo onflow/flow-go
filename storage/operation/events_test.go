@@ -82,7 +82,7 @@ func TestRetrieveEventByBlockIDTxID(t *testing.T) {
 			require.Equal(t, expected, actual)
 		}
 
-		t.Run("retrieve events by Block ID", func(t *testing.T) {
+		t.Run("retrieve events by UnsignedBlock ID", func(t *testing.T) {
 			for _, b := range blockIDs {
 				var actualEvents = make([]flow.Event, 0)
 

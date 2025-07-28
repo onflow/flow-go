@@ -31,7 +31,7 @@ import (
 func TestUnknownReferenceBlock(t *testing.T) {
 	rootHeight := uint64(100)
 	participants := unittest.IdentityListFixture(5, unittest.WithAllRoles())
-	rootSnapshot := unittest.RootSnapshotFixture(participants, func(block *flow.Block) {
+	rootSnapshot := unittest.RootSnapshotFixture(participants, func(block *flow.UnsignedBlock) {
 		block.Height = rootHeight
 	})
 	rootProtocolStateID := getRootProtocolStateID(t, rootSnapshot)
@@ -319,7 +319,7 @@ func TestSealingSegment(t *testing.T) {
 
 			// sealing segment should contain B1 and B2
 			// B2 is reference of snapshot, B1 is latest sealed
-			unittest.AssertEqualBlockSequences(t, []*flow.Block{rootSnapshot.Encodable().SealingSegment.Sealed(), block1}, segment.Blocks)
+			unittest.AssertEqualBlockSequences(t, []*flow.UnsignedBlock{rootSnapshot.Encodable().SealingSegment.Sealed(), block1}, segment.Blocks)
 			assert.Len(t, segment.ExecutionResults, 1)
 			assert.Empty(t, segment.ExtraBlocks)
 			assertSealingSegmentBlocksQueryableAfterBootstrap(t, state.AtBlockID(block1.ID()))
@@ -375,7 +375,7 @@ func TestSealingSegment(t *testing.T) {
 
 			// sealing segment should contain B1, B2, B3
 			// B3 is reference of snapshot, B1 is latest sealed
-			unittest.AssertEqualBlockSequences(t, []*flow.Block{block1, block2, block3}, segment.Blocks)
+			unittest.AssertEqualBlockSequences(t, []*flow.UnsignedBlock{block1, block2, block3}, segment.Blocks)
 			assert.Len(t, segment.ExecutionResults, 1)
 			assertSealingSegmentBlocksQueryableAfterBootstrap(t, state.AtBlockID(block3.ID()))
 		})
@@ -404,7 +404,7 @@ func TestSealingSegment(t *testing.T) {
 					// Repetitions of the same receipt in one fork would be a protocol violation.
 					// Hence, we include the result only once in the direct child of B1.
 					next, err = flow.NewBlock(
-						flow.UntrustedBlock{
+						flow.UntrustedUnsignedBlock{
 							HeaderBody: next.HeaderBody,
 							Payload: unittest.PayloadFixture(
 								unittest.WithReceipts(receipt1),
@@ -501,8 +501,8 @@ func TestSealingSegment(t *testing.T) {
 
 			// sealing segment should be [B2, B3, B4, B5, B6]
 			require.Len(t, segment.Blocks, 5)
-			unittest.AssertEqualBlockSequences(t, []*flow.Block{block2, block3, block4, block5, block6}, segment.Blocks)
-			unittest.AssertEqualBlockSequences(t, []*flow.Block{block1}, segment.ExtraBlocks[1:])
+			unittest.AssertEqualBlockSequences(t, []*flow.UnsignedBlock{block2, block3, block4, block5, block6}, segment.Blocks)
+			unittest.AssertEqualBlockSequences(t, []*flow.UnsignedBlock{block1}, segment.ExtraBlocks[1:])
 			require.Len(t, segment.ExecutionResults, 1)
 
 			assertSealingSegmentBlocksQueryableAfterBootstrap(t, state.AtBlockID(block6.ID()))
@@ -574,7 +574,7 @@ func TestSealingSegment(t *testing.T) {
 			buildBlock(t, state, unittest.BlockWithParentProtocolState(block5))
 
 			require.Len(t, segment.Blocks, 4)
-			unittest.AssertEqualBlockSequences(t, []*flow.Block{block2, block3, block4, block5}, segment.Blocks)
+			unittest.AssertEqualBlockSequences(t, []*flow.UnsignedBlock{block2, block3, block4, block5}, segment.Blocks)
 			require.Contains(t, segment.ExecutionResults, resultA)
 			require.Len(t, segment.ExecutionResults, 2)
 
@@ -654,7 +654,7 @@ func TestSealingSegment(t *testing.T) {
 			buildBlock(t, state, unittest.BlockWithParentProtocolState(block5))
 
 			require.Len(t, segment.Blocks, 4)
-			unittest.AssertEqualBlockSequences(t, []*flow.Block{block2, block3, block4, block5}, segment.Blocks)
+			unittest.AssertEqualBlockSequences(t, []*flow.UnsignedBlock{block2, block3, block4, block5}, segment.Blocks)
 			require.Contains(t, segment.ExecutionResults, resultA)
 			// ResultA should only be added once even though it is referenced in 2 different blocks
 			require.Len(t, segment.ExecutionResults, 2)
@@ -712,7 +712,7 @@ func TestSealingSegment(t *testing.T) {
 			require.NoError(t, err)
 			// sealing segment should contain B1 and B5
 			// B5 is reference of snapshot, B1 is latest sealed
-			unittest.AssertEqualBlockSequences(t, []*flow.Block{block1, block2, block3, block4, block5}, segment.Blocks)
+			unittest.AssertEqualBlockSequences(t, []*flow.UnsignedBlock{block1, block2, block3, block4, block5}, segment.Blocks)
 			assert.Len(t, segment.ExecutionResults, 1)
 
 			assertSealingSegmentBlocksQueryableAfterBootstrap(t, snapshot)
@@ -731,7 +731,7 @@ func TestSealingSegment(t *testing.T) {
 			)
 			buildFinalizedBlock(t, state, root)
 
-			blocks := make([]*flow.Block, 0, flow.DefaultTransactionExpiry+3)
+			blocks := make([]*flow.UnsignedBlock, 0, flow.DefaultTransactionExpiry+3)
 			parent := root
 			for i := 0; i < flow.DefaultTransactionExpiry+1; i++ {
 				next := unittest.BlockFixture(
@@ -880,7 +880,7 @@ func TestSealingSegment(t *testing.T) {
 			assert.Equal(t, lastBlock.ToHeader(), segment.Highest().ToHeader())
 			assert.Equal(t, block4.ToHeader(), segment.Sealed().ToHeader())
 			root := rootSnapshot.Encodable().SealingSegment.Sealed()
-			unittest.AssertEqualBlockSequences(t, []*flow.Block{root, block1, block2, block3}, segment.ExtraBlocks)
+			unittest.AssertEqualBlockSequences(t, []*flow.UnsignedBlock{root, block1, block2, block3}, segment.ExtraBlocks)
 			assert.Len(t, segment.ExecutionResults, 2)
 
 			assertSealingSegmentBlocksQueryableAfterBootstrap(t, snapshot)
@@ -938,7 +938,7 @@ func TestSealingSegment_FailureCases(t *testing.T) {
 		)
 
 		multipleBlockSnapshot := snapshotAfter(t, sporkRootSnapshot, func(state *bprotocol.FollowerState, mutableState protocol.MutableProtocolState) protocol.Snapshot {
-			for _, b := range []*flow.Block{b1, b2, b3} {
+			for _, b := range []*flow.UnsignedBlock{b1, b2, b3} {
 				buildFinalizedBlock(t, state, b)
 			}
 			b4 := unittest.BlockWithParentProtocolState(b3)
@@ -1088,8 +1088,8 @@ func TestBootstrapSealingSegmentWithExtraBlocks(t *testing.T) {
 
 		// sealing segment should be [B2, B3, B4, B5, B6]
 		require.Len(t, segment.Blocks, 5)
-		unittest.AssertEqualBlockSequences(t, []*flow.Block{block2, block3, block4, block5, block6}, segment.Blocks)
-		unittest.AssertEqualBlockSequences(t, []*flow.Block{block1}, segment.ExtraBlocks[1:])
+		unittest.AssertEqualBlockSequences(t, []*flow.UnsignedBlock{block2, block3, block4, block5, block6}, segment.Blocks)
+		unittest.AssertEqualBlockSequences(t, []*flow.UnsignedBlock{block1}, segment.ExtraBlocks[1:])
 		require.Len(t, segment.ExecutionResults, 1)
 
 		assertSealingSegmentBlocksQueryableAfterBootstrap(t, snapshot)
@@ -1716,7 +1716,7 @@ func TestSnapshot_CrossEpochIdentities(t *testing.T) {
 // root block is non-nil
 func TestSnapshot_PostSporkIdentities(t *testing.T) {
 	expected := unittest.CompleteIdentitySet()
-	root, result, seal := unittest.BootstrapFixture(expected, func(block *flow.Block) {
+	root, result, seal := unittest.BootstrapFixture(expected, func(block *flow.UnsignedBlock) {
 		block.ParentID = unittest.IdentifierFixture()
 	})
 	qc := unittest.QuorumCertificateFixture(unittest.QCWithRootBlockID(root.ID()))

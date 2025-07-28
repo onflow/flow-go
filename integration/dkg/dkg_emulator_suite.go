@@ -371,7 +371,7 @@ func (s *EmulatorSuite) claimDKGParticipant(node *node) {
 }
 
 // sendDummyTx submits a transaction from the service account
-func (s *EmulatorSuite) sendDummyTx() (*flow.Block, error) {
+func (s *EmulatorSuite) sendDummyTx() (*flow.UnsignedBlock, error) {
 	// we are using an account-creation transaction but it doesnt matter; we
 	// could be using anything other transaction
 	createAccountTx, err := sdktemplates.CreateAccount(
@@ -506,7 +506,7 @@ func (s *EmulatorSuite) initEngines(node *node, ids flow.IdentityList) {
 
 // prepareAndSubmit adds a block reference and signs a transaction before
 // submitting it via the admin emulator client.
-func (s *EmulatorSuite) prepareAndSubmit(tx *sdk.Transaction, signerAddresses []sdk.Address, signers []sdkcrypto.Signer) (*flow.Block, error) {
+func (s *EmulatorSuite) prepareAndSubmit(tx *sdk.Transaction, signerAddresses []sdk.Address, signers []sdkcrypto.Signer) (*flow.UnsignedBlock, error) {
 
 	// set block reference
 	latestBlock, err := s.adminEmulatorClient.GetLatestBlock(context.Background(), true)

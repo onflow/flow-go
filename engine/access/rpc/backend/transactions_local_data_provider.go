@@ -137,7 +137,7 @@ func (t *TransactionsLocalDataProvider) GetTransactionResultFromStorage(
 // getter or when deriving transaction status.
 func (t *TransactionsLocalDataProvider) GetTransactionResultsByBlockIDFromStorage(
 	ctx context.Context,
-	block *flow.Block,
+	block *flow.UnsignedBlock,
 	requiredEventEncodingVersion entities.EventEncodingVersion,
 ) ([]*accessmodel.TransactionResult, error) {
 	blockID := block.ID()
@@ -230,7 +230,7 @@ func (t *TransactionsLocalDataProvider) GetTransactionResultsByBlockIDFromStorag
 // getter or when deriving transaction status.
 func (t *TransactionsLocalDataProvider) GetTransactionResultByIndexFromStorage(
 	ctx context.Context,
-	block *flow.Block,
+	block *flow.UnsignedBlock,
 	index uint32,
 	requiredEventEncodingVersion entities.EventEncodingVersion,
 ) (*accessmodel.TransactionResult, error) {
@@ -372,7 +372,7 @@ func isExpired(refHeight, compareToHeight uint64) bool {
 // LookupCollectionIDInBlock returns the collection ID based on the transaction ID. The lookup is performed in block
 // collections.
 func (t *TransactionsLocalDataProvider) LookupCollectionIDInBlock(
-	block *flow.Block,
+	block *flow.UnsignedBlock,
 	txID flow.Identifier,
 ) (flow.Identifier, error) {
 	for _, guarantee := range block.Payload.Guarantees {
@@ -392,7 +392,7 @@ func (t *TransactionsLocalDataProvider) LookupCollectionIDInBlock(
 
 // buildTxIDToCollectionIDMapping returns a map of transaction ID to collection ID based on the provided block.
 // No errors expected during normal operations.
-func (t *TransactionsLocalDataProvider) buildTxIDToCollectionIDMapping(block *flow.Block) (map[flow.Identifier]flow.Identifier, error) {
+func (t *TransactionsLocalDataProvider) buildTxIDToCollectionIDMapping(block *flow.UnsignedBlock) (map[flow.Identifier]flow.Identifier, error) {
 	txToCollectionID := make(map[flow.Identifier]flow.Identifier)
 	for _, guarantee := range block.Payload.Guarantees {
 		collection, err := t.collections.LightByID(guarantee.CollectionID)

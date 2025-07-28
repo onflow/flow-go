@@ -237,7 +237,7 @@ func (e *Core) onProcessableBlock(blockID flow.Identifier, height uint64) error 
 	return nil
 }
 
-func (e *Core) enqueuBlock(block *flow.Block, blockID flow.Identifier) (
+func (e *Core) enqueuBlock(block *flow.UnsignedBlock, blockID flow.Identifier) (
 	[]*block_queue.MissingCollection,
 	[]*entity.ExecutableBlock,
 	error,

@@ -50,23 +50,23 @@ type EmulatorStorage interface {
 	LatestBlockHeight(ctx context.Context) (uint64, error)
 
 	// LatestBlock returns the block with the highest block height.
-	LatestBlock(ctx context.Context) (flowgo.Block, error)
+	LatestBlock(ctx context.Context) (flowgo.UnsignedBlock, error)
 
 	// StoreBlock stores the block in storage. If the exactly same block is already in a storage, return successfully
-	StoreBlock(ctx context.Context, block *flowgo.Block) error
+	StoreBlock(ctx context.Context, block *flowgo.UnsignedBlock) error
 
 	// BlockByID returns the block with the given hash. It is available for
 	// finalized and ambiguous blocks.
-	BlockByID(ctx context.Context, blockID flowgo.Identifier) (*flowgo.Block, error)
+	BlockByID(ctx context.Context, blockID flowgo.Identifier) (*flowgo.UnsignedBlock, error)
 
 	// BlockByHeight returns the block at the given height. It is only available
 	// for finalized blocks.
-	BlockByHeight(ctx context.Context, height uint64) (*flowgo.Block, error)
+	BlockByHeight(ctx context.Context, height uint64) (*flowgo.UnsignedBlock, error)
 
 	// CommitBlock atomically saves the execution results for a block.
 	CommitBlock(
 		ctx context.Context,
-		block *flowgo.Block,
+		block *flowgo.UnsignedBlock,
 		collections []*flowgo.LightCollection,
 		transactions map[flowgo.Identifier]*flowgo.TransactionBody,
 		transactionResults map[flowgo.Identifier]*StorableTransactionResult,

@@ -142,7 +142,7 @@ func TestExecutionStateWithStorehouse(t *testing.T) {
 			Meter: meter.NewMeter(meter.DefaultParameters()),
 		}
 
-		// create Block 11's end statecommitment
+		// create UnsignedBlock 11's end statecommitment
 		sc2, update, sc2Snapshot, err := state.CommitDelta(l, executionSnapshot,
 			storehouse.NewExecutingBlockSnapshot(state.NewLedgerStorageSnapshot(l, sc10), sc10))
 		require.NoError(t, err)

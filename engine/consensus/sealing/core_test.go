@@ -370,7 +370,7 @@ func (s *ApprovalProcessingCoreTestSuite) TestOnBlockFinalized_EmergencySealing(
 //
 // B_1 becomes finalized rendering forks starting at B_2 and B_3 as orphans
 func (s *ApprovalProcessingCoreTestSuite) TestOnBlockFinalized_ProcessingOrphanApprovals() {
-	forks := make([][]*flow.Block, 3)
+	forks := make([][]*flow.UnsignedBlock, 3)
 	forkResults := make([][]*flow.ExecutionResult, len(forks))
 
 	for forkIndex := range forks {
@@ -440,7 +440,7 @@ func (s *ApprovalProcessingCoreTestSuite) TestOnBlockFinalized_ProcessingOrphanA
 //	.           |
 //	.       finalized
 func (s *ApprovalProcessingCoreTestSuite) TestOnBlockFinalized_ExtendingUnprocessableFork() {
-	forks := make([][]*flow.Block, 2)
+	forks := make([][]*flow.UnsignedBlock, 2)
 
 	for forkIndex := range forks {
 		forks[forkIndex] = unittest.ChainFixtureFrom(forkIndex+3, s.Block)
@@ -531,7 +531,7 @@ func (s *ApprovalProcessingCoreTestSuite) TestRequestPendingApprovals() {
 	n := 100
 
 	// create blocks
-	unsealedFinalizedBlocks := make([]flow.Block, 0, n)
+	unsealedFinalizedBlocks := make([]flow.UnsignedBlock, 0, n)
 	parentBlock := s.ParentBlock
 	for i := 0; i < n; i++ {
 		block := unittest.BlockWithParentFixture(parentBlock)
@@ -681,7 +681,7 @@ func (s *ApprovalProcessingCoreTestSuite) TestRepopulateAssignmentCollectorTree(
 	rootSnapshot := unittest.StateSnapshotForKnownBlock(s.finalizedRootHeader, nil)
 	s.Snapshots[s.finalizedRootHeader.ID()] = rootSnapshot
 	block, err := flow.NewRootBlock(
-		flow.UntrustedBlock{
+		flow.UntrustedUnsignedBlock{
 			HeaderBody: s.finalizedRootHeader.HeaderBody,
 			Payload:    unittest.PayloadFixture(),
 		},
@@ -799,15 +799,15 @@ func (s *ApprovalProcessingCoreTestSuite) TestRepopulateAssignmentCollectorTree(
 // TODO: add result for block B
 //
 // Key aspects of this setup:
-//  1. Block S is the lowest block in `SealingSegment.Blocks` (ignoring `SealingSegment.ExtraBlocks`)
+//  1. UnsignedBlock S is the lowest block in `SealingSegment.Blocks` (ignoring `SealingSegment.ExtraBlocks`)
 //     This is the highest sealed block as of block D.
 //     After bootstrapping, the storage API will only permit retrieving blocks whose height is larger or equal to the root block.
-//  2. Block X is an ancestor of S but not included in sealing segment (because it is before the root block)
-//  3. Block B contains execution results for:
-//     - Block X (a pre-root block)
-//     - Block S (the root block)
-//  4. Block C contains a seal for block X
-//  5. Block D contains a seal for block S
+//  2. UnsignedBlock X is an ancestor of S but not included in sealing segment (because it is before the root block)
+//  3. UnsignedBlock B contains execution results for:
+//     - UnsignedBlock X (a pre-root block)
+//     - UnsignedBlock S (the root block)
+//  4. UnsignedBlock C contains a seal for block X
+//  5. UnsignedBlock D contains a seal for block S
 //
 // Important Implementation Notes:
 // (i) Per `sealing_segment.md`, block X would normally need to be included in the sealing
@@ -841,7 +841,7 @@ func (s *ApprovalProcessingCoreTestSuite) TestRepopulateAssignmentCollectorTree_
 	blockS := unittest.BlockFixture()
 	s.Blocks[blockS.ID()] = blockS.ToHeader()
 	s.IdentitiesCache[blockS.ID()] = s.AuthorizedVerifiers
-	// Note: as Block S is already sealed, `payloads` should not be queried for it
+	// Note: as UnsignedBlock S is already sealed, `payloads` should not be queried for it
 
 	// Create block B with results for both X and S
 	receiptS := unittest.ExecutionReceiptFixture(unittest.WithResult(unittest.ExecutionResultFixture(
@@ -890,7 +890,7 @@ func (s *ApprovalProcessingCoreTestSuite) TestRepopulateAssignmentCollectorTree_
 	s.State.On("Sealed").Unset()
 	s.State.On("Sealed").Return(unittest.StateSnapshotForKnownBlock(blockS.ToHeader(), nil))
 	// * snapshot for latest finalized block:
-	//   Block D is the latest finalized block, right after bootstrapping. While the freshly bootstrapped node does not
+	//   UnsignedBlock D is the latest finalized block, right after bootstrapping. While the freshly bootstrapped node does not
 	//   know any children of D, the Sealing Segment definition guarantees that only finalized blocks are included.
 	finalSnapshot := unittest.StateSnapshotForKnownBlock(blockD.ToHeader(), nil)
 	s.State.On("Final").Return(finalSnapshot) // call `s.State.AtBlockID(…)` looks up the snapshots in map `s.Snapshots`

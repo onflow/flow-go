@@ -177,7 +177,7 @@ func (s *NodeDisallowListWrapperTestSuite) TestDisallowListNode() {
 		}
 	})
 
-	// this tests the edge case where the  Identities func is invoked with the p2p.NotEjectedFilter. Block listed
+	// this tests the edge case where the  Identities func is invoked with the p2p.NotEjectedFilter. UnsignedBlock listed
 	// nodes are expected to be filtered from the identity list returned after setting the ejected field.
 	s.Run("Identities(p2p.NotEjectedFilter) should not return block listed nodes", func() {
 		disallowlistLookup := disallowlist.Lookup()

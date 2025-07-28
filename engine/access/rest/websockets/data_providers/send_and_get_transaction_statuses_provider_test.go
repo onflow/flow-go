@@ -28,7 +28,7 @@ type SendTransactionStatusesProviderSuite struct {
 	api *accessmock.API
 
 	chain          flow.Chain
-	rootBlock      *flow.Block
+	rootBlock      *flow.UnsignedBlock
 	finalizedBlock *flow.Header
 
 	factory       *DataProviderFactoryImpl

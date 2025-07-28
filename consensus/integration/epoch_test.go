@@ -37,7 +37,7 @@ func TestUnweightedNode(t *testing.T) {
 			currentEpochCollectionNodes,
 			nextEpochParticipantsData.Identities()...)...,
 	)
-	rootSnapshot = withNextEpoch(t, rootSnapshot, nextEpochIdentities, nextEpochParticipantsData, consensusParticipants, 10_000, func(block *flow.Block) *flow.QuorumCertificate {
+	rootSnapshot = withNextEpoch(t, rootSnapshot, nextEpochIdentities, nextEpochParticipantsData, consensusParticipants, 10_000, func(block *flow.UnsignedBlock) *flow.QuorumCertificate {
 		return createRootQC(t, block, participantsData)
 	})
 	encodableSnap := rootSnapshot.Encodable()
@@ -71,7 +71,7 @@ func TestStaticEpochTransition(t *testing.T) {
 	// set up next epoch beginning in 4 views, with same identities as first epoch
 	nextEpochIdentities, err := rootSnapshot.Identities(filter.Any)
 	require.NoError(t, err)
-	rootSnapshot = withNextEpoch(t, rootSnapshot, nextEpochIdentities, participantsData, consensusParticipants, 4, func(block *flow.Block) *flow.QuorumCertificate {
+	rootSnapshot = withNextEpoch(t, rootSnapshot, nextEpochIdentities, participantsData, consensusParticipants, 4, func(block *flow.UnsignedBlock) *flow.QuorumCertificate {
 		return createRootQC(t, block, participantsData)
 	})
 
@@ -121,7 +121,7 @@ func TestEpochTransition_IdentitiesOverlap(t *testing.T) {
 
 	// generate new identities for next epoch, it will generate new Random Beacon keys for random beacon participants
 	nextEpochParticipantData := completeConsensusIdentities(t, privateNodeInfos[1:])
-	rootSnapshot = withNextEpoch(t, rootSnapshot, nextEpochIdentities, nextEpochParticipantData, consensusParticipants, 4, func(block *flow.Block) *flow.QuorumCertificate {
+	rootSnapshot = withNextEpoch(t, rootSnapshot, nextEpochIdentities, nextEpochParticipantData, consensusParticipants, 4, func(block *flow.UnsignedBlock) *flow.QuorumCertificate {
 		return createRootQC(t, block, firstEpochConsensusParticipants)
 	})
 
@@ -167,7 +167,7 @@ func TestEpochTransition_IdentitiesDisjoint(t *testing.T) {
 		nextEpochParticipantData.Identities()...,                                                   // add new consensus nodes
 	)
 
-	rootSnapshot = withNextEpoch(t, rootSnapshot, nextEpochIdentities, nextEpochParticipantData, consensusParticipants, 4, func(block *flow.Block) *flow.QuorumCertificate {
+	rootSnapshot = withNextEpoch(t, rootSnapshot, nextEpochIdentities, nextEpochParticipantData, consensusParticipants, 4, func(block *flow.UnsignedBlock) *flow.QuorumCertificate {
 		return createRootQC(t, block, firstEpochConsensusParticipants)
 	})
 
@@ -203,7 +203,7 @@ func withNextEpoch(
 	nextEpochParticipantData *run.ParticipantData,
 	participantsCache *ConsensusParticipants,
 	curEpochViews uint64,
-	createQC func(block *flow.Block) *flow.QuorumCertificate,
+	createQC func(block *flow.UnsignedBlock) *flow.QuorumCertificate,
 ) *inmem.Snapshot {
 	nextEpochIdentities = nextEpochIdentities.Sort(flow.Canonical[flow.Identity])
 

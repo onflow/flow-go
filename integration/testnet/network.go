@@ -151,7 +151,7 @@ type FlowNetwork struct {
 	Containers           map[string]*Container
 	ConsensusFollowers   map[flow.Identifier]consensus_follower.ConsensusFollower
 	CorruptedPortMapping map[flow.Identifier]string // port binding for corrupted containers.
-	root                 *flow.Block
+	root                 *flow.UnsignedBlock
 	result               *flow.ExecutionResult
 	seal                 *flow.Seal
 
@@ -204,7 +204,7 @@ func (net *FlowNetwork) ContainersByRole(role flow.Role, ghost bool) []*Containe
 }
 
 // Root returns the root block generated for the network.
-func (net *FlowNetwork) Root() *flow.Block {
+func (net *FlowNetwork) Root() *flow.UnsignedBlock {
 	return net.root
 }
 
@@ -1073,7 +1073,7 @@ func followerNodeInfos(confs []ConsensusFollowerConfig) ([]bootstrap.NodeInfo, e
 }
 
 type BootstrapData struct {
-	Root              *flow.Block
+	Root              *flow.UnsignedBlock
 	Result            *flow.ExecutionResult
 	Seal              *flow.Seal
 	StakedConfs       []ContainerConfig
@@ -1242,7 +1242,7 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string, chainID fl
 		return nil, err
 	}
 	root, err := flow.NewRootBlock(
-		flow.UntrustedBlock{
+		flow.UntrustedUnsignedBlock{
 			HeaderBody: *rootHeaderBody,
 			Payload:    unittest.PayloadFixture(unittest.WithProtocolStateID(rootProtocolState.ID())),
 		},

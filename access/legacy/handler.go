@@ -348,7 +348,7 @@ func (h *Handler) GetEventsForBlockIDs(
 	}, nil
 }
 
-func blockResponse(block *flow.Block) (*accessproto.BlockResponse, error) {
+func blockResponse(block *flow.UnsignedBlock) (*accessproto.BlockResponse, error) {
 	msg, err := convert.BlockToMessage(block)
 	if err != nil {
 		return nil, err

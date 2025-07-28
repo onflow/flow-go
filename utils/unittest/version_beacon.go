@@ -58,7 +58,7 @@ func AddVersionBeacon(t *testing.T, beacon *flow.VersionBeacon, state protocol.F
 	addToState(t, state, C, true)
 }
 
-func addToState(t *testing.T, state protocol.FollowerState, block *flow.Block, finalize bool) {
+func addToState(t *testing.T, state protocol.FollowerState, block *flow.UnsignedBlock, finalize bool) {
 	err := state.ExtendCertified(context.Background(), NewCertifiedBlock(block))
 	require.NoError(t, err)
 

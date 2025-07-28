@@ -18,7 +18,7 @@ type backendBlockDetails struct {
 	state  protocol.State
 }
 
-func (b *backendBlockDetails) GetLatestBlock(ctx context.Context, isSealed bool) (*flow.Block, flow.BlockStatus, error) {
+func (b *backendBlockDetails) GetLatestBlock(ctx context.Context, isSealed bool) (*flow.UnsignedBlock, flow.BlockStatus, error) {
 	var header *flow.Header
 	var err error
 
@@ -64,7 +64,7 @@ func (b *backendBlockDetails) GetLatestBlock(ctx context.Context, isSealed bool)
 	return block, stat, nil
 }
 
-func (b *backendBlockDetails) GetBlockByID(ctx context.Context, id flow.Identifier) (*flow.Block, flow.BlockStatus, error) {
+func (b *backendBlockDetails) GetBlockByID(ctx context.Context, id flow.Identifier) (*flow.UnsignedBlock, flow.BlockStatus, error) {
 	block, err := b.blocks.ByID(id)
 	if err != nil {
 		return nil, flow.BlockStatusUnknown, rpc.ConvertStorageError(err)
@@ -77,7 +77,7 @@ func (b *backendBlockDetails) GetBlockByID(ctx context.Context, id flow.Identifi
 	return block, stat, nil
 }
 
-func (b *backendBlockDetails) GetBlockByHeight(ctx context.Context, height uint64) (*flow.Block, flow.BlockStatus, error) {
+func (b *backendBlockDetails) GetBlockByHeight(ctx context.Context, height uint64) (*flow.UnsignedBlock, flow.BlockStatus, error) {
 	block, err := b.blocks.ByHeight(height)
 	if err != nil {
 		return nil, flow.BlockStatusUnknown, rpc.ConvertStorageError(resolveHeightError(b.state.Params(), height, err))
@@ -91,7 +91,7 @@ func (b *backendBlockDetails) GetBlockByHeight(ctx context.Context, height uint6
 }
 
 // No errors are expected during normal operations.
-func (b *backendBlockDetails) getBlockStatus(ctx context.Context, block *flow.Block) (flow.BlockStatus, error) {
+func (b *backendBlockDetails) getBlockStatus(ctx context.Context, block *flow.UnsignedBlock) (flow.BlockStatus, error) {
 	sealed, err := b.state.Sealed().Head()
 	if err != nil {
 		// In the RPC engine, if we encounter an error from the protocol state indicating state corruption,

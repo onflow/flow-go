@@ -47,9 +47,9 @@ type BackendBlocksSuite struct {
 	chainID flow.ChainID
 
 	broadcaster *engine.Broadcaster
-	blocksArray []*flow.Block
-	blockMap    map[uint64]*flow.Block
-	rootBlock   *flow.Block
+	blocksArray []*flow.UnsignedBlock
+	blockMap    map[uint64]*flow.UnsignedBlock
+	rootBlock   *flow.UnsignedBlock
 
 	backend *Backend
 }
@@ -88,8 +88,8 @@ func (s *BackendBlocksSuite) SetupTest() {
 	s.broadcaster = engine.NewBroadcaster()
 
 	blockCount := 5
-	s.blockMap = make(map[uint64]*flow.Block, blockCount)
-	s.blocksArray = make([]*flow.Block, 0, blockCount)
+	s.blockMap = make(map[uint64]*flow.UnsignedBlock, blockCount)
+	s.blocksArray = make([]*flow.UnsignedBlock, 0, blockCount)
 
 	// generate blockCount consecutive blocks with associated seal, result and execution data
 	s.rootBlock = unittest.BlockFixture()
@@ -119,7 +119,7 @@ func (s *BackendBlocksSuite) SetupTest() {
 	s.headers.On("ByHeight", mock.AnythingOfType("uint64")).Return(
 		mocks.ConvertStorageOutput(
 			mocks.StorageMapGetter(s.blockMap),
-			func(block *flow.Block) *flow.Header { return block.ToHeader() },
+			func(block *flow.UnsignedBlock) *flow.Header { return block.ToHeader() },
 		),
 	).Maybe()
 
@@ -350,7 +350,7 @@ func (s *BackendBlocksSuite) TestSubscribeBlocksFromLatest() {
 //     and returns a subscription.Subscription.
 //
 //   - requireFn: A function responsible for validating that the received information
-//     matches the expected data. It takes an actual interface{} and an expected *flow.Block as parameters.
+//     matches the expected data. It takes an actual interface{} and an expected *flow.UnsignedBlock as parameters.
 //
 //   - tests: A slice of testType representing different test scenarios for subscriptions.
 //
@@ -366,7 +366,7 @@ func (s *BackendBlocksSuite) TestSubscribeBlocksFromLatest() {
 //  8. Cancels the subscription and ensures it shuts down gracefully.
 func (s *BackendBlocksSuite) subscribe(
 	subscribeFn func(ctx context.Context, startValue interface{}, blockStatus flow.BlockStatus) subscription.Subscription,
-	requireFn func(interface{}, *flow.Block),
+	requireFn func(interface{}, *flow.UnsignedBlock),
 	tests []testType,
 ) {
 	ctx, cancel := context.WithCancel(context.Background())
@@ -431,8 +431,8 @@ func (s *BackendBlocksSuite) subscribe(
 }
 
 // requireBlocks ensures that the received block information matches the expected data.
-func (s *BackendBlocksSuite) requireBlocks(v interface{}, expectedBlock *flow.Block) {
-	actualBlock, ok := v.(*flow.Block)
+func (s *BackendBlocksSuite) requireBlocks(v interface{}, expectedBlock *flow.UnsignedBlock) {
+	actualBlock, ok := v.(*flow.UnsignedBlock)
 	require.True(s.T(), ok, "unexpected response type: %T", v)
 
 	s.Require().Equal(expectedBlock.Height, actualBlock.Height)

@@ -167,7 +167,7 @@ func (cc *ComplianceCollector) FinalizedHeight(height uint64) {
 }
 
 // BlockFinalized reports metrics about finalized blocks.
-func (cc *ComplianceCollector) BlockFinalized(block *flow.Block) {
+func (cc *ComplianceCollector) BlockFinalized(block *flow.UnsignedBlock) {
 	now := time.Now()
 	if !cc.lastBlockFinalizedAt.IsZero() {
 		cc.finalizedBlocksPerSecond.Observe(1.0 / now.Sub(cc.lastBlockFinalizedAt).Seconds())
@@ -185,7 +185,7 @@ func (cc *ComplianceCollector) SealedHeight(height uint64) {
 }
 
 // BlockSealed reports metrics about sealed blocks.
-func (cc *ComplianceCollector) BlockSealed(block *flow.Block) {
+func (cc *ComplianceCollector) BlockSealed(block *flow.UnsignedBlock) {
 	cc.sealedBlocks.Inc()
 	cc.sealedPayload.With(prometheus.Labels{LabelResource: ResourceGuarantee}).Add(float64(len(block.Payload.Guarantees)))
 	cc.sealedPayload.With(prometheus.Labels{LabelResource: ResourceSeal}).Add(float64(len(block.Payload.Seals)))

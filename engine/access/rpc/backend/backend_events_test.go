@@ -61,7 +61,7 @@ type BackendEventsSuite struct {
 	execClient     *access.ExecutionAPIClient
 
 	sealedHead  *flow.Header
-	blocks      []*flow.Block
+	blocks      []*flow.UnsignedBlock
 	blockIDs    []flow.Identifier
 	blockEvents []flow.Event
 
@@ -89,7 +89,7 @@ func (s *BackendEventsSuite) SetupTest() {
 	s.eventsIndex = index.NewEventsIndex(index.NewReporter(), s.events)
 
 	blockCount := 5
-	s.blocks = make([]*flow.Block, blockCount)
+	s.blocks = make([]*flow.UnsignedBlock, blockCount)
 	s.blockIDs = make([]flow.Identifier, blockCount)
 
 	for i := 0; i < blockCount; i++ {
@@ -103,7 +103,7 @@ func (s *BackendEventsSuite) SetupTest() {
 		payload := unittest.PayloadFixture()
 		header.PayloadHash = payload.Hash()
 		block, err := flow.NewBlock(
-			flow.UntrustedBlock{
+			flow.UntrustedUnsignedBlock{
 				HeaderBody: header.HeaderBody,
 				Payload:    payload,
 			},
@@ -201,7 +201,7 @@ func (s *BackendEventsSuite) defaultBackend() *backendEvents {
 }
 
 // setupExecutionNodes sets up the mocks required to test against an EN backend
-func (s *BackendEventsSuite) setupExecutionNodes(block *flow.Block) {
+func (s *BackendEventsSuite) setupExecutionNodes(block *flow.UnsignedBlock) {
 	s.params.On("FinalizedRoot").Return(s.rootHeader, nil)
 	s.state.On("Params").Return(s.params)
 	s.state.On("Final").Return(s.snapshot)
@@ -218,7 +218,7 @@ func (s *BackendEventsSuite) setupExecutionNodes(block *flow.Block) {
 }
 
 // setupENSuccessResponse configures the execution node client to return a successful response
-func (s *BackendEventsSuite) setupENSuccessResponse(eventType string, blocks []*flow.Block) {
+func (s *BackendEventsSuite) setupENSuccessResponse(eventType string, blocks []*flow.UnsignedBlock) {
 	s.setupExecutionNodes(blocks[len(blocks)-1])
 
 	ids := make([][]byte, len(blocks))
@@ -360,7 +360,7 @@ func (s *BackendEventsSuite) TestGetEvents_HappyPaths() {
 				return
 			case IndexQueryModeFailover:
 				// only failing blocks queried from EN
-				s.setupENSuccessResponse(targetEvent, []*flow.Block{s.blocks[0], s.blocks[4]})
+				s.setupENSuccessResponse(targetEvent, []*flow.UnsignedBlock{s.blocks[0], s.blocks[4]})
 			}
 
 			// the first and last blocks are not available from storage, and should be fetched from the EN

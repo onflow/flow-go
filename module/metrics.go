@@ -479,13 +479,13 @@ type ComplianceMetrics interface {
 	// SealedHeight reports the latest block that has a finalized seal known to this node.
 	SealedHeight(height uint64)
 	// BlockFinalized reports information about data contained within finalized blocks.
-	BlockFinalized(*flow.Block)
+	BlockFinalized(*flow.UnsignedBlock)
 	// BlockSealed reports information about data contained within blocks with a finalized seal.
 	// When a new block is finalized, this method is called for every seal in the finalized block,
 	// in the order the seals are listed.
 	// CAUTION: within a block, seals can be included in any permutation (not necessarily in order
 	// of increasing height).
-	BlockSealed(*flow.Block)
+	BlockSealed(*flow.UnsignedBlock)
 	// CurrentEpochCounter reports the current epoch counter.
 	CurrentEpochCounter(counter uint64)
 	// CurrentEpochPhase reports the current epoch phase.
@@ -593,7 +593,7 @@ type CruiseCtlMetrics interface {
 	// and derivative terms of the PID controller.
 	PIDError(p, i, d float64)
 
-	// TargetProposalDuration measures the current value of the Block Time Controller output:
+	// TargetProposalDuration measures the current value of the UnsignedBlock Time Controller output:
 	// the target duration from parent to child proposal.
 	TargetProposalDuration(duration time.Duration)
 
@@ -624,16 +624,16 @@ type CollectionMetrics interface {
 }
 
 type ConsensusMetrics interface {
-	// StartCollectionToFinalized reports Metrics C1: Collection Received by CCL→ Collection Included in Finalized Block
+	// StartCollectionToFinalized reports Metrics C1: Collection Received by CCL→ Collection Included in Finalized UnsignedBlock
 	StartCollectionToFinalized(collectionID flow.Identifier)
 
-	// FinishCollectionToFinalized reports Metrics C1: Collection Received by CCL→ Collection Included in Finalized Block
+	// FinishCollectionToFinalized reports Metrics C1: Collection Received by CCL→ Collection Included in Finalized UnsignedBlock
 	FinishCollectionToFinalized(collectionID flow.Identifier)
 
-	// StartBlockToSeal reports Metrics C4: Block Received by CCL → Block Seal in finalized block
+	// StartBlockToSeal reports Metrics C4: UnsignedBlock Received by CCL → UnsignedBlock Seal in finalized block
 	StartBlockToSeal(blockID flow.Identifier)
 
-	// FinishBlockToSeal reports Metrics C4: Block Received by CCL → Block Seal in finalized block
+	// FinishBlockToSeal reports Metrics C4: UnsignedBlock Received by CCL → UnsignedBlock Seal in finalized block
 	FinishBlockToSeal(blockID flow.Identifier)
 
 	// EmergencySeal increments the number of seals that were created in emergency mode
@@ -1183,7 +1183,7 @@ type DHTMetrics interface {
 type CollectionExecutedMetric interface {
 	CollectionFinalized(light flow.LightCollection)
 	CollectionExecuted(light flow.LightCollection)
-	BlockFinalized(block *flow.Block)
+	BlockFinalized(block *flow.UnsignedBlock)
 	ExecutionReceiptReceived(r *flow.ExecutionReceipt)
 	UpdateLastFullBlockHeight(height uint64)
 }

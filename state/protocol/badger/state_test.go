@@ -30,7 +30,7 @@ func TestBootstrapAndOpen(t *testing.T) {
 
 	// create a state root and bootstrap the protocol state with it
 	participants := unittest.CompleteIdentitySet()
-	rootSnapshot := unittest.RootSnapshotFixture(participants, func(block *flow.Block) {
+	rootSnapshot := unittest.RootSnapshotFixture(participants, func(block *flow.UnsignedBlock) {
 		block.ParentID = unittest.IdentifierFixture()
 	})
 
@@ -87,7 +87,7 @@ func TestBootstrapAndOpen(t *testing.T) {
 func TestBootstrapAndOpen_EpochCommitted(t *testing.T) {
 	// create a state root and bootstrap the protocol state with it
 	participants := unittest.CompleteIdentitySet()
-	rootSnapshot := unittest.RootSnapshotFixture(participants, func(block *flow.Block) {
+	rootSnapshot := unittest.RootSnapshotFixture(participants, func(block *flow.UnsignedBlock) {
 		block.ParentID = unittest.IdentifierFixture()
 	})
 	rootBlock, err := rootSnapshot.Head()
@@ -774,12 +774,12 @@ func snapshotAfter(t *testing.T, rootSnapshot protocol.Snapshot, f func(*bprotoc
 }
 
 // buildBlock extends the protocol state by the given block
-func buildBlock(t *testing.T, state protocol.FollowerState, block *flow.Block) {
+func buildBlock(t *testing.T, state protocol.FollowerState, block *flow.UnsignedBlock) {
 	require.NoError(t, state.ExtendCertified(context.Background(), unittest.NewCertifiedBlock(block)))
 }
 
 // buildFinalizedBlock extends the protocol state by the given block and marks the block as finalized
-func buildFinalizedBlock(t *testing.T, state protocol.FollowerState, block *flow.Block) {
+func buildFinalizedBlock(t *testing.T, state protocol.FollowerState, block *flow.UnsignedBlock) {
 	require.NoError(t, state.ExtendCertified(context.Background(), unittest.NewCertifiedBlock(block)))
 	require.NoError(t, state.Finalize(context.Background(), block.ID()))
 }

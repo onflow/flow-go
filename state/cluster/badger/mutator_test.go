@@ -45,7 +45,7 @@ type MutatorSuite struct {
 	// protocol state for reference blocks for transactions
 	protoState           protocol.FollowerState
 	mutableProtocolState protocol.MutableProtocolState
-	protoGenesis         *flow.Block
+	protoGenesis         *flow.UnsignedBlock
 
 	state cluster.MutableState
 }

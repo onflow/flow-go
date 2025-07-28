@@ -20,9 +20,9 @@ type API interface {
 	GetBlockHeaderByHeight(ctx context.Context, height uint64) (*flow.Header, flow.BlockStatus, error)
 	GetBlockHeaderByID(ctx context.Context, id flow.Identifier) (*flow.Header, flow.BlockStatus, error)
 
-	GetLatestBlock(ctx context.Context, isSealed bool) (*flow.Block, flow.BlockStatus, error)
-	GetBlockByHeight(ctx context.Context, height uint64) (*flow.Block, flow.BlockStatus, error)
-	GetBlockByID(ctx context.Context, id flow.Identifier) (*flow.Block, flow.BlockStatus, error)
+	GetLatestBlock(ctx context.Context, isSealed bool) (*flow.UnsignedBlock, flow.BlockStatus, error)
+	GetBlockByHeight(ctx context.Context, height uint64) (*flow.UnsignedBlock, flow.BlockStatus, error)
+	GetBlockByID(ctx context.Context, id flow.Identifier) (*flow.UnsignedBlock, flow.BlockStatus, error)
 
 	GetCollectionByID(ctx context.Context, id flow.Identifier) (*flow.LightCollection, error)
 	GetFullCollectionByID(ctx context.Context, id flow.Identifier) (*flow.Collection, error)

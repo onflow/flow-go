@@ -57,8 +57,8 @@ type BackfillTxErrorMessagesSuite struct {
 
 	blockHeadersMap map[uint64]*flow.Header
 
-	nodeRootBlock *flow.Block
-	sealedBlock   *flow.Block
+	nodeRootBlock *flow.UnsignedBlock
+	sealedBlock   *flow.UnsignedBlock
 	blockCount    int
 }
 

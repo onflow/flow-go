@@ -198,7 +198,7 @@ func (s *HotStuffFollowerSuite) TestOnBlockIncorporated() {
 // with:
 //   - [ 52078] is the root block with view 52078
 //   - The block b = [◄(52078) 52078+2] was produced 2 views later (no finalization advancement).
-//   - Block b has a certified child: [◄(52078+2) 52078+3] ◄(52078+3)
+//   - UnsignedBlock b has a certified child: [◄(52078+2) 52078+3] ◄(52078+3)
 //     The child's view 52078+3 is exactly one bigger than B's view. Hence it proves finalization of b.
 func (s *HotStuffFollowerSuite) TestFollowerFinalizedBlock() {
 	b := s.mockConsensus.extendBlock(s.rootHeader.View+2, s.rootHeader)
@@ -288,7 +288,7 @@ func (s *HotStuffFollowerSuite) TestOutOfOrderBlocks() {
 	s.follower.AddCertifiedBlock(toCertifiedBlock(s.T(), block09, block10.ParentQC()))
 	s.follower.AddCertifiedBlock(toCertifiedBlock(s.T(), block13, block14.ParentQC()))
 
-	// Block 20 should now finalize the fork up to and including block13
+	// UnsignedBlock 20 should now finalize the fork up to and including block13
 	finalityAdvanced := make(chan struct{}) // close when finality has advanced to b
 	s.notifier.On("OnFinalizedBlock", blockWithID(block01.ID())).Return().Once()
 	s.finalizer.On("MakeFinal", blockID(block01.ID())).Return(nil).Once()

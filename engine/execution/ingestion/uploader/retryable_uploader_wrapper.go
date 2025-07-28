@@ -67,7 +67,7 @@ func NewBadgerRetryableUploaderWrapper(
 		if computationResult == nil || computationResult.ExecutableBlock == nil ||
 			computationResult.ExecutableBlock.Block == nil {
 			log.Warn().Msg("nil ComputationResult or nil ComputationResult.ExecutableBlock or " +
-				"computationResult.ExecutableBlock.Block")
+				"computationResult.ExecutableBlock.UnsignedBlock")
 			return
 		}
 
@@ -108,7 +108,7 @@ func NewBadgerRetryableUploaderWrapper(
 func (b *BadgerRetryableUploaderWrapper) Upload(computationResult *execution.ComputationResult) error {
 	if computationResult == nil || computationResult.ExecutableBlock == nil ||
 		computationResult.ExecutableBlock.Block == nil {
-		return errors.New("ComputationResult or its ExecutableBlock(or its Block) is nil when Upload() is called")
+		return errors.New("ComputationResult or its ExecutableBlock(or its UnsignedBlock) is nil when Upload() is called")
 	}
 
 	// Before upload we store ComputationResult upload status to BadgerDB as false before upload is done.
@@ -190,11 +190,11 @@ func (b *BadgerRetryableUploaderWrapper) reconstructComputationResult(
 			"failed to retrieve events for BlockID %s. Error: %s", blockID.String(), err.Error())
 	}
 
-	// retrieving Block from local BadgerDB
+	// retrieving UnsignedBlock from local BadgerDB
 	block, err := b.blocks.ByID(blockID)
 	if err != nil {
 		log.Warn().Msgf(
-			"failed to retrieve Block with BlockID %s. Error: %s", blockID.String(), err.Error())
+			"failed to retrieve UnsignedBlock with BlockID %s. Error: %s", blockID.String(), err.Error())
 	}
 
 	// grabbing collections and guarantees from BadgerDB

@@ -102,7 +102,7 @@ func TestExecutionForkWithDuplicateAssignedChunks(t *testing.T) {
 // creates chunk statuses for that first duplicate chunk on both results.
 //
 // It returns the block, results, assigned chunk statuses, their corresponding locators, and a map between chunks to their collections.
-func executionResultForkFixture(t *testing.T) (*flow.Block,
+func executionResultForkFixture(t *testing.T) (*flow.UnsignedBlock,
 	*flow.ExecutionResult,
 	*verification.ChunkStatus,
 	*flow.ExecutionResult,

@@ -394,9 +394,9 @@ func (ss *SyncSuite) TestPrune() {
 	final.Height = 100
 
 	var (
-		prunableHeights  []*flow.Block
-		prunableBlockIDs []*flow.Block
-		unprunable       []*flow.Block
+		prunableHeights  []*flow.UnsignedBlock
+		prunableBlockIDs []*flow.UnsignedBlock
+		unprunable       []*flow.UnsignedBlock
 	)
 
 	// add some finalized blocks by height

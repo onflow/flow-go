@@ -66,8 +66,8 @@ type Suite struct {
 	sealedBlock    *flow.Header
 	finalizedBlock *flow.Header
 	log            zerolog.Logger
-	blockMap       map[uint64]*flow.Block
-	rootBlock      *flow.Block
+	blockMap       map[uint64]*flow.UnsignedBlock
+	rootBlock      *flow.UnsignedBlock
 
 	collectionExecutedMetric *indexer.CollectionExecutedMetricImpl
 
@@ -136,7 +136,7 @@ func (s *Suite) SetupTest() {
 	s.proto.state.On("Params").Return(s.proto.params)
 
 	blockCount := 5
-	s.blockMap = make(map[uint64]*flow.Block, blockCount)
+	s.blockMap = make(map[uint64]*flow.UnsignedBlock, blockCount)
 	s.rootBlock = unittest.Block.Genesis(flow.Emulator)
 	parent := s.rootBlock.ToHeader()
 
@@ -151,7 +151,7 @@ func (s *Suite) SetupTest() {
 	s.blocks.On("ByHeight", mock.AnythingOfType("uint64")).Return(
 		mocks.ConvertStorageOutput(
 			mocks.StorageMapGetter(s.blockMap),
-			func(block *flow.Block) *flow.Block { return block },
+			func(block *flow.UnsignedBlock) *flow.UnsignedBlock { return block },
 		),
 	).Maybe()
 
@@ -226,7 +226,7 @@ func (s *Suite) initEngineAndSyncer(ctx irrecoverable.SignalerContext) (*Engine,
 }
 
 // mockCollectionsForBlock mocks collections for block
-func (s *Suite) mockCollectionsForBlock(block *flow.Block) {
+func (s *Suite) mockCollectionsForBlock(block *flow.UnsignedBlock) {
 	// we should query the block once and index the guarantee payload once
 	for _, g := range block.Payload.Guarantees {
 		collection := unittest.CollectionFixture(1)
@@ -236,7 +236,7 @@ func (s *Suite) mockCollectionsForBlock(block *flow.Block) {
 }
 
 // generateBlock prepares block with payload and specified guarantee.SignerIndices
-func (s *Suite) generateBlock(clusterCommittee flow.IdentitySkeletonList, snap *protocol.Snapshot) *flow.Block {
+func (s *Suite) generateBlock(clusterCommittee flow.IdentitySkeletonList, snap *protocol.Snapshot) *flow.UnsignedBlock {
 	block := unittest.BlockFixture(
 		unittest.Block.WithPayload(unittest.PayloadFixture(
 			unittest.WithGuarantees(unittest.CollectionGuaranteesFixture(4)...),
@@ -336,7 +336,7 @@ func (s *Suite) TestOnFinalizedBlockSeveralBlocksAhead() {
 
 	newBlocksCount := 3
 	startHeight := s.finalizedBlock.Height + 1
-	blocks := make([]*flow.Block, newBlocksCount)
+	blocks := make([]*flow.UnsignedBlock, newBlocksCount)
 
 	// generate the test blocks, cgs and collections
 	for i := 0; i < newBlocksCount; i++ {
@@ -645,7 +645,7 @@ func (s *Suite) TestProcessBackgroundCalls() {
 	blkCnt := 3
 	collPerBlk := 10
 	startHeight := uint64(1000)
-	blocks := make([]*flow.Block, blkCnt)
+	blocks := make([]*flow.UnsignedBlock, blkCnt)
 	collMap := make(map[flow.Identifier]*flow.LightCollection, blkCnt*collPerBlk)
 
 	// prepare cluster committee members

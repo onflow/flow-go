@@ -132,7 +132,7 @@ func (s *SafetyRulesTestSuite) TestProduceVote_ShouldVote() {
 
 // TestProduceVote_IncludedQCHigherThanTCsQC checks specific scenario where previous round resulted in TC and leader
 // knows about QC which is not part of TC and qc.View > tc.NewestQC.View. We want to allow this, in this case leader
-// includes his QC into proposal satisfies next condition: Block.QC.View > lastViewTC.NewestQC.View
+// includes his QC into proposal satisfies next condition: UnsignedBlock.QC.View > lastViewTC.NewestQC.View
 func (s *SafetyRulesTestSuite) TestProduceVote_IncludedQCHigherThanTCsQC() {
 	lastViewTC := helper.MakeTC(
 		helper.WithTCView(s.proposal.Block.View+1),
@@ -375,7 +375,7 @@ func (s *SafetyRulesTestSuite) TestProduceVote_VotingOnInvalidProposals() {
 		require.Nil(s.T(), vote)
 	})
 	s.Run("no-last-view-tc", func() {
-		// create block where Block.View != Block.QC.View+1 and LastViewTC = nil
+		// create block where UnsignedBlock.View != UnsignedBlock.QC.View+1 and LastViewTC = nil
 		proposal := helper.MakeSignedProposal(helper.WithProposal(helper.MakeProposal(
 			helper.WithBlock(
 				helper.MakeBlock(
@@ -387,8 +387,8 @@ func (s *SafetyRulesTestSuite) TestProduceVote_VotingOnInvalidProposals() {
 		require.Nil(s.T(), vote)
 	})
 	s.Run("last-view-tc-invalid-view", func() {
-		// create block where Block.View != Block.QC.View+1 and
-		// Block.View != LastViewTC.View+1
+		// create block where UnsignedBlock.View != UnsignedBlock.QC.View+1 and
+		// UnsignedBlock.View != LastViewTC.View+1
 		proposal := helper.MakeSignedProposal(helper.WithProposal(helper.MakeProposal(
 			helper.WithBlock(
 				helper.MakeBlock(
@@ -403,8 +403,8 @@ func (s *SafetyRulesTestSuite) TestProduceVote_VotingOnInvalidProposals() {
 		require.Nil(s.T(), vote)
 	})
 	s.Run("proposal-includes-QC-for-higher-view", func() {
-		// create block where Block.View != Block.QC.View+1 and
-		// Block.View == LastViewTC.View+1 and Block.QC.View >= Block.View
+		// create block where UnsignedBlock.View != UnsignedBlock.QC.View+1 and
+		// UnsignedBlock.View == LastViewTC.View+1 and UnsignedBlock.QC.View >= UnsignedBlock.View
 		// in this case block is not safe to extend since proposal includes QC which is newer than the proposal itself.
 		proposal := helper.MakeSignedProposal(helper.WithProposal(helper.MakeProposal(
 			helper.WithBlock(
@@ -423,8 +423,8 @@ func (s *SafetyRulesTestSuite) TestProduceVote_VotingOnInvalidProposals() {
 		require.Nil(s.T(), vote)
 	})
 	s.Run("last-view-tc-invalid-highest-qc", func() {
-		// create block where Block.View != Block.QC.View+1 and
-		// Block.View == LastViewTC.View+1 and Block.QC.View < LastViewTC.NewestQC.View
+		// create block where UnsignedBlock.View != UnsignedBlock.QC.View+1 and
+		// UnsignedBlock.View == LastViewTC.View+1 and UnsignedBlock.QC.View < LastViewTC.NewestQC.View
 		// in this case block is not safe to extend since proposal is built on top of QC, which is lower
 		// than QC presented in LastViewTC.
 		TONewestQC := helper.MakeQC(helper.WithQCView(s.bootstrapBlock.View + 1))

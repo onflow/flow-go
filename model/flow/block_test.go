@@ -18,7 +18,7 @@ func TestGenesisEncodingJSON(t *testing.T) {
 	genesisID := genesis.ID()
 	data, err := json.Marshal(genesis)
 	require.NoError(t, err)
-	var decoded flow.Block
+	var decoded flow.UnsignedBlock
 	err = json.Unmarshal(data, &decoded)
 	require.NoError(t, err)
 	decodedID := decoded.ID()
@@ -31,7 +31,7 @@ func TestGenesisDecodingMsgpack(t *testing.T) {
 	genesisID := genesis.ID()
 	data, err := msgpack.Marshal(genesis)
 	require.NoError(t, err)
-	var decoded flow.Block
+	var decoded flow.UnsignedBlock
 	err = msgpack.Unmarshal(data, &decoded)
 	require.NoError(t, err)
 	decodedID := decoded.ID()
@@ -44,7 +44,7 @@ func TestBlockEncodingJSON(t *testing.T) {
 	blockID := block.ID()
 	data, err := json.Marshal(block)
 	require.NoError(t, err)
-	var decoded flow.Block
+	var decoded flow.UnsignedBlock
 	err = json.Unmarshal(data, &decoded)
 	require.NoError(t, err)
 	decodedID := decoded.ID()
@@ -57,7 +57,7 @@ func TestBlockEncodingMsgpack(t *testing.T) {
 	blockID := block.ID()
 	data, err := msgpack.Marshal(block)
 	require.NoError(t, err)
-	var decoded flow.Block
+	var decoded flow.UnsignedBlock
 	err = msgpack.Unmarshal(data, &decoded)
 	require.NoError(t, err)
 	decodedID := decoded.ID()
@@ -105,7 +105,7 @@ func TestBlock_Status(t *testing.T) {
 	}
 }
 
-// TestBlockMalleability checks that flow.Block is not malleable: any change in its data
+// TestBlockMalleability checks that flow.UnsignedBlock is not malleable: any change in its data
 // should result in a different ID.
 // Because our NewHeaderBody constructor enforces ParentView < View we use
 // WithFieldGenerator to safely pass it.
@@ -129,7 +129,7 @@ func TestBlockMalleability(t *testing.T) {
 // Test Cases:
 //
 // 1. Valid input:
-//   - Verifies that a properly populated UntrustedBlock results in a valid Block.
+//   - Verifies that a properly populated UntrustedUnsignedBlock results in a valid UnsignedBlock.
 //
 // 2. Invalid input with invalid HeaderBody:
 //   - Ensures an error is returned when the HeaderBody.ParentID is flow.ZeroID.
@@ -140,7 +140,7 @@ func TestNewBlock(t *testing.T) {
 	t.Run("valid input", func(t *testing.T) {
 		block := unittest.BlockFixture()
 
-		res, err := flow.NewBlock(flow.UntrustedBlock(*block))
+		res, err := flow.NewBlock(flow.UntrustedUnsignedBlock(*block))
 		require.NoError(t, err)
 		require.NotNil(t, res)
 	})
@@ -149,7 +149,7 @@ func TestNewBlock(t *testing.T) {
 		block := unittest.BlockFixture()
 		block.ParentID = flow.ZeroID
 
-		res, err := flow.NewBlock(flow.UntrustedBlock(*block))
+		res, err := flow.NewBlock(flow.UntrustedUnsignedBlock(*block))
 		require.Error(t, err)
 		require.Nil(t, res)
 		require.Contains(t, err.Error(), "invalid header body")
@@ -159,7 +159,7 @@ func TestNewBlock(t *testing.T) {
 		block := unittest.BlockFixture()
 		block.Payload.ProtocolStateID = flow.ZeroID
 
-		res, err := flow.NewBlock(flow.UntrustedBlock(*block))
+		res, err := flow.NewBlock(flow.UntrustedUnsignedBlock(*block))
 		require.Error(t, err)
 		require.Nil(t, res)
 		require.Contains(t, err.Error(), "invalid payload")
@@ -172,7 +172,7 @@ func TestNewBlock(t *testing.T) {
 // Test Cases:
 //
 // 1. Valid input:
-//   - Verifies that a properly populated UntrustedBlock results in a valid root Block.
+//   - Verifies that a properly populated UntrustedUnsignedBlock results in a valid root UnsignedBlock.
 //
 // 2. Invalid input with invalid HeaderBody:
 //   - Ensures an error is returned when the HeaderBody.ParentView is not zero.
@@ -180,9 +180,9 @@ func TestNewBlock(t *testing.T) {
 // 3. Invalid input with invalid Payload:
 //   - Ensures an error is returned when the Payload.ProtocolStateID is flow.ZeroID.
 func TestNewRootBlock(t *testing.T) {
-	// validRootBlockFixture returns a new valid root flow.UntrustedBlock for use in tests.
-	validRootBlockFixture := func() flow.UntrustedBlock {
-		return flow.UntrustedBlock{
+	// validRootBlockFixture returns a new valid root flow.UntrustedUnsignedBlock for use in tests.
+	validRootBlockFixture := func() flow.UntrustedUnsignedBlock {
+		return flow.UntrustedUnsignedBlock{
 			HeaderBody: flow.HeaderBody{
 				ChainID:            flow.Emulator,
 				ParentID:           unittest.IdentifierFixture(),
@@ -234,8 +234,8 @@ func TestNewRootBlock(t *testing.T) {
 // 1. Valid input:
 //   - Verifies that a properly populated UntrustedProposal results in a valid Proposal.
 //
-// 2. Invalid input with invalid Block:
-//   - Ensures an error is returned when the Block.ParentID is flow.ZeroID.
+// 2. Invalid input with invalid UnsignedBlock:
+//   - Ensures an error is returned when the UnsignedBlock.ParentID is flow.ZeroID.
 //
 // 3. Invalid input with nil ProposerSigData:
 //   - Ensures an error is returned when the ProposerSigData is nil.
@@ -292,15 +292,15 @@ func TestNewProposal(t *testing.T) {
 //   - Verifies that an empty (but non-nil) ProposerSigData is also accepted,
 //     since root proposals must not include a signature.
 //
-// 3. Invalid input with invalid Block:
-//   - Ensures an error is returned if the Block.ParentView is non-zero, which is disallowed for root blocks.
+// 3. Invalid input with invalid UnsignedBlock:
+//   - Ensures an error is returned if the UnsignedBlock.ParentView is non-zero, which is disallowed for root blocks.
 //
 // 4. Invalid input with non-empty ProposerSigData:
 //   - Ensures an error is returned when a ProposerSigData is included, as this is not permitted for root proposals.
 func TestNewRootProposal(t *testing.T) {
 	// validRootProposalFixture returns a new valid root flow.UntrustedProposal for use in tests.
 	validRootProposalFixture := func() flow.UntrustedProposal {
-		block, err := flow.NewRootBlock(flow.UntrustedBlock{
+		block, err := flow.NewRootBlock(flow.UntrustedUnsignedBlock{
 			HeaderBody: flow.HeaderBody{
 				ChainID:            flow.Emulator,
 				ParentID:           unittest.IdentifierFixture(),

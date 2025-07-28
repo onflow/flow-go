@@ -8,7 +8,7 @@ import (
 )
 
 func GenerateRootResult(
-	block *flow.Block,
+	block *flow.UnsignedBlock,
 	commit flow.StateCommitment,
 	epochSetup *flow.EpochSetup,
 	epochCommit *flow.EpochCommit,

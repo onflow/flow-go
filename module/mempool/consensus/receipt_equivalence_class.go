@@ -8,7 +8,7 @@ import (
 )
 
 // ReceiptsOfSameResult represents a set of ExecutionReceipt all committing to the same
-// ExecutionResult. As an ExecutionResult contains the Block ID, all results with the same
+// ExecutionResult. As an ExecutionResult contains the UnsignedBlock ID, all results with the same
 // ID must be for the same block. For optimized storage, we only store the result once.
 // Mathematically, a ReceiptsOfSameResult struct represents an Equivalence Class of
 // Execution Receipts.

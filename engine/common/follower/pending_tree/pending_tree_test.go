@@ -273,6 +273,6 @@ func certifiedBlocksFixture(t *testing.T, count int, parent *flow.Header) []flow
 }
 
 // certifiedBlockFixture builds a certified block using a QC with fixture signatures.
-func certifiedBlockFixture(block *flow.Block) flow.CertifiedBlock {
+func certifiedBlockFixture(block *flow.UnsignedBlock) flow.CertifiedBlock {
 	return *unittest.NewCertifiedBlock(block)
 }

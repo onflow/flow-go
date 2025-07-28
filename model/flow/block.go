@@ -35,15 +35,15 @@ type GenericBlock[T HashablePayload] struct {
 	Payload T
 }
 
-// ID returns a collision-resistant hash of the Block struct.
+// ID returns a collision-resistant hash of the UnsignedBlock struct.
 func (b *GenericBlock[T]) ID() Identifier {
 	return b.ToHeader().ID()
 }
 
 // ToHeader converts the block into a compact [flow.Header] representation,
 // where the payload is compressed to a hash reference.
-// The receiver Block must be well-formed (enforced by mutation protection on the type).
-// This function may panic if invoked on a malformed Block.
+// The receiver UnsignedBlock must be well-formed (enforced by mutation protection on the type).
+// This function may panic if invoked on a malformed UnsignedBlock.
 func (b *GenericBlock[T]) ToHeader() *Header {
 	if !b.ContainsParentQC() {
 		rootHeader, err := NewRootHeader(UntrustedHeader{
@@ -66,33 +66,33 @@ func (b *GenericBlock[T]) ToHeader() *Header {
 	return header
 }
 
-// Block is the canonical instantiation of GenericBlock using flow.Payload as the payload type.
+// UnsignedBlock is the canonical instantiation of GenericBlock using flow.Payload as the payload type.
 //
 // Zero values for certain HeaderBody fields are allowed only for root blocks, which must be constructed
 // using the NewRootBlock constructor. All non-root blocks must be constructed
 // using NewBlock to ensure validation of the block fields.
 //
 //structwrite:immutable - mutations allowed only within the constructor
-type Block = GenericBlock[Payload]
+type UnsignedBlock = GenericBlock[Payload]
 
-// UntrustedBlock is an untrusted input-only representation of a Block,
+// UntrustedUnsignedBlock is an untrusted input-only representation of a UnsignedBlock,
 // used for construction.
 //
 // This type exists to ensure that constructor functions are invoked explicitly
 // with named fields, which improves clarity and reduces the risk of incorrect field
 // ordering during construction.
 //
-// An instance of UntrustedBlock should be validated and converted into
-// a trusted Block using the NewBlock constructor (or NewRootBlock
+// An instance of UntrustedUnsignedBlock should be validated and converted into
+// a trusted UnsignedBlock using the NewBlock constructor (or NewRootBlock
 // for the root block).
-type UntrustedBlock Block
+type UntrustedUnsignedBlock UnsignedBlock
 
 // NewBlock creates a new block.
 // This constructor enforces validation rules to ensure the block is well-formed.
 // It must be used to construct all non-root blocks.
 //
-// All errors indicate that a valid Block cannot be constructed from the input.
-func NewBlock(untrusted UntrustedBlock) (*Block, error) {
+// All errors indicate that a valid UnsignedBlock cannot be constructed from the input.
+func NewBlock(untrusted UntrustedUnsignedBlock) (*UnsignedBlock, error) {
 	// validate header body
 	headerBody, err := NewHeaderBody(UntrustedHeaderBody(untrusted.HeaderBody))
 	if err != nil {
@@ -105,7 +105,7 @@ func NewBlock(untrusted UntrustedBlock) (*Block, error) {
 		return nil, fmt.Errorf("invalid payload: %w", err)
 	}
 
-	return &Block{
+	return &UnsignedBlock{
 		HeaderBody: *headerBody,
 		Payload:    *payload,
 	}, nil
@@ -114,7 +114,7 @@ func NewBlock(untrusted UntrustedBlock) (*Block, error) {
 // NewRootBlock creates a root block.
 // This constructor must be used **only** for constructing the root block,
 // which is the only case where zero values are allowed.
-func NewRootBlock(untrusted UntrustedBlock) (*Block, error) {
+func NewRootBlock(untrusted UntrustedUnsignedBlock) (*UnsignedBlock, error) {
 	rootHeaderBody, err := NewRootHeaderBody(UntrustedHeaderBody(untrusted.HeaderBody))
 	if err != nil {
 		return nil, fmt.Errorf("invalid root header body: %w", err)
@@ -126,7 +126,7 @@ func NewRootBlock(untrusted UntrustedBlock) (*Block, error) {
 		return nil, fmt.Errorf("invalid payload: %w", err)
 	}
 
-	return &Block{
+	return &UnsignedBlock{
 		HeaderBody: *rootHeaderBody,
 		Payload:    *payload,
 	}, nil
@@ -153,7 +153,7 @@ func (s BlockStatus) String() string {
 //
 //structwrite:immutable - mutations allowed only within the constructor
 type Proposal struct {
-	Block           Block
+	Block           UnsignedBlock
 	ProposerSigData []byte
 }
 
@@ -175,7 +175,7 @@ type UntrustedProposal Proposal
 //
 // All errors indicate that a valid Proposal cannot be constructed from the input.
 func NewProposal(untrusted UntrustedProposal) (*Proposal, error) {
-	block, err := NewBlock(UntrustedBlock(untrusted.Block))
+	block, err := NewBlock(UntrustedUnsignedBlock(untrusted.Block))
 	if err != nil {
 		return nil, fmt.Errorf("invalid block: %w", err)
 	}
@@ -193,7 +193,7 @@ func NewProposal(untrusted UntrustedProposal) (*Proposal, error) {
 // This constructor must be used **only** for constructing the root proposal,
 // which is the only case where zero values are allowed.
 func NewRootProposal(untrusted UntrustedProposal) (*Proposal, error) {
-	block, err := NewRootBlock(UntrustedBlock(untrusted.Block))
+	block, err := NewRootBlock(UntrustedUnsignedBlock(untrusted.Block))
 	if err != nil {
 		return nil, fmt.Errorf("invalid root block: %w", err)
 	}
@@ -217,7 +217,7 @@ func (b *Proposal) ProposalHeader() *ProposalHeader {
 // CertifiedBlock holds a certified block, which is a block and a Quorum Certificate [QC] pointing
 // to the block. A QC is the aggregated form of votes from a supermajority of HotStuff and therefore
 // proves validity of the block. A certified block satisfies:
-// Block.View == QC.View and Block.BlockID == QC.BlockID
+// UnsignedBlock.View == QC.View and UnsignedBlock.BlockID == QC.BlockID
 //
 // Conceptually, blocks must always be signed by the proposer. Once a block is certified, the
 // proposer's signature is included in the QC and does not need to be provided individually anymore.
@@ -236,7 +236,7 @@ type CertifiedBlock struct {
 // NewCertifiedBlock constructs a new certified block. It checks the consistency
 // requirements and errors otherwise:
 //
-//	Block.View == QC.View and Block.BlockID == QC.BlockID
+//	UnsignedBlock.View == QC.View and UnsignedBlock.BlockID == QC.BlockID
 func NewCertifiedBlock(proposal *Proposal, qc *QuorumCertificate) (CertifiedBlock, error) {
 	if proposal.Block.View != qc.View {
 		return CertifiedBlock{}, fmt.Errorf("block's view (%d) should equal the qc's view (%d)", proposal.Block.View, qc.View)

@@ -352,7 +352,7 @@ func TestHandler_COA(t *testing.T) {
 				events := backend.Events()
 				require.Len(t, events, 3)
 
-				// Block level expected values
+				// UnsignedBlock level expected values
 				txHashes := make(types.TransactionHashes, 0)
 				totalGasUsed := uint64(0)
 

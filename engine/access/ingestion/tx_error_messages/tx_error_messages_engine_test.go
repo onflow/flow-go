@@ -50,8 +50,8 @@ type TxErrorMessagesEngineSuite struct {
 	execClient  *accessmock.ExecutionAPIClient
 	connFactory *connectionmock.ConnectionFactory
 
-	blockMap    map[uint64]*flow.Block
-	rootBlock   *flow.Block
+	blockMap    map[uint64]*flow.UnsignedBlock
+	rootBlock   *flow.UnsignedBlock
 	sealedBlock *flow.Header
 
 	db    *badger.DB
@@ -88,7 +88,7 @@ func (s *TxErrorMessagesEngineSuite) SetupTest() {
 	s.txErrorMessages = storage.NewTransactionResultErrorMessages(s.T())
 
 	blockCount := 5
-	s.blockMap = make(map[uint64]*flow.Block, blockCount)
+	s.blockMap = make(map[uint64]*flow.UnsignedBlock, blockCount)
 	s.rootBlock = unittest.Block.Genesis(flow.Emulator)
 	parent := s.rootBlock.ToHeader()
 
@@ -104,7 +104,7 @@ func (s *TxErrorMessagesEngineSuite) SetupTest() {
 	s.headers.On("ByHeight", mock.AnythingOfType("uint64")).Return(
 		mocks.ConvertStorageOutput(
 			mocks.StorageMapGetter(s.blockMap),
-			func(block *flow.Block) *flow.Header { return block.ToHeader() },
+			func(block *flow.UnsignedBlock) *flow.Header { return block.ToHeader() },
 		),
 	).Maybe()
 

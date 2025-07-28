@@ -28,7 +28,7 @@ import (
 // Instead, the FollowerState relies on the consensus nodes to run the full
 // payload check and uses quorum certificates to prove validity of block payloads.
 // Consequently, a block B should only be considered valid, if
-// there is a certifying QC for that block QC.View == Block.View && QC.BlockID == Block.ID().
+// there is a certifying QC for that block QC.View == UnsignedBlock.View && QC.BlockID == UnsignedBlock.ID().
 //
 // The FollowerState allows non-consensus nodes to execute fork-aware queries
 // against the protocol state, while minimizing the amount of payload checks
@@ -459,7 +459,7 @@ func (m *ParticipantState) checkOutdatedExtension(header flow.HeaderBody) error 
 // duplicated collections (also including ancestor blocks).
 // Expected errors during normal operations:
 //   - state.InvalidExtensionError if the candidate block contains invalid collection guarantees
-func (m *ParticipantState) guaranteeExtend(ctx context.Context, candidate *flow.Block) error {
+func (m *ParticipantState) guaranteeExtend(ctx context.Context, candidate *flow.UnsignedBlock) error {
 	span, _ := m.tracer.StartSpanFromContext(ctx, trace.ProtoStateMutatorExtendCheckGuarantees)
 	defer span.End()
 
@@ -541,7 +541,7 @@ func (m *ParticipantState) guaranteeExtend(ctx context.Context, candidate *flow.
 // operation for indexing the latest seal as of the candidate block and returns the latest seal.
 // Expected errors during normal operations:
 //   - state.InvalidExtensionError if the candidate block has invalid seals
-func (m *ParticipantState) sealExtend(ctx context.Context, candidate *flow.Block, deferredDbOps *transaction.DeferredDbOps) (*flow.Seal, error) {
+func (m *ParticipantState) sealExtend(ctx context.Context, candidate *flow.UnsignedBlock, deferredDbOps *transaction.DeferredDbOps) (*flow.Seal, error) {
 	span, _ := m.tracer.StartSpanFromContext(ctx, trace.ProtoStateMutatorExtendCheckSeals)
 	defer span.End()
 
@@ -564,7 +564,7 @@ func (m *ParticipantState) sealExtend(ctx context.Context, candidate *flow.Block
 //
 // Expected errors during normal operations:
 //   - state.InvalidExtensionError if the candidate block contains invalid receipts
-func (m *ParticipantState) receiptExtend(ctx context.Context, candidate *flow.Block) error {
+func (m *ParticipantState) receiptExtend(ctx context.Context, candidate *flow.UnsignedBlock) error {
 	span, _ := m.tracer.StartSpanFromContext(ctx, trace.ProtoStateMutatorExtendCheckReceipts)
 	defer span.End()
 
@@ -593,7 +593,7 @@ func (m *ParticipantState) receiptExtend(ctx context.Context, candidate *flow.Bl
 // Now, if block 101 is extending block 100, and its payload has a seal for 96, then it will
 // be the last sealed for block 101.
 // No errors are expected during normal operation.
-func (m *FollowerState) lastSealed(candidate *flow.Block, deferredDbOps *transaction.DeferredDbOps) (latestSeal *flow.Seal, err error) {
+func (m *FollowerState) lastSealed(candidate *flow.UnsignedBlock, deferredDbOps *transaction.DeferredDbOps) (latestSeal *flow.Seal, err error) {
 	payload := candidate.Payload
 	blockID := candidate.ID()
 
@@ -632,7 +632,7 @@ func (m *FollowerState) lastSealed(candidate *flow.Block, deferredDbOps *transac
 // Expected errors during normal operations:
 //   - state.InvalidExtensionError if the Protocol State commitment in the candidate block does
 //     not match the Protocol State we constructed locally
-func (m *FollowerState) evolveProtocolState(ctx context.Context, candidate *flow.Block, deferredDbOps *transaction.DeferredDbOps) error {
+func (m *FollowerState) evolveProtocolState(ctx context.Context, candidate *flow.UnsignedBlock, deferredDbOps *transaction.DeferredDbOps) error {
 	span, _ := m.tracer.StartSpanFromContext(ctx, trace.ProtoStateMutatorEvolveProtocolState)
 	defer span.End()
 
@@ -928,7 +928,7 @@ func (m *FollowerState) epochMetricsAndEventsOnBlockFinalized(parentEpochState, 
 // The version beacons will be returned in the ascending height order of the seals.
 // Technically only the last VersionBeacon is relevant.
 func (m *FollowerState) versionBeaconOnBlockFinalized(
-	finalized *flow.Block,
+	finalized *flow.UnsignedBlock,
 ) ([]*flow.SealedVersionBeacon, error) {
 	var versionBeacons []*flow.SealedVersionBeacon
 

@@ -14,7 +14,7 @@ import (
 
 // FinalizedProtocolStateWithParticipants returns a protocol state with finalized participants
 func FinalizedProtocolStateWithParticipants(participants flow.IdentityList) (
-	*flow.Block, *mockprotocol.Snapshot, *mockprotocol.State, *mockprotocol.Snapshot) {
+	*flow.UnsignedBlock, *mockprotocol.Snapshot, *mockprotocol.State, *mockprotocol.Snapshot) {
 	sealed := BlockFixture()
 	block := BlockWithParentFixture(sealed.ToHeader())
 	head := block.ToHeader()
@@ -73,7 +73,7 @@ func FinalizedProtocolStateWithParticipants(participants flow.IdentityList) (
 // a receipt for the block (BR), the second (BS) containing a seal for the block.
 // B <- BR(Result_B) <- BS(Seal_B)
 // Returns the two generated blocks.
-func SealBlock(t *testing.T, st protocol.ParticipantState, mutableProtocolState protocol.MutableProtocolState, block *flow.Block, receipt *flow.ExecutionReceipt, seal *flow.Seal) (br *flow.Block, bs *flow.Block) {
+func SealBlock(t *testing.T, st protocol.ParticipantState, mutableProtocolState protocol.MutableProtocolState, block *flow.UnsignedBlock, receipt *flow.ExecutionReceipt, seal *flow.Seal) (br *flow.UnsignedBlock, bs *flow.UnsignedBlock) {
 	block2 := BlockWithParentAndPayload(
 		block.ToHeader(),
 		flow.Payload{
@@ -107,7 +107,7 @@ func SealBlock(t *testing.T, st protocol.ParticipantState, mutableProtocolState 
 }
 
 // InsertAndFinalize inserts, then finalizes, the input block.
-func InsertAndFinalize(t *testing.T, st protocol.ParticipantState, block *flow.Block) {
+func InsertAndFinalize(t *testing.T, st protocol.ParticipantState, block *flow.UnsignedBlock) {
 	err := st.Extend(context.Background(), ProposalFromBlock(block))
 	require.NoError(t, err)
 	err = st.Finalize(context.Background(), block.ID())

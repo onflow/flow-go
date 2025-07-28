@@ -45,10 +45,10 @@ func (m *MockEmulatorStorage) EXPECT() *MockEmulatorStorageMockRecorder {
 }
 
 // BlockByHeight mocks base method.
-func (m *MockEmulatorStorage) BlockByHeight(ctx context.Context, height uint64) (*flow.Block, error) {
+func (m *MockEmulatorStorage) BlockByHeight(ctx context.Context, height uint64) (*flow.UnsignedBlock, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "BlockByHeight", ctx, height)
-	ret0, _ := ret[0].(*flow.Block)
+	ret0, _ := ret[0].(*flow.UnsignedBlock)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -60,10 +60,10 @@ func (mr *MockEmulatorStorageMockRecorder) BlockByHeight(ctx, height any) *gomoc
 }
 
 // BlockByID mocks base method.
-func (m *MockEmulatorStorage) BlockByID(ctx context.Context, blockID flow.Identifier) (*flow.Block, error) {
+func (m *MockEmulatorStorage) BlockByID(ctx context.Context, blockID flow.Identifier) (*flow.UnsignedBlock, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "BlockByID", ctx, blockID)
-	ret0, _ := ret[0].(*flow.Block)
+	ret0, _ := ret[0].(*flow.UnsignedBlock)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -105,7 +105,7 @@ func (mr *MockEmulatorStorageMockRecorder) CollectionByID(ctx, collectionID any)
 }
 
 // CommitBlock mocks base method.
-func (m *MockEmulatorStorage) CommitBlock(ctx context.Context, block flow.Block, collections []*flow.LightCollection, transactions map[flow.Identifier]*flow.TransactionBody, transactionResults map[flow.Identifier]*emulator.StorableTransactionResult, executionSnapshot *snapshot.ExecutionSnapshot, events []flow.Event) error {
+func (m *MockEmulatorStorage) CommitBlock(ctx context.Context, block flow.UnsignedBlock, collections []*flow.LightCollection, transactions map[flow.Identifier]*flow.TransactionBody, transactionResults map[flow.Identifier]*emulator.StorableTransactionResult, executionSnapshot *snapshot.ExecutionSnapshot, events []flow.Event) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "CommitBlock", ctx, block, collections, transactions, transactionResults, executionSnapshot, events)
 	ret0, _ := ret[0].(error)
@@ -194,10 +194,10 @@ func (mr *MockEmulatorStorageMockRecorder) IndexedHeight() *gomock.Call {
 }
 
 // LatestBlock mocks base method.
-func (m *MockEmulatorStorage) LatestBlock(ctx context.Context) (flow.Block, error) {
+func (m *MockEmulatorStorage) LatestBlock(ctx context.Context) (flow.UnsignedBlock, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "LatestBlock", ctx)
-	ret0, _ := ret[0].(flow.Block)
+	ret0, _ := ret[0].(flow.UnsignedBlock)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -280,7 +280,7 @@ func (mr *MockEmulatorStorageMockRecorder) Stop() *gomock.Call {
 }
 
 // StoreBlock mocks base method.
-func (m *MockEmulatorStorage) StoreBlock(ctx context.Context, block *flow.Block) error {
+func (m *MockEmulatorStorage) StoreBlock(ctx context.Context, block *flow.UnsignedBlock) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "StoreBlock", ctx, block)
 	ret0, _ := ret[0].(error)

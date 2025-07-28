@@ -22,7 +22,7 @@ func configureLedger(
 	vm *fvm.VirtualMachine,
 	ctx fvm.Context,
 ) (
-	*flowgo.Block,
+	*flowgo.UnsignedBlock,
 	snapshot.StorageSnapshot,
 	error,
 ) {

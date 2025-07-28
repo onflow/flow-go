@@ -83,7 +83,7 @@ func generateVote(c *cobra.Command, args []string) {
 		log.Fatal().Err(err).Msg("could not read root block file")
 	}
 
-	var rootBlock flow.Block
+	var rootBlock flow.UnsignedBlock
 	err = json.Unmarshal(data, &rootBlock)
 	if err != nil {
 		log.Fatal().Err(err).Msg("could not unmarshal root block data")

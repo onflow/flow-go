@@ -193,7 +193,7 @@ func NewBlockProvider(backend access.API, options ...blockProviderOption) *block
 	return blkProvider
 }
 
-func (blkProvider *blockProvider) getBlock(ctx context.Context) (*flow.Block, flow.BlockStatus, error) {
+func (blkProvider *blockProvider) getBlock(ctx context.Context) (*flow.UnsignedBlock, flow.BlockStatus, error) {
 	if blkProvider.id != nil {
 		blk, _, err := blkProvider.backend.GetBlockByID(ctx, *blkProvider.id)
 		if err != nil { // unfortunately backend returns internal error status if not found

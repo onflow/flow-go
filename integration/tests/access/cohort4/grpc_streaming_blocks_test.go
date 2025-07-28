@@ -202,8 +202,8 @@ func (s *GrpcBlocksStreamSuite) TestHappyPath() {
 //   - rpcCallName: The name of the rpc subscription call which is testing.
 //   - txCount: A pointer to an integer that tracks the number of transactions received from the node.
 func (s *GrpcBlocksStreamSuite) addObserverBlock(
-	block *flow.Block,
-	responseTracker *ResponseTracker[*flow.Block],
+	block *flow.UnsignedBlock,
+	responseTracker *ResponseTracker[*flow.UnsignedBlock],
 	rpcCallName string,
 	txCount *int,
 ) {
@@ -220,11 +220,11 @@ func (s *GrpcBlocksStreamSuite) addObserverBlock(
 	*txCount++
 }
 
-func blockResponseHandler(msg *accessproto.SubscribeBlocksResponse) (*flow.Block, error) {
+func blockResponseHandler(msg *accessproto.SubscribeBlocksResponse) (*flow.UnsignedBlock, error) {
 	return convert.MessageToBlock(msg.GetBlock())
 }
 
-func compareBlocksResponse(t *testing.T, responses map[uint64]map[string]*flow.Block, blockHeight uint64) error {
+func compareBlocksResponse(t *testing.T, responses map[uint64]map[string]*flow.UnsignedBlock, blockHeight uint64) error {
 	accessData := responses[blockHeight]["access"]
 	observerData := responses[blockHeight]["observer"]
 
@@ -234,7 +234,7 @@ func compareBlocksResponse(t *testing.T, responses map[uint64]map[string]*flow.B
 	return nil
 }
 
-func compareBlocks(t *testing.T, accessBlock *flow.Block, observerBlock *flow.Block) {
+func compareBlocks(t *testing.T, accessBlock *flow.UnsignedBlock, observerBlock *flow.UnsignedBlock) {
 	require.Equal(t, accessBlock.ID(), observerBlock.ID())
 	require.Equal(t, accessBlock.Height, observerBlock.Height)
 	require.Equal(t, accessBlock.Timestamp, observerBlock.Timestamp)

@@ -91,7 +91,7 @@ func TestNewBlock(t *testing.T) {
 // 4. Invalid input with invalid Payload:
 //   - Ensures an error is returned when the Payload.ReferenceBlockID is not flow.ZeroID.
 func TestNewRootBlock(t *testing.T) {
-	// validRootBlockFixture returns a new valid root cluster.UntrustedBlock for use in tests.
+	// validRootBlockFixture returns a new valid root cluster.UntrustedUnsignedBlock for use in tests.
 	validRootBlockFixture := func() cluster.UntrustedBlock {
 		return cluster.UntrustedBlock{
 			HeaderBody: flow.HeaderBody{

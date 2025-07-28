@@ -48,14 +48,14 @@ func MockBlockTimer() protocol.BlockTimer {
 func MockSealValidator(sealsDB storage.Seals) module.SealValidator {
 	validator := &modulemock.SealValidator{}
 	validator.On("Validate", mock.Anything).Return(
-		func(candidate *flow.Block) *flow.Seal {
+		func(candidate *flow.UnsignedBlock) *flow.Seal {
 			if len(candidate.Payload.Seals) > 0 {
 				return candidate.Payload.Seals[0]
 			}
 			last, _ := sealsDB.HighestInFork(candidate.ParentID)
 			return last
 		},
-		func(candidate *flow.Block) error {
+		func(candidate *flow.UnsignedBlock) error {
 			if len(candidate.Payload.Seals) > 0 {
 				return nil
 			}

@@ -257,13 +257,13 @@ func (b *Blockchain) PendingBlockTimestamp() uint64 {
 }
 
 // GetLatestBlock gets the latest sealed block.
-func (b *Blockchain) GetLatestBlock() (*flowgo.Block, error) {
+func (b *Blockchain) GetLatestBlock() (*flowgo.UnsignedBlock, error) {
 	b.mu.RLock()
 	defer b.mu.RUnlock()
 	return b.getLatestBlock()
 }
 
-func (b *Blockchain) getLatestBlock() (*flowgo.Block, error) {
+func (b *Blockchain) getLatestBlock() (*flowgo.UnsignedBlock, error) {
 	block, err := b.storage.LatestBlock(context.Background())
 	if err != nil {
 		return nil, err
@@ -273,13 +273,13 @@ func (b *Blockchain) getLatestBlock() (*flowgo.Block, error) {
 }
 
 // GetBlockByID gets a block by ID.
-func (b *Blockchain) GetBlockByID(id flowgo.Identifier) (*flowgo.Block, error) {
+func (b *Blockchain) GetBlockByID(id flowgo.Identifier) (*flowgo.UnsignedBlock, error) {
 	b.mu.RLock()
 	defer b.mu.RUnlock()
 	return b.getBlockByID(id)
 }
 
-func (b *Blockchain) getBlockByID(id flowgo.Identifier) (*flowgo.Block, error) {
+func (b *Blockchain) getBlockByID(id flowgo.Identifier) (*flowgo.UnsignedBlock, error) {
 	block, err := b.storage.BlockByID(context.Background(), id)
 	if err != nil {
 		if errors.Is(err, ErrNotFound) {
@@ -293,7 +293,7 @@ func (b *Blockchain) getBlockByID(id flowgo.Identifier) (*flowgo.Block, error) {
 }
 
 // GetBlockByHeight gets a block by height.
-func (b *Blockchain) GetBlockByHeight(height uint64) (*flowgo.Block, error) {
+func (b *Blockchain) GetBlockByHeight(height uint64) (*flowgo.UnsignedBlock, error) {
 	b.mu.RLock()
 	defer b.mu.RUnlock()
 
@@ -305,7 +305,7 @@ func (b *Blockchain) GetBlockByHeight(height uint64) (*flowgo.Block, error) {
 	return block, nil
 }
 
-func (b *Blockchain) getBlockByHeight(height uint64) (*flowgo.Block, error) {
+func (b *Blockchain) getBlockByHeight(height uint64) (*flowgo.UnsignedBlock, error) {
 	block, err := b.storage.BlockByHeight(context.Background(), height)
 	if err != nil {
 		if errors.Is(err, ErrNotFound) {
@@ -678,7 +678,7 @@ func (b *Blockchain) executeNextTransaction(ctx fvm.Context) (*TransactionResult
 // CommitBlock seals the current pending block and saves it to storage.
 //
 // This function clears the pending transaction pool and resets the pending block.
-func (b *Blockchain) CommitBlock() (*flowgo.Block, error) {
+func (b *Blockchain) CommitBlock() (*flowgo.UnsignedBlock, error) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 
@@ -690,7 +690,7 @@ func (b *Blockchain) CommitBlock() (*flowgo.Block, error) {
 	return block, nil
 }
 
-func (b *Blockchain) commitBlock() (*flowgo.Block, error) {
+func (b *Blockchain) commitBlock() (*flowgo.UnsignedBlock, error) {
 	// pending block cannot be committed before execution starts (unless empty)
 	if !b.pendingBlock.ExecutionStarted() && !b.pendingBlock.Empty() {
 		return nil, &PendingBlockCommitBeforeExecutionError{BlockID: b.pendingBlock.Block().ID()}
@@ -750,7 +750,7 @@ func (b *Blockchain) commitBlock() (*flowgo.Block, error) {
 }
 
 // ExecuteAndCommitBlock is a utility that combines ExecuteBlock with CommitBlock.
-func (b *Blockchain) ExecuteAndCommitBlock() (*flowgo.Block, []*TransactionResult, error) {
+func (b *Blockchain) ExecuteAndCommitBlock() (*flowgo.UnsignedBlock, []*TransactionResult, error) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 
@@ -758,7 +758,7 @@ func (b *Blockchain) ExecuteAndCommitBlock() (*flowgo.Block, []*TransactionResul
 }
 
 // ExecuteAndCommitBlock is a utility that combines ExecuteBlock with CommitBlock.
-func (b *Blockchain) executeAndCommitBlock() (*flowgo.Block, []*TransactionResult, error) {
+func (b *Blockchain) executeAndCommitBlock() (*flowgo.UnsignedBlock, []*TransactionResult, error) {
 
 	results, err := b.executeBlock()
 	if err != nil {
@@ -774,7 +774,7 @@ func (b *Blockchain) executeAndCommitBlock() (*flowgo.Block, []*TransactionResul
 	b.conf.ServerLogger.Debug().Fields(map[string]any{
 		"blockHeight": block.Height,
 		"blockID":     hex.EncodeToString(blockID[:]),
-	}).Msgf("📦 Block #%d committed", block.Height)
+	}).Msgf("📦 UnsignedBlock #%d committed", block.Height)
 
 	return block, results, nil
 }

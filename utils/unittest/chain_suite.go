@@ -30,12 +30,12 @@ type BaseChainSuite struct {
 	Approvers  flow.IdentityList
 
 	// BLOCKS
-	RootBlock             *flow.Block
-	LatestSealedBlock     flow.Block
-	LatestFinalizedBlock  *flow.Block
-	UnfinalizedBlock      flow.Block
+	RootBlock             *flow.UnsignedBlock
+	LatestSealedBlock     flow.UnsignedBlock
+	LatestFinalizedBlock  *flow.UnsignedBlock
+	UnfinalizedBlock      flow.UnsignedBlock
 	LatestExecutionResult *flow.ExecutionResult
-	Blocks                map[flow.Identifier]*flow.Block
+	Blocks                map[flow.Identifier]*flow.UnsignedBlock
 
 	// PROTOCOL STATE
 	State          *protocol.State
@@ -104,7 +104,7 @@ func (bc *BaseChainSuite) SetupChain() {
 	bc.LatestFinalizedBlock = latestFinalizedBlock
 	bc.UnfinalizedBlock = *BlockWithParentFixture(bc.LatestFinalizedBlock.ToHeader())
 
-	bc.Blocks = make(map[flow.Identifier]*flow.Block)
+	bc.Blocks = make(map[flow.Identifier]*flow.UnsignedBlock)
 	bc.Blocks[bc.RootBlock.ID()] = bc.RootBlock
 	bc.Blocks[bc.LatestSealedBlock.ID()] = &bc.LatestSealedBlock
 	bc.Blocks[bc.LatestFinalizedBlock.ID()] = bc.LatestFinalizedBlock
@@ -183,7 +183,7 @@ func (bc *BaseChainSuite) SetupChain() {
 		nil,
 	)
 
-	findBlockByHeight := func(blocks map[flow.Identifier]*flow.Block, height uint64) (*flow.Block, bool) {
+	findBlockByHeight := func(blocks map[flow.Identifier]*flow.UnsignedBlock, height uint64) (*flow.UnsignedBlock, bool) {
 		for _, block := range blocks {
 			if block.Height == height {
 				return block, true
@@ -455,7 +455,7 @@ func ApprovalFor(result *flow.ExecutionResult, chunkIdx uint64, approverID flow.
 
 // subgraphFixture represents a subgraph of the blockchain:
 //
-//	Result   -----------------------------------> Block
+//	Result   -----------------------------------> UnsignedBlock
 //	  |                                             |
 //	  |                                             v
 //	  |                                           ParentBlock
@@ -466,8 +466,8 @@ func ApprovalFor(result *flow.ExecutionResult, chunkIdx uint64, approverID flow.
 //   - valid:   PreviousResult.BlockID == ParentBlock.ID()
 //   - invalid: PreviousResult.BlockID != ParentBlock.ID()
 type subgraphFixture struct {
-	Block              *flow.Block
-	ParentBlock        *flow.Block
+	Block              *flow.UnsignedBlock
+	ParentBlock        *flow.UnsignedBlock
 	Result             *flow.ExecutionResult
 	PreviousResult     *flow.ExecutionResult
 	IncorporatedResult *flow.IncorporatedResult
@@ -533,7 +533,7 @@ func (bc *BaseChainSuite) ValidSubgraphFixture() subgraphFixture {
 	}
 }
 
-func (bc *BaseChainSuite) Extend(block *flow.Block) {
+func (bc *BaseChainSuite) Extend(block *flow.UnsignedBlock) {
 	blockID := block.ID()
 	bc.Blocks[blockID] = block
 	if seal, ok := bc.SealsIndex[block.ParentID]; ok {

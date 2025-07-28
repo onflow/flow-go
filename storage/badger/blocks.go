@@ -42,8 +42,8 @@ func (b *Blocks) StoreTx(proposal *flow.Proposal) func(*transaction.Tx) error {
 	}
 }
 
-func (b *Blocks) retrieveTx(blockID flow.Identifier) func(*badger.Txn) (*flow.Block, error) {
-	return func(tx *badger.Txn) (*flow.Block, error) {
+func (b *Blocks) retrieveTx(blockID flow.Identifier) func(*badger.Txn) (*flow.UnsignedBlock, error) {
+	return func(tx *badger.Txn) (*flow.UnsignedBlock, error) {
 		header, err := b.headers.retrieveTx(blockID)(tx)
 		if err != nil {
 			return nil, fmt.Errorf("could not retrieve header: %w", err)
@@ -53,11 +53,11 @@ func (b *Blocks) retrieveTx(blockID flow.Identifier) func(*badger.Txn) (*flow.Bl
 			return nil, fmt.Errorf("could not retrieve payload: %w", err)
 		}
 
-		untrustedBlock := flow.UntrustedBlock{
+		untrustedBlock := flow.UntrustedUnsignedBlock{
 			HeaderBody: header.HeaderBody,
 			Payload:    *payload,
 		}
-		var block *flow.Block
+		var block *flow.UnsignedBlock
 		if header.ContainsParentQC() {
 			block, err = flow.NewBlock(untrustedBlock)
 			if err != nil {
@@ -112,7 +112,7 @@ func (b *Blocks) Store(proposal *flow.Proposal) error {
 }
 
 // ByID ...
-func (b *Blocks) ByID(blockID flow.Identifier) (*flow.Block, error) {
+func (b *Blocks) ByID(blockID flow.Identifier) (*flow.UnsignedBlock, error) {
 	tx := b.db.NewTransaction(false)
 	defer tx.Discard()
 	return b.retrieveTx(blockID)(tx)
@@ -128,7 +128,7 @@ func (b *Blocks) ProposalByID(blockID flow.Identifier) (*flow.Proposal, error) {
 //
 // Expected errors during normal operations:
 // - storage.ErrNotFound if no block is found for the given height
-func (b *Blocks) ByHeight(height uint64) (*flow.Block, error) {
+func (b *Blocks) ByHeight(height uint64) (*flow.UnsignedBlock, error) {
 	tx := b.db.NewTransaction(false)
 	defer tx.Discard()
 
@@ -151,7 +151,7 @@ func (b *Blocks) ProposalByHeight(height uint64) (*flow.Proposal, error) {
 }
 
 // ByCollectionID ...
-func (b *Blocks) ByCollectionID(collID flow.Identifier) (*flow.Block, error) {
+func (b *Blocks) ByCollectionID(collID flow.Identifier) (*flow.UnsignedBlock, error) {
 	var blockID flow.Identifier
 	guarantee, err := b.payloads.guarantees.ByCollectionID(collID)
 	if err != nil {

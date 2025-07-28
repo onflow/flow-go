@@ -37,7 +37,7 @@ type Blocks interface {
 	//   - storage.ErrNotFound if no block with the corresponding ID was found
 	//   - generic error in case of unexpected failure from the database layer, or failure
 	//     to decode an existing database value
-	ByID(blockID flow.Identifier) (*flow.Block, error)
+	ByID(blockID flow.Identifier) (*flow.UnsignedBlock, error)
 
 	// ProposalByID returns the block with the given ID, along with the proposer's signature on it.
 	// It is available for all incorporated blocks (validated blocks that have been appended to any
@@ -56,7 +56,7 @@ type Blocks interface {
 	//   - storage.ErrNotFound if no block for the corresponding height was found
 	//   - generic error in case of unexpected failure from the database layer, or failure
 	//     to decode an existing database value
-	ByHeight(height uint64) (*flow.Block, error)
+	ByHeight(height uint64) (*flow.UnsignedBlock, error)
 
 	// ProposalByHeight returns the block at the given height, along with the proposer's
 	// signature on it. It is only available for finalized blocks.
@@ -78,7 +78,7 @@ type Blocks interface {
 	//   - storage.ErrNotFound if the collection ID was not found
 	//   - generic error in case of unexpected failure from the database layer, or failure
 	//     to decode an existing database value
-	ByCollectionID(collID flow.Identifier) (*flow.Block, error)
+	ByCollectionID(collID flow.Identifier) (*flow.UnsignedBlock, error)
 
 	// IndexBlockForCollectionGuarantees is only to be called for *finalized* blocks. For each
 	// collection ID, it stores the blockID as the block containing this collection.

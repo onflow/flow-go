@@ -36,7 +36,7 @@ func (r FinalizedBlockReader) AtIndex(index uint64) (module.Job, error) {
 }
 
 // blockByHeight returns the block at the given height.
-func (r FinalizedBlockReader) blockByHeight(height uint64) (*flow.Block, error) {
+func (r FinalizedBlockReader) blockByHeight(height uint64) (*flow.UnsignedBlock, error) {
 	block, err := r.blocks.ByHeight(height)
 	if err != nil {
 		return nil, fmt.Errorf("could not get block by height %d: %w", height, err)

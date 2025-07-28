@@ -19,7 +19,7 @@ import (
 //   - Verifies that a properly populated UntrustedClusterProposal results in a valid cluster.Proposal.
 //
 // 2. Invalid input with invalid cluster.Block:
-//   - Ensures an error is returned when the Block.ParentID is zero.
+//   - Ensures an error is returned when the UnsignedBlock.ParentID is zero.
 //
 // 3. Invalid input with nil ProposerSigData:
 //   - Ensures an error is returned when the ProposerSigData is nil.

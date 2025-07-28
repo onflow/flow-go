@@ -33,9 +33,9 @@ type BlocksProviderSuite struct {
 	log zerolog.Logger
 	api *accessmock.API
 
-	blocks []*flow.Block
+	blocks []*flow.UnsignedBlock
 
-	rootBlock      *flow.Block
+	rootBlock      *flow.UnsignedBlock
 	finalizedBlock *flow.Header
 
 	factory       *DataProviderFactoryImpl
@@ -52,7 +52,7 @@ func (s *BlocksProviderSuite) SetupTest() {
 	s.linkGenerator = mockcommonmodels.NewLinkGenerator(s.T())
 
 	blockCount := 5
-	s.blocks = make([]*flow.Block, 0, blockCount)
+	s.blocks = make([]*flow.UnsignedBlock, 0, blockCount)
 	s.rootBlock = unittest.Block.Genesis(flow.Emulator)
 	parent := s.rootBlock.ToHeader()
 
@@ -192,7 +192,7 @@ func (s *BlocksProviderSuite) requireBlock(actual interface{}, expected interfac
 
 // expectedBlockResponses generates a list of expected block responses for the given blocks.
 func (s *BlocksProviderSuite) expectedBlockResponses(
-	blocks []*flow.Block,
+	blocks []*flow.UnsignedBlock,
 	expand map[string]bool,
 	status flow.BlockStatus,
 ) []interface{} {

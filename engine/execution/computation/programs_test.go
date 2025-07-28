@@ -175,7 +175,7 @@ func TestPrograms_TestContractUpdates(t *testing.T) {
 }
 
 type blockProvider struct {
-	blocks map[uint64]*flow.Block
+	blocks map[uint64]*flow.UnsignedBlock
 }
 
 func (b blockProvider) ByHeightFrom(height uint64, _ *flow.Header) (*flow.Header, error) {
@@ -208,7 +208,7 @@ func TestPrograms_TestBlockForks(t *testing.T) {
 	execCtx := fvm.NewContext(
 		fvm.WithEVMEnabled(true),
 		fvm.WithBlockHeader(block.ToHeader()),
-		fvm.WithBlocks(blockProvider{map[uint64]*flow.Block{0: block}}),
+		fvm.WithBlocks(blockProvider{map[uint64]*flow.UnsignedBlock{0: block}}),
 		fvm.WithChain(chain))
 	privateKeys, err := testutil.GenerateAccountPrivateKeys(1)
 	require.NoError(t, err)
@@ -265,14 +265,14 @@ func TestPrograms_TestBlockForks(t *testing.T) {
 		res *execution.ComputationResult
 
 		block1, block11, block111, block112, block1121,
-		block1111, block12, block121, block1211 *flow.Block
+		block1111, block12, block121, block1211 *flow.UnsignedBlock
 
 		block1Snapshot, block11Snapshot, block111Snapshot, block112Snapshot,
 		block12Snapshot, block121Snapshot snapshot.SnapshotTree
 	)
 
 	t.Run("executing block1 (no collection)", func(t *testing.T) {
-		block1 = &flow.Block{
+		block1 = &flow.UnsignedBlock{
 			HeaderBody: flow.HeaderBody{
 				View:      1,
 				ChainID:   flow.Emulator,
@@ -485,11 +485,11 @@ func TestPrograms_TestBlockForks(t *testing.T) {
 func createTestBlockAndRun(
 	t *testing.T,
 	engine *Manager,
-	parentBlock *flow.Block,
+	parentBlock *flow.UnsignedBlock,
 	col flow.Collection,
 	snapshotTree snapshot.SnapshotTree,
 ) (
-	*flow.Block,
+	*flow.UnsignedBlock,
 	*execution.ComputationResult,
 	snapshot.SnapshotTree,
 ) {

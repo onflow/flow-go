@@ -42,8 +42,8 @@ type TxErrorMessagesCoreSuite struct {
 	execClient  *accessmock.ExecutionAPIClient
 	connFactory *connectionmock.ConnectionFactory
 
-	blockMap       map[uint64]*flow.Block
-	rootBlock      *flow.Block
+	blockMap       map[uint64]*flow.UnsignedBlock
+	rootBlock      *flow.UnsignedBlock
 	finalizedBlock *flow.Header
 
 	ctx    context.Context
@@ -304,7 +304,7 @@ func mockTransactionResultsByBlock(count int) []flow.LightTransactionResult {
 
 // setupReceiptsForBlock sets up mock execution receipts for a block and returns the receipts along
 // with the identities of the execution nodes that processed them.
-func setupReceiptsForBlock(receipts *storage.ExecutionReceipts, block *flow.Block, eNodeID flow.Identifier) {
+func setupReceiptsForBlock(receipts *storage.ExecutionReceipts, block *flow.UnsignedBlock, eNodeID flow.Identifier) {
 	receipt1 := unittest.ReceiptForBlockFixture(block)
 	receipt1.ExecutorID = eNodeID
 	receipt2 := unittest.ReceiptForBlockFixture(block)

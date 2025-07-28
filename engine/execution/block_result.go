@@ -218,7 +218,7 @@ func (ar *BlockAttestationResult) ChunkAt(index int) (*flow.Chunk, error) {
 	if execRes.executionSnapshot == nil {
 		// This should never happen
 		// In case it does, attach additional information to the error message
-		panic(fmt.Sprintf("execution snapshot is nil. Block ID: %s, EndState: %s", ar.Block.ID(), attestRes.endStateCommit))
+		panic(fmt.Sprintf("execution snapshot is nil. UnsignedBlock ID: %s, EndState: %s", ar.Block.ID(), attestRes.endStateCommit))
 	}
 
 	// TODO(mainnet27, #6773): replace with flow.NewChunk https://github.com/onflow/flow-go/issues/6773

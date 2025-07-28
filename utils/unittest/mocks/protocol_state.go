@@ -21,12 +21,12 @@ import (
 type ProtocolState struct {
 	sync.Mutex
 	protocol.ParticipantState
-	blocks    map[flow.Identifier]*flow.Block
+	blocks    map[flow.Identifier]*flow.UnsignedBlock
 	children  map[flow.Identifier][]flow.Identifier
-	heights   map[uint64]*flow.Block
+	heights   map[uint64]*flow.UnsignedBlock
 	finalized uint64
 	sealed    uint64
-	root      *flow.Block
+	root      *flow.UnsignedBlock
 	result    *flow.ExecutionResult
 	seal      *flow.Seal
 }
@@ -35,9 +35,9 @@ var _ protocol.State = (*ProtocolState)(nil)
 
 func NewProtocolState() *ProtocolState {
 	return &ProtocolState{
-		blocks:   make(map[flow.Identifier]*flow.Block),
+		blocks:   make(map[flow.Identifier]*flow.UnsignedBlock),
 		children: make(map[flow.Identifier][]flow.Identifier),
-		heights:  make(map[uint64]*flow.Block),
+		heights:  make(map[uint64]*flow.UnsignedBlock),
 	}
 }
 
@@ -165,7 +165,7 @@ func pending(ps *ProtocolState, blockID flow.Identifier) []flow.Identifier {
 	return pendingIDs
 }
 
-func (m *ProtocolState) Bootstrap(root *flow.Block, result *flow.ExecutionResult, seal *flow.Seal) error {
+func (m *ProtocolState) Bootstrap(root *flow.UnsignedBlock, result *flow.ExecutionResult, seal *flow.Seal) error {
 	m.Lock()
 	defer m.Unlock()
 
@@ -182,7 +182,7 @@ func (m *ProtocolState) Bootstrap(root *flow.Block, result *flow.ExecutionResult
 	return nil
 }
 
-func (m *ProtocolState) Extend(block *flow.Block) error {
+func (m *ProtocolState) Extend(block *flow.UnsignedBlock) error {
 	m.Lock()
 	defer m.Unlock()
 

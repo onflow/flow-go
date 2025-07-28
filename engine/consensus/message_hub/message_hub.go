@@ -344,7 +344,7 @@ func (h *MessageHub) sendOwnProposal(proposal *flow.ProposalHeader) error {
 	// - proposer ID is conveyed over the network message
 	// - the payload hash is deduced from the payload
 	block, err := flow.NewBlock(
-		flow.UntrustedBlock{
+		flow.UntrustedUnsignedBlock{
 			HeaderBody: header.HeaderBody,
 			Payload:    *payload,
 		},

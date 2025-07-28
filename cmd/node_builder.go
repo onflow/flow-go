@@ -252,9 +252,9 @@ type StateExcerptAtBoot struct {
 	// 		FinalizedRootBlock and SealedRootBlock are the same block (special case of self-sealing block)
 	// For node bootstrapped with a root snapshot for a block above the first block of a spork (dynamically bootstrapped),
 	// 		FinalizedRootBlock.Height > SealedRootBlock.Height
-	FinalizedRootBlock  *flow.Block             // The last finalized block when bootstrapped.
-	SealedRootBlock     *flow.Block             // The last sealed block when bootstrapped.
-	RootQC              *flow.QuorumCertificate // QC for Finalized Root Block
+	FinalizedRootBlock  *flow.UnsignedBlock     // The last finalized block when bootstrapped.
+	SealedRootBlock     *flow.UnsignedBlock     // The last sealed block when bootstrapped.
+	RootQC              *flow.QuorumCertificate // QC for Finalized Root UnsignedBlock
 	RootResult          *flow.ExecutionResult   // Result for SealedRootBlock
 	RootSeal            *flow.Seal              // Seal for RootResult
 	RootChainID         flow.ChainID

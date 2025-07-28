@@ -87,7 +87,7 @@ func (s *CombinedVoteProcessorV2TestSuite) SetupTest() {
 	}
 }
 
-// TestInitialState tests that Block() and Status() return correct values after calling constructor
+// TestInitialState tests that UnsignedBlock() and Status() return correct values after calling constructor
 func (s *CombinedVoteProcessorV2TestSuite) TestInitialState() {
 	require.Equal(s.T(), s.proposal.Block, s.processor.Block())
 	require.Equal(s.T(), hotstuff.VoteCollectorStatusVerifying, s.processor.Status())

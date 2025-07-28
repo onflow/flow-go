@@ -391,7 +391,7 @@ func (s *SealValidationSuite) TestValidatePayload_SealsSkipBlock() {
 	receipts := unittest.ReceiptChainFor(blocks, resultB0)
 	var err error
 	blocks[3], err = flow.NewBlock(
-		flow.UntrustedBlock{
+		flow.UntrustedUnsignedBlock{
 			HeaderBody: blocks[3].HeaderBody,
 			Payload: unittest.PayloadFixture(
 				unittest.WithReceipts(receipts[0], receipts[1], receipts[2]),
@@ -478,7 +478,7 @@ func (s *SealValidationSuite) TestValidatePayload_SealsSkipBlock() {
 // In addition, we also run a valid test case to confirm the proper construction of the test
 func (s *SealValidationSuite) TestValidatePayload_ExecutionDisconnected() {
 
-	blocks := []*flow.Block{&s.LatestSealedBlock} // slice with elements  [S, A, B, C, D]
+	blocks := []*flow.UnsignedBlock{&s.LatestSealedBlock} // slice with elements  [S, A, B, C, D]
 	blocks = append(blocks, unittest.ChainFixtureFrom(4, s.LatestSealedBlock.ToHeader())...)
 	receiptChain1 := unittest.ReceiptChainFor(blocks, unittest.ExecutionResultFixture()) // elements  [Result[S]_1, Result[A]_1, Result[B]_1, ...]
 	receiptChain2 := unittest.ReceiptChainFor(blocks, unittest.ExecutionResultFixture()) // elements  [Result[S]_2, Result[A]_2, Result[B]_2, ...]
@@ -487,7 +487,7 @@ func (s *SealValidationSuite) TestValidatePayload_ExecutionDisconnected() {
 	for i := 1; i <= 3; i++ {
 		// set payload for blocks A, B, C
 		blocks[i], err = flow.NewBlock(
-			flow.UntrustedBlock{
+			flow.UntrustedUnsignedBlock{
 				HeaderBody: blocks[i].HeaderBody,
 				Payload: unittest.PayloadFixture(
 					unittest.WithReceipts(receiptChain1[i-1], receiptChain2[i-1]),
@@ -498,7 +498,7 @@ func (s *SealValidationSuite) TestValidatePayload_ExecutionDisconnected() {
 	}
 
 	blocks[4], err = flow.NewBlock(
-		flow.UntrustedBlock{
+		flow.UntrustedUnsignedBlock{
 			HeaderBody: blocks[4].HeaderBody,
 			Payload: unittest.PayloadFixture(
 				unittest.WithSeals(unittest.Seal.Fixture(unittest.Seal.WithResult(&receiptChain1[0].ExecutionResult))),
@@ -601,7 +601,7 @@ func (s *SealValidationSuite) TestExtendSealDuplicate() {
 	s.T().Run("Duplicate seal in same payload", func(t *testing.T) {
 		_, _, b3, _, sealB1 := s.generateBasicTestFork()
 		b3, err := flow.NewBlock(
-			flow.UntrustedBlock{
+			flow.UntrustedUnsignedBlock{
 				HeaderBody: b3.HeaderBody,
 				Payload: unittest.PayloadFixture(
 					unittest.WithSeals(sealB1, sealB1),
@@ -673,7 +673,7 @@ func (s *SealValidationSuite) TestExtendSeal_DifferentIncorporatedResult() {
 	)
 	seal := unittest.Seal.Fixture(unittest.Seal.WithResult(differentResult))
 	newBlock, err := flow.NewBlock(
-		flow.UntrustedBlock{
+		flow.UntrustedUnsignedBlock{
 			HeaderBody: newBlock.HeaderBody,
 			Payload: unittest.PayloadFixture(
 				unittest.WithSeals(seal),
@@ -782,7 +782,7 @@ func (s *SealValidationSuite) validSealForResult(result *flow.ExecutionResult) *
 // a seal for `sealedResult`. For each chunk, the seal has aggregated approval signatures from
 // `numberApprovals` assigned verification Nodes.
 // Note: numberApprovals cannot be larger than the number of assigned verification nodes.
-func (s *SealValidationSuite) makeBlockSealingResult(parentBlock *flow.Block, sealedResult *flow.ExecutionResult, numberApprovals int) *flow.Block {
+func (s *SealValidationSuite) makeBlockSealingResult(parentBlock *flow.UnsignedBlock, sealedResult *flow.ExecutionResult, numberApprovals int) *flow.UnsignedBlock {
 	seal := s.validSealForResult(sealedResult)
 	for chunkIndex := 0; chunkIndex < len(seal.AggregatedApprovalSigs); chunkIndex++ {
 		seal.AggregatedApprovalSigs[chunkIndex].SignerIDs = seal.AggregatedApprovalSigs[chunkIndex].SignerIDs[:numberApprovals]
@@ -809,7 +809,7 @@ func (s *SealValidationSuite) makeBlockSealingResult(parentBlock *flow.Block, se
 //   - as block B0, we use `LatestFinalizedBlock` (already initialized in test setup)
 //
 // Returns: (B1, B2, newBlock, Receipt[B0], Seal[B0])
-func (s *SealValidationSuite) generateBasicTestFork() (*flow.Block, *flow.Block, *flow.Block, *flow.ExecutionReceipt, *flow.Seal) {
+func (s *SealValidationSuite) generateBasicTestFork() (*flow.UnsignedBlock, *flow.UnsignedBlock, *flow.UnsignedBlock, *flow.ExecutionReceipt, *flow.Seal) {
 	receipt := unittest.ExecutionReceiptFixture(
 		unittest.WithExecutorID(s.ExeID),
 		unittest.WithResult(unittest.ExecutionResultFixture(

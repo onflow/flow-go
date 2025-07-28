@@ -60,9 +60,9 @@ func (et *ExecutionTreeTestSuite) SetupTest() {
 //	:
 //	:                                                       ? ? ? ? <- r[C13] {ER}
 //	pruned height
-func (et *ExecutionTreeTestSuite) createExecutionTree() (map[string]*flow.Block, map[string]*flow.ExecutionResult, map[string]*flow.ExecutionReceipt) {
+func (et *ExecutionTreeTestSuite) createExecutionTree() (map[string]*flow.UnsignedBlock, map[string]*flow.ExecutionResult, map[string]*flow.ExecutionReceipt) {
 	// Make blocks
-	blocks := make(map[string]*flow.Block)
+	blocks := make(map[string]*flow.UnsignedBlock)
 
 	blocks["A10"] = unittest.BlockFixture(unittest.Block.WithHeight(10))
 	blocks["A11"] = unittest.BlockWithParentFixture(blocks["A10"].ToHeader())
@@ -116,8 +116,8 @@ func (et *ExecutionTreeTestSuite) createExecutionTree() (map[string]*flow.Block,
 	return blocks, results, receipts
 }
 
-func (et *ExecutionTreeTestSuite) addReceipts2ReceiptsForest(receipts map[string]*flow.ExecutionReceipt, blocks map[string]*flow.Block) {
-	blockById := make(map[flow.Identifier]*flow.Block)
+func (et *ExecutionTreeTestSuite) addReceipts2ReceiptsForest(receipts map[string]*flow.ExecutionReceipt, blocks map[string]*flow.UnsignedBlock) {
+	blockById := make(map[flow.Identifier]*flow.UnsignedBlock)
 	for _, block := range blocks {
 		blockById[block.ID()] = block
 	}

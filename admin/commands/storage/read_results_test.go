@@ -28,9 +28,9 @@ type ReadResultsSuite struct {
 	state   *protocolmock.State
 	results *storagemock.ExecutionResults
 
-	final     *flow.Block
-	sealed    *flow.Block
-	allBlocks []*flow.Block
+	final     *flow.UnsignedBlock
+	sealed    *flow.UnsignedBlock
+	allBlocks []*flow.UnsignedBlock
 
 	finalResult  *flow.ExecutionResult
 	sealedResult *flow.ExecutionResult
@@ -46,7 +46,7 @@ func (suite *ReadResultsSuite) SetupTest() {
 	suite.state = new(protocolmock.State)
 	suite.results = new(storagemock.ExecutionResults)
 
-	var blocks []*flow.Block
+	var blocks []*flow.UnsignedBlock
 	var results []*flow.ExecutionResult
 
 	genesis := unittest.Block.Genesis(flow.Emulator)

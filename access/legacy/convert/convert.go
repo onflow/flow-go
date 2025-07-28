@@ -138,7 +138,7 @@ func BlockHeaderToMessage(h *flow.Header) (*entitiesproto.BlockHeader, error) {
 	}, nil
 }
 
-func BlockToMessage(h *flow.Block) (*entitiesproto.Block, error) {
+func BlockToMessage(h *flow.UnsignedBlock) (*entitiesproto.Block, error) {
 	id := h.ID()
 
 	cg := make([]*entitiesproto.CollectionGuarantee, len(h.Payload.Guarantees))

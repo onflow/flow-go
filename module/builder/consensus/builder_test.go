@@ -59,7 +59,7 @@ type BuilderSuite struct {
 	// storage for dbs
 	headers       map[flow.Identifier]*flow.Header
 	index         map[flow.Identifier]*flow.Index
-	blocks        map[flow.Identifier]*flow.Block
+	blocks        map[flow.Identifier]*flow.UnsignedBlock
 	blockChildren map[flow.Identifier][]flow.Identifier // ids of children blocks
 
 	lastSeal *flow.Seal
@@ -92,7 +92,7 @@ type BuilderSuite struct {
 	build *Builder
 }
 
-func (bs *BuilderSuite) storeBlock(block *flow.Block) {
+func (bs *BuilderSuite) storeBlock(block *flow.UnsignedBlock) {
 	bs.headers[block.ID()] = block.ToHeader()
 	bs.blocks[block.ID()] = block
 	bs.index[block.ID()] = block.Payload.Index()
@@ -107,7 +107,7 @@ func (bs *BuilderSuite) storeBlock(block *flow.Block) {
 // block, which is also used to create a seal for the previous block. The seal
 // and the result are combined in an IncorporatedResultSeal which is a candidate
 // for the seals mempool.
-func (bs *BuilderSuite) createAndRecordBlock(parentBlock *flow.Block, candidateSealForParent bool) *flow.Block {
+func (bs *BuilderSuite) createAndRecordBlock(parentBlock *flow.UnsignedBlock, candidateSealForParent bool) *flow.UnsignedBlock {
 	block := unittest.BlockWithParentFixture(parentBlock.ToHeader())
 
 	// Create a receipt for a result of the parentBlock block,
@@ -208,7 +208,7 @@ func (bs *BuilderSuite) SetupTest() {
 	bs.lastSeal = nil
 	bs.headers = make(map[flow.Identifier]*flow.Header)
 	bs.index = make(map[flow.Identifier]*flow.Index)
-	bs.blocks = make(map[flow.Identifier]*flow.Block)
+	bs.blocks = make(map[flow.Identifier]*flow.UnsignedBlock)
 	bs.blockChildren = make(map[flow.Identifier][]flow.Identifier)
 
 	// initialize behaviour tracking
@@ -332,7 +332,7 @@ func (bs *BuilderSuite) SetupTest() {
 
 	bs.blockDB = &storage.Blocks{}
 	bs.blockDB.On("ByID", mock.Anything).Return(
-		func(blockID flow.Identifier) *flow.Block {
+		func(blockID flow.Identifier) *flow.UnsignedBlock {
 			return bs.blocks[blockID]
 		},
 		func(blockID flow.Identifier) error {
@@ -579,7 +579,7 @@ func (bs *BuilderSuite) TestPayloadGuaranteeReferenceExpired() {
 //
 // Expected behaviour:
 //   - builder should include seals [F0], ..., [A4]
-//   - note: Block [A3] will not have a seal in the happy path for the following reason:
+//   - note: UnsignedBlock [A3] will not have a seal in the happy path for the following reason:
 //     In our example, the result for block A3 is incorporated in block A4. But, for the verifiers to start
 //     their work, they need a child block of A4, because the child contains the source of randomness for
 //     A4. But we are just constructing this child right now. Hence, the verifiers couldn't have checked
@@ -836,7 +836,7 @@ func (bs *BuilderSuite) TestValidatePayloadSeals_ExecutionForks() {
 	bs.build.cfg.expiry = 4 // reduce expiry so collection dedup algorithm doesn't walk past  [lastSeal]
 
 	blockF := bs.blocks[bs.finalID]
-	blocks := []*flow.Block{blockF}
+	blocks := []*flow.UnsignedBlock{blockF}
 	blocks = append(blocks, unittest.ChainFixtureFrom(4, blockF.ToHeader())...)          // elements  [F, A, B, C, D]
 	receiptChain1 := unittest.ReceiptChainFor(blocks, unittest.ExecutionResultFixture()) // elements  [Result[F]_1, Result[A]_1, Result[B]_1, ...]
 	receiptChain2 := unittest.ReceiptChainFor(blocks, unittest.ExecutionResultFixture()) // elements  [Result[F]_2, Result[A]_2, Result[B]_2, ...]
@@ -845,7 +845,7 @@ func (bs *BuilderSuite) TestValidatePayloadSeals_ExecutionForks() {
 	for i := 1; i <= 3; i++ {
 		var err error
 		blocks[i], err = flow.NewBlock(
-			flow.UntrustedBlock{
+			flow.UntrustedUnsignedBlock{
 				HeaderBody: blocks[i].HeaderBody,
 				Payload: unittest.PayloadFixture(
 					unittest.WithReceipts(receiptChain1[i-1], receiptChain2[i-1]),
@@ -859,7 +859,7 @@ func (bs *BuilderSuite) TestValidatePayloadSeals_ExecutionForks() {
 	var err error
 	// set payload for block D
 	blocks[4], err = flow.NewBlock(
-		flow.UntrustedBlock{
+		flow.UntrustedUnsignedBlock{
 			HeaderBody: blocks[4].HeaderBody,
 			Payload: unittest.PayloadFixture(
 				unittest.WithSeals(sealF),
@@ -1497,7 +1497,7 @@ func (bs *BuilderSuite) TestIntegration_RepopulateExecutionTreeAtStartup() {
 	bs.storeBlock(C)
 
 	// store execution results
-	for _, block := range []*flow.Block{A, B, C} {
+	for _, block := range []*flow.UnsignedBlock{A, B, C} {
 		// for current block create empty receipts list
 		bs.receiptsByBlockID[block.ID()] = flow.ExecutionReceiptList{}
 

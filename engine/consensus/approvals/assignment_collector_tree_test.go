@@ -64,7 +64,7 @@ func (s *AssignmentCollectorTreeSuite) prepareMockedCollector(result *flow.Execu
 	collector.On("ResultID").Return(result.ID()).Maybe()
 	collector.On("Result").Return(result).Maybe()
 	collector.On("BlockID").Return(result.BlockID).Maybe()
-	collector.On("Block").Return(func() *flow.Header {
+	collector.On("UnsignedBlock").Return(func() *flow.Header {
 		return s.Blocks[result.BlockID]
 	}).Maybe()
 
@@ -262,7 +262,7 @@ func (s *AssignmentCollectorTreeSuite) TestGetOrCreateCollector_AddingSealedColl
 func (s *AssignmentCollectorTreeSuite) TestFinalizeForkAtLevel_ProcessableAfterSealedParent() {
 	s.IdentitiesCache[s.IncorporatedBlock.ID()] = s.AuthorizedVerifiers
 	// two forks
-	forks := make([][]*flow.Block, 2)
+	forks := make([][]*flow.UnsignedBlock, 2)
 	results := make([][]*flow.IncorporatedResult, 2)
 
 	firstResult := unittest.ExecutionResultFixture(

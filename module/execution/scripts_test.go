@@ -58,7 +58,7 @@ func (s *scriptTestSuite) TestScriptExecution() {
 		s.Assert().Equal(number, val.(cadence.Int).Value.Int64())
 	})
 
-	s.Run("Get Block", func() {
+	s.Run("Get UnsignedBlock", func() {
 		code := []byte(fmt.Sprintf(`access(all) fun main(): UInt64 {
 			getBlock(at: %d)!
 			return getCurrentBlock().height 
@@ -377,8 +377,8 @@ func newAccountKey(
 	return publicKey, encodedCadencePublicKey
 }
 
-func newBlockHeadersStorage(blocks []*flow.Block) storage.Headers {
-	blocksByHeight := make(map[uint64]*flow.Block)
+func newBlockHeadersStorage(blocks []*flow.UnsignedBlock) storage.Headers {
+	blocksByHeight := make(map[uint64]*flow.UnsignedBlock)
 	for _, b := range blocks {
 		blocksByHeight[b.Height] = b
 	}

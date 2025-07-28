@@ -119,9 +119,9 @@ type AccessProvider interface {
 	Ping() error
 	GetNetworkParameters() accessmodel.NetworkParameters
 
-	GetLatestBlock() (*flowgo.Block, error)
-	GetBlockByID(id flowgo.Identifier) (*flowgo.Block, error)
-	GetBlockByHeight(height uint64) (*flowgo.Block, error)
+	GetLatestBlock() (*flowgo.UnsignedBlock, error)
+	GetBlockByID(id flowgo.Identifier) (*flowgo.UnsignedBlock, error)
+	GetBlockByHeight(height uint64) (*flowgo.UnsignedBlock, error)
 
 	GetCollectionByID(colID flowgo.Identifier) (*flowgo.LightCollection, error)
 	GetFullCollectionByID(colID flowgo.Identifier) (*flowgo.Collection, error)
@@ -153,10 +153,10 @@ type AutoMineCapable interface {
 }
 
 type ExecutionCapable interface {
-	ExecuteAndCommitBlock() (*flowgo.Block, []*TransactionResult, error)
+	ExecuteAndCommitBlock() (*flowgo.UnsignedBlock, []*TransactionResult, error)
 	ExecuteNextTransaction() (*TransactionResult, error)
 	ExecuteBlock() ([]*TransactionResult, error)
-	CommitBlock() (*flowgo.Block, error)
+	CommitBlock() (*flowgo.UnsignedBlock, error)
 }
 
 type Contract struct {

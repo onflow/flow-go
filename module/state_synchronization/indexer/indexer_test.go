@@ -25,7 +25,7 @@ import (
 const testTimeout = 300 * time.Millisecond
 
 type indexerTest struct {
-	blocks        []*flow.Block
+	blocks        []*flow.UnsignedBlock
 	progress      *mockProgress
 	registers     *storagemock.RegisterIndex
 	indexTest     *indexCoreTest
@@ -100,11 +100,11 @@ func (w *indexerTest) latestHeight() (uint64, error) {
 	return w.last().Height, nil
 }
 
-func (w *indexerTest) last() *flow.Block {
+func (w *indexerTest) last() *flow.UnsignedBlock {
 	return w.blocks[len(w.blocks)-1]
 }
 
-func (w *indexerTest) first() *flow.Block {
+func (w *indexerTest) first() *flow.UnsignedBlock {
 	return w.blocks[0]
 }
 
