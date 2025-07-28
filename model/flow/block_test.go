@@ -225,3 +225,138 @@ func TestNewRootBlock(t *testing.T) {
 		require.Contains(t, err.Error(), "invalid payload")
 	})
 }
+
+// TestNewProposal verifies the behavior of the NewProposal constructor.
+// It ensures proper handling of both valid and invalid input fields.
+//
+// Test Cases:
+//
+// 1. Valid input:
+//   - Verifies that a properly populated UntrustedProposal results in a valid Proposal.
+//
+// 2. Invalid input with invalid Block:
+//   - Ensures an error is returned when the Block.ParentID is flow.ZeroID.
+//
+// 3. Invalid input with nil ProposerSigData:
+//   - Ensures an error is returned when the ProposerSigData is nil.
+//
+// 4. Invalid input with empty ProposerSigData:
+//   - Ensures an error is returned when the ProposerSigData is an empty byte slice.
+func TestNewProposal(t *testing.T) {
+	t.Run("valid input", func(t *testing.T) {
+		res, err := flow.NewProposal(flow.UntrustedProposal(*unittest.ProposalFixture()))
+		require.NoError(t, err)
+		require.NotNil(t, res)
+	})
+
+	t.Run("invalid input with invalid block", func(t *testing.T) {
+		untrustedProposal := flow.UntrustedProposal(*unittest.ProposalFixture())
+		untrustedProposal.Block.ParentID = flow.ZeroID
+
+		res, err := flow.NewProposal(untrustedProposal)
+		require.Error(t, err)
+		require.Nil(t, res)
+		require.Contains(t, err.Error(), "invalid block")
+	})
+
+	t.Run("invalid input with nil ProposerSigData", func(t *testing.T) {
+		untrustedProposal := flow.UntrustedProposal(*unittest.ProposalFixture())
+		untrustedProposal.ProposerSigData = nil
+
+		res, err := flow.NewProposal(untrustedProposal)
+		require.Error(t, err)
+		require.Nil(t, res)
+		require.Contains(t, err.Error(), "proposer signature must not be empty")
+	})
+
+	t.Run("invalid input with empty ProposerSigData", func(t *testing.T) {
+		untrustedProposal := flow.UntrustedProposal(*unittest.ProposalFixture())
+		untrustedProposal.ProposerSigData = []byte{}
+
+		res, err := flow.NewProposal(untrustedProposal)
+		require.Error(t, err)
+		require.Nil(t, res)
+		require.Contains(t, err.Error(), "proposer signature must not be empty")
+	})
+}
+
+// TestNewRootProposal verifies the behavior of the NewRootProposal constructor.
+// It ensures proper handling of both valid and invalid untrusted input fields.
+//
+// Test Cases:
+//
+// 1. Valid input with nil ProposerSigData:
+//   - Verifies that a root proposal with nil ProposerSigData is accepted.
+//
+// 2. Valid input with empty ProposerSigData:
+//   - Verifies that an empty (but non-nil) ProposerSigData is also accepted,
+//     since root proposals must not include a signature.
+//
+// 3. Invalid input with invalid Block:
+//   - Ensures an error is returned if the Block.ParentView is non-zero, which is disallowed for root blocks.
+//
+// 4. Invalid input with non-empty ProposerSigData:
+//   - Ensures an error is returned when a ProposerSigData is included, as this is not permitted for root proposals.
+func TestNewRootProposal(t *testing.T) {
+	// validRootProposalFixture returns a new valid root flow.UntrustedProposal for use in tests.
+	validRootProposalFixture := func() flow.UntrustedProposal {
+		block, err := flow.NewRootBlock(flow.UntrustedBlock{
+			HeaderBody: flow.HeaderBody{
+				ChainID:            flow.Emulator,
+				ParentID:           unittest.IdentifierFixture(),
+				Height:             10,
+				Timestamp:          uint64(time.Now().UnixMilli()),
+				View:               0,
+				ParentView:         0,
+				ParentVoterIndices: []byte{},
+				ParentVoterSigData: []byte{},
+				ProposerID:         flow.ZeroID,
+				LastViewTC:         nil,
+			},
+			Payload: unittest.PayloadFixture(),
+		})
+		if err != nil {
+			panic(err)
+		}
+		return flow.UntrustedProposal{
+			Block:           *block,
+			ProposerSigData: nil,
+		}
+	}
+
+	t.Run("valid input with nil ProposerSigData", func(t *testing.T) {
+		res, err := flow.NewRootProposal(validRootProposalFixture())
+
+		require.NoError(t, err)
+		require.NotNil(t, res)
+	})
+
+	t.Run("valid input with empty ProposerSigData", func(t *testing.T) {
+		untrustedProposal := validRootProposalFixture()
+		untrustedProposal.ProposerSigData = []byte{}
+
+		res, err := flow.NewRootProposal(untrustedProposal)
+		require.NoError(t, err)
+		require.NotNil(t, res)
+	})
+
+	t.Run("invalid input with invalid block", func(t *testing.T) {
+		untrustedProposal := validRootProposalFixture()
+		untrustedProposal.Block.ParentView = 1
+
+		res, err := flow.NewRootProposal(untrustedProposal)
+		require.Error(t, err)
+		require.Nil(t, res)
+		require.Contains(t, err.Error(), "invalid root block")
+	})
+
+	t.Run("invalid input with non-empty proposer signature", func(t *testing.T) {
+		untrustedProposal := validRootProposalFixture()
+		untrustedProposal.ProposerSigData = unittest.SignatureFixture()
+
+		res, err := flow.NewRootProposal(untrustedProposal)
+		require.Error(t, err)
+		require.Nil(t, res)
+		require.Contains(t, err.Error(), "proposer signature must be empty")
+	})
+}

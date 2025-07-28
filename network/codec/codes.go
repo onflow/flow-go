@@ -70,7 +70,7 @@ func MessageCodeFromInterface(v interface{}) (MessageCode, string, error) {
 	s := what(v)
 	switch v.(type) {
 	// consensus
-	case *messages.UntrustedProposal:
+	case *flow.UntrustedProposal:
 		return CodeBlockProposal, s, nil
 	case *messages.BlockVote:
 		return CodeBlockVote, s, nil
@@ -152,7 +152,7 @@ func InterfaceFromMessageCode(code MessageCode) (interface{}, string, error) {
 	switch code {
 	// consensus
 	case CodeBlockProposal:
-		return &messages.UntrustedProposal{}, what(&messages.UntrustedProposal{}), nil
+		return &flow.UntrustedProposal{}, what(&flow.UntrustedProposal{}), nil
 	case CodeBlockVote:
 		return &messages.BlockVote{}, what(&messages.BlockVote{}), nil
 	case CodeTimeoutObject:

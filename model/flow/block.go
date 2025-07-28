@@ -148,9 +148,61 @@ func (s BlockStatus) String() string {
 }
 
 // Proposal is a signed proposal that includes the block payload, in addition to the required header and signature.
+//
+//structwrite:immutable - mutations allowed only within the constructor
 type Proposal struct {
 	Block           Block
 	ProposerSigData []byte
+}
+
+// UntrustedProposal is an untrusted input-only representation of a Proposal,
+// used for construction.
+//
+// This type exists to ensure that constructor functions are invoked explicitly
+// with named fields, which improves clarity and reduces the risk of incorrect field
+// ordering during construction.
+//
+// An instance of UntrustedProposal should be validated and converted into
+// a trusted Proposal using the NewProposal constructor (or NewRootProposal
+// for the root proposal).
+type UntrustedProposal Proposal
+
+// NewProposal creates a new Proposal.
+// This constructor enforces validation rules to ensure the Proposal is well-formed.
+// It must be used to construct all non-root proposal.
+//
+// All errors indicate that a valid Proposal cannot be constructed from the input.
+func NewProposal(untrusted UntrustedProposal) (*Proposal, error) {
+	block, err := NewBlock(UntrustedBlock(untrusted.Block))
+	if err != nil {
+		return nil, fmt.Errorf("invalid block: %w", err)
+	}
+	if len(untrusted.ProposerSigData) == 0 {
+		return nil, fmt.Errorf("proposer signature must not be empty")
+	}
+
+	return &Proposal{
+		Block:           *block,
+		ProposerSigData: untrusted.ProposerSigData,
+	}, nil
+}
+
+// NewRootProposal creates a root proposal.
+// This constructor must be used **only** for constructing the root proposal,
+// which is the only case where zero values are allowed.
+func NewRootProposal(untrusted UntrustedProposal) (*Proposal, error) {
+	block, err := NewRootBlock(UntrustedBlock(untrusted.Block))
+	if err != nil {
+		return nil, fmt.Errorf("invalid root block: %w", err)
+	}
+	if len(untrusted.ProposerSigData) > 0 {
+		return nil, fmt.Errorf("proposer signature must be empty")
+	}
+
+	return &Proposal{
+		Block:           *block,
+		ProposerSigData: untrusted.ProposerSigData,
+	}, nil
 }
 
 // ProposalHeader converts the proposal into a compact [ProposalHeader] representation,

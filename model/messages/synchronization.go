@@ -52,7 +52,7 @@ type BatchRequest struct {
 // that should correspond to the request.
 type BlockResponse struct {
 	Nonce  uint64
-	Blocks []UntrustedProposal
+	Blocks []flow.UntrustedProposal
 }
 
 // BlocksInternal converts all untrusted block proposals in the BlockResponse
@@ -61,10 +61,10 @@ type BlockResponse struct {
 // All errors indicate that the input message could not be converted to a valid proposal.
 func (br *BlockResponse) BlocksInternal() ([]*flow.Proposal, error) {
 	internal := make([]*flow.Proposal, len(br.Blocks))
-	for i, block := range br.Blocks {
-		proposal, err := block.DeclareStructurallyValid()
+	for i, untrusted := range br.Blocks {
+		proposal, err := flow.NewProposal(untrusted)
 		if err != nil {
-			return nil, fmt.Errorf("could not convert proposal: %w", err)
+			return nil, fmt.Errorf("could not build proposal: %w", err)
 		}
 		internal[i] = proposal
 	}

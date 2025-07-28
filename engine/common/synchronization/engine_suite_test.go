@@ -13,7 +13,6 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module/id"
-	"github.com/onflow/flow-go/module/metrics"
 	module "github.com/onflow/flow-go/module/mock"
 	netint "github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/channels"
@@ -46,6 +45,7 @@ type SyncSuite struct {
 	blocks       *storage.Blocks
 	comp         *mockconsensus.Compliance
 	core         *module.SyncCore
+	metrics      *module.EngineMetrics
 	e            *Engine
 }
 
@@ -147,13 +147,13 @@ func (ss *SyncSuite) SetupTest() {
 
 	// initialize the engine
 	log := zerolog.New(io.Discard)
-	metrics := metrics.NewNoopCollector()
+	ss.metrics = new(module.EngineMetrics)
 
 	idCache, err := cache.NewProtocolStateIDCache(log, ss.state, protocolEvents.NewDistributor())
 	require.NoError(ss.T(), err, "could not create protocol state identity cache")
 	spamConfig, err := NewSpamDetectionConfig()
 	require.NoError(ss.T(), err, "could not create spam detection config")
-	e, err := New(log, metrics, ss.net, ss.me, ss.state, ss.blocks, ss.comp, ss.core,
+	e, err := New(log, ss.metrics, ss.net, ss.me, ss.state, ss.blocks, ss.comp, ss.core,
 		id.NewIdentityFilterIdentifierProvider(
 			filter.And(
 				filter.HasRole[flow.Identity](flow.RoleConsensus),

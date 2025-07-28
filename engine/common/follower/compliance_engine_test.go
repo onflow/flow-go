@@ -14,7 +14,6 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	followermock "github.com/onflow/flow-go/engine/common/follower/mock"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module/compliance"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
@@ -104,15 +103,15 @@ func (s *EngineSuite) TestProcessSyncedBlock() {
 		close(done)
 	}).Once()
 
-	s.engine.OnSyncedBlocks(flow.Slashable[[]*messages.UntrustedProposal]{
+	s.engine.OnSyncedBlocks(flow.Slashable[[]*flow.Proposal]{
 		OriginID: originID,
-		Message:  flowBlockProposalsToMessage(proposal),
+		Message:  []*flow.Proposal{proposal},
 	})
 	unittest.AssertClosesBefore(s.T(), done, time.Second)
 }
 
-// TestProcessGossipedBlock check that processing single gossiped block results in call to FollowerCore.
-func (s *EngineSuite) TestProcessGossipedBlock() {
+// TestProcessGossipedValidBlock check that processing single structurally valid gossiped block results in call to FollowerCore.
+func (s *EngineSuite) TestProcessGossipedValidBlock() {
 	block := unittest.BlockWithParentFixture(s.finalized)
 	proposal := unittest.ProposalFromBlock(block)
 
@@ -122,10 +121,25 @@ func (s *EngineSuite) TestProcessGossipedBlock() {
 		close(done)
 	}).Once()
 
-	err := s.engine.Process(channels.ReceiveBlocks, originID, messages.NewUntrustedProposal(proposal))
+	err := s.engine.Process(channels.ReceiveBlocks, originID, (*flow.UntrustedProposal)(proposal))
 	require.NoError(s.T(), err)
 
 	unittest.AssertClosesBefore(s.T(), done, time.Second)
+}
+
+// TestProcessGossipedInvalidBlock check that processing single structurally invalid gossiped block results in call to FollowerCore.
+func (s *EngineSuite) TestProcessGossipedInvalidBlock() {
+	block := unittest.BlockWithParentFixture(s.finalized)
+	proposal := unittest.ProposalFromBlock(block)
+	proposal.ProposerSigData = nil
+
+	originID := unittest.IdentifierFixture()
+
+	err := s.engine.Process(channels.ReceiveBlocks, originID, (*flow.UntrustedProposal)(proposal))
+	require.NoError(s.T(), err)
+
+	// OnBlockRange should NOT be called for invalid proposal
+	s.core.AssertNotCalled(s.T(), "OnBlockRange", mock.Anything, mock.Anything)
 }
 
 // TestProcessBlockFromComplianceInterface check that processing single gossiped block using compliance interface results in call to FollowerCore.
@@ -139,9 +153,9 @@ func (s *EngineSuite) TestProcessBlockFromComplianceInterface() {
 		close(done)
 	}).Once()
 
-	s.engine.OnBlockProposal(flow.Slashable[*messages.UntrustedProposal]{
+	s.engine.OnBlockProposal(flow.Slashable[*flow.Proposal]{
 		OriginID: originID,
-		Message:  messages.NewUntrustedProposal(proposal),
+		Message:  proposal,
 	})
 
 	unittest.AssertClosesBefore(s.T(), done, time.Second)
@@ -169,9 +183,9 @@ func (s *EngineSuite) TestProcessBatchOfDisconnectedBlocks() {
 		wg.Done()
 	}).Return(nil).Once()
 
-	s.engine.OnSyncedBlocks(flow.Slashable[[]*messages.UntrustedProposal]{
+	s.engine.OnSyncedBlocks(flow.Slashable[[]*flow.Proposal]{
 		OriginID: originID,
-		Message:  flowBlockProposalsToMessage(blocks...),
+		Message:  blocks,
 	})
 	unittest.RequireReturnsBefore(s.T(), wg.Wait, time.Millisecond*500, "expect to return before timeout")
 }
@@ -207,9 +221,9 @@ func (s *EngineSuite) TestProcessFinalizedBlock() {
 	}).Return().Once()
 	s.engine.engMetrics = metricsMock
 
-	s.engine.OnSyncedBlocks(flow.Slashable[[]*messages.UntrustedProposal]{
+	s.engine.OnSyncedBlocks(flow.Slashable[[]*flow.Proposal]{
 		OriginID: unittest.IdentifierFixture(),
-		Message:  flowBlockProposalsToMessage(proposal),
+		Message:  []*flow.Proposal{proposal},
 	})
 	unittest.RequireCloseBefore(s.T(), done, time.Millisecond*500, "expect to close before timeout")
 	// check if message wasn't buffered in internal channel
@@ -219,13 +233,4 @@ func (s *EngineSuite) TestProcessFinalizedBlock() {
 	default:
 
 	}
-}
-
-// flowBlockProposalsToMessage is a helper function to transform types.
-func flowBlockProposalsToMessage(proposals ...*flow.Proposal) []*messages.UntrustedProposal {
-	result := make([]*messages.UntrustedProposal, 0, len(proposals))
-	for _, prop := range proposals {
-		result = append(result, messages.NewUntrustedProposal(prop))
-	}
-	return result
 }
