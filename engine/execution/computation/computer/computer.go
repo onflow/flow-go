@@ -295,7 +295,6 @@ func numberOfTransactionsInBlock(collections []*entity.CompleteCollection) int {
 	return numTxns
 }
 
-
 func (e *blockComputer) executeBlock(
 	ctx context.Context,
 	parentBlockExecutionResultID flow.Identifier,

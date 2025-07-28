@@ -45,7 +45,6 @@ type ChunkBody struct {
 	NumberOfTransactions uint64 // number of transactions inside the collection
 }
 
-
 type Chunk struct {
 	ChunkBody
 
