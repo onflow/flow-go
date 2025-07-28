@@ -210,6 +210,7 @@ func (c SystemContracts) AsTemplateEnv() templates.Environment {
 
 		FlowFeesAddress:                   c.FlowFees.Address.Hex(),
 		FlowTokenAddress:                  c.FlowToken.Address.Hex(),
+		FlowCallbackSchedulerAddress:      c.FlowCallbackScheduler.Address.Hex(),
 		FungibleTokenAddress:              c.FungibleToken.Address.Hex(),
 		FungibleTokenSwitchboardAddress:   c.FungibleTokenSwitchboard.Address.Hex(),
 		FungibleTokenMetadataViewsAddress: c.FungibleTokenMetadataViews.Address.Hex(),
