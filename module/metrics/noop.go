@@ -30,9 +30,9 @@ func (nc *NoopCollector) OutboundMessageSent(int, string, string, string)       
 func (nc *NoopCollector) InboundMessageReceived(int, string, string, string)     {}
 func (nc *NoopCollector) DuplicateInboundMessagesDropped(string, string, string) {}
 func (nc *NoopCollector) UnicastMessageSendingStarted(topic string)              {}
-func (nc *NoopCollector) UnicastMessageSendingCompleted(topic string)  {}
-func (nc *NoopCollector) BlockProposed(*flow.UnsignedBlock)            {}
-func (nc *NoopCollector) BlockProposalDuration(duration time.Duration) {}
+func (nc *NoopCollector) UnicastMessageSendingCompleted(topic string)            {}
+func (nc *NoopCollector) BlockProposed(*flow.UnsignedBlock)                      {}
+func (nc *NoopCollector) BlockProposalDuration(duration time.Duration)           {}
 
 // interface check
 var _ module.BackendScriptsMetrics = (*NoopCollector)(nil)
@@ -88,10 +88,10 @@ func (nc *NoopCollector) BadgerNumPuts(n int64)                                 
 func (nc *NoopCollector) BadgerNumBlockedPuts(n int64)                                           {}
 func (nc *NoopCollector) BadgerNumMemtableGets(n int64)                                          {}
 func (nc *NoopCollector) FinalizedHeight(height uint64)                                          {}
-func (nc *NoopCollector) SealedHeight(height uint64)          {}
-func (nc *NoopCollector) BlockFinalized(*flow.UnsignedBlock)  {}
-func (nc *NoopCollector) BlockSealed(*flow.UnsignedBlock)     {}
-func (nc *NoopCollector) EpochTransitionHeight(height uint64) {}
+func (nc *NoopCollector) SealedHeight(height uint64)                                             {}
+func (nc *NoopCollector) BlockFinalized(*flow.UnsignedBlock)                                     {}
+func (nc *NoopCollector) BlockSealed(*flow.UnsignedBlock)                                        {}
+func (nc *NoopCollector) EpochTransitionHeight(height uint64)                                    {}
 func (nc *NoopCollector) CurrentEpochCounter(counter uint64)                                     {}
 func (nc *NoopCollector) CurrentEpochPhase(phase flow.EpochPhase)                                {}
 func (nc *NoopCollector) CurrentEpochFinalView(view uint64)                                      {}
@@ -124,8 +124,8 @@ func (nc *NoopCollector) ValidatorProcessingDuration(duration time.Duration)    
 func (nc *NoopCollector) PayloadProductionDuration(duration time.Duration)               {}
 func (nc *NoopCollector) TimeoutCollectorsRange(uint64, uint64, int)                     {}
 func (nc *NoopCollector) TransactionIngested(txID flow.Identifier)                       {}
-func (nc *NoopCollector) ClusterBlockProposed(*cluster.Block)                            {}
-func (nc *NoopCollector) ClusterBlockFinalized(*cluster.Block)                           {}
+func (nc *NoopCollector) ClusterBlockProposed(*cluster.UnsignedBlock)                    {}
+func (nc *NoopCollector) ClusterBlockFinalized(*cluster.UnsignedBlock)                   {}
 func (nc *NoopCollector) StartCollectionToFinalized(collectionID flow.Identifier)        {}
 func (nc *NoopCollector) FinishCollectionToFinalized(collectionID flow.Identifier)       {}
 func (nc *NoopCollector) StartBlockToSeal(blockID flow.Identifier)                       {}

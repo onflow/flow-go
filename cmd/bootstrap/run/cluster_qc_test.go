@@ -16,7 +16,7 @@ func TestGenerateClusterRootQC(t *testing.T) {
 	participants := createClusterParticipants(t, 3)
 
 	clusterBlock, err := cluster.NewRootBlock(
-		cluster.UntrustedBlock{
+		cluster.UnsignedUntrustedBlock{
 			HeaderBody: flow.HeaderBody{
 				ChainID:   flow.Emulator,
 				ParentID:  flow.ZeroID,

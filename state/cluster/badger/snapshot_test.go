@@ -28,7 +28,7 @@ type SnapshotSuite struct {
 	db    *badger.DB
 	dbdir string
 
-	genesis      *model.Block
+	genesis      *model.UnsignedBlock
 	chainID      flow.ChainID
 	epochCounter uint64
 
@@ -126,7 +126,7 @@ func (suite *SnapshotSuite) Payload(transactions ...*flow.TransactionBody) model
 }
 
 // ProposalWithParentAndPayload returns a valid block proposal with the given parent and payload.
-func (suite *SnapshotSuite) ProposalWithParentAndPayload(parent *model.Block, payload model.Payload) model.Proposal {
+func (suite *SnapshotSuite) ProposalWithParentAndPayload(parent *model.UnsignedBlock, payload model.Payload) model.Proposal {
 	block := unittest.ClusterBlockFixture(
 		unittest.ClusterBlock.WithParent(parent),
 		unittest.ClusterBlock.WithPayload(payload),
@@ -147,7 +147,7 @@ func (suite *SnapshotSuite) InsertBlock(proposal model.Proposal) {
 // InsertSubtree recursively inserts chain state as a subtree of the parent
 // block. The subtree has the given depth and `fanout` children at each node.
 // All child indices are updated.
-func (suite *SnapshotSuite) InsertSubtree(parent model.Block, depth, fanout int) {
+func (suite *SnapshotSuite) InsertSubtree(parent model.UnsignedBlock, depth, fanout int) {
 	if depth == 0 {
 		return
 	}

@@ -333,7 +333,7 @@ func (h *MessageHub) sendOwnProposal(proposal *flow.ProposalHeader) error {
 	}
 
 	block, err := cluster.NewBlock(
-		cluster.UntrustedBlock{
+		cluster.UnsignedUntrustedBlock{
 			HeaderBody: header.HeaderBody,
 			Payload:    *payload,
 		},

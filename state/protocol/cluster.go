@@ -26,7 +26,7 @@ type Cluster interface {
 	Members() flow.IdentitySkeletonList
 
 	// RootBlock returns the root block for this cluster.
-	RootBlock() *cluster.Block
+	RootBlock() *cluster.UnsignedBlock
 
 	// RootQC returns the quorum certificate for this cluster.
 	RootQC() *flow.QuorumCertificate

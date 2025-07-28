@@ -55,7 +55,7 @@ type BuilderSuite struct {
 	db    *badger.DB
 	dbdir string
 
-	genesis      *model.Block
+	genesis      *model.UnsignedBlock
 	chainID      flow.ChainID
 	epochCounter uint64
 
@@ -190,12 +190,12 @@ func (suite *BuilderSuite) TearDownTest() {
 	suite.Assert().NoError(err)
 }
 
-func (suite *BuilderSuite) InsertBlock(block *model.Block) {
+func (suite *BuilderSuite) InsertBlock(block *model.UnsignedBlock) {
 	err := suite.db.Update(procedure.InsertClusterBlock(unittest.ClusterProposalFromBlock(block)))
 	suite.Assert().NoError(err)
 }
 
-func (suite *BuilderSuite) FinalizeBlock(block model.Block) {
+func (suite *BuilderSuite) FinalizeBlock(block model.UnsignedBlock) {
 	err := suite.db.Update(func(tx *badger.Txn) error {
 		var refBlock flow.Header
 		err := operation.RetrieveHeader(block.Payload.ReferenceBlockID, &refBlock)(tx)
@@ -269,7 +269,7 @@ func (suite *BuilderSuite) TestBuildOn_Success() {
 	suite.Assert().Equal(expectedHeight, proposal.Header.Height)
 
 	// should be able to retrieve built block from storage
-	var built model.Block
+	var built model.UnsignedBlock
 	err = suite.db.View(procedure.RetrieveClusterBlock(proposal.Header.ID(), &built))
 	suite.Assert().NoError(err)
 	builtCollection := built.Payload.Collection
@@ -332,7 +332,7 @@ func (suite *BuilderSuite) TestBuildOn_WithUnknownReferenceBlock() {
 	suite.Require().NoError(err)
 
 	// should be able to retrieve built block from storage
-	var built model.Block
+	var built model.UnsignedBlock
 	err = suite.db.View(procedure.RetrieveClusterBlock(header.Header.ID(), &built))
 	suite.Assert().NoError(err)
 	builtCollection := built.Payload.Collection
@@ -373,7 +373,7 @@ func (suite *BuilderSuite) TestBuildOn_WithUnfinalizedReferenceBlock() {
 	suite.Require().NoError(err)
 
 	// should be able to retrieve built block from storage
-	var built model.Block
+	var built model.UnsignedBlock
 	err = suite.db.View(procedure.RetrieveClusterBlock(header.Header.ID(), &built))
 	suite.Assert().NoError(err)
 	builtCollection := built.Payload.Collection
@@ -424,7 +424,7 @@ func (suite *BuilderSuite) TestBuildOn_WithOrphanedReferenceBlock() {
 	suite.Require().NoError(err)
 
 	// should be able to retrieve built block from storage
-	var built model.Block
+	var built model.UnsignedBlock
 	err = suite.db.View(procedure.RetrieveClusterBlock(header.Header.ID(), &built))
 	suite.Assert().NoError(err)
 	builtCollection := built.Payload.Collection
@@ -467,7 +467,7 @@ func (suite *BuilderSuite) TestBuildOn_WithForks() {
 	require.NoError(t, err)
 
 	// should be able to retrieve built block from storage
-	var built model.Block
+	var built model.UnsignedBlock
 	err = suite.db.View(procedure.RetrieveClusterBlock(header.Header.ID(), &built))
 	assert.NoError(t, err)
 	builtCollection := built.Payload.Collection
@@ -514,7 +514,7 @@ func (suite *BuilderSuite) TestBuildOn_ConflictingFinalizedBlock() {
 	require.NoError(t, err)
 
 	// retrieve the built block from storage
-	var built model.Block
+	var built model.UnsignedBlock
 	err = suite.db.View(procedure.RetrieveClusterBlock(header.Header.ID(), &built))
 	assert.NoError(t, err)
 	builtCollection := built.Payload.Collection
@@ -564,7 +564,7 @@ func (suite *BuilderSuite) TestBuildOn_ConflictingInvalidatedForks() {
 	require.NoError(t, err)
 
 	// retrieve the built block from storage
-	var built model.Block
+	var built model.UnsignedBlock
 	err = suite.db.View(procedure.RetrieveClusterBlock(header.Header.ID(), &built))
 	assert.NoError(t, err)
 	builtCollection := built.Payload.Collection
@@ -649,7 +649,7 @@ func (suite *BuilderSuite) TestBuildOn_LargeHistory() {
 	require.NoError(t, err)
 
 	// retrieve the built block from storage
-	var built model.Block
+	var built model.UnsignedBlock
 	err = suite.db.View(procedure.RetrieveClusterBlock(header.Header.ID(), &built))
 	require.NoError(t, err)
 	builtCollection := built.Payload.Collection
@@ -668,7 +668,7 @@ func (suite *BuilderSuite) TestBuildOn_MaxCollectionSize() {
 	suite.Require().NoError(err)
 
 	// retrieve the built block from storage
-	var built model.Block
+	var built model.UnsignedBlock
 	err = suite.db.View(procedure.RetrieveClusterBlock(header.Header.ID(), &built))
 	suite.Require().NoError(err)
 	builtCollection := built.Payload.Collection
@@ -686,7 +686,7 @@ func (suite *BuilderSuite) TestBuildOn_MaxCollectionByteSize() {
 	suite.Require().NoError(err)
 
 	// retrieve the built block from storage
-	var built model.Block
+	var built model.UnsignedBlock
 	err = suite.db.View(procedure.RetrieveClusterBlock(header.Header.ID(), &built))
 	suite.Require().NoError(err)
 	builtCollection := built.Payload.Collection
@@ -704,7 +704,7 @@ func (suite *BuilderSuite) TestBuildOn_MaxCollectionTotalGas() {
 	suite.Require().NoError(err)
 
 	// retrieve the built block from storage
-	var built model.Block
+	var built model.UnsignedBlock
 	err = suite.db.View(procedure.RetrieveClusterBlock(header.Header.ID(), &built))
 	suite.Require().NoError(err)
 	builtCollection := built.Payload.Collection
@@ -763,7 +763,7 @@ func (suite *BuilderSuite) TestBuildOn_ExpiredTransaction() {
 	suite.Require().NoError(err)
 
 	// retrieve the built block from storage
-	var built model.Block
+	var built model.UnsignedBlock
 	err = suite.db.View(procedure.RetrieveClusterBlock(header.Header.ID(), &built))
 	suite.Require().NoError(err)
 	builtCollection := built.Payload.Collection
@@ -784,7 +784,7 @@ func (suite *BuilderSuite) TestBuildOn_EmptyMempool() {
 	header, err := suite.builder.BuildOn(suite.genesis.ID(), setter, signer)
 	suite.Require().NoError(err)
 
-	var built model.Block
+	var built model.UnsignedBlock
 	err = suite.db.View(procedure.RetrieveClusterBlock(header.Header.ID(), &built))
 	suite.Require().NoError(err)
 
@@ -842,7 +842,7 @@ func (suite *BuilderSuite) TestBuildOn_NoRateLimiting() {
 		parentID = header.Header.ID()
 
 		// each collection should be full with 10 transactions
-		var built model.Block
+		var built model.UnsignedBlock
 		err = suite.db.View(procedure.RetrieveClusterBlock(header.Header.ID(), &built))
 		suite.Assert().NoError(err)
 		suite.Assert().Len(built.Payload.Collection.Transactions, 10)
@@ -900,7 +900,7 @@ func (suite *BuilderSuite) TestBuildOn_RateLimitNonPayer() {
 		parentID = header.Header.ID()
 
 		// each collection should be full with 10 transactions
-		var built model.Block
+		var built model.UnsignedBlock
 		err = suite.db.View(procedure.RetrieveClusterBlock(header.Header.ID(), &built))
 		suite.Assert().NoError(err)
 		suite.Assert().Len(built.Payload.Collection.Transactions, 10)
@@ -949,7 +949,7 @@ func (suite *BuilderSuite) TestBuildOn_HighRateLimit() {
 		parentID = header.Header.ID()
 
 		// each collection should be half-full with 5 transactions
-		var built model.Block
+		var built model.UnsignedBlock
 		err = suite.db.View(procedure.RetrieveClusterBlock(header.Header.ID(), &built))
 		suite.Assert().NoError(err)
 		suite.Assert().Len(built.Payload.Collection.Transactions, 5)
@@ -999,7 +999,7 @@ func (suite *BuilderSuite) TestBuildOn_LowRateLimit() {
 		parentID = header.Header.ID()
 
 		// collections should either be empty or have 1 transaction
-		var built model.Block
+		var built model.UnsignedBlock
 		err = suite.db.View(procedure.RetrieveClusterBlock(header.Header.ID(), &built))
 		suite.Assert().NoError(err)
 		if i%2 == 0 {
@@ -1051,7 +1051,7 @@ func (suite *BuilderSuite) TestBuildOn_UnlimitedPayer() {
 		parentID = header.Header.ID()
 
 		// each collection should be full with 10 transactions
-		var built model.Block
+		var built model.UnsignedBlock
 		err = suite.db.View(procedure.RetrieveClusterBlock(header.Header.ID(), &built))
 		suite.Assert().NoError(err)
 		suite.Assert().Len(built.Payload.Collection.Transactions, 10)
@@ -1103,7 +1103,7 @@ func (suite *BuilderSuite) TestBuildOn_RateLimitDryRun() {
 		parentID = header.Header.ID()
 
 		// each collection should be full with 10 transactions
-		var built model.Block
+		var built model.UnsignedBlock
 		err = suite.db.View(procedure.RetrieveClusterBlock(header.Header.ID(), &built))
 		suite.Assert().NoError(err)
 		suite.Assert().Len(built.Payload.Collection.Transactions, 10)

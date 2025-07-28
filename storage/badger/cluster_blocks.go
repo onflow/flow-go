@@ -65,7 +65,7 @@ func (b *ClusterBlocks) ProposalByID(blockID flow.Identifier) (*cluster.Proposal
 		return nil, fmt.Errorf("could not retrieve proposer signature: %w", err)
 	}
 	block, err := cluster.NewBlock(
-		cluster.UntrustedBlock{
+		cluster.UnsignedUntrustedBlock{
 			HeaderBody: header.HeaderBody,
 			Payload:    *payload,
 		},

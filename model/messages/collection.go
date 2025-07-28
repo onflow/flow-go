@@ -26,7 +26,7 @@ type CollectionResponse struct {
 // a different type (like this one), until such time as they are fully validated.
 type UntrustedClusterProposal cluster.Proposal
 
-func NewUntrustedClusterProposal(internal cluster.Block, proposerSig []byte) *UntrustedClusterProposal {
+func NewUntrustedClusterProposal(internal cluster.UnsignedBlock, proposerSig []byte) *UntrustedClusterProposal {
 	return &UntrustedClusterProposal{
 		Block:           internal,
 		ProposerSigData: proposerSig,
@@ -37,7 +37,7 @@ func NewUntrustedClusterProposal(internal cluster.Block, proposerSig []byte) *Un
 // CAUTION: Prior to using this function, ensure that the untrusted proposal has been fully validated.
 func (cbp *UntrustedClusterProposal) DeclareStructurallyValid() (*cluster.Proposal, error) {
 	block, err := cluster.NewBlock(
-		cluster.UntrustedBlock{
+		cluster.UnsignedUntrustedBlock{
 			HeaderBody: cbp.Block.HeaderBody,
 			Payload:    cbp.Block.Payload,
 		},

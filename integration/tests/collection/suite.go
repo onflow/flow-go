@@ -197,9 +197,9 @@ func (suite *CollectorSuite) TxForCluster(target flow.IdentitySkeletonList) *sdk
 
 // AwaitProposals waits to observe the given number of cluster block proposals
 // and returns them.
-func (suite *CollectorSuite) AwaitProposals(n uint) []cluster.Block {
+func (suite *CollectorSuite) AwaitProposals(n uint) []cluster.UnsignedBlock {
 
-	blocks := make([]cluster.Block, 0, n)
+	blocks := make([]cluster.UnsignedBlock, 0, n)
 	suite.T().Logf("awaiting %d cluster blocks", n)
 
 	waitFor := defaultTimeout + time.Duration(n)*2*time.Second

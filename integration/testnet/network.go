@@ -1078,7 +1078,7 @@ type BootstrapData struct {
 	Seal              *flow.Seal
 	StakedConfs       []ContainerConfig
 	Snapshot          *inmem.Snapshot
-	ClusterRootBlocks []*cluster.Block
+	ClusterRootBlocks []*cluster.UnsignedBlock
 }
 
 func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string, chainID flow.ChainID) (*BootstrapData, error) {
@@ -1431,7 +1431,7 @@ func runBeaconKG(confs []ContainerConfig) (dkgmod.ThresholdKeySet, flow.DKGIndex
 // setupClusterGenesisBlockQCs generates bootstrapping resources necessary for each collector cluster:
 //   - a cluster-specific root block
 //   - a cluster-specific root QC
-func setupClusterGenesisBlockQCs(nClusters uint, epochCounter uint64, confs []ContainerConfig) ([]*cluster.Block, flow.AssignmentList, []*flow.QuorumCertificate, error) {
+func setupClusterGenesisBlockQCs(nClusters uint, epochCounter uint64, confs []ContainerConfig) ([]*cluster.UnsignedBlock, flow.AssignmentList, []*flow.QuorumCertificate, error) {
 
 	participantsUnsorted := toParticipants(confs)
 	participants := participantsUnsorted.Sort(flow.Canonical[flow.Identity])
@@ -1442,7 +1442,7 @@ func setupClusterGenesisBlockQCs(nClusters uint, epochCounter uint64, confs []Co
 		return nil, nil, nil, fmt.Errorf("could not create cluster list: %w", err)
 	}
 
-	rootBlocks := make([]*cluster.Block, 0, nClusters)
+	rootBlocks := make([]*cluster.UnsignedBlock, 0, nClusters)
 	qcs := make([]*flow.QuorumCertificate, 0, nClusters)
 
 	for _, cluster := range clusters {

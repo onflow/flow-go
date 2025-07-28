@@ -12,8 +12,8 @@ var ClusterBlock clusterBlockFactory
 
 type clusterBlockFactory struct{}
 
-func ClusterBlockFixture(opts ...func(*cluster.Block)) *cluster.Block {
-	block := &cluster.Block{
+func ClusterBlockFixture(opts ...func(*cluster.UnsignedBlock)) *cluster.UnsignedBlock {
+	block := &cluster.UnsignedBlock{
 		HeaderBody: HeaderBodyFixture(),
 		Payload:    *ClusterPayloadFixture(3),
 	}
@@ -23,8 +23,8 @@ func ClusterBlockFixture(opts ...func(*cluster.Block)) *cluster.Block {
 	return block
 }
 
-func (f *clusterBlockFactory) WithParent(parent *cluster.Block) func(*cluster.Block) {
-	return func(block *cluster.Block) {
+func (f *clusterBlockFactory) WithParent(parent *cluster.UnsignedBlock) func(*cluster.UnsignedBlock) {
+	return func(block *cluster.UnsignedBlock) {
 		block.Height = parent.Height + 1
 		block.View = parent.View + 1
 		block.ChainID = parent.ChainID
@@ -34,31 +34,31 @@ func (f *clusterBlockFactory) WithParent(parent *cluster.Block) func(*cluster.Bl
 	}
 }
 
-func (f *clusterBlockFactory) WithHeight(height uint64) func(*cluster.Block) {
-	return func(block *cluster.Block) {
+func (f *clusterBlockFactory) WithHeight(height uint64) func(*cluster.UnsignedBlock) {
+	return func(block *cluster.UnsignedBlock) {
 		block.Height = height
 	}
 }
 
-func (f *clusterBlockFactory) WithChainID(chainID flow.ChainID) func(*cluster.Block) {
-	return func(block *cluster.Block) {
+func (f *clusterBlockFactory) WithChainID(chainID flow.ChainID) func(*cluster.UnsignedBlock) {
+	return func(block *cluster.UnsignedBlock) {
 		block.ChainID = chainID
 	}
 }
 
-func (f *clusterBlockFactory) WithProposerID(proposerID flow.Identifier) func(*cluster.Block) {
-	return func(block *cluster.Block) {
+func (f *clusterBlockFactory) WithProposerID(proposerID flow.Identifier) func(*cluster.UnsignedBlock) {
+	return func(block *cluster.UnsignedBlock) {
 		block.ProposerID = proposerID
 	}
 }
 
-func (f *clusterBlockFactory) WithPayload(payload cluster.Payload) func(*cluster.Block) {
-	return func(b *cluster.Block) {
+func (f *clusterBlockFactory) WithPayload(payload cluster.Payload) func(*cluster.UnsignedBlock) {
+	return func(b *cluster.UnsignedBlock) {
 		b.Payload = payload
 	}
 }
 
-func (f *clusterBlockFactory) Genesis() (*cluster.Block, error) {
+func (f *clusterBlockFactory) Genesis() (*cluster.UnsignedBlock, error) {
 	headerBody, err := flow.NewRootHeaderBody(flow.UntrustedHeaderBody{
 		View:      0,
 		ChainID:   "cluster",
@@ -77,7 +77,7 @@ func (f *clusterBlockFactory) Genesis() (*cluster.Block, error) {
 	}
 
 	block, err := cluster.NewRootBlock(
-		cluster.UntrustedBlock{
+		cluster.UnsignedUntrustedBlock{
 			HeaderBody: *headerBody,
 			Payload:    *payload,
 		},

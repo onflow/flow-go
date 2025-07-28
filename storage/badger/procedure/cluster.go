@@ -45,7 +45,7 @@ func InsertClusterBlock(proposal *cluster.Proposal) func(*badger.Txn) error {
 }
 
 // RetrieveClusterBlock retrieves a cluster consensus block by block ID.
-func RetrieveClusterBlock(blockID flow.Identifier, block *cluster.Block) func(*badger.Txn) error {
+func RetrieveClusterBlock(blockID flow.Identifier, block *cluster.UnsignedBlock) func(*badger.Txn) error {
 	return func(tx *badger.Txn) error {
 		// retrieve the block header
 		var header flow.Header
@@ -63,7 +63,7 @@ func RetrieveClusterBlock(blockID flow.Identifier, block *cluster.Block) func(*b
 
 		// overwrite block
 		newBlock, err := cluster.NewBlock(
-			cluster.UntrustedBlock{
+			cluster.UnsignedUntrustedBlock{
 				HeaderBody: header.HeaderBody,
 				Payload:    payload,
 			},

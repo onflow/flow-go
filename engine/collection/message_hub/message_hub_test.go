@@ -45,7 +45,7 @@ type MessageHubSuite struct {
 	cluster   flow.IdentityList
 	clusterID flow.ChainID
 	myID      flow.Identifier
-	head      *cluster.Block
+	head      *cluster.UnsignedBlock
 
 	// mocked dependencies
 	payloads          *storage.ClusterPayloads

@@ -110,7 +110,7 @@ type EncodableCluster struct {
 	Index     uint
 	Counter   uint64
 	Members   flow.IdentitySkeletonList
-	RootBlock *cluster.Block
+	RootBlock *cluster.UnsignedBlock
 	RootQC    *flow.QuorumCertificate
 }
 

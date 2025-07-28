@@ -16,7 +16,7 @@ type ClusterLightBlock struct {
 	Transactions []flow.Identifier
 }
 
-func ClusterBlockToLight(clusterBlock *cluster.Block) *ClusterLightBlock {
+func ClusterBlockToLight(clusterBlock *cluster.UnsignedBlock) *ClusterLightBlock {
 	return &ClusterLightBlock{
 		ID:           clusterBlock.ID(),
 		Height:       clusterBlock.Height,

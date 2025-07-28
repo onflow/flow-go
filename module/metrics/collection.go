@@ -66,7 +66,7 @@ func (cc *CollectionCollector) TransactionIngested(txID flow.Identifier) {
 
 // ClusterBlockProposed tracks the size and number of proposals, as well as
 // starting the collection->guarantee span.
-func (cc *CollectionCollector) ClusterBlockProposed(block *cluster.Block) {
+func (cc *CollectionCollector) ClusterBlockProposed(block *cluster.UnsignedBlock) {
 	collection := block.Payload.Collection.Light()
 
 	cc.proposals.
@@ -76,7 +76,7 @@ func (cc *CollectionCollector) ClusterBlockProposed(block *cluster.Block) {
 
 // ClusterBlockFinalized updates the guaranteed collection size gauge and
 // finishes the tx->collection span for each constituent transaction.
-func (cc *CollectionCollector) ClusterBlockFinalized(block *cluster.Block) {
+func (cc *CollectionCollector) ClusterBlockFinalized(block *cluster.UnsignedBlock) {
 	collection := block.Payload.Collection.Light()
 	chainID := block.ChainID
 

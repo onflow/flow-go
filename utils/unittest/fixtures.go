@@ -261,7 +261,7 @@ func ProposalFromBlock(block *flow.UnsignedBlock) *flow.Proposal {
 	}
 }
 
-func ClusterProposalFromBlock(block *cluster.Block) *cluster.Proposal {
+func ClusterProposalFromBlock(block *cluster.UnsignedBlock) *cluster.Proposal {
 	return &cluster.Proposal{
 		Block:           *block,
 		ProposerSigData: SignatureFixture(),
@@ -558,8 +558,8 @@ func ClusterPayloadFixture(transactionsCount int) *cluster.Payload {
 	}
 }
 
-func ClusterBlockFixtures(n int) []*cluster.Block {
-	clusterBlocks := make([]*cluster.Block, 0, n)
+func ClusterBlockFixtures(n int) []*cluster.UnsignedBlock {
+	clusterBlocks := make([]*cluster.UnsignedBlock, 0, n)
 
 	parent := ClusterBlockFixture()
 

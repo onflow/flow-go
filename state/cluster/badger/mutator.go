@@ -42,18 +42,18 @@ func NewMutableState(state *State, tracer module.Tracer, headers storage.Headers
 
 // extendContext encapsulates all state information required in order to validate a candidate cluster block.
 type extendContext struct {
-	candidate                *cluster.Block // the proposed candidate cluster block
-	finalizedClusterBlock    *flow.Header   // the latest finalized cluster block
-	finalizedConsensusHeight uint64         // the latest finalized height on the main chain
-	epochFirstHeight         uint64         // the first height of this cluster's operating epoch
-	epochLastHeight          uint64         // the last height of this cluster's operating epoch (may be unknown)
-	epochHasEnded            bool           // whether this cluster's operating epoch has ended (whether the above field is known)
+	candidate                *cluster.UnsignedBlock // the proposed candidate cluster block
+	finalizedClusterBlock    *flow.Header           // the latest finalized cluster block
+	finalizedConsensusHeight uint64                 // the latest finalized height on the main chain
+	epochFirstHeight         uint64                 // the first height of this cluster's operating epoch
+	epochLastHeight          uint64                 // the last height of this cluster's operating epoch (may be unknown)
+	epochHasEnded            bool                   // whether this cluster's operating epoch has ended (whether the above field is known)
 }
 
 // getExtendCtx reads all required information from the database in order to validate
 // a candidate cluster block.
 // No errors are expected during normal operation.
-func (m *MutableState) getExtendCtx(candidate *cluster.Block) (extendContext, error) {
+func (m *MutableState) getExtendCtx(candidate *cluster.UnsignedBlock) (extendContext, error) {
 	var ctx extendContext
 	ctx.candidate = candidate
 
@@ -151,7 +151,7 @@ func (m *MutableState) Extend(proposal *cluster.Proposal) error {
 // valid generally for inclusion in the cluster consensus, and w.r.t. its parent.
 // Expected error returns:
 //   - state.InvalidExtensionError if the candidate header is invalid
-func (m *MutableState) checkHeaderValidity(candidate *cluster.Block) error {
+func (m *MutableState) checkHeaderValidity(candidate *cluster.UnsignedBlock) error {
 	// check chain ID
 	if candidate.ChainID != m.State.clusterID {
 		return state.NewInvalidExtensionErrorf("new block chain ID (%s) does not match configured (%s)", candidate.ChainID, m.State.clusterID)
@@ -345,7 +345,7 @@ func (m *MutableState) checkPayloadTransactions(ctx extendContext) error {
 
 // checkDupeTransactionsInUnfinalizedAncestry checks for duplicate transactions in the un-finalized
 // ancestry of the given block, and returns a list of all duplicates if there are any.
-func (m *MutableState) checkDupeTransactionsInUnfinalizedAncestry(block *cluster.Block, includedTransactions map[flow.Identifier]struct{}, finalHeight uint64) ([]flow.Identifier, error) {
+func (m *MutableState) checkDupeTransactionsInUnfinalizedAncestry(block *cluster.UnsignedBlock, includedTransactions map[flow.Identifier]struct{}, finalHeight uint64) ([]flow.Identifier, error) {
 
 	var duplicateTxIDs []flow.Identifier
 	err := fork.TraverseBackward(m.headers, block.ParentID, func(ancestor *flow.Header) error {

@@ -8,7 +8,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-// Block represents a block in collection node cluster consensus. It contains
+// UnsignedBlock represents a block in collection node cluster consensus. It contains
 // a standard block header with a payload containing only a single collection.
 //
 // Zero values for certain HeaderBody fields are allowed only for root blocks, which must be constructed
@@ -16,26 +16,26 @@ import (
 // using NewBlock to ensure validation of the block fields.
 //
 //structwrite:immutable - mutations allowed only within the constructor
-type Block = flow.GenericBlock[Payload]
+type UnsignedBlock = flow.GenericBlock[Payload]
 
-// UntrustedBlock is an untrusted input-only representation of a cluster Block,
+// UnsignedUntrustedBlock is an untrusted input-only representation of a cluster UnsignedBlock,
 // used for construction.
 //
 // This type exists to ensure that constructor functions are invoked explicitly
 // with named fields, which improves clarity and reduces the risk of incorrect field
 // ordering during construction.
 //
-// An instance of UntrustedBlock should be validated and converted into
-// a trusted cluster Block using the NewBlock constructor (or NewRootBlock
+// An instance of UnsignedUntrustedBlock should be validated and converted into
+// a trusted cluster UnsignedBlock using the NewBlock constructor (or NewRootBlock
 // for the root block).
-type UntrustedBlock Block
+type UnsignedUntrustedBlock UnsignedBlock
 
 // NewBlock creates a new block in collection node cluster consensus.
 // This constructor enforces validation rules to ensure the block is well-formed.
 // It must be used to construct all non-root blocks.
 //
-// All errors indicate that a valid Block cannot be constructed from the input.
-func NewBlock(untrusted UntrustedBlock) (*Block, error) {
+// All errors indicate that a valid UnsignedBlock cannot be constructed from the input.
+func NewBlock(untrusted UnsignedUntrustedBlock) (*UnsignedBlock, error) {
 	// validate header body
 	headerBody, err := flow.NewHeaderBody(flow.UntrustedHeaderBody(untrusted.HeaderBody))
 	if err != nil {
@@ -48,7 +48,7 @@ func NewBlock(untrusted UntrustedBlock) (*Block, error) {
 		return nil, fmt.Errorf("invalid cluster payload: %w", err)
 	}
 
-	return &Block{
+	return &UnsignedBlock{
 		HeaderBody: *headerBody,
 		Payload:    *payload,
 	}, nil
@@ -58,7 +58,7 @@ func NewBlock(untrusted UntrustedBlock) (*Block, error) {
 //
 // This constructor must be used **only** for constructing the root block,
 // which is the only case where zero values are allowed.
-func NewRootBlock(untrusted UntrustedBlock) (*Block, error) {
+func NewRootBlock(untrusted UnsignedUntrustedBlock) (*UnsignedBlock, error) {
 	rootHeaderBody, err := flow.NewRootHeaderBody(flow.UntrustedHeaderBody(untrusted.HeaderBody))
 	if err != nil {
 		return nil, fmt.Errorf("invalid root header body: %w", err)
@@ -73,7 +73,7 @@ func NewRootBlock(untrusted UntrustedBlock) (*Block, error) {
 		return nil, fmt.Errorf("invalid root cluster payload: %w", err)
 	}
 
-	return &Block{
+	return &UnsignedBlock{
 		HeaderBody: *rootHeaderBody,
 		Payload:    *rootPayload,
 	}, nil
@@ -81,7 +81,7 @@ func NewRootBlock(untrusted UntrustedBlock) (*Block, error) {
 
 // Proposal represents a signed proposed block in collection node cluster consensus.
 type Proposal struct {
-	Block           Block
+	Block           UnsignedBlock
 	ProposerSigData []byte
 }
 
