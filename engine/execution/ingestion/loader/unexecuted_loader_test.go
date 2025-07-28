@@ -94,7 +94,7 @@ func TestLoadingUnexecutedBlocks(t *testing.T) {
 
 		es := newMockExecutionState(seal, genesis)
 		headers := new(storage.Headers)
-		headers.On("ByBlockID", genesis.ID()).Return(genesis.ToHeader(), nil)
+		headers.On("ByBlockID", genesis.ID()).Return(genesis.ToHeader(), nil).Once()
 		log := unittest.Logger()
 		loader := loader.NewUnexecutedLoader(log, ps, headers, es)
 
@@ -102,6 +102,8 @@ func TestLoadingUnexecutedBlocks(t *testing.T) {
 		require.NoError(t, err)
 
 		unittest.IDsEqual(t, []flow.Identifier{}, unexecuted)
+
+		headers.AssertExpectations(t)
 	})
 
 	t.Run("no finalized, nor pending unexected", func(t *testing.T) {
@@ -133,6 +135,8 @@ func TestLoadingUnexecutedBlocks(t *testing.T) {
 		require.NoError(t, err)
 
 		unittest.IDsEqual(t, []flow.Identifier{blockA.ID(), blockB.ID(), blockC.ID(), blockD.ID()}, unexecuted)
+
+		headers.AssertExpectations(t)
 	})
 
 	t.Run("no finalized, some pending executed", func(t *testing.T) {
@@ -168,6 +172,8 @@ func TestLoadingUnexecutedBlocks(t *testing.T) {
 		require.NoError(t, err)
 
 		unittest.IDsEqual(t, []flow.Identifier{blockC.ID(), blockD.ID()}, unexecuted)
+
+		headers.AssertExpectations(t)
 	})
 
 	t.Run("all finalized have been executed, and no pending executed", func(t *testing.T) {
@@ -206,6 +212,8 @@ func TestLoadingUnexecutedBlocks(t *testing.T) {
 		require.NoError(t, err)
 
 		unittest.IDsEqual(t, []flow.Identifier{blockD.ID()}, unexecuted)
+
+		headers.AssertExpectations(t)
 	})
 
 	t.Run("some finalized are executed and conflicting are executed", func(t *testing.T) {
@@ -243,6 +251,8 @@ func TestLoadingUnexecutedBlocks(t *testing.T) {
 		require.NoError(t, err)
 
 		unittest.IDsEqual(t, []flow.Identifier{blockD.ID()}, unexecuted)
+
+		headers.AssertExpectations(t)
 	})
 
 	t.Run("all pending executed", func(t *testing.T) {
@@ -283,6 +293,8 @@ func TestLoadingUnexecutedBlocks(t *testing.T) {
 		require.NoError(t, err)
 
 		unittest.IDsEqual(t, []flow.Identifier{}, unexecuted)
+
+		headers.AssertExpectations(t)
 	})
 
 	t.Run("some fork is executed", func(t *testing.T) {
@@ -359,5 +371,7 @@ func TestLoadingUnexecutedBlocks(t *testing.T) {
 			// it won't included
 			blockH.ID()},
 			unexecuted)
+
+		headers.AssertExpectations(t)
 	})
 }
