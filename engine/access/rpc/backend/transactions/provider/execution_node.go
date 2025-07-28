@@ -206,7 +206,7 @@ func (e *ENTransactionProvider) TransactionResultsByBlockID(
 	i := 0
 	errInsufficientResults := status.Errorf(
 		codes.Internal,
-		"number of transaction results returned by execution node is less than the number of transactions  in the block",
+		"number of transaction results returned by execution node is less than the number of transactions in the block",
 	)
 
 	for _, guarantee := range block.Payload.Guarantees {

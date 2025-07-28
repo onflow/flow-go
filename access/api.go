@@ -126,8 +126,6 @@ type API interface {
 	GetExecutionResultForBlockID(ctx context.Context, blockID flow.Identifier) (*flow.ExecutionResult, error)
 	GetExecutionResultByID(ctx context.Context, id flow.Identifier) (*flow.ExecutionResult, error)
 
-	// SubscribeBlocks
-
 	// SubscribeBlocksFromStartBlockID subscribes to the finalized or sealed blocks starting at the requested
 	// start block id, up until the latest available block. Once the latest is
 	// reached, the stream will remain open and responses are sent for each new
@@ -174,8 +172,6 @@ type API interface {
 	//
 	// If invalid parameters will be supplied SubscribeBlocksFromLatest will return a failed subscription.
 	SubscribeBlocksFromLatest(ctx context.Context, blockStatus flow.BlockStatus) subscription.Subscription
-
-	// SubscribeHeaders
 
 	// SubscribeBlockHeadersFromStartBlockID streams finalized or sealed block headers starting at the requested
 	// start block id, up until the latest available block header. Once the latest is

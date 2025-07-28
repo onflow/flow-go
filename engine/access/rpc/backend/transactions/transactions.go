@@ -216,8 +216,6 @@ func (t *Transactions) SendTransaction(ctx context.Context, tx *flow.Transaction
 
 // trySendTransaction tries to transaction to a collection node
 func (t *Transactions) trySendTransaction(ctx context.Context, tx *flow.TransactionBody) error {
-	//TODO: can we use noop rpc client to avoid check for nil?
-
 	// if a collection node rpc client was provided at startup, just use that
 	if t.collectionRPCClient != nil {
 		return t.grpcTxSend(ctx, t.collectionRPCClient, tx)
@@ -232,7 +230,7 @@ func (t *Transactions) trySendTransaction(ctx context.Context, tx *flow.Transact
 	var sendError error
 	logAnyError := func() {
 		if sendError != nil {
-			t.log.Info().Err(err).Msg("failed to send transactions  to collector nodes")
+			t.log.Info().Err(err).Msg("failed to send transactions to collector nodes")
 		}
 	}
 	defer logAnyError()
@@ -321,16 +319,12 @@ func (t *Transactions) SendRawTransaction(
 }
 
 func (t *Transactions) GetTransaction(ctx context.Context, txID flow.Identifier) (*flow.TransactionBody, error) {
-	// look up transaction from storage
 	tx, err := t.transactions.ByID(txID)
-	txErr := rpc.ConvertStorageError(err)
-
-	if txErr != nil {
-		if status.Code(txErr) == codes.NotFound {
+	if err != nil {
+		if errors.Is(err, storage.ErrNotFound) {
 			return t.getHistoricalTransaction(ctx, txID)
 		}
-		// Other Error trying to retrieve the transaction, return with err
-		return nil, txErr
+		return nil, rpc.ConvertStorageError(err)
 	}
 
 	return tx, nil
@@ -374,10 +368,8 @@ func (t *Transactions) GetTransactionResult(
 
 	tx, err := t.transactions.ByID(txID)
 	if err != nil {
-		txErr := rpc.ConvertStorageError(err)
-
-		if status.Code(txErr) != codes.NotFound {
-			return nil, txErr
+		if !errors.Is(err, storage.ErrNotFound) {
+			return nil, rpc.ConvertStorageError(err)
 		}
 
 		// Tx not found. If we have historical Sporks setup, lets look through those as well
@@ -487,14 +479,14 @@ func (t *Transactions) lookupCollectionIDInBlock(
 	txID flow.Identifier,
 ) (flow.Identifier, error) {
 	for _, guarantee := range block.Payload.Guarantees {
-		collection, err := t.collections.LightByID(guarantee.ID())
+		collectionID := guarantee.ID()
+		collection, err := t.collections.LightByID(collectionID)
 		if err != nil {
-			return flow.ZeroID, fmt.Errorf("failed to get collection %s in indexed block: %w", guarantee.ID(), err)
+			return flow.ZeroID, fmt.Errorf("failed to get collection %s in indexed block: %w", collectionID, err)
 		}
-
 		for _, collectionTxID := range collection.Transactions {
 			if collectionTxID == txID {
-				return guarantee.ID(), nil
+				return collectionID, nil
 			}
 		}
 	}
@@ -554,7 +546,6 @@ func (t *Transactions) GetTransactionResultByIndex(
 	index uint32,
 	requiredEventEncodingVersion entities.EventEncodingVersion,
 ) (*accessmodel.TransactionResult, error) {
-	// TODO: https://github.com/onflow/flow-go/issues/2175 so caching doesn't cause a circular dependency
 	block, err := t.blocks.ByID(blockID)
 	if err != nil {
 		return nil, rpc.ConvertStorageError(err)
@@ -602,7 +593,6 @@ func (t *Transactions) lookupTransactionResult(
 	requiredEventEncodingVersion entities.EventEncodingVersion,
 ) (*accessmodel.TransactionResult, error) {
 	txResult, err := t.txProvider.TransactionResult(ctx, header, txID, requiredEventEncodingVersion)
-
 	if err != nil {
 		// if either the storage or execution node reported no results or there were not enough execution results
 		if status.Code(err) == codes.NotFound {
@@ -656,7 +646,7 @@ func (t *Transactions) getHistoricalTransactionResult(
 			}
 
 			if result.GetStatus() == entities.TransactionStatus_PENDING {
-				// This is on a historical node. No transactions  from it will ever be
+				// This is on a historical node. No transactions from it will ever be
 				// executed, therefore we should consider this expired
 				result.Status = entities.TransactionStatus_EXPIRED
 			}

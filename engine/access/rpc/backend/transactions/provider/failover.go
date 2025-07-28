@@ -34,8 +34,8 @@ func (f *FailoverTransactionProvider) TransactionResult(
 		return localResult, nil
 	}
 
-	ENResult, ENErr := f.execNodeProvider.TransactionResult(ctx, header, txID, encodingVersion)
-	return ENResult, ENErr
+	execNodeResult, execNodeErr := f.execNodeProvider.TransactionResult(ctx, header, txID, encodingVersion)
+	return execNodeResult, execNodeErr
 }
 
 func (f *FailoverTransactionProvider) TransactionResultByIndex(
@@ -49,8 +49,8 @@ func (f *FailoverTransactionProvider) TransactionResultByIndex(
 		return localResult, nil
 	}
 
-	ENResult, ENErr := f.execNodeProvider.TransactionResultByIndex(ctx, block, index, encodingVersion)
-	return ENResult, ENErr
+	execNodeResult, execNodeErr := f.execNodeProvider.TransactionResultByIndex(ctx, block, index, encodingVersion)
+	return execNodeResult, execNodeErr
 }
 
 func (f *FailoverTransactionProvider) TransactionResultsByBlockID(
@@ -63,6 +63,6 @@ func (f *FailoverTransactionProvider) TransactionResultsByBlockID(
 		return localResults, nil
 	}
 
-	ENResults, ENErr := f.execNodeProvider.TransactionResultsByBlockID(ctx, block, encodingVersion)
-	return ENResults, ENErr
+	execNodeResults, execNodeErr := f.execNodeProvider.TransactionResultsByBlockID(ctx, block, encodingVersion)
+	return execNodeResults, execNodeErr
 }
