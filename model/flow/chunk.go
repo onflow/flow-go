@@ -79,7 +79,6 @@ func NewChunk(
 	}
 }
 
-
 // ID returns a unique id for this entity
 func (ch *Chunk) ID() Identifier {
 	return MakeID(ch.ChunkBody)

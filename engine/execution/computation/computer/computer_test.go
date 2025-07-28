@@ -118,7 +118,6 @@ func (committer *fakeCommitter) CommitView(
 	}
 
 func TestBlockExecutor_ExecuteBlock(t *testing.T) {
-
 	rag := &RandomAddressGenerator{}
 
 	executorID := unittest.IdentifierFixture()

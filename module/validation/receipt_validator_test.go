@@ -179,7 +179,6 @@ func (s *ReceiptValidationSuite) TestReceiptTooFewChunks() {
 	s.Assert().True(engine.IsInvalidInputError(err))
 }
 
-
 // TestReceiptServiceEventCountMismatch tests that we reject any receipt where
 // the sum of service event counts specified by chunks is inconsistent with the
 // number of service events in the ExecutionResult.
