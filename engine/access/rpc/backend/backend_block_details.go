@@ -106,7 +106,7 @@ func (b *backendBlockDetails) getBlockStatus(ctx context.Context, block *flow.Bl
 		return flow.BlockStatusUnknown, err
 	}
 
-	if block.Header.Height > sealed.Height {
+	if block.Height > sealed.Height {
 		return flow.BlockStatusFinalized, nil
 	}
 	return flow.BlockStatusSealed, nil

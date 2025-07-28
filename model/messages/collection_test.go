@@ -36,7 +36,7 @@ func TestClusterProposal_DeclareStructurallyValid(t *testing.T) {
 
 	t.Run("invalid input with invalid block", func(t *testing.T) {
 		untrustedProposal := messages.UntrustedClusterProposal(*unittest.ClusterProposalFixture())
-		untrustedProposal.Block.Header.ParentID = flow.ZeroID
+		untrustedProposal.Block.ParentID = flow.ZeroID
 
 		res, err := untrustedProposal.DeclareStructurallyValid()
 		require.Error(t, err)

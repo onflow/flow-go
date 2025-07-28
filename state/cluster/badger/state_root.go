@@ -28,12 +28,12 @@ func NewStateRoot(genesis *cluster.Block, qc *flow.QuorumCertificate, epoch uint
 
 func validateClusterGenesis(genesis *cluster.Block) error {
 	// check height of genesis block
-	if genesis.Header.Height != 0 {
-		return fmt.Errorf("height of genesis cluster block should be 0 (got %d)", genesis.Header.Height)
+	if genesis.Height != 0 {
+		return fmt.Errorf("height of genesis cluster block should be 0 (got %d)", genesis.Height)
 	}
 	// check header parent ID
-	if genesis.Header.ParentID != flow.ZeroID {
-		return fmt.Errorf("genesis parent ID must be zero hash (got %x)", genesis.Header.ParentID)
+	if genesis.ParentID != flow.ZeroID {
+		return fmt.Errorf("genesis parent ID must be zero hash (got %x)", genesis.ParentID)
 	}
 
 	// check payload
@@ -46,7 +46,7 @@ func validateClusterGenesis(genesis *cluster.Block) error {
 }
 
 func (s StateRoot) ClusterID() flow.ChainID {
-	return s.block.Header.ChainID
+	return s.block.ChainID
 }
 
 func (s StateRoot) Block() *cluster.Block {

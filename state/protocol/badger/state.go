@@ -188,8 +188,8 @@ func Bootstrap(
 			return fmt.Errorf("could not update epoch metrics: %w", err)
 		}
 		metrics.BlockSealed(lastSealed)
-		metrics.SealedHeight(lastSealed.Header.Height)
-		metrics.FinalizedHeight(lastFinalized.Header.Height)
+		metrics.SealedHeight(lastSealed.Height)
+		metrics.FinalizedHeight(lastFinalized.Height)
 		for _, proposal := range segment.Blocks {
 			metrics.BlockFinalized(&proposal.Block)
 		}
@@ -325,7 +325,7 @@ func bootstrapSealingSegment(
 
 		for _, proposal := range segment.ExtraBlocks {
 			blockID := proposal.Block.ID()
-			height := proposal.Block.Header.Height
+			height := proposal.Block.Height
 			err := blocks.StoreTx(proposal)(tx)
 			if err != nil {
 				return fmt.Errorf("could not insert SealingSegment extra block: %w", err)
@@ -334,8 +334,8 @@ func bootstrapSealingSegment(
 			if err != nil {
 				return fmt.Errorf("could not index SealingSegment extra block (id=%x): %w", blockID, err)
 			}
-			if proposal.Block.Header.ContainsParentQC() {
-				err = qcs.StoreTx(proposal.Block.Header.ParentQC())(tx)
+			if proposal.Block.ContainsParentQC() {
+				err = qcs.StoreTx(proposal.Block.ParentQC())(tx)
 				if err != nil {
 					return fmt.Errorf("could not store qc for SealingSegment extra block (id=%x): %w", blockID, err)
 				}
@@ -344,7 +344,7 @@ func bootstrapSealingSegment(
 
 		for i, proposal := range segment.Blocks {
 			blockID := proposal.Block.ID()
-			height := proposal.Block.Header.Height
+			height := proposal.Block.Height
 
 			err := blocks.StoreTx(proposal)(tx)
 			if err != nil {
@@ -354,8 +354,8 @@ func bootstrapSealingSegment(
 			if err != nil {
 				return fmt.Errorf("could not index SealingSegment block (id=%x): %w", blockID, err)
 			}
-			if proposal.Block.Header.ContainsParentQC() {
-				err = qcs.StoreTx(proposal.Block.Header.ParentQC())(tx)
+			if proposal.Block.ContainsParentQC() {
+				err = qcs.StoreTx(proposal.Block.ParentQC())(tx)
 				if err != nil {
 					return fmt.Errorf("could not store qc for SealingSegment block (id=%x): %w", blockID, err)
 				}
@@ -378,7 +378,7 @@ func bootstrapSealingSegment(
 
 			// for all but the first block in the segment, index the parent->child relationship
 			if i > 0 {
-				err = operation.InsertBlockChildren(proposal.Block.Header.ParentID, []flow.Identifier{blockID})(txn)
+				err = operation.InsertBlockChildren(proposal.Block.ParentID, []flow.Identifier{blockID})(txn)
 				if err != nil {
 					return fmt.Errorf("could not insert child index for block (id=%x): %w", blockID, err)
 				}
@@ -412,8 +412,8 @@ func bootstrapStatePointers(root protocol.Snapshot) func(*transaction.Tx) error 
 		}
 
 		safetyData := &hotstuff.SafetyData{
-			LockedOneChainView:      highest.Header.View,
-			HighestAcknowledgedView: highest.Header.View,
+			LockedOneChainView:      highest.View,
+			HighestAcknowledgedView: highest.View,
 		}
 
 		// Per convention, all blocks in the sealing segment must be finalized. Therefore, a QC must
@@ -430,44 +430,44 @@ func bootstrapStatePointers(root protocol.Snapshot) func(*transaction.Tx) error 
 		if rootQC == nil {
 			return fmt.Errorf("QC for highest (finalized) block in sealing segment cannot be nil")
 		}
-		if rootQC.View != highest.Header.View {
-			return fmt.Errorf("root QC's view %d does not match the highest block in sealing segment (view %d)", rootQC.View, highest.Header.View)
+		if rootQC.View != highest.View {
+			return fmt.Errorf("root QC's view %d does not match the highest block in sealing segment (view %d)", rootQC.View, highest.View)
 		}
 		if rootQC.BlockID != highest.ID() {
 			return fmt.Errorf("root QC is for block %v, which does not match the highest block %v in sealing segment", rootQC.BlockID, highest.ID())
 		}
 
 		livenessData := &hotstuff.LivenessData{
-			CurrentView: highest.Header.View + 1,
+			CurrentView: highest.View + 1,
 			NewestQC:    rootQC,
 		}
 
 		bdtx := tx.DBTxn // tx is just a wrapper around a badger transaction with the additional ability to register callbacks that are executed after the badger transaction completed _successfully_
 		// insert initial views for HotStuff
-		err = operation.InsertSafetyData(highest.Header.ChainID, safetyData)(bdtx)
+		err = operation.InsertSafetyData(highest.ChainID, safetyData)(bdtx)
 		if err != nil {
 			return fmt.Errorf("could not insert safety data: %w", err)
 		}
-		err = operation.InsertLivenessData(highest.Header.ChainID, livenessData)(bdtx)
+		err = operation.InsertLivenessData(highest.ChainID, livenessData)(bdtx)
 		if err != nil {
 			return fmt.Errorf("could not insert liveness data: %w", err)
 		}
 
 		// insert height pointers
-		err = operation.InsertRootHeight(highest.Header.Height)(bdtx)
+		err = operation.InsertRootHeight(highest.Height)(bdtx)
 		if err != nil {
 			return fmt.Errorf("could not insert finalized root height: %w", err)
 		}
 		// the sealed root height is the lowest block in sealing segment
-		err = operation.InsertSealedRootHeight(lowest.Header.Height)(bdtx)
+		err = operation.InsertSealedRootHeight(lowest.Height)(bdtx)
 		if err != nil {
 			return fmt.Errorf("could not insert sealed root height: %w", err)
 		}
-		err = operation.InsertFinalizedHeight(highest.Header.Height)(bdtx)
+		err = operation.InsertFinalizedHeight(highest.Height)(bdtx)
 		if err != nil {
 			return fmt.Errorf("could not insert finalized height: %w", err)
 		}
-		err = operation.InsertSealedHeight(lowest.Header.Height)(bdtx)
+		err = operation.InsertSealedHeight(lowest.Height)(bdtx)
 		if err != nil {
 			return fmt.Errorf("could not insert sealed height: %w", err)
 		}
@@ -613,7 +613,7 @@ func indexEpochHeights(segment *flow.SealingSegment) func(*badger.Txn) error {
 		// Index `E.counter → B.Height`.
 		if segment.IsSporkRoot() {
 			counter := segment.LatestProtocolStateEntry().EpochEntry.EpochCounter()
-			firstHeight := segment.Highest().Header.Height
+			firstHeight := segment.Highest().Height
 			err := operation.InsertEpochFirstHeight(counter, firstHeight)(tx)
 			if err != nil {
 				return fmt.Errorf("could not index first height %d for epoch %d: %w", firstHeight, counter, err)
@@ -631,7 +631,7 @@ func indexEpochHeights(segment *flow.SealingSegment) func(*badger.Txn) error {
 		for _, block := range allBlocks[1:] {
 			thisBlockEpochCounter := segment.ProtocolStateEntries[block.Block.Payload.ProtocolStateID].EpochEntry.EpochCounter()
 			if lastBlockEpochCounter != thisBlockEpochCounter {
-				firstHeight := block.Block.Header.Height
+				firstHeight := block.Block.Height
 				err := operation.InsertEpochFirstHeight(thisBlockEpochCounter, firstHeight)(tx)
 				if err != nil {
 					return fmt.Errorf("could not index first height %d for epoch %d: %w", firstHeight, thisBlockEpochCounter, err)

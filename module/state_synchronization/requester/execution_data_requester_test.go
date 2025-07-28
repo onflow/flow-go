@@ -547,7 +547,7 @@ func (suite *ExecutionDataRequesterSuite) consumeExecutionDataNotifications(cfg 
 			return
 		}
 
-		suite.T().Logf("notified of execution data for block %v height %d (%d/%d)", ed.BlockID, cfg.blocksByID[ed.BlockID].Header.Height, len(fetchedExecutionData), cfg.sealedCount)
+		suite.T().Logf("notified of execution data for block %v height %d (%d/%d)", ed.BlockID, cfg.blocksByID[ed.BlockID].Height, len(fetchedExecutionData), cfg.sealedCount)
 
 		if cfg.IsLastSeal(ed.BlockID) {
 			done()
@@ -559,7 +559,7 @@ func (suite *ExecutionDataRequesterSuite) finalizeBlocks(cfg *fetchTestRun, foll
 	for i := cfg.StartHeight(); i <= cfg.endHeight; i++ {
 		b := cfg.blocksByHeight[i]
 
-		suite.T().Log(">>>> Finalizing block", b.ID(), b.Header.Height)
+		suite.T().Log(">>>> Finalizing block", b.ID(), b.Height)
 
 		if len(b.Payload.Seals) > 0 {
 			seal := b.Payload.Seals[0]

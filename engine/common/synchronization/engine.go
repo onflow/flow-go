@@ -303,8 +303,8 @@ func (e *Engine) onBlockResponse(originID flow.Identifier, res *messages.BlockRe
 		return
 	}
 
-	first := res.Blocks[0].Block.Header.Height
-	last := res.Blocks[len(res.Blocks)-1].Block.Header.Height
+	first := res.Blocks[0].Block.Height
+	last := res.Blocks[len(res.Blocks)-1].Block.Height
 	e.log.Debug().Uint64("first", first).Uint64("last", last).Msg("received block response")
 
 	filteredBlocks := make([]*messages.UntrustedProposal, 0, len(res.Blocks))

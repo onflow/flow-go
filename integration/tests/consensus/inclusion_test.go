@@ -117,7 +117,7 @@ func (is *InclusionSuite) TestCollectionGuaranteeIncluded() {
 	require.NoError(t, err)
 	sentinel.SignerIndices = signerIndices
 	sentinel.ReferenceBlockID = is.net.Root().ID()
-	sentinel.ChainID = is.net.BootstrapData.ClusterRootBlocks[0].Header.ChainID
+	sentinel.ChainID = is.net.BootstrapData.ClusterRootBlocks[0].ChainID
 	colID := sentinel.CollectionID
 
 	is.waitUntilSeenProposal(deadline)
@@ -155,9 +155,9 @@ func (is *InclusionSuite) waitUntilSeenProposal(deadline time.Time) {
 		require.NoError(is.T(), err)
 		block := proposalTrusted.Block
 
-		is.T().Logf("receive block proposal from %v, height %v", originID, block.Header.Height)
+		is.T().Logf("receive block proposal from %v, height %v", originID, block.Height)
 		// wait until proposal finalized
-		if block.Header.Height >= 1 {
+		if block.Height >= 1 {
 			return
 		}
 	}
@@ -207,7 +207,7 @@ func (is *InclusionSuite) waitUntilCollectionIncludeInProposal(deadline time.Tim
 		block := proposalTrusted.Block
 
 		guarantees := block.Payload.Guarantees
-		height := block.Header.Height
+		height := block.Height
 		is.T().Logf("receive block proposal height %v from %v, %v guarantees included in the payload!", height, originID, len(guarantees))
 
 		// check if the collection guarantee is included
@@ -263,7 +263,7 @@ func (is *InclusionSuite) waitUntilProposalConfirmed(deadline time.Time, sentine
 		// if the parent is in the map, it is on a chain that included the
 		// guarantee; take parent confirmatians plus one as the confirmations
 		// for the follow-up block
-		n, ok := confirmations[nextBlock.Header.ParentID]
+		n, ok := confirmations[nextBlock.ParentID]
 		if ok {
 			confirmations[proposalID] = n + 1
 			is.T().Logf("%x: collection guarantee %x confirmed! (count: %d)\n", proposalID, colID, n+1)

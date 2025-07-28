@@ -39,31 +39,31 @@ func Bootstrap(db *badger.DB, stateRoot *StateRoot) (*State, error) {
 	rootQC := stateRoot.QC()
 	// bootstrap cluster state
 	err = operation.RetryOnConflict(state.db.Update, func(tx *badger.Txn) error {
-		chainID := genesis.Header.ChainID
+		chainID := genesis.ChainID
 		// insert the block - by protocol convention, the genesis block does not have a proposer signature, which must be handled by the implementation
 		err := procedure.InsertClusterBlock(&clustermodel.Proposal{Block: *genesis, ProposerSigData: nil})(tx)
 		if err != nil {
 			return fmt.Errorf("could not insert genesis block: %w", err)
 		}
 		// insert block height -> ID mapping
-		err = operation.IndexClusterBlockHeight(chainID, genesis.Header.Height, genesis.ID())(tx)
+		err = operation.IndexClusterBlockHeight(chainID, genesis.Height, genesis.ID())(tx)
 		if err != nil {
 			return fmt.Errorf("failed to map genesis block height to block: %w", err)
 		}
 		// insert boundary
-		err = operation.InsertClusterFinalizedHeight(chainID, genesis.Header.Height)(tx)
+		err = operation.InsertClusterFinalizedHeight(chainID, genesis.Height)(tx)
 		// insert started view for hotstuff
 		if err != nil {
 			return fmt.Errorf("could not insert genesis boundary: %w", err)
 		}
 
 		safetyData := &hotstuff.SafetyData{
-			LockedOneChainView:      genesis.Header.View,
-			HighestAcknowledgedView: genesis.Header.View,
+			LockedOneChainView:      genesis.View,
+			HighestAcknowledgedView: genesis.View,
 		}
 
 		livenessData := &hotstuff.LivenessData{
-			CurrentView: genesis.Header.View + 1,
+			CurrentView: genesis.View + 1,
 			NewestQC:    rootQC,
 		}
 		// insert safety data

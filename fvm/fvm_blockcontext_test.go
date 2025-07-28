@@ -1501,11 +1501,11 @@ func TestBlockContext_GetBlockInfo(t *testing.T) {
 	block2 := unittest.BlockWithParentFixture(block1.ToHeader())
 	block3 := unittest.BlockWithParentFixture(block2.ToHeader())
 
-	blocks.On("ByHeightFrom", block1.Header.Height, block1.ToHeader()).Return(block1.ToHeader(), nil)
-	blocks.On("ByHeightFrom", block2.Header.Height, block1.ToHeader()).Return(block2.ToHeader(), nil)
+	blocks.On("ByHeightFrom", block1.Height, block1.ToHeader()).Return(block1.ToHeader(), nil)
+	blocks.On("ByHeightFrom", block2.Height, block1.ToHeader()).Return(block2.ToHeader(), nil)
 
 	type logPanic struct{}
-	blocks.On("ByHeightFrom", block3.Header.Height, block1.ToHeader()).Run(func(args mock.Arguments) { panic(logPanic{}) })
+	blocks.On("ByHeightFrom", block3.Height, block1.ToHeader()).Run(func(args mock.Arguments) { panic(logPanic{}) })
 
 	blockCtx := fvm.NewContextFromParent(ctx, fvm.WithBlocks(blocks), fvm.WithBlockHeader(block1.ToHeader()))
 
@@ -1540,10 +1540,10 @@ func TestBlockContext_GetBlockInfo(t *testing.T) {
 			t,
 			fmt.Sprintf(
 				"Block(height: %v, view: %v, id: 0x%x, timestamp: %.8f)",
-				block1.Header.Height,
-				block1.Header.View,
+				block1.Height,
+				block1.View,
 				block1.ID(),
-				float64(block1.Header.Timestamp/1000), // Unix time in seconds
+				float64(block1.Timestamp/1000), // Unix time in seconds
 			),
 			output.Logs[0],
 		)
@@ -1551,10 +1551,10 @@ func TestBlockContext_GetBlockInfo(t *testing.T) {
 			t,
 			fmt.Sprintf(
 				"Block(height: %v, view: %v, id: 0x%x, timestamp: %.8f)",
-				block2.Header.Height,
-				block2.Header.View,
+				block2.Height,
+				block2.View,
 				block2.ID(),
-				float64(block2.Header.Timestamp/1000), // Unix time in seconds
+				float64(block2.Timestamp/1000), // Unix time in seconds
 			),
 			output.Logs[1],
 		)
@@ -1582,10 +1582,10 @@ func TestBlockContext_GetBlockInfo(t *testing.T) {
 		require.Equal(t,
 			fmt.Sprintf(
 				"Block(height: %v, view: %v, id: 0x%x, timestamp: %.8f)",
-				block1.Header.Height,
-				block1.Header.View,
+				block1.Height,
+				block1.View,
 				block1.ID(),
-				float64(block1.Header.Timestamp/1000), // Unix time in seconds
+				float64(block1.Timestamp/1000), // Unix time in seconds
 			),
 			output.Logs[0],
 		)
@@ -1593,10 +1593,10 @@ func TestBlockContext_GetBlockInfo(t *testing.T) {
 			t,
 			fmt.Sprintf(
 				"Block(height: %v, view: %v, id: 0x%x, timestamp: %.8f)",
-				block2.Header.Height,
-				block2.Header.View,
+				block2.Height,
+				block2.View,
 				block2.ID(),
-				float64(block2.Header.Timestamp/1000), // Unix time in seconds
+				float64(block2.Timestamp/1000), // Unix time in seconds
 			),
 			output.Logs[1],
 		)

@@ -87,14 +87,14 @@ func NewClusterSwitchoverTestCase(t *testing.T, conf ClusterSwitchoverTestConf) 
 	tc.sentTransactions = make(map[uint64]map[uint]flow.IdentifierList)
 	tc.hub = stub.NewNetworkHub()
 
-	rootHeader := unittest.Block.Genesis(flow.Emulator).Header
+	rootHeaderBody := unittest.Block.Genesis(flow.Emulator).HeaderBody
 	counter := uint64(1)
 
 	setup := unittest.EpochSetupFixture(
 		unittest.WithParticipants(identities.ToSkeleton()),
 		unittest.SetupWithCounter(counter),
-		unittest.WithFirstView(rootHeader.View),
-		unittest.WithFinalView(rootHeader.View+100_000),
+		unittest.WithFirstView(rootHeaderBody.View),
+		unittest.WithFinalView(rootHeaderBody.View+100_000),
 		unittest.WithAssignments(unittest.ClusterAssignment(tc.conf.clusters, identities.ToSkeleton())),
 	)
 	commit := unittest.EpochCommitFixture(
@@ -105,7 +105,7 @@ func NewClusterSwitchoverTestCase(t *testing.T, conf ClusterSwitchoverTestConf) 
 	)
 
 	// create a root snapshot with the given number of initial clusters
-	root, result, seal := unittest.BootstrapFixtureWithSetupAndCommit(rootHeader, setup, commit)
+	root, result, seal := unittest.BootstrapFixtureWithSetupAndCommit(rootHeaderBody, setup, commit)
 	seal.ResultID = result.ID()
 	qc := unittest.QuorumCertificateFixture(unittest.QCWithRootBlockID(root.ID()))
 

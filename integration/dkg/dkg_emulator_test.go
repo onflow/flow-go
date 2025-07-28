@@ -110,7 +110,7 @@ func (s *EmulatorSuite) runTest(goodNodes int, emulatorProblems bool) {
 			for _, node := range nodes {
 				node.ProtocolEvents.BlockFinalized(block.ToHeader())
 			}
-			view = int(block.Header.View)
+			view = int(block.View)
 		}
 	}
 

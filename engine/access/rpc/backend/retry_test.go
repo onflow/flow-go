@@ -25,7 +25,7 @@ func (suite *Suite) TestTransactionRetry() {
 	)
 	transactionBody.ReferenceBlockID = block.ID()
 	headBlock := unittest.BlockFixture(
-		unittest.Block.WithHeight(block.Header.Height - 1), // head is behind the current block
+		unittest.Block.WithHeight(block.Height - 1), // head is behind the current block
 	)
 	suite.state.On("Final").Return(suite.snapshot, nil).Maybe()
 
@@ -46,24 +46,24 @@ func (suite *Suite) TestTransactionRetry() {
 	retry := newRetry(suite.log).SetBackend(backend).Activate()
 	backend.retry = retry
 
-	retry.RegisterTransaction(block.Header.Height, transactionBody)
+	retry.RegisterTransaction(block.Height, transactionBody)
 
 	suite.colClient.On("SendTransaction", mock.Anything, mock.Anything).Return(&access.SendTransactionResponse{}, nil)
 
 	// Don't retry on every height
-	err = retry.Retry(block.Header.Height + 1)
+	err = retry.Retry(block.Height + 1)
 	suite.Require().NoError(err)
 
 	suite.colClient.AssertNotCalled(suite.T(), "SendTransaction", mock.Anything, mock.Anything)
 
 	// Retry every `retryFrequency`
-	err = retry.Retry(block.Header.Height + retryFrequency)
+	err = retry.Retry(block.Height + retryFrequency)
 	suite.Require().NoError(err)
 
 	suite.colClient.AssertNumberOfCalls(suite.T(), "SendTransaction", 1)
 
 	// do not retry if expired
-	err = retry.Retry(block.Header.Height + retryFrequency + flow.DefaultTransactionExpiry)
+	err = retry.Retry(block.Height + retryFrequency + flow.DefaultTransactionExpiry)
 	suite.Require().NoError(err)
 
 	// Should've still only been called once
@@ -125,7 +125,7 @@ func (suite *Suite) TestSuccessfulTransactionsDontRetry() {
 	retry := newRetry(suite.log).SetBackend(backend).Activate()
 	backend.retry = retry
 
-	retry.RegisterTransaction(block.Header.Height, transactionBody)
+	retry.RegisterTransaction(block.Height, transactionBody)
 
 	suite.colClient.On("SendTransaction", mock.Anything, mock.Anything).Return(&access.SendTransactionResponse{}, nil)
 
@@ -148,19 +148,19 @@ func (suite *Suite) TestSuccessfulTransactionsDontRetry() {
 	suite.Assert().Equal(flow.TransactionStatusFinalized, result.Status)
 
 	// Don't retry now now that block is finalized
-	err = retry.Retry(block.Header.Height + 1)
+	err = retry.Retry(block.Height + 1)
 	suite.Require().NoError(err)
 
 	suite.colClient.AssertNotCalled(suite.T(), "SendTransaction", mock.Anything, mock.Anything)
 
 	// Don't retry now now that block is finalized
-	err = retry.Retry(block.Header.Height + retryFrequency)
+	err = retry.Retry(block.Height + retryFrequency)
 	suite.Require().NoError(err)
 
 	suite.colClient.AssertNotCalled(suite.T(), "SendTransaction", mock.Anything, mock.Anything)
 
 	// Don't retry now now that block is finalized
-	err = retry.Retry(block.Header.Height + retryFrequency + flow.DefaultTransactionExpiry)
+	err = retry.Retry(block.Height + retryFrequency + flow.DefaultTransactionExpiry)
 	suite.Require().NoError(err)
 
 	// Should've still should not be called

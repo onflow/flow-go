@@ -54,8 +54,8 @@ func (b *Blocks) retrieveTx(blockID flow.Identifier) func(*badger.Txn) (*flow.Bl
 		}
 
 		untrustedBlock := flow.UntrustedBlock{
-			Header:  header.HeaderBody,
-			Payload: *payload,
+			HeaderBody: header.HeaderBody,
+			Payload:    *payload,
 		}
 		var block *flow.Block
 		if header.ContainsParentQC() {

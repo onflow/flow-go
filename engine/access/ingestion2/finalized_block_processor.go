@@ -158,7 +158,7 @@ func (p *FinalizedBlockProcessor) indexFinalizedBlock(block *flow.Block) error {
 		}
 	}
 
-	p.collectionSyncer.RequestCollectionsForBlock(block.Header.Height, block.Payload.Guarantees)
+	p.collectionSyncer.RequestCollectionsForBlock(block.Height, block.Payload.Guarantees)
 	p.collectionExecutedMetric.BlockFinalized(block)
 
 	return nil

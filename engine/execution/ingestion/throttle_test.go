@@ -104,7 +104,7 @@ func TestThrottleFallBehindCatchUp(t *testing.T) {
 
 	// when 11 is received, verify block 11 is loaded
 	wg.Add(1)
-	require.NoError(t, throttle.OnBlock(allBlocks[11].ID(), allBlocks[11].Header.Height))
+	require.NoError(t, throttle.OnBlock(allBlocks[11].ID(), allBlocks[11].Height))
 	wg.Wait()
 	require.Equal(t, HeaderToBlockIDHeight(allBlocks[11].ToHeader()), consumer.LastProcessable())
 

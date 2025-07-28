@@ -67,10 +67,10 @@ func (s *CacheSuite) TestBlocksEquivocation() {
 	for i := 1; i < len(equivocatedBlocks); i++ {
 		block := equivocatedBlocks[i]
 		// update view to be the same as already submitted batch to trigger equivocation
-		block.Header.View = blocks[i].Block.Header.View
+		block.View = blocks[i].Block.View
 		// update parentID and parentView so blocks are still connected
-		block.Header.ParentID = equivocatedBlocks[i-1].ID()
-		block.Header.ParentView = equivocatedBlocks[i-1].Header.View
+		block.ParentID = equivocatedBlocks[i-1].ID()
+		block.ParentView = equivocatedBlocks[i-1].View
 		s.consumer.On("OnDoubleProposeDetected",
 			model.BlockFromFlow(blocks[i].Block.ToHeader()), model.BlockFromFlow(block.ToHeader())).Return().Once()
 
@@ -98,7 +98,7 @@ func (s *CacheSuite) TestBlocksAreNotConnected() {
 		blocks := unittest.ProposalChainFixtureFrom(10, unittest.BlockHeaderFixture())
 
 		// altering Height will break ParentID in next block, rendering batch as not sequential
-		blocks[len(blocks)/2].Block.Header.Height += 1
+		blocks[len(blocks)/2].Block.Height += 1
 
 		_, err := s.cache.AddBlocks(blocks)
 		require.ErrorIs(s.T(), err, ErrDisconnectedBatch)
@@ -157,7 +157,7 @@ func (s *CacheSuite) TestBlockInTheMiddle() {
 	require.Len(s.T(), certifiedBlocks, 2)
 	require.Equal(s.T(), blocks[0], certifiedBlocks[0].Proposal)
 	require.Equal(s.T(), blocks[len(blocks)-2], certifiedBlocks[len(certifiedBlocks)-1].Proposal)
-	require.Equal(s.T(), blocks[2].Block.Header.ParentQC(), certifiedBlocks[1].CertifyingQC)
+	require.Equal(s.T(), blocks[2].Block.ParentQC(), certifiedBlocks[1].CertifyingQC)
 }
 
 // TestAddBatch tests a scenario: B1 <- ... <- BN added in one batch.
@@ -171,9 +171,9 @@ func (s *CacheSuite) TestAddBatch() {
 	for i := 0; i < len(certifiedBatch)-1; i++ {
 		certifiedBlock := certifiedBatch[i]
 		require.Equal(s.T(), blocks[i], certifiedBlock.Proposal)
-		require.Equal(s.T(), blocks[i+1].Block.Header.ParentQC(), certifiedBlock.CertifyingQC)
+		require.Equal(s.T(), blocks[i+1].Block.ParentQC(), certifiedBlock.CertifyingQC)
 		require.Equal(s.T(), certifiedBlock.Proposal.Block.ID(), certifiedBlock.CertifyingQC.BlockID)
-		require.Equal(s.T(), certifiedBlock.Proposal.Block.Header.View, certifiedBlock.CertifyingQC.View)
+		require.Equal(s.T(), certifiedBlock.Proposal.Block.View, certifiedBlock.CertifyingQC.View)
 	}
 }
 
@@ -187,7 +187,7 @@ func (s *CacheSuite) TestDuplicatedBatch() {
 	require.Len(s.T(), certifiedBatch, len(blocks)-2)
 	require.Equal(s.T(), blocks[1], certifiedBatch[0].Proposal)
 	require.Equal(s.T(), blocks[len(blocks)-2], certifiedBatch[len(certifiedBatch)-1].Proposal)
-	require.Equal(s.T(), blocks[len(blocks)-1].Block.Header.ParentQC(), certifiedBatch[len(certifiedBatch)-1].CertifyingQC)
+	require.Equal(s.T(), blocks[len(blocks)-1].Block.ParentQC(), certifiedBatch[len(certifiedBatch)-1].CertifyingQC)
 
 	// add same batch again, this has to be rejected as redundant input
 	certifiedBatch, err = s.cache.AddBlocks(blocks[1:])
@@ -201,18 +201,18 @@ func (s *CacheSuite) TestDuplicatedBatch() {
 	require.Len(s.T(), certifiedBatch, len(blocks)-1)
 	require.Equal(s.T(), blocks[0], certifiedBatch[0].Proposal)
 	require.Equal(s.T(), blocks[len(blocks)-2], certifiedBatch[len(certifiedBatch)-1].Proposal)
-	require.Equal(s.T(), blocks[len(blocks)-1].Block.Header.ParentQC(), certifiedBatch[len(certifiedBatch)-1].CertifyingQC)
+	require.Equal(s.T(), blocks[len(blocks)-1].Block.ParentQC(), certifiedBatch[len(certifiedBatch)-1].CertifyingQC)
 }
 
 // TestPruneUpToView tests that blocks lower than pruned height will be properly filtered out from incoming batch.
 func (s *CacheSuite) TestPruneUpToView() {
 	blocks := unittest.ProposalChainFixtureFrom(3, unittest.BlockHeaderFixture())
-	s.cache.PruneUpToView(blocks[1].Block.Header.View)
+	s.cache.PruneUpToView(blocks[1].Block.View)
 	certifiedBatch, err := s.cache.AddBlocks(blocks)
 	require.NoError(s.T(), err)
 	require.Equal(s.T(), blocks[1], certifiedBatch[0].Proposal)
 	require.Equal(s.T(), blocks[len(blocks)-2], certifiedBatch[len(certifiedBatch)-1].Proposal)
-	require.Equal(s.T(), blocks[len(blocks)-1].Block.Header.ParentQC(), certifiedBatch[len(certifiedBatch)-1].CertifyingQC)
+	require.Equal(s.T(), blocks[len(blocks)-1].Block.ParentQC(), certifiedBatch[len(certifiedBatch)-1].CertifyingQC)
 }
 
 // TestConcurrentAdd simulates multiple workers adding batches of blocks out of order.
@@ -253,7 +253,7 @@ func (s *CacheSuite) TestConcurrentAdd() {
 
 	require.Len(s.T(), allCertifiedBlocks, len(blocks)-1)
 	slices.SortFunc(allCertifiedBlocks, func(lhs flow.CertifiedBlock, rhs flow.CertifiedBlock) int {
-		return int(lhs.Proposal.Block.Header.Height) - int(rhs.Proposal.Block.Header.Height)
+		return int(lhs.Proposal.Block.Height) - int(rhs.Proposal.Block.Height)
 	})
 	for i, block := range blocks[:len(blocks)-1] {
 		require.Equal(s.T(), block, allCertifiedBlocks[i].Proposal)
@@ -282,7 +282,7 @@ func (s *CacheSuite) TestMultipleChildrenForSameParent() {
 	A := unittest.BlockFixture()
 	B := unittest.BlockWithParentFixture(A.ToHeader())
 	C := unittest.BlockWithParentFixture(A.ToHeader())
-	C.Header.View = B.Header.View + 1 // make sure views are different
+	C.View = B.View + 1 // make sure views are different
 	Ap := unittest.ProposalFromBlock(A)
 	Bp := unittest.ProposalFromBlock(B)
 	Cp := unittest.ProposalFromBlock(C)
@@ -310,7 +310,7 @@ func (s *CacheSuite) TestChildEjectedBeforeAddingParent() {
 	A := unittest.BlockFixture()
 	B := unittest.BlockWithParentFixture(A.ToHeader())
 	C := unittest.BlockWithParentFixture(A.ToHeader())
-	C.Header.View = B.Header.View + 1 // make sure views are different
+	C.View = B.View + 1 // make sure views are different
 
 	Ap := unittest.ProposalFromBlock(A)
 	Bp := unittest.ProposalFromBlock(B)

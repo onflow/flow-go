@@ -120,7 +120,7 @@ func TestFinalizer(t *testing.T) {
 				unittest.ClusterBlock.WithParent(genesis),
 				unittest.ClusterBlock.WithPayload(*model.NewEmptyPayload(refBlock.ID())),
 			)
-			block.Header.ParentID = unittest.IdentifierFixture()
+			block.ParentID = unittest.IdentifierFixture()
 			insert(block)
 
 			// try to finalize - this should fail
@@ -187,8 +187,8 @@ func TestFinalizer(t *testing.T) {
 			pusher.On("SubmitCollectionGuarantee", &flow.CollectionGuarantee{
 				CollectionID:     block.Payload.Collection.ID(),
 				ReferenceBlockID: refBlock.ID(),
-				ChainID:          block.Header.ChainID,
-				SignerIndices:    block.Header.ParentVoterIndices,
+				ChainID:          block.ChainID,
+				SignerIndices:    block.ParentVoterIndices,
 				Signature:        nil,
 			}).Once()
 
@@ -205,7 +205,7 @@ func TestFinalizer(t *testing.T) {
 			final, err := state.Final().Head()
 			assert.NoError(t, err)
 			assert.Equal(t, block.ToHeader().ID(), final.ID())
-			assertClusterBlocksIndexedByReferenceHeight(t, db, refBlock.Header.Height, final.ID())
+			assertClusterBlocksIndexedByReferenceHeight(t, db, refBlock.Height, final.ID())
 		})
 
 		// when finalizing a block with un-finalized ancestors, those ancestors should be finalized as well
@@ -255,15 +255,15 @@ func TestFinalizer(t *testing.T) {
 			pusher.On("SubmitCollectionGuarantee", &flow.CollectionGuarantee{
 				CollectionID:     block1.Payload.Collection.ID(),
 				ReferenceBlockID: refBlock.ID(),
-				ChainID:          block1.Header.ChainID,
-				SignerIndices:    block1.Header.ParentVoterIndices,
+				ChainID:          block1.ChainID,
+				SignerIndices:    block1.ParentVoterIndices,
 				Signature:        nil,
 			}).Once()
 			pusher.On("SubmitCollectionGuarantee", &flow.CollectionGuarantee{
 				CollectionID:     block2.Payload.Collection.ID(),
 				ReferenceBlockID: refBlock.ID(),
-				ChainID:          block2.Header.ChainID,
-				SignerIndices:    block2.Header.ParentVoterIndices,
+				ChainID:          block2.ChainID,
+				SignerIndices:    block2.ParentVoterIndices,
 				Signature:        nil,
 			}).Once()
 
@@ -279,7 +279,7 @@ func TestFinalizer(t *testing.T) {
 			final, err := state.Final().Head()
 			assert.NoError(t, err)
 			assert.Equal(t, block2.ToHeader().ID(), final.ID())
-			assertClusterBlocksIndexedByReferenceHeight(t, db, refBlock.Header.Height, block1.ID(), block2.ID())
+			assertClusterBlocksIndexedByReferenceHeight(t, db, refBlock.Height, block1.ID(), block2.ID())
 		})
 
 		t.Run("finalize with un-finalized child", func(t *testing.T) {
@@ -328,8 +328,8 @@ func TestFinalizer(t *testing.T) {
 			pusher.On("SubmitCollectionGuarantee", &flow.CollectionGuarantee{
 				CollectionID:     block1.Payload.Collection.ID(),
 				ReferenceBlockID: refBlock.ID(),
-				ChainID:          block1.Header.ChainID,
-				SignerIndices:    block1.Header.ParentVoterIndices,
+				ChainID:          block1.ChainID,
+				SignerIndices:    block1.ParentVoterIndices,
 				Signature:        nil,
 			}).Once()
 
@@ -346,7 +346,7 @@ func TestFinalizer(t *testing.T) {
 			final, err := state.Final().Head()
 			assert.NoError(t, err)
 			assert.Equal(t, block1.ToHeader().ID(), final.ID())
-			assertClusterBlocksIndexedByReferenceHeight(t, db, refBlock.Header.Height, block1.ID())
+			assertClusterBlocksIndexedByReferenceHeight(t, db, refBlock.Height, block1.ID())
 		})
 
 		// when finalizing a block with a conflicting fork, the fork should not be finalized.
@@ -396,8 +396,8 @@ func TestFinalizer(t *testing.T) {
 			pusher.On("SubmitCollectionGuarantee", &flow.CollectionGuarantee{
 				CollectionID:     block1.Payload.Collection.ID(),
 				ReferenceBlockID: refBlock.ID(),
-				ChainID:          block1.Header.ChainID,
-				SignerIndices:    block1.Header.ParentVoterIndices,
+				ChainID:          block1.ChainID,
+				SignerIndices:    block1.ParentVoterIndices,
 				Signature:        nil,
 			}).Once()
 
@@ -414,7 +414,7 @@ func TestFinalizer(t *testing.T) {
 			final, err := state.Final().Head()
 			assert.NoError(t, err)
 			assert.Equal(t, block1.ToHeader().ID(), final.ID())
-			assertClusterBlocksIndexedByReferenceHeight(t, db, refBlock.Header.Height, block1.ID())
+			assertClusterBlocksIndexedByReferenceHeight(t, db, refBlock.Height, block1.ID())
 		})
 	})
 }

@@ -167,7 +167,7 @@ func (s *TransactionStatusSuite) initializeBackend() {
 	s.receipts.On("ByBlockID", mock.AnythingOfType("flow.Identifier")).Return(receipts, nil).Maybe()
 	s.finalSnapshot.On("Identities", mock.Anything).Return(executionNodes, nil).Maybe()
 
-	progress, err := store.NewConsumerProgress(badgerimpl.ToDB(s.db), module.ConsumeProgressLastFullBlockHeight).Initialize(s.rootBlock.Header.Height)
+	progress, err := store.NewConsumerProgress(badgerimpl.ToDB(s.db), module.ConsumeProgressLastFullBlockHeight).Initialize(s.rootBlock.Height)
 	require.NoError(s.T(), err)
 	s.lastFullBlockHeight, err = counters.NewPersistentStrictMonotonicCounter(progress)
 	require.NoError(s.T(), err)
@@ -175,8 +175,8 @@ func (s *TransactionStatusSuite) initializeBackend() {
 	s.sealedBlock = s.rootBlock
 	s.finalizedBlock = unittest.BlockWithParentFixture(s.sealedBlock.ToHeader())
 	s.blockMap = map[uint64]*flow.Block{
-		s.sealedBlock.Header.Height:    s.sealedBlock,
-		s.finalizedBlock.Header.Height: s.finalizedBlock,
+		s.sealedBlock.Height:    s.sealedBlock,
+		s.finalizedBlock.Height: s.finalizedBlock,
 	}
 
 	backendParams := s.backendParams()
@@ -266,18 +266,15 @@ func (s *TransactionStatusSuite) initializeMainMockInstructions() {
 	}, nil).Maybe()
 
 	s.finalSnapshot.On("Head").Return(func() *flow.Header {
-		finalizedHeader := s.finalizedBlock.ToHeader()
-		return finalizedHeader
+		return s.finalizedBlock.ToHeader()
 	}, nil).Maybe()
 
 	s.blockTracker.On("GetStartHeightFromBlockID", mock.Anything).Return(func(_ flow.Identifier) (uint64, error) {
-		finalizedHeader := s.finalizedBlock.Header
-		return finalizedHeader.Height, nil
+		return s.finalizedBlock.Height, nil
 	}, nil).Maybe()
 
 	s.blockTracker.On("GetHighestHeight", flow.BlockStatusFinalized).Return(func(_ flow.BlockStatus) (uint64, error) {
-		finalizedHeader := s.finalizedBlock.Header
-		return finalizedHeader.Height, nil
+		return s.finalizedBlock.Height, nil
 	}, nil).Maybe()
 }
 
@@ -285,10 +282,9 @@ func (s *TransactionStatusSuite) initializeMainMockInstructions() {
 func (s *TransactionStatusSuite) initializeHappyCaseMockInstructions() {
 	s.initializeMainMockInstructions()
 
-	s.reporter.On("LowestIndexedHeight").Return(s.rootBlock.Header.Height, nil).Maybe()
+	s.reporter.On("LowestIndexedHeight").Return(s.rootBlock.Height, nil).Maybe()
 	s.reporter.On("HighestIndexedHeight").Return(func() (uint64, error) {
-		finalizedHeader := s.finalizedBlock.Header
-		return finalizedHeader.Height, nil
+		return s.finalizedBlock.Height, nil
 	}, nil).Maybe()
 
 	s.sealedSnapshot.On("Head").Return(func() *flow.Header {
@@ -326,7 +322,7 @@ func (s *TransactionStatusSuite) addNewFinalizedBlock(parent *flow.Header, notif
 		option(s.finalizedBlock)
 	}
 
-	s.blockMap[s.finalizedBlock.Header.Height] = s.finalizedBlock
+	s.blockMap[s.finalizedBlock.Height] = s.finalizedBlock
 
 	if notify {
 		s.broadcaster.Publish()
@@ -360,8 +356,8 @@ func (s *TransactionStatusSuite) addBlockWithTransaction(transaction *flow.Trans
 		var err error
 		block, err = flow.NewBlock(
 			flow.UntrustedBlock{
-				Header:  block.Header,
-				Payload: unittest.PayloadFixture(unittest.WithGuarantees(&guarantee)),
+				HeaderBody: block.HeaderBody,
+				Payload:    unittest.PayloadFixture(unittest.WithGuarantees(&guarantee)),
 			},
 		)
 		require.NoError(s.T(), err)
@@ -453,10 +449,9 @@ func (s *TransactionStatusSuite) TestSendAndSubscribeTransactionStatusExpired() 
 
 	s.initializeMainMockInstructions()
 
-	s.reporter.On("LowestIndexedHeight").Return(s.rootBlock.Header.Height, nil).Maybe()
+	s.reporter.On("LowestIndexedHeight").Return(s.rootBlock.Height, nil).Maybe()
 	s.reporter.On("HighestIndexedHeight").Return(func() (uint64, error) {
-		finalizedHeader := s.finalizedBlock.Header
-		return finalizedHeader.Height, nil
+		return s.finalizedBlock.Height, nil
 	}, nil).Maybe()
 	s.transactionResults.On(
 		"ByBlockIDTransactionID",
@@ -474,7 +469,7 @@ func (s *TransactionStatusSuite) TestSendAndSubscribeTransactionStatusExpired() 
 	s.checkNewSubscriptionMessage(sub, txId, []flow.TransactionStatus{flow.TransactionStatusPending})
 
 	// Generate 600 blocks without transaction included and check, that transaction still pending
-	startHeight := s.finalizedBlock.Header.Height + 1
+	startHeight := s.finalizedBlock.Height + 1
 	lastHeight := startHeight + flow.DefaultTransactionExpiry
 
 	for i := startHeight; i <= lastHeight; i++ {
@@ -484,7 +479,7 @@ func (s *TransactionStatusSuite) TestSendAndSubscribeTransactionStatusExpired() 
 
 	// Generate final blocks and check transaction expired
 	s.sealedBlock = s.finalizedBlock
-	err := s.lastFullBlockHeight.Set(s.sealedBlock.Header.Height)
+	err := s.lastFullBlockHeight.Set(s.sealedBlock.Height)
 	s.Require().NoError(err)
 	s.addNewFinalizedBlock(s.sealedBlock.ToHeader(), true)
 

@@ -82,7 +82,7 @@ func (s *BackendBlockHeadersSuite) requireBlockHeaders(v interface{}, expectedBl
 	actualHeader, ok := v.(*flow.Header)
 	require.True(s.T(), ok, "unexpected response type: %T", v)
 
-	s.Require().Equal(expectedBlock.Header.Height, actualHeader.Height)
+	s.Require().Equal(expectedBlock.Height, actualHeader.Height)
 	s.Require().Equal(expectedBlock.ToHeader().ID(), actualHeader.ID())
 	s.Require().Equal(*expectedBlock.ToHeader(), *actualHeader)
 }
@@ -134,7 +134,7 @@ func (s *BackendBlockHeadersSuite) TestSubscribeBlockHeadersHandlesErrors() {
 		subCtx, subCancel := context.WithCancel(ctx)
 		defer subCancel()
 
-		sub := s.backend.SubscribeBlockHeadersFromStartHeight(subCtx, s.rootBlock.Header.Height-1, flow.BlockStatusFinalized)
+		sub := s.backend.SubscribeBlockHeadersFromStartHeight(subCtx, s.rootBlock.Height-1, flow.BlockStatusFinalized)
 		assert.Equal(s.T(), codes.InvalidArgument, status.Code(sub.Err()), "expected %s, got %v: %v", codes.InvalidArgument, status.Code(sub.Err()).String(), sub.Err())
 	})
 
@@ -142,7 +142,7 @@ func (s *BackendBlockHeadersSuite) TestSubscribeBlockHeadersHandlesErrors() {
 		subCtx, subCancel := context.WithCancel(ctx)
 		defer subCancel()
 
-		sub := s.backend.SubscribeBlockHeadersFromStartHeight(subCtx, s.blocksArray[len(s.blocksArray)-1].Header.Height+10, flow.BlockStatusFinalized)
+		sub := s.backend.SubscribeBlockHeadersFromStartHeight(subCtx, s.blocksArray[len(s.blocksArray)-1].Height+10, flow.BlockStatusFinalized)
 		assert.Equal(s.T(), codes.NotFound, status.Code(sub.Err()), "expected %s, got %v: %v", codes.NotFound, status.Code(sub.Err()).String(), sub.Err())
 	})
 }

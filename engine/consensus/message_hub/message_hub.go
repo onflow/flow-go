@@ -345,8 +345,8 @@ func (h *MessageHub) sendOwnProposal(proposal *flow.ProposalHeader) error {
 	// - the payload hash is deduced from the payload
 	block, err := flow.NewBlock(
 		flow.UntrustedBlock{
-			Header:  header.HeaderBody,
-			Payload: *payload,
+			HeaderBody: header.HeaderBody,
+			Payload:    *payload,
 		},
 	)
 	if err != nil {

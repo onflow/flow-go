@@ -277,7 +277,7 @@ func (suite *Suite) TestInvalidTransaction() {
 	suite.Run("expired reference block ID", func() {
 		// "finalize" a sufficiently high block that root block is expired
 		suite.final = unittest.BlockFixture(
-			unittest.Block.WithHeight(suite.root.Header.Height + flow.DefaultTransactionExpiry + 1),
+			unittest.Block.WithHeight(suite.root.Height + flow.DefaultTransactionExpiry + 1),
 		)
 
 		tx := unittest.TransactionBodyFixture()

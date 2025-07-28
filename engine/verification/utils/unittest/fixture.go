@@ -349,8 +349,8 @@ func ExecutionResultFixture(t *testing.T,
 		require.NoError(t, err)
 		referenceBlock, err = flow.NewBlock(
 			flow.UntrustedBlock{
-				Header:  refBlkHeader.HeaderBody,
-				Payload: *payload,
+				HeaderBody: refBlkHeader.HeaderBody,
+				Payload:    *payload,
 			},
 		)
 		require.NoError(t, err)
@@ -500,7 +500,7 @@ func ContainerBlockFixture(parent *flow.Header, protocolStateID flow.Identifier,
 			unittest.WithProtocolStateID(protocolStateID),
 		),
 	)
-	containerBlock.Header.ParentVoterSigData = unittest.QCSigDataWithSoRFixture(source)
+	containerBlock.ParentVoterSigData = unittest.QCSigDataWithSoRFixture(source)
 
 	return containerBlock
 }

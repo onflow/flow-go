@@ -248,7 +248,7 @@ func (suite *Suite) TestGetBlockById_InternalFailure() {
 func (suite *Suite) TestGetBlockByHeight_Success() {
 	// setup the mocks
 	block := unittest.BlockFixture()
-	height := block.Header.Height
+	height := block.Height
 
 	suite.blocks.
 		On("ByHeight", height).
@@ -270,7 +270,7 @@ func (suite *Suite) TestGetBlockByHeight_Success() {
 func (suite *Suite) TestGetBlockByHeight_StorageNotFoundFailure() {
 	// setup the mocks
 	block := unittest.BlockFixture()
-	height := block.Header.Height
+	height := block.Height
 
 	suite.blocks.
 		On("ByHeight", height).
@@ -290,7 +290,7 @@ func (suite *Suite) TestGetBlockByHeight_StorageNotFoundFailure() {
 func (suite *Suite) TestGetBlockByHeight_CodesNotFoundFailure() {
 	// setup the mocks
 	block := unittest.BlockFixture()
-	height := block.Header.Height
+	height := block.Height
 
 	suite.blocks.
 		On("ByHeight", height).
@@ -310,7 +310,7 @@ func (suite *Suite) TestGetBlockByHeight_CodesNotFoundFailure() {
 func (suite *Suite) TestGetBlockByHeight_InternalFailure() {
 	// setup the mocks
 	block := unittest.BlockFixture()
-	height := block.Header.Height
+	height := block.Height
 
 	suite.blocks.
 		On("ByHeight", height).

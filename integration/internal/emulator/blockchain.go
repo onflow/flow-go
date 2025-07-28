@@ -253,7 +253,7 @@ func (b *Blockchain) PendingBlockView() uint64 {
 
 // PendingBlockTimestamp returns the Timestamp of the pending block (Unix time in milliseconds).
 func (b *Blockchain) PendingBlockTimestamp() uint64 {
-	return b.pendingBlock.Block().Header.Timestamp
+	return b.pendingBlock.Block().Timestamp
 }
 
 // GetLatestBlock gets the latest sealed block.
@@ -432,7 +432,7 @@ func (b *Blockchain) GetAccountByIndex(index uint) (*flowgo.Account, error) {
 	if err != nil {
 		return nil, err
 	}
-	return b.getAccountAtBlock(address, latestBlock.Header.Height)
+	return b.getAccountAtBlock(address, latestBlock.Height)
 
 }
 
@@ -449,7 +449,7 @@ func (b *Blockchain) getAccount(address flowgo.Address) (*flowgo.Account, error)
 	if err != nil {
 		return nil, err
 	}
-	return b.getAccountAtBlock(address, latestBlock.Header.Height)
+	return b.getAccountAtBlock(address, latestBlock.Height)
 }
 
 // GetAccountAtBlockHeight  returns the account for the given address at specified block height.
@@ -489,14 +489,14 @@ func (b *Blockchain) GetEventsForBlockIDs(eventType string, blockIDs []flowgo.Id
 		if err != nil {
 			break
 		}
-		events, err := b.storage.EventsByHeight(context.Background(), block.Header.Height, eventType)
+		events, err := b.storage.EventsByHeight(context.Background(), block.Height, eventType)
 		if err != nil {
 			break
 		}
 		result = append(result, flowgo.BlockEvents{
 			BlockID:        block.ID(),
-			BlockHeight:    block.Header.Height,
-			BlockTimestamp: time.UnixMilli(int64(block.Header.Timestamp)).UTC(),
+			BlockHeight:    block.Height,
+			BlockTimestamp: time.UnixMilli(int64(block.Timestamp)).UTC(),
 			Events:         events,
 		})
 	}
@@ -521,8 +521,8 @@ func (b *Blockchain) GetEventsForHeightRange(eventType string, startHeight, endH
 
 		result = append(result, flowgo.BlockEvents{
 			BlockID:        block.ID(),
-			BlockHeight:    block.Header.Height,
-			BlockTimestamp: time.UnixMilli(int64(block.Header.Timestamp)).UTC(),
+			BlockHeight:    block.Height,
+			BlockTimestamp: time.UnixMilli(int64(block.Timestamp)).UTC(),
 			Events:         events,
 		})
 	}
@@ -733,7 +733,7 @@ func (b *Blockchain) commitBlock() (*flowgo.Block, error) {
 
 	ledger, err := b.storage.LedgerByHeight(
 		context.Background(),
-		block.Header.Height,
+		block.Height,
 	)
 	if err != nil {
 		return nil, err
@@ -772,9 +772,9 @@ func (b *Blockchain) executeAndCommitBlock() (*flowgo.Block, []*TransactionResul
 
 	blockID := block.ID()
 	b.conf.ServerLogger.Debug().Fields(map[string]any{
-		"blockHeight": block.Header.Height,
+		"blockHeight": block.Height,
 		"blockID":     hex.EncodeToString(blockID[:]),
-	}).Msgf("📦 Block #%d committed", block.Header.Height)
+	}).Msgf("📦 Block #%d committed", block.Height)
 
 	return block, results, nil
 }
@@ -791,7 +791,7 @@ func (b *Blockchain) ResetPendingBlock() error {
 
 	latestLedger, err := b.storage.LedgerByHeight(
 		context.Background(),
-		latestBlock.Header.Height,
+		latestBlock.Height,
 	)
 	if err != nil {
 		return err
@@ -834,7 +834,7 @@ func (b *Blockchain) executeScriptAtBlockID(script []byte, arguments [][]byte, i
 
 	requestedLedgerSnapshot, err := b.storage.LedgerByHeight(
 		context.Background(),
-		requestedBlock.Header.Height,
+		requestedBlock.Height,
 	)
 	if err != nil {
 		return nil, err
