@@ -844,7 +844,7 @@ func (bs *BuilderSuite) TestValidatePayloadSeals_ExecutionForks() {
 	// set payload for blocks A, B, C
 	for i := 1; i <= 3; i++ {
 		var err error
-		blocks[i], err = flow.NewBlock(
+		blocks[i], err = flow.NewUnsignedBlock(
 			flow.UntrustedUnsignedBlock{
 				HeaderBody: blocks[i].HeaderBody,
 				Payload: unittest.PayloadFixture(
@@ -858,7 +858,7 @@ func (bs *BuilderSuite) TestValidatePayloadSeals_ExecutionForks() {
 	sealF := unittest.Seal.Fixture(unittest.Seal.WithResult(&sealedResult))
 	var err error
 	// set payload for block D
-	blocks[4], err = flow.NewBlock(
+	blocks[4], err = flow.NewUnsignedBlock(
 		flow.UntrustedUnsignedBlock{
 			HeaderBody: blocks[4].HeaderBody,
 			Payload: unittest.PayloadFixture(

@@ -125,7 +125,7 @@ func (f *Finalizer) MakeFinal(blockID flow.Identifier) error {
 				return fmt.Errorf("could not finalize cluster block (id=%x): %w", clusterBlockID, err)
 			}
 
-			block, err := cluster.NewBlock(
+			block, err := cluster.NewUnsignedBlock(
 				cluster.UntrustedUnsignedBlock{
 					HeaderBody: step.HeaderBody,
 					Payload:    payload,

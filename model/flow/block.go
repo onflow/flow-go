@@ -18,8 +18,8 @@ type HashablePayload interface {
 // It includes both the block header metadata and the block payload.
 //
 // Zero values for certain HeaderBody fields are allowed only for root blocks, which must be constructed
-// using the NewRootBlock constructor. All non-root blocks must be constructed
-// using NewBlock to ensure validation of the block fields.
+// using the NewRootUnsignedBlock constructor. All non-root blocks must be constructed
+// using NewUnsignedBlock to ensure validation of the block fields.
 //
 //structwrite:immutable - mutations allowed only within the constructor
 type GenericBlock[T HashablePayload] struct {
@@ -46,7 +46,7 @@ func (b *GenericBlock[T]) ID() Identifier {
 // This function may panic if invoked on a malformed UnsignedBlock.
 func (b *GenericBlock[T]) ToHeader() *UnsignedHeader {
 	if !b.ContainsParentQC() {
-		rootHeader, err := NewRootHeader(UntrustedUnsignedHeader{
+		rootHeader, err := NewRootUnsignedHeader(UntrustedUnsignedHeader{
 			HeaderBody:  b.HeaderBody,
 			PayloadHash: b.Payload.Hash(),
 		})
@@ -56,7 +56,7 @@ func (b *GenericBlock[T]) ToHeader() *UnsignedHeader {
 		return rootHeader
 	}
 
-	header, err := NewHeader(UntrustedUnsignedHeader{
+	header, err := NewUnsignedHeader(UntrustedUnsignedHeader{
 		HeaderBody:  b.HeaderBody,
 		PayloadHash: b.Payload.Hash(),
 	})
@@ -69,8 +69,8 @@ func (b *GenericBlock[T]) ToHeader() *UnsignedHeader {
 // UnsignedBlock is the canonical instantiation of GenericBlock using flow.Payload as the payload type.
 //
 // Zero values for certain HeaderBody fields are allowed only for root blocks, which must be constructed
-// using the NewRootBlock constructor. All non-root blocks must be constructed
-// using NewBlock to ensure validation of the block fields.
+// using the NewRootUnsignedBlock constructor. All non-root blocks must be constructed
+// using NewUnsignedBlock to ensure validation of the block fields.
 //
 //structwrite:immutable - mutations allowed only within the constructor
 type UnsignedBlock = GenericBlock[Payload]
@@ -83,16 +83,16 @@ type UnsignedBlock = GenericBlock[Payload]
 // ordering during construction.
 //
 // An instance of UntrustedUnsignedBlock should be validated and converted into
-// a trusted UnsignedBlock using the NewBlock constructor (or NewRootBlock
+// a trusted UnsignedBlock using the NewUnsignedBlock constructor (or NewRootUnsignedBlock
 // for the root block).
 type UntrustedUnsignedBlock UnsignedBlock
 
-// NewBlock creates a new block.
+// NewUnsignedBlock creates a new block.
 // This constructor enforces validation rules to ensure the block is well-formed.
 // It must be used to construct all non-root blocks.
 //
 // All errors indicate that a valid UnsignedBlock cannot be constructed from the input.
-func NewBlock(untrusted UntrustedUnsignedBlock) (*UnsignedBlock, error) {
+func NewUnsignedBlock(untrusted UntrustedUnsignedBlock) (*UnsignedBlock, error) {
 	// validate header body
 	headerBody, err := NewHeaderBody(UntrustedHeaderBody(untrusted.HeaderBody))
 	if err != nil {
@@ -111,10 +111,10 @@ func NewBlock(untrusted UntrustedUnsignedBlock) (*UnsignedBlock, error) {
 	}, nil
 }
 
-// NewRootBlock creates a root block.
+// NewRootUnsignedBlock creates a root block.
 // This constructor must be used **only** for constructing the root block,
 // which is the only case where zero values are allowed.
-func NewRootBlock(untrusted UntrustedUnsignedBlock) (*UnsignedBlock, error) {
+func NewRootUnsignedBlock(untrusted UntrustedUnsignedBlock) (*UnsignedBlock, error) {
 	rootHeaderBody, err := NewRootHeaderBody(UntrustedHeaderBody(untrusted.HeaderBody))
 	if err != nil {
 		return nil, fmt.Errorf("invalid root header body: %w", err)
@@ -175,7 +175,7 @@ type UntrustedProposal Proposal
 //
 // All errors indicate that a valid Proposal cannot be constructed from the input.
 func NewProposal(untrusted UntrustedProposal) (*Proposal, error) {
-	block, err := NewBlock(UntrustedUnsignedBlock(untrusted.Block))
+	block, err := NewUnsignedBlock(UntrustedUnsignedBlock(untrusted.Block))
 	if err != nil {
 		return nil, fmt.Errorf("invalid block: %w", err)
 	}
@@ -193,7 +193,7 @@ func NewProposal(untrusted UntrustedProposal) (*Proposal, error) {
 // This constructor must be used **only** for constructing the root proposal,
 // which is the only case where zero values are allowed.
 func NewRootProposal(untrusted UntrustedProposal) (*Proposal, error) {
-	block, err := NewRootBlock(UntrustedUnsignedBlock(untrusted.Block))
+	block, err := NewRootUnsignedBlock(UntrustedUnsignedBlock(untrusted.Block))
 	if err != nil {
 		return nil, fmt.Errorf("invalid root block: %w", err)
 	}

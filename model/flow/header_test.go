@@ -385,7 +385,7 @@ func TestHeaderBodyBuilder_PresenceChecks(t *testing.T) {
 	}
 }
 
-// TestNewRootHeader verifies the behavior of the NewRootHeader constructor.
+// TestNewRootHeader verifies the behavior of the NewRootUnsignedHeader constructor.
 //
 // Test Cases:
 //
@@ -420,7 +420,7 @@ func TestNewRootHeader(t *testing.T) {
 		u := UntrustedHeaderBodyFixture(
 			WithRootDefaults(),
 		)
-		h, err := flow.NewRootHeader(flow.UntrustedUnsignedHeader{
+		h, err := flow.NewRootUnsignedHeader(flow.UntrustedUnsignedHeader{
 			HeaderBody:  flow.HeaderBody(u),
 			PayloadHash: nonZeroHash,
 		})
@@ -436,7 +436,7 @@ func TestNewRootHeader(t *testing.T) {
 				u.ParentID = flow.ZeroID
 			},
 		)
-		h, err := flow.NewRootHeader(flow.UntrustedUnsignedHeader{
+		h, err := flow.NewRootUnsignedHeader(flow.UntrustedUnsignedHeader{
 			HeaderBody:  flow.HeaderBody(u),
 			PayloadHash: nonZeroHash,
 		})
@@ -451,7 +451,7 @@ func TestNewRootHeader(t *testing.T) {
 				u.ChainID = ""
 			},
 		)
-		h, err := flow.NewRootHeader(flow.UntrustedUnsignedHeader{
+		h, err := flow.NewRootUnsignedHeader(flow.UntrustedUnsignedHeader{
 			HeaderBody:  flow.HeaderBody(u),
 			PayloadHash: nonZeroHash,
 		})
@@ -462,7 +462,7 @@ func TestNewRootHeader(t *testing.T) {
 
 	t.Run("empty PayloadHash", func(t *testing.T) {
 		u := UntrustedHeaderBodyFixture(WithRootDefaults())
-		h, err := flow.NewRootHeader(flow.UntrustedUnsignedHeader{
+		h, err := flow.NewRootUnsignedHeader(flow.UntrustedUnsignedHeader{
 			HeaderBody:  flow.HeaderBody(u),
 			PayloadHash: flow.ZeroID,
 		})
@@ -478,7 +478,7 @@ func TestNewRootHeader(t *testing.T) {
 				u.ParentVoterIndices = unittest.SignerIndicesFixture(3)
 			},
 		)
-		h, err := flow.NewRootHeader(flow.UntrustedUnsignedHeader{
+		h, err := flow.NewRootUnsignedHeader(flow.UntrustedUnsignedHeader{
 			HeaderBody:  flow.HeaderBody(u),
 			PayloadHash: nonZeroHash,
 		})
@@ -494,7 +494,7 @@ func TestNewRootHeader(t *testing.T) {
 				u.ParentVoterSigData = unittest.QCSigDataFixture()
 			},
 		)
-		h, err := flow.NewRootHeader(flow.UntrustedUnsignedHeader{
+		h, err := flow.NewRootUnsignedHeader(flow.UntrustedUnsignedHeader{
 			HeaderBody:  flow.HeaderBody(u),
 			PayloadHash: nonZeroHash,
 		})
@@ -510,7 +510,7 @@ func TestNewRootHeader(t *testing.T) {
 				u.ProposerID = validID
 			},
 		)
-		h, err := flow.NewRootHeader(flow.UntrustedUnsignedHeader{
+		h, err := flow.NewRootUnsignedHeader(flow.UntrustedUnsignedHeader{
 			HeaderBody:  flow.HeaderBody(u),
 			PayloadHash: nonZeroHash,
 		})
@@ -520,7 +520,7 @@ func TestNewRootHeader(t *testing.T) {
 	})
 }
 
-// TestNewHeader verifies the behavior of the NewHeader constructor.
+// TestNewHeader verifies the behavior of the NewUnsignedHeader constructor.
 //
 // Test Cases:
 //
@@ -557,7 +557,7 @@ func TestNewHeader(t *testing.T) {
 			HeaderBody:  flow.HeaderBody(uBody),
 			PayloadHash: validHash,
 		}
-		h, err := flow.NewHeader(u)
+		h, err := flow.NewUnsignedHeader(u)
 		assert.NoError(t, err)
 		assert.NotNil(t, h)
 		assert.Equal(t, flow.HeaderBody(uBody), h.HeaderBody)
@@ -572,7 +572,7 @@ func TestNewHeader(t *testing.T) {
 			HeaderBody:  flow.HeaderBody(uBody),
 			PayloadHash: validHash,
 		}
-		h, err := flow.NewHeader(u)
+		h, err := flow.NewUnsignedHeader(u)
 		assert.Error(t, err)
 		assert.Nil(t, h)
 		assert.Contains(t, err.Error(), "invalid header body")
@@ -586,7 +586,7 @@ func TestNewHeader(t *testing.T) {
 			HeaderBody:  flow.HeaderBody(uBody),
 			PayloadHash: validHash,
 		}
-		h, err := flow.NewHeader(u)
+		h, err := flow.NewUnsignedHeader(u)
 		assert.Error(t, err)
 		assert.Nil(t, h)
 		assert.Contains(t, err.Error(), "invalid header body")
@@ -600,7 +600,7 @@ func TestNewHeader(t *testing.T) {
 			HeaderBody:  flow.HeaderBody(uBody),
 			PayloadHash: validHash,
 		}
-		h, err := flow.NewHeader(u)
+		h, err := flow.NewUnsignedHeader(u)
 		assert.Error(t, err)
 		assert.Nil(t, h)
 		assert.Contains(t, err.Error(), "invalid header body")
@@ -619,7 +619,7 @@ func TestNewHeader(t *testing.T) {
 			HeaderBody:  flow.HeaderBody(uBody),
 			PayloadHash: validHash,
 		}
-		h, err := flow.NewHeader(u)
+		h, err := flow.NewUnsignedHeader(u)
 		assert.Error(t, err)
 		assert.Nil(t, h)
 		assert.Contains(t, err.Error(), "invalid header body")
@@ -633,7 +633,7 @@ func TestNewHeader(t *testing.T) {
 			HeaderBody:  flow.HeaderBody(uBody),
 			PayloadHash: validHash,
 		}
-		h, err := flow.NewHeader(u)
+		h, err := flow.NewUnsignedHeader(u)
 		assert.Error(t, err)
 		assert.Nil(t, h)
 		assert.Contains(t, err.Error(), "invalid header body")
@@ -647,7 +647,7 @@ func TestNewHeader(t *testing.T) {
 			HeaderBody:  flow.HeaderBody(uBody),
 			PayloadHash: validHash,
 		}
-		h, err := flow.NewHeader(u)
+		h, err := flow.NewUnsignedHeader(u)
 		assert.Error(t, err)
 		assert.Nil(t, h)
 		assert.Contains(t, err.Error(), "invalid header body")
@@ -660,7 +660,7 @@ func TestNewHeader(t *testing.T) {
 			HeaderBody:  flow.HeaderBody(uBody),
 			PayloadHash: flow.ZeroID,
 		}
-		h, err := flow.NewHeader(u)
+		h, err := flow.NewUnsignedHeader(u)
 		assert.Error(t, err)
 		assert.Nil(t, h)
 		assert.Contains(t, err.Error(), "PayloadHash must not be empty")

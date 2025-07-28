@@ -307,7 +307,7 @@ func (s *ReceiptValidationSuite) TestReceiptServiceEventCountMismatch() {
 func (s *ReceiptValidationSuite) TestReceiptForBlockWith0Collections() {
 	s.publicKey.On("Verify", mock.Anything, mock.Anything, mock.Anything).Return(true, nil).Maybe()
 	valSubgrph := s.ValidSubgraphFixture()
-	block, err := flow.NewBlock(
+	block, err := flow.NewUnsignedBlock(
 		flow.UntrustedUnsignedBlock{
 			HeaderBody: valSubgrph.Block.HeaderBody,
 			Payload:    unittest.PayloadFixture(),

@@ -105,7 +105,7 @@ func TestExecutionFlow(t *testing.T) {
 	signerIndices, err := signature.EncodeSignersToIndices(
 		[]flow.Identifier{colID.NodeID}, []flow.Identifier{colID.NodeID})
 	require.NoError(t, err)
-	block, err = flow.NewBlock(
+	block, err = flow.NewUnsignedBlock(
 		flow.UntrustedUnsignedBlock{
 			HeaderBody: block.HeaderBody,
 			Payload: flow.Payload{
@@ -130,7 +130,7 @@ func TestExecutionFlow(t *testing.T) {
 	require.NoError(t, err)
 
 	child := unittest.BlockWithParentAndProposerFixture(t, block.ToHeader(), conID.NodeID) // sets field `ParentVoterIndices` such that `conID.NodeID` is the sole signer
-	child, err = flow.NewBlock(
+	child, err = flow.NewUnsignedBlock(
 		flow.UntrustedUnsignedBlock{
 			HeaderBody: child.HeaderBody,
 			Payload:    unittest.PayloadFixture(unittest.WithProtocolStateID(block.Payload.ProtocolStateID)),
@@ -284,7 +284,7 @@ func deployContractBlock(
 
 	// make block
 	block := unittest.BlockWithParentAndProposerFixture(t, parent.ToHeader(), conID.NodeID) // sets field `ParentVoterIndices` such that `conID.NodeID` is the sole signer
-	block, err = flow.NewBlock(
+	block, err = flow.NewUnsignedBlock(
 		flow.UntrustedUnsignedBlock{
 			HeaderBody: block.HeaderBody,
 			Payload: flow.Payload{
@@ -325,7 +325,7 @@ func makePanicBlock(t *testing.T, conID *flow.Identity, colID *flow.Identity, ch
 		[]flow.Identifier{colID.NodeID}, []flow.Identifier{colID.NodeID})
 	require.NoError(t, err)
 
-	block, err = flow.NewBlock(
+	block, err = flow.NewUnsignedBlock(
 		flow.UntrustedUnsignedBlock{
 			HeaderBody: block.HeaderBody,
 			Payload: flow.Payload{
@@ -356,7 +356,7 @@ func makeSuccessBlock(t *testing.T, conID *flow.Identity, colID *flow.Identity, 
 
 	col := &flow.Collection{Transactions: []*flow.TransactionBody{tx}}
 	block := unittest.BlockWithParentAndProposerFixture(t, parent.ToHeader(), conID.NodeID) // sets field `ParentVoterIndices` such that `conID.NodeID` is the sole signer
-	block, err = flow.NewBlock(
+	block, err = flow.NewUnsignedBlock(
 		flow.UntrustedUnsignedBlock{
 			HeaderBody: block.HeaderBody,
 			Payload: flow.Payload{
@@ -593,7 +593,7 @@ func TestBroadcastToMultipleVerificationNodes(t *testing.T) {
 	voterIndices, err := signature.EncodeSignersToIndices([]flow.Identifier{conID.NodeID}, []flow.Identifier{conID.NodeID})
 	require.NoError(t, err)
 	block.ParentVoterIndices = voterIndices
-	block, err = flow.NewBlock(
+	block, err = flow.NewUnsignedBlock(
 		flow.UntrustedUnsignedBlock{
 			HeaderBody: block.HeaderBody,
 			Payload:    unittest.PayloadFixture(unittest.WithProtocolStateID(genesis.Payload.ProtocolStateID)),

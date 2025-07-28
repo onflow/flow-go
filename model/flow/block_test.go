@@ -123,7 +123,7 @@ func TestBlockMalleability(t *testing.T) {
 	)
 }
 
-// TestNewBlock verifies the behavior of the NewBlock constructor.
+// TestNewBlock verifies the behavior of the NewUnsignedBlock constructor.
 // It ensures proper handling of both valid and invalid untrusted input fields.
 //
 // Test Cases:
@@ -140,7 +140,7 @@ func TestNewBlock(t *testing.T) {
 	t.Run("valid input", func(t *testing.T) {
 		block := unittest.BlockFixture()
 
-		res, err := flow.NewBlock(flow.UntrustedUnsignedBlock(*block))
+		res, err := flow.NewUnsignedBlock(flow.UntrustedUnsignedBlock(*block))
 		require.NoError(t, err)
 		require.NotNil(t, res)
 	})
@@ -149,7 +149,7 @@ func TestNewBlock(t *testing.T) {
 		block := unittest.BlockFixture()
 		block.ParentID = flow.ZeroID
 
-		res, err := flow.NewBlock(flow.UntrustedUnsignedBlock(*block))
+		res, err := flow.NewUnsignedBlock(flow.UntrustedUnsignedBlock(*block))
 		require.Error(t, err)
 		require.Nil(t, res)
 		require.Contains(t, err.Error(), "invalid header body")
@@ -159,14 +159,14 @@ func TestNewBlock(t *testing.T) {
 		block := unittest.BlockFixture()
 		block.Payload.ProtocolStateID = flow.ZeroID
 
-		res, err := flow.NewBlock(flow.UntrustedUnsignedBlock(*block))
+		res, err := flow.NewUnsignedBlock(flow.UntrustedUnsignedBlock(*block))
 		require.Error(t, err)
 		require.Nil(t, res)
 		require.Contains(t, err.Error(), "invalid payload")
 	})
 }
 
-// TestNewRootBlock verifies the behavior of the NewRootBlock constructor.
+// TestNewRootBlock verifies the behavior of the NewRootUnsignedBlock constructor.
 // It ensures proper handling of both valid and invalid untrusted input fields.
 //
 // Test Cases:
@@ -200,7 +200,7 @@ func TestNewRootBlock(t *testing.T) {
 	}
 
 	t.Run("valid input", func(t *testing.T) {
-		res, err := flow.NewRootBlock(validRootBlockFixture())
+		res, err := flow.NewRootUnsignedBlock(validRootBlockFixture())
 		require.NoError(t, err)
 		require.NotNil(t, res)
 	})
@@ -209,7 +209,7 @@ func TestNewRootBlock(t *testing.T) {
 		block := validRootBlockFixture()
 		block.ParentView = 1
 
-		res, err := flow.NewRootBlock(block)
+		res, err := flow.NewRootUnsignedBlock(block)
 		require.Error(t, err)
 		require.Nil(t, res)
 		require.Contains(t, err.Error(), "invalid root header body")
@@ -219,7 +219,7 @@ func TestNewRootBlock(t *testing.T) {
 		block := validRootBlockFixture()
 		block.Payload.ProtocolStateID = flow.ZeroID
 
-		res, err := flow.NewRootBlock(block)
+		res, err := flow.NewRootUnsignedBlock(block)
 		require.Error(t, err)
 		require.Nil(t, res)
 		require.Contains(t, err.Error(), "invalid payload")
@@ -300,7 +300,7 @@ func TestNewProposal(t *testing.T) {
 func TestNewRootProposal(t *testing.T) {
 	// validRootProposalFixture returns a new valid root flow.UntrustedProposal for use in tests.
 	validRootProposalFixture := func() flow.UntrustedProposal {
-		block, err := flow.NewRootBlock(flow.UntrustedUnsignedBlock{
+		block, err := flow.NewRootUnsignedBlock(flow.UntrustedUnsignedBlock{
 			HeaderBody: flow.HeaderBody{
 				ChainID:            flow.Emulator,
 				ParentID:           unittest.IdentifierFixture(),

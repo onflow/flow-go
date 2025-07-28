@@ -207,7 +207,7 @@ func NewInstance(t *testing.T, options ...Option) *Instance {
 			require.NoError(t, setter(headerBuilder))
 			headerBody, err := headerBuilder.Build()
 			require.NoError(t, err)
-			header, err := flow.NewHeader(flow.UntrustedUnsignedHeader{
+			header, err := flow.NewUnsignedHeader(flow.UntrustedUnsignedHeader{
 				HeaderBody:  *headerBody,
 				PayloadHash: unittest.IdentifierFixture(),
 			})

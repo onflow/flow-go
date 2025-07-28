@@ -191,7 +191,7 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.HeaderBody
 		return nil, fmt.Errorf("could not build header: %w", err)
 	}
 
-	block, err := cluster.NewBlock(
+	block, err := cluster.NewUnsignedBlock(
 		cluster.UntrustedUnsignedBlock{
 			HeaderBody: proposal.Header.HeaderBody,
 			Payload:    *payload,
@@ -538,7 +538,7 @@ func (b *Builder) buildHeader(
 	if err != nil {
 		return nil, irrecoverable.NewExceptionf("unexpected error when building header body: %w", err)
 	}
-	header, err := flow.NewHeader(flow.UntrustedUnsignedHeader{
+	header, err := flow.NewUnsignedHeader(flow.UntrustedUnsignedHeader{
 		HeaderBody:  *headerBody,
 		PayloadHash: payload.Hash(),
 	})

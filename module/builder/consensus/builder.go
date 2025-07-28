@@ -658,7 +658,7 @@ func (b *Builder) createProposal(parentID flow.Identifier,
 		return nil, fmt.Errorf("could not build the payload: %w", err)
 	}
 
-	block, err := flow.NewBlock(
+	block, err := flow.NewUnsignedBlock(
 		flow.UntrustedUnsignedBlock{
 			HeaderBody: *headerBody,
 			Payload:    *payload,

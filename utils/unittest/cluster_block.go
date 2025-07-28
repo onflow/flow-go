@@ -76,7 +76,7 @@ func (f *clusterBlockFactory) Genesis() (*cluster.UnsignedBlock, error) {
 		return nil, fmt.Errorf("failed to create root cluster payload: %w", err)
 	}
 
-	block, err := cluster.NewRootBlock(
+	block, err := cluster.NewRootUnsignedBlock(
 		cluster.UntrustedUnsignedBlock{
 			HeaderBody: *headerBody,
 			Payload:    *payload,

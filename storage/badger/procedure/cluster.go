@@ -62,7 +62,7 @@ func RetrieveClusterBlock(blockID flow.Identifier, block *cluster.UnsignedBlock)
 		}
 
 		// overwrite block
-		newBlock, err := cluster.NewBlock(
+		newBlock, err := cluster.NewUnsignedBlock(
 			cluster.UntrustedUnsignedBlock{
 				HeaderBody: header.HeaderBody,
 				Payload:    payload,

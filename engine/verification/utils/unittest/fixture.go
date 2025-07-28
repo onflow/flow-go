@@ -339,7 +339,7 @@ func ExecutionResultFixture(t *testing.T,
 			},
 		)
 		require.NoError(t, err)
-		referenceBlock, err = flow.NewBlock(
+		referenceBlock, err = flow.NewUnsignedBlock(
 			flow.UntrustedUnsignedBlock{
 				HeaderBody: refBlkHeader.HeaderBody,
 				Payload:    *payload,

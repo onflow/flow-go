@@ -29,7 +29,7 @@ func TestClusterBlockMalleability(t *testing.T) {
 	)
 }
 
-// TestNewBlock verifies the behavior of the NewBlock constructor.
+// TestNewBlock verifies the behavior of the NewUnsignedBlock constructor.
 // It ensures proper handling of both valid and invalid untrusted input fields.
 //
 // Test Cases:
@@ -46,7 +46,7 @@ func TestNewBlock(t *testing.T) {
 	t.Run("valid input", func(t *testing.T) {
 		block := unittest.ClusterBlockFixture()
 
-		res, err := cluster.NewBlock(cluster.UntrustedUnsignedBlock(*block))
+		res, err := cluster.NewUnsignedBlock(cluster.UntrustedUnsignedBlock(*block))
 		require.NoError(t, err)
 		require.NotNil(t, res)
 	})
@@ -55,7 +55,7 @@ func TestNewBlock(t *testing.T) {
 		block := unittest.ClusterBlockFixture()
 		block.ParentID = flow.ZeroID
 
-		res, err := cluster.NewBlock(cluster.UntrustedUnsignedBlock(*block))
+		res, err := cluster.NewUnsignedBlock(cluster.UntrustedUnsignedBlock(*block))
 		require.Error(t, err)
 		require.Nil(t, res)
 		require.Contains(t, err.Error(), "invalid header body")
@@ -67,14 +67,14 @@ func TestNewBlock(t *testing.T) {
 		collection.Transactions[2] = nil
 		block.Payload.Collection = collection
 
-		res, err := cluster.NewBlock(cluster.UntrustedUnsignedBlock(*block))
+		res, err := cluster.NewUnsignedBlock(cluster.UntrustedUnsignedBlock(*block))
 		require.Error(t, err)
 		require.Nil(t, res)
 		require.Contains(t, err.Error(), "invalid cluster payload")
 	})
 }
 
-// TestNewRootBlock verifies the behavior of the NewRootBlock constructor.
+// TestNewRootBlock verifies the behavior of the NewRootUnsignedBlock constructor.
 // It ensures proper handling of both valid and invalid untrusted input fields.
 //
 // Test Cases:
@@ -111,7 +111,7 @@ func TestNewRootBlock(t *testing.T) {
 	}
 
 	t.Run("valid input", func(t *testing.T) {
-		res, err := cluster.NewRootBlock(validRootBlockFixture())
+		res, err := cluster.NewRootUnsignedBlock(validRootBlockFixture())
 		require.NoError(t, err)
 		require.NotNil(t, res)
 	})
@@ -120,7 +120,7 @@ func TestNewRootBlock(t *testing.T) {
 		block := validRootBlockFixture()
 		block.ParentView = 1
 
-		res, err := cluster.NewRootBlock(block)
+		res, err := cluster.NewRootUnsignedBlock(block)
 		require.Error(t, err)
 		require.Nil(t, res)
 		require.Contains(t, err.Error(), "invalid root header body")
@@ -130,7 +130,7 @@ func TestNewRootBlock(t *testing.T) {
 		block := validRootBlockFixture()
 		block.ParentID = unittest.IdentifierFixture()
 
-		res, err := cluster.NewRootBlock(block)
+		res, err := cluster.NewRootUnsignedBlock(block)
 		require.Error(t, err)
 		require.Nil(t, res)
 		require.Contains(t, err.Error(), "ParentID must be zero")
@@ -140,7 +140,7 @@ func TestNewRootBlock(t *testing.T) {
 		block := validRootBlockFixture()
 		block.Payload.ReferenceBlockID = unittest.IdentifierFixture()
 
-		res, err := cluster.NewRootBlock(block)
+		res, err := cluster.NewRootUnsignedBlock(block)
 		require.Error(t, err)
 		require.Nil(t, res)
 		require.Contains(t, err.Error(), "invalid root cluster payload")

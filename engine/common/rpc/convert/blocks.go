@@ -78,7 +78,7 @@ func MessageToBlock(m *entities.Block) (*flow.UnsignedBlock, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to convert block header: %w", err)
 	}
-	block, err := flow.NewBlock(
+	block, err := flow.NewUnsignedBlock(
 		flow.UntrustedUnsignedBlock{
 			HeaderBody: header.HeaderBody,
 			Payload:    *payload,

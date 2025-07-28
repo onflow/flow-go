@@ -105,7 +105,7 @@ func MessageToBlockHeader(m *entities.BlockHeader) (*flow.UnsignedHeader, error)
 			return nil, fmt.Errorf("failed to create root header body: %w", err)
 		}
 
-		rootHeader, err := flow.NewRootHeader(flow.UntrustedUnsignedHeader{
+		rootHeader, err := flow.NewRootUnsignedHeader(flow.UntrustedUnsignedHeader{
 			HeaderBody:  *rootHeaderBody,
 			PayloadHash: MessageToIdentifier(m.PayloadHash),
 		})
@@ -131,7 +131,7 @@ func MessageToBlockHeader(m *entities.BlockHeader) (*flow.UnsignedHeader, error)
 	if err != nil {
 		return nil, fmt.Errorf("could not build header body: %w", err)
 	}
-	header, err := flow.NewHeader(flow.UntrustedUnsignedHeader{
+	header, err := flow.NewUnsignedHeader(flow.UntrustedUnsignedHeader{
 		HeaderBody:  *headerBody,
 		PayloadHash: MessageToIdentifier(m.PayloadHash),
 	})

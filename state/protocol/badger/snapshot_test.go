@@ -403,7 +403,7 @@ func TestSealingSegment(t *testing.T) {
 				if i == 0 {
 					// Repetitions of the same receipt in one fork would be a protocol violation.
 					// Hence, we include the result only once in the direct child of B1.
-					next, err = flow.NewBlock(
+					next, err = flow.NewUnsignedBlock(
 						flow.UntrustedUnsignedBlock{
 							HeaderBody: next.HeaderBody,
 							Payload: unittest.PayloadFixture(

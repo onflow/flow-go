@@ -1241,7 +1241,7 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string, chainID fl
 	if err != nil {
 		return nil, err
 	}
-	root, err := flow.NewRootBlock(
+	root, err := flow.NewRootUnsignedBlock(
 		flow.UntrustedUnsignedBlock{
 			HeaderBody: *rootHeaderBody,
 			Payload:    unittest.PayloadFixture(unittest.WithProtocolStateID(rootProtocolState.ID())),

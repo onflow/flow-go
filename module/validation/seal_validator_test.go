@@ -390,7 +390,7 @@ func (s *SealValidationSuite) TestValidatePayload_SealsSkipBlock() {
 	resultB0 := unittest.ExecutionResultFixture(unittest.WithBlock(blocks[0]), unittest.WithPreviousResult(*s.LatestExecutionResult))
 	receipts := unittest.ReceiptChainFor(blocks, resultB0)
 	var err error
-	blocks[3], err = flow.NewBlock(
+	blocks[3], err = flow.NewUnsignedBlock(
 		flow.UntrustedUnsignedBlock{
 			HeaderBody: blocks[3].HeaderBody,
 			Payload: unittest.PayloadFixture(
@@ -486,7 +486,7 @@ func (s *SealValidationSuite) TestValidatePayload_ExecutionDisconnected() {
 	var err error
 	for i := 1; i <= 3; i++ {
 		// set payload for blocks A, B, C
-		blocks[i], err = flow.NewBlock(
+		blocks[i], err = flow.NewUnsignedBlock(
 			flow.UntrustedUnsignedBlock{
 				HeaderBody: blocks[i].HeaderBody,
 				Payload: unittest.PayloadFixture(
@@ -497,7 +497,7 @@ func (s *SealValidationSuite) TestValidatePayload_ExecutionDisconnected() {
 		require.NoError(s.T(), err)
 	}
 
-	blocks[4], err = flow.NewBlock(
+	blocks[4], err = flow.NewUnsignedBlock(
 		flow.UntrustedUnsignedBlock{
 			HeaderBody: blocks[4].HeaderBody,
 			Payload: unittest.PayloadFixture(
@@ -600,7 +600,7 @@ func (s *SealValidationSuite) TestExtendSealDuplicate() {
 	// <- LatestSealedBlock <- B0 <- B1{ Result[B0], Receipt[B0] } <- B2 <- B3{S(R(B1)), S(R(B1))}
 	s.T().Run("Duplicate seal in same payload", func(t *testing.T) {
 		_, _, b3, _, sealB1 := s.generateBasicTestFork()
-		b3, err := flow.NewBlock(
+		b3, err := flow.NewUnsignedBlock(
 			flow.UntrustedUnsignedBlock{
 				HeaderBody: b3.HeaderBody,
 				Payload: unittest.PayloadFixture(
@@ -672,7 +672,7 @@ func (s *SealValidationSuite) TestExtendSeal_DifferentIncorporatedResult() {
 		unittest.WithPreviousResult(*s.LatestExecutionResult),
 	)
 	seal := unittest.Seal.Fixture(unittest.Seal.WithResult(differentResult))
-	newBlock, err := flow.NewBlock(
+	newBlock, err := flow.NewUnsignedBlock(
 		flow.UntrustedUnsignedBlock{
 			HeaderBody: newBlock.HeaderBody,
 			Payload: unittest.PayloadFixture(

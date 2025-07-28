@@ -36,7 +36,7 @@ func constructRootBlock(rootHeaderBody *flow.HeaderBody, protocolStateID flow.Id
 		return nil, fmt.Errorf("could not construct payload: %w", err)
 	}
 
-	block, err := flow.NewRootBlock(
+	block, err := flow.NewRootUnsignedBlock(
 		flow.UntrustedUnsignedBlock{
 			HeaderBody: *rootHeaderBody,
 			Payload:    *payload,

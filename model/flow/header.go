@@ -195,14 +195,14 @@ type UnsignedHeader struct {
 // ordering during construction.
 //
 // An instance of UntrustedUnsignedHeader should be validated and converted into
-// a trusted UnsignedHeader using NewHeader constructor.
+// a trusted UnsignedHeader using NewUnsignedHeader constructor.
 type UntrustedUnsignedHeader UnsignedHeader
 
-// NewHeader creates a new instance of UnsignedHeader.
+// NewUnsignedHeader creates a new instance of UnsignedHeader.
 // Construction of UnsignedHeader is allowed only within the constructor
 //
 // All errors indicate a valid UnsignedHeader cannot be constructed from the input.
-func NewHeader(untrusted UntrustedUnsignedHeader) (*UnsignedHeader, error) {
+func NewUnsignedHeader(untrusted UntrustedUnsignedHeader) (*UnsignedHeader, error) {
 	headerBody, err := NewHeaderBody(UntrustedHeaderBody(untrusted.HeaderBody))
 	if err != nil {
 		return nil, fmt.Errorf("invalid header body: %w", err)
@@ -218,11 +218,11 @@ func NewHeader(untrusted UntrustedUnsignedHeader) (*UnsignedHeader, error) {
 	}, nil
 }
 
-// NewRootHeader creates a root header.
+// NewRootUnsignedHeader creates a root header.
 //
 // This constructor must be used **only** for constructing the root header,
 // which is the only case where zero values are allowed.
-func NewRootHeader(untrusted UntrustedUnsignedHeader) (*UnsignedHeader, error) {
+func NewRootUnsignedHeader(untrusted UntrustedUnsignedHeader) (*UnsignedHeader, error) {
 	rootHeaderBody, err := NewRootHeaderBody(UntrustedHeaderBody(untrusted.HeaderBody))
 	if err != nil {
 		return nil, fmt.Errorf("invalid root header body: %w", err)

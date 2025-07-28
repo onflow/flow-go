@@ -85,7 +85,7 @@ func (f *blockFactory) Genesis(chainID flow.ChainID) *flow.UnsignedBlock {
 	}
 
 	// combine to block
-	block, err := flow.NewRootBlock(
+	block, err := flow.NewRootUnsignedBlock(
 		flow.UntrustedUnsignedBlock{
 			HeaderBody: *headerBody,
 			Payload:    payload,

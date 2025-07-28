@@ -501,7 +501,7 @@ func (b *bootstrapExecutor) genesisHeader() (*flow.UnsignedHeader, error) {
 		return nil, fmt.Errorf("failed to create root header body: %w", err)
 	}
 
-	header, err := flow.NewRootHeader(
+	header, err := flow.NewRootUnsignedHeader(
 		flow.UntrustedUnsignedHeader{
 			HeaderBody:  *headerBody,
 			PayloadHash: payload.Hash(),

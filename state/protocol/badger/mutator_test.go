@@ -3207,7 +3207,7 @@ func TestExtendInvalidGuarantee(t *testing.T) {
 			checksumMismatch[0] = byte(2)
 		}
 		payload.Guarantees[0].SignerIndices = checksumMismatch
-		block, err = flow.NewBlock(
+		block, err = flow.NewUnsignedBlock(
 			flow.UntrustedUnsignedBlock{
 				HeaderBody: block.HeaderBody,
 				Payload:    payload,
@@ -3227,7 +3227,7 @@ func TestExtendInvalidGuarantee(t *testing.T) {
 		wrongTailing[len(wrongTailing)-1] = byte(255)
 
 		payload.Guarantees[0].SignerIndices = wrongTailing
-		block, err = flow.NewBlock(
+		block, err = flow.NewUnsignedBlock(
 			flow.UntrustedUnsignedBlock{
 				HeaderBody: block.HeaderBody,
 				Payload:    payload,
@@ -3243,7 +3243,7 @@ func TestExtendInvalidGuarantee(t *testing.T) {
 		// test imcompatible bit vector length
 		wrongbitVectorLength := validSignerIndices[0 : len(validSignerIndices)-1]
 		payload.Guarantees[0].SignerIndices = wrongbitVectorLength
-		block, err = flow.NewBlock(
+		block, err = flow.NewUnsignedBlock(
 			flow.UntrustedUnsignedBlock{
 				HeaderBody: block.HeaderBody,
 				Payload:    payload,
@@ -3261,7 +3261,7 @@ func TestExtendInvalidGuarantee(t *testing.T) {
 
 		// test the ReferenceBlockID is not found
 		payload.Guarantees[0].ReferenceBlockID = flow.ZeroID
-		block, err = flow.NewBlock(
+		block, err = flow.NewUnsignedBlock(
 			flow.UntrustedUnsignedBlock{
 				HeaderBody: block.HeaderBody,
 				Payload:    payload,
@@ -3283,7 +3283,7 @@ func TestExtendInvalidGuarantee(t *testing.T) {
 
 		// test the guarantee has wrong chain ID, and should return ErrClusterNotFound
 		payload.Guarantees[0].ChainID = flow.ChainID("some_bad_chain_ID")
-		block, err = flow.NewBlock(
+		block, err = flow.NewUnsignedBlock(
 			flow.UntrustedUnsignedBlock{
 				HeaderBody: block.HeaderBody,
 				Payload:    payload,

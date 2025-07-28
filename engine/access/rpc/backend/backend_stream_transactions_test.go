@@ -353,7 +353,7 @@ func (s *TransactionStatusSuite) addBlockWithTransaction(transaction *flow.Trans
 	s.sealedBlock = s.finalizedBlock
 	s.addNewFinalizedBlock(s.sealedBlock.ToHeader(), true, func(block *flow.UnsignedBlock) {
 		var err error
-		block, err = flow.NewBlock(
+		block, err = flow.NewUnsignedBlock(
 			flow.UntrustedUnsignedBlock{
 				HeaderBody: block.HeaderBody,
 				Payload:    unittest.PayloadFixture(unittest.WithGuarantees(&guarantee)),

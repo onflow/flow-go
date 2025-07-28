@@ -102,7 +102,7 @@ func (s *BackendEventsSuite) SetupTest() {
 
 		payload := unittest.PayloadFixture()
 		header.PayloadHash = payload.Hash()
-		block, err := flow.NewBlock(
+		block, err := flow.NewUnsignedBlock(
 			flow.UntrustedUnsignedBlock{
 				HeaderBody: header.HeaderBody,
 				Payload:    payload,
