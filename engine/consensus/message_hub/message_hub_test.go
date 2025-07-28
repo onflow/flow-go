@@ -224,7 +224,7 @@ func (s *MessageHubSuite) TestProcessInvalidIncomingMessages() {
 		require.NoError(s.T(), err)
 
 		// OnBlockRange should NOT be called for invalid proposal
-		s.compliance.AssertNotCalled(s.T(), "OnBlockRange", mock.Anything)
+		s.compliance.AssertNotCalled(s.T(), "OnBlockProposal", mock.Anything)
 	})
 	s.Run("to-vote-aggregator", func() {
 		expectedVote := unittest.VoteFixture(unittest.WithVoteSignerID(originID))
