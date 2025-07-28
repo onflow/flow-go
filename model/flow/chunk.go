@@ -20,7 +20,6 @@ func init() {
 	}
 }
 
-
 type ChunkBody struct {
 	CollectionIndex uint
 
@@ -54,8 +53,6 @@ type Chunk struct {
 	// EndState inferred from next chunk or from the ER
 	EndState StateCommitment
 }
-
-
 
 // NewChunk returns a Chunk compliant with Protocol Version 2 and later.
 func NewChunk(
