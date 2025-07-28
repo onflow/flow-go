@@ -159,7 +159,6 @@ func (ss *SyncSuite) SetupTest() {
 }
 
 func (ss *SyncSuite) TestOnSyncRequest() {
-
 	// generate origin and request message
 	originID := unittest.IdentifierFixture()
 	req := &messages.SyncRequest{
@@ -195,14 +194,15 @@ func (ss *SyncSuite) TestOnSyncRequest() {
 			assert.Equal(ss.T(), originID, recipientID, "should send response to original sender")
 		},
 	)
+	ss.metrics.On("MessageSent", metrics.EngineClusterSynchronization, metrics.MessageSyncResponse).Once()
 	err = ss.e.requestHandler.onSyncRequest(originID, req)
 	require.NoError(ss.T(), err, "smaller height sync request should pass")
 
 	ss.core.AssertExpectations(ss.T())
+	ss.metrics.AssertExpectations(ss.T())
 }
 
 func (ss *SyncSuite) TestOnSyncResponse() {
-
 	// generate origin ID and response message
 	originID := unittest.IdentifierFixture()
 	res := &messages.SyncResponse{
@@ -217,7 +217,6 @@ func (ss *SyncSuite) TestOnSyncResponse() {
 }
 
 func (ss *SyncSuite) TestOnRangeRequest() {
-
 	// generate originID and range request
 	originID := unittest.IdentifierFixture()
 	req := &messages.RangeRequest{
@@ -269,6 +268,8 @@ func (ss *SyncSuite) TestOnRangeRequest() {
 				assert.Equal(ss.T(), originID, recipientID, "should send response to original requester")
 			},
 		)
+		ss.metrics.On("MessageSent", metrics.EngineClusterSynchronization, metrics.MessageBlockResponse).Once()
+
 		err := ss.e.requestHandler.onRangeRequest(originID, req)
 		require.NoError(ss.T(), err, "range request with higher to height should pass")
 	})
@@ -289,6 +290,8 @@ func (ss *SyncSuite) TestOnRangeRequest() {
 				assert.Equal(ss.T(), originID, recipientID, "should send response to original requester")
 			},
 		)
+		ss.metrics.On("MessageSent", metrics.EngineClusterSynchronization, metrics.MessageBlockResponse).Once()
+
 		err := ss.e.requestHandler.onRangeRequest(originID, req)
 		require.NoError(ss.T(), err, "valid range with missing blocks should fail")
 	})
@@ -309,6 +312,8 @@ func (ss *SyncSuite) TestOnRangeRequest() {
 				assert.Equal(ss.T(), originID, recipientID, "should send response to original requester")
 			},
 		)
+		ss.metrics.On("MessageSent", metrics.EngineClusterSynchronization, metrics.MessageBlockResponse).Once()
+
 		err := ss.e.requestHandler.onRangeRequest(originID, req)
 		require.NoError(ss.T(), err, "valid range request should pass")
 	})
@@ -338,14 +343,16 @@ func (ss *SyncSuite) TestOnRangeRequest() {
 		config.MaxSize = 2
 		ss.e.requestHandler.core, err = chainsync.New(ss.e.log, config, metrics.NewNoopCollector(), flow.Localnet)
 		require.NoError(ss.T(), err)
+		ss.metrics.On("MessageSent", metrics.EngineClusterSynchronization, metrics.MessageBlockResponse).Once()
 
 		err = ss.e.requestHandler.onRangeRequest(originID, req)
 		require.NoError(ss.T(), err, "valid range request should pass")
 	})
+
+	ss.metrics.AssertExpectations(ss.T())
 }
 
 func (ss *SyncSuite) TestOnBatchRequest() {
-
 	// generate origin ID and batch request
 	originID := unittest.IdentifierFixture()
 	req := &messages.BatchRequest{
@@ -387,6 +394,7 @@ func (ss *SyncSuite) TestOnBatchRequest() {
 				assert.Equal(ss.T(), originID, recipientID, "response should be send to original requester")
 			},
 		)
+		ss.metrics.On("MessageSent", metrics.EngineClusterSynchronization, metrics.MessageBlockResponse).Once()
 		err := ss.e.requestHandler.onBatchRequest(originID, req)
 		require.NoError(ss.T(), err, "should pass request with valid block")
 	})
@@ -421,10 +429,13 @@ func (ss *SyncSuite) TestOnBatchRequest() {
 		config.MaxSize = 2
 		ss.e.requestHandler.core, err = chainsync.New(ss.e.log, config, metrics.NewNoopCollector(), flow.Localnet)
 		require.NoError(ss.T(), err)
+		ss.metrics.On("MessageSent", metrics.EngineClusterSynchronization, metrics.MessageBlockResponse).Once()
 
 		err = ss.e.requestHandler.onBatchRequest(originID, req)
 		require.NoError(ss.T(), err, "should pass request with valid block")
 	})
+
+	ss.metrics.AssertExpectations(ss.T())
 }
 
 func (ss *SyncSuite) TestOnBlockResponse() {
@@ -492,8 +503,10 @@ func (ss *SyncSuite) TestPollHeight() {
 			require.Equal(ss.T(), ss.head.Height, req.Height, "request should contain finalized height")
 		},
 	)
+	ss.metrics.On("MessageSent", metrics.EngineClusterSynchronization, metrics.MessageSyncRequest).Once()
 	ss.e.pollHeight()
 	ss.con.AssertExpectations(ss.T())
+	ss.metrics.AssertExpectations(ss.T())
 }
 
 func (ss *SyncSuite) TestSendRequests() {
@@ -519,10 +532,13 @@ func (ss *SyncSuite) TestSendRequests() {
 		},
 	)
 	ss.core.On("BatchRequested", batches[0])
+	ss.metrics.On("MessageSent", metrics.EngineClusterSynchronization, metrics.MessageRangeRequest).Once()
+	ss.metrics.On("MessageSent", metrics.EngineClusterSynchronization, metrics.MessageBatchRequest).Once()
 
 	// exclude my node ID
 	ss.e.sendRequests(ranges, batches)
 	ss.con.AssertExpectations(ss.T())
+	ss.metrics.AssertExpectations(ss.T())
 }
 
 // test a synchronization engine can be started and stopped
@@ -544,6 +560,9 @@ func (ss *SyncSuite) TestProcessingMultipleItems() {
 			Height: uint64(1000 + i),
 		}
 		ss.core.On("HandleHeight", mock.Anything, msg.Height).Once()
+		ss.metrics.On("MessageSent", metrics.EngineClusterSynchronization, metrics.MessageSyncResponse).Once()
+		ss.metrics.On("MessageReceived", metrics.EngineClusterSynchronization, metrics.MessageSyncResponse).Once()
+		ss.metrics.On("MessageHandled", metrics.EngineClusterSynchronization, metrics.MessageSyncResponse).Once()
 		require.NoError(ss.T(), ss.e.Process(channels.SyncCommittee, originID, msg))
 	}
 
@@ -558,6 +577,7 @@ func (ss *SyncSuite) TestProcessingMultipleItems() {
 		ss.core.On("WithinTolerance", mock.Anything, mock.Anything).Return(false).Once()
 		ss.core.On("HandleHeight", mock.Anything, msg.Height).Once()
 		ss.con.On("Unicast", mock.Anything, mock.Anything).Return(nil)
+		ss.metrics.On("MessageReceived", metrics.EngineClusterSynchronization, metrics.MessageSyncRequest).Once()
 
 		require.NoError(ss.T(), ss.e.Process(channels.SyncCommittee, originID, msg))
 	}
@@ -566,6 +586,7 @@ func (ss *SyncSuite) TestProcessingMultipleItems() {
 	time.Sleep(time.Millisecond * 100)
 
 	ss.core.AssertExpectations(ss.T())
+	ss.metrics.AssertExpectations(ss.T())
 }
 
 // TestProcessUnsupportedMessageType tests that Process and ProcessLocal correctly handle a case where invalid message type

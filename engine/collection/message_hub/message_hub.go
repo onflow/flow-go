@@ -352,7 +352,7 @@ func (h *MessageHub) sendOwnProposal(proposal *flow.ProposalHeader) error {
 	}
 
 	// broadcast the proposal to consensus nodes
-	err = h.con.Publish(&proposalMsg, recipients.NodeIDs()...)
+	err = h.con.Publish(proposalMsg, recipients.NodeIDs()...)
 	if err != nil {
 		if !errors.Is(err, network.EmptyTargetList) {
 			log.Err(err).Msg("could not send proposal message")
