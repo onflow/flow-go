@@ -71,8 +71,9 @@ func (b *GenericBlock[T]) ToHeader() *Header {
 // Zero values for certain HeaderBody fields are allowed only for root blocks, which must be constructed
 // using the NewRootBlock constructor. All non-root blocks must be constructed
 // using NewBlock to ensure validation of the block fields.
+//
 //structwrite:immutable - mutations allowed only within the constructor
-type Block GenericBlock[Payload]
+type Block = GenericBlock[Payload]
 
 // UntrustedBlock is an untrusted input-only representation of a Block,
 // used for construction.
@@ -209,7 +210,8 @@ func NewRootProposal(untrusted UntrustedProposal) (*Proposal, error) {
 // ProposalHeader converts the proposal into a compact [ProposalHeader] representation,
 // where the payload is compressed to a hash reference.
 func (b *Proposal) ProposalHeader() *ProposalHeader {
-	return &ProposalHeader{Header: b.Block.ToHeader(), ProposerSigData: b.ProposerSigData}
+	block := &b.Block
+	return &ProposalHeader{Header: block.ToHeader(), ProposerSigData: b.ProposerSigData}
 }
 
 // CertifiedBlock holds a certified block, which is a block and a Quorum Certificate [QC] pointing
