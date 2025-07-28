@@ -10,8 +10,8 @@ import (
 	"github.com/onflow/flow-go/model/fingerprint"
 )
 
-// TransactionBodyBuilder constructs a validated, immutable TransactionBody in two phases:
-// first by setting individual fields using fluent WithX methods, then by calling Build()
+// TransactionBodyBuilder constructs a validated, immutable [TransactionBody] in two phases:
+// first by setting individual fields using fluent SetX methods, then by calling Build()
 // to perform minimal validity and sanity checks and return the final [TransactionBody].
 type TransactionBodyBuilder struct {
 	u UntrustedTransactionBody
