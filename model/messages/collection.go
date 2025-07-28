@@ -37,7 +37,7 @@ func NewUntrustedClusterProposal(internal cluster.UnsignedBlock, proposerSig []b
 // CAUTION: Prior to using this function, ensure that the untrusted proposal has been fully validated.
 func (cbp *UntrustedClusterProposal) DeclareStructurallyValid() (*cluster.Proposal, error) {
 	block, err := cluster.NewBlock(
-		cluster.UnsignedUntrustedBlock{
+		cluster.UntrustedUnsignedBlock{
 			HeaderBody: cbp.Block.HeaderBody,
 			Payload:    cbp.Block.Payload,
 		},

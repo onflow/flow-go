@@ -77,7 +77,7 @@ func (f *clusterBlockFactory) Genesis() (*cluster.UnsignedBlock, error) {
 	}
 
 	block, err := cluster.NewRootBlock(
-		cluster.UnsignedUntrustedBlock{
+		cluster.UntrustedUnsignedBlock{
 			HeaderBody: *headerBody,
 			Payload:    *payload,
 		},

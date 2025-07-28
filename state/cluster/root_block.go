@@ -40,7 +40,7 @@ func CanonicalRootBlock(epoch uint64, participants flow.IdentitySkeletonList) (*
 	}
 
 	block, err := cluster.NewRootBlock(
-		cluster.UnsignedUntrustedBlock{
+		cluster.UntrustedUnsignedBlock{
 			HeaderBody: *rootHeaderBody,
 			Payload:    *rootBlockPayload,
 		},

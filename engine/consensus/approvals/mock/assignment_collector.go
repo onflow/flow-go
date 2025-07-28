@@ -21,7 +21,7 @@ func (_m *AssignmentCollector) Block() *flow.UnsignedHeader {
 	ret := _m.Called()
 
 	if len(ret) == 0 {
-		panic("no return value specified for UnsignedBlock")
+		panic("no return value specified for Block")
 	}
 
 	var r0 *flow.UnsignedHeader

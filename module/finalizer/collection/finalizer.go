@@ -126,7 +126,7 @@ func (f *Finalizer) MakeFinal(blockID flow.Identifier) error {
 			}
 
 			block, err := cluster.NewBlock(
-				cluster.UnsignedUntrustedBlock{
+				cluster.UntrustedUnsignedBlock{
 					HeaderBody: step.HeaderBody,
 					Payload:    payload,
 				},
