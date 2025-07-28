@@ -5,7 +5,6 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
@@ -14,7 +13,7 @@ import (
 	stateMock "github.com/onflow/flow-go/engine/execution/state/mock"
 	"github.com/onflow/flow-go/model/flow"
 	storageerr "github.com/onflow/flow-go/storage"
-	storage "github.com/onflow/flow-go/storage/mocks"
+	storage "github.com/onflow/flow-go/storage/mock"
 	"github.com/onflow/flow-go/utils/unittest"
 	"github.com/onflow/flow-go/utils/unittest/mocks"
 )
@@ -94,9 +93,8 @@ func TestLoadingUnexecutedBlocks(t *testing.T) {
 		require.NoError(t, ps.Bootstrap(genesis, result, seal))
 
 		es := newMockExecutionState(seal, genesis)
-		ctrl := gomock.NewController(t)
-		headers := storage.NewMockHeaders(ctrl)
-		headers.EXPECT().ByBlockID(genesis.ID()).Return(genesis.ToHeader(), nil)
+		headers := new(storage.Headers)
+		headers.On("ByBlockID", genesis.ID()).Return(genesis.ToHeader(), nil)
 		log := unittest.Logger()
 		loader := loader.NewUnexecutedLoader(log, ps, headers, es)
 
@@ -122,13 +120,12 @@ func TestLoadingUnexecutedBlocks(t *testing.T) {
 		require.NoError(t, ps.Extend(blockD))
 
 		es := newMockExecutionState(seal, genesis)
-		ctrl := gomock.NewController(t)
-		headers := storage.NewMockHeaders(ctrl)
-		headers.EXPECT().ByBlockID(genesis.ID()).Return(genesis.ToHeader(), nil)
-		headers.EXPECT().ByBlockID(blockA.ID()).Return(blockA.ToHeader(), nil)
-		headers.EXPECT().ByBlockID(blockB.ID()).Return(blockB.ToHeader(), nil)
-		headers.EXPECT().ByBlockID(blockC.ID()).Return(blockC.ToHeader(), nil)
-		headers.EXPECT().ByBlockID(blockD.ID()).Return(blockD.ToHeader(), nil)
+		headers := new(storage.Headers)
+		headers.On("ByBlockID", genesis.ID()).Return(genesis.ToHeader(), nil).Once()
+		headers.On("ByBlockID", blockA.ID()).Return(blockA.ToHeader(), nil).Once()
+		headers.On("ByBlockID", blockB.ID()).Return(blockB.ToHeader(), nil).Once()
+		headers.On("ByBlockID", blockC.ID()).Return(blockC.ToHeader(), nil).Once()
+		headers.On("ByBlockID", blockD.ID()).Return(blockD.ToHeader(), nil).Once()
 		log := unittest.Logger()
 		loader := loader.NewUnexecutedLoader(log, ps, headers, es)
 
@@ -154,13 +151,12 @@ func TestLoadingUnexecutedBlocks(t *testing.T) {
 		require.NoError(t, ps.Extend(blockD))
 
 		es := newMockExecutionState(seal, genesis)
-		ctrl := gomock.NewController(t)
-		headers := storage.NewMockHeaders(ctrl)
-		headers.EXPECT().ByBlockID(genesis.ID()).Return(genesis.ToHeader(), nil)
-		headers.EXPECT().ByBlockID(blockA.ID()).Return(blockA.ToHeader(), nil)
-		headers.EXPECT().ByBlockID(blockB.ID()).Return(blockB.ToHeader(), nil)
-		headers.EXPECT().ByBlockID(blockC.ID()).Return(blockC.ToHeader(), nil)
-		headers.EXPECT().ByBlockID(blockD.ID()).Return(blockD.ToHeader(), nil)
+		headers := new(storage.Headers)
+		headers.On("ByBlockID", genesis.ID()).Return(genesis.ToHeader(), nil).Once()
+		headers.On("ByBlockID", blockA.ID()).Return(blockA.ToHeader(), nil).Once()
+		headers.On("ByBlockID", blockB.ID()).Return(blockB.ToHeader(), nil).Once()
+		headers.On("ByBlockID", blockC.ID()).Return(blockC.ToHeader(), nil).Once()
+		headers.On("ByBlockID", blockD.ID()).Return(blockD.ToHeader(), nil).Once()
 
 		log := unittest.Logger()
 		loader := loader.NewUnexecutedLoader(log, ps, headers, es)
@@ -192,16 +188,15 @@ func TestLoadingUnexecutedBlocks(t *testing.T) {
 		require.NoError(t, ps.Finalize(blockC.ID()))
 
 		es := newMockExecutionState(seal, genesis)
-		ctrl := gomock.NewController(t)
-		headers := storage.NewMockHeaders(ctrl)
-		headers.EXPECT().ByBlockID(genesis.ID()).Return(genesis.ToHeader(), nil)
-		headers.EXPECT().ByBlockID(blockD.ID()).Return(blockD.ToHeader(), nil)
+		headers := new(storage.Headers)
+		headers.On("ByBlockID", genesis.ID()).Return(genesis.ToHeader(), nil).Once()
+		headers.On("ByBlockID", blockD.ID()).Return(blockD.ToHeader(), nil).Once()
 
 		log := unittest.Logger()
 		loader := loader.NewUnexecutedLoader(log, ps, headers, es)
 
 		// block C is the only finalized block, index its header by its height
-		headers.EXPECT().BlockIDByHeight(blockC.Height).Return(blockC.ID(), nil)
+		headers.On("BlockIDByHeight", blockC.Height).Return(blockC.ID(), nil).Once()
 
 		es.ExecuteBlock(t, blockA)
 		es.ExecuteBlock(t, blockB)
@@ -231,15 +226,14 @@ func TestLoadingUnexecutedBlocks(t *testing.T) {
 		require.NoError(t, ps.Finalize(blockC.ID()))
 
 		es := newMockExecutionState(seal, genesis)
-		ctrl := gomock.NewController(t)
-		headers := storage.NewMockHeaders(ctrl)
-		headers.EXPECT().ByBlockID(genesis.ID()).Return(genesis.ToHeader(), nil)
-		headers.EXPECT().ByBlockID(blockD.ID()).Return(blockD.ToHeader(), nil)
+		headers := new(storage.Headers)
+		headers.On("ByBlockID", genesis.ID()).Return(genesis.ToHeader(), nil).Once()
+		headers.On("ByBlockID", blockD.ID()).Return(blockD.ToHeader(), nil).Once()
 		log := unittest.Logger()
 		loader := loader.NewUnexecutedLoader(log, ps, headers, es)
 
 		// block C is finalized, index its header by its height
-		headers.EXPECT().BlockIDByHeight(blockC.Height).Return(blockC.ID(), nil)
+		headers.On("BlockIDByHeight", blockC.Height).Return(blockC.ID(), nil).Once()
 
 		es.ExecuteBlock(t, blockA)
 		es.ExecuteBlock(t, blockB)
@@ -268,18 +262,17 @@ func TestLoadingUnexecutedBlocks(t *testing.T) {
 		require.NoError(t, ps.Finalize(blockA.ID()))
 
 		es := newMockExecutionState(seal, genesis)
-		ctrl := gomock.NewController(t)
-		headers := storage.NewMockHeaders(ctrl)
-		headers.EXPECT().ByBlockID(genesis.ID()).Return(genesis.ToHeader(), nil)
-		headers.EXPECT().ByBlockID(blockB.ID()).Return(blockB.ToHeader(), nil)
-		headers.EXPECT().ByBlockID(blockC.ID()).Return(blockC.ToHeader(), nil)
-		headers.EXPECT().ByBlockID(blockD.ID()).Return(blockD.ToHeader(), nil)
+		headers := new(storage.Headers)
+		headers.On("ByBlockID", genesis.ID()).Return(genesis.ToHeader(), nil).Once()
+		headers.On("ByBlockID", blockB.ID()).Return(blockB.ToHeader(), nil).Once()
+		headers.On("ByBlockID", blockC.ID()).Return(blockC.ToHeader(), nil).Once()
+		headers.On("ByBlockID", blockD.ID()).Return(blockD.ToHeader(), nil).Once()
 
 		log := unittest.Logger()
 		loader := loader.NewUnexecutedLoader(log, ps, headers, es)
 
 		// block A is finalized, index its header by its height
-		headers.EXPECT().BlockIDByHeight(blockA.Height).Return(blockA.ID(), nil)
+		headers.On("BlockIDByHeight", blockA.Height).Return(blockA.ID(), nil).Once()
 
 		es.ExecuteBlock(t, blockA)
 		es.ExecuteBlock(t, blockB)
@@ -333,21 +326,20 @@ func TestLoadingUnexecutedBlocks(t *testing.T) {
 		require.NoError(t, ps.Finalize(blockC.ID()))
 
 		es := newMockExecutionState(seal, genesis)
-		ctrl := gomock.NewController(t)
-		headers := storage.NewMockHeaders(ctrl)
-		headers.EXPECT().ByBlockID(genesis.ID()).Return(genesis.ToHeader(), nil)
-		headers.EXPECT().ByBlockID(blockD.ID()).Return(blockD.ToHeader(), nil)
-		headers.EXPECT().ByBlockID(blockE.ID()).Return(blockE.ToHeader(), nil)
-		headers.EXPECT().ByBlockID(blockF.ID()).Return(blockF.ToHeader(), nil)
-		headers.EXPECT().ByBlockID(blockG.ID()).Return(blockG.ToHeader(), nil)
-		headers.EXPECT().ByBlockID(blockH.ID()).Return(blockH.ToHeader(), nil)
-		headers.EXPECT().ByBlockID(blockI.ID()).Return(blockI.ToHeader(), nil)
+		headers := new(storage.Headers)
+		headers.On("ByBlockID", genesis.ID()).Return(genesis.ToHeader(), nil).Once()
+		headers.On("ByBlockID", blockD.ID()).Return(blockD.ToHeader(), nil).Once()
+		headers.On("ByBlockID", blockE.ID()).Return(blockE.ToHeader(), nil).Once()
+		headers.On("ByBlockID", blockF.ID()).Return(blockF.ToHeader(), nil).Once()
+		headers.On("ByBlockID", blockG.ID()).Return(blockG.ToHeader(), nil).Once()
+		headers.On("ByBlockID", blockH.ID()).Return(blockH.ToHeader(), nil).Once()
+		headers.On("ByBlockID", blockI.ID()).Return(blockI.ToHeader(), nil).Once()
 
 		log := unittest.Logger()
 		loader := loader.NewUnexecutedLoader(log, ps, headers, es)
 
 		// block C is finalized, index its header by its height
-		headers.EXPECT().BlockIDByHeight(blockC.Height).Return(blockC.ID(), nil)
+		headers.On("BlockIDByHeight", blockC.Height).Return(blockC.ID(), nil).Once()
 
 		es.ExecuteBlock(t, blockA)
 		es.ExecuteBlock(t, blockB)
