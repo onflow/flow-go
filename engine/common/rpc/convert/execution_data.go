@@ -327,12 +327,12 @@ func messageToTrustedTransaction(
 
 	//proposal key and payer are empty addresses for service tx
 	if proposalAddress == flow.EmptyAddress && payerAddress == flow.EmptyAddress {
-		transactionBody, err := flow.NewSystemChunkTransactionBody(tb.GetUntrustedTransactionBody())
+		systemTransactionBody, err := tb.BuildSystemTx()
 		if err != nil {
-			return t, fmt.Errorf("could not create system transaction body: %w", err)
+			return t, fmt.Errorf("could not build system transaction body: %w", err)
 		}
 
-		return *transactionBody, nil
+		return *systemTransactionBody, nil
 	}
 
 	transactionBody, err := tb.Build()
