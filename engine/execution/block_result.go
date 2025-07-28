@@ -139,7 +139,6 @@ type BlockAttestationResult struct {
 	// was the reason this is kept here, long term we don't need this data and should
 	// act based on register deltas
 	*execution_data.BlockExecutionData
-
 }
 
 func NewEmptyBlockAttestationResult(
