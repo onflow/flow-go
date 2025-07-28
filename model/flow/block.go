@@ -8,7 +8,7 @@ import (
 // HashablePayload is a temporary interface used to generalize the payload type of GenericBlock.
 // It defines the minimal interface required for a payload to participate in block hashing.
 //
-// TODO: remove this interface after renaming IDEntity's method `ID` to `Hash`,
+// TODO(malleability, #7164): remove this interface after renaming IDEntity's method `ID` to `Hash`,
 // and replace all usages of HashablePayload with IDEntity.
 type HashablePayload interface {
 	Hash() Identifier
@@ -71,7 +71,8 @@ func (b *GenericBlock[T]) ToHeader() *Header {
 // Zero values for certain HeaderBody fields are allowed only for root blocks, which must be constructed
 // using the NewRootBlock constructor. All non-root blocks must be constructed
 // using NewBlock to ensure validation of the block fields.
-type Block = GenericBlock[Payload]
+//structwrite:immutable - mutations allowed only within the constructor
+type Block GenericBlock[Payload]
 
 // UntrustedBlock is an untrusted input-only representation of a Block,
 // used for construction.

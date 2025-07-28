@@ -14,7 +14,8 @@ import (
 // Zero values for certain HeaderBody fields are allowed only for root blocks, which must be constructed
 // using the NewRootBlock constructor. All non-root blocks must be constructed
 // using NewBlock to ensure validation of the block fields.
-type Block = flow.GenericBlock[Payload]
+//structwrite:immutable - mutations allowed only within the constructor
+type Block flow.GenericBlock[Payload]
 
 // UntrustedBlock is an untrusted input-only representation of a cluster Block,
 // used for construction.
