@@ -107,7 +107,7 @@ func (tb *TransactionBodyBuilder) AddEnvelopeSignature(address Address, keyID ui
 	return tb
 }
 
-func (tb *TransactionBodyBuilder) PayloadMessage() []byte {
+func (tb *TransactionBodyBuilder) payloadMessage() []byte {
 	return fingerprint.Fingerprint(tb.payloadCanonicalForm())
 }
 
@@ -232,7 +232,7 @@ func (tb *TransactionBodyBuilder) SignPayload(
 	privateKey crypto.PrivateKey,
 	hasher hash.Hasher,
 ) error {
-	sig, err := tb.Sign(tb.PayloadMessage(), privateKey, hasher)
+	sig, err := tb.Sign(tb.payloadMessage(), privateKey, hasher)
 
 	if err != nil {
 		return fmt.Errorf("failed to sign transaction payload with given key: %w", err)

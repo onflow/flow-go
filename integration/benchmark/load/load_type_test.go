@@ -220,13 +220,13 @@ func (t *testTransactionSender) Send(tx *sdk.Transaction) (sdk.TransactionResult
 		)
 	}
 
-	require.Equal(t.t, string(tx.PayloadMessage()), string(txBodyBuilder.PayloadMessage()))
-	require.Equal(t.t, string(tx.EnvelopeMessage()), string(txBodyBuilder.EnvelopeMessage()))
-
 	txBody, err := txBodyBuilder.Build()
 	if err != nil {
 		return sdk.TransactionResult{}, fmt.Errorf("failed to build transaction body: %w", err)
 	}
+
+	require.Equal(t.t, string(tx.PayloadMessage()), string(txBody.PayloadMessage()))
+	require.Equal(t.t, string(tx.EnvelopeMessage()), string(txBody.EnvelopeMessage()))
 
 	proc := fvm.Transaction(txBody, 0)
 
