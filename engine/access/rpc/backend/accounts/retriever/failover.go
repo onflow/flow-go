@@ -36,15 +36,15 @@ func (f *FailoverAccountRetriever) GetAccountAtBlock(
 	ctx context.Context,
 	address flow.Address,
 	blockID flow.Identifier,
-	height uint64, //TODO: fix ALL places with unused arguments
+	height uint64,
 ) (*flow.Account, error) {
 	localAccount, localErr := f.localRequester.GetAccountAtBlock(ctx, address, blockID, height)
 	if localErr == nil {
 		return localAccount, nil
 	}
 
-	ENAccount, ENErr := f.execNodeRequester.GetAccountAtBlock(ctx, address, blockID, height)
-	return ENAccount, ENErr
+	execNodeAccount, execNodeErr := f.execNodeRequester.GetAccountAtBlock(ctx, address, blockID, height)
+	return execNodeAccount, execNodeErr
 }
 
 func (f *FailoverAccountRetriever) GetAccountBalanceAtBlock(
@@ -58,12 +58,12 @@ func (f *FailoverAccountRetriever) GetAccountBalanceAtBlock(
 		return localBalance, nil
 	}
 
-	ENBalance, ENErr := f.execNodeRequester.GetAccountBalanceAtBlock(ctx, address, blockID, height)
-	if ENErr != nil {
-		return 0, ENErr
+	execNodeBalance, execNodeErr := f.execNodeRequester.GetAccountBalanceAtBlock(ctx, address, blockID, height)
+	if execNodeErr != nil {
+		return 0, execNodeErr
 	}
 
-	return ENBalance, nil
+	return execNodeBalance, nil
 }
 
 func (f *FailoverAccountRetriever) GetAccountKeyAtBlock(
@@ -78,12 +78,12 @@ func (f *FailoverAccountRetriever) GetAccountKeyAtBlock(
 		return localKey, nil
 	}
 
-	ENKey, ENErr := f.execNodeRequester.GetAccountKeyAtBlock(ctx, address, keyIndex, blockID, height)
-	if ENErr != nil {
-		return nil, ENErr
+	execNodeKey, execNodeErr := f.execNodeRequester.GetAccountKeyAtBlock(ctx, address, keyIndex, blockID, height)
+	if execNodeErr != nil {
+		return nil, execNodeErr
 	}
 
-	return ENKey, nil
+	return execNodeKey, nil
 }
 
 func (f *FailoverAccountRetriever) GetAccountKeysAtBlock(
@@ -97,10 +97,10 @@ func (f *FailoverAccountRetriever) GetAccountKeysAtBlock(
 		return localKeys, nil
 	}
 
-	ENKeys, ENErr := f.execNodeRequester.GetAccountKeysAtBlock(ctx, address, blockID, height)
-	if ENErr != nil {
-		return nil, ENErr
+	execNodeKeys, execNodeErr := f.execNodeRequester.GetAccountKeysAtBlock(ctx, address, blockID, height)
+	if execNodeErr != nil {
+		return nil, execNodeErr
 	}
 
-	return ENKeys, nil
+	return execNodeKeys, nil
 }
