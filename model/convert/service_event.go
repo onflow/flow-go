@@ -341,7 +341,6 @@ func convertServiceEventEpochCommitV1(event flow.Event) (*flow.ServiceEvent, err
 	return serviceEvent, nil
 }
 
-
 // convertServiceEventEpochRecover converts a service event encoded as the generic
 // flow.Event type to a ServiceEvent type for an EpochRecover event.
 // CAUTION: This function must only be used for input events computed locally, by an

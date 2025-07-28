@@ -161,7 +161,6 @@ func EpochCommitFixtureByChainID(chain flow.ChainID) (flow.Event, *flow.EpochCom
 	return event, expected
 }
 
-
 // EpochRecoverFixtureByChainID returns an EpochRecover service event as a Cadence event
 // representation and as a protocol model representation.
 func EpochRecoverFixtureByChainID(chain flow.ChainID) (flow.Event, *flow.EpochRecover) {
@@ -816,7 +815,6 @@ func createEpochCommitEvent() cadence.Event {
 	}).WithType(newFlowEpochEpochCommitEventType())
 }
 
-
 func createEpochRecoverEvent(randomSourceHex string) cadence.Event {
 
 	clusterQCVoteDataType := newFlowClusterQCClusterQCVoteDataStructType()
@@ -1164,7 +1162,6 @@ func newFlowEpochEpochCommitEventType() *cadence.EventType {
 	)
 }
 
-
 func newFlowEpochEpochRecoverEventType() *cadence.EventType {
 
 	// A.01cf0e2f2f715450.FlowEpoch.EpochRecover
@@ -1453,7 +1450,6 @@ var EpochCommitFixtureCCF = func() []byte {
 	}
 	return b
 }()
-
 
 func EpochRecoverFixtureCCF(randomSource []byte) []byte {
 	randomSourceHex := hex.EncodeToString(randomSource)

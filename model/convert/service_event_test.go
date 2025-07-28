@@ -100,7 +100,6 @@ func TestEventConversion(t *testing.T) {
 	},
 	)
 
-
 	t.Run("epoch recover", func(t *testing.T) {
 		fixture, expected := unittest.EpochRecoverFixtureByChainID(chainID)
 
