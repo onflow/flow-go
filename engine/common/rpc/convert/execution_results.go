@@ -121,7 +121,6 @@ func MessagesToExecutionResultMetaList(m []*entities.ExecutionReceiptMeta) flow.
 	return execMetaList[:]
 }
 
-
 // ChunkToMessage converts a chunk to a protobuf message
 func ChunkToMessage(chunk *flow.Chunk) *entities.Chunk {
 	return &entities.Chunk{

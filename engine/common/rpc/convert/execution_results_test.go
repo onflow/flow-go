@@ -25,8 +25,6 @@ func TestConvertExecutionResult(t *testing.T) {
 	assert.Equal(t, er, converted)
 }
 
-
-
 func TestConvertExecutionResults(t *testing.T) {
 	t.Parallel()
 
