@@ -82,9 +82,9 @@ func TestBlockInfo(t *testing.T) {
 		AssertTransactionSucceeded(t, result)
 
 		require.Len(t, result.Logs, 2)
-		assert.Equal(t, fmt.Sprintf("UnsignedBlock(height: %v, view: %v, id: 0x%x, timestamp: %.8f)", block2.Height+1,
+		assert.Equal(t, fmt.Sprintf("Block(height: %v, view: %v, id: 0x%x, timestamp: %.8f)", block2.Height+1,
 			b.PendingBlockView(), b.PendingBlockID(), float64(b.PendingBlockTimestamp()/1000)), result.Logs[0])
-		assert.Equal(t, fmt.Sprintf("UnsignedBlock(height: %v, view: %v, id: 0x%x, timestamp: %.8f)", block2.Height,
+		assert.Equal(t, fmt.Sprintf("Block(height: %v, view: %v, id: 0x%x, timestamp: %.8f)", block2.Height,
 			block2.View, block2.ID(), float64(block2.Timestamp/1000)), result.Logs[1])
 	})
 
@@ -105,9 +105,9 @@ func TestBlockInfo(t *testing.T) {
 		assert.True(t, result.Succeeded())
 
 		require.Len(t, result.Logs, 2)
-		assert.Equal(t, fmt.Sprintf("UnsignedBlock(height: %v, view: %v, id: 0x%x, timestamp: %.8f)", block2.Height,
+		assert.Equal(t, fmt.Sprintf("Block(height: %v, view: %v, id: 0x%x, timestamp: %.8f)", block2.Height,
 			block2.View, block2.ID(), float64(block2.Timestamp/1000)), result.Logs[0])
-		assert.Equal(t, fmt.Sprintf("UnsignedBlock(height: %v, view: %v, id: 0x%x, timestamp: %.8f)", block1.Height,
+		assert.Equal(t, fmt.Sprintf("Block(height: %v, view: %v, id: 0x%x, timestamp: %.8f)", block1.Height,
 			block1.View, block1.ID(), float64(block1.Timestamp/1000)), result.Logs[1])
 	})
 }

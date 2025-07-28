@@ -1475,7 +1475,7 @@ func TestBlockContext_GetBlockInfo(t *testing.T) {
 		require.Equal(
 			t,
 			fmt.Sprintf(
-				"UnsignedBlock(height: %v, view: %v, id: 0x%x, timestamp: %.8f)",
+				"Block(height: %v, view: %v, id: 0x%x, timestamp: %.8f)",
 				block1.Height,
 				block1.View,
 				block1.ID(),
@@ -1486,7 +1486,7 @@ func TestBlockContext_GetBlockInfo(t *testing.T) {
 		require.Equal(
 			t,
 			fmt.Sprintf(
-				"UnsignedBlock(height: %v, view: %v, id: 0x%x, timestamp: %.8f)",
+				"Block(height: %v, view: %v, id: 0x%x, timestamp: %.8f)",
 				block2.Height,
 				block2.View,
 				block2.ID(),
@@ -1517,7 +1517,7 @@ func TestBlockContext_GetBlockInfo(t *testing.T) {
 		require.Len(t, output.Logs, 2)
 		require.Equal(t,
 			fmt.Sprintf(
-				"UnsignedBlock(height: %v, view: %v, id: 0x%x, timestamp: %.8f)",
+				"Block(height: %v, view: %v, id: 0x%x, timestamp: %.8f)",
 				block1.Height,
 				block1.View,
 				block1.ID(),
@@ -1528,7 +1528,7 @@ func TestBlockContext_GetBlockInfo(t *testing.T) {
 		require.Equal(
 			t,
 			fmt.Sprintf(
-				"UnsignedBlock(height: %v, view: %v, id: 0x%x, timestamp: %.8f)",
+				"Block(height: %v, view: %v, id: 0x%x, timestamp: %.8f)",
 				block2.Height,
 				block2.View,
 				block2.ID(),

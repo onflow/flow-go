@@ -64,7 +64,7 @@ func (s *AssignmentCollectorTreeSuite) prepareMockedCollector(result *flow.Execu
 	collector.On("ResultID").Return(result.ID()).Maybe()
 	collector.On("Result").Return(result).Maybe()
 	collector.On("BlockID").Return(result.BlockID).Maybe()
-	collector.On("UnsignedBlock").Return(func() *flow.UnsignedHeader {
+	collector.On("Block").Return(func() *flow.UnsignedHeader {
 		return s.Blocks[result.BlockID]
 	}).Maybe()
 

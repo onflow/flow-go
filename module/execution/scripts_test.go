@@ -58,7 +58,7 @@ func (s *scriptTestSuite) TestScriptExecution() {
 		s.Assert().Equal(number, val.(cadence.Int).Value.Int64())
 	})
 
-	s.Run("Get UnsignedBlock", func() {
+	s.Run("Get Block", func() {
 		code := []byte(fmt.Sprintf(`access(all) fun main(): UInt64 {
 			getBlock(at: %d)!
 			return getCurrentBlock().height 

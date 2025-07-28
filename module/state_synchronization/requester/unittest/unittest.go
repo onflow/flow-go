@@ -58,7 +58,7 @@ func MockBlobService(bs blockstore.Blockstore) *mocknetwork.BlobService {
 			return ch
 		}).Maybe()
 
-	bex.On("AddBlobs", mock.Anything, mock.AnythingOfType("[]blocks.UnsignedBlock")).Return(bs.PutMany).Maybe()
+	bex.On("AddBlobs", mock.Anything, mock.AnythingOfType("[]blocks.Block")).Return(bs.PutMany).Maybe()
 	bex.On("DeleteBlob", mock.Anything, mock.AnythingOfType("cid.Cid")).Return(bs.DeleteBlock).Maybe()
 
 	noop := module.NoopReadyDoneAware{}

@@ -36,7 +36,7 @@ func getExecutionDataStore(ds datastore.Batching) execution_data.ExecutionDataSt
 func getBlobservice(t *testing.T, ds datastore.Batching) network.BlobService {
 	blobstore := blobs.NewBlobstore(ds)
 	blobService := mocknetwork.NewBlobService(t)
-	blobService.On("AddBlobs", mock.Anything, mock.AnythingOfType("[]blocks.UnsignedBlock")).Return(blobstore.PutMany)
+	blobService.On("AddBlobs", mock.Anything, mock.AnythingOfType("[]blocks.Block")).Return(blobstore.PutMany)
 	return blobService
 }
 
@@ -108,7 +108,7 @@ func TestProvideContextCanceled(t *testing.T) {
 	require.NoError(t, err)
 
 	blobService := mocknetwork.NewBlobService(t)
-	blobService.On("AddBlobs", mock.Anything, mock.AnythingOfType("[]blocks.UnsignedBlock")).
+	blobService.On("AddBlobs", mock.Anything, mock.AnythingOfType("[]blocks.Block")).
 		Return(func(ctx context.Context, blobs []blobs.Blob) error {
 			<-ctx.Done()
 			return ctx.Err()

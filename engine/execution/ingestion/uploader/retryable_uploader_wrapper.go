@@ -67,7 +67,7 @@ func NewBadgerRetryableUploaderWrapper(
 		if computationResult == nil || computationResult.ExecutableBlock == nil ||
 			computationResult.ExecutableBlock.Block == nil {
 			log.Warn().Msg("nil ComputationResult or nil ComputationResult.ExecutableBlock or " +
-				"computationResult.ExecutableBlock.UnsignedBlock")
+				"computationResult.ExecutableBlock.Block")
 			return
 		}
 
