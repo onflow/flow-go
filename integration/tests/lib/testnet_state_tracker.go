@@ -81,10 +81,10 @@ func (tst *TestnetStateTracker) Track(t *testing.T, ctx context.Context, ghost *
 			tst.MsgState.Add(sender, msg)
 
 			switch m := msg.(type) {
-			case *messages.UntrustedProposal:
-				err := tst.BlockState.Add(t, m)
+			case *flow.UntrustedProposal:
+				proposal, err := flow.NewProposal(*m)
 				require.NoError(t, err)
-				proposal, err := m.DeclareStructurallyValid()
+				err = tst.BlockState.Add(t, proposal)
 				require.NoError(t, err)
 
 				block := proposal.Block

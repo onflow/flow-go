@@ -99,7 +99,7 @@ func TestTopicValidator_Unstaked(t *testing.T) {
 	outgoingMessageScope1, err := message.NewOutgoingScope(
 		flow.IdentifierList{identity1.NodeID, identity2.NodeID},
 		topic,
-		messages.NewUntrustedProposal(unittest.ProposalFixture()),
+		(*flow.UntrustedProposal)(unittest.ProposalFixture()),
 		unittest.NetworkCodec().Encode,
 		message.ProtocolTypePubSub)
 	require.NoError(t, err)
@@ -230,7 +230,7 @@ func TestTopicValidator_TopicMismatch(t *testing.T) {
 	outgoingMessageScope1, err := message.NewOutgoingScope(
 		flow.IdentifierList{identity1.NodeID, identity2.NodeID},
 		topic,
-		messages.NewUntrustedProposal(unittest.ProposalFixture()),
+		(*flow.UntrustedProposal)(unittest.ProposalFixture()),
 		unittest.NetworkCodec().Encode,
 		message.ProtocolTypePubSub)
 	require.NoError(t, err)
@@ -293,7 +293,7 @@ func TestTopicValidator_InvalidTopic(t *testing.T) {
 	dummyMessageScope, err := message.NewOutgoingScope(
 		flow.IdentifierList{identity1.NodeID, identity2.NodeID},
 		channels.TopicFromChannel(channels.PushBlocks, sporkId),
-		messages.NewUntrustedProposal(unittest.ProposalFixture()),
+		(*flow.UntrustedProposal)(unittest.ProposalFixture()),
 		unittest.NetworkCodec().Encode,
 		message.ProtocolTypePubSub)
 	require.NoError(t, err)
@@ -345,7 +345,7 @@ func TestAuthorizedSenderValidator_Unauthorized(t *testing.T) {
 		Identity: &identity3,
 		PeerID:   p2plogging.PeerId(an1.ID()),
 		OriginID: identity3.NodeID,
-		MsgType:  "*messages.UntrustedProposal",
+		MsgType:  "*flow.UntrustedProposal",
 		Channel:  channel,
 		Protocol: message.ProtocolTypePubSub,
 		Err:      message.ErrUnauthorizedRole,
@@ -394,7 +394,7 @@ func TestAuthorizedSenderValidator_Unauthorized(t *testing.T) {
 	outgoingMessageScope1, err := message.NewOutgoingScope(
 		flow.IdentifierList{identity1.NodeID, identity2.NodeID},
 		topic,
-		messages.NewUntrustedProposal(unittest.ProposalFixture()),
+		(*flow.UntrustedProposal)(unittest.ProposalFixture()),
 		unittest.NetworkCodec().Encode,
 		message.ProtocolTypePubSub)
 	require.NoError(t, err)
@@ -421,7 +421,7 @@ func TestAuthorizedSenderValidator_Unauthorized(t *testing.T) {
 	outgoingMessageScope2, err := message.NewOutgoingScope(
 		flow.IdentifierList{identity1.NodeID, identity2.NodeID},
 		topic,
-		messages.NewUntrustedProposal(unittest.ProposalFixture()),
+		(*flow.UntrustedProposal)(unittest.ProposalFixture()),
 		unittest.NetworkCodec().Encode,
 		message.ProtocolTypePubSub)
 	require.NoError(t, err)
@@ -515,7 +515,7 @@ func TestAuthorizedSenderValidator_InvalidMsg(t *testing.T) {
 	outgoingMessageScope1, err := message.NewOutgoingScope(
 		flow.IdentifierList{identity1.NodeID, identity2.NodeID},
 		topic,
-		messages.NewUntrustedProposal(unittest.ProposalFixture()),
+		(*flow.UntrustedProposal)(unittest.ProposalFixture()),
 		unittest.NetworkCodec().Encode,
 		message.ProtocolTypePubSub)
 	require.NoError(t, err)
@@ -609,7 +609,7 @@ func TestAuthorizedSenderValidator_Ejected(t *testing.T) {
 	outgoingMessageScope1, err := message.NewOutgoingScope(
 		flow.IdentifierList{identity1.NodeID, identity2.NodeID},
 		topic,
-		messages.NewUntrustedProposal(unittest.ProposalFixture()),
+		(*flow.UntrustedProposal)(unittest.ProposalFixture()),
 		unittest.NetworkCodec().Encode,
 		message.ProtocolTypePubSub)
 	require.NoError(t, err)
@@ -634,7 +634,7 @@ func TestAuthorizedSenderValidator_Ejected(t *testing.T) {
 	outgoingMessageScope3, err := message.NewOutgoingScope(
 		flow.IdentifierList{identity1.NodeID, identity2.NodeID},
 		topic,
-		messages.NewUntrustedProposal(unittest.ProposalFixture()),
+		(*flow.UntrustedProposal)(unittest.ProposalFixture()),
 		unittest.NetworkCodec().Encode,
 		message.ProtocolTypePubSub)
 	require.NoError(t, err)
