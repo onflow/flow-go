@@ -32,9 +32,6 @@ type SnapshotExecutionSubset interface {
 	// boundaries.
 	VersionBeacon() (*flow.SealedVersionBeacon, error)
 
-	// ProtocolState is needed to check protocol version, which modifies the execution node's behaviour.
-	// TODO(mainnet27, #6773): remove this function https://github.com/onflow/flow-go/issues/6773
-	ProtocolState() (KVStoreReader, error)
 }
 
 // SnapshotExecutionSubsetProvider is an interface that provides a subset of the protocol state
