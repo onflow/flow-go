@@ -397,25 +397,22 @@ func NewEpochCommit(untrusted UntrustedEpochCommit) (*EpochCommit, error) {
 	if len(untrusted.ClusterQCs) == 0 {
 		return nil, fmt.Errorf("cluster QCs list must not be empty")
 	}
-	// TODO(mainnet27): remove this conditional: https://github.com/onflow/flow-go/issues/6772
-	if untrusted.DKGIndexMap != nil {
-		// enforce invariant: len(DKGParticipantKeys) == len(DKGIndexMap)
-		n := len(untrusted.DKGIndexMap) // size of the DKG committee
-		if len(untrusted.DKGParticipantKeys) != n {
-			return nil, fmt.Errorf("number of %d Random Beacon key shares is inconsistent with number of DKG participants (len=%d)", len(untrusted.DKGParticipantKeys), len(untrusted.DKGIndexMap))
-		}
+	// enforce invariant: len(DKGParticipantKeys) == len(DKGIndexMap)
+	n := len(untrusted.DKGIndexMap) // size of the DKG committee
+	if len(untrusted.DKGParticipantKeys) != n {
+		return nil, fmt.Errorf("number of %d Random Beacon key shares is inconsistent with number of DKG participants (len=%d)", len(untrusted.DKGParticipantKeys), len(untrusted.DKGIndexMap))
+	}
 
-		// enforce invariant: DKGIndexMap values form the set {0, 1, ..., n-1} where n=len(DKGParticipantKeys)
-		encounteredIndex := make([]bool, n)
-		for _, index := range untrusted.DKGIndexMap {
-			if index < 0 || index >= n {
-				return nil, fmt.Errorf("index %d is outside allowed range [0,n-1] for a DKG committee of size n=%d", index, n)
-			}
-			if encounteredIndex[index] {
-				return nil, fmt.Errorf("duplicated DKG index %d", index)
-			}
-			encounteredIndex[index] = true
+	// enforce invariant: DKGIndexMap values form the set {0, 1, ..., n-1} where n=len(DKGParticipantKeys)
+	encounteredIndex := make([]bool, n)
+	for _, index := range untrusted.DKGIndexMap {
+		if index < 0 || index >= n {
+			return nil, fmt.Errorf("index %d is outside allowed range [0,n-1] for a DKG committee of size n=%d", index, n)
 		}
+		if encounteredIndex[index] {
+			return nil, fmt.Errorf("duplicated DKG index %d", index)
+		}
+		encounteredIndex[index] = true
 	}
 
 	return &EpochCommit{
@@ -576,50 +573,28 @@ func (commit *EpochCommit) UnmarshalMsgpack(b []byte) error {
 // differently from JSON/msgpack, because it does not handle custom encoders
 // within map types.
 // NOTE: DecodeRLP is not needed, as this is only used for hashing.
-// TODO(EFM, #6794): Currently we implement RLP encoding based on availability of DKGIndexMap
-// this is needed to support backward compatibility, to guarantee that we will produce same hash
-// for the same event. This should be removed once we complete the network upgrade.
 func (commit *EpochCommit) EncodeRLP(w io.Writer) error {
-	if commit.DKGIndexMap == nil {
-		rlpEncodable := struct {
-			Counter            uint64
-			ClusterQCs         []ClusterQCVoteData
-			DKGGroupKey        []byte
-			DKGParticipantKeys [][]byte
-		}{
-			Counter:            commit.Counter,
-			ClusterQCs:         commit.ClusterQCs,
-			DKGGroupKey:        commit.DKGGroupKey.Encode(),
-			DKGParticipantKeys: make([][]byte, 0, len(commit.DKGParticipantKeys)),
-		}
-		for _, key := range commit.DKGParticipantKeys {
-			rlpEncodable.DKGParticipantKeys = append(rlpEncodable.DKGParticipantKeys, key.Encode())
-		}
-
-		return rlp.Encode(w, rlpEncodable)
-	} else {
-		rlpEncodable := struct {
-			Counter            uint64
-			ClusterQCs         []ClusterQCVoteData
-			DKGGroupKey        []byte
-			DKGParticipantKeys [][]byte
-			DKGIndexMap        IdentifierList
-		}{
-			Counter:            commit.Counter,
-			ClusterQCs:         commit.ClusterQCs,
-			DKGGroupKey:        commit.DKGGroupKey.Encode(),
-			DKGParticipantKeys: make([][]byte, 0, len(commit.DKGParticipantKeys)),
-			DKGIndexMap:        make(IdentifierList, len(commit.DKGIndexMap)),
-		}
-		for _, key := range commit.DKGParticipantKeys {
-			rlpEncodable.DKGParticipantKeys = append(rlpEncodable.DKGParticipantKeys, key.Encode())
-		}
-		for id, index := range commit.DKGIndexMap {
-			rlpEncodable.DKGIndexMap[index] = id
-		}
-
-		return rlp.Encode(w, rlpEncodable)
+	rlpEncodable := struct {
+		Counter            uint64
+		ClusterQCs         []ClusterQCVoteData
+		DKGGroupKey        []byte
+		DKGParticipantKeys [][]byte
+		DKGIndexMap        IdentifierList
+	}{
+		Counter:            commit.Counter,
+		ClusterQCs:         commit.ClusterQCs,
+		DKGGroupKey:        commit.DKGGroupKey.Encode(),
+		DKGParticipantKeys: make([][]byte, 0, len(commit.DKGParticipantKeys)),
+		DKGIndexMap:        make(IdentifierList, len(commit.DKGIndexMap)),
 	}
+	for _, key := range commit.DKGParticipantKeys {
+		rlpEncodable.DKGParticipantKeys = append(rlpEncodable.DKGParticipantKeys, key.Encode())
+	}
+	for id, index := range commit.DKGIndexMap {
+		rlpEncodable.DKGIndexMap[index] = id
+	}
+
+	return rlp.Encode(w, rlpEncodable)
 }
 
 // ID returns the hash of the event contents.
