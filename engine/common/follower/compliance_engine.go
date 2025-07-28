@@ -330,7 +330,7 @@ func (e *ComplianceEngine) processQueuedBlocks(doneSignal <-chan struct{}) error
 			Hex("origin_id", batch.OriginID[:]).
 			Str("chain_id", lastBlock.ChainID.String()).
 			Uint64("first_block_height", firstBlock.Height).
-			Uint64("first_block_view", lastBlock.View).
+			Uint64("first_block_view", firstBlock.View).
 			Uint64("last_block_height", lastBlock.Height).
 			Uint64("last_block_view", lastBlock.View).
 			Int("range_length", len(proposals)).
