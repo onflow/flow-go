@@ -9,7 +9,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/model/messages"
 )
 
 const blockStateTimeout = 120 * time.Second
@@ -74,14 +73,10 @@ func (bs *BlockState) WaitForHalt(t *testing.T, requiredDurationWithoutProgress,
 // It validates and tracks the proposal and updating finalized and sealed blocks.
 //
 // All errors indicate that the input message could not be converted to a valid proposal.
-func (bs *BlockState) Add(t *testing.T, msg *messages.UntrustedProposal) error {
+func (bs *BlockState) Add(t *testing.T, proposal *flow.Proposal) error {
 	bs.Lock()
 	defer bs.Unlock()
 
-	proposal, err := msg.DeclareStructurallyValid()
-	if err != nil {
-		return fmt.Errorf("could not convert proposal: %w", err)
-	}
 	b := &proposal.Block
 	bs.blocksByID[b.ID()] = b
 	bs.blocksByHeight[b.Height] = append(bs.blocksByHeight[b.Height], b)

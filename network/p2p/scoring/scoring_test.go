@@ -14,7 +14,6 @@ import (
 
 	"github.com/onflow/flow-go/config"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/id"
 	"github.com/onflow/flow-go/module/irrecoverable"
@@ -110,7 +109,7 @@ func TestInvalidCtrlMsgScoringIntegration(t *testing.T) {
 	blockTopic := channels.TopicFromChannel(channels.PushBlocks, sporkId)
 	// checks end-to-end message delivery works on GossipSub.
 	p2ptest.EnsurePubsubMessageExchange(t, ctx, nodes, blockTopic, 1, func() interface{} {
-		return messages.NewUntrustedProposal(unittest.ProposalFixture())
+		return (*flow.UntrustedProposal)(unittest.ProposalFixture())
 	})
 
 	// simulates node2 spamming node1 with invalid gossipsub control messages until node2 gets dissallow listed.
@@ -136,6 +135,6 @@ func TestInvalidCtrlMsgScoringIntegration(t *testing.T) {
 		blockTopic,
 		1,
 		func() interface{} {
-			return messages.NewUntrustedProposal(unittest.ProposalFixture())
+			return (*flow.UntrustedProposal)(unittest.ProposalFixture())
 		})
 }
