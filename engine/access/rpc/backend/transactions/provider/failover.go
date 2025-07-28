@@ -1,4 +1,4 @@
-package retriever
+package provider
 
 import (
 	"context"
@@ -9,21 +9,21 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-type FailoverTransactionRetriever struct {
-	localProvider    TransactionRetriever
-	execNodeProvider TransactionRetriever
+type FailoverTransactionProvider struct {
+	localProvider    TransactionProvider
+	execNodeProvider TransactionProvider
 }
 
-var _ TransactionRetriever = (*FailoverTransactionRetriever)(nil)
+var _ TransactionProvider = (*FailoverTransactionProvider)(nil)
 
-func NewFailoverTransactionRetriever(local TransactionRetriever, execNode TransactionRetriever) *FailoverTransactionRetriever {
-	return &FailoverTransactionRetriever{
+func NewFailoverTransactionProvider(local TransactionProvider, execNode TransactionProvider) *FailoverTransactionProvider {
+	return &FailoverTransactionProvider{
 		localProvider:    local,
 		execNodeProvider: execNode,
 	}
 }
 
-func (f *FailoverTransactionRetriever) TransactionResult(
+func (f *FailoverTransactionProvider) TransactionResult(
 	ctx context.Context,
 	header *flow.Header,
 	txID flow.Identifier,
@@ -38,7 +38,7 @@ func (f *FailoverTransactionRetriever) TransactionResult(
 	return ENResult, ENErr
 }
 
-func (f *FailoverTransactionRetriever) TransactionResultByIndex(
+func (f *FailoverTransactionProvider) TransactionResultByIndex(
 	ctx context.Context,
 	block *flow.Block,
 	index uint32,
@@ -53,7 +53,7 @@ func (f *FailoverTransactionRetriever) TransactionResultByIndex(
 	return ENResult, ENErr
 }
 
-func (f *FailoverTransactionRetriever) TransactionResultsByBlockID(
+func (f *FailoverTransactionProvider) TransactionResultsByBlockID(
 	ctx context.Context,
 	block *flow.Block,
 	encodingVersion entities.EventEncodingVersion,

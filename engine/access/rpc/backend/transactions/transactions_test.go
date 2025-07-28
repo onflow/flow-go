@@ -27,7 +27,7 @@ import (
 	"github.com/onflow/flow-go/engine/access/rpc/backend/node_communicator"
 	communicatormock "github.com/onflow/flow-go/engine/access/rpc/backend/node_communicator/mock"
 	"github.com/onflow/flow-go/engine/access/rpc/backend/query_mode"
-	"github.com/onflow/flow-go/engine/access/rpc/backend/transactions/error_message_retriever"
+	"github.com/onflow/flow-go/engine/access/rpc/backend/transactions/error_message_provider"
 	"github.com/onflow/flow-go/engine/access/rpc/backend/transactions/retrier"
 	"github.com/onflow/flow-go/engine/access/rpc/backend/transactions/status_deriver"
 	connectionmock "github.com/onflow/flow-go/engine/access/rpc/connection/mock"
@@ -90,7 +90,7 @@ type Suite struct {
 	eventsIndex    *index.EventsIndex
 	txResultsIndex *index.TransactionResultsIndex
 
-	errorMessageRetriever error_message_retriever.TxErrorMessageRetriever
+	errMessageProvider error_message_provider.TxErrorMessageProvider
 
 	chainID  flow.ChainID
 	systemTx *flow.TransactionBody
@@ -154,7 +154,7 @@ func (suite *Suite) SetupTest() {
 
 	suite.fixedExecutionNodeIDs = nil
 	suite.preferredExecutionNodeIDs = nil
-	suite.errorMessageRetriever = nil
+	suite.errMessageProvider = nil
 }
 
 func (suite *Suite) TearDownTest() {
@@ -200,7 +200,7 @@ func (suite *Suite) defaultTransactionsParams() Params {
 		Blocks:                      suite.blocks,
 		Collections:                 suite.collections,
 		Transactions:                suite.transactions,
-		TxErrorMessageRetriever:     suite.errorMessageRetriever,
+		TxErrorMessageProvider:      suite.errMessageProvider,
 		TxResultCache:               suite.txResultCache,
 		TxResultQueryMode:           query_mode.IndexQueryModeExecutionNodesOnly,
 		TxValidator:                 txValidator,
@@ -783,7 +783,7 @@ func (suite *Suite) TestTransactionResultFromStorage() {
 
 	params := suite.defaultTransactionsParams()
 	params.TxResultQueryMode = query_mode.IndexQueryModeLocalOnly
-	params.TxErrorMessageRetriever = error_message_retriever.NewTxErrorMessageRetriever(
+	params.TxErrorMessageProvider = error_message_provider.NewTxErrorMessageProvider(
 		params.Log,
 		nil,
 		params.TxResultsIndex,
@@ -864,7 +864,7 @@ func (suite *Suite) TestTransactionByIndexFromStorage() {
 
 	params := suite.defaultTransactionsParams()
 	params.TxResultQueryMode = query_mode.IndexQueryModeLocalOnly
-	params.TxErrorMessageRetriever = error_message_retriever.NewTxErrorMessageRetriever(
+	params.TxErrorMessageProvider = error_message_provider.NewTxErrorMessageProvider(
 		params.Log,
 		nil,
 		params.TxResultsIndex,
@@ -968,7 +968,7 @@ func (suite *Suite) TestTransactionResultsByBlockIDFromStorage() {
 
 	params := suite.defaultTransactionsParams()
 	params.TxResultQueryMode = query_mode.IndexQueryModeLocalOnly
-	params.TxErrorMessageRetriever = error_message_retriever.NewTxErrorMessageRetriever(
+	params.TxErrorMessageProvider = error_message_provider.NewTxErrorMessageProvider(
 		params.Log,
 		nil,
 		params.TxResultsIndex,

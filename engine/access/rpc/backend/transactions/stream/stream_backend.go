@@ -13,7 +13,7 @@ import (
 	"github.com/onflow/flow/protobuf/go/flow/entities"
 
 	"github.com/onflow/flow-go/access"
-	txretriever "github.com/onflow/flow-go/engine/access/rpc/backend/transactions/retriever"
+	txprovider "github.com/onflow/flow-go/engine/access/rpc/backend/transactions/provider"
 	"github.com/onflow/flow-go/engine/access/rpc/backend/transactions/status_deriver"
 	"github.com/onflow/flow-go/engine/access/subscription"
 	"github.com/onflow/flow-go/engine/access/subscription/tracker"
@@ -45,7 +45,7 @@ type TransactionStream struct {
 	collections  storage.Collections
 	transactions storage.Transactions
 
-	txRetriever     *txretriever.FailoverTransactionRetriever
+	txProvider      *txprovider.FailoverTransactionProvider
 	txStatusDeriver *status_deriver.TxStatusDeriver
 }
 
@@ -60,7 +60,7 @@ func NewTransactionStreamBackend(
 	blocks storage.Blocks,
 	collections storage.Collections,
 	transactions storage.Transactions,
-	txRetriever *txretriever.FailoverTransactionRetriever,
+	txProvider *txprovider.FailoverTransactionProvider,
 	txStatusDeriver *status_deriver.TxStatusDeriver,
 ) *TransactionStream {
 	return &TransactionStream{
@@ -72,7 +72,7 @@ func NewTransactionStreamBackend(
 		blocks:              blocks,
 		collections:         collections,
 		transactions:        transactions,
-		txRetriever:         txRetriever,
+		txProvider:          txProvider,
 		txStatusDeriver:     txStatusDeriver,
 	}
 }
@@ -164,7 +164,7 @@ func (t *TransactionStream) createSubscription(
 		txID,
 		referenceBlockID,
 		requiredEventEncodingVersion,
-		t.txRetriever,
+		t.txProvider,
 		t.txStatusDeriver,
 	)
 

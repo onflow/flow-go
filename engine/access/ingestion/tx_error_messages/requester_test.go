@@ -17,7 +17,7 @@ import (
 	"github.com/onflow/flow-go/engine/access/index"
 	accessmock "github.com/onflow/flow-go/engine/access/mock"
 	"github.com/onflow/flow-go/engine/access/rpc/backend/node_communicator"
-	"github.com/onflow/flow-go/engine/access/rpc/backend/transactions/error_message_retriever"
+	"github.com/onflow/flow-go/engine/access/rpc/backend/transactions/error_message_provider"
 	connectionmock "github.com/onflow/flow-go/engine/access/rpc/connection/mock"
 	commonrpc "github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/model/flow"
@@ -100,7 +100,7 @@ func (s *RequesterSuite) TestRequest_HappyPath() {
 		s.enNodeIDs.NodeIDs(),
 	)
 
-	errorMessageRetriever := error_message_retriever.NewTxErrorMessageRetriever(
+	errorMessageProvider := error_message_provider.NewTxErrorMessageProvider(
 		s.log,
 		s.txErrorMessages,
 		s.txResultsIndex,
@@ -135,7 +135,7 @@ func (s *RequesterSuite) TestRequest_HappyPath() {
 		RetryDelay:    1 * time.Second,
 		MaxRetryDelay: 5 * time.Second,
 	}
-	requester := NewRequester(s.log, config, errorMessageRetriever, execNodeIdentitiesProvider, executionResult)
+	requester := NewRequester(s.log, config, errorMessageProvider, execNodeIdentitiesProvider, executionResult)
 	actualErrorMessages, err := requester.Request(context.Background())
 	require.NoError(s.T(), err)
 	require.ElementsMatch(s.T(), expectedErrorMessages, actualErrorMessages)
@@ -150,7 +150,7 @@ func (s *RequesterSuite) TestRequest_ErrorCases() {
 		s.enNodeIDs.NodeIDs(),
 	)
 
-	errorMessageRetriever := error_message_retriever.NewTxErrorMessageRetriever(
+	errorMessageProvider := error_message_provider.NewTxErrorMessageProvider(
 		s.log,
 		s.txErrorMessages,
 		s.txResultsIndex,
@@ -186,7 +186,7 @@ func (s *RequesterSuite) TestRequest_ErrorCases() {
 			Return(nil, expectedError).
 			Once()
 
-		requester := NewRequester(s.log, config, errorMessageRetriever, execNodeIdentitiesProvider, executionResult)
+		requester := NewRequester(s.log, config, errorMessageProvider, execNodeIdentitiesProvider, executionResult)
 		actualErrorMessages, err := requester.Request(context.Background())
 		require.ErrorIs(s.T(), err, expectedError)
 		require.Nil(s.T(), actualErrorMessages)
@@ -198,7 +198,7 @@ func (s *RequesterSuite) TestRequest_ErrorCases() {
 			Return(nil, expectedError).
 			Once()
 
-		requester := NewRequester(s.log, config, errorMessageRetriever, execNodeIdentitiesProvider, executionResult)
+		requester := NewRequester(s.log, config, errorMessageProvider, execNodeIdentitiesProvider, executionResult)
 		actualErrorMessages, err := requester.Request(context.Background())
 		require.ErrorIs(s.T(), err, expectedError)
 		require.Nil(s.T(), actualErrorMessages)
@@ -210,7 +210,7 @@ func (s *RequesterSuite) TestRequest_ErrorCases() {
 			Return(nil, expectedError).
 			Once()
 
-		requester := NewRequester(s.log, config, errorMessageRetriever, execNodeIdentitiesProvider, executionResult)
+		requester := NewRequester(s.log, config, errorMessageProvider, execNodeIdentitiesProvider, executionResult)
 		actualErrorMessages, err := requester.Request(context.Background())
 		require.ErrorIs(s.T(), err, expectedError)
 		require.Nil(s.T(), actualErrorMessages)
@@ -229,7 +229,7 @@ func (s *RequesterSuite) TestRequest_ErrorCases() {
 			Once()
 
 		expectedErrorMessages := createExpectedTxErrorMessages(resultsByBlockID, s.enNodeIDs.NodeIDs()[0])
-		requester := NewRequester(s.log, config, errorMessageRetriever, execNodeIdentitiesProvider, executionResult)
+		requester := NewRequester(s.log, config, errorMessageProvider, execNodeIdentitiesProvider, executionResult)
 		actualErrorMessages, err := requester.Request(context.Background())
 		require.NoError(s.T(), err)
 		require.ElementsMatch(s.T(), expectedErrorMessages, actualErrorMessages)
@@ -248,7 +248,7 @@ func (s *RequesterSuite) TestRequest_ErrorCases() {
 			Once()
 
 		expectedErrorMessages := createExpectedTxErrorMessages(resultsByBlockID, s.enNodeIDs.NodeIDs()[0])
-		requester := NewRequester(s.log, config, errorMessageRetriever, execNodeIdentitiesProvider, executionResult)
+		requester := NewRequester(s.log, config, errorMessageProvider, execNodeIdentitiesProvider, executionResult)
 		actualErrorMessages, err := requester.Request(context.Background())
 		require.NoError(s.T(), err)
 		require.ElementsMatch(s.T(), expectedErrorMessages, actualErrorMessages)

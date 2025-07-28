@@ -21,8 +21,8 @@ import (
 	"github.com/onflow/flow-go/engine/access/rpc/backend/query_mode"
 	"github.com/onflow/flow-go/engine/access/rpc/backend/scripts"
 	"github.com/onflow/flow-go/engine/access/rpc/backend/transactions"
-	"github.com/onflow/flow-go/engine/access/rpc/backend/transactions/error_message_retriever"
-	"github.com/onflow/flow-go/engine/access/rpc/backend/transactions/retriever"
+	"github.com/onflow/flow-go/engine/access/rpc/backend/transactions/error_message_provider"
+	"github.com/onflow/flow-go/engine/access/rpc/backend/transactions/provider"
 	"github.com/onflow/flow-go/engine/access/rpc/backend/transactions/status_deriver"
 	txstream "github.com/onflow/flow-go/engine/access/rpc/backend/transactions/stream"
 	"github.com/onflow/flow-go/engine/access/rpc/connection"
@@ -117,7 +117,7 @@ type Params struct {
 	IndexReporter              state_synchronization.IndexReporter
 	VersionControl             *version.VersionControl
 	ExecNodeIdentitiesProvider *commonrpc.ExecutionNodeIdentitiesProvider
-	TxErrorMessageRetriever    error_message_retriever.TxErrorMessageRetriever
+	TxErrorMessageProvider     error_message_provider.TxErrorMessageProvider
 }
 
 var _ access.API = (*Backend)(nil)
@@ -229,7 +229,7 @@ func New(params Params) (*Backend, error) {
 			Blocks:                      params.Blocks,
 			Collections:                 params.Collections,
 			Transactions:                params.Transactions,
-			TxErrorMessageRetriever:     params.TxErrorMessageRetriever,
+			TxErrorMessageProvider:      params.TxErrorMessageProvider,
 			TxResultCache:               txResCache,
 			TxResultQueryMode:           params.TxResultQueryMode,
 			TxValidator:                 txValidator,
@@ -242,17 +242,17 @@ func New(params Params) (*Backend, error) {
 		return nil, fmt.Errorf("failed to create transactions backend: %w", err)
 	}
 
-	localTxRetriever := retriever.NewLocalTransactionRetriever(
+	localTxProvider := provider.NewLocalTransactionProvider(
 		params.State,
 		params.Collections,
 		params.Blocks,
 		params.EventsIndex,
 		params.TxResultsIndex,
-		params.TxErrorMessageRetriever,
+		params.TxErrorMessageProvider,
 		systemTxID,
 		txStatusDeriver,
 	)
-	execNodeTxRetriever := retriever.NewENTransactionRetriever(
+	execNodeTxProvider := provider.NewENTransactionProvider(
 		params.Log,
 		params.State,
 		params.Collections,
@@ -263,7 +263,7 @@ func New(params Params) (*Backend, error) {
 		systemTxID,
 		systemTx,
 	)
-	failoverTxRetriever := retriever.NewFailoverTransactionRetriever(localTxRetriever, execNodeTxRetriever)
+	failoverTxProvider := provider.NewFailoverTransactionProvider(localTxProvider, execNodeTxProvider)
 
 	txStreamBackend := txstream.NewTransactionStreamBackend(
 		params.Log,
@@ -274,7 +274,7 @@ func New(params Params) (*Backend, error) {
 		params.Blocks,
 		params.Collections,
 		params.Transactions,
-		failoverTxRetriever,
+		failoverTxProvider,
 		txStatusDeriver,
 	)
 

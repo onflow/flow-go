@@ -6,7 +6,7 @@ import (
 
 	"github.com/rs/zerolog"
 
-	"github.com/onflow/flow-go/engine/access/rpc/backend/transactions/error_message_retriever"
+	"github.com/onflow/flow-go/engine/access/rpc/backend/transactions/error_message_provider"
 	commonrpc "github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/model/flow"
@@ -21,7 +21,7 @@ import (
 type TxErrorMessagesCore struct {
 	log zerolog.Logger // used to log relevant actions with context
 
-	txErrorMessageProvider         error_message_retriever.TxErrorMessageRetriever
+	txErrorMessageProvider         error_message_provider.TxErrorMessageProvider
 	transactionResultErrorMessages storage.TransactionResultErrorMessages
 	execNodeIdentitiesProvider     *commonrpc.ExecutionNodeIdentitiesProvider
 }
@@ -29,7 +29,7 @@ type TxErrorMessagesCore struct {
 // NewTxErrorMessagesCore creates a new instance of TxErrorMessagesCore.
 func NewTxErrorMessagesCore(
 	log zerolog.Logger,
-	txErrorMessageProvider error_message_retriever.TxErrorMessageRetriever,
+	txErrorMessageProvider error_message_provider.TxErrorMessageProvider,
 	transactionResultErrorMessages storage.TransactionResultErrorMessages,
 	execNodeIdentitiesProvider *commonrpc.ExecutionNodeIdentitiesProvider,
 ) *TxErrorMessagesCore {
@@ -42,7 +42,7 @@ func NewTxErrorMessagesCore(
 }
 
 // FetchErrorMessages processes transaction result error messages for a given block ID.
-// It retrieves error messages from the txErrorMessageRetriever if they do not already exist in storage.
+// It retrieves error messages from the txErrorMessageProvider if they do not already exist in storage.
 //
 // The function first checks if error messages for the given block ID are already present in storage.
 // If they are not, it fetches the messages from execution nodes and stores them.
@@ -76,7 +76,7 @@ func (c *TxErrorMessagesCore) FetchErrorMessagesByENs(
 		return nil
 	}
 
-	// retrieves error messages from the txErrorMessageRetriever if they do not already exist in storage
+	// retrieves error messages from the txErrorMessageProvider if they do not already exist in storage
 	req := &execproto.GetTransactionErrorMessagesByBlockIDRequest{
 		BlockId: convert.IdentifierToMessage(blockID),
 	}

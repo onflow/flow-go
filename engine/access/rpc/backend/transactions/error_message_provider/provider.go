@@ -1,4 +1,4 @@
-package error_message_retriever
+package error_message_provider
 
 import (
 	"context"
@@ -22,8 +22,8 @@ import (
 
 const DefaultFailedErrorMessage = "failed"
 
-// TxErrorMessageRetriever declares the lookup transaction error methods by different input parameters.
-type TxErrorMessageRetriever interface {
+// TxErrorMessageProvider declares the lookup transaction error methods by different input parameters.
+type TxErrorMessageProvider interface {
 	// ErrorMessageByTransactionID is a function type for getting transaction error message by block ID and transaction ID.
 	// Expected errors during normal operation:
 	//   - InsufficientExecutionReceipts - found insufficient receipts for given block ID.
@@ -79,7 +79,7 @@ type TxErrorMessageRetriever interface {
 	) ([]*execproto.GetTransactionErrorMessagesResponse_Result, *flow.IdentitySkeleton, error)
 }
 
-type TxErrorMessageRetrieverImpl struct {
+type TxErrorMessageProviderImpl struct {
 	log zerolog.Logger
 
 	txResultErrorMessages storage.TransactionResultErrorMessages
@@ -90,17 +90,17 @@ type TxErrorMessageRetrieverImpl struct {
 	execNodeIdentitiesProvider *rpc.ExecutionNodeIdentitiesProvider
 }
 
-var _ TxErrorMessageRetriever = (*TxErrorMessageRetrieverImpl)(nil)
+var _ TxErrorMessageProvider = (*TxErrorMessageProviderImpl)(nil)
 
-func NewTxErrorMessageRetriever(
+func NewTxErrorMessageProvider(
 	log zerolog.Logger,
 	txResultErrorMessages storage.TransactionResultErrorMessages,
 	txResultsIndex *index.TransactionResultsIndex,
 	connFactory connection.ConnectionFactory,
 	nodeCommunicator node_communicator.Communicator,
 	execNodeIdentitiesProvider *rpc.ExecutionNodeIdentitiesProvider,
-) *TxErrorMessageRetrieverImpl {
-	return &TxErrorMessageRetrieverImpl{
+) *TxErrorMessageProviderImpl {
+	return &TxErrorMessageProviderImpl{
 		log:                        log,
 		txResultErrorMessages:      txResultErrorMessages,
 		txResultsIndex:             txResultsIndex,
@@ -110,7 +110,7 @@ func NewTxErrorMessageRetriever(
 	}
 }
 
-func (e *TxErrorMessageRetrieverImpl) ErrorMessageByTransactionID(
+func (e *TxErrorMessageProviderImpl) ErrorMessageByTransactionID(
 	ctx context.Context,
 	blockID flow.Identifier,
 	height uint64,
@@ -158,7 +158,7 @@ func (e *TxErrorMessageRetrieverImpl) ErrorMessageByTransactionID(
 	return resp.ErrorMessage, nil
 }
 
-func (e *TxErrorMessageRetrieverImpl) ErrorMessageByIndex(
+func (e *TxErrorMessageProviderImpl) ErrorMessageByIndex(
 	ctx context.Context,
 	blockID flow.Identifier,
 	height uint64,
@@ -206,7 +206,7 @@ func (e *TxErrorMessageRetrieverImpl) ErrorMessageByIndex(
 	return resp.ErrorMessage, nil
 }
 
-func (e *TxErrorMessageRetrieverImpl) ErrorMessagesByBlockID(
+func (e *TxErrorMessageProviderImpl) ErrorMessagesByBlockID(
 	ctx context.Context,
 	blockID flow.Identifier,
 	height uint64,
@@ -269,7 +269,7 @@ func (e *TxErrorMessageRetrieverImpl) ErrorMessagesByBlockID(
 //   - status.Error - GRPC call failed, some of possible codes are:
 //   - codes.NotFound - request cannot be served by EN because of absence of data.
 //   - codes.Unavailable - remote node is not unavailable.
-func (e *TxErrorMessageRetrieverImpl) ErrorMessageFromAnyEN(
+func (e *TxErrorMessageProviderImpl) ErrorMessageFromAnyEN(
 	ctx context.Context,
 	execNodes flow.IdentitySkeletonList,
 	req *execproto.GetTransactionErrorMessageRequest,
@@ -313,7 +313,7 @@ func (e *TxErrorMessageRetrieverImpl) ErrorMessageFromAnyEN(
 //   - status.Error - GRPC call failed, some of possible codes are:
 //   - codes.NotFound - request cannot be served by EN because of absence of data.
 //   - codes.Unavailable - remote node is not unavailable.
-func (e *TxErrorMessageRetrieverImpl) ErrorMessageByIndexFromAnyEN(
+func (e *TxErrorMessageProviderImpl) ErrorMessageByIndexFromAnyEN(
 	ctx context.Context,
 	execNodes flow.IdentitySkeletonList,
 	req *execproto.GetTransactionErrorMessageByIndexRequest,
@@ -355,7 +355,7 @@ func (e *TxErrorMessageRetrieverImpl) ErrorMessageByIndexFromAnyEN(
 //   - status.Error - GRPC call failed, some of possible codes are:
 //   - codes.NotFound - request cannot be served by EN because of absence of data.
 //   - codes.Unavailable - remote node is not unavailable.
-func (e *TxErrorMessageRetrieverImpl) ErrorMessageByBlockIDFromAnyEN(
+func (e *TxErrorMessageProviderImpl) ErrorMessageByBlockIDFromAnyEN(
 	ctx context.Context,
 	execNodes flow.IdentitySkeletonList,
 	req *execproto.GetTransactionErrorMessagesByBlockIDRequest,
@@ -401,7 +401,7 @@ func (e *TxErrorMessageRetrieverImpl) ErrorMessageByBlockIDFromAnyEN(
 //   - codes.Unavailable - remote node is not unavailable.
 //
 // tryGetTransactionErrorMessageFromEN performs a grpc call to the specified execution node and returns response.
-func (e *TxErrorMessageRetrieverImpl) tryGetTransactionErrorMessageFromEN(
+func (e *TxErrorMessageProviderImpl) tryGetTransactionErrorMessageFromEN(
 	ctx context.Context,
 	execNode *flow.IdentitySkeleton,
 	req *execproto.GetTransactionErrorMessageRequest,
@@ -419,7 +419,7 @@ func (e *TxErrorMessageRetrieverImpl) tryGetTransactionErrorMessageFromEN(
 //   - status.Error - GRPC call failed, some of possible codes are:
 //   - codes.NotFound - request cannot be served by EN because of absence of data.
 //   - codes.Unavailable - remote node is not unavailable.
-func (e *TxErrorMessageRetrieverImpl) tryGetTransactionErrorMessageByIndexFromEN(
+func (e *TxErrorMessageProviderImpl) tryGetTransactionErrorMessageByIndexFromEN(
 	ctx context.Context,
 	execNode *flow.IdentitySkeleton,
 	req *execproto.GetTransactionErrorMessageByIndexRequest,
@@ -437,7 +437,7 @@ func (e *TxErrorMessageRetrieverImpl) tryGetTransactionErrorMessageByIndexFromEN
 //   - status.Error - GRPC call failed, some of possible codes are:
 //   - codes.NotFound - request cannot be served by EN because of absence of data.
 //   - codes.Unavailable - remote node is not unavailable.
-func (e *TxErrorMessageRetrieverImpl) tryGetTransactionErrorMessagesByBlockIDFromEN(
+func (e *TxErrorMessageProviderImpl) tryGetTransactionErrorMessagesByBlockIDFromEN(
 	ctx context.Context,
 	execNode *flow.IdentitySkeleton,
 	req *execproto.GetTransactionErrorMessagesByBlockIDRequest,
