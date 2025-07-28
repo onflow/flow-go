@@ -1597,13 +1597,16 @@ func Test_ExecutingSystemCollection(t *testing.T) {
 }
 
 func Test_ScheduledCallback(t *testing.T) {
+	chain := flow.Testnet.Chain()
+
 	t.Run("process with no scheduled callback", func(t *testing.T) {
-		testScheduledCallback(t, []cadence.Event{}, 2) // process callback + system chunk
+		testScheduledCallback(t, chain, []cadence.Event{}, 2) // process callback + system chunk
 	})
 
 	t.Run("process with 2 scheduled callbacks", func(t *testing.T) {
 		// create callback events that process callback will return
-		location := common.NewAddressLocation(nil, common.Address(flow.HexToAddress("0x0000000000000000")), "CallbackScheduler")
+		env := systemcontracts.SystemContractsForChain(chain.ChainID())
+		location := common.NewAddressLocation(nil, common.Address(env.FlowCallbackScheduler.Address), "CallbackScheduler")
 
 		eventType := cadence.NewEventType(
 			location,
@@ -1632,18 +1635,17 @@ func Test_ScheduledCallback(t *testing.T) {
 			},
 		).WithType(eventType)
 
-		testScheduledCallback(t, []cadence.Event{callbackEvent1, callbackEvent2}, 4) // process callback + 2 callbacks + system chunk
+		testScheduledCallback(t, chain, []cadence.Event{callbackEvent1, callbackEvent2}, 4) // process callback + 2 callbacks + system chunk
 	})
 }
 
-func testScheduledCallback(t *testing.T, callbackEvents []cadence.Event, expectedTransactionCount int) {
+func testScheduledCallback(t *testing.T, chain flow.Chain, callbackEvents []cadence.Event, expectedTransactionCount int) {
 	rag := &RandomAddressGenerator{}
-
 	executorID := unittest.IdentifierFixture()
 
 	execCtx := fvm.NewContext(
 		fvm.WithScheduleCallbacksEnabled(true), // Enable callbacks
-		fvm.WithChain(flow.Localnet.Chain()),
+		fvm.WithChain(chain),
 	)
 
 	// track which transactions were executed and their details
@@ -1855,30 +1857,33 @@ type callbackTestExecutor struct {
 
 // we need to reimplement this Output since the events are consumed in the block computer
 // from the output of the procedure executor
-func (executor *callbackTestExecutor) Output() fvm.ProcedureOutput {
-	executor.vm.executedMutex.Lock()
-	defer executor.vm.executedMutex.Unlock()
+func (c *callbackTestExecutor) Output() fvm.ProcedureOutput {
+	c.vm.executedMutex.Lock()
+	defer c.vm.executedMutex.Unlock()
 
-	txProc, ok := executor.proc.(*fvm.TransactionProcedure)
+	txProc, ok := c.proc.(*fvm.TransactionProcedure)
 	if !ok {
 		return fvm.ProcedureOutput{}
 	}
 
+	const callbackSchedulerImport = `import "FlowCallbackScheduler"`
 	txBody := txProc.Transaction
+	script := string(txBody.Script)
 	txID := fmt.Sprintf("tx_%d", txProc.TxIndex)
 
 	switch {
 	// scheduled callbacks process transaction
-	case strings.Contains(string(txBody.Script), "CallbackScheduler.process"):
-		executor.vm.executedTransactions[txID] = "process_callback"
-		env := systemcontracts.SystemContractsForChain(flow.Mainnet.Chain().ChainID()).AsTemplateEnv()
+	case strings.Contains(script, "CallbackScheduler.process"):
+		require.False(c.t, strings.Contains(script, callbackSchedulerImport), "should resolve callback scheduler import")
+
+		c.vm.executedTransactions[txID] = "process_callback"
+		env := systemcontracts.SystemContractsForChain(c.ctx.Chain.ChainID()).AsTemplateEnv()
 		eventTypeString := fmt.Sprintf("A.%v.CallbackScheduler.CallbackProcessed", env.FlowCallbackSchedulerAddress)
 
 		// return events for each scheduled callback
-		events := make([]flow.Event, len(executor.vm.eventPayloads))
-		for i, payload := range executor.vm.eventPayloads {
+		events := make([]flow.Event, len(c.vm.eventPayloads))
+		for i, payload := range c.vm.eventPayloads {
 			events[i] = flow.Event{
-				// TODO: we shouldn't hardcode this event types, refactor after the scheduler contract is done
 				Type:             flow.EventType(eventTypeString),
 				TransactionID:    txProc.ID,
 				TransactionIndex: txProc.TxIndex,
@@ -1891,7 +1896,9 @@ func (executor *callbackTestExecutor) Output() fvm.ProcedureOutput {
 			Events: events,
 		}
 	// scheduled callbacks execute transaction
-	case strings.Contains(string(txBody.Script), "CallbackScheduler.executeCallback"):
+	case strings.Contains(script, "CallbackScheduler.executeCallback"):
+		require.False(c.t, strings.Contains(script, callbackSchedulerImport), "should resolve callback scheduler import")
+
 		// extract the callback ID from the arguments
 		if len(txBody.Arguments) == 0 {
 			return fvm.ProcedureOutput{}
@@ -1903,7 +1910,7 @@ func (executor *callbackTestExecutor) Output() fvm.ProcedureOutput {
 			if idValue, ok := argValue.(cadence.UInt64); ok {
 				// find which callback this is
 				callbackIndex := -1
-				for i, callbackID := range executor.vm.callbackIDs {
+				for i, callbackID := range c.vm.callbackIDs {
 					if uint64(idValue) == callbackID {
 						callbackIndex = i
 						break
@@ -1911,9 +1918,9 @@ func (executor *callbackTestExecutor) Output() fvm.ProcedureOutput {
 				}
 
 				if callbackIndex >= 0 {
-					executor.vm.executedTransactions[txID] = fmt.Sprintf("callback%d", callbackIndex+1)
+					c.vm.executedTransactions[txID] = fmt.Sprintf("callback%d", callbackIndex+1)
 				} else {
-					executor.vm.executedTransactions[txID] = "unknown_callback"
+					c.vm.executedTransactions[txID] = "unknown_callback"
 				}
 			}
 		}
@@ -1921,7 +1928,7 @@ func (executor *callbackTestExecutor) Output() fvm.ProcedureOutput {
 		return fvm.ProcedureOutput{}
 	// system chunk transaction
 	default:
-		executor.vm.executedTransactions[txID] = "system_chunk"
+		c.vm.executedTransactions[txID] = "system_chunk"
 		return fvm.ProcedureOutput{}
 	}
 }

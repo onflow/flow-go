@@ -2,6 +2,7 @@ package blueprints_test
 
 import (
 	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -24,6 +25,7 @@ func TestProcessCallbacksTransaction(t *testing.T) {
 
 	assert.NotNil(t, tx)
 	assert.NotEmpty(t, tx.Script)
+	require.False(t, strings.Contains(string(tx.Script), `import "FlowCallbackScheduler"`), "should resolve callback scheduler import")
 	assert.Equal(t, uint64(blueprints.SystemChunkTransactionGasLimit), tx.GasLimit)
 	assert.Empty(t, tx.Arguments)
 }
@@ -123,6 +125,7 @@ func TestExecuteCallbackTransaction(t *testing.T) {
 	tx := txs[0]
 	assert.NotNil(t, tx)
 	assert.NotEmpty(t, tx.Script)
+	require.False(t, strings.Contains(string(tx.Script), `import "FlowCallbackScheduler"`), "should resolve callback scheduler import")
 	assert.Equal(t, uint64(effort), tx.GasLimit)
 	assert.Len(t, tx.Arguments, 1)
 
