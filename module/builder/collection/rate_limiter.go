@@ -115,13 +115,12 @@ func (limiter *rateLimiter) shouldRateLimit(tx *flow.TransactionBody) bool {
 }
 
 type BySealingLagRateLimiter struct {
-	state             protocol.State
-	minSealingLag     uint
-	maxSealingLag     uint
-	halvingInterval   uint
-	minCollectionSize uint
-	maxCollectionSize uint // the maximum size of a collection that this rate limiter allows
-
+	state                 protocol.State
+	minSealingLag         uint
+	maxSealingLag         uint
+	halvingInterval       uint
+	minCollectionSize     uint
+	maxCollectionSize     uint
 	currentCollectionSize uint
 }
 
@@ -161,8 +160,8 @@ func (limiter *BySealingLagRateLimiter) update() error {
 	limiter.currentCollectionSize = StepHalving(
 		[2]uint{limiter.minSealingLag, limiter.maxSealingLag},         // [minSealingLag, maxSealingLag] is the range of input values where the halving is applied
 		[2]uint{limiter.minCollectionSize, limiter.maxCollectionSize}, // [minCollectionSize, maxCollectionSize] is the range of collection sizes that halving function outputs
-		sealingLag,                                                    // the current sealing lag
-		limiter.halvingInterval,                                       // interval in blocks in which the halving is applied
+		sealingLag,              // the current sealing lag
+		limiter.halvingInterval, // interval in blocks in which the halving is applied
 	)
 	return nil
 }

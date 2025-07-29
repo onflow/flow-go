@@ -31,18 +31,19 @@ import (
 // HotStuff event loop is the only consumer of this interface and is single
 // threaded, this is OK.
 type Builder struct {
-	db             *badger.DB
-	mainHeaders    storage.Headers
-	metrics        module.CollectionMetrics
-	clusterHeaders storage.Headers
-	protoState     protocol.State
-	clusterState   clusterstate.State
-	payloads       storage.ClusterPayloads
-	transactions   mempool.Transactions
-	tracer         module.Tracer
-	config         Config
-	log            zerolog.Logger
-	clusterEpoch   uint64 // the operating epoch for this cluster
+	db                         *badger.DB
+	mainHeaders                storage.Headers
+	metrics                    module.CollectionMetrics
+	clusterHeaders             storage.Headers
+	protoState                 protocol.State
+	clusterState               clusterstate.State
+	payloads                   storage.ClusterPayloads
+	transactions               mempool.Transactions
+	tracer                     module.Tracer
+	config                     Config
+	bySealingRateLimiterConfig module.BySealingLagRateLimiterConfigGetter
+	log                        zerolog.Logger
+	clusterEpoch               uint64 // the operating epoch for this cluster
 	// cache of values about the operating epoch which never change
 	epochFinalHeight *uint64          // last height of this cluster's operating epoch (nil if epoch not ended)
 	epochFinalID     *flow.Identifier // ID of last block in this cluster's operating epoch (nil if epoch not ended)
@@ -60,21 +61,23 @@ func NewBuilder(
 	transactions mempool.Transactions,
 	log zerolog.Logger,
 	epochCounter uint64,
+	bySealingRateLimiterConfig module.BySealingLagRateLimiterConfigGetter,
 	opts ...Opt,
 ) (*Builder, error) {
 	b := Builder{
-		db:             db,
-		tracer:         tracer,
-		metrics:        metrics,
-		protoState:     protoState,
-		clusterState:   clusterState,
-		mainHeaders:    mainHeaders,
-		clusterHeaders: clusterHeaders,
-		payloads:       payloads,
-		transactions:   transactions,
-		config:         DefaultConfig(),
-		log:            log.With().Str("component", "cluster_builder").Logger(),
-		clusterEpoch:   epochCounter,
+		db:                         db,
+		tracer:                     tracer,
+		metrics:                    metrics,
+		protoState:                 protoState,
+		clusterState:               clusterState,
+		mainHeaders:                mainHeaders,
+		clusterHeaders:             clusterHeaders,
+		payloads:                   payloads,
+		transactions:               transactions,
+		config:                     DefaultConfig(),
+		bySealingRateLimiterConfig: bySealingRateLimiterConfig,
+		log:                        log.With().Str("component", "cluster_builder").Logger(),
+		clusterEpoch:               epochCounter,
 	}
 
 	for _, apply := range opts {
@@ -220,10 +223,10 @@ func (b *Builder) getBlockBuildContext(parentID flow.Identifier) (*blockBuildCon
 	ctx.lookup = newTransactionLookup()
 	bySealingLagRateLimiter, err := NewBySealingLagRateLimiter(
 		b.protoState,
-		25,
-		55,
-		10,
-		0,
+		b.bySealingRateLimiterConfig.MinSealingLag(),
+		b.bySealingRateLimiterConfig.MaxSealingLag(),
+		b.bySealingRateLimiterConfig.HalvingInterval(),
+		b.bySealingRateLimiterConfig.MinCollectionSize(),
 		b.config.MaxCollectionSize,
 	)
 	if err != nil {
