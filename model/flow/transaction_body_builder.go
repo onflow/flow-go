@@ -13,6 +13,7 @@ import (
 // TransactionBodyBuilder constructs a validated, immutable [TransactionBody] in two phases:
 // first by setting individual fields using fluent SetX methods, then by calling Build()
 // to perform minimal validity and sanity checks and return the final [TransactionBody].
+// Caution: TransactionBodyBuilder is not safe for concurrent use by multiple goroutines.
 type TransactionBodyBuilder struct {
 	u UntrustedTransactionBody
 }
