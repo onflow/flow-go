@@ -148,7 +148,7 @@ func createValidCallbackEvent(t *testing.T, id uint64, effort uint64) flow.Event
 		location,
 		"CallbackProcessed",
 		[]cadence.Field{
-			{Identifier: "ID", Type: cadence.UInt64Type},
+			{Identifier: "id", Type: cadence.UInt64Type},
 			{Identifier: "executionEffort", Type: cadence.UInt64Type},
 		},
 		nil,

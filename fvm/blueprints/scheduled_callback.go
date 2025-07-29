@@ -5,6 +5,7 @@ import (
 
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/encoding/ccf"
+	jsoncdc "github.com/onflow/cadence/encoding/json"
 	"github.com/onflow/flow-core-contracts/lib/go/templates"
 	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/model/flow"
@@ -24,6 +25,9 @@ func ExecuteCallbacksTransactions(chainID flow.Chain, processEvents flow.EventsL
 	env := systemcontracts.SystemContractsForChain(chainID.ChainID()).AsTemplateEnv()
 
 	for _, event := range processEvents {
+		// todo make sure to check event index to ensure order is indeed correct
+		// event.EventIndex
+
 		id, effort, err := callbackArgsFromEvent(env, event)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get callback args from event: %w", err)
@@ -52,9 +56,9 @@ func executeCallbackTransaction(env templates.Environment, id []byte, effort uin
 // event CallbackProcessed(ID: UInt64, executionEffort: UInt64)
 func callbackArgsFromEvent(env templates.Environment, event flow.Event) ([]byte, uint64, error) {
 	const (
-		processedCallbackIDFieldName     = "ID"
+		processedCallbackIDFieldName     = "id"
 		processedCallbackEffortFieldName = "executionEffort"
-		processedEventTypeTemplate       = "A.%v.CallbackScheduler.CallbackProcessed"
+		processedEventTypeTemplate       = "A.%v.FlowCallbackScheduler.CallbackProcessed"
 	)
 
 	scheduledContractAddress := env.FlowCallbackSchedulerAddress
@@ -94,10 +98,10 @@ func callbackArgsFromEvent(env templates.Environment, event flow.Event) ([]byte,
 		return nil, 0, fmt.Errorf("effort is not uint64")
 	}
 
-	encodedID, err := ccf.Encode(id)
+	encID, err := jsoncdc.Encode(id)
 	if err != nil {
 		return nil, 0, fmt.Errorf("failed to encode id: %w", err)
 	}
 
-	return encodedID, uint64(effort), nil
+	return encID, uint64(effort), nil
 }
