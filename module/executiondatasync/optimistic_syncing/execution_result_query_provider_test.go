@@ -244,7 +244,7 @@ func (suite *ExecutionResultQueryProviderSuite) TestPreferredAndRequiredExecutio
 	executionResult := unittest.ExecutionResultFixture()
 
 	numReceipts := 6
-	// Create receipts from the first 4 execution nodes
+	// Create receipts from the first `numReceipts` execution nodes
 	receipts := make(flow.ExecutionReceiptList, numReceipts)
 	for i := 0; i < numReceipts; i++ {
 		r := unittest.ReceiptForBlockFixture(&block)
