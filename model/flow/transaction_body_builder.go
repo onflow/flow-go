@@ -22,7 +22,7 @@ func NewTransactionBodyBuilder() *TransactionBodyBuilder {
 	return &TransactionBodyBuilder{}
 }
 
-// Build validates and returns an immutable TransactionBody. All required fields must be explicitly set (even if they are zero).
+// Build validates and returns an immutable TransactionBody.
 // All errors indicate that a valid TransactionBody cannot be created from the current builder state.
 func (tb *TransactionBodyBuilder) Build() (*TransactionBody, error) {
 	return NewTransactionBody(tb.u)
