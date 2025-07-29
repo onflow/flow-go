@@ -3,6 +3,7 @@ package testutil
 import (
 	"context"
 	"fmt"
+	"github.com/onflow/flow-go/module/updatable_configs"
 	"math"
 	"path/filepath"
 	"testing"
@@ -334,6 +335,7 @@ func CollectionNode(t *testing.T, hub *stub.Hub, identity bootstrap.NodeInfo, ro
 		node.Metrics,
 		pusherEngine,
 		node.Log,
+		updatable_configs.DefaultBySealingLagRateLimiterConfigs(),
 	)
 	require.NoError(t, err)
 

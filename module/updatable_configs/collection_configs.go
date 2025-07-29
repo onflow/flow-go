@@ -19,7 +19,7 @@ func DefaultBySealingLagRateLimiterConfigs() module.BySealingLagRateLimiterConfi
 	return &bySealingLagRateLimiterConfigs{
 		minSealingLag:     atomic.NewUint32(25),
 		maxSealingLag:     atomic.NewUint32(55),
-		halvingInterval:   atomic.NewUint32(10),
+		halvingInterval:   atomic.NewUint32(30),
 		minCollectionSize: atomic.NewUint32(0),
 	}
 }

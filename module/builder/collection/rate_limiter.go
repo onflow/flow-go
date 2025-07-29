@@ -190,8 +190,8 @@ func StepHalving(xBounds, yBounds [2]uint, x, interval uint) uint {
 	if x >= xBounds[1] {
 		return yBounds[0]
 	}
-	x = x - xBounds[0]             // normalize x to start from 0
-	halvings := (x / interval) + 1 // + 1 because we would like to halve immediately after reaching the first interval
+	x = x - xBounds[0] // normalize x to start from 0
+	halvings := x / interval
 	if x <= 0 {
 		return yBounds[1]
 	}

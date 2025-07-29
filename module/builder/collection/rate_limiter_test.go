@@ -10,7 +10,7 @@ func TestStepHalving(t *testing.T) {
 	max := uint(55)
 	for i := 0; i < 100; i++ {
 		x := i
-		interval := 10
+		interval := max - min
 		y := StepHalving([2]uint{min, max}, [2]uint{0, 100}, uint(x), uint(interval))
 		fmt.Printf("%d, %d\n", x, y)
 	}
