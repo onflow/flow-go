@@ -240,6 +240,7 @@ func New(params Params) (*Backend, error) {
 		Log:                         params.Log,
 		Metrics:                     params.AccessMetrics,
 		State:                       params.State,
+		ChainID:                     params.ChainID,
 		SystemTx:                    systemTx,
 		SystemTxID:                  systemTxID,
 		StaticCollectionRPCClient:   params.CollectionRPC,
@@ -416,6 +417,6 @@ func (b *Backend) GetFullCollectionByID(_ context.Context, colID flow.Identifier
 
 func (b *Backend) GetNetworkParameters(_ context.Context) accessmodel.NetworkParameters {
 	return accessmodel.NetworkParameters{
-		ChainID: b.chainID,
+		ChainID: b.backendNetwork.chainID,
 	}
 }

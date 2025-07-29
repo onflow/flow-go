@@ -41,7 +41,8 @@ type Transactions struct {
 	log     zerolog.Logger
 	metrics module.TransactionMetrics
 
-	state protocol.State
+	state   protocol.State
+	chainID flow.ChainID
 
 	systemTxID flow.Identifier
 	systemTx   *flow.TransactionBody
@@ -71,6 +72,7 @@ type Params struct {
 	Log                         zerolog.Logger
 	Metrics                     module.TransactionMetrics
 	State                       protocol.State
+	ChainID                     flow.ChainID
 	SystemTxID                  flow.Identifier
 	SystemTx                    *flow.TransactionBody
 	StaticCollectionRPCClient   accessproto.AccessAPIClient
@@ -96,6 +98,7 @@ func NewTransactionsBackend(params Params) (*Transactions, error) {
 		log:                         params.Log,
 		metrics:                     params.Metrics,
 		state:                       params.State,
+		chainID:                     params.ChainID,
 		systemTxID:                  params.SystemTxID,
 		systemTx:                    params.SystemTx,
 		collectionRPCClient:         params.StaticCollectionRPCClient,
@@ -260,12 +263,16 @@ func (t *Transactions) SendRawTransaction(
 }
 
 func (t *Transactions) GetTransaction(ctx context.Context, txID flow.Identifier) (*flow.TransactionBody, error) {
+	// look up transaction from storage
 	tx, err := t.transactions.ByID(txID)
-	if err != nil {
-		if errors.Is(err, storage.ErrNotFound) {
+	txErr := rpc.ConvertStorageError(err)
+
+	if txErr != nil {
+		if status.Code(txErr) == codes.NotFound {
 			return t.getHistoricalTransaction(ctx, txID)
 		}
-		return nil, rpc.ConvertStorageError(err)
+		// Other Error trying to retrieve the transaction, return with err
+		return nil, txErr
 	}
 
 	return tx, nil
@@ -556,7 +563,7 @@ func (t *Transactions) getHistoricalTransaction(
 	for _, historicalNode := range t.historicalAccessNodeClients {
 		txResp, err := historicalNode.GetTransaction(ctx, &accessproto.GetTransactionRequest{Id: txID[:]})
 		if err == nil {
-			tx, err := convert.MessageToTransaction(txResp.Transaction, t.state.Params().ChainID().Chain())
+			tx, err := convert.MessageToTransaction(txResp.Transaction, t.chainID.Chain())
 			if err != nil {
 				return nil, status.Errorf(codes.Internal, "could not convert transaction: %v", err)
 			}

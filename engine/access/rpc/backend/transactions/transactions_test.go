@@ -200,6 +200,7 @@ func (suite *Suite) defaultTransactionsParams() Params {
 		Log:                         suite.log,
 		Metrics:                     metrics.NewNoopCollector(),
 		State:                       suite.state,
+		ChainID:                     flow.Testnet,
 		SystemTxID:                  suite.systemTx.ID(),
 		SystemTx:                    suite.systemTx,
 		StaticCollectionRPCClient:   suite.historicalAccessAPIClient,

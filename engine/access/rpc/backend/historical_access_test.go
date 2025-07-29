@@ -15,7 +15,6 @@ import (
 
 // TestHistoricalTransactionResult tests to see if the historical transaction status can be retrieved
 func (suite *Suite) TestHistoricalTransactionResult() {
-
 	ctx := context.Background()
 	collection := unittest.CollectionFixture(1)
 	transactionBody := collection.Transactions[0]
