@@ -398,14 +398,14 @@ func (builder *SealingSegmentBuilder) SealingSegment() (*SealingSegment, error) 
 	}
 
 	for _, block := range append(builder.extraBlocks, builder.blocks...) {
-		for _, receipt := range block.Payload.Receipts {
+		for _, receipt := range block.Block.Payload.Receipts {
 			_, included := builder.includedResults[receipt.ResultID]
 			if included {
 				continue
 			}
 			missingExecutionResultMap[receipt.ResultID] = struct{}{}
 		}
-		for _, seal := range block.Payload.Seals {
+		for _, seal := range block.Block.Payload.Seals {
 			_, included := builder.includedResults[seal.ResultID]
 			if included {
 				continue
