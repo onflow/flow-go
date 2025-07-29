@@ -5,6 +5,9 @@ import (
 	"errors"
 	"fmt"
 
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
+
 	txprovider "github.com/onflow/flow-go/engine/access/rpc/backend/transactions/provider"
 	"github.com/onflow/flow-go/engine/access/rpc/backend/transactions/status_deriver"
 	"github.com/onflow/flow-go/engine/access/subscription"
@@ -233,6 +236,13 @@ func (t *TransactionMetadata) refreshTransactionResult(ctx context.Context) erro
 		t.eventEncodingVersion,
 	)
 	if err != nil {
+		// TODO: I don't like the fact we propagate this error from txProvider.
+		// Fix it during error handling polishing project
+		if status.Code(err) == codes.NotFound {
+			// No result yet, indicate that it has not been executed
+			return nil
+		}
+
 		return fmt.Errorf("unexpected error while getting transaction result: %w", err)
 	}
 
