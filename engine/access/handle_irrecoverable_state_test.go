@@ -234,6 +234,7 @@ func (suite *IrrecoverableStateTestSuite) TestRestInconsistentNodeState() {
 		),
 	)
 	suite.blocks.On("ByID", block.ID()).Return(block, nil)
+	suite.headers.On("BlockIDByHeight", block.Height).Return(block.ID(), nil)
 
 	err := fmt.Errorf("inconsistent node's state")
 	suite.snapshot.On("Head").Return(nil, err)

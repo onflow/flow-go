@@ -601,7 +601,15 @@ func TestAddBlock_StorageError(t *testing.T) {
 			)),
 		)
 
-		err := builder.AddBlock(unittest.ProposalFromBlock(block1))
+		block1.SetPayload(unittest.PayloadFixture(
+			unittest.WithReceiptsAndNoResults(missingReceipt),
+			unittest.WithSeals(unittest.Seal.Fixture(unittest.Seal.WithResult(&missingReceipt.ExecutionResult))),
+		))
+
+		err := builder.AddBlock(&block1)
+		require.NoError(t, err)
+
+		_, err = builder.SealingSegment()
 		require.ErrorIs(t, err, exception)
 	})
 
