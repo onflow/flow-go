@@ -163,39 +163,3 @@ func TestChunkTotalComputationUsedIsSet(t *testing.T) {
 
 	assert.Equal(t, i, chunk.TotalComputationUsed)
 }
-
-// TestChunkEncodeDecode test encoding and decoding properties.
-func TestChunkEncodeDecode(t *testing.T) {
-	chunk := unittest.ChunkFixture(unittest.IdentifierFixture(), 0, unittest.StateCommitmentFixture())
-
-	t.Run("encode/decode preserves ServiceEventCount", func(t *testing.T) {
-		chunk.ServiceEventCount = 5
-		t.Run("json", func(t *testing.T) {
-			bz, err := json.Marshal(chunk)
-			require.NoError(t, err)
-			unmarshaled := new(flow.Chunk)
-			err = json.Unmarshal(bz, unmarshaled)
-			require.NoError(t, err)
-			assert.Equal(t, chunk, unmarshaled)
-			assert.Equal(t, uint16(5), unmarshaled.ServiceEventCount)
-		})
-		t.Run("lax non-BFT cbor decoding", func(t *testing.T) {
-			bz, err := cborcodec.EncMode.Marshal(chunk)
-			require.NoError(t, err)
-			unmarshaled := new(flow.Chunk)
-			err = cborcodec.UnsafeDecMode.Unmarshal(bz, unmarshaled)
-			require.NoError(t, err)
-			assert.Equal(t, chunk, unmarshaled)
-			assert.Equal(t, uint16(5), unmarshaled.ServiceEventCount)
-		})
-		t.Run("default strict cbor decoding", func(t *testing.T) {
-			bz, err := cborcodec.EncMode.Marshal(chunk)
-			require.NoError(t, err)
-			unmarshaled := new(flow.Chunk)
-			err = cborcodec.DefaultDecMode.Unmarshal(bz, unmarshaled)
-			require.NoError(t, err)
-			assert.Equal(t, chunk, unmarshaled)
-			assert.Equal(t, uint16(5), unmarshaled.ServiceEventCount)
-		})
-	})
-}

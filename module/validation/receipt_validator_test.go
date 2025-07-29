@@ -1137,7 +1137,6 @@ func (s *ReceiptValidationSuite) TestException_ProtocolStateHead() {
 	snapshot := mock_protocol.NewSnapshot(s.T())
 	exception := errors.New("state.Head() exception")
 	snapshot.On("Head").Return(nil, exception)
-	unittest.MockProtocolStateVersion(snapshot, 2)
 	s.State.On("AtBlockID", valSubgrph.Block.ID()).Return(snapshot)
 
 	s.T().Run("Method Validate", func(t *testing.T) {
@@ -1171,7 +1170,6 @@ func (s *ReceiptValidationSuite) TestException_ProtocolStateIdentity() {
 	// receiptValidator.state yields exception on Identity retrieval
 	*s.State = *mock_protocol.NewState(s.T()) // receiptValidator has pointer to this field, which we override with a new state mock
 	snapshot := mock_protocol.NewSnapshot(s.T())
-	unittest.MockProtocolStateVersion(snapshot, 2)
 	exception := errors.New("state.Identity() exception")
 	snapshot.On("Head").Return(valSubgrph.Block.Header, nil)
 	snapshot.On("Identity", mock.Anything).Return(nil, exception)
