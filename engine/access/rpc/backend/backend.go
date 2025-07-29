@@ -213,35 +213,6 @@ func New(params Params) (*Backend, error) {
 
 	txStatusDeriver := status_deriver.NewTxStatusDeriver(params.State, params.LastFullBlockHeight)
 
-	txBackend, err := transactions.NewTransactionsBackend(
-		transactions.Params{
-			Log:                         params.Log,
-			Metrics:                     params.AccessMetrics,
-			State:                       params.State,
-			SystemTx:                    systemTx,
-			SystemTxID:                  systemTxID,
-			StaticCollectionRPCClient:   params.CollectionRPC,
-			HistoricalAccessNodeClients: params.HistoricalAccessNodes,
-			NodeCommunicator:            params.Communicator,
-			ConnFactory:                 params.ConnFactory,
-			EnableRetries:               params.RetryEnabled,
-			NodeProvider:                params.ExecNodeIdentitiesProvider,
-			Blocks:                      params.Blocks,
-			Collections:                 params.Collections,
-			Transactions:                params.Transactions,
-			TxErrorMessageProvider:      params.TxErrorMessageProvider,
-			TxResultCache:               txResCache,
-			TxResultQueryMode:           params.TxResultQueryMode,
-			TxValidator:                 txValidator,
-			TxStatusDeriver:             txStatusDeriver,
-			EventsIndex:                 params.EventsIndex,
-			TxResultsIndex:              params.TxResultsIndex,
-		},
-	)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create transactions backend: %w", err)
-	}
-
 	localTxProvider := provider.NewLocalTransactionProvider(
 		params.State,
 		params.Collections,
@@ -264,6 +235,45 @@ func New(params Params) (*Backend, error) {
 		systemTx,
 	)
 	failoverTxProvider := provider.NewFailoverTransactionProvider(localTxProvider, execNodeTxProvider)
+
+	txParams := transactions.Params{
+		Log:                         params.Log,
+		Metrics:                     params.AccessMetrics,
+		State:                       params.State,
+		SystemTx:                    systemTx,
+		SystemTxID:                  systemTxID,
+		StaticCollectionRPCClient:   params.CollectionRPC,
+		HistoricalAccessNodeClients: params.HistoricalAccessNodes,
+		NodeCommunicator:            params.Communicator,
+		ConnFactory:                 params.ConnFactory,
+		EnableRetries:               params.RetryEnabled,
+		NodeProvider:                params.ExecNodeIdentitiesProvider,
+		Blocks:                      params.Blocks,
+		Collections:                 params.Collections,
+		Transactions:                params.Transactions,
+		TxErrorMessageProvider:      params.TxErrorMessageProvider,
+		TxResultCache:               txResCache,
+		TxValidator:                 txValidator,
+		TxStatusDeriver:             txStatusDeriver,
+		EventsIndex:                 params.EventsIndex,
+		TxResultsIndex:              params.TxResultsIndex,
+	}
+
+	switch params.TxResultQueryMode {
+	case query_mode.IndexQueryModeLocalOnly:
+		txParams.TxProvider = localTxProvider
+	case query_mode.IndexQueryModeExecutionNodesOnly:
+		txParams.TxProvider = execNodeTxProvider
+	case query_mode.IndexQueryModeFailover:
+		txParams.TxProvider = failoverTxProvider
+	default:
+		return nil, fmt.Errorf("invalid tx result query mode: %s", params.TxResultQueryMode)
+	}
+
+	txBackend, err := transactions.NewTransactionsBackend(txParams)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create transactions backend: %w", err)
+	}
 
 	txStreamBackend := txstream.NewTransactionStreamBackend(
 		params.Log,

@@ -17,7 +17,6 @@ import (
 	"github.com/onflow/flow-go/access/validator"
 	"github.com/onflow/flow-go/engine/access/index"
 	"github.com/onflow/flow-go/engine/access/rpc/backend/node_communicator"
-	"github.com/onflow/flow-go/engine/access/rpc/backend/query_mode"
 	"github.com/onflow/flow-go/engine/access/rpc/backend/transactions/error_message_provider"
 	"github.com/onflow/flow-go/engine/access/rpc/backend/transactions/provider"
 	"github.com/onflow/flow-go/engine/access/rpc/backend/transactions/retrier"
@@ -85,73 +84,14 @@ type Params struct {
 	Transactions                storage.Transactions
 	TxErrorMessageProvider      error_message_provider.TxErrorMessageProvider
 	TxResultCache               *lru.Cache[flow.Identifier, *accessmodel.TransactionResult]
-	TxResultQueryMode           query_mode.IndexQueryMode
-	//TxProvider                  provider.TransactionProvider
-	TxValidator     *validator.TransactionValidator
-	TxStatusDeriver *status_deriver.TxStatusDeriver
-	EventsIndex     *index.EventsIndex
-	TxResultsIndex  *index.TransactionResultsIndex
+	TxProvider                  provider.TransactionProvider
+	TxValidator                 *validator.TransactionValidator
+	TxStatusDeriver             *status_deriver.TxStatusDeriver
+	EventsIndex                 *index.EventsIndex
+	TxResultsIndex              *index.TransactionResultsIndex
 }
 
 func NewTransactionsBackend(params Params) (*Transactions, error) {
-	var txProvider provider.TransactionProvider
-
-	switch params.TxResultQueryMode {
-	case query_mode.IndexQueryModeLocalOnly:
-		txProvider = provider.NewLocalTransactionProvider(
-			params.State,
-			params.Collections,
-			params.Blocks,
-			params.EventsIndex,
-			params.TxResultsIndex,
-			params.TxErrorMessageProvider,
-			params.SystemTxID,
-			params.TxStatusDeriver,
-		)
-
-	case query_mode.IndexQueryModeExecutionNodesOnly:
-		txProvider = provider.NewENTransactionProvider(
-			params.Log,
-			params.State,
-			params.Collections,
-			params.ConnFactory,
-			params.NodeCommunicator,
-			params.NodeProvider,
-			params.TxStatusDeriver,
-			params.SystemTxID,
-			params.SystemTx,
-		)
-
-	case query_mode.IndexQueryModeFailover:
-		local := provider.NewLocalTransactionProvider(
-			params.State,
-			params.Collections,
-			params.Blocks,
-			params.EventsIndex,
-			params.TxResultsIndex,
-			params.TxErrorMessageProvider,
-			params.SystemTxID,
-			params.TxStatusDeriver,
-		)
-
-		execNode := provider.NewENTransactionProvider(
-			params.Log,
-			params.State,
-			params.Collections,
-			params.ConnFactory,
-			params.NodeCommunicator,
-			params.NodeProvider,
-			params.TxStatusDeriver,
-			params.SystemTxID,
-			params.SystemTx,
-		)
-
-		txProvider = provider.NewFailoverTransactionProvider(local, execNode)
-
-	default:
-		return nil, status.Error(codes.Internal, "invalid index query mode")
-	}
-
 	txs := &Transactions{
 		log:                         params.Log,
 		metrics:                     params.Metrics,
@@ -167,7 +107,7 @@ func NewTransactionsBackend(params Params) (*Transactions, error) {
 		transactions:                params.Transactions,
 		txResultCache:               params.TxResultCache,
 		txValidator:                 params.TxValidator,
-		txProvider:                  txProvider,
+		txProvider:                  params.TxProvider,
 		txStatusDeriver:             params.TxStatusDeriver,
 	}
 

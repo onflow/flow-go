@@ -25,9 +25,8 @@ import (
 	"github.com/onflow/flow-go/engine/access/index"
 	accessmock "github.com/onflow/flow-go/engine/access/mock"
 	"github.com/onflow/flow-go/engine/access/rpc/backend/node_communicator"
-	communicatormock "github.com/onflow/flow-go/engine/access/rpc/backend/node_communicator/mock"
-	"github.com/onflow/flow-go/engine/access/rpc/backend/query_mode"
 	"github.com/onflow/flow-go/engine/access/rpc/backend/transactions/error_message_provider"
+	"github.com/onflow/flow-go/engine/access/rpc/backend/transactions/provider"
 	"github.com/onflow/flow-go/engine/access/rpc/backend/transactions/retrier"
 	"github.com/onflow/flow-go/engine/access/rpc/backend/transactions/status_deriver"
 	connectionmock "github.com/onflow/flow-go/engine/access/rpc/connection/mock"
@@ -83,7 +82,6 @@ type Suite struct {
 	historicalAccessAPIClient *accessmock.AccessAPIClient
 
 	connectionFactory *connectionmock.ConnectionFactory
-	communicator      *communicatormock.Communicator
 
 	reporter       *syncmock.IndexReporter
 	indexReporter  *index.Reporter
@@ -130,7 +128,6 @@ func (suite *Suite) SetupTest() {
 	suite.chainID = flow.Testnet
 	suite.historicalAccessAPIClient = accessmock.NewAccessAPIClient(suite.T())
 	suite.connectionFactory = connectionmock.NewConnectionFactory(suite.T())
-	suite.communicator = communicatormock.NewCommunicator(suite.T())
 
 	txResCache, err := lru.New[flow.Identifier, *accessmodel.TransactionResult](10)
 	suite.Require().NoError(err)
@@ -185,6 +182,20 @@ func (suite *Suite) defaultTransactionsParams() Params {
 	)
 	suite.Require().NoError(err)
 
+	nodeCommunicator := node_communicator.NewNodeCommunicator(false)
+
+	txProvider := provider.NewENTransactionProvider(
+		suite.log,
+		suite.state,
+		suite.collections,
+		suite.connectionFactory,
+		nodeCommunicator,
+		nodeProvider,
+		txStatusDeriver,
+		suite.systemTx.ID(),
+		suite.systemTx,
+	)
+
 	return Params{
 		Log:                         suite.log,
 		Metrics:                     metrics.NewNoopCollector(),
@@ -193,7 +204,7 @@ func (suite *Suite) defaultTransactionsParams() Params {
 		SystemTx:                    suite.systemTx,
 		StaticCollectionRPCClient:   suite.historicalAccessAPIClient,
 		HistoricalAccessNodeClients: nil,
-		NodeCommunicator:            node_communicator.NewNodeCommunicator(false),
+		NodeCommunicator:            nodeCommunicator,
 		ConnFactory:                 suite.connectionFactory,
 		EnableRetries:               true,
 		NodeProvider:                nodeProvider,
@@ -202,7 +213,7 @@ func (suite *Suite) defaultTransactionsParams() Params {
 		Transactions:                suite.transactions,
 		TxErrorMessageProvider:      suite.errMessageProvider,
 		TxResultCache:               suite.txResultCache,
-		TxResultQueryMode:           query_mode.IndexQueryModeExecutionNodesOnly,
+		TxProvider:                  txProvider,
 		TxValidator:                 txValidator,
 		TxStatusDeriver:             txStatusDeriver,
 		EventsIndex:                 suite.eventsIndex,
@@ -619,10 +630,18 @@ func (suite *Suite) TestGetSystemTransactionResultFromStorage() {
 
 	// Set up the backend parameters and the backend instance
 	params := suite.defaultTransactionsParams()
-	params.TxResultQueryMode = query_mode.IndexQueryModeLocalOnly
-
 	params.EventsIndex = index.NewEventsIndex(indexReporter, suite.events)
 	params.TxResultsIndex = index.NewTransactionResultsIndex(indexReporter, suite.lightTxResults)
+	params.TxProvider = provider.NewLocalTransactionProvider(
+		params.State,
+		params.Collections,
+		params.Blocks,
+		params.EventsIndex,
+		params.TxResultsIndex,
+		params.TxErrorMessageProvider,
+		params.SystemTxID,
+		params.TxStatusDeriver,
+	)
 
 	txBackend, err := NewTransactionsBackend(params)
 	suite.Require().NoError(err)
@@ -782,7 +801,6 @@ func (suite *Suite) TestTransactionResultFromStorage() {
 		Once()
 
 	params := suite.defaultTransactionsParams()
-	params.TxResultQueryMode = query_mode.IndexQueryModeLocalOnly
 	params.TxErrorMessageProvider = error_message_provider.NewTxErrorMessageProvider(
 		params.Log,
 		nil,
@@ -790,6 +808,16 @@ func (suite *Suite) TestTransactionResultFromStorage() {
 		params.ConnFactory,
 		params.NodeCommunicator,
 		params.NodeProvider,
+	)
+	params.TxProvider = provider.NewLocalTransactionProvider(
+		params.State,
+		params.Collections,
+		params.Blocks,
+		params.EventsIndex,
+		params.TxResultsIndex,
+		params.TxErrorMessageProvider,
+		params.SystemTxID,
+		params.TxStatusDeriver,
 	)
 
 	txBackend, err := NewTransactionsBackend(params)
@@ -863,7 +891,6 @@ func (suite *Suite) TestTransactionByIndexFromStorage() {
 		Once()
 
 	params := suite.defaultTransactionsParams()
-	params.TxResultQueryMode = query_mode.IndexQueryModeLocalOnly
 	params.TxErrorMessageProvider = error_message_provider.NewTxErrorMessageProvider(
 		params.Log,
 		nil,
@@ -872,6 +899,17 @@ func (suite *Suite) TestTransactionByIndexFromStorage() {
 		params.NodeCommunicator,
 		params.NodeProvider,
 	)
+	params.TxProvider = provider.NewLocalTransactionProvider(
+		params.State,
+		params.Collections,
+		params.Blocks,
+		params.EventsIndex,
+		params.TxResultsIndex,
+		params.TxErrorMessageProvider,
+		params.SystemTxID,
+		params.TxStatusDeriver,
+	)
+
 	txBackend, err := NewTransactionsBackend(params)
 	suite.Require().NoError(err)
 
@@ -967,7 +1005,6 @@ func (suite *Suite) TestTransactionResultsByBlockIDFromStorage() {
 		Once()
 
 	params := suite.defaultTransactionsParams()
-	params.TxResultQueryMode = query_mode.IndexQueryModeLocalOnly
 	params.TxErrorMessageProvider = error_message_provider.NewTxErrorMessageProvider(
 		params.Log,
 		nil,
@@ -975,6 +1012,16 @@ func (suite *Suite) TestTransactionResultsByBlockIDFromStorage() {
 		params.ConnFactory,
 		params.NodeCommunicator,
 		params.NodeProvider,
+	)
+	params.TxProvider = provider.NewLocalTransactionProvider(
+		params.State,
+		params.Collections,
+		params.Blocks,
+		params.EventsIndex,
+		params.TxResultsIndex,
+		params.TxErrorMessageProvider,
+		params.SystemTxID,
+		params.TxStatusDeriver,
 	)
 	txBackend, err := NewTransactionsBackend(params)
 	suite.Require().NoError(err)
