@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"github.com/onflow/flow-go/module/updatable_configs"
 	"time"
 
 	"github.com/spf13/pflag"
@@ -100,15 +101,16 @@ func main() {
 		err                   error
 
 		// epoch qc contract client
-		machineAccountInfo *bootstrap.NodeMachineAccountInfo
-		flowClientConfigs  []*grpcclient.FlowClientConfig
-		insecureAccessAPI  bool
-		accessNodeIDS      []string
-		apiRatelimits      map[string]int
-		apiBurstlimits     map[string]int
-		txRatelimits       float64
-		txBurstlimits      int
-		txRatelimitPayers  string
+		machineAccountInfo                  *bootstrap.NodeMachineAccountInfo
+		flowClientConfigs                   []*grpcclient.FlowClientConfig
+		insecureAccessAPI                   bool
+		accessNodeIDS                       []string
+		apiRatelimits                       map[string]int
+		apiBurstlimits                      map[string]int
+		txRatelimits                        float64
+		txBurstlimits                       int
+		txRatelimitPayers                   string
+		bySealingLagRateLimiterConfigGetter module.BySealingLagRateLimiterConfigGetter
 	)
 	var deprecatedFlagBlockRateDelay time.Duration
 
@@ -290,6 +292,41 @@ func main() {
 			flowClientConfigs, err = grpcclient.FlowClientConfigs(anIDS, insecureAccessAPI, node.State.Sealed())
 			if err != nil {
 				return fmt.Errorf("failed to prepare flow client connection configs for each access node id %w", err)
+			}
+
+			return nil
+		}).
+		Module("updatable collection rate limiting config", func(node *cmd.NodeConfig) error {
+			setter := updatable_configs.DefaultBySealingLagRateLimiterConfigs()
+
+			// update the getter with the setter, so other modules can only get, but not set
+			bySealingLagRateLimiterConfigGetter = setter
+
+			// admin tool is the only instance that have access to the setter interface, therefore, is
+			// the only module can change this config
+			err = node.ConfigManager.RegisterUintConfig("collection-builder-rate-limiter-min-sealing-lag",
+				setter.MinSealingLag,
+				setter.SetMinSealingLag)
+			if err != nil {
+				return err
+			}
+			err = node.ConfigManager.RegisterUintConfig("collection-builder-rate-limiter-max-sealing-lag",
+				setter.MaxSealingLag,
+				setter.SetMaxSealingLag)
+			if err != nil {
+				return err
+			}
+			err = node.ConfigManager.RegisterUintConfig("collection-builder-rate-limiter-halving-interval",
+				setter.HalvingInterval,
+				setter.SetHalvingInterval)
+			if err != nil {
+				return err
+			}
+			err = node.ConfigManager.RegisterUintConfig("collection-builder-rate-limiter-min-collection-size",
+				setter.MinCollectionSize,
+				setter.SetMinCollectionSize)
+			if err != nil {
+				return err
 			}
 
 			return nil
@@ -509,6 +546,7 @@ func main() {
 				colMetrics,
 				push,
 				node.Logger,
+				bySealingLagRateLimiterConfigGetter,
 				builder.WithMaxCollectionSize(maxCollectionSize),
 				builder.WithMaxCollectionByteSize(maxCollectionByteSize),
 				builder.WithMaxCollectionTotalGas(maxCollectionTotalGas),
