@@ -1,24 +1,26 @@
 package storage
 
-import "github.com/onflow/flow-go/module/executiondatasync/optimistic_sync/storage/reader"
+import (
+	"github.com/onflow/flow-go/storage"
+)
 
 // Snapshot provides access to execution data readers for querying various data types from a specific ExecutionResult.
 type Snapshot interface {
 	// Events returns a reader for querying event data.
-	Events() reader.Events
+	Events() storage.EventsReader
 
 	// Collections returns a reader for querying collection data.
-	Collections() reader.Collections
+	Collections() storage.CollectionsReader
 
 	// Transactions returns a reader for querying transaction data.
-	Transactions() reader.Transactions
+	Transactions() storage.TransactionsReader
 
 	// LightTransactionResults returns a reader for querying light transaction result data.
-	LightTransactionResults() reader.LightTransactionResults
+	LightTransactionResults() storage.LightTransactionResultsReader
 
 	// TransactionResultErrorMessages returns a reader for querying transaction error message data.
-	TransactionResultErrorMessages() reader.TransactionResultErrorMessages
+	TransactionResultErrorMessages() storage.TransactionResultErrorMessagesReader
 
 	// Registers returns a reader for querying register data.
-	Registers() reader.RegisterIndex
+	Registers() storage.RegisterIndexReader
 }
