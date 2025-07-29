@@ -48,6 +48,7 @@ func NewBuilderFactory(
 		metrics:          metrics,
 		pusher:           pusher,
 		log:              log,
+		configGetter:     configGetter,
 		opts:             opts,
 	}
 	return factory, nil
