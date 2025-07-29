@@ -55,7 +55,8 @@ func (suite *Suite) TestHistoricalTransactionResult() {
 		flow.ZeroID,
 		entities.EventEncodingVersion_JSON_CDC_V0,
 	)
-	suite.checkResponse(result, err)
+	suite.Require().NoError(err)
+	suite.Require().NotNil(result)
 
 	// status should be sealed
 	suite.Assert().Equal(flow.TransactionStatusSealed, result.Status)
@@ -98,7 +99,8 @@ func (suite *Suite) TestHistoricalTransaction() {
 
 	// Make the call for the transaction result
 	tx, err := backend.GetTransaction(ctx, txID)
-	suite.checkResponse(tx, err)
+	suite.Require().NoError(err)
+	suite.Require().NotNil(tx)
 
 	suite.assertAllExpectations()
 }

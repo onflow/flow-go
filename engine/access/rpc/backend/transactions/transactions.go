@@ -86,10 +86,11 @@ type Params struct {
 	TxErrorMessageProvider      error_message_provider.TxErrorMessageProvider
 	TxResultCache               *lru.Cache[flow.Identifier, *accessmodel.TransactionResult]
 	TxResultQueryMode           query_mode.IndexQueryMode
-	TxValidator                 *validator.TransactionValidator
-	TxStatusDeriver             *status_deriver.TxStatusDeriver
-	EventsIndex                 *index.EventsIndex
-	TxResultsIndex              *index.TransactionResultsIndex
+	//TxProvider                  provider.TransactionProvider
+	TxValidator     *validator.TransactionValidator
+	TxStatusDeriver *status_deriver.TxStatusDeriver
+	EventsIndex     *index.EventsIndex
+	TxResultsIndex  *index.TransactionResultsIndex
 }
 
 func NewTransactionsBackend(params Params) (*Transactions, error) {
@@ -368,8 +369,9 @@ func (t *Transactions) GetTransactionResult(
 
 	tx, err := t.transactions.ByID(txID)
 	if err != nil {
-		if !errors.Is(err, storage.ErrNotFound) {
-			return nil, rpc.ConvertStorageError(err)
+		txErr := rpc.ConvertStorageError(err)
+		if status.Code(txErr) != codes.NotFound {
+			return nil, txErr
 		}
 
 		// Tx not found. If we have historical Sporks setup, lets look through those as well
