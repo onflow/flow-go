@@ -102,7 +102,7 @@ func (s *Suite) MetricsPort() string {
 }
 
 func (s *Suite) SetupTest() {
-	s.log = unittest.LoggerForTest(s.Suite.T(), zerolog.InfoLevel)
+	s.log = unittest.LoggerForTest(s.Suite.T(), zerolog.DebugLevel)
 	s.log.Info().Msg("================> SetupTest")
 
 	s.nodeConfigs = append(s.nodeConfigs, testnet.NewNodeConfig(flow.RoleAccess))
@@ -120,7 +120,8 @@ func (s *Suite) SetupTest() {
 	// need one execution nodes
 	s.exe1ID = unittest.IdentifierFixture()
 	exe1Config := testnet.NewNodeConfig(flow.RoleExecution, testnet.WithID(s.exe1ID),
-		testnet.WithLogLevel(zerolog.InfoLevel))
+		testnet.WithLogLevel(zerolog.InfoLevel),
+		testnet.WithAdditionalFlag("--schedule-callbacks-enabled=true"))
 	s.nodeConfigs = append(s.nodeConfigs, exe1Config)
 
 	// need two collection node
