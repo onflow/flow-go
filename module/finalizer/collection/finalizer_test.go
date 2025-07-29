@@ -187,7 +187,7 @@ func TestFinalizer(t *testing.T) {
 			pusher.On("SubmitCollectionGuarantee", &flow.CollectionGuarantee{
 				CollectionID:     block.Payload.Collection.ID(),
 				ReferenceBlockID: refBlock.ID(),
-				ChainID:          block.ChainID,
+				ClusterChainID:   block.ChainID,
 				SignerIndices:    block.ParentVoterIndices,
 				Signature:        nil,
 			}).Once()
@@ -255,14 +255,14 @@ func TestFinalizer(t *testing.T) {
 			pusher.On("SubmitCollectionGuarantee", &flow.CollectionGuarantee{
 				CollectionID:     block1.Payload.Collection.ID(),
 				ReferenceBlockID: refBlock.ID(),
-				ChainID:          block1.ChainID,
+				ClusterChainID:   block1.ChainID,
 				SignerIndices:    block1.ParentVoterIndices,
 				Signature:        nil,
 			}).Once()
 			pusher.On("SubmitCollectionGuarantee", &flow.CollectionGuarantee{
 				CollectionID:     block2.Payload.Collection.ID(),
 				ReferenceBlockID: refBlock.ID(),
-				ChainID:          block2.ChainID,
+				ClusterChainID:   block2.ChainID,
 				SignerIndices:    block2.ParentVoterIndices,
 				Signature:        nil,
 			}).Once()
@@ -328,7 +328,7 @@ func TestFinalizer(t *testing.T) {
 			pusher.On("SubmitCollectionGuarantee", &flow.CollectionGuarantee{
 				CollectionID:     block1.Payload.Collection.ID(),
 				ReferenceBlockID: refBlock.ID(),
-				ChainID:          block1.ChainID,
+				ClusterChainID:   block1.ChainID,
 				SignerIndices:    block1.ParentVoterIndices,
 				Signature:        nil,
 			}).Once()
@@ -396,7 +396,7 @@ func TestFinalizer(t *testing.T) {
 			pusher.On("SubmitCollectionGuarantee", &flow.CollectionGuarantee{
 				CollectionID:     block1.Payload.Collection.ID(),
 				ReferenceBlockID: refBlock.ID(),
-				ChainID:          block1.ChainID,
+				ClusterChainID:   block1.ChainID,
 				SignerIndices:    block1.ParentVoterIndices,
 				Signature:        nil,
 			}).Once()

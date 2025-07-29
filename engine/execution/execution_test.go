@@ -113,13 +113,13 @@ func TestExecutionFlow(t *testing.T) {
 					{
 						CollectionID:     col1.ID(),
 						SignerIndices:    signerIndices,
-						ChainID:          clusterChainID,
+						ClusterChainID:   clusterChainID,
 						ReferenceBlockID: genesis.ID(),
 					},
 					{
 						CollectionID:     col2.ID(),
 						SignerIndices:    signerIndices,
-						ChainID:          clusterChainID,
+						ClusterChainID:   clusterChainID,
 						ReferenceBlockID: genesis.ID(),
 					},
 				},
@@ -294,7 +294,7 @@ func deployContractBlock(
 					{
 						CollectionID:     col.ID(),
 						SignerIndices:    signerIndices,
-						ChainID:          clusterChainID,
+						ClusterChainID:   clusterChainID,
 						ReferenceBlockID: ref.ID(),
 					},
 				},
@@ -334,7 +334,7 @@ func makePanicBlock(t *testing.T, conID *flow.Identity, colID *flow.Identity, ch
 			HeaderBody: block.HeaderBody,
 			Payload: flow.Payload{
 				Guarantees: []*flow.CollectionGuarantee{
-					{CollectionID: col.ID(), SignerIndices: signerIndices, ChainID: clusterChainID, ReferenceBlockID: ref.ID()},
+					{CollectionID: col.ID(), SignerIndices: signerIndices, ClusterChainID: clusterChainID, ReferenceBlockID: ref.ID()},
 				},
 				ProtocolStateID: parent.Payload.ProtocolStateID,
 			},
@@ -367,7 +367,7 @@ func makeSuccessBlock(t *testing.T, conID *flow.Identity, colID *flow.Identity, 
 			HeaderBody: block.HeaderBody,
 			Payload: flow.Payload{
 				Guarantees: []*flow.CollectionGuarantee{
-					{CollectionID: col.ID(), SignerIndices: signerIndices, ChainID: clusterChainID, ReferenceBlockID: ref.ID()},
+					{CollectionID: col.ID(), SignerIndices: signerIndices, ClusterChainID: clusterChainID, ReferenceBlockID: ref.ID()},
 				},
 				ProtocolStateID: parent.Payload.ProtocolStateID,
 			},

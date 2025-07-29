@@ -159,19 +159,19 @@ func (e *Core) validateGuarantors(guarantee *flow.CollectionGuarantee) error {
 	if err != nil {
 		return fmt.Errorf("could not get current epoch: %w", err)
 	}
-	cluster, err := epoch.ClusterByChainID(guarantee.ChainID)
+	cluster, err := epoch.ClusterByChainID(guarantee.ClusterChainID)
 	// reference block not found
 	if errors.Is(err, state.ErrUnknownSnapshotReference) {
 		return engine.NewUnverifiableInputError(
-			"could not get clusters with chainID %v for unknown reference block (id=%x): %w", guarantee.ChainID, guarantee.ReferenceBlockID, err)
+			"could not get clusters with chainID %v for unknown reference block (id=%x): %w", guarantee.ClusterChainID, guarantee.ReferenceBlockID, err)
 	}
 	// cluster not found by the chain ID
 	if errors.Is(err, protocol.ErrClusterNotFound) {
-		return engine.NewInvalidInputErrorf("cluster not found by chain ID %v: %w", guarantee.ChainID, err)
+		return engine.NewInvalidInputErrorf("cluster not found by chain ID %v: %w", guarantee.ClusterChainID, err)
 	}
 	if err != nil {
-		return fmt.Errorf("internal error retrieving collector clusters for guarantee (ReferenceBlockID: %v, ChainID: %v): %w",
-			guarantee.ReferenceBlockID, guarantee.ChainID, err)
+		return fmt.Errorf("internal error retrieving collector clusters for guarantee (ReferenceBlockID: %v, ClusterChainID: %v): %w",
+			guarantee.ReferenceBlockID, guarantee.ClusterChainID, err)
 	}
 
 	// ensure the guarantors are from the same cluster

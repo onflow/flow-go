@@ -252,13 +252,13 @@ func (suite *IngestionCoreSuite) TestOnGuaranteeExpired() {
 	suite.Assert().True(engine.IsOutdatedInputError(err))
 }
 
-// TestOnGuaranteeReferenceBlockFromWrongEpoch validates that guarantees which contain a ChainID
-// that is inconsistent with the reference block (ie. the ChainID either refers to a non-existent
+// TestOnGuaranteeReferenceBlockFromWrongEpoch validates that guarantees which contain a ClusterChainID
+// that is inconsistent with the reference block (ie. the ClusterChainID either refers to a non-existent
 // cluster, or a cluster for a different epoch) should be considered invalid inputs.
 func (suite *IngestionCoreSuite) TestOnGuaranteeReferenceBlockFromWrongEpoch() {
 	// create a guarantee from a cluster in a different epoch
 	guarantee := suite.validGuarantee()
-	guarantee.ChainID = cluster.CanonicalClusterID(suite.epochCounter+1, suite.clusterMembers.NodeIDs())
+	guarantee.ClusterChainID = cluster.CanonicalClusterID(suite.epochCounter+1, suite.clusterMembers.NodeIDs())
 
 	// the guarantee is not part of the memory pool
 	suite.pool.On("Has", guarantee.ID()).Return(false)
@@ -340,7 +340,7 @@ func (suite *IngestionCoreSuite) TestOnGuaranteeUnknownOrigin() {
 // validGuarantee returns a valid collection guarantee based on the suite state.
 func (suite *IngestionCoreSuite) validGuarantee() *flow.CollectionGuarantee {
 	guarantee := unittest.CollectionGuaranteeFixture()
-	guarantee.ChainID = suite.clusterID
+	guarantee.ClusterChainID = suite.clusterID
 
 	signerIndices, err := signature.EncodeSignersToIndices(
 		[]flow.Identifier{suite.collID}, []flow.Identifier{suite.collID})

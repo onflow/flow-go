@@ -3168,7 +3168,7 @@ func TestExtendInvalidGuarantee(t *testing.T) {
 		payload := flow.Payload{
 			Guarantees: []*flow.CollectionGuarantee{
 				{
-					ChainID:          cluster.ChainID(),
+					ClusterChainID:   cluster.ChainID(),
 					ReferenceBlockID: head.ID(),
 					SignerIndices:    validSignerIndices,
 				},
@@ -3283,7 +3283,7 @@ func TestExtendInvalidGuarantee(t *testing.T) {
 		// return the protocol.ErrNextEpochNotCommitted for testing
 
 		// test the guarantee has wrong chain ID, and should return ErrClusterNotFound
-		payload.Guarantees[0].ChainID = flow.ChainID("some_bad_chain_ID")
+		payload.Guarantees[0].ClusterChainID = flow.ChainID("some_bad_chain_ID")
 		block, err = flow.NewBlock(
 			flow.UntrustedBlock{
 				HeaderBody: block.HeaderBody,

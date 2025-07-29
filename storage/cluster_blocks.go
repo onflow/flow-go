@@ -6,7 +6,7 @@ import (
 )
 
 // ClusterBlocks provides persistent storage for collector blocks (aka collections) produced
-// by *one specific* collector cluster (identified by the ChainID).
+// by *one specific* collector cluster (identified by the ClusterChainID).
 // For consistency, method naming is analogous to the [storage.Blocks] interface. Though,
 // at the moment, we only need to store [cluster.Proposal]. Therefore, methods `ByID` and
 // `ByHeight` don't exist here (but might be added later).

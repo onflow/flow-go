@@ -13,7 +13,7 @@ import (
 type CollectionGuarantee struct {
 	CollectionID     Identifier       // ID of the collection being guaranteed
 	ReferenceBlockID Identifier       // defines expiry of the collection
-	ChainID          ChainID          // the chainID of the cluster in order to determine which cluster this guarantee belongs to
+	ClusterChainID   ChainID          // the chainID of the cluster in order to determine which cluster this guarantee belongs to
 	SignerIndices    []byte           // encoded indices of the signers
 	Signature        crypto.Signature // guarantor signatures
 }
@@ -33,10 +33,10 @@ type UntrustedCollectionGuarantee CollectionGuarantee
 // Construction CollectionGuarantee allowed only within the constructor
 //
 // This constructor enforces basic structural validity, ensuring critical fields like
-// CollectionID and ReferenceBlockID are non-zero. Other fields — such as ChainID and Signature —
+// CollectionID and ReferenceBlockID are non-zero. Other fields — such as ClusterChainID and Signature —
 // are not validated here for the following reasons:
 //
-//   - ChainID is currently optional or omitted in some upstream models (e.g. protobuf).
+//   - ClusterChainID is currently optional or omitted in some upstream models (e.g. protobuf).
 //     This field may be empty and still represent a valid state for certain internal flows.
 //
 //   - Signature is allowed to be nil in intermediate states.(Like MakeFinal method which handles finalization logic for a block.)
@@ -56,7 +56,7 @@ func NewCollectionGuarantee(untrusted UntrustedCollectionGuarantee) (*Collection
 	return &CollectionGuarantee{
 		CollectionID:     untrusted.CollectionID,
 		ReferenceBlockID: untrusted.ReferenceBlockID,
-		ChainID:          untrusted.ChainID,
+		ClusterChainID:   untrusted.ClusterChainID,
 		SignerIndices:    untrusted.SignerIndices,
 		Signature:        untrusted.Signature,
 	}, nil
