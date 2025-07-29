@@ -10,7 +10,6 @@ import (
 	"github.com/cockroachdb/pebble"
 	"github.com/dgraph-io/badger/v2"
 	"github.com/rs/zerolog"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
 
@@ -191,7 +190,7 @@ func (p *PipelineFunctionalSuite) TestPipelineDownloadError() {
 		},
 		{
 			name:        "transaction result error messages requester not found error",
-			expectedErr: assert.AnError,
+			expectedErr: fmt.Errorf("test transaction result error messages not found error"),
 			requesterInitialization: func(err error) {
 				p.execDataRequester.On("RequestExecutionData", mock.Anything).Return(expectedExecutionData, nil).Once()
 				p.txResultErrMsgsRequester.On("Request", mock.Anything).Return(([]flow.TransactionResultErrorMessage)(nil), err).Once()
@@ -244,9 +243,10 @@ func (p *PipelineFunctionalSuite) TestPipelineIndexingError() {
 
 // TestPipelinePersistingError tests the pipeline behavior when an error occurs during the persisting step.
 func (p *PipelineFunctionalSuite) TestPipelinePersistingError() {
+	expectedError := fmt.Errorf("test events batch store error")
 	// Mock events storage to simulate an error on a persisting step. In normal flow and with real storages, it is hard to make a meaningful error explicitly.
 	mockEvents := storagemock.NewEvents(p.T())
-	mockEvents.On("BatchStore", mock.Anything, mock.Anything, mock.Anything).Return(assert.AnError).Maybe()
+	mockEvents.On("BatchStore", mock.Anything, mock.Anything, mock.Anything).Return(expectedError).Maybe()
 	p.persistentEvents = mockEvents
 
 	expectedExecutionData, expectedTxResultErrMsgs := p.initializeTestData()
@@ -261,7 +261,7 @@ func (p *PipelineFunctionalSuite) TestPipelinePersistingError() {
 
 		pipeline.SetSealed()
 
-		waitForError(p.T(), errChan, assert.AnError)
+		waitForError(p.T(), errChan, expectedError)
 		p.Assert().Equal(StateWaitingPersist, pipeline.GetState())
 	}, p.config)
 }
