@@ -49,7 +49,6 @@ type BackfillTxErrorMessagesSuite struct {
 	transactionResults *storagemock.LightTransactionResults
 	receipts           *storagemock.ExecutionReceipts
 	headers            *storagemock.Headers
-	lightTxResults     *storagemock.LightTransactionResults
 
 	reporter       *syncmock.IndexReporter
 	indexReporter  *index.Reporter
@@ -83,13 +82,12 @@ func (suite *BackfillTxErrorMessagesSuite) SetupTest() {
 	suite.receipts = new(storagemock.ExecutionReceipts)
 	suite.transactionResults = storagemock.NewLightTransactionResults(suite.T())
 	suite.txErrorMessages = new(storagemock.TransactionResultErrorMessages)
-	suite.lightTxResults = storagemock.NewLightTransactionResults(suite.T())
 	suite.reporter = syncmock.NewIndexReporter(suite.T())
 
 	suite.indexReporter = index.NewReporter()
 	err := suite.indexReporter.Initialize(suite.reporter)
 	suite.Require().NoError(err)
-	suite.txResultsIndex = index.NewTransactionResultsIndex(suite.indexReporter, suite.lightTxResults)
+	suite.txResultsIndex = index.NewTransactionResultsIndex(suite.indexReporter, suite.transactionResults)
 
 	suite.execClient = new(accessmock.ExecutionAPIClient)
 
