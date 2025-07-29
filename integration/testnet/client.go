@@ -122,7 +122,6 @@ func (c *Client) Events(ctx context.Context, typ string) ([]sdk.BlockEvents, err
 // code to the root account.
 func (c *Client) DeployContract(ctx context.Context, refID sdk.Identifier, contract dsl.Contract) (*sdk.Transaction, error) {
 	return c.deployContract(ctx, refID, dsl.Transaction{
-		Import: dsl.Import{},
 		Content: dsl.Prepare{
 			Content: dsl.SetAccountCode{
 				Code: contract.ToCadence(),
@@ -136,7 +135,6 @@ func (c *Client) DeployContract(ctx context.Context, refID sdk.Identifier, contr
 // code to the root account.
 func (c *Client) UpdateContract(ctx context.Context, refID sdk.Identifier, contract dsl.Contract) (*sdk.Transaction, error) {
 	return c.deployContract(ctx, refID, dsl.Transaction{
-		Import: dsl.Import{},
 		Content: dsl.Prepare{
 			Content: dsl.SetAccountCode{
 				Code:   contract.ToCadence(),
@@ -189,6 +187,10 @@ func (c *Client) SignAndSendTransaction(ctx context.Context, tx *sdk.Transaction
 	}
 
 	return c.SendTransaction(ctx, tx)
+}
+
+func (c *Client) GetTransactionResult(ctx context.Context, txID sdk.Identifier) (*sdk.TransactionResult, error) {
+	return c.client.GetTransactionResult(ctx, txID)
 }
 
 func (c *Client) ExecuteScript(ctx context.Context, script dsl.Main) (cadence.Value, error) {
