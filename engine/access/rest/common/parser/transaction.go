@@ -112,7 +112,7 @@ func (t *Transaction) Parse(raw io.Reader, chain flow.Chain) error {
 		EnvelopeSignatures: envelopeSigs.Flow(),
 	})
 	if err != nil {
-		return fmt.Errorf("invalid payer address: %w", err)
+		return fmt.Errorf("could not construct transaction body: %w", err)
 	}
 
 	// we use the gRPC method of converting the incoming transaction to a Flow transaction since
