@@ -271,13 +271,15 @@ func (suite *ExecutionResultQueryProviderSuite) TestPreferredAndRequiredExecutio
 	})
 
 	suite.Run("with operator preferred executors", func() {
-		provider := suite.createProvider(allExecutionNodes[1:4].NodeIDs(), Criteria{})
+		provider := suite.createProvider(allExecutionNodes[1:5].NodeIDs(), Criteria{})
 
 		// Criteria are empty to use operator defaults
 		query, err := provider.ExecutionResultQuery(block.ID(), Criteria{})
 		suite.Require().NoError(err)
 
-		suite.Assert().Subset(provider.preferredENIdentifiers, query.ExecutionNodes.NodeIDs())
+		actualExecutors := query.ExecutionNodes.NodeIDs()
+
+		suite.Assert().ElementsMatch(provider.preferredENIdentifiers, actualExecutors)
 	})
 
 	suite.Run("with operator required executors", func() {
@@ -291,21 +293,23 @@ func (suite *ExecutionResultQueryProviderSuite) TestPreferredAndRequiredExecutio
 
 		actualExecutors := query.ExecutionNodes.NodeIDs()
 
-		// As not all recepts contain required executors, the number of return executors should be lower than the number of all required executors
-		suite.Assert().Greater(len(provider.requiredENIdentifiers), len(actualExecutors))
-		suite.Assert().Subset(provider.requiredENIdentifiers, actualExecutors)
+		// Just one required executor contains the result
+		expectedExecutors := provider.requiredENIdentifiers[0:1]
+
+		suite.Assert().ElementsMatch(expectedExecutors, actualExecutors)
 	})
 
 	suite.Run("with both: operator preferred & required executors", func() {
 		provider := suite.createProvider(allExecutionNodes[0:1].NodeIDs(), Criteria{
-			RequiredExecutors: allExecutionNodes[4:6].NodeIDs(),
+			RequiredExecutors: allExecutionNodes[3:6].NodeIDs(),
 		})
 
 		// Criteria are empty to use operator defaults
 		query, err := provider.ExecutionResultQuery(block.ID(), Criteria{})
 		suite.Require().NoError(err)
 
-		expectedExecutors := append(provider.preferredENIdentifiers, provider.requiredENIdentifiers...)
+		// `preferredENIdentifiers` contain 1 executor, that is not enough, so the logic will get 2 executors from `requiredENIdentifiers` to fill `maxNodesCnt` executors.
+		expectedExecutors := append(provider.preferredENIdentifiers, provider.requiredENIdentifiers[0:2]...)
 		actualExecutors := query.ExecutionNodes.NodeIDs()
 
 		suite.Assert().Len(actualExecutors, maxNodesCnt)
