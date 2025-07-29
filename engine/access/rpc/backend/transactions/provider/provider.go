@@ -9,6 +9,8 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
+// TransactionProvider defines an interface for retrieving transaction results
+// from various data sources, such as local storage and execution nodes.
 type TransactionProvider interface {
 	TransactionResult(
 		ctx context.Context,

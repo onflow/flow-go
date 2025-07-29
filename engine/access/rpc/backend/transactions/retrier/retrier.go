@@ -18,7 +18,7 @@ import (
 const RetryFrequency uint64 = 120 // Blocks
 
 type Transactions map[flow.Identifier]*flow.TransactionBody
-type BlockHeightToTransactions = map[uint64]Transactions
+type BlockHeightToTransactions map[uint64]Transactions
 
 type TransactionSender interface {
 	SendRawTransaction(ctx context.Context, tx *flow.TransactionBody) error

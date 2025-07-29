@@ -110,6 +110,13 @@ func NewTxErrorMessageProvider(
 	}
 }
 
+// ErrorMessageByTransactionID returns transaction error message for specified transaction.
+// If transaction error messages are stored locally, they will be checked first in local storage.
+// If error messages are not stored locally, an RPC call will be made to the EN to fetch message.
+//
+// Expected errors during normal operation:
+//   - InsufficientExecutionReceipts - found insufficient receipts for the given block ID.
+//   - status.Error - remote GRPC call to EN has failed.
 func (e *TxErrorMessageProviderImpl) ErrorMessageByTransactionID(
 	ctx context.Context,
 	blockID flow.Identifier,
@@ -158,6 +165,13 @@ func (e *TxErrorMessageProviderImpl) ErrorMessageByTransactionID(
 	return resp.ErrorMessage, nil
 }
 
+// ErrorMessageByIndex returns the transaction error message for a specified transaction using its index.
+// If transaction error messages are stored locally, they will be checked first in local storage.
+// If error messages are not stored locally, an RPC call will be made to the EN to fetch message.
+//
+// Expected errors during normal operation:
+//   - InsufficientExecutionReceipts - found insufficient receipts for the given block ID.
+//   - status.Error - remote GRPC call to EN has failed.
 func (e *TxErrorMessageProviderImpl) ErrorMessageByIndex(
 	ctx context.Context,
 	blockID flow.Identifier,
@@ -206,6 +220,13 @@ func (e *TxErrorMessageProviderImpl) ErrorMessageByIndex(
 	return resp.ErrorMessage, nil
 }
 
+// ErrorMessagesByBlockID returns all error messages for failed transactions by blockID.
+// If transaction error messages are stored locally, they will be checked first in local storage.
+// If error messages are not stored locally, an RPC call will be made to the EN to fetch messages.
+//
+// Expected errors during normal operation:
+//   - InsufficientExecutionReceipts - found insufficient receipts for the given block ID.
+//   - status.Error - remote GRPC call to EN has failed.
 func (e *TxErrorMessageProviderImpl) ErrorMessagesByBlockID(
 	ctx context.Context,
 	blockID flow.Identifier,
@@ -395,12 +416,12 @@ func (e *TxErrorMessageProviderImpl) ErrorMessageByBlockIDFromAnyEN(
 	return resp.GetResults(), execNode, nil
 }
 
+// tryGetTransactionErrorMessageFromEN performs a grpc call to the specified execution node and returns response.
+//
 // Expected errors during normal operation:
 //   - status.Error - GRPC call failed, some of possible codes are:
 //   - codes.NotFound - request cannot be served by EN because of absence of data.
 //   - codes.Unavailable - remote node is not unavailable.
-//
-// tryGetTransactionErrorMessageFromEN performs a grpc call to the specified execution node and returns response.
 func (e *TxErrorMessageProviderImpl) tryGetTransactionErrorMessageFromEN(
 	ctx context.Context,
 	execNode *flow.IdentitySkeleton,
