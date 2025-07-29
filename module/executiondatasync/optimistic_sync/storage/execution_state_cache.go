@@ -14,7 +14,7 @@ type ExecutionStateCache interface {
 	// The returned Snapshot provides access to execution data, including both sealed and unsealed data.
 	//
 	// Expected errors during normal operation:
-	//   - storage.ErrNotFound - result is not available, not in a valid state, or does not descend from the latest sealed result.
+	//   - storage.ErrNotFound - result is not available, not ready for querying, or does not descend from the latest sealed result.
 	//   - All other errors are potential indicators of bugs or corrupted internal state (continuation impossible)
 	Snapshot(executionResultID flow.Identifier) (Snapshot, error)
 }
