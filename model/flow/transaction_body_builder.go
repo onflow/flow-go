@@ -2,10 +2,10 @@ package flow
 
 import (
 	"fmt"
+	"slices"
 
 	"github.com/onflow/crypto"
 	"github.com/onflow/crypto/hash"
-	"golang.org/x/exp/slices"
 
 	"github.com/onflow/flow-go/model/fingerprint"
 )
@@ -26,12 +26,16 @@ func NewTransactionBodyBuilder() *TransactionBodyBuilder {
 // Build validates and returns an immutable TransactionBody.
 // All errors indicate that a valid TransactionBody cannot be created from the current builder state.
 func (tb *TransactionBodyBuilder) Build() (*TransactionBody, error) {
+	slices.SortFunc(tb.u.PayloadSignatures, compareSignatures)
+	slices.SortFunc(tb.u.EnvelopeSignatures, compareSignatures)
 	return NewTransactionBody(tb.u)
 }
 
 // BuildSystemTx validates and returns an immutable system chunk TransactionBody. All required fields must be explicitly set (even if they are zero).
 // All errors indicate that a valid system chunk TransactionBody cannot be created from the current builder state.
 func (tb *TransactionBodyBuilder) BuildSystemTx() (*TransactionBody, error) {
+	slices.SortFunc(tb.u.PayloadSignatures, compareSignatures)
+	slices.SortFunc(tb.u.EnvelopeSignatures, compareSignatures)
 	return NewSystemChunkTransactionBody(tb.u)
 }
 
@@ -93,20 +97,14 @@ func (tb *TransactionBodyBuilder) AddAuthorizer(authorizer Address) *Transaction
 // AddPayloadSignature adds a payload signature to the transaction for the given address and key ID.
 func (tb *TransactionBodyBuilder) AddPayloadSignature(address Address, keyID uint32, sig []byte) *TransactionBodyBuilder {
 	s := tb.createSignature(address, keyID, sig)
-
 	tb.u.PayloadSignatures = append(tb.u.PayloadSignatures, s)
-	slices.SortFunc(tb.u.PayloadSignatures, compareSignatures)
-
 	return tb
 }
 
 // AddEnvelopeSignature adds an envelope signature to the transaction for the given address and key ID.
 func (tb *TransactionBodyBuilder) AddEnvelopeSignature(address Address, keyID uint32, sig []byte) *TransactionBodyBuilder {
 	s := tb.createSignature(address, keyID, sig)
-
 	tb.u.EnvelopeSignatures = append(tb.u.EnvelopeSignatures, s)
-	slices.SortFunc(tb.u.EnvelopeSignatures, compareSignatures)
-
 	return tb
 }
 
