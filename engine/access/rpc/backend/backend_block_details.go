@@ -42,7 +42,6 @@ func (b *backendBlockDetails) GetLatestBlock(
 			err = fmt.Errorf("failed to lookup latest finalize header: %w", err)
 			return nil, flow.BlockStatusUnknown, access.RequireNoError(ctx, err)
 		}
-		blockStatus = flow.BlockStatusFinalized
 
 		// Note: there is a corner case when requesting the latest finalized block before the
 		// consensus follower has progressed past the spork root block. In this case, the returned

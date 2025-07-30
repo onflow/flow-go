@@ -220,7 +220,7 @@ func (suite *IrrecoverableStateTestSuite) TestRestInconsistentNodeState() {
 	err := fmt.Errorf("inconsistent node state")
 	suite.snapshot.On("Head").Return(nil, err)
 
-	suite.startServers(suite.T(), fmt.Errorf("failed to lookup latest sealed header: %w", err))
+	suite.startServers(suite.T(), fmt.Errorf("failed to lookup sealed header: %w", err))
 
 	config := restclient.NewConfiguration()
 	config.BasePath = fmt.Sprintf("http://%s/v1", suite.rpcEng.RestApiAddress().String())
