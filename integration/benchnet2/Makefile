@@ -55,6 +55,7 @@ gen-bootstrap:
 		--root-chain bench \
 		--root-height 0 \
 		--root-parent 0000000000000000000000000000000000000000000000000000000000000000 \
+		--root-view 0 \
 		--epoch-counter 0 \
 		--epoch-length $(EPOCH_LEN) \
 		--epoch-staking-phase-length $(EPOCH_STAKING_PHASE_LEN) \
