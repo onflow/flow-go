@@ -16,6 +16,7 @@ import (
 	"google.golang.org/grpc/status"
 
 	"github.com/onflow/flow-go/engine/access/index"
+	"github.com/onflow/flow-go/engine/access/rpc/backend/query_mode"
 	connectionmock "github.com/onflow/flow-go/engine/access/rpc/connection/mock"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/fvm/blueprints"
@@ -1107,7 +1108,7 @@ func (suite *Suite) TestGetSystemTransactionResultFromStorage() {
 
 	// Set up the backend parameters and the backend instance
 	params := suite.defaultBackendParams()
-	params.TxResultQueryMode = IndexQueryModeLocalOnly
+	params.TxResultQueryMode = query_mode.IndexQueryModeLocalOnly
 
 	params.EventsIndex = index.NewEventsIndex(indexReporter, suite.events)
 	params.TxResultsIndex = index.NewTransactionResultsIndex(indexReporter, suite.transactionResults)
@@ -1328,7 +1329,7 @@ func (suite *Suite) TestTransactionResultFromStorage() {
 	params := suite.defaultBackendParams()
 	// the connection factory should be used to get the execution node client
 	params.ConnFactory = suite.setupConnectionFactory()
-	params.TxResultQueryMode = IndexQueryModeLocalOnly
+	params.TxResultQueryMode = query_mode.IndexQueryModeLocalOnly
 	params.EventsIndex = index.NewEventsIndex(indexReporter, suite.events)
 	params.TxResultsIndex = index.NewTransactionResultsIndex(indexReporter, suite.transactionResults)
 
@@ -1415,7 +1416,7 @@ func (suite *Suite) TestTransactionByIndexFromStorage() {
 	params := suite.defaultBackendParams()
 	// the connection factory should be used to get the execution node client
 	params.ConnFactory = suite.setupConnectionFactory()
-	params.TxResultQueryMode = IndexQueryModeLocalOnly
+	params.TxResultQueryMode = query_mode.IndexQueryModeLocalOnly
 	params.EventsIndex = index.NewEventsIndex(indexReporter, suite.events)
 	params.TxResultsIndex = index.NewTransactionResultsIndex(indexReporter, suite.transactionResults)
 
@@ -1510,7 +1511,7 @@ func (suite *Suite) TestTransactionResultsByBlockIDFromStorage() {
 	params.ConnFactory = suite.setupConnectionFactory()
 	params.EventsIndex = index.NewEventsIndex(indexReporter, suite.events)
 	params.TxResultsIndex = index.NewTransactionResultsIndex(indexReporter, suite.transactionResults)
-	params.TxResultQueryMode = IndexQueryModeLocalOnly
+	params.TxResultQueryMode = query_mode.IndexQueryModeLocalOnly
 
 	backend, err := New(params)
 	suite.Require().NoError(err)
