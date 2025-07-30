@@ -15,23 +15,23 @@ type Blocks struct {
 }
 
 // ByCollectionID provides a mock function with given fields: collID
-func (_m *Blocks) ByCollectionID(collID flow.Identifier) (*flow.Block, error) {
+func (_m *Blocks) ByCollectionID(collID flow.Identifier) (*flow.GenericBlock[flow.Payload], error) {
 	ret := _m.Called(collID)
 
 	if len(ret) == 0 {
 		panic("no return value specified for ByCollectionID")
 	}
 
-	var r0 *flow.Block
+	var r0 *flow.GenericBlock[flow.Payload]
 	var r1 error
-	if rf, ok := ret.Get(0).(func(flow.Identifier) (*flow.Block, error)); ok {
+	if rf, ok := ret.Get(0).(func(flow.Identifier) (*flow.GenericBlock[flow.Payload], error)); ok {
 		return rf(collID)
 	}
-	if rf, ok := ret.Get(0).(func(flow.Identifier) *flow.Block); ok {
+	if rf, ok := ret.Get(0).(func(flow.Identifier) *flow.GenericBlock[flow.Payload]); ok {
 		r0 = rf(collID)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*flow.Block)
+			r0 = ret.Get(0).(*flow.GenericBlock[flow.Payload])
 		}
 	}
 
@@ -45,23 +45,23 @@ func (_m *Blocks) ByCollectionID(collID flow.Identifier) (*flow.Block, error) {
 }
 
 // ByHeight provides a mock function with given fields: height
-func (_m *Blocks) ByHeight(height uint64) (*flow.Block, error) {
+func (_m *Blocks) ByHeight(height uint64) (*flow.GenericBlock[flow.Payload], error) {
 	ret := _m.Called(height)
 
 	if len(ret) == 0 {
 		panic("no return value specified for ByHeight")
 	}
 
-	var r0 *flow.Block
+	var r0 *flow.GenericBlock[flow.Payload]
 	var r1 error
-	if rf, ok := ret.Get(0).(func(uint64) (*flow.Block, error)); ok {
+	if rf, ok := ret.Get(0).(func(uint64) (*flow.GenericBlock[flow.Payload], error)); ok {
 		return rf(height)
 	}
-	if rf, ok := ret.Get(0).(func(uint64) *flow.Block); ok {
+	if rf, ok := ret.Get(0).(func(uint64) *flow.GenericBlock[flow.Payload]); ok {
 		r0 = rf(height)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*flow.Block)
+			r0 = ret.Get(0).(*flow.GenericBlock[flow.Payload])
 		}
 	}
 
@@ -75,23 +75,23 @@ func (_m *Blocks) ByHeight(height uint64) (*flow.Block, error) {
 }
 
 // ByID provides a mock function with given fields: blockID
-func (_m *Blocks) ByID(blockID flow.Identifier) (*flow.Block, error) {
+func (_m *Blocks) ByID(blockID flow.Identifier) (*flow.GenericBlock[flow.Payload], error) {
 	ret := _m.Called(blockID)
 
 	if len(ret) == 0 {
 		panic("no return value specified for ByID")
 	}
 
-	var r0 *flow.Block
+	var r0 *flow.GenericBlock[flow.Payload]
 	var r1 error
-	if rf, ok := ret.Get(0).(func(flow.Identifier) (*flow.Block, error)); ok {
+	if rf, ok := ret.Get(0).(func(flow.Identifier) (*flow.GenericBlock[flow.Payload], error)); ok {
 		return rf(blockID)
 	}
-	if rf, ok := ret.Get(0).(func(flow.Identifier) *flow.Block); ok {
+	if rf, ok := ret.Get(0).(func(flow.Identifier) *flow.GenericBlock[flow.Payload]); ok {
 		r0 = rf(blockID)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*flow.Block)
+			r0 = ret.Get(0).(*flow.GenericBlock[flow.Payload])
 		}
 	}
 

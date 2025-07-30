@@ -5,14 +5,24 @@ import (
 	"time"
 )
 
-// Block includes both the block header metadata and the payload content.
+// HashablePayload is a temporary interface used to generalize the payload type of GenericBlock.
+// It defines the minimal interface required for a payload to participate in block hashing.
+//
+// TODO(malleability, #7164): remove this interface after renaming IDEntity's method `ID` to `Hash`,
+// and replace all usages of HashablePayload with IDEntity.
+type HashablePayload interface {
+	Hash() Identifier
+}
+
+// GenericBlock represents a generic Flow block structure parameterized by a payload type.
+// It includes both the block header metadata and the block payload.
 //
 // Zero values for certain HeaderBody fields are allowed only for root blocks, which must be constructed
 // using the NewRootBlock constructor. All non-root blocks must be constructed
 // using NewBlock to ensure validation of the block fields.
 //
 //structwrite:immutable - mutations allowed only within the constructor
-type Block struct {
+type GenericBlock[T HashablePayload] struct {
 	// HeaderBody is a container encapsulating most of the header fields - *excluding* the payload hash
 	// and the proposer signature. Generally, the type [HeaderBody] should not be used on its own.
 	// CAUTION regarding security:
@@ -22,8 +32,48 @@ type Block struct {
 	//  * With a byzantine HeaderBody alone, an honest node cannot prove who created that faulty data structure,
 	//    because HeaderBody does not include the proposer's signature.
 	HeaderBody
-	Payload Payload
+	Payload T
 }
+
+// ID returns a collision-resistant hash of the Block struct.
+func (b *GenericBlock[T]) ID() Identifier {
+	return b.ToHeader().ID()
+}
+
+// ToHeader converts the block into a compact [flow.Header] representation,
+// where the payload is compressed to a hash reference.
+// The receiver Block must be well-formed (enforced by mutation protection on the type).
+// This function may panic if invoked on a malformed Block.
+func (b *GenericBlock[T]) ToHeader() *Header {
+	if !b.ContainsParentQC() {
+		rootHeader, err := NewRootHeader(UntrustedHeader{
+			HeaderBody:  b.HeaderBody,
+			PayloadHash: b.Payload.Hash(),
+		})
+		if err != nil {
+			panic(fmt.Errorf("could not build root header from block: %w", err))
+		}
+		return rootHeader
+	}
+
+	header, err := NewHeader(UntrustedHeader{
+		HeaderBody:  b.HeaderBody,
+		PayloadHash: b.Payload.Hash(),
+	})
+	if err != nil {
+		panic(fmt.Errorf("could not build header from block: %w", err))
+	}
+	return header
+}
+
+// Block is the canonical instantiation of GenericBlock using flow.Payload as the payload type.
+//
+// Zero values for certain HeaderBody fields are allowed only for root blocks, which must be constructed
+// using the NewRootBlock constructor. All non-root blocks must be constructed
+// using NewBlock to ensure validation of the block fields.
+//
+//structwrite:immutable - mutations allowed only within the constructor
+type Block = GenericBlock[Payload]
 
 // UntrustedBlock is an untrusted input-only representation of a Block,
 // used for construction.
@@ -80,37 +130,6 @@ func NewRootBlock(untrusted UntrustedBlock) (*Block, error) {
 		HeaderBody: *rootHeaderBody,
 		Payload:    *payload,
 	}, nil
-}
-
-// ID returns a collision-resistant hash of the Block struct.
-func (b Block) ID() Identifier {
-	return b.ToHeader().ID()
-}
-
-// ToHeader converts the block into a compact [flow.Header] representation,
-// where the payload is compressed to a hash reference.
-// The receiver Block must be well-formed (enforced by mutation protection on the type).
-// This function may panic if invoked on a malformed Block.
-func (b Block) ToHeader() *Header {
-	if !b.ContainsParentQC() {
-		rootHeader, err := NewRootHeader(UntrustedHeader{
-			HeaderBody:  b.HeaderBody,
-			PayloadHash: b.Payload.Hash(),
-		})
-		if err != nil {
-			panic(fmt.Errorf("could not build root header from block: %w", err))
-		}
-		return rootHeader
-	}
-
-	header, err := NewHeader(UntrustedHeader{
-		HeaderBody:  b.HeaderBody,
-		PayloadHash: b.Payload.Hash(),
-	})
-	if err != nil {
-		panic(fmt.Errorf("could not build header from block: %w", err))
-	}
-	return header
 }
 
 // BlockStatus represents the status of a block.

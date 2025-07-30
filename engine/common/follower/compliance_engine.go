@@ -229,7 +229,7 @@ func (e *ComplianceEngine) Process(channel channels.Channel, originID flow.Ident
 	case *flow.UntrustedProposal:
 		proposal, err := flow.NewProposal(*msg)
 		if err != nil {
-			// TODO: Replace this log statement with a call to the protocol violation consumer.
+			// TODO(BFT, #7620): Replace this log statement with a call to the protocol violation consumer.
 			e.log.Warn().
 				Hex("origin_id", originID[:]).
 				Hex("block_id", logging.ID(msg.Block.ID())).

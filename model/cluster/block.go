@@ -16,10 +16,7 @@ import (
 // using NewBlock to ensure validation of the block fields.
 //
 //structwrite:immutable - mutations allowed only within the constructor
-type Block struct {
-	flow.HeaderBody
-	Payload Payload
-}
+type Block = flow.GenericBlock[Payload]
 
 // UntrustedBlock is an untrusted input-only representation of a cluster Block,
 // used for construction.
@@ -82,45 +79,66 @@ func NewRootBlock(untrusted UntrustedBlock) (*Block, error) {
 	}, nil
 }
 
-// ID returns a collision-resistant hash of the cluster.Block struct.
-func (b *Block) ID() flow.Identifier {
-	return b.ToHeader().ID()
-}
-
-// ToHeader converts the block into a compact [flow.Header] representation,
-// where the payload is compressed to a hash reference.
-// The receiver Block must be well-formed (enforced by mutation protection on the type).
-// This function may panic if invoked on a malformed Block.
-func (b *Block) ToHeader() *flow.Header {
-	if !b.ContainsParentQC() {
-		rootHeader, err := flow.NewRootHeader(flow.UntrustedHeader{
-			HeaderBody:  b.HeaderBody,
-			PayloadHash: b.Payload.Hash(),
-		})
-		if err != nil {
-			panic(fmt.Errorf("could not build root header from block: %w", err))
-		}
-		return rootHeader
-	}
-
-	header, err := flow.NewHeader(flow.UntrustedHeader{
-		HeaderBody:  b.HeaderBody,
-		PayloadHash: b.Payload.Hash(),
-	})
-	if err != nil {
-		panic(fmt.Errorf("could not build header from block: %w", err))
-	}
-	return header
-}
-
 // Proposal represents a signed proposed block in collection node cluster consensus.
+//
+//structwrite:immutable - mutations allowed only within the constructor.
 type Proposal struct {
 	Block           Block
 	ProposerSigData []byte
 }
 
+// UntrustedProposal is an untrusted input-only representation of a cluster.Proposal,
+// used for construction.
+//
+// This type exists to ensure that constructor functions are invoked explicitly
+// with named fields, which improves clarity and reduces the risk of incorrect field
+// ordering during construction.
+//
+// An instance of UntrustedProposal should be validated and converted into
+// a trusted cluster Proposal using the NewProposal constructor (or NewRootProposal
+// for the root proposal).
+type UntrustedProposal Proposal
+
+// NewProposal creates a new cluster Proposal.
+// This constructor enforces validation rules to ensure the Proposal is well-formed.
+//
+// All errors indicate that a valid cluster.Proposal cannot be constructed from the input.
+func NewProposal(untrusted UntrustedProposal) (*Proposal, error) {
+	block, err := NewBlock(UntrustedBlock(untrusted.Block))
+	if err != nil {
+		return nil, fmt.Errorf("invalid block: %w", err)
+	}
+	if len(untrusted.ProposerSigData) == 0 {
+		return nil, fmt.Errorf("proposer signature must not be empty")
+	}
+
+	return &Proposal{
+		Block:           *block,
+		ProposerSigData: untrusted.ProposerSigData,
+	}, nil
+}
+
+// NewRootProposal creates a root cluster proposal.
+// This constructor must be used **only** for constructing the root proposal,
+// which is the only case where zero values are allowed.
+func NewRootProposal(untrusted UntrustedProposal) (*Proposal, error) {
+	block, err := NewRootBlock(UntrustedBlock(untrusted.Block))
+	if err != nil {
+		return nil, fmt.Errorf("invalid root block: %w", err)
+	}
+	if len(untrusted.ProposerSigData) > 0 {
+		return nil, fmt.Errorf("proposer signature must be empty")
+	}
+
+	return &Proposal{
+		Block:           *block,
+		ProposerSigData: untrusted.ProposerSigData,
+	}, nil
+
+}
+
 // ProposalHeader converts the proposal into a compact [ProposalHeader] representation,
 // where the payload is compressed to a hash reference.
-func (b *Proposal) ProposalHeader() *flow.ProposalHeader {
-	return &flow.ProposalHeader{Header: b.Block.ToHeader(), ProposerSigData: b.ProposerSigData}
+func (p *Proposal) ProposalHeader() *flow.ProposalHeader {
+	return &flow.ProposalHeader{Header: p.Block.ToHeader(), ProposerSigData: p.ProposerSigData}
 }
