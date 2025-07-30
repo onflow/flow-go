@@ -401,6 +401,14 @@ func (c *Client) GetAccount(accountAddress sdk.Address) (*sdk.Account, error) {
 	return account, nil
 }
 
+func (c *Client) GetAccountAtBlockHeight(ctx context.Context, accountAddress sdk.Address, blockHeight uint64) (*sdk.Account, error) {
+	account, err := c.client.GetAccountAtBlockHeight(ctx, accountAddress, blockHeight)
+	if err != nil {
+		return nil, fmt.Errorf("could not get account at block height: %w", err)
+	}
+	return account, nil
+}
+
 func (c *Client) CreateAccount(
 	ctx context.Context,
 	accountKey *sdk.AccountKey,
@@ -451,7 +459,7 @@ func (c *Client) GetEventsForBlockIDs(
 }
 
 func getAccount(ctx context.Context, client *client.Client, address sdk.Address) (*sdk.Account, error) {
-	header, err := client.GetLatestBlockHeader(ctx, false) // todo change back to true
+	header, err := client.GetLatestBlockHeader(ctx, false) // todo change back to true when sealing is done
 	if err != nil {
 		return nil, fmt.Errorf("could not get latest block header: %w", err)
 	}
