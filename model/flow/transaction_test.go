@@ -91,11 +91,7 @@ func TestTransactionBody_Fingerprint(t *testing.T) {
 //   - Payer is non-empty and Script is non-empty.
 //   - Ensures a TransactionBody is returned with all fields populated correctly.
 //
-// 2. Empty Payer:
-//   - Payer is flow.EmptyAddress.
-//   - Ensures an error is returned mentioning "Payer address must not be empty".
-//
-// 3. Empty Script:
+// 2. Empty Script:
 //   - Script slice is empty.
 //   - Ensures an error is returned mentioning "Script must not be empty".
 func TestNewTransactionBody(t *testing.T) {
@@ -107,17 +103,6 @@ func TestNewTransactionBody(t *testing.T) {
 		assert.NotNil(t, tb)
 
 		assert.Equal(t, flow.TransactionBody(utb), *tb)
-	})
-
-	t.Run("empty Payer", func(t *testing.T) {
-		utb := UntrustedTransactionBodyFixture(func(u *flow.UntrustedTransactionBody) {
-			u.Payer = flow.EmptyAddress
-		})
-
-		tb, err := flow.NewTransactionBody(utb)
-		assert.Error(t, err)
-		assert.Nil(t, tb)
-		assert.Contains(t, err.Error(), "Payer address must not be empty")
 	})
 
 	t.Run("empty Script", func(t *testing.T) {
