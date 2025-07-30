@@ -36,13 +36,10 @@ func (s *ScheduledCallbacksSuite) TestScheduleCallback_DeployAndGetStatus() {
 	chainID := s.net.Root().Header.ChainID
 	chain := chainID.Chain()
 
-	result := s.getCallbackStatus(chain.ServiceAddress(), 0)
+	result, ok := s.getCallbackStatus(chain.ServiceAddress(), 0)
 	s.T().Logf("result: %v", result)
-
-	// Verify the result is nil (cadence.Optional with nil value)
-	optionalResult, ok := result.(cadence.Optional)
-	require.True(s.T(), ok, "result should be a cadence.Optional")
-	require.Nil(s.T(), optionalResult.Value, "getStatus(0) should return nil for non-existent callback")
+	require.False(s.T(), ok)
+	require.Nil(s.T(), result, "getStatus(0) should return nil for non-existent callback")
 
 	// Wait for a block to be executed to ensure everything is processed
 	blockB := s.BlockState.WaitForHighestFinalizedProgress(s.T(), blockA.Header.Height)
@@ -67,19 +64,20 @@ func (s *ScheduledCallbacksSuite) TestScheduleCallback_ScheduledAndExecuted() {
 	// Wait for next height finalized before scheduling callback
 	s.BlockState.WaitForHighestFinalizedProgress(s.T(), s.BlockState.HighestFinalizedHeight())
 
-	// Schedule a callback for 70 seconds in the future
-	scheduleDelta := int64(70)
+	// Schedule a callback for 90 seconds in the future
+	scheduleDelta := int64(90)
 	futureTimestamp := time.Now().Unix() + scheduleDelta
 	s.T().Logf("scheduling callback at timestamp: %v, current timestamp: %v", futureTimestamp, time.Now().Unix())
 	callbackID := s.scheduleCallback(sc, futureTimestamp)
 	s.T().Logf("scheduled callback with ID: %d", callbackID)
 
+	const scheduledStatus = 0
+	const executedStatus = 2
+
 	// Check the status of the callback right after scheduling
-	status := s.getCallbackStatus(serviceAddress, callbackID)
-	require.NotNil(s.T(), status, "callback status should not be nil after scheduling")
-	scheduledStatus, ok := status.(cadence.UInt8)
-	require.True(s.T(), ok, "status incorrect type")
-	require.Equal(s.T(), uint8(0), scheduledStatus, "status should be equal to scheduled")
+	status, ok := s.getCallbackStatus(serviceAddress, callbackID)
+	require.True(s.T(), ok, "callback status should not be nil after scheduling")
+	require.Equal(s.T(), scheduledStatus, status, "status should be equal to scheduled")
 	s.T().Logf("callback status after scheduling: %v", status)
 
 	// Verify the callback is scheduled (not executed yet)
@@ -96,10 +94,9 @@ func (s *ScheduledCallbacksSuite) TestScheduleCallback_ScheduledAndExecuted() {
 	s.T().Logf("got block result ID %v after waiting", erBlock.ExecutionResult.BlockID)
 
 	// Check the status again - it should still exist but be marked as executed
-	statusAfter := s.getCallbackStatus(serviceAddress, callbackID)
-	if statusAfter != nil {
-		s.T().Logf("callback status after execution time: %v", statusAfter)
-	}
+	statusAfter, ok := s.getCallbackStatus(serviceAddress, callbackID)
+	require.True(s.T(), ok, "callback status should not be nil after scheduling")
+	require.Equal(s.T(), executedStatus, statusAfter, "status should be equal to executed")
 
 	// Verify the callback was executed by checking our test contract
 	executedCallbacksAfter := s.getExecutedCallbacks(serviceAddress)
@@ -114,7 +111,7 @@ func (s *ScheduledCallbacksSuite) deployTestContract(serviceAddress flow.Address
 	require.NoError(s.T(), err, "could not deploy test contract")
 	s.T().Logf("deployed test contract, tx ID: %v", tx.ID())
 
-	_, err = s.AccessClient().WaitForSealed(context.Background(), tx.ID())
+	_, err = s.AccessClient().WaitForExecuted(context.Background(), tx.ID())
 	require.NoError(s.T(), err, "could not wait for deploy transaction to be sealed")
 }
 
@@ -190,10 +187,6 @@ func (s *ScheduledCallbacksSuite) scheduleCallback(sc *systemcontracts.SystemCon
 	require.NoError(s.T(), err, "could not wait for schedule transaction to be executed")
 	require.NoError(s.T(), executedResult.Error, "schedule transaction should not have error")
 
-	for _, event := range executedResult.Events {
-		s.T().Logf("schedule transaction event type: %s, val: %s", event.Type, event.String())
-	}
-
 	// Extract callback ID from events
 	callbackID := s.extractCallbackIDFromEvents(executedResult)
 	require.NotEqual(s.T(), callbackID, uint64(0), "callback ID should not be 0")
@@ -201,7 +194,7 @@ func (s *ScheduledCallbacksSuite) scheduleCallback(sc *systemcontracts.SystemCon
 	return callbackID
 }
 
-func (s *ScheduledCallbacksSuite) getCallbackStatus(serviceAddress flow.Address, callbackID uint64) cadence.Value {
+func (s *ScheduledCallbacksSuite) getCallbackStatus(serviceAddress flow.Address, callbackID uint64) (int, bool) {
 	getStatusScript := dsl.Main{
 		Import: dsl.Import{
 			Address: sdk.Address(serviceAddress),
@@ -211,9 +204,27 @@ func (s *ScheduledCallbacksSuite) getCallbackStatus(serviceAddress flow.Address,
 		Code:       fmt.Sprintf("return FlowCallbackScheduler.getStatus(id: %d)", callbackID),
 	}
 
-	result, err := s.AccessClient().ExecuteScript(context.Background(), getStatusScript)
+	latest, err := s.AccessClient().GetLatestFinalizedBlockHeader(context.Background())
+	require.NoError(s.T(), err, "could not get latest finalized block header")
+
+	result, err := s.AccessClient().ExecuteScriptAtBlock(context.Background(), getStatusScript, latest.ID)
 	require.NoError(s.T(), err, "could not execute getStatus script")
-	return result
+
+	optionalResult, ok := result.(cadence.Optional)
+	require.True(s.T(), ok, "result should be a cadence.Optional")
+
+	if optionalResult.Value == nil {
+		return 0, false
+	}
+
+	enumValue, ok := optionalResult.Value.(cadence.Enum)
+	require.True(s.T(), ok, "status should be a cadence.Enum")
+
+	raw := enumValue.FieldsMappedByName()["rawValue"]
+	val, ok := raw.(cadence.UInt8)
+	require.True(s.T(), ok, "status should be a cadence.UInt8")
+
+	return int(val), true
 }
 
 func (s *ScheduledCallbacksSuite) getExecutedCallbacks(serviceAddress flow.Address) []uint64 {
