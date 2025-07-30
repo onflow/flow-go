@@ -22,13 +22,14 @@ type Suite struct {
 	suite.Suite
 	log zerolog.Logger
 	lib.TestnetStateTracker
-	cancel      context.CancelFunc
-	net         *testnet.FlowNetwork
-	nodeConfigs []testnet.NodeConfig
-	nodeIDs     []flow.Identifier
-	ghostID     flow.Identifier
-	exe1ID      flow.Identifier
-	verID       flow.Identifier
+	cancel       context.CancelFunc
+	net          *testnet.FlowNetwork
+	nodeConfigs  []testnet.NodeConfig
+	nodeIDs      []flow.Identifier
+	ghostID      flow.Identifier
+	exe1ID       flow.Identifier
+	verID        flow.Identifier
+	accessClient *testnet.Client
 }
 
 func (s *Suite) Ghost() *client.GhostClient {
@@ -38,9 +39,13 @@ func (s *Suite) Ghost() *client.GhostClient {
 }
 
 func (s *Suite) AccessClient() *testnet.Client {
-	client, err := s.net.ContainerByName(testnet.PrimaryAN).TestnetClient()
-	require.NoError(s.T(), err, "could not get access client")
-	return client
+	if s.accessClient == nil { // cache access client
+		client, err := s.net.ContainerByName(testnet.PrimaryAN).TestnetClient()
+		require.NoError(s.T(), err, "could not get access client")
+		s.accessClient = client
+	}
+
+	return s.accessClient
 }
 
 type AdminCommandRequest struct {
