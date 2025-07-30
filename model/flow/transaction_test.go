@@ -132,68 +132,6 @@ func TestNewTransactionBody(t *testing.T) {
 	})
 }
 
-// TestNewSystemChunkTransactionBody verifies the behavior of the NewSystemChunkTransactionBody constructor.
-// Test Cases:
-//
-// 1. Valid input:
-//   - Script non-empty, GasLimit > 0, and Authorizers non-empty.
-//   - Ensures a TransactionBody is returned with all fields populated correctly.
-//
-// 2. Empty Script:
-//   - Script slice is empty.
-//   - Ensures an error is returned mentioning "Script must not be empty in system chunk transaction".
-//
-// 3. Zero GasLimit:
-//   - GasLimit == 0.
-//   - Ensures an error is returned mentioning "Compute limit must not be empty in system chunk transaction".
-//
-// 4. Empty Authorizers:
-//   - Authorizers slice is nil or empty.
-//   - Ensures an error is returned mentioning "Authorizers must not be empty in system chunk transaction".
-func TestNewSystemChunkTransactionBody(t *testing.T) {
-	t.Run("valid input", func(t *testing.T) {
-		utb := UntrustedTransactionBodyFixture()
-
-		tb, err := flow.NewSystemChunkTransactionBody(utb)
-		assert.NoError(t, err)
-		assert.NotNil(t, tb)
-		assert.Equal(t, flow.TransactionBody(utb), *tb)
-	})
-
-	t.Run("empty Script", func(t *testing.T) {
-		utb := UntrustedTransactionBodyFixture(func(u *flow.UntrustedTransactionBody) {
-			u.Script = []byte{}
-		})
-
-		tb, err := flow.NewSystemChunkTransactionBody(utb)
-		assert.Error(t, err)
-		assert.Nil(t, tb)
-		assert.Contains(t, err.Error(), "Script must not be empty in system chunk transaction")
-	})
-
-	t.Run("zero GasLimit", func(t *testing.T) {
-		utb := UntrustedTransactionBodyFixture(func(u *flow.UntrustedTransactionBody) {
-			u.GasLimit = 0
-		})
-
-		tb, err := flow.NewSystemChunkTransactionBody(utb)
-		assert.Error(t, err)
-		assert.Nil(t, tb)
-		assert.Contains(t, err.Error(), "Compute limit must not be empty in system chunk transaction")
-	})
-
-	t.Run("empty Authorizers", func(t *testing.T) {
-		utb := UntrustedTransactionBodyFixture(func(u *flow.UntrustedTransactionBody) {
-			u.Authorizers = []flow.Address{}
-		})
-
-		tb, err := flow.NewSystemChunkTransactionBody(utb)
-		assert.Error(t, err)
-		assert.Nil(t, tb)
-		assert.Contains(t, err.Error(), "Authorizers must not be empty in system chunk transaction")
-	})
-}
-
 // UntrustedTransactionBodyFixture returns an UntrustedTransactionBody
 // pre‐populated with sane defaults. Any opts override those defaults.
 func UntrustedTransactionBodyFixture(opts ...func(*flow.UntrustedTransactionBody)) flow.UntrustedTransactionBody {

@@ -31,14 +31,6 @@ func (tb *TransactionBodyBuilder) Build() (*TransactionBody, error) {
 	return NewTransactionBody(tb.u)
 }
 
-// BuildSystemTx validates and returns an immutable system chunk TransactionBody. All required fields must be explicitly set (even if they are zero).
-// All errors indicate that a valid system chunk TransactionBody cannot be created from the current builder state.
-func (tb *TransactionBodyBuilder) BuildSystemTx() (*TransactionBody, error) {
-	slices.SortFunc(tb.u.PayloadSignatures, compareSignatures)
-	slices.SortFunc(tb.u.EnvelopeSignatures, compareSignatures)
-	return NewSystemChunkTransactionBody(tb.u)
-}
-
 // SetReferenceBlockID sets the reference block ID for this transaction.
 func (tb *TransactionBodyBuilder) SetReferenceBlockID(blockID Identifier) *TransactionBodyBuilder {
 	tb.u.ReferenceBlockID = blockID

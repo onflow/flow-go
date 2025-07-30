@@ -66,42 +66,9 @@ type UntrustedTransactionBody TransactionBody
 //
 // All errors indicate a valid TransactionBody cannot be constructed from the input.
 func NewTransactionBody(untrusted UntrustedTransactionBody) (*TransactionBody, error) {
-	if untrusted.Payer == EmptyAddress {
-		return nil, fmt.Errorf("Payer address must not be empty")
-	}
 
 	if len(untrusted.Script) == 0 {
 		return nil, fmt.Errorf("Script must not be empty")
-	}
-
-	return &TransactionBody{
-		ReferenceBlockID:   untrusted.ReferenceBlockID,
-		Script:             untrusted.Script,
-		Arguments:          untrusted.Arguments,
-		GasLimit:           untrusted.GasLimit,
-		ProposalKey:        untrusted.ProposalKey,
-		Payer:              untrusted.Payer,
-		Authorizers:        untrusted.Authorizers,
-		PayloadSignatures:  untrusted.PayloadSignatures,
-		EnvelopeSignatures: untrusted.EnvelopeSignatures,
-	}, nil
-}
-
-// NewSystemChunkTransactionBody creates a new instance of TransactionBody corresponding to the system chunk.
-// Construction of TransactionBody is allowed only within the constructor.
-//
-// All errors indicate a valid TransactionBody cannot be constructed from the input.
-func NewSystemChunkTransactionBody(untrusted UntrustedTransactionBody) (*TransactionBody, error) {
-	if len(untrusted.Script) == 0 {
-		return nil, fmt.Errorf("Script must not be empty in system chunk transaction")
-	}
-
-	if untrusted.GasLimit == 0 {
-		return nil, fmt.Errorf("Compute limit must not be empty in system chunk transaction")
-	}
-
-	if len(untrusted.Authorizers) == 0 {
-		return nil, fmt.Errorf("Authorizers must not be empty in system chunk transaction")
 	}
 
 	return &TransactionBody{

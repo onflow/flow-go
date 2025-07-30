@@ -276,10 +276,8 @@ func messageToTrustedTransaction(
 	tb := flow.NewTransactionBodyBuilder()
 
 	proposalKey := m.GetProposalKey()
-	var proposalAddress flow.Address
-	var err error
 	if proposalKey != nil {
-		proposalAddress, err = insecureAddress(proposalKey.GetAddress())
+		proposalAddress, err := insecureAddress(proposalKey.GetAddress())
 		if err != nil {
 			return t, fmt.Errorf("could not convert proposer address: %w", err)
 		}
@@ -287,9 +285,8 @@ func messageToTrustedTransaction(
 	}
 
 	payer := m.GetPayer()
-	var payerAddress flow.Address
 	if payer != nil {
-		payerAddress, err = insecureAddress(payer)
+		payerAddress, err := insecureAddress(payer)
 		if err != nil {
 			return t, fmt.Errorf("could not convert payer address: %w", err)
 		}
@@ -320,22 +317,11 @@ func messageToTrustedTransaction(
 		tb.AddEnvelopeSignature(addr, sig.GetKeyId(), sig.GetSignature())
 	}
 
-	tb.SetScript(m.GetScript()).
+	transactionBody, err := tb.SetScript(m.GetScript()).
 		SetArguments(m.GetArguments()).
 		SetReferenceBlockID(flow.HashToID(m.GetReferenceBlockId())).
-		SetComputeLimit(m.GetGasLimit())
-
-	//proposal key and payer are empty addresses for service tx
-	if proposalAddress == flow.EmptyAddress && payerAddress == flow.EmptyAddress {
-		systemTransactionBody, err := tb.BuildSystemTx()
-		if err != nil {
-			return t, fmt.Errorf("could not build system transaction body: %w", err)
-		}
-
-		return *systemTransactionBody, nil
-	}
-
-	transactionBody, err := tb.Build()
+		SetComputeLimit(m.GetGasLimit()).
+		Build()
 	if err != nil {
 		return t, fmt.Errorf("could not build transaction body: %w", err)
 	}

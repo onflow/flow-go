@@ -44,7 +44,7 @@ func SystemChunkTransaction(chain flow.Chain) (*flow.TransactionBody, error) {
 		SetScript([]byte(prepareSystemContractCode(chain.ChainID()))).
 		SetComputeLimit(SystemChunkTransactionGasLimit).
 		AddAuthorizer(chain.ServiceAddress()).
-		BuildSystemTx()
+		Build()
 	if err != nil {
 		return nil, fmt.Errorf("could not build system chunk transaction: %w", err)
 	}
