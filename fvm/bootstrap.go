@@ -454,10 +454,8 @@ func (b *bootstrapExecutor) Execute() error {
 	// deploy staking collection contract to the service account
 	b.deployStakingCollection(service, &env)
 
-	if b.ctx.ScheduleCallbacksEnabled {
-		// deploy flow callback scheduler contract to the service account
-		b.deployFlowCallbackScheduler(service, &env)
-	}
+	// deploy flow callback scheduler contract to the service account
+	b.deployFlowCallbackScheduler(service, &env)
 
 	// sets up the EVM environment
 	b.setupEVM(service, nonFungibleToken, fungibleToken, flowToken, &env)
@@ -818,6 +816,7 @@ func (b *bootstrapExecutor) deployFlowCallbackScheduler(deployTo flow.Address, e
 		Transaction(blueprints.DeployContractTransaction(deployTo, contract, "FlowCallbackScheduler"), 0),
 	)
 
+	env.FlowCallbackSchedulerAddress = deployTo.String()
 	panicOnMetaInvokeErrf("failed to deploy FlowCallbackScheduler contract: %s", txError, err)
 }
 
