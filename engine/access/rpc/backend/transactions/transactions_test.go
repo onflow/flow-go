@@ -28,7 +28,7 @@ import (
 	"github.com/onflow/flow-go/engine/access/rpc/backend/transactions/error_message_provider"
 	"github.com/onflow/flow-go/engine/access/rpc/backend/transactions/provider"
 	"github.com/onflow/flow-go/engine/access/rpc/backend/transactions/retrier"
-	"github.com/onflow/flow-go/engine/access/rpc/backend/transactions/status_deriver"
+	txstatus "github.com/onflow/flow-go/engine/access/rpc/backend/transactions/status"
 	connectionmock "github.com/onflow/flow-go/engine/access/rpc/connection/mock"
 	commonrpc "github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
@@ -168,7 +168,7 @@ func (suite *Suite) defaultTransactionsParams() Params {
 		suite.fixedExecutionNodeIDs,
 	)
 
-	txStatusDeriver := status_deriver.NewTxStatusDeriver(
+	txStatusDeriver := txstatus.NewTxStatusDeriver(
 		suite.state,
 		suite.lastFullBlockHeight,
 	)

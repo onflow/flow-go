@@ -771,7 +771,7 @@ func (suite *Suite) TestLookupByBlockID_FromStorage_HappyPath() {
 	}
 }
 
-func (suite *Suite) TestLookupByBlockID_ExecutionNodeError_UnknownTx() {
+func (suite *Suite) TestLookupByBlockID_ExecutionNodeError_UnknownBlock() {
 	suite.state.On("Final").Return(suite.snapshot, nil).Once()
 	suite.snapshot.On("Identities", mock.Anything).Return(suite.fixedExecutionNodes, nil).Once()
 	suite.reporter.On("LowestIndexedHeight").Return(suite.block.Header.Height, nil).Once()

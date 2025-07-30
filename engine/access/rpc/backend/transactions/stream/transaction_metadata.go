@@ -9,7 +9,7 @@ import (
 	"google.golang.org/grpc/status"
 
 	txprovider "github.com/onflow/flow-go/engine/access/rpc/backend/transactions/provider"
-	"github.com/onflow/flow-go/engine/access/rpc/backend/transactions/status_deriver"
+	txstatus "github.com/onflow/flow-go/engine/access/rpc/backend/transactions/status"
 	"github.com/onflow/flow-go/engine/access/subscription"
 	"github.com/onflow/flow-go/engine/common/rpc"
 	accessmodel "github.com/onflow/flow-go/model/access"
@@ -37,7 +37,7 @@ type TransactionMetadata struct {
 	eventEncodingVersion entities.EventEncodingVersion
 
 	txProvider      *txprovider.FailoverTransactionProvider
-	txStatusDeriver *status_deriver.TxStatusDeriver
+	txStatusDeriver *txstatus.TxStatusDeriver
 }
 
 // NewTransactionMetadata initializes a new metadata object for a transaction subscription.
@@ -62,7 +62,7 @@ func NewTransactionMetadata(
 	txReferenceBlockID flow.Identifier,
 	eventEncodingVersion entities.EventEncodingVersion,
 	txProvider *txprovider.FailoverTransactionProvider,
-	txStatusDeriver *status_deriver.TxStatusDeriver,
+	txStatusDeriver *txstatus.TxStatusDeriver,
 ) *TransactionMetadata {
 	return &TransactionMetadata{
 		txResult:             &accessmodel.TransactionResult{TransactionID: txID},

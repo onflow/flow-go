@@ -12,7 +12,7 @@ import (
 
 	"github.com/onflow/flow-go/engine/access/rpc/backend/common"
 	"github.com/onflow/flow-go/engine/access/rpc/backend/node_communicator"
-	"github.com/onflow/flow-go/engine/access/rpc/backend/transactions/status_deriver"
+	txstatus "github.com/onflow/flow-go/engine/access/rpc/backend/transactions/status"
 	"github.com/onflow/flow-go/engine/access/rpc/connection"
 	"github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
@@ -34,7 +34,7 @@ type ENTransactionProvider struct {
 	nodeCommunicator node_communicator.Communicator
 	nodeProvider     *rpc.ExecutionNodeIdentitiesProvider
 
-	txStatusDeriver *status_deriver.TxStatusDeriver
+	txStatusDeriver *txstatus.TxStatusDeriver
 
 	systemTxID flow.Identifier
 	systemTx   *flow.TransactionBody
@@ -49,7 +49,7 @@ func NewENTransactionProvider(
 	connFactory connection.ConnectionFactory,
 	nodeCommunicator node_communicator.Communicator,
 	execNodeIdentitiesProvider *rpc.ExecutionNodeIdentitiesProvider,
-	txStatusDeriver *status_deriver.TxStatusDeriver,
+	txStatusDeriver *txstatus.TxStatusDeriver,
 	systemTxID flow.Identifier,
 	systemTx *flow.TransactionBody,
 ) *ENTransactionProvider {

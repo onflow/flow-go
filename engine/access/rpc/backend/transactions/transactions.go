@@ -20,7 +20,7 @@ import (
 	"github.com/onflow/flow-go/engine/access/rpc/backend/transactions/error_message_provider"
 	"github.com/onflow/flow-go/engine/access/rpc/backend/transactions/provider"
 	"github.com/onflow/flow-go/engine/access/rpc/backend/transactions/retrier"
-	"github.com/onflow/flow-go/engine/access/rpc/backend/transactions/status_deriver"
+	txstatus "github.com/onflow/flow-go/engine/access/rpc/backend/transactions/status"
 	"github.com/onflow/flow-go/engine/access/rpc/connection"
 	"github.com/onflow/flow-go/engine/common/rpc"
 	commonrpc "github.com/onflow/flow-go/engine/common/rpc"
@@ -63,7 +63,7 @@ type Transactions struct {
 
 	txValidator     *validator.TransactionValidator
 	txProvider      provider.TransactionProvider
-	txStatusDeriver *status_deriver.TxStatusDeriver
+	txStatusDeriver *txstatus.TxStatusDeriver
 }
 
 var _ access.TransactionsAPI = (*Transactions)(nil)
@@ -88,7 +88,7 @@ type Params struct {
 	TxResultCache               *lru.Cache[flow.Identifier, *accessmodel.TransactionResult]
 	TxProvider                  provider.TransactionProvider
 	TxValidator                 *validator.TransactionValidator
-	TxStatusDeriver             *status_deriver.TxStatusDeriver
+	TxStatusDeriver             *txstatus.TxStatusDeriver
 	EventsIndex                 *index.EventsIndex
 	TxResultsIndex              *index.TransactionResultsIndex
 }

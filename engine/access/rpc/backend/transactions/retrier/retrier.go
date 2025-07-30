@@ -8,7 +8,7 @@ import (
 
 	"github.com/rs/zerolog"
 
-	"github.com/onflow/flow-go/engine/access/rpc/backend/transactions/status_deriver"
+	"github.com/onflow/flow-go/engine/access/rpc/backend/transactions/status"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/state"
 	"github.com/onflow/flow-go/storage"
@@ -40,7 +40,7 @@ type RetrierImpl struct {
 	collections storage.Collections
 
 	txSender        TransactionSender
-	txStatusDeriver *status_deriver.TxStatusDeriver
+	txStatusDeriver *status.TxStatusDeriver
 }
 
 func NewRetrier(
@@ -48,7 +48,7 @@ func NewRetrier(
 	blocks storage.Blocks,
 	collections storage.Collections,
 	txSender TransactionSender,
-	txStatusDeriver *status_deriver.TxStatusDeriver,
+	txStatusDeriver *status.TxStatusDeriver,
 ) *RetrierImpl {
 	return &RetrierImpl{
 		log:                 log,

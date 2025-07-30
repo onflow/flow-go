@@ -12,7 +12,7 @@ import (
 
 	"github.com/onflow/flow-go/engine/access/index"
 	"github.com/onflow/flow-go/engine/access/rpc/backend/transactions/error_message_provider"
-	"github.com/onflow/flow-go/engine/access/rpc/backend/transactions/status_deriver"
+	txstatus "github.com/onflow/flow-go/engine/access/rpc/backend/transactions/status"
 	"github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	accessmodel "github.com/onflow/flow-go/model/access"
@@ -35,7 +35,7 @@ type LocalTransactionProvider struct {
 	txResultsIndex  *index.TransactionResultsIndex
 	txErrorMessages error_message_provider.TxErrorMessageProvider
 	systemTxID      flow.Identifier
-	txStatusDeriver *status_deriver.TxStatusDeriver
+	txStatusDeriver *txstatus.TxStatusDeriver
 }
 
 var _ TransactionProvider = (*LocalTransactionProvider)(nil)
@@ -48,7 +48,7 @@ func NewLocalTransactionProvider(
 	txResultsIndex *index.TransactionResultsIndex,
 	txErrorMessages error_message_provider.TxErrorMessageProvider,
 	systemTxID flow.Identifier,
-	txStatusDeriver *status_deriver.TxStatusDeriver,
+	txStatusDeriver *txstatus.TxStatusDeriver,
 ) *LocalTransactionProvider {
 	return &LocalTransactionProvider{
 		state:           state,

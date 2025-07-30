@@ -23,7 +23,7 @@ import (
 	"github.com/onflow/flow-go/engine/access/rpc/backend/transactions"
 	"github.com/onflow/flow-go/engine/access/rpc/backend/transactions/error_message_provider"
 	"github.com/onflow/flow-go/engine/access/rpc/backend/transactions/provider"
-	"github.com/onflow/flow-go/engine/access/rpc/backend/transactions/status_deriver"
+	"github.com/onflow/flow-go/engine/access/rpc/backend/transactions/status"
 	txstream "github.com/onflow/flow-go/engine/access/rpc/backend/transactions/stream"
 	"github.com/onflow/flow-go/engine/access/rpc/connection"
 	"github.com/onflow/flow-go/engine/access/subscription"
@@ -211,7 +211,7 @@ func New(params Params) (*Backend, error) {
 		return nil, fmt.Errorf("could not create transaction validator: %w", err)
 	}
 
-	txStatusDeriver := status_deriver.NewTxStatusDeriver(params.State, params.LastFullBlockHeight)
+	txStatusDeriver := status.NewTxStatusDeriver(params.State, params.LastFullBlockHeight)
 
 	localTxProvider := provider.NewLocalTransactionProvider(
 		params.State,

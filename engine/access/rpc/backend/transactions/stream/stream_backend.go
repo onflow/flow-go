@@ -14,7 +14,7 @@ import (
 
 	"github.com/onflow/flow-go/access"
 	txprovider "github.com/onflow/flow-go/engine/access/rpc/backend/transactions/provider"
-	"github.com/onflow/flow-go/engine/access/rpc/backend/transactions/status_deriver"
+	txstatus "github.com/onflow/flow-go/engine/access/rpc/backend/transactions/status"
 	"github.com/onflow/flow-go/engine/access/subscription"
 	"github.com/onflow/flow-go/engine/access/subscription/tracker"
 	accessmodel "github.com/onflow/flow-go/model/access"
@@ -46,7 +46,7 @@ type TransactionStream struct {
 	transactions storage.Transactions
 
 	txProvider      *txprovider.FailoverTransactionProvider
-	txStatusDeriver *status_deriver.TxStatusDeriver
+	txStatusDeriver *txstatus.TxStatusDeriver
 }
 
 var _ access.TransactionStreamAPI = (*TransactionStream)(nil)
@@ -61,7 +61,7 @@ func NewTransactionStreamBackend(
 	collections storage.Collections,
 	transactions storage.Transactions,
 	txProvider *txprovider.FailoverTransactionProvider,
-	txStatusDeriver *status_deriver.TxStatusDeriver,
+	txStatusDeriver *txstatus.TxStatusDeriver,
 ) *TransactionStream {
 	return &TransactionStream{
 		log:                 log,

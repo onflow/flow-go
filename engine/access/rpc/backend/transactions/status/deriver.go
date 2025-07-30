@@ -1,4 +1,4 @@
-package status_deriver
+package status
 
 import (
 	"github.com/onflow/flow-go/model/flow"
