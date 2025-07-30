@@ -30,7 +30,7 @@ type UnsignedBlock = flow.GenericBlock[Payload]
 // for the root block).
 type UntrustedUnsignedBlock UnsignedBlock
 
-// NewUnsignedBlock creates a new block in collection node cluster consensus.
+// NewUnsignedBlock creates a new unsigned block in collection node cluster consensus.
 // This constructor enforces validation rules to ensure the block is well-formed.
 // It must be used to construct all non-root blocks.
 //
@@ -54,9 +54,9 @@ func NewUnsignedBlock(untrusted UntrustedUnsignedBlock) (*UnsignedBlock, error) 
 	}, nil
 }
 
-// NewRootUnsignedBlock creates a root block in collection node cluster consensus.
+// NewRootUnsignedBlock creates an unsigned root block in collection node cluster consensus.
 //
-// This constructor must be used **only** for constructing the root block,
+// This constructor must be used **only** for constructing the root unsigned block,
 // which is the only case where zero values are allowed.
 func NewRootUnsignedBlock(untrusted UntrustedUnsignedBlock) (*UnsignedBlock, error) {
 	rootHeaderBody, err := flow.NewRootHeaderBody(flow.UntrustedHeaderBody(untrusted.HeaderBody))

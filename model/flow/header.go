@@ -218,9 +218,9 @@ func NewUnsignedHeader(untrusted UntrustedUnsignedHeader) (*UnsignedHeader, erro
 	}, nil
 }
 
-// NewRootUnsignedHeader creates a root header.
+// NewRootUnsignedHeader creates an unsigned root header.
 //
-// This constructor must be used **only** for constructing the root header,
+// This constructor must be used **only** for constructing the root unsigned header,
 // which is the only case where zero values are allowed.
 func NewRootUnsignedHeader(untrusted UntrustedUnsignedHeader) (*UnsignedHeader, error) {
 	rootHeaderBody, err := NewRootHeaderBody(UntrustedHeaderBody(untrusted.HeaderBody))

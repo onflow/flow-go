@@ -87,7 +87,7 @@ type UnsignedBlock = GenericBlock[Payload]
 // for the root block).
 type UntrustedUnsignedBlock UnsignedBlock
 
-// NewUnsignedBlock creates a new block.
+// NewUnsignedBlock creates a new unsigned block.
 // This constructor enforces validation rules to ensure the block is well-formed.
 // It must be used to construct all non-root blocks.
 //
@@ -111,7 +111,7 @@ func NewUnsignedBlock(untrusted UntrustedUnsignedBlock) (*UnsignedBlock, error) 
 	}, nil
 }
 
-// NewRootUnsignedBlock creates a root block.
+// NewRootUnsignedBlock creates an unsigned root block.
 // This constructor must be used **only** for constructing the root block,
 // which is the only case where zero values are allowed.
 func NewRootUnsignedBlock(untrusted UntrustedUnsignedBlock) (*UnsignedBlock, error) {
