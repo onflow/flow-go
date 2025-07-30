@@ -54,18 +54,26 @@ var (
 )
 
 // TestFlowCallbackHandlerContract creates a test contract DSL for testing FlowCallbackScheduler
-func TestFlowCallbackHandlerContract(serviceAddress sdk.Address) dsl.Contract {
+func TestFlowCallbackHandlerContract(callbackScheduler sdk.Address, flowToken sdk.Address, fungibleToken sdk.Address) dsl.Contract {
 	return dsl.Contract{
 		Name: "TestFlowCallbackHandler",
 		Imports: []dsl.Import{
 			{
 				Names:   []string{"FlowCallbackScheduler"},
-				Address: serviceAddress,
+				Address: callbackScheduler,
+			},
+			{
+				Names:   []string{"FlowToken"},
+				Address: flowToken,
+			},
+			{
+				Names:   []string{"FungibleToken"},
+				Address: fungibleToken,
 			},
 		},
 		Members: []dsl.CadenceCode{
 			dsl.Code(`
-				access(all) var scheduledCallbacks: [FlowCallbackScheduler.ScheduledCallback]
+				access(all) var scheduledCallbacks: {UInt64: FlowCallbackScheduler.ScheduledCallback}
 				access(all) var executedCallbacks: [UInt64]
 
 				access(all) let HandlerStoragePath: StoragePath
@@ -84,15 +92,22 @@ func TestFlowCallbackHandlerContract(serviceAddress sdk.Address) dsl.Contract {
 				}
 
 				access(all) fun addScheduledCallback(callback: FlowCallbackScheduler.ScheduledCallback) {
-					self.scheduledCallbacks.append(callback)
+					self.scheduledCallbacks[callback.id] = callback
+				}
+
+				access(all) fun cancelCallback(id: UInt64): @FlowToken.Vault {
+					let callback = self.scheduledCallbacks[id]
+						?? panic("Invalid ID: \(id) callback not found")
+					self.scheduledCallbacks[id] = nil
+					return <-FlowCallbackScheduler.cancel(callback: callback)
 				}
 
 				access(all) fun getExecutedCallbacks(): [UInt64] {
 					return self.executedCallbacks
 				}
 
-				init() {
-					self.scheduledCallbacks = []
+				access(all) init() {
+					self.scheduledCallbacks = {}
 					self.executedCallbacks = []
 
 					self.HandlerStoragePath = /storage/testCallbackHandler
