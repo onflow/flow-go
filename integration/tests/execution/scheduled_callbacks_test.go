@@ -33,10 +33,7 @@ func (s *ScheduledCallbacksSuite) TestScheduleCallback_DeployAndGetStatus() {
 	s.T().Logf("got blockA height %v ID %v", blockA.Header.Height, blockA.Header.ID())
 
 	// Execute script to call getStatus(id: 0) on the contract
-	chainID := s.net.Root().Header.ChainID
-	chain := chainID.Chain()
-
-	result, ok := s.getCallbackStatus(chain.ServiceAddress(), 0)
+	result, ok := s.getCallbackStatus(0)
 	s.T().Logf("result: %v", result)
 	require.False(s.T(), ok)
 	require.Nil(s.T(), result, "getStatus(0) should return nil for non-existent callback")
@@ -51,7 +48,6 @@ func (s *ScheduledCallbacksSuite) TestScheduleCallback_ScheduledAndExecuted() {
 	// Get chain information
 	chainID := s.net.Root().Header.ChainID
 	sc := systemcontracts.SystemContractsForChain(chainID)
-	serviceAddress := sc.FlowServiceAccount.Address
 
 	// Wait for next height finalized (potentially first height)
 	currentFinalized := s.BlockState.HighestFinalizedHeight()
@@ -59,7 +55,7 @@ func (s *ScheduledCallbacksSuite) TestScheduleCallback_ScheduledAndExecuted() {
 	s.T().Logf("got blockA height %v ID %v", blockA.Header.Height, blockA.Header.ID())
 
 	// Deploy the test contract first
-	s.deployTestContract(serviceAddress)
+	s.deployTestContract()
 
 	// Wait for next height finalized before scheduling callback
 	s.BlockState.WaitForHighestFinalizedProgress(s.T(), s.BlockState.HighestFinalizedHeight())
@@ -75,13 +71,13 @@ func (s *ScheduledCallbacksSuite) TestScheduleCallback_ScheduledAndExecuted() {
 	const executedStatus = 2
 
 	// Check the status of the callback right after scheduling
-	status, ok := s.getCallbackStatus(serviceAddress, callbackID)
+	status, ok := s.getCallbackStatus(callbackID)
 	require.True(s.T(), ok, "callback status should not be nil after scheduling")
 	require.Equal(s.T(), scheduledStatus, status, "status should be equal to scheduled")
 	s.T().Logf("callback status after scheduling: %v", status)
 
 	// Verify the callback is scheduled (not executed yet)
-	executedCallbacks := s.getExecutedCallbacks(serviceAddress)
+	executedCallbacks := s.getExecutedCallbacks()
 	require.NotContains(s.T(), executedCallbacks, callbackID, "callback should not be executed immediately")
 
 	// Wait to ensure the callback has time to be executed
@@ -94,18 +90,18 @@ func (s *ScheduledCallbacksSuite) TestScheduleCallback_ScheduledAndExecuted() {
 	s.T().Logf("got block result ID %v after waiting", erBlock.ExecutionResult.BlockID)
 
 	// Check the status again - it should still exist but be marked as executed
-	statusAfter, ok := s.getCallbackStatus(serviceAddress, callbackID)
+	statusAfter, ok := s.getCallbackStatus(callbackID)
 	require.True(s.T(), ok, "callback status should not be nil after scheduling")
 	require.Equal(s.T(), executedStatus, statusAfter, "status should be equal to executed")
 
 	// Verify the callback was executed by checking our test contract
-	executedCallbacksAfter := s.getExecutedCallbacks(serviceAddress)
+	executedCallbacksAfter := s.getExecutedCallbacks()
 	s.T().Logf("executed callbacks: %v", executedCallbacksAfter)
 	require.Contains(s.T(), executedCallbacksAfter, callbackID, "callback should have been executed")
 }
 
-func (s *ScheduledCallbacksSuite) deployTestContract(serviceAddress flow.Address) {
-	testContract := lib.TestFlowCallbackHandlerContract(sdk.Address(serviceAddress))
+func (s *ScheduledCallbacksSuite) deployTestContract() {
+	testContract := lib.TestFlowCallbackHandlerContract(s.accessClient.SDKServiceAddress())
 	tx, err := s.AccessClient().DeployContract(context.Background(), sdk.Identifier(s.net.Root().ID()), testContract)
 
 	require.NoError(s.T(), err, "could not deploy test contract")
@@ -194,10 +190,10 @@ func (s *ScheduledCallbacksSuite) scheduleCallback(sc *systemcontracts.SystemCon
 	return callbackID
 }
 
-func (s *ScheduledCallbacksSuite) getCallbackStatus(serviceAddress flow.Address, callbackID uint64) (int, bool) {
+func (s *ScheduledCallbacksSuite) getCallbackStatus(callbackID uint64) (int, bool) {
 	getStatusScript := dsl.Main{
 		Import: dsl.Import{
-			Address: sdk.Address(serviceAddress),
+			Address: s.accessClient.SDKServiceAddress(),
 			Names:   []string{"FlowCallbackScheduler"},
 		},
 		ReturnType: "FlowCallbackScheduler.Status?",
@@ -227,10 +223,10 @@ func (s *ScheduledCallbacksSuite) getCallbackStatus(serviceAddress flow.Address,
 	return int(val), true
 }
 
-func (s *ScheduledCallbacksSuite) getExecutedCallbacks(serviceAddress flow.Address) []uint64 {
+func (s *ScheduledCallbacksSuite) getExecutedCallbacks() []uint64 {
 	getExecutedScript := dsl.Main{
 		Import: dsl.Import{
-			Address: sdk.Address(serviceAddress),
+			Address: s.accessClient.SDKServiceAddress(),
 			Names:   []string{"TestFlowCallbackHandler"},
 		},
 		ReturnType: "[UInt64]",
