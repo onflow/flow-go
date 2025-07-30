@@ -13,27 +13,11 @@ import (
 	"github.com/onflow/flow-go/utils/merr"
 )
 
-// CheckFunc is a function that checks if the value should be read and decoded.
-// return (true, nil) to read the value and pass it to the CreateFunc and HandleFunc for decoding
-// return (false, nil) to skip reading the value
-// return (false, err) if running into any exception, the iteration should be stopped.
-// when making a CheckFunc to be used in the IterationFunc to iterate over the keys, a sentinel error
-// can be defined and checked to stop the iteration early, such as finding the first key that match
-// certain condition.
-// Note: the returned bool is to decide whether to read the value or not, rather than whether to stop
-// the iteration or not.
-type CheckFunc func(key []byte) (bool, error)
-
-// CreateFunc returns a pointer to an initialized entity that we can potentially
-// decode the next value into during a badger DB iteration.
-type CreateFunc func() interface{}
-
-// HandleFunc is a function that starts the processing of the current key-value
-// pair during a badger iteration. It should be called after the key was checked
-// and the entity was decoded.
-// No errors are expected during normal operation. Any errors will halt the iteration.
-type HandleFunc func() error
-type IterationFunc func() (CheckFunc, CreateFunc, HandleFunc)
+// IterationFunc is a callback function that will be called on each key-value pair during the iteration.
+// The key is copied and passed to the function, so key can be modified or retained after iteration.
+// The `getValue` function can be called to retrieve the value of the current key and decode value into destVal object.
+// The caller can return (true, nil) to stop the iteration early.
+type IterationFunc func(keyCopy []byte, getValue func(destVal any) error) (bail bool, err error)
 
 // IterateKeysByPrefixRange will iterate over all entries in the database, where the key starts with a prefixes in
 // the range [startPrefix, endPrefix] (both inclusive). We require that startPrefix <= endPrefix (otherwise this
@@ -41,15 +25,14 @@ type IterationFunc func() (CheckFunc, CreateFunc, HandleFunc)
 // In other words, error returned by the iteration functions will be propagated to the caller.
 // No errors expected during normal operations.
 func IterateKeysByPrefixRange(r storage.Reader, startPrefix []byte, endPrefix []byte, check func(key []byte) error) error {
-	return IterateKeys(r, startPrefix, endPrefix, func() (CheckFunc, CreateFunc, HandleFunc) {
-		return func(key []byte) (bool, error) {
-			err := check(key)
-			if err != nil {
-				return false, err
-			}
-			return false, nil
-		}, nil, nil
-	}, storage.IteratorOption{BadgerIterateKeyOnly: true})
+	iterFunc := func(key []byte, getValue func(destVal any) error) (bail bool, err error) {
+		err = check(key)
+		if err != nil {
+			return true, err
+		}
+		return false, nil
+	}
+	return IterateKeys(r, startPrefix, endPrefix, iterFunc, storage.IteratorOption{BadgerIterateKeyOnly: true})
 }
 
 // IterateKeys will iterate over all entries in the database, where the key starts with a prefixes in
@@ -81,9 +64,6 @@ func IterateKeys(r storage.Reader, startPrefix []byte, endPrefix []byte, iterFun
 		item := it.IterItem()
 		key := item.Key()
 
-		// initialize processing functions for iteration
-		check, create, handle := iterFunc()
-
 		keyCopy := make([]byte, len(key))
 
 		// The underlying database may re-use and modify the backing memory of the returned key.
@@ -91,41 +71,23 @@ func IterateKeys(r storage.Reader, startPrefix []byte, endPrefix []byte, iterFun
 		copy(keyCopy, key)
 
 		// check if we should process the item at all
-		shouldReadValue, err := check(keyCopy)
+		bail, err := iterFunc(keyCopy, func(destVal any) error {
+			return item.Value(func(val []byte) error {
+				return msgpack.Unmarshal(val, destVal)
+			})
+		})
 		if err != nil {
 			return err
 		}
-		if !shouldReadValue { // skip reading value
-			continue
-		}
-
-		err = item.Value(func(val []byte) error {
-
-			// decode into the entity
-			entity := create()
-			err = msgpack.Unmarshal(val, entity)
-			if err != nil {
-				return irrecoverable.NewExceptionf("could not decode entity: %w", err)
-			}
-
-			// process the entity
-			err = handle()
-			if err != nil {
-				return fmt.Errorf("could not handle entity: %w", err)
-			}
-
+		if bail {
 			return nil
-		})
-
-		if err != nil {
-			return fmt.Errorf("could not process value: %w", err)
 		}
 	}
 
 	return nil
 }
 
-// Traverse will iterate over all keys with the given prefix
+// TraverseByPrefix will iterate over all keys with the given prefix
 // error returned by the iteration functions will be propagated to the caller.
 // No other errors are expected during normal operation.
 func TraverseByPrefix(r storage.Reader, prefix []byte, iterFunc IterationFunc, opt storage.IteratorOption) error {
@@ -134,20 +96,12 @@ func TraverseByPrefix(r storage.Reader, prefix []byte, iterFunc IterationFunc, o
 
 // KeyOnlyIterateFunc returns an IterationFunc that only iterates over keys
 func KeyOnlyIterateFunc(fn func(key []byte) error) IterationFunc {
-	return func() (CheckFunc, CreateFunc, HandleFunc) {
-		checker := func(key []byte) (bool, error) {
-			return false, fn(key)
+	return func(key []byte, _ func(destVal any) error) (bail bool, err error) {
+		err = fn(key)
+		if err != nil {
+			return true, err
 		}
-
-		create := func() interface{} {
-			return nil
-		}
-
-		handle := func() error {
-			return nil
-		}
-
-		return checker, create, handle
+		return false, nil
 	}
 }
 
@@ -180,7 +134,7 @@ func KeyExists(r storage.Reader, key []byte) (exist bool, errToReturn error) {
 //   - storage.ErrNotFound if the key does not exist in the database
 //   - generic error in case of unexpected failure from the database layer, or failure
 //     to decode an existing database value
-func RetrieveByKey(r storage.Reader, key []byte, entity interface{}) (errToReturn error) {
+func RetrieveByKey(r storage.Reader, key []byte, entity any) (errToReturn error) {
 	val, closer, err := r.Get(key)
 	if err != nil {
 		return err
@@ -201,7 +155,7 @@ func RetrieveByKey(r storage.Reader, key []byte, entity interface{}) (errToRetur
 // keys with the format prefix` + `height` (where "+" denotes concatenation of binary strings). The height
 // is encoded as Big-Endian (entries with numerically smaller height have lexicographically smaller key).
 // The function finds the *highest* key with the given prefix and height equal to or below the given height.
-func FindHighestAtOrBelowByPrefix(r storage.Reader, prefix []byte, height uint64, entity interface{}) (errToReturn error) {
+func FindHighestAtOrBelowByPrefix(r storage.Reader, prefix []byte, height uint64, entity any) (errToReturn error) {
 	if len(prefix) == 0 {
 		return fmt.Errorf("prefix must not be empty")
 	}
