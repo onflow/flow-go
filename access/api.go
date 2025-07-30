@@ -10,6 +10,84 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
+type AccountsAPI interface {
+	GetAccount(ctx context.Context, address flow.Address) (*flow.Account, error)
+	GetAccountAtLatestBlock(ctx context.Context, address flow.Address) (*flow.Account, error)
+	GetAccountAtBlockHeight(ctx context.Context, address flow.Address, height uint64) (*flow.Account, error)
+
+	GetAccountBalanceAtLatestBlock(ctx context.Context, address flow.Address) (uint64, error)
+	GetAccountBalanceAtBlockHeight(ctx context.Context, address flow.Address, height uint64) (uint64, error)
+
+	GetAccountKeyAtLatestBlock(ctx context.Context, address flow.Address, keyIndex uint32) (*flow.AccountPublicKey, error)
+	GetAccountKeyAtBlockHeight(ctx context.Context, address flow.Address, keyIndex uint32, height uint64) (*flow.AccountPublicKey, error)
+	GetAccountKeysAtLatestBlock(ctx context.Context, address flow.Address) ([]flow.AccountPublicKey, error)
+	GetAccountKeysAtBlockHeight(ctx context.Context, address flow.Address, height uint64) ([]flow.AccountPublicKey, error)
+}
+
+type EventsAPI interface {
+	GetEventsForHeightRange(
+		ctx context.Context,
+		eventType string,
+		startHeight,
+		endHeight uint64,
+		requiredEventEncodingVersion entities.EventEncodingVersion,
+	) ([]flow.BlockEvents, error)
+
+	GetEventsForBlockIDs(
+		ctx context.Context,
+		eventType string,
+		blockIDs []flow.Identifier,
+		requiredEventEncodingVersion entities.EventEncodingVersion,
+	) ([]flow.BlockEvents, error)
+}
+
+type ScriptsAPI interface {
+	ExecuteScriptAtLatestBlock(ctx context.Context, script []byte, arguments [][]byte) ([]byte, error)
+	ExecuteScriptAtBlockHeight(ctx context.Context, blockHeight uint64, script []byte, arguments [][]byte) ([]byte, error)
+	ExecuteScriptAtBlockID(ctx context.Context, blockID flow.Identifier, script []byte, arguments [][]byte) ([]byte, error)
+}
+
+type TransactionsAPI interface {
+	SendTransaction(ctx context.Context, tx *flow.TransactionBody) error
+
+	GetTransaction(ctx context.Context, id flow.Identifier) (*flow.TransactionBody, error)
+	GetTransactionsByBlockID(ctx context.Context, blockID flow.Identifier) ([]*flow.TransactionBody, error)
+
+	GetTransactionResult(ctx context.Context, txID flow.Identifier, blockID flow.Identifier, collectionID flow.Identifier, encodingVersion entities.EventEncodingVersion) (*accessmodel.TransactionResult, error)
+	GetTransactionResultByIndex(ctx context.Context, blockID flow.Identifier, index uint32, encodingVersion entities.EventEncodingVersion) (*accessmodel.TransactionResult, error)
+	GetTransactionResultsByBlockID(ctx context.Context, blockID flow.Identifier, encodingVersion entities.EventEncodingVersion) ([]*accessmodel.TransactionResult, error)
+
+	GetSystemTransaction(ctx context.Context, blockID flow.Identifier) (*flow.TransactionBody, error)
+	GetSystemTransactionResult(ctx context.Context, blockID flow.Identifier, encodingVersion entities.EventEncodingVersion) (*accessmodel.TransactionResult, error)
+}
+
+type TransactionStreamAPI interface {
+	// SubscribeTransactionStatuses subscribes to transaction status updates for a given transaction ID. Monitoring starts
+	// from the latest block to obtain the current transaction status. If the transaction is already in the final state
+	// ([flow.TransactionStatusSealed] or [flow.TransactionStatusExpired]), all statuses will be prepared and sent to the client
+	// sequentially. If the transaction is not in the final state, the subscription will stream status updates until the transaction
+	// reaches the final state. Once a final state is reached, the subscription will automatically terminate.
+	//
+	// If the transaction cannot be sent, the subscription will fail and return a failed subscription.
+	SubscribeTransactionStatuses(
+		ctx context.Context,
+		txID flow.Identifier,
+		requiredEventEncodingVersion entities.EventEncodingVersion,
+	) subscription.Subscription
+
+	// SendAndSubscribeTransactionStatuses sends a transaction to the execution node and subscribes to its status updates.
+	// Monitoring begins from the reference block saved in the transaction itself and streams status updates until the transaction
+	// reaches the final state ([flow.TransactionStatusSealed] or [flow.TransactionStatusExpired]). Once the final status has been reached, the subscription
+	// automatically terminates.
+	//
+	// If the transaction cannot be sent, the subscription will fail and return a failed subscription.
+	SendAndSubscribeTransactionStatuses(
+		ctx context.Context,
+		tx *flow.TransactionBody,
+		requiredEventEncodingVersion entities.EventEncodingVersion,
+	) subscription.Subscription
+}
+
 // API provides all public-facing functionality of the Flow Access API.
 //
 // CAUTION: SIMPLIFIED ERROR HANDLING
@@ -17,6 +95,12 @@ import (
 //   - All errors returned by this API are guaranteed to be benign. The node can continue normal operations after such errors.
 //   - To prevent delivering incorrect results to clients, in case of an error, all other return values should be discarded.
 type API interface {
+	AccountsAPI
+	EventsAPI
+	ScriptsAPI
+	TransactionsAPI
+	TransactionStreamAPI
+
 	// Ping responds to requests when the server is up.
 	//
 	// CAUTION: this layer SIMPLIFIES the ERROR HANDLING convention
@@ -111,34 +195,6 @@ type API interface {
 	// Expected sentinel errors providing details to clients about failed requests:
 	//   - access.DataNotFoundError if the collection is not found.
 	GetFullCollectionByID(ctx context.Context, id flow.Identifier) (*flow.Collection, error)
-
-	SendTransaction(ctx context.Context, tx *flow.TransactionBody) error
-	GetTransaction(ctx context.Context, id flow.Identifier) (*flow.TransactionBody, error)
-	GetTransactionsByBlockID(ctx context.Context, blockID flow.Identifier) ([]*flow.TransactionBody, error)
-	GetTransactionResult(ctx context.Context, id flow.Identifier, blockID flow.Identifier, collectionID flow.Identifier, requiredEventEncodingVersion entities.EventEncodingVersion) (*accessmodel.TransactionResult, error)
-	GetTransactionResultByIndex(ctx context.Context, blockID flow.Identifier, index uint32, requiredEventEncodingVersion entities.EventEncodingVersion) (*accessmodel.TransactionResult, error)
-	GetTransactionResultsByBlockID(ctx context.Context, blockID flow.Identifier, requiredEventEncodingVersion entities.EventEncodingVersion) ([]*accessmodel.TransactionResult, error)
-	GetSystemTransaction(ctx context.Context, blockID flow.Identifier) (*flow.TransactionBody, error)
-	GetSystemTransactionResult(ctx context.Context, blockID flow.Identifier, requiredEventEncodingVersion entities.EventEncodingVersion) (*accessmodel.TransactionResult, error)
-
-	GetAccount(ctx context.Context, address flow.Address) (*flow.Account, error)
-	GetAccountAtLatestBlock(ctx context.Context, address flow.Address) (*flow.Account, error)
-	GetAccountAtBlockHeight(ctx context.Context, address flow.Address, height uint64) (*flow.Account, error)
-
-	GetAccountBalanceAtLatestBlock(ctx context.Context, address flow.Address) (uint64, error)
-	GetAccountBalanceAtBlockHeight(ctx context.Context, address flow.Address, height uint64) (uint64, error)
-
-	GetAccountKeyAtLatestBlock(ctx context.Context, address flow.Address, keyIndex uint32) (*flow.AccountPublicKey, error)
-	GetAccountKeyAtBlockHeight(ctx context.Context, address flow.Address, keyIndex uint32, height uint64) (*flow.AccountPublicKey, error)
-	GetAccountKeysAtLatestBlock(ctx context.Context, address flow.Address) ([]flow.AccountPublicKey, error)
-	GetAccountKeysAtBlockHeight(ctx context.Context, address flow.Address, height uint64) ([]flow.AccountPublicKey, error)
-
-	ExecuteScriptAtLatestBlock(ctx context.Context, script []byte, arguments [][]byte) ([]byte, error)
-	ExecuteScriptAtBlockHeight(ctx context.Context, blockHeight uint64, script []byte, arguments [][]byte) ([]byte, error)
-	ExecuteScriptAtBlockID(ctx context.Context, blockID flow.Identifier, script []byte, arguments [][]byte) ([]byte, error)
-
-	GetEventsForHeightRange(ctx context.Context, eventType string, startHeight, endHeight uint64, requiredEventEncodingVersion entities.EventEncodingVersion) ([]flow.BlockEvents, error)
-	GetEventsForBlockIDs(ctx context.Context, eventType string, blockIDs []flow.Identifier, requiredEventEncodingVersion entities.EventEncodingVersion) ([]flow.BlockEvents, error)
 
 	// GetLatestProtocolStateSnapshot returns the latest finalized snapshot.
 	//
@@ -288,21 +344,4 @@ type API interface {
 	//
 	// If invalid parameters are supplied, a failed subscription is returned.
 	SubscribeBlockDigestsFromLatest(ctx context.Context, blockStatus flow.BlockStatus) subscription.Subscription
-
-	// SubscribeTransactionStatuses subscribes to transaction status updates for a given transaction ID. Monitoring starts
-	// from the latest block to obtain the current transaction status. If the transaction is already in the final state
-	// ([flow.TransactionStatusSealed] or [flow.TransactionStatusExpired]), all statuses will be prepared and sent to the client
-	// sequentially. If the transaction is not in the final state, the subscription will stream status updates until the transaction
-	// reaches the final state. Once a final state is reached, the subscription will automatically terminate.
-	//
-	// If the transaction cannot be sent, the subscription will fail and return a failed subscription.
-	SubscribeTransactionStatuses(ctx context.Context, txID flow.Identifier, requiredEventEncodingVersion entities.EventEncodingVersion) subscription.Subscription
-
-	// SendAndSubscribeTransactionStatuses sends a transaction to the execution node and subscribes to its status updates.
-	// Monitoring begins from the reference block saved in the transaction itself and streams status updates until the transaction
-	// reaches the final state ([flow.TransactionStatusSealed] or [flow.TransactionStatusExpired]). Once the final status has been reached, the subscription
-	// automatically terminates.
-	//
-	// If the transaction cannot be sent, the subscription will fail and return a failed subscription.
-	SendAndSubscribeTransactionStatuses(ctx context.Context, tx *flow.TransactionBody, requiredEventEncodingVersion entities.EventEncodingVersion) subscription.Subscription
 }

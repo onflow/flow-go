@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/onflow/flow-go/access"
+	"github.com/onflow/flow-go/engine/access/rpc/backend/common"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/storage"
 )
@@ -93,7 +94,7 @@ func (b *backendBlockHeaders) GetBlockHeaderByHeight(
 	header, err := b.headers.ByHeight(height)
 	if err != nil {
 		err = access.RequireErrorIs(ctx, err, storage.ErrNotFound)
-		err = resolveHeightError(b.state.Params(), height, err)
+		err = common.ResolveHeightError(b.state.Params(), height, err)
 		err = fmt.Errorf("failed to find header by height: %w", err)
 		return nil, flow.BlockStatusUnknown, access.NewDataNotFoundError("header", err)
 	}

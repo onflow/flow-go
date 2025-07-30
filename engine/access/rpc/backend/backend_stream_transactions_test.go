@@ -24,7 +24,10 @@ import (
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/access/index"
 	access "github.com/onflow/flow-go/engine/access/mock"
-	backendmock "github.com/onflow/flow-go/engine/access/rpc/backend/mock"
+	"github.com/onflow/flow-go/engine/access/rpc/backend/events"
+	"github.com/onflow/flow-go/engine/access/rpc/backend/node_communicator"
+	communicatormock "github.com/onflow/flow-go/engine/access/rpc/backend/node_communicator/mock"
+	"github.com/onflow/flow-go/engine/access/rpc/backend/query_mode"
 	connectionmock "github.com/onflow/flow-go/engine/access/rpc/connection/mock"
 	"github.com/onflow/flow-go/engine/access/subscription"
 	trackermock "github.com/onflow/flow-go/engine/access/subscription/tracker/mock"
@@ -73,7 +76,7 @@ type TransactionStatusSuite struct {
 	archiveClient          *access.AccessAPIClient
 
 	connectionFactory *connectionmock.ConnectionFactory
-	communicator      *backendmock.Communicator
+	communicator      *communicatormock.Communicator
 	blockTracker      *trackermock.BlockTracker
 	reporter          *syncmock.IndexReporter
 	indexReporter     *index.Reporter
@@ -122,7 +125,7 @@ func (s *TransactionStatusSuite) SetupTest() {
 	s.chainID = flow.Testnet
 	s.historicalAccessClient = access.NewAccessAPIClient(s.T())
 	s.connectionFactory = connectionmock.NewConnectionFactory(s.T())
-	s.communicator = backendmock.NewCommunicator(s.T())
+	s.communicator = communicatormock.NewCommunicator(s.T())
 	s.broadcaster = engine.NewBroadcaster()
 	s.blockTracker = trackermock.NewBlockTracker(s.T())
 	s.reporter = syncmock.NewIndexReporter(s.T())
@@ -141,16 +144,25 @@ func (s *TransactionStatusSuite) TearDownTest() {
 
 // initializeBackend sets up and initializes the backend with required dependencies, mocks, and configurations for testing.
 func (s *TransactionStatusSuite) initializeBackend() {
-	s.transactions.On("Store", mock.Anything).Return(nil).Maybe()
+	s.transactions.
+		On("Store", mock.Anything).
+		Return(nil).
+		Maybe()
 
-	s.execClient.On("GetTransactionResult", mock.Anything, mock.Anything).Return(nil, status.Error(codes.NotFound, "not found")).Maybe()
-	s.connectionFactory.On("GetExecutionAPIClient", mock.Anything).Return(s.execClient, &mocks.MockCloser{}, nil).Maybe()
+	s.execClient.
+		On("GetTransactionResult", mock.Anything, mock.Anything).
+		Return(nil, status.Error(codes.NotFound, "not found")).
+		Maybe()
 
-	s.colClient.On(
-		"SendTransaction",
-		mock.Anything,
-		mock.Anything,
-	).Return(&accessproto.SendTransactionResponse{}, nil).Maybe()
+	s.connectionFactory.
+		On("GetExecutionAPIClient", mock.Anything).
+		Return(s.execClient, &mocks.MockCloser{}, nil).
+		Maybe()
+
+	s.colClient.
+		On("SendTransaction", mock.Anything, mock.Anything).
+		Return(&accessproto.SendTransactionResponse{}, nil).
+		Maybe()
 
 	// generate blockCount consecutive blocks with associated seal, result and execution data
 	s.rootBlock = unittest.BlockFixture()
@@ -196,9 +208,9 @@ func (s *TransactionStatusSuite) backendParams() Params {
 		ExecutionResults:     s.results,
 		ChainID:              s.chainID,
 		CollectionRPC:        s.colClient,
-		MaxHeightRange:       DefaultMaxHeightRange,
+		MaxHeightRange:       events.DefaultMaxHeightRange,
 		SnapshotHistoryLimit: DefaultSnapshotHistoryLimit,
-		Communicator:         NewNodeCommunicator(false),
+		Communicator:         node_communicator.NewNodeCommunicator(false),
 		AccessMetrics:        metrics.NewNoopCollector(),
 		Log:                  s.log,
 		BlockTracker:         s.blockTracker,
@@ -210,8 +222,9 @@ func (s *TransactionStatusSuite) backendParams() Params {
 			subscription.DefaultSendBufferSize,
 		),
 		TxResultsIndex:      index.NewTransactionResultsIndex(s.indexReporter, s.transactionResults),
-		EventQueryMode:      IndexQueryModeLocalOnly,
-		TxResultQueryMode:   IndexQueryModeLocalOnly,
+		EventQueryMode:      query_mode.IndexQueryModeLocalOnly,
+		TxResultQueryMode:   query_mode.IndexQueryModeLocalOnly,
+		ScriptExecutionMode: query_mode.IndexQueryModeLocalOnly,
 		EventsIndex:         index.NewEventsIndex(s.indexReporter, s.events),
 		LastFullBlockHeight: s.lastFullBlockHeight,
 		ExecNodeIdentitiesProvider: commonrpc.NewExecutionNodeIdentitiesProvider(
@@ -332,20 +345,20 @@ func (s *TransactionStatusSuite) addNewFinalizedBlock(parent *flow.Header, notif
 }
 
 func (s *TransactionStatusSuite) mockTransactionResult(transactionID *flow.Identifier, hasTransactionResultInStorage *bool) {
-	s.transactionResults.On(
-		"ByBlockIDTransactionID",
-		mock.AnythingOfType("flow.Identifier"),
-		mock.AnythingOfType("flow.Identifier"),
-	).Return(func(blockID, txID flow.Identifier) (*flow.LightTransactionResult, error) {
-		if *hasTransactionResultInStorage {
-			return &flow.LightTransactionResult{
-				TransactionID:   *transactionID,
-				Failed:          false,
-				ComputationUsed: 0,
-			}, nil
-		}
-		return nil, storage.ErrNotFound
-	})
+	s.transactionResults.
+		On("ByBlockIDTransactionID", mock.Anything, mock.Anything).
+		Return(
+			func(blockID, txID flow.Identifier) (*flow.LightTransactionResult, error) {
+				if *hasTransactionResultInStorage {
+					return &flow.LightTransactionResult{
+						TransactionID:   *transactionID,
+						Failed:          false,
+						ComputationUsed: 0,
+					}, nil
+				}
+				return nil, storage.ErrNotFound
+			},
+		)
 }
 
 func (s *TransactionStatusSuite) addBlockWithTransaction(transaction *flow.Transaction) {
