@@ -59,11 +59,6 @@ func NewScriptsBackend(
 		execNode := executor.NewENScriptExecutor(log, metrics, nodeProvider, nodeCommunicator, connFactory, cache)
 		exec = executor.NewFailoverScriptExecutor(local, execNode)
 
-	case query_mode.IndexQueryModeCompare:
-		local := executor.NewLocalScriptExecutor(log, metrics, scriptExecutor, cache)
-		execNode := executor.NewENScriptExecutor(log, metrics, nodeProvider, nodeCommunicator, connFactory, cache)
-		exec = executor.NewComparingScriptExecutor(log, metrics, cache, local, execNode)
-
 	default:
 		return nil, fmt.Errorf("invalid index mode: %s", scriptExecMode.String())
 	}
