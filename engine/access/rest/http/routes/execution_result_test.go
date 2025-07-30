@@ -8,13 +8,13 @@ import (
 	"testing"
 
 	mocks "github.com/stretchr/testify/mock"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 
+	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/access/mock"
 	"github.com/onflow/flow-go/engine/access/rest/router"
 	"github.com/onflow/flow-go/engine/access/rest/util"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -57,11 +57,11 @@ func TestGetResultByID(t *testing.T) {
 		id := unittest.IdentifierFixture()
 		backend.Mock.
 			On("GetExecutionResultByID", mocks.Anything, id).
-			Return(nil, status.Error(codes.NotFound, "block not found")).
+			Return(nil, access.NewDataNotFoundError("block", storage.ErrNotFound)).
 			Once()
 
 		req := getResultByIDReq(id.String(), nil)
-		router.AssertResponse(t, req, http.StatusNotFound, `{"code":404,"message":"Flow resource not found: block not found"}`, backend)
+		router.AssertResponse(t, req, http.StatusNotFound, `{"code":404,"message":"Flow resource not found: data not found for block: key not found"}`, backend)
 		mocks.AssertExpectationsForObjects(t, backend)
 	})
 }
@@ -90,11 +90,11 @@ func TestGetResultBlockID(t *testing.T) {
 		blockID := unittest.IdentifierFixture()
 		backend.Mock.
 			On("GetExecutionResultForBlockID", mocks.Anything, blockID).
-			Return(nil, status.Error(codes.NotFound, "block not found")).
+			Return(nil, access.NewDataNotFoundError("block", fmt.Errorf("block not found"))).
 			Once()
 
 		req := getResultByIDReq("", []string{blockID.String()})
-		router.AssertResponse(t, req, http.StatusNotFound, `{"code":404,"message":"Flow resource not found: block not found"}`, backend)
+		router.AssertResponse(t, req, http.StatusNotFound, `{"code":404,"message":"Flow resource not found: data not found for block: block not found"}`, backend)
 		mocks.AssertExpectationsForObjects(t, backend)
 	})
 }

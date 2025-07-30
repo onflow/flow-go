@@ -68,9 +68,7 @@ func NewLocalTransactionProvider(
 //   - codes.Internal if event payload conversion failed.
 //   - indexer.ErrIndexNotInitialized when txResultsIndex not initialized
 //   - storage.ErrHeightNotIndexed when data is unavailable
-//
-// All other errors are considered as state corruption (fatal) or internal errors in the transaction error message
-// getter or when deriving transaction status.
+//   - All other errors are potential indicators of bugs or corrupted internal state (continuation impossible)
 func (t *LocalTransactionProvider) TransactionResult(
 	ctx context.Context,
 	block *flow.Header,
@@ -141,9 +139,7 @@ func (t *LocalTransactionProvider) TransactionResult(
 //   - codes.Internal when event payload conversion failed.
 //   - indexer.ErrIndexNotInitialized when txResultsIndex not initialized
 //   - storage.ErrHeightNotIndexed when data is unavailable
-//
-// All other errors are considered as state corruption (fatal) or internal errors in the transaction error message
-// getter or when deriving transaction status.
+//   - All other errors are potential indicators of bugs or corrupted internal state (continuation impossible)
 func (t *LocalTransactionProvider) TransactionResultByIndex(
 	ctx context.Context,
 	block *flow.Block,
@@ -215,9 +211,7 @@ func (t *LocalTransactionProvider) TransactionResultByIndex(
 //   - codes.Internal when event payload conversion failed.
 //   - indexer.ErrIndexNotInitialized when txResultsIndex not initialized
 //   - storage.ErrHeightNotIndexed when data is unavailable
-//
-// All other errors are considered as state corruption (fatal) or internal errors in the transaction error message
-// getter or when deriving transaction status.
+//   - All other errors are potential indicators of bugs or corrupted internal state (continuation impossible)
 func (t *LocalTransactionProvider) TransactionResultsByBlockID(
 	ctx context.Context,
 	block *flow.Block,
