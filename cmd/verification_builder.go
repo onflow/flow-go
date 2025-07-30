@@ -219,7 +219,7 @@ func (v *VerificationNodeBuilder) LoadComponentsAndModules() {
 			)
 
 			// TODO(JanezP): cleanup creation of fvm context github.com/onflow/flow-go/issues/5249
-			fvmOptions = append(fvmOptions, computation.DefaultFVMOptions(node.RootChainID, false, false)...)
+			fvmOptions = append(fvmOptions, computation.DefaultFVMOptions(node.RootChainID, false, false, true)...)
 			vmCtx := fvm.NewContext(fvmOptions...)
 
 			chunkVerifier := chunks.NewChunkVerifier(vm, vmCtx, node.Logger)
