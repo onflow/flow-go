@@ -18,6 +18,9 @@ import (
 	"github.com/onflow/flow-go/engine/access/ingestion/tx_error_messages"
 	accessmock "github.com/onflow/flow-go/engine/access/mock"
 	"github.com/onflow/flow-go/engine/access/rpc/backend"
+	"github.com/onflow/flow-go/engine/access/rpc/backend/events"
+	"github.com/onflow/flow-go/engine/access/rpc/backend/node_communicator"
+	"github.com/onflow/flow-go/engine/access/rpc/backend/query_mode"
 	connectionmock "github.com/onflow/flow-go/engine/access/rpc/connection/mock"
 	commonrpc "github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/model/flow"
@@ -137,12 +140,13 @@ func (suite *BackfillTxErrorMessagesSuite) SetupTest() {
 		State:                      suite.state,
 		ExecutionReceipts:          suite.receipts,
 		ConnFactory:                suite.connFactory,
-		MaxHeightRange:             backend.DefaultMaxHeightRange,
+		MaxHeightRange:             events.DefaultMaxHeightRange,
 		Log:                        suite.log,
 		SnapshotHistoryLimit:       backend.DefaultSnapshotHistoryLimit,
-		Communicator:               backend.NewNodeCommunicator(false),
-		ScriptExecutionMode:        backend.IndexQueryModeExecutionNodesOnly,
-		TxResultQueryMode:          backend.IndexQueryModeExecutionNodesOnly,
+		Communicator:               node_communicator.NewNodeCommunicator(false),
+		ScriptExecutionMode:        query_mode.IndexQueryModeExecutionNodesOnly,
+		TxResultQueryMode:          query_mode.IndexQueryModeExecutionNodesOnly,
+		EventQueryMode:             query_mode.IndexQueryModeExecutionNodesOnly,
 		ChainID:                    flow.Testnet,
 		ExecNodeIdentitiesProvider: executionNodeIdentitiesProvider,
 	})

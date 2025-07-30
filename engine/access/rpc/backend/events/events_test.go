@@ -1,4 +1,4 @@
-package backend
+package events
 
 import (
 	"bytes"
@@ -9,6 +9,7 @@ import (
 
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -20,6 +21,8 @@ import (
 
 	"github.com/onflow/flow-go/engine/access/index"
 	access "github.com/onflow/flow-go/engine/access/mock"
+	"github.com/onflow/flow-go/engine/access/rpc/backend/node_communicator"
+	"github.com/onflow/flow-go/engine/access/rpc/backend/query_mode"
 	connectionmock "github.com/onflow/flow-go/engine/access/rpc/connection/mock"
 	commonrpc "github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
@@ -38,10 +41,10 @@ var targetEvent string
 
 type testCase struct {
 	encoding  entities.EventEncodingVersion
-	queryMode IndexQueryMode
+	queryMode query_mode.IndexQueryMode
 }
 
-type BackendEventsSuite struct {
+type EventsSuite struct {
 	suite.Suite
 
 	log        zerolog.Logger
@@ -69,10 +72,10 @@ type BackendEventsSuite struct {
 }
 
 func TestBackendEventsSuite(t *testing.T) {
-	suite.Run(t, new(BackendEventsSuite))
+	suite.Run(t, new(EventsSuite))
 }
 
-func (s *BackendEventsSuite) SetupTest() {
+func (s *EventsSuite) SetupTest() {
 	s.log = unittest.Logger()
 	s.state = protocol.NewState(s.T())
 	s.snapshot = protocol.NewSnapshot(s.T())
@@ -162,10 +165,10 @@ func (s *BackendEventsSuite) SetupTest() {
 		entities.EventEncodingVersion_CCF_V0,
 		entities.EventEncodingVersion_JSON_CDC_V0,
 	} {
-		for _, queryMode := range []IndexQueryMode{
-			IndexQueryModeExecutionNodesOnly,
-			IndexQueryModeLocalOnly,
-			IndexQueryModeFailover,
+		for _, queryMode := range []query_mode.IndexQueryMode{
+			query_mode.IndexQueryModeExecutionNodesOnly,
+			query_mode.IndexQueryModeLocalOnly,
+			query_mode.IndexQueryModeFailover,
 		} {
 			s.testCases = append(s.testCases, testCase{
 				encoding:  encoding,
@@ -175,29 +178,290 @@ func (s *BackendEventsSuite) SetupTest() {
 	}
 }
 
-func (s *BackendEventsSuite) defaultBackend() *backendEvents {
-	return &backendEvents{
-		log:              s.log,
-		chain:            s.chainID.Chain(),
-		state:            s.state,
-		headers:          s.headers,
-		connFactory:      s.connectionFactory,
-		nodeCommunicator: NewNodeCommunicator(false),
-		maxHeightRange:   DefaultMaxHeightRange,
-		queryMode:        IndexQueryModeExecutionNodesOnly,
-		eventsIndex:      s.eventsIndex,
-		execNodeIdentitiesProvider: commonrpc.NewExecutionNodeIdentitiesProvider(
+// TestGetEvents_HappyPaths tests the happy paths for GetEventsForBlockIDs and GetEventsForHeightRange
+// across all queryModes and encodings
+func (s *EventsSuite) TestGetEvents_HappyPaths() {
+	ctx := context.Background()
+
+	startHeight := s.blocks[0].Header.Height
+	endHeight := s.sealedHead.Height
+
+	reporter := syncmock.NewIndexReporter(s.T())
+	reporter.On("LowestIndexedHeight").Return(startHeight, nil)
+	reporter.On("HighestIndexedHeight").Return(endHeight+10, nil)
+	err := s.eventsIndex.Initialize(reporter)
+	s.Require().NoError(err)
+
+	s.state.On("Sealed").Return(s.snapshot)
+	s.snapshot.On("Head").Return(s.sealedHead, nil)
+
+	s.Run("GetEventsForHeightRange - end height updated", func() {
+		backend := s.defaultBackend(query_mode.IndexQueryModeFailover, s.eventsIndex)
+		endHeight := startHeight + 20 // should still return 5 responses
+		encoding := entities.EventEncodingVersion_CCF_V0
+
+		response, err := backend.GetEventsForHeightRange(ctx, targetEvent, startHeight, endHeight, encoding)
+		s.Require().NoError(err)
+
+		s.assertResponse(response, encoding)
+	})
+
+	for _, tt := range s.testCases {
+		s.Run(fmt.Sprintf("all from storage - %s - %s", tt.encoding.String(), tt.queryMode), func() {
+			switch tt.queryMode {
+			case query_mode.IndexQueryModeExecutionNodesOnly:
+				// not applicable
+				return
+			case query_mode.IndexQueryModeLocalOnly, query_mode.IndexQueryModeFailover:
+				// only calls to local storage
+			}
+
+			backend := s.defaultBackend(tt.queryMode, s.eventsIndex)
+
+			response, err := backend.GetEventsForBlockIDs(ctx, targetEvent, s.blockIDs, tt.encoding)
+			s.Require().NoError(err)
+			s.assertResponse(response, tt.encoding)
+
+			response, err = backend.GetEventsForHeightRange(ctx, targetEvent, startHeight, endHeight, tt.encoding)
+			s.Require().NoError(err)
+			s.assertResponse(response, tt.encoding)
+		})
+
+		s.Run(fmt.Sprintf("all from en - %s - %s", tt.encoding.String(), tt.queryMode), func() {
+			events := storagemock.NewEvents(s.T())
+			eventsIndex := index.NewEventsIndex(index.NewReporter(), events)
+
+			switch tt.queryMode {
+			case query_mode.IndexQueryModeLocalOnly:
+				// not applicable
+				return
+			case query_mode.IndexQueryModeExecutionNodesOnly:
+				// only calls to EN, no calls to storage
+			case query_mode.IndexQueryModeFailover:
+				// all calls to storage fail
+				// simulated by not initializing the eventIndex so all calls return ErrIndexNotInitialized
+			}
+
+			backend := s.defaultBackend(tt.queryMode, eventsIndex)
+			s.setupENSuccessResponse(targetEvent, s.blocks)
+
+			response, err := backend.GetEventsForBlockIDs(ctx, targetEvent, s.blockIDs, tt.encoding)
+			s.Require().NoError(err)
+			s.assertResponse(response, tt.encoding)
+
+			response, err = backend.GetEventsForHeightRange(ctx, targetEvent, startHeight, endHeight, tt.encoding)
+			s.Require().NoError(err)
+			s.assertResponse(response, tt.encoding)
+		})
+
+		s.Run(fmt.Sprintf("mixed storage & en - %s - %s", tt.encoding.String(), tt.queryMode), func() {
+			events := storagemock.NewEvents(s.T())
+			eventsIndex := index.NewEventsIndex(index.NewReporter(), events)
+
+			switch tt.queryMode {
+			case query_mode.IndexQueryModeLocalOnly, query_mode.IndexQueryModeExecutionNodesOnly:
+				// not applicable
+				return
+			case query_mode.IndexQueryModeFailover:
+				// only failing blocks queried from EN
+				s.setupENSuccessResponse(targetEvent, []*flow.Block{s.blocks[0], s.blocks[4]})
+			}
+
+			// the first and last blocks are not available from storage, and should be fetched from the EN
+			reporter := syncmock.NewIndexReporter(s.T())
+			reporter.On("LowestIndexedHeight").Return(s.blocks[1].Header.Height, nil)
+			reporter.On("HighestIndexedHeight").Return(s.blocks[3].Header.Height, nil)
+
+			events.On("ByBlockID", s.blockIDs[1]).Return(s.blockEvents, nil)
+			events.On("ByBlockID", s.blockIDs[2]).Return(s.blockEvents, nil)
+			events.On("ByBlockID", s.blockIDs[3]).Return(s.blockEvents, nil)
+
+			err := eventsIndex.Initialize(reporter)
+			s.Require().NoError(err)
+
+			backend := s.defaultBackend(tt.queryMode, eventsIndex)
+			response, err := backend.GetEventsForBlockIDs(ctx, targetEvent, s.blockIDs, tt.encoding)
+			s.Require().NoError(err)
+			s.assertResponse(response, tt.encoding)
+
+			response, err = backend.GetEventsForHeightRange(ctx, targetEvent, startHeight, endHeight, tt.encoding)
+			s.Require().NoError(err)
+			s.assertResponse(response, tt.encoding)
+		})
+	}
+}
+
+func (s *EventsSuite) TestGetEventsForHeightRange_HandlesErrors() {
+	ctx := context.Background()
+
+	startHeight := s.blocks[0].Header.Height
+	endHeight := s.sealedHead.Height
+	encoding := entities.EventEncodingVersion_CCF_V0
+
+	s.Run("returns error for endHeight < startHeight", func() {
+		backend := s.defaultBackend(query_mode.IndexQueryModeExecutionNodesOnly, s.eventsIndex)
+		endHeight := startHeight - 1
+
+		response, err := backend.GetEventsForHeightRange(ctx, targetEvent, startHeight, endHeight, encoding)
+		s.Assert().Equal(codes.InvalidArgument, status.Code(err))
+		s.Assert().Nil(response)
+	})
+
+	s.Run("returns error for range larger than max", func() {
+		backend := s.defaultBackend(query_mode.IndexQueryModeExecutionNodesOnly, s.eventsIndex)
+		endHeight := startHeight + DefaultMaxHeightRange
+
+		response, err := backend.GetEventsForHeightRange(ctx, targetEvent, startHeight, endHeight, encoding)
+		s.Assert().Equal(codes.InvalidArgument, status.Code(err))
+		s.Assert().Nil(response)
+	})
+
+	s.Run("throws irrecoverable if sealed header not available", func() {
+		s.state.On("Sealed").Return(s.snapshot)
+		s.snapshot.On("Head").Return(nil, storage.ErrNotFound).Once()
+
+		signCtxErr := irrecoverable.NewExceptionf("failed to lookup sealed header: %w", storage.ErrNotFound)
+		signalerCtx := irrecoverable.WithSignalerContext(context.Background(),
+			irrecoverable.NewMockSignalerContextExpectError(s.T(), ctx, signCtxErr))
+
+		backend := s.defaultBackend(query_mode.IndexQueryModeExecutionNodesOnly, s.eventsIndex)
+		response, err := backend.GetEventsForHeightRange(signalerCtx, targetEvent, startHeight, endHeight, encoding)
+		// these will never be returned in production
+		s.Assert().Equal(codes.Unknown, status.Code(err))
+		s.Assert().Nil(response)
+	})
+
+	s.state.On("Sealed").Return(s.snapshot)
+	s.snapshot.On("Head").Return(s.sealedHead, nil)
+
+	s.Run("returns error for startHeight > sealed height", func() {
+		startHeight := s.sealedHead.Height + 1
+		endHeight := startHeight + 1
+
+		backend := s.defaultBackend(query_mode.IndexQueryModeExecutionNodesOnly, s.eventsIndex)
+		response, err := backend.GetEventsForHeightRange(ctx, targetEvent, startHeight, endHeight, encoding)
+		s.Assert().Equal(codes.OutOfRange, status.Code(err))
+		s.Assert().Nil(response)
+	})
+
+	s.state.On("Params").Return(s.params)
+
+	s.Run("returns error for startHeight < spork root height", func() {
+		sporkRootHeight := s.blocks[0].Header.Height - 10
+		startHeight := sporkRootHeight - 1
+
+		s.params.On("SporkRootBlockHeight").Return(sporkRootHeight).Once()
+		s.params.On("SealedRoot").Return(s.rootHeader, nil).Once()
+
+		backend := s.defaultBackend(query_mode.IndexQueryModeExecutionNodesOnly, s.eventsIndex)
+		response, err := backend.GetEventsForHeightRange(ctx, targetEvent, startHeight, endHeight, encoding)
+		s.Assert().Equal(codes.NotFound, status.Code(err))
+		s.Assert().ErrorContains(err, "Try to use a historic node")
+		s.Assert().Nil(response)
+	})
+
+	s.Run("returns error for startHeight < node root height", func() {
+		backend := s.defaultBackend(query_mode.IndexQueryModeExecutionNodesOnly, s.eventsIndex)
+
+		sporkRootHeight := s.blocks[0].Header.Height - 10
+		nodeRootHeader := unittest.BlockHeaderWithHeight(s.blocks[0].Header.Height)
+		startHeight := nodeRootHeader.Height - 5
+
+		s.params.On("SporkRootBlockHeight").Return(sporkRootHeight).Once()
+		s.params.On("SealedRoot").Return(nodeRootHeader, nil).Once()
+
+		response, err := backend.GetEventsForHeightRange(ctx, targetEvent, startHeight, endHeight, encoding)
+		s.Assert().Equal(codes.NotFound, status.Code(err))
+		s.Assert().ErrorContains(err, "Try to use a different Access node")
+		s.Assert().Nil(response)
+	})
+}
+
+func (s *EventsSuite) TestGetEventsForBlockIDs_HandlesErrors() {
+	ctx := context.Background()
+
+	encoding := entities.EventEncodingVersion_CCF_V0
+
+	s.Run("returns error when too many blockIDs requested", func() {
+		backend := s.defaultBackend(query_mode.IndexQueryModeExecutionNodesOnly, s.eventsIndex)
+		backend.maxHeightRange = 3
+
+		response, err := backend.GetEventsForBlockIDs(ctx, targetEvent, s.blockIDs, encoding)
+		s.Assert().Equal(codes.InvalidArgument, status.Code(err))
+		s.Assert().Nil(response)
+	})
+
+	s.Run("returns error for missing header", func() {
+		headers := storagemock.NewHeaders(s.T())
+		backend := s.defaultBackend(query_mode.IndexQueryModeExecutionNodesOnly, s.eventsIndex)
+		backend.headers = headers
+
+		for i, blockID := range s.blockIDs {
+			// return error on the last header
+			if i == len(s.blocks)-1 {
+				headers.On("ByBlockID", blockID).Return(nil, storage.ErrNotFound)
+				continue
+			}
+
+			headers.On("ByBlockID", blockID).Return(s.blocks[i].Header, nil)
+		}
+
+		response, err := backend.GetEventsForBlockIDs(ctx, targetEvent, s.blockIDs, encoding)
+		s.Assert().Equal(codes.NotFound, status.Code(err))
+		s.Assert().Nil(response)
+	})
+}
+
+func (s *EventsSuite) assertResponse(response []flow.BlockEvents, encoding entities.EventEncodingVersion) {
+	s.Assert().Len(response, len(s.blocks))
+	for i, block := range s.blocks {
+		s.Assert().Equal(block.Header.Height, response[i].BlockHeight)
+		s.Assert().Equal(block.Header.ID(), response[i].BlockID)
+		s.Assert().Len(response[i].Events, 1)
+
+		s.assertEncoding(&response[i].Events[0], encoding)
+	}
+}
+
+func (s *EventsSuite) assertEncoding(event *flow.Event, encoding entities.EventEncodingVersion) {
+	var err error
+	switch encoding {
+	case entities.EventEncodingVersion_CCF_V0:
+		_, err = ccf.Decode(nil, event.Payload)
+	case entities.EventEncodingVersion_JSON_CDC_V0:
+		_, err = jsoncdc.Decode(nil, event.Payload)
+	default:
+		s.T().Errorf("unknown encoding: %s", encoding.String())
+	}
+	s.Require().NoError(err)
+}
+
+func (s *EventsSuite) defaultBackend(mode query_mode.IndexQueryMode, eventsIndex *index.EventsIndex) *Events {
+	e, err := NewEventsBackend(
+		s.log,
+		s.state,
+		s.chainID.Chain(),
+		DefaultMaxHeightRange,
+		s.headers,
+		s.connectionFactory,
+		node_communicator.NewNodeCommunicator(false),
+		mode,
+		eventsIndex,
+		commonrpc.NewExecutionNodeIdentitiesProvider(
 			s.log,
 			s.state,
 			s.receipts,
 			flow.IdentifierList{},
 			flow.IdentifierList{},
-		),
-	}
+		))
+
+	require.NoError(s.T(), err)
+
+	return e
 }
 
 // setupExecutionNodes sets up the mocks required to test against an EN backend
-func (s *BackendEventsSuite) setupExecutionNodes(block *flow.Block) {
+func (s *EventsSuite) setupExecutionNodes(block *flow.Block) {
 	s.params.On("FinalizedRoot").Return(s.rootHeader, nil)
 	s.state.On("Params").Return(s.params)
 	s.state.On("Final").Return(s.snapshot)
@@ -214,7 +478,7 @@ func (s *BackendEventsSuite) setupExecutionNodes(block *flow.Block) {
 }
 
 // setupENSuccessResponse configures the execution node client to return a successful response
-func (s *BackendEventsSuite) setupENSuccessResponse(eventType string, blocks []*flow.Block) {
+func (s *EventsSuite) setupENSuccessResponse(eventType string, blocks []*flow.Block) {
 	s.setupExecutionNodes(blocks[len(blocks)-1])
 
 	ids := make([][]byte, len(blocks))
@@ -250,7 +514,7 @@ func (s *BackendEventsSuite) setupENSuccessResponse(eventType string, blocks []*
 }
 
 // setupENFailingResponse configures the execution node client to return an error
-func (s *BackendEventsSuite) setupENFailingResponse(eventType string, headers []*flow.Header, err error) {
+func (s *EventsSuite) setupENFailingResponse(eventType string, headers []*flow.Header, err error) {
 	ids := make([][]byte, len(headers))
 	for i, header := range headers {
 		id := header.ID()
@@ -263,272 +527,4 @@ func (s *BackendEventsSuite) setupENFailingResponse(eventType string, headers []
 
 	s.execClient.On("GetEventsForBlockIDs", mock.Anything, failingRequest).
 		Return(nil, err)
-}
-
-// TestGetEvents_HappyPaths tests the happy paths for GetEventsForBlockIDs and GetEventsForHeightRange
-// across all queryModes and encodings
-func (s *BackendEventsSuite) TestGetEvents_HappyPaths() {
-	ctx := context.Background()
-
-	startHeight := s.blocks[0].Header.Height
-	endHeight := s.sealedHead.Height
-
-	reporter := syncmock.NewIndexReporter(s.T())
-	reporter.On("LowestIndexedHeight").Return(startHeight, nil)
-	reporter.On("HighestIndexedHeight").Return(endHeight+10, nil)
-	err := s.eventsIndex.Initialize(reporter)
-	s.Require().NoError(err)
-
-	s.state.On("Sealed").Return(s.snapshot)
-	s.snapshot.On("Head").Return(s.sealedHead, nil)
-
-	s.Run("GetEventsForHeightRange - end height updated", func() {
-		backend := s.defaultBackend()
-		backend.queryMode = IndexQueryModeFailover
-		endHeight := startHeight + 20 // should still return 5 responses
-		encoding := entities.EventEncodingVersion_CCF_V0
-
-		response, err := backend.GetEventsForHeightRange(ctx, targetEvent, startHeight, endHeight, encoding)
-		s.Require().NoError(err)
-
-		s.assertResponse(response, encoding)
-	})
-
-	for _, tt := range s.testCases {
-		s.Run(fmt.Sprintf("all from storage - %s - %s", tt.encoding.String(), tt.queryMode), func() {
-			switch tt.queryMode {
-			case IndexQueryModeExecutionNodesOnly:
-				// not applicable
-				return
-			case IndexQueryModeLocalOnly, IndexQueryModeFailover:
-				// only calls to local storage
-			}
-
-			backend := s.defaultBackend()
-			backend.queryMode = tt.queryMode
-
-			response, err := backend.GetEventsForBlockIDs(ctx, targetEvent, s.blockIDs, tt.encoding)
-			s.Require().NoError(err)
-			s.assertResponse(response, tt.encoding)
-
-			response, err = backend.GetEventsForHeightRange(ctx, targetEvent, startHeight, endHeight, tt.encoding)
-			s.Require().NoError(err)
-			s.assertResponse(response, tt.encoding)
-		})
-
-		s.Run(fmt.Sprintf("all from en - %s - %s", tt.encoding.String(), tt.queryMode), func() {
-			events := storagemock.NewEvents(s.T())
-			eventsIndex := index.NewEventsIndex(index.NewReporter(), events)
-
-			switch tt.queryMode {
-			case IndexQueryModeLocalOnly:
-				// not applicable
-				return
-			case IndexQueryModeExecutionNodesOnly:
-				// only calls to EN, no calls to storage
-			case IndexQueryModeFailover:
-				// all calls to storage fail
-				// simulated by not initializing the eventIndex so all calls return ErrIndexNotInitialized
-			}
-
-			backend := s.defaultBackend()
-			backend.queryMode = tt.queryMode
-			backend.eventsIndex = eventsIndex
-
-			s.setupENSuccessResponse(targetEvent, s.blocks)
-
-			response, err := backend.GetEventsForBlockIDs(ctx, targetEvent, s.blockIDs, tt.encoding)
-			s.Require().NoError(err)
-			s.assertResponse(response, tt.encoding)
-
-			response, err = backend.GetEventsForHeightRange(ctx, targetEvent, startHeight, endHeight, tt.encoding)
-			s.Require().NoError(err)
-			s.assertResponse(response, tt.encoding)
-		})
-
-		s.Run(fmt.Sprintf("mixed storage & en - %s - %s", tt.encoding.String(), tt.queryMode), func() {
-			events := storagemock.NewEvents(s.T())
-			eventsIndex := index.NewEventsIndex(index.NewReporter(), events)
-
-			switch tt.queryMode {
-			case IndexQueryModeLocalOnly, IndexQueryModeExecutionNodesOnly:
-				// not applicable
-				return
-			case IndexQueryModeFailover:
-				// only failing blocks queried from EN
-				s.setupENSuccessResponse(targetEvent, []*flow.Block{s.blocks[0], s.blocks[4]})
-			}
-
-			// the first and last blocks are not available from storage, and should be fetched from the EN
-			reporter := syncmock.NewIndexReporter(s.T())
-			reporter.On("LowestIndexedHeight").Return(s.blocks[1].Header.Height, nil)
-			reporter.On("HighestIndexedHeight").Return(s.blocks[3].Header.Height, nil)
-
-			events.On("ByBlockID", s.blockIDs[1]).Return(s.blockEvents, nil)
-			events.On("ByBlockID", s.blockIDs[2]).Return(s.blockEvents, nil)
-			events.On("ByBlockID", s.blockIDs[3]).Return(s.blockEvents, nil)
-
-			err := eventsIndex.Initialize(reporter)
-			s.Require().NoError(err)
-
-			backend := s.defaultBackend()
-			backend.queryMode = tt.queryMode
-			backend.eventsIndex = eventsIndex
-
-			response, err := backend.GetEventsForBlockIDs(ctx, targetEvent, s.blockIDs, tt.encoding)
-			s.Require().NoError(err)
-			s.assertResponse(response, tt.encoding)
-
-			response, err = backend.GetEventsForHeightRange(ctx, targetEvent, startHeight, endHeight, tt.encoding)
-			s.Require().NoError(err)
-			s.assertResponse(response, tt.encoding)
-		})
-	}
-}
-
-func (s *BackendEventsSuite) TestGetEventsForHeightRange_HandlesErrors() {
-	ctx := context.Background()
-
-	startHeight := s.blocks[0].Header.Height
-	endHeight := s.sealedHead.Height
-	encoding := entities.EventEncodingVersion_CCF_V0
-
-	s.Run("returns error for endHeight < startHeight", func() {
-		backend := s.defaultBackend()
-		endHeight := startHeight - 1
-
-		response, err := backend.GetEventsForHeightRange(ctx, targetEvent, startHeight, endHeight, encoding)
-		s.Assert().Equal(codes.InvalidArgument, status.Code(err))
-		s.Assert().Nil(response)
-	})
-
-	s.Run("returns error for range larger than max", func() {
-		backend := s.defaultBackend()
-		endHeight := startHeight + DefaultMaxHeightRange
-
-		response, err := backend.GetEventsForHeightRange(ctx, targetEvent, startHeight, endHeight, encoding)
-		s.Assert().Equal(codes.InvalidArgument, status.Code(err))
-		s.Assert().Nil(response)
-	})
-
-	s.Run("throws irrecoverable if sealed header not available", func() {
-		s.state.On("Sealed").Return(s.snapshot)
-		s.snapshot.On("Head").Return(nil, storage.ErrNotFound).Once()
-
-		signCtxErr := irrecoverable.NewExceptionf("failed to lookup sealed header: %w", storage.ErrNotFound)
-		signalerCtx := irrecoverable.WithSignalerContext(context.Background(),
-			irrecoverable.NewMockSignalerContextExpectError(s.T(), ctx, signCtxErr))
-
-		backend := s.defaultBackend()
-
-		response, err := backend.GetEventsForHeightRange(signalerCtx, targetEvent, startHeight, endHeight, encoding)
-		// these will never be returned in production
-		s.Assert().Equal(codes.Unknown, status.Code(err))
-		s.Assert().Nil(response)
-	})
-
-	s.state.On("Sealed").Return(s.snapshot)
-	s.snapshot.On("Head").Return(s.sealedHead, nil)
-
-	s.Run("returns error for startHeight > sealed height", func() {
-		backend := s.defaultBackend()
-		startHeight := s.sealedHead.Height + 1
-		endHeight := startHeight + 1
-
-		response, err := backend.GetEventsForHeightRange(ctx, targetEvent, startHeight, endHeight, encoding)
-		s.Assert().Equal(codes.OutOfRange, status.Code(err))
-		s.Assert().Nil(response)
-	})
-
-	s.state.On("Params").Return(s.params)
-
-	s.Run("returns error for startHeight < spork root height", func() {
-		backend := s.defaultBackend()
-
-		sporkRootHeight := s.blocks[0].Header.Height - 10
-		startHeight := sporkRootHeight - 1
-
-		s.params.On("SporkRootBlockHeight").Return(sporkRootHeight).Once()
-		s.params.On("SealedRoot").Return(s.rootHeader, nil).Once()
-
-		response, err := backend.GetEventsForHeightRange(ctx, targetEvent, startHeight, endHeight, encoding)
-		s.Assert().Equal(codes.NotFound, status.Code(err))
-		s.Assert().ErrorContains(err, "Try to use a historic node")
-		s.Assert().Nil(response)
-	})
-
-	s.Run("returns error for startHeight < node root height", func() {
-		backend := s.defaultBackend()
-
-		sporkRootHeight := s.blocks[0].Header.Height - 10
-		nodeRootHeader := unittest.BlockHeaderWithHeight(s.blocks[0].Header.Height)
-		startHeight := nodeRootHeader.Height - 5
-
-		s.params.On("SporkRootBlockHeight").Return(sporkRootHeight).Once()
-		s.params.On("SealedRoot").Return(nodeRootHeader, nil).Once()
-
-		response, err := backend.GetEventsForHeightRange(ctx, targetEvent, startHeight, endHeight, encoding)
-		s.Assert().Equal(codes.NotFound, status.Code(err))
-		s.Assert().ErrorContains(err, "Try to use a different Access node")
-		s.Assert().Nil(response)
-	})
-}
-
-func (s *BackendEventsSuite) TestGetEventsForBlockIDs_HandlesErrors() {
-	ctx := context.Background()
-
-	encoding := entities.EventEncodingVersion_CCF_V0
-
-	s.Run("returns error when too many blockIDs requested", func() {
-		backend := s.defaultBackend()
-		backend.maxHeightRange = 3
-
-		response, err := backend.GetEventsForBlockIDs(ctx, targetEvent, s.blockIDs, encoding)
-		s.Assert().Equal(codes.InvalidArgument, status.Code(err))
-		s.Assert().Nil(response)
-	})
-
-	s.Run("returns error for missing header", func() {
-		headers := storagemock.NewHeaders(s.T())
-		backend := s.defaultBackend()
-		backend.headers = headers
-
-		for i, blockID := range s.blockIDs {
-			// return error on the last header
-			if i == len(s.blocks)-1 {
-				headers.On("ByBlockID", blockID).Return(nil, storage.ErrNotFound)
-				continue
-			}
-
-			headers.On("ByBlockID", blockID).Return(s.blocks[i].Header, nil)
-		}
-
-		response, err := backend.GetEventsForBlockIDs(ctx, targetEvent, s.blockIDs, encoding)
-		s.Assert().Equal(codes.NotFound, status.Code(err))
-		s.Assert().Nil(response)
-	})
-}
-
-func (s *BackendEventsSuite) assertResponse(response []flow.BlockEvents, encoding entities.EventEncodingVersion) {
-	s.Assert().Len(response, len(s.blocks))
-	for i, block := range s.blocks {
-		s.Assert().Equal(block.Header.Height, response[i].BlockHeight)
-		s.Assert().Equal(block.Header.ID(), response[i].BlockID)
-		s.Assert().Len(response[i].Events, 1)
-
-		s.assertEncoding(&response[i].Events[0], encoding)
-	}
-}
-
-func (s *BackendEventsSuite) assertEncoding(event *flow.Event, encoding entities.EventEncodingVersion) {
-	var err error
-	switch encoding {
-	case entities.EventEncodingVersion_CCF_V0:
-		_, err = ccf.Decode(nil, event.Payload)
-	case entities.EventEncodingVersion_JSON_CDC_V0:
-		_, err = jsoncdc.Decode(nil, event.Payload)
-	default:
-		s.T().Errorf("unknown encoding: %s", encoding.String())
-	}
-	s.Require().NoError(err)
 }
