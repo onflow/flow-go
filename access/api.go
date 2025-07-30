@@ -41,10 +41,17 @@ type EventsAPI interface {
 	) ([]flow.BlockEvents, error)
 }
 
+type ScriptsAPI interface {
+	ExecuteScriptAtLatestBlock(ctx context.Context, script []byte, arguments [][]byte) ([]byte, error)
+	ExecuteScriptAtBlockHeight(ctx context.Context, blockHeight uint64, script []byte, arguments [][]byte) ([]byte, error)
+	ExecuteScriptAtBlockID(ctx context.Context, blockID flow.Identifier, script []byte, arguments [][]byte) ([]byte, error)
+}
+
 // API provides all public-facing functionality of the Flow Access API.
 type API interface {
 	AccountsAPI
 	EventsAPI
+	ScriptsAPI
 
 	Ping(ctx context.Context) error
 	GetNetworkParameters(ctx context.Context) accessmodel.NetworkParameters
@@ -69,10 +76,6 @@ type API interface {
 	GetTransactionResultsByBlockID(ctx context.Context, blockID flow.Identifier, requiredEventEncodingVersion entities.EventEncodingVersion) ([]*accessmodel.TransactionResult, error)
 	GetSystemTransaction(ctx context.Context, blockID flow.Identifier) (*flow.TransactionBody, error)
 	GetSystemTransactionResult(ctx context.Context, blockID flow.Identifier, requiredEventEncodingVersion entities.EventEncodingVersion) (*accessmodel.TransactionResult, error)
-
-	ExecuteScriptAtLatestBlock(ctx context.Context, script []byte, arguments [][]byte) ([]byte, error)
-	ExecuteScriptAtBlockHeight(ctx context.Context, blockHeight uint64, script []byte, arguments [][]byte) ([]byte, error)
-	ExecuteScriptAtBlockID(ctx context.Context, blockID flow.Identifier, script []byte, arguments [][]byte) ([]byte, error)
 
 	GetLatestProtocolStateSnapshot(ctx context.Context) ([]byte, error)
 	GetProtocolStateSnapshotByBlockID(ctx context.Context, blockID flow.Identifier) ([]byte, error)
