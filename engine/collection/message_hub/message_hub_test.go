@@ -179,19 +179,19 @@ func (s *MessageHubSuite) TearDownTest() {
 	}
 }
 
-// TestProcessIncomingMessages tests processing of incoming messages, MessageHub matches messages by type
+// TestProcessValidIncomingMessages tests processing of structurally valid incoming messages, MessageHub matches messages by type
 // and sends them to other modules which execute business logic.
-func (s *MessageHubSuite) TestProcessIncomingMessages() {
+func (s *MessageHubSuite) TestProcessValidIncomingMessages() {
 	var channel channels.Channel
 	originID := unittest.IdentifierFixture()
 	s.Run("to-compliance-engine", func() {
-		blockProposalMsg := messages.NewUntrustedClusterProposal(*unittest.ClusterBlockFixture(), unittest.SignatureFixture())
-		expectedComplianceMsg := flow.Slashable[*messages.UntrustedClusterProposal]{
+		proposal := unittest.ClusterProposalFixture()
+		expectedComplianceMsg := flow.Slashable[*cluster.Proposal]{
 			OriginID: originID,
-			Message:  blockProposalMsg,
+			Message:  proposal,
 		}
 		s.compliance.On("OnClusterBlockProposal", expectedComplianceMsg).Return(nil).Once()
-		err := s.hub.Process(channel, originID, blockProposalMsg)
+		err := s.hub.Process(channel, originID, (*cluster.UntrustedProposal)(proposal))
 		require.NoError(s.T(), err)
 	})
 	s.Run("to-vote-aggregator", func() {
@@ -220,6 +220,51 @@ func (s *MessageHubSuite) TestProcessIncomingMessages() {
 	s.Run("unsupported-msg-type", func() {
 		err := s.hub.Process(channel, originID, struct{}{})
 		require.NoError(s.T(), err)
+	})
+}
+
+// TestProcessInvalidIncomingMessages tests processing of structurally invalid incoming messages, MessageHub matches messages by type
+// and sends them to other modules which execute business logic.
+func (s *MessageHubSuite) TestProcessInvalidIncomingMessages() {
+	var channel channels.Channel
+	originID := unittest.IdentifierFixture()
+	s.Run("to-compliance-engine", func() {
+		proposal := unittest.ClusterProposalFixture()
+		proposal.ProposerSigData = nil // invalid value
+
+		err := s.hub.Process(channel, originID, (*cluster.UntrustedProposal)(proposal))
+		require.NoError(s.T(), err)
+
+		// OnBlockRange should NOT be called for invalid proposal
+		s.compliance.AssertNotCalled(s.T(), "OnClusterBlockProposal", mock.Anything)
+	})
+	s.Run("to-vote-aggregator", func() {
+		expectedVote := unittest.VoteFixture(unittest.WithVoteSignerID(originID))
+		msg := &messages.ClusterBlockVote{
+			View:    expectedVote.View,
+			BlockID: flow.ZeroID, // invalid value
+			SigData: expectedVote.SigData,
+		}
+
+		err := s.hub.Process(channel, originID, msg)
+		require.NoError(s.T(), err)
+
+		// AddVote should NOT be called for invalid Vote
+		s.voteAggregator.AssertNotCalled(s.T(), "AddVote", mock.Anything)
+	})
+	s.Run("to-timeout-aggregator", func() {
+		expectedTimeout := helper.TimeoutObjectFixture(helper.WithTimeoutObjectSignerID(originID))
+		msg := &messages.ClusterTimeoutObject{
+			View:       expectedTimeout.View,
+			NewestQC:   expectedTimeout.NewestQC,
+			LastViewTC: expectedTimeout.LastViewTC,
+			SigData:    nil, // invalid value
+		}
+		err := s.hub.Process(channel, originID, msg)
+		require.NoError(s.T(), err)
+
+		// AddTimeout should NOT be called for invalid TimeoutObject
+		s.timeoutAggregator.AssertNotCalled(s.T(), "AddTimeout", mock.Anything)
 	})
 }
 
@@ -269,7 +314,10 @@ func (s *MessageHubSuite) TestOnOwnProposal() {
 	})
 
 	s.Run("should broadcast proposal and pass to HotStuff for valid proposals", func() {
-		expectedBroadcastMsg := messages.NewUntrustedClusterProposal(*block, unittest.SignatureFixture())
+		expectedBroadcastMsg := &cluster.UntrustedProposal{
+			Block:           *block,
+			ProposerSigData: unittest.SignatureFixture(),
+		}
 
 		submitted := make(chan struct{}) // closed when proposal is submitted to hotstuff
 		headerProposal := &flow.ProposalHeader{Header: block.ToHeader(), ProposerSigData: expectedBroadcastMsg.ProposerSigData}
@@ -340,7 +388,10 @@ func (s *MessageHubSuite) TestProcessMultipleMessagesHappyPath() {
 		hotstuffProposal := model.SignedProposalFromFlow(proposal)
 		s.voteAggregator.On("AddBlock", hotstuffProposal)
 		s.hotstuff.On("SubmitProposal", hotstuffProposal)
-		expectedBroadcastMsg := messages.NewUntrustedClusterProposal(*block, proposal.ProposerSigData)
+		expectedBroadcastMsg := &cluster.UntrustedProposal{
+			Block:           *block,
+			ProposerSigData: proposal.ProposerSigData,
+		}
 		s.con.On("Publish", expectedBroadcastMsg, s.cluster[1].NodeID, s.cluster[2].NodeID).
 			Run(func(_ mock.Arguments) { wg.Done() }).
 			Return(nil)

@@ -64,19 +64,42 @@ func (b *ClusterBlocks) ProposalByID(blockID flow.Identifier) (*cluster.Proposal
 	if err != nil {
 		return nil, fmt.Errorf("could not retrieve proposer signature: %w", err)
 	}
-	block, err := cluster.NewUnsignedBlock(
-		cluster.UntrustedUnsignedBlock{
-			HeaderBody: header.HeaderBody,
-			Payload:    *payload,
-		},
-	)
-	if err != nil {
-		return nil, fmt.Errorf("could not build cluster block: %w", err)
+
+	untrustedBlock := cluster.UntrustedUnsignedBlock{
+		HeaderBody: header.HeaderBody,
+		Payload:    *payload,
 	}
-	proposal := &cluster.Proposal{
+	var block *cluster.UnsignedBlock
+	if header.ContainsParentQC() {
+		block, err = cluster.NewUnsignedBlock(untrustedBlock)
+		if err != nil {
+			return nil, fmt.Errorf("could not build cluster block: %w", err)
+		}
+
+	} else {
+		block, err = cluster.NewRootUnsignedBlock(untrustedBlock)
+		if err != nil {
+			return nil, fmt.Errorf("could not build cluster root block: %w", err)
+		}
+	}
+
+	untrustedProposal := cluster.UntrustedProposal{
 		Block:           *block,
 		ProposerSigData: sig,
 	}
+	var proposal *cluster.Proposal
+	if header.ContainsParentQC() {
+		proposal, err = cluster.NewProposal(untrustedProposal)
+		if err != nil {
+			return nil, fmt.Errorf("could not build cluster proposal: %w", err)
+		}
+	} else {
+		proposal, err = cluster.NewRootProposal(untrustedProposal)
+		if err != nil {
+			return nil, fmt.Errorf("could not build root cluster proposal: %w", err)
+		}
+	}
+
 	return proposal, nil
 }
 

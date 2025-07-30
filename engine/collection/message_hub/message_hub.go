@@ -343,11 +343,13 @@ func (h *MessageHub) sendOwnProposal(proposal *flow.ProposalHeader) error {
 	}
 
 	// create the proposal message for the collection
-	cbp := &cluster.Proposal{
+	proposalMsg := &cluster.UntrustedProposal{
 		Block:           *block,
 		ProposerSigData: proposal.ProposerSigData,
 	}
-	proposalMsg := messages.UntrustedClusterProposalFromInternal(cbp)
+	if _, err = cluster.NewProposal(*proposalMsg); err != nil {
+		return fmt.Errorf("could not build cluster proposal: %w", err)
+	}
 
 	// broadcast the proposal to consensus nodes
 	err = h.con.Publish(proposalMsg, recipients.NodeIDs()...)
@@ -430,12 +432,31 @@ func (h *MessageHub) OnOwnProposal(proposal *flow.ProposalHeader, targetPublicat
 // Process handles incoming messages from consensus channel. After matching message by type, sends it to the correct
 // component for handling.
 // No errors are expected during normal operations.
+//
+// TODO(BFT, #7620): This function should not return an error. The networking layer's responsibility is fulfilled
+// once it delivers a message to an engine. It does not possess the context required to handle
+// errors that may arise during an engine's processing of the message, as error handling for
+// message processing falls outside the domain of the networking layer.
+//
+// Some of the current error returns signal Byzantine behavior, such as forged or malformed
+// messages. These cases must be logged and routed to a dedicated violation reporting consumer.
 func (h *MessageHub) Process(channel channels.Channel, originID flow.Identifier, message interface{}) error {
 	switch msg := message.(type) {
-	case *messages.UntrustedClusterProposal:
-		h.compliance.OnClusterBlockProposal(flow.Slashable[*messages.UntrustedClusterProposal]{
+	case *cluster.UntrustedProposal:
+		proposal, err := cluster.NewProposal(*msg)
+		if err != nil {
+			// TODO(BFT, #7620): Replace this log statement with a call to the protocol violation consumer.
+			h.log.Warn().
+				Hex("origin_id", originID[:]).
+				Hex("block_id", logging.ID(msg.Block.ID())).
+				Uint64("block_height", msg.Block.Height).
+				Uint64("block_view", msg.Block.View).
+				Err(err).Msgf("received invalid cluster proposal message")
+			return nil
+		}
+		h.compliance.OnClusterBlockProposal(flow.Slashable[*cluster.Proposal]{
 			OriginID: originID,
-			Message:  msg,
+			Message:  proposal,
 		})
 	case *messages.ClusterBlockVote:
 		vote, err := model.NewVote(model.UntrustedVote{
@@ -445,7 +466,13 @@ func (h *MessageHub) Process(channel channels.Channel, originID flow.Identifier,
 			SigData:  msg.SigData,
 		})
 		if err != nil {
-			h.log.Warn().Err(err).Msgf("failed to forward vote")
+			// TODO(BFT, #7620): Replace this log statement with a call to the protocol violation consumer.
+			h.log.Warn().
+				Hex("origin_id", originID[:]).
+				Hex("block_id", msg.BlockID[:]).
+				Uint64("view", msg.View).
+				Err(err).Msgf("received invalid cluster vote message")
+			return nil
 		}
 
 		h.forwardToOwnVoteAggregator(vote)
@@ -461,7 +488,18 @@ func (h *MessageHub) Process(channel channels.Channel, originID flow.Identifier,
 			},
 		)
 		if err != nil {
-			return fmt.Errorf("could not construct timeout object: %w", err)
+			// TODO(BFT, #7620): Replace this log statement with a call to the protocol violation consumer.
+			h.log.Warn().
+				Hex("origin_id", originID[:]).
+				Uint64("view", msg.View).
+				Uint64("newest_qc_view", msg.NewestQC.View).
+				Hex("newest_qc_block_id", logging.ID(msg.NewestQC.BlockID)).
+				Uint64("last_view_tc_view", msg.LastViewTC.View).
+				Uint64("last_view_tc_newest_qc_view", msg.LastViewTC.NewestQC.View).
+				Hex("last_view_tc_newest_qc_block_id", logging.ID(msg.LastViewTC.NewestQC.BlockID)).
+				Uint64("timeout_tick", msg.TimeoutTick).
+				Err(err).Msgf("received invalid cluster timeout object message")
+			return nil
 		}
 		h.forwardToOwnTimeoutAggregator(t)
 	default:
