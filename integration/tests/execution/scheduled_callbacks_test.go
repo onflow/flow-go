@@ -45,9 +45,6 @@ func (s *ScheduledCallbacksSuite) TestScheduleCallback_DeployAndGetStatus() {
 }
 
 func (s *ScheduledCallbacksSuite) TestScheduleCallback_ScheduledAndExecuted() {
-	// Get chain information
-	chainID := s.net.Root().Header.ChainID
-	sc := systemcontracts.SystemContractsForChain(chainID)
 
 	// Wait for next height finalized (potentially first height)
 	currentFinalized := s.BlockState.HighestFinalizedHeight()
@@ -64,7 +61,7 @@ func (s *ScheduledCallbacksSuite) TestScheduleCallback_ScheduledAndExecuted() {
 	scheduleDelta := int64(10)
 	futureTimestamp := time.Now().Unix() + scheduleDelta
 	s.T().Logf("scheduling callback at timestamp: %v, current timestamp: %v", futureTimestamp, time.Now().Unix())
-	callbackID := s.scheduleCallback(sc, futureTimestamp)
+	callbackID := s.scheduleCallback(futureTimestamp)
 	s.T().Logf("scheduled callback with ID: %d", callbackID)
 
 	const scheduledStatus = 0
@@ -101,18 +98,79 @@ func (s *ScheduledCallbacksSuite) TestScheduleCallback_ScheduledAndExecuted() {
 	require.Contains(s.T(), executedCallbacksAfter, callbackID, "callback should have been executed")
 }
 
+func (s *ScheduledCallbacksSuite) TestScheduleCallback_ScheduleAndCancelCallback() {
+
+	// Wait for next height finalized (potentially first height)
+	currentFinalized := s.BlockState.HighestFinalizedHeight()
+	blockA := s.BlockState.WaitForHighestFinalizedProgress(s.T(), currentFinalized)
+	s.T().Logf("got blockA height %v ID %v", blockA.Header.Height, blockA.Header.ID())
+
+	// Deploy the test contract first
+	s.deployTestContract()
+
+	// Wait for next height finalized before scheduling callback
+	s.BlockState.WaitForHighestFinalizedProgress(s.T(), s.BlockState.HighestFinalizedHeight())
+
+	// Schedule a callback for 10 seconds in the future
+	scheduleDelta := int64(10)
+	futureTimestamp := time.Now().Unix() + scheduleDelta
+	s.T().Logf("scheduling callback at timestamp: %v, current timestamp: %v", futureTimestamp, time.Now().Unix())
+	callbackID := s.scheduleCallback(futureTimestamp)
+	s.T().Logf("scheduled callback with ID: %d", callbackID)
+
+	const scheduledStatus = 0
+	const canceledStatus = 3
+
+	// Wait fraction of the scheduled time
+	s.T().Log("waiting for callback execution...")
+	time.Sleep(time.Second + 2)
+
+	// Check the status of the callback
+	status, ok := s.getCallbackStatus(callbackID)
+	require.True(s.T(), ok, "callback status should not be nil after scheduling")
+	require.Equal(s.T(), scheduledStatus, status, "status should be equal to scheduled")
+	s.T().Logf("callback status after scheduling: %v", status)
+
+	// Verify the callback is scheduled (not executed yet)
+	executedCallbacks := s.getExecutedCallbacks()
+	require.NotContains(s.T(), executedCallbacks, callbackID, "callback should not be executed immediately")
+
+	// Cancel the callback
+	canceledID := s.cancelCallback(callbackID)
+	require.Equal(s.T(), callbackID, canceledID, "canceled callback ID should be the same as scheduled")
+
+	// Wait for callback scheduled time to make sure it was not executed
+	time.Sleep(time.Duration(scheduleDelta) * time.Second)
+
+	// Check the status of the callback
+	status, ok = s.getCallbackStatus(callbackID)
+	require.True(s.T(), ok, "callback status should not be nil after scheduling")
+	require.Equal(s.T(), canceledStatus, status, "status should be equal to canceled")
+}
+
 func (s *ScheduledCallbacksSuite) deployTestContract() {
-	testContract := lib.TestFlowCallbackHandlerContract(s.AccessClient().SDKServiceAddress())
+	chainID := s.net.Root().Header.ChainID
+	sc := systemcontracts.SystemContractsForChain(chainID)
+
+	testContract := lib.TestFlowCallbackHandlerContract(
+		sdk.Address(sc.FlowCallbackScheduler.Address),
+		sdk.Address(sc.FlowToken.Address),
+		sdk.Address(sc.FungibleToken.Address),
+	)
 	tx, err := s.AccessClient().DeployContract(context.Background(), sdk.Identifier(s.net.Root().ID()), testContract)
 
 	require.NoError(s.T(), err, "could not deploy test contract")
 	s.T().Logf("deployed test contract, tx ID: %v", tx.ID())
 
-	_, err = s.AccessClient().WaitForExecuted(context.Background(), tx.ID())
+	res, err := s.AccessClient().WaitForExecuted(context.Background(), tx.ID())
 	require.NoError(s.T(), err, "could not wait for deploy transaction to be sealed")
+	require.NoError(s.T(), res.Error, "deploy transaction should not have error")
 }
 
-func (s *ScheduledCallbacksSuite) scheduleCallback(sc *systemcontracts.SystemContracts, timestamp int64) uint64 {
+func (s *ScheduledCallbacksSuite) scheduleCallback(timestamp int64) uint64 {
+	chainID := s.net.Root().Header.ChainID
+	sc := systemcontracts.SystemContractsForChain(chainID)
+
 	scheduledTx := fmt.Sprintf(`
 		import FlowCallbackScheduler from 0x%s
 		import TestFlowCallbackHandler from 0x%s
@@ -157,38 +215,35 @@ func (s *ScheduledCallbacksSuite) scheduleCallback(sc *systemcontracts.SystemCon
 		} 
 	`, sc.FlowCallbackScheduler.Address, s.AccessClient().SDKServiceAddress(), sc.FlowToken.Address, sc.FungibleToken.Address)
 
-	acc, err := s.AccessClient().GetAccount(s.AccessClient().SDKServiceAddress())
-	require.NoError(s.T(), err, "could not get account")
-
-	refID, err := s.AccessClient().GetLatestBlockID(context.Background())
-	require.NoError(s.T(), err, "could not get latest block ID")
-
-	tx := sdk.NewTransaction().
-		SetScript([]byte(scheduledTx)).
-		SetReferenceBlockID(sdk.Identifier(refID)).
-		SetProposalKey(sdk.Address(acc.Address), 0, uint64(acc.Keys[0].Index+1)). // todo fix
-		SetPayer(sdk.Address(acc.Address)).
-		AddAuthorizer(sdk.Address(acc.Address))
-
 	timeArg, err := cadence.NewUFix64(fmt.Sprintf("%d.0", timestamp))
 	require.NoError(s.T(), err, "could not create time argument")
 
-	err = tx.AddArgument(timeArg)
-	require.NoError(s.T(), err, "could not add argument to transaction")
+	return s.sendCallbackTx([]byte(scheduledTx), []cadence.Value{timeArg})
+}
 
-	err = s.AccessClient().SignAndSendTransaction(context.Background(), tx)
-	require.NoError(s.T(), err, "could not send schedule transaction")
+func (s *ScheduledCallbacksSuite) cancelCallback(callbackID uint64) uint64 {
+	chainID := s.net.Root().Header.ChainID
+	sc := systemcontracts.SystemContractsForChain(chainID)
 
-	// Wait for the transaction to be executed
-	executedResult, err := s.AccessClient().WaitForExecuted(context.Background(), tx.ID())
-	require.NoError(s.T(), err, "could not wait for schedule transaction to be executed")
-	require.NoError(s.T(), executedResult.Error, "schedule transaction should not have error")
+	cancelTx := fmt.Sprintf(`
+		import FlowCallbackScheduler from 0x%s
+		import TestFlowCallbackHandler from 0x%s
+		import FlowToken from 0x%s
+		import FungibleToken from 0x%s
 
-	// Extract callback ID from events
-	callbackID := s.extractCallbackIDFromEvents(executedResult)
-	require.NotEqual(s.T(), callbackID, uint64(0), "callback ID should not be 0")
+		transaction(id: UInt64) {
 
-	return callbackID
+			prepare(account: auth(BorrowValue, SaveValue, IssueStorageCapabilityController, PublishCapability, GetStorageCapabilityController) &Account) {
+
+				let vault = account.storage.borrow<auth(FungibleToken.Withdraw) &FlowToken.Vault>(from: /storage/flowTokenVault)
+					?? panic("Could not borrow FlowToken vault")
+
+				vault.deposit(from: <-TestFlowCallbackHandler.cancelCallback(id: id))
+			}
+		} 
+	`, sc.FlowCallbackScheduler.Address, s.AccessClient().SDKServiceAddress(), sc.FlowToken.Address, sc.FungibleToken.Address)
+
+	return s.sendCallbackTx([]byte(cancelTx), []cadence.Value{cadence.UInt64(callbackID)})
 }
 
 func (s *ScheduledCallbacksSuite) getCallbackStatus(callbackID uint64) (int, bool) {
@@ -254,14 +309,52 @@ func (s *ScheduledCallbacksSuite) getExecutedCallbacks() []uint64 {
 	return executedIDs
 }
 
+func (s *ScheduledCallbacksSuite) sendCallbackTx(script []byte, args []cadence.Value) uint64 {
+	header, err := s.AccessClient().GetLatestFinalizedBlockHeader(context.Background())
+	require.NoError(s.T(), err, "could not get latest block ID")
+
+	acc, err := s.AccessClient().GetAccountAtBlockHeight(context.Background(), s.AccessClient().SDKServiceAddress(), header.Height)
+	require.NoError(s.T(), err, "could not get account")
+
+	tx := sdk.NewTransaction().
+		SetScript(script).
+		SetReferenceBlockID(sdk.Identifier(header.ID)).
+		SetProposalKey(sdk.Address(acc.Address), acc.Keys[0].Index, acc.Keys[0].SequenceNumber).
+		SetPayer(sdk.Address(acc.Address)).
+		AddAuthorizer(sdk.Address(acc.Address))
+
+	for _, arg := range args {
+		err = tx.AddArgument(arg)
+		require.NoError(s.T(), err, "could not add argument to transaction")
+	}
+
+	err = s.AccessClient().SignAndSendTransaction(context.Background(), tx)
+	require.NoError(s.T(), err, "could not send schedule transaction")
+
+	// Wait for the transaction to be executed
+	executedResult, err := s.AccessClient().WaitForExecuted(context.Background(), tx.ID())
+	require.NoError(s.T(), err, "could not wait for schedule transaction to be executed")
+	require.NoError(s.T(), executedResult.Error, "schedule transaction should not have error")
+
+	// Extract callback ID from events
+	callbackID := s.extractCallbackIDFromEvents(executedResult)
+	require.NotEqual(s.T(), callbackID, uint64(0), "callback ID should not be 0")
+
+	return callbackID
+}
+
 func (s *ScheduledCallbacksSuite) extractCallbackIDFromEvents(result *sdk.TransactionResult) uint64 {
 	for _, event := range result.Events {
-		if strings.Contains(string(event.Type), "FlowCallbackScheduler.CallbackScheduled") {
-			id := event.Value.SearchFieldByName("id")
-			if id != nil {
+		if strings.Contains(string(event.Type), "FlowCallbackScheduler.CallbackScheduled") ||
+			strings.Contains(string(event.Type), "FlowCallbackScheduler.CallbackCanceled") ||
+			strings.Contains(string(event.Type), "FlowCallbackScheduler.CallbackExecuted") ||
+			strings.Contains(string(event.Type), "FlowCallbackScheduler.CallbackProcessed") {
+
+			if id := event.Value.SearchFieldByName("id"); id != nil {
 				return uint64(id.(cadence.UInt64))
 			}
 		}
 	}
+
 	return 0
 }
