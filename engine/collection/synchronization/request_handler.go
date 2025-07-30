@@ -8,6 +8,7 @@ import (
 
 	"github.com/onflow/flow-go/engine"
 	commonsync "github.com/onflow/flow-go/engine/common/synchronization"
+	clustermodel "github.com/onflow/flow-go/model/cluster"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module"
@@ -234,9 +235,9 @@ func (r *RequestHandlerEngine) onRangeRequest(originID flow.Identifier, req *mes
 	}
 
 	// get all of the blocks, one by one
-	blocks := make([]messages.UntrustedClusterProposal, 0, req.ToHeight-req.FromHeight+1)
+	proposals := make([]clustermodel.UntrustedProposal, 0, req.ToHeight-req.FromHeight+1)
 	for height := req.FromHeight; height <= req.ToHeight; height++ {
-		block, err := r.blocks.ProposalByHeight(height)
+		proposal, err := r.blocks.ProposalByHeight(height)
 		if errors.Is(err, storage.ErrNotFound) {
 			r.log.Error().Uint64("height", height).Msg("skipping unknown heights")
 			break
@@ -244,11 +245,11 @@ func (r *RequestHandlerEngine) onRangeRequest(originID flow.Identifier, req *mes
 		if err != nil {
 			return fmt.Errorf("could not get block for height (%d): %w", height, err)
 		}
-		blocks = append(blocks, *messages.UntrustedClusterProposalFromInternal(block))
+		proposals = append(proposals, clustermodel.UntrustedProposal(*proposal))
 	}
 
 	// if there are no blocks to send, skip network message
-	if len(blocks) == 0 {
+	if len(proposals) == 0 {
 		r.log.Debug().Msg("skipping empty range response")
 		return nil
 	}
@@ -256,7 +257,7 @@ func (r *RequestHandlerEngine) onRangeRequest(originID flow.Identifier, req *mes
 	// send the response
 	res := &messages.ClusterBlockResponse{
 		Nonce:  req.Nonce,
-		Blocks: blocks,
+		Blocks: proposals,
 	}
 	err = r.con.Unicast(res, originID)
 	if err != nil {
@@ -303,9 +304,9 @@ func (r *RequestHandlerEngine) onBatchRequest(originID flow.Identifier, req *mes
 	}
 
 	// try to get all the blocks by ID
-	blocks := make([]messages.UntrustedClusterProposal, 0, len(blockIDs))
+	proposals := make([]clustermodel.UntrustedProposal, 0, len(blockIDs))
 	for blockID := range blockIDs {
-		block, err := r.blocks.ProposalByID(blockID)
+		proposal, err := r.blocks.ProposalByID(blockID)
 		if errors.Is(err, storage.ErrNotFound) {
 			r.log.Debug().Hex("block_id", blockID[:]).Msg("skipping unknown block")
 			continue
@@ -313,11 +314,11 @@ func (r *RequestHandlerEngine) onBatchRequest(originID flow.Identifier, req *mes
 		if err != nil {
 			return fmt.Errorf("could not get block by ID (%s): %w", blockID, err)
 		}
-		blocks = append(blocks, *messages.UntrustedClusterProposalFromInternal(block))
+		proposals = append(proposals, clustermodel.UntrustedProposal(*proposal))
 	}
 
 	// if there are no blocks to send, skip network message
-	if len(blocks) == 0 {
+	if len(proposals) == 0 {
 		r.log.Debug().Msg("skipping empty batch response")
 		return nil
 	}
@@ -325,7 +326,7 @@ func (r *RequestHandlerEngine) onBatchRequest(originID flow.Identifier, req *mes
 	// send the response
 	res := &messages.ClusterBlockResponse{
 		Nonce:  req.Nonce,
-		Blocks: blocks,
+		Blocks: proposals,
 	}
 	err := r.con.Unicast(res, originID)
 	if err != nil {
