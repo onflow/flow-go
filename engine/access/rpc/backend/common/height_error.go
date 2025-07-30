@@ -15,11 +15,6 @@ import (
 // accessible range and provides context-sensitive error messages based on spork and node root block
 // heights.
 //
-// Parameters:
-// - stateParams: Protocol parameters that contain spork root and node root block heights.
-// - height: The queried block height.
-// - err: The original error.
-//
 // Will return the original error, possibly wrapped with additional context.
 // CAUTION: this function might return irrecoverable errors or generic fatal from the lower protocol layers
 func ResolveHeightError(
