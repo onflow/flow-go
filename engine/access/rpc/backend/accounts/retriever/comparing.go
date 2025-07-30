@@ -44,10 +44,10 @@ func (c *ComparingAccountRetriever) GetAccountAtBlock(
 		return localAccount, nil
 	}
 
-	ENAccount, ENErr := c.execNodeRequester.GetAccountAtBlock(ctx, address, blockID, height)
-	c.compareAccountResults(ENAccount, ENErr, localAccount, localErr, blockID, address)
+	execNodeAccount, execNodeErr := c.execNodeRequester.GetAccountAtBlock(ctx, address, blockID, height)
+	c.compareAccountResults(execNodeAccount, execNodeErr, localAccount, localErr, blockID, address)
 
-	return ENAccount, ENErr
+	return execNodeAccount, execNodeErr
 }
 
 // compareAccountResults compares the result and error returned from local and remote getAccount calls

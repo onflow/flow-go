@@ -53,9 +53,9 @@ func (f *FailoverEventRetriever) Events(
 		Int("missing_blocks", len(localEvents.MissingBlocks)).
 		Msg("querying execution nodes for events from missing blocks")
 
-	ENEvents, ENErr := f.execNodeRetriever.Events(ctx, localEvents.MissingBlocks, eventType, encoding)
-	if ENErr != nil {
-		return Response{}, ENErr
+	execNodeEvents, execNodeErr := f.execNodeRetriever.Events(ctx, localEvents.MissingBlocks, eventType, encoding)
+	if execNodeErr != nil {
+		return Response{}, execNodeErr
 	}
 
 	// sort ascending by block height
@@ -64,7 +64,7 @@ func (f *FailoverEventRetriever) Events(
 	// especially for nodes started after a spork, or once pruning is enabled.
 	// Note: this may not match the order of the original request for clients using GetEventsForBlockIDs
 	// that provide out of order block IDs
-	combinedEvents := append(localEvents.Events, ENEvents.Events...)
+	combinedEvents := append(localEvents.Events, execNodeEvents.Events...)
 	sort.Slice(combinedEvents, func(i, j int) bool {
 		return combinedEvents[i].BlockHeight < combinedEvents[j].BlockHeight
 	})
