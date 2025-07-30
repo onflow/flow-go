@@ -16,10 +16,7 @@ import (
 // using NewBlock to ensure validation of the block fields.
 //
 //structwrite:immutable - mutations allowed only within the constructor
-type Block struct {
-	flow.HeaderBody
-	Payload Payload
-}
+type Block = flow.GenericBlock[Payload]
 
 // UntrustedBlock is an untrusted input-only representation of a cluster Block,
 // used for construction.
@@ -82,37 +79,6 @@ func NewRootBlock(untrusted UntrustedBlock) (*Block, error) {
 	}, nil
 }
 
-// ID returns a collision-resistant hash of the cluster.Block struct.
-func (b *Block) ID() flow.Identifier {
-	return b.ToHeader().ID()
-}
-
-// ToHeader converts the block into a compact [flow.Header] representation,
-// where the payload is compressed to a hash reference.
-// The receiver Block must be well-formed (enforced by mutation protection on the type).
-// This function may panic if invoked on a malformed Block.
-func (b *Block) ToHeader() *flow.Header {
-	if !b.ContainsParentQC() {
-		rootHeader, err := flow.NewRootHeader(flow.UntrustedHeader{
-			HeaderBody:  b.HeaderBody,
-			PayloadHash: b.Payload.Hash(),
-		})
-		if err != nil {
-			panic(fmt.Errorf("could not build root header from block: %w", err))
-		}
-		return rootHeader
-	}
-
-	header, err := flow.NewHeader(flow.UntrustedHeader{
-		HeaderBody:  b.HeaderBody,
-		PayloadHash: b.Payload.Hash(),
-	})
-	if err != nil {
-		panic(fmt.Errorf("could not build header from block: %w", err))
-	}
-	return header
-}
-
 // Proposal represents a signed proposed block in collection node cluster consensus.
 type Proposal struct {
 	Block           Block
@@ -121,6 +87,6 @@ type Proposal struct {
 
 // ProposalHeader converts the proposal into a compact [ProposalHeader] representation,
 // where the payload is compressed to a hash reference.
-func (b *Proposal) ProposalHeader() *flow.ProposalHeader {
-	return &flow.ProposalHeader{Header: b.Block.ToHeader(), ProposerSigData: b.ProposerSigData}
+func (p *Proposal) ProposalHeader() *flow.ProposalHeader {
+	return &flow.ProposalHeader{Header: p.Block.ToHeader(), ProposerSigData: p.ProposerSigData}
 }
