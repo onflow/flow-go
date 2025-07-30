@@ -15,6 +15,7 @@ import (
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/common"
 	"github.com/onflow/cadence/encoding/ccf"
+	jsoncdc "github.com/onflow/cadence/encoding/json"
 	"github.com/onflow/cadence/interpreter"
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/sema"
@@ -1606,14 +1607,16 @@ func Test_ScheduledCallback(t *testing.T) {
 	t.Run("process with 2 scheduled callbacks", func(t *testing.T) {
 		// create callback events that process callback will return
 		env := systemcontracts.SystemContractsForChain(chain.ChainID())
-		location := common.NewAddressLocation(nil, common.Address(env.FlowCallbackScheduler.Address), "CallbackScheduler")
+		location := common.NewAddressLocation(nil, common.Address(env.FlowCallbackScheduler.Address), "FlowCallbackScheduler")
 
 		eventType := cadence.NewEventType(
 			location,
 			"CallbackProcessed",
 			[]cadence.Field{
-				{Identifier: "ID", Type: cadence.UInt64Type},
+				{Identifier: "id", Type: cadence.UInt64Type},
+				{Identifier: "priority", Type: cadence.UInt8Type},
 				{Identifier: "executionEffort", Type: cadence.UInt64Type},
+				{Identifier: "callbackOwner", Type: cadence.AddressType},
 			},
 			nil,
 		)
@@ -1624,14 +1627,18 @@ func Test_ScheduledCallback(t *testing.T) {
 		callbackEvent1 := cadence.NewEvent(
 			[]cadence.Value{
 				cadence.NewUInt64(callbackID1),
+				cadence.NewUInt8(1),
 				cadence.NewUInt64(1000), // execution effort
+				cadence.NewAddress(env.FlowServiceAccount.Address),
 			},
 		).WithType(eventType)
 
 		callbackEvent2 := cadence.NewEvent(
 			[]cadence.Value{
 				cadence.NewUInt64(callbackID2),
+				cadence.NewUInt8(1),
 				cadence.NewUInt64(2000), // execution effort
+				cadence.NewAddress(env.FlowServiceAccount.Address),
 			},
 		).WithType(eventType)
 
@@ -1666,7 +1673,7 @@ func testScheduledCallback(t *testing.T, chain flow.Chain, callbackEvents []cade
 			require.NoError(t, err)
 			if cadenceEvent, ok := decodedEvent.(cadence.Event); ok {
 				// search for the ID field in the event
-				idField := cadence.SearchFieldByName(cadenceEvent, "ID")
+				idField := cadence.SearchFieldByName(cadenceEvent, "id")
 				if idValue, ok := idField.(cadence.UInt64); ok {
 					callbackIDs[i] = uint64(idValue)
 				}
@@ -1873,12 +1880,12 @@ func (c *callbackTestExecutor) Output() fvm.ProcedureOutput {
 
 	switch {
 	// scheduled callbacks process transaction
-	case strings.Contains(script, "CallbackScheduler.process"):
+	case strings.Contains(script, "FlowCallbackScheduler.process"):
 		require.False(c.t, strings.Contains(script, callbackSchedulerImport), "should resolve callback scheduler import")
 
 		c.vm.executedTransactions[txID] = "process_callback"
 		env := systemcontracts.SystemContractsForChain(c.ctx.Chain.ChainID()).AsTemplateEnv()
-		eventTypeString := fmt.Sprintf("A.%v.CallbackScheduler.CallbackProcessed", env.FlowCallbackSchedulerAddress)
+		eventTypeString := fmt.Sprintf("A.%v.FlowCallbackScheduler.CallbackProcessed", env.FlowCallbackSchedulerAddress)
 
 		// return events for each scheduled callback
 		events := make([]flow.Event, len(c.vm.eventPayloads))
@@ -1896,7 +1903,7 @@ func (c *callbackTestExecutor) Output() fvm.ProcedureOutput {
 			Events: events,
 		}
 	// scheduled callbacks execute transaction
-	case strings.Contains(script, "CallbackScheduler.executeCallback"):
+	case strings.Contains(script, "FlowCallbackScheduler.executeCallback"):
 		require.False(c.t, strings.Contains(script, callbackSchedulerImport), "should resolve callback scheduler import")
 
 		// extract the callback ID from the arguments
@@ -1905,7 +1912,7 @@ func (c *callbackTestExecutor) Output() fvm.ProcedureOutput {
 		}
 
 		// decode the argument to check which callback it is
-		argValue, err := ccf.Decode(nil, txBody.Arguments[0])
+		argValue, err := jsoncdc.Decode(nil, txBody.Arguments[0])
 		if err == nil {
 			if idValue, ok := argValue.(cadence.UInt64); ok {
 				// find which callback this is
