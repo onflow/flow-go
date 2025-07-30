@@ -205,6 +205,15 @@ func (c *Client) ExecuteScript(ctx context.Context, script dsl.Main) (cadence.Va
 	return res, nil
 }
 
+func (c *Client) ExecuteScriptAtBlock(ctx context.Context, script dsl.Main, blockID sdk.Identifier) (cadence.Value, error) {
+	res, err := c.client.ExecuteScriptAtBlockID(ctx, blockID, []byte(script.ToCadence()), nil)
+	if err != nil {
+		return nil, fmt.Errorf("could not execute script: %w", err)
+	}
+
+	return res, nil
+}
+
 func (c *Client) ExecuteScriptBytes(ctx context.Context, script []byte, args []cadence.Value) (cadence.Value, error) {
 	res, err := c.client.ExecuteScriptAtLatestBlock(ctx, script, args)
 	if err != nil {
@@ -442,7 +451,7 @@ func (c *Client) GetEventsForBlockIDs(
 }
 
 func getAccount(ctx context.Context, client *client.Client, address sdk.Address) (*sdk.Account, error) {
-	header, err := client.GetLatestBlockHeader(ctx, true)
+	header, err := client.GetLatestBlockHeader(ctx, false) // todo change back to true
 	if err != nil {
 		return nil, fmt.Errorf("could not get latest block header: %w", err)
 	}
