@@ -60,8 +60,8 @@ func (s *ScheduledCallbacksSuite) TestScheduleCallback_ScheduledAndExecuted() {
 	// Wait for next height finalized before scheduling callback
 	s.BlockState.WaitForHighestFinalizedProgress(s.T(), s.BlockState.HighestFinalizedHeight())
 
-	// Schedule a callback for 90 seconds in the future
-	scheduleDelta := int64(90)
+	// Schedule a callback for 10 seconds in the future
+	scheduleDelta := int64(10)
 	futureTimestamp := time.Now().Unix() + scheduleDelta
 	s.T().Logf("scheduling callback at timestamp: %v, current timestamp: %v", futureTimestamp, time.Now().Unix())
 	callbackID := s.scheduleCallback(sc, futureTimestamp)
@@ -82,7 +82,7 @@ func (s *ScheduledCallbacksSuite) TestScheduleCallback_ScheduledAndExecuted() {
 
 	// Wait to ensure the callback has time to be executed
 	s.T().Log("waiting for callback execution...")
-	time.Sleep(time.Duration(scheduleDelta)*time.Second + 10)
+	time.Sleep(time.Duration(scheduleDelta)*time.Second + 2)
 
 	// Wait for blocks to be processed after the callback execution time
 	blockC := s.BlockState.WaitForHighestFinalizedProgress(s.T(), blockA.Header.Height+2)
@@ -97,11 +97,12 @@ func (s *ScheduledCallbacksSuite) TestScheduleCallback_ScheduledAndExecuted() {
 	// Verify the callback was executed by checking our test contract
 	executedCallbacksAfter := s.getExecutedCallbacks()
 	s.T().Logf("executed callbacks: %v", executedCallbacksAfter)
+	require.Len(s.T(), executedCallbacksAfter, 1, "should have exactly one executed callback")
 	require.Contains(s.T(), executedCallbacksAfter, callbackID, "callback should have been executed")
 }
 
 func (s *ScheduledCallbacksSuite) deployTestContract() {
-	testContract := lib.TestFlowCallbackHandlerContract(s.accessClient.SDKServiceAddress())
+	testContract := lib.TestFlowCallbackHandlerContract(s.AccessClient().SDKServiceAddress())
 	tx, err := s.AccessClient().DeployContract(context.Background(), sdk.Identifier(s.net.Root().ID()), testContract)
 
 	require.NoError(s.T(), err, "could not deploy test contract")
@@ -154,9 +155,9 @@ func (s *ScheduledCallbacksSuite) scheduleCallback(sc *systemcontracts.SystemCon
 				TestFlowCallbackHandler.addScheduledCallback(callback: scheduledCallback)
 			}
 		} 
-	`, sc.FlowServiceAccount.Address, sc.FlowCallbackScheduler.Address, sc.FlowToken.Address, sc.FungibleToken.Address)
+	`, sc.FlowCallbackScheduler.Address, s.AccessClient().SDKServiceAddress(), sc.FlowToken.Address, sc.FungibleToken.Address)
 
-	acc, err := s.AccessClient().GetAccount(sdk.Address(sc.FlowServiceAccount.Address))
+	acc, err := s.AccessClient().GetAccount(s.AccessClient().SDKServiceAddress())
 	require.NoError(s.T(), err, "could not get account")
 
 	refID, err := s.AccessClient().GetLatestBlockID(context.Background())
@@ -193,7 +194,7 @@ func (s *ScheduledCallbacksSuite) scheduleCallback(sc *systemcontracts.SystemCon
 func (s *ScheduledCallbacksSuite) getCallbackStatus(callbackID uint64) (int, bool) {
 	getStatusScript := dsl.Main{
 		Import: dsl.Import{
-			Address: s.accessClient.SDKServiceAddress(),
+			Address: s.AccessClient().SDKServiceAddress(),
 			Names:   []string{"FlowCallbackScheduler"},
 		},
 		ReturnType: "FlowCallbackScheduler.Status?",
@@ -226,15 +227,18 @@ func (s *ScheduledCallbacksSuite) getCallbackStatus(callbackID uint64) (int, boo
 func (s *ScheduledCallbacksSuite) getExecutedCallbacks() []uint64 {
 	getExecutedScript := dsl.Main{
 		Import: dsl.Import{
-			Address: s.accessClient.SDKServiceAddress(),
+			Address: s.AccessClient().SDKServiceAddress(),
 			Names:   []string{"TestFlowCallbackHandler"},
 		},
 		ReturnType: "[UInt64]",
 		Code:       "return TestFlowCallbackHandler.getExecutedCallbacks()",
 	}
 
-	result, err := s.AccessClient().ExecuteScript(context.Background(), getExecutedScript)
-	require.NoError(s.T(), err, "could not execute getExecutedCallbacks script")
+	latest, err := s.AccessClient().GetLatestFinalizedBlockHeader(context.Background())
+	require.NoError(s.T(), err, "could not get latest finalized block header")
+
+	result, err := s.AccessClient().ExecuteScriptAtBlock(context.Background(), getExecutedScript, latest.ID)
+	require.NoError(s.T(), err, "could not execute getStatus script")
 
 	// Convert cadence array to Go slice
 	cadenceArray, ok := result.(cadence.Array)
