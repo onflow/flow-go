@@ -12,10 +12,10 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
+	"github.com/onflow/flow-go/engine/access/rpc/backend/transactions/error_message_provider"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/utils/logging"
 
-	"github.com/onflow/flow-go/engine/access/rpc/backend"
 	"github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -44,7 +44,7 @@ var _ Requester = (*RequesterImpl)(nil)
 type RequesterImpl struct {
 	logger                     zerolog.Logger
 	config                     *RequesterConfig
-	backend                    *backend.Backend
+	txErrorMessageProvider     error_message_provider.TxErrorMessageProvider
 	execNodeIdentitiesProvider *rpc.ExecutionNodeIdentitiesProvider
 	executionResult            *flow.ExecutionResult
 }
@@ -52,14 +52,14 @@ type RequesterImpl struct {
 func NewRequester(
 	logger zerolog.Logger,
 	config *RequesterConfig,
-	backend *backend.Backend,
+	txErrorMessageProvider error_message_provider.TxErrorMessageProvider,
 	execNodeIdentitiesProvider *rpc.ExecutionNodeIdentitiesProvider,
 	executionResult *flow.ExecutionResult,
 ) *RequesterImpl {
 	return &RequesterImpl{
 		logger:                     logger,
 		config:                     config,
-		backend:                    backend,
+		txErrorMessageProvider:     txErrorMessageProvider,
 		execNodeIdentitiesProvider: execNodeIdentitiesProvider,
 		executionResult:            executionResult,
 	}
@@ -154,7 +154,7 @@ func (r *RequesterImpl) request(
 		BlockId: convert.IdentifierToMessage(blockID),
 	}
 
-	resp, execNode, err := r.backend.GetTransactionErrorMessagesFromAnyEN(ctx, execNodes, req)
+	resp, execNode, err := r.txErrorMessageProvider.ErrorMessageByBlockIDFromAnyEN(ctx, execNodes, req)
 	if err != nil {
 		r.logger.Error().Err(err).
 			Msgf("failed to get transaction error messages from execution nodes for blockID: %s", blockID.String())
