@@ -1,6 +1,7 @@
 package transactions
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"math/rand"
@@ -222,8 +223,8 @@ func (suite *Suite) defaultTransactionsParams() Params {
 	}
 }
 
-// TestGetTransactionResultReturnsUnknown returns unknown result when tx not found
-func (suite *Suite) TestGetTransactionResultReturnsUnknown() {
+// TestGetTransactionResult_UnknownTx returns unknown result when tx not found
+func (suite *Suite) TestGetTransactionResult_UnknownTx() {
 	block := unittest.BlockFixture()
 	tbody := unittest.TransactionBodyFixture()
 	tx := unittest.TransactionFixture()
@@ -246,19 +247,25 @@ func (suite *Suite) TestGetTransactionResultReturnsUnknown() {
 	)
 	suite.Require().NoError(err)
 	suite.Require().Equal(res.Status, flow.TransactionStatusUnknown)
+	suite.Require().Empty(res.BlockID)
+	suite.Require().Empty(res.BlockHeight)
+	suite.Require().Empty(res.TransactionID)
+	suite.Require().Empty(res.CollectionID)
+	suite.Require().Empty(res.ErrorMessage)
 }
 
-// TestGetTransactionResultReturnsTransactionError returns error from transaction storage
-func (suite *Suite) TestGetTransactionResultReturnsTransactionError() {
+// TestGetTransactionResult_TxLookupFailure returns error from transaction storage
+func (suite *Suite) TestGetTransactionResult_TxLookupFailure() {
 	block := unittest.BlockFixture()
 	tbody := unittest.TransactionBodyFixture()
 	tx := unittest.TransactionFixture()
 	tx.TransactionBody = tbody
 	coll := flow.CollectionFromTransactions([]*flow.Transaction{&tx})
 
+	expectedErr := fmt.Errorf("some other error")
 	suite.transactions.
 		On("ByID", tx.ID()).
-		Return(nil, fmt.Errorf("some other error"))
+		Return(nil, expectedErr)
 
 	params := suite.defaultTransactionsParams()
 	txBackend, err := NewTransactionsBackend(params)
@@ -271,11 +278,11 @@ func (suite *Suite) TestGetTransactionResultReturnsTransactionError() {
 		coll.ID(),
 		entities.EventEncodingVersion_JSON_CDC_V0,
 	)
-	suite.Require().Equal(err, status.Errorf(codes.Internal, "failed to find: %v", fmt.Errorf("some other error")))
+	suite.Require().Equal(err, status.Errorf(codes.Internal, "failed to find: %v", expectedErr))
 }
 
-// TestGetTransactionResultReturnsValidTransactionResultFromHistoricNode tests lookup in historic nodes
-func (suite *Suite) TestGetTransactionResultReturnsValidTransactionResultFromHistoricNode() {
+// TestGetTransactionResult_HistoricNodes_Success tests lookup in historic nodes
+func (suite *Suite) TestGetTransactionResult_HistoricNodes_Success() {
 	block := unittest.BlockFixture()
 	tbody := unittest.TransactionBodyFixture()
 	tx := unittest.TransactionFixture()
@@ -292,7 +299,10 @@ func (suite *Suite) TestGetTransactionResultReturnsValidTransactionResultFromHis
 	}
 
 	suite.historicalAccessAPIClient.
-		On("GetTransactionResult", mock.Anything, mock.Anything).
+		On("GetTransactionResult", mock.Anything, mock.MatchedBy(func(req *access.GetTransactionRequest) bool {
+			txID := tx.ID()
+			return bytes.Equal(txID[:], req.Id)
+		})).
 		Return(&transactionResultResponse, nil).
 		Once()
 
@@ -313,8 +323,8 @@ func (suite *Suite) TestGetTransactionResultReturnsValidTransactionResultFromHis
 	suite.Require().Equal(uint(flow.TransactionStatusExecuted), resp.StatusCode)
 }
 
-// TestGetTransactionResultFromCache get historic transaction result from cache
-func (suite *Suite) TestGetTransactionResultFromCache() {
+// TestGetTransactionResult_HistoricNodes_FromCache get historic transaction result from cache
+func (suite *Suite) TestGetTransactionResult_HistoricNodes_FromCache() {
 	block := unittest.BlockFixture()
 	tbody := unittest.TransactionBodyFixture()
 	tx := unittest.TransactionFixture()
@@ -618,7 +628,7 @@ func (suite *Suite) TestGetSystemTransactionResultFromStorage() {
 
 	// Set up the state and snapshot mocks
 	suite.state.On("Sealed").Return(suite.snapshot, nil)
-	suite.snapshot.On("Head", mock.Anything).Return(block.Header, nil)
+	suite.snapshot.On("Head").Return(block.Header, nil)
 
 	// create a mock index reporter
 	reporter := syncmock.NewIndexReporter(suite.T())
@@ -681,7 +691,7 @@ func (suite *Suite) TestGetSystemTransactionResult_FailedEncodingConversion() {
 	_, fixedENIDs := suite.setupReceipts(&block)
 	suite.fixedExecutionNodeIDs = fixedENIDs.NodeIDs()
 
-	suite.snapshot.On("Head", mock.Anything).Return(block.Header, nil)
+	suite.snapshot.On("Head").Return(block.Header, nil)
 	suite.snapshot.On("Identities", mock.Anything).Return(fixedENIDs, nil)
 	suite.state.On("Sealed").Return(suite.snapshot, nil)
 	suite.state.On("Final").Return(suite.snapshot, nil)
@@ -729,9 +739,9 @@ func (suite *Suite) TestGetSystemTransactionResult_FailedEncodingConversion() {
 		fmt.Errorf("conversion from format JSON_CDC_V0 to CCF_V0 is not supported")))
 }
 
-// TestTransactionResultFromStorage tests the retrieval of a transaction result (flow.TransactionResult) from storage
+// TestGetTransactionResult_FromStorage tests the retrieval of a transaction result (flow.TransactionResult) from storage
 // instead of requesting it from the Execution Node.
-func (suite *Suite) TestTransactionResultFromStorage() {
+func (suite *Suite) TestGetTransactionResult_FromStorage() {
 	// Create fixtures for block, transaction, and collection
 	block := unittest.BlockFixture()
 	transaction := unittest.TransactionFixture()
@@ -777,7 +787,7 @@ func (suite *Suite) TestTransactionResultFromStorage() {
 	suite.state.On("Final").Return(suite.snapshot, nil)
 	suite.state.On("Sealed").Return(suite.snapshot, nil)
 	suite.snapshot.On("Identities", mock.Anything).Return(fixedENIDs, nil)
-	suite.snapshot.On("Head", mock.Anything).Return(block.Header, nil)
+	suite.snapshot.On("Head").Return(block.Header, nil)
 
 	suite.reporter.On("LowestIndexedHeight").Return(block.Header.Height, nil)
 	suite.reporter.On("HighestIndexedHeight").Return(block.Header.Height+10, nil)
@@ -881,7 +891,7 @@ func (suite *Suite) TestTransactionByIndexFromStorage() {
 	suite.state.On("Final").Return(suite.snapshot, nil)
 	suite.state.On("Sealed").Return(suite.snapshot, nil)
 	suite.snapshot.On("Identities", mock.Anything).Return(fixedENIDs, nil)
-	suite.snapshot.On("Head", mock.Anything).Return(block.Header, nil)
+	suite.snapshot.On("Head").Return(block.Header, nil)
 
 	suite.reporter.On("LowestIndexedHeight").Return(block.Header.Height, nil)
 	suite.reporter.On("HighestIndexedHeight").Return(block.Header.Height+10, nil)
@@ -995,7 +1005,7 @@ func (suite *Suite) TestTransactionResultsByBlockIDFromStorage() {
 	suite.state.On("Final").Return(suite.snapshot, nil)
 	suite.state.On("Sealed").Return(suite.snapshot, nil)
 	suite.snapshot.On("Identities", mock.Anything).Return(fixedENIDs, nil)
-	suite.snapshot.On("Head", mock.Anything).Return(block.Header, nil)
+	suite.snapshot.On("Head").Return(block.Header, nil)
 
 	suite.reporter.On("LowestIndexedHeight").Return(block.Header.Height, nil)
 	suite.reporter.On("HighestIndexedHeight").Return(block.Header.Height+10, nil)
