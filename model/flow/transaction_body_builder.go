@@ -18,7 +18,7 @@ type TransactionBodyBuilder struct {
 	u UntrustedTransactionBody
 }
 
-// NewTransactionBodyBuilder help to build a new Transaction
+// NewTransactionBodyBuilder constructs an empty transaction builder.
 func NewTransactionBodyBuilder() *TransactionBodyBuilder {
 	return &TransactionBodyBuilder{}
 }
