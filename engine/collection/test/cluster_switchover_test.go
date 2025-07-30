@@ -26,6 +26,7 @@ import (
 	"github.com/onflow/flow-go/state/protocol/inmem"
 	"github.com/onflow/flow-go/state/protocol/protocol_state/kvstore"
 	protocol_state "github.com/onflow/flow-go/state/protocol/protocol_state/state"
+	"github.com/onflow/flow-go/storage/operation/badgerimpl"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -303,7 +304,7 @@ func (tc *ClusterSwitchoverTestCase) ExpectTransaction(epochCounter uint64, clus
 
 // ClusterState opens and returns a read-only cluster state for the given node and cluster ID.
 func (tc *ClusterSwitchoverTestCase) ClusterState(node testmock.CollectionNode, clusterID flow.ChainID, epoch uint64) cluster.State {
-	state, err := bcluster.OpenState(node.PublicDB, node.Tracer, node.Headers, node.ClusterPayloads, clusterID, epoch)
+	state, err := bcluster.OpenState(badgerimpl.ToDB(node.PublicDB), node.Tracer, node.Headers, node.ClusterPayloads, clusterID, epoch)
 	require.NoError(tc.T(), err)
 	return state
 }

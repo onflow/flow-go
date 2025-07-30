@@ -20,6 +20,7 @@ import (
 	"github.com/onflow/flow-go/state/protocol/invalid"
 	protocolmock "github.com/onflow/flow-go/state/protocol/mock"
 	bstorage "github.com/onflow/flow-go/storage/badger"
+	"github.com/onflow/flow-go/storage/locks"
 	"github.com/onflow/flow-go/storage/operation/badgerimpl"
 	"github.com/onflow/flow-go/storage/operation/pebbleimpl"
 	"github.com/onflow/flow-go/storage/store"
@@ -42,16 +43,16 @@ func TestMigrateLastSealedExecutedResultToPebble(t *testing.T) {
 		metrics := &metrics.NoopCollector{}
 
 		headers := bstorage.NewHeaders(metrics, bdb)
-		txResults := store.NewTransactionResults(metrics, db, bstorage.DefaultCacheSize)
+		txResults := store.NewTransactionResults(metrics, db, store.DefaultCacheSize)
 		commits := store.NewCommits(metrics, db)
 		results := store.NewExecutionResults(metrics, db)
-		receipts := store.NewExecutionReceipts(metrics, db, results, bstorage.DefaultCacheSize)
+		receipts := store.NewExecutionReceipts(metrics, db, results, store.DefaultCacheSize)
 		myReceipts := store.NewMyExecutionReceipts(metrics, db, receipts)
 		events := store.NewEvents(metrics, db)
 		serviceEvents := store.NewServiceEvents(metrics, db)
-		transactions := bstorage.NewTransactions(metrics, bdb)
-		collections := bstorage.NewCollections(bdb, transactions)
-		chunkDataPacks := store.NewChunkDataPacks(metrics, pebbleimpl.ToDB(pdb), collections, bstorage.DefaultCacheSize)
+		transactions := store.NewTransactions(metrics, db)
+		collections := store.NewCollections(db, transactions)
+		chunkDataPacks := store.NewChunkDataPacks(metrics, pebbleimpl.ToDB(pdb), collections, store.DefaultCacheSize)
 
 		err = headers.Store(genesis)
 		require.NoError(t, err)
@@ -59,6 +60,7 @@ func TestMigrateLastSealedExecutedResultToPebble(t *testing.T) {
 		getLatestFinalized := func() (uint64, error) {
 			return genesis.Height, nil
 		}
+		lockManager := locks.NewTestingLockManager()
 
 		// create execution state module
 		es := state.NewExecutionState(
@@ -77,6 +79,7 @@ func TestMigrateLastSealedExecutedResultToPebble(t *testing.T) {
 			trace.NewNoopTracer(),
 			nil,
 			false,
+			lockManager,
 		)
 		require.NotNil(t, es)
 
@@ -183,6 +186,7 @@ func TestMigrateLastSealedExecutedResultToPebble(t *testing.T) {
 			trace.NewNoopTracer(),
 			nil,
 			false,
+			lockManager,
 		)
 		require.NotNil(t, es)
 
