@@ -340,7 +340,10 @@ func (suite *Suite) TestGetTransactionResult_HistoricNodes_FromCache() {
 	}
 
 	suite.historicalAccessAPIClient.
-		On("GetTransactionResult", mock.Anything, mock.AnythingOfType("*access.GetTransactionRequest")).
+		On("GetTransactionResult", mock.Anything, mock.MatchedBy(func(req *access.GetTransactionRequest) bool {
+			txID := tx.ID()
+			return bytes.Equal(txID[:], req.Id)
+		})).
 		Return(&transactionResultResponse, nil).
 		Once()
 
@@ -371,53 +374,6 @@ func (suite *Suite) TestGetTransactionResult_HistoricNodes_FromCache() {
 	suite.Require().NoError(err)
 	suite.Require().Equal(flow.TransactionStatusExecuted, resp2.Status)
 	suite.Require().Equal(uint(flow.TransactionStatusExecuted), resp2.StatusCode)
-
-	suite.historicalAccessAPIClient.AssertExpectations(suite.T())
-}
-
-// TestGetTransactionResultCacheNonExistent tests caches non existing result
-func (suite *Suite) TestGetTransactionResultCacheNonExistent() {
-	block := unittest.BlockFixture()
-	tbody := unittest.TransactionBodyFixture()
-	tx := unittest.TransactionFixture()
-	tx.TransactionBody = tbody
-
-	suite.transactions.
-		On("ByID", tx.ID()).
-		Return(nil, storage.ErrNotFound)
-
-	suite.historicalAccessAPIClient.
-		On("GetTransactionResult", mock.Anything, mock.AnythingOfType("*access.GetTransactionRequest")).
-		Return(nil, status.Errorf(codes.NotFound, "no known transaction with ID %s", tx.ID())).
-		Once()
-
-	params := suite.defaultTransactionsParams()
-	params.HistoricalAccessNodeClients = []access.AccessAPIClient{suite.historicalAccessAPIClient}
-	txBackend, err := NewTransactionsBackend(params)
-	require.NoError(suite.T(), err)
-
-	coll := flow.CollectionFromTransactions([]*flow.Transaction{&tx})
-	resp, err := txBackend.GetTransactionResult(
-		context.Background(),
-		tx.ID(),
-		block.ID(),
-		coll.ID(),
-		entities.EventEncodingVersion_JSON_CDC_V0,
-	)
-	suite.Require().NoError(err)
-	suite.Require().Equal(flow.TransactionStatusUnknown, resp.Status)
-	suite.Require().Equal(uint(flow.TransactionStatusUnknown), resp.StatusCode)
-
-	// ensure the unknown transaction is cached when not found anywhere
-	txStatus := flow.TransactionStatusUnknown
-	res, ok := txBackend.txResultCache.Get(tx.ID())
-	suite.Require().True(ok)
-	suite.Require().Equal(res, &accessmodel.TransactionResult{
-		Status:     txStatus,
-		StatusCode: uint(txStatus),
-	})
-
-	suite.historicalAccessAPIClient.AssertExpectations(suite.T())
 }
 
 // TestGetTransactionResultUnknownFromCache retrieve unknown result from cache.
@@ -432,7 +388,10 @@ func (suite *Suite) TestGetTransactionResultUnknownFromCache() {
 		Return(nil, storage.ErrNotFound)
 
 	suite.historicalAccessAPIClient.
-		On("GetTransactionResult", mock.Anything, mock.AnythingOfType("*access.GetTransactionRequest")).
+		On("GetTransactionResult", mock.Anything, mock.MatchedBy(func(req *access.GetTransactionRequest) bool {
+			txID := tx.ID()
+			return bytes.Equal(txID[:], req.Id)
+		})).
 		Return(nil, status.Errorf(codes.NotFound, "no known transaction with ID %s", tx.ID())).
 		Once()
 
@@ -462,6 +421,7 @@ func (suite *Suite) TestGetTransactionResultUnknownFromCache() {
 		StatusCode: uint(txStatus),
 	})
 
+	// ensure underlying GetTransactionResult() won't be called the second time
 	resp2, err := txBackend.GetTransactionResult(
 		context.Background(),
 		tx.ID(),
@@ -472,8 +432,6 @@ func (suite *Suite) TestGetTransactionResultUnknownFromCache() {
 	suite.Require().NoError(err)
 	suite.Require().Equal(flow.TransactionStatusUnknown, resp2.Status)
 	suite.Require().Equal(uint(flow.TransactionStatusUnknown), resp2.StatusCode)
-
-	suite.historicalAccessAPIClient.AssertExpectations(suite.T())
 }
 
 // TestGetSystemTransaction_HappyPath tests that GetSystemTransaction call returns system chunk transaction.
@@ -537,7 +495,10 @@ func (suite *Suite) TestGetSystemTransactionResult_HappyPath() {
 		}
 
 		suite.executionAPIClient.
-			On("GetTransactionResult", mock.Anything, mock.AnythingOfType("*execution.GetTransactionResultRequest")).
+			On("GetTransactionResult", mock.Anything, mock.MatchedBy(func(req *execproto.GetTransactionResultRequest) bool {
+				txID := suite.systemTx.ID()
+				return bytes.Equal(txID[:], req.TransactionId)
+			})).
 			Return(exeEventResp.TransactionResults[0], nil).
 			Once()
 
@@ -714,7 +675,10 @@ func (suite *Suite) TestGetSystemTransactionResult_FailedEncodingConversion() {
 	}
 
 	suite.executionAPIClient.
-		On("GetTransactionResult", mock.Anything, mock.AnythingOfType("*execution.GetTransactionResultRequest")).
+		On("GetTransactionResult", mock.Anything, mock.MatchedBy(func(req *execproto.GetTransactionResultRequest) bool {
+			txID := suite.systemTx.ID()
+			return bytes.Equal(txID[:], req.TransactionId)
+		})).
 		Return(exeEventResp.TransactionResults[0], nil).
 		Once()
 
