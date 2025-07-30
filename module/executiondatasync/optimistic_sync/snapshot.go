@@ -1,4 +1,4 @@
-package storage
+package optimistic_sync
 
 import (
 	"github.com/onflow/flow-go/storage"
