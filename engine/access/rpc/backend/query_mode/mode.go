@@ -18,7 +18,6 @@ const (
 	// then falls back to execution nodes if data is not available for the height or if request
 	// failed due to a non-user error.
 	IndexQueryModeFailover
-
 )
 
 func ParseIndexQueryMode(s string) (IndexQueryMode, error) {
