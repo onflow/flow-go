@@ -895,7 +895,7 @@ func (suite *Suite) TestGetTransaction() {
 
 	actual, err := backend.GetTransaction(ctx, transaction.ID())
 	suite.Require().NoError(err)
-	suite.Require().NotNil(header)
+	suite.Require().NotNil(actual)
 
 	suite.Require().Equal(expected, *actual)
 
