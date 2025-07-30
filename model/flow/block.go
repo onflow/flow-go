@@ -210,8 +210,7 @@ func NewRootProposal(untrusted UntrustedProposal) (*Proposal, error) {
 // ProposalHeader converts the proposal into a compact [ProposalHeader] representation,
 // where the payload is compressed to a hash reference.
 func (b *Proposal) ProposalHeader() *ProposalHeader {
-	block := &b.Block
-	return &ProposalHeader{Header: block.ToHeader(), ProposerSigData: b.ProposerSigData}
+	return &ProposalHeader{Header: b.Block.ToHeader(), ProposerSigData: b.ProposerSigData}
 }
 
 // CertifiedBlock holds a certified block, which is a block and a Quorum Certificate [QC] pointing
