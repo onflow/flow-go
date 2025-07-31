@@ -6,7 +6,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 
@@ -426,91 +425,4 @@ func TestValidateTransition(t *testing.T) {
 			assert.ErrorIs(t, err, ErrInvalidTransition)
 		}
 	}
-}
-
-type mockStateProvider struct {
-	state State
-}
-
-func NewMockStateProvider() *mockStateProvider {
-	return &mockStateProvider{
-		state: StatePending,
-	}
-}
-
-func (m *mockStateProvider) UpdateState(state State, pipeline *PipelineImpl) {
-	m.state = state
-	pipeline.OnParentStateUpdated(state)
-}
-
-func (m *mockStateProvider) GetState() State {
-	return m.state
-}
-
-type mockStateReceiver struct {
-	updateChan chan State
-}
-
-func NewMockStateReceiver() *mockStateReceiver {
-	return &mockStateReceiver{
-		updateChan: make(chan State, 10),
-	}
-}
-
-func (m *mockStateReceiver) OnStateUpdated(state State) {
-	m.updateChan <- state
-}
-
-// waitForStateUpdates waits for a sequence of state updates to occur or timeout after 500ms.
-// updates must be received in the correct order or the test will fail.
-func waitForStateUpdates(t *testing.T, updateChan <-chan State, expectedStates ...State) {
-	done := make(chan struct{})
-	unittest.RequireReturnsBefore(t, func() {
-		for _, expected := range expectedStates {
-			select {
-			case <-done:
-				return
-			case update := <-updateChan:
-				assert.Equalf(t, expected, update, "expected pipeline to transition to %s, but got %s", expected, update)
-			}
-		}
-	}, 500*time.Millisecond, "Timeout waiting for state update")
-	close(done) // make sure function exists after timeout
-}
-
-// waitNeverStateUpdate verifies that no state updates occur until the expected state is reached.
-func waitNeverStateUpdate(t *testing.T, updateChan <-chan State) {
-	done := make(chan struct{})
-	unittest.RequireNeverReturnBefore(t, func() {
-		select {
-		case <-done:
-			return
-		case newState := <-updateChan:
-			t.Fatalf("Pipeline transitioned to state %s, but should not have", newState)
-		}
-	}, 500*time.Millisecond, "expected pipeline to not transition to any state")
-	close(done) // make sure function exists after timeout
-}
-
-// waitForError waits for an error to occur or timeout after 500ms.
-func waitForError(t *testing.T, errChan <-chan error, expectedErr error) {
-	unittest.RequireReturnsBefore(t, func() {
-		err := <-errChan
-		if expectedErr == nil {
-			assert.NoError(t, err, "Pipeline should complete without errors")
-		} else {
-			assert.ErrorIs(t, err, expectedErr)
-		}
-	}, 500*time.Millisecond, "Timeout waiting for error")
-}
-
-// createPipeline creates a pipeline and its dependencies
-func createPipeline(t *testing.T) (*PipelineImpl, *osmock.Core, <-chan State, *mockStateProvider) {
-	mockCore := osmock.NewCore(t)
-	parent := NewMockStateProvider()
-	stateReceiver := NewMockStateReceiver()
-
-	pipeline := NewPipeline(zerolog.Nop(), unittest.ExecutionResultFixture(), false, stateReceiver)
-
-	return pipeline, mockCore, stateReceiver.updateChan, parent
 }
