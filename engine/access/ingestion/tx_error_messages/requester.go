@@ -12,7 +12,7 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
-	"github.com/onflow/flow-go/engine/access/rpc/backend/transactions/error_message_provider"
+	"github.com/onflow/flow-go/engine/access/rpc/backend/transactions/error_messages"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/utils/logging"
 
@@ -44,7 +44,7 @@ var _ Requester = (*RequesterImpl)(nil)
 type RequesterImpl struct {
 	logger                     zerolog.Logger
 	config                     *RequesterConfig
-	txErrorMessageProvider     error_message_provider.TxErrorMessageProvider
+	txErrorMessageProvider     error_messages.Provider
 	execNodeIdentitiesProvider *rpc.ExecutionNodeIdentitiesProvider
 	executionResult            *flow.ExecutionResult
 }
@@ -52,7 +52,7 @@ type RequesterImpl struct {
 func NewRequester(
 	logger zerolog.Logger,
 	config *RequesterConfig,
-	txErrorMessageProvider error_message_provider.TxErrorMessageProvider,
+	txErrorMessageProvider error_messages.Provider,
 	execNodeIdentitiesProvider *rpc.ExecutionNodeIdentitiesProvider,
 	executionResult *flow.ExecutionResult,
 ) *RequesterImpl {

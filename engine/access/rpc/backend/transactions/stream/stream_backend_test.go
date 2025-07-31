@@ -1,4 +1,4 @@
-package backend
+package stream
 
 import (
 	"context"
@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	lru "github.com/hashicorp/golang-lru/v2"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
@@ -21,22 +22,27 @@ import (
 	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
 	"github.com/onflow/flow/protobuf/go/flow/entities"
 
+	"github.com/onflow/flow-go/access/validator"
+	validatormock "github.com/onflow/flow-go/access/validator/mock"
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/access/index"
 	access "github.com/onflow/flow-go/engine/access/mock"
-	"github.com/onflow/flow-go/engine/access/rpc/backend/events"
 	"github.com/onflow/flow-go/engine/access/rpc/backend/node_communicator"
-	communicatormock "github.com/onflow/flow-go/engine/access/rpc/backend/node_communicator/mock"
-	"github.com/onflow/flow-go/engine/access/rpc/backend/query_mode"
+	"github.com/onflow/flow-go/engine/access/rpc/backend/transactions"
+	"github.com/onflow/flow-go/engine/access/rpc/backend/transactions/error_messages"
+	"github.com/onflow/flow-go/engine/access/rpc/backend/transactions/provider"
+	txstatus "github.com/onflow/flow-go/engine/access/rpc/backend/transactions/status"
 	connectionmock "github.com/onflow/flow-go/engine/access/rpc/connection/mock"
 	"github.com/onflow/flow-go/engine/access/subscription"
 	trackermock "github.com/onflow/flow-go/engine/access/subscription/tracker/mock"
 	commonrpc "github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
+	"github.com/onflow/flow-go/fvm/blueprints"
 	accessmodel "github.com/onflow/flow-go/model/access"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/counters"
+	execmock "github.com/onflow/flow-go/module/execution/mock"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
 	syncmock "github.com/onflow/flow-go/module/state_synchronization/mock"
@@ -50,8 +56,8 @@ import (
 	"github.com/onflow/flow-go/utils/unittest/mocks"
 )
 
-// TransactionStatusSuite represents a suite for testing transaction status-related functionality in the Flow blockchain.
-type TransactionStatusSuite struct {
+// TransactionStreamSuite represents a suite for testing transaction status-related functionality in the Flow blockchain.
+type TransactionStreamSuite struct {
 	suite.Suite
 
 	state          *protocol.State
@@ -76,10 +82,12 @@ type TransactionStatusSuite struct {
 	archiveClient          *access.AccessAPIClient
 
 	connectionFactory *connectionmock.ConnectionFactory
-	communicator      *communicatormock.Communicator
-	blockTracker      *trackermock.BlockTracker
-	reporter          *syncmock.IndexReporter
-	indexReporter     *index.Reporter
+
+	blockTracker  *trackermock.BlockTracker
+	reporter      *syncmock.IndexReporter
+	indexReporter *index.Reporter
+	eventIndex    *index.EventsIndex
+	txResultIndex *index.TransactionResultsIndex
 
 	chainID flow.ChainID
 
@@ -90,19 +98,24 @@ type TransactionStatusSuite struct {
 
 	blockMap map[uint64]*flow.Block
 
-	backend *Backend
+	txStreamBackend *TransactionStream
 
 	db                  *badger.DB
 	dbDir               string
 	lastFullBlockHeight *counters.PersistentStrictMonotonicCounter
+
+	systemTx *flow.TransactionBody
+
+	fixedExecutionNodeIDs     flow.IdentifierList
+	preferredExecutionNodeIDs flow.IdentifierList
 }
 
 func TestTransactionStatusSuite(t *testing.T) {
-	suite.Run(t, new(TransactionStatusSuite))
+	suite.Run(t, new(TransactionStreamSuite))
 }
 
-// SetupTest initializes the test dependencies, configurations, and mock objects for TransactionStatusSuite tests.
-func (s *TransactionStatusSuite) SetupTest() {
+// SetupTest initializes the test dependencies, configurations, and mock objects for TransactionStreamSuite tests.
+func (s *TransactionStreamSuite) SetupTest() {
 	s.log = zerolog.New(zerolog.NewConsoleWriter())
 	s.state = protocol.NewState(s.T())
 	s.sealedSnapshot = protocol.NewSnapshot(s.T())
@@ -125,25 +138,32 @@ func (s *TransactionStatusSuite) SetupTest() {
 	s.chainID = flow.Testnet
 	s.historicalAccessClient = access.NewAccessAPIClient(s.T())
 	s.connectionFactory = connectionmock.NewConnectionFactory(s.T())
-	s.communicator = communicatormock.NewCommunicator(s.T())
 	s.broadcaster = engine.NewBroadcaster()
 	s.blockTracker = trackermock.NewBlockTracker(s.T())
 	s.reporter = syncmock.NewIndexReporter(s.T())
 	s.indexReporter = index.NewReporter()
 	err := s.indexReporter.Initialize(s.reporter)
 	require.NoError(s.T(), err)
+	s.eventIndex = index.NewEventsIndex(s.indexReporter, s.events)
+	s.txResultIndex = index.NewTransactionResultsIndex(s.indexReporter, s.transactionResults)
+
+	s.systemTx, err = blueprints.SystemChunkTransaction(s.chainID.Chain())
+	s.Require().NoError(err)
+
+	s.fixedExecutionNodeIDs = nil
+	s.preferredExecutionNodeIDs = nil
 
 	s.initializeBackend()
 }
 
 // TearDownTest cleans up the db
-func (s *TransactionStatusSuite) TearDownTest() {
+func (s *TransactionStreamSuite) TearDownTest() {
 	err := os.RemoveAll(s.dbDir)
 	s.Require().NoError(err)
 }
 
-// initializeBackend sets up and initializes the backend with required dependencies, mocks, and configurations for testing.
-func (s *TransactionStatusSuite) initializeBackend() {
+// initializeBackend sets up and initializes the txStreamBackend with required dependencies, mocks, and configurations for testing.
+func (s *TransactionStreamSuite) initializeBackend() {
 	s.transactions.
 		On("Store", mock.Anything).
 		Return(nil).
@@ -191,55 +211,138 @@ func (s *TransactionStatusSuite) initializeBackend() {
 		s.finalizedBlock.Header.Height: s.finalizedBlock,
 	}
 
-	backendParams := s.backendParams()
-	s.backend, err = New(backendParams)
-	require.NoError(s.T(), err)
-}
+	txStatusDeriver := txstatus.NewTxStatusDeriver(
+		s.state,
+		s.lastFullBlockHeight,
+	)
 
-// backendParams returns the Params configuration for the backend.
-func (s *TransactionStatusSuite) backendParams() Params {
-	return Params{
-		State:                s.state,
-		Blocks:               s.blocks,
-		Headers:              s.headers,
-		Collections:          s.collections,
-		Transactions:         s.transactions,
-		ExecutionReceipts:    s.receipts,
-		ExecutionResults:     s.results,
-		ChainID:              s.chainID,
-		CollectionRPC:        s.colClient,
-		MaxHeightRange:       events.DefaultMaxHeightRange,
-		SnapshotHistoryLimit: DefaultSnapshotHistoryLimit,
-		Communicator:         node_communicator.NewNodeCommunicator(false),
-		AccessMetrics:        metrics.NewNoopCollector(),
-		Log:                  s.log,
-		BlockTracker:         s.blockTracker,
-		SubscriptionHandler: subscription.NewSubscriptionHandler(
-			s.log,
-			s.broadcaster,
-			subscription.DefaultSendTimeout,
-			subscription.DefaultResponseLimit,
-			subscription.DefaultSendBufferSize,
-		),
-		TxResultsIndex:      index.NewTransactionResultsIndex(s.indexReporter, s.transactionResults),
-		EventQueryMode:      query_mode.IndexQueryModeLocalOnly,
-		TxResultQueryMode:   query_mode.IndexQueryModeLocalOnly,
-		ScriptExecutionMode: query_mode.IndexQueryModeLocalOnly,
-		EventsIndex:         index.NewEventsIndex(s.indexReporter, s.events),
-		LastFullBlockHeight: s.lastFullBlockHeight,
-		ExecNodeIdentitiesProvider: commonrpc.NewExecutionNodeIdentitiesProvider(
-			s.log,
-			s.state,
-			s.receipts,
-			nil,
-			nil,
-		),
-		ConnFactory: s.connectionFactory,
+	nodeCommunicator := node_communicator.NewNodeCommunicator(false)
+
+	execNodeProvider := commonrpc.NewExecutionNodeIdentitiesProvider(
+		s.log,
+		s.state,
+		s.receipts,
+		s.preferredExecutionNodeIDs,
+		s.fixedExecutionNodeIDs,
+	)
+
+	errorMessageProvider := error_messages.NewTxErrorMessageProvider(
+		s.log,
+		nil,
+		s.txResultIndex,
+		s.connectionFactory,
+		nodeCommunicator,
+		execNodeProvider,
+	)
+
+	localTxProvider := provider.NewLocalTransactionProvider(
+		s.state,
+		s.collections,
+		s.blocks,
+		s.eventIndex,
+		s.txResultIndex,
+		errorMessageProvider,
+		s.systemTx.ID(),
+		txStatusDeriver,
+	)
+
+	execNodeTxProvider := provider.NewENTransactionProvider(
+		s.log,
+		s.state,
+		s.collections,
+		s.connectionFactory,
+		nodeCommunicator,
+		execNodeProvider,
+		txStatusDeriver,
+		s.systemTx.ID(),
+		s.systemTx,
+	)
+
+	txProvider := provider.NewFailoverTransactionProvider(localTxProvider, execNodeTxProvider)
+
+	subscriptionHandler := subscription.NewSubscriptionHandler(
+		s.log,
+		s.broadcaster,
+		subscription.DefaultSendTimeout,
+		subscription.DefaultResponseLimit,
+		subscription.DefaultSendBufferSize,
+	)
+
+	validatorBlocks := validatormock.NewBlocks(s.T())
+	validatorBlocks.
+		On("HeaderByID", mock.Anything).
+		Return(s.finalizedBlock.Header, nil).
+		Maybe() // used for some tests
+
+	validatorBlocks.
+		On("FinalizedHeader", mock.Anything).
+		Return(s.finalizedBlock.Header, nil).
+		Maybe() // used for some tests
+
+	txValidator, err := validator.NewTransactionValidator(
+		validatorBlocks,
+		s.chainID.Chain(),
+		metrics.NewNoopCollector(),
+		validator.TransactionValidationOptions{
+			MaxTransactionByteSize: flow.DefaultMaxTransactionByteSize,
+			MaxCollectionByteSize:  flow.DefaultMaxCollectionByteSize,
+		},
+		execmock.NewScriptExecutor(s.T()),
+	)
+	s.Require().NoError(err)
+
+	txResCache, err := lru.New[flow.Identifier, *accessmodel.TransactionResult](10)
+	s.Require().NoError(err)
+
+	client := access.NewAccessAPIClient(s.T())
+	client.
+		On("SendTransaction", mock.Anything, mock.Anything).
+		Return(&accessproto.SendTransactionResponse{}, nil).
+		Maybe() // used for some tests
+
+	txParams := transactions.Params{
+		Log:                         s.log,
+		Metrics:                     metrics.NewNoopCollector(),
+		State:                       s.state,
+		ChainID:                     s.chainID,
+		SystemTxID:                  s.systemTx.ID(),
+		SystemTx:                    s.systemTx,
+		StaticCollectionRPCClient:   client,
+		HistoricalAccessNodeClients: nil,
+		NodeCommunicator:            nodeCommunicator,
+		ConnFactory:                 s.connectionFactory,
+		EnableRetries:               false,
+		NodeProvider:                execNodeProvider,
+		Blocks:                      s.blocks,
+		Collections:                 s.collections,
+		Transactions:                s.transactions,
+		TxErrorMessageProvider:      errorMessageProvider,
+		TxResultCache:               txResCache,
+		TxProvider:                  txProvider,
+		TxValidator:                 txValidator,
+		TxStatusDeriver:             txStatusDeriver,
+		EventsIndex:                 s.eventIndex,
+		TxResultsIndex:              s.txResultIndex,
 	}
+	txBackend, err := transactions.NewTransactionsBackend(txParams)
+	s.Require().NoError(err)
+
+	s.txStreamBackend = NewTransactionStreamBackend(
+		s.log,
+		s.state,
+		subscriptionHandler,
+		s.blockTracker,
+		txBackend.SendTransaction,
+		s.blocks,
+		s.collections,
+		s.transactions,
+		txProvider,
+		txStatusDeriver,
+	)
 }
 
-// initializeMainMockInstructions sets up the main mock behaviors for components used in TransactionStatusSuite tests.
-func (s *TransactionStatusSuite) initializeMainMockInstructions() {
+// initializeMainMockInstructions sets up the main mock behaviors for components used in TransactionStreamSuite tests.
+func (s *TransactionStreamSuite) initializeMainMockInstructions() {
 	s.transactions.On("Store", mock.Anything).Return(nil).Maybe()
 
 	s.blocks.On("ByHeight", mock.AnythingOfType("uint64")).Return(mocks.StorageMapGetter(s.blockMap)).Maybe()
@@ -295,7 +398,7 @@ func (s *TransactionStatusSuite) initializeMainMockInstructions() {
 }
 
 // initializeHappyCaseMockInstructions sets up mock behaviors for a happy-case scenario in transaction status testing.
-func (s *TransactionStatusSuite) initializeHappyCaseMockInstructions() {
+func (s *TransactionStreamSuite) initializeHappyCaseMockInstructions() {
 	s.initializeMainMockInstructions()
 
 	s.reporter.On("LowestIndexedHeight").Return(s.rootBlock.Header.Height, nil).Maybe()
@@ -323,7 +426,7 @@ func (s *TransactionStatusSuite) initializeHappyCaseMockInstructions() {
 }
 
 // createSendTransaction generate sent transaction with ref block of the current finalized block
-func (s *TransactionStatusSuite) createSendTransaction() flow.Transaction {
+func (s *TransactionStreamSuite) createSendTransaction() flow.Transaction {
 	transaction := unittest.TransactionFixture()
 	transaction.SetReferenceBlockID(s.finalizedBlock.ID())
 	s.transactions.On("ByID", mock.AnythingOfType("flow.Identifier")).Return(&transaction.TransactionBody, nil).Maybe()
@@ -331,7 +434,7 @@ func (s *TransactionStatusSuite) createSendTransaction() flow.Transaction {
 }
 
 // addNewFinalizedBlock sets up a new finalized block using the provided parent header and options, and optionally notifies via broadcasting.
-func (s *TransactionStatusSuite) addNewFinalizedBlock(parent *flow.Header, notify bool, options ...func(*flow.Block)) {
+func (s *TransactionStreamSuite) addNewFinalizedBlock(parent *flow.Header, notify bool, options ...func(*flow.Block)) {
 	s.finalizedBlock = unittest.BlockWithParentFixture(parent)
 	for _, option := range options {
 		option(s.finalizedBlock)
@@ -344,7 +447,7 @@ func (s *TransactionStatusSuite) addNewFinalizedBlock(parent *flow.Header, notif
 	}
 }
 
-func (s *TransactionStatusSuite) mockTransactionResult(transactionID *flow.Identifier, hasTransactionResultInStorage *bool) {
+func (s *TransactionStreamSuite) mockTransactionResult(transactionID *flow.Identifier, hasTransactionResultInStorage *bool) {
 	s.transactionResults.
 		On("ByBlockIDTransactionID", mock.Anything, mock.Anything).
 		Return(
@@ -361,7 +464,7 @@ func (s *TransactionStatusSuite) mockTransactionResult(transactionID *flow.Ident
 		)
 }
 
-func (s *TransactionStatusSuite) addBlockWithTransaction(transaction *flow.Transaction) {
+func (s *TransactionStreamSuite) addBlockWithTransaction(transaction *flow.Transaction) {
 	col := flow.CollectionFromTransactions([]*flow.Transaction{transaction})
 	colID := col.ID()
 	guarantee := col.Guarantee()
@@ -377,7 +480,7 @@ func (s *TransactionStatusSuite) addBlockWithTransaction(transaction *flow.Trans
 
 // Create a special common function to read subscription messages from the channel and check converting it to transaction info
 // and check results for correctness
-func (s *TransactionStatusSuite) checkNewSubscriptionMessage(sub subscription.Subscription, txId flow.Identifier, expectedTxStatuses []flow.TransactionStatus) {
+func (s *TransactionStreamSuite) checkNewSubscriptionMessage(sub subscription.Subscription, txId flow.Identifier, expectedTxStatuses []flow.TransactionStatus) {
 	unittest.RequireReturnsBefore(s.T(), func() {
 		v, ok := <-sub.Channel()
 		require.True(s.T(), ok,
@@ -398,7 +501,7 @@ func (s *TransactionStatusSuite) checkNewSubscriptionMessage(sub subscription.Su
 }
 
 // checkGracefulShutdown ensures the provided subscription shuts down gracefully within a specified timeout duration.
-func (s *TransactionStatusSuite) checkGracefulShutdown(sub subscription.Subscription) {
+func (s *TransactionStreamSuite) checkGracefulShutdown(sub subscription.Subscription) {
 	// Ensure subscription shuts down gracefully
 	unittest.RequireReturnsBefore(s.T(), func() {
 		<-sub.Channel()
@@ -408,7 +511,7 @@ func (s *TransactionStatusSuite) checkGracefulShutdown(sub subscription.Subscrip
 
 // TestSendAndSubscribeTransactionStatusHappyCase tests the functionality of the SubscribeTransactionStatusesFromStartBlockID method in the Backend.
 // It covers the emulation of transaction stages from pending to sealed, and receiving status updates.
-func (s *TransactionStatusSuite) TestSendAndSubscribeTransactionStatusHappyCase() {
+func (s *TransactionStreamSuite) TestSendAndSubscribeTransactionStatusHappyCase() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -424,7 +527,7 @@ func (s *TransactionStatusSuite) TestSendAndSubscribeTransactionStatusHappyCase(
 	s.mockTransactionResult(&txId, &hasTransactionResultInStorage)
 
 	// 1. Subscribe to transaction status and receive the first message with pending status
-	sub := s.backend.SendAndSubscribeTransactionStatuses(ctx, &transaction.TransactionBody, entities.EventEncodingVersion_CCF_V0)
+	sub := s.txStreamBackend.SendAndSubscribeTransactionStatuses(ctx, &transaction.TransactionBody, entities.EventEncodingVersion_CCF_V0)
 	s.checkNewSubscriptionMessage(sub, txId, []flow.TransactionStatus{flow.TransactionStatusPending})
 
 	// 2. Make transaction reference block sealed, and add a new finalized block that includes the transaction
@@ -451,7 +554,7 @@ func (s *TransactionStatusSuite) TestSendAndSubscribeTransactionStatusHappyCase(
 
 // TestSendAndSubscribeTransactionStatusExpired tests the functionality of the SubscribeTransactionStatusesFromStartBlockID method in the Backend
 // when transaction become expired
-func (s *TransactionStatusSuite) TestSendAndSubscribeTransactionStatusExpired() {
+func (s *TransactionStreamSuite) TestSendAndSubscribeTransactionStatusExpired() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -474,7 +577,7 @@ func (s *TransactionStatusSuite) TestSendAndSubscribeTransactionStatusExpired() 
 	s.collections.On("LightByTransactionID", txId).Return(nil, storage.ErrNotFound)
 
 	// Subscribe to transaction status and receive the first message with pending status
-	sub := s.backend.SendAndSubscribeTransactionStatuses(ctx, &transaction.TransactionBody, entities.EventEncodingVersion_CCF_V0)
+	sub := s.txStreamBackend.SendAndSubscribeTransactionStatuses(ctx, &transaction.TransactionBody, entities.EventEncodingVersion_CCF_V0)
 	s.checkNewSubscriptionMessage(sub, txId, []flow.TransactionStatus{flow.TransactionStatusPending})
 
 	// Generate 600 blocks without transaction included and check, that transaction still pending
@@ -498,7 +601,7 @@ func (s *TransactionStatusSuite) TestSendAndSubscribeTransactionStatusExpired() 
 }
 
 // TestSubscribeTransactionStatusWithCurrentPending verifies the subscription behavior for a transaction starting as pending.
-func (s *TransactionStatusSuite) TestSubscribeTransactionStatusWithCurrentPending() {
+func (s *TransactionStreamSuite) TestSubscribeTransactionStatusWithCurrentPending() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -511,7 +614,7 @@ func (s *TransactionStatusSuite) TestSubscribeTransactionStatusWithCurrentPendin
 	hasTransactionResultInStorage := false
 	s.mockTransactionResult(&txId, &hasTransactionResultInStorage)
 
-	sub := s.backend.SubscribeTransactionStatuses(ctx, txId, entities.EventEncodingVersion_CCF_V0)
+	sub := s.txStreamBackend.SubscribeTransactionStatuses(ctx, txId, entities.EventEncodingVersion_CCF_V0)
 	s.checkNewSubscriptionMessage(sub, txId, []flow.TransactionStatus{flow.TransactionStatusPending})
 
 	s.addBlockWithTransaction(&transaction)
@@ -532,7 +635,7 @@ func (s *TransactionStatusSuite) TestSubscribeTransactionStatusWithCurrentPendin
 }
 
 // TestSubscribeTransactionStatusWithCurrentFinalized verifies the subscription behavior for a transaction starting as finalized.
-func (s *TransactionStatusSuite) TestSubscribeTransactionStatusWithCurrentFinalized() {
+func (s *TransactionStreamSuite) TestSubscribeTransactionStatusWithCurrentFinalized() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -546,7 +649,7 @@ func (s *TransactionStatusSuite) TestSubscribeTransactionStatusWithCurrentFinali
 
 	s.addBlockWithTransaction(&transaction)
 
-	sub := s.backend.SubscribeTransactionStatuses(ctx, txId, entities.EventEncodingVersion_CCF_V0)
+	sub := s.txStreamBackend.SubscribeTransactionStatuses(ctx, txId, entities.EventEncodingVersion_CCF_V0)
 	s.checkNewSubscriptionMessage(sub, txId, []flow.TransactionStatus{flow.TransactionStatusPending, flow.TransactionStatusFinalized})
 
 	hasTransactionResultInStorage = true
@@ -564,7 +667,7 @@ func (s *TransactionStatusSuite) TestSubscribeTransactionStatusWithCurrentFinali
 }
 
 // TestSubscribeTransactionStatusWithCurrentExecuted verifies the subscription behavior for a transaction starting as executed.
-func (s *TransactionStatusSuite) TestSubscribeTransactionStatusWithCurrentExecuted() {
+func (s *TransactionStreamSuite) TestSubscribeTransactionStatusWithCurrentExecuted() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -582,8 +685,15 @@ func (s *TransactionStatusSuite) TestSubscribeTransactionStatusWithCurrentExecut
 	// init transaction result for storage
 	hasTransactionResultInStorage = true
 	s.addNewFinalizedBlock(s.finalizedBlock.Header, true)
-	sub := s.backend.SubscribeTransactionStatuses(ctx, txId, entities.EventEncodingVersion_CCF_V0)
-	s.checkNewSubscriptionMessage(sub, txId, []flow.TransactionStatus{flow.TransactionStatusPending, flow.TransactionStatusFinalized, flow.TransactionStatusExecuted})
+	sub := s.txStreamBackend.SubscribeTransactionStatuses(ctx, txId, entities.EventEncodingVersion_CCF_V0)
+	s.checkNewSubscriptionMessage(
+		sub,
+		txId,
+		[]flow.TransactionStatus{
+			flow.TransactionStatusPending,
+			flow.TransactionStatusFinalized,
+			flow.TransactionStatusExecuted,
+		})
 
 	// 4. Make the transaction block sealed, and add a new finalized block
 	s.sealedBlock = s.finalizedBlock
@@ -598,7 +708,7 @@ func (s *TransactionStatusSuite) TestSubscribeTransactionStatusWithCurrentExecut
 }
 
 // TestSubscribeTransactionStatusWithCurrentSealed verifies the subscription behavior for a transaction starting as sealed.
-func (s *TransactionStatusSuite) TestSubscribeTransactionStatusWithCurrentSealed() {
+func (s *TransactionStreamSuite) TestSubscribeTransactionStatusWithCurrentSealed() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -619,7 +729,7 @@ func (s *TransactionStatusSuite) TestSubscribeTransactionStatusWithCurrentSealed
 	s.sealedBlock = s.finalizedBlock
 	s.addNewFinalizedBlock(s.sealedBlock.Header, true)
 
-	sub := s.backend.SubscribeTransactionStatuses(ctx, txId, entities.EventEncodingVersion_CCF_V0)
+	sub := s.txStreamBackend.SubscribeTransactionStatuses(ctx, txId, entities.EventEncodingVersion_CCF_V0)
 
 	s.checkNewSubscriptionMessage(
 		sub,
@@ -641,7 +751,7 @@ func (s *TransactionStatusSuite) TestSubscribeTransactionStatusWithCurrentSealed
 
 // TestSubscribeTransactionStatusFailedSubscription verifies the behavior of subscription when transaction status fails.
 // Ensures failure scenarios are handled correctly, such as missing sealed header, start height, or transaction by ID.
-func (s *TransactionStatusSuite) TestSubscribeTransactionStatusFailedSubscription() {
+func (s *TransactionStreamSuite) TestSubscribeTransactionStatusFailedSubscription() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -658,7 +768,7 @@ func (s *TransactionStatusSuite) TestSubscribeTransactionStatusFailedSubscriptio
 		signalerCtx := irrecoverable.WithSignalerContext(ctx,
 			irrecoverable.NewMockSignalerContextExpectError(s.T(), ctx, fmt.Errorf("failed to lookup sealed block: %w", expectedError)))
 
-		sub := s.backend.SubscribeTransactionStatuses(signalerCtx, txId, entities.EventEncodingVersion_CCF_V0)
+		sub := s.txStreamBackend.SubscribeTransactionStatuses(signalerCtx, txId, entities.EventEncodingVersion_CCF_V0)
 		s.Assert().ErrorContains(sub.Err(), fmt.Errorf("failed to lookup sealed block: %w", expectedError).Error())
 	})
 
@@ -670,7 +780,7 @@ func (s *TransactionStatusSuite) TestSubscribeTransactionStatusFailedSubscriptio
 		expectedError := storage.ErrNotFound
 		s.blockTracker.On("GetStartHeightFromBlockID", s.sealedBlock.ID()).Return(uint64(0), expectedError).Once()
 
-		sub := s.backend.SubscribeTransactionStatuses(ctx, txId, entities.EventEncodingVersion_CCF_V0)
+		sub := s.txStreamBackend.SubscribeTransactionStatuses(ctx, txId, entities.EventEncodingVersion_CCF_V0)
 		s.Assert().ErrorContains(sub.Err(), expectedError.Error())
 	})
 }
