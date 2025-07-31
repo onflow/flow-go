@@ -43,23 +43,23 @@ func (_m *Headers) BlockIDByHeight(height uint64) (flow.Identifier, error) {
 }
 
 // ByBlockID provides a mock function with given fields: blockID
-func (_m *Headers) ByBlockID(blockID flow.Identifier) (*flow.Header, error) {
+func (_m *Headers) ByBlockID(blockID flow.Identifier) (*flow.UnsignedHeader, error) {
 	ret := _m.Called(blockID)
 
 	if len(ret) == 0 {
 		panic("no return value specified for ByBlockID")
 	}
 
-	var r0 *flow.Header
+	var r0 *flow.UnsignedHeader
 	var r1 error
-	if rf, ok := ret.Get(0).(func(flow.Identifier) (*flow.Header, error)); ok {
+	if rf, ok := ret.Get(0).(func(flow.Identifier) (*flow.UnsignedHeader, error)); ok {
 		return rf(blockID)
 	}
-	if rf, ok := ret.Get(0).(func(flow.Identifier) *flow.Header); ok {
+	if rf, ok := ret.Get(0).(func(flow.Identifier) *flow.UnsignedHeader); ok {
 		r0 = rf(blockID)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*flow.Header)
+			r0 = ret.Get(0).(*flow.UnsignedHeader)
 		}
 	}
 
@@ -73,23 +73,23 @@ func (_m *Headers) ByBlockID(blockID flow.Identifier) (*flow.Header, error) {
 }
 
 // ByHeight provides a mock function with given fields: height
-func (_m *Headers) ByHeight(height uint64) (*flow.Header, error) {
+func (_m *Headers) ByHeight(height uint64) (*flow.UnsignedHeader, error) {
 	ret := _m.Called(height)
 
 	if len(ret) == 0 {
 		panic("no return value specified for ByHeight")
 	}
 
-	var r0 *flow.Header
+	var r0 *flow.UnsignedHeader
 	var r1 error
-	if rf, ok := ret.Get(0).(func(uint64) (*flow.Header, error)); ok {
+	if rf, ok := ret.Get(0).(func(uint64) (*flow.UnsignedHeader, error)); ok {
 		return rf(height)
 	}
-	if rf, ok := ret.Get(0).(func(uint64) *flow.Header); ok {
+	if rf, ok := ret.Get(0).(func(uint64) *flow.UnsignedHeader); ok {
 		r0 = rf(height)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*flow.Header)
+			r0 = ret.Get(0).(*flow.UnsignedHeader)
 		}
 	}
 
@@ -103,23 +103,23 @@ func (_m *Headers) ByHeight(height uint64) (*flow.Header, error) {
 }
 
 // ByParentID provides a mock function with given fields: parentID
-func (_m *Headers) ByParentID(parentID flow.Identifier) ([]*flow.Header, error) {
+func (_m *Headers) ByParentID(parentID flow.Identifier) ([]*flow.UnsignedHeader, error) {
 	ret := _m.Called(parentID)
 
 	if len(ret) == 0 {
 		panic("no return value specified for ByParentID")
 	}
 
-	var r0 []*flow.Header
+	var r0 []*flow.UnsignedHeader
 	var r1 error
-	if rf, ok := ret.Get(0).(func(flow.Identifier) ([]*flow.Header, error)); ok {
+	if rf, ok := ret.Get(0).(func(flow.Identifier) ([]*flow.UnsignedHeader, error)); ok {
 		return rf(parentID)
 	}
-	if rf, ok := ret.Get(0).(func(flow.Identifier) []*flow.Header); ok {
+	if rf, ok := ret.Get(0).(func(flow.Identifier) []*flow.UnsignedHeader); ok {
 		r0 = rf(parentID)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]*flow.Header)
+			r0 = ret.Get(0).([]*flow.UnsignedHeader)
 		}
 	}
 

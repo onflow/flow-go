@@ -11,7 +11,7 @@ const ExpandableFieldPayload = "payload"
 const ExpandableExecutionResult = "execution_result"
 
 func NewBlock(
-	block *flow.Block,
+	block *flow.UnsignedBlock,
 	execResult *flow.ExecutionResult,
 	link LinkGenerator,
 	blockStatus flow.BlockStatus,
@@ -73,7 +73,7 @@ func NewBlock(
 }
 
 func (b *Block) Build(
-	block *flow.Block,
+	block *flow.UnsignedBlock,
 	execResult *flow.ExecutionResult,
 	link LinkGenerator,
 	blockStatus flow.BlockStatus,
@@ -163,7 +163,7 @@ func (b *BlockPayload) Build(payload *flow.Payload) error {
 	return nil
 }
 
-func NewBlockHeader(header *flow.Header) *BlockHeader {
+func NewBlockHeader(header *flow.UnsignedHeader) *BlockHeader {
 	return &BlockHeader{
 		Id:                   header.ID().String(),
 		ParentId:             header.ParentID.String(),
@@ -173,7 +173,7 @@ func NewBlockHeader(header *flow.Header) *BlockHeader {
 	}
 }
 
-func (b *BlockHeader) Build(header *flow.Header) {
+func (b *BlockHeader) Build(header *flow.UnsignedHeader) {
 	b.Id = header.ID().String()
 	b.ParentId = header.ParentID.String()
 	b.Height = util.FromUint(header.Height)

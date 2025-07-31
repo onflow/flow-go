@@ -35,5 +35,5 @@ type Terminal interface {
 
 	// ConfirmTerminalReached is a self-consistency check that the lowest visited block is
 	// in fact the expected terminal.
-	ConfirmTerminalReached(headers storage.Headers, lowestVisitedBlock *flow.Header) error
+	ConfirmTerminalReached(headers storage.Headers, lowestVisitedBlock *flow.UnsignedHeader) error
 }

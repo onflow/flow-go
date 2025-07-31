@@ -73,8 +73,8 @@ type EpochBuilder struct {
 	t                    *testing.T
 	mutableProtocolState protocol.MutableProtocolState
 	states               []protocol.FollowerState
-	blocksByID           map[flow.Identifier]*flow.Block
-	blocks               []*flow.Block
+	blocksByID           map[flow.Identifier]*flow.UnsignedBlock
+	blocks               []*flow.UnsignedBlock
 	built                map[uint64]*EpochHeights
 	setupOpts            []func(*flow.EpochSetup)  // options to apply to the EpochSetup event
 	commitOpts           []func(*flow.EpochCommit) // options to apply to the EpochCommit event
@@ -90,8 +90,8 @@ func NewEpochBuilder(t *testing.T, mutator protocol.MutableProtocolState, states
 		t:                    t,
 		mutableProtocolState: mutator,
 		states:               states,
-		blocksByID:           make(map[flow.Identifier]*flow.Block),
-		blocks:               make([]*flow.Block, 0),
+		blocksByID:           make(map[flow.Identifier]*flow.UnsignedBlock),
+		blocks:               make([]*flow.UnsignedBlock, 0),
 		built:                make(map[uint64]*EpochHeights),
 	}
 	return builder
@@ -364,7 +364,7 @@ func (builder *EpochBuilder) CompleteEpoch() *EpochBuilder {
 
 // addBlock adds the given block to the state by: extending the state,
 // finalizing the block, and caching the block.
-func (builder *EpochBuilder) addBlock(block *flow.Block) {
+func (builder *EpochBuilder) addBlock(block *flow.UnsignedBlock) {
 	updatedStateId, dbUpdates, err := builder.mutableProtocolState.EvolveState(block.ParentID, block.View, block.Payload.Seals)
 	require.NoError(builder.t, err)
 	require.False(builder.t, dbUpdates.IsEmpty())

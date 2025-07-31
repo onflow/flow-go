@@ -22,7 +22,7 @@ func constructRootHeaderBody(rootChain string, rootParent string, rootHeight uin
 }
 
 // constructRootBlock constructs a valid root block based on the given header and protocol state ID for that block.
-func constructRootBlock(rootHeaderBody *flow.HeaderBody, protocolStateID flow.Identifier) (*flow.Block, error) {
+func constructRootBlock(rootHeaderBody *flow.HeaderBody, protocolStateID flow.Identifier) (*flow.UnsignedBlock, error) {
 	payload, err := flow.NewPayload(
 		flow.UntrustedPayload{
 			Guarantees:      nil,
@@ -36,8 +36,8 @@ func constructRootBlock(rootHeaderBody *flow.HeaderBody, protocolStateID flow.Id
 		return nil, fmt.Errorf("could not construct payload: %w", err)
 	}
 
-	block, err := flow.NewRootBlock(
-		flow.UntrustedBlock{
+	block, err := flow.NewRootUnsignedBlock(
+		flow.UntrustedUnsignedBlock{
 			HeaderBody: *rootHeaderBody,
 			Payload:    *payload,
 		},

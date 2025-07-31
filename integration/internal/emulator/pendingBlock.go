@@ -59,7 +59,7 @@ type pendingBlock struct {
 
 // newPendingBlock creates a new pending block sequentially after a specified block.
 func newPendingBlock(
-	prevBlock *flowgo.Block,
+	prevBlock *flowgo.UnsignedBlock,
 	ledgerSnapshot snapshot.StorageSnapshot,
 	chainID flowgo.ChainID,
 	timestamp time.Time,
@@ -86,7 +86,7 @@ func newPendingBlock(
 }
 
 // Block returns the block information for the pending block.
-func (b *pendingBlock) Block() *flowgo.Block {
+func (b *pendingBlock) Block() *flowgo.UnsignedBlock {
 	collections := b.Collections()
 
 	guarantees := make([]*flowgo.CollectionGuarantee, len(collections))
@@ -97,7 +97,7 @@ func (b *pendingBlock) Block() *flowgo.Block {
 	}
 
 	//nolint:structwrite - safe because Emulator is strictly used for integration tests
-	return &flowgo.Block{
+	return &flowgo.UnsignedBlock{
 		HeaderBody: flowgo.HeaderBody{
 			ChainID:   b.chainID,
 			Height:    b.height,

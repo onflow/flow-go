@@ -84,17 +84,17 @@ type ProtocolStateEntryWrapper struct {
 
 // Highest is the highest block in the sealing segment and the reference block from snapshot that was
 // used to produce this sealing segment.
-func (segment *SealingSegment) Highest() *Block {
+func (segment *SealingSegment) Highest() *UnsignedBlock {
 	return &segment.Blocks[len(segment.Blocks)-1].Block
 }
 
 // Finalized returns the last finalized block, which is an alias of Highest
-func (segment *SealingSegment) Finalized() *Block {
+func (segment *SealingSegment) Finalized() *UnsignedBlock {
 	return segment.Highest()
 }
 
 // Sealed returns the most recently sealed block based on head of sealing segment(highest block).
-func (segment *SealingSegment) Sealed() *Block {
+func (segment *SealingSegment) Sealed() *UnsignedBlock {
 	return &segment.Blocks[0].Block
 }
 
@@ -453,7 +453,7 @@ func (builder *SealingSegmentBuilder) SealingSegment() (*SealingSegment, error) 
 }
 
 // isValidHeight returns true iff block is exactly 1 height higher than the current highest block in the segment.
-func (builder *SealingSegmentBuilder) isValidHeight(block *Block) bool {
+func (builder *SealingSegmentBuilder) isValidHeight(block *UnsignedBlock) bool {
 	if builder.highest() == nil {
 		return true
 	}
@@ -536,7 +536,7 @@ func (builder *SealingSegmentBuilder) validateSegment() error {
 }
 
 // highest returns the highest block in segment.
-func (builder *SealingSegmentBuilder) highest() *Block {
+func (builder *SealingSegmentBuilder) highest() *UnsignedBlock {
 	if len(builder.blocks) == 0 {
 		return nil
 	}
@@ -545,7 +545,7 @@ func (builder *SealingSegmentBuilder) highest() *Block {
 }
 
 // lowest returns the lowest block in segment.
-func (builder *SealingSegmentBuilder) lowest() *Block {
+func (builder *SealingSegmentBuilder) lowest() *UnsignedBlock {
 	return &builder.blocks[0].Block
 }
 

@@ -48,8 +48,8 @@ type ComplianceCore struct {
 	follower                  module.HotStuffFollower
 	validator                 hotstuff.Validator
 	sync                      module.BlockRequester
-	certifiedRangesChan       chan CertifiedBlocks // delivers ranges of certified blocks to main core worker
-	finalizedBlocksChan       chan *flow.Header    // delivers finalized blocks to main core worker.
+	certifiedRangesChan       chan CertifiedBlocks      // delivers ranges of certified blocks to main core worker
+	finalizedBlocksChan       chan *flow.UnsignedHeader // delivers finalized blocks to main core worker.
 }
 
 var _ complianceCore = (*ComplianceCore)(nil)
@@ -83,7 +83,7 @@ func NewComplianceCore(log zerolog.Logger,
 		sync:                      sync,
 		tracer:                    tracer,
 		certifiedRangesChan:       make(chan CertifiedBlocks, defaultCertifiedRangeChannelCapacity),
-		finalizedBlocksChan:       make(chan *flow.Header, defaultFinalizedBlocksChannelCapacity),
+		finalizedBlocksChan:       make(chan *flow.UnsignedHeader, defaultFinalizedBlocksChannelCapacity),
 	}
 
 	// prune cache to latest finalized view
@@ -222,7 +222,7 @@ func (c *ComplianceCore) processCoreSeqEvents(ctx irrecoverable.SignalerContext,
 // to be processed by internal goroutine.
 // This function is safe to use in concurrent environment.
 // CAUTION: this function blocks and hence is not compliant with the `FinalizationConsumer.OnFinalizedBlock` interface.
-func (c *ComplianceCore) OnFinalizedBlock(final *flow.Header) {
+func (c *ComplianceCore) OnFinalizedBlock(final *flow.UnsignedHeader) {
 	c.pendingCache.PruneUpToView(final.View)
 
 	// in-case we have already stopped our worker we use a select statement to avoid
@@ -279,7 +279,7 @@ func (c *ComplianceCore) processCertifiedBlocks(ctx context.Context, blocks Cert
 // processFinalizedBlock informs the PendingTree about finalization of the given block.
 // Is NOT concurrency safe: should be executed by _single dedicated_ goroutine.
 // No errors expected during normal operations.
-func (c *ComplianceCore) processFinalizedBlock(ctx context.Context, finalized *flow.Header) error {
+func (c *ComplianceCore) processFinalizedBlock(ctx context.Context, finalized *flow.UnsignedHeader) error {
 	span, _ := c.tracer.StartSpanFromContext(ctx, trace.FollowerProcessFinalizedBlock)
 	defer span.End()
 

@@ -11,7 +11,7 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-func doTest(t *testing.T, f func(*testing.T, *storageMock.Headers, Blocks, *flow.Header)) func(*testing.T) {
+func doTest(t *testing.T, f func(*testing.T, *storageMock.Headers, Blocks, *flow.UnsignedHeader)) func(*testing.T) {
 	return func(t *testing.T) {
 
 		headers := new(storageMock.Headers)
@@ -27,13 +27,13 @@ func doTest(t *testing.T, f func(*testing.T, *storageMock.Headers, Blocks, *flow
 
 func Test_BlockFinder_ReturnsHeaderIfSameHeight(t *testing.T) {
 
-	t.Run("returns header is height is the same", doTest(t, func(t *testing.T, headers *storageMock.Headers, blockFinder Blocks, header *flow.Header) {
+	t.Run("returns header is height is the same", doTest(t, func(t *testing.T, headers *storageMock.Headers, blockFinder Blocks, header *flow.UnsignedHeader) {
 		heightFrom, err := blockFinder.ByHeightFrom(10, header)
 		require.NoError(t, err)
 		require.Equal(t, *header, *heightFrom)
 	}))
 
-	t.Run("nil header defaults to ByHeight", doTest(t, func(t *testing.T, headers *storageMock.Headers, blockFinder Blocks, header *flow.Header) {
+	t.Run("nil header defaults to ByHeight", doTest(t, func(t *testing.T, headers *storageMock.Headers, blockFinder Blocks, header *flow.UnsignedHeader) {
 
 		headers.On("ByHeight", uint64(10)).Return(header, nil)
 
@@ -42,7 +42,7 @@ func Test_BlockFinder_ReturnsHeaderIfSameHeight(t *testing.T) {
 		require.Equal(t, *header, *heightFrom)
 	}))
 
-	t.Run("follows blocks chain", doTest(t, func(t *testing.T, headers *storageMock.Headers, blockFinder Blocks, header *flow.Header) {
+	t.Run("follows blocks chain", doTest(t, func(t *testing.T, headers *storageMock.Headers, blockFinder Blocks, header *flow.UnsignedHeader) {
 
 		header0 := unittest.BlockHeaderFixture()
 		header0.Height = 0
@@ -68,7 +68,7 @@ func Test_BlockFinder_ReturnsHeaderIfSameHeight(t *testing.T) {
 		require.Equal(t, *header0, *heightFrom)
 	}))
 
-	t.Run("skips heights once it get to finalized chain", doTest(t, func(t *testing.T, headers *storageMock.Headers, blockFinder Blocks, header *flow.Header) {
+	t.Run("skips heights once it get to finalized chain", doTest(t, func(t *testing.T, headers *storageMock.Headers, blockFinder Blocks, header *flow.UnsignedHeader) {
 
 		header0 := unittest.BlockHeaderFixture()
 		header0.Height = 0

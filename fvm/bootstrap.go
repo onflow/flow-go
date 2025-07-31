@@ -75,7 +75,7 @@ type BootstrapProcedure struct {
 }
 
 type BootstrapParams struct {
-	rootHeader *flow.Header
+	rootHeader *flow.UnsignedHeader
 
 	// genesis parameters
 	accountKeys        BootstrapAccountKeys
@@ -194,7 +194,7 @@ func WithEpochConfig(epochConfig epochs.EpochConfig) BootstrapProcedureOption {
 	}
 }
 
-func WithRootBlock(rootBlock *flow.Header) BootstrapProcedureOption {
+func WithRootBlock(rootBlock *flow.UnsignedHeader) BootstrapProcedureOption {
 	return func(bp *BootstrapProcedure) *BootstrapProcedure {
 		bp.rootHeader = rootBlock
 		return bp
@@ -483,7 +483,7 @@ func (b *bootstrapExecutor) Execute() error {
 // genesisHeader creates genesis block header with empty payload.
 //
 // This function must always return a structurally valid genesis block header.
-func (b *bootstrapExecutor) genesisHeader() (*flow.Header, error) {
+func (b *bootstrapExecutor) genesisHeader() (*flow.UnsignedHeader, error) {
 	// create the raw content for the genesis block
 	payload := flow.NewEmptyPayload()
 
@@ -501,8 +501,8 @@ func (b *bootstrapExecutor) genesisHeader() (*flow.Header, error) {
 		return nil, fmt.Errorf("failed to create root header body: %w", err)
 	}
 
-	header, err := flow.NewRootHeader(
-		flow.UntrustedHeader{
+	header, err := flow.NewRootUnsignedHeader(
+		flow.UntrustedUnsignedHeader{
 			HeaderBody:  *headerBody,
 			PayloadHash: payload.Hash(),
 		})

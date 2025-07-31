@@ -344,8 +344,8 @@ func mergeNodeInfos(internalNodes, partnerNodes []model.NodeInfo) ([]model.NodeI
 
 // readRootBlock reads root block data from disc, this file needs to be prepared with
 // rootblock command
-func readRootBlock() *flow.Block {
-	rootBlock, err := utils.ReadData[flow.Block](flagRootBlockPath)
+func readRootBlock() *flow.UnsignedBlock {
+	rootBlock, err := utils.ReadData[flow.UnsignedBlock](flagRootBlockPath)
 	if err != nil {
 		log.Fatal().Err(err).Msg("could not read root block data")
 	}
@@ -407,7 +407,7 @@ func readIntermediaryBootstrappingData() *IntermediaryBootstrappingData {
 // generateEmptyExecutionState generates a new empty execution state with the
 // given configuration. Sets the flagRootCommit variable for future reads.
 func generateEmptyExecutionState(
-	rootBlock *flow.Header,
+	rootBlock *flow.UnsignedHeader,
 	epochConfig epochs.EpochConfig,
 	nodes []bootstrap.NodeInfo,
 ) (commit flow.StateCommitment) {

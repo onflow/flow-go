@@ -170,7 +170,7 @@ func WithEventCollectionSizeLimit(limit uint64) Option {
 // WithBlockHeader sets the block header for a virtual machine context.
 //
 // The VM uses the header to provide current block information to the Cadence runtime.
-func WithBlockHeader(header *flow.Header) Option {
+func WithBlockHeader(header *flow.UnsignedHeader) Option {
 	return func(ctx Context) Context {
 		ctx.BlockHeader = header
 		return ctx

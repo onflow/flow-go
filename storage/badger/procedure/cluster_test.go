@@ -19,7 +19,7 @@ func TestInsertRetrieveClusterBlock(t *testing.T) {
 		err := db.Update(InsertClusterBlock(unittest.ClusterProposalFromBlock(block)))
 		require.NoError(t, err)
 
-		var retrieved cluster.Block
+		var retrieved cluster.UnsignedBlock
 		err = db.View(RetrieveClusterBlock(block.ID(), &retrieved))
 		require.NoError(t, err)
 

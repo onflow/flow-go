@@ -168,7 +168,7 @@ func (s *HandlerTestSuite) TestHeartbeatResponse() {
 		}()
 
 		// expect a response for every other block
-		expectedBlocks := make([]*flow.Block, 0)
+		expectedBlocks := make([]*flow.UnsignedBlock, 0)
 		for i, block := range s.blocks {
 			if (i+1)%int(req.HeartbeatInterval) == 0 {
 				expectedBlocks = append(expectedBlocks, block)

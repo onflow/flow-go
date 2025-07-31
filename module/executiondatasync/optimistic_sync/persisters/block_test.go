@@ -34,7 +34,7 @@ type PersisterSuite struct {
 	latestPersistedSealedResult *storagemock.LatestPersistedSealedResult
 	database                    *storagemock.DB
 	executionResult             *flow.ExecutionResult
-	header                      *flow.Header
+	header                      *flow.UnsignedHeader
 }
 
 func TestPersisterSuite(t *testing.T) {

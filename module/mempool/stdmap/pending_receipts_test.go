@@ -17,7 +17,7 @@ func TestPendingReceipts(t *testing.T) {
 	t.Parallel()
 
 	headers := &mockstorage.Headers{}
-	zeroHeader := &flow.Header{}
+	zeroHeader := &flow.UnsignedHeader{}
 	headers.On("ByBlockID", mock.Anything).Return(zeroHeader, nil).Maybe()
 
 	t.Run("get nothing", func(t *testing.T) {

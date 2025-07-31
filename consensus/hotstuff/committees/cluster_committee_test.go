@@ -28,7 +28,7 @@ type ClusterSuite struct {
 	payloads *storagemock.ClusterPayloads
 
 	members flow.IdentityList
-	root    *cluster.Block
+	root    *cluster.UnsignedBlock
 	me      *flow.Identity
 
 	com *Cluster

@@ -37,7 +37,7 @@ func NewCore(
 // checkMyCommitWithSealedCommit is the main check of the checker engine
 func checkMyCommitWithSealedCommit(
 	logger zerolog.Logger,
-	executedBlock *flow.Header,
+	executedBlock *flow.UnsignedHeader,
 	myCommit flow.StateCommitment,
 	sealedCommit flow.StateCommitment,
 ) error {
@@ -112,7 +112,7 @@ func (c *Core) RunCheck() error {
 }
 
 // findLastSealedBlock finds the last sealed block
-func (c *Core) findLastSealedBlock() (*flow.Header, *flow.Header, *flow.Seal, error) {
+func (c *Core) findLastSealedBlock() (*flow.UnsignedHeader, *flow.UnsignedHeader, *flow.Seal, error) {
 	finalized := c.state.Final()
 	lastFinal, err := finalized.Head()
 	if err != nil {
@@ -142,7 +142,7 @@ func (c *Core) findLastExecutedBlockHeight() (uint64, error) {
 }
 
 // findLatestSealedAtHeight finds the latest sealed block at the given height
-func (c *Core) findLatestSealedAtHeight(finalizedHeight uint64) (*flow.Header, *flow.Seal, error) {
+func (c *Core) findLatestSealedAtHeight(finalizedHeight uint64) (*flow.UnsignedHeader, *flow.Seal, error) {
 	_, seal, err := c.state.AtHeight(finalizedHeight).SealedResult()
 	if err != nil {
 		return nil, nil, fmt.Errorf("could not get the last sealed for the finalized block: %w", err)

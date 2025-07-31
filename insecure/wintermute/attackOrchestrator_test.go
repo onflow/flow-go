@@ -581,7 +581,7 @@ func TestPassingThroughMiscellaneousEvents(t *testing.T) {
 			event, ok := args[0].(*insecure.EgressEvent)
 			require.True(t, ok)
 
-			_, ok = event.FlowProtocolEvent.(flow.Block)
+			_, ok = event.FlowProtocolEvent.(flow.UnsignedBlock)
 			require.True(t, ok)
 
 			require.Equal(t, miscellaneousEvent, event)

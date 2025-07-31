@@ -14,7 +14,7 @@ type IncorporatedResultSeal struct {
 
 	// the header of the executed block
 	// useful for indexing the seal by height in the mempool in order for fast pruning
-	Header *Header
+	Header *UnsignedHeader
 }
 
 // IncorporatedResultID returns the identifier of the IncorporatedResult

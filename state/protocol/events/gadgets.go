@@ -11,7 +11,7 @@ type Heights interface {
 }
 
 // OnViewCallback is the type of callback triggered by view events.
-type OnViewCallback func(*flow.Header)
+type OnViewCallback func(*flow.UnsignedHeader)
 
 // Views enables subscribing to specific views. The callback is invoked when the
 // first block of the given view is finalized.

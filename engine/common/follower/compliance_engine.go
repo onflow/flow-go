@@ -96,7 +96,7 @@ func NewComplianceLayer(
 	me module.Local,
 	engMetrics module.EngineMetrics,
 	headers storage.Headers,
-	finalized *flow.Header,
+	finalized *flow.UnsignedHeader,
 	core complianceCore,
 	config compliance.Config,
 	opts ...EngineOption,

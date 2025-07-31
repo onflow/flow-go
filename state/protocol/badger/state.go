@@ -25,9 +25,9 @@ import (
 // we can cache them together
 type cachedLatest struct {
 	finalizedID     flow.Identifier
-	finalizedHeader *flow.Header
+	finalizedHeader *flow.UnsignedHeader
 	sealedID        flow.Identifier
-	sealedHeader    *flow.Header
+	sealedHeader    *flow.UnsignedHeader
 }
 
 type State struct {
@@ -290,7 +290,7 @@ func bootstrapSealingSegment(
 	blocks storage.Blocks,
 	qcs storage.QuorumCertificates,
 	segment *flow.SealingSegment,
-	head *flow.Block,
+	head *flow.UnsignedBlock,
 	rootSeal *flow.Seal,
 ) func(*transaction.Tx) error {
 	return func(tx *transaction.Tx) error {

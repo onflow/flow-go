@@ -48,7 +48,7 @@ func (ss *SyncSuite) RequestedStatus() *chainsync.Status {
 	}
 }
 
-func (ss *SyncSuite) ReceivedStatus(header *flow.Header) *chainsync.Status {
+func (ss *SyncSuite) ReceivedStatus(header *flow.UnsignedHeader) *chainsync.Status {
 	return &chainsync.Status{
 		BlockHeight: header.Height,
 		Queued:      time.Now().Add(-time.Second * 2),
@@ -394,9 +394,9 @@ func (ss *SyncSuite) TestPrune() {
 	final.Height = 100
 
 	var (
-		prunableHeights  []*flow.Block
-		prunableBlockIDs []*flow.Block
-		unprunable       []*flow.Block
+		prunableHeights  []*flow.UnsignedBlock
+		prunableBlockIDs []*flow.UnsignedBlock
+		unprunable       []*flow.UnsignedBlock
 	)
 
 	// add some finalized blocks by height

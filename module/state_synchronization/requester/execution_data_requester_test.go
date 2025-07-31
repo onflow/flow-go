@@ -134,7 +134,7 @@ func MockDownloader(edStore map[flow.Identifier]*testExecutionDataServiceEntry) 
 	return downloader
 }
 
-func (suite *ExecutionDataRequesterSuite) mockProtocolState(blocksByHeight map[uint64]*flow.Block) *statemock.State {
+func (suite *ExecutionDataRequesterSuite) mockProtocolState(blocksByHeight map[uint64]*flow.UnsignedBlock) *statemock.State {
 	state := new(statemock.State)
 
 	suite.mockSnapshot = new(mockSnapshot)
@@ -582,8 +582,8 @@ type fetchTestRun struct {
 	sealedCount              int
 	startHeight              uint64
 	endHeight                uint64
-	blocksByHeight           map[uint64]*flow.Block
-	blocksByID               map[flow.Identifier]*flow.Block
+	blocksByHeight           map[uint64]*flow.UnsignedBlock
+	blocksByID               map[flow.Identifier]*flow.UnsignedBlock
 	resultsByID              map[flow.Identifier]*flow.ExecutionResult
 	resultsByBlockID         map[flow.Identifier]*flow.ExecutionResult
 	sealsByBlockID           map[flow.Identifier]*flow.Seal
@@ -633,8 +633,8 @@ func (r *fetchTestRun) IsLastSeal(blockID flow.Identifier) bool {
 
 func generateTestData(t *testing.T, blobstore blobs.Blobstore, blockCount int, specialHeightFuncs map[uint64]testExecutionDataCallback) *fetchTestRun {
 	edsEntries := map[flow.Identifier]*testExecutionDataServiceEntry{}
-	blocksByHeight := map[uint64]*flow.Block{}
-	blocksByID := map[flow.Identifier]*flow.Block{}
+	blocksByHeight := map[uint64]*flow.UnsignedBlock{}
+	blocksByID := map[flow.Identifier]*flow.UnsignedBlock{}
 	resultsByID := map[flow.Identifier]*flow.ExecutionResult{}
 	resultsByBlockID := map[flow.Identifier]*flow.ExecutionResult{}
 	sealsByBlockID := map[flow.Identifier]*flow.Seal{}
@@ -651,14 +651,14 @@ func generateTestData(t *testing.T, blobstore blobs.Blobstore, blockCount int, s
 	// instantiate ExecutionDataService to generate correct CIDs
 	eds := execution_data.NewExecutionDataStore(blobstore, execution_data.DefaultSerializer)
 
-	var previousBlock *flow.Block
+	var previousBlock *flow.UnsignedBlock
 	var previousResult *flow.ExecutionResult
 	for i := 0; i < blockCount; i++ {
-		var seals []*flow.Header
+		var seals []*flow.UnsignedHeader
 
 		if i >= firstSeal {
 			sealedBlock := blocksByHeight[uint64(i-firstSeal+1)]
-			seals = []*flow.Header{
+			seals = []*flow.UnsignedHeader{
 				sealedBlock.ToHeader(), // block 0 doesn't get sealed (it's pre-sealed in the genesis state)
 			}
 
@@ -721,7 +721,7 @@ func generateTestData(t *testing.T, blobstore blobs.Blobstore, blockCount int, s
 	}
 }
 
-func buildBlock(height uint64, parent *flow.Block, seals []*flow.Header) *flow.Block {
+func buildBlock(height uint64, parent *flow.UnsignedBlock, seals []*flow.UnsignedHeader) *flow.UnsignedBlock {
 	if parent == nil {
 		return unittest.Block.Genesis(flow.Emulator)
 	}
@@ -733,7 +733,7 @@ func buildBlock(height uint64, parent *flow.Block, seals []*flow.Header) *flow.B
 	return unittest.BlockWithParentAndSeals(parent.ToHeader(), seals)
 }
 
-func buildResult(block *flow.Block, cid flow.Identifier, previousResult *flow.ExecutionResult) *flow.ExecutionResult {
+func buildResult(block *flow.UnsignedBlock, cid flow.Identifier, previousResult *flow.ExecutionResult) *flow.ExecutionResult {
 	opts := []func(result *flow.ExecutionResult){
 		unittest.WithBlock(block),
 		unittest.WithExecutionDataID(cid),
@@ -765,14 +765,14 @@ func verifyFetchedExecutionData(t *testing.T, actual receivedExecutionData, cfg 
 }
 
 type mockSnapshot struct {
-	header *flow.Header
+	header *flow.UnsignedHeader
 	err    error
 	mu     sync.Mutex
 }
 
 var _ protocol.Snapshot = &mockSnapshot{}
 
-func (m *mockSnapshot) set(header *flow.Header, err error) {
+func (m *mockSnapshot) set(header *flow.UnsignedHeader, err error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -780,7 +780,7 @@ func (m *mockSnapshot) set(header *flow.Header, err error) {
 	m.err = err
 }
 
-func (m *mockSnapshot) Head() (*flow.Header, error) {
+func (m *mockSnapshot) Head() (*flow.UnsignedHeader, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 

@@ -29,7 +29,7 @@ type RegisterStore interface {
 	// - exception if the block is below the pruned height
 	// - exception if the save block is saved again
 	// - exception for any other exception
-	SaveRegisters(header *flow.Header, registers flow.RegisterEntries) error
+	SaveRegisters(header *flow.UnsignedHeader, registers flow.RegisterEntries) error
 
 	// Depend on FinalizedReader's FinalizedBlockIDAtHeight
 	// Depend on ExecutedFinalizedWAL.Append

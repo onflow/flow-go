@@ -238,7 +238,7 @@ func (v *VersionControl) initBoundaries(
 
 // BlockFinalized is called when a block is finalized.
 // It implements the protocol.Consumer interface.
-func (v *VersionControl) BlockFinalized(h *flow.Header) {
+func (v *VersionControl) BlockFinalized(h *flow.UnsignedHeader) {
 	if v.finalizedHeight.Set(h.Height) {
 		v.finalizedHeightNotifier.Notify()
 	}

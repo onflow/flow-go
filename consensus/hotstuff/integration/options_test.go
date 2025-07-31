@@ -12,7 +12,7 @@ var errStopCondition = errors.New("stop condition reached")
 type Option func(*Config)
 
 type Config struct {
-	Root                   *flow.Header
+	Root                   *flow.UnsignedHeader
 	Participants           flow.IdentityList
 	LocalID                flow.Identifier
 	Timeouts               timeout.Config
@@ -26,7 +26,7 @@ type Config struct {
 	StopCondition Condition
 }
 
-func WithRoot(root *flow.Header) Option {
+func WithRoot(root *flow.UnsignedHeader) Option {
 	return func(cfg *Config) {
 		cfg.Root = root
 	}

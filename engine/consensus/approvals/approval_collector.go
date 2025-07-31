@@ -17,8 +17,8 @@ import (
 // creating and submitting seal candidates once signatures for every chunk are aggregated.
 type ApprovalCollector struct {
 	log                  zerolog.Logger
-	incorporatedBlock    *flow.Header                    // block that incorporates execution result
-	executedBlock        *flow.Header                    // block that was executed
+	incorporatedBlock    *flow.UnsignedHeader            // block that incorporates execution result
+	executedBlock        *flow.UnsignedHeader            // block that was executed
 	incorporatedResult   *flow.IncorporatedResult        // incorporated result that is being sealed
 	chunkCollectors      []*ChunkApprovalCollector       // slice of chunk collectorTree that is created on construction and doesn't change
 	aggregatedSignatures *AggregatedSignatures           // aggregated signature for each chunk
@@ -29,8 +29,8 @@ type ApprovalCollector struct {
 func NewApprovalCollector(
 	log zerolog.Logger,
 	result *flow.IncorporatedResult,
-	incorporatedBlock *flow.Header,
-	executedBlock *flow.Header,
+	incorporatedBlock *flow.UnsignedHeader,
+	executedBlock *flow.UnsignedHeader,
 	assignment *chunks.Assignment,
 	seals mempool.IncorporatedResultSeals,
 	requiredApprovalsForSealConstruction uint,
@@ -92,7 +92,7 @@ func (c *ApprovalCollector) IncorporatedBlockID() flow.Identifier {
 }
 
 // IncorporatedBlock returns the block which incorporates execution result
-func (c *ApprovalCollector) IncorporatedBlock() *flow.Header {
+func (c *ApprovalCollector) IncorporatedBlock() *flow.UnsignedHeader {
 	return c.incorporatedBlock
 }
 

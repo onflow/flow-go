@@ -89,7 +89,7 @@ type SameGRPCPortTestSuite struct {
 	execDataCache     *cache.ExecutionDataCache
 	execDataHeroCache *herocache.BlockExecutionData
 
-	blockMap map[uint64]*flow.Block
+	blockMap map[uint64]*flow.UnsignedBlock
 }
 
 func (suite *SameGRPCPortTestSuite) SetupTest() {
@@ -144,7 +144,7 @@ func (suite *SameGRPCPortTestSuite) SetupTest() {
 	}
 
 	blockCount := 5
-	suite.blockMap = make(map[uint64]*flow.Block, blockCount)
+	suite.blockMap = make(map[uint64]*flow.UnsignedBlock, blockCount)
 	// generate blockCount consecutive blocks with associated seal, result and execution data
 	rootBlock := unittest.BlockFixture()
 	parent := rootBlock.ToHeader()

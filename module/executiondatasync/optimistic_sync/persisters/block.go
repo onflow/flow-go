@@ -20,7 +20,7 @@ type BlockPersister struct {
 	persisterStores []stores.PersisterStore
 	protocolDB      storage.DB
 	executionResult *flow.ExecutionResult
-	header          *flow.Header
+	header          *flow.UnsignedHeader
 }
 
 // NewBlockPersister creates a new block persister.
@@ -28,7 +28,7 @@ func NewBlockPersister(
 	log zerolog.Logger,
 	protocolDB storage.DB,
 	executionResult *flow.ExecutionResult,
-	header *flow.Header,
+	header *flow.UnsignedHeader,
 	persisterStores []stores.PersisterStore,
 ) *BlockPersister {
 	log = log.With().

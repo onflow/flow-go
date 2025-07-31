@@ -13,7 +13,7 @@ import (
 )
 
 func TestUUIDPartition(t *testing.T) {
-	blockHeader := &flow.Header{}
+	blockHeader := &flow.UnsignedHeader{}
 
 	usedPartitions := map[byte]struct{}{}
 
@@ -66,7 +66,7 @@ func TestUUIDGeneratorInitializePartitionNoHeader(t *testing.T) {
 }
 
 func TestUUIDGeneratorInitializePartition(t *testing.T) {
-	blockHeader := &flow.Header{}
+	blockHeader := &flow.UnsignedHeader{}
 
 	for numBlocks := 0; numBlocks < 10; numBlocks++ {
 		blockId := blockHeader.ID()
@@ -100,11 +100,11 @@ func TestUUIDGeneratorInitializePartition(t *testing.T) {
 
 func TestUUIDGeneratorIdGeneration(t *testing.T) {
 	for txnIndex := uint32(0); txnIndex < 256; txnIndex++ {
-		testUUIDGenerator(t, &flow.Header{}, txnIndex)
+		testUUIDGenerator(t, &flow.UnsignedHeader{}, txnIndex)
 	}
 }
 
-func testUUIDGenerator(t *testing.T, blockHeader *flow.Header, txnIndex uint32) {
+func testUUIDGenerator(t *testing.T, blockHeader *flow.UnsignedHeader, txnIndex uint32) {
 	generator := NewUUIDGenerator(
 		tracing.NewTracerSpan(),
 		zerolog.Nop(),

@@ -48,7 +48,7 @@ const (
 // ExecutionReceiptData is a test helper struct that represents all data required
 // to verify the result of an execution receipt.
 type ExecutionReceiptData struct {
-	ReferenceBlock *flow.Block // block that execution receipt refers to
+	ReferenceBlock *flow.UnsignedBlock // block that execution receipt refers to
 	ChunkDataPacks []*flow.ChunkDataPack
 	SpockSecrets   [][]byte
 }
@@ -57,7 +57,7 @@ type ExecutionReceiptData struct {
 // data required to verify its execution receipts.
 // TODO update this as needed based on execution requirements
 type CompleteExecutionReceipt struct {
-	ContainerBlock *flow.Block // block that contains execution receipt of reference block
+	ContainerBlock *flow.UnsignedBlock // block that contains execution receipt of reference block
 
 	// TODO: this is a temporary field to support finder engine logic
 	// It should be removed once we replace finder engine.
@@ -192,7 +192,7 @@ func WithClusterCommittee(clusterCommittee flow.IdentityList) CompleteExecutionR
 func ExecutionResultFixture(t *testing.T,
 	chunkCount int,
 	chain flow.Chain,
-	refBlkHeader *flow.Header,
+	refBlkHeader *flow.UnsignedHeader,
 	protocolStateID flow.Identifier,
 	clusterCommittee flow.IdentityList,
 	source []byte,
@@ -225,7 +225,7 @@ func ExecutionResultFixture(t *testing.T,
 	log := zerolog.Nop()
 
 	// setups execution outputs:
-	var referenceBlock *flow.Block
+	var referenceBlock *flow.UnsignedBlock
 	var spockSecrets [][]byte
 	var chunkDataPacks []*flow.ChunkDataPack
 	var result *flow.ExecutionResult
@@ -339,8 +339,8 @@ func ExecutionResultFixture(t *testing.T,
 			},
 		)
 		require.NoError(t, err)
-		referenceBlock, err = flow.NewBlock(
-			flow.UntrustedBlock{
+		referenceBlock, err = flow.NewUnsignedBlock(
+			flow.UntrustedUnsignedBlock{
 				HeaderBody: refBlkHeader.HeaderBody,
 				Payload:    *payload,
 			},
@@ -384,7 +384,7 @@ func ExecutionResultFixture(t *testing.T,
 //
 // It returns a slice of complete execution receipt fixtures that contains a container block as well as all data to verify its contained receipts.
 func CompleteExecutionReceiptChainFixture(t *testing.T,
-	root *flow.Header,
+	root *flow.UnsignedHeader,
 	rootProtocolStateID flow.Identifier,
 	count int,
 	sources [][]byte,
@@ -437,12 +437,12 @@ func CompleteExecutionReceiptChainFixture(t *testing.T,
 //
 // Each result may appear in more than one receipt depending on the builder parameters.
 func ExecutionReceiptsFromParentBlockFixture(t *testing.T,
-	parent *flow.Header,
+	parent *flow.UnsignedHeader,
 	protocolStateID flow.Identifier,
 	builder *CompleteExecutionReceiptBuilder,
 	sources [][]byte) (
 	[]*flow.ExecutionReceipt,
-	[]*ExecutionReceiptData, *flow.Header) {
+	[]*ExecutionReceiptData, *flow.UnsignedHeader) {
 
 	allData := make([]*ExecutionReceiptData, 0, builder.resultsCount*builder.executorCount)
 	allReceipts := make([]*flow.ExecutionReceipt, 0, builder.resultsCount*builder.executorCount)
@@ -471,7 +471,7 @@ func ExecutionReceiptsFromParentBlockFixture(t *testing.T,
 
 // ExecutionResultFromParentBlockFixture is a test helper that creates a child (reference) block from the parent, as well as an execution for it.
 func ExecutionResultFromParentBlockFixture(t *testing.T,
-	parent *flow.Header,
+	parent *flow.UnsignedHeader,
 	protocolStateID flow.Identifier,
 	builder *CompleteExecutionReceiptBuilder,
 	sources [][]byte,
@@ -483,7 +483,7 @@ func ExecutionResultFromParentBlockFixture(t *testing.T,
 }
 
 // ContainerBlockFixture builds and returns a block that contains input execution receipts.
-func ContainerBlockFixture(parent *flow.Header, protocolStateID flow.Identifier, receipts []*flow.ExecutionReceipt, source []byte) *flow.Block {
+func ContainerBlockFixture(parent *flow.UnsignedHeader, protocolStateID flow.Identifier, receipts []*flow.ExecutionReceipt, source []byte) *flow.UnsignedBlock {
 	// container block is the block that contains the execution receipt of reference block
 	containerBlock := unittest.BlockWithParentAndPayload(
 		parent,
@@ -501,7 +501,7 @@ func ContainerBlockFixture(parent *flow.Header, protocolStateID flow.Identifier,
 // Each execution result has two chunks.
 // First chunks of both results are the same, i.e., have same ID.
 // It returns both results, their shared block, and collection corresponding to their first chunk.
-func ExecutionResultForkFixture(t *testing.T) (*flow.ExecutionResult, *flow.ExecutionResult, *flow.Collection, *flow.Block) {
+func ExecutionResultForkFixture(t *testing.T) (*flow.ExecutionResult, *flow.ExecutionResult, *flow.Collection, *flow.UnsignedBlock) {
 	// collection and block
 	collections := unittest.CollectionListFixture(1)
 	block := unittest.BlockFixture(

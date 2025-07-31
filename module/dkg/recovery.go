@@ -72,7 +72,7 @@ func NewBeaconKeyRecovery(
 
 // EpochFallbackModeExited implements handler from protocol.Consumer to perform recovery of the beacon private key when
 // this node has exited the epoch fallback mode.
-func (b *BeaconKeyRecovery) EpochFallbackModeExited(epochCounter uint64, refBlock *flow.Header) {
+func (b *BeaconKeyRecovery) EpochFallbackModeExited(epochCounter uint64, refBlock *flow.UnsignedHeader) {
 	b.log.Info().Msgf("epoch fallback mode exited for epoch %d", epochCounter)
 	err := b.recoverMyBeaconPrivateKey(b.state.AtHeight(refBlock.Height)) // refBlock must be finalized
 	if err != nil {

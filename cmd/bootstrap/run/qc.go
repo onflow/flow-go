@@ -86,7 +86,7 @@ func (pd *ParticipantData) DKGData() (indexMap flow.DKGIndexMap, keyShares []cry
 // It returns (qc, nil, nil) if a QC can be constructed with enough votes, and there is no invalid votes
 // It returns (qc, invalidVotes, nil) if there are some invalid votes, but a QC can still be constructed
 // It returns (nil, invalidVotes, err) if no qc can be constructed with not enough votes or running any any exception
-func GenerateRootQC(block *flow.Block, votes []*model.Vote, participantData *ParticipantData, identities flow.IdentityList) (
+func GenerateRootQC(block *flow.UnsignedBlock, votes []*model.Vote, participantData *ParticipantData, identities flow.IdentityList) (
 	*flow.QuorumCertificate, // the constructed QC
 	[]error, // return invalid votes error
 	error, // exception or could not construct qc
@@ -145,7 +145,7 @@ func GenerateRootQC(block *flow.Block, votes []*model.Vote, participantData *Par
 }
 
 // GenerateRootBlockVotes generates votes for root block based on participantData
-func GenerateRootBlockVotes(block *flow.Block, participantData *ParticipantData) ([]*model.Vote, error) {
+func GenerateRootBlockVotes(block *flow.UnsignedBlock, participantData *ParticipantData) ([]*model.Vote, error) {
 	hotBlock := model.GenesisBlockFromFlow(block.ToHeader())
 	n := len(participantData.Participants)
 	fmt.Println("Number of staked consensus nodes: ", n)

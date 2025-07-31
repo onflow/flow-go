@@ -148,7 +148,7 @@ func (c *Core) RepopulateAssignmentCollectorTree(payloads storage.Payloads) erro
 	totalBlocks := finalized.Height - latestSealedBlock.Height
 
 	// resultProcessor adds _all known_ results for the given block to the assignment collector tree
-	resultProcessor := func(header *flow.Header) error {
+	resultProcessor := func(header *flow.UnsignedHeader) error {
 		blockID := header.ID()
 		payload, err := payloads.ByBlockID(blockID)
 		if err != nil {
@@ -577,7 +577,7 @@ func (c *Core) ProcessFinalizedBlock(finalizedBlockID flow.Identifier) error {
 // Furthermore, it  removes obsolete entries from AssignmentCollectorTree, RequestTracker
 // and IncorporatedResultSeals mempool.
 // We do _not_ expect any errors during normal operations.
-func (c *Core) prune(parentSpan otelTrace.Span, finalized, lastSealed *flow.Header) error {
+func (c *Core) prune(parentSpan otelTrace.Span, finalized, lastSealed *flow.UnsignedHeader) error {
 	pruningSpan := c.tracer.StartSpanFromParent(parentSpan, trace.CONSealingPruning)
 	defer pruningSpan.End()
 
@@ -653,7 +653,7 @@ func (c *Core) requestPendingApprovals(observation consensus.SealingObservation,
 //
 //	     [  sealing segment       ]
 //	Z <- A <- B(RZ) <- C <- D <- E
-func (c *Core) getOutdatedBlockIDsFromRootSealingSegment(rootHeader *flow.Header) (map[flow.Identifier]struct{}, error) {
+func (c *Core) getOutdatedBlockIDsFromRootSealingSegment(rootHeader *flow.UnsignedHeader) (map[flow.Identifier]struct{}, error) {
 	rootSealingSegment, err := c.state.AtBlockID(rootHeader.ID()).SealingSegment()
 	if err != nil {
 		return nil, fmt.Errorf("could not get root sealing segment: %w", err)

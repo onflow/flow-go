@@ -32,7 +32,7 @@ type Consumer interface {
 	// BlockFinalized is called when a block is finalized.
 	// Formally, this callback is informationally idempotent. I.e. the consumer
 	// of this callback must handle repeated calls for the same block.
-	BlockFinalized(block *flow.Header)
+	BlockFinalized(block *flow.UnsignedHeader)
 
 	// BlockProcessable is called when a correct block is encountered that is
 	// ready to be processed (i.e. it is connected to the finalized chain and
@@ -41,7 +41,7 @@ type Consumer interface {
 	// for the root block, as the root block is always processable.
 	// Formally, this callback is informationally idempotent. I.e. the consumer
 	// of this callback must handle repeated calls for the same block.
-	BlockProcessable(block *flow.Header, certifyingQC *flow.QuorumCertificate)
+	BlockProcessable(block *flow.UnsignedHeader, certifyingQC *flow.QuorumCertificate)
 
 	// EpochTransition is called when we transition to a new epoch. This is
 	// equivalent to the beginning of the new epoch's staking phase and the end
@@ -50,7 +50,7 @@ type Consumer interface {
 	// The block parameter is the first block of the new epoch.
 	//
 	// NOTE: Only called once the transition has been finalized.
-	EpochTransition(newEpochCounter uint64, first *flow.Header)
+	EpochTransition(newEpochCounter uint64, first *flow.UnsignedHeader)
 
 	// EpochSetupPhaseStarted is called when we begin the epoch setup phase for
 	// the current epoch. This is equivalent to the end of the epoch staking
@@ -66,7 +66,7 @@ type Consumer interface {
 	//                         ^--- block c - finalizes block b, triggers EpochSetupPhaseStarted event
 	//
 	// NOTE: Only called once the phase transition has been finalized.
-	EpochSetupPhaseStarted(currentEpochCounter uint64, first *flow.Header)
+	EpochSetupPhaseStarted(currentEpochCounter uint64, first *flow.UnsignedHeader)
 
 	// EpochCommittedPhaseStarted is called when we begin the epoch committed phase
 	// for the current epoch. This is equivalent to the end of the epoch setup
@@ -82,7 +82,7 @@ type Consumer interface {
 	//                                            ^--- block f - finalizes block e, triggers EpochCommittedPhaseStarted event
 	//
 	// NOTE: Only called once the phase transition has been finalized.
-	EpochCommittedPhaseStarted(currentEpochCounter uint64, first *flow.Header)
+	EpochCommittedPhaseStarted(currentEpochCounter uint64, first *flow.UnsignedHeader)
 
 	// EpochFallbackModeTriggered is called when Epoch Fallback Mode [EFM] is triggered.
 	// EFM is triggered when an invalid or unexpected epoch-related service event is observed,
@@ -97,7 +97,7 @@ type Consumer interface {
 	//   - header is the block when EFM was triggered
 	//
 	// NOTE: This notification is emitted when the block triggering EFM is finalized.
-	EpochFallbackModeTriggered(epochCounter uint64, header *flow.Header)
+	EpochFallbackModeTriggered(epochCounter uint64, header *flow.UnsignedHeader)
 
 	// EpochFallbackModeExited is called when epoch fallback mode [EFM] is exited.
 	// EFM is exited when an EpochRecover service event is processed, which defines
@@ -107,7 +107,7 @@ type Consumer interface {
 	//   - header is the block when EFM was triggered
 	//
 	// NOTE: Only called once the block incorporating the EpochRecover is finalized.
-	EpochFallbackModeExited(epochCounter uint64, header *flow.Header)
+	EpochFallbackModeExited(epochCounter uint64, header *flow.UnsignedHeader)
 
 	// EpochExtended is called when a flow.EpochExtension is added to the current epoch
 	// Consumers can get context for handling events from:
@@ -115,5 +115,5 @@ type Consumer interface {
 	//   - header is the block when EFM was triggered
 	//
 	// NOTE: This notification is emitted when the block triggering the EFM extension is finalized.
-	EpochExtended(epochCounter uint64, header *flow.Header, extension flow.EpochExtension)
+	EpochExtended(epochCounter uint64, header *flow.UnsignedHeader, extension flow.EpochExtension)
 }

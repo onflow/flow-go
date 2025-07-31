@@ -52,7 +52,7 @@ var testEventTypes = []flow.EventType{
 type SubscribeEventsSuite struct {
 	suite.Suite
 
-	blocks      []*flow.Block
+	blocks      []*flow.UnsignedBlock
 	blockEvents map[flow.Identifier]flow.EventsList
 }
 
@@ -66,7 +66,7 @@ func (s *SubscribeEventsSuite) SetupTest() {
 
 	blockCount := 5
 
-	s.blocks = make([]*flow.Block, 0, blockCount)
+	s.blocks = make([]*flow.UnsignedBlock, 0, blockCount)
 	s.blockEvents = make(map[flow.Identifier]flow.EventsList, blockCount)
 
 	for i := 0; i < blockCount; i++ {

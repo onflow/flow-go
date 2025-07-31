@@ -60,9 +60,9 @@ func (et *ExecutionTreeTestSuite) SetupTest() {
 //	:
 //	:                                                       ? ? ? ? <- r[C13] {ER}
 //	pruned height
-func (et *ExecutionTreeTestSuite) createExecutionTree() (map[string]*flow.Block, map[string]*flow.ExecutionResult, map[string]*flow.ExecutionReceipt) {
+func (et *ExecutionTreeTestSuite) createExecutionTree() (map[string]*flow.UnsignedBlock, map[string]*flow.ExecutionResult, map[string]*flow.ExecutionReceipt) {
 	// Make blocks
-	blocks := make(map[string]*flow.Block)
+	blocks := make(map[string]*flow.UnsignedBlock)
 
 	blocks["A10"] = unittest.BlockFixture(unittest.Block.WithHeight(10))
 	blocks["A11"] = unittest.BlockWithParentFixture(blocks["A10"].ToHeader())
@@ -116,8 +116,8 @@ func (et *ExecutionTreeTestSuite) createExecutionTree() (map[string]*flow.Block,
 	return blocks, results, receipts
 }
 
-func (et *ExecutionTreeTestSuite) addReceipts2ReceiptsForest(receipts map[string]*flow.ExecutionReceipt, blocks map[string]*flow.Block) {
-	blockById := make(map[flow.Identifier]*flow.Block)
+func (et *ExecutionTreeTestSuite) addReceipts2ReceiptsForest(receipts map[string]*flow.ExecutionReceipt, blocks map[string]*flow.UnsignedBlock) {
+	blockById := make(map[flow.Identifier]*flow.UnsignedBlock)
 	for _, block := range blocks {
 		blockById[block.ID()] = block
 	}
@@ -186,7 +186,7 @@ func (et *ExecutionTreeTestSuite) Test_AddResult_Bridge() {
 	et.addReceipts2ReceiptsForest(receipts, blocks)
 
 	// restrict traversal to B10 <- C11 <- C12 <- C13
-	blockFilter := func(h *flow.Header) bool {
+	blockFilter := func(h *flow.UnsignedHeader) bool {
 		for _, blockName := range []string{"B10", "C11", "C12", "C13"} {
 			if blocks[blockName].ID() == h.ID() {
 				return true
@@ -292,7 +292,7 @@ func (et *ExecutionTreeTestSuite) Test_RootBlockExcluded() {
 	blocks, _, receipts := et.createExecutionTree()
 	et.addReceipts2ReceiptsForest(receipts, blocks)
 
-	blockFilter := func(h *flow.Header) bool {
+	blockFilter := func(h *flow.UnsignedHeader) bool {
 		return blocks["B10"].ID() != h.ID()
 	}
 
@@ -307,7 +307,7 @@ func (et *ExecutionTreeTestSuite) Test_FilterChainForks() {
 	blocks, _, receipts := et.createExecutionTree()
 	et.addReceipts2ReceiptsForest(receipts, blocks)
 
-	blockFilter := func(h *flow.Header) bool {
+	blockFilter := func(h *flow.UnsignedHeader) bool {
 		return blocks["B11"].ID() != h.ID()
 	}
 
@@ -375,7 +375,7 @@ func (et *ExecutionTreeTestSuite) Test_Prune() {
 }
 
 func anyBlock() mempool.BlockFilter {
-	return func(*flow.Header) bool { return true }
+	return func(*flow.UnsignedHeader) bool { return true }
 }
 
 func anyReceipt() mempool.ReceiptFilter {

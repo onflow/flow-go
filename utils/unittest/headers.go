@@ -9,16 +9,16 @@ import (
 )
 
 // HeadersFromMap creates a storage header mock that backed by a given map
-func HeadersFromMap(headerDB map[flow.Identifier]*flow.Header) *storage.Headers {
+func HeadersFromMap(headerDB map[flow.Identifier]*flow.UnsignedHeader) *storage.Headers {
 	headers := &storage.Headers{}
 	headers.On("Store", mock.Anything).Return(
-		func(header *flow.Header) error {
+		func(header *flow.UnsignedHeader) error {
 			headerDB[header.ID()] = header
 			return nil
 		},
 	)
 	headers.On("ByBlockID", mock.Anything).Return(
-		func(blockID flow.Identifier) *flow.Header {
+		func(blockID flow.Identifier) *flow.UnsignedHeader {
 			return headerDB[blockID]
 		},
 		func(blockID flow.Identifier) error {

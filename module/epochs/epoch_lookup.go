@@ -312,7 +312,7 @@ func (lookup *EpochLookup) handleProtocolEvents(ctx irrecoverable.SignalerContex
 // current epoch, which will now be updated because the epoch has extensions.
 // We must process _all_ `EpochExtended` notifications.
 // No errors are expected to be returned by the process callback during normal operation.
-func (lookup *EpochLookup) EpochExtended(epochCounter uint64, _ *flow.Header, extension flow.EpochExtension) {
+func (lookup *EpochLookup) EpochExtended(epochCounter uint64, _ *flow.UnsignedHeader, extension flow.EpochExtension) {
 	lookup.epochEvents <- func() error {
 		err := lookup.epochs.extendLatestEpoch(epochCounter, extension)
 		if err != nil {
@@ -328,7 +328,7 @@ func (lookup *EpochLookup) EpochExtended(epochCounter uint64, _ *flow.Header, ex
 // epoch. The notification is queued for async processing by the worker. Specifically, we cache the next epoch in the EpochLookup.
 // We must process _all_ `EpochCommittedPhaseStarted` notifications.
 // No errors are expected to be returned by the process callback during normal operation.
-func (lookup *EpochLookup) EpochCommittedPhaseStarted(_ uint64, first *flow.Header) {
+func (lookup *EpochLookup) EpochCommittedPhaseStarted(_ uint64, first *flow.UnsignedHeader) {
 	lookup.epochEvents <- func() error {
 		epoch, err := lookup.state.AtBlockID(first.ID()).Epochs().NextCommitted()
 		if err != nil {

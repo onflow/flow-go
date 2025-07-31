@@ -93,7 +93,7 @@ type Suite struct {
 	epochQuery *mocks.EpochQuery
 	counter    uint64                              // reflects the counter of the current epoch
 	phase      flow.EpochPhase                     // phase at mocked snapshot
-	header     *flow.Header                        // header at mocked snapshot
+	header     *flow.UnsignedHeader                // header at mocked snapshot
 	epochs     map[uint64]*protocol.CommittedEpoch // track all epochs
 	components map[uint64]*mockComponents          // track all epoch components
 
@@ -166,7 +166,7 @@ func (suite *Suite) SetupTest() {
 	suite.state.On("AtBlockID", suite.header.ID()).Return(suite.snap).Maybe()
 	suite.snap.On("Epochs").Return(suite.epochQuery)
 	suite.snap.On("Head").Return(
-		func() *flow.Header { return suite.header },
+		func() *flow.UnsignedHeader { return suite.header },
 		func() error { return nil })
 	suite.snap.On("EpochPhase").Return(
 		func() flow.EpochPhase { return suite.phase },

@@ -34,7 +34,7 @@ type Snapshot struct {
 // at a finalized block. It is guaranteed to have a header available.
 type FinalizedSnapshot struct {
 	Snapshot
-	header *flow.Header
+	header *flow.UnsignedHeader
 }
 
 var _ protocol.Snapshot = (*Snapshot)(nil)
@@ -51,7 +51,7 @@ func newSnapshotWithIncorporatedReferenceBlock(state *State, blockID flow.Identi
 
 // NewFinalizedSnapshot instantiates a `FinalizedSnapshot`.
 // CAUTION: the header's ID _must_ match `blockID` (not checked)
-func NewFinalizedSnapshot(state *State, blockID flow.Identifier, header *flow.Header) *FinalizedSnapshot {
+func NewFinalizedSnapshot(state *State, blockID flow.Identifier, header *flow.UnsignedHeader) *FinalizedSnapshot {
 	return &FinalizedSnapshot{
 		Snapshot: Snapshot{
 			state:   state,
@@ -61,11 +61,11 @@ func NewFinalizedSnapshot(state *State, blockID flow.Identifier, header *flow.He
 	}
 }
 
-func (s *FinalizedSnapshot) Head() (*flow.Header, error) {
+func (s *FinalizedSnapshot) Head() (*flow.UnsignedHeader, error) {
 	return s.header, nil
 }
 
-func (s *Snapshot) Head() (*flow.Header, error) {
+func (s *Snapshot) Head() (*flow.UnsignedHeader, error) {
 	head, err := s.state.headers.ByBlockID(s.blockID)
 	return head, err
 }
@@ -215,7 +215,7 @@ func (s *Snapshot) SealingSegment() (*flow.SealingSegment, error) {
 	// walk through the chain backward until we reach the block referenced by
 	// the latest seal - the returned segment includes this block
 	builder := flow.NewSealingSegmentBuilder(s.state.results.ByID, s.state.seals.HighestInFork, getProtocolStateEntry)
-	scraper := func(header *flow.Header) error {
+	scraper := func(header *flow.UnsignedHeader) error {
 		blockID := header.ID()
 		block, err := s.state.blocks.ProposalByID(blockID)
 		if err != nil {
@@ -262,7 +262,7 @@ func (s *Snapshot) SealingSegment() (*flow.SealingSegment, error) {
 	}
 	if limitHeight < blockSealedAtHead.Height {
 		// we need to include extra blocks in sealing segment
-		extraBlocksScraper := func(header *flow.Header) error {
+		extraBlocksScraper := func(header *flow.UnsignedHeader) error {
 			blockID := header.ID()
 			block, err := s.state.blocks.ProposalByID(blockID)
 			if err != nil {

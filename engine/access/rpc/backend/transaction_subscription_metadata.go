@@ -30,7 +30,7 @@ type transactionSubscriptionMetadata struct {
 
 	txResult             *accessmodel.TransactionResult
 	txReferenceBlockID   flow.Identifier
-	blockWithTx          *flow.Header
+	blockWithTx          *flow.UnsignedHeader
 	eventEncodingVersion entities.EventEncodingVersion
 	backendTransactions  *backendTransactions
 }

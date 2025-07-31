@@ -275,7 +275,7 @@ type ObserverServiceBuilder struct {
 	TransactionTimings   *stdmap.TransactionTimings
 	FollowerDistributor  *pubsub.FollowerDistributor
 	Committee            hotstuff.DynamicCommittee
-	Finalized            *flow.Header
+	Finalized            *flow.UnsignedHeader
 	Pending              []*flow.ProposalHeader
 	FollowerCore         module.HotStuffFollower
 	ExecutionIndexer     *indexer.Indexer

@@ -341,7 +341,7 @@ func TestBlockDelayIsHigherThanTimeout(t *testing.T) {
 // This test verifies that nodes still make progress, despite first TO messages being lost.
 // Implementation:
 //   - We have 4 replicas in total, each of them skips voting for first view to force a timeout
-//   - Block TOs for whole committee until each replica has generated its first TO.
+//   - UnsignedBlock TOs for whole committee until each replica has generated its first TO.
 //   - After each replica has generated a timeout allow subsequent timeout rebroadcasts to make progress.
 func TestAsyncClusterStartup(t *testing.T) {
 	replicas := 4

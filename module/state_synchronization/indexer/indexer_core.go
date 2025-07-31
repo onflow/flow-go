@@ -262,7 +262,7 @@ func (c *IndexerCore) IndexBlockData(data *execution_data.BlockExecutionDataEnti
 	return nil
 }
 
-func (c *IndexerCore) updateProgramCache(header *flow.Header, events []flow.Event, collections []*flow.Collection) error {
+func (c *IndexerCore) updateProgramCache(header *flow.UnsignedHeader, events []flow.Event, collections []*flow.Collection) error {
 	if c.derivedChainData == nil {
 		return nil
 	}

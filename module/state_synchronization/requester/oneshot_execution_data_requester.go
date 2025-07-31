@@ -49,7 +49,7 @@ type OneshotExecutionDataRequester struct {
 	config             OneshotExecutionDataConfig
 	execDataDownloader execution_data.Downloader
 	executionResult    *flow.ExecutionResult
-	blockHeader        *flow.Header
+	blockHeader        *flow.UnsignedHeader
 }
 
 // NewOneshotExecutionDataRequester creates a new OneshotExecutionDataRequester instance.
@@ -70,7 +70,7 @@ func NewOneshotExecutionDataRequester(
 	metrics module.ExecutionDataRequesterMetrics,
 	execDataDownloader execution_data.Downloader,
 	executionResult *flow.ExecutionResult,
-	blockHeader *flow.Header,
+	blockHeader *flow.UnsignedHeader,
 	config OneshotExecutionDataConfig,
 ) (*OneshotExecutionDataRequester, error) {
 	if blockHeader.ID() != executionResult.BlockID {

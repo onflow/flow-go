@@ -28,7 +28,7 @@ type mockExecutionState struct {
 	commits map[flow.Identifier]flow.StateCommitment
 }
 
-func newMockExecutionState(seal *flow.Seal, genesis *flow.Block) *mockExecutionState {
+func newMockExecutionState(seal *flow.Seal, genesis *flow.UnsignedBlock) *mockExecutionState {
 	commits := make(map[flow.Identifier]flow.StateCommitment)
 	commits[seal.BlockID] = seal.FinalState
 	es := &mockExecutionState{
@@ -62,7 +62,7 @@ func (es *mockExecutionState) IsBlockExecuted(height uint64, blockID flow.Identi
 	return ok, nil
 }
 
-func (es *mockExecutionState) ExecuteBlock(t *testing.T, block *flow.Block) {
+func (es *mockExecutionState) ExecuteBlock(t *testing.T, block *flow.UnsignedBlock) {
 	parentExecuted, err := es.IsBlockExecuted(
 		block.Height,
 		block.ParentID)
@@ -74,7 +74,7 @@ func (es *mockExecutionState) ExecuteBlock(t *testing.T, block *flow.Block) {
 	es.commits[block.ID()] = unittest.StateCommitmentFixture()
 }
 
-func logChain(chain []*flow.Block) {
+func logChain(chain []*flow.UnsignedBlock) {
 	log := unittest.Logger()
 	for i, block := range chain {
 		log.Info().Msgf("block %v, height: %v, ID: %v", i, block.Height, block.ID())

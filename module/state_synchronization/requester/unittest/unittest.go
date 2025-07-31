@@ -69,7 +69,7 @@ func MockBlobService(bs blockstore.Blockstore) *mocknetwork.BlobService {
 
 type SnapshotMockOptions func(*statemock.Snapshot)
 
-func WithHead(head *flow.Header) SnapshotMockOptions {
+func WithHead(head *flow.UnsignedHeader) SnapshotMockOptions {
 	return func(snapshot *statemock.Snapshot) {
 		snapshot.On("Head").Return(head, nil)
 	}
@@ -111,10 +111,10 @@ func MockProtocolState(opts ...StateMockOptions) *statemock.State {
 
 type BlockHeaderMockOptions func(*storagemock.Headers)
 
-func WithByHeight(blocksByHeight map[uint64]*flow.Block) BlockHeaderMockOptions {
+func WithByHeight(blocksByHeight map[uint64]*flow.UnsignedBlock) BlockHeaderMockOptions {
 	return func(blocks *storagemock.Headers) {
 		blocks.On("ByHeight", mock.AnythingOfType("uint64")).Return(
-			func(height uint64) *flow.Header {
+			func(height uint64) *flow.UnsignedHeader {
 				if _, has := blocksByHeight[height]; !has {
 					return nil
 				}
@@ -130,10 +130,10 @@ func WithByHeight(blocksByHeight map[uint64]*flow.Block) BlockHeaderMockOptions 
 	}
 }
 
-func WithByID(blocksByID map[flow.Identifier]*flow.Block) BlockHeaderMockOptions {
+func WithByID(blocksByID map[flow.Identifier]*flow.UnsignedBlock) BlockHeaderMockOptions {
 	return func(blocks *storagemock.Headers) {
 		blocks.On("ByBlockID", mock.AnythingOfType("flow.Identifier")).Return(
-			func(blockID flow.Identifier) *flow.Header {
+			func(blockID flow.Identifier) *flow.UnsignedHeader {
 				if _, has := blocksByID[blockID]; !has {
 					return nil
 				}
@@ -149,7 +149,7 @@ func WithByID(blocksByID map[flow.Identifier]*flow.Block) BlockHeaderMockOptions
 	}
 }
 
-func WithBlockIDByHeight(blocksByHeight map[uint64]*flow.Block) BlockHeaderMockOptions {
+func WithBlockIDByHeight(blocksByHeight map[uint64]*flow.UnsignedBlock) BlockHeaderMockOptions {
 	return func(blocks *storagemock.Headers) {
 		blocks.On("BlockIDByHeight", mock.AnythingOfType("uint64")).Return(
 			func(height uint64) flow.Identifier {

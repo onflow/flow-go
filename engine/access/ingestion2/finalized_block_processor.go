@@ -144,7 +144,7 @@ func (p *FinalizedBlockProcessor) processFinalizedBlockJobCallback(
 // and requests related collections from the syncer.
 //
 // No errors are expected during normal operations.
-func (p *FinalizedBlockProcessor) indexFinalizedBlock(block *flow.Block) error {
+func (p *FinalizedBlockProcessor) indexFinalizedBlock(block *flow.UnsignedBlock) error {
 	err := p.blocks.IndexBlockForCollectionGuarantees(block.ID(), flow.GetIDs(block.Payload.Guarantees))
 	if err != nil {
 		return fmt.Errorf("could not index block for collections: %w", err)

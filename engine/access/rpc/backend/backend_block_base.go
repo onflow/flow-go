@@ -19,7 +19,7 @@ type backendBlockBase struct {
 // getBlockStatus returns the block status for a given header.
 //
 // No errors are expected during normal operations.
-func (b *backendBlockBase) getBlockStatus(header *flow.Header) (flow.BlockStatus, error) {
+func (b *backendBlockBase) getBlockStatus(header *flow.UnsignedHeader) (flow.BlockStatus, error) {
 	// check which block is finalized at the target block's height
 	// note: this index is only populated for finalized blocks
 	blockIDFinalizedAtHeight, err := b.headers.BlockIDByHeight(header.Height)

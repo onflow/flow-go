@@ -83,7 +83,7 @@ func init() {
 		"state commitment (hex-encoded, 64 characters)")
 
 	Cmd.Flags().StringVar(&flagBlockHash, "block-hash", "",
-		"Block hash (hex-encoded, 64 characters)")
+		"UnsignedBlock hash (hex-encoded, 64 characters)")
 
 	Cmd.Flags().StringVar(&flagDatadir, "datadir", "",
 		"directory that stores the protocol state")

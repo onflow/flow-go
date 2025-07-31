@@ -19,7 +19,7 @@ type EncodableSnapshot struct {
 // Head returns the latest finalized header of the Snapshot, which is the block
 // in the sealing segment with the greatest Height.
 // The EncodableSnapshot receiver must be correctly formed.
-func (snap EncodableSnapshot) Head() *flow.Header {
+func (snap EncodableSnapshot) Head() *flow.UnsignedHeader {
 	return snap.SealingSegment.Highest().ToHeader()
 }
 
@@ -110,7 +110,7 @@ type EncodableCluster struct {
 	Index     uint
 	Counter   uint64
 	Members   flow.IdentitySkeletonList
-	RootBlock *cluster.Block
+	RootBlock *cluster.UnsignedBlock
 	RootQC    *flow.QuorumCertificate
 }
 

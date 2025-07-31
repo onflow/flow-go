@@ -107,7 +107,7 @@ func (_m *RegisterStore) OnBlockFinalized() error {
 }
 
 // SaveRegisters provides a mock function with given fields: header, registers
-func (_m *RegisterStore) SaveRegisters(header *flow.Header, registers flow.RegisterEntries) error {
+func (_m *RegisterStore) SaveRegisters(header *flow.UnsignedHeader, registers flow.RegisterEntries) error {
 	ret := _m.Called(header, registers)
 
 	if len(ret) == 0 {
@@ -115,7 +115,7 @@ func (_m *RegisterStore) SaveRegisters(header *flow.Header, registers flow.Regis
 	}
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(*flow.Header, flow.RegisterEntries) error); ok {
+	if rf, ok := ret.Get(0).(func(*flow.UnsignedHeader, flow.RegisterEntries) error); ok {
 		r0 = rf(header, registers)
 	} else {
 		r0 = ret.Error(0)

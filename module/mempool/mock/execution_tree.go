@@ -15,7 +15,7 @@ type ExecutionTree struct {
 }
 
 // AddReceipt provides a mock function with given fields: receipt, block
-func (_m *ExecutionTree) AddReceipt(receipt *flow.ExecutionReceipt, block *flow.Header) (bool, error) {
+func (_m *ExecutionTree) AddReceipt(receipt *flow.ExecutionReceipt, block *flow.UnsignedHeader) (bool, error) {
 	ret := _m.Called(receipt, block)
 
 	if len(ret) == 0 {
@@ -24,16 +24,16 @@ func (_m *ExecutionTree) AddReceipt(receipt *flow.ExecutionReceipt, block *flow.
 
 	var r0 bool
 	var r1 error
-	if rf, ok := ret.Get(0).(func(*flow.ExecutionReceipt, *flow.Header) (bool, error)); ok {
+	if rf, ok := ret.Get(0).(func(*flow.ExecutionReceipt, *flow.UnsignedHeader) (bool, error)); ok {
 		return rf(receipt, block)
 	}
-	if rf, ok := ret.Get(0).(func(*flow.ExecutionReceipt, *flow.Header) bool); ok {
+	if rf, ok := ret.Get(0).(func(*flow.ExecutionReceipt, *flow.UnsignedHeader) bool); ok {
 		r0 = rf(receipt, block)
 	} else {
 		r0 = ret.Get(0).(bool)
 	}
 
-	if rf, ok := ret.Get(1).(func(*flow.ExecutionReceipt, *flow.Header) error); ok {
+	if rf, ok := ret.Get(1).(func(*flow.ExecutionReceipt, *flow.UnsignedHeader) error); ok {
 		r1 = rf(receipt, block)
 	} else {
 		r1 = ret.Error(1)
@@ -43,7 +43,7 @@ func (_m *ExecutionTree) AddReceipt(receipt *flow.ExecutionReceipt, block *flow.
 }
 
 // AddResult provides a mock function with given fields: result, block
-func (_m *ExecutionTree) AddResult(result *flow.ExecutionResult, block *flow.Header) error {
+func (_m *ExecutionTree) AddResult(result *flow.ExecutionResult, block *flow.UnsignedHeader) error {
 	ret := _m.Called(result, block)
 
 	if len(ret) == 0 {
@@ -51,7 +51,7 @@ func (_m *ExecutionTree) AddResult(result *flow.ExecutionResult, block *flow.Hea
 	}
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(*flow.ExecutionResult, *flow.Header) error); ok {
+	if rf, ok := ret.Get(0).(func(*flow.ExecutionResult, *flow.UnsignedHeader) error); ok {
 		r0 = rf(result, block)
 	} else {
 		r0 = ret.Error(0)

@@ -1055,7 +1055,7 @@ func (suite *Suite) TestTransactionStatusTransition() {
 
 	suite.snapshot.
 		On("Head").
-		Return(func() *flow.Header {
+		Return(func() *flow.UnsignedHeader {
 			return headBlock.ToHeader()
 		}, nil)
 
@@ -1176,7 +1176,7 @@ func (suite *Suite) TestTransactionExpiredStatusTransition() {
 
 	suite.snapshot.
 		On("Head").
-		Return(func() *flow.Header {
+		Return(func() *flow.UnsignedHeader {
 			return headBlock.ToHeader()
 		}, nil)
 
@@ -1975,7 +1975,7 @@ func (suite *Suite) checkResponse(resp interface{}, err error) {
 	suite.Require().NotNil(resp)
 }
 
-func (suite *Suite) setupReceipts(block *flow.Block) ([]*flow.ExecutionReceipt, flow.IdentityList) {
+func (suite *Suite) setupReceipts(block *flow.UnsignedBlock) ([]*flow.ExecutionReceipt, flow.IdentityList) {
 	ids := unittest.IdentityListFixture(2, unittest.WithRole(flow.RoleExecution))
 	receipt1 := unittest.ReceiptForBlockFixture(block)
 	receipt1.ExecutorID = ids[0].NodeID

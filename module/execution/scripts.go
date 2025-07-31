@@ -200,7 +200,7 @@ func (s *Scripts) GetAccountKey(ctx context.Context, address flow.Address, keyIn
 
 // snapshotWithBlock is a common function for executing scripts and get account functionality.
 // It creates a storage snapshot that is needed by the FVM to execute scripts.
-func (s *Scripts) snapshotWithBlock(height uint64) (snapshot.StorageSnapshot, *flow.Header, error) {
+func (s *Scripts) snapshotWithBlock(height uint64) (snapshot.StorageSnapshot, *flow.UnsignedHeader, error) {
 	header, err := s.headers.ByHeight(height)
 	if err != nil {
 		return nil, nil, err

@@ -9,12 +9,12 @@ import (
 
 // StateRoot is the root information required to bootstrap the cluster state.
 type StateRoot struct {
-	block *cluster.Block          // root block for the cluster chain
+	block *cluster.UnsignedBlock  // root block for the cluster chain
 	qc    *flow.QuorumCertificate // root QC for the cluster chain
 	epoch uint64                  // operating epoch for the cluster chain
 }
 
-func NewStateRoot(genesis *cluster.Block, qc *flow.QuorumCertificate, epoch uint64) (*StateRoot, error) {
+func NewStateRoot(genesis *cluster.UnsignedBlock, qc *flow.QuorumCertificate, epoch uint64) (*StateRoot, error) {
 	err := validateClusterGenesis(genesis)
 	if err != nil {
 		return nil, fmt.Errorf("inconsistent state root: %w", err)
@@ -26,7 +26,7 @@ func NewStateRoot(genesis *cluster.Block, qc *flow.QuorumCertificate, epoch uint
 	}, nil
 }
 
-func validateClusterGenesis(genesis *cluster.Block) error {
+func validateClusterGenesis(genesis *cluster.UnsignedBlock) error {
 	// check height of genesis block
 	if genesis.Height != 0 {
 		return fmt.Errorf("height of genesis cluster block should be 0 (got %d)", genesis.Height)
@@ -49,7 +49,7 @@ func (s StateRoot) ClusterID() flow.ChainID {
 	return s.block.ChainID
 }
 
-func (s StateRoot) Block() *cluster.Block {
+func (s StateRoot) Block() *cluster.UnsignedBlock {
 	return s.block
 }
 

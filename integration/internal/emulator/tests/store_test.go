@@ -304,8 +304,8 @@ func TestLedger(t *testing.T) {
 
 		// Insert all the ledgers, starting with block 1.
 		// This will result in a ledger state that looks like this:
-		// Block 1: {1: 1, 2: 1, 3: 1}
-		// Block 2: {2: 2, 3: 2, 4: 2}
+		// UnsignedBlock 1: {1: 1, 2: 1, 3: 1}
+		// UnsignedBlock 2: {2: 2, 3: 2, 4: 2}
 		// ...
 		// The combined state at block N looks like:
 		// {1: 1, 2: 2, 3: 3, ..., N+1: N, N+2: N}

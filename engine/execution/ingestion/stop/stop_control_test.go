@@ -31,7 +31,7 @@ func TestCannotSetNewValuesAfterStoppingCommenced(t *testing.T) {
 			nil,
 			nil,
 			nil,
-			&flow.Header{HeaderBody: flow.HeaderBody{Height: 1}},
+			&flow.UnsignedHeader{HeaderBody: flow.HeaderBody{Height: 1}},
 			false,
 			false,
 		)
@@ -77,7 +77,7 @@ func TestCannotSetNewValuesAfterStoppingCommenced(t *testing.T) {
 			nil,
 			nil,
 			nil,
-			&flow.Header{HeaderBody: flow.HeaderBody{Height: 1}},
+			&flow.UnsignedHeader{HeaderBody: flow.HeaderBody{Height: 1}},
 			false,
 			false,
 		)
@@ -133,7 +133,7 @@ func TestExecutionFallingBehind(t *testing.T) {
 		nil,
 		nil,
 		nil,
-		&flow.Header{HeaderBody: flow.HeaderBody{Height: 1}},
+		&flow.UnsignedHeader{HeaderBody: flow.HeaderBody{Height: 1}},
 		false,
 		false,
 	)
@@ -159,7 +159,7 @@ func TestExecutionFallingBehind(t *testing.T) {
 }
 
 type stopControlMockHeaders struct {
-	headers map[uint64]*flow.Header
+	headers map[uint64]*flow.UnsignedHeader
 }
 
 func (m *stopControlMockHeaders) BlockIDByHeight(height uint64) (flow.Identifier, error) {
@@ -179,7 +179,7 @@ func TestAddStopForPastBlocks(t *testing.T) {
 	headerD := unittest.BlockHeaderWithParentFixture(headerC) // 23
 
 	headers := &stopControlMockHeaders{
-		headers: map[uint64]*flow.Header{
+		headers: map[uint64]*flow.UnsignedHeader{
 			headerA.Height: headerA,
 			headerB.Height: headerB,
 			headerC.Height: headerC,
@@ -195,7 +195,7 @@ func TestAddStopForPastBlocks(t *testing.T) {
 		headers,
 		nil,
 		nil,
-		&flow.Header{HeaderBody: flow.HeaderBody{Height: 1}},
+		&flow.UnsignedHeader{HeaderBody: flow.HeaderBody{Height: 1}},
 		false,
 		false,
 	)
@@ -235,7 +235,7 @@ func TestAddStopForPastBlocksExecutionFallingBehind(t *testing.T) {
 	headerD := unittest.BlockHeaderWithParentFixture(headerC) // 23
 
 	headers := &stopControlMockHeaders{
-		headers: map[uint64]*flow.Header{
+		headers: map[uint64]*flow.UnsignedHeader{
 			headerA.Height: headerA,
 			headerB.Height: headerB,
 			headerC.Height: headerC,
@@ -251,7 +251,7 @@ func TestAddStopForPastBlocksExecutionFallingBehind(t *testing.T) {
 		headers,
 		nil,
 		nil,
-		&flow.Header{HeaderBody: flow.HeaderBody{Height: 1}},
+		&flow.UnsignedHeader{HeaderBody: flow.HeaderBody{Height: 1}},
 		false,
 		false,
 	)
@@ -289,7 +289,7 @@ func TestStopControlWithVersionControl(t *testing.T) {
 		headerC := unittest.BlockHeaderWithParentFixture(headerB) // 22
 
 		headers := &stopControlMockHeaders{
-			headers: map[uint64]*flow.Header{
+			headers: map[uint64]*flow.UnsignedHeader{
 				headerA.Height: headerA,
 				headerB.Height: headerB,
 				headerC.Height: headerC,
@@ -304,7 +304,7 @@ func TestStopControlWithVersionControl(t *testing.T) {
 			headers,
 			versionBeacons,
 			semver.New("1.0.0"),
-			&flow.Header{HeaderBody: flow.HeaderBody{Height: 1}},
+			&flow.UnsignedHeader{HeaderBody: flow.HeaderBody{Height: 1}},
 			false,
 			false,
 		)
@@ -391,7 +391,7 @@ func TestStopControlWithVersionControl(t *testing.T) {
 		headerC := unittest.BlockHeaderWithParentFixture(headerB) // 22
 
 		headers := &stopControlMockHeaders{
-			headers: map[uint64]*flow.Header{
+			headers: map[uint64]*flow.UnsignedHeader{
 				headerA.Height: headerA,
 				headerB.Height: headerB,
 				headerC.Height: headerC,
@@ -406,7 +406,7 @@ func TestStopControlWithVersionControl(t *testing.T) {
 			headers,
 			versionBeacons,
 			semver.New("1.0.0"),
-			&flow.Header{HeaderBody: flow.HeaderBody{Height: 1}},
+			&flow.UnsignedHeader{HeaderBody: flow.HeaderBody{Height: 1}},
 			false,
 			false,
 		)
@@ -469,7 +469,7 @@ func TestStopControlWithVersionControl(t *testing.T) {
 		headerC := unittest.BlockHeaderWithParentFixture(headerB) // 22
 
 		headers := &stopControlMockHeaders{
-			headers: map[uint64]*flow.Header{
+			headers: map[uint64]*flow.UnsignedHeader{
 				headerA.Height: headerA,
 				headerB.Height: headerB,
 				headerC.Height: headerC,
@@ -484,7 +484,7 @@ func TestStopControlWithVersionControl(t *testing.T) {
 			headers,
 			versionBeacons,
 			semver.New("1.0.0"),
-			&flow.Header{HeaderBody: flow.HeaderBody{Height: 1}},
+			&flow.UnsignedHeader{HeaderBody: flow.HeaderBody{Height: 1}},
 			false,
 			false,
 		)
@@ -548,7 +548,7 @@ func TestStopControlWithVersionControl(t *testing.T) {
 		headerB := unittest.BlockHeaderWithParentFixture(headerA) // 21
 
 		headers := &stopControlMockHeaders{
-			headers: map[uint64]*flow.Header{
+			headers: map[uint64]*flow.UnsignedHeader{
 				headerA.Height: headerA,
 				headerB.Height: headerB,
 			},
@@ -562,7 +562,7 @@ func TestStopControlWithVersionControl(t *testing.T) {
 			headers,
 			versionBeacons,
 			semver.New("1.0.0"),
-			&flow.Header{HeaderBody: flow.HeaderBody{Height: 1}},
+			&flow.UnsignedHeader{HeaderBody: flow.HeaderBody{Height: 1}},
 			false,
 			false,
 		)
@@ -616,7 +616,7 @@ func TestStartingStopped(t *testing.T) {
 		nil,
 		nil,
 		nil,
-		&flow.Header{HeaderBody: flow.HeaderBody{Height: 1}},
+		&flow.UnsignedHeader{HeaderBody: flow.HeaderBody{Height: 1}},
 		true,
 		false,
 	)
@@ -637,7 +637,7 @@ func TestStoppedStateRejectsAllBlocksAndChanged(t *testing.T) {
 		nil,
 		nil,
 		nil,
-		&flow.Header{HeaderBody: flow.HeaderBody{Height: 1}},
+		&flow.UnsignedHeader{HeaderBody: flow.HeaderBody{Height: 1}},
 		true,
 		false,
 	)
@@ -667,7 +667,7 @@ func Test_StopControlWorkers(t *testing.T) {
 			nil,
 			nil,
 			nil,
-			&flow.Header{HeaderBody: flow.HeaderBody{Height: 1}},
+			&flow.UnsignedHeader{HeaderBody: flow.HeaderBody{Height: 1}},
 			true,
 			false,
 		)
@@ -694,7 +694,7 @@ func Test_StopControlWorkers(t *testing.T) {
 			nil,
 			nil,
 			nil,
-			&flow.Header{HeaderBody: flow.HeaderBody{Height: 1}},
+			&flow.UnsignedHeader{HeaderBody: flow.HeaderBody{Height: 1}},
 			false,
 			false,
 		)
@@ -736,7 +736,7 @@ func Test_StopControlWorkers(t *testing.T) {
 		execState.On("IsBlockExecuted", headerA.Height, headerA.ID()).Return(true, nil).Once()
 
 		headers := &stopControlMockHeaders{
-			headers: map[uint64]*flow.Header{
+			headers: map[uint64]*flow.UnsignedHeader{
 				headerA.Height: headerA,
 				headerB.Height: headerB,
 			},
@@ -807,7 +807,7 @@ func Test_StopControlWorkers(t *testing.T) {
 		execState.On("IsBlockExecuted", headerB.Height, headerB.ID()).Return(true, nil).Once()
 
 		headers := &stopControlMockHeaders{
-			headers: map[uint64]*flow.Header{
+			headers: map[uint64]*flow.UnsignedHeader{
 				headerA.Height: headerA,
 				headerB.Height: headerB,
 				headerC.Height: headerC,

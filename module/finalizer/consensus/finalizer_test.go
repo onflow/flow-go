@@ -50,7 +50,7 @@ func TestMakeFinalValidChain(t *testing.T) {
 
 	// generate a couple of children that are pending
 	parent := final
-	var pending []*flow.Header
+	var pending []*flow.UnsignedHeader
 	total := 8
 	for i := 0; i < total; i++ {
 		header := unittest.BlockHeaderFixture()

@@ -41,7 +41,7 @@ func createNodes(
 	conIdentities []bootstrap.NodeInfo,
 	currentEpochSetup flow.EpochSetup,
 	nextEpochSetup flow.EpochSetup,
-	firstBlock *flow.Header) []*node {
+	firstBlock *flow.UnsignedHeader) []*node {
 
 	identities := make(flow.IdentityList, 0, len(conIdentities))
 	for _, identity := range conIdentities {
@@ -79,7 +79,7 @@ func createNode(
 	whiteboard *whiteboard,
 	currentSetup flow.EpochSetup,
 	nextSetup flow.EpochSetup,
-	firstBlock *flow.Header) *node {
+	firstBlock *flow.UnsignedHeader) *node {
 
 	core := testutil.GenericNodeFromParticipants(t, hub, id, ids, chainID)
 	core.Log = zerolog.New(os.Stdout).Level(zerolog.WarnLevel)
@@ -215,10 +215,10 @@ func TestWithWhiteboard(t *testing.T) {
 	// final      : 300
 
 	// create and record relevant blocks
-	blocks := make(map[uint64]*flow.Header)
+	blocks := make(map[uint64]*flow.UnsignedHeader)
 	var view uint64
 	for view = 100; view <= 250; view += dkgeng.DefaultPollStep {
-		blocks[view] = &flow.Header{
+		blocks[view] = &flow.UnsignedHeader{
 			HeaderBody: flow.HeaderBody{
 				View: view,
 			},

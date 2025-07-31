@@ -14,7 +14,7 @@ import (
 
 func TestHeaderInsertCheckRetrieve(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
-		expected := &flow.Header{
+		expected := &flow.UnsignedHeader{
 			HeaderBody: flow.HeaderBody{
 				View:               1337,
 				Timestamp:          uint64(time.Now().UnixMilli()),
@@ -30,7 +30,7 @@ func TestHeaderInsertCheckRetrieve(t *testing.T) {
 		err := db.Update(InsertHeader(expected.ID(), expected))
 		require.NoError(t, err)
 
-		var actual flow.Header
+		var actual flow.UnsignedHeader
 		err = db.View(RetrieveHeader(blockID, &actual))
 		require.NoError(t, err)
 

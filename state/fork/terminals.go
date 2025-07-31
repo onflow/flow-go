@@ -22,7 +22,7 @@ func (t IncludingBlock) LowestHeightToVisit(headers storage.Headers) (uint64, er
 
 // ConfirmTerminalReached is a self-consistency check that the lowest visited block is
 // in fact the expected terminal.
-func (t IncludingBlock) ConfirmTerminalReached(headers storage.Headers, lowestVisitedBlock *flow.Header) error {
+func (t IncludingBlock) ConfirmTerminalReached(headers storage.Headers, lowestVisitedBlock *flow.UnsignedHeader) error {
 	if lowestVisitedBlock.ID() != flow.Identifier(t) {
 		return fmt.Errorf("last visited block has ID %x but expecting %x", lowestVisitedBlock.ID(), flow.Identifier(t))
 	}
@@ -45,7 +45,7 @@ func (t ExcludingBlock) LowestHeightToVisit(headers storage.Headers) (uint64, er
 
 // ConfirmTerminalReached is a self-consistency check that the lowest visited block is
 // in fact the expected terminal.
-func (t ExcludingBlock) ConfirmTerminalReached(headers storage.Headers, lowestVisitedBlock *flow.Header) error {
+func (t ExcludingBlock) ConfirmTerminalReached(headers storage.Headers, lowestVisitedBlock *flow.UnsignedHeader) error {
 	if lowestVisitedBlock.ParentID != flow.Identifier(t) {
 		return fmt.Errorf("parent of last visited block has ID %x but expecting %x", lowestVisitedBlock.ParentID, flow.Identifier(t))
 	}
@@ -63,7 +63,7 @@ func (t IncludingHeight) LowestHeightToVisit(storage.Headers) (uint64, error) {
 
 // ConfirmTerminalReached is a self-consistency check that the lowest visited block is
 // in fact the expected terminal.
-func (t IncludingHeight) ConfirmTerminalReached(headers storage.Headers, lowestVisitedBlock *flow.Header) error {
+func (t IncludingHeight) ConfirmTerminalReached(headers storage.Headers, lowestVisitedBlock *flow.UnsignedHeader) error {
 	if lowestVisitedBlock.Height != uint64(t) {
 		return fmt.Errorf("expecting terminal block with height %d but got %d", uint64(t), lowestVisitedBlock.Height)
 	}
@@ -81,7 +81,7 @@ func (t ExcludingHeight) LowestHeightToVisit(storage.Headers) (uint64, error) {
 
 // ConfirmTerminalReached is a self-consistency check that the lowest visited block is
 // in fact the expected terminal.
-func (t ExcludingHeight) ConfirmTerminalReached(headers storage.Headers, lowestVisitedBlock *flow.Header) error {
+func (t ExcludingHeight) ConfirmTerminalReached(headers storage.Headers, lowestVisitedBlock *flow.UnsignedHeader) error {
 	if lowestVisitedBlock.Height != uint64(t)+1 {
 		return fmt.Errorf("expecting terminal block with height %d but got %d", uint64(t)+1, lowestVisitedBlock.Height)
 	}

@@ -315,7 +315,7 @@ func (s *AssignmentCollectorTestSuite) TestRequestMissingApprovals() {
 	// replace old one
 	s.ChunksAssignment = assignmentBuilder.Build()
 
-	incorporatedBlocks := make([]*flow.Header, 0)
+	incorporatedBlocks := make([]*flow.UnsignedHeader, 0)
 
 	lastHeight := uint64(rand.Uint32())
 	for i := 0; i < 2; i++ {

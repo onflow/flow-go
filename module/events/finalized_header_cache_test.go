@@ -24,7 +24,7 @@ func TestFinalizedHeaderCache(t *testing.T) {
 	snap := protocolmock.NewSnapshot(t)
 	state.On("Final").Return(snap)
 	snap.On("Head").Return(
-		func() *flow.Header { return final },
+		func() *flow.UnsignedHeader { return final },
 		func() error { return nil })
 
 	cache, worker, err := NewFinalizedHeaderCache(state)

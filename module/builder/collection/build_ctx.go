@@ -7,14 +7,14 @@ import (
 // blockBuildContext encapsulates required information about the cluster chain and
 // main chain state needed to build a new cluster block proposal.
 type blockBuildContext struct {
-	parentID                   flow.Identifier  // ID of the parent we are extending
-	parent                     *flow.Header     // parent of the block we are building
-	clusterChainFinalizedBlock *flow.Header     // finalized block on the cluster chain
-	refChainFinalizedHeight    uint64           // finalized height on reference chain
-	refChainFinalizedID        flow.Identifier  // finalized block ID on reference chain
-	refEpochFirstHeight        uint64           // first height of this cluster's operating epoch
-	refEpochFinalHeight        *uint64          // last height of this cluster's operating epoch (nil if epoch not ended)
-	refEpochFinalID            *flow.Identifier // ID of last block in this cluster's operating epoch (nil if epoch not ended)
+	parentID                   flow.Identifier      // ID of the parent we are extending
+	parent                     *flow.UnsignedHeader // parent of the block we are building
+	clusterChainFinalizedBlock *flow.UnsignedHeader // finalized block on the cluster chain
+	refChainFinalizedHeight    uint64               // finalized height on reference chain
+	refChainFinalizedID        flow.Identifier      // finalized block ID on reference chain
+	refEpochFirstHeight        uint64               // first height of this cluster's operating epoch
+	refEpochFinalHeight        *uint64              // last height of this cluster's operating epoch (nil if epoch not ended)
+	refEpochFinalID            *flow.Identifier     // ID of last block in this cluster's operating epoch (nil if epoch not ended)
 	config                     Config
 	limiter                    *rateLimiter
 	lookup                     *transactionLookup

@@ -26,7 +26,7 @@ type InMemoryIndexer struct {
 	results         *unsynchronized.LightTransactionResults
 	txResultErrMsgs *unsynchronized.TransactionResultErrorMessages
 	executionResult *flow.ExecutionResult
-	header          *flow.Header
+	header          *flow.UnsignedHeader
 }
 
 // NewInMemoryIndexer creates a new indexer that uses in-memory storage implementations.
@@ -42,7 +42,7 @@ func NewInMemoryIndexer(
 	results *unsynchronized.LightTransactionResults,
 	txResultErrMsgs *unsynchronized.TransactionResultErrorMessages,
 	executionResult *flow.ExecutionResult,
-	header *flow.Header,
+	header *flow.UnsignedHeader,
 ) *InMemoryIndexer {
 	indexer := &InMemoryIndexer{
 		log:             log.With().Str("component", "in_memory_indexer").Logger(),

@@ -61,7 +61,7 @@ type ChunkBody struct {
 	// Within an ExecutionResult, all chunks must use either representation (1) or (2), not both.
 	// TODO(mainnet27, #6773): make this field non-pointer https://github.com/onflow/flow-go/issues/6773
 	ServiceEventCount *uint16    `cbor:",omitempty"`
-	BlockID           Identifier // Block id of the execution result this chunk belongs to
+	BlockID           Identifier // UnsignedBlock id of the execution result this chunk belongs to
 
 	// Computation consumption info
 	TotalComputationUsed uint64 // total amount of computation used by running all txs in this chunk

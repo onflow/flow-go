@@ -118,7 +118,7 @@ func NewBlockQueue(logger zerolog.Logger) *BlockQueue {
 // 2. if a block's parent is not executed, then the parent block must be passed in first
 // 3. if a block's parent is executed, then the parent's finalState must be passed in
 // It returns (nil, nil, nil) if this block is a duplication
-func (q *BlockQueue) HandleBlock(block *flow.Block, parentFinalState *flow.StateCommitment) (
+func (q *BlockQueue) HandleBlock(block *flow.UnsignedBlock, parentFinalState *flow.StateCommitment) (
 	[]*MissingCollection, // missing collections
 	[]*entity.ExecutableBlock, // blocks ready to execute
 	error, // exceptions

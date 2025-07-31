@@ -8,7 +8,7 @@ import (
 // FinalityProof represents a finality proof for a Block. By convention, a FinalityProof
 // is immutable. Finality in Jolteon/HotStuff is determined by the 2-chain rule:
 //
-//	There exists a _certified_ block C, such that Block.View + 1 = C.View
+//	There exists a _certified_ block C, such that UnsignedBlock.View + 1 = C.View
 type FinalityProof struct {
 	Block          *model.Block
 	CertifiedChild model.CertifiedBlock

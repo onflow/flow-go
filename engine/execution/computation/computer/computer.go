@@ -221,7 +221,7 @@ func (e *blockComputer) ExecuteBlock(
 func (e *blockComputer) queueTransactionRequests(
 	blockId flow.Identifier,
 	blockIdStr string,
-	blockHeader *flow.Header,
+	blockHeader *flow.UnsignedHeader,
 	rawCollections []*entity.CompleteCollection,
 	systemTxnBody *flow.TransactionBody,
 	requestQueue chan TransactionRequest,

@@ -45,10 +45,10 @@ func InsertClusterBlock(proposal *cluster.Proposal) func(*badger.Txn) error {
 }
 
 // RetrieveClusterBlock retrieves a cluster consensus block by block ID.
-func RetrieveClusterBlock(blockID flow.Identifier, block *cluster.Block) func(*badger.Txn) error {
+func RetrieveClusterBlock(blockID flow.Identifier, block *cluster.UnsignedBlock) func(*badger.Txn) error {
 	return func(tx *badger.Txn) error {
 		// retrieve the block header
-		var header flow.Header
+		var header flow.UnsignedHeader
 		err := operation.RetrieveHeader(blockID, &header)(tx)
 		if err != nil {
 			return fmt.Errorf("could not retrieve header: %w", err)
@@ -62,8 +62,8 @@ func RetrieveClusterBlock(blockID flow.Identifier, block *cluster.Block) func(*b
 		}
 
 		// overwrite block
-		newBlock, err := cluster.NewBlock(
-			cluster.UntrustedBlock{
+		newBlock, err := cluster.NewUnsignedBlock(
+			cluster.UntrustedUnsignedBlock{
 				HeaderBody: header.HeaderBody,
 				Payload:    payload,
 			},
@@ -79,7 +79,7 @@ func RetrieveClusterBlock(blockID flow.Identifier, block *cluster.Block) func(*b
 
 // RetrieveLatestFinalizedClusterHeader retrieves the latest finalized for the
 // given cluster chain ID.
-func RetrieveLatestFinalizedClusterHeader(chainID flow.ChainID, final *flow.Header) func(tx *badger.Txn) error {
+func RetrieveLatestFinalizedClusterHeader(chainID flow.ChainID, final *flow.UnsignedHeader) func(tx *badger.Txn) error {
 	return func(tx *badger.Txn) error {
 		var boundary uint64
 		err := operation.RetrieveClusterFinalizedHeight(chainID, &boundary)(tx)
@@ -106,7 +106,7 @@ func RetrieveLatestFinalizedClusterHeader(chainID flow.ChainID, final *flow.Head
 func FinalizeClusterBlock(blockID flow.Identifier) func(*badger.Txn) error {
 	return func(tx *badger.Txn) error {
 		// retrieve the header to check the parent
-		var header flow.Header
+		var header flow.UnsignedHeader
 		err := operation.RetrieveHeader(blockID, &header)(tx)
 		if err != nil {
 			return fmt.Errorf("could not retrieve header: %w", err)

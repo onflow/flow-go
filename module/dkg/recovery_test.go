@@ -28,7 +28,7 @@ func TestBeaconKeyRecovery(t *testing.T) {
 // mocked state.
 type BeaconKeyRecoverySuite struct {
 	suite.Suite
-	head               *flow.Header
+	head               *flow.UnsignedHeader
 	local              *mockmodule.Local
 	state              *mockprotocol.State
 	epochProtocolState *mockprotocol.EpochProtocolState

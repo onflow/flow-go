@@ -78,7 +78,7 @@ func New(log zerolog.Logger, config Config, metrics module.ChainSyncMetrics, cha
 // HandleBlock handles receiving a new block from another node. It returns
 // true if the block should be processed by the compliance layer and false
 // if it should be ignored.
-func (c *Core) HandleBlock(header *flow.Header) bool {
+func (c *Core) HandleBlock(header *flow.UnsignedHeader) bool {
 	log := c.log
 	if c.log.Debug().Enabled() {
 		log = c.log.With().Str("block_id", header.ID().String()).Uint64("block_height", header.Height).Logger()
@@ -114,7 +114,7 @@ func (c *Core) HandleBlock(header *flow.Header) bool {
 // HandleHeight handles receiving a new highest finalized height from another node.
 // If the height difference between local and the reported height is outside tolerance, we do nothing.
 // Otherwise, we queue each missing height.
-func (c *Core) HandleHeight(final *flow.Header, height uint64) {
+func (c *Core) HandleHeight(final *flow.UnsignedHeader, height uint64) {
 	log := c.log.With().Uint64("final_height", final.Height).Uint64("recv_height", height).Logger()
 	log.Debug().Msg("received height")
 	// don't bother queueing anything if we're within tolerance
@@ -185,7 +185,7 @@ func (c *Core) requeueHeight(height uint64) {
 // ScanPending scans all pending block statuses for blocks that should be
 // requested. It apportions requestable items into range and batch requests
 // according to configured maximums, giving precedence to range requests.
-func (c *Core) ScanPending(final *flow.Header) ([]chainsync.Range, []chainsync.Batch) {
+func (c *Core) ScanPending(final *flow.UnsignedHeader) ([]chainsync.Range, []chainsync.Batch) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
@@ -208,7 +208,7 @@ func (c *Core) ScanPending(final *flow.Header) ([]chainsync.Range, []chainsync.B
 
 // WithinTolerance returns whether or not the given height is within configured
 // height tolerance, wrt the given local finalized header.
-func (c *Core) WithinTolerance(final *flow.Header, height uint64) bool {
+func (c *Core) WithinTolerance(final *flow.UnsignedHeader, height uint64) bool {
 
 	lower := final.Height - uint64(c.Config.Tolerance)
 	if lower > final.Height { // underflow check
@@ -274,7 +274,7 @@ func (c *Core) getRequestStatus(height uint64, blockID flow.Identifier) *chainsy
 
 // prune removes any pending requests which we have received and which is below
 // the finalized height, or which we received sufficiently long ago.
-func (c *Core) prune(final *flow.Header) {
+func (c *Core) prune(final *flow.UnsignedHeader) {
 	if c.localFinalizedHeight >= final.Height {
 		return
 	}
@@ -312,7 +312,7 @@ func (c *Core) prune(final *flow.Header) {
 		Msgf("pruned %d heights, %d block IDs", prunedHeights, prunedBlockIDs)
 }
 
-func (c *Core) Prune(final *flow.Header) {
+func (c *Core) Prune(final *flow.UnsignedHeader) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.prune(final)

@@ -189,8 +189,8 @@ func AccountFixture() (*flow.Account, error) {
 	}, nil
 }
 
-func ChainBlockFixtureWithRoot(root *flow.Header, n int) []*flow.Block {
-	bs := make([]*flow.Block, 0, n)
+func ChainBlockFixtureWithRoot(root *flow.UnsignedHeader, n int) []*flow.UnsignedBlock {
+	bs := make([]*flow.UnsignedBlock, 0, n)
 	parent := root
 	for i := 0; i < n; i++ {
 		b := BlockWithParentFixture(parent)
@@ -200,7 +200,7 @@ func ChainBlockFixtureWithRoot(root *flow.Header, n int) []*flow.Block {
 	return bs
 }
 
-func RechainBlocks(blocks []*flow.Block) {
+func RechainBlocks(blocks []*flow.UnsignedBlock) {
 	if len(blocks) == 0 {
 		return
 	}
@@ -213,16 +213,16 @@ func RechainBlocks(blocks []*flow.Block) {
 	}
 }
 
-func FullBlockFixture() *flow.Block {
+func FullBlockFixture() *flow.UnsignedBlock {
 	b := BlockFixture()
-	return &flow.Block{
+	return &flow.UnsignedBlock{
 		HeaderBody: b.HeaderBody,
 		Payload:    PayloadFixture(WithAllTheFixins),
 	}
 }
 
-func BlockFixtures(number int) []*flow.Block {
-	blocks := make([]*flow.Block, 0, number)
+func BlockFixtures(number int) []*flow.UnsignedBlock {
+	blocks := make([]*flow.UnsignedBlock, 0, number)
 	for range number {
 		block := BlockFixture()
 		blocks = append(blocks, block)
@@ -247,29 +247,29 @@ func ClusterProposalFixture() *cluster.Proposal {
 	return ClusterProposalFromBlock(ClusterBlockFixture())
 }
 
-func ProposalHeaderFromHeader(header *flow.Header) *flow.ProposalHeader {
+func ProposalHeaderFromHeader(header *flow.UnsignedHeader) *flow.ProposalHeader {
 	return &flow.ProposalHeader{
 		Header:          header,
 		ProposerSigData: SignatureFixture(),
 	}
 }
 
-func ProposalFromBlock(block *flow.Block) *flow.Proposal {
+func ProposalFromBlock(block *flow.UnsignedBlock) *flow.Proposal {
 	return &flow.Proposal{
 		Block:           *block,
 		ProposerSigData: SignatureFixture(),
 	}
 }
 
-func ClusterProposalFromBlock(block *cluster.Block) *cluster.Proposal {
+func ClusterProposalFromBlock(block *cluster.UnsignedBlock) *cluster.Proposal {
 	return &cluster.Proposal{
 		Block:           *block,
 		ProposerSigData: SignatureFixture(),
 	}
 }
 
-func BlockchainFixture(length int) []*flow.Block {
-	blocks := make([]*flow.Block, length)
+func BlockchainFixture(length int) []*flow.UnsignedBlock {
+	blocks := make([]*flow.UnsignedBlock, length)
 
 	genesis := BlockFixture()
 	blocks[0] = genesis
@@ -290,7 +290,7 @@ func AsSlashable[T any](msg T) flow.Slashable[T] {
 }
 
 // ReceiptAndSealForBlock returns a receipt with service events and a seal for them for a given block.
-func ReceiptAndSealForBlock(block *flow.Block, serviceEvents ...flow.ServiceEvent) (*flow.ExecutionReceipt, *flow.Seal) {
+func ReceiptAndSealForBlock(block *flow.UnsignedBlock, serviceEvents ...flow.ServiceEvent) (*flow.ExecutionReceipt, *flow.Seal) {
 	receipt := ReceiptForBlockFixture(block)
 	receipt.ExecutionResult.ServiceEvents = serviceEvents
 	seal := Seal.Fixture(Seal.WithBlock(block.ToHeader()), Seal.WithResult(&receipt.ExecutionResult))
@@ -370,21 +370,21 @@ func WithExecutionResults(results ...*flow.ExecutionResult) func(*flow.Payload) 
 	}
 }
 
-func BlockWithParentFixture(parent *flow.Header) *flow.Block {
+func BlockWithParentFixture(parent *flow.UnsignedHeader) *flow.UnsignedBlock {
 	return BlockWithParentAndPayload(parent, PayloadFixture())
 }
 
 // BlockWithParentAndPayload creates a new block that is valid
 // with respect to the given parent block and with given payload.
-func BlockWithParentAndPayload(parent *flow.Header, payload flow.Payload) *flow.Block {
-	return &flow.Block{
+func BlockWithParentAndPayload(parent *flow.UnsignedHeader, payload flow.Payload) *flow.UnsignedBlock {
+	return &flow.UnsignedBlock{
 		HeaderBody: HeaderBodyWithParentFixture(parent),
 		Payload:    payload,
 	}
 }
 
-func BlockWithParentProtocolState(parent *flow.Block) *flow.Block {
-	return &flow.Block{
+func BlockWithParentProtocolState(parent *flow.UnsignedBlock) *flow.UnsignedBlock {
+	return &flow.UnsignedBlock{
 		HeaderBody: HeaderBodyWithParentFixture(parent.ToHeader()),
 		Payload:    PayloadFixture(WithProtocolStateID(parent.Payload.ProtocolStateID)),
 	}
@@ -392,9 +392,9 @@ func BlockWithParentProtocolState(parent *flow.Block) *flow.Block {
 
 func BlockWithParentAndProposerFixture(
 	t *testing.T,
-	parent *flow.Header,
+	parent *flow.UnsignedHeader,
 	proposer flow.Identifier,
-) *flow.Block {
+) *flow.UnsignedBlock {
 	block := BlockWithParentFixture(parent)
 
 	indices, err := signature.EncodeSignersToIndices(
@@ -411,7 +411,7 @@ func BlockWithParentAndProposerFixture(
 	return block
 }
 
-func BlockWithParentAndSeals(parent *flow.Header, seals []*flow.Header) *flow.Block {
+func BlockWithParentAndSeals(parent *flow.UnsignedHeader, seals []*flow.UnsignedHeader) *flow.UnsignedBlock {
 	payload := flow.Payload{}
 
 	if len(seals) > 0 {
@@ -425,14 +425,14 @@ func BlockWithParentAndSeals(parent *flow.Header, seals []*flow.Header) *flow.Bl
 	return BlockWithParentAndPayload(parent, payload)
 }
 
-func WithHeaderHeight(height uint64) func(header *flow.Header) {
-	return func(header *flow.Header) {
+func WithHeaderHeight(height uint64) func(header *flow.UnsignedHeader) {
+	return func(header *flow.UnsignedHeader) {
 		header.Height = height
 	}
 }
 
-func HeaderWithView(view uint64) func(*flow.Header) {
-	return func(header *flow.Header) {
+func HeaderWithView(view uint64) func(*flow.UnsignedHeader) {
+	return func(header *flow.UnsignedHeader) {
 		header.View = view
 	}
 }
@@ -440,7 +440,7 @@ func HeaderWithView(view uint64) func(*flow.Header) {
 func HeaderBodyFixture(opts ...func(header flow.HeaderBody)) flow.HeaderBody {
 	height := 1 + uint64(rand.Uint32()) // avoiding edge case of height = 0 (genesis block)
 	view := height + uint64(rand.Intn(1000))
-	header := HeaderBodyWithParentFixture(&flow.Header{
+	header := HeaderBodyWithParentFixture(&flow.UnsignedHeader{
 		HeaderBody: flow.HeaderBody{
 			ChainID:  flow.Emulator,
 			ParentID: IdentifierFixture(),
@@ -456,10 +456,10 @@ func HeaderBodyFixture(opts ...func(header flow.HeaderBody)) flow.HeaderBody {
 	return header
 }
 
-func BlockHeaderFixture(opts ...func(header *flow.Header)) *flow.Header {
+func BlockHeaderFixture(opts ...func(header *flow.UnsignedHeader)) *flow.UnsignedHeader {
 	height := 1 + uint64(rand.Uint32()) // avoiding edge case of height = 0 (genesis block)
 	view := height + uint64(rand.Intn(1000))
-	header := BlockHeaderWithParentFixture(&flow.Header{
+	header := BlockHeaderWithParentFixture(&flow.UnsignedHeader{
 		HeaderBody: flow.HeaderBody{
 			ChainID:            flow.Emulator,
 			ParentID:           IdentifierFixture(),
@@ -480,11 +480,11 @@ func BlockHeaderFixture(opts ...func(header *flow.Header)) *flow.Header {
 
 func BlockHeaderFixtureOnChain(
 	chainID flow.ChainID,
-	opts ...func(header *flow.Header),
-) *flow.Header {
+	opts ...func(header *flow.UnsignedHeader),
+) *flow.UnsignedHeader {
 	height := 1 + uint64(rand.Uint32()) // avoiding edge case of height = 0 (genesis block)
 	view := height + uint64(rand.Intn(1000))
-	header := BlockHeaderWithParentFixture(&flow.Header{
+	header := BlockHeaderWithParentFixture(&flow.UnsignedHeader{
 		HeaderBody: flow.HeaderBody{
 			ChainID:  chainID,
 			ParentID: IdentifierFixture(),
@@ -500,14 +500,14 @@ func BlockHeaderFixtureOnChain(
 	return header
 }
 
-func BlockHeaderWithParentFixture(parent *flow.Header) *flow.Header {
-	return &flow.Header{
+func BlockHeaderWithParentFixture(parent *flow.UnsignedHeader) *flow.UnsignedHeader {
+	return &flow.UnsignedHeader{
 		HeaderBody:  HeaderBodyWithParentFixture(parent),
 		PayloadHash: IdentifierFixture(),
 	}
 }
 
-func HeaderBodyWithParentFixture(parent *flow.Header) flow.HeaderBody {
+func HeaderBodyWithParentFixture(parent *flow.UnsignedHeader) flow.HeaderBody {
 	height := parent.Height + 1
 	view := parent.View + 1 + uint64(rand.Intn(10)) // Intn returns [0, n)
 	var lastViewTC *flow.TimeoutCertificate
@@ -537,15 +537,15 @@ func HeaderBodyWithParentFixture(parent *flow.Header) flow.HeaderBody {
 	}
 }
 
-func BlockHeaderWithHeight(height uint64) *flow.Header {
+func BlockHeaderWithHeight(height uint64) *flow.UnsignedHeader {
 	return BlockHeaderFixture(WithHeaderHeight(height))
 }
 
-func BlockHeaderWithParentWithSoRFixture(parent *flow.Header, source []byte) *flow.Header {
+func BlockHeaderWithParentWithSoRFixture(parent *flow.UnsignedHeader, source []byte) *flow.UnsignedHeader {
 	headerBody := HeaderBodyWithParentFixture(parent)
 	headerBody.ParentVoterSigData = QCSigDataWithSoRFixture(source)
 
-	return &flow.Header{
+	return &flow.UnsignedHeader{
 		HeaderBody:  headerBody,
 		PayloadHash: IdentifierFixture(),
 	}
@@ -558,8 +558,8 @@ func ClusterPayloadFixture(transactionsCount int) *cluster.Payload {
 	}
 }
 
-func ClusterBlockFixtures(n int) []*cluster.Block {
-	clusterBlocks := make([]*cluster.Block, 0, n)
+func ClusterBlockFixtures(n int) []*cluster.UnsignedBlock {
+	clusterBlocks := make([]*cluster.UnsignedBlock, 0, n)
 
 	parent := ClusterBlockFixture()
 
@@ -586,7 +586,7 @@ func WithCollection(collection *flow.Collection) func(guarantee *flow.Collection
 	}
 }
 
-func AddCollectionsToBlock(block *flow.Block, collections []*flow.Collection) {
+func AddCollectionsToBlock(block *flow.UnsignedBlock, collections []*flow.Collection) {
 	gs := make([]*flow.CollectionGuarantee, 0, len(collections))
 	for _, collection := range collections {
 		gs = append(gs, &flow.CollectionGuarantee{CollectionID: collection.ID()})
@@ -708,7 +708,7 @@ func ExecutableBlockFixture(
 
 func ExecutableBlockFixtureWithParent(
 	collectionsSignerIDs [][]flow.Identifier,
-	parent *flow.Header,
+	parent *flow.UnsignedHeader,
 	startState *flow.StateCommitment,
 ) *entity.ExecutableBlock {
 
@@ -800,12 +800,12 @@ func UnsignedExecutionReceiptFixture(opts ...func(*flow.UnsignedExecutionReceipt
 	return receipt
 }
 
-func ReceiptForBlockFixture(block *flow.Block) *flow.ExecutionReceipt {
+func ReceiptForBlockFixture(block *flow.UnsignedBlock) *flow.ExecutionReceipt {
 	return ReceiptForBlockExecutorFixture(block, IdentifierFixture())
 }
 
 func ReceiptForBlockExecutorFixture(
-	block *flow.Block,
+	block *flow.UnsignedBlock,
 	executor flow.Identifier,
 ) *flow.ExecutionReceipt {
 	result := ExecutionResultFixture(WithBlock(block))
@@ -814,7 +814,7 @@ func ReceiptForBlockExecutorFixture(
 }
 
 func ReceiptsForBlockFixture(
-	block *flow.Block,
+	block *flow.UnsignedBlock,
 	ids []flow.Identifier,
 ) []*flow.ExecutionReceipt {
 	result := ExecutionResultFixture(WithBlock(block))
@@ -842,7 +842,7 @@ func WithPreviousResultID(previousResultID flow.Identifier) func(*flow.Execution
 	}
 }
 
-func WithBlock(block *flow.Block) func(*flow.ExecutionResult) {
+func WithBlock(block *flow.UnsignedBlock) func(*flow.ExecutionResult) {
 	chunks := 1 // tailing chunk is always system chunk
 	chunks += len(block.Payload.Guarantees)
 	blockID := block.ID()
@@ -944,7 +944,7 @@ func WithApproverID(approverID flow.Identifier) func(*flow.ResultApproval) {
 	}
 }
 
-func WithAttestationBlock(block *flow.Block) func(*flow.ResultApproval) {
+func WithAttestationBlock(block *flow.UnsignedBlock) func(*flow.ResultApproval) {
 	return func(ra *flow.ResultApproval) {
 		ra.Body.Attestation.BlockID = block.ID()
 	}
@@ -1534,7 +1534,7 @@ func RegisterIDFixture() flow.RegisterID {
 
 // VerifiableChunkDataFixture returns a complete verifiable chunk with an
 // execution receipt referencing the block/collections.
-func VerifiableChunkDataFixture(chunkIndex uint64, opts ...func(*flow.HeaderBody)) (*verification.VerifiableChunkData, *flow.Block) {
+func VerifiableChunkDataFixture(chunkIndex uint64, opts ...func(*flow.HeaderBody)) (*verification.VerifiableChunkData, *flow.UnsignedBlock) {
 
 	guarantees := make([]*flow.CollectionGuarantee, 0, chunkIndex+1)
 
@@ -1554,7 +1554,7 @@ func VerifiableChunkDataFixture(chunkIndex uint64, opts ...func(*flow.HeaderBody
 		opt(&headerBody)
 	}
 
-	block := &flow.Block{
+	block := &flow.UnsignedBlock{
 		HeaderBody: headerBody,
 		Payload:    payload,
 	}
@@ -1806,7 +1806,7 @@ func SeedFixtures(m int, n int) [][]byte {
 
 // BlockEventsFixture returns a block events model populated with random events of length n.
 func BlockEventsFixture(
-	header *flow.Header,
+	header *flow.UnsignedHeader,
 	n int,
 ) flow.BlockEvents {
 	return flow.BlockEvents{
@@ -1879,7 +1879,7 @@ func BatchListFixture(n int) []chainsync.Batch {
 }
 
 func BootstrapExecutionResultFixture(
-	block *flow.Block,
+	block *flow.UnsignedBlock,
 	commit flow.StateCommitment,
 ) *flow.ExecutionResult {
 	result := &flow.ExecutionResult{
@@ -1963,7 +1963,7 @@ func QuorumCertificateFixture(opts ...func(*flow.QuorumCertificate)) *flow.Quoru
 }
 
 // CertifyBlock returns a quorum certificate for the given block header
-func CertifyBlock(header *flow.Header) *flow.QuorumCertificate {
+func CertifyBlock(header *flow.UnsignedHeader) *flow.QuorumCertificate {
 	qc := QuorumCertificateFixture(func(qc *flow.QuorumCertificate) {
 		qc.View = header.View
 		qc.BlockID = header.ID()
@@ -1971,14 +1971,14 @@ func CertifyBlock(header *flow.Header) *flow.QuorumCertificate {
 	return qc
 }
 
-func CertifiedByChild(block *flow.Block, child *flow.Block) *flow.CertifiedBlock {
+func CertifiedByChild(block *flow.UnsignedBlock, child *flow.UnsignedBlock) *flow.CertifiedBlock {
 	return &flow.CertifiedBlock{
 		Proposal:     &flow.Proposal{Block: *block, ProposerSigData: SignatureFixture()},
 		CertifyingQC: child.ParentQC(),
 	}
 }
 
-func NewCertifiedBlock(block *flow.Block) *flow.CertifiedBlock {
+func NewCertifiedBlock(block *flow.UnsignedBlock) *flow.CertifiedBlock {
 	return &flow.CertifiedBlock{
 		Proposal: &flow.Proposal{
 			Block:           *block,
@@ -2248,16 +2248,16 @@ func ProtocolStateVersionUpgradeFixture() *flow.ProtocolStateVersionUpgrade {
 // protocol state.
 func BootstrapFixture(
 	participants flow.IdentityList,
-	opts ...func(*flow.Block),
-) (*flow.Block, *flow.ExecutionResult, *flow.Seal) {
+	opts ...func(*flow.UnsignedBlock),
+) (*flow.UnsignedBlock, *flow.ExecutionResult, *flow.Seal) {
 	return BootstrapFixtureWithChainID(participants, flow.Emulator, opts...)
 }
 
 func BootstrapFixtureWithChainID(
 	participants flow.IdentityList,
 	chainID flow.ChainID,
-	opts ...func(*flow.Block),
-) (*flow.Block, *flow.ExecutionResult, *flow.Seal) {
+	opts ...func(*flow.UnsignedBlock),
+) (*flow.UnsignedBlock, *flow.ExecutionResult, *flow.Seal) {
 	root := Block.Genesis(chainID)
 	for _, apply := range opts {
 		apply(root)
@@ -2285,7 +2285,7 @@ func BootstrapFixtureWithSetupAndCommit(
 	header flow.HeaderBody,
 	setup *flow.EpochSetup,
 	commit *flow.EpochCommit,
-) (*flow.Block, *flow.ExecutionResult, *flow.Seal) {
+) (*flow.UnsignedBlock, *flow.ExecutionResult, *flow.Seal) {
 	safetyParams, err := protocol.DefaultEpochSafetyParams(header.ChainID)
 	if err != nil {
 		panic(err)
@@ -2299,7 +2299,7 @@ func BootstrapFixtureWithSetupAndCommit(
 		panic(err)
 	}
 
-	root := &flow.Block{
+	root := &flow.UnsignedBlock{
 		HeaderBody: header,
 		Payload:    flow.Payload{ProtocolStateID: rootProtocolState.ID()},
 	}
@@ -2321,7 +2321,7 @@ func BootstrapFixtureWithSetupAndCommit(
 // example one as returned from BootstrapFixture.
 func RootSnapshotFixture(
 	participants flow.IdentityList,
-	opts ...func(*flow.Block),
+	opts ...func(*flow.UnsignedBlock),
 ) *inmem.Snapshot {
 	return RootSnapshotFixtureWithChainID(participants, flow.Emulator, opts...)
 }
@@ -2329,7 +2329,7 @@ func RootSnapshotFixture(
 func RootSnapshotFixtureWithChainID(
 	participants flow.IdentityList,
 	chainID flow.ChainID,
-	opts ...func(*flow.Block),
+	opts ...func(*flow.UnsignedBlock),
 ) *inmem.Snapshot {
 	block, result, seal := BootstrapFixtureWithChainID(participants.Sort(flow.Canonical[flow.Identity]), chainID, opts...)
 	qc := QuorumCertificateFixture(QCWithRootBlockID(block.ID()))
@@ -2358,11 +2358,11 @@ func SnapshotClusterByIndex(
 
 // ChainFixture creates a list of blocks that forms a chain
 func ChainFixture(nonGenesisCount int) (
-	[]*flow.Block,
+	[]*flow.UnsignedBlock,
 	*flow.ExecutionResult,
 	*flow.Seal,
 ) {
-	chain := make([]*flow.Block, 0, nonGenesisCount+1)
+	chain := make([]*flow.UnsignedBlock, 0, nonGenesisCount+1)
 
 	participants := IdentityListFixture(5, WithAllRoles())
 	genesis, result, seal := BootstrapFixture(participants)
@@ -2375,8 +2375,8 @@ func ChainFixture(nonGenesisCount int) (
 
 // ChainFixtureFrom creates a chain of blocks starting from a given parent block,
 // the total number of blocks in the chain is specified by the given count
-func ChainFixtureFrom(count int, parent *flow.Header) []*flow.Block {
-	blocks := make([]*flow.Block, 0, count)
+func ChainFixtureFrom(count int, parent *flow.UnsignedHeader) []*flow.UnsignedBlock {
+	blocks := make([]*flow.UnsignedBlock, 0, count)
 
 	for i := 0; i < count; i++ {
 		block := BlockWithParentFixture(parent)
@@ -2388,7 +2388,7 @@ func ChainFixtureFrom(count int, parent *flow.Header) []*flow.Block {
 }
 
 // ProposalChainFixtureFrom creates a chain of blocks and wraps each one in a Proposal.
-func ProposalChainFixtureFrom(count int, parent *flow.Header) []*flow.Proposal {
+func ProposalChainFixtureFrom(count int, parent *flow.UnsignedHeader) []*flow.Proposal {
 	proposals := make([]*flow.Proposal, 0, count)
 	for _, block := range ChainFixtureFrom(count, parent) {
 		proposals = append(proposals, ProposalFromBlock(block))
@@ -2397,7 +2397,7 @@ func ProposalChainFixtureFrom(count int, parent *flow.Header) []*flow.Proposal {
 }
 
 func ReceiptChainFor(
-	blocks []*flow.Block,
+	blocks []*flow.UnsignedBlock,
 	result0 *flow.ExecutionResult,
 ) []*flow.ExecutionReceipt {
 	receipts := make([]*flow.ExecutionReceipt, len(blocks))
@@ -2420,7 +2420,7 @@ func ReceiptChainFor(
 // ReconnectBlocksAndReceipts re-computes each block's PayloadHash and ParentID
 // so that all the blocks are connected.
 // blocks' height have to be in strict increasing order.
-func ReconnectBlocksAndReceipts(blocks []*flow.Block, receipts []*flow.ExecutionReceipt) {
+func ReconnectBlocksAndReceipts(blocks []*flow.UnsignedBlock, receipts []*flow.ExecutionReceipt) {
 	for i := 1; i < len(blocks); i++ {
 		b := blocks[i]
 		p := i - 1

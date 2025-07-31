@@ -37,9 +37,9 @@ func TestProduceConsume(t *testing.T) {
 	// blocking on the blocks, results in processor only receiving the first three finalized blocks:
 	// 10 blocks sequentially --> block reader --> consumer can read and push 3 blocks at a time to processor --> blocking processor.
 	t.Run("pushing 10 blocks, blocking, receives 3", func(t *testing.T) {
-		received := make([]*flow.Block, 0)
+		received := make([]*flow.UnsignedBlock, 0)
 		lock := &sync.Mutex{}
-		neverFinish := func(notifier module.ProcessingNotifier, block *flow.Block) {
+		neverFinish := func(notifier module.ProcessingNotifier, block *flow.UnsignedBlock) {
 			lock.Lock()
 			defer lock.Unlock()
 			received = append(received, block)
@@ -48,7 +48,7 @@ func TestProduceConsume(t *testing.T) {
 			// hence from consumer perspective, it is blocking on each received block.
 		}
 
-		withConsumer(t, 10, 3, neverFinish, func(consumer *blockconsumer.BlockConsumer, blocks []*flow.Block) {
+		withConsumer(t, 10, 3, neverFinish, func(consumer *blockconsumer.BlockConsumer, blocks []*flow.UnsignedBlock) {
 			unittest.RequireCloseBefore(t, consumer.Ready(), time.Second, "could not start consumer")
 
 			for i := 0; i < len(blocks); i++ {
@@ -71,10 +71,10 @@ func TestProduceConsume(t *testing.T) {
 	// 10 blocks sequentially --> block reader --> consumer can read and push 3 blocks at a time to processor --> processor finishes blocks
 	// immediately.
 	t.Run("pushing 100 blocks, non-blocking, receives 100", func(t *testing.T) {
-		received := make([]*flow.Block, 0)
+		received := make([]*flow.UnsignedBlock, 0)
 		lock := &sync.Mutex{}
 		var processAll sync.WaitGroup
-		alwaysFinish := func(notifier module.ProcessingNotifier, block *flow.Block) {
+		alwaysFinish := func(notifier module.ProcessingNotifier, block *flow.UnsignedBlock) {
 			lock.Lock()
 			defer lock.Unlock()
 
@@ -86,7 +86,7 @@ func TestProduceConsume(t *testing.T) {
 			}()
 		}
 
-		withConsumer(t, 100, 3, alwaysFinish, func(consumer *blockconsumer.BlockConsumer, blocks []*flow.Block) {
+		withConsumer(t, 100, 3, alwaysFinish, func(consumer *blockconsumer.BlockConsumer, blocks []*flow.UnsignedBlock) {
 			unittest.RequireCloseBefore(t, consumer.Ready(), time.Second, "could not start consumer")
 			processAll.Add(len(blocks))
 
@@ -115,8 +115,8 @@ func withConsumer(
 	t *testing.T,
 	blockCount int,
 	workerCount int,
-	process func(notifier module.ProcessingNotifier, block *flow.Block),
-	withBlockConsumer func(*blockconsumer.BlockConsumer, []*flow.Block),
+	process func(notifier module.ProcessingNotifier, block *flow.UnsignedBlock),
+	withBlockConsumer func(*blockconsumer.BlockConsumer, []*flow.UnsignedBlock),
 ) {
 
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
@@ -174,10 +174,10 @@ func withConsumer(
 // mockBlockProcessor provides a FinalizedBlockProcessor with a plug-and-play process method.
 type mockBlockProcessor struct {
 	notifier module.ProcessingNotifier
-	process  func(module.ProcessingNotifier, *flow.Block)
+	process  func(module.ProcessingNotifier, *flow.UnsignedBlock)
 }
 
-func (e *mockBlockProcessor) ProcessFinalizedBlock(block *flow.Block) {
+func (e *mockBlockProcessor) ProcessFinalizedBlock(block *flow.UnsignedBlock) {
 	e.process(e.notifier, block)
 }
 

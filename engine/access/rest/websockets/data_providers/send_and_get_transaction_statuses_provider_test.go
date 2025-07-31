@@ -28,8 +28,8 @@ type SendTransactionStatusesProviderSuite struct {
 	api *accessmock.API
 
 	chain          flow.Chain
-	rootBlock      *flow.Block
-	finalizedBlock *flow.Header
+	rootBlock      *flow.UnsignedBlock
+	finalizedBlock *flow.UnsignedHeader
 
 	factory       *DataProviderFactoryImpl
 	linkGenerator *mockcommonmodels.LinkGenerator

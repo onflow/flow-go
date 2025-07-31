@@ -68,19 +68,19 @@ func NewConsensusCollector(tracer module.Tracer, registerer prometheus.Registere
 	return cc
 }
 
-// StartCollectionToFinalized reports Metrics C1: Collection Received by CCL→ Collection Included in Finalized Block
+// StartCollectionToFinalized reports Metrics C1: Collection Received by CCL→ Collection Included in Finalized UnsignedBlock
 func (cc *ConsensusCollector) StartCollectionToFinalized(collectionID flow.Identifier) {
 }
 
-// FinishCollectionToFinalized reports Metrics C1: Collection Received by CCL→ Collection Included in Finalized Block
+// FinishCollectionToFinalized reports Metrics C1: Collection Received by CCL→ Collection Included in Finalized UnsignedBlock
 func (cc *ConsensusCollector) FinishCollectionToFinalized(collectionID flow.Identifier) {
 }
 
-// StartBlockToSeal reports Metrics C4: Block Received by CCL → Block Seal in finalized block
+// StartBlockToSeal reports Metrics C4: UnsignedBlock Received by CCL → UnsignedBlock Seal in finalized block
 func (cc *ConsensusCollector) StartBlockToSeal(blockID flow.Identifier) {
 }
 
-// FinishBlockToSeal reports Metrics C4: Block Received by CCL → Block Seal in finalized block
+// FinishBlockToSeal reports Metrics C4: UnsignedBlock Received by CCL → UnsignedBlock Seal in finalized block
 func (cc *ConsensusCollector) FinishBlockToSeal(blockID flow.Identifier) {
 }
 

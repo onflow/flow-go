@@ -23,8 +23,8 @@ type BaseStateMachineSuite struct {
 	suite.Suite
 
 	parentProtocolState *flow.RichEpochStateEntry
-	parentBlock         *flow.Header
-	candidate           *flow.Header
+	parentBlock         *flow.UnsignedHeader
+	candidate           *flow.UnsignedHeader
 	consumer            *protocol_statemock.StateMachineTelemetryConsumer
 }
 

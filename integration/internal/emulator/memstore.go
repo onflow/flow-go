@@ -36,7 +36,7 @@ type Store struct {
 	// block ID to block height
 	blockIDToHeight map[flowgo.Identifier]uint64
 	// blocks by height
-	blocks map[uint64]flowgo.Block
+	blocks map[uint64]flowgo.UnsignedBlock
 	// collections by ID
 	collections map[flowgo.Identifier]flowgo.LightCollection
 	// transactions by ID
@@ -55,7 +55,7 @@ var _ environment.Blocks = &Store{}
 var _ validator.Blocks = &Store{}
 var _ EmulatorStorage = &Store{}
 
-func (b *Store) HeaderByID(id flowgo.Identifier) (*flowgo.Header, error) {
+func (b *Store) HeaderByID(id flowgo.Identifier) (*flowgo.UnsignedHeader, error) {
 	block, err := b.BlockByID(context.Background(), id)
 	if err != nil {
 		if errors.Is(err, ErrNotFound) {
@@ -66,7 +66,7 @@ func (b *Store) HeaderByID(id flowgo.Identifier) (*flowgo.Header, error) {
 	return block.ToHeader(), nil
 }
 
-func (b *Store) FinalizedHeader() (*flowgo.Header, error) {
+func (b *Store) FinalizedHeader() (*flowgo.UnsignedHeader, error) {
 	block, err := b.LatestBlock(context.Background())
 	if err != nil {
 		return nil, err
@@ -75,7 +75,7 @@ func (b *Store) FinalizedHeader() (*flowgo.Header, error) {
 	return block.ToHeader(), nil
 }
 
-func (b *Store) SealedHeader() (*flowgo.Header, error) {
+func (b *Store) SealedHeader() (*flowgo.UnsignedHeader, error) {
 	block, err := b.LatestBlock(context.Background())
 	if err != nil {
 		return nil, err
@@ -94,7 +94,7 @@ func (b *Store) IndexedHeight() (uint64, error) {
 }
 
 // ByHeightFrom We don't have to do anything complex here, as emulator does not fork the chain
-func (b *Store) ByHeightFrom(height uint64, header *flowgo.Header) (*flowgo.Header, error) {
+func (b *Store) ByHeightFrom(height uint64, header *flowgo.UnsignedHeader) (*flowgo.UnsignedHeader, error) {
 	if height > header.Height {
 		return nil, ErrNotFound
 	}
@@ -111,7 +111,7 @@ func NewMemoryStore() *Store {
 	return &Store{
 		mu:                  sync.RWMutex{},
 		blockIDToHeight:     make(map[flowgo.Identifier]uint64),
-		blocks:              make(map[uint64]flowgo.Block),
+		blocks:              make(map[uint64]flowgo.UnsignedBlock),
 		collections:         make(map[flowgo.Identifier]flowgo.LightCollection),
 		transactions:        make(map[flowgo.Identifier]flowgo.TransactionBody),
 		transactionResults:  make(map[flowgo.Identifier]StorableTransactionResult),
@@ -136,25 +136,25 @@ func (b *Store) LatestBlockHeight(ctx context.Context) (uint64, error) {
 	return block.Height, nil
 }
 
-func (b *Store) LatestBlock(_ context.Context) (flowgo.Block, error) {
+func (b *Store) LatestBlock(_ context.Context) (flowgo.UnsignedBlock, error) {
 	b.mu.RLock()
 	defer b.mu.RUnlock()
 
 	latestBlock, ok := b.blocks[b.blockHeight]
 	if !ok {
-		return flowgo.Block{}, ErrNotFound
+		return flowgo.UnsignedBlock{}, ErrNotFound
 	}
 	return latestBlock, nil
 }
 
-func (b *Store) StoreBlock(_ context.Context, block *flowgo.Block) error {
+func (b *Store) StoreBlock(_ context.Context, block *flowgo.UnsignedBlock) error {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 
 	return b.storeBlock(block)
 }
 
-func (b *Store) storeBlock(block *flowgo.Block) error {
+func (b *Store) storeBlock(block *flowgo.UnsignedBlock) error {
 	b.blocks[block.Height] = *block
 	b.blockIDToHeight[block.ID()] = block.Height
 
@@ -165,7 +165,7 @@ func (b *Store) storeBlock(block *flowgo.Block) error {
 	return nil
 }
 
-func (b *Store) BlockByID(_ context.Context, blockID flowgo.Identifier) (*flowgo.Block, error) {
+func (b *Store) BlockByID(_ context.Context, blockID flowgo.Identifier) (*flowgo.UnsignedBlock, error) {
 	b.mu.RLock()
 	defer b.mu.RUnlock()
 
@@ -183,7 +183,7 @@ func (b *Store) BlockByID(_ context.Context, blockID flowgo.Identifier) (*flowgo
 
 }
 
-func (b *Store) BlockByHeight(_ context.Context, height uint64) (*flowgo.Block, error) {
+func (b *Store) BlockByHeight(_ context.Context, height uint64) (*flowgo.UnsignedBlock, error) {
 	b.mu.RLock()
 	defer b.mu.RUnlock()
 
@@ -197,7 +197,7 @@ func (b *Store) BlockByHeight(_ context.Context, height uint64) (*flowgo.Block, 
 
 func (b *Store) CommitBlock(
 	_ context.Context,
-	block *flowgo.Block,
+	block *flowgo.UnsignedBlock,
 	collections []*flowgo.LightCollection,
 	transactions map[flowgo.Identifier]*flowgo.TransactionBody,
 	transactionResults map[flowgo.Identifier]*StorableTransactionResult,

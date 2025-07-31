@@ -377,8 +377,8 @@ func newAccountKey(
 	return publicKey, encodedCadencePublicKey
 }
 
-func newBlockHeadersStorage(blocks []*flow.Block) storage.Headers {
-	blocksByHeight := make(map[uint64]*flow.Block)
+func newBlockHeadersStorage(blocks []*flow.UnsignedBlock) storage.Headers {
+	blocksByHeight := make(map[uint64]*flow.UnsignedBlock)
 	for _, b := range blocks {
 		blocksByHeight[b.Height] = b
 	}

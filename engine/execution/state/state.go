@@ -45,7 +45,7 @@ type ScriptExecutionState interface {
 	// - (nil, nil, storage.ErrNotFound) if block is unknown
 	// - (nil, nil, state.ErrNotExecuted) if block is not executed
 	// - (nil, nil, state.ErrExecutionStatePruned) if the execution state has been pruned
-	CreateStorageSnapshot(blockID flow.Identifier) (snapshot.StorageSnapshot, *flow.Header, error)
+	CreateStorageSnapshot(blockID flow.Identifier) (snapshot.StorageSnapshot, *flow.UnsignedHeader, error)
 
 	// StateCommitmentByBlockID returns the final state commitment for the provided block ID.
 	StateCommitmentByBlockID(flow.Identifier) (flow.StateCommitment, error)
@@ -54,7 +54,7 @@ type ScriptExecutionState interface {
 	IsBlockExecuted(height uint64, blockID flow.Identifier) (bool, error)
 }
 
-func IsParentExecuted(state ReadOnlyExecutionState, header *flow.Header) (bool, error) {
+func IsParentExecuted(state ReadOnlyExecutionState, header *flow.UnsignedHeader) (bool, error) {
 	// sanity check, caller should not pass a root block
 	if header.Height == 0 {
 		return false, fmt.Errorf("root block does not have parent block")
@@ -258,7 +258,7 @@ func (s *state) NewStorageSnapshot(
 
 func (s *state) CreateStorageSnapshot(
 	blockID flow.Identifier,
-) (snapshot.StorageSnapshot, *flow.Header, error) {
+) (snapshot.StorageSnapshot, *flow.UnsignedHeader, error) {
 	header, err := s.headers.ByBlockID(blockID)
 	if err != nil {
 		return nil, nil, fmt.Errorf("cannot get header by block ID: %w", err)

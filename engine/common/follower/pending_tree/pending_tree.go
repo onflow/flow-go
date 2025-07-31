@@ -48,7 +48,7 @@ func (v *PendingBlockVertex) Parent() (flow.Identifier, uint64) {
 //     applications _and_ would require additional code and additional tests making it more complex.
 //
 // Outlook:
-//   - At the moment, PendingTree relies on notion of a `Certified Block` which is a valid block accompanied
+//   - At the moment, PendingTree relies on notion of a `Certified UnsignedBlock` which is a valid block accompanied
 //     by a certifying QC (proving block validity). This works well for consensus follower, as it is designed
 //     to work with certified blocks.
 //   - In the future, we could use the PendingTree also for consensus participants. Therefore, we would need
@@ -61,7 +61,7 @@ type PendingTree struct {
 }
 
 // NewPendingTree creates new instance of PendingTree. Accepts finalized block to set up initial state.
-func NewPendingTree(finalized *flow.Header) *PendingTree {
+func NewPendingTree(finalized *flow.UnsignedHeader) *PendingTree {
 	return &PendingTree{
 		forest:          forest.NewLevelledForest(finalized.View),
 		lastFinalizedID: finalized.ID(),
@@ -173,7 +173,7 @@ func (t *PendingTree) connectsToFinalizedBlock(block flow.CertifiedBlock) bool {
 // returns these blocks. Returned blocks are ordered such that parents appear before their children.
 //
 // No errors are expected during normal operation.
-func (t *PendingTree) FinalizeFork(finalized *flow.Header) ([]flow.CertifiedBlock, error) {
+func (t *PendingTree) FinalizeFork(finalized *flow.UnsignedHeader) ([]flow.CertifiedBlock, error) {
 	var connectedBlocks []flow.CertifiedBlock
 
 	err := t.forest.PruneUpToLevel(finalized.View)
@@ -194,10 +194,10 @@ func (t *PendingTree) FinalizeFork(finalized *flow.Header) ([]flow.CertifiedBloc
 	return connectedBlocks, nil
 }
 
-// updateAndCollectFork marks the subtree rooted at `vertex.Block` as connected to the finalized state
-// and returns all blocks in this subtree. No parents of `vertex.Block` are modified or included in the output.
+// updateAndCollectFork marks the subtree rooted at `vertex.UnsignedBlock` as connected to the finalized state
+// and returns all blocks in this subtree. No parents of `vertex.UnsignedBlock` are modified or included in the output.
 // The output list will be ordered so that parents appear before children.
-// The caller must ensure that `vertex.Block` is connected to the finalized state.
+// The caller must ensure that `vertex.UnsignedBlock` is connected to the finalized state.
 //
 //	A ← B ← C ←D
 //	      ↖ E

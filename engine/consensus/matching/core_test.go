@@ -233,7 +233,7 @@ func (ms *MatchingSuite) TestOnUnverifiableReceipt() {
 func (ms *MatchingSuite) TestRequestPendingReceipts() {
 	// create blocks
 	n := 100
-	orderedBlocks := make([]flow.Block, 0, n)
+	orderedBlocks := make([]flow.UnsignedBlock, 0, n)
 	parentBlock := ms.UnfinalizedBlock
 	for i := 0; i < n; i++ {
 		block := unittest.BlockWithParentFixture(parentBlock.ToHeader())

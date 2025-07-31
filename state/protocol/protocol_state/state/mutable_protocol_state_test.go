@@ -40,7 +40,7 @@ type StateMutatorSuite struct {
 
 	// basic setup for happy path test
 	parentState           protocol_statemock.KVStoreAPI // Protocol state of `candidate`s parent block
-	candidate             flow.Header                   // candidate block, potentially still under construction
+	candidate             flow.UnsignedHeader           // candidate block, potentially still under construction
 	evolvingState         protocol_statemock.KVStoreMutator
 	latestProtocolVersion uint64
 

@@ -54,7 +54,7 @@ func (_m *ComplianceCore) OnBlockRange(originID flow.Identifier, connectedRange 
 }
 
 // OnFinalizedBlock provides a mock function with given fields: finalized
-func (_m *ComplianceCore) OnFinalizedBlock(finalized *flow.Header) {
+func (_m *ComplianceCore) OnFinalizedBlock(finalized *flow.UnsignedHeader) {
 	_m.Called(finalized)
 }
 

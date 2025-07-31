@@ -2,8 +2,8 @@ package integration
 
 import "github.com/onflow/flow-go/model/flow"
 
-func FinalizedBlocks(in *Instance) []*flow.Header {
-	finalized := make([]*flow.Header, 0)
+func FinalizedBlocks(in *Instance) []*flow.UnsignedHeader {
+	finalized := make([]*flow.UnsignedHeader, 0)
 
 	lastFinalID := in.forks.FinalizedBlock().BlockID
 	in.updatingBlocks.RLock()

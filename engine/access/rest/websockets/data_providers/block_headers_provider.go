@@ -82,7 +82,7 @@ func (p *BlockHeadersDataProvider) createAndStartSubscription(
 	return p.api.SubscribeBlockHeadersFromLatest(ctx, args.BlockStatus)
 }
 
-func (p *BlockHeadersDataProvider) sendResponse(header *flow.Header) error {
+func (p *BlockHeadersDataProvider) sendResponse(header *flow.UnsignedHeader) error {
 	headerPayload := commonmodels.NewBlockHeader(header)
 	response := models.BaseDataProvidersResponse{
 		SubscriptionID: p.ID(),

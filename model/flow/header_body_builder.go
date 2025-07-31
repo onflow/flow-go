@@ -57,14 +57,14 @@ type HeaderBodyBuilder struct {
 	present []byte
 }
 
-// NewHeaderBodyBuilder helps to build a new Header.
+// NewHeaderBodyBuilder helps to build a new UnsignedHeader.
 func NewHeaderBodyBuilder() *HeaderBodyBuilder {
 	return &HeaderBodyBuilder{
 		present: bitutils.MakeBitVector(int(numHeaderBodyFields)),
 	}
 }
 
-// Build validates and returns an immutable Header. All required fields must be explicitly set (even if they are zero).
+// Build validates and returns an immutable UnsignedHeader. All required fields must be explicitly set (even if they are zero).
 // All errors indicate that a valid HeaderBody cannot be created from the current builder state.
 func (b *HeaderBodyBuilder) Build() (*HeaderBody, error) {
 	// make sure every required field was initialized

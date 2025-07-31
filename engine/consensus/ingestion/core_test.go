@@ -32,7 +32,7 @@ type IngestionCoreSuite struct {
 	conID    flow.Identifier
 	execID   flow.Identifier
 	verifID  flow.Identifier
-	head     *flow.Header
+	head     *flow.UnsignedHeader
 
 	finalIdentities flow.IdentityList // identities at finalized state
 	refIdentities   flow.IdentityList // identities at reference block state

@@ -16,12 +16,12 @@ type Headers interface {
 	// ByBlockID returns the header with the given ID. It is available for finalized blocks and those pending finalization.
 	// Error returns:
 	//  - ErrNotFound if no block header with the given ID exists
-	ByBlockID(blockID flow.Identifier) (*flow.Header, error)
+	ByBlockID(blockID flow.Identifier) (*flow.UnsignedHeader, error)
 
 	// ByHeight returns the block with the given number. It is only available for finalized blocks.
 	// Error returns:
 	//  - ErrNotFound if no finalized block is known at the given height
-	ByHeight(height uint64) (*flow.Header, error)
+	ByHeight(height uint64) (*flow.UnsignedHeader, error)
 
 	// Exists returns true if a header with the given ID has been stored.
 	// CAUTION: this method is not backed by a cache and therefore comparatively slow!
@@ -37,7 +37,7 @@ type Headers interface {
 	// might be unfinalized; if there is more than one, at least one of them has to
 	// be unfinalized.
 	// CAUTION: this method is not backed by a cache and therefore comparatively slow!
-	ByParentID(parentID flow.Identifier) ([]*flow.Header, error)
+	ByParentID(parentID flow.Identifier) ([]*flow.UnsignedHeader, error)
 
 	// ProposalByBlockID returns the header with the given ID, along with the corresponding proposer signature.
 	// It is available for finalized blocks and those pending finalization.

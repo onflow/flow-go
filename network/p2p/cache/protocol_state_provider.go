@@ -69,7 +69,7 @@ func NewProtocolStateIDCache(
 // TODO(EFM, #6123): per API contract, implementations of `EpochTransition` should be non-blocking
 // and virtually latency free. However, we run data base queries and acquire locks here,
 // which is undesired.
-func (p *ProtocolStateIDCache) EpochTransition(newEpochCounter uint64, header *flow.Header) {
+func (p *ProtocolStateIDCache) EpochTransition(newEpochCounter uint64, header *flow.UnsignedHeader) {
 	p.update(header.ID())
 }
 
@@ -80,7 +80,7 @@ func (p *ProtocolStateIDCache) EpochTransition(newEpochCounter uint64, header *f
 // TODO(EFM, #6123): per API contract, implementations of `EpochSetupPhaseStarted` should be non-blocking
 // and virtually latency free. However, we run data base queries and acquire locks here,
 // which is undesired.
-func (p *ProtocolStateIDCache) EpochSetupPhaseStarted(currentEpochCounter uint64, header *flow.Header) {
+func (p *ProtocolStateIDCache) EpochSetupPhaseStarted(currentEpochCounter uint64, header *flow.UnsignedHeader) {
 	p.update(header.ID())
 }
 
@@ -91,7 +91,7 @@ func (p *ProtocolStateIDCache) EpochSetupPhaseStarted(currentEpochCounter uint64
 // TODO(EFM, #6123): per API contract, implementations of `EpochCommittedPhaseStarted` should be non-blocking
 // and virtually latency free. However, we run data base queries and acquire locks here,
 // which is undesired.
-func (p *ProtocolStateIDCache) EpochCommittedPhaseStarted(currentEpochCounter uint64, header *flow.Header) {
+func (p *ProtocolStateIDCache) EpochCommittedPhaseStarted(currentEpochCounter uint64, header *flow.UnsignedHeader) {
 	p.update(header.ID())
 }
 

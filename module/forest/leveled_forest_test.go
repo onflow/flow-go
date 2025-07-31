@@ -180,14 +180,14 @@ func TestLevelledForest_HasVertex(t *testing.T) {
 	assert.True(t, F.HasVertex(string2Identifier("X")))
 
 	assert.False(t, F.HasVertex(string2Identifier("Genesis")))     // Genesis block never directly added (only referenced) => unknown
-	assert.False(t, F.HasVertex(string2Identifier("NotYetAdded"))) // Block never mentioned before
+	assert.False(t, F.HasVertex(string2Identifier("NotYetAdded"))) // UnsignedBlock never mentioned before
 }
 
 // TestLevelledForest_GetChildren tests that children are returned properly
 func TestLevelledForest_GetChildren(t *testing.T) {
 	F := populateNewForest(t)
 
-	// testing children for Block that is contained in Tree
+	// testing children for UnsignedBlock that is contained in Tree
 	it := F.GetChildren(string2Identifier("X"))
 	expectedChildren := []*mock.Vertex{
 		TestVertices["Y"],
@@ -195,7 +195,7 @@ func TestLevelledForest_GetChildren(t *testing.T) {
 	}
 	assert.ElementsMatch(t, expectedChildren, children2List(&it))
 
-	// testing children for referenced Block that is NOT contained in Tree
+	// testing children for referenced UnsignedBlock that is NOT contained in Tree
 	it = F.GetChildren(string2Identifier("Genesis"))
 	expectedChildren = []*mock.Vertex{
 		TestVertices["A"],
@@ -203,7 +203,7 @@ func TestLevelledForest_GetChildren(t *testing.T) {
 	}
 	assert.ElementsMatch(t, expectedChildren, children2List(&it))
 
-	// testing children for Block that is contained in Tree but no children are known
+	// testing children for UnsignedBlock that is contained in Tree but no children are known
 	it = F.GetChildren(string2Identifier("D"))
 	assert.False(t, it.HasNext())
 }
@@ -212,13 +212,13 @@ func TestLevelledForest_GetChildren(t *testing.T) {
 func TestLevelledForest_GetNumberOfChildren(t *testing.T) {
 	F := populateNewForest(t)
 
-	// testing children for Block that is contained in Tree
+	// testing children for UnsignedBlock that is contained in Tree
 	assert.Equal(t, 2, F.GetNumberOfChildren(string2Identifier("X")))
 
-	// testing children for referenced Block that is NOT contained in Tree
+	// testing children for referenced UnsignedBlock that is NOT contained in Tree
 	assert.Equal(t, 2, F.GetNumberOfChildren(string2Identifier("Genesis")))
 
-	// testing children for Block that is contained in Tree but no children are known
+	// testing children for UnsignedBlock that is contained in Tree but no children are known
 	assert.Equal(t, 0, F.GetNumberOfChildren(string2Identifier("D")))
 }
 

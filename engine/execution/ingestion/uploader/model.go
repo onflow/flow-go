@@ -13,7 +13,7 @@ import (
 )
 
 type BlockData struct {
-	Block                *flow.Block
+	Block                *flow.UnsignedBlock
 	Collections          []*entity.CompleteCollection
 	TxResults            []*flow.TransactionResult
 	Events               []*flow.Event

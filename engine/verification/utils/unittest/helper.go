@@ -375,8 +375,8 @@ func EvenChunkIndexAssigner(index uint64, chunkNum int) bool {
 // e.g., C1 contains receipts for R1,1, R1,2, etc.
 // Note: for sake of simplicity we do not include guarantees in the container blocks for now.
 func ExtendStateWithFinalizedBlocks(t *testing.T, completeExecutionReceipts CompleteExecutionReceiptList,
-	state protocol.ParticipantState) []*flow.Block {
-	blocks := make([]*flow.Block, 0)
+	state protocol.ParticipantState) []*flow.UnsignedBlock {
+	blocks := make([]*flow.UnsignedBlock, 0)
 
 	// tracks of duplicate reference blocks
 	// since receipts may share the same execution result, hence
@@ -440,7 +440,7 @@ func NewVerificationHappyPathTest(t *testing.T,
 
 	withConsumers(t, authorized, blockCount, verCollector, mempoolCollector, RespondChunkDataPackRequestAfterNTrials(retry), func(
 		blockConsumer *blockconsumer.BlockConsumer,
-		blocks []*flow.Block,
+		blocks []*flow.UnsignedBlock,
 		resultApprovalsWG *sync.WaitGroup,
 		chunkDataRequestWG *sync.WaitGroup) {
 
@@ -470,7 +470,7 @@ func withConsumers(t *testing.T,
 	verCollector module.VerificationMetrics, // verification metrics collector
 	mempoolCollector module.MempoolMetrics, // memory pool metrics collector
 	providerFunc MockChunkDataProviderFunc,
-	withBlockConsumer func(*blockconsumer.BlockConsumer, []*flow.Block, *sync.WaitGroup, *sync.WaitGroup),
+	withBlockConsumer func(*blockconsumer.BlockConsumer, []*flow.UnsignedBlock, *sync.WaitGroup, *sync.WaitGroup),
 	ops ...CompleteExecutionReceiptBuilderOpt) {
 
 	tracer := trace.NewNoopTracer()

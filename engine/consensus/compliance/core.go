@@ -392,7 +392,7 @@ func (c *Core) processBlockProposal(proposal *flow.Proposal) error {
 
 // ProcessFinalizedBlock performs pruning of stale data based on finalization event
 // removes pending blocks below the finalized view
-func (c *Core) ProcessFinalizedBlock(finalized *flow.Header) {
+func (c *Core) ProcessFinalizedBlock(finalized *flow.UnsignedHeader) {
 	// remove all pending blocks at or below the finalized view
 	c.pending.PruneByView(finalized.View)
 	c.finalizedHeight.Set(finalized.Height)

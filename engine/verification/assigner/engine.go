@@ -156,7 +156,7 @@ func (e *Engine) processChunk(chunk *flow.Chunk, resultID flow.Identifier, block
 // Through the pipeline the execution receipts included in the block are indexed, and their chunk assignments are done, and
 // the assigned chunks are pushed to the chunks queue, which is the output stream of this engine.
 // Once the assigner engine is done handling all the receipts in the block, it notifies the block consumer.
-func (e *Engine) ProcessFinalizedBlock(block *flow.Block) {
+func (e *Engine) ProcessFinalizedBlock(block *flow.UnsignedBlock) {
 	blockID := block.ID()
 
 	// We don't have any existing information and don't need cancellation, so use a background (empty) context
@@ -168,7 +168,7 @@ func (e *Engine) ProcessFinalizedBlock(block *flow.Block) {
 
 // processFinalizedBlock indexes the execution receipts included in the block, performs chunk assignment on its result, and
 // processes the chunks assigned to this verification node by pushing them to the chunks consumer.
-func (e *Engine) processFinalizedBlock(ctx context.Context, block *flow.Block) {
+func (e *Engine) processFinalizedBlock(ctx context.Context, block *flow.UnsignedBlock) {
 
 	if e.stopAtHeight > 0 && block.Height == e.stopAtHeight {
 		e.stopAtBlockID.Store(block.ID())

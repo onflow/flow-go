@@ -25,10 +25,10 @@ func init() {
 	rootCmd.AddCommand(SnapshotCmd)
 
 	SnapshotCmd.Flags().Uint64Var(&flagHeight, "height", 0,
-		"Block height")
+		"UnsignedBlock height")
 
 	SnapshotCmd.Flags().StringVar(&flagBlockID, "block-id", "",
-		"Block ID (hex-encoded, 64 characters)")
+		"UnsignedBlock ID (hex-encoded, 64 characters)")
 
 	SnapshotCmd.Flags().BoolVar(&flagFinal, "final", false,
 		"get finalized block")

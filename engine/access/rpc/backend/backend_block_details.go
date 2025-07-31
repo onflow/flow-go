@@ -15,8 +15,8 @@ type backendBlockDetails struct {
 	backendBlockBase
 }
 
-func (b *backendBlockDetails) GetLatestBlock(ctx context.Context, isSealed bool) (*flow.Block, flow.BlockStatus, error) {
-	var header *flow.Header
+func (b *backendBlockDetails) GetLatestBlock(ctx context.Context, isSealed bool) (*flow.UnsignedBlock, flow.BlockStatus, error) {
+	var header *flow.UnsignedHeader
 	var blockStatus flow.BlockStatus
 	var err error
 
@@ -57,7 +57,7 @@ func (b *backendBlockDetails) GetLatestBlock(ctx context.Context, isSealed bool)
 	return block, blockStatus, nil
 }
 
-func (b *backendBlockDetails) GetBlockByID(ctx context.Context, id flow.Identifier) (*flow.Block, flow.BlockStatus, error) {
+func (b *backendBlockDetails) GetBlockByID(ctx context.Context, id flow.Identifier) (*flow.UnsignedBlock, flow.BlockStatus, error) {
 	block, err := b.blocks.ByID(id)
 	if err != nil {
 		return nil, flow.BlockStatusUnknown, rpc.ConvertStorageError(err)
@@ -73,7 +73,7 @@ func (b *backendBlockDetails) GetBlockByID(ctx context.Context, id flow.Identifi
 	return block, status, nil
 }
 
-func (b *backendBlockDetails) GetBlockByHeight(ctx context.Context, height uint64) (*flow.Block, flow.BlockStatus, error) {
+func (b *backendBlockDetails) GetBlockByHeight(ctx context.Context, height uint64) (*flow.UnsignedBlock, flow.BlockStatus, error) {
 	block, err := b.blocks.ByHeight(height)
 	if err != nil {
 		return nil, flow.BlockStatusUnknown, rpc.ConvertStorageError(resolveHeightError(b.state.Params(), height, err))

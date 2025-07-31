@@ -20,12 +20,12 @@ type ExecutionTree interface {
 	// After recovering from a crash, the mempools are wiped and the sealed results will not
 	// be stored in the Execution Tree anymore. Adding the result to the tree allows to create
 	// a vertex in the tree without attaching any Execution Receipts to it.
-	AddResult(result *flow.ExecutionResult, block *flow.Header) error
+	AddResult(result *flow.ExecutionResult, block *flow.UnsignedHeader) error
 
 	// AddReceipt adds the given execution receipt to the memory pool. Requires height
 	// of the block the receipt is for. We enforce data consistency on an API
 	// level by using the block header as input.
-	AddReceipt(receipt *flow.ExecutionReceipt, block *flow.Header) (bool, error)
+	AddReceipt(receipt *flow.ExecutionReceipt, block *flow.UnsignedHeader) (bool, error)
 
 	// HasReceipt returns true if the given receipt is already present in the mempool.
 	HasReceipt(receipt *flow.ExecutionReceipt) bool
@@ -93,7 +93,7 @@ type ExecutionTree interface {
 // The search only traverses to results for blocks which pass the filter.
 // If an the block for an execution result does not pass the filter, the entire
 // sub-tree of derived results is not traversed.
-type BlockFilter func(header *flow.Header) bool
+type BlockFilter func(header *flow.UnsignedHeader) bool
 
 // ReceiptFilter is used to drop specific receipts from. It does NOT
 // affect the ExecutionTree's Execution Tree search.

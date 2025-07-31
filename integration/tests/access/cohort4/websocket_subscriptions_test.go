@@ -519,7 +519,7 @@ func (s *WebsocketSubscriptionSuite) testHappyCases() {
 			testUnsubscribe:                    true,
 		},
 		{
-			name:  "Block headers streaming",
+			name:  "UnsignedBlock headers streaming",
 			topic: data_providers.BlockHeadersTopic,
 			prepareArguments: func() models.Arguments {
 				return models.Arguments{"block_status": parser.Finalized}
@@ -528,7 +528,7 @@ func (s *WebsocketSubscriptionSuite) testHappyCases() {
 			testUnsubscribe:                    true,
 		},
 		{
-			name:  "Block digests streaming",
+			name:  "UnsignedBlock digests streaming",
 			topic: data_providers.BlockDigestsTopic,
 			prepareArguments: func() models.Arguments {
 				return models.Arguments{"block_status": parser.Finalized}
@@ -711,14 +711,14 @@ func (s *WebsocketSubscriptionSuite) testSubscriptionMultiplexing() {
 			},
 		},
 		{
-			name:  "Block headers streaming",
+			name:  "UnsignedBlock headers streaming",
 			topic: data_providers.BlockHeadersTopic,
 			prepareArguments: func() models.Arguments {
 				return models.Arguments{"block_status": parser.Finalized}
 			},
 		},
 		{
-			name:  "Block digests streaming",
+			name:  "UnsignedBlock digests streaming",
 			topic: data_providers.BlockDigestsTopic,
 			prepareArguments: func() models.Arguments {
 				return models.Arguments{"block_status": parser.Finalized}

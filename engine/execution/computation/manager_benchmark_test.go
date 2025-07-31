@@ -256,7 +256,7 @@ func benchmarkComputeBlock(
 	b.ReportMetric(float64(elapsed.Nanoseconds()/totalTxes/int64(time.Microsecond)), "us/tx")
 }
 
-func createBlock(b *testing.B, parentBlock *flow.Block, accs *testAccounts, colNum int, txNum int) *entity.ExecutableBlock {
+func createBlock(b *testing.B, parentBlock *flow.UnsignedBlock, accs *testAccounts, colNum int, txNum int) *entity.ExecutableBlock {
 	completeCollections := make(map[flow.Identifier]*entity.CompleteCollection, colNum)
 	collections := make([]*flow.Collection, colNum)
 	guarantees := make([]*flow.CollectionGuarantee, colNum)

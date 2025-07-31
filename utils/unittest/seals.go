@@ -47,7 +47,7 @@ func (f *sealFactory) WithBlockID(blockID flow.Identifier) func(*flow.Seal) {
 	}
 }
 
-func (f *sealFactory) WithBlock(block *flow.Header) func(*flow.Seal) {
+func (f *sealFactory) WithBlock(block *flow.UnsignedHeader) func(*flow.Seal) {
 	return func(seal *flow.Seal) {
 		seal.BlockID = block.ID()
 	}

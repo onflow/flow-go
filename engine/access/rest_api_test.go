@@ -58,8 +58,8 @@ type RestAPITestSuite struct {
 	chainID           flow.ChainID
 	metrics           *metrics.NoopCollector
 	rpcEng            *rpc.Engine
-	sealedBlock       *flow.Header
-	finalizedBlock    *flow.Header
+	sealedBlock       *flow.UnsignedHeader
+	finalizedBlock    *flow.UnsignedHeader
 
 	// storage
 	blocks           *storagemock.Blocks
@@ -96,13 +96,13 @@ func (suite *RestAPITestSuite) SetupTest() {
 	suite.state.On("Final").Return(suite.finalizedSnapshot, nil)
 	suite.state.On("Params").Return(params)
 	suite.sealedSnaphost.On("Head").Return(
-		func() *flow.Header {
+		func() *flow.UnsignedHeader {
 			return suite.sealedBlock
 		},
 		nil,
 	).Maybe()
 	suite.finalizedSnapshot.On("Head").Return(
-		func() *flow.Header {
+		func() *flow.UnsignedHeader {
 			return suite.finalizedBlock
 		},
 		nil,
@@ -232,7 +232,7 @@ func TestRestAPI(t *testing.T) {
 func (suite *RestAPITestSuite) TestGetBlock() {
 
 	testBlockIDs := make([]string, parser.MaxIDsLength)
-	testBlocks := make([]*flow.Block, parser.MaxIDsLength)
+	testBlocks := make([]*flow.UnsignedBlock, parser.MaxIDsLength)
 	for i := range testBlockIDs {
 		collections := unittest.CollectionListFixture(1)
 		block := unittest.BlockFixture(

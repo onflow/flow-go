@@ -45,7 +45,7 @@ type MessageHubSuite struct {
 	cluster   flow.IdentityList
 	clusterID flow.ChainID
 	myID      flow.Identifier
-	head      *cluster.Block
+	head      *cluster.UnsignedBlock
 
 	// mocked dependencies
 	payloads          *storage.ClusterPayloads
@@ -139,7 +139,7 @@ func (s *MessageHubSuite) SetupTest() {
 	// set up protocol snapshot mock
 	s.snapshot = &clusterstate.Snapshot{}
 	s.snapshot.On("Head").Return(
-		func() *flow.Header {
+		func() *flow.UnsignedHeader {
 			return s.head.ToHeader()
 		},
 		nil,

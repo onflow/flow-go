@@ -20,11 +20,11 @@ type InstanceParams interface {
 	// FinalizedRoot returns the finalized root header of the current protocol state. This will be
 	// the head of the protocol state snapshot used to bootstrap this state and
 	// may differ from node to node for the same protocol state.
-	FinalizedRoot() *flow.Header
+	FinalizedRoot() *flow.UnsignedHeader
 
 	// SealedRoot returns the sealed root block. If it's different from FinalizedRoot() block,
 	// it means the node is bootstrapped from mid-spork.
-	SealedRoot() *flow.Header
+	SealedRoot() *flow.UnsignedHeader
 
 	// Seal returns the root block seal of the current protocol state. This is the seal for the
 	// `SealedRoot` block that was used to bootstrap this state. It may differ from node to node.

@@ -21,7 +21,7 @@ func NewFinalizedHeaderCache(t *testing.T, state protocol.State) *finalizedHeade
 	}
 }
 
-func (cache *finalizedHeaderCache) Get() *flow.Header {
+func (cache *finalizedHeaderCache) Get() *flow.UnsignedHeader {
 	head, err := cache.state.Final().Head()
 	require.NoError(cache.t, err)
 	return head

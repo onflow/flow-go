@@ -755,7 +755,7 @@ func (h *handler) GetLatestBlockHeader(
 	_ context.Context,
 	req *execution.GetLatestBlockHeaderRequest,
 ) (*execution.BlockHeaderResponse, error) {
-	var header *flow.Header
+	var header *flow.UnsignedHeader
 	var err error
 
 	if req.GetIsSealed() {
@@ -791,7 +791,7 @@ func (h *handler) GetBlockHeaderByID(
 	return h.blockHeaderResponse(header)
 }
 
-func (h *handler) blockHeaderResponse(header *flow.Header) (*execution.BlockHeaderResponse, error) {
+func (h *handler) blockHeaderResponse(header *flow.UnsignedHeader) (*execution.BlockHeaderResponse, error) {
 	signerIDs, err := h.signerIndicesDecoder.DecodeSignerIDs(header)
 	if err != nil {
 		// the block was retrieved from local storage - so no errors are expected

@@ -64,7 +64,7 @@ func newSafetyRulesConcurrencyWrapper(safetyRules hotstuff.SafetyRules) *safetyR
 //   - model.NoVoteError if it is not safe for us to vote (our proposal includes our vote)
 //     for this view. This can happen if we have already proposed or timed out this view.
 //   - generic error in case of unexpected failure
-func (w *safetyRulesConcurrencyWrapper) Sign(unsignedHeader *flow.Header) ([]byte, error) {
+func (w *safetyRulesConcurrencyWrapper) Sign(unsignedHeader *flow.UnsignedHeader) ([]byte, error) {
 	if !w.signingStatus.CompareAndSwap(0, 1) { // value of `signingStatus` is something else than 0
 		return nil, fmt.Errorf("signer has already commenced signing; possibly repeated signer call")
 	} // signer is now in state 1, and this thread is the only one every going to execute the following logic

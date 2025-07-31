@@ -269,7 +269,7 @@ func (en ExecutionNode) Done(cancelFunc context.CancelFunc) {
 	en.GenericNode.Done()
 }
 
-func (en ExecutionNode) AssertHighestExecutedBlock(t *testing.T, header *flow.Header) {
+func (en ExecutionNode) AssertHighestExecutedBlock(t *testing.T, header *flow.UnsignedHeader) {
 	height, blockID, err := en.ExecutionState.GetLastExecutedBlockID(context.Background())
 	require.NoError(t, err)
 
@@ -277,13 +277,13 @@ func (en ExecutionNode) AssertHighestExecutedBlock(t *testing.T, header *flow.He
 	require.Equal(t, header.Height, height)
 }
 
-func (en ExecutionNode) AssertBlockIsExecuted(t *testing.T, header *flow.Header) {
+func (en ExecutionNode) AssertBlockIsExecuted(t *testing.T, header *flow.UnsignedHeader) {
 	executed, err := en.ExecutionState.IsBlockExecuted(header.Height, header.ID())
 	require.NoError(t, err)
 	require.True(t, executed)
 }
 
-func (en ExecutionNode) AssertBlockNotExecuted(t *testing.T, header *flow.Header) {
+func (en ExecutionNode) AssertBlockNotExecuted(t *testing.T, header *flow.UnsignedHeader) {
 	executed, err := en.ExecutionState.IsBlockExecuted(header.Height, header.ID())
 	require.NoError(t, err)
 	require.False(t, executed)

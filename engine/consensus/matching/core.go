@@ -255,7 +255,7 @@ func (c *Core) processReceipt(receipt *flow.ExecutionReceipt) (bool, error) {
 // Return values:
 //   - bool to indicate whether the receipt is stored.
 //   - exception in case something (unexpected) went wrong
-func (c *Core) storeReceipt(receipt *flow.ExecutionReceipt, head *flow.Header) (bool, error) {
+func (c *Core) storeReceipt(receipt *flow.ExecutionReceipt, head *flow.UnsignedHeader) (bool, error) {
 	added, err := c.receipts.AddReceipt(receipt, head)
 	if err != nil {
 		return false, fmt.Errorf("adding receipt (%x) to mempool failed: %w", receipt.ID(), err)

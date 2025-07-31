@@ -64,19 +64,20 @@ func (b *ClusterBlocks) ProposalByID(blockID flow.Identifier) (*cluster.Proposal
 	if err != nil {
 		return nil, fmt.Errorf("could not retrieve proposer signature: %w", err)
 	}
-	untrustedBlock := cluster.UntrustedBlock{
+
+	untrustedBlock := cluster.UntrustedUnsignedBlock{
 		HeaderBody: header.HeaderBody,
 		Payload:    *payload,
 	}
-	var block *cluster.Block
+	var block *cluster.UnsignedBlock
 	if header.ContainsParentQC() {
-		block, err = cluster.NewBlock(untrustedBlock)
+		block, err = cluster.NewUnsignedBlock(untrustedBlock)
 		if err != nil {
 			return nil, fmt.Errorf("could not build cluster block: %w", err)
 		}
 
 	} else {
-		block, err = cluster.NewRootBlock(untrustedBlock)
+		block, err = cluster.NewRootUnsignedBlock(untrustedBlock)
 		if err != nil {
 			return nil, fmt.Errorf("could not build cluster root block: %w", err)
 		}

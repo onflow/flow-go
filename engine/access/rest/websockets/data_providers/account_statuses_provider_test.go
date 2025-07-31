@@ -32,8 +32,8 @@ type AccountStatusesProviderSuite struct {
 	api *ssmock.API
 
 	chain          flow.Chain
-	rootBlock      *flow.Block
-	finalizedBlock *flow.Header
+	rootBlock      *flow.UnsignedBlock
+	finalizedBlock *flow.UnsignedHeader
 
 	factory *DataProviderFactoryImpl
 }

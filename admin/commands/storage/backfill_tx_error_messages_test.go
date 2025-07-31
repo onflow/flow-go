@@ -55,10 +55,10 @@ type BackfillTxErrorMessagesSuite struct {
 	backend                   *backend.Backend
 	txResultErrorMessagesCore *tx_error_messages.TxErrorMessagesCore
 
-	blockHeadersMap map[uint64]*flow.Header
+	blockHeadersMap map[uint64]*flow.UnsignedHeader
 
-	nodeRootBlock *flow.Block
-	sealedBlock   *flow.Block
+	nodeRootBlock *flow.UnsignedBlock
+	sealedBlock   *flow.UnsignedBlock
 	blockCount    int
 }
 
@@ -78,7 +78,7 @@ func (suite *BackfillTxErrorMessagesSuite) SetupTest() {
 	suite.execClient = new(accessmock.ExecutionAPIClient)
 
 	suite.blockCount = 5
-	suite.blockHeadersMap = make(map[uint64]*flow.Header, suite.blockCount)
+	suite.blockHeadersMap = make(map[uint64]*flow.UnsignedHeader, suite.blockCount)
 
 	suite.nodeRootBlock = unittest.Block.Genesis(flow.Emulator)
 	suite.blockHeadersMap[suite.nodeRootBlock.Height] = suite.nodeRootBlock.ToHeader()
@@ -95,7 +95,7 @@ func (suite *BackfillTxErrorMessagesSuite) SetupTest() {
 
 	suite.params = protocolmock.NewParams(suite.T())
 	suite.params.On("SealedRoot").Return(
-		func() *flow.Header {
+		func() *flow.UnsignedHeader {
 			return suite.nodeRootBlock.ToHeader()
 		}, nil)
 	suite.state.On("Params").Return(suite.params, nil).Maybe()

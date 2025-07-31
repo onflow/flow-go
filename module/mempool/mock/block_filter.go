@@ -14,7 +14,7 @@ type BlockFilter struct {
 }
 
 // Execute provides a mock function with given fields: header
-func (_m *BlockFilter) Execute(header *flow.Header) bool {
+func (_m *BlockFilter) Execute(header *flow.UnsignedHeader) bool {
 	ret := _m.Called(header)
 
 	if len(ret) == 0 {
@@ -22,7 +22,7 @@ func (_m *BlockFilter) Execute(header *flow.Header) bool {
 	}
 
 	var r0 bool
-	if rf, ok := ret.Get(0).(func(*flow.Header) bool); ok {
+	if rf, ok := ret.Get(0).(func(*flow.UnsignedHeader) bool); ok {
 		r0 = rf(header)
 	} else {
 		r0 = ret.Get(0).(bool)

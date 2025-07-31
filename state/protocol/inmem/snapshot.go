@@ -19,7 +19,7 @@ type Snapshot struct {
 
 var _ protocol.Snapshot = (*Snapshot)(nil)
 
-func (s Snapshot) Head() (*flow.Header, error) {
+func (s Snapshot) Head() (*flow.UnsignedHeader, error) {
 	return s.enc.Head(), nil
 }
 

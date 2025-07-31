@@ -8,34 +8,34 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-// Block represents a block in collection node cluster consensus. It contains
+// UnsignedBlock represents a block in collection node cluster consensus. It contains
 // a standard block header with a payload containing only a single collection.
 //
 // Zero values for certain HeaderBody fields are allowed only for root blocks, which must be constructed
-// using the NewRootBlock constructor. All non-root blocks must be constructed
-// using NewBlock to ensure validation of the block fields.
+// using the NewRootUnsignedBlock constructor. All non-root blocks must be constructed
+// using NewUnsignedBlock to ensure validation of the block fields.
 //
 //structwrite:immutable - mutations allowed only within the constructor
-type Block = flow.GenericBlock[Payload]
+type UnsignedBlock = flow.GenericBlock[Payload]
 
-// UntrustedBlock is an untrusted input-only representation of a cluster Block,
+// UntrustedUnsignedBlock is an untrusted input-only representation of a cluster UnsignedBlock,
 // used for construction.
 //
 // This type exists to ensure that constructor functions are invoked explicitly
 // with named fields, which improves clarity and reduces the risk of incorrect field
 // ordering during construction.
 //
-// An instance of UntrustedBlock should be validated and converted into
-// a trusted cluster Block using the NewBlock constructor (or NewRootBlock
+// An instance of UntrustedUnsignedBlock should be validated and converted into
+// a trusted cluster UnsignedBlock using the NewUnsignedBlock constructor (or NewRootUnsignedBlock
 // for the root block).
-type UntrustedBlock Block
+type UntrustedUnsignedBlock UnsignedBlock
 
-// NewBlock creates a new block in collection node cluster consensus.
+// NewUnsignedBlock creates a new unsigned block in collection node cluster consensus.
 // This constructor enforces validation rules to ensure the block is well-formed.
 // It must be used to construct all non-root blocks.
 //
-// All errors indicate that a valid Block cannot be constructed from the input.
-func NewBlock(untrusted UntrustedBlock) (*Block, error) {
+// All errors indicate that a valid UnsignedBlock cannot be constructed from the input.
+func NewUnsignedBlock(untrusted UntrustedUnsignedBlock) (*UnsignedBlock, error) {
 	// validate header body
 	headerBody, err := flow.NewHeaderBody(flow.UntrustedHeaderBody(untrusted.HeaderBody))
 	if err != nil {
@@ -48,17 +48,17 @@ func NewBlock(untrusted UntrustedBlock) (*Block, error) {
 		return nil, fmt.Errorf("invalid cluster payload: %w", err)
 	}
 
-	return &Block{
+	return &UnsignedBlock{
 		HeaderBody: *headerBody,
 		Payload:    *payload,
 	}, nil
 }
 
-// NewRootBlock creates a root block in collection node cluster consensus.
+// NewRootUnsignedBlock creates an unsigned root block in collection node cluster consensus.
 //
-// This constructor must be used **only** for constructing the root block,
+// This constructor must be used **only** for constructing the root unsigned block,
 // which is the only case where zero values are allowed.
-func NewRootBlock(untrusted UntrustedBlock) (*Block, error) {
+func NewRootUnsignedBlock(untrusted UntrustedUnsignedBlock) (*UnsignedBlock, error) {
 	rootHeaderBody, err := flow.NewRootHeaderBody(flow.UntrustedHeaderBody(untrusted.HeaderBody))
 	if err != nil {
 		return nil, fmt.Errorf("invalid root header body: %w", err)
@@ -73,7 +73,7 @@ func NewRootBlock(untrusted UntrustedBlock) (*Block, error) {
 		return nil, fmt.Errorf("invalid root cluster payload: %w", err)
 	}
 
-	return &Block{
+	return &UnsignedBlock{
 		HeaderBody: *rootHeaderBody,
 		Payload:    *rootPayload,
 	}, nil
@@ -83,7 +83,7 @@ func NewRootBlock(untrusted UntrustedBlock) (*Block, error) {
 //
 //structwrite:immutable - mutations allowed only within the constructor.
 type Proposal struct {
-	Block           Block
+	Block           UnsignedBlock
 	ProposerSigData []byte
 }
 
@@ -104,7 +104,7 @@ type UntrustedProposal Proposal
 //
 // All errors indicate that a valid cluster.Proposal cannot be constructed from the input.
 func NewProposal(untrusted UntrustedProposal) (*Proposal, error) {
-	block, err := NewBlock(UntrustedBlock(untrusted.Block))
+	block, err := NewUnsignedBlock(UntrustedUnsignedBlock(untrusted.Block))
 	if err != nil {
 		return nil, fmt.Errorf("invalid block: %w", err)
 	}
@@ -122,7 +122,7 @@ func NewProposal(untrusted UntrustedProposal) (*Proposal, error) {
 // This constructor must be used **only** for constructing the root proposal,
 // which is the only case where zero values are allowed.
 func NewRootProposal(untrusted UntrustedProposal) (*Proposal, error) {
-	block, err := NewRootBlock(UntrustedBlock(untrusted.Block))
+	block, err := NewRootUnsignedBlock(UntrustedUnsignedBlock(untrusted.Block))
 	if err != nil {
 		return nil, fmt.Errorf("invalid root block: %w", err)
 	}

@@ -184,7 +184,7 @@ func (is *InclusionSuite) sendCollectionToConsensus(deadline time.Time, sentinel
 	is.T().Fatalf("%v timeout (deadline %s) sendng collection %x to consensus", time.Now(), deadline, colID)
 }
 
-func (is *InclusionSuite) waitUntilCollectionIncludeInProposal(deadline time.Time, sentinel *flow.CollectionGuarantee) *flow.Block {
+func (is *InclusionSuite) waitUntilCollectionIncludeInProposal(deadline time.Time, sentinel *flow.CollectionGuarantee) *flow.UnsignedBlock {
 	colID := sentinel.CollectionID
 	// we try to find a block with the guarantee included
 	for time.Now().Before(deadline) {
@@ -225,7 +225,7 @@ func (is *InclusionSuite) waitUntilCollectionIncludeInProposal(deadline time.Tim
 
 // checkingProposalConfirmed returns whether it has seen 3 blocks confirmations on the block
 // that contains the guarantee
-func (is *InclusionSuite) waitUntilProposalConfirmed(deadline time.Time, sentinel *flow.CollectionGuarantee, block *flow.Block) {
+func (is *InclusionSuite) waitUntilProposalConfirmed(deadline time.Time, sentinel *flow.CollectionGuarantee, block *flow.UnsignedBlock) {
 	colID := sentinel.CollectionID
 	// we try to find a block with the guarantee included and three confirmations
 	confirmations := make(map[flow.Identifier]uint)

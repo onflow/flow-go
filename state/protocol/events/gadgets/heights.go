@@ -27,7 +27,7 @@ func NewHeights() *Heights {
 
 // BlockFinalized handles block finalized protocol events, triggering height
 // callbacks as needed.
-func (g *Heights) BlockFinalized(block *flow.Header) {
+func (g *Heights) BlockFinalized(block *flow.UnsignedHeader) {
 	g.mu.Lock()
 	defer g.mu.Unlock()
 

@@ -407,11 +407,11 @@ func (f *Forks) checkForAdvancingFinalization(certifiedBlock *model.CertifiedBlo
 	//  * a DIRECT 1-chain as '<-'
 	//  * a general 1-chain as '<~' (direct or indirect)
 	// Jolteon's rule for finalizing `parentBlock` is
-	//     parentBlock <- Block <~ certifyingQC    (i.e. a DIRECT 1-chain PLUS any 1-chain)
+	//     parentBlock <- UnsignedBlock <~ certifyingQC    (i.e. a DIRECT 1-chain PLUS any 1-chain)
 	//                   ╰─────────────────────╯
 	//                       certifiedBlock
 	// Hence, we can finalize `parentBlock` as head of a 2-chain,
-	// if and only if `Block.View` is exactly 1 higher than the view of `parentBlock`
+	// if and only if `UnsignedBlock.View` is exactly 1 higher than the view of `parentBlock`
 	if parentBlock.View+1 != certifiedBlock.View() {
 		return nil
 	}

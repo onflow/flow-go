@@ -103,7 +103,7 @@ func (s *sealValidator) verifySealSignature(aggregatedSignatures *flow.Aggregate
 //
 // => Therefore, only seals whose results pass the sub-graph check will be
 // allowed.
-func (s *sealValidator) Validate(candidate *flow.Block) (*flow.Seal, error) {
+func (s *sealValidator) Validate(candidate *flow.UnsignedBlock) (*flow.Seal, error) {
 	payload := candidate.Payload
 	parentID := candidate.ParentID
 
@@ -146,7 +146,7 @@ func (s *sealValidator) Validate(candidate *flow.Block) (*flow.Seal, error) {
 
 	// Traverse fork starting from the lowest unsealed block (included) up to the parent block (included).
 	// For each visited block collect: IncorporatedResults and block ID
-	forkCollector := func(header *flow.Header) error {
+	forkCollector := func(header *flow.UnsignedHeader) error {
 		blockID := header.ID()
 		if blockID == parentID {
 			// Important protocol edge case: There must be at least one block in between the block incorporating

@@ -13,7 +13,7 @@ type OnViewCallback struct {
 }
 
 // Execute provides a mock function with given fields: _a0
-func (_m *OnViewCallback) Execute(_a0 *flow.Header) {
+func (_m *OnViewCallback) Execute(_a0 *flow.UnsignedHeader) {
 	_m.Called(_a0)
 }
 

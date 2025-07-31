@@ -1141,8 +1141,8 @@ func (h *Handler) SubscribeBlocksFromLatest(request *accessproto.SubscribeBlocks
 //
 // Expected errors during normal operation:
 //   - codes.Internal: If cannot convert a block to a message or the stream could not send a response.
-func (h *Handler) handleBlocksResponse(send sendSubscribeBlocksResponseFunc, fullBlockResponse bool, blockStatus flow.BlockStatus) func(*flow.Block) error {
-	return func(block *flow.Block) error {
+func (h *Handler) handleBlocksResponse(send sendSubscribeBlocksResponseFunc, fullBlockResponse bool, blockStatus flow.BlockStatus) func(*flow.UnsignedBlock) error {
+	return func(block *flow.UnsignedBlock) error {
 		msgBlockResponse, err := h.blockResponse(block, fullBlockResponse, blockStatus)
 		if err != nil {
 			return rpc.ConvertError(err, "could not convert block to message", codes.Internal)
@@ -1252,8 +1252,8 @@ func (h *Handler) SubscribeBlockHeadersFromLatest(request *accessproto.Subscribe
 //
 // Expected errors during normal operation:
 //   - codes.Internal: If could not decode the signer indices from the given block header, could not convert a block header to a message or the stream could not send a response.
-func (h *Handler) handleBlockHeadersResponse(send sendSubscribeBlockHeadersResponseFunc) func(*flow.Header) error {
-	return func(header *flow.Header) error {
+func (h *Handler) handleBlockHeadersResponse(send sendSubscribeBlockHeadersResponseFunc) func(*flow.UnsignedHeader) error {
+	return func(header *flow.UnsignedHeader) error {
 		signerIDs, err := h.signerIndicesDecoder.DecodeSignerIDs(header)
 		if err != nil {
 			return rpc.ConvertError(err, "could not decode the signer indices from the given block header", codes.Internal) // the block was retrieved from local storage - so no errors are expected
@@ -1387,7 +1387,7 @@ func (h *Handler) handleBlockDigestsResponse(send sendSubscribeBlockDigestsRespo
 //
 // Returns:
 // - flow.Identifier: The start block id for searching.
-// - flow.BlockStatus: Block status.
+// - flow.BlockStatus: UnsignedBlock status.
 // - error: An error indicating the result of the operation, if any.
 //
 // Expected errors during normal operation:
@@ -1452,7 +1452,7 @@ func (h *Handler) SendAndSubscribeTransactionStatuses(
 	})
 }
 
-func (h *Handler) blockResponse(block *flow.Block, fullResponse bool, status flow.BlockStatus) (*accessproto.BlockResponse, error) {
+func (h *Handler) blockResponse(block *flow.UnsignedBlock, fullResponse bool, status flow.BlockStatus) (*accessproto.BlockResponse, error) {
 	metadata, err := h.buildMetadataResponse()
 	if err != nil {
 		return nil, err
@@ -1480,7 +1480,7 @@ func (h *Handler) blockResponse(block *flow.Block, fullResponse bool, status flo
 	}, nil
 }
 
-func (h *Handler) blockHeaderResponse(header *flow.Header, status flow.BlockStatus) (*accessproto.BlockHeaderResponse, error) {
+func (h *Handler) blockHeaderResponse(header *flow.UnsignedHeader, status flow.BlockStatus) (*accessproto.BlockHeaderResponse, error) {
 	metadata, err := h.buildMetadataResponse()
 	if err != nil {
 		return nil, err

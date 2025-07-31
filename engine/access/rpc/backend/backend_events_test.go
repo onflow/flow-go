@@ -48,7 +48,7 @@ type BackendEventsSuite struct {
 	state      *protocol.State
 	snapshot   *protocol.Snapshot
 	params     *protocol.Params
-	rootHeader *flow.Header
+	rootHeader *flow.UnsignedHeader
 
 	eventsIndex       *index.EventsIndex
 	events            *storagemock.Events
@@ -60,8 +60,8 @@ type BackendEventsSuite struct {
 	executionNodes flow.IdentityList
 	execClient     *access.ExecutionAPIClient
 
-	sealedHead  *flow.Header
-	blocks      []*flow.Block
+	sealedHead  *flow.UnsignedHeader
+	blocks      []*flow.UnsignedBlock
 	blockIDs    []flow.Identifier
 	blockEvents []flow.Event
 
@@ -89,11 +89,11 @@ func (s *BackendEventsSuite) SetupTest() {
 	s.eventsIndex = index.NewEventsIndex(index.NewReporter(), s.events)
 
 	blockCount := 5
-	s.blocks = make([]*flow.Block, blockCount)
+	s.blocks = make([]*flow.UnsignedBlock, blockCount)
 	s.blockIDs = make([]flow.Identifier, blockCount)
 
 	for i := 0; i < blockCount; i++ {
-		var header *flow.Header
+		var header *flow.UnsignedHeader
 		if i == 0 {
 			header = unittest.BlockHeaderFixture()
 		} else {
@@ -102,8 +102,8 @@ func (s *BackendEventsSuite) SetupTest() {
 
 		payload := unittest.PayloadFixture()
 		header.PayloadHash = payload.Hash()
-		block, err := flow.NewBlock(
-			flow.UntrustedBlock{
+		block, err := flow.NewUnsignedBlock(
+			flow.UntrustedUnsignedBlock{
 				HeaderBody: header.HeaderBody,
 				Payload:    payload,
 			},
@@ -151,7 +151,7 @@ func (s *BackendEventsSuite) SetupTest() {
 		return flow.ZeroID, storage.ErrNotFound
 	}).Maybe()
 
-	s.headers.On("ByBlockID", mock.Anything).Return(func(blockID flow.Identifier) (*flow.Header, error) {
+	s.headers.On("ByBlockID", mock.Anything).Return(func(blockID flow.Identifier) (*flow.UnsignedHeader, error) {
 		for _, block := range s.blocks {
 			if blockID == block.ID() {
 				return block.ToHeader(), nil
@@ -201,7 +201,7 @@ func (s *BackendEventsSuite) defaultBackend() *backendEvents {
 }
 
 // setupExecutionNodes sets up the mocks required to test against an EN backend
-func (s *BackendEventsSuite) setupExecutionNodes(block *flow.Block) {
+func (s *BackendEventsSuite) setupExecutionNodes(block *flow.UnsignedBlock) {
 	s.params.On("FinalizedRoot").Return(s.rootHeader, nil)
 	s.state.On("Params").Return(s.params)
 	s.state.On("Final").Return(s.snapshot)
@@ -218,7 +218,7 @@ func (s *BackendEventsSuite) setupExecutionNodes(block *flow.Block) {
 }
 
 // setupENSuccessResponse configures the execution node client to return a successful response
-func (s *BackendEventsSuite) setupENSuccessResponse(eventType string, blocks []*flow.Block) {
+func (s *BackendEventsSuite) setupENSuccessResponse(eventType string, blocks []*flow.UnsignedBlock) {
 	s.setupExecutionNodes(blocks[len(blocks)-1])
 
 	ids := make([][]byte, len(blocks))
@@ -254,7 +254,7 @@ func (s *BackendEventsSuite) setupENSuccessResponse(eventType string, blocks []*
 }
 
 // setupENFailingResponse configures the execution node client to return an error
-func (s *BackendEventsSuite) setupENFailingResponse(eventType string, headers []*flow.Header, err error) {
+func (s *BackendEventsSuite) setupENFailingResponse(eventType string, headers []*flow.UnsignedHeader, err error) {
 	ids := make([][]byte, len(headers))
 	for i, header := range headers {
 		id := header.ID()
@@ -360,7 +360,7 @@ func (s *BackendEventsSuite) TestGetEvents_HappyPaths() {
 				return
 			case IndexQueryModeFailover:
 				// only failing blocks queried from EN
-				s.setupENSuccessResponse(targetEvent, []*flow.Block{s.blocks[0], s.blocks[4]})
+				s.setupENSuccessResponse(targetEvent, []*flow.UnsignedBlock{s.blocks[0], s.blocks[4]})
 			}
 
 			// the first and last blocks are not available from storage, and should be fetched from the EN

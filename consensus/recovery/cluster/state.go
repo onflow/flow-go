@@ -19,7 +19,7 @@ import (
 //
 // Note: this is an expensive method, which is intended to help recover from a crash, e.g. help to
 // re-built the in-memory consensus state.
-func FindLatest(state cluster.State, headers storage.Headers) (*flow.Header, []*flow.ProposalHeader, error) {
+func FindLatest(state cluster.State, headers storage.Headers) (*flow.UnsignedHeader, []*flow.ProposalHeader, error) {
 	finalizedSnapshot := state.Final()              // state snapshot at latest finalized block
 	finalizedBlock, err := finalizedSnapshot.Head() // header of latest finalized block
 	if err != nil {

@@ -38,14 +38,14 @@ type MutatorSuite struct {
 	db    *badger.DB
 	dbdir string
 
-	genesis      *model.Block
+	genesis      *model.UnsignedBlock
 	chainID      flow.ChainID
 	epochCounter uint64
 
 	// protocol state for reference blocks for transactions
 	protoState           protocol.FollowerState
 	mutableProtocolState protocol.MutableProtocolState
-	protoGenesis         *flow.Block
+	protoGenesis         *flow.UnsignedBlock
 
 	state cluster.MutableState
 }
@@ -176,7 +176,7 @@ func (suite *MutatorSuite) Payload(transactions ...*flow.TransactionBody) model.
 }
 
 // ProposalWithParent returns a valid block proposal with the given parent and the given payload.
-func (suite *MutatorSuite) ProposalWithParentAndPayload(parent *model.Block, payload model.Payload) model.Proposal {
+func (suite *MutatorSuite) ProposalWithParentAndPayload(parent *model.UnsignedBlock, payload model.Payload) model.Proposal {
 	block := unittest.ClusterBlockFixture(
 		unittest.ClusterBlock.WithParent(parent),
 		unittest.ClusterBlock.WithPayload(payload),
@@ -189,9 +189,9 @@ func (suite *MutatorSuite) Proposal() model.Proposal {
 	return suite.ProposalWithParentAndPayload(suite.genesis, suite.Payload())
 }
 
-func (suite *MutatorSuite) FinalizeBlock(block model.Block) {
+func (suite *MutatorSuite) FinalizeBlock(block model.UnsignedBlock) {
 	err := suite.db.Update(func(tx *badger.Txn) error {
-		var refBlock flow.Header
+		var refBlock flow.UnsignedHeader
 		err := operation.RetrieveHeader(block.Payload.ReferenceBlockID, &refBlock)(tx)
 		if err != nil {
 			return err
@@ -257,7 +257,7 @@ func (suite *MutatorSuite) TestBootstrap_Successful() {
 		suite.Assert().Equal(suite.genesis.Payload.Collection.Light(), collection)
 
 		// should insert header
-		var header flow.Header
+		var header flow.UnsignedHeader
 		err = operation.RetrieveHeader(suite.genesis.ID(), &header)(tx)
 		suite.Assert().Nil(err)
 		suite.Assert().Equal(suite.genesis.ToHeader().ID(), header.ID())
@@ -366,7 +366,7 @@ func (suite *MutatorSuite) TestExtend_Success() {
 	suite.Assert().Nil(err)
 
 	// should be able to retrieve the block
-	var extended model.Block
+	var extended model.UnsignedBlock
 	err = suite.db.View(procedure.RetrieveClusterBlock(proposal.Block.ID(), &extended))
 	suite.Assert().Nil(err)
 	suite.Assert().Equal(proposal.Block.Payload, extended.Payload)

@@ -59,7 +59,7 @@ func (n *node) Done() <-chan struct{} {
 // desired current and next epochs.
 // The next epoch is set up as tentative, since this helper is only used by the DKG emulator test
 // and DKG events occur during the `flow.EpochPhaseSetup` phase before the next epoch is committed.
-func (n *node) setEpochs(t *testing.T, currentSetup flow.EpochSetup, nextSetup flow.EpochSetup, firstBlock *flow.Header) {
+func (n *node) setEpochs(t *testing.T, currentSetup flow.EpochSetup, nextSetup flow.EpochSetup, firstBlock *flow.UnsignedHeader) {
 	currentEpoch := new(protocolmock.CommittedEpoch)
 	currentEpoch.On("Counter").Return(currentSetup.Counter)
 	currentEpoch.On("InitialIdentities").Return(currentSetup.Participants)

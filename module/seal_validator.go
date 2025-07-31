@@ -15,5 +15,5 @@ import "github.com/onflow/flow-go/model/flow"
 //   - the Seal validator walks the chain backwards and requires the relevant ancestors to be known and validated
 //   - the storage.Seals only holds seals for block that are attached to the main chain.
 type SealValidator interface {
-	Validate(candidate *flow.Block) (*flow.Seal, error)
+	Validate(candidate *flow.UnsignedBlock) (*flow.Seal, error)
 }

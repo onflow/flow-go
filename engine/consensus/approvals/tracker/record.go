@@ -108,7 +108,7 @@ func (r *SealingRecord) Generate() (Rec, error) {
 //   - nil if result is incorporated at an unfinalized height
 //   - "finalized" if result is incorporated at a finalized block
 //   - "orphaned" if result is incorporated in an orphaned block
-func (r *SealingRecord) assignmentFinalizationStatus(incorporatingBlock *flow.Header) (*string, error) {
+func (r *SealingRecord) assignmentFinalizationStatus(incorporatingBlock *flow.UnsignedHeader) (*string, error) {
 	if incorporatingBlock.Height > r.finalizedBlock.Height {
 		return nil, nil // result is incorporated at an unfinalized height.
 	}

@@ -41,7 +41,7 @@ func NewExecutionTree() *ExecutionTree {
 // After recovering from a crash, the mempools are wiped and the sealed results will not
 // be stored in the Execution Tree anymore. Adding the result to the tree allows to create
 // a vertex in the tree without attaching any Execution Receipts to it.
-func (et *ExecutionTree) AddResult(result *flow.ExecutionResult, block *flow.Header) error {
+func (et *ExecutionTree) AddResult(result *flow.ExecutionResult, block *flow.UnsignedHeader) error {
 	et.Lock()
 	defer et.Unlock()
 
@@ -64,7 +64,7 @@ func (et *ExecutionTree) AddResult(result *flow.ExecutionResult, block *flow.Hea
 
 // getEquivalenceClass retrieves the Equivalence class for the given result
 // or creates a new one and stores it into the levelled forest
-func (et *ExecutionTree) getEquivalenceClass(result *flow.ExecutionResult, block *flow.Header) (*ReceiptsOfSameResult, error) {
+func (et *ExecutionTree) getEquivalenceClass(result *flow.ExecutionResult, block *flow.UnsignedHeader) (*ReceiptsOfSameResult, error) {
 	vertex, found := et.forest.GetVertex(result.ID())
 	var receiptsForResult *ReceiptsOfSameResult
 	if !found {
@@ -102,7 +102,7 @@ func (et *ExecutionTree) HasReceipt(receipt *flow.ExecutionReceipt) bool {
 // AddReceipt adds the given execution receipt to the memory pool. Requires
 // height of the block the receipt is for. We enforce data consistency on
 // an API level by using the block header as input.
-func (et *ExecutionTree) AddReceipt(receipt *flow.ExecutionReceipt, block *flow.Header) (bool, error) {
+func (et *ExecutionTree) AddReceipt(receipt *flow.ExecutionReceipt, block *flow.UnsignedHeader) (bool, error) {
 	et.Lock()
 	defer et.Unlock()
 

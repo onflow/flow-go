@@ -180,7 +180,7 @@ func (suite *Suite) TestGetTransactionResultReturnsValidTransactionResultFromHis
 	})
 }
 
-func (suite *Suite) withGetTransactionCachingTestSetup(f func(b *flow.Block, t *flow.Transaction)) {
+func (suite *Suite) withGetTransactionCachingTestSetup(f func(b *flow.UnsignedBlock, t *flow.Transaction)) {
 	suite.withPreConfiguredState(func(snap protocol.Snapshot) {
 		block := unittest.BlockFixture()
 		tbody := unittest.TransactionBodyFixture()
@@ -199,7 +199,7 @@ func (suite *Suite) withGetTransactionCachingTestSetup(f func(b *flow.Block, t *
 
 // TestGetTransactionResultFromCache get historic transaction result from cache
 func (suite *Suite) TestGetTransactionResultFromCache() {
-	suite.withGetTransactionCachingTestSetup(func(block *flow.Block, tx *flow.Transaction) {
+	suite.withGetTransactionCachingTestSetup(func(block *flow.UnsignedBlock, tx *flow.Transaction) {
 		transactionResultResponse := access.TransactionResultResponse{
 			Status:     entities.TransactionStatus_EXECUTED,
 			StatusCode: uint32(entities.TransactionStatus_EXECUTED),
@@ -247,7 +247,7 @@ func (suite *Suite) TestGetTransactionResultFromCache() {
 
 // TestGetTransactionResultCacheNonExistent tests caches non existing result
 func (suite *Suite) TestGetTransactionResultCacheNonExistent() {
-	suite.withGetTransactionCachingTestSetup(func(block *flow.Block, tx *flow.Transaction) {
+	suite.withGetTransactionCachingTestSetup(func(block *flow.UnsignedBlock, tx *flow.Transaction) {
 		suite.historicalAccessClient.
 			On("GetTransactionResult", mock.Anything, mock.AnythingOfType("*access.GetTransactionRequest")).
 			Return(nil, status.Errorf(codes.NotFound, "no known transaction with ID %s", tx.ID())).Once()
@@ -288,7 +288,7 @@ func (suite *Suite) TestGetTransactionResultCacheNonExistent() {
 
 // TestGetTransactionResultUnknownFromCache retrieve unknown result from cache.
 func (suite *Suite) TestGetTransactionResultUnknownFromCache() {
-	suite.withGetTransactionCachingTestSetup(func(block *flow.Block, tx *flow.Transaction) {
+	suite.withGetTransactionCachingTestSetup(func(block *flow.UnsignedBlock, tx *flow.Transaction) {
 		suite.historicalAccessClient.
 			On("GetTransactionResult", mock.Anything, mock.AnythingOfType("*access.GetTransactionRequest")).
 			Return(nil, status.Errorf(codes.NotFound, "no known transaction with ID %s", tx.ID())).Once()
@@ -1236,7 +1236,7 @@ func (suite *Suite) TestGetSystemTransactionResult_FailedEncodingConversion() {
 func (suite *Suite) assertTransactionResultResponse(
 	err error,
 	response *accessmodel.TransactionResult,
-	block *flow.Block,
+	block *flow.UnsignedBlock,
 	txId flow.Identifier,
 	txFailed bool,
 	eventsForTx []flow.Event,

@@ -34,7 +34,7 @@ type SyncSuite struct {
 	suite.Suite
 	myID         flow.Identifier
 	participants flow.IdentityList
-	head         *flow.Header
+	head         *flow.UnsignedHeader
 	heights      map[uint64]*flow.Proposal
 	blockIDs     map[flow.Identifier]*flow.Proposal
 	net          *mocknetwork.Network
@@ -107,7 +107,7 @@ func (ss *SyncSuite) SetupTest() {
 	// set up the snapshot mock
 	ss.snapshot = &protocol.Snapshot{}
 	ss.snapshot.On("Head").Return(
-		func() *flow.Header {
+		func() *flow.UnsignedHeader {
 			return ss.head
 		},
 		nil,

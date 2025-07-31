@@ -42,7 +42,7 @@ type MessageHubSuite struct {
 	// parameters
 	participants flow.IdentityList
 	myID         flow.Identifier
-	head         *flow.Header
+	head         *flow.UnsignedHeader
 
 	// mocked dependencies
 	payloads          *storage.Payloads
@@ -127,7 +127,7 @@ func (s *MessageHubSuite) SetupTest() {
 		nil,
 	)
 	s.snapshot.On("Head").Return(
-		func() *flow.Header {
+		func() *flow.UnsignedHeader {
 			return s.head
 		},
 		nil,

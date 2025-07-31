@@ -26,7 +26,7 @@ type blockSignerDecoderSuite struct {
 	committee    *hotstuff.DynamicCommittee
 
 	decoder *BlockSignerDecoder
-	block   *flow.Block
+	block   *flow.UnsignedBlock
 }
 
 func (s *blockSignerDecoderSuite) SetupTest() {

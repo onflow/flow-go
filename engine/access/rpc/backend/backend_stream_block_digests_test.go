@@ -78,7 +78,7 @@ func (s *BackendBlockDigestSuite) TestSubscribeBlockDigestsFromLatest() {
 }
 
 // requireBlockDigests ensures that the received block digest information matches the expected data.
-func (s *BackendBlockDigestSuite) requireBlockDigests(v interface{}, expectedBlock *flow.Block) {
+func (s *BackendBlockDigestSuite) requireBlockDigests(v interface{}, expectedBlock *flow.UnsignedBlock) {
 	actualBlock, ok := v.(*flow.BlockDigest)
 	require.True(s.T(), ok, "unexpected response type: %T", v)
 

@@ -18,12 +18,12 @@ type CompleteCollection struct {
 // ExecutableBlock represents a block that can be executed by the VM
 //
 // It assumes that the attached Block is immutable, so take care in not modifying or changing the inner
-// *flow.Block, otherwise the struct will be in an inconsistent state. It requires the Block is immutable
-// because it lazy loads the Block.ID() into the private blockID field, on the first call to ExecutableBlock.BlockID()
-// All future calls to BlockID will not call Block.ID(), therefore if the Block changes, the blockID will not match the Block.
+// *flow.UnsignedBlock, otherwise the struct will be in an inconsistent state. It requires the Block is immutable
+// because it lazy loads the UnsignedBlock.ID() into the private blockID field, on the first call to ExecutableBlock.BlockID()
+// All future calls to BlockID will not call UnsignedBlock.ID(), therefore if the Block changes, the blockID will not match the Block.
 type ExecutableBlock struct {
 	blockID             flow.Identifier
-	Block               *flow.Block
+	Block               *flow.UnsignedBlock
 	CompleteCollections map[flow.Identifier]*CompleteCollection // key is the collection ID.
 	StartState          *flow.StateCommitment
 	Executing           bool // flag used to indicate if block is being executed, to avoid re-execution
@@ -35,7 +35,7 @@ func (c CompleteCollection) IsCompleted() bool {
 	return c.Collection != nil && len(c.Collection.Transactions) > 0
 }
 
-// BlockID lazy loads the Block.ID() into the private blockID field on the first call, and returns
+// BlockID lazy loads the UnsignedBlock.ID() into the private blockID field on the first call, and returns
 // the id field in all future calls
 func (b *ExecutableBlock) BlockID() flow.Identifier {
 	if b.blockID == flow.ZeroID {

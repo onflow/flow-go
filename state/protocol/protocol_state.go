@@ -137,7 +137,7 @@ type MutableProtocolState interface {
 	//
 	// SERVICE EVENTS form an order-preserving, asynchronous, one-way message bus from the System Smart Contracts
 	// (verified honest execution) to the Protocol State. For example, consider a fork where a service event is
-	// emitted during execution of block A. Block B contains an execution receipt `RA` for A. Block C holds a
+	// emitted during execution of block A. UnsignedBlock B contains an execution receipt `RA` for A. UnsignedBlock C holds a
 	// seal `SA` for A's execution result.
 	//
 	//    A ← … ← B(RA) ← … ← C(SA)

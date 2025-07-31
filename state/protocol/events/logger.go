@@ -20,21 +20,21 @@ func NewEventLogger(logger zerolog.Logger) *EventLogger {
 	}
 }
 
-func (p EventLogger) EpochTransition(newEpochCounter uint64, header *flow.Header) {
+func (p EventLogger) EpochTransition(newEpochCounter uint64, header *flow.UnsignedHeader) {
 	p.logger.Info().Uint64("newEpochCounter", newEpochCounter).
 		Uint64("height", header.Height).
 		Uint64("view", header.View).
 		Msg("epoch transition")
 }
 
-func (p EventLogger) EpochSetupPhaseStarted(currentEpochCounter uint64, header *flow.Header) {
+func (p EventLogger) EpochSetupPhaseStarted(currentEpochCounter uint64, header *flow.UnsignedHeader) {
 	p.logger.Info().Uint64("currentEpochCounter", currentEpochCounter).
 		Uint64("height", header.Height).
 		Uint64("view", header.View).
 		Msg("epoch setup phase started")
 }
 
-func (p EventLogger) EpochCommittedPhaseStarted(currentEpochCounter uint64, header *flow.Header) {
+func (p EventLogger) EpochCommittedPhaseStarted(currentEpochCounter uint64, header *flow.UnsignedHeader) {
 	p.logger.Info().Uint64("currentEpochCounter", currentEpochCounter).
 		Uint64("height", header.Height).
 		Uint64("view", header.View).

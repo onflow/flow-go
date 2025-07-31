@@ -127,7 +127,7 @@ func TransactionResultToMessage(result accessmodel.TransactionResult) *accesspro
 	}
 }
 
-func BlockHeaderToMessage(h *flow.Header) (*entitiesproto.BlockHeader, error) {
+func BlockHeaderToMessage(h *flow.UnsignedHeader) (*entitiesproto.BlockHeader, error) {
 	id := h.ID()
 
 	return &entitiesproto.BlockHeader{
@@ -138,7 +138,7 @@ func BlockHeaderToMessage(h *flow.Header) (*entitiesproto.BlockHeader, error) {
 	}, nil
 }
 
-func BlockToMessage(h *flow.Block) (*entitiesproto.Block, error) {
+func BlockToMessage(h *flow.UnsignedBlock) (*entitiesproto.Block, error) {
 	id := h.ID()
 
 	cg := make([]*entitiesproto.CollectionGuarantee, len(h.Payload.Guarantees))

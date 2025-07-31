@@ -31,8 +31,8 @@ type TransactionStatusesProviderSuite struct {
 	api *accessmock.API
 
 	chain          flow.Chain
-	rootBlock      *flow.Block
-	finalizedBlock *flow.Header
+	rootBlock      *flow.UnsignedBlock
+	finalizedBlock *flow.UnsignedHeader
 
 	factory       *DataProviderFactoryImpl
 	linkGenerator *mockcommonmodels.LinkGenerator
@@ -119,7 +119,7 @@ func (s *TransactionStatusesProviderSuite) requireTransactionStatuses(
 	require.Equal(s.T(), expectedResponsePayload.TransactionResult.BlockId, actualResponsePayload.TransactionResult.BlockId)
 }
 
-func backendTransactionStatusesResponse(block *flow.Block) []*accessmodel.TransactionResult {
+func backendTransactionStatusesResponse(block *flow.UnsignedBlock) []*accessmodel.TransactionResult {
 	cid := unittest.IdentifierFixture()
 	txr := accessmodel.TransactionResult{
 		Status:       flow.TransactionStatusSealed,

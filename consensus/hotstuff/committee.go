@@ -134,7 +134,7 @@ type BlockSignerDecoder interface {
 	// Expected Error returns during normal operations:
 	//  - signature.InvalidSignerIndicesError if signer indices included in the header do
 	//    not encode a valid subset of the consensus committee
-	DecodeSignerIDs(header *flow.Header) (flow.IdentifierList, error)
+	DecodeSignerIDs(header *flow.UnsignedHeader) (flow.IdentifierList, error)
 }
 
 type DKG interface {

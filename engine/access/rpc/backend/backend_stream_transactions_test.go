@@ -81,11 +81,11 @@ type TransactionStatusSuite struct {
 	chainID flow.ChainID
 
 	broadcaster    *engine.Broadcaster
-	rootBlock      *flow.Block
-	sealedBlock    *flow.Block
-	finalizedBlock *flow.Block
+	rootBlock      *flow.UnsignedBlock
+	sealedBlock    *flow.UnsignedBlock
+	finalizedBlock *flow.UnsignedBlock
 
-	blockMap map[uint64]*flow.Block
+	blockMap map[uint64]*flow.UnsignedBlock
 
 	backend *Backend
 
@@ -174,7 +174,7 @@ func (s *TransactionStatusSuite) initializeBackend() {
 
 	s.sealedBlock = s.rootBlock
 	s.finalizedBlock = unittest.BlockWithParentFixture(s.sealedBlock.ToHeader())
-	s.blockMap = map[uint64]*flow.Block{
+	s.blockMap = map[uint64]*flow.UnsignedBlock{
 		s.sealedBlock.Height:    s.sealedBlock,
 		s.finalizedBlock.Height: s.finalizedBlock,
 	}
@@ -231,7 +231,7 @@ func (s *TransactionStatusSuite) initializeMainMockInstructions() {
 
 	s.blocks.On("ByHeight", mock.AnythingOfType("uint64")).Return(mocks.StorageMapGetter(s.blockMap)).Maybe()
 	s.blocks.On("ByID", mock.Anything).Return(
-		func(blockID flow.Identifier) *flow.Block {
+		func(blockID flow.Identifier) *flow.UnsignedBlock {
 			for _, block := range s.blockMap {
 				if block.ID() == blockID {
 					return block
@@ -252,7 +252,7 @@ func (s *TransactionStatusSuite) initializeMainMockInstructions() {
 	s.state.On("Final").Return(s.finalSnapshot, nil).Maybe()
 	s.state.On("AtBlockID", mock.AnythingOfType("flow.Identifier")).Return(func(blockID flow.Identifier) protocolint.Snapshot {
 		s.tempSnapshot.On("Head").Unset()
-		s.tempSnapshot.On("Head").Return(func() *flow.Header {
+		s.tempSnapshot.On("Head").Return(func() *flow.UnsignedHeader {
 			for _, block := range s.blockMap {
 				if block.ID() == blockID {
 					return block.ToHeader()
@@ -265,7 +265,7 @@ func (s *TransactionStatusSuite) initializeMainMockInstructions() {
 		return s.tempSnapshot
 	}, nil).Maybe()
 
-	s.finalSnapshot.On("Head").Return(func() *flow.Header {
+	s.finalSnapshot.On("Head").Return(func() *flow.UnsignedHeader {
 		return s.finalizedBlock.ToHeader()
 	}, nil).Maybe()
 
@@ -287,7 +287,7 @@ func (s *TransactionStatusSuite) initializeHappyCaseMockInstructions() {
 		return s.finalizedBlock.Height, nil
 	}, nil).Maybe()
 
-	s.sealedSnapshot.On("Head").Return(func() *flow.Header {
+	s.sealedSnapshot.On("Head").Return(func() *flow.UnsignedHeader {
 		return s.sealedBlock.ToHeader()
 	}, nil).Maybe()
 	s.state.On("Sealed").Return(s.sealedSnapshot, nil).Maybe()
@@ -315,7 +315,7 @@ func (s *TransactionStatusSuite) createSendTransaction() flow.Transaction {
 }
 
 // addNewFinalizedBlock sets up a new finalized block using the provided parent header and options, and optionally notifies via broadcasting.
-func (s *TransactionStatusSuite) addNewFinalizedBlock(parent *flow.Header, notify bool, options ...func(*flow.Block)) {
+func (s *TransactionStatusSuite) addNewFinalizedBlock(parent *flow.UnsignedHeader, notify bool, options ...func(*flow.UnsignedBlock)) {
 	s.finalizedBlock = unittest.BlockWithParentFixture(parent)
 	for _, option := range options {
 		option(s.finalizedBlock)
@@ -351,10 +351,10 @@ func (s *TransactionStatusSuite) addBlockWithTransaction(transaction *flow.Trans
 	guarantee := flow.CollectionGuarantee{CollectionID: colID}
 	light := col.Light()
 	s.sealedBlock = s.finalizedBlock
-	s.addNewFinalizedBlock(s.sealedBlock.ToHeader(), true, func(block *flow.Block) {
+	s.addNewFinalizedBlock(s.sealedBlock.ToHeader(), true, func(block *flow.UnsignedBlock) {
 		var err error
-		block, err = flow.NewBlock(
-			flow.UntrustedBlock{
+		block, err = flow.NewUnsignedBlock(
+			flow.UntrustedUnsignedBlock{
 				HeaderBody: block.HeaderBody,
 				Payload:    unittest.PayloadFixture(unittest.WithGuarantees(&guarantee)),
 			},
@@ -653,7 +653,7 @@ func (s *TransactionStatusSuite) TestSubscribeTransactionStatusFailedSubscriptio
 	})
 
 	s.Run("if could not get start height", func() {
-		s.sealedSnapshot.On("Head").Return(func() *flow.Header {
+		s.sealedSnapshot.On("Head").Return(func() *flow.UnsignedHeader {
 			return s.sealedBlock.ToHeader()
 		}, nil).Once()
 		s.state.On("Sealed").Return(s.sealedSnapshot, nil).Once()

@@ -16,7 +16,7 @@ import (
 type CachingAssignmentCollectorTestSuite struct {
 	suite.Suite
 
-	executedBlock *flow.Header
+	executedBlock *flow.UnsignedHeader
 	result        *flow.ExecutionResult
 	collector     *CachingAssignmentCollector
 }

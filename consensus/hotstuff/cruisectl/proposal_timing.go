@@ -78,7 +78,7 @@ var _ ProposalTiming = (*happyPathBlockTime)(nil)
 // newHappyPathBlockTime instantiates a new happyPathBlockTime. Inputs:
 //   - `timedBlock` references the _published_ block with the highest view known to this node.
 //     On the consensus happy path, this node may construct the child block (iff it is the primary for
-//     view `timedBlock.Block.View` + 1). Note that the controller determines when to publish this child.
+//     view `timedBlock.UnsignedBlock.View` + 1). Note that the controller determines when to publish this child.
 //     In other words, when primary determines at what future time to broadcast the child, the child
 //     has _not_ been published and the `timedBlock` references the parent on the happy path (or another
 //     earlier block on the unhappy path)
@@ -103,7 +103,7 @@ func (pt *happyPathBlockTime) ConstrainedBlockTime() time.Duration { return pt.c
 //  1. If `parentBlockId` matches our `TimedBlock`, i.e. the EventHandler is just building the child block, then
 //     we return `TimedBlock.TimeObserved + ConstrainedBlockTime` as the target publication time for the child block.
 //  2. If `parentBlockId` does _not_ match our `TimedBlock`, the EventHandler should release the block immediately.
-//     This heuristic is based on the intuition that Block time is expected to be very long when deviating from the happy path.
+//     This heuristic is based on the intuition that UnsignedBlock time is expected to be very long when deviating from the happy path.
 func (pt *happyPathBlockTime) TargetPublicationTime(proposalView uint64, timeViewEntered time.Time, parentBlockId flow.Identifier) time.Time {
 	if parentBlockId != pt.Block.BlockID {
 		return timeViewEntered // broadcast immediately

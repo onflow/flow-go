@@ -58,10 +58,10 @@ func (mr *MockEmulatorMockRecorder) AddTransaction(tx any) *gomock.Call {
 }
 
 // CommitBlock mocks base method.
-func (m *MockEmulator) CommitBlock() (*flow.Block, error) {
+func (m *MockEmulator) CommitBlock() (*flow.UnsignedBlock, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "CommitBlock")
-	ret0, _ := ret[0].(*flow.Block)
+	ret0, _ := ret[0].(*flow.UnsignedBlock)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -97,10 +97,10 @@ func (mr *MockEmulatorMockRecorder) EnableAutoMine() *gomock.Call {
 }
 
 // ExecuteAndCommitBlock mocks base method.
-func (m *MockEmulator) ExecuteAndCommitBlock() (*flow.Block, []*emulator.TransactionResult, error) {
+func (m *MockEmulator) ExecuteAndCommitBlock() (*flow.UnsignedBlock, []*emulator.TransactionResult, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "ExecuteAndCommitBlock")
-	ret0, _ := ret[0].(*flow.Block)
+	ret0, _ := ret[0].(*flow.UnsignedBlock)
 	ret1, _ := ret[1].([]*emulator.TransactionResult)
 	ret2, _ := ret[2].(error)
 	return ret0, ret1, ret2
@@ -233,10 +233,10 @@ func (mr *MockEmulatorMockRecorder) GetAccountByIndex(arg0 any) *gomock.Call {
 }
 
 // GetBlockByHeight mocks base method.
-func (m *MockEmulator) GetBlockByHeight(height uint64) (*flow.Block, error) {
+func (m *MockEmulator) GetBlockByHeight(height uint64) (*flow.UnsignedBlock, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetBlockByHeight", height)
-	ret0, _ := ret[0].(*flow.Block)
+	ret0, _ := ret[0].(*flow.UnsignedBlock)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -248,10 +248,10 @@ func (mr *MockEmulatorMockRecorder) GetBlockByHeight(height any) *gomock.Call {
 }
 
 // GetBlockByID mocks base method.
-func (m *MockEmulator) GetBlockByID(id flow.Identifier) (*flow.Block, error) {
+func (m *MockEmulator) GetBlockByID(id flow.Identifier) (*flow.UnsignedBlock, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetBlockByID", id)
-	ret0, _ := ret[0].(*flow.Block)
+	ret0, _ := ret[0].(*flow.UnsignedBlock)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -338,10 +338,10 @@ func (mr *MockEmulatorMockRecorder) GetFullCollectionByID(colID any) *gomock.Cal
 }
 
 // GetLatestBlock mocks base method.
-func (m *MockEmulator) GetLatestBlock() (*flow.Block, error) {
+func (m *MockEmulator) GetLatestBlock() (*flow.UnsignedBlock, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetLatestBlock")
-	ret0, _ := ret[0].(*flow.Block)
+	ret0, _ := ret[0].(*flow.UnsignedBlock)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }

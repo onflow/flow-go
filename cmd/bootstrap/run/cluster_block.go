@@ -8,8 +8,8 @@ import (
 	clusterstate "github.com/onflow/flow-go/state/cluster"
 )
 
-func GenerateRootClusterBlocks(epoch uint64, clusters flow.ClusterList) []*cluster.Block {
-	clusterBlocks := make([]*cluster.Block, len(clusters))
+func GenerateRootClusterBlocks(epoch uint64, clusters flow.ClusterList) []*cluster.UnsignedBlock {
+	clusterBlocks := make([]*cluster.UnsignedBlock, len(clusters))
 	for i := range clusterBlocks {
 		cluster, ok := clusters.ByIndex(uint(i))
 		if !ok {

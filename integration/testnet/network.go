@@ -152,7 +152,7 @@ type FlowNetwork struct {
 	Containers           map[string]*Container
 	ConsensusFollowers   map[flow.Identifier]consensus_follower.ConsensusFollower
 	CorruptedPortMapping map[flow.Identifier]string // port binding for corrupted containers.
-	root                 *flow.Block
+	root                 *flow.UnsignedBlock
 	result               *flow.ExecutionResult
 	seal                 *flow.Seal
 
@@ -205,7 +205,7 @@ func (net *FlowNetwork) ContainersByRole(role flow.Role, ghost bool) []*Containe
 }
 
 // Root returns the root block generated for the network.
-func (net *FlowNetwork) Root() *flow.Block {
+func (net *FlowNetwork) Root() *flow.UnsignedBlock {
 	return net.root
 }
 
@@ -1076,12 +1076,12 @@ func followerNodeInfos(confs []ConsensusFollowerConfig) ([]bootstrap.NodeInfo, e
 }
 
 type BootstrapData struct {
-	Root              *flow.Block
+	Root              *flow.UnsignedBlock
 	Result            *flow.ExecutionResult
 	Seal              *flow.Seal
 	StakedConfs       []ContainerConfig
 	Snapshot          *inmem.Snapshot
-	ClusterRootBlocks []*cluster.Block
+	ClusterRootBlocks []*cluster.UnsignedBlock
 }
 
 func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string, chainID flow.ChainID) (*BootstrapData, error) {
@@ -1244,8 +1244,8 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string, chainID fl
 	if err != nil {
 		return nil, err
 	}
-	root, err := flow.NewRootBlock(
-		flow.UntrustedBlock{
+	root, err := flow.NewRootUnsignedBlock(
+		flow.UntrustedUnsignedBlock{
 			HeaderBody: *rootHeaderBody,
 			Payload:    unittest.PayloadFixture(unittest.WithProtocolStateID(rootProtocolState.ID())),
 		},
@@ -1434,7 +1434,7 @@ func runBeaconKG(confs []ContainerConfig) (dkgmod.ThresholdKeySet, flow.DKGIndex
 // setupClusterGenesisBlockQCs generates bootstrapping resources necessary for each collector cluster:
 //   - a cluster-specific root block
 //   - a cluster-specific root QC
-func setupClusterGenesisBlockQCs(nClusters uint, epochCounter uint64, confs []ContainerConfig) ([]*cluster.Block, flow.AssignmentList, []*flow.QuorumCertificate, error) {
+func setupClusterGenesisBlockQCs(nClusters uint, epochCounter uint64, confs []ContainerConfig) ([]*cluster.UnsignedBlock, flow.AssignmentList, []*flow.QuorumCertificate, error) {
 
 	participantsUnsorted := toParticipants(confs)
 	participants := participantsUnsorted.Sort(flow.Canonical[flow.Identity])
@@ -1445,7 +1445,7 @@ func setupClusterGenesisBlockQCs(nClusters uint, epochCounter uint64, confs []Co
 		return nil, nil, nil, fmt.Errorf("could not create cluster list: %w", err)
 	}
 
-	rootBlocks := make([]*cluster.Block, 0, nClusters)
+	rootBlocks := make([]*cluster.UnsignedBlock, 0, nClusters)
 	qcs := make([]*flow.QuorumCertificate, 0, nClusters)
 
 	for _, cluster := range clusters {

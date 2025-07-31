@@ -44,8 +44,8 @@ type ReactorEngineSuite_SetupPhase struct {
 	myIndex            int               // my index in the DKG
 	committee          flow.IdentityList // the DKG committee
 	expectedPrivateKey crypto.PrivateKey
-	firstBlock         *flow.Header
-	blocksByView       map[uint64]*flow.Header
+	firstBlock         *flow.UnsignedHeader
+	blocksByView       map[uint64]*flow.UnsignedHeader
 
 	// track how many warn-level logs are logged
 	warnsLogged int
@@ -104,7 +104,7 @@ func (suite *ReactorEngineSuite_SetupPhase) SetupTest() {
 	suite.local.On("NodeID").Return(suite.committee[suite.myIndex].NodeID)
 
 	// create a block for each view of interest
-	suite.blocksByView = make(map[uint64]*flow.Header)
+	suite.blocksByView = make(map[uint64]*flow.UnsignedHeader)
 	for view := suite.dkgStartView; view <= suite.dkgPhase3FinalView; view += dkg.DefaultPollStep {
 		header := unittest.BlockHeaderFixture(unittest.HeaderWithView(view))
 		suite.blocksByView[view] = header
@@ -263,12 +263,12 @@ func (suite *ReactorEngineSuite_SetupPhase) TestRunDKG_StartupInSetupPhase_DKGAl
 type ReactorEngineSuite_CommittedPhase struct {
 	suite.Suite
 
-	epochCounter         uint64            // current epoch counter
-	myLocalBeaconKey     crypto.PrivateKey // my locally computed beacon key
-	myGlobalBeaconPubKey crypto.PublicKey  // my public key, as dictated by global DKG
-	DKGState             flow.DKGState     // backend for DGKState.
-	firstBlock           *flow.Header      // first block of EpochCommitted phase
-	warnsLogged          int               // count # of warn-level logs
+	epochCounter         uint64               // current epoch counter
+	myLocalBeaconKey     crypto.PrivateKey    // my locally computed beacon key
+	myGlobalBeaconPubKey crypto.PublicKey     // my public key, as dictated by global DKG
+	DKGState             flow.DKGState        // backend for DGKState.
+	firstBlock           *flow.UnsignedHeader // first block of EpochCommitted phase
+	warnsLogged          int                  // count # of warn-level logs
 
 	me       *module.Local
 	dkgState *storage.DKGState

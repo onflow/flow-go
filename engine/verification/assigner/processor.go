@@ -12,12 +12,12 @@ import (
 // included in a finalized block.
 // From the architectural perspective, FinalizedBlockProcessor aligns as following on the verification pipeline:
 // -----------------------------                           ------------------                                  --------------------------
-// | Consensus Follower Engine | ---> finalized blocks --> | Block Consumer | ---> finalized block workers --> | FinalizedBlockProcessor|
+// | Consensus Follower Engine | ---> finalized blocks --> | UnsignedBlock Consumer | ---> finalized block workers --> | FinalizedBlockProcessor|
 // -----------------------------                           ------------------                                  --------------------------
 type FinalizedBlockProcessor interface {
 	// ProcessFinalizedBlock receives a finalized block and processes all of its constituent execution receipts.
 	// Note: it should be implemented in a non-blocking way.
-	ProcessFinalizedBlock(*flow.Block)
+	ProcessFinalizedBlock(*flow.UnsignedBlock)
 
 	// WithBlockConsumerNotifier sets the notifier of this finalized block processor.
 	// The notifier is called by the internal logic of the processor to let the consumer know that

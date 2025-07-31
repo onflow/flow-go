@@ -35,7 +35,7 @@ type Snapshot interface {
 	//   - state.ErrUnknownSnapshotReference if the reference point for the snapshot
 	//     (height or block ID) does not resolve to a queriable block in the state.
 	// All other errors should be treated as exceptions.
-	Head() (*flow.Header, error)
+	Head() (*flow.UnsignedHeader, error)
 
 	// QuorumCertificate returns a valid quorum certificate for the header at
 	// this snapshot, if one exists.

@@ -21,7 +21,7 @@ import (
 	"github.com/onflow/flow-go/storage"
 )
 
-// EVM Root Height is the first block that has EVM Block Event where the EVM block height is 1
+// EVM Root Height is the first block that has EVM UnsignedBlock Event where the EVM block height is 1
 func IsEVMRootHeight(chainID flow.ChainID, flowHeight uint64) bool {
 	if chainID == flow.Testnet {
 		return flowHeight == 211176670
