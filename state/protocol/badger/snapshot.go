@@ -66,8 +66,7 @@ func (s *FinalizedSnapshot) Head() (*flow.Header, error) {
 }
 
 func (s *Snapshot) Head() (*flow.Header, error) {
-	head, err := s.state.headers.ByBlockID(s.blockID)
-	return head, err
+	return s.state.headers.ByBlockID(s.blockID)
 }
 
 // QuorumCertificate (QC) returns a valid quorum certificate pointing to the
@@ -214,7 +213,12 @@ func (s *Snapshot) SealingSegment() (*flow.SealingSegment, error) {
 
 	// walk through the chain backward until we reach the block referenced by
 	// the latest seal - the returned segment includes this block
-	builder := flow.NewSealingSegmentBuilder(s.state.results.ByID, s.state.seals.HighestInFork, getProtocolStateEntry)
+	builder := flow.NewSealingSegmentBuilder(
+		s.state.results.ByID,
+		s.state.seals.HighestInFork,
+		getProtocolStateEntry,
+		s.state.sporkRootBlockView,
+	)
 	scraper := func(header *flow.Header) error {
 		blockID := header.ID()
 		block, err := s.state.blocks.ProposalByID(blockID)

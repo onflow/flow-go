@@ -65,6 +65,8 @@ type SealingSegment struct {
 	// ProtocolStateEntries contains every protocol state entry committed to
 	// by any block in the SealingSegment (including ExtraBlocks).
 	ProtocolStateEntries map[Identifier]*ProtocolStateEntryWrapper
+	// SporkRootBlockView is the view of the root block in the current spork
+	SporkRootBlockView uint64
 }
 
 // ProtocolStateEntryWrapper is a wrapper coupling two data sources.
@@ -151,7 +153,6 @@ func (segment *SealingSegment) LatestProtocolStateEntry() *ProtocolStateEntryWra
 // Errors expected during normal operation:
 //   - InvalidSealingSegmentError if `segment` is an invalid SealingSegment.
 func (segment *SealingSegment) Validate() error {
-
 	// populate lookup of seals and results in the segment to satisfy builder
 	seals := make(map[Identifier]*Seal)
 	results := segment.ExecutionResults.Lookup()
@@ -194,7 +195,7 @@ func (segment *SealingSegment) Validate() error {
 		return entry, nil
 	}
 
-	builder := NewSealingSegmentBuilder(getResult, getSeal, getProtocolStateEntry)
+	builder := NewSealingSegmentBuilder(getResult, getSeal, getProtocolStateEntry, segment.SporkRootBlockView)
 	for _, proposal := range segment.Blocks {
 		err := builder.AddBlock(proposal)
 		if err != nil {
@@ -274,6 +275,8 @@ type SealingSegmentBuilder struct {
 	// extraBlocks included in sealing segment, must connect to the lowest block of segment
 	// stored in descending order for simpler population logic
 	extraBlocks []*Proposal
+	// sporkRootBlockView is the view of the root block in the current spork
+	sporkRootBlockView uint64
 }
 
 // AddBlock appends a block to the sealing segment under construction.
@@ -430,6 +433,7 @@ func (builder *SealingSegmentBuilder) SealingSegment() (*SealingSegment, error) 
 		ProtocolStateEntries: builder.protocolStateEntries,
 		LatestSeals:          builder.latestSeals,
 		FirstSeal:            builder.firstSeal,
+		SporkRootBlockView:   builder.sporkRootBlockView,
 	}, nil
 }
 
@@ -456,8 +460,8 @@ func (builder *SealingSegmentBuilder) validateRootSegment() error {
 	if len(builder.extraBlocks) > 0 {
 		return NewInvalidSealingSegmentError("root segment cannot have extra blocks")
 	}
-	if builder.lowest().View != 0 {
-		return NewInvalidSealingSegmentError("root block has unexpected view (%d != 0)", builder.lowest().View)
+	if builder.lowest().View != builder.sporkRootBlockView {
+		return NewInvalidSealingSegmentError("root block has unexpected view (%d != %d)", builder.lowest().View, builder.sporkRootBlockView)
 	}
 	if len(builder.results) != 1 {
 		return NewInvalidSealingSegmentError("expected %d results, got %d", 1, len(builder.results))
@@ -531,7 +535,12 @@ func (builder *SealingSegmentBuilder) lowest() *Block {
 }
 
 // NewSealingSegmentBuilder returns *SealingSegmentBuilder
-func NewSealingSegmentBuilder(resultLookup GetResultFunc, sealLookup GetSealByBlockIDFunc, protocolStateLookup GetProtocolStateEntryFunc) *SealingSegmentBuilder {
+func NewSealingSegmentBuilder(
+	resultLookup GetResultFunc,
+	sealLookup GetSealByBlockIDFunc,
+	protocolStateLookup GetProtocolStateEntryFunc,
+	sporkRootBlockView uint64,
+) *SealingSegmentBuilder {
 	return &SealingSegmentBuilder{
 		resultLookup:         resultLookup,
 		sealByBlockIDLookup:  sealLookup,
@@ -542,6 +551,7 @@ func NewSealingSegmentBuilder(resultLookup GetResultFunc, sealLookup GetSealByBl
 		blocks:               make([]*Proposal, 0, 10),
 		extraBlocks:          make([]*Proposal, 0, DefaultTransactionExpiry),
 		results:              make(ExecutionResultList, 0, 3),
+		sporkRootBlockView:   sporkRootBlockView,
 	}
 }
 
