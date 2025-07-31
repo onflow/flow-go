@@ -13,7 +13,7 @@ import (
 
 	awsconfig "github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
-	"github.com/cockroachdb/pebble"
+	"github.com/cockroachdb/pebble/v2"
 	"github.com/ipfs/boxo/bitswap"
 	"github.com/ipfs/go-cid"
 	"github.com/onflow/cadence"
@@ -1090,7 +1090,7 @@ func (exeNode *ExecutionNode) LoadIngestionEngine(
 		colFetcher = accessFetcher
 		exeNode.collectionRequester = accessFetcher
 	} else {
-		reqEng, err := requester.New(node.Logger, node.Metrics.Engine, node.EngineRegistry, node.Me, node.State,
+		reqEng, err := requester.New(node.Logger.With().Str("entity", "collection").Logger(), node.Metrics.Engine, node.EngineRegistry, node.Me, node.State,
 			channels.RequestCollections,
 			filter.Any,
 			func() flow.Entity { return new(flow.Collection) },
@@ -1298,7 +1298,7 @@ func (exeNode *ExecutionNode) LoadReceiptProviderEngine(
 		engineRegister = &underlay.NoopEngineRegister{}
 	}
 	eng, err := provider.New(
-		node.Logger.With().Str("engine", "receipt_provider").Logger(),
+		node.Logger.With().Str("entity", "receipt").Logger(),
 		node.Metrics.Engine,
 		engineRegister,
 		node.Me,

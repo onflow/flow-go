@@ -5,8 +5,9 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/cockroachdb/pebble"
+	"github.com/cockroachdb/pebble/v2"
 	"github.com/dgraph-io/badger/v2"
+	"github.com/jordanschalm/lockctx"
 	"github.com/onflow/crypto"
 	"github.com/rs/zerolog"
 
@@ -44,6 +45,9 @@ type Config struct {
 	exposeMetrics    bool                // whether to expose metrics
 	syncConfig       *chainsync.Config   // sync core configuration
 	complianceConfig *compliance.Config  // follower engine configuration
+	// lock manager for the follower, allows integration tests who run mulitple followers
+	// to be able to use different lock managers.
+	lockManager lockctx.Manager
 }
 
 type Option func(c *Config)
@@ -91,6 +95,15 @@ func WithComplianceConfig(config *compliance.Config) Option {
 	}
 }
 
+func WithLockManager(lockManager lockctx.Manager) Option {
+	return func(c *Config) {
+		if c.lockManager != nil {
+			panic("lock manager already set, cannot overwrite")
+		}
+		c.lockManager = lockManager
+	}
+}
+
 // BootstrapNodeInfo contains the details about the upstream bootstrap peer the consensus follower uses
 type BootstrapNodeInfo struct {
 	Host             string // ip or hostname
@@ -117,6 +130,7 @@ func getFollowerServiceOptions(config *Config) []FollowerOption {
 		WithBootStrapPeers(ids...),
 		WithBaseOptions(getBaseOptions(config)),
 		WithNetworkKey(config.networkPrivKey),
+		WithStorageLockManager(config.lockManager),
 	}
 }
 
@@ -186,6 +200,7 @@ func NewConsensusFollower(
 		pebbleDB:       nil,
 		logLevel:       "info",
 		exposeMetrics:  false,
+		lockManager:    nil, // default to nil, can be set optionally with WithLockManager in tests
 	}
 
 	for _, opt := range opts {

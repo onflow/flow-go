@@ -7,7 +7,7 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/module/executiondatasync/optimistic_syncing/persisters/stores"
+	"github.com/onflow/flow-go/module/executiondatasync/optimistic_sync/persisters/stores"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/utils/logging"
 )

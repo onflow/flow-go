@@ -631,6 +631,7 @@ func TestExtendInconsistentParentView(t *testing.T) {
 		)
 		// set an invalid parent view
 		block.ParentView++
+		block.View++
 
 		err = state.Extend(context.Background(), unittest.ProposalFromBlock(block))
 		require.Error(t, err)
