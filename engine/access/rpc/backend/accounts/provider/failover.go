@@ -1,4 +1,4 @@
-package retriever
+package provider
 
 import (
 	"context"
@@ -9,30 +9,30 @@ import (
 	"github.com/onflow/flow-go/state/protocol"
 )
 
-type FailoverAccountRetriever struct {
+type FailoverAccountProvider struct {
 	log               zerolog.Logger
 	state             protocol.State
-	localRequester    AccountRetriever
-	execNodeRequester AccountRetriever
+	localRequester    AccountProvider
+	execNodeRequester AccountProvider
 }
 
-var _ AccountRetriever = (*FailoverAccountRetriever)(nil)
+var _ AccountProvider = (*FailoverAccountProvider)(nil)
 
-func NewFailoverAccountRetriever(
+func NewFailoverAccountProvider(
 	log zerolog.Logger,
 	state protocol.State,
-	localRequester AccountRetriever,
-	execNodeRequester AccountRetriever,
-) *FailoverAccountRetriever {
-	return &FailoverAccountRetriever{
-		log:               log.With().Str("account_retriever", "failover").Logger(),
+	localRequester AccountProvider,
+	execNodeRequester AccountProvider,
+) *FailoverAccountProvider {
+	return &FailoverAccountProvider{
+		log:               log.With().Str("account_provider", "failover").Logger(),
 		state:             state,
 		localRequester:    localRequester,
 		execNodeRequester: execNodeRequester,
 	}
 }
 
-func (f *FailoverAccountRetriever) GetAccountAtBlock(
+func (f *FailoverAccountProvider) GetAccountAtBlock(
 	ctx context.Context,
 	address flow.Address,
 	blockID flow.Identifier,
@@ -47,7 +47,7 @@ func (f *FailoverAccountRetriever) GetAccountAtBlock(
 	return execNodeAccount, execNodeErr
 }
 
-func (f *FailoverAccountRetriever) GetAccountBalanceAtBlock(
+func (f *FailoverAccountProvider) GetAccountBalanceAtBlock(
 	ctx context.Context,
 	address flow.Address,
 	blockID flow.Identifier,
@@ -66,7 +66,7 @@ func (f *FailoverAccountRetriever) GetAccountBalanceAtBlock(
 	return execNodeBalance, nil
 }
 
-func (f *FailoverAccountRetriever) GetAccountKeyAtBlock(
+func (f *FailoverAccountProvider) GetAccountKeyAtBlock(
 	ctx context.Context,
 	address flow.Address,
 	keyIndex uint32,
@@ -86,7 +86,7 @@ func (f *FailoverAccountRetriever) GetAccountKeyAtBlock(
 	return execNodeKey, nil
 }
 
-func (f *FailoverAccountRetriever) GetAccountKeysAtBlock(
+func (f *FailoverAccountProvider) GetAccountKeysAtBlock(
 	ctx context.Context,
 	address flow.Address,
 	blockID flow.Identifier,

@@ -1,4 +1,4 @@
-package retriever
+package provider
 
 import (
 	"context"
@@ -6,7 +6,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-type AccountRetriever interface {
+type AccountProvider interface {
 	GetAccountAtBlock(ctx context.Context, address flow.Address, blockID flow.Identifier, height uint64) (*flow.Account, error)
 	GetAccountBalanceAtBlock(ctx context.Context, address flow.Address, blockID flow.Identifier, height uint64) (uint64, error)
 	GetAccountKeyAtBlock(ctx context.Context, address flow.Address, keyIndex uint32, blockID flow.Identifier, height uint64) (*flow.AccountPublicKey, error)
