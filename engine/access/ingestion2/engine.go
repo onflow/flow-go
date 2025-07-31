@@ -108,6 +108,7 @@ func (e *Engine) Process(chanName channels.Channel, originID flow.Identifier, ev
 	default:
 	}
 
+	//TODO: we don't need this type switch as message handler has this check under the hood
 	switch event.(type) {
 	case *flow.ExecutionReceipt:
 		err := e.messageHandler.Process(originID, event)
