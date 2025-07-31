@@ -1,5 +1,2 @@
 # Protocol owners are not generally differentiated by sub-area for simplicity
 /** @onflow/flow-core-protocol
-
-# FVM specific
-/fvm/** @janezpodhostnik @zhangchiqing 
