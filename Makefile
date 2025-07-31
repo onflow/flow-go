@@ -210,7 +210,7 @@ generate-mocks: install-mock-generators
 	mockery --name 'WebsocketConnection' --dir="./engine/access/rest/websockets" --case=underscore --output="./engine/access/rest/websockets/mock"  --outpkg="mock"
 	mockery --name 'ConnectionFactory' --dir="./engine/access/rpc/connection" --case=underscore --output="./engine/access/rpc/connection/mock" --outpkg="mock"
 	mockery --name 'Communicator' --dir="./engine/access/rpc/backend/node_communicator" --case=underscore --output="./engine/access/rpc/backend/node_communicator/mock" --outpkg="mock"
-	mockery --name 'AccountRetriever' --dir="./engine/access/rpc/backend/accounts/retriever" --case=underscore --output="./engine/access/rpc/backend/accounts/retriever/mock" --outpkg="mock"
+	mockery --name 'AccountProvider' --dir="./engine/access/rpc/backend/accounts/provider" --case=underscore --output="./engine/access/rpc/backend/accounts/provider/mock" --outpkg="mock"
 	mockery --name 'EventProvider' --dir="./engine/access/rpc/backend/events/provider" --case=underscore --output="./engine/access/rpc/backend/events/provider/mock" --outpkg="mock"
 	mockery --name 'TransactionProvider' --dir="./engine/access/rpc/backend/transactions/provider" --case=underscore --output="./engine/access/rpc/backend/transactions/provider/mock" --outpkg="mock"
 	mockery --name 'TxErrorMessageProvider' --dir="./engine/access/rpc/backend/transactions/error_message_provider" --case=underscore --output="./engine/access/rpc/backend/transactions/error_message_provider/mock" --outpkg="mock"

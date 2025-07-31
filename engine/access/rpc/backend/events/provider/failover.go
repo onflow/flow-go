@@ -19,13 +19,13 @@ type FailoverEventRetriever struct {
 
 var _ EventProvider = (*FailoverEventRetriever)(nil)
 
-func NewFailoverEventRetriever(
+func NewFailoverEventProvider(
 	log zerolog.Logger,
 	localRetriever EventProvider,
 	execNodeRetriever EventProvider,
 ) *FailoverEventRetriever {
 	return &FailoverEventRetriever{
-		log:               log.With().Str("events_retriever", "failover").Logger(),
+		log:               log.With().Str("event_provider", "failover").Logger(),
 		localRetriever:    localRetriever,
 		execNodeRetriever: execNodeRetriever,
 	}

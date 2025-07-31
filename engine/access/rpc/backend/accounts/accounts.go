@@ -7,7 +7,7 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/access"
-	"github.com/onflow/flow-go/engine/access/rpc/backend/accounts/retriever"
+	"github.com/onflow/flow-go/engine/access/rpc/backend/accounts/provider"
 	"github.com/onflow/flow-go/engine/access/rpc/backend/common"
 	"github.com/onflow/flow-go/engine/access/rpc/backend/node_communicator"
 	"github.com/onflow/flow-go/engine/access/rpc/backend/query_mode"
@@ -24,7 +24,7 @@ type Accounts struct {
 	log       zerolog.Logger
 	state     protocol.State
 	headers   storage.Headers
-	retriever retriever.AccountRetriever
+	retriever provider.AccountProvider
 }
 
 var _ access.AccountsAPI = (*Accounts)(nil)
@@ -39,24 +39,24 @@ func NewAccountsBackend(
 	scriptExecutor execution.ScriptExecutor,
 	execNodeIdentitiesProvider *commonrpc.ExecutionNodeIdentitiesProvider,
 ) (*Accounts, error) {
-	var accountsRetriever retriever.AccountRetriever
+	var accountsRetriever provider.AccountProvider
 
 	switch scriptExecMode {
 	case query_mode.IndexQueryModeLocalOnly:
-		accountsRetriever = retriever.NewLocalAccountRetriever(log, state, scriptExecutor)
+		accountsRetriever = provider.NewLocalAccountProvider(log, state, scriptExecutor)
 
 	case query_mode.IndexQueryModeExecutionNodesOnly:
-		accountsRetriever = retriever.NewENAccountRetriever(log, state, connFactory, nodeCommunicator, execNodeIdentitiesProvider)
+		accountsRetriever = provider.NewENAccountProvider(log, state, connFactory, nodeCommunicator, execNodeIdentitiesProvider)
 
 	case query_mode.IndexQueryModeFailover:
-		local := retriever.NewLocalAccountRetriever(log, state, scriptExecutor)
-		execNode := retriever.NewENAccountRetriever(log, state, connFactory, nodeCommunicator, execNodeIdentitiesProvider)
-		accountsRetriever = retriever.NewFailoverAccountRetriever(log, state, local, execNode)
+		local := provider.NewLocalAccountProvider(log, state, scriptExecutor)
+		execNode := provider.NewENAccountProvider(log, state, connFactory, nodeCommunicator, execNodeIdentitiesProvider)
+		accountsRetriever = provider.NewFailoverAccountProvider(log, state, local, execNode)
 
 	case query_mode.IndexQueryModeCompare:
-		local := retriever.NewLocalAccountRetriever(log, state, scriptExecutor)
-		execNode := retriever.NewENAccountRetriever(log, state, connFactory, nodeCommunicator, execNodeIdentitiesProvider)
-		accountsRetriever = retriever.NewComparingAccountRetriever(log, state, local, execNode)
+		local := provider.NewLocalAccountProvider(log, state, scriptExecutor)
+		execNode := provider.NewENAccountProvider(log, state, connFactory, nodeCommunicator, execNodeIdentitiesProvider)
+		accountsRetriever = provider.NewComparingAccountProvider(log, state, local, execNode)
 
 	default:
 		return nil, fmt.Errorf("unknown execution mode: %v", scriptExecMode)

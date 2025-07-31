@@ -54,15 +54,15 @@ func NewEventsBackend(
 
 	switch queryMode {
 	case query_mode.IndexQueryModeLocalOnly:
-		eventRetriever = provider.NewLocalEventRetriever(eventsIndex)
+		eventRetriever = provider.NewLocalEventProvider(eventsIndex)
 
 	case query_mode.IndexQueryModeExecutionNodesOnly:
-		eventRetriever = provider.NewENEventRetriever(log, execNodeIdentitiesProvider, connFactory, nodeCommunicator)
+		eventRetriever = provider.NewENEventProvider(log, execNodeIdentitiesProvider, connFactory, nodeCommunicator)
 
 	case query_mode.IndexQueryModeFailover:
-		local := provider.NewLocalEventRetriever(eventsIndex)
-		execNode := provider.NewENEventRetriever(log, execNodeIdentitiesProvider, connFactory, nodeCommunicator)
-		eventRetriever = provider.NewFailoverEventRetriever(log, local, execNode)
+		local := provider.NewLocalEventProvider(eventsIndex)
+		execNode := provider.NewENEventProvider(log, execNodeIdentitiesProvider, connFactory, nodeCommunicator)
+		eventRetriever = provider.NewFailoverEventProvider(log, local, execNode)
 
 	default:
 		return nil, fmt.Errorf("unknown execution mode: %v", queryMode)

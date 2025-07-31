@@ -23,7 +23,7 @@ type LocalEventProvider struct {
 
 var _ EventProvider = (*LocalEventProvider)(nil)
 
-func NewLocalEventRetriever(index *index.EventsIndex) *LocalEventProvider {
+func NewLocalEventProvider(index *index.EventsIndex) *LocalEventProvider {
 	return &LocalEventProvider{
 		index: index,
 	}

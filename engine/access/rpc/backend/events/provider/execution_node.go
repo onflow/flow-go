@@ -30,14 +30,14 @@ type ENEventProvider struct {
 
 var _ EventProvider = (*ENEventProvider)(nil)
 
-func NewENEventRetriever(
+func NewENEventProvider(
 	log zerolog.Logger,
 	nodeProvider *rpc.ExecutionNodeIdentitiesProvider,
 	connFactory connection.ConnectionFactory,
 	nodeCommunicator node_communicator.Communicator,
 ) *ENEventProvider {
 	return &ENEventProvider{
-		log:              log.With().Str("events_retriever", "execution_node").Logger(),
+		log:              log.With().Str("event_provider", "execution_node").Logger(),
 		nodeProvider:     nodeProvider,
 		connFactory:      connFactory,
 		nodeCommunicator: nodeCommunicator,
