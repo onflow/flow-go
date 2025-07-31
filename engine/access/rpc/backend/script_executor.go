@@ -1,4 +1,4 @@
-package scripts
+package backend
 
 import (
 	"context"
