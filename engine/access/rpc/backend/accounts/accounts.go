@@ -53,11 +53,6 @@ func NewAccountsBackend(
 		execNode := retriever.NewENAccountRetriever(log, state, connFactory, nodeCommunicator, execNodeIdentitiesProvider)
 		accountsRetriever = retriever.NewFailoverAccountRetriever(log, state, local, execNode)
 
-	case query_mode.IndexQueryModeCompare:
-		local := retriever.NewLocalAccountRetriever(log, state, scriptExecutor)
-		execNode := retriever.NewENAccountRetriever(log, state, connFactory, nodeCommunicator, execNodeIdentitiesProvider)
-		accountsRetriever = retriever.NewComparingAccountRetriever(log, state, local, execNode)
-
 	default:
 		return nil, fmt.Errorf("unknown execution mode: %v", scriptExecMode)
 	}
