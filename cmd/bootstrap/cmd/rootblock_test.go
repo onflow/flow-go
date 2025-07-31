@@ -64,7 +64,7 @@ func TestRootBlock_HappyPath(t *testing.T) {
 		flagRootParent = hex.EncodeToString(rootParent[:])
 		flagRootChain = chainName
 		flagRootHeight = rootHeight
-		flagRootView = 0
+		flagRootView = 1_000
 		flagEpochCounter = 0
 		flagNumViewsInEpoch = 100_000
 		flagNumViewsInStakingAuction = 50_000

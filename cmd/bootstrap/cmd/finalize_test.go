@@ -69,7 +69,7 @@ func TestFinalize_HappyPath(t *testing.T) {
 		flagRootChain = chainName
 		flagRootParent = hex.EncodeToString(rootParent[:])
 		flagRootHeight = rootHeight
-		flagRootView = 0
+		flagRootView = 1_000
 		flagRootCommit = hex.EncodeToString(rootCommit[:])
 		flagEpochCounter = epochCounter
 		flagNumViewsInEpoch = 100_000
