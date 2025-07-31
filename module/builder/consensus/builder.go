@@ -2,7 +2,6 @@ package consensus
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"time"
 
@@ -373,27 +372,6 @@ func (b *Builder) getInsertableSeals(parentID flow.Identifier) ([]*flow.Seal, er
 	}
 	latestSealedHeight := latestSealedBlock.Height
 
-	getInsertableSealsObservation := &struct {
-		LastSealedHeight      uint64
-		LastSealedHeightAfter uint64
-		IRs                   []*struct {
-			Height              uint64
-			HasSeal             bool
-			ExecutedBlockHeight uint64
-			SealsCount          uint64
-		}
-	}{
-		LastSealedHeight: latestSealedHeight,
-	}
-
-	defer func() {
-		bytes, err := json.Marshal(getInsertableSealsObservation)
-		if err != nil {
-			panic(err)
-		}
-		fmt.Printf("**** builder observation: %s\n", string(bytes))
-	}()
-
 	// STEP I: Collect the seals for all results that satisfy (0), (1), and (2).
 	//         The will give us a _superset_ of all seals that can be included.
 	// Implementation:
@@ -427,19 +405,6 @@ func (b *Builder) getInsertableSeals(parentID flow.Identifier) ([]*flow.Seal, er
 			return fmt.Errorf("could not retrieve index for block %x: %w", blockID, err)
 		}
 
-		obs := &struct {
-			Height              uint64
-			HasSeal             bool
-			ExecutedBlockHeight uint64
-			SealsCount          uint64
-		}{
-			Height:              header.Height,
-			HasSeal:             false,
-			ExecutedBlockHeight: 0,
-			SealsCount:          0,
-		}
-		getInsertableSealsObservation.IRs = append(getInsertableSealsObservation.IRs, obs)
-
 		// enforce condition (1): only consider seals for results that are incorporated in the fork
 		for _, resultID := range index.ResultIDs {
 			result, err := b.resultsDB.ByID(resultID)
@@ -461,7 +426,6 @@ func (b *Builder) getInsertableSeals(parentID flow.Identifier) ([]*flow.Seal, er
 			// approvals have been collected. Hence, any incorporated result for which we
 			// find a candidate seal satisfies condition (0)
 			irSeal, ok := b.sealPool.ByID(incorporatedResult.ID())
-			obs.HasSeal = ok
 			if !ok {
 				continue
 			}
@@ -476,12 +440,9 @@ func (b *Builder) getInsertableSeals(parentID flow.Identifier) ([]*flow.Seal, er
 				continue
 			}
 
-			obs.ExecutedBlockHeight = executedBlock.Height
-
 			// The following is a subtle but important protocol edge case: There can be multiple
 			// candidate seals for the same block. We have to include all to guarantee sealing liveness!
 			sealsSuperset[executedBlock.Height] = append(sealsSuperset[executedBlock.Height], irSeal)
-			obs.SealsCount = uint64(len(sealsSuperset[executedBlock.Height]))
 		}
 
 		return nil
@@ -513,7 +474,6 @@ func (b *Builder) getInsertableSeals(parentID flow.Identifier) ([]*flow.Seal, er
 		lastSeal = candidateSeal
 		latestSealedHeight += 1
 	}
-	getInsertableSealsObservation.LastSealedHeightAfter = latestSealedHeight
 	return seals, nil
 }
 
