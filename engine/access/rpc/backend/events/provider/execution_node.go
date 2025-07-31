@@ -1,4 +1,4 @@
-package retriever
+package provider
 
 import (
 	"context"
@@ -21,22 +21,22 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-type ENEventRetriever struct {
+type ENEventProvider struct {
 	log              zerolog.Logger
 	nodeProvider     *rpc.ExecutionNodeIdentitiesProvider
 	connFactory      connection.ConnectionFactory
 	nodeCommunicator node_communicator.Communicator
 }
 
-var _ EventRetriever = (*ENEventRetriever)(nil)
+var _ EventProvider = (*ENEventProvider)(nil)
 
 func NewENEventRetriever(
 	log zerolog.Logger,
 	nodeProvider *rpc.ExecutionNodeIdentitiesProvider,
 	connFactory connection.ConnectionFactory,
 	nodeCommunicator node_communicator.Communicator,
-) *ENEventRetriever {
-	return &ENEventRetriever{
+) *ENEventProvider {
+	return &ENEventProvider{
 		log:              log.With().Str("events_retriever", "execution_node").Logger(),
 		nodeProvider:     nodeProvider,
 		connFactory:      connFactory,
@@ -44,7 +44,7 @@ func NewENEventRetriever(
 	}
 }
 
-func (e *ENEventRetriever) Events(
+func (e *ENEventProvider) Events(
 	ctx context.Context,
 	blocks []BlockMetadata,
 	eventType flow.EventType,
@@ -107,7 +107,7 @@ func (e *ENEventRetriever) Events(
 // We attempt querying each EN in sequence. If any EN returns a valid response, then errors from
 // other ENs are logged and swallowed. If all ENs fail to return a valid response, then an
 // error aggregating all failures is returned.
-func (e *ENEventRetriever) getEventsFromAnyExeNode(
+func (e *ENEventProvider) getEventsFromAnyExeNode(
 	ctx context.Context,
 	execNodes flow.IdentitySkeletonList,
 	req *execproto.GetEventsForBlockIDsRequest,
@@ -145,7 +145,7 @@ func (e *ENEventRetriever) getEventsFromAnyExeNode(
 	return resp, execNode, errToReturn
 }
 
-func (e *ENEventRetriever) tryGetEvents(
+func (e *ENEventProvider) tryGetEvents(
 	ctx context.Context,
 	execNode *flow.IdentitySkeleton,
 	req *execproto.GetEventsForBlockIDsRequest,

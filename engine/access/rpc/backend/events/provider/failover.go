@@ -1,4 +1,4 @@
-package retriever
+package provider
 
 import (
 	"context"
@@ -13,16 +13,16 @@ import (
 
 type FailoverEventRetriever struct {
 	log               zerolog.Logger
-	localRetriever    EventRetriever
-	execNodeRetriever EventRetriever
+	localRetriever    EventProvider
+	execNodeRetriever EventProvider
 }
 
-var _ EventRetriever = (*FailoverEventRetriever)(nil)
+var _ EventProvider = (*FailoverEventRetriever)(nil)
 
 func NewFailoverEventRetriever(
 	log zerolog.Logger,
-	localRetriever EventRetriever,
-	execNodeRetriever EventRetriever,
+	localRetriever EventProvider,
+	execNodeRetriever EventProvider,
 ) *FailoverEventRetriever {
 	return &FailoverEventRetriever{
 		log:               log.With().Str("events_retriever", "failover").Logger(),
