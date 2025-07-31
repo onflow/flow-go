@@ -2,6 +2,7 @@ package flow
 
 import (
 	"encoding/json"
+	"fmt"
 
 	"github.com/onflow/crypto"
 )
@@ -10,6 +11,7 @@ type Spock []byte
 
 // ExecutionReceipt is the full execution receipt, as sent by the Execution Node.
 // Specifically, it contains the detailed execution result.
+//
 type ExecutionReceipt struct {
 	ExecutorID Identifier
 	ExecutionResult
@@ -210,4 +212,31 @@ func (l ExecutionReceiptMetaList) Lookup() map[Identifier]*ExecutionReceiptMeta 
 		receiptsByID[receipt.ID()] = receipt
 	}
 	return receiptsByID
+}
+
+// used for construction.
+//
+// This type exists to ensure that constructor functions are invoked explicitly
+// with named fields, which improves clarity and reduces the risk of incorrect field
+// ordering during construction.
+//
+type UntrustedExecutionReceipt ExecutionReceipt
+
+//
+func NewExecutionReceipt(untrusted UntrustedExecutionReceipt) (*ExecutionReceipt, error) {
+	if untrusted.ExecutorID == ZeroID {
+		return nil, fmt.Errorf("executor ID must not be zero")
+	}
+	if len(untrusted.Spocks) == 0 {
+		return nil, fmt.Errorf("spocks must not be empty")
+	}
+	if len(untrusted.ExecutorSignature) == 0 {
+		return nil, fmt.Errorf("executor signature must not be empty")
+	}
+	return &ExecutionReceipt{
+		ExecutorID:        untrusted.ExecutorID,
+		ExecutionResult:   untrusted.ExecutionResult,
+		Spocks:            untrusted.Spocks,
+		ExecutorSignature: untrusted.ExecutorSignature,
+	}, nil
 }
