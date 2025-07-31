@@ -144,7 +144,7 @@ func rootBlock(cmd *cobra.Command, args []string) {
 
 	chainID := parseChainID(flagRootChain)
 	if (chainID == flow.Testnet || chainID == flow.Mainnet) && flagRootView == 0 {
-		log.Fatal().Msgf("--root-view must be non-zero for %q chain (got: %d)", flagRootChain, flagRootView)
+		log.Fatal().Msgf("--root-view must be non-zero for %q chain", flagRootChain)
 	}
 
 	// validate epoch configs
