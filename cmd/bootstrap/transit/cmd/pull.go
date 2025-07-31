@@ -37,6 +37,7 @@ func addPullCmdFlags() {
 	pullCmd.Flags().StringVarP(&flagNodeRole, "role", "r", "", `node role (can be "collection", "consensus", "execution", "verification" or "access")`)
 	pullCmd.Flags().DurationVar(&flagTimeout, "timeout", time.Second*300, `timeout for pull`)
 	pullCmd.Flags().Int64Var(&flagConcurrency, "concurrency", 2, `concurrency limit for pull`)
+	pullCmd.Flags().StringVarP(&flagBucketName, "bucket", "g", "flow-genesis-bootstrap", `bucket for pulling bootstrap files`)
 
 	_ = pullCmd.MarkFlagRequired("token")
 	_ = pullCmd.MarkFlagRequired("role")
