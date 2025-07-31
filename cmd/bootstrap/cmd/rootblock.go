@@ -142,6 +142,11 @@ func rootBlock(cmd *cobra.Command, args []string) {
 		log.Warn().Msg("using deprecated flag --protocol-version; please remove this flag from your workflow, it is ignored and will be removed in a future release")
 	}
 
+	chainID := parseChainID(flagRootChain)
+	if (chainID == flow.Testnet || chainID == flow.Mainnet) && flagRootView == 0 {
+		log.Fatal().Msgf("--root-view must be non-zero for %q chain (got: %d)", flagRootChain, flagRootView)
+	}
+
 	// validate epoch configs
 	err := validateEpochConfig()
 	if err != nil {
