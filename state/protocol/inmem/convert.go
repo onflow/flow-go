@@ -55,6 +55,7 @@ func FromParams(from protocol.GlobalParams) (*Params, error) {
 		ChainID:              from.ChainID(),
 		SporkID:              from.SporkID(),
 		SporkRootBlockHeight: from.SporkRootBlockHeight(),
+		SporkRootBlockView:   from.SporkRootBlockView(),
 	}
 	return &Params{params}, nil
 }
@@ -64,6 +65,7 @@ func ClusterFromEncodable(enc EncodableCluster) (*Cluster, error) {
 	return &Cluster{enc}, nil
 }
 
+// TODO(Uliana): move to unittests
 // SnapshotFromBootstrapState generates a protocol.Snapshot representing a
 // root bootstrap state. This is used to bootstrap the protocol state for
 // genesis or post-spork states.
@@ -120,6 +122,7 @@ func SnapshotFromBootstrapStateWithParams(
 		ChainID:              root.ChainID, // chain ID must match the root block
 		SporkID:              root.ID(),    // use root block ID as the unique spork identifier
 		SporkRootBlockHeight: root.Height,  // use root block height as the spork root block height
+		SporkRootBlockView:   root.View,    // use root block view as the spork root block view
 	}
 
 	rootMinEpochState, err := EpochProtocolStateFromServiceEvents(setup, commit)
@@ -175,8 +178,9 @@ func SnapshotFromBootstrapStateWithParams(
 			ProtocolStateEntries: map[flow.Identifier]*flow.ProtocolStateEntryWrapper{
 				rootKvStore.ID(): rootProtocolStateEntryWrapper,
 			},
-			FirstSeal:   seal,
-			ExtraBlocks: make([]*flow.Proposal, 0),
+			FirstSeal:          seal,
+			ExtraBlocks:        make([]*flow.Proposal, 0),
+			SporkRootBlockView: root.View,
 		},
 		QuorumCertificate:   qc,
 		Params:              params,

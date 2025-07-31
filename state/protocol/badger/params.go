@@ -131,6 +131,12 @@ func ReadGlobalParams(db *badger.DB) (*inmem.Params, error) {
 		return nil, fmt.Errorf("could not get spork root block height: %w", err)
 	}
 
+	var sporkRootBlockView uint64
+	err = db.View(operation.RetrieveSporkRootBlockView(&sporkRootBlockView))
+	if err != nil {
+		return nil, fmt.Errorf("could not get spork root block view: %w", err)
+	}
+
 	root, err := ReadFinalizedRoot(db) // retrieve root header
 	if err != nil {
 		return nil, fmt.Errorf("could not get root: %w", err)
@@ -141,6 +147,7 @@ func ReadGlobalParams(db *badger.DB) (*inmem.Params, error) {
 			ChainID:              root.ChainID,
 			SporkID:              sporkID,
 			SporkRootBlockHeight: sporkRootBlockHeight,
+			SporkRootBlockView:   sporkRootBlockView,
 		},
 	), nil
 }

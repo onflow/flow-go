@@ -61,6 +61,11 @@ type State struct {
 	// Caution: A node that joined in a later epoch past the spork, the node will likely _not_
 	// know the spork's root block in full (though it will always know the height).
 	sporkRootBlockHeight uint64
+	// sporkRootBlockView is the view of the root block in the current spork. We cache it in
+	// the state, because it cannot change over the lifecycle of a protocol state instance.
+	// Caution: A node that joined in a later epoch past the spork, the node will likely _not_
+	// know the spork's root block in full (though it will always know the view).
+	sporkRootBlockView uint64
 	// cachedLatest caches both the *latest* finalized header and sealed header,
 	// because the protocol state is solely responsible for updating it.
 	// finalized header and sealed header can be cached together since they are updated together atomically
@@ -599,6 +604,12 @@ func bootstrapSporkInfo(root protocol.Snapshot) func(*transaction.Tx) error {
 			return fmt.Errorf("could not insert spork root block height: %w", err)
 		}
 
+		sporkRootBlockView := params.SporkRootBlockView()
+		err = operation.InsertSporkRootBlockView(sporkRootBlockView)(bdtx)
+		if err != nil {
+			return fmt.Errorf("could not insert spork root block view: %w", err)
+		}
+
 		return nil
 	}
 }
@@ -925,6 +936,7 @@ func (state *State) populateCache() error {
 		state.finalizedRootHeight = state.Params().FinalizedRoot().Height
 		state.sealedRootHeight = state.Params().SealedRoot().Height
 		state.sporkRootBlockHeight = state.Params().SporkRootBlockHeight()
+		state.sporkRootBlockView = state.Params().SporkRootBlockView()
 
 		return nil
 	})
