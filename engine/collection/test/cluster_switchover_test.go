@@ -276,11 +276,13 @@ func (tc *ClusterSwitchoverTestCase) ServiceAddress() flow.Address {
 // Transaction returns a transaction which is valid for ingestion by a
 // collection node in this test suite.
 func (tc *ClusterSwitchoverTestCase) Transaction(opts ...func(*flow.TransactionBody)) *flow.TransactionBody {
-	tx := flow.NewTransactionBody().
+	tx, err := flow.NewTransactionBodyBuilder().
 		AddAuthorizer(tc.ServiceAddress()).
 		SetPayer(tc.ServiceAddress()).
 		SetScript(unittest.NoopTxScript()).
-		SetReferenceBlockID(tc.RootBlock().ID())
+		SetReferenceBlockID(tc.RootBlock().ID()).
+		Build()
+	require.NoError(tc.T(), err)
 
 	for _, apply := range opts {
 		apply(tx)
@@ -383,7 +385,7 @@ func (tc *ClusterSwitchoverTestCase) SubmitTransactionToCluster(
 	// get any block within the target epoch as the transaction's reference block
 	refBlock := tc.BlockInEpoch(epochCounter)
 	tx := tc.Transaction(func(tx *flow.TransactionBody) {
-		tx.SetReferenceBlockID(refBlock.ID())
+		tx.ReferenceBlockID = refBlock.ID()
 	})
 	clusterTx := unittest.AlterTransactionForCluster(*tx, clustering, clusterMembers, nil)
 	tc.ExpectTransaction(epochCounter, clusterIndex, clusterTx.ID())

@@ -269,12 +269,14 @@ func deployContractBlock(
 ) (
 	*flow.TransactionBody, *flow.Collection, *flow.Block, *flow.UntrustedProposal, uint64) {
 	// make tx
-	tx := execTestutil.DeployCounterContractTransaction(chain.ServiceAddress(), chain)
-	err := execTestutil.SignTransactionAsServiceAccount(tx, seq, chain)
+	txBodyBuilder := execTestutil.DeployCounterContractTransaction(chain.ServiceAddress(), chain)
+	err := execTestutil.SignTransactionAsServiceAccount(txBodyBuilder, seq, chain)
 	require.NoError(t, err)
 
 	// make collection
-	col := &flow.Collection{Transactions: []*flow.TransactionBody{tx}}
+	txBody, err := txBodyBuilder.Build()
+	require.NoError(t, err)
+	col := &flow.Collection{Transactions: []*flow.TransactionBody{txBody}}
 
 	signerIndices, err := signature.EncodeSignersToIndices(
 		[]flow.Identifier{colID.NodeID}, []flow.Identifier{colID.NodeID})
@@ -304,18 +306,20 @@ func deployContractBlock(
 
 	// make proposal
 	proposal := (*flow.UntrustedProposal)(unittest.ProposalFromBlock(block))
-	return tx, col, block, proposal, seq + 1
+	return txBody, col, block, proposal, seq + 1
 }
 
 func makePanicBlock(t *testing.T, conID *flow.Identity, colID *flow.Identity, chain flow.Chain, seq uint64, parent *flow.Block, ref *flow.Header) (
 	*flow.TransactionBody, *flow.Collection, *flow.Block, *flow.UntrustedProposal, uint64) {
 	// make tx
-	tx := execTestutil.CreateCounterPanicTransaction(chain.ServiceAddress(), chain.ServiceAddress())
-	err := execTestutil.SignTransactionAsServiceAccount(tx, seq, chain)
+	txBodyBuilder := execTestutil.CreateCounterPanicTransaction(chain.ServiceAddress(), chain.ServiceAddress())
+	err := execTestutil.SignTransactionAsServiceAccount(txBodyBuilder, seq, chain)
 	require.NoError(t, err)
 
 	// make collection
-	col := &flow.Collection{Transactions: []*flow.TransactionBody{tx}}
+	txBody, err := txBodyBuilder.Build()
+	require.NoError(t, err)
+	col := &flow.Collection{Transactions: []*flow.TransactionBody{txBody}}
 
 	clusterChainID := cluster.CanonicalClusterID(1, flow.IdentityList{colID}.NodeIDs())
 	// make block
@@ -340,13 +344,13 @@ func makePanicBlock(t *testing.T, conID *flow.Identity, colID *flow.Identity, ch
 
 	proposal := (*flow.UntrustedProposal)(unittest.ProposalFromBlock(block))
 
-	return tx, col, block, proposal, seq + 1
+	return txBody, col, block, proposal, seq + 1
 }
 
 func makeSuccessBlock(t *testing.T, conID *flow.Identity, colID *flow.Identity, chain flow.Chain, seq uint64, parent *flow.Block, ref *flow.Header) (
 	*flow.TransactionBody, *flow.Collection, *flow.Block, *flow.UntrustedProposal, uint64) {
-	tx := execTestutil.AddToCounterTransaction(chain.ServiceAddress(), chain.ServiceAddress())
-	err := execTestutil.SignTransactionAsServiceAccount(tx, seq, chain)
+	txBodyBuilder := execTestutil.AddToCounterTransaction(chain.ServiceAddress(), chain.ServiceAddress())
+	err := execTestutil.SignTransactionAsServiceAccount(txBodyBuilder, seq, chain)
 	require.NoError(t, err)
 
 	signerIndices, err := signature.EncodeSignersToIndices(
@@ -354,7 +358,9 @@ func makeSuccessBlock(t *testing.T, conID *flow.Identity, colID *flow.Identity, 
 	require.NoError(t, err)
 	clusterChainID := cluster.CanonicalClusterID(1, flow.IdentityList{colID}.NodeIDs())
 
-	col := &flow.Collection{Transactions: []*flow.TransactionBody{tx}}
+	txBody, err := txBodyBuilder.Build()
+	require.NoError(t, err)
+	col := &flow.Collection{Transactions: []*flow.TransactionBody{txBody}}
 	block := unittest.BlockWithParentAndProposerFixture(t, parent.ToHeader(), conID.NodeID) // sets field `ParentVoterIndices` such that `conID.NodeID` is the sole signer
 	block, err = flow.NewBlock(
 		flow.UntrustedBlock{
@@ -371,7 +377,7 @@ func makeSuccessBlock(t *testing.T, conID *flow.Identity, colID *flow.Identity, 
 
 	proposal := (*flow.UntrustedProposal)(unittest.ProposalFromBlock(block))
 
-	return tx, col, block, proposal, seq + 1
+	return txBody, col, block, proposal, seq + 1
 }
 
 // Test a successful tx should change the statecommitment,

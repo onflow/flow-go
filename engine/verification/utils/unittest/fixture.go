@@ -199,15 +199,21 @@ func ExecutionResultFixture(t *testing.T,
 ) (*flow.ExecutionResult, *ExecutionReceiptData) {
 
 	// setups up the first collection of block consists of three transactions
-	tx1 := testutil.DeployCounterContractTransaction(chain.ServiceAddress(), chain)
-	err := testutil.SignTransactionAsServiceAccount(tx1, 0, chain)
+	tx1Builder := testutil.DeployCounterContractTransaction(chain.ServiceAddress(), chain)
+	err := testutil.SignTransactionAsServiceAccount(tx1Builder, 0, chain)
 	require.NoError(t, err)
 
-	tx2 := testutil.CreateCounterTransaction(chain.ServiceAddress(), chain.ServiceAddress())
-	err = testutil.SignTransactionAsServiceAccount(tx2, 1, chain)
+	tx2Builder := testutil.CreateCounterTransaction(chain.ServiceAddress(), chain.ServiceAddress())
+	err = testutil.SignTransactionAsServiceAccount(tx2Builder, 1, chain)
 	require.NoError(t, err)
-	tx3 := testutil.CreateCounterPanicTransaction(chain.ServiceAddress(), chain.ServiceAddress())
-	err = testutil.SignTransactionAsServiceAccount(tx3, 2, chain)
+	tx3Builder := testutil.CreateCounterPanicTransaction(chain.ServiceAddress(), chain.ServiceAddress())
+	err = testutil.SignTransactionAsServiceAccount(tx3Builder, 2, chain)
+	require.NoError(t, err)
+	tx1, err := tx1Builder.Build()
+	require.NoError(t, err)
+	tx2, err := tx2Builder.Build()
+	require.NoError(t, err)
+	tx3, err := tx3Builder.Build()
 	require.NoError(t, err)
 	transactions := []*flow.TransactionBody{tx1, tx2, tx3}
 	collection := flow.Collection{Transactions: transactions}
@@ -314,11 +320,13 @@ func ExecutionResultFixture(t *testing.T,
 		}
 
 		for i := 1; i < chunkCount; i++ {
-			tx := testutil.CreateCounterTransaction(chain.ServiceAddress(), chain.ServiceAddress())
-			err = testutil.SignTransactionAsServiceAccount(tx, 3+uint64(i), chain)
+			txBuilder := testutil.CreateCounterTransaction(chain.ServiceAddress(), chain.ServiceAddress())
+			err = testutil.SignTransactionAsServiceAccount(txBuilder, 3+uint64(i), chain)
+			require.NoError(t, err)
+			txBody, err := txBuilder.Build()
 			require.NoError(t, err)
 
-			collection := flow.Collection{Transactions: []*flow.TransactionBody{tx}}
+			collection := flow.Collection{Transactions: []*flow.TransactionBody{txBody}}
 			guarantee := unittest.CollectionGuaranteeFixture(unittest.WithCollection(&collection), unittest.WithCollRef(refBlkHeader.ParentID))
 			guarantee.SignerIndices = indices
 			guarantee.ChainID = clusterChainID

@@ -23,7 +23,7 @@ func (suite *Suite) TestTransactionRetry() {
 	block := unittest.BlockFixture(
 		unittest.Block.WithHeight(flow.DefaultTransactionExpiry + 1), // Height needs to be at least DefaultTransactionExpiry before we start doing retries
 	)
-	transactionBody.SetReferenceBlockID(block.ID())
+	transactionBody.ReferenceBlockID = block.ID()
 	headBlock := unittest.BlockFixture(
 		unittest.Block.WithHeight(block.Height - 1), // head is behind the current block
 	)
@@ -81,7 +81,7 @@ func (suite *Suite) TestSuccessfulTransactionsDontRetry() {
 	refBlock := unittest.BlockFixture(
 		unittest.Block.WithHeight(2),
 	)
-	transactionBody.SetReferenceBlockID(refBlock.ID())
+	transactionBody.ReferenceBlockID = refBlock.ID()
 
 	block := unittest.BlockFixture(
 		// Height needs to be at least DefaultTransactionExpiry before we start doing retries
