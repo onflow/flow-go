@@ -406,6 +406,42 @@ func NewDefaultKVStore(finalizationSafetyThreshold, epochExtensionViewCount uint
 	}, nil
 }
 
+// NewKVStore constructs a key-value store for a particular Protocol State version for bootstrapping.
+func NewKVStore(
+	version uint64,
+	finalizationSafetyThreshold, epochExtensionViewCount uint64,
+	epochStateID flow.Identifier,
+) (protocol_state.KVStoreAPI, error) {
+	modelv0, err := newKVStoreV0(finalizationSafetyThreshold, epochExtensionViewCount, epochStateID)
+	if err != nil {
+		return nil, fmt.Errorf("could not construct v0 kvstore: %w", err)
+	}
+
+	switch version {
+	case 0:
+		return modelv0, nil
+	case 1:
+		return &Modelv1{Modelv0: *modelv0}, nil
+	case 2:
+		return &Modelv2{Modelv1: Modelv1{Modelv0: *modelv0}}, nil
+	case 3:
+		return &Modelv3{
+			Modelv2: Modelv2{Modelv1: Modelv1{Modelv0: *modelv0}},
+			CadenceComponentVersion: protocol.UpdatableField[protocol.MagnitudeVersion]{
+				CurrentValue: protocol.MagnitudeVersion{Major: 0, Minor: 0},
+			},
+			ExecutionComponentVersion: protocol.UpdatableField[protocol.MagnitudeVersion]{
+				CurrentValue: protocol.MagnitudeVersion{Major: 0, Minor: 0},
+			},
+			ExecutionMeteringParameters: protocol.UpdatableField[protocol.ExecutionMeteringParameters]{
+				CurrentValue: protocol.DefaultExecutionMeteringParameters(),
+			},
+		}, nil
+	default:
+		return nil, fmt.Errorf("unsupported protocol state version: %d", version)
+	}
+}
+
 // NewKVStoreV0 constructs a KVStore using the v0 model. This is used to test
 // version upgrades, from v0 to v1.
 func newKVStoreV0(finalizationSafetyThreshold, epochExtensionViewCount uint64, epochStateID flow.Identifier) (*Modelv0, error) {
