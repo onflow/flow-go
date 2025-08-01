@@ -1013,12 +1013,16 @@ func (b *Blockchain) systemChunkTransaction() (*flowgo.TransactionBody, error) {
 		),
 	)
 
-	tx := flowgo.NewTransactionBody().
+	tx, err := flowgo.NewTransactionBodyBuilder().
 		SetScript([]byte(script)).
 		SetComputeLimit(flowgo.DefaultMaxTransactionGasLimit).
 		AddAuthorizer(serviceAddress).
 		SetPayer(serviceAddress).
-		SetReferenceBlockID(b.pendingBlock.parentID)
+		SetReferenceBlockID(b.pendingBlock.parentID).
+		Build()
+	if err != nil {
+		return nil, fmt.Errorf("failed to build transaction body: %w", err)
+	}
 
 	return tx, nil
 }

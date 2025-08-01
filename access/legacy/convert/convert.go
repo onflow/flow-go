@@ -17,60 +17,64 @@ import (
 var ErrEmptyMessage = errors.New("protobuf message is empty")
 
 func MessageToTransaction(m *entitiesproto.Transaction, chain flow.Chain) (flow.TransactionBody, error) {
+	var t flow.TransactionBody
 	if m == nil {
-		return flow.TransactionBody{}, ErrEmptyMessage
+		return t, ErrEmptyMessage
 	}
 
-	t := flow.NewTransactionBody()
-
+	tb := flow.NewTransactionBodyBuilder()
 	proposalKey := m.GetProposalKey()
 	if proposalKey != nil {
 		proposalAddress, err := convert.Address(proposalKey.GetAddress(), chain)
 		if err != nil {
-			return *t, err
+			return t, err
 		}
-		t.SetProposalKey(proposalAddress, proposalKey.GetKeyId(), proposalKey.GetSequenceNumber())
+		tb.SetProposalKey(proposalAddress, proposalKey.GetKeyId(), proposalKey.GetSequenceNumber())
 	}
 
 	payer := m.GetPayer()
 	if payer != nil {
 		payerAddress, err := convert.Address(payer, chain)
 		if err != nil {
-			return *t, err
+			return t, err
 		}
-		t.SetPayer(payerAddress)
+		tb.SetPayer(payerAddress)
 	}
 
 	for _, authorizer := range m.GetAuthorizers() {
 		authorizerAddress, err := convert.Address(authorizer, chain)
 		if err != nil {
-			return *t, err
+			return t, err
 		}
-		t.AddAuthorizer(authorizerAddress)
+		tb.AddAuthorizer(authorizerAddress)
 	}
 
 	for _, sig := range m.GetPayloadSignatures() {
 		addr, err := convert.Address(sig.GetAddress(), chain)
 		if err != nil {
-			return *t, err
+			return t, err
 		}
-		t.AddPayloadSignature(addr, sig.GetKeyId(), sig.GetSignature())
+		tb.AddPayloadSignature(addr, sig.GetKeyId(), sig.GetSignature())
 	}
 
 	for _, sig := range m.GetEnvelopeSignatures() {
 		addr, err := convert.Address(sig.GetAddress(), chain)
 		if err != nil {
-			return *t, err
+			return t, err
 		}
-		t.AddEnvelopeSignature(addr, sig.GetKeyId(), sig.GetSignature())
+		tb.AddEnvelopeSignature(addr, sig.GetKeyId(), sig.GetSignature())
 	}
 
-	t.SetScript(m.GetScript())
-	t.SetArguments(m.GetArguments())
-	t.SetReferenceBlockID(flow.HashToID(m.GetReferenceBlockId()))
-	t.SetComputeLimit(m.GetGasLimit())
+	transactionBody, err := tb.SetScript(m.GetScript()).
+		SetArguments(m.GetArguments()).
+		SetReferenceBlockID(flow.HashToID(m.GetReferenceBlockId())).
+		SetComputeLimit(m.GetGasLimit()).
+		Build()
+	if err != nil {
+		return t, fmt.Errorf("could not build transaction body: %w", err)
+	}
 
-	return *t, nil
+	return *transactionBody, nil
 }
 
 func TransactionToMessage(tb flow.TransactionBody) *entitiesproto.Transaction {

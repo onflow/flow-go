@@ -243,6 +243,7 @@ func (suite *RestAPITestSuite) TestGetBlock() {
 		)
 		suite.blocks.On("ByID", block.ID()).Return(block, nil)
 		suite.blocks.On("ByHeight", block.Height).Return(block, nil)
+		suite.headers.On("BlockIDByHeight", block.Height).Return(block.ID(), nil)
 		testBlocks[i] = block
 		testBlockIDs[i] = block.ID().String()
 

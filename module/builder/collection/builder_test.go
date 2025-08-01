@@ -36,7 +36,7 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-var noopSigner = func(*flow.Header) ([]byte, error) { return nil, nil }
+var signer = func(*flow.Header) ([]byte, error) { return unittest.SignatureFixture(), nil }
 var setter = func(h *flow.HeaderBodyBuilder) error {
 	h.WithHeight(42).
 		WithChainID(flow.Emulator).
@@ -244,14 +244,14 @@ func (suite *BuilderSuite) TestBuildOn_NonExistentParent() {
 	// use a non-existent parent ID
 	parentID := unittest.IdentifierFixture()
 
-	_, err := suite.builder.BuildOn(parentID, setter, noopSigner)
+	_, err := suite.builder.BuildOn(parentID, setter, signer)
 	suite.Assert().Error(err)
 }
 
 func (suite *BuilderSuite) TestBuildOn_Success() {
 	var expectedHeight uint64 = 42
 
-	proposal, err := suite.builder.BuildOn(suite.genesis.ID(), setter, noopSigner)
+	proposal, err := suite.builder.BuildOn(suite.genesis.ID(), setter, signer)
 	suite.Require().NoError(err)
 
 	// setter should have been run
@@ -281,7 +281,7 @@ func (suite *BuilderSuite) TestBuildOn_SetterErrorPassthrough() {
 	setter := func(h *flow.HeaderBodyBuilder) error {
 		return sentinel
 	}
-	_, err := suite.builder.BuildOn(suite.genesis.ID(), setter, noopSigner)
+	_, err := suite.builder.BuildOn(suite.genesis.ID(), setter, signer)
 	suite.Assert().ErrorIs(err, sentinel)
 }
 
@@ -317,7 +317,7 @@ func (suite *BuilderSuite) TestBuildOn_WithUnknownReferenceBlock() {
 	unknownReferenceTx.ReferenceBlockID = unittest.IdentifierFixture()
 	suite.pool.Add(unknownReferenceTx.ID(), &unknownReferenceTx)
 
-	header, err := suite.builder.BuildOn(suite.genesis.ID(), setter, noopSigner)
+	header, err := suite.builder.BuildOn(suite.genesis.ID(), setter, signer)
 	suite.Require().NoError(err)
 
 	// should be able to retrieve built block from storage
@@ -358,7 +358,7 @@ func (suite *BuilderSuite) TestBuildOn_WithUnfinalizedReferenceBlock() {
 	unfinalizedReferenceTx.ReferenceBlockID = unfinalizedReferenceBlock.ID()
 	suite.pool.Add(unfinalizedReferenceTx.ID(), &unfinalizedReferenceTx)
 
-	header, err := suite.builder.BuildOn(suite.genesis.ID(), setter, noopSigner)
+	header, err := suite.builder.BuildOn(suite.genesis.ID(), setter, signer)
 	suite.Require().NoError(err)
 
 	// should be able to retrieve built block from storage
@@ -409,7 +409,7 @@ func (suite *BuilderSuite) TestBuildOn_WithOrphanedReferenceBlock() {
 	orphanedReferenceTx.ReferenceBlockID = orphan.ID()
 	suite.pool.Add(orphanedReferenceTx.ID(), &orphanedReferenceTx)
 
-	header, err := suite.builder.BuildOn(suite.genesis.ID(), setter, noopSigner)
+	header, err := suite.builder.BuildOn(suite.genesis.ID(), setter, signer)
 	suite.Require().NoError(err)
 
 	// should be able to retrieve built block from storage
@@ -452,7 +452,7 @@ func (suite *BuilderSuite) TestBuildOn_WithForks() {
 	suite.InsertBlock(block2)
 
 	// build on top of fork 1
-	header, err := suite.builder.BuildOn(block1.ID(), setter, noopSigner)
+	header, err := suite.builder.BuildOn(block1.ID(), setter, signer)
 	require.NoError(t, err)
 
 	// should be able to retrieve built block from storage
@@ -499,7 +499,7 @@ func (suite *BuilderSuite) TestBuildOn_ConflictingFinalizedBlock() {
 	suite.FinalizeBlock(*finalizedBlock)
 
 	// build on the un-finalized block
-	header, err := suite.builder.BuildOn(unFinalizedBlock.ID(), setter, noopSigner)
+	header, err := suite.builder.BuildOn(unFinalizedBlock.ID(), setter, signer)
 	require.NoError(t, err)
 
 	// retrieve the built block from storage
@@ -549,7 +549,7 @@ func (suite *BuilderSuite) TestBuildOn_ConflictingInvalidatedForks() {
 	suite.FinalizeBlock(*finalizedBlock)
 
 	// build on the finalized block
-	header, err := suite.builder.BuildOn(finalizedBlock.ID(), setter, noopSigner)
+	header, err := suite.builder.BuildOn(finalizedBlock.ID(), setter, signer)
 	require.NoError(t, err)
 
 	// retrieve the built block from storage
@@ -634,7 +634,7 @@ func (suite *BuilderSuite) TestBuildOn_LargeHistory() {
 	t.Log("conflicting: ", len(invalidatedTxIds))
 
 	// build on the head block
-	header, err := suite.builder.BuildOn(head.ID(), setter, noopSigner)
+	header, err := suite.builder.BuildOn(head.ID(), setter, signer)
 	require.NoError(t, err)
 
 	// retrieve the built block from storage
@@ -653,7 +653,7 @@ func (suite *BuilderSuite) TestBuildOn_MaxCollectionSize() {
 	suite.builder, _ = builder.NewBuilder(suite.db, trace.NewNoopTracer(), suite.protoState, suite.state, suite.headers, suite.headers, suite.payloads, suite.pool, unittest.Logger(), suite.epochCounter, builder.WithMaxCollectionSize(1))
 
 	// build a block
-	header, err := suite.builder.BuildOn(suite.genesis.ID(), setter, noopSigner)
+	header, err := suite.builder.BuildOn(suite.genesis.ID(), setter, signer)
 	suite.Require().NoError(err)
 
 	// retrieve the built block from storage
@@ -671,7 +671,7 @@ func (suite *BuilderSuite) TestBuildOn_MaxCollectionByteSize() {
 	suite.builder, _ = builder.NewBuilder(suite.db, trace.NewNoopTracer(), suite.protoState, suite.state, suite.headers, suite.headers, suite.payloads, suite.pool, unittest.Logger(), suite.epochCounter, builder.WithMaxCollectionByteSize(400))
 
 	// build a block
-	header, err := suite.builder.BuildOn(suite.genesis.ID(), setter, noopSigner)
+	header, err := suite.builder.BuildOn(suite.genesis.ID(), setter, signer)
 	suite.Require().NoError(err)
 
 	// retrieve the built block from storage
@@ -689,7 +689,7 @@ func (suite *BuilderSuite) TestBuildOn_MaxCollectionTotalGas() {
 	suite.builder, _ = builder.NewBuilder(suite.db, trace.NewNoopTracer(), suite.protoState, suite.state, suite.headers, suite.headers, suite.payloads, suite.pool, unittest.Logger(), suite.epochCounter, builder.WithMaxCollectionTotalGas(20000))
 
 	// build a block
-	header, err := suite.builder.BuildOn(suite.genesis.ID(), setter, noopSigner)
+	header, err := suite.builder.BuildOn(suite.genesis.ID(), setter, signer)
 	suite.Require().NoError(err)
 
 	// retrieve the built block from storage
@@ -748,7 +748,7 @@ func (suite *BuilderSuite) TestBuildOn_ExpiredTransaction() {
 	suite.T().Log("tx2: ", tx2.ID())
 
 	// build a block
-	header, err := suite.builder.BuildOn(suite.genesis.ID(), setter, noopSigner)
+	header, err := suite.builder.BuildOn(suite.genesis.ID(), setter, signer)
 	suite.Require().NoError(err)
 
 	// retrieve the built block from storage
@@ -770,7 +770,7 @@ func (suite *BuilderSuite) TestBuildOn_EmptyMempool() {
 	suite.pool = herocache.NewTransactions(1000, unittest.Logger(), metrics.NewNoopCollector())
 	suite.builder, _ = builder.NewBuilder(suite.db, trace.NewNoopTracer(), suite.protoState, suite.state, suite.headers, suite.headers, suite.payloads, suite.pool, unittest.Logger(), suite.epochCounter)
 
-	header, err := suite.builder.BuildOn(suite.genesis.ID(), setter, noopSigner)
+	header, err := suite.builder.BuildOn(suite.genesis.ID(), setter, signer)
 	suite.Require().NoError(err)
 
 	var built model.Block
@@ -826,7 +826,7 @@ func (suite *BuilderSuite) TestBuildOn_NoRateLimiting() {
 	}
 
 	for i := 0; i < 10; i++ {
-		header, err := suite.builder.BuildOn(parentID, setter, noopSigner)
+		header, err := suite.builder.BuildOn(parentID, setter, signer)
 		suite.Require().NoError(err)
 		parentID = header.Header.ID()
 
@@ -884,7 +884,7 @@ func (suite *BuilderSuite) TestBuildOn_RateLimitNonPayer() {
 		return nil
 	}
 	for i := 0; i < 10; i++ {
-		header, err := suite.builder.BuildOn(parentID, setter, noopSigner)
+		header, err := suite.builder.BuildOn(parentID, setter, signer)
 		suite.Require().NoError(err)
 		parentID = header.Header.ID()
 
@@ -933,7 +933,7 @@ func (suite *BuilderSuite) TestBuildOn_HighRateLimit() {
 		return nil
 	}
 	for i := 0; i < 10; i++ {
-		header, err := suite.builder.BuildOn(parentID, setter, noopSigner)
+		header, err := suite.builder.BuildOn(parentID, setter, signer)
 		suite.Require().NoError(err)
 		parentID = header.Header.ID()
 
@@ -983,7 +983,7 @@ func (suite *BuilderSuite) TestBuildOn_LowRateLimit() {
 		return nil
 	}
 	for i := 0; i < 10; i++ {
-		header, err := suite.builder.BuildOn(parentID, setter, noopSigner)
+		header, err := suite.builder.BuildOn(parentID, setter, signer)
 		suite.Require().NoError(err)
 		parentID = header.Header.ID()
 
@@ -1035,7 +1035,7 @@ func (suite *BuilderSuite) TestBuildOn_UnlimitedPayer() {
 		return nil
 	}
 	for i := 0; i < 10; i++ {
-		header, err := suite.builder.BuildOn(parentID, setter, noopSigner)
+		header, err := suite.builder.BuildOn(parentID, setter, signer)
 		suite.Require().NoError(err)
 		parentID = header.Header.ID()
 
@@ -1087,7 +1087,7 @@ func (suite *BuilderSuite) TestBuildOn_RateLimitDryRun() {
 		return nil
 	}
 	for i := 0; i < 10; i++ {
-		header, err := suite.builder.BuildOn(parentID, setter, noopSigner)
+		header, err := suite.builder.BuildOn(parentID, setter, signer)
 		suite.Require().NoError(err)
 		parentID = header.Header.ID()
 
@@ -1197,7 +1197,7 @@ func benchmarkBuildOn(b *testing.B, size int) {
 
 	b.StartTimer()
 	for n := 0; n < b.N; n++ {
-		_, err := suite.builder.BuildOn(final.ID(), setter, noopSigner)
+		_, err := suite.builder.BuildOn(final.ID(), setter, signer)
 		assert.NoError(b, err)
 	}
 }

@@ -18,23 +18,23 @@ type API struct {
 }
 
 // GetBlockByHeight provides a mock function with given fields: ctx, height
-func (_m *API) GetBlockByHeight(ctx context.Context, height uint64) (*flow.Block, error) {
+func (_m *API) GetBlockByHeight(ctx context.Context, height uint64) (*flow.GenericBlock[flow.Payload], error) {
 	ret := _m.Called(ctx, height)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetBlockByHeight")
 	}
 
-	var r0 *flow.Block
+	var r0 *flow.GenericBlock[flow.Payload]
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, uint64) (*flow.Block, error)); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, uint64) (*flow.GenericBlock[flow.Payload], error)); ok {
 		return rf(ctx, height)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, uint64) *flow.Block); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, uint64) *flow.GenericBlock[flow.Payload]); ok {
 		r0 = rf(ctx, height)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*flow.Block)
+			r0 = ret.Get(0).(*flow.GenericBlock[flow.Payload])
 		}
 	}
 
@@ -48,23 +48,23 @@ func (_m *API) GetBlockByHeight(ctx context.Context, height uint64) (*flow.Block
 }
 
 // GetBlockByID provides a mock function with given fields: ctx, id
-func (_m *API) GetBlockByID(ctx context.Context, id flow.Identifier) (*flow.Block, error) {
+func (_m *API) GetBlockByID(ctx context.Context, id flow.Identifier) (*flow.GenericBlock[flow.Payload], error) {
 	ret := _m.Called(ctx, id)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetBlockByID")
 	}
 
-	var r0 *flow.Block
+	var r0 *flow.GenericBlock[flow.Payload]
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, flow.Identifier) (*flow.Block, error)); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, flow.Identifier) (*flow.GenericBlock[flow.Payload], error)); ok {
 		return rf(ctx, id)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, flow.Identifier) *flow.Block); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, flow.Identifier) *flow.GenericBlock[flow.Payload]); ok {
 		r0 = rf(ctx, id)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*flow.Block)
+			r0 = ret.Get(0).(*flow.GenericBlock[flow.Payload])
 		}
 	}
 
@@ -138,23 +138,23 @@ func (_m *API) GetBlockHeaderByID(ctx context.Context, id flow.Identifier) (*flo
 }
 
 // GetLatestBlock provides a mock function with given fields: ctx, isSealed
-func (_m *API) GetLatestBlock(ctx context.Context, isSealed bool) (*flow.Block, error) {
+func (_m *API) GetLatestBlock(ctx context.Context, isSealed bool) (*flow.GenericBlock[flow.Payload], error) {
 	ret := _m.Called(ctx, isSealed)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetLatestBlock")
 	}
 
-	var r0 *flow.Block
+	var r0 *flow.GenericBlock[flow.Payload]
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, bool) (*flow.Block, error)); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, bool) (*flow.GenericBlock[flow.Payload], error)); ok {
 		return rf(ctx, isSealed)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, bool) *flow.Block); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, bool) *flow.GenericBlock[flow.Payload]); ok {
 		r0 = rf(ctx, isSealed)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*flow.Block)
+			r0 = ret.Get(0).(*flow.GenericBlock[flow.Payload])
 		}
 	}
 

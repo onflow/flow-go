@@ -155,9 +155,21 @@ func SnapshotFromBootstrapStateWithParams(
 		EpochEntry: richRootEpochState,
 	}
 
+	proposal, err := flow.NewRootProposal(
+		flow.UntrustedProposal{
+			Block:           *root,
+			ProposerSigData: nil,
+		},
+	)
+	if err != nil {
+		return nil, fmt.Errorf("could not construct root proposal: %w", err)
+	}
+
 	snap := SnapshotFromEncodable(EncodableSnapshot{
 		SealingSegment: &flow.SealingSegment{
-			Blocks:           []*flow.Proposal{{Block: *root, ProposerSigData: nil}},
+			Blocks: []*flow.Proposal{
+				proposal,
+			},
 			ExecutionResults: flow.ExecutionResultList{result},
 			LatestSeals:      map[flow.Identifier]flow.Identifier{root.ID(): seal.ID()},
 			ProtocolStateEntries: map[flow.Identifier]*flow.ProtocolStateEntryWrapper{

@@ -155,7 +155,6 @@ generate-fvm-env-wrappers:
 .PHONY: generate-mocks
 generate-mocks: install-mock-generators
 	mockery --name '(Connector|PingInfoProvider)' --dir=network/p2p --case=underscore --output="./network/mocknetwork" --outpkg="mocknetwork"
-	CGO_CFLAGS=$(CRYPTO_FLAG) mockgen -destination=storage/mocks/storage.go -package=mocks github.com/onflow/flow-go/storage Blocks,Headers,Payloads,Collections,Commits,Events,ServiceEvents,TransactionResults
 	CGO_CFLAGS=$(CRYPTO_FLAG) mockgen -destination=network/mocknetwork/mock_network.go -package=mocknetwork github.com/onflow/flow-go/network EngineRegistry
 	mockery --name=ExecutionDataStore --dir=module/executiondatasync/execution_data --case=underscore --output="./module/executiondatasync/execution_data/mock" --outpkg="mock"
 	mockery --name=Downloader --dir=module/executiondatasync/execution_data --case=underscore --output="./module/executiondatasync/execution_data/mock" --outpkg="mock"
@@ -217,7 +216,7 @@ generate-mocks: install-mock-generators
 	mockery --name 'Storage' --dir=module/executiondatasync/tracker --case=underscore --output="module/executiondatasync/tracker/mock" --outpkg="mocktracker"
 	mockery --name 'ScriptExecutor' --dir=module/execution --case=underscore --output="module/execution/mock" --outpkg="mock"
 	mockery --name 'StorageSnapshot' --dir=fvm/storage/snapshot --case=underscore --output="fvm/storage/snapshot/mock" --outpkg="mock"
-	mockery --name 'Core' --dir=module/executiondatasync/optimistic_syncing --case=underscore --output="module/executiondatasync/optimistic_syncing/mock" --outpkg="mock"
+	mockery --name 'Core' --dir=module/executiondatasync/optimistic_sync --case=underscore --output="module/executiondatasync/optimistic_sync/mock" --outpkg="mock"
 	mockery --name 'Requester' --dir=engine/access/ingestion/tx_error_messages --case=underscore --output="engine/access/ingestion/tx_error_messages/mock" --outpkg="mock"
 	mockery --name 'ExecutionDataRequester' --dir=module/state_synchronization/requester --case=underscore --output="module/state_synchronization/requester/mock" --outpkg="mock"
 

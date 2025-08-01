@@ -13,7 +13,6 @@ import (
 )
 
 func TestTransaction_SignatureOrdering(t *testing.T) {
-	tx := flow.NewTransactionBody()
 
 	proposerAddress := unittest.RandomAddressFixture()
 	proposerKeyIndex := uint32(1)
@@ -28,14 +27,16 @@ func TestTransaction_SignatureOrdering(t *testing.T) {
 	payerKeyIndex := uint32(0)
 	payerSignature := []byte{7, 8, 9}
 
-	tx.SetProposalKey(proposerAddress, proposerKeyIndex, proposerSequenceNumber)
-	tx.AddPayloadSignature(proposerAddress, proposerKeyIndex, proposerSignature)
-
-	tx.SetPayer(payerAddress)
-	tx.AddEnvelopeSignature(payerAddress, payerKeyIndex, payerSignature)
-
-	tx.AddAuthorizer(authorizerAddress)
-	tx.AddPayloadSignature(authorizerAddress, authorizerKeyIndex, authorizerSignature)
+	tx, err := flow.NewTransactionBodyBuilder().
+		SetScript([]byte(`transaction(){}`)).
+		SetProposalKey(proposerAddress, proposerKeyIndex, proposerSequenceNumber).
+		AddPayloadSignature(proposerAddress, proposerKeyIndex, proposerSignature).
+		SetPayer(payerAddress).
+		AddEnvelopeSignature(payerAddress, payerKeyIndex, payerSignature).
+		AddAuthorizer(authorizerAddress).
+		AddPayloadSignature(authorizerAddress, authorizerKeyIndex, authorizerSignature).
+		Build()
+	require.NoError(t, err)
 
 	require.Len(t, tx.PayloadSignatures, 2)
 
@@ -79,4 +80,49 @@ func TestTransactionBody_Fingerprint(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, fp1, fp2)
 	assert.Equal(t, fp2, fp3)
+}
+
+// TestNewTransactionBody verifies that NewTransactionBody constructs a valid TransactionBody
+// when given all required fields, and returns an error if any mandatory field is missing.
+//
+// Test Cases:
+//
+// 1. Valid input:
+//   - Payer is non-empty and Script is non-empty.
+//   - Ensures a TransactionBody is returned with all fields populated correctly.
+//
+// 2. Empty Script:
+//   - Script slice is empty.
+//   - Ensures an error is returned mentioning "Script must not be empty".
+func TestNewTransactionBody(t *testing.T) {
+	t.Run("valid input", func(t *testing.T) {
+		utb := UntrustedTransactionBodyFixture()
+
+		tb, err := flow.NewTransactionBody(utb)
+		assert.NoError(t, err)
+		assert.NotNil(t, tb)
+
+		assert.Equal(t, flow.TransactionBody(utb), *tb)
+	})
+
+	t.Run("empty Script", func(t *testing.T) {
+		utb := UntrustedTransactionBodyFixture(func(u *flow.UntrustedTransactionBody) {
+			u.Script = []byte{}
+		})
+
+		tb, err := flow.NewTransactionBody(utb)
+		assert.Error(t, err)
+		assert.Nil(t, tb)
+		assert.Contains(t, err.Error(), "Script must not be empty")
+	})
+}
+
+// UntrustedTransactionBodyFixture returns an UntrustedTransactionBody
+// pre‐populated with sane defaults. Any opts override those defaults.
+func UntrustedTransactionBodyFixture(opts ...func(*flow.UntrustedTransactionBody)) flow.UntrustedTransactionBody {
+	u := flow.UntrustedTransactionBody(unittest.TransactionBodyFixture())
+	for _, opt := range opts {
+		opt(&u)
+	}
+	return u
 }

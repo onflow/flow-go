@@ -11,7 +11,6 @@ import (
 	"github.com/onflow/flow-go/engine/common/fifoqueue"
 	"github.com/onflow/flow-go/engine/consensus"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/compliance"
 	"github.com/onflow/flow-go/module/component"
@@ -20,6 +19,7 @@ import (
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/storage"
+	"github.com/onflow/flow-go/utils/logging"
 )
 
 type EngineOption func(*ComplianceEngine)
@@ -174,10 +174,10 @@ func NewComplianceLayer(
 	return e, nil
 }
 
-// OnBlockProposal queues *untrusted* proposals for further processing and notifies the Engine's
+// OnBlockProposal queues structurally validated proposals for further processing and notifies the Engine's
 // internal workers. This method is intended for fresh proposals received directly from leaders.
 // It can ingest synced blocks as well, but is less performant compared to method `OnSyncedBlocks`.
-func (e *ComplianceEngine) OnBlockProposal(proposal flow.Slashable[*messages.UntrustedProposal]) {
+func (e *ComplianceEngine) OnBlockProposal(proposal flow.Slashable[*flow.Proposal]) {
 	e.engMetrics.MessageReceived(metrics.EngineFollower, metrics.MessageBlockProposal)
 	// queue proposal
 	if e.pendingProposals.Push(proposal) {
@@ -185,11 +185,11 @@ func (e *ComplianceEngine) OnBlockProposal(proposal flow.Slashable[*messages.Unt
 	}
 }
 
-// OnSyncedBlocks is an optimized consumer for *untrusted* synced blocks. It is specifically
+// OnSyncedBlocks is an optimized consumer for structurally validated synced blocks. It is specifically
 // efficient for batches of continuously connected blocks (honest nodes supply finalized blocks
 // in suitable sequences where possible). Nevertheless, the method tolerates blocks in arbitrary
 // order (less efficient), making it robust against byzantine nodes.
-func (e *ComplianceEngine) OnSyncedBlocks(blocks flow.Slashable[[]*messages.UntrustedProposal]) {
+func (e *ComplianceEngine) OnSyncedBlocks(blocks flow.Slashable[[]*flow.Proposal]) {
 	e.engMetrics.MessageReceived(metrics.EngineFollower, metrics.MessageSyncedBlocks)
 	// The synchronization engine feeds the follower with batches of blocks. The field `Slashable.OriginID`
 	// states which node forwarded the batch to us. Each block contains its proposer and signature.
@@ -216,12 +216,32 @@ func (e *ComplianceEngine) OnFinalizedBlock(block *model.Block) {
 // a blocking manner. It returns the potential processing error when done.
 // This method is intended to be used as a callback by the networking layer,
 // notifying us about fresh proposals directly from the consensus leaders.
+//
+// TODO(BFT, #7620): This function should not return an error. The networking layer's responsibility is fulfilled
+// once it delivers a message to an engine. It does not possess the context required to handle
+// errors that may arise during an engine's processing of the message, as error handling for
+// message processing falls outside the domain of the networking layer.
+//
+// Some of the current error returns signal Byzantine behavior, such as forged or malformed
+// messages. These cases must be logged and routed to a dedicated violation reporting consumer.
 func (e *ComplianceEngine) Process(channel channels.Channel, originID flow.Identifier, message interface{}) error {
 	switch msg := message.(type) {
-	case *messages.UntrustedProposal:
-		e.OnBlockProposal(flow.Slashable[*messages.UntrustedProposal]{
+	case *flow.UntrustedProposal:
+		proposal, err := flow.NewProposal(*msg)
+		if err != nil {
+			// TODO(BFT, #7620): Replace this log statement with a call to the protocol violation consumer.
+			e.log.Warn().
+				Hex("origin_id", originID[:]).
+				Hex("block_id", logging.ID(msg.Block.ID())).
+				Uint64("block_height", msg.Block.Height).
+				Uint64("block_view", msg.Block.View).
+				Err(err).Msgf("received invalid proposal message")
+			return nil
+		}
+
+		e.OnBlockProposal(flow.Slashable[*flow.Proposal]{
 			OriginID: originID,
-			Message:  msg,
+			Message:  proposal,
 		})
 	default:
 		e.log.Warn().Msgf("%v delivered unsupported message %T through %v", originID, message, channel)
@@ -275,19 +295,16 @@ func (e *ComplianceEngine) processQueuedBlocks(doneSignal <-chan struct{}) error
 		// Priority 1: ingest fresh proposals
 		msg, ok := e.pendingProposals.Pop()
 		if ok {
-			proposalMsg := msg.(flow.Slashable[*messages.UntrustedProposal])
-			proposal, err := proposalMsg.Message.DeclareStructurallyValid()
-			if err != nil {
-				return fmt.Errorf("could not convert proposal: %w", err)
-			}
+			proposal := msg.(flow.Slashable[*flow.Proposal])
+			proposalMsg := proposal.Message
 			log := e.log.With().
-				Hex("origin_id", proposalMsg.OriginID[:]).
-				Str("chain_id", proposal.Block.ChainID.String()).
-				Uint64("view", proposal.Block.View).
-				Uint64("height", proposal.Block.Height).
+				Hex("origin_id", proposal.OriginID[:]).
+				Str("chain_id", proposalMsg.Block.ChainID.String()).
+				Uint64("view", proposalMsg.Block.View).
+				Uint64("height", proposalMsg.Block.Height).
 				Logger()
 			latestFinalizedView := e.finalizedBlockTracker.NewestBlock().View
-			e.submitConnectedBatch(log, latestFinalizedView, proposalMsg.OriginID, []*flow.Proposal{proposal})
+			e.submitConnectedBatch(log, latestFinalizedView, proposal.OriginID, []*flow.Proposal{proposalMsg})
 			e.engMetrics.MessageHandled(metrics.EngineFollower, metrics.MessageBlockProposal)
 			continue
 		}
@@ -300,22 +317,15 @@ func (e *ComplianceEngine) processQueuedBlocks(doneSignal <-chan struct{}) error
 			return nil
 		}
 
-		batch := msg.(flow.Slashable[[]*messages.UntrustedProposal])
+		batch := msg.(flow.Slashable[[]*flow.Proposal])
 		if len(batch.Message) < 1 {
 			continue
 		}
-		blocks := make([]*flow.Proposal, 0, len(batch.Message))
-		for _, block := range batch.Message {
-			block, err := block.DeclareStructurallyValid()
-			if err != nil {
-				return fmt.Errorf("could not convert proposal: %w", err)
-			}
-			blocks = append(blocks, block)
+		proposals := make([]*flow.Proposal, 0, len(batch.Message))
+		proposals = append(proposals, batch.Message...)
 
-		}
-
-		firstBlock := blocks[0].Block
-		lastBlock := blocks[len(blocks)-1].Block
+		firstBlock := proposals[0].Block
+		lastBlock := proposals[len(proposals)-1].Block
 		log := e.log.With().
 			Hex("origin_id", batch.OriginID[:]).
 			Str("chain_id", lastBlock.ChainID.String()).
@@ -323,22 +333,22 @@ func (e *ComplianceEngine) processQueuedBlocks(doneSignal <-chan struct{}) error
 			Uint64("first_block_view", firstBlock.View).
 			Uint64("last_block_height", lastBlock.Height).
 			Uint64("last_block_view", lastBlock.View).
-			Int("range_length", len(blocks)).
+			Int("range_length", len(proposals)).
 			Logger()
 
 		// extract sequences of connected blocks and schedule them for further processing
 		// we assume the sender has already ordered blocks into connected ranges if possible
 		latestFinalizedView := e.finalizedBlockTracker.NewestBlock().View
-		parentID := blocks[0].Block.ID()
+		parentID := proposals[0].Block.ID()
 		indexOfLastConnected := 0
-		for i, block := range blocks {
+		for i, block := range proposals {
 			if block.Block.ParentID != parentID {
-				e.submitConnectedBatch(log, latestFinalizedView, batch.OriginID, blocks[indexOfLastConnected:i])
+				e.submitConnectedBatch(log, latestFinalizedView, batch.OriginID, proposals[indexOfLastConnected:i])
 				indexOfLastConnected = i
 			}
 			parentID = block.Block.ID()
 		}
-		e.submitConnectedBatch(log, latestFinalizedView, batch.OriginID, blocks[indexOfLastConnected:])
+		e.submitConnectedBatch(log, latestFinalizedView, batch.OriginID, proposals[indexOfLastConnected:])
 		e.engMetrics.MessageHandled(metrics.EngineFollower, metrics.MessageSyncedBlocks)
 	}
 }

@@ -168,8 +168,6 @@ func (suite *Suite) TestGetLatestFinalizedBlockHeader() {
 	block := unittest.BlockHeaderFixture()
 	suite.state.On("Final").Return(suite.snapshot, nil).Maybe()
 	suite.snapshot.On("Head").Return(block, nil).Once()
-	suite.state.On("Sealed").Return(suite.snapshot, nil)
-	suite.snapshot.On("Head").Return(block, nil).Once()
 
 	params := suite.defaultBackendParams()
 
@@ -184,7 +182,7 @@ func (suite *Suite) TestGetLatestFinalizedBlockHeader() {
 	suite.Require().Equal(block.ID(), header.ID())
 	suite.Require().Equal(block.Height, header.Height)
 	suite.Require().Equal(block.ParentID, header.ParentID)
-	suite.Require().Equal(stat, flow.BlockStatusSealed)
+	suite.Require().Equal(stat, flow.BlockStatusFinalized)
 
 	suite.assertAllExpectations()
 }
@@ -827,7 +825,6 @@ func (suite *Suite) TestGetLatestSealedBlockHeader() {
 	suite.Run("GetLatestSealedBlockHeader - happy path", func() {
 		block := unittest.BlockHeaderFixture()
 		suite.snapshot.On("Head").Return(block, nil).Once()
-		suite.snapshot.On("Head").Return(block, nil).Once()
 
 		// query the handler for the latest sealed block
 		header, stat, err := backend.GetLatestBlockHeader(context.Background(), true)
@@ -1168,7 +1165,7 @@ func (suite *Suite) TestTransactionExpiredStatusTransition() {
 	block := unittest.BlockFixture(
 		unittest.Block.WithHeight(2),
 	)
-	transactionBody.SetReferenceBlockID(block.ID())
+	transactionBody.ReferenceBlockID = block.ID()
 
 	headBlock := unittest.BlockFixture(
 		unittest.Block.WithHeight(block.Height - 1), // head is behind the current block
@@ -1280,7 +1277,7 @@ func (suite *Suite) TestTransactionPendingToFinalizedStatusTransition() {
 		unittest.Block.WithHeight(2),
 	)
 	refBlockID := refBlock.ID()
-	transactionBody.SetReferenceBlockID(refBlockID)
+	transactionBody.ReferenceBlockID = refBlockID
 	txID := transactionBody.ID()
 
 	headBlock := unittest.BlockFixture(
@@ -1427,14 +1424,6 @@ func (suite *Suite) TestGetLatestFinalizedBlock() {
 		suite.snapshot.
 			On("Head").
 			Return(header, nil).Once()
-
-		headerClone := *header
-		headerClone.Height = 0
-
-		suite.snapshot.
-			On("Head").
-			Return(&headerClone, nil).
-			Once()
 
 		suite.blocks.
 			On("ByHeight", header.Height).
@@ -1763,7 +1752,7 @@ func (suite *Suite) TestGetTransactionResultEventEncodingVersion() {
 	refBlock := unittest.BlockFixture(
 		unittest.Block.WithHeight(2),
 	)
-	transactionBody.SetReferenceBlockID(refBlock.ID())
+	transactionBody.ReferenceBlockID = refBlock.ID()
 	txId := transactionBody.ID()
 
 	// transaction storage returns the corresponding transaction

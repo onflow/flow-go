@@ -223,7 +223,7 @@ func (s *Snapshot) SealingSegment() (*flow.SealingSegment, error) {
 		blockID := header.ID()
 		block, err := s.state.blocks.ProposalByID(blockID)
 		if err != nil {
-			return fmt.Errorf("could not get block: %w", err)
+			return fmt.Errorf("could not get proposal: %w", err)
 		}
 
 		err = builder.AddBlock(block)

@@ -5,14 +5,24 @@ import (
 	"time"
 )
 
-// Block includes both the block header metadata and the payload content.
+// HashablePayload is a temporary interface used to generalize the payload type of GenericBlock.
+// It defines the minimal interface required for a payload to participate in block hashing.
+//
+// TODO(malleability, #7164): remove this interface after renaming IDEntity's method `ID` to `Hash`,
+// and replace all usages of HashablePayload with IDEntity.
+type HashablePayload interface {
+	Hash() Identifier
+}
+
+// GenericBlock represents a generic Flow block structure parameterized by a payload type.
+// It includes both the block header metadata and the block payload.
 //
 // Zero values for certain HeaderBody fields are allowed only for root blocks, which must be constructed
 // using the NewRootBlock constructor. All non-root blocks must be constructed
 // using NewBlock to ensure validation of the block fields.
 //
 //structwrite:immutable - mutations allowed only within the constructor
-type Block struct {
+type GenericBlock[T HashablePayload] struct {
 	// HeaderBody is a container encapsulating most of the header fields - *excluding* the payload hash
 	// and the proposer signature. Generally, the type [HeaderBody] should not be used on its own.
 	// CAUTION regarding security:
@@ -22,8 +32,48 @@ type Block struct {
 	//  * With a byzantine HeaderBody alone, an honest node cannot prove who created that faulty data structure,
 	//    because HeaderBody does not include the proposer's signature.
 	HeaderBody
-	Payload Payload
+	Payload T
 }
+
+// ID returns a collision-resistant hash of the Block struct.
+func (b *GenericBlock[T]) ID() Identifier {
+	return b.ToHeader().ID()
+}
+
+// ToHeader converts the block into a compact [flow.Header] representation,
+// where the payload is compressed to a hash reference.
+// The receiver Block must be well-formed (enforced by mutation protection on the type).
+// This function may panic if invoked on a malformed Block.
+func (b *GenericBlock[T]) ToHeader() *Header {
+	if !b.ContainsParentQC() {
+		rootHeader, err := NewRootHeader(UntrustedHeader{
+			HeaderBody:  b.HeaderBody,
+			PayloadHash: b.Payload.Hash(),
+		})
+		if err != nil {
+			panic(fmt.Errorf("could not build root header from block: %w", err))
+		}
+		return rootHeader
+	}
+
+	header, err := NewHeader(UntrustedHeader{
+		HeaderBody:  b.HeaderBody,
+		PayloadHash: b.Payload.Hash(),
+	})
+	if err != nil {
+		panic(fmt.Errorf("could not build header from block: %w", err))
+	}
+	return header
+}
+
+// Block is the canonical instantiation of GenericBlock using flow.Payload as the payload type.
+//
+// Zero values for certain HeaderBody fields are allowed only for root blocks, which must be constructed
+// using the NewRootBlock constructor. All non-root blocks must be constructed
+// using NewBlock to ensure validation of the block fields.
+//
+//structwrite:immutable - mutations allowed only within the constructor
+type Block = GenericBlock[Payload]
 
 // UntrustedBlock is an untrusted input-only representation of a Block,
 // used for construction.
@@ -82,37 +132,6 @@ func NewRootBlock(untrusted UntrustedBlock) (*Block, error) {
 	}, nil
 }
 
-// ID returns a collision-resistant hash of the Block struct.
-func (b Block) ID() Identifier {
-	return b.ToHeader().ID()
-}
-
-// ToHeader converts the block into a compact [flow.Header] representation,
-// where the payload is compressed to a hash reference.
-// The receiver Block must be well-formed (enforced by mutation protection on the type).
-// This function may panic if invoked on a malformed Block.
-func (b Block) ToHeader() *Header {
-	if !b.ContainsParentQC() {
-		rootHeader, err := NewRootHeader(UntrustedHeader{
-			HeaderBody:  b.HeaderBody,
-			PayloadHash: b.Payload.Hash(),
-		})
-		if err != nil {
-			panic(fmt.Errorf("could not build root header from block: %w", err))
-		}
-		return rootHeader
-	}
-
-	header, err := NewHeader(UntrustedHeader{
-		HeaderBody:  b.HeaderBody,
-		PayloadHash: b.Payload.Hash(),
-	})
-	if err != nil {
-		panic(fmt.Errorf("could not build header from block: %w", err))
-	}
-	return header
-}
-
 // BlockStatus represents the status of a block.
 type BlockStatus int
 
@@ -131,9 +150,61 @@ func (s BlockStatus) String() string {
 }
 
 // Proposal is a signed proposal that includes the block payload, in addition to the required header and signature.
+//
+//structwrite:immutable - mutations allowed only within the constructor
 type Proposal struct {
 	Block           Block
 	ProposerSigData []byte
+}
+
+// UntrustedProposal is an untrusted input-only representation of a Proposal,
+// used for construction.
+//
+// This type exists to ensure that constructor functions are invoked explicitly
+// with named fields, which improves clarity and reduces the risk of incorrect field
+// ordering during construction.
+//
+// An instance of UntrustedProposal should be validated and converted into
+// a trusted Proposal using the NewProposal constructor (or NewRootProposal
+// for the root proposal).
+type UntrustedProposal Proposal
+
+// NewProposal creates a new Proposal.
+// This constructor enforces validation rules to ensure the Proposal is well-formed.
+// It must be used to construct all non-root proposal.
+//
+// All errors indicate that a valid Proposal cannot be constructed from the input.
+func NewProposal(untrusted UntrustedProposal) (*Proposal, error) {
+	block, err := NewBlock(UntrustedBlock(untrusted.Block))
+	if err != nil {
+		return nil, fmt.Errorf("invalid block: %w", err)
+	}
+	if len(untrusted.ProposerSigData) == 0 {
+		return nil, fmt.Errorf("proposer signature must not be empty")
+	}
+
+	return &Proposal{
+		Block:           *block,
+		ProposerSigData: untrusted.ProposerSigData,
+	}, nil
+}
+
+// NewRootProposal creates a root proposal.
+// This constructor must be used **only** for constructing the root proposal,
+// which is the only case where zero values are allowed.
+func NewRootProposal(untrusted UntrustedProposal) (*Proposal, error) {
+	block, err := NewRootBlock(UntrustedBlock(untrusted.Block))
+	if err != nil {
+		return nil, fmt.Errorf("invalid root block: %w", err)
+	}
+	if len(untrusted.ProposerSigData) > 0 {
+		return nil, fmt.Errorf("proposer signature must be empty")
+	}
+
+	return &Proposal{
+		Block:           *block,
+		ProposerSigData: untrusted.ProposerSigData,
+	}, nil
 }
 
 // ProposalHeader converts the proposal into a compact [ProposalHeader] representation,

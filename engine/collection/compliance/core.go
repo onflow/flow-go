@@ -12,7 +12,6 @@ import (
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/cluster"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/compliance"
 	"github.com/onflow/flow-go/module/counters"
@@ -104,21 +103,12 @@ func NewCore(
 
 // OnBlockProposal handles incoming block proposals.
 // No errors are expected during normal operation.
-func (c *Core) OnBlockProposal(proposalMsg flow.Slashable[*messages.UntrustedClusterProposal]) error {
+func (c *Core) OnBlockProposal(proposal flow.Slashable[*cluster.Proposal]) error {
 	startTime := time.Now()
 	defer func() {
 		c.hotstuffMetrics.BlockProcessingDuration(time.Since(startTime))
 	}()
 
-	trustedBlockProposal, err := proposalMsg.Message.DeclareStructurallyValid()
-	if err != nil {
-		return fmt.Errorf("could not convert to cluster block proposal: %w", err)
-	}
-
-	proposal := flow.Slashable[*cluster.Proposal]{
-		OriginID: proposalMsg.OriginID,
-		Message:  trustedBlockProposal,
-	}
 	block := proposal.Message.Block
 	payload := proposal.Message.Block.Payload
 	blockID := proposal.Message.Block.ID()
@@ -179,7 +169,7 @@ func (c *Core) OnBlockProposal(proposalMsg flow.Slashable[*messages.UntrustedClu
 	}
 
 	// ignore proposals that were already processed
-	_, err = c.headers.ByBlockID(blockID)
+	_, err := c.headers.ByBlockID(blockID)
 	if err == nil {
 		log.Debug().Msg("skipping already processed proposal")
 		return nil

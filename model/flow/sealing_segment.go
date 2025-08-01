@@ -1,6 +1,7 @@
 package flow
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 
@@ -294,12 +295,6 @@ func (builder *SealingSegmentBuilder) AddBlock(block *Proposal) error {
 	}
 	blockID := block.Block.ID()
 
-	// a block might contain receipts or seals that refer to results that are included in blocks
-	// whose height is below the first block of the segment.
-	// In order to include those missing results into the segment, we construct a list of those
-	// missing result IDs referenced by this block
-	missingResultIDs := make(map[Identifier]struct{})
-
 	// for the first (lowest) block, if it contains no seal, store the latest
 	// seal incorporated prior to the first block
 	if len(builder.blocks) == 0 {
@@ -309,8 +304,6 @@ func (builder *SealingSegmentBuilder) AddBlock(block *Proposal) error {
 				return fmt.Errorf("could not look up seal: %w", err)
 			}
 			builder.firstSeal = seal
-			// add first seal result ID here, since it isn't in payload
-			missingResultIDs[seal.ResultID] = struct{}{}
 		}
 	}
 
@@ -325,28 +318,6 @@ func (builder *SealingSegmentBuilder) AddBlock(block *Proposal) error {
 	// they could be referenced in a future block in the segment
 	for _, result := range block.Block.Payload.Results {
 		builder.includedResults[result.ID()] = struct{}{}
-	}
-
-	for _, receipt := range block.Block.Payload.Receipts {
-		if _, ok := builder.includedResults[receipt.ResultID]; !ok {
-			missingResultIDs[receipt.ResultID] = struct{}{}
-		}
-	}
-	for _, seal := range block.Block.Payload.Seals {
-		if _, ok := builder.includedResults[seal.ResultID]; !ok {
-			missingResultIDs[seal.ResultID] = struct{}{}
-		}
-	}
-
-	// add the missing results
-	for resultID := range missingResultIDs {
-		result, err := builder.resultLookup(resultID)
-
-		if err != nil {
-			return fmt.Errorf("could not look up result with id=%x: %w", resultID, err)
-		}
-		builder.addExecutionResult(result)
-		builder.includedResults[resultID] = struct{}{}
 	}
 
 	// if the block commits to an unseen ProtocolStateID, add the corresponding data entry
@@ -408,6 +379,7 @@ func (builder *SealingSegmentBuilder) AddExtraBlock(block *Proposal) error {
 // AddExecutionResult adds result to executionResults
 func (builder *SealingSegmentBuilder) addExecutionResult(result *ExecutionResult) {
 	builder.results = append(builder.results, result)
+	builder.includedResults[result.ID()] = struct{}{}
 }
 
 // SealingSegment completes building the sealing segment, validating the segment
@@ -416,6 +388,53 @@ func (builder *SealingSegmentBuilder) addExecutionResult(result *ExecutionResult
 // Errors expected during normal operation:
 //   - InvalidSealingSegmentError if the added block would cause an invalid resulting segment
 func (builder *SealingSegmentBuilder) SealingSegment() (*SealingSegment, error) {
+
+	// at this point, go through all blocks and store any results which are referenced
+	// by blocks in the segment, but not contained within any blocks in the segment
+	missingExecutionResultMap := make(map[Identifier]struct{})
+
+	if builder.firstSeal != nil {
+		_, ok := builder.includedResults[builder.firstSeal.ResultID]
+		if !ok {
+			missingExecutionResultMap[builder.firstSeal.ResultID] = struct{}{}
+		}
+	}
+
+	for _, block := range append(builder.extraBlocks, builder.blocks...) {
+		for _, receipt := range block.Block.Payload.Receipts {
+			_, included := builder.includedResults[receipt.ResultID]
+			if included {
+				continue
+			}
+			missingExecutionResultMap[receipt.ResultID] = struct{}{}
+		}
+		for _, seal := range block.Block.Payload.Seals {
+			_, included := builder.includedResults[seal.ResultID]
+			if included {
+				continue
+			}
+			missingExecutionResultMap[seal.ResultID] = struct{}{}
+		}
+	}
+
+	// sort execution results to canonical order for consistent serialization
+	missingExecutionResults := make([]Identifier, 0, len(missingExecutionResultMap))
+	for resultID := range missingExecutionResultMap {
+		missingExecutionResults = append(missingExecutionResults, resultID)
+	}
+	slices.SortFunc(missingExecutionResults, func(a, b Identifier) int {
+		return bytes.Compare(a[:], b[:])
+	})
+
+	// retrieve and store all missing execution results
+	for _, resultID := range missingExecutionResults {
+		result, err := builder.resultLookup(resultID)
+		if err != nil {
+			return nil, fmt.Errorf("could not retrieve missing result (id=%x): %w", resultID, err)
+		}
+		builder.addExecutionResult(result)
+	}
+
 	if err := builder.validateSegment(); err != nil {
 		return nil, fmt.Errorf("failed to validate sealing segment: %w", err)
 	}
