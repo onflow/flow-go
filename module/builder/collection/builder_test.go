@@ -121,17 +121,6 @@ func (suite *BuilderSuite) SetupTest() {
 
 	require.NoError(suite.T(), err)
 	clusterQC := unittest.QuorumCertificateFixture(unittest.QCWithRootBlockID(suite.genesis.ID()))
-	minEpochStateEntry, err = inmem.EpochProtocolStateFromServiceEvents(
-		result.ServiceEvents[0].Event.(*flow.EpochSetup),
-		result.ServiceEvents[1].Event.(*flow.EpochCommit),
-	)
-	require.NoError(suite.T(), err)
-	rootProtocolState, err = kvstore.NewDefaultKVStore(
-		safetyParams.FinalizationSafetyThreshold, safetyParams.EpochExtensionViewCount,
-		minEpochStateEntry.ID(),
-	)
-	require.NoError(suite.T(), err)
-	root.Payload.ProtocolStateID = rootProtocolState.ID()
 	clusterStateRoot, err := clusterkv.NewStateRoot(suite.genesis, clusterQC, suite.epochCounter)
 	suite.Require().NoError(err)
 	clusterState, err := clusterkv.Bootstrap(suite.db, clusterStateRoot)
