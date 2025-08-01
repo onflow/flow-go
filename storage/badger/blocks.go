@@ -6,6 +6,7 @@ import (
 	"github.com/dgraph-io/badger/v2"
 
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/badger/operation"
 	"github.com/onflow/flow-go/storage/badger/transaction"
 )
@@ -17,6 +18,8 @@ type Blocks struct {
 	payloads *Payloads
 }
 
+var _ storage.Blocks = (*Blocks)(nil)
+
 // NewBlocks ...
 func NewBlocks(db *badger.DB, headers *Headers, payloads *Payloads) *Blocks {
 	b := &Blocks{
@@ -27,6 +30,10 @@ func NewBlocks(db *badger.DB, headers *Headers, payloads *Payloads) *Blocks {
 	return b
 }
 
+// StoreTx allows us to store a new block, including its payload & header, as part of a DB transaction, while
+// still going through the caching layer.
+// Expected errors during normal operation:
+//   - storage.ErrAlreadyExists if the block has already been persisted
 func (b *Blocks) StoreTx(block *flow.Block) func(*transaction.Tx) error {
 	return func(tx *transaction.Tx) error {
 		err := b.headers.storeTx(block.Header)(tx)
@@ -83,6 +90,23 @@ func (b *Blocks) ByHeight(height uint64) (*flow.Block, error) {
 	if err != nil {
 		return nil, err
 	}
+	return b.retrieveTx(blockID)(tx)
+}
+
+// ByView returns the block with the given view. It is only available for certified blocks.
+// certified blocks are the blocks that have received QC. Hotstuff guarantees that for each view,
+// at most one block is certified. Hence, the return value of `ByView` is guaranteed to be unique
+// even for non-finalized blocks.
+// Expected errors during normal operations:
+//   - `storage.ErrNotFound` if no certified block is known at given view.
+func (b *Blocks) ByView(view uint64) (*flow.Block, error) {
+	blockID, err := b.headers.BlockIDByView(view)
+	if err != nil {
+		return nil, err
+	}
+
+	tx := b.db.NewTransaction(false)
+	defer tx.Discard()
 	return b.retrieveTx(blockID)(tx)
 }
 
