@@ -1258,6 +1258,56 @@ func (suite *BuilderSuite) TestBuildOn_RateLimitDryRun() {
 	}
 }
 
+func (suite *BuilderSuite) TestBuildOn_SystemTxAlwaysIncluded() {
+	// start with an empty mempool
+	suite.ClearPool()
+
+	// create builder with 5 tx/payer and max 10 tx/collection
+	// configure an unlimited payer
+	suite.builder, _ = builder.NewBuilder(
+		suite.db,
+		trace.NewNoopTracer(),
+		metrics.NewNoopCollector(),
+		suite.protoState,
+		suite.state,
+		suite.headers,
+		suite.headers,
+		suite.payloads,
+		suite.pool,
+		unittest.Logger(),
+		suite.epochCounter,
+		updatable_configs.DefaultBySealingLagRateLimiterConfigs(),
+		builder.WithMaxCollectionSize(0),
+	)
+
+	// fill the pool with 100 transactions
+	suite.FillPool(100, func() *flow.TransactionBody {
+		tx := unittest.TransactionBodyFixture()
+		tx.ReferenceBlockID = suite.ProtoStateRoot().ID()
+		return &tx
+	})
+	serviceAccountAddress := suite.protoState.Params().ChainID().Chain().ServiceAddress()
+	suite.FillPool(2, func() *flow.TransactionBody {
+		tx := unittest.TransactionBodyFixture()
+		tx.ReferenceBlockID = suite.ProtoStateRoot().ID()
+		tx.Payer = serviceAccountAddress
+		return &tx
+	})
+
+	// rate-limiting should not be applied, since the payer is marked as unlimited
+	parentID := suite.genesis.ID()
+	header, err := suite.builder.BuildOn(parentID, noopSetter, noopSigner)
+	suite.Require().NoError(err)
+
+	var built model.Block
+	err = suite.db.View(procedure.RetrieveClusterBlock(header.ID(), &built))
+	suite.Assert().NoError(err)
+	suite.Assert().Len(built.Payload.Collection.Transactions, 2)
+	for _, tx := range built.Payload.Collection.Transactions {
+		suite.Assert().Equal(serviceAccountAddress, tx.Payer)
+	}
+}
+
 // helper to check whether a collection contains each of the given transactions.
 func collectionContains(collection flow.Collection, txIDs ...flow.Identifier) bool {
 

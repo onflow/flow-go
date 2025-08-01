@@ -44,6 +44,7 @@ type Builder struct {
 	bySealingRateLimiterConfig module.BySealingLagRateLimiterConfigGetter
 	log                        zerolog.Logger
 	clusterEpoch               uint64 // the operating epoch for this cluster
+	chain                      flow.Chain
 	// cache of values about the operating epoch which never change
 	epochFinalHeight *uint64          // last height of this cluster's operating epoch (nil if epoch not ended)
 	epochFinalID     *flow.Identifier // ID of last block in this cluster's operating epoch (nil if epoch not ended)
@@ -78,6 +79,7 @@ func NewBuilder(
 		bySealingRateLimiterConfig: bySealingRateLimiterConfig,
 		log:                        log.With().Str("component", "cluster_builder").Logger(),
 		clusterEpoch:               epochCounter,
+		chain:                      protoState.Params().ChainID().Chain(),
 	}
 
 	for _, apply := range opts {
@@ -392,11 +394,23 @@ func (b *Builder) buildPayload(buildCtx *blockBuildContext) (*cluster.Payload, e
 	var transactions []*flow.TransactionBody
 	var totalByteSize uint64
 	var totalGas uint64
-	for _, tx := range b.transactions.All() {
+
+	// ATTENTION: this is a temporary measure to ensure that we give some prioritization to the service account
+	// transactions. This is experimental approach to increase likelihood of service account transactions being included in the collection.
+	serviceAccountTransactions := b.transactions.ByPayer(b.chain.ServiceAddress())
+	maxAllowedCollectionSize := config.MaxCollectionSize + uint(len(serviceAccountTransactions))
+	// txDedup is a map to deduplicate transactions by their ID, since we are merging service account transactions
+	// and all transactions from the mempool, we need to ensure that we don't include the same transaction twice.
+	txDedup := make(map[flow.Identifier]struct{}, maxAllowedCollectionSize)
+	for _, tx := range append(serviceAccountTransactions, b.transactions.All()...) {
 
 		// if we have reached maximum number of transactions, stop
-		if uint(len(transactions)) >= config.MaxCollectionSize {
+		if uint(len(transactions)) >= maxAllowedCollectionSize {
 			break
+		}
+		txID := tx.ID()
+		if _, exists := txDedup[txID]; exists {
+			continue
 		}
 
 		txByteSize := uint64(tx.ByteSize())
@@ -439,7 +453,6 @@ func (b *Builder) buildPayload(buildCtx *blockBuildContext) (*cluster.Payload, e
 			continue
 		}
 
-		txID := tx.ID()
 		// make sure the reference block is finalized and not orphaned
 		blockIDFinalizedAtRefHeight, err := b.mainHeaders.BlockIDByHeight(refHeader.Height)
 		if err != nil {
@@ -499,6 +512,7 @@ func (b *Builder) buildPayload(buildCtx *blockBuildContext) (*cluster.Payload, e
 		limiter.transactionIncluded(tx)
 
 		transactions = append(transactions, tx)
+		txDedup[txID] = struct{}{}
 		totalByteSize += txByteSize
 		totalGas += tx.GasLimit
 	}
