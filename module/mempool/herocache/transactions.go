@@ -2,31 +2,37 @@ package herocache
 
 import (
 	"fmt"
+	"github.com/onflow/flow-go/module/mempool"
+	"github.com/onflow/flow-go/module/mempool/herocache/backdata/heropool"
 
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	herocache "github.com/onflow/flow-go/module/mempool/herocache/backdata"
-	"github.com/onflow/flow-go/module/mempool/herocache/backdata/heropool"
 	"github.com/onflow/flow-go/module/mempool/stdmap"
 )
 
 type Transactions struct {
-	c *stdmap.Backend
+	c       *stdmap.Backend
+	byPayer map[flow.Address]map[flow.Identifier]struct{}
 }
 
 // NewTransactions implements a transactions mempool based on hero cache.
 func NewTransactions(limit uint32, logger zerolog.Logger, collector module.HeroCacheMetrics) *Transactions {
+	byPayer := make(map[flow.Address]map[flow.Identifier]struct{})
 	t := &Transactions{
-		c: stdmap.NewBackend(
-			stdmap.WithBackData(
-				herocache.NewCache(limit,
-					herocache.DefaultOversizeFactor,
-					heropool.LRUEjection,
-					logger.With().Str("mempool", "transactions").Logger(),
-					collector))),
+		byPayer: byPayer,
 	}
+
+	tracer := &ejectionTracer{transactions: t}
+	t.c = stdmap.NewBackend(stdmap.WithBackData(
+		herocache.NewCache(limit,
+			herocache.DefaultOversizeFactor,
+			heropool.LRUEjection,
+			logger.With().Str("mempool", "transactions").Logger(),
+			collector,
+			herocache.WithTracer(tracer))))
 
 	return t
 }
@@ -39,9 +45,27 @@ func (t Transactions) Has(id flow.Identifier) bool {
 
 // Add adds a transaction to the mempool.
 func (t *Transactions) Add(tx *flow.TransactionBody) bool {
-	// Warning! reference pointer must be dereferenced before adding to HeroCache.
-	// This is crucial for its heap object optimizations.
-	return t.c.Add(*tx)
+	added := false
+	err := t.c.Run(func(backdata mempool.BackData) error {
+		// Warning! reference pointer must be dereferenced before adding to HeroCache.
+		// This is crucial for its heap object optimizations.
+		txID := tx.ID()
+		added = backdata.Add(txID, *tx)
+		if !added {
+			return nil
+		}
+		txns, ok := t.byPayer[tx.Payer]
+		if !ok {
+			txns = make(map[flow.Identifier]struct{})
+			t.byPayer[tx.Payer] = txns
+		}
+		txns[txID] = struct{}{}
+		return nil
+	})
+	if err != nil {
+		panic("failed to add transaction to mempool: " + err.Error())
+	}
+	return added
 }
 
 // ByID returns the transaction with the given ID from the mempool.
@@ -74,7 +98,14 @@ func (t Transactions) All() []*flow.TransactionBody {
 
 // Clear removes all transactions stored in this mempool.
 func (t *Transactions) Clear() {
-	t.c.Clear()
+	err := t.c.Run(func(backdata mempool.BackData) error {
+		backdata.Clear()
+		t.byPayer = make(map[flow.Address]map[flow.Identifier]struct{})
+		return nil
+	})
+	if err != nil {
+		panic("failed to clear transactions mempool: " + err.Error())
+	}
 }
 
 // Size returns total number of stored transactions.
@@ -84,5 +115,66 @@ func (t Transactions) Size() uint {
 
 // Remove removes transaction from mempool.
 func (t *Transactions) Remove(id flow.Identifier) bool {
-	return t.c.Remove(id)
+	removed := false
+	err := t.c.Run(func(backdata mempool.BackData) error {
+		var entity flow.Entity
+		entity, removed = backdata.Remove(id)
+		if !removed {
+			return nil
+		}
+		txBody := entity.(flow.TransactionBody)
+		t.removeFromIndex(id, txBody.Payer)
+		return nil
+	})
+	if err != nil {
+		panic("failed to remove transaction from mempool: " + err.Error())
+	}
+	return removed
 }
+
+func (t *Transactions) ByPayer(payer flow.Address) []*flow.TransactionBody {
+	var result []*flow.TransactionBody
+	err := t.c.Run(func(backdata mempool.BackData) error {
+		ids := t.byPayer[payer]
+		for id := range ids {
+			entity, exists := backdata.ByID(id)
+			if !exists {
+				continue
+			}
+			txBody := entity.(flow.TransactionBody)
+			result = append(result, &txBody)
+		}
+		return nil
+	})
+	if err != nil {
+		panic("failed to get transactions by payer: " + err.Error())
+	}
+	return result
+}
+
+func (t *Transactions) removeFromIndex(id flow.Identifier, payer flow.Address) {
+	txns := t.byPayer[payer]
+	delete(txns, id)
+	if len(txns) == 0 {
+		delete(t.byPayer, payer)
+	}
+}
+
+type ejectionTracer struct {
+	transactions *Transactions
+}
+
+func (t *ejectionTracer) EntityEjectionDueToEmergency(ejectedEntity flow.Entity) {
+	t.cleanupIndex(ejectedEntity)
+}
+
+func (t *ejectionTracer) EntityEjectionDueToFullCapacity(ejectedEntity flow.Entity) {
+	t.cleanupIndex(ejectedEntity)
+}
+
+func (t *ejectionTracer) cleanupIndex(ejectedEntity flow.Entity) {
+	txBody := ejectedEntity.(flow.TransactionBody)
+	t.transactions.removeFromIndex(txBody.ID(), txBody.Payer)
+}
+
+var _ herocache.Tracer = (*ejectionTracer)(nil)
