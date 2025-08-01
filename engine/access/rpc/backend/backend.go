@@ -3,7 +3,6 @@ package backend
 import (
 	"context"
 	"crypto/md5" //nolint:gosec
-	"errors"
 	"fmt"
 	"time"
 
@@ -11,9 +10,21 @@ import (
 	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
 	"github.com/rs/zerolog"
 
+	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/access/validator"
 	"github.com/onflow/flow-go/cmd/build"
 	"github.com/onflow/flow-go/engine/access/index"
+	"github.com/onflow/flow-go/engine/access/rpc/backend/accounts"
+	"github.com/onflow/flow-go/engine/access/rpc/backend/common"
+	"github.com/onflow/flow-go/engine/access/rpc/backend/events"
+	"github.com/onflow/flow-go/engine/access/rpc/backend/node_communicator"
+	"github.com/onflow/flow-go/engine/access/rpc/backend/query_mode"
+	"github.com/onflow/flow-go/engine/access/rpc/backend/scripts"
+	"github.com/onflow/flow-go/engine/access/rpc/backend/transactions"
+	"github.com/onflow/flow-go/engine/access/rpc/backend/transactions/error_message_provider"
+	"github.com/onflow/flow-go/engine/access/rpc/backend/transactions/provider"
+	"github.com/onflow/flow-go/engine/access/rpc/backend/transactions/status"
+	txstream "github.com/onflow/flow-go/engine/access/rpc/backend/transactions/stream"
 	"github.com/onflow/flow-go/engine/access/rpc/connection"
 	"github.com/onflow/flow-go/engine/access/subscription"
 	"github.com/onflow/flow-go/engine/access/subscription/tracker"
@@ -31,16 +42,9 @@ import (
 	"github.com/onflow/flow-go/storage"
 )
 
-// DefaultMaxHeightRange is the default maximum size of range requests.
-const DefaultMaxHeightRange = 250
-
 // DefaultSnapshotHistoryLimit the amount of blocks to look back in state
 // when recursively searching for a valid snapshot
 const DefaultSnapshotHistoryLimit = 500
-
-// DefaultLoggedScriptsCacheSize is the default size of the lookup cache used to dedupe logs of scripts sent to ENs
-// limiting cache size to 16MB and does not affect script execution, only for keeping logs tidy
-const DefaultLoggedScriptsCacheSize = 1_000_000
 
 // DefaultConnectionPoolSize is the default size for the connection pool to collection and execution nodes
 const DefaultConnectionPoolSize = 250
@@ -58,26 +62,25 @@ const DefaultConnectionPoolSize = 250
 //
 // All remaining calls are handled by the base Backend in this file.
 type Backend struct {
-	backendScripts
-	backendTransactions
-	backendEvents
+	accounts.Accounts
+	events.Events
+	scripts.Scripts
+	transactions.Transactions
+	txstream.TransactionStream
 	backendBlockHeaders
 	backendBlockDetails
-	backendAccounts
 	backendExecutionResults
 	backendNetwork
 	backendSubscribeBlocks
-	backendSubscribeTransactions
 
-	state             protocol.State
-	chainID           flow.ChainID
-	collections       storage.Collections
-	executionReceipts storage.ExecutionReceipts
-	connFactory       connection.ConnectionFactory
+	state               protocol.State
+	collections         storage.Collections
+	staticCollectionRPC accessproto.AccessAPIClient
 
-	BlockTracker   tracker.BlockTracker
 	stateParams    protocol.Params
 	versionControl *version.VersionControl
+
+	BlockTracker tracker.BlockTracker
 }
 
 type Params struct {
@@ -98,34 +101,30 @@ type Params struct {
 	MaxHeightRange        uint
 	Log                   zerolog.Logger
 	SnapshotHistoryLimit  int
-	Communicator          Communicator
+	Communicator          node_communicator.Communicator
 	TxResultCacheSize     uint
 	ScriptExecutor        execution.ScriptExecutor
-	ScriptExecutionMode   IndexQueryMode
+	ScriptExecutionMode   query_mode.IndexQueryMode
 	CheckPayerBalanceMode validator.PayerBalanceMode
-	EventQueryMode        IndexQueryMode
+	EventQueryMode        query_mode.IndexQueryMode
 	BlockTracker          tracker.BlockTracker
 	SubscriptionHandler   *subscription.SubscriptionHandler
 
 	EventsIndex                *index.EventsIndex
-	TxResultQueryMode          IndexQueryMode
+	TxResultQueryMode          query_mode.IndexQueryMode
 	TxResultsIndex             *index.TransactionResultsIndex
 	LastFullBlockHeight        *counters.PersistentStrictMonotonicCounter
 	IndexReporter              state_synchronization.IndexReporter
 	VersionControl             *version.VersionControl
 	ExecNodeIdentitiesProvider *commonrpc.ExecutionNodeIdentitiesProvider
+	TxErrorMessageProvider     error_message_provider.TxErrorMessageProvider
 }
 
-var _ TransactionErrorMessage = (*Backend)(nil)
+var _ access.API = (*Backend)(nil)
 
 // New creates backend instance
 func New(params Params) (*Backend, error) {
-	retry := newRetry(params.Log)
-	if params.RetryEnabled {
-		retry.Activate()
-	}
-
-	loggedScripts, err := lru.New[[md5.Size]byte, time.Time](DefaultLoggedScriptsCacheSize)
+	loggedScripts, err := lru.New[[md5.Size]byte, time.Time](common.DefaultLoggedScriptsCacheSize)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize script logging cache: %w", err)
 	}
@@ -145,34 +144,157 @@ func New(params Params) (*Backend, error) {
 	}
 	systemTxID := systemTx.ID()
 
+	accountsBackend, err := accounts.NewAccountsBackend(
+		params.Log,
+		params.State,
+		params.Headers,
+		params.ConnFactory,
+		params.Communicator,
+		params.ScriptExecutionMode,
+		params.ScriptExecutor,
+		params.ExecNodeIdentitiesProvider,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create accounts: %w", err)
+	}
+
+	eventsBackend, err := events.NewEventsBackend(
+		params.Log,
+		params.State,
+		params.ChainID.Chain(),
+		params.MaxHeightRange,
+		params.Headers,
+		params.ConnFactory,
+		params.Communicator,
+		params.EventQueryMode,
+		params.EventsIndex,
+		params.ExecNodeIdentitiesProvider,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create events: %w", err)
+	}
+
+	scriptsBackend, err := scripts.NewScriptsBackend(
+		params.Log,
+		params.AccessMetrics,
+		params.Headers,
+		params.State,
+		params.ConnFactory,
+		params.Communicator,
+		params.ScriptExecutor,
+		params.ScriptExecutionMode,
+		params.ExecNodeIdentitiesProvider,
+		loggedScripts,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create scripts: %w", err)
+	}
+
+	txValidator, err := validator.NewTransactionValidator(
+		validator.NewProtocolStateBlocks(params.State, params.IndexReporter),
+		params.ChainID.Chain(),
+		params.AccessMetrics,
+		validator.TransactionValidationOptions{
+			Expiry:                       flow.DefaultTransactionExpiry,
+			ExpiryBuffer:                 flow.DefaultTransactionExpiryBuffer,
+			AllowEmptyReferenceBlockID:   false,
+			AllowUnknownReferenceBlockID: false,
+			CheckScriptsParse:            false,
+			MaxGasLimit:                  flow.DefaultMaxTransactionGasLimit,
+			MaxTransactionByteSize:       flow.DefaultMaxTransactionByteSize,
+			MaxCollectionByteSize:        flow.DefaultMaxCollectionByteSize,
+			CheckPayerBalanceMode:        params.CheckPayerBalanceMode,
+		},
+		params.ScriptExecutor,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("could not create transaction validator: %w", err)
+	}
+
+	txStatusDeriver := status.NewTxStatusDeriver(params.State, params.LastFullBlockHeight)
+
+	localTxProvider := provider.NewLocalTransactionProvider(
+		params.State,
+		params.Collections,
+		params.Blocks,
+		params.EventsIndex,
+		params.TxResultsIndex,
+		params.TxErrorMessageProvider,
+		systemTxID,
+		txStatusDeriver,
+	)
+	execNodeTxProvider := provider.NewENTransactionProvider(
+		params.Log,
+		params.State,
+		params.Collections,
+		params.ConnFactory,
+		params.Communicator,
+		params.ExecNodeIdentitiesProvider,
+		txStatusDeriver,
+		systemTxID,
+		systemTx,
+	)
+	failoverTxProvider := provider.NewFailoverTransactionProvider(localTxProvider, execNodeTxProvider)
+
+	txParams := transactions.Params{
+		Log:                         params.Log,
+		Metrics:                     params.AccessMetrics,
+		State:                       params.State,
+		ChainID:                     params.ChainID,
+		SystemTx:                    systemTx,
+		SystemTxID:                  systemTxID,
+		StaticCollectionRPCClient:   params.CollectionRPC,
+		HistoricalAccessNodeClients: params.HistoricalAccessNodes,
+		NodeCommunicator:            params.Communicator,
+		ConnFactory:                 params.ConnFactory,
+		EnableRetries:               params.RetryEnabled,
+		NodeProvider:                params.ExecNodeIdentitiesProvider,
+		Blocks:                      params.Blocks,
+		Collections:                 params.Collections,
+		Transactions:                params.Transactions,
+		TxErrorMessageProvider:      params.TxErrorMessageProvider,
+		TxResultCache:               txResCache,
+		TxValidator:                 txValidator,
+		TxStatusDeriver:             txStatusDeriver,
+		EventsIndex:                 params.EventsIndex,
+		TxResultsIndex:              params.TxResultsIndex,
+	}
+
+	switch params.TxResultQueryMode {
+	case query_mode.IndexQueryModeLocalOnly:
+		txParams.TxProvider = localTxProvider
+	case query_mode.IndexQueryModeExecutionNodesOnly:
+		txParams.TxProvider = execNodeTxProvider
+	case query_mode.IndexQueryModeFailover:
+		txParams.TxProvider = failoverTxProvider
+	default:
+		return nil, fmt.Errorf("invalid tx result query mode: %s", params.TxResultQueryMode)
+	}
+
+	txBackend, err := transactions.NewTransactionsBackend(txParams)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create transactions backend: %w", err)
+	}
+
+	txStreamBackend := txstream.NewTransactionStreamBackend(
+		params.Log,
+		params.State,
+		params.SubscriptionHandler,
+		params.BlockTracker,
+		txBackend.SendTransaction,
+		params.Blocks,
+		params.Collections,
+		params.Transactions,
+		failoverTxProvider,
+		txStatusDeriver,
+	)
+
 	b := &Backend{
-		state:        params.State,
-		BlockTracker: params.BlockTracker,
-		// create the sub-backends
-		backendScripts: backendScripts{
-			log:                        params.Log,
-			headers:                    params.Headers,
-			connFactory:                params.ConnFactory,
-			state:                      params.State,
-			metrics:                    params.AccessMetrics,
-			loggedScripts:              loggedScripts,
-			nodeCommunicator:           params.Communicator,
-			scriptExecutor:             params.ScriptExecutor,
-			scriptExecMode:             params.ScriptExecutionMode,
-			execNodeIdentitiesProvider: params.ExecNodeIdentitiesProvider,
-		},
-		backendEvents: backendEvents{
-			log:                        params.Log,
-			chain:                      params.ChainID.Chain(),
-			state:                      params.State,
-			headers:                    params.Headers,
-			connFactory:                params.ConnFactory,
-			maxHeightRange:             params.MaxHeightRange,
-			nodeCommunicator:           params.Communicator,
-			queryMode:                  params.EventQueryMode,
-			eventsIndex:                params.EventsIndex,
-			execNodeIdentitiesProvider: params.ExecNodeIdentitiesProvider,
-		},
+		Accounts:          *accountsBackend,
+		Events:            *eventsBackend,
+		Scripts:           *scriptsBackend,
+		Transactions:      *txBackend,
+		TransactionStream: *txStreamBackend,
 		backendBlockHeaders: backendBlockHeaders{
 			backendBlockBase: backendBlockBase{
 				blocks:  params.Blocks,
@@ -186,16 +308,6 @@ func New(params Params) (*Backend, error) {
 				headers: params.Headers,
 				state:   params.State,
 			},
-		},
-		backendAccounts: backendAccounts{
-			log:                        params.Log,
-			state:                      params.State,
-			headers:                    params.Headers,
-			connFactory:                params.ConnFactory,
-			nodeCommunicator:           params.Communicator,
-			scriptExecutor:             params.ScriptExecutor,
-			scriptExecMode:             params.ScriptExecutionMode,
-			execNodeIdentitiesProvider: params.ExecNodeIdentitiesProvider,
 		},
 		backendExecutionResults: backendExecutionResults{
 			executionResults: params.ExecutionResults,
@@ -215,88 +327,15 @@ func New(params Params) (*Backend, error) {
 			blockTracker:        params.BlockTracker,
 		},
 
-		collections:       params.Collections,
-		executionReceipts: params.ExecutionReceipts,
-		connFactory:       params.ConnFactory,
-		chainID:           params.ChainID,
-		stateParams:       params.State.Params(),
-		versionControl:    params.VersionControl,
+		state:               params.State,
+		collections:         params.Collections,
+		staticCollectionRPC: params.CollectionRPC,
+		stateParams:         params.State.Params(),
+		versionControl:      params.VersionControl,
+		BlockTracker:        params.BlockTracker,
 	}
-
-	txValidator, err := configureTransactionValidator(params.State, params.ChainID, params.IndexReporter, params.AccessMetrics, params.ScriptExecutor, params.CheckPayerBalanceMode)
-	if err != nil {
-		return nil, fmt.Errorf("could not create transaction validator: %w", err)
-	}
-
-	b.backendTransactions = backendTransactions{
-		TransactionsLocalDataProvider: &TransactionsLocalDataProvider{
-			state:               params.State,
-			collections:         params.Collections,
-			blocks:              params.Blocks,
-			eventsIndex:         params.EventsIndex,
-			txResultsIndex:      params.TxResultsIndex,
-			systemTxID:          systemTxID,
-			lastFullBlockHeight: params.LastFullBlockHeight,
-		},
-		log:                        params.Log,
-		staticCollectionRPC:        params.CollectionRPC,
-		chainID:                    params.ChainID,
-		transactions:               params.Transactions,
-		txResultErrorMessages:      params.TxResultErrorMessages,
-		transactionValidator:       txValidator,
-		transactionMetrics:         params.AccessMetrics,
-		retry:                      retry,
-		connFactory:                params.ConnFactory,
-		previousAccessNodes:        params.HistoricalAccessNodes,
-		nodeCommunicator:           params.Communicator,
-		txResultCache:              txResCache,
-		txResultQueryMode:          params.TxResultQueryMode,
-		systemTx:                   systemTx,
-		systemTxID:                 systemTxID,
-		execNodeIdentitiesProvider: params.ExecNodeIdentitiesProvider,
-	}
-
-	// TODO: The TransactionErrorMessage interface should be reorganized in future, as it is implemented in backendTransactions but used in TransactionsLocalDataProvider, and its initialization is somewhat quirky.
-	b.backendTransactions.txErrorMessages = b
-
-	b.backendSubscribeTransactions = backendSubscribeTransactions{
-		backendTransactions: &b.backendTransactions,
-		log:                 params.Log,
-		subscriptionHandler: params.SubscriptionHandler,
-		blockTracker:        params.BlockTracker,
-		sendTransaction:     b.SendTransaction,
-	}
-
-	retry.SetBackend(b)
 
 	return b, nil
-}
-
-func configureTransactionValidator(
-	state protocol.State,
-	chainID flow.ChainID,
-	indexReporter state_synchronization.IndexReporter,
-	transactionMetrics module.TransactionValidationMetrics,
-	executor execution.ScriptExecutor,
-	checkPayerBalanceMode validator.PayerBalanceMode,
-) (*validator.TransactionValidator, error) {
-	return validator.NewTransactionValidator(
-		validator.NewProtocolStateBlocks(state, indexReporter),
-		chainID.Chain(),
-		transactionMetrics,
-		validator.TransactionValidationOptions{
-			Expiry:                       flow.DefaultTransactionExpiry,
-			ExpiryBuffer:                 flow.DefaultTransactionExpiryBuffer,
-			AllowEmptyReferenceBlockID:   false,
-			AllowUnknownReferenceBlockID: false,
-			CheckScriptsParse:            false,
-			MaxGasLimit:                  flow.DefaultMaxTransactionGasLimit,
-			MaxTransactionByteSize:       flow.DefaultMaxTransactionByteSize,
-			MaxCollectionByteSize:        flow.DefaultMaxCollectionByteSize,
-			CheckPayerBalanceMode:        checkPayerBalanceMode,
-		},
-		executor,
-	)
 }
 
 // Ping responds to requests when the server is up.
@@ -378,47 +417,6 @@ func (b *Backend) GetFullCollectionByID(_ context.Context, colID flow.Identifier
 
 func (b *Backend) GetNetworkParameters(_ context.Context) accessmodel.NetworkParameters {
 	return accessmodel.NetworkParameters{
-		ChainID: b.chainID,
-	}
-}
-
-// resolveHeightError processes errors returned during height-based queries.
-// If the error is due to a block not being found, this function determines whether the queried
-// height falls outside the node's accessible range and provides context-sensitive error messages
-// based on spork and node root block heights.
-//
-// Parameters:
-// - stateParams: Protocol parameters that contain spork root and node root block heights.
-// - height: The queried block height.
-// - genericErr: The initial error returned when the block is not found.
-//
-// Expected errors during normal operation:
-// - storage.ErrNotFound - Indicates that the queried block does not exist in the local database.
-func resolveHeightError(
-	stateParams protocol.Params,
-	height uint64,
-	genericErr error,
-) error {
-	if !errors.Is(genericErr, storage.ErrNotFound) {
-		return genericErr
-	}
-
-	sporkRootBlockHeight := stateParams.SporkRootBlockHeight()
-	nodeRootBlockHeader := stateParams.SealedRoot().Height
-
-	if height < sporkRootBlockHeight {
-		return fmt.Errorf("block height %d is less than the spork root block height %d. Try to use a historic node: %w",
-			height,
-			sporkRootBlockHeight,
-			genericErr,
-		)
-	} else if height < nodeRootBlockHeader {
-		return fmt.Errorf("block height %d is less than the node's root block height %d. Try to use a different Access node: %w",
-			height,
-			nodeRootBlockHeader,
-			genericErr,
-		)
-	} else {
-		return genericErr
+		ChainID: b.backendNetwork.chainID,
 	}
 }
