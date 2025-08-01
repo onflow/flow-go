@@ -16,7 +16,6 @@ import (
 	statepkg "github.com/onflow/flow-go/state"
 	"github.com/onflow/flow-go/state/protocol"
 	bprotocol "github.com/onflow/flow-go/state/protocol/badger"
-	"github.com/onflow/flow-go/state/protocol/inmem"
 	"github.com/onflow/flow-go/state/protocol/prg"
 	"github.com/onflow/flow-go/state/protocol/util"
 	"github.com/onflow/flow-go/storage"
@@ -247,7 +246,7 @@ func TestClusters(t *testing.T) {
 	seal.ResultID = result.ID()
 
 	qc := unittest.QuorumCertificateFixture(unittest.QCWithRootBlockID(root.ID()))
-	rootSnapshot, err := inmem.SnapshotFromBootstrapState(root, result, seal, qc)
+	rootSnapshot, err := unittest.SnapshotFromBootstrapState(root, result, seal, qc)
 	require.NoError(t, err)
 
 	util.RunWithBootstrapState(t, rootSnapshot, func(db *badger.DB, state *bprotocol.State) {
@@ -1721,7 +1720,7 @@ func TestSnapshot_PostSporkIdentities(t *testing.T) {
 	})
 	qc := unittest.QuorumCertificateFixture(unittest.QCWithRootBlockID(root.ID()))
 
-	rootSnapshot, err := inmem.SnapshotFromBootstrapState(root, result, seal, qc)
+	rootSnapshot, err := unittest.SnapshotFromBootstrapState(root, result, seal, qc)
 	require.NoError(t, err)
 
 	util.RunWithBootstrapState(t, rootSnapshot, func(db *badger.DB, state *bprotocol.State) {

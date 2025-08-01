@@ -814,6 +814,28 @@ func TestBootstrap_SealMismatch(t *testing.T) {
 	})
 }
 
+// TestBootstrap_InvalidLivenessData verifies that bootstrapStatePointers
+// returns an error when the SporkRootBlockView is set to a value higher or equal
+// than the LivenessData.CurrentView.
+func TestBootstrap_InvalidLivenessData(t *testing.T) {
+	rootSnapshot := unittest.RootSnapshotFixture(unittest.CompleteIdentitySet())
+	// convert to encodable to easily modify snapshot
+	encodable := rootSnapshot.Encodable()
+
+	segment, err := rootSnapshot.SealingSegment()
+	require.NoError(t, err)
+
+	currentView := segment.Finalized().View + 1       // according to creating LivenessData
+	encodable.Params.SporkRootBlockView = currentView // update spork root block view
+
+	rootSnapshot = inmem.SnapshotFromEncodable(encodable)
+
+	bootstrap(t, rootSnapshot, func(state *bprotocol.State, err error) {
+		require.Error(t, err)
+		require.Contains(t, err.Error(), fmt.Sprintf("PaceMaker cannot start in view %d which is less or equal than spork root view %d", currentView, rootSnapshot.Params().SporkRootBlockView()))
+	})
+}
+
 // bootstraps protocol state with the given snapshot and invokes the callback
 // with the result of the constructor
 func bootstrap(t *testing.T, rootSnapshot protocol.Snapshot, f func(*bprotocol.State, error)) {

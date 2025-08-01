@@ -124,7 +124,7 @@ func chainViews(t *testing.T, node *Node) []uint64 {
 
 	head, err := node.state.Final().Head()
 	require.NoError(t, err)
-	for head != nil && head.View > 0 {
+	for head != nil && head.ContainsParentQC() {
 		views = append(views, head.View)
 		head, err = node.headers.ByBlockID(head.ParentID)
 		require.NoError(t, err)

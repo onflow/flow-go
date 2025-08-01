@@ -89,7 +89,7 @@ func (suite *MutatorSuite) SetupTest() {
 	)
 	require.NoError(suite.T(), err)
 	genesis.Payload.ProtocolStateID = rootProtocolState.ID()
-	rootSnapshot, err := inmem.SnapshotFromBootstrapState(genesis, result, seal, qc)
+	rootSnapshot, err := unittest.SnapshotFromBootstrapState(genesis, result, seal, qc)
 	require.NoError(suite.T(), err)
 	suite.epochCounter = rootSnapshot.Encodable().SealingSegment.LatestProtocolStateEntry().EpochEntry.EpochCounter()
 

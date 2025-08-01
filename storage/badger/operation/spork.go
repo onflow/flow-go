@@ -29,3 +29,15 @@ func InsertSporkRootBlockHeight(height uint64) func(*badger.Txn) error {
 func RetrieveSporkRootBlockHeight(height *uint64) func(*badger.Txn) error {
 	return retrieve(makePrefix(codeSporkRootBlockHeight), height)
 }
+
+// InsertSporkRootBlockView inserts the spork root block view for the present spork.
+// A single database and protocol state instance spans at most one spork, so this is inserted
+// exactly once, when bootstrapping the state.
+func InsertSporkRootBlockView(view uint64) func(*badger.Txn) error {
+	return insert(makePrefix(codeSporkRootBlockView), view)
+}
+
+// RetrieveSporkRootBlockView retrieves the spork root block view for the present spork.
+func RetrieveSporkRootBlockView(view *uint64) func(*badger.Txn) error {
+	return retrieve(makePrefix(codeSporkRootBlockView), view)
+}

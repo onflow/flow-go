@@ -91,6 +91,7 @@ Each input is a config file specified as a command line parameter:
 * parameter with the ID for the chain for the root block (`root-chain`)
 * parameter with the ID of the parent block for the root block (`root-parent`)
 * parameter with height of the root block to bootstrap from (`root-height`)
+* parameter with view of the root block to bootstrap from (`root-view`)
 * parameter with state commitment for the initial execution state (`root-commit`)
 * `json` containing configuration for all Dapper-Controlled nodes (see `./example_files/node-config.json`)
 * folder containing the `<NodeID>.node-info.pub.json` files for _all_ partner nodes (see `.example_files/partner-node-infos`)
@@ -125,6 +126,7 @@ go run . rootblock  \
     --root-chain bench \
     --root-height 0 \
     --root-parent 0000000000000000000000000000000000000000000000000000000000000000 \
+    --root-view 0 \
     --epoch-counter 0 \
     --epoch-length 30000 \
     --epoch-staking-phase-length 20000 \

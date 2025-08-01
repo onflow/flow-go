@@ -364,7 +364,7 @@ func createRootSnapshot(t *testing.T, participantData *run.ParticipantData) *inm
 	root, result, seal := createRootBlockData(t, participantData)
 	rootQC := createRootQC(t, root, participantData)
 
-	rootSnapshot, err := inmem.SnapshotFromBootstrapState(root, result, seal, rootQC)
+	rootSnapshot, err := unittest.SnapshotFromBootstrapState(root, result, seal, rootQC)
 	require.NoError(t, err)
 	return rootSnapshot
 }

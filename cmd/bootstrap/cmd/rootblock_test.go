@@ -2,6 +2,9 @@ package cmd
 
 import (
 	"encoding/hex"
+	"fmt"
+	"os"
+	"os/exec"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -47,32 +50,36 @@ const rootBlockHappyPathLogs = "collecting partner network and staking keys" +
 
 var rootBlockHappyPathRegex = regexp.MustCompile(rootBlockHappyPathLogs)
 
-func TestRootBlock_HappyPath(t *testing.T) {
+// setupHappyPathFlags sets up all required flags for the root block happy path test.
+func setupHappyPathFlags(bootDir, partnerDir, partnerWeights, internalPrivDir, configPath string) {
 	rootParent := unittest.StateCommitmentFixture()
-	chainName := "main"
-	rootHeight := uint64(12332)
+	flagOutdir = bootDir
+	flagConfig = configPath
+	flagPartnerNodeInfoDir = partnerDir
+	flagPartnerWeights = partnerWeights
+	flagInternalNodePrivInfoDir = internalPrivDir
 
+	flagRootParent = hex.EncodeToString(rootParent[:])
+	flagRootChain = "main"
+	flagRootHeight = 12332
+	flagRootView = 1000
+	flagEpochCounter = 0
+	flagNumViewsInEpoch = 100_000
+	flagNumViewsInStakingAuction = 50_000
+	flagNumViewsInDKGPhase = 2_000
+	flagFinalizationSafetyThreshold = 1_000
+	flagUseDefaultEpochTargetEndTime = true
+	flagEpochTimingRefCounter = 0
+	flagEpochTimingRefTimestamp = 0
+	flagEpochTimingDuration = 0
+}
+
+// TestRootBlock_HappyPath verifies that the rootBlock function
+// completes successfully with valid arguments and outputs
+// logs matching the expected pattern.
+func TestRootBlock_HappyPath(t *testing.T) {
 	utils.RunWithSporkBootstrapDir(t, func(bootDir, partnerDir, partnerWeights, internalPrivDir, configPath string) {
-
-		flagOutdir = bootDir
-
-		flagConfig = configPath
-		flagPartnerNodeInfoDir = partnerDir
-		flagPartnerWeights = partnerWeights
-		flagInternalNodePrivInfoDir = internalPrivDir
-
-		flagRootParent = hex.EncodeToString(rootParent[:])
-		flagRootChain = chainName
-		flagRootHeight = rootHeight
-		flagEpochCounter = 0
-		flagNumViewsInEpoch = 100_000
-		flagNumViewsInStakingAuction = 50_000
-		flagNumViewsInDKGPhase = 2_000
-		flagFinalizationSafetyThreshold = 1_000
-		flagUseDefaultEpochTargetEndTime = true
-		flagEpochTimingRefCounter = 0
-		flagEpochTimingRefTimestamp = 0
-		flagEpochTimingDuration = 0
+		setupHappyPathFlags(bootDir, partnerDir, partnerWeights, internalPrivDir, configPath)
 
 		hook := zeroLoggerHook{logs: &strings.Builder{}}
 		log = log.Hook(hook)
@@ -84,5 +91,42 @@ func TestRootBlock_HappyPath(t *testing.T) {
 		// check if root protocol snapshot exists
 		rootBlockDataPath := filepath.Join(bootDir, model.PathRootBlockData)
 		assert.FileExists(t, rootBlockDataPath)
+	})
+}
+
+// TestInvalidRootBlockView verifies that running
+// rootBlock with an invalid root view (0) on "main" or "testnet" chains.
+// The test runs in subprocesses because the tested code calls os.Exit.
+func TestInvalidRootBlockView(t *testing.T) {
+	for _, chain := range []string{"main", "test"} {
+		t.Run("invalid root block view for "+chain, func(t *testing.T) {
+			cmd := exec.Command(os.Args[0], "-test.run=TestInvalidRootBlockViewSubprocess")
+			cmd.Env = append(os.Environ(),
+				"FLAG=1",
+				"CHAIN="+chain,
+			)
+
+			output, err := cmd.CombinedOutput()
+			assert.Error(t, err)
+			assert.Contains(t, string(output), fmt.Sprintf("--root-view must be non-zero for %q chain", chain))
+		})
+	}
+}
+
+// TestInvalidRootBlockViewSubprocess runs in subprocess for invalid root view test on various chains
+func TestInvalidRootBlockViewSubprocess(t *testing.T) {
+	if os.Getenv("FLAG") != "1" {
+		return
+	}
+
+	utils.RunWithSporkBootstrapDir(t, func(bootDir, partnerDir, partnerWeights, internalPrivDir, configPath string) {
+		setupHappyPathFlags(bootDir, partnerDir, partnerWeights, internalPrivDir, configPath)
+		flagRootView = 0
+		flagRootChain = os.Getenv("CHAIN")
+
+		hook := zeroLoggerHook{logs: &strings.Builder{}}
+		log = log.Hook(hook)
+
+		rootBlock(nil, nil)
 	})
 }

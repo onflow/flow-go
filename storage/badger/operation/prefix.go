@@ -19,6 +19,7 @@ const (
 	_                        = 14 // DEPRECATED: 14 was used for ProtocolVersion before the versioned Protocol State
 	_                        = 15 // DEPRECATED: 15 was used to save the finalization safety threshold
 	codeSporkRootBlockHeight = 16
+	codeSporkRootBlockView   = 17 // the view of the block contained in the root spork
 
 	// code for heights with special meaning
 	codeFinalizedHeight         = 20 // latest finalized block height

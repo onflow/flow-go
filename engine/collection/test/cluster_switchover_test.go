@@ -23,7 +23,6 @@ import (
 	"github.com/onflow/flow-go/state/cluster"
 	bcluster "github.com/onflow/flow-go/state/cluster/badger"
 	"github.com/onflow/flow-go/state/protocol"
-	"github.com/onflow/flow-go/state/protocol/inmem"
 	protocol_state "github.com/onflow/flow-go/state/protocol/protocol_state/state"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -109,7 +108,7 @@ func NewClusterSwitchoverTestCase(t *testing.T, conf ClusterSwitchoverTestConf) 
 	seal.ResultID = result.ID()
 	qc := unittest.QuorumCertificateFixture(unittest.QCWithRootBlockID(root.ID()))
 
-	tc.root, err = inmem.SnapshotFromBootstrapState(root, result, seal, qc)
+	tc.root, err = unittest.SnapshotFromBootstrapState(root, result, seal, qc)
 	require.NoError(t, err)
 
 	// build a lookup table for node infos

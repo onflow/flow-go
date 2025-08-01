@@ -30,6 +30,7 @@ type SealingSegmentSuite struct {
 	priorReceipt           *flow.ExecutionReceipt
 	priorSeal              *flow.Seal
 	defaultProtocolStateID flow.Identifier
+	sporkRootBlockView     uint64
 
 	builder *flow.SealingSegmentBuilder
 }
@@ -84,7 +85,8 @@ func (suite *SealingSegmentSuite) SetupTest() {
 	suite.results = make(map[flow.Identifier]*flow.ExecutionResult)
 	suite.sealsByBlockID = make(map[flow.Identifier]*flow.Seal)
 	suite.protocolStateEntries = make(map[flow.Identifier]*flow.ProtocolStateEntryWrapper)
-	suite.builder = flow.NewSealingSegmentBuilder(suite.GetResult, suite.GetSealByBlockID, suite.GetProtocolStateEntry)
+	suite.sporkRootBlockView = 0
+	suite.builder = flow.NewSealingSegmentBuilder(suite.GetResult, suite.GetSealByBlockID, suite.GetProtocolStateEntry, suite.sporkRootBlockView)
 
 	suite.defaultProtocolStateID = unittest.IdentifierFixture()
 	suite.protocolStateEntries[suite.defaultProtocolStateID] = suite.ProtocolStateEntryWrapperFixture()
@@ -332,6 +334,7 @@ func (suite *SealingSegmentSuite) TestBuild_RootSegment() {
 	suite.addResult(result)
 	err := suite.builder.AddBlock(unittest.ProposalFromBlock(root))
 	require.NoError(suite.T(), err)
+	suite.sporkRootBlockView = 0
 
 	segment, err := suite.builder.SealingSegment()
 	require.NoError(suite.T(), err)
@@ -345,7 +348,6 @@ func (suite *SealingSegmentSuite) TestBuild_RootSegment() {
 // TestBuild_RootSegmentWrongView tests that we return ErrSegmentInvalidRootView for
 // a single-block sealing segment with a block view not equal to 0.
 func (suite *SealingSegmentSuite) TestBuild_RootSegmentWrongView() {
-
 	root, result, seal := unittest.BootstrapFixture(
 		unittest.IdentityListFixture(5, unittest.WithAllRoles()),
 		func(block *flow.Block) {
@@ -560,7 +562,7 @@ func (suite *SealingSegmentSuite) TestBuild_ChangingProtocolStateID_ExtraBlocks(
 // Test that we should return InvalidSealingSegmentError if sealing segment is
 // built with no blocks.
 func (suite *SealingSegmentSuite) TestBuild_NoBlocks() {
-	builder := flow.NewSealingSegmentBuilder(nil, nil, nil)
+	builder := flow.NewSealingSegmentBuilder(nil, nil, nil, suite.sporkRootBlockView)
 	_, err := builder.SealingSegment()
 	require.True(suite.T(), flow.IsInvalidSealingSegmentError(err))
 }
@@ -582,7 +584,7 @@ func (suite *SealingSegmentSuite) TestAddBlock_InvalidHeight() {
 
 // TestAddBlock_StorageError tests that errors in the resource getters bubble up.
 func TestAddBlock_StorageError(t *testing.T) {
-
+	sporkRootBlockView := uint64(0)
 	t.Run("missing result", func(t *testing.T) {
 		// create a receipt to include in the first block, whose result is not in storage
 		missingReceipt := unittest.ExecutionReceiptFixture()
@@ -593,7 +595,7 @@ func TestAddBlock_StorageError(t *testing.T) {
 		protocolStateEntryLookup := func(flow.Identifier) (*flow.ProtocolStateEntryWrapper, error) {
 			return &flow.ProtocolStateEntryWrapper{}, nil
 		}
-		builder := flow.NewSealingSegmentBuilder(resultLookup, sealLookup, protocolStateEntryLookup)
+		builder := flow.NewSealingSegmentBuilder(resultLookup, sealLookup, protocolStateEntryLookup, sporkRootBlockView)
 		block1 := unittest.BlockFixture(
 			unittest.Block.WithPayload(unittest.PayloadFixture(
 				unittest.WithReceiptsAndNoResults(missingReceipt),
@@ -619,7 +621,7 @@ func TestAddBlock_StorageError(t *testing.T) {
 		block1 := unittest.BlockFixture(
 			unittest.Block.WithPayload(*flow.NewEmptyPayload()),
 		)
-		builder := flow.NewSealingSegmentBuilder(resultLookup, sealLookup, protocolStateEntryLookup)
+		builder := flow.NewSealingSegmentBuilder(resultLookup, sealLookup, protocolStateEntryLookup, sporkRootBlockView)
 
 		err := builder.AddBlock(unittest.ProposalFromBlock(block1))
 		require.ErrorIs(t, err, exception)
@@ -633,7 +635,7 @@ func TestAddBlock_StorageError(t *testing.T) {
 		block1 := unittest.BlockFixture(
 			unittest.Block.WithPayload(*flow.NewEmptyPayload()),
 		)
-		builder := flow.NewSealingSegmentBuilder(resultLookup, sealLookup, protocolStateEntryLookup)
+		builder := flow.NewSealingSegmentBuilder(resultLookup, sealLookup, protocolStateEntryLookup, sporkRootBlockView)
 
 		err := builder.AddBlock(unittest.ProposalFromBlock(block1))
 		require.ErrorIs(t, err, exception)
@@ -649,7 +651,7 @@ func (suite *SealingSegmentSuite) TestAddExtraBlock() {
 	suite.AddBlocks(firstBlock)
 
 	suite.T().Run("empty-segment", func(t *testing.T) {
-		builder := flow.NewSealingSegmentBuilder(nil, nil, nil)
+		builder := flow.NewSealingSegmentBuilder(nil, nil, nil, suite.sporkRootBlockView)
 		block := suite.BlockFixture()
 		err := builder.AddExtraBlock(unittest.ProposalFromBlock(block))
 		require.Error(t, err)
@@ -662,7 +664,7 @@ func (suite *SealingSegmentSuite) TestAddExtraBlock() {
 		require.True(suite.T(), flow.IsInvalidSealingSegmentError(err))
 	})
 	suite.T().Run("extra-block-not-continuous", func(t *testing.T) {
-		builder := flow.NewSealingSegmentBuilder(suite.GetResult, suite.GetSealByBlockID, suite.GetProtocolStateEntry)
+		builder := flow.NewSealingSegmentBuilder(suite.GetResult, suite.GetSealByBlockID, suite.GetProtocolStateEntry, suite.sporkRootBlockView)
 		err := builder.AddBlock(firstProposal)
 		require.NoError(t, err)
 		extraBlock := suite.BlockFixture()
@@ -675,7 +677,7 @@ func (suite *SealingSegmentSuite) TestAddExtraBlock() {
 		require.True(suite.T(), flow.IsInvalidSealingSegmentError(err))
 	})
 	suite.T().Run("root-segment-extra-blocks", func(t *testing.T) {
-		builder := flow.NewSealingSegmentBuilder(suite.GetResult, suite.GetSealByBlockID, suite.GetProtocolStateEntry)
+		builder := flow.NewSealingSegmentBuilder(suite.GetResult, suite.GetSealByBlockID, suite.GetProtocolStateEntry, suite.sporkRootBlockView)
 		err := builder.AddBlock(firstProposal)
 		require.NoError(t, err)
 
