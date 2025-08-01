@@ -161,16 +161,16 @@ func Bootstrap(
 			return fmt.Errorf("could not insert root qc: %w", err)
 		}
 
-		// initialize the current protocol state height/view pointers
-		err = bootstrapStatePointers(root)(tx)
-		if err != nil {
-			return fmt.Errorf("could not bootstrap height/view pointers: %w", err)
-		}
-
 		// initialize spork params
 		err = bootstrapSporkInfo(root)(tx)
 		if err != nil {
 			return fmt.Errorf("could not bootstrap spork info: %w", err)
+		}
+
+		// initialize the current protocol state height/view pointers
+		err = bootstrapStatePointers(root)(tx)
+		if err != nil {
+			return fmt.Errorf("could not bootstrap height/view pointers: %w", err)
 		}
 
 		// bootstrap dynamic protocol state
@@ -445,6 +445,11 @@ func bootstrapStatePointers(root protocol.Snapshot) func(*transaction.Tx) error 
 		livenessData := &hotstuff.LivenessData{
 			CurrentView: highest.View + 1,
 			NewestQC:    rootQC,
+		}
+
+		sporkRootBlockView := root.Params().SporkRootBlockView()
+		if livenessData.CurrentView <= sporkRootBlockView {
+			return fmt.Errorf("PaceMaker cannot start in view %d which is less or equal than spork root view %d", livenessData.CurrentView, sporkRootBlockView)
 		}
 
 		bdtx := tx.DBTxn // tx is just a wrapper around a badger transaction with the additional ability to register callbacks that are executed after the badger transaction completed _successfully_
