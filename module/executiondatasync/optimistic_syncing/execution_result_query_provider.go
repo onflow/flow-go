@@ -6,7 +6,7 @@ import (
 
 	"github.com/rs/zerolog"
 
-	"github.com/onflow/flow-go/engine/access/rpc/backend"
+	"github.com/onflow/flow-go/engine/access/rpc/backend/common"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/state/protocol"
@@ -220,7 +220,7 @@ func (e *ExecutionResultQueryProviderImpl) findResultAndExecutors(
 	}
 
 	if len(results) == 0 {
-		return nil, nil, backend.NewInsufficientExecutionReceipts(blockID, 0)
+		return nil, nil, common.NewInsufficientExecutionReceipts(blockID, 0)
 	}
 
 	// sort results by the number of execution nodes in descending order

@@ -3,12 +3,11 @@ package pipeline
 import (
 	"testing"
 
-	"github.com/onflow/flow-go/engine/access/rpc/backend"
-
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
 
+	"github.com/onflow/flow-go/engine/access/rpc/backend/common"
 	"github.com/onflow/flow-go/model/flow"
 	protocol "github.com/onflow/flow-go/state/protocol/mock"
 	storagemock "github.com/onflow/flow-go/storage/mock"
@@ -178,7 +177,7 @@ func (suite *ExecutionResultQueryProviderSuite) TestExecutionResultQuery() {
 		})
 		suite.Require().Error(err)
 
-		suite.Assert().True(backend.IsInsufficientExecutionReceipts(err))
+		suite.Assert().True(common.IsInsufficientExecutionReceipts(err))
 	})
 
 	suite.Run("required executors not found returns error", func() {
@@ -200,7 +199,7 @@ func (suite *ExecutionResultQueryProviderSuite) TestExecutionResultQuery() {
 		})
 		suite.Require().Error(err)
 
-		suite.Assert().True(backend.IsInsufficientExecutionReceipts(err))
+		suite.Assert().True(common.IsInsufficientExecutionReceipts(err))
 	})
 }
 
