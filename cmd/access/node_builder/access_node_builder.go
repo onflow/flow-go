@@ -2088,7 +2088,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 			var err error
 
 			builder.RequestEng, err = requester.New(
-				node.Logger,
+				node.Logger.With().Str("entity", "collection").Logger(),
 				node.Metrics.Engine,
 				node.EngineRegistry,
 				node.Me,

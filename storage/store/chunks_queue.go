@@ -19,7 +19,8 @@ import (
 type ChunksQueue struct {
 	db                storage.DB
 	chunkLocatorCache *Cache[uint64, *chunks.Locator] // cache for chunk locators, indexed by job index
-	storing           *sync.Mutex
+	// TODO(7355): lockctx
+	storing *sync.Mutex
 }
 
 const JobQueueChunksQueue = "JobQueueChunksQueue"

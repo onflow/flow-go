@@ -602,6 +602,9 @@ func TestAddBlock_StorageError(t *testing.T) {
 		)
 
 		err := builder.AddBlock(unittest.ProposalFromBlock(block1))
+		require.NoError(t, err)
+
+		_, err = builder.SealingSegment()
 		require.ErrorIs(t, err, exception)
 	})
 
