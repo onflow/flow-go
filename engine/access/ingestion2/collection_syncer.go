@@ -8,6 +8,8 @@ import (
 
 	"github.com/rs/zerolog"
 
+	"github.com/onflow/flow-go/engine"
+	"github.com/onflow/flow-go/engine/common/fifoqueue"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module"
@@ -73,8 +75,9 @@ type CollectionSyncer struct {
 	state     protocol.State
 	requester module.Requester
 
-	// channel of collections to be indexed
-	pendingCollections chan flow.Entity
+	// collections to be indexed
+	pendingCollections        *engine.FifoMessageStore
+	pendingCollectionsHandler *engine.MessageHandler
 
 	blocks       storage.Blocks
 	collections  storage.Collections
@@ -94,20 +97,39 @@ func NewCollectionSyncer(
 	collections storage.Collections,
 	transactions storage.Transactions,
 	lastFullBlockHeight *counters.PersistentStrictMonotonicCounter,
-) *CollectionSyncer {
+) (*CollectionSyncer, error) {
 	collectionExecutedMetric.UpdateLastFullBlockHeight(lastFullBlockHeight.Value())
 
-	return &CollectionSyncer{
-		logger:                   logger,
-		state:                    state,
-		requester:                requester,
-		pendingCollections:       make(chan flow.Entity),
-		blocks:                   blocks,
-		collections:              collections,
-		transactions:             transactions,
-		lastFullBlockHeight:      lastFullBlockHeight,
-		collectionExecutedMetric: collectionExecutedMetric,
+	collectionsQueue, err := fifoqueue.NewFifoQueue(defaultQueueCapacity)
+	if err != nil {
+		return nil, fmt.Errorf("could not create collections queue: %w", err)
 	}
+
+	pendingCollections := &engine.FifoMessageStore{FifoQueue: collectionsQueue}
+	pendingCollectionsHandler := engine.NewMessageHandler(
+		logger,
+		engine.NewNotifier(),
+		engine.Pattern{
+			Match: func(msg *engine.Message) bool {
+				_, ok := msg.Payload.(*flow.Collection)
+				return ok
+			},
+			Store: pendingCollections,
+		},
+	)
+
+	return &CollectionSyncer{
+		logger:                    logger,
+		state:                     state,
+		requester:                 requester,
+		pendingCollectionsHandler: pendingCollectionsHandler,
+		pendingCollections:        pendingCollections,
+		blocks:                    blocks,
+		collections:               collections,
+		transactions:              transactions,
+		lastFullBlockHeight:       lastFullBlockHeight,
+		collectionExecutedMetric:  collectionExecutedMetric,
+	}, nil
 }
 
 // StartWorkerLoop continuously monitors and triggers collection sync operations.
@@ -133,8 +155,6 @@ func (s *CollectionSyncer) StartWorkerLoop(ctx irrecoverable.SignalerContext, re
 	updateLastFullBlockHeightTicker := time.NewTicker(fullBlockRefreshInterval)
 	defer updateLastFullBlockHeightTicker.Stop()
 
-	defer close(s.pendingCollections)
-
 	for {
 		select {
 		case <-ctx.Done():
@@ -152,13 +172,13 @@ func (s *CollectionSyncer) StartWorkerLoop(ctx irrecoverable.SignalerContext, re
 				ctx.Throw(err)
 			}
 
-		case entity := <-s.pendingCollections:
-			collection, ok := entity.(*flow.Collection)
+		case <-s.pendingCollectionsHandler.GetNotifier():
+			msg, ok := s.pendingCollections.Get()
 			if !ok {
-				ctx.Throw(fmt.Errorf("expected a *flow.Collection but got %T", entity))
-				return
+				ctx.Throw(fmt.Errorf("could not get pending collection"))
 			}
 
+			collection := msg.Payload.(*flow.Collection)
 			err := indexer.IndexCollection(collection, s.collections, s.transactions, s.logger, s.collectionExecutedMetric)
 			if err != nil {
 				ctx.Throw(fmt.Errorf("error indexing collection: %w", err))
@@ -432,6 +452,9 @@ func (s *CollectionSyncer) findLowestBlockHeightWithMissingCollections(
 //
 // If any engine crashes, we treat it as a sign of possible state corruption,
 // and the node is expected to restart. Thus, this edge case is not handled explicitly.
-func (s *CollectionSyncer) OnCollectionDownloaded(_ flow.Identifier, entity flow.Entity) {
-	s.pendingCollections <- entity
+func (s *CollectionSyncer) OnCollectionDownloaded(id flow.Identifier, entity flow.Entity) {
+	err := s.pendingCollectionsHandler.Process(id, entity)
+	if err != nil {
+		s.logger.Warn().Err(err).Msg("failed to process pending collections. matching processor wasn't set up?")
+	}
 }
