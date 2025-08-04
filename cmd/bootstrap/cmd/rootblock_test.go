@@ -102,7 +102,7 @@ func TestInvalidRootBlockView(t *testing.T) {
 		t.Run("invalid root block view for "+chain, func(t *testing.T) {
 			cmd := exec.Command(os.Args[0], "-test.run=TestInvalidRootBlockViewSubprocess")
 			cmd.Env = append(os.Environ(),
-				"FLAG=1",
+				"FLAG_RUN_IN_SUBPROCESS_ONLY=1",
 				"CHAIN="+chain,
 			)
 
@@ -114,8 +114,9 @@ func TestInvalidRootBlockView(t *testing.T) {
 }
 
 // TestInvalidRootBlockViewSubprocess runs in subprocess for invalid root view test on various chains
+// This test only runs when invoked by TestInvalidRootBlockView as a sub-process.
 func TestInvalidRootBlockViewSubprocess(t *testing.T) {
-	if os.Getenv("FLAG") != "1" {
+	if os.Getenv("FLAG_RUN_IN_SUBPROCESS_ONLY") != "1" {
 		return
 	}
 
