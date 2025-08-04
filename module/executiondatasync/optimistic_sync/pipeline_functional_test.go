@@ -57,6 +57,8 @@ type PipelineFunctionalSuite struct {
 	executionResult               *flow.ExecutionResult
 	metrics                       module.CacheMetrics
 	config                        PipelineConfig
+	expectedExecutionData         *execution_data.BlockExecutionData
+	expectedTxResultErrMsgs       []flow.TransactionResultErrorMessage
 }
 
 func TestPipelineFunctionalSuite(t *testing.T) {
@@ -133,6 +135,7 @@ func (p *PipelineFunctionalSuite) SetupTest() {
 	p.config = PipelineConfig{
 		parentState: StateWaitingPersist,
 	}
+	p.expectedExecutionData, p.expectedTxResultErrMsgs = p.createExecutionData()
 }
 
 // TearDownTest cleans up resources after each test case.
@@ -150,10 +153,8 @@ func (p *PipelineFunctionalSuite) TearDownTest() {
 // 2. All data types (events, collections, transactions, registers, error messages) are correctly persisted to storage
 // 3. No errors occur during the entire process
 func (p *PipelineFunctionalSuite) TestPipelineCompletesSuccessfully() {
-	expectedExecutionData, expectedTxResultErrMsgs := p.initializeTestData()
-
-	p.execDataRequester.On("RequestExecutionData", mock.Anything).Return(expectedExecutionData, nil).Once()
-	p.txResultErrMsgsRequester.On("Request", mock.Anything).Return(expectedTxResultErrMsgs, nil).Once()
+	p.execDataRequester.On("RequestExecutionData", mock.Anything).Return(p.expectedExecutionData, nil).Once()
+	p.txResultErrMsgsRequester.On("Request", mock.Anything).Return(p.expectedTxResultErrMsgs, nil).Once()
 
 	p.WithRunningPipeline(func(pipeline Pipeline, updateChan chan State, errChan chan error, cancel context.CancelFunc) {
 		pipeline.OnParentStateUpdated(StateComplete)
@@ -164,8 +165,8 @@ func (p *PipelineFunctionalSuite) TestPipelineCompletesSuccessfully() {
 
 		waitForStateUpdates(p.T(), updateChan, StateComplete)
 
-		expectedChunkExecutionData := expectedExecutionData.ChunkExecutionDatas[0]
-		p.verifyDataPersistence(expectedChunkExecutionData, expectedTxResultErrMsgs)
+		expectedChunkExecutionData := p.expectedExecutionData.ChunkExecutionDatas[0]
+		p.verifyDataPersistence(expectedChunkExecutionData, p.expectedTxResultErrMsgs)
 	}, p.config)
 }
 
@@ -173,8 +174,6 @@ func (p *PipelineFunctionalSuite) TestPipelineCompletesSuccessfully() {
 // It ensures that both execution data and transaction result error message request errors
 // are correctly detected and returned.
 func (p *PipelineFunctionalSuite) TestPipelineDownloadError() {
-	expectedExecutionData, expectedTxResultErrMsgs := p.initializeTestData()
-
 	tests := []struct {
 		name                    string
 		expectedErr             error
@@ -185,14 +184,14 @@ func (p *PipelineFunctionalSuite) TestPipelineDownloadError() {
 			expectedErr: execution_data.NewMalformedDataError(fmt.Errorf("execution data test deserialization error")),
 			requesterInitialization: func(err error) {
 				p.execDataRequester.On("RequestExecutionData", mock.Anything).Return((*execution_data.BlockExecutionData)(nil), err).Once()
-				p.txResultErrMsgsRequester.On("Request", mock.Anything).Return(expectedTxResultErrMsgs, nil).Once()
+				p.txResultErrMsgsRequester.On("Request", mock.Anything).Return(p.expectedTxResultErrMsgs, nil).Once()
 			},
 		},
 		{
 			name:        "transaction result error messages requester not found error",
 			expectedErr: fmt.Errorf("test transaction result error messages not found error"),
 			requesterInitialization: func(err error) {
-				p.execDataRequester.On("RequestExecutionData", mock.Anything).Return(expectedExecutionData, nil).Once()
+				p.execDataRequester.On("RequestExecutionData", mock.Anything).Return(p.expectedExecutionData, nil).Once()
 				p.txResultErrMsgsRequester.On("Request", mock.Anything).Return(([]flow.TransactionResultErrorMessage)(nil), err).Once()
 			},
 		},
@@ -224,10 +223,13 @@ func (p *PipelineFunctionalSuite) TestPipelineIndexingError() {
 	p.execDataRequester.On("RequestExecutionData", mock.Anything).Return(expectedExecutionData, nil).Once()
 
 	// note: txResultErrMsgsRequester.Request() currently never returns and error, so skipping the case
-	expectedTxResultErrMsgs := unittest.TransactionResultErrorMessagesFixture(5)
-	p.txResultErrMsgsRequester.On("Request", mock.Anything).Return(expectedTxResultErrMsgs, nil).Once()
+	p.txResultErrMsgsRequester.On("Request", mock.Anything).Return(p.expectedTxResultErrMsgs, nil).Once()
 
-	expectedIndexingError := fmt.Errorf("could not perform indexing: invalid block execution data. expected block_id=%s, actual block_id=%s", p.block.ID().String(), invalidBlockID.String())
+	expectedIndexingError := fmt.Errorf(
+		"could not perform indexing: invalid block execution data. expected block_id=%s, actual block_id=%s",
+		p.block.ID().String(),
+		invalidBlockID.String(),
+	)
 
 	p.WithRunningPipeline(func(pipeline Pipeline, updateChan chan State, errChan chan error, cancel context.CancelFunc) {
 		pipeline.OnParentStateUpdated(StateComplete)
@@ -244,15 +246,14 @@ func (p *PipelineFunctionalSuite) TestPipelineIndexingError() {
 // TestPipelinePersistingError tests the pipeline behavior when an error occurs during the persisting step.
 func (p *PipelineFunctionalSuite) TestPipelinePersistingError() {
 	expectedError := fmt.Errorf("test events batch store error")
-	// Mock events storage to simulate an error on a persisting step. In normal flow and with real storages, it is hard to make a meaningful error explicitly.
+	// Mock events storage to simulate an error on a persisting step. In normal flow and with real storages,
+	// it is hard to make a meaningful error explicitly.
 	mockEvents := storagemock.NewEvents(p.T())
-	mockEvents.On("BatchStore", mock.Anything, mock.Anything, mock.Anything).Return(expectedError).Maybe()
+	mockEvents.On("BatchStore", mock.Anything, mock.Anything, mock.Anything).Return(expectedError).Once()
 	p.persistentEvents = mockEvents
 
-	expectedExecutionData, expectedTxResultErrMsgs := p.initializeTestData()
-
-	p.execDataRequester.On("RequestExecutionData", mock.Anything).Return(expectedExecutionData, nil).Once()
-	p.txResultErrMsgsRequester.On("Request", mock.Anything).Return(expectedTxResultErrMsgs, nil).Once()
+	p.execDataRequester.On("RequestExecutionData", mock.Anything).Return(p.expectedExecutionData, nil).Once()
+	p.txResultErrMsgsRequester.On("Request", mock.Anything).Return(p.expectedTxResultErrMsgs, nil).Once()
 
 	p.WithRunningPipeline(func(pipeline Pipeline, updateChan chan State, errChan chan error, cancel context.CancelFunc) {
 		pipeline.OnParentStateUpdated(StateComplete)
@@ -323,10 +324,8 @@ func (p *PipelineFunctionalSuite) TestMainCtxCancellationDuringRequestingTxResul
 
 // TestMainCtxCancellationDuringWaitingPersist tests the pipeline's behavior when the main context is canceled during StateWaitingPersist.
 func (p *PipelineFunctionalSuite) TestMainCtxCancellationDuringWaitingPersist() {
-	expectedExecutionData, expectedTxResultErrMsgs := p.initializeTestData()
-
-	p.execDataRequester.On("RequestExecutionData", mock.Anything).Return(expectedExecutionData, nil).Once()
-	p.txResultErrMsgsRequester.On("Request", mock.Anything).Return(expectedTxResultErrMsgs, nil).Once()
+	p.execDataRequester.On("RequestExecutionData", mock.Anything).Return(p.expectedExecutionData, nil).Once()
+	p.txResultErrMsgsRequester.On("Request", mock.Anything).Return(p.expectedTxResultErrMsgs, nil).Once()
 
 	p.WithRunningPipeline(func(pipeline Pipeline, updateChan chan State, errChan chan error, cancel context.CancelFunc) {
 		pipeline.OnParentStateUpdated(StateComplete)
@@ -345,8 +344,6 @@ func (p *PipelineFunctionalSuite) TestMainCtxCancellationDuringWaitingPersist() 
 
 // TestPipelineShutdownOnParentAbandon verifies that the pipeline transitions correctly to a shutdown state when the parent is abandoned.
 func (p *PipelineFunctionalSuite) TestPipelineShutdownOnParentAbandon() {
-	expectedExecutionData, expectedTxResultErrMsgs := p.initializeTestData()
-
 	tests := []struct {
 		name        string
 		config      PipelineConfig
@@ -384,8 +381,8 @@ func (p *PipelineFunctionalSuite) TestPipelineShutdownOnParentAbandon() {
 	for _, test := range tests {
 		p.T().Run(test.name, func(t *testing.T) {
 			p.WithRunningPipeline(func(pipeline Pipeline, updateChan chan State, errChan chan error, cancel context.CancelFunc) {
-				p.execDataRequester.On("RequestExecutionData", mock.Anything).Return(expectedExecutionData, nil).Maybe()
-				p.txResultErrMsgsRequester.On("Request", mock.Anything).Return(expectedTxResultErrMsgs, nil).Maybe()
+				p.execDataRequester.On("RequestExecutionData", mock.Anything).Return(p.expectedExecutionData, nil).Maybe()
+				p.txResultErrMsgsRequester.On("Request", mock.Anything).Return(p.expectedTxResultErrMsgs, nil).Maybe()
 
 				if test.customSetup != nil {
 					test.customSetup(pipeline, updateChan)
@@ -409,7 +406,10 @@ type PipelineConfig struct {
 // WithRunningPipeline is a test helper that initializes and starts a pipeline instance.
 // It manages the context and channels needed to run the pipeline and invokes the testFunc
 // with access to the pipeline, update channel, error channel, and cancel function.
-func (p *PipelineFunctionalSuite) WithRunningPipeline(testFunc func(pipeline Pipeline, updateChan chan State, errChan chan error, cancel context.CancelFunc), pipelineConfig PipelineConfig) {
+func (p *PipelineFunctionalSuite) WithRunningPipeline(
+	testFunc func(pipeline Pipeline, updateChan chan State, errChan chan error, cancel context.CancelFunc),
+	pipelineConfig PipelineConfig,
+) {
 	p.core = NewCoreImpl(
 		p.logger,
 		p.executionResult,
@@ -453,10 +453,10 @@ func (p *PipelineFunctionalSuite) WithRunningPipeline(testFunc func(pipeline Pip
 	testFunc(pipeline, pipelineStateConsumer.updateChan, errChan, cancel)
 }
 
-// initializeTestData creates and returns test execution data and transaction result
+// createExecutionData creates and returns test execution data and transaction result
 // error messages for use in test cases. It generates realistic test data including
 // chunk execution data with events, trie updates, collections, and system chunks.
-func (p *PipelineFunctionalSuite) initializeTestData() (*execution_data.BlockExecutionData, []flow.TransactionResultErrorMessage) {
+func (p *PipelineFunctionalSuite) createExecutionData() (*execution_data.BlockExecutionData, []flow.TransactionResultErrorMessage) {
 	expectedChunkExecutionData := unittest.ChunkExecutionDataFixture(
 		p.T(),
 		0,
@@ -548,7 +548,9 @@ func (p *PipelineFunctionalSuite) verifyRegistersPersisted(expectedTrieUpdate *l
 // verifyTxResultErrorMessagesPersisted checks that transaction result error messages
 // were stored correctly in the error messages storage. It retrieves messages by block ID
 // and compares them with expected error messages.
-func (p *PipelineFunctionalSuite) verifyTxResultErrorMessagesPersisted(expectedTxResultErrMsgs []flow.TransactionResultErrorMessage) {
+func (p *PipelineFunctionalSuite) verifyTxResultErrorMessagesPersisted(
+	expectedTxResultErrMsgs []flow.TransactionResultErrorMessage,
+) {
 	storedErrMsgs, err := p.persistentTxResultErrMsg.ByBlockID(p.block.ID())
 	p.Require().NoError(err, "Should be able to retrieve tx result error messages by block ID")
 
