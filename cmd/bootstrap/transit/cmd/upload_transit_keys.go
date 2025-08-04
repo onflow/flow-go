@@ -29,6 +29,7 @@ func init() {
 
 func addUploadTransitKeysCmdFlags() {
 	pushTransitKeyCmd.Flags().StringVarP(&flagToken, "token", "t", "", "token provided by the Flow team")
+	pushTransitKeyCmd.Flags().StringVarP(&flagBucketName, "genesis-bucket", "g", "flow-genesis-bootstrap", `bucket used for pushing transit keys`)
 	err := pushTransitKeyCmd.MarkFlagRequired("token")
 	if err != nil {
 		log.Fatal().Err(err).Msg("failed to initialize")
@@ -37,7 +38,6 @@ func addUploadTransitKeysCmdFlags() {
 
 // pushTransitKey uploads transit keys to the Flow server
 func pushTransitKey(_ *cobra.Command, _ []string) {
-
 	nodeIDString, err := readNodeID()
 	if err != nil {
 		log.Fatal().Err(err).Msg("could not read node ID")
