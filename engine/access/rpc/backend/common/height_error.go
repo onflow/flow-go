@@ -13,11 +13,6 @@ import (
 // height falls outside the node's accessible range and provides context-sensitive error messages
 // based on spork and node root block heights.
 //
-// Parameters:
-// - stateParams: Protocol parameters that contain spork root and node root block heights.
-// - height: The queried block height.
-// - genericErr: The initial error returned when the block is not found.
-//
 // Expected errors during normal operation:
 // - storage.ErrNotFound - Indicates that the queried block does not exist in the local database.
 func ResolveHeightError(

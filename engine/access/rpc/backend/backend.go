@@ -20,6 +20,11 @@ import (
 	"github.com/onflow/flow-go/engine/access/rpc/backend/node_communicator"
 	"github.com/onflow/flow-go/engine/access/rpc/backend/query_mode"
 	"github.com/onflow/flow-go/engine/access/rpc/backend/scripts"
+	"github.com/onflow/flow-go/engine/access/rpc/backend/transactions"
+	"github.com/onflow/flow-go/engine/access/rpc/backend/transactions/error_message_provider"
+	"github.com/onflow/flow-go/engine/access/rpc/backend/transactions/provider"
+	"github.com/onflow/flow-go/engine/access/rpc/backend/transactions/status"
+	txstream "github.com/onflow/flow-go/engine/access/rpc/backend/transactions/stream"
 	"github.com/onflow/flow-go/engine/access/rpc/connection"
 	"github.com/onflow/flow-go/engine/access/subscription"
 	"github.com/onflow/flow-go/engine/access/subscription/tracker"
@@ -60,23 +65,22 @@ type Backend struct {
 	accounts.Accounts
 	events.Events
 	scripts.Scripts
-	backendTransactions
+	transactions.Transactions
+	txstream.TransactionStream
 	backendBlockHeaders
 	backendBlockDetails
 	backendExecutionResults
 	backendNetwork
 	backendSubscribeBlocks
-	backendSubscribeTransactions
 
-	state             protocol.State
-	chainID           flow.ChainID
-	collections       storage.Collections
-	executionReceipts storage.ExecutionReceipts
-	connFactory       connection.ConnectionFactory
+	state               protocol.State
+	collections         storage.Collections
+	staticCollectionRPC accessproto.AccessAPIClient
 
-	BlockTracker   tracker.BlockTracker
 	stateParams    protocol.Params
 	versionControl *version.VersionControl
+
+	BlockTracker tracker.BlockTracker
 }
 
 type Params struct {
@@ -113,18 +117,13 @@ type Params struct {
 	IndexReporter              state_synchronization.IndexReporter
 	VersionControl             *version.VersionControl
 	ExecNodeIdentitiesProvider *commonrpc.ExecutionNodeIdentitiesProvider
+	TxErrorMessageProvider     error_message_provider.TxErrorMessageProvider
 }
 
 var _ access.API = (*Backend)(nil)
-var _ TransactionErrorMessage = (*Backend)(nil)
 
 // New creates backend instance
 func New(params Params) (*Backend, error) {
-	retry := newRetry(params.Log)
-	if params.RetryEnabled {
-		retry.Activate()
-	}
-
 	loggedScripts, err := lru.New[[md5.Size]byte, time.Time](common.DefaultLoggedScriptsCacheSize)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize script logging cache: %w", err)
@@ -191,10 +190,111 @@ func New(params Params) (*Backend, error) {
 		return nil, fmt.Errorf("failed to create scripts: %w", err)
 	}
 
+	txValidator, err := validator.NewTransactionValidator(
+		validator.NewProtocolStateBlocks(params.State, params.IndexReporter),
+		params.ChainID.Chain(),
+		params.AccessMetrics,
+		validator.TransactionValidationOptions{
+			Expiry:                       flow.DefaultTransactionExpiry,
+			ExpiryBuffer:                 flow.DefaultTransactionExpiryBuffer,
+			AllowEmptyReferenceBlockID:   false,
+			AllowUnknownReferenceBlockID: false,
+			CheckScriptsParse:            false,
+			MaxGasLimit:                  flow.DefaultMaxTransactionGasLimit,
+			MaxTransactionByteSize:       flow.DefaultMaxTransactionByteSize,
+			MaxCollectionByteSize:        flow.DefaultMaxCollectionByteSize,
+			CheckPayerBalanceMode:        params.CheckPayerBalanceMode,
+		},
+		params.ScriptExecutor,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("could not create transaction validator: %w", err)
+	}
+
+	txStatusDeriver := status.NewTxStatusDeriver(params.State, params.LastFullBlockHeight)
+
+	localTxProvider := provider.NewLocalTransactionProvider(
+		params.State,
+		params.Collections,
+		params.Blocks,
+		params.EventsIndex,
+		params.TxResultsIndex,
+		params.TxErrorMessageProvider,
+		systemTxID,
+		txStatusDeriver,
+	)
+	execNodeTxProvider := provider.NewENTransactionProvider(
+		params.Log,
+		params.State,
+		params.Collections,
+		params.ConnFactory,
+		params.Communicator,
+		params.ExecNodeIdentitiesProvider,
+		txStatusDeriver,
+		systemTxID,
+		systemTx,
+	)
+	failoverTxProvider := provider.NewFailoverTransactionProvider(localTxProvider, execNodeTxProvider)
+
+	txParams := transactions.Params{
+		Log:                         params.Log,
+		Metrics:                     params.AccessMetrics,
+		State:                       params.State,
+		ChainID:                     params.ChainID,
+		SystemTx:                    systemTx,
+		SystemTxID:                  systemTxID,
+		StaticCollectionRPCClient:   params.CollectionRPC,
+		HistoricalAccessNodeClients: params.HistoricalAccessNodes,
+		NodeCommunicator:            params.Communicator,
+		ConnFactory:                 params.ConnFactory,
+		EnableRetries:               params.RetryEnabled,
+		NodeProvider:                params.ExecNodeIdentitiesProvider,
+		Blocks:                      params.Blocks,
+		Collections:                 params.Collections,
+		Transactions:                params.Transactions,
+		TxErrorMessageProvider:      params.TxErrorMessageProvider,
+		TxResultCache:               txResCache,
+		TxValidator:                 txValidator,
+		TxStatusDeriver:             txStatusDeriver,
+		EventsIndex:                 params.EventsIndex,
+		TxResultsIndex:              params.TxResultsIndex,
+	}
+
+	switch params.TxResultQueryMode {
+	case query_mode.IndexQueryModeLocalOnly:
+		txParams.TxProvider = localTxProvider
+	case query_mode.IndexQueryModeExecutionNodesOnly:
+		txParams.TxProvider = execNodeTxProvider
+	case query_mode.IndexQueryModeFailover:
+		txParams.TxProvider = failoverTxProvider
+	default:
+		return nil, fmt.Errorf("invalid tx result query mode: %s", params.TxResultQueryMode)
+	}
+
+	txBackend, err := transactions.NewTransactionsBackend(txParams)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create transactions backend: %w", err)
+	}
+
+	txStreamBackend := txstream.NewTransactionStreamBackend(
+		params.Log,
+		params.State,
+		params.SubscriptionHandler,
+		params.BlockTracker,
+		txBackend.SendTransaction,
+		params.Blocks,
+		params.Collections,
+		params.Transactions,
+		failoverTxProvider,
+		txStatusDeriver,
+	)
+
 	b := &Backend{
-		Accounts: *accountsBackend,
-		Events:   *eventsBackend,
-		Scripts:  *scriptsBackend,
+		Accounts:          *accountsBackend,
+		Events:            *eventsBackend,
+		Scripts:           *scriptsBackend,
+		Transactions:      *txBackend,
+		TransactionStream: *txStreamBackend,
 		backendBlockHeaders: backendBlockHeaders{
 			backendBlockBase: backendBlockBase{
 				blocks:  params.Blocks,
@@ -227,90 +327,15 @@ func New(params Params) (*Backend, error) {
 			blockTracker:        params.BlockTracker,
 		},
 
-		state:             params.State,
-		BlockTracker:      params.BlockTracker,
-		collections:       params.Collections,
-		executionReceipts: params.ExecutionReceipts,
-		connFactory:       params.ConnFactory,
-		chainID:           params.ChainID,
-		stateParams:       params.State.Params(),
-		versionControl:    params.VersionControl,
+		state:               params.State,
+		collections:         params.Collections,
+		staticCollectionRPC: params.CollectionRPC,
+		stateParams:         params.State.Params(),
+		versionControl:      params.VersionControl,
+		BlockTracker:        params.BlockTracker,
 	}
-
-	txValidator, err := configureTransactionValidator(params.State, params.ChainID, params.IndexReporter, params.AccessMetrics, params.ScriptExecutor, params.CheckPayerBalanceMode)
-	if err != nil {
-		return nil, fmt.Errorf("could not create transaction validator: %w", err)
-	}
-
-	b.backendTransactions = backendTransactions{
-		TransactionsLocalDataProvider: &TransactionsLocalDataProvider{
-			state:               params.State,
-			collections:         params.Collections,
-			blocks:              params.Blocks,
-			eventsIndex:         params.EventsIndex,
-			txResultsIndex:      params.TxResultsIndex,
-			systemTxID:          systemTxID,
-			lastFullBlockHeight: params.LastFullBlockHeight,
-		},
-		log:                        params.Log,
-		staticCollectionRPC:        params.CollectionRPC,
-		chainID:                    params.ChainID,
-		transactions:               params.Transactions,
-		txResultErrorMessages:      params.TxResultErrorMessages,
-		transactionValidator:       txValidator,
-		transactionMetrics:         params.AccessMetrics,
-		retry:                      retry,
-		connFactory:                params.ConnFactory,
-		previousAccessNodes:        params.HistoricalAccessNodes,
-		nodeCommunicator:           params.Communicator,
-		txResultCache:              txResCache,
-		txResultQueryMode:          params.TxResultQueryMode,
-		systemTx:                   systemTx,
-		systemTxID:                 systemTxID,
-		execNodeIdentitiesProvider: params.ExecNodeIdentitiesProvider,
-	}
-
-	// TODO: The TransactionErrorMessage interface should be reorganized in future, as it is implemented in backendTransactions but used in TransactionsLocalDataProvider, and its initialization is somewhat quirky.
-	b.backendTransactions.txErrorMessages = b
-
-	b.backendSubscribeTransactions = backendSubscribeTransactions{
-		backendTransactions: &b.backendTransactions,
-		log:                 params.Log,
-		subscriptionHandler: params.SubscriptionHandler,
-		blockTracker:        params.BlockTracker,
-		sendTransaction:     b.SendTransaction,
-	}
-
-	retry.SetBackend(b)
 
 	return b, nil
-}
-
-func configureTransactionValidator(
-	state protocol.State,
-	chainID flow.ChainID,
-	indexReporter state_synchronization.IndexReporter,
-	transactionMetrics module.TransactionValidationMetrics,
-	executor execution.ScriptExecutor,
-	checkPayerBalanceMode validator.PayerBalanceMode,
-) (*validator.TransactionValidator, error) {
-	return validator.NewTransactionValidator(
-		validator.NewProtocolStateBlocks(state, indexReporter),
-		chainID.Chain(),
-		transactionMetrics,
-		validator.TransactionValidationOptions{
-			Expiry:                       flow.DefaultTransactionExpiry,
-			ExpiryBuffer:                 flow.DefaultTransactionExpiryBuffer,
-			AllowEmptyReferenceBlockID:   false,
-			AllowUnknownReferenceBlockID: false,
-			CheckScriptsParse:            false,
-			MaxGasLimit:                  flow.DefaultMaxTransactionGasLimit,
-			MaxTransactionByteSize:       flow.DefaultMaxTransactionByteSize,
-			MaxCollectionByteSize:        flow.DefaultMaxCollectionByteSize,
-			CheckPayerBalanceMode:        checkPayerBalanceMode,
-		},
-		executor,
-	)
 }
 
 // Ping responds to requests when the server is up.
@@ -392,6 +417,6 @@ func (b *Backend) GetFullCollectionByID(_ context.Context, colID flow.Identifier
 
 func (b *Backend) GetNetworkParameters(_ context.Context) accessmodel.NetworkParameters {
 	return accessmodel.NetworkParameters{
-		ChainID: b.chainID,
+		ChainID: b.backendNetwork.chainID,
 	}
 }

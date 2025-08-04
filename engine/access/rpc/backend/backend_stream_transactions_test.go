@@ -144,16 +144,25 @@ func (s *TransactionStatusSuite) TearDownTest() {
 
 // initializeBackend sets up and initializes the backend with required dependencies, mocks, and configurations for testing.
 func (s *TransactionStatusSuite) initializeBackend() {
-	s.transactions.On("Store", mock.Anything).Return(nil).Maybe()
+	s.transactions.
+		On("Store", mock.Anything).
+		Return(nil).
+		Maybe()
 
-	s.execClient.On("GetTransactionResult", mock.Anything, mock.Anything).Return(nil, status.Error(codes.NotFound, "not found")).Maybe()
-	s.connectionFactory.On("GetExecutionAPIClient", mock.Anything).Return(s.execClient, &mocks.MockCloser{}, nil).Maybe()
+	s.execClient.
+		On("GetTransactionResult", mock.Anything, mock.Anything).
+		Return(nil, status.Error(codes.NotFound, "not found")).
+		Maybe()
 
-	s.colClient.On(
-		"SendTransaction",
-		mock.Anything,
-		mock.Anything,
-	).Return(&accessproto.SendTransactionResponse{}, nil).Maybe()
+	s.connectionFactory.
+		On("GetExecutionAPIClient", mock.Anything).
+		Return(s.execClient, &mocks.MockCloser{}, nil).
+		Maybe()
+
+	s.colClient.
+		On("SendTransaction", mock.Anything, mock.Anything).
+		Return(&accessproto.SendTransactionResponse{}, nil).
+		Maybe()
 
 	// generate blockCount consecutive blocks with associated seal, result and execution data
 	s.rootBlock = unittest.BlockFixture()
@@ -336,20 +345,20 @@ func (s *TransactionStatusSuite) addNewFinalizedBlock(parent *flow.Header, notif
 }
 
 func (s *TransactionStatusSuite) mockTransactionResult(transactionID *flow.Identifier, hasTransactionResultInStorage *bool) {
-	s.transactionResults.On(
-		"ByBlockIDTransactionID",
-		mock.AnythingOfType("flow.Identifier"),
-		mock.AnythingOfType("flow.Identifier"),
-	).Return(func(blockID, txID flow.Identifier) (*flow.LightTransactionResult, error) {
-		if *hasTransactionResultInStorage {
-			return &flow.LightTransactionResult{
-				TransactionID:   *transactionID,
-				Failed:          false,
-				ComputationUsed: 0,
-			}, nil
-		}
-		return nil, storage.ErrNotFound
-	})
+	s.transactionResults.
+		On("ByBlockIDTransactionID", mock.Anything, mock.Anything).
+		Return(
+			func(blockID, txID flow.Identifier) (*flow.LightTransactionResult, error) {
+				if *hasTransactionResultInStorage {
+					return &flow.LightTransactionResult{
+						TransactionID:   *transactionID,
+						Failed:          false,
+						ComputationUsed: 0,
+					}, nil
+				}
+				return nil, storage.ErrNotFound
+			},
+		)
 }
 
 func (s *TransactionStatusSuite) addBlockWithTransaction(transaction *flow.Transaction) {
