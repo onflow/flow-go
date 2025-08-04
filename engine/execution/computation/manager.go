@@ -235,7 +235,7 @@ func DefaultFVMOptions(chainID flow.ChainID, cadenceTracing bool, extensiveTraci
 				},
 			)),
 		fvm.WithEVMEnabled(true),
-		fvm.WithScheduleCallbacksEnabled(true), // todo take in correct value
+		fvm.WithScheduleCallbacksEnabled(scheduleCallbacksEnabled),
 	}
 
 	if extensiveTracing {
