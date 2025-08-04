@@ -15,13 +15,16 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	hotmodel "github.com/onflow/flow-go/consensus/hotstuff/model"
+	"github.com/onflow/flow-go/engine/access/index"
 	accessmock "github.com/onflow/flow-go/engine/access/mock"
-	"github.com/onflow/flow-go/engine/access/rpc/backend"
+	"github.com/onflow/flow-go/engine/access/rpc/backend/node_communicator"
+	"github.com/onflow/flow-go/engine/access/rpc/backend/transactions/error_message_provider"
 	connectionmock "github.com/onflow/flow-go/engine/access/rpc/connection/mock"
 	commonrpc "github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/irrecoverable"
+	syncmock "github.com/onflow/flow-go/module/state_synchronization/mock"
 	protocol "github.com/onflow/flow-go/state/protocol/mock"
 	storage "github.com/onflow/flow-go/storage/mock"
 	"github.com/onflow/flow-go/storage/operation/badgerimpl"
@@ -45,6 +48,11 @@ type TxErrorMessagesEngineSuite struct {
 	headers         *storage.Headers
 	receipts        *storage.ExecutionReceipts
 	txErrorMessages *storage.TransactionResultErrorMessages
+	lightTxResults  *storage.LightTransactionResults
+
+	reporter       *syncmock.IndexReporter
+	indexReporter  *index.Reporter
+	txResultsIndex *index.TransactionResultsIndex
 
 	enNodeIDs   flow.IdentityList
 	execClient  *accessmock.ExecutionAPIClient
@@ -86,6 +94,12 @@ func (s *TxErrorMessagesEngineSuite) SetupTest() {
 	s.headers = storage.NewHeaders(s.T())
 	s.receipts = storage.NewExecutionReceipts(s.T())
 	s.txErrorMessages = storage.NewTransactionResultErrorMessages(s.T())
+	s.lightTxResults = storage.NewLightTransactionResults(s.T())
+	s.reporter = syncmock.NewIndexReporter(s.T())
+	s.indexReporter = index.NewReporter()
+	err := s.indexReporter.Initialize(s.reporter)
+	s.Require().NoError(err)
+	s.txResultsIndex = index.NewTransactionResultsIndex(s.indexReporter, s.lightTxResults)
 
 	blockCount := 5
 	s.blockMap = make(map[uint64]*flow.Block, blockCount)
@@ -145,26 +159,18 @@ func (s *TxErrorMessagesEngineSuite) initEngine(ctx irrecoverable.SignalerContex
 		flow.IdentifierList{},
 	)
 
-	// Initialize the backend with the mocked state, blocks, headers, transactions, etc.
-	backend, err := backend.New(backend.Params{
-		State:                      s.proto.state,
-		Headers:                    s.headers,
-		ExecutionReceipts:          s.receipts,
-		ConnFactory:                s.connFactory,
-		MaxHeightRange:             backend.DefaultMaxHeightRange,
-		Log:                        s.log,
-		SnapshotHistoryLimit:       backend.DefaultSnapshotHistoryLimit,
-		Communicator:               backend.NewNodeCommunicator(false),
-		ScriptExecutionMode:        backend.IndexQueryModeExecutionNodesOnly,
-		TxResultQueryMode:          backend.IndexQueryModeExecutionNodesOnly,
-		ChainID:                    flow.Testnet,
-		ExecNodeIdentitiesProvider: execNodeIdentitiesProvider,
-	})
-	require.NoError(s.T(), err)
+	errorMessageProvider := error_message_provider.NewTxErrorMessageProvider(
+		s.log,
+		s.txErrorMessages,
+		s.txResultsIndex,
+		s.connFactory,
+		node_communicator.NewNodeCommunicator(false),
+		execNodeIdentitiesProvider,
+	)
 
 	txResultErrorMessagesCore := NewTxErrorMessagesCore(
 		s.log,
-		backend,
+		errorMessageProvider,
 		s.txErrorMessages,
 		execNodeIdentitiesProvider,
 	)
