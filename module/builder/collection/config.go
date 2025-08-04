@@ -39,6 +39,10 @@ type Config struct {
 	// rate limiting.
 	UnlimitedPayers map[flow.Address]struct{}
 
+	// PriorityPayers is a set of addresses which are prioritized for inclusion
+	// in the transaction selection algorithm.
+	PriorityPayers map[flow.Address]struct{}
+
 	// MaxCollectionByteSize is the maximum byte size of a collection.
 	MaxCollectionByteSize uint64
 
@@ -94,6 +98,16 @@ func WithUnlimitedPayers(payers ...flow.Address) Opt {
 	}
 	return func(c *Config) {
 		c.UnlimitedPayers = lookup
+	}
+}
+
+func WithPriorityPayers(payers ...flow.Address) Opt {
+	lookup := make(map[flow.Address]struct{})
+	for _, payer := range payers {
+		lookup[payer] = struct{}{}
+	}
+	return func(c *Config) {
+		c.PriorityPayers = lookup
 	}
 }
 

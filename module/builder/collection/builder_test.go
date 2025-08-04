@@ -1264,6 +1264,7 @@ func (suite *BuilderSuite) TestBuildOn_SystemTxAlwaysIncluded() {
 
 	// create builder with 5 tx/payer and max 10 tx/collection
 	// configure an unlimited payer
+	serviceAccountAddress := unittest.AddressFixture() // priority address
 	suite.builder, _ = builder.NewBuilder(
 		suite.db,
 		trace.NewNoopTracer(),
@@ -1277,7 +1278,8 @@ func (suite *BuilderSuite) TestBuildOn_SystemTxAlwaysIncluded() {
 		unittest.Logger(),
 		suite.epochCounter,
 		updatable_configs.DefaultBySealingLagRateLimiterConfigs(),
-		builder.WithMaxCollectionSize(0),
+		builder.WithMaxCollectionSize(2),
+		builder.WithPriorityPayers(serviceAccountAddress),
 	)
 
 	// fill the pool with 100 transactions
@@ -1286,7 +1288,6 @@ func (suite *BuilderSuite) TestBuildOn_SystemTxAlwaysIncluded() {
 		tx.ReferenceBlockID = suite.ProtoStateRoot().ID()
 		return &tx
 	})
-	serviceAccountAddress := suite.protoState.Params().ChainID().Chain().ServiceAddress()
 	suite.FillPool(2, func() *flow.TransactionBody {
 		tx := unittest.TransactionBodyFixture()
 		tx.ReferenceBlockID = suite.ProtoStateRoot().ID()

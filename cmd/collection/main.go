@@ -74,6 +74,7 @@ func main() {
 		builderPayerRateLimitDryRun       bool
 		builderPayerRateLimit             float64
 		builderUnlimitedPayers            []string
+		builderPriorityPayers             []string
 		hotstuffMinTimeout                time.Duration
 		hotstuffTimeoutAdjustmentFactor   float64
 		hotstuffHappyPathMaxRoundFailures uint64
@@ -144,6 +145,8 @@ func main() {
 			"rate limit for each payer (transactions/collection)")
 		flags.StringSliceVar(&builderUnlimitedPayers, "builder-unlimited-payers", []string{}, // no unlimited payers
 			"set of payer addresses which are omitted from rate limiting")
+		flags.StringSliceVar(&builderPriorityPayers, "builder-priority-payers", []string{}, // no priority payers
+			"set of payer addresses which are prioritized in tx selection algorithm")
 		flags.UintVar(&maxCollectionSize, "builder-max-collection-size", flow.DefaultMaxCollectionSize,
 			"maximum number of transactions in proposed collections")
 		flags.Uint64Var(&maxCollectionByteSize, "builder-max-collection-byte-size", flow.DefaultMaxCollectionByteSize,
@@ -538,6 +541,13 @@ func main() {
 				unlimitedPayers = append(unlimitedPayers, payerAddr)
 			}
 
+			// convert hex string flag values to addresses
+			priorityPayers := make([]flow.Address, 0, len(builderPriorityPayers))
+			for _, payerStr := range builderPriorityPayers {
+				payerAddr := flow.HexToAddress(payerStr)
+				priorityPayers = append(priorityPayers, payerAddr)
+			}
+
 			builderFactory, err := factories.NewBuilderFactory(
 				node.DB,
 				node.State,
@@ -554,6 +564,7 @@ func main() {
 				builder.WithRateLimitDryRun(builderPayerRateLimitDryRun),
 				builder.WithMaxPayerTransactionRate(builderPayerRateLimit),
 				builder.WithUnlimitedPayers(unlimitedPayers...),
+				builder.WithPriorityPayers(priorityPayers...),
 			)
 			if err != nil {
 				return nil, err
