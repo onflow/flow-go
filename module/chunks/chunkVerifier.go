@@ -442,7 +442,7 @@ func (fcv *ChunkVerifier) createSystemChunk(
 	processTx := fvm.Transaction(processBody, txIndex)
 
 	// Execute process callback transaction
-	executionSnapshot, processOutput, err := fcv.vm.Run(context, processTx, snapshotTree)
+	executionSnapshot, processOutput, err := fcv.vm.Run(context, processTx, *snapshotTree)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to execute process callback transaction: %w", err)
 	}
