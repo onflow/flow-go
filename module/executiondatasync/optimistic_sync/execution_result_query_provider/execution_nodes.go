@@ -61,7 +61,7 @@ func (en *ExecutionNodesSelector) SelectExecutionNodes(
 	// since the result is chosen based on the user's required executors, this should always return
 	// at least one match.
 	if len(userRequiredExecutors) > 0 {
-		chosenIDs = executors.Filter(filter.And(filter.HasNodeID[flow.Identity](userRequiredExecutors...)))
+		chosenIDs = executors.Filter(filter.HasNodeID[flow.Identity](userRequiredExecutors...))
 		return chosenIDs.ToSkeleton(), nil
 	}
 
@@ -76,7 +76,7 @@ func (en *ExecutionNodesSelector) SelectExecutionNodes(
 	// if only preferred ENs are set, then select any preferred ENs that have executed the result,
 	// and fall back to selecting any executors.
 	if len(en.preferredENIdentifiers) > 0 {
-		chosenIDs = executors.Filter(filter.And(filter.HasNodeID[flow.Identity](en.preferredENIdentifiers...)))
+		chosenIDs = executors.Filter(filter.HasNodeID[flow.Identity](en.preferredENIdentifiers...))
 		if len(chosenIDs) >= en.maxNodesCnt {
 			return chosenIDs.ToSkeleton(), nil
 		}
@@ -99,14 +99,14 @@ func (en *ExecutionNodesSelector) selectFromRequiredENIDs(
 	// add any preferred ENs that have executed the result and return if there are enough nodes
 	// if both preferred and required ENs are set, then preferred MUST be a subset of required
 	if len(en.preferredENIdentifiers) > 0 {
-		chosenIDs = executors.Filter(filter.And(filter.HasNodeID[flow.Identity](en.preferredENIdentifiers...)))
+		chosenIDs = executors.Filter(filter.HasNodeID[flow.Identity](en.preferredENIdentifiers...))
 		if len(chosenIDs) >= en.maxNodesCnt {
 			return chosenIDs
 		}
 	}
 
 	// next, add any other required ENs that have executed the result
-	executedRequired := executors.Filter(filter.And(filter.HasNodeID[flow.Identity](en.requiredENIdentifiers...)))
+	executedRequired := executors.Filter(filter.HasNodeID[flow.Identity](en.requiredENIdentifiers...))
 	chosenIDs = en.mergeExecutionNodes(chosenIDs, executedRequired)
 
 	return chosenIDs
