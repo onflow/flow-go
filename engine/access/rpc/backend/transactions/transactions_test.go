@@ -26,7 +26,7 @@ import (
 	"github.com/onflow/flow-go/engine/access/index"
 	accessmock "github.com/onflow/flow-go/engine/access/mock"
 	"github.com/onflow/flow-go/engine/access/rpc/backend/node_communicator"
-	"github.com/onflow/flow-go/engine/access/rpc/backend/transactions/error_message_provider"
+	"github.com/onflow/flow-go/engine/access/rpc/backend/transactions/error_messages"
 	"github.com/onflow/flow-go/engine/access/rpc/backend/transactions/provider"
 	"github.com/onflow/flow-go/engine/access/rpc/backend/transactions/retrier"
 	txstatus "github.com/onflow/flow-go/engine/access/rpc/backend/transactions/status"
@@ -89,7 +89,7 @@ type Suite struct {
 	eventsIndex    *index.EventsIndex
 	txResultsIndex *index.TransactionResultsIndex
 
-	errMessageProvider error_message_provider.TxErrorMessageProvider
+	errorMessageProvider error_messages.Provider
 
 	chainID  flow.ChainID
 	systemTx *flow.TransactionBody
@@ -152,7 +152,7 @@ func (suite *Suite) SetupTest() {
 
 	suite.fixedExecutionNodeIDs = nil
 	suite.preferredExecutionNodeIDs = nil
-	suite.errMessageProvider = nil
+	suite.errorMessageProvider = nil
 }
 
 func (suite *Suite) TearDownTest() {
@@ -213,7 +213,7 @@ func (suite *Suite) defaultTransactionsParams() Params {
 		Blocks:                      suite.blocks,
 		Collections:                 suite.collections,
 		Transactions:                suite.transactions,
-		TxErrorMessageProvider:      suite.errMessageProvider,
+		TxErrorMessageProvider:      suite.errorMessageProvider,
 		TxResultCache:               suite.txResultCache,
 		TxProvider:                  txProvider,
 		TxValidator:                 txValidator,
@@ -776,7 +776,7 @@ func (suite *Suite) TestGetTransactionResult_FromStorage() {
 		Once()
 
 	params := suite.defaultTransactionsParams()
-	params.TxErrorMessageProvider = error_message_provider.NewTxErrorMessageProvider(
+	params.TxErrorMessageProvider = error_messages.NewTxErrorMessageProvider(
 		params.Log,
 		nil,
 		params.TxResultsIndex,
@@ -866,7 +866,7 @@ func (suite *Suite) TestTransactionByIndexFromStorage() {
 		Once()
 
 	params := suite.defaultTransactionsParams()
-	params.TxErrorMessageProvider = error_message_provider.NewTxErrorMessageProvider(
+	params.TxErrorMessageProvider = error_messages.NewTxErrorMessageProvider(
 		params.Log,
 		nil,
 		params.TxResultsIndex,
@@ -980,7 +980,7 @@ func (suite *Suite) TestTransactionResultsByBlockIDFromStorage() {
 		Once()
 
 	params := suite.defaultTransactionsParams()
-	params.TxErrorMessageProvider = error_message_provider.NewTxErrorMessageProvider(
+	params.TxErrorMessageProvider = error_messages.NewTxErrorMessageProvider(
 		params.Log,
 		nil,
 		params.TxResultsIndex,
