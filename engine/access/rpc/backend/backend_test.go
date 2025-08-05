@@ -25,7 +25,11 @@ import (
 
 	"github.com/onflow/flow-go/cmd/build"
 	accessmock "github.com/onflow/flow-go/engine/access/mock"
-	backendmock "github.com/onflow/flow-go/engine/access/rpc/backend/mock"
+	"github.com/onflow/flow-go/engine/access/rpc/backend/common"
+	"github.com/onflow/flow-go/engine/access/rpc/backend/events"
+	"github.com/onflow/flow-go/engine/access/rpc/backend/node_communicator"
+	communicatormock "github.com/onflow/flow-go/engine/access/rpc/backend/node_communicator/mock"
+	"github.com/onflow/flow-go/engine/access/rpc/backend/query_mode"
 	"github.com/onflow/flow-go/engine/access/rpc/connection"
 	connectionmock "github.com/onflow/flow-go/engine/access/rpc/connection/mock"
 	commonrpc "github.com/onflow/flow-go/engine/common/rpc"
@@ -87,7 +91,7 @@ type Suite struct {
 	historicalAccessClient *accessmock.AccessAPIClient
 
 	connectionFactory *connectionmock.ConnectionFactory
-	communicator      *backendmock.Communicator
+	communicator      *communicatormock.Communicator
 
 	chainID  flow.ChainID
 	systemTx *flow.TransactionBody
@@ -127,7 +131,7 @@ func (suite *Suite) SetupTest() {
 	suite.historicalAccessClient = new(accessmock.AccessAPIClient)
 	suite.connectionFactory = connectionmock.NewConnectionFactory(suite.T())
 
-	suite.communicator = new(backendmock.Communicator)
+	suite.communicator = new(communicatormock.Communicator)
 
 	var err error
 	suite.systemTx, err = blueprints.SystemChunkTransaction(flow.Testnet.Chain())
@@ -177,7 +181,8 @@ func (suite *Suite) TestGetLatestFinalizedBlockHeader() {
 
 	// query the handler for the latest finalized block
 	header, stat, err := backend.GetLatestBlockHeader(context.Background(), false)
-	suite.checkResponse(header, err)
+	suite.Require().NoError(err)
+	suite.Require().NotNil(header)
 
 	// make sure we got the latest block
 	suite.Require().Equal(block.ID(), header.ID())
@@ -819,7 +824,8 @@ func (suite *Suite) TestGetLatestSealedBlockHeader() {
 
 		// query the handler for the latest sealed block
 		header, stat, err := backend.GetLatestBlockHeader(context.Background(), true)
-		suite.checkResponse(header, err)
+		suite.Require().NoError(err)
+		suite.Require().NotNil(header)
 
 		// make sure we got the latest sealed block
 		suite.Require().Equal(block.ID(), header.ID())
@@ -864,7 +870,8 @@ func (suite *Suite) TestGetTransaction() {
 	suite.Require().NoError(err)
 
 	actual, err := backend.GetTransaction(context.Background(), transaction.ID())
-	suite.checkResponse(actual, err)
+	suite.Require().NoError(err)
+	suite.Require().NotNil(actual)
 
 	suite.Require().Equal(expected, *actual)
 
@@ -888,7 +895,8 @@ func (suite *Suite) TestGetCollection() {
 
 	actual, err := backend.GetCollectionByID(context.Background(), expected.ID())
 	suite.transactions.AssertExpectations(suite.T())
-	suite.checkResponse(actual, err)
+	suite.Require().NoError(err)
+	suite.Require().NotNil(actual)
 
 	suite.Equal(expected, *actual)
 	suite.assertAllExpectations()
@@ -937,7 +945,8 @@ func (suite *Suite) TestGetTransactionResultByIndex() {
 	suite.Run("TestGetTransactionResultByIndex - happy path", func() {
 		suite.snapshot.On("Head").Return(block.Header, nil).Once()
 		result, err := backend.GetTransactionResultByIndex(ctx, blockId, index, entitiesproto.EventEncodingVersion_JSON_CDC_V0)
-		suite.checkResponse(result, err)
+		suite.Require().NoError(err)
+		suite.Require().NotNil(result)
 		suite.Assert().Equal(result.BlockHeight, block.Header.Height)
 
 		suite.assertAllExpectations()
@@ -1003,7 +1012,8 @@ func (suite *Suite) TestGetTransactionResultsByBlockID() {
 		suite.snapshot.On("Head").Return(block.Header, nil).Once()
 
 		result, err := backend.GetTransactionResultsByBlockID(ctx, blockId, entitiesproto.EventEncodingVersion_JSON_CDC_V0)
-		suite.checkResponse(result, err)
+		suite.Require().NoError(err)
+		suite.Require().NotNil(result)
 
 		suite.assertAllExpectations()
 	})
@@ -1095,7 +1105,8 @@ func (suite *Suite) TestTransactionStatusTransition() {
 
 	// first call - when block under test is greater height than the sealed head, but execution node does not know about Tx
 	result, err := backend.GetTransactionResult(ctx, txID, flow.ZeroID, flow.ZeroID, entitiesproto.EventEncodingVersion_JSON_CDC_V0)
-	suite.checkResponse(result, err)
+	suite.Require().NoError(err)
+	suite.Require().NotNil(result)
 
 	// status should be finalized since the sealed Blocks is smaller in height
 	suite.Assert().Equal(flow.TransactionStatusFinalized, result.Status)
@@ -1110,7 +1121,8 @@ func (suite *Suite) TestTransactionStatusTransition() {
 
 	// second call - when block under test's height is greater height than the sealed head
 	result, err = backend.GetTransactionResult(ctx, txID, flow.ZeroID, flow.ZeroID, entitiesproto.EventEncodingVersion_JSON_CDC_V0)
-	suite.checkResponse(result, err)
+	suite.Require().NoError(err)
+	suite.Require().NotNil(result)
 
 	// status should be executed since no `NotFound` error in the `GetTransactionResult` call
 	suite.Assert().Equal(flow.TransactionStatusExecuted, result.Status)
@@ -1120,7 +1132,8 @@ func (suite *Suite) TestTransactionStatusTransition() {
 
 	// third call - when block under test's height is less than sealed head's height
 	result, err = backend.GetTransactionResult(ctx, txID, flow.ZeroID, flow.ZeroID, entitiesproto.EventEncodingVersion_JSON_CDC_V0)
-	suite.checkResponse(result, err)
+	suite.Require().NoError(err)
+	suite.Require().NotNil(result)
 
 	// status should be sealed since the sealed Blocks is greater in height
 	suite.Assert().Equal(flow.TransactionStatusSealed, result.Status)
@@ -1131,7 +1144,8 @@ func (suite *Suite) TestTransactionStatusTransition() {
 	// fourth call - when block under test's height so much less than the head's height that it's considered expired,
 	// but since there is a execution result, means it should retain it's sealed status
 	result, err = backend.GetTransactionResult(ctx, txID, flow.ZeroID, flow.ZeroID, entitiesproto.EventEncodingVersion_JSON_CDC_V0)
-	suite.checkResponse(result, err)
+	suite.Require().NoError(err)
+	suite.Require().NotNil(result)
 
 	// status should be expired since
 	suite.Assert().Equal(flow.TransactionStatusSealed, result.Status)
@@ -1190,7 +1204,8 @@ func (suite *Suite) TestTransactionExpiredStatusTransition() {
 	suite.Run("pending", func() {
 		// referenced block isn't known yet, so should return pending status
 		result, err := backend.GetTransactionResult(ctx, txID, flow.ZeroID, flow.ZeroID, entitiesproto.EventEncodingVersion_JSON_CDC_V0)
-		suite.checkResponse(result, err)
+		suite.Require().NoError(err)
+		suite.Require().NotNil(result)
 
 		suite.Assert().Equal(flow.TransactionStatusPending, result.Status)
 	})
@@ -1207,7 +1222,8 @@ func (suite *Suite) TestTransactionExpiredStatusTransition() {
 			suite.Require().NoError(err)
 
 			result, err := backend.GetTransactionResult(ctx, txID, flow.ZeroID, flow.ZeroID, entitiesproto.EventEncodingVersion_JSON_CDC_V0)
-			suite.checkResponse(result, err)
+			suite.Require().NoError(err)
+			suite.Require().NotNil(result)
 			suite.Assert().Equal(flow.TransactionStatusPending, result.Status)
 		})
 
@@ -1221,7 +1237,8 @@ func (suite *Suite) TestTransactionExpiredStatusTransition() {
 			headBlock.Header.Height = block.Header.Height + flow.DefaultTransactionExpiry/2
 
 			result, err := backend.GetTransactionResult(ctx, txID, flow.ZeroID, flow.ZeroID, entitiesproto.EventEncodingVersion_JSON_CDC_V0)
-			suite.checkResponse(result, err)
+			suite.Require().NoError(err)
+			suite.Require().NotNil(result)
 			suite.Assert().Equal(flow.TransactionStatusPending, result.Status)
 		})
 
@@ -1232,7 +1249,8 @@ func (suite *Suite) TestTransactionExpiredStatusTransition() {
 			headBlock.Header.Height = block.Header.Height + flow.DefaultTransactionExpiry + 1
 
 			result, err := backend.GetTransactionResult(ctx, txID, flow.ZeroID, flow.ZeroID, entitiesproto.EventEncodingVersion_JSON_CDC_V0)
-			suite.checkResponse(result, err)
+			suite.Require().NoError(err)
+			suite.Require().NotNil(result)
 			suite.Assert().Equal(flow.TransactionStatusExpired, result.Status)
 		})
 	})
@@ -1344,7 +1362,8 @@ func (suite *Suite) TestTransactionPendingToFinalizedStatusTransition() {
 	suite.Run("pending", func() {
 		currentState = flow.TransactionStatusPending
 		result, err := backend.GetTransactionResult(ctx, txID, flow.ZeroID, flow.ZeroID, entitiesproto.EventEncodingVersion_JSON_CDC_V0)
-		suite.checkResponse(result, err)
+		suite.Require().NoError(err)
+		suite.Require().NotNil(result)
 		suite.Assert().Equal(flow.TransactionStatusPending, result.Status)
 		// assert that no call to an execution node is made
 		suite.execClient.AssertNotCalled(suite.T(), "GetTransactionResult", mock.Anything, mock.Anything)
@@ -1355,7 +1374,8 @@ func (suite *Suite) TestTransactionPendingToFinalizedStatusTransition() {
 	suite.Run("finalized", func() {
 		currentState = flow.TransactionStatusFinalized
 		result, err := backend.GetTransactionResult(ctx, txID, flow.ZeroID, flow.ZeroID, entitiesproto.EventEncodingVersion_JSON_CDC_V0)
-		suite.checkResponse(result, err)
+		suite.Require().NoError(err)
+		suite.Require().NotNil(result)
 		suite.Assert().Equal(flow.TransactionStatusFinalized, result.Status)
 	})
 
@@ -1380,7 +1400,8 @@ func (suite *Suite) TestTransactionResultUnknown() {
 
 	// first call - when block under test is greater height than the sealed head, but execution node does not know about Tx
 	result, err := backend.GetTransactionResult(ctx, txID, flow.ZeroID, flow.ZeroID, entitiesproto.EventEncodingVersion_JSON_CDC_V0)
-	suite.checkResponse(result, err)
+	suite.Require().NoError(err)
+	suite.Require().NotNil(result)
 
 	// status should be reported as unknown
 	suite.Assert().Equal(flow.TransactionStatusUnknown, result.Status)
@@ -1410,7 +1431,8 @@ func (suite *Suite) TestGetLatestFinalizedBlock() {
 
 		// query the handler for the latest finalized header
 		actual, stat, err := backend.GetLatestBlock(context.Background(), false)
-		suite.checkResponse(actual, err)
+		suite.Require().NoError(err)
+		suite.Require().NotNil(actual)
 
 		// make sure we got the latest header
 		suite.Require().Equal(expected, *actual)
@@ -1489,7 +1511,8 @@ func (suite *Suite) TestGetExecutionResultByID() {
 
 		// execute request
 		er, err := backend.GetExecutionResultByID(ctx, executionResult.ID())
-		suite.checkResponse(er, err)
+		suite.Require().NoError(err)
+		suite.Require().NotNil(er)
 
 		require.Equal(suite.T(), executionResult, er)
 	})
@@ -1553,7 +1576,8 @@ func (suite *Suite) TestGetExecutionResultByBlockID() {
 
 		// execute request
 		er, err := backend.GetExecutionResultForBlockID(ctx, blockID)
-		suite.checkResponse(er, err)
+		suite.Require().NoError(err)
+		suite.Require().NotNil(er)
 
 		require.Equal(suite.T(), executionResult, er)
 	})
@@ -1780,7 +1804,8 @@ func (suite *Suite) TestGetTransactionResultEventEncodingVersion() {
 				Once()
 
 			result, err := backend.GetTransactionResult(ctx, txId, blockId, flow.ZeroID, version)
-			suite.checkResponse(result, err)
+			suite.Require().NoError(err)
+			suite.Require().NotNil(result)
 
 			var expectedResult []flow.Event
 			switch version {
@@ -1844,7 +1869,8 @@ func (suite *Suite) TestGetTransactionResultByIndexAndBlockIdEventEncodingVersio
 				Once()
 
 			result, err := backend.GetTransactionResultByIndex(ctx, blockId, index, version)
-			suite.checkResponse(result, err)
+			suite.Require().NoError(err)
+			suite.Require().NotNil(result)
 
 			var expectedResult []flow.Event
 			switch version {
@@ -1875,7 +1901,8 @@ func (suite *Suite) TestGetTransactionResultByIndexAndBlockIdEventEncodingVersio
 				Once()
 
 			results, err := backend.GetTransactionResultsByBlockID(ctx, blockId, version)
-			suite.checkResponse(results, err)
+			suite.Require().NoError(err)
+			suite.Require().NotNil(results)
 
 			var expectedResult []flow.Event
 			switch version {
@@ -1948,11 +1975,6 @@ func (suite *Suite) assertAllExpectations() {
 	suite.execClient.AssertExpectations(suite.T())
 }
 
-func (suite *Suite) checkResponse(resp interface{}, err error) {
-	suite.Require().NoError(err)
-	suite.Require().NotNil(resp)
-}
-
 func (suite *Suite) setupReceipts(block *flow.Block) ([]*flow.ExecutionReceipt, flow.IdentityList) {
 	ids := unittest.IdentityListFixture(2, unittest.WithRole(flow.RoleExecution))
 	receipt1 := unittest.ReceiptForBlockFixture(block)
@@ -2006,13 +2028,15 @@ func (suite *Suite) defaultBackendParams() Params {
 		ExecutionResults:     suite.results,
 		ChainID:              suite.chainID,
 		CollectionRPC:        suite.colClient,
-		MaxHeightRange:       DefaultMaxHeightRange,
+		MaxHeightRange:       events.DefaultMaxHeightRange,
 		SnapshotHistoryLimit: DefaultSnapshotHistoryLimit,
-		Communicator:         NewNodeCommunicator(false),
+		Communicator:         node_communicator.NewNodeCommunicator(false),
 		AccessMetrics:        metrics.NewNoopCollector(),
 		Log:                  suite.log,
 		BlockTracker:         nil,
-		TxResultQueryMode:    IndexQueryModeExecutionNodesOnly,
+		TxResultQueryMode:    query_mode.IndexQueryModeExecutionNodesOnly,
+		EventQueryMode:       query_mode.IndexQueryModeExecutionNodesOnly,
+		ScriptExecutionMode:  query_mode.IndexQueryModeExecutionNodesOnly,
 		LastFullBlockHeight:  suite.lastFullBlockHeight,
 		VersionControl:       suite.versionControl,
 		ExecNodeIdentitiesProvider: commonrpc.NewExecutionNodeIdentitiesProvider(
@@ -2025,9 +2049,9 @@ func (suite *Suite) defaultBackendParams() Params {
 	}
 }
 
-// TestResolveHeightError tests the resolveHeightError function for various scenarios where the block height
+// TestResolveHeightError tests the ResolveHeightError function for various scenarios where the block height
 // is below the spork root height, below the node root height, above the node root height, or when a different
-// error is provided. It validates that resolveHeightError returns an appropriate error message for each case.
+// error is provided. It validates that ResolveHeightError returns an appropriate error message for each case.
 //
 // Test cases:
 // 1) If height is below the spork root height, it suggests using a historic node.
@@ -2090,7 +2114,7 @@ func (suite *Suite) TestResolveHeightError() {
 				stateParams.On("SealedRoot").Return(sealedRootHeader, nil).Once()
 			}
 
-			err := resolveHeightError(stateParams, test.height, test.genericErr)
+			err := common.ResolveHeightError(stateParams, test.height, test.genericErr)
 
 			if test.expectOriginalErr {
 				suite.Assert().True(errors.Is(err, test.genericErr))
