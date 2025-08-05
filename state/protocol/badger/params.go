@@ -119,62 +119,18 @@ func (p *InstanceParams) Seal() *flow.Seal {
 // ReadGlobalParams reads the global parameters from the database and returns them as in-memory representation.
 // No errors are expected during normal operation.
 func ReadGlobalParams(db *badger.DB) (*inmem.Params, error) {
-	var sporkID flow.Identifier
-	err := db.View(operation.RetrieveSporkID(&sporkID))
-	if err != nil {
-		return nil, fmt.Errorf("could not get spork id: %w", err)
-	}
-
-	var sporkRootBlockHeight uint64
-	err = db.View(operation.RetrieveSporkRootBlockHeight(&sporkRootBlockHeight))
+	var sporkRootBlock flow.Block
+	err := db.View(operation.RetrieveSporkRootBlock(&sporkRootBlock))
 	if err != nil {
 		return nil, fmt.Errorf("could not get spork root block height: %w", err)
 	}
 
-	var sporkRootBlockView uint64
-	err = db.View(operation.RetrieveSporkRootBlockView(&sporkRootBlockView))
-	if err != nil {
-		return nil, fmt.Errorf("could not get spork root block view: %w", err)
-	}
-
-	root, err := ReadFinalizedRoot(db) // retrieve root header
-	if err != nil {
-		return nil, fmt.Errorf("could not get root: %w", err)
-	}
-
 	return inmem.NewParams(
 		inmem.EncodableParams{
-			ChainID:              root.ChainID,
-			SporkID:              sporkID,
-			SporkRootBlockHeight: sporkRootBlockHeight,
-			SporkRootBlockView:   sporkRootBlockView,
+			ChainID:              sporkRootBlock.ChainID,
+			SporkID:              sporkRootBlock.ID(),
+			SporkRootBlockHeight: sporkRootBlock.Height,
+			SporkRootBlockView:   sporkRootBlock.View,
 		},
 	), nil
-}
-
-// ReadFinalizedRoot retrieves the root block's header from the database.
-// This information is immutable for the runtime of the software and may be cached.
-func ReadFinalizedRoot(db *badger.DB) (*flow.Header, error) {
-	var finalizedRootHeight uint64
-	var rootID flow.Identifier
-	var rootHeader flow.Header
-	err := db.View(func(tx *badger.Txn) error {
-		err := operation.RetrieveRootHeight(&finalizedRootHeight)(tx)
-		if err != nil {
-			return fmt.Errorf("could not retrieve finalized root height: %w", err)
-		}
-		err = operation.LookupBlockHeight(finalizedRootHeight, &rootID)(tx) // look up root block ID
-		if err != nil {
-			return fmt.Errorf("could not retrieve root header's ID by height: %w", err)
-		}
-		err = operation.RetrieveHeader(rootID, &rootHeader)(tx) // retrieve root header
-		if err != nil {
-			return fmt.Errorf("could not retrieve root header: %w", err)
-		}
-		return nil
-	})
-	if err != nil {
-		return nil, fmt.Errorf("failed to read root information from database: %w", err)
-	}
-	return &rootHeader, nil
 }

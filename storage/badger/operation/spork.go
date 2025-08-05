@@ -6,38 +6,14 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-// InsertSporkID inserts the spork ID for the present spork. A single database
+// InsertSporkRootBlock inserts the spork root block for the present spork. A single database
 // and protocol state instance spans at most one spork, so this is inserted
 // exactly once, when bootstrapping the state.
-func InsertSporkID(sporkID flow.Identifier) func(*badger.Txn) error {
-	return insert(makePrefix(codeSporkID), sporkID)
+func InsertSporkRootBlock(block *flow.Block) func(*badger.Txn) error {
+	return insert(makePrefix(codeSporkRootBlock), block)
 }
 
-// RetrieveSporkID retrieves the spork ID for the present spork.
-func RetrieveSporkID(sporkID *flow.Identifier) func(*badger.Txn) error {
-	return retrieve(makePrefix(codeSporkID), sporkID)
-}
-
-// InsertSporkRootBlockHeight inserts the spork root block height for the present spork.
-// A single database and protocol state instance spans at most one spork, so this is inserted
-// exactly once, when bootstrapping the state.
-func InsertSporkRootBlockHeight(height uint64) func(*badger.Txn) error {
-	return insert(makePrefix(codeSporkRootBlockHeight), height)
-}
-
-// RetrieveSporkRootBlockHeight retrieves the spork root block height for the present spork.
-func RetrieveSporkRootBlockHeight(height *uint64) func(*badger.Txn) error {
-	return retrieve(makePrefix(codeSporkRootBlockHeight), height)
-}
-
-// InsertSporkRootBlockView inserts the spork root block view for the present spork.
-// A single database and protocol state instance spans at most one spork, so this is inserted
-// exactly once, when bootstrapping the state.
-func InsertSporkRootBlockView(view uint64) func(*badger.Txn) error {
-	return insert(makePrefix(codeSporkRootBlockView), view)
-}
-
-// RetrieveSporkRootBlockView retrieves the spork root block view for the present spork.
-func RetrieveSporkRootBlockView(view *uint64) func(*badger.Txn) error {
-	return retrieve(makePrefix(codeSporkRootBlockView), view)
+// RetrieveSporkRootBlock retrieves the spork root block for the present spork.
+func RetrieveSporkRootBlock(block *flow.Block) func(*badger.Txn) error {
+	return retrieve(makePrefix(codeSporkRootBlock), block)
 }

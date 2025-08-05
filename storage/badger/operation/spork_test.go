@@ -11,17 +11,19 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-func TestSporkID_InsertRetrieve(t *testing.T) {
+// TestSporkRootBlock_InsertRetrieve verifies that a spork root block can be
+// correctly inserted into and retrieved from the Badger database.
+func TestSporkRootBlock_InsertRetrieve(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
-		sporkID := unittest.IdentifierFixture()
+		sporkRootBlock := unittest.BlockFixture()
 
-		err := db.Update(InsertSporkID(sporkID))
+		err := db.Update(InsertSporkRootBlock(sporkRootBlock))
 		require.NoError(t, err)
 
-		var actual flow.Identifier
-		err = db.View(RetrieveSporkID(&actual))
+		var actual flow.Block
+		err = db.View(RetrieveSporkRootBlock(&actual))
 		require.NoError(t, err)
 
-		assert.Equal(t, sporkID, actual)
+		assert.Equal(t, sporkRootBlock, &actual)
 	})
 }
