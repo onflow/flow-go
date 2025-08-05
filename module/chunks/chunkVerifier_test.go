@@ -68,6 +68,7 @@ var serviceEventsList = []flow.Event{
 var executionDataCIDProvider = provider.NewExecutionDataCIDProvider(execution_data.DefaultSerializer)
 
 var serviceTxBody *flow.TransactionBody
+var processTxBody *flow.TransactionBody
 
 type ChunkVerifierTestSuite struct {
 	suite.Suite
@@ -86,7 +87,10 @@ type ChunkVerifierTestSuite struct {
 // Make sure variables are set properly
 // SetupTest is executed prior to each individual test in this test suite
 func (s *ChunkVerifierTestSuite) SetupSuite() {
-	vmCtx := fvm.NewContext(fvm.WithChain(testChain.Chain()))
+	vmCtx := fvm.NewContext(
+		fvm.WithChain(testChain.Chain()),
+		fvm.WithScheduleCallbacksEnabled(true),
+	)
 	vmMock := fvmmock.NewVM(s.T())
 
 	vmMock.
@@ -130,6 +134,8 @@ func (s *ChunkVerifierTestSuite) SetupSuite() {
 	txBody, err := blueprints.SystemChunkTransaction(testChain.Chain())
 	require.NoError(s.T(), err)
 	serviceTxBody = txBody
+
+	processTxBody = blueprints.ProcessCallbacksTransaction(testChain.Chain())
 }
 
 func (s *ChunkVerifierTestSuite) SetupTest() {
@@ -137,6 +143,13 @@ func (s *ChunkVerifierTestSuite) SetupTest() {
 
 	s.snapshots = make(map[string]*snapshot.ExecutionSnapshot)
 	s.outputs = make(map[string]fvm.ProcedureOutput)
+
+	// Add default snapshot for process callback transaction with no events
+	// subject to overwrite by test cases
+	s.snapshots[string(processTxBody.Script)] = &snapshot.ExecutionSnapshot{}
+	s.outputs[string(processTxBody.Script)] = fvm.ProcedureOutput{
+		ComputationUsed: computationUsed,
+	}
 }
 
 // TestChunkVerifier invokes all the tests in this test suite
@@ -267,6 +280,13 @@ func (s *ChunkVerifierTestSuite) TestServiceEventsMismatch_SystemChunk() {
 		ServiceEvents:          unittest.EventsFixture(1),
 		ConvertedServiceEvents: flow.ServiceEventList{*epochCommitServiceEvent},
 		Events:                 meta.ChunkEvents,
+	}
+
+	processTxBody := blueprints.ProcessCallbacksTransaction(testChain.Chain())
+
+	s.snapshots[string(processTxBody.Script)] = &snapshot.ExecutionSnapshot{}
+	s.outputs[string(processTxBody.Script)] = fvm.ProcedureOutput{
+		ComputationUsed: computationUsed,
 	}
 
 	_, err = s.verifier.Verify(vch)
@@ -430,6 +450,14 @@ func (s *ChunkVerifierTestSuite) TestExecutionDataIdMismatch() {
 	assert.IsType(s.T(), &chunksmodels.CFInvalidExecutionDataID{}, err)
 }
 
+func (s *ChunkVerifierTestSuite) TestSystemChunkWithExecuteCallback() {
+	meta := s.GetTestSetup(s.T(), "", true, true)
+	vch := meta.RefreshChunkData(s.T())
+
+	_, err := s.verifier.Verify(vch)
+	assert.NoError(s.T(), err)
+}
+
 func newLedger(t *testing.T) *completeLedger.Ledger {
 	f, err := completeLedger.NewLedger(&fixtures.NoopWAL{}, 1000, metrics.NewNoopCollector(), zerolog.Nop(), completeLedger.DefaultPathFinderVersion)
 	require.NoError(t, err)
@@ -566,7 +594,7 @@ func generateCollection(t *testing.T, isSystemChunk bool, script string) *flow.C
 		// the system chunk's data pack does not include the collection, but the execution data does.
 		// we must include the correct collection in the execution data, otherwise verification will fail.
 		return &flow.Collection{
-			Transactions: []*flow.TransactionBody{serviceTxBody},
+			Transactions: []*flow.TransactionBody{processTxBody, serviceTxBody},
 		}
 	}
 
@@ -610,7 +638,7 @@ func (s *ChunkVerifierTestSuite) GetTestSetup(t *testing.T, script string, syste
 	txResults := generateTransactionResults(t, collection)
 	// make sure this includes results even for the service tx
 	if system {
-		require.Len(t, txResults, 1)
+		require.Len(t, txResults, 2) // todo should be dynamic
 	} else {
 		require.Len(t, txResults, len(collection.Transactions))
 	}
@@ -670,7 +698,7 @@ func (m *testMetadata) RefreshChunkData(t *testing.T) *verification.VerifiableCh
 		// the system chunk's data pack does not include the collection, but the execution data does.
 		// we must include the correct collection in the execution data, otherwise verification will fail.
 		cedCollection = &flow.Collection{
-			Transactions: []*flow.TransactionBody{serviceTxBody},
+			Transactions: []*flow.TransactionBody{processTxBody, serviceTxBody},
 		}
 	}
 
