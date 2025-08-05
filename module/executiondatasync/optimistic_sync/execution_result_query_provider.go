@@ -6,10 +6,26 @@ import "github.com/onflow/flow-go/model/flow"
 // It specifies requirements for execution result selection including the number
 // of agreeing executors and requires executor nodes.
 type Criteria struct {
-	// AgreeingExecutors is the number of receipts including the same ExecutionResult
-	AgreeingExecutors uint
+	// AgreeingExecutorsCount is the number of receipts including the same ExecutionResult
+	AgreeingExecutorsCount uint
 	// RequiredExecutors is the list of EN node IDs, one of which must have produced the result
 	RequiredExecutors flow.IdentifierList
+}
+
+// OverrideWith overrides the original criteria with the incoming criteria, returning a new Criteria object.
+// Fields from `override` criteria take precedence when set.
+func (c *Criteria) OverrideWith(override Criteria) Criteria {
+	newCriteria := *c
+
+	if override.AgreeingExecutorsCount > 0 {
+		newCriteria.AgreeingExecutorsCount = override.AgreeingExecutorsCount
+	}
+
+	if len(override.RequiredExecutors) > 0 {
+		newCriteria.RequiredExecutors = override.RequiredExecutors
+	}
+
+	return newCriteria
 }
 
 // Query contains the result of an execution result query.
@@ -31,6 +47,5 @@ type ExecutionResultQueryProvider interface {
 	//
 	// Expected errors during normal operations:
 	//   - backend.InsufficientExecutionReceipts - found insufficient receipts for given block ID.
-	//   - All other errors are potential indicators of bugs or corrupted internal state
 	ExecutionResultQuery(blockID flow.Identifier, criteria Criteria) (*Query, error)
 }

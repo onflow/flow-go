@@ -110,8 +110,8 @@ func (suite *ExecutionResultQueryProviderSuite) TestExecutionResultQuery() {
 		requiredExecutors := allExecutionNodes[0:2].NodeIDs()
 
 		query, err := provider.ExecutionResultQuery(block.ID(), optimistic_sync.Criteria{
-			AgreeingExecutors: 2,
-			RequiredExecutors: requiredExecutors,
+			AgreeingExecutorsCount: 2,
+			RequiredExecutors:      requiredExecutors,
 		})
 		suite.Require().NoError(err)
 
@@ -172,8 +172,8 @@ func (suite *ExecutionResultQueryProviderSuite) TestExecutionResultQuery() {
 		suite.setupIdentitiesMock(allExecutionNodes)
 
 		_, err := provider.ExecutionResultQuery(insufficientBlock.ID(), optimistic_sync.Criteria{
-			AgreeingExecutors: 2,
-			RequiredExecutors: allExecutionNodes[0:1].NodeIDs(),
+			AgreeingExecutorsCount: 2,
+			RequiredExecutors:      allExecutionNodes[0:1].NodeIDs(),
 		})
 		suite.Require().Error(err)
 
@@ -224,8 +224,8 @@ func (suite *ExecutionResultQueryProviderSuite) TestRootBlockHandling() {
 
 		requiredExecutors := allExecutionNodes[0:2].NodeIDs()
 		criteria := optimistic_sync.Criteria{
-			AgreeingExecutors: 1,
-			RequiredExecutors: requiredExecutors,
+			AgreeingExecutorsCount: 1,
+			RequiredExecutors:      requiredExecutors,
 		}
 
 		query, err := provider.ExecutionResultQuery(suite.rootBlock.ID(), criteria)

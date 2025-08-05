@@ -16,22 +16,7 @@ import (
 
 // DefaultCriteria is the system default criteria for execution result queries.
 var DefaultCriteria = optimistic_sync.Criteria{
-	AgreeingExecutors: 2,
-}
-
-// merge merges the `update` criteria into the `original` criteria, returning a new Criteria object.
-// Fields from `update` take precedence when set.
-func merge(original optimistic_sync.Criteria, update optimistic_sync.Criteria) optimistic_sync.Criteria {
-
-	if update.AgreeingExecutors > 0 {
-		original.AgreeingExecutors = update.AgreeingExecutors
-	}
-
-	if len(update.RequiredExecutors) > 0 {
-		original.RequiredExecutors = update.RequiredExecutors
-	}
-
-	return original
+	AgreeingExecutorsCount: 2,
 }
 
 var _ optimistic_sync.ExecutionResultQueryProvider = (*ExecutionResultQueryProvider)(nil)
@@ -44,7 +29,7 @@ type ExecutionResultQueryProvider struct {
 	executionReceipts storage.ExecutionReceipts
 	state             protocol.State
 
-	executionNodes *ExecutionNodes
+	executionNodes *ExecutionNodesSelector
 
 	rootBlockID     flow.Identifier
 	rootBlockResult *flow.ExecutionResult
@@ -61,7 +46,7 @@ func NewExecutionResultQueryProvider(
 	state protocol.State,
 	headers storage.Headers,
 	executionReceipts storage.ExecutionReceipts,
-	executionNodes *ExecutionNodes,
+	executionNodes *ExecutionNodesSelector,
 	operatorCriteria optimistic_sync.Criteria,
 ) (*ExecutionResultQueryProvider, error) {
 	// Root block ID and result should not change and could be cached.
@@ -83,7 +68,7 @@ func NewExecutionResultQueryProvider(
 		executionNodes:    executionNodes,
 		rootBlockID:       rootBlockID,
 		rootBlockResult:   rootBlockResult,
-		baseCriteria:      merge(DefaultCriteria, operatorCriteria),
+		baseCriteria:      DefaultCriteria.OverrideWith(operatorCriteria),
 	}, nil
 }
 
@@ -101,7 +86,7 @@ func (e *ExecutionResultQueryProvider) ExecutionResultQuery(blockID flow.Identif
 	// if the block ID is the root block, then use the root ExecutionResult and skip the receipt
 	// check since there will not be any.
 	if e.rootBlockID == blockID {
-		subsetENs, err := e.executionNodes.ChooseExecutionNodes(executorIdentities, criteria.RequiredExecutors)
+		subsetENs, err := e.executionNodes.SelectExecutionNodes(executorIdentities, criteria.RequiredExecutors)
 		if err != nil {
 			return nil, fmt.Errorf("failed to choose execution nodes for root block ID %v: %w", e.rootBlockID, err)
 		}
@@ -118,18 +103,18 @@ func (e *ExecutionResultQueryProvider) ExecutionResultQuery(blockID flow.Identif
 	}
 
 	executors := executorIdentities.Filter(filter.HasNodeID[flow.Identity](executorIDs...))
-	subsetENs, err := e.executionNodes.ChooseExecutionNodes(executors, criteria.RequiredExecutors)
+	subsetENs, err := e.executionNodes.SelectExecutionNodes(executors, criteria.RequiredExecutors)
 	if err != nil {
 		return nil, fmt.Errorf("failed to choose execution nodes for block ID %v: %w", blockID, err)
 	}
 
 	if len(subsetENs) == 0 {
 		// this is unexpected, and probably indicates there is a bug.
-		// There are only three ways that ChooseExecutionNodes can return an empty list:
+		// There are only three ways that SelectExecutionNodes can return an empty list:
 		//   1. there are no executors for the result
 		//   2. none of the user's required executors are in the executor list
 		//   3. none of the operator's required executors are in the executor list
-		// None of these are possible since there must be at least one AgreeingExecutors. If the
+		// None of these are possible since there must be at least one AgreeingExecutorsCount. If the
 		// criteria is met, then there must be at least one acceptable executor. If this is not true,
 		// then the criteria check must fail.
 		return nil, fmt.Errorf("no execution nodes found for result %v (blockID: %v): %w", result.ID(), blockID, err)
@@ -147,7 +132,6 @@ func (e *ExecutionResultQueryProvider) ExecutionResultQuery(blockID flow.Identif
 //
 // Expected errors during normal operations:
 //   - backend.InsufficientExecutionReceipts - found insufficient receipts for given block ID.
-//   - All other errors are potential indicators of bugs or corrupted internal state
 func (e *ExecutionResultQueryProvider) findResultAndExecutors(
 	blockID flow.Identifier,
 	criteria optimistic_sync.Criteria,
@@ -157,7 +141,7 @@ func (e *ExecutionResultQueryProvider) findResultAndExecutors(
 		receipts flow.ExecutionReceiptList
 	}
 
-	criteria = merge(e.baseCriteria, criteria)
+	criteria = e.baseCriteria.OverrideWith(criteria)
 
 	// Note: this will return an empty slice with no error if no receipts are found.
 	allReceipts, err := e.executionReceipts.ByBlockID(blockID)
@@ -192,7 +176,7 @@ func (e *ExecutionResultQueryProvider) findResultAndExecutors(
 
 // isExecutorGroupMeetingCriteria checks if an executor group meets the specified criteria for execution receipts matching.
 func isExecutorGroupMeetingCriteria(executorGroup flow.ExecutionReceiptGroupedList, criteria optimistic_sync.Criteria) bool {
-	if uint(len(executorGroup)) < criteria.AgreeingExecutors {
+	if uint(len(executorGroup)) < criteria.AgreeingExecutorsCount {
 		return false
 	}
 
