@@ -56,16 +56,11 @@ type State struct {
 	// sealedRootHeight returns the root block that is sealed. We cache it in
 	// the state, because it cannot change over the lifecycle of a protocol state instance.
 	sealedRootHeight uint64
-	// sporkRootBlockHeight is the height of the root block in the current spork. We cache it in
+	// sporkRootBlock is the root block in the current spork. We cache it in
 	// the state, because it cannot change over the lifecycle of a protocol state instance.
 	// Caution: A node that joined in a later epoch past the spork, the node will likely _not_
 	// know the spork's root block in full (though it will always know the height).
-	sporkRootBlockHeight uint64
-	// sporkRootBlockView is the view of the root block in the current spork. We cache it in
-	// the state, because it cannot change over the lifecycle of a protocol state instance.
-	// Caution: A node that joined in a later epoch past the spork, the node will likely _not_
-	// know the spork's root block in full (though it will always know the view).
-	sporkRootBlockView uint64
+	sporkRootBlock *flow.Block
 	// cachedLatest caches both the *latest* finalized header and sealed header,
 	// because the protocol state is solely responsible for updating it.
 	// finalized header and sealed header can be cached together since they are updated together atomically
@@ -162,7 +157,7 @@ func Bootstrap(
 		}
 
 		// initialize spork params
-		err = bootstrapSporkInfo(root)(tx)
+		err = bootstrapSporkInfo(segment.SporkRootBlock)(tx)
 		if err != nil {
 			return fmt.Errorf("could not bootstrap spork info: %w", err)
 		}
@@ -592,27 +587,13 @@ func bootstrapEpochForProtocolStateEntry(
 
 // bootstrapSporkInfo bootstraps the protocol state with information about the
 // spork which is used to disambiguate Flow networks.
-func bootstrapSporkInfo(root protocol.Snapshot) func(*transaction.Tx) error {
+func bootstrapSporkInfo(rootSporkBlock *flow.Block) func(*transaction.Tx) error {
 	return func(tx *transaction.Tx) error {
 		bdtx := tx.DBTxn // tx is just a wrapper around a badger transaction with the additional ability to register callbacks that are executed after the badger transaction completed _successfully_
 
-		params := root.Params()
-		sporkID := params.SporkID()
-		err := operation.InsertSporkID(sporkID)(bdtx)
+		err := operation.InsertSporkRootBlock(rootSporkBlock)(bdtx)
 		if err != nil {
-			return fmt.Errorf("could not insert spork ID: %w", err)
-		}
-
-		sporkRootBlockHeight := params.SporkRootBlockHeight()
-		err = operation.InsertSporkRootBlockHeight(sporkRootBlockHeight)(bdtx)
-		if err != nil {
-			return fmt.Errorf("could not insert spork root block height: %w", err)
-		}
-
-		sporkRootBlockView := params.SporkRootBlockView()
-		err = operation.InsertSporkRootBlockView(sporkRootBlockView)(bdtx)
-		if err != nil {
-			return fmt.Errorf("could not insert spork root block view: %w", err)
+			return fmt.Errorf("could not insert spork root block: %w", err)
 		}
 
 		return nil
@@ -940,8 +921,13 @@ func (state *State) populateCache() error {
 
 		state.finalizedRootHeight = state.Params().FinalizedRoot().Height
 		state.sealedRootHeight = state.Params().SealedRoot().Height
-		state.sporkRootBlockHeight = state.Params().SporkRootBlockHeight()
-		state.sporkRootBlockView = state.Params().SporkRootBlockView()
+
+		var sporkRootBlock flow.Block
+		err = operation.RetrieveSporkRootBlock(&sporkRootBlock)(tx)
+		if err != nil {
+			return fmt.Errorf("could not get spork root block height: %w", err)
+		}
+		state.sporkRootBlock = &sporkRootBlock
 
 		return nil
 	})

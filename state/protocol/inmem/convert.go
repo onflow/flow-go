@@ -175,9 +175,9 @@ func SnapshotFromBootstrapStateWithParams(
 			ProtocolStateEntries: map[flow.Identifier]*flow.ProtocolStateEntryWrapper{
 				rootKvStore.ID(): rootProtocolStateEntryWrapper,
 			},
-			FirstSeal:          seal,
-			ExtraBlocks:        make([]*flow.Proposal, 0),
-			SporkRootBlockView: root.View,
+			FirstSeal:      seal,
+			ExtraBlocks:    make([]*flow.Proposal, 0),
+			SporkRootBlock: root,
 		},
 		QuorumCertificate:   qc,
 		Params:              params,
