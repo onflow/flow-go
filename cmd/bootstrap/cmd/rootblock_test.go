@@ -100,15 +100,15 @@ func TestRootBlock_HappyPath(t *testing.T) {
 func TestInvalidRootBlockView(t *testing.T) {
 	for _, chain := range []string{"main", "test"} {
 		t.Run("invalid root block view for "+chain, func(t *testing.T) {
-			cmd := exec.Command(os.Args[0], "-test.run=TestInvalidRootBlockViewSubprocess")
-			cmd.Env = append(os.Environ(),
-				"FLAG_RUN_IN_SUBPROCESS_ONLY=1",
-				"CHAIN="+chain,
-			)
+			expectedError := fmt.Sprintf("--root-view must be non-zero on %q chain", chain)
+			extraEnv := []string{"CHAIN=" + chain}
 
-			output, err := cmd.CombinedOutput()
-			assert.Error(t, err)
-			assert.Contains(t, string(output), fmt.Sprintf("--root-view must be non-zero for %q chain", chain))
+			runTestInSubprocessWithError(
+				t,
+				"TestInvalidRootBlockViewSubprocess",
+				expectedError,
+				extraEnv,
+			)
 		})
 	}
 }
@@ -130,4 +130,57 @@ func TestInvalidRootBlockViewSubprocess(t *testing.T) {
 
 		rootBlock(nil, nil)
 	})
+}
+
+// TestInvalidKVStoreValues verifies that running
+// rootBlock with an invalid kvstore values (default) on "main" or "testnet" chains.
+// The test runs in subprocesses because the tested code calls os.Exit.
+func TestInvalidKVStoreValues(t *testing.T) {
+	for _, chain := range []string{"main", "test"} {
+		t.Run("invalid kv store values for "+chain, func(t *testing.T) {
+			expectedError := fmt.Sprintf("cannot use default KVStore values (epoch extension view count and finalization safety threshold) on %q chain", chain)
+			extraEnv := []string{"CHAIN=" + chain}
+
+			runTestInSubprocessWithError(
+				t,
+				"TestInvalidKVStoreValuesSubprocess",
+				expectedError,
+				extraEnv,
+			)
+		})
+	}
+}
+
+// TestInvalidKVStoreValuesSubprocess runs in subprocess for invalid kvstore values test on various chains
+func TestInvalidKVStoreValuesSubprocess(t *testing.T) {
+	if os.Getenv("FLAG_RUN_IN_SUBPROCESS_ONLY") != "1" {
+		return
+	}
+
+	utils.RunWithSporkBootstrapDir(t, func(bootDir, partnerDir, partnerWeights, internalPrivDir, configPath string) {
+		setupHappyPathFlags(bootDir, partnerDir, partnerWeights, internalPrivDir, configPath)
+		flagFinalizationSafetyThreshold = defaultFinalizationSafetyThreshold
+		flagEpochExtensionViewCount = defaultEpochExtensionViewCount
+		flagRootChain = os.Getenv("CHAIN")
+
+		hook := zeroLoggerHook{logs: &strings.Builder{}}
+		log = log.Hook(hook)
+
+		rootBlock(nil, nil)
+	})
+}
+
+// runTestInSubprocessWithError executes a test function in a subprocess,
+// expecting it to fail with an error. It is used for testing code paths
+// that call os.Exit.
+func runTestInSubprocessWithError(t *testing.T, testName, expectedOutput string, extraEnv []string) {
+	cmd := exec.Command(os.Args[0], "-test.run="+testName)
+
+	env := append(os.Environ(), "FLAG_RUN_IN_SUBPROCESS_ONLY=1")
+	env = append(env, extraEnv...) // <-- add custom env if needed
+	cmd.Env = env
+
+	output, err := cmd.CombinedOutput()
+	assert.Error(t, err)
+	assert.Contains(t, string(output), expectedOutput)
 }
