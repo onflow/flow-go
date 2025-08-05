@@ -46,7 +46,12 @@ func NewChunkVerifier(vm fvm.VM, vmCtx fvm.Context, logger zerolog.Logger) *Chun
 // final state commitment.
 // It returns a Spock Secret as a byte array, verification fault of the chunk,
 // and an error.
-func (fcv *ChunkVerifier) Verify(vc *verification.VerifiableChunkData) ([]byte, error) {
+func (fcv *ChunkVerifier) Verify(
+	vc *verification.VerifiableChunkData,
+) (
+	[]byte,
+	error,
+) {
 
 	var ctx fvm.Context
 	var transactions []*fvm.TransactionProcedure
