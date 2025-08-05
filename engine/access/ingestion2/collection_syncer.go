@@ -178,7 +178,12 @@ func (s *CollectionSyncer) StartWorkerLoop(ctx irrecoverable.SignalerContext, re
 				ctx.Throw(fmt.Errorf("could not get pending collection"))
 			}
 
-			collection := msg.Payload.(*flow.Collection)
+			collection, ok := msg.Payload.(*flow.Collection)
+			if !ok {
+				ctx.Throw(fmt.Errorf("could not cast pending collection to *flow.Collection"))
+				return
+			}
+
 			err := indexer.IndexCollection(collection, s.collections, s.transactions, s.logger, s.collectionExecutedMetric)
 			if err != nil {
 				ctx.Throw(fmt.Errorf("error indexing collection: %w", err))
@@ -455,6 +460,6 @@ func (s *CollectionSyncer) findLowestBlockHeightWithMissingCollections(
 func (s *CollectionSyncer) OnCollectionDownloaded(id flow.Identifier, entity flow.Entity) {
 	err := s.pendingCollectionsHandler.Process(id, entity)
 	if err != nil {
-		s.logger.Warn().Err(err).Msg("failed to process pending collections. matching processor wasn't set up?")
+		s.logger.Warn().Err(err).Msg("failed to process pending collections")
 	}
 }
