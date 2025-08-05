@@ -1,9 +1,12 @@
 package chunks_test
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/ipfs/go-cid"
+	"github.com/onflow/cadence"
+	"github.com/onflow/cadence/encoding/ccf"
 	"github.com/onflow/cadence/runtime"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
@@ -17,6 +20,7 @@ import (
 	fvmErrors "github.com/onflow/flow-go/fvm/errors"
 	fvmmock "github.com/onflow/flow-go/fvm/mock"
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
+	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/ledger"
 	completeLedger "github.com/onflow/flow-go/ledger/complete"
 	"github.com/onflow/flow-go/ledger/complete/wal/fixtures"
@@ -450,11 +454,132 @@ func (s *ChunkVerifierTestSuite) TestExecutionDataIdMismatch() {
 	assert.IsType(s.T(), &chunksmodels.CFInvalidExecutionDataID{}, err)
 }
 
-func (s *ChunkVerifierTestSuite) TestSystemChunkWithExecuteCallback() {
+func (s *ChunkVerifierTestSuite) TestSystemChunkWithScheduledCallbackReturningEvent() {
+	systemContracts := systemcontracts.SystemContractsForChain(testChain)
+
+	// create the event returned for processed callback
+	processedEventName := fmt.Sprintf(
+		"A.%s.FlowCallbackScheduler.CallbackProcessed",
+		systemContracts.FlowCallbackScheduler.Address,
+	)
+	callbackEventPayload, err := ccf.Encode(cadence.NewEvent(
+		[]cadence.Value{
+			cadence.NewUInt64(1),               // id
+			cadence.NewUInt64(computationUsed), // executionEffort
+		},
+	).WithType(cadence.NewEventType(
+		nil,
+		processedEventName,
+		[]cadence.Field{
+			{Identifier: "id", Type: cadence.UInt64Type},
+			{Identifier: "executionEffort", Type: cadence.UInt64Type},
+		},
+		nil,
+	)))
+	require.NoError(s.T(), err)
+
+	processEvent := flow.Event{
+		Type:             flow.EventType(processedEventName),
+		TransactionID:    processTxBody.ID(),
+		TransactionIndex: 0,
+		EventIndex:       0,
+		Payload:          callbackEventPayload,
+	}
+
+	// Setup mock outputs for process callback transaction
+	s.outputs[string(processTxBody.Script)] = fvm.ProcedureOutput{
+		ComputationUsed: computationUsed,
+		Events:          flow.EventsList{processEvent},
+	}
+
+	// Create execute callback transaction body
+	executeCallbackTxs, err := blueprints.ExecuteCallbacksTransactions(testChain.Chain(), flow.EventsList{processEvent})
+	require.NoError(s.T(), err)
+	require.Len(s.T(), executeCallbackTxs, 1)
+
+	executeCallbackTx := executeCallbackTxs[0]
+
+	// Setup mock output for execute callback transaction
+	s.outputs[string(executeCallbackTx.Script)] = fvm.ProcedureOutput{
+		ComputationUsed: computationUsed,
+	}
+
+	// Setup system transaction output
+	epochSetupServiceEvent, err := convert.ServiceEvent(testChain, epochSetupEvent)
+	require.NoError(s.T(), err)
+
+	s.outputs[string(serviceTxBody.Script)] = fvm.ProcedureOutput{
+		ComputationUsed:        computationUsed,
+		ConvertedServiceEvents: flow.ServiceEventList{*epochSetupServiceEvent},
+		Events:                 flow.EventsList{epochSetupEvent},
+	}
+
+	// Create custom test metadata
 	meta := s.GetTestSetup(s.T(), "", true, true)
+
+	// Override the collection to include callback execution transaction
+	meta.customCollection = &flow.Collection{
+		Transactions: []*flow.TransactionBody{processTxBody, executeCallbackTx, serviceTxBody},
+	}
+
+	// Update expected events to include all events
+	meta.ChunkEvents = flow.EventsList{}
+	meta.ChunkEvents = append(meta.ChunkEvents, processEvent)    // Process callback event
+	meta.ChunkEvents = append(meta.ChunkEvents, epochSetupEvent) // System tx event
+
+	// Update transaction results to match the 3 transactions
+	meta.TxResults = []flow.LightTransactionResult{
+		{TransactionID: processTxBody.ID(), ComputationUsed: computationUsed, Failed: false},
+		{TransactionID: executeCallbackTx.ID(), ComputationUsed: computationUsed, Failed: false},
+		{TransactionID: serviceTxBody.ID(), ComputationUsed: computationUsed, Failed: false},
+	}
+
+	// Update service events
+	meta.ServiceEvents = []flow.ServiceEvent{*epochSetupServiceEvent}
+
 	vch := meta.RefreshChunkData(s.T())
 
-	_, err := s.verifier.Verify(vch)
+	_, err = s.verifier.Verify(vch)
+	assert.NoError(s.T(), err)
+}
+
+// TestSystemChunkWithNoScheduledCallbacks tests verification of system chunks
+// when scheduled callbacks are enabled but no callbacks are actually scheduled
+func (s *ChunkVerifierTestSuite) TestSystemChunkWithNoScheduledCallbacks() {
+	// Setup mock outputs for process callback transaction with no events
+	s.outputs[string(processTxBody.Script)] = fvm.ProcedureOutput{
+		ComputationUsed: computationUsed,
+		Events:          flow.EventsList{}, // No callback events
+	}
+
+	// Setup system transaction output
+	epochSetupServiceEvent, err := convert.ServiceEvent(testChain, epochSetupEvent)
+	require.NoError(s.T(), err)
+
+	s.outputs[string(serviceTxBody.Script)] = fvm.ProcedureOutput{
+		ComputationUsed:        computationUsed,
+		ConvertedServiceEvents: flow.ServiceEventList{*epochSetupServiceEvent},
+		Events:                 flow.EventsList{epochSetupEvent},
+	}
+
+	// Create test metadata - no custom collection needed since no callbacks
+	meta := s.GetTestSetup(s.T(), "", true, true)
+
+	// Expected events: only system tx service event (no callback events)
+	meta.ChunkEvents = flow.EventsList{epochSetupEvent}
+
+	// Update transaction results for 2 transactions (process callback + system)
+	meta.TxResults = []flow.LightTransactionResult{
+		{TransactionID: processTxBody.ID(), ComputationUsed: computationUsed, Failed: false},
+		{TransactionID: serviceTxBody.ID(), ComputationUsed: computationUsed, Failed: false},
+	}
+
+	// Update service events
+	meta.ServiceEvents = []flow.ServiceEvent{*epochSetupServiceEvent}
+
+	vch := meta.RefreshChunkData(s.T())
+
+	_, err = s.verifier.Verify(vch)
 	assert.NoError(s.T(), err)
 }
 
@@ -688,6 +813,9 @@ type testMetadata struct {
 	// separated to allow overriding
 	ExecDataBlockID flow.Identifier
 
+	// custom collection for system chunks with callbacks
+	customCollection *flow.Collection
+
 	ledger *completeLedger.Ledger
 }
 
@@ -697,8 +825,12 @@ func (m *testMetadata) RefreshChunkData(t *testing.T) *verification.VerifiableCh
 	if m.IsSystemChunk {
 		// the system chunk's data pack does not include the collection, but the execution data does.
 		// we must include the correct collection in the execution data, otherwise verification will fail.
-		cedCollection = &flow.Collection{
-			Transactions: []*flow.TransactionBody{processTxBody, serviceTxBody},
+		if m.customCollection != nil {
+			cedCollection = m.customCollection
+		} else {
+			cedCollection = &flow.Collection{
+				Transactions: []*flow.TransactionBody{processTxBody, serviceTxBody},
+			}
 		}
 	}
 
