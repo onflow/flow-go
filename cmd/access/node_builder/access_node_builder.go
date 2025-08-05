@@ -53,7 +53,7 @@ import (
 	"github.com/onflow/flow-go/engine/access/rpc/backend/node_communicator"
 	"github.com/onflow/flow-go/engine/access/rpc/backend/query_mode"
 	"github.com/onflow/flow-go/engine/access/rpc/backend/scripts"
-	"github.com/onflow/flow-go/engine/access/rpc/backend/transactions/error_message_provider"
+	"github.com/onflow/flow-go/engine/access/rpc/backend/transactions/error_messages"
 	rpcConnection "github.com/onflow/flow-go/engine/access/rpc/connection"
 	"github.com/onflow/flow-go/engine/access/state_stream"
 	statestreambackend "github.com/onflow/flow-go/engine/access/state_stream/backend"
@@ -376,7 +376,7 @@ type FlowAccessNodeBuilder struct {
 
 	ExecNodeIdentitiesProvider   *commonrpc.ExecutionNodeIdentitiesProvider
 	TxResultErrorMessagesCore    *tx_error_messages.TxErrorMessagesCore
-	txResultErrorMessageProvider error_message_provider.TxErrorMessageProvider
+	txResultErrorMessageProvider error_messages.Provider
 }
 
 func (builder *FlowAccessNodeBuilder) buildFollowerState() *FlowAccessNodeBuilder {
@@ -2033,7 +2033,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 			)
 
 			nodeCommunicator := node_communicator.NewNodeCommunicator(backendConfig.CircuitBreakerConfig.Enabled)
-			builder.txResultErrorMessageProvider = error_message_provider.NewTxErrorMessageProvider(
+			builder.txResultErrorMessageProvider = error_messages.NewTxErrorMessageProvider(
 				node.Logger,
 				builder.transactionResultErrorMessages, // might be nil
 				notNil(builder.TxResultsIndex),

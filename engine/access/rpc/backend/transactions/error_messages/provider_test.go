@@ -1,4 +1,4 @@
-package error_message_provider
+package error_messages
 
 import (
 	"context"

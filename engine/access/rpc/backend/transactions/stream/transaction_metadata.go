@@ -47,7 +47,7 @@ type TransactionMetadata struct {
 //
 // Parameters:
 //   - ctx: Context for managing the lifecycle of the operation.
-//   - backendTransactions: A reference to the backend transaction manager.
+//   - backendTransactions: A reference to the txStreamBackend transaction manager.
 //   - txID: The unique identifier of the transaction.
 //   - txReferenceBlockID: The ID of the transaction’s reference block.
 //   - eventEncodingVersion: The required version of event encoding.
