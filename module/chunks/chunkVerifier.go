@@ -46,12 +46,7 @@ func NewChunkVerifier(vm fvm.VM, vmCtx fvm.Context, logger zerolog.Logger) *Chun
 // final state commitment.
 // It returns a Spock Secret as a byte array, verification fault of the chunk,
 // and an error.
-func (fcv *ChunkVerifier) Verify(
-	vc *verification.VerifiableChunkData,
-) (
-	[]byte,
-	error,
-) {
+func (fcv *ChunkVerifier) Verify(vc *verification.VerifiableChunkData) ([]byte, error) {
 
 	var ctx fvm.Context
 	var transactions []*fvm.TransactionProcedure
@@ -61,20 +56,7 @@ func (fcv *ChunkVerifier) Verify(
 			fvm.WithBlockHeader(vc.Header),
 			fvm.WithProtocolStateSnapshot(vc.Snapshot),
 		)
-
-		// if callbacks are enabled we must dynamically recreate the transactions as part of
-		// verifyTransactionsInContext to include the process callback and callback executions
-		// which rely on the result from the process callback transaction
-		if !fcv.vmCtx.ScheduleCallbacksEnabled {
-			txBody, err := blueprints.SystemChunkTransaction(fcv.vmCtx.Chain)
-			if err != nil {
-				return nil, fmt.Errorf("could not get system chunk transaction: %w", err)
-			}
-
-			transactions = []*fvm.TransactionProcedure{
-				fvm.Transaction(txBody, vc.TransactionOffset+uint32(0)),
-			}
-		}
+		// transactions will be dynamically created for system chunk
 	} else {
 		ctx = fvm.NewContextFromParent(
 			fcv.vmCtx,
