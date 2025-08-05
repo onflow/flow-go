@@ -45,7 +45,7 @@ var (
 	flagOutputPayloadFileName         string
 	flagOutputPayloadByAddresses      string
 	flagCPUProfile                    string
-	flagEmptyMigration                bool
+	flagZeroMigration                 bool
 )
 
 var Cmd = &cobra.Command{
@@ -78,8 +78,8 @@ func init() {
 	Cmd.Flags().BoolVar(&flagNoMigration, "no-migration", false,
 		"don't migrate the state")
 
-	Cmd.Flags().BoolVar(&flagEmptyMigration, "empty-migration", false,
-		"empty migration (to estimate minimum migration time)")
+	Cmd.Flags().BoolVar(&flagZeroMigration, "estimate-migration-duration", false,
+		"run zero migrations to get minimum duration needed by migrations (load execution state, group payloads by account, iterate account payloads, create trie from payload, and generate checkpoint)")
 
 	Cmd.Flags().StringVar(&flagMigration, "migration", "", "migration name")
 
@@ -151,8 +151,8 @@ func run(*cobra.Command, []string) {
 		log.Fatal().Err(err).Msgf("cannot create output directory %s", flagOutputDir)
 	}
 
-	if flagNoMigration && flagEmptyMigration {
-		log.Fatal().Msg("cannot run the command with both --no-migration and --empty-migration flags, one of them or none of them should be provided")
+	if flagNoMigration && flagZeroMigration {
+		log.Fatal().Msg("cannot run the command with both --no-migration and --estimate-migration-duration flags, one of them or none of them should be provided")
 		return
 	}
 
@@ -321,7 +321,7 @@ func run(*cobra.Command, []string) {
 		return
 	}
 
-	if flagEmptyMigration {
+	if flagZeroMigration {
 		newStateCommitment, err := emptyMigration(
 			log.Logger,
 			flagExecutionStateDir,
@@ -446,7 +446,7 @@ func emptyMigration(
 	stateCommitment flow.StateCommitment,
 ) (ledger.State, error) {
 
-	log.Info().Msgf("Loading state with commitmemnt %s", stateCommitment)
+	log.Info().Msgf("Loading state with commitment %s", stateCommitment)
 
 	// Load state for given state commitment
 	trie, err := util.ReadTrie(executionStateDir, stateCommitment)
