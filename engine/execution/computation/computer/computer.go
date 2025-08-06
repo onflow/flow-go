@@ -300,26 +300,6 @@ func (e *blockComputer) queueSystemTransaction(
 	}
 }
 
-// selectChunkConstructorForProtocolVersion selects a [flow.Chunk] constructor to
-// use when constructing the [flow.ExecutionResult] for the input block. We select
-// based on the protocol version at the input block. When we process the version upgrade
-// event to protocol version 2, we begin populating the new [flow.ChunkBody.ServiceEventCount]
-// field.
-// Deprecated:
-// TODO(mainnet27, #6773): remove this function https://github.com/onflow/flow-go/issues/6773
-func (e *blockComputer) selectChunkConstructorForProtocolVersion(blockID flow.Identifier) (flow.ChunkConstructor, error) {
-	ps, err := e.protocolState.AtBlockID(blockID).ProtocolState()
-	if err != nil {
-		return nil, err
-	}
-	version := ps.GetProtocolStateVersion()
-	if version < 2 {
-		return flow.NewChunk_ProtocolVersion1, nil
-	} else {
-		return flow.NewChunk, nil
-	}
-}
-
 func (e *blockComputer) executeBlock(
 	ctx context.Context,
 	parentBlockExecutionResultID flow.Identifier,
@@ -346,12 +326,14 @@ func (e *blockComputer) executeBlock(
 		attribute.Int("collection_counts", len(rawCollections)))
 	defer blockSpan.End()
 
-	// We temporarily support chunk models associated with both protocol versions 1 and 2.
-	// TODO(mainnet27, #6773): remove this https://github.com/onflow/flow-go/issues/6773
-	versionedChunkConstructor, err := e.selectChunkConstructorForProtocolVersion(block.ID())
+	systemTxn, err := blueprints.SystemChunkTransaction(e.vmCtx.Chain)
 	if err != nil {
-		return nil, fmt.Errorf("could not select chunk constructor for current protocol version: %w", err)
+		return nil, fmt.Errorf(
+			"could not get system chunk transaction: %w",
+			err)
 	}
+
+	numTxns := numberOfTransactionsInBlock(rawCollections)
 
 	collector := newResultCollector(
 		e.tracer,
@@ -367,7 +349,6 @@ func (e *blockComputer) executeBlock(
 		e.maxConcurrency*2, // we add some buffer just in case result collection becomes slower than the execution
 		e.colResCons,
 		baseSnapshot,
-		versionedChunkConstructor,
 	)
 	defer collector.Stop()
 
