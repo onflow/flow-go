@@ -349,13 +349,8 @@ func (m *ParticipantState) Extend(ctx context.Context, candidate *flow.Block) er
 // the protocol state).
 //
 // Expected errors during normal operations:
-<<<<<<< HEAD
 //   - state.InvalidExtensionError if the candidate block is invalid
 func (m *FollowerState) headerExtend(ctx context.Context, candidate *flow.Block, certifyingQC *flow.QuorumCertificate, deferredBlockPersist *deferred.DeferredBlockPersist) error {
-=======
-//   - [state.InvalidExtensionError] if the candidate block is invalid
-func (m *FollowerState) headerExtend(ctx context.Context, candidate *flow.Block, certifyingQC *flow.QuorumCertificate, deferredDbOps *transaction.DeferredDbOps) error {
->>>>>>> leo/add-block-view-index
 	span, _ := m.tracer.StartSpanFromContext(ctx, trace.ProtoStateMutatorExtendCheckHeader)
 	defer span.End()
 	blockID := candidate.ID()
@@ -408,26 +403,14 @@ func (m *FollowerState) headerExtend(ctx context.Context, candidate *flow.Block,
 	}
 
 	// STEP 5:
-<<<<<<< HEAD
 	qc := candidate.Header.ParentQC()
 	deferredBlockPersist.AddNextOperation(func(lctx lockctx.Proof, blockID flow.Identifier, rw storage.ReaderBatchWriter) error {
-		// STEP 5a: Store QC for parent block and emit `BlockProcessable` notification if and only if
-		//  - the QC for the parent has not been stored before (otherwise, we already emitted the notification) and
-		//  - the parent block's height is larger than the finalized root height (the root block is already considered processed)
-		// Thereby, we reduce duplicated `BlockProcessable` notifications.
-		err = m.qcs.BatchStore(lctx, rw, qc)
-=======
-	qc := candidate.Header.QuorumCertificate()
-	deferredDbOps.AddDbOp(func(tx *transaction.Tx) error {
 		// STEP 5a: Deciding whether the candidate's parent has already been certified or not.
 		// Here, we populate the [storage.QuorumCertificates] index: certified block ID → QC. Except for bootstrapping, this is the
 		// only place where this index is updated. Therefore, the parent is certified if and only if [storage.QuorumCertificates]
 		// contains an entry for `qc.BlockID`. We optimistically attempt to add a new element to the index. We receive a
 		// [storage.ErrAlreadyExists] sentinel if and only if step 5a has already been executed for the parent.
-		// CAUTION: This approach only works for database backends that support reads and writes as part of the same atomic transaction!
-		// For Pebble, where only batch writes with asynchronous reads are supported, the following logic has to be reworked.
-		err := m.qcs.StoreTx(qc)(tx)
->>>>>>> leo/add-block-view-index
+		err = m.qcs.BatchStore(lctx, rw, qc)
 		if err != nil {
 			// storage.ErrAlreadyExists guarantees that 5a has already been executed for the parent.
 			if !errors.Is(err, storage.ErrAlreadyExists) {
@@ -435,7 +418,7 @@ func (m *FollowerState) headerExtend(ctx context.Context, candidate *flow.Block,
 			}
 		} else { // no error entails that 5a has never been executed for the parent block
 			// add parent to index of certified blocks:
-			err := transaction.WithTx(operation.IndexCertifiedBlockByView(parent.View, qc.BlockID))(tx)
+			err := operation.IndexCertifiedBlockByView(lctx, rw, parent.View, qc.BlockID)
 			if err != nil {
 				return fmt.Errorf("could not index certified block by view %v: %w", parent.View, err)
 			}
@@ -464,18 +447,14 @@ func (m *FollowerState) headerExtend(ctx context.Context, candidate *flow.Block,
 			if err != nil {
 				return fmt.Errorf("could not store certifying qc: %w", err)
 			}
-<<<<<<< HEAD
-			storage.OnCommitSucceed(rw, func() { // queue a BlockProcessable event for candidate block, since it is certified
-=======
 
 			// add candidate to index of certified blocks:
-			err := transaction.WithTx(operation.IndexCertifiedBlockByView(candidate.Header.View, blockID))(tx)
+			err := operation.IndexCertifiedBlockByView(lctx, rw, candidate.Header.View, blockID)
 			if err != nil {
-				return fmt.Errorf("could not index certified block at step 5c at view %v: %w", candidate.Header.View, err)
+				return fmt.Errorf("could not index certified block by view %v: %w", candidate.Header.View, err)
 			}
 
-			tx.OnSucceed(func() { // queue a BlockProcessable event for candidate block, since it is certified
->>>>>>> leo/add-block-view-index
+			storage.OnCommitSucceed(rw, func() { // queue a BlockProcessable event for candidate block, since it is certified
 				m.consumer.BlockProcessable(candidate.Header, certifyingQC)
 			})
 		}
@@ -826,13 +805,8 @@ func (m *FollowerState) Finalize(ctx context.Context, blockID flow.Identifier) e
 	//   This value could actually stay the same if it has no seals in
 	//   its payload, in which case the parent's seal is the same.
 	// * set the epoch fallback flag, if it is triggered
-<<<<<<< HEAD
 	err = m.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 		err = operation.IndexFinalizedBlockByHeight(lctx, rw, header.Height, blockID)
-=======
-	err = operation.RetryOnConflict(m.db.Update, func(tx *badger.Txn) error {
-		err = operation.IndexFinalizedBlockByHeight(header.Height, blockID)(tx)
->>>>>>> leo/add-block-view-index
 		if err != nil {
 			return fmt.Errorf("could not insert number mapping: %w", err)
 		}

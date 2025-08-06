@@ -43,6 +43,7 @@ func IndexFinalizedBlockByHeight(lctx lockctx.Proof, rw storage.ReaderBatchWrite
 // HotStuff guarantees that there is at most one certified block per view. Caution: this does not hold for
 // uncertified proposals, as a byzantine leader might produce multiple proposals for the same view.
 // Hence, only certified blocks (i.e. blocks that have received a QC) can be indexed!
+// Returns [storage.ErrAlreadyExists] if an ID has already been finalized for this view.
 func IndexCertifiedBlockByView(lctx lockctx.Proof, rw storage.ReaderBatchWriter, view uint64, blockID flow.Identifier) error {
 	if !lctx.HoldsLock(storage.LockInsertBlock) {
 		return fmt.Errorf("missing required lock: %s", storage.LockInsertBlock)
