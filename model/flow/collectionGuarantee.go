@@ -30,16 +30,14 @@ type CollectionGuarantee struct {
 type UntrustedCollectionGuarantee CollectionGuarantee
 
 // NewCollectionGuarantee creates a new instance of CollectionGuarantee.
-// Construction CollectionGuarantee allowed only within the constructor
+// Construction of CollectionGuarantee is allowed only within the constructor.
 //
 // This constructor enforces basic structural validity, ensuring critical fields like
-// CollectionID and ReferenceBlockID are non-zero. Other fields — such as ClusterChainID and Signature —
-// are not validated here for the following reasons:
+// CollectionID and ReferenceBlockID are non-zero.
+// The Signature field is not validated here for the following reasons:
 //
-//   - ClusterChainID is currently optional or omitted in some upstream models (e.g. protobuf).
-//     This field may be empty and still represent a valid state for certain internal flows.
-//
-//   - Signature is allowed to be nil in intermediate states.(Like MakeFinal method which handles finalization logic for a block.)
+//   - Signature is currently unused and set to nil when generating a CollectionGuarantee,
+//     as the consensus nodes are currently unable to easily verify it.
 func NewCollectionGuarantee(untrusted UntrustedCollectionGuarantee) (*CollectionGuarantee, error) {
 	if untrusted.CollectionID == ZeroID {
 		return nil, fmt.Errorf("CollectionID must not be empty")
@@ -51,6 +49,10 @@ func NewCollectionGuarantee(untrusted UntrustedCollectionGuarantee) (*Collection
 
 	if len(untrusted.SignerIndices) == 0 {
 		return nil, fmt.Errorf("SignerIndices must not be empty")
+	}
+
+	if len(untrusted.ClusterChainID) == 0 {
+		return nil, fmt.Errorf("ClusterChainID must not be empty")
 	}
 
 	return &CollectionGuarantee{
