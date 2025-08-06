@@ -13,17 +13,17 @@ import (
 
 // TestSporkRootBlock_InsertRetrieve verifies that a spork root block can be
 // correctly inserted into and retrieved from the Badger database.
-func TestSporkRootBlock_InsertRetrieve(t *testing.T) {
+func TestSporkRootBlockID_InsertRetrieve(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
-		sporkRootBlock := unittest.BlockFixture()
+		sporkRootBlockID := unittest.IdentifierFixture()
 
-		err := db.Update(InsertSporkRootBlock(sporkRootBlock))
+		err := db.Update(InsertSporkRootBlockID(sporkRootBlockID))
 		require.NoError(t, err)
 
-		var actual flow.Block
-		err = db.View(RetrieveSporkRootBlock(&actual))
+		var actual flow.Identifier
+		err = db.View(RetrieveSporkRootBlockID(&actual))
 		require.NoError(t, err)
 
-		assert.Equal(t, sporkRootBlock, &actual)
+		assert.Equal(t, sporkRootBlockID, actual)
 	})
 }

@@ -15,11 +15,11 @@ const (
 	codeLivenessData = 11 // liveness data for hotstuff state
 
 	// codes for fields associated with the root state
-	_                  = 13 // DEPRECATED: 13 was used for root spork ID
-	_                  = 14 // DEPRECATED: 14 was used for ProtocolVersion before the versioned Protocol State
-	_                  = 15 // DEPRECATED: 15 was used to save the finalization safety threshold
-	_                  = 16 // DEPRECATED: 16 was used for root spork height
-	codeSporkRootBlock = 17 // the view of the block contained in the root spork
+	_                    = 13 // DEPRECATED: 13 was used for root spork ID
+	_                    = 14 // DEPRECATED: 14 was used for ProtocolVersion before the versioned Protocol State
+	_                    = 15 // DEPRECATED: 15 was used to save the finalization safety threshold
+	_                    = 16 // DEPRECATED: 16 was used for root spork height
+	codeSporkRootBlockID = 17 // the root spork block ID
 
 	// code for heights with special meaning
 	codeFinalizedHeight         = 20 // latest finalized block height
