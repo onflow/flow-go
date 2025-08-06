@@ -180,7 +180,7 @@ func (s *CollectionSyncer) StartWorkerLoop(ctx irrecoverable.SignalerContext, re
 
 			collection, ok := msg.Payload.(*flow.Collection)
 			if !ok {
-				ctx.Throw(fmt.Errorf("could not cast pending collection to *flow.Collection"))
+				ctx.Throw(fmt.Errorf("could not cast pending collection to *flow.Collection. got: %T", msg.Payload))
 				return
 			}
 
@@ -450,16 +450,14 @@ func (s *CollectionSyncer) findLowestBlockHeightWithMissingCollections(
 
 // OnCollectionDownloaded indexes and persists a downloaded collection.
 // This function is a callback intended to be used by the requester engine.
-//
-// Note: You might wonder what happens if the ingestion engine crashes,
-// but the requester engine continues to invoke this callback and writes
-// to a closed channel. In our current design, we intentionally ignore such cases.
-//
-// If any engine crashes, we treat it as a sign of possible state corruption,
-// and the node is expected to restart. Thus, this edge case is not handled explicitly.
 func (s *CollectionSyncer) OnCollectionDownloaded(id flow.Identifier, entity flow.Entity) {
 	err := s.pendingCollectionsHandler.Process(id, entity)
 	if err != nil {
-		s.logger.Warn().Err(err).Msg("failed to process pending collections")
+		// this is an unexpected error condition. The only expected error returned from Process
+		// is for an unexpected type. since OnCollectionDownloaded is called from the requester engine,
+		// which is configured to only process collections, any error returned here indicates
+		// a bug or state corruption.
+		s.logger.Fatal().Err(err).Msg("failed to process pending collections")
+		return
 	}
 }
