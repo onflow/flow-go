@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/dgraph-io/badger"
 	"github.com/jordanschalm/lockctx"
 
 	"github.com/onflow/flow-go/model/flow"
@@ -39,9 +40,36 @@ func IndexFinalizedBlockByHeight(lctx lockctx.Proof, rw storage.ReaderBatchWrite
 	return UpsertByKey(rw.Writer(), MakePrefix(codeHeightToBlock, height), blockID)
 }
 
+// IndexCertifiedBlockByView indexes a block by its view.
+// HotStuff guarantees that there is at most one certified block per view. Caution: this does not hold for
+// uncertified proposals, as a byzantine leader might produce multiple proposals for the same view.
+// Hence, only certified blocks (i.e. blocks that have received a QC) can be indexed!
+func IndexCertifiedBlockByView(lctx lockctx.Proof, rw storage.ReaderBatchWriter, view uint64, blockID flow.Identifier) func(*badger.Txn) error {
+	if !lctx.HoldsLock(storage.LockInsertBlock) {
+		return fmt.Errorf("missing required lock: %s", storage.LockInsertBlock)
+	}
+
+	var existingID flow.Identifier
+	err := RetrieveByKey(rw.GlobalReader(), MakePrefix(codeCertifiedBlockByView, view), &existingID)
+	if err == nil {
+		return fmt.Errorf("block ID already exists for view %d: %w", view, storage.ErrAlreadyExists)
+	}
+	if !errors.Is(err, storage.ErrNotFound) {
+		return fmt.Errorf("failed to check existing block ID for view %d: %w", view, err)
+	}
+
+	return UpsertByKey(rw.Writer(), MakePrefix(codeCertifiedBlockByView, view), blockID)
+}
+
 // LookupBlockHeight retrieves finalized blocks by height.
 func LookupBlockHeight(r storage.Reader, height uint64, blockID *flow.Identifier) error {
 	return RetrieveByKey(r, MakePrefix(codeHeightToBlock, height), blockID)
+}
+
+// LookupCertifiedBlockByView retrieves the certified block by view. (certified blocks are blocks that have received QC)
+// Returns `storage.ErrNotFound` if no certified block for the specified view is known.
+func LookupCertifiedBlockByView(r storage.Reader, view uint64, blockID *flow.Identifier) error {
+	return RetrieveByKey(r, MakePrefix(codeCertifiedBlockByView, view), blockID)
 }
 
 // BlockExists checks whether the block exists in the database.

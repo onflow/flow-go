@@ -72,6 +72,21 @@ func (b *Blocks) ByID(blockID flow.Identifier) (*flow.Block, error) {
 	return b.retrieveTx(blockID)
 }
 
+// ByView returns the block with the given view. It is only available for certified blocks.
+// certified blocks are the blocks that have received QC. Hotstuff guarantees that for each view,
+// at most one block is certified. Hence, the return value of `ByView` is guaranteed to be unique
+// even for non-finalized blocks.
+// Expected errors during normal operations:
+//   - `storage.ErrNotFound` if no certified block is known at given view.
+func (b *Blocks) ByView(view uint64) (*flow.Block, error) {
+	blockID, err := b.headers.BlockIDByView(view)
+	if err != nil {
+		return nil, err
+	}
+
+	return b.ByID(blockID)
+}
+
 // ByHeight returns the block at the given height. It is only available
 // for finalized blocks.
 //
