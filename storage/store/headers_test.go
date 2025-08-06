@@ -35,7 +35,7 @@ func TestHeaderStoreRetrieve(t *testing.T) {
 		require.NoError(t, lctx2.AcquireLock(storage.LockFinalizeBlock))
 		// index the header
 		err = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			return operation.IndexBlockHeight(lctx2, rw, block.Header.Height, block.ID())
+			return operation.IndexFinalizedBlockByHeight(lctx2, rw, block.Header.Height, block.ID())
 		})
 		lctx2.Release()
 		require.NoError(t, err)

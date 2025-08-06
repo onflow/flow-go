@@ -758,7 +758,7 @@ func (m *FollowerState) Finalize(ctx context.Context, blockID flow.Identifier) e
 	//   its payload, in which case the parent's seal is the same.
 	// * set the epoch fallback flag, if it is triggered
 	err = m.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-		err = operation.IndexBlockHeight(lctx, rw, header.Height, blockID)
+		err = operation.IndexFinalizedBlockByHeight(lctx, rw, header.Height, blockID)
 		if err != nil {
 			return fmt.Errorf("could not insert number mapping: %w", err)
 		}

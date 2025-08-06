@@ -256,14 +256,14 @@ func (bs *BuilderSuite) SetupTest() {
 
 	err := bs.db.Update(badgeroperation.InsertFinalizedHeight(final.Header.Height))
 	bs.Require().NoError(err)
-	err = bs.db.Update(badgeroperation.IndexBlockHeight(final.Header.Height, bs.finalID))
+	err = bs.db.Update(badgeroperation.IndexFinalizedBlockByHeight(final.Header.Height, bs.finalID))
 	bs.Require().NoError(err)
 
 	err = bs.db.Update(badgeroperation.InsertRootHeight(13))
 	bs.Require().NoError(err)
 
 	bs.Require().NoError(err)
-	err = bs.db.Update(badgeroperation.IndexBlockHeight(first.Header.Height, first.ID()))
+	err = bs.db.Update(badgeroperation.IndexFinalizedBlockByHeight(first.Header.Height, first.ID()))
 	bs.Require().NoError(err)
 	db := badgerimpl.ToDB(bs.db)
 	require.NoError(bs.T(), db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
