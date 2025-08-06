@@ -68,7 +68,7 @@ func NewExecutionResultQueryProvider(
 		executionNodes:    executionNodes,
 		rootBlockID:       rootBlockID,
 		rootBlockResult:   rootBlockResult,
-		baseCriteria:      DefaultCriteria.OverrideWith(operatorCriteria),
+		baseCriteria:      DefaultCriteria.WithOverridesFrom(operatorCriteria),
 	}, nil
 }
 
@@ -141,7 +141,7 @@ func (e *ExecutionResultQueryProvider) findResultAndExecutors(
 		receipts flow.ExecutionReceiptList
 	}
 
-	criteria = e.baseCriteria.OverrideWith(criteria)
+	criteria = e.baseCriteria.WithOverridesFrom(criteria)
 
 	// Note: this will return an empty slice with no error if no receipts are found.
 	allReceipts, err := e.executionReceipts.ByBlockID(blockID)
