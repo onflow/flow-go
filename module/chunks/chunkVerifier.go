@@ -222,7 +222,8 @@ func (fcv *ChunkVerifier) verifyTransactionsInContext(
 		txResults = make([]flow.LightTransactionResult, len(transactions))
 	}
 
-	// If system chunk, we already executed the process callback transaction
+	// If system chunk, we already executed the process callback transaction so skip it
+	// by setting the start index to 1 and assigning existing process result to tx results
 	if systemResult != nil {
 		txResults[0] = *systemResult
 		txStartIndex = 1
