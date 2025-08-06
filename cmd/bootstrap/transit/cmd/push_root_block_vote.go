@@ -28,7 +28,7 @@ func addPushVoteCmdFlags() {
 	defaultVoteFilePath := fmt.Sprintf(bootstrap.PathNodeRootBlockVote, "<node_id>")
 	pushVoteCmd.Flags().StringVarP(&flagToken, "token", "t", "", "token provided by the Flow team to access the Transit server")
 	pushVoteCmd.Flags().StringVarP(&flagVoteFile, "vote-file", "v", "", fmt.Sprintf("path under bootstrap directory of the vote file to upload (default: %s)", defaultVoteFilePath))
-	pushVoteCmd.Flags().StringVarP(&flagBucketName, "genesis-bucket", "g", "flow-genesis-bootstrap", `bucket for pushing root block vote files`)
+	pushVoteCmd.Flags().StringVarP(&flagBucketName, "bucket-name", "g", "flow-genesis-bootstrap", `bucket for pushing root block vote files`)
 
 	_ = pushVoteCmd.MarkFlagRequired("token")
 }

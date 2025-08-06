@@ -29,7 +29,7 @@ func init() {
 func addPushCmdFlags() {
 	pushCmd.Flags().StringVarP(&flagToken, "token", "t", "", "token provided by the Flow team to access the Transit server")
 	pushCmd.Flags().StringVarP(&flagNodeRole, "role", "r", "", `node role (can be "collection", "consensus", "execution", "verification" or "access")`)
-	pushCmd.Flags().StringVarP(&flagBucketName, "genesis-bucket", "g", "flow-genesis-bootstrap", `bucket for uploading transit keys`)
+	pushCmd.Flags().StringVarP(&flagBucketName, "bucket-name", "g", "flow-genesis-bootstrap", `bucket for uploading transit keys`)
 	_ = pushCmd.MarkFlagRequired("token")
 }
 

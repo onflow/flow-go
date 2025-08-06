@@ -25,7 +25,7 @@ func init() {
 
 func addPullRootBlockCmdFlags() {
 	pullRootBlockCmd.Flags().StringVarP(&flagToken, "token", "t", "", "token provided by the Flow team to access the Transit server")
-	pullRootBlockCmd.Flags().StringVarP(&flagBucketName, "genesis-bucket", "g", "flow-genesis-bootstrap", `bucket for pulling root block`)
+	pullRootBlockCmd.Flags().StringVarP(&flagBucketName, "bucket-name", "g", "flow-genesis-bootstrap", `bucket for pulling root block`)
 	_ = pullRootBlockCmd.MarkFlagRequired("token")
 }
 
