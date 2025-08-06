@@ -139,16 +139,10 @@ type BlockAttestationResult struct {
 	// was the reason this is kept here, long term we don't need this data and should
 	// act based on register deltas
 	*execution_data.BlockExecutionData
-
-	// Deprecated:
-	// TODO(mainnet27, #6773): remove this field https://github.com/onflow/flow-go/issues/6773
-	//   this is only temporarily needed produce different chunk Data Packs depending on the protocol version
-	versionAwareChunkConstructor flow.ChunkConstructor
 }
 
 func NewEmptyBlockAttestationResult(
 	blockExecutionResult *BlockExecutionResult,
-	versionAwareChunkConstructor flow.ChunkConstructor,
 ) *BlockAttestationResult {
 	colSize := blockExecutionResult.Size()
 	return &BlockAttestationResult{
@@ -161,7 +155,6 @@ func NewEmptyBlockAttestationResult(
 				0,
 				colSize),
 		},
-		versionAwareChunkConstructor: versionAwareChunkConstructor,
 	}
 }
 
@@ -213,8 +206,7 @@ func (ar *BlockAttestationResult) ChunkAt(index int) *flow.Chunk {
 		panic(fmt.Sprintf("execution snapshot is nil. Block ID: %s, EndState: %s", ar.Block.ID(), attestRes.endStateCommit))
 	}
 
-	// TODO(mainnet27, #6773): replace with flow.NewChunk https://github.com/onflow/flow-go/issues/6773
-	return ar.versionAwareChunkConstructor(
+	return flow.NewChunk(
 		ar.Block.ID(),
 		index,
 		attestRes.startStateCommit,
