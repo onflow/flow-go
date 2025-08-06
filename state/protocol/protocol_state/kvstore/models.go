@@ -401,9 +401,7 @@ func NewDefaultKVStore(finalizationSafetyThreshold, epochExtensionViewCount uint
 	if err != nil {
 		return nil, fmt.Errorf("could not construct v0 kvstore: %w", err)
 	}
-	return &Modelv1{
-		Modelv0: *modelv0,
-	}, nil
+	return &Modelv2{Modelv1: Modelv1{Modelv0: *modelv0}}, nil
 }
 
 // NewKVStore constructs a key-value store for a particular Protocol State version for bootstrapping.

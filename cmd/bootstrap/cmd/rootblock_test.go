@@ -177,7 +177,7 @@ func runTestInSubprocessWithError(t *testing.T, testName, expectedOutput string,
 	cmd := exec.Command(os.Args[0], "-test.run="+testName)
 
 	env := append(os.Environ(), "FLAG_RUN_IN_SUBPROCESS_ONLY=1")
-	env = append(env, extraEnv...) // <-- add custom env if needed
+	env = append(env, extraEnv...)
 	cmd.Env = env
 
 	output, err := cmd.CombinedOutput()
