@@ -13,9 +13,10 @@ import "github.com/onflow/flow-go/engine/access/rest/common/models"
 type Account struct {
 	Address string `json:"address"`
 	// Flow balance of the account.
-	Balance    string             `json:"balance"`
-	Keys       []AccountPublicKey `json:"keys,omitempty"`
-	Contracts  map[string]string  `json:"contracts,omitempty"`
-	Expandable *AccountExpandable `json:"_expandable"`
-	Links      *models.Links      `json:"_links,omitempty"`
+	Balance          string                   `json:"balance"`
+	Keys             []AccountPublicKey       `json:"keys,omitempty"`
+	Contracts        map[string]string        `json:"contracts,omitempty"`
+	ExecutorMetadata *models.ExecutorMetadata `json:"executor_metadata,omitempty"`
+	Expandable       *AccountExpandable       `json:"_expandable"`
+	Links            *models.Links            `json:"_links,omitempty"`
 }
