@@ -19,6 +19,7 @@ import (
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/invalid"
 	protocolmock "github.com/onflow/flow-go/state/protocol/mock"
+	"github.com/onflow/flow-go/storage"
 	bstorage "github.com/onflow/flow-go/storage/badger"
 	"github.com/onflow/flow-go/storage/locks"
 	"github.com/onflow/flow-go/storage/operation/badgerimpl"
@@ -31,9 +32,9 @@ func TestMigrateLastSealedExecutedResultToPebble(t *testing.T) {
 	unittest.RunWithBadgerDBAndPebbleDB(t, func(bdb *badger.DB, pdb *pebble.DB) {
 		// bootstrap to init highest executed height
 		bootstrapper := bootstrap.NewBootstrapper(unittest.Logger())
-		genesis := unittest.BlockHeaderFixture()
+		genesis := unittest.BlockFixture()
 		rootSeal := unittest.Seal.Fixture()
-		unittest.Seal.WithBlock(genesis)(rootSeal)
+		unittest.Seal.WithBlock(genesis.Header)(rootSeal)
 
 		db := badgerimpl.ToDB(bdb)
 		err := bootstrapper.BootstrapExecutionDatabase(db, rootSeal)
@@ -42,23 +43,27 @@ func TestMigrateLastSealedExecutedResultToPebble(t *testing.T) {
 		// create all modules
 		metrics := &metrics.NoopCollector{}
 
-		headers := bstorage.NewHeaders(metrics, bdb)
+		all := store.InitAll(metrics, db)
+		headers := all.Headers
+		blocks := all.Blocks
 		txResults := store.NewTransactionResults(metrics, db, store.DefaultCacheSize)
 		commits := store.NewCommits(metrics, db)
-		results := store.NewExecutionResults(metrics, db)
-		receipts := store.NewExecutionReceipts(metrics, db, results, store.DefaultCacheSize)
+		chunkDataPacks := store.NewChunkDataPacks(metrics, pebbleimpl.ToDB(pdb), store.NewCollections(db, store.NewTransactions(metrics, db)), store.DefaultCacheSize)
+		results := all.Results
+		receipts := all.Receipts
 		myReceipts := store.NewMyExecutionReceipts(metrics, db, receipts)
 		events := store.NewEvents(metrics, db)
 		serviceEvents := store.NewServiceEvents(metrics, db)
-		transactions := store.NewTransactions(metrics, db)
-		collections := store.NewCollections(db, transactions)
-		chunkDataPacks := store.NewChunkDataPacks(metrics, pebbleimpl.ToDB(pdb), collections, store.DefaultCacheSize)
 
-		err = headers.Store(genesis)
+		manager, lctx := unittest.LockManagerWithContext(t, storage.LockInsertBlock)
+		err = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+			return blocks.BatchStore(lctx, rw, &genesis)
+		})
+		lctx.Release()
 		require.NoError(t, err)
 
 		getLatestFinalized := func() (uint64, error) {
-			return genesis.Height, nil
+			return genesis.Header.Height, nil
 		}
 		lockManager := locks.NewTestingLockManager()
 
@@ -85,7 +90,7 @@ func TestMigrateLastSealedExecutedResultToPebble(t *testing.T) {
 
 		executableBlock := unittest.ExecutableBlockFixtureWithParent(
 			nil,
-			genesis,
+			genesis.Header,
 			&unittest.GenesisStateCommitment)
 		header := executableBlock.Block.Header
 
@@ -100,7 +105,12 @@ func TestMigrateLastSealedExecutedResultToPebble(t *testing.T) {
 			&commit)
 		newheader := newexecutableBlock.Block.Header
 
-		err = headers.Store(header)
+		lctx2 := manager.NewContext()
+		require.NoError(t, lctx2.AcquireLock(storage.LockInsertBlock))
+		err = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+			return blocks.BatchStore(lctx2, rw, newexecutableBlock.Block)
+		})
+		lctx2.Release()
 		require.NoError(t, err)
 
 		// save execution results
@@ -133,7 +143,7 @@ func TestMigrateLastSealedExecutedResultToPebble(t *testing.T) {
 				if blockID == header.ID() {
 					return createSnapshot(header)
 				} else if blockID == genesis.ID() {
-					return createSnapshot(genesis)
+					return createSnapshot(genesis.Header)
 				} else if blockID == newheader.ID() {
 					return createSnapshot(newheader)
 				}
@@ -190,7 +200,12 @@ func TestMigrateLastSealedExecutedResultToPebble(t *testing.T) {
 		)
 		require.NotNil(t, es)
 
-		err = headers.Store(newheader)
+		lctx2 = manager.NewContext()
+		require.NoError(t, lctx2.AcquireLock(storage.LockInsertBlock))
+		err = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+			return blocks.BatchStore(lctx2, rw, newexecutableBlock.Block)
+		})
+		lctx2.Release()
 		require.NoError(t, err)
 
 		newcomputationResult := testutil.ComputationResultFixture(t)

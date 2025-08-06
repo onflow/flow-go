@@ -13,9 +13,9 @@ import (
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/trace"
 	mockprot "github.com/onflow/flow-go/state/protocol/mock"
-	storage "github.com/onflow/flow-go/storage/badger"
 	"github.com/onflow/flow-go/storage/badger/operation"
 	"github.com/onflow/flow-go/storage/operation/badgerimpl"
+	"github.com/onflow/flow-go/storage/store"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -86,7 +86,7 @@ func TestMakeFinalValidChain(t *testing.T) {
 		metrics := metrics.NewNoopCollector()
 		fin := Finalizer{
 			dbReader: badgerimpl.ToDB(db).Reader(),
-			headers:  storage.NewHeaders(metrics, db),
+			headers:  store.NewHeaders(metrics, badgerimpl.ToDB(db)),
 			state:    state,
 			tracer:   trace.NewNoopTracer(),
 			cleanup:  LogCleanup(&list),
@@ -142,7 +142,7 @@ func TestMakeFinalInvalidHeight(t *testing.T) {
 		metrics := metrics.NewNoopCollector()
 		fin := Finalizer{
 			dbReader: badgerimpl.ToDB(db).Reader(),
-			headers:  storage.NewHeaders(metrics, db),
+			headers:  store.NewHeaders(metrics, badgerimpl.ToDB(db)),
 			state:    state,
 			tracer:   trace.NewNoopTracer(),
 			cleanup:  LogCleanup(&list),
@@ -190,7 +190,7 @@ func TestMakeFinalDuplicate(t *testing.T) {
 		metrics := metrics.NewNoopCollector()
 		fin := Finalizer{
 			dbReader: badgerimpl.ToDB(db).Reader(),
-			headers:  storage.NewHeaders(metrics, db),
+			headers:  store.NewHeaders(metrics, badgerimpl.ToDB(db)),
 			state:    state,
 			tracer:   trace.NewNoopTracer(),
 			cleanup:  LogCleanup(&list),
