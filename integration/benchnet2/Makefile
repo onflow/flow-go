@@ -18,7 +18,7 @@ EPOCH_STAKING_PHASE_LEN = 500
 DKG_PHASE_LEN = 1000
 EPOCH_EXTENSION_LEN = 600
 # Spork root config
-ROOT_VIEW = 1
+ROOT_VIEW = 0
 
 validate:
 ifeq ($(strip $(VALID_EXECUTION)), 1)
