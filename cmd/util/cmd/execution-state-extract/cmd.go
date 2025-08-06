@@ -17,6 +17,7 @@ import (
 	"github.com/onflow/flow-go/cmd/util/ledger/migrations"
 	"github.com/onflow/flow-go/cmd/util/ledger/reporters"
 	"github.com/onflow/flow-go/cmd/util/ledger/util"
+	"github.com/onflow/flow-go/cmd/util/ledger/util/registers"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/complete/wal"
 	"github.com/onflow/flow-go/model/bootstrap"
@@ -44,6 +45,7 @@ var (
 	flagOutputPayloadFileName         string
 	flagOutputPayloadByAddresses      string
 	flagCPUProfile                    string
+	flagZeroMigration                 bool
 )
 
 var Cmd = &cobra.Command{
@@ -75,6 +77,9 @@ func init() {
 
 	Cmd.Flags().BoolVar(&flagNoMigration, "no-migration", false,
 		"don't migrate the state")
+
+	Cmd.Flags().BoolVar(&flagZeroMigration, "estimate-migration-duration", false,
+		"run zero migrations to get minimum duration needed by migrations (load execution state, group payloads by account, iterate account payloads, create trie from payload, and generate checkpoint)")
 
 	Cmd.Flags().StringVar(&flagMigration, "migration", "", "migration name")
 
@@ -144,6 +149,11 @@ func run(*cobra.Command, []string) {
 	err := os.MkdirAll(flagOutputDir, 0755)
 	if err != nil {
 		log.Fatal().Err(err).Msgf("cannot create output directory %s", flagOutputDir)
+	}
+
+	if flagNoMigration && flagZeroMigration {
+		log.Fatal().Msg("cannot run the command with both --no-migration and --estimate-migration-duration flags, one of them or none of them should be provided")
+		return
 	}
 
 	if len(flagBlockHash) > 0 && len(flagStateCommitment) > 0 {
@@ -311,6 +321,21 @@ func run(*cobra.Command, []string) {
 		return
 	}
 
+	if flagZeroMigration {
+		newStateCommitment, err := emptyMigration(
+			log.Logger,
+			flagExecutionStateDir,
+			flagOutputDir,
+			stateCommitment)
+		if err != nil {
+			log.Fatal().Err(err).Msgf("error extracting state for commitment %s", stateCommitment)
+		}
+		if stateCommitment != flow.StateCommitment(newStateCommitment) {
+			log.Fatal().Err(err).Msgf("empty migration failed: state commitments are different: %v != %s", stateCommitment, newStateCommitment)
+		}
+		return
+	}
+
 	var extractor extractor
 	if len(flagInputPayloadFileName) > 0 {
 		extractor = newPayloadFileExtractor(log.Logger, flagInputPayloadFileName)
@@ -412,6 +437,66 @@ func extractStateToCheckpointWithoutMigration(
 
 	// Create checkpoint files
 	return createCheckpoint(logger, newTrie, outputDir, bootstrap.FilenameWALRootCheckpoint)
+}
+
+func emptyMigration(
+	logger zerolog.Logger,
+	executionStateDir string,
+	outputDir string,
+	stateCommitment flow.StateCommitment,
+) (ledger.State, error) {
+
+	log.Info().Msgf("Loading state with commitment %s", stateCommitment)
+
+	// Load state for given state commitment
+	trie, err := util.ReadTrie(executionStateDir, stateCommitment)
+	if err != nil {
+		return ledger.DummyState, fmt.Errorf("failed to load state: %w", err)
+	}
+
+	log.Info().Msgf("Getting payloads from loaded state")
+
+	// Get payloads from trie.
+	payloads := trie.AllPayloads()
+
+	log.Info().Msgf("Migrating %d payloads", len(payloads))
+
+	// Migrate payloads (migration is no-op)
+	migs := []migrations.NamedMigration{
+		{
+			Name: "empty migration",
+			Migrate: func(*registers.ByAccount) error {
+				return nil
+			},
+		},
+	}
+
+	migration := newMigration(log.Logger, migs, flagNWorker)
+
+	migratedPayloads, err := migration(payloads)
+	if err != nil {
+		return ledger.DummyState, fmt.Errorf("failed to migrate payloads: %w", err)
+	}
+
+	log.Info().Msgf("Migrated %d payloads", len(migratedPayloads))
+
+	// Create trie from migrated payloads
+	migratedTrie, err := createTrieFromPayloads(log.Logger, payloads)
+	if err != nil {
+		return ledger.DummyState, fmt.Errorf("failed to create new trie from migrated payloads: %w", err)
+	}
+
+	log.Info().Msgf("Created trie from migrated payloads with commitment %s", migratedTrie.RootHash())
+
+	// Create checkpoint files
+	newState, err := createCheckpoint(logger, migratedTrie, outputDir, bootstrap.FilenameWALRootCheckpoint)
+	if err != nil {
+		return ledger.DummyState, fmt.Errorf("failed to create checkpoint: %w", err)
+	}
+
+	log.Info().Msgf("Created checkpoint")
+
+	return newState, nil
 }
 
 func ensureCheckpointFileExist(dir string) error {
