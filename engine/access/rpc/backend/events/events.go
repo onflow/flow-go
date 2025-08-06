@@ -33,7 +33,7 @@ type Events struct {
 	state          protocol.State
 	chain          flow.Chain
 	maxHeightRange uint
-	retriever      provider.EventProvider
+	provider       provider.EventProvider
 }
 
 var _ access.EventsAPI = (*Events)(nil)
@@ -50,19 +50,19 @@ func NewEventsBackend(
 	eventsIndex *index.EventsIndex,
 	execNodeIdentitiesProvider *rpc.ExecutionNodeIdentitiesProvider,
 ) (*Events, error) {
-	var eventRetriever provider.EventProvider
+	var eventProvider provider.EventProvider
 
 	switch queryMode {
 	case query_mode.IndexQueryModeLocalOnly:
-		eventRetriever = provider.NewLocalEventProvider(eventsIndex)
+		eventProvider = provider.NewLocalEventProvider(eventsIndex)
 
 	case query_mode.IndexQueryModeExecutionNodesOnly:
-		eventRetriever = provider.NewENEventProvider(log, execNodeIdentitiesProvider, connFactory, nodeCommunicator)
+		eventProvider = provider.NewENEventProvider(log, execNodeIdentitiesProvider, connFactory, nodeCommunicator)
 
 	case query_mode.IndexQueryModeFailover:
 		local := provider.NewLocalEventProvider(eventsIndex)
 		execNode := provider.NewENEventProvider(log, execNodeIdentitiesProvider, connFactory, nodeCommunicator)
-		eventRetriever = provider.NewFailoverEventProvider(log, local, execNode)
+		eventProvider = provider.NewFailoverEventProvider(log, local, execNode)
 
 	default:
 		return nil, fmt.Errorf("unknown execution mode: %v", queryMode)
@@ -73,7 +73,7 @@ func NewEventsBackend(
 		chain:          chain,
 		maxHeightRange: maxHeightRange,
 		headers:        headers,
-		retriever:      eventRetriever,
+		provider:       eventProvider,
 	}, nil
 }
 
@@ -150,7 +150,7 @@ func (e *Events) GetEventsForHeightRange(
 		})
 	}
 
-	resp, err := e.retriever.Events(ctx, blockHeaders, flow.EventType(eventType), requiredEventEncodingVersion)
+	resp, err := e.provider.Events(ctx, blockHeaders, flow.EventType(eventType), requiredEventEncodingVersion)
 	if err != nil {
 		return nil, err
 	}
@@ -188,7 +188,7 @@ func (e *Events) GetEventsForBlockIDs(
 		})
 	}
 
-	resp, err := e.retriever.Events(ctx, blockHeaders, flow.EventType(eventType), requiredEventEncodingVersion)
+	resp, err := e.provider.Events(ctx, blockHeaders, flow.EventType(eventType), requiredEventEncodingVersion)
 	if err != nil {
 		return nil, err
 	}
