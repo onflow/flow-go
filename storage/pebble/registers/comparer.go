@@ -1,6 +1,6 @@
 package registers
 
-import "github.com/cockroachdb/pebble"
+import "github.com/cockroachdb/pebble/v2"
 
 const (
 	// Size of the block height encoded in the key.

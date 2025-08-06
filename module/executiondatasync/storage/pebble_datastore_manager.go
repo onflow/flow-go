@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/cockroachdb/pebble"
+	"github.com/cockroachdb/pebble/v2"
 	ds "github.com/ipfs/go-datastore"
 	pebbleds "github.com/ipfs/go-ds-pebble"
 	"github.com/rs/zerolog"
@@ -44,7 +44,7 @@ func NewPebbleDatastoreManager(logger zerolog.Logger, path string, options *pebb
 		return nil, fmt.Errorf("failed to open db: %w", err)
 	}
 
-	ds, err := pebbleds.NewDatastore(path, options, pebbleds.WithPebbleDB(db))
+	ds, err := pebbleds.NewDatastore(path, pebbleds.WithPebbleDB(db))
 	if err != nil {
 		return nil, fmt.Errorf("could not open tracker ds: %w", err)
 	}
