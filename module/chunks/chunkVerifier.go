@@ -404,7 +404,8 @@ func (fcv *ChunkVerifier) verifyTransactionsInContext(
 	return chunkExecutionSnapshot.SpockSecret, nil
 }
 
-// createSystemChunk recreates the system chunk transactions.
+// createSystemChunk recreates the system chunk transactions and executes the
+// process callback transaction if scheduled callbacks are enabled.
 //
 // If scheduled callbacks are dissabled it will only contain the system transaction.
 // If scheduled callbacks are enabled we need to do the following actions:
