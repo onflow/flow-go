@@ -6,14 +6,14 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-// InsertSporkRootBlock inserts the spork root block for the present spork. A single database
+// InsertSporkRootBlockID inserts the spork root block ID for the present spork. A single database
 // and protocol state instance spans at most one spork, so this is inserted
 // exactly once, when bootstrapping the state.
-func InsertSporkRootBlock(block *flow.Block) func(*badger.Txn) error {
-	return insert(makePrefix(codeSporkRootBlock), block)
+func InsertSporkRootBlockID(blockID flow.Identifier) func(*badger.Txn) error {
+	return insert(makePrefix(codeSporkRootBlockID), blockID)
 }
 
-// RetrieveSporkRootBlock retrieves the spork root block for the present spork.
-func RetrieveSporkRootBlock(block *flow.Block) func(*badger.Txn) error {
-	return retrieve(makePrefix(codeSporkRootBlock), block)
+// RetrieveSporkRootBlockID retrieves the spork root block ID for the present spork.
+func RetrieveSporkRootBlockID(blockID *flow.Identifier) func(*badger.Txn) error {
+	return retrieve(makePrefix(codeSporkRootBlockID), blockID)
 }

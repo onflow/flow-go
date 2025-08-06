@@ -7,7 +7,6 @@ import (
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/state/protocol"
-	"github.com/onflow/flow-go/state/protocol/inmem"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/badger/operation"
 )
@@ -116,21 +115,22 @@ func (p *InstanceParams) Seal() *flow.Seal {
 	return p.rootSeal
 }
 
-// ReadGlobalParams reads the global parameters from the database and returns them as in-memory representation.
+// ReadSporkRootBlock reads the spork root block from the database.
 // No errors are expected during normal operation.
-func ReadGlobalParams(db *badger.DB) (*inmem.Params, error) {
-	var sporkRootBlock flow.Block
-	err := db.View(operation.RetrieveSporkRootBlock(&sporkRootBlock))
+func ReadSporkRootBlock(
+	db *badger.DB,
+	blocks storage.Blocks,
+) (*flow.Block, error) {
+	var sporkRootBlockID flow.Identifier
+	err := db.View(operation.RetrieveSporkRootBlockID(&sporkRootBlockID))
 	if err != nil {
-		return nil, fmt.Errorf("could not get spork root block height: %w", err)
+		return nil, fmt.Errorf("could not get spork root block ID: %w", err)
 	}
 
-	return inmem.NewParams(
-		inmem.EncodableParams{
-			ChainID:              sporkRootBlock.ChainID,
-			SporkID:              sporkRootBlock.ID(),
-			SporkRootBlockHeight: sporkRootBlock.Height,
-			SporkRootBlockView:   sporkRootBlock.View,
-		},
-	), nil
+	sporkRootBlock, err := blocks.ByID(sporkRootBlockID)
+	if err != nil {
+		return nil, fmt.Errorf("could not retrieve spork root block: %w", err)
+	}
+
+	return sporkRootBlock, nil
 }
