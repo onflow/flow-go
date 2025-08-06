@@ -6,6 +6,9 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
+// InsertHeader indexes the block header by the provided `headerID`.
+// Expected errors during normal operation
+//   - storage.ErrAlreadyExists if the key already exists in the database.
 func InsertHeader(headerID flow.Identifier, header *flow.Header) func(*badger.Txn) error {
 	return insert(makePrefix(codeHeader, headerID), header)
 }
@@ -20,9 +23,23 @@ func IndexFinalizedBlockByHeight(height uint64, blockID flow.Identifier) func(*b
 	return insert(makePrefix(codeHeightToBlock, height), blockID)
 }
 
+// IndexCertifiedBlockByView indexes a block by its view.
+// HotStuff guarantees that there is at most one certified block per view. Caution: this does not hold for
+// uncertified proposals, as a byzantine leader might produce multiple proposals for the same view.
+// Hence, only certified blocks (i.e. blocks that have received a QC) can be indexed!
+func IndexCertifiedBlockByView(view uint64, blockID flow.Identifier) func(*badger.Txn) error {
+	return insert(makePrefix(codeCertifiedBlockByView, view), blockID)
+}
+
 // LookupBlockHeight retrieves finalized blocks by height.
 func LookupBlockHeight(height uint64, blockID *flow.Identifier) func(*badger.Txn) error {
 	return retrieve(makePrefix(codeHeightToBlock, height), blockID)
+}
+
+// LookupCertifiedBlockByView retrieves the certified block by view. (certified blocks are blocks that have received QC)
+// Returns `storage.ErrNotFound` if no certified block for the specified view is known.
+func LookupCertifiedBlockByView(view uint64, blockID *flow.Identifier) func(*badger.Txn) error {
+	return retrieve(makePrefix(codeCertifiedBlockByView, view), blockID)
 }
 
 // BlockExists checks whether the block exists in the database.
