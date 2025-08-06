@@ -936,7 +936,7 @@ func WithServiceEvents(n int) func(result *flow.ExecutionResult) {
 		// randomly assign service events to chunks
 		for i := 0; i < n; i++ {
 			chunkIndex := rand.Intn(result.Chunks.Len())
-			*result.Chunks[chunkIndex].ServiceEventCount++
+			result.Chunks[chunkIndex].ServiceEventCount++
 		}
 	}
 }
@@ -1345,7 +1345,7 @@ func WithChunkStartState(startState flow.StateCommitment) func(chunk *flow.Chunk
 	}
 }
 
-func WithServiceEventCount(count *uint16) func(*flow.Chunk) {
+func WithServiceEventCount(count uint16) func(*flow.Chunk) {
 	return func(chunk *flow.Chunk) {
 		chunk.ServiceEventCount = count
 	}
@@ -1362,7 +1362,7 @@ func ChunkFixture(
 			CollectionIndex:      collectionIndex,
 			StartState:           startState,
 			EventCollection:      IdentifierFixture(),
-			ServiceEventCount:    PtrTo[uint16](0),
+			ServiceEventCount:    0,
 			TotalComputationUsed: 4200,
 			NumberOfTransactions: 42,
 			BlockID:              blockID,
@@ -1720,37 +1720,49 @@ func WithChunkID(chunkID flow.Identifier) func(*verification.ChunkDataPackReques
 // Use options to customize the request.
 func ChunkDataPackRequestFixture(opts ...func(*verification.ChunkDataPackRequest)) *verification.
 	ChunkDataPackRequest {
-
 	req := &verification.ChunkDataPackRequest{
 		Locator: chunks.Locator{
 			ResultID: IdentifierFixture(),
 			Index:    0,
 		},
-		ChunkDataPackRequestInfo: verification.ChunkDataPackRequestInfo{
-			ChunkID:   IdentifierFixture(),
-			Height:    0,
-			Agrees:    IdentifierListFixture(1),
-			Disagrees: IdentifierListFixture(1),
-		},
+		ChunkDataPackRequestInfo: *ChunkDataPackRequestInfoFixture(),
 	}
 
 	for _, opt := range opts {
 		opt(req)
 	}
 
+	// Ensure Targets reflects current Agrees and Disagrees
+	req.Targets = makeTargets(req.Agrees, req.Disagrees)
+
+	return req
+}
+
+func ChunkDataPackRequestInfoFixture() *verification.ChunkDataPackRequestInfo {
+	agrees := IdentifierListFixture(1)
+	disagrees := IdentifierListFixture(1)
+
+	return &verification.ChunkDataPackRequestInfo{
+		ChunkID:   IdentifierFixture(),
+		Height:    0,
+		Agrees:    agrees,
+		Disagrees: disagrees,
+		Targets:   makeTargets(agrees, disagrees),
+	}
+}
+
+// makeTargets returns a combined IdentityList for the given agrees and disagrees.
+func makeTargets(agrees, disagrees flow.IdentifierList) flow.IdentityList {
 	// creates identity fixtures for target ids as union of agrees and disagrees
 	// TODO: remove this inner fixture once we have filter for identifier list.
 	targets := flow.IdentityList{}
-	for _, id := range req.Agrees {
-		targets = append(targets, IdentityFixture(WithNodeID(id), WithRole(flow.RoleExecution)))
+	for _, id := range append(agrees, disagrees...) {
+		targets = append(targets, IdentityFixture(
+			WithNodeID(id),
+			WithRole(flow.RoleExecution),
+		))
 	}
-	for _, id := range req.Disagrees {
-		targets = append(targets, IdentityFixture(WithNodeID(id), WithRole(flow.RoleExecution)))
-	}
-
-	req.Targets = targets
-
-	return req
+	return targets
 }
 
 func WithChunkDataPackCollection(collection *flow.Collection) func(*flow.ChunkDataPack) {
@@ -2733,6 +2745,61 @@ func ChunkExecutionDataFixture(t *testing.T, minSize int, opts ...func(*executio
 		ced.TrieUpdate.Payloads[0] = ledger.NewPayload(k, v)
 		size *= 2
 	}
+}
+
+func WithTxResultErrorMessageTxID(id flow.Identifier) func(txResErrMsg *flow.TransactionResultErrorMessage) {
+	return func(txResErrMsg *flow.TransactionResultErrorMessage) {
+		txResErrMsg.TransactionID = id
+	}
+}
+
+func WithTxResultErrorMessageIndex(index uint32) func(txResErrMsg *flow.TransactionResultErrorMessage) {
+	return func(txResErrMsg *flow.TransactionResultErrorMessage) {
+		txResErrMsg.Index = index
+	}
+}
+
+func WithTxResultErrorMessageTxMsg(message string) func(txResErrMsg *flow.TransactionResultErrorMessage) {
+	return func(txResErrMsg *flow.TransactionResultErrorMessage) {
+		txResErrMsg.ErrorMessage = message
+	}
+}
+
+func WithTxResultErrorMessageExecutorID(id flow.Identifier) func(txResErrMsg *flow.TransactionResultErrorMessage) {
+	return func(txResErrMsg *flow.TransactionResultErrorMessage) {
+		txResErrMsg.ExecutorID = id
+	}
+}
+
+// TransactionResultErrorMessageFixture creates a fixture tx result error message with random generated tx ID and executor ID for test purpose.
+func TransactionResultErrorMessageFixture(opts ...func(*flow.TransactionResultErrorMessage)) flow.TransactionResultErrorMessage {
+	txResErrMsg := flow.TransactionResultErrorMessage{
+		TransactionID: IdentifierFixture(),
+		Index:         0,
+		ErrorMessage:  "transaction result error",
+		ExecutorID:    IdentifierFixture(),
+	}
+
+	for _, opt := range opts {
+		opt(&txResErrMsg)
+	}
+
+	return txResErrMsg
+}
+
+// TransactionResultErrorMessagesFixture creates a fixture collection of tx result error messages with n elements.
+func TransactionResultErrorMessagesFixture(n int) []flow.TransactionResultErrorMessage {
+	txResErrMsgs := make([]flow.TransactionResultErrorMessage, 0, n)
+	executorID := IdentifierFixture()
+
+	for i := 0; i < n; i++ {
+		txResErrMsgs = append(txResErrMsgs, TransactionResultErrorMessageFixture(
+			WithTxResultErrorMessageIndex(uint32(i)),
+			WithTxResultErrorMessageTxMsg(fmt.Sprintf("transaction result error %d", i)),
+			WithTxResultErrorMessageExecutorID(executorID),
+		))
+	}
+	return txResErrMsgs
 }
 
 // RootEpochProtocolStateFixture creates a fixture with correctly structured Epoch sub-state.

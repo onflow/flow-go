@@ -12,6 +12,7 @@ transaction(
     networkingAddress: String,
     networkingKey: String,
     stakingKey: String,
+    stakingKeyPoP: String,
     machineAcctKey: Crypto.KeyListEntry?) {
 
     prepare(service: auth(BorrowValue) &Account) {
@@ -62,6 +63,7 @@ transaction(
             networkingAddress: networkingAddress,
             networkingKey: networkingKey,
             stakingKey: stakingKey,
+            stakingKeyPoP: stakingKeyPoP,
             amount: stake,
             payer: service,
         ) {

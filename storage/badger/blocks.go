@@ -71,7 +71,10 @@ func (b *Blocks) ByID(blockID flow.Identifier) (*flow.Block, error) {
 	return b.retrieveTx(blockID)(tx)
 }
 
-// ByHeight ...
+// ByHeight returns block by height
+//
+// Expected errors during normal operations:
+// - storage.ErrNotFound if no block is found for the given height
 func (b *Blocks) ByHeight(height uint64) (*flow.Block, error) {
 	tx := b.db.NewTransaction(false)
 	defer tx.Discard()

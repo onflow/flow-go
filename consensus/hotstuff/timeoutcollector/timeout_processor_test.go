@@ -412,7 +412,7 @@ func (s *TimeoutProcessorTestSuite) TestProcess_ConcurrentCreatingTC() {
 		})
 	}
 	// don't care about actual data
-	s.sigAggregator.On("Aggregate").Return(signersData, crypto.Signature{}, nil)
+	s.sigAggregator.On("Aggregate").Return(signersData, unittest.SignatureFixture(), nil)
 
 	var startupWg, shutdownWg sync.WaitGroup
 
