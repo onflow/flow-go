@@ -94,7 +94,6 @@ require (
 
 require (
 	github.com/coreos/go-semver v0.3.0
-	github.com/dgraph-io/badger v1.6.2
 	github.com/docker/go-units v0.5.0
 	github.com/dustin/go-humanize v1.0.1
 	github.com/go-playground/validator/v10 v10.19.0
@@ -118,8 +117,6 @@ require (
 	google.golang.org/genproto/googleapis/bytestream v0.0.0-20250428153025-10db94c68c34
 	gopkg.in/yaml.v2 v2.4.0
 )
-
-require github.com/AndreasBriese/bbloom v0.0.0-20190825152654-46b345b51c96 // indirect
 
 require (
 	cel.dev/expr v0.20.0 // indirect
