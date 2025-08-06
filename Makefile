@@ -213,7 +213,7 @@ generate-mocks: install-mock-generators
 	mockery --name 'AccountRetriever' --dir="./engine/access/rpc/backend/accounts/retriever" --case=underscore --output="./engine/access/rpc/backend/accounts/retriever/mock" --outpkg="mock"
 	mockery --name 'EventRetriever' --dir="./engine/access/rpc/backend/events/retriever" --case=underscore --output="./engine/access/rpc/backend/events/retriever/mock" --outpkg="mock"
 	mockery --name 'TransactionProvider' --dir="./engine/access/rpc/backend/transactions/provider" --case=underscore --output="./engine/access/rpc/backend/transactions/provider/mock" --outpkg="mock"
-	mockery --name 'TxErrorMessageProvider' --dir="./engine/access/rpc/backend/transactions/error_message_provider" --case=underscore --output="./engine/access/rpc/backend/transactions/error_message_provider/mock" --outpkg="mock"
+	mockery --name 'Provider' --dir="./engine/access/rpc/backend/transactions/error_messages" --case=underscore --output="./engine/access/rpc/backend/transactions/error_messages/mock" --outpkg="mock"
 	mockery --name 'TransactionSender' --dir="./engine/access/rpc/backend/transactions/retrier" --case=underscore --output="./engine/access/rpc/backend/transactions/retrier/mock" --outpkg="mock"
 	mockery --name 'Retrier' --dir="./engine/access/rpc/backend/transactions/retrier" --case=underscore --output="./engine/access/rpc/backend/transactions/retrier/mock" --outpkg="mock"
 	mockery --name '.*' --dir=model/fingerprint --case=underscore --output="./model/fingerprint/mock" --outpkg="mock"
