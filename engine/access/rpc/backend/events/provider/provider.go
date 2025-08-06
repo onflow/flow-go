@@ -1,4 +1,4 @@
-package retriever
+package provider
 
 import (
 	"context"
@@ -9,7 +9,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-type EventRetriever interface {
+type EventProvider interface {
 	Events(
 		ctx context.Context,
 		blocks []BlockMetadata,

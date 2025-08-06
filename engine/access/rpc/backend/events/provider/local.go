@@ -1,4 +1,4 @@
-package retriever
+package provider
 
 import (
 	"context"
@@ -17,19 +17,19 @@ import (
 	"github.com/onflow/flow-go/storage"
 )
 
-type LocalEventRetriever struct {
+type LocalEventProvider struct {
 	index *index.EventsIndex
 }
 
-var _ EventRetriever = (*LocalEventRetriever)(nil)
+var _ EventProvider = (*LocalEventProvider)(nil)
 
-func NewLocalEventRetriever(index *index.EventsIndex) *LocalEventRetriever {
-	return &LocalEventRetriever{
+func NewLocalEventProvider(index *index.EventsIndex) *LocalEventProvider {
+	return &LocalEventProvider{
 		index: index,
 	}
 }
 
-func (l *LocalEventRetriever) Events(
+func (l *LocalEventProvider) Events(
 	ctx context.Context,
 	blocks []BlockMetadata,
 	eventType flow.EventType,
