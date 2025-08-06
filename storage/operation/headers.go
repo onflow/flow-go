@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/dgraph-io/badger"
 	"github.com/jordanschalm/lockctx"
 
 	"github.com/onflow/flow-go/model/flow"
@@ -44,7 +43,7 @@ func IndexFinalizedBlockByHeight(lctx lockctx.Proof, rw storage.ReaderBatchWrite
 // HotStuff guarantees that there is at most one certified block per view. Caution: this does not hold for
 // uncertified proposals, as a byzantine leader might produce multiple proposals for the same view.
 // Hence, only certified blocks (i.e. blocks that have received a QC) can be indexed!
-func IndexCertifiedBlockByView(lctx lockctx.Proof, rw storage.ReaderBatchWriter, view uint64, blockID flow.Identifier) func(*badger.Txn) error {
+func IndexCertifiedBlockByView(lctx lockctx.Proof, rw storage.ReaderBatchWriter, view uint64, blockID flow.Identifier) error {
 	if !lctx.HoldsLock(storage.LockInsertBlock) {
 		return fmt.Errorf("missing required lock: %s", storage.LockInsertBlock)
 	}
