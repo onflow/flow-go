@@ -17,6 +17,7 @@ import (
 	"github.com/onflow/flow-go/cmd/util/ledger/migrations"
 	"github.com/onflow/flow-go/cmd/util/ledger/reporters"
 	"github.com/onflow/flow-go/cmd/util/ledger/util"
+	"github.com/onflow/flow-go/cmd/util/ledger/util/registers"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/complete/wal"
 	"github.com/onflow/flow-go/model/bootstrap"
@@ -27,38 +28,24 @@ import (
 )
 
 var (
-	flagExecutionStateDir                  string
-	flagOutputDir                          string
-	flagBlockHash                          string
-	flagStateCommitment                    string
-	flagDatadir                            string
-	flagChain                              string
-	flagNWorker                            int
-	flagNoMigration                        bool
-	flagMigration                          string
-	flagNoReport                           bool
-	flagValidateMigration                  bool
-	flagAllowPartialStateFromPayloads      bool
-	flagSortPayloads                       bool
-	flagPrune                              bool
-	flagLogVerboseValidationError          bool
-	flagDiffMigration                      bool
-	flagLogVerboseDiff                     bool
-	flagVerboseErrorOutput                 bool
-	flagStagedContractsFile                string
-	flagContinueMigrationOnValidationError bool
-	flagCheckStorageHealthBeforeMigration  bool
-	flagCheckStorageHealthAfterMigration   bool
-	flagInputPayloadFileName               string
-	flagOutputPayloadFileName              string
-	flagOutputPayloadByAddresses           string
-	flagMaxAccountSize                     uint64
-	flagFixSlabsWithBrokenReferences       bool
-	flagFilterUnreferencedSlabs            bool
-	flagCPUProfile                         string
-	flagReportMetrics                      bool
-	flagCacheStaticTypeMigrationResults    bool
-	flagCacheEntitlementsMigrationResults  bool
+	flagExecutionStateDir             string
+	flagOutputDir                     string
+	flagBlockHash                     string
+	flagStateCommitment               string
+	flagDatadir                       string
+	flagChain                         string
+	flagNWorker                       int
+	flagNoMigration                   bool
+	flagMigration                     string
+	flagNoReport                      bool
+	flagAllowPartialStateFromPayloads bool
+	flagSortPayloads                  bool
+	flagPrune                         bool
+	flagInputPayloadFileName          string
+	flagOutputPayloadFileName         string
+	flagOutputPayloadByAddresses      string
+	flagCPUProfile                    string
+	flagZeroMigration                 bool
 )
 
 var Cmd = &cobra.Command{
@@ -91,6 +78,9 @@ func init() {
 	Cmd.Flags().BoolVar(&flagNoMigration, "no-migration", false,
 		"don't migrate the state")
 
+	Cmd.Flags().BoolVar(&flagZeroMigration, "estimate-migration-duration", false,
+		"run zero migrations to get minimum duration needed by migrations (load execution state, group payloads by account, iterate account payloads, create trie from payload, and generate checkpoint)")
+
 	Cmd.Flags().StringVar(&flagMigration, "migration", "", "migration name")
 
 	Cmd.Flags().BoolVar(&flagNoReport, "no-report", false,
@@ -98,35 +88,8 @@ func init() {
 
 	Cmd.Flags().IntVar(&flagNWorker, "n-migrate-worker", 10, "number of workers to migrate payload concurrently")
 
-	Cmd.Flags().BoolVar(&flagValidateMigration, "validate", false,
-		"validate migrated Cadence values (atree migration)")
-
-	Cmd.Flags().BoolVar(&flagLogVerboseValidationError, "log-verbose-validation-error", false,
-		"log entire Cadence values on validation error (atree migration)")
-
-	Cmd.Flags().BoolVar(&flagDiffMigration, "diff", false,
-		"compare Cadence values and log diff (migration)")
-
-	Cmd.Flags().BoolVar(&flagLogVerboseDiff, "log-verbose-diff", false,
-		"log entire Cadence values on diff (requires --diff flag)")
-
-	Cmd.Flags().BoolVar(&flagVerboseErrorOutput, "verbose-error-output", true,
-		"log verbose output on migration errors")
-
-	Cmd.Flags().StringVar(&flagStagedContractsFile, "staged-contracts", "",
-		"Staged contracts CSV file")
-
 	Cmd.Flags().BoolVar(&flagAllowPartialStateFromPayloads, "allow-partial-state-from-payload-file", false,
 		"allow input payload file containing partial state (e.g. not all accounts)")
-
-	Cmd.Flags().BoolVar(&flagCheckStorageHealthBeforeMigration, "check-storage-health-before", false,
-		"check (atree) storage health before migration")
-
-	Cmd.Flags().BoolVar(&flagCheckStorageHealthAfterMigration, "check-storage-health-after", false,
-		"check (atree) storage health after migration")
-
-	Cmd.Flags().BoolVar(&flagContinueMigrationOnValidationError, "continue-migration-on-validation-errors", false,
-		"continue migration even if validation fails")
 
 	Cmd.Flags().BoolVar(&flagSortPayloads, "sort-payloads", true,
 		"sort payloads (generate deterministic output; disable only for development purposes)")
@@ -164,26 +127,8 @@ func init() {
 		"extract payloads of addresses (comma separated hex-encoded addresses) to file specified by output-payload-filename",
 	)
 
-	Cmd.Flags().Uint64Var(&flagMaxAccountSize, "max-account-size", 0,
-		"max account size")
-
-	Cmd.Flags().BoolVar(&flagFixSlabsWithBrokenReferences, "fix-testnet-slabs-with-broken-references", false,
-		"fix slabs with broken references in testnet")
-
-	Cmd.Flags().BoolVar(&flagFilterUnreferencedSlabs, "filter-unreferenced-slabs", false,
-		"filter unreferenced slabs")
-
 	Cmd.Flags().StringVar(&flagCPUProfile, "cpu-profile", "",
 		"enable CPU profiling")
-
-	Cmd.Flags().BoolVar(&flagReportMetrics, "report-metrics", false,
-		"report migration metrics")
-
-	Cmd.Flags().BoolVar(&flagCacheStaticTypeMigrationResults, "cache-static-type-migration", false,
-		"cache static type migration results")
-
-	Cmd.Flags().BoolVar(&flagCacheEntitlementsMigrationResults, "cache-entitlements-migration", false,
-		"cache entitlements migration results")
 }
 
 func run(*cobra.Command, []string) {
@@ -206,6 +151,11 @@ func run(*cobra.Command, []string) {
 		log.Fatal().Err(err).Msgf("cannot create output directory %s", flagOutputDir)
 	}
 
+	if flagNoMigration && flagZeroMigration {
+		log.Fatal().Msg("cannot run the command with both --no-migration and --estimate-migration-duration flags, one of them or none of them should be provided")
+		return
+	}
+
 	if len(flagBlockHash) > 0 && len(flagStateCommitment) > 0 {
 		log.Fatal().Msg("cannot run the command with both block hash and state commitment as inputs, only one of them should be provided")
 		return
@@ -222,10 +172,6 @@ func run(*cobra.Command, []string) {
 	// When flagOutputPayloadByAddresses is specified, flagOutputPayloadFileName is required.
 	if len(flagOutputPayloadFileName) == 0 && len(flagOutputPayloadByAddresses) > 0 {
 		log.Fatal().Msg("--extract-payloads-by-address requires --output-payload-filename to be specified")
-	}
-
-	if flagValidateMigration && flagDiffMigration {
-		log.Fatal().Msg("Both --validate and --diff are enabled, please specify only one (or none) of these")
 	}
 
 	var stateCommitment flow.StateCommitment
@@ -316,34 +262,6 @@ func run(*cobra.Command, []string) {
 		log.Warn().Msgf("--no-report flag is deprecated")
 	}
 
-	if flagValidateMigration {
-		log.Warn().Msgf("--validate flag is enabled and will increase duration of migration")
-	}
-
-	if flagLogVerboseValidationError {
-		log.Warn().Msgf("--log-verbose-validation-error flag is enabled which may increase size of log")
-	}
-
-	if flagDiffMigration {
-		log.Warn().Msgf("--diff flag is enabled and will increase duration of migration")
-	}
-
-	if flagLogVerboseDiff {
-		log.Warn().Msgf("--log-verbose-diff flag is enabled which may increase size of log")
-	}
-
-	if flagVerboseErrorOutput {
-		log.Warn().Msgf("--verbose-error-output flag is enabled which may increase size of log")
-	}
-
-	if flagCheckStorageHealthBeforeMigration {
-		log.Warn().Msgf("--check-storage-health-before flag is enabled and will increase duration of migration")
-	}
-
-	if flagCheckStorageHealthAfterMigration {
-		log.Warn().Msgf("--check-storage-health-after flag is enabled and will increase duration of migration")
-	}
-
 	var inputMsg string
 	if len(flagInputPayloadFileName) > 0 {
 		// Input is payloads
@@ -400,6 +318,21 @@ func run(*cobra.Command, []string) {
 		}
 
 		reportExtraction(stateCommitment, exportedState)
+		return
+	}
+
+	if flagZeroMigration {
+		newStateCommitment, err := emptyMigration(
+			log.Logger,
+			flagExecutionStateDir,
+			flagOutputDir,
+			stateCommitment)
+		if err != nil {
+			log.Fatal().Err(err).Msgf("error extracting state for commitment %s", stateCommitment)
+		}
+		if stateCommitment != flow.StateCommitment(newStateCommitment) {
+			log.Fatal().Err(err).Msgf("empty migration failed: state commitments are different: %v != %s", stateCommitment, newStateCommitment)
+		}
 		return
 	}
 
@@ -504,6 +437,66 @@ func extractStateToCheckpointWithoutMigration(
 
 	// Create checkpoint files
 	return createCheckpoint(logger, newTrie, outputDir, bootstrap.FilenameWALRootCheckpoint)
+}
+
+func emptyMigration(
+	logger zerolog.Logger,
+	executionStateDir string,
+	outputDir string,
+	stateCommitment flow.StateCommitment,
+) (ledger.State, error) {
+
+	log.Info().Msgf("Loading state with commitment %s", stateCommitment)
+
+	// Load state for given state commitment
+	trie, err := util.ReadTrie(executionStateDir, stateCommitment)
+	if err != nil {
+		return ledger.DummyState, fmt.Errorf("failed to load state: %w", err)
+	}
+
+	log.Info().Msgf("Getting payloads from loaded state")
+
+	// Get payloads from trie.
+	payloads := trie.AllPayloads()
+
+	log.Info().Msgf("Migrating %d payloads", len(payloads))
+
+	// Migrate payloads (migration is no-op)
+	migs := []migrations.NamedMigration{
+		{
+			Name: "empty migration",
+			Migrate: func(*registers.ByAccount) error {
+				return nil
+			},
+		},
+	}
+
+	migration := newMigration(log.Logger, migs, flagNWorker)
+
+	migratedPayloads, err := migration(payloads)
+	if err != nil {
+		return ledger.DummyState, fmt.Errorf("failed to migrate payloads: %w", err)
+	}
+
+	log.Info().Msgf("Migrated %d payloads", len(migratedPayloads))
+
+	// Create trie from migrated payloads
+	migratedTrie, err := createTrieFromPayloads(log.Logger, payloads)
+	if err != nil {
+		return ledger.DummyState, fmt.Errorf("failed to create new trie from migrated payloads: %w", err)
+	}
+
+	log.Info().Msgf("Created trie from migrated payloads with commitment %s", migratedTrie.RootHash())
+
+	// Create checkpoint files
+	newState, err := createCheckpoint(logger, migratedTrie, outputDir, bootstrap.FilenameWALRootCheckpoint)
+	if err != nil {
+		return ledger.DummyState, fmt.Errorf("failed to create checkpoint: %w", err)
+	}
+
+	log.Info().Msgf("Created checkpoint")
+
+	return newState, nil
 }
 
 func ensureCheckpointFileExist(dir string) error {
