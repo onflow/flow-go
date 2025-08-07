@@ -573,8 +573,7 @@ func (e *blockComputer) executeProcessCallback(
 		}
 
 		return nil, fmt.Errorf(
-			"failed to execute %s transaction %v (%d@%d) for block %s at height %v: %w",
-			"system",
+			"failed to execute system process transaction %v (%d@%d) for block %s at height %v: %w",
 			request.txnIdStr,
 			request.txnIndex,
 			snapshotTime,

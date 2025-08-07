@@ -1411,9 +1411,23 @@ func Test_ScheduledCallback(t *testing.T) {
 
 		testScheduledCallback(t, chain, []cadence.Event{callbackEvent1, callbackEvent2}, 4) // process callback + 2 callbacks + system chunk
 	})
+
+	t.Run("process callback transaction execution error", func(t *testing.T) {
+		processCallbackError := fvmErrors.NewInvalidAddressErrorf(flow.EmptyAddress, "process callback execution failed")
+		testScheduledCallbackWithError(t, chain, []cadence.Event{}, 0, processCallbackError)
+	})
+
+	t.Run("process callback transaction output error", func(t *testing.T) {
+		processCallbackError := fvmErrors.NewInvalidAddressErrorf(flow.EmptyAddress, "process callback output error")
+		testScheduledCallbackWithError(t, chain, []cadence.Event{}, 0, processCallbackError)
+	})
 }
 
 func testScheduledCallback(t *testing.T, chain flow.Chain, callbackEvents []cadence.Event, expectedTransactionCount int) {
+	testScheduledCallbackWithError(t, chain, callbackEvents, expectedTransactionCount, nil)
+}
+
+func testScheduledCallbackWithError(t *testing.T, chain flow.Chain, callbackEvents []cadence.Event, expectedTransactionCount int, processCallbackError fvmErrors.CodedError) {
 	rag := &RandomAddressGenerator{}
 	executorID := unittest.IdentifierFixture()
 
@@ -1452,7 +1466,8 @@ func testScheduledCallback(t *testing.T, chain flow.Chain, callbackEvents []cade
 	vm := &callbackTestVM{
 		testVM: testVM{
 			t:                    t,
-			eventsPerTransaction: 0, // we'll handle events manually
+			eventsPerTransaction: 0,                    // we'll handle events manually
+			err:                  processCallbackError, // inject error if provided
 		},
 		executedTransactions: executedTransactions,
 		executedMutex:        &executedTransactionsMutex,
@@ -1542,6 +1557,14 @@ func testScheduledCallback(t *testing.T, chain flow.Chain, callbackEvents []cade
 		block,
 		nil,
 		derived.NewEmptyDerivedBlockData(0))
+
+	// If we expect an error, verify it and return early
+	if processCallbackError != nil {
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "system process transaction")
+		return
+	}
+
 	require.NoError(t, err)
 
 	// verify execution results
@@ -1629,9 +1652,36 @@ type callbackTestExecutor struct {
 	vm *callbackTestVM
 }
 
+func (c *callbackTestExecutor) Execute() error {
+	// Return error if one was injected for process callback transaction
+	if c.vm.err != nil {
+		txProc, ok := c.proc.(*fvm.TransactionProcedure)
+		if ok {
+			script := string(txProc.Transaction.Script)
+			if strings.Contains(script, "FlowCallbackScheduler.process") {
+				return c.vm.err
+			}
+		}
+	}
+
+	return c.testExecutor.Execute()
+}
+
 // we need to reimplement this Output since the events are consumed in the block computer
 // from the output of the procedure executor
 func (c *callbackTestExecutor) Output() fvm.ProcedureOutput {
+	// Return error if one was injected for process callback transaction
+	if c.vm.err != nil {
+		txProc, ok := c.proc.(*fvm.TransactionProcedure)
+		if ok {
+			script := string(txProc.Transaction.Script)
+			if strings.Contains(script, "FlowCallbackScheduler.process") {
+				return fvm.ProcedureOutput{
+					Err: c.vm.err,
+				}
+			}
+		}
+	}
 	c.vm.executedMutex.Lock()
 	defer c.vm.executedMutex.Unlock()
 
