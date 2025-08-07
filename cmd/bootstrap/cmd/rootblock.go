@@ -113,8 +113,8 @@ func addRootBlockCmdFlags() {
 	cmd.MarkFlagRequired(rootBlockCmd, "root-parent")
 	cmd.MarkFlagRequired(rootBlockCmd, "root-height")
 	cmd.MarkFlagRequired(rootBlockCmd, "root-view")
-	cmd.MarkFlagRequired(rootBlockCmd, "finalization-safety-threshold")
-	cmd.MarkFlagRequired(rootBlockCmd, "epoch-extension-view-count")
+	cmd.MarkFlagRequired(rootBlockCmd, "kvstore-finalization-safety-threshold")
+	cmd.MarkFlagRequired(rootBlockCmd, "kvstore-epoch-extension-view-count")
 
 	// Epoch timing config - these values must be set identically to `EpochTimingConfig` in the FlowEpoch smart contract.
 	// See https://github.com/onflow/flow-core-contracts/blob/240579784e9bb8d97d91d0e3213614e25562c078/contracts/epochs/FlowEpoch.cdc#L259-L266

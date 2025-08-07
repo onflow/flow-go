@@ -63,10 +63,10 @@ gen-bootstrap:
 		--epoch-length $(EPOCH_LEN) \
 		--epoch-staking-phase-length $(EPOCH_STAKING_PHASE_LEN) \
 		--epoch-dkg-phase-length $(DKG_PHASE_LEN) \
-		--epoch-extension-view-count=$(EPOCH_EXTENSION_LEN) \
+		--kvstore-epoch-extension-view-count=$(EPOCH_EXTENSION_LEN) \
 		--collection-clusters 1 \
 		--protocol-version=0 \
-		--finalization-safety-threshold=100 \
+		--kvstore-finalization-safety-threshold=100 \
 		--use-default-epoch-timing \
 		--config ../../../bootstrap/conf/node-config.json \
 		-o ../../../bootstrap/ \
