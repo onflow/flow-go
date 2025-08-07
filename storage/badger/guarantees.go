@@ -62,15 +62,15 @@ func NewGuarantees(
 				var storedGuaranteeID flow.Identifier
 				err = transaction.WithTx(operation.LookupGuarantee(collID, &storedGuaranteeID))(tx)
 				if err != nil {
-					return err
+					return fmt.Errorf("failed to retrieve existing guarantee for collection: %w", err)
 				}
 				if storedGuaranteeID != guaranteeID {
-					return fmt.Errorf("new guarantee ID %v did not match already stored guarantee ID %v, for collection %v: %w",
+					return fmt.Errorf("new guarantee %x did not match already stored guarantee %x, for collection %x: %w",
 						guaranteeID, storedGuaranteeID, collID, storage.ErrDataMismatch)
 				}
 			}
 			if err != nil {
-				return fmt.Errorf("could not index guarantee for collection (%x): %w", collID[:], err)
+				return err
 			}
 			return nil
 		}
