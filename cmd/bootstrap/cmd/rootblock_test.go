@@ -144,8 +144,6 @@ func TestInvalidKVStoreValues(t *testing.T) {
 // TestInvalidKVStoreValuesSubprocess runs in subprocess for invalid kvstore values test on various chains
 func TestInvalidKVStoreValuesSubprocess(t *testing.T) {
 	invalidRootBlockSubprocess(t, func() {
-		flagFinalizationSafetyThreshold = defaultFinalizationSafetyThreshold
-		flagEpochExtensionViewCount = defaultEpochExtensionViewCount
 		flagRootChain = os.Getenv("CHAIN")
 	})
 }
