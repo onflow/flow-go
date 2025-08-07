@@ -12,13 +12,12 @@ import (
 )
 
 // constructRootHeaderBody constructs a header body for the root block.
-func constructRootHeaderBody(rootChain string, rootParent string, rootHeight uint64, rootTimestamp string) (*flow.HeaderBody, error) {
+func constructRootHeaderBody(rootChain string, rootParent string, rootHeight uint64, rootView uint64, rootTimestamp string) (*flow.HeaderBody, error) {
 	chainID := parseChainID(rootChain)
 	parentID := parseParentID(rootParent)
-	height := rootHeight
 	timestamp := parseRootTimestamp(rootTimestamp)
 
-	return run.GenerateRootHeaderBody(chainID, parentID, height, timestamp)
+	return run.GenerateRootHeaderBody(chainID, parentID, rootHeight, rootView, timestamp)
 }
 
 // constructRootBlock constructs a valid root block based on the given header and protocol state ID for that block.
