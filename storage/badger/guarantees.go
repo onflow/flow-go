@@ -1,6 +1,7 @@
 package badger
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/dgraph-io/badger/v2"
@@ -56,7 +57,18 @@ func NewGuarantees(
 	// Therefore it's safe to ignore duplicates when updating the CollectionID->GuaranteeID index.
 	indexByCollectionID := func(collID flow.Identifier, guaranteeID flow.Identifier) func(*transaction.Tx) error {
 		return func(tx *transaction.Tx) error {
-			err := transaction.WithTx(operation.SkipDuplicates(operation.IndexGuarantee(collID, guaranteeID)))(tx)
+			err := transaction.WithTx(operation.IndexGuarantee(collID, guaranteeID))(tx)
+			if errors.Is(err, storage.ErrAlreadyExists) {
+				var storedGuaranteeID flow.Identifier
+				err = transaction.WithTx(operation.LookupGuarantee(collID, &storedGuaranteeID))(tx)
+				if err != nil {
+					return err
+				}
+				if storedGuaranteeID != guaranteeID {
+					return fmt.Errorf("new guarantee ID %v did not match already stored guarantee ID %v, for collection %v: %w",
+						guaranteeID, storedGuaranteeID, collID, storage.ErrDataMismatch)
+				}
+			}
 			if err != nil {
 				return fmt.Errorf("could not index guarantee for collection (%x): %w", collID[:], err)
 			}
