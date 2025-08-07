@@ -22,7 +22,6 @@ import (
 	realproto "github.com/onflow/flow-go/state/protocol"
 	protocol "github.com/onflow/flow-go/state/protocol/mock"
 	"github.com/onflow/flow-go/storage"
-	badgeroperation "github.com/onflow/flow-go/storage/badger/operation"
 	storagemock "github.com/onflow/flow-go/storage/mock"
 	"github.com/onflow/flow-go/storage/operation"
 	"github.com/onflow/flow-go/storage/operation/badgerimpl"
@@ -254,18 +253,21 @@ func (bs *BuilderSuite) SetupTest() {
 	_, lctx := unittest.LockManagerWithContext(bs.T(), storage.LockFinalizeBlock)
 	defer lctx.Release()
 
-	err := bs.db.Update(badgeroperation.InsertFinalizedHeight(final.Header.Height))
-	bs.Require().NoError(err)
-	err = bs.db.Update(badgeroperation.IndexFinalizedBlockByHeight(final.Header.Height, bs.finalID))
-	bs.Require().NoError(err)
-
-	err = bs.db.Update(badgeroperation.InsertRootHeight(13))
-	bs.Require().NoError(err)
-
-	bs.Require().NoError(err)
-	err = bs.db.Update(badgeroperation.IndexFinalizedBlockByHeight(first.Header.Height, first.ID()))
-	bs.Require().NoError(err)
 	db := badgerimpl.ToDB(bs.db)
+
+	// insert finalized height and root height
+	require.NoError(bs.T(), db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+		return operation.InsertRootHeight(rw.Writer(), 13)
+	}))
+
+	require.NoError(bs.T(), db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+		return operation.UpsertFinalizedHeight(lctx, rw.Writer(), final.Header.Height)
+	}))
+
+	require.NoError(bs.T(), db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+		return operation.IndexFinalizedBlockByHeight(lctx, rw, final.Header.Height, bs.finalID)
+	}))
+
 	require.NoError(bs.T(), db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 		return operation.UpsertSealedHeight(lctx, rw.Writer(), first.Header.Height)
 	}))
