@@ -104,10 +104,10 @@ func addRootBlockCmdFlags() {
 	rootBlockCmd.Flags().StringVar(&flagRootTimestamp, "root-timestamp", time.Now().UTC().Format(time.RFC3339), "timestamp of the root block (RFC3339)")
 	rootBlockCmd.Flags().Uint64Var(&flagRootView, "root-view", 0, "view of the root block")
 	rootBlockCmd.Flags().UintVar(&deprecatedFlagProtocolVersion, "protocol-version", 0, "deprecated: this flag will be ignored and remove in a future release")
-	rootBlockCmd.Flags().Uint64Var(&flagFinalizationSafetyThreshold, "finalization-safety-threshold", defaultFinalizationSafetyThreshold, "defines finalization safety threshold")
-	rootBlockCmd.Flags().Uint64Var(&flagEpochExtensionViewCount, "epoch-extension-view-count", defaultEpochExtensionViewCount, "length of epoch extension in views, default is 100_000 which is approximately 1 day")
+	rootBlockCmd.Flags().Uint64Var(&flagFinalizationSafetyThreshold, "kvstore-finalization-safety-threshold", defaultFinalizationSafetyThreshold, "defines finalization safety threshold")
+	rootBlockCmd.Flags().Uint64Var(&flagEpochExtensionViewCount, "kvstore-epoch-extension-view-count", defaultEpochExtensionViewCount, "length of epoch extension in views, default is 100_000 which is approximately 1 day")
 	rootBlockCmd.Flags().Uint64Var(&flagKVStoreVersion, "kvstore-version", 2,
-		"protocol state KVStore version to initialize (0, 1, 2, 3)")
+		"protocol state KVStore version to initialize (0, 1, 2)")
 
 	cmd.MarkFlagRequired(rootBlockCmd, "root-chain")
 	cmd.MarkFlagRequired(rootBlockCmd, "root-parent")
