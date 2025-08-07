@@ -51,7 +51,7 @@ func NewClientWithKey(accessAddr string, accountAddr sdk.Address, key sdkcrypto.
 		return nil, fmt.Errorf("could not create new flow client: %w", err)
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
 	acc, err := getAccount(ctx, flowClient, accountAddr)
@@ -122,7 +122,6 @@ func (c *Client) Events(ctx context.Context, typ string) ([]sdk.BlockEvents, err
 // code to the root account.
 func (c *Client) DeployContract(ctx context.Context, refID sdk.Identifier, contract dsl.Contract) (*sdk.Transaction, error) {
 	return c.deployContract(ctx, refID, dsl.Transaction{
-		Import: dsl.Import{},
 		Content: dsl.Prepare{
 			Content: dsl.SetAccountCode{
 				Code: contract.ToCadence(),
@@ -136,7 +135,6 @@ func (c *Client) DeployContract(ctx context.Context, refID sdk.Identifier, contr
 // code to the root account.
 func (c *Client) UpdateContract(ctx context.Context, refID sdk.Identifier, contract dsl.Contract) (*sdk.Transaction, error) {
 	return c.deployContract(ctx, refID, dsl.Transaction{
-		Import: dsl.Import{},
 		Content: dsl.Prepare{
 			Content: dsl.SetAccountCode{
 				Code:   contract.ToCadence(),
@@ -191,11 +189,24 @@ func (c *Client) SignAndSendTransaction(ctx context.Context, tx *sdk.Transaction
 	return c.SendTransaction(ctx, tx)
 }
 
+func (c *Client) GetTransactionResult(ctx context.Context, txID sdk.Identifier) (*sdk.TransactionResult, error) {
+	return c.client.GetTransactionResult(ctx, txID)
+}
+
 func (c *Client) ExecuteScript(ctx context.Context, script dsl.Main) (cadence.Value, error) {
 
 	code := script.ToCadence()
 
 	res, err := c.client.ExecuteScriptAtLatestBlock(ctx, []byte(code), nil)
+	if err != nil {
+		return nil, fmt.Errorf("could not execute script: %w", err)
+	}
+
+	return res, nil
+}
+
+func (c *Client) ExecuteScriptAtBlock(ctx context.Context, script dsl.Main, blockID sdk.Identifier) (cadence.Value, error) {
+	res, err := c.client.ExecuteScriptAtBlockID(ctx, blockID, []byte(script.ToCadence()), nil)
 	if err != nil {
 		return nil, fmt.Errorf("could not execute script: %w", err)
 	}
@@ -251,7 +262,7 @@ func (c *Client) waitForStatus(
 	var result *sdk.TransactionResult
 	var err error
 	for result == nil || (result.Status != targetStatus) {
-		childCtx, cancel := context.WithTimeout(ctx, time.Second*5)
+		childCtx, cancel := context.WithTimeout(ctx, time.Second*30)
 		result, err = c.client.GetTransactionResult(childCtx, id)
 		cancel()
 		if err != nil {
@@ -390,6 +401,14 @@ func (c *Client) GetAccount(accountAddress sdk.Address) (*sdk.Account, error) {
 	return account, nil
 }
 
+func (c *Client) GetAccountAtBlockHeight(ctx context.Context, accountAddress sdk.Address, blockHeight uint64) (*sdk.Account, error) {
+	account, err := c.client.GetAccountAtBlockHeight(ctx, accountAddress, blockHeight)
+	if err != nil {
+		return nil, fmt.Errorf("could not get account at block height: %w", err)
+	}
+	return account, nil
+}
+
 func (c *Client) CreateAccount(
 	ctx context.Context,
 	accountKey *sdk.AccountKey,
@@ -440,7 +459,7 @@ func (c *Client) GetEventsForBlockIDs(
 }
 
 func getAccount(ctx context.Context, client *client.Client, address sdk.Address) (*sdk.Account, error) {
-	header, err := client.GetLatestBlockHeader(ctx, true)
+	header, err := client.GetLatestBlockHeader(ctx, false) // todo change back to true when sealing is done
 	if err != nil {
 		return nil, fmt.Errorf("could not get latest block header: %w", err)
 	}
