@@ -13,7 +13,8 @@ import (
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/trace"
 	mockprot "github.com/onflow/flow-go/state/protocol/mock"
-	"github.com/onflow/flow-go/storage/badger/operation"
+	"github.com/onflow/flow-go/storage"
+	"github.com/onflow/flow-go/storage/operation"
 	"github.com/onflow/flow-go/storage/operation/badgerimpl"
 	"github.com/onflow/flow-go/storage/store"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -63,22 +64,35 @@ func TestMakeFinalValidChain(t *testing.T) {
 	var list []flow.Identifier
 
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+		// set up lock context
+		_, lctx := unittest.LockManagerWithContext(t, storage.LockFinalizeBlock)
+		defer lctx.Release()
+
+		dbImpl := badgerimpl.ToDB(db)
 
 		// insert the latest finalized height
-		err := db.Update(operation.InsertFinalizedHeight(final.Height))
+		err := dbImpl.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+			return operation.UpsertFinalizedHeight(lctx, rw.Writer(), final.Height)
+		})
 		require.NoError(t, err)
 
 		// map the finalized height to the finalized block ID
-		err = db.Update(operation.IndexFinalizedBlockByHeight(final.Height, final.ID()))
+		err = dbImpl.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+			return operation.IndexFinalizedBlockByHeight(lctx, rw, final.Height, final.ID())
+		})
 		require.NoError(t, err)
 
 		// insert the finalized block header into the DB
-		err = db.Update(operation.InsertHeader(final.ID(), final))
+		err = dbImpl.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+			return operation.InsertHeader(rw.Writer(), final.ID(), final)
+		})
 		require.NoError(t, err)
 
 		// insert all of the pending blocks into the DB
 		for _, header := range pending {
-			err = db.Update(operation.InsertHeader(header.ID(), header))
+			err = dbImpl.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+				return operation.InsertHeader(rw.Writer(), header.ID(), header)
+			})
 			require.NoError(t, err)
 		}
 
@@ -121,21 +135,34 @@ func TestMakeFinalInvalidHeight(t *testing.T) {
 	var list []flow.Identifier
 
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+		// set up lock context
+		_, lctx := unittest.LockManagerWithContext(t, storage.LockFinalizeBlock)
+		defer lctx.Release()
+
+		dbImpl := badgerimpl.ToDB(db)
 
 		// insert the latest finalized height
-		err := db.Update(operation.InsertFinalizedHeight(final.Height))
+		err := dbImpl.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+			return operation.UpsertFinalizedHeight(lctx, rw.Writer(), final.Height)
+		})
 		require.NoError(t, err)
 
 		// map the finalized height to the finalized block ID
-		err = db.Update(operation.IndexFinalizedBlockByHeight(final.Height, final.ID()))
+		err = dbImpl.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+			return operation.IndexFinalizedBlockByHeight(lctx, rw, final.Height, final.ID())
+		})
 		require.NoError(t, err)
 
 		// insert the finalized block header into the DB
-		err = db.Update(operation.InsertHeader(final.ID(), final))
+		err = dbImpl.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+			return operation.InsertHeader(rw.Writer(), final.ID(), final)
+		})
 		require.NoError(t, err)
 
 		// insert all of the pending header into DB
-		err = db.Update(operation.InsertHeader(pending.ID(), pending))
+		err = dbImpl.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+			return operation.InsertHeader(rw.Writer(), pending.ID(), pending)
+		})
 		require.NoError(t, err)
 
 		// initialize the finalizer with the dependencies and make the call
@@ -173,17 +200,28 @@ func TestMakeFinalDuplicate(t *testing.T) {
 	var list []flow.Identifier
 
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+		// set up lock context
+		_, lctx := unittest.LockManagerWithContext(t, storage.LockFinalizeBlock)
+		defer lctx.Release()
+
+		dbImpl := badgerimpl.ToDB(db)
 
 		// insert the latest finalized height
-		err := db.Update(operation.InsertFinalizedHeight(final.Height))
+		err := dbImpl.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+			return operation.UpsertFinalizedHeight(lctx, rw.Writer(), final.Height)
+		})
 		require.NoError(t, err)
 
 		// map the finalized height to the finalized block ID
-		err = db.Update(operation.IndexFinalizedBlockByHeight(final.Height, final.ID()))
+		err = dbImpl.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+			return operation.IndexFinalizedBlockByHeight(lctx, rw, final.Height, final.ID())
+		})
 		require.NoError(t, err)
 
 		// insert the finalized block header into the DB
-		err = db.Update(operation.InsertHeader(final.ID(), final))
+		err = dbImpl.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+			return operation.InsertHeader(rw.Writer(), final.ID(), final)
+		})
 		require.NoError(t, err)
 
 		// initialize the finalizer with the dependencies and make the call
