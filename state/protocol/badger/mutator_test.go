@@ -34,9 +34,12 @@ import (
 	protocol_state "github.com/onflow/flow-go/state/protocol/protocol_state/state"
 	"github.com/onflow/flow-go/state/protocol/util"
 	"github.com/onflow/flow-go/storage"
+
 	stoerr "github.com/onflow/flow-go/storage"
 	bstorage "github.com/onflow/flow-go/storage/badger"
 	"github.com/onflow/flow-go/storage/badger/operation"
+	"github.com/onflow/flow-go/storage/deferred"
+	storageoperation "github.com/onflow/flow-go/storage/operation"
 	"github.com/onflow/flow-go/storage/operation/badgerimpl"
 	"github.com/onflow/flow-go/storage/store"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -52,7 +55,8 @@ func TestBootstrapValid(t *testing.T) {
 		require.NoError(t, err)
 
 		var sealed uint64
-		err = db.View(operation.RetrieveSealedHeight(&sealed))
+		bdb := badgerimpl.ToDB(db)
+		err = storageoperation.RetrieveSealedHeight(bdb.Reader(), &sealed)
 		require.NoError(t, err)
 
 		var genesisID flow.Identifier
@@ -63,13 +67,15 @@ func TestBootstrapValid(t *testing.T) {
 		err = db.View(operation.RetrieveHeader(genesisID, &header))
 		require.NoError(t, err)
 
+		storagedb := badgerimpl.ToDB(db)
+
 		var sealID flow.Identifier
-		err = db.View(operation.LookupLatestSealAtBlock(genesisID, &sealID))
+		err = storageoperation.LookupLatestSealAtBlock(storagedb.Reader(), genesisID, &sealID)
 		require.NoError(t, err)
 
 		_, seal, err := rootSnapshot.SealedResult()
 		require.NoError(t, err)
-		err = db.View(operation.RetrieveSeal(sealID, seal))
+		err = storageoperation.RetrieveSeal(storagedb.Reader(), sealID, seal)
 		require.NoError(t, err)
 
 		block, err := rootSnapshot.Head()
@@ -87,6 +93,7 @@ func TestBootstrapValid(t *testing.T) {
 // * BlockProcessable is emitted when a block's child is inserted
 func TestExtendValid(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+		lockManager := storage.NewTestingLockManager()
 		metrics := metrics.NewNoopCollector()
 		tracer := trace.NewNoopTracer()
 		log := zerolog.Nop()
@@ -103,7 +110,8 @@ func TestExtendValid(t *testing.T) {
 
 		state, err := protocol.Bootstrap(
 			metrics,
-			db,
+			badgerimpl.ToDB(db),
+			lockManager,
 			all.Headers,
 			all.Seals,
 			all.Results,
@@ -248,7 +256,8 @@ func TestSealedIndex(t *testing.T) {
 		require.NoError(t, err)
 
 		metrics := metrics.NewNoopCollector()
-		seals := bstorage.NewSeals(metrics, db)
+		storedb := badgerimpl.ToDB(db)
+		seals := store.NewSeals(metrics, storedb)
 
 		// can only find seal for G
 		_, err = seals.FinalizedSealForBlock(rootHeader.ID())
@@ -547,9 +556,11 @@ func TestExtendMissingParent(t *testing.T) {
 		require.False(t, st.IsInvalidExtensionError(err), err)
 		require.False(t, st.IsOutdatedExtensionError(err), err)
 
+		storagedb := badgerimpl.ToDB(db)
+
 		// verify seal that was contained in candidate block is not indexed
 		var sealID flow.Identifier
-		err = db.View(operation.LookupLatestSealAtBlock(extend.ID(), &sealID))
+		err = storageoperation.LookupLatestSealAtBlock(storagedb.Reader(), extend.ID(), &sealID)
 		require.Error(t, err)
 		require.ErrorIs(t, err, stoerr.ErrNotFound)
 	})
@@ -580,9 +591,11 @@ func TestExtendHeightTooSmall(t *testing.T) {
 		err = state.Extend(context.Background(), &extend)
 		require.Error(t, err)
 
+		storagedb := badgerimpl.ToDB(db)
+
 		// verify seal not indexed
 		var sealID flow.Identifier
-		err = db.View(operation.LookupLatestSealAtBlock(extend.ID(), &sealID))
+		err = storageoperation.LookupLatestSealAtBlock(storagedb.Reader(), extend.ID(), &sealID)
 		require.Error(t, err)
 		require.ErrorIs(t, err, stoerr.ErrNotFound)
 	})
@@ -650,9 +663,11 @@ func TestExtendBlockNotConnected(t *testing.T) {
 		err = state.Extend(context.Background(), extend)
 		require.Error(t, err)
 
+		storagedb := badgerimpl.ToDB(db)
+
 		// verify seal not indexed
 		var sealID flow.Identifier
-		err = db.View(operation.LookupLatestSealAtBlock(extend.ID(), &sealID))
+		err = storageoperation.LookupLatestSealAtBlock(storagedb.Reader(), extend.ID(), &sealID)
 		require.Error(t, err)
 		require.ErrorIs(t, err, stoerr.ErrNotFound)
 	})
@@ -841,6 +856,7 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 	rootSnapshot := unittest.RootSnapshotFixture(participants)
 	rootProtocolStateID := getRootProtocolStateID(t, rootSnapshot)
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+		lockManager := storage.NewTestingLockManager()
 
 		// set up state and mock ComplianceMetrics object
 		metrics := mockmodule.NewComplianceMetrics(t)
@@ -872,7 +888,8 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 		all := bstorage.InitAll(mmetrics.NewNoopCollector(), db)
 		protoState, err := protocol.Bootstrap(
 			metrics,
-			db,
+			badgerimpl.ToDB(db),
+			lockManager,
 			all.Headers,
 			all.Seals,
 			all.Results,
@@ -901,7 +918,7 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 		)
 		require.NoError(t, err)
 
-		mutableProtocolState := protocol_state.NewMutableProtocolState(
+		mutableState := protocol_state.NewMutableProtocolState(
 			log,
 			all.EpochProtocolStateEntries,
 			all.ProtocolKVStore,
@@ -911,11 +928,13 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 			all.Setups,
 			all.EpochCommits,
 		)
-		expectedStateIdCalculator := calculateExpectedStateId(t, mutableProtocolState)
+		expectedStateIdCalculator := calculateExpectedStateId(t, mutableState)
 
 		head, err := rootSnapshot.Head()
 		require.NoError(t, err)
 		result, _, err := rootSnapshot.SealedResult()
+		require.NoError(t, err)
+		_, err = state.AtBlockID(head.ID()).Epochs().Current()
 		require.NoError(t, err)
 
 		// we should begin the epoch in the staking phase
@@ -1396,7 +1415,7 @@ func TestExtendEpochSetupInvalid(t *testing.T) {
 	// setupState initializes the protocol state for a test case
 	// * creates and finalizes a new block for the first seal to reference
 	// * creates a factory method for test cases to generated valid EpochSetup events
-	setupState := func(t *testing.T, db *badger.DB, state *protocol.ParticipantState) (
+	setupState := func(t *testing.T, _ *badger.DB, state *protocol.ParticipantState) (
 		*flow.Block,
 		func(...func(*flow.EpochSetup)) (*flow.EpochSetup, *flow.ExecutionReceipt, *flow.Seal),
 	) {
@@ -1729,7 +1748,7 @@ func TestEpochFallbackMode(t *testing.T) {
 		protoEventsMock.On("BlockFinalized", mock.Anything)
 		protoEventsMock.On("BlockProcessable", mock.Anything, mock.Anything)
 
-		util.RunWithFullProtocolStateAndMetricsAndConsumer(t, rootSnapshot, metricsMock, protoEventsMock, func(db *badger.DB, state *protocol.ParticipantState, mutableProtocolState realprotocol.MutableProtocolState) {
+		util.RunWithFullProtocolStateAndMetricsAndConsumer(t, rootSnapshot, metricsMock, protoEventsMock, func(db *badger.DB, state *protocol.ParticipantState, mutableState realprotocol.MutableProtocolState) {
 			head, err := rootSnapshot.Head()
 			require.NoError(t, err)
 			result, _, err := rootSnapshot.SealedResult()
@@ -1740,7 +1759,7 @@ func TestEpochFallbackMode(t *testing.T) {
 			safetyThreshold := rootProtocolState.GetFinalizationSafetyThreshold()
 			require.GreaterOrEqual(t, epochExtensionViewCount, safetyThreshold, "epoch extension view count must be at least as large as safety threshold")
 
-			expectedStateIdCalculator := calculateExpectedStateId(t, mutableProtocolState)
+			expectedStateIdCalculator := calculateExpectedStateId(t, mutableState)
 
 			epoch1Setup := result.ServiceEvents[0].Event.(*flow.EpochSetup)
 			epoch1FinalView := epoch1Setup.FinalView
@@ -2026,13 +2045,13 @@ func TestRecoveryFromEpochFallbackMode(t *testing.T) {
 		protoEventsMock.On("BlockFinalized", mock.Anything)
 		protoEventsMock.On("BlockProcessable", mock.Anything, mock.Anything)
 
-		util.RunWithFullProtocolStateAndMetricsAndConsumer(t, rootSnapshot, metricsMock, protoEventsMock, func(db *badger.DB, state *protocol.ParticipantState, mutableProtocolState realprotocol.MutableProtocolState) {
+		util.RunWithFullProtocolStateAndMetricsAndConsumer(t, rootSnapshot, metricsMock, protoEventsMock, func(db *badger.DB, state *protocol.ParticipantState, mutableState realprotocol.MutableProtocolState) {
 			head, err := rootSnapshot.Head()
 			require.NoError(t, err)
 			rootResult, _, err := rootSnapshot.SealedResult()
 			require.NoError(t, err)
 
-			expectedStateIdCalculator := calculateExpectedStateId(t, mutableProtocolState)
+			expectedStateIdCalculator := calculateExpectedStateId(t, mutableState)
 
 			// add a block for the first seal to reference
 			block1 := unittest.BlockWithParentFixture(head)
@@ -2054,7 +2073,7 @@ func TestRecoveryFromEpochFallbackMode(t *testing.T) {
 			receipt, seal := unittest.ReceiptAndSealForBlock(block1, invalidSetup.ServiceEvent())
 
 			// ingesting block 2 and 3, block 3 seals the invalid setup event
-			block2, block3 := unittest.SealBlock(t, state, mutableProtocolState, block1, receipt, seal)
+			block2, block3 := unittest.SealBlock(t, state, mutableState, block1, receipt, seal)
 			assertEpochFallbackTriggered(t, state.AtBlockID(block2.ID()), false) // EFM shouldn't be triggered since block 2 only incorporates the event, sealing happens in block 3
 			assertEpochFallbackTriggered(t, state.AtBlockID(block3.ID()), true)  // EFM has to be triggered at block 3, since it seals the invalid setup event
 			assertEpochFallbackTriggered(t, state.Final(), false)                // EFM should still not be triggered for finalized state since the invalid service event does not have a finalized seal
@@ -2084,7 +2103,7 @@ func TestRecoveryFromEpochFallbackMode(t *testing.T) {
 			receipt, seal = unittest.ReceiptAndSealForBlock(block2, epochRecover.ServiceEvent())
 
 			// ingesting block 4 and 5, block 5 seals the EpochRecover event
-			block4, block5 := unittest.SealBlock(t, state, mutableProtocolState, block3, receipt, seal)
+			block4, block5 := unittest.SealBlock(t, state, mutableState, block3, receipt, seal)
 			assertEpochFallbackTriggered(t, state.AtBlockID(block4.ID()), true)
 			assertEpochFallbackTriggered(t, state.AtBlockID(block5.ID()), false)
 			assertEpochFallbackTriggered(t, state.Final(), true) // the latest finalized state should still be in EFM as `epochRecover` event does not have a finalized seal
@@ -2119,13 +2138,13 @@ func TestRecoveryFromEpochFallbackMode(t *testing.T) {
 		protoEventsMock.On("BlockFinalized", mock.Anything)
 		protoEventsMock.On("BlockProcessable", mock.Anything, mock.Anything)
 
-		util.RunWithFullProtocolStateAndMetricsAndConsumer(t, rootSnapshot, metricsMock, protoEventsMock, func(db *badger.DB, state *protocol.ParticipantState, mutableProtocolState realprotocol.MutableProtocolState) {
+		util.RunWithFullProtocolStateAndMetricsAndConsumer(t, rootSnapshot, metricsMock, protoEventsMock, func(db *badger.DB, state *protocol.ParticipantState, mutableState realprotocol.MutableProtocolState) {
 			head, err := rootSnapshot.Head()
 			require.NoError(t, err)
 			rootResult, _, err := rootSnapshot.SealedResult()
 			require.NoError(t, err)
 
-			expectedStateIdCalculator := calculateExpectedStateId(t, mutableProtocolState)
+			expectedStateIdCalculator := calculateExpectedStateId(t, mutableState)
 
 			// add a block for the first seal to reference
 			block1 := unittest.BlockWithParentFixture(head)
@@ -2148,7 +2167,7 @@ func TestRecoveryFromEpochFallbackMode(t *testing.T) {
 			receipt, seal := unittest.ReceiptAndSealForBlock(block1, epoch2Setup.ServiceEvent())
 
 			// ingesting block 2 and 3, block 3 seals the EpochSetup event
-			block2, block3 := unittest.SealBlock(t, state, mutableProtocolState, block1, receipt, seal)
+			block2, block3 := unittest.SealBlock(t, state, mutableState, block1, receipt, seal)
 			err = state.Finalize(context.Background(), block2.ID())
 			require.NoError(t, err)
 
@@ -2165,7 +2184,7 @@ func TestRecoveryFromEpochFallbackMode(t *testing.T) {
 			receipt, seal = unittest.ReceiptAndSealForBlock(block2, invalidEpochCommit.ServiceEvent())
 
 			// ingesting block 4 and 5, block 5 seals the invalid commit event
-			block4, block5 := unittest.SealBlock(t, state, mutableProtocolState, block3, receipt, seal)
+			block4, block5 := unittest.SealBlock(t, state, mutableState, block3, receipt, seal)
 			assertEpochFallbackTriggered(t, state.AtBlockID(block4.ID()), false) // EFM shouldn't be triggered since block 4 only incorporates the event, sealing happens in block 5
 			assertEpochFallbackTriggered(t, state.AtBlockID(block5.ID()), true)  // EFM has to be triggered at block 5, since it seals the invalid commit event
 			assertEpochFallbackTriggered(t, state.Final(), false)                // EFM should still not be triggered for finalized state since the invalid service event does not have a finalized seal
@@ -2194,7 +2213,7 @@ func TestRecoveryFromEpochFallbackMode(t *testing.T) {
 			receipt, seal = unittest.ReceiptAndSealForBlock(block3, epochRecover.ServiceEvent())
 
 			// ingesting block 6 and 7, block 7 seals the `epochRecover` event
-			block6, block7 := unittest.SealBlock(t, state, mutableProtocolState, block5, receipt, seal)
+			block6, block7 := unittest.SealBlock(t, state, mutableState, block5, receipt, seal)
 			assertEpochFallbackTriggered(t, state.AtBlockID(block6.ID()), true)
 			assertEpochFallbackTriggered(t, state.AtBlockID(block7.ID()), false)
 			assertEpochFallbackTriggered(t, state.Final(), true) // the latest finalized state should still be in EFM as `epochRecover` event does not have a finalized seal
@@ -2245,7 +2264,7 @@ func TestRecoveryFromEpochFallbackMode(t *testing.T) {
 		protoEventsMock.On("BlockFinalized", mock.Anything)
 		protoEventsMock.On("BlockProcessable", mock.Anything, mock.Anything)
 
-		util.RunWithFullProtocolStateAndMetricsAndConsumer(t, rootSnapshot, metricsMock, protoEventsMock, func(db *badger.DB, state *protocol.ParticipantState, mutableProtocolState realprotocol.MutableProtocolState) {
+		util.RunWithFullProtocolStateAndMetricsAndConsumer(t, rootSnapshot, metricsMock, protoEventsMock, func(db *badger.DB, state *protocol.ParticipantState, mutableState realprotocol.MutableProtocolState) {
 			head, err := rootSnapshot.Head()
 			require.NoError(t, err)
 			rootResult, _, err := rootSnapshot.SealedResult()
@@ -2256,7 +2275,7 @@ func TestRecoveryFromEpochFallbackMode(t *testing.T) {
 			safetyThreshold := rootProtocolState.GetFinalizationSafetyThreshold()
 			require.GreaterOrEqual(t, epochExtensionViewCount, safetyThreshold, "epoch extension view count must be at least as large as safety threshold")
 
-			expectedStateIdCalculator := calculateExpectedStateId(t, mutableProtocolState)
+			expectedStateIdCalculator := calculateExpectedStateId(t, mutableState)
 
 			// Constructing blocks
 			//   ... <- B1 <- B2(ER(B1, EpochSetup)) <- B3(S(ER(B1))) <- B4(ER(B2, EpochCommit)) <- B5(S(ER(B2))) <- ...
@@ -2287,7 +2306,7 @@ func TestRecoveryFromEpochFallbackMode(t *testing.T) {
 			receipt, seal := unittest.ReceiptAndSealForBlock(block1, epoch2Setup.ServiceEvent())
 
 			// ingesting block 2 and 3, block 3 seals the `epochSetup` for the next epoch
-			block2, block3 := unittest.SealBlock(t, state, mutableProtocolState, block1, receipt, seal)
+			block2, block3 := unittest.SealBlock(t, state, mutableState, block1, receipt, seal)
 			err = state.Finalize(context.Background(), block2.ID())
 			require.NoError(t, err)
 
@@ -2307,7 +2326,7 @@ func TestRecoveryFromEpochFallbackMode(t *testing.T) {
 			receipt, seal = unittest.ReceiptAndSealForBlock(block2, epoch2Commit.ServiceEvent())
 
 			// ingesting block 4 and 5, block 5 seals the `epochCommit` for the next epoch
-			block4, block5 := unittest.SealBlock(t, state, mutableProtocolState, block3, receipt, seal)
+			block4, block5 := unittest.SealBlock(t, state, mutableState, block3, receipt, seal)
 			err = state.Finalize(context.Background(), block4.ID())
 			require.NoError(t, err)
 
@@ -2332,7 +2351,7 @@ func TestRecoveryFromEpochFallbackMode(t *testing.T) {
 			receipt, seal = unittest.ReceiptAndSealForBlock(block3, invalidCommit.ServiceEvent())
 
 			// seal B3 by building two blocks on top of B5 that contain ER and seal respectively
-			block6, block7 := unittest.SealBlock(t, state, mutableProtocolState, block5, receipt, seal)
+			block6, block7 := unittest.SealBlock(t, state, mutableState, block5, receipt, seal)
 			assertEpochFallbackTriggered(t, state.AtBlockID(block6.ID()), false) // EFM shouldn't be triggered since block 6 only incorporates the event, sealing happens in block 7
 			assertEpochFallbackTriggered(t, state.AtBlockID(block7.ID()), true)  // EFM has to be triggered at block 7, since it seals the invalid commit event
 			assertEpochFallbackTriggered(t, state.Final(), false)                // EFM should still not be triggered for finalized state since the invalid service event does not have a finalized seal
@@ -2419,7 +2438,7 @@ func TestRecoveryFromEpochFallbackMode(t *testing.T) {
 			receipt, seal = unittest.ReceiptAndSealForBlock(block4, epochRecover.ServiceEvent())
 
 			// ingesting block 11 and 12, block 12 seals the `epochRecover` event
-			block11, block12 := unittest.SealBlock(t, state, mutableProtocolState, block10, receipt, seal)
+			block11, block12 := unittest.SealBlock(t, state, mutableState, block10, receipt, seal)
 			assertEpochFallbackTriggered(t, state.AtBlockID(block11.ID()), true)
 			assertEpochFallbackTriggered(t, state.AtBlockID(block12.ID()), false)
 			assertEpochFallbackTriggered(t, state.Final(), true) // the latest finalized state should still be in EFM as `epochRecover` event does not have a finalized seal
@@ -2482,7 +2501,7 @@ func TestRecoveryFromEpochFallbackMode(t *testing.T) {
 // We assume we keep the same view duration for all views in the epoch and all extensions.
 func TestEpochTargetEndTime(t *testing.T) {
 	rootSnapshot := unittest.RootSnapshotFixture(participants)
-	util.RunWithFullProtocolStateAndMutator(t, rootSnapshot, func(db *badger.DB, state *protocol.ParticipantState, mutableProtocolState realprotocol.MutableProtocolState) {
+	util.RunWithFullProtocolStateAndMutator(t, rootSnapshot, func(db *badger.DB, state *protocol.ParticipantState, mutableState realprotocol.MutableProtocolState) {
 		head, err := rootSnapshot.Head()
 		require.NoError(t, err)
 		rootResult, _, err := rootSnapshot.SealedResult()
@@ -2494,7 +2513,7 @@ func TestEpochTargetEndTime(t *testing.T) {
 		rootTargetEndTime := currentEpoch.TargetEndTime()
 		require.Equal(t, epoch1Setup.TargetEndTime, rootTargetEndTime)
 
-		expectedStateIdCalculator := calculateExpectedStateId(t, mutableProtocolState)
+		expectedStateIdCalculator := calculateExpectedStateId(t, mutableState)
 
 		viewIndex := make(map[uint64]struct{})
 		// add a block that will trigger EFM and add an epoch extension since the view of the epoch exceeds the safety threshold
@@ -2541,7 +2560,7 @@ func TestEpochTargetEndTime(t *testing.T) {
 // We assume we keep the same view duration for all views in the epoch and all extensions.
 func TestEpochTargetDuration(t *testing.T) {
 	rootSnapshot := unittest.RootSnapshotFixture(participants)
-	util.RunWithFullProtocolStateAndMutator(t, rootSnapshot, func(db *badger.DB, state *protocol.ParticipantState, mutableProtocolState realprotocol.MutableProtocolState) {
+	util.RunWithFullProtocolStateAndMutator(t, rootSnapshot, func(db *badger.DB, state *protocol.ParticipantState, mutableState realprotocol.MutableProtocolState) {
 		head, err := rootSnapshot.Head()
 		require.NoError(t, err)
 		rootResult, _, err := rootSnapshot.SealedResult()
@@ -2553,7 +2572,7 @@ func TestEpochTargetDuration(t *testing.T) {
 		rootTargetDuration := currentEpoch.TargetDuration()
 		require.Equal(t, epoch1Setup.TargetDuration, rootTargetDuration)
 
-		expectedStateIdCalculator := calculateExpectedStateId(t, mutableProtocolState)
+		expectedStateIdCalculator := calculateExpectedStateId(t, mutableState)
 
 		viewIndex := make(map[uint64]struct{})
 		// add a block that will trigger EFM and add an epoch extension since the view of the epoch exceeds the safety threshold
@@ -2594,6 +2613,7 @@ func TestEpochTargetDuration(t *testing.T) {
 
 func TestExtendInvalidSealsInBlock(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+		lockManager := storage.NewTestingLockManager()
 		metrics := metrics.NewNoopCollector()
 		tracer := trace.NewNoopTracer()
 		log := zerolog.Nop()
@@ -2610,7 +2630,8 @@ func TestExtendInvalidSealsInBlock(t *testing.T) {
 
 		state, err := protocol.Bootstrap(
 			metrics,
-			db,
+			badgerimpl.ToDB(db),
+			lockManager,
 			all.Headers,
 			all.Seals,
 			all.Results,
@@ -2722,9 +2743,11 @@ func TestHeaderExtendMissingParent(t *testing.T) {
 		require.Error(t, err)
 		require.False(t, st.IsInvalidExtensionError(err), err)
 
+		storagedb := badgerimpl.ToDB(db)
+
 		// verify seal not indexed
 		var sealID flow.Identifier
-		err = db.View(operation.LookupLatestSealAtBlock(extend.ID(), &sealID))
+		err = storageoperation.LookupLatestSealAtBlock(storagedb.Reader(), extend.ID(), &sealID)
 		require.Error(t, err)
 		require.ErrorIs(t, err, stoerr.ErrNotFound)
 	})
@@ -2754,9 +2777,11 @@ func TestHeaderExtendHeightTooSmall(t *testing.T) {
 		err = state.ExtendCertified(context.Background(), block2, unittest.CertifyBlock(block2.Header))
 		require.False(t, st.IsInvalidExtensionError(err))
 
+		storagedb := badgerimpl.ToDB(db)
+
 		// verify seal not indexed
 		var sealID flow.Identifier
-		err = db.View(operation.LookupLatestSealAtBlock(block2.ID(), &sealID))
+		err = storageoperation.LookupLatestSealAtBlock(storagedb.Reader(), block2.ID(), &sealID)
 		require.ErrorIs(t, err, stoerr.ErrNotFound)
 	})
 }
@@ -2838,9 +2863,11 @@ func TestFollowerHeaderExtendBlockNotConnected(t *testing.T) {
 		err = state.ExtendCertified(context.Background(), block2, unittest.CertifyBlock(block2.Header))
 		require.NoError(t, err)
 
+		storagedb := badgerimpl.ToDB(db)
+
 		// verify seal not indexed
 		var sealID flow.Identifier
-		err = db.View(operation.LookupLatestSealAtBlock(block2.ID(), &sealID))
+		err = storageoperation.LookupLatestSealAtBlock(storagedb.Reader(), block2.ID(), &sealID)
 		require.NoError(t, err)
 	})
 }
@@ -2872,9 +2899,11 @@ func TestParticipantHeaderExtendBlockNotConnected(t *testing.T) {
 		err = state.Extend(context.Background(), block2)
 		require.True(t, st.IsOutdatedExtensionError(err), err)
 
+		storagedb := badgerimpl.ToDB(db)
+
 		// verify seal not indexed
 		var sealID flow.Identifier
-		err = db.View(operation.LookupLatestSealAtBlock(block2.ID(), &sealID))
+		err = storageoperation.LookupLatestSealAtBlock(storagedb.Reader(), block2.ID(), &sealID)
 		require.ErrorIs(t, err, stoerr.ErrNotFound)
 	})
 }
@@ -3136,7 +3165,7 @@ func TestCacheAtomicity(t *testing.T) {
 			var wg sync.WaitGroup
 			wg.Add(1)
 			go func(blockID flow.Identifier) {
-				for i := 0; i < 100; i++ {
+				for range 100 {
 					_, err := headers.ByBlockID(blockID)
 					if errors.Is(err, stoerr.ErrNotFound) {
 						continue
@@ -3160,6 +3189,7 @@ func TestCacheAtomicity(t *testing.T) {
 // TestHeaderInvalidTimestamp tests that extending header with invalid timestamp results in sentinel error
 func TestHeaderInvalidTimestamp(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+		lockManager := storage.NewTestingLockManager()
 		metrics := metrics.NewNoopCollector()
 		tracer := trace.NewNoopTracer()
 		log := zerolog.Nop()
@@ -3177,7 +3207,8 @@ func TestHeaderInvalidTimestamp(t *testing.T) {
 
 		state, err := protocol.Bootstrap(
 			metrics,
-			db,
+			badgerimpl.ToDB(db),
+			lockManager,
 			all.Headers,
 			all.Seals,
 			all.Results,
@@ -3291,9 +3322,9 @@ func getRootProtocolStateID(t *testing.T, rootSnapshot *inmem.Snapshot) flow.Ide
 }
 
 // calculateExpectedStateId is a utility function which makes easier to get expected protocol state ID after applying service events contained in seals.
-func calculateExpectedStateId(t *testing.T, mutableProtocolState realprotocol.MutableProtocolState) func(header *flow.Header, seals []*flow.Seal) flow.Identifier {
+func calculateExpectedStateId(t *testing.T, mutableState realprotocol.MutableProtocolState) func(header *flow.Header, seals []*flow.Seal) flow.Identifier {
 	return func(header *flow.Header, seals []*flow.Seal) flow.Identifier {
-		expectedStateID, _, err := mutableProtocolState.EvolveState(header.ParentID, header.View, seals)
+		expectedStateID, err := mutableState.EvolveState(deferred.NewDeferredBlockPersist(), header.ParentID, header.View, seals)
 		require.NoError(t, err)
 		return expectedStateID
 	}

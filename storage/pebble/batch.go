@@ -3,9 +3,10 @@ package pebble
 import (
 	"sync"
 
-	"github.com/cockroachdb/pebble"
+	"github.com/cockroachdb/pebble/v2"
 )
 
+// TODO: unused?
 type Batch struct {
 	writer *pebble.Batch
 

@@ -1,6 +1,8 @@
 package storage
 
 import (
+	"github.com/jordanschalm/lockctx"
+
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -15,11 +17,8 @@ import (
 //     a Verifier will always produce the same approval)
 type ResultApprovals interface {
 
-	// Store stores a ResultApproval by its ID.
-	// No errors are expected during normal operations.
-	Store(result *flow.ResultApproval) error
-
-	// Index indexes a ResultApproval by result ID and chunk index.
+	// StoreMyApproval stores my own ResultApproval
+	// and indexes it by result ID and chunk index.
 	//
 	// CAUTION: the Flow protocol requires multiple approvals for the same chunk from different verification
 	// nodes. In other words, there are multiple different approvals for the same chunk. Therefore, the index
@@ -31,8 +30,9 @@ type ResultApprovals interface {
 	// still the method succeeds on each call. However, when attempting to index *different* ResultApproval IDs
 	// for the same key (resultID, chunkIndex) this method returns an exception, as this should never happen for
 	// a correct Verification Node indexing its own approvals.
+	// It requires storage.LockIndexResultApproval lock to be held by the caller.
 	// No errors are expected during normal operations.
-	Index(resultID flow.Identifier, chunkIndex uint64, approvalID flow.Identifier) error
+	StoreMyApproval(approval *flow.ResultApproval) func(lctx lockctx.Proof) error
 
 	// ByID retrieves a ResultApproval by its ID.
 	// Returns [storage.ErrNotFound] if no Approval with the given ID has been stored.

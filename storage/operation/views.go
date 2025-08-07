@@ -16,7 +16,7 @@ func RetrieveSafetyData(r storage.Reader, chainID flow.ChainID, safetyData *hots
 	return RetrieveByKey(r, MakePrefix(codeSafetyData, chainID), safetyData)
 }
 
-// UpsertLivenessData updates liveness data in the database.
+// UpsertLivenessData upserts liveness data in the database.
 func UpsertLivenessData(w storage.Writer, chainID flow.ChainID, livenessData *hotstuff.LivenessData) error {
 	return UpsertByKey(w, MakePrefix(codeLivenessData, chainID), livenessData)
 }

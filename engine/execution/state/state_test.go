@@ -18,6 +18,7 @@ import (
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/trace"
 	storageerr "github.com/onflow/flow-go/storage"
+	"github.com/onflow/flow-go/storage/locks"
 	storage "github.com/onflow/flow-go/storage/mock"
 	"github.com/onflow/flow-go/storage/operation/badgerimpl"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -51,11 +52,13 @@ func prepareTest(f func(t *testing.T, es state.ExecutionState, l *ledger.Ledger,
 				return 0, nil
 			}
 
+			lockManager := locks.NewTestingLockManager()
 			db := badgerimpl.ToDB(badgerDB)
 			es := state.NewExecutionState(
 				ls, stateCommitments, blocks, headers, chunkDataPacks, results, myReceipts, events, serviceEvents, txResults, db, getLatestFinalized, trace.NewNoopTracer(),
 				nil,
 				false,
+				lockManager,
 			)
 
 			f(t, es, ls, headers, stateCommitments)

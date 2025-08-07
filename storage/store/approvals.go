@@ -1,9 +1,9 @@
 package store
 
 import (
-	"errors"
 	"fmt"
-	"sync"
+
+	"github.com/jordanschalm/lockctx"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
@@ -21,18 +21,14 @@ import (
 //     *only safe* for Verification Nodes when tracking their own approvals (for the same ExecutionResult,
 //     a Verifier will always produce the same approval)
 type ResultApprovals struct {
-	db       storage.DB
-	cache    *Cache[flow.Identifier, *flow.ResultApproval]
-	indexing *sync.Mutex // preventing concurrent indexing of approvals
+	db          storage.DB
+	cache       *Cache[flow.Identifier, *flow.ResultApproval]
+	lockManager lockctx.Manager
 }
 
 var _ storage.ResultApprovals = (*ResultApprovals)(nil)
 
-func NewResultApprovals(collector module.CacheMetrics, db storage.DB) *ResultApprovals {
-	store := func(rw storage.ReaderBatchWriter, key flow.Identifier, val *flow.ResultApproval) error {
-		return operation.InsertResultApproval(rw.Writer(), val)
-	}
-
+func NewResultApprovals(collector module.CacheMetrics, db storage.DB, lockManager lockctx.Manager) *ResultApprovals {
 	retrieve := func(r storage.Reader, approvalID flow.Identifier) (*flow.ResultApproval, error) {
 		var approval flow.ResultApproval
 		err := operation.RetrieveResultApproval(r, approvalID, &approval)
@@ -40,71 +36,50 @@ func NewResultApprovals(collector module.CacheMetrics, db storage.DB) *ResultApp
 	}
 
 	return &ResultApprovals{
-		db: db,
+		lockManager: lockManager,
+		db:          db,
 		cache: newCache(collector, metrics.ResourceResultApprovals,
 			withLimit[flow.Identifier, *flow.ResultApproval](flow.DefaultTransactionExpiry+100),
-			withStore(store),
 			withRetrieve(retrieve)),
-		indexing: new(sync.Mutex),
 	}
 }
 
-// Store stores a ResultApproval
-func (r *ResultApprovals) Store(approval *flow.ResultApproval) error {
-	return r.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-		return r.cache.PutTx(rw, approval.ID(), approval)
-	})
-}
-
-// Index indexes a ResultApproval by chunk (ResultID + chunk index).
-// This operation is idempotent (repeated calls with the same value are equivalent to
-// just calling the method once; still the method succeeds on each call).
+// StoreMyApproval stores my own ResultApproval
+// No errors are expected during normal operations.
+// It requires storage.LockIndexResultApproval lock to be held by the caller.
+// it also indexes a ResultApproval by result ID and chunk index.
 //
 // CAUTION: the Flow protocol requires multiple approvals for the same chunk from different verification
 // nodes. In other words, there are multiple different approvals for the same chunk. Therefore, the index
 // Executed Chunk ➜ ResultApproval ID (populated here) is *only safe* to be used by Verification Nodes
 // for tracking their own approvals.
-func (r *ResultApprovals) Index(resultID flow.Identifier, chunkIndex uint64, approvalID flow.Identifier) error {
-	// For the same ExecutionResult, a correct Verifier will always produce the same approval. In other words,
-	// if we have already indexed an approval for the pair (resultID, chunkIndex) we should never overwrite it
-	// with a _different_ approval. We explicitly enforce that here to prevent state corruption.
-	// The lock guarantees that no other thread can concurrently update the index. Thereby confirming that no value
-	// is already stored for the given key (resultID, chunkIndex) and then updating the index (or aborting) is
-	// synchronized into one atomic operation.
-	r.indexing.Lock()
-	defer r.indexing.Unlock()
+//
+// For the same ExecutionResult, a Verifier will always produce the same approval. Therefore, this operation
+// is idempotent, i.e. repeated calls with the *same inputs* are equivalent to just calling the method once;
+// still the method succeeds on each call. However, when attempting to index *different* ResultApproval IDs
+// for the same key (resultID, chunkIndex) this method returns an exception, as this should never happen for
+// a correct Verification Node indexing its own approvals.
+// It returns a functor so that some computation (such as computing approval ID) can be done
+// before acquiring the lock.
+func (r *ResultApprovals) StoreMyApproval(approval *flow.ResultApproval) func(lctx lockctx.Proof) error {
+	// pre-compute the approval ID and encoded data to be stored
+	// db operation is deferred until the returned function is called
+	storing := operation.InsertAndIndexResultApproval(approval)
 
-	err := r.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-		var storedApprovalID flow.Identifier
-		err := operation.LookupResultApproval(rw.GlobalReader(), resultID, chunkIndex, &storedApprovalID)
-		if err != nil {
-			if !errors.Is(err, storage.ErrNotFound) {
-				return fmt.Errorf("could not lookup result approval ID: %w", err)
-			}
-
-			// no approval found, index the approval
-
-			return operation.UnsafeIndexResultApproval(rw.Writer(), resultID, chunkIndex, approvalID)
+	return func(lctx lockctx.Proof) error {
+		if !lctx.HoldsLock(storage.LockIndexResultApproval) {
+			return fmt.Errorf("missing lock for index result approval")
 		}
 
-		// an approval is already indexed, double check if it is the same
-		// We don't allow indexing multiple approvals per chunk because the
-		// store is only used within Verification nodes, and it is impossible
-		// for a Verification node to compute different approvals for the same
-		// chunk.
-
-		if storedApprovalID != approvalID {
-			return fmt.Errorf("attempting to store conflicting approval (result: %v, chunk index: %d): storing: %v, stored: %v. %w",
-				resultID, chunkIndex, approvalID, storedApprovalID, storage.ErrDataMismatch)
-		}
-
-		return nil
-	})
-
-	if err != nil {
-		return fmt.Errorf("could not index result approval: %w", err)
+		return r.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+			storage.OnCommitSucceed(rw, func() {
+				// the success callback is called after the lock is released, so
+				// the id computation here would not increase the lock contention
+				r.cache.Insert(approval.ID(), approval)
+			})
+			return storing(lctx, rw)
+		})
 	}
-	return nil
 }
 
 // ByID retrieves a ResultApproval by its ID

@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/dgraph-io/badger/v2"
+	"github.com/jordanschalm/lockctx"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
 
@@ -16,16 +17,21 @@ import (
 	"github.com/onflow/flow-go/state/cluster"
 	"github.com/onflow/flow-go/state/protocol"
 	pbadger "github.com/onflow/flow-go/state/protocol/badger"
-	storage "github.com/onflow/flow-go/storage/badger"
-	"github.com/onflow/flow-go/storage/badger/operation"
-	"github.com/onflow/flow-go/storage/badger/procedure"
+	"github.com/onflow/flow-go/storage"
+	"github.com/onflow/flow-go/storage/operation"
+	"github.com/onflow/flow-go/storage/operation/badgerimpl"
+	"github.com/onflow/flow-go/storage/procedure"
+	"github.com/onflow/flow-go/storage/store"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
 type SnapshotSuite struct {
 	suite.Suite
-	db    *badger.DB
-	dbdir string
+
+	db          storage.DB
+	badgerdb    *badger.DB
+	dbdir       string
+	lockManager lockctx.Manager
 
 	genesis      *model.Block
 	chainID      flow.ChainID
@@ -44,13 +50,16 @@ func (suite *SnapshotSuite) SetupTest() {
 	suite.chainID = suite.genesis.Header.ChainID
 
 	suite.dbdir = unittest.TempDir(suite.T())
-	suite.db = unittest.BadgerDB(suite.T(), suite.dbdir)
+	suite.badgerdb = unittest.BadgerDB(suite.T(), suite.dbdir)
+	suite.db = badgerimpl.ToDB(suite.badgerdb)
+	lockManager := storage.NewTestingLockManager()
+	suite.lockManager = lockManager
 
 	metrics := metrics.NewNoopCollector()
 	tracer := trace.NewNoopTracer()
 
-	all := storage.InitAll(metrics, suite.db)
-	colPayloads := storage.NewClusterPayloads(metrics, suite.db)
+	all := store.InitAll(metrics, suite.db)
+	colPayloads := store.NewClusterPayloads(metrics, suite.db)
 
 	root := unittest.RootSnapshotFixture(unittest.IdentityListFixture(5, unittest.WithAllRoles()))
 	suite.epochCounter = root.Encodable().SealingSegment.LatestProtocolStateEntry().EpochEntry.EpochCounter()
@@ -58,12 +67,13 @@ func (suite *SnapshotSuite) SetupTest() {
 	suite.protoState, err = pbadger.Bootstrap(
 		metrics,
 		suite.db,
+		lockManager,
 		all.Headers,
 		all.Seals,
 		all.Results,
 		all.Blocks,
 		all.QuorumCertificates,
-		all.Setups,
+		all.EpochSetups,
 		all.EpochCommits,
 		all.EpochProtocolStateEntries,
 		all.ProtocolKVStore,
@@ -74,15 +84,15 @@ func (suite *SnapshotSuite) SetupTest() {
 
 	clusterStateRoot, err := NewStateRoot(suite.genesis, unittest.QuorumCertificateFixture(), suite.epochCounter)
 	suite.Require().NoError(err)
-	clusterState, err := Bootstrap(suite.db, clusterStateRoot)
+	clusterState, err := Bootstrap(suite.db, lockManager, clusterStateRoot)
 	suite.Require().NoError(err)
-	suite.state, err = NewMutableState(clusterState, tracer, all.Headers, colPayloads)
+	suite.state, err = NewMutableState(clusterState, suite.lockManager, tracer, all.Headers, colPayloads)
 	suite.Require().NoError(err)
 }
 
 // runs after each test finishes
 func (suite *SnapshotSuite) TearDownTest() {
-	err := suite.db.Close()
+	err := suite.badgerdb.Close()
 	suite.Assert().Nil(err)
 	err = os.RemoveAll(suite.dbdir)
 	suite.Assert().Nil(err)
@@ -123,7 +133,13 @@ func (suite *SnapshotSuite) Block() model.Block {
 }
 
 func (suite *SnapshotSuite) InsertBlock(block model.Block) {
-	err := suite.db.Update(procedure.InsertClusterBlock(&block))
+	lctx := suite.lockManager.NewContext()
+	defer lctx.Release()
+	err := lctx.AcquireLock(storage.LockInsertOrFinalizeClusterBlock)
+	suite.Assert().Nil(err)
+	err = suite.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+		return procedure.InsertClusterBlock(lctx, rw, &block)
+	})
 	suite.Assert().Nil(err)
 }
 
@@ -210,7 +226,14 @@ func (suite *SnapshotSuite) TestFinalizedBlock() {
 	assert.NoError(t, err)
 
 	// finalize the block
-	err = suite.db.Update(procedure.FinalizeClusterBlock(finalizedBlock1.ID()))
+	err = suite.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+		lctx := suite.lockManager.NewContext()
+		defer lctx.Release()
+		if err := lctx.AcquireLock(storage.LockInsertOrFinalizeClusterBlock); err != nil {
+			return err
+		}
+		return procedure.FinalizeClusterBlock(lctx, rw, finalizedBlock1.ID())
+	})
 	assert.NoError(t, err)
 
 	// get the final snapshot, should map to finalizedBlock1
@@ -277,7 +300,7 @@ func (suite *SnapshotSuite) TestPending_Grandchildren() {
 
 	for _, blockID := range pending {
 		var header flow.Header
-		err := suite.db.View(operation.RetrieveHeader(blockID, &header))
+		err := operation.RetrieveHeader(suite.db.Reader(), blockID, &header)
 		suite.Require().Nil(err)
 
 		// we must have already seen the parent

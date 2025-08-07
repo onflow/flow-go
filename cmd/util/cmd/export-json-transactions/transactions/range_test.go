@@ -4,18 +4,18 @@ import (
 	"fmt"
 	"testing"
 
-	badger "github.com/dgraph-io/badger/v2"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/cmd/util/cmd/common"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/state/protocol/mock"
 	"github.com/onflow/flow-go/storage"
+	"github.com/onflow/flow-go/storage/operation/dbtest"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
 func TestFindBlockTransactions(t *testing.T) {
-	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
 		// prepare two blocks
 		// block 1 has 2 collections
 		// block 2 has 1 collection
@@ -59,8 +59,16 @@ func TestFindBlockTransactions(t *testing.T) {
 		state.On("AtHeight", uint64(5)).Return(snap5, nil)
 
 		// store into database
-		require.NoError(t, payloads.Store(b1.ID(), b1.Payload))
-		require.NoError(t, payloads.Store(b2.ID(), b2.Payload))
+		_, lctx := unittest.LockManagerWithContext(t, storage.LockInsertBlock)
+		defer lctx.Release()
+		require.NoError(t, db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+			err := storages.Blocks.BatchStore(lctx, rw, &b1)
+			if err != nil {
+				return err
+			}
+
+			return storages.Blocks.BatchStore(lctx, rw, &b2)
+		}))
 
 		require.NoError(t, collections.Store(&col1.Collection))
 		require.NoError(t, collections.Store(&col2.Collection))

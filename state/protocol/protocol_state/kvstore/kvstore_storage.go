@@ -3,11 +3,12 @@ package kvstore
 import (
 	"fmt"
 
+	"github.com/jordanschalm/lockctx"
+
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/protocol_state"
 	"github.com/onflow/flow-go/storage"
-	"github.com/onflow/flow-go/storage/badger/transaction"
 )
 
 // ProtocolKVStore persists different snapshots of key-value stores [KV-stores]. Here, we augment
@@ -31,19 +32,13 @@ func NewProtocolKVStore(protocolStateSnapshots storage.ProtocolKVStore) *Protoco
 	}
 }
 
-// StoreTx returns an anonymous function (intended to be executed as part of a badger transaction), which persists
-// the given KV-store snapshot as part of a DB tx. Per convention, all implementations of `protocol.KVStoreReader`
-// must support encoding their state into a version and data blob.
-// Expected errors of the returned anonymous function:
-//   - storage.ErrAlreadyExists if a KV-store snapshot with the given id is already stored.
-func (p *ProtocolKVStore) StoreTx(stateID flow.Identifier, kvStore protocol.KVStoreReader) func(*transaction.Tx) error {
+// BatchStore stores the protocol state key value data with the given stateID.into the database
+func (p *ProtocolKVStore) BatchStore(lctx lockctx.Proof, rw storage.ReaderBatchWriter, stateID flow.Identifier, kvStore protocol.KVStoreReader) error {
 	version, data, err := kvStore.VersionedEncode()
 	if err != nil {
-		return func(*transaction.Tx) error {
-			return fmt.Errorf("failed to VersionedEncode protocol state: %w", err)
-		}
+		return fmt.Errorf("failed to VersionedEncode protocol state: %w", err)
 	}
-	return p.ProtocolKVStore.StoreTx(stateID, &flow.PSKeyValueStoreData{
+	return p.ProtocolKVStore.BatchStore(lctx, rw, stateID, &flow.PSKeyValueStoreData{
 		Version: version,
 		Data:    data,
 	})

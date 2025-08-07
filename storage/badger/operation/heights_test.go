@@ -36,30 +36,6 @@ func TestFinalizedInsertUpdateRetrieve(t *testing.T) {
 	})
 }
 
-func TestSealedInsertUpdateRetrieve(t *testing.T) {
-	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
-		height := uint64(1337)
-
-		err := db.Update(InsertSealedHeight(height))
-		require.NoError(t, err)
-
-		var retrieved uint64
-		err = db.View(RetrieveSealedHeight(&retrieved))
-		require.NoError(t, err)
-
-		assert.Equal(t, retrieved, height)
-
-		height = 9999
-		err = db.Update(UpdateSealedHeight(height))
-		require.NoError(t, err)
-
-		err = db.View(RetrieveSealedHeight(&retrieved))
-		require.NoError(t, err)
-
-		assert.Equal(t, retrieved, height)
-	})
-}
-
 func TestEpochFirstBlockIndex_InsertRetrieve(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 		height := rand.Uint64()
@@ -86,53 +62,5 @@ func TestEpochFirstBlockIndex_InsertRetrieve(t *testing.T) {
 		// insert existent key errors
 		err = db.Update(InsertEpochFirstHeight(epoch, height))
 		require.ErrorIs(t, err, storage.ErrAlreadyExists)
-	})
-}
-
-func TestLastCompleteBlockHeightInsertUpdateRetrieve(t *testing.T) {
-	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
-		height := uint64(1337)
-
-		err := db.Update(InsertLastCompleteBlockHeight(height))
-		require.NoError(t, err)
-
-		var retrieved uint64
-		err = db.View(RetrieveLastCompleteBlockHeight(&retrieved))
-		require.NoError(t, err)
-
-		assert.Equal(t, retrieved, height)
-
-		height = 9999
-		err = db.Update(UpdateLastCompleteBlockHeight(height))
-		require.NoError(t, err)
-
-		err = db.View(RetrieveLastCompleteBlockHeight(&retrieved))
-		require.NoError(t, err)
-
-		assert.Equal(t, retrieved, height)
-	})
-}
-
-func TestLastCompleteBlockHeightInsertIfNotExists(t *testing.T) {
-	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
-		height1 := uint64(1337)
-
-		err := db.Update(InsertLastCompleteBlockHeightIfNotExists(height1))
-		require.NoError(t, err)
-
-		var retrieved uint64
-		err = db.View(RetrieveLastCompleteBlockHeight(&retrieved))
-		require.NoError(t, err)
-
-		assert.Equal(t, retrieved, height1)
-
-		height2 := uint64(9999)
-		err = db.Update(InsertLastCompleteBlockHeightIfNotExists(height2))
-		require.NoError(t, err)
-
-		err = db.View(RetrieveLastCompleteBlockHeight(&retrieved))
-		require.NoError(t, err)
-
-		assert.Equal(t, retrieved, height1)
 	})
 }

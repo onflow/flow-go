@@ -6,10 +6,11 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/cockroachdb/pebble"
+	"github.com/cockroachdb/pebble/v2"
 	"github.com/dgraph-io/badger/v2"
 	"github.com/rs/zerolog/log"
 
+	badgerstorage "github.com/onflow/flow-go/storage/badger"
 	pebblestorage "github.com/onflow/flow-go/storage/pebble"
 	"github.com/onflow/flow-go/storage/util"
 )
@@ -74,7 +75,7 @@ func RunMigration(badgerDir string, pebbleDir string, cfg MigrationConfig) error
 	startTime = time.Now()
 	badgerOptions := badger.DefaultOptions(badgerDir).
 		WithLogger(util.NewLogger(log.Logger.With().Str("db", "badger").Logger()))
-	badgerDB, err := badger.Open(badgerOptions)
+	badgerDB, err := badgerstorage.SafeOpen(badgerOptions)
 	if err != nil {
 		return fmt.Errorf("failed to open BadgerDB: %w", err)
 	}

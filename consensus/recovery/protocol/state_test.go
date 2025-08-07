@@ -12,7 +12,8 @@ import (
 	"github.com/onflow/flow-go/module/metrics"
 	protocol "github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/state/protocol/util"
-	bstorage "github.com/onflow/flow-go/storage/badger"
+	"github.com/onflow/flow-go/storage/operation/badgerimpl"
+	"github.com/onflow/flow-go/storage/store"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -44,7 +45,7 @@ func TestSaveBlockAsReplica(t *testing.T) {
 		require.NoError(t, err)
 
 		metrics := metrics.NewNoopCollector()
-		headers := bstorage.NewHeaders(metrics, db)
+		headers := store.NewHeaders(metrics, badgerimpl.ToDB(db))
 		finalized, pending, err := recovery.FindLatest(state, headers)
 		require.NoError(t, err)
 		require.Equal(t, b0.ID(), finalized.ID(), "recover find latest returns inconsistent finalized block")

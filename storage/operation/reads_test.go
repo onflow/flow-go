@@ -90,10 +90,10 @@ func TestIterateKeysByPrefixRange(t *testing.T) {
 
 		// Forward iteration and check boundaries
 		var found [][]byte
-		require.NoError(t, operation.Iterate(prefixStart, prefixEnd, func(key []byte) error {
+		require.NoError(t, operation.IterateKeysByPrefixRange(r, prefixStart, prefixEnd, func(key []byte) error {
 			found = append(found, key)
 			return nil
-		})(r), "should iterate forward without error")
+		}), "should iterate forward without error")
 		require.ElementsMatch(t, keysInRange, found, "forward iteration should return the correct keys in range")
 	})
 }
@@ -160,10 +160,10 @@ func TestIterateHierachicalPrefixes(t *testing.T) {
 			{0x11, 0xff, 0xff},
 		}
 		firstPrefixRangeActual := make([][]byte, 0)
-		err := operation.Iterate([]byte{0x10}, []byte{0x11}, func(key []byte) error {
+		err := operation.IterateKeysByPrefixRange(r, []byte{0x10}, []byte{0x11}, func(key []byte) error {
 			firstPrefixRangeActual = append(firstPrefixRangeActual, key)
 			return nil
-		})(r)
+		})
 		require.NoError(t, err, "iterate with range of first prefixes should not return an error")
 		require.Equal(t, firstPrefixRangeExpected, firstPrefixRangeActual, "iterated values for range of first prefixes should match expected values")
 
@@ -175,10 +175,10 @@ func TestIterateHierachicalPrefixes(t *testing.T) {
 			{0x10, 0x21, 0x00},
 			{0x10, 0x21, 0xff},
 		}
-		err = operation.Iterate([]byte{0x10, 0x20}, []byte{0x10, 0x21}, func(key []byte) error {
+		err = operation.IterateKeysByPrefixRange(r, []byte{0x10, 0x20}, []byte{0x10, 0x21}, func(key []byte) error {
 			secondPrefixRangeActual = append(secondPrefixRangeActual, key)
 			return nil
-		})(r)
+		})
 		require.NoError(t, err, "iterate with range of second prefixes should not return an error")
 		require.Equal(t, secondPrefixRangeExpected, secondPrefixRangeActual, "iterated values for range of second prefixes should match expected values")
 	})
@@ -229,10 +229,10 @@ func TestIterationBoundary(t *testing.T) {
 
 		// Forward iteration and check boundaries
 		var found [][]byte
-		require.NoError(t, operation.Iterate(prefixStart, prefixEnd, func(key []byte) error {
+		require.NoError(t, operation.IterateKeysByPrefixRange(r, prefixStart, prefixEnd, func(key []byte) error {
 			found = append(found, key)
 			return nil
-		})(r), "should iterate forward without error")
+		}), "should iterate forward without error")
 		require.ElementsMatch(t, expectedKeys, found, "forward iteration should return the correct keys in range")
 	})
 }
@@ -264,24 +264,22 @@ func TestTraverse(t *testing.T) {
 		actual := make([]uint64, 0, len(keyVals))
 
 		// Define the iteration logic
-		iterationFunc := func() (operation.CheckFunc, operation.CreateFunc, operation.HandleFunc) {
-			check := func(key []byte) (bool, error) {
-				// Skip the key {0x42, 0x56}
-				return !bytes.Equal(key, []byte{0x42, 0x56}), nil
+		iterationFunc := func(keyCopy []byte, getValue func(destVal any) error) (bail bool, err error) {
+			// Skip the key {0x42, 0x56}
+			if bytes.Equal(keyCopy, []byte{0x42, 0x56}) {
+				return false, nil
 			}
 			var val uint64
-			create := func() interface{} {
-				return &val
+			err = getValue(&val)
+			if err != nil {
+				return true, err
 			}
-			handle := func() error {
-				actual = append(actual, val)
-				return nil
-			}
-			return check, create, handle
+			actual = append(actual, val)
+			return false, nil
 		}
 
 		// Traverse the keys starting with prefix {0x42}
-		err := operation.Traverse([]byte{0x42}, iterationFunc, storage.DefaultIteratorOptions())(r)
+		err := operation.TraverseByPrefix(r, []byte{0x42}, iterationFunc, storage.DefaultIteratorOptions())
 		require.NoError(t, err, "traverse should not return an error")
 
 		// Assert that the actual values match the expected values
@@ -322,10 +320,10 @@ func TestTraverseKeyOnly(t *testing.T) {
 		actual := make([][]byte, 0)
 
 		// Traverse the keys starting with prefix {0x11}
-		err := operation.Traverse([]byte{0x10}, operation.KeyOnlyIterateFunc(func(key []byte) error {
+		err := operation.TraverseByPrefix(r, []byte{0x10}, func(key []byte, getValue func(destVal any) error) (bail bool, err error) {
 			actual = append(actual, key)
-			return nil
-		}), storage.DefaultIteratorOptions())(r)
+			return false, nil
+		}, storage.DefaultIteratorOptions())
 		require.NoError(t, err, "traverse should not return an error")
 
 		// Assert that the actual values match the expected values
@@ -392,10 +390,11 @@ func TestFindHighestAtOrBelow(t *testing.T) {
 					prefixToUse = []byte{}
 				}
 
-				err := operation.FindHighestAtOrBelow(
+				err := operation.FindHighestAtOrBelowByPrefix(
+					r,
 					prefixToUse,
 					tt.height,
-					&entity)(r)
+					&entity)
 
 				if tt.expectError {
 					require.Error(t, err, fmt.Sprintf("expected error but got nil, entity: %v", entity))

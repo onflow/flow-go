@@ -6,6 +6,8 @@ import (
 	"testing"
 
 	"github.com/ipfs/go-cid"
+	"github.com/jordanschalm/lockctx"
+	"github.com/stretchr/testify/mock"
 	testifymock "github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
@@ -25,6 +27,8 @@ import (
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/mocknetwork"
 	protocol "github.com/onflow/flow-go/state/protocol/mock"
+	"github.com/onflow/flow-go/storage"
+	"github.com/onflow/flow-go/storage/locks"
 	mockstorage "github.com/onflow/flow-go/storage/mock"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -103,7 +107,9 @@ func (suite *VerifierEngineTestSuite) getTestNewEngine() *verifier.Engine {
 		suite.state,
 		suite.me,
 		suite.chunkVerifier,
-		suite.approvals)
+		suite.approvals,
+		locks.NewTestingLockManager(),
+	)
 	require.NoError(suite.T(), err)
 
 	suite.net.AssertExpectations(suite.T())
@@ -148,44 +154,27 @@ func (suite *VerifierEngineTestSuite) TestVerifyHappyPath() {
 			var expectedApproval *flow.ResultApproval
 
 			suite.approvals.
-				On("Store", testifymock.Anything).
-				Return(nil).
-				Run(func(args testifymock.Arguments) {
-					ra, ok := args[0].(*flow.ResultApproval)
-					suite.Require().True(ok)
+				On("StoreMyApproval", mock.Anything).
+				Return(func(ra *flow.ResultApproval) func(lockctx.Proof) error {
+					return func(lctx lockctx.Proof) error {
+						suite.Assert().True(lctx.HoldsLock(storage.LockIndexResultApproval))
+						suite.Assert().Equal(vChunk.Chunk.BlockID, ra.Body.BlockID)
+						suite.Assert().Equal(vChunk.Result.ID(), ra.Body.ExecutionResultID)
+						suite.Assert().Equal(vChunk.Chunk.Index, ra.Body.ChunkIndex)
+						suite.Assert().Equal(suite.me.NodeID(), ra.Body.ApproverID)
 
-					suite.Assert().Equal(vChunk.Chunk.BlockID, ra.Body.BlockID)
-					suite.Assert().Equal(vChunk.Result.ID(), ra.Body.ExecutionResultID)
-					suite.Assert().Equal(vChunk.Chunk.Index, ra.Body.ChunkIndex)
-					suite.Assert().Equal(suite.me.NodeID(), ra.Body.ApproverID)
+						// verifies the signatures
+						atstID := ra.Body.Attestation.ID()
+						suite.Assert().True(suite.sk.PublicKey().Verify(ra.Body.AttestationSignature, atstID[:], suite.hasher))
+						bodyID := ra.Body.ID()
+						suite.Assert().True(suite.sk.PublicKey().Verify(ra.VerifierSignature, bodyID[:], suite.hasher))
 
-					// verifies the signatures
-					atstID := ra.Body.Attestation.ID()
-					suite.Assert().True(suite.sk.PublicKey().Verify(ra.Body.AttestationSignature, atstID[:], suite.hasher))
-					bodyID := ra.Body.ID()
-					suite.Assert().True(suite.sk.PublicKey().Verify(ra.VerifierSignature, bodyID[:], suite.hasher))
+						// spock should be non-nil
+						suite.Assert().NotNil(ra.Body.Spock)
 
-					// spock should be non-nil
-					suite.Assert().NotNil(ra.Body.Spock)
-
-					expectedApproval = ra
-				}).
-				Once()
-			suite.approvals.
-				On("Index", testifymock.Anything, testifymock.Anything, testifymock.Anything).
-				Return(nil).
-				Run(func(args testifymock.Arguments) {
-					erID, ok := args[0].(flow.Identifier)
-					suite.Require().True(ok)
-					suite.Assert().Equal(expectedApproval.Body.ExecutionResultID, erID)
-
-					chIndex, ok := args[1].(uint64)
-					suite.Require().True(ok)
-					suite.Assert().Equal(expectedApproval.Body.ChunkIndex, chIndex)
-
-					raID, ok := args[2].(flow.Identifier)
-					suite.Require().True(ok)
-					suite.Assert().Equal(expectedApproval.ID(), raID)
+						expectedApproval = ra
+						return nil
+					}
 				}).
 				Once()
 

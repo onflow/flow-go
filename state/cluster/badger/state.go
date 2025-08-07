@@ -4,19 +4,19 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/dgraph-io/badger/v2"
+	"github.com/jordanschalm/lockctx"
 
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/state/cluster"
 	"github.com/onflow/flow-go/storage"
-	"github.com/onflow/flow-go/storage/badger/operation"
-	"github.com/onflow/flow-go/storage/badger/procedure"
+	"github.com/onflow/flow-go/storage/operation"
+	"github.com/onflow/flow-go/storage/procedure"
 )
 
 type State struct {
-	db        *badger.DB
+	db        storage.DB
 	clusterID flow.ChainID // the chain ID for the cluster
 	epoch     uint64       // the operating epoch for the cluster
 }
@@ -24,7 +24,13 @@ type State struct {
 // Bootstrap initializes the persistent cluster state with a genesis block.
 // The genesis block must have height 0, a parent hash of 32 zero bytes,
 // and an empty collection as payload.
-func Bootstrap(db *badger.DB, stateRoot *StateRoot) (*State, error) {
+func Bootstrap(db storage.DB, lockManager lockctx.Manager, stateRoot *StateRoot) (*State, error) {
+	lctx := lockManager.NewContext()
+	defer lctx.Release()
+	err := lctx.AcquireLock(storage.LockInsertOrFinalizeClusterBlock)
+	if err != nil {
+		return nil, fmt.Errorf("failed to acquire lock for inserting cluster block: %w", err)
+	}
 	isBootstrapped, err := IsBootstrapped(db, stateRoot.ClusterID())
 	if err != nil {
 		return nil, fmt.Errorf("failed to determine whether database contains bootstrapped state: %w", err)
@@ -36,21 +42,22 @@ func Bootstrap(db *badger.DB, stateRoot *StateRoot) (*State, error) {
 
 	genesis := stateRoot.Block()
 	rootQC := stateRoot.QC()
+
 	// bootstrap cluster state
-	err = operation.RetryOnConflict(state.db.Update, func(tx *badger.Txn) error {
+	err = state.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 		chainID := genesis.Header.ChainID
 		// insert the block
-		err := procedure.InsertClusterBlock(genesis)(tx)
+		err := procedure.InsertClusterBlock(lctx, rw, genesis)
 		if err != nil {
 			return fmt.Errorf("could not insert genesis block: %w", err)
 		}
 		// insert block height -> ID mapping
-		err = operation.IndexClusterBlockHeight(chainID, genesis.Header.Height, genesis.ID())(tx)
+		err = operation.IndexClusterBlockHeight(lctx, rw.Writer(), chainID, genesis.Header.Height, genesis.ID())
 		if err != nil {
 			return fmt.Errorf("failed to map genesis block height to block: %w", err)
 		}
 		// insert boundary
-		err = operation.InsertClusterFinalizedHeight(chainID, genesis.Header.Height)(tx)
+		err = operation.UpsertClusterFinalizedHeight(lctx, rw.Writer(), chainID, genesis.Header.Height)
 		// insert started view for hotstuff
 		if err != nil {
 			return fmt.Errorf("could not insert genesis boundary: %w", err)
@@ -66,12 +73,12 @@ func Bootstrap(db *badger.DB, stateRoot *StateRoot) (*State, error) {
 			NewestQC:    rootQC,
 		}
 		// insert safety data
-		err = operation.InsertSafetyData(chainID, safetyData)(tx)
+		err = operation.UpsertSafetyData(rw.Writer(), chainID, safetyData)
 		if err != nil {
 			return fmt.Errorf("could not insert safety data: %w", err)
 		}
 		// insert liveness data
-		err = operation.InsertLivenessData(chainID, livenessData)(tx)
+		err = operation.UpsertLivenessData(rw.Writer(), chainID, livenessData)
 		if err != nil {
 			return fmt.Errorf("could not insert liveness data: %w", err)
 		}
@@ -85,7 +92,7 @@ func Bootstrap(db *badger.DB, stateRoot *StateRoot) (*State, error) {
 	return state, nil
 }
 
-func OpenState(db *badger.DB, _ module.Tracer, _ storage.Headers, _ storage.ClusterPayloads, clusterID flow.ChainID, epoch uint64) (*State, error) {
+func OpenState(db storage.DB, _ module.Tracer, _ storage.Headers, _ storage.ClusterPayloads, clusterID flow.ChainID, epoch uint64) (*State, error) {
 	isBootstrapped, err := IsBootstrapped(db, clusterID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to determine whether database contains bootstrapped state: %w", err)
@@ -97,7 +104,7 @@ func OpenState(db *badger.DB, _ module.Tracer, _ storage.Headers, _ storage.Clus
 	return state, nil
 }
 
-func newState(db *badger.DB, clusterID flow.ChainID, epoch uint64) *State {
+func newState(db storage.DB, clusterID flow.ChainID, epoch uint64) *State {
 	state := &State{
 		db:        db,
 		clusterID: clusterID,
@@ -116,20 +123,21 @@ func (s *State) Params() cluster.Params {
 func (s *State) Final() cluster.Snapshot {
 	// get the finalized block ID
 	var blockID flow.Identifier
-	err := s.db.View(func(tx *badger.Txn) error {
+	err := (func(r storage.Reader) error {
 		var boundary uint64
-		err := operation.RetrieveClusterFinalizedHeight(s.clusterID, &boundary)(tx)
+		err := operation.RetrieveClusterFinalizedHeight(r, s.clusterID, &boundary)
 		if err != nil {
 			return fmt.Errorf("could not retrieve finalized boundary: %w", err)
 		}
 
-		err = operation.LookupClusterBlockHeight(s.clusterID, boundary, &blockID)(tx)
+		err = operation.LookupClusterBlockHeight(r, s.clusterID, boundary, &blockID)
 		if err != nil {
 			return fmt.Errorf("could not retrieve finalized ID: %w", err)
 		}
 
 		return nil
-	})
+	})(s.db.Reader())
+
 	if err != nil {
 		return &Snapshot{
 			err: err,
@@ -152,9 +160,9 @@ func (s *State) AtBlockID(blockID flow.Identifier) cluster.Snapshot {
 }
 
 // IsBootstrapped returns whether the database contains a bootstrapped state.
-func IsBootstrapped(db *badger.DB, clusterID flow.ChainID) (bool, error) {
+func IsBootstrapped(db storage.DB, clusterID flow.ChainID) (bool, error) {
 	var finalized uint64
-	err := db.View(operation.RetrieveClusterFinalizedHeight(clusterID, &finalized))
+	err := operation.RetrieveClusterFinalizedHeight(db.Reader(), clusterID, &finalized)
 	if errors.Is(err, storage.ErrNotFound) {
 		return false, nil
 	}

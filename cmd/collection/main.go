@@ -56,7 +56,7 @@ import (
 	badgerState "github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/state/protocol/blocktimer"
 	"github.com/onflow/flow-go/state/protocol/events/gadgets"
-	"github.com/onflow/flow-go/storage/badger"
+	"github.com/onflow/flow-go/storage/store"
 	"github.com/onflow/flow-go/utils/grpcutils"
 )
 
@@ -151,7 +151,7 @@ func main() {
 		// Collection Nodes use a lower min timeout than Consensus Nodes (1.5s vs 2.5s) because:
 		//  - they tend to have higher happy-path view rate, allowing a shorter timeout
 		//  - since they have smaller committees, 1-2 offline replicas has a larger negative impact, which is mitigating with a smaller timeout
-		flags.DurationVar(&hotstuffMinTimeout, "hotstuff-min-timeout", 1500*time.Millisecond,
+		flags.DurationVar(&hotstuffMinTimeout, "hotstuff-min-timeout", 1000*time.Millisecond,
 			"the lower timeout bound for the hotstuff pacemaker, this is also used as initial timeout")
 		flags.Float64Var(&hotstuffTimeoutAdjustmentFactor, "hotstuff-timeout-adjustment-factor", timeout.DefaultConfig.TimeoutAdjustmentFactor,
 			"adjustment of timeout duration in case of time out event")
@@ -218,12 +218,9 @@ func main() {
 			return collectionCommands.NewTxRateLimitCommand(addressRateLimiter)
 		}).
 		AdminCommand("read-range-cluster-blocks", func(conf *cmd.NodeConfig) commands.AdminCommand {
-			clusterPayloads := badger.NewClusterPayloads(&metrics.NoopCollector{}, conf.DB)
-			headers, ok := conf.Storage.Headers.(*badger.Headers)
-			if !ok {
-				panic("fail to initialize admin tool, conf.Storage.Headers can not be casted as badger headers")
-			}
-			return storageCommands.NewReadRangeClusterBlocksCommand(conf.DB, headers, clusterPayloads)
+			clusterPayloads := store.NewClusterPayloads(&metrics.NoopCollector{}, conf.ProtocolDB)
+			headers := store.NewHeaders(&metrics.NoopCollector{}, conf.ProtocolDB)
+			return storageCommands.NewReadRangeClusterBlocksCommand(conf.ProtocolDB, headers, clusterPayloads)
 		}).
 		Module("follower distributor", func(node *cmd.NodeConfig) error {
 			followerDistributor = pubsub.NewFollowerDistributor()
@@ -328,7 +325,7 @@ func main() {
 		Component("follower core", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			// create a finalizer for updating the protocol
 			// state when the follower detects newly finalized blocks
-			finalizer := confinalizer.NewFinalizer(node.DB, node.Storage.Headers, followerState, node.Tracer)
+			finalizer := confinalizer.NewFinalizer(node.ProtocolDB.Reader(), node.Storage.Headers, followerState, node.Tracer)
 			finalized, pending, err := recovery.FindLatest(node.State, node.Storage.Headers)
 			if err != nil {
 				return nil, fmt.Errorf("could not find latest finalized block and pending blocks to recover consensus follower: %w", err)
@@ -489,7 +486,7 @@ func main() {
 		// Epoch manager encapsulates and manages epoch-dependent engines as we
 		// transition between epochs
 		Component("epoch manager", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-			clusterStateFactory, err := factories.NewClusterStateFactory(node.DB, node.Metrics.Cache, node.Tracer)
+			clusterStateFactory, err := factories.NewClusterStateFactory(node.ProtocolDB, node.StorageLockMgr, node.Metrics.Cache, node.Tracer)
 			if err != nil {
 				return nil, err
 			}
@@ -502,8 +499,9 @@ func main() {
 			}
 
 			builderFactory, err := factories.NewBuilderFactory(
-				node.DB,
+				node.ProtocolDB,
 				node.State,
+				node.StorageLockMgr,
 				node.Storage.Headers,
 				node.Tracer,
 				colMetrics,

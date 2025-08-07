@@ -7,11 +7,6 @@ import (
 // Headers represents persistent storage for blocks.
 type Headers interface {
 
-	// Store persists a new header.
-	// Expected errors during normal operation:
-	//   - storage.ErrAlreadyExists if the header has already been persisted
-	Store(header *flow.Header) error
-
 	// ByBlockID returns the header with the given ID. It is available for finalized and ambiguous blocks.
 	// Error returns:
 	//  - ErrNotFound if no block header with the given ID exists

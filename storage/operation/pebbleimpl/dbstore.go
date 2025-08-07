@@ -1,7 +1,7 @@
 package pebbleimpl
 
 import (
-	"github.com/cockroachdb/pebble"
+	"github.com/cockroachdb/pebble/v2"
 
 	"github.com/onflow/flow-go/storage"
 )
@@ -24,4 +24,8 @@ func (b *dbStore) WithReaderBatchWriter(fn func(storage.ReaderBatchWriter) error
 
 func (b *dbStore) NewBatch() storage.Batch {
 	return NewReaderBatchWriter(b.db)
+}
+
+func (b *dbStore) Close() error {
+	return b.db.Close()
 }

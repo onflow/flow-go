@@ -9,6 +9,7 @@ import (
 
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/storage"
+	"github.com/onflow/flow-go/storage/locks"
 	"github.com/onflow/flow-go/storage/operation/dbtest"
 	"github.com/onflow/flow-go/storage/store"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -31,8 +32,12 @@ func TestMyExecutionReceiptsStorage(t *testing.T) {
 			block := unittest.BlockFixture()
 			receipt1 := unittest.ReceiptForBlockFixture(&block)
 
+			lockManager := locks.NewTestingLockManager()
+			lctx := lockManager.NewContext()
+			defer lctx.Release()
+			require.NoError(t, lctx.AcquireLock(storage.LockInsertOwnReceipt))
 			err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-				return myReceipts.BatchStoreMyReceipt(receipt1, rw)
+				return myReceipts.BatchStoreMyReceipt(lctx, receipt1, rw)
 			})
 			require.NoError(t, err)
 
@@ -58,13 +63,21 @@ func TestMyExecutionReceiptsStorage(t *testing.T) {
 
 			receipt1 := unittest.ReceiptForBlockFixture(&block)
 
+			lockManager := locks.NewTestingLockManager()
+			lctx := lockManager.NewContext()
+			defer lctx.Release()
+			require.NoError(t, lctx.AcquireLock(storage.LockInsertOwnReceipt))
 			err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-				return myReceipts.BatchStoreMyReceipt(receipt1, rw)
+				return myReceipts.BatchStoreMyReceipt(lctx, receipt1, rw)
 			})
 			require.NoError(t, err)
 
+			lockManager2 := locks.NewTestingLockManager()
+			lctx2 := lockManager2.NewContext()
+			defer lctx2.Release()
+			require.NoError(t, lctx2.AcquireLock(storage.LockInsertOwnReceipt))
 			err = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-				return myReceipts.BatchStoreMyReceipt(receipt1, rw)
+				return myReceipts.BatchStoreMyReceipt(lctx2, receipt1, rw)
 			})
 			require.NoError(t, err)
 		})
@@ -80,13 +93,21 @@ func TestMyExecutionReceiptsStorage(t *testing.T) {
 			receipt1 := unittest.ReceiptForBlockExecutorFixture(&block, executor1)
 			receipt2 := unittest.ReceiptForBlockExecutorFixture(&block, executor2)
 
+			lockManager := locks.NewTestingLockManager()
+			lctx := lockManager.NewContext()
+			defer lctx.Release()
+			require.NoError(t, lctx.AcquireLock(storage.LockInsertOwnReceipt))
 			err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-				return myReceipts.BatchStoreMyReceipt(receipt1, rw)
+				return myReceipts.BatchStoreMyReceipt(lctx, receipt1, rw)
 			})
 			require.NoError(t, err)
 
+			lockManager2 := locks.NewTestingLockManager()
+			lctx2 := lockManager2.NewContext()
+			defer lctx2.Release()
+			require.NoError(t, lctx2.AcquireLock(storage.LockInsertOwnReceipt))
 			err = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-				return myReceipts.BatchStoreMyReceipt(receipt2, rw)
+				return myReceipts.BatchStoreMyReceipt(lctx2, receipt2, rw)
 			})
 
 			require.Error(t, err)
@@ -109,18 +130,26 @@ func TestMyExecutionReceiptsStorage(t *testing.T) {
 
 			wg.Add(2)
 
+			lockManager := locks.NewTestingLockManager()
+
 			go func() {
 				defer wg.Done()
+				lctx := lockManager.NewContext()
+				defer lctx.Release()
+				require.NoError(t, lctx.AcquireLock(storage.LockInsertOwnReceipt))
 				err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-					return myReceipts.BatchStoreMyReceipt(receipt1, rw)
+					return myReceipts.BatchStoreMyReceipt(lctx, receipt1, rw)
 				})
 				errChan <- err
 			}()
 
 			go func() {
 				defer wg.Done()
+				lctx := lockManager.NewContext()
+				defer lctx.Release()
+				require.NoError(t, lctx.AcquireLock(storage.LockInsertOwnReceipt))
 				err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-					return myReceipts.BatchStoreMyReceipt(receipt2, rw)
+					return myReceipts.BatchStoreMyReceipt(lctx, receipt2, rw)
 				})
 				errChan <- err
 			}()
@@ -155,10 +184,13 @@ func TestMyExecutionReceiptsStorage(t *testing.T) {
 					executor := unittest.IdentifierFixture()
 					receipt := unittest.ReceiptForBlockExecutorFixture(&block, executor)
 
+					lockManager := locks.NewTestingLockManager()
+					lctx := lockManager.NewContext()
+					defer lctx.Release()
+					require.NoError(t, lctx.AcquireLock(storage.LockInsertOwnReceipt))
 					err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-						return myReceipts.BatchStoreMyReceipt(receipt, rw)
+						return myReceipts.BatchStoreMyReceipt(lctx, receipt, rw)
 					})
-
 					errChan <- err
 				}(i)
 			}
@@ -178,8 +210,12 @@ func TestMyExecutionReceiptsStorage(t *testing.T) {
 			block := unittest.BlockFixture()
 			receipt1 := unittest.ReceiptForBlockFixture(&block)
 
+			lockManager := locks.NewTestingLockManager()
+			lctx := lockManager.NewContext()
+			defer lctx.Release()
+			require.NoError(t, lctx.AcquireLock(storage.LockInsertOwnReceipt))
 			err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-				return myReceipts.BatchStoreMyReceipt(receipt1, rw)
+				return myReceipts.BatchStoreMyReceipt(lctx, receipt1, rw)
 			})
 			require.NoError(t, err)
 
@@ -219,12 +255,16 @@ func TestMyExecutionReceiptsStorageMultipleStoreInSameBatch(t *testing.T) {
 		receipt1 := unittest.ReceiptForBlockFixture(&block)
 		receipt2 := unittest.ReceiptForBlockFixture(&block)
 
+		lockManager := locks.NewTestingLockManager()
+		lctx := lockManager.NewContext()
+		defer lctx.Release()
+		require.NoError(t, lctx.AcquireLock(storage.LockInsertOwnReceipt))
 		err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			err := myReceipts.BatchStoreMyReceipt(receipt1, rw)
+			err := myReceipts.BatchStoreMyReceipt(lctx, receipt1, rw)
 			if err != nil {
 				return err
 			}
-			return myReceipts.BatchStoreMyReceipt(receipt2, rw)
+			return myReceipts.BatchStoreMyReceipt(lctx, receipt2, rw)
 		})
 		require.NoError(t, err)
 	})

@@ -1,6 +1,10 @@
 package operation
 
 import (
+	"fmt"
+
+	"github.com/jordanschalm/lockctx"
+
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/storage"
 )
@@ -28,7 +32,10 @@ func RemoveCollection(w storage.Writer, collID flow.Identifier) error {
 
 // IndexCollectionPayload will overwrite any existing index, which is acceptable
 // because the blockID is derived from txIDs within the payload, ensuring its uniqueness.
-func IndexCollectionPayload(w storage.Writer, blockID flow.Identifier, txIDs []flow.Identifier) error {
+func IndexCollectionPayload(lctx lockctx.Proof, w storage.Writer, blockID flow.Identifier, txIDs []flow.Identifier) error {
+	if !lctx.HoldsLock(storage.LockInsertOrFinalizeClusterBlock) {
+		return fmt.Errorf("missing lock: %v", storage.LockInsertOrFinalizeClusterBlock)
+	}
 	return UpsertByKey(w, MakePrefix(codeIndexCollection, blockID), txIDs)
 }
 

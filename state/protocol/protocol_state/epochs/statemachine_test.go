@@ -16,7 +16,6 @@ import (
 	"github.com/onflow/flow-go/state/protocol/protocol_state/epochs"
 	"github.com/onflow/flow-go/state/protocol/protocol_state/epochs/mock"
 	protocol_statemock "github.com/onflow/flow-go/state/protocol/protocol_state/mock"
-	"github.com/onflow/flow-go/storage/badger/transaction"
 	storagemock "github.com/onflow/flow-go/storage/mock"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -96,17 +95,19 @@ func (s *EpochStateMachineSuite) TestBuild_NoChanges() {
 	err := s.stateMachine.EvolveState(nil)
 	require.NoError(s.T(), err)
 
-	indexTxDeferredUpdate := storagemock.NewDeferredDBUpdate(s.T())
-	indexTxDeferredUpdate.On("Execute", mocks.Anything).Return(nil).Once()
+	rw := storagemock.NewReaderBatchWriter(s.T())
 
-	s.epochStateDB.On("Index", s.candidate.ID(), s.parentEpochState.ID()).Return(indexTxDeferredUpdate.Execute, nil).Once()
+	s.epochStateDB.On("BatchIndex", rw, s.candidate.ID(), s.parentEpochState.ID()).Return(nil).Once()
 	s.mutator.On("SetEpochStateID", s.parentEpochState.ID()).Return(nil).Once()
 
 	dbUpdates, err := s.stateMachine.Build()
 	require.NoError(s.T(), err)
-	// Provide the blockID and execute the resulting `DeferredDBUpdate`. Thereby,
+
+	// Provide the blockID and execute the resulting `DBUpdate`. Thereby,
 	// the expected mock methods should be called, which is asserted by the testify framework
-	err = dbUpdates.Pending().WithBlock(s.candidate.ID())(&transaction.Tx{})
+	blockID := s.candidate.ID()
+	// passing nil lockctx proof because no operations require lock; operations are deferred only because block ID is not known yet
+	err = dbUpdates.Execute(nil, blockID, rw)
 	require.NoError(s.T(), err)
 }
 
@@ -126,34 +127,30 @@ func (s *EpochStateMachineSuite) TestBuild_HappyPath() {
 	s.happyPathStateMachine.On("ProcessEpochSetup", epochSetup).Return(true, nil).Once()
 	s.happyPathStateMachine.On("ProcessEpochCommit", epochCommit).Return(true, nil).Once()
 
+	w := storagemock.NewWriter(s.T())
+	rw := storagemock.NewReaderBatchWriter(s.T())
+	rw.On("Writer").Return(w).Once() // called by epochStateDB.BatchStore
 	// prepare a DB update for epoch setup
-	storeEpochSetupTx := storagemock.NewDeferredDBUpdate(s.T())
-	storeEpochSetupTx.On("Execute", mocks.Anything).Return(nil).Once()
-	s.setupsDB.On("StoreTx", epochSetup).Return(storeEpochSetupTx.Execute, nil).Once()
+	s.setupsDB.On("BatchStore", rw, epochSetup).Return(nil).Once()
 
 	// prepare a DB update for epoch commit
-	storeEpochCommitTx := storagemock.NewDeferredDBUpdate(s.T())
-	storeEpochCommitTx.On("Execute", mocks.Anything).Return(nil).Once()
-	s.commitsDB.On("StoreTx", epochCommit).Return(storeEpochCommitTx.Execute, nil).Once()
+	s.commitsDB.On("BatchStore", rw, epochCommit).Return(nil).Once()
 
 	err := s.stateMachine.EvolveState([]flow.ServiceEvent{epochSetup.ServiceEvent(), epochCommit.ServiceEvent()})
 	require.NoError(s.T(), err)
 
 	// prepare a DB update for epoch state
-	indexTxDeferredUpdate := storagemock.NewDeferredDBUpdate(s.T())
-	indexTxDeferredUpdate.On("Execute", mocks.Anything).Return(nil).Once()
-	storeTxDeferredUpdate := storagemock.NewDeferredDBUpdate(s.T())
-	storeTxDeferredUpdate.On("Execute", mocks.Anything).Return(nil).Once()
-
-	s.epochStateDB.On("Index", s.candidate.ID(), updatedStateID).Return(indexTxDeferredUpdate.Execute, nil).Once()
-	s.epochStateDB.On("StoreTx", updatedStateID, updatedState.MinEpochStateEntry).Return(storeTxDeferredUpdate.Execute, nil).Once()
+	s.epochStateDB.On("BatchIndex", rw, s.candidate.ID(), updatedStateID).Return(nil).Once()
+	s.epochStateDB.On("BatchStore", w, updatedStateID, updatedState.MinEpochStateEntry).Return(nil).Once()
 	s.mutator.On("SetEpochStateID", updatedStateID).Return(nil).Once()
 
 	dbUpdates, err := s.stateMachine.Build()
 	require.NoError(s.T(), err)
-	// Provide the blockID and execute the resulting `DeferredDBUpdate`. Thereby,
+	// Provide the blockID and execute the resulting `DBUpdate`. Thereby,
 	// the expected mock methods should be called, which is asserted by the testify framework
-	err = dbUpdates.Pending().WithBlock(s.candidate.ID())(&transaction.Tx{})
+	blockID := s.candidate.ID()
+	// passing nil lockctx proof because no operations require lock; operations are deferred only because block ID is not known yet
+	err = dbUpdates.Execute(nil, blockID, rw)
 	require.NoError(s.T(), err)
 }
 
@@ -534,9 +531,7 @@ func (s *EpochStateMachineSuite) TestEvolveStateTransitionToNextEpoch_WithInvali
 	err = stateMachine.EvolveState([]flow.ServiceEvent{invalidServiceEvent.ServiceEvent()})
 	require.NoError(s.T(), err)
 
-	indexTxDeferredUpdate := storagemock.NewDeferredDBUpdate(s.T())
-	indexTxDeferredUpdate.On("Execute", mocks.Anything).Return(nil).Once()
-	s.epochStateDB.On("Index", s.candidate.ID(), mocks.Anything).Return(indexTxDeferredUpdate.Execute, nil).Once()
+	s.epochStateDB.On("BatchIndex", mocks.Anything, s.candidate.ID(), mocks.Anything).Return(nil).Once()
 
 	expectedEpochState := &flow.MinEpochStateEntry{
 		PreviousEpoch:          s.parentEpochState.CurrentEpoch.Copy(),
@@ -545,15 +540,20 @@ func (s *EpochStateMachineSuite) TestEvolveStateTransitionToNextEpoch_WithInvali
 		EpochFallbackTriggered: true,
 	}
 
-	storeTxDeferredUpdate := storagemock.NewDeferredDBUpdate(s.T())
-	storeTxDeferredUpdate.On("Execute", mocks.Anything).Return(nil).Once()
-	s.epochStateDB.On("StoreTx", expectedEpochState.ID(), expectedEpochState).Return(storeTxDeferredUpdate.Execute, nil).Once()
+	s.epochStateDB.On("BatchStore", mocks.Anything, expectedEpochState.ID(), expectedEpochState).Return(nil).Once()
 	s.mutator.On("SetEpochStateID", expectedEpochState.ID()).Return().Once()
 
 	dbOps, err := stateMachine.Build()
 	require.NoError(s.T(), err)
-	// Provide the blockID and execute the resulting `DeferredDBUpdate`. Thereby,
+
+	w := storagemock.NewWriter(s.T())
+	rw := storagemock.NewReaderBatchWriter(s.T())
+	rw.On("Writer").Return(w).Once() // called by epochStateDB.BatchStore
+
+	// Provide the blockID and execute the resulting `DBUpdate`. Thereby,
 	// the expected mock methods should be called, which is asserted by the testify framework
-	err = dbOps.Pending().WithBlock(s.candidate.ID())(&transaction.Tx{})
+	blockID := s.candidate.ID()
+	// passing nil lockctx proof because no operations require lock; operations are deferred only because block ID is not known yet
+	err = dbOps.Execute(nil, blockID, rw)
 	require.NoError(s.T(), err)
 }

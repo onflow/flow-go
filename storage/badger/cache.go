@@ -34,12 +34,6 @@ func noStore[K comparable, V any](_ K, _ V) func(*transaction.Tx) error {
 	}
 }
 
-func noopStore[K comparable, V any](_ K, _ V) func(*transaction.Tx) error {
-	return func(tx *transaction.Tx) error {
-		return nil
-	}
-}
-
 type retrieveFunc[K comparable, V any] func(key K) func(*badger.Txn) (V, error)
 
 func withRetrieve[K comparable, V any](retrieve retrieveFunc[K, V]) func(*Cache[K, V]) {

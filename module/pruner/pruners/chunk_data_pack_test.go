@@ -5,13 +5,13 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/cockroachdb/pebble"
+	"github.com/cockroachdb/pebble/v2"
 	"github.com/dgraph-io/badger/v2"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/storage"
-	storagebadger "github.com/onflow/flow-go/storage/badger"
+	"github.com/onflow/flow-go/storage/operation/badgerimpl"
 	"github.com/onflow/flow-go/storage/operation/pebbleimpl"
 	"github.com/onflow/flow-go/storage/store"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -22,9 +22,10 @@ func TestChunkDataPackPruner(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(badgerDB *badger.DB) {
 		unittest.RunWithPebbleDB(t, func(pebbleDB *pebble.DB) {
 			m := metrics.NewNoopCollector()
-			results := storagebadger.NewExecutionResults(m, badgerDB)
-			transactions := storagebadger.NewTransactions(m, badgerDB)
-			collections := storagebadger.NewCollections(badgerDB, transactions)
+			db := badgerimpl.ToDB(badgerDB)
+			results := store.NewExecutionResults(m, db)
+			transactions := store.NewTransactions(m, db)
+			collections := store.NewCollections(db, transactions)
 			byChunkIDCacheSize := uint(10)
 			pdb := pebbleimpl.ToDB(pebbleDB)
 			chunks := store.NewChunkDataPacks(m, pdb, collections, byChunkIDCacheSize)
