@@ -86,9 +86,9 @@ func prepareStorehouseTest(f func(t *testing.T, es state.ExecutionState, l *ledg
 					return operation.UpdateExecutedBlock(rw.Writer(), rootID)
 				}))
 
-				badgerimpl.ToDB(badgerDB).WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+				require.NoError(t, badgerimpl.ToDB(badgerDB).WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 					return operation.InsertHeader(rw.Writer(), finalizedHeaders[10].ID(), finalizedHeaders[10])
-				})
+				}))
 
 				getLatestFinalized := func() (uint64, error) {
 					return rootHeight, nil
