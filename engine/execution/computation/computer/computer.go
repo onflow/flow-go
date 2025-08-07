@@ -273,7 +273,7 @@ func (e *blockComputer) queueUserTransactions(
 	}
 }
 
-func (e *blockComputer) queueSystemTransaction(
+func (e *blockComputer) queueSystemTransactions(
 	systemCtx fvm.Context,
 	systemCollectionInfo collectionInfo,
 	systemTxn *flow.TransactionBody,
@@ -282,13 +282,17 @@ func (e *blockComputer) queueSystemTransaction(
 	txnIndex uint32,
 	systemLogger zerolog.Logger,
 ) {
-	allTxs := append(executeCallbackTxs, systemTxn)
-	// add execute callback transactions to the system collection info along to existing process transaction
-	systemCollectionInfo.CompleteCollection.Transactions = append(systemCollectionInfo.CompleteCollection.Transactions, allTxs...)
 	systemLogger = systemLogger.With().Uint32("num_txs", uint32(len(systemCollectionInfo.CompleteCollection.Transactions))).Logger()
 
+	// Add execute callback transactions (if any) and system transaction to the system collection
+	allTxs := append(executeCallbackTxs, systemTxn)
+	systemCollectionInfo.CompleteCollection.Transactions = append(
+		systemCollectionInfo.CompleteCollection.Transactions,
+		allTxs...,
+	)
+
 	for i, txBody := range allTxs {
-		last := i == len(allTxs)-1
+		last := i == len(allTxs)-1 // Is this last tx in collection
 
 		requestQueue <- newTransactionRequest(
 			systemCollectionInfo,
@@ -340,7 +344,8 @@ func (e *blockComputer) executeBlock(
 		e.receiptHasher,
 		parentBlockExecutionResultID,
 		block,
-		e.maxConcurrency*2, // we add some buffer just in case result collection becomes slower than the execution
+		// Add buffer just in case result collection becomes slower than the execution
+		e.maxConcurrency*2,
 		e.colResCons,
 		baseSnapshot,
 	)
@@ -415,14 +420,16 @@ func (e *blockComputer) executeUserTransactions(
 
 // executeSystemTransactions executes all system transactions in the block as part of the system collection.
 //
-// System transactions are executed in the following order:
-// 1. system transaction that processes the scheduled callbacks which is a blocking transaction and
-// the result is used for the next system transaction
-// 2. system transactions that each execute a single scheduled callback by the ID obtained from events
-// of the previous system transaction
-// 3. system transaction that executes the system chunk
+// When scheduled callbacks are enabled, system transactions are executed in the following order:
+//  1. Process callback transaction - queries the scheduler contract to identify ready callbacks
+//     and emits events containing callback IDs and execution effort requirements
+//  2. Callback execution transactions - one transaction per callback ID from step 1 events,
+//     each executing a single scheduled callback with its specified effort limit
+//  3. System chunk transaction - performs standard system operations
 //
-// An error can be returned if the process callback transaction fails. This is a fatal error.
+// When scheduled callbacks are disabled, only the system chunk transaction is executed.
+//
+// All errors are indicators of bugs or corrupted internal state (continuation impossible)
 func (e *blockComputer) executeSystemTransactions(
 	block *entity.ExecutableBlock,
 	blockSpan otelTrace.Span,
@@ -451,7 +458,7 @@ func (e *blockComputer) executeSystemTransactions(
 		blockId:             block.ID(),
 		blockIdStr:          block.ID().String(),
 		blockHeight:         block.Block.Header.Height,
-		collectionIndex:     len(rawCollections),
+		collectionIndex:     userCollectionCount,
 		CompleteCollection:  &entity.CompleteCollection{},
 		isSystemTransaction: true,
 	}
@@ -475,10 +482,16 @@ func (e *blockComputer) executeSystemTransactions(
 		txIndex++
 	}
 
-	// queue size for callback transactions + 1 system transaction (process callback already executed)
+	// Update logger with number of transactions once they've become known
+	// (user tx + callbacks + 2 (process, system)
+	systemLogger = systemLogger.With().
+		Uint32("num_txs", uint32(userTxCount+len(callbackTxs)+2)).
+		Logger()
+
+	// Queue size for callback transactions + 1 system transaction (process callback already executed)
 	txQueue := make(chan TransactionRequest, len(callbackTxs)+1)
 
-	e.queueSystemTransaction(
+	e.queueSystemTransactions(
 		systemCtx,
 		systemCollectionInfo,
 		e.systemTxn,
@@ -515,10 +528,20 @@ func (e *blockComputer) executeQueue(
 	wg.Wait()
 }
 
-// executeProcessCallback executes a transaction that calls callback scheduler contract process method.
-// The execution result contains events that are emitted for each callback which is ready for execution.
-// We use these events to prepare callback execution transactions, which are later executed as part of the system collection.
-// An error can be returned if the process callback transaction fails. This is a fatal error.
+// executeProcessCallback submits a transaction that invokes the `process` method
+// on the callback scheduler contract.
+//
+// The `process` method scans for scheduled callbacks and emits an event for each that should
+// be executed. These emitted events are used to construct callback execution transactions,
+// which are then added to the system transaction collection.
+//
+// If the `process` transaction fails, a fatal error is returned.
+//
+// Note: this transaction is executed serially and not concurrently with the system transaction.
+// This is because it's unclear whether the callback executions triggered by `process`
+// will result in additional system transactions.
+// In theory, if no additional transactions are emitted, concurrent execution could be optimized.
+// However, due to the added complexity, this optimization was deferred.
 func (e *blockComputer) executeProcessCallback(
 	systemCtx fvm.Context,
 	systemCollectionInfo collectionInfo,
@@ -527,8 +550,12 @@ func (e *blockComputer) executeProcessCallback(
 	txnIndex uint32,
 	systemLogger zerolog.Logger,
 ) ([]*flow.TransactionBody, error) {
-	// add process callback transaction to the system collection info
-	systemCollectionInfo.CompleteCollection.Transactions = append(systemCollectionInfo.CompleteCollection.Transactions, e.processCallbackTxn)
+	// Add process callback transaction to the system collection info
+	// Note: since complete collection is a pointer, this will modify original
+	systemCollectionInfo.CompleteCollection.Transactions = append(
+		systemCollectionInfo.CompleteCollection.Transactions,
+		e.processCallbackTxn,
+	)
 
 	request := newTransactionRequest(
 		systemCollectionInfo,
