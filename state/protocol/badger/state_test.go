@@ -814,10 +814,10 @@ func TestBootstrap_SealMismatch(t *testing.T) {
 	})
 }
 
-// TestBootstrap_InvalidLivenessData verifies that bootstrapStatePointers
+// TestBootstrap_InvalidSporkBlockView verifies that bootstrapStatePointers
 // returns an error when the SporkRootBlockView is set to a value higher or equal
 // than the LivenessData.CurrentView.
-func TestBootstrap_InvalidLivenessData(t *testing.T) {
+func TestBootstrap_InvalidSporkBlockView(t *testing.T) {
 	rootSnapshot := unittest.RootSnapshotFixture(unittest.CompleteIdentitySet())
 	// convert to encodable to easily modify snapshot
 	encodable := rootSnapshot.Encodable()

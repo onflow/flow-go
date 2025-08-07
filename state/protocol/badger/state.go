@@ -599,7 +599,7 @@ func bootstrapSporkInfo(
 
 		sporkRootBlockID := sporkRootBlock.ID()
 		//  store the spork root block ID.
-		err := operation.InsertSporkRootBlockID(sporkRootBlockID)(bdtx)
+		err := operation.IndexSporkRootBlock(sporkRootBlockID)(bdtx)
 		if err != nil {
 			return fmt.Errorf("could not insert spork root block ID: %w", err)
 		}

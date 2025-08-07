@@ -6,6 +6,7 @@ import (
 	"github.com/dgraph-io/badger/v2"
 
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/badger/operation"
@@ -124,12 +125,12 @@ func ReadSporkRootBlock(
 	var sporkRootBlockID flow.Identifier
 	err := db.View(operation.RetrieveSporkRootBlockID(&sporkRootBlockID))
 	if err != nil {
-		return nil, fmt.Errorf("could not get spork root block ID: %w", err)
+		return nil, irrecoverable.NewExceptionf("could not get spork root block ID: %w", err)
 	}
 
 	sporkRootBlock, err := blocks.ByID(sporkRootBlockID)
 	if err != nil {
-		return nil, fmt.Errorf("could not retrieve spork root block: %w", err)
+		return nil, irrecoverable.NewExceptionf("could not retrieve spork root block: %w", err)
 	}
 
 	return sporkRootBlock, nil
