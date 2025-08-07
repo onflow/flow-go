@@ -82,8 +82,12 @@ func TestFinalize_HappyPath(t *testing.T) {
 		flagEpochTimingRefTimestamp = 0
 		flagEpochTimingDuration = 0
 
+		// KV store values (epoch extension view count and finalization safety threshold) must be explicitly set for mainnet
+		require.NoError(t, rootBlockCmd.Flags().Set("kvstore-finalization-safety-threshold", "1000"))
+		require.NoError(t, rootBlockCmd.Flags().Set("kvstore-epoch-extension-view-count", "100000"))
+
 		// rootBlock will generate DKG and place it into bootDir/public-root-information
-		rootBlock(nil, nil)
+		rootBlock(rootBlockCmd, nil)
 
 		flagRootBlockPath = filepath.Join(bootDir, model.PathRootBlockData)
 		flagIntermediaryBootstrappingDataPath = filepath.Join(bootDir, model.PathIntermediaryBootstrappingData)
