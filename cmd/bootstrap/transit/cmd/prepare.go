@@ -21,6 +21,8 @@ func init() {
 
 func addPrepareCmdFlags() {
 	prepareCmd.Flags().StringVarP(&flagNodeRole, "role", "r", "", `node role (can be "collection", "consensus", "execution", "verification" or "access")`)
+	prepareCmd.Flags().StringVarP(&flagNodeID, "nodeID", "n", "", "node id")
+	prepareCmd.Flags().StringVarP(&flagOutputDir, "outputDir", "o", "", "ouput directory")
 	_ = prepareCmd.MarkFlagRequired("role")
 }
 
@@ -38,12 +40,22 @@ func prepare(cmd *cobra.Command, args []string) {
 		return
 	}
 
-	nodeID, err := readNodeID()
-	if err != nil {
-		log.Fatal().Err(err).Msg("could not read node ID from file")
+	// Set the output directory from the flag or use the bootstrap directory
+	outputDir := flagOutputDir
+	if outputDir == "" {
+		outputDir = flagBootDir
 	}
 
-	err = generateKeys(flagBootDir, nodeID)
+	// Set the NodeID from the flag or read it from the file
+	nodeID := flagNodeID
+	if nodeID == "" {
+		nodeID, err = readNodeID()
+		if err != nil {
+			log.Fatal().Err(err).Msg("could not read node ID from file")
+		}
+	}
+
+	err = generateKeys(outputDir, nodeID)
 	if err != nil {
 		log.Fatal().Err(err).Msg("failed to prepare")
 	}

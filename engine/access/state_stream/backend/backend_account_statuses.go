@@ -27,7 +27,7 @@ type AccountStatusesBackend struct {
 	subscriptionHandler *subscription.SubscriptionHandler
 
 	executionDataTracker tracker.ExecutionDataTracker
-	eventsRetriever      EventsRetriever
+	eventsProvider       EventsProvider
 }
 
 // subscribe creates and returns a subscription to receive account status updates starting from the specified height.
@@ -97,7 +97,7 @@ func (b *AccountStatusesBackend) getAccountStatusResponseFactory(
 	filter state_stream.AccountStatusFilter,
 ) subscription.GetDataByHeightFunc {
 	return func(ctx context.Context, height uint64) (interface{}, error) {
-		eventsResponse, err := b.eventsRetriever.GetAllEventsResponse(ctx, height)
+		eventsResponse, err := b.eventsProvider.GetAllEventsResponse(ctx, height)
 		if err != nil {
 			if errors.Is(err, storage.ErrNotFound) ||
 				errors.Is(err, storage.ErrHeightNotIndexed) {
