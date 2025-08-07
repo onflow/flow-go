@@ -422,19 +422,6 @@ func NewKVStore(
 		return &Modelv1{Modelv0: *modelv0}, nil
 	case 2:
 		return &Modelv2{Modelv1: Modelv1{Modelv0: *modelv0}}, nil
-	case 3:
-		return &Modelv3{
-			Modelv2: Modelv2{Modelv1: Modelv1{Modelv0: *modelv0}},
-			CadenceComponentVersion: protocol.UpdatableField[protocol.MagnitudeVersion]{
-				CurrentValue: protocol.MagnitudeVersion{Major: 0, Minor: 0},
-			},
-			ExecutionComponentVersion: protocol.UpdatableField[protocol.MagnitudeVersion]{
-				CurrentValue: protocol.MagnitudeVersion{Major: 0, Minor: 0},
-			},
-			ExecutionMeteringParameters: protocol.UpdatableField[protocol.ExecutionMeteringParameters]{
-				CurrentValue: protocol.DefaultExecutionMeteringParameters(),
-			},
-		}, nil
 	default:
 		return nil, fmt.Errorf("unsupported protocol state version: %d", version)
 	}

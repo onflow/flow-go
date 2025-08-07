@@ -353,7 +353,7 @@ func TestNewDefaultKVStore(t *testing.T) {
 		require.GreaterOrEqual(t, store.GetEpochExtensionViewCount(), 2*safetyParams.FinalizationSafetyThreshold,
 			"extension view count should be at least 2*FinalizationSafetyThreshold")
 	})
-	t.Run("invalid-epoch-extension-view-count", func(t *testing.T) {
+	t.Run("invalid-kvstore-epoch-extension-view-count", func(t *testing.T) {
 		safetyParams, err := protocol.DefaultEpochSafetyParams(flow.Localnet)
 		require.NoError(t, err)
 		epochStateID := unittest.IdentifierFixture()
@@ -460,7 +460,7 @@ func TestNewKVStore_SupportedVersions(t *testing.T) {
 	require.NoError(t, err)
 	epochStateID := unittest.IdentifierFixture()
 
-	supportedVersions := []uint64{0, 1, 2, 3}
+	supportedVersions := []uint64{0, 1, 2}
 
 	for _, version := range supportedVersions {
 		t.Run(fmt.Sprintf("version %d", version), func(t *testing.T) {
