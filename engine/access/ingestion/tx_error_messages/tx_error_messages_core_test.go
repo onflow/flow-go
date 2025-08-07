@@ -12,12 +12,15 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
+	"github.com/onflow/flow-go/engine/access/index"
 	accessmock "github.com/onflow/flow-go/engine/access/mock"
-	"github.com/onflow/flow-go/engine/access/rpc/backend"
+	"github.com/onflow/flow-go/engine/access/rpc/backend/node_communicator"
+	"github.com/onflow/flow-go/engine/access/rpc/backend/transactions/error_messages"
 	connectionmock "github.com/onflow/flow-go/engine/access/rpc/connection/mock"
 	commonrpc "github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/irrecoverable"
+	syncmock "github.com/onflow/flow-go/module/state_synchronization/mock"
 	protocol "github.com/onflow/flow-go/state/protocol/mock"
 	storage "github.com/onflow/flow-go/storage/mock"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -37,6 +40,11 @@ type TxErrorMessagesCoreSuite struct {
 
 	receipts        *storage.ExecutionReceipts
 	txErrorMessages *storage.TransactionResultErrorMessages
+	lightTxResults  *storage.LightTransactionResults
+
+	reporter       *syncmock.IndexReporter
+	indexReporter  *index.Reporter
+	txResultsIndex *index.TransactionResultsIndex
 
 	enNodeIDs   flow.IdentityList
 	execClient  *accessmock.ExecutionAPIClient
@@ -74,6 +82,13 @@ func (s *TxErrorMessagesCoreSuite) SetupTest() {
 	s.connFactory = connectionmock.NewConnectionFactory(s.T())
 	s.receipts = storage.NewExecutionReceipts(s.T())
 	s.txErrorMessages = storage.NewTransactionResultErrorMessages(s.T())
+
+	s.lightTxResults = storage.NewLightTransactionResults(s.T())
+	s.reporter = syncmock.NewIndexReporter(s.T())
+	s.indexReporter = index.NewReporter()
+	err := s.indexReporter.Initialize(s.reporter)
+	s.Require().NoError(err)
+	s.txResultsIndex = index.NewTransactionResultsIndex(s.indexReporter, s.lightTxResults)
 
 	s.rootBlock = unittest.BlockFixture()
 	s.rootBlock.Header.Height = 0
@@ -242,25 +257,18 @@ func (s *TxErrorMessagesCoreSuite) initCore() *TxErrorMessagesCore {
 		s.enNodeIDs.NodeIDs(),
 	)
 
-	// Initialize the backend
-	backend, err := backend.New(backend.Params{
-		State:                      s.proto.state,
-		ExecutionReceipts:          s.receipts,
-		ConnFactory:                s.connFactory,
-		MaxHeightRange:             backend.DefaultMaxHeightRange,
-		Log:                        s.log,
-		SnapshotHistoryLimit:       backend.DefaultSnapshotHistoryLimit,
-		Communicator:               backend.NewNodeCommunicator(false),
-		ScriptExecutionMode:        backend.IndexQueryModeExecutionNodesOnly,
-		TxResultQueryMode:          backend.IndexQueryModeExecutionNodesOnly,
-		ChainID:                    flow.Testnet,
-		ExecNodeIdentitiesProvider: execNodeIdentitiesProvider,
-	})
-	require.NoError(s.T(), err)
+	errorMessageProvider := error_messages.NewTxErrorMessageProvider(
+		s.log,
+		s.txErrorMessages,
+		s.txResultsIndex,
+		s.connFactory,
+		node_communicator.NewNodeCommunicator(false),
+		execNodeIdentitiesProvider,
+	)
 
 	core := NewTxErrorMessagesCore(
 		s.log,
-		backend,
+		errorMessageProvider,
 		s.txErrorMessages,
 		execNodeIdentitiesProvider,
 	)
