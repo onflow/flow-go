@@ -1,4 +1,4 @@
-package retriever
+package provider
 
 import (
 	"context"
@@ -19,7 +19,7 @@ import (
 	"github.com/onflow/flow-go/state/protocol"
 )
 
-type ENAccountRetriever struct {
+type ENAccountProvider struct {
 	log                        zerolog.Logger
 	state                      protocol.State
 	connFactory                connection.ConnectionFactory
@@ -27,17 +27,17 @@ type ENAccountRetriever struct {
 	execNodeIdentitiesProvider *rpc.ExecutionNodeIdentitiesProvider
 }
 
-var _ AccountRetriever = (*ENAccountRetriever)(nil)
+var _ AccountProvider = (*ENAccountProvider)(nil)
 
-func NewENAccountRetriever(
+func NewENAccountProvider(
 	log zerolog.Logger,
 	state protocol.State,
 	connFactory connection.ConnectionFactory,
 	nodeCommunicator node_communicator.Communicator,
 	execNodeIdentityProvider *rpc.ExecutionNodeIdentitiesProvider,
-) *ENAccountRetriever {
-	return &ENAccountRetriever{
-		log:                        log.With().Str("account_retriever", "execution_node").Logger(),
+) *ENAccountProvider {
+	return &ENAccountProvider{
+		log:                        log.With().Str("account_provider", "execution_node").Logger(),
 		state:                      state,
 		connFactory:                connFactory,
 		nodeCommunicator:           nodeCommunicator,
@@ -45,7 +45,7 @@ func NewENAccountRetriever(
 	}
 }
 
-func (e *ENAccountRetriever) GetAccountAtBlock(
+func (e *ENAccountProvider) GetAccountAtBlock(
 	ctx context.Context,
 	address flow.Address,
 	blockID flow.Identifier,
@@ -105,7 +105,7 @@ func (e *ENAccountRetriever) GetAccountAtBlock(
 	return account, nil
 }
 
-func (e *ENAccountRetriever) GetAccountBalanceAtBlock(
+func (e *ENAccountProvider) GetAccountBalanceAtBlock(
 	ctx context.Context,
 	address flow.Address,
 	blockID flow.Identifier,
@@ -119,7 +119,7 @@ func (e *ENAccountRetriever) GetAccountBalanceAtBlock(
 	return account.Balance, nil
 }
 
-func (e *ENAccountRetriever) GetAccountKeyAtBlock(
+func (e *ENAccountProvider) GetAccountKeyAtBlock(
 	ctx context.Context,
 	address flow.Address,
 	keyIndex uint32,
@@ -140,7 +140,7 @@ func (e *ENAccountRetriever) GetAccountKeyAtBlock(
 	return nil, status.Errorf(codes.NotFound, "failed to get account key by index: %d", keyIndex)
 }
 
-func (e *ENAccountRetriever) GetAccountKeysAtBlock(
+func (e *ENAccountProvider) GetAccountKeysAtBlock(
 	ctx context.Context,
 	address flow.Address,
 	blockID flow.Identifier,
@@ -155,7 +155,7 @@ func (e *ENAccountRetriever) GetAccountKeysAtBlock(
 }
 
 // tryGetAccount attempts to get the account from the given execution node.
-func (e *ENAccountRetriever) tryGetAccount(
+func (e *ENAccountProvider) tryGetAccount(
 	ctx context.Context,
 	execNode *flow.IdentitySkeleton,
 	req *execproto.GetAccountAtBlockIDRequest,
