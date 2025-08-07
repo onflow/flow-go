@@ -19,7 +19,6 @@ DKG_PHASE_LEN = 1000
 EPOCH_EXTENSION_LEN = 600
 # Spork root config
 ROOT_VIEW = 0
-KVSTORE_VERSION = 2
 
 validate:
 ifeq ($(strip $(VALID_EXECUTION)), 1)
@@ -59,7 +58,7 @@ gen-bootstrap:
 		--root-height 0 \
 		--root-parent 0000000000000000000000000000000000000000000000000000000000000000 \
 		--root-view $(ROOT_VIEW) \
-		--kvstore-version $(KVSTORE_VERSION) \
+		--kvstore-version 2 \
 		--epoch-counter 0 \
 		--epoch-length $(EPOCH_LEN) \
 		--epoch-staking-phase-length $(EPOCH_STAKING_PHASE_LEN) \
