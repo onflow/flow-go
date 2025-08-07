@@ -48,6 +48,7 @@ func newContractType(chainID flow.ChainID) *sema.CompositeType {
 		},
 	}
 
+	// Kind of environment (interpreter or VM) since we are not executing the code, but only type checking it.
 	env := runtime.NewBaseInterpreterEnvironment(runtime.Config{})
 	env.Configure(
 		runtimeInterface,
@@ -56,7 +57,14 @@ func newContractType(chainID flow.ChainID) *sema.CompositeType {
 		nil,
 	)
 
-	SetupEnvironment(env, nil, evmContractAddress)
+	SetupEnvironment(
+		env,
+		// Not necessary for type checking
+		nil,
+		// Not necessary for type checking
+		InternalEVMFunctions{},
+		evmContractAddress,
+	)
 
 	program, err := env.ParseAndCheckProgram(evmCode, evmContractLocation, false)
 	if err != nil {

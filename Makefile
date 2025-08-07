@@ -36,7 +36,6 @@ GOARCH := $(shell go env GOARCH)
 # The location of the k8s YAML files
 K8S_YAMLS_LOCATION_STAGING=./k8s/staging
 
-
 # docker container registry
 export CONTAINER_REGISTRY := gcr.io/flow-container-registry
 export DOCKER_BUILDKIT := 1
@@ -72,7 +71,19 @@ update-cadence-version:
 .PHONY: unittest-main
 unittest-main:
 	# test all packages
-	CGO_CFLAGS=$(CRYPTO_FLAG) go test $(if $(VERBOSE),-v,) -coverprofile=$(COVER_PROFILE) -covermode=atomic $(if $(RACE_DETECTOR),-race,) $(if $(JSON_OUTPUT),-json,) $(if $(NUM_RUNS),-count $(NUM_RUNS),) $(GO_TEST_PACKAGES)
+	# TODO: CGO_CFLAGS=$(CRYPTO_FLAG) go test $(if $(VERBOSE),-v,) -coverprofile=$(COVER_PROFILE) -covermode=atomic $(if $(RACE_DETECTOR),-race,) $(if $(JSON_OUTPUT),-json,) $(if $(NUM_RUNS),-count $(NUM_RUNS),) $(GO_TEST_PACKAGES)
+ifneq ($(filter github.com/onflow/flow-go/fvm,$(GO_TEST_PACKAGES)),)
+	CGO_CFLAGS=$(CRYPTO_FLAG) go test $(if $(VERBOSE),-v,) -coverprofile=$(COVER_PROFILE) -covermode=atomic $(if $(RACE_DETECTOR),-race,) $(if $(JSON_OUTPUT),-json,) $(if $(NUM_RUNS),-count $(NUM_RUNS),) \
+		github.com/onflow/flow-go/fvm github.com/onflow/flow-go/fvm/evm github.com/onflow/flow-go/fvm/evm/stdlib -testWithVMTransactionExecution=true -testWithVMScriptExecution=true
+endif
+ifneq ($(filter github.com/onflow/flow-go/engine/execution/state/bootstrap,$(GO_TEST_PACKAGES)),)
+	CGO_CFLAGS=$(CRYPTO_FLAG) go test $(if $(VERBOSE),-v,) -coverprofile=$(COVER_PROFILE) -covermode=atomic $(if $(RACE_DETECTOR),-race,) $(if $(JSON_OUTPUT),-json,) $(if $(NUM_RUNS),-count $(NUM_RUNS),) \
+		github.com/onflow/flow-go/engine/execution/state/bootstrap -testWithVMTransactionExecution=true -testWithVMScriptExecution=true
+endif
+ifneq ($(filter github.com/onflow/flow-go/engine/access/rpc/backend,$(GO_TEST_PACKAGES)),)
+	CGO_CFLAGS=$(CRYPTO_FLAG) go test $(if $(VERBOSE),-v,) -coverprofile=$(COVER_PROFILE) -covermode=atomic $(if $(RACE_DETECTOR),-race,) $(if $(JSON_OUTPUT),-json,) $(if $(NUM_RUNS),-count $(NUM_RUNS),) \
+		github.com/onflow/flow-go/engine/access/rpc/backend -testWithVMScriptExecution=true
+endif
 
 .PHONY: install-mock-generators
 install-mock-generators:
