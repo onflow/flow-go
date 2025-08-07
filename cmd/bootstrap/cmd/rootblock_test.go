@@ -10,7 +10,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/cmd/bootstrap/utils"
 	model "github.com/onflow/flow-go/model/bootstrap"
@@ -81,16 +81,20 @@ func TestRootBlock_HappyPath(t *testing.T) {
 	utils.RunWithSporkBootstrapDir(t, func(bootDir, partnerDir, partnerWeights, internalPrivDir, configPath string) {
 		setupHappyPathFlags(bootDir, partnerDir, partnerWeights, internalPrivDir, configPath)
 
+		// KV store values (epoch extension view count and finalization safety threshold) must be explicitly set for mainnet
+		require.NoError(t, rootBlockCmd.Flags().Set("kvstore-finalization-safety-threshold", "1000"))
+		require.NoError(t, rootBlockCmd.Flags().Set("kvstore-epoch-extension-view-count", "100000"))
+
 		hook := zeroLoggerHook{logs: &strings.Builder{}}
 		log = log.Hook(hook)
 
-		rootBlock(nil, nil)
-		assert.Regexp(t, rootBlockHappyPathRegex, hook.logs.String())
+		rootBlock(rootBlockCmd, nil)
+		require.Regexp(t, rootBlockHappyPathRegex, hook.logs.String())
 		hook.logs.Reset()
 
 		// check if root protocol snapshot exists
 		rootBlockDataPath := filepath.Join(bootDir, model.PathRootBlockData)
-		assert.FileExists(t, rootBlockDataPath)
+		require.FileExists(t, rootBlockDataPath)
 	})
 }
 
@@ -128,7 +132,7 @@ func TestInvalidRootBlockViewSubprocess(t *testing.T) {
 func TestInvalidKVStoreValues(t *testing.T) {
 	for _, chain := range []string{"main", "test"} {
 		t.Run("invalid kv store values for "+chain, func(t *testing.T) {
-			expectedError := fmt.Sprintf("cannot use default KVStore values (epoch extension view count and finalization safety threshold) on %q chain", chain)
+			expectedError := fmt.Sprintf("KV store values (epoch extension view count and finalization safety threshold) must be explicitly set on the %q chain", chain)
 			extraEnv := []string{"CHAIN=" + chain}
 
 			runTestInSubprocessWithError(
@@ -166,7 +170,7 @@ func invalidRootBlockSubprocess(t *testing.T, flagsModifier func()) {
 		hook := zeroLoggerHook{logs: &strings.Builder{}}
 		log = log.Hook(hook)
 
-		rootBlock(nil, nil)
+		rootBlock(rootBlockCmd, nil)
 	})
 }
 
@@ -181,6 +185,6 @@ func runTestInSubprocessWithError(t *testing.T, testName, expectedOutput string,
 	cmd.Env = env
 
 	output, err := cmd.CombinedOutput()
-	assert.Error(t, err)
-	assert.Contains(t, string(output), expectedOutput)
+	require.Error(t, err)
+	require.Contains(t, string(output), expectedOutput)
 }
