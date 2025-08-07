@@ -116,19 +116,9 @@ func TestInvalidRootBlockView(t *testing.T) {
 // TestInvalidRootBlockViewSubprocess runs in subprocess for invalid root view test on various chains
 // This test only runs when invoked by TestInvalidRootBlockView as a sub-process.
 func TestInvalidRootBlockViewSubprocess(t *testing.T) {
-	if os.Getenv("FLAG_RUN_IN_SUBPROCESS_ONLY") != "1" {
-		return
-	}
-
-	utils.RunWithSporkBootstrapDir(t, func(bootDir, partnerDir, partnerWeights, internalPrivDir, configPath string) {
-		setupHappyPathFlags(bootDir, partnerDir, partnerWeights, internalPrivDir, configPath)
+	invalidRootBlockSubprocess(t, func() {
 		flagRootView = 0
 		flagRootChain = os.Getenv("CHAIN")
-
-		hook := zeroLoggerHook{logs: &strings.Builder{}}
-		log = log.Hook(hook)
-
-		rootBlock(nil, nil)
 	})
 }
 
@@ -153,15 +143,27 @@ func TestInvalidKVStoreValues(t *testing.T) {
 
 // TestInvalidKVStoreValuesSubprocess runs in subprocess for invalid kvstore values test on various chains
 func TestInvalidKVStoreValuesSubprocess(t *testing.T) {
+	invalidRootBlockSubprocess(t, func() {
+		flagFinalizationSafetyThreshold = defaultFinalizationSafetyThreshold
+		flagEpochExtensionViewCount = defaultEpochExtensionViewCount
+		flagRootChain = os.Getenv("CHAIN")
+	})
+}
+
+// invalidRootBlockSubprocess is a reusable helper that runs rootBlock() with setup and logger hook,
+// allowing the caller to override flags via the flagsModifier.
+func invalidRootBlockSubprocess(t *testing.T, flagsModifier func()) {
 	if os.Getenv("FLAG_RUN_IN_SUBPROCESS_ONLY") != "1" {
 		return
 	}
 
 	utils.RunWithSporkBootstrapDir(t, func(bootDir, partnerDir, partnerWeights, internalPrivDir, configPath string) {
 		setupHappyPathFlags(bootDir, partnerDir, partnerWeights, internalPrivDir, configPath)
-		flagFinalizationSafetyThreshold = defaultFinalizationSafetyThreshold
-		flagEpochExtensionViewCount = defaultEpochExtensionViewCount
-		flagRootChain = os.Getenv("CHAIN")
+
+		// Allow customization of flags before running rootBlock
+		if flagsModifier != nil {
+			flagsModifier()
+		}
 
 		hook := zeroLoggerHook{logs: &strings.Builder{}}
 		log = log.Hook(hook)
