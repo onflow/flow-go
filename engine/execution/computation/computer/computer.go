@@ -360,7 +360,7 @@ func (e *blockComputer) executeBlock(
 		userTxCount,
 	)
 
-	err = e.executeSystemTransactions(
+	err := e.executeSystemTransactions(
 		block,
 		blockSpan,
 		database,
