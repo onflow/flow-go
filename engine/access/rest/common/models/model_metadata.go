@@ -8,8 +8,7 @@
  */
 package models
 
-// Contains data about the execution result used to serve the request.
-type ExecutorMetadata struct {
-	ExecutionResultId string   `json:"execution_result_id,omitempty"`
-	ExecutorIds       []string `json:"executor_ids,omitempty"`
+// Contains data about the node's state at the time of the request.
+type Metadata struct {
+	ExecutorMetadata *ExecutorMetadata `json:"executor_metadata,omitempty"`
 }

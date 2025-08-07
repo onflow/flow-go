@@ -17,10 +17,12 @@ type TransactionsBody struct {
 	Arguments        []string `json:"arguments"`
 	ReferenceBlockId string   `json:"reference_block_id"`
 	// The limit on the amount of computation a transaction is allowed to preform.
-	GasLimit           string                        `json:"gas_limit"`
-	Payer              string                        `json:"payer"`
-	ProposalKey        *models.ProposalKey           `json:"proposal_key"`
-	Authorizers        []string                      `json:"authorizers"`
-	PayloadSignatures  []models.TransactionSignature `json:"payload_signatures"`
+	GasLimit    string              `json:"gas_limit"`
+	Payer       string              `json:"payer"`
+	ProposalKey *models.ProposalKey `json:"proposal_key"`
+	Authorizers []string            `json:"authorizers"`
+	// A list of Base64 encoded signatures.
+	PayloadSignatures []models.TransactionSignature `json:"payload_signatures"`
+	// A list of Base64 encoded signatures.
 	EnvelopeSignatures []models.TransactionSignature `json:"envelope_signatures"`
 }

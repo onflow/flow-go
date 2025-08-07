@@ -54,7 +54,7 @@ require (
 	github.com/onflow/flow-core-contracts/lib/go/contracts v1.7.3
 	github.com/onflow/flow-core-contracts/lib/go/templates v1.7.1
 	github.com/onflow/flow-go-sdk v1.6.2
-	github.com/onflow/flow/protobuf/go/flow v0.4.13-0.20250806123113-b80883ca75bc
+	github.com/onflow/flow/protobuf/go/flow v0.4.13-0.20250807110253-16e1f93acdde
 	github.com/pbnjay/memory v0.0.0-20210728143218-7b4eea64cf58
 	github.com/pierrec/lz4 v2.6.1+incompatible
 	github.com/pkg/errors v0.9.1

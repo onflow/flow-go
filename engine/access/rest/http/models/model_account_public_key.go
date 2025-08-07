@@ -22,6 +22,6 @@ type AccountPublicKey struct {
 	// Weight of the key.
 	Weight string `json:"weight"`
 	// Flag indicating whether the key is active or not.
-	Revoked          bool                     `json:"revoked"`
-	ExecutorMetadata *models.ExecutorMetadata `json:"executor_metadata,omitempty"`
+	Revoked  bool             `json:"revoked"`
+	Metadata *models.Metadata `json:"metadata,omitempty"`
 }
