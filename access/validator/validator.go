@@ -234,7 +234,6 @@ func (v *TransactionValidator) initValidationSteps() {
 }
 
 func (v *TransactionValidator) Validate(ctx context.Context, tx *flow.TransactionBody) (err error) {
-
 	for _, step := range v.validationSteps {
 		if err = step.check(tx); err != nil {
 			v.transactionValidationMetrics.TransactionValidationFailed(step.failReason)

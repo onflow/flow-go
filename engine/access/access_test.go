@@ -24,6 +24,9 @@ import (
 	accessmock "github.com/onflow/flow-go/engine/access/mock"
 	"github.com/onflow/flow-go/engine/access/rpc"
 	"github.com/onflow/flow-go/engine/access/rpc/backend"
+	"github.com/onflow/flow-go/engine/access/rpc/backend/events"
+	"github.com/onflow/flow-go/engine/access/rpc/backend/node_communicator"
+	"github.com/onflow/flow-go/engine/access/rpc/backend/query_mode"
 	connectionmock "github.com/onflow/flow-go/engine/access/rpc/connection/mock"
 	"github.com/onflow/flow-go/engine/access/subscription"
 	commonrpc "github.com/onflow/flow-go/engine/common/rpc"
@@ -169,10 +172,13 @@ func (suite *Suite) RunTest(
 			ExecutionReceipts:    en.Receipts,
 			ChainID:              suite.chainID,
 			AccessMetrics:        suite.metrics,
-			MaxHeightRange:       backend.DefaultMaxHeightRange,
+			MaxHeightRange:       events.DefaultMaxHeightRange,
 			Log:                  suite.log,
 			SnapshotHistoryLimit: backend.DefaultSnapshotHistoryLimit,
-			Communicator:         backend.NewNodeCommunicator(false),
+			Communicator:         node_communicator.NewNodeCommunicator(false),
+			EventQueryMode:       query_mode.IndexQueryModeExecutionNodesOnly,
+			ScriptExecutionMode:  query_mode.IndexQueryModeExecutionNodesOnly,
+			TxResultQueryMode:    query_mode.IndexQueryModeExecutionNodesOnly,
 		})
 		require.NoError(suite.T(), err)
 
@@ -338,10 +344,13 @@ func (suite *Suite) TestSendTransactionToRandomCollectionNode() {
 			ChainID:              suite.chainID,
 			AccessMetrics:        metrics,
 			ConnFactory:          connFactory,
-			MaxHeightRange:       backend.DefaultMaxHeightRange,
+			MaxHeightRange:       events.DefaultMaxHeightRange,
 			Log:                  suite.log,
 			SnapshotHistoryLimit: backend.DefaultSnapshotHistoryLimit,
-			Communicator:         backend.NewNodeCommunicator(false),
+			Communicator:         node_communicator.NewNodeCommunicator(false),
+			EventQueryMode:       query_mode.IndexQueryModeExecutionNodesOnly,
+			ScriptExecutionMode:  query_mode.IndexQueryModeExecutionNodesOnly,
+			TxResultQueryMode:    query_mode.IndexQueryModeExecutionNodesOnly,
 		})
 		require.NoError(suite.T(), err)
 
@@ -682,11 +691,13 @@ func (suite *Suite) TestGetSealedTransaction() {
 			ChainID:                    suite.chainID,
 			AccessMetrics:              suite.metrics,
 			ConnFactory:                connFactory,
-			MaxHeightRange:             backend.DefaultMaxHeightRange,
+			MaxHeightRange:             events.DefaultMaxHeightRange,
 			Log:                        suite.log,
 			SnapshotHistoryLimit:       backend.DefaultSnapshotHistoryLimit,
-			Communicator:               backend.NewNodeCommunicator(false),
-			TxResultQueryMode:          backend.IndexQueryModeExecutionNodesOnly,
+			Communicator:               node_communicator.NewNodeCommunicator(false),
+			TxResultQueryMode:          query_mode.IndexQueryModeExecutionNodesOnly,
+			EventQueryMode:             query_mode.IndexQueryModeExecutionNodesOnly,
+			ScriptExecutionMode:        query_mode.IndexQueryModeExecutionNodesOnly,
 			ExecNodeIdentitiesProvider: execNodeIdentitiesProvider,
 		})
 		require.NoError(suite.T(), err)
@@ -896,11 +907,13 @@ func (suite *Suite) TestGetTransactionResult() {
 			ChainID:                    suite.chainID,
 			AccessMetrics:              suite.metrics,
 			ConnFactory:                connFactory,
-			MaxHeightRange:             backend.DefaultMaxHeightRange,
+			MaxHeightRange:             events.DefaultMaxHeightRange,
 			Log:                        suite.log,
 			SnapshotHistoryLimit:       backend.DefaultSnapshotHistoryLimit,
-			Communicator:               backend.NewNodeCommunicator(false),
-			TxResultQueryMode:          backend.IndexQueryModeExecutionNodesOnly,
+			Communicator:               node_communicator.NewNodeCommunicator(false),
+			TxResultQueryMode:          query_mode.IndexQueryModeExecutionNodesOnly,
+			EventQueryMode:             query_mode.IndexQueryModeExecutionNodesOnly,
+			ScriptExecutionMode:        query_mode.IndexQueryModeExecutionNodesOnly,
 			ExecNodeIdentitiesProvider: execNodeIdentitiesProvider,
 		})
 		require.NoError(suite.T(), err)
@@ -1145,12 +1158,13 @@ func (suite *Suite) TestExecuteScript() {
 			ChainID:                    suite.chainID,
 			AccessMetrics:              suite.metrics,
 			ConnFactory:                connFactory,
-			MaxHeightRange:             backend.DefaultMaxHeightRange,
+			MaxHeightRange:             events.DefaultMaxHeightRange,
 			Log:                        suite.log,
 			SnapshotHistoryLimit:       backend.DefaultSnapshotHistoryLimit,
-			Communicator:               backend.NewNodeCommunicator(false),
-			ScriptExecutionMode:        backend.IndexQueryModeExecutionNodesOnly,
-			TxResultQueryMode:          backend.IndexQueryModeExecutionNodesOnly,
+			Communicator:               node_communicator.NewNodeCommunicator(false),
+			EventQueryMode:             query_mode.IndexQueryModeExecutionNodesOnly,
+			ScriptExecutionMode:        query_mode.IndexQueryModeExecutionNodesOnly,
+			TxResultQueryMode:          query_mode.IndexQueryModeExecutionNodesOnly,
 			ExecNodeIdentitiesProvider: execNodeIdentitiesProvider,
 		})
 		require.NoError(suite.T(), err)
