@@ -28,7 +28,6 @@ import (
 	"github.com/onflow/flow-go/engine/access/rpc/connection"
 	"github.com/onflow/flow-go/engine/access/subscription"
 	"github.com/onflow/flow-go/engine/access/subscription/tracker"
-	"github.com/onflow/flow-go/engine/common/rpc"
 	commonrpc "github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/engine/common/version"
 	"github.com/onflow/flow-go/fvm/blueprints"
@@ -339,12 +338,19 @@ func New(params Params) (*Backend, error) {
 }
 
 // Ping responds to requests when the server is up.
+//
+// CAUTION: this layer SIMPLIFIES the ERROR HANDLING convention
+// As documented in the [access.API], which we partially implement with this function
+//   - All errors returned by this API are guaranteed to be benign. The node can continue normal operations after such errors.
+//   - Hence, we MUST check here and crash on all errors *except* for those known to be benign in the present context!
+//
+// Expected sentinel errors providing details to clients about failed requests:
+// - access.ServiceUnavailable if the configured static collection node does not respond to ping.
 func (b *Backend) Ping(ctx context.Context) error {
 	// staticCollectionRPC is only set if a collection node address was provided at startup
 	if b.staticCollectionRPC != nil {
-		_, err := b.staticCollectionRPC.Ping(ctx, &accessproto.PingRequest{})
-		if err != nil {
-			return fmt.Errorf("could not ping collection node: %w", err)
+		if _, err := b.staticCollectionRPC.Ping(ctx, &accessproto.PingRequest{}); err != nil {
+			return access.NewServiceUnavailable(fmt.Errorf("could not ping collection node: %w", err))
 		}
 	}
 
@@ -352,13 +358,18 @@ func (b *Backend) Ping(ctx context.Context) error {
 }
 
 // GetNodeVersionInfo returns node version information such as semver, commit, sporkID, protocolVersion, etc
-func (b *Backend) GetNodeVersionInfo(_ context.Context) (*accessmodel.NodeVersionInfo, error) {
+//
+// CAUTION: this layer SIMPLIFIES the ERROR HANDLING convention
+// As documented in the [access.API], which we partially implement with this function
+//   - All errors returned by this API are guaranteed to be benign. The node can continue normal operations after such errors.
+//   - Hence, we MUST check here and crash on all errors *except* for those known to be benign in the present context!
+func (b *Backend) GetNodeVersionInfo(ctx context.Context) (*accessmodel.NodeVersionInfo, error) {
 	sporkID := b.stateParams.SporkID()
 	sporkRootBlockHeight := b.stateParams.SporkRootBlockHeight()
 	nodeRootBlockHeader := b.stateParams.SealedRoot()
 	protocolSnapshot, err := b.state.Final().ProtocolState()
 	if err != nil {
-		return nil, fmt.Errorf("could not read finalized protocol kvstore: %w", err)
+		return nil, access.RequireNoError(ctx, fmt.Errorf("could not read finalized protocol kvstore: %w", err))
 	}
 
 	var compatibleRange *accessmodel.CompatibleRange
@@ -385,38 +396,44 @@ func (b *Backend) GetNodeVersionInfo(_ context.Context) (*accessmodel.NodeVersio
 	return nodeInfo, nil
 }
 
-func (b *Backend) GetCollectionByID(_ context.Context, colID flow.Identifier) (*flow.LightCollection, error) {
-	// retrieve the collection from the collection storage
+// GetCollectionByID returns a light collection by its ID.
+//
+// CAUTION: this layer SIMPLIFIES the ERROR HANDLING convention
+// As documented in the [access.API], which we partially implement with this function
+//   - All errors returned by this API are guaranteed to be benign. The node can continue normal operations after such errors.
+//   - Hence, we MUST check here and crash on all errors *except* for those known to be benign in the present context!
+//
+// Expected sentinel errors providing details to clients about failed requests:
+//   - access.DataNotFoundError if the collection is not found.
+func (b *Backend) GetCollectionByID(ctx context.Context, colID flow.Identifier) (*flow.LightCollection, error) {
 	col, err := b.collections.LightByID(colID)
 	if err != nil {
-		// Collections are retrieved asynchronously as we finalize blocks, so
-		// it is possible for a client to request a finalized block from us
-		// containing some collection, then get a not found error when requesting
-		// that collection. These clients should retry.
-		err = rpc.ConvertStorageError(fmt.Errorf("please retry for collection in finalized block: %w", err))
-		return nil, err
+		// Collections are retrieved asynchronously as we finalize blocks, so it is possible to get
+		// a storage.ErrNotFound for a collection within a finalized block. Clients should retry.
+		err = access.RequireErrorIs(ctx, err, storage.ErrNotFound)
+		return nil, access.NewDataNotFoundError("collection", fmt.Errorf("please retry for collection in finalized block: %w", err))
 	}
 
 	return col, nil
 }
 
-func (b *Backend) GetFullCollectionByID(_ context.Context, colID flow.Identifier) (*flow.Collection, error) {
-	// retrieve the collection from the collection storage
+// GetFullCollectionByID returns a full collection by its ID.
+//
+// CAUTION: this layer SIMPLIFIES the ERROR HANDLING convention
+// As documented in the [access.API], which we partially implement with this function
+//   - All errors returned by this API are guaranteed to be benign. The node can continue normal operations after such errors.
+//   - Hence, we MUST check here and crash on all errors *except* for those known to be benign in the present context!
+//
+// Expected sentinel errors providing details to clients about failed requests:
+//   - access.DataNotFoundError if the collection is not found.
+func (b *Backend) GetFullCollectionByID(ctx context.Context, colID flow.Identifier) (*flow.Collection, error) {
 	col, err := b.collections.ByID(colID)
 	if err != nil {
-		// Collections are retrieved asynchronously as we finalize blocks, so
-		// it is possible for a client to request a finalized block from us
-		// containing some collection, then get a not found error when requesting
-		// that collection. These clients should retry.
-		err = rpc.ConvertStorageError(fmt.Errorf("please retry for collection in finalized block: %w", err))
-		return nil, err
+		// Collections are retrieved asynchronously as we finalize blocks, so it is possible to get
+		// a storage.ErrNotFound for a collection within a finalized block. Clients should retry.
+		err = access.RequireErrorIs(ctx, err, storage.ErrNotFound)
+		return nil, access.NewDataNotFoundError("collection", fmt.Errorf("please retry for collection in finalized block: %w", err))
 	}
 
 	return col, nil
-}
-
-func (b *Backend) GetNetworkParameters(_ context.Context) accessmodel.NetworkParameters {
-	return accessmodel.NetworkParameters{
-		ChainID: b.backendNetwork.chainID,
-	}
 }

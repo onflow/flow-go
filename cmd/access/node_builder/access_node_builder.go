@@ -1400,7 +1400,7 @@ func (builder *FlowAccessNodeBuilder) extraFlags() {
 		flags.StringVar(&builder.rpcConf.BackendConfig.ScriptExecutionMode,
 			"script-execution-mode",
 			defaultConfig.rpcConf.BackendConfig.ScriptExecutionMode,
-			"mode to use when executing scripts. one of (local-only, execution-nodes-only, failover, compare)")
+			"mode to use when executing scripts. one of (local-only, execution-nodes-only, failover)")
 		flags.Uint64Var(&builder.scriptExecutorConfig.ComputationLimit,
 			"script-execution-computation-limit",
 			defaultConfig.scriptExecutorConfig.ComputationLimit,
@@ -1977,9 +1977,6 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 			if err != nil {
 				return nil, fmt.Errorf("could not parse event query mode: %w", err)
 			}
-			if eventQueryMode == query_mode.IndexQueryModeCompare {
-				return nil, fmt.Errorf("event query mode 'compare' is not supported")
-			}
 
 			broadcaster := engine.NewBroadcaster()
 			// create BlockTracker that will track for new blocks (finalized and sealed) and
@@ -1996,9 +1993,6 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 			txResultQueryMode, err := query_mode.ParseIndexQueryMode(config.BackendConfig.TxResultQueryMode)
 			if err != nil {
 				return nil, fmt.Errorf("could not parse transaction result query mode: %w", err)
-			}
-			if txResultQueryMode == query_mode.IndexQueryModeCompare {
-				return nil, fmt.Errorf("transaction result query mode 'compare' is not supported")
 			}
 
 			// If execution data syncing and indexing is disabled, pass nil indexReporter

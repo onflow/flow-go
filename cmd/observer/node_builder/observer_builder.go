@@ -1941,16 +1941,10 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 		if err != nil {
 			return nil, fmt.Errorf("could not parse event query mode: %w", err)
 		}
-		if eventQueryMode == query_mode.IndexQueryModeCompare {
-			return nil, fmt.Errorf("event query mode 'compare' is not supported")
-		}
 
 		txResultQueryMode, err := query_mode.ParseIndexQueryMode(config.BackendConfig.TxResultQueryMode)
 		if err != nil {
 			return nil, fmt.Errorf("could not parse transaction result query mode: %w", err)
-		}
-		if txResultQueryMode == query_mode.IndexQueryModeCompare {
-			return nil, fmt.Errorf("transaction result query mode 'compare' is not supported")
 		}
 
 		execNodeIdentitiesProvider := commonrpc.NewExecutionNodeIdentitiesProvider(

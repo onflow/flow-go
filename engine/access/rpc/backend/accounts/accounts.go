@@ -53,11 +53,6 @@ func NewAccountsBackend(
 		execNode := provider.NewENAccountProvider(log, state, connFactory, nodeCommunicator, execNodeIdentitiesProvider)
 		accountProvider = provider.NewFailoverAccountProvider(log, state, local, execNode)
 
-	case query_mode.IndexQueryModeCompare:
-		local := provider.NewLocalAccountProvider(log, state, scriptExecutor)
-		execNode := provider.NewENAccountProvider(log, state, connFactory, nodeCommunicator, execNodeIdentitiesProvider)
-		accountProvider = provider.NewComparingAccountProvider(log, state, local, execNode)
-
 	default:
 		return nil, fmt.Errorf("unknown execution mode: %v", scriptExecMode)
 	}

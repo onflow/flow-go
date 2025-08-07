@@ -2,9 +2,12 @@ package apiproxy
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/rs/zerolog"
+	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
 	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
@@ -19,14 +22,17 @@ import (
 	"github.com/onflow/flow-go/module/metrics"
 )
 
-// RestProxyHandler is a structure that represents the proxy algorithm for observer node.
-// It includes the local backend and forwards the methods which can't be handled locally to an upstream using gRPC API.
+// RestProxyHandler implements the access.API interface to provide backend functionality for the
+// REST API. It uses a local implementation for all data that is available locally on observer nodes,
+// and proxies the remaining methods to an upstream Access node using its grpc endpoints.
+// For proxied methods, the handler converts the grpc response and errors back to the local
+// representation and returns them to the caller.
 type RestProxyHandler struct {
 	access.API
 	*forwarder.Forwarder
-	Logger  zerolog.Logger
-	Metrics metrics.ObserverMetrics
-	Chain   flow.Chain
+	logger  zerolog.Logger
+	metrics metrics.ObserverMetrics
+	chain   flow.Chain
 }
 
 // NewRestProxyHandler returns a new rest proxy handler for observer node.
@@ -47,9 +53,9 @@ func NewRestProxyHandler(
 	}
 
 	restProxyHandler := &RestProxyHandler{
-		Logger:  log,
-		Metrics: metrics,
-		Chain:   chain,
+		logger:  log,
+		metrics: metrics,
+		chain:   chain,
 	}
 
 	restProxyHandler.API = api
@@ -60,9 +66,9 @@ func NewRestProxyHandler(
 
 func (r *RestProxyHandler) log(handler, rpc string, err error) {
 	code := status.Code(err)
-	r.Metrics.RecordRPC(handler, rpc, code)
+	r.metrics.RecordRPC(handler, rpc, code)
 
-	logger := r.Logger.With().
+	logger := r.logger.With().
 		Str("handler", handler).
 		Str("rest_method", rpc).
 		Str("rest_code", code.String()).
@@ -76,11 +82,18 @@ func (r *RestProxyHandler) log(handler, rpc string, err error) {
 	logger.Info().Msg("request succeeded")
 }
 
-// GetCollectionByID returns a collection by ID.
+// GetCollectionByID returns a light collection by its ID.
+//
+// CAUTION: this layer SIMPLIFIES the ERROR HANDLING convention
+//   - All errors returned are guaranteed to be benign. The node can continue normal operations after such errors.
+//   - To prevent delivering incorrect results to clients in case of an error, all other return values should be discarded.
+//
+// Expected sentinel errors providing details to clients about failed requests:
+//   - access.DataNotFoundError if the collection is not found.
 func (r *RestProxyHandler) GetCollectionByID(ctx context.Context, id flow.Identifier) (*flow.LightCollection, error) {
 	upstream, closer, err := r.FaultTolerantClient()
 	if err != nil {
-		return nil, err
+		return nil, access.NewServiceUnavailable(err)
 	}
 	defer closer.Close()
 
@@ -92,15 +105,17 @@ func (r *RestProxyHandler) GetCollectionByID(ctx context.Context, id flow.Identi
 	r.log("upstream", "GetCollectionByID", err)
 
 	if err != nil {
-		return nil, err
+		return nil, convertError(ctx, err, "collection")
 	}
 
-	transactions, err := convert.MessageToLightCollection(collectionResponse.Collection)
+	collection, err := convert.MessageToLightCollection(collectionResponse.Collection)
 	if err != nil {
-		return nil, err
+		// this is not fatal because the data is coming from the upstream AN, so a failure here
+		// does not imply inconsistent local state.
+		return nil, access.NewInternalError(fmt.Errorf("failed to convert collection response: %w", err))
 	}
 
-	return transactions, nil
+	return collection, nil
 }
 
 // SendTransaction sends already created transaction.
@@ -140,7 +155,7 @@ func (r *RestProxyHandler) GetTransaction(ctx context.Context, id flow.Identifie
 		return nil, err
 	}
 
-	transactionBody, err := convert.MessageToTransaction(transactionResponse.Transaction, r.Chain)
+	transactionBody, err := convert.MessageToTransaction(transactionResponse.Transaction, r.chain)
 	if err != nil {
 		return nil, err
 	}
@@ -411,45 +426,61 @@ func (r *RestProxyHandler) GetEventsForBlockIDs(
 	return convert.MessagesToBlockEvents(eventsResponse.Results), nil
 }
 
-// GetExecutionResultForBlockID gets execution result by provided block ID.
-func (r *RestProxyHandler) GetExecutionResultForBlockID(ctx context.Context, blockID flow.Identifier) (*flow.ExecutionResult, error) {
-	upstream, closer, err := r.FaultTolerantClient()
-	if err != nil {
-		return nil, err
+// convertError converts a serialized access error formatted as a grpc error returned from the upstream AN,
+// to a local access sentinel error.
+// if conversion fails, an irrecoverable error is thrown.
+func convertError(ctx context.Context, err error, typeName string) error {
+	// this is a bit fragile since we're decoding error strings. it's only needed until we add support for execution data on the public network
+	switch status.Code(err) {
+	case codes.NotFound:
+		if sourceErrStr, ok := splitOnPrefix(err.Error(), fmt.Sprintf("data not found for %s: ", typeName)); ok {
+			return access.NewDataNotFoundError(typeName, errors.New(sourceErrStr))
+		}
+	case codes.Internal:
+		if sourceErrStr, ok := splitOnPrefix(err.Error(), "internal error: "); ok {
+			return access.NewInternalError(errors.New(sourceErrStr))
+		}
+	case codes.OutOfRange:
+		if sourceErrStr, ok := splitOnPrefix(err.Error(), "out of range: "); ok {
+			return access.NewOutOfRangeError(errors.New(sourceErrStr))
+		}
+	case codes.FailedPrecondition:
+		if sourceErrStr, ok := splitOnPrefix(err.Error(), "precondition failed: "); ok {
+			return access.NewPreconditionFailedError(errors.New(sourceErrStr))
+		}
+	case codes.InvalidArgument:
+		if sourceErrStr, ok := splitOnPrefix(err.Error(), "invalid argument: "); ok {
+			return access.NewInvalidRequestError(errors.New(sourceErrStr))
+		}
+	case codes.Canceled:
+		if sourceErrStr, ok := splitOnPrefix(err.Error(), "request canceled: "); ok {
+			return access.NewRequestCanceledError(errors.New(sourceErrStr))
+		}
+		// it's possible that this came from the client side, so wrap the original error directly.
+		return access.NewRequestCanceledError(err)
+	case codes.DeadlineExceeded:
+		if sourceErrStr, ok := splitOnPrefix(err.Error(), "request timed out: "); ok {
+			return access.NewRequestTimedOutError(errors.New(sourceErrStr))
+		}
+		// it's possible that this came from the client side, so wrap the original error directly.
+		return access.NewRequestTimedOutError(err)
+	case codes.Unavailable:
+		if sourceErrStr, ok := splitOnPrefix(err.Error(), "service unavailable error: "); ok {
+			return access.NewServiceUnavailable(errors.New(sourceErrStr))
+		}
+		// it's possible that this came from the client side, so wrap the original error directly.
+		return access.NewServiceUnavailable(err)
 	}
-	defer closer.Close()
 
-	getExecutionResultForBlockID := &accessproto.GetExecutionResultForBlockIDRequest{
-		BlockId: blockID[:],
-	}
-	executionResultForBlockIDResponse, err := upstream.GetExecutionResultForBlockID(ctx, getExecutionResultForBlockID)
-	r.log("upstream", "GetExecutionResultForBlockID", err)
-
-	if err != nil {
-		return nil, err
-	}
-
-	return convert.MessageToExecutionResult(executionResultForBlockIDResponse.ExecutionResult)
+	// all methods MUST return an access sentinel error. if we couldn't successfully convert the error,
+	// then there is a bug. throw an irrecoverable exception.
+	return access.RequireNoError(ctx, fmt.Errorf("failed to convert upstream error: %w", err))
 }
 
-// GetExecutionResultByID gets execution result by its ID.
-func (r *RestProxyHandler) GetExecutionResultByID(ctx context.Context, id flow.Identifier) (*flow.ExecutionResult, error) {
-	upstream, closer, err := r.FaultTolerantClient()
-	if err != nil {
-		return nil, err
+func splitOnPrefix(original, prefix string) (string, bool) {
+	parts := strings.Split(original, prefix)
+	if len(parts) == 2 {
+		return parts[1], true
 	}
-	defer closer.Close()
-
-	executionResultByIDRequest := &accessproto.GetExecutionResultByIDRequest{
-		Id: id[:],
-	}
-
-	executionResultByIDResponse, err := upstream.GetExecutionResultByID(ctx, executionResultByIDRequest)
-	r.log("upstream", "GetExecutionResultByID", err)
-
-	if err != nil {
-		return nil, err
-	}
-
-	return convert.MessageToExecutionResult(executionResultByIDResponse.ExecutionResult)
+	return "", false
 }

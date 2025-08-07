@@ -59,23 +59,29 @@ func (s *ObserverSuite) TearDownTest() {
 
 func (s *ObserverSuite) SetupTest() {
 	s.localRpc = map[string]struct{}{
-		"Ping":                           {},
-		"GetLatestBlockHeader":           {},
-		"GetBlockHeaderByID":             {},
-		"GetBlockHeaderByHeight":         {},
-		"GetLatestBlock":                 {},
-		"GetBlockByID":                   {},
-		"GetBlockByHeight":               {},
-		"GetLatestProtocolStateSnapshot": {},
-		"GetNetworkParameters":           {},
+		"Ping":                              {},
+		"GetLatestBlockHeader":              {},
+		"GetBlockHeaderByID":                {},
+		"GetBlockHeaderByHeight":            {},
+		"GetLatestBlock":                    {},
+		"GetBlockByID":                      {},
+		"GetBlockByHeight":                  {},
+		"GetLatestProtocolStateSnapshot":    {},
+		"GetProtocolStateSnapshotByBlockID": {},
+		"GetProtocolStateSnapshotByHeight":  {},
+		"GetNetworkParameters":              {},
+		"GetExecutionResultByID":            {},
+		"GetExecutionResultForBlockID":      {},
 	}
 
 	s.localRest = map[string]struct{}{
-		"getBlocksByIDs":       {},
-		"getBlocksByHeight":    {},
-		"getBlockPayloadByID":  {},
-		"getNetworkParameters": {},
-		"getNodeVersionInfo":   {},
+		"getBlocksByIDs":              {},
+		"getBlocksByHeight":           {},
+		"getBlockPayloadByID":         {},
+		"getNetworkParameters":        {},
+		"getNodeVersionInfo":          {},
+		"getExecutionResultByID":      {},
+		"getExecutionResultByBlockID": {},
 	}
 
 	s.testedRPCs = s.getRPCs

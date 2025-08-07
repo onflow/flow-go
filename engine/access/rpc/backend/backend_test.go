@@ -23,6 +23,7 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
+	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/cmd/build"
 	accessmock "github.com/onflow/flow-go/engine/access/mock"
 	"github.com/onflow/flow-go/engine/access/rpc/backend/common"
@@ -164,7 +165,9 @@ func (suite *Suite) TestPing() {
 	backend, err := New(params)
 	suite.Require().NoError(err)
 
-	err = backend.Ping(context.Background())
+	ctx := rpcContext(suite.T(), context.Background())
+
+	err = backend.Ping(ctx)
 	suite.Require().NoError(err)
 }
 
@@ -179,8 +182,10 @@ func (suite *Suite) TestGetLatestFinalizedBlockHeader() {
 	backend, err := New(params)
 	suite.Require().NoError(err)
 
+	ctx := rpcContext(suite.T(), context.Background())
+
 	// query the handler for the latest finalized block
-	header, stat, err := backend.GetLatestBlockHeader(context.Background(), false)
+	header, stat, err := backend.GetLatestBlockHeader(ctx, false)
 	suite.Require().NoError(err)
 	suite.Require().NotNil(header)
 
@@ -228,8 +233,10 @@ func (suite *Suite) TestGetLatestProtocolStateSnapshot_NoTransitionSpan() {
 		backend, err := New(params)
 		suite.Require().NoError(err)
 
+		ctx := rpcContext(suite.T(), context.Background())
+
 		// query the handler for the latest finalized snapshot
-		bytes, err := backend.GetLatestProtocolStateSnapshot(context.Background())
+		bytes, err := backend.GetLatestProtocolStateSnapshot(ctx)
 		suite.Require().NoError(err)
 
 		// we expect the endpoint to return the snapshot at the same height we requested
@@ -282,8 +289,10 @@ func (suite *Suite) TestGetLatestProtocolStateSnapshot_TransitionSpans() {
 		backend, err := New(params)
 		suite.Require().NoError(err)
 
+		ctx := rpcContext(suite.T(), context.Background())
+
 		// query the handler for the latest finalized snapshot
-		bytes, err := backend.GetLatestProtocolStateSnapshot(context.Background())
+		bytes, err := backend.GetLatestProtocolStateSnapshot(ctx)
 		suite.Require().NoError(err)
 		fmt.Println()
 
@@ -331,8 +340,10 @@ func (suite *Suite) TestGetLatestProtocolStateSnapshot_PhaseTransitionSpan() {
 		backend, err := New(params)
 		suite.Require().NoError(err)
 
+		ctx := rpcContext(suite.T(), context.Background())
+
 		// query the handler for the latest finalized snapshot
-		bytes, err := backend.GetLatestProtocolStateSnapshot(context.Background())
+		bytes, err := backend.GetLatestProtocolStateSnapshot(ctx)
 		suite.Require().NoError(err)
 
 		// we expect the endpoint to return latest snapshot, even though it spans an epoch phase transition
@@ -391,8 +402,10 @@ func (suite *Suite) TestGetLatestProtocolStateSnapshot_EpochTransitionSpan() {
 		backend, err := New(params)
 		suite.Require().NoError(err)
 
+		ctx := rpcContext(suite.T(), context.Background())
+
 		// query the handler for the latest finalized snapshot
-		bytes, err := backend.GetLatestProtocolStateSnapshot(context.Background())
+		bytes, err := backend.GetLatestProtocolStateSnapshot(ctx)
 		suite.Require().NoError(err)
 
 		// we expect endpoint to return the latest snapshot, even though it spans an epoch transition
@@ -441,8 +454,10 @@ func (suite *Suite) TestGetProtocolStateSnapshotByBlockID() {
 		backend, err := New(params)
 		suite.Require().NoError(err)
 
+		ctx := rpcContext(suite.T(), context.Background())
+
 		// query the handler for the latest finalized snapshot
-		bytes, err := backend.GetProtocolStateSnapshotByBlockID(context.Background(), blockHead.ID())
+		bytes, err := backend.GetProtocolStateSnapshotByBlockID(ctx, blockHead.ID())
 		suite.Require().NoError(err)
 
 		// we expect the endpoint to return the snapshot at the same height we requested
@@ -469,17 +484,15 @@ func (suite *Suite) TestGetProtocolStateSnapshotByBlockID_UnknownQueryBlock() {
 
 		// create a new block with root block as parent
 		newBlock := unittest.BlockWithParentFixture(rootBlock)
-		ctx := context.Background()
+		ctx := rpcContext(suite.T(), context.Background())
 
 		suite.state.On("AtBlockID", newBlock.ID()).Return(unittest.StateSnapshotForUnknownBlock())
 
 		// query the handler for the snapshot for non existing block
 		snapshotBytes, err := backend.GetProtocolStateSnapshotByBlockID(ctx, newBlock.ID())
 		suite.Require().Nil(snapshotBytes)
-		suite.Require().Error(err)
-		suite.Require().Equal(codes.NotFound, status.Code(err))
-		suite.Require().Equal(status.Errorf(codes.NotFound, "failed to get a valid snapshot: block not found").Error(),
-			err.Error())
+		suite.Require().True(access.IsDataNotFoundError(err))
+		suite.Require().ErrorIs(err, realstate.ErrUnknownSnapshotReference)
 		suite.assertAllExpectations()
 	})
 }
@@ -496,18 +509,22 @@ func (suite *Suite) TestGetProtocolStateSnapshotByBlockID_AtBlockIDInternalError
 		backend, err := New(params)
 		suite.Require().NoError(err)
 
-		ctx := context.Background()
+		expectedError := errors.New("runtime-error")
+		invalidSnapshot := invalid.NewSnapshot(expectedError)
+
+		// inject signaler context into the context used within the backend
+		ctx := rpcContextExpectError(suite.T(), context.Background(), fmt.Errorf("critical unexpected error querying snapshot: %w", expectedError))
+
 		newBlock := unittest.BlockFixture()
 
-		expectedError := errors.New("runtime-error")
-		suite.state.On("AtBlockID", newBlock.ID()).Return(invalid.NewSnapshot(expectedError))
+		suite.state.On("AtBlockID", newBlock.ID()).Return(invalidSnapshot)
 
 		// query the handler for the snapshot
 		snapshotBytes, err := backend.GetProtocolStateSnapshotByBlockID(ctx, newBlock.ID())
 		suite.Require().Nil(snapshotBytes)
 		suite.Require().Error(err)
-		suite.Require().ErrorAs(err, &expectedError)
-		suite.Require().Equal(codes.Internal, status.Code(err))
+		// mock signaler context will assert that the error is thrown
+
 		suite.assertAllExpectations()
 	})
 }
@@ -533,7 +550,9 @@ func (suite *Suite) TestGetProtocolStateSnapshotByBlockID_BlockNotFinalizedAtHei
 		// create a new block with root block as parent
 		newBlock := unittest.BlockWithParentFixture(rootBlock)
 		newBlock.SetPayload(unittest.PayloadFixture(unittest.WithProtocolStateID(rootProtocolStateID)))
-		ctx := context.Background()
+
+		ctx := rpcContext(suite.T(), context.Background())
+
 		// add new block to the chain state
 		err = state.Extend(ctx, newBlock)
 		suite.Require().NoError(err)
@@ -545,8 +564,7 @@ func (suite *Suite) TestGetProtocolStateSnapshotByBlockID_BlockNotFinalizedAtHei
 		// query the handler for the snapshot for non finalized block
 		snapshotBytes, err := backend.GetProtocolStateSnapshotByBlockID(ctx, newBlock.ID())
 		suite.Require().Nil(snapshotBytes)
-		suite.Require().Error(err)
-		suite.Require().Equal(codes.FailedPrecondition, status.Code(err))
+		suite.Require().True(access.IsPreconditionFailedError(err))
 		suite.assertAllExpectations()
 	})
 }
@@ -574,7 +592,8 @@ func (suite *Suite) TestGetProtocolStateSnapshotByBlockID_DifferentBlockFinalize
 		finalizedBlock.SetPayload(unittest.PayloadFixture(unittest.WithProtocolStateID(rootProtocolStateID)))
 		orphanBlock := unittest.BlockWithParentFixture(rootBlock)
 		orphanBlock.SetPayload(unittest.PayloadFixture(unittest.WithProtocolStateID(rootProtocolStateID)))
-		ctx := context.Background()
+
+		ctx := rpcContext(suite.T(), context.Background())
 
 		// add new block to the chain state
 		err = state.Extend(ctx, finalizedBlock)
@@ -596,8 +615,7 @@ func (suite *Suite) TestGetProtocolStateSnapshotByBlockID_DifferentBlockFinalize
 		// query the handler for the snapshot for non finalized block
 		snapshotBytes, err := backend.GetProtocolStateSnapshotByBlockID(ctx, orphanBlock.ID())
 		suite.Require().Nil(snapshotBytes)
-		suite.Require().Error(err)
-		suite.Require().Equal(codes.InvalidArgument, status.Code(err))
+		suite.Require().True(access.IsInvalidRequestError(err))
 		suite.assertAllExpectations()
 	})
 }
@@ -623,22 +641,22 @@ func (suite *Suite) TestGetProtocolStateSnapshotByBlockID_UnexpectedErrorBlockID
 		// create a new block with root block as parent
 		newBlock := unittest.BlockWithParentFixture(rootBlock)
 		newBlock.SetPayload(unittest.PayloadFixture(unittest.WithProtocolStateID(rootProtocolStateID)))
-		ctx := context.Background()
+
+		expectedError := errors.New("unexpected error")
+		ctx := rpcContextExpectError(suite.T(), context.Background(), expectedError)
+
 		// add new block to the chain state
 		err = state.Extend(ctx, newBlock)
 		suite.Require().NoError(err)
 
 		// since block was added to the block tree it must be queryable by block ID
 		suite.state.On("AtBlockID", newBlock.ID()).Return(state.AtBlockID(newBlock.ID()))
-		// expectedError := errors.New("runtime-error")
-		suite.headers.On("BlockIDByHeight", newBlock.Header.Height).Return(flow.ZeroID,
-			status.Errorf(codes.Internal, "failed to lookup block id by height %d", newBlock.Header.Height))
+		suite.headers.On("BlockIDByHeight", newBlock.Header.Height).Return(flow.ZeroID, expectedError)
 
 		// query the handler for the snapshot
 		snapshotBytes, err := backend.GetProtocolStateSnapshotByBlockID(ctx, newBlock.ID())
 		suite.Require().Nil(snapshotBytes)
 		suite.Require().Error(err)
-		suite.Require().Equal(codes.Internal, status.Code(err))
 		suite.assertAllExpectations()
 	})
 }
@@ -660,6 +678,8 @@ func (suite *Suite) TestGetProtocolStateSnapshotByBlockID_InvalidSegment() {
 		// get heights of each phase in built epochs
 		epoch1, ok := epochBuilder.EpochHeights(1)
 		require.True(suite.T(), ok)
+
+		ctx := rpcContext(suite.T(), context.Background())
 
 		// setup AtBlockID and AtHeight mock returns for State
 		for _, height := range epoch1.Range() {
@@ -685,12 +705,12 @@ func (suite *Suite) TestGetProtocolStateSnapshotByBlockID_InvalidSegment() {
 			suite.Require().NoError(err)
 
 			suite.T().Run("ByBlockID", func(t *testing.T) {
-				bytes, err := backend.GetProtocolStateSnapshotByBlockID(context.Background(), block.ID())
+				bytes, err := backend.GetProtocolStateSnapshotByBlockID(ctx, block.ID())
 				suite.Require().NoError(err)
 				suite.Require().Equal(expectedSnapshotBytes, bytes)
 			})
 			suite.T().Run("ByHeight", func(t *testing.T) {
-				bytes, err := backend.GetProtocolStateSnapshotByHeight(context.Background(), block.Height)
+				bytes, err := backend.GetProtocolStateSnapshotByHeight(ctx, block.Height)
 				suite.Require().NoError(err)
 				suite.Require().Equal(expectedSnapshotBytes, bytes)
 			})
@@ -713,12 +733,12 @@ func (suite *Suite) TestGetProtocolStateSnapshotByBlockID_InvalidSegment() {
 			suite.Require().NoError(err)
 
 			suite.T().Run("ByBlockID", func(t *testing.T) {
-				bytes, err := backend.GetProtocolStateSnapshotByBlockID(context.Background(), block.ID())
+				bytes, err := backend.GetProtocolStateSnapshotByBlockID(ctx, block.ID())
 				suite.Require().NoError(err)
 				suite.Require().Equal(expectedSnapshotBytes, bytes)
 			})
 			suite.T().Run("ByHeight", func(t *testing.T) {
-				bytes, err := backend.GetProtocolStateSnapshotByHeight(context.Background(), block.Height)
+				bytes, err := backend.GetProtocolStateSnapshotByHeight(ctx, block.Height)
 				suite.Require().NoError(err)
 				suite.Require().Equal(expectedSnapshotBytes, bytes)
 			})
@@ -758,8 +778,10 @@ func (suite *Suite) TestGetProtocolStateSnapshotByHeight() {
 		backend, err := New(params)
 		suite.Require().NoError(err)
 
+		ctx := rpcContext(suite.T(), context.Background())
+
 		// query the handler for the latest finalized snapshot
-		bytes, err := backend.GetProtocolStateSnapshotByHeight(context.Background(), epoch1.Range()[2])
+		bytes, err := backend.GetProtocolStateSnapshotByHeight(ctx, epoch1.Range()[2])
 		suite.Require().NoError(err)
 
 		// we expect the endpoint to return the snapshot at the same height we requested
@@ -783,7 +805,9 @@ func (suite *Suite) TestGetProtocolStateSnapshotByHeight_NonFinalizedBlocks() {
 		// create a new block with root block as parent
 		newBlock := unittest.BlockWithParentFixture(rootBlock)
 		newBlock.SetPayload(unittest.PayloadFixture(unittest.WithProtocolStateID(rootProtocolStateID)))
-		ctx := context.Background()
+
+		ctx := rpcContext(suite.T(), context.Background())
+
 		// add new block to the chain state
 		err = state.Extend(ctx, newBlock)
 		suite.Require().NoError(err)
@@ -798,19 +822,16 @@ func (suite *Suite) TestGetProtocolStateSnapshotByHeight_NonFinalizedBlocks() {
 		suite.Require().NoError(err)
 
 		// query the handler for the snapshot for non finalized block
-		bytes, err := backend.GetProtocolStateSnapshotByHeight(context.Background(), newBlock.Header.Height)
+		bytes, err := backend.GetProtocolStateSnapshotByHeight(ctx, newBlock.Header.Height)
 
 		suite.Require().Nil(bytes)
-		suite.Require().Error(err)
-		suite.Require().Equal(status.Errorf(codes.NotFound, "failed to find snapshot: %v",
-			realstate.ErrUnknownSnapshotReference).Error(),
-			err.Error())
+		suite.Require().True(access.IsDataNotFoundError(err))
+		suite.Require().ErrorIs(err, realstate.ErrUnknownSnapshotReference)
 	})
 }
 
 func (suite *Suite) TestGetLatestSealedBlockHeader() {
 	// setup the mocks
-	suite.state.On("Sealed").Return(suite.snapshot, nil).Maybe()
 	suite.state.On("Sealed").Return(suite.snapshot, nil)
 
 	params := suite.defaultBackendParams()
@@ -818,12 +839,14 @@ func (suite *Suite) TestGetLatestSealedBlockHeader() {
 	backend, err := New(params)
 	suite.Require().NoError(err)
 
+	ctx := rpcContext(suite.T(), context.Background())
+
 	suite.Run("GetLatestSealedBlockHeader - happy path", func() {
 		block := unittest.BlockHeaderFixture()
 		suite.snapshot.On("Head").Return(block, nil).Once()
 
 		// query the handler for the latest sealed block
-		header, stat, err := backend.GetLatestBlockHeader(context.Background(), true)
+		header, stat, err := backend.GetLatestBlockHeader(ctx, true)
 		suite.Require().NoError(err)
 		suite.Require().NotNil(header)
 
@@ -837,17 +860,16 @@ func (suite *Suite) TestGetLatestSealedBlockHeader() {
 	})
 
 	// tests that signaler context received error when node state is inconsistent
-	suite.Run("GetLatestSealedBlockHeader - fails with inconsistent node's state", func() {
-		err := fmt.Errorf("inconsistent node's state")
+	suite.Run("GetLatestSealedBlockHeader - fails with inconsistent node state", func() {
+		err := fmt.Errorf("inconsistent node state")
 		suite.snapshot.On("Head").Return(nil, err)
 
 		// mock signaler context expect an error
-		signCtxErr := irrecoverable.NewExceptionf("failed to lookup sealed header: %w", err)
-		signalerCtx := irrecoverable.WithSignalerContext(context.Background(),
-			irrecoverable.NewMockSignalerContextExpectError(suite.T(), context.Background(), signCtxErr))
+		signCtxErr := fmt.Errorf("failed to lookup latest sealed header: %w", err)
+		signalerCtx := rpcContextExpectError(suite.T(), context.Background(), signCtxErr)
 
 		actualHeader, actualStatus, err := backend.GetLatestBlockHeader(signalerCtx, true)
-		suite.Require().Error(err)
+		suite.Require().Equal(err.Error(), irrecoverable.NewExceptionf(signCtxErr.Error()).Error()) // can't use ErrorIs because NewExceptionf does not allow unwrapping
 		suite.Require().Nil(actualHeader)
 		suite.Require().Equal(flow.BlockStatusUnknown, actualStatus)
 	})
@@ -869,7 +891,9 @@ func (suite *Suite) TestGetTransaction() {
 	backend, err := New(params)
 	suite.Require().NoError(err)
 
-	actual, err := backend.GetTransaction(context.Background(), transaction.ID())
+	ctx := rpcContext(suite.T(), context.Background())
+
+	actual, err := backend.GetTransaction(ctx, transaction.ID())
 	suite.Require().NoError(err)
 	suite.Require().NotNil(actual)
 
@@ -893,7 +917,9 @@ func (suite *Suite) TestGetCollection() {
 	backend, err := New(params)
 	suite.Require().NoError(err)
 
-	actual, err := backend.GetCollectionByID(context.Background(), expected.ID())
+	ctx := rpcContext(suite.T(), context.Background())
+
+	actual, err := backend.GetCollectionByID(ctx, expected.ID())
 	suite.transactions.AssertExpectations(suite.T())
 	suite.Require().NoError(err)
 	suite.Require().NotNil(actual)
@@ -906,7 +932,8 @@ func (suite *Suite) TestGetCollection() {
 func (suite *Suite) TestGetTransactionResultByIndex() {
 	suite.state.On("Sealed").Return(suite.snapshot, nil).Maybe()
 
-	ctx := context.Background()
+	ctx := rpcContext(suite.T(), context.Background())
+
 	block := unittest.BlockFixture()
 	blockId := block.ID()
 	index := uint32(0)
@@ -953,14 +980,13 @@ func (suite *Suite) TestGetTransactionResultByIndex() {
 	})
 
 	// tests that signaler context received error when node state is inconsistent
-	suite.Run("TestGetTransactionResultByIndex - fails with inconsistent node's state", func() {
-		err := fmt.Errorf("inconsistent node's state")
+	suite.Run("TestGetTransactionResultByIndex - fails with inconsistent node state", func() {
+		err := fmt.Errorf("inconsistent node state")
 		suite.snapshot.On("Head").Return(nil, err).Once()
 
 		// mock signaler context expect an error
 		signCtxErr := irrecoverable.NewExceptionf("failed to lookup sealed header: %w", err)
-		signalerCtx := irrecoverable.WithSignalerContext(context.Background(),
-			irrecoverable.NewMockSignalerContextExpectError(suite.T(), context.Background(), signCtxErr))
+		signalerCtx := rpcContextExpectError(suite.T(), context.Background(), signCtxErr)
 
 		actual, err := backend.GetTransactionResultByIndex(signalerCtx, blockId, index, entitiesproto.EventEncodingVersion_JSON_CDC_V0)
 		suite.Require().Error(err)
@@ -971,7 +997,7 @@ func (suite *Suite) TestGetTransactionResultByIndex() {
 func (suite *Suite) TestGetTransactionResultsByBlockID() {
 	suite.state.On("Sealed").Return(suite.snapshot, nil).Maybe()
 
-	ctx := context.Background()
+	ctx := rpcContext(suite.T(), context.Background())
 
 	block := unittest.BlockFixture()
 	sporkRootBlockHeight := suite.state.Params().SporkRootBlockHeight()
@@ -1019,14 +1045,13 @@ func (suite *Suite) TestGetTransactionResultsByBlockID() {
 	})
 
 	// tests that signaler context received error when node state is inconsistent
-	suite.Run("GetTransactionResultsByBlockID - fails with inconsistent node's state", func() {
-		err := fmt.Errorf("inconsistent node's state")
+	suite.Run("GetTransactionResultsByBlockID - fails with inconsistent node state", func() {
+		err := fmt.Errorf("inconsistent node state")
 		suite.snapshot.On("Head").Return(nil, err).Once()
 
 		// mock signaler context expect an error
 		signCtxErr := irrecoverable.NewExceptionf("failed to lookup sealed header: %w", err)
-		signalerCtx := irrecoverable.WithSignalerContext(context.Background(),
-			irrecoverable.NewMockSignalerContextExpectError(suite.T(), context.Background(), signCtxErr))
+		signalerCtx := rpcContextExpectError(suite.T(), context.Background(), signCtxErr)
 
 		actual, err := backend.GetTransactionResultsByBlockID(signalerCtx, blockId, entitiesproto.EventEncodingVersion_JSON_CDC_V0)
 		suite.Require().Error(err)
@@ -1039,7 +1064,7 @@ func (suite *Suite) TestGetTransactionResultsByBlockID() {
 func (suite *Suite) TestTransactionStatusTransition() {
 	suite.state.On("Sealed").Return(suite.snapshot, nil).Maybe()
 
-	ctx := context.Background()
+	ctx := rpcContext(suite.T(), context.Background())
 	collection := unittest.CollectionFixture(1)
 	transactionBody := collection.Transactions[0]
 	block := unittest.BlockFixture()
@@ -1159,7 +1184,8 @@ func (suite *Suite) TestTransactionExpiredStatusTransition() {
 	suite.state.On("Sealed").Return(suite.snapshot, nil).Maybe()
 	suite.state.On("Final").Return(suite.snapshot, nil).Maybe()
 
-	ctx := context.Background()
+	ctx := rpcContext(suite.T(), context.Background())
+
 	collection := unittest.CollectionFixture(1)
 	transactionBody := collection.Transactions[0]
 	block := unittest.BlockFixture()
@@ -1260,7 +1286,8 @@ func (suite *Suite) TestTransactionExpiredStatusTransition() {
 
 // TestTransactionPendingToFinalizedStatusTransition tests that the status of transaction changes from Finalized to Expired
 func (suite *Suite) TestTransactionPendingToFinalizedStatusTransition() {
-	ctx := context.Background()
+	ctx := rpcContext(suite.T(), context.Background())
+
 	collection := unittest.CollectionFixture(1)
 	transactionBody := collection.Transactions[0]
 	// block which will eventually contain the transaction
@@ -1385,7 +1412,7 @@ func (suite *Suite) TestTransactionPendingToFinalizedStatusTransition() {
 // TestTransactionResultUnknown tests that the status of transaction is reported as unknown when it is not found in the
 // local storage
 func (suite *Suite) TestTransactionResultUnknown() {
-	ctx := context.Background()
+	ctx := rpcContext(suite.T(), context.Background())
 	txID := unittest.IdentifierFixture()
 
 	// transaction storage returns an error
@@ -1408,8 +1435,7 @@ func (suite *Suite) TestTransactionResultUnknown() {
 }
 
 func (suite *Suite) TestGetLatestFinalizedBlock() {
-	suite.state.On("Sealed").Return(suite.snapshot, nil).Maybe()
-	suite.state.On("Final").Return(suite.snapshot, nil).Maybe()
+	suite.state.On("Final").Return(suite.snapshot, nil)
 
 	params := suite.defaultBackendParams()
 
@@ -1429,10 +1455,12 @@ func (suite *Suite) TestGetLatestFinalizedBlock() {
 			On("ByHeight", header.Height).
 			Return(&expected, nil)
 
+		ctx := rpcContext(suite.T(), context.Background())
+
 		// query the handler for the latest finalized header
-		actual, stat, err := backend.GetLatestBlock(context.Background(), false)
+		actual, stat, err := backend.GetLatestBlock(ctx, false)
 		suite.Require().NoError(err)
-		suite.Require().NotNil(actual)
+		suite.Require().NotNil(header)
 
 		// make sure we got the latest header
 		suite.Require().Equal(expected, *actual)
@@ -1442,14 +1470,13 @@ func (suite *Suite) TestGetLatestFinalizedBlock() {
 	})
 
 	// tests that signaler context received error when node state is inconsistent
-	suite.Run("GetLatestFinalizedBlock - fails with inconsistent node's state", func() {
-		err := fmt.Errorf("inconsistent node's state")
+	suite.Run("GetLatestFinalizedBlock - fails with inconsistent node state", func() {
+		err := fmt.Errorf("inconsistent node state")
 		suite.snapshot.On("Head").Return(nil, err)
 
 		// mock signaler context expect an error
-		signCtxErr := irrecoverable.NewExceptionf("failed to lookup final header: %w", err)
-		signalerCtx := irrecoverable.WithSignalerContext(context.Background(),
-			irrecoverable.NewMockSignalerContextExpectError(suite.T(), context.Background(), signCtxErr))
+		signCtxErr := fmt.Errorf("failed to lookup latest finalize header: %w", err)
+		signalerCtx := rpcContextExpectError(suite.T(), context.Background(), signCtxErr)
 
 		actualBlock, actualStatus, err := backend.GetLatestBlock(signalerCtx, false)
 		suite.Require().Error(err)
@@ -1472,7 +1499,7 @@ func (suite *Suite) TestGetExecutionResultByID() {
 	executionResult := unittest.ExecutionResultFixture(
 		unittest.WithExecutionResultBlockID(blockID))
 
-	ctx := context.Background()
+	ctx := rpcContext(suite.T(), context.Background())
 
 	results := new(storagemock.ExecutionResults)
 	results.
@@ -1535,7 +1562,7 @@ func (suite *Suite) TestGetExecutionResultByBlockID() {
 		unittest.WithExecutionResultBlockID(blockID),
 		unittest.WithServiceEvents(2))
 
-	ctx := context.Background()
+	ctx := rpcContext(suite.T(), context.Background())
 
 	nonexistingBlockID := unittest.IdentifierFixture()
 
@@ -1622,7 +1649,9 @@ func (suite *Suite) TestGetNodeVersionInfo() {
 		backend, err := New(params)
 		suite.Require().NoError(err)
 
-		actual, err := backend.GetNodeVersionInfo(context.Background())
+		ctx := rpcContext(suite.T(), context.Background())
+
+		actual, err := backend.GetNodeVersionInfo(ctx)
 		suite.Require().NoError(err)
 
 		suite.Require().Equal(expected, actual)
@@ -1688,8 +1717,11 @@ func (suite *Suite) TestGetNodeVersionInfo() {
 
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
+
+		ctxSignaler := irrecoverable.NewMockSignalerContext(suite.T(), ctx)
+
 		// Start the VersionControl component.
-		suite.versionControl.Start(irrecoverable.NewMockSignalerContext(suite.T(), ctx))
+		suite.versionControl.Start(ctxSignaler)
 		unittest.RequireComponentsReadyBefore(suite.T(), 2*time.Second, suite.versionControl)
 
 		expected := &accessmodel.NodeVersionInfo{
@@ -1729,7 +1761,9 @@ func (suite *Suite) TestGetNetworkParameters() {
 	backend, err := New(params)
 	suite.Require().NoError(err)
 
-	actual := backend.GetNetworkParameters(context.Background())
+	ctx := rpcContext(suite.T(), context.Background())
+
+	actual := backend.GetNetworkParameters(ctx)
 
 	suite.Require().Equal(expectedChainID, actual.ChainID)
 }
@@ -1738,7 +1772,7 @@ func (suite *Suite) TestGetNetworkParameters() {
 func (suite *Suite) TestGetTransactionResultEventEncodingVersion() {
 	suite.state.On("Sealed").Return(suite.snapshot, nil).Maybe()
 
-	ctx := context.Background()
+	ctx := rpcContext(suite.T(), context.Background())
 
 	collection := unittest.CollectionFixture(1)
 	transactionBody := collection.Transactions[0]
@@ -1824,7 +1858,7 @@ func (suite *Suite) TestGetTransactionResultEventEncodingVersion() {
 func (suite *Suite) TestGetTransactionResultByIndexAndBlockIdEventEncodingVersion() {
 	suite.state.On("Sealed").Return(suite.snapshot, nil).Maybe()
 
-	ctx := context.Background()
+	ctx := rpcContext(suite.T(), context.Background())
 	block := unittest.BlockFixture()
 	blockId := block.ID()
 	index := uint32(0)
@@ -1926,7 +1960,7 @@ func (suite *Suite) TestNodeCommunicator() {
 	suite.state.On("Sealed").Return(suite.snapshot, nil).Maybe()
 	suite.snapshot.On("Head").Return(head, nil).Maybe()
 
-	ctx := context.Background()
+	ctx := rpcContext(suite.T(), context.Background())
 	block := unittest.BlockFixture()
 	blockId := block.ID()
 
@@ -2124,4 +2158,18 @@ func (suite *Suite) TestResolveHeightError() {
 			}
 		})
 	}
+}
+
+// rpcContext creates a context with a mock signaler context injected that requires no irrecoverable
+// errors to be thrown
+func rpcContext(t *testing.T, ctx context.Context) context.Context {
+	ctxSignaler := irrecoverable.NewMockSignalerContext(t, context.Background())
+	return irrecoverable.WithSignalerContext(ctx, ctxSignaler)
+}
+
+// rpcContextExpectError creates a context with a mock signaler context injected that requires the
+// provided error to be thrown
+func rpcContextExpectError(t *testing.T, ctx context.Context, expectedError error) context.Context {
+	ctxSignaler := irrecoverable.NewMockSignalerContextExpectError(t, ctx, expectedError)
+	return irrecoverable.WithSignalerContext(ctx, ctxSignaler)
 }
