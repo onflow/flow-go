@@ -4,16 +4,10 @@ import (
 	"github.com/jordanschalm/lockctx"
 
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/storage/badger/transaction"
 )
 
 // Blocks represents persistent storage for blocks.
 type Blocks interface {
-
-	// StoreTx allows us to store a new block, including its payload & header, as part of a DB transaction, while
-	// still going through the caching layer.
-	// Deprecated: to be removed alongside Badger DB
-	StoreTx(block *flow.Block) func(*transaction.Tx) error
 
 	// BatchStore stores a valid block in a batch.
 	BatchStore(lctx lockctx.Proof, rw ReaderBatchWriter, block *flow.Block) error

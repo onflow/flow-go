@@ -7,7 +7,6 @@ import (
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/storage"
-	"github.com/onflow/flow-go/storage/badger/transaction"
 	"github.com/onflow/flow-go/storage/operation"
 )
 
@@ -39,10 +38,6 @@ func NewQuorumCertificates(collector module.CacheMetrics, db storage.DB, cacheSi
 			withStoreWithLock(storeWithLock),
 			withRetrieve(retrieve)),
 	}
-}
-
-func (q *QuorumCertificates) StoreTx(qc *flow.QuorumCertificate) func(*transaction.Tx) error {
-	panic("not implemented")
 }
 
 // BatchStore stores a Quorum Certificate as part of database batch update. QC is indexed by QC.BlockID.

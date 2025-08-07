@@ -7,7 +7,6 @@ import (
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/storage"
-	"github.com/onflow/flow-go/storage/badger/transaction"
 	"github.com/onflow/flow-go/storage/operation"
 )
 
@@ -28,11 +27,6 @@ func NewBlocks(db storage.DB, headers *Headers, payloads *Payloads) *Blocks {
 		payloads: payloads,
 	}
 	return b
-}
-
-// TODO: to be removed
-func (b *Blocks) StoreTx(block *flow.Block) func(*transaction.Tx) error {
-	panic("StoreTx is deprecated, use BatchStore instead")
 }
 
 // BatchStore stores a valid block in a batch.
