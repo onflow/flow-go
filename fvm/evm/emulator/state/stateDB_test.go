@@ -88,12 +88,20 @@ func TestStateDB(t *testing.T) {
 		ret = db.GetCommittedState(addr1, key1)
 		require.Equal(t, gethCommon.Hash{}, ret)
 
+		currentState, originalState := db.GetStateAndCommittedState(addr1, key1)
+		require.Equal(t, value1, currentState)
+		require.Equal(t, gethCommon.Hash{}, originalState)
+
 		commit, err := db.Commit(true)
 		require.NoError(t, err)
 		require.NotEmpty(t, commit)
 
 		ret = db.GetCommittedState(addr1, key1)
 		require.Equal(t, value1, ret)
+
+		currentState, originalState = db.GetStateAndCommittedState(addr1, key1)
+		require.Equal(t, value1, currentState)
+		require.Equal(t, value1, originalState)
 
 		// create a new db
 		db, err = state.NewStateDB(ledger, rootAddr)
@@ -106,6 +114,10 @@ func TestStateDB(t *testing.T) {
 		val := db.GetState(addr1, key1)
 		require.NoError(t, db.Error())
 		require.Equal(t, value1, val)
+
+		currentState, originalState = db.GetStateAndCommittedState(addr1, key1)
+		require.Equal(t, value1, currentState)
+		require.Equal(t, value1, originalState)
 	})
 
 	t.Run("test snapshot and revert functionality", func(t *testing.T) {

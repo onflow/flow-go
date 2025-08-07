@@ -6,7 +6,7 @@ import (
 
 	"github.com/rs/zerolog"
 
-	"github.com/onflow/flow-go/engine/access/rpc/backend/transactions/error_message_provider"
+	"github.com/onflow/flow-go/engine/access/rpc/backend/transactions/error_messages"
 	commonrpc "github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/model/flow"
@@ -21,7 +21,7 @@ import (
 type TxErrorMessagesCore struct {
 	log zerolog.Logger // used to log relevant actions with context
 
-	txErrorMessageProvider         error_message_provider.TxErrorMessageProvider
+	txErrorMessageProvider         error_messages.Provider
 	transactionResultErrorMessages storage.TransactionResultErrorMessages
 	execNodeIdentitiesProvider     *commonrpc.ExecutionNodeIdentitiesProvider
 }
@@ -29,7 +29,7 @@ type TxErrorMessagesCore struct {
 // NewTxErrorMessagesCore creates a new instance of TxErrorMessagesCore.
 func NewTxErrorMessagesCore(
 	log zerolog.Logger,
-	txErrorMessageProvider error_message_provider.TxErrorMessageProvider,
+	txErrorMessageProvider error_messages.Provider,
 	transactionResultErrorMessages storage.TransactionResultErrorMessages,
 	execNodeIdentitiesProvider *commonrpc.ExecutionNodeIdentitiesProvider,
 ) *TxErrorMessagesCore {
