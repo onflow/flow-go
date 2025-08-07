@@ -325,6 +325,10 @@ func (bl *BlockView) newProcedure() (*procedure, error) {
 		cfg.EVMConfig,
 	)
 	evm.SetTxContext(*cfg.TxContext)
+	// inject the applicable precompiled contracts for the current
+	// chain rules, as well as any extra precompiled contracts,
+	// such as Cadence Arch etc
+	evm.SetPrecompiles(cfg.PrecompiledContracts)
 
 	return &procedure{
 		config: cfg,
