@@ -17,7 +17,7 @@ func TestSporkRootBlockID_InsertRetrieve(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 		sporkRootBlockID := unittest.IdentifierFixture()
 
-		err := db.Update(InsertSporkRootBlockID(sporkRootBlockID))
+		err := db.Update(IndexSporkRootBlock(sporkRootBlockID))
 		require.NoError(t, err)
 
 		var actual flow.Identifier
