@@ -3,7 +3,7 @@ package state_test
 import (
 	"testing"
 
-	"github.com/onflow/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/fvm/evm/emulator/state"

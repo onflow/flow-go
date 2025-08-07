@@ -3,8 +3,8 @@ package types_test
 import (
 	"testing"
 
-	gethTypes "github.com/onflow/go-ethereum/core/types"
-	gethTrie "github.com/onflow/go-ethereum/trie"
+	gethTypes "github.com/ethereum/go-ethereum/core/types"
+	gethTrie "github.com/ethereum/go-ethereum/trie"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/fvm/evm/testutils"
