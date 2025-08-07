@@ -256,6 +256,17 @@ func (db *StateDB) GetCommittedState(addr gethCommon.Address, key gethCommon.Has
 	return value
 }
 
+// GetStateAndCommittedState returns the current value and the original value.
+func (db *StateDB) GetStateAndCommittedState(
+	addr gethCommon.Address,
+	key gethCommon.Hash,
+) (gethCommon.Hash, gethCommon.Hash) {
+	origin := db.GetCommittedState(addr, key)
+	value := db.GetState(addr, key)
+
+	return value, origin
+}
+
 // GetState returns the value for the given storage slot
 func (db *StateDB) GetState(addr gethCommon.Address, key gethCommon.Hash) gethCommon.Hash {
 	state, err := db.latestView().GetState(types.SlotAddress{Address: addr, Key: key})
