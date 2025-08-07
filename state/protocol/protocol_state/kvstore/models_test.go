@@ -495,5 +495,5 @@ func TestNewKVStore_UnsupportedVersion(t *testing.T) {
 
 	require.Error(t, err)
 	require.Nil(t, store)
-	require.Contains(t, err.Error(), "unsupported protocol state version", "unexpected error message")
+	require.Contains(t, err.Error(), "unsupported protocol state version")
 }
