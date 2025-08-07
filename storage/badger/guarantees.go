@@ -51,10 +51,10 @@ func NewGuarantees(
 
 	// While a collection guarantee can only be present once in the finalized chain,
 	// across different consensus forks we may encounter the same guarantee multiple times.
-	// There is a 1:1 correspondence between CollectionGuarantees and Collections, since
-	// each collection is produced only by one cluster, and the guarantee produced for that collection
-	// when it is finalized by the collector nodes is unique.
-	// Therefore it's safe to ignore duplicates when updating the CollectionID->GuaranteeID index.
+	// On the happy path there is a 1:1 correspondence between CollectionGuarantees and Collections.
+	// However, the finalization status of guarantees is not yet verified by consensus nodes,
+	// nor is the possibility of byzantine collection nodes dealt with, so we check here that
+	// there are no conflicting guarantees for the same collection.
 	indexByCollectionID := func(collID flow.Identifier, guaranteeID flow.Identifier) func(*transaction.Tx) error {
 		return func(tx *transaction.Tx) error {
 			err := transaction.WithTx(operation.IndexGuarantee(collID, guaranteeID))(tx)
