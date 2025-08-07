@@ -599,8 +599,8 @@ func CollectionGuaranteeFixture(options ...func(*flow.CollectionGuarantee)) *flo
 	guarantee := &flow.CollectionGuarantee{
 		CollectionID:     IdentifierFixture(),
 		ReferenceBlockID: IdentifierFixture(),
-		SignerIndices:    RandomBytes(16),
 		ClusterChainID:   flow.ChainID("cluster-1-00000000"),
+		SignerIndices:    RandomBytes(16),
 		Signature:        SignatureFixture(),
 	}
 	for _, option := range options {
