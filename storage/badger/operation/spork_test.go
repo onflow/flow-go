@@ -11,9 +11,9 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-// TestSporkRootBlock_InsertRetrieve verifies that a spork root block can be
-// correctly inserted into and retrieved from the Badger database.
-func TestSporkRootBlockID_InsertRetrieve(t *testing.T) {
+// TestSporkRootBlock_IndexRetrieve verifies that a spork root block can be
+// correctly indexed and retrieved from the Badger database.
+func TestSporkRootBlockID_IndexRetrieve(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 		sporkRootBlockID := unittest.IdentifierFixture()
 
