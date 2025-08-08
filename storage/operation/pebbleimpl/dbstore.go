@@ -26,6 +26,7 @@ func (b *dbStore) NewBatch() storage.Batch {
 	return NewReaderBatchWriter(b.db)
 }
 
+// No errors are expected during normal operation.
 func (b *dbStore) Close() error {
 	return b.db.Close()
 }
