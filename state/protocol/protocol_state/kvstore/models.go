@@ -405,6 +405,7 @@ func NewDefaultKVStore(finalizationSafetyThreshold, epochExtensionViewCount uint
 }
 
 // NewKVStore constructs a key-value store for a particular Protocol State version for bootstrapping.
+// Caller must provide a supported version number, otherwise an exception is returned.
 func NewKVStore(
 	version uint64,
 	finalizationSafetyThreshold, epochExtensionViewCount uint64,

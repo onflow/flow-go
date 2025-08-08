@@ -453,7 +453,7 @@ func TestMalleability(t *testing.T) {
 	})
 }
 
-// TestNewKVStore_SupportedVersions verifies that supported versions (0 to 3)
+// TestNewKVStore_SupportedVersions verifies that supported versions
 // construct the expected key-value store without error.
 func TestNewKVStore_SupportedVersions(t *testing.T) {
 	safetyParams, err := protocol.DefaultEpochSafetyParams(flow.Localnet)
