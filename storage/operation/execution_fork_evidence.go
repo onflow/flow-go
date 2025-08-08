@@ -21,6 +21,12 @@ func RetrieveExecutionForkEvidence(r storage.Reader, conflictingSeals *[]*flow.I
 	return RetrieveByKey(r, MakePrefix(codeExecutionFork), conflictingSeals)
 }
 
+// RemoveExecutionForkEvidence deletes conflicting seals record from the database.
+// No errors are expected during normal operations.
+func RemoveExecutionForkEvidence(w storage.Writer) error {
+	return RemoveByKey(w, MakePrefix(codeExecutionFork))
+}
+
 // InsertExecutionForkEvidence upserts conflicting seals to the database.
 // If a record already exists, it is overwritten; otherwise a new record is created.
 // No errors are expected during normal operations.

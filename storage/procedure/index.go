@@ -2,15 +2,18 @@ package procedure
 
 import (
 	"fmt"
-	"sync"
+
+	"github.com/jordanschalm/lockctx"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/operation"
 )
 
-func InsertIndex(lock *sync.Mutex, rw storage.ReaderBatchWriter, blockID flow.Identifier, index *flow.Index) error {
-	rw.Lock(lock)
+func InsertIndex(lock lockctx.Proof, rw storage.ReaderBatchWriter, blockID flow.Identifier, index *flow.Index) error {
+	if !lock.HoldsLock(storage.LockInsertBlock) {
+		return fmt.Errorf("missing required lock: %s", storage.LockInsertBlock)
+	}
 
 	w := rw.Writer()
 	// TODO: Check if the blockID is already indexed

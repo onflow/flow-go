@@ -3,7 +3,8 @@ package procedure
 import (
 	"errors"
 	"fmt"
-	"sync"
+
+	"github.com/jordanschalm/lockctx"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/storage"
@@ -23,11 +24,10 @@ import (
 //     there are two special cases for (2):
 //     - if the parent block is zero, then we don't need to add this index.
 //     - if the parent block doesn't exist, then we will insert the child index instead of updating
-func IndexNewBlock(indexing *sync.Mutex, rw storage.ReaderBatchWriter, blockID flow.Identifier, parentID flow.Identifier) error {
-	indexing.Lock()
-	rw.AddCallback(func(error) {
-		indexing.Unlock()
-	})
+func IndexNewBlock(lctx lockctx.Proof, rw storage.ReaderBatchWriter, blockID flow.Identifier, parentID flow.Identifier) error {
+	if !lctx.HoldsLock(storage.LockInsertBlock) {
+		return fmt.Errorf("missing required lock: %s", storage.LockInsertBlock)
+	}
 
 	// Step 1: index the child for the new block.
 	// the new block has no child, so adding an empty child index for it
