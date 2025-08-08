@@ -1258,6 +1258,8 @@ func (suite *BuilderSuite) TestBuildOn_RateLimitDryRun() {
 	}
 }
 
+// TestBuildOn_SystemTxAlwaysIncluded tests that transaction made by a priority payer will always be included
+// in the collection, even if mempool has more transactions than the maximum collection size.
 func (suite *BuilderSuite) TestBuildOn_SystemTxAlwaysIncluded() {
 	// start with an empty mempool
 	suite.ClearPool()
