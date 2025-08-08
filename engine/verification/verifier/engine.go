@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/jordanschalm/lockctx"
 	"github.com/onflow/crypto"
 	"github.com/onflow/crypto/hash"
 	"github.com/rs/zerolog"
@@ -43,6 +44,7 @@ type Engine struct {
 	chVerif        module.ChunkVerifier       // used to verify chunks
 	spockHasher    hash.Hasher                // used for generating spocks
 	approvals      storage.ResultApprovals    // used to store result approvals
+	lockManager    lockctx.Manager
 }
 
 // New creates and returns a new instance of a verifier engine.
@@ -55,6 +57,7 @@ func New(
 	me module.Local,
 	chVerif module.ChunkVerifier,
 	approvals storage.ResultApprovals,
+	lockManager lockctx.Manager,
 ) (*Engine, error) {
 
 	e := &Engine{
@@ -68,6 +71,7 @@ func New(
 		approvalHasher: utils.NewResultApprovalHasher(),
 		spockHasher:    signature.NewBLSHasher(signature.SPOCKTag),
 		approvals:      approvals,
+		lockManager:    lockManager,
 	}
 
 	var err error
@@ -265,10 +269,13 @@ func (e *Engine) verify(ctx context.Context, originID flow.Identifier,
 
 	// Generate result approval
 	span, _ = e.tracer.StartSpanFromContext(ctx, trace.VERVerGenerateResultApproval)
-	attestation := &flow.Attestation{
+	attestation, err := flow.NewAttestation(flow.UntrustedAttestation{
 		BlockID:           vc.Header.ID(),
 		ExecutionResultID: vc.Result.ID(),
 		ChunkIndex:        vc.Chunk.Index,
+	})
+	if err != nil {
+		return fmt.Errorf("could not build attestation: %w", err)
 	}
 	approval, err := GenerateResultApproval(
 		e.me,
@@ -282,14 +289,9 @@ func (e *Engine) verify(ctx context.Context, originID flow.Identifier,
 		return fmt.Errorf("couldn't generate a result approval: %w", err)
 	}
 
-	err = e.approvals.Store(approval)
+	err = e.storeApproval(approval)
 	if err != nil {
 		return fmt.Errorf("could not store approval: %w", err)
-	}
-
-	err = e.approvals.Index(approval.Body.ExecutionResultID, approval.Body.ChunkIndex, approval.ID())
-	if err != nil {
-		return fmt.Errorf("could not index approval: %w", err)
 	}
 
 	// Extracting consensus node ids
@@ -310,6 +312,28 @@ func (e *Engine) verify(ctx context.Context, originID flow.Identifier,
 	log.Info().Msg("result approval submitted")
 	// increases number of sent result approvals for sake of metrics
 	e.metrics.OnResultApprovalDispatchedInNetworkByVerifier()
+
+	return nil
+}
+
+// storeApproval stores the result approval in the database.
+// No errors are expected during normal operations.
+// concurrency safe and guarantees that an approval for a result
+// is never overwritten by a different one
+func (e *Engine) storeApproval(approval *flow.ResultApproval) error {
+	lctx := e.lockManager.NewContext()
+	defer lctx.Release()
+
+	err := lctx.AcquireLock(storage.LockMyResultApproval)
+	if err != nil {
+		return fmt.Errorf("fail to acquire lock to insert result approval: %w", err)
+	}
+
+	// store the approval in the database
+	err = e.approvals.StoreMyApproval(lctx, approval)
+	if err != nil {
+		return fmt.Errorf("could not store result approval: %w", err)
+	}
 
 	return nil
 }
@@ -337,11 +361,14 @@ func GenerateResultApproval(
 	}
 
 	// result approval body
-	body := flow.ResultApprovalBody{
+	body, err := flow.NewResultApprovalBody(flow.UntrustedResultApprovalBody{
 		Attestation:          *attestation,
 		ApproverID:           me.NodeID(),
 		AttestationSignature: atstSign,
 		Spock:                spock,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("could not build result approval body: %w", err)
 	}
 
 	// generates a signature over result approval body
@@ -351,10 +378,15 @@ func GenerateResultApproval(
 		return nil, fmt.Errorf("could not sign result approval body: %w", err)
 	}
 
-	return &flow.ResultApproval{
-		Body:              body,
+	resultApproval, err := flow.NewResultApproval(flow.UntrustedResultApproval{
+		Body:              *body,
 		VerifierSignature: bodySign,
-	}, nil
+	})
+	if err != nil {
+		return nil, fmt.Errorf("could not build result approval: %w", err)
+	}
+
+	return resultApproval, nil
 }
 
 // verifiableChunkHandler acts as a wrapper around the verify method that captures its performance-related metrics

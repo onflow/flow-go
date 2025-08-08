@@ -12,12 +12,13 @@ type ComputationResult struct {
 	*flow.ExecutionReceipt
 }
 
+// NewEmptyComputationResult creates an empty ComputationResult.
+// Construction ComputationResult allowed only within the constructor.
 func NewEmptyComputationResult(
 	block *entity.ExecutableBlock,
-	versionAwareChunkConstructor flow.ChunkConstructor,
 ) *ComputationResult {
 	ber := NewPopulatedBlockExecutionResult(block)
-	aer := NewEmptyBlockAttestationResult(ber, versionAwareChunkConstructor)
+	aer := NewEmptyBlockAttestationResult(ber)
 	return &ComputationResult{
 		BlockExecutionResult:   ber,
 		BlockAttestationResult: aer,

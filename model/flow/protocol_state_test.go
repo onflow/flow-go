@@ -894,6 +894,102 @@ func TestBuildIdentityTable(t *testing.T) {
 	})
 }
 
+// TestNewEpochStateContainer tests the NewEpochStateContainer constructor with valid and invalid inputs.
+//
+// Valid Cases:
+//
+// 1. Valid input with all fields:
+//   - Should successfully construct an EpochStateContainer.
+//
+// 2. Valid input with zero CommitID and nil EpochExtensions:
+//   - Should successfully construct an EpochStateContainer.
+//
+// Invalid Cases:
+//
+// 3. Invalid input with zero SetupID:
+//   - Should return an error indicating SetupID must not be zero.
+//
+// 4. Invalid input with nil ActiveIdentities:
+//   - Should return an error indicating ActiveIdentities must not be nil.
+//
+// 5. Invalid input with unsorted ActiveIdentities:
+//   - Should return an error indicating ActiveIdentities are not sorted.
+func TestNewEpochStateContainer(t *testing.T) {
+	identities := unittest.DynamicIdentityEntryListFixture(3)
+	sortedIdentities := identities.Sort(flow.IdentifierCanonical)
+
+	// Copy and shuffle to ensure it's unsorted
+	unsortedIdentities := sortedIdentities.Copy()
+	unsortedIdentities[0], unsortedIdentities[1] = unsortedIdentities[1], unsortedIdentities[0]
+
+	// 1. Valid input with all fields
+	t.Run("valid input with all fields", func(t *testing.T) {
+		container, err := flow.NewEpochStateContainer(
+			flow.UntrustedEpochStateContainer{
+				SetupID:          unittest.IdentifierFixture(),
+				CommitID:         unittest.IdentifierFixture(),
+				ActiveIdentities: sortedIdentities,
+				EpochExtensions: []flow.EpochExtension{
+					{FirstView: 100, FinalView: 200},
+				},
+			},
+		)
+
+		require.NoError(t, err)
+		require.NotNil(t, container)
+	})
+
+	// 2. Valid input with zero CommitID and nil EpochExtensions
+	t.Run("valid input with zero CommitID and nil EpochExtensions", func(t *testing.T) {
+		container, err := flow.NewEpochStateContainer(
+			flow.UntrustedEpochStateContainer{
+				SetupID:          unittest.IdentifierFixture(),
+				CommitID:         flow.ZeroID,
+				ActiveIdentities: sortedIdentities,
+				EpochExtensions:  nil,
+			},
+		)
+
+		require.NoError(t, err)
+		require.NotNil(t, container)
+	})
+
+	// 3. Invalid input with zero SetupID
+	t.Run("invalid - zero SetupID", func(t *testing.T) {
+		_, err := flow.NewEpochStateContainer(
+			flow.UntrustedEpochStateContainer{
+				SetupID:          flow.ZeroID,
+				ActiveIdentities: sortedIdentities,
+			},
+		)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "SetupID must not be zero")
+	})
+
+	// 4. Invalid input with nil ActiveIdentities
+	t.Run("invalid - nil ActiveIdentities", func(t *testing.T) {
+		_, err := flow.NewEpochStateContainer(
+			flow.UntrustedEpochStateContainer{
+				SetupID: unittest.IdentifierFixture(),
+			},
+		)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "ActiveIdentities must not be nil")
+	})
+
+	// 5. Invalid input with unsorted ActiveIdentities
+	t.Run("invalid - unsorted ActiveIdentities", func(t *testing.T) {
+		_, err := flow.NewEpochStateContainer(
+			flow.UntrustedEpochStateContainer{
+				SetupID:          unittest.IdentifierFixture(),
+				ActiveIdentities: unsortedIdentities,
+			},
+		)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "ActiveIdentities are not sorted")
+	})
+}
+
 // TestNewMinEpochStateEntry validates the behavior of the NewMinEpochStateEntry constructor function.
 // It checks for correct handling of both valid and invalid inputs.
 //

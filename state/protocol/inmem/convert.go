@@ -196,8 +196,6 @@ func SnapshotFromBootstrapStateWithParams(
 //     that happened before should be reflected in the EpochSetup event. Specifically, ejected
 //     nodes should be no longer listed in the EpochSetup event.
 //     Hence, when the EpochSetup event is emitted / processed, the ejected flag is false for all epoch participants.
-//
-// No errors are expected during normal operation.
 func EpochProtocolStateFromServiceEvents(setup *flow.EpochSetup, commit *flow.EpochCommit) (*flow.MinEpochStateEntry, error) {
 	identities := make(flow.DynamicIdentityEntryList, 0, len(setup.Participants))
 	for _, identity := range setup.Participants {
@@ -206,14 +204,22 @@ func EpochProtocolStateFromServiceEvents(setup *flow.EpochSetup, commit *flow.Ep
 			Ejected: false,
 		})
 	}
+	currentEpoch, err := flow.NewEpochStateContainer(
+		flow.UntrustedEpochStateContainer{
+			SetupID:          setup.ID(),
+			CommitID:         commit.ID(),
+			ActiveIdentities: identities,
+			EpochExtensions:  nil,
+		},
+	)
+	if err != nil {
+		return nil, fmt.Errorf("could not construct current epoch state: %w", err)
+	}
+
 	return flow.NewMinEpochStateEntry(
 		flow.UntrustedMinEpochStateEntry{
-			PreviousEpoch: nil,
-			CurrentEpoch: flow.EpochStateContainer{
-				SetupID:          setup.ID(),
-				CommitID:         commit.ID(),
-				ActiveIdentities: identities,
-			},
+			PreviousEpoch:          nil,
+			CurrentEpoch:           *currentEpoch,
 			NextEpoch:              nil,
 			EpochFallbackTriggered: false,
 		},

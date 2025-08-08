@@ -152,20 +152,9 @@ func convertServiceEventEpochSetup(event flow.Event) (*flow.ServiceEvent, error)
 		return nil, fmt.Errorf("failed to decode EpochSetup event: %w", err)
 	}
 
-	setup := &flow.EpochSetup{
-		Counter:            uint64(counter),
-		FirstView:          uint64(firstView),
-		FinalView:          uint64(finalView),
-		DKGPhase1FinalView: uint64(dkgPhase1FinalView),
-		DKGPhase2FinalView: uint64(dkgPhase2FinalView),
-		DKGPhase3FinalView: uint64(dkgPhase3FinalView),
-		TargetDuration:     uint64(targetDuration),
-		TargetEndTime:      uint64(targetEndTimeUnix),
-	}
-
 	// random source from the event must be a hex string
 	// containing exactly 128 bits (equivalent to 16 bytes or 32 hex characters)
-	setup.RandomSource, err = hex.DecodeString(string(randomSrcHex))
+	randomSource, err := hex.DecodeString(string(randomSrcHex))
 	if err != nil {
 		return nil, fmt.Errorf(
 			"could not decode random source hex (%v): %w",
@@ -174,24 +163,34 @@ func convertServiceEventEpochSetup(event flow.Event) (*flow.ServiceEvent, error)
 		)
 	}
 
-	if len(setup.RandomSource) != flow.EpochSetupRandomSourceLength {
-		return nil, fmt.Errorf(
-			"random source in epoch setup event must be of (%d) bytes, got (%d)",
-			flow.EpochSetupRandomSourceLength,
-			len(setup.RandomSource),
-		)
-	}
-
 	// parse cluster assignments; returned assignments are in canonical order
-	setup.Assignments, err = convertClusterAssignments(cdcClusters.Values)
+	assignments, err := convertClusterAssignments(cdcClusters.Values)
 	if err != nil {
 		return nil, fmt.Errorf("could not convert cluster assignments: %w", err)
 	}
 
 	// parse epoch participants; returned node identities are in canonical order
-	setup.Participants, err = convertParticipants(cdcParticipants.Values)
+	participants, err := convertParticipants(cdcParticipants.Values)
 	if err != nil {
 		return nil, fmt.Errorf("could not convert participants: %w", err)
+	}
+	setup, err := flow.NewEpochSetup(
+		flow.UntrustedEpochSetup{
+			Counter:            uint64(counter),
+			FirstView:          uint64(firstView),
+			DKGPhase1FinalView: uint64(dkgPhase1FinalView),
+			DKGPhase2FinalView: uint64(dkgPhase2FinalView),
+			DKGPhase3FinalView: uint64(dkgPhase3FinalView),
+			FinalView:          uint64(finalView),
+			Participants:       participants,
+			Assignments:        assignments,
+			RandomSource:       randomSource,
+			TargetDuration:     uint64(targetDuration),
+			TargetEndTime:      uint64(targetEndTimeUnix),
+		},
+	)
+	if err != nil {
+		return nil, fmt.Errorf("could not construct epoch setup: %w", err)
 	}
 
 	// construct the service event
@@ -203,46 +202,12 @@ func convertServiceEventEpochSetup(event flow.Event) (*flow.ServiceEvent, error)
 	return serviceEvent, nil
 }
 
-// convertServiceEventEpochCommit is a wrapper function to support backward-compatible event parsing for [flow.EpochCommit] events.
-// It delegates to the version-specific conversion function based on the number of fields in the event.
-// TODO(EFM, #6794): Replace this function with the body of `convertServiceEventEpochCommitV1` once the network upgrade is complete.
-func convertServiceEventEpochCommit(event flow.Event) (*flow.ServiceEvent, error) {
-	// decode bytes using ccf
-	payload, err := ccf.Decode(nil, event.Payload)
-	if err != nil {
-		return nil, fmt.Errorf("could not unmarshal event payload: %w", err)
-	}
-
-	cdcEvent, ok := payload.(cadence.Event)
-	if !ok {
-		return nil, invalidCadenceTypeError("payload", payload, cadence.Event{})
-	}
-
-	if cdcEvent.Type() == nil {
-		return nil, fmt.Errorf("EpochCommit event doesn't have type")
-	}
-
-	fields := cadence.FieldsMappedByName(cdcEvent)
-
-	switch len(fields) {
-	case 3:
-		return convertServiceEventEpochCommitV0(event)
-	case 5:
-		return convertServiceEventEpochCommitV1(event)
-	default:
-		return nil, fmt.Errorf(
-			"invalid number of fields in EpochCommit event, expect 3 or 5, got: %d",
-			len(fields),
-		)
-	}
-}
-
 // convertServiceEventEpochCommit converts a service event encoded as the generic
 // flow.Event type to a ServiceEvent type for an EpochCommit event.
 // CAUTION: This function must only be used for input events computed locally, by an
 // Execution or Verification Node; it is not resilient to malicious inputs.
 // No errors are expected during normal operation.
-func convertServiceEventEpochCommitV1(event flow.Event) (*flow.ServiceEvent, error) {
+func convertServiceEventEpochCommit(event flow.Event) (*flow.ServiceEvent, error) {
 	// decode bytes using ccf
 	payload, err := ccf.Decode(nil, event.Payload)
 	if err != nil {
@@ -296,24 +261,20 @@ func convertServiceEventEpochCommitV1(event flow.Event) (*flow.ServiceEvent, err
 		return nil, fmt.Errorf("failed to decode EpochCommit event: %w", err)
 	}
 
-	commit := &flow.EpochCommit{
-		Counter: uint64(counter),
-	}
-
 	// parse cluster qc votes
-	commit.ClusterQCs, err = convertClusterQCVotes(cdcClusterQCVotes.Values)
+	clusterQCs, err := convertClusterQCVotes(cdcClusterQCVotes.Values)
 	if err != nil {
 		return nil, fmt.Errorf("could not convert cluster qc votes: %w", err)
 	}
 
 	// parse DKG participants
-	commit.DKGParticipantKeys, err = convertDKGKeys(cdcDKGKeys.Values)
+	dKGParticipantKeys, err := convertDKGKeys(cdcDKGKeys.Values)
 	if err != nil {
 		return nil, fmt.Errorf("could not convert Random Beacon keys: %w", err)
 	}
 
 	// parse DKG group key
-	commit.DKGGroupKey, err = convertDKGKey(cdcDKGGroupKey)
+	dKGGroupKey, err := convertDKGKey(cdcDKGGroupKey)
 	if err != nil {
 		return nil, fmt.Errorf("could not convert Random Beacon group key: %w", err)
 	}
@@ -340,108 +301,28 @@ func convertServiceEventEpochCommitV1(event flow.Event) (*flow.ServiceEvent, err
 	// ExecutionResult has already been fully constructed, but can't be broadcast).
 	//    We will only drop service events whose DKGIndexMap is invalid. As the Protocol State will anyway discard
 	// such events, it is fine to not relay them in the first place.
-	n := len(cdcDKGIndexMap.Pairs)
-	encounteredIndices := make([]bool, n) // tracks which indices we have already seed, to detect duplicates
-	commit.DKGIndexMap = make(flow.DKGIndexMap, n)
+	dKGIndexMap := make(flow.DKGIndexMap, len(cdcDKGIndexMap.Pairs))
 	for _, pair := range cdcDKGIndexMap.Pairs {
 		nodeID, err := flow.HexStringToIdentifier(string(pair.Key.(cadence.String)))
 		if err != nil {
 			return nil, fmt.Errorf("failed to decode flow.Identifer in DKGIndexMap entry from EpochRecover event: %w", err)
 		}
 		index := pair.Value.(cadence.Int).Int()
-		commit.DKGIndexMap[nodeID] = index
-
-		// enforce invariant needed for ID computation: DKGIndexMap values form the set {0, 1, ..., n-1}
-		if index < 0 || index >= n {
-			return nil, fmt.Errorf("index %d is outside allowed range [0,n-1] for a DKG committee of size n=%d", index, n)
-		}
-		if encounteredIndices[index] {
-			return nil, fmt.Errorf("duplicated DKG index %d", index)
-		}
-		encounteredIndices[index] = true
+		dKGIndexMap[nodeID] = index
 	}
 
-	// create the service event
-	serviceEvent := &flow.ServiceEvent{
-		Type:  flow.ServiceEventCommit,
-		Event: commit,
-	}
-
-	return serviceEvent, nil
-}
-
-// convertServiceEventEpochCommit converts a service event encoded as the generic
-// flow.Event type to a ServiceEvent type for an EpochCommit event.
-// CAUTION: This function must only be used for input events computed locally, by an
-// Execution or Verification Node; it is not resilient to malicious inputs.
-// No errors are expected during normal operation.
-// TODO(EFM, #6794): Remove this once we complete the network upgrade
-func convertServiceEventEpochCommitV0(event flow.Event) (*flow.ServiceEvent, error) {
-	// decode bytes using ccf
-	payload, err := ccf.Decode(nil, event.Payload)
+	commit, err := flow.NewEpochCommit(
+		flow.UntrustedEpochCommit{
+			Counter:            uint64(counter),
+			ClusterQCs:         clusterQCs,
+			DKGGroupKey:        dKGGroupKey,
+			DKGParticipantKeys: dKGParticipantKeys,
+			DKGIndexMap:        dKGIndexMap,
+		},
+	)
 	if err != nil {
-		return nil, fmt.Errorf("could not unmarshal event payload: %w", err)
+		return nil, fmt.Errorf("could not construct epoch commit: %w", err)
 	}
-
-	cdcEvent, ok := payload.(cadence.Event)
-	if !ok {
-		return nil, invalidCadenceTypeError("payload", payload, cadence.Event{})
-	}
-
-	if cdcEvent.Type() == nil {
-		return nil, fmt.Errorf("EpochCommit event doesn't have type")
-	}
-
-	fields := cadence.FieldsMappedByName(cdcEvent)
-
-	const expectedFieldCount = 3
-	if len(fields) < expectedFieldCount {
-		return nil, fmt.Errorf(
-			"insufficient fields in EpochCommit event (%d < %d)",
-			len(fields),
-			expectedFieldCount,
-		)
-	}
-
-	// Extract EpochCommit event fields
-
-	counter, err := getField[cadence.UInt64](fields, "counter")
-	if err != nil {
-		return nil, fmt.Errorf("failed to decode EpochCommit event: %w", err)
-	}
-
-	cdcClusterQCVotes, err := getField[cadence.Array](fields, "clusterQCs")
-	if err != nil {
-		return nil, fmt.Errorf("failed to decode EpochCommit event: %w", err)
-	}
-
-	cdcDKGKeys, err := getField[cadence.Array](fields, "dkgPubKeys")
-	if err != nil {
-		return nil, fmt.Errorf("failed to decode EpochCommit event: %w", err)
-	}
-
-	commit := &flow.EpochCommit{
-		Counter: uint64(counter),
-	}
-
-	// parse cluster qc votes
-	commit.ClusterQCs, err = convertClusterQCVotes(cdcClusterQCVotes.Values)
-	if err != nil {
-		return nil, fmt.Errorf("could not convert cluster qc votes: %w", err)
-	}
-
-	// parse DKG group key and participants
-	// Note: this is read in the same order as `DKGClient.SubmitResult` ie. with the group public key first followed by individual keys
-	// https://github.com/onflow/flow-go/blob/feature/dkg/module/dkg/client.go#L182-L183
-	commit.DKGGroupKey, err = convertDKGKey(cdcDKGKeys.Values[0])
-	if err != nil {
-		return nil, fmt.Errorf("could not convert DKG group key: %w", err)
-	}
-	commit.DKGParticipantKeys, err = convertDKGKeys(cdcDKGKeys.Values[1:])
-	if err != nil {
-		return nil, fmt.Errorf("could not convert DKG keys: %w", err)
-	}
-	commit.DKGIndexMap = nil
 
 	// create the service event
 	serviceEvent := &flow.ServiceEvent{
@@ -562,20 +443,9 @@ func convertServiceEventEpochRecover(event flow.Event) (*flow.ServiceEvent, erro
 		return nil, fmt.Errorf("failed to decode EpochRecover event: %w", err)
 	}
 
-	setup := flow.EpochSetup{
-		Counter:            uint64(counter),
-		FirstView:          uint64(firstView),
-		FinalView:          uint64(finalView),
-		DKGPhase1FinalView: uint64(dkgPhase1FinalView),
-		DKGPhase2FinalView: uint64(dkgPhase2FinalView),
-		DKGPhase3FinalView: uint64(dkgPhase3FinalView),
-		TargetDuration:     uint64(targetDuration),
-		TargetEndTime:      uint64(targetEndTimeUnix),
-	}
-
 	// random source from the event must be a hex string
 	// containing exactly 128 bits (equivalent to 16 bytes or 32 hex characters)
-	setup.RandomSource, err = hex.DecodeString(string(randomSrcHex))
+	randomSource, err := hex.DecodeString(string(randomSrcHex))
 	if err != nil {
 		return nil, fmt.Errorf(
 			"failed to decode random source hex (%v) from EpochRecover event: %w",
@@ -584,44 +454,51 @@ func convertServiceEventEpochRecover(event flow.Event) (*flow.ServiceEvent, erro
 		)
 	}
 
-	if len(setup.RandomSource) != flow.EpochSetupRandomSourceLength {
-		return nil, fmt.Errorf(
-			"random source in EpochRecover event must be of (%d) bytes, got (%d)",
-			flow.EpochSetupRandomSourceLength,
-			len(setup.RandomSource),
-		)
-	}
-
 	// parse cluster assignments; returned assignments are in canonical order
-	setup.Assignments, err = convertEpochRecoverCollectorClusterAssignments(cdcClusters.Values)
+	assignments, err := convertEpochRecoverCollectorClusterAssignments(cdcClusters.Values)
 	if err != nil {
 		return nil, fmt.Errorf("failed to convert cluster assignments from EpochRecover event: %w", err)
 	}
 
 	// parse epoch participants; returned node identities are in canonical order
-	setup.Participants, err = convertParticipants(cdcParticipants.Values)
+	participants, err := convertParticipants(cdcParticipants.Values)
 	if err != nil {
 		return nil, fmt.Errorf("failed to convert participants from EpochRecover event: %w", err)
 	}
 
-	commit := flow.EpochCommit{
-		Counter: uint64(counter),
+	setup, err := flow.NewEpochSetup(
+		flow.UntrustedEpochSetup{
+			Counter:            uint64(counter),
+			FirstView:          uint64(firstView),
+			DKGPhase1FinalView: uint64(dkgPhase1FinalView),
+			DKGPhase2FinalView: uint64(dkgPhase2FinalView),
+			DKGPhase3FinalView: uint64(dkgPhase3FinalView),
+			FinalView:          uint64(finalView),
+			Participants:       participants,
+			Assignments:        assignments,
+			RandomSource:       randomSource,
+			TargetDuration:     uint64(targetDuration),
+			TargetEndTime:      uint64(targetEndTimeUnix),
+		},
+	)
+	if err != nil {
+		return nil, fmt.Errorf("could not construct epoch setup: %w", err)
 	}
 
 	// parse cluster qc votes
-	commit.ClusterQCs, err = convertClusterQCVoteData(cdcClusterQCVoteData.Values)
+	clusterQCs, err := convertClusterQCVoteData(cdcClusterQCVoteData.Values)
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode clusterQCVoteData from EpochRecover event: %w", err)
 	}
 
 	// parse DKG participants
-	commit.DKGParticipantKeys, err = convertDKGKeys(cdcDKGKeys.Values)
+	dKGParticipantKeys, err := convertDKGKeys(cdcDKGKeys.Values)
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode Random Beacon key shares from EpochRecover event: %w", err)
 	}
 
 	// parse DKG group key
-	commit.DKGGroupKey, err = convertDKGKey(cdcDKGGroupKey)
+	dKGGroupKey, err := convertDKGKey(cdcDKGGroupKey)
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode Random Beacon group key from EpochRecover event: %w", err)
 	}
@@ -648,34 +525,43 @@ func convertServiceEventEpochRecover(event flow.Event) (*flow.ServiceEvent, erro
 	// ExecutionResult has already been fully constructed, but can't be broadcast).
 	//    We will only drop service events whose DKGIndexMap is invalid. As the Protocol State will anyway discard
 	// such events, it is fine to not relay them in the first place.
-	n := len(cdcDKGIndexMap.Pairs)
-	encounteredIndices := make([]bool, n) // tracks which indices we have already seed, to detect duplicates
-	commit.DKGIndexMap = make(flow.DKGIndexMap, n)
+	dKGIndexMap := make(flow.DKGIndexMap, len(cdcDKGIndexMap.Pairs))
 	for _, pair := range cdcDKGIndexMap.Pairs {
 		nodeID, err := flow.HexStringToIdentifier(string(pair.Key.(cadence.String)))
 		if err != nil {
 			return nil, fmt.Errorf("failed to decode flow.Identifer in DKGIndexMap entry from EpochRecover event: %w", err)
 		}
 		index := pair.Value.(cadence.Int).Int()
-		commit.DKGIndexMap[nodeID] = index
+		dKGIndexMap[nodeID] = index
+	}
 
-		// enforce invariant needed for ID computation: DKGIndexMap values form the set {0, 1, ..., n-1}
-		if index < 0 || index >= n {
-			return nil, fmt.Errorf("index %d is outside allowed range [0,n-1] for a DKG committee of size n=%d", index, n)
-		}
-		if encounteredIndices[index] {
-			return nil, fmt.Errorf("duplicated DKG index %d", index)
-		}
-		encounteredIndices[index] = true
+	commit, err := flow.NewEpochCommit(
+		flow.UntrustedEpochCommit{
+			Counter:            uint64(counter),
+			ClusterQCs:         clusterQCs,
+			DKGGroupKey:        dKGGroupKey,
+			DKGParticipantKeys: dKGParticipantKeys,
+			DKGIndexMap:        dKGIndexMap,
+		},
+	)
+	if err != nil {
+		return nil, fmt.Errorf("could not construct epoch commit: %w", err)
 	}
 
 	// create the service event
-	serviceEvent := &flow.ServiceEvent{
-		Type: flow.ServiceEventRecover,
-		Event: &flow.EpochRecover{
-			EpochSetup:  setup,
-			EpochCommit: commit,
+	epochRecover, err := flow.NewEpochRecover(
+		flow.UntrustedEpochRecover{
+			EpochSetup:  *setup,
+			EpochCommit: *commit,
 		},
+	)
+	if err != nil {
+		return nil, fmt.Errorf("could not construct epoch recover: %w", err)
+	}
+
+	serviceEvent := &flow.ServiceEvent{
+		Type:  flow.ServiceEventRecover,
+		Event: epochRecover,
 	}
 
 	return serviceEvent, nil

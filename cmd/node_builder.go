@@ -4,8 +4,9 @@ import (
 	"context"
 	"time"
 
-	"github.com/cockroachdb/pebble"
+	"github.com/cockroachdb/pebble/v2"
 	"github.com/dgraph-io/badger/v2"
+	"github.com/jordanschalm/lockctx"
 	madns "github.com/multiformats/go-multiaddr-dns"
 	"github.com/onflow/crypto"
 	"github.com/prometheus/client_golang/prometheus"
@@ -189,6 +190,8 @@ type BaseConfig struct {
 	// BitswapReprovideEnabled configures whether the Bitswap reprovide mechanism is enabled.
 	// This is only meaningful to Access and Execution nodes.
 	BitswapReprovideEnabled bool
+
+	TransactionFeesDisabled bool
 }
 
 // NodeConfig contains all the derived parameters such the NodeID, private keys etc. and initialized instances of
@@ -209,6 +212,7 @@ type NodeConfig struct {
 	ProtocolDB        storage.DB
 	SecretsDB         *badger.DB
 	Storage           Storage
+	StorageLockMgr    lockctx.Manager
 	ProtocolEvents    *events.Distributor
 	State             protocol.State
 	Resolver          madns.BasicResolver
@@ -280,7 +284,7 @@ func DefaultBaseConfig() *BaseConfig {
 		BootstrapDir:     "bootstrap",
 		datadir:          datadir,
 		pebbleDir:        pebbleDir,
-		DBOps:            string(dbops.BadgerTransaction), // "badger-transaction" (default) or "batch-update"
+		DBOps:            string(dbops.BadgerBatch), // "badger-batch" (default) or "pebble-batch"
 		badgerDB:         nil,
 		pebbleDB:         nil,
 		secretsdir:       NotSet,
