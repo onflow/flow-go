@@ -114,6 +114,8 @@ func (limiter *rateLimiter) shouldRateLimit(tx *flow.TransactionBody) bool {
 	return false
 }
 
+// BySealingLagRateLimiter implements collection throttling based on the sealing lag.
+// It can be configured to allow a minimum and maximum sealing lag, as well as a halving interval.
 type BySealingLagRateLimiter struct {
 	state                 protocol.State
 	minSealingLag         uint
@@ -124,6 +126,8 @@ type BySealingLagRateLimiter struct {
 	currentCollectionSize uint
 }
 
+// NewBySealingLagRateLimiter creates a new BySealingLagRateLimiter instance.
+// No errors are expected during normal operations.
 func NewBySealingLagRateLimiter(
 	state protocol.State,
 	minSealingLag uint,
@@ -147,6 +151,7 @@ func NewBySealingLagRateLimiter(
 	return limiter, nil
 }
 
+// update updates the current collection size based on the sealing lag.
 func (limiter *BySealingLagRateLimiter) update() error {
 	lastFinalized, err := limiter.state.Final().Head()
 	if err != nil {
@@ -169,16 +174,6 @@ func (limiter *BySealingLagRateLimiter) update() error {
 // MaxCollectionSize returns the maximum size of a collection that this rate limiter allows.
 func (limiter *BySealingLagRateLimiter) MaxCollectionSize() uint {
 	return limiter.currentCollectionSize
-}
-
-// OnBlockFinalized is the event handler to receive notifications about finalized blocks.
-func (limiter *BySealingLagRateLimiter) OnBlockFinalized(_ *flow.Header) {
-	// TODO: this should be moved to a worker goroutine to avoid blocking the finalization process
-	// and proper error handling
-	err := limiter.update()
-	if err != nil {
-		panic(err)
-	}
 }
 
 // StepHalving applies a step halving algorithm to determine the maximum collection size based on the sealing lag.
