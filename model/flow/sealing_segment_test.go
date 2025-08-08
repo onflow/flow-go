@@ -84,7 +84,8 @@ func (suite *SealingSegmentSuite) SetupTest() {
 	suite.results = make(map[flow.Identifier]*flow.ExecutionResult)
 	suite.sealsByBlockID = make(map[flow.Identifier]*flow.Seal)
 	suite.protocolStateEntries = make(map[flow.Identifier]*flow.ProtocolStateEntryWrapper)
-	suite.builder = flow.NewSealingSegmentBuilder(suite.GetResult, suite.GetSealByBlockID, suite.GetProtocolStateEntry)
+	root, _, _ := unittest.BootstrapFixture(unittest.IdentityListFixture(5, unittest.WithAllRoles()))
+	suite.builder = flow.NewSealingSegmentBuilder(suite.GetResult, suite.GetSealByBlockID, suite.GetProtocolStateEntry, root)
 
 	suite.defaultProtocolStateID = unittest.IdentifierFixture()
 	suite.protocolStateEntries[suite.defaultProtocolStateID] = suite.ProtocolStateEntryWrapperFixture()
@@ -325,7 +326,6 @@ func (suite *SealingSegmentSuite) TestBuild_MultipleFinalBlockSeals() {
 
 // TestBuild_RootSegment tests we can build a valid root sealing segment.
 func (suite *SealingSegmentSuite) TestBuild_RootSegment() {
-
 	root, result, seal := unittest.BootstrapFixture(unittest.IdentityListFixture(5, unittest.WithAllRoles()))
 	suite.sealsByBlockID[root.ID()] = seal
 	suite.addProtocolStateEntry(root.Payload.ProtocolStateID, suite.ProtocolStateEntryWrapperFixture())
@@ -345,7 +345,6 @@ func (suite *SealingSegmentSuite) TestBuild_RootSegment() {
 // TestBuild_RootSegmentWrongView tests that we return ErrSegmentInvalidRootView for
 // a single-block sealing segment with a block view not equal to 0.
 func (suite *SealingSegmentSuite) TestBuild_RootSegmentWrongView() {
-
 	root, result, seal := unittest.BootstrapFixture(
 		unittest.IdentityListFixture(5, unittest.WithAllRoles()),
 		func(block *flow.Block) {
@@ -560,7 +559,8 @@ func (suite *SealingSegmentSuite) TestBuild_ChangingProtocolStateID_ExtraBlocks(
 // Test that we should return InvalidSealingSegmentError if sealing segment is
 // built with no blocks.
 func (suite *SealingSegmentSuite) TestBuild_NoBlocks() {
-	builder := flow.NewSealingSegmentBuilder(nil, nil, nil)
+	root, _, _ := unittest.BootstrapFixture(unittest.IdentityListFixture(5, unittest.WithAllRoles()))
+	builder := flow.NewSealingSegmentBuilder(nil, nil, nil, root)
 	_, err := builder.SealingSegment()
 	require.True(suite.T(), flow.IsInvalidSealingSegmentError(err))
 }
@@ -582,7 +582,7 @@ func (suite *SealingSegmentSuite) TestAddBlock_InvalidHeight() {
 
 // TestAddBlock_StorageError tests that errors in the resource getters bubble up.
 func TestAddBlock_StorageError(t *testing.T) {
-
+	root, _, _ := unittest.BootstrapFixture(unittest.IdentityListFixture(5, unittest.WithAllRoles()))
 	t.Run("missing result", func(t *testing.T) {
 		// create a receipt to include in the first block, whose result is not in storage
 		missingReceipt := unittest.ExecutionReceiptFixture()
@@ -593,7 +593,7 @@ func TestAddBlock_StorageError(t *testing.T) {
 		protocolStateEntryLookup := func(flow.Identifier) (*flow.ProtocolStateEntryWrapper, error) {
 			return &flow.ProtocolStateEntryWrapper{}, nil
 		}
-		builder := flow.NewSealingSegmentBuilder(resultLookup, sealLookup, protocolStateEntryLookup)
+		builder := flow.NewSealingSegmentBuilder(resultLookup, sealLookup, protocolStateEntryLookup, root)
 		block1 := unittest.BlockFixture(
 			unittest.Block.WithPayload(unittest.PayloadFixture(
 				unittest.WithReceiptsAndNoResults(missingReceipt),
@@ -619,7 +619,7 @@ func TestAddBlock_StorageError(t *testing.T) {
 		block1 := unittest.BlockFixture(
 			unittest.Block.WithPayload(*flow.NewEmptyPayload()),
 		)
-		builder := flow.NewSealingSegmentBuilder(resultLookup, sealLookup, protocolStateEntryLookup)
+		builder := flow.NewSealingSegmentBuilder(resultLookup, sealLookup, protocolStateEntryLookup, root)
 
 		err := builder.AddBlock(unittest.ProposalFromBlock(block1))
 		require.ErrorIs(t, err, exception)
@@ -633,7 +633,7 @@ func TestAddBlock_StorageError(t *testing.T) {
 		block1 := unittest.BlockFixture(
 			unittest.Block.WithPayload(*flow.NewEmptyPayload()),
 		)
-		builder := flow.NewSealingSegmentBuilder(resultLookup, sealLookup, protocolStateEntryLookup)
+		builder := flow.NewSealingSegmentBuilder(resultLookup, sealLookup, protocolStateEntryLookup, root)
 
 		err := builder.AddBlock(unittest.ProposalFromBlock(block1))
 		require.ErrorIs(t, err, exception)
@@ -642,6 +642,7 @@ func TestAddBlock_StorageError(t *testing.T) {
 
 // TestAddExtraBlock tests different scenarios for adding extra blocks, covers happy and unhappy path scenarios.
 func (suite *SealingSegmentSuite) TestAddExtraBlock() {
+	root, _, _ := unittest.BootstrapFixture(unittest.IdentityListFixture(5, unittest.WithAllRoles()))
 	// populate sealing segment with one block
 	firstBlock := suite.FirstBlock()
 	firstBlock.Height += 100
@@ -649,7 +650,7 @@ func (suite *SealingSegmentSuite) TestAddExtraBlock() {
 	suite.AddBlocks(firstBlock)
 
 	suite.T().Run("empty-segment", func(t *testing.T) {
-		builder := flow.NewSealingSegmentBuilder(nil, nil, nil)
+		builder := flow.NewSealingSegmentBuilder(nil, nil, nil, root)
 		block := suite.BlockFixture()
 		err := builder.AddExtraBlock(unittest.ProposalFromBlock(block))
 		require.Error(t, err)
@@ -662,7 +663,7 @@ func (suite *SealingSegmentSuite) TestAddExtraBlock() {
 		require.True(suite.T(), flow.IsInvalidSealingSegmentError(err))
 	})
 	suite.T().Run("extra-block-not-continuous", func(t *testing.T) {
-		builder := flow.NewSealingSegmentBuilder(suite.GetResult, suite.GetSealByBlockID, suite.GetProtocolStateEntry)
+		builder := flow.NewSealingSegmentBuilder(suite.GetResult, suite.GetSealByBlockID, suite.GetProtocolStateEntry, root)
 		err := builder.AddBlock(firstProposal)
 		require.NoError(t, err)
 		extraBlock := suite.BlockFixture()
@@ -675,7 +676,7 @@ func (suite *SealingSegmentSuite) TestAddExtraBlock() {
 		require.True(suite.T(), flow.IsInvalidSealingSegmentError(err))
 	})
 	suite.T().Run("root-segment-extra-blocks", func(t *testing.T) {
-		builder := flow.NewSealingSegmentBuilder(suite.GetResult, suite.GetSealByBlockID, suite.GetProtocolStateEntry)
+		builder := flow.NewSealingSegmentBuilder(suite.GetResult, suite.GetSealByBlockID, suite.GetProtocolStateEntry, root)
 		err := builder.AddBlock(firstProposal)
 		require.NoError(t, err)
 

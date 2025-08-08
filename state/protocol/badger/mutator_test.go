@@ -97,7 +97,7 @@ func TestExtendValid(t *testing.T) {
 
 		block, result, seal := unittest.BootstrapFixture(participants)
 		qc := unittest.QuorumCertificateFixture(unittest.QCWithRootBlockID(block.ID()))
-		rootSnapshot, err := inmem.SnapshotFromBootstrapState(block, result, seal, qc)
+		rootSnapshot, err := unittest.SnapshotFromBootstrapState(block, result, seal, qc)
 		require.NoError(t, err)
 
 		state, err := protocol.Bootstrap(
@@ -3411,7 +3411,7 @@ func TestHeaderInvalidTimestamp(t *testing.T) {
 
 		block, result, seal := unittest.BootstrapFixture(participants)
 		qc := unittest.QuorumCertificateFixture(unittest.QCWithRootBlockID(block.ID()))
-		rootSnapshot, err := inmem.SnapshotFromBootstrapState(block, result, seal, qc)
+		rootSnapshot, err := unittest.SnapshotFromBootstrapState(block, result, seal, qc)
 		require.NoError(t, err)
 
 		state, err := protocol.Bootstrap(

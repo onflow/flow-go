@@ -473,8 +473,9 @@ func (m *ParticipantState) guaranteeExtend(ctx context.Context, candidate *flow.
 	if limit > headerBody.Height { // overflow check
 		limit = 0
 	}
-	if limit < m.sporkRootBlockHeight {
-		limit = m.sporkRootBlockHeight
+	sporkRootBlockHeight := m.sporkRootBlock.Height
+	if limit < sporkRootBlockHeight {
+		limit = sporkRootBlockHeight
 	}
 
 	// build a list of all previously used guarantees on this part of the chain

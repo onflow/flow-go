@@ -5,11 +5,13 @@ import (
 )
 
 // Guarantees represents persistent storage for collection guarantees.
+// Must only be used to store finalized collection guarantees.
 type Guarantees interface {
 
 	// Store inserts the collection guarantee and indexes it by the collection ID.
+	// It is the caller's responsibility to ensure that only finalized collection guarantees are passed to be stored.
 	// Expected errors of the returned anonymous function:
-	//   - storage.ErrAlreadyExists if a collection guarantee with the given id is already stored.
+	//   - storage.ErrDataMismatch if a different guarantee for the same collection is already stored.
 	Store(guarantee *flow.CollectionGuarantee) error
 
 	// ByID returns the flow.CollectionGuarantee by its ID.

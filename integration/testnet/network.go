@@ -1160,12 +1160,13 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string, chainID fl
 	// define root block parameters
 	parentID := flow.ZeroID
 	height := uint64(0)
+	view := uint64(0)
 	timestamp := time.Now().UTC()
 	epochCounter := uint64(0)
 	participants := bootstrap.ToIdentityList(stakedNodeInfos)
 
 	// generate root block
-	rootHeaderBody, err := run.GenerateRootHeaderBody(chainID, parentID, height, timestamp)
+	rootHeaderBody, err := run.GenerateRootHeaderBody(chainID, parentID, height, view, timestamp)
 	if err != nil {
 		return nil, err
 	}

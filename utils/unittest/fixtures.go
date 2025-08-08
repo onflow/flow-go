@@ -47,6 +47,7 @@ import (
 	"github.com/onflow/flow-go/network/p2p/keyutils"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/inmem"
+	"github.com/onflow/flow-go/state/protocol/protocol_state"
 	"github.com/onflow/flow-go/state/protocol/protocol_state/kvstore"
 	"github.com/onflow/flow-go/utils/dsl"
 )
@@ -2334,7 +2335,7 @@ func RootSnapshotFixtureWithChainID(
 ) *inmem.Snapshot {
 	block, result, seal := BootstrapFixtureWithChainID(participants.Sort(flow.Canonical[flow.Identity]), chainID, opts...)
 	qc := QuorumCertificateFixture(QCWithRootBlockID(block.ID()))
-	root, err := inmem.SnapshotFromBootstrapState(block, result, seal, qc)
+	root, err := SnapshotFromBootstrapState(block, result, seal, qc)
 	if err != nil {
 		panic(err)
 	}
@@ -3266,4 +3267,17 @@ func EpochSetupRandomSourceFixture() []byte {
 		panic(err)
 	}
 	return source
+}
+
+// SnapshotFromBootstrapState generates a protocol.Snapshot representing a
+// root bootstrap state. This is used to bootstrap the protocol state for
+// genesis or post-spork states.
+func SnapshotFromBootstrapState(root *flow.Block, result *flow.ExecutionResult, seal *flow.Seal, qc *flow.QuorumCertificate) (*inmem.Snapshot, error) {
+	safetyParams, err := protocol.DefaultEpochSafetyParams(root.ChainID)
+	if err != nil {
+		return nil, fmt.Errorf("could not get default epoch commit safety threshold: %w", err)
+	}
+	return inmem.SnapshotFromBootstrapStateWithParams(root, result, seal, qc, func(epochStateID flow.Identifier) (protocol_state.KVStoreAPI, error) {
+		return kvstore.NewDefaultKVStore(safetyParams.FinalizationSafetyThreshold, safetyParams.EpochExtensionViewCount, epochStateID)
+	})
 }
