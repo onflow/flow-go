@@ -24,7 +24,7 @@ func TestProcessCallbacksTransaction(t *testing.T) {
 
 	assert.NotNil(t, tx)
 	assert.NotEmpty(t, tx.Script)
-	assert.Equal(t, uint64(blueprints.SystemChunkTransactionGasLimit), tx.GasLimit)
+	assert.Equal(t, uint64(flow.DefaultMaxTransactionGasLimit), tx.GasLimit)
 	encodedEffort, err := ccf.Encode(cadence.UInt64(effortLeft))
 	require.NoError(t, err)
 	assert.Equal(t, encodedEffort, tx.Arguments[0])

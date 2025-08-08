@@ -39,7 +39,7 @@ func ProcessCallbacksTransaction(chain flow.Chain, maxEffortLeft uint64) (*flow.
 	tx := flow.NewTransactionBody().
 		SetScript(script).
 		AddArgument(effort).
-		SetComputeLimit(SystemChunkTransactionGasLimit)
+		SetComputeLimit(flow.DefaultMaxTransactionGasLimit)
 
 	return tx, nil
 }
