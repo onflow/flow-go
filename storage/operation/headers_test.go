@@ -70,7 +70,7 @@ func TestBlockHeightIndexLookup(t *testing.T) {
 		defer lctx.Release()
 
 		err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			return operation.IndexBlockHeight(lctx, rw, height, expected)
+			return operation.IndexFinalizedBlockByHeight(lctx, rw, height, expected)
 		})
 		require.NoError(t, err)
 

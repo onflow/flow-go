@@ -56,7 +56,7 @@ import (
 	badgerState "github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/state/protocol/blocktimer"
 	"github.com/onflow/flow-go/state/protocol/events/gadgets"
-	"github.com/onflow/flow-go/storage/badger"
+	"github.com/onflow/flow-go/storage/store"
 	"github.com/onflow/flow-go/utils/grpcutils"
 )
 
@@ -218,9 +218,9 @@ func main() {
 			return collectionCommands.NewTxRateLimitCommand(addressRateLimiter)
 		}).
 		AdminCommand("read-range-cluster-blocks", func(conf *cmd.NodeConfig) commands.AdminCommand {
-			clusterPayloads := badger.NewClusterPayloads(&metrics.NoopCollector{}, conf.DB)
-			headers := badger.NewHeaders(&metrics.NoopCollector{}, conf.DB)
-			return storageCommands.NewReadRangeClusterBlocksCommand(conf.DB, headers, clusterPayloads)
+			clusterPayloads := store.NewClusterPayloads(&metrics.NoopCollector{}, conf.ProtocolDB)
+			headers := store.NewHeaders(&metrics.NoopCollector{}, conf.ProtocolDB)
+			return storageCommands.NewReadRangeClusterBlocksCommand(conf.ProtocolDB, headers, clusterPayloads)
 		}).
 		Module("follower distributor", func(node *cmd.NodeConfig) error {
 			followerDistributor = pubsub.NewFollowerDistributor()
@@ -486,7 +486,7 @@ func main() {
 		// Epoch manager encapsulates and manages epoch-dependent engines as we
 		// transition between epochs
 		Component("epoch manager", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-			clusterStateFactory, err := factories.NewClusterStateFactory(node.DB, node.Metrics.Cache, node.Tracer)
+			clusterStateFactory, err := factories.NewClusterStateFactory(node.ProtocolDB, node.StorageLockMgr, node.Metrics.Cache, node.Tracer)
 			if err != nil {
 				return nil, err
 			}
@@ -499,8 +499,9 @@ func main() {
 			}
 
 			builderFactory, err := factories.NewBuilderFactory(
-				node.DB,
+				node.ProtocolDB,
 				node.State,
+				node.StorageLockMgr,
 				node.Storage.Headers,
 				node.Tracer,
 				colMetrics,
