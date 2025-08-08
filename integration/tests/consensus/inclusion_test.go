@@ -116,7 +116,7 @@ func (is *InclusionSuite) TestCollectionGuaranteeIncluded() {
 	require.NoError(t, err)
 	sentinel.SignerIndices = signerIndices
 	sentinel.ReferenceBlockID = is.net.Root().ID()
-	sentinel.ChainID = is.net.BootstrapData.ClusterRootBlocks[0].ChainID
+	sentinel.ClusterChainID = is.net.BootstrapData.ClusterRootBlocks[0].ChainID
 	colID := sentinel.CollectionID
 
 	is.waitUntilSeenProposal(deadline)

@@ -221,7 +221,7 @@ func ExecutionResultFixture(t *testing.T,
 	clusterChainID := cluster.CanonicalClusterID(1, clusterCommittee.NodeIDs())
 
 	guarantee := unittest.CollectionGuaranteeFixture(unittest.WithCollection(&collection), unittest.WithCollRef(refBlkHeader.ParentID))
-	guarantee.ChainID = clusterChainID
+	guarantee.ClusterChainID = clusterChainID
 	indices, err := signature.EncodeSignersToIndices(clusterCommittee.NodeIDs(), clusterCommittee.NodeIDs())
 	require.NoError(t, err)
 	guarantee.SignerIndices = indices
@@ -329,7 +329,7 @@ func ExecutionResultFixture(t *testing.T,
 			collection := flow.Collection{Transactions: []*flow.TransactionBody{txBody}}
 			guarantee := unittest.CollectionGuaranteeFixture(unittest.WithCollection(&collection), unittest.WithCollRef(refBlkHeader.ParentID))
 			guarantee.SignerIndices = indices
-			guarantee.ChainID = clusterChainID
+			guarantee.ClusterChainID = clusterChainID
 
 			collections = append(collections, &collection)
 			guarantees = append(guarantees, guarantee)

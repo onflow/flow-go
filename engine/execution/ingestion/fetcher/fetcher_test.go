@@ -32,7 +32,7 @@ func TestFetch(t *testing.T) {
 	cluster := new(statemock.Cluster)
 	cluster.On("Members").Return(nodes.ToSkeleton())
 	epoch := new(statemock.CommittedEpoch)
-	epoch.On("ClusterByChainID", guarantee.ChainID).Return(cluster, nil)
+	epoch.On("ClusterByChainID", guarantee.ClusterChainID).Return(cluster, nil)
 	epochs := new(statemock.EpochQuery)
 	epochs.On("Current").Return(epoch, nil)
 	snapshot := new(statemock.Snapshot)
