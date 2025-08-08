@@ -65,7 +65,7 @@ else
 		-epoch-length=$(EPOCHLEN) \
 		-epoch-staking-phase-length=$(STAKINGLEN) \
 		-epoch-dkg-phase-length=$(DKGLEN) \
-		-finalization-safety-threshold=$(FINALIZATIONSAFETYTHRESHOLD) \
+		-kvstore-finalization-safety-threshold=$(FINALIZATIONSAFETYTHRESHOLD) \
 		-profiler=$(PROFILER) \
 		-profile-uploader=$(PROFILE_UPLOADER) \
 		-tracing=$(TRACING) \

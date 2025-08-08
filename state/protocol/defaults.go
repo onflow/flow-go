@@ -28,7 +28,7 @@ func DefaultEpochSafetyParams(chain flow.ChainID) (SafetyParams, error) {
 			EpochExtensionViewCount:     600, // approximately 10 minutes
 		}, nil
 	}
-	return SafetyParams{}, fmt.Errorf("unkown chain id %s", chain.String())
+	return SafetyParams{}, fmt.Errorf("unknown chain id %s", chain.String())
 }
 
 // RandomBeaconSafetyThreshold defines a production network safety threshold for random beacon protocol based on the size
