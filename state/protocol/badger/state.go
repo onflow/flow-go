@@ -56,11 +56,11 @@ type State struct {
 	// sealedRootHeight returns the root block that is sealed. We cache it in
 	// the state, because it cannot change over the lifecycle of a protocol state instance.
 	sealedRootHeight uint64
-	// sporkRootBlockHeight is the height of the root block in the current spork. We cache it in
+	// sporkRootBlock is the root block in the current spork. We cache it in
 	// the state, because it cannot change over the lifecycle of a protocol state instance.
 	// Caution: A node that joined in a later epoch past the spork, the node will likely _not_
 	// know the spork's root block in full (though it will always know the height).
-	sporkRootBlockHeight uint64
+	sporkRootBlock *flow.Block
 	// cachedLatest caches both the *latest* finalized header and sealed header,
 	// because the protocol state is solely responsible for updating it.
 	// finalized header and sealed header can be cached together since they are updated together atomically
@@ -131,6 +131,8 @@ func Bootstrap(
 		return nil, fmt.Errorf("could not get sealed result for sealing segment: %w", err)
 	}
 
+	sporkRootBlock := segment.SporkRootBlock
+
 	err = operation.RetryOnConflictTx(db, transaction.Update, func(tx *transaction.Tx) error {
 		// sealing segment is in ascending height order, so the tail is the
 		// oldest ancestor and head is the newest child in the segment
@@ -162,8 +164,8 @@ func Bootstrap(
 			return fmt.Errorf("could not bootstrap height/view pointers: %w", err)
 		}
 
-		// initialize spork params
-		err = bootstrapSporkInfo(root)(tx)
+		// initialize spork info
+		err = bootstrapSporkInfo(blocks, sporkRootBlock)(tx)
 		if err != nil {
 			return fmt.Errorf("could not bootstrap spork info: %w", err)
 		}
@@ -224,6 +226,7 @@ func Bootstrap(
 		protocolKVStoreSnapshots,
 		versionBeacons,
 		params,
+		sporkRootBlock,
 	)
 }
 
@@ -442,6 +445,11 @@ func bootstrapStatePointers(root protocol.Snapshot) func(*transaction.Tx) error 
 			NewestQC:    rootQC,
 		}
 
+		sporkRootBlockView := root.Params().SporkRootBlockView()
+		if livenessData.CurrentView <= sporkRootBlockView {
+			return fmt.Errorf("PaceMaker cannot start in view %d which is less or equal than spork root view %d", livenessData.CurrentView, sporkRootBlockView)
+		}
+
 		bdtx := tx.DBTxn // tx is just a wrapper around a badger transaction with the additional ability to register callbacks that are executed after the badger transaction completed _successfully_
 		// insert initial views for HotStuff
 		err = operation.InsertSafetyData(highest.ChainID, safetyData)(bdtx)
@@ -582,21 +590,32 @@ func bootstrapEpochForProtocolStateEntry(
 
 // bootstrapSporkInfo bootstraps the protocol state with information about the
 // spork which is used to disambiguate Flow networks.
-func bootstrapSporkInfo(root protocol.Snapshot) func(*transaction.Tx) error {
+func bootstrapSporkInfo(
+	blocks storage.Blocks,
+	sporkRootBlock *flow.Block,
+) func(*transaction.Tx) error {
 	return func(tx *transaction.Tx) error {
 		bdtx := tx.DBTxn // tx is just a wrapper around a badger transaction with the additional ability to register callbacks that are executed after the badger transaction completed _successfully_
 
-		params := root.Params()
-		sporkID := params.SporkID()
-		err := operation.InsertSporkID(sporkID)(bdtx)
+		sporkRootBlockID := sporkRootBlock.ID()
+		//  store the spork root block ID.
+		err := operation.IndexSporkRootBlock(sporkRootBlockID)(bdtx)
 		if err != nil {
-			return fmt.Errorf("could not insert spork ID: %w", err)
+			return fmt.Errorf("could not insert spork root block ID: %w", err)
 		}
 
-		sporkRootBlockHeight := params.SporkRootBlockHeight()
-		err = operation.InsertSporkRootBlockHeight(sporkRootBlockHeight)(bdtx)
+		proposal, err := flow.NewRootProposal(
+			flow.UntrustedProposal{
+				Block:           *sporkRootBlock,
+				ProposerSigData: nil,
+			},
+		)
 		if err != nil {
-			return fmt.Errorf("could not insert spork root block height: %w", err)
+			return fmt.Errorf("could not construct root proposal: %w", err)
+		}
+		err = operation.SkipDuplicatesTx(blocks.StoreTx(proposal))(tx)
+		if err != nil {
+			return fmt.Errorf("could not store spork root block: %w", err)
 		}
 
 		return nil
@@ -664,10 +683,20 @@ func OpenState(
 	if !isBootstrapped {
 		return nil, fmt.Errorf("expected database to contain bootstrapped state")
 	}
-	globalParams, err := ReadGlobalParams(db)
+
+	sporkRootBlock, err := ReadSporkRootBlock(db, blocks)
 	if err != nil {
-		return nil, fmt.Errorf("could not read global params: %w", err)
+		return nil, fmt.Errorf("could not read spork root block: %w", err)
 	}
+
+	globalParams := inmem.NewParams(
+		inmem.EncodableParams{
+			ChainID:              sporkRootBlock.ChainID,
+			SporkID:              sporkRootBlock.ID(),
+			SporkRootBlockHeight: sporkRootBlock.Height,
+			SporkRootBlockView:   sporkRootBlock.View,
+		},
+	)
 	instanceParams, err := ReadInstanceParams(db, headers, seals)
 	if err != nil {
 		return nil, fmt.Errorf("could not read instance params: %w", err)
@@ -691,6 +720,7 @@ func OpenState(
 		protocolKVStoreSnapshots,
 		versionBeacons,
 		params,
+		sporkRootBlock,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("could not create state: %w", err)
@@ -795,6 +825,7 @@ func newState(
 	protocolKVStoreSnapshots storage.ProtocolKVStore,
 	versionBeacons storage.VersionBeacons,
 	params protocol.Params,
+	sporkRootBlock *flow.Block,
 ) (*State, error) {
 	state := &State{
 		metrics: metrics,
@@ -822,6 +853,7 @@ func newState(
 			),
 		versionBeacons: versionBeacons,
 		cachedLatest:   new(atomic.Pointer[cachedLatest]),
+		sporkRootBlock: sporkRootBlock,
 	}
 
 	// populate the protocol state cache
@@ -924,7 +956,6 @@ func (state *State) populateCache() error {
 
 		state.finalizedRootHeight = state.Params().FinalizedRoot().Height
 		state.sealedRootHeight = state.Params().SealedRoot().Height
-		state.sporkRootBlockHeight = state.Params().SporkRootBlockHeight()
 
 		return nil
 	})

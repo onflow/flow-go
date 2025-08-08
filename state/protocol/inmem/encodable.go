@@ -119,4 +119,5 @@ type EncodableParams struct {
 	ChainID              flow.ChainID
 	SporkID              flow.Identifier
 	SporkRootBlockHeight uint64
+	SporkRootBlockView   uint64
 }
