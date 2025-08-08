@@ -10,9 +10,17 @@ const (
 	codeMax    = 1 // keeps track of the maximum key size
 	codeDBType = 2 // specifies a database type
 
+	// codes for single entity storage
+	codeHeader        = 30
+	codeExecutedBlock = 23 // latest executed block with max height
+
+	// codes for indexing single identifier by identifier/integer
+	codeHeightToBlock   = 40 // index mapping height to block ID
+	codeCollectionBlock = 54 // index mapping collection ID to block ID
+
 	// codes related to protocol level information
-	// codeEpochSetup         = 61 // EpochSetup service event, keyed by ID
-	// codeEpochCommit        = 62 // EpochCommit service event, keyed by ID
+	codeEpochSetup       = 61 // EpochSetup service event, keyed by ID
+	codeEpochCommit      = 62 // EpochCommit service event, keyed by ID
 	codeBeaconPrivateKey = 63 // BeaconPrivateKey, keyed by epoch counter
 	// _                      = 64 // [DEPRECATED] flag that the DKG for an epoch has been started, used in protocol version v1
 	codeDKGEndState = 65 // [DEPRECATED] flag for DKG end state, used in protocol version v1
