@@ -23,6 +23,8 @@ type Transactions interface {
 	// pool. It will return false if it was not found in the mempool.
 	ByID(txID flow.Identifier) (*flow.TransactionBody, bool)
 
+	// ByPayer retrieves all transactions from the memory pool that are sent
+	// by the given payer.
 	ByPayer(payer flow.Address) []*flow.TransactionBody
 
 	// Size will return the current size of the memory pool.

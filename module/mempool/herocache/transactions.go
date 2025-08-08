@@ -39,7 +39,7 @@ func NewTransactions(limit uint32, logger zerolog.Logger, collector module.HeroC
 
 // Has checks whether the transaction with the given hash is currently in
 // the memory pool.
-func (t Transactions) Has(id flow.Identifier) bool {
+func (t *Transactions) Has(id flow.Identifier) bool {
 	return t.c.Has(id)
 }
 
@@ -69,7 +69,7 @@ func (t *Transactions) Add(tx *flow.TransactionBody) bool {
 }
 
 // ByID returns the transaction with the given ID from the mempool.
-func (t Transactions) ByID(txID flow.Identifier) (*flow.TransactionBody, bool) {
+func (t *Transactions) ByID(txID flow.Identifier) (*flow.TransactionBody, bool) {
 	entity, exists := t.c.ByID(txID)
 	if !exists {
 		return nil, false
@@ -83,7 +83,7 @@ func (t Transactions) ByID(txID flow.Identifier) (*flow.TransactionBody, bool) {
 
 // All returns all transactions from the mempool. Since it is using the HeroCache, All guarantees returning
 // all transactions in the same order as they are added.
-func (t Transactions) All() []*flow.TransactionBody {
+func (t *Transactions) All() []*flow.TransactionBody {
 	entities := t.c.All()
 	txs := make([]*flow.TransactionBody, 0, len(entities))
 	for _, entity := range entities {
@@ -109,7 +109,7 @@ func (t *Transactions) Clear() {
 }
 
 // Size returns total number of stored transactions.
-func (t Transactions) Size() uint {
+func (t *Transactions) Size() uint {
 	return t.c.Size()
 }
 
@@ -132,6 +132,8 @@ func (t *Transactions) Remove(id flow.Identifier) bool {
 	return removed
 }
 
+// ByPayer retrieves all transactions from the memory pool that are sent
+// by the given payer.
 func (t *Transactions) ByPayer(payer flow.Address) []*flow.TransactionBody {
 	var result []*flow.TransactionBody
 	err := t.c.Run(func(backdata mempool.BackData) error {
@@ -152,6 +154,8 @@ func (t *Transactions) ByPayer(payer flow.Address) []*flow.TransactionBody {
 	return result
 }
 
+// removeFromIndex removes the transaction with the given ID from the index.
+// This function expects that underlying backadata has been locked by the caller, otherwise the operation won't be atomic.
 func (t *Transactions) removeFromIndex(id flow.Identifier, payer flow.Address) {
 	txns := t.byPayer[payer]
 	delete(txns, id)
@@ -160,9 +164,13 @@ func (t *Transactions) removeFromIndex(id flow.Identifier, payer flow.Address) {
 	}
 }
 
+// ejectionTracer implements herocache.Tracer interface and is used to clean up the index
+// when a transaction is ejected from the HeroCache due to capacity or emergency.
 type ejectionTracer struct {
 	transactions *Transactions
 }
+
+var _ herocache.Tracer = (*ejectionTracer)(nil)
 
 func (t *ejectionTracer) EntityEjectionDueToEmergency(ejectedEntity flow.Entity) {
 	t.cleanupIndex(ejectedEntity)
@@ -172,9 +180,9 @@ func (t *ejectionTracer) EntityEjectionDueToFullCapacity(ejectedEntity flow.Enti
 	t.cleanupIndex(ejectedEntity)
 }
 
+// cleanupIndex calls removeFromIndex on the transactions to clean up the index. This is safe since
+// backdata is locked by the caller when this function is called.
 func (t *ejectionTracer) cleanupIndex(ejectedEntity flow.Entity) {
 	txBody := ejectedEntity.(flow.TransactionBody)
 	t.transactions.removeFromIndex(txBody.ID(), txBody.Payer)
 }
-
-var _ herocache.Tracer = (*ejectionTracer)(nil)
