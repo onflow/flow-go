@@ -21,7 +21,7 @@ import (
 	"github.com/onflow/flow-go/engine/access/rpc/backend/query_mode"
 	"github.com/onflow/flow-go/engine/access/rpc/backend/scripts"
 	"github.com/onflow/flow-go/engine/access/rpc/backend/transactions"
-	"github.com/onflow/flow-go/engine/access/rpc/backend/transactions/error_message_provider"
+	"github.com/onflow/flow-go/engine/access/rpc/backend/transactions/error_messages"
 	"github.com/onflow/flow-go/engine/access/rpc/backend/transactions/provider"
 	"github.com/onflow/flow-go/engine/access/rpc/backend/transactions/status"
 	txstream "github.com/onflow/flow-go/engine/access/rpc/backend/transactions/stream"
@@ -116,7 +116,7 @@ type Params struct {
 	IndexReporter              state_synchronization.IndexReporter
 	VersionControl             *version.VersionControl
 	ExecNodeIdentitiesProvider *commonrpc.ExecutionNodeIdentitiesProvider
-	TxErrorMessageProvider     error_message_provider.TxErrorMessageProvider
+	TxErrorMessageProvider     error_messages.Provider
 }
 
 var _ access.API = (*Backend)(nil)

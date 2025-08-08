@@ -7,7 +7,7 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/access"
-	"github.com/onflow/flow-go/engine/access/rpc/backend/accounts/retriever"
+	"github.com/onflow/flow-go/engine/access/rpc/backend/accounts/provider"
 	"github.com/onflow/flow-go/engine/access/rpc/backend/common"
 	"github.com/onflow/flow-go/engine/access/rpc/backend/node_communicator"
 	"github.com/onflow/flow-go/engine/access/rpc/backend/query_mode"
@@ -21,10 +21,10 @@ import (
 )
 
 type Accounts struct {
-	log       zerolog.Logger
-	state     protocol.State
-	headers   storage.Headers
-	retriever retriever.AccountRetriever
+	log      zerolog.Logger
+	state    protocol.State
+	headers  storage.Headers
+	provider provider.AccountProvider
 }
 
 var _ access.AccountsAPI = (*Accounts)(nil)
@@ -39,29 +39,29 @@ func NewAccountsBackend(
 	scriptExecutor execution.ScriptExecutor,
 	execNodeIdentitiesProvider *commonrpc.ExecutionNodeIdentitiesProvider,
 ) (*Accounts, error) {
-	var accountsRetriever retriever.AccountRetriever
+	var accountProvider provider.AccountProvider
 
 	switch scriptExecMode {
 	case query_mode.IndexQueryModeLocalOnly:
-		accountsRetriever = retriever.NewLocalAccountRetriever(log, state, scriptExecutor)
+		accountProvider = provider.NewLocalAccountProvider(log, state, scriptExecutor)
 
 	case query_mode.IndexQueryModeExecutionNodesOnly:
-		accountsRetriever = retriever.NewENAccountRetriever(log, state, connFactory, nodeCommunicator, execNodeIdentitiesProvider)
+		accountProvider = provider.NewENAccountProvider(log, state, connFactory, nodeCommunicator, execNodeIdentitiesProvider)
 
 	case query_mode.IndexQueryModeFailover:
-		local := retriever.NewLocalAccountRetriever(log, state, scriptExecutor)
-		execNode := retriever.NewENAccountRetriever(log, state, connFactory, nodeCommunicator, execNodeIdentitiesProvider)
-		accountsRetriever = retriever.NewFailoverAccountRetriever(log, state, local, execNode)
+		local := provider.NewLocalAccountProvider(log, state, scriptExecutor)
+		execNode := provider.NewENAccountProvider(log, state, connFactory, nodeCommunicator, execNodeIdentitiesProvider)
+		accountProvider = provider.NewFailoverAccountProvider(log, state, local, execNode)
 
 	default:
 		return nil, fmt.Errorf("unknown execution mode: %v", scriptExecMode)
 	}
 
 	return &Accounts{
-		log:       log,
-		state:     state,
-		headers:   headers,
-		retriever: accountsRetriever,
+		log:      log,
+		state:    state,
+		headers:  headers,
+		provider: accountProvider,
 	}, nil
 }
 
@@ -81,7 +81,7 @@ func (a *Accounts) GetAccountAtLatestBlock(ctx context.Context, address flow.Add
 	}
 
 	sealedBlockID := sealed.ID()
-	account, err := a.retriever.GetAccountAtBlock(ctx, address, sealedBlockID, sealed.Height)
+	account, err := a.provider.GetAccountAtBlock(ctx, address, sealedBlockID, sealed.Height)
 	if err != nil {
 		a.log.Debug().Err(err).Msgf("failed to get account at blockID: %v", sealedBlockID)
 		return nil, err
@@ -101,7 +101,7 @@ func (a *Accounts) GetAccountAtBlockHeight(
 		return nil, commonrpc.ConvertStorageError(common.ResolveHeightError(a.state.Params(), height, err))
 	}
 
-	account, err := a.retriever.GetAccountAtBlock(ctx, address, blockID, height)
+	account, err := a.provider.GetAccountAtBlock(ctx, address, blockID, height)
 	if err != nil {
 		a.log.Debug().Err(err).Msgf("failed to get account at height: %d", height)
 		return nil, err
@@ -120,7 +120,7 @@ func (a *Accounts) GetAccountBalanceAtLatestBlock(ctx context.Context, address f
 	}
 
 	sealedBlockID := sealed.ID()
-	balance, err := a.retriever.GetAccountBalanceAtBlock(ctx, address, sealedBlockID, sealed.Height)
+	balance, err := a.provider.GetAccountBalanceAtBlock(ctx, address, sealedBlockID, sealed.Height)
 	if err != nil {
 		a.log.Debug().Err(err).Msgf("failed to get account balance at blockID: %v", sealedBlockID)
 		return 0, err
@@ -140,7 +140,7 @@ func (a *Accounts) GetAccountBalanceAtBlockHeight(
 		return 0, commonrpc.ConvertStorageError(common.ResolveHeightError(a.state.Params(), height, err))
 	}
 
-	balance, err := a.retriever.GetAccountBalanceAtBlock(ctx, address, blockID, height)
+	balance, err := a.provider.GetAccountBalanceAtBlock(ctx, address, blockID, height)
 	if err != nil {
 		a.log.Debug().Err(err).Msgf("failed to get account balance at height: %v", height)
 		return 0, err
@@ -163,7 +163,7 @@ func (a *Accounts) GetAccountKeyAtLatestBlock(
 	}
 
 	sealedBlockID := sealed.ID()
-	key, err := a.retriever.GetAccountKeyAtBlock(ctx, address, keyIndex, sealedBlockID, sealed.Height)
+	key, err := a.provider.GetAccountKeyAtBlock(ctx, address, keyIndex, sealedBlockID, sealed.Height)
 	if err != nil {
 		a.log.Debug().Err(err).Msgf("failed to get account key at blockID: %v", sealedBlockID)
 		return nil, err
@@ -184,7 +184,7 @@ func (a *Accounts) GetAccountKeyAtBlockHeight(
 		return nil, commonrpc.ConvertStorageError(common.ResolveHeightError(a.state.Params(), height, err))
 	}
 
-	key, err := a.retriever.GetAccountKeyAtBlock(ctx, address, keyIndex, blockID, height)
+	key, err := a.provider.GetAccountKeyAtBlock(ctx, address, keyIndex, blockID, height)
 	if err != nil {
 		a.log.Debug().Err(err).Msgf("failed to get account key at height: %v", height)
 		return nil, err
@@ -206,7 +206,7 @@ func (a *Accounts) GetAccountKeysAtLatestBlock(
 	}
 
 	sealedBlockID := sealed.ID()
-	keys, err := a.retriever.GetAccountKeysAtBlock(ctx, address, sealedBlockID, sealed.Height)
+	keys, err := a.provider.GetAccountKeysAtBlock(ctx, address, sealedBlockID, sealed.Height)
 	if err != nil {
 		a.log.Debug().Err(err).Msgf("failed to get account keys at blockID: %v", sealedBlockID)
 		return nil, err
@@ -226,7 +226,7 @@ func (a *Accounts) GetAccountKeysAtBlockHeight(
 		return nil, commonrpc.ConvertStorageError(common.ResolveHeightError(a.state.Params(), height, err))
 	}
 
-	keys, err := a.retriever.GetAccountKeysAtBlock(ctx, address, blockID, height)
+	keys, err := a.provider.GetAccountKeysAtBlock(ctx, address, blockID, height)
 	if err != nil {
 		a.log.Debug().Err(err).Msgf("failed to get account keys at height: %v", height)
 		return nil, err

@@ -11,7 +11,7 @@ import (
 	"google.golang.org/grpc/codes"
 
 	"github.com/onflow/flow-go/engine/access/index"
-	"github.com/onflow/flow-go/engine/access/rpc/backend/transactions/error_message_provider"
+	"github.com/onflow/flow-go/engine/access/rpc/backend/transactions/error_messages"
 	txstatus "github.com/onflow/flow-go/engine/access/rpc/backend/transactions/status"
 	"github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
@@ -33,7 +33,7 @@ type LocalTransactionProvider struct {
 	blocks          storage.Blocks
 	eventsIndex     *index.EventsIndex
 	txResultsIndex  *index.TransactionResultsIndex
-	txErrorMessages error_message_provider.TxErrorMessageProvider
+	txErrorMessages error_messages.Provider
 	systemTxID      flow.Identifier
 	txStatusDeriver *txstatus.TxStatusDeriver
 }
@@ -46,7 +46,7 @@ func NewLocalTransactionProvider(
 	blocks storage.Blocks,
 	eventsIndex *index.EventsIndex,
 	txResultsIndex *index.TransactionResultsIndex,
-	txErrorMessages error_message_provider.TxErrorMessageProvider,
+	txErrorMessages error_messages.Provider,
 	systemTxID flow.Identifier,
 	txStatusDeriver *txstatus.TxStatusDeriver,
 ) *LocalTransactionProvider {

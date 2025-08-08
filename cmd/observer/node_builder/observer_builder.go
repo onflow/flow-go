@@ -49,7 +49,6 @@ import (
 	"github.com/onflow/flow-go/engine/access/rpc/backend/events"
 	"github.com/onflow/flow-go/engine/access/rpc/backend/node_communicator"
 	"github.com/onflow/flow-go/engine/access/rpc/backend/query_mode"
-	"github.com/onflow/flow-go/engine/access/rpc/backend/scripts"
 	rpcConnection "github.com/onflow/flow-go/engine/access/rpc/connection"
 	"github.com/onflow/flow-go/engine/access/state_stream"
 	statestreambackend "github.com/onflow/flow-go/engine/access/state_stream/backend"
@@ -300,7 +299,7 @@ type ObserverServiceBuilder struct {
 	RegistersAsyncStore *execution.RegistersAsyncStore
 	Reporter            *index.Reporter
 	EventsIndex         *index.EventsIndex
-	ScriptExecutor      *scripts.ScriptExecutor
+	ScriptExecutor      *backend.ScriptExecutor
 
 	// storage
 	events                  storage.Events
@@ -1812,7 +1811,7 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 		return nil
 	})
 	builder.Module("script executor", func(node *cmd.NodeConfig) error {
-		builder.ScriptExecutor = scripts.NewScriptExecutor(builder.Logger, builder.scriptExecMinBlock, builder.scriptExecMaxBlock)
+		builder.ScriptExecutor = backend.NewScriptExecutor(builder.Logger, builder.scriptExecMinBlock, builder.scriptExecMaxBlock)
 		return nil
 	})
 
