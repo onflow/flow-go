@@ -3,7 +3,9 @@
 package mock
 
 import (
+	lockctx "github.com/jordanschalm/lockctx"
 	flow "github.com/onflow/flow-go/model/flow"
+
 	mock "github.com/stretchr/testify/mock"
 
 	storage "github.com/onflow/flow-go/storage"
@@ -14,17 +16,17 @@ type ProtocolKVStore struct {
 	mock.Mock
 }
 
-// BatchIndex provides a mock function with given fields: rw, blockID, stateID
-func (_m *ProtocolKVStore) BatchIndex(rw storage.ReaderBatchWriter, blockID flow.Identifier, stateID flow.Identifier) error {
-	ret := _m.Called(rw, blockID, stateID)
+// BatchIndex provides a mock function with given fields: lctx, rw, blockID, stateID
+func (_m *ProtocolKVStore) BatchIndex(lctx lockctx.Proof, rw storage.ReaderBatchWriter, blockID flow.Identifier, stateID flow.Identifier) error {
+	ret := _m.Called(lctx, rw, blockID, stateID)
 
 	if len(ret) == 0 {
 		panic("no return value specified for BatchIndex")
 	}
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(storage.ReaderBatchWriter, flow.Identifier, flow.Identifier) error); ok {
-		r0 = rf(rw, blockID, stateID)
+	if rf, ok := ret.Get(0).(func(lockctx.Proof, storage.ReaderBatchWriter, flow.Identifier, flow.Identifier) error); ok {
+		r0 = rf(lctx, rw, blockID, stateID)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -32,17 +34,17 @@ func (_m *ProtocolKVStore) BatchIndex(rw storage.ReaderBatchWriter, blockID flow
 	return r0
 }
 
-// BatchStore provides a mock function with given fields: rw, stateID, data
-func (_m *ProtocolKVStore) BatchStore(rw storage.ReaderBatchWriter, stateID flow.Identifier, data *flow.PSKeyValueStoreData) error {
-	ret := _m.Called(rw, stateID, data)
+// BatchStore provides a mock function with given fields: lctx, rw, stateID, data
+func (_m *ProtocolKVStore) BatchStore(lctx lockctx.Proof, rw storage.ReaderBatchWriter, stateID flow.Identifier, data *flow.PSKeyValueStoreData) error {
+	ret := _m.Called(lctx, rw, stateID, data)
 
 	if len(ret) == 0 {
 		panic("no return value specified for BatchStore")
 	}
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(storage.ReaderBatchWriter, flow.Identifier, *flow.PSKeyValueStoreData) error); ok {
-		r0 = rf(rw, stateID, data)
+	if rf, ok := ret.Get(0).(func(lockctx.Proof, storage.ReaderBatchWriter, flow.Identifier, *flow.PSKeyValueStoreData) error); ok {
+		r0 = rf(lctx, rw, stateID, data)
 	} else {
 		r0 = ret.Error(0)
 	}
