@@ -16,10 +16,9 @@ type ComputationResult struct {
 // Construction ComputationResult allowed only within the constructor.
 func NewEmptyComputationResult(
 	block *entity.ExecutableBlock,
-	versionAwareChunkConstructor flow.ChunkConstructor,
 ) *ComputationResult {
 	ber := NewPopulatedBlockExecutionResult(block)
-	aer := NewEmptyBlockAttestationResult(ber, versionAwareChunkConstructor)
+	aer := NewEmptyBlockAttestationResult(ber)
 	return &ComputationResult{
 		BlockExecutionResult:   ber,
 		BlockAttestationResult: aer,

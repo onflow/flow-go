@@ -46,6 +46,9 @@ import (
 	"github.com/onflow/flow-go/engine/access/rest/websockets"
 	"github.com/onflow/flow-go/engine/access/rpc"
 	"github.com/onflow/flow-go/engine/access/rpc/backend"
+	"github.com/onflow/flow-go/engine/access/rpc/backend/events"
+	"github.com/onflow/flow-go/engine/access/rpc/backend/node_communicator"
+	"github.com/onflow/flow-go/engine/access/rpc/backend/query_mode"
 	rpcConnection "github.com/onflow/flow-go/engine/access/rpc/connection"
 	"github.com/onflow/flow-go/engine/access/state_stream"
 	statestreambackend "github.com/onflow/flow-go/engine/access/state_stream/backend"
@@ -187,12 +190,12 @@ func DefaultObserverServiceConfig() *ObserverServiceConfig {
 				CollectionClientTimeout:   3 * time.Second,
 				ExecutionClientTimeout:    3 * time.Second,
 				ConnectionPoolSize:        backend.DefaultConnectionPoolSize,
-				MaxHeightRange:            backend.DefaultMaxHeightRange,
+				MaxHeightRange:            events.DefaultMaxHeightRange,
 				PreferredExecutionNodeIDs: nil,
 				FixedExecutionNodeIDs:     nil,
-				ScriptExecutionMode:       backend.IndexQueryModeExecutionNodesOnly.String(), // default to ENs only for now
-				EventQueryMode:            backend.IndexQueryModeExecutionNodesOnly.String(), // default to ENs only for now
-				TxResultQueryMode:         backend.IndexQueryModeExecutionNodesOnly.String(), // default to ENs only for now
+				ScriptExecutionMode:       query_mode.IndexQueryModeExecutionNodesOnly.String(), // default to ENs only for now
+				EventQueryMode:            query_mode.IndexQueryModeExecutionNodesOnly.String(), // default to ENs only for now
+				TxResultQueryMode:         query_mode.IndexQueryModeExecutionNodesOnly.String(), // default to ENs only for now
 			},
 			RestConfig: rest.Config{
 				ListenAddress:  "",
@@ -1535,7 +1538,7 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 			}
 			broadcaster := engine.NewBroadcaster()
 
-			eventQueryMode, err := backend.ParseIndexQueryMode(builder.rpcConf.BackendConfig.EventQueryMode)
+			eventQueryMode, err := query_mode.ParseIndexQueryMode(builder.rpcConf.BackendConfig.EventQueryMode)
 			if err != nil {
 				return nil, fmt.Errorf("could not parse event query mode: %w", err)
 			}
@@ -1543,7 +1546,7 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 			// use the events index for events if enabled and the node is configured to use it for
 			// regular event queries
 			useIndex := builder.executionDataIndexingEnabled &&
-				eventQueryMode != backend.IndexQueryModeExecutionNodesOnly
+				eventQueryMode != query_mode.IndexQueryModeExecutionNodesOnly
 
 			executionDataTracker := subscriptiontracker.NewExecutionDataTracker(
 				builder.Logger,
@@ -1930,6 +1933,27 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 			return nil, fmt.Errorf("failed to convert node id string to Flow Identifier for fixed EN map: %w", err)
 		}
 
+		scriptExecMode, err := query_mode.ParseIndexQueryMode(config.BackendConfig.ScriptExecutionMode)
+		if err != nil {
+			return nil, fmt.Errorf("could not parse script execution mode: %w", err)
+		}
+
+		eventQueryMode, err := query_mode.ParseIndexQueryMode(config.BackendConfig.EventQueryMode)
+		if err != nil {
+			return nil, fmt.Errorf("could not parse event query mode: %w", err)
+		}
+		if eventQueryMode == query_mode.IndexQueryModeCompare {
+			return nil, fmt.Errorf("event query mode 'compare' is not supported")
+		}
+
+		txResultQueryMode, err := query_mode.ParseIndexQueryMode(config.BackendConfig.TxResultQueryMode)
+		if err != nil {
+			return nil, fmt.Errorf("could not parse transaction result query mode: %w", err)
+		}
+		if txResultQueryMode == query_mode.IndexQueryModeCompare {
+			return nil, fmt.Errorf("transaction result query mode 'compare' is not supported")
+		}
+
 		execNodeIdentitiesProvider := commonrpc.NewExecutionNodeIdentitiesProvider(
 			node.Logger,
 			node.State,
@@ -1953,8 +1977,11 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 			MaxHeightRange:       backendConfig.MaxHeightRange,
 			Log:                  node.Logger,
 			SnapshotHistoryLimit: backend.DefaultSnapshotHistoryLimit,
-			Communicator:         backend.NewNodeCommunicator(backendConfig.CircuitBreakerConfig.Enabled),
+			Communicator:         node_communicator.NewNodeCommunicator(backendConfig.CircuitBreakerConfig.Enabled),
 			BlockTracker:         blockTracker,
+			ScriptExecutionMode:  scriptExecMode,
+			EventQueryMode:       eventQueryMode,
+			TxResultQueryMode:    txResultQueryMode,
 			SubscriptionHandler: subscription.NewSubscriptionHandler(
 				builder.Logger,
 				broadcaster,
@@ -1968,8 +1995,8 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 		}
 
 		if builder.localServiceAPIEnabled {
-			backendParams.ScriptExecutionMode = backend.IndexQueryModeLocalOnly
-			backendParams.EventQueryMode = backend.IndexQueryModeLocalOnly
+			backendParams.ScriptExecutionMode = query_mode.IndexQueryModeLocalOnly
+			backendParams.EventQueryMode = query_mode.IndexQueryModeLocalOnly
 			backendParams.TxResultsIndex = builder.TxResultsIndex
 			backendParams.EventsIndex = builder.EventsIndex
 			backendParams.ScriptExecutor = builder.ScriptExecutor
