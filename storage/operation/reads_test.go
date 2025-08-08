@@ -320,10 +320,10 @@ func TestTraverseKeyOnly(t *testing.T) {
 		actual := make([][]byte, 0)
 
 		// Traverse the keys starting with prefix {0x11}
-		err := operation.TraverseByPrefix(r, []byte{0x10}, operation.KeyOnlyIterateFunc(func(key []byte) error {
+		err := operation.TraverseByPrefix(r, []byte{0x10}, func(key []byte, getValue func(destVal any) error) (bail bool, err error) {
 			actual = append(actual, key)
-			return nil
-		}), storage.DefaultIteratorOptions())
+			return false, nil
+		}, storage.DefaultIteratorOptions())
 		require.NoError(t, err, "traverse should not return an error")
 
 		// Assert that the actual values match the expected values
