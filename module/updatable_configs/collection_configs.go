@@ -1,9 +1,10 @@
 package updatable_configs
 
 import (
+	"go.uber.org/atomic"
+
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/updatable_configs/validation"
-	"go.uber.org/atomic"
 )
 
 type bySealingLagRateLimiterConfigs struct {

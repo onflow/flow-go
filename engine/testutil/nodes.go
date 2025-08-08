@@ -3,7 +3,6 @@ package testutil
 import (
 	"context"
 	"fmt"
-	"github.com/onflow/flow-go/module/updatable_configs"
 	"math"
 	"path/filepath"
 	"testing"
@@ -94,6 +93,7 @@ import (
 	"github.com/onflow/flow-go/module/signature"
 	requesterunit "github.com/onflow/flow-go/module/state_synchronization/requester/unittest"
 	"github.com/onflow/flow-go/module/trace"
+	"github.com/onflow/flow-go/module/updatable_configs"
 	"github.com/onflow/flow-go/module/validation"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/p2p/cache"

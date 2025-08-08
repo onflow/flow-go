@@ -2,14 +2,14 @@ package herocache
 
 import (
 	"fmt"
-	"github.com/onflow/flow-go/module/mempool"
-	"github.com/onflow/flow-go/module/mempool/herocache/backdata/heropool"
 
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/mempool"
 	herocache "github.com/onflow/flow-go/module/mempool/herocache/backdata"
+	"github.com/onflow/flow-go/module/mempool/herocache/backdata/heropool"
 	"github.com/onflow/flow-go/module/mempool/stdmap"
 )
 

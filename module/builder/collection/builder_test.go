@@ -3,7 +3,6 @@ package collection_test
 import (
 	"context"
 	"errors"
-	"github.com/onflow/flow-go/module/updatable_configs"
 	"math/rand"
 	"os"
 	"testing"
@@ -22,6 +21,7 @@ import (
 	"github.com/onflow/flow-go/module/mempool/herocache"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/trace"
+	"github.com/onflow/flow-go/module/updatable_configs"
 	"github.com/onflow/flow-go/state/cluster"
 	clusterkv "github.com/onflow/flow-go/state/cluster/badger"
 	"github.com/onflow/flow-go/state/protocol"
