@@ -4,6 +4,7 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"fmt"
+	"strconv"
 	"time"
 
 	"github.com/onflow/cadence"
@@ -33,7 +34,7 @@ var (
 	// Historically, this flag set a spork-scoped version number, by convention equal to the major software version.
 	// Now that we have HCUs which change the major software version mid-spork, this is no longer useful.
 	deprecatedFlagProtocolVersion   uint
-	flagKVStoreVersion              uint64
+	flagKVStoreVersion              string
 	flagFinalizationSafetyThreshold uint64
 	flagEpochExtensionViewCount     uint64
 	flagCollectionClusters          uint
@@ -102,8 +103,8 @@ func addRootBlockCmdFlags() {
 	rootBlockCmd.Flags().UintVar(&deprecatedFlagProtocolVersion, "protocol-version", 0, "deprecated: this flag will be ignored and remove in a future release")
 	rootBlockCmd.Flags().Uint64Var(&flagFinalizationSafetyThreshold, "kvstore-finalization-safety-threshold", 0, "defines finalization safety threshold")
 	rootBlockCmd.Flags().Uint64Var(&flagEpochExtensionViewCount, "kvstore-epoch-extension-view-count", 0, "length of epoch extension in views, default is 100_000 which is approximately 1 day")
-	rootBlockCmd.Flags().Uint64Var(&flagKVStoreVersion, "kvstore-version", 2,
-		"protocol state KVStore version to initialize (0, 1, 2)")
+	rootBlockCmd.Flags().StringVar(&flagKVStoreVersion, "kvstore-version", "default",
+		"protocol state KVStore version to initialize ('0', '1', '2')")
 
 	cmd.MarkFlagRequired(rootBlockCmd, "root-chain")
 	cmd.MarkFlagRequired(rootBlockCmd, "root-parent")
@@ -296,14 +297,18 @@ func rootBlock(cmd *cobra.Command, args []string) {
 	var rootProtocolState protocol_state.KVStoreAPI
 	kvStoreVersionSet := cmd.Flags().Lookup("kvstore-version").Changed
 	if kvStoreVersionSet {
+		kvStoreVersion, err := strconv.ParseUint(flagKVStoreVersion, 10, 64)
+		if err != nil {
+			log.Fatal().Err(err).Msgf("--kvstore-version must be '0', '1' or '2', got %s ", flagKVStoreVersion)
+		}
 		rootProtocolState, err = kvstore.NewKVStore(
-			flagKVStoreVersion,
+			kvStoreVersion,
 			flagFinalizationSafetyThreshold,
 			flagEpochExtensionViewCount,
 			minEpochStateEntry.ID(),
 		)
 		if err != nil {
-			log.Fatal().Err(err).Msgf("failed to construct root kvstore with version: %d", flagKVStoreVersion)
+			log.Fatal().Err(err).Msgf("failed to construct root kvstore with version: %d", kvStoreVersion)
 		}
 	} else {
 		rootProtocolState, err = kvstore.NewDefaultKVStore(
