@@ -19,7 +19,7 @@ func BenchmarkRetrieve(t *testing.B) {
 
 		for i := 0; i < t.N; i++ {
 			var readBack Entity
-			require.NoError(t, operation.Retrieve(e.Key(), &readBack)(r))
+			require.NoError(t, operation.RetrieveByKey(r, e.Key(), &readBack))
 		}
 	})
 }
@@ -34,8 +34,8 @@ func BenchmarkNonExist(t *testing.B) {
 		t.ResetTimer()
 		nonExist := Entity{ID: uint64(t.N + 1)}
 		for i := 0; i < t.N; i++ {
-			var exists bool
-			require.NoError(t, operation.Exists(nonExist.Key(), &exists)(r))
+			_, err := operation.KeyExists(r, nonExist.Key())
+			require.NoError(t, err)
 		}
 	})
 }
@@ -55,9 +55,9 @@ func BenchmarkIterate(t *testing.B) {
 
 		t.ResetTimer()
 		var found [][]byte
-		require.NoError(t, operation.Iterate(prefix1, prefix2, func(key []byte) error {
+		require.NoError(t, operation.IterateKeysByPrefixRange(r, prefix1, prefix2, func(key []byte) error {
 			found = append(found, key)
 			return nil
-		})(r), "should iterate forward without error")
+		}), "should iterate forward without error")
 	})
 }

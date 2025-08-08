@@ -16,7 +16,7 @@ type Collections struct {
 	db           storage.DB
 	transactions *Transactions
 	// TODO(7355): lockctx
-	indexingByTx sync.Mutex
+	indexingByTx *sync.Mutex
 }
 
 var _ storage.Collections = (*Collections)(nil)
@@ -26,19 +26,9 @@ func NewCollections(db storage.DB, transactions *Transactions) *Collections {
 	c := &Collections{
 		db:           db,
 		transactions: transactions,
-		indexingByTx: sync.Mutex{},
+		indexingByTx: new(sync.Mutex),
 	}
 	return c
-}
-
-func (c *Collections) StoreLight(collection *flow.LightCollection) error {
-	return c.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-		err := operation.UpsertCollection(rw.Writer(), collection)
-		if err != nil {
-			return fmt.Errorf("could not insert collection: %w", err)
-		}
-		return nil
-	})
 }
 
 // Store stores a collection in the database.
@@ -189,10 +179,10 @@ func (c *Collections) StoreLightAndIndexByTransaction(collection *flow.LightColl
 	//   make sure there is no dirty read, we need to use a lock to protect the indexing operation.
 	// - Note, this approach works because this is the only place where UnsafeIndexCollectionByTransaction
 	//   is used in the code base to index collection by transaction.
-	c.indexingByTx.Lock()
-	defer c.indexingByTx.Unlock()
 
 	return c.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+		// TODO(7355): lockctx
+		rw.Lock(c.indexingByTx)
 		return c.batchStoreLightAndIndexByTransaction(collection, rw)
 	})
 }
