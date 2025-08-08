@@ -460,9 +460,15 @@ func TestNewKVStore_SupportedVersions(t *testing.T) {
 	require.NoError(t, err)
 	epochStateID := unittest.IdentifierFixture()
 
-	supportedVersions := []uint64{0, 1, 2}
+	defaultKVStore, err := kvstore.NewDefaultKVStore(
+		safetyParams.FinalizationSafetyThreshold,
+		safetyParams.EpochExtensionViewCount,
+		epochStateID,
+	)
+	require.NoError(t, err)
 
-	for _, version := range supportedVersions {
+	defaultVersion := defaultKVStore.GetProtocolStateVersion()
+	for version := uint64(0); version <= defaultVersion; version++ {
 		t.Run(fmt.Sprintf("version %d", version), func(t *testing.T) {
 			store, err := kvstore.NewKVStore(
 				version,
@@ -484,7 +490,10 @@ func TestNewKVStore_UnsupportedVersion(t *testing.T) {
 	require.NoError(t, err)
 	epochStateID := unittest.IdentifierFixture()
 
-	invalidVersion := uint64(999)
+	defaultKVStore, err := kvstore.NewDefaultKVStore(safetyParams.FinalizationSafetyThreshold, safetyParams.EpochExtensionViewCount, epochStateID)
+	require.NoError(t, err)
+	defaultVersion := defaultKVStore.GetProtocolStateVersion()
+	invalidVersion := defaultVersion + 1
 
 	store, err := kvstore.NewKVStore(
 		invalidVersion,
