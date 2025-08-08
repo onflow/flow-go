@@ -16,6 +16,8 @@ type bySealingLagRateLimiterConfigs struct {
 
 var _ module.BySealingLagRateLimiterConfigSetter = (*bySealingLagRateLimiterConfigs)(nil)
 
+// DefaultBySealingLagRateLimiterConfigs returns a default config for collection throttling.
+// It performs binary throttling once the sealing lag reaches max sealing lag.
 func DefaultBySealingLagRateLimiterConfigs() module.BySealingLagRateLimiterConfigSetter {
 	return &bySealingLagRateLimiterConfigs{
 		minSealingLag:     atomic.NewUint32(300),

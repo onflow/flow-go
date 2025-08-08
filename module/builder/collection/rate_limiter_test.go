@@ -5,6 +5,7 @@ import (
 	"testing"
 )
 
+// StepHalving implements a step halving function.
 func TestStepHalving(t *testing.T) {
 	min := uint(25)
 	max := uint(55)
