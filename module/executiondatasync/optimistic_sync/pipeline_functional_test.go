@@ -49,7 +49,7 @@ type PipelineFunctionalSuite struct {
 	persistentResults             *store.LightTransactionResults
 	persistentTxResultErrMsg      *store.TransactionResultErrorMessages
 	consumerProgress              storage.ConsumerProgress
-	headers                       *bstorage.Headers
+	headers                       *store.Headers
 	results                       *store.ExecutionResults
 	persistentLatestSealedResult  *store.LatestPersistedSealedResult
 	core                          *CoreImpl
@@ -100,7 +100,7 @@ func (p *PipelineFunctionalSuite) SetupTest() {
 	p.Require().NoError(err)
 
 	// store and index the root header
-	p.headers = bstorage.NewHeaders(p.metrics, p.bdb)
+	p.headers = store.NewHeaders(p.metrics, p.db)
 
 	err = p.headers.Store(rootBlock)
 	p.Require().NoError(err)
