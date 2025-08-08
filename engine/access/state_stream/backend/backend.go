@@ -118,7 +118,7 @@ func New(
 		executionDataTracker: executionDataTracker,
 	}
 
-	eventsRetriever := EventsRetriever{
+	eventsProvider := EventsProvider{
 		log:              logger,
 		headers:          headers,
 		getExecutionData: b.getExecutionData,
@@ -130,14 +130,14 @@ func New(
 		log:                  logger,
 		subscriptionHandler:  subscriptionHandler,
 		executionDataTracker: executionDataTracker,
-		eventsRetriever:      eventsRetriever,
+		eventsProvider:       eventsProvider,
 	}
 
 	b.AccountStatusesBackend = AccountStatusesBackend{
 		log:                  logger,
 		subscriptionHandler:  subscriptionHandler,
 		executionDataTracker: b.ExecutionDataTracker,
-		eventsRetriever:      eventsRetriever,
+		eventsProvider:       eventsProvider,
 	}
 
 	return b, nil

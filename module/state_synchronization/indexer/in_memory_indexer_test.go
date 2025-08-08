@@ -1,8 +1,6 @@
 package indexer
 
 import (
-	"crypto/rand"
-	"fmt"
 	"testing"
 
 	"github.com/rs/zerolog"
@@ -11,8 +9,6 @@ import (
 
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/convert"
-	"github.com/onflow/flow-go/ledger/common/pathfinder"
-	"github.com/onflow/flow-go/ledger/complete"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	"github.com/onflow/flow-go/storage/store/inmemory/unsynchronized"
@@ -37,7 +33,7 @@ func TestInMemoryIndexer_IndexBlockData(t *testing.T) {
 		exeResult := unittest.ExecutionResultFixture(unittest.WithBlock(block))
 		indexer := createInMemoryIndexer(exeResult, header)
 
-		trie := createTestTrieUpdate(t)
+		trie := TrieUpdateRandomLedgerPayloadsFixture(t)
 		require.NotEmpty(t, trie.Payloads)
 		collection := unittest.CollectionFixture(0)
 
@@ -79,7 +75,7 @@ func TestInMemoryIndexer_IndexBlockData(t *testing.T) {
 		exeResult := unittest.ExecutionResultFixture(unittest.WithBlock(block))
 		indexer := createInMemoryIndexer(exeResult, header)
 
-		tries := []*ledger.TrieUpdate{createTestTrieUpdate(t), createTestTrieUpdate(t)}
+		tries := []*ledger.TrieUpdate{TrieUpdateRandomLedgerPayloadsFixture(t), TrieUpdateRandomLedgerPayloadsFixture(t)}
 		// Make sure we have two register updates that are updating the same value
 		tries[1].Paths[0] = tries[0].Paths[0]
 		testValue := tries[1].Payloads[0]
@@ -242,7 +238,7 @@ func TestInMemoryIndexer_IndexBlockData(t *testing.T) {
 		expectedResults := unittest.LightTransactionResultsFixture(20)
 		expectedCollections := unittest.CollectionListFixture(2)
 		systemChunkCollection := unittest.CollectionFixture(1)
-		expectedTries := []*ledger.TrieUpdate{createTestTrieUpdate(t), createTestTrieUpdate(t)}
+		expectedTries := []*ledger.TrieUpdate{TrieUpdateRandomLedgerPayloadsFixture(t), TrieUpdateRandomLedgerPayloadsFixture(t)}
 
 		ed := &execution_data.BlockExecutionData{
 			BlockID: blockID,
@@ -345,56 +341,4 @@ func createInMemoryIndexer(executionResult *flow.ExecutionResult, header *flow.H
 		unsynchronized.NewTransactionResultErrorMessages(),
 		executionResult,
 		header)
-}
-
-func createTestTrieWithPayloads(payloads []*ledger.Payload) *ledger.TrieUpdate {
-	keys := make([]ledger.Key, 0)
-	values := make([]ledger.Value, 0)
-	for _, payload := range payloads {
-		key, _ := payload.Key()
-		keys = append(keys, key)
-		values = append(values, payload.Value())
-	}
-
-	update, _ := ledger.NewUpdate(ledger.DummyState, keys, values)
-	trie, _ := pathfinder.UpdateToTrieUpdate(update, complete.DefaultPathFinderVersion)
-	return trie
-}
-
-func createTestTrieUpdate(t *testing.T) *ledger.TrieUpdate {
-	return createTestTrieWithPayloads(
-		[]*ledger.Payload{
-			createTestPayload(t),
-			createTestPayload(t),
-			createTestPayload(t),
-			createTestPayload(t),
-		})
-}
-
-func createTestPayload(t *testing.T) *ledger.Payload {
-	owner := unittest.RandomAddressFixture()
-	key := make([]byte, 8)
-	_, err := rand.Read(key)
-	require.NoError(t, err)
-	val := make([]byte, 8)
-	_, err = rand.Read(val)
-	require.NoError(t, err)
-	return createTestLedgerPayload(owner.String(), fmt.Sprintf("%x", key), val)
-}
-
-func createTestLedgerPayload(owner string, key string, value []byte) *ledger.Payload {
-	k := ledger.Key{
-		KeyParts: []ledger.KeyPart{
-			{
-				Type:  ledger.KeyPartOwner,
-				Value: []byte(owner),
-			},
-			{
-				Type:  ledger.KeyPartKey,
-				Value: []byte(key),
-			},
-		},
-	}
-
-	return ledger.NewPayload(k, value)
 }
