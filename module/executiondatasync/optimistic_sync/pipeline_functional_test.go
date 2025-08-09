@@ -24,7 +24,7 @@ import (
 	reqestermock "github.com/onflow/flow-go/module/state_synchronization/requester/mock"
 	"github.com/onflow/flow-go/storage"
 	bstorage "github.com/onflow/flow-go/storage/badger"
-	"github.com/onflow/flow-go/storage/badger/operation"
+	badgerop "github.com/onflow/flow-go/storage/badger/operation"
 	storagemock "github.com/onflow/flow-go/storage/mock"
 	"github.com/onflow/flow-go/storage/operation/badgerimpl"
 	pebbleStorage "github.com/onflow/flow-go/storage/pebble"
@@ -105,14 +105,14 @@ func (p *PipelineFunctionalSuite) SetupTest() {
 	err = p.headers.Store(rootBlock)
 	p.Require().NoError(err)
 
-	err = p.bdb.Update(operation.IndexBlockHeight(rootBlock.Height, rootBlock.ID()))
+	err = p.bdb.Update(badgerop.IndexFinalizedBlockByHeight(rootBlock.Height, rootBlock.ID()))
 	p.Require().NoError(err)
 
 	// store and index the latest sealed block header
 	err = p.headers.Store(sealedBlock.Header)
 	p.Require().NoError(err)
 
-	err = p.bdb.Update(operation.IndexBlockHeight(sealedBlock.Header.Height, sealedBlock.ID()))
+	err = p.bdb.Update(badgerop.IndexFinalizedBlockByHeight(sealedBlock.Header.Height, sealedBlock.ID()))
 	p.Require().NoError(err)
 
 	// Store and index sealed block execution result
