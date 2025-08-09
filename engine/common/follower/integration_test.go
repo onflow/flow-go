@@ -29,6 +29,7 @@ import (
 	"github.com/onflow/flow-go/state/protocol/events"
 	"github.com/onflow/flow-go/state/protocol/util"
 	bstorage "github.com/onflow/flow-go/storage/badger"
+	"github.com/onflow/flow-go/storage/operation/badgerimpl"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -54,7 +55,7 @@ func TestFollowerHappyPath(t *testing.T) {
 		// bootstrap root snapshot
 		state, err := pbadger.Bootstrap(
 			metrics,
-			db,
+			badgerimpl.ToDB(db),
 			all.Headers,
 			all.Seals,
 			all.Results,
@@ -81,7 +82,7 @@ func TestFollowerHappyPath(t *testing.T) {
 			mockTimer,
 		)
 		require.NoError(t, err)
-		finalizer := moduleconsensus.NewFinalizer(db, all.Headers, followerState, tracer)
+		finalizer := moduleconsensus.NewFinalizer(badgerimpl.ToDB(db).Reader(), all.Headers, followerState, tracer)
 		rootHeader, err := rootSnapshot.Head()
 		require.NoError(t, err)
 		rootQC, err := rootSnapshot.QuorumCertificate()
