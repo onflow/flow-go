@@ -11,6 +11,7 @@ import (
 )
 
 // TransactionBody includes the main contents of a transaction
+//
 type TransactionBody struct {
 
 	// A reference to a previous block
@@ -158,6 +159,7 @@ func (tb *TransactionBody) AddAuthorizer(address Address) *TransactionBody {
 }
 
 // Transaction is the smallest unit of task.
+//
 type Transaction struct {
 	TransactionBody
 	Status           TransactionStatus
@@ -507,4 +509,67 @@ func (s signaturesList) canonicalForm() interface{} {
 	}
 
 	return signatures
+}
+
+// used for construction.
+//
+// This type exists to ensure that constructor functions are invoked explicitly
+// with named fields, which improves clarity and reduces the risk of incorrect field
+// ordering during construction.
+//
+type UntrustedTransactionBody TransactionBody
+
+// NewTransactionBodyFromUntrusted creates a new instance of TransactionBody.
+//
+func NewTransactionBodyFromUntrusted(untrusted UntrustedTransactionBody) (*TransactionBody, error) {
+	if untrusted.ReferenceBlockID == ZeroID {
+		return nil, fmt.Errorf("reference block ID must not be zero")
+	}
+	if len(untrusted.Script) == 0 {
+		return nil, fmt.Errorf("script must not be empty")
+	}
+	if untrusted.Payer == EmptyAddress {
+		return nil, fmt.Errorf("payer must not be empty")
+	}
+	return &TransactionBody{
+		ReferenceBlockID:       untrusted.ReferenceBlockID,
+		Script:                 untrusted.Script,
+		Arguments:              untrusted.Arguments,
+		GasLimit:               untrusted.GasLimit,
+		ProposalKey:            untrusted.ProposalKey,
+		Payer:                  untrusted.Payer,
+		Authorizers:            untrusted.Authorizers,
+		PayloadSignatures:      untrusted.PayloadSignatures,
+		EnvelopeSignatures:     untrusted.EnvelopeSignatures,
+	}, nil
+}
+
+// used for construction.
+//
+// This type exists to ensure that constructor functions are invoked explicitly
+// with named fields, which improves clarity and reduces the risk of incorrect field
+// ordering during construction.
+//
+type UntrustedTransaction Transaction
+
+// NewTransactionFromUntrusted creates a new instance of Transaction.
+//
+func NewTransactionFromUntrusted(untrusted UntrustedTransaction) (*Transaction, error) {
+	if untrusted.ReferenceBlockID == ZeroID {
+		return nil, fmt.Errorf("reference block ID must not be zero")
+	}
+	if len(untrusted.Script) == 0 {
+		return nil, fmt.Errorf("script must not be empty")
+	}
+	if untrusted.Payer == EmptyAddress {
+		return nil, fmt.Errorf("payer must not be empty")
+	}
+	return &Transaction{
+		TransactionBody:  untrusted.TransactionBody,
+		Status:           untrusted.Status,
+		Events:           untrusted.Events,
+		ComputationSpent: untrusted.ComputationSpent,
+		StartState:       untrusted.StartState,
+		EndState:         untrusted.EndState,
+	}, nil
 }

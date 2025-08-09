@@ -138,8 +138,16 @@ func (b *Broker) PrivateSend(dest int, data []byte) {
 		b.log.Error().Msgf("destination id out of range: %d", dest)
 		return
 	}
+	dkgMessage, err := messages.NewDKGMessage(messages.UntrustedDKGMessage{
+		Data:          data,
+		DKGInstanceID: b.dkgInstanceID,
+	})
+	if err != nil {
+		b.log.Error().Err(err).Msg("could not create DKG message")
+		return
+	}
 	dkgMessageOut := messages.PrivDKGMessageOut{
-		DKGMessage: messages.NewDKGMessage(data, b.dkgInstanceID),
+		DKGMessage: *dkgMessage,
 		DestID:     b.committee[dest].NodeID,
 	}
 	b.tunnel.SendOut(dkgMessageOut)
@@ -466,17 +474,20 @@ func (b *Broker) hasValidDKGInstanceID(msg messages.DKGMessage) error {
 // prepareBroadcastMessage creates BroadcastDKGMessage with a signature from the
 // node's staking key.
 func (b *Broker) prepareBroadcastMessage(data []byte) (messages.BroadcastDKGMessage, error) {
-	dkgMessage := messages.NewDKGMessage(
-		data,
-		b.dkgInstanceID,
-	)
+	dkgMessage, err := messages.NewDKGMessage(messages.UntrustedDKGMessage{
+		Data:          data,
+		DKGInstanceID: b.dkgInstanceID,
+	})
+	if err != nil {
+		return messages.BroadcastDKGMessage{}, fmt.Errorf("could not create DKG message: %w", err)
+	}
 	sigData := fingerprint.Fingerprint(dkgMessage)
 	signature, err := b.me.Sign(sigData[:], NewDKGMessageHasher())
 	if err != nil {
 		return messages.BroadcastDKGMessage{}, err
 	}
 	bcastMsg := messages.BroadcastDKGMessage{
-		DKGMessage: dkgMessage,
+		DKGMessage: *dkgMessage,
 		Signature:  signature,
 	}
 	return bcastMsg, nil
