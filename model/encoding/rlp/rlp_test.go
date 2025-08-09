@@ -3,7 +3,7 @@ package rlp_test
 import (
 	"testing"
 
-	"github.com/onflow/go-ethereum/rlp"
+	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

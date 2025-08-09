@@ -4,8 +4,8 @@ import (
 	"math/rand"
 	"testing"
 
+	"github.com/ethereum/go-ethereum/rlp"
 	clone "github.com/huandu/go-clone/generic"
-	"github.com/onflow/go-ethereum/rlp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

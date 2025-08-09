@@ -3,11 +3,11 @@ package types
 import (
 	"fmt"
 
+	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/common"
 	"github.com/onflow/cadence/sema"
 	cadenceRLP "github.com/onflow/cadence/stdlib/rlp"
-	"github.com/onflow/go-ethereum/rlp"
 
 	"github.com/onflow/flow-go/model/flow"
 )

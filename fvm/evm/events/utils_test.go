@@ -3,8 +3,8 @@ package events
 import (
 	"testing"
 
+	gethCommon "github.com/ethereum/go-ethereum/common"
 	"github.com/onflow/cadence"
-	gethCommon "github.com/onflow/go-ethereum/common"
 	"github.com/stretchr/testify/require"
 )
 

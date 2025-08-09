@@ -3,7 +3,7 @@ package emulator
 import (
 	"math/big"
 
-	"github.com/onflow/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/core/types"
 )
 
 var defaultBlockNumberForEVMRules = big.NewInt(1) // anything bigger than 0

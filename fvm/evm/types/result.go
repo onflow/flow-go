@@ -3,11 +3,11 @@ package types
 import (
 	"fmt"
 
-	"github.com/onflow/go-ethereum/accounts/abi"
-	gethCommon "github.com/onflow/go-ethereum/common"
-	gethTypes "github.com/onflow/go-ethereum/core/types"
-	gethVM "github.com/onflow/go-ethereum/core/vm"
-	"github.com/onflow/go-ethereum/rlp"
+	"github.com/ethereum/go-ethereum/accounts/abi"
+	gethCommon "github.com/ethereum/go-ethereum/common"
+	gethTypes "github.com/ethereum/go-ethereum/core/types"
+	gethVM "github.com/ethereum/go-ethereum/core/vm"
+	"github.com/ethereum/go-ethereum/rlp"
 )
 
 // InvalidTransactionGasCost is a gas cost we charge when

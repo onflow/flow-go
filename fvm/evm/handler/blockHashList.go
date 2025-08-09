@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"strings"
 
-	gethCommon "github.com/onflow/go-ethereum/common"
+	gethCommon "github.com/ethereum/go-ethereum/common"
 
 	"github.com/onflow/flow-go/fvm/evm/types"
 	"github.com/onflow/flow-go/model/flow"

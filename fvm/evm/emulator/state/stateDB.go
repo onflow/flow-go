@@ -6,16 +6,16 @@ import (
 	"fmt"
 	"sort"
 
+	gethCommon "github.com/ethereum/go-ethereum/common"
+	gethState "github.com/ethereum/go-ethereum/core/state"
+	gethStateless "github.com/ethereum/go-ethereum/core/stateless"
+	gethTracing "github.com/ethereum/go-ethereum/core/tracing"
+	gethTypes "github.com/ethereum/go-ethereum/core/types"
+	gethParams "github.com/ethereum/go-ethereum/params"
+	gethUtils "github.com/ethereum/go-ethereum/trie/utils"
 	"github.com/holiman/uint256"
 	"github.com/onflow/atree"
 	"github.com/onflow/crypto/hash"
-	gethCommon "github.com/onflow/go-ethereum/common"
-	gethState "github.com/onflow/go-ethereum/core/state"
-	gethStateless "github.com/onflow/go-ethereum/core/stateless"
-	gethTracing "github.com/onflow/go-ethereum/core/tracing"
-	gethTypes "github.com/onflow/go-ethereum/core/types"
-	gethParams "github.com/onflow/go-ethereum/params"
-	gethUtils "github.com/onflow/go-ethereum/trie/utils"
 
 	"github.com/onflow/flow-go/fvm/evm/types"
 	"github.com/onflow/flow-go/model/flow"
@@ -284,7 +284,7 @@ func (db *StateDB) GetState(addr gethCommon.Address, key gethCommon.Hash) gethCo
 //
 // This behavior is ok for this version of EVM as the only
 // use case in the EVM right now is here
-// https://github.com/onflow/go-ethereum/blob/37590b2c5579c36d846c788c70861685b0ea240e/core/vm/evm.go#L480
+// https://github.com/ethereum/go-ethereum/blob/37590b2c5579c36d846c788c70861685b0ea240e/core/vm/evm.go#L480
 // where the value that is returned is compared to empty values to make sure the storage is empty
 // This endpoint is added mostly to prevent the case that an smart contract is self-destructed
 // and a later transaction tries to deploy a contract to the same address.

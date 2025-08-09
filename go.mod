@@ -15,7 +15,7 @@ require (
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc
 	github.com/dgraph-io/badger/v2 v2.2007.4
 	github.com/ef-ds/deque v1.0.4
-	github.com/ethereum/go-ethereum v1.13.10
+	github.com/ethereum/go-ethereum v1.16.2
 	github.com/fxamacker/cbor/v2 v2.8.1-0.20250402194037-6f932b086829
 	github.com/gammazero/workerpool v1.1.3
 	github.com/gogo/protobuf v1.3.2
@@ -107,7 +107,6 @@ require (
 	github.com/libp2p/go-libp2p-routing-helpers v0.7.4
 	github.com/mitchellh/mapstructure v1.5.0
 	github.com/onflow/flow-evm-bridge v0.1.0
-	github.com/onflow/go-ethereum v1.16.2
 	github.com/onflow/nft-storefront/lib/go/contracts v1.0.0
 	github.com/onflow/wal v1.0.2
 	github.com/slok/go-http-metrics v0.12.0
@@ -123,6 +122,7 @@ require (
 	github.com/emicklei/dot v1.6.2 // indirect
 	github.com/ethereum/c-kzg-4844/v2 v2.1.0 // indirect
 	github.com/ferranbt/fastssz v0.1.4 // indirect
+	github.com/onflow/go-ethereum v1.16.2 // indirect
 )
 
 require (

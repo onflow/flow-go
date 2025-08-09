@@ -5,10 +5,10 @@ import (
 	"encoding/hex"
 	"fmt"
 
+	gethCommon "github.com/ethereum/go-ethereum/common"
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/encoding/ccf"
 	"github.com/onflow/cadence/sema"
-	gethCommon "github.com/onflow/go-ethereum/common"
 
 	"github.com/onflow/flow-go/model/flow"
 )
