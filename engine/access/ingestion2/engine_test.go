@@ -205,7 +205,7 @@ func (s *Suite) initEngineAndSyncer(ctx irrecoverable.SignalerContext) (*Engine,
 	s.lastFullBlockHeight, err = counters.NewPersistentStrictMonotonicCounter(lastFullBlockHeight)
 	require.NoError(s.T(), err)
 
-	syncer := NewCollectionSyncer(
+	syncer, err := NewCollectionSyncer(
 		s.log,
 		s.collectionExecutedMetric,
 		s.request,
@@ -215,6 +215,7 @@ func (s *Suite) initEngineAndSyncer(ctx irrecoverable.SignalerContext) (*Engine,
 		s.transactions,
 		s.lastFullBlockHeight,
 	)
+	require.NoError(s.T(), err)
 
 	blockProcessor, err := NewFinalizedBlockProcessor(
 		s.log,

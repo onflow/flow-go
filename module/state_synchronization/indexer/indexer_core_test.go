@@ -2,7 +2,6 @@ package indexer
 
 import (
 	"context"
-	"crypto/rand"
 	"fmt"
 	"os"
 	"testing"
@@ -16,8 +15,6 @@ import (
 	"github.com/onflow/flow-go/fvm/storage/derived"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/convert"
-	"github.com/onflow/flow-go/ledger/common/pathfinder"
-	"github.com/onflow/flow-go/ledger/complete"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	"github.com/onflow/flow-go/module/mempool/stdmap"
@@ -251,7 +248,7 @@ func TestExecutionState_IndexBlockData(t *testing.T) {
 	// this test makes sure the index block data is correctly calling store register with the
 	// same entries we create as a block execution data test, and correctly converts the registers
 	t.Run("Index Single Chunk and Single Register", func(t *testing.T) {
-		trie := trieUpdateFixture(t)
+		trie := TrieUpdateRandomLedgerPayloadsFixture(t)
 		ed := &execution_data.BlockExecutionData{
 			BlockID: block.ID(),
 			ChunkExecutionDatas: []*execution_data.ChunkExecutionData{
@@ -286,7 +283,7 @@ func TestExecutionState_IndexBlockData(t *testing.T) {
 	// we only update that register once with the latest value, so this makes sure merging of
 	// registers is done correctly.
 	t.Run("Index Multiple Chunks and Merge Same Register Updates", func(t *testing.T) {
-		tries := []*ledger.TrieUpdate{trieUpdateFixture(t), trieUpdateFixture(t)}
+		tries := []*ledger.TrieUpdate{TrieUpdateRandomLedgerPayloadsFixture(t), TrieUpdateRandomLedgerPayloadsFixture(t)}
 		// make sure we have two register updates that are updating the same value, so we can check
 		// if the value from the second update is being persisted instead of first
 		tries[1].Paths[0] = tries[0].Paths[0]
@@ -473,7 +470,7 @@ func TestExecutionState_IndexBlockData(t *testing.T) {
 		expectedEvents := unittest.EventsFixture(20)
 		expectedResults := unittest.LightTransactionResultsFixture(20)
 		expectedCollections := unittest.CollectionListFixture(2)
-		expectedTries := []*ledger.TrieUpdate{trieUpdateFixture(t), trieUpdateFixture(t)}
+		expectedTries := []*ledger.TrieUpdate{TrieUpdateRandomLedgerPayloadsFixture(t), TrieUpdateRandomLedgerPayloadsFixture(t)}
 		expectedPayloads := make([]*ledger.Payload, 0)
 		for _, trie := range expectedTries {
 			expectedPayloads = append(expectedPayloads, trie.Payloads...)
@@ -598,58 +595,6 @@ func newBlockHeadersStorage(blocks []*flow.Block) storage.Headers {
 	}
 
 	return synctest.MockBlockHeaderStorage(synctest.WithByID(blocksByID))
-}
-
-func trieUpdateWithPayloadsFixture(payloads []*ledger.Payload) *ledger.TrieUpdate {
-	keys := make([]ledger.Key, 0)
-	values := make([]ledger.Value, 0)
-	for _, payload := range payloads {
-		key, _ := payload.Key()
-		keys = append(keys, key)
-		values = append(values, payload.Value())
-	}
-
-	update, _ := ledger.NewUpdate(ledger.DummyState, keys, values)
-	trie, _ := pathfinder.UpdateToTrieUpdate(update, complete.DefaultPathFinderVersion)
-	return trie
-}
-
-func trieUpdateFixture(t *testing.T) *ledger.TrieUpdate {
-	return trieUpdateWithPayloadsFixture(
-		[]*ledger.Payload{
-			ledgerPayloadFixture(t),
-			ledgerPayloadFixture(t),
-			ledgerPayloadFixture(t),
-			ledgerPayloadFixture(t),
-		})
-}
-
-func ledgerPayloadFixture(t *testing.T) *ledger.Payload {
-	owner := unittest.RandomAddressFixture()
-	key := make([]byte, 8)
-	_, err := rand.Read(key)
-	require.NoError(t, err)
-	val := make([]byte, 8)
-	_, err = rand.Read(key)
-	require.NoError(t, err)
-	return ledgerPayloadWithValuesFixture(owner.String(), fmt.Sprintf("%x", key), val)
-}
-
-func ledgerPayloadWithValuesFixture(owner string, key string, value []byte) *ledger.Payload {
-	k := ledger.Key{
-		KeyParts: []ledger.KeyPart{
-			{
-				Type:  ledger.KeyPartOwner,
-				Value: []byte(owner),
-			},
-			{
-				Type:  ledger.KeyPartKey,
-				Value: []byte(key),
-			},
-		},
-	}
-
-	return ledger.NewPayload(k, value)
 }
 
 // trieRegistersPayloadComparer checks that trie payloads and register payloads are same, used for testing.
@@ -822,6 +767,6 @@ func TestIndexerIntegration_StoreAndGet(t *testing.T) {
 
 // helper to store register at height and increment index range
 func storeRegisterWithValue(indexer *IndexerCore, height uint64, owner string, key string, value []byte) error {
-	payload := ledgerPayloadWithValuesFixture(owner, key, value)
+	payload := LedgerPayloadFixture(owner, key, value)
 	return indexer.indexRegisters(map[ledger.Path]*ledger.Payload{ledger.DummyPath: payload}, height)
 }

@@ -946,9 +946,9 @@ func (_m *API) GetSystemTransaction(ctx context.Context, blockID flow.Identifier
 	return r0, r1
 }
 
-// GetSystemTransactionResult provides a mock function with given fields: ctx, blockID, requiredEventEncodingVersion
-func (_m *API) GetSystemTransactionResult(ctx context.Context, blockID flow.Identifier, requiredEventEncodingVersion entities.EventEncodingVersion) (*modelaccess.TransactionResult, error) {
-	ret := _m.Called(ctx, blockID, requiredEventEncodingVersion)
+// GetSystemTransactionResult provides a mock function with given fields: ctx, blockID, encodingVersion
+func (_m *API) GetSystemTransactionResult(ctx context.Context, blockID flow.Identifier, encodingVersion entities.EventEncodingVersion) (*modelaccess.TransactionResult, error) {
+	ret := _m.Called(ctx, blockID, encodingVersion)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetSystemTransactionResult")
@@ -957,10 +957,10 @@ func (_m *API) GetSystemTransactionResult(ctx context.Context, blockID flow.Iden
 	var r0 *modelaccess.TransactionResult
 	var r1 error
 	if rf, ok := ret.Get(0).(func(context.Context, flow.Identifier, entities.EventEncodingVersion) (*modelaccess.TransactionResult, error)); ok {
-		return rf(ctx, blockID, requiredEventEncodingVersion)
+		return rf(ctx, blockID, encodingVersion)
 	}
 	if rf, ok := ret.Get(0).(func(context.Context, flow.Identifier, entities.EventEncodingVersion) *modelaccess.TransactionResult); ok {
-		r0 = rf(ctx, blockID, requiredEventEncodingVersion)
+		r0 = rf(ctx, blockID, encodingVersion)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*modelaccess.TransactionResult)
@@ -968,7 +968,7 @@ func (_m *API) GetSystemTransactionResult(ctx context.Context, blockID flow.Iden
 	}
 
 	if rf, ok := ret.Get(1).(func(context.Context, flow.Identifier, entities.EventEncodingVersion) error); ok {
-		r1 = rf(ctx, blockID, requiredEventEncodingVersion)
+		r1 = rf(ctx, blockID, encodingVersion)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -1006,9 +1006,9 @@ func (_m *API) GetTransaction(ctx context.Context, id flow.Identifier) (*flow.Tr
 	return r0, r1
 }
 
-// GetTransactionResult provides a mock function with given fields: ctx, id, blockID, collectionID, requiredEventEncodingVersion
-func (_m *API) GetTransactionResult(ctx context.Context, id flow.Identifier, blockID flow.Identifier, collectionID flow.Identifier, requiredEventEncodingVersion entities.EventEncodingVersion) (*modelaccess.TransactionResult, error) {
-	ret := _m.Called(ctx, id, blockID, collectionID, requiredEventEncodingVersion)
+// GetTransactionResult provides a mock function with given fields: ctx, txID, blockID, collectionID, encodingVersion
+func (_m *API) GetTransactionResult(ctx context.Context, txID flow.Identifier, blockID flow.Identifier, collectionID flow.Identifier, encodingVersion entities.EventEncodingVersion) (*modelaccess.TransactionResult, error) {
+	ret := _m.Called(ctx, txID, blockID, collectionID, encodingVersion)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetTransactionResult")
@@ -1017,10 +1017,10 @@ func (_m *API) GetTransactionResult(ctx context.Context, id flow.Identifier, blo
 	var r0 *modelaccess.TransactionResult
 	var r1 error
 	if rf, ok := ret.Get(0).(func(context.Context, flow.Identifier, flow.Identifier, flow.Identifier, entities.EventEncodingVersion) (*modelaccess.TransactionResult, error)); ok {
-		return rf(ctx, id, blockID, collectionID, requiredEventEncodingVersion)
+		return rf(ctx, txID, blockID, collectionID, encodingVersion)
 	}
 	if rf, ok := ret.Get(0).(func(context.Context, flow.Identifier, flow.Identifier, flow.Identifier, entities.EventEncodingVersion) *modelaccess.TransactionResult); ok {
-		r0 = rf(ctx, id, blockID, collectionID, requiredEventEncodingVersion)
+		r0 = rf(ctx, txID, blockID, collectionID, encodingVersion)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*modelaccess.TransactionResult)
@@ -1028,7 +1028,7 @@ func (_m *API) GetTransactionResult(ctx context.Context, id flow.Identifier, blo
 	}
 
 	if rf, ok := ret.Get(1).(func(context.Context, flow.Identifier, flow.Identifier, flow.Identifier, entities.EventEncodingVersion) error); ok {
-		r1 = rf(ctx, id, blockID, collectionID, requiredEventEncodingVersion)
+		r1 = rf(ctx, txID, blockID, collectionID, encodingVersion)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -1036,9 +1036,9 @@ func (_m *API) GetTransactionResult(ctx context.Context, id flow.Identifier, blo
 	return r0, r1
 }
 
-// GetTransactionResultByIndex provides a mock function with given fields: ctx, blockID, index, requiredEventEncodingVersion
-func (_m *API) GetTransactionResultByIndex(ctx context.Context, blockID flow.Identifier, index uint32, requiredEventEncodingVersion entities.EventEncodingVersion) (*modelaccess.TransactionResult, error) {
-	ret := _m.Called(ctx, blockID, index, requiredEventEncodingVersion)
+// GetTransactionResultByIndex provides a mock function with given fields: ctx, blockID, index, encodingVersion
+func (_m *API) GetTransactionResultByIndex(ctx context.Context, blockID flow.Identifier, index uint32, encodingVersion entities.EventEncodingVersion) (*modelaccess.TransactionResult, error) {
+	ret := _m.Called(ctx, blockID, index, encodingVersion)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetTransactionResultByIndex")
@@ -1047,10 +1047,10 @@ func (_m *API) GetTransactionResultByIndex(ctx context.Context, blockID flow.Ide
 	var r0 *modelaccess.TransactionResult
 	var r1 error
 	if rf, ok := ret.Get(0).(func(context.Context, flow.Identifier, uint32, entities.EventEncodingVersion) (*modelaccess.TransactionResult, error)); ok {
-		return rf(ctx, blockID, index, requiredEventEncodingVersion)
+		return rf(ctx, blockID, index, encodingVersion)
 	}
 	if rf, ok := ret.Get(0).(func(context.Context, flow.Identifier, uint32, entities.EventEncodingVersion) *modelaccess.TransactionResult); ok {
-		r0 = rf(ctx, blockID, index, requiredEventEncodingVersion)
+		r0 = rf(ctx, blockID, index, encodingVersion)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*modelaccess.TransactionResult)
@@ -1058,7 +1058,7 @@ func (_m *API) GetTransactionResultByIndex(ctx context.Context, blockID flow.Ide
 	}
 
 	if rf, ok := ret.Get(1).(func(context.Context, flow.Identifier, uint32, entities.EventEncodingVersion) error); ok {
-		r1 = rf(ctx, blockID, index, requiredEventEncodingVersion)
+		r1 = rf(ctx, blockID, index, encodingVersion)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -1066,9 +1066,9 @@ func (_m *API) GetTransactionResultByIndex(ctx context.Context, blockID flow.Ide
 	return r0, r1
 }
 
-// GetTransactionResultsByBlockID provides a mock function with given fields: ctx, blockID, requiredEventEncodingVersion
-func (_m *API) GetTransactionResultsByBlockID(ctx context.Context, blockID flow.Identifier, requiredEventEncodingVersion entities.EventEncodingVersion) ([]*modelaccess.TransactionResult, error) {
-	ret := _m.Called(ctx, blockID, requiredEventEncodingVersion)
+// GetTransactionResultsByBlockID provides a mock function with given fields: ctx, blockID, encodingVersion
+func (_m *API) GetTransactionResultsByBlockID(ctx context.Context, blockID flow.Identifier, encodingVersion entities.EventEncodingVersion) ([]*modelaccess.TransactionResult, error) {
+	ret := _m.Called(ctx, blockID, encodingVersion)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetTransactionResultsByBlockID")
@@ -1077,10 +1077,10 @@ func (_m *API) GetTransactionResultsByBlockID(ctx context.Context, blockID flow.
 	var r0 []*modelaccess.TransactionResult
 	var r1 error
 	if rf, ok := ret.Get(0).(func(context.Context, flow.Identifier, entities.EventEncodingVersion) ([]*modelaccess.TransactionResult, error)); ok {
-		return rf(ctx, blockID, requiredEventEncodingVersion)
+		return rf(ctx, blockID, encodingVersion)
 	}
 	if rf, ok := ret.Get(0).(func(context.Context, flow.Identifier, entities.EventEncodingVersion) []*modelaccess.TransactionResult); ok {
-		r0 = rf(ctx, blockID, requiredEventEncodingVersion)
+		r0 = rf(ctx, blockID, encodingVersion)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]*modelaccess.TransactionResult)
@@ -1088,7 +1088,7 @@ func (_m *API) GetTransactionResultsByBlockID(ctx context.Context, blockID flow.
 	}
 
 	if rf, ok := ret.Get(1).(func(context.Context, flow.Identifier, entities.EventEncodingVersion) error); ok {
-		r1 = rf(ctx, blockID, requiredEventEncodingVersion)
+		r1 = rf(ctx, blockID, encodingVersion)
 	} else {
 		r1 = ret.Error(1)
 	}

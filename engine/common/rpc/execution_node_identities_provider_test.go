@@ -9,7 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
-	"github.com/onflow/flow-go/engine/access/rpc/backend"
+	"github.com/onflow/flow-go/engine/access/rpc/backend/node_communicator"
 	commonrpc "github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/model/flow"
 	protocol "github.com/onflow/flow-go/state/protocol/mock"
@@ -124,7 +124,7 @@ func (suite *ENIdentitiesProviderSuite) TestExecutionNodesForBlockID() {
 		allExecNodes, err := execNodeIdentitiesProvider.ExecutionNodesForBlockID(context.Background(), block.ID())
 		require.NoError(suite.T(), err)
 
-		execNodeSelectorFactory := backend.NewNodeSelectorFactory(false)
+		execNodeSelectorFactory := node_communicator.NewNodeSelectorFactory(false)
 		execSelector, err := execNodeSelectorFactory.SelectNodes(allExecNodes)
 		require.NoError(suite.T(), err)
 
@@ -163,7 +163,7 @@ func (suite *ENIdentitiesProviderSuite) TestExecutionNodesForBlockID() {
 		allExecNodes, err := execNodeIdentitiesProvider.ExecutionNodesForBlockID(context.Background(), block.ID())
 		require.NoError(suite.T(), err)
 
-		execNodeSelectorFactory := backend.NewNodeSelectorFactory(false)
+		execNodeSelectorFactory := node_communicator.NewNodeSelectorFactory(false)
 		execSelector, err := execNodeSelectorFactory.SelectNodes(allExecNodes)
 		require.NoError(suite.T(), err)
 
