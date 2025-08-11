@@ -453,7 +453,7 @@ func GenesisFixture() *flow.Block {
 	return genesis
 }
 
-func WithHeaderHeight(height uint64) func(header *flow.Header) {
+func WithHeaderHeight(height uint64) func(*flow.Header) {
 	return func(header *flow.Header) {
 		header.Height = height
 	}
