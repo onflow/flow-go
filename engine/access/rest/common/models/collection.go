@@ -47,7 +47,7 @@ func (c *CollectionGuarantee) Build(guarantee *flow.CollectionGuarantee) {
 	c.SignerIndices = fmt.Sprintf("%x", guarantee.SignerIndices)
 	c.Signature = util.ToBase64(guarantee.Signature.Bytes())
 	c.ReferenceBlockID = guarantee.ReferenceBlockID.String()
-	c.ClusterChainID = guarantee.ChainID.String()
+	c.ClusterChainID = guarantee.ClusterChainID.String()
 }
 
 type CollectionGuarantees []CollectionGuarantee

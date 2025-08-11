@@ -1096,7 +1096,7 @@ func TestBootstrapSealingSegmentWithExtraBlocks(t *testing.T) {
 		// bootstrap from snapshot
 		util.RunWithFullProtocolState(t, snapshot, func(db *badger.DB, state *bprotocol.ParticipantState) {
 			guarantee := unittest.CollectionGuaranteeFixture(unittest.WithCollRef(block1.ID()))
-			guarantee.ChainID = cluster.ChainID()
+			guarantee.ClusterChainID = cluster.ChainID()
 
 			signerIndices, err := signature.EncodeSignersToIndices(
 				[]flow.Identifier{collID}, []flow.Identifier{collID})

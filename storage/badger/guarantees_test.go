@@ -40,3 +40,47 @@ func TestGuaranteeStoreRetrieve(t *testing.T) {
 		require.Equal(t, expected, actual)
 	})
 }
+
+func TestStoreDuplicateGuarantee(t *testing.T) {
+	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+		metrics := metrics.NewNoopCollector()
+		store := badgerstorage.NewGuarantees(metrics, db, 1000, 1000)
+		expected := unittest.CollectionGuaranteeFixture()
+
+		err := store.Store(expected)
+		require.NoError(t, err)
+		// storage of the same guarantee should be idempotent
+		err = store.Store(expected)
+		require.NoError(t, err)
+
+		actual, err := store.ByID(expected.ID())
+		require.NoError(t, err)
+		require.Equal(t, expected, actual)
+		actual, err = store.ByCollectionID(expected.CollectionID)
+		require.NoError(t, err)
+		require.Equal(t, expected, actual)
+	})
+}
+
+func TestStoreConflictingGuarantee(t *testing.T) {
+	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+		metrics := metrics.NewNoopCollector()
+		store := badgerstorage.NewGuarantees(metrics, db, 1000, 1000)
+		expected := unittest.CollectionGuaranteeFixture()
+		err := store.Store(expected)
+		require.NoError(t, err)
+
+		// a differing guarantee for the same collection is potentially byzantine and should return an error
+		conflicting := *expected
+		conflicting.SignerIndices = []byte{99}
+		err = store.Store(&conflicting)
+		require.ErrorIs(t, err, storage.ErrDataMismatch)
+
+		actual, err := store.ByID(expected.ID())
+		require.NoError(t, err)
+		require.Equal(t, expected, actual)
+		actual, err = store.ByCollectionID(expected.CollectionID)
+		require.NoError(t, err)
+		require.Equal(t, expected, actual)
+	})
+}

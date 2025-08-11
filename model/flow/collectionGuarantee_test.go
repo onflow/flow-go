@@ -20,7 +20,7 @@ func TestNewCollectionGuarantee(t *testing.T) {
 		ug := flow.UntrustedCollectionGuarantee{
 			CollectionID:     unittest.IdentifierFixture(),
 			ReferenceBlockID: unittest.IdentifierFixture(),
-			ChainID:          flow.Testnet,
+			ClusterChainID:   flow.Testnet,
 			SignerIndices:    []byte{0, 1, 2},
 			Signature:        unittest.SignatureFixture(),
 		}

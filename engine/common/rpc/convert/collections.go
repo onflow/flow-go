@@ -90,7 +90,7 @@ func CollectionGuaranteeToMessage(g *flow.CollectionGuarantee) *entities.Collect
 		ReferenceBlockId: IdentifierToMessage(g.ReferenceBlockID),
 		Signature:        g.Signature,
 		SignerIndices:    g.SignerIndices,
-		ClusterChainId:   []byte(g.ChainID),
+		ClusterChainId:   []byte(g.ClusterChainID),
 	}
 }
 
@@ -99,7 +99,7 @@ func MessageToCollectionGuarantee(m *entities.CollectionGuarantee) (*flow.Collec
 	return flow.NewCollectionGuarantee(flow.UntrustedCollectionGuarantee{
 		CollectionID:     MessageToIdentifier(m.CollectionId),
 		ReferenceBlockID: MessageToIdentifier(m.ReferenceBlockId),
-		ChainID:          flow.ChainID(m.ClusterChainId),
+		ClusterChainID:   flow.ChainID(m.ClusterChainId),
 		SignerIndices:    m.SignerIndices,
 		Signature:        MessageToSignature(m.Signature),
 	})

@@ -169,7 +169,7 @@ func (f *Finalizer) MakeFinal(blockID flow.Identifier) error {
 			guarantee, err := flow.NewCollectionGuarantee(flow.UntrustedCollectionGuarantee{
 				CollectionID:     payload.Collection.ID(),
 				ReferenceBlockID: payload.ReferenceBlockID,
-				ChainID:          header.ChainID,
+				ClusterChainID:   header.ChainID,
 				SignerIndices:    step.ParentVoterIndices,
 				Signature:        nil, // TODO: to remove because it's not easily verifiable by consensus nodes
 			})
