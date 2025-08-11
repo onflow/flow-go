@@ -684,28 +684,6 @@ func EntropyProviderFixture(source []byte) environment.EntropyProvider {
 	return &provider
 }
 
-// ProtocolStateWithVersionFixture is the same as ProtocolStateWithSourceFixture,
-// but it allows specifying the desired protocol version, rather than random source.
-// TODO(mainnet27, #6773): remove, because this is only temporarily needed in the execution node to produce different chunk Data Packs depending on the protocol version
-func ProtocolStateWithVersionFixture(protocolVersion uint64) protocol.SnapshotExecutionSubsetProvider {
-	kvstore := &protocolMock.KVStoreReader{}
-	kvstore.On("GetProtocolStateVersion").Return(protocolVersion)
-	snapshot := mockSnapshotSubset{
-		randomSourceFunc: func() ([]byte, error) {
-			return unittest.SignatureFixture(), nil
-		},
-		kvStoreFunc: func() (protocol.KVStoreReader, error) {
-			return kvstore, nil
-		},
-	}
-	provider := mockProtocolStateSnapshotProvider{
-		snapshotFunc: func(blockID flow.Identifier) protocol.SnapshotExecutionSubset {
-			return snapshot
-		},
-	}
-	return provider
-}
-
 // ProtocolStateWithSourceFixture returns a protocol state mock that only
 // supports AtBlockID to return a snapshot mock.
 // The snapshot mock only supports RandomSource().

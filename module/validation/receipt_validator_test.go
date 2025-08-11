@@ -5,7 +5,6 @@ import (
 	"math/rand"
 	"testing"
 
-	clone "github.com/huandu/go-clone/generic"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
@@ -180,54 +179,6 @@ func (s *ReceiptValidationSuite) TestReceiptTooFewChunks() {
 	s.Assert().True(engine.IsInvalidInputError(err))
 }
 
-// TestReceiptChunkModelVersions tests that the receipt validator enforces
-// that receipts included in blocks use a data model consistent with the
-// reference block's protocol version.
-// TODO(mainnet27, #6773): remove this test case
-func (s *ReceiptValidationSuite) TestReceiptChunkModelVersions() {
-	valSubgrph := s.ValidSubgraphFixture()
-	receipt := unittest.ExecutionReceiptFixture(unittest.WithExecutorID(s.ExeID),
-		unittest.WithResult(valSubgrph.Result))
-	s.AddSubgraphFixtureToMempools(valSubgrph)
-
-	s.publicKey.On("Verify",
-		mock.Anything,
-		mock.Anything,
-		mock.Anything).Return(true, nil).Maybe()
-
-	receiptProtocolVersion1 := clone.Clone(receipt)
-	for _, chunk := range receiptProtocolVersion1.Chunks {
-		chunk.ServiceEventCount = nil
-	}
-	// fixture produces receipt already compliant with protocol version 2
-	receiptProtocolVersion2 := clone.Clone(receipt)
-
-	s.Run("protocol state version 1", func() {
-		s.ProtocolStateVersion = 1
-		s.Run("execution result compliant with protocol version 1", func() {
-			err := s.receiptValidator.Validate(receiptProtocolVersion1)
-			s.Require().NoError(err)
-		})
-		s.Run("execution result compliant with protocol version 2", func() {
-			err := s.receiptValidator.Validate(receiptProtocolVersion2)
-			s.Require().Error(err, "should reject new result model when protocol version is set to 1")
-			s.Assert().True(engine.IsInvalidInputError(err))
-		})
-	})
-	s.Run("protocol state version 2", func() {
-		s.ProtocolStateVersion = 2
-		s.Run("execution result compliant with protocol version 1", func() {
-			err := s.receiptValidator.Validate(receiptProtocolVersion1)
-			s.Require().Error(err, "should reject old result model when protocol version is set to 2")
-			s.Assert().True(engine.IsInvalidInputError(err))
-		})
-		s.Run("execution result compliant with protocol version 2", func() {
-			err := s.receiptValidator.Validate(receiptProtocolVersion2)
-			s.Require().NoError(err)
-		})
-	})
-}
-
 // TestReceiptServiceEventCountMismatch tests that we reject any receipt where
 // the sum of service event counts specified by chunks is inconsistent with the
 // number of service events in the ExecutionResult.
@@ -249,26 +200,18 @@ func (s *ReceiptValidationSuite) TestReceiptServiceEventCountMismatch() {
 			s.Require().NoError(err)
 		})
 		s.Run("chunk list has too large service event count", func() {
-			*result.Chunks[rand.Intn(len(result.Chunks))].ServiceEventCount++
+			result.Chunks[rand.Intn(len(result.Chunks))].ServiceEventCount++
 			err := s.receiptValidator.Validate(receipt)
 			s.Require().Error(err, "should reject with invalid chunks")
 			s.Assert().True(engine.IsInvalidInputError(err))
 		})
 		s.Run("chunk list has too small service event count", func() {
 			for _, chunk := range result.Chunks {
-				if *chunk.ServiceEventCount > 0 {
-					*chunk.ServiceEventCount--
+				if chunk.ServiceEventCount > 0 {
+					chunk.ServiceEventCount--
 				}
 			}
-			*result.Chunks[rand.Intn(len(result.Chunks))].ServiceEventCount++
-			err := s.receiptValidator.Validate(receipt)
-			s.Require().Error(err, "should reject with invalid chunks")
-			s.Assert().True(engine.IsInvalidInputError(err))
-		})
-		s.Run("chunk list contains nil service event count field", func() {
-			// TODO(mainnet27, #6773): remove after changing ServiceEventCount field to value type https://github.com/onflow/flow-go/issues/6773
-
-			result.Chunks[rand.Intn(len(result.Chunks))].ServiceEventCount = nil
+			result.Chunks[rand.Intn(len(result.Chunks))].ServiceEventCount++
 			err := s.receiptValidator.Validate(receipt)
 			s.Require().Error(err, "should reject with invalid chunks")
 			s.Assert().True(engine.IsInvalidInputError(err))
@@ -286,13 +229,7 @@ func (s *ReceiptValidationSuite) TestReceiptServiceEventCountMismatch() {
 			s.Require().NoError(err)
 		})
 		s.Run("chunk list has wrong sum of service event counts", func() {
-			*result.Chunks[rand.Intn(len(result.Chunks))].ServiceEventCount++
-			err := s.receiptValidator.Validate(receipt)
-			s.Require().Error(err, "should reject with invalid chunks")
-			s.Assert().True(engine.IsInvalidInputError(err))
-		})
-		s.Run("chunk list contains nil service event count field", func() {
-			result.Chunks[rand.Intn(len(result.Chunks))].ServiceEventCount = nil
+			result.Chunks[rand.Intn(len(result.Chunks))].ServiceEventCount++
 			err := s.receiptValidator.Validate(receipt)
 			s.Require().Error(err, "should reject with invalid chunks")
 			s.Assert().True(engine.IsInvalidInputError(err))
@@ -1264,7 +1201,6 @@ func (s *ReceiptValidationSuite) TestException_ProtocolStateHead() {
 	snapshot := mock_protocol.NewSnapshot(s.T())
 	exception := errors.New("state.Head() exception")
 	snapshot.On("Head").Return(nil, exception)
-	unittest.MockProtocolStateVersion(snapshot, 2)
 	s.State.On("AtBlockID", valSubgrph.Block.ID()).Return(snapshot)
 
 	s.T().Run("Method Validate", func(t *testing.T) {
@@ -1300,7 +1236,6 @@ func (s *ReceiptValidationSuite) TestException_ProtocolStateIdentity() {
 	// receiptValidator.state yields exception on Identity retrieval
 	*s.State = *mock_protocol.NewState(s.T()) // receiptValidator has pointer to this field, which we override with a new state mock
 	snapshot := mock_protocol.NewSnapshot(s.T())
-	unittest.MockProtocolStateVersion(snapshot, 2)
 	exception := errors.New("state.Identity() exception")
 	snapshot.On("Head").Return(valSubgrph.Block.ToHeader(), nil)
 	snapshot.On("Identity", mock.Anything).Return(nil, exception)

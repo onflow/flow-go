@@ -1,15 +1,12 @@
 package flow_test
 
 import (
-	"encoding/json"
 	"testing"
 
-	"github.com/fxamacker/cbor/v2"
 	"github.com/ipfs/go-cid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	cborcodec "github.com/onflow/flow-go/model/encoding/cbor"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/rand"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -68,7 +65,7 @@ func TestChunkIndexIsSet(t *testing.T) {
 			CollectionIndex:      i,
 			StartState:           unittest.StateCommitmentFixture(),
 			EventCollection:      unittest.IdentifierFixture(),
-			ServiceEventCount:    unittest.PtrTo[uint16](0),
+			ServiceEventCount:    0,
 			BlockID:              unittest.IdentifierFixture(),
 			TotalComputationUsed: 17995,
 			NumberOfTransactions: uint64(21),
@@ -91,7 +88,7 @@ func TestChunkNumberOfTxsIsSet(t *testing.T) {
 			CollectionIndex:      3,
 			StartState:           unittest.StateCommitmentFixture(),
 			EventCollection:      unittest.IdentifierFixture(),
-			ServiceEventCount:    unittest.PtrTo[uint16](0),
+			ServiceEventCount:    0,
 			BlockID:              unittest.IdentifierFixture(),
 			TotalComputationUsed: 17995,
 			NumberOfTransactions: uint64(i),
@@ -113,7 +110,7 @@ func TestChunkTotalComputationUsedIsSet(t *testing.T) {
 			CollectionIndex:      3,
 			StartState:           unittest.StateCommitmentFixture(),
 			EventCollection:      unittest.IdentifierFixture(),
-			ServiceEventCount:    unittest.PtrTo[uint16](0),
+			ServiceEventCount:    0,
 			BlockID:              unittest.IdentifierFixture(),
 			TotalComputationUsed: i,
 			NumberOfTransactions: uint64(21),
@@ -126,255 +123,10 @@ func TestChunkTotalComputationUsedIsSet(t *testing.T) {
 	assert.Equal(t, i, chunk.TotalComputationUsed)
 }
 
-// TestChunkEncodeDecode test encoding and decoding properties.
-// In particular, we confirm that `nil` values of the ServiceEventCount field are preserved (and
-// not conflated with 0) by the encoding schemes we use, because this difference is meaningful and
-// important for backward compatibility (see [ChunkBody.ServiceEventCount] for details).
-func TestChunkEncodeDecode(t *testing.T) {
-	chunk := unittest.ChunkFixture(unittest.IdentifierFixture(), 0, unittest.StateCommitmentFixture())
-
-	t.Run("encode/decode preserves nil ServiceEventCount", func(t *testing.T) {
-		chunk.ServiceEventCount = nil
-		t.Run("json", func(t *testing.T) {
-			bz, err := json.Marshal(chunk)
-			require.NoError(t, err)
-			unmarshaled := new(flow.Chunk)
-			err = json.Unmarshal(bz, unmarshaled)
-			require.NoError(t, err)
-			assert.Equal(t, chunk, unmarshaled)
-			assert.Nil(t, unmarshaled.ServiceEventCount)
-		})
-		t.Run("lax non-BFT cbor decoding", func(t *testing.T) {
-			bz, err := cborcodec.EncMode.Marshal(chunk)
-			require.NoError(t, err)
-			unmarshaled := new(flow.Chunk)
-			err = cborcodec.UnsafeDecMode.Unmarshal(bz, unmarshaled)
-			require.NoError(t, err)
-			assert.Equal(t, chunk, unmarshaled)
-			assert.Nil(t, unmarshaled.ServiceEventCount)
-		})
-		t.Run("default strict cbor decoding", func(t *testing.T) {
-			bz, err := cborcodec.EncMode.Marshal(chunk)
-			require.NoError(t, err)
-			unmarshaled := new(flow.Chunk)
-			err = cborcodec.DefaultDecMode.Unmarshal(bz, unmarshaled)
-			require.NoError(t, err)
-			assert.Equal(t, chunk, unmarshaled)
-			assert.Nil(t, unmarshaled.ServiceEventCount)
-		})
-	})
-	t.Run("encode/decode preserves empty but non-nil ServiceEventCount", func(t *testing.T) {
-		chunk.ServiceEventCount = unittest.PtrTo[uint16](0)
-		t.Run("json", func(t *testing.T) {
-			bz, err := json.Marshal(chunk)
-			require.NoError(t, err)
-			unmarshaled := new(flow.Chunk)
-			err = json.Unmarshal(bz, unmarshaled)
-			require.NoError(t, err)
-			assert.Equal(t, chunk, unmarshaled)
-			assert.NotNil(t, unmarshaled.ServiceEventCount)
-		})
-		t.Run("lax non-BFT cbor decoding", func(t *testing.T) {
-			bz, err := cborcodec.EncMode.Marshal(chunk)
-			require.NoError(t, err)
-			unmarshaled := new(flow.Chunk)
-			err = cborcodec.UnsafeDecMode.Unmarshal(bz, unmarshaled)
-			require.NoError(t, err)
-			assert.Equal(t, chunk, unmarshaled)
-			assert.NotNil(t, unmarshaled.ServiceEventCount)
-		})
-		t.Run("default strict cbor decoding", func(t *testing.T) {
-			bz, err := cborcodec.EncMode.Marshal(chunk)
-			require.NoError(t, err)
-			unmarshaled := new(flow.Chunk)
-			err = cborcodec.DefaultDecMode.Unmarshal(bz, unmarshaled)
-			require.NoError(t, err)
-			assert.Equal(t, chunk, unmarshaled)
-			assert.NotNil(t, unmarshaled.ServiceEventCount)
-		})
-	})
-}
-
-// TestChunk_ModelVersions_EncodeDecode tests that encoding and decoding between
-// supported versions works as expected.
-func TestChunk_ModelVersions_EncodeDecode(t *testing.T) {
-	chunkFixture := unittest.ChunkFixture(unittest.IdentifierFixture(), 1, unittest.StateCommitmentFixture())
-	chunkFixture.ServiceEventCount = unittest.PtrTo[uint16](0) // non-nil extra field
-
-	t.Run("encoding v0 and decoding it into v1 should yield nil for ServiceEventCount", func(t *testing.T) {
-		var chunkv0 flow.ChunkBodyV0
-		unittest.EncodeDecodeDifferentVersions(t, chunkFixture.ChunkBody, &chunkv0)
-
-		t.Run("json", func(t *testing.T) {
-			bz, err := json.Marshal(chunkv0)
-			require.NoError(t, err)
-
-			var unmarshaled flow.ChunkBody
-			err = json.Unmarshal(bz, &unmarshaled)
-			require.NoError(t, err)
-			assert.Equal(t, chunkv0.EventCollection, unmarshaled.EventCollection)
-			assert.Equal(t, chunkv0.BlockID, unmarshaled.BlockID)
-			assert.Nil(t, unmarshaled.ServiceEventCount)
-		})
-
-		t.Run("lax non-BFT cbor decoding", func(t *testing.T) {
-			bz, err := cborcodec.EncMode.Marshal(chunkv0)
-			require.NoError(t, err)
-
-			var unmarshaled flow.ChunkBody
-			err = cborcodec.UnsafeDecMode.Unmarshal(bz, &unmarshaled)
-			require.NoError(t, err)
-			assert.Equal(t, chunkv0.EventCollection, unmarshaled.EventCollection)
-			assert.Equal(t, chunkv0.BlockID, unmarshaled.BlockID)
-			assert.Nil(t, unmarshaled.ServiceEventCount)
-		})
-
-		t.Run("default strict cbor decoding", func(t *testing.T) {
-			bz, err := cborcodec.EncMode.Marshal(chunkv0)
-			require.NoError(t, err)
-
-			var unmarshaled flow.ChunkBody
-			err = cborcodec.DefaultDecMode.Unmarshal(bz, &unmarshaled)
-			require.NoError(t, err)
-			assert.Equal(t, chunkv0.EventCollection, unmarshaled.EventCollection)
-			assert.Equal(t, chunkv0.BlockID, unmarshaled.BlockID)
-			assert.Nil(t, unmarshaled.ServiceEventCount)
-		})
-	})
-	t.Run("encoding v1 and decoding it into v0", func(t *testing.T) {
-		t.Run("non-nil ServiceEventCount field", func(t *testing.T) {
-			chunkv1 := chunkFixture.ChunkBody
-			chunkv1.ServiceEventCount = unittest.PtrTo[uint16](0) // ensure non-nil ServiceEventCount field
-
-			t.Run("json - should not error", func(t *testing.T) {
-				bz, err := json.Marshal(chunkv1)
-				require.NoError(t, err)
-
-				var unmarshaled flow.ChunkBodyV0
-				err = json.Unmarshal(bz, &unmarshaled)
-				require.NoError(t, err)
-				assert.Equal(t, chunkv1.EventCollection, unmarshaled.EventCollection)
-				assert.Equal(t, chunkv1.BlockID, unmarshaled.BlockID)
-			})
-			t.Run("lax non-BFT cbor decoding - should not error", func(t *testing.T) {
-				// CAUTION: using the lax decoding is not safe for data structures that are exchanged between nodes!
-				bz, err := cborcodec.EncMode.Marshal(chunkv1)
-				require.NoError(t, err)
-
-				var unmarshaled flow.ChunkBodyV0
-				err = cborcodec.UnsafeDecMode.Unmarshal(bz, &unmarshaled)
-				require.NoError(t, err)
-				assert.Equal(t, chunkv1.EventCollection, unmarshaled.EventCollection)
-				assert.Equal(t, chunkv1.BlockID, unmarshaled.BlockID)
-			})
-			// In the stricter mode (default), which we use for decoding on the networking layer, an error is expected
-			// because the message includes a field not present in the v0 target,
-			// when the new ServiceEventCount field is non-nil
-			t.Run("cbor strict - error expected", func(t *testing.T) {
-				bz, err := cborcodec.EncMode.Marshal(chunkv1)
-				require.NoError(t, err)
-
-				var unmarshaled flow.ChunkBodyV0
-				err = cborcodec.DefaultDecMode.Unmarshal(bz, &unmarshaled)
-				assert.Error(t, err)
-				target := &cbor.UnknownFieldError{}
-				assert.ErrorAs(t, err, &target)
-			})
-		})
-		t.Run("nil ServiceEventCount field should not error", func(t *testing.T) {
-			chunkv1 := chunkFixture.ChunkBody
-			chunkv1.ServiceEventCount = nil // ensure non-nil ServiceEventCount field
-
-			t.Run("json", func(t *testing.T) {
-				bz, err := json.Marshal(chunkv1)
-				require.NoError(t, err)
-
-				var unmarshaled flow.ChunkBodyV0
-				err = json.Unmarshal(bz, &unmarshaled)
-				require.NoError(t, err)
-				assert.Equal(t, chunkv1.EventCollection, unmarshaled.EventCollection)
-				assert.Equal(t, chunkv1.BlockID, unmarshaled.BlockID)
-			})
-			t.Run("lax non-BFT cbor decoding", func(t *testing.T) {
-				bz, err := cborcodec.EncMode.Marshal(chunkv1)
-				require.NoError(t, err)
-
-				var unmarshaled flow.ChunkBodyV0
-				err = cborcodec.UnsafeDecMode.Unmarshal(bz, &unmarshaled)
-				require.NoError(t, err)
-				assert.Equal(t, chunkv1.EventCollection, unmarshaled.EventCollection)
-				assert.Equal(t, chunkv1.BlockID, unmarshaled.BlockID)
-			})
-			// When the new ServiceEventCount field is nil, we expect even strict
-			// cbor decoding to pass, because the new field will be omitted.
-			t.Run("cbor strict", func(t *testing.T) {
-				bz, err := cborcodec.EncMode.Marshal(chunkv1)
-				require.NoError(t, err)
-
-				var unmarshaled flow.ChunkBodyV0
-				err = cborcodec.DefaultDecMode.Unmarshal(bz, &unmarshaled)
-				require.NoError(t, err)
-				assert.Equal(t, chunkv1.EventCollection, unmarshaled.EventCollection)
-				assert.Equal(t, chunkv1.BlockID, unmarshaled.BlockID)
-			})
-		})
-	})
-}
-
-// FingerprintBackwardCompatibility ensures that the Fingerprint and ID functions
-// are backward compatible with old data model versions. We emulate the
-// case where a peer running an older software version receives a `ChunkBody` that
-// was encoded in the new version. Specifically, if the new ServiceEventCount field
-// is nil, then the new model should produce IDs consistent with the old model.
-//
-// Backward compatibility is implemented by providing a custom EncodeRLP method.
-func TestChunk_FingerprintBackwardCompatibility(t *testing.T) {
-	chunk := unittest.ChunkFixture(unittest.IdentifierFixture(), 1, unittest.StateCommitmentFixture())
-	chunk.ServiceEventCount = nil
-
-	// Define an older type which use flow.ChunkBodyV0
-	type ChunkV0 struct {
-		flow.ChunkBodyV0
-		Index    uint64
-		EndState flow.StateCommitment
-	}
-
-	var chunkV0 ChunkV0
-	unittest.EncodeDecodeDifferentVersions(t, chunk, &chunkV0)
-
-	// A nil ServiceEventCount fields indicates a prior model version.
-	// The ID calculation for the old and new model version should be the same.
-	t.Run("nil ServiceEventCount fields", func(t *testing.T) {
-		chunk.ServiceEventCount = nil
-		assert.Equal(t, flow.MakeID(chunkV0), chunk.ID())
-		assert.Equal(t, flow.MakeID(chunkV0), flow.MakeID(chunk))
-	})
-	// A non-nil ServiceEventCount fields indicates an up-to-date model version.
-	// The ID calculation for the old and new model version should be different,
-	// because the new model should include the ServiceEventCount field value.
-	t.Run("non-nil ServiceEventCount fields", func(t *testing.T) {
-		chunk.ServiceEventCount = unittest.PtrTo[uint16](0)
-		assert.NotEqual(t, flow.MakeID(chunkV0), chunk.ID())
-		assert.NotEqual(t, flow.MakeID(chunkV0), flow.MakeID(chunk))
-	})
-}
-
 // TestChunkMalleability performs sanity checks to ensure that chunk is not malleable.
 func TestChunkMalleability(t *testing.T) {
 	t.Run("Chunk with non-nil ServiceEventCount", func(t *testing.T) {
 		unittest.RequireEntityNonMalleable(t, unittest.ChunkFixture(unittest.IdentifierFixture(), 0, unittest.StateCommitmentFixture()))
-	})
-
-	// TODO(mainnet27, #6773): remove this test according to https://github.com/onflow/flow-go/issues/6773
-	t.Run("Chunk with nil ServiceEventCount", func(t *testing.T) {
-		unittest.RequireEntityNonMalleable(
-			t,
-			unittest.ChunkFixture(unittest.IdentifierFixture(), 0, unittest.StateCommitmentFixture(), func(c *flow.Chunk) {
-				c.ServiceEventCount = nil
-			}),
-			// We pin the `ServiceEventCount` to the current value (nil), so `MalleabilityChecker` will not mutate this field:
-			unittest.WithPinnedField("ChunkBody.ServiceEventCount"),
-		)
 	})
 }
 
@@ -543,7 +295,6 @@ func TestNewChunkDataPack(t *testing.T) {
 func TestNewChunk(t *testing.T) {
 	validID := unittest.IdentifierFixture()
 	validState := unittest.StateCommitmentFixture()
-	validServiceCount := uint16(2)
 
 	base := flow.UntrustedChunk{
 		ChunkBody: flow.ChunkBody{
@@ -551,7 +302,7 @@ func TestNewChunk(t *testing.T) {
 			CollectionIndex:      3,
 			StartState:           validState,
 			EventCollection:      validID,
-			ServiceEventCount:    &validServiceCount,
+			ServiceEventCount:    2,
 			TotalComputationUsed: 10,
 			NumberOfTransactions: 5,
 		},
@@ -586,16 +337,6 @@ func TestNewChunk(t *testing.T) {
 		assert.Contains(t, err.Error(), "StartState")
 	})
 
-	t.Run("nil ServiceEventCount", func(t *testing.T) {
-		u := base
-		u.ChunkBody.ServiceEventCount = nil
-
-		ch, err := flow.NewChunk(u)
-		assert.Error(t, err)
-		assert.Nil(t, ch)
-		assert.Contains(t, err.Error(), "ServiceEventCount")
-	})
-
 	t.Run("missing EventCollection", func(t *testing.T) {
 		u := base
 		u.ChunkBody.EventCollection = flow.ZeroID
@@ -611,96 +352,6 @@ func TestNewChunk(t *testing.T) {
 		u.EndState = flow.StateCommitment{}
 
 		ch, err := flow.NewChunk(u)
-		assert.Error(t, err)
-		assert.Nil(t, ch)
-		assert.Contains(t, err.Error(), "EndState")
-	})
-}
-
-// TestNewChunk_ProtocolVersion1 verifies that NewChunk_ProtocolVersion1 constructs a
-// valid Chunk for protocol version 1 when given complete, non-zero fields, and
-// returns an error if any required field is missing.
-//
-// Test Cases:
-//
-// 1. Valid protocol v1 input:
-//   - Ensures a valid Chunk is returned with ServiceEventCount == nil.
-//
-// 2. Missing BlockID:
-//   - Ensures an error is returned when BlockID is ZeroID.
-//
-// 3. Zero StartState:
-//   - Ensures an error is returned when StartState is zero-value.
-//
-// 4. Missing EventCollection:
-//   - Ensures an error is returned when EventCollection is ZeroID.
-//
-// 5. Zero EndState:
-//   - Ensures an error is returned when EndState is zero-value.
-func TestNewChunk_ProtocolVersion1(t *testing.T) {
-	validID := unittest.IdentifierFixture()
-	validState := unittest.StateCommitmentFixture()
-
-	base := flow.UntrustedChunk{
-		ChunkBody: flow.ChunkBody{
-			BlockID:              validID,
-			CollectionIndex:      2,
-			StartState:           validState,
-			EventCollection:      validID,
-			ServiceEventCount:    nil, // ignored in v1
-			TotalComputationUsed: 7,
-			NumberOfTransactions: 3,
-		},
-		Index:    1,
-		EndState: validState,
-	}
-
-	t.Run("valid protocol v1 chunk", func(t *testing.T) {
-		ch, err := flow.NewChunk_ProtocolVersion1(base)
-		assert.NoError(t, err)
-		assert.NotNil(t, ch)
-
-		// ServiceEventCount must be nil for protocol v1
-		assert.Nil(t, ch.ChunkBody.ServiceEventCount)
-
-		assert.Equal(t, *ch, flow.Chunk(base))
-	})
-
-	t.Run("missing BlockID", func(t *testing.T) {
-		u := base
-		u.ChunkBody.BlockID = flow.ZeroID
-
-		ch, err := flow.NewChunk_ProtocolVersion1(u)
-		assert.Error(t, err)
-		assert.Nil(t, ch)
-		assert.Contains(t, err.Error(), "BlockID")
-	})
-
-	t.Run("zero StartState", func(t *testing.T) {
-		u := base
-		u.ChunkBody.StartState = flow.StateCommitment{}
-
-		ch, err := flow.NewChunk_ProtocolVersion1(u)
-		assert.Error(t, err)
-		assert.Nil(t, ch)
-		assert.Contains(t, err.Error(), "StartState")
-	})
-
-	t.Run("missing EventCollection", func(t *testing.T) {
-		u := base
-		u.ChunkBody.EventCollection = flow.ZeroID
-
-		ch, err := flow.NewChunk_ProtocolVersion1(u)
-		assert.Error(t, err)
-		assert.Nil(t, ch)
-		assert.Contains(t, err.Error(), "EventCollection")
-	})
-
-	t.Run("zero EndState", func(t *testing.T) {
-		u := base
-		u.EndState = flow.StateCommitment{}
-
-		ch, err := flow.NewChunk_ProtocolVersion1(u)
 		assert.Error(t, err)
 		assert.Nil(t, ch)
 		assert.Contains(t, err.Error(), "EndState")
