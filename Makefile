@@ -11,18 +11,17 @@ VERSION := $(shell git describe --tags --abbrev=2 --match "v*" --match "secure-c
 GO_TEST_PACKAGES := ./...
 
 # Image tag: if image tag is not set, set it with version (or short commit if empty)
-# Convert + to - for docker tag compatibility while keeping semantic version intact
 ifeq (${IMAGE_TAG},)
-IMAGE_TAG := $(subst +,-,${VERSION})
+IMAGE_TAG := ${VERSION}
 endif
 
 ifeq (${IMAGE_TAG},)
 IMAGE_TAG := ${SHORT_COMMIT}
 endif
 
-IMAGE_TAG_NO_ADX := $(IMAGE_TAG)-without-adx
-IMAGE_TAG_NO_NETGO_NO_ADX := $(IMAGE_TAG)-without-netgo-without-adx
-IMAGE_TAG_ARM := $(IMAGE_TAG)-arm
+IMAGE_TAG_NO_ADX := $(subst +,-,$(IMAGE_TAG)+without-adx)
+IMAGE_TAG_NO_NETGO_NO_ADX := $(subst +,-,$(IMAGE_TAG)+without-netgo-without-adx)
+IMAGE_TAG_ARM := $(subst +,-,$(IMAGE_TAG)+arm)
 
 # Name of the cover profile
 COVER_PROFILE := coverage.txt
