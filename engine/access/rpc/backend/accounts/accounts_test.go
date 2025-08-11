@@ -289,15 +289,7 @@ func (s *AccountsSuite) TestGetAccountBalanceFromStorage_HappyPath() {
 	ctx := context.Background()
 
 	scriptExecutor := execmock.NewScriptExecutor(s.T())
-<<<<<<< HEAD:engine/access/rpc/backend/accounts/accounts_test.go
-	scriptExecutor.On("GetAccountBalance", mock.Anything, s.account.Address, s.block.Header.Height).
-=======
-	backend := s.defaultBackend()
-	backend.scriptExecMode = IndexQueryModeLocalOnly
-	backend.scriptExecutor = scriptExecutor
-
 	scriptExecutor.On("GetAccountBalance", mock.Anything, s.account.Address, s.block.Height).
->>>>>>> feature/malleability:engine/access/rpc/backend/backend_accounts_test.go
 		Return(s.account.Balance, nil)
 
 	backend := s.defaultAccountsBackend(query_mode.IndexQueryModeLocalOnly, scriptExecutor)
@@ -537,15 +529,9 @@ func (s *AccountsSuite) testGetAccountAtLatestBlock(ctx context.Context, backend
 	}
 }
 
-<<<<<<< HEAD:engine/access/rpc/backend/accounts/accounts_test.go
 func (s *AccountsSuite) testGetAccountAtBlockHeight(ctx context.Context, backend *Accounts, statusCode codes.Code) {
-	height := s.block.Header.Height
-	s.headers.On("BlockIDByHeight", height).Return(s.block.Header.ID(), nil).Once()
-=======
-func (s *BackendAccountsSuite) testGetAccountAtBlockHeight(ctx context.Context, backend *backendAccounts, statusCode codes.Code) {
 	height := s.block.Height
 	s.headers.On("BlockIDByHeight", height).Return(s.block.ID(), nil).Once()
->>>>>>> feature/malleability:engine/access/rpc/backend/backend_accounts_test.go
 
 	if statusCode == codes.OK {
 		actual, err := backend.GetAccountAtBlockHeight(ctx, s.account.Address, height)
@@ -568,13 +554,8 @@ func (s *AccountsSuite) testGetAccountBalanceAtLatestBlock(ctx context.Context, 
 	s.Require().Equal(s.account.Balance, actual)
 }
 
-<<<<<<< HEAD:engine/access/rpc/backend/accounts/accounts_test.go
 func (s *AccountsSuite) testGetAccountBalanceAtBlockHeight(ctx context.Context, backend *Accounts) {
-	actual, err := backend.GetAccountBalanceAtBlockHeight(ctx, s.account.Address, s.block.Header.Height)
-=======
-func (s *BackendAccountsSuite) testGetAccountBalanceAtBlockHeight(ctx context.Context, backend *backendAccounts) {
 	actual, err := backend.GetAccountBalanceAtBlockHeight(ctx, s.account.Address, s.block.Height)
->>>>>>> feature/malleability:engine/access/rpc/backend/backend_accounts_test.go
 	s.Require().NoError(err)
 	s.Require().Equal(s.account.Balance, actual)
 }
@@ -598,25 +579,14 @@ func (s *AccountsSuite) testGetAccountKeyAtLatestBlock(ctx context.Context, back
 	s.Require().Equal(expectedKeyByIndex, actual)
 }
 
-<<<<<<< HEAD:engine/access/rpc/backend/accounts/accounts_test.go
 func (s *AccountsSuite) testGetAccountKeysAtBlockHeight(ctx context.Context, backend *Accounts) {
-	actual, err := backend.GetAccountKeysAtBlockHeight(ctx, s.account.Address, s.block.Header.Height)
-=======
-func (s *BackendAccountsSuite) testGetAccountKeysAtBlockHeight(ctx context.Context, backend *backendAccounts) {
 	actual, err := backend.GetAccountKeysAtBlockHeight(ctx, s.account.Address, s.block.Height)
->>>>>>> feature/malleability:engine/access/rpc/backend/backend_accounts_test.go
 	s.Require().NoError(err)
 	s.Require().Equal(s.account.Keys, actual)
 }
 
-<<<<<<< HEAD:engine/access/rpc/backend/accounts/accounts_test.go
 func (s *AccountsSuite) testGetAccountKeyAtBlockHeight(ctx context.Context, backend *Accounts, keyIndex uint32) {
-	actual, err := backend.GetAccountKeyAtBlockHeight(ctx, s.account.Address, keyIndex, s.block.Header.Height)
-=======
-func (s *BackendAccountsSuite) testGetAccountKeyAtBlockHeight(ctx context.Context, backend *backendAccounts, keyIndex uint32) {
-
 	actual, err := backend.GetAccountKeyAtBlockHeight(ctx, s.account.Address, keyIndex, s.block.Height)
->>>>>>> feature/malleability:engine/access/rpc/backend/backend_accounts_test.go
 	expectedKeyByIndex := findAccountKeyByIndex(s.account.Keys, keyIndex)
 	s.Require().NoError(err)
 	s.Require().Equal(expectedKeyByIndex, actual)

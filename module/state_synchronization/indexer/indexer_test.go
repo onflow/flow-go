@@ -182,13 +182,8 @@ func TestIndexer_Success(t *testing.T) {
 	lastIndexedIndex := 5
 	test := newIndexerTest(t, blocks, lastIndexedIndex)
 
-<<<<<<< HEAD
-	test.setBlockDataByID(func(ID flow.Identifier) (*execution_data.BlockExecutionDataEntity, bool) {
-		trie := TrieUpdateRandomLedgerPayloadsFixture(t)
-=======
 	test.setBlockDataGet(func(ID flow.Identifier) (*execution_data.BlockExecutionDataEntity, bool) {
-		trie := trieUpdateFixture(t)
->>>>>>> feature/malleability
+		trie := TrieUpdateRandomLedgerPayloadsFixture(t)
 		collection := unittest.CollectionFixture(0)
 		ed := &execution_data.BlockExecutionData{
 			BlockID: ID,
@@ -231,13 +226,8 @@ func TestIndexer_Failure(t *testing.T) {
 	lastIndexedIndex := 5
 	test := newIndexerTest(t, blocks, lastIndexedIndex)
 
-<<<<<<< HEAD
-	test.setBlockDataByID(func(ID flow.Identifier) (*execution_data.BlockExecutionDataEntity, bool) {
-		trie := TrieUpdateRandomLedgerPayloadsFixture(t)
-=======
 	test.setBlockDataGet(func(ID flow.Identifier) (*execution_data.BlockExecutionDataEntity, bool) {
-		trie := trieUpdateFixture(t)
->>>>>>> feature/malleability
+		trie := TrieUpdateRandomLedgerPayloadsFixture(t)
 		collection := unittest.CollectionFixture(0)
 		ed := &execution_data.BlockExecutionData{
 			BlockID: ID,

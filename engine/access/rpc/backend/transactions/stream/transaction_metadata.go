@@ -186,15 +186,9 @@ func (t *TransactionMetadata) refreshBlock() error {
 		return fmt.Errorf("failed to lookup block containing collection: %w", err)
 	}
 
-<<<<<<< HEAD:engine/access/rpc/backend/transactions/stream/transaction_metadata.go
-	t.blockWithTx = block.Header
+	t.blockWithTx = block.ToHeader()
 	t.txResult.BlockID = block.ID()
-	t.txResult.BlockHeight = block.Header.Height
-=======
-	tm.blockWithTx = block.ToHeader()
-	tm.txResult.BlockID = block.ID()
-	tm.txResult.BlockHeight = block.Height
->>>>>>> feature/malleability:engine/access/rpc/backend/transaction_subscription_metadata.go
+	t.txResult.BlockHeight = block.Height
 	return nil
 }
 

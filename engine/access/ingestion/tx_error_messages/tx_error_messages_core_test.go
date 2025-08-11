@@ -82,7 +82,8 @@ func (s *TxErrorMessagesCoreSuite) SetupTest() {
 	s.connFactory = connectionmock.NewConnectionFactory(s.T())
 	s.receipts = storage.NewExecutionReceipts(s.T())
 	s.txErrorMessages = storage.NewTransactionResultErrorMessages(s.T())
-<<<<<<< HEAD
+	s.rootBlock = unittest.Block.Genesis(flow.Emulator)
+	s.finalizedBlock = unittest.BlockWithParentFixture(s.rootBlock.ToHeader()).ToHeader()
 
 	s.lightTxResults = storage.NewLightTransactionResults(s.T())
 	s.reporter = syncmock.NewIndexReporter(s.T())
@@ -90,14 +91,6 @@ func (s *TxErrorMessagesCoreSuite) SetupTest() {
 	err := s.indexReporter.Initialize(s.reporter)
 	s.Require().NoError(err)
 	s.txResultsIndex = index.NewTransactionResultsIndex(s.indexReporter, s.lightTxResults)
-
-	s.rootBlock = unittest.BlockFixture()
-	s.rootBlock.Header.Height = 0
-	s.finalizedBlock = unittest.BlockWithParentFixture(s.rootBlock.Header).Header
-=======
-	s.rootBlock = unittest.Block.Genesis(flow.Emulator)
-	s.finalizedBlock = unittest.BlockWithParentFixture(s.rootBlock.ToHeader()).ToHeader()
->>>>>>> feature/malleability
 
 	s.proto.state.On("Params").Return(s.proto.params)
 

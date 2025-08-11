@@ -271,12 +271,12 @@ func (s *TransactionStreamSuite) initializeBackend() {
 	validatorBlocks := validatormock.NewBlocks(s.T())
 	validatorBlocks.
 		On("HeaderByID", mock.Anything).
-		Return(s.finalizedBlock.Header, nil).
+		Return(s.finalizedBlock.ToHeader(), nil).
 		Maybe() // used for some tests
 
 	validatorBlocks.
 		On("FinalizedHeader", mock.Anything).
-		Return(s.finalizedBlock.Header, nil).
+		Return(s.finalizedBlock.ToHeader(), nil).
 		Maybe() // used for some tests
 
 	txValidator, err := validator.NewTransactionValidator(
@@ -423,16 +423,10 @@ func (s *TransactionStreamSuite) initializeHappyCaseMockInstructions() {
 }
 
 // createSendTransaction generate sent transaction with ref block of the current finalized block
-<<<<<<< HEAD:engine/access/rpc/backend/transactions/stream/stream_backend_test.go
 func (s *TransactionStreamSuite) createSendTransaction() flow.Transaction {
-	transaction := unittest.TransactionFixture()
-	transaction.SetReferenceBlockID(s.finalizedBlock.ID())
-=======
-func (s *TransactionStatusSuite) createSendTransaction() flow.Transaction {
 	transaction := unittest.TransactionFixture(func(t *flow.Transaction) {
 		t.ReferenceBlockID = s.finalizedBlock.ID()
 	})
->>>>>>> feature/malleability:engine/access/rpc/backend/backend_stream_transactions_test.go
 	s.transactions.On("ByID", mock.AnythingOfType("flow.Identifier")).Return(&transaction.TransactionBody, nil).Maybe()
 	return transaction
 }
@@ -468,13 +462,8 @@ func (s *TransactionStreamSuite) mockTransactionResult(transactionID *flow.Ident
 		)
 }
 
-<<<<<<< HEAD:engine/access/rpc/backend/transactions/stream/stream_backend_test.go
 func (s *TransactionStreamSuite) addBlockWithTransaction(transaction *flow.Transaction) {
-	col := flow.CollectionFromTransactions([]*flow.Transaction{transaction})
-=======
-func (s *TransactionStatusSuite) addBlockWithTransaction(transaction *flow.Transaction) {
 	col := unittest.CollectionFromTransactions([]*flow.Transaction{transaction})
->>>>>>> feature/malleability:engine/access/rpc/backend/backend_stream_transactions_test.go
 	colID := col.ID()
 	guarantee := flow.CollectionGuarantee{CollectionID: colID}
 	light := col.Light()
@@ -699,8 +688,7 @@ func (s *TransactionStreamSuite) TestSubscribeTransactionStatusWithCurrentExecut
 	// 3. Add one more finalized block on top of the transaction block and add execution results to storage
 	// init transaction result for storage
 	hasTransactionResultInStorage = true
-<<<<<<< HEAD:engine/access/rpc/backend/transactions/stream/stream_backend_test.go
-	s.addNewFinalizedBlock(s.finalizedBlock.Header, true)
+	s.addNewFinalizedBlock(s.finalizedBlock.ToHeader(), true)
 	sub := s.txStreamBackend.SubscribeTransactionStatuses(ctx, txId, entities.EventEncodingVersion_CCF_V0)
 	s.checkNewSubscriptionMessage(
 		sub,
@@ -710,11 +698,6 @@ func (s *TransactionStreamSuite) TestSubscribeTransactionStatusWithCurrentExecut
 			flow.TransactionStatusFinalized,
 			flow.TransactionStatusExecuted,
 		})
-=======
-	s.addNewFinalizedBlock(s.finalizedBlock.ToHeader(), true)
-	sub := s.backend.SubscribeTransactionStatuses(ctx, txId, entities.EventEncodingVersion_CCF_V0)
-	s.checkNewSubscriptionMessage(sub, txId, []flow.TransactionStatus{flow.TransactionStatusPending, flow.TransactionStatusFinalized, flow.TransactionStatusExecuted})
->>>>>>> feature/malleability:engine/access/rpc/backend/backend_stream_transactions_test.go
 
 	// 4. Make the transaction block sealed, and add a new finalized block
 	s.sealedBlock = s.finalizedBlock

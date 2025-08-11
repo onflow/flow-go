@@ -954,14 +954,9 @@ func (suite *Suite) TestGetTransactionResultByIndex() {
 	suite.Run("TestGetTransactionResultByIndex - happy path", func() {
 		suite.snapshot.On("Head").Return(block.ToHeader(), nil).Once()
 		result, err := backend.GetTransactionResultByIndex(ctx, blockId, index, entitiesproto.EventEncodingVersion_JSON_CDC_V0)
-<<<<<<< HEAD
 		suite.Require().NoError(err)
 		suite.Require().NotNil(result)
-		suite.Assert().Equal(result.BlockHeight, block.Header.Height)
-=======
-		suite.checkResponse(result, err)
 		suite.Assert().Equal(result.BlockHeight, block.Height)
->>>>>>> feature/malleability
 
 		suite.assertAllExpectations()
 	})
@@ -1075,7 +1070,7 @@ func (suite *Suite) TestTransactionStatusTransition() {
 		}, nil)
 
 	light := collection.Light()
-	suite.collections.On("LightByID", light.ID()).Return(light, nil)
+	suite.collections.On("LightByID", collection.ID()).Return(light, nil)
 
 	// transaction storage returns the corresponding transaction
 	suite.transactions.

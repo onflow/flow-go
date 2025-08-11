@@ -168,52 +168,13 @@ func MessageToChunk(m *entities.Chunk) (*flow.Chunk, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse Message end state to Chunk: %w", err)
 	}
-<<<<<<< HEAD
-	chunkBody := flow.ChunkBody{
-		CollectionIndex:      uint(m.CollectionIndex),
-		StartState:           startState,
-		EventCollection:      MessageToIdentifier(m.EventCollection),
-		BlockID:              MessageToIdentifier(m.BlockId),
-		TotalComputationUsed: m.TotalComputationUsed,
-		NumberOfTransactions: uint64(m.NumberOfTransactions),
-		ServiceEventCount:    uint16(m.ServiceEventCount),
-=======
 
-	serviceEventCountPtr := MessageToServiceEventCountField(m.ServiceEventCount)
-	var chunk *flow.Chunk
-
-	// Branch on nil-vs-non-nil to preserve backward compatibility
-	//TODO(mainnet27, #6773): remove the v1 branch here
-	if serviceEventCountPtr == nil {
-		// Protocol v1: omit ServiceEventCount
-		chunk, err = flow.NewChunk_ProtocolVersion1(flow.UntrustedChunk{
-			ChunkBody: flow.ChunkBody{
-				CollectionIndex:      uint(m.CollectionIndex),
-				StartState:           startState,
-				EventCollection:      MessageToIdentifier(m.EventCollection),
-				ServiceEventCount:    nil,
-				BlockID:              MessageToIdentifier(m.BlockId),
-				TotalComputationUsed: m.TotalComputationUsed,
-				NumberOfTransactions: uint64(m.NumberOfTransactions),
-			},
-			Index:    m.Index,
-			EndState: endState,
-		})
-		if err != nil {
-			return nil, fmt.Errorf("could not build chunk protocol version1: %w", err)
-		}
-
-		return chunk, nil
->>>>>>> feature/malleability
-	}
-
-	// Protocol v2+: include ServiceEventCount
-	chunk, err = flow.NewChunk(flow.UntrustedChunk{
+	chunk, err := flow.NewChunk(flow.UntrustedChunk{
 		ChunkBody: flow.ChunkBody{
 			CollectionIndex:      uint(m.CollectionIndex),
 			StartState:           startState,
 			EventCollection:      MessageToIdentifier(m.EventCollection),
-			ServiceEventCount:    serviceEventCountPtr,
+			ServiceEventCount:    uint16(m.ServiceEventCount),
 			BlockID:              MessageToIdentifier(m.BlockId),
 			TotalComputationUsed: m.TotalComputationUsed,
 			NumberOfTransactions: uint64(m.NumberOfTransactions),

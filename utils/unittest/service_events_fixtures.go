@@ -147,48 +147,6 @@ func EpochCommitFixtureByChainID(chain flow.ChainID) (flow.Event, *flow.EpochCom
 	return event, expected
 }
 
-<<<<<<< HEAD
-=======
-// EpochCommitV0FixtureByChainID returns an EpochCommit service event for old data model as a Cadence event
-// representation and as a protocol model representation. This is used for testing backwards compatibility.
-// TODO(EFM, #6794): Remove this once we complete the network upgrade
-func EpochCommitV0FixtureByChainID(chain flow.ChainID) (flow.Event, *flow.EpochCommit) {
-	events := systemcontracts.ServiceEventsForChain(chain)
-
-	event := EventFixture(
-		Event.WithEventType(events.EpochCommit.EventType()),
-		Event.WithPayload(EpochCommitV0FixtureCCF),
-	)
-
-	expected := &flow.EpochCommit{
-		Counter: 1,
-		ClusterQCs: []flow.ClusterQCVoteData{
-			{
-				VoterIDs: []flow.Identifier{
-					flow.MustHexStringToIdentifier("0000000000000000000000000000000000000000000000000000000000000001"),
-					flow.MustHexStringToIdentifier("0000000000000000000000000000000000000000000000000000000000000002"),
-				},
-				SigData: MustDecodeSignatureHex("b072ed22ed305acd44818a6c836e09b4e844eebde6a4fdbf5cec983e2872b86c8b0f6c34c0777bf52e385ab7c45dc55d"),
-			},
-			{
-				VoterIDs: []flow.Identifier{
-					flow.MustHexStringToIdentifier("0000000000000000000000000000000000000000000000000000000000000003"),
-					flow.MustHexStringToIdentifier("0000000000000000000000000000000000000000000000000000000000000004"),
-				},
-				SigData: MustDecodeSignatureHex("899e266a543e1b3a564f68b22f7be571f2e944ec30fadc4b39e2d5f526ba044c0f3cb2648f8334fc216fa3360a0418b2"),
-			},
-		},
-		DKGGroupKey: MustDecodePublicKeyHex(crypto.BLSBLS12381, "8c588266db5f5cda629e83f8aa04ae9413593fac19e4865d06d291c9d14fbdd9bdb86a7a12f9ef8590c79cb635e3163315d193087e9336092987150d0cd2b14ac6365f7dc93eec573752108b8c12368abb65f0652d9f644e5aed611c37926950"),
-		DKGParticipantKeys: []crypto.PublicKey{
-			MustDecodePublicKeyHex(crypto.BLSBLS12381, "87a339e4e5c74f089da20a33f515d8c8f4464ab53ede5a74aa2432cd1ae66d522da0c122249ee176cd747ddc83ca81090498389384201614caf51eac392c1c0a916dfdcfbbdf7363f9552b6468434add3d3f6dc91a92bbe3ee368b59b7828488"),
-		},
-		DKGIndexMap: nil,
-	}
-
-	return event, expected
-}
-
->>>>>>> feature/malleability
 // EpochRecoverFixtureByChainID returns an EpochRecover service event as a Cadence event
 // representation and as a protocol model representation.
 func EpochRecoverFixtureByChainID(chain flow.ChainID) (flow.Event, *flow.EpochRecover) {

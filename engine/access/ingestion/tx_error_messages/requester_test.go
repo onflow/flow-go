@@ -67,7 +67,6 @@ func (s *RequesterSuite) SetupTest() {
 	s.rootBlock = unittest.Block.Genesis(flow.Emulator)
 	s.finalizedBlock = unittest.BlockWithParentFixture(s.rootBlock.ToHeader()).ToHeader()
 
-<<<<<<< HEAD
 	s.txErrorMessages = storage.NewTransactionResultErrorMessages(s.T())
 	s.lightTxResults = storage.NewLightTransactionResults(s.T())
 	s.reporter = syncmock.NewIndexReporter(s.T())
@@ -76,14 +75,7 @@ func (s *RequesterSuite) SetupTest() {
 	s.Require().NoError(err)
 	s.txResultsIndex = index.NewTransactionResultsIndex(s.indexReporter, s.lightTxResults)
 
-	s.rootBlock = unittest.BlockFixture()
-	s.rootBlock.Header.Height = 0
-	s.finalizedBlock = unittest.BlockWithParentFixture(s.rootBlock.Header).Header
-
-	s.proto.params.On("FinalizedRoot").Return(s.rootBlock.Header, nil)
-=======
 	s.proto.params.On("FinalizedRoot").Return(s.rootBlock.ToHeader(), nil)
->>>>>>> feature/malleability
 	s.proto.state.On("Params").Return(s.proto.params)
 
 	s.proto.snapshot.On("Head").Return(

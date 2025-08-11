@@ -460,15 +460,9 @@ func (s *BackendScriptsSuite) testExecuteScriptAtBlockID(ctx context.Context, sc
 	}
 }
 
-<<<<<<< HEAD:engine/access/rpc/backend/scripts/scripts_test.go
 func (s *BackendScriptsSuite) testExecuteScriptAtBlockHeight(ctx context.Context, scripts *Scripts, statusCode codes.Code) {
-	height := s.block.Header.Height
-	s.headers.On("ByHeight", height).Return(s.block.Header, nil).Once()
-=======
-func (s *BackendScriptsSuite) testExecuteScriptAtBlockHeight(ctx context.Context, backend *backendScripts, statusCode codes.Code) {
 	height := s.block.Height
 	s.headers.On("ByHeight", height).Return(s.block.ToHeader(), nil).Once()
->>>>>>> feature/malleability:engine/access/rpc/backend/backend_scripts_test.go
 
 	if statusCode == codes.OK {
 		actual, err := scripts.ExecuteScriptAtBlockHeight(ctx, height, s.script, s.arguments)
