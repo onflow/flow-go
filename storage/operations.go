@@ -173,6 +173,7 @@ type DB interface {
 	NewBatch() Batch
 
 	// Close closes the database and releases all resources.
+	// No errors are expected during normal operation.
 	Close() error
 }
 
