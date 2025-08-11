@@ -1,4 +1,4 @@
-package retriever
+package provider
 
 import (
 	"context"
@@ -17,27 +17,27 @@ import (
 	"github.com/onflow/flow-go/storage"
 )
 
-type LocalAccountRetriever struct {
+type LocalAccountProvider struct {
 	log            zerolog.Logger
 	state          protocol.State
 	scriptExecutor execution.ScriptExecutor
 }
 
-var _ AccountRetriever = (*LocalAccountRetriever)(nil)
+var _ AccountProvider = (*LocalAccountProvider)(nil)
 
-func NewLocalAccountRetriever(
+func NewLocalAccountProvider(
 	log zerolog.Logger,
 	state protocol.State,
 	scriptExecutor execution.ScriptExecutor,
-) *LocalAccountRetriever {
-	return &LocalAccountRetriever{
-		log:            log.With().Str("account_retriever", "local").Logger(),
+) *LocalAccountProvider {
+	return &LocalAccountProvider{
+		log:            log.With().Str("account_provider", "local").Logger(),
 		state:          state,
 		scriptExecutor: scriptExecutor,
 	}
 }
 
-func (l *LocalAccountRetriever) GetAccountAtBlock(
+func (l *LocalAccountProvider) GetAccountAtBlock(
 	ctx context.Context,
 	address flow.Address,
 	_ flow.Identifier,
@@ -50,7 +50,7 @@ func (l *LocalAccountRetriever) GetAccountAtBlock(
 	return account, nil
 }
 
-func (l *LocalAccountRetriever) GetAccountBalanceAtBlock(
+func (l *LocalAccountProvider) GetAccountBalanceAtBlock(
 	ctx context.Context,
 	address flow.Address,
 	blockID flow.Identifier,
@@ -65,7 +65,7 @@ func (l *LocalAccountRetriever) GetAccountBalanceAtBlock(
 	return accountBalance, nil
 }
 
-func (l *LocalAccountRetriever) GetAccountKeyAtBlock(
+func (l *LocalAccountProvider) GetAccountKeyAtBlock(
 	ctx context.Context,
 	address flow.Address,
 	keyIndex uint32,
@@ -81,7 +81,7 @@ func (l *LocalAccountRetriever) GetAccountKeyAtBlock(
 	return accountKey, nil
 }
 
-func (l *LocalAccountRetriever) GetAccountKeysAtBlock(
+func (l *LocalAccountProvider) GetAccountKeysAtBlock(
 	ctx context.Context,
 	address flow.Address,
 	_ flow.Identifier,
