@@ -1160,12 +1160,16 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string, chainID fl
 	// define root block parameters
 	parentID := flow.ZeroID
 	height := uint64(0)
+	view := uint64(0)
 	timestamp := time.Now().UTC()
 	epochCounter := uint64(0)
 	participants := bootstrap.ToIdentityList(stakedNodeInfos)
 
 	// generate root block
-	rootHeader := run.GenerateRootHeader(chainID, parentID, height, timestamp)
+	rootHeaderBody, err := run.GenerateRootHeaderBody(chainID, parentID, height, view, timestamp)
+	if err != nil {
+		return nil, err
+	}
 
 	// generate root blocks for each collector cluster
 	clusterRootBlocks, clusterAssignments, clusterQCs, err := setupClusterGenesisBlockQCs(networkConf.NClusters, epochCounter, stakedConfs)
@@ -1195,7 +1199,7 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string, chainID fl
 		return nil, err
 	}
 
-	dkgOffsetView := rootHeader.View + networkConf.ViewsInStakingAuction - 1
+	dkgOffsetView := rootHeaderBody.View + networkConf.ViewsInStakingAuction - 1
 
 	// target number of seconds in epoch
 	targetDuration := networkConf.ViewsInEpoch / networkConf.ViewsPerSecond
@@ -1204,11 +1208,11 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string, chainID fl
 	epochSetup, err := flow.NewEpochSetup(
 		flow.UntrustedEpochSetup{
 			Counter:            epochCounter,
-			FirstView:          rootHeader.View,
+			FirstView:          rootHeaderBody.View,
 			DKGPhase1FinalView: dkgOffsetView + networkConf.ViewsInDKGPhase,
 			DKGPhase2FinalView: dkgOffsetView + networkConf.ViewsInDKGPhase*2,
 			DKGPhase3FinalView: dkgOffsetView + networkConf.ViewsInDKGPhase*3,
-			FinalView:          rootHeader.View + networkConf.ViewsInEpoch - 1,
+			FinalView:          rootHeaderBody.View + networkConf.ViewsInEpoch - 1,
 			Participants:       participants.ToSkeleton(),
 			Assignments:        clusterAssignments,
 			RandomSource:       randomSource,
@@ -1233,9 +1237,6 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string, chainID fl
 		return nil, fmt.Errorf("could not construct epoch commit: %w", err)
 	}
 
-	root := &flow.Block{
-		Header: rootHeader,
-	}
 	minEpochStateEntry, err := inmem.EpochProtocolStateFromServiceEvents(epochSetup, epochCommit)
 	if err != nil {
 		return nil, fmt.Errorf("could not construct epoch protocol state: %w", err)
@@ -1244,9 +1245,15 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string, chainID fl
 	if err != nil {
 		return nil, err
 	}
-	root.SetPayload(unittest.PayloadFixture(unittest.WithProtocolStateID(
-		rootProtocolState.ID(),
-	)))
+	root, err := flow.NewRootBlock(
+		flow.UntrustedBlock{
+			HeaderBody: *rootHeaderBody,
+			Payload:    unittest.PayloadFixture(unittest.WithProtocolStateID(rootProtocolState.ID())),
+		},
+	)
+	if err != nil {
+		return nil, fmt.Errorf("could not construct root block: %w", err)
+	}
 
 	cdcRandomSource, err := cadence.NewString(hex.EncodeToString(randomSource))
 	if err != nil {
@@ -1272,12 +1279,11 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string, chainID fl
 		trieDir,
 		unittest.ServiceAccountPublicKey,
 		chain,
-		fvm.WithRootBlock(root.Header),
 		fvm.WithInitialTokenSupply(unittest.GenesisTokenSupply),
 		fvm.WithAccountCreationFee(fvm.DefaultAccountCreationFee),
 		fvm.WithMinimumStorageReservation(fvm.DefaultMinimumStorageReservation),
 		fvm.WithStorageMBPerFLOW(fvm.DefaultStorageMBPerFLOW),
-		fvm.WithRootBlock(root.Header),
+		fvm.WithRootBlock(root.ToHeader()),
 		fvm.WithEpochConfig(epochConfig),
 		fvm.WithNodes(stakedNodeInfos),
 	)
@@ -1286,7 +1292,10 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string, chainID fl
 	}
 
 	// generate execution result and block seal
-	result := run.GenerateRootResult(root, commit, epochSetup, epochCommit)
+	result, err := run.GenerateRootResult(root, commit, epochSetup, epochCommit)
+	if err != nil {
+		return nil, fmt.Errorf("generating root result failed: %w", err)
+	}
 	seal, err := run.GenerateRootSeal(result)
 	if err != nil {
 		return nil, fmt.Errorf("generating root seal failed: %w", err)
@@ -1442,7 +1451,10 @@ func setupClusterGenesisBlockQCs(nClusters uint, epochCounter uint64, confs []Co
 
 	for _, cluster := range clusters {
 		// generate root cluster block
-		block := clusterstate.CanonicalRootBlock(epochCounter, cluster)
+		block, err := clusterstate.CanonicalRootBlock(epochCounter, cluster)
+		if err != nil {
+			return nil, nil, nil, fmt.Errorf("failed to generate canonical root block: %w", err)
+		}
 
 		lookup := make(map[flow.Identifier]struct{})
 		for _, node := range cluster {

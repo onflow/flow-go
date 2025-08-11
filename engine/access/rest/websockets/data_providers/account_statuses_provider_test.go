@@ -22,7 +22,6 @@ import (
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
-	"github.com/onflow/flow-go/utils/unittest/generator"
 )
 
 // AccountStatusesProviderSuite is a test suite for testing the account statuses providers functionality.
@@ -33,7 +32,7 @@ type AccountStatusesProviderSuite struct {
 	api *ssmock.API
 
 	chain          flow.Chain
-	rootBlock      flow.Block
+	rootBlock      *flow.Block
 	finalizedBlock *flow.Header
 
 	factory *DataProviderFactoryImpl
@@ -46,12 +45,8 @@ func TestNewAccountStatusesDataProvider(t *testing.T) {
 func (s *AccountStatusesProviderSuite) SetupTest() {
 	s.log = unittest.Logger()
 	s.api = ssmock.NewAPI(s.T())
-
 	s.chain = flow.Testnet.Chain()
-
-	s.rootBlock = unittest.BlockFixture()
-	s.rootBlock.Header.Height = 0
-
+	s.rootBlock = unittest.Block.Genesis(s.chain.ChainID())
 	s.factory = NewDataProviderFactory(
 		s.log,
 		s.api,
@@ -69,7 +64,7 @@ func (s *AccountStatusesProviderSuite) SetupTest() {
 // validates that events are correctly streamed to the channel and ensures
 // no unexpected errors occur.
 func (s *AccountStatusesProviderSuite) TestAccountStatusesDataProvider_HappyPath() {
-	eventGenerator := generator.EventGenerator(generator.WithEncoding(entities.EventEncodingVersion_CCF_V0))
+	eventGenerator := unittest.NewEventGenerator(unittest.EventGenerator.WithEncoding(entities.EventEncodingVersion_CCF_V0))
 	events := []flow.Event{
 		eventGenerator.New(),
 		eventGenerator.New(),
@@ -142,7 +137,7 @@ func (s *AccountStatusesProviderSuite) subscribeAccountStatusesDataProviderTestC
 		{
 			name: "SubscribeAccountStatusesFromStartHeight happy path",
 			arguments: wsmodels.Arguments{
-				"start_block_height": strconv.FormatUint(s.rootBlock.Header.Height, 10),
+				"start_block_height": strconv.FormatUint(s.rootBlock.Height, 10),
 				"event_types":        []string{string(flow.EventAccountCreated)},
 				"account_addresses":  []string{unittest.AddressFixture().String()},
 			},
@@ -150,7 +145,7 @@ func (s *AccountStatusesProviderSuite) subscribeAccountStatusesDataProviderTestC
 				s.api.On(
 					"SubscribeAccountStatusesFromStartHeight",
 					mock.Anything,
-					s.rootBlock.Header.Height,
+					s.rootBlock.Height,
 					mock.Anything,
 				).Return(sub).Once()
 			},
@@ -343,7 +338,7 @@ func (s *AccountStatusesProviderSuite) backendAccountStatusesResponses(events []
 
 	for i := range events {
 		responses[i] = &backend.AccountStatusesResponse{
-			Height:  s.rootBlock.Header.Height,
+			Height:  s.rootBlock.Height,
 			BlockID: s.rootBlock.ID(),
 			AccountEvents: map[string]flow.EventsList{
 				unittest.RandomAddressFixture().String(): events,
@@ -360,7 +355,7 @@ func invalidAccountStatusesArgumentsTestCases() []testErrType {
 			name: "provide both 'start_block_id' and 'start_block_height' arguments",
 			arguments: wsmodels.Arguments{
 				"start_block_id":     unittest.BlockFixture().ID().String(),
-				"start_block_height": fmt.Sprintf("%d", unittest.BlockFixture().Header.Height),
+				"start_block_height": fmt.Sprintf("%d", unittest.BlockFixture().Height),
 				"event_types":        []string{state_stream.CoreEventAccountCreated},
 				"account_addresses":  []string{unittest.AddressFixture().String()},
 			},

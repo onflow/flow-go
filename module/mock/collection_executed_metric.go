@@ -13,7 +13,7 @@ type CollectionExecutedMetric struct {
 }
 
 // BlockFinalized provides a mock function with given fields: block
-func (_m *CollectionExecutedMetric) BlockFinalized(block *flow.Block) {
+func (_m *CollectionExecutedMetric) BlockFinalized(block *flow.GenericBlock[flow.Payload]) {
 	_m.Called(block)
 }
 

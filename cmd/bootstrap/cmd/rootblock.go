@@ -27,6 +27,7 @@ var (
 	flagRootParent    string
 	flagRootHeight    uint64
 	flagRootTimestamp string
+	flagRootView      uint64
 	// Deprecated: Replaced by ProtocolStateVersion
 	// Historically, this flag set a spork-scoped version number, by convention equal to the major software version.
 	// Now that we have HCUs which change the major software version mid-spork, this is no longer useful.
@@ -95,6 +96,7 @@ func addRootBlockCmdFlags() {
 	rootBlockCmd.Flags().StringVar(&flagRootParent, "root-parent", "0000000000000000000000000000000000000000000000000000000000000000", "ID for the parent of the root block")
 	rootBlockCmd.Flags().Uint64Var(&flagRootHeight, "root-height", 0, "height of the root block")
 	rootBlockCmd.Flags().StringVar(&flagRootTimestamp, "root-timestamp", time.Now().UTC().Format(time.RFC3339), "timestamp of the root block (RFC3339)")
+	rootBlockCmd.Flags().Uint64Var(&flagRootView, "root-view", 0, "view of the root block")
 	rootBlockCmd.Flags().UintVar(&deprecatedFlagProtocolVersion, "protocol-version", 0, "deprecated: this flag will be ignored and remove in a future release")
 	rootBlockCmd.Flags().Uint64Var(&flagFinalizationSafetyThreshold, "finalization-safety-threshold", 500, "defines finalization safety threshold")
 	rootBlockCmd.Flags().Uint64Var(&flagEpochExtensionViewCount, "epoch-extension-view-count", 100_000, "length of epoch extension in views, default is 100_000 which is approximately 1 day")
@@ -102,6 +104,7 @@ func addRootBlockCmdFlags() {
 	cmd.MarkFlagRequired(rootBlockCmd, "root-chain")
 	cmd.MarkFlagRequired(rootBlockCmd, "root-parent")
 	cmd.MarkFlagRequired(rootBlockCmd, "root-height")
+	cmd.MarkFlagRequired(rootBlockCmd, "root-view")
 	cmd.MarkFlagRequired(rootBlockCmd, "finalization-safety-threshold")
 	cmd.MarkFlagRequired(rootBlockCmd, "epoch-extension-view-count")
 
@@ -126,7 +129,6 @@ func addRootBlockCmdFlags() {
 }
 
 func rootBlock(cmd *cobra.Command, args []string) {
-
 	// maintain backward compatibility with old flag name
 	if deprecatedFlagPartnerStakes != "" {
 		log.Warn().Msg("using deprecated flag --partner-stakes (use --partner-weights instead)")
@@ -138,6 +140,11 @@ func rootBlock(cmd *cobra.Command, args []string) {
 	}
 	if deprecatedFlagProtocolVersion != 0 {
 		log.Warn().Msg("using deprecated flag --protocol-version; please remove this flag from your workflow, it is ignored and will be removed in a future release")
+	}
+
+	chainID := parseChainID(flagRootChain)
+	if (chainID == flow.Testnet || chainID == flow.Mainnet) && flagRootView == 0 {
+		log.Fatal().Msgf("--root-view must be non-zero for %q chain", flagRootChain)
 	}
 
 	// validate epoch configs
@@ -221,11 +228,14 @@ func rootBlock(cmd *cobra.Command, args []string) {
 	log.Info().Msg("")
 
 	log.Info().Msg("constructing root header")
-	header := constructRootHeader(flagRootChain, flagRootParent, flagRootHeight, flagRootTimestamp)
+	headerBody, err := constructRootHeaderBody(flagRootChain, flagRootParent, flagRootHeight, flagRootView, flagRootTimestamp)
+	if err != nil {
+		log.Fatal().Err(err).Msg("failed to construct root header")
+	}
 	log.Info().Msg("")
 
 	log.Info().Msg("constructing intermediary bootstrapping data")
-	epochSetup, epochCommit, err := constructRootEpochEvents(header.View, participants, assignments, clusterQCs, randomBeaconData, dkgIndexMap)
+	epochSetup, epochCommit, err := constructRootEpochEvents(headerBody.View, participants, assignments, clusterQCs, randomBeaconData, dkgIndexMap)
 	if err != nil {
 		log.Fatal().Err(err).Msg("failed to construct root epoch events")
 	}
@@ -264,7 +274,10 @@ func rootBlock(cmd *cobra.Command, args []string) {
 	if err != nil {
 		log.Fatal().Err(err).Msg("failed to construct root kvstore")
 	}
-	block := constructRootBlock(header, rootProtocolState.ID())
+	block, err := constructRootBlock(headerBody, rootProtocolState.ID())
+	if err != nil {
+		log.Fatal().Err(err).Msg("failed to construct root block")
+	}
 	err = common.WriteJSON(model.PathRootBlockData, flagOutdir, block)
 	if err != nil {
 		log.Fatal().Err(err).Msg("failed to write json")

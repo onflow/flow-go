@@ -89,9 +89,7 @@ func (s *BackendScriptsSuite) SetupTest() {
 
 	s.execClient = access.NewExecutionAPIClient(s.T())
 	s.executionNodes = unittest.IdentityListFixture(2, unittest.WithRole(flow.RoleExecution))
-
-	block := unittest.BlockFixture()
-	s.block = &block
+	s.block = unittest.BlockFixture()
 
 	s.script = []byte("access(all) fun main() { return 1 }")
 	s.arguments = [][]byte{[]byte("arg1"), []byte("arg2")}
@@ -224,7 +222,7 @@ func (s *BackendScriptsSuite) TestExecuteScriptFromStorage_HappyPath() {
 	ctx := context.Background()
 
 	scriptExecutor := execmock.NewScriptExecutor(s.T())
-	scriptExecutor.On("ExecuteAtBlockHeight", mock.Anything, s.script, s.arguments, s.block.Header.Height).
+	scriptExecutor.On("ExecuteAtBlockHeight", mock.Anything, s.script, s.arguments, s.block.Height).
 		Return(expectedResponse, nil)
 
 	scripts := s.defaultBackend(scriptExecutor, query_mode.IndexQueryModeLocalOnly)
@@ -277,7 +275,7 @@ func (s *BackendScriptsSuite) TestExecuteScriptFromStorage_Fails() {
 	}
 
 	for _, tt := range testCases {
-		scriptExecutor.On("ExecuteAtBlockHeight", mock.Anything, s.failingScript, s.arguments, s.block.Header.Height).
+		scriptExecutor.On("ExecuteAtBlockHeight", mock.Anything, s.failingScript, s.arguments, s.block.Height).
 			Return(nil, tt.err).Times(3)
 
 		s.Run(fmt.Sprintf("GetAccount - fails with %v", tt.err), func() {
@@ -316,7 +314,7 @@ func (s *BackendScriptsSuite) TestExecuteScriptWithFailover_HappyPath() {
 
 	for _, errToReturn := range errors {
 		// configure local script executor to fail
-		scriptExecutor.On("ExecuteAtBlockHeight", mock.Anything, s.script, s.arguments, s.block.Header.Height).
+		scriptExecutor.On("ExecuteAtBlockHeight", mock.Anything, s.script, s.arguments, s.block.Height).
 			Return(nil, errToReturn).Times(3)
 
 		s.Run(fmt.Sprintf("ExecuteScriptAtLatestBlock - recovers %v", errToReturn), func() {
@@ -357,7 +355,7 @@ func (s *BackendScriptsSuite) TestExecuteScriptWithFailover_SkippedForCorrectCod
 	}
 
 	for _, tt := range testCases {
-		scriptExecutor.On("ExecuteAtBlockHeight", mock.Anything, s.failingScript, s.arguments, s.block.Header.Height).
+		scriptExecutor.On("ExecuteAtBlockHeight", mock.Anything, s.failingScript, s.arguments, s.block.Height).
 			Return(nil, tt.err).
 			Times(3)
 
@@ -390,7 +388,7 @@ func (s *BackendScriptsSuite) TestExecuteScriptWithFailover_ReturnsENErrors() {
 
 	// configure local script executor to fail
 	scriptExecutor := execmock.NewScriptExecutor(s.T())
-	scriptExecutor.On("ExecuteAtBlockHeight", mock.Anything, mock.Anything, mock.Anything, s.block.Header.Height).
+	scriptExecutor.On("ExecuteAtBlockHeight", mock.Anything, mock.Anything, mock.Anything, s.block.Height).
 		Return(nil, storage.ErrHeightNotIndexed)
 
 	scripts := s.defaultBackend(scriptExecutor, query_mode.IndexQueryModeFailover)
@@ -432,7 +430,7 @@ func (s *BackendScriptsSuite) TestExecuteScriptAtLatestBlockFromStorage_Inconsis
 
 func (s *BackendScriptsSuite) testExecuteScriptAtLatestBlock(ctx context.Context, scripts *Scripts, statusCode codes.Code) {
 	s.state.On("Sealed").Return(s.snapshot, nil).Once()
-	s.snapshot.On("Head").Return(s.block.Header, nil).Once()
+	s.snapshot.On("Head").Return(s.block.ToHeader(), nil).Once()
 
 	if statusCode == codes.OK {
 		actual, err := scripts.ExecuteScriptAtLatestBlock(ctx, s.script, s.arguments)
@@ -448,7 +446,7 @@ func (s *BackendScriptsSuite) testExecuteScriptAtLatestBlock(ctx context.Context
 
 func (s *BackendScriptsSuite) testExecuteScriptAtBlockID(ctx context.Context, scripts *Scripts, statusCode codes.Code) {
 	blockID := s.block.ID()
-	s.headers.On("ByBlockID", blockID).Return(s.block.Header, nil).Once()
+	s.headers.On("ByBlockID", blockID).Return(s.block.ToHeader(), nil).Once()
 
 	if statusCode == codes.OK {
 		actual, err := scripts.ExecuteScriptAtBlockID(ctx, blockID, s.script, s.arguments)
@@ -462,9 +460,15 @@ func (s *BackendScriptsSuite) testExecuteScriptAtBlockID(ctx context.Context, sc
 	}
 }
 
+<<<<<<< HEAD:engine/access/rpc/backend/scripts/scripts_test.go
 func (s *BackendScriptsSuite) testExecuteScriptAtBlockHeight(ctx context.Context, scripts *Scripts, statusCode codes.Code) {
 	height := s.block.Header.Height
 	s.headers.On("ByHeight", height).Return(s.block.Header, nil).Once()
+=======
+func (s *BackendScriptsSuite) testExecuteScriptAtBlockHeight(ctx context.Context, backend *backendScripts, statusCode codes.Code) {
+	height := s.block.Height
+	s.headers.On("ByHeight", height).Return(s.block.ToHeader(), nil).Once()
+>>>>>>> feature/malleability:engine/access/rpc/backend/backend_scripts_test.go
 
 	if statusCode == codes.OK {
 		actual, err := scripts.ExecuteScriptAtBlockHeight(ctx, height, s.script, s.arguments)

@@ -117,6 +117,242 @@ func (committer *fakeCommitter) CommitView(
 		nil
 }
 
+<<<<<<< HEAD
+=======
+// This test validates that the blockComputer produces chunk data structures
+// in compliance with both protocol versions 1 and 2.
+// We do this by replicating the "single collection" test case from TestBlockExecutor_ExecuteBlock
+// and adding checks on the ServiceEventCount field of the output ExecutionResult.
+// TODO(mainnet27, #6773): remove this test case https://github.com/onflow/flow-go/issues/6773
+func TestBlockExecutor_ExecuteBlock_VersionAwareChunk(t *testing.T) {
+
+	rag := &RandomAddressGenerator{}
+
+	executorID := unittest.IdentifierFixture()
+
+	me := new(modulemock.Local)
+	me.On("NodeID").Return(executorID)
+	me.On("Sign", mock.Anything, mock.Anything).Return(unittest.SignatureFixture(), nil)
+	me.On("SignFunc", mock.Anything, mock.Anything, mock.Anything).
+		Return(nil, nil)
+
+	// Runs one instance of the "single collection" test case from TestBlockExecutor_ExecuteBlock
+	// using the given protocol state version. Returns the output ExecutionResult
+	// NOTE: This is an exact copy of the "single collection" test case, except we use a protocol
+	// state mock constructor which adds the appropriate version.
+	runTest := func(version uint64) *flow.ExecutionResult {
+		execCtx := fvm.NewContext()
+
+		vm := &testVM{
+			t:                    t,
+			eventsPerTransaction: 1,
+		}
+
+		committer := &fakeCommitter{
+			callCount: 0,
+		}
+
+		exemetrics := new(modulemock.ExecutionMetrics)
+		exemetrics.On("ExecutionBlockExecuted",
+			mock.Anything,  // duration
+			mock.Anything). // stats
+			Return(nil).
+			Times(1)
+
+		exemetrics.On("ExecutionCollectionExecuted",
+			mock.Anything,  // duration
+			mock.Anything). // stats
+			Return(nil).
+			Times(2) // 1 collection + system collection
+
+		exemetrics.On("ExecutionTransactionExecuted",
+			mock.Anything,
+			mock.MatchedBy(func(arg module.TransactionExecutionResultStats) bool {
+				return !arg.Failed // only successful transactions
+			}),
+			mock.Anything).
+			Return(nil).
+			Times(2 + 1) // 2 txs in collection + system chunk tx
+
+		exemetrics.On(
+			"ExecutionChunkDataPackGenerated",
+			mock.Anything,
+			mock.Anything).
+			Return(nil).
+			Times(2) // 1 collection + system collection
+
+		expectedProgramsInCache := 1 // we set one program in the cache
+		exemetrics.On(
+			"ExecutionBlockCachedPrograms",
+			expectedProgramsInCache).
+			Return(nil).
+			Times(1) // 1 block
+
+		bservice := requesterunit.MockBlobService(blockstore.NewBlockstore(dssync.MutexWrap(datastore.NewMapDatastore())))
+		trackerStorage := mocktracker.NewMockStorage()
+
+		prov := provider.NewProvider(
+			zerolog.Nop(),
+			metrics.NewNoopCollector(),
+			execution_data.DefaultSerializer,
+			bservice,
+			trackerStorage,
+		)
+
+		exe, err := computer.NewBlockComputer(
+			vm,
+			execCtx,
+			exemetrics,
+			trace.NewNoopTracer(),
+			zerolog.Nop(),
+			committer,
+			me,
+			prov,
+			nil,
+			testutil.ProtocolStateWithVersionFixture(version),
+			testMaxConcurrency)
+		require.NoError(t, err)
+
+		// create a block with 1 collection with 2 transactions
+		block := generateBlock(1, 2, rag)
+
+		parentBlockExecutionResultID := unittest.IdentifierFixture()
+		result, err := exe.ExecuteBlock(
+			context.Background(),
+			parentBlockExecutionResultID,
+			block,
+			nil,
+			derived.NewEmptyDerivedBlockData(0))
+		assert.NoError(t, err)
+		assert.Len(t, result.AllExecutionSnapshots(), 1+1) // +1 system chunk
+
+		require.Equal(t, 2, committer.callCount)
+
+		assert.Equal(t, block.BlockID(), result.BlockExecutionData.BlockID)
+
+		expectedChunk1EndState := incStateCommitment(*block.StartState)
+		expectedChunk2EndState := incStateCommitment(expectedChunk1EndState)
+
+		assert.Equal(t, expectedChunk2EndState, result.CurrentEndState())
+
+		assertEventHashesMatch(t, 1+1, result)
+
+		// Verify ExecutionReceipt
+		receipt := result.ExecutionReceipt
+
+		assert.Equal(t, executorID, receipt.ExecutorID)
+		assert.Equal(
+			t,
+			parentBlockExecutionResultID,
+			receipt.PreviousResultID)
+		assert.Equal(t, block.BlockID(), receipt.BlockID)
+		assert.NotEqual(t, flow.ZeroID, receipt.ExecutionDataID)
+
+		assert.Len(t, receipt.Chunks, 1+1) // +1 system chunk
+
+		chunk1 := receipt.Chunks[0]
+
+		eventCommits := result.AllEventCommitments()
+		assert.Equal(t, block.BlockID(), chunk1.BlockID)
+		assert.Equal(t, uint(0), chunk1.CollectionIndex)
+		assert.Equal(t, uint64(2), chunk1.NumberOfTransactions)
+		assert.Equal(t, eventCommits[0], chunk1.EventCollection)
+
+		assert.Equal(t, *block.StartState, chunk1.StartState)
+
+		assert.NotEqual(t, *block.StartState, chunk1.EndState)
+		assert.NotEqual(t, flow.DummyStateCommitment, chunk1.EndState)
+		assert.Equal(t, expectedChunk1EndState, chunk1.EndState)
+
+		chunk2 := receipt.Chunks[1]
+		assert.Equal(t, block.BlockID(), chunk2.BlockID)
+		assert.Equal(t, uint(1), chunk2.CollectionIndex)
+		assert.Equal(t, uint64(1), chunk2.NumberOfTransactions)
+		assert.Equal(t, eventCommits[1], chunk2.EventCollection)
+
+		assert.Equal(t, expectedChunk1EndState, chunk2.StartState)
+
+		assert.NotEqual(t, *block.StartState, chunk2.EndState)
+		assert.NotEqual(t, flow.DummyStateCommitment, chunk2.EndState)
+		assert.NotEqual(t, expectedChunk1EndState, chunk2.EndState)
+		assert.Equal(t, expectedChunk2EndState, chunk2.EndState)
+
+		// Verify ChunkDataPacks
+
+		chunkDataPacks, err := result.AllChunkDataPacks()
+		require.NoError(t, err)
+		assert.Len(t, chunkDataPacks, 1+1) // +1 system chunk
+
+		chunkDataPack1 := chunkDataPacks[0]
+
+		assert.Equal(t, chunk1.ID(), chunkDataPack1.ChunkID)
+		assert.Equal(t, *block.StartState, chunkDataPack1.StartState)
+		assert.Equal(t, []byte{1}, chunkDataPack1.Proof)
+		assert.NotNil(t, chunkDataPack1.Collection)
+
+		chunkDataPack2 := chunkDataPacks[1]
+
+		assert.Equal(t, chunk2.ID(), chunkDataPack2.ChunkID)
+		assert.Equal(t, chunk2.StartState, chunkDataPack2.StartState)
+		assert.Equal(t, []byte{2}, chunkDataPack2.Proof)
+		assert.Nil(t, chunkDataPack2.Collection)
+
+		// Verify BlockExecutionData
+
+		assert.Len(t, result.ChunkExecutionDatas, 1+1) // +1 system chunk
+
+		chunkExecutionData1 := result.ChunkExecutionDatas[0]
+		assert.Equal(
+			t,
+			chunkDataPack1.Collection,
+			chunkExecutionData1.Collection)
+		assert.NotNil(t, chunkExecutionData1.TrieUpdate)
+		assert.Equal(t, ledger.RootHash(chunk1.StartState), chunkExecutionData1.TrieUpdate.RootHash)
+
+		chunkExecutionData2 := result.ChunkExecutionDatas[1]
+		assert.NotNil(t, chunkExecutionData2.Collection)
+		assert.NotNil(t, chunkExecutionData2.TrieUpdate)
+		assert.Equal(t, ledger.RootHash(chunk2.StartState), chunkExecutionData2.TrieUpdate.RootHash)
+
+		assert.GreaterOrEqual(t, vm.CallCount(), 3)
+		// if every transaction is retried once, then the call count should be
+		// (1+totalTransactionCount) /2 * totalTransactionCount
+		assert.LessOrEqual(t, vm.CallCount(), (1+3)/2*3)
+
+		return &result.ExecutionReceipt.ExecutionResult
+	}
+
+	// Versions before v1 should have nil ServiceEventCount field
+	t.Run("<v1", func(t *testing.T) {
+		result := runTest(0)
+		for _, chunk := range result.Chunks {
+			assert.Nil(t, chunk.ServiceEventCount)
+		}
+	})
+	// v1 should have nil ServiceEventCount field
+	t.Run("v1", func(t *testing.T) {
+		result := runTest(1)
+		for _, chunk := range result.Chunks {
+			assert.Nil(t, chunk.ServiceEventCount)
+		}
+	})
+	// v2 should have non-nil ServiceEventCount field
+	t.Run("v2", func(t *testing.T) {
+		result := runTest(2)
+		for _, chunk := range result.Chunks {
+			assert.NotNil(t, chunk.ServiceEventCount)
+		}
+	})
+	// Versions later than v2 should have non-nil ServiceEventCount field
+	t.Run(">v2", func(t *testing.T) {
+		result := runTest(2 + uint64(rand.Intn(10)+1))
+		for _, chunk := range result.Chunks {
+			assert.NotNil(t, chunk.ServiceEventCount)
+		}
+	})
+}
+
+>>>>>>> feature/malleability
 func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 	rag := &RandomAddressGenerator{}
 
@@ -124,7 +360,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 
 	me := new(modulemock.Local)
 	me.On("NodeID").Return(executorID)
-	me.On("Sign", mock.Anything, mock.Anything).Return(nil, nil)
+	me.On("Sign", mock.Anything, mock.Anything).Return(unittest.SignatureFixture(), nil)
 	me.On("SignFunc", mock.Anything, mock.Anything, mock.Anything).
 		Return(nil, nil)
 
@@ -217,7 +453,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 
 		require.Equal(t, 2, committer.callCount)
 
-		assert.Equal(t, block.ID(), result.BlockExecutionData.BlockID)
+		assert.Equal(t, block.BlockID(), result.BlockExecutionData.BlockID)
 
 		expectedChunk1EndState := incStateCommitment(*block.StartState)
 		expectedChunk2EndState := incStateCommitment(expectedChunk1EndState)
@@ -234,7 +470,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			t,
 			parentBlockExecutionResultID,
 			receipt.PreviousResultID)
-		assert.Equal(t, block.ID(), receipt.BlockID)
+		assert.Equal(t, block.BlockID(), receipt.BlockID)
 		assert.NotEqual(t, flow.ZeroID, receipt.ExecutionDataID)
 
 		assert.Len(t, receipt.Chunks, 1+1) // +1 system chunk
@@ -242,7 +478,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		chunk1 := receipt.Chunks[0]
 
 		eventCommits := result.AllEventCommitments()
-		assert.Equal(t, block.ID(), chunk1.BlockID)
+		assert.Equal(t, block.BlockID(), chunk1.BlockID)
 		assert.Equal(t, uint(0), chunk1.CollectionIndex)
 		assert.Equal(t, uint64(2), chunk1.NumberOfTransactions)
 		assert.Equal(t, eventCommits[0], chunk1.EventCollection)
@@ -254,7 +490,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		assert.Equal(t, expectedChunk1EndState, chunk1.EndState)
 
 		chunk2 := receipt.Chunks[1]
-		assert.Equal(t, block.ID(), chunk2.BlockID)
+		assert.Equal(t, block.BlockID(), chunk2.BlockID)
 		assert.Equal(t, uint(1), chunk2.CollectionIndex)
 		assert.Equal(t, uint64(1), chunk2.NumberOfTransactions)
 		assert.Equal(t, eventCommits[1], chunk2.EventCollection)
@@ -268,7 +504,8 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 
 		// Verify ChunkDataPacks
 
-		chunkDataPacks := result.AllChunkDataPacks()
+		chunkDataPacks, err := result.AllChunkDataPacks()
+		require.NoError(t, err)
 		assert.Len(t, chunkDataPacks, 1+1) // +1 system chunk
 
 		chunkDataPack1 := chunkDataPacks[0]
@@ -562,7 +799,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 
 		expectedResults := make([]flow.TransactionResult, 0)
 		for _, c := range block.CompleteCollections {
-			for _, t := range c.Transactions {
+			for _, t := range c.Collection.Transactions {
 				txResult := flow.TransactionResult{
 					TransactionID: t.ID(),
 					ErrorMessage: fvmErrors.NewInvalidAddressErrorf(
@@ -635,7 +872,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 
 			transactions := []*flow.TransactionBody{}
 			for _, col := range block.Collections() {
-				transactions = append(transactions, col.Transactions...)
+				transactions = append(transactions, col.Collection.Transactions...)
 			}
 
 			// events to emit for each iteration/transaction
@@ -884,7 +1121,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 
 		normalTransactions := map[common.Location]struct{}{}
 		for _, col := range block.Collections() {
-			for _, txn := range col.Transactions {
+			for _, txn := range col.Collection.Transactions {
 				loc := common.TransactionLocation(txn.ID())
 				normalTransactions[loc] = struct{}{}
 			}
@@ -1324,7 +1561,7 @@ func Test_ExecutingSystemCollection(t *testing.T) {
 
 	me := new(modulemock.Local)
 	me.On("NodeID").Return(unittest.IdentifierFixture())
-	me.On("Sign", mock.Anything, mock.Anything).Return(nil, nil)
+	me.On("Sign", mock.Anything, mock.Anything).Return(unittest.SignatureFixture(), nil)
 	me.On("SignFunc", mock.Anything, mock.Anything, mock.Anything).
 		Return(nil, nil)
 
@@ -1382,22 +1619,20 @@ func generateBlockWithVisitor(
 		collection := generateCollection(transactionCount, addressGenerator, visitor)
 		collections[i] = collection
 		guarantees[i] = collection.Guarantee
-		completeCollections[collection.Guarantee.ID()] = collection
+		completeCollections[collection.Guarantee.CollectionID] = collection
 	}
 
-	block := flow.Block{
-		Header: &flow.Header{
-			Timestamp: flow.GenesisTime,
-			Height:    42,
-			View:      42,
-		},
-		Payload: &flow.Payload{
-			Guarantees: guarantees,
-		},
-	}
+	block := unittest.BlockFixture(
+		unittest.Block.WithHeight(42),
+		unittest.Block.WithView(42),
+		unittest.Block.WithParentView(41),
+		unittest.Block.WithPayload(
+			unittest.PayloadFixture(unittest.WithGuarantees(guarantees...)),
+		),
+	)
 
 	return &entity.ExecutableBlock{
-		Block:               &block,
+		Block:               block,
 		CompleteCollections: completeCollections,
 		StartState:          unittest.StateCommitmentPointerFixture(),
 	}
@@ -1430,8 +1665,8 @@ func generateCollection(
 	guarantee := &flow.CollectionGuarantee{CollectionID: collection.ID()}
 
 	return &entity.CompleteCollection{
-		Guarantee:    guarantee,
-		Transactions: transactions,
+		Guarantee:  guarantee,
+		Collection: &flow.Collection{Transactions: transactions},
 	}
 }
 

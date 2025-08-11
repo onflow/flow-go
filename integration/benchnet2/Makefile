@@ -17,6 +17,8 @@ EPOCH_LEN = 5000
 EPOCH_STAKING_PHASE_LEN = 500
 DKG_PHASE_LEN = 1000
 EPOCH_EXTENSION_LEN = 600
+# Spork root config
+ROOT_VIEW = 0
 
 validate:
 ifeq ($(strip $(VALID_EXECUTION)), 1)
@@ -55,6 +57,7 @@ gen-bootstrap:
 		--root-chain bench \
 		--root-height 0 \
 		--root-parent 0000000000000000000000000000000000000000000000000000000000000000 \
+		--root-view $(ROOT_VIEW) \
 		--epoch-counter 0 \
 		--epoch-length $(EPOCH_LEN) \
 		--epoch-staking-phase-length $(EPOCH_STAKING_PHASE_LEN) \

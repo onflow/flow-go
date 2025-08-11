@@ -190,7 +190,7 @@ func NewInstance(t *testing.T, options ...Option) *Instance {
 
 	// program the builder module behaviour
 	in.builder.On("BuildOn", mock.Anything, mock.Anything, mock.Anything).Return(
-		func(parentID flow.Identifier, setter func(*flow.Header) error, sign func(*flow.Header) error) *flow.Header {
+		func(parentID flow.Identifier, setter func(builder *flow.HeaderBodyBuilder) error, sign func(*flow.Header) ([]byte, error)) *flow.ProposalHeader {
 			in.updatingBlocks.Lock()
 			defer in.updatingBlocks.Unlock()
 
@@ -198,20 +198,30 @@ func NewInstance(t *testing.T, options ...Option) *Instance {
 			if !ok {
 				return nil
 			}
-			header := &flow.Header{
-				ChainID:     "chain",
-				ParentID:    parentID,
-				ParentView:  parent.View,
-				Height:      parent.Height + 1,
+			headerBuilder := flow.NewHeaderBodyBuilder().
+				WithChainID("chain").
+				WithParentID(parentID).
+				WithParentView(parent.View).
+				WithHeight(parent.Height + 1).
+				WithTimestamp(uint64(time.Now().UnixMilli()))
+			require.NoError(t, setter(headerBuilder))
+			headerBody, err := headerBuilder.Build()
+			require.NoError(t, err)
+			header, err := flow.NewHeader(flow.UntrustedHeader{
+				HeaderBody:  *headerBody,
 				PayloadHash: unittest.IdentifierFixture(),
-				Timestamp:   time.Now().UTC(),
+			})
+			require.NoError(t, err)
+			sig, err := sign(header)
+			require.NoError(t, err)
+			proposal := &flow.ProposalHeader{
+				Header:          header,
+				ProposerSigData: sig,
 			}
-			require.NoError(t, setter(header))
-			require.NoError(t, sign(header))
 			in.headers[header.ID()] = header
-			return header
+			return proposal
 		},
-		func(parentID flow.Identifier, _ func(*flow.Header) error, _ func(*flow.Header) error) error {
+		func(parentID flow.Identifier, _ func(*flow.HeaderBodyBuilder) error, _ func(*flow.Header) ([]byte, error)) error {
 			in.updatingBlocks.RLock()
 			_, ok := in.headers[parentID]
 			in.updatingBlocks.RUnlock()
@@ -266,7 +276,7 @@ func NewInstance(t *testing.T, options ...Option) *Instance {
 				View:          votes[0].View,
 				BlockID:       votes[0].BlockID,
 				SignerIndices: signerIndices,
-				SigData:       nil,
+				SigData:       unittest.RandomBytes(msig.SigLen),
 			}
 			return qc
 		},
@@ -281,23 +291,23 @@ func NewInstance(t *testing.T, options ...Option) *Instance {
 	// program the hotstuff communicator behaviour
 	in.notifier.On("OnOwnProposal", mock.Anything, mock.Anything).Run(
 		func(args mock.Arguments) {
-			header, ok := args[0].(*flow.Header)
+			proposal, ok := args[0].(*flow.ProposalHeader)
 			require.True(t, ok)
 
 			// sender should always have the parent
 			in.updatingBlocks.RLock()
-			_, exists := in.headers[header.ParentID]
+			_, exists := in.headers[proposal.Header.ParentID]
 			in.updatingBlocks.RUnlock()
 
 			if !exists {
-				t.Fatalf("parent for proposal not found parent: %x", header.ParentID)
+				t.Fatalf("parent for proposal not found parent: %x", proposal.Header.ParentID)
 			}
 
 			// convert into proposal immediately
-			proposal := model.SignedProposalFromFlow(header)
+			hotstuffProposal := model.SignedProposalFromFlow(proposal)
 
 			// store locally and loop back to engine for processing
-			in.ProcessBlock(proposal)
+			in.ProcessBlock(hotstuffProposal)
 		},
 	)
 	in.notifier.On("OnOwnTimeout", mock.Anything).Run(func(args mock.Arguments) {
@@ -366,7 +376,7 @@ func NewInstance(t *testing.T, options ...Option) *Instance {
 		View:          rootBlock.View,
 		BlockID:       rootBlock.BlockID,
 		SignerIndices: signerIndices,
-		SigData:       unittest.SignatureFixture(),
+		SigData:       unittest.RandomBytes(msig.SigLen),
 	}
 	certifiedRootBlock, err := model.NewCertifiedBlock(rootBlock, rootQC)
 	require.NoError(t, err)
@@ -642,7 +652,7 @@ func (in *Instance) ProcessBlock(proposal *model.SignedProposal) {
 	if parentExists {
 		next := proposal
 		for next != nil {
-			in.headers[next.Block.BlockID] = helper.SignedProposalToFlow(next)
+			in.headers[next.Block.BlockID] = helper.SignedProposalToFlow(next).Header
 
 			in.queue <- next
 			// keep processing the pending blocks
