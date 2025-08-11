@@ -11,8 +11,9 @@ VERSION := $(shell git describe --tags --abbrev=2 --match "v*" --match "secure-c
 GO_TEST_PACKAGES := ./...
 
 # Image tag: if image tag is not set, set it with version (or short commit if empty)
+# Convert + to - for docker tag compatibility while keeping semantic version intact
 ifeq (${IMAGE_TAG},)
-IMAGE_TAG := ${VERSION}
+IMAGE_TAG := $(subst +,-,${VERSION})
 endif
 
 ifeq (${IMAGE_TAG},)
