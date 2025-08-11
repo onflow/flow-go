@@ -3,8 +3,9 @@ package fixtures
 import (
 	"testing"
 
-	"github.com/onflow/flow-go/model/flow"
 	"github.com/stretchr/testify/require"
+
+	"github.com/onflow/flow-go/model/flow"
 )
 
 // IdentifierGenerator generates identifiers with consistent randomness.

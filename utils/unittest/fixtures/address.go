@@ -4,8 +4,9 @@ import (
 	"testing"
 
 	sdk "github.com/onflow/flow-go-sdk"
-	"github.com/onflow/flow-go/model/flow"
 	"github.com/stretchr/testify/require"
+
+	"github.com/onflow/flow-go/model/flow"
 )
 
 // AddressGenerator generates addresses with consistent randomness.

@@ -3,9 +3,10 @@ package fixtures
 import (
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	hotstuff "github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/stretchr/testify/require"
 )
 
 // QuorumCertificateGenerator generates quorum certificates with consistent randomness.
