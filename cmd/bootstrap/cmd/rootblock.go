@@ -296,7 +296,7 @@ func rootBlock(cmd *cobra.Command, args []string) {
 
 	var rootProtocolState protocol_state.KVStoreAPI
 	kvStoreVersionSet := cmd.Flags().Lookup("kvstore-version").Changed
-	if kvStoreVersionSet {
+	if kvStoreVersionSet && flagKVStoreVersion != "default" {
 		kvStoreVersion, err := strconv.ParseUint(flagKVStoreVersion, 10, 64)
 		if err != nil {
 			log.Fatal().Err(err).Msgf("--kvstore-version must be '0', '1' or '2', got %s ", flagKVStoreVersion)
