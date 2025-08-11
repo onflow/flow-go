@@ -269,7 +269,7 @@ func (e *blockComputer) queueUserTransactions(
 	}
 }
 
-func (e *blockComputer) queueSystemTransaction(
+func (e *blockComputer) queueSystemTransactions(
 	systemCtx fvm.Context,
 	systemCollectionInfo collectionInfo,
 	systemTxn *flow.TransactionBody,
@@ -484,7 +484,7 @@ func (e *blockComputer) executeSystemTransactions(
 	// queue size for callback transactions + 1 system transaction (process callback already executed)
 	txQueue := make(chan TransactionRequest, len(callbackTxs)+1)
 
-	e.queueSystemTransaction(
+	e.queueSystemTransactions(
 		systemCtx,
 		systemCollectionInfo,
 		e.systemTxn,
