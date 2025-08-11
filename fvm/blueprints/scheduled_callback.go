@@ -7,6 +7,7 @@ import (
 
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/encoding/ccf"
+
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -34,7 +35,7 @@ func ProcessCallbacksTransaction(chain flow.Chain) *flow.TransactionBody {
 
 	return flow.NewTransactionBody().
 		SetScript(script).
-		SetComputeLimit(SystemChunkTransactionGasLimit)
+		SetComputeLimit(low.DefaultMaxTransactionGasLimit)
 }
 
 func ExecuteCallbacksTransactions(chainID flow.Chain, processEvents flow.EventsList) ([]*flow.TransactionBody, error) {
