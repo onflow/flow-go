@@ -114,6 +114,8 @@ func (g *EventGenerator) List(t testing.TB, n int, opts ...func(*eventConfig)) [
 		// For lists, we want sequential indices
 		list[i] = g.Fixture(t, append(opts, g.WithTransactionIndex(uint32(i)), g.WithEventIndex(uint32(i)))...)
 	}
+	// ensure event/transaction indexes are sequential
+	list = AdjustEventsMetadata(list)
 	return list
 }
 
@@ -138,6 +140,8 @@ func (g *EventGenerator) ForTransactions(t testing.TB, transactionIDs []flow.Ide
 		txEvents := g.ForTransaction(t, txID, uint32(i), eventsPerTransaction, opts...)
 		allEvents = append(allEvents, txEvents...)
 	}
+	// ensure event/transaction indexes are sequential
+	allEvents = AdjustEventsMetadata(allEvents)
 	return allEvents
 }
 
@@ -288,12 +292,12 @@ func AdjustEventsMetadata(events []flow.Event) []flow.Event {
 	txIndex := uint32(0)
 	lastTxID := events[0].TransactionID
 	for eventIndex, event := range events {
-		event.EventIndex = uint32(eventIndex)
-		event.TransactionIndex = txIndex
 		if event.TransactionID != lastTxID {
 			txIndex++
 			lastTxID = event.TransactionID
 		}
+		event.EventIndex = uint32(eventIndex)
+		event.TransactionIndex = txIndex
 		output[eventIndex] = event
 	}
 	return output

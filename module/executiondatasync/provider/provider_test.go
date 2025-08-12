@@ -38,7 +38,7 @@ const (
 
 var (
 	// canonicalExecutionDataID is the execution data ID of the canonical execution data.
-	canonicalExecutionDataID = flow.MustHexStringToIdentifier("15fe460fe551f988f2da926c4323fbbad214b3fef1954517efbf9109fc7f02c0")
+	canonicalExecutionDataID = flow.MustHexStringToIdentifier("d64e70ca81ae8e5ab770f47eb21b98eb1eb5955fff642f204b8a2815186b8acd")
 )
 
 func getDatastore() datastore.Batching {
@@ -69,7 +69,7 @@ func getProvider(blobService network.BlobService) provider.Provider {
 }
 
 func generateBlockExecutionData(t *testing.T, numChunks int, minSerializedSizePerChunk int) *execution_data.BlockExecutionData {
-	suite := fixtures.NewGeneratorSuite(t, fixtures.WithSeed(canonicalGeneratorSeed))
+	suite := fixtures.NewGeneratorSuite(t)
 
 	cedGen := suite.ChunkExecutionDatas()
 	chunkExecutionData := cedGen.List(t, numChunks, cedGen.WithMinSize(minSerializedSizePerChunk))
