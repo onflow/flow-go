@@ -135,7 +135,7 @@ func main() {
 
 	defaultEpochSafetyParams, err := protocol.DefaultEpochSafetyParams(flow.Localnet)
 	if err != nil {
-		panic(fmt.Sprintf("could not get default epoch commit safety parameters: %w", err))
+		panic(fmt.Sprintf("could not get default epoch commit safety parameters: %s", err))
 	}
 
 	// Generate a Flow network config for localnet
