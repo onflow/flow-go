@@ -104,7 +104,7 @@ func addRootBlockCmdFlags() {
 	rootBlockCmd.Flags().Uint64Var(&flagFinalizationSafetyThreshold, "kvstore-finalization-safety-threshold", 0, "defines finalization safety threshold")
 	rootBlockCmd.Flags().Uint64Var(&flagEpochExtensionViewCount, "kvstore-epoch-extension-view-count", 0, "length of epoch extension in views, default is 100_000 which is approximately 1 day")
 	rootBlockCmd.Flags().StringVar(&flagKVStoreVersion, "kvstore-version", "default",
-		"protocol state KVStore version to initialize ('0', '1', '2')")
+		"protocol state KVStore version to initialize ('default' or an integer equal to a supported protocol version: '0', '1', '2', ...)")
 
 	cmd.MarkFlagRequired(rootBlockCmd, "root-chain")
 	cmd.MarkFlagRequired(rootBlockCmd, "root-parent")
@@ -299,7 +299,7 @@ func rootBlock(cmd *cobra.Command, args []string) {
 	if kvStoreVersionSet && flagKVStoreVersion != "default" {
 		kvStoreVersion, err := strconv.ParseUint(flagKVStoreVersion, 10, 64)
 		if err != nil {
-			log.Fatal().Err(err).Msgf("--kvstore-version must be '0', '1' or '2', got %s ", flagKVStoreVersion)
+			log.Fatal().Err(err).Msgf("--kvstore-version must be a supported integer version number: (eg. '0', '1' or '2', etc.) got %s ", flagKVStoreVersion)
 		}
 		rootProtocolState, err = kvstore.NewKVStore(
 			kvStoreVersion,
