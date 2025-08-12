@@ -1,33 +1,38 @@
-package badger_test
+package store_test
 
 import (
 	"testing"
 
-	"github.com/onflow/flow-go/storage/badger/operation"
+	"github.com/onflow/flow-go/storage/operation"
+	"github.com/onflow/flow-go/storage/operation/dbtest"
+	"github.com/onflow/flow-go/storage/store"
 
-	"github.com/dgraph-io/badger/v2"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/utils/unittest"
-
-	badgerstorage "github.com/onflow/flow-go/storage/badger"
 )
 
 func TestHeaderStoreRetrieve(t *testing.T) {
-	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
 		metrics := metrics.NewNoopCollector()
-		headers := badgerstorage.NewHeaders(metrics, db)
+		all := store.InitAll(metrics, db)
+		headers := all.Headers
+		blocks := all.Blocks
 
 		block := unittest.BlockFixture()
 
-		// store header
-		err := headers.Store(block.Header)
+		// store block which will also store header
+		err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+			return blocks.BatchStore(rw, &block)
+		})
 		require.NoError(t, err)
 
 		// index the header
-		err = operation.RetryOnConflict(db.Update, operation.IndexBlockHeight(block.Header.Height, block.ID()))
+		err = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+			return operation.IndexBlockHeight(rw, block.Header.Height, block.ID())
+		})
 		require.NoError(t, err)
 
 		// retrieve header by height
@@ -38,9 +43,9 @@ func TestHeaderStoreRetrieve(t *testing.T) {
 }
 
 func TestHeaderRetrieveWithoutStore(t *testing.T) {
-	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
 		metrics := metrics.NewNoopCollector()
-		headers := badgerstorage.NewHeaders(metrics, db)
+		headers := store.NewHeaders(metrics, db)
 
 		header := unittest.BlockHeaderFixture()
 

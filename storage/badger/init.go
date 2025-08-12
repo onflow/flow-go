@@ -1,51 +1,42 @@
-package badger
+package store
 
 import (
-	"fmt"
-
-	"github.com/dgraph-io/badger/v2"
-
-	"github.com/onflow/flow-go/storage/badger/operation"
+	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/storage"
 )
 
-// InitPublic initializes a public database by checking and setting the database
-// type marker. If an existing, inconsistent type marker is set, this method will
-// return an error. Once a database type marker has been set using these methods,
-// the type cannot be changed.
-func InitPublic(opts badger.Options) (*badger.DB, error) {
-
-	db, err := badger.Open(opts)
-	if err != nil {
-		return nil, fmt.Errorf("could not open db: %w", err)
-	}
-	err = db.Update(operation.InsertPublicDBMarker)
-	if err != nil {
-		// Close db before returning error.
-		db.Close()
-
-		return nil, fmt.Errorf("could not assert db type: %w", err)
-	}
-
-	return db, nil
+type All struct {
+	Headers            *Headers
+	Guarantees         *Guarantees
+	Seals              *Seals
+	Index              *Index
+	Payloads           *Payloads
+	Blocks             *Blocks
+	QuorumCertificates *QuorumCertificates
+	Results            *ExecutionResults
+	Receipts           *ExecutionReceipts
 }
 
-// InitSecret initializes a secrets database by checking and setting the database
-// type marker. If an existing, inconsistent type marker is set, this method will
-// return an error. Once a database type marker has been set using these methods,
-// the type cannot be changed.
-func InitSecret(opts badger.Options) (*badger.DB, error) {
+func InitAll(metrics module.CacheMetrics, db storage.DB) *All {
+	headers := NewHeaders(metrics, db)
+	guarantees := NewGuarantees(metrics, db, DefaultCacheSize)
+	seals := NewSeals(metrics, db)
+	index := NewIndex(metrics, db)
+	results := NewExecutionResults(metrics, db)
+	receipts := NewExecutionReceipts(metrics, db, results, DefaultCacheSize)
+	payloads := NewPayloads(db, index, guarantees, seals, receipts, results)
+	blocks := NewBlocks(db, headers, payloads)
+	qcs := NewQuorumCertificates(metrics, db, DefaultCacheSize)
 
-	db, err := badger.Open(opts)
-	if err != nil {
-		return nil, fmt.Errorf("could not open db: %w", err)
+	return &All{
+		Headers:            headers,
+		Guarantees:         guarantees,
+		Seals:              seals,
+		Index:              index,
+		Payloads:           payloads,
+		Blocks:             blocks,
+		QuorumCertificates: qcs,
+		Results:            results,
+		Receipts:           receipts,
 	}
-	err = db.Update(operation.InsertSecretDBMarker)
-	if err != nil {
-		// Close db before returning error.
-		db.Close()
-
-		return nil, fmt.Errorf("could not assert db type: %w", err)
-	}
-
-	return db, nil
 }

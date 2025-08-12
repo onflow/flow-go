@@ -1,51 +1,45 @@
-package badger
+package store
 
 import (
 	"fmt"
 
-	"github.com/dgraph-io/badger/v2"
-
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/metrics"
-	"github.com/onflow/flow-go/storage/badger/operation"
-	"github.com/onflow/flow-go/storage/badger/procedure"
-	"github.com/onflow/flow-go/storage/badger/transaction"
+	"github.com/onflow/flow-go/storage"
+	"github.com/onflow/flow-go/storage/operation"
+	"github.com/onflow/flow-go/storage/procedure"
 )
 
-// Headers implements a simple read-only header storage around a badger DB.
+// Headers implements a simple read-only header storage around a DB.
 type Headers struct {
-	db          *badger.DB
+	db          storage.DB
 	cache       *Cache[flow.Identifier, *flow.Header]
 	heightCache *Cache[uint64, flow.Identifier]
 }
 
-func NewHeaders(collector module.CacheMetrics, db *badger.DB) *Headers {
+func NewHeaders(collector module.CacheMetrics, db storage.DB) *Headers {
 
-	store := func(blockID flow.Identifier, header *flow.Header) func(*transaction.Tx) error {
-		return transaction.WithTx(operation.InsertHeader(blockID, header))
+	store := func(rw storage.ReaderBatchWriter, blockID flow.Identifier, header *flow.Header) error {
+		return operation.InsertHeader(rw.Writer(), blockID, header)
 	}
 
 	// CAUTION: should only be used to index FINALIZED blocks by their
 	// respective height
-	storeHeight := func(height uint64, id flow.Identifier) func(*transaction.Tx) error {
-		return transaction.WithTx(operation.IndexBlockHeight(height, id))
+	storeHeight := func(rw storage.ReaderBatchWriter, height uint64, id flow.Identifier) error {
+		return operation.IndexBlockHeight(rw, height, id)
 	}
 
-	retrieve := func(blockID flow.Identifier) func(tx *badger.Txn) (*flow.Header, error) {
+	retrieve := func(r storage.Reader, blockID flow.Identifier) (*flow.Header, error) {
 		var header flow.Header
-		return func(tx *badger.Txn) (*flow.Header, error) {
-			err := operation.RetrieveHeader(blockID, &header)(tx)
-			return &header, err
-		}
+		err := operation.RetrieveHeader(r, blockID, &header)
+		return &header, err
 	}
 
-	retrieveHeight := func(height uint64) func(tx *badger.Txn) (flow.Identifier, error) {
-		return func(tx *badger.Txn) (flow.Identifier, error) {
-			var id flow.Identifier
-			err := operation.LookupBlockHeight(height, &id)(tx)
-			return id, err
-		}
+	retrieveHeight := func(r storage.Reader, height uint64) (flow.Identifier, error) {
+		var id flow.Identifier
+		err := operation.LookupBlockHeight(r, height, &id)
+		return id, err
 	}
 
 	h := &Headers{
@@ -64,50 +58,37 @@ func NewHeaders(collector module.CacheMetrics, db *badger.DB) *Headers {
 	return h
 }
 
-func (h *Headers) storeTx(header *flow.Header) func(*transaction.Tx) error {
-	return h.cache.PutTx(header.ID(), header)
+func (h *Headers) storeTx(rw storage.ReaderBatchWriter, header *flow.Header) error {
+	return h.cache.PutTx(rw, header.ID(), header)
 }
 
-func (h *Headers) retrieveTx(blockID flow.Identifier) func(*badger.Txn) (*flow.Header, error) {
-	return func(tx *badger.Txn) (*flow.Header, error) {
-		val, err := h.cache.Get(blockID)(tx)
-		if err != nil {
-			return nil, err
-		}
-		return val, nil
-	}
-}
-
-// results in `storage.ErrNotFound` for unknown height
-func (h *Headers) retrieveIdByHeightTx(height uint64) func(*badger.Txn) (flow.Identifier, error) {
-	return func(tx *badger.Txn) (flow.Identifier, error) {
-		blockID, err := h.heightCache.Get(height)(tx)
-		if err != nil {
-			return flow.ZeroID, fmt.Errorf("failed to retrieve block ID for height %d: %w", height, err)
-		}
-		return blockID, nil
-	}
-}
-
-func (h *Headers) Store(header *flow.Header) error {
-	return operation.RetryOnConflictTx(h.db, transaction.Update, h.storeTx(header))
-}
-
-func (h *Headers) ByBlockID(blockID flow.Identifier) (*flow.Header, error) {
-	tx := h.db.NewTransaction(false)
-	defer tx.Discard()
-	return h.retrieveTx(blockID)(tx)
-}
-
-func (h *Headers) ByHeight(height uint64) (*flow.Header, error) {
-	tx := h.db.NewTransaction(false)
-	defer tx.Discard()
-
-	blockID, err := h.retrieveIdByHeightTx(height)(tx)
+func (h *Headers) retrieveTx(blockID flow.Identifier) (*flow.Header, error) {
+	val, err := h.cache.Get(h.db.Reader(), blockID)
 	if err != nil {
 		return nil, err
 	}
-	return h.retrieveTx(blockID)(tx)
+	return val, nil
+}
+
+// results in `storage.ErrNotFound` for unknown height
+func (h *Headers) retrieveIdByHeightTx(height uint64) (flow.Identifier, error) {
+	blockID, err := h.heightCache.Get(h.db.Reader(), height)
+	if err != nil {
+		return flow.ZeroID, fmt.Errorf("failed to retrieve block ID for height %d: %w", height, err)
+	}
+	return blockID, nil
+}
+
+func (h *Headers) ByBlockID(blockID flow.Identifier) (*flow.Header, error) {
+	return h.retrieveTx(blockID)
+}
+
+func (h *Headers) ByHeight(height uint64) (*flow.Header, error) {
+	blockID, err := h.retrieveIdByHeightTx(height)
+	if err != nil {
+		return nil, err
+	}
+	return h.retrieveTx(blockID)
 }
 
 // Exists returns true if a header with the given ID has been stored.
@@ -118,8 +99,7 @@ func (h *Headers) Exists(blockID flow.Identifier) (bool, error) {
 		return ok, nil
 	}
 	// otherwise, check badger store
-	var exists bool
-	err := h.db.View(operation.BlockExists(blockID, &exists))
+	exists, err := operation.BlockExists(h.db.Reader(), blockID)
 	if err != nil {
 		return false, fmt.Errorf("could not check existence: %w", err)
 	}
@@ -130,10 +110,7 @@ func (h *Headers) Exists(blockID flow.Identifier) (bool, error) {
 // version of `ByHeight` that skips retrieving the block. Expected errors during normal operations:
 //   - `storage.ErrNotFound` if no finalized block is known at given height.
 func (h *Headers) BlockIDByHeight(height uint64) (flow.Identifier, error) {
-	tx := h.db.NewTransaction(false)
-	defer tx.Discard()
-
-	blockID, err := h.retrieveIdByHeightTx(height)(tx)
+	blockID, err := h.retrieveIdByHeightTx(height)
 	if err != nil {
 		return flow.ZeroID, fmt.Errorf("could not lookup block id by height %d: %w", height, err)
 	}
@@ -142,7 +119,7 @@ func (h *Headers) BlockIDByHeight(height uint64) (flow.Identifier, error) {
 
 func (h *Headers) ByParentID(parentID flow.Identifier) ([]*flow.Header, error) {
 	var blockIDs flow.IdentifierList
-	err := h.db.View(procedure.LookupBlockChildren(parentID, &blockIDs))
+	err := procedure.LookupBlockChildren(h.db.Reader(), parentID, &blockIDs)
 	if err != nil {
 		return nil, fmt.Errorf("could not look up children: %w", err)
 	}
@@ -159,34 +136,36 @@ func (h *Headers) ByParentID(parentID flow.Identifier) ([]*flow.Header, error) {
 
 func (h *Headers) FindHeaders(filter func(header *flow.Header) bool) ([]flow.Header, error) {
 	blocks := make([]flow.Header, 0, 1)
-	err := h.db.View(operation.FindHeaders(filter, &blocks))
+	err := operation.FindHeaders(h.db.Reader(), filter, &blocks)
 	return blocks, err
 }
 
 // RollbackExecutedBlock update the executed block header to the given header.
 // only useful for execution node to roll back executed block height
+// This method is not concurrent safe, the caller should make sure to call
+// this method in a single thread.
 func (h *Headers) RollbackExecutedBlock(header *flow.Header) error {
-	return operation.RetryOnConflict(h.db.Update, func(txn *badger.Txn) error {
-		var blockID flow.Identifier
-		err := operation.RetrieveExecutedBlock(&blockID)(txn)
-		if err != nil {
-			return fmt.Errorf("cannot lookup executed block: %w", err)
-		}
+	var blockID flow.Identifier
+	err := operation.RetrieveExecutedBlock(h.db.Reader(), &blockID)
+	if err != nil {
+		return fmt.Errorf("cannot lookup executed block: %w", err)
+	}
 
-		var highest flow.Header
-		err = operation.RetrieveHeader(blockID, &highest)(txn)
-		if err != nil {
-			return fmt.Errorf("cannot retrieve executed header: %w", err)
-		}
+	var highest flow.Header
+	err = operation.RetrieveHeader(h.db.Reader(), blockID, &highest)
+	if err != nil {
+		return fmt.Errorf("cannot retrieve executed header: %w", err)
+	}
 
-		// only rollback if the given height is below the current executed height
-		if header.Height >= highest.Height {
-			return fmt.Errorf("cannot roolback. expect the target height %v to be lower than highest executed height %v, but actually is not",
-				header.Height, highest.Height,
-			)
-		}
+	// only rollback if the given height is below the current executed height
+	if header.Height >= highest.Height {
+		return fmt.Errorf("cannot roolback. expect the target height %v to be lower than highest executed height %v, but actually is not",
+			header.Height, highest.Height,
+		)
+	}
 
-		err = operation.UpdateExecutedBlock(header.ID())(txn)
+	return h.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+		err = operation.UpdateExecutedBlock(rw.Writer(), header.ID())
 		if err != nil {
 			return fmt.Errorf("cannot update highest executed block: %w", err)
 		}

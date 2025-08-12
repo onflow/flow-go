@@ -1,13 +1,17 @@
+//nolint:golint,unused
 package operation
 
 import (
-	op "github.com/onflow/flow-go/storage/operation"
+	"encoding/binary"
+	"fmt"
+
+	"github.com/onflow/flow-go/model/flow"
 )
 
 const (
 
 	// codes for special database markers
-	codeMax    = 1 // keeps track of the maximum key size
+	// codeMax    = 1 // deprecated
 	codeDBType = 2 // specifies a database type
 
 	// codes for views with special meaning
@@ -15,10 +19,10 @@ const (
 	codeLivenessData = 11 // liveness data for hotstuff state
 
 	// codes for fields associated with the root state
-	// codeSporkID              = 13
-	_ = 14 // DEPRECATED: 14 was used for ProtocolVersion before the versioned Protocol State
-	_ = 15 // DEPRECATED: 15 was used to save the finalization safety threshold
-	// codeSporkRootBlockHeight = 16
+	codeSporkID              = 13
+	_                        = 14 // DEPRECATED: 14 was used for ProtocolVersion before the versioned Protocol State
+	_                        = 15 // DEPRECATED: 15 was used to save the finalization safety threshold
+	codeSporkRootBlockHeight = 16
 
 	// code for heights with special meaning
 	codeFinalizedHeight         = 20 // latest finalized block height
@@ -69,9 +73,8 @@ const (
 	codeEpochSetup         = 61 // EpochSetup service event, keyed by ID
 	codeEpochCommit        = 62 // EpochCommit service event, keyed by ID
 	codeBeaconPrivateKey   = 63 // BeaconPrivateKey, keyed by epoch counter
-	_                      = 64 // [DEPRECATED] flag that the DKG for an epoch has been started, used in protocol version v1
-	codeDKGEndState        = 65 // [DEPRECATED] flag for DKG end state, used in protocol version v1
-	codeDKGState           = 66 // current state of Recoverable Random Beacon State Machine for given epoch
+	codeDKGStarted         = 64 // flag that the DKG for an epoch has been started
+	codeDKGEnded           = 65 // flag that the DKG for an epoch has ended (stores end state)
 	codeVersionBeacon      = 67 // flag for storing version beacons
 	codeEpochProtocolState = 68
 	codeProtocolKVStore    = 69
@@ -79,7 +82,7 @@ const (
 	// code for ComputationResult upload status storage
 	// NOTE: for now only GCP uploader is supported. When other uploader (AWS e.g.) needs to
 	//		 be supported, we will need to define new code.
-	_ = 66 // used by ComputationResults in storage/operation
+	codeComputationResults = 66
 
 	// job queue consumers and producers
 	codeJobConsumerProcessed = 70
@@ -112,10 +115,66 @@ const (
 	codeEpochEmergencyFallbackTriggered = 255
 )
 
-func makePrefix(code byte, keys ...any) []byte {
-	return op.MakePrefix(code, keys...)
+func MakePrefix(code byte, keys ...any) []byte {
+	length := 1
+	for _, key := range keys {
+		length += prefixKeyPartLength(key)
+	}
+
+	prefix := make([]byte, 1, length)
+	prefix[0] = code
+	for _, key := range keys {
+		prefix = AppendPrefixKeyPart(prefix, key)
+	}
+	return prefix
 }
 
-func keyPartToBinary(v any) []byte {
-	return op.AppendPrefixKeyPart(nil, v)
+// AppendPrefixKeyPart appends v in binary prefix format to buf.
+// NOTE: this function needs to be in sync with prefixKeyPartLength.
+func AppendPrefixKeyPart(buf []byte, v any) []byte {
+	switch i := v.(type) {
+	case uint8:
+		return append(buf, i)
+	case uint32:
+		var b [4]byte
+		binary.BigEndian.PutUint32(b[:], i)
+		return append(buf, b[:]...)
+	case uint64:
+		var b [8]byte
+		binary.BigEndian.PutUint64(b[:], i)
+		return append(buf, b[:]...)
+	case string:
+		return append(buf, []byte(i)...)
+	case flow.Role:
+		return append(buf, byte(i))
+	case flow.Identifier:
+		return append(buf, i[:]...)
+	case flow.ChainID:
+		return append(buf, []byte(i)...)
+	default:
+		panic(fmt.Sprintf("unsupported type to convert (%T)", v))
+	}
+}
+
+// prefixKeyPartLength returns length of v in binary prefix format.
+// NOTE: this function needs to be in sync with AppendPrefixKeyPartToBuffer.
+func prefixKeyPartLength(v any) int {
+	switch i := v.(type) {
+	case uint8:
+		return 1
+	case uint32:
+		return 4
+	case uint64:
+		return 8
+	case string:
+		return len(i)
+	case flow.Role:
+		return 1
+	case flow.Identifier:
+		return len(i)
+	case flow.ChainID:
+		return len(i)
+	default:
+		panic(fmt.Sprintf("unsupported type to convert (%T)", v))
+	}
 }

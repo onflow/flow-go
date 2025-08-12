@@ -1,75 +1,71 @@
 package operation
 
 import (
-	"github.com/dgraph-io/badger/v2"
+	"errors"
+	"fmt"
 
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/storage"
 )
 
-func InsertHeader(headerID flow.Identifier, header *flow.Header) func(*badger.Txn) error {
-	return insert(makePrefix(codeHeader, headerID), header)
+func InsertHeader(w storage.Writer, headerID flow.Identifier, header *flow.Header) error {
+	return UpsertByKey(w, MakePrefix(codeHeader, headerID), header)
 }
 
-func RetrieveHeader(blockID flow.Identifier, header *flow.Header) func(*badger.Txn) error {
-	return retrieve(makePrefix(codeHeader, blockID), header)
+func RetrieveHeader(r storage.Reader, blockID flow.Identifier, header *flow.Header) error {
+	return RetrieveByKey(r, MakePrefix(codeHeader, blockID), header)
 }
 
 // IndexBlockHeight indexes the height of a block. It should only be called on
 // finalized blocks.
-func IndexBlockHeight(height uint64, blockID flow.Identifier) func(*badger.Txn) error {
-	return insert(makePrefix(codeHeightToBlock, height), blockID)
+// TODO(leo): add synchronization
+func IndexBlockHeight(rw storage.ReaderBatchWriter, height uint64, blockID flow.Identifier) error {
+	var existingID flow.Identifier
+	err := RetrieveByKey(rw.GlobalReader(), MakePrefix(codeHeightToBlock, height), &existingID)
+	if err == nil {
+		return fmt.Errorf("block ID already exists for height %d: %w", height, storage.ErrAlreadyExists)
+	}
+
+	if !errors.Is(err, storage.ErrNotFound) {
+		return fmt.Errorf("failed to check existing block ID for height %d: %w", height, err)
+	}
+
+	return UpsertByKey(rw.Writer(), MakePrefix(codeHeightToBlock, height), blockID)
 }
 
 // LookupBlockHeight retrieves finalized blocks by height.
-func LookupBlockHeight(height uint64, blockID *flow.Identifier) func(*badger.Txn) error {
-	return retrieve(makePrefix(codeHeightToBlock, height), blockID)
+func LookupBlockHeight(r storage.Reader, height uint64, blockID *flow.Identifier) error {
+	return RetrieveByKey(r, MakePrefix(codeHeightToBlock, height), blockID)
 }
 
 // BlockExists checks whether the block exists in the database.
 // No errors are expected during normal operation.
-func BlockExists(blockID flow.Identifier, blockExists *bool) func(*badger.Txn) error {
-	return exists(makePrefix(codeHeader, blockID), blockExists)
-}
-
-func InsertExecutedBlock(blockID flow.Identifier) func(*badger.Txn) error {
-	return insert(makePrefix(codeExecutedBlock), blockID)
-}
-
-func UpdateExecutedBlock(blockID flow.Identifier) func(*badger.Txn) error {
-	return update(makePrefix(codeExecutedBlock), blockID)
-}
-
-func RetrieveExecutedBlock(blockID *flow.Identifier) func(*badger.Txn) error {
-	return retrieve(makePrefix(codeExecutedBlock), blockID)
+func BlockExists(r storage.Reader, blockID flow.Identifier) (bool, error) {
+	return KeyExists(r, MakePrefix(codeHeader, blockID))
 }
 
 // IndexCollectionBlock indexes a block by a collection within that block.
-func IndexCollectionBlock(collID flow.Identifier, blockID flow.Identifier) func(*badger.Txn) error {
-	return insert(makePrefix(codeCollectionBlock, collID), blockID)
+func IndexCollectionBlock(w storage.Writer, collID flow.Identifier, blockID flow.Identifier) error {
+	return UpsertByKey(w, MakePrefix(codeCollectionBlock, collID), blockID)
 }
 
 // LookupCollectionBlock looks up a block by a collection within that block.
-func LookupCollectionBlock(collID flow.Identifier, blockID *flow.Identifier) func(*badger.Txn) error {
-	return retrieve(makePrefix(codeCollectionBlock, collID), blockID)
+func LookupCollectionBlock(r storage.Reader, collID flow.Identifier, blockID *flow.Identifier) error {
+	return RetrieveByKey(r, MakePrefix(codeCollectionBlock, collID), blockID)
 }
 
 // FindHeaders iterates through all headers, calling `filter` on each, and adding
 // them to the `found` slice if `filter` returned true
-func FindHeaders(filter func(header *flow.Header) bool, found *[]flow.Header) func(*badger.Txn) error {
-	return traverse(makePrefix(codeHeader), func() (checkFunc, createFunc, handleFunc) {
-		check := func(key []byte) bool {
-			return true
+func FindHeaders(r storage.Reader, filter func(header *flow.Header) bool, found *[]flow.Header) error {
+	return TraverseByPrefix(r, MakePrefix(codeHeader), func(key []byte, getValue func(destVal any) error) (bail bool, err error) {
+		var h flow.Header
+		err = getValue(&h)
+		if err != nil {
+			return true, err
 		}
-		var val flow.Header
-		create := func() interface{} {
-			return &val
+		if filter(&h) {
+			*found = append(*found, h)
 		}
-		handle := func() error {
-			if filter(&val) {
-				*found = append(*found, val)
-			}
-			return nil
-		}
-		return check, create, handle
-	})
+		return false, nil
+	}, storage.DefaultIteratorOptions())
 }
