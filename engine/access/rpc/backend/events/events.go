@@ -20,6 +20,7 @@ import (
 	"github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/model/events"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/executiondatasync/optimistic_sync"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
@@ -49,18 +50,20 @@ func NewEventsBackend(
 	queryMode query_mode.IndexQueryMode,
 	eventsIndex *index.EventsIndex,
 	execNodeIdentitiesProvider *rpc.ExecutionNodeIdentitiesProvider,
+	executionResultQueryProvider optimistic_sync.ExecutionResultQueryProvider,
+	executionStateCache optimistic_sync.ExecutionStateCache,
 ) (*Events, error) {
 	var eventProvider provider.EventProvider
 
 	switch queryMode {
 	case query_mode.IndexQueryModeLocalOnly:
-		eventProvider = provider.NewLocalEventProvider(eventsIndex)
+		eventProvider = provider.NewLocalEventProvider(eventsIndex, executionResultQueryProvider, executionStateCache)
 
 	case query_mode.IndexQueryModeExecutionNodesOnly:
 		eventProvider = provider.NewENEventProvider(log, execNodeIdentitiesProvider, connFactory, nodeCommunicator)
 
 	case query_mode.IndexQueryModeFailover:
-		local := provider.NewLocalEventProvider(eventsIndex)
+		local := provider.NewLocalEventProvider(eventsIndex, executionResultQueryProvider, executionStateCache)
 		execNode := provider.NewENEventProvider(log, execNodeIdentitiesProvider, connFactory, nodeCommunicator)
 		eventProvider = provider.NewFailoverEventProvider(log, local, execNode)
 
@@ -84,6 +87,7 @@ func (e *Events) GetEventsForHeightRange(
 	eventType string,
 	startHeight, endHeight uint64,
 	requiredEventEncodingVersion entities.EventEncodingVersion,
+	execStateQuery *entities.ExecutionStateQuery,
 ) ([]flow.BlockEvents, error) {
 	if _, err := events.ValidateEvent(flow.EventType(eventType), e.chain); err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, "invalid event type: %v", err)
@@ -164,6 +168,7 @@ func (e *Events) GetEventsForBlockIDs(
 	eventType string,
 	blockIDs []flow.Identifier,
 	requiredEventEncodingVersion entities.EventEncodingVersion,
+	execStateQuery *entities.ExecutionStateQuery,
 ) ([]flow.BlockEvents, error) {
 	if _, err := events.ValidateEvent(flow.EventType(eventType), e.chain); err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, "invalid event type: %v", err)

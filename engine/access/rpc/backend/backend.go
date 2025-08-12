@@ -36,6 +36,7 @@ import (
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/counters"
 	"github.com/onflow/flow-go/module/execution"
+	"github.com/onflow/flow-go/module/executiondatasync/optimistic_sync"
 	"github.com/onflow/flow-go/module/state_synchronization"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
@@ -117,6 +118,9 @@ type Params struct {
 	VersionControl             *version.VersionControl
 	ExecNodeIdentitiesProvider *commonrpc.ExecutionNodeIdentitiesProvider
 	TxErrorMessageProvider     error_messages.Provider
+
+	ExecutionResultQueryProvider optimistic_sync.ExecutionResultQueryProvider
+	ExecutionStateCache          optimistic_sync.ExecutionStateCache
 }
 
 var _ access.API = (*Backend)(nil)
@@ -168,6 +172,8 @@ func New(params Params) (*Backend, error) {
 		params.EventQueryMode,
 		params.EventsIndex,
 		params.ExecNodeIdentitiesProvider,
+		params.ExecutionResultQueryProvider,
+		params.ExecutionStateCache,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create events: %w", err)
