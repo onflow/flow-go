@@ -6,6 +6,7 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
+	"github.com/onflow/flow-go/engine/access/rpc/backend/common"
 	"github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/irrecoverable"
@@ -76,7 +77,7 @@ func (b *backendBlockDetails) GetBlockByID(ctx context.Context, id flow.Identifi
 func (b *backendBlockDetails) GetBlockByHeight(ctx context.Context, height uint64) (*flow.Block, flow.BlockStatus, error) {
 	block, err := b.blocks.ByHeight(height)
 	if err != nil {
-		return nil, flow.BlockStatusUnknown, rpc.ConvertStorageError(resolveHeightError(b.state.Params(), height, err))
+		return nil, flow.BlockStatusUnknown, rpc.ConvertStorageError(common.ResolveHeightError(b.state.Params(), height, err))
 	}
 
 	status, err := b.getBlockStatus(block.ToHeader())

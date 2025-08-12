@@ -41,7 +41,7 @@ func ComputationResultForBlockFixture(
 	completeBlock *entity.ExecutableBlock,
 ) *execution.ComputationResult {
 	collections := completeBlock.Collections()
-	computationResult := execution.NewEmptyComputationResult(completeBlock, flow.NewChunk)
+	computationResult := execution.NewEmptyComputationResult(completeBlock)
 
 	numberOfChunks := len(collections) + 1
 	ceds := make([]*execution_data.ChunkExecutionData, numberOfChunks)

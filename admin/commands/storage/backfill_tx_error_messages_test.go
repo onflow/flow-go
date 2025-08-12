@@ -10,17 +10,20 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
-	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
 	"github.com/onflow/flow-go/admin"
 	"github.com/onflow/flow-go/admin/commands"
+	"github.com/onflow/flow-go/engine/access/index"
 	"github.com/onflow/flow-go/engine/access/ingestion/tx_error_messages"
 	accessmock "github.com/onflow/flow-go/engine/access/mock"
 	"github.com/onflow/flow-go/engine/access/rpc/backend"
+	"github.com/onflow/flow-go/engine/access/rpc/backend/node_communicator"
+	"github.com/onflow/flow-go/engine/access/rpc/backend/transactions/error_messages"
 	connectionmock "github.com/onflow/flow-go/engine/access/rpc/connection/mock"
 	commonrpc "github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/model/flow"
+	syncmock "github.com/onflow/flow-go/module/state_synchronization/mock"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/invalid"
 	protocolmock "github.com/onflow/flow-go/state/protocol/mock"
@@ -46,6 +49,10 @@ type BackfillTxErrorMessagesSuite struct {
 	transactionResults *storagemock.LightTransactionResults
 	receipts           *storagemock.ExecutionReceipts
 	headers            *storagemock.Headers
+
+	reporter       *syncmock.IndexReporter
+	indexReporter  *index.Reporter
+	txResultsIndex *index.TransactionResultsIndex
 
 	execClient *accessmock.ExecutionAPIClient
 
@@ -75,6 +82,13 @@ func (suite *BackfillTxErrorMessagesSuite) SetupTest() {
 	suite.receipts = new(storagemock.ExecutionReceipts)
 	suite.transactionResults = storagemock.NewLightTransactionResults(suite.T())
 	suite.txErrorMessages = new(storagemock.TransactionResultErrorMessages)
+	suite.reporter = syncmock.NewIndexReporter(suite.T())
+
+	suite.indexReporter = index.NewReporter()
+	err := suite.indexReporter.Initialize(suite.reporter)
+	suite.Require().NoError(err)
+	suite.txResultsIndex = index.NewTransactionResultsIndex(suite.indexReporter, suite.transactionResults)
+
 	suite.execClient = new(accessmock.ExecutionAPIClient)
 
 	suite.blockCount = 5
@@ -132,25 +146,18 @@ func (suite *BackfillTxErrorMessagesSuite) SetupTest() {
 		nil,
 	)
 
-	var err error
-	suite.backend, err = backend.New(backend.Params{
-		State:                      suite.state,
-		ExecutionReceipts:          suite.receipts,
-		ConnFactory:                suite.connFactory,
-		MaxHeightRange:             backend.DefaultMaxHeightRange,
-		Log:                        suite.log,
-		SnapshotHistoryLimit:       backend.DefaultSnapshotHistoryLimit,
-		Communicator:               backend.NewNodeCommunicator(false),
-		ScriptExecutionMode:        backend.IndexQueryModeExecutionNodesOnly,
-		TxResultQueryMode:          backend.IndexQueryModeExecutionNodesOnly,
-		ChainID:                    flow.Testnet,
-		ExecNodeIdentitiesProvider: executionNodeIdentitiesProvider,
-	})
-	require.NoError(suite.T(), err)
+	errorMessageProvider := error_messages.NewTxErrorMessageProvider(
+		suite.log,
+		suite.txErrorMessages,
+		suite.txResultsIndex,
+		suite.connFactory,
+		node_communicator.NewNodeCommunicator(false),
+		executionNodeIdentitiesProvider,
+	)
 
 	suite.txResultErrorMessagesCore = tx_error_messages.NewTxErrorMessagesCore(
 		suite.log,
-		suite.backend,
+		errorMessageProvider,
 		suite.txErrorMessages,
 		executionNodeIdentitiesProvider,
 	)

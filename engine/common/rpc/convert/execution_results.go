@@ -143,41 +143,6 @@ func MessagesToExecutionResultMetaList(m []*entities.ExecutionReceiptMeta) (flow
 	return execMetaList[:], nil
 }
 
-// ServiceEventCountFieldToMessage converts the [flow.Chunk.ServiceEventCount] field
-// to a uint32 representation used in Protobuf. Protobuf does not natively support
-// optional (pointer) values, and does not support numerics smaller than 32 bits.
-// To temporarily support both nil and non-nil values for this field, we use the
-// upper 16 bits to encode nil values, with the following rule:
-//   - If any of the high-order 16 bits are non-zero, the field is nil
-//   - Otherwise, the (zero) high-order 16 bits are truncated to yield the (non-nil) uint16 value
-//
-// Deprecated:
-// TODO(mainnet27, #6773): remove this function
-func ServiceEventCountFieldToMessage(serviceEventCount *uint16) uint32 {
-	if serviceEventCount == nil {
-		return 0xffff0000
-	}
-	return uint32(*serviceEventCount)
-}
-
-// MessageToServiceEventCountField converts the uint32 protobuf field to a
-// [flow.Chunk.ServiceEventCount] field. Protobuf does not natively support
-// optional (pointer) values, and does not support numerics smaller than 32 bits.
-// To temporarily support both nil and non-nil values for this field, we use the
-// upper 16 bits to encode nil values, with the following rule:
-//   - If any of the high-order 16 bits are non-zero, the field is nil
-//   - Otherwise, the (zero) high-order 16 bits are truncated to yield the (non-nil) uint16 value
-//
-// Deprecated:
-// TODO(mainnet27, #6773): remove this function
-func MessageToServiceEventCountField(msgField uint32) *uint16 {
-	if msgField&0xffff0000 > 0 {
-		return nil
-	}
-	val := uint16(msgField)
-	return &val
-}
-
 // ChunkToMessage converts a chunk to a protobuf message
 func ChunkToMessage(chunk *flow.Chunk) *entities.Chunk {
 	return &entities.Chunk{
@@ -189,7 +154,7 @@ func ChunkToMessage(chunk *flow.Chunk) *entities.Chunk {
 		NumberOfTransactions: uint32(chunk.NumberOfTransactions),
 		Index:                chunk.Index,
 		EndState:             StateCommitmentToMessage(chunk.EndState),
-		ServiceEventCount:    ServiceEventCountFieldToMessage(chunk.ServiceEventCount),
+		ServiceEventCount:    uint32(chunk.ServiceEventCount),
 	}
 }
 
@@ -204,40 +169,12 @@ func MessageToChunk(m *entities.Chunk) (*flow.Chunk, error) {
 		return nil, fmt.Errorf("failed to parse Message end state to Chunk: %w", err)
 	}
 
-	serviceEventCountPtr := MessageToServiceEventCountField(m.ServiceEventCount)
-	var chunk *flow.Chunk
-
-	// Branch on nil-vs-non-nil to preserve backward compatibility
-	//TODO(mainnet27, #6773): remove the v1 branch here
-	if serviceEventCountPtr == nil {
-		// Protocol v1: omit ServiceEventCount
-		chunk, err = flow.NewChunk_ProtocolVersion1(flow.UntrustedChunk{
-			ChunkBody: flow.ChunkBody{
-				CollectionIndex:      uint(m.CollectionIndex),
-				StartState:           startState,
-				EventCollection:      MessageToIdentifier(m.EventCollection),
-				ServiceEventCount:    nil,
-				BlockID:              MessageToIdentifier(m.BlockId),
-				TotalComputationUsed: m.TotalComputationUsed,
-				NumberOfTransactions: uint64(m.NumberOfTransactions),
-			},
-			Index:    m.Index,
-			EndState: endState,
-		})
-		if err != nil {
-			return nil, fmt.Errorf("could not build chunk protocol version1: %w", err)
-		}
-
-		return chunk, nil
-	}
-
-	// Protocol v2+: include ServiceEventCount
-	chunk, err = flow.NewChunk(flow.UntrustedChunk{
+	chunk, err := flow.NewChunk(flow.UntrustedChunk{
 		ChunkBody: flow.ChunkBody{
 			CollectionIndex:      uint(m.CollectionIndex),
 			StartState:           startState,
 			EventCollection:      MessageToIdentifier(m.EventCollection),
-			ServiceEventCount:    serviceEventCountPtr,
+			ServiceEventCount:    uint16(m.ServiceEventCount),
 			BlockID:              MessageToIdentifier(m.BlockId),
 			TotalComputationUsed: m.TotalComputationUsed,
 			NumberOfTransactions: uint64(m.NumberOfTransactions),

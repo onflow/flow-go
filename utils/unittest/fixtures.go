@@ -896,7 +896,7 @@ func WithServiceEvents(n int) func(result *flow.ExecutionResult) {
 		// randomly assign service events to chunks
 		for i := 0; i < n; i++ {
 			chunkIndex := rand.Intn(result.Chunks.Len())
-			*result.Chunks[chunkIndex].ServiceEventCount++
+			result.Chunks[chunkIndex].ServiceEventCount++
 		}
 	}
 }
@@ -1318,7 +1318,7 @@ func WithChunkStartState(startState flow.StateCommitment) func(chunk *flow.Chunk
 	}
 }
 
-func WithServiceEventCount(count *uint16) func(*flow.Chunk) {
+func WithServiceEventCount(count uint16) func(*flow.Chunk) {
 	return func(chunk *flow.Chunk) {
 		chunk.ServiceEventCount = count
 	}
@@ -1335,7 +1335,7 @@ func ChunkFixture(
 			CollectionIndex:      collectionIndex,
 			StartState:           startState,
 			EventCollection:      IdentifierFixture(),
-			ServiceEventCount:    PtrTo[uint16](0),
+			ServiceEventCount:    0,
 			TotalComputationUsed: 4200,
 			NumberOfTransactions: 42,
 			BlockID:              blockID,
