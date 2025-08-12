@@ -23,6 +23,7 @@ IMAGE_TAG_NO_ADX := $(IMAGE_TAG)+without-adx
 IMAGE_TAG_NO_NETGO_NO_ADX := $(IMAGE_TAG)+without-netgo-without-adx
 IMAGE_TAG_ARM := $(IMAGE_TAG)+arm
 
+DOCKER_TAG := $(IMAGE_TAG)
 DOCKER_TAG_NO_ADX := $(subst +,-,$(IMAGE_TAG_NO_ADX))
 DOCKER_TAG_NO_NETGO_NO_ADX := $(subst +,-,$(IMAGE_TAG_NO_NETGO_NO_ADX))
 DOCKER_TAG_ARM := $(subst +,-,$(IMAGE_TAG_ARM))
@@ -675,19 +676,19 @@ docker-native-build-benchnet: docker-native-build-flow docker-native-build-loade
 
 .PHONY: docker-push-collection-with-adx
 docker-push-collection-with-adx:
-	docker push "$(CONTAINER_REGISTRY)/collection:$(IMAGE_TAG)"
+	docker push "$(CONTAINER_REGISTRY)/collection:$(DOCKER_TAG)"
 
 .PHONY: docker-push-collection-without-adx
 docker-push-collection-without-adx:
-	docker push "$(CONTAINER_REGISTRY)/collection:$(IMAGE_TAG_NO_ADX)"
+	docker push "$(CONTAINER_REGISTRY)/collection:$(DOCKER_TAG_NO_ADX)"
 
 .PHONY: docker-push-collection-without-netgo-without-adx
 docker-push-collection-without-netgo-without-adx:
-	docker push "$(CONTAINER_REGISTRY)/collection:$(IMAGE_TAG_NO_NETGO_NO_ADX)"
+	docker push "$(CONTAINER_REGISTRY)/collection:$(DOCKER_TAG_NO_NETGO_NO_ADX)"
 
 .PHONY: docker-push-collection-arm
 docker-push-collection-arm:
-	docker push "$(CONTAINER_REGISTRY)/collection:$(IMAGE_TAG_ARM)"
+	docker push "$(CONTAINER_REGISTRY)/collection:$(DOCKER_TAG_ARM)"
 
 .PHONY: docker-push-collection-latest
 docker-push-collection-latest: docker-push-collection
@@ -695,19 +696,19 @@ docker-push-collection-latest: docker-push-collection
 
 .PHONY: docker-push-consensus-with-adx
 docker-push-consensus-with-adx:
-	docker push "$(CONTAINER_REGISTRY)/consensus:$(IMAGE_TAG)"
+	docker push "$(CONTAINER_REGISTRY)/consensus:$(DOCKER_TAG)"
 
 .PHONY: docker-push-consensus-without-adx
 docker-push-consensus-without-adx:
-	docker push "$(CONTAINER_REGISTRY)/consensus:$(IMAGE_TAG_NO_ADX)"
+	docker push "$(CONTAINER_REGISTRY)/consensus:$(DOCKER_TAG_NO_ADX)"
 
 .PHONY: docker-push-consensus-without-netgo-without-adx
 docker-push-consensus-without-netgo-without-adx:
-	docker push "$(CONTAINER_REGISTRY)/consensus:$(IMAGE_TAG_NO_NETGO_NO_ADX)"
+	docker push "$(CONTAINER_REGISTRY)/consensus:$(DOCKER_TAG_NO_NETGO_NO_ADX)"
 
 .PHONY: docker-push-consensus-arm
 docker-push-consensus-arm:
-	docker push "$(CONTAINER_REGISTRY)/consensus:$(IMAGE_TAG_ARM)"
+	docker push "$(CONTAINER_REGISTRY)/consensus:$(DOCKER_TAG_ARM)"
 
 .PHONY: docker-push-consensus-latest
 docker-push-consensus-latest: docker-push-consensus
@@ -715,23 +716,23 @@ docker-push-consensus-latest: docker-push-consensus
 
 .PHONY: docker-push-execution-with-adx
 docker-push-execution-with-adx:
-	docker push "$(CONTAINER_REGISTRY)/execution:$(IMAGE_TAG)"
+	docker push "$(CONTAINER_REGISTRY)/execution:$(DOCKER_TAG)"
 
 .PHONY: docker-push-execution-corrupt
 docker-push-execution-corrupt:
-	docker push "$(CONTAINER_REGISTRY)/execution-corrupted:$(IMAGE_TAG)"
+	docker push "$(CONTAINER_REGISTRY)/execution-corrupted:$(DOCKER_TAG)"
 
 .PHONY: docker-push-execution-without-adx
 docker-push-execution-without-adx:
-	docker push "$(CONTAINER_REGISTRY)/execution:$(IMAGE_TAG_NO_ADX)"
+	docker push "$(CONTAINER_REGISTRY)/execution:$(DOCKER_TAG_NO_ADX)"
 
 .PHONY: docker-push-execution-without-netgo-without-adx
 docker-push-execution-without-netgo-without-adx:
-	docker push "$(CONTAINER_REGISTRY)/execution:$(IMAGE_TAG_NO_NETGO_NO_ADX)"
+	docker push "$(CONTAINER_REGISTRY)/execution:$(DOCKER_TAG_NO_NETGO_NO_ADX)"
 
 .PHONY: docker-push-execution-arm
 docker-push-execution-arm:
-	docker push "$(CONTAINER_REGISTRY)/execution:$(IMAGE_TAG_ARM)"
+	docker push "$(CONTAINER_REGISTRY)/execution:$(DOCKER_TAG_ARM)"
 
 .PHONY: docker-push-execution-latest
 docker-push-execution-latest: docker-push-execution
@@ -739,23 +740,23 @@ docker-push-execution-latest: docker-push-execution
 
 .PHONY: docker-push-verification-with-adx
 docker-push-verification-with-adx:
-	docker push "$(CONTAINER_REGISTRY)/verification:$(IMAGE_TAG)"
+	docker push "$(CONTAINER_REGISTRY)/verification:$(DOCKER_TAG)"
 
 .PHONY: docker-push-verification-without-adx
 docker-push-verification-without-adx:
-	docker push "$(CONTAINER_REGISTRY)/verification:$(IMAGE_TAG_NO_ADX)"
+	docker push "$(CONTAINER_REGISTRY)/verification:$(DOCKER_TAG_NO_ADX)"
 
 .PHONY: docker-push-verification-corrupt
 docker-push-verification-corrupt:
-	docker push "$(CONTAINER_REGISTRY)/verification-corrupted:$(IMAGE_TAG)"
+	docker push "$(CONTAINER_REGISTRY)/verification-corrupted:$(DOCKER_TAG)"
 
 .PHONY: docker-push-verification-without-netgo-without-adx
 docker-push-verification-without-netgo-without-adx:
-	docker push "$(CONTAINER_REGISTRY)/verification:$(IMAGE_TAG_NO_NETGO_NO_ADX)"
+	docker push "$(CONTAINER_REGISTRY)/verification:$(DOCKER_TAG_NO_NETGO_NO_ADX)"
 
 .PHONY: docker-push-verification-arm
 docker-push-verification-arm:
-	docker push "$(CONTAINER_REGISTRY)/verification:$(IMAGE_TAG_ARM)"
+	docker push "$(CONTAINER_REGISTRY)/verification:$(DOCKER_TAG_ARM)"
 
 .PHONY: docker-push-verification-latest
 docker-push-verification-latest: docker-push-verification
@@ -763,23 +764,23 @@ docker-push-verification-latest: docker-push-verification
 
 .PHONY: docker-push-access-with-adx
 docker-push-access-with-adx:
-	docker push "$(CONTAINER_REGISTRY)/access:$(IMAGE_TAG)"
+	docker push "$(CONTAINER_REGISTRY)/access:$(DOCKER_TAG)"
 
 .PHONY: docker-push-access-without-adx
 docker-push-access-without-adx:
-	docker push "$(CONTAINER_REGISTRY)/access:$(IMAGE_TAG_NO_ADX)"
+	docker push "$(CONTAINER_REGISTRY)/access:$(DOCKER_TAG_NO_ADX)"
 
 .PHONY: docker-push-access-corrupt
 docker-push-access-corrupt:
-	docker push "$(CONTAINER_REGISTRY)/access-corrupted:$(IMAGE_TAG)"
+	docker push "$(CONTAINER_REGISTRY)/access-corrupted:$(DOCKER_TAG)"
 
 .PHONY: docker-push-access-without-netgo-without-adx
 docker-push-access-without-netgo-without-adx:
-	docker push "$(CONTAINER_REGISTRY)/access:$(IMAGE_TAG_NO_NETGO_NO_ADX)"
+	docker push "$(CONTAINER_REGISTRY)/access:$(DOCKER_TAG_NO_NETGO_NO_ADX)"
 
 .PHONY: docker-push-access-arm
 docker-push-access-arm:
-	docker push "$(CONTAINER_REGISTRY)/access:$(IMAGE_TAG_ARM)"
+	docker push "$(CONTAINER_REGISTRY)/access:$(DOCKER_TAG_ARM)"
 
 .PHONY: docker-push-access-latest
 docker-push-access-latest: docker-push-access
@@ -788,19 +789,19 @@ docker-push-access-latest: docker-push-access
 
 .PHONY: docker-push-observer-with-adx
 docker-push-observer-with-adx:
-	docker push "$(CONTAINER_REGISTRY)/observer:$(IMAGE_TAG)"
+	docker push "$(CONTAINER_REGISTRY)/observer:$(DOCKER_TAG)"
 
 .PHONY: docker-push-observer-without-adx
 docker-push-observer-without-adx:
-	docker push "$(CONTAINER_REGISTRY)/observer:$(IMAGE_TAG_NO_ADX)"
+	docker push "$(CONTAINER_REGISTRY)/observer:$(DOCKER_TAG_NO_ADX)"
 
 .PHONY: docker-push-observer-without-netgo-without-adx
 docker-push-observer-without-netgo-without-adx:
-	docker push "$(CONTAINER_REGISTRY)/observer:$(IMAGE_TAG_NO_NETGO_NO_ADX)"
+	docker push "$(CONTAINER_REGISTRY)/observer:$(DOCKER_TAG_NO_NETGO_NO_ADX)"
 
 .PHONY: docker-push-observer-arm
 docker-push-observer-arm:
-	docker push "$(CONTAINER_REGISTRY)/observer:$(IMAGE_TAG_ARM)"
+	docker push "$(CONTAINER_REGISTRY)/observer:$(DOCKER_TAG_ARM)"
 
 .PHONY: docker-push-observer-latest
 docker-push-observer-latest: docker-push-observer
@@ -808,7 +809,7 @@ docker-push-observer-latest: docker-push-observer
 
 .PHONY: docker-push-ghost
 docker-push-ghost:
-	docker push "$(CONTAINER_REGISTRY)/ghost:$(IMAGE_TAG)"
+	docker push "$(CONTAINER_REGISTRY)/ghost:$(DOCKER_TAG)"
 
 .PHONY: docker-push-ghost-latest
 docker-push-ghost-latest: docker-push-ghost
@@ -816,7 +817,7 @@ docker-push-ghost-latest: docker-push-ghost
 
 .PHONY: docker-push-loader
 docker-push-loader:
-	docker push "$(CONTAINER_REGISTRY)/loader:$(IMAGE_TAG)"
+	docker push "$(CONTAINER_REGISTRY)/loader:$(DOCKER_TAG)"
 
 .PHONY: docker-push-loader-latest
 docker-push-loader-latest: docker-push-loader
