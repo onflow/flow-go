@@ -27,6 +27,7 @@ import (
 	commonrpc "github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/executiondatasync/optimistic_sync"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	syncmock "github.com/onflow/flow-go/module/state_synchronization/mock"
 	protocol "github.com/onflow/flow-go/state/protocol/mock"
@@ -67,6 +68,9 @@ type EventsSuite struct {
 	blocks      []*flow.Block
 	blockIDs    []flow.Identifier
 	blockEvents []flow.Event
+
+	executionResultQueryProvider optimistic_sync.ExecutionResultQueryProvider
+	executionStateCache          optimistic_sync.ExecutionStateCache
 
 	testCases []testCase
 }
@@ -159,7 +163,8 @@ func (s *EventsSuite) SetupTest() {
 		return nil, storage.ErrNotFound
 	}).Maybe()
 
-	s.testCases = make([]testCase, 0)
+	s.executionResultQueryProvider.
+		s.testCases = make([]testCase, 0)
 
 	for _, encoding := range []entities.EventEncodingVersion{
 		entities.EventEncodingVersion_CCF_V0,
@@ -200,7 +205,7 @@ func (s *EventsSuite) TestGetEvents_HappyPaths() {
 		endHeight := startHeight + 20 // should still return 5 responses
 		encoding := entities.EventEncodingVersion_CCF_V0
 
-		response, err := backend.GetEventsForHeightRange(ctx, targetEvent, startHeight, endHeight, encoding)
+		response, err := backend.GetEventsForHeightRange(ctx, targetEvent, startHeight, endHeight, encoding, nil)
 		s.Require().NoError(err)
 
 		s.assertResponse(response, encoding)
@@ -218,11 +223,11 @@ func (s *EventsSuite) TestGetEvents_HappyPaths() {
 
 			backend := s.defaultBackend(tt.queryMode, s.eventsIndex)
 
-			response, err := backend.GetEventsForBlockIDs(ctx, targetEvent, s.blockIDs, tt.encoding)
+			response, err := backend.GetEventsForBlockIDs(ctx, targetEvent, s.blockIDs, tt.encoding, nil)
 			s.Require().NoError(err)
 			s.assertResponse(response, tt.encoding)
 
-			response, err = backend.GetEventsForHeightRange(ctx, targetEvent, startHeight, endHeight, tt.encoding)
+			response, err = backend.GetEventsForHeightRange(ctx, targetEvent, startHeight, endHeight, tt.encoding, nil)
 			s.Require().NoError(err)
 			s.assertResponse(response, tt.encoding)
 		})
@@ -245,11 +250,11 @@ func (s *EventsSuite) TestGetEvents_HappyPaths() {
 			backend := s.defaultBackend(tt.queryMode, eventsIndex)
 			s.setupENSuccessResponse(targetEvent, s.blocks)
 
-			response, err := backend.GetEventsForBlockIDs(ctx, targetEvent, s.blockIDs, tt.encoding)
+			response, err := backend.GetEventsForBlockIDs(ctx, targetEvent, s.blockIDs, tt.encoding, nil)
 			s.Require().NoError(err)
 			s.assertResponse(response, tt.encoding)
 
-			response, err = backend.GetEventsForHeightRange(ctx, targetEvent, startHeight, endHeight, tt.encoding)
+			response, err = backend.GetEventsForHeightRange(ctx, targetEvent, startHeight, endHeight, tt.encoding, nil)
 			s.Require().NoError(err)
 			s.assertResponse(response, tt.encoding)
 		})
@@ -280,11 +285,11 @@ func (s *EventsSuite) TestGetEvents_HappyPaths() {
 			s.Require().NoError(err)
 
 			backend := s.defaultBackend(tt.queryMode, eventsIndex)
-			response, err := backend.GetEventsForBlockIDs(ctx, targetEvent, s.blockIDs, tt.encoding)
+			response, err := backend.GetEventsForBlockIDs(ctx, targetEvent, s.blockIDs, tt.encoding, nil)
 			s.Require().NoError(err)
 			s.assertResponse(response, tt.encoding)
 
-			response, err = backend.GetEventsForHeightRange(ctx, targetEvent, startHeight, endHeight, tt.encoding)
+			response, err = backend.GetEventsForHeightRange(ctx, targetEvent, startHeight, endHeight, tt.encoding, nil)
 			s.Require().NoError(err)
 			s.assertResponse(response, tt.encoding)
 		})
@@ -302,7 +307,7 @@ func (s *EventsSuite) TestGetEventsForHeightRange_HandlesErrors() {
 		backend := s.defaultBackend(query_mode.IndexQueryModeExecutionNodesOnly, s.eventsIndex)
 		endHeight := startHeight - 1
 
-		response, err := backend.GetEventsForHeightRange(ctx, targetEvent, startHeight, endHeight, encoding)
+		response, err := backend.GetEventsForHeightRange(ctx, targetEvent, startHeight, endHeight, encoding, nil)
 		s.Assert().Equal(codes.InvalidArgument, status.Code(err))
 		s.Assert().Nil(response)
 	})
@@ -311,7 +316,7 @@ func (s *EventsSuite) TestGetEventsForHeightRange_HandlesErrors() {
 		backend := s.defaultBackend(query_mode.IndexQueryModeExecutionNodesOnly, s.eventsIndex)
 		endHeight := startHeight + DefaultMaxHeightRange
 
-		response, err := backend.GetEventsForHeightRange(ctx, targetEvent, startHeight, endHeight, encoding)
+		response, err := backend.GetEventsForHeightRange(ctx, targetEvent, startHeight, endHeight, encoding, nil)
 		s.Assert().Equal(codes.InvalidArgument, status.Code(err))
 		s.Assert().Nil(response)
 	})
@@ -325,7 +330,7 @@ func (s *EventsSuite) TestGetEventsForHeightRange_HandlesErrors() {
 			irrecoverable.NewMockSignalerContextExpectError(s.T(), ctx, signCtxErr))
 
 		backend := s.defaultBackend(query_mode.IndexQueryModeExecutionNodesOnly, s.eventsIndex)
-		response, err := backend.GetEventsForHeightRange(signalerCtx, targetEvent, startHeight, endHeight, encoding)
+		response, err := backend.GetEventsForHeightRange(signalerCtx, targetEvent, startHeight, endHeight, encoding, nil)
 		// these will never be returned in production
 		s.Assert().Equal(codes.Unknown, status.Code(err))
 		s.Assert().Nil(response)
@@ -339,7 +344,7 @@ func (s *EventsSuite) TestGetEventsForHeightRange_HandlesErrors() {
 		endHeight := startHeight + 1
 
 		backend := s.defaultBackend(query_mode.IndexQueryModeExecutionNodesOnly, s.eventsIndex)
-		response, err := backend.GetEventsForHeightRange(ctx, targetEvent, startHeight, endHeight, encoding)
+		response, err := backend.GetEventsForHeightRange(ctx, targetEvent, startHeight, endHeight, encoding, nil)
 		s.Assert().Equal(codes.OutOfRange, status.Code(err))
 		s.Assert().Nil(response)
 	})
@@ -354,7 +359,7 @@ func (s *EventsSuite) TestGetEventsForHeightRange_HandlesErrors() {
 		s.params.On("SealedRoot").Return(s.rootHeader, nil).Once()
 
 		backend := s.defaultBackend(query_mode.IndexQueryModeExecutionNodesOnly, s.eventsIndex)
-		response, err := backend.GetEventsForHeightRange(ctx, targetEvent, startHeight, endHeight, encoding)
+		response, err := backend.GetEventsForHeightRange(ctx, targetEvent, startHeight, endHeight, encoding, nil)
 		s.Assert().Equal(codes.NotFound, status.Code(err))
 		s.Assert().ErrorContains(err, "Try to use a historic node")
 		s.Assert().Nil(response)
@@ -370,7 +375,7 @@ func (s *EventsSuite) TestGetEventsForHeightRange_HandlesErrors() {
 		s.params.On("SporkRootBlockHeight").Return(sporkRootHeight).Once()
 		s.params.On("SealedRoot").Return(nodeRootHeader, nil).Once()
 
-		response, err := backend.GetEventsForHeightRange(ctx, targetEvent, startHeight, endHeight, encoding)
+		response, err := backend.GetEventsForHeightRange(ctx, targetEvent, startHeight, endHeight, encoding, nil)
 		s.Assert().Equal(codes.NotFound, status.Code(err))
 		s.Assert().ErrorContains(err, "Try to use a different Access node")
 		s.Assert().Nil(response)
@@ -386,7 +391,7 @@ func (s *EventsSuite) TestGetEventsForBlockIDs_HandlesErrors() {
 		backend := s.defaultBackend(query_mode.IndexQueryModeExecutionNodesOnly, s.eventsIndex)
 		backend.maxHeightRange = 3
 
-		response, err := backend.GetEventsForBlockIDs(ctx, targetEvent, s.blockIDs, encoding)
+		response, err := backend.GetEventsForBlockIDs(ctx, targetEvent, s.blockIDs, encoding, nil)
 		s.Assert().Equal(codes.InvalidArgument, status.Code(err))
 		s.Assert().Nil(response)
 	})
@@ -406,7 +411,7 @@ func (s *EventsSuite) TestGetEventsForBlockIDs_HandlesErrors() {
 			headers.On("ByBlockID", blockID).Return(s.blocks[i].Header, nil)
 		}
 
-		response, err := backend.GetEventsForBlockIDs(ctx, targetEvent, s.blockIDs, encoding)
+		response, err := backend.GetEventsForBlockIDs(ctx, targetEvent, s.blockIDs, encoding, nil)
 		s.Assert().Equal(codes.NotFound, status.Code(err))
 		s.Assert().Nil(response)
 	})

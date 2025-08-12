@@ -13,19 +13,30 @@ import (
 	"github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/executiondatasync/optimistic_sync"
 	"github.com/onflow/flow-go/module/state_synchronization/indexer"
 	"github.com/onflow/flow-go/storage"
 )
 
 type LocalEventProvider struct {
-	index *index.EventsIndex
+	//TODO: should indexer be removed completely?
+	// or does it make sense to write a new indexer with exec result cache like a thin wrapper around it?
+	index                   *index.EventsIndex
+	execResultQueryProvider optimistic_sync.ExecutionResultQueryProvider
+	execStateCache          optimistic_sync.ExecutionStateCache
 }
 
 var _ EventProvider = (*LocalEventProvider)(nil)
 
-func NewLocalEventProvider(index *index.EventsIndex) *LocalEventProvider {
+func NewLocalEventProvider(
+	index *index.EventsIndex,
+	execResultQueryProvider optimistic_sync.ExecutionResultQueryProvider,
+	execStateCache optimistic_sync.ExecutionStateCache,
+) *LocalEventProvider {
 	return &LocalEventProvider{
-		index: index,
+		index:                   index,
+		execResultQueryProvider: execResultQueryProvider,
+		execStateCache:          execStateCache,
 	}
 }
 
@@ -43,7 +54,20 @@ func (l *LocalEventProvider) Events(
 			return Response{}, rpc.ConvertError(ctx.Err(), "failed to get events from storage", codes.Canceled)
 		}
 
-		events, err := l.index.ByBlockID(blockInfo.ID, blockInfo.Height)
+		query, err := l.execResultQueryProvider.ExecutionResultQuery(blockInfo.ID, optimistic_sync.Criteria{
+			AgreeingExecutorsCount: 2,
+			RequiredExecutors:      []flow.Identifier{},
+		})
+		if err != nil {
+			return Response{}, err
+		}
+
+		snapshot, err := l.execStateCache.Snapshot(query.ExecutionResult.ID())
+		if err != nil {
+			return Response{}, fmt.Errorf("failed to get snapshot for execution result %s: %w", query.ExecutionResult.ID(), err)
+		}
+
+		events, err := snapshot.Events().ByBlockID(blockInfo.ID)
 		if err != nil {
 			if errors.Is(err, storage.ErrNotFound) ||
 				errors.Is(err, storage.ErrHeightNotIndexed) ||
