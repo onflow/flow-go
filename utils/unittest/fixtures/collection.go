@@ -27,7 +27,6 @@ func (g *CollectionGenerator) WithTransactions(transactions []*flow.TransactionB
 func (g *CollectionGenerator) Fixture(t testing.TB, n int, opts ...func(*collectionConfig)) *flow.Collection {
 	config := &collectionConfig{}
 
-	// Apply options
 	for _, opt := range opts {
 		opt(config)
 	}

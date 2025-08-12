@@ -27,6 +27,7 @@ func (g *AddressGenerator) WithChainID(chainID flow.ChainID) func(*addressConfig
 	}
 }
 
+// ServiceAddress returns an option to generate the service address for the given chain.
 func (g *AddressGenerator) ServiceAddress() func(*addressConfig) {
 	return func(config *addressConfig) {
 		config.index = 1
@@ -43,7 +44,6 @@ func (g *AddressGenerator) Fixture(t testing.TB, opts ...func(*addressConfig)) f
 		index: uint64(g.randomGen.Uint32()),
 	}
 
-	// Apply options
 	for _, opt := range opts {
 		opt(config)
 	}
@@ -52,6 +52,15 @@ func (g *AddressGenerator) Fixture(t testing.TB, opts ...func(*addressConfig)) f
 	require.NoError(t, err)
 
 	return addr
+}
+
+// List returns a list of addresses for the given chain.
+func (g *AddressGenerator) List(t testing.TB, n int, opts ...func(*addressConfig)) []flow.Address {
+	addresses := make([]flow.Address, n)
+	for i := range n {
+		addresses[i] = g.Fixture(t, opts...)
+	}
+	return addresses
 }
 
 // ToSDKAddress converts a flow.Address to a sdk.Address.

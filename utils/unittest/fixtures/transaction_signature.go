@@ -59,7 +59,6 @@ func (g *TransactionSignatureGenerator) Fixture(t testing.TB, opts ...func(*tran
 		keyIndex:    1,
 	}
 
-	// Apply options
 	for _, opt := range opts {
 		opt(config)
 	}
@@ -81,8 +80,7 @@ func (g *TransactionSignatureGenerator) List(t testing.TB, n int, opts ...func(*
 	return list
 }
 
-// Helper methods for generating random values
-
+// generateValidSignature generates a valid ECDSA signature for the given transaction.
 func (g *TransactionSignatureGenerator) generateValidSignature(t testing.TB) crypto.Signature {
 	sigLen := crypto.SignatureLenECDSAP256
 	signature := g.randomGen.RandomBytes(t, sigLen)

@@ -166,6 +166,9 @@ num := randomGen.Uint64InRange(1, 100)
 | Events | `Events()` | Generate events with encoding support |
 | Event Types | `EventTypes()` | Generate event types |
 | Time | `Time()` | Generate time.Time values |
+| Ledger Paths | `LedgerPaths()` | Generate ledger paths |
+| Ledger Payloads | `LedgerPayloads()` | Generate ledger payloads |
+| Ledger Values | `LedgerValues()` | Generate ledger values |
 
 ## Available Generators
 
@@ -635,6 +638,83 @@ time7 := timeGen.Fixture(t,
 )
 ```
 
+### Ledger Path Generator
+
+Generates ledger paths with consistent randomness and deduplication.
+
+**Options:**
+- `WithCount(count int)`: Sets the number of paths to generate
+
+**Methods:**
+- `Fixture(t testing.TB, opts ...func(*pathConfig))`: Generates a single ledger path
+- `List(t testing.TB, n int, opts ...func(*pathConfig))`: Generates a list of ledger paths
+
+```go
+pathGen := suite.LedgerPaths()
+
+// Basic path fixture
+path1 := pathGen.Fixture(t)
+
+// List of paths
+paths := pathGen.List(t, 3)
+```
+
+### Ledger Payload Generator
+
+Generates ledger payloads with consistent randomness and configurable sizes.
+
+**Options:**
+- `WithSize(minSize, maxSize int)`: Sets the payload size range
+- `WithValue(value ledger.Value)`: Sets the value for the payload
+
+**Methods:**
+- `Fixture(t testing.TB, opts ...func(*payloadConfig))`: Generates a single ledger payload
+- `List(t testing.TB, n int, opts ...func(*payloadConfig))`: Generates a list of ledger payloads
+
+```go
+payloadGen := suite.LedgerPayloads()
+
+// Basic payload fixture
+payload1 := payloadGen.Fixture(t)
+
+// Payload with specific size
+payload2 := payloadGen.Fixture(t, payloadGen.WithSize(4, 16))
+
+// Payload with specific value
+value := suite.LedgerValues().Fixture(t)
+payload3 := payloadGen.Fixture(t, payloadGen.WithValue(value))
+
+// List of payloads
+payloads := payloadGen.List(t, 3)
+```
+
+### Ledger Value Generator
+
+Generates ledger values with consistent randomness and configurable sizes.
+
+**Options:**
+- `WithSize(minSize, maxSize int)`: Sets the value size range [minSize, maxSize)
+
+**Methods:**
+- `Fixture(t testing.TB, opts ...func(*valueConfig))`: Generates a single ledger value
+- `List(t testing.TB, n int, opts ...func(*valueConfig))`: Generates a list of ledger values
+
+```go
+valueGen := suite.LedgerValues()
+
+// Basic value fixture
+value1 := valueGen.Fixture(t)
+
+// Value with specific size
+value2 := valueGen.Fixture(t, valueGen.WithSize(4, 16))
+
+// List of values
+values := valueGen.List(t, 3)
+
+// List of values with specific size
+largeValues := valueGen.List(t, 2, valueGen.WithSize(8, 32))
+```
+
 ## Migration Guide
 
 ### From Standalone Fixtures
@@ -723,6 +803,9 @@ The fixtures module is organized into focused files:
 | `event.go` | Event generation |
 | `event_type.go` | Event type generation |
 | `time.go` | Time generation |
+| `ledger_path.go` | Ledger path generation |
+| `ledger_payload.go` | Ledger payload generation |
+| `ledger_value.go` | Ledger value generation |
 | `examples.go` | Usage examples |
 | `generators_test.go` | Comprehensive tests |
 

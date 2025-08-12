@@ -85,7 +85,6 @@ func (g *TransactionGenerator) Fixture(t testing.TB, opts ...func(*transactionCo
 		authorizers:      []flow.Address{g.addressGen.Fixture(t)},
 	}
 
-	// Apply options
 	for _, opt := range opts {
 		opt(config)
 	}

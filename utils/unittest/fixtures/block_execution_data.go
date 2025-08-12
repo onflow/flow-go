@@ -40,7 +40,6 @@ func (g *BlockExecutionDataGenerator) Fixture(t testing.TB, opts ...func(*blockE
 		chunkExecutionDatas: []*execution_data.ChunkExecutionData{},
 	}
 
-	// Apply options
 	for _, opt := range opts {
 		opt(config)
 	}

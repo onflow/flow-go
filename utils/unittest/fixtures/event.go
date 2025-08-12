@@ -89,7 +89,6 @@ func (g *EventGenerator) Fixture(t testing.TB, opts ...func(*eventConfig)) flow.
 		encoding:         entities.EventEncodingVersion_CCF_V0, // Default to CCF
 	}
 
-	// Apply options
 	for _, opt := range opts {
 		opt(config)
 	}
@@ -165,6 +164,7 @@ func (g *EventGenerator) generateEncodedPayload(t testing.TB, eventType flow.Eve
 	}
 }
 
+// generateCadenceEvent generates a cadence event fixture from a flow event type.
 func (g *EventGenerator) generateCadenceEvent(t testing.TB, eventType flow.EventType) cadence.Event {
 	parsed, err := events.ParseEvent(eventType)
 	require.NoError(t, err)
@@ -197,6 +197,7 @@ func (g *EventGenerator) generateCadenceEvent(t testing.TB, eventType flow.Event
 	return cadence.NewEvent(values).WithType(cadenceEventType)
 }
 
+// generateGenericEventData generates generic event data for a cadence event.
 func (g *EventGenerator) generateGenericEventData(t testing.TB) (fields []cadence.Field, values []cadence.Value) {
 	testString, err := cadence.NewString(g.randomGen.RandomString(10))
 	require.NoError(t, err)
@@ -219,6 +220,7 @@ func (g *EventGenerator) generateGenericEventData(t testing.TB) (fields []cadenc
 	return fields, values
 }
 
+// generateProtocolEventData generates protocol event data for a cadence event.
 func (g *EventGenerator) generateProtocolEventData(t testing.TB, eventName string) ([]cadence.Field, []cadence.Value) {
 	switch eventName {
 	case "AccountCreated":
@@ -275,7 +277,7 @@ func (g *EventGenerator) generateProtocolEventData(t testing.TB, eventName strin
 	}
 }
 
-// AdjustEventsMetadata adjusts the event and tx indexes to be sequential.
+// AdjustEventsMetadata adjusts the event and transaction indexes to be sequential.
 func AdjustEventsMetadata(events []flow.Event) []flow.Event {
 	if len(events) == 0 {
 		return events

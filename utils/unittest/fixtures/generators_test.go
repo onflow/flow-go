@@ -339,4 +339,31 @@ func TestGeneratorsDeterministic(t *testing.T) {
 	time3 := suite1.Time().Fixture(t, suite1.Time().WithBaseTime(baseTime))
 	time4 := suite2.Time().Fixture(t, suite2.Time().WithBaseTime(baseTime))
 	assert.Equal(t, time3, time4)
+
+	// Test ledger path generator
+	path1 := suite1.LedgerPaths().Fixture(t)
+	path2 := suite2.LedgerPaths().Fixture(t)
+	assert.Equal(t, path1, path2)
+
+	paths1 := suite1.LedgerPaths().List(t, 3)
+	paths2 := suite2.LedgerPaths().List(t, 3)
+	assert.Equal(t, paths1, paths2)
+
+	// Test ledger payload generator
+	payload1 := suite1.LedgerPayloads().Fixture(t)
+	payload2 := suite2.LedgerPayloads().Fixture(t)
+	assert.Equal(t, payload1, payload2)
+
+	payloads1 := suite1.LedgerPayloads().List(t, 2)
+	payloads2 := suite2.LedgerPayloads().List(t, 2)
+	assert.Equal(t, payloads1, payloads2)
+
+	// Test ledger value generator
+	value1 := suite1.LedgerValues().Fixture(t)
+	value2 := suite2.LedgerValues().Fixture(t)
+	assert.Equal(t, value1, value2)
+
+	values1 := suite1.LedgerValues().List(t, 3)
+	values2 := suite2.LedgerValues().List(t, 3)
+	assert.Equal(t, values1, values2)
 }

@@ -77,7 +77,6 @@ func (g *QuorumCertificateGenerator) Fixture(t testing.TB, opts ...func(*quorumC
 		source:        nil,
 	}
 
-	// Apply options
 	for _, opt := range opts {
 		opt(config)
 	}
@@ -109,8 +108,7 @@ func (g *QuorumCertificateGenerator) QCSigDataWithSoR(t testing.TB, source []byt
 	return encoded
 }
 
-// Helper methods for generating signature data
-
+// qcRawSignatureData generates a raw signature data for a quorum certificate.
 func (g *QuorumCertificateGenerator) qcRawSignatureData(t testing.TB, source []byte) hotstuff.SignatureData {
 	sigType := g.randomGen.RandomBytes(t, 5)
 	for i := range sigType {

@@ -31,12 +31,14 @@ func (g *TimeGenerator) WithTimezone(tz *time.Location) func(*timeConfig) {
 	}
 }
 
+// WithOffset returns an option to set the offset from the base time.
 func (g *TimeGenerator) WithOffset(offset time.Duration) func(*timeConfig) {
 	return func(config *timeConfig) {
 		config.offset = offset
 	}
 }
 
+// WithOffsetRandom returns an option to set a random offset from the base time in the range [0, max).
 func (g *TimeGenerator) WithOffsetRandom(max time.Duration) func(*timeConfig) {
 	return func(config *timeConfig) {
 		offset := time.Duration(g.randomGen.Intn(int(max)))
@@ -51,7 +53,6 @@ func (g *TimeGenerator) Fixture(t testing.TB, opts ...func(*timeConfig)) time.Ti
 		timezone: time.UTC,
 	}
 
-	// Apply options
 	for _, opt := range opts {
 		opt(config)
 	}

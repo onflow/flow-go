@@ -71,7 +71,6 @@ func (g *ChunkExecutionDataGenerator) Fixture(t testing.TB, opts ...func(*chunkE
 		trieUpdate: g.trieUpdateGen.Fixture(t),
 	}
 
-	// Apply options
 	for _, opt := range opts {
 		opt(config)
 	}

@@ -3,15 +3,15 @@ package fixtures
 import (
 	"testing"
 
-	"github.com/stretchr/testify/require"
-
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/testutils"
 )
 
 // TrieUpdateGenerator generates trie updates with consistent randomness.
 type TrieUpdateGenerator struct {
-	randomGen *RandomGenerator
+	randomGen        *RandomGenerator
+	ledgerPathGen    *LedgerPathGenerator
+	ledgerPayloadGen *LedgerPayloadGenerator
 }
 
 // trieUpdateConfig holds the configuration for trie update generation.
@@ -71,17 +71,16 @@ func (g *TrieUpdateGenerator) Fixture(t testing.TB, opts ...func(*trieUpdateConf
 		maxSize:  8,
 	}
 
-	// Apply options
 	for _, opt := range opts {
 		opt(config)
 	}
 
 	// Generate paths and payloads if not provided
 	if config.paths == nil {
-		config.paths = g.RandomPaths(t, config.numPaths)
+		config.paths = g.ledgerPathGen.List(t, config.numPaths)
 	}
 	if config.payloads == nil {
-		config.payloads = g.RandomPayloads(t, config.numPaths, config.minSize, config.maxSize)
+		config.payloads = g.ledgerPayloadGen.List(t, config.numPaths, g.ledgerPayloadGen.WithSize(config.minSize, config.maxSize))
 	}
 
 	return &ledger.TrieUpdate{
@@ -98,60 +97,4 @@ func (g *TrieUpdateGenerator) List(t testing.TB, n int, opts ...func(*trieUpdate
 		list[i] = g.Fixture(t, opts...)
 	}
 	return list
-}
-
-// RandomPaths generates n random (no repetition)
-func (g *TrieUpdateGenerator) RandomPaths(t testing.TB, n int) []ledger.Path {
-	paths := make([]ledger.Path, 0, n)
-	alreadySelectPaths := make(map[ledger.Path]bool)
-	i := 0
-	for i < n {
-		var path ledger.Path
-		pathData := g.randomGen.RandomBytes(t, ledger.PathLen)
-		copy(path[:], pathData)
-
-		// deduplicate
-		if _, found := alreadySelectPaths[path]; !found {
-			paths = append(paths, path)
-			alreadySelectPaths[path] = true
-			i++
-		}
-	}
-	return paths
-}
-
-// RandomPayload returns a random payload
-func (g *TrieUpdateGenerator) RandomPayload(t testing.TB, minByteSize int, maxByteSize int) *ledger.Payload {
-	keyByteSize := minByteSize + g.randomGen.Intn(maxByteSize-minByteSize)
-	keydata := g.randomGen.RandomBytes(t, keyByteSize)
-	key := ledger.Key{KeyParts: []ledger.KeyPart{{Type: 0, Value: keydata}}}
-
-	valueByteSize := minByteSize + g.randomGen.Intn(maxByteSize-minByteSize)
-	valuedata := g.randomGen.RandomBytes(t, valueByteSize)
-	value := ledger.Value(valuedata)
-	return ledger.NewPayload(key, value)
-}
-
-// RandomPayloads returns n random payloads
-func (g *TrieUpdateGenerator) RandomPayloads(t testing.TB, n int, minByteSize int, maxByteSize int) []*ledger.Payload {
-	res := make([]*ledger.Payload, 0, n)
-	for range n {
-		res = append(res, g.RandomPayload(t, minByteSize, maxByteSize))
-	}
-	return res
-}
-
-// RandomValues returns n random values with variable sizes (minByteSize <= size < maxByteSize)
-func (g *TrieUpdateGenerator) RandomValues(t testing.TB, n int, minByteSize, maxByteSize int) []ledger.Value {
-	require.LessOrEqual(t, minByteSize, maxByteSize, "minByteSize must be less than or equal to maxByteSize")
-
-	values := make([]ledger.Value, 0, n)
-	for range n {
-		var byteSize = maxByteSize
-		if minByteSize < maxByteSize {
-			byteSize = minByteSize + g.randomGen.Intn(maxByteSize-minByteSize)
-		}
-		values = append(values, g.randomGen.RandomBytes(t, byteSize))
-	}
-	return values
 }

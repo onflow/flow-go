@@ -59,10 +59,9 @@ func (g *TransactionResultGenerator) Fixture(t testing.TB, opts ...func(*transac
 	config := &transactionResultConfig{
 		transactionID:   g.identifierGen.Fixture(t),
 		errorMessage:    "",
-		computationUsed: g.randomGen.Uint64InRange(1, 10_000),
+		computationUsed: g.randomGen.Uint64InRange(1, 9999),
 	}
 
-	// Apply options
 	for _, opt := range opts {
 		opt(config)
 	}
@@ -92,11 +91,10 @@ type LightTransactionResultGenerator struct {
 func (g *LightTransactionResultGenerator) Fixture(t testing.TB, opts ...func(*transactionResultConfig)) flow.LightTransactionResult {
 	config := &transactionResultConfig{
 		transactionID:   g.identifierGen.Fixture(t),
-		computationUsed: g.randomGen.Uint64InRange(1, 10_000),
+		computationUsed: g.randomGen.Uint64InRange(1, 9999),
 		failed:          false,
 	}
 
-	// Apply options
 	for _, opt := range opts {
 		opt(config)
 	}

@@ -33,7 +33,6 @@ func NewGeneratorSuite(t testing.TB, opts ...GeneratorSuiteOption) *GeneratorSui
 		seed: time.Now().UnixNano(), // default random seed
 	}
 
-	// Apply options
 	for _, opt := range opts {
 		opt(config)
 	}
@@ -158,7 +157,9 @@ func (g *GeneratorSuite) Collections() *CollectionGenerator {
 // TrieUpdates returns a trie update generator for this suite.
 func (g *GeneratorSuite) TrieUpdates() *TrieUpdateGenerator {
 	return &TrieUpdateGenerator{
-		randomGen: g.Random(),
+		randomGen:        g.Random(),
+		ledgerPathGen:    g.LedgerPaths(),
+		ledgerPayloadGen: g.LedgerPayloads(),
 	}
 }
 
@@ -213,6 +214,28 @@ func (g *GeneratorSuite) EventTypes() *EventTypeGenerator {
 // Time returns a time generator for this suite.
 func (g *GeneratorSuite) Time() *TimeGenerator {
 	return &TimeGenerator{
+		randomGen: g.Random(),
+	}
+}
+
+// LedgerPaths returns a ledger path generator for this suite.
+func (g *GeneratorSuite) LedgerPaths() *LedgerPathGenerator {
+	return &LedgerPathGenerator{
+		randomGen: g.Random(),
+	}
+}
+
+// LedgerPayloads returns a ledger payload generator for this suite.
+func (g *GeneratorSuite) LedgerPayloads() *LedgerPayloadGenerator {
+	return &LedgerPayloadGenerator{
+		randomGen:      g.Random(),
+		ledgerValueGen: g.LedgerValues(),
+	}
+}
+
+// LedgerValues returns a ledger value generator for this suite.
+func (g *GeneratorSuite) LedgerValues() *LedgerValueGenerator {
+	return &LedgerValueGenerator{
 		randomGen: g.Random(),
 	}
 }

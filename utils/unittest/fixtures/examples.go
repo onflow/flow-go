@@ -327,3 +327,71 @@ func ExampleTimeGenerator() {
 	_ = time5
 	_ = time6
 }
+
+// ExampleLedgerPathGenerator shows usage of the ledger path generator methods
+func ExampleLedgerPathGenerator() {
+	t := &testing.T{}
+	suite := NewGeneratorSuite(t)
+
+	pathGen := suite.LedgerPaths()
+
+	// Basic path fixture
+	path1 := pathGen.Fixture(t)
+
+	// List of paths
+	paths := pathGen.List(t, 3)
+
+	_ = path1
+	_ = paths
+}
+
+// ExampleLedgerPayloadGenerator shows usage of the ledger payload generator methods
+func ExampleLedgerPayloadGenerator() {
+	t := &testing.T{}
+	suite := NewGeneratorSuite(t)
+
+	payloadGen := suite.LedgerPayloads()
+
+	// Basic payload fixture
+	payload1 := payloadGen.Fixture(t)
+
+	// Payload with specific size
+	payload2 := payloadGen.Fixture(t, payloadGen.WithSize(4, 16))
+
+	// Payload with specific value
+	value := suite.LedgerValues().Fixture(t)
+	payload3 := payloadGen.Fixture(t, payloadGen.WithValue(value))
+
+	// List of payloads
+	payloads := payloadGen.List(t, 3)
+
+	_ = payload1
+	_ = payload2
+	_ = payload3
+	_ = payloads
+}
+
+// ExampleLedgerValueGenerator shows usage of the ledger value generator methods
+func ExampleLedgerValueGenerator() {
+	t := &testing.T{}
+	suite := NewGeneratorSuite(t)
+
+	valueGen := suite.LedgerValues()
+
+	// Basic value fixture
+	value1 := valueGen.Fixture(t)
+
+	// Value with specific size
+	value2 := valueGen.Fixture(t, valueGen.WithSize(4, 16))
+
+	// List of values
+	values := valueGen.List(t, 3)
+
+	// List of values with specific size
+	largeValues := valueGen.List(t, 2, valueGen.WithSize(8, 32))
+
+	_ = value1
+	_ = value2
+	_ = values
+	_ = largeValues
+}

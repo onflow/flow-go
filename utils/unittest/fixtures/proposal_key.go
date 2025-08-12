@@ -47,7 +47,6 @@ func (g *ProposalKeyGenerator) Fixture(t testing.TB, opts ...func(*proposalKeyCo
 		sequenceNumber: 0,
 	}
 
-	// Apply options
 	for _, opt := range opts {
 		opt(config)
 	}
