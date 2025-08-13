@@ -1,4 +1,4 @@
-package retriever
+package provider
 
 import (
 	"bytes"
@@ -11,21 +11,21 @@ import (
 	"github.com/onflow/flow-go/state/protocol"
 )
 
-type ComparingAccountRetriever struct {
-	FailoverAccountRetriever
+type ComparingAccountProvider struct {
+	FailoverAccountProvider
 }
 
-var _ AccountRetriever = (*ComparingAccountRetriever)(nil)
+var _ AccountProvider = (*ComparingAccountProvider)(nil)
 
-func NewComparingAccountRetriever(
+func NewComparingAccountProvider(
 	log zerolog.Logger,
 	state protocol.State,
-	localRequester AccountRetriever,
-	execNodeRequester AccountRetriever,
-) *ComparingAccountRetriever {
-	return &ComparingAccountRetriever{
-		FailoverAccountRetriever: FailoverAccountRetriever{
-			log:               log.With().Str("account_retriever", "comparing").Logger(),
+	localRequester AccountProvider,
+	execNodeRequester AccountProvider,
+) *ComparingAccountProvider {
+	return &ComparingAccountProvider{
+		FailoverAccountProvider: FailoverAccountProvider{
+			log:               log.With().Str("account_provider", "comparing").Logger(),
 			state:             state,
 			localRequester:    localRequester,
 			execNodeRequester: execNodeRequester,
@@ -33,7 +33,7 @@ func NewComparingAccountRetriever(
 	}
 }
 
-func (c *ComparingAccountRetriever) GetAccountAtBlock(
+func (c *ComparingAccountProvider) GetAccountAtBlock(
 	ctx context.Context,
 	address flow.Address,
 	blockID flow.Identifier,
@@ -52,7 +52,7 @@ func (c *ComparingAccountRetriever) GetAccountAtBlock(
 
 // compareAccountResults compares the result and error returned from local and remote getAccount calls
 // and logs the results if they are different
-func (c *ComparingAccountRetriever) compareAccountResults(
+func (c *ComparingAccountProvider) compareAccountResults(
 	execNodeResult *flow.Account,
 	execErr error,
 	localResult *flow.Account,

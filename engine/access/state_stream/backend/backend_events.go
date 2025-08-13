@@ -19,7 +19,7 @@ type EventsBackend struct {
 
 	subscriptionHandler  *subscription.SubscriptionHandler
 	executionDataTracker tracker.ExecutionDataTracker
-	eventsRetriever      EventsRetriever
+	eventsProvider       EventsProvider
 }
 
 // SubscribeEvents is deprecated and will be removed in a future version.
@@ -133,7 +133,7 @@ func (b *EventsBackend) SubscribeEventsFromLatest(ctx context.Context, filter st
 // - subscription.ErrBlockNotReady: execution data for the given block height is not available.
 func (b *EventsBackend) getResponseFactory(filter state_stream.EventFilter) subscription.GetDataByHeightFunc {
 	return func(ctx context.Context, height uint64) (response interface{}, err error) {
-		eventsResponse, err := b.eventsRetriever.GetAllEventsResponse(ctx, height)
+		eventsResponse, err := b.eventsProvider.GetAllEventsResponse(ctx, height)
 		if err != nil {
 			if errors.Is(err, storage.ErrNotFound) ||
 				errors.Is(err, storage.ErrHeightNotIndexed) {

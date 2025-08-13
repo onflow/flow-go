@@ -5,10 +5,13 @@ import (
 
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/encoding/ccf"
+
 	"github.com/onflow/flow-core-contracts/lib/go/templates"
 	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/model/flow"
 )
+
+const callbackTransactionGasLimit = flow.DefaultMaxTransactionGasLimit
 
 func ProcessCallbacksTransaction(chain flow.Chain) *flow.TransactionBody {
 	sc := systemcontracts.SystemContractsForChain(chain.ChainID())
@@ -16,7 +19,7 @@ func ProcessCallbacksTransaction(chain flow.Chain) *flow.TransactionBody {
 
 	return flow.NewTransactionBody().
 		SetScript(script).
-		SetComputeLimit(SystemChunkTransactionGasLimit)
+		SetComputeLimit(callbackTransactionGasLimit)
 }
 
 func ExecuteCallbacksTransactions(chainID flow.Chain, processEvents flow.EventsList) ([]*flow.TransactionBody, error) {

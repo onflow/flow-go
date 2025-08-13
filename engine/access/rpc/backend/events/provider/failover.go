@@ -1,4 +1,4 @@
-package retriever
+package provider
 
 import (
 	"context"
@@ -11,33 +11,33 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-type FailoverEventRetriever struct {
-	log               zerolog.Logger
-	localRetriever    EventRetriever
-	execNodeRetriever EventRetriever
+type FailoverEventProvider struct {
+	log              zerolog.Logger
+	localProvider    EventProvider
+	execNodeProvider EventProvider
 }
 
-var _ EventRetriever = (*FailoverEventRetriever)(nil)
+var _ EventProvider = (*FailoverEventProvider)(nil)
 
-func NewFailoverEventRetriever(
+func NewFailoverEventProvider(
 	log zerolog.Logger,
-	localRetriever EventRetriever,
-	execNodeRetriever EventRetriever,
-) *FailoverEventRetriever {
-	return &FailoverEventRetriever{
-		log:               log.With().Str("events_retriever", "failover").Logger(),
-		localRetriever:    localRetriever,
-		execNodeRetriever: execNodeRetriever,
+	localProvider EventProvider,
+	execNodeProvider EventProvider,
+) *FailoverEventProvider {
+	return &FailoverEventProvider{
+		log:              log.With().Str("event_provider", "failover").Logger(),
+		localProvider:    localProvider,
+		execNodeProvider: execNodeProvider,
 	}
 }
 
-func (f *FailoverEventRetriever) Events(
+func (f *FailoverEventProvider) Events(
 	ctx context.Context,
 	blocks []BlockMetadata,
 	eventType flow.EventType,
 	encoding entities.EventEncodingVersion,
 ) (Response, error) {
-	localEvents, localErr := f.localRetriever.Events(ctx, blocks, eventType, encoding)
+	localEvents, localErr := f.localProvider.Events(ctx, blocks, eventType, encoding)
 	if localErr != nil {
 		f.log.Debug().Err(localErr).
 			Msg("failed to get events from local storage. will try to get them from execution node")
@@ -53,7 +53,7 @@ func (f *FailoverEventRetriever) Events(
 		Int("missing_blocks", len(localEvents.MissingBlocks)).
 		Msg("querying execution nodes for events from missing blocks")
 
-	execNodeEvents, execNodeErr := f.execNodeRetriever.Events(ctx, localEvents.MissingBlocks, eventType, encoding)
+	execNodeEvents, execNodeErr := f.execNodeProvider.Events(ctx, localEvents.MissingBlocks, eventType, encoding)
 	if execNodeErr != nil {
 		return Response{}, execNodeErr
 	}
