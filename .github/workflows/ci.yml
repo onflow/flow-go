@@ -298,7 +298,7 @@ jobs:
     # Set the environment based on the author association of the pull request.
     # This is used to determine whether the build should be run in an internal or external environment.
     # If the author is a member or collaborator, use the internal environment; otherwise, use the external environment that will require approval
-    environment: ${{ (github.event.pull_request.author_association == 'MEMBER' || github.event.pull_request.author_association == 'COLLABORATOR') && 'internal ci' || 'external ci' }}
+    environment: ${{ (github.event_name == 'merge_group' || (github.event.pull_request && (github.event.pull_request.author_association == 'MEMBER' || github.event.pull_request.author_association == 'COLLABORATOR'))) && 'internal-ci' || 'external-ci' }}
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
