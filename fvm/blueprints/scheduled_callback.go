@@ -9,6 +9,7 @@ import (
 
 	jsoncdc "github.com/onflow/cadence/encoding/json"
 	"github.com/onflow/flow-core-contracts/lib/go/templates"
+
 	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/model/flow"
 )
