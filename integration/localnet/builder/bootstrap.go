@@ -152,9 +152,6 @@ func main() {
 	if numViewsInDKGPhase != 0 {
 		flowNetworkOpts = append(flowNetworkOpts, testnet.WithViewsInDKGPhase(numViewsInDKGPhase))
 	}
-	if finalizationSafetyThreshold != 0 {
-		flowNetworkOpts = append(flowNetworkOpts, testnet.WithFinalizationSafetyThreshold(finalizationSafetyThreshold))
-	}
 
 	// Set default finalizationSafetyThreshold if not explicitly set
 	if finalizationSafetyThreshold == 0 {
