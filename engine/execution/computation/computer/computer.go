@@ -489,10 +489,9 @@ func (e *blockComputer) executeSystemTransactions(
 	}
 
 	var callbackTxs []*flow.TransactionBody
-	var err error
 
 	if e.vmCtx.ScheduleCallbacksEnabled {
-		callbackTxs, err = e.executeProcessCallback(
+		callbacks, updatedTxnIndex, err := e.executeProcessCallback(
 			callbackCtx,
 			systemCollectionInfo,
 			database,
@@ -504,7 +503,8 @@ func (e *blockComputer) executeSystemTransactions(
 			return err
 		}
 
-		txIndex++
+		callbackTxs = callbacks
+		txIndex = updatedTxnIndex
 	}
 
 	txQueue := e.queueSystemTransactions(
@@ -553,7 +553,7 @@ func (e *blockComputer) executeProcessCallback(
 	blockSpan otelTrace.Span,
 	txnIndex uint32,
 	systemLogger zerolog.Logger,
-) ([]*flow.TransactionBody, error) {
+) ([]*flow.TransactionBody, uint32, error) {
 	// add process callback transaction to the system collection info
 	systemCollectionInfo.CompleteCollection.Transactions = append(systemCollectionInfo.CompleteCollection.Transactions, e.processCallbackTxn)
 
@@ -565,6 +565,8 @@ func (e *blockComputer) executeProcessCallback(
 		e.processCallbackTxn,
 		false)
 
+	txnIndex++
+
 	txn, err := e.executeTransactionInternal(blockSpan, database, request, 0)
 	if err != nil {
 		snapshotTime := logical.Time(0)
@@ -572,7 +574,7 @@ func (e *blockComputer) executeProcessCallback(
 			snapshotTime = txn.SnapshotTime()
 		}
 
-		return nil, fmt.Errorf(
+		return nil, 0, fmt.Errorf(
 			"failed to execute %s transaction %v (%d@%d) for block %s at height %v: %w",
 			"system",
 			request.txnIdStr,
@@ -584,13 +586,18 @@ func (e *blockComputer) executeProcessCallback(
 	}
 
 	if txn.Output().Err != nil {
-		return nil, fmt.Errorf(
+		return nil, 0, fmt.Errorf(
 			"process callback transaction %s error: %v",
 			request.txnIdStr,
 			txn.Output().Err)
 	}
 
-	return blueprints.ExecuteCallbacksTransactions(e.vmCtx.Chain, txn.Output().Events)
+	callbackTxs, err := blueprints.ExecuteCallbacksTransactions(e.vmCtx.Chain, txn.Output().Events)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	return callbackTxs, txnIndex, nil
 }
 
 func (e *blockComputer) executeTransactions(
