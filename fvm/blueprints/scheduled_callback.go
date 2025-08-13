@@ -28,6 +28,7 @@ const (
 	processedCallbackIDFieldName     = "ID"
 	processedCallbackEffortFieldName = "executionEffort"
 	processedEventTypeTemplate       = "A.%v.CallbackScheduler.CallbackProcessed"
+	callbackTransactionGasLimit      = flow.DefaultMaxTransactionGasLimit
 )
 
 func ProcessCallbacksTransaction(chain flow.Chain) *flow.TransactionBody {
@@ -35,7 +36,7 @@ func ProcessCallbacksTransaction(chain flow.Chain) *flow.TransactionBody {
 
 	return flow.NewTransactionBody().
 		SetScript(script).
-		SetComputeLimit(low.DefaultMaxTransactionGasLimit)
+		SetComputeLimit(callbackTransactionGasLimit)
 }
 
 func ExecuteCallbacksTransactions(chainID flow.Chain, processEvents flow.EventsList) ([]*flow.TransactionBody, error) {
