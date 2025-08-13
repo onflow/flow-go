@@ -101,8 +101,7 @@ func (p *PersisterSuite) populateInMemoryStorages() {
 
 	for i := 0; i < 2; i++ {
 		collection := unittest.CollectionFixture(2)
-		light := collection.Light()
-		err := p.inMemoryCollections.StoreLightAndIndexByTransaction(&light)
+		_, err := p.inMemoryCollections.Store(&collection)
 		p.Require().NoError(err)
 
 		for _, tx := range collection.Transactions {
@@ -149,7 +148,7 @@ func (p *PersisterSuite) TestPersister_PersistWithEmptyData() {
 	// Verify other storages were not called since the data is empty
 	p.events.AssertNotCalled(t, "BatchStore")
 	p.results.AssertNotCalled(t, "BatchStore")
-	p.collections.AssertNotCalled(t, "BatchStoreLightAndIndexByTransaction")
+	p.collections.AssertNotCalled(t, "BatchStoreAndIndexByTransaction")
 	p.transactions.AssertNotCalled(t, "BatchStore")
 	p.txResultErrMsg.AssertNotCalled(t, "BatchStore")
 }
@@ -169,23 +168,24 @@ func (p *PersisterSuite) TestPersister_PersistWithData() {
 		storedEvents = se
 	}).Return(nil)
 
-	p.collections.On("BatchStoreLightAndIndexByTransaction", mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
-		collection, ok := args.Get(0).(*flow.LightCollection)
-		p.Require().True(ok)
-		storedCollections = append(storedCollections, *collection)
-	}).Return(nil)
-
-	p.transactions.On("BatchStore", mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
-		transaction, ok := args.Get(0).(*flow.TransactionBody)
-		p.Require().True(ok)
-		storedTransactions = append(storedTransactions, *transaction)
-	}).Return(nil)
-
 	p.results.On("BatchStore", p.executionResult.BlockID, mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
 		sr, ok := args.Get(1).([]flow.LightTransactionResult)
 		p.Require().True(ok)
 		storedResults = sr
 	}).Return(nil)
+
+	p.collections.On("BatchStoreAndIndexByTransaction", mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
+		collection, ok := args.Get(0).(*flow.Collection)
+		p.Require().True(ok)
+		light := collection.Light()
+		storedCollections = append(storedCollections, light)
+	}).Return(flow.LightCollection{}, nil)
+
+	p.transactions.On("BatchStore", mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
+		transaction, ok := args.Get(0).(*flow.TransactionBody)
+		p.Require().True(ok)
+		storedTransactions = append(storedTransactions, *transaction)
+	}).Return(nil).Times(len(p.inMemoryTransactions.Data()))
 
 	p.txResultErrMsg.On("BatchStore", p.executionResult.BlockID, mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
 		terrm, ok := args.Get(1).([]flow.TransactionResultErrorMessage)
@@ -198,10 +198,16 @@ func (p *PersisterSuite) TestPersister_PersistWithData() {
 	err := p.persister.Persist()
 	p.Require().NoError(err)
 
+	// Convert full collections to light collections for comparison
+	expectedLightCollections := make([]flow.LightCollection, 0, len(p.inMemoryCollections.Data()))
+	for _, collection := range p.inMemoryCollections.Data() {
+		expectedLightCollections = append(expectedLightCollections, collection.Light())
+	}
+
 	// Verify expected data was stored
 	p.Assert().ElementsMatch([]flow.EventsList{p.inMemoryEvents.Data()}, storedEvents)
 	p.Assert().ElementsMatch(p.inMemoryResults.Data(), storedResults)
-	p.Assert().ElementsMatch(p.inMemoryCollections.LightCollections(), storedCollections)
+	p.Assert().ElementsMatch(expectedLightCollections, storedCollections)
 	p.Assert().ElementsMatch(p.inMemoryTransactions.Data(), storedTransactions)
 	p.Assert().ElementsMatch(p.inMemoryTxResultErrMsg.Data(), storedTxResultErrMsgs)
 }
@@ -232,7 +238,7 @@ func (p *PersisterSuite) TestPersister_PersistErrorHandling() {
 			setupMocks: func() {
 				p.events.On("BatchStore", p.executionResult.BlockID, mock.Anything, mock.Anything).Return(nil).Once()
 				p.results.On("BatchStore", p.executionResult.BlockID, mock.Anything, mock.Anything).Return(nil).Once()
-				p.collections.On("BatchStoreLightAndIndexByTransaction", mock.Anything, mock.Anything).Return(assert.AnError).Once()
+				p.collections.On("BatchStoreAndIndexByTransaction", mock.Anything, mock.Anything).Return(flow.LightCollection{}, assert.AnError).Once()
 			},
 			expectedError: "could not add light collections to batch",
 		},
@@ -241,8 +247,8 @@ func (p *PersisterSuite) TestPersister_PersistErrorHandling() {
 			setupMocks: func() {
 				p.events.On("BatchStore", p.executionResult.BlockID, mock.Anything, mock.Anything).Return(nil).Once()
 				p.results.On("BatchStore", p.executionResult.BlockID, mock.Anything, mock.Anything).Return(nil).Once()
-				numberOfCollections := len(p.inMemoryCollections.LightCollections())
-				p.collections.On("BatchStoreLightAndIndexByTransaction", mock.Anything, mock.Anything).Return(nil).Times(numberOfCollections)
+				numberOfCollections := len(p.inMemoryCollections.Data())
+				p.collections.On("BatchStoreAndIndexByTransaction", mock.Anything, mock.Anything).Return(flow.LightCollection{}, nil).Times(numberOfCollections)
 				p.transactions.On("BatchStore", mock.Anything, mock.Anything).Return(assert.AnError).Once()
 			},
 			expectedError: "could not add transactions to batch",
@@ -252,8 +258,8 @@ func (p *PersisterSuite) TestPersister_PersistErrorHandling() {
 			setupMocks: func() {
 				p.events.On("BatchStore", p.executionResult.BlockID, mock.Anything, mock.Anything).Return(nil).Once()
 				p.results.On("BatchStore", p.executionResult.BlockID, mock.Anything, mock.Anything).Return(nil).Once()
-				numberOfCollections := len(p.inMemoryCollections.LightCollections())
-				p.collections.On("BatchStoreLightAndIndexByTransaction", mock.Anything, mock.Anything).Return(nil).Times(numberOfCollections)
+				numberOfCollections := len(p.inMemoryCollections.Data())
+				p.collections.On("BatchStoreAndIndexByTransaction", mock.Anything, mock.Anything).Return(flow.LightCollection{}, nil).Times(numberOfCollections)
 				numberOfTransactions := len(p.inMemoryTransactions.Data())
 				p.transactions.On("BatchStore", mock.Anything, mock.Anything).Return(nil).Times(numberOfTransactions)
 				p.txResultErrMsg.On("BatchStore", p.executionResult.BlockID, mock.Anything, mock.Anything).Return(assert.AnError).Once()
@@ -265,8 +271,8 @@ func (p *PersisterSuite) TestPersister_PersistErrorHandling() {
 			setupMocks: func() {
 				p.events.On("BatchStore", p.executionResult.BlockID, mock.Anything, mock.Anything).Return(nil).Once()
 				p.results.On("BatchStore", p.executionResult.BlockID, mock.Anything, mock.Anything).Return(nil).Once()
-				numberOfCollections := len(p.inMemoryCollections.LightCollections())
-				p.collections.On("BatchStoreLightAndIndexByTransaction", mock.Anything, mock.Anything).Return(nil).Times(numberOfCollections)
+				numberOfCollections := len(p.inMemoryCollections.Data())
+				p.collections.On("BatchStoreAndIndexByTransaction", mock.Anything, mock.Anything).Return(flow.LightCollection{}, nil).Times(numberOfCollections)
 				numberOfTransactions := len(p.inMemoryTransactions.Data())
 				p.transactions.On("BatchStore", mock.Anything, mock.Anything).Return(nil).Times(numberOfTransactions)
 				p.txResultErrMsg.On("BatchStore", p.executionResult.BlockID, mock.Anything, mock.Anything).Return(nil).Once()

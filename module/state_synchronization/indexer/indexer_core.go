@@ -185,7 +185,7 @@ func (c *IndexerCore) IndexBlockData(data *execution_data.BlockExecutionDataEnti
 		indexedCount := 0
 		if len(data.ChunkExecutionDatas) > 0 {
 			for _, chunk := range data.ChunkExecutionDatas[0 : len(data.ChunkExecutionDatas)-1] {
-				err := IndexCollection(chunk.Collection, c.collections, c.transactions, c.log, c.collectionExecutedMetric)
+				err := IndexCollection(chunk.Collection, c.collections, c.log, c.collectionExecutedMetric)
 				if err != nil {
 					return fmt.Errorf("could not handle collection")
 				}
@@ -330,40 +330,21 @@ func (c *IndexerCore) indexRegisters(registers map[ledger.Path]*ledger.Payload, 
 func IndexCollection(
 	collection *flow.Collection,
 	collections storage.Collections,
-	transactions storage.Transactions,
 	logger zerolog.Logger,
 	collectionExecutedMetric module.CollectionExecutedMetric,
 ) error {
-
-	light := collection.Light()
-
-	collectionExecutedMetric.CollectionFinalized(light)
-	collectionExecutedMetric.CollectionExecuted(light)
 
 	// FIX: we can't index guarantees here, as we might have more than one block
 	// with the same collection as long as it is not finalized
 
 	// store the light collection (collection minus the transaction body - those are stored separately)
 	// and add transaction ids as index
-	err := collections.StoreLightAndIndexByTransaction(&light)
+	light, err := collections.StoreAndIndexByTransaction(collection)
 	if err != nil {
-		// ignore collection if already seen
-		if errors.Is(err, storage.ErrAlreadyExists) {
-			logger.Debug().
-				Hex("collection_id", logging.Entity(light)).
-				Msg("collection is already seen")
-			return nil
-		}
 		return err
 	}
 
-	// now store each of the transaction body
-	for _, tx := range collection.Transactions {
-		err := transactions.Store(tx)
-		if err != nil {
-			return fmt.Errorf("could not store transaction (%x): %w", tx.ID(), err)
-		}
-	}
-
+	collectionExecutedMetric.CollectionFinalized(light)
+	collectionExecutedMetric.CollectionExecuted(light)
 	return nil
 }

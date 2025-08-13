@@ -172,13 +172,14 @@ func (i *InMemoryIndexer) indexRegisters(registers map[ledger.Path]*ledger.Paylo
 // No errors are expected during normal operation.
 func (i *InMemoryIndexer) indexCollection(collection *flow.Collection) error {
 	// Store the full collection
-	if err := i.collections.Store(collection); err != nil {
+	_, err := i.collections.Store(collection)
+	if err != nil {
 		return fmt.Errorf("failed to store collection: %w", err)
 	}
 
-	// Store the light collection
-	light := collection.Light()
-	if err := i.collections.StoreLightAndIndexByTransaction(&light); err != nil {
+	// Store the light collection and index by transaction
+	_, err = i.collections.StoreAndIndexByTransaction(collection)
+	if err != nil {
 		return fmt.Errorf("failed to store light collection and transaction index: %w", err)
 	}
 

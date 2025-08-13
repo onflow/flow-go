@@ -14,22 +14,32 @@ type Collections struct {
 	mock.Mock
 }
 
-// BatchStoreLightAndIndexByTransaction provides a mock function with given fields: collection, batch
-func (_m *Collections) BatchStoreLightAndIndexByTransaction(collection *flow.LightCollection, batch storage.ReaderBatchWriter) error {
+// BatchStoreAndIndexByTransaction provides a mock function with given fields: collection, batch
+func (_m *Collections) BatchStoreAndIndexByTransaction(collection *flow.Collection, batch storage.ReaderBatchWriter) (flow.LightCollection, error) {
 	ret := _m.Called(collection, batch)
 
 	if len(ret) == 0 {
-		panic("no return value specified for BatchStoreLightAndIndexByTransaction")
+		panic("no return value specified for BatchStoreAndIndexByTransaction")
 	}
 
-	var r0 error
-	if rf, ok := ret.Get(0).(func(*flow.LightCollection, storage.ReaderBatchWriter) error); ok {
+	var r0 flow.LightCollection
+	var r1 error
+	if rf, ok := ret.Get(0).(func(*flow.Collection, storage.ReaderBatchWriter) (flow.LightCollection, error)); ok {
+		return rf(collection, batch)
+	}
+	if rf, ok := ret.Get(0).(func(*flow.Collection, storage.ReaderBatchWriter) flow.LightCollection); ok {
 		r0 = rf(collection, batch)
 	} else {
-		r0 = ret.Error(0)
+		r0 = ret.Get(0).(flow.LightCollection)
 	}
 
-	return r0
+	if rf, ok := ret.Get(1).(func(*flow.Collection, storage.ReaderBatchWriter) error); ok {
+		r1 = rf(collection, batch)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
 }
 
 // ByID provides a mock function with given fields: collID
@@ -141,39 +151,59 @@ func (_m *Collections) Remove(collID flow.Identifier) error {
 }
 
 // Store provides a mock function with given fields: collection
-func (_m *Collections) Store(collection *flow.Collection) error {
+func (_m *Collections) Store(collection *flow.Collection) (flow.LightCollection, error) {
 	ret := _m.Called(collection)
 
 	if len(ret) == 0 {
 		panic("no return value specified for Store")
 	}
 
-	var r0 error
-	if rf, ok := ret.Get(0).(func(*flow.Collection) error); ok {
+	var r0 flow.LightCollection
+	var r1 error
+	if rf, ok := ret.Get(0).(func(*flow.Collection) (flow.LightCollection, error)); ok {
+		return rf(collection)
+	}
+	if rf, ok := ret.Get(0).(func(*flow.Collection) flow.LightCollection); ok {
 		r0 = rf(collection)
 	} else {
-		r0 = ret.Error(0)
+		r0 = ret.Get(0).(flow.LightCollection)
 	}
 
-	return r0
+	if rf, ok := ret.Get(1).(func(*flow.Collection) error); ok {
+		r1 = rf(collection)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
 }
 
-// StoreLightAndIndexByTransaction provides a mock function with given fields: collection
-func (_m *Collections) StoreLightAndIndexByTransaction(collection *flow.LightCollection) error {
+// StoreAndIndexByTransaction provides a mock function with given fields: collection
+func (_m *Collections) StoreAndIndexByTransaction(collection *flow.Collection) (flow.LightCollection, error) {
 	ret := _m.Called(collection)
 
 	if len(ret) == 0 {
-		panic("no return value specified for StoreLightAndIndexByTransaction")
+		panic("no return value specified for StoreAndIndexByTransaction")
 	}
 
-	var r0 error
-	if rf, ok := ret.Get(0).(func(*flow.LightCollection) error); ok {
+	var r0 flow.LightCollection
+	var r1 error
+	if rf, ok := ret.Get(0).(func(*flow.Collection) (flow.LightCollection, error)); ok {
+		return rf(collection)
+	}
+	if rf, ok := ret.Get(0).(func(*flow.Collection) flow.LightCollection); ok {
 		r0 = rf(collection)
 	} else {
-		r0 = ret.Error(0)
+		r0 = ret.Get(0).(flow.LightCollection)
 	}
 
-	return r0
+	if rf, ok := ret.Get(1).(func(*flow.Collection) error); ok {
+		r1 = rf(collection)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
 }
 
 // NewCollections creates a new instance of Collections. It also registers a testing interface on the mock and a cleanup function to assert the mocks expectations.

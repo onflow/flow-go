@@ -28,8 +28,8 @@ func NewCollectionsStore(
 // Persist adds light collections to the batch.
 // No errors are expected during normal operations
 func (c *LightCollectionsStore) Persist(batch storage.ReaderBatchWriter) error {
-	for _, collection := range c.inMemoryCollections.LightCollections() {
-		if err := c.persistedCollections.BatchStoreLightAndIndexByTransaction(&collection, batch); err != nil {
+	for _, collection := range c.inMemoryCollections.Data() {
+		if _, err := c.persistedCollections.BatchStoreAndIndexByTransaction(&collection, batch); err != nil {
 			return fmt.Errorf("could not add light collections to batch: %w", err)
 		}
 	}
