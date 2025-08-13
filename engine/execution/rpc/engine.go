@@ -131,13 +131,14 @@ func New(
 
 	return eng
 }
+// serveWorker is a component.Component worker that runs the gRPC server.
 func (e *Engine) serveWorker(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 	e.log.Info().Msgf("starting server on address %s", e.config.ListenAddr)
 
 	l, err := net.Listen("tcp", e.config.ListenAddr)
 	if err != nil {
 		e.log.Err(err).Msg("failed to start server")
-		ctx.Throw(err)
+		ctx.Throw(fmt.Errorf("failed to start grpc server: %w", err))
 		return
 	}
 
@@ -150,7 +151,7 @@ func (e *Engine) serveWorker(ctx irrecoverable.SignalerContext, ready component.
 
 	if err := e.server.Serve(l); err != nil {
 		e.log.Err(err).Msg("fatal error in server")
-		ctx.Throw(err)
+		ctx.Throw(fmt.Errorf("error encountered while running grpc server: %w", err))
 		return
 	}
 }
