@@ -155,11 +155,6 @@ func (e *Engine) serveWorker(ctx irrecoverable.SignalerContext, ready component.
 	}
 }
 
-
-
-
- 
-
 // handler implements a subset of the Observation API.
 type handler struct {
 	engine               exeEng.ScriptExecutor
