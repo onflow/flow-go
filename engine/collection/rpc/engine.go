@@ -119,14 +119,14 @@ func (e *Engine) serveGRPCWorker(ctx irrecoverable.SignalerContext, ready compon
 	l, err := net.Listen("tcp", e.config.ListenAddr)
 	if err != nil {
 		e.log.Err(err).Msg("failed to start server")
-		ctx.Throw(err)
+		ctx.Throw(fmt.Errorf("failed to start server: %w", err))
 		return
 	}
 	ready()
 
 	if err := e.server.Serve(l); err != nil {
 		e.log.Error().Err(err).Msg("fatal error in server")
-		ctx.Throw(err)
+		ctx.Throw(fmt.Errorf("error encountered while running grpc server: %w", err))
 	}
 }
 
