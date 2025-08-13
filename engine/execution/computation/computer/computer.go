@@ -105,10 +105,11 @@ type BlockComputer interface {
 type blockComputer struct {
 	vm                    fvm.VM
 	vmCtx                 fvm.Context
+	systemChunkCtx        fvm.Context
+	callbackCtx           fvm.Context
 	metrics               module.ExecutionMetrics
 	tracer                module.Tracer
 	log                   zerolog.Logger
-	systemChunkCtx        fvm.Context
 	systemTxn             *flow.TransactionBody
 	processCallbackTxn    *flow.TransactionBody
 	committer             ViewCommitter
@@ -121,20 +122,32 @@ type blockComputer struct {
 	maxConcurrency        int
 }
 
+// SystemChunkContext is the context for the system chunk transaction.
 func SystemChunkContext(vmCtx fvm.Context, metrics module.ExecutionMetrics) fvm.Context {
 	return fvm.NewContextFromParent(
 		vmCtx,
-		fvm.WithContractDeploymentRestricted(false),
-		fvm.WithContractRemovalRestricted(false),
 		fvm.WithAuthorizationChecksEnabled(false),
 		fvm.WithSequenceNumberCheckAndIncrementEnabled(false),
 		fvm.WithTransactionFeesEnabled(false),
+		fvm.WithMetricsReporter(metrics),
+		fvm.WithContractDeploymentRestricted(false),
+		fvm.WithContractRemovalRestricted(false),
 		fvm.WithEventCollectionSizeLimit(SystemChunkEventCollectionMaxSize),
 		fvm.WithMemoryAndInteractionLimitsDisabled(),
 		// only the system transaction is allowed to call the block entropy provider
 		fvm.WithRandomSourceHistoryCallAllowed(true),
-		fvm.WithMetricsReporter(metrics),
 		fvm.WithAccountStorageLimit(false),
+	)
+}
+
+// CallbackContext is the context for the scheduled callback transactions.
+func CallbackContext(vmCtx fvm.Context, metrics module.ExecutionMetrics) fvm.Context {
+	return fvm.NewContextFromParent(
+		vmCtx,
+		fvm.WithAuthorizationChecksEnabled(false),
+		fvm.WithSequenceNumberCheckAndIncrementEnabled(false),
+		fvm.WithTransactionFeesEnabled(false),
+		fvm.WithMetricsReporter(metrics),
 	)
 }
 
@@ -162,7 +175,6 @@ func NewBlockComputer(
 		return nil, fmt.Errorf("program cache writes are not allowed in scripts on Execution nodes")
 	}
 
-	systemChunkCtx := SystemChunkContext(vmCtx, metrics)
 	vmCtx = fvm.NewContextFromParent(
 		vmCtx,
 		fvm.WithMetricsReporter(metrics),
@@ -178,10 +190,11 @@ func NewBlockComputer(
 	return &blockComputer{
 		vm:                    vm,
 		vmCtx:                 vmCtx,
+		callbackCtx:           CallbackContext(vmCtx, metrics),
+		systemChunkCtx:        SystemChunkContext(vmCtx, metrics),
 		metrics:               metrics,
 		tracer:                tracer,
 		log:                   logger,
-		systemChunkCtx:        systemChunkCtx,
 		systemTxn:             systemTxn,
 		processCallbackTxn:    processCallbackTxn,
 		committer:             committer,
@@ -232,8 +245,11 @@ func (e *blockComputer) queueUserTransactions(
 	blockId flow.Identifier,
 	blockHeader *flow.Header,
 	rawCollections []*entity.CompleteCollection,
-	requestQueue chan TransactionRequest,
-) {
+	userTxCount int,
+) chan TransactionRequest {
+	txQueue := make(chan TransactionRequest, userTxCount)
+	defer close(txQueue)
+
 	txnIndex := uint32(0)
 	blockIdStr := blockId.String()
 
@@ -261,7 +277,7 @@ func (e *blockComputer) queueUserTransactions(
 		}
 
 		for i, txnBody := range collection.Transactions {
-			requestQueue <- newTransactionRequest(
+			txQueue <- newTransactionRequest(
 				collectionInfo,
 				collectionCtx,
 				collectionLogger,
@@ -271,32 +287,41 @@ func (e *blockComputer) queueUserTransactions(
 			txnIndex += 1
 		}
 	}
+
+	return txQueue
 }
 
 func (e *blockComputer) queueSystemTransactions(
-	systemCtx fvm.Context,
-	systemCollectionInfo collectionInfo,
+	callbackCtx fvm.Context,
+	systemChunkCtx fvm.Context,
+	systemColection collectionInfo,
 	systemTxn *flow.TransactionBody,
 	executeCallbackTxs []*flow.TransactionBody,
-	requestQueue chan TransactionRequest,
 	txnIndex uint32,
 	systemLogger zerolog.Logger,
-) {
-	systemLogger = systemLogger.With().Uint32("num_txs", uint32(len(systemCollectionInfo.CompleteCollection.Transactions))).Logger()
+) chan TransactionRequest {
+	// queue size for callback transactions + 1 system transaction (process callback already executed)
+	txQueue := make(chan TransactionRequest, len(executeCallbackTxs)+1)
+	defer close(txQueue)
 
-	// Add execute callback transactions (if any) and system transaction to the system collection
 	allTxs := append(executeCallbackTxs, systemTxn)
-	systemCollectionInfo.CompleteCollection.Transactions = append(
-		systemCollectionInfo.CompleteCollection.Transactions,
-		allTxs...,
-	)
+	// add execute callback transactions to the system collection info along to existing process transaction
+	systemTxs := systemColection.CompleteCollection.Transactions
+	systemColection.CompleteCollection.Transactions = append(systemTxs, allTxs...)
+	systemLogger = systemLogger.With().Uint32("num_txs", uint32(len(systemTxs))).Logger()
 
 	for i, txBody := range allTxs {
 		last := i == len(allTxs)-1 // Is this last tx in collection
 
-		requestQueue <- newTransactionRequest(
-			systemCollectionInfo,
-			systemCtx,
+		ctx := callbackCtx
+		// last transaction is system chunk and has own context
+		if last {
+			ctx = systemChunkCtx
+		}
+
+		txQueue <- newTransactionRequest(
+			systemColection,
+			ctx,
 			systemLogger,
 			txnIndex,
 			txBody,
@@ -305,6 +330,8 @@ func (e *blockComputer) queueSystemTransactions(
 
 		txnIndex++
 	}
+
+	return txQueue
 }
 
 func (e *blockComputer) executeBlock(
@@ -404,16 +431,12 @@ func (e *blockComputer) executeUserTransactions(
 	rawCollections []*entity.CompleteCollection,
 	userTxCount int,
 ) {
-	txQueue := make(chan TransactionRequest, userTxCount)
-
-	e.queueUserTransactions(
+	txQueue := e.queueUserTransactions(
 		block.ID(),
 		block.Block.Header,
 		rawCollections,
-		txQueue,
+		userTxCount,
 	)
-
-	close(txQueue)
 
 	e.executeQueue(blockSpan, database, txQueue)
 }
@@ -440,13 +463,19 @@ func (e *blockComputer) executeSystemTransactions(
 	userCollectionCount := len(rawCollections)
 	txIndex := uint32(userTxCount)
 
-	systemCtx := fvm.NewContextFromParent(
+	callbackCtx := fvm.NewContextFromParent(
+		e.callbackCtx,
+		fvm.WithBlockHeader(block.Block.Header),
+		fvm.WithProtocolStateSnapshot(e.protocolState.AtBlockID(block.ID())),
+	)
+
+	systemChunkCtx := fvm.NewContextFromParent(
 		e.systemChunkCtx,
 		fvm.WithBlockHeader(block.Block.Header),
 		fvm.WithProtocolStateSnapshot(e.protocolState.AtBlockID(block.ID())),
 	)
 
-	systemLogger := systemCtx.Logger.With().
+	systemLogger := callbackCtx.Logger.With().
 		Str("block_id", block.ID().String()).
 		Uint64("height", block.Block.Header.Height).
 		Bool("system_chunk", true).
@@ -464,11 +493,10 @@ func (e *blockComputer) executeSystemTransactions(
 	}
 
 	var callbackTxs []*flow.TransactionBody
-	var err error
 
 	if e.vmCtx.ScheduleCallbacksEnabled {
-		callbackTxs, err = e.executeProcessCallback(
-			systemCtx,
+		callbacks, updatedTxnIndex, err := e.executeProcessCallback(
+			callbackCtx,
 			systemCollectionInfo,
 			database,
 			blockSpan,
@@ -479,7 +507,8 @@ func (e *blockComputer) executeSystemTransactions(
 			return err
 		}
 
-		txIndex++
+		callbackTxs = callbacks
+		txIndex = updatedTxnIndex
 	}
 
 	// Update logger with number of transactions once they've become known
@@ -488,20 +517,15 @@ func (e *blockComputer) executeSystemTransactions(
 		Uint32("num_txs", uint32(userTxCount+len(callbackTxs)+2)).
 		Logger()
 
-	// Queue size for callback transactions + 1 system transaction (process callback already executed)
-	txQueue := make(chan TransactionRequest, len(callbackTxs)+1)
-
-	e.queueSystemTransactions(
-		systemCtx,
+	txQueue := e.queueSystemTransactions(
+		callbackCtx,
+		systemChunkCtx,
 		systemCollectionInfo,
 		e.systemTxn,
 		callbackTxs,
-		txQueue,
 		txIndex,
 		systemLogger,
 	)
-
-	close(txQueue)
 
 	e.executeQueue(blockSpan, database, txQueue)
 
@@ -549,7 +573,7 @@ func (e *blockComputer) executeProcessCallback(
 	blockSpan otelTrace.Span,
 	txnIndex uint32,
 	systemLogger zerolog.Logger,
-) ([]*flow.TransactionBody, error) {
+) ([]*flow.TransactionBody, uint32, error) {
 	// Add process callback transaction to the system collection info
 	// Note: since complete collection is a pointer, this will modify original
 	systemCollectionInfo.CompleteCollection.Transactions = append(
@@ -565,6 +589,8 @@ func (e *blockComputer) executeProcessCallback(
 		e.processCallbackTxn,
 		false)
 
+	txnIndex++
+
 	txn, err := e.executeTransactionInternal(blockSpan, database, request, 0)
 	if err != nil {
 		snapshotTime := logical.Time(0)
@@ -572,7 +598,7 @@ func (e *blockComputer) executeProcessCallback(
 			snapshotTime = txn.SnapshotTime()
 		}
 
-		return nil, fmt.Errorf(
+		return nil, 0, fmt.Errorf(
 			"failed to execute system process transaction %v (%d@%d) for block %s at height %v: %w",
 			request.txnIdStr,
 			request.txnIndex,
@@ -583,13 +609,18 @@ func (e *blockComputer) executeProcessCallback(
 	}
 
 	if txn.Output().Err != nil {
-		return nil, fmt.Errorf(
+		return nil, 0, fmt.Errorf(
 			"process callback transaction %s error: %v",
 			request.txnIdStr,
 			txn.Output().Err)
 	}
 
-	return blueprints.ExecuteCallbacksTransactions(e.vmCtx.Chain, txn.Output().Events)
+	callbackTxs, err := blueprints.ExecuteCallbacksTransactions(e.vmCtx.Chain, txn.Output().Events)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	return callbackTxs, txnIndex, nil
 }
 
 func (e *blockComputer) executeTransactions(

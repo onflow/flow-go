@@ -5,11 +5,15 @@ import (
 
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/encoding/ccf"
+	"github.com/rs/zerolog/log"
+
 	jsoncdc "github.com/onflow/cadence/encoding/json"
 	"github.com/onflow/flow-core-contracts/lib/go/templates"
 	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/model/flow"
 )
+
+const callbackTransactionGasLimit = flow.DefaultMaxTransactionGasLimit
 
 func ProcessCallbacksTransaction(chain flow.Chain) *flow.TransactionBody {
 	sc := systemcontracts.SystemContractsForChain(chain.ChainID())
@@ -17,7 +21,7 @@ func ProcessCallbacksTransaction(chain flow.Chain) *flow.TransactionBody {
 
 	return flow.NewTransactionBody().
 		SetScript(script).
-		SetComputeLimit(SystemChunkTransactionGasLimit)
+		SetComputeLimit(callbackTransactionGasLimit)
 }
 
 func ExecuteCallbacksTransactions(chainID flow.Chain, processEvents flow.EventsList) ([]*flow.TransactionBody, error) {
@@ -93,9 +97,16 @@ func callbackArgsFromEvent(env templates.Environment, event flow.Event) ([]byte,
 		return nil, 0, fmt.Errorf("id is not uint64")
 	}
 
-	effort, ok := effortValue.(cadence.UInt64)
+	cadenceEffort, ok := effortValue.(cadence.UInt64)
 	if !ok {
 		return nil, 0, fmt.Errorf("effort is not uint64")
+	}
+
+	effort := uint64(cadenceEffort)
+
+	if effort > flow.DefaultMaxTransactionGasLimit {
+		log.Warn().Uint64("effort", effort).Msg("effort is greater than max transaction gas limit, setting to max")
+		effort = flow.DefaultMaxTransactionGasLimit
 	}
 
 	encID, err := jsoncdc.Encode(id)

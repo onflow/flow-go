@@ -21,9 +21,9 @@ type EventsResponse struct {
 	BlockTimestamp time.Time
 }
 
-// EventsRetriever retrieves events by block height. It can be configured to retrieve events from
+// EventsProvider retrieves events by block height. It can be configured to retrieve events from
 // the events indexer(if available) or using a dedicated callback to query it from other sources.
-type EventsRetriever struct {
+type EventsProvider struct {
 	log              zerolog.Logger
 	headers          storage.Headers
 	getExecutionData GetExecutionDataFunc
@@ -35,7 +35,7 @@ type EventsRetriever struct {
 // Expected errors:
 // - codes.NotFound: If block header for the specified block height is not found.
 // - error: An error, if any, encountered during getting events from storage or execution data.
-func (b *EventsRetriever) GetAllEventsResponse(ctx context.Context, height uint64) (*EventsResponse, error) {
+func (b *EventsProvider) GetAllEventsResponse(ctx context.Context, height uint64) (*EventsResponse, error) {
 	var response *EventsResponse
 	var err error
 	if b.useEventsIndex {
@@ -66,7 +66,7 @@ func (b *EventsRetriever) GetAllEventsResponse(ctx context.Context, height uint6
 // getEventsFromExecutionData returns the events for a given height extract from the execution data.
 // Expected errors:
 // - error: An error indicating issues with getting execution data for block
-func (b *EventsRetriever) getEventsFromExecutionData(ctx context.Context, height uint64) (*EventsResponse, error) {
+func (b *EventsProvider) getEventsFromExecutionData(ctx context.Context, height uint64) (*EventsResponse, error) {
 	executionData, err := b.getExecutionData(ctx, height)
 	if err != nil {
 		return nil, fmt.Errorf("could not get execution data for block %d: %w", height, err)
@@ -88,7 +88,7 @@ func (b *EventsRetriever) getEventsFromExecutionData(ctx context.Context, height
 // Expected errors:
 // - error: An error indicating any issues with the provided block height or
 // an error indicating issue with getting events for a block.
-func (b *EventsRetriever) getEventsFromStorage(height uint64) (*EventsResponse, error) {
+func (b *EventsProvider) getEventsFromStorage(height uint64) (*EventsResponse, error) {
 	blockID, err := b.headers.BlockIDByHeight(height)
 	if err != nil {
 		return nil, fmt.Errorf("could not get header for height %d: %w", height, err)
