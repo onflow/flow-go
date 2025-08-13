@@ -424,27 +424,13 @@ func (s *Suite) TestOnCollection() {
 	light := collection.Light()
 
 	// we should store the light collection and index its transactions
-	s.collections.On("StoreLightAndIndexByTransaction", &light).Return(nil).Once()
+	s.collections.On("StoreAndIndexByTransaction", &collection).Return(light, nil).Once()
 
-	// for each transaction in the collection, we should store it
-	needed := make(map[flow.Identifier]struct{})
-	for _, txID := range light.Transactions {
-		needed[txID] = struct{}{}
-	}
-	s.transactions.On("Store", mock.Anything).Return(nil).Run(
-		func(args mock.Arguments) {
-			tx := args.Get(0).(*flow.TransactionBody)
-			_, pending := needed[tx.ID()]
-			s.Assert().True(pending, "tx not pending (%x)", tx.ID())
-		},
-	)
-
-	err := indexer.IndexCollection(&collection, s.collections, s.transactions, s.log, s.collectionExecutedMetric)
+	err := indexer.IndexCollection(&collection, s.collections, s.log, s.collectionExecutedMetric)
 	require.NoError(s.T(), err)
 
-	// check that the collection was stored and indexed, and we stored all transactions
+	// check that the collection was stored and indexed
 	s.collections.AssertExpectations(s.T())
-	s.transactions.AssertNumberOfCalls(s.T(), "Store", len(collection.Transactions))
 }
 
 // TestExecutionReceiptsAreIndexed checks that execution receipts are properly indexed
@@ -456,7 +442,7 @@ func (s *Suite) TestExecutionReceiptsAreIndexed() {
 	light := collection.Light()
 
 	// we should store the light collection and index its transactions
-	s.collections.On("StoreLightAndIndexByTransaction", &light).Return(nil).Once()
+	s.collections.On("StoreAndIndexByTransaction", &collection).Return(light, nil).Once()
 	block := &flow.Block{
 		Header:  &flow.Header{Height: 0},
 		Payload: &flow.Payload{Guarantees: []*flow.CollectionGuarantee{}},
@@ -505,27 +491,14 @@ func (s *Suite) TestOnCollectionDuplicate() {
 	light := collection.Light()
 
 	// we should store the light collection and index its transactions
-	s.collections.On("StoreLightAndIndexByTransaction", &light).Return(storerr.ErrAlreadyExists).Once()
+	s.collections.On("StoreAndIndexByTransaction", &collection).Return(light, storerr.ErrAlreadyExists).Once()
 
-	// for each transaction in the collection, we should store it
-	needed := make(map[flow.Identifier]struct{})
-	for _, txID := range light.Transactions {
-		needed[txID] = struct{}{}
-	}
-	s.transactions.On("Store", mock.Anything).Return(nil).Run(
-		func(args mock.Arguments) {
-			tx := args.Get(0).(*flow.TransactionBody)
-			_, pending := needed[tx.ID()]
-			s.Assert().True(pending, "tx not pending (%x)", tx.ID())
-		},
-	)
+	err := indexer.IndexCollection(&collection, s.collections, s.log, s.collectionExecutedMetric)
+	require.Error(s.T(), err)
+	require.ErrorIs(s.T(), err, storerr.ErrAlreadyExists)
 
-	err := indexer.IndexCollection(&collection, s.collections, s.transactions, s.log, s.collectionExecutedMetric)
-	require.NoError(s.T(), err)
-
-	// check that the collection was stored and indexed, and we stored all transactions
+	// check that the collection was stored and indexed
 	s.collections.AssertExpectations(s.T())
-	s.transactions.AssertNotCalled(s.T(), "Store", "should not store any transactions")
 }
 
 // TestRequestMissingCollections tests that the all missing collections are requested on the call to requestMissingCollections

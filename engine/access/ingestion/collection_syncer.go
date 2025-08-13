@@ -390,7 +390,7 @@ func (s *CollectionSyncer) OnCollectionDownloaded(_ flow.Identifier, entity flow
 		return
 	}
 
-	err := indexer.IndexCollection(collection, s.collections, s.transactions, s.logger, s.collectionExecutedMetric)
+	err := indexer.IndexCollection(collection, s.collections, s.logger, s.collectionExecutedMetric)
 	if err != nil {
 		s.logger.Error().Err(err).Msg("could not index collection after it has been downloaded")
 		return

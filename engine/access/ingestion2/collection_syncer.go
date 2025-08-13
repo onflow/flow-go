@@ -184,7 +184,7 @@ func (s *CollectionSyncer) StartWorkerLoop(ctx irrecoverable.SignalerContext, re
 				return
 			}
 
-			err := indexer.IndexCollection(collection, s.collections, s.transactions, s.logger, s.collectionExecutedMetric)
+			err := indexer.IndexCollection(collection, s.collections, s.logger, s.collectionExecutedMetric)
 			if err != nil {
 				ctx.Throw(fmt.Errorf("error indexing collection: %w", err))
 				return
