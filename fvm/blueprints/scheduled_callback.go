@@ -5,6 +5,7 @@ import (
 
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/encoding/ccf"
+	"github.com/rs/zerolog/log"
 
 	"github.com/onflow/flow-core-contracts/lib/go/templates"
 	"github.com/onflow/flow-go/fvm/systemcontracts"
@@ -92,9 +93,16 @@ func callbackArgsFromEvent(env templates.Environment, event flow.Event) ([]byte,
 		return nil, 0, fmt.Errorf("id is not uint64")
 	}
 
-	effort, ok := effortValue.(cadence.UInt64)
+	cadenceEffort, ok := effortValue.(cadence.UInt64)
 	if !ok {
 		return nil, 0, fmt.Errorf("effort is not uint64")
+	}
+
+	effort := uint64(cadenceEffort)
+
+	if effort > flow.DefaultMaxTransactionGasLimit {
+		log.Warn().Uint64("effort", effort).Msg("effort is greater than max transaction gas limit, setting to max")
+		effort = flow.DefaultMaxTransactionGasLimit
 	}
 
 	encodedID, err := ccf.Encode(id)
@@ -102,5 +110,5 @@ func callbackArgsFromEvent(env templates.Environment, event flow.Event) ([]byte,
 		return nil, 0, fmt.Errorf("failed to encode id: %w", err)
 	}
 
-	return encodedID, uint64(effort), nil
+	return encodedID, effort, nil
 }
