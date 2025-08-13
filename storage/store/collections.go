@@ -10,6 +10,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/operation"
+	"github.com/onflow/flow-go/utils/logging"
 )
 
 type Collections struct {
@@ -155,8 +156,12 @@ func (c *Collections) batchStoreLightAndIndexByTransaction(collection *flow.Ligh
 			// so if transaction is already indexed by a collection, check if it's the same collection.
 			// TODO: For now we log a warning, but eventually we need to handle Byzantine clusters
 			if collectionID != differentColTxIsIn {
-				log.Error().Msgf("sanity check failed: transaction %v in collection %v is already indexed by a different collection %v",
-					txID, collectionID, differentColTxIsIn)
+				log.Error().
+					Str(logging.KeySuspicious, "true").
+					Hex("transaction hash", txID[:]).
+					Hex("previously persisted collection containing transactions", differentColTxIsIn[:]).
+					Hex("newly encountered collection containing transactions", collectionID[:]).
+					Msgf("sanity check failed: transaction contained in multiple collections -- this is a symptom of a byzantine collector cluster (or a bug)")
 			}
 			continue
 		}
