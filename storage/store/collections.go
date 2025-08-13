@@ -120,7 +120,11 @@ func (c *Collections) Remove(colID flow.Identifier) error {
 			if err != nil {
 				return fmt.Errorf("could not remove collection payload indices: %w", err)
 			}
-
+			// Honest clusters ensure a transaction can only belong to one collection. However, in rare
+			// cases, the collector clusters can exceed byzantine thresholds -- making it possible to
+			// produce multiple finalized collections (aka guaranteed collections) containing the same
+			// transaction repeadely.
+			// TODO: For now we log a warning, but eventually we need to handle Byzantine clusters
 			err = operation.RemoveTransaction(rw.Writer(), txID)
 			if err != nil {
 				return fmt.Errorf("could not remove transaction: %w", err)
@@ -152,8 +156,10 @@ func (c *Collections) batchStoreLightAndIndexByTransaction(collection *flow.Ligh
 		var differentColTxIsIn flow.Identifier
 		err := operation.LookupCollectionByTransaction(rw.GlobalReader(), txID, &differentColTxIsIn)
 		if err == nil {
-			// collection nodes have ensured that a transaction can only belong to one collection
-			// so if transaction is already indexed by a collection, check if it's the same collection.
+			// Honest clusters ensure a transaction can only belong to one collection. However, in rare
+			// cases, the collector clusters can exceed byzantine thresholds -- making it possible to
+			// produce multiple finalized collections (aka guaranteed collections) containing the same
+			// transaction repeadely.
 			// TODO: For now we log a warning, but eventually we need to handle Byzantine clusters
 			if collectionID != differentColTxIsIn {
 				log.Error().
