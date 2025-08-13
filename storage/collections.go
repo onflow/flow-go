@@ -1,6 +1,7 @@
 package storage
 
 import (
+	"github.com/jordanschalm/lockctx"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -34,6 +35,8 @@ type Collections interface {
 
 	// Store inserts the collection keyed by ID and all constituent
 	// transactions.
+	// This is used by execution node storing collections
+	// No errors are expected during normal operation.
 	// No errors are expected during normal operation.
 	Store(collection *flow.Collection) (flow.LightCollection, error)
 
@@ -41,7 +44,12 @@ type Collections interface {
 	// No errors are expected during normal operation.
 	Remove(collID flow.Identifier) error
 
-	StoreAndIndexByTransaction(collection *flow.Collection) (flow.LightCollection, error)
+	// StoreAndIndexByTransaction stores the collection and indexes it by transaction.
+	// This is used by access node storing collections for finalized blocks
+	// No errors are expected during normal operation.
+	StoreAndIndexByTransaction(lctx lockctx.Proof, collection *flow.Collection) (flow.LightCollection, error)
 
-	BatchStoreAndIndexByTransaction(collection *flow.Collection, batch ReaderBatchWriter) (flow.LightCollection, error)
+	// BatchStoreAndIndexByTransaction stores the collection and indexes it by transaction within a batch.
+	// This is used by access node storing collections for finalized blocks
+	BatchStoreAndIndexByTransaction(lctx lockctx.Proof, collection *flow.Collection, batch ReaderBatchWriter) (flow.LightCollection, error)
 }

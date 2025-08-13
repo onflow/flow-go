@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/jordanschalm/lockctx"
 	"github.com/rs/zerolog"
 	"golang.org/x/sync/errgroup"
 
@@ -35,6 +36,7 @@ type IndexerCore struct {
 
 	derivedChainData *derived.DerivedChainData
 	serviceAddress   flow.Address
+	lockManager      lockctx.Manager
 }
 
 // New execution state indexer used to ingest block execution data and index it by height.
@@ -53,6 +55,7 @@ func New(
 	chain flow.Chain,
 	derivedChainData *derived.DerivedChainData,
 	collectionExecutedMetric module.CollectionExecutedMetric,
+	lockManager lockctx.Manager,
 ) (*IndexerCore, error) {
 	log = log.With().Str("component", "execution_indexer").Logger()
 	metrics.InitializeLatestHeight(registers.LatestHeight())
@@ -76,6 +79,7 @@ func New(
 		derivedChainData: derivedChainData,
 
 		collectionExecutedMetric: collectionExecutedMetric,
+		lockManager:              lockManager,
 	}, nil
 }
 
@@ -185,7 +189,15 @@ func (c *IndexerCore) IndexBlockData(data *execution_data.BlockExecutionDataEnti
 		indexedCount := 0
 		if len(data.ChunkExecutionDatas) > 0 {
 			for _, chunk := range data.ChunkExecutionDatas[0 : len(data.ChunkExecutionDatas)-1] {
-				err := IndexCollection(chunk.Collection, c.collections, c.log, c.collectionExecutedMetric)
+				lctx := c.lockManager.NewContext()
+				err := lctx.AcquireLock(storage.LockInsertCollection)
+				if err != nil {
+					lctx.Release()
+					return fmt.Errorf("could not acquire lock for indexing collections: %w", err)
+				}
+
+				err = IndexCollection(lctx, chunk.Collection, c.collections, c.log, c.collectionExecutedMetric)
+				lctx.Release()
 				if err != nil {
 					return fmt.Errorf("could not handle collection")
 				}
@@ -328,6 +340,7 @@ func (c *IndexerCore) indexRegisters(registers map[ledger.Path]*ledger.Payload, 
 // IndexCollection handles the response of the collection request made earlier when a block was received.
 // No errors expected during normal operations.
 func IndexCollection(
+	lctx lockctx.Proof,
 	collection *flow.Collection,
 	collections storage.Collections,
 	logger zerolog.Logger,
@@ -339,7 +352,7 @@ func IndexCollection(
 
 	// store the light collection (collection minus the transaction body - those are stored separately)
 	// and add transaction ids as index
-	light, err := collections.StoreAndIndexByTransaction(collection)
+	light, err := collections.StoreAndIndexByTransaction(lctx, collection)
 	if err != nil {
 		return err
 	}

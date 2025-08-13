@@ -956,6 +956,7 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 					builder.RootChainID.Chain(),
 					indexerDerivedChainData,
 					notNil(builder.collectionExecutedMetric),
+					node.StorageLockMgr,
 				)
 				if err != nil {
 					return nil, err

@@ -50,12 +50,15 @@ func RemoveCollectionPayloadIndices(w storage.Writer, blockID flow.Identifier) e
 	return RemoveByKey(w, MakePrefix(codeIndexCollection, blockID))
 }
 
-// UnsafeIndexCollectionByTransaction inserts a collection id keyed by a transaction id
-// Unsafe because a transaction can belong to multiple collections, indexing collection by a transaction
+// IndexCollectionByTransaction inserts a collection id keyed by a transaction id
+// A transaction can belong to multiple collections, indexing collection by a transaction
 // will overwrite the previous collection id that was indexed by the same transaction id
-// To prevent overwritting, the caller must check if the transaction is already indexed, and make sure there
-// is no dirty read before the writing by using locks.
-func UnsafeIndexCollectionByTransaction(w storage.Writer, txID flow.Identifier, collectionID flow.Identifier) error {
+// To prevent overwritting, the caller must acquire the storage.LockInsertCollection lock
+func IndexCollectionByTransaction(lctx lockctx.Proof, w storage.Writer, txID flow.Identifier, collectionID flow.Identifier) error {
+	if !lctx.HoldsLock(storage.LockInsertCollection) {
+		return fmt.Errorf("missing lock: %v", storage.LockInsertOrFinalizeClusterBlock)
+	}
+
 	return UpsertByKey(w, MakePrefix(codeIndexCollectionByTransaction, txID), collectionID)
 }
 
@@ -68,7 +71,7 @@ func LookupCollectionByTransaction(r storage.Reader, txID flow.Identifier, colle
 }
 
 // RemoveCollectionByTransactionIndex removes a collection id indexed by a transaction id,
-// created by [UnsafeIndexCollectionByTransaction].
+// created by [IndexCollectionByTransaction].
 // No errors are expected during normal operation.
 func RemoveCollectionTransactionIndices(w storage.Writer, txID flow.Identifier) error {
 	return RemoveByKey(w, MakePrefix(codeIndexCollectionByTransaction, txID))
