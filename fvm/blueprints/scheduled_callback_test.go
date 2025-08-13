@@ -11,6 +11,7 @@ import (
 	"github.com/onflow/cadence"
 	cadenceCommon "github.com/onflow/cadence/common"
 	"github.com/onflow/cadence/encoding/ccf"
+
 	jsoncdc "github.com/onflow/cadence/encoding/json"
 	"github.com/onflow/flow-go/fvm/blueprints"
 	"github.com/onflow/flow-go/fvm/systemcontracts"
@@ -27,7 +28,7 @@ func TestProcessCallbacksTransaction(t *testing.T) {
 	assert.NotNil(t, tx)
 	assert.NotEmpty(t, tx.Script)
 	require.False(t, strings.Contains(string(tx.Script), `import "FlowCallbackScheduler"`), "should resolve callback scheduler import")
-	assert.Equal(t, uint64(blueprints.SystemChunkTransactionGasLimit), tx.GasLimit)
+	assert.Equal(t, uint64(flow.DefaultMaxTransactionGasLimit), tx.GasLimit)
 	assert.Empty(t, tx.Arguments)
 }
 
