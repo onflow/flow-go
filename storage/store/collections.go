@@ -17,6 +17,10 @@ type Collections struct {
 	transactions *Transactions
 	// TODO(7355): lockctx
 	indexingByTx *sync.Mutex
+
+	// TODO: Add caching -- this might be relatively frequently queried within the AN;
+	//       likely predominantly with requests about recent transactions.
+	//       Note that we already have caching for transactions.
 }
 
 var _ storage.Collections = (*Collections)(nil)
@@ -121,7 +125,6 @@ func (c *Collections) Remove(colID flow.Identifier) error {
 		// remove the collection
 		return operation.RemoveCollection(rw.Writer(), colID)
 	})
-
 	if err != nil {
 		return fmt.Errorf("could not remove collection: %w", err)
 	}
