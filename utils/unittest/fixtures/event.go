@@ -140,8 +140,6 @@ func (g *EventGenerator) ForTransactions(t testing.TB, transactionIDs []flow.Ide
 		txEvents := g.ForTransaction(t, txID, uint32(i), eventsPerTransaction, opts...)
 		allEvents = append(allEvents, txEvents...)
 	}
-	// ensure event/transaction indexes are sequential
-	allEvents = AdjustEventsMetadata(allEvents)
 	return allEvents
 }
 
@@ -282,23 +280,31 @@ func (g *EventGenerator) generateProtocolEventData(t testing.TB, eventName strin
 }
 
 // AdjustEventsMetadata adjusts the event and transaction indexes to be sequential.
+// The following changes are made:
+// - Transaction Index is updated to match the actual transactions
+// - Event Index is updated to be sequential and reset for each transaction
 func AdjustEventsMetadata(events []flow.Event) []flow.Event {
 	if len(events) == 0 {
 		return events
 	}
 
-	output := make([]flow.Event, len(events))
-
-	txIndex := uint32(0)
 	lastTxID := events[0].TransactionID
-	for eventIndex, event := range events {
+	txIndex := uint32(0)
+	eventIndex := uint32(0)
+
+	output := make([]flow.Event, len(events))
+	for i, event := range events {
 		if event.TransactionID != lastTxID {
-			txIndex++
 			lastTxID = event.TransactionID
+			txIndex++
+			eventIndex = 0
 		}
-		event.EventIndex = uint32(eventIndex)
+
+		event.EventIndex = eventIndex
 		event.TransactionIndex = txIndex
-		output[eventIndex] = event
+		eventIndex++
+
+		output[i] = event
 	}
 	return output
 }

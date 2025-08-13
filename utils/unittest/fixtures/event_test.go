@@ -22,22 +22,21 @@ func TestAdjustEventsMetadata(t *testing.T) {
 		eventGen := suite.Events()
 		identifierGen := suite.Identifiers()
 
-		// Create a single event with custom transaction ID using fixture options
-		customTxID := identifierGen.Fixture(t)
+		txID := identifierGen.Fixture(t)
 		event := eventGen.Fixture(t,
-			eventGen.WithTransactionID(customTxID),
-			eventGen.WithEventIndex(999),       // Should be reset to 0
-			eventGen.WithTransactionIndex(999), // Should be reset to 0
+			eventGen.WithTransactionID(txID),
+			eventGen.WithEventIndex(999),
+			eventGen.WithTransactionIndex(999),
 		)
 
 		result := AdjustEventsMetadata([]flow.Event{event})
-
 		require.Len(t, result, 1)
+
 		assert.Equal(t, uint32(0), result[0].EventIndex)
 		assert.Equal(t, uint32(0), result[0].TransactionIndex)
 
 		// unchanged
-		assert.Equal(t, customTxID, result[0].TransactionID)
+		assert.Equal(t, txID, result[0].TransactionID)
 		assert.Equal(t, event.Type, result[0].Type)
 		assert.Equal(t, event.Payload, result[0].Payload)
 	})
@@ -47,28 +46,26 @@ func TestAdjustEventsMetadata(t *testing.T) {
 		eventGen := suite.Events()
 		identifierGen := suite.Identifiers()
 
-		// Create multiple events with same transaction ID but different event indexes using fixture options
 		txID := identifierGen.Fixture(t)
 		events := []flow.Event{
 			eventGen.Fixture(t,
 				eventGen.WithTransactionID(txID),
-				eventGen.WithTransactionIndex(999), // Should be reset to 0
-				eventGen.WithEventIndex(999),       // Should be reset to 0
+				eventGen.WithTransactionIndex(999),
+				eventGen.WithEventIndex(999),
 			),
 			eventGen.Fixture(t,
 				eventGen.WithTransactionID(txID),
-				eventGen.WithTransactionIndex(888), // Should be reset to 0
-				eventGen.WithEventIndex(888),       // Should be reset to 1
+				eventGen.WithTransactionIndex(888),
+				eventGen.WithEventIndex(888),
 			),
 			eventGen.Fixture(t,
 				eventGen.WithTransactionID(txID),
-				eventGen.WithTransactionIndex(777), // Should be reset to 0
-				eventGen.WithEventIndex(777),       // Should be reset to 2
+				eventGen.WithTransactionIndex(777),
+				eventGen.WithEventIndex(777),
 			),
 		}
 
 		result := AdjustEventsMetadata(events)
-
 		require.Len(t, result, 3)
 
 		for i, event := range result {
@@ -82,61 +79,67 @@ func TestAdjustEventsMetadata(t *testing.T) {
 		suite := NewGeneratorSuite(t)
 		eventGen := suite.Events()
 		identifierGen := suite.Identifiers()
+		randomGen := suite.Random()
 
-		// Create events from different transactions using fixture options
-		// Use the same identifier for events that should be in the same transaction
-		txs := []flow.Identifier{
-			identifierGen.Fixture(t),
-			identifierGen.Fixture(t),
-			identifierGen.Fixture(t),
+		txID0 := identifierGen.Fixture(t)
+		txID1 := identifierGen.Fixture(t)
+		txID2 := identifierGen.Fixture(t)
+
+		type eventConfig struct {
+			transactionID    flow.Identifier
+			transactionIndex uint32
+			eventIndex       uint32
 		}
 
-		events := []flow.Event{
-			// First transaction - 2 events (both use txID1)
-			eventGen.Fixture(t,
-				eventGen.WithTransactionID(txs[0]),
-				eventGen.WithTransactionIndex(999), // Should be reset to 0
-				eventGen.WithEventIndex(999),       // Should be reset to 0
-			),
-			eventGen.Fixture(t,
-				eventGen.WithTransactionID(txs[0]),
-				eventGen.WithTransactionIndex(888), // Should be reset to 0
-				eventGen.WithEventIndex(888),       // Should be reset to 1
-			),
-			// Second transaction - 1 event (uses txID2)
-			eventGen.Fixture(t,
-				eventGen.WithTransactionID(txs[1]),
-				eventGen.WithTransactionIndex(777), // Should be reset to 1
-				eventGen.WithEventIndex(777),       // Should be reset to 2
-			),
-			// Third transaction - 3 events (all use txID3)
-			eventGen.Fixture(t,
-				eventGen.WithTransactionID(txs[2]),
-				eventGen.WithTransactionIndex(666), // Should be reset to 2
-				eventGen.WithEventIndex(666),       // Should be reset to 3
-			),
-			eventGen.Fixture(t,
-				eventGen.WithTransactionID(txs[2]),
-				eventGen.WithTransactionIndex(555), // Should be reset to 2
-				eventGen.WithEventIndex(555),       // Should be reset to 4
-			),
-			eventGen.Fixture(t,
-				eventGen.WithTransactionID(txs[2]),
-				eventGen.WithTransactionIndex(444), // Should be reset to 2
-				eventGen.WithEventIndex(444),       // Should be reset to 5
-			),
+		expected := []eventConfig{
+			{
+				transactionID:    txID0,
+				transactionIndex: 0,
+				eventIndex:       0,
+			},
+			{
+				transactionID:    txID0,
+				transactionIndex: 0,
+				eventIndex:       1,
+			},
+			{
+				transactionID:    txID1,
+				transactionIndex: 1,
+				eventIndex:       0,
+			},
+			{
+				transactionID:    txID2,
+				transactionIndex: 2,
+				eventIndex:       0,
+			},
+			{
+				transactionID:    txID2,
+				transactionIndex: 2,
+				eventIndex:       1,
+			},
+			{
+				transactionID:    txID2,
+				transactionIndex: 2,
+				eventIndex:       2,
+			},
+		}
+
+		events := make([]flow.Event, len(expected))
+		for i, event := range expected {
+			events[i] = eventGen.Fixture(t,
+				eventGen.WithTransactionID(event.transactionID),
+				eventGen.WithTransactionIndex(randomGen.Uint32()),
+				eventGen.WithEventIndex(randomGen.Uint32()),
+			)
 		}
 
 		result := AdjustEventsMetadata(events)
-		require.Len(t, result, 6)
+		require.Len(t, result, len(expected))
 
-		expectedTxIndexes := []uint32{0, 0, 1, 2, 2, 2}
 		for i, event := range result {
-			assert.Equal(t, uint32(i), event.EventIndex)
-
-			expectedTxIndex := expectedTxIndexes[i]
-			assert.Equal(t, expectedTxIndex, event.TransactionIndex)
-			assert.Equal(t, txs[expectedTxIndex], event.TransactionID)
+			assert.Equal(t, expected[i].transactionID, event.TransactionID)
+			assert.Equal(t, expected[i].transactionIndex, event.TransactionIndex)
+			assert.Equal(t, expected[i].eventIndex, event.EventIndex)
 		}
 	})
 }
