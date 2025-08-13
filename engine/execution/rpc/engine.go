@@ -24,14 +24,15 @@ import (
 	_ "github.com/onflow/flow-go/engine/common/grpc/compressor/snappy"  // required for gRPC compression
 
 	"github.com/onflow/flow-go/consensus/hotstuff"
-	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	exeEng "github.com/onflow/flow-go/engine/execution"
 	"github.com/onflow/flow-go/engine/execution/computation/metrics"
 	"github.com/onflow/flow-go/engine/execution/state"
 	fvmerrors "github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/grpcserver"
+	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
 )
@@ -47,7 +48,8 @@ type Config struct {
 
 // Engine implements a gRPC server with a simplified version of the Observation API.
 type Engine struct {
-	unit    *engine.Unit
+	component.Component
+
 	log     zerolog.Logger
 	handler *handler     // the gRPC service implementation
 	server  *grpc.Server // the gRPC server
@@ -97,8 +99,7 @@ func New(
 	server := grpc.NewServer(serverOptions...)
 
 	eng := &Engine{
-		log:  log,
-		unit: engine.NewUnit(),
+		log: log,
 		handler: &handler{
 			engine:               scriptsExecutor,
 			chain:                chainID,
@@ -124,40 +125,40 @@ func New(
 
 	execution.RegisterExecutionAPIServer(eng.server, eng.handler)
 
+	eng.Component = component.NewComponentManagerBuilder().
+		AddWorker(eng.serveWorker).
+		Build()
+
 	return eng
 }
-
-// Ready returns a ready channel that is closed once the engine has fully
-// started. The RPC engine is ready when the gRPC server has successfully
-// started.
-func (e *Engine) Ready() <-chan struct{} {
-	e.unit.Launch(e.serve)
-	return e.unit.Ready()
-}
-
-// Done returns a done channel that is closed once the engine has fully stopped.
-// It sends a signal to stop the gRPC server, then closes the channel.
-func (e *Engine) Done() <-chan struct{} {
-	return e.unit.Done(e.server.GracefulStop)
-}
-
-// serve starts the gRPC server .
 //
-// When this function returns, the server is considered ready.
-func (e *Engine) serve() {
+func (e *Engine) serveWorker(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 	e.log.Info().Msgf("starting server on address %s", e.config.ListenAddr)
 
 	l, err := net.Listen("tcp", e.config.ListenAddr)
 	if err != nil {
 		e.log.Err(err).Msg("failed to start server")
+		ctx.Throw(err)
 		return
 	}
 
-	err = e.server.Serve(l)
-	if err != nil {
+	ready()
+
+	go func() {
+		<-ctx.Done()
+		e.server.GracefulStop()
+	}()
+
+	if err := e.server.Serve(l); err != nil {
 		e.log.Err(err).Msg("fatal error in server")
+		ctx.Throw(err)
+		return
 	}
 }
+
+
+
+
 
 // handler implements a subset of the Observation API.
 type handler struct {
