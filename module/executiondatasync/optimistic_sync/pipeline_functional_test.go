@@ -426,6 +426,8 @@ func (p *PipelineFunctionalSuite) WithRunningPipeline(
 	testFunc func(pipeline Pipeline, updateChan chan State, errChan chan error, cancel context.CancelFunc),
 	pipelineConfig PipelineConfig,
 ) {
+	lockManager := storage.NewTestingLockManager()
+
 	p.core = NewCoreImpl(
 		p.logger,
 		p.executionResult,
@@ -441,6 +443,7 @@ func (p *PipelineFunctionalSuite) WithRunningPipeline(
 		p.persistentTxResultErrMsg,
 		p.persistentLatestSealedResult,
 		p.db,
+		lockManager,
 	)
 
 	pipelineStateConsumer := NewMockStateConsumer()

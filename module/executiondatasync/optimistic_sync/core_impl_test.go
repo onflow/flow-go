@@ -83,6 +83,8 @@ func (c *CoreImplSuite) createTestCoreImpl() *CoreImpl {
 	block := unittest.BlockFixture()
 	executionResult := unittest.ExecutionResultFixture(unittest.WithBlock(&block))
 
+	lockManager := storage.NewTestingLockManager()
+
 	core := NewCoreImpl(
 		c.logger,
 		executionResult,
@@ -98,6 +100,7 @@ func (c *CoreImplSuite) createTestCoreImpl() *CoreImpl {
 		c.persistentTxResultErrMsg,
 		c.latestPersistedSealedResult,
 		c.db,
+		lockManager,
 	)
 
 	return core

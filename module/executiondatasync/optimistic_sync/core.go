@@ -145,6 +145,7 @@ func NewCoreImpl(
 		inmemTxResultErrMsgs,
 		executionResult,
 		header,
+		lockManager,
 	)
 
 	persisterStores := []stores.PersisterStore{

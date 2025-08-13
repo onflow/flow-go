@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/jordanschalm/lockctx"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/storage"
 )
@@ -102,7 +103,7 @@ func (c *Collections) Store(collection *flow.Collection) (flow.LightCollection, 
 // already exists.
 //
 // No errors are expected during normal operation.
-func (c *Collections) StoreAndIndexByTransaction(collection *flow.Collection) (flow.LightCollection, error) {
+func (c *Collections) StoreAndIndexByTransaction(_ lockctx.Proof, collection *flow.Collection) (flow.LightCollection, error) {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
@@ -158,6 +159,6 @@ func (c *Collections) LightCollections() []flow.LightCollection {
 
 // BatchStoreAndIndexByTransaction stores a light collection and indexes it by transaction ID within a batch operation.
 // This method is not implemented and will always return an error.
-func (c *Collections) BatchStoreAndIndexByTransaction(_ *flow.Collection, _ storage.ReaderBatchWriter) (flow.LightCollection, error) {
+func (c *Collections) BatchStoreAndIndexByTransaction(_ lockctx.Proof, _ *flow.Collection, _ storage.ReaderBatchWriter) (flow.LightCollection, error) {
 	return flow.LightCollection{}, fmt.Errorf("not implemented")
 }
