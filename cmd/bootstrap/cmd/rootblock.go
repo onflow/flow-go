@@ -154,29 +154,30 @@ func rootBlock(cmd *cobra.Command, args []string) {
 	epochExtensionSet := cmd.Flags().Lookup("kvstore-epoch-extension-view-count").Changed
 
 	// Warn if KV store values were not set on mainnet/testnet
-	if (chainID == flow.Testnet || chainID == flow.Mainnet) &&
-		(!finalizationSet || !epochExtensionSet) {
-		log.Fatal().Msgf(
-			"KV store values (epoch extension view count and finalization safety threshold) must be explicitly set on the %q chain",
-			flagRootChain,
-		)
-	}
+	if chainID == flow.Testnet || chainID == flow.Mainnet {
+		if !finalizationSet || !epochExtensionSet {
+			log.Fatal().Msgf(
+				"KV store values (epoch extension view count and finalization safety threshold) must be explicitly set on the %q chain",
+				flagRootChain,
+			)
+		}
+	} else {
+		defaultEpochSafetyParams, err := protocol.DefaultEpochSafetyParams(chainID)
+		if err != nil {
+			log.Fatal().Err(err).Msgf("could not get default epoch commit safety parameters")
+		}
 
-	defaultEpochSafetyParams, err := protocol.DefaultEpochSafetyParams(chainID)
-	if err != nil {
-		log.Fatal().Err(err).Msgf("could not get default epoch commit safety parameters")
-	}
-
-	// Use default values for non-mainnet/testnet chains if not explicitly set
-	if !finalizationSet {
-		flagFinalizationSafetyThreshold = defaultEpochSafetyParams.FinalizationSafetyThreshold
-	}
-	if !epochExtensionSet {
-		flagEpochExtensionViewCount = defaultEpochSafetyParams.EpochExtensionViewCount
+		// Use default values for non-mainnet/testnet chains if not explicitly set
+		if !finalizationSet {
+			flagFinalizationSafetyThreshold = defaultEpochSafetyParams.FinalizationSafetyThreshold
+		}
+		if !epochExtensionSet {
+			flagEpochExtensionViewCount = defaultEpochSafetyParams.EpochExtensionViewCount
+		}
 	}
 
 	// validate epoch configs
-	err = validateEpochConfig()
+	err := validateEpochConfig()
 	if err != nil {
 		log.Fatal().Err(err).Msg("invalid or unsafe config for finalization safety threshold")
 	}
