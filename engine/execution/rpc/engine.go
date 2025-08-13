@@ -132,8 +132,6 @@ func New(
 	return eng
 }
 
-
-
 // serveWorker is a component.Component worker that runs the gRPC server.
 func (e *Engine) serveWorker(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 	e.log.Info().Msgf("starting server on address %s", e.config.ListenAddr)
