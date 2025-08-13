@@ -79,15 +79,16 @@ func (c *Collections) LightByTransactionID(txID flow.Identifier) (*flow.LightCol
 
 // Store inserts the collection keyed by ID and all constituent transactions.
 // No errors are expected during normal operation.
-func (c *Collections) Store(collection *flow.Collection) error {
+func (c *Collections) Store(collection *flow.Collection) (flow.LightCollection, error) {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
 	c.collections[collection.ID()] = collection
-	return nil
+	light := collection.Light()
+	return light, nil
 }
 
-// StoreLightAndIndexByTransaction inserts the light collection (only
+// StoreAndIndexByTransaction inserts the light collection (only
 // transaction IDs) and adds a transaction id index for each of the
 // transactions within the collection (transaction_id->collection_id).
 //
@@ -101,16 +102,17 @@ func (c *Collections) Store(collection *flow.Collection) error {
 // already exists.
 //
 // No errors are expected during normal operation.
-func (c *Collections) StoreLightAndIndexByTransaction(collection *flow.LightCollection) error {
+func (c *Collections) StoreAndIndexByTransaction(collection *flow.Collection) (flow.LightCollection, error) {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
-	c.lightCollections[collection.ID()] = collection
-	for _, txID := range collection.Transactions {
-		c.transactionIDToLightCollection[txID] = collection
+	light := collection.Light()
+	c.lightCollections[light.ID()] = &light
+	for _, txID := range light.Transactions {
+		c.transactionIDToLightCollection[txID] = &light
 	}
 
-	return nil
+	return light, nil
 }
 
 // Remove removes the collection and all constituent transactions.
@@ -154,8 +156,8 @@ func (c *Collections) LightCollections() []flow.LightCollection {
 	return out
 }
 
-// BatchStoreLightAndIndexByTransaction stores a light collection and indexes it by transaction ID within a batch operation.
+// BatchStoreAndIndexByTransaction stores a light collection and indexes it by transaction ID within a batch operation.
 // This method is not implemented and will always return an error.
-func (c *Collections) BatchStoreLightAndIndexByTransaction(_ *flow.LightCollection, _ storage.ReaderBatchWriter) error {
-	return fmt.Errorf("not implemented")
+func (c *Collections) BatchStoreAndIndexByTransaction(_ *flow.Collection, _ storage.ReaderBatchWriter) (flow.LightCollection, error) {
+	return flow.LightCollection{}, fmt.Errorf("not implemented")
 }
