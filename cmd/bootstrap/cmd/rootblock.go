@@ -4,6 +4,7 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"fmt"
+	"strconv"
 	"time"
 
 	"github.com/onflow/cadence"
@@ -19,6 +20,7 @@ import (
 	"github.com/onflow/flow-go/module/epochs"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/inmem"
+	"github.com/onflow/flow-go/state/protocol/protocol_state"
 	"github.com/onflow/flow-go/state/protocol/protocol_state/kvstore"
 )
 
@@ -32,6 +34,7 @@ var (
 	// Historically, this flag set a spork-scoped version number, by convention equal to the major software version.
 	// Now that we have HCUs which change the major software version mid-spork, this is no longer useful.
 	deprecatedFlagProtocolVersion   uint
+	flagKVStoreVersion              string
 	flagFinalizationSafetyThreshold uint64
 	flagEpochExtensionViewCount     uint64
 	flagCollectionClusters          uint
@@ -98,15 +101,15 @@ func addRootBlockCmdFlags() {
 	rootBlockCmd.Flags().StringVar(&flagRootTimestamp, "root-timestamp", time.Now().UTC().Format(time.RFC3339), "timestamp of the root block (RFC3339)")
 	rootBlockCmd.Flags().Uint64Var(&flagRootView, "root-view", 0, "view of the root block")
 	rootBlockCmd.Flags().UintVar(&deprecatedFlagProtocolVersion, "protocol-version", 0, "deprecated: this flag will be ignored and remove in a future release")
-	rootBlockCmd.Flags().Uint64Var(&flagFinalizationSafetyThreshold, "finalization-safety-threshold", 500, "defines finalization safety threshold")
-	rootBlockCmd.Flags().Uint64Var(&flagEpochExtensionViewCount, "epoch-extension-view-count", 100_000, "length of epoch extension in views, default is 100_000 which is approximately 1 day")
+	rootBlockCmd.Flags().Uint64Var(&flagFinalizationSafetyThreshold, "kvstore-finalization-safety-threshold", 0, "defines finalization safety threshold")
+	rootBlockCmd.Flags().Uint64Var(&flagEpochExtensionViewCount, "kvstore-epoch-extension-view-count", 0, "length of epoch extension in views, default is 100_000 which is approximately 1 day")
+	rootBlockCmd.Flags().StringVar(&flagKVStoreVersion, "kvstore-version", "default",
+		"protocol state KVStore version to initialize ('default' or an integer equal to a supported protocol version: '0', '1', '2', ...)")
 
 	cmd.MarkFlagRequired(rootBlockCmd, "root-chain")
 	cmd.MarkFlagRequired(rootBlockCmd, "root-parent")
 	cmd.MarkFlagRequired(rootBlockCmd, "root-height")
 	cmd.MarkFlagRequired(rootBlockCmd, "root-view")
-	cmd.MarkFlagRequired(rootBlockCmd, "finalization-safety-threshold")
-	cmd.MarkFlagRequired(rootBlockCmd, "epoch-extension-view-count")
 
 	// Epoch timing config - these values must be set identically to `EpochTimingConfig` in the FlowEpoch smart contract.
 	// See https://github.com/onflow/flow-core-contracts/blob/240579784e9bb8d97d91d0e3213614e25562c078/contracts/epochs/FlowEpoch.cdc#L259-L266
@@ -144,7 +147,33 @@ func rootBlock(cmd *cobra.Command, args []string) {
 
 	chainID := parseChainID(flagRootChain)
 	if (chainID == flow.Testnet || chainID == flow.Mainnet) && flagRootView == 0 {
-		log.Fatal().Msgf("--root-view must be non-zero for %q chain", flagRootChain)
+		log.Fatal().Msgf("--root-view must be non-zero on %q chain", flagRootChain)
+	}
+
+	finalizationSet := cmd.Flags().Lookup("kvstore-finalization-safety-threshold").Changed
+	epochExtensionSet := cmd.Flags().Lookup("kvstore-epoch-extension-view-count").Changed
+
+	// Warn if KV store values were not set on mainnet/testnet
+	if chainID == flow.Testnet || chainID == flow.Mainnet {
+		if !finalizationSet || !epochExtensionSet {
+			log.Fatal().Msgf(
+				"KV store values (epoch extension view count and finalization safety threshold) must be explicitly set on the %q chain",
+				flagRootChain,
+			)
+		}
+	} else {
+		defaultEpochSafetyParams, err := protocol.DefaultEpochSafetyParams(chainID)
+		if err != nil {
+			log.Fatal().Err(err).Msgf("could not get default epoch commit safety parameters")
+		}
+
+		// Use default values for non-mainnet/testnet chains if not explicitly set
+		if !finalizationSet {
+			flagFinalizationSafetyThreshold = defaultEpochSafetyParams.FinalizationSafetyThreshold
+		}
+		if !epochExtensionSet {
+			flagEpochExtensionViewCount = defaultEpochSafetyParams.EpochExtensionViewCount
+		}
 	}
 
 	// validate epoch configs
@@ -266,13 +295,30 @@ func rootBlock(cmd *cobra.Command, args []string) {
 		log.Fatal().Err(err).Msg("failed to construct epoch protocol state")
 	}
 
-	rootProtocolState, err := kvstore.NewDefaultKVStore(
-		flagFinalizationSafetyThreshold,
-		flagEpochExtensionViewCount,
-		minEpochStateEntry.ID(),
-	)
-	if err != nil {
-		log.Fatal().Err(err).Msg("failed to construct root kvstore")
+	var rootProtocolState protocol_state.KVStoreAPI
+	if flagKVStoreVersion != "default" {
+		kvStoreVersion, err := strconv.ParseUint(flagKVStoreVersion, 10, 64)
+		if err != nil {
+			log.Fatal().Err(err).Msgf("--kvstore-version must be a supported integer version number: (eg. '0', '1' or '2', etc.) got %s ", flagKVStoreVersion)
+		}
+		rootProtocolState, err = kvstore.NewKVStore(
+			kvStoreVersion,
+			flagFinalizationSafetyThreshold,
+			flagEpochExtensionViewCount,
+			minEpochStateEntry.ID(),
+		)
+		if err != nil {
+			log.Fatal().Err(err).Msgf("failed to construct root kvstore with version: %d", kvStoreVersion)
+		}
+	} else {
+		rootProtocolState, err = kvstore.NewDefaultKVStore(
+			flagFinalizationSafetyThreshold,
+			flagEpochExtensionViewCount,
+			minEpochStateEntry.ID(),
+		)
+		if err != nil {
+			log.Fatal().Err(err).Msg("failed to construct default root kvstore")
+		}
 	}
 	block, err := constructRootBlock(headerBody, rootProtocolState.ID())
 	if err != nil {

@@ -20,6 +20,9 @@ EPOCH_EXTENSION_LEN = 600
 # Spork root config
 ROOT_VIEW = 0
 
+KVSTORE_VERSION=default
+FINALIZATION_SAFETY_THRESHOLD=100
+
 validate:
 ifeq ($(strip $(VALID_EXECUTION)), 1)
 	# multiple execution nodes are required to prevent seals being generated in case of execution forking.
@@ -62,10 +65,11 @@ gen-bootstrap:
 		--epoch-length $(EPOCH_LEN) \
 		--epoch-staking-phase-length $(EPOCH_STAKING_PHASE_LEN) \
 		--epoch-dkg-phase-length $(DKG_PHASE_LEN) \
-		--epoch-extension-view-count=$(EPOCH_EXTENSION_LEN) \
+		--kvstore-version=$(KVSTORE_VERSION) \
+		--kvstore-epoch-extension-view-count=$(EPOCH_EXTENSION_LEN) \
+		--kvstore-finalization-safety-threshold=$(FINALIZATION_SAFETY_THRESHOLD)\
 		--collection-clusters 1 \
 		--protocol-version=0 \
-		--finalization-safety-threshold=100 \
 		--use-default-epoch-timing \
 		--config ../../../bootstrap/conf/node-config.json \
 		-o ../../../bootstrap/ \
