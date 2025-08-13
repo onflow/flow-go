@@ -637,9 +637,7 @@ func (m *mockStateTransition) Mock() protocol_statemock.OrthogonalStoreStateMach
 	stateMachine.On("Build").Run(func(args mock.Arguments) {
 		require.True(m.T, evolveStateCalled, "Method `OrthogonalStoreStateMachine.Build` called before `EvolveState`!")
 	}).Return([]storage.BlockIndexingBatchWrite{
-		func(blockID flow.Identifier, rw storage.ReaderBatchWriter) error {
-			return nil
-		},
+		func(blockID flow.Identifier, rw storage.ReaderBatchWriter) error { return nil },
 	}, nil).Once()
 	return *stateMachine //nolint:govet
 }
