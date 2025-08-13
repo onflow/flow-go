@@ -245,8 +245,11 @@ func (e *blockComputer) queueUserTransactions(
 	blockId flow.Identifier,
 	blockHeader *flow.Header,
 	rawCollections []*entity.CompleteCollection,
-	requestQueue chan TransactionRequest,
-) {
+	userTxCount int,
+) chan TransactionRequest {
+	txQueue := make(chan TransactionRequest, userTxCount)
+	defer close(txQueue)
+
 	txnIndex := uint32(0)
 	blockIdStr := blockId.String()
 
@@ -274,7 +277,7 @@ func (e *blockComputer) queueUserTransactions(
 		}
 
 		for i, txnBody := range collection.Transactions {
-			requestQueue <- newTransactionRequest(
+			txQueue <- newTransactionRequest(
 				collectionInfo,
 				collectionCtx,
 				collectionLogger,
@@ -284,6 +287,8 @@ func (e *blockComputer) queueUserTransactions(
 			txnIndex += 1
 		}
 	}
+
+	return txQueue
 }
 
 func (e *blockComputer) queueSystemTransactions(
@@ -292,14 +297,18 @@ func (e *blockComputer) queueSystemTransactions(
 	systemColection collectionInfo,
 	systemTxn *flow.TransactionBody,
 	executeCallbackTxs []*flow.TransactionBody,
-	requestQueue chan TransactionRequest,
 	txnIndex uint32,
 	systemLogger zerolog.Logger,
-) {
+) chan TransactionRequest {
+	// queue size for callback transactions + 1 system transaction (process callback already executed)
+	txQueue := make(chan TransactionRequest, len(executeCallbackTxs)+1)
+	defer close(txQueue)
+
 	allTxs := append(executeCallbackTxs, systemTxn)
 	// add execute callback transactions to the system collection info along to existing process transaction
-	systemCollectionInfo.CompleteCollection.Transactions = append(systemCollectionInfo.CompleteCollection.Transactions, allTxs...)
-	systemLogger = systemLogger.With().Uint32("num_txs", uint32(len(systemCollectionInfo.CompleteCollection.Transactions))).Logger()
+	systemTxs := systemColection.CompleteCollection.Transactions
+	systemColection.CompleteCollection.Transactions = append(systemTxs, allTxs...)
+	systemLogger = systemLogger.With().Uint32("num_txs", uint32(len(systemTxs))).Logger()
 
 	for i, txBody := range allTxs {
 		last := i == len(allTxs)-1
@@ -309,7 +318,7 @@ func (e *blockComputer) queueSystemTransactions(
 			ctx = systemChunkCtx
 		}
 
-		requestQueue <- newTransactionRequest(
+		txQueue <- newTransactionRequest(
 			systemColection,
 			ctx,
 			systemLogger,
@@ -320,6 +329,8 @@ func (e *blockComputer) queueSystemTransactions(
 
 		txnIndex++
 	}
+
+	return txQueue
 }
 
 func (e *blockComputer) executeBlock(
@@ -418,16 +429,12 @@ func (e *blockComputer) executeUserTransactions(
 	rawCollections []*entity.CompleteCollection,
 	userTxCount int,
 ) {
-	txQueue := make(chan TransactionRequest, userTxCount)
-
-	e.queueUserTransactions(
+	txQueue := e.queueUserTransactions(
 		block.ID(),
 		block.Block.Header,
 		rawCollections,
-		txQueue,
+		userTxCount,
 	)
-
-	close(txQueue)
 
 	e.executeQueue(blockSpan, database, txQueue)
 }
@@ -500,21 +507,15 @@ func (e *blockComputer) executeSystemTransactions(
 		txIndex++
 	}
 
-	// queue size for callback transactions + 1 system transaction (process callback already executed)
-	txQueue := make(chan TransactionRequest, len(callbackTxs)+1)
-
-	e.queueSystemTransactions(
+	txQueue := e.queueSystemTransactions(
 		callbackCtx,
 		systemChunkCtx,
 		systemCollectionInfo,
 		e.systemTxn,
 		callbackTxs,
-		txQueue,
 		txIndex,
 		systemLogger,
 	)
-
-	close(txQueue)
 
 	e.executeQueue(blockSpan, database, txQueue)
 
