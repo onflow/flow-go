@@ -191,7 +191,6 @@ func Bootstrap(
 
 		return nil
 	})
-
 	if err != nil {
 		return nil, fmt.Errorf("bootstrapping failed: %w", err)
 	}
