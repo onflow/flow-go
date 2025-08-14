@@ -24,7 +24,7 @@ func TestEpochSetupStoreAndRetrieve(t *testing.T) {
 		_, err := s.ByID(unittest.IdentifierFixture())
 		assert.ErrorIs(t, err, storage.ErrNotFound)
 
-		// s a setup in db
+		// store a setup in db
 		expected := unittest.EpochSetupFixture()
 		err = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 			return s.BatchStore(rw, expected)
