@@ -153,7 +153,7 @@ func InterfaceFromMessageCode(code MessageCode) (interface{}, string, error) {
 	switch code {
 	// consensus
 	case CodeBlockProposal:
-		return &flow.UntrustedProposal{}, what(&flow.UntrustedProposal{}), nil
+		return &messages.Proposal{}, what(&messages.Proposal{}), nil
 	case CodeBlockVote:
 		return &messages.BlockVote{}, what(&messages.BlockVote{}), nil
 	case CodeTimeoutObject:
@@ -161,7 +161,7 @@ func InterfaceFromMessageCode(code MessageCode) (interface{}, string, error) {
 
 	// cluster consensus
 	case CodeClusterBlockProposal:
-		return &cluster.UntrustedProposal{}, what(&cluster.UntrustedProposal{}), nil
+		return &messages.ClusterProposal{}, what(&messages.ClusterProposal{}), nil
 	case CodeClusterBlockVote:
 		return &messages.ClusterBlockVote{}, what(&messages.ClusterBlockVote{}), nil
 	case CodeClusterBlockResponse:

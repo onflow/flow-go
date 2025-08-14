@@ -1,8 +1,18 @@
 package messages
 
 import (
+	"github.com/onflow/flow-go/model/cluster"
 	"github.com/onflow/flow-go/model/flow"
 )
+
+// ClusterProposal is an untrusted signed cluster block proposal in
+// collection node cluster consensus.
+type ClusterProposal cluster.UntrustedProposal
+
+// TODO: ClusterProposal should implement UntrustedMessage interface
+func (p *ClusterProposal) ToInternal() (*cluster.Proposal, error) {
+	return cluster.NewProposal(cluster.UntrustedProposal(*p))
+}
 
 // CollectionRequest request all transactions from a collection with the given
 // fingerprint.
