@@ -16,17 +16,6 @@ import (
 	"github.com/onflow/flow-go/utils/logging"
 )
 
-// noOpLockContext is a no-op implementation of lockctx.Proof for in-memory operations
-type noOpLockContext struct{}
-
-func (n *noOpLockContext) HoldsLock(lockName string) bool {
-	return true // Always return true since this is a no-op context
-}
-
-func (n *noOpLockContext) Release() {
-	// No-op
-}
-
 // InMemoryIndexer handles indexing of block execution data in memory.
 // It stores data in unsynchronized in-memory caches that are designed
 // to be populated once before being read.
