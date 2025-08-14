@@ -361,8 +361,9 @@ func (h *MessageHub) sendOwnProposal(proposal *flow.ProposalHeader) error {
 		return fmt.Errorf("could not build proposal: %w", err)
 	}
 
+	message := (*messages.Proposal)(blockProposal)
 	// broadcast the proposal to consensus nodes
-	err = h.con.Publish(blockProposal, consRecipients.NodeIDs()...)
+	err = h.con.Publish(message, consRecipients.NodeIDs()...)
 	if err != nil {
 		if !errors.Is(err, network.EmptyTargetList) {
 			log.Err(err).Msg("could not send proposal message")
@@ -372,7 +373,7 @@ func (h *MessageHub) sendOwnProposal(proposal *flow.ProposalHeader) error {
 	log.Info().Msg("block proposal was broadcast")
 
 	// submit proposal to non-consensus nodes
-	h.provideProposal(blockProposal, allIdentities.Filter(filter.Not(filter.HasRole[flow.Identity](flow.RoleConsensus))))
+	h.provideProposal(message, allIdentities.Filter(filter.Not(filter.HasRole[flow.Identity](flow.RoleConsensus))))
 	h.engineMetrics.MessageSent(metrics.EngineConsensusMessageHub, metrics.MessageBlockProposal)
 
 	return nil
@@ -380,7 +381,7 @@ func (h *MessageHub) sendOwnProposal(proposal *flow.ProposalHeader) error {
 
 // provideProposal is used when we want to broadcast a local block to the rest  of the
 // network (non-consensus nodes).
-func (h *MessageHub) provideProposal(proposal *flow.UntrustedProposal, recipients flow.IdentityList) {
+func (h *MessageHub) provideProposal(proposal *messages.Proposal, recipients flow.IdentityList) {
 	header := proposal.Block.ToHeader()
 	blockID := header.ID()
 	log := h.log.With().
@@ -477,8 +478,9 @@ func (h *MessageHub) OnOwnProposal(proposal *flow.ProposalHeader, targetPublicat
 // messages. These cases must be logged and routed to a dedicated violation reporting consumer.
 func (h *MessageHub) Process(channel channels.Channel, originID flow.Identifier, message interface{}) error {
 	switch msg := message.(type) {
-	case *flow.UntrustedProposal:
-		proposal, err := flow.NewProposal(*msg)
+	// TODO(malleability immutable): Replace *messages.Proposal to *flow.Proposal and remove validation check when ToInternal() was added to decoder
+	case *messages.Proposal:
+		proposal, err := flow.NewProposal(flow.UntrustedProposal(*msg))
 		if err != nil {
 			// TODO(BFT, #7620): Replace this log statement with a call to the protocol violation consumer.
 			h.log.Warn().
@@ -489,7 +491,6 @@ func (h *MessageHub) Process(channel channels.Channel, originID flow.Identifier,
 				Err(err).Msgf("received invalid proposal message")
 			return nil
 		}
-
 		h.compliance.OnBlockProposal(flow.Slashable[*flow.Proposal]{
 			OriginID: originID,
 			Message:  proposal,

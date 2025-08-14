@@ -343,16 +343,17 @@ func (h *MessageHub) sendOwnProposal(proposal *flow.ProposalHeader) error {
 	}
 
 	// create the proposal message for the collection
-	proposalMsg := &cluster.UntrustedProposal{
+	blockProposal := &cluster.UntrustedProposal{
 		Block:           *block,
 		ProposerSigData: proposal.ProposerSigData,
 	}
-	if _, err = cluster.NewProposal(*proposalMsg); err != nil {
+	if _, err = cluster.NewProposal(*blockProposal); err != nil {
 		return fmt.Errorf("could not build cluster proposal: %w", err)
 	}
 
+	message := (*messages.ClusterProposal)(blockProposal)
 	// broadcast the proposal to consensus nodes
-	err = h.con.Publish(proposalMsg, recipients.NodeIDs()...)
+	err = h.con.Publish(message, recipients.NodeIDs()...)
 	if err != nil {
 		if !errors.Is(err, network.EmptyTargetList) {
 			log.Err(err).Msg("could not send proposal message")
@@ -442,8 +443,9 @@ func (h *MessageHub) OnOwnProposal(proposal *flow.ProposalHeader, targetPublicat
 // messages. These cases must be logged and routed to a dedicated violation reporting consumer.
 func (h *MessageHub) Process(channel channels.Channel, originID flow.Identifier, message interface{}) error {
 	switch msg := message.(type) {
-	case *cluster.UntrustedProposal:
-		proposal, err := cluster.NewProposal(*msg)
+	// TODO(malleability immutable): Replace *messages.ClusterProposal to *cluster.Proposal and remove validation check when ToInternal() was added to decoder
+	case *messages.ClusterProposal:
+		proposal, err := cluster.NewProposal(cluster.UntrustedProposal(*msg))
 		if err != nil {
 			// TODO(BFT, #7620): Replace this log statement with a call to the protocol violation consumer.
 			h.log.Warn().

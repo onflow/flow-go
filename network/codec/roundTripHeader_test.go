@@ -7,6 +7,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -24,13 +25,13 @@ import (
 func roundTripHeaderViaCodec(t *testing.T, codec network.Codec) {
 	block := unittest.BlockFixture()
 	proposal := unittest.ProposalFromBlock(block)
-	message := flow.UntrustedProposal(*proposal)
+	message := messages.Proposal(*proposal)
 	encoded, err := codec.Encode(&message)
 	assert.NoError(t, err)
 	decodedInterface, err := codec.Decode(encoded)
 	assert.NoError(t, err)
-	decoded := decodedInterface.(*flow.UntrustedProposal)
-	proposalTrusted, err := flow.NewProposal(*decoded)
+	decoded := decodedInterface.(*messages.Proposal)
+	proposalTrusted, err := flow.NewProposal(flow.UntrustedProposal(*decoded))
 	require.NoError(t, err)
 	decodedBlock := proposalTrusted.Block
 	// compare LastViewTC separately, because it is a pointer field
