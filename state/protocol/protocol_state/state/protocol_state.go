@@ -350,13 +350,12 @@ func (s *MutableProtocolState) build(
 			if err == nil {
 				return nil
 			}
-
-			// note, skip already existing error because the result might equal to an earlier known state (we explicitly want to de-duplicate)
-			if errors.Is(err, storage.ErrAlreadyExists) {
-				return nil
-			}
-
-			return err
+			// The only error that `ProtocolKVStore.BatchStore` might return is `storage.ErrDataMismatch`.
+			// Repeated requests to store the same state for the same id should be no-ops. It should be noted
+			// that the `resultingStateID` is a collision-resistant hash of the encoded state (including the
+			// state's version). Hence, mismatching data for the same id indicates a security-critical bug
+			// or state corruption, making continuation impossible.
+			return irrecoverable.NewExceptionf("unexpected error while trying to store new protocol state: %w", err)
 		})
 	}
 
