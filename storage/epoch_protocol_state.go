@@ -7,7 +7,7 @@ import (
 // EpochProtocolStateEntries represents persistent, fork-aware storage for the Epoch-related
 // sub-state of the overall of the overall Protocol State (KV Store).
 type EpochProtocolStateEntries interface {
-	// BatchStore returns persists the given epoch protocol state entry as part of a DB batch. Per convention, the identities in
+	// BatchStore persists the given epoch protocol state entry as part of a DB batch. Per convention, the identities in
 	// the flow.MinEpochStateEntry must be in canonical order for the current and next epoch (if present),
 	// otherwise an exception is returned.
 	// No errors are expected during normal operation.
