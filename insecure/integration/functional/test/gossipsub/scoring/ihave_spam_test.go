@@ -173,7 +173,7 @@ func TestGossipSubIHaveBrokenPromises_Below_Threshold(t *testing.T) {
 
 	// since spammer stays below the threshold, it should be able to exchange messages with the victim node over pubsub.
 	p2ptest.EnsurePubsubMessageExchange(t, ctx, nodes, blockTopic, 1, func() interface{} {
-		return (*flow.UntrustedProposal)(unittest.ProposalFixture())
+		return (*messages.Proposal)(unittest.ProposalFixture())
 	})
 }
 
