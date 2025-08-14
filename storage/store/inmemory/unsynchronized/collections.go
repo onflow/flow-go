@@ -107,6 +107,7 @@ func (c *Collections) StoreAndIndexByTransaction(_ lockctx.Proof, collection *fl
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
+	c.collections[collection.ID()] = collection
 	light := collection.Light()
 	c.lightCollections[light.ID()] = &light
 	for _, txID := range light.Transactions {

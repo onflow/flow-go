@@ -197,5 +197,15 @@ func (i *InMemoryIndexer) indexRegisters(registers map[ledger.Path]*ledger.Paylo
 func (i *InMemoryIndexer) indexCollection(lctx lockctx.Proof, collection *flow.Collection) error {
 	// Store the light collection and index by transaction
 	_, err := i.collections.StoreAndIndexByTransaction(lctx, collection)
-	return err
+	if err != nil {
+		return err
+	}
+
+	for _, tx := range collection.Transactions {
+		if err := i.transactions.Store(tx); err != nil {
+			return fmt.Errorf("could not index transaction: %w", err)
+		}
+	}
+
+	return nil
 }
