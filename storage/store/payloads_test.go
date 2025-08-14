@@ -26,7 +26,7 @@ func TestPayloadStoreRetrieve(t *testing.T) {
 		blockID := unittest.IdentifierFixture()
 		expected := unittest.PayloadFixture(unittest.WithAllTheFixins)
 
-		// s payload
+		// store payload
 		err := s.Store(blockID, &expected)
 		require.NoError(t, err)
 
