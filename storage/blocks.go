@@ -23,7 +23,9 @@ type Blocks interface {
 	BatchStoreWithStoringResults(rw ReaderBatchWriter, block *flow.Block, storingResults map[flow.Identifier]*flow.ExecutionResult) error
 
 	// ByID returns the block with the given hash. It is available for
-	// finalized and ambiguous blocks.
+// finalized and pending blocks.
+// Expected errors during normal operations:
+// - storage.ErrNotFound if no block is found
 	ByID(blockID flow.Identifier) (*flow.Block, error)
 
 	// ByHeight returns the block at the given height. It is only available for finalized blocks.
@@ -33,6 +35,10 @@ type Blocks interface {
 	ByHeight(height uint64) (*flow.Block, error)
 
 	// ByCollectionID returns the block for the given collection ID.
+	// ByCollectionID returns the *finalized** block that contains the collection with the given ID.
+	//
+	// Expected errors during normal operations:
+	// - storage.ErrNotFound if finalized block is known that contains the collection
 	ByCollectionID(collID flow.Identifier) (*flow.Block, error)
 
 	// IndexBlockForCollections indexes the block each collection was
