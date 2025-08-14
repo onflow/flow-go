@@ -26,7 +26,7 @@ func TestRetrieveWithoutStore(t *testing.T) {
 	})
 }
 
-// TestSealStoreRetrieve verifies that a seal can be sd and retrieved by its ID
+// TestSealStoreRetrieve verifies that a seal can be stored and retrieved by its ID
 func TestSealStoreRetrieve(t *testing.T) {
 	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
 		metrics := metrics.NewNoopCollector()

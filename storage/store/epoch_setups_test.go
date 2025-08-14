@@ -14,7 +14,7 @@ import (
 	"github.com/onflow/flow-go/storage/store"
 )
 
-// TestEpochSetupStoreAndRetrieve tests that a setup can be sd, retrieved and attempted to be sd again without an error
+// TestEpochSetupStoreAndRetrieve tests that a setup can be sd, retrieved and attempted to be stored again without an error
 func TestEpochSetupStoreAndRetrieve(t *testing.T) {
 	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
 		metrics := metrics.NewNoopCollector()
