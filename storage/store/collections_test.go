@@ -25,8 +25,15 @@ func TestCollections(t *testing.T) {
 		// create a collection with three transactions
 		expected := unittest.CollectionFixture(3)
 
+		// Create a lock manager and context for testing
+		lockManager := storage.NewTestingLockManager()
+		lctx := lockManager.NewContext()
+		err := lctx.AcquireLock(storage.LockInsertCollection)
+		require.NoError(t, err)
+		defer lctx.Release()
+
 		// store the collection and the transaction index
-		_, err := collections.StoreAndIndexByTransaction(&expected)
+		_, err = collections.StoreAndIndexByTransaction(lctx, &expected)
 		require.NoError(t, err)
 
 		// retrieve the light collection by collection id
@@ -84,12 +91,19 @@ func TestCollections_IndexDuplicateTx(t *testing.T) {
 		col2Tx := col2.Transactions[0] // transaction that's only in col2
 		col2.Transactions = append(col2.Transactions, dupTx)
 
+		// Create a lock manager and context for testing
+		lockManager := storage.NewTestingLockManager()
+		lctx := lockManager.NewContext()
+		err := lctx.AcquireLock(storage.LockInsertCollection)
+		require.NoError(t, err)
+		defer lctx.Release()
+
 		// insert col1
-		_, err := collections.StoreAndIndexByTransaction(&col1)
+		_, err = collections.StoreAndIndexByTransaction(lctx, &col1)
 		require.NoError(t, err)
 
 		// insert col2
-		_, err = collections.StoreAndIndexByTransaction(&col2)
+		_, err = collections.StoreAndIndexByTransaction(lctx, &col2)
 		require.NoError(t, err)
 
 		// should be able to retrieve col2 by ID
@@ -128,6 +142,13 @@ func TestCollections_ConcurrentIndexByTx(t *testing.T) {
 		sharedTx := col1.Transactions[0] // The shared transaction
 		col2.Transactions[0] = sharedTx
 
+		// Create a lock manager and context for testing
+		lockManager := storage.NewTestingLockManager()
+		lctx := lockManager.NewContext()
+		err := lctx.AcquireLock(storage.LockInsertCollection)
+		require.NoError(t, err)
+		defer lctx.Release()
+
 		var wg sync.WaitGroup
 		errChan := make(chan error, 2*numCollections)
 
@@ -138,7 +159,7 @@ func TestCollections_ConcurrentIndexByTx(t *testing.T) {
 			for i := 0; i < numCollections; i++ {
 				col := unittest.CollectionFixture(1)
 				col.Transactions[0] = sharedTx // Ensure it shares the same transaction
-				_, err := collections.StoreAndIndexByTransaction(&col)
+				_, err := collections.StoreAndIndexByTransaction(lctx, &col)
 				errChan <- err
 			}
 		}()
@@ -150,7 +171,7 @@ func TestCollections_ConcurrentIndexByTx(t *testing.T) {
 			for i := 0; i < numCollections; i++ {
 				col := unittest.CollectionFixture(1)
 				col.Transactions[0] = sharedTx // Ensure it shares the same transaction
-				_, err := collections.StoreAndIndexByTransaction(&col)
+				_, err := collections.StoreAndIndexByTransaction(lctx, &col)
 				errChan <- err
 			}
 		}()

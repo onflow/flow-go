@@ -3,8 +3,9 @@
 package mock
 
 import (
-	"github.com/jordanschalm/lockctx"
+	lockctx "github.com/jordanschalm/lockctx"
 	flow "github.com/onflow/flow-go/model/flow"
+
 	mock "github.com/stretchr/testify/mock"
 
 	storage "github.com/onflow/flow-go/storage"

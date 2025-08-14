@@ -3,6 +3,7 @@ package mocks
 import (
 	"fmt"
 
+	"github.com/jordanschalm/lockctx"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/storage"
 )
@@ -57,10 +58,10 @@ func (m *MockCollectionStore) BatchStoreLightAndIndexByTransaction(_ *flow.Light
 	panic("BatchStoreLightAndIndexByTransaction not implemented")
 }
 
-func (m *MockCollectionStore) StoreAndIndexByTransaction(collection *flow.Collection) (flow.LightCollection, error) {
+func (m *MockCollectionStore) StoreAndIndexByTransaction(_ lockctx.Proof, collection *flow.Collection) (flow.LightCollection, error) {
 	panic("StoreAndIndexByTransaction not implemented")
 }
 
-func (m *MockCollectionStore) BatchStoreAndIndexByTransaction(collection *flow.Collection, batch storage.ReaderBatchWriter) (flow.LightCollection, error) {
+func (m *MockCollectionStore) BatchStoreAndIndexByTransaction(_ lockctx.Proof, collection *flow.Collection, batch storage.ReaderBatchWriter) (flow.LightCollection, error) {
 	panic("BatchStoreAndIndexByTransaction not implemented")
 }

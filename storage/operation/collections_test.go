@@ -80,8 +80,10 @@ func TestCollections(t *testing.T) {
 			transactionID := unittest.IdentifierFixture()
 			actual := flow.Identifier{}
 
+			_, lctx := unittest.LockManagerWithContext(t, storage.LockInsertCollection)
+			defer lctx.Release()
 			_ = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-				err := operation.UnsafeIndexCollectionByTransaction(rw.Writer(), transactionID, expected)
+				err := operation.IndexCollectionByTransaction(lctx, rw.Writer(), transactionID, expected)
 				assert.NoError(t, err)
 				return nil
 			})
