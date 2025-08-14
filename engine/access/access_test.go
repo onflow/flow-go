@@ -726,13 +726,14 @@ func (suite *Suite) TestGetSealedTransaction() {
 
 		collectionSyncer := ingestion.NewCollectionSyncer(
 			suite.log,
-			collectionExecutedMetric,
+			module.CollectionExecutedMetric(collectionExecutedMetric),
 			suite.request,
 			suite.state,
 			all.Blocks,
 			collections,
 			transactions,
 			lastFullBlockHeight,
+			storage.NewTestingLockManager(),
 		)
 
 		ingestEng, err := ingestion.New(
@@ -785,7 +786,13 @@ func (suite *Suite) TestGetSealedTransaction() {
 		// 3. Request engine is used to request missing collection
 		suite.request.On("EntityByID", collection.ID(), mock.Anything).Return()
 		// 4. Indexer IndexCollection receives the requested collection and all the execution receipts
-		err = indexer.IndexCollection(collection, collections, transactions, suite.log, collectionExecutedMetric)
+		// Create a lock context for indexing
+		indexLctx := storage.NewTestingLockManager().NewContext()
+		lockErr := indexLctx.AcquireLock(storage.LockInsertCollection)
+		require.NoError(suite.T(), lockErr)
+		defer indexLctx.Release()
+
+		err = indexer.IndexCollection(indexLctx, collection, collections, suite.log, module.CollectionExecutedMetric(collectionExecutedMetric))
 		require.NoError(suite.T(), err)
 
 		for _, r := range executionReceipts {
@@ -877,7 +884,7 @@ func (suite *Suite) TestGetTransactionResult() {
 		storedb := badgerimpl.ToDB(db)
 		transactions := store.NewTransactions(metrics, storedb)
 		collections := store.NewCollections(storedb, transactions)
-		err := collections.Store(collectionNegative)
+		_, err := collections.Store(collectionNegative)
 		require.NoError(suite.T(), err)
 		collectionsToMarkFinalized, err := stdmap.NewTimes(100)
 		require.NoError(suite.T(), err)
@@ -943,13 +950,14 @@ func (suite *Suite) TestGetTransactionResult() {
 
 		collectionSyncer := ingestion.NewCollectionSyncer(
 			suite.log,
-			collectionExecutedMetric,
+			module.CollectionExecutedMetric(collectionExecutedMetric),
 			suite.request,
 			suite.state,
 			all.Blocks,
 			collections,
 			transactions,
 			lastFullBlockHeight,
+			storage.NewTestingLockManager(),
 		)
 
 		ingestEng, err := ingestion.New(
@@ -990,7 +998,13 @@ func (suite *Suite) TestGetTransactionResult() {
 			ingestEng.OnFinalizedBlock(mb)
 
 			// Indexer IndexCollection receives the requested collection and all the execution receipts
-			err = indexer.IndexCollection(collection, collections, transactions, suite.log, collectionExecutedMetric)
+			// Create a lock context for indexing
+			indexLctx := storage.NewTestingLockManager().NewContext()
+			lockErr := indexLctx.AcquireLock(storage.LockInsertCollection)
+			require.NoError(suite.T(), lockErr)
+			defer indexLctx.Release()
+
+			err = indexer.IndexCollection(indexLctx, collection, collections, suite.log, module.CollectionExecutedMetric(collectionExecutedMetric))
 			require.NoError(suite.T(), err)
 
 			for _, r := range executionReceipts {
@@ -1209,13 +1223,14 @@ func (suite *Suite) TestExecuteScript() {
 
 		collectionSyncer := ingestion.NewCollectionSyncer(
 			suite.log,
-			collectionExecutedMetric,
+			module.CollectionExecutedMetric(collectionExecutedMetric),
 			suite.request,
 			suite.state,
 			all.Blocks,
 			all.Collections,
 			all.Transactions,
 			lastFullBlockHeight,
+			storage.NewTestingLockManager(),
 		)
 
 		ingestEng, err := ingestion.New(
