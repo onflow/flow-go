@@ -12,9 +12,9 @@ import (
 // TODO maybe rename to `ProtocolStateSnapshots` (?) because at this low level, we are not exposing the
 // KV-store, it is just an encoded data blob
 type ProtocolKVStore interface {
-	// BatchStore persists the KV-store snapshot in the database using the given ID as key. 
+	// BatchStore persists the KV-store snapshot in the database using the given ID as key.
 	// BatchStore is idempotent, i.e. it accepts repeated calls with the same pairs of (stateID, kvStore).
-	// Here, the ID is expected to be a collision-resistant hash of the snapshot (including the 
+	// Here, the ID is expected to be a collision-resistant hash of the snapshot (including the
 	// ProtocolStateVersion). Hence, for the same ID (key), BatchStore will reject changing the data (value).
 	// Expected errors during normal operations:
 	// - storage.ErrDataMismatch if a KV store for the given stateID has already been indexed, but different
@@ -22,7 +22,7 @@ type ProtocolKVStore interface {
 
 	// BatchIndex appends the following operation to the provided write batch:
 	// we extend the map from `blockID` to `stateID`, where `blockID` references the
-	// block that _proposes_ updated key-value store. 
+	// block that _proposes_ updated key-value store.
 	// BatchIndex is idempotent, i.e. it accepts repeated calls with the same pairs of (blockID , stateID).
 	// Per protocol convention, the block references the `stateID`. As the `blockID` is a collision-resistant hash,
 	// for the same `blockID`, BatchIndex will reject changing the data.

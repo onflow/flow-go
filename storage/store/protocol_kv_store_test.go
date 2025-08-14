@@ -48,8 +48,8 @@ func TestKeyValueStoreStorage(t *testing.T) {
 
 // TestProtocolKVStore_StoreTx tests that StoreTx handles storage request correctly, when a snapshot with
 // the given id has already been  stored:
-//  - if the KV-store snapshot is exactly the same as the one already stored (incl. the version),  `BatchStore` should return without an error
-//  - if we request to store a _different_  KV-store snapshot, an `storage.ErrDataMismatch` should be returned.
+//   - if the KV-store snapshot is exactly the same as the one already stored (incl. the version),  `BatchStore` should return without an error
+//   - if we request to store a _different_  KV-store snapshot, an `storage.ErrDataMismatch` should be returned.
 func TestProtocolKVStore_StoreTx(t *testing.T) {
 	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
 		metrics := metrics.NewNoopCollector()
@@ -98,8 +98,8 @@ func TestProtocolKVStore_StoreTx(t *testing.T) {
 
 // TestProtocolKVStore_IndexTx tests that IndexTx handles storage request correctly, when a snapshot with
 // the given id has already been indexed:
-//  - if the KV-store ID is exactly the same as the one already indexed,  `BatchIndex` should return without an error
-//  - if we request to index a different ID, an `storage.ErrDataMismatch` should be returned.
+//   - if the KV-store ID is exactly the same as the one already indexed,  `BatchIndex` should return without an error
+//   - if we request to index a different ID, an `storage.ErrDataMismatch` should be returned.
 func TestProtocolKVStore_IndexTx(t *testing.T) {
 	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
 		metrics := metrics.NewNoopCollector()
