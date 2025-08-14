@@ -32,7 +32,7 @@ type EventsAPI interface {
 		endHeight uint64,
 		requiredEventEncodingVersion entities.EventEncodingVersion,
 		execStateQuery *entities.ExecutionStateQuery,
-	) ([]flow.BlockEvents, error)
+	) ([]flow.BlockEvents, entities.ExecutorMetadata, error)
 
 	GetEventsForBlockIDs(
 		ctx context.Context,
@@ -40,7 +40,7 @@ type EventsAPI interface {
 		blockIDs []flow.Identifier,
 		requiredEventEncodingVersion entities.EventEncodingVersion,
 		execStateQuery *entities.ExecutionStateQuery,
-	) ([]flow.BlockEvents, error)
+	) ([]flow.BlockEvents, entities.ExecutorMetadata, error)
 }
 
 type ScriptsAPI interface {

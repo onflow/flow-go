@@ -554,64 +554,78 @@ func (_m *API) GetCollectionByID(ctx context.Context, id flow.Identifier) (*flow
 	return r0, r1
 }
 
-// GetEventsForBlockIDs provides a mock function with given fields: ctx, eventType, blockIDs, requiredEventEncodingVersion
-func (_m *API) GetEventsForBlockIDs(ctx context.Context, eventType string, blockIDs []flow.Identifier, requiredEventEncodingVersion entities.EventEncodingVersion) ([]flow.BlockEvents, error) {
-	ret := _m.Called(ctx, eventType, blockIDs, requiredEventEncodingVersion)
+// GetEventsForBlockIDs provides a mock function with given fields: ctx, eventType, blockIDs, requiredEventEncodingVersion, execStateQuery
+func (_m *API) GetEventsForBlockIDs(ctx context.Context, eventType string, blockIDs []flow.Identifier, requiredEventEncodingVersion entities.EventEncodingVersion, execStateQuery *entities.ExecutionStateQuery) ([]flow.BlockEvents, entities.ExecutorMetadata, error) {
+	ret := _m.Called(ctx, eventType, blockIDs, requiredEventEncodingVersion, execStateQuery)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetEventsForBlockIDs")
 	}
 
 	var r0 []flow.BlockEvents
-	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, []flow.Identifier, entities.EventEncodingVersion) ([]flow.BlockEvents, error)); ok {
-		return rf(ctx, eventType, blockIDs, requiredEventEncodingVersion)
+	var r1 entities.ExecutorMetadata
+	var r2 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, []flow.Identifier, entities.EventEncodingVersion, *entities.ExecutionStateQuery) ([]flow.BlockEvents, entities.ExecutorMetadata, error)); ok {
+		return rf(ctx, eventType, blockIDs, requiredEventEncodingVersion, execStateQuery)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, string, []flow.Identifier, entities.EventEncodingVersion) []flow.BlockEvents); ok {
-		r0 = rf(ctx, eventType, blockIDs, requiredEventEncodingVersion)
+	if rf, ok := ret.Get(0).(func(context.Context, string, []flow.Identifier, entities.EventEncodingVersion, *entities.ExecutionStateQuery) []flow.BlockEvents); ok {
+		r0 = rf(ctx, eventType, blockIDs, requiredEventEncodingVersion, execStateQuery)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]flow.BlockEvents)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, string, []flow.Identifier, entities.EventEncodingVersion) error); ok {
-		r1 = rf(ctx, eventType, blockIDs, requiredEventEncodingVersion)
+	if rf, ok := ret.Get(1).(func(context.Context, string, []flow.Identifier, entities.EventEncodingVersion, *entities.ExecutionStateQuery) entities.ExecutorMetadata); ok {
+		r1 = rf(ctx, eventType, blockIDs, requiredEventEncodingVersion, execStateQuery)
 	} else {
-		r1 = ret.Error(1)
+		r1 = ret.Get(1).(entities.ExecutorMetadata)
 	}
 
-	return r0, r1
+	if rf, ok := ret.Get(2).(func(context.Context, string, []flow.Identifier, entities.EventEncodingVersion, *entities.ExecutionStateQuery) error); ok {
+		r2 = rf(ctx, eventType, blockIDs, requiredEventEncodingVersion, execStateQuery)
+	} else {
+		r2 = ret.Error(2)
+	}
+
+	return r0, r1, r2
 }
 
-// GetEventsForHeightRange provides a mock function with given fields: ctx, eventType, startHeight, endHeight, requiredEventEncodingVersion
-func (_m *API) GetEventsForHeightRange(ctx context.Context, eventType string, startHeight uint64, endHeight uint64, requiredEventEncodingVersion entities.EventEncodingVersion) ([]flow.BlockEvents, error) {
-	ret := _m.Called(ctx, eventType, startHeight, endHeight, requiredEventEncodingVersion)
+// GetEventsForHeightRange provides a mock function with given fields: ctx, eventType, startHeight, endHeight, requiredEventEncodingVersion, execStateQuery
+func (_m *API) GetEventsForHeightRange(ctx context.Context, eventType string, startHeight uint64, endHeight uint64, requiredEventEncodingVersion entities.EventEncodingVersion, execStateQuery *entities.ExecutionStateQuery) ([]flow.BlockEvents, entities.ExecutorMetadata, error) {
+	ret := _m.Called(ctx, eventType, startHeight, endHeight, requiredEventEncodingVersion, execStateQuery)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetEventsForHeightRange")
 	}
 
 	var r0 []flow.BlockEvents
-	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, uint64, uint64, entities.EventEncodingVersion) ([]flow.BlockEvents, error)); ok {
-		return rf(ctx, eventType, startHeight, endHeight, requiredEventEncodingVersion)
+	var r1 entities.ExecutorMetadata
+	var r2 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, uint64, uint64, entities.EventEncodingVersion, *entities.ExecutionStateQuery) ([]flow.BlockEvents, entities.ExecutorMetadata, error)); ok {
+		return rf(ctx, eventType, startHeight, endHeight, requiredEventEncodingVersion, execStateQuery)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, string, uint64, uint64, entities.EventEncodingVersion) []flow.BlockEvents); ok {
-		r0 = rf(ctx, eventType, startHeight, endHeight, requiredEventEncodingVersion)
+	if rf, ok := ret.Get(0).(func(context.Context, string, uint64, uint64, entities.EventEncodingVersion, *entities.ExecutionStateQuery) []flow.BlockEvents); ok {
+		r0 = rf(ctx, eventType, startHeight, endHeight, requiredEventEncodingVersion, execStateQuery)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]flow.BlockEvents)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, string, uint64, uint64, entities.EventEncodingVersion) error); ok {
-		r1 = rf(ctx, eventType, startHeight, endHeight, requiredEventEncodingVersion)
+	if rf, ok := ret.Get(1).(func(context.Context, string, uint64, uint64, entities.EventEncodingVersion, *entities.ExecutionStateQuery) entities.ExecutorMetadata); ok {
+		r1 = rf(ctx, eventType, startHeight, endHeight, requiredEventEncodingVersion, execStateQuery)
 	} else {
-		r1 = ret.Error(1)
+		r1 = ret.Get(1).(entities.ExecutorMetadata)
 	}
 
-	return r0, r1
+	if rf, ok := ret.Get(2).(func(context.Context, string, uint64, uint64, entities.EventEncodingVersion, *entities.ExecutionStateQuery) error); ok {
+		r2 = rf(ctx, eventType, startHeight, endHeight, requiredEventEncodingVersion, execStateQuery)
+	} else {
+		r2 = ret.Error(2)
+	}
+
+	return r0, r1, r2
 }
 
 // GetExecutionResultByID provides a mock function with given fields: ctx, id
