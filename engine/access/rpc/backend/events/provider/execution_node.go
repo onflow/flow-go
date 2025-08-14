@@ -48,10 +48,11 @@ func (e *ENEventProvider) Events(
 	ctx context.Context,
 	blocks []BlockMetadata,
 	eventType flow.EventType,
-	encoding entities.EventEncodingVersion,
-) (Response, error) {
+	encodingVersion entities.EventEncodingVersion,
+	_ *entities.ExecutionStateQuery,
+) (Response, entities.ExecutorMetadata, error) {
 	if len(blocks) == 0 {
-		return Response{}, nil
+		return Response{}, entities.ExecutorMetadata{}, nil
 	}
 
 	// create an execution API request for events at block ID
@@ -73,14 +74,16 @@ func (e *ENEventProvider) Events(
 		lastBlockID,
 	)
 	if err != nil {
-		return Response{}, rpc.ConvertError(err, "failed to get execution nodes for events query", codes.Internal)
+		return Response{}, entities.ExecutorMetadata{},
+			rpc.ConvertError(err, "failed to get execution nodes for events query", codes.Internal)
 	}
 
 	var resp *execproto.GetEventsForBlockIDsResponse
 	var successfulNode *flow.IdentitySkeleton
 	resp, successfulNode, err = e.getEventsFromAnyExeNode(ctx, execNodes, req)
 	if err != nil {
-		return Response{}, rpc.ConvertError(err, "failed to get execution nodes for events query", codes.Internal)
+		return Response{}, entities.ExecutorMetadata{},
+			rpc.ConvertError(err, "failed to get execution nodes for events query", codes.Internal)
 	}
 	e.log.Trace().
 		Str("execution_id", successfulNode.String()).
@@ -92,15 +95,16 @@ func (e *ENEventProvider) Events(
 		resp.GetResults(),
 		blocks,
 		resp.GetEventEncodingVersion(),
-		encoding,
+		encodingVersion,
 	)
 	if err != nil {
-		return Response{}, status.Errorf(codes.Internal, "failed to verify retrieved events from execution node: %v", err)
+		return Response{}, entities.ExecutorMetadata{},
+			status.Errorf(codes.Internal, "failed to verify retrieved events from execution node: %v", err)
 	}
 
 	return Response{
 		Events: results,
-	}, nil
+	}, entities.ExecutorMetadata{}, nil
 }
 
 // getEventsFromAnyExeNode retrieves the given events from any EN in `execNodes`.

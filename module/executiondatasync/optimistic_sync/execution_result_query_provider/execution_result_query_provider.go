@@ -19,7 +19,7 @@ var DefaultCriteria = optimistic_sync.Criteria{
 	AgreeingExecutorsCount: 2,
 }
 
-var _ optimistic_sync.ExecutionResultQueryProvider = (*ExecutionResultQueryProvider)(nil)
+var _ optimistic_sync.ExecutionResultProvider = (*ExecutionResultQueryProvider)(nil)
 
 // ExecutionResultQueryProvider is a container for elements required to retrieve
 // execution results and execution node identities for a given block ID based on specified criteria.
@@ -77,7 +77,7 @@ func NewExecutionResultQueryProvider(
 //
 // Expected errors during normal operations:
 //   - backend.InsufficientExecutionReceipts - found insufficient receipts for given block ID.
-func (e *ExecutionResultQueryProvider) ExecutionResultQuery(blockID flow.Identifier, criteria optimistic_sync.Criteria) (*optimistic_sync.Query, error) {
+func (e *ExecutionResultQueryProvider) ExecutionResult(blockID flow.Identifier, criteria optimistic_sync.Criteria) (*optimistic_sync.ExecutionResultInfo, error) {
 	executorIdentities, err := e.state.Final().Identities(filter.HasRole[flow.Identity](flow.RoleExecution))
 	if err != nil {
 		return nil, fmt.Errorf("failed to retrieve execution IDs for root block: %w", err)
@@ -91,7 +91,7 @@ func (e *ExecutionResultQueryProvider) ExecutionResultQuery(blockID flow.Identif
 			return nil, fmt.Errorf("failed to choose execution nodes for root block ID %v: %w", e.rootBlockID, err)
 		}
 
-		return &optimistic_sync.Query{
+		return &optimistic_sync.ExecutionResultInfo{
 			ExecutionResult: e.rootBlockResult,
 			ExecutionNodes:  subsetENs,
 		}, nil
@@ -120,7 +120,7 @@ func (e *ExecutionResultQueryProvider) ExecutionResultQuery(blockID flow.Identif
 		return nil, fmt.Errorf("no execution nodes found for result %v (blockID: %v): %w", result.ID(), blockID, err)
 	}
 
-	return &optimistic_sync.Query{
+	return &optimistic_sync.ExecutionResultInfo{
 		ExecutionResult: result,
 		ExecutionNodes:  subsetENs,
 	}, nil

@@ -35,9 +35,10 @@ func (f *FailoverEventProvider) Events(
 	ctx context.Context,
 	blocks []BlockMetadata,
 	eventType flow.EventType,
-	encoding entities.EventEncodingVersion,
-) (Response, error) {
-	localEvents, localErr := f.localProvider.Events(ctx, blocks, eventType, encoding)
+	encodingVersion entities.EventEncodingVersion,
+	executionState *entities.ExecutionStateQuery,
+) (Response, entities.ExecutorMetadata, error) {
+	localEvents, metadata, localErr := f.localProvider.Events(ctx, blocks, eventType, encodingVersion, executionState)
 	if localErr != nil {
 		f.log.Debug().Err(localErr).
 			Msg("failed to get events from local storage. will try to get them from execution node")
@@ -46,16 +47,16 @@ func (f *FailoverEventProvider) Events(
 	}
 
 	if len(localEvents.MissingBlocks) == 0 {
-		return localEvents, nil
+		return localEvents, metadata, nil
 	}
 
 	f.log.Debug().
 		Int("missing_blocks", len(localEvents.MissingBlocks)).
 		Msg("querying execution nodes for events from missing blocks")
 
-	execNodeEvents, execNodeErr := f.execNodeProvider.Events(ctx, localEvents.MissingBlocks, eventType, encoding)
+	execNodeEvents, _, execNodeErr := f.execNodeProvider.Events(ctx, localEvents.MissingBlocks, eventType, encodingVersion, executionState)
 	if execNodeErr != nil {
-		return Response{}, execNodeErr
+		return Response{}, metadata, execNodeErr
 	}
 
 	// sort ascending by block height
@@ -71,5 +72,5 @@ func (f *FailoverEventProvider) Events(
 
 	return Response{
 		Events: combinedEvents,
-	}, nil
+	}, metadata, nil
 }
