@@ -4,6 +4,7 @@ import (
 	"math"
 
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/state/protocol"
 )
 
 // rateLimiter implements payer-based rate limiting. See Config for details.
@@ -111,4 +112,87 @@ func (limiter *rateLimiter) shouldRateLimit(tx *flow.TransactionBody) bool {
 	}
 
 	return false
+}
+
+// BySealingLagRateLimiter implements collection throttling based on the sealing lag.
+// It can be configured to allow a minimum and maximum sealing lag, as well as a halving interval.
+type BySealingLagRateLimiter struct {
+	state                 protocol.State
+	minSealingLag         uint
+	maxSealingLag         uint
+	halvingInterval       uint
+	minCollectionSize     uint
+	maxCollectionSize     uint
+	currentCollectionSize uint
+}
+
+// NewBySealingLagRateLimiter creates a new BySealingLagRateLimiter instance.
+// No errors are expected during normal operations.
+func NewBySealingLagRateLimiter(
+	state protocol.State,
+	minSealingLag uint,
+	maxSealingLag uint,
+	halvingInterval uint,
+	minCollectionSize uint,
+	maxCollectionSize uint,
+) (*BySealingLagRateLimiter, error) {
+	limiter := &BySealingLagRateLimiter{
+		state:             state,
+		minSealingLag:     minSealingLag,
+		maxSealingLag:     maxSealingLag,
+		halvingInterval:   halvingInterval,
+		minCollectionSize: minCollectionSize,
+		maxCollectionSize: maxCollectionSize,
+	}
+	err := limiter.update()
+	if err != nil {
+		return nil, err
+	}
+	return limiter, nil
+}
+
+// update updates the current collection size based on the sealing lag.
+func (limiter *BySealingLagRateLimiter) update() error {
+	lastFinalized, err := limiter.state.Final().Head()
+	if err != nil {
+		return err
+	}
+	lastSealed, err := limiter.state.Sealed().Head()
+	if err != nil {
+		return err
+	}
+	sealingLag := uint(lastFinalized.Height - lastSealed.Height)
+	limiter.currentCollectionSize = StepHalving(
+		[2]uint{limiter.minSealingLag, limiter.maxSealingLag},         // [minSealingLag, maxSealingLag] is the range of input values where the halving is applied
+		[2]uint{limiter.minCollectionSize, limiter.maxCollectionSize}, // [minCollectionSize, maxCollectionSize] is the range of collection sizes that halving function outputs
+		sealingLag,              // the current sealing lag
+		limiter.halvingInterval, // interval in blocks in which the halving is applied
+	)
+	return nil
+}
+
+// MaxCollectionSize returns the maximum size of a collection that this rate limiter allows.
+func (limiter *BySealingLagRateLimiter) MaxCollectionSize() uint {
+	return limiter.currentCollectionSize
+}
+
+// StepHalving applies a step halving algorithm to determine the maximum collection size based on the sealing lag.
+// minValue is the minimum collection size, maxValue is the maximum collection size,
+func StepHalving(xBounds, yBounds [2]uint, x, interval uint) uint {
+	if x <= xBounds[0] {
+		return yBounds[1]
+	}
+	if x >= xBounds[1] {
+		return yBounds[0]
+	}
+	x = x - xBounds[0] // normalize x to start from 0
+	halvings := x / interval
+	if x <= 0 {
+		return yBounds[1]
+	}
+	result := uint(float64(yBounds[1]) / math.Pow(2, float64(halvings)))
+	if result < yBounds[0] {
+		return yBounds[0]
+	}
+	return result
 }
