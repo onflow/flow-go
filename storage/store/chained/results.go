@@ -15,7 +15,7 @@ type ChainedExecutionResults struct {
 
 var _ storage.ExecutionResultsReader = (*ChainedExecutionResults)(nil)
 
-// NewResults returns a new ChainedExecutionResults results store, which will handle reads. which only implements
+// NewExecutionResults returns a new ChainedExecutionResults results store, which will handle reads. which only implements
 // read operations
 // for reads, it first query the first database, then the second database, this is useful when migrating
 // data from badger to pebble
