@@ -12,6 +12,13 @@ type DKGMessage struct {
 	DKGInstanceID string
 }
 
+var _ UntrustedMessage = (*DKGMessage)(nil)
+
+func (dkg *DKGMessage) ToInternal() (any, error) {
+	// Temporary: just return the unvalidated wire struct
+	return dkg, nil
+}
+
 // NewDKGMessage creates a new DKGMessage.
 func NewDKGMessage(data []byte, dkgInstanceID string) DKGMessage {
 	return DKGMessage{

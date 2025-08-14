@@ -14,6 +14,13 @@ type EntityRequest struct {
 	EntityIDs []flow.Identifier
 }
 
+var _ UntrustedMessage = (*EntityRequest)(nil)
+
+func (er *EntityRequest) ToInternal() (any, error) {
+	// Temporary: just return the unvalidated wire struct
+	return er, nil
+}
+
 // EntityResponse is a response to an entity request, containing a set of
 // serialized entities and the identifiers used to request them. The returned
 // entity set may be empty or incomplete.
@@ -21,4 +28,11 @@ type EntityResponse struct {
 	Nonce     uint64
 	EntityIDs []flow.Identifier
 	Blobs     [][]byte
+}
+
+var _ UntrustedMessage = (*EntityResponse)(nil)
+
+func (er *EntityResponse) ToInternal() (any, error) {
+	// Temporary: just return the unvalidated wire struct
+	return er, nil
 }

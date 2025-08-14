@@ -17,12 +17,26 @@ type SyncRequest struct {
 	Height uint64
 }
 
+var _ UntrustedMessage = (*SyncRequest)(nil)
+
+func (sr *SyncRequest) ToInternal() (any, error) {
+	// Temporary: just return the unvalidated wire struct
+	return sr, nil
+}
+
 // SyncResponse is part of the synchronization protocol and represents the reply
 // to a synchronization request that contains the latest finalized block height
 // of the responding node.
 type SyncResponse struct {
 	Nonce  uint64
 	Height uint64
+}
+
+var _ UntrustedMessage = (*SyncResponse)(nil)
+
+func (sr *SyncResponse) ToInternal() (any, error) {
+	// Temporary: just return the unvalidated wire struct
+	return sr, nil
 }
 
 // RangeRequest is part of the synchronization protocol and represents an active
@@ -37,6 +51,13 @@ type RangeRequest struct {
 	ToHeight   uint64
 }
 
+var _ UntrustedMessage = (*RangeRequest)(nil)
+
+func (r *RangeRequest) ToInternal() (any, error) {
+	// Temporary: just return the unvalidated wire struct
+	return r, nil
+}
+
 // BatchRequest is part of the synchronization protocol and represents an active
 // (pulling) attempt to synchronize with the consensus state of the network. It
 // requests finalized or unfinalized blocks by a list of block IDs.
@@ -47,12 +68,26 @@ type BatchRequest struct {
 	BlockIDs []flow.Identifier
 }
 
+var _ UntrustedMessage = (*BatchRequest)(nil)
+
+func (br *BatchRequest) ToInternal() (any, error) {
+	// Temporary: just return the unvalidated wire struct
+	return br, nil
+}
+
 // BlockResponse is part of the synchronization protocol and represents the
 // reply to any active synchronization attempts. It contains a list of blocks
 // that should correspond to the request.
 type BlockResponse struct {
 	Nonce  uint64
 	Blocks []flow.UntrustedProposal
+}
+
+var _ UntrustedMessage = (*BlockResponse)(nil)
+
+func (br *BlockResponse) ToInternal() (any, error) {
+	// Temporary: just return the unvalidated wire struct
+	return br, nil
 }
 
 // BlocksInternal converts all untrusted block proposals in the BlockResponse
@@ -76,6 +111,13 @@ func (br *BlockResponse) BlocksInternal() ([]*flow.Proposal, error) {
 type ClusterBlockResponse struct {
 	Nonce  uint64
 	Blocks []cluster.UntrustedProposal
+}
+
+var _ UntrustedMessage = (*ClusterBlockResponse)(nil)
+
+func (br *ClusterBlockResponse) ToInternal() (any, error) {
+	// Temporary: just return the unvalidated wire struct
+	return br, nil
 }
 
 func (br *ClusterBlockResponse) BlocksInternal() ([]*cluster.Proposal, error) {
