@@ -8,6 +8,8 @@ import (
 	"strings"
 	"testing"
 
+	gethTypes "github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/common"
 	"github.com/onflow/cadence/encoding/json"
@@ -18,8 +20,6 @@ import (
 	. "github.com/onflow/cadence/test_utils/runtime_utils"
 	coreContracts "github.com/onflow/flow-core-contracts/lib/go/contracts"
 	coreContractstemplates "github.com/onflow/flow-core-contracts/lib/go/templates"
-	gethTypes "github.com/onflow/go-ethereum/core/types"
-	"github.com/onflow/go-ethereum/crypto"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -3665,7 +3665,7 @@ func TestEVMDecodeABIWithSignatureMismatch(t *testing.T) {
 		},
 	)
 	require.Error(t, err)
-	assert.ErrorContains(t, err, "panic: signature mismatch")
+	assert.ErrorContains(t, err, "EVM.decodeABIWithSignature(): Cannot decode! The signature does not match the provided data.")
 }
 
 func TestEVMAddressConstructionAndReturn(t *testing.T) {
@@ -5998,7 +5998,7 @@ func TestEVMValidateCOAOwnershipProof(t *testing.T) {
 		message := result.(cadence.Struct).
 			SearchFieldByName("problem").(cadence.Optional).
 			Value.(cadence.String).String()
-		require.Equal(t, "\"the given signatures are not valid or provide enough weight\"", message)
+		require.Equal(t, "\"EVM.validateCOAOwnershipProof(): Cannot validate COA ownership for Cadence account 0x0000000000000001. The given signatures are not valid or provide enough weight.\"", message)
 	})
 }
 

@@ -54,6 +54,7 @@ func MakeCreateAndSetupNodeTx(
 	networkingAddress string,
 	networkingKey string,
 	stakingKey string,
+	stakingKeyPoP string,
 	machineKey *sdk.AccountKey,
 ) (
 	*sdk.Transaction,
@@ -132,6 +133,16 @@ func MakeCreateAndSetupNodeTx(
 		return nil, err
 	}
 	err = tx.AddArgument(stakingKeyCDC)
+	if err != nil {
+		return nil, err
+	}
+
+	// 7 - staking key PoP
+	stakingKeyPoPCDC, err := cadence.NewString(stakingKeyPoP)
+	if err != nil {
+		return nil, err
+	}
+	err = tx.AddArgument(stakingKeyPoPCDC)
 	if err != nil {
 		return nil, err
 	}
@@ -220,7 +231,7 @@ func MakeSetProtocolStateVersionTx(
 // This ensures a single transaction can be sealed by the network.
 func CreateFlowAccount(ctx context.Context, client *testnet.Client) (sdk.Address, error) {
 	fullAccountKey := sdk.NewAccountKey().
-		SetPublicKey(unittest.PrivateKeyFixture(crypto.ECDSAP256, crypto.KeyGenSeedMinLen).PublicKey()).
+		SetPublicKey(unittest.PrivateKeyFixture(crypto.ECDSAP256).PublicKey()).
 		SetHashAlgo(sdkcrypto.SHA2_256).
 		SetWeight(sdk.AccountKeyWeightThreshold)
 

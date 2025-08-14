@@ -93,6 +93,12 @@ jobs:
       - name: Setup Google Cloud Authentication
         run: gcloud auth configure-docker ${{ env.PRIVATE_REGISTRY_HOST }}
 
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ vars.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
       - name: Execute ${{ matrix.build_command }} command to build and push images
         env:
           IMAGE_TAG: ${{ inputs.tag }}
@@ -131,7 +137,40 @@ jobs:
           ref: master-private 
           workflow_file_name: 'secure_build.yml'
 
-  promote-images:
+  promote-to-partner-registry:
+    # This job promotes container images from the private registry to the partner registry.
+    # As of right now, the only role being promoted to the partner registry is 'access'.
+    # It uses a matrix strategy to handle the promotion of images for different roles in parallel.
+    # The environments defined for each role are used to gate the promotion process.
+    # This ensures that only approved images are deployed to the partner registry.
+    name: Promote Images to Partner Registry
+    runs-on: ubuntu-latest
+    needs: [public-build, secure-build]
+    # This job will only run if the previous jobs were successful and not cancelled.
+    # It checks the results of both the public and secure builds to ensure that at least one of them succeeded.
+    if: |
+      ${{ !cancelled() }} &&
+      ${{ needs.public-build.result != 'failure' || needs.secure-build.result != 'failure' }}
+    strategy:
+      fail-fast: false
+      matrix:
+        role: [access]
+    environment: ${{ matrix.role }} image promotion to partner registry 
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v3
+
+      - name: Promote ${{ matrix.role }} 
+        uses: ./actions/promote-images
+        with:
+          gcp_credentials: ${{ secrets.PARTNER_REGISTRY_PROMOTION_SECRET }}
+          private_registry: ${{ vars.PRIVATE_REGISTRY }}
+          private_registry_host: ${{ env.PRIVATE_REGISTRY_HOST }}
+          promotion_registry: ${{ vars.PARTNER_REGISTRY }}
+          role: ${{ matrix.role }} 
+          tags: "${{ inputs.tag }},${{ inputs.tag }}-without-adx,${{ inputs.tag }}-without-netgo-without-adx,${{ inputs.tag }}-arm"
+
+  promote-to-public-registry:
     # This job promotes container images for various roles from a private registry to a public registry.
     # It uses a matrix strategy to handle the promotion of images for different roles in parallel.
     # The environments defined for each role are used to gate the promotion process.
@@ -159,7 +198,7 @@ jobs:
           gcp_credentials: ${{ secrets.PUBLIC_REGISTRY_PROMOTION_SECRET }}
           private_registry: ${{ vars.PRIVATE_REGISTRY }}
           private_registry_host: ${{ env.PRIVATE_REGISTRY_HOST }}
-          public_registry: ${{ vars.PUBLIC_REGISTRY }}
+          promotion_registry: ${{ vars.PUBLIC_REGISTRY }}
           role: ${{ matrix.role }} 
           tags: "${{ inputs.tag }},${{ inputs.tag }}-without-adx,${{ inputs.tag }}-without-netgo-without-adx,${{ inputs.tag }}-arm"
 

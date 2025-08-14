@@ -6,7 +6,7 @@ import (
 
 	"github.com/rs/zerolog"
 
-	"github.com/onflow/flow-go/engine/access/rpc/backend"
+	"github.com/onflow/flow-go/engine/access/rpc/backend/transactions/error_messages"
 	commonrpc "github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/model/flow"
@@ -21,7 +21,7 @@ import (
 type TxErrorMessagesCore struct {
 	log zerolog.Logger // used to log relevant actions with context
 
-	backend                        *backend.Backend
+	txErrorMessageProvider         error_messages.Provider
 	transactionResultErrorMessages storage.TransactionResultErrorMessages
 	execNodeIdentitiesProvider     *commonrpc.ExecutionNodeIdentitiesProvider
 }
@@ -29,20 +29,20 @@ type TxErrorMessagesCore struct {
 // NewTxErrorMessagesCore creates a new instance of TxErrorMessagesCore.
 func NewTxErrorMessagesCore(
 	log zerolog.Logger,
-	backend *backend.Backend,
+	txErrorMessageProvider error_messages.Provider,
 	transactionResultErrorMessages storage.TransactionResultErrorMessages,
 	execNodeIdentitiesProvider *commonrpc.ExecutionNodeIdentitiesProvider,
 ) *TxErrorMessagesCore {
 	return &TxErrorMessagesCore{
 		log:                            log.With().Str("module", "tx_error_messages_core").Logger(),
-		backend:                        backend,
+		txErrorMessageProvider:         txErrorMessageProvider,
 		transactionResultErrorMessages: transactionResultErrorMessages,
 		execNodeIdentitiesProvider:     execNodeIdentitiesProvider,
 	}
 }
 
-// HandleTransactionResultErrorMessages processes transaction result error messages for a given block ID.
-// It retrieves error messages from the backend if they do not already exist in storage.
+// FetchErrorMessages processes transaction result error messages for a given block ID.
+// It retrieves error messages from the txErrorMessageProvider if they do not already exist in storage.
 //
 // The function first checks if error messages for the given block ID are already present in storage.
 // If they are not, it fetches the messages from execution nodes and stores them.
@@ -52,17 +52,17 @@ func NewTxErrorMessagesCore(
 // - blockID: The identifier of the block for which transaction result error messages need to be processed.
 //
 // No errors are expected during normal operation.
-func (c *TxErrorMessagesCore) HandleTransactionResultErrorMessages(ctx context.Context, blockID flow.Identifier) error {
+func (c *TxErrorMessagesCore) FetchErrorMessages(ctx context.Context, blockID flow.Identifier) error {
 	execNodes, err := c.execNodeIdentitiesProvider.ExecutionNodesForBlockID(ctx, blockID)
 	if err != nil {
 		c.log.Error().Err(err).Msg(fmt.Sprintf("failed to find execution nodes for block id: %s", blockID))
 		return fmt.Errorf("could not find execution nodes for block: %w", err)
 	}
 
-	return c.HandleTransactionResultErrorMessagesByENs(ctx, blockID, execNodes)
+	return c.FetchErrorMessagesByENs(ctx, blockID, execNodes)
 }
 
-func (c *TxErrorMessagesCore) HandleTransactionResultErrorMessagesByENs(
+func (c *TxErrorMessagesCore) FetchErrorMessagesByENs(
 	ctx context.Context,
 	blockID flow.Identifier,
 	execNodes flow.IdentitySkeletonList,
@@ -76,7 +76,7 @@ func (c *TxErrorMessagesCore) HandleTransactionResultErrorMessagesByENs(
 		return nil
 	}
 
-	// retrieves error messages from the backend if they do not already exist in storage
+	// retrieves error messages from the txErrorMessageProvider if they do not already exist in storage
 	req := &execproto.GetTransactionErrorMessagesByBlockIDRequest{
 		BlockId: convert.IdentifierToMessage(blockID),
 	}
@@ -84,7 +84,7 @@ func (c *TxErrorMessagesCore) HandleTransactionResultErrorMessagesByENs(
 	c.log.Debug().
 		Msgf("transaction error messages for block %s are being downloaded", blockID)
 
-	resp, execNode, err := c.backend.GetTransactionErrorMessagesFromAnyEN(ctx, execNodes, req)
+	resp, execNode, err := c.txErrorMessageProvider.ErrorMessageByBlockIDFromAnyEN(ctx, execNodes, req)
 	if err != nil {
 		c.log.Error().Err(err).Msg("failed to get transaction error messages from execution nodes")
 		return err

@@ -53,8 +53,7 @@ import (
 )
 
 const (
-	DefaultSeedFixtureLength = 64
-	DefaultAddress           = "localhost:0"
+	DefaultAddress = "localhost:0"
 )
 
 // returns a deterministic math/rand PRG that can be used for deterministic randomness in tests only.
@@ -937,7 +936,7 @@ func WithServiceEvents(n int) func(result *flow.ExecutionResult) {
 		// randomly assign service events to chunks
 		for i := 0; i < n; i++ {
 			chunkIndex := rand.Intn(result.Chunks.Len())
-			*result.Chunks[chunkIndex].ServiceEventCount++
+			result.Chunks[chunkIndex].ServiceEventCount++
 		}
 	}
 }
@@ -1149,8 +1148,28 @@ func NodeConfigFixture(opts ...func(*flow.Identity)) bootstrap.NodeConfig {
 }
 
 func NodeInfoFixture(opts ...func(*flow.Identity)) bootstrap.NodeInfo {
-	opts = append(opts, WithKeys)
-	return bootstrap.NodeInfoFromIdentity(IdentityFixture(opts...))
+	nodes := NodeInfosFixture(1, opts...)
+	return nodes[0]
+}
+
+// NodeInfoFromIdentity converts an identity to a public NodeInfo
+// WARNING: the function replaces the staking key from the identity by a freshly generated one.
+func NodeInfoFromIdentity(identity *flow.Identity) bootstrap.NodeInfo {
+	stakingSK := StakingPrivKeyFixture()
+	stakingPoP, err := crypto.BLSGeneratePOP(stakingSK)
+	if err != nil {
+		panic(err.Error())
+	}
+
+	return bootstrap.NewPublicNodeInfo(
+		identity.NodeID,
+		identity.Role,
+		identity.Address,
+		identity.InitialWeight,
+		identity.NetworkPubKey,
+		stakingSK.PublicKey(),
+		stakingPoP,
+	)
 }
 
 func NodeInfosFixture(n int, opts ...func(*flow.Identity)) []bootstrap.NodeInfo {
@@ -1158,7 +1177,7 @@ func NodeInfosFixture(n int, opts ...func(*flow.Identity)) []bootstrap.NodeInfo 
 	il := IdentityListFixture(n, opts...)
 	nodeInfos := make([]bootstrap.NodeInfo, 0, n)
 	for _, identity := range il {
-		nodeInfos = append(nodeInfos, bootstrap.NodeInfoFromIdentity(identity))
+		nodeInfos = append(nodeInfos, NodeInfoFromIdentity(identity))
 	}
 	return nodeInfos
 }
@@ -1174,7 +1193,10 @@ func PrivateNodeInfosFixture(n int, opts ...func(*flow.Identity)) []bootstrap.No
 func PrivateNodeInfosFromIdentityList(il flow.IdentityList) []bootstrap.NodeInfo {
 	nodeInfos := make([]bootstrap.NodeInfo, 0, len(il))
 	for _, identity := range il {
-		nodeInfo := bootstrap.PrivateNodeInfoFromIdentity(identity, KeyFixture(crypto.ECDSAP256), KeyFixture(crypto.BLSBLS12381))
+		nodeInfo, err := bootstrap.PrivateNodeInfoFromIdentity(identity, KeyFixture(crypto.ECDSAP256), KeyFixture(crypto.BLSBLS12381))
+		if err != nil {
+			panic(err.Error())
+		}
 		nodeInfos = append(nodeInfos, nodeInfo)
 	}
 	return nodeInfos
@@ -1323,7 +1345,7 @@ func WithChunkStartState(startState flow.StateCommitment) func(chunk *flow.Chunk
 	}
 }
 
-func WithServiceEventCount(count *uint16) func(*flow.Chunk) {
+func WithServiceEventCount(count uint16) func(*flow.Chunk) {
 	return func(chunk *flow.Chunk) {
 		chunk.ServiceEventCount = count
 	}
@@ -1340,7 +1362,7 @@ func ChunkFixture(
 			CollectionIndex:      collectionIndex,
 			StartState:           startState,
 			EventCollection:      IdentifierFixture(),
-			ServiceEventCount:    PtrTo[uint16](0),
+			ServiceEventCount:    0,
 			TotalComputationUsed: 4200,
 			NumberOfTransactions: 42,
 			BlockID:              blockID,
@@ -1698,37 +1720,49 @@ func WithChunkID(chunkID flow.Identifier) func(*verification.ChunkDataPackReques
 // Use options to customize the request.
 func ChunkDataPackRequestFixture(opts ...func(*verification.ChunkDataPackRequest)) *verification.
 	ChunkDataPackRequest {
-
 	req := &verification.ChunkDataPackRequest{
 		Locator: chunks.Locator{
 			ResultID: IdentifierFixture(),
 			Index:    0,
 		},
-		ChunkDataPackRequestInfo: verification.ChunkDataPackRequestInfo{
-			ChunkID:   IdentifierFixture(),
-			Height:    0,
-			Agrees:    IdentifierListFixture(1),
-			Disagrees: IdentifierListFixture(1),
-		},
+		ChunkDataPackRequestInfo: *ChunkDataPackRequestInfoFixture(),
 	}
 
 	for _, opt := range opts {
 		opt(req)
 	}
 
+	// Ensure Targets reflects current Agrees and Disagrees
+	req.Targets = makeTargets(req.Agrees, req.Disagrees)
+
+	return req
+}
+
+func ChunkDataPackRequestInfoFixture() *verification.ChunkDataPackRequestInfo {
+	agrees := IdentifierListFixture(1)
+	disagrees := IdentifierListFixture(1)
+
+	return &verification.ChunkDataPackRequestInfo{
+		ChunkID:   IdentifierFixture(),
+		Height:    0,
+		Agrees:    agrees,
+		Disagrees: disagrees,
+		Targets:   makeTargets(agrees, disagrees),
+	}
+}
+
+// makeTargets returns a combined IdentityList for the given agrees and disagrees.
+func makeTargets(agrees, disagrees flow.IdentifierList) flow.IdentityList {
 	// creates identity fixtures for target ids as union of agrees and disagrees
 	// TODO: remove this inner fixture once we have filter for identifier list.
 	targets := flow.IdentityList{}
-	for _, id := range req.Agrees {
-		targets = append(targets, IdentityFixture(WithNodeID(id), WithRole(flow.RoleExecution)))
+	for _, id := range append(agrees, disagrees...) {
+		targets = append(targets, IdentityFixture(
+			WithNodeID(id),
+			WithRole(flow.RoleExecution),
+		))
 	}
-	for _, id := range req.Disagrees {
-		targets = append(targets, IdentityFixture(WithNodeID(id), WithRole(flow.RoleExecution)))
-	}
-
-	req.Targets = targets
-
-	return req
+	return targets
 }
 
 func WithChunkDataPackCollection(collection *flow.Collection) func(*flow.ChunkDataPack) {
@@ -2159,11 +2193,10 @@ func EpochRecoverFixture(opts ...func(setup *flow.EpochSetup)) *flow.EpochRecove
 		WithClusterQCsFromAssignments(setup.Assignments),
 	)
 
-	ev := &flow.EpochRecover{
+	return &flow.EpochRecover{
 		EpochSetup:  *setup,
 		EpochCommit: *commit,
 	}
-	return ev
 }
 
 func IndexFixture() *flow.Index {
@@ -2291,7 +2324,10 @@ func BootstrapFixtureWithChainID(
 	if err != nil {
 		panic(err)
 	}
-	rootEpochState := inmem.EpochProtocolStateFromServiceEvents(setup, commit)
+	rootEpochState, err := inmem.EpochProtocolStateFromServiceEvents(setup, commit)
+	if err != nil {
+		panic(err)
+	}
 	rootProtocolState, err := kvstore.NewDefaultKVStore(safetyParams.FinalizationSafetyThreshold, safetyParams.EpochExtensionViewCount, rootEpochState.ID())
 	if err != nil {
 		panic(err)
@@ -2450,9 +2486,9 @@ func DKGBroadcastMessageFixture() *messages.BroadcastDKGMessage {
 	}
 }
 
-// PrivateKeyFixture returns a random private key with specified signature algorithm and seed length
-func PrivateKeyFixture(algo crypto.SigningAlgorithm, seedLength int) crypto.PrivateKey {
-	sk, err := crypto.GeneratePrivateKey(algo, SeedFixture(seedLength))
+// PrivateKeyFixture returns a random private key with specified signature algorithm
+func PrivateKeyFixture(algo crypto.SigningAlgorithm) crypto.PrivateKey {
+	sk, err := crypto.GeneratePrivateKey(algo, SeedFixture(crypto.KeyGenSeedMinLen))
 	if err != nil {
 		panic(err)
 	}
@@ -2466,8 +2502,9 @@ func PrivateKeyFixtureByIdentifier(
 	seedLength int,
 	id flow.Identifier,
 ) crypto.PrivateKey {
-	seed := append(id[:], id[:]...)
-	sk, err := crypto.GeneratePrivateKey(algo, seed[:seedLength])
+	seed := make([]byte, seedLength)
+	copy(seed, id[:])
+	sk, err := crypto.GeneratePrivateKey(algo, seed)
 	if err != nil {
 		panic(err)
 	}
@@ -2480,18 +2517,18 @@ func StakingPrivKeyByIdentifier(id flow.Identifier) crypto.PrivateKey {
 
 // NetworkingPrivKeyFixture returns random ECDSAP256 private key
 func NetworkingPrivKeyFixture() crypto.PrivateKey {
-	return PrivateKeyFixture(crypto.ECDSAP256, crypto.KeyGenSeedMinLen)
+	return PrivateKeyFixture(crypto.ECDSAP256)
 }
 
 // StakingPrivKeyFixture returns a random BLS12381 private keyf
 func StakingPrivKeyFixture() crypto.PrivateKey {
-	return PrivateKeyFixture(crypto.BLSBLS12381, crypto.KeyGenSeedMinLen)
+	return PrivateKeyFixture(crypto.BLSBLS12381)
 }
 
 func NodeMachineAccountInfoFixture() bootstrap.NodeMachineAccountInfo {
 	return bootstrap.NodeMachineAccountInfo{
 		Address:           RandomAddressFixture().String(),
-		EncodedPrivateKey: PrivateKeyFixture(crypto.ECDSAP256, DefaultSeedFixtureLength).Encode(),
+		EncodedPrivateKey: PrivateKeyFixture(crypto.ECDSAP256).Encode(),
 		HashAlgorithm:     bootstrap.DefaultMachineAccountHashAlgo,
 		SigningAlgorithm:  bootstrap.DefaultMachineAccountSignAlgo,
 		KeyIndex:          bootstrap.DefaultMachineAccountKeyIndex,
@@ -2710,6 +2747,61 @@ func ChunkExecutionDataFixture(t *testing.T, minSize int, opts ...func(*executio
 	}
 }
 
+func WithTxResultErrorMessageTxID(id flow.Identifier) func(txResErrMsg *flow.TransactionResultErrorMessage) {
+	return func(txResErrMsg *flow.TransactionResultErrorMessage) {
+		txResErrMsg.TransactionID = id
+	}
+}
+
+func WithTxResultErrorMessageIndex(index uint32) func(txResErrMsg *flow.TransactionResultErrorMessage) {
+	return func(txResErrMsg *flow.TransactionResultErrorMessage) {
+		txResErrMsg.Index = index
+	}
+}
+
+func WithTxResultErrorMessageTxMsg(message string) func(txResErrMsg *flow.TransactionResultErrorMessage) {
+	return func(txResErrMsg *flow.TransactionResultErrorMessage) {
+		txResErrMsg.ErrorMessage = message
+	}
+}
+
+func WithTxResultErrorMessageExecutorID(id flow.Identifier) func(txResErrMsg *flow.TransactionResultErrorMessage) {
+	return func(txResErrMsg *flow.TransactionResultErrorMessage) {
+		txResErrMsg.ExecutorID = id
+	}
+}
+
+// TransactionResultErrorMessageFixture creates a fixture tx result error message with random generated tx ID and executor ID for test purpose.
+func TransactionResultErrorMessageFixture(opts ...func(*flow.TransactionResultErrorMessage)) flow.TransactionResultErrorMessage {
+	txResErrMsg := flow.TransactionResultErrorMessage{
+		TransactionID: IdentifierFixture(),
+		Index:         0,
+		ErrorMessage:  "transaction result error",
+		ExecutorID:    IdentifierFixture(),
+	}
+
+	for _, opt := range opts {
+		opt(&txResErrMsg)
+	}
+
+	return txResErrMsg
+}
+
+// TransactionResultErrorMessagesFixture creates a fixture collection of tx result error messages with n elements.
+func TransactionResultErrorMessagesFixture(n int) []flow.TransactionResultErrorMessage {
+	txResErrMsgs := make([]flow.TransactionResultErrorMessage, 0, n)
+	executorID := IdentifierFixture()
+
+	for i := 0; i < n; i++ {
+		txResErrMsgs = append(txResErrMsgs, TransactionResultErrorMessageFixture(
+			WithTxResultErrorMessageIndex(uint32(i)),
+			WithTxResultErrorMessageTxMsg(fmt.Sprintf("transaction result error %d", i)),
+			WithTxResultErrorMessageExecutorID(executorID),
+		))
+	}
+	return txResErrMsgs
+}
+
 // RootEpochProtocolStateFixture creates a fixture with correctly structured Epoch sub-state.
 // The epoch substate is part of the overall protocol state (KV store).
 // This can be useful for testing bootstrap when there is no previous epoch.
@@ -2895,6 +2987,8 @@ func WithValidDKG() func(*flow.RichEpochStateEntry) {
 			commit.DKGParticipantKeys = append(commit.DKGParticipantKeys, KeyFixture(crypto.BLSBLS12381).PublicKey())
 			commit.DKGIndexMap[nodeID] = index
 		}
+		// update CommitID according to new CurrentEpochCommit object
+		entry.MinEpochStateEntry.CurrentEpoch.CommitID = entry.CurrentEpochCommit.ID()
 	}
 }
 

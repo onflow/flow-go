@@ -6,7 +6,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/cockroachdb/pebble"
+	"github.com/cockroachdb/pebble/v2"
 	"github.com/hashicorp/go-multierror"
 	"github.com/rs/zerolog"
 
@@ -58,7 +58,7 @@ func OpenRegisterPebbleDB(logger zerolog.Logger, dir string) (*pebble.DB, error)
 // OpenDefaultPebbleDB opens a pebble database using default options,
 // such as cache size and comparer
 // If the pebbleDB is not bootstrapped at this folder, it will auto-bootstrap it,
-// use MustOpenDefaultPebbleDB if you want to return error instead
+// use ShouldOpenDefaultPebbleDB if you want to return error instead
 func OpenDefaultPebbleDB(logger zerolog.Logger, dir string) (*pebble.DB, error) {
 	cache := pebble.NewCache(DefaultPebbleCacheSize)
 	defer cache.Unref()
@@ -71,9 +71,9 @@ func OpenDefaultPebbleDB(logger zerolog.Logger, dir string) (*pebble.DB, error) 
 	return db, nil
 }
 
-// MustOpenDefaultPebbleDB returns error if the pebbleDB is not bootstrapped at this folder
+// ShouldOpenDefaultPebbleDB returns error if the pebbleDB is not bootstrapped at this folder
 // if bootstrapped, then open the pebbleDB
-func MustOpenDefaultPebbleDB(logger zerolog.Logger, dir string) (*pebble.DB, error) {
+func ShouldOpenDefaultPebbleDB(logger zerolog.Logger, dir string) (*pebble.DB, error) {
 	err := IsPebbleInitialized(dir)
 	if err != nil {
 		return nil, fmt.Errorf("pebble db is not initialized: %w", err)

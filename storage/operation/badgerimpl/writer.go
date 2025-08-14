@@ -79,6 +79,7 @@ func (b *ReaderBatchWriter) Commit() error {
 // Close releases memory of the batch and no error is returned.
 // This can be called as a defer statement immediately after creating Batch
 // to reduce risk of unbounded memory consumption.
+// No errors are expected during normal operation.
 func (b *ReaderBatchWriter) Close() error {
 	// BadgerDB v2 docs for WriteBatch.Cancel():
 	//

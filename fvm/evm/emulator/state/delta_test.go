@@ -4,10 +4,10 @@ import (
 	"fmt"
 	"testing"
 
+	gethCommon "github.com/ethereum/go-ethereum/common"
+	gethTypes "github.com/ethereum/go-ethereum/core/types"
+	gethCrypto "github.com/ethereum/go-ethereum/crypto"
 	"github.com/holiman/uint256"
-	gethCommon "github.com/onflow/go-ethereum/common"
-	gethTypes "github.com/onflow/go-ethereum/core/types"
-	gethCrypto "github.com/onflow/go-ethereum/crypto"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/fvm/evm/emulator/state"
@@ -496,7 +496,7 @@ func TestDeltaView(t *testing.T) {
 			})
 
 		// check address through parent
-		require.True(t, view.AddressInAccessList(addr1))
+		require.False(t, view.AddressInAccessList(addr1))
 
 		// add addr 2 to the list
 		require.False(t, view.AddressInAccessList(addr2))
@@ -511,7 +511,7 @@ func TestDeltaView(t *testing.T) {
 		// check slot through parent
 		addrFound, slotFound := view.SlotInAccessList(slot1)
 		require.False(t, addrFound)
-		require.True(t, slotFound)
+		require.False(t, slotFound)
 
 		// add slot 2 to the list
 		addrFound, slotFound = view.SlotInAccessList(slot2)

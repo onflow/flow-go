@@ -12,12 +12,15 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
+	"github.com/onflow/flow-go/engine/access/index"
 	accessmock "github.com/onflow/flow-go/engine/access/mock"
-	"github.com/onflow/flow-go/engine/access/rpc/backend"
+	"github.com/onflow/flow-go/engine/access/rpc/backend/node_communicator"
+	"github.com/onflow/flow-go/engine/access/rpc/backend/transactions/error_messages"
 	connectionmock "github.com/onflow/flow-go/engine/access/rpc/connection/mock"
 	commonrpc "github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/irrecoverable"
+	syncmock "github.com/onflow/flow-go/module/state_synchronization/mock"
 	protocol "github.com/onflow/flow-go/state/protocol/mock"
 	storage "github.com/onflow/flow-go/storage/mock"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -37,6 +40,11 @@ type TxErrorMessagesCoreSuite struct {
 
 	receipts        *storage.ExecutionReceipts
 	txErrorMessages *storage.TransactionResultErrorMessages
+	lightTxResults  *storage.LightTransactionResults
+
+	reporter       *syncmock.IndexReporter
+	indexReporter  *index.Reporter
+	txResultsIndex *index.TransactionResultsIndex
 
 	enNodeIDs   flow.IdentityList
 	execClient  *accessmock.ExecutionAPIClient
@@ -74,6 +82,13 @@ func (s *TxErrorMessagesCoreSuite) SetupTest() {
 	s.connFactory = connectionmock.NewConnectionFactory(s.T())
 	s.receipts = storage.NewExecutionReceipts(s.T())
 	s.txErrorMessages = storage.NewTransactionResultErrorMessages(s.T())
+
+	s.lightTxResults = storage.NewLightTransactionResults(s.T())
+	s.reporter = syncmock.NewIndexReporter(s.T())
+	s.indexReporter = index.NewReporter()
+	err := s.indexReporter.Initialize(s.reporter)
+	s.Require().NoError(err)
+	s.txResultsIndex = index.NewTransactionResultsIndex(s.indexReporter, s.lightTxResults)
 
 	s.rootBlock = unittest.BlockFixture()
 	s.rootBlock.Header.Height = 0
@@ -135,7 +150,7 @@ func (s *TxErrorMessagesCoreSuite) TestHandleTransactionResultErrorMessages() {
 		Return(nil).Once()
 
 	core := s.initCore()
-	err := core.HandleTransactionResultErrorMessages(irrecoverableCtx, blockId)
+	err := core.FetchErrorMessages(irrecoverableCtx, blockId)
 	require.NoError(s.T(), err)
 
 	// Verify that the mock expectations for storing the error messages were met.
@@ -147,7 +162,7 @@ func (s *TxErrorMessagesCoreSuite) TestHandleTransactionResultErrorMessages() {
 	s.txErrorMessages.On("Exists", blockId).
 		Return(true, nil).Once()
 	s.proto.state.On("AtBlockID", blockId).Return(s.proto.snapshot).Once()
-	err = core.HandleTransactionResultErrorMessages(irrecoverableCtx, blockId)
+	err = core.FetchErrorMessages(irrecoverableCtx, blockId)
 	require.NoError(s.T(), err)
 
 	// Verify that the mock expectations for storing the error messages were not met.
@@ -157,7 +172,7 @@ func (s *TxErrorMessagesCoreSuite) TestHandleTransactionResultErrorMessages() {
 }
 
 // TestHandleTransactionResultErrorMessages_ErrorCases tests the error handling of
-// the HandleTransactionResultErrorMessages function in the following cases:
+// the FetchErrorMessages function in the following cases:
 //
 // 1. Execution node fetch error: When fetching transaction error messages from the execution node fails,
 // the function should return an appropriate error and no further actions should be taken.
@@ -188,7 +203,7 @@ func (s *TxErrorMessagesCoreSuite) TestHandleTransactionResultErrorMessages_Erro
 			Return(nil, fmt.Errorf("execution node fetch error")).Once()
 
 		core := s.initCore()
-		err := core.HandleTransactionResultErrorMessages(irrecoverableCtx, blockId)
+		err := core.FetchErrorMessages(irrecoverableCtx, blockId)
 
 		// Assert that the function returns an error due to the client fetch error.
 		require.Error(s.T(), err)
@@ -220,7 +235,7 @@ func (s *TxErrorMessagesCoreSuite) TestHandleTransactionResultErrorMessages_Erro
 			Return(fmt.Errorf("storage error")).Once()
 
 		core := s.initCore()
-		err := core.HandleTransactionResultErrorMessages(irrecoverableCtx, blockId)
+		err := core.FetchErrorMessages(irrecoverableCtx, blockId)
 
 		// Assert that the function returns an error due to the store error.
 		require.Error(s.T(), err)
@@ -242,25 +257,18 @@ func (s *TxErrorMessagesCoreSuite) initCore() *TxErrorMessagesCore {
 		s.enNodeIDs.NodeIDs(),
 	)
 
-	// Initialize the backend
-	backend, err := backend.New(backend.Params{
-		State:                      s.proto.state,
-		ExecutionReceipts:          s.receipts,
-		ConnFactory:                s.connFactory,
-		MaxHeightRange:             backend.DefaultMaxHeightRange,
-		Log:                        s.log,
-		SnapshotHistoryLimit:       backend.DefaultSnapshotHistoryLimit,
-		Communicator:               backend.NewNodeCommunicator(false),
-		ScriptExecutionMode:        backend.IndexQueryModeExecutionNodesOnly,
-		TxResultQueryMode:          backend.IndexQueryModeExecutionNodesOnly,
-		ChainID:                    flow.Testnet,
-		ExecNodeIdentitiesProvider: execNodeIdentitiesProvider,
-	})
-	require.NoError(s.T(), err)
+	errorMessageProvider := error_messages.NewTxErrorMessageProvider(
+		s.log,
+		s.txErrorMessages,
+		s.txResultsIndex,
+		s.connFactory,
+		node_communicator.NewNodeCommunicator(false),
+		execNodeIdentitiesProvider,
+	)
 
 	core := NewTxErrorMessagesCore(
 		s.log,
-		backend,
+		errorMessageProvider,
 		s.txErrorMessages,
 		execNodeIdentitiesProvider,
 	)
@@ -319,6 +327,23 @@ func setupReceiptsForBlock(receipts *storage.ExecutionReceipts, block *flow.Bloc
 		On("ByBlockID", block.ID()).
 		Return(func(flow.Identifier) flow.ExecutionReceiptList {
 			return receiptsList
+		}, nil)
+}
+
+// setupReceiptsForBlockWithResult sets up mock execution receipts for a block with a specific execution result
+func setupReceiptsForBlockWithResult(receipts *storage.ExecutionReceipts, executionResult *flow.ExecutionResult, executorIDs ...flow.Identifier) {
+	receiptList := make(flow.ExecutionReceiptList, 0, len(executorIDs))
+	for _, enID := range executorIDs {
+		receiptList = append(receiptList, unittest.ExecutionReceiptFixture(
+			unittest.WithResult(executionResult),
+			unittest.WithExecutorID(enID),
+		))
+	}
+
+	receipts.
+		On("ByBlockID", executionResult.BlockID).
+		Return(func(flow.Identifier) flow.ExecutionReceiptList {
+			return receiptList
 		}, nil)
 }
 

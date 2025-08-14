@@ -3,6 +3,7 @@ package flow
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"io"
 
 	"github.com/ethereum/go-ethereum/rlp"
@@ -136,6 +137,8 @@ const EpochSetupRandomSourceLength = 16
 // When an EpochSetup event is accepted and incorporated into the Protocol State, this triggers the
 // Distributed Key Generation [DKG] and cluster QC voting process for the next epoch.
 // It also causes the current epoch to enter the EpochPhaseSetup phase.
+//
+//structwrite:immutable - mutations allowed only within the constructor
 type EpochSetup struct {
 	Counter            uint64               // the number of the epoch being setup (current+1)
 	FirstView          uint64               // the first view of the epoch being setup
@@ -148,6 +151,69 @@ type EpochSetup struct {
 	RandomSource       []byte               // source of randomness for epoch-specific setup tasks
 	TargetDuration     uint64               // desired real-world duration for the epoch [seconds]
 	TargetEndTime      uint64               // desired real-world end time for the epoch in UNIX time [seconds]
+}
+
+// UntrustedEpochSetup is an untrusted input-only representation of an EpochSetup,
+// used for construction.
+//
+// This type exists to ensure that constructor functions are invoked explicitly
+// with named fields, which improves clarity and reduces the risk of incorrect field
+// ordering during construction.
+//
+// An instance of UntrustedEpochSetup should be validated and converted into
+// a trusted EpochSetup using NewEpochSetup constructor.
+type UntrustedEpochSetup EpochSetup
+
+// NewEpochSetup creates a new instance of EpochSetup.
+// Construction EpochSetup allowed only within the constructor.
+//
+// All errors indicate a valid EpochSetup cannot be constructed from the input.
+func NewEpochSetup(untrusted UntrustedEpochSetup) (*EpochSetup, error) {
+	if untrusted.FirstView >= untrusted.FinalView {
+		return nil, fmt.Errorf("invalid timing - first view (%d) ends after the final view (%d)", untrusted.FirstView, untrusted.FinalView)
+	}
+	if untrusted.FirstView >= untrusted.DKGPhase1FinalView {
+		return nil, fmt.Errorf("invalid timing - first view (%d) ends after dkg phase 1 (%d)", untrusted.FirstView, untrusted.DKGPhase1FinalView)
+	}
+	if untrusted.DKGPhase1FinalView >= untrusted.DKGPhase2FinalView {
+		return nil, fmt.Errorf("invalid dkg timing - phase 1 (%d) ends after phase 2 (%d)", untrusted.DKGPhase1FinalView, untrusted.DKGPhase2FinalView)
+	}
+	if untrusted.DKGPhase2FinalView >= untrusted.DKGPhase3FinalView {
+		return nil, fmt.Errorf("invalid dkg timing - phase 2 (%d) ends after phase 3 (%d)", untrusted.DKGPhase2FinalView, untrusted.DKGPhase3FinalView)
+	}
+	if untrusted.DKGPhase3FinalView >= untrusted.FinalView {
+		return nil, fmt.Errorf("invalid timing - dkg phase 3 (%d) ends after final view (%d)", untrusted.DKGPhase3FinalView, untrusted.FinalView)
+	}
+	if untrusted.Participants == nil {
+		return nil, fmt.Errorf("participants must not be nil")
+	}
+	if untrusted.Assignments == nil {
+		return nil, fmt.Errorf("assignments must not be nil")
+	}
+	if len(untrusted.RandomSource) != EpochSetupRandomSourceLength {
+		return nil, fmt.Errorf(
+			"random source must be of (%d) bytes, got (%d)",
+			EpochSetupRandomSourceLength,
+			len(untrusted.RandomSource),
+		)
+	}
+	if untrusted.TargetDuration == 0 {
+		return nil, fmt.Errorf("target duration must be greater than 0")
+	}
+
+	return &EpochSetup{
+		Counter:            untrusted.Counter,
+		FirstView:          untrusted.FirstView,
+		DKGPhase1FinalView: untrusted.DKGPhase1FinalView,
+		DKGPhase2FinalView: untrusted.DKGPhase2FinalView,
+		DKGPhase3FinalView: untrusted.DKGPhase3FinalView,
+		FinalView:          untrusted.FinalView,
+		Participants:       untrusted.Participants,
+		Assignments:        untrusted.Assignments,
+		RandomSource:       untrusted.RandomSource,
+		TargetDuration:     untrusted.TargetDuration,
+		TargetEndTime:      untrusted.TargetEndTime,
+	}, nil
 }
 
 func (setup *EpochSetup) ServiceEvent() ServiceEvent {
@@ -199,9 +265,49 @@ func (setup *EpochSetup) EqualTo(other *EpochSetup) bool {
 // EpochRecover service event is emitted when network is in Epoch Fallback Mode(EFM) in an attempt to return to happy path.
 // It contains data from EpochSetup, and EpochCommit events to so replicas can create a committed epoch from which they
 // can continue operating on the happy path.
+//
+//structwrite:immutable - mutations allowed only within the constructor
 type EpochRecover struct {
 	EpochSetup  EpochSetup
 	EpochCommit EpochCommit
+}
+
+// UntrustedEpochRecover is an untrusted input-only representation of an EpochRecover,
+// used for construction.
+//
+// This type exists to ensure that constructor functions are invoked explicitly
+// with named fields, which improves clarity and reduces the risk of incorrect field
+// ordering during construction.
+//
+// An instance of UntrustedEpochRecover should be validated and converted into
+// a trusted EpochRecover using NewEpochRecover constructor.
+type UntrustedEpochRecover EpochRecover
+
+// NewEpochRecover creates a new instance of EpochRecover.
+// Construction EpochRecover allowed only within the constructor.
+//
+// All errors indicate a valid EpochRecover cannot be constructed from the input.
+func NewEpochRecover(untrusted UntrustedEpochRecover) (*EpochRecover, error) {
+	// EpochSetup and must be non-empty and is intended to be constructed solely through the constructor.
+	if untrusted.EpochSetup.EqualTo(new(EpochSetup)) {
+		return nil, fmt.Errorf("EpochSetup is empty")
+	}
+	// EpochCommit and must be non-empty and is intended to be constructed solely through the constructor.
+	if untrusted.EpochCommit.EqualTo(new(EpochCommit)) {
+		return nil, fmt.Errorf("EpochCommit is empty")
+	}
+
+	if untrusted.EpochCommit.Counter != untrusted.EpochSetup.Counter {
+		return nil, fmt.Errorf("inconsistent epoch counter between commit (%d) and setup (%d) events in same epoch", untrusted.EpochCommit.Counter, untrusted.EpochSetup.Counter)
+	}
+	if len(untrusted.EpochSetup.Assignments) != len(untrusted.EpochCommit.ClusterQCs) {
+		return nil, fmt.Errorf("number of clusters (%d) does not match number of QCs (%d)", len(untrusted.EpochSetup.Assignments), len(untrusted.EpochCommit.ClusterQCs))
+	}
+
+	return &EpochRecover{
+		EpochSetup:  untrusted.EpochSetup,
+		EpochCommit: untrusted.EpochCommit,
+	}, nil
 }
 
 func (er *EpochRecover) ServiceEvent() ServiceEvent {
@@ -241,6 +347,8 @@ func (er *EpochRecover) EqualTo(other *EpochRecover) bool {
 // artifacts produced by the DKG are referred to with the "DKG" prefix (for example, DKGGroupKey).
 // These artifacts are *produced by* the DKG, but used for the Random Beacon. As such, other
 // components refer to these same artifacts with the "RandomBeacon" prefix.
+//
+//structwrite:immutable - mutations allowed only within the constructor
 type EpochCommit struct {
 	// Counter is the epoch counter of the epoch being committed
 	Counter uint64
@@ -265,6 +373,58 @@ type EpochCommit struct {
 	//          and may NOT include identifiers for all nodes in the consensus committee.
 	//
 	DKGIndexMap DKGIndexMap
+}
+
+// UntrustedEpochCommit is an untrusted input-only representation of an EpochCommit,
+// used for construction.
+//
+// This type exists to ensure that constructor functions are invoked explicitly
+// with named fields, which improves clarity and reduces the risk of incorrect field
+// ordering during construction.
+//
+// An instance of UntrustedEpochCommit should be validated and converted into
+// a trusted EpochCommit using NewEpochCommit constructor.
+type UntrustedEpochCommit EpochCommit
+
+// NewEpochCommit creates a new instance of EpochCommit.
+// Construction EpochCommit allowed only within the constructor.
+//
+// All errors indicate a valid EpochCommit cannot be constructed from the input.
+func NewEpochCommit(untrusted UntrustedEpochCommit) (*EpochCommit, error) {
+	if untrusted.DKGGroupKey == nil {
+		return nil, fmt.Errorf("DKG group key must not be nil")
+	}
+	if len(untrusted.ClusterQCs) == 0 {
+		return nil, fmt.Errorf("cluster QCs list must not be empty")
+	}
+	// TODO(mainnet27): remove this conditional: https://github.com/onflow/flow-go/issues/6772
+	if untrusted.DKGIndexMap != nil {
+		// enforce invariant: len(DKGParticipantKeys) == len(DKGIndexMap)
+		n := len(untrusted.DKGIndexMap) // size of the DKG committee
+		if len(untrusted.DKGParticipantKeys) != n {
+			return nil, fmt.Errorf("number of %d Random Beacon key shares is inconsistent with number of DKG participants (len=%d)", len(untrusted.DKGParticipantKeys), len(untrusted.DKGIndexMap))
+		}
+
+		// enforce invariant: DKGIndexMap values form the set {0, 1, ..., n-1} where n=len(DKGParticipantKeys)
+		encounteredIndex := make([]bool, n)
+		for _, index := range untrusted.DKGIndexMap {
+			if index < 0 || index >= n {
+				return nil, fmt.Errorf("index %d is outside allowed range [0,n-1] for a DKG committee of size n=%d", index, n)
+			}
+			if encounteredIndex[index] {
+				return nil, fmt.Errorf("duplicated DKG index %d", index)
+			}
+			encounteredIndex[index] = true
+		}
+	}
+
+	return &EpochCommit{
+		Counter:            untrusted.Counter,
+		ClusterQCs:         untrusted.ClusterQCs,
+		DKGGroupKey:        untrusted.DKGGroupKey,
+		DKGParticipantKeys: untrusted.DKGParticipantKeys,
+		DKGIndexMap:        untrusted.DKGIndexMap,
+	}, nil
 }
 
 // ClusterQCVoteData represents the votes for a cluster quorum certificate, as
@@ -337,22 +497,24 @@ func encodableFromCommit(commit *EpochCommit) encodableCommit {
 	}
 }
 
-func commitFromEncodable(enc encodableCommit) EpochCommit {
+func commitFromEncodable(enc encodableCommit) (*EpochCommit, error) {
 	dkgKeys := make([]crypto.PublicKey, 0, len(enc.DKGParticipantKeys))
 	for _, key := range enc.DKGParticipantKeys {
 		dkgKeys = append(dkgKeys, key.PublicKey)
 	}
-	return EpochCommit{
-		Counter:            enc.Counter,
-		ClusterQCs:         enc.ClusterQCs,
-		DKGGroupKey:        enc.DKGGroupKey.PublicKey,
-		DKGParticipantKeys: dkgKeys,
-		DKGIndexMap:        enc.DKGIndexMap,
-	}
+	return NewEpochCommit(
+		UntrustedEpochCommit{
+			Counter:            enc.Counter,
+			ClusterQCs:         enc.ClusterQCs,
+			DKGGroupKey:        enc.DKGGroupKey.PublicKey,
+			DKGParticipantKeys: dkgKeys,
+			DKGIndexMap:        enc.DKGIndexMap,
+		},
+	)
 }
 
-func (commit EpochCommit) MarshalJSON() ([]byte, error) {
-	return json.Marshal(encodableFromCommit(&commit))
+func (commit *EpochCommit) MarshalJSON() ([]byte, error) {
+	return json.Marshal(encodableFromCommit(commit))
 }
 
 func (commit *EpochCommit) UnmarshalJSON(b []byte) error {
@@ -362,7 +524,12 @@ func (commit *EpochCommit) UnmarshalJSON(b []byte) error {
 		return err
 	}
 
-	*commit = commitFromEncodable(enc)
+	newCommit, err := commitFromEncodable(enc)
+	if err != nil {
+		return err
+	}
+	*commit = *newCommit
+
 	return nil
 }
 
@@ -377,7 +544,12 @@ func (commit *EpochCommit) UnmarshalCBOR(b []byte) error {
 		return err
 	}
 
-	*commit = commitFromEncodable(enc)
+	newCommit, err := commitFromEncodable(enc)
+	if err != nil {
+		return err
+	}
+	*commit = *newCommit
+
 	return nil
 }
 
@@ -391,7 +563,12 @@ func (commit *EpochCommit) UnmarshalMsgpack(b []byte) error {
 	if err != nil {
 		return err
 	}
-	*commit = commitFromEncodable(enc)
+	newCommit, err := commitFromEncodable(enc)
+	if err != nil {
+		return err
+	}
+	*commit = *newCommit
+
 	return nil
 }
 
@@ -399,50 +576,29 @@ func (commit *EpochCommit) UnmarshalMsgpack(b []byte) error {
 // differently from JSON/msgpack, because it does not handle custom encoders
 // within map types.
 // NOTE: DecodeRLP is not needed, as this is only used for hashing.
-// TODO(EFM, #6794): Currently we implement RLP encoding based on availability of DKGIndexMap
-// this is needed to support backward compatibility, to guarantee that we will produce same hash
-// for the same event. This should be removed once we complete the network upgrade.
 func (commit *EpochCommit) EncodeRLP(w io.Writer) error {
-	if commit.DKGIndexMap == nil {
-		rlpEncodable := struct {
-			Counter            uint64
-			ClusterQCs         []ClusterQCVoteData
-			DKGGroupKey        []byte
-			DKGParticipantKeys [][]byte
-		}{
-			Counter:            commit.Counter,
-			ClusterQCs:         commit.ClusterQCs,
-			DKGGroupKey:        commit.DKGGroupKey.Encode(),
-			DKGParticipantKeys: make([][]byte, 0, len(commit.DKGParticipantKeys)),
-		}
-		for _, key := range commit.DKGParticipantKeys {
-			rlpEncodable.DKGParticipantKeys = append(rlpEncodable.DKGParticipantKeys, key.Encode())
-		}
-
-		return rlp.Encode(w, rlpEncodable)
-	} else {
-		rlpEncodable := struct {
-			Counter            uint64
-			ClusterQCs         []ClusterQCVoteData
-			DKGGroupKey        []byte
-			DKGParticipantKeys [][]byte
-			DKGIndexMap        IdentifierList
-		}{
-			Counter:            commit.Counter,
-			ClusterQCs:         commit.ClusterQCs,
-			DKGGroupKey:        commit.DKGGroupKey.Encode(),
-			DKGParticipantKeys: make([][]byte, 0, len(commit.DKGParticipantKeys)),
-			DKGIndexMap:        make(IdentifierList, len(commit.DKGIndexMap)),
-		}
-		for _, key := range commit.DKGParticipantKeys {
-			rlpEncodable.DKGParticipantKeys = append(rlpEncodable.DKGParticipantKeys, key.Encode())
-		}
-		for id, index := range commit.DKGIndexMap {
-			rlpEncodable.DKGIndexMap[index] = id
-		}
-
-		return rlp.Encode(w, rlpEncodable)
+	rlpEncodable := struct {
+		Counter            uint64
+		ClusterQCs         []ClusterQCVoteData
+		DKGGroupKey        []byte
+		DKGParticipantKeys [][]byte
+		DKGIndexMap        IdentifierList
+	}{
+		Counter:            commit.Counter,
+		ClusterQCs:         commit.ClusterQCs,
+		DKGGroupKey:        commit.DKGGroupKey.Encode(),
+		DKGParticipantKeys: make([][]byte, 0, len(commit.DKGParticipantKeys)),
+		DKGIndexMap:        make(IdentifierList, len(commit.DKGIndexMap)),
 	}
+	for _, key := range commit.DKGParticipantKeys {
+		rlpEncodable.DKGParticipantKeys = append(rlpEncodable.DKGParticipantKeys, key.Encode())
+	}
+	// ensure index map is serialized in a consistent ordered manner
+	for id, index := range commit.DKGIndexMap {
+		rlpEncodable.DKGIndexMap[index] = id
+	}
+
+	return rlp.Encode(w, rlpEncodable)
 }
 
 // ID returns the hash of the event contents.
