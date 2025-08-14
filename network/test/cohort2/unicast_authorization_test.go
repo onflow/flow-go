@@ -402,7 +402,7 @@ func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_UnauthorizedUni
 		Identity: u.senderID,
 		OriginID: u.senderID.NodeID,
 		PeerID:   p2plogging.PeerId(expectedSenderPeerID),
-		MsgType:  "*flow.UntrustedProposal",
+		MsgType:  "*messages.Proposal",
 		Channel:  channels.ConsensusCommittee,
 		Protocol: message.ProtocolTypeUnicast,
 		Err:      message.ErrUnauthorizedUnicastOnChannel,

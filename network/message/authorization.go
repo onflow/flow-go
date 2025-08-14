@@ -406,7 +406,7 @@ func initializeMessageAuthConfigsMap() {
 func GetMessageAuthConfig(v interface{}) (MsgAuthConfig, error) {
 	switch v.(type) {
 	// consensus
-	case *flow.UntrustedProposal:
+	case *messages.Proposal:
 		return authorizationConfigs[BlockProposal], nil
 	case *messages.BlockVote:
 		return authorizationConfigs[BlockVote], nil
@@ -426,7 +426,7 @@ func GetMessageAuthConfig(v interface{}) (MsgAuthConfig, error) {
 		return authorizationConfigs[BlockResponse], nil
 
 	// cluster consensus
-	case *cluster.UntrustedProposal:
+	case *messages.ClusterProposal:
 		return authorizationConfigs[ClusterBlockProposal], nil
 	case *messages.ClusterBlockVote:
 		return authorizationConfigs[ClusterBlockVote], nil
