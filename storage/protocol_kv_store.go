@@ -12,15 +12,20 @@ import (
 // TODO maybe rename to `ProtocolStateSnapshots` (?) because at this low level, we are not exposing the
 // KV-store, it is just an encoded data blob
 type ProtocolKVStore interface {
-	// BatchStore stores the protocol state key value data with the given stateID.into the database
+	// BatchStore persists the KV-store snapshot in the database using the given ID as key. 
+	// BatchStore is idempotent, i.e. it accepts repeated calls with the same pairs of (stateID, kvStore).
+	// Here, the ID is expected to be a collision-resistant hash of the snapshot (including the 
+	// ProtocolStateVersion). Hence, for the same ID (key), BatchStore will reject changing the data (value).
 	// Expected errors during normal operations:
 	// - storage.ErrDataMismatch if a KV store for the given stateID has already been indexed, but different
 	BatchStore(rw ReaderBatchWriter, stateID flow.Identifier, data *flow.PSKeyValueStoreData) error
 
-	// BatchIndex returns an anonymous function intended to be executed as part of a database transaction.
-	// In a nutshell, we want to maintain a map from `blockID` to `stateID`, where `blockID` references the
-	// block that _proposes_ the updated key-value store.
-	// Upon call, the anonymous function persists the specific map entry in the node's database.
+	// BatchIndex appends the following operation to the provided write batch:
+	// we extend the map from `blockID` to `stateID`, where `blockID` references the
+	// block that _proposes_ updated key-value store. 
+	// BatchIndex is idempotent, i.e. it accepts repeated calls with the same pairs of (blockID , stateID).
+	// Per protocol convention, the block references the `stateID`. As the `blockID` is a collision-resistant hash,
+	// for the same `blockID`, BatchIndex will reject changing the data.
 	// Protocol convention:
 	//   - Consider block B, whose ingestion might potentially lead to an updated KV store. For example,
 	//     the KV store changes if we seal some execution results emitting specific service events.
