@@ -173,7 +173,7 @@ func (s *MessageHubSuite) TestProcessValidIncomingMessages() {
 	originID := unittest.IdentifierFixture()
 	s.Run("to-compliance-engine", func() {
 		proposal := unittest.ProposalFixture()
-		blockProposalMsg := flow.UntrustedProposal(*proposal)
+		blockProposalMsg := messages.Proposal(*proposal)
 		expectedComplianceMsg := flow.Slashable[*flow.Proposal]{
 			OriginID: originID,
 			Message:  proposal,

@@ -1,7 +1,6 @@
 package message
 
 import (
-	"github.com/onflow/flow-go/model/cluster"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/libp2p/message"
 	"github.com/onflow/flow-go/model/messages"
@@ -62,7 +61,7 @@ func initializeMessageAuthConfigsMap() {
 	authorizationConfigs[BlockProposal] = MsgAuthConfig{
 		Name: BlockProposal,
 		Type: func() interface{} {
-			return new(flow.UntrustedProposal)
+			return new(messages.Proposal)
 		},
 		Config: map[channels.Channel]ChannelAuthConfig{
 			channels.ConsensusCommittee: {
@@ -182,7 +181,7 @@ func initializeMessageAuthConfigsMap() {
 	authorizationConfigs[ClusterBlockProposal] = MsgAuthConfig{
 		Name: ClusterBlockProposal,
 		Type: func() interface{} {
-			return new(cluster.UntrustedProposal)
+			return new(messages.ClusterProposal)
 		},
 		Config: map[channels.Channel]ChannelAuthConfig{
 			channels.ConsensusClusterPrefix: {

@@ -191,7 +191,7 @@ func (s *MessageHubSuite) TestProcessValidIncomingMessages() {
 			Message:  proposal,
 		}
 		s.compliance.On("OnClusterBlockProposal", expectedComplianceMsg).Return(nil).Once()
-		err := s.hub.Process(channel, originID, (*cluster.UntrustedProposal)(proposal))
+		err := s.hub.Process(channel, originID, (*messages.ClusterProposal)(proposal))
 		require.NoError(s.T(), err)
 	})
 	s.Run("to-vote-aggregator", func() {

@@ -477,10 +477,22 @@ func (h *MessageHub) OnOwnProposal(proposal *flow.ProposalHeader, targetPublicat
 // messages. These cases must be logged and routed to a dedicated violation reporting consumer.
 func (h *MessageHub) Process(channel channels.Channel, originID flow.Identifier, message interface{}) error {
 	switch msg := message.(type) {
-	case *flow.Proposal:
+	// TODO(malleability immutable): Replace *messages.Proposal to *flow.Proposal and remove validation check when ToInternal() was added to decoder
+	case *messages.Proposal:
+		proposal, err := flow.NewProposal(flow.UntrustedProposal(*msg))
+		if err != nil {
+			// TODO(BFT, #7620): Replace this log statement with a call to the protocol violation consumer.
+			h.log.Warn().
+				Hex("origin_id", originID[:]).
+				Hex("block_id", logging.ID(msg.Block.ID())).
+				Uint64("block_height", msg.Block.Height).
+				Uint64("block_view", msg.Block.View).
+				Err(err).Msgf("received invalid proposal message")
+			return nil
+		}
 		h.compliance.OnBlockProposal(flow.Slashable[*flow.Proposal]{
 			OriginID: originID,
-			Message:  msg,
+			Message:  proposal,
 		})
 	case *messages.BlockVote:
 		vote, err := model.NewVote(model.UntrustedVote{

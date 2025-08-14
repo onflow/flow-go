@@ -14,6 +14,7 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	followermock "github.com/onflow/flow-go/engine/common/follower/mock"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module/compliance"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
@@ -121,7 +122,7 @@ func (s *EngineSuite) TestProcessGossipedValidBlock() {
 		close(done)
 	}).Once()
 
-	err := s.engine.Process(channels.ReceiveBlocks, originID, (*flow.UntrustedProposal)(proposal))
+	err := s.engine.Process(channels.ReceiveBlocks, originID, (*messages.Proposal)(proposal))
 	require.NoError(s.T(), err)
 
 	unittest.AssertClosesBefore(s.T(), done, time.Second)
