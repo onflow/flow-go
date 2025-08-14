@@ -3,8 +3,6 @@ package codec
 import (
 	"fmt"
 
-	"github.com/onflow/flow-go/model/cluster"
-	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/libp2p/message"
 	"github.com/onflow/flow-go/model/messages"
 )
@@ -71,7 +69,7 @@ func MessageCodeFromInterface(v interface{}) (MessageCode, string, error) {
 	s := what(v)
 	switch v.(type) {
 	// consensus
-	case *flow.UntrustedProposal:
+	case *messages.Proposal:
 		return CodeBlockProposal, s, nil
 	case *messages.BlockVote:
 		return CodeBlockVote, s, nil
@@ -79,7 +77,7 @@ func MessageCodeFromInterface(v interface{}) (MessageCode, string, error) {
 		return CodeTimeoutObject, s, nil
 
 	// cluster consensus
-	case *cluster.UntrustedProposal:
+	case *messages.ClusterProposal:
 		return CodeClusterBlockProposal, s, nil
 	case *messages.ClusterBlockVote:
 		return CodeClusterBlockVote, s, nil
@@ -101,17 +99,17 @@ func MessageCodeFromInterface(v interface{}) (MessageCode, string, error) {
 		return CodeBlockResponse, s, nil
 
 	// collections, guarantees & transactions
-	case *flow.CollectionGuarantee:
+	case *messages.CollectionGuarantee:
 		return CodeCollectionGuarantee, s, nil
-	case *flow.TransactionBody:
+	case *messages.TransactionBody:
 		return CodeTransactionBody, s, nil
-	case *flow.Transaction:
+	case *messages.Transaction:
 		return CodeTransaction, s, nil
 
 	// core messages for execution & verification
-	case *flow.ExecutionReceipt:
+	case *messages.ExecutionReceipt:
 		return CodeExecutionReceipt, s, nil
-	case *flow.ResultApproval:
+	case *messages.ResultApproval:
 		return CodeResultApproval, s, nil
 
 	// data exchange for execution of blocks

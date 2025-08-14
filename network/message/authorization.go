@@ -406,7 +406,7 @@ func initializeMessageAuthConfigsMap() {
 func GetMessageAuthConfig(v interface{}) (MsgAuthConfig, error) {
 	switch v.(type) {
 	// consensus
-	case *flow.UntrustedProposal:
+	case *messages.Proposal:
 		return authorizationConfigs[BlockProposal], nil
 	case *messages.BlockVote:
 		return authorizationConfigs[BlockVote], nil
@@ -436,15 +436,15 @@ func GetMessageAuthConfig(v interface{}) (MsgAuthConfig, error) {
 		return authorizationConfigs[ClusterBlockResponse], nil
 
 	// collections, guarantees & transactions
-	case *flow.CollectionGuarantee:
+	case *messages.CollectionGuarantee:
 		return authorizationConfigs[CollectionGuarantee], nil
-	case *flow.TransactionBody:
+	case *messages.TransactionBody:
 		return authorizationConfigs[TransactionBody], nil
 
 	// core messages for execution & verification
-	case *flow.ExecutionReceipt:
+	case *messages.ExecutionReceipt:
 		return authorizationConfigs[ExecutionReceipt], nil
-	case *flow.ResultApproval:
+	case *messages.ResultApproval:
 		return authorizationConfigs[ResultApproval], nil
 
 	// data exchange for execution of blocks
