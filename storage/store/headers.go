@@ -18,6 +18,8 @@ type Headers struct {
 	heightCache *Cache[uint64, flow.Identifier]
 }
 
+var _ storage.Headers = (*Headers)(nil)
+
 func NewHeaders(collector module.CacheMetrics, db storage.DB) *Headers {
 
 	store := func(rw storage.ReaderBatchWriter, blockID flow.Identifier, header *flow.Header) error {

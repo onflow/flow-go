@@ -39,8 +39,6 @@ func NewPayloads(db storage.DB, index *Index, guarantees *Guarantees, seals *Sea
 func (p *Payloads) storeTx(rw storage.ReaderBatchWriter, blockID flow.Identifier, payload *flow.Payload, storingResults map[flow.Identifier]*flow.ExecutionResult) error {
 	// For correct payloads, the execution result is part of the payload or it's already stored
 	// in storage. If execution result is not present in either of those places, we error.
-	// ATTENTION: this is unnecessarily complex if we have execution receipt which points an execution result
-	// which is not included in current payload but was incorporated in one of previous blocks.
 
 	resultsByID := payload.Results.Lookup()
 	fullReceipts := make([]*flow.ExecutionReceipt, 0, len(payload.Receipts))
@@ -54,7 +52,7 @@ func (p *Payloads) storeTx(rw storage.ReaderBatchWriter, blockID flow.Identifier
 				result, err = p.results.ByID(meta.ResultID)
 				if err != nil {
 					if errors.Is(err, storage.ErrNotFound) {
-						return fmt.Errorf("invalid payload referencing unknown execution result %v, err: %w", meta.ResultID, err)
+						return irrecoverable.NewExceptionf("invalid payload referencing unknown execution result %v, err: %w", meta.ResultID, err)
 					}
 					return err
 				}
