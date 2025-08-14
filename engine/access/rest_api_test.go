@@ -27,6 +27,8 @@ import (
 	"github.com/onflow/flow-go/engine/access/rest/websockets"
 	"github.com/onflow/flow-go/engine/access/rpc"
 	"github.com/onflow/flow-go/engine/access/rpc/backend"
+	"github.com/onflow/flow-go/engine/access/rpc/backend/node_communicator"
+	"github.com/onflow/flow-go/engine/access/rpc/backend/query_mode"
 	statestreambackend "github.com/onflow/flow-go/engine/access/state_stream/backend"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/grpcserver"
@@ -176,7 +178,10 @@ func (suite *RestAPITestSuite) SetupTest() {
 		MaxHeightRange:       0,
 		Log:                  suite.log,
 		SnapshotHistoryLimit: 0,
-		Communicator:         backend.NewNodeCommunicator(false),
+		Communicator:         node_communicator.NewNodeCommunicator(false),
+		EventQueryMode:       query_mode.IndexQueryModeExecutionNodesOnly,
+		ScriptExecutionMode:  query_mode.IndexQueryModeExecutionNodesOnly,
+		TxResultQueryMode:    query_mode.IndexQueryModeExecutionNodesOnly,
 	})
 	require.NoError(suite.T(), err)
 
@@ -241,6 +246,7 @@ func (suite *RestAPITestSuite) TestGetBlock() {
 		block.Header.Height = uint64(i)
 		suite.blocks.On("ByID", block.ID()).Return(block, nil)
 		suite.blocks.On("ByHeight", block.Header.Height).Return(block, nil)
+		suite.headers.On("BlockIDByHeight", block.Header.Height).Return(block.ID(), nil)
 		testBlocks[i] = block
 		testBlockIDs[i] = block.ID().String()
 

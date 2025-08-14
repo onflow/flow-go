@@ -68,7 +68,6 @@ import (
 	"github.com/onflow/flow-go/state/protocol/events/gadgets"
 	protocol_state "github.com/onflow/flow-go/state/protocol/protocol_state/state"
 	bstorage "github.com/onflow/flow-go/storage/badger"
-	"github.com/onflow/flow-go/storage/badger/operation"
 	"github.com/onflow/flow-go/utils/io"
 )
 
@@ -202,15 +201,6 @@ func main() {
 	nodeBuilder.
 		PreInit(cmd.DynamicStartPreInit).
 		ValidateRootSnapshot(badgerState.ValidRootSnapshotContainsEntityExpiryRange).
-		PostInit(func(nodeConfig *cmd.NodeConfig) error {
-			// TODO(EFM, #6794): This function is introduced to implement a backward-compatible upgrade from v1 to v2.
-			// Remove this once we complete the network upgrade.
-			log := nodeConfig.Logger.With().Str("postinit", "dkg_end_state_migration").Logger()
-			if err := operation.RetryOnConflict(nodeBuilder.SecretsDB.Update, operation.MigrateDKGEndStateFromV1(log)); err != nil {
-				return fmt.Errorf("could not migrate DKG end state from v1 to v2: %w", err)
-			}
-			return nil
-		}).
 		Module("machine account config", func(node *cmd.NodeConfig) error {
 			machineAccountInfo, err = cmd.LoadNodeMachineAccountInfoFile(node.BootstrapDir, node.NodeID)
 			return err
@@ -501,7 +491,7 @@ func main() {
 		}).
 		Component("matching engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			receiptRequester, err = requester.New(
-				node.Logger,
+				node.Logger.With().Str("entity", "receipt").Logger(),
 				node.Metrics.Engine,
 				node.EngineRegistry,
 				node.Me,

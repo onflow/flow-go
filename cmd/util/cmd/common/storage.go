@@ -3,7 +3,7 @@ package common
 import (
 	"fmt"
 
-	"github.com/cockroachdb/pebble"
+	"github.com/cockroachdb/pebble/v2"
 	"github.com/dgraph-io/badger/v2"
 	"github.com/rs/zerolog/log"
 
@@ -174,7 +174,7 @@ func WithStorage(flags DBFlags, f func(storage.DB) error) error {
 	log.Info().Msgf("using %s db at %s", usedDir.UseDB, usedDir.DBDir)
 
 	if usedDir.UseDB == UsedDBPebble {
-		db, err := pebblestorage.MustOpenDefaultPebbleDB(log.Logger, usedDir.DBDir)
+		db, err := pebblestorage.ShouldOpenDefaultPebbleDB(log.Logger, usedDir.DBDir)
 		if err != nil {
 			return fmt.Errorf("can not open pebble db at %v: %w", usedDir.DBDir, err)
 		}
@@ -196,7 +196,7 @@ func WithStorage(flags DBFlags, f func(storage.DB) error) error {
 
 // InitBadgerAndPebble initializes the badger and pebble storages
 func InitBadgerAndPebble(dirs TwoDBDirs) (bdb *badger.DB, pdb *pebble.DB, err error) {
-	pdb, err = pebblestorage.MustOpenDefaultPebbleDB(
+	pdb, err = pebblestorage.ShouldOpenDefaultPebbleDB(
 		log.Logger.With().Str("pebbledb", "protocol").Logger(), dirs.PebbleDir)
 	if err != nil {
 		return nil, nil, err

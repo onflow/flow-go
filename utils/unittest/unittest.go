@@ -14,8 +14,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/cockroachdb/pebble"
+	"github.com/cockroachdb/pebble/v2"
 	"github.com/dgraph-io/badger/v2"
+	"github.com/jordanschalm/lockctx"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/onflow/crypto"
 	"github.com/stretchr/testify/assert"
@@ -28,6 +29,7 @@ import (
 	cborcodec "github.com/onflow/flow-go/network/codec/cbor"
 	"github.com/onflow/flow-go/network/p2p/keyutils"
 	"github.com/onflow/flow-go/network/topology"
+	"github.com/onflow/flow-go/storage/locks"
 )
 
 type SkipReason int
@@ -319,6 +321,16 @@ func RunWithTempDir(t testing.TB, f func(string)) {
 	f(dbDir)
 }
 
+func RunWithTempDirs(t testing.TB, f func(string, string)) {
+	dbDir := TempDir(t)
+	dbDir2 := TempDir(t)
+	defer func() {
+		require.NoError(t, os.RemoveAll(dbDir))
+		require.NoError(t, os.RemoveAll(dbDir2))
+	}()
+	f(dbDir, dbDir2)
+}
+
 func badgerDB(t testing.TB, dir string, create func(badger.Options) (*badger.DB, error)) *badger.DB {
 	opts := badger.
 		DefaultOptions(dir).
@@ -387,7 +399,9 @@ func TempPebbleDBWithOpts(t testing.TB, opts *pebble.Options) (*pebble.DB, strin
 
 func RunWithPebbleDB(t testing.TB, f func(*pebble.DB)) {
 	RunWithTempDir(t, func(dir string) {
-		db, err := pebble.Open(dir, &pebble.Options{})
+		db, err := pebble.Open(dir, &pebble.Options{
+			FormatMajorVersion: pebble.FormatNewest,
+		})
 		require.NoError(t, err)
 		defer func() {
 			assert.NoError(t, db.Close())
@@ -413,13 +427,17 @@ func RunWithBadgerDBAndPebbleDB(t testing.TB, f func(*badger.DB, *pebble.DB)) {
 }
 
 func PebbleDB(t testing.TB, dir string) *pebble.DB {
-	db, err := pebble.Open(dir, &pebble.Options{})
+	db, err := pebble.Open(dir, &pebble.Options{
+		FormatMajorVersion: pebble.FormatNewest,
+	})
 	require.NoError(t, err)
 	return db
 }
 
 func TypedPebbleDB(t testing.TB, dir string, create func(string, *pebble.Options) (*pebble.DB, error)) *pebble.DB {
-	db, err := create(dir, &pebble.Options{})
+	db, err := create(dir, &pebble.Options{
+		FormatMajorVersion: pebble.FormatNewest,
+	})
 	require.NoError(t, err)
 	return db
 }
@@ -436,6 +454,16 @@ func RunWithTypedPebbleDB(
 		}()
 		f(db)
 	})
+}
+
+func LockManagerWithContext(t *testing.T, lcks ...string) (lockctx.Manager, lockctx.Context) {
+	lockManager := locks.NewTestingLockManager()
+	lctx := lockManager.NewContext()
+	for _, lock := range lcks {
+		err := lctx.AcquireLock(lock)
+		require.NoError(t, err)
+	}
+	return lockManager, lctx
 }
 
 func Concurrently(n int, f func(int)) {
