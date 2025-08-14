@@ -228,6 +228,7 @@ func (i *indexCoreTest) initIndexer() *indexCoreTest {
 		flow.Testnet.Chain(),
 		derivedChainData,
 		collectionExecutedMetric,
+		storage.NewTestingLockManager(),
 	)
 	require.NoError(i.t, err)
 	i.indexer = indexer

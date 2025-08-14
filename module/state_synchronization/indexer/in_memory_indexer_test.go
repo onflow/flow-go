@@ -11,6 +11,7 @@ import (
 	"github.com/onflow/flow-go/ledger/common/convert"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
+	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/store/inmemory/unsynchronized"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -340,5 +341,6 @@ func createInMemoryIndexer(executionResult *flow.ExecutionResult, header *flow.H
 		unsynchronized.NewLightTransactionResults(),
 		unsynchronized.NewTransactionResultErrorMessages(),
 		executionResult,
-		header)
+		header,
+		storage.NewTestingLockManager())
 }
