@@ -19,7 +19,6 @@ import (
 	"github.com/onflow/flow/protobuf/go/flow/entities"
 	execproto "github.com/onflow/flow/protobuf/go/flow/execution"
 
-	"github.com/onflow/flow-go/engine/access/index"
 	access "github.com/onflow/flow-go/engine/access/mock"
 	"github.com/onflow/flow-go/engine/access/rpc/backend/node_communicator"
 	"github.com/onflow/flow-go/engine/access/rpc/backend/query_mode"
@@ -28,8 +27,9 @@ import (
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/executiondatasync/optimistic_sync"
+	osyncmock "github.com/onflow/flow-go/module/executiondatasync/optimistic_sync/mock"
+
 	"github.com/onflow/flow-go/module/irrecoverable"
-	syncmock "github.com/onflow/flow-go/module/state_synchronization/mock"
 	protocol "github.com/onflow/flow-go/state/protocol/mock"
 	"github.com/onflow/flow-go/storage"
 	storagemock "github.com/onflow/flow-go/storage/mock"
@@ -54,7 +54,6 @@ type EventsSuite struct {
 	params     *protocol.Params
 	rootHeader *flow.Header
 
-	eventsIndex       *index.EventsIndex
 	events            *storagemock.Events
 	headers           *storagemock.Headers
 	receipts          *storagemock.ExecutionReceipts
@@ -64,13 +63,16 @@ type EventsSuite struct {
 	executionNodes flow.IdentityList
 	execClient     *access.ExecutionAPIClient
 
-	sealedHead  *flow.Header
-	blocks      []*flow.Block
-	blockIDs    []flow.Identifier
-	blockEvents []flow.Event
+	executionResult *flow.ExecutionResult
+	sealedHead      *flow.Header
+	blocks          []*flow.Block
+	blockIDs        []flow.Identifier
+	blockEvents     []flow.Event
 
-	executionResultQueryProvider optimistic_sync.ExecutionResultQueryProvider
-	executionStateCache          optimistic_sync.ExecutionStateCache
+	executionResultProvider *osyncmock.ExecutionResultProvider
+	executionStateCache     *osyncmock.ExecutionStateCache
+	resultForestSnapshot    *osyncmock.Snapshot
+	executionState          *entities.ExecutionStateQuery
 
 	testCases []testCase
 }
@@ -93,8 +95,8 @@ func (s *EventsSuite) SetupTest() {
 
 	s.execClient = access.NewExecutionAPIClient(s.T())
 	s.executionNodes = unittest.IdentityListFixture(2, unittest.WithRole(flow.RoleExecution))
-	s.eventsIndex = index.NewEventsIndex(index.NewReporter(), s.events)
 
+	s.executionResult = unittest.ExecutionResultFixture()
 	blockCount := 5
 	s.blocks = make([]*flow.Block, blockCount)
 	s.blockIDs = make([]flow.Identifier, blockCount)
@@ -163,8 +165,35 @@ func (s *EventsSuite) SetupTest() {
 		return nil, storage.ErrNotFound
 	}).Maybe()
 
-	s.executionResultQueryProvider.
-		s.testCases = make([]testCase, 0)
+	s.resultForestSnapshot = osyncmock.NewSnapshot(s.T())
+	s.resultForestSnapshot.
+		On("Events").
+		Return(s.events, nil).
+		Maybe()
+
+	s.executionResultProvider = osyncmock.NewExecutionResultProvider(s.T())
+	s.executionResultProvider.
+		On("ExecutionResult", mock.Anything, mock.Anything).
+		Return(&optimistic_sync.ExecutionResultInfo{
+			ExecutionResult: s.executionResult,
+			ExecutionNodes:  s.executionNodes.ToSkeleton(),
+		}, nil).
+		Maybe() // it is called only for local query mode
+
+	s.executionStateCache = osyncmock.NewExecutionStateCache(s.T())
+	s.executionStateCache.
+		On("Snapshot", mock.Anything).
+		Return(s.resultForestSnapshot, nil).
+		Maybe() // it is called only for local query mode
+
+	executorIDs := unittest.IdentityListFixture(2, unittest.WithRole(flow.RoleExecution))
+	s.executionState = &entities.ExecutionStateQuery{
+		AgreeingExecutorsCount:  2,
+		RequiredExecutorId:      convert.IdentifiersToMessages(executorIDs.NodeIDs()),
+		IncludeExecutorMetadata: false,
+	}
+
+	s.testCases = make([]testCase, 0)
 
 	for _, encoding := range []entities.EventEncodingVersion{
 		entities.EventEncodingVersion_CCF_V0,
@@ -191,105 +220,67 @@ func (s *EventsSuite) TestGetEvents_HappyPaths() {
 	startHeight := s.blocks[0].Header.Height
 	endHeight := s.sealedHead.Height
 
-	reporter := syncmock.NewIndexReporter(s.T())
-	reporter.On("LowestIndexedHeight").Return(startHeight, nil)
-	reporter.On("HighestIndexedHeight").Return(endHeight+10, nil)
-	err := s.eventsIndex.Initialize(reporter)
-	s.Require().NoError(err)
-
 	s.state.On("Sealed").Return(s.snapshot)
 	s.snapshot.On("Head").Return(s.sealedHead, nil)
 
 	s.Run("GetEventsForHeightRange - end height updated", func() {
-		backend := s.defaultBackend(query_mode.IndexQueryModeFailover, s.eventsIndex)
+		backend := s.defaultBackend(query_mode.IndexQueryModeFailover)
 		endHeight := startHeight + 20 // should still return 5 responses
 		encoding := entities.EventEncodingVersion_CCF_V0
 
-		response, err := backend.GetEventsForHeightRange(ctx, targetEvent, startHeight, endHeight, encoding, nil)
+		response, _, err := backend.GetEventsForHeightRange(ctx, targetEvent, startHeight, endHeight, encoding, s.executionState)
 		s.Require().NoError(err)
 
 		s.assertResponse(response, encoding)
 	})
 
 	for _, tt := range s.testCases {
-		s.Run(fmt.Sprintf("all from storage - %s - %s", tt.encoding.String(), tt.queryMode), func() {
-			switch tt.queryMode {
-			case query_mode.IndexQueryModeExecutionNodesOnly:
-				// not applicable
+		s.Run(fmt.Sprintf("with local query mode. encdoing: %s, query mode: %s", tt.encoding.String(), tt.queryMode), func() {
+			if tt.queryMode != query_mode.IndexQueryModeLocalOnly {
 				return
-			case query_mode.IndexQueryModeLocalOnly, query_mode.IndexQueryModeFailover:
-				// only calls to local storage
 			}
 
-			backend := s.defaultBackend(tt.queryMode, s.eventsIndex)
-
-			response, err := backend.GetEventsForBlockIDs(ctx, targetEvent, s.blockIDs, tt.encoding, nil)
+			backend := s.defaultBackend(tt.queryMode)
+			response, _, err := backend.GetEventsForBlockIDs(ctx, targetEvent, s.blockIDs, tt.encoding, s.executionState)
 			s.Require().NoError(err)
 			s.assertResponse(response, tt.encoding)
 
-			response, err = backend.GetEventsForHeightRange(ctx, targetEvent, startHeight, endHeight, tt.encoding, nil)
+			response, _, err = backend.GetEventsForHeightRange(ctx, targetEvent, startHeight, endHeight, tt.encoding, s.executionState)
 			s.Require().NoError(err)
 			s.assertResponse(response, tt.encoding)
 		})
 
-		s.Run(fmt.Sprintf("all from en - %s - %s", tt.encoding.String(), tt.queryMode), func() {
-			events := storagemock.NewEvents(s.T())
-			eventsIndex := index.NewEventsIndex(index.NewReporter(), events)
-
-			switch tt.queryMode {
-			case query_mode.IndexQueryModeLocalOnly:
-				// not applicable
+		s.Run(fmt.Sprintf("with execution node query mode. encdoing: %s, query mode: %s", tt.encoding.String(), tt.queryMode), func() {
+			if tt.queryMode != query_mode.IndexQueryModeExecutionNodesOnly {
 				return
-			case query_mode.IndexQueryModeExecutionNodesOnly:
-				// only calls to EN, no calls to storage
-			case query_mode.IndexQueryModeFailover:
-				// all calls to storage fail
-				// simulated by not initializing the eventIndex so all calls return ErrIndexNotInitialized
 			}
 
-			backend := s.defaultBackend(tt.queryMode, eventsIndex)
+			backend := s.defaultBackend(tt.queryMode)
 			s.setupENSuccessResponse(targetEvent, s.blocks)
 
-			response, err := backend.GetEventsForBlockIDs(ctx, targetEvent, s.blockIDs, tt.encoding, nil)
+			response, _, err := backend.GetEventsForBlockIDs(ctx, targetEvent, s.blockIDs, tt.encoding, s.executionState)
 			s.Require().NoError(err)
 			s.assertResponse(response, tt.encoding)
 
-			response, err = backend.GetEventsForHeightRange(ctx, targetEvent, startHeight, endHeight, tt.encoding, nil)
+			response, _, err = backend.GetEventsForHeightRange(ctx, targetEvent, startHeight, endHeight, tt.encoding, s.executionState)
 			s.Require().NoError(err)
 			s.assertResponse(response, tt.encoding)
 		})
 
-		s.Run(fmt.Sprintf("mixed storage & en - %s - %s", tt.encoding.String(), tt.queryMode), func() {
-			events := storagemock.NewEvents(s.T())
-			eventsIndex := index.NewEventsIndex(index.NewReporter(), events)
-
-			switch tt.queryMode {
-			case query_mode.IndexQueryModeLocalOnly, query_mode.IndexQueryModeExecutionNodesOnly:
-				// not applicable
+		s.Run(fmt.Sprintf("with failover query mode. encdoing: %s, query mode: %s", tt.encoding.String(), tt.queryMode), func() {
+			if tt.queryMode != query_mode.IndexQueryModeFailover {
 				return
-			case query_mode.IndexQueryModeFailover:
-				// only failing blocks queried from EN
-				s.setupENSuccessResponse(targetEvent, []*flow.Block{s.blocks[0], s.blocks[4]})
 			}
 
-			// the first and last blocks are not available from storage, and should be fetched from the EN
-			reporter := syncmock.NewIndexReporter(s.T())
-			reporter.On("LowestIndexedHeight").Return(s.blocks[1].Header.Height, nil)
-			reporter.On("HighestIndexedHeight").Return(s.blocks[3].Header.Height, nil)
+			//TODO: this tests only local query mode tbh. we need to make it fail at some point and
+			// make sure that execution nodes are called
 
-			events.On("ByBlockID", s.blockIDs[1]).Return(s.blockEvents, nil)
-			events.On("ByBlockID", s.blockIDs[2]).Return(s.blockEvents, nil)
-			events.On("ByBlockID", s.blockIDs[3]).Return(s.blockEvents, nil)
-
-			err := eventsIndex.Initialize(reporter)
-			s.Require().NoError(err)
-
-			backend := s.defaultBackend(tt.queryMode, eventsIndex)
-			response, err := backend.GetEventsForBlockIDs(ctx, targetEvent, s.blockIDs, tt.encoding, nil)
+			backend := s.defaultBackend(tt.queryMode)
+			response, _, err := backend.GetEventsForBlockIDs(ctx, targetEvent, s.blockIDs, tt.encoding, s.executionState)
 			s.Require().NoError(err)
 			s.assertResponse(response, tt.encoding)
 
-			response, err = backend.GetEventsForHeightRange(ctx, targetEvent, startHeight, endHeight, tt.encoding, nil)
+			response, _, err = backend.GetEventsForHeightRange(ctx, targetEvent, startHeight, endHeight, tt.encoding, s.executionState)
 			s.Require().NoError(err)
 			s.assertResponse(response, tt.encoding)
 		})
@@ -304,19 +295,19 @@ func (s *EventsSuite) TestGetEventsForHeightRange_HandlesErrors() {
 	encoding := entities.EventEncodingVersion_CCF_V0
 
 	s.Run("returns error for endHeight < startHeight", func() {
-		backend := s.defaultBackend(query_mode.IndexQueryModeExecutionNodesOnly, s.eventsIndex)
+		backend := s.defaultBackend(query_mode.IndexQueryModeExecutionNodesOnly)
 		endHeight := startHeight - 1
 
-		response, err := backend.GetEventsForHeightRange(ctx, targetEvent, startHeight, endHeight, encoding, nil)
+		response, _, err := backend.GetEventsForHeightRange(ctx, targetEvent, startHeight, endHeight, encoding, s.executionState)
 		s.Assert().Equal(codes.InvalidArgument, status.Code(err))
 		s.Assert().Nil(response)
 	})
 
 	s.Run("returns error for range larger than max", func() {
-		backend := s.defaultBackend(query_mode.IndexQueryModeExecutionNodesOnly, s.eventsIndex)
+		backend := s.defaultBackend(query_mode.IndexQueryModeExecutionNodesOnly)
 		endHeight := startHeight + DefaultMaxHeightRange
 
-		response, err := backend.GetEventsForHeightRange(ctx, targetEvent, startHeight, endHeight, encoding, nil)
+		response, _, err := backend.GetEventsForHeightRange(ctx, targetEvent, startHeight, endHeight, encoding, s.executionState)
 		s.Assert().Equal(codes.InvalidArgument, status.Code(err))
 		s.Assert().Nil(response)
 	})
@@ -329,8 +320,8 @@ func (s *EventsSuite) TestGetEventsForHeightRange_HandlesErrors() {
 		signalerCtx := irrecoverable.WithSignalerContext(context.Background(),
 			irrecoverable.NewMockSignalerContextExpectError(s.T(), ctx, signCtxErr))
 
-		backend := s.defaultBackend(query_mode.IndexQueryModeExecutionNodesOnly, s.eventsIndex)
-		response, err := backend.GetEventsForHeightRange(signalerCtx, targetEvent, startHeight, endHeight, encoding, nil)
+		backend := s.defaultBackend(query_mode.IndexQueryModeExecutionNodesOnly)
+		response, _, err := backend.GetEventsForHeightRange(signalerCtx, targetEvent, startHeight, endHeight, encoding, s.executionState)
 		// these will never be returned in production
 		s.Assert().Equal(codes.Unknown, status.Code(err))
 		s.Assert().Nil(response)
@@ -343,8 +334,8 @@ func (s *EventsSuite) TestGetEventsForHeightRange_HandlesErrors() {
 		startHeight := s.sealedHead.Height + 1
 		endHeight := startHeight + 1
 
-		backend := s.defaultBackend(query_mode.IndexQueryModeExecutionNodesOnly, s.eventsIndex)
-		response, err := backend.GetEventsForHeightRange(ctx, targetEvent, startHeight, endHeight, encoding, nil)
+		backend := s.defaultBackend(query_mode.IndexQueryModeExecutionNodesOnly)
+		response, _, err := backend.GetEventsForHeightRange(ctx, targetEvent, startHeight, endHeight, encoding, s.executionState)
 		s.Assert().Equal(codes.OutOfRange, status.Code(err))
 		s.Assert().Nil(response)
 	})
@@ -358,15 +349,15 @@ func (s *EventsSuite) TestGetEventsForHeightRange_HandlesErrors() {
 		s.params.On("SporkRootBlockHeight").Return(sporkRootHeight).Once()
 		s.params.On("SealedRoot").Return(s.rootHeader, nil).Once()
 
-		backend := s.defaultBackend(query_mode.IndexQueryModeExecutionNodesOnly, s.eventsIndex)
-		response, err := backend.GetEventsForHeightRange(ctx, targetEvent, startHeight, endHeight, encoding, nil)
+		backend := s.defaultBackend(query_mode.IndexQueryModeExecutionNodesOnly)
+		response, _, err := backend.GetEventsForHeightRange(ctx, targetEvent, startHeight, endHeight, encoding, s.executionState)
 		s.Assert().Equal(codes.NotFound, status.Code(err))
 		s.Assert().ErrorContains(err, "Try to use a historic node")
 		s.Assert().Nil(response)
 	})
 
 	s.Run("returns error for startHeight < node root height", func() {
-		backend := s.defaultBackend(query_mode.IndexQueryModeExecutionNodesOnly, s.eventsIndex)
+		backend := s.defaultBackend(query_mode.IndexQueryModeExecutionNodesOnly)
 
 		sporkRootHeight := s.blocks[0].Header.Height - 10
 		nodeRootHeader := unittest.BlockHeaderWithHeight(s.blocks[0].Header.Height)
@@ -375,7 +366,7 @@ func (s *EventsSuite) TestGetEventsForHeightRange_HandlesErrors() {
 		s.params.On("SporkRootBlockHeight").Return(sporkRootHeight).Once()
 		s.params.On("SealedRoot").Return(nodeRootHeader, nil).Once()
 
-		response, err := backend.GetEventsForHeightRange(ctx, targetEvent, startHeight, endHeight, encoding, nil)
+		response, _, err := backend.GetEventsForHeightRange(ctx, targetEvent, startHeight, endHeight, encoding, s.executionState)
 		s.Assert().Equal(codes.NotFound, status.Code(err))
 		s.Assert().ErrorContains(err, "Try to use a different Access node")
 		s.Assert().Nil(response)
@@ -384,21 +375,20 @@ func (s *EventsSuite) TestGetEventsForHeightRange_HandlesErrors() {
 
 func (s *EventsSuite) TestGetEventsForBlockIDs_HandlesErrors() {
 	ctx := context.Background()
-
 	encoding := entities.EventEncodingVersion_CCF_V0
 
 	s.Run("returns error when too many blockIDs requested", func() {
-		backend := s.defaultBackend(query_mode.IndexQueryModeExecutionNodesOnly, s.eventsIndex)
+		backend := s.defaultBackend(query_mode.IndexQueryModeExecutionNodesOnly)
 		backend.maxHeightRange = 3
 
-		response, err := backend.GetEventsForBlockIDs(ctx, targetEvent, s.blockIDs, encoding, nil)
+		response, _, err := backend.GetEventsForBlockIDs(ctx, targetEvent, s.blockIDs, encoding, s.executionState)
 		s.Assert().Equal(codes.InvalidArgument, status.Code(err))
 		s.Assert().Nil(response)
 	})
 
 	s.Run("returns error for missing header", func() {
 		headers := storagemock.NewHeaders(s.T())
-		backend := s.defaultBackend(query_mode.IndexQueryModeExecutionNodesOnly, s.eventsIndex)
+		backend := s.defaultBackend(query_mode.IndexQueryModeExecutionNodesOnly)
 		backend.headers = headers
 
 		for i, blockID := range s.blockIDs {
@@ -411,7 +401,7 @@ func (s *EventsSuite) TestGetEventsForBlockIDs_HandlesErrors() {
 			headers.On("ByBlockID", blockID).Return(s.blocks[i].Header, nil)
 		}
 
-		response, err := backend.GetEventsForBlockIDs(ctx, targetEvent, s.blockIDs, encoding, nil)
+		response, _, err := backend.GetEventsForBlockIDs(ctx, targetEvent, s.blockIDs, encoding, s.executionState)
 		s.Assert().Equal(codes.NotFound, status.Code(err))
 		s.Assert().Nil(response)
 	})
@@ -441,7 +431,7 @@ func (s *EventsSuite) assertEncoding(event *flow.Event, encoding entities.EventE
 	s.Require().NoError(err)
 }
 
-func (s *EventsSuite) defaultBackend(mode query_mode.IndexQueryMode, eventsIndex *index.EventsIndex) *Events {
+func (s *EventsSuite) defaultBackend(mode query_mode.IndexQueryMode) *Events {
 	e, err := NewEventsBackend(
 		s.log,
 		s.state,
@@ -451,15 +441,16 @@ func (s *EventsSuite) defaultBackend(mode query_mode.IndexQueryMode, eventsIndex
 		s.connectionFactory,
 		node_communicator.NewNodeCommunicator(false),
 		mode,
-		eventsIndex,
 		commonrpc.NewExecutionNodeIdentitiesProvider(
 			s.log,
 			s.state,
 			s.receipts,
 			flow.IdentifierList{},
 			flow.IdentifierList{},
-		))
-
+		),
+		s.executionResultProvider,
+		s.executionStateCache,
+	)
 	require.NoError(s.T(), err)
 
 	return e
@@ -478,7 +469,8 @@ func (s *EventsSuite) setupExecutionNodes(block *flow.Block) {
 	receipts = unittest.ReceiptsForBlockFixture(block, s.executionNodes.NodeIDs())
 	s.receipts.On("ByBlockID", block.ID()).Return(receipts, nil)
 
-	s.connectionFactory.On("GetExecutionAPIClient", mock.Anything).
+	s.connectionFactory.
+		On("GetExecutionAPIClient", mock.Anything).
 		Return(s.execClient, &mocks.MockCloser{}, nil)
 }
 
@@ -514,7 +506,8 @@ func (s *EventsSuite) setupENSuccessResponse(eventType string, blocks []*flow.Bl
 		EventEncodingVersion: entities.EventEncodingVersion_CCF_V0,
 	}
 
-	s.execClient.On("GetEventsForBlockIDs", mock.Anything, expectedExecRequest).
+	s.execClient.
+		On("GetEventsForBlockIDs", mock.Anything, expectedExecRequest).
 		Return(expectedResponse, nil)
 }
 

@@ -11,7 +11,6 @@ import (
 	"github.com/onflow/flow/protobuf/go/flow/entities"
 
 	"github.com/onflow/flow-go/access"
-	"github.com/onflow/flow-go/engine/access/index"
 	"github.com/onflow/flow-go/engine/access/rpc/backend/common"
 	"github.com/onflow/flow-go/engine/access/rpc/backend/events/provider"
 	"github.com/onflow/flow-go/engine/access/rpc/backend/node_communicator"
@@ -48,22 +47,21 @@ func NewEventsBackend(
 	connFactory connection.ConnectionFactory,
 	nodeCommunicator node_communicator.Communicator,
 	queryMode query_mode.IndexQueryMode,
-	eventsIndex *index.EventsIndex,
 	execNodeIdentitiesProvider *rpc.ExecutionNodeIdentitiesProvider,
-	executionResultQueryProvider optimistic_sync.ExecutionResultQueryProvider,
+	executionResultProvider optimistic_sync.ExecutionResultProvider,
 	executionStateCache optimistic_sync.ExecutionStateCache,
 ) (*Events, error) {
 	var eventProvider provider.EventProvider
 
 	switch queryMode {
 	case query_mode.IndexQueryModeLocalOnly:
-		eventProvider = provider.NewLocalEventProvider(eventsIndex, executionResultQueryProvider, executionStateCache)
+		eventProvider = provider.NewLocalEventProvider(executionResultProvider, executionStateCache)
 
 	case query_mode.IndexQueryModeExecutionNodesOnly:
 		eventProvider = provider.NewENEventProvider(log, execNodeIdentitiesProvider, connFactory, nodeCommunicator)
 
 	case query_mode.IndexQueryModeFailover:
-		local := provider.NewLocalEventProvider(eventsIndex, executionResultQueryProvider, executionStateCache)
+		local := provider.NewLocalEventProvider(executionResultProvider, executionStateCache)
 		execNode := provider.NewENEventProvider(log, execNodeIdentitiesProvider, connFactory, nodeCommunicator)
 		eventProvider = provider.NewFailoverEventProvider(log, local, execNode)
 
@@ -87,20 +85,22 @@ func (e *Events) GetEventsForHeightRange(
 	eventType string,
 	startHeight, endHeight uint64,
 	requiredEventEncodingVersion entities.EventEncodingVersion,
-	execStateQuery *entities.ExecutionStateQuery,
-) ([]flow.BlockEvents, error) {
+	execState *entities.ExecutionStateQuery,
+) ([]flow.BlockEvents, entities.ExecutorMetadata, error) {
 	if _, err := events.ValidateEvent(flow.EventType(eventType), e.chain); err != nil {
-		return nil, status.Errorf(codes.InvalidArgument, "invalid event type: %v", err)
+		return nil, entities.ExecutorMetadata{},
+			status.Errorf(codes.InvalidArgument, "invalid event type: %v", err)
 	}
 
 	if endHeight < startHeight {
-		return nil, status.Error(codes.InvalidArgument, "start height must not be larger than end height")
+		return nil, entities.ExecutorMetadata{},
+			status.Error(codes.InvalidArgument, "start height must not be larger than end height")
 	}
 
 	rangeSize := endHeight - startHeight + 1 // range is inclusive on both ends
 	if rangeSize > uint64(e.maxHeightRange) {
-		return nil, status.Errorf(codes.InvalidArgument,
-			"requested block range (%d) exceeded maximum (%d)", rangeSize, e.maxHeightRange)
+		return nil, entities.ExecutorMetadata{},
+			status.Errorf(codes.InvalidArgument, "requested block range (%d) exceeded maximum (%d)", rangeSize, e.maxHeightRange)
 	}
 
 	// get the latest sealed block header
@@ -109,13 +109,13 @@ func (e *Events) GetEventsForHeightRange(
 		// sealed block must be in the store, so throw an exception for any error
 		err := irrecoverable.NewExceptionf("failed to lookup sealed header: %w", err)
 		irrecoverable.Throw(ctx, err)
-		return nil, err
+		return nil, entities.ExecutorMetadata{}, err
 	}
 
 	// start height should not be beyond the last sealed height
 	if startHeight > sealed.Height {
-		return nil, status.Errorf(codes.OutOfRange,
-			"start height %d is greater than the last sealed block height %d", startHeight, sealed.Height)
+		return nil, entities.ExecutorMetadata{},
+			status.Errorf(codes.OutOfRange, "start height %d is greater than the last sealed block height %d", startHeight, sealed.Height)
 	}
 
 	// limit max height to last sealed block in the chain
@@ -140,11 +140,11 @@ func (e *Events) GetEventsForHeightRange(
 		// and avoids calculating header.ID() for each block.
 		blockID, err := e.headers.BlockIDByHeight(i)
 		if err != nil {
-			return nil, rpc.ConvertStorageError(common.ResolveHeightError(e.state.Params(), i, err))
+			return nil, entities.ExecutorMetadata{}, rpc.ConvertStorageError(common.ResolveHeightError(e.state.Params(), i, err))
 		}
 		header, err := e.headers.ByBlockID(blockID)
 		if err != nil {
-			return nil, rpc.ConvertStorageError(fmt.Errorf("failed to get block header for %d: %w", i, err))
+			return nil, entities.ExecutorMetadata{}, rpc.ConvertStorageError(fmt.Errorf("failed to get block header for %d: %w", i, err))
 		}
 
 		blockHeaders = append(blockHeaders, provider.BlockMetadata{
@@ -154,12 +154,12 @@ func (e *Events) GetEventsForHeightRange(
 		})
 	}
 
-	resp, err := e.provider.Events(ctx, blockHeaders, flow.EventType(eventType), requiredEventEncodingVersion)
+	resp, metadata, err := e.provider.Events(ctx, blockHeaders, flow.EventType(eventType), requiredEventEncodingVersion, execState)
 	if err != nil {
-		return nil, err
+		return nil, metadata, err
 	}
 
-	return resp.Events, nil
+	return resp.Events, metadata, nil
 }
 
 // GetEventsForBlockIDs retrieves events for all the specified block IDs that have the given type
@@ -168,14 +168,15 @@ func (e *Events) GetEventsForBlockIDs(
 	eventType string,
 	blockIDs []flow.Identifier,
 	requiredEventEncodingVersion entities.EventEncodingVersion,
-	execStateQuery *entities.ExecutionStateQuery,
-) ([]flow.BlockEvents, error) {
+	executionState *entities.ExecutionStateQuery,
+) ([]flow.BlockEvents, entities.ExecutorMetadata, error) {
 	if _, err := events.ValidateEvent(flow.EventType(eventType), e.chain); err != nil {
-		return nil, status.Errorf(codes.InvalidArgument, "invalid event type: %v", err)
+		return nil, entities.ExecutorMetadata{}, status.Errorf(codes.InvalidArgument, "invalid event type: %v", err)
 	}
 
 	if uint(len(blockIDs)) > e.maxHeightRange {
-		return nil, status.Errorf(codes.InvalidArgument, "requested block range (%d) exceeded maximum (%d)", len(blockIDs), e.maxHeightRange)
+		return nil, entities.ExecutorMetadata{},
+			status.Errorf(codes.InvalidArgument, "requested block range (%d) exceeded maximum (%d)", len(blockIDs), e.maxHeightRange)
 	}
 
 	// find the block headers for all the block IDs
@@ -183,7 +184,8 @@ func (e *Events) GetEventsForBlockIDs(
 	for _, blockID := range blockIDs {
 		header, err := e.headers.ByBlockID(blockID)
 		if err != nil {
-			return nil, rpc.ConvertStorageError(fmt.Errorf("failed to get block header for %s: %w", blockID, err))
+			return nil, entities.ExecutorMetadata{},
+				rpc.ConvertStorageError(fmt.Errorf("failed to get block header for %s: %w", blockID, err))
 		}
 
 		blockHeaders = append(blockHeaders, provider.BlockMetadata{
@@ -193,10 +195,10 @@ func (e *Events) GetEventsForBlockIDs(
 		})
 	}
 
-	resp, err := e.provider.Events(ctx, blockHeaders, flow.EventType(eventType), requiredEventEncodingVersion)
+	resp, metadata, err := e.provider.Events(ctx, blockHeaders, flow.EventType(eventType), requiredEventEncodingVersion, executionState)
 	if err != nil {
-		return nil, err
+		return nil, metadata, err
 	}
 
-	return resp.Events, nil
+	return resp.Events, metadata, nil
 }

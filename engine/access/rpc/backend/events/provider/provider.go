@@ -14,8 +14,9 @@ type EventProvider interface {
 		ctx context.Context,
 		blocks []BlockMetadata,
 		eventType flow.EventType,
-		requiredEventEncodingVersion entities.EventEncodingVersion,
-	) (Response, error)
+		encodingVersion entities.EventEncodingVersion,
+		executionState *entities.ExecutionStateQuery,
+	) (Response, entities.ExecutorMetadata, error)
 }
 
 // BlockMetadata is used to capture information about requested blocks to avoid repeated blockID
