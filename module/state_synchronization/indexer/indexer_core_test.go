@@ -16,6 +16,7 @@ import (
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/convert"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	"github.com/onflow/flow-go/module/mempool/stdmap"
 	"github.com/onflow/flow-go/module/metrics"
@@ -159,7 +160,7 @@ func (i *indexCoreTest) setGetRegisters(f func(t *testing.T, ID flow.RegisterID,
 
 func (i *indexCoreTest) useDefaultStorageMocks() *indexCoreTest {
 
-	i.collections.On("StoreAndIndexByTransaction", mock.AnythingOfType("*flow.Collection")).Return(flow.LightCollection{}, nil).Maybe()
+	i.collections.On("StoreAndIndexByTransaction", mock.Anything, mock.AnythingOfType("*flow.Collection")).Return(flow.LightCollection{}, nil).Maybe()
 	i.transactions.On("Store", mock.AnythingOfType("*flow.TransactionBody")).Return(nil).Maybe()
 
 	return i
@@ -644,7 +645,7 @@ func TestIndexerIntegration_StoreAndGet(t *testing.T) {
 		pebbleStorage.RunWithRegistersStorageAtInitialHeights(t, 0, 0, func(registers *pebbleStorage.Registers) {
 			index, err := New(
 				logger,
-				metrics,
+				module.ExecutionStateIndexerMetrics(metrics),
 				badgerimpl.ToDB(db),
 				registers,
 				nil,
@@ -655,6 +656,7 @@ func TestIndexerIntegration_StoreAndGet(t *testing.T) {
 				flow.Testnet.Chain(),
 				derivedChainData,
 				nil,
+				storage.NewTestingLockManager(),
 			)
 			require.NoError(t, err)
 
@@ -678,7 +680,7 @@ func TestIndexerIntegration_StoreAndGet(t *testing.T) {
 		pebbleStorage.RunWithRegistersStorageAtInitialHeights(t, 0, 0, func(registers *pebbleStorage.Registers) {
 			index, err := New(
 				logger,
-				metrics,
+				module.ExecutionStateIndexerMetrics(metrics),
 				badgerimpl.ToDB(db),
 				registers,
 				nil,
@@ -689,6 +691,7 @@ func TestIndexerIntegration_StoreAndGet(t *testing.T) {
 				flow.Testnet.Chain(),
 				derivedChainData,
 				nil,
+				storage.NewTestingLockManager(),
 			)
 			require.NoError(t, err)
 
@@ -705,7 +708,7 @@ func TestIndexerIntegration_StoreAndGet(t *testing.T) {
 		pebbleStorage.RunWithRegistersStorageAtInitialHeights(t, 0, 0, func(registers *pebbleStorage.Registers) {
 			index, err := New(
 				logger,
-				metrics,
+				module.ExecutionStateIndexerMetrics(metrics),
 				badgerimpl.ToDB(db),
 				registers,
 				nil,
@@ -716,6 +719,7 @@ func TestIndexerIntegration_StoreAndGet(t *testing.T) {
 				flow.Testnet.Chain(),
 				derivedChainData,
 				nil,
+				storage.NewTestingLockManager(),
 			)
 			require.NoError(t, err)
 
@@ -749,7 +753,7 @@ func TestIndexerIntegration_StoreAndGet(t *testing.T) {
 		pebbleStorage.RunWithRegistersStorageAtInitialHeights(t, 0, 0, func(registers *pebbleStorage.Registers) {
 			index, err := New(
 				logger,
-				metrics,
+				module.ExecutionStateIndexerMetrics(metrics),
 				badgerimpl.ToDB(db),
 				registers,
 				nil,
@@ -760,6 +764,7 @@ func TestIndexerIntegration_StoreAndGet(t *testing.T) {
 				flow.Testnet.Chain(),
 				derivedChainData,
 				nil,
+				storage.NewTestingLockManager(),
 			)
 			require.NoError(t, err)
 

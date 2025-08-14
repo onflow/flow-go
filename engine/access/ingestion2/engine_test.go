@@ -211,13 +211,14 @@ func (s *Suite) initEngineAndSyncer(ctx irrecoverable.SignalerContext) (*Engine,
 
 	syncer, err := NewCollectionSyncer(
 		s.log,
-		s.collectionExecutedMetric,
-		s.request,
+		module.CollectionExecutedMetric(s.collectionExecutedMetric),
+		module.Requester(s.request),
 		s.proto.state,
 		s.blocks,
 		s.collections,
 		s.transactions,
 		s.lastFullBlockHeight,
+		storerr.NewTestingLockManager(),
 	)
 	require.NoError(s.T(), err)
 
@@ -424,9 +425,15 @@ func (s *Suite) TestOnCollection() {
 	light := collection.Light()
 
 	// we should store the light collection and index its transactions
-	s.collections.On("StoreAndIndexByTransaction", &collection).Return(light, nil).Once()
+	s.collections.On("StoreAndIndexByTransaction", mock.Anything, &collection).Return(light, nil).Once()
 
-	err := indexer.IndexCollection(&collection, s.collections, s.log, s.collectionExecutedMetric)
+	// Create a lock context for indexing
+	lctx := storerr.NewTestingLockManager().NewContext()
+	err := lctx.AcquireLock(storerr.LockInsertCollection)
+	require.NoError(s.T(), err)
+	defer lctx.Release()
+
+	err = indexer.IndexCollection(lctx, &collection, s.collections, s.log, module.CollectionExecutedMetric(s.collectionExecutedMetric))
 	require.NoError(s.T(), err)
 
 	// check that the collection was stored and indexed
@@ -491,9 +498,15 @@ func (s *Suite) TestOnCollectionDuplicate() {
 	light := collection.Light()
 
 	// we should store the light collection and index its transactions
-	s.collections.On("StoreAndIndexByTransaction", &collection).Return(light, storerr.ErrAlreadyExists).Once()
+	s.collections.On("StoreAndIndexByTransaction", mock.Anything, &collection).Return(light, storerr.ErrAlreadyExists).Once()
 
-	err := indexer.IndexCollection(&collection, s.collections, s.log, s.collectionExecutedMetric)
+	// Create a lock context for indexing
+	lctx := storerr.NewTestingLockManager().NewContext()
+	err := lctx.AcquireLock(storerr.LockInsertCollection)
+	require.NoError(s.T(), err)
+	defer lctx.Release()
+
+	err = indexer.IndexCollection(lctx, &collection, s.collections, s.log, module.CollectionExecutedMetric(s.collectionExecutedMetric))
 	require.Error(s.T(), err)
 	require.ErrorIs(s.T(), err, storerr.ErrAlreadyExists)
 

@@ -20,6 +20,7 @@ import (
 	"github.com/onflow/flow-go/fvm/storage/derived"
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/execution"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
@@ -129,7 +130,7 @@ func (s *ScriptExecutorSuite) SetupTest() {
 
 	indexerCore, err := indexer.New(
 		s.log,
-		metrics.NewNoopCollector(),
+		module.ExecutionStateIndexerMetrics(metrics.NewNoopCollector()),
 		nil,
 		s.registerIndex,
 		s.headers,
@@ -139,7 +140,8 @@ func (s *ScriptExecutorSuite) SetupTest() {
 		nil,
 		s.chain,
 		derivedChainData,
-		nil,
+		module.CollectionExecutedMetric(metrics.NewNoopCollector()),
+		storage.NewTestingLockManager(),
 	)
 	s.Require().NoError(err)
 
