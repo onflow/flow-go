@@ -428,31 +428,29 @@ func NewConsensusFollowerConfig(t *testing.T, networkingPrivKey crypto.PrivateKe
 
 // NetworkConfig is the config for the network.
 type NetworkConfig struct {
-	Nodes                       NodeConfigs
-	ConsensusFollowers          []ConsensusFollowerConfig
-	Observers                   []ObserverConfig
-	Name                        string
-	NClusters                   uint
-	ViewsInDKGPhase             uint64
-	ViewsInStakingAuction       uint64
-	ViewsInEpoch                uint64
-	ViewsPerSecond              uint64
-	FinalizationSafetyThreshold uint64
-	KVStoreFactory              func(epochStateID flow.Identifier) (protocol_state.KVStoreAPI, error)
+	Nodes                 NodeConfigs
+	ConsensusFollowers    []ConsensusFollowerConfig
+	Observers             []ObserverConfig
+	Name                  string
+	NClusters             uint
+	ViewsInDKGPhase       uint64
+	ViewsInStakingAuction uint64
+	ViewsInEpoch          uint64
+	ViewsPerSecond        uint64
+	KVStoreFactory        func(epochStateID flow.Identifier) (protocol_state.KVStoreAPI, error)
 }
 
 type NetworkConfigOpt func(*NetworkConfig)
 
 func NewNetworkConfig(name string, nodes NodeConfigs, opts ...NetworkConfigOpt) NetworkConfig {
 	c := NetworkConfig{
-		Nodes:                       nodes,
-		Name:                        name,
-		NClusters:                   1, // default to 1 cluster
-		ViewsInStakingAuction:       DefaultViewsInStakingAuction,
-		ViewsInDKGPhase:             DefaultViewsInDKGPhase,
-		ViewsInEpoch:                DefaultViewsInEpoch,
-		ViewsPerSecond:              DefaultViewsPerSecond,
-		FinalizationSafetyThreshold: DefaultFinalizationSafetyThreshold,
+		Nodes:                 nodes,
+		Name:                  name,
+		NClusters:             1, // default to 1 cluster
+		ViewsInStakingAuction: DefaultViewsInStakingAuction,
+		ViewsInDKGPhase:       DefaultViewsInDKGPhase,
+		ViewsInEpoch:          DefaultViewsInEpoch,
+		ViewsPerSecond:        DefaultViewsPerSecond,
 		KVStoreFactory: func(epochStateID flow.Identifier) (protocol_state.KVStoreAPI, error) {
 			return kvstore.NewDefaultKVStore(DefaultFinalizationSafetyThreshold, DefaultEpochExtensionViewCount, epochStateID)
 		},
@@ -465,12 +463,11 @@ func NewNetworkConfig(name string, nodes NodeConfigs, opts ...NetworkConfigOpt) 
 	return c
 }
 
-func NewNetworkConfigWithEpochConfig(name string, nodes NodeConfigs, viewsInStakingAuction, viewsInDKGPhase, viewsInEpoch, safetyThreshold uint64, opts ...NetworkConfigOpt) NetworkConfig {
+func NewNetworkConfigWithEpochConfig(name string, nodes NodeConfigs, viewsInStakingAuction, viewsInDKGPhase, viewsInEpoch uint64, opts ...NetworkConfigOpt) NetworkConfig {
 	c := NewNetworkConfig(name, nodes,
 		WithViewsInStakingAuction(viewsInStakingAuction),
 		WithViewsInDKGPhase(viewsInDKGPhase),
-		WithViewsInEpoch(viewsInEpoch),
-		WithFinalizationSafetyThreshold(safetyThreshold))
+		WithViewsInEpoch(viewsInEpoch))
 
 	for _, apply := range opts {
 		apply(&c)
@@ -500,12 +497,6 @@ func WithViewsPerSecond(views uint64) func(*NetworkConfig) {
 func WithViewsInDKGPhase(views uint64) func(*NetworkConfig) {
 	return func(config *NetworkConfig) {
 		config.ViewsInDKGPhase = views
-	}
-}
-
-func WithFinalizationSafetyThreshold(threshold uint64) func(*NetworkConfig) {
-	return func(config *NetworkConfig) {
-		config.FinalizationSafetyThreshold = threshold
 	}
 }
 
