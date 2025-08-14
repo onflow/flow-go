@@ -2,11 +2,13 @@ package store
 
 import (
 	"errors"
+
 	"fmt"
 	"sync"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/operation"
@@ -126,7 +128,7 @@ func (s *ProtocolKVStore) BatchStore(rw storage.ReaderBatchWriter, stateID flow.
 
 // BatchIndex appends the following operation to the provided write batch:
 // we extend the map from `blockID` to `stateID`, where `blockID` references the
-// block that _proposes_ updated key-value store. 
+// block that _proposes_ updated key-value store.
 // BatchIndex is idempotent, i.e. it accepts repeated calls with the same pairs of (blockID , stateID).
 // Per protocol convention, the block references the `stateID`. As the `blockID` is a collision-resistant hash,
 // for the same `blockID`, BatchIndex will reject changing the data.

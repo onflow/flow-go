@@ -81,7 +81,7 @@ func (b *Blocks) retrieve(blockID flow.Identifier) (*flow.Block, error) {
 // Expected errors during normal operations:
 // - storage.ErrNotFound if no block is found
 func (b *Blocks) ByID(blockID flow.Identifier) (*flow.Block, error) {
-	return b.retrieveTx(blockID)
+	return b.retrieve(blockID)
 }
 
 // ByHeight returns the block at the given height. It is only available
@@ -94,7 +94,7 @@ func (b *Blocks) ByHeight(height uint64) (*flow.Block, error) {
 	if err != nil {
 		return nil, err
 	}
-	return b.retrieveTx(blockID)
+	return b.retrieve(blockID)
 }
 
 // ByCollectionID returns the *finalized** block that contains the collection with the given ID.
@@ -115,7 +115,7 @@ func (b *Blocks) ByCollectionID(collID flow.Identifier) (*flow.Block, error) {
 // assumes a one-to-one map from collection ID to a *single* block ID. This holds for FINALIZED BLOCKS ONLY
 // *and* only in the absence of byzantine collector clusters (which the mature protocol must tolerate).
 // Hence, this function should be treated as a temporary solution, which requires generalization
-// (one-to-many mapping) for soft finality and the mature protocol. 
+// (one-to-many mapping) for soft finality and the mature protocol.
 //
 // No errors expected during normal operation.
 func (b *Blocks) IndexBlockForCollections(blockID flow.Identifier, collIDs []flow.Identifier) error {
