@@ -17,8 +17,8 @@ type Params struct {
 
 var _ protocol.Params = (*Params)(nil)
 
-// InstanceParams implements the interface protocol.InstanceParams. All functions
-// are served on demand directly from the database, _without_ any caching.
+// InstanceParams implements the interface [protocol.InstanceParams]. All values
+// are cached after construction and do not incur database reads.
 type InstanceParams struct {
 	// finalizedRoot marks the cutoff of the history this node knows about. It is the block at the tip
 	// of the root snapshot used to bootstrap this node - all newer blocks are synced from the network.
