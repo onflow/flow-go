@@ -642,5 +642,5 @@ func (m *mockStateTransition) Mock() protocol_statemock.OrthogonalStoreStateMach
 	stateMachine.On("Build").Run(func(args mock.Arguments) {
 		require.True(m.T, evolveStateCalled, "Method `OrthogonalStoreStateMachine.Build` called before `EvolveState`!")
 	}).Return(deferred.NewDeferredBlockPersist(), nil).Once()
-	return *stateMachine
+	return *stateMachine //nolint:govet
 }
