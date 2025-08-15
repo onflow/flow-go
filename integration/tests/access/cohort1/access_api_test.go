@@ -929,28 +929,24 @@ func (s *AccessAPISuite) TestExtensionDataPreservation() {
 
 	// Test with different ExtensionData values to ensure they are preserved
 	testCases := []struct {
-		name                  string
-		extensionData         []byte
-		description           string
-		expectedExtensionData []byte
+		name          string
+		extensionData []byte
+		description   string
 	}{
 		{
-			name:                  "plain_scheme_preservation",
-			extensionData:         []byte{0x0},
-			description:           "Plain authentication scheme ExtensionData preservation",
-			expectedExtensionData: nil,
+			name:          "plain_scheme_preservation",
+			extensionData: []byte{0x0},
+			description:   "Plain authentication scheme ExtensionData preservation",
 		},
 		{
-			name:                  "webauthn_scheme_preservation",
-			extensionData:         []byte{0x1, 0xAA, 0xBB, 0xCC, 0xDD},
-			description:           "WebAuthn authentication scheme ExtensionData preservation",
-			expectedExtensionData: []byte{0x1, 0xAA, 0xBB, 0xCC, 0xDD},
+			name:          "webauthn_scheme_preservation",
+			extensionData: []byte{0x1, 0xAA, 0xBB, 0xCC, 0xDD},
+			description:   "WebAuthn authentication scheme ExtensionData preservation",
 		},
 		{
-			name:                  "custom_data_preservation",
-			extensionData:         []byte{0x02, 0x11, 0x22, 0x33, 0x44, 0x55},
-			description:           "Custom ExtensionData preservation",
-			expectedExtensionData: []byte{0x02, 0x11, 0x22, 0x33, 0x44, 0x55},
+			name:          "custom_data_preservation",
+			extensionData: []byte{0x02, 0x11, 0x22, 0x33, 0x44, 0x55},
+			description:   "Custom ExtensionData preservation",
 		},
 	}
 
@@ -1033,7 +1029,7 @@ func (s *AccessAPISuite) TestExtensionDataPreservation() {
 			// Verify the retrieved transaction matches the original
 			envelopSigs := txFromAccess.GetTransaction().EnvelopeSignatures
 
-			s.Assert().Equal(tc.expectedExtensionData, envelopSigs[0].ExtensionData, "ExtensionData should be preserved in the envelope signature")
+			s.Assert().Equal(tc.extensionData, envelopSigs[0].ExtensionData, "ExtensionData should be preserved in the envelope signature")
 		})
 	}
 }
