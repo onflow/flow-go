@@ -665,6 +665,7 @@ func (s *AccessAPISuite) TestTransactionSignaturePlainExtensionData() {
 			name:          "plain_scheme_explicit",
 			extensionData: []byte{0x0},
 			description:   "Plain authentication scheme with explicit ExtensionData",
+			expectSuccess: true,
 		},
 		{
 			name:          "custom_extension_data",
