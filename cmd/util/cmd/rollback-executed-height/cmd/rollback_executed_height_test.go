@@ -13,7 +13,9 @@ import (
 	"github.com/onflow/flow-go/engine/execution/testutil"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/trace"
+	"github.com/onflow/flow-go/storage"
 	bstorage "github.com/onflow/flow-go/storage/badger"
+	"github.com/onflow/flow-go/storage/locks"
 	"github.com/onflow/flow-go/storage/operation/badgerimpl"
 	"github.com/onflow/flow-go/storage/operation/pebbleimpl"
 	"github.com/onflow/flow-go/storage/store"
@@ -28,8 +30,8 @@ func TestReExecuteBlock(t *testing.T) {
 
 			// bootstrap to init highest executed height
 			bootstrapper := bootstrap.NewBootstrapper(unittest.Logger())
-			genesis := unittest.BlockHeaderFixture()
-			rootSeal := unittest.Seal.Fixture(unittest.Seal.WithBlock(genesis))
+			genesis := unittest.BlockFixture()
+			rootSeal := unittest.Seal.Fixture(unittest.Seal.WithBlock(genesis.Header))
 			db := badgerimpl.ToDB(bdb)
 			err := bootstrapper.BootstrapExecutionDatabase(db, rootSeal)
 			require.NoError(t, err)
@@ -37,22 +39,30 @@ func TestReExecuteBlock(t *testing.T) {
 			// create all modules
 			metrics := &metrics.NoopCollector{}
 
-			headers := bstorage.NewHeaders(metrics, bdb)
-			txResults := store.NewTransactionResults(metrics, db, bstorage.DefaultCacheSize)
+			all := store.InitAll(metrics, db)
+			headers := all.Headers
+			blocks := all.Blocks
+			txResults := store.NewTransactionResults(metrics, db, store.DefaultCacheSize)
 			commits := store.NewCommits(metrics, db)
-			chunkDataPacks := store.NewChunkDataPacks(metrics, pebbleimpl.ToDB(pdb), bstorage.NewCollections(bdb, bstorage.NewTransactions(metrics, bdb)), bstorage.DefaultCacheSize)
-			results := store.NewExecutionResults(metrics, db)
-			receipts := store.NewExecutionReceipts(metrics, db, results, bstorage.DefaultCacheSize)
+			chunkDataPacks := store.NewChunkDataPacks(metrics, pebbleimpl.ToDB(pdb), store.NewCollections(db, store.NewTransactions(metrics, db)), store.DefaultCacheSize)
+			results := all.Results
+			receipts := all.Receipts
 			myReceipts := store.NewMyExecutionReceipts(metrics, db, receipts)
 			events := store.NewEvents(metrics, db)
 			serviceEvents := store.NewServiceEvents(metrics, db)
 
-			err = headers.Store(genesis)
+			manager, lctx := unittest.LockManagerWithContext(t, storage.LockInsertBlock)
+			err = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+				return blocks.BatchStore(lctx, rw, &genesis)
+			})
+			lctx.Release()
 			require.NoError(t, err)
 
 			getLatestFinalized := func() (uint64, error) {
-				return genesis.Height, nil
+				return genesis.Header.Height, nil
 			}
+
+			lockManager := locks.NewTestingLockManager()
 
 			// create execution state module
 			es := state.NewExecutionState(
@@ -71,13 +81,19 @@ func TestReExecuteBlock(t *testing.T) {
 				trace.NewNoopTracer(),
 				nil,
 				false,
+				lockManager,
 			)
 			require.NotNil(t, es)
 
 			computationResult := testutil.ComputationResultFixture(t)
 			header := computationResult.Block.Header
 
-			err = headers.Store(header)
+			lctx2 := manager.NewContext()
+			require.NoError(t, lctx2.AcquireLock(storage.LockInsertBlock))
+			err = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+				return blocks.BatchStore(lctx2, rw, computationResult.Block)
+			})
+			lctx2.Release()
 			require.NoError(t, err)
 
 			// save execution results
@@ -186,9 +202,11 @@ func TestReExecuteBlockWithDifferentResult(t *testing.T) {
 			myReceipts := store.NewMyExecutionReceipts(metrics, db, receipts)
 			events := store.NewEvents(metrics, db)
 			serviceEvents := store.NewServiceEvents(metrics, db)
-			transactions := bstorage.NewTransactions(metrics, bdb)
-			collections := bstorage.NewCollections(bdb, transactions)
+			transactions := store.NewTransactions(metrics, db)
+			collections := store.NewCollections(db, transactions)
 			chunkDataPacks := store.NewChunkDataPacks(metrics, pebbleimpl.ToDB(pdb), collections, bstorage.DefaultCacheSize)
+
+			lockManager := locks.NewTestingLockManager()
 
 			err = headers.Store(genesis)
 			require.NoError(t, err)
@@ -214,6 +232,7 @@ func TestReExecuteBlockWithDifferentResult(t *testing.T) {
 				trace.NewNoopTracer(),
 				nil,
 				false,
+				lockManager,
 			)
 			require.NotNil(t, es)
 

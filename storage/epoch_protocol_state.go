@@ -2,24 +2,20 @@ package storage
 
 import (
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/storage/badger/transaction"
 )
 
 // EpochProtocolStateEntries represents persistent, fork-aware storage for the Epoch-related
 // sub-state of the overall of the overall Protocol State (KV Store).
 type EpochProtocolStateEntries interface {
-	// StoreTx returns an anonymous function (intended to be executed as part of a badger transaction),
-	// which persists the given epoch sub-state as part of a DB tx. Per convention, the identities in
-	// the Protocol State must be in canonical order for the current and next epoch (if present),
+	// BatchStore persists the given epoch protocol state entry as part of a DB batch. Per convention, the identities in
+	// the flow.MinEpochStateEntry must be in canonical order for the current and next epoch (if present),
 	// otherwise an exception is returned.
-	// Expected errors of the returned anonymous function:
-	//   - storage.ErrAlreadyExists if an epoch sub-state with the given id is already stored
-	StoreTx(epochProtocolStateID flow.Identifier, epochProtocolStateEntry *flow.MinEpochStateEntry) func(*transaction.Tx) error
+	// No errors are expected during normal operation.
+	BatchStore(w Writer, epochProtocolStateID flow.Identifier, epochProtocolStateEntry *flow.MinEpochStateEntry) error
 
-	// Index returns an anonymous function that is intended to be executed as part of a database transaction.
-	// In a nutshell, we want to maintain a map from `blockID` to `epochProtocolStateID`, where `blockID` references the
-	// block that _proposes_ the epoch sub-state.
-	// Upon call, the anonymous function persists the specific map entry in the node's database.
+	// BatchIndex persists the specific map entry in the node's database.
+	// In a nutshell, we want to maintain a map from `blockID` to `epochStateEntry`, where `blockID` references the
+	// block that _proposes_ the referenced epoch protocol state entry.
 	// Protocol convention:
 	//   - Consider block B, whose ingestion might potentially lead to an updated protocol state. For example,
 	//     the protocol state changes if we seal some execution results emitting service events.
@@ -28,9 +24,8 @@ type EpochProtocolStateEntries interface {
 	//   - CAUTION: The protocol state requires confirmation by a QC and will only become active at the child block,
 	//     _after_ validating the QC.
 	//
-	// Expected errors during normal operations:
-	//   - storage.ErrAlreadyExists if a epoch sub-state for the given blockID has already been indexed
-	Index(blockID flow.Identifier, epochProtocolStateID flow.Identifier) func(*transaction.Tx) error
+	// No errors are expected during normal operation.
+	BatchIndex(rw ReaderBatchWriter, blockID flow.Identifier, epochProtocolStateID flow.Identifier) error
 
 	// ByID returns the flow.RichEpochStateEntry by its ID.
 	// Expected errors during normal operations:
