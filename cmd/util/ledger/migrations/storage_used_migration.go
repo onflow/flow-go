@@ -44,6 +44,7 @@ func (m *AccountUsageMigration) InitMigration(
 }
 
 func (m *AccountUsageMigration) Close() error {
+	m.rw.Close()
 	return nil
 }
 
@@ -159,7 +160,7 @@ func (m *AccountUsageMigration) MigrateAccount(
 		}
 
 		m.rw.Write(accountUsageMigrationReportData{
-			AccountAddress: address,
+			AccountAddress: address.Hex(),
 			OldStorageUsed: currentUsed,
 			NewStorageUsed: actualUsed,
 		})
@@ -169,7 +170,7 @@ func (m *AccountUsageMigration) MigrateAccount(
 }
 
 type accountUsageMigrationReportData struct {
-	AccountAddress common.Address
+	AccountAddress string
 	OldStorageUsed uint64
 	NewStorageUsed uint64
 }
