@@ -402,7 +402,7 @@ func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_UnauthorizedUni
 		Identity: u.senderID,
 		OriginID: u.senderID.NodeID,
 		PeerID:   p2plogging.PeerId(expectedSenderPeerID),
-		MsgType:  "*flow.UntrustedProposal",
+		MsgType:  "*messages.Proposal",
 		Channel:  channels.ConsensusCommittee,
 		Protocol: message.ProtocolTypeUnicast,
 		Err:      message.ErrUnauthorizedUnicastOnChannel,
@@ -421,8 +421,8 @@ func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_UnauthorizedUni
 	senderCon, err := u.senderNetwork.Register(channels.ConsensusCommittee, &mocknetwork.MessageProcessor{})
 	require.NoError(u.T(), err)
 
-	// flow.UntrustedProposal is not authorized to be sent via unicast over the ConsensusCommittee channel
-	payload := flow.UntrustedProposal(*unittest.ProposalFixture())
+	// messages.Proposal is not authorized to be sent via unicast over the ConsensusCommittee channel
+	payload := messages.Proposal(*unittest.ProposalFixture())
 	// send message via unicast
 	err = senderCon.Unicast(&payload, u.receiverID.NodeID)
 	require.NoError(u.T(), err)
