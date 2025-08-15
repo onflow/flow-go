@@ -54,7 +54,7 @@ func pushVote(c *cobra.Command, args []string) {
 	}
 
 	if flagVoteFilePath != "" {
-		voteFilePath = filepath.Join(flagVoteFilePath, voteFile)
+		voteFilePath = filepath.Join(flagVoteFilePath, "root-block-vote.json")
 	}
 
 	destination := filepath.Join(flagToken, fmt.Sprintf(bootstrap.FilenameRootBlockVote, nodeID))
