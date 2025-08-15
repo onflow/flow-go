@@ -11,6 +11,7 @@ import (
 	"github.com/dgraph-io/badger/v2"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
 	txerrmsgsmock "github.com/onflow/flow-go/engine/access/ingestion/tx_error_messages/mock"
@@ -24,8 +25,8 @@ import (
 	reqestermock "github.com/onflow/flow-go/module/state_synchronization/requester/mock"
 	"github.com/onflow/flow-go/storage"
 	bstorage "github.com/onflow/flow-go/storage/badger"
-	"github.com/onflow/flow-go/storage/badger/operation"
 	storagemock "github.com/onflow/flow-go/storage/mock"
+	"github.com/onflow/flow-go/storage/operation"
 	"github.com/onflow/flow-go/storage/operation/badgerimpl"
 	pebbleStorage "github.com/onflow/flow-go/storage/pebble"
 	"github.com/onflow/flow-go/storage/store"
@@ -49,7 +50,7 @@ type PipelineFunctionalSuite struct {
 	persistentResults             *store.LightTransactionResults
 	persistentTxResultErrMsg      *store.TransactionResultErrorMessages
 	consumerProgress              storage.ConsumerProgress
-	headers                       *bstorage.Headers
+	headers                       *store.Headers
 	results                       *store.ExecutionResults
 	persistentLatestSealedResult  *store.LatestPersistedSealedResult
 	core                          *CoreImpl
@@ -100,20 +101,35 @@ func (p *PipelineFunctionalSuite) SetupTest() {
 	p.Require().NoError(err)
 
 	// store and index the root header
-	p.headers = bstorage.NewHeaders(p.metrics, p.bdb)
+	p.headers = store.NewHeaders(p.metrics, p.db)
 
-	err = p.headers.Store(rootBlock)
+	err = p.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+		return operation.InsertHeader(rw.Writer(), rootBlock.ID(), rootBlock)
+	})
 	p.Require().NoError(err)
 
-	err = p.bdb.Update(operation.IndexBlockHeight(rootBlock.Height, rootBlock.ID()))
+	manager := storage.NewTestingLockManager()
+	lctx := manager.NewContext()
+	require.NoError(t, lctx.AcquireLock(storage.LockFinalizeBlock))
+	err = p.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+		return operation.IndexFinalizedBlockByHeight(lctx, rw, rootBlock.Height, rootBlock.ID())
+	})
 	p.Require().NoError(err)
+	lctx.Release()
 
 	// store and index the latest sealed block header
-	err = p.headers.Store(sealedBlock.Header)
+	err = p.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+		return operation.InsertHeader(rw.Writer(), sealedBlock.Header.ID(), sealedBlock.Header)
+	})
 	p.Require().NoError(err)
 
-	err = p.bdb.Update(operation.IndexBlockHeight(sealedBlock.Header.Height, sealedBlock.ID()))
+	lctx = manager.NewContext()
+	require.NoError(t, lctx.AcquireLock(storage.LockFinalizeBlock))
+	err = p.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+		return operation.IndexFinalizedBlockByHeight(lctx, rw, sealedBlock.Header.Height, sealedBlock.ID())
+	})
 	p.Require().NoError(err)
+	lctx.Release()
 
 	// Store and index sealed block execution result
 	err = p.results.Store(sealedExecutionResult)
