@@ -64,7 +64,7 @@ func pullRootBlock(c *cobra.Command, args []string) {
 	}
 
 	objectName := filepath.Join(flagToken, fmt.Sprintf(FilenameRandomBeaconCipher, nodeID))
-	fullOutpath = filepath.Join(flagBootDir, filepath.Base(objectName))
+	fullOutpath = filepath.Join(fullOutpath, filepath.Base(objectName))
 
 	log.Info().Msgf("downloading random beacon key: %s", objectName)
 
@@ -73,7 +73,7 @@ func pullRootBlock(c *cobra.Command, args []string) {
 		log.Fatal().Err(err).Msg("could not download file from google bucket")
 	}
 
-	err = unWrapFile(flagBootDir, nodeID)
+	err = unWrapFile(flagBootDir, nodeID, fullOutpath)
 	if err != nil {
 		log.Fatal().Err(err).Msg("could not unwrap random beacon file")
 	}
