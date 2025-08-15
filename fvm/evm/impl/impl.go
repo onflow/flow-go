@@ -14,7 +14,7 @@ import (
 	"github.com/onflow/flow-go/fvm/evm/types"
 	"github.com/onflow/flow-go/model/flow"
 
-	gethTypes "github.com/onflow/go-ethereum/core/types"
+	gethTypes "github.com/ethereum/go-ethereum/core/types"
 )
 
 var internalEVMContractStaticType = interpreter.ConvertSemaCompositeTypeToStaticCompositeType(

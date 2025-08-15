@@ -30,6 +30,7 @@ type Context struct {
 	// limits and set them to MaxUint64, effectively disabling these limits.
 	DisableMemoryAndInteractionLimits bool
 	EVMEnabled                        bool
+	ScheduleCallbacksEnabled          bool
 	ComputationLimit                  uint64
 	MemoryLimit                       uint64
 	MaxStateKeySize                   uint64
@@ -400,6 +401,14 @@ func WithProtocolStateSnapshot(snapshot protocol.SnapshotExecutionSubset) Option
 		ctx = WithEntropyProvider(snapshot)(ctx)
 
 		ctx = WithExecutionVersionProvider(environment.NewVersionBeaconExecutionVersionProvider(snapshot.VersionBeacon))(ctx)
+		return ctx
+	}
+}
+
+// WithScheduleCallbacksEnabled enables execution of scheduled callbacks.
+func WithScheduleCallbacksEnabled(enabled bool) Option {
+	return func(ctx Context) Context {
+		ctx.ScheduleCallbacksEnabled = enabled
 		return ctx
 	}
 }

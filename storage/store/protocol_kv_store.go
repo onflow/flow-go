@@ -2,12 +2,14 @@ package store
 
 import (
 	"errors"
+
 	"fmt"
 
 	"github.com/jordanschalm/lockctx"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/operation"
@@ -91,7 +93,10 @@ func NewProtocolKVStore(collector module.CacheMetrics,
 	}
 }
 
-// BatchStore stores the protocol state key value data with the given stateID.into the database
+// BatchStore persists the KV-store snapshot in the database using the given ID as key.
+// BatchStore is idempotent, i.e. it accepts repeated calls with the same pairs of (stateID, kvStore).
+// Here, the ID is expected to be a collision-resistant hash of the snapshot (including the
+// ProtocolStateVersion). Hence, for the same ID, BatchStore will reject changing the data.
 // Expected errors during normal operations:
 // - storage.ErrDataMismatch if a KV store for the given stateID has already been indexed, but different
 func (s *ProtocolKVStore) BatchStore(lctx lockctx.Proof, rw storage.ReaderBatchWriter, stateID flow.Identifier, data *flow.PSKeyValueStoreData) error {
@@ -101,7 +106,6 @@ func (s *ProtocolKVStore) BatchStore(lctx lockctx.Proof, rw storage.ReaderBatchW
 
 	existingData, err := s.ByID(stateID)
 	if err == nil {
-
 		if existingData.Equal(data) {
 			return nil
 		}
@@ -113,7 +117,7 @@ func (s *ProtocolKVStore) BatchStore(lctx lockctx.Proof, rw storage.ReaderBatchW
 	}
 
 	if !errors.Is(err, storage.ErrNotFound) {
-		return fmt.Errorf("could not check if kv-store snapshot with id (%x) exists: %w", stateID[:], err)
+		return fmt.Errorf("unexpected error checking if kv-store snapshot %x exists: %w", stateID[:], irrecoverable.NewException(err))
 	}
 
 	return s.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
@@ -121,10 +125,12 @@ func (s *ProtocolKVStore) BatchStore(lctx lockctx.Proof, rw storage.ReaderBatchW
 	})
 }
 
-// BatchIndex returns an anonymous function intended to be executed as part of a database transaction.
-// In a nutshell, we want to maintain a map from `blockID` to `stateID`, where `blockID` references the
+// BatchIndex appends the following operation to the provided write batch:
+// we extend the map from `blockID` to `stateID`, where `blockID` references the
 // block that _proposes_ updated key-value store.
-// Upon call, the anonymous function persists the specific map entry in the node's database.
+// BatchIndex is idempotent, i.e. it accepts repeated calls with the same pairs of (blockID , stateID).
+// Per protocol convention, the block references the `stateID`. As the `blockID` is a collision-resistant hash,
+// for the same `blockID`, BatchIndex will reject changing the data.
 // Protocol convention:
 //   - Consider block B, whose ingestion might potentially lead to an updated KV store. For example,
 //     the KV store changes if we seal some execution results emitting specific service events.
@@ -141,7 +147,6 @@ func (s *ProtocolKVStore) BatchIndex(lctx lockctx.Proof, rw storage.ReaderBatchW
 
 	existingStateID, err := s.byBlockIdCache.Get(s.db.Reader(), blockID)
 	if err == nil {
-
 		// if it's about to index the same state ID, then we can skip the operation
 		if existingStateID == stateID {
 			return nil
