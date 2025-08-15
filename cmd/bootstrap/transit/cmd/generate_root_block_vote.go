@@ -30,7 +30,7 @@ func init() {
 }
 
 func addGenerateRootBlockCmdFlags() {
-	prepareCmd.Flags().StringVarP(&flagOutputDir, "outputDir", "o", "", "ouput directory")
+	generateVoteCmd.Flags().StringVarP(&flagOutputDir, "outputDir", "o", "", "ouput directory")
 }
 
 func generateVote(c *cobra.Command, args []string) {
