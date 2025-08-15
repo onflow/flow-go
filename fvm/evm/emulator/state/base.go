@@ -359,22 +359,33 @@ func (v *BaseView) PurgeAllSlotsOfAnAccount(addr gethCommon.Address) error {
 	if acc == nil { // if account doesn't exist return
 		return nil
 	}
-	col, err := v.collectionProvider.CollectionByID(acc.CollectionID)
-	if err != nil {
-		return err
+
+	// remove storage slots
+	// this is taken from DeleteAccount()
+	if len(acc.CollectionID) > 0 {
+		col, found := v.slots[addr]
+		if !found {
+			col, err = v.collectionProvider.CollectionByID(acc.CollectionID)
+			if err != nil {
+				return err
+			}
+		}
+		// delete all slots related to this account (eip-6780)
+		keys, err := col.Destroy()
+		if err != nil {
+			return err
+		}
+
+		delete(v.slots, addr)
+
+		for _, key := range keys {
+			delete(v.cachedSlots, types.SlotAddress{
+				Address: addr,
+				Key:     gethCommon.BytesToHash(key),
+			})
+		}
 	}
-	// delete all slots related to this account (eip-6780)
-	keys, err := col.Destroy()
-	if err != nil {
-		return err
-	}
-	delete(v.slots, addr)
-	for _, key := range keys {
-		delete(v.cachedSlots, types.SlotAddress{
-			Address: addr,
-			Key:     gethCommon.BytesToHash(key),
-		})
-	}
+
 	return nil
 }
 
@@ -675,9 +686,6 @@ func (v *BaseView) storeSlot(sk types.SlotAddress, data gethCommon.Hash) error {
 	}
 	if acc == nil {
 		return fmt.Errorf("slot belongs to a non-existing account")
-	}
-	if !acc.HasCode() {
-		return fmt.Errorf("slot belongs to a non-smart contract account")
 	}
 	col, err := v.getSlotCollection(acc)
 	if err != nil {
