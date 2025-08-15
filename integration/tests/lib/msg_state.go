@@ -88,6 +88,6 @@ func MsgIsChunkDataPackResponse(msg interface{}) bool {
 }
 
 func MsgIsResultApproval(msg interface{}) bool {
-	_, ok := msg.(*flow.ResultApproval)
+	_, ok := msg.(*messages.ResultApproval)
 	return ok
 }

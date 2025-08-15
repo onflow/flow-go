@@ -17,6 +17,7 @@ import (
 	mockinsecure "github.com/onflow/flow-go/insecure/mock"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/libp2p/message"
+	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module/local"
 	"github.com/onflow/flow-go/network/mocknetwork"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -216,7 +217,7 @@ func TestProcessAttackerMessage_ResultApproval_Dictated(t *testing.T) {
 			// corrupted result approval dictated by attacker needs to only have the attestation field, as the rest will be
 			// filled up by the CCF.
 			dictatedAttestation := *unittest.AttestationFixture()
-			msg, _, _ := insecure.EgressMessageFixture(t, unittest.NetworkCodec(), insecure.Protocol_PUBLISH, &flow.ResultApproval{
+			msg, _, _ := insecure.EgressMessageFixture(t, unittest.NetworkCodec(), insecure.Protocol_PUBLISH, &messages.ResultApproval{
 				Body: flow.ResultApprovalBody{
 					Attestation: dictatedAttestation,
 				},
@@ -284,7 +285,7 @@ func TestProcessAttackerMessage_ResultApproval_PassThrough(t *testing.T) {
 			stream insecure.CorruptNetwork_ProcessAttackerMessageClient, // gRPC interface that orchestrator network uses to send messages to this ccf.
 		) {
 
-			passThroughApproval := unittest.ResultApprovalFixture()
+			passThroughApproval := (*messages.ResultApproval)(unittest.ResultApprovalFixture())
 			msg, _, _ := insecure.EgressMessageFixture(t, unittest.NetworkCodec(), insecure.Protocol_PUBLISH, passThroughApproval)
 
 			params := []interface{}{channels.Channel(msg.Egress.ChannelID), mock.Anything}
@@ -297,7 +298,7 @@ func TestProcessAttackerMessage_ResultApproval_PassThrough(t *testing.T) {
 			corruptedEventDispatchedOnFlowNetWg := sync.WaitGroup{}
 			corruptedEventDispatchedOnFlowNetWg.Add(1)
 			adapter.On("PublishOnChannel", params...).Run(func(args mock.Arguments) {
-				approval, ok := args[1].(*flow.ResultApproval)
+				approval, ok := args[1].(*messages.ResultApproval)
 				require.True(t, ok)
 
 				// attestation part of the approval must be the same as attacker dictates.
@@ -332,7 +333,7 @@ func TestProcessAttackerMessage_ExecutionReceipt_Dictated(t *testing.T) {
 			// corrupted execution receipt dictated by attacker needs to only have the result field, as the rest will be
 			// filled up by the CCF.
 			dictatedResult := *unittest.ExecutionResultFixture()
-			msg, _, _ := insecure.EgressMessageFixture(t, unittest.NetworkCodec(), insecure.Protocol_PUBLISH, &flow.ExecutionReceipt{
+			msg, _, _ := insecure.EgressMessageFixture(t, unittest.NetworkCodec(), insecure.Protocol_PUBLISH, &messages.ExecutionReceipt{
 				UnsignedExecutionReceipt: flow.UnsignedExecutionReceipt{ExecutionResult: dictatedResult},
 			})
 
@@ -388,7 +389,7 @@ func TestProcessAttackerMessage_ExecutionReceipt_PassThrough(t *testing.T) {
 			stream insecure.CorruptNetwork_ProcessAttackerMessageClient, // gRPC interface that orchestrator network uses to send messages to the corrupt network.
 		) {
 
-			passThroughReceipt := unittest.ExecutionReceiptFixture()
+			passThroughReceipt := (*messages.ExecutionReceipt)(unittest.ExecutionReceiptFixture())
 			msg, _, _ := insecure.EgressMessageFixture(t, unittest.NetworkCodec(), insecure.Protocol_PUBLISH, passThroughReceipt)
 
 			params := []interface{}{channels.Channel(msg.Egress.ChannelID), mock.Anything}
@@ -401,7 +402,7 @@ func TestProcessAttackerMessage_ExecutionReceipt_PassThrough(t *testing.T) {
 			corruptedEventDispatchedOnFlowNetWg := sync.WaitGroup{}
 			corruptedEventDispatchedOnFlowNetWg.Add(1)
 			adapter.On("PublishOnChannel", params...).Run(func(args mock.Arguments) {
-				receipt, ok := args[1].(*flow.ExecutionReceipt)
+				receipt, ok := args[1].(*messages.ExecutionReceipt)
 				require.True(t, ok)
 
 				// receipt should be completely intact.
