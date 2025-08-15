@@ -26,6 +26,11 @@ var generateVoteCmd = &cobra.Command{
 
 func init() {
 	rootCmd.AddCommand(generateVoteCmd)
+	addGenerateRootBlockCmdFlags()
+}
+
+func addGenerateRootBlockCmdFlags() {
+	generateVoteCmd.Flags().StringVarP(&flagOutputDir, "outputDir", "o", "", "ouput directory")
 }
 
 func generateVote(c *cobra.Command, args []string) {
@@ -95,8 +100,12 @@ func generateVote(c *cobra.Command, args []string) {
 	}
 
 	voteFile := fmt.Sprintf(bootstrap.PathNodeRootBlockVote, nodeID)
+	voteFilePath := filepath.Join(flagBootDir, voteFile)
+	if flagOutputDir != "" {
+		voteFilePath = filepath.Join(flagOutputDir, "root-block-vote.json")
+	}
 
-	if err = io.WriteJSON(filepath.Join(flagBootDir, voteFile), vote); err != nil {
+	if err = io.WriteJSON(voteFilePath, vote); err != nil {
 		log.Fatal().Err(err).Msg("could not write vote to file")
 	}
 
