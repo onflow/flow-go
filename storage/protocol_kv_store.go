@@ -1,6 +1,8 @@
 package storage
 
 import (
+	"github.com/jordanschalm/lockctx"
+
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -18,7 +20,7 @@ type ProtocolKVStore interface {
 	// ProtocolStateVersion). Hence, for the same ID (key), BatchStore will reject changing the data (value).
 	// Expected errors during normal operations:
 	// - storage.ErrDataMismatch if a KV store for the given stateID has already been indexed, but different
-	BatchStore(rw ReaderBatchWriter, stateID flow.Identifier, data *flow.PSKeyValueStoreData) error
+	BatchStore(lctx lockctx.Proof, rw ReaderBatchWriter, stateID flow.Identifier, data *flow.PSKeyValueStoreData) error
 
 	// BatchIndex appends the following operation to the provided write batch:
 	// we extend the map from `blockID` to `stateID`, where `blockID` references the
@@ -35,7 +37,7 @@ type ProtocolKVStore interface {
 	//
 	// Expected errors during normal operations:
 	//   - storage.ErrDataMismatch if a KV store for the given blockID has already been indexed, but different
-	BatchIndex(rw ReaderBatchWriter, blockID flow.Identifier, stateID flow.Identifier) error
+	BatchIndex(lctx lockctx.Proof, rw ReaderBatchWriter, blockID flow.Identifier, stateID flow.Identifier) error
 
 	// ByID retrieves the KV store snapshot with the given ID.
 	// Expected errors during normal operations:

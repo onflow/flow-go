@@ -787,6 +787,7 @@ func (exeNode *ExecutionNode) LoadExecutionState(
 		node.Tracer,
 		exeNode.registerStore,
 		exeNode.exeConf.enableStorehouse,
+		node.StorageLockMgr,
 	)
 
 	height, _, err := exeNode.executionState.GetLastExecutedBlockID(context.Background())

@@ -3,7 +3,9 @@
 package mock
 
 import (
+	lockctx "github.com/jordanschalm/lockctx"
 	flow "github.com/onflow/flow-go/model/flow"
+
 	mock "github.com/stretchr/testify/mock"
 
 	storage "github.com/onflow/flow-go/storage"
@@ -16,17 +18,17 @@ type QuorumCertificates struct {
 	mock.Mock
 }
 
-// BatchStore provides a mock function with given fields: _a0, _a1
-func (_m *QuorumCertificates) BatchStore(_a0 storage.ReaderBatchWriter, _a1 *flow.QuorumCertificate) error {
-	ret := _m.Called(_a0, _a1)
+// BatchStore provides a mock function with given fields: _a0, _a1, _a2
+func (_m *QuorumCertificates) BatchStore(_a0 lockctx.Proof, _a1 storage.ReaderBatchWriter, _a2 *flow.QuorumCertificate) error {
+	ret := _m.Called(_a0, _a1, _a2)
 
 	if len(ret) == 0 {
 		panic("no return value specified for BatchStore")
 	}
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(storage.ReaderBatchWriter, *flow.QuorumCertificate) error); ok {
-		r0 = rf(_a0, _a1)
+	if rf, ok := ret.Get(0).(func(lockctx.Proof, storage.ReaderBatchWriter, *flow.QuorumCertificate) error); ok {
+		r0 = rf(_a0, _a1, _a2)
 	} else {
 		r0 = ret.Error(0)
 	}
