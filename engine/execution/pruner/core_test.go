@@ -66,7 +66,7 @@ func TestLoopPruneExecutionDataFromRootToLatestSealed(t *testing.T) {
 					return blockstore.BatchStore(lctx, rw, block)
 				}))
 				lctx.Release()
-				require.NoError(t, bdb.Update(operation.IndexBlockHeight(chunk.Header.Height, chunk.Header.ID())))
+				require.NoError(t, bdb.Update(operation.IndexFinalizedBlockByHeight(chunk.Header.Height, chunk.Header.ID())))
 				require.NoError(t, results.Store(chunk.Result))
 				require.NoError(t, results.Index(chunk.Result.BlockID, chunk.Result.ID()))
 				require.NoError(t, chunkDataPacks.Store([]*flow.ChunkDataPack{chunk.ChunkDataPack}))
