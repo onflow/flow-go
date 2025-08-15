@@ -715,3 +715,8 @@ type PSKeyValueStoreData struct {
 	Version uint64
 	Data    []byte
 }
+
+func (d PSKeyValueStoreData) Equal(d2 *PSKeyValueStoreData) bool {
+	return d.Version == d2.Version &&
+		slices.Equal(d.Data, d2.Data)
+}

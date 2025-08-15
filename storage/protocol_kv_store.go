@@ -2,7 +2,6 @@ package storage
 
 import (
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/storage/badger/transaction"
 )
 
 // ProtocolKVStore persists different snapshots of key-value stores [KV-stores]. At this level, the API
@@ -13,16 +12,20 @@ import (
 // TODO maybe rename to `ProtocolStateSnapshots` (?) because at this low level, we are not exposing the
 // KV-store, it is just an encoded data blob
 type ProtocolKVStore interface {
-	// StoreTx returns an anonymous function (intended to be executed as part of a badger transaction),
-	// which persists the given KV-store snapshot as part of a DB tx.
-	// Expected errors of the returned anonymous function:
-	//   - storage.ErrAlreadyExists if a KV-store snapshot with the given id is already stored.
-	StoreTx(stateID flow.Identifier, data *flow.PSKeyValueStoreData) func(*transaction.Tx) error
+	// BatchStore persists the KV-store snapshot in the database using the given ID as key.
+	// BatchStore is idempotent, i.e. it accepts repeated calls with the same pairs of (stateID, kvStore).
+	// Here, the ID is expected to be a collision-resistant hash of the snapshot (including the
+	// ProtocolStateVersion). Hence, for the same ID (key), BatchStore will reject changing the data (value).
+	// Expected errors during normal operations:
+	// - storage.ErrDataMismatch if a KV store for the given stateID has already been indexed, but different
+	BatchStore(rw ReaderBatchWriter, stateID flow.Identifier, data *flow.PSKeyValueStoreData) error
 
-	// IndexTx returns an anonymous function intended to be executed as part of a database transaction.
-	// In a nutshell, we want to maintain a map from `blockID` to `stateID`, where `blockID` references the
-	// block that _proposes_ the updated key-value store.
-	// Upon call, the anonymous function persists the specific map entry in the node's database.
+	// BatchIndex appends the following operation to the provided write batch:
+	// we extend the map from `blockID` to `stateID`, where `blockID` references the
+	// block that _proposes_ updated key-value store.
+	// BatchIndex is idempotent, i.e. it accepts repeated calls with the same pairs of (blockID , stateID).
+	// Per protocol convention, the block references the `stateID`. As the `blockID` is a collision-resistant hash,
+	// for the same `blockID`, BatchIndex will reject changing the data.
 	// Protocol convention:
 	//   - Consider block B, whose ingestion might potentially lead to an updated KV store. For example,
 	//     the KV store changes if we seal some execution results emitting specific service events.
@@ -31,8 +34,8 @@ type ProtocolKVStore interface {
 	//     child block, _after_ validating the QC.
 	//
 	// Expected errors during normal operations:
-	//   - storage.ErrAlreadyExists if a KV store for the given blockID has already been indexed.
-	IndexTx(blockID flow.Identifier, stateID flow.Identifier) func(*transaction.Tx) error
+	//   - storage.ErrDataMismatch if a KV store for the given blockID has already been indexed, but different
+	BatchIndex(rw ReaderBatchWriter, blockID flow.Identifier, stateID flow.Identifier) error
 
 	// ByID retrieves the KV store snapshot with the given ID.
 	// Expected errors during normal operations:

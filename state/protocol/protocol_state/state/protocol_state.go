@@ -15,8 +15,6 @@ import (
 	"github.com/onflow/flow-go/state/protocol/protocol_state/kvstore"
 	"github.com/onflow/flow-go/state/protocol/protocol_state/pubsub"
 	"github.com/onflow/flow-go/storage"
-	"github.com/onflow/flow-go/storage/badger/operation"
-	"github.com/onflow/flow-go/storage/badger/transaction"
 )
 
 // ProtocolState is an implementation of the read-only interface for protocol state, it allows querying information
@@ -204,7 +202,7 @@ func (s *MutableProtocolState) EvolveState(
 	parentBlockID flow.Identifier,
 	candidateView uint64,
 	candidateSeals []*flow.Seal,
-) (flow.Identifier, *transaction.DeferredBlockPersist, error) {
+) (flow.Identifier, []storage.BlockIndexingBatchWrite, error) {
 	serviceEvents, err := s.serviceEventsFromSeals(candidateSeals)
 	if err != nil {
 		return flow.ZeroID, nil, fmt.Errorf("extracting service events from candidate seals failed: %w", err)
@@ -321,7 +319,7 @@ func (s *MutableProtocolState) build(
 	stateMachines []protocol_state.KeyValueStoreStateMachine,
 	serviceEvents []flow.ServiceEvent,
 	evolvingState protocol.KVStoreReader,
-) (flow.Identifier, *transaction.DeferredBlockPersist, error) {
+) (flow.Identifier, []storage.BlockIndexingBatchWrite, error) {
 	for _, stateMachine := range stateMachines {
 		err := stateMachine.EvolveState(serviceEvents) // state machine should only bubble up exceptions
 		if err != nil {
@@ -330,24 +328,35 @@ func (s *MutableProtocolState) build(
 	}
 
 	// _after_ all state machines have ingested the available information, we build the resulting overall state
-	dbUpdates := transaction.NewDeferredBlockPersist()
+	dbUpdates := make([]storage.BlockIndexingBatchWrite, 0, len(stateMachines)+2)
 	for _, stateMachine := range stateMachines {
 		dbOps, err := stateMachine.Build()
 		if err != nil {
 			return flow.ZeroID, nil, fmt.Errorf("unexpected exception from sub-state machine while building its output state: %w", err)
 		}
-		dbUpdates.AddIndexingOps(dbOps.Pending())
+		dbUpdates = append(dbUpdates, dbOps...)
 	}
 	resultingStateID := evolvingState.ID()
 
 	// We _always_ index the protocol state by the candidate block's ID. But only if the
 	// state actually changed, we add a database operation to persist it.
-	dbUpdates.AddIndexingOp(func(blockID flow.Identifier, tx *transaction.Tx) error {
-		return s.kvStoreSnapshots.IndexTx(blockID, resultingStateID)(tx)
+	dbUpdates = append(dbUpdates, func(blockID flow.Identifier, rw storage.ReaderBatchWriter) error {
+		return s.kvStoreSnapshots.BatchIndex(rw, blockID, resultingStateID)
 	})
+
 	if parentStateID != resultingStateID {
-		// note that `SkipDuplicatesTx` is still required, because the result might equal to an earlier known state (we explicitly want to de-duplicate)
-		dbUpdates.AddDbOp(operation.SkipDuplicatesTx(s.kvStoreSnapshots.StoreTx(resultingStateID, evolvingState)))
+		dbUpdates = append(dbUpdates, func(_ flow.Identifier, rw storage.ReaderBatchWriter) error {
+			err := s.kvStoreSnapshots.BatchStore(rw, resultingStateID, evolvingState)
+			if err == nil {
+				return nil
+			}
+			// The only error that `ProtocolKVStore.BatchStore` might return is `storage.ErrDataMismatch`.
+			// Repeated requests to store the same state for the same id should be no-ops. It should be noted
+			// that the `resultingStateID` is a collision-resistant hash of the encoded state (including the
+			// state's version). Hence, mismatching data for the same id indicates a security-critical bug
+			// or state corruption, making continuation impossible.
+			return irrecoverable.NewExceptionf("unexpected error while trying to store new protocol state: %w", err)
+		})
 	}
 
 	return resultingStateID, dbUpdates, nil

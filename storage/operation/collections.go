@@ -43,11 +43,11 @@ func RemoveCollectionPayloadIndices(w storage.Writer, blockID flow.Identifier) e
 	return RemoveByKey(w, MakePrefix(codeIndexCollection, blockID))
 }
 
-// UnsafeIndexCollectionByTransaction inserts a collection id keyed by a transaction id
-// Unsafe because a transaction can belong to multiple collections, indexing collection by a transaction
-// will overwrite the previous collection id that was indexed by the same transaction id
-// To prevent overwritting, the caller must check if the transaction is already indexed, and make sure there
-// is no dirty read before the writing by using locks.
+// UnsafeIndexCollectionByTransaction indexes a collection id keyed by a transaction id.
+// It is unsafe, because a transaction can belong to multiple collections; indexing a collection
+// by a transaction will overwrite the collection previously memorized to contain the transaction.
+// To prevent overwriting, the caller must check if the transaction is already indexed, and make
+// sure there is no dirty read before the writing by using locks.
 func UnsafeIndexCollectionByTransaction(w storage.Writer, txID flow.Identifier, collectionID flow.Identifier) error {
 	return UpsertByKey(w, MakePrefix(codeIndexCollectionByTransaction, txID), collectionID)
 }
