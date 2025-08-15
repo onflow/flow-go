@@ -1019,10 +1019,16 @@ func (s *AccessAPISuite) TestExtensionDataPreservation() {
 			s.Assert().Equal(entities.TransactionStatus_SEALED, lastReportedTxStatus)
 
 			// Now retrieve the transaction and verify ExtensionData is preserved
-			// Note: This test assumes that the Access API will eventually provide a way to retrieve
-			// transaction details including signatures. For now, we verify the transaction was
-			// accepted and processed correctly.
 			s.T().Logf("Transaction %s was successfully processed with ExtensionData: %v", txID, tc.extensionData)
+
+			txFromAccess, err := accessClient.GetTransaction(s.ctx, &accessproto.GetTransactionRequest{
+				Id: txID.Bytes(),
+			})
+			s.Require().NoError(err)
+
+			// Verify the retrieved transaction matches the original
+			envelopSigs := txFromAccess.GetTransaction().EnvelopeSignatures
+			s.Assert().Equal(tc.extensionData, envelopSigs[0].ExtensionData, "ExtensionData should be preserved in the envelope signature")
 		})
 	}
 }
