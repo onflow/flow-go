@@ -1033,7 +1033,7 @@ func (s *AccessAPISuite) TestExtensionDataPreservation() {
 			// Verify the retrieved transaction matches the original
 			envelopSigs := txFromAccess.GetTransaction().EnvelopeSignatures
 
-			s.Assert().Equal(tc.extensionData, envelopSigs[0].ExtensionData, "ExtensionData should be preserved in the envelope signature")
+			s.Assert().Equal(tc.expectedExtensionData, envelopSigs[0].ExtensionData, "ExtensionData should be preserved in the envelope signature")
 		})
 	}
 }
