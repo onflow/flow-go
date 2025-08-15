@@ -1,0 +1,207 @@
+package migrations
+
+import (
+	"fmt"
+
+	"github.com/rs/zerolog"
+
+	"github.com/onflow/flow-go/cmd/util/ledger/util/registers"
+	"github.com/onflow/flow-go/model/flow"
+)
+
+const (
+	accountStatusV4WithNoDeduplicationFlag = 0x40
+)
+
+func getAccountRegisterOrError(
+	accountRegisters *registers.AccountRegisters,
+	owner string,
+	key string,
+) ([]byte, error) {
+	value, err := accountRegisters.Get(owner, key)
+	if err != nil {
+		return nil, err
+	}
+	if len(value) == 0 {
+		return nil, fmt.Errorf("owner %x key %s register not found", owner, key)
+	}
+	return value, nil
+}
+
+func getAccountPublicKeyOrError(
+	accountRegisters *registers.AccountRegisters,
+	owner string,
+	keyIndex uint32,
+) (flow.AccountPublicKey, error) {
+	publicKeyRegisterKey := fmt.Sprintf(legacyAccountKeyRegisterKeyPattern, keyIndex)
+
+	encodedAccountPublicKey, err := getAccountRegisterOrError(accountRegisters, owner, publicKeyRegisterKey)
+	if err != nil {
+		return flow.AccountPublicKey{}, err
+	}
+
+	decodedAccountPublicKey, err := flow.DecodeAccountPublicKey(encodedAccountPublicKey, keyIndex)
+	if err != nil {
+		return flow.AccountPublicKey{}, err
+	}
+
+	return decodedAccountPublicKey, nil
+}
+
+func removeAccountPublicKey(
+	accountRegisters *registers.AccountRegisters,
+	owner string,
+	keyIndex uint32,
+) error {
+	publicKeyRegisterKey := fmt.Sprintf(legacyAccountKeyRegisterKeyPattern, keyIndex)
+	return accountRegisters.Set(owner, publicKeyRegisterKey, nil)
+}
+
+// migrateAccountStatusToV4 sets account status version to v4, stores account status
+// in accountRegisters, and returns updated account status.
+func migrateAccountStatusToV4(
+	log zerolog.Logger,
+	accountRegisters *registers.AccountRegisters,
+	owner string,
+) ([]byte, error) {
+	encodedAccountStatus, err := getAccountRegisterOrError(accountRegisters, owner, flow.AccountStatusKey)
+	if err != nil {
+		return nil, err
+	}
+
+	if encodedAccountStatus[0] != 0 {
+		log.Warn().Msgf("%x account status flag is %d, flag will be reset during migration", owner, encodedAccountStatus[0])
+	}
+
+	// Update account status version and flag in place.
+	encodedAccountStatus[0] = accountStatusV4WithNoDeduplicationFlag
+
+	// Set account status register
+	err = accountRegisters.Set(owner, flow.AccountStatusKey, encodedAccountStatus)
+	if err != nil {
+		return nil, err
+	}
+
+	return encodedAccountStatus, nil
+}
+
+// migrateAccountPublicKey0 renames public_key_0 to apk_0, stores renamed
+// account public key, and returns raw data of account public key 0.
+func migrateAccountPublicKey0(
+	accountRegisters *registers.AccountRegisters,
+	owner string,
+) ([]byte, error) {
+	encodedAccountPublicKey0, err := getAccountRegisterOrError(accountRegisters, owner, legacyAccountKey0RegisterKey)
+	if err != nil {
+		return nil, err
+	}
+
+	// Rename public_key_0 register key to apk_0
+	err = accountRegisters.Set(owner, legacyAccountKey0RegisterKey, nil)
+	if err != nil {
+		return nil, err
+	}
+	err = accountRegisters.Set(owner, accountKey0RegisterKey, encodedAccountPublicKey0)
+	if err != nil {
+		return nil, err
+	}
+
+	return encodedAccountPublicKey0, nil
+}
+
+// migrateSeqNumberIfNeeded creates sequence number register for the given
+// account public key if sequence number is > 0.
+func migrateSeqNumberIfNeeded(
+	accountRegisters *registers.AccountRegisters,
+	owner string,
+	keyIndex uint32,
+	seqNumber uint64,
+) error {
+	if seqNumber == 0 {
+		return nil
+	}
+
+	seqNumberRegisterKey := fmt.Sprintf(sequenceNumberRegisterKeyPattern, keyIndex)
+
+	encodedSeqNumber, err := flow.EncodeSequenceNumber(seqNumber)
+	if err != nil {
+		return err
+	}
+
+	return accountRegisters.Set(owner, seqNumberRegisterKey, encodedSeqNumber)
+}
+
+// migrateAccountStatusWithPublicKeyMetadata appends accounts public key metadata
+// to account status register.
+func migrateAccountStatusWithPublicKeyMetadata(
+	log zerolog.Logger,
+	accountRegisters *registers.AccountRegisters,
+	owner string,
+	accountPublicKeyWeightAndRevokedStatus []accountKeyWeightAndRevokedStatus,
+	encodedPublicKeys [][]byte,
+	keyIndexMappings []uint32,
+	deduplicated bool,
+) error {
+	encodedAccountStatus, err := getAccountRegisterOrError(accountRegisters, owner, flow.AccountStatusKey)
+	if err != nil {
+		return err
+	}
+
+	startIndexForDigests, digests := generateLastNPublicKeyDigests(log, owner, encodedPublicKeys, maxStoredDigests, nil)
+
+	startIndexForMapping := firstDeduplicatedKeyIndexInMappings(keyIndexMappings)
+	keyIndexMappings = keyIndexMappings[startIndexForMapping:]
+
+	newAccountStatus, err := encodeAccountStatusV4WithPublicKeyMetadata(
+		encodedAccountStatus,
+		accountPublicKeyWeightAndRevokedStatus,
+		uint32(startIndexForDigests),
+		digests,
+		uint32(startIndexForMapping),
+		keyIndexMappings,
+		deduplicated,
+	)
+	if err != nil {
+		return err
+	}
+
+	return accountRegisters.Set(owner, flow.AccountStatusKey, newAccountStatus)
+}
+
+// migrateAccountPublicKeysIfNeeded migrates account public key from index >= 1 to batched public key register.
+// NOTE:
+// - Key 0 in batch 0 is always empty since it corresponds to account public key 0, which is stored in its own register.
+func migrateAccountPublicKeysIfNeeded(
+	accountRegisters *registers.AccountRegisters,
+	owner string,
+	encodedPublicKeys [][]byte,
+) error {
+	// Return early if encodedPublicKeys only contains public key 0 (which always stores in register apk_0)
+	if len(encodedPublicKeys) == 1 {
+		return nil
+	}
+
+	encodedBatchPublicKeys, err := encodePublicKeysInBatches(encodedPublicKeys)
+	if err != nil {
+		return err
+	}
+
+	for batchIndex, encodedBatchPublicKey := range encodedBatchPublicKeys {
+		batchPublicKeyRegisterKey := fmt.Sprintf(batchPublicKeyRegisterKeyPattern, batchIndex)
+		err = accountRegisters.Set(owner, batchPublicKeyRegisterKey, encodedBatchPublicKey)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func firstDeduplicatedKeyIndexInMappings(accountKeyMappings []uint32) int {
+	for keyIndex, storedKeyIndex := range accountKeyMappings {
+		if uint32(keyIndex) != storedKeyIndex {
+			return keyIndex
+		}
+	}
+	return len(accountKeyMappings)
+}
