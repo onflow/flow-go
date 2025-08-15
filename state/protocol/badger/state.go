@@ -177,6 +177,7 @@ func Bootstrap(
 			return fmt.Errorf("could not bootstrap spork info: %w", err)
 		}
 
+		// bootstrap dynamic protocol state
 		err = bootstrapProtocolState(lctx, rw, segment, root.Params(), epochProtocolStateSnapshots, protocolKVStoreSnapshots, setups, commits, !config.SkipNetworkAddressValidation)
 		if err != nil {
 			return fmt.Errorf("could not bootstrap protocol state: %w", err)
@@ -201,7 +202,6 @@ func Bootstrap(
 
 		return nil
 	})
-
 	if err != nil {
 		return nil, fmt.Errorf("bootstrapping failed: %w", err)
 	}

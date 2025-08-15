@@ -26,14 +26,14 @@ func TestRetrieveWithoutStore(t *testing.T) {
 	})
 }
 
-// TestSealStoreRetrieve verifies that a seal can be sd and retrieved by its ID
+// TestSealStoreRetrieve verifies that a seal can be stored and retrieved by its ID
 func TestSealStoreRetrieve(t *testing.T) {
 	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
 		metrics := metrics.NewNoopCollector()
 		s := store.NewSeals(metrics, db)
 
 		expected := unittest.Seal.Fixture()
-		// s seal
+		// store seal
 		err := s.Store(expected)
 		require.NoError(t, err)
 
@@ -58,7 +58,7 @@ func TestSealIndexAndRetrieve(t *testing.T) {
 		expectedSeal := unittest.Seal.Fixture()
 		blockID := unittest.IdentifierFixture()
 
-		// s the seal first
+		// store the seal first
 		err := s.Store(expectedSeal)
 		require.NoError(t, err)
 
@@ -86,7 +86,7 @@ func TestSealedBlockIndexAndRetrieve(t *testing.T) {
 		blockID := unittest.IdentifierFixture()
 		expectedSeal.BlockID = blockID
 
-		// s the seal first
+		// store the seal first
 		err := s.Store(expectedSeal)
 		require.NoError(t, err)
 

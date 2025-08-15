@@ -93,6 +93,12 @@ jobs:
       - name: Setup Google Cloud Authentication
         run: gcloud auth configure-docker ${{ env.PRIVATE_REGISTRY_HOST }}
 
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ vars.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
       - name: Execute ${{ matrix.build_command }} command to build and push images
         env:
           IMAGE_TAG: ${{ inputs.tag }}

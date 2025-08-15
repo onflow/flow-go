@@ -32,7 +32,15 @@ func NewProtocolKVStore(protocolStateSnapshots storage.ProtocolKVStore) *Protoco
 	}
 }
 
-// BatchStore stores the protocol state key value data with the given stateID.into the database
+// BatchStore adds the KV-store snapshot in the database using the given ID as key. Per convention, all
+// implementations of [protocol.KVStoreReader] should be able to successfully encode their state into a
+// data blob. If the encoding fails, an error is returned.
+// BatchStore is idempotent, i.e. it accepts repeated calls with the same pairs of (stateID, kvStore).
+// Here, the ID is expected to be a collision-resistant hash of the snapshot (including the
+// ProtocolStateVersion). Hence, for the same ID (key), BatchStore will reject changing the data (value).
+//
+// Expected errors during normal operations:
+// - storage.ErrDataMismatch if a _different_ KV store for the given stateID has already been persisted
 func (p *ProtocolKVStore) BatchStore(lctx lockctx.Proof, rw storage.ReaderBatchWriter, stateID flow.Identifier, kvStore protocol.KVStoreReader) error {
 	version, data, err := kvStore.VersionedEncode()
 	if err != nil {
