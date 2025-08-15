@@ -48,7 +48,11 @@ func (b *Blocks) BatchStore(lctx lockctx.Proof, rw storage.ReaderBatchWriter, bl
 	return nil
 }
 
-func (b *Blocks) retrieveTx(blockID flow.Identifier) (*flow.Block, error) {
+// retrieve returns the block with the given hash. It is available for
+// finalized and pending blocks.
+// Expected errors during normal operations:
+// - storage.ErrNotFound if no block is found
+func (b *Blocks) retrieve(blockID flow.Identifier) (*flow.Block, error) {
 	header, err := b.headers.retrieveTx(blockID)
 	if err != nil {
 		return nil, fmt.Errorf("could not retrieve header: %w", err)
@@ -65,11 +69,11 @@ func (b *Blocks) retrieveTx(blockID flow.Identifier) (*flow.Block, error) {
 }
 
 // ByID returns the block with the given hash. It is available for
-// finalized and ambiguous blocks.
+// finalized and pending blocks.
 // Expected errors during normal operations:
 // - storage.ErrNotFound if no block is found
 func (b *Blocks) ByID(blockID flow.Identifier) (*flow.Block, error) {
-	return b.retrieveTx(blockID)
+	return b.retrieve(blockID)
 }
 
 // ByHeight returns the block at the given height. It is only available
@@ -82,10 +86,13 @@ func (b *Blocks) ByHeight(height uint64) (*flow.Block, error) {
 	if err != nil {
 		return nil, err
 	}
-	return b.retrieveTx(blockID)
+	return b.retrieve(blockID)
 }
 
-// ByCollectionID returns the block for the given collection ID.
+// ByCollectionID returns the *finalized** block that contains the collection with the given ID.
+//
+// Expected errors during normal operations:
+// - storage.ErrNotFound if finalized block is known that contains the collection
 func (b *Blocks) ByCollectionID(collID flow.Identifier) (*flow.Block, error) {
 	var blockID flow.Identifier
 	err := operation.LookupCollectionBlock(b.db.Reader(), collID, &blockID)
@@ -95,8 +102,14 @@ func (b *Blocks) ByCollectionID(collID flow.Identifier) (*flow.Block, error) {
 	return b.ByID(blockID)
 }
 
-// IndexBlockForCollections indexes the block each collection was
-// included in. This should not be called when finalizing a block
+// IndexBlockForCollections indexes the block each collection was included in.
+// CAUTION: a collection can be included in multiple *unfinalized* blocks. However, the implementation
+// assumes a one-to-one map from collection ID to a *single* block ID. This holds for FINALIZED BLOCKS ONLY
+// *and* only in the absence of byzantine collector clusters (which the mature protocol must tolerate).
+// Hence, this function should be treated as a temporary solution, which requires generalization
+// (one-to-many mapping) for soft finality and the mature protocol.
+//
+// No errors expected during normal operation.
 func (b *Blocks) IndexBlockForCollections(blockID flow.Identifier, collIDs []flow.Identifier) error {
 	return b.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 		for _, collID := range collIDs {
