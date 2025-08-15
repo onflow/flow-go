@@ -158,7 +158,7 @@ func pull(cmd *cobra.Command, args []string) {
 	// unwrap consensus node role files
 	if role == flow.RoleConsensus {
 		outputPath := filepath.Join(flagBootDir, fmt.Sprintf(bootstrap.PathRandomBeaconPriv, nodeID))
-		err = unWrapFile(flagBootDir, nodeID, outputPath)
+		err = unWrapFile(flagBootDir, nodeID, flagBootDir, outputPath)
 		if err != nil {
 			log.Fatal().Err(err).Msg("failed to pull")
 		}

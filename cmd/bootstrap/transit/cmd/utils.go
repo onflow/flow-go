@@ -152,12 +152,12 @@ func moveFile(src, dst string) error {
 	return nil
 }
 
-func unWrapFile(bootDir string, nodeID string, outputPath string) error {
+func unWrapFile(bootDir, nodeID, cipherTextPath, outputPath string) error {
 	log.Info().Msg("decrypting Random Beacon key")
 
 	pubKeyPath := filepath.Join(bootDir, fmt.Sprintf(FilenameTransitKeyPub, nodeID))
 	privKeyPath := filepath.Join(bootDir, fmt.Sprintf(FilenameTransitKeyPriv, nodeID))
-	ciphertextPath := filepath.Join(bootDir, fmt.Sprintf(FilenameRandomBeaconCipher, nodeID))
+	ciphertextPath := filepath.Join(cipherTextPath, fmt.Sprintf(FilenameRandomBeaconCipher, nodeID))
 	plaintextPath := outputPath
 
 	ciphertext, err := ioutils.ReadFile(ciphertextPath)

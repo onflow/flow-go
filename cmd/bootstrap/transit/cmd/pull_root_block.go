@@ -75,7 +75,7 @@ func pullRootBlock(c *cobra.Command, args []string) {
 	if err != nil {
 		log.Fatal().Err(err).Msg("could not download file from google bucket")
 	}
-	err = unWrapFile(flagBootDir, nodeID, fullRandomBeaconPath)
+	err = unWrapFile(flagBootDir, nodeID, flagOutputDir, fullRandomBeaconPath)
 	if err != nil {
 		log.Fatal().Err(err).Msg("could not unwrap random beacon file")
 	}
