@@ -676,9 +676,6 @@ func (v *BaseView) storeSlot(sk types.SlotAddress, data gethCommon.Hash) error {
 	if acc == nil {
 		return fmt.Errorf("slot belongs to a non-existing account")
 	}
-	if !acc.HasCode() {
-		return fmt.Errorf("slot belongs to a non-smart contract account")
-	}
 	col, err := v.getSlotCollection(acc)
 	if err != nil {
 		return err
