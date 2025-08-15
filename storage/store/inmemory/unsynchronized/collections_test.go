@@ -21,7 +21,8 @@ func (n *noOpLockContext) Release() {
 }
 
 func TestCollection_HappyCase(t *testing.T) {
-	collections := NewCollections()
+	transactions := NewTransactions()
+	collections := NewCollections(transactions)
 
 	collection := unittest.CollectionFixture(3)
 
@@ -49,7 +50,8 @@ func TestCollection_HappyCase(t *testing.T) {
 }
 
 func TestLightByTransactionID_HappyCase(t *testing.T) {
-	collections := NewCollections()
+	transactions := NewTransactions()
+	collections := NewCollections(transactions)
 	collection := unittest.CollectionFixture(2)
 
 	// Create a no-op lock context for testing

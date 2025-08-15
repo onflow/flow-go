@@ -51,8 +51,8 @@ func (p *PersisterSuite) SetupTest() {
 
 	p.inMemoryRegisters = unsynchronized.NewRegisters(p.header.Height)
 	p.inMemoryEvents = unsynchronized.NewEvents()
-	p.inMemoryCollections = unsynchronized.NewCollections()
 	p.inMemoryTransactions = unsynchronized.NewTransactions()
+	p.inMemoryCollections = unsynchronized.NewCollections(p.inMemoryTransactions)
 	p.inMemoryResults = unsynchronized.NewLightTransactionResults()
 	p.inMemoryTxResultErrMsg = unsynchronized.NewTransactionResultErrorMessages()
 
