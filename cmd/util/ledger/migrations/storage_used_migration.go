@@ -3,6 +3,7 @@ package migrations
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/onflow/flow-go/cmd/util/ledger/reporters"
 
@@ -14,6 +15,8 @@ import (
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/model/flow"
 )
+
+const sequenceNumberStorageSize = 9 // RLP encoded math.MaxUint64 is 9 bytes
 
 // AccountUsageMigration iterates through each payload, and calculate the storage usage
 // and update the accounts status with the updated storage usage. It also upgrades the
@@ -52,11 +55,28 @@ func (m *AccountUsageMigration) MigrateAccount(
 
 	var status *environment.AccountStatus
 	var statusValue []byte
+	var accountPublicKeyCount uint32
+
 	actualUsed := uint64(0)
 
 	// Find the account status register,
 	// and calculate the storage usage
 	err := accountRegisters.ForEach(func(owner, key string, value []byte) error {
+
+		if strings.HasPrefix(key, sequenceNumberRegisterKeyPrefix) {
+			// DO NOT include sequence number registers in storage used.
+			// Instead, storage used should include sequenceNumberStorageSize
+			// per key for all account public key at key index >= 1.
+
+			// Sequence number register is only created when account key at key index >= 1 is used as proposal key.
+			// This approach stores sequence number separately on chain, while reducing register count.
+
+			// By including sequenceNumberStorageSize per key beforehand unblocks some cases for
+			// concurrent execution. In other words, account status register doesn't need to be updated
+			// for storage used when account public key is used as proposal key at a later time.
+
+			return nil
+		}
 
 		if key == flow.AccountStatusKey {
 			statusValue = value
@@ -66,6 +86,8 @@ func (m *AccountUsageMigration) MigrateAccount(
 			if err != nil {
 				return fmt.Errorf("could not parse account status: %w", err)
 			}
+
+			accountPublicKeyCount = status.PublicKeyCount()
 		}
 
 		actualUsed += uint64(environment.RegisterSize(
@@ -110,6 +132,13 @@ func (m *AccountUsageMigration) MigrateAccount(
 		actualUsed = actualUsed - uint64(-statusSizeDiff)
 	} else if statusSizeDiff > 0 {
 		actualUsed = actualUsed + uint64(statusSizeDiff)
+	}
+
+	if accountPublicKeyCount > 1 {
+		// Include sequenceNumberStorageSize per key for all account public key at index >= 1.
+		// NOTE: sequence number for first account public key is included in
+		// first account public key register, so it doesn't need to be included here.
+		actualUsed += uint64(accountPublicKeyCount-1) * sequenceNumberStorageSize
 	}
 
 	currentUsed := status.StorageUsed()
