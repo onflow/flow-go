@@ -2,6 +2,7 @@ package collection
 
 import (
 	"context"
+	"github.com/onflow/flow-go/model/messages"
 	"time"
 
 	"github.com/rs/zerolog"
@@ -210,8 +211,8 @@ func (suite *CollectorSuite) AwaitProposals(n uint) []cluster.Block {
 		suite.T().Logf("ghost recv: %T", msg)
 
 		switch val := msg.(type) {
-		case *cluster.UntrustedProposal:
-			internalClusterProposal, err := cluster.NewProposal(*val)
+		case *messages.ClusterProposal:
+			internalClusterProposal, err := cluster.NewProposal(cluster.UntrustedProposal(*val))
 			require.NoError(suite.T(), err)
 			blocks = append(blocks, internalClusterProposal.Block)
 			if len(blocks) == int(n) {
@@ -260,8 +261,8 @@ func (suite *CollectorSuite) AwaitTransactionsIncluded(txIDs ...flow.Identifier)
 		require.Nil(suite.T(), err, "could not read next message")
 
 		switch val := msg.(type) {
-		case *cluster.UntrustedProposal:
-			internalClusterProposal, err := cluster.NewProposal(*val)
+		case *messages.ClusterProposal:
+			internalClusterProposal, err := cluster.NewProposal(cluster.UntrustedProposal(*val))
 			require.NoError(suite.T(), err)
 			block := internalClusterProposal.Block
 			collection := block.Payload.Collection
@@ -286,7 +287,7 @@ func (suite *CollectorSuite) AwaitTransactionsIncluded(txIDs ...flow.Identifier)
 				proposals[collection.ID()] = collection.Light().Transactions
 			}
 
-		case *flow.CollectionGuarantee:
+		case *messages.CollectionGuarantee:
 			finalizedTxIDs, ok := proposals[val.CollectionID]
 			if !ok {
 				suite.T().Logf("got guarantee from %v before the collection proposal (collection id=%x)", originID, val.CollectionID)
@@ -305,8 +306,8 @@ func (suite *CollectorSuite) AwaitTransactionsIncluded(txIDs ...flow.Identifier)
 				return
 			}
 
-		case *flow.TransactionBody:
-			suite.T().Logf("got tx from %v: %v", originID, val.ID())
+		case *messages.TransactionBody:
+			suite.T().Logf("got tx from %v: %v", originID, flow.TransactionBody(*val).ID())
 		}
 	}
 

@@ -81,8 +81,8 @@ func (tst *TestnetStateTracker) Track(t *testing.T, ctx context.Context, ghost *
 			tst.MsgState.Add(sender, msg)
 
 			switch m := msg.(type) {
-			case *flow.UntrustedProposal:
-				proposal, err := flow.NewProposal(*m)
+			case *messages.Proposal:
+				proposal, err := flow.NewProposal(flow.UntrustedProposal(*m))
 				require.NoError(t, err)
 				err = tst.BlockState.Add(t, proposal)
 				require.NoError(t, err)
@@ -94,18 +94,18 @@ func (tst *TestnetStateTracker) Track(t *testing.T, ctx context.Context, ghost *
 					block.Height,
 					block.View,
 					block.ID())
-			case *flow.ResultApproval:
-				tst.ApprovalState.Add(sender, m)
+			case *messages.ResultApproval:
+				tst.ApprovalState.Add(sender, (*flow.ResultApproval)(m))
 				t.Logf("%v result approval received from %s for execution result ID %x and chunk index %v\n",
 					time.Now().UTC(),
 					sender,
 					m.Body.ExecutionResultID,
 					m.Body.ChunkIndex)
 
-			case *flow.ExecutionReceipt:
+			case *messages.ExecutionReceipt:
 				finalState, err := m.ExecutionResult.FinalStateCommitment()
 				require.NoError(t, err)
-				tst.ReceiptState.Add(m)
+				tst.ReceiptState.Add((*flow.ExecutionReceipt)(m))
 				t.Logf("%v execution receipts received from %s for block ID %x by executor ID %x with final state %x result ID %x chunks %d\n",
 					time.Now().UTC(),
 					sender,

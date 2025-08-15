@@ -12,6 +12,7 @@ import (
 	"github.com/onflow/flow-go/engine/ghost/client"
 	"github.com/onflow/flow-go/integration/testnet"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module/signature"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -146,11 +147,11 @@ func (is *InclusionSuite) waitUntilSeenProposal(deadline time.Time) {
 		}
 
 		// we only care about block proposals at the moment
-		proposal, ok := msg.(*flow.UntrustedProposal)
+		proposal, ok := msg.(*messages.Proposal)
 		if !ok {
 			continue
 		}
-		proposalTrusted, err := flow.NewProposal(*proposal)
+		proposalTrusted, err := flow.NewProposal(flow.UntrustedProposal(*proposal))
 		require.NoError(is.T(), err)
 		block := proposalTrusted.Block
 
