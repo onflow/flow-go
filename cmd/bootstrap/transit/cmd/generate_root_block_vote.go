@@ -102,7 +102,7 @@ func generateVote(c *cobra.Command, args []string) {
 	voteFile := fmt.Sprintf(bootstrap.PathNodeRootBlockVote, nodeID)
 	voteFilePath := filepath.Join(flagBootDir, voteFile)
 	if flagOutputDir != "" {
-		voteFilePath = filepath.Join(flagOutputDir, voteFile)
+		voteFilePath = flagOutputDir
 	}
 
 	if err = io.WriteJSON(voteFilePath, vote); err != nil {
