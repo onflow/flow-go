@@ -21,6 +21,8 @@ import (
 	"github.com/onflow/flow-go/ledger/complete/wal"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
+	"github.com/onflow/flow-go/storage"
+	"github.com/onflow/flow-go/storage/operation"
 	"github.com/onflow/flow-go/storage/store"
 	"github.com/onflow/flow-go/utils/unittest"
 
@@ -65,8 +67,10 @@ func TestExtractExecutionState(t *testing.T) {
 			blockID := unittest.IdentifierFixture()
 			stateCommitment := unittest.StateCommitmentFixture()
 
-			err := commits.Store(blockID, stateCommitment)
-			require.NoError(t, err)
+			require.NoError(t, storageDB.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+				// Store the state commitment for the block ID
+				return operation.IndexStateCommitment(rw.Writer(), blockID, stateCommitment)
+			}))
 
 			retrievedStateCommitment, err := commits.ByBlockID(blockID)
 			require.NoError(t, err)
@@ -100,7 +104,6 @@ func TestExtractExecutionState(t *testing.T) {
 
 			// Convert to storage.DB interface
 			storageDB := pebbleimpl.ToDB(db)
-			commits := store.NewCommits(metr, storageDB)
 
 			// generate some oldLedger data
 			size := 10
@@ -132,8 +135,10 @@ func TestExtractExecutionState(t *testing.T) {
 
 				// generate random block and map it to state commitment
 				blockID := unittest.IdentifierFixture()
-				err = commits.Store(blockID, flow.StateCommitment(stateCommitment))
-				require.NoError(t, err)
+
+				require.NoError(t, storageDB.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+					return operation.IndexStateCommitment(rw.Writer(), blockID, flow.StateCommitment(stateCommitment))
+				}))
 
 				data := make(map[string]keyPair, len(keys))
 				for j, key := range keys {

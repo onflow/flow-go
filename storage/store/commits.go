@@ -13,11 +13,9 @@ type Commits struct {
 	cache *Cache[flow.Identifier, flow.StateCommitment]
 }
 
-func NewCommits(collector module.CacheMetrics, db storage.DB) *Commits {
+var _ storage.Commits = (*Commits)(nil)
 
-	store := func(rw storage.ReaderBatchWriter, blockID flow.Identifier, commit flow.StateCommitment) error {
-		return operation.IndexStateCommitment(rw.Writer(), blockID, commit)
-	}
+func NewCommits(collector module.CacheMetrics, db storage.DB) *Commits {
 
 	retrieve := func(r storage.Reader, blockID flow.Identifier) (flow.StateCommitment, error) {
 		var commit flow.StateCommitment
@@ -33,7 +31,6 @@ func NewCommits(collector module.CacheMetrics, db storage.DB) *Commits {
 		db: db,
 		cache: newCache(collector, metrics.ResourceCommit,
 			withLimit[flow.Identifier, flow.StateCommitment](1000),
-			withStore(store),
 			withRetrieve(retrieve),
 			withRemove[flow.Identifier, flow.StateCommitment](remove),
 		),
@@ -42,22 +39,12 @@ func NewCommits(collector module.CacheMetrics, db storage.DB) *Commits {
 	return c
 }
 
-func (c *Commits) storeTx(rw storage.ReaderBatchWriter, blockID flow.Identifier, commit flow.StateCommitment) error {
-	return c.cache.PutTx(rw, blockID, commit)
-}
-
 func (c *Commits) retrieveTx(r storage.Reader, blockID flow.Identifier) (flow.StateCommitment, error) {
 	val, err := c.cache.Get(r, blockID)
 	if err != nil {
 		return flow.DummyStateCommitment, err
 	}
 	return val, nil
-}
-
-func (c *Commits) Store(blockID flow.Identifier, commit flow.StateCommitment) error {
-	return c.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-		return c.storeTx(rw, blockID, commit)
-	})
 }
 
 // BatchStore stores Commit keyed by blockID in provided batch

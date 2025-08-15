@@ -9,6 +9,7 @@ import (
 
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/storage"
+	"github.com/onflow/flow-go/storage/operation"
 	"github.com/onflow/flow-go/storage/operation/badgerimpl"
 	"github.com/onflow/flow-go/storage/operation/pebbleimpl"
 	"github.com/onflow/flow-go/storage/store"
@@ -30,8 +31,10 @@ func TestCommitsOnlyFirstHave(t *testing.T) {
 		require.Error(t, err)
 		require.ErrorIs(t, err, storage.ErrNotFound)
 
+		require.NoError(t, pebbleimpl.ToDB(pdb).WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+			return operation.IndexStateCommitment(rw.Writer(), blockID, commit)
+		}))
 		// only stored in first
-		require.NoError(t, pcommits.Store(blockID, commit))
 		actual, err := chained.ByBlockID(blockID)
 		require.NoError(t, err)
 
@@ -49,7 +52,9 @@ func TestCommitsOnlySecondHave(t *testing.T) {
 
 		chained := NewCommits(pcommits, bcommits)
 		// only stored in second
-		require.NoError(t, bcommits.Store(blockID, commit))
+		require.NoError(t, badgerimpl.ToDB(bdb).WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+			return operation.IndexStateCommitment(rw.Writer(), blockID, commit)
+		}))
 		actual, err := chained.ByBlockID(blockID)
 		require.NoError(t, err)
 
