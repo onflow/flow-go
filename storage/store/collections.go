@@ -166,6 +166,14 @@ func (c *Collections) BatchStoreAndIndexByTransaction(lctx lockctx.Proof, collec
 		}
 	}
 
+	// Store individual transactions
+	for _, tx := range collection.Transactions {
+		err = c.transactions.storeTx(rw, tx)
+		if err != nil {
+			return flow.LightCollection{}, fmt.Errorf("could not insert transaction: %w", err)
+		}
+	}
+
 	return light, nil
 }
 
