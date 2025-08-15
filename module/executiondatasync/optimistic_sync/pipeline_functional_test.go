@@ -327,7 +327,7 @@ func (p *PipelineFunctionalSuite) TestMainCtxCancellationDuringRequestingTxResul
 				<-ctx.Done()
 
 				return nil, ctx.Err()
-			}).Once()
+			}).Maybe()
 
 		pipeline.OnParentStateUpdated(StateComplete)
 

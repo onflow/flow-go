@@ -36,7 +36,7 @@ func (c *LightCollectionsStore) Persist(batch storage.ReaderBatchWriter) error {
 	if err != nil {
 		return fmt.Errorf("could not acquire lock for inserting light collections: %w", err)
 	}
-	lctx.Release()
+	defer lctx.Release()
 
 	for _, collection := range c.inMemoryCollections.Data() {
 		if _, err := c.persistedCollections.BatchStoreAndIndexByTransaction(lctx, &collection, batch); err != nil {
