@@ -738,11 +738,11 @@ func (s *AccessAPISuite) TestTransactionSignaturePlainExtensionData() {
 
 			if !tc.expectSuccess {
 				// For invalid cases, we expect the transaction to be rejected
-				s.Assert().NotEqual(statusCode, uint32(codes.OK), "Expected transaction to fail, but got status code: %d", statusCode)
+				s.Assert().NotEqual(uint32(codes.OK), statusCode, "Expected transaction to fail, but got status code: %d", statusCode)
 				return
 			}
 
-			s.Assert().Equal(statusCode, uint32(codes.OK), "Expected transaction to be successful, but got status code: %d", statusCode)
+			s.Assert().Equal(uint32(codes.OK), statusCode, "Expected transaction to be successful, but got status code: %d", statusCode)
 
 		})
 	}
@@ -870,6 +870,7 @@ func (s *AccessAPISuite) TestTransactionSignatureWebAuthnExtensionData() {
 			lastReportedTxStatus := entities.TransactionStatus_UNKNOWN
 			var txID sdk.Identifier
 			var statusCode uint32
+			var errorMessage string
 
 			for {
 				resp, err := subClient.Recv()
@@ -895,6 +896,7 @@ func (s *AccessAPISuite) TestTransactionSignatureWebAuthnExtensionData() {
 				expectedCounter++
 				lastReportedTxStatus = resp.TransactionResults.Status
 				statusCode = resp.TransactionResults.GetStatusCode()
+				errorMessage = resp.TransactionResults.GetErrorMessage()
 			}
 
 			// Check that the final transaction status is sealed
@@ -902,11 +904,11 @@ func (s *AccessAPISuite) TestTransactionSignatureWebAuthnExtensionData() {
 
 			if !tc.expectSuccess {
 				// For invalid cases, we expect the transaction to be rejected
-				s.Assert().NotEqual(statusCode, uint32(codes.OK), "Expected transaction to fail, but got status code: %d", statusCode)
+				s.Assert().NotEqual(uint32(codes.OK), statusCode, "Expected transaction to fail, but got status code: %d", statusCode)
 				return
 			}
 
-			s.Assert().Equal(statusCode, uint32(codes.OK), "Expected transaction to be successful, but got status code: %d", statusCode)
+			s.Assert().Equal(uint32(codes.OK), statusCode, "Expected transaction to be successful, but got status code: %d with message: %s", statusCode, errorMessage)
 
 		})
 	}
