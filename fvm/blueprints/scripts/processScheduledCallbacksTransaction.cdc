@@ -1,7 +1,7 @@
 import "CallbackScheduler"
 
-transaction(maxEffortLeft: UInt64) {
+transaction() {
     execute {
-        CallbackScheduler.process(maxEffortLeft: effortLimit)
+        CallbackScheduler.process()
     }
 }
