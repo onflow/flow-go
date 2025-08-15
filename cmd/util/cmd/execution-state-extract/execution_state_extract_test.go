@@ -69,7 +69,11 @@ func TestExtractExecutionState(t *testing.T) {
 
 			require.NoError(t, storageDB.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 				// Store the state commitment for the block ID
-				return operation.IndexStateCommitment(rw.Writer(), blockID, stateCommitment)
+				lockManager := storage.NewTestingLockManager()
+				lctx := lockManager.NewContext()
+				defer lctx.Release()
+				require.NoError(t, lctx.AcquireLock(storage.LockInsertOwnReceipt))
+				return operation.IndexStateCommitment(lctx, rw, blockID, stateCommitment)
 			}))
 
 			retrievedStateCommitment, err := commits.ByBlockID(blockID)
@@ -137,7 +141,11 @@ func TestExtractExecutionState(t *testing.T) {
 				blockID := unittest.IdentifierFixture()
 
 				require.NoError(t, storageDB.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-					return operation.IndexStateCommitment(rw.Writer(), blockID, flow.StateCommitment(stateCommitment))
+					lockManager := storage.NewTestingLockManager()
+					lctx := lockManager.NewContext()
+					defer lctx.Release()
+					require.NoError(t, lctx.AcquireLock(storage.LockInsertOwnReceipt))
+					return operation.IndexStateCommitment(lctx, rw, blockID, flow.StateCommitment(stateCommitment))
 				}))
 
 				data := make(map[string]keyPair, len(keys))

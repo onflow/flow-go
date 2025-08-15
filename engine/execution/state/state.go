@@ -463,7 +463,7 @@ func (s *state) saveExecutionResults(
 		// the state commitment is the last data item to be stored, so that
 		// IsBlockExecuted can be implemented by checking whether state commitment exists
 		// in the database
-		err = s.commits.BatchStore(blockID, result.CurrentEndState(), batch)
+		err = s.commits.BatchStore(lctx, blockID, result.CurrentEndState(), batch)
 		if err != nil {
 			return fmt.Errorf("cannot store state commitment: %w", err)
 		}

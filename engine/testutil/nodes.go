@@ -619,7 +619,8 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity bootstrap.NodeInfo, ide
 	require.Equal(t, fmt.Sprint(rootSeal.FinalState), fmt.Sprint(commit))
 	require.Equal(t, rootSeal.ResultID, rootResult.ID())
 
-	err = bootstrapper.BootstrapExecutionDatabase(db, rootSeal)
+	bootstrapLockManager := locks.NewTestingLockManager()
+	err = bootstrapper.BootstrapExecutionDatabase(bootstrapLockManager, db, rootSeal)
 	require.NoError(t, err)
 
 	registerDir := unittest.TempPebblePath(t)

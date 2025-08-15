@@ -14,6 +14,7 @@ import (
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
+	"github.com/onflow/flow-go/storage/locks"
 	"github.com/onflow/flow-go/storage/operation"
 	"github.com/onflow/flow-go/storage/operation/badgerimpl"
 	"github.com/onflow/flow-go/storage/operation/pebbleimpl"
@@ -70,7 +71,8 @@ func MigrateLastSealedExecutedResultToPebble(logger zerolog.Logger, badgerDB *ba
 	}
 
 	if !bootstrapped {
-		err = bootstrapper.BootstrapExecutionDatabase(pdb, rootSeal)
+		lockManager := locks.NewTestingLockManager()
+		err = bootstrapper.BootstrapExecutionDatabase(lockManager, pdb, rootSeal)
 		if err != nil {
 			return fmt.Errorf("could not bootstrap pebble execution database: %w", err)
 		}
@@ -150,7 +152,13 @@ func MigrateLastSealedExecutedResultToPebble(logger zerolog.Logger, badgerDB *ba
 			return fmt.Errorf("failed to index result for block %s: %w", blockID, err)
 		}
 
-		if err := pebbleCommits.BatchStore(blockID, commit, batch); err != nil {
+		lockManager := locks.NewTestingLockManager()
+		lctx := lockManager.NewContext()
+		defer lctx.Release()
+		if err := lctx.AcquireLock(storage.LockInsertOwnReceipt); err != nil {
+			return fmt.Errorf("failed to acquire lock: %w", err)
+		}
+		if err := pebbleCommits.BatchStore(lctx, blockID, commit, batch); err != nil {
 			return fmt.Errorf("failed to store commit for block %s: %w", blockID, err)
 		}
 

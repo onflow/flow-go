@@ -52,7 +52,7 @@ func prepareStorehouseTest(f func(t *testing.T, es state.ExecutionState, l *ledg
 			}()
 
 			stateCommitments := storagemock.NewCommits(t)
-			stateCommitments.On("BatchStore", mock.Anything, mock.Anything, mock.Anything).Return(nil)
+			stateCommitments.On("BatchStore", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
 			headers := storagemock.NewHeaders(t)
 			blocks := storagemock.NewBlocks(t)
 			events := storagemock.NewEvents(t)
