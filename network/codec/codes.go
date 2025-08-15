@@ -181,7 +181,7 @@ func InterfaceFromMessageCode(code MessageCode) (messages.UntrustedMessage, stri
 
 	// collections, guarantees & transactions
 	case CodeCollectionGuarantee:
-		return &messages.CollectionGuarantee{}, what(messages.CollectionGuarantee{}), nil
+		return &messages.CollectionGuarantee{}, what(&messages.CollectionGuarantee{}), nil
 	case CodeTransactionBody:
 		return &messages.TransactionBody{}, what(&messages.TransactionBody{}), nil
 	case CodeTransaction:
