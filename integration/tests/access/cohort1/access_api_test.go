@@ -2,6 +2,7 @@ package cohort1
 
 import (
 	"context"
+	"encoding/hex"
 	"fmt"
 	"io"
 	"testing"
@@ -586,9 +587,9 @@ func notOutOfRangeError(err error) bool {
 	return statusErr.Code() != codes.OutOfRange
 }
 
-// TestTransactionSignatureExtensionData tests that the Access API properly handles the ExtensionData field
+// TestTransactionSignaturePlainExtensionData tests that the Access API properly handles the ExtensionData field
 // in transaction signatures for different authentication schemes.
-func (s *AccessAPISuite) TestTransactionSignatureExtensionData() {
+func (s *AccessAPISuite) TestTransactionSignaturePlainExtensionData() {
 	accessNodeContainer := s.net.ContainerByName(testnet.PrimaryAN)
 
 	// Establish a gRPC connection to the access API
@@ -646,16 +647,19 @@ func (s *AccessAPISuite) TestTransactionSignatureExtensionData() {
 		name          string
 		extensionData []byte
 		description   string
+		expectSuccess bool
 	}{
 		{
 			name:          "plain_scheme_nil",
 			extensionData: nil,
 			description:   "Plain authentication scheme with nil ExtensionData",
+			expectSuccess: true,
 		},
 		{
 			name:          "plain_scheme_empty",
 			extensionData: []byte{},
 			description:   "Plain authentication scheme with empty ExtensionData",
+			expectSuccess: true,
 		},
 		{
 			name:          "plain_scheme_explicit",
@@ -663,14 +667,10 @@ func (s *AccessAPISuite) TestTransactionSignatureExtensionData() {
 			description:   "Plain authentication scheme with explicit ExtensionData",
 		},
 		{
-			name:          "webauthn_scheme",
-			extensionData: []byte{0x1, 0x01, 0x02, 0x03, 0x04}, // WebAuthn scheme with some data
-			description:   "WebAuthn authentication scheme with ExtensionData",
-		},
-		{
 			name:          "custom_extension_data",
 			extensionData: []byte{0x02, 0xAA, 0xBB, 0xCC}, // Invalid scheme with custom data
 			description:   "Custom ExtensionData with invalid scheme",
+			expectSuccess: false, // Expect failure due to invalid scheme
 		},
 	}
 
@@ -704,6 +704,7 @@ func (s *AccessAPISuite) TestTransactionSignatureExtensionData() {
 			expectedCounter := uint64(0)
 			lastReportedTxStatus := entities.TransactionStatus_UNKNOWN
 			var txID sdk.Identifier
+			var statusCode uint32
 
 			for {
 				resp, err := subClient.Recv()
@@ -728,16 +729,26 @@ func (s *AccessAPISuite) TestTransactionSignatureExtensionData() {
 
 				expectedCounter++
 				lastReportedTxStatus = resp.TransactionResults.Status
+				statusCode = resp.TransactionResults.GetStatusCode()
 			}
 
 			// Check that the final transaction status is sealed
 			s.Assert().Equal(entities.TransactionStatus_SEALED, lastReportedTxStatus)
+
+			if !tc.expectSuccess {
+				// For invalid cases, we expect the transaction to be rejected
+				s.Assert().NotEqual(statusCode, codes.OK, "Expected transaction to fail, but got status code: %d", statusCode)
+				return
+			}
+
+			s.Assert().Equal(statusCode, codes.OK, "Expected transaction to be successful, but got status code: %d", statusCode)
+
 		})
 	}
 }
 
-// TestWebAuthnExtensionData tests the WebAuthn authentication scheme with properly constructed extension data.
-func (s *AccessAPISuite) TestWebAuthnExtensionData() {
+// TestTransactionSignatureWebAuthnExtensionData tests the WebAuthn authentication scheme with properly constructed extension data.
+func (s *AccessAPISuite) TestTransactionSignatureWebAuthnExtensionData() {
 	accessNodeContainer := s.net.ContainerByName(testnet.PrimaryAN)
 
 	// Establish a gRPC connection to the access API
@@ -790,6 +801,9 @@ func (s *AccessAPISuite) TestWebAuthnExtensionData() {
 		return msgSigs
 	}
 
+	validWebAuthnExtensionData, err := hex.DecodeString("f899a5fd942c3a3408d48b926627637ab286b8d3fbb6430376f8ad75e8747134dc1cdd01017e60ddb8717b226368616c6c656e6765223a2238434e656d4c6f57712d50666e484670354d34537279433175766375516958744a52416c387842366e436b3d222c226f726967696e223a2268747470733a2f2f74657374696e672e636f6d222c2274797065223a22776562617574686e2e676574227d") // Example WebAuthn extension data
+	s.Require().NoError(err)
+
 	// Test WebAuthn extension data with different scenarios
 	testCases := []struct {
 		name          string
@@ -798,7 +812,13 @@ func (s *AccessAPISuite) TestWebAuthnExtensionData() {
 		expectSuccess bool
 	}{
 		{
-			name:          "webauthn_valid_minimal",
+			name:          "webauthn_valid",
+			extensionData: append([]byte{0x1}, validWebAuthnExtensionData...),
+			description:   "WebAuthn scheme with minimal extension data",
+			expectSuccess: true,
+		},
+		{
+			name:          "webauthn_invalid_minimal",
 			extensionData: []byte{0x1}, // WebAuthn scheme identifier only
 			description:   "WebAuthn scheme with minimal extension data",
 			expectSuccess: false, // Should fail validation due to incomplete WebAuthn data
@@ -843,17 +863,12 @@ func (s *AccessAPISuite) TestWebAuthnExtensionData() {
 				EventEncodingVersion: entities.EventEncodingVersion_CCF_V0,
 			})
 
-			if !tc.expectSuccess {
-				// For invalid cases, we expect the transaction to be rejected
-				s.Require().Error(err)
-				return
-			}
-
 			s.Require().NoError(err)
 
 			expectedCounter := uint64(0)
 			lastReportedTxStatus := entities.TransactionStatus_UNKNOWN
 			var txID sdk.Identifier
+			var statusCode uint32
 
 			for {
 				resp, err := subClient.Recv()
@@ -878,10 +893,20 @@ func (s *AccessAPISuite) TestWebAuthnExtensionData() {
 
 				expectedCounter++
 				lastReportedTxStatus = resp.TransactionResults.Status
+				statusCode = resp.TransactionResults.GetStatusCode()
 			}
 
 			// Check that the final transaction status is sealed
 			s.Assert().Equal(entities.TransactionStatus_SEALED, lastReportedTxStatus)
+
+			if !tc.expectSuccess {
+				// For invalid cases, we expect the transaction to be rejected
+				s.Assert().NotEqual(statusCode, codes.OK, "Expected transaction to fail, but got status code: %d", statusCode)
+				return
+			}
+
+			s.Assert().Equal(statusCode, codes.OK, "Expected transaction to be successful, but got status code: %d", statusCode)
+
 		})
 	}
 }
