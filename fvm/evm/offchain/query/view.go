@@ -277,6 +277,28 @@ func WithStateOverrideState(
 		if err != nil {
 			return err
 		}
+		balance, err := baseView.GetBalance(addr)
+		if err != nil {
+			return err
+		}
+		nonce, err := baseView.GetNonce(addr)
+		if err != nil {
+			return err
+		}
+		code, err := baseView.GetCode(addr)
+		if err != nil {
+			return err
+		}
+		codeHash := gethTypes.EmptyCodeHash
+		if len(code) > 0 {
+			codeHash = gethCrypto.Keccak256Hash(code)
+		}
+
+		err = baseView.UpdateAccount(addr, balance, nonce, code, codeHash)
+		if err != nil {
+			return err
+		}
+
 		// purge all the slots
 		err = baseView.PurgeAllSlotsOfAnAccount(addr)
 		if err != nil {
@@ -307,6 +329,28 @@ func WithStateOverrideStateDiff(
 		if err != nil {
 			return err
 		}
+		balance, err := baseView.GetBalance(addr)
+		if err != nil {
+			return err
+		}
+		nonce, err := baseView.GetNonce(addr)
+		if err != nil {
+			return err
+		}
+		code, err := baseView.GetCode(addr)
+		if err != nil {
+			return err
+		}
+		codeHash := gethTypes.EmptyCodeHash
+		if len(code) > 0 {
+			codeHash = gethCrypto.Keccak256Hash(code)
+		}
+
+		err = baseView.UpdateAccount(addr, balance, nonce, code, codeHash)
+		if err != nil {
+			return err
+		}
+
 		// no need to be sorted this is off-chain operation
 		for k, v := range slots {
 			err = baseView.UpdateSlot(types.SlotAddress{
