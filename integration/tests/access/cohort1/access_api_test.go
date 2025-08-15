@@ -737,11 +737,11 @@ func (s *AccessAPISuite) TestTransactionSignaturePlainExtensionData() {
 
 			if !tc.expectSuccess {
 				// For invalid cases, we expect the transaction to be rejected
-				s.Assert().NotEqual(statusCode, codes.OK, "Expected transaction to fail, but got status code: %d", statusCode)
+				s.Assert().NotEqual(statusCode, uint32(codes.OK), "Expected transaction to fail, but got status code: %d", statusCode)
 				return
 			}
 
-			s.Assert().Equal(statusCode, codes.OK, "Expected transaction to be successful, but got status code: %d", statusCode)
+			s.Assert().Equal(statusCode, uint32(codes.OK), "Expected transaction to be successful, but got status code: %d", statusCode)
 
 		})
 	}
@@ -901,11 +901,11 @@ func (s *AccessAPISuite) TestTransactionSignatureWebAuthnExtensionData() {
 
 			if !tc.expectSuccess {
 				// For invalid cases, we expect the transaction to be rejected
-				s.Assert().NotEqual(statusCode, codes.OK, "Expected transaction to fail, but got status code: %d", statusCode)
+				s.Assert().NotEqual(statusCode, uint32(codes.OK), "Expected transaction to fail, but got status code: %d", statusCode)
 				return
 			}
 
-			s.Assert().Equal(statusCode, codes.OK, "Expected transaction to be successful, but got status code: %d", statusCode)
+			s.Assert().Equal(statusCode, uint32(codes.OK), "Expected transaction to be successful, but got status code: %d", statusCode)
 
 		})
 	}
