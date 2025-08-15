@@ -44,7 +44,10 @@ func init() {
 
 func run(*cobra.Command, []string) {
 
-	db := common.InitStorage(flagDatadir)
+	db, err := common.InitStorage(flagDatadir)
+	if err != nil {
+		log.Fatal().Err(err).Msg("could not init storage")
+	}
 	defer db.Close()
 
 	storages := common.InitStorages(db)
