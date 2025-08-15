@@ -2,7 +2,6 @@ package collection
 
 import (
 	"context"
-	"github.com/onflow/flow-go/model/messages"
 	"time"
 
 	"github.com/rs/zerolog"
@@ -20,6 +19,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/factory"
 	"github.com/onflow/flow-go/model/flow/filter"
+	"github.com/onflow/flow-go/model/messages"
 	clusterstate "github.com/onflow/flow-go/state/cluster"
 	clusterstateimpl "github.com/onflow/flow-go/state/cluster/badger"
 	"github.com/onflow/flow-go/utils/unittest"
