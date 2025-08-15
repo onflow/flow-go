@@ -111,7 +111,7 @@ func NewEpochProtocolStateEntries(collector module.CacheMetrics,
 	}
 }
 
-// BatchStore returns persists the given epoch protocol state entry as part of a DB batch. Per convention, the identities in
+// BatchStore persists the given epoch protocol state entry as part of a DB batch. Per convention, the identities in
 // the flow.MinEpochStateEntry must be in canonical order for the current and next epoch (if present),
 // otherwise an exception is returned.
 // No errors are expected during normal operation.
@@ -120,7 +120,7 @@ func (s *EpochProtocolStateEntries) BatchStore(
 	epochProtocolStateEntryID flow.Identifier,
 	epochStateEntry *flow.MinEpochStateEntry,
 ) error {
-	// front-load sanity checks:
+	// sanity checks:
 	if !epochStateEntry.CurrentEpoch.ActiveIdentities.Sorted(flow.IdentifierCanonical) {
 		return fmt.Errorf("sanity check failed: identities are not sorted")
 	}
@@ -128,7 +128,7 @@ func (s *EpochProtocolStateEntries) BatchStore(
 		return fmt.Errorf("sanity check failed: next epoch identities are not sorted")
 	}
 
-	// happy path: return anonymous function, whose future execution (as part of a transaction) will store the state entry.
+	// happy path: add storage operation of the state entry to the batch
 	return operation.InsertEpochProtocolState(w, epochProtocolStateEntryID, epochStateEntry)
 }
 

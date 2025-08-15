@@ -1,7 +1,7 @@
 package sync
 
 import (
-	gethTracers "github.com/onflow/go-ethereum/eth/tracers"
+	gethTracers "github.com/ethereum/go-ethereum/eth/tracers"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/fvm/evm/events"
