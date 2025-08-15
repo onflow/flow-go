@@ -3,8 +3,8 @@ package store
 import (
 	"errors"
 	"fmt"
-	"sync"
 
+	"github.com/jordanschalm/lockctx"
 	"github.com/rs/zerolog/log"
 
 	"github.com/onflow/flow-go/model/flow"
@@ -15,8 +15,6 @@ import (
 type Collections struct {
 	db           storage.DB
 	transactions *Transactions
-	// TODO(7355): lockctx
-	indexingByTx sync.Mutex
 }
 
 var _ storage.Collections = (*Collections)(nil)
@@ -26,26 +24,15 @@ func NewCollections(db storage.DB, transactions *Transactions) *Collections {
 	c := &Collections{
 		db:           db,
 		transactions: transactions,
-		indexingByTx: sync.Mutex{},
 	}
 	return c
 }
 
-func (c *Collections) StoreLight(collection *flow.LightCollection) error {
-	return c.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-		err := operation.UpsertCollection(rw.Writer(), collection)
-		if err != nil {
-			return fmt.Errorf("could not insert collection: %w", err)
-		}
-		return nil
-	})
-}
-
 // Store stores a collection in the database.
 // any error returned are exceptions
-func (c *Collections) Store(collection *flow.Collection) error {
-	return c.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-		light := collection.Light()
+func (c *Collections) Store(collection *flow.Collection) (flow.LightCollection, error) {
+	light := collection.Light()
+	err := c.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 		err := operation.UpsertCollection(rw.Writer(), &light)
 		if err != nil {
 			return fmt.Errorf("could not insert collection: %w", err)
@@ -60,6 +47,11 @@ func (c *Collections) Store(collection *flow.Collection) error {
 
 		return nil
 	})
+
+	if err != nil {
+		return flow.LightCollection{}, err
+	}
+	return light, nil
 }
 
 // ByID retrieves a collection by its ID.
@@ -122,7 +114,7 @@ func (c *Collections) Remove(colID flow.Identifier) error {
 				return fmt.Errorf("could not remove collection payload indices: %w", err)
 			}
 
-			err = operation.RemoveTransaction(rw.Writer(), txID)
+			err = c.transactions.RemoveBatch(rw, txID)
 			if err != nil {
 				return fmt.Errorf("could not remove transaction: %w", err)
 			}
@@ -138,18 +130,23 @@ func (c *Collections) Remove(colID flow.Identifier) error {
 	return nil
 }
 
-// batchStoreLightAndIndexByTransaction stores a light collection and indexes it by transaction ID within a batch.
+// BatchStoreLightAndIndexByTransaction stores a light collection and indexes it by transaction ID within a batch.
 // This is the common implementation used by both StoreLightAndIndexByTransaction and BatchStoreLightAndIndexByTransaction.
 // No errors are expected during normal operations
-func (c *Collections) batchStoreLightAndIndexByTransaction(collection *flow.LightCollection, rw storage.ReaderBatchWriter) error {
-	collectionID := collection.ID()
+func (c *Collections) BatchStoreAndIndexByTransaction(lctx lockctx.Proof, collection *flow.Collection, rw storage.ReaderBatchWriter) (flow.LightCollection, error) {
+	light := collection.Light()
+	collectionID := light.ID()
 
-	err := operation.UpsertCollection(rw.Writer(), collection)
+	err := operation.UpsertCollection(rw.Writer(), &light)
 	if err != nil {
-		return fmt.Errorf("could not insert collection: %w", err)
+		return flow.LightCollection{}, fmt.Errorf("could not insert collection: %w", err)
 	}
 
-	for _, txID := range collection.Transactions {
+	if !lctx.HoldsLock(storage.LockInsertCollection) {
+		return flow.LightCollection{}, fmt.Errorf("missing lock: %v", storage.LockInsertCollection)
+	}
+
+	for _, txID := range light.Transactions {
 		var differentColTxIsIn flow.Identifier
 		err := operation.LookupCollectionByTransaction(rw.GlobalReader(), txID, &differentColTxIsIn)
 		if err == nil {
@@ -163,20 +160,27 @@ func (c *Collections) batchStoreLightAndIndexByTransaction(collection *flow.Ligh
 			continue
 		}
 
-		// the indexingByTx lock has ensured we are the only process indexing collection by transaction
-		err = operation.UnsafeIndexCollectionByTransaction(rw.Writer(), txID, collectionID)
+		err = operation.IndexCollectionByTransaction(lctx, rw.Writer(), txID, collectionID)
 		if err != nil {
-			return fmt.Errorf("could not insert transaction ID: %w", err)
+			return flow.LightCollection{}, fmt.Errorf("could not insert transaction ID: %w", err)
 		}
 	}
 
-	return nil
+	// Store individual transactions
+	for _, tx := range collection.Transactions {
+		err = c.transactions.storeTx(rw, tx)
+		if err != nil {
+			return flow.LightCollection{}, fmt.Errorf("could not insert transaction: %w", err)
+		}
+	}
+
+	return light, nil
 }
 
 // StoreLightAndIndexByTransaction stores a light collection and indexes it by transaction ID.
 // It's concurrent-safe.
 // any error returned are exceptions
-func (c *Collections) StoreLightAndIndexByTransaction(collection *flow.LightCollection) error {
+func (c *Collections) StoreAndIndexByTransaction(lctx lockctx.Proof, collection *flow.Collection) (flow.LightCollection, error) {
 	// - This lock is to ensure there is no race condition when indexing collection by transaction ID
 	// - The access node uses this index to report the transaction status. It's done by first
 	//   find the collection for a given transaction ID, and then find the block by the collection,
@@ -189,12 +193,14 @@ func (c *Collections) StoreLightAndIndexByTransaction(collection *flow.LightColl
 	//   make sure there is no dirty read, we need to use a lock to protect the indexing operation.
 	// - Note, this approach works because this is the only place where UnsafeIndexCollectionByTransaction
 	//   is used in the code base to index collection by transaction.
-	c.indexingByTx.Lock()
-	defer c.indexingByTx.Unlock()
-
-	return c.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-		return c.batchStoreLightAndIndexByTransaction(collection, rw)
+	var light flow.LightCollection
+	err := c.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+		var err error
+		light, err = c.BatchStoreAndIndexByTransaction(lctx, collection, rw)
+		return err
 	})
+
+	return light, err
 }
 
 // LightByTransactionID retrieves a light collection by a transaction ID.
@@ -212,31 +218,4 @@ func (c *Collections) LightByTransactionID(txID flow.Identifier) (*flow.LightCol
 	}
 
 	return &collection, nil
-}
-
-// BatchStoreLightAndIndexByTransaction stores a light collection and indexes it by transaction ID within a batch operation.
-// No errors are expected during normal operations
-func (c *Collections) BatchStoreLightAndIndexByTransaction(collection *flow.LightCollection, batch storage.ReaderBatchWriter) error {
-	// - This lock is to ensure there is no race condition when indexing collection by transaction ID
-	// - The access node uses this index to report the transaction status. It's done by first
-	//   find the collection for a given transaction ID, and then find the block by the collection,
-	//   and then find the status of the block.
-	// - since a transaction can belong to multiple collections, when indexing collection by transaction ID,
-	//   if we overwrite the previous collection ID that was indexed by the same transaction ID, the access node
-	//   will return different collection for the same transaction, and the transaction result status will be
-	//   inconsistent.
-	// - therefore, we need to check if the transaction is already indexed by a collection, and to
-	//   make sure there is no dirty read, we need to use a lock to protect the indexing operation.
-	// - Note, this approach works because this is the only place where UnsafeIndexCollectionByTransaction
-	//   is used in the code base to index collection by transaction.
-	c.indexingByTx.Lock()
-	batch.AddCallback(func(err error) {
-		defer c.indexingByTx.Unlock()
-	})
-
-	if err := c.batchStoreLightAndIndexByTransaction(collection, batch); err != nil {
-		return err
-	}
-
-	return nil
 }

@@ -5,18 +5,29 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
+// noOpLockContext is a no-op implementation of lockctx.Proof for testing
+type noOpLockContext struct{}
+
+func (n *noOpLockContext) HoldsLock(lockName string) bool {
+	return true // Always return true since this is a no-op context
+}
+
+func (n *noOpLockContext) Release() {
+	// No-op
+}
+
 func TestCollection_HappyCase(t *testing.T) {
-	collections := NewCollections()
+	transactions := NewTransactions()
+	collections := NewCollections(transactions)
 
 	collection := unittest.CollectionFixture(3)
 
 	// Store collection
-	err := collections.Store(&collection)
+	_, err := collections.Store(&collection)
 	require.NoError(t, err)
 
 	// Retrieve collection
@@ -39,24 +50,26 @@ func TestCollection_HappyCase(t *testing.T) {
 }
 
 func TestLightByTransactionID_HappyCase(t *testing.T) {
-	collections := NewCollections()
-	lightCollection := &flow.LightCollection{
-		Transactions: []flow.Identifier{unittest.IdentifierFixture(), unittest.IdentifierFixture()},
-	}
+	transactions := NewTransactions()
+	collections := NewCollections(transactions)
+	collection := unittest.CollectionFixture(2)
 
-	err := collections.StoreLightAndIndexByTransaction(lightCollection)
+	// Create a no-op lock context for testing
+	noOpLockCtx := &noOpLockContext{}
+	_, err := collections.StoreAndIndexByTransaction(noOpLockCtx, &collection)
 	require.NoError(t, err)
 
 	// Fetch by transaction ID and validate
-	retrieved, err := collections.LightByTransactionID(lightCollection.Transactions[0])
+	retrieved, err := collections.LightByTransactionID(collection.Transactions[0].ID())
 	require.NoError(t, err)
-	require.Equal(t, lightCollection, retrieved)
+	lightCollection := collection.Light()
+	require.Equal(t, &lightCollection, retrieved)
 
-	retrieved, err = collections.LightByTransactionID(lightCollection.Transactions[1])
+	retrieved, err = collections.LightByTransactionID(collection.Transactions[1].ID())
 	require.NoError(t, err)
-	require.Equal(t, lightCollection, retrieved)
+	require.Equal(t, &lightCollection, retrieved)
 
 	extracted := collections.LightCollections()
 	require.Len(t, extracted, 1)
-	require.Equal(t, *lightCollection, extracted[0])
+	require.Equal(t, lightCollection, extracted[0])
 }
