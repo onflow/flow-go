@@ -57,7 +57,7 @@ func pullRootBlock(c *cobra.Command, args []string) {
 		fullRootBlockPath = filepath.Join(flagOutputDir, "root-block.json")
 	}
 
-	log.Info().Str("source", rootBlockFile).Str("dest", fullOutpath).Msgf("downloading root block file from transit servers")
+	log.Info().Str("source", rootBlockFile).Str("dest", fullRootBlockPath).Msgf("downloading root block file from transit servers")
 	err = bucket.DownloadFile(ctx, client, fullRootBlockPath, rootBlockFile)
 	if err != nil {
 		log.Fatal().Err(err).Msgf("could not download google bucket file")
