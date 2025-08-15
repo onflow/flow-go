@@ -1,6 +1,7 @@
 package store
 
 import (
+	"github.com/jordanschalm/lockctx"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/metrics"
@@ -50,10 +51,10 @@ func (c *Commits) retrieveTx(r storage.Reader, blockID flow.Identifier) (flow.St
 // BatchStore stores Commit keyed by blockID in provided batch
 // No errors are expected during normal operation, even if no entries are matched.
 // If Badger unexpectedly fails to process the request, the error is wrapped in a generic error and returned.
-func (c *Commits) BatchStore(blockID flow.Identifier, commit flow.StateCommitment, rw storage.ReaderBatchWriter) error {
+func (c *Commits) BatchStore(lctx lockctx.Proof, blockID flow.Identifier, commit flow.StateCommitment, rw storage.ReaderBatchWriter) error {
 	// we can't cache while using batches, as it's unknown at this point when, and if
 	// the batch will be committed. Cache will be populated on read however.
-	return operation.IndexStateCommitment(rw.Writer(), blockID, commit)
+	return operation.IndexStateCommitment(lctx, rw, blockID, commit)
 }
 
 func (c *Commits) ByBlockID(blockID flow.Identifier) (flow.StateCommitment, error) {
