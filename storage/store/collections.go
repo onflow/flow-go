@@ -114,7 +114,7 @@ func (c *Collections) Remove(colID flow.Identifier) error {
 				return fmt.Errorf("could not remove collection payload indices: %w", err)
 			}
 
-			err = operation.RemoveTransaction(rw.Writer(), txID)
+			err = c.transactions.RemoveBatch(rw, txID)
 			if err != nil {
 				return fmt.Errorf("could not remove transaction: %w", err)
 			}
