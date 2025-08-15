@@ -1,6 +1,8 @@
 package blueprints_test
 
 import (
+	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -10,7 +12,10 @@ import (
 	cadenceCommon "github.com/onflow/cadence/common"
 	"github.com/onflow/cadence/encoding/ccf"
 
+	jsoncdc "github.com/onflow/cadence/encoding/json"
+
 	"github.com/onflow/flow-go/fvm/blueprints"
+	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -23,6 +28,7 @@ func TestProcessCallbacksTransaction(t *testing.T) {
 
 	assert.NotNil(t, tx)
 	assert.NotEmpty(t, tx.Script)
+	require.False(t, strings.Contains(string(tx.Script), `import "FlowCallbackScheduler"`), "should resolve callback scheduler import")
 	assert.Equal(t, uint64(flow.DefaultMaxTransactionGasLimit), tx.GasLimit)
 	assert.Empty(t, tx.Arguments)
 }
@@ -122,10 +128,11 @@ func TestExecuteCallbackTransaction(t *testing.T) {
 	tx := txs[0]
 	assert.NotNil(t, tx)
 	assert.NotEmpty(t, tx.Script)
+	require.False(t, strings.Contains(string(tx.Script), `import "FlowCallbackScheduler"`), "should resolve callback scheduler import")
 	assert.Equal(t, uint64(effort), tx.GasLimit)
 	assert.Len(t, tx.Arguments, 1)
 
-	expectedEncodedID, err := ccf.Encode(cadence.NewUInt64(id))
+	expectedEncodedID, err := jsoncdc.Encode(cadence.NewUInt64(id))
 	require.NoError(t, err)
 	assert.Equal(t, tx.Arguments[0], expectedEncodedID)
 
@@ -133,16 +140,21 @@ func TestExecuteCallbackTransaction(t *testing.T) {
 }
 
 func createValidCallbackEvent(t *testing.T, id uint64, effort uint64) flow.Event {
-	// todo use proper location
-	contractAddress := flow.HexToAddress("0x0000000000000000")
-	location := cadenceCommon.NewAddressLocation(nil, cadenceCommon.Address(contractAddress), "CallbackScheduler")
+	const processedEventTypeTemplate = "A.%v.FlowCallbackScheduler.CallbackProcessed"
+	env := systemcontracts.SystemContractsForChain(flow.Mainnet.Chain().ChainID()).AsTemplateEnv()
+	eventTypeString := fmt.Sprintf(processedEventTypeTemplate, env.FlowCallbackSchedulerAddress)
+	loc, err := cadenceCommon.HexToAddress(env.FlowCallbackSchedulerAddress)
+	require.NoError(t, err)
+	location := cadenceCommon.NewAddressLocation(nil, loc, "CallbackProcessed")
 
 	eventType := cadence.NewEventType(
 		location,
 		"CallbackProcessed",
 		[]cadence.Field{
-			{Identifier: "ID", Type: cadence.UInt64Type},
+			{Identifier: "id", Type: cadence.UInt64Type},
+			{Identifier: "priority", Type: cadence.UInt8Type},
 			{Identifier: "executionEffort", Type: cadence.UInt64Type},
+			{Identifier: "callbackOwner", Type: cadence.AddressType},
 		},
 		nil,
 	)
@@ -150,7 +162,9 @@ func createValidCallbackEvent(t *testing.T, id uint64, effort uint64) flow.Event
 	event := cadence.NewEvent(
 		[]cadence.Value{
 			cadence.NewUInt64(id),
+			cadence.NewUInt8(1),
 			cadence.NewUInt64(effort),
+			cadence.NewAddress([8]byte{}),
 		},
 	).WithType(eventType)
 
@@ -158,7 +172,7 @@ func createValidCallbackEvent(t *testing.T, id uint64, effort uint64) flow.Event
 	require.NoError(t, err)
 
 	return flow.Event{
-		Type:             flow.EventType("A.0x0000000000000000.CallbackScheduler.CallbackProcessed"),
+		Type:             flow.EventType(eventTypeString),
 		TransactionID:    unittest.IdentifierFixture(),
 		TransactionIndex: 0,
 		EventIndex:       0,
@@ -168,7 +182,7 @@ func createValidCallbackEvent(t *testing.T, id uint64, effort uint64) flow.Event
 
 func createInvalidTypeEvent() flow.Event {
 	return flow.Event{
-		Type:             flow.EventType("A.0x0000000000000000.SomeContract.WrongEvent"),
+		Type:             flow.EventType("A.0000000000000000.SomeContract.WrongEvent"),
 		TransactionID:    unittest.IdentifierFixture(),
 		TransactionIndex: 0,
 		EventIndex:       0,
@@ -178,7 +192,7 @@ func createInvalidTypeEvent() flow.Event {
 
 func createInvalidPayloadEvent() flow.Event {
 	return flow.Event{
-		Type:             flow.EventType("A.0x0000000000000000.CallbackScheduler.CallbackProcessed"),
+		Type:             flow.EventType("A.0000000000000000.FlowCallbackScheduler.CallbackProcessed"),
 		TransactionID:    unittest.IdentifierFixture(),
 		TransactionIndex: 0,
 		EventIndex:       0,
