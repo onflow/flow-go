@@ -76,7 +76,7 @@ func TestAccounts_GetPublicKey(t *testing.T) {
 			err := accounts.Create(nil, address)
 			require.NoError(t, err)
 
-			_, err = accounts.GetPublicKey(address, 0)
+			_, err = accounts.GetAccountPublicKey(address, 0)
 			require.True(t, errors.IsAccountPublicKeyNotFoundError(err))
 		}
 	})
@@ -101,7 +101,7 @@ func TestAccounts_GetPublicKeyCount(t *testing.T) {
 			err := accounts.Create(nil, address)
 			require.NoError(t, err)
 
-			count, err := accounts.GetPublicKeyCount(address)
+			count, err := accounts.GetAccountPublicKeyCount(address)
 			require.NoError(t, err)
 			require.Equal(t, uint32(0), count)
 		}
@@ -128,7 +128,7 @@ func TestAccounts_GetPublicKeys(t *testing.T) {
 			err := accounts.Create(nil, address)
 			require.NoError(t, err)
 
-			keys, err := accounts.GetPublicKeys(address)
+			keys, err := accounts.GetAccountPublicKeys(address)
 			require.NoError(t, err)
 			require.Empty(t, keys)
 		}

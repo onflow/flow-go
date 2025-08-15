@@ -120,7 +120,7 @@ func (reader *accountKeyReader) GetAccountKey(
 	address := flow.ConvertAddress(runtimeAddress)
 
 	// address verification is also done in this step
-	accountPublicKey, err := reader.accounts.GetPublicKey(
+	accountPublicKey, err := reader.accounts.GetAccountPublicKey(
 		address,
 		keyIndex)
 	if err != nil {
@@ -167,7 +167,7 @@ func (reader *accountKeyReader) AccountKeysCount(
 	}
 
 	// address verification is also done in this step
-	keyCount, err := reader.accounts.GetPublicKeyCount(
+	keyCount, err := reader.accounts.GetAccountPublicKeyCount(
 		flow.ConvertAddress(runtimeAddress))
 
 	return keyCount, err
