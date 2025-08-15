@@ -130,8 +130,8 @@ func NewCoreImpl(
 
 	inmemRegisters := unsynchronized.NewRegisters(header.Height)
 	inmemEvents := unsynchronized.NewEvents()
-	inmemCollections := unsynchronized.NewCollections()
 	inmemTransactions := unsynchronized.NewTransactions()
+	inmemCollections := unsynchronized.NewCollections(inmemTransactions)
 	inmemResults := unsynchronized.NewLightTransactionResults()
 	inmemTxResultErrMsgs := unsynchronized.NewTransactionResultErrorMessages()
 
@@ -140,7 +140,6 @@ func NewCoreImpl(
 		inmemRegisters,
 		inmemEvents,
 		inmemCollections,
-		inmemTransactions,
 		inmemResults,
 		inmemTxResultErrMsgs,
 		executionResult,

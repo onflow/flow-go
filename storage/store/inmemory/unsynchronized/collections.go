@@ -19,15 +19,18 @@ type Collections struct {
 	collections                    map[flow.Identifier]*flow.Collection
 	lightCollections               map[flow.Identifier]*flow.LightCollection
 	transactionIDToLightCollection map[flow.Identifier]*flow.LightCollection
+
+	transactions *Transactions // Reference to Transactions to store txs when storing collections
 }
 
 var _ storage.Collections = (*Collections)(nil)
 
-func NewCollections() *Collections {
+func NewCollections(transactions *Transactions) *Collections {
 	return &Collections{
 		collections:                    make(map[flow.Identifier]*flow.Collection),
 		lightCollections:               make(map[flow.Identifier]*flow.LightCollection),
 		transactionIDToLightCollection: make(map[flow.Identifier]*flow.LightCollection),
+		transactions:                   transactions,
 	}
 }
 
@@ -113,6 +116,12 @@ func (c *Collections) StoreAndIndexByTransaction(_ lockctx.Proof, collection *fl
 	c.lightCollections[light.ID()] = &light
 	for _, txID := range light.Transactions {
 		c.transactionIDToLightCollection[txID] = &light
+	}
+
+	for _, tx := range collection.Transactions {
+		if err := c.transactions.Store(tx); err != nil {
+			return flow.LightCollection{}, fmt.Errorf("could not index transaction: %w", err)
+		}
 	}
 
 	return light, nil

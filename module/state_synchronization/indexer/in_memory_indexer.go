@@ -24,7 +24,6 @@ type InMemoryIndexer struct {
 	registers       *unsynchronized.Registers
 	events          *unsynchronized.Events
 	collections     *unsynchronized.Collections
-	transactions    *unsynchronized.Transactions
 	results         *unsynchronized.LightTransactionResults
 	txResultErrMsgs *unsynchronized.TransactionResultErrorMessages
 	executionResult *flow.ExecutionResult
@@ -41,7 +40,6 @@ func NewInMemoryIndexer(
 	registers *unsynchronized.Registers,
 	events *unsynchronized.Events,
 	collections *unsynchronized.Collections,
-	transactions *unsynchronized.Transactions,
 	results *unsynchronized.LightTransactionResults,
 	txResultErrMsgs *unsynchronized.TransactionResultErrorMessages,
 	executionResult *flow.ExecutionResult,
@@ -53,7 +51,6 @@ func NewInMemoryIndexer(
 		registers:       registers,
 		events:          events,
 		collections:     collections,
-		transactions:    transactions,
 		results:         results,
 		txResultErrMsgs: txResultErrMsgs,
 		executionResult: executionResult,
@@ -188,12 +185,6 @@ func (i *InMemoryIndexer) indexCollection(lctx lockctx.Proof, collection *flow.C
 	_, err := i.collections.StoreAndIndexByTransaction(lctx, collection)
 	if err != nil {
 		return err
-	}
-
-	for _, tx := range collection.Transactions {
-		if err := i.transactions.Store(tx); err != nil {
-			return fmt.Errorf("could not index transaction: %w", err)
-		}
 	}
 
 	return nil
