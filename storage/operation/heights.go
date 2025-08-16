@@ -40,7 +40,7 @@ func RetrieveFinalizedHeight(r storage.Reader, height *uint64) error {
 	return RetrieveByKey(r, MakePrefix(codeFinalizedHeight), height)
 }
 
-// UpsertSealedHeight upserts the sealed height index, overwriting the current value.
+// UpsertSealedHeight upserts the latest sealed height, OVERWRITING the current value.
 // Updates to this index must strictly increase the sealed height.
 // To enforce this, the caller must check the current sealed height while holding [storage.LockFinalizeBlock].
 func UpsertSealedHeight(lctx lockctx.Proof, w storage.Writer, height uint64) error {
