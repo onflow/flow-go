@@ -21,12 +21,12 @@ import (
 )
 
 const (
-	legacyAccountKeyRegisterKeyPattern = "public_key_%d"
-	legacyAccountKey0RegisterKey       = "public_key_0"
-	accountKey0RegisterKey             = "apk_0"
-	sequenceNumberRegisterKeyPattern   = "sn_%d"
-	sequenceNumberRegisterKeyPrefix    = "sn_"
-	batchPublicKeyRegisterKeyPattern   = "pk_b%d"
+	legacyAccountPublicKeyRegisterKeyPattern = "public_key_%d"
+	legacyAccountPublicKey0RegisterKey       = "public_key_0"
+	accountPublicKey0RegisterKey             = "apk_0"
+	sequenceNumberRegisterKeyPattern         = "sn_%d"
+	sequenceNumberRegisterKeyPrefix          = "sn_"
+	batchPublicKeyRegisterKeyPattern         = "pk_b%d"
 )
 
 const (
@@ -39,7 +39,7 @@ const (
 )
 
 // AccountPublicKeyDeduplicationMigration deduplicates account public keys,
-// and migrates account status and account key related registers.
+// and migrates account status and account public key related registers.
 type AccountPublicKeyDeduplicationMigration struct {
 	log                     zerolog.Logger
 	chainID                 flow.ChainID
@@ -187,9 +187,9 @@ func migrateAndDeduplicateAccountPublicKeysIfNeeded(
 ) {
 	// TODO: maybe special case migration for accounts with 2 account public keys (16% of accounts)
 
-	// accountPublicKeyWeightAndRevokedStatus is ordered by account public key index,
-	// starting from account key at index 1.
-	accountPublicKeyWeightAndRevokedStatus := make([]accountKeyWeightAndRevokedStatus, 0, accountPublicKeyCount-1)
+	// accountPublicKeyWeightAndRevokedStatuses is ordered by account public key index,
+	// starting from account public key at index 1.
+	accountPublicKeyWeightAndRevokedStatuses := make([]accountPublicKeyWeightAndRevokedStatus, 0, accountPublicKeyCount-1)
 
 	// Account public key deduplicator deduplicates keys.
 	deduplicator := newAccountPublicKeyDeduplicator(owner, accountPublicKeyCount)
@@ -213,9 +213,9 @@ func migrateAndDeduplicateAccountPublicKeysIfNeeded(
 		}
 
 		// Save weight and revoked status for account public key
-		accountPublicKeyWeightAndRevokedStatus = append(
-			accountPublicKeyWeightAndRevokedStatus,
-			accountKeyWeightAndRevokedStatus{
+		accountPublicKeyWeightAndRevokedStatuses = append(
+			accountPublicKeyWeightAndRevokedStatuses,
+			accountPublicKeyWeightAndRevokedStatus{
 				weight:  uint16(decodedAccountPublicKey.Weight),
 				revoked: decodedAccountPublicKey.Revoked,
 			},
@@ -245,7 +245,7 @@ func migrateAndDeduplicateAccountPublicKeysIfNeeded(
 		log,
 		accountRegisters,
 		owner,
-		accountPublicKeyWeightAndRevokedStatus,
+		accountPublicKeyWeightAndRevokedStatuses,
 		encodedPublicKeys,
 		deduplicator.keyIndexMapping(),
 		shouldDeduplicate,
@@ -263,7 +263,7 @@ func migrateAndDeduplicateAccountPublicKeysIfNeeded(
 	return shouldDeduplicate, nil
 }
 
-// accountPublicKeyDeduplicator deduplicates all account public keys (including account key 0).
+// accountPublicKeyDeduplicator deduplicates all account public keys (including account public key 0).
 type accountPublicKeyDeduplicator struct {
 	owner string
 
@@ -277,7 +277,7 @@ type accountPublicKeyDeduplicator struct {
 	uniqEncodedPublicKeys [][]byte
 
 	// accountPublicKeyIndexMappings contains mapping of account public key index to unique public key index.
-	// NOTE: First mapping is always 0 (account key index 0) to 0 (unique key index 0).
+	// NOTE: First mapping is always 0 (account public key index 0) to 0 (unique key index 0).
 	accountPublicKeyIndexMappings []uint32 // index: account public key index, element: uniqEncodedPublicKeys index
 }
 
@@ -320,7 +320,7 @@ func (d *accountPublicKeyDeduplicator) addAccountPublicKey(
 		// Unique key index is the last key index in uniqEncodedPublicKeys.
 		uniqKeyIndex = uint32(len(d.uniqEncodedPublicKeys) - 1)
 
-		// Append unique key index to account key mappings
+		// Append unique key index to account public key mappings
 		d.accountPublicKeyIndexMappings[keyIndex] = uniqKeyIndex
 
 		d.uniqEncodedPublicKeysMap[string(encodedPublicKey)] = uniqKeyIndex

@@ -33,7 +33,7 @@ func getAccountPublicKeyOrError(
 	owner string,
 	keyIndex uint32,
 ) (flow.AccountPublicKey, error) {
-	publicKeyRegisterKey := fmt.Sprintf(legacyAccountKeyRegisterKeyPattern, keyIndex)
+	publicKeyRegisterKey := fmt.Sprintf(legacyAccountPublicKeyRegisterKeyPattern, keyIndex)
 
 	encodedAccountPublicKey, err := getAccountRegisterOrError(accountRegisters, owner, publicKeyRegisterKey)
 	if err != nil {
@@ -53,12 +53,12 @@ func removeAccountPublicKey(
 	owner string,
 	keyIndex uint32,
 ) error {
-	publicKeyRegisterKey := fmt.Sprintf(legacyAccountKeyRegisterKeyPattern, keyIndex)
+	publicKeyRegisterKey := fmt.Sprintf(legacyAccountPublicKeyRegisterKeyPattern, keyIndex)
 	return accountRegisters.Set(owner, publicKeyRegisterKey, nil)
 }
 
 // migrateAccountStatusToV4 sets account status version to v4, stores account status
-// in accountRegisters, and returns updated account status.
+// in account status register, and returns updated account status.
 func migrateAccountStatusToV4(
 	log zerolog.Logger,
 	accountRegisters *registers.AccountRegisters,
@@ -91,17 +91,17 @@ func migrateAccountPublicKey0(
 	accountRegisters *registers.AccountRegisters,
 	owner string,
 ) ([]byte, error) {
-	encodedAccountPublicKey0, err := getAccountRegisterOrError(accountRegisters, owner, legacyAccountKey0RegisterKey)
+	encodedAccountPublicKey0, err := getAccountRegisterOrError(accountRegisters, owner, legacyAccountPublicKey0RegisterKey)
 	if err != nil {
 		return nil, err
 	}
 
 	// Rename public_key_0 register key to apk_0
-	err = accountRegisters.Set(owner, legacyAccountKey0RegisterKey, nil)
+	err = accountRegisters.Set(owner, legacyAccountPublicKey0RegisterKey, nil)
 	if err != nil {
 		return nil, err
 	}
-	err = accountRegisters.Set(owner, accountKey0RegisterKey, encodedAccountPublicKey0)
+	err = accountRegisters.Set(owner, accountPublicKey0RegisterKey, encodedAccountPublicKey0)
 	if err != nil {
 		return nil, err
 	}
@@ -137,7 +137,7 @@ func migrateAccountStatusWithPublicKeyMetadata(
 	log zerolog.Logger,
 	accountRegisters *registers.AccountRegisters,
 	owner string,
-	accountPublicKeyWeightAndRevokedStatus []accountKeyWeightAndRevokedStatus,
+	accountPublicKeyWeightAndRevokedStatus []accountPublicKeyWeightAndRevokedStatus,
 	encodedPublicKeys [][]byte,
 	keyIndexMappings []uint32,
 	deduplicated bool,
@@ -197,11 +197,11 @@ func migrateAccountPublicKeysIfNeeded(
 	return nil
 }
 
-func firstDeduplicatedKeyIndexInMappings(accountKeyMappings []uint32) int {
-	for keyIndex, storedKeyIndex := range accountKeyMappings {
+func firstDeduplicatedKeyIndexInMappings(accountPublicKeyMappings []uint32) int {
+	for keyIndex, storedKeyIndex := range accountPublicKeyMappings {
 		if uint32(keyIndex) != storedKeyIndex {
 			return keyIndex
 		}
 	}
-	return len(accountKeyMappings)
+	return len(accountPublicKeyMappings)
 }

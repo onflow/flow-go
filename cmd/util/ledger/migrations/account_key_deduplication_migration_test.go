@@ -15,7 +15,7 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-func TestAccountKeyDeduplicator(t *testing.T) {
+func TestAccountPublicKeyDeduplicator(t *testing.T) {
 	pk1 := newAccountPublicKey(t, 1000)
 	pkb1, err := encodeStoredPublicKeyFromAccountPublicKey(pk1)
 	require.NoError(t, err)
@@ -203,7 +203,7 @@ func TestDigestForLastNEncodedPublicKeys(t *testing.T) {
 func TestMigration(t *testing.T) {
 	const accountStatusMinSize = 29
 
-	t.Run("no account key", func(t *testing.T) {
+	t.Run("no account public key", func(t *testing.T) {
 		var owner [8]byte
 		_, _ = rand.Read(owner[:])
 
@@ -220,7 +220,7 @@ func TestMigration(t *testing.T) {
 		require.NoError(t, err)
 		require.False(t, deduplicated)
 
-		// Regiser after migration:
+		// Register after migration:
 		// - "a.s"
 		require.Equal(t, 1, accountRegisters.Count())
 
@@ -232,7 +232,7 @@ func TestMigration(t *testing.T) {
 		require.Equal(t, encodedAccountStatusV3[1:], encodedAccountStatusV4[1:])
 	})
 
-	t.Run("1 account key without sequence number", func(t *testing.T) {
+	t.Run("1 account public key without sequence number", func(t *testing.T) {
 		var owner [8]byte
 		_, _ = rand.Read(owner[:])
 
@@ -245,7 +245,7 @@ func TestMigration(t *testing.T) {
 		accountRegisters := registers.NewAccountRegisters(string(owner[:]))
 		err = accountRegisters.Set(string(owner[:]), flow.AccountStatusKey, encodedAccountStatusV3)
 		require.NoError(t, err)
-		err = accountRegisters.Set(string(owner[:]), legacyAccountKey0RegisterKey, encodedPk1)
+		err = accountRegisters.Set(string(owner[:]), legacyAccountPublicKey0RegisterKey, encodedPk1)
 		require.NoError(t, err)
 
 		deduplicated, err := migrateAndDeduplicateAccountPublicKeys(
@@ -255,25 +255,25 @@ func TestMigration(t *testing.T) {
 		require.NoError(t, err)
 		require.False(t, deduplicated)
 
-		// Regisers after migration:
+		// Registers after migration:
 		// - "a.s"
 		// - "apk_0"
 		require.Equal(t, 2, accountRegisters.Count())
 
-		// Test "a.s" regsiter
+		// Test "a.s" register
 		encodedAccountStatusV4, err := accountRegisters.Get(string(owner[:]), flow.AccountStatusKey)
 		require.NoError(t, err)
 		require.Equal(t, len(encodedAccountStatusV3), len(encodedAccountStatusV4))
 		require.Equal(t, byte(0x40), encodedAccountStatusV4[0])
 		require.Equal(t, encodedAccountStatusV3[1:], encodedAccountStatusV4[1:])
 
-		// Test "apk_0" regsiter
-		encodedAccountPublicKey0, err := accountRegisters.Get(string(owner[:]), accountKey0RegisterKey)
+		// Test "apk_0" register
+		encodedAccountPublicKey0, err := accountRegisters.Get(string(owner[:]), accountPublicKey0RegisterKey)
 		require.NoError(t, err)
 		require.Equal(t, encodedPk1, encodedAccountPublicKey0)
 	})
 
-	t.Run("1 account key with sequence number", func(t *testing.T) {
+	t.Run("1 account public key with sequence number", func(t *testing.T) {
 		var owner [8]byte
 		_, _ = rand.Read(owner[:])
 
@@ -287,7 +287,7 @@ func TestMigration(t *testing.T) {
 		accountRegisters := registers.NewAccountRegisters(string(owner[:]))
 		err = accountRegisters.Set(string(owner[:]), flow.AccountStatusKey, encodedAccountStatusV3)
 		require.NoError(t, err)
-		err = accountRegisters.Set(string(owner[:]), legacyAccountKey0RegisterKey, encodedPk1)
+		err = accountRegisters.Set(string(owner[:]), legacyAccountPublicKey0RegisterKey, encodedPk1)
 		require.NoError(t, err)
 
 		deduplicated, err := migrateAndDeduplicateAccountPublicKeys(
@@ -297,25 +297,25 @@ func TestMigration(t *testing.T) {
 		require.NoError(t, err)
 		require.False(t, deduplicated)
 
-		// Regisers after migration:
+		// Registers after migration:
 		// - "a.s"
 		// - "apk_0"
 		require.Equal(t, 2, accountRegisters.Count())
 
-		// Test "a.s" regsiter
+		// Test "a.s" register
 		encodedAccountStatusV4, err := accountRegisters.Get(string(owner[:]), flow.AccountStatusKey)
 		require.NoError(t, err)
 		require.Equal(t, len(encodedAccountStatusV3), len(encodedAccountStatusV4))
 		require.Equal(t, byte(0x40), encodedAccountStatusV4[0])
 		require.Equal(t, encodedAccountStatusV3[1:], encodedAccountStatusV4[1:])
 
-		// Test "apk_0" regsiter
-		encodedAccountPublicKey0, err := accountRegisters.Get(string(owner[:]), accountKey0RegisterKey)
+		// Test "apk_0" register
+		encodedAccountPublicKey0, err := accountRegisters.Get(string(owner[:]), accountPublicKey0RegisterKey)
 		require.NoError(t, err)
 		require.Equal(t, encodedPk1, encodedAccountPublicKey0)
 	})
 
-	t.Run("2 unique account key without sequence number", func(t *testing.T) {
+	t.Run("2 unique account public key without sequence number", func(t *testing.T) {
 		var owner [8]byte
 		_, _ = rand.Read(owner[:])
 		seed := binary.BigEndian.Uint64(owner[:])
@@ -343,9 +343,9 @@ func TestMigration(t *testing.T) {
 		accountRegisters := registers.NewAccountRegisters(string(owner[:]))
 		err = accountRegisters.Set(string(owner[:]), flow.AccountStatusKey, encodedAccountStatusV3)
 		require.NoError(t, err)
-		err = accountRegisters.Set(string(owner[:]), legacyAccountKey0RegisterKey, encodedPk1)
+		err = accountRegisters.Set(string(owner[:]), legacyAccountPublicKey0RegisterKey, encodedPk1)
 		require.NoError(t, err)
-		err = accountRegisters.Set(string(owner[:]), fmt.Sprintf(legacyAccountKeyRegisterKeyPattern, 1), encodedPk2)
+		err = accountRegisters.Set(string(owner[:]), fmt.Sprintf(legacyAccountPublicKeyRegisterKeyPattern, 1), encodedPk2)
 		require.NoError(t, err)
 
 		deduplicated, err := migrateAndDeduplicateAccountPublicKeys(
@@ -355,29 +355,29 @@ func TestMigration(t *testing.T) {
 		require.NoError(t, err)
 		require.False(t, deduplicated)
 
-		// Regisers after migration:
+		// Registers after migration:
 		// - "a.s"
 		// - "apk_0"
 		// - "pk_b0"
 		require.Equal(t, 3, accountRegisters.Count())
 
-		// Test "a.s" regsiter
+		// Test "a.s" register
 		encodedAccountStatusV4, err := accountRegisters.Get(string(owner[:]), flow.AccountStatusKey)
 		require.NoError(t, err)
 		require.True(t, len(encodedAccountStatusV3) < len(encodedAccountStatusV4))
 		require.Equal(t, byte(0x40), encodedAccountStatusV4[0])
 		require.Equal(t, encodedAccountStatusV3[1:], encodedAccountStatusV4[1:len(encodedAccountStatusV3)])
 
-		_, weightAndRevokedStatus, startKeyIndexForDigests, digests, startKeyIndexForMapping, accountKeyMappings, err := decodeAccountStatusV4(encodedAccountStatusV4)
+		_, weightAndRevokedStatus, startKeyIndexForDigests, digests, startKeyIndexForMapping, accountPublicKeyMappings, err := decodeAccountStatusV4(encodedAccountStatusV4)
 		require.NoError(t, err)
-		require.ElementsMatch(t, []accountKeyWeightAndRevokedStatus{{1000, false}}, weightAndRevokedStatus)
+		require.ElementsMatch(t, []accountPublicKeyWeightAndRevokedStatus{{1000, false}}, weightAndRevokedStatus)
 		require.Equal(t, uint32(0), startKeyIndexForDigests)
 		require.ElementsMatch(t, []uint64{digest1, digest2}, digests)
 		require.Equal(t, uint32(0), startKeyIndexForMapping)
-		require.Nil(t, accountKeyMappings)
+		require.Nil(t, accountPublicKeyMappings)
 
-		// Test "apk_0" regsiter
-		encodedAccountPublicKey0, err := accountRegisters.Get(string(owner[:]), accountKey0RegisterKey)
+		// Test "apk_0" register
+		encodedAccountPublicKey0, err := accountRegisters.Get(string(owner[:]), accountPublicKey0RegisterKey)
 		require.NoError(t, err)
 		require.Equal(t, encodedPk1, encodedAccountPublicKey0)
 
@@ -390,7 +390,7 @@ func TestMigration(t *testing.T) {
 		require.ElementsMatch(t, [][]byte{{}, encodedSpk2}, encodedPks)
 	})
 
-	t.Run("2 unique account key with sequence number", func(t *testing.T) {
+	t.Run("2 unique account public key with sequence number", func(t *testing.T) {
 		var owner [8]byte
 		_, _ = rand.Read(owner[:])
 		seed := binary.BigEndian.Uint64(owner[:])
@@ -420,9 +420,9 @@ func TestMigration(t *testing.T) {
 		accountRegisters := registers.NewAccountRegisters(string(owner[:]))
 		err = accountRegisters.Set(string(owner[:]), flow.AccountStatusKey, encodedAccountStatusV3)
 		require.NoError(t, err)
-		err = accountRegisters.Set(string(owner[:]), legacyAccountKey0RegisterKey, encodedPk1)
+		err = accountRegisters.Set(string(owner[:]), legacyAccountPublicKey0RegisterKey, encodedPk1)
 		require.NoError(t, err)
-		err = accountRegisters.Set(string(owner[:]), fmt.Sprintf(legacyAccountKeyRegisterKeyPattern, 1), encodedPk2)
+		err = accountRegisters.Set(string(owner[:]), fmt.Sprintf(legacyAccountPublicKeyRegisterKeyPattern, 1), encodedPk2)
 		require.NoError(t, err)
 
 		deduplicated, err := migrateAndDeduplicateAccountPublicKeys(
@@ -432,30 +432,30 @@ func TestMigration(t *testing.T) {
 		require.NoError(t, err)
 		require.False(t, deduplicated)
 
-		// Regiser after migration:
+		// Registers after migration:
 		// - "a.s"
 		// - "apk_0"
 		// - "pk_b0"
 		// - "sn_1"
 		require.Equal(t, 4, accountRegisters.Count())
 
-		// Test "a.s" regsiter
+		// Test "a.s" register
 		encodedAccountStatusV4, err := accountRegisters.Get(string(owner[:]), flow.AccountStatusKey)
 		require.NoError(t, err)
 		require.True(t, len(encodedAccountStatusV3) < len(encodedAccountStatusV4))
 		require.Equal(t, byte(0x40), encodedAccountStatusV4[0])
 		require.Equal(t, encodedAccountStatusV3[1:], encodedAccountStatusV4[1:len(encodedAccountStatusV3)])
 
-		_, weightAndRevokedStatus, startKeyIndexForDigests, digests, startKeyIndexForMapping, accountKeyMappings, err := decodeAccountStatusV4(encodedAccountStatusV4)
+		_, weightAndRevokedStatus, startKeyIndexForDigests, digests, startKeyIndexForMapping, accountPublicKeyMappings, err := decodeAccountStatusV4(encodedAccountStatusV4)
 		require.NoError(t, err)
-		require.ElementsMatch(t, []accountKeyWeightAndRevokedStatus{{1000, false}}, weightAndRevokedStatus)
+		require.ElementsMatch(t, []accountPublicKeyWeightAndRevokedStatus{{1000, false}}, weightAndRevokedStatus)
 		require.Equal(t, uint32(0), startKeyIndexForDigests)
 		require.ElementsMatch(t, []uint64{digest1, digest2}, digests)
 		require.Equal(t, uint32(0), startKeyIndexForMapping)
-		require.Nil(t, accountKeyMappings)
+		require.Nil(t, accountPublicKeyMappings)
 
-		// Test "apk_0" regsiter
-		encodedAccountPublicKey0, err := accountRegisters.Get(string(owner[:]), accountKey0RegisterKey)
+		// Test "apk_0" register
+		encodedAccountPublicKey0, err := accountRegisters.Get(string(owner[:]), accountPublicKey0RegisterKey)
 		require.NoError(t, err)
 		require.Equal(t, encodedPk1, encodedAccountPublicKey0)
 
@@ -476,7 +476,7 @@ func TestMigration(t *testing.T) {
 		require.Equal(t, uint64(2), seqNum)
 	})
 
-	t.Run("2 account key (1 unique key) without sequence number", func(t *testing.T) {
+	t.Run("2 account public key (1 unique key) without sequence number", func(t *testing.T) {
 		var owner [8]byte
 		_, _ = rand.Read(owner[:])
 		seed := binary.BigEndian.Uint64(owner[:])
@@ -495,9 +495,9 @@ func TestMigration(t *testing.T) {
 		accountRegisters := registers.NewAccountRegisters(string(owner[:]))
 		err = accountRegisters.Set(string(owner[:]), flow.AccountStatusKey, encodedAccountStatusV3)
 		require.NoError(t, err)
-		err = accountRegisters.Set(string(owner[:]), legacyAccountKey0RegisterKey, encodedPk1)
+		err = accountRegisters.Set(string(owner[:]), legacyAccountPublicKey0RegisterKey, encodedPk1)
 		require.NoError(t, err)
-		err = accountRegisters.Set(string(owner[:]), fmt.Sprintf(legacyAccountKeyRegisterKeyPattern, 1), encodedPk1)
+		err = accountRegisters.Set(string(owner[:]), fmt.Sprintf(legacyAccountPublicKeyRegisterKeyPattern, 1), encodedPk1)
 		require.NoError(t, err)
 
 		deduplicated, err := migrateAndDeduplicateAccountPublicKeys(
@@ -507,33 +507,33 @@ func TestMigration(t *testing.T) {
 		require.NoError(t, err)
 		require.True(t, deduplicated)
 
-		// Regisers after migration:
+		// Registers after migration:
 		// - "a.s"
 		// - "apk_0"
 		require.Equal(t, 2, accountRegisters.Count())
 
-		// Test "a.s" regsiter
+		// Test "a.s" register
 		encodedAccountStatusV4, err := accountRegisters.Get(string(owner[:]), flow.AccountStatusKey)
 		require.NoError(t, err)
 		require.True(t, len(encodedAccountStatusV3) < len(encodedAccountStatusV4))
 		require.Equal(t, byte(0x41), encodedAccountStatusV4[0])
 		require.Equal(t, encodedAccountStatusV3[1:], encodedAccountStatusV4[1:len(encodedAccountStatusV3)])
 
-		_, weightAndRevokedStatus, startKeyIndexForDigests, digests, startKeyIndexForMapping, accountKeyMappings, err := decodeAccountStatusV4(encodedAccountStatusV4)
+		_, weightAndRevokedStatus, startKeyIndexForDigests, digests, startKeyIndexForMapping, accountPublicKeyMappings, err := decodeAccountStatusV4(encodedAccountStatusV4)
 		require.NoError(t, err)
-		require.ElementsMatch(t, []accountKeyWeightAndRevokedStatus{{1000, false}}, weightAndRevokedStatus)
+		require.ElementsMatch(t, []accountPublicKeyWeightAndRevokedStatus{{1000, false}}, weightAndRevokedStatus)
 		require.Equal(t, uint32(0), startKeyIndexForDigests)
 		require.ElementsMatch(t, []uint64{digest1}, digests)
 		require.Equal(t, uint32(1), startKeyIndexForMapping)
-		require.ElementsMatch(t, []uint32{0}, accountKeyMappings)
+		require.ElementsMatch(t, []uint32{0}, accountPublicKeyMappings)
 
-		// Test "apk_0" regsiter
-		encodedAccountPublicKey0, err := accountRegisters.Get(string(owner[:]), accountKey0RegisterKey)
+		// Test "apk_0" register
+		encodedAccountPublicKey0, err := accountRegisters.Get(string(owner[:]), accountPublicKey0RegisterKey)
 		require.NoError(t, err)
 		require.Equal(t, encodedPk1, encodedAccountPublicKey0)
 	})
 
-	t.Run("2 account key (1 unique key) with sequence number", func(t *testing.T) {
+	t.Run("2 account public key (1 unique key) with sequence number", func(t *testing.T) {
 		var owner [8]byte
 		_, _ = rand.Read(owner[:])
 		seed := binary.BigEndian.Uint64(owner[:])
@@ -553,9 +553,9 @@ func TestMigration(t *testing.T) {
 		accountRegisters := registers.NewAccountRegisters(string(owner[:]))
 		err = accountRegisters.Set(string(owner[:]), flow.AccountStatusKey, encodedAccountStatusV3)
 		require.NoError(t, err)
-		err = accountRegisters.Set(string(owner[:]), legacyAccountKey0RegisterKey, encodedPk1)
+		err = accountRegisters.Set(string(owner[:]), legacyAccountPublicKey0RegisterKey, encodedPk1)
 		require.NoError(t, err)
-		err = accountRegisters.Set(string(owner[:]), fmt.Sprintf(legacyAccountKeyRegisterKeyPattern, 1), encodedPk1)
+		err = accountRegisters.Set(string(owner[:]), fmt.Sprintf(legacyAccountPublicKeyRegisterKeyPattern, 1), encodedPk1)
 		require.NoError(t, err)
 
 		deduplicated, err := migrateAndDeduplicateAccountPublicKeys(
@@ -565,29 +565,29 @@ func TestMigration(t *testing.T) {
 		require.NoError(t, err)
 		require.True(t, deduplicated)
 
-		// Regiser after migration:
+		// Registers after migration:
 		// - "a.s"
 		// - "apk_0"
 		// - "sn_1"
 		require.Equal(t, 3, accountRegisters.Count())
 
-		// Test "a.s" regsiter
+		// Test "a.s" register
 		encodedAccountStatusV4, err := accountRegisters.Get(string(owner[:]), flow.AccountStatusKey)
 		require.NoError(t, err)
 		require.True(t, len(encodedAccountStatusV3) < len(encodedAccountStatusV4))
 		require.Equal(t, byte(0x41), encodedAccountStatusV4[0])
 		require.Equal(t, encodedAccountStatusV3[1:], encodedAccountStatusV4[1:len(encodedAccountStatusV3)])
 
-		_, weightAndRevokedStatus, startKeyIndexForDigests, digests, startKeyIndexForMapping, accountKeyMappings, err := decodeAccountStatusV4(encodedAccountStatusV4)
+		_, weightAndRevokedStatus, startKeyIndexForDigests, digests, startKeyIndexForMapping, accountPublicKeyMappings, err := decodeAccountStatusV4(encodedAccountStatusV4)
 		require.NoError(t, err)
-		require.ElementsMatch(t, []accountKeyWeightAndRevokedStatus{{1000, false}}, weightAndRevokedStatus)
+		require.ElementsMatch(t, []accountPublicKeyWeightAndRevokedStatus{{1000, false}}, weightAndRevokedStatus)
 		require.Equal(t, uint32(0), startKeyIndexForDigests)
 		require.ElementsMatch(t, []uint64{digest1}, digests)
 		require.Equal(t, uint32(1), startKeyIndexForMapping)
-		require.ElementsMatch(t, []uint32{0}, accountKeyMappings)
+		require.ElementsMatch(t, []uint32{0}, accountPublicKeyMappings)
 
-		// Test "apk_0" regsiter
-		encodedAccountPublicKey0, err := accountRegisters.Get(string(owner[:]), accountKey0RegisterKey)
+		// Test "apk_0" register
+		encodedAccountPublicKey0, err := accountRegisters.Get(string(owner[:]), accountPublicKey0RegisterKey)
 		require.NoError(t, err)
 		require.Equal(t, encodedPk1, encodedAccountPublicKey0)
 
@@ -608,7 +608,7 @@ func newAccountPublicKey(t *testing.T, weight int) flow.AccountPublicKey {
 	return privateKey.PublicKey(weight)
 }
 
-func newEncodedAccountStatusV3(accountKeyCount uint32) []byte {
+func newEncodedAccountStatusV3(accountPublicKeyCount uint32) []byte {
 	b := []byte{
 		0,                      // initial empty flags
 		0, 0, 0, 0, 0, 0, 0, 0, // init value for storage used
@@ -617,10 +617,10 @@ func newEncodedAccountStatusV3(accountKeyCount uint32) []byte {
 		0, 0, 0, 0, 0, 0, 0, 0, // init value for address id counter
 	}
 
-	var encodedAccountKeyCount [4]byte
-	binary.BigEndian.PutUint32(encodedAccountKeyCount[:], accountKeyCount)
+	var encodedAccountPublicKeyCount [4]byte
+	binary.BigEndian.PutUint32(encodedAccountPublicKeyCount[:], accountPublicKeyCount)
 
-	copy(b[17:], encodedAccountKeyCount[:])
+	copy(b[17:], encodedAccountPublicKeyCount[:])
 
 	return b
 }

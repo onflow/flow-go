@@ -25,7 +25,7 @@ func encodeStoredPublicKeyFromAccountPublicKey(a flow.AccountPublicKey) ([]byte,
 	return flow.EncodeStoredPublicKey(storedPublicKey)
 }
 
-// Account Key Weight and Revoked Status
+// Account Public Key Weight and Revoked Status
 
 const (
 	maxRunLengthInEncodedStatusGroup = math.MaxUint16
@@ -35,17 +35,17 @@ const (
 	weightMask                       = 0x7fff
 )
 
-type accountKeyWeightAndRevokedStatus struct {
+type accountPublicKeyWeightAndRevokedStatus struct {
 	weight  uint16 // Weight is 0-1000
 	revoked bool
 }
 
-// accountKeyWeightAndRevokedStatus is encoded using RLE:
+// accountPublicKeyWeightAndRevokedStatus is encoded using RLE:
 // - run length (2 bytes)
-// - value (2 bytes): revoked status in high 1 bit and weight in 15 bits.
+// - value (2 bytes): revoked status is the high bit and weight is the remaining 15 bits.
 // NOTE: if number of elements in a run-length group exceeds maxRunLengthInEncodedStatusGroup,
 // a new group is created with remaining run-length and the same weight and revoked status.
-func encodeAccountKeyWeightsAndRevokedStatus(weightsAndRevoked []accountKeyWeightAndRevokedStatus) ([]byte, error) {
+func encodeAccountPublicKeyWeightsAndRevokedStatus(weightsAndRevoked []accountPublicKeyWeightAndRevokedStatus) ([]byte, error) {
 	if len(weightsAndRevoked) == 0 {
 		return nil, nil
 	}
@@ -84,18 +84,18 @@ func encodeAccountKeyWeightsAndRevokedStatus(weightsAndRevoked []accountKeyWeigh
 	return buf, nil
 }
 
-func decodeAccountKeyWeightAndRevokedStatusGroups(b []byte) ([]accountKeyWeightAndRevokedStatus, error) {
+func decodeAccountPublicKeyWeightAndRevokedStatusGroups(b []byte) ([]accountPublicKeyWeightAndRevokedStatus, error) {
 	if len(b)%weightAndRevokedStatusGroupSize != 0 {
 		return nil, fmt.Errorf("failed to decode weight and revoked status: expect multiple of %d bytes, got %d", weightAndRevokedStatusGroupSize, len(b))
 	}
 
-	statuses := make([]accountKeyWeightAndRevokedStatus, 0, len(b)/weightAndRevokedStatusGroupSize)
+	statuses := make([]accountPublicKeyWeightAndRevokedStatus, 0, len(b)/weightAndRevokedStatusGroupSize)
 
 	for i := 0; i < len(b); i += weightAndRevokedStatusGroupSize {
 		runLength := uint32(binary.BigEndian.Uint16(b[i:]))
 		weightAndRevoked := binary.BigEndian.Uint16(b[i+2 : i+4])
 
-		status := accountKeyWeightAndRevokedStatus{
+		status := accountPublicKeyWeightAndRevokedStatus{
 			weight:  weightAndRevoked & weightMask,
 			revoked: (weightAndRevoked & revokedMask) > 0,
 		}
@@ -108,7 +108,7 @@ func decodeAccountKeyWeightAndRevokedStatusGroups(b []byte) ([]accountKeyWeightA
 	return statuses, nil
 }
 
-// Account Key Index to Stored Key Index Mappings
+// Account Public Key Index to Stored Public Key Index Mappings
 
 const (
 	maxRunLengthInEncodedMappingGroup = 1<<15 - 1
@@ -146,7 +146,7 @@ func (groups mappingGroups) Encode() []byte {
 
 		switch group.runLength {
 		case 0:
-			panic(fmt.Sprintf("groupCount shouldn't be 0, mapping groups %+v", groups))
+			panic(fmt.Sprintf("run length shouldn't be 0, mapping groups %+v", groups))
 
 		case 1:
 			// Handle consecutive groups
@@ -215,11 +215,11 @@ func encodeMappingGroup(buf []byte, off int, runLength uint32, value uint32, isC
 	return buf, off
 }
 
-// encodeAccountKeyMapping encodes keyIndexMappings into concatenated run-length groups.
+// encodeAccountPublicKeyMapping encodes keyIndexMappings into concatenated run-length groups.
 // Each run-length group is encoded as:
 // - length (2 bytes) with max length as 2<<15-1
 // - stored key index (4 bytes)
-func encodeAccountKeyMapping(mapping []uint32) ([]byte, error) {
+func encodeAccountPublicKeyMapping(mapping []uint32) ([]byte, error) {
 	if len(mapping) == 0 {
 		return nil, nil
 	}
@@ -243,7 +243,7 @@ func encodeAccountKeyMapping(mapping []uint32) ([]byte, error) {
 	return groups.Encode(), nil
 }
 
-func decodeAccountKeyMapping(b []byte) ([]uint32, error) {
+func decodeAccountPublicKeyMapping(b []byte) ([]uint32, error) {
 	if len(b)%mappingGroupSize != 0 {
 		return nil, fmt.Errorf("failed to decode mappings: expect multiple of %d bytes, got %d", mappingGroupSize, len(b))
 	}
@@ -321,7 +321,7 @@ func encodePublicKeysInBatches(encodedPublicKey [][]byte) ([][]byte, error) {
 	}
 
 	// Reset first encoded public key to nil during encoding
-	// to avoid encoding first account key in batch public key.
+	// to avoid encoding first account public key in batch public key.
 
 	firstEncodedPublicKey := encodedPublicKey[0]
 	defer func() {
@@ -415,26 +415,26 @@ const (
 //
 // With deduplicated flag, account status is encoded as:
 // - account status v3 (29 bytes)
-// - length prefixed list of account key weight and revoked status starting from key index 1
-// - startKeyIndex (4 bytes) + length prefixed list of account key index mappings to stored key index
+// - length prefixed list of account public key weight and revoked status starting from key index 1
+// - startKeyIndex (4 bytes) + length prefixed list of account public key index mappings to stored key index
 // - startStoredKeyIndex (4 bytes) + length prefixed list of last N stored key digests
 //
 // Without deduplicated flag, account status is encoded as:
 // - account status v3 (29 bytes)
-// - length prefixed list of account key weight and revoked status starting from key index 1
+// - length prefixed list of account public key weight and revoked status starting from key index 1
 // - startStoredKeyIndex (4 bytes) + length prefixed list of last N stored key digests
 func encodeAccountStatusV4WithPublicKeyMetadata(
 	original []byte,
-	weightAndRevokedStatus []accountKeyWeightAndRevokedStatus,
+	weightAndRevokedStatus []accountPublicKeyWeightAndRevokedStatus,
 	startKeyIndexForDigests uint32,
 	keyDigests []uint64,
 	startKeyIndexForMappings uint32,
-	accountKeyMappings []uint32,
+	accountPublicKeyMappings []uint32,
 	deduplicated bool,
 ) ([]byte, error) {
 
-	// Encode list of account key weight and revoked status
-	encodedAccountKeyWeightAndRevokedStatus, err := encodeAccountKeyWeightsAndRevokedStatus(weightAndRevokedStatus)
+	// Encode list of account public key weight and revoked status
+	encodedAccountPublicKeyWeightAndRevokedStatus, err := encodeAccountPublicKeyWeightsAndRevokedStatus(weightAndRevokedStatus)
 	if err != nil {
 		return nil, err
 	}
@@ -443,22 +443,22 @@ func encodeAccountStatusV4WithPublicKeyMetadata(
 	encodedKeyDigests := encodeDigestList(keyDigests)
 
 	// Encode mappings for deduplicated account status
-	var encodedAccountKeyMapping []byte
+	var encodedAccountPublicKeyMapping []byte
 	if deduplicated {
-		encodedAccountKeyMapping, err = encodeAccountKeyMapping(accountKeyMappings)
+		encodedAccountPublicKeyMapping, err = encodeAccountPublicKeyMapping(accountPublicKeyMappings)
 		if err != nil {
 			return nil, err
 		}
 	}
 
 	newAccountStatusPayloadSize := len(original) +
-		lengthPrefixSize + len(encodedAccountKeyWeightAndRevokedStatus) + // length prefixed account key weight and revoked status
+		lengthPrefixSize + len(encodedAccountPublicKeyWeightAndRevokedStatus) + // length prefixed account public key weight and revoked status
 		4 + // start stored key index for digests
 		lengthPrefixSize + len(encodedKeyDigests) // length prefixed digests
 
 	if deduplicated {
 		newAccountStatusPayloadSize += 4 + // start key index for mapping
-			lengthPrefixSize + len(encodedAccountKeyMapping) // used to retrieve account key
+			lengthPrefixSize + len(encodedAccountPublicKeyMapping) // used to retrieve account public key
 	}
 
 	buf := make([]byte, newAccountStatusPayloadSize)
@@ -477,10 +477,10 @@ func encodeAccountStatusV4WithPublicKeyMetadata(
 	off += n
 
 	// Append length prefixed encoded revoked status
-	binary.BigEndian.PutUint32(buf[off:], uint32(len(encodedAccountKeyWeightAndRevokedStatus)))
+	binary.BigEndian.PutUint32(buf[off:], uint32(len(encodedAccountPublicKeyWeightAndRevokedStatus)))
 	off += 4
 
-	n = copy(buf[off:], encodedAccountKeyWeightAndRevokedStatus)
+	n = copy(buf[off:], encodedAccountPublicKeyWeightAndRevokedStatus)
 	off += n
 
 	if deduplicated {
@@ -488,11 +488,11 @@ func encodeAccountStatusV4WithPublicKeyMetadata(
 		binary.BigEndian.PutUint32(buf[off:], startKeyIndexForMappings)
 		off += 4
 
-		// Append length prefixed account key mapping
-		binary.BigEndian.PutUint32(buf[off:], uint32(len(encodedAccountKeyMapping)))
+		// Append length prefixed account public key mapping
+		binary.BigEndian.PutUint32(buf[off:], uint32(len(encodedAccountPublicKeyMapping)))
 		off += 4
 
-		n = copy(buf[off:], encodedAccountKeyMapping)
+		n = copy(buf[off:], encodedAccountPublicKeyMapping)
 		off += n
 	}
 
@@ -512,11 +512,11 @@ func encodeAccountStatusV4WithPublicKeyMetadata(
 
 func decodeAccountStatusV4(b []byte) (
 	requiredFields []byte,
-	weightAndRevokedStatus []accountKeyWeightAndRevokedStatus,
+	weightAndRevokedStatus []accountPublicKeyWeightAndRevokedStatus,
 	startKeyIndexForDigests uint32,
 	digests []uint64,
 	startKeyIndexForMapping uint32,
-	accountKeyMappings []uint32,
+	accountPublicKeyMappings []uint32,
 	err error,
 ) {
 	if len(b) < accountStatusV4MinimumSize {
@@ -543,15 +543,15 @@ func decodeAccountStatusV4(b []byte) (
 		return nil, nil, 0, nil, 0, nil, err
 	}
 
-	accountKeyCount := accountStatus.PublicKeyCount()
+	accountPublicKeyCount := accountStatus.PublicKeyCount()
 
-	if accountKeyCount <= 1 {
+	if accountPublicKeyCount <= 1 {
 		if len(optionalFields) > 0 {
-			return nil, nil, 0, nil, 0, nil, fmt.Errorf("failed to decode AccountStatusV4: found optional fields when account key count is %d", accountKeyCount)
+			return nil, nil, 0, nil, 0, nil, fmt.Errorf("failed to decode AccountStatusV4: found optional fields when account public key count is %d", accountPublicKeyCount)
 		}
 
 		if deduplicated {
-			return nil, nil, 0, nil, 0, nil, fmt.Errorf("failed to create AccountStatusV4: deduplication flag should be off when account key is less than 2")
+			return nil, nil, 0, nil, 0, nil, fmt.Errorf("failed to create AccountStatusV4: deduplication flag should be off when account public key is less than 2")
 		}
 
 		return requiredFields, nil, 0, nil, 0, nil, err
@@ -565,12 +565,12 @@ func decodeAccountStatusV4(b []byte) (
 		return nil, nil, 0, nil, 0, nil, fmt.Errorf("failed to decode AccountStatusV4: %w", err)
 	}
 
-	weightAndRevokedStatus, err = decodeAccountKeyWeightAndRevokedStatusGroups(weightAndRevokedGroupsData)
+	weightAndRevokedStatus, err = decodeAccountPublicKeyWeightAndRevokedStatusGroups(weightAndRevokedGroupsData)
 	if err != nil {
 		return nil, nil, 0, nil, 0, nil, fmt.Errorf("failed to decode weight and revoked status list: %w", err)
 	}
 
-	// Decode account key mapping if deduplication is on
+	// Decode account public key mapping if deduplication is on
 
 	if deduplicated {
 		if len(optionalFields) < 4 {
@@ -587,9 +587,9 @@ func decodeAccountStatusV4(b []byte) (
 			return nil, nil, 0, nil, 0, nil, fmt.Errorf("failed to decode AccountStatusV4: %w", err)
 		}
 
-		accountKeyMappings, err = decodeAccountKeyMapping(mappingData)
+		accountPublicKeyMappings, err = decodeAccountPublicKeyMapping(mappingData)
 		if err != nil {
-			return nil, nil, 0, nil, 0, nil, fmt.Errorf("failed to decode account key mappings: %w", err)
+			return nil, nil, 0, nil, 0, nil, fmt.Errorf("failed to decode account public key mappings: %w", err)
 		}
 	}
 
@@ -639,40 +639,40 @@ func parseNextLengthPrefixedData(b []byte) (next []byte, rest []byte, err error)
 
 func validateKeyMetadata(
 	deduplicated bool,
-	accountKeyCount uint32,
-	weightAndRevokedStatus []accountKeyWeightAndRevokedStatus,
+	accountPublicKeyCount uint32,
+	weightAndRevokedStatus []accountPublicKeyWeightAndRevokedStatus,
 	startKeyIndexForDigests uint32,
 	digests []uint64,
 	startKeyIndexForMapping uint32,
-	accountKeyMappings []uint32,
+	accountPublicKeyMappings []uint32,
 ) error {
-	if len(weightAndRevokedStatus) != int(accountKeyCount)-1 {
-		return fmt.Errorf("found %d weight and revoked status, expect %d", len(weightAndRevokedStatus), accountKeyCount-1)
+	if len(weightAndRevokedStatus) != int(accountPublicKeyCount)-1 {
+		return fmt.Errorf("found %d weight and revoked status, expect %d", len(weightAndRevokedStatus), accountPublicKeyCount-1)
 	}
 
 	if len(digests) > maxStoredDigests {
 		return fmt.Errorf("found %d digests, expect max %d digests", len(digests), maxStoredDigests)
 	}
 
-	if len(digests) > int(accountKeyCount) {
-		return fmt.Errorf("found %d digest, expect fewer digests than account key count %d", len(digests), accountKeyCount)
+	if len(digests) > int(accountPublicKeyCount) {
+		return fmt.Errorf("found %d digest, expect fewer digests than account public key count %d", len(digests), accountPublicKeyCount)
 	}
 
-	if int(startKeyIndexForDigests)+len(digests) > int(accountKeyCount) {
-		return fmt.Errorf("found %d digest at start index %d, expect fewer digests than account key count %d", len(digests), startKeyIndexForDigests, accountKeyCount)
+	if int(startKeyIndexForDigests)+len(digests) > int(accountPublicKeyCount) {
+		return fmt.Errorf("found %d digest at start index %d, expect fewer digests than account public key count %d", len(digests), startKeyIndexForDigests, accountPublicKeyCount)
 	}
 
 	if deduplicated {
-		if int(startKeyIndexForMapping)+len(accountKeyMappings) != int(accountKeyCount) {
+		if int(startKeyIndexForMapping)+len(accountPublicKeyMappings) != int(accountPublicKeyCount) {
 			return fmt.Errorf("found %d mappings at start index %d, expect %d",
-				len(accountKeyMappings),
+				len(accountPublicKeyMappings),
 				startKeyIndexForMapping,
-				accountKeyCount,
+				accountPublicKeyCount,
 			)
 		}
 	} else {
-		if len(accountKeyMappings) > 0 {
-			return fmt.Errorf("found %d account key mappings for non-deduplicated account, expect 0", len(accountKeyMappings))
+		if len(accountPublicKeyMappings) > 0 {
+			return fmt.Errorf("found %d account public key mappings for non-deduplicated account, expect 0", len(accountPublicKeyMappings))
 		}
 	}
 

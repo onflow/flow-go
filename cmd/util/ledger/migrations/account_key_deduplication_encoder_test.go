@@ -9,10 +9,10 @@ import (
 	"github.com/onflow/flow-go/fvm/environment"
 )
 
-func TestAccountKeyWeightsAndRevokedStatusSerizliation(t *testing.T) {
+func TestAccountPublicKeyWeightsAndRevokedStatusSerizliation(t *testing.T) {
 	testcases := []struct {
 		name     string
-		status   []accountKeyWeightAndRevokedStatus
+		status   []accountPublicKeyWeightAndRevokedStatus
 		expected []byte
 	}{
 		{
@@ -22,14 +22,14 @@ func TestAccountKeyWeightsAndRevokedStatusSerizliation(t *testing.T) {
 		},
 		{
 			name: "one status",
-			status: []accountKeyWeightAndRevokedStatus{
+			status: []accountPublicKeyWeightAndRevokedStatus{
 				{weight: 1000, revoked: false},
 			},
 			expected: []byte{0, 1, 0x03, 0xe8},
 		},
 		{
 			name: "multiple identical status",
-			status: []accountKeyWeightAndRevokedStatus{
+			status: []accountPublicKeyWeightAndRevokedStatus{
 				{weight: 1000, revoked: true},
 				{weight: 1000, revoked: true},
 				{weight: 1000, revoked: true},
@@ -38,7 +38,7 @@ func TestAccountKeyWeightsAndRevokedStatusSerizliation(t *testing.T) {
 		},
 		{
 			name: "different status",
-			status: []accountKeyWeightAndRevokedStatus{
+			status: []accountPublicKeyWeightAndRevokedStatus{
 				{weight: 1, revoked: false},
 				{weight: 2, revoked: false},
 				{weight: 2, revoked: true},
@@ -51,7 +51,7 @@ func TestAccountKeyWeightsAndRevokedStatusSerizliation(t *testing.T) {
 		},
 		{
 			name: "different status",
-			status: []accountKeyWeightAndRevokedStatus{
+			status: []accountPublicKeyWeightAndRevokedStatus{
 				{weight: 1, revoked: false},
 				{weight: 1, revoked: false},
 				{weight: 2, revoked: true},
@@ -65,11 +65,11 @@ func TestAccountKeyWeightsAndRevokedStatusSerizliation(t *testing.T) {
 
 	for _, tc := range testcases {
 		t.Run(tc.name, func(t *testing.T) {
-			b, err := encodeAccountKeyWeightsAndRevokedStatus(tc.status)
+			b, err := encodeAccountPublicKeyWeightsAndRevokedStatus(tc.status)
 			require.NoError(t, err)
 			require.Equal(t, tc.expected, b)
 
-			decodedStatus, err := decodeAccountKeyWeightAndRevokedStatusGroups(b)
+			decodedStatus, err := decodeAccountPublicKeyWeightAndRevokedStatusGroups(b)
 			require.NoError(t, err)
 			require.ElementsMatch(t, tc.status, decodedStatus)
 		})
@@ -77,20 +77,20 @@ func TestAccountKeyWeightsAndRevokedStatusSerizliation(t *testing.T) {
 
 	t.Run("same status exceeding max group count", func(t *testing.T) {
 		count := maxRunLengthInEncodedStatusGroup + 10
-		status := make([]accountKeyWeightAndRevokedStatus, count)
+		status := make([]accountPublicKeyWeightAndRevokedStatus, count)
 		for i := range len(status) {
-			status[i] = accountKeyWeightAndRevokedStatus{weight: 1000, revoked: true}
+			status[i] = accountPublicKeyWeightAndRevokedStatus{weight: 1000, revoked: true}
 		}
 
 		expected := []byte{
 			0xff, 0xff, 0x83, 0xe8,
 			0x00, 0x0a, 0x83, 0xe8}
 
-		b, err := encodeAccountKeyWeightsAndRevokedStatus(status)
+		b, err := encodeAccountPublicKeyWeightsAndRevokedStatus(status)
 		require.NoError(t, err)
 		require.Equal(t, expected, b)
 
-		decodedStatus, err := decodeAccountKeyWeightAndRevokedStatusGroups(b)
+		decodedStatus, err := decodeAccountPublicKeyWeightAndRevokedStatusGroups(b)
 		require.NoError(t, err)
 		require.ElementsMatch(t, status, decodedStatus)
 	})
@@ -194,11 +194,11 @@ func TestMappingGroupSerialization(t *testing.T) {
 
 	for _, tc := range testcases {
 		t.Run(tc.name, func(t *testing.T) {
-			b, err := encodeAccountKeyMapping(tc.mappings)
+			b, err := encodeAccountPublicKeyMapping(tc.mappings)
 			require.NoError(t, err)
 			require.Equal(t, tc.expected, b)
 
-			decodedMappings, err := decodeAccountKeyMapping(b)
+			decodedMappings, err := decodeAccountPublicKeyMapping(b)
 			require.NoError(t, err)
 			require.ElementsMatch(t, tc.mappings, decodedMappings)
 		})
@@ -318,24 +318,24 @@ func TestBatchPublicKeySerialization(t *testing.T) {
 
 func TestAccountStatusV4Serialization(t *testing.T) {
 	// NOTE: account status only contains key metadata
-	// if there are at least 2 account keys.
+	// if there are at least 2 account public keys.
 
 	testcases := []struct {
-		name                   string
-		deduplicated           bool
-		accountKeyCount        uint32
-		weightAndRevokedStatus []accountKeyWeightAndRevokedStatus
-		startIndexForDigests   uint32
-		digests                []uint64
-		startIndexForMappings  uint32
-		accountKeyMappings     []uint32
-		expected               []byte
+		name                     string
+		deduplicated             bool
+		accountPublicKeyCount    uint32
+		weightAndRevokedStatus   []accountPublicKeyWeightAndRevokedStatus
+		startIndexForDigests     uint32
+		digests                  []uint64
+		startIndexForMappings    uint32
+		accountPublicKeyMappings []uint32
+		expected                 []byte
 	}{
 		{
-			name:            "not deduplicated with 2 account key",
-			deduplicated:    false,
-			accountKeyCount: uint32(2),
-			weightAndRevokedStatus: []accountKeyWeightAndRevokedStatus{
+			name:                  "not deduplicated with 2 account public key",
+			deduplicated:          false,
+			accountPublicKeyCount: uint32(2),
+			weightAndRevokedStatus: []accountPublicKeyWeightAndRevokedStatus{
 				{weight: 1000, revoked: false},
 			},
 			startIndexForDigests: uint32(0),
@@ -357,10 +357,10 @@ func TestAccountStatusV4Serialization(t *testing.T) {
 			},
 		},
 		{
-			name:            "not deduplicated with 3 account key",
-			deduplicated:    false,
-			accountKeyCount: uint32(3),
-			weightAndRevokedStatus: []accountKeyWeightAndRevokedStatus{
+			name:                  "not deduplicated with 3 account public key",
+			deduplicated:          false,
+			accountPublicKeyCount: uint32(3),
+			weightAndRevokedStatus: []accountPublicKeyWeightAndRevokedStatus{
 				{weight: 1000, revoked: false},
 				{weight: 1000, revoked: false},
 			},
@@ -383,16 +383,16 @@ func TestAccountStatusV4Serialization(t *testing.T) {
 			},
 		},
 		{
-			name:            "deduplicated with 2 account key (1 stored key)",
-			deduplicated:    true,
-			accountKeyCount: uint32(2),
-			weightAndRevokedStatus: []accountKeyWeightAndRevokedStatus{
+			name:                  "deduplicated with 2 account public key (1 stored key)",
+			deduplicated:          true,
+			accountPublicKeyCount: uint32(2),
+			weightAndRevokedStatus: []accountPublicKeyWeightAndRevokedStatus{
 				{weight: 1000, revoked: false},
 			},
-			startIndexForDigests:  uint32(0),
-			digests:               []uint64{1},
-			startIndexForMappings: uint32(1),
-			accountKeyMappings:    []uint32{0},
+			startIndexForDigests:     uint32(0),
+			digests:                  []uint64{1},
+			startIndexForMappings:    uint32(1),
+			accountPublicKeyMappings: []uint32{0},
 			expected: []byte{
 				// Required Fields
 				0x41,                   // version + flag
@@ -412,17 +412,17 @@ func TestAccountStatusV4Serialization(t *testing.T) {
 			},
 		},
 		{
-			name:            "deduplicated with 3 account key (2 stored keys)",
-			deduplicated:    true,
-			accountKeyCount: uint32(3),
-			weightAndRevokedStatus: []accountKeyWeightAndRevokedStatus{
+			name:                  "deduplicated with 3 account public key (2 stored keys)",
+			deduplicated:          true,
+			accountPublicKeyCount: uint32(3),
+			weightAndRevokedStatus: []accountPublicKeyWeightAndRevokedStatus{
 				{weight: 1000, revoked: false},
 				{weight: 1000, revoked: false},
 			},
-			startIndexForDigests:  uint32(0),
-			digests:               []uint64{1, 2},
-			startIndexForMappings: uint32(1),
-			accountKeyMappings:    []uint32{0, 1},
+			startIndexForDigests:     uint32(0),
+			digests:                  []uint64{1, 2},
+			startIndexForMappings:    uint32(1),
+			accountPublicKeyMappings: []uint32{0, 1},
 			expected: []byte{
 				// Required Fields
 				0x41,                   // version + flag
@@ -448,7 +448,7 @@ func TestAccountStatusV4Serialization(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 
 			s := environment.NewAccountStatus()
-			s.SetPublicKeyCount(tc.accountKeyCount)
+			s.SetPublicKeyCount(tc.accountPublicKeyCount)
 
 			b, err := encodeAccountStatusV4WithPublicKeyMetadata(
 				s.ToBytes(),
@@ -456,28 +456,28 @@ func TestAccountStatusV4Serialization(t *testing.T) {
 				tc.startIndexForDigests,
 				tc.digests,
 				tc.startIndexForMappings,
-				tc.accountKeyMappings,
+				tc.accountPublicKeyMappings,
 				tc.deduplicated,
 			)
 			require.NoError(t, err)
 			require.Equal(t, tc.expected, b)
 
-			_, decodedWeightAndRevokedStatus, decodedStartIndexForDigests, decodedDigests, decodedStartIndexForMappings, decodedAccountKeyMappings, err := decodeAccountStatusV4(b)
+			_, decodedWeightAndRevokedStatus, decodedStartIndexForDigests, decodedDigests, decodedStartIndexForMappings, decodedAccountPublicKeyMappings, err := decodeAccountStatusV4(b)
 			require.NoError(t, err)
 			require.ElementsMatch(t, tc.weightAndRevokedStatus, decodedWeightAndRevokedStatus)
 			require.Equal(t, tc.startIndexForDigests, decodedStartIndexForDigests)
 			require.ElementsMatch(t, tc.digests, decodedDigests)
 			require.Equal(t, tc.startIndexForMappings, decodedStartIndexForMappings)
-			require.ElementsMatch(t, tc.accountKeyMappings, decodedAccountKeyMappings)
+			require.ElementsMatch(t, tc.accountPublicKeyMappings, decodedAccountPublicKeyMappings)
 
 			err = validateKeyMetadata(
 				tc.deduplicated,
-				tc.accountKeyCount,
+				tc.accountPublicKeyCount,
 				decodedWeightAndRevokedStatus,
 				decodedStartIndexForDigests,
 				decodedDigests,
 				decodedStartIndexForMappings,
-				decodedAccountKeyMappings)
+				decodedAccountPublicKeyMappings)
 			require.NoError(t, err)
 		})
 	}

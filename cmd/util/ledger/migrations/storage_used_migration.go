@@ -69,7 +69,7 @@ func (m *AccountUsageMigration) MigrateAccount(
 			// Instead, storage used should include sequenceNumberStorageSize
 			// per key for all account public key at key index >= 1.
 
-			// Sequence number register is only created when account key at key index >= 1 is used as proposal key.
+			// Sequence number register is only created when account public key at key index >= 1 is used as proposal key.
 			// This approach stores sequence number separately on chain, while reducing register count.
 
 			// By including sequenceNumberStorageSize per key beforehand unblocks some cases for

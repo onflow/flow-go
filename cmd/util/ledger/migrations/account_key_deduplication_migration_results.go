@@ -39,7 +39,7 @@ func writeAccountMigrationResults(
 
 	file, err := os.Create(fileName)
 	if err != nil {
-		return fmt.Errorf("faild to create account migration result file %s: %w", fileName, err)
+		return fmt.Errorf("failed to create account migration result file %s: %w", fileName, err)
 	}
 	defer file.Close()
 
