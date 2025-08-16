@@ -34,7 +34,8 @@ func TestReExecuteBlock(t *testing.T) {
 			genesis := unittest.BlockFixture()
 			rootSeal := unittest.Seal.Fixture(unittest.Seal.WithBlock(genesis.Header))
 			db := badgerimpl.ToDB(bdb)
-			err := bootstrapper.BootstrapExecutionDatabase(db, rootSeal)
+			bootstrapLockManager := locks.NewTestingLockManager()
+			err := bootstrapper.BootstrapExecutionDatabase(bootstrapLockManager, db, rootSeal)
 			require.NoError(t, err)
 
 			// create all modules
@@ -196,7 +197,8 @@ func TestReExecuteBlockWithDifferentResult(t *testing.T) {
 		unittest.Seal.WithBlock(genesis.Header)(rootSeal)
 
 		db := pebbleimpl.ToDB(pdb)
-		err := bootstrapper.BootstrapExecutionDatabase(db, rootSeal)
+		bootstrapLockManage := locks.NewTestingLockManager()
+		err := bootstrapper.BootstrapExecutionDatabase(bootstrapLockManage, db, rootSeal)
 		require.NoError(t, err)
 
 		// create all modules
