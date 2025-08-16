@@ -28,20 +28,21 @@ func RetrieveResultApproval(r storage.Reader, approvalID flow.Identifier, approv
 	return RetrieveByKey(r, MakePrefix(codeResultApproval, approvalID), approval)
 }
 
-// IndexResultApproval inserts a ResultApproval ID keyed by ExecutionResult ID
-// and chunk index.
-// Note: Unsafe means it does not check if a different approval is indexed for the same
-// chunk, and will overwrite the existing index.
+// UnsafeIndexResultApproval inserts a ResultApproval ID keyed by ExecutionResult ID
+// and chunk index. OVERWRITES the existing value for the key (it if exists).
 // CAUTION:
 //   - In general, the Flow protocol requires multiple approvals for the same chunk from different
 //     verification nodes. In other words, there are multiple different approvals for the same chunk.
 //     Therefore, this index Executed Chunk ➜ ResultApproval ID is *only safe* to be used by
 //     Verification Nodes for tracking their own approvals (for the same ExecutionResult, a Verifier
-//     will always produce the same approval)
-//   - In order to make sure only one approval is indexed for the chunk, _all calls_ to
-//     `UnsafeIndexResultApproval` must be synchronized by the higher-logic. Currently, we have the
-//     lockctx.Proof to prove the higher logic is holding the lock inserting the approval after checking
-//     that the approval is not already indexed.
+//     must always produce the same approval).
+//   - A verifier sending _different_ approvals for the _same chunk_ is a slashable protocol violation,
+//     which we want to prevent in all cases via a sanity check. In order to ensure that at most a
+//     single approval is indexed for the chunk, the CALLER must acquire [storage.LockIndexResultApproval]
+//     and atomically check that no conflicting value was already indexed prior to writing.
+//     [UnsafeIndexResultApproval] receives the `lockctx.Proof` to verify that the higher-level logic is
+//     indeed holding the lock for inserting the approvals - and signaling to the caller that atomic checks
+//     must be performed before calling this function.
 func UnsafeIndexResultApproval(lctx lockctx.Proof, w storage.Writer, resultID flow.Identifier, chunkIndex uint64, approvalID flow.Identifier) error {
 	if !lctx.HoldsLock(storage.LockIndexResultApproval) {
 		return fmt.Errorf("missing lock for index result approval for result: %v", resultID)
