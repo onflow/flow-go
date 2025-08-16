@@ -18,6 +18,8 @@ type Headers struct {
 	heightCache *Cache[uint64, flow.Identifier]
 }
 
+var _ storage.Headers = (*Headers)(nil)
+
 func NewHeaders(collector module.CacheMetrics, db storage.DB) *Headers {
 
 	// TODO: the current cache structure doesn't work well to pass in auxiliary info like the lock context

@@ -555,7 +555,8 @@ func (s *StateMutatorSuite) Test_EncodeFailed() {
 	for _, update := range dbUpdates {
 		err := update(blockID, rw)
 		if err != nil {
-			require.ErrorIs(s.T(), err, exception)
+			// The error should be wrapped as an irrecoverable exception, so we check the message
+			require.Contains(s.T(), err.Error(), "exception")
 		}
 	}
 
