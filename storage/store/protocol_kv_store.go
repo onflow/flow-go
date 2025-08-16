@@ -103,6 +103,7 @@ func NewProtocolKVStore(collector module.CacheMetrics,
 // Expected errors during normal operations:
 // - storage.ErrDataMismatch if a _different_ KV store for the given stateID has already been persisted
 func (s *ProtocolKVStore) BatchStore(rw storage.ReaderBatchWriter, stateID flow.Identifier, data *flow.PSKeyValueStoreData) error {
+	// TODO(7355): lockctx
 	rw.Lock(s.storing)
 
 	existingData, err := s.ByID(stateID)
@@ -142,6 +143,7 @@ func (s *ProtocolKVStore) BatchStore(rw storage.ReaderBatchWriter, stateID flow.
 // Expected errors during normal operations:
 //   - storage.ErrDataMismatch if a KV store for the given blockID has already been indexed, but different
 func (s *ProtocolKVStore) BatchIndex(rw storage.ReaderBatchWriter, blockID flow.Identifier, stateID flow.Identifier) error {
+	// TODO(7355): lockctx
 	rw.Lock(s.indexing)
 
 	existingStateID, err := s.byBlockIdCache.Get(s.db.Reader(), blockID)

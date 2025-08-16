@@ -66,8 +66,11 @@ func TestBlockHeightIndexLookup(t *testing.T) {
 		height := uint64(1337)
 		expected := flow.Identifier{0x01, 0x02, 0x03}
 
+		_, lctx := unittest.LockManagerWithContext(t, storage.LockFinalizeBlock)
+		defer lctx.Release()
+
 		err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			return operation.IndexBlockHeight(rw, height, expected)
+			return operation.IndexBlockHeight(lctx, rw, height, expected)
 		})
 		require.NoError(t, err)
 

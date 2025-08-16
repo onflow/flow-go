@@ -73,6 +73,7 @@ func (suite *BuilderSuite) SetupTest() {
 
 	suite.dbdir = unittest.TempDir(suite.T())
 	suite.db = unittest.BadgerDB(suite.T(), suite.dbdir)
+	lockManager := storage.NewTestingLockManager()
 
 	metrics := metrics.NewNoopCollector()
 	tracer := trace.NewNoopTracer()
@@ -132,6 +133,7 @@ func (suite *BuilderSuite) SetupTest() {
 	state, err := pbadger.Bootstrap(
 		metrics,
 		badgerimpl.ToDB(suite.db),
+		lockManager,
 		all.Headers,
 		all.Seals,
 		all.Results,

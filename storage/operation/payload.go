@@ -1,6 +1,10 @@
 package operation
 
 import (
+	"fmt"
+
+	"github.com/jordanschalm/lockctx"
+
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/storage"
 )
@@ -48,7 +52,10 @@ func LookupPayloadResults(r storage.Reader, blockID flow.Identifier, resultIDs *
 // IndexLatestSealAtBlock persists the highest seal that was included in the fork up to (and including) blockID.
 // In most cases, it is the highest seal included in this block's payload. However, if there are no
 // seals in this block, sealID should reference the highest seal in blockID's ancestor.
-func IndexLatestSealAtBlock(w storage.Writer, blockID flow.Identifier, sealID flow.Identifier) error {
+func IndexLatestSealAtBlock(lctx lockctx.Proof, w storage.Writer, blockID flow.Identifier, sealID flow.Identifier) error {
+	if !lctx.HoldsLock(storage.LockInsertBlock) {
+		return fmt.Errorf("missing required lock: %s", storage.LockInsertBlock)
+	}
 	return UpsertByKey(w, MakePrefix(codeBlockIDToLatestSealID, blockID), sealID)
 }
 

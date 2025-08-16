@@ -50,16 +50,16 @@ func (q *QuorumCertificates) StoreTx(qc *flow.QuorumCertificate) func(*transacti
 }
 
 // BatchStore stores a Quorum Certificate as part of database batch update. QC is indexed by QC.BlockID.
-// * storage.ErrAlreadyExists if a different QC for blockID is already stored
+// * storage.ErrAlreadyExists if some QC certifying the same block is already stored
 func (q *QuorumCertificates) BatchStore(rw storage.ReaderBatchWriter, qc *flow.QuorumCertificate) error {
+	// TODO(7355): lockctx
 	rw.Lock(q.storing)
 
-	// Check if the QC is already exist
+	// Check if some QC for the block is already stored
 	_, err := q.cache.Get(rw.GlobalReader(), qc.BlockID)
 	if err == nil {
-		return fmt.Errorf("qc already exists for block ID %s: %w", qc.BlockID, storage.ErrAlreadyExists)
+		return fmt.Errorf("some QC certifying block %s already exists: %w", qc.BlockID, storage.ErrAlreadyExists)
 	}
-
 	if !errors.Is(err, storage.ErrNotFound) {
 		return fmt.Errorf("failed to get qc for block ID %s: %w", qc.BlockID, err)
 	}
@@ -67,6 +67,8 @@ func (q *QuorumCertificates) BatchStore(rw storage.ReaderBatchWriter, qc *flow.Q
 	return q.cache.PutTx(rw, qc.BlockID, qc)
 }
 
+// ByBlockID returns QC that certifies block referred by blockID.
+// * storage.ErrNotFound if no QC for blockID doesn't exist.
 func (q *QuorumCertificates) ByBlockID(blockID flow.Identifier) (*flow.QuorumCertificate, error) {
 	val, err := q.cache.Get(q.db.Reader(), blockID)
 	if err != nil {

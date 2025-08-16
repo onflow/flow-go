@@ -214,6 +214,7 @@ func (c *Collections) StoreLightAndIndexByTransaction(collection *flow.LightColl
 	//   is used in the code base to index collection by transaction.
 
 	return c.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+		// TODO(7355): lockctx
 		rw.Lock(c.indexingByTx)
 		return c.batchStoreLightAndIndexByTransaction(collection, rw)
 	})

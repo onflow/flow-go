@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/gammazero/workerpool"
+	"github.com/jordanschalm/lockctx"
 	"github.com/onflow/crypto"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/mock"
@@ -139,6 +140,7 @@ func (p *ConsensusParticipants) Update(epochCounter uint64, data *run.Participan
 
 type Node struct {
 	db                fstorage.DB
+	lockManager       lockctx.Manager
 	dbCloser          io.Closer
 	dbDir             string
 	index             int
@@ -379,6 +381,7 @@ func createNode(
 	metricsCollector := metrics.NewNoopCollector()
 	tracer := trace.NewNoopTracer()
 	db := badgerimpl.ToDB(badgerdb)
+	lockManager := fstorage.NewTestingLockManager()
 
 	headersDB := store.NewHeaders(metricsCollector, db)
 	guaranteesDB := store.NewGuarantees(metricsCollector, db, store.DefaultCacheSize)
@@ -408,6 +411,7 @@ func createNode(
 	state, err := bprotocol.Bootstrap(
 		metricsCollector,
 		db,
+		lockManager,
 		headersDB,
 		sealsDB,
 		resultsDB,
