@@ -146,8 +146,8 @@ func Bootstrap(
 		return nil, fmt.Errorf("could not get sealed result for sealing segment: %w", err)
 	}
 
-	// sealing segment is in ascending height order, so the tail is the
-	// oldest ancestor and head is the newest child in the segment
+	// sealing segment lists blocks in order of ascending height, so the tail
+	// is the oldest ancestor and head is the newest child in the segment
 	// TAIL <- ... <- HEAD
 	lastFinalized := segment.Finalized() // the highest block in sealing segment is the last finalized block
 	lastSealed := segment.Sealed()       // the lowest block in sealing segment is the last sealed block
@@ -178,7 +178,7 @@ func Bootstrap(
 		}
 
 		// bootstrap dynamic protocol state
-		err = bootstrapProtocolState(rw, segment, root.Params(), epochProtocolStateSnapshots, protocolKVStoreSnapshots, setups, commits, !config.SkipNetworkAddressValidation)
+		err = bootstrapProtocolStates(rw, segment, root.Params(), epochProtocolStateSnapshots, protocolKVStoreSnapshots, setups, commits, !config.SkipNetworkAddressValidation)
 		if err != nil {
 			return fmt.Errorf("could not bootstrap protocol state: %w", err)
 		}
@@ -245,13 +245,13 @@ func Bootstrap(
 	)
 }
 
-// bootstrapProtocolState bootstraps data structures needed for Dynamic Protocol State.
+// bootstrapProtocolStates bootstraps data structures needed for Dynamic Protocol State.
 // The sealing segment may contain blocks committing to different Protocol State entries,
 // in which case each of these protocol state entries are stored in the database during
 // bootstrapping.
 // For each distinct protocol state entry, we also store the associated EpochSetup and
 // EpochCommit service events.
-func bootstrapProtocolState(
+func bootstrapProtocolStates(
 	rw storage.ReaderBatchWriter,
 	segment *flow.SealingSegment,
 	params protocol.GlobalParams,
@@ -348,18 +348,21 @@ func bootstrapSealingSegment(
 		return err
 	}
 
-	// why not storing all blocks in the same batch?
-	// because we need to ensure a block does not include a result that refers a unknown block.
-	// when validating the results, we could check if the referred block exists in the database,
-	// however if we are storing multiple blocks in the same batch, the previous block from the same
-	// batch has not been stored in database yet, so the check can't distinguish between a block that
-	// refers to a previous block in the same batch and a block that refers to a block that does not
-	// exist in the database. Unless we pass down the previous blocks to the validation function as well
-	// as the database operation functions, such as blocks.BatchStore method, which we consider a bad
-	// practice, since having the database operation function taking previous blocks (or previous results)
-	// as an argument is confusing and vulnerable to bugs.
-	// since storing multiple blocks in the same batch only happens during bootstrapping, we decided to
-	// store each block in a separate batch.
+	// PERSIST BLOCKS to the database ONE-BY-ONE in order of increasing height:
+	// * Execution Receipts are incorporated into blocks for bookkeeping when and which execution results the ENs published.
+	// * Typically, most ENs commit to the same results. Therefore, Results in blocks are stored separately from the Receipts
+	//   in blocks and deduplicated along the fork -- specifically, we only store the result along a fork in the first block
+	//   containing an execution receipt committing to that result. For receipts committing to the same result in descending
+	//   blocks, we only store the receipt and omit the result as it is already contained in an ancestor.
+	// * We want to ensure that for every receipt in a block that we store, the result is also going to be available in storage
+	//   [Blocks.BatchStore] automatically performs this check and errors when attempting to store a block referencing unknown
+	//   results.
+	// * During normal operations, we ingest and persist blocks one by one. However, during bootstrapping we need to store
+	//   multiple blocks. Hypothetically, if we were to store all blocks in the same batch, results included in ancestor blocks
+	//   would not be persisted in the database yet when attempting to persist their descendants. In other words, the check in
+	//   [Blocks.BatchStore] can't distinguish between a receipt referencing a missing result vs a receipt referencing a result
+	//   that is contained in a previous block being stored as part of the same batch.
+	// Hence, for bootstrapping we emulate the process during normal operations and just store the blocks also one by one.
 	for _, block := range segment.ExtraBlocks {
 		err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 			blockID := block.ID()
@@ -394,7 +397,7 @@ func bootstrapSealingSegment(
 		sealsLookup[segment.FirstSeal.ID()] = struct{}{}
 	}
 
-	for i, block := range segment.Blocks {
+	for i, block := range segment.Blocks { // same as for `segment.ExtraBlocks` above: PERSIST BLOCKS to the database ONE-BY-ONE
 		err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 			w := rw.Writer()
 			blockID := block.ID()
@@ -462,14 +465,25 @@ func bootstrapSealingSegment(
 }
 
 // bootstrapStatePointers instantiates special pointers used to by the protocol
-// state to keep track of special block heights and views.
+// state to keep track of central lifecycle variables:
+//   - Consensus Safety and Liveness Data (only used by consensus participants)
+//   - Root Block's Height (heighest block in sealing segment)
+//   - Sealed Root Block Height (block height sealed as of the Root Block)
+//   - Latest Finalized Height (initialized to height of Root Block)
+//   - Latest Sealed Block Height (initialized to block height sealed as of the Root Block)
+//   - initial entry in map:
+//     Finalized Block ID -> ID of latest seal in fork with this block as head
 func bootstrapStatePointers(lctx lockctx.Proof, rw storage.ReaderBatchWriter, root protocol.Snapshot) error {
+	// sealing segment lists blocks in order of ascending height, so the tail
+	// is the oldest ancestor and head is the newest child in the segment
+	// TAIL <- ... <- HEAD
 	segment, err := root.SealingSegment()
 	if err != nil {
 		return fmt.Errorf("could not get sealing segment: %w", err)
 	}
-	highest := segment.Finalized()
-	lowest := segment.Sealed()
+	highest := segment.Finalized() // the highest block in sealing segment is the last finalized block
+	lowest := segment.Sealed()     // the lowest block in sealing segment is the last sealed block
+
 	// find the finalized seal that seals the lowest block, meaning seal.BlockID == lowest.ID()
 	seal, err := segment.FinalizedSeal()
 	if err != nil {
@@ -555,8 +569,8 @@ func bootstrapStatePointers(lctx lockctx.Proof, rw storage.ReaderBatchWriter, ro
 // a particular Dynamic Protocol State entry.
 // There may be several such entries within a single root snapshot, in which case this
 // function is called once for each entry. Entries may overlap in which underlying
-// epoch information (service events) they reference, which case duplicate writes of
-// the same data are ignored.
+// epoch information (service events) they reference -- this only has a minor performance
+// cost, as duplicate writes of the same data are idempotent.
 func bootstrapEpochForProtocolStateEntry(
 	rw storage.ReaderBatchWriter,
 	epochProtocolStateSnapshots storage.EpochProtocolStateEntries,
@@ -588,19 +602,20 @@ func bootstrapEpochForProtocolStateEntry(
 		commits = append(commits, commit)
 	}
 
-	// validate and insert current epoch
-	setup := richEntry.CurrentEpochSetup
-	commit := richEntry.CurrentEpochCommit
+	{ // validate and insert current epoch (always exist)
+		setup := richEntry.CurrentEpochSetup
+		commit := richEntry.CurrentEpochCommit
 
-	if err := protocol.IsValidEpochSetup(setup, verifyNetworkAddress); err != nil {
-		return fmt.Errorf("invalid EpochSetup for current epoch: %w", err)
-	}
-	if err := protocol.IsValidEpochCommit(commit, setup); err != nil {
-		return fmt.Errorf("invalid EpochCommit for current epoch: %w", err)
-	}
+		if err := protocol.IsValidEpochSetup(setup, verifyNetworkAddress); err != nil {
+			return fmt.Errorf("invalid EpochSetup for current epoch: %w", err)
+		}
+		if err := protocol.IsValidEpochCommit(commit, setup); err != nil {
+			return fmt.Errorf("invalid EpochCommit for current epoch: %w", err)
+		}
 
-	setups = append(setups, setup)
-	commits = append(commits, commit)
+		setups = append(setups, setup)
+		commits = append(commits, commit)
+	}
 
 	// validate and insert next epoch, if it exists
 	if richEntry.NextEpoch != nil {
@@ -646,7 +661,6 @@ func bootstrapEpochForProtocolStateEntry(
 // bootstrapSporkInfo bootstraps the protocol state with information about the
 // spork which is used to disambiguate Flow networks.
 func bootstrapSporkInfo(rw storage.ReaderBatchWriter, root protocol.Snapshot) error {
-
 	w := rw.Writer()
 	params := root.Params()
 	sporkID := params.SporkID()
