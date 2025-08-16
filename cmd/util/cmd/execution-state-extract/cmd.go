@@ -357,12 +357,35 @@ func run(*cobra.Command, []string) {
 	if !flagNoMigration {
 		var migs []migrations.NamedMigration
 
-		switch flagMigration {
-		case "add-migrationmainnet-keys":
-			migs = append(migs, addMigrationMainnetKeysMigration(log.Logger, flagOutputDir, flagNWorker, chain.ChainID())...)
-		default:
-			log.Fatal().Msgf("unknown migration: %s", flagMigration)
+		if len(flagMigration) > 0 {
+			switch flagMigration {
+			case "add-migrationmainnet-keys":
+				migs = append(migs, addMigrationMainnetKeysMigration(log.Logger, flagOutputDir, flagNWorker, chain.ChainID())...)
+			default:
+				log.Fatal().Msgf("unknown migration: %s", flagMigration)
+			}
 		}
+
+		migs = append(
+			migs,
+			migrations.NamedMigration{
+				Name: "account-public-key-deduplication",
+				Migrate: migrations.NewAccountBasedMigration(
+					log.Logger,
+					flagNWorker,
+					[]migrations.AccountBasedMigration{
+						migrations.NewAccountPublicKeyDeduplicationMigration(
+							chain.ChainID(),
+							flagOutputDir,
+							reporters.NewReportFileWriterFactory(flagOutputDir, log.Logger),
+						),
+						migrations.NewAccountUsageMigration(
+							reporters.NewReportFileWriterFactoryWithFormat(flagOutputDir, log.Logger, reporters.ReportFormatJSONL),
+						),
+					},
+				),
+			},
+		)
 
 		migration := newMigration(log.Logger, migs, flagNWorker)
 

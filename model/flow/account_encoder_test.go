@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 type legacyAccountPublicKeyWrapper struct {
@@ -58,4 +59,35 @@ func TestDecodeAccountPublicKey_Legacy(t *testing.T) {
 
 	// legacy account key should not be revoked
 	assert.False(t, accountKey.Revoked)
+}
+
+func TestStoredPublicKey(t *testing.T) {
+	sk, err := unittest.AccountKeyDefaultFixture()
+	assert.NoError(t, err)
+
+	pk := flow.StoredPublicKey{
+		PublicKey: sk.PrivateKey.PublicKey(),
+		SignAlgo:  sk.SignAlgo,
+		HashAlgo:  sk.HashAlgo,
+	}
+
+	b, err := flow.EncodeStoredPublicKey(pk)
+	assert.NoError(t, err)
+
+	decodedPk, err := flow.DecodeStoredPublicKey(b)
+	assert.NoError(t, err)
+
+	assert.Equal(t, pk, decodedPk)
+}
+
+func TestSequenceNumber(t *testing.T) {
+	seqNumber := uint64(42)
+
+	b, err := flow.EncodeSequenceNumber(seqNumber)
+	assert.NoError(t, err)
+
+	decodedSeqNumber, err := flow.DecodeSequenceNumber(b)
+	assert.NoError(t, err)
+
+	assert.Equal(t, seqNumber, decodedSeqNumber)
 }
