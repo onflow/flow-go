@@ -7,7 +7,6 @@ import (
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/storage"
-	"github.com/onflow/flow-go/storage/badger/transaction"
 	"github.com/onflow/flow-go/storage/operation"
 )
 
@@ -115,13 +114,6 @@ func (r *ExecutionResults) BatchIndex(blockID flow.Identifier, resultID flow.Ide
 
 func (r *ExecutionResults) ByID(resultID flow.Identifier) (*flow.ExecutionResult, error) {
 	return r.byID(resultID)
-}
-
-// TODO: deprecated, should be removed when protocol data is moved pebble
-func (r *ExecutionResults) ByIDTx(resultID flow.Identifier) func(tx *transaction.Tx) (*flow.ExecutionResult, error) {
-	return func(tx *transaction.Tx) (*flow.ExecutionResult, error) {
-		return nil, fmt.Errorf("not implemented")
-	}
 }
 
 // Index indexes an execution result by block ID.
