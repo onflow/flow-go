@@ -20,7 +20,7 @@ func TestGuaranteeStoreRetrieve(t *testing.T) {
 		blocks := all.Blocks
 		guarantees := all.Guarantees
 
-		s := store.NewGuarantees(metrics, db, 1000)
+		s := store.NewGuarantees(metrics, db, 1000, 1000)
 
 		// abiturary guarantees
 		expected := unittest.CollectionGuaranteeFixture()
@@ -51,5 +51,74 @@ func TestGuaranteeStoreRetrieve(t *testing.T) {
 			return blocks.BatchStore(lctx2, rw, block2)
 		}))
 		lctx2.Release()
+	})
+}
+
+func TestStoreDuplicateGuarantee(t *testing.T) {
+	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
+		metrics := metrics.NewNoopCollector()
+		all := store.InitAll(metrics, db)
+		blocks := all.Blocks
+		store1 := all.Guarantees
+		expected := unittest.CollectionGuaranteeFixture()
+		block := unittest.BlockWithGuaranteesFixture([]*flow.CollectionGuarantee{expected})
+
+		// store guarantee
+		manager, lctx := unittest.LockManagerWithContext(t, storage.LockInsertBlock)
+		require.NoError(t, db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+			return blocks.BatchStore(lctx, rw, block)
+		}))
+		lctx.Release()
+
+		// storage of the same guarantee should be idempotent
+		block2 := unittest.BlockWithGuaranteesFixture([]*flow.CollectionGuarantee{expected})
+		lctx2 := manager.NewContext()
+		require.NoError(t, lctx2.AcquireLock(storage.LockInsertBlock))
+		require.NoError(t, db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+			return blocks.BatchStore(lctx2, rw, block2)
+		}))
+		lctx2.Release()
+
+		actual, err := store1.ByID(expected.ID())
+		require.NoError(t, err)
+		require.Equal(t, expected, actual)
+		actual, err = store1.ByCollectionID(expected.CollectionID)
+		require.NoError(t, err)
+		require.Equal(t, expected, actual)
+	})
+}
+
+func TestStoreConflictingGuarantee(t *testing.T) {
+	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
+		metrics := metrics.NewNoopCollector()
+		all := store.InitAll(metrics, db)
+		blocks := all.Blocks
+		store1 := all.Guarantees
+		expected := unittest.CollectionGuaranteeFixture()
+		block := unittest.BlockWithGuaranteesFixture([]*flow.CollectionGuarantee{expected})
+
+		manager, lctx := unittest.LockManagerWithContext(t, storage.LockInsertBlock)
+		require.NoError(t, db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+			return blocks.BatchStore(lctx, rw, block)
+		}))
+		lctx.Release()
+
+		// a differing guarantee for the same collection is potentially byzantine and should return an error
+		conflicting := *expected
+		conflicting.SignerIndices = []byte{99}
+		block2 := unittest.BlockWithGuaranteesFixture([]*flow.CollectionGuarantee{&conflicting})
+		lctx2 := manager.NewContext()
+		require.NoError(t, lctx2.AcquireLock(storage.LockInsertBlock))
+		require.NoError(t, db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+			return blocks.BatchStore(lctx2, rw, block2)
+		}))
+		lctx2.Release()
+
+		actual, err := store1.ByID(expected.ID())
+		require.NoError(t, err)
+		require.Equal(t, expected, actual)
+		actual, err = store1.ByCollectionID(expected.CollectionID)
+		require.NoError(t, err)
+		require.Equal(t, expected, actual)
 	})
 }

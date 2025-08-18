@@ -23,6 +23,7 @@ import (
 	hotstuff "github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/access/rest/util"
+	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/bitutils"
 	"github.com/onflow/flow-go/ledger/common/testutils"
@@ -406,7 +407,6 @@ func BlockWithParentProtocolState(parent *flow.Block) *flow.Block {
 	}
 }
 
-<<<<<<< HEAD
 // making sure the new block has a unique view
 func BlockWithParentProtocolStateAndUniqueView(parent *flow.Block, viewIndex map[uint64]struct{}) *flow.Block {
 	block := BlockWithParentProtocolState(parent)
@@ -440,8 +440,6 @@ func StateInteractionsFixture() *snapshot.ExecutionSnapshot {
 	return &snapshot.ExecutionSnapshot{}
 }
 
-=======
->>>>>>> @{-1}
 func BlockWithParentAndProposerFixture(
 	t *testing.T,
 	parent *flow.Header,
