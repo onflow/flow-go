@@ -314,7 +314,7 @@ func (s *MessageHubSuite) TestOnOwnProposal() {
 	})
 
 	s.Run("should broadcast proposal and pass to HotStuff for valid proposals", func() {
-		expectedBroadcastMsg := &cluster.UntrustedProposal{
+		expectedBroadcastMsg := &messages.ClusterProposal{
 			Block:           *block,
 			ProposerSigData: unittest.SignatureFixture(),
 		}
@@ -388,7 +388,7 @@ func (s *MessageHubSuite) TestProcessMultipleMessagesHappyPath() {
 		hotstuffProposal := model.SignedProposalFromFlow(proposal)
 		s.voteAggregator.On("AddBlock", hotstuffProposal)
 		s.hotstuff.On("SubmitProposal", hotstuffProposal)
-		expectedBroadcastMsg := &cluster.UntrustedProposal{
+		expectedBroadcastMsg := &messages.ClusterProposal{
 			Block:           *block,
 			ProposerSigData: proposal.ProposerSigData,
 		}
