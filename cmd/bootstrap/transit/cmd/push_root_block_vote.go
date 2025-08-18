@@ -46,12 +46,21 @@ func pushVote(c *cobra.Command, args []string) {
 	}
 
 	voteFile := flagVoteFile
+
+	// If the vote file is not specified, use the bootstrap directory
+	voteFilePath := filepath.Join(flagBootDir, voteFile)
+
 	if voteFile == "" {
 		voteFile = fmt.Sprintf(bootstrap.PathNodeRootBlockVote, nodeID)
+		voteFilePath = filepath.Join(flagBootDir, voteFile)
+	}
+
+	// If vote-file-dir is specified, use it to construct the full path to the vote file
+	if flagVoteFilePath != "" {
+		voteFilePath = filepath.Join(flagVoteFilePath, "root-block-vote.json")
 	}
 
 	destination := filepath.Join(flagToken, fmt.Sprintf(bootstrap.FilenameRootBlockVote, nodeID))
-	source := filepath.Join(flagBootDir, voteFile)
 
 	log.Info().Msg("pushing root block vote")
 
@@ -68,7 +77,7 @@ func pushVote(c *cobra.Command, args []string) {
 	}
 	defer client.Close()
 
-	err = bucket.UploadFile(ctx, client, destination, source)
+	err = bucket.UploadFile(ctx, client, destination, voteFilePath)
 	if err != nil {
 		log.Fatal().Err(err).Msg("failed to upload vote file")
 	}
