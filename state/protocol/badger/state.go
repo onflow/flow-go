@@ -301,8 +301,18 @@ func bootstrapProtocolStates(
 	return nil
 }
 
-// bootstrapSealingSegment inserts all blocks and associated metadata for the
-// protocol state root snapshot to disk.
+// bootstrapSealingSegment inserts all blocks and associated metadata for the protocol state root
+// snapshot to disk. We proceed as follows:
+//  1. we persist the auxiliary execution results from the sealing segment
+//  2. persist extra blocks from the sealing segment; these blocks are below the history cut-off and
+//     therefore not fully indexed (we only index the blocks by height).
+//  3. persist sealing segment Blocks and properly populate all indices as if those blocks:
+//     - blocks are index by their heights
+//     - latest seale is indexed for each block
+//     - children of each block is initialized with the set containing the child block
+//  4. For the highest seal (`rootSeal`), we index the sealed result ID in the database.
+//     This is necessary for the execution node to confirm that it is starting to execute from the
+//     correct state.
 func bootstrapSealingSegment(
 	lctx lockctx.Proof,
 	db storage.DB,
@@ -312,6 +322,7 @@ func bootstrapSealingSegment(
 	head *flow.Block,
 	rootSeal *flow.Seal,
 ) error {
+	// STEP 1: persist AUXILIARY EXECUTION RESULTS (should include the result sealed by segment.FirstSeal if that is not nil)
 	err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 		w := rw.Writer()
 		for _, result := range segment.ExecutionResults {
@@ -324,31 +335,18 @@ func bootstrapSealingSegment(
 				return fmt.Errorf("could not index execution result: %w", err)
 			}
 		}
-
-		// insert the first seal (in case the segment's first block contains no seal)
-		if segment.FirstSeal != nil {
-			err := operation.InsertSeal(w, segment.FirstSeal.ID(), segment.FirstSeal)
-			if err != nil {
-				return fmt.Errorf("could not insert first seal: %w", err)
-			}
-		}
-
-		// root seal contains the result ID for the sealed root block. If the sealed root block is
-		// different from the finalized root block, then it means the node dynamically bootstrapped.
-		// In that case, we should index the result of the sealed root block so that the EN is able
-		// to execute the next block.
-		err := operation.IndexExecutionResult(w, rootSeal.BlockID, rootSeal.ResultID)
-		if err != nil {
-			return fmt.Errorf("could not index root result: %w", err)
-		}
-
 		return nil
 	})
 	if err != nil {
 		return err
 	}
 
-	// PERSIST BLOCKS to the database ONE-BY-ONE in order of increasing height:
+	// STEP 2: persist EXTRA BLOCKS to the database
+	// These blocks are _ancestors_ of `segment.Blocks`, i.e. below the history cut-off. Therefore, we only persist the extra blocks
+	// and index them by height, while all the other indices are omitted, as they would potentially reference non-existent data.
+	//
+	// We PERSIST these blocks ONE-BY-ONE in order of increasing height,
+	// emulating the process during normal operations, the the following reason:
 	// * Execution Receipts are incorporated into blocks for bookkeeping when and which execution results the ENs published.
 	// * Typically, most ENs commit to the same results. Therefore, Results in blocks are stored separately from the Receipts
 	//   in blocks and deduplicated along the fork -- specifically, we only store the result along a fork in the first block
@@ -362,7 +360,6 @@ func bootstrapSealingSegment(
 	//   would not be persisted in the database yet when attempting to persist their descendants. In other words, the check in
 	//   [Blocks.BatchStore] can't distinguish between a receipt referencing a missing result vs a receipt referencing a result
 	//   that is contained in a previous block being stored as part of the same batch.
-	// Hence, for bootstrapping we emulate the process during normal operations and just store the blocks also one by one.
 	for _, block := range segment.ExtraBlocks {
 		err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 			blockID := block.ID()
@@ -391,13 +388,37 @@ func bootstrapSealingSegment(
 		}
 	}
 
+	// STEP 3: persist sealing segment Blocks and properly populate all indices as if those blocks
+	// For each block B, we index the highest seal in the fork with head B. To sanity check proper state construction, we want to ensure that the referenced
+	// seal actually exists in the database at the end of the bootstrapping process. Therefore, we track all the seals that we are storing and error in case
+	// we attempt to reference a seal that is not in that set. It is fine to omit any seals in `segment.ExtraBlocks` for the following reason:
+	//  * Let's consider the lowest-height block in `segment.Blocks`, by convention `segment.Blocks[0]`, and call it B1.
+	//  * If B1 contains seals, then the latest seal as of B1 is part of the block's payload. S1 will be stored in the database while persisting B1.
+	//  * If and only if B1 contains no seal, then `segment.FirstSeal` is set to the latest seal included in an ancestor of B1 (see [flow.SealingSegment]
+	//    documentation). We explicitly store FirstSeal in the database.
+	//  * By induction, this argument can be applied to all subsequent blocks in `segment.Blocks`. Hence, the index `LatestSealAtBlock` is correctly populated
+	//    for all blocks in `segment.Blocks`.
 	sealsLookup := make(map[flow.Identifier]struct{})
 	sealsLookup[rootSeal.ID()] = struct{}{}
-	if segment.FirstSeal != nil {
+	if segment.FirstSeal != nil { // in case the segment's first block contains no seal, insert the first seal
 		sealsLookup[segment.FirstSeal.ID()] = struct{}{}
+		err = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+			if segment.FirstSeal != nil {
+				err := operation.InsertSeal(rw.Writer(), segment.FirstSeal.ID(), segment.FirstSeal)
+				if err != nil {
+					return fmt.Errorf("could not insert first seal: %w", err)
+				}
+			}
+			return nil
+		})
+		if err != nil {
+			return err
+		}
 	}
 
-	for i, block := range segment.Blocks { // same as for `segment.ExtraBlocks` above: PERSIST BLOCKS to the database ONE-BY-ONE
+	// PERSIST these blocks ONE-BY-ONE in order of increasing height, emulating the process during normal operations,
+	// so sanity checks from normal operations should continue to apply.
+	for i, block := range segment.Blocks {
 		err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 			w := rw.Writer()
 			blockID := block.ID()
@@ -439,11 +460,17 @@ func bootstrapSealingSegment(
 				return fmt.Errorf("could not index block seal: %w", err)
 			}
 
-			// for all but the first block in the segment, index the parent->child relationship
-			if i > 0 {
+			// Populate parent->child relationship
+			if i > 0 { // for all but the first block in the segment, index the current block as a child of its parent
 				err = operation.UpsertBlockChildren(w, block.Header.ParentID, []flow.Identifier{blockID})
 				if err != nil {
 					return fmt.Errorf("could not insert child index for block (id=%x): %w", blockID, err)
+				}
+			}
+			if i == len(segment.Blocks)-1 { // in addition, for the highest block in the sealing segment, the known set of children is empty:
+				err = operation.UpsertBlockChildren(rw.Writer(), head.ID(), nil)
+				if err != nil {
+					return fmt.Errorf("could not insert child index for head block (id=%x): %w", head.ID(), err)
 				}
 			}
 
@@ -454,18 +481,34 @@ func bootstrapSealingSegment(
 		}
 	}
 
-	// insert an empty child index for the final block in the segment
-	return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-		err := operation.UpsertBlockChildren(rw.Writer(), head.ID(), nil)
+	// STEP 4: For the highest seal (`rootSeal`), we index the sealed result ID in the database.
+	err = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+		// sanity check existence of referenced execution result (should have been stored in STEP 1)
+		var result flow.ExecutionResult
+		err := operation.RetrieveExecutionResult(rw.GlobalReader(), rootSeal.ResultID, &result)
 		if err != nil {
-			return fmt.Errorf("could not insert child index for head block (id=%x): %w", head.ID(), err)
+			return fmt.Errorf("missing sealed execution result %v: %w", rootSeal.ResultID, err)
 		}
+
+		// If the sealed root block is different from the finalized root block, then it means the node dynamically
+		// bootstrapped. In that case, we index the result of the latest sealed result, so that the EN is able
+		// to confirm that it is loading the correct state to execute the next block.
+		err = operation.IndexExecutionResult(rw.Writer(), rootSeal.BlockID, rootSeal.ResultID)
+		if err != nil {
+			return fmt.Errorf("could not index root result: %w", err)
+		}
+
 		return nil
 	})
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
-// bootstrapStatePointers instantiates special pointers used to by the protocol
-// state to keep track of central lifecycle variables:
+// bootstrapStatePointers instantiates central pointers used to by the protocol
+// state for keeping track of lifecycle variables:
 //   - Consensus Safety and Liveness Data (only used by consensus participants)
 //   - Root Block's Height (heighest block in sealing segment)
 //   - Sealed Root Block Height (block height sealed as of the Root Block)
