@@ -136,7 +136,7 @@ func (s *EngineSuite) TestProcessGossipedInvalidBlock() {
 
 	originID := unittest.IdentifierFixture()
 
-	err := s.engine.Process(channels.ReceiveBlocks, originID, (*flow.UntrustedProposal)(proposal))
+	err := s.engine.Process(channels.ReceiveBlocks, originID, (*messages.Proposal)(proposal))
 	require.NoError(s.T(), err)
 
 	// OnBlockRange should NOT be called for invalid proposal

@@ -81,8 +81,9 @@ func (tst *TestnetStateTracker) Track(t *testing.T, ctx context.Context, ghost *
 			tst.MsgState.Add(sender, msg)
 
 			switch m := msg.(type) {
-			case *flow.UntrustedProposal:
-				proposal, err := flow.NewProposal(*m)
+			// TODO(malleability immutable): Replace *messages.Proposal to *flow.Proposal and remove validation check when ToInternal() was added to decoder
+			case *messages.Proposal:
+				proposal, err := flow.NewProposal(flow.UntrustedProposal(*m))
 				require.NoError(t, err)
 				err = tst.BlockState.Add(t, proposal)
 				require.NoError(t, err)
