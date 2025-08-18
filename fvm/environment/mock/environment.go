@@ -1411,9 +1411,9 @@ func (_m *Environment) ReadRandom(_a0 []byte) error {
 	return r0
 }
 
-// RecordTrace provides a mock function with given fields: operation, location, duration, attrs
-func (_m *Environment) RecordTrace(operation string, location common.Location, duration time.Duration, attrs []attribute.KeyValue) {
-	_m.Called(operation, location, duration, attrs)
+// RecordTrace provides a mock function with given fields: operation, duration, attrs
+func (_m *Environment) RecordTrace(operation string, duration time.Duration, attrs []attribute.KeyValue) {
+	_m.Called(operation, duration, attrs)
 }
 
 // RecoverProgram provides a mock function with given fields: program, location

@@ -98,10 +98,9 @@ func newResultCollector(
 	receiptHasher hash.Hasher,
 	parentBlockExecutionResultID flow.Identifier,
 	block *entity.ExecutableBlock,
-	numTransactions int,
+	inputChannelSize int,
 	consumers []result.ExecutedCollectionConsumer,
 	previousBlockSnapshot snapshot.StorageSnapshot,
-	versionAwareChunkConstructor flow.ChunkConstructor,
 ) *resultCollector {
 	numCollections := len(block.Collections()) + 1
 	now := time.Now()
@@ -109,7 +108,7 @@ func newResultCollector(
 		tracer:                       tracer,
 		blockSpan:                    blockSpan,
 		metrics:                      metrics,
-		processorInputChan:           make(chan transactionResult, numTransactions),
+		processorInputChan:           make(chan transactionResult, inputChannelSize),
 		processorDoneChan:            make(chan struct{}),
 		committer:                    committer,
 		signer:                       signer,
@@ -117,7 +116,7 @@ func newResultCollector(
 		receiptHasher:                receiptHasher,
 		executionDataProvider:        executionDataProvider,
 		parentBlockExecutionResultID: parentBlockExecutionResultID,
-		result:                       execution.NewEmptyComputationResult(block, versionAwareChunkConstructor),
+		result:                       execution.NewEmptyComputationResult(block),
 		consumers:                    consumers,
 		spockSignatures:              make([]crypto.Signature, 0, numCollections),
 		blockStartTime:               now,

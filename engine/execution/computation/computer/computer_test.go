@@ -4,9 +4,14 @@ import (
 	"context"
 	"fmt"
 	"math/rand"
+	"strings"
+	"sync"
 	"sync/atomic"
 	"testing"
 
+	"github.com/ipfs/boxo/blockstore"
+	"github.com/ipfs/go-datastore"
+	dssync "github.com/ipfs/go-datastore/sync"
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/common"
 	"github.com/onflow/cadence/encoding/ccf"
@@ -14,10 +19,6 @@ import (
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/sema"
 	"github.com/onflow/cadence/stdlib"
-
-	"github.com/ipfs/boxo/blockstore"
-	"github.com/ipfs/go-datastore"
-	dssync "github.com/ipfs/go-datastore/sync"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -117,240 +118,7 @@ func (committer *fakeCommitter) CommitView(
 		nil
 }
 
-// This test validates that the blockComputer produces chunk data structures
-// in compliance with both protocol versions 1 and 2.
-// We do this by replicating the "single collection" test case from TestBlockExecutor_ExecuteBlock
-// and adding checks on the ServiceEventCount field of the output ExecutionResult.
-// TODO(mainnet27, #6773): remove this test case https://github.com/onflow/flow-go/issues/6773
-func TestBlockExecutor_ExecuteBlock_VersionAwareChunk(t *testing.T) {
-
-	rag := &RandomAddressGenerator{}
-
-	executorID := unittest.IdentifierFixture()
-
-	me := new(modulemock.Local)
-	me.On("NodeID").Return(executorID)
-	me.On("Sign", mock.Anything, mock.Anything).Return(nil, nil)
-	me.On("SignFunc", mock.Anything, mock.Anything, mock.Anything).
-		Return(nil, nil)
-
-	// Runs one instance of the "single collection" test case from TestBlockExecutor_ExecuteBlock
-	// using the given protocol state version. Returns the output ExecutionResult
-	// NOTE: This is an exact copy of the "single collection" test case, except we use a protocol
-	// state mock constructor which adds the appropriate version.
-	runTest := func(version uint64) *flow.ExecutionResult {
-		execCtx := fvm.NewContext()
-
-		vm := &testVM{
-			t:                    t,
-			eventsPerTransaction: 1,
-		}
-
-		committer := &fakeCommitter{
-			callCount: 0,
-		}
-
-		exemetrics := new(modulemock.ExecutionMetrics)
-		exemetrics.On("ExecutionBlockExecuted",
-			mock.Anything,  // duration
-			mock.Anything). // stats
-			Return(nil).
-			Times(1)
-
-		exemetrics.On("ExecutionCollectionExecuted",
-			mock.Anything,  // duration
-			mock.Anything). // stats
-			Return(nil).
-			Times(2) // 1 collection + system collection
-
-		exemetrics.On("ExecutionTransactionExecuted",
-			mock.Anything,
-			mock.MatchedBy(func(arg module.TransactionExecutionResultStats) bool {
-				return !arg.Failed // only successful transactions
-			}),
-			mock.Anything).
-			Return(nil).
-			Times(2 + 1) // 2 txs in collection + system chunk tx
-
-		exemetrics.On(
-			"ExecutionChunkDataPackGenerated",
-			mock.Anything,
-			mock.Anything).
-			Return(nil).
-			Times(2) // 1 collection + system collection
-
-		expectedProgramsInCache := 1 // we set one program in the cache
-		exemetrics.On(
-			"ExecutionBlockCachedPrograms",
-			expectedProgramsInCache).
-			Return(nil).
-			Times(1) // 1 block
-
-		bservice := requesterunit.MockBlobService(blockstore.NewBlockstore(dssync.MutexWrap(datastore.NewMapDatastore())))
-		trackerStorage := mocktracker.NewMockStorage()
-
-		prov := provider.NewProvider(
-			zerolog.Nop(),
-			metrics.NewNoopCollector(),
-			execution_data.DefaultSerializer,
-			bservice,
-			trackerStorage,
-		)
-
-		exe, err := computer.NewBlockComputer(
-			vm,
-			execCtx,
-			exemetrics,
-			trace.NewNoopTracer(),
-			zerolog.Nop(),
-			committer,
-			me,
-			prov,
-			nil,
-			testutil.ProtocolStateWithVersionFixture(version),
-			testMaxConcurrency)
-		require.NoError(t, err)
-
-		// create a block with 1 collection with 2 transactions
-		block := generateBlock(1, 2, rag)
-
-		parentBlockExecutionResultID := unittest.IdentifierFixture()
-		result, err := exe.ExecuteBlock(
-			context.Background(),
-			parentBlockExecutionResultID,
-			block,
-			nil,
-			derived.NewEmptyDerivedBlockData(0))
-		assert.NoError(t, err)
-		assert.Len(t, result.AllExecutionSnapshots(), 1+1) // +1 system chunk
-
-		require.Equal(t, 2, committer.callCount)
-
-		assert.Equal(t, block.ID(), result.BlockExecutionData.BlockID)
-
-		expectedChunk1EndState := incStateCommitment(*block.StartState)
-		expectedChunk2EndState := incStateCommitment(expectedChunk1EndState)
-
-		assert.Equal(t, expectedChunk2EndState, result.CurrentEndState())
-
-		assertEventHashesMatch(t, 1+1, result)
-
-		// Verify ExecutionReceipt
-		receipt := result.ExecutionReceipt
-
-		assert.Equal(t, executorID, receipt.ExecutorID)
-		assert.Equal(
-			t,
-			parentBlockExecutionResultID,
-			receipt.PreviousResultID)
-		assert.Equal(t, block.ID(), receipt.BlockID)
-		assert.NotEqual(t, flow.ZeroID, receipt.ExecutionDataID)
-
-		assert.Len(t, receipt.Chunks, 1+1) // +1 system chunk
-
-		chunk1 := receipt.Chunks[0]
-
-		eventCommits := result.AllEventCommitments()
-		assert.Equal(t, block.ID(), chunk1.BlockID)
-		assert.Equal(t, uint(0), chunk1.CollectionIndex)
-		assert.Equal(t, uint64(2), chunk1.NumberOfTransactions)
-		assert.Equal(t, eventCommits[0], chunk1.EventCollection)
-
-		assert.Equal(t, *block.StartState, chunk1.StartState)
-
-		assert.NotEqual(t, *block.StartState, chunk1.EndState)
-		assert.NotEqual(t, flow.DummyStateCommitment, chunk1.EndState)
-		assert.Equal(t, expectedChunk1EndState, chunk1.EndState)
-
-		chunk2 := receipt.Chunks[1]
-		assert.Equal(t, block.ID(), chunk2.BlockID)
-		assert.Equal(t, uint(1), chunk2.CollectionIndex)
-		assert.Equal(t, uint64(1), chunk2.NumberOfTransactions)
-		assert.Equal(t, eventCommits[1], chunk2.EventCollection)
-
-		assert.Equal(t, expectedChunk1EndState, chunk2.StartState)
-
-		assert.NotEqual(t, *block.StartState, chunk2.EndState)
-		assert.NotEqual(t, flow.DummyStateCommitment, chunk2.EndState)
-		assert.NotEqual(t, expectedChunk1EndState, chunk2.EndState)
-		assert.Equal(t, expectedChunk2EndState, chunk2.EndState)
-
-		// Verify ChunkDataPacks
-
-		chunkDataPacks := result.AllChunkDataPacks()
-		assert.Len(t, chunkDataPacks, 1+1) // +1 system chunk
-
-		chunkDataPack1 := chunkDataPacks[0]
-
-		assert.Equal(t, chunk1.ID(), chunkDataPack1.ChunkID)
-		assert.Equal(t, *block.StartState, chunkDataPack1.StartState)
-		assert.Equal(t, []byte{1}, chunkDataPack1.Proof)
-		assert.NotNil(t, chunkDataPack1.Collection)
-
-		chunkDataPack2 := chunkDataPacks[1]
-
-		assert.Equal(t, chunk2.ID(), chunkDataPack2.ChunkID)
-		assert.Equal(t, chunk2.StartState, chunkDataPack2.StartState)
-		assert.Equal(t, []byte{2}, chunkDataPack2.Proof)
-		assert.Nil(t, chunkDataPack2.Collection)
-
-		// Verify BlockExecutionData
-
-		assert.Len(t, result.ChunkExecutionDatas, 1+1) // +1 system chunk
-
-		chunkExecutionData1 := result.ChunkExecutionDatas[0]
-		assert.Equal(
-			t,
-			chunkDataPack1.Collection,
-			chunkExecutionData1.Collection)
-		assert.NotNil(t, chunkExecutionData1.TrieUpdate)
-		assert.Equal(t, ledger.RootHash(chunk1.StartState), chunkExecutionData1.TrieUpdate.RootHash)
-
-		chunkExecutionData2 := result.ChunkExecutionDatas[1]
-		assert.NotNil(t, chunkExecutionData2.Collection)
-		assert.NotNil(t, chunkExecutionData2.TrieUpdate)
-		assert.Equal(t, ledger.RootHash(chunk2.StartState), chunkExecutionData2.TrieUpdate.RootHash)
-
-		assert.GreaterOrEqual(t, vm.CallCount(), 3)
-		// if every transaction is retried once, then the call count should be
-		// (1+totalTransactionCount) /2 * totalTransactionCount
-		assert.LessOrEqual(t, vm.CallCount(), (1+3)/2*3)
-
-		return &result.ExecutionResult
-	}
-
-	// Versions before v1 should have nil ServiceEventCount field
-	t.Run("<v1", func(t *testing.T) {
-		result := runTest(0)
-		for _, chunk := range result.Chunks {
-			assert.Nil(t, chunk.ServiceEventCount)
-		}
-	})
-	// v1 should have nil ServiceEventCount field
-	t.Run("v1", func(t *testing.T) {
-		result := runTest(1)
-		for _, chunk := range result.Chunks {
-			assert.Nil(t, chunk.ServiceEventCount)
-		}
-	})
-	// v2 should have non-nil ServiceEventCount field
-	t.Run("v2", func(t *testing.T) {
-		result := runTest(2)
-		for _, chunk := range result.Chunks {
-			assert.NotNil(t, chunk.ServiceEventCount)
-		}
-	})
-	// Versions later than v2 should have non-nil ServiceEventCount field
-	t.Run(">v2", func(t *testing.T) {
-		result := runTest(2 + uint64(rand.Intn(10)+1))
-		for _, chunk := range result.Chunks {
-			assert.NotNil(t, chunk.ServiceEventCount)
-		}
-	})
-}
-
 func TestBlockExecutor_ExecuteBlock(t *testing.T) {
-
 	rag := &RandomAddressGenerator{}
 
 	executorID := unittest.IdentifierFixture()
@@ -1593,6 +1361,334 @@ func Test_ExecutingSystemCollection(t *testing.T) {
 	assert.Empty(t, result.AllTransactionResults()[0].ErrorMessage)
 
 	committer.AssertExpectations(t)
+}
+
+func Test_ScheduledCallback(t *testing.T) {
+	t.Run("process with no scheduled callback", func(t *testing.T) {
+		testScheduledCallback(t, []cadence.Event{}, 2) // process callback + system chunk
+	})
+
+	t.Run("process with 2 scheduled callbacks", func(t *testing.T) {
+		// create callback events that process callback will return
+		location := common.NewAddressLocation(nil, common.Address(flow.HexToAddress("0x0000000000000000")), "CallbackScheduler")
+
+		eventType := cadence.NewEventType(
+			location,
+			"CallbackProcessed",
+			[]cadence.Field{
+				{Identifier: "ID", Type: cadence.UInt64Type},
+				{Identifier: "executionEffort", Type: cadence.UInt64Type},
+			},
+			nil,
+		)
+
+		callbackID1 := uint64(1)
+		callbackID2 := uint64(2)
+
+		callbackEvent1 := cadence.NewEvent(
+			[]cadence.Value{
+				cadence.NewUInt64(callbackID1),
+				cadence.NewUInt64(1000), // execution effort
+			},
+		).WithType(eventType)
+
+		callbackEvent2 := cadence.NewEvent(
+			[]cadence.Value{
+				cadence.NewUInt64(callbackID2),
+				cadence.NewUInt64(2000), // execution effort
+			},
+		).WithType(eventType)
+
+		testScheduledCallback(t, []cadence.Event{callbackEvent1, callbackEvent2}, 4) // process callback + 2 callbacks + system chunk
+	})
+}
+
+func testScheduledCallback(t *testing.T, callbackEvents []cadence.Event, expectedTransactionCount int) {
+	rag := &RandomAddressGenerator{}
+
+	executorID := unittest.IdentifierFixture()
+
+	execCtx := fvm.NewContext(
+		fvm.WithScheduleCallbacksEnabled(true), // Enable callbacks
+		fvm.WithChain(flow.Localnet.Chain()),
+	)
+
+	// track which transactions were executed and their details
+	executedTransactions := make(map[string]string)
+	var executedTransactionsMutex sync.Mutex
+
+	// encode events to create flow event payloads
+	eventPayloads := make([][]byte, len(callbackEvents))
+	callbackIDs := make([]uint64, len(callbackEvents))
+	for i, event := range callbackEvents {
+		payload, err := ccf.Encode(event)
+		require.NoError(t, err)
+		eventPayloads[i] = payload
+
+		// extract callback ID from event for later comparison
+		if len(callbackEvents) > 0 {
+			decodedEvent, err := ccf.Decode(nil, payload)
+			require.NoError(t, err)
+			if cadenceEvent, ok := decodedEvent.(cadence.Event); ok {
+				// search for the ID field in the event
+				idField := cadence.SearchFieldByName(cadenceEvent, "ID")
+				if idValue, ok := idField.(cadence.UInt64); ok {
+					callbackIDs[i] = uint64(idValue)
+				}
+			}
+		}
+	}
+
+	// create a VM that will track execution and return appropriate events
+	vm := &callbackTestVM{
+		testVM: testVM{
+			t:                    t,
+			eventsPerTransaction: 0, // we'll handle events manually
+		},
+		executedTransactions: executedTransactions,
+		executedMutex:        &executedTransactionsMutex,
+		eventPayloads:        eventPayloads,
+		callbackIDs:          callbackIDs,
+	}
+
+	committer := &fakeCommitter{
+		callCount: 0,
+	}
+
+	me := new(modulemock.Local)
+	me.On("NodeID").Return(executorID)
+	me.On("Sign", mock.Anything, mock.Anything).Return(nil, nil)
+	me.On("SignFunc", mock.Anything, mock.Anything, mock.Anything).
+		Return(nil, nil)
+
+	exemetrics := new(modulemock.ExecutionMetrics)
+	exemetrics.On("ExecutionBlockExecuted",
+		mock.Anything,
+		mock.Anything).
+		Return(nil).
+		Times(1)
+
+	// expect 1 system collection execution
+	exemetrics.On("ExecutionCollectionExecuted",
+		mock.Anything,
+		mock.Anything).
+		Return(nil).
+		Times(1)
+
+	// expect the specified number of transactions
+	exemetrics.On("ExecutionTransactionExecuted",
+		mock.Anything,
+		mock.MatchedBy(func(arg module.TransactionExecutionResultStats) bool {
+			return !arg.Failed && arg.SystemTransaction
+		}),
+		mock.Anything).
+		Return(nil).
+		Times(expectedTransactionCount)
+
+	exemetrics.On(
+		"ExecutionChunkDataPackGenerated",
+		mock.Anything,
+		mock.Anything).
+		Return(nil).
+		Times(1) // system collection
+
+	exemetrics.On(
+		"ExecutionBlockCachedPrograms",
+		mock.Anything).
+		Return(nil).
+		Times(1)
+
+	bservice := requesterunit.MockBlobService(blockstore.NewBlockstore(dssync.MutexWrap(datastore.NewMapDatastore())))
+	trackerStorage := mocktracker.NewMockStorage()
+
+	prov := provider.NewProvider(
+		zerolog.Nop(),
+		metrics.NewNoopCollector(),
+		execution_data.DefaultSerializer,
+		bservice,
+		trackerStorage,
+	)
+
+	exe, err := computer.NewBlockComputer(
+		vm,
+		execCtx,
+		exemetrics,
+		trace.NewNoopTracer(),
+		zerolog.Nop(),
+		committer,
+		me,
+		prov,
+		nil,
+		testutil.ProtocolStateWithSourceFixture(nil),
+		testMaxConcurrency)
+	require.NoError(t, err)
+
+	// create empty block (no user collections)
+	block := generateBlock(0, 0, rag)
+
+	parentBlockExecutionResultID := unittest.IdentifierFixture()
+	result, err := exe.ExecuteBlock(
+		context.Background(),
+		parentBlockExecutionResultID,
+		block,
+		nil,
+		derived.NewEmptyDerivedBlockData(0))
+	require.NoError(t, err)
+
+	// verify execution results
+	assert.Len(t, result.AllExecutionSnapshots(), 1) // Only system chunk
+	assert.Len(t, result.AllTransactionResults(), expectedTransactionCount)
+
+	// verify correct number of commits (1 for system collection)
+	assert.Equal(t, 1, committer.callCount)
+	assert.Equal(t, expectedTransactionCount, len(executedTransactions))
+
+	// verify we executed each type of transaction
+	hasProcessCallback := false
+	hasSystemChunk := false
+	callbackNames := make(map[string]bool)
+
+	for _, txType := range executedTransactions {
+		switch txType {
+		case "process_callback":
+			hasProcessCallback = true
+		case "system_chunk":
+			hasSystemChunk = true
+		default:
+			if strings.HasPrefix(txType, "callback") {
+				// add unique callbacks to the map
+				callbackNames[txType] = true
+			}
+		}
+	}
+
+	assert.True(t, hasProcessCallback, "process callback transaction should have been executed")
+	assert.True(t, hasSystemChunk, "system chunk transaction should have been executed")
+	assert.Equal(t, len(callbackEvents), len(callbackNames), "should have executed the expected number of callback transactions")
+
+	// verify no transaction errors
+	for _, txResult := range result.AllTransactionResults() {
+		assert.Empty(t, txResult.ErrorMessage, "transaction should not have failed")
+	}
+
+	// verify receipt structure
+	receipt := result.ExecutionReceipt
+	assert.Equal(t, executorID, receipt.ExecutorID)
+	assert.Equal(t, parentBlockExecutionResultID, receipt.PreviousResultID)
+	assert.Equal(t, block.ID(), receipt.BlockID)
+	assert.Len(t, receipt.Chunks, 1) // Only system chunk
+
+	// verify system chunk details
+	systemChunk := receipt.Chunks[0]
+	assert.Equal(t, block.ID(), systemChunk.BlockID)
+	assert.Equal(t, uint(0), systemChunk.CollectionIndex) // System collection is at index 0 for empty block
+	assert.Equal(t, uint64(expectedTransactionCount), systemChunk.NumberOfTransactions)
+
+	// verify all mocks were called as expected
+	exemetrics.AssertExpectations(t)
+}
+
+// callbackTestVM is a custom VM for testing callback execution
+type callbackTestVM struct {
+	testVM               // Embed testVM
+	executedTransactions map[string]string
+	executedMutex        *sync.Mutex
+	eventPayloads        [][]byte
+	callbackIDs          []uint64
+}
+
+func (vm *callbackTestVM) NewExecutor(
+	ctx fvm.Context,
+	proc fvm.Procedure,
+	txnState storage.TransactionPreparer,
+) fvm.ProcedureExecutor {
+	// Create a custom executor that tracks execution and returns proper events
+	return &callbackTestExecutor{
+		testExecutor: testExecutor{
+			testVM:   &vm.testVM,
+			ctx:      ctx,
+			proc:     proc,
+			txnState: txnState,
+		},
+		vm: vm,
+	}
+}
+
+// callbackTestExecutor is a custom executor for testing callback execution
+type callbackTestExecutor struct {
+	testExecutor
+	vm *callbackTestVM
+}
+
+// we need to reimplement this Output since the events are consumed in the block computer
+// from the output of the procedure executor
+func (executor *callbackTestExecutor) Output() fvm.ProcedureOutput {
+	executor.vm.executedMutex.Lock()
+	defer executor.vm.executedMutex.Unlock()
+
+	txProc, ok := executor.proc.(*fvm.TransactionProcedure)
+	if !ok {
+		return fvm.ProcedureOutput{}
+	}
+
+	txBody := txProc.Transaction
+	txID := fmt.Sprintf("tx_%d", txProc.TxIndex)
+
+	switch {
+	// scheduled callbacks process transaction
+	case strings.Contains(string(txBody.Script), "CallbackScheduler.process"):
+		executor.vm.executedTransactions[txID] = "process_callback"
+
+		// return events for each scheduled callback
+		events := make([]flow.Event, len(executor.vm.eventPayloads))
+		for i, payload := range executor.vm.eventPayloads {
+			events[i] = flow.Event{
+				// TODO: we shouldn't hardcode this event types, refactor after the scheduler contract is done
+				Type:             flow.EventType("A.0x0000000000000000.CallbackScheduler.CallbackProcessed"),
+				TransactionID:    txProc.ID,
+				TransactionIndex: txProc.TxIndex,
+				EventIndex:       uint32(i),
+				Payload:          payload,
+			}
+		}
+
+		return fvm.ProcedureOutput{
+			Events: events,
+		}
+	// scheduled callbacks execute transaction
+	case strings.Contains(string(txBody.Script), "CallbackScheduler.executeCallback"):
+		// extract the callback ID from the arguments
+		if len(txBody.Arguments) == 0 {
+			return fvm.ProcedureOutput{}
+		}
+
+		// decode the argument to check which callback it is
+		argValue, err := ccf.Decode(nil, txBody.Arguments[0])
+		if err == nil {
+			if idValue, ok := argValue.(cadence.UInt64); ok {
+				// find which callback this is
+				callbackIndex := -1
+				for i, callbackID := range executor.vm.callbackIDs {
+					if uint64(idValue) == callbackID {
+						callbackIndex = i
+						break
+					}
+				}
+
+				if callbackIndex >= 0 {
+					executor.vm.executedTransactions[txID] = fmt.Sprintf("callback%d", callbackIndex+1)
+				} else {
+					executor.vm.executedTransactions[txID] = "unknown_callback"
+				}
+			}
+		}
+
+		return fvm.ProcedureOutput{}
+	// system chunk transaction
+	default:
+		executor.vm.executedTransactions[txID] = "system_chunk"
+		return fvm.ProcedureOutput{}
+	}
 }
 
 func generateBlock(
