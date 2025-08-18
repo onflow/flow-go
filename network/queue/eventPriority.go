@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"math"
 
-	"github.com/onflow/flow-go/model/cluster"
 	"github.com/onflow/flow-go/model/flow"
 	libp2pmessage "github.com/onflow/flow-go/model/libp2p/message"
 	"github.com/onflow/flow-go/model/messages"
@@ -59,7 +58,7 @@ func getPriorityByType(message interface{}) Priority {
 		return HighPriority
 
 	// cluster consensus
-	case *cluster.UntrustedProposal:
+	case *messages.ClusterProposal:
 		return HighPriority
 	case *messages.ClusterBlockVote:
 		return HighPriority

@@ -2,7 +2,6 @@ package follower
 
 import (
 	"fmt"
-	"github.com/onflow/flow-go/model/messages"
 
 	"github.com/rs/zerolog"
 
@@ -12,6 +11,7 @@ import (
 	"github.com/onflow/flow-go/engine/common/fifoqueue"
 	"github.com/onflow/flow-go/engine/consensus"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/compliance"
 	"github.com/onflow/flow-go/module/component"
