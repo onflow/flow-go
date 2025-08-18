@@ -20,7 +20,6 @@ func TestEndToEnd(t *testing.T) {
 	t.Logf("Created dir %s", bootdir)
 
 	// Create test files
-	// bootcmd.WriteText(filepath.Join(bootdir, bootstrap.PathNodeId), []byte(nodeID)
 	randomBeaconPath := filepath.Join(bootdir, fmt.Sprintf(bootstrap.PathRandomBeaconPriv, nodeID))
 	err := os.MkdirAll(filepath.Dir(randomBeaconPath), 0755)
 	if err != nil {
