@@ -26,6 +26,11 @@ var generateVoteCmd = &cobra.Command{
 
 func init() {
 	rootCmd.AddCommand(generateVoteCmd)
+	addGenerateRootBlockCmdFlags()
+}
+
+func addGenerateRootBlockCmdFlags() {
+	generateVoteCmd.Flags().StringVarP(&flagOutputDir, "outputDir", "o", "", "ouput directory")
 }
 
 func generateVote(c *cobra.Command, args []string) {
