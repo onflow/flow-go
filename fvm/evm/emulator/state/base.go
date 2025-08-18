@@ -356,33 +356,51 @@ func (v *BaseView) PurgeAllSlotsOfAnAccount(addr gethCommon.Address) error {
 	if err != nil {
 		return err
 	}
-	if acc == nil { // if account doesn't exist return
+	// if account doesn't exist, return
+	if acc == nil || len(acc.CollectionID) == 0 {
 		return nil
 	}
 
 	// remove storage slots
-	// this is taken from DeleteAccount()
-	if len(acc.CollectionID) > 0 {
-		col, found := v.slots[addr]
-		if !found {
-			col, err = v.collectionProvider.CollectionByID(acc.CollectionID)
-			if err != nil {
-				return err
-			}
-		}
-		// delete all slots related to this account (eip-6780)
-		keys, err := col.Destroy()
+	col, found := v.slots[addr]
+	if !found {
+		col, err = v.collectionProvider.CollectionByID(acc.CollectionID)
 		if err != nil {
 			return err
 		}
+	}
 
-		delete(v.slots, addr)
+	delete(v.slots, addr)
 
-		for _, key := range keys {
-			delete(v.cachedSlots, types.SlotAddress{
-				Address: addr,
-				Key:     gethCommon.BytesToHash(key),
-			})
+	keys := [][]byte{}
+	keysIterator, err := col.ReadOnlyIterator()
+	if err != nil {
+		return err
+	}
+
+	key, _, err := keysIterator.Next()
+	if err != nil {
+		return err
+	}
+
+	// we need to collect all the keys, before removing them,
+	// as per the ReadOnlyIterator's specification
+	for key != nil {
+		keys = append(keys, key)
+		delete(v.cachedSlots, types.SlotAddress{
+			Address: addr,
+			Key:     gethCommon.BytesToHash(key),
+		})
+		key, _, err = keysIterator.Next()
+		if err != nil {
+			return err
+		}
+	}
+
+	// remove slot keys from account's collection
+	for _, key := range keys {
+		if err = col.Remove(key); err != nil {
+			return err
 		}
 	}
 
