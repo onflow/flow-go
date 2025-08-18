@@ -198,11 +198,11 @@ func (is *InclusionSuite) waitUntilCollectionIncludeInProposal(deadline time.Tim
 		}
 
 		// we only care about block proposals at the moment
-		proposal, ok := msg.(*flow.UntrustedProposal)
+		proposal, ok := msg.(*messages.Proposal)
 		if !ok {
 			continue
 		}
-		proposalTrusted, err := flow.NewProposal(*proposal)
+		proposalTrusted, err := flow.NewProposal(flow.UntrustedProposal(*proposal))
 		require.NoError(is.T(), err)
 		block := proposalTrusted.Block
 
@@ -243,11 +243,11 @@ func (is *InclusionSuite) waitUntilProposalConfirmed(deadline time.Time, sentine
 		}
 
 		// we only care about block proposals at the moment
-		proposal, ok := msg.(*flow.UntrustedProposal)
+		proposal, ok := msg.(*messages.Proposal)
 		if !ok {
 			continue
 		}
-		proposalTrusted, err := flow.NewProposal(*proposal)
+		proposalTrusted, err := flow.NewProposal(flow.UntrustedProposal(*proposal))
 		require.NoError(is.T(), err)
 		nextBlock := proposalTrusted.Block
 
