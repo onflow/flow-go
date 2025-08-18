@@ -23,7 +23,7 @@ func TestEpochCommitStoreAndRetrieve(t *testing.T) {
 		_, err := s.ByID(unittest.IdentifierFixture())
 		assert.ErrorIs(t, err, storage.ErrNotFound)
 
-		// s a commit in db
+		// store a commit in db
 		expected := unittest.EpochCommitFixture()
 		err = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 			return s.BatchStore(rw, expected)

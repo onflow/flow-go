@@ -2,7 +2,6 @@ package operation_test
 
 import (
 	"math/rand"
-	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -105,62 +104,5 @@ func TestEpochFirstBlockIndex_InsertRetrieve(t *testing.T) {
 			return operation.InsertEpochFirstHeight(lctx, rw, epoch, height)
 		})
 		require.ErrorIs(t, err, storage.ErrAlreadyExists)
-	})
-}
-
-func TestLastCompleteBlockHeightInsertUpdateRetrieve(t *testing.T) {
-	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
-		height := uint64(1337)
-
-		err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			return operation.UpsertLastCompleteBlockHeight(rw.Writer(), height)
-		})
-		require.NoError(t, err)
-
-		var retrieved uint64
-		err = operation.RetrieveLastCompleteBlockHeight(db.Reader(), &retrieved)
-		require.NoError(t, err)
-
-		assert.Equal(t, retrieved, height)
-
-		height = 9999
-		err = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			return operation.UpsertLastCompleteBlockHeight(rw.Writer(), height)
-		})
-		require.NoError(t, err)
-
-		err = operation.RetrieveLastCompleteBlockHeight(db.Reader(), &retrieved)
-		require.NoError(t, err)
-
-		assert.Equal(t, retrieved, height)
-	})
-}
-
-func TestLastCompleteBlockHeightInsertIfNotExists(t *testing.T) {
-	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
-		height1 := uint64(1337)
-
-		inserting := &sync.Mutex{}
-		err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			return operation.InsertLastCompleteBlockHeightIfNotExists(inserting, rw, height1)
-		})
-		require.NoError(t, err)
-
-		var retrieved uint64
-		err = operation.RetrieveLastCompleteBlockHeight(db.Reader(), &retrieved)
-		require.NoError(t, err)
-
-		assert.Equal(t, retrieved, height1)
-
-		height2 := uint64(9999)
-		err = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			return operation.InsertLastCompleteBlockHeightIfNotExists(inserting, rw, height2)
-		})
-		require.NoError(t, err)
-
-		err = operation.RetrieveLastCompleteBlockHeight(db.Reader(), &retrieved)
-		require.NoError(t, err)
-
-		assert.Equal(t, retrieved, height1)
 	})
 }

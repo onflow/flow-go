@@ -16,13 +16,15 @@ import (
 // supported by the current software version. There might be serialized snapshots with legacy versions
 // in the database that are not supported anymore by this software version.
 type ProtocolKVStore interface {
-	// BatchStore writes the given KV-store snapshot to the input write batch. Per convention, all implementations
-	// of `protocol.KVStoreReader` should be able to successfully encode their state into a data blob.
-	// If the encoding fails, the anonymous function returns an error upon call.
-	// It requires the caller to acquire storage.LockInsertBlock lock
+	// BatchStore adds the KV-store snapshot in the database using the given ID as key. Per convention, all
+	// implementations of [protocol.KVStoreReader] should be able to successfully encode their state into a
+	// data blob. If the encoding fails, an error is returned.
+	// BatchStore is idempotent, i.e. it accepts repeated calls with the same pairs of (stateID, kvStore).
+	// Here, the ID is expected to be a collision-resistant hash of the snapshot (including the
+	// ProtocolStateVersion). Hence, for the same ID (key), BatchStore will reject changing the data (value).
 	//
-	// Expected errors of the returned anonymous function:
-	//   - storage.ErrAlreadyExists if a KV-store snapshot with the given id is already stored.
+	// Expected errors during normal operations:
+	// - storage.ErrDataMismatch if a _different_ KV store for the given stateID has already been persisted
 	BatchStore(lctx lockctx.Proof, rw storage.ReaderBatchWriter, stateID flow.Identifier, kvStore protocol.KVStoreReader) error
 
 	// BatchIndex writes the blockID->stateID index to the input write batch.

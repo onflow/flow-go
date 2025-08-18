@@ -29,7 +29,7 @@ func TestProtocolStateStorage(t *testing.T) {
 
 		// store protocol state and auxiliary info
 		err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			// s epoch events to be able to retrieve them later
+			// store epoch events to be able to retrieve them later
 			err := setups.BatchStore(rw, expected.PreviousEpochSetup)
 			require.NoError(t, err)
 			err = setups.BatchStore(rw, expected.CurrentEpochSetup)
@@ -115,9 +115,9 @@ func TestProtocolStateMergeParticipants(t *testing.T) {
 		identity.Address = newAddress
 		protocolStateID := stateEntry.ID()
 
-		// s protocol state and auxiliary info
+		// store protocol state and auxiliary info
 		err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			// s epoch events to be able to retrieve them later
+			// store epoch events to be able to retrieve them later
 			err := setups.BatchStore(rw, stateEntry.PreviousEpochSetup)
 			require.NoError(t, err)
 			err = setups.BatchStore(rw, stateEntry.CurrentEpochSetup)
@@ -157,9 +157,9 @@ func TestProtocolStateRootSnapshot(t *testing.T) {
 		protocolStateID := expected.ID()
 		blockID := unittest.IdentifierFixture()
 
-		// s protocol state and auxiliary info
+		// store protocol state and auxiliary info
 		err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			// s epoch events to be able to retrieve them later
+			// store epoch events to be able to retrieve them later
 			err := setups.BatchStore(rw, expected.CurrentEpochSetup)
 			require.NoError(t, err)
 			err = commits.BatchStore(rw, expected.CurrentEpochCommit)
