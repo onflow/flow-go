@@ -439,7 +439,7 @@ func bootstrapSealingSegment(
 
 			// for all but the first block in the segment, index the parent->child relationship
 			if i > 0 {
-				err = operation.UpsertBlockChildren(w, block.Header.ParentID, []flow.Identifier{blockID})
+				err = operation.UpsertBlockChildren(lctx, w, block.Header.ParentID, []flow.Identifier{blockID})
 				if err != nil {
 					return fmt.Errorf("could not insert child index for block (id=%x): %w", blockID, err)
 				}
@@ -454,7 +454,7 @@ func bootstrapSealingSegment(
 
 	// insert an empty child index for the final block in the segment
 	return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-		err := operation.UpsertBlockChildren(rw.Writer(), head.ID(), nil)
+		err := operation.UpsertBlockChildren(lctx, rw.Writer(), head.ID(), nil)
 		if err != nil {
 			return fmt.Errorf("could not insert child index for head block (id=%x): %w", head.ID(), err)
 		}
