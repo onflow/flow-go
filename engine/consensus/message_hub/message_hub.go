@@ -353,11 +353,11 @@ func (h *MessageHub) sendOwnProposal(proposal *flow.ProposalHeader) error {
 		return fmt.Errorf("could not build block: %w", err)
 	}
 
-	blockProposal := &flow.UntrustedProposal{
+	blockProposal := &messages.Proposal{
 		Block:           *block,
 		ProposerSigData: proposal.ProposerSigData,
 	}
-	if _, err = flow.NewProposal(*blockProposal); err != nil {
+	if _, err = flow.NewProposal(flow.UntrustedProposal(*blockProposal)); err != nil {
 		return fmt.Errorf("could not build proposal: %w", err)
 	}
 
@@ -380,7 +380,7 @@ func (h *MessageHub) sendOwnProposal(proposal *flow.ProposalHeader) error {
 
 // provideProposal is used when we want to broadcast a local block to the rest  of the
 // network (non-consensus nodes).
-func (h *MessageHub) provideProposal(proposal *flow.UntrustedProposal, recipients flow.IdentityList) {
+func (h *MessageHub) provideProposal(proposal *messages.Proposal, recipients flow.IdentityList) {
 	header := proposal.Block.ToHeader()
 	blockID := header.ID()
 	log := h.log.With().
@@ -477,8 +477,8 @@ func (h *MessageHub) OnOwnProposal(proposal *flow.ProposalHeader, targetPublicat
 // messages. These cases must be logged and routed to a dedicated violation reporting consumer.
 func (h *MessageHub) Process(channel channels.Channel, originID flow.Identifier, message interface{}) error {
 	switch msg := message.(type) {
-	case *flow.UntrustedProposal:
-		proposal, err := flow.NewProposal(*msg)
+	case *messages.Proposal:
+		proposal, err := flow.NewProposal(flow.UntrustedProposal(*msg))
 		if err != nil {
 			// TODO(BFT, #7620): Replace this log statement with a call to the protocol violation consumer.
 			h.log.Warn().

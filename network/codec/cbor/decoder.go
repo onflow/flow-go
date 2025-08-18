@@ -47,5 +47,10 @@ func (d *Decoder) Decode() (interface{}, error) {
 		return nil, codec.NewMsgUnmarshalErr(data[0], what, err)
 	}
 
-	return msgInterface, nil
+	trusted, err := msgInterface.ToInternal()
+	if err != nil {
+		return nil, err
+	}
+
+	return trusted, nil
 }

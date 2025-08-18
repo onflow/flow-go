@@ -343,11 +343,11 @@ func (h *MessageHub) sendOwnProposal(proposal *flow.ProposalHeader) error {
 	}
 
 	// create the proposal message for the collection
-	proposalMsg := &cluster.UntrustedProposal{
+	proposalMsg := &messages.ClusterProposal{
 		Block:           *block,
 		ProposerSigData: proposal.ProposerSigData,
 	}
-	if _, err = cluster.NewProposal(*proposalMsg); err != nil {
+	if _, err = cluster.NewProposal(cluster.UntrustedProposal(*proposalMsg)); err != nil {
 		return fmt.Errorf("could not build cluster proposal: %w", err)
 	}
 
@@ -442,8 +442,8 @@ func (h *MessageHub) OnOwnProposal(proposal *flow.ProposalHeader, targetPublicat
 // messages. These cases must be logged and routed to a dedicated violation reporting consumer.
 func (h *MessageHub) Process(channel channels.Channel, originID flow.Identifier, message interface{}) error {
 	switch msg := message.(type) {
-	case *cluster.UntrustedProposal:
-		proposal, err := cluster.NewProposal(*msg)
+	case *messages.ClusterProposal:
+		proposal, err := cluster.NewProposal(cluster.UntrustedProposal(*msg))
 		if err != nil {
 			// TODO(BFT, #7620): Replace this log statement with a call to the protocol violation consumer.
 			h.log.Warn().

@@ -10,7 +10,6 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
-	"github.com/onflow/flow-go/model/cluster"
 	"github.com/onflow/flow-go/model/flow"
 	libp2pmessage "github.com/onflow/flow-go/model/libp2p/message"
 	"github.com/onflow/flow-go/model/messages"
@@ -254,13 +253,13 @@ func (s *TestAuthorizedSenderValidatorSuite) TestValidatorCallback_ClusterPrefix
 	require.ErrorIs(s.T(), err, message.ErrUnauthorizedUnicastOnChannel)
 	require.Equal(s.T(), "*messages.SyncRequest", msgType)
 
-	// ensure UntrustedClusterProposal not allowed to be sent on channel via unicast
+	// ensure messages.ClusterProposal not allowed to be sent on channel via unicast
 	msgType, err = authorizedSenderValidator.Validate(pid, []byte{codec.CodeClusterBlockProposal.Uint8()}, channels.ConsensusCluster(clusterID), message.ProtocolTypeUnicast)
 	require.ErrorIs(s.T(), err, message.ErrUnauthorizedUnicastOnChannel)
-	require.Equal(s.T(), "*cluster.UntrustedProposal", msgType)
+	require.Equal(s.T(), "*messages.ClusterProposal", msgType)
 
-	// ensure UntrustedClusterProposal is allowed to be sent via pubsub by authorized sender
-	payload, err := s.codec.Encode(&cluster.UntrustedProposal{})
+	// ensure messages.ClusterProposal is allowed to be sent via pubsub by authorized sender
+	payload, err := s.codec.Encode(&messages.ClusterProposal{})
 	require.NoError(s.T(), err)
 	m := &message.Message{
 		ChannelID: channels.ConsensusCluster(clusterID).String(),
@@ -333,7 +332,7 @@ func (s *TestAuthorizedSenderValidatorSuite) TestValidatorCallback_ValidationFai
 		require.True(s.T(), codec.IsErrUnknownMsgCode(err))
 		require.Equal(s.T(), "", msgType)
 
-		payload, err := s.codec.Encode(&flow.UntrustedProposal{})
+		payload, err := s.codec.Encode(&messages.Proposal{})
 		require.NoError(s.T(), err)
 		payload[0] = byte('x')
 		netMsg := &message.Message{

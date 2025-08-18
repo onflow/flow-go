@@ -11,6 +11,7 @@ import (
 	"github.com/onflow/flow-go/engine/common/fifoqueue"
 	"github.com/onflow/flow-go/engine/consensus"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/compliance"
 	"github.com/onflow/flow-go/module/component"
@@ -226,8 +227,8 @@ func (e *ComplianceEngine) OnFinalizedBlock(block *model.Block) {
 // messages. These cases must be logged and routed to a dedicated violation reporting consumer.
 func (e *ComplianceEngine) Process(channel channels.Channel, originID flow.Identifier, message interface{}) error {
 	switch msg := message.(type) {
-	case *flow.UntrustedProposal:
-		proposal, err := flow.NewProposal(*msg)
+	case *messages.Proposal:
+		proposal, err := flow.NewProposal(flow.UntrustedProposal(*msg))
 		if err != nil {
 			// TODO(BFT, #7620): Replace this log statement with a call to the protocol violation consumer.
 			e.log.Warn().

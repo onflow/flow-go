@@ -4,10 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/fxamacker/cbor/v2"
-	"github.com/vmihailenco/msgpack/v4"
-
-	cborcodec "github.com/onflow/flow-go/model/encoding/cbor"
 	"github.com/onflow/flow-go/model/fingerprint"
 )
 
@@ -275,8 +271,6 @@ func (h Header) ID() Identifier {
 }
 
 // MarshalJSON makes sure the timestamp is encoded in UTC.
-//
-//nolint:structwrite
 func (h Header) MarshalJSON() ([]byte, error) {
 
 	// we use an alias to avoid endless recursion; the alias will not have the
@@ -292,70 +286,12 @@ func (h Header) MarshalJSON() ([]byte, error) {
 }
 
 // UnmarshalJSON makes sure the timestamp is decoded in UTC.
-//
-//nolint:structwrite
 func (h *Header) UnmarshalJSON(data []byte) error {
 
 	// we use an alias to avoid endless recursion; the alias will not have the
 	// unmarshal function and decode like a raw header
 	type Decodable *Header
 	err := json.Unmarshal(data, Decodable(h))
-
-	return err
-}
-
-// MarshalCBOR makes sure the timestamp is encoded in UTC.
-//
-//nolint:structwrite
-func (h Header) MarshalCBOR() ([]byte, error) {
-
-	// we use an alias to avoid endless recursion; the alias will not have the
-	// marshal function and encode like a raw header
-	type Encodable Header
-	return cborcodec.EncMode.Marshal(Encodable(h))
-}
-
-// UnmarshalCBOR makes sure the timestamp is decoded in UTC.
-//
-//nolint:structwrite
-func (h *Header) UnmarshalCBOR(data []byte) error {
-
-	// we use an alias to avoid endless recursion; the alias will not have the
-	// unmarshal function and decode like a raw header
-	// NOTE: for some reason, the pointer alias works for JSON to not recurse,
-	// but msgpack will still recurse; we have to do an extra struct copy here
-	type Decodable Header
-	decodable := Decodable(*h)
-	err := cbor.Unmarshal(data, &decodable)
-	*h = Header(decodable)
-
-	return err
-}
-
-// MarshalMsgpack makes sure the timestamp is encoded in UTC.
-//
-//nolint:structwrite
-func (h Header) MarshalMsgpack() ([]byte, error) {
-
-	// we use an alias to avoid endless recursion; the alias will not have the
-	// marshal function and encode like a raw header
-	type Encodable Header
-	return msgpack.Marshal(Encodable(h))
-}
-
-// UnmarshalMsgpack makes sure the timestamp is decoded in UTC.
-//
-//nolint:structwrite
-func (h *Header) UnmarshalMsgpack(data []byte) error {
-
-	// we use an alias to avoid endless recursion; the alias will not have the
-	// unmarshal function and decode like a raw header
-	// NOTE: for some reason, the pointer alias works for JSON to not recurse,
-	// but msgpack will still recurse; we have to do an extra struct copy here
-	type Decodable Header
-	decodable := Decodable(*h)
-	err := msgpack.Unmarshal(data, &decodable)
-	*h = Header(decodable)
 
 	return err
 }

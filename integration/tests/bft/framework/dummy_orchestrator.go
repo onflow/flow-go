@@ -60,14 +60,14 @@ func NewDummyOrchestrator(t *testing.T, Logger zerolog.Logger) *orchestrator {
 // trackEgressEvent tracks egress events by event type, this func is used as a callback in the BaseOrchestrator OnEgressEvent callback list.
 func (o *orchestrator) trackEgressEvents(event *insecure.EgressEvent) error {
 	switch e := event.FlowProtocolEvent.(type) {
-	case *flow.ExecutionReceipt:
+	case *messages.ExecutionReceipt:
 		o.egressEventTracker[typeExecutionReceipt] = append(o.egressEventTracker[typeExecutionReceipt], e.ID())
 	case *messages.ChunkDataRequest:
 		o.egressEventTracker[typeChunkDataRequest] = append(o.egressEventTracker[typeChunkDataRequest], e.ChunkID)
 	case *messages.ChunkDataResponse:
 		o.egressEventTracker[typeChunkDataResponse] = append(o.egressEventTracker[typeChunkDataResponse], e.ChunkDataPack.ChunkID)
-	case *flow.ResultApproval:
-		o.egressEventTracker[typeResultApproval] = append(o.egressEventTracker[typeResultApproval], e.ID())
+	case *messages.ResultApproval:
+		o.egressEventTracker[typeResultApproval] = append(o.egressEventTracker[typeResultApproval], flow.ResultApproval(*e).ID())
 	}
 	return nil
 }
