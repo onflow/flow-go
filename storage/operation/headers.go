@@ -47,16 +47,17 @@ func IndexFinalizedBlockByHeight(lctx lockctx.Proof, rw storage.ReaderBatchWrite
 		return fmt.Errorf("missing required lock: %s", storage.LockFinalizeBlock)
 	}
 
-	var existingID flow.Identifier
-	err := RetrieveByKey(rw.GlobalReader(), MakePrefix(codeHeightToBlock, height), &existingID)
-	if err == nil {
-		return fmt.Errorf("block ID already exists for height %d: %w", height, storage.ErrAlreadyExists)
-	}
-	if !errors.Is(err, storage.ErrNotFound) {
+	key := MakePrefix(codeHeightToBlock, height)
+	exists, err := KeyExists(rw.GlobalReader(), key)
+	if err != nil {
 		return fmt.Errorf("failed to check existing block ID for height %d: %w", height, err)
 	}
 
-	return UpsertByKey(rw.Writer(), MakePrefix(codeHeightToBlock, height), blockID)
+	if exists {
+		return fmt.Errorf("block ID already exists for height %d: %w", height, storage.ErrAlreadyExists)
+	}
+
+	return UpsertByKey(rw.Writer(), key, blockID)
 }
 
 // IndexCertifiedBlockByView indexes a block by its view.
