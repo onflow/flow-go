@@ -20,6 +20,32 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
+// Public key deduplication migration deduplicates public keys and migrates related registers.
+// Migration includes:
+// - Optionally appending account public key metadata in "a.s" (account status) register.
+// - Renaming "public_key_0" register to "apk_0"
+// - Migrating public keys from individual registers to batch public key registers, starting from account public key 1.
+// - Migrating non-zero sequence number to its register
+//
+// Using a data format (account public key metadata) that can detect duplicates and store deduplication data
+// requires storing some related information (overhead) but in most cases the overhead is more than offset
+// by deduplication.
+// To avoid or reduce overhead,
+// - migration only adds key metadata section to "a.s" register for accounts with at least two keys.
+// - migration only stores digests of the last N unique public keys (N=2 is good, using more wasn't always better).
+// - migration only stores account public keys to stored public keys mappings if key deduplication occurred.
+//
+// More specifically:
+// - For accounts with 0 public keys, migration skips them
+// - For accounts with 1 public key, migration only renames the "public_key_0" register to "apk_0" (no other changes)
+// - For accounts with at least two keys, migration:
+//   * renames the "public_key_0" register to "apk_0"
+//   * stores unique keys in batch public key registers, starting from public key 1
+//   * stores non-zero sequence numbers in sequence number registers
+//   * adds account key weights and revoked statuses to the key metadata section in key metadata section
+//   * adds digests of only the last N unique public keys in key metadata section (N=2 is the default)
+//   * adds account public key to unique key mappings if any key is deduplicated
+
 const (
 	legacyAccountPublicKeyRegisterKeyPattern = "public_key_%d"
 	legacyAccountPublicKey0RegisterKey       = "public_key_0"
