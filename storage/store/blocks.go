@@ -104,7 +104,7 @@ func (b *Blocks) ByHeight(height uint64) (*flow.Block, error) {
 // - storage.ErrNotFound if finalized block is known that contains the collection
 func (b *Blocks) ByCollectionID(collID flow.Identifier) (*flow.Block, error) {
 	var blockID flow.Identifier
-	err := operation.LookupCollectionBlock(b.db.Reader(), collID, &blockID)
+	err := operation.LookupCollectionGuaranteeBlock(b.db.Reader(), collID, &blockID)
 	if err != nil {
 		return nil, fmt.Errorf("could not look up block: %w", err)
 	}
@@ -122,7 +122,7 @@ func (b *Blocks) ByCollectionID(collID flow.Identifier) (*flow.Block, error) {
 func (b *Blocks) IndexBlockForCollections(blockID flow.Identifier, collIDs []flow.Identifier) error {
 	return b.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 		for _, collID := range collIDs {
-			err := operation.IndexCollectionBlock(rw.Writer(), collID, blockID)
+			err := operation.IndexCollectionGuaranteeBlock(rw.Writer(), collID, blockID)
 			if err != nil {
 				return fmt.Errorf("could not index collection block (%x): %w", collID, err)
 			}

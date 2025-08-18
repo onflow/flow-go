@@ -56,21 +56,13 @@ func TestHeaderIDIndexByCollectionID(t *testing.T) {
 		headerID := unittest.IdentifierFixture()
 		collectionGuaranteeID := unittest.IdentifierFixture()
 
-<<<<<<< HEAD:storage/operation/headers_test.go
 		err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			return operation.IndexCollectionBlock(rw.Writer(), collectionID, headerID)
+			return operation.IndexCollectionGuaranteeBlock(rw.Writer(), collectionID, headerID)
 		})
 		require.NoError(t, err)
 
 		actualID := &flow.Identifier{}
-		err = operation.LookupCollectionBlock(db.Reader(), collectionID, actualID)
-=======
-		err := db.Update(IndexCollectionGuaranteeBlock(collectionGuaranteeID, headerID))
-		require.NoError(t, err)
-
-		actualID := &flow.Identifier{}
-		err = db.View(LookupCollectionGuaranteeBlock(collectionGuaranteeID, actualID))
->>>>>>> feature/malleability:storage/badger/operation/headers_test.go
+		err = operation.LookupCollectionGuaranteeBlock(db.Reader(), collectionID, actualID)
 		require.NoError(t, err)
 		assert.Equal(t, headerID, *actualID)
 	})
