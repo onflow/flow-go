@@ -18,10 +18,12 @@ func TestGuaranteeInsertRetrieve(t *testing.T) {
 	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
 		g := unittest.CollectionGuaranteeFixture()
 
+		_, lctx := unittest.LockManagerWithContext(t, storage.LockInsertBlock)
 		err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			return operation.UnsafeInsertGuarantee(rw.Writer(), g.CollectionID, g)
+			return operation.UnsafeInsertGuarantee(lctx, rw.Writer(), g.CollectionID, g)
 		})
 		require.NoError(t, err)
+		lctx.Release()
 
 		var retrieved flow.CollectionGuarantee
 		err = operation.RetrieveGuarantee(db.Reader(), g.CollectionID, &retrieved)
@@ -42,17 +44,20 @@ func TestIndexGuaranteedCollectionByBlockHashInsertRetrieve(t *testing.T) {
 		}
 		expected := flow.GetIDs(guarantees)
 
+		_, lctx := unittest.LockManagerWithContext(t, storage.LockInsertBlock)
 		err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 			for _, guarantee := range guarantees {
-				if err := operation.UnsafeInsertGuarantee(rw.Writer(), guarantee.ID(), guarantee); err != nil {
+				if err := operation.UnsafeInsertGuarantee(lctx, rw.Writer(), guarantee.ID(), guarantee); err != nil {
 					return err
 				}
 			}
-			if err := operation.UnsafeIndexPayloadGuarantees(rw.Writer(), blockID, expected); err != nil {
+			if err := operation.IndexPayloadGuarantees(lctx, rw.Writer(), blockID, expected); err != nil {
 				return err
 			}
 			return nil
 		})
+		require.NoError(t, err)
+		lctx.Release()
 		require.NoError(t, err)
 
 		var actual []flow.Identifier
@@ -83,32 +88,36 @@ func TestIndexGuaranteedCollectionByBlockHashMultipleBlocks(t *testing.T) {
 		ids2 := flow.GetIDs(set2)
 
 		// insert block 1
+		_, lctx1 := unittest.LockManagerWithContext(t, storage.LockInsertBlock)
 		err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 			for _, guarantee := range set1 {
-				if err := operation.UnsafeInsertGuarantee(rw.Writer(), guarantee.CollectionID, guarantee); err != nil {
+				if err := operation.UnsafeInsertGuarantee(lctx1, rw.Writer(), guarantee.CollectionID, guarantee); err != nil {
 					return err
 				}
 			}
-			if err := operation.UnsafeIndexPayloadGuarantees(rw.Writer(), blockID1, ids1); err != nil {
+			if err := operation.IndexPayloadGuarantees(lctx1, rw.Writer(), blockID1, ids1); err != nil {
 				return err
 			}
 			return nil
 		})
 		require.NoError(t, err)
+		lctx1.Release()
 
 		// insert block 2
+		_, lctx2 := unittest.LockManagerWithContext(t, storage.LockInsertBlock)
 		err = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 			for _, guarantee := range set2 {
-				if err := operation.UnsafeInsertGuarantee(rw.Writer(), guarantee.CollectionID, guarantee); err != nil {
+				if err := operation.UnsafeInsertGuarantee(lctx2, rw.Writer(), guarantee.CollectionID, guarantee); err != nil {
 					return err
 				}
 			}
-			if err := operation.UnsafeIndexPayloadGuarantees(rw.Writer(), blockID2, ids2); err != nil {
+			if err := operation.IndexPayloadGuarantees(lctx2, rw.Writer(), blockID2, ids2); err != nil {
 				return err
 			}
 			return nil
 		})
 		require.NoError(t, err)
+		lctx2.Release()
 
 		t.Run("should retrieve collections for block", func(t *testing.T) {
 			var actual1 []flow.Identifier

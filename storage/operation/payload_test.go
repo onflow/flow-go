@@ -41,18 +41,20 @@ func TestSealIndexAndLookup(t *testing.T) {
 
 		expected := []flow.Identifier(flow.GetIDs(seals))
 
+		_, lctx := unittest.LockManagerWithContext(t, storage.LockInsertBlock)
 		err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 			for _, seal := range seals {
 				if err := operation.InsertSeal(rw.Writer(), seal.ID(), seal); err != nil {
 					return err
 				}
 			}
-			if err := operation.IndexPayloadSeals(rw.Writer(), blockID, expected); err != nil {
+			if err := operation.IndexPayloadSeals(lctx, rw.Writer(), blockID, expected); err != nil {
 				return err
 			}
 			return nil
 		})
 		require.NoError(t, err)
+		lctx.Release()
 
 		var actual []flow.Identifier
 		err = operation.LookupPayloadSeals(db.Reader(), blockID, &actual)
