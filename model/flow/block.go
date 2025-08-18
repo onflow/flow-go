@@ -73,7 +73,7 @@ func (b *GenericBlock[T]) ToHeader() *Header {
 func (b *GenericBlock[T]) MarshalJSON() ([]byte, error) {
 	return json.Marshal(struct {
 		GenericBlock[T]
-		ID Identifier `json:"id"`
+		ID Identifier
 	}{
 		GenericBlock: *b,
 		ID:           b.ID(),
