@@ -83,3 +83,19 @@ Running `transit push-transit-key` will perform the following actions:
    - `transit-key.priv.<id>`
 1. Upload the node's public files to the server
    - `transit-key.pub.<id>`
+
+## Ansible Playbook
+
+The `root_block_voting.yml` Ansible playbook is used to automate the process of pulling the root block and random beacon key, generating the root block vote, and pushing the vote to the server. Please refer to this as an example of how to use the transit script in an automated environment.
+
+Example usage:
+
+```shell
+ansible-playbook -i inventories/mainnet/mainnet26.yml/ vote_on_root_block.yml \ 
+    -e "boot_tools_tar=https://storage.googleapis.com/flow-genesis-bootstrap/boot-tools.tar" \
+    -e "output_directory=/var/flow/bootstrap" \
+    -e "network_version_token=mainnet-26" \
+    -e "genesis_bucket=flow-genesis-bootstrap" \
+    -e force_repull_transit=true
+```
+
