@@ -52,6 +52,19 @@ func TestBlockEncodingJSON(t *testing.T) {
 	assert.Equal(t, block, &decoded)
 }
 
+// TestBlockEncodingJSON_IDField ensures that the explicit ID field added to the
+// block when encoded as JSON is present and accurate.
+func TestBlockEncodingJSON_IDField(t *testing.T) {
+	block := unittest.BlockFixture()
+	blockID := block.ID()
+	data, err := json.Marshal(block)
+	require.NoError(t, err)
+	var decodedIDField struct{ ID flow.Identifier }
+	err = json.Unmarshal(data, &decodedIDField)
+	require.NoError(t, err)
+	assert.Equal(t, blockID, decodedIDField.ID)
+}
+
 func TestBlockEncodingMsgpack(t *testing.T) {
 	block := unittest.BlockFixture()
 	blockID := block.ID()
