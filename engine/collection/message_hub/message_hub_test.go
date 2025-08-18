@@ -232,7 +232,7 @@ func (s *MessageHubSuite) TestProcessInvalidIncomingMessages() {
 		proposal := unittest.ClusterProposalFixture()
 		proposal.ProposerSigData = nil // invalid value
 
-		err := s.hub.Process(channel, originID, (*cluster.UntrustedProposal)(proposal))
+		err := s.hub.Process(channel, originID, (*messages.ClusterProposal)(proposal))
 		require.NoError(s.T(), err)
 
 		// OnBlockRange should NOT be called for invalid proposal

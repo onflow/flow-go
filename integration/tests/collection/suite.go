@@ -19,6 +19,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/factory"
 	"github.com/onflow/flow-go/model/flow/filter"
+	"github.com/onflow/flow-go/model/messages"
 	clusterstate "github.com/onflow/flow-go/state/cluster"
 	clusterstateimpl "github.com/onflow/flow-go/state/cluster/badger"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -210,8 +211,9 @@ func (suite *CollectorSuite) AwaitProposals(n uint) []cluster.Block {
 		suite.T().Logf("ghost recv: %T", msg)
 
 		switch val := msg.(type) {
-		case *cluster.UntrustedProposal:
-			internalClusterProposal, err := cluster.NewProposal(*val)
+		// TODO(malleability immutable): Replace *messages.ClusterProposal to *cluster.Proposal and remove validation check when ToInternal() was added to decoder
+		case *messages.ClusterProposal:
+			internalClusterProposal, err := cluster.NewProposal(cluster.UntrustedProposal(*val))
 			require.NoError(suite.T(), err)
 			blocks = append(blocks, internalClusterProposal.Block)
 			if len(blocks) == int(n) {
@@ -260,8 +262,9 @@ func (suite *CollectorSuite) AwaitTransactionsIncluded(txIDs ...flow.Identifier)
 		require.Nil(suite.T(), err, "could not read next message")
 
 		switch val := msg.(type) {
-		case *cluster.UntrustedProposal:
-			internalClusterProposal, err := cluster.NewProposal(*val)
+		// TODO(malleability immutable): Replace *messages.ClusterProposal to *cluster.Proposal and remove validation check when ToInternal() was added to decoder
+		case *messages.ClusterProposal:
+			internalClusterProposal, err := cluster.NewProposal(cluster.UntrustedProposal(*val))
 			require.NoError(suite.T(), err)
 			block := internalClusterProposal.Block
 			collection := block.Payload.Collection
