@@ -21,6 +21,16 @@ type CollectionResponse struct {
 // consensus; effectively a vote for a particular collection.
 type ClusterBlockVote BlockVote
 
+func (c ClusterBlockVote) ToInternal() (any, error) {
+	// TODO(malleability, #7702) implement with validation checks
+	return c, nil
+}
+
 // ClusterTimeoutObject is part of the collection cluster protocol and represents a collection node
 // timing out in given round. Contains a sequential number for deduplication purposes.
 type ClusterTimeoutObject TimeoutObject
+
+func (c ClusterTimeoutObject) ToInternal() (any, error) {
+	// TODO(malleability, #7704) implement with validation checks
+	return c, nil
+}

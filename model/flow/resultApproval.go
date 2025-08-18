@@ -136,6 +136,11 @@ type ResultApproval struct {
 	VerifierSignature crypto.Signature
 }
 
+func (ra ResultApproval) ToInternal() (any, error) {
+	// TODO(malleability, #7714) create typedef for this type in messages package and implement it there
+	return ra, nil
+}
+
 var _ Entity = (*ResultApproval)(nil)
 
 // UntrustedResultApproval is an untrusted input-only representation of an ResultApproval,

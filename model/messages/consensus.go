@@ -12,6 +12,11 @@ type BlockVote struct {
 	SigData []byte
 }
 
+func (b BlockVote) ToInternal() (any, error) {
+	// TODO(malleability, #7702) implement with validation checks
+	return b, nil
+}
+
 // TimeoutObject is part of the consensus protocol and represents a consensus node
 // timing out in given round. Contains a sequential number for deduplication purposes.
 type TimeoutObject struct {
@@ -20,4 +25,9 @@ type TimeoutObject struct {
 	NewestQC    *flow.QuorumCertificate
 	LastViewTC  *flow.TimeoutCertificate
 	SigData     []byte
+}
+
+func (t TimeoutObject) ToInternal() (any, error) {
+	// TODO(malleability, #7700) implement with validation checks
+	return t, nil
 }

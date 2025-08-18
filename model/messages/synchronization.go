@@ -17,12 +17,22 @@ type SyncRequest struct {
 	Height uint64
 }
 
+func (s SyncRequest) ToInternal() (any, error) {
+	// TODO(malleability, #7705) implement with validation checks
+	return s, nil
+}
+
 // SyncResponse is part of the synchronization protocol and represents the reply
 // to a synchronization request that contains the latest finalized block height
 // of the responding node.
 type SyncResponse struct {
 	Nonce  uint64
 	Height uint64
+}
+
+func (s SyncResponse) ToInternal() (any, error) {
+	// TODO(malleability, #7706) implement with validation checks
+	return s, nil
 }
 
 // RangeRequest is part of the synchronization protocol and represents an active
@@ -37,6 +47,11 @@ type RangeRequest struct {
 	ToHeight   uint64
 }
 
+func (r RangeRequest) ToInternal() (any, error) {
+	// TODO(malleability, #7707) implement with validation checks
+	return r, nil
+}
+
 // BatchRequest is part of the synchronization protocol and represents an active
 // (pulling) attempt to synchronize with the consensus state of the network. It
 // requests finalized or unfinalized blocks by a list of block IDs.
@@ -47,12 +62,22 @@ type BatchRequest struct {
 	BlockIDs []flow.Identifier
 }
 
+func (b BatchRequest) ToInternal() (any, error) {
+	// TODO(malleability, #7708) implement with validation checks
+	return b, nil
+}
+
 // BlockResponse is part of the synchronization protocol and represents the
 // reply to any active synchronization attempts. It contains a list of blocks
 // that should correspond to the request.
 type BlockResponse struct {
 	Nonce  uint64
 	Blocks []flow.UntrustedProposal
+}
+
+func (br *BlockResponse) ToInternal() (any, error) {
+	// TODO(malleability, #7709) implement with validation checks
+	return br, nil
 }
 
 // BlocksInternal converts all untrusted block proposals in the BlockResponse
@@ -76,6 +101,11 @@ func (br *BlockResponse) BlocksInternal() ([]*flow.Proposal, error) {
 type ClusterBlockResponse struct {
 	Nonce  uint64
 	Blocks []cluster.UntrustedProposal
+}
+
+func (br *ClusterBlockResponse) ToInternal() (any, error) {
+	// TODO(malleability, #7703) implement with validation checks
+	return br, nil
 }
 
 func (br *ClusterBlockResponse) BlocksInternal() ([]*cluster.Proposal, error) {

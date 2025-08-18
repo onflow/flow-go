@@ -12,6 +12,11 @@ type DKGMessage struct {
 	DKGInstanceID string
 }
 
+func (D DKGMessage) ToInternal() (any, error) {
+	// TODO(malleability, #7721) implement with validation checks
+	return D, nil
+}
+
 // NewDKGMessage creates a new DKGMessage.
 func NewDKGMessage(data []byte, dkgInstanceID string) DKGMessage {
 	return DKGMessage{
