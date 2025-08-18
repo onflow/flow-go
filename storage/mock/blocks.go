@@ -3,7 +3,9 @@
 package mock
 
 import (
+	lockctx "github.com/jordanschalm/lockctx"
 	flow "github.com/onflow/flow-go/model/flow"
+
 	mock "github.com/stretchr/testify/mock"
 
 	storage "github.com/onflow/flow-go/storage"
@@ -16,35 +18,17 @@ type Blocks struct {
 	mock.Mock
 }
 
-// BatchStore provides a mock function with given fields: rw, block
-func (_m *Blocks) BatchStore(rw storage.ReaderBatchWriter, block *flow.Block) error {
-	ret := _m.Called(rw, block)
+// BatchStore provides a mock function with given fields: lctx, rw, block
+func (_m *Blocks) BatchStore(lctx lockctx.Proof, rw storage.ReaderBatchWriter, block *flow.Block) error {
+	ret := _m.Called(lctx, rw, block)
 
 	if len(ret) == 0 {
 		panic("no return value specified for BatchStore")
 	}
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(storage.ReaderBatchWriter, *flow.Block) error); ok {
-		r0 = rf(rw, block)
-	} else {
-		r0 = ret.Error(0)
-	}
-
-	return r0
-}
-
-// BatchStoreWithStoringResults provides a mock function with given fields: rw, block, storingResults
-func (_m *Blocks) BatchStoreWithStoringResults(rw storage.ReaderBatchWriter, block *flow.Block, storingResults map[flow.Identifier]*flow.ExecutionResult) error {
-	ret := _m.Called(rw, block, storingResults)
-
-	if len(ret) == 0 {
-		panic("no return value specified for BatchStoreWithStoringResults")
-	}
-
-	var r0 error
-	if rf, ok := ret.Get(0).(func(storage.ReaderBatchWriter, *flow.Block, map[flow.Identifier]*flow.ExecutionResult) error); ok {
-		r0 = rf(rw, block, storingResults)
+	if rf, ok := ret.Get(0).(func(lockctx.Proof, storage.ReaderBatchWriter, *flow.Block) error); ok {
+		r0 = rf(lctx, rw, block)
 	} else {
 		r0 = ret.Error(0)
 	}

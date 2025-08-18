@@ -251,6 +251,8 @@ func (bs *BuilderSuite) SetupTest() {
 
 	// set up temporary database for tests
 	bs.db, bs.dir = unittest.TempBadgerDB(bs.T())
+	_, lctx := unittest.LockManagerWithContext(bs.T(), storage.LockFinalizeBlock)
+	defer lctx.Release()
 
 	err := bs.db.Update(badgeroperation.InsertFinalizedHeight(final.Header.Height))
 	bs.Require().NoError(err)
@@ -265,7 +267,7 @@ func (bs *BuilderSuite) SetupTest() {
 	bs.Require().NoError(err)
 	db := badgerimpl.ToDB(bs.db)
 	require.NoError(bs.T(), db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-		return operation.UpsertSealedHeight(rw.Writer(), first.Header.Height)
+		return operation.UpsertSealedHeight(lctx, rw.Writer(), first.Header.Height)
 	}))
 
 	bs.sentinel = 1337

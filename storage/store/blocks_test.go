@@ -20,8 +20,10 @@ func TestBlockStoreAndRetrieve(t *testing.T) {
 		block := unittest.FullBlockFixture()
 		block.SetPayload(unittest.PayloadFixture(unittest.WithAllTheFixins))
 
+		_, lctx := unittest.LockManagerWithContext(t, storage.LockInsertBlock)
+		defer lctx.Release()
 		err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			return blocks.BatchStore(rw, &block)
+			return blocks.BatchStore(lctx, rw, &block)
 		})
 		require.NoError(t, err)
 

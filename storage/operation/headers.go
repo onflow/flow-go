@@ -4,6 +4,8 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/jordanschalm/lockctx"
+
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/storage"
 )
@@ -16,16 +18,20 @@ func RetrieveHeader(r storage.Reader, blockID flow.Identifier, header *flow.Head
 	return RetrieveByKey(r, MakePrefix(codeHeader, blockID), header)
 }
 
-// IndexBlockHeight indexes the height of a block. It should only be called on
-// finalized blocks.
-// TODO(leo): add synchronization
-func IndexBlockHeight(rw storage.ReaderBatchWriter, height uint64, blockID flow.Identifier) error {
+// IndexBlockHeight indexes the height of a block. It must only be called on finalized blocks.
+// This function guarantees that the index is only inserted once for each height.
+// The caller must acquire the [storage.LockFinalizeBlock] lock.
+// Returns [storage.ErrAlreadyExists] if an ID has already been finalized for this height.
+func IndexBlockHeight(lctx lockctx.Proof, rw storage.ReaderBatchWriter, height uint64, blockID flow.Identifier) error {
+	if !lctx.HoldsLock(storage.LockFinalizeBlock) {
+		return fmt.Errorf("missing required lock: %s", storage.LockFinalizeBlock)
+	}
+
 	var existingID flow.Identifier
 	err := RetrieveByKey(rw.GlobalReader(), MakePrefix(codeHeightToBlock, height), &existingID)
 	if err == nil {
 		return fmt.Errorf("block ID already exists for height %d: %w", height, storage.ErrAlreadyExists)
 	}
-
 	if !errors.Is(err, storage.ErrNotFound) {
 		return fmt.Errorf("failed to check existing block ID for height %d: %w", height, err)
 	}

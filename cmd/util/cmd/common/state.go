@@ -14,10 +14,12 @@ import (
 
 func InitProtocolState(db *badger.DB, storages *storage.All) (protocol.State, error) {
 	metrics := &metrics.NoopCollector{}
+	lockManager := storage.NewTestingLockManager()
 
 	protocolState, err := protocolbadger.OpenState(
 		metrics,
 		badgerimpl.ToDB(db),
+		lockManager,
 		storages.Headers,
 		storages.Seals,
 		storages.Results,

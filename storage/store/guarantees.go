@@ -29,7 +29,7 @@ func NewGuarantees(collector module.CacheMetrics, db storage.DB, cacheSize uint)
 
 	g := &Guarantees{
 		db: db,
-		cache: newCache[flow.Identifier, *flow.CollectionGuarantee](collector, metrics.ResourceGuarantee,
+		cache: newCache(collector, metrics.ResourceGuarantee,
 			withLimit[flow.Identifier, *flow.CollectionGuarantee](cacheSize),
 			withStore(store),
 			withRetrieve(retrieve)),

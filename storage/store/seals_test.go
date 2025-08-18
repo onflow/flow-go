@@ -51,6 +51,7 @@ func TestSealStoreRetrieve(t *testing.T) {
 // Badger operation. The Seals mempool only supports retrieving the latest sealed block.
 func TestSealIndexAndRetrieve(t *testing.T) {
 	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
+		_, lctx := unittest.LockManagerWithContext(t, storage.LockInsertBlock)
 		metrics := metrics.NewNoopCollector()
 		s := store.NewSeals(metrics, db)
 
@@ -63,7 +64,7 @@ func TestSealIndexAndRetrieve(t *testing.T) {
 
 		// index the seal ID for the heighest sealed block in this fork
 		err = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			return operation.IndexLatestSealAtBlock(rw.Writer(), blockID, expectedSeal.ID())
+			return operation.IndexLatestSealAtBlock(lctx, rw.Writer(), blockID, expectedSeal.ID())
 		})
 		require.NoError(t, err)
 

@@ -91,6 +91,7 @@ func TestBootstrapValid(t *testing.T) {
 // * BlockProcessable is emitted when a block's child is inserted
 func TestExtendValid(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+		lockManager := storage.NewTestingLockManager()
 		metrics := metrics.NewNoopCollector()
 		tracer := trace.NewNoopTracer()
 		log := zerolog.Nop()
@@ -108,6 +109,7 @@ func TestExtendValid(t *testing.T) {
 		state, err := protocol.Bootstrap(
 			metrics,
 			badgerimpl.ToDB(db),
+			lockManager,
 			all.Headers,
 			all.Seals,
 			all.Results,
@@ -836,6 +838,7 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 	rootSnapshot := unittest.RootSnapshotFixture(participants)
 	rootProtocolStateID := getRootProtocolStateID(t, rootSnapshot)
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+		lockManager := storage.NewTestingLockManager()
 
 		// set up state and mock ComplianceMetrics object
 		metrics := mockmodule.NewComplianceMetrics(t)
@@ -868,6 +871,7 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 		protoState, err := protocol.Bootstrap(
 			metrics,
 			badgerimpl.ToDB(db),
+			lockManager,
 			all.Headers,
 			all.Seals,
 			all.Results,
@@ -2580,6 +2584,7 @@ func TestEpochTargetDuration(t *testing.T) {
 
 func TestExtendInvalidSealsInBlock(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+		lockManager := storage.NewTestingLockManager()
 		metrics := metrics.NewNoopCollector()
 		tracer := trace.NewNoopTracer()
 		log := zerolog.Nop()
@@ -2597,6 +2602,7 @@ func TestExtendInvalidSealsInBlock(t *testing.T) {
 		state, err := protocol.Bootstrap(
 			metrics,
 			badgerimpl.ToDB(db),
+			lockManager,
 			all.Headers,
 			all.Seals,
 			all.Results,
@@ -3147,6 +3153,7 @@ func TestCacheAtomicity(t *testing.T) {
 // TestHeaderInvalidTimestamp tests that extending header with invalid timestamp results in sentinel error
 func TestHeaderInvalidTimestamp(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+		lockManager := storage.NewTestingLockManager()
 		metrics := metrics.NewNoopCollector()
 		tracer := trace.NewNoopTracer()
 		log := zerolog.Nop()
@@ -3165,6 +3172,7 @@ func TestHeaderInvalidTimestamp(t *testing.T) {
 		state, err := protocol.Bootstrap(
 			metrics,
 			badgerimpl.ToDB(db),
+			lockManager,
 			all.Headers,
 			all.Seals,
 			all.Results,

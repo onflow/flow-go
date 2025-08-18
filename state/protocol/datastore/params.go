@@ -33,30 +33,30 @@ var _ protocol.InstanceParams = (*InstanceParams)(nil)
 
 // ReadInstanceParams reads the instance parameters from the database and returns them as in-memory representation.
 // No errors are expected during normal operation.
-func ReadInstanceParams(db storage.DB, headers storage.Headers, seals storage.Seals) (*InstanceParams, error) {
+func ReadInstanceParams(r storage.Reader, headers storage.Headers, seals storage.Seals) (*InstanceParams, error) {
 	params := &InstanceParams{}
 
-	// in next section we will read data from the database and cache them,
-	// as they are immutable for the runtime of the node.
+	// The values below are written during bootstrapping and immutable for the lifetime of the node. All
+	// following parameters are uniquely defined by the values initially read. No atomicity is required.
 	var (
-		finalizedRootHeight uint64
-		sealedRootHeight    uint64
+		finalizedRootHeight uint64 // height of the highest finalized block contained in the root snapshot
+		sealedRootHeight    uint64 // height of the highest sealed block contained in the root snapshot
 	)
 
 	// root height
-	err := operation.RetrieveRootHeight(db.Reader(), &finalizedRootHeight)
+	err := operation.RetrieveRootHeight(r, &finalizedRootHeight)
 	if err != nil {
 		return nil, fmt.Errorf("could not read root block to populate cache: %w", err)
 	}
 	// sealed root height
-	err = operation.RetrieveSealedRootHeight(db.Reader(), &sealedRootHeight)
+	err = operation.RetrieveSealedRootHeight(r, &sealedRootHeight)
 	if err != nil {
 		return nil, fmt.Errorf("could not read sealed root block to populate cache: %w", err)
 	}
 
 	// look up 'finalized root block'
 	var finalizedRootID flow.Identifier
-	err = operation.LookupBlockHeight(db.Reader(), finalizedRootHeight, &finalizedRootID)
+	err = operation.LookupBlockHeight(r, finalizedRootHeight, &finalizedRootID)
 	if err != nil {
 		return nil, fmt.Errorf("could not look up finalized root height: %w", err)
 	}
@@ -67,7 +67,7 @@ func ReadInstanceParams(db storage.DB, headers storage.Headers, seals storage.Se
 
 	// look up the sealed block as of the 'finalized root block'
 	var sealedRootID flow.Identifier
-	err = operation.LookupBlockHeight(db.Reader(), sealedRootHeight, &sealedRootID)
+	err = operation.LookupBlockHeight(r, sealedRootHeight, &sealedRootID)
 	if err != nil {
 		return nil, fmt.Errorf("could not look up sealed root height: %w", err)
 	}
@@ -80,10 +80,6 @@ func ReadInstanceParams(db storage.DB, headers storage.Headers, seals storage.Se
 	params.rootSeal, err = seals.HighestInFork(finalizedRootID)
 	if err != nil {
 		return nil, fmt.Errorf("could not retrieve root seal: %w", err)
-	}
-
-	if err != nil {
-		return nil, fmt.Errorf("could not read InstanceParams data to populate cache: %w", err)
 	}
 
 	return params, nil
@@ -110,20 +106,20 @@ func (p *InstanceParams) Seal() *flow.Seal {
 
 // ReadGlobalParams reads the global parameters from the database and returns them as in-memory representation.
 // No errors are expected during normal operation.
-func ReadGlobalParams(db storage.DB) (*inmem.Params, error) {
+func ReadGlobalParams(r storage.Reader) (*inmem.Params, error) {
 	var sporkID flow.Identifier
-	err := operation.RetrieveSporkID(db.Reader(), &sporkID)
+	err := operation.RetrieveSporkID(r, &sporkID)
 	if err != nil {
 		return nil, fmt.Errorf("could not get spork id: %w", err)
 	}
 
 	var sporkRootBlockHeight uint64
-	err = operation.RetrieveSporkRootBlockHeight(db.Reader(), &sporkRootBlockHeight)
+	err = operation.RetrieveSporkRootBlockHeight(r, &sporkRootBlockHeight)
 	if err != nil {
 		return nil, fmt.Errorf("could not get spork root block height: %w", err)
 	}
 
-	root, err := ReadFinalizedRoot(db) // retrieve root header
+	root, err := ReadFinalizedRoot(r) // retrieve root header
 	if err != nil {
 		return nil, fmt.Errorf("could not get root: %w", err)
 	}
@@ -139,25 +135,24 @@ func ReadGlobalParams(db storage.DB) (*inmem.Params, error) {
 
 // ReadFinalizedRoot retrieves the root block's header from the database.
 // This information is immutable for the runtime of the software and may be cached.
-func ReadFinalizedRoot(db storage.DB) (*flow.Header, error) {
+func ReadFinalizedRoot(r storage.Reader) (*flow.Header, error) {
+	// The values below are written during bootstrapping and immutable for the lifetime of the node. All
+	// following parameters are uniquely defined by the values initially read. No atomicity is required.
 	var finalizedRootHeight uint64
 	var rootID flow.Identifier
-	var rootHeader flow.Header
-	err := operation.RetrieveRootHeight(db.Reader(), &finalizedRootHeight)
+	err := operation.RetrieveRootHeight(r, &finalizedRootHeight)
 	if err != nil {
 		return nil, fmt.Errorf("could not retrieve finalized root height: %w", err)
 	}
-	err = operation.LookupBlockHeight(db.Reader(), finalizedRootHeight, &rootID) // look up root block ID
+	err = operation.LookupBlockHeight(r, finalizedRootHeight, &rootID) // look up root block ID
 	if err != nil {
 		return nil, fmt.Errorf("could not retrieve root header's ID by height: %w", err)
 	}
-	err = operation.RetrieveHeader(db.Reader(), rootID, &rootHeader) // retrieve root header
+
+	var rootHeader flow.Header
+	err = operation.RetrieveHeader(r, rootID, &rootHeader) // retrieve root header
 	if err != nil {
 		return nil, fmt.Errorf("could not retrieve root header: %w", err)
-	}
-
-	if err != nil {
-		return nil, fmt.Errorf("failed to read root information from database: %w", err)
 	}
 	return &rootHeader, nil
 }

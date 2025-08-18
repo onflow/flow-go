@@ -22,13 +22,14 @@ import (
 //     *only safe* for Verification Nodes when tracking their own approvals (for the same ExecutionResult,
 //     a Verifier will always produce the same approval)
 type ResultApprovals struct {
-	db    storage.DB
-	cache *Cache[flow.Identifier, *flow.ResultApproval]
+	db          storage.DB
+	cache       *Cache[flow.Identifier, *flow.ResultApproval]
+	lockManager lockctx.Manager
 }
 
 var _ storage.ResultApprovals = (*ResultApprovals)(nil)
 
-func NewResultApprovals(collector module.CacheMetrics, db storage.DB) *ResultApprovals {
+func NewResultApprovals(collector module.CacheMetrics, db storage.DB, lockManager lockctx.Manager) *ResultApprovals {
 	storeWithLock := func(lctx lockctx.Proof, rw storage.ReaderBatchWriter, key flow.Identifier, val *flow.ResultApproval) error {
 		return operation.InsertResultApproval(lctx, rw.Writer(), val)
 	}
@@ -40,7 +41,8 @@ func NewResultApprovals(collector module.CacheMetrics, db storage.DB) *ResultApp
 	}
 
 	return &ResultApprovals{
-		db: db,
+		lockManager: lockManager,
+		db:          db,
 		cache: newCache(collector, metrics.ResourceResultApprovals,
 			withLimit[flow.Identifier, *flow.ResultApproval](flow.DefaultTransactionExpiry+100),
 			withStoreWithLock(storeWithLock),
@@ -63,7 +65,7 @@ func NewResultApprovals(collector module.CacheMetrics, db storage.DB) *ResultApp
 // for the same key (resultID, chunkIndex) this method returns an exception, as this should never happen for
 // a correct Verification Node indexing its own approvals.
 func (r *ResultApprovals) StoreMyApproval(lctx lockctx.Proof, approval *flow.ResultApproval) error {
-	if !lctx.HoldsLock(storage.LockMyResultApproval) {
+	if !lctx.HoldsLock(storage.LockIndexResultApproval) {
 		return fmt.Errorf("missing lock for index result approval")
 	}
 

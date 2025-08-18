@@ -31,9 +31,11 @@ func TestGuaranteeStoreRetrieve(t *testing.T) {
 		require.ErrorIs(t, err, storage.ErrNotFound)
 
 		// store guarantee
+		manager, lctx := unittest.LockManagerWithContext(t, storage.LockInsertBlock)
 		require.NoError(t, db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			return blocks.BatchStore(rw, block)
+			return blocks.BatchStore(lctx, rw, block)
 		}))
+		lctx.Release()
 
 		// retreive by coll idx
 		actual, err := guarantees.ByCollectionID(expected.ID())
@@ -41,8 +43,11 @@ func TestGuaranteeStoreRetrieve(t *testing.T) {
 		require.Equal(t, expected, actual)
 
 		// OK to store again
+		lctx2 := manager.NewContext()
+		require.NoError(t, lctx2.AcquireLock(storage.LockInsertBlock))
 		require.NoError(t, db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			return blocks.BatchStore(rw, block)
+			return blocks.BatchStore(lctx2, rw, block)
 		}))
+		lctx2.Release()
 	})
 }

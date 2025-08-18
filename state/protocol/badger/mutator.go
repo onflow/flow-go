@@ -4,8 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"sync"
 
+	"github.com/jordanschalm/lockctx"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/engine"
@@ -42,10 +42,6 @@ type FollowerState struct {
 	consumer      protocol.Consumer
 	blockTimer    protocol.BlockTimer
 	protocolState protocol.MutableProtocolState
-
-	// locks
-	indexingNewBlock *sync.Mutex
-	finalizing       *sync.Mutex
 }
 
 var _ protocol.FollowerState = (*FollowerState)(nil)
@@ -90,9 +86,6 @@ func NewFollowerState(
 			state.epoch.setups,
 			state.epoch.commits,
 		),
-
-		indexingNewBlock: &sync.Mutex{},
-		finalizing:       &sync.Mutex{},
 	}
 	return followerState, nil
 }
@@ -156,6 +149,13 @@ func NewFullConsensusState(
 //
 // No errors are expected during normal operations.
 func (m *FollowerState) ExtendCertified(ctx context.Context, candidate *flow.Block, certifyingQC *flow.QuorumCertificate) error {
+	lctx := m.lockManager.NewContext()
+	defer lctx.Release()
+	err := lctx.AcquireLock(storage.LockInsertBlock)
+	if err != nil {
+		return err
+	}
+
 	span, ctx := m.tracer.StartSpanFromContext(ctx, trace.ProtoStateMutatorHeaderExtend)
 	defer span.End()
 
@@ -176,17 +176,21 @@ func (m *FollowerState) ExtendCertified(ctx context.Context, candidate *flow.Blo
 
 	return m.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 		// check if the block header is a valid extension of parent block
-		err = m.headerExtend(ctx, candidate, certifyingQC, rw)
+		err = m.headerExtend(ctx, lctx, candidate, certifyingQC, rw)
 		if err != nil {
 			// since we have a QC for this block, it cannot be an invalid extension
 			return fmt.Errorf("unexpected invalid block (id=%x) with certifying qc (id=%x): %s",
 				candidate.ID(), certifyingQC.ID(), err.Error())
 		}
 
-		// find the last seal at the parent block
-		_, err = m.lastSealed(candidate, rw)
+		// find highest sealed block from the fork with head `candidate`:
+		latestSeal, err := m.lastSealed(candidate)
 		if err != nil {
 			return fmt.Errorf("failed to determine the lastest sealed block in fork: %w", err)
+		}
+		err = operation.IndexLatestSealAtBlock(lctx, rw.Writer(), blockID, latestSeal.ID())
+		if err != nil {
+			return fmt.Errorf("could not index latest seal: %w", err)
 		}
 
 		// TODO: we might not need the deferred db updates, because the candidate passed into
@@ -231,6 +235,13 @@ func (m *FollowerState) ExtendCertified(ctx context.Context, candidate *flow.Blo
 //   - state.OutdatedExtensionError if the candidate block is outdated (e.g. orphaned)
 //   - state.InvalidExtensionError if the candidate block is invalid
 func (m *ParticipantState) Extend(ctx context.Context, candidate *flow.Block) error {
+	lctx := m.lockManager.NewContext()
+	defer lctx.Release()
+	err := lctx.AcquireLock(storage.LockInsertBlock)
+	if err != nil {
+		return err
+	}
+
 	span, ctx := m.tracer.StartSpanFromContext(ctx, trace.ProtoStateMutatorExtend)
 	defer span.End()
 
@@ -243,7 +254,7 @@ func (m *ParticipantState) Extend(ctx context.Context, candidate *flow.Block) er
 	return m.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 
 		// check if the block header is a valid extension of parent block
-		err = m.headerExtend(ctx, candidate, nil, rw)
+		err = m.headerExtend(ctx, lctx, candidate, nil, rw)
 		if err != nil {
 			return fmt.Errorf("header not compliant with chain state: %w", err)
 		}
@@ -270,7 +281,7 @@ func (m *ParticipantState) Extend(ctx context.Context, candidate *flow.Block) er
 		}
 
 		// check if the seals in the payload is a valid extension of the finalized state
-		_, dbUpdatesFromSealExtend, err := m.sealExtend(ctx, candidate, rw)
+		_, dbUpdatesFromSealExtend, err := m.sealExtend(ctx, lctx, candidate)
 		if err != nil {
 			return fmt.Errorf("payload seal(s) not compliant with chain state: %w", err)
 		}
@@ -320,7 +331,7 @@ func (m *ParticipantState) Extend(ctx context.Context, candidate *flow.Block) er
 //
 // Expected errors during normal operations:
 //   - state.InvalidExtensionError if the candidate block is invalid
-func (m *FollowerState) headerExtend(ctx context.Context, candidate *flow.Block, certifyingQC *flow.QuorumCertificate, rw storage.ReaderBatchWriter) error {
+func (m *FollowerState) headerExtend(ctx context.Context, lctx lockctx.Proof, candidate *flow.Block, certifyingQC *flow.QuorumCertificate, rw storage.ReaderBatchWriter) error {
 	span, _ := m.tracer.StartSpanFromContext(ctx, trace.ProtoStateMutatorExtendCheckHeader)
 	defer span.End()
 	blockID := candidate.ID()
@@ -393,11 +404,11 @@ func (m *FollowerState) headerExtend(ctx context.Context, candidate *flow.Block,
 	}
 
 	// STEP 5b: Store candidate block and index it as a child of its parent (needed for recovery to traverse unfinalized blocks)
-	err = m.blocks.BatchStore(rw, candidate) // insert the block into the database AND cache
+	err = m.blocks.BatchStore(lctx, rw, candidate) // insert the block into the database AND cache
 	if err != nil {
 		return fmt.Errorf("could not store candidate block: %w", err)
 	}
-	err = procedure.IndexNewBlock(m.indexingNewBlock, rw, blockID, candidate.Header.ParentID)
+	err = procedure.IndexNewBlock(lctx, rw, blockID, candidate.Header.ParentID)
 	if err != nil {
 		return fmt.Errorf("could not index new block: %w", err)
 	}
@@ -559,7 +570,7 @@ func (m *ParticipantState) guaranteeExtend(ctx context.Context, candidate *flow.
 // operation for indexing the latest seal as of the candidate block and returns the latest seal.
 // Expected errors during normal operations:
 //   - state.InvalidExtensionError if the candidate block has invalid seals
-func (m *ParticipantState) sealExtend(ctx context.Context, candidate *flow.Block, rw storage.ReaderBatchWriter) (*flow.Seal, []storage.BlockIndexingBatchWrite, error) {
+func (m *ParticipantState) sealExtend(ctx context.Context, lctx lockctx.Proof, candidate *flow.Block) (*flow.Seal, []storage.BlockIndexingBatchWrite, error) {
 	span, _ := m.tracer.StartSpanFromContext(ctx, trace.ProtoStateMutatorExtendCheckSeals)
 	defer span.End()
 
@@ -570,7 +581,7 @@ func (m *ParticipantState) sealExtend(ctx context.Context, candidate *flow.Block
 
 	return lastSeal, []storage.BlockIndexingBatchWrite{
 		func(blockID flow.Identifier, rw storage.ReaderBatchWriter) error {
-			return operation.IndexLatestSealAtBlock(rw.Writer(), blockID, lastSeal.ID())
+			return operation.IndexLatestSealAtBlock(lctx, rw.Writer(), blockID, lastSeal.ID())
 		},
 	}, nil
 }
@@ -604,19 +615,16 @@ func (m *ParticipantState) receiptExtend(ctx context.Context, candidate *flow.Bl
 	return nil
 }
 
-// lastSealed determines the highest sealed block from the fork with head `candidate`.
-// It queues a deferred database operation for indexing the latest seal as of the candidate block.
-// and returns the latest seal.
+// lastSealed returns the highest sealed block from the fork with head `candidate`.
 //
 // For instance, here is the chain state: block 100 is the head, block 97 is finalized,
 // and 95 is the last sealed block at the state of block 100.
 // 95 (sealed) <- 96 <- 97 (finalized) <- 98 <- 99 <- 100
 // Now, if block 101 is extending block 100, and its payload has a seal for 96, then it will
-// be the last sealed for block 101.
+// be the last sealed as of block 101. The result is independent of finalization.
 // No errors are expected during normal operation.
-func (m *FollowerState) lastSealed(candidate *flow.Block, rw storage.ReaderBatchWriter) (latestSeal *flow.Seal, err error) {
+func (m *FollowerState) lastSealed(candidate *flow.Block) (latestSeal *flow.Seal, err error) {
 	payload := candidate.Payload
-	blockID := candidate.ID()
 
 	// If the candidate blocks' payload has no seals, the latest seal in this fork remains unchanged, i.e. latest seal as of the
 	// parent is also the latest seal as of the candidate block. Otherwise, we take the latest seal included in the candidate block.
@@ -641,10 +649,6 @@ func (m *FollowerState) lastSealed(candidate *flow.Block, rw storage.ReaderBatch
 		latestSeal = ordered[len(ordered)-1]
 	}
 
-	err = operation.IndexLatestSealAtBlock(rw.Writer(), blockID, latestSeal.ID())
-	if err != nil {
-		return nil, fmt.Errorf("could not index latest seal: %w", err)
-	}
 	return latestSeal, nil
 }
 
@@ -680,6 +684,13 @@ func (m *FollowerState) evolveProtocolState(ctx context.Context, candidate *flow
 // Hence, the parent of `blockID` has to be the last finalized block.
 // No errors are expected during normal operations.
 func (m *FollowerState) Finalize(ctx context.Context, blockID flow.Identifier) error {
+	lctx := m.lockManager.NewContext()
+	defer lctx.Release()
+	err := lctx.AcquireLock(storage.LockFinalizeBlock)
+	if err != nil {
+		return err
+	}
+
 	// preliminaries: start tracer and retrieve full block
 	span, _ := m.tracer.StartSpanFromContext(ctx, trace.ProtoStateMutatorFinalize)
 	defer span.End()
@@ -757,21 +768,21 @@ func (m *FollowerState) Finalize(ctx context.Context, blockID flow.Identifier) e
 	//   its payload, in which case the parent's seal is the same.
 	// * set the epoch fallback flag, if it is triggered
 	err = m.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-		err = operation.IndexBlockHeight(rw, header.Height, blockID)
+		err = operation.IndexBlockHeight(lctx, rw, header.Height, blockID)
 		if err != nil {
 			return fmt.Errorf("could not insert number mapping: %w", err)
 		}
-		err = operation.UpsertFinalizedHeight(rw.Writer(), header.Height)
+		err = operation.UpsertFinalizedHeight(lctx, rw.Writer(), header.Height)
 		if err != nil {
 			return fmt.Errorf("could not update finalized height: %w", err)
 		}
-		err = operation.UpsertSealedHeight(rw.Writer(), sealed.Height)
+		err = operation.UpsertSealedHeight(lctx, rw.Writer(), sealed.Height)
 		if err != nil {
 			return fmt.Errorf("could not update sealed height: %w", err)
 		}
 
 		if isFirstBlockOfEpoch(parentEpochState, finalizingEpochState) {
-			err = operation.InsertEpochFirstHeight(m.finalizing, rw, currentEpochSetup.Counter, header.Height)
+			err = operation.InsertEpochFirstHeight(lctx, rw, currentEpochSetup.Counter, header.Height)
 			if err != nil {
 				return fmt.Errorf("could not insert epoch first block height: %w", err)
 			}
