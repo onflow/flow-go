@@ -16,8 +16,9 @@ import (
 // This error allows the caller to detect duplicate inserts. Since the header is stored along with other part
 // of the block in the same batch, similar duplication checks could be skipped for storing other parts of the block
 func InsertHeader(lctx lockctx.Proof, rw storage.ReaderBatchWriter, headerID flow.Identifier, header *flow.Header) error {
-	if !lctx.HoldsLock(storage.LockInsertBlock) {
-		return fmt.Errorf("missing required lock: %s", storage.LockInsertBlock)
+	held := lctx.HoldsLock(storage.LockInsertBlock) || lctx.HoldsLock(storage.LockInsertOrFinalizeClusterBlock)
+	if !held {
+		return fmt.Errorf("missing required lock: %s or %s", storage.LockInsertBlock, storage.LockInsertOrFinalizeClusterBlock)
 	}
 
 	key := MakePrefix(codeHeader, headerID)

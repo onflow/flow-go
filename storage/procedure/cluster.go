@@ -27,8 +27,12 @@ func InsertClusterBlock(lctx lockctx.Proof, rw storage.ReaderBatchWriter, block 
 		return fmt.Errorf("could not insert header: %w", err)
 	}
 
+	// since InsertHeader already checks for duplicates, we can safely
+	// assume that the block header is new and there is no existing index
+	// for other data related to this block ID.
+
 	// insert the block payload
-	err = InsertClusterPayload(lctx, rw, blockID, block.Payload)
+	err = InsertClusterPayload(lctx, rw.Writer(), blockID, block.Payload)
 	if err != nil {
 		return fmt.Errorf("could not insert payload: %w", err)
 	}
@@ -148,27 +152,20 @@ func FinalizeClusterBlock(lctx lockctx.Proof, rw storage.ReaderBatchWriter, bloc
 
 // InsertClusterPayload inserts the payload for a cluster block. It inserts
 // both the collection and all constituent transactions, allowing duplicates.
-func InsertClusterPayload(lctx lockctx.Proof, rw storage.ReaderBatchWriter, blockID flow.Identifier, payload *cluster.Payload) error {
+func InsertClusterPayload(lctx lockctx.Proof, writer storage.Writer, blockID flow.Identifier, payload *cluster.Payload) error {
 	if !lctx.HoldsLock(storage.LockInsertOrFinalizeClusterBlock) {
 		return fmt.Errorf("missing required lock: %s", storage.LockInsertOrFinalizeClusterBlock)
 	}
 
-	var txIDs []flow.Identifier
-	err := operation.LookupCollectionPayload(rw.GlobalReader(), blockID, &txIDs)
-	if err == nil {
-		return fmt.Errorf("collection payload already exists for block %s: %w", blockID, storage.ErrAlreadyExists)
-	}
-
-	if err != storage.ErrNotFound {
-		return fmt.Errorf("could not look up collection payload: %w", err)
-	}
+	// Only need to check if the lock is held, no need to check if is already stored,
+	// because the duplication check is done when storing a header, which is in the same
+	// batch update and holding the same lock.
 
 	// Cluster payloads only contain a single collection
 	// We allow duplicates, because it is valid for two competing forks to have the same payload.
 	// Payloads are keyed by content hash, so duplicate values have the same key.
 	light := payload.Collection.Light()
-	writer := rw.Writer()
-	err = operation.UpsertCollection(writer, &light) // keyed by content hash so no lock needed
+	err := operation.UpsertCollection(writer, &light) // keyed by content hash so no lock needed
 	if err != nil {
 		return fmt.Errorf("could not insert payload collection: %w", err)
 	}
@@ -182,7 +179,7 @@ func InsertClusterPayload(lctx lockctx.Proof, rw storage.ReaderBatchWriter, bloc
 	}
 
 	// index the transaction IDs within the collection
-	txIDs = payload.Collection.Light().Transactions
+	txIDs := payload.Collection.Light().Transactions
 	err = operation.IndexCollectionPayload(lctx, writer, blockID, txIDs)
 	if err != nil {
 		return fmt.Errorf("could not index collection: %w", err)

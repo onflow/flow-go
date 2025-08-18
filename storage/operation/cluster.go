@@ -49,6 +49,11 @@ func IndexReferenceBlockByClusterBlock(lctx lockctx.Proof, w storage.Writer, clu
 	if !lctx.HoldsLock(storage.LockInsertOrFinalizeClusterBlock) {
 		return fmt.Errorf("missing lock: %v", storage.LockInsertOrFinalizeClusterBlock)
 	}
+
+	// Only need to check if the lock is held, no need to check if is already stored,
+	// because the duplication check is done when storing a header, which is in the same
+	// batch update and holding the same lock.
+
 	return UpsertByKey(w, MakePrefix(codeClusterBlockToRefBlock, clusterBlockID), refID)
 }
 
