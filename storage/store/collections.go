@@ -10,11 +10,16 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/operation"
+	"github.com/onflow/flow-go/utils/logging"
 )
 
 type Collections struct {
 	db           storage.DB
 	transactions *Transactions
+
+	// TODO: Add caching -- this might be relatively frequently queried within the AN;
+	//       likely predominantly with requests about recent transactions.
+	//       Note that we already have caching for transactions.
 }
 
 var _ storage.Collections = (*Collections)(nil)
@@ -54,7 +59,11 @@ func (c *Collections) Store(collection *flow.Collection) (flow.LightCollection, 
 	return light, nil
 }
 
-// ByID retrieves a collection by its ID.
+// ByID returns the collection with the given ID, including all
+// transactions within the collection.
+//
+// Expected errors during normal operation:
+//   - `storage.ErrNotFound` if no light collection was found.
 func (c *Collections) ByID(colID flow.Identifier) (*flow.Collection, error) {
 	var (
 		light      flow.LightCollection
@@ -78,7 +87,11 @@ func (c *Collections) ByID(colID flow.Identifier) (*flow.Collection, error) {
 	return &collection, nil
 }
 
-// LightByID retrieves a light collection by its ID.
+// LightByID returns a reduced representation of the collection with the given ID.
+// The reduced collection references the constituent transactions by their hashes.
+//
+// Expected errors during normal operation:
+//   - `storage.ErrNotFound` if no light collection was found.
 func (c *Collections) LightByID(colID flow.Identifier) (*flow.LightCollection, error) {
 	var collection flow.LightCollection
 
@@ -123,7 +136,6 @@ func (c *Collections) Remove(colID flow.Identifier) error {
 		// remove the collection
 		return operation.RemoveCollection(rw.Writer(), colID)
 	})
-
 	if err != nil {
 		return fmt.Errorf("could not remove collection: %w", err)
 	}
@@ -150,12 +162,18 @@ func (c *Collections) BatchStoreAndIndexByTransaction(lctx lockctx.Proof, collec
 		var differentColTxIsIn flow.Identifier
 		err := operation.LookupCollectionByTransaction(rw.GlobalReader(), txID, &differentColTxIsIn)
 		if err == nil {
-			// collection nodes have ensured that a transaction can only belong to one collection
-			// so if transaction is already indexed by a collection, check if it's the same collection.
+			// Honest clusters ensure a transaction can only belong to one collection. However, in rare
+			// cases, the collector clusters can exceed byzantine thresholds -- making it possible to
+			// produce multiple finalized collections (aka guaranteed collections) containing the same
+			// transaction repeadely.
 			// TODO: For now we log a warning, but eventually we need to handle Byzantine clusters
 			if collectionID != differentColTxIsIn {
-				log.Error().Msgf("sanity check failed: transaction %v in collection %v is already indexed by a different collection %v",
-					txID, collectionID, differentColTxIsIn)
+				log.Error().
+					Str(logging.KeySuspicious, "true").
+					Hex("transaction hash", txID[:]).
+					Hex("previously persisted collection containing transactions", differentColTxIsIn[:]).
+					Hex("newly encountered collection containing transactions", collectionID[:]).
+					Msgf("sanity check failed: transaction contained in multiple collections -- this is a symptom of a byzantine collector cluster (or a bug)")
 			}
 			continue
 		}
@@ -179,7 +197,16 @@ func (c *Collections) BatchStoreAndIndexByTransaction(lctx lockctx.Proof, collec
 
 // StoreLightAndIndexByTransaction stores a light collection and indexes it by transaction ID.
 // It's concurrent-safe.
-// any error returned are exceptions
+// NOTE: Currently it is possible in rare circumstances for two collections
+// to be guaranteed which both contain the same transaction (see https://github.com/dapperlabs/flow-go/issues/3556).
+// The second of these will revert upon reaching the execution node, so
+// this doesn't impact the execution state, but it can result in the Access
+// node processing two collections which both contain the same transaction (see https://github.com/dapperlabs/flow-go/issues/5337).
+// To handle this, we skip indexing the affected transaction when inserting
+// the transaction_id->collection_id index when an index for the transaction
+// already exists.
+//
+// No errors are expected during normal operation.
 func (c *Collections) StoreAndIndexByTransaction(lctx lockctx.Proof, collection *flow.Collection) (flow.LightCollection, error) {
 	// - This lock is to ensure there is no race condition when indexing collection by transaction ID
 	// - The access node uses this index to report the transaction status. It's done by first
@@ -203,7 +230,12 @@ func (c *Collections) StoreAndIndexByTransaction(lctx lockctx.Proof, collection 
 	return light, err
 }
 
-// LightByTransactionID retrieves a light collection by a transaction ID.
+// LightByTransactionID returns a reduced representation of the collection
+// holding the given transaction ID. The reduced collection references the
+// constituent transactions by their hashes.
+//
+// Expected errors during normal operation:
+//   - `storage.ErrNotFound` if no light collection was found.
 func (c *Collections) LightByTransactionID(txID flow.Identifier) (*flow.LightCollection, error) {
 	collID := &flow.Identifier{}
 	err := operation.LookupCollectionByTransaction(c.db.Reader(), txID, collID)

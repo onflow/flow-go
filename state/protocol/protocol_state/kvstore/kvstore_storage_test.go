@@ -44,6 +44,11 @@ func TestProtocolKVStore_StoreTx(t *testing.T) {
 		rw := storagemock.NewReaderBatchWriter(t)
 		llStorage.On("BatchStore", lctx, rw, kvStateID, versionedSnapshot).Return(nil).Once()
 
+		// TODO: potentially update - we might be bringing back a functor here, because we acquire a lock  as explained in slack thread https://flow-foundation.slack.com/archives/C071612SJJE/p1754600182033289?thread_ts=1752912083.194619&cid=C071612SJJE
+		// Calling `BatchStore` should return the output of the wrapped low-level storage, which is a deferred database
+		// update. Conceptually, it is possible that `ProtocolKVStore` wraps the deferred database operation in faulty
+		// code, such that it cannot be executed. Therefore, we execute the top-level deferred database update below
+		// and verify that the deferred database operation returned by the lower-level is actually reached.
 		require.NoError(t, store.BatchStore(lctx, rw, kvStateID, kvState))
 	})
 
@@ -51,6 +56,7 @@ func TestProtocolKVStore_StoreTx(t *testing.T) {
 	// a deferred database update that always returns the encoding error.
 	t.Run("encoding fails", func(t *testing.T) {
 		encodingError := errors.New("encoding error")
+
 		kvState.On("VersionedEncode").Return(uint64(0), nil, encodingError).Once()
 
 		lockManager := storage.NewTestingLockManager()
@@ -81,6 +87,11 @@ func TestProtocolKVStore_IndexTx(t *testing.T) {
 		rw := storagemock.NewReaderBatchWriter(t)
 		llStorage.On("BatchIndex", lctx, rw, blockID, stateID).Return(nil).Once()
 
+		// TODO: potentially update - we might be bringing back a functor here, because we acquire a lock  as explained in slack thread https://flow-foundation.slack.com/archives/C071612SJJE/p1754600182033289?thread_ts=1752912083.194619&cid=C071612SJJE
+		// Calling `BatchIndex` should return the output of the wrapped low-level storage, which is a deferred database
+		// update. Conceptually, it is possible that `ProtocolKVStore` wraps the deferred database operation in faulty
+		// code, such that it cannot be executed. Therefore, we execute the top-level deferred database update below
+		// and verify that the deferred database operation returned by the lower-level is actually reached.
 		require.NoError(t, store.BatchIndex(lctx, rw, blockID, stateID))
 	})
 

@@ -15,15 +15,16 @@ type CollectionsReader interface {
 	//   - `storage.ErrNotFound` if no light collection was found.
 	ByID(collID flow.Identifier) (*flow.Collection, error)
 
-	// LightByID returns collection with the given ID. Only retrieves
-	// transaction hashes.
+	// LightByID returns a reduced representation of the collection with the given ID.
+	// The reduced collection references the constituent transactions by their hashes.
 	//
 	// Expected errors during normal operation:
 	//   - `storage.ErrNotFound` if no light collection was found.
 	LightByID(collID flow.Identifier) (*flow.LightCollection, error)
 
-	// LightByTransactionID returns the collection for the given transaction ID. Only retrieves
-	// transaction hashes.
+	// LightByTransactionID returns a reduced representation of the collection
+	// holding the given transaction ID. The reduced collection references the
+	// constituent transactions by their hashes.
 	//
 	// Expected errors during normal operation:
 	//   - `storage.ErrNotFound` if no light collection was found.
