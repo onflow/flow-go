@@ -17,12 +17,12 @@ import (
 // associated indexes.
 func InsertClusterBlock(lctx lockctx.Proof, rw storage.ReaderBatchWriter, block *cluster.Block) error {
 	if !lctx.HoldsLock(storage.LockInsertOrFinalizeClusterBlock) {
-		return fmt.Errorf("missing required lock: %s", storage.LockInsertBlock)
+		return fmt.Errorf("missing required lock: %s", storage.LockInsertOrFinalizeClusterBlock)
 	}
 
 	// store the block header
 	blockID := block.ID()
-	err := operation.InsertHeader(rw.Writer(), blockID, block.Header)
+	err := operation.InsertHeader(lctx, rw, blockID, block.Header)
 	if err != nil {
 		return fmt.Errorf("could not insert header: %w", err)
 	}

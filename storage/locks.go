@@ -56,6 +56,7 @@ type LockManager = lockctx.Manager
 func makeLockPolicy() lockctx.Policy {
 	return lockctx.NewDAGPolicyBuilder().
 		Add(LockInsertBlock, LockFinalizeBlock).
+		Add(LockInsertOrFinalizeClusterBlock, LockInsertBlock).
 		Build()
 }
 

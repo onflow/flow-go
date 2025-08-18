@@ -37,6 +37,7 @@ func TestClusterBlocks(t *testing.T) {
 		// store a chain of blocks
 		for _, block := range blocks {
 			_, lctx := unittest.LockManagerWithContext(t, storage.LockInsertOrFinalizeClusterBlock)
+			require.NoError(t, lctx.AcquireLock(storage.LockInsertBlock))
 			err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 				return procedure.InsertClusterBlock(lctx, rw, &block)
 			})

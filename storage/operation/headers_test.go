@@ -29,8 +29,11 @@ func TestHeaderInsertCheckRetrieve(t *testing.T) {
 		}
 		blockID := expected.ID()
 
+		_, lctx := unittest.LockManagerWithContext(t, storage.LockInsertBlock)
+		defer lctx.Release()
+
 		err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			return operation.InsertHeader(rw.Writer(), expected.ID(), expected)
+			return operation.InsertHeader(lctx, rw, expected.ID(), expected)
 		})
 		require.NoError(t, err)
 
