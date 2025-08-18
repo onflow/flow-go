@@ -41,7 +41,7 @@ func GetEventPriority(message interface{}) (Priority, error) {
 func getPriorityByType(message interface{}) Priority {
 	switch message.(type) {
 	// consensus
-	case *flow.UntrustedProposal:
+	case *messages.Proposal:
 		return HighPriority
 	case *messages.BlockVote:
 		return HighPriority
@@ -67,17 +67,17 @@ func getPriorityByType(message interface{}) Priority {
 		return HighPriority
 
 	// collections, guarantees & transactions
-	case *flow.CollectionGuarantee:
+	case *messages.CollectionGuarantee:
 		return HighPriority
-	case *flow.TransactionBody:
+	case *messages.TransactionBody:
 		return HighPriority
-	case *flow.Transaction:
+	case *messages.Transaction:
 		return HighPriority
 
 	// core messages for execution & verification
-	case *flow.ExecutionReceipt:
+	case *messages.ExecutionReceipt:
 		return HighPriority
-	case *flow.ResultApproval:
+	case *messages.ResultApproval:
 		return HighPriority
 
 	// data exchange for execution of blocks

@@ -173,7 +173,7 @@ func (s *MessageHubSuite) TestProcessValidIncomingMessages() {
 	originID := unittest.IdentifierFixture()
 	s.Run("to-compliance-engine", func() {
 		proposal := unittest.ProposalFixture()
-		blockProposalMsg := flow.UntrustedProposal(*proposal)
+		blockProposalMsg := messages.Proposal(*proposal)
 		expectedComplianceMsg := flow.Slashable[*flow.Proposal]{
 			OriginID: originID,
 			Message:  proposal,
@@ -220,7 +220,7 @@ func (s *MessageHubSuite) TestProcessInvalidIncomingMessages() {
 		proposal := unittest.ProposalFixture()
 		proposal.ProposerSigData = nil // invalid value
 
-		err := s.hub.Process(channel, originID, (*flow.UntrustedProposal)(proposal))
+		err := s.hub.Process(channel, originID, (*messages.Proposal)(proposal))
 		require.NoError(s.T(), err)
 
 		// OnBlockRange should NOT be called for invalid proposal
