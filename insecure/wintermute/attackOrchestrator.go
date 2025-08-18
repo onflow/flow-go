@@ -75,7 +75,7 @@ func (o *Orchestrator) HandleEgressEvent(event *insecure.EgressEvent) error {
 
 	switch event.FlowProtocolEvent.(type) {
 
-	case *flow.ExecutionReceipt:
+	case *messages.ExecutionReceipt:
 		// orchestrator received execution receipt from corrupted EN after EN executed a block.
 		if err := o.handleExecutionReceiptEvent(event); err != nil {
 			return fmt.Errorf("could not handle execution receipt event: %w", err)
@@ -90,7 +90,7 @@ func (o *Orchestrator) HandleEgressEvent(event *insecure.EgressEvent) error {
 		if err := o.handleChunkDataPackResponseEvent(event); err != nil {
 			return fmt.Errorf("could not handle chunk data pack response event: %w", err)
 		}
-	case *flow.ResultApproval:
+	case *messages.ResultApproval:
 		// orchestrator receives a result approval from corrupted VN. If it is an approval for the original result, it should
 		// be wintermuted, i.e., a corrupted VN must not approve any conflicting result with the corrupted result (otherwise, it
 		// causes a sealing halt at consensus nodes).
@@ -350,7 +350,7 @@ func (o *Orchestrator) handleChunkDataPackResponseEvent(chunkDataPackReplyEvent 
 func (o *Orchestrator) handleResultApprovalEvent(resultApprovalEvent *insecure.EgressEvent) error {
 	// non-nil state means a result has been corrupted, hence checking whether the approval
 	// belongs to the chunks of the original (non-corrupted) result.
-	approval := resultApprovalEvent.FlowProtocolEvent.(*flow.ResultApproval)
+	approval := resultApprovalEvent.FlowProtocolEvent.(*messages.ResultApproval)
 	lg := o.logger.With().
 		Hex("result_id", logging.ID(approval.Body.ExecutionResultID)).
 		Uint64("chunk_index", approval.Body.ChunkIndex).
