@@ -101,7 +101,15 @@ func generateVote(c *cobra.Command, args []string) {
 
 	voteFile := fmt.Sprintf(bootstrap.PathNodeRootBlockVote, nodeID)
 
-	if err = io.WriteJSON(filepath.Join(flagBootDir, voteFile), vote); err != nil {
+	// By default, use the bootstrap directory for storing the vote file
+	voteFilePath := filepath.Join(flagBootDir, voteFile)
+
+	// If output directory is specified, use it for the vote file path
+	if flagOutputDir != "" {
+		voteFilePath = filepath.Join(flagOutputDir, "root-block-vote.json")
+	}
+
+	if err = io.WriteJSON(voteFilePath, vote); err != nil {
 		log.Fatal().Err(err).Msg("could not write vote to file")
 	}
 
