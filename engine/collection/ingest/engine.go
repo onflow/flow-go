@@ -13,6 +13,7 @@ import (
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/common/fifoqueue"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/irrecoverable"
@@ -93,7 +94,7 @@ func New(
 		engine.NewNotifier(),
 		engine.Pattern{
 			Match: func(msg *engine.Message) bool {
-				_, ok := msg.Payload.(*flow.TransactionBody)
+				_, ok := msg.Payload.(*messages.TransactionBody)
 				if ok {
 					engMetrics.MessageReceived(metrics.EngineCollectionIngest, metrics.MessageTransaction)
 				}
