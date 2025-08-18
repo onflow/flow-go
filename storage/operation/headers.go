@@ -10,8 +10,27 @@ import (
 	"github.com/onflow/flow-go/storage"
 )
 
-func InsertHeader(w storage.Writer, headerID flow.Identifier, header *flow.Header) error {
-	return UpsertByKey(w, MakePrefix(codeHeader, headerID), header)
+// InsertHeader inserts a block header into the database.
+// The caller must ensure headerID is unique by deriving from header.ID()
+// It returns [storage.ErrAlreadyExists] if the header already exists, in other words, we only insert a new header once.
+// This error allows the caller to detect duplicate inserts. Since the header is stored along with other part
+// of the block in the same batch, similar duplication checks could be skipped for storing other parts of the block
+func InsertHeader(lctx lockctx.Proof, rw storage.ReaderBatchWriter, headerID flow.Identifier, header *flow.Header) error {
+	if !lctx.HoldsLock(storage.LockInsertBlock) {
+		return fmt.Errorf("missing required lock: %s", storage.LockInsertBlock)
+	}
+
+	key := MakePrefix(codeHeader, headerID)
+	exist, err := KeyExists(rw.GlobalReader(), key)
+	if err != nil {
+		return err
+	}
+
+	if exist {
+		return fmt.Errorf("header already exists: %w", storage.ErrAlreadyExists)
+	}
+
+	return UpsertByKey(rw.Writer(), key, header)
 }
 
 func RetrieveHeader(r storage.Reader, blockID flow.Identifier, header *flow.Header) error {

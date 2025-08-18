@@ -3,6 +3,7 @@ package store
 import (
 	"fmt"
 
+	"github.com/jordanschalm/lockctx"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/metrics"
@@ -23,9 +24,8 @@ var _ storage.Headers = (*Headers)(nil)
 
 func NewHeaders(collector module.CacheMetrics, db storage.DB) *Headers {
 
-	// TODO: the current cache structure doesn't work well to pass in auxiliary info like the lock context
-	store := func(rw storage.ReaderBatchWriter, blockID flow.Identifier, header *flow.Header) error {
-		return operation.InsertHeader(rw.Writer(), blockID, header)
+	storeWithLock := func(lctx lockctx.Proof, rw storage.ReaderBatchWriter, blockID flow.Identifier, header *flow.Header) error {
+		return operation.InsertHeader(lctx, rw, blockID, header)
 	}
 
 	retrieve := func(r storage.Reader, blockID flow.Identifier) (*flow.Header, error) {
@@ -50,7 +50,7 @@ func NewHeaders(collector module.CacheMetrics, db storage.DB) *Headers {
 		db: db,
 		cache: newCache(collector, metrics.ResourceHeader,
 			withLimit[flow.Identifier, *flow.Header](4*flow.DefaultTransactionExpiry),
-			withStore(store),
+			withStoreWithLock(storeWithLock),
 			withRetrieve(retrieve)),
 
 		heightCache: newCache(collector, metrics.ResourceFinalizedHeight,
@@ -65,8 +65,8 @@ func NewHeaders(collector module.CacheMetrics, db storage.DB) *Headers {
 	return h
 }
 
-func (h *Headers) storeTx(rw storage.ReaderBatchWriter, header *flow.Header) error {
-	return h.cache.PutTx(rw, header.ID(), header)
+func (h *Headers) storeTx(lctx lockctx.Proof, rw storage.ReaderBatchWriter, header *flow.Header) error {
+	return h.cache.PutWithLockTx(lctx, rw, header.ID(), header)
 }
 
 func (h *Headers) retrieveTx(blockID flow.Identifier) (*flow.Header, error) {

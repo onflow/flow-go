@@ -17,6 +17,7 @@ func InsertIndex(lock lockctx.Proof, rw storage.ReaderBatchWriter, blockID flow.
 
 	w := rw.Writer()
 	// TODO: Check if the blockID is already indexed
+
 	err := operation.UnsafeIndexPayloadGuarantees(w, blockID, index.CollectionIDs)
 	if err != nil {
 		return fmt.Errorf("could not store guarantee index: %w", err)
