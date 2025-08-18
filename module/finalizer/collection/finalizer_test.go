@@ -60,10 +60,12 @@ func TestFinalizer(t *testing.T) {
 			defer lctx.Release()
 			state, err = cluster.Bootstrap(db, lockManager, stateRoot)
 			require.NoError(t, err)
+			_, insertLctx := unittest.LockManagerWithContext(t, storage.LockInsertBlock)
 			err = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-				return operation.InsertHeader(rw.Writer(), refBlock.ID(), refBlock)
+				return operation.InsertHeader(insertLctx, rw, refBlock.ID(), refBlock)
 			})
 			require.NoError(t, err)
+			insertLctx.Release()
 		}
 
 		// a helper function to insert a block
@@ -71,6 +73,7 @@ func TestFinalizer(t *testing.T) {
 			lctx := lockManager.NewContext()
 			defer lctx.Release()
 			require.NoError(t, lctx.AcquireLock(storage.LockInsertOrFinalizeClusterBlock))
+			require.NoError(t, lctx.AcquireLock(storage.LockInsertBlock))
 			err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 				return procedure.InsertClusterBlock(lctx, rw, &block)
 			})

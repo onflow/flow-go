@@ -83,17 +83,21 @@ func TestMakeFinalValidChain(t *testing.T) {
 		require.NoError(t, err)
 
 		// insert the finalized block header into the DB
+		_, insertLctx := unittest.LockManagerWithContext(t, storage.LockInsertBlock)
 		err = dbImpl.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			return operation.InsertHeader(rw.Writer(), final.ID(), final)
+			return operation.InsertHeader(insertLctx, rw, final.ID(), final)
 		})
 		require.NoError(t, err)
+		insertLctx.Release()
 
 		// insert all of the pending blocks into the DB
 		for _, header := range pending {
+			_, insertLctx := unittest.LockManagerWithContext(t, storage.LockInsertBlock)
 			err = dbImpl.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-				return operation.InsertHeader(rw.Writer(), header.ID(), header)
+				return operation.InsertHeader(insertLctx, rw, header.ID(), header)
 			})
 			require.NoError(t, err)
+			insertLctx.Release()
 		}
 
 		// initialize the finalizer with the dependencies and make the call
@@ -154,16 +158,20 @@ func TestMakeFinalInvalidHeight(t *testing.T) {
 		require.NoError(t, err)
 
 		// insert the finalized block header into the DB
+		_, insertLctx := unittest.LockManagerWithContext(t, storage.LockInsertBlock)
 		err = dbImpl.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			return operation.InsertHeader(rw.Writer(), final.ID(), final)
+			return operation.InsertHeader(insertLctx, rw, final.ID(), final)
 		})
 		require.NoError(t, err)
+		insertLctx.Release()
 
 		// insert all of the pending header into DB
+		_, insertLctx2 := unittest.LockManagerWithContext(t, storage.LockInsertBlock)
 		err = dbImpl.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			return operation.InsertHeader(rw.Writer(), pending.ID(), pending)
+			return operation.InsertHeader(insertLctx2, rw, pending.ID(), pending)
 		})
 		require.NoError(t, err)
+		insertLctx2.Release()
 
 		// initialize the finalizer with the dependencies and make the call
 		metrics := metrics.NewNoopCollector()
@@ -219,10 +227,12 @@ func TestMakeFinalDuplicate(t *testing.T) {
 		require.NoError(t, err)
 
 		// insert the finalized block header into the DB
+		_, insertLctx := unittest.LockManagerWithContext(t, storage.LockInsertBlock)
 		err = dbImpl.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			return operation.InsertHeader(rw.Writer(), final.ID(), final)
+			return operation.InsertHeader(insertLctx, rw, final.ID(), final)
 		})
 		require.NoError(t, err)
+		insertLctx.Release()
 
 		// initialize the finalizer with the dependencies and make the call
 		metrics := metrics.NewNoopCollector()
