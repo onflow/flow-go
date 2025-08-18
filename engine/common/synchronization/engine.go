@@ -172,12 +172,14 @@ func (e *Engine) setupResponseMessageHandler() error {
 		},
 		engine.Pattern{
 			Match: func(msg *engine.Message) bool {
+				// TODO(malleability immutable): Replace *messages.BlockResponse to *flow.BlockResponse when it was added to decoder
 				_, ok := msg.Payload.(*messages.BlockResponse)
 				if ok {
 					e.metrics.MessageReceived(metrics.EngineSynchronization, metrics.MessageBlockResponse)
 				}
 				return ok
 			},
+			// TODO(malleability immutable): Remove Map function when ToInternal() was added to decoder
 			Map: func(msg *engine.Message) (*engine.Message, bool) {
 				blockResponse, ok := msg.Payload.(*messages.BlockResponse)
 				if !ok {
@@ -188,7 +190,7 @@ func (e *Engine) setupResponseMessageHandler() error {
 						Msg("cannot match the payload to BlockResponse")
 					return nil, false
 				}
-				proposals, err := blockResponse.BlocksInternal()
+				proposals, err := blockResponse.ToInternal()
 				if err != nil {
 					// TODO(BFT, #7620): Replace this log statement with a call to the protocol violation consumer.
 					e.log.Warn().
@@ -305,7 +307,7 @@ func (e *Engine) processAvailableResponses(ctx context.Context) {
 
 		msg, ok = e.pendingBlockResponses.Get()
 		if ok {
-			e.onBlockResponse(msg.OriginID, msg.Payload.([]*flow.Proposal))
+			e.onBlockResponse(msg.OriginID, msg.Payload.(*flow.BlockResponse))
 			e.metrics.MessageHandled(metrics.EngineSynchronization, metrics.MessageBlockResponse)
 			continue
 		}
@@ -323,26 +325,27 @@ func (e *Engine) onSyncResponse(originID flow.Identifier, res *messages.SyncResp
 	e.core.HandleHeight(final, res.Height)
 }
 
-// onBlockResponse processes a structurally validated block proposal containing a specifically requested block.
-func (e *Engine) onBlockResponse(originID flow.Identifier, res []*flow.Proposal) {
+// onBlockResponse processes a structurally validated block proposal containing a specifically requested block response.
+func (e *Engine) onBlockResponse(originID flow.Identifier, res *flow.BlockResponse) {
 	// process the proposal one by one
-	if len(res) == 0 {
+	if len(res.Blocks) == 0 {
 		e.log.Debug().Msg("received empty proposals")
 		return
 	}
 
-	first := res[0].Block.Height
-	last := res[len(res)-1].Block.Height
+	proposals := res.Blocks
+	first := proposals[0].Block.Height
+	last := proposals[len(proposals)-1].Block.Height
 	e.log.Debug().Uint64("first", first).Uint64("last", last).Msg("received proposal")
 
-	filteredProposals := make([]*flow.Proposal, 0, len(res))
-	for _, proposal := range res {
+	filteredProposals := make([]*flow.Proposal, 0, len(proposals))
+	for _, proposal := range proposals {
 		header := proposal.Block.ToHeader()
 		if !e.core.HandleBlock(header) {
 			e.log.Debug().Uint64("height", header.Height).Msg("block handler rejected")
 			continue
 		}
-		filteredProposals = append(filteredProposals, proposal)
+		filteredProposals = append(filteredProposals, &proposal)
 	}
 
 	// forward the block to the compliance engine for validation and processing

@@ -13,16 +13,16 @@ import (
 )
 
 func TestBlockResponse(t *testing.T) {
-	expected := []*flow.Proposal{unittest.ProposalFixture(), unittest.ProposalFixture()}
+	expected := []flow.Proposal{*unittest.ProposalFixture(), *unittest.ProposalFixture()}
 	res := messages.BlockResponse{
 		Blocks: []flow.UntrustedProposal{
-			flow.UntrustedProposal(*expected[0]),
-			flow.UntrustedProposal(*expected[1]),
+			flow.UntrustedProposal(expected[0]),
+			flow.UntrustedProposal(expected[1]),
 		},
 	}
-	converted, err := res.BlocksInternal()
+	converted, err := res.ToInternal()
 	require.NoError(t, err)
-	assert.Equal(t, expected, converted)
+	assert.Equal(t, expected, converted.Blocks)
 }
 
 func TestClusterBlockResponse(t *testing.T) {
