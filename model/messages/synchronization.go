@@ -82,14 +82,22 @@ type ClusterBlockResponse struct {
 	Blocks []cluster.UntrustedProposal
 }
 
-func (br *ClusterBlockResponse) BlocksInternal() ([]*cluster.Proposal, error) {
-	internal := make([]*cluster.Proposal, len(br.Blocks))
+// ToInternal converts all untrusted cluster block proposals in the BlockResponse
+// into trusted cluster.BlockResponse instances.
+//
+// All errors indicate that the input message could not be converted to a valid proposal.
+// TODO: ClusterBlockResponse should implement UntrustedMessage interface
+func (br *ClusterBlockResponse) ToInternal() (*cluster.BlockResponse, error) {
+	internal := make([]cluster.Proposal, len(br.Blocks))
 	for i, untrusted := range br.Blocks {
 		proposal, err := cluster.NewProposal(untrusted)
 		if err != nil {
 			return nil, fmt.Errorf("could not build proposal: %w", err)
 		}
-		internal[i] = proposal
+		internal[i] = *proposal
 	}
-	return internal, nil
+	return &cluster.BlockResponse{
+		Nonce:  br.Nonce,
+		Blocks: internal,
+	}, nil
 }

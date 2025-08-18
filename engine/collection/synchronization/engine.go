@@ -150,12 +150,14 @@ func (e *Engine) setupResponseMessageHandler() error {
 		},
 		engine.Pattern{
 			Match: func(msg *engine.Message) bool {
+				// TODO(malleability immutable): Replace *messages.ClusterBlockResponse to *cluster.BlockResponse when it was added to decoder
 				_, ok := msg.Payload.(*messages.ClusterBlockResponse)
 				if ok {
 					e.metrics.MessageReceived(metrics.EngineClusterSynchronization, metrics.MessageBlockResponse)
 				}
 				return ok
 			},
+			// TODO(malleability immutable): Remove Map function when ToInternal() was added to decoder
 			Map: func(msg *engine.Message) (*engine.Message, bool) {
 				blockResponse, ok := msg.Payload.(*messages.ClusterBlockResponse)
 				if !ok {
@@ -166,7 +168,7 @@ func (e *Engine) setupResponseMessageHandler() error {
 						Msg("cannot match the payload to ClusterBlockResponse")
 					return nil, false
 				}
-				proposals, err := blockResponse.BlocksInternal()
+				proposals, err := blockResponse.ToInternal()
 				if err != nil {
 					// TODO(BFT, #7620): Replace this log statement with a call to the protocol violation consumer.
 					e.log.Warn().
@@ -298,7 +300,7 @@ func (e *Engine) processAvailableResponses() {
 
 		msg, ok = e.pendingBlockResponses.Get()
 		if ok {
-			e.onBlockResponse(msg.OriginID, msg.Payload.([]*clustermodel.Proposal))
+			e.onBlockResponse(msg.OriginID, msg.Payload.(*clustermodel.BlockResponse))
 			e.metrics.MessageHandled(metrics.EngineClusterSynchronization, metrics.MessageBlockResponse)
 			continue
 		}
@@ -321,15 +323,15 @@ func (e *Engine) onSyncResponse(originID flow.Identifier, res *messages.SyncResp
 
 // onBlockResponse processes a slice of requested block proposals.
 // Input proposals are structurally validated.
-func (e *Engine) onBlockResponse(originID flow.Identifier, proposals []*clustermodel.Proposal) {
+func (e *Engine) onBlockResponse(originID flow.Identifier, response *clustermodel.BlockResponse) {
 	// process the blocks one by one
-	for _, proposal := range proposals {
+	for _, proposal := range response.Blocks {
 		if !e.core.HandleBlock(proposal.Block.ToHeader()) {
 			continue
 		}
 		synced := flow.Slashable[*clustermodel.Proposal]{
 			OriginID: originID,
-			Message:  proposal,
+			Message:  &proposal,
 		}
 		// forward the block to the compliance engine for validation and processing
 		e.comp.OnSyncedClusterBlock(synced)

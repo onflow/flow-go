@@ -28,14 +28,14 @@ func TestBlockResponse(t *testing.T) {
 func TestClusterBlockResponse(t *testing.T) {
 	b1 := unittest.ClusterBlockFixture()
 	b2 := unittest.ClusterBlockFixture()
-	expected := []*cluster.Proposal{unittest.ClusterProposalFromBlock(b1), unittest.ClusterProposalFromBlock(b2)}
+	expected := []cluster.Proposal{*unittest.ClusterProposalFromBlock(b1), *unittest.ClusterProposalFromBlock(b2)}
 	res := messages.ClusterBlockResponse{
 		Blocks: []cluster.UntrustedProposal{
-			cluster.UntrustedProposal(*expected[0]),
-			cluster.UntrustedProposal(*expected[1]),
+			cluster.UntrustedProposal(expected[0]),
+			cluster.UntrustedProposal(expected[1]),
 		},
 	}
-	converted, err := res.BlocksInternal()
+	converted, err := res.ToInternal()
 	require.NoError(t, err)
-	assert.Equal(t, expected, converted)
+	assert.Equal(t, expected, converted.Blocks)
 }

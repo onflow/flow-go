@@ -368,12 +368,12 @@ func (ss *SyncSuite) TestOnValidBlockResponse() {
 	originID := unittest.IdentifierFixture()
 
 	// add one block that should be processed
-	processableResponse := unittest.BlockResponseFixture(2)
-	processable := processableResponse.Blocks[0]
+	response := unittest.BlockResponseFixture(2)
+	processable := response.Blocks[0]
 	ss.core.On("HandleBlock", processable.Block.ToHeader()).Return(true)
 
 	// add one block that should not be processed
-	unprocessable := processableResponse.Blocks[1]
+	unprocessable := response.Blocks[1]
 	ss.core.On("HandleBlock", unprocessable.Block.ToHeader()).Return(false)
 
 	ss.comp.On("OnSyncedBlocks", mock.Anything).Run(func(args mock.Arguments) {
@@ -384,7 +384,7 @@ func (ss *SyncSuite) TestOnValidBlockResponse() {
 		ss.Assert().Equal(originID, res.OriginID)
 	})
 
-	ss.e.onBlockResponse(originID, processableResponse)
+	ss.e.onBlockResponse(originID, response)
 	ss.core.AssertExpectations(ss.T())
 }
 
