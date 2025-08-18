@@ -17,7 +17,14 @@ func RetrieveSeal(r storage.Reader, sealID flow.Identifier, seal *flow.Seal) err
 	return RetrieveByKey(r, MakePrefix(codeSeal, sealID), seal)
 }
 
-func IndexPayloadSeals(w storage.Writer, blockID flow.Identifier, sealIDs []flow.Identifier) error {
+func IndexPayloadSeals(lctx lockctx.Proof, w storage.Writer, blockID flow.Identifier, sealIDs []flow.Identifier) error {
+	if !lctx.HoldsLock(storage.LockInsertBlock) {
+		return fmt.Errorf("cannot index seal for blockID %v without holding lock %s",
+			blockID, storage.LockInsertBlock)
+	}
+	// Only need to check if the lock is held, no need to check if is already stored,
+	// because the duplication check is done when storing a header, which is in the same
+	// batch update and holding the same lock.
 	return UpsertByKey(w, MakePrefix(codePayloadSeals, blockID), sealIDs)
 }
 
@@ -25,15 +32,38 @@ func LookupPayloadSeals(r storage.Reader, blockID flow.Identifier, sealIDs *[]fl
 	return RetrieveByKey(r, MakePrefix(codePayloadSeals, blockID), sealIDs)
 }
 
-func IndexPayloadReceipts(w storage.Writer, blockID flow.Identifier, receiptIDs []flow.Identifier) error {
+func IndexPayloadReceipts(lctx lockctx.Proof, w storage.Writer, blockID flow.Identifier, receiptIDs []flow.Identifier) error {
+	if !lctx.HoldsLock(storage.LockInsertBlock) {
+		return fmt.Errorf("cannot index seal for blockID %v without holding lock %s",
+			blockID, storage.LockInsertBlock)
+	}
+	// Only need to check if the lock is held, no need to check if is already stored,
+	// because the duplication check is done when storing a header, which is in the same
+	// batch update and holding the same lock.
+
 	return UpsertByKey(w, MakePrefix(codePayloadReceipts, blockID), receiptIDs)
 }
 
-func IndexPayloadResults(w storage.Writer, blockID flow.Identifier, resultIDs []flow.Identifier) error {
+func IndexPayloadResults(lctx lockctx.Proof, w storage.Writer, blockID flow.Identifier, resultIDs []flow.Identifier) error {
+	if !lctx.HoldsLock(storage.LockInsertBlock) {
+		return fmt.Errorf("cannot index seal for blockID %v without holding lock %s",
+			blockID, storage.LockInsertBlock)
+	}
+	// Only need to check if the lock is held, no need to check if is already stored,
+	// because the duplication check is done when storing a header, which is in the same
+	// batch update and holding the same lock.
 	return UpsertByKey(w, MakePrefix(codePayloadResults, blockID), resultIDs)
 }
 
-func IndexPayloadProtocolStateID(w storage.Writer, blockID flow.Identifier, stateID flow.Identifier) error {
+func IndexPayloadProtocolStateID(lctx lockctx.Proof, w storage.Writer, blockID flow.Identifier, stateID flow.Identifier) error {
+	if !lctx.HoldsLock(storage.LockInsertBlock) {
+		return fmt.Errorf("cannot index seal for blockID %v without holding lock %s",
+			blockID, storage.LockInsertBlock)
+	}
+	// Only need to check if the lock is held, no need to check if is already stored,
+	// because the duplication check is done when storing a header, which is in the same
+	// batch update and holding the same lock.
+
 	return UpsertByKey(w, MakePrefix(codePayloadProtocolStateID, blockID), stateID)
 }
 

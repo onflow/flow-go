@@ -57,7 +57,7 @@ func (p *Payloads) storeTx(lctx lockctx.Proof, rw storage.ReaderBatchWriter, blo
 
 	// make sure all payload guarantees are stored
 	for _, guarantee := range payload.Guarantees {
-		err := p.guarantees.storeTx(rw, guarantee)
+		err := p.guarantees.storeTx(lctx, rw, guarantee)
 		if err != nil {
 			return fmt.Errorf("could not store guarantee: %w", err)
 		}
