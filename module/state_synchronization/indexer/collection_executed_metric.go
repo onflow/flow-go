@@ -52,7 +52,7 @@ func NewCollectionExecutedMetricImpl(
 }
 
 // CollectionFinalized tracks collections to mark finalized
-func (c *CollectionExecutedMetricImpl) CollectionFinalized(light flow.LightCollection) {
+func (c *CollectionExecutedMetricImpl) CollectionFinalized(light *flow.LightCollection) {
 	lightID := light.ID()
 	if ti, found := c.collectionsToMarkFinalized.Get(lightID); found {
 
