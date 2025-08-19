@@ -14,36 +14,6 @@ type ClusterBlocks struct {
 	mock.Mock
 }
 
-// ByID provides a mock function with given fields: blockID
-func (_m *ClusterBlocks) ByID(blockID flow.Identifier) (*flow.GenericBlock[cluster.Payload], error) {
-	ret := _m.Called(blockID)
-
-	if len(ret) == 0 {
-		panic("no return value specified for ByID")
-	}
-
-	var r0 *flow.GenericBlock[cluster.Payload]
-	var r1 error
-	if rf, ok := ret.Get(0).(func(flow.Identifier) (*flow.GenericBlock[cluster.Payload], error)); ok {
-		return rf(blockID)
-	}
-	if rf, ok := ret.Get(0).(func(flow.Identifier) *flow.GenericBlock[cluster.Payload]); ok {
-		r0 = rf(blockID)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*flow.GenericBlock[cluster.Payload])
-		}
-	}
-
-	if rf, ok := ret.Get(1).(func(flow.Identifier) error); ok {
-		r1 = rf(blockID)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
 // ProposalByHeight provides a mock function with given fields: height
 func (_m *ClusterBlocks) ProposalByHeight(height uint64) (*cluster.Proposal, error) {
 	ret := _m.Called(height)
