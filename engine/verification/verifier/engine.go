@@ -322,7 +322,7 @@ func (e *Engine) verify(ctx context.Context, originID flow.Identifier,
 // must never publish two different approvals for the same chunk).
 // No errors are expected during normal operations.
 func (e *Engine) storeApproval(approval *flow.ResultApproval) error {
-	// store the approval in the database
+	// create deferred operation for storing approval in the database
 	storing := e.approvals.StoreMyApproval(approval)
 
 	lctx := e.lockManager.NewContext()
