@@ -1,7 +1,6 @@
 package store
 
 import (
-	"errors"
 	"fmt"
 
 	"github.com/jordanschalm/lockctx"
@@ -33,8 +32,8 @@ func NewGuarantees(
 	byCollectionIDCacheSize uint,
 ) *Guarantees {
 
-	storeByGuaranteeIDWithLock := func(lctx lockctx.Proof, rw storage.ReaderBatchWriter, guaranteeID flow.Identifier, guarantee *flow.CollectionGuarantee) error {
-		return operation.UnsafeInsertGuarantee(lctx, rw.Writer(), guaranteeID, guarantee)
+	storeByGuaranteeIDWithLock := func(rw storage.ReaderBatchWriter, guaranteeID flow.Identifier, guarantee *flow.CollectionGuarantee) error {
+		return operation.InsertGuarantee(rw.Writer(), guaranteeID, guarantee)
 	}
 
 	retrieveByGuaranteeID := func(r storage.Reader, guaranteeID flow.Identifier) (*flow.CollectionGuarantee, error) {
@@ -49,26 +48,7 @@ func NewGuarantees(
 	// However, the finalization status of guarantees is not yet verified by consensus nodes,
 	// nor is the possibility of byzantine collection nodes dealt with, so we check here that
 	// there are no conflicting guarantees for the same collection.
-	indexByCollectionID := func(rw storage.ReaderBatchWriter, collID flow.Identifier, guaranteeID flow.Identifier) error {
-		err := operation.IndexGuarantee(rw.Writer(), collID, guaranteeID)
-		// TODO: move to index guarantee
-		if errors.Is(err, storage.ErrAlreadyExists) {
-			var storedGuaranteeID flow.Identifier
-			err = operation.LookupGuarantee(rw.GlobalReader(), collID, &storedGuaranteeID)
-			if err != nil {
-				return fmt.Errorf("failed to retrieve existing guarantee for collection: %w", err)
-			}
-			if storedGuaranteeID != guaranteeID {
-				return fmt.Errorf("new guarantee %x did not match already stored guarantee %x, for collection %x: %w",
-					guaranteeID, storedGuaranteeID, collID, storage.ErrDataMismatch)
-			}
-		}
-		if err != nil {
-			return err
-		}
-
-		return nil
-	}
+	indexByCollectionID := operation.IndexGuarantee
 
 	lookupByCollectionID := func(r storage.Reader, collID flow.Identifier) (flow.Identifier, error) {
 		var guaranteeID flow.Identifier
@@ -83,11 +63,11 @@ func NewGuarantees(
 		db: db,
 		cache: newCache(collector, metrics.ResourceGuarantee,
 			withLimit[flow.Identifier, *flow.CollectionGuarantee](cacheSize),
-			withStoreWithLock(storeByGuaranteeIDWithLock),
+			withStore(storeByGuaranteeIDWithLock),
 			withRetrieve(retrieveByGuaranteeID)),
 		byCollectionIdCache: newCache[flow.Identifier, flow.Identifier](collector, metrics.ResourceGuaranteeByCollectionID,
 			withLimit[flow.Identifier, flow.Identifier](byCollectionIDCacheSize),
-			withStore(indexByCollectionID),
+			withStoreWithLock(indexByCollectionID),
 			withRetrieve(lookupByCollectionID)),
 	}
 
@@ -95,15 +75,16 @@ func NewGuarantees(
 }
 
 func (g *Guarantees) storeTx(lctx lockctx.Proof, rw storage.ReaderBatchWriter, guarantee *flow.CollectionGuarantee) error {
-	err := g.cache.PutWithLockTx(lctx, rw, guarantee.ID(), guarantee)
+	guaranteeID := guarantee.ID()
+	err := g.cache.PutTx(rw, guaranteeID, guarantee)
 	if err != nil {
 		return err
 	}
 
-	err = g.byCollectionIdCache.PutTx(rw, guarantee.CollectionID, guarantee.ID())
+	err = g.byCollectionIdCache.PutWithLockTx(lctx, rw, guarantee.CollectionID, guaranteeID)
 	if err != nil {
 		return fmt.Errorf("could not index guarantee %x under collection %x: %w",
-			guarantee.ID(), guarantee.CollectionID[:], err)
+			guaranteeID, guarantee.CollectionID[:], err)
 	}
 
 	return nil
