@@ -18,23 +18,15 @@ func TestGuaranteeInsertRetrieve(t *testing.T) {
 	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
 		g := unittest.CollectionGuaranteeFixture()
 
-<<<<<<< HEAD:storage/operation/guarantees_test.go
 		_, lctx := unittest.LockManagerWithContext(t, storage.LockInsertBlock)
 		err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			return operation.UnsafeInsertGuarantee(lctx, rw.Writer(), g.CollectionID, g)
+			return operation.UnsafeInsertGuarantee(lctx, rw.Writer(), g.ID(), g)
 		})
-=======
-		err := db.Update(InsertGuarantee(g.ID(), g))
->>>>>>> feature/malleability:storage/badger/operation/guarantees_test.go
 		require.NoError(t, err)
 		lctx.Release()
 
 		var retrieved flow.CollectionGuarantee
-<<<<<<< HEAD:storage/operation/guarantees_test.go
-		err = operation.RetrieveGuarantee(db.Reader(), g.CollectionID, &retrieved)
-=======
-		err = db.View(RetrieveGuarantee(g.ID(), &retrieved))
->>>>>>> feature/malleability:storage/badger/operation/guarantees_test.go
+		err = operation.RetrieveGuarantee(db.Reader(), g.ID(), &retrieved)
 		require.NoError(t, err)
 
 		assert.Equal(t, g, &retrieved)
@@ -99,11 +91,7 @@ func TestIndexGuaranteedCollectionByBlockHashMultipleBlocks(t *testing.T) {
 		_, lctx1 := unittest.LockManagerWithContext(t, storage.LockInsertBlock)
 		err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 			for _, guarantee := range set1 {
-<<<<<<< HEAD:storage/operation/guarantees_test.go
-				if err := operation.UnsafeInsertGuarantee(lctx1, rw.Writer(), guarantee.CollectionID, guarantee); err != nil {
-=======
-				if err := InsertGuarantee(guarantee.ID(), guarantee)(tx); err != nil {
->>>>>>> feature/malleability:storage/badger/operation/guarantees_test.go
+				if err := operation.UnsafeInsertGuarantee(lctx1, rw.Writer(), guarantee.ID(), guarantee); err != nil {
 					return err
 				}
 			}
@@ -119,11 +107,7 @@ func TestIndexGuaranteedCollectionByBlockHashMultipleBlocks(t *testing.T) {
 		_, lctx2 := unittest.LockManagerWithContext(t, storage.LockInsertBlock)
 		err = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 			for _, guarantee := range set2 {
-<<<<<<< HEAD:storage/operation/guarantees_test.go
-				if err := operation.UnsafeInsertGuarantee(lctx2, rw.Writer(), guarantee.CollectionID, guarantee); err != nil {
-=======
-				if err := InsertGuarantee(guarantee.ID(), guarantee)(tx); err != nil {
->>>>>>> feature/malleability:storage/badger/operation/guarantees_test.go
+				if err := operation.UnsafeInsertGuarantee(lctx2, rw.Writer(), guarantee.ID(), guarantee); err != nil {
 					return err
 				}
 			}
