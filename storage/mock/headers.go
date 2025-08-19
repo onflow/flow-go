@@ -160,8 +160,6 @@ func (_m *Headers) Exists(blockID flow.Identifier) (bool, error) {
 	return r0, r1
 }
 
-<<<<<<< HEAD
-=======
 // ProposalByBlockID provides a mock function with given fields: blockID
 func (_m *Headers) ProposalByBlockID(blockID flow.Identifier) (*flow.ProposalHeader, error) {
 	ret := _m.Called(blockID)
@@ -192,6 +190,7 @@ func (_m *Headers) ProposalByBlockID(blockID flow.Identifier) (*flow.ProposalHea
 	return r0, r1
 }
 
+<<<<<<< HEAD
 // Store provides a mock function with given fields: proposal
 func (_m *Headers) Store(proposal *flow.ProposalHeader) error {
 	ret := _m.Called(proposal)
@@ -211,6 +210,8 @@ func (_m *Headers) Store(proposal *flow.ProposalHeader) error {
 }
 
 >>>>>>> @{-1}
+=======
+>>>>>>> 19546633c8 (update mocks)
 // NewHeaders creates a new instance of Headers. It also registers a testing interface on the mock and a cleanup function to assert the mocks expectations.
 // The first argument is typically a *testing.T value.
 func NewHeaders(t interface {

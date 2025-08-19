@@ -42,8 +42,6 @@ func (_m *Guarantees) ByCollectionID(collID flow.Identifier) (*flow.CollectionGu
 	return r0, r1
 }
 
-<<<<<<< HEAD
-=======
 // ByID provides a mock function with given fields: guaranteeID
 func (_m *Guarantees) ByID(guaranteeID flow.Identifier) (*flow.CollectionGuarantee, error) {
 	ret := _m.Called(guaranteeID)
@@ -74,6 +72,7 @@ func (_m *Guarantees) ByID(guaranteeID flow.Identifier) (*flow.CollectionGuarant
 	return r0, r1
 }
 
+<<<<<<< HEAD
 // Store provides a mock function with given fields: guarantee
 func (_m *Guarantees) Store(guarantee *flow.CollectionGuarantee) error {
 	ret := _m.Called(guarantee)
@@ -93,6 +92,8 @@ func (_m *Guarantees) Store(guarantee *flow.CollectionGuarantee) error {
 }
 
 >>>>>>> @{-1}
+=======
+>>>>>>> 19546633c8 (update mocks)
 // NewGuarantees creates a new instance of Guarantees. It also registers a testing interface on the mock and a cleanup function to assert the mocks expectations.
 // The first argument is typically a *testing.T value.
 func NewGuarantees(t interface {
