@@ -46,7 +46,6 @@ var clusterBlocksCmd = &cobra.Command{
 				return fmt.Errorf("provide either a --id or --height and not both")
 			}
 
-<<<<<<< HEAD
 			if flagClusterBlockID != "" {
 				log.Info().Msgf("got flag cluster block id: %s", flagClusterBlockID)
 				clusterBlockID, err := flow.HexStringToIdentifier(flagClusterBlockID)
@@ -55,52 +54,28 @@ var clusterBlocksCmd = &cobra.Command{
 				}
 
 				log.Info().Msgf("getting cluster block by id: %v", clusterBlockID)
-				clusterBlock, err := clusterBlocks.ByID(clusterBlockID)
+				clusterBlock, err := clusterBlocks.ProposalByID(clusterBlockID)
 				if err != nil {
 					return fmt.Errorf("could not get cluster block with id: %v, %w", clusterBlockID, err)
 				}
 
 				common.PrettyPrint(clusterBlock)
 				return nil
-=======
-			log.Info().Msgf("getting cluster block by id: %v", clusterBlockID)
-			clusterBlock, err := clusterBlocks.ProposalByID(clusterBlockID)
-			if err != nil {
-				log.Error().Err(err).Msgf("could not get cluster block with id: %v", clusterBlockID)
-				return
->>>>>>> @{-1}
 			}
 
 			if flagHeight > 0 {
 				log.Info().Msgf("getting cluster block by height: %v", flagHeight)
-				clusterBlock, err := clusterBlocks.ByHeight(flagHeight)
+				clusterBlock, err := clusterBlocks.ProposalByHeight(flagHeight)
 				if err != nil {
 					return fmt.Errorf("could not get cluster block with height: %v, %w", flagHeight, err)
 				}
 
-<<<<<<< HEAD
-				log.Info().Msgf("block id: %v", clusterBlock.ID())
+				log.Info().Msgf("block id: %v", clusterBlock.Block.ID())
 				common.PrettyPrint(clusterBlock)
 				return nil
 			}
 
 			return fmt.Errorf("provide either a --id or --height")
 		})
-=======
-		if flagClusterBlockID != "" {
-			log.Info().Msgf("getting cluster block by height: %v", flagHeight)
-			clusterBlock, err := clusterBlocks.ProposalByHeight(flagHeight)
-			if err != nil {
-				log.Error().Err(err).Msgf("could not get cluster block with height: %v", flagHeight)
-				return
-			}
-
-			log.Info().Msgf("block id: %v", clusterBlock.Block.ID())
-			common.PrettyPrint(clusterBlock)
-			return
-		}
-
-		log.Error().Msg("provide either a --id or --height")
->>>>>>> @{-1}
 	},
 }
