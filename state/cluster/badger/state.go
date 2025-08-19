@@ -7,6 +7,7 @@ import (
 	"github.com/jordanschalm/lockctx"
 
 	"github.com/onflow/flow-go/consensus/hotstuff"
+	clustermodel "github.com/onflow/flow-go/model/cluster"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/state/cluster"
@@ -48,32 +49,56 @@ func Bootstrap(db storage.DB, lockManager lockctx.Manager, stateRoot *StateRoot)
 	rootQC := stateRoot.QC()
 
 	// bootstrap cluster state
+<<<<<<< HEAD
 	err = state.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 		chainID := genesis.Header.ChainID
 		// insert the block
 		err := procedure.InsertClusterBlock(lctx, rw, genesis)
+=======
+	err = operation.RetryOnConflict(state.db.Update, func(tx *badger.Txn) error {
+		chainID := genesis.ChainID
+		// insert the block - by protocol convention, the genesis block does not have a proposer signature, which must be handled by the implementation
+		proposal, err := clustermodel.NewRootProposal(
+			clustermodel.UntrustedProposal{
+				Block:           *genesis,
+				ProposerSigData: nil,
+			},
+		)
+		if err != nil {
+			return fmt.Errorf("could not build root cluster proposal: %w", err)
+		}
+		err = procedure.InsertClusterBlock(proposal)(tx)
+>>>>>>> feature/malleability
 		if err != nil {
 			return fmt.Errorf("could not insert genesis block: %w", err)
 		}
 		// insert block height -> ID mapping
+<<<<<<< HEAD
 		err = operation.IndexClusterBlockHeight(lctx, rw.Writer(), chainID, genesis.Header.Height, genesis.ID())
+=======
+		err = operation.IndexClusterBlockHeight(chainID, genesis.Height, genesis.ID())(tx)
+>>>>>>> feature/malleability
 		if err != nil {
 			return fmt.Errorf("failed to map genesis block height to block: %w", err)
 		}
 		// insert boundary
+<<<<<<< HEAD
 		err = operation.UpsertClusterFinalizedHeight(lctx, rw.Writer(), chainID, genesis.Header.Height)
+=======
+		err = operation.InsertClusterFinalizedHeight(chainID, genesis.Height)(tx)
+>>>>>>> feature/malleability
 		// insert started view for hotstuff
 		if err != nil {
 			return fmt.Errorf("could not insert genesis boundary: %w", err)
 		}
 
 		safetyData := &hotstuff.SafetyData{
-			LockedOneChainView:      genesis.Header.View,
-			HighestAcknowledgedView: genesis.Header.View,
+			LockedOneChainView:      genesis.View,
+			HighestAcknowledgedView: genesis.View,
 		}
 
 		livenessData := &hotstuff.LivenessData{
-			CurrentView: genesis.Header.View + 1,
+			CurrentView: genesis.View + 1,
 			NewestQC:    rootQC,
 		}
 		// insert safety data

@@ -56,11 +56,16 @@ func TestMigrateLastSealedExecutedResultToPebble(t *testing.T) {
 		events := store.NewEvents(metrics, db)
 		serviceEvents := store.NewServiceEvents(metrics, db)
 
+<<<<<<< HEAD
 		manager, lctx := unittest.LockManagerWithContext(t, storage.LockInsertBlock)
 		err = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 			return blocks.BatchStore(lctx, rw, &genesis)
 		})
 		lctx.Release()
+=======
+		// By convention, root block has no proposer signature - implementation has to handle this edge case
+		err = headers.Store(&flow.ProposalHeader{Header: genesis, ProposerSigData: nil})
+>>>>>>> feature/malleability
 		require.NoError(t, err)
 
 		getLatestFinalized := func() (uint64, error) {
@@ -93,7 +98,7 @@ func TestMigrateLastSealedExecutedResultToPebble(t *testing.T) {
 			nil,
 			genesis.Header,
 			&unittest.GenesisStateCommitment)
-		header := executableBlock.Block.Header
+		header := executableBlock.Block.ToHeader()
 
 		computationResult := testutil.ComputationResultFixture(t)
 		computationResult.ExecutableBlock = executableBlock
@@ -104,14 +109,18 @@ func TestMigrateLastSealedExecutedResultToPebble(t *testing.T) {
 			nil,
 			header,
 			&commit)
-		newheader := newexecutableBlock.Block.Header
+		newheader := newexecutableBlock.Block.ToHeader()
 
+<<<<<<< HEAD
 		lctx2 := manager.NewContext()
 		require.NoError(t, lctx2.AcquireLock(storage.LockInsertBlock))
 		err = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 			return blocks.BatchStore(lctx2, rw, newexecutableBlock.Block)
 		})
 		lctx2.Release()
+=======
+		err = headers.Store(unittest.ProposalHeaderFromHeader(header))
+>>>>>>> feature/malleability
 		require.NoError(t, err)
 
 		// save execution results
@@ -201,12 +210,16 @@ func TestMigrateLastSealedExecutedResultToPebble(t *testing.T) {
 		)
 		require.NotNil(t, es)
 
+<<<<<<< HEAD
 		lctx2 = manager.NewContext()
 		require.NoError(t, lctx2.AcquireLock(storage.LockInsertBlock))
 		err = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 			return blocks.BatchStore(lctx2, rw, newexecutableBlock.Block)
 		})
 		lctx2.Release()
+=======
+		err = headers.Store(unittest.ProposalHeaderFromHeader(newheader))
+>>>>>>> feature/malleability
 		require.NoError(t, err)
 
 		newcomputationResult := testutil.ComputationResultFixture(t)

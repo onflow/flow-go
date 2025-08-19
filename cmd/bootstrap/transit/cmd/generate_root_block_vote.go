@@ -89,7 +89,7 @@ func generateVote(c *cobra.Command, args []string) {
 		log.Fatal().Err(err).Msg("could not unmarshal root block data")
 	}
 
-	vote, err := signer.CreateVote(model.GenesisBlockFromFlow(rootBlock.Header))
+	vote, err := signer.CreateVote(model.GenesisBlockFromFlow(rootBlock.ToHeader()))
 	if err != nil {
 		log.Fatal().Err(err).Msg("could not load private node info")
 	}

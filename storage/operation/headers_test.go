@@ -4,7 +4,11 @@ import (
 	"testing"
 	"time"
 
+<<<<<<< HEAD:storage/operation/headers_test.go
 	"github.com/onflow/crypto"
+=======
+	"github.com/dgraph-io/badger/v2"
+>>>>>>> feature/malleability:storage/badger/operation/headers_test.go
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -18,14 +22,15 @@ import (
 func TestHeaderInsertCheckRetrieve(t *testing.T) {
 	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
 		expected := &flow.Header{
-			View:               1337,
-			Timestamp:          time.Now().UTC(),
-			ParentID:           flow.Identifier{0x11},
-			PayloadHash:        flow.Identifier{0x22},
-			ParentVoterIndices: []byte{0x44},
-			ParentVoterSigData: []byte{0x88},
-			ProposerID:         flow.Identifier{0x33},
-			ProposerSigData:    crypto.Signature{0x77},
+			HeaderBody: flow.HeaderBody{
+				View:               1337,
+				Timestamp:          uint64(time.Now().UnixMilli()),
+				ParentID:           flow.Identifier{0x11},
+				ParentVoterIndices: []byte{0x44},
+				ParentVoterSigData: []byte{0x88},
+				ProposerID:         flow.Identifier{0x33},
+			},
+			PayloadHash: flow.Identifier{0x22},
 		}
 		blockID := expected.ID()
 
@@ -49,8 +54,9 @@ func TestHeaderIDIndexByCollectionID(t *testing.T) {
 	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
 
 		headerID := unittest.IdentifierFixture()
-		collectionID := unittest.IdentifierFixture()
+		collectionGuaranteeID := unittest.IdentifierFixture()
 
+<<<<<<< HEAD:storage/operation/headers_test.go
 		err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 			return operation.IndexCollectionBlock(rw.Writer(), collectionID, headerID)
 		})
@@ -58,6 +64,13 @@ func TestHeaderIDIndexByCollectionID(t *testing.T) {
 
 		actualID := &flow.Identifier{}
 		err = operation.LookupCollectionBlock(db.Reader(), collectionID, actualID)
+=======
+		err := db.Update(IndexCollectionGuaranteeBlock(collectionGuaranteeID, headerID))
+		require.NoError(t, err)
+
+		actualID := &flow.Identifier{}
+		err = db.View(LookupCollectionGuaranteeBlock(collectionGuaranteeID, actualID))
+>>>>>>> feature/malleability:storage/badger/operation/headers_test.go
 		require.NoError(t, err)
 		assert.Equal(t, headerID, *actualID)
 	})

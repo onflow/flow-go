@@ -18,26 +18,36 @@ func TestBlockStoreAndRetrieve(t *testing.T) {
 		// verify after storing a block should be able to retrieve it back
 		blocks := store.InitAll(cacheMetrics, db).Blocks
 		block := unittest.FullBlockFixture()
-		block.SetPayload(unittest.PayloadFixture(unittest.WithAllTheFixins))
+		prop := unittest.ProposalFromBlock(block)
 
+<<<<<<< HEAD:storage/store/blocks_test.go
 		_, lctx := unittest.LockManagerWithContext(t, storage.LockInsertBlock)
 		defer lctx.Release()
 		err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 			return blocks.BatchStore(lctx, rw, &block)
 		})
+=======
+		err := blocks.Store(prop)
+>>>>>>> feature/malleability:storage/badger/blocks_test.go
 		require.NoError(t, err)
 
 		retrieved, err := blocks.ByID(block.ID())
 		require.NoError(t, err)
+		require.Equal(t, block, retrieved)
 
-		require.Equal(t, &block, retrieved)
+		retrievedp, err := blocks.ProposalByID(block.ID())
+		require.NoError(t, err)
+		require.Equal(t, prop, retrievedp)
 
 		// verify after a restart, the block stored in the database is the same
 		// as the original
 		blocksAfterRestart := store.InitAll(cacheMetrics, db).Blocks
 		receivedAfterRestart, err := blocksAfterRestart.ByID(block.ID())
 		require.NoError(t, err)
+		require.Equal(t, block, receivedAfterRestart)
 
-		require.Equal(t, &block, receivedAfterRestart)
+		receivedAfterRestartp, err := blocksAfterRestart.ProposalByID(block.ID())
+		require.NoError(t, err)
+		require.Equal(t, prop, receivedAfterRestartp)
 	})
 }
