@@ -61,8 +61,7 @@ func parseGetEvents(
 		return GetEvents{}, fmt.Errorf("invalid end height: %w", err)
 	}
 
-	var blockIDs parser.IDs
-	err = blockIDs.Parse(rawBlockIds)
+	blockIDs, err := parser.NewIDs(rawBlockIds)
 	if err != nil {
 		return GetEvents{}, err
 	}
