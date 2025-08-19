@@ -17,7 +17,7 @@ type Blocks struct {
 }
 
 // BatchStore provides a mock function with given fields: lctx, rw, block
-func (_m *Blocks) BatchStore(lctx lockctx.Proof, rw storage.ReaderBatchWriter, block *flow.Block) error {
+func (_m *Blocks) BatchStore(lctx lockctx.Proof, rw storage.ReaderBatchWriter, block *flow.GenericBlock[flow.Payload]) error {
 	ret := _m.Called(lctx, rw, block)
 
 	if len(ret) == 0 {
@@ -25,7 +25,7 @@ func (_m *Blocks) BatchStore(lctx lockctx.Proof, rw storage.ReaderBatchWriter, b
 	}
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(lockctx.Proof, storage.ReaderBatchWriter, *flow.Block) error); ok {
+	if rf, ok := ret.Get(0).(func(lockctx.Proof, storage.ReaderBatchWriter, *flow.GenericBlock[flow.Payload]) error); ok {
 		r0 = rf(lctx, rw, block)
 	} else {
 		r0 = ret.Error(0)
@@ -142,8 +142,6 @@ func (_m *Blocks) IndexBlockForCollectionGuarantees(blockID flow.Identifier, col
 	return r0
 }
 
-<<<<<<< HEAD
-=======
 // ProposalByHeight provides a mock function with given fields: height
 func (_m *Blocks) ProposalByHeight(height uint64) (*flow.Proposal, error) {
 	ret := _m.Called(height)
@@ -204,45 +202,6 @@ func (_m *Blocks) ProposalByID(blockID flow.Identifier) (*flow.Proposal, error) 
 	return r0, r1
 }
 
-// Store provides a mock function with given fields: proposal
-func (_m *Blocks) Store(proposal *flow.Proposal) error {
-	ret := _m.Called(proposal)
-
-	if len(ret) == 0 {
-		panic("no return value specified for Store")
-	}
-
-	var r0 error
-	if rf, ok := ret.Get(0).(func(*flow.Proposal) error); ok {
-		r0 = rf(proposal)
-	} else {
-		r0 = ret.Error(0)
-	}
-
-	return r0
-}
-
-// StoreTx provides a mock function with given fields: proposal
-func (_m *Blocks) StoreTx(proposal *flow.Proposal) func(*transaction.Tx) error {
-	ret := _m.Called(proposal)
-
-	if len(ret) == 0 {
-		panic("no return value specified for StoreTx")
-	}
-
-	var r0 func(*transaction.Tx) error
-	if rf, ok := ret.Get(0).(func(*flow.Proposal) func(*transaction.Tx) error); ok {
-		r0 = rf(proposal)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(func(*transaction.Tx) error)
-		}
-	}
-
-	return r0
-}
-
->>>>>>> feature/malleability
 // NewBlocks creates a new instance of Blocks. It also registers a testing interface on the mock and a cleanup function to assert the mocks expectations.
 // The first argument is typically a *testing.T value.
 func NewBlocks(t interface {

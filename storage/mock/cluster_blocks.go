@@ -14,6 +14,36 @@ type ClusterBlocks struct {
 	mock.Mock
 }
 
+// ByID provides a mock function with given fields: blockID
+func (_m *ClusterBlocks) ByID(blockID flow.Identifier) (*flow.GenericBlock[cluster.Payload], error) {
+	ret := _m.Called(blockID)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ByID")
+	}
+
+	var r0 *flow.GenericBlock[cluster.Payload]
+	var r1 error
+	if rf, ok := ret.Get(0).(func(flow.Identifier) (*flow.GenericBlock[cluster.Payload], error)); ok {
+		return rf(blockID)
+	}
+	if rf, ok := ret.Get(0).(func(flow.Identifier) *flow.GenericBlock[cluster.Payload]); ok {
+		r0 = rf(blockID)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*flow.GenericBlock[cluster.Payload])
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(flow.Identifier) error); ok {
+		r1 = rf(blockID)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // ProposalByHeight provides a mock function with given fields: height
 func (_m *ClusterBlocks) ProposalByHeight(height uint64) (*cluster.Proposal, error) {
 	ret := _m.Called(height)
@@ -74,27 +104,6 @@ func (_m *ClusterBlocks) ProposalByID(blockID flow.Identifier) (*cluster.Proposa
 	return r0, r1
 }
 
-<<<<<<< HEAD
-=======
-// Store provides a mock function with given fields: proposal
-func (_m *ClusterBlocks) Store(proposal *cluster.Proposal) error {
-	ret := _m.Called(proposal)
-
-	if len(ret) == 0 {
-		panic("no return value specified for Store")
-	}
-
-	var r0 error
-	if rf, ok := ret.Get(0).(func(*cluster.Proposal) error); ok {
-		r0 = rf(proposal)
-	} else {
-		r0 = ret.Error(0)
-	}
-
-	return r0
-}
-
->>>>>>> feature/malleability
 // NewClusterBlocks creates a new instance of ClusterBlocks. It also registers a testing interface on the mock and a cleanup function to assert the mocks expectations.
 // The first argument is typically a *testing.T value.
 func NewClusterBlocks(t interface {
