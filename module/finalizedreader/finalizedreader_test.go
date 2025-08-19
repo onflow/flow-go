@@ -30,41 +30,28 @@ func TestFinalizedReader(t *testing.T) {
 		all := store.InitAll(metrics, db)
 		blocks := all.Blocks
 		headers := all.Headers
-		block := unittest.BlockFixture()
+		proposal := unittest.ProposalFixture()
+		block := proposal.Block
 
-<<<<<<< HEAD
 		// store block 1
 		lockManager := storage.NewTestingLockManager()
 		withLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
 			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-				return blocks.BatchStore(lctx, rw, &block)
+				return blocks.BatchStore(lctx, rw, proposal)
 			})
 		})
 
 		// finalize block 1
 		withLock(t, lockManager, storage.LockFinalizeBlock, func(lctx lockctx.Context) error {
 			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-				return operation.IndexFinalizedBlockByHeight(lctx, rw, block.Header.Height, block.ID())
+				return operation.IndexFinalizedBlockByHeight(lctx, rw, proposal.Block.Height, proposal.Block.ID())
 			})
 		})
 
 		// verify is able to reader the finalized block ID
-		reader := NewFinalizedReader(headers, block.Header.Height)
+		reader := NewFinalizedReader(headers, proposal.Block.Height)
 
-		finalized, err := reader.FinalizedBlockIDAtHeight(block.Header.Height)
-=======
-		// store header
-		err := headers.Store(unittest.ProposalHeaderFromHeader(block.ToHeader()))
-		require.NoError(t, err)
-
-		// index the header
-		err = db.Update(operation.IndexBlockHeight(block.Height, block.ID()))
-		require.NoError(t, err)
-
-		// verify is able to reader the finalized block ID
-		reader := NewFinalizedReader(headers, block.Height)
-		finalized, err := reader.FinalizedBlockIDAtHeight(block.Height)
->>>>>>> feature/malleability
+		finalized, err := reader.FinalizedBlockIDAtHeight(proposal.Block.Height)
 		require.NoError(t, err)
 		require.Equal(t, block.ID(), finalized)
 
@@ -74,29 +61,22 @@ func TestFinalizedReader(t *testing.T) {
 		require.True(t, errors.Is(err, storage.ErrNotFound), err)
 
 		// finalize one more block
-<<<<<<< HEAD
-		block2 := unittest.BlockWithParentFixture(block.Header)
+		proposal2 := unittest.ProposalFromBlock(unittest.BlockWithParentFixture(block.ToHeader()))
+		block2 := proposal2.Block
 
 		withLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
 			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-				return blocks.BatchStore(lctx, rw, block2)
+				return blocks.BatchStore(lctx, rw, proposal2)
 			})
 		})
 
 		withLock(t, lockManager, storage.LockFinalizeBlock, func(lctx lockctx.Context) error {
 			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-				return operation.IndexFinalizedBlockByHeight(lctx, rw, block2.Header.Height, block2.ID())
+				return operation.IndexFinalizedBlockByHeight(lctx, rw, block2.Height, block2.ID())
 			})
 		})
 
-		reader.BlockFinalized(block2.Header)
-=======
-		block2 := unittest.BlockWithParentFixture(block.ToHeader())
-		require.NoError(t, headers.Store(unittest.ProposalHeaderFromHeader(block2.ToHeader())))
-		err = db.Update(operation.IndexBlockHeight(block2.Height, block2.ID()))
-		require.NoError(t, err)
 		reader.BlockFinalized(block2.ToHeader())
->>>>>>> feature/malleability
 
 		// should be able to retrieve the block
 		finalized, err = reader.FinalizedBlockIDAtHeight(block2.Height)
