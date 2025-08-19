@@ -9,8 +9,13 @@ import (
 	"github.com/onflow/flow-go/storage"
 )
 
-// InsertQuorumCertificate upserts a quorum certificate by block ID
-// If a quorum certificate for the block already exists, it returns storage.ErrAlreadyExists.
+// InsertQuorumCertificate upserts a quorum certificate by block ID.
+// Note: we index the QC by the block it certifies. Hence, the key is not derived from the value via a
+// collision-resistant hash function. For the same block, different QCs can easily be constructed by selecting
+// different sub-sets of the received votes (provided more than the minimal number of consensus participants voted,
+// which is typically the case). In most cases, it is only important that a block has been certified, but it is
+// irrelevant who specifically contributed to the QC. Therefore, we only store the first QC.
+// If a quorum certificate for the block already exists, it returns storage.ErrAlreadyExists (typically benign).
 func InsertQuorumCertificate(lctx lockctx.Proof, rw storage.ReaderBatchWriter, qc *flow.QuorumCertificate) error {
 	if !lctx.HoldsLock(storage.LockInsertBlock) {
 		return fmt.Errorf("cannot insert quorum certificate without holding lock %s", storage.LockInsertBlock)
@@ -21,10 +26,8 @@ func InsertQuorumCertificate(lctx lockctx.Proof, rw storage.ReaderBatchWriter, q
 	if err != nil {
 		return fmt.Errorf("failed to check if quorum certificate exists for block %s: %w", qc.BlockID, err)
 	}
-
 	if exist {
-		return fmt.Errorf("quorum certificate for block %s already exists: %w", qc.BlockID,
-			storage.ErrAlreadyExists)
+		return fmt.Errorf("quorum certificate for block %s already exists: %w", qc.BlockID, storage.ErrAlreadyExists)
 	}
 
 	return UpsertByKey(rw.Writer(), key, qc)
