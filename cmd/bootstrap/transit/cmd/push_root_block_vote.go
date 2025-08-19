@@ -28,10 +28,11 @@ func addPushVoteCmdFlags() {
 	defaultVoteFilePath := fmt.Sprintf(bootstrap.PathNodeRootBlockVote, "<node_id>")
 	pushVoteCmd.Flags().StringVarP(&flagToken, "token", "t", "", "token provided by the Flow team to access the Transit server")
 	pushVoteCmd.Flags().StringVarP(&flagVoteFile, "vote-file", "v", "", fmt.Sprintf("path under bootstrap directory of the vote file to upload (default: %s)", defaultVoteFilePath))
-	pushVoteCmd.Flags().StringVarP(&flagVoteFilePath, "vote-file-dir", "d", "", "directory for vote file to upload")
+	pushVoteCmd.Flags().StringVarP(&flagVoteFilePath, "vote-file-dir", "d", "", "directory for vote file to upload, ONLY for vote files outside the bootstrap directory")
 	pushVoteCmd.Flags().StringVarP(&flagBucketName, "bucket-name", "g", "flow-genesis-bootstrap", `bucket for pushing root block vote files`)
 
 	_ = pushVoteCmd.MarkFlagRequired("token")
+	pushVoteCmd.MarkFlagsMutuallyExclusive("vote-file", "vote-file-dir")
 }
 
 func pushVote(c *cobra.Command, args []string) {
@@ -47,15 +48,16 @@ func pushVote(c *cobra.Command, args []string) {
 
 	voteFile := flagVoteFile
 
-	// If the vote file is not specified, use the bootstrap directory
+	// If --vote-file-dir is not specified, use the bootstrap directory
 	voteFilePath := filepath.Join(flagBootDir, voteFile)
 
+	// if --vote-file is not specified, use default file name within bootstrap directory
 	if voteFile == "" {
 		voteFile = fmt.Sprintf(bootstrap.PathNodeRootBlockVote, nodeID)
 		voteFilePath = filepath.Join(flagBootDir, voteFile)
 	}
 
-	// If vote-file-dir is specified, use it to construct the full path to the vote file
+	// If vote-file-dir is specified, use it to construct the full path to the vote file (with default file name)
 	if flagVoteFilePath != "" {
 		voteFilePath = filepath.Join(flagVoteFilePath, "root-block-vote.json")
 	}
