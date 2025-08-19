@@ -1458,9 +1458,9 @@ func testScheduledCallback(t *testing.T, callbackEvents []cadence.Event, expecte
 
 	me := new(modulemock.Local)
 	me.On("NodeID").Return(executorID)
-	me.On("Sign", mock.Anything, mock.Anything).Return(nil, nil)
+	me.On("Sign", mock.Anything, mock.Anything).Return(unittest.SignatureFixture(), nil)
 	me.On("SignFunc", mock.Anything, mock.Anything, mock.Anything).
-		Return(nil, nil)
+		Return(unittest.SignatureFixture(), nil)
 
 	exemetrics := new(modulemock.ExecutionMetrics)
 	exemetrics.On("ExecutionBlockExecuted",
@@ -1576,12 +1576,12 @@ func testScheduledCallback(t *testing.T, callbackEvents []cadence.Event, expecte
 	receipt := result.ExecutionReceipt
 	assert.Equal(t, executorID, receipt.ExecutorID)
 	assert.Equal(t, parentBlockExecutionResultID, receipt.PreviousResultID)
-	assert.Equal(t, block.ID(), receipt.BlockID)
+	assert.Equal(t, block.BlockID(), receipt.BlockID)
 	assert.Len(t, receipt.Chunks, 1) // Only system chunk
 
 	// verify system chunk details
 	systemChunk := receipt.Chunks[0]
-	assert.Equal(t, block.ID(), systemChunk.BlockID)
+	assert.Equal(t, block.BlockID(), systemChunk.BlockID)
 	assert.Equal(t, uint(0), systemChunk.CollectionIndex) // System collection is at index 0 for empty block
 	assert.Equal(t, uint64(expectedTransactionCount), systemChunk.NumberOfTransactions)
 

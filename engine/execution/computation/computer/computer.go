@@ -304,8 +304,9 @@ func (e *blockComputer) queueSystemTransactions(
 ) {
 	allTxs := append(executeCallbackTxs, systemTxn)
 	// add execute callback transactions to the system collection info along to existing process transaction
-	systemTxs := systemColection.CompleteCollection.Transactions
-	systemColection.CompleteCollection.Transactions = append(systemTxs, allTxs...)
+	// TODO(7749): fix illegal mutation
+	systemTxs := systemColection.CompleteCollection.Collection.Transactions
+	systemColection.CompleteCollection.Collection.Transactions = append(systemTxs, allTxs...) //nolint:structwrite
 	systemLogger = systemLogger.With().Uint32("num_txs", uint32(len(systemTxs))).Logger()
 
 	for i, txBody := range allTxs {
@@ -428,8 +429,8 @@ func (e *blockComputer) executeUserTransactions(
 	txQueue := make(chan TransactionRequest, userTxCount)
 
 	e.queueUserTransactions(
-		block.ID(),
-		block.Block.Header,
+		block.BlockID(),
+		block.Block.ToHeader(),
 		rawCollections,
 		txQueue,
 	)
@@ -461,30 +462,32 @@ func (e *blockComputer) executeSystemTransactions(
 
 	callbackCtx := fvm.NewContextFromParent(
 		e.callbackCtx,
-		fvm.WithBlockHeader(block.Block.Header),
-		fvm.WithProtocolStateSnapshot(e.protocolState.AtBlockID(block.ID())),
+		fvm.WithBlockHeader(block.Block.ToHeader()),
+		fvm.WithProtocolStateSnapshot(e.protocolState.AtBlockID(block.BlockID())),
 	)
 
 	systemChunkCtx := fvm.NewContextFromParent(
 		e.systemChunkCtx,
-		fvm.WithBlockHeader(block.Block.Header),
-		fvm.WithProtocolStateSnapshot(e.protocolState.AtBlockID(block.ID())),
+		fvm.WithBlockHeader(block.Block.ToHeader()),
+		fvm.WithProtocolStateSnapshot(e.protocolState.AtBlockID(block.BlockID())),
 	)
 
 	systemLogger := callbackCtx.Logger.With().
-		Str("block_id", block.ID().String()).
-		Uint64("height", block.Block.Header.Height).
+		Str("block_id", block.BlockID().String()).
+		Uint64("height", block.Block.Height).
 		Bool("system_chunk", true).
 		Bool("system_transaction", true).
 		Int("num_collections", userCollectionCount).
 		Logger()
 
 	systemCollectionInfo := collectionInfo{
-		blockId:             block.ID(),
-		blockIdStr:          block.ID().String(),
-		blockHeight:         block.Block.Header.Height,
-		collectionIndex:     len(rawCollections),
-		CompleteCollection:  &entity.CompleteCollection{},
+		blockId:         block.BlockID(),
+		blockIdStr:      block.BlockID().String(),
+		blockHeight:     block.Block.Height,
+		collectionIndex: len(rawCollections),
+		CompleteCollection: &entity.CompleteCollection{
+			Collection: flow.NewEmptyCollection(), // TODO(7749)
+		},
 		isSystemTransaction: true,
 	}
 
@@ -560,10 +563,14 @@ func (e *blockComputer) executeProcessCallback(
 	txnIndex uint32,
 	systemLogger zerolog.Logger,
 ) ([]*flow.TransactionBody, error) {
-	processTxn := blueprints.ProcessCallbacksTransaction(e.vmCtx.Chain)
+	processTxn, err := blueprints.ProcessCallbacksTransaction(e.vmCtx.Chain)
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate callbacks script: %w", err)
+	}
 
 	// add process callback transaction to the system collection info
-	systemCollectionInfo.CompleteCollection.Transactions = append(systemCollectionInfo.CompleteCollection.Transactions, processTxn)
+	// TODO(7749): fix illegal mutation
+	systemCollectionInfo.CompleteCollection.Collection.Transactions = append(systemCollectionInfo.CompleteCollection.Collection.Transactions, processTxn) //nolint:structwrite
 
 	request := newTransactionRequest(
 		systemCollectionInfo,
