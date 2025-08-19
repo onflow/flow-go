@@ -21,6 +21,9 @@ func TestApprovalStoreAndRetrieve(t *testing.T) {
 		metrics := metrics.NewNoopCollector()
 		store := store.NewResultApprovals(metrics, db, storage.NewTestingLockManager())
 
+		// create the deferred database operation to store `approval`; we deliberately
+		// do this outside of the lock to confirm that the lock is not required for
+		// creating the operation -- only for executing the storage write further below
 		approval := unittest.ResultApprovalFixture()
 		storing := store.StoreMyApproval(approval)
 		lockManager := locks.NewTestingLockManager()
