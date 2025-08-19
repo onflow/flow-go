@@ -27,64 +27,66 @@ func TestMyExecutionReceiptsStorage(t *testing.T) {
 		})
 	}
 
-	t.Run("myReceipts one get one", func(t *testing.T) {
+	t.Run("myReceipts store and retrieve from different storage layers", func(t *testing.T) {
 		withStore(t, func(myReceipts storage.MyExecutionReceipts, results storage.ExecutionResults, receipts storage.ExecutionReceipts, db storage.DB) {
+			lockManager := locks.NewTestingLockManager()
 			block := unittest.BlockFixture()
 			receipt1 := unittest.ReceiptForBlockFixture(&block)
 
-			lockManager := locks.NewTestingLockManager()
+			// STEP 1: Store receipt
 			lctx := lockManager.NewContext()
-			defer lctx.Release()
 			require.NoError(t, lctx.AcquireLock(storage.LockInsertOwnReceipt))
 			err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 				return myReceipts.BatchStoreMyReceipt(lctx, receipt1, rw)
 			})
 			require.NoError(t, err)
+			defer lctx.Release() // While still holding the lock, retrieve values; this verifies that reads are not blocked by acquired locks
 
+			// STEP 2: Retrieve from different storage layers
+			// MyExecutionReceipts delegates the storage of the receipt to the more generic storage.ExecutionReceipts and storage.ExecutionResults,
+			// which is also used by the consensus follower to store execution receipts & results that are incorporated into blocks.
+			// After storing my receipts, we check that the result and receipt can also be retrieved from the lower-level generic storage layers.
 			actual, err := myReceipts.MyReceipt(block.ID())
 			require.NoError(t, err)
-
 			require.Equal(t, receipt1, actual)
 
-			// Check after storing my receipts, the result and receipt are stored
-			actualReceipt, err := receipts.ByID(receipt1.ID())
+			actualReceipt, err := receipts.ByID(receipt1.ID()) // generic receipts storage
 			require.NoError(t, err)
 			require.Equal(t, receipt1, actualReceipt)
 
-			actualResult, err := results.ByID(receipt1.ExecutionResult.ID())
+			actualResult, err := results.ByID(receipt1.ExecutionResult.ID()) // generic results storage
 			require.NoError(t, err)
 			require.Equal(t, receipt1.ExecutionResult, *actualResult)
 		})
 	})
 
-	t.Run("myReceipts same for the same block", func(t *testing.T) {
+	t.Run("myReceipts store identical receipt for the same block", func(t *testing.T) {
 		withStore(t, func(myReceipts storage.MyExecutionReceipts, _ storage.ExecutionResults, _ storage.ExecutionReceipts, db storage.DB) {
+			lockManager := locks.NewTestingLockManager()
 			block := unittest.BlockFixture()
-
 			receipt1 := unittest.ReceiptForBlockFixture(&block)
 
-			lockManager := locks.NewTestingLockManager()
 			lctx := lockManager.NewContext()
-			defer lctx.Release()
 			require.NoError(t, lctx.AcquireLock(storage.LockInsertOwnReceipt))
 			err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 				return myReceipts.BatchStoreMyReceipt(lctx, receipt1, rw)
 			})
 			require.NoError(t, err)
+			lctx.Release()
 
-			lockManager2 := locks.NewTestingLockManager()
-			lctx2 := lockManager2.NewContext()
-			defer lctx2.Release()
+			lctx2 := lockManager.NewContext()
 			require.NoError(t, lctx2.AcquireLock(storage.LockInsertOwnReceipt))
 			err = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 				return myReceipts.BatchStoreMyReceipt(lctx2, receipt1, rw)
 			})
 			require.NoError(t, err)
+			lctx2.Release()
 		})
 	})
 
 	t.Run("store different receipt for same block should fail", func(t *testing.T) {
 		withStore(t, func(myReceipts storage.MyExecutionReceipts, results storage.ExecutionResults, receipts storage.ExecutionReceipts, db storage.DB) {
+			lockManager := locks.NewTestingLockManager()
 			block := unittest.BlockFixture()
 
 			executor1 := unittest.IdentifierFixture()
@@ -93,30 +95,28 @@ func TestMyExecutionReceiptsStorage(t *testing.T) {
 			receipt1 := unittest.ReceiptForBlockExecutorFixture(&block, executor1)
 			receipt2 := unittest.ReceiptForBlockExecutorFixture(&block, executor2)
 
-			lockManager := locks.NewTestingLockManager()
 			lctx := lockManager.NewContext()
-			defer lctx.Release()
 			require.NoError(t, lctx.AcquireLock(storage.LockInsertOwnReceipt))
 			err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 				return myReceipts.BatchStoreMyReceipt(lctx, receipt1, rw)
 			})
 			require.NoError(t, err)
+			lctx.Release()
 
-			lockManager2 := locks.NewTestingLockManager()
-			lctx2 := lockManager2.NewContext()
-			defer lctx2.Release()
+			lctx2 := lockManager.NewContext()
 			require.NoError(t, lctx2.AcquireLock(storage.LockInsertOwnReceipt))
 			err = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 				return myReceipts.BatchStoreMyReceipt(lctx2, receipt2, rw)
 			})
-
 			require.Error(t, err)
 			require.Contains(t, err.Error(), "different receipt")
+			lctx2.Release()
 		})
 	})
 
 	t.Run("concurrent store different receipt for same block should fail", func(t *testing.T) {
 		withStore(t, func(myReceipts storage.MyExecutionReceipts, results storage.ExecutionResults, receipts storage.ExecutionReceipts, db storage.DB) {
+			lockManager := locks.NewTestingLockManager()
 			block := unittest.BlockFixture()
 
 			executor1 := unittest.IdentifierFixture()
@@ -125,38 +125,43 @@ func TestMyExecutionReceiptsStorage(t *testing.T) {
 			receipt1 := unittest.ReceiptForBlockExecutorFixture(&block, executor1)
 			receipt2 := unittest.ReceiptForBlockExecutorFixture(&block, executor2)
 
-			var wg sync.WaitGroup
+			var startSignal sync.WaitGroup // goroutines attempting store operations will wait for this signal to start concurrently
+			startSignal.Add(1)             // expecting one signal from the main thread to start both goroutines
+			var doneSinal sync.WaitGroup   // the main thread will wait on this for both goroutines to finish
+			doneSinal.Add(2)               // expecting two goroutines to signal finish
 			errChan := make(chan error, 2)
 
-			wg.Add(2)
-
-			lockManager := locks.NewTestingLockManager()
-
 			go func() {
-				defer wg.Done()
 				lctx := lockManager.NewContext()
-				defer lctx.Release()
+
+				startSignal.Wait()
 				require.NoError(t, lctx.AcquireLock(storage.LockInsertOwnReceipt))
 				err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 					return myReceipts.BatchStoreMyReceipt(lctx, receipt1, rw)
 				})
 				errChan <- err
+				lctx.Release()
+				doneSinal.Done()
 			}()
 
 			go func() {
-				defer wg.Done()
 				lctx := lockManager.NewContext()
-				defer lctx.Release()
+
+				startSignal.Wait()
 				require.NoError(t, lctx.AcquireLock(storage.LockInsertOwnReceipt))
 				err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 					return myReceipts.BatchStoreMyReceipt(lctx, receipt2, rw)
 				})
 				errChan <- err
+				lctx.Release()
+				doneSinal.Done()
 			}()
 
-			wg.Wait()
+			startSignal.Done() // start both goroutines
+			doneSinal.Wait()   // wait for both goroutines to finish
 			close(errChan)
 
+			// Check that one of the Index operations succeeded and the other failed
 			var errCount int
 			for err := range errChan {
 				if err != nil {
@@ -164,38 +169,41 @@ func TestMyExecutionReceiptsStorage(t *testing.T) {
 					require.Contains(t, err.Error(), "different receipt")
 				}
 			}
-
 			require.Equal(t, 1, errCount, "Exactly one of the operations should fail")
 		})
 	})
 
 	t.Run("concurrent store of 10 different receipts for different blocks should succeed", func(t *testing.T) {
 		withStore(t, func(myReceipts storage.MyExecutionReceipts, results storage.ExecutionResults, receipts storage.ExecutionReceipts, db storage.DB) {
-			var wg sync.WaitGroup
+			lockManager := locks.NewTestingLockManager()
+
+			var startSignal sync.WaitGroup // goroutines attempting store operations will wait for this signal to start concurrently
+			startSignal.Add(1)             // expecting one signal from the main thread to start both goroutines
+			var doneSinal sync.WaitGroup   // the main thread will wait on this for goroutines attempting store operations to finish
 			errChan := make(chan error, 10)
 
 			// Store receipts concurrently
 			for i := 0; i < 10; i++ {
-				wg.Add(1)
+				doneSinal.Add(1)
 				go func(i int) {
-					defer wg.Done()
-
 					block := unittest.BlockFixture() // Each iteration gets a new block
 					executor := unittest.IdentifierFixture()
 					receipt := unittest.ReceiptForBlockExecutorFixture(&block, executor)
-
-					lockManager := locks.NewTestingLockManager()
 					lctx := lockManager.NewContext()
-					defer lctx.Release()
+
+					startSignal.Wait()
 					require.NoError(t, lctx.AcquireLock(storage.LockInsertOwnReceipt))
 					err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 						return myReceipts.BatchStoreMyReceipt(lctx, receipt, rw)
 					})
 					errChan <- err
+					lctx.Release()
+					doneSinal.Done()
 				}(i)
 			}
 
-			wg.Wait()
+			startSignal.Done() // start both goroutines
+			doneSinal.Wait()   // wait for both goroutines to finish
 			close(errChan)
 
 			// Verify all succeeded

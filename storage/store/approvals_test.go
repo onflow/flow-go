@@ -19,19 +19,19 @@ import (
 func TestApprovalStoreAndRetrieve(t *testing.T) {
 	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
 		metrics := metrics.NewNoopCollector()
-		store := store.NewResultApprovals(metrics, db, storage.NewTestingLockManager())
+		lockManager := locks.NewTestingLockManager()
+		store := store.NewResultApprovals(metrics, db, lockManager)
 
 		// create the deferred database operation to store `approval`; we deliberately
 		// do this outside of the lock to confirm that the lock is not required for
 		// creating the operation -- only for executing the storage write further below
 		approval := unittest.ResultApprovalFixture()
 		storing := store.StoreMyApproval(approval)
-		lockManager := locks.NewTestingLockManager()
 		lctx := lockManager.NewContext()
 		require.NoError(t, lctx.AcquireLock(storage.LockIndexResultApproval))
 		err := storing(lctx)
 		require.NoError(t, err)
-		lctx.Release() // release lock before any reads
+		defer lctx.Release() // While still holding the lock, verify that reads are not blocked by acquired locks
 
 		// retrieve entire approval by its ID
 		byID, err := store.ByID(approval.ID())
@@ -48,14 +48,14 @@ func TestApprovalStoreAndRetrieve(t *testing.T) {
 func TestApprovalStoreTwice(t *testing.T) {
 	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
 		metrics := metrics.NewNoopCollector()
-		store := store.NewResultApprovals(metrics, db, storage.NewTestingLockManager())
+		lockManager := locks.NewTestingLockManager()
+		store := store.NewResultApprovals(metrics, db, lockManager)
 
 		// create the deferred database operation to store `approval`; we deliberately
 		// do this outside of the lock to confirm that the lock is not required for
 		// creating the operation -- only for executing the storage write further below
 		approval := unittest.ResultApprovalFixture()
 		storing := store.StoreMyApproval(approval)
-		lockManager := locks.NewTestingLockManager()
 		lctx := lockManager.NewContext()
 		require.NoError(t, lctx.AcquireLock(storage.LockIndexResultApproval))
 		err := storing(lctx)
@@ -73,8 +73,8 @@ func TestApprovalStoreTwice(t *testing.T) {
 func TestApprovalStoreTwoDifferentApprovalsShouldFail(t *testing.T) {
 	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
 		metrics := metrics.NewNoopCollector()
-		store := store.NewResultApprovals(metrics, db, storage.NewTestingLockManager())
 		lockManager := locks.NewTestingLockManager()
+		store := store.NewResultApprovals(metrics, db, lockManager)
 
 		approval1, approval2 := twoApprovalsForTheSameResult(t)
 
@@ -102,21 +102,20 @@ func TestApprovalStoreTwoDifferentApprovalsShouldFail(t *testing.T) {
 func TestApprovalStoreTwoDifferentApprovalsConcurrently(t *testing.T) {
 	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
 		metrics := metrics.NewNoopCollector()
-		store := store.NewResultApprovals(metrics, db, storage.NewTestingLockManager())
-
 		lockManager := locks.NewTestingLockManager()
+		store := store.NewResultApprovals(metrics, db, lockManager)
+
 		approval1, approval2 := twoApprovalsForTheSameResult(t)
 
-		var startSignal sync.WaitGroup // both goroutines will wait for this signal to start concurrently
+		var startSignal sync.WaitGroup // goroutines attempting store operations will wait for this signal to start concurrently
 		startSignal.Add(1)             // expecting one signal from the main thread to start both goroutines
-		var doneSinal sync.WaitGroup   // the main thread will wait on this for both goroutines to finish
-		doneSinal.Add(2)               // expecting two goroutines to finish
+		var doneSinal sync.WaitGroup   // the main thread will wait on this for goroutines attempting store operations to finish
+		doneSinal.Add(2)               // expecting two goroutines to signal finish
 
 		var firstIndexErr, secondIndexErr error
 
 		// First goroutine stores and indexes the first approval.
 		go func() {
-			defer doneSinal.Done()
 			storing := store.StoreMyApproval(approval1)
 			lctx := lockManager.NewContext()
 
@@ -124,11 +123,11 @@ func TestApprovalStoreTwoDifferentApprovalsConcurrently(t *testing.T) {
 			require.NoError(t, lctx.AcquireLock(storage.LockIndexResultApproval))
 			firstIndexErr = storing(lctx)
 			lctx.Release()
+			doneSinal.Done()
 		}()
 
 		// Second goroutine stores and tries to index the second approval for the same chunk.
 		go func() {
-			defer doneSinal.Done()
 			storing := store.StoreMyApproval(approval2)
 			lctx := lockManager.NewContext()
 
@@ -136,6 +135,7 @@ func TestApprovalStoreTwoDifferentApprovalsConcurrently(t *testing.T) {
 			require.NoError(t, lctx.AcquireLock(storage.LockIndexResultApproval))
 			secondIndexErr = storing(lctx)
 			lctx.Release()
+			doneSinal.Done()
 		}()
 
 		startSignal.Done() // start both goroutines
