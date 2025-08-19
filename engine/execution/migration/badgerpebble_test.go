@@ -33,7 +33,7 @@ func TestMigrateLastSealedExecutedResultToPebble(t *testing.T) {
 		bootstrapper := bootstrap.NewBootstrapper(unittest.Logger())
 		genesis := unittest.BlockFixture()
 		rootSeal := unittest.Seal.Fixture()
-		unittest.Seal.WithBlock(genesis.Header)(rootSeal)
+		unittest.Seal.WithBlock(genesis.ToHeader())(rootSeal)
 
 		db := badgerimpl.ToDB(bdb)
 		lockManager := storage.NewTestingLockManager()
@@ -55,20 +55,15 @@ func TestMigrateLastSealedExecutedResultToPebble(t *testing.T) {
 		events := store.NewEvents(metrics, db)
 		serviceEvents := store.NewServiceEvents(metrics, db)
 
-<<<<<<< HEAD
 		manager, lctx := unittest.LockManagerWithContext(t, storage.LockInsertBlock)
 		err = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			return blocks.BatchStore(lctx, rw, &genesis)
+			return blocks.BatchStore(lctx, rw, unittest.ProposalFromBlock(genesis))
 		})
 		lctx.Release()
-=======
-		// By convention, root block has no proposer signature - implementation has to handle this edge case
-		err = headers.Store(&flow.ProposalHeader{Header: genesis, ProposerSigData: nil})
->>>>>>> @{-1}
 		require.NoError(t, err)
 
 		getLatestFinalized := func() (uint64, error) {
-			return genesis.Header.Height, nil
+			return genesis.Height, nil
 		}
 
 		// create execution state module
@@ -94,7 +89,7 @@ func TestMigrateLastSealedExecutedResultToPebble(t *testing.T) {
 
 		executableBlock := unittest.ExecutableBlockFixtureWithParent(
 			nil,
-			genesis.Header,
+			genesis.ToHeader(),
 			&unittest.GenesisStateCommitment)
 		header := executableBlock.Block.ToHeader()
 
@@ -109,16 +104,12 @@ func TestMigrateLastSealedExecutedResultToPebble(t *testing.T) {
 			&commit)
 		newheader := newexecutableBlock.Block.ToHeader()
 
-<<<<<<< HEAD
 		lctx2 := manager.NewContext()
 		require.NoError(t, lctx2.AcquireLock(storage.LockInsertBlock))
 		err = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			return blocks.BatchStore(lctx2, rw, newexecutableBlock.Block)
+			return blocks.BatchStore(lctx2, rw, unittest.ProposalFromBlock(newexecutableBlock.Block))
 		})
 		lctx2.Release()
-=======
-		err = headers.Store(unittest.ProposalHeaderFromHeader(header))
->>>>>>> @{-1}
 		require.NoError(t, err)
 
 		// save execution results
@@ -137,7 +128,7 @@ func TestMigrateLastSealedExecutedResultToPebble(t *testing.T) {
 			nil,
 			newheader,
 			&secondCommit)
-		secondHeader := secondExecutableBlock.Block.Header
+		secondHeader := secondExecutableBlock.Block.ToHeader()
 
 		// mock that the executed block is the last executed and sealed block
 		ps := new(protocolmock.State)
@@ -161,7 +152,7 @@ func TestMigrateLastSealedExecutedResultToPebble(t *testing.T) {
 				if blockID == header.ID() {
 					return createSnapshot(header)
 				} else if blockID == genesis.ID() {
-					return createSnapshot(genesis.Header)
+					return createSnapshot(genesis.ToHeader())
 				} else if blockID == newheader.ID() {
 					return createSnapshot(newheader)
 				} else if blockID == secondHeader.ID() {
@@ -220,16 +211,12 @@ func TestMigrateLastSealedExecutedResultToPebble(t *testing.T) {
 		)
 		require.NotNil(t, es)
 
-<<<<<<< HEAD
 		lctx2 = manager.NewContext()
 		require.NoError(t, lctx2.AcquireLock(storage.LockInsertBlock))
 		err = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			return blocks.BatchStore(lctx2, rw, secondExecutableBlock.Block)
+			return blocks.BatchStore(lctx2, rw, unittest.ProposalFromBlock(secondExecutableBlock.Block))
 		})
 		lctx2.Release()
-=======
-		err = headers.Store(unittest.ProposalHeaderFromHeader(newheader))
->>>>>>> @{-1}
 		require.NoError(t, err)
 
 		newcomputationResult := testutil.ComputationResultFixture(t)
