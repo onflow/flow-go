@@ -40,7 +40,7 @@ func TestGuaranteeStoreRetrieve(t *testing.T) {
 		lctx.Release()
 
 		// retreive by coll idx
-		actual, err := guarantees.ByCollectionID(expected.ID())
+		actual, err := guarantees.ByCollectionID(expected.CollectionID)
 		require.NoError(t, err)
 		require.Equal(t, expected, actual)
 
