@@ -36,7 +36,7 @@ func (f *FailoverEventProvider) Events(
 	blocks []BlockMetadata,
 	eventType flow.EventType,
 	encodingVersion entities.EventEncodingVersion,
-	executionState *entities.ExecutionStateQuery,
+	executionState entities.ExecutionStateQuery,
 ) (Response, entities.ExecutorMetadata, error) {
 	localEvents, metadata, localErr := f.localProvider.Events(ctx, blocks, eventType, encodingVersion, executionState)
 	if localErr != nil {

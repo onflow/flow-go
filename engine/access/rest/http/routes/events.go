@@ -16,7 +16,7 @@ const EventTypeQuery = "type"
 
 // GetEvents for the provided block range or list of block IDs filtered by type.
 func GetEvents(r *common.Request, backend access.API, _ commonmodels.LinkGenerator) (interface{}, error) {
-	req, err := request.GetEventsRequest(r)
+	req, err := request.NewGetEvents(r)
 	if err != nil {
 		return nil, common.NewBadRequestError(err)
 	}
@@ -24,11 +24,12 @@ func GetEvents(r *common.Request, backend access.API, _ commonmodels.LinkGenerat
 	// if the request has block IDs provided then return events for block IDs
 	var blocksEvents commonmodels.BlocksEvents
 	if len(req.BlockIDs) > 0 {
-		events, err := backend.GetEventsForBlockIDs(
+		events, _, err := backend.GetEventsForBlockIDs(
 			r.Context(),
 			req.Type,
 			req.BlockIDs,
 			entitiesproto.EventEncodingVersion_JSON_CDC_V0,
+			req.ExecutionState,
 		)
 		if err != nil {
 			return nil, err
@@ -53,12 +54,13 @@ func GetEvents(r *common.Request, backend access.API, _ commonmodels.LinkGenerat
 	}
 
 	// if request provided block height range then return events for that range
-	events, err := backend.GetEventsForHeightRange(
+	events, _, err := backend.GetEventsForHeightRange(
 		r.Context(),
 		req.Type,
 		req.StartHeight,
 		req.EndHeight,
 		entitiesproto.EventEncodingVersion_JSON_CDC_V0,
+		req.ExecutionState,
 	)
 	if err != nil {
 		return nil, err

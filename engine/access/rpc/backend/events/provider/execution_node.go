@@ -49,7 +49,7 @@ func (e *ENEventProvider) Events(
 	blocks []BlockMetadata,
 	eventType flow.EventType,
 	encodingVersion entities.EventEncodingVersion,
-	_ *entities.ExecutionStateQuery,
+	_ entities.ExecutionStateQuery,
 ) (Response, entities.ExecutorMetadata, error) {
 	if len(blocks) == 0 {
 		return Response{}, entities.ExecutorMetadata{}, nil

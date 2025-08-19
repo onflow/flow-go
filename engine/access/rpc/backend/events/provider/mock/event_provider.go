@@ -19,7 +19,7 @@ type EventProvider struct {
 }
 
 // Events provides a mock function with given fields: ctx, blocks, eventType, encodingVersion, executionState
-func (_m *EventProvider) Events(ctx context.Context, blocks []provider.BlockMetadata, eventType flow.EventType, encodingVersion entities.EventEncodingVersion, executionState *entities.ExecutionStateQuery) (provider.Response, entities.ExecutorMetadata, error) {
+func (_m *EventProvider) Events(ctx context.Context, blocks []provider.BlockMetadata, eventType flow.EventType, encodingVersion entities.EventEncodingVersion, executionState entities.ExecutionStateQuery) (provider.Response, entities.ExecutorMetadata, error) {
 	ret := _m.Called(ctx, blocks, eventType, encodingVersion, executionState)
 
 	if len(ret) == 0 {
@@ -29,22 +29,22 @@ func (_m *EventProvider) Events(ctx context.Context, blocks []provider.BlockMeta
 	var r0 provider.Response
 	var r1 entities.ExecutorMetadata
 	var r2 error
-	if rf, ok := ret.Get(0).(func(context.Context, []provider.BlockMetadata, flow.EventType, entities.EventEncodingVersion, *entities.ExecutionStateQuery) (provider.Response, entities.ExecutorMetadata, error)); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, []provider.BlockMetadata, flow.EventType, entities.EventEncodingVersion, entities.ExecutionStateQuery) (provider.Response, entities.ExecutorMetadata, error)); ok {
 		return rf(ctx, blocks, eventType, encodingVersion, executionState)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, []provider.BlockMetadata, flow.EventType, entities.EventEncodingVersion, *entities.ExecutionStateQuery) provider.Response); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, []provider.BlockMetadata, flow.EventType, entities.EventEncodingVersion, entities.ExecutionStateQuery) provider.Response); ok {
 		r0 = rf(ctx, blocks, eventType, encodingVersion, executionState)
 	} else {
 		r0 = ret.Get(0).(provider.Response)
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, []provider.BlockMetadata, flow.EventType, entities.EventEncodingVersion, *entities.ExecutionStateQuery) entities.ExecutorMetadata); ok {
+	if rf, ok := ret.Get(1).(func(context.Context, []provider.BlockMetadata, flow.EventType, entities.EventEncodingVersion, entities.ExecutionStateQuery) entities.ExecutorMetadata); ok {
 		r1 = rf(ctx, blocks, eventType, encodingVersion, executionState)
 	} else {
 		r1 = ret.Get(1).(entities.ExecutorMetadata)
 	}
 
-	if rf, ok := ret.Get(2).(func(context.Context, []provider.BlockMetadata, flow.EventType, entities.EventEncodingVersion, *entities.ExecutionStateQuery) error); ok {
+	if rf, ok := ret.Get(2).(func(context.Context, []provider.BlockMetadata, flow.EventType, entities.EventEncodingVersion, entities.ExecutionStateQuery) error); ok {
 		r2 = rf(ctx, blocks, eventType, encodingVersion, executionState)
 	} else {
 		r2 = ret.Error(2)
