@@ -72,8 +72,14 @@ func NewHeaders(collector module.CacheMetrics, db storage.DB) *Headers {
 	return h
 }
 
-func (h *Headers) storeTx(lctx lockctx.Proof, rw storage.ReaderBatchWriter, header *flow.Header, proposalSig []byte) error {
-	err := h.cache.PutWithLockTx(lctx, rw, header.ID(), header)
+func (h *Headers) storeTx(
+	lctx lockctx.Proof,
+	rw storage.ReaderBatchWriter,
+	blockID flow.Identifier,
+	header *flow.Header,
+	proposalSig []byte,
+) error {
+	err := h.cache.PutWithLockTx(lctx, rw, blockID, header)
 	if err != nil {
 		return err
 	}
