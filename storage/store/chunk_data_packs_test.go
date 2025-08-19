@@ -40,17 +40,10 @@ func TestChunkDataPack_Remove(t *testing.T) {
 			require.NoError(t, err)
 		}
 
-<<<<<<< HEAD
 		chunkIDs := make([]flow.Identifier, 0, len(chunkDataPacks))
 		for _, chunk := range chunkDataPacks {
-			chunkIDs = append(chunkIDs, chunk.ID())
+			chunkIDs = append(chunkIDs, chunk.ChunkID)
 		}
-=======
-			chunkIDs := make([]flow.Identifier, 0, len(chunkDataPacks))
-			for _, chunk := range chunkDataPacks {
-				chunkIDs = append(chunkIDs, chunk.ChunkID)
-			}
->>>>>>> feature/malleability
 
 		require.NoError(t, chunkDataPackStore.Store(chunkDataPacks))
 		require.NoError(t, chunkDataPackStore.Remove(chunkIDs))
