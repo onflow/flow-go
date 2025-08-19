@@ -10,8 +10,6 @@ const (
 	codeMax    = 1 // keeps track of the maximum key size
 	codeDBType = 2 // specifies a database type
 
-<<<<<<< HEAD
-=======
 	// codes for views with special meaning
 	codeSafetyData   = 10 // safety data for hotstuff state
 	codeLivenessData = 11 // liveness data for hotstuff state
@@ -70,7 +68,6 @@ const (
 	codeAllBlockReceipts       = 59 // index mapping of blockID to multiple receipts
 	codePayloadProtocolStateID = 60 // index mapping block ID to payload protocol state ID
 
->>>>>>> @{-1}
 	// codes related to protocol level information
 	codeEpochSetup       = 61 // EpochSetup service event, keyed by ID
 	codeEpochCommit      = 62 // EpochCommit service event, keyed by ID
