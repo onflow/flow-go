@@ -120,7 +120,6 @@ func TestStoreConflictingGuarantee(t *testing.T) {
 			return blocks.BatchStore(lctx2, rw, proposal2)
 		}))
 		lctx2.Release()
-
 		actual, err := store1.ByID(expected.ID())
 		require.NoError(t, err)
 		require.Equal(t, expected, actual)
