@@ -39,7 +39,7 @@ func (l *LocalEventProvider) Events(
 	blocks []BlockMetadata,
 	eventType flow.EventType,
 	encodingVersion entities.EventEncodingVersion,
-	executionState *entities.ExecutionStateQuery,
+	executionState entities.ExecutionStateQuery,
 ) (Response, entities.ExecutorMetadata, error) {
 	missing := make([]BlockMetadata, 0)
 	resp := make([]flow.BlockEvents, 0)
@@ -50,6 +50,7 @@ func (l *LocalEventProvider) Events(
 			return Response{}, entities.ExecutorMetadata{}, rpc.ConvertError(ctx.Err(), "failed to get events from storage", codes.Canceled)
 		}
 
+		// TODO: use operator's criteria if one is not provided
 		result, err := l.execResultProvider.ExecutionResult(
 			blockInfo.ID,
 			optimistic_sync.Criteria{

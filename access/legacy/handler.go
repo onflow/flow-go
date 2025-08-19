@@ -320,7 +320,7 @@ func (h *Handler) GetEventsForHeightRange(
 	startHeight := req.GetStartHeight()
 	endHeight := req.GetEndHeight()
 
-	results, err := h.api.GetEventsForHeightRange(ctx, eventType, startHeight, endHeight, entities.EventEncodingVersion_JSON_CDC_V0)
+	results, _, err := h.api.GetEventsForHeightRange(ctx, eventType, startHeight, endHeight, entities.EventEncodingVersion_JSON_CDC_V0, entities.ExecutionStateQuery{})
 	if err != nil {
 		return nil, err
 	}
@@ -338,7 +338,7 @@ func (h *Handler) GetEventsForBlockIDs(
 	eventType := req.GetType()
 	blockIDs := convert.MessagesToIdentifiers(req.GetBlockIds())
 
-	results, err := h.api.GetEventsForBlockIDs(ctx, eventType, blockIDs, entities.EventEncodingVersion_JSON_CDC_V0)
+	results, _, err := h.api.GetEventsForBlockIDs(ctx, eventType, blockIDs, entities.EventEncodingVersion_JSON_CDC_V0, entities.ExecutionStateQuery{})
 	if err != nil {
 		return nil, err
 	}

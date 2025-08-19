@@ -170,7 +170,6 @@ func New(params Params) (*Backend, error) {
 		params.ConnFactory,
 		params.Communicator,
 		params.EventQueryMode,
-		params.EventsIndex,
 		params.ExecNodeIdentitiesProvider,
 		params.ExecutionResultProvider,
 		params.ExecutionStateCache,

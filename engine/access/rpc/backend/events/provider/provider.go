@@ -15,7 +15,7 @@ type EventProvider interface {
 		blocks []BlockMetadata,
 		eventType flow.EventType,
 		encodingVersion entities.EventEncodingVersion,
-		executionState *entities.ExecutionStateQuery,
+		executionState entities.ExecutionStateQuery,
 	) (Response, entities.ExecutorMetadata, error)
 }
 

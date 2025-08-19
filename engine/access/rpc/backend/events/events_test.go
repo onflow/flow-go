@@ -72,7 +72,7 @@ type EventsSuite struct {
 	executionResultProvider *osyncmock.ExecutionResultProvider
 	executionStateCache     *osyncmock.ExecutionStateCache
 	resultForestSnapshot    *osyncmock.Snapshot
-	executionState          *entities.ExecutionStateQuery
+	executionState          entities.ExecutionStateQuery
 
 	testCases []testCase
 }
@@ -187,7 +187,7 @@ func (s *EventsSuite) SetupTest() {
 		Maybe() // it is called only for local query mode
 
 	executorIDs := unittest.IdentityListFixture(2, unittest.WithRole(flow.RoleExecution))
-	s.executionState = &entities.ExecutionStateQuery{
+	s.executionState = entities.ExecutionStateQuery{
 		AgreeingExecutorsCount:  2,
 		RequiredExecutorId:      convert.IdentifiersToMessages(executorIDs.NodeIDs()),
 		IncludeExecutorMetadata: false,

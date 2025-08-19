@@ -34,6 +34,7 @@ type Events struct {
 	chain          flow.Chain
 	maxHeightRange uint
 	provider       provider.EventProvider
+	queryMode      query_mode.IndexQueryMode
 }
 
 var _ access.EventsAPI = (*Events)(nil)
@@ -75,6 +76,7 @@ func NewEventsBackend(
 		maxHeightRange: maxHeightRange,
 		headers:        headers,
 		provider:       eventProvider,
+		queryMode:      queryMode,
 	}, nil
 }
 
@@ -85,7 +87,7 @@ func (e *Events) GetEventsForHeightRange(
 	eventType string,
 	startHeight, endHeight uint64,
 	requiredEventEncodingVersion entities.EventEncodingVersion,
-	execState *entities.ExecutionStateQuery,
+	executionState entities.ExecutionStateQuery,
 ) ([]flow.BlockEvents, entities.ExecutorMetadata, error) {
 	if _, err := events.ValidateEvent(flow.EventType(eventType), e.chain); err != nil {
 		return nil, entities.ExecutorMetadata{},
@@ -154,7 +156,7 @@ func (e *Events) GetEventsForHeightRange(
 		})
 	}
 
-	resp, metadata, err := e.provider.Events(ctx, blockHeaders, flow.EventType(eventType), requiredEventEncodingVersion, execState)
+	resp, metadata, err := e.provider.Events(ctx, blockHeaders, flow.EventType(eventType), requiredEventEncodingVersion, executionState)
 	if err != nil {
 		return nil, metadata, err
 	}
@@ -168,7 +170,7 @@ func (e *Events) GetEventsForBlockIDs(
 	eventType string,
 	blockIDs []flow.Identifier,
 	requiredEventEncodingVersion entities.EventEncodingVersion,
-	executionState *entities.ExecutionStateQuery,
+	executionState entities.ExecutionStateQuery,
 ) ([]flow.BlockEvents, entities.ExecutorMetadata, error) {
 	if _, err := events.ValidateEvent(flow.EventType(eventType), e.chain); err != nil {
 		return nil, entities.ExecutorMetadata{}, status.Errorf(codes.InvalidArgument, "invalid event type: %v", err)
