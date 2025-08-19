@@ -1181,8 +1181,8 @@ type DHTMetrics interface {
 }
 
 type CollectionExecutedMetric interface {
-	CollectionFinalized(light flow.LightCollection)
-	CollectionExecuted(light flow.LightCollection)
+	CollectionFinalized(light *flow.LightCollection)
+	CollectionExecuted(light *flow.LightCollection)
 	BlockFinalized(block *flow.Block)
 	ExecutionReceiptReceived(r *flow.ExecutionReceipt)
 	UpdateLastFullBlockHeight(height uint64)
