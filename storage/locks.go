@@ -15,7 +15,9 @@ const (
 	LockFinalizeBlock = "lock_finalize_block"
 	// LockIndexResultApproval protects indexing result approvals by approval and chunk.
 	LockIndexResultApproval = "lock_index_result_approval"
-	LockInsertOwnReceipt    = "lock_insert_own_receipt"
+	// LockInsertOwnReceipt is intended for Execution Nodes to ensure that they never publish different receipts for the same block.
+	// Specifically, with this lock we prevent accidental overwrites of the index `executed block ID` ➜ `Receipt ID`.
+	LockInsertOwnReceipt = "lock_insert_own_receipt"
 )
 
 // Locks returns a list of all named locks used by the storage layer.

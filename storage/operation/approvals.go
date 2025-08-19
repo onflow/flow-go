@@ -7,6 +7,7 @@ import (
 	"github.com/jordanschalm/lockctx"
 
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/storage"
 )
 
@@ -59,8 +60,8 @@ func InsertAndIndexResultApproval(approval *flow.ResultApproval) func(lctx lockc
 			}
 			return nil // already stored and indexed
 		}
-		if !errors.Is(err, storage.ErrNotFound) {
-			return fmt.Errorf("could not lookup result approval ID: %w", err)
+		if !errors.Is(err, storage.ErrNotFound) { // `storage.ErrNotFound` is expected, as this indicates that no receipt is indexed yet; anything else is an exception
+			return fmt.Errorf("could not lookup result approval ID: %w", irrecoverable.NewException(err))
 		}
 
 		err = inserting(rw.Writer())

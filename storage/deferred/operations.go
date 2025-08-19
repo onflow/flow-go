@@ -13,13 +13,16 @@ import (
 type DBOp = func(lctx lockctx.Proof, blockID flow.Identifier, rw storage.ReaderBatchWriter) error
 
 // DeferredBlockPersist accumulates deferred database operations to be executed later in a single atomic batch update.
-// Operations are executed in the order in which they were queued.
+// Specifically, we defer appending writes and success-callbacks to a [storage.ReaderBatchWriter].
+// Operations for appending writes and success-callbacks are executed in the order in which they were queued.
 // Since Pebble does not provide serializable snapshot isolation, callers MUST ensure that the necessary locks are
 // acquired before executing the set of deferred operations.
 //
 // This construct accomplishes two distinct goals:
 //  1. Deferring block indexing write operations when the block ID is not yet known.
-//  2. Deferring lock-requiring read-then-write operations, to minimize time spent holding a lock.
+//  2. Deferring lock-requiring read-then-write operations to minimize time spent holding a lock.
+//
+// NOT CONCURRENCY SAFE
 type DeferredBlockPersist struct {
 	pending DBOp // Holds the accumulated operations as a single composed function. Can be nil if no ops are added.
 }
@@ -38,7 +41,7 @@ func (d *DeferredBlockPersist) IsEmpty() bool {
 
 // AddNextOperation adds a new deferred database operation to the queue of pending operations.
 // If there are already pending operations, this new operation will be composed to run after them.
-// This method ensures the operations execute sequentially and short-circuits on the first error.
+// This method ensures the operations execute sequentially and abort on the first error.
 //
 // If `nil` is passed, it is ignored — this might happen if chaining with an empty DeferredBlockPersist.
 func (d *DeferredBlockPersist) AddNextOperation(nextOperation DBOp) {
@@ -68,7 +71,10 @@ func (d *DeferredBlockPersist) AddNextOperation(nextOperation DBOp) {
 	}
 }
 
-// Chain merges the deferred operations from another DeferredBlockPersist into this one, preserving order.
+// Chain merges the deferred operations from another DeferredBlockPersist into this one.
+// The resulting order of operations is:
+// 1. execute the operations in the receiver in the order they were added
+// 2. execute the operations from the input in the order they were added
 func (d *DeferredBlockPersist) Chain(deferred *DeferredBlockPersist) {
 	d.AddNextOperation(deferred.pending)
 }
@@ -77,7 +83,7 @@ func (d *DeferredBlockPersist) Chain(deferred *DeferredBlockPersist) {
 // This is useful for registering indexing tasks or post-commit hooks.
 // The callback is only invoked if no error occurred during batch updates execution.
 func (d *DeferredBlockPersist) AddSucceedCallback(callback func()) {
-	d.AddNextOperation(func(lctx lockctx.Proof, blockID flow.Identifier, rw storage.ReaderBatchWriter) error {
+	d.AddNextOperation(func(_ lockctx.Proof, blockID flow.Identifier, rw storage.ReaderBatchWriter) error {
 		// Schedule the callback to run after a successful commit.
 		storage.OnCommitSucceed(rw, callback)
 		return nil

@@ -43,9 +43,9 @@ func TestInsertQuorumCertificate(t *testing.T) {
 		err = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 			return operation.InsertQuorumCertificate(lctx2, rw, different)
 		})
-		lctx2.Release()
 		require.Error(t, err)
 		require.ErrorIs(t, err, storage.ErrAlreadyExists)
+		lctx2.Release()
 
 		// verify that the original QC is still there
 		err = operation.RetrieveQuorumCertificate(db.Reader(), expected.BlockID, &actual)
