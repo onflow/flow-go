@@ -22,7 +22,6 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/executiondatasync/provider"
-	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/mempool/entity"
 	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/state/protocol"
@@ -228,8 +227,16 @@ func (e *blockComputer) ExecuteBlock(
 	return results, nil
 }
 
-<<<<<<< HEAD
-// queueTransactionRequests enqueues transaction processing requests for all user and
+func (e *blockComputer) userTransactionsCount(collections []*entity.CompleteCollection) int {
+	count := 0
+	for _, collection := range collections {
+		count += len(collection.Collection.Transactions)
+	}
+
+	return count
+}
+
+// queueUserTransactions enqueues transaction processing requests for all user and
 // system transactions in the given block.
 //
 // If constructing the Collection for the system transaction fails (for example, because
@@ -240,29 +247,12 @@ func (e *blockComputer) ExecuteBlock(
 // Returns:
 //   - nil on success,
 //   - error if an irrecoverable error is received if the system transaction’s Collection cannot be constructed.
-func (e *blockComputer) queueTransactionRequests(
-=======
-func (e *blockComputer) userTransactionsCount(collections []*entity.CompleteCollection) int {
-	count := 0
-	for _, collection := range collections {
-		count += len(collection.Transactions)
-	}
-
-	return count
-}
-
 func (e *blockComputer) queueUserTransactions(
->>>>>>> master
 	blockId flow.Identifier,
 	blockHeader *flow.Header,
 	rawCollections []*entity.CompleteCollection,
 	requestQueue chan TransactionRequest,
-<<<<<<< HEAD
-	numTxns int,
-) error {
-=======
 ) {
->>>>>>> master
 	txnIndex := uint32(0)
 	blockIdStr := blockId.String()
 
@@ -300,55 +290,6 @@ func (e *blockComputer) queueUserTransactions(
 			txnIndex += 1
 		}
 	}
-<<<<<<< HEAD
-
-	systemCtx := fvm.NewContextFromParent(
-		e.systemChunkCtx,
-		fvm.WithBlockHeader(blockHeader),
-		fvm.WithProtocolStateSnapshot(e.protocolState.AtBlockID(blockId)),
-	)
-	systemCollectionLogger := systemCtx.Logger.With().
-		Str("block_id", blockIdStr).
-		Uint64("height", blockHeader.Height).
-		Bool("system_chunk", true).
-		Bool("system_transaction", true).
-		Int("num_collections", len(rawCollections)).
-		Int("num_txs", numTxns).
-		Logger()
-
-	collection, err := flow.NewCollection(flow.UntrustedCollection{Transactions: []*flow.TransactionBody{systemTxnBody}})
-	if err != nil {
-		return irrecoverable.NewExceptionf("could not construct collection for system transacftion: %w", err)
-	}
-
-	systemCollectionInfo := collectionInfo{
-		blockId:         blockId,
-		blockIdStr:      blockIdStr,
-		blockHeight:     blockHeader.Height,
-		collectionIndex: len(rawCollections),
-		CompleteCollection: &entity.CompleteCollection{
-			Collection: collection,
-		},
-		isSystemTransaction: true,
-	}
-
-	requestQueue <- newTransactionRequest(
-		systemCollectionInfo,
-		systemCtx,
-		systemCollectionLogger,
-		txnIndex,
-		systemTxnBody,
-		true)
-
-	return nil
-}
-
-func numberOfTransactionsInBlock(collections []*entity.CompleteCollection) int {
-	numTxns := 1 // there's one system transaction per block
-	for _, collection := range collections {
-		numTxns += len(collection.Collection.Transactions)
-	}
-=======
 }
 
 func (e *blockComputer) queueSystemTransactions(
@@ -366,7 +307,6 @@ func (e *blockComputer) queueSystemTransactions(
 	systemTxs := systemColection.CompleteCollection.Transactions
 	systemColection.CompleteCollection.Transactions = append(systemTxs, allTxs...)
 	systemLogger = systemLogger.With().Uint32("num_txs", uint32(len(systemTxs))).Logger()
->>>>>>> master
 
 	for i, txBody := range allTxs {
 		last := i == len(allTxs)-1
@@ -404,20 +344,14 @@ func (e *blockComputer) executeBlock(
 		return nil, fmt.Errorf("executable block start state is not set")
 	}
 
-<<<<<<< HEAD
-	blockId := block.BlockID()
-	blockIdStr := blockId.String()
-
-=======
->>>>>>> master
 	rawCollections := block.Collections()
 	userTxCount := e.userTransactionsCount(rawCollections)
 
 	blockSpan := e.tracer.StartSpanFromParent(
-		e.tracer.BlockRootSpan(block.ID()),
+		e.tracer.BlockRootSpan(block.BlockID()),
 		trace.EXEComputeBlock)
 	blockSpan.SetAttributes(
-		attribute.String("block_id", block.ID().String()),
+		attribute.String("block_id", block.BlockID().String()),
 		attribute.Int("collection_counts", len(rawCollections)))
 	defer blockSpan.End()
 
@@ -444,27 +378,13 @@ func (e *blockComputer) executeBlock(
 		derivedBlockData,
 		collector)
 
-<<<<<<< HEAD
-	err = e.queueTransactionRequests(
-		blockId,
-		blockIdStr,
-		block.Block.ToHeader(),
-=======
 	e.executeUserTransactions(
 		block,
 		blockSpan,
 		database,
->>>>>>> master
 		rawCollections,
 		userTxCount,
 	)
-<<<<<<< HEAD
-	if err != nil {
-		return nil, fmt.Errorf("could not queue transaction requests: %w", err)
-	}
-	close(requestQueue)
-=======
->>>>>>> master
 
 	err := e.executeSystemTransactions(
 		block,
@@ -488,7 +408,7 @@ func (e *blockComputer) executeBlock(
 	}
 
 	e.log.Debug().
-		Hex("block_id", blockId[:]).
+		Str("block_id", block.BlockID().String()).
 		Msg("all views committed")
 
 	e.metrics.ExecutionBlockCachedPrograms(derivedBlockData.CachedPrograms())
