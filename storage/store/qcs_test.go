@@ -37,8 +37,32 @@ func TestQuorumCertificates_StoreTx(t *testing.T) {
 	})
 }
 
+// TestQuorumCertificates_LockEnforced verifies that storing a QC requires holding the
+// storage.LockInsertBlock lock. If the lock is not held, `BatchStore` should error.
+func TestQuorumCertificates_LockEnforced(t *testing.T) {
+	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
+		metrics := metrics.NewNoopCollector()
+		store := store.NewQuorumCertificates(metrics, db, 10)
+		qc := unittest.QuorumCertificateFixture()
+
+		// acquire wrong lock and attempt to store QC: should error
+		lockManager := locks.NewTestingLockManager()
+		lctx := lockManager.NewContext()
+		require.NoError(t, lctx.AcquireLock(storage.LockFinalizeBlock)) // INCORRECT LOCK
+		err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+			return store.BatchStore(lctx, rw, qc)
+		})
+		require.Error(t, err)
+		lctx.Release()
+
+		// qc should not be stored, so ByBlockID should return `storage.ErrNotFound`
+		_, err = store.ByBlockID(qc.BlockID)
+		require.ErrorIs(t, err, storage.ErrNotFound)
+	})
+}
+
 // TestQuorumCertificates_StoreTx_OtherQC checks if storing other QC for same blockID results in
-// expected storage error and already stored value is not overwritten.
+// `storage.ErrAlreadyExists` and already stored value is not overwritten.
 func TestQuorumCertificates_StoreTx_OtherQC(t *testing.T) {
 	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
 		metrics := metrics.NewNoopCollector()

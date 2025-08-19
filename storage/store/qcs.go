@@ -51,7 +51,7 @@ func (q *QuorumCertificates) BatchStore(lctx lockctx.Proof, rw storage.ReaderBat
 	return q.cache.PutWithLockTx(lctx, rw, qc.BlockID, qc)
 }
 
-// ByBlockID returns QC that certifies block referred by blockID.
+// ByBlockID returns QC that certifies the block referred by blockID.
 // * storage.ErrNotFound if no QC for blockID doesn't exist.
 func (q *QuorumCertificates) ByBlockID(blockID flow.Identifier) (*flow.QuorumCertificate, error) {
 	val, err := q.cache.Get(q.db.Reader(), blockID)

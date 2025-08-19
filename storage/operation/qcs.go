@@ -13,7 +13,7 @@ import (
 // If a quorum certificate for the block already exists, it returns storage.ErrAlreadyExists.
 func InsertQuorumCertificate(lctx lockctx.Proof, rw storage.ReaderBatchWriter, qc *flow.QuorumCertificate) error {
 	if !lctx.HoldsLock(storage.LockInsertBlock) {
-		return fmt.Errorf("cannot upsert quorum certificate without holding lock %s", storage.LockInsertBlock)
+		return fmt.Errorf("cannot insert quorum certificate without holding lock %s", storage.LockInsertBlock)
 	}
 
 	key := MakePrefix(codeBlockIDToQuorumCertificate, qc.BlockID)
