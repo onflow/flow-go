@@ -28,15 +28,17 @@ func TestApprovalStoreAndRetrieve(t *testing.T) {
 		storing := store.StoreMyApproval(approval)
 		lockManager := locks.NewTestingLockManager()
 		lctx := lockManager.NewContext()
-		defer lctx.Release()
 		require.NoError(t, lctx.AcquireLock(storage.LockIndexResultApproval))
 		err := storing(lctx)
 		require.NoError(t, err)
+		lctx.Release() // release lock before any reads
 
+		// retrieve entire approval by its ID
 		byID, err := store.ByID(approval.ID())
 		require.NoError(t, err)
 		require.Equal(t, approval, byID)
 
+		// retrieve approval by pair (executed result ID, chunk index)
 		byChunk, err := store.ByChunk(approval.Body.ExecutionResultID, approval.Body.ChunkIndex)
 		require.NoError(t, err)
 		require.Equal(t, approval, byChunk)
@@ -48,6 +50,9 @@ func TestApprovalStoreTwice(t *testing.T) {
 		metrics := metrics.NewNoopCollector()
 		store := store.NewResultApprovals(metrics, db, storage.NewTestingLockManager())
 
+		// create the deferred database operation to store `approval`; we deliberately
+		// do this outside of the lock to confirm that the lock is not required for
+		// creating the operation -- only for executing the storage write further below
 		approval := unittest.ResultApprovalFixture()
 		storing := store.StoreMyApproval(approval)
 		lockManager := locks.NewTestingLockManager()
@@ -59,7 +64,7 @@ func TestApprovalStoreTwice(t *testing.T) {
 
 		lctx2 := lockManager.NewContext()
 		require.NoError(t, lctx2.AcquireLock(storage.LockIndexResultApproval))
-		err = storing(lctx2)
+		err = storing(lctx2) // repeated storage of same approval should be no-op
 		require.NoError(t, err)
 		lctx2.Release()
 	})
@@ -69,12 +74,11 @@ func TestApprovalStoreTwoDifferentApprovalsShouldFail(t *testing.T) {
 	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
 		metrics := metrics.NewNoopCollector()
 		store := store.NewResultApprovals(metrics, db, storage.NewTestingLockManager())
+		lockManager := locks.NewTestingLockManager()
 
 		approval1, approval2 := twoApprovalsForTheSameResult(t)
 
 		storing := store.StoreMyApproval(approval1)
-
-		lockManager := locks.NewTestingLockManager()
 		lctx := lockManager.NewContext()
 		require.NoError(t, lctx.AcquireLock(storage.LockIndexResultApproval))
 		err := storing(lctx)
@@ -103,37 +107,39 @@ func TestApprovalStoreTwoDifferentApprovalsConcurrently(t *testing.T) {
 		lockManager := locks.NewTestingLockManager()
 		approval1, approval2 := twoApprovalsForTheSameResult(t)
 
-		var wg sync.WaitGroup
-		wg.Add(2)
+		var startSignal sync.WaitGroup // both goroutines will wait for this signal to start concurrently
+		startSignal.Add(1)             // expecting one signal from the main thread to start both goroutines
+		var doneSinal sync.WaitGroup   // the main thread will wait on this for both goroutines to finish
+		doneSinal.Add(2)               // expecting two goroutines to finish
 
 		var firstIndexErr, secondIndexErr error
 
 		// First goroutine stores and indexes the first approval.
 		go func() {
-			defer wg.Done()
-
+			defer doneSinal.Done()
 			storing := store.StoreMyApproval(approval1)
-
 			lctx := lockManager.NewContext()
-			defer lctx.Release()
+
+			startSignal.Wait()
 			require.NoError(t, lctx.AcquireLock(storage.LockIndexResultApproval))
 			firstIndexErr = storing(lctx)
+			lctx.Release()
 		}()
 
 		// Second goroutine stores and tries to index the second approval for the same chunk.
 		go func() {
-			defer wg.Done()
+			defer doneSinal.Done()
 			storing := store.StoreMyApproval(approval2)
-
 			lctx := lockManager.NewContext()
-			defer lctx.Release()
-			require.NoError(t, lctx.AcquireLock(storage.LockIndexResultApproval))
 
+			startSignal.Wait()
+			require.NoError(t, lctx.AcquireLock(storage.LockIndexResultApproval))
 			secondIndexErr = storing(lctx)
+			lctx.Release()
 		}()
 
-		// Wait for both goroutines to finish
-		wg.Wait()
+		startSignal.Done() // start both goroutines
+		doneSinal.Wait()   // wait for both goroutines to finish
 
 		// Check that one of the Index operations succeeded and the other failed
 		if firstIndexErr == nil {
