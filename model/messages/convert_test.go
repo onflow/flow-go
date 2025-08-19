@@ -1,6 +1,7 @@
 package messages_test
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -9,6 +10,7 @@ import (
 	"github.com/onflow/flow-go/model/cluster"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/messages"
+	"github.com/onflow/flow-go/network/codec"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -20,8 +22,10 @@ func TestBlockResponse(t *testing.T) {
 			flow.UntrustedProposal(expected[1]),
 		},
 	}
-	converted, err := res.ToInternal()
+	internal, err := res.ToInternal()
 	require.NoError(t, err)
+	converted, ok := internal.(*flow.BlockResponse)
+	require.True(t, ok)
 	assert.Equal(t, expected, converted.Blocks)
 }
 
@@ -35,7 +39,16 @@ func TestClusterBlockResponse(t *testing.T) {
 			cluster.UntrustedProposal(expected[1]),
 		},
 	}
-	converted, err := res.ToInternal()
+	internal, err := res.ToInternal()
 	require.NoError(t, err)
+	converted, ok := internal.(*cluster.BlockResponse)
+	require.True(t, ok)
 	assert.Equal(t, expected, converted.Blocks)
+}
+
+func TestInterfaceFromMessageCode(t *testing.T) {
+	msg, _, _ := codec.InterfaceFromMessageCode(codec.CodeBlockProposal)
+	fmt.Printf("%T\n%v\n", msg, msg)
+	msgint, _ := msg.ToInternal()
+	fmt.Printf("%T\n%v\n", msgint, msgint)
 }

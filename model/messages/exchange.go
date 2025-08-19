@@ -14,6 +14,11 @@ type EntityRequest struct {
 	EntityIDs []flow.Identifier
 }
 
+func (e *EntityRequest) ToInternal() (any, error) {
+	// TODO(malleability, #7719) implement with validation checks
+	return e, nil
+}
+
 // EntityResponse is a response to an entity request, containing a set of
 // serialized entities and the identifiers used to request them. The returned
 // entity set may be empty or incomplete.
@@ -21,4 +26,9 @@ type EntityResponse struct {
 	Nonce     uint64
 	EntityIDs []flow.Identifier
 	Blobs     [][]byte
+}
+
+func (e *EntityResponse) ToInternal() (any, error) {
+	// TODO(malleability, #7720) implement with validation checks
+	return e, nil
 }

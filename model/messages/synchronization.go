@@ -17,12 +17,22 @@ type SyncRequest struct {
 	Height uint64
 }
 
+func (s *SyncRequest) ToInternal() (any, error) {
+	// TODO(malleability, #7705) implement with validation checks
+	return s, nil
+}
+
 // SyncResponse is part of the synchronization protocol and represents the reply
 // to a synchronization request that contains the latest finalized block height
 // of the responding node.
 type SyncResponse struct {
 	Nonce  uint64
 	Height uint64
+}
+
+func (s *SyncResponse) ToInternal() (any, error) {
+	// TODO(malleability, #7706) implement with validation checks
+	return s, nil
 }
 
 // RangeRequest is part of the synchronization protocol and represents an active
@@ -37,6 +47,11 @@ type RangeRequest struct {
 	ToHeight   uint64
 }
 
+func (r *RangeRequest) ToInternal() (any, error) {
+	// TODO(malleability, #7707) implement with validation checks
+	return r, nil
+}
+
 // BatchRequest is part of the synchronization protocol and represents an active
 // (pulling) attempt to synchronize with the consensus state of the network. It
 // requests finalized or unfinalized blocks by a list of block IDs.
@@ -47,6 +62,11 @@ type BatchRequest struct {
 	BlockIDs []flow.Identifier
 }
 
+func (b *BatchRequest) ToInternal() (any, error) {
+	// TODO(malleability, #7708) implement with validation checks
+	return b, nil
+}
+
 // BlockResponse is part of the synchronization protocol and represents the
 // reply to any active synchronization attempts. It contains a list of blocks
 // that should correspond to the request.
@@ -55,12 +75,13 @@ type BlockResponse struct {
 	Blocks []flow.UntrustedProposal
 }
 
+var _ UntrustedMessage = (*BlockResponse)(nil)
+
 // ToInternal converts all untrusted block proposals in the BlockResponse
 // into trusted flow.BlockResponse instances.
 //
-// All errors indicate that the input message could not be converted to a valid proposal.
-// TODO: BlockResponse should implement UntrustedMessage interface
-func (br *BlockResponse) ToInternal() (*flow.BlockResponse, error) {
+// All errors indicate that the message could not be converted to a valid BlockResponse.
+func (br *BlockResponse) ToInternal() (any, error) {
 	internal := make([]flow.Proposal, len(br.Blocks))
 	for i, untrusted := range br.Blocks {
 		proposal, err := flow.NewProposal(untrusted)
@@ -82,12 +103,13 @@ type ClusterBlockResponse struct {
 	Blocks []cluster.UntrustedProposal
 }
 
-// ToInternal converts all untrusted cluster block proposals in the BlockResponse
-// into trusted cluster.BlockResponse instances.
+var _ UntrustedMessage = (*ClusterBlockResponse)(nil)
+
+// ToInternal converts all untrusted cluster block proposals in the ClusterBlockResponse
+// into trusted cluster.BlockResponse instance.
 //
-// All errors indicate that the input message could not be converted to a valid proposal.
-// TODO: ClusterBlockResponse should implement UntrustedMessage interface
-func (br *ClusterBlockResponse) ToInternal() (*cluster.BlockResponse, error) {
+// All errors indicate that the message could not be converted to a valid ClusterBlockResponse.
+func (br *ClusterBlockResponse) ToInternal() (any, error) {
 	internal := make([]cluster.Proposal, len(br.Blocks))
 	for i, untrusted := range br.Blocks {
 		proposal, err := cluster.NewProposal(untrusted)

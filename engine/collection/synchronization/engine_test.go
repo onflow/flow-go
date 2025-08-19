@@ -282,8 +282,10 @@ func (ss *SyncSuite) TestOnRangeRequest() {
 			func(args mock.Arguments) {
 				res := args.Get(0).(*messages.ClusterBlockResponse)
 				expected := []clustermodel.Proposal{*ss.heights[ref-2], *ss.heights[ref-1], *ss.heights[ref]}
-				actual, err := res.ToInternal()
+				internal, err := res.ToInternal()
 				require.NoError(t, err)
+				actual, ok := internal.(*clustermodel.BlockResponse)
+				require.True(t, ok)
 				assert.ElementsMatch(ss.T(), expected, actual.Blocks, "response should contain right blocks")
 				assert.Equal(ss.T(), req.Nonce, res.Nonce, "response should contain request nonce")
 				recipientID := args.Get(1).(flow.Identifier)
@@ -304,8 +306,10 @@ func (ss *SyncSuite) TestOnRangeRequest() {
 			func(args mock.Arguments) {
 				res := args.Get(0).(*messages.ClusterBlockResponse)
 				expected := []clustermodel.Proposal{*ss.heights[ref-2], *ss.heights[ref-1], *ss.heights[ref]}
-				actual, err := res.ToInternal()
+				internal, err := res.ToInternal()
 				require.NoError(t, err)
+				actual, ok := internal.(*clustermodel.BlockResponse)
+				require.True(t, ok)
 				assert.ElementsMatch(ss.T(), expected, actual.Blocks, "response should contain right blocks")
 				assert.Equal(ss.T(), req.Nonce, res.Nonce, "response should contain request nonce")
 				recipientID := args.Get(1).(flow.Identifier)
@@ -328,8 +332,10 @@ func (ss *SyncSuite) TestOnRangeRequest() {
 			func(args mock.Arguments) {
 				res := args.Get(0).(*messages.ClusterBlockResponse)
 				expected := []clustermodel.Proposal{*ss.heights[ref-4], *ss.heights[ref-3], *ss.heights[ref-2]}
-				actual, err := res.ToInternal()
+				internal, err := res.ToInternal()
 				require.NoError(t, err)
+				actual, ok := internal.(*clustermodel.BlockResponse)
+				require.True(t, ok)
 				assert.ElementsMatch(ss.T(), expected, actual.Blocks, "response should contain right blocks")
 				assert.Equal(ss.T(), req.Nonce, res.Nonce, "response should contain request nonce")
 				recipientID := args.Get(1).(flow.Identifier)
@@ -414,8 +420,10 @@ func (ss *SyncSuite) TestOnBatchRequest() {
 		ss.con.On("Unicast", mock.Anything, mock.Anything).Return(nil).Once().Run(
 			func(args mock.Arguments) {
 				res := args.Get(0).(*messages.ClusterBlockResponse)
-				proposals, err := res.ToInternal()
+				internal, err := res.ToInternal()
 				require.NoError(t, err)
+				proposals, ok := internal.(*clustermodel.BlockResponse)
+				require.True(t, ok)
 				assert.ElementsMatch(ss.T(), []clustermodel.Proposal{*ss.blockIDs[req.BlockIDs[0]], *ss.blockIDs[req.BlockIDs[1]]}, proposals.Blocks, "response should contain right block")
 				assert.Equal(ss.T(), req.Nonce, res.Nonce, "response should contain request nonce")
 				recipientID := args.Get(1).(flow.Identifier)

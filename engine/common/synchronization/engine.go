@@ -172,41 +172,11 @@ func (e *Engine) setupResponseMessageHandler() error {
 		},
 		engine.Pattern{
 			Match: func(msg *engine.Message) bool {
-				// TODO(malleability immutable): Replace *messages.BlockResponse to *flow.BlockResponse when it was added to decoder
-				_, ok := msg.Payload.(*messages.BlockResponse)
+				_, ok := msg.Payload.(*flow.BlockResponse)
 				if ok {
 					e.metrics.MessageReceived(metrics.EngineSynchronization, metrics.MessageBlockResponse)
 				}
 				return ok
-			},
-			// TODO(malleability immutable): Remove Map function when ToInternal() was added to decoder
-			Map: func(msg *engine.Message) (*engine.Message, bool) {
-				blockResponse, ok := msg.Payload.(*messages.BlockResponse)
-				if !ok {
-					// should never happen, unless there is a bug.
-					e.log.Fatal().
-						Hex("origin_id", logging.ID(msg.OriginID)).
-						Interface("payload", msg.Payload).
-						Msg("cannot match the payload to BlockResponse")
-					return nil, false
-				}
-				proposals, err := blockResponse.ToInternal()
-				if err != nil {
-					// TODO(BFT, #7620): Replace this log statement with a call to the protocol violation consumer.
-					e.log.Warn().
-						Hex("origin_id", logging.ID(msg.OriginID)).
-						Uint64("nonce", blockResponse.Nonce).
-						Int("block_count", len(blockResponse.Blocks)).
-						Err(err).
-						Msgf("cannot convert untrusted proposal to trusted proposal")
-					e.metrics.InboundMessageDropped(metrics.EngineSynchronization, metrics.MessageBlockProposal)
-					return nil, false
-				}
-
-				return &engine.Message{
-					OriginID: msg.OriginID,
-					Payload:  proposals,
-				}, true
 			},
 			Store: e.pendingBlockResponses,
 		},
@@ -255,7 +225,7 @@ func (e *Engine) process(channel channels.Channel, originID flow.Identifier, eve
 		}
 		return e.requestHandler.Process(channel, originID, event)
 
-	case *messages.BlockResponse:
+	case *flow.BlockResponse:
 		err := e.validateBlockResponseForALSP(channel, originID, message)
 		if err != nil {
 			irrecoverable.Throw(context.TODO(), fmt.Errorf("failed to validate block response from %x: %w", originID[:], err))
@@ -559,7 +529,7 @@ func (e *Engine) validateBatchRequestForALSP(originID flow.Identifier, batchRequ
 }
 
 // TODO: implement spam reporting similar to validateSyncRequestForALSP
-func (e *Engine) validateBlockResponseForALSP(channel channels.Channel, id flow.Identifier, blockResponse *messages.BlockResponse) error {
+func (e *Engine) validateBlockResponseForALSP(channel channels.Channel, id flow.Identifier, blockResponse *flow.BlockResponse) error {
 	return nil
 }
 

@@ -25,7 +25,6 @@ import (
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/state/cluster"
 	"github.com/onflow/flow-go/storage"
-	"github.com/onflow/flow-go/utils/logging"
 	"github.com/onflow/flow-go/utils/rand"
 )
 
@@ -150,41 +149,11 @@ func (e *Engine) setupResponseMessageHandler() error {
 		},
 		engine.Pattern{
 			Match: func(msg *engine.Message) bool {
-				// TODO(malleability immutable): Replace *messages.ClusterBlockResponse to *cluster.BlockResponse when it was added to decoder
-				_, ok := msg.Payload.(*messages.ClusterBlockResponse)
+				_, ok := msg.Payload.(*clustermodel.BlockResponse)
 				if ok {
 					e.metrics.MessageReceived(metrics.EngineClusterSynchronization, metrics.MessageBlockResponse)
 				}
 				return ok
-			},
-			// TODO(malleability immutable): Remove Map function when ToInternal() was added to decoder
-			Map: func(msg *engine.Message) (*engine.Message, bool) {
-				blockResponse, ok := msg.Payload.(*messages.ClusterBlockResponse)
-				if !ok {
-					// should never happen, unless there is a bug.
-					e.log.Fatal().
-						Hex("origin_id", logging.ID(msg.OriginID)).
-						Interface("payload", msg.Payload).
-						Msg("cannot match the payload to ClusterBlockResponse")
-					return nil, false
-				}
-				proposals, err := blockResponse.ToInternal()
-				if err != nil {
-					// TODO(BFT, #7620): Replace this log statement with a call to the protocol violation consumer.
-					e.log.Warn().
-						Hex("origin_id", logging.ID(msg.OriginID)).
-						Uint64("nonce", blockResponse.Nonce).
-						Int("block_count", len(blockResponse.Blocks)).
-						Err(err).
-						Msgf("cannot convert untrusted proposal to trusted proposal")
-					e.metrics.InboundMessageDropped(metrics.EngineClusterSynchronization, metrics.MessageBlockProposal)
-					return nil, false
-				}
-
-				return &engine.Message{
-					OriginID: msg.OriginID,
-					Payload:  proposals,
-				}, true
 			},
 			Store: e.pendingBlockResponses,
 		},
@@ -262,7 +231,7 @@ func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 	switch event.(type) {
 	case *messages.RangeRequest, *messages.BatchRequest, *messages.SyncRequest:
 		return e.requestHandler.process(originID, event)
-	case *messages.SyncResponse, *messages.ClusterBlockResponse:
+	case *messages.SyncResponse, *clustermodel.BlockResponse:
 		return e.responseMessageHandler.Process(originID, event)
 	default:
 		return fmt.Errorf("received input with type %T from %x: %w", event, originID[:], engine.IncompatibleInputTypeError)
