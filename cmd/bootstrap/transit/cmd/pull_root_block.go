@@ -63,6 +63,8 @@ func pullRootBlock(c *cobra.Command, args []string) {
 		log.Fatal().Err(err).Msgf("could not download google bucket file")
 	}
 
+	log.Info().Msg("successfully downloaded root block ")
+
 	objectName := filepath.Join(flagToken, fmt.Sprintf(FilenameRandomBeaconCipher, nodeID))
 
 	// By default, use the bootstrap directory for the random beacon download & unwrapping
@@ -83,12 +85,12 @@ func pullRootBlock(c *cobra.Command, args []string) {
 
 	err = bucket.DownloadFile(ctx, client, fullRandomBeaconPath, objectName)
 	if err != nil {
-		log.Fatal().Err(err).Msg("could not download file from google bucket")
+		log.Info().Msg("could not download file from google bucket")
+	} else {
+		err = unWrapFile(flagBootDir, nodeID, flagOutputDir, unWrappedRandomBeaconPath)
+		if err != nil {
+			log.Fatal().Err(err).Msg("could not unwrap random beacon file")
+		}
+		log.Info().Msg("successfully downloaded and unwrapped random beacon private key")
 	}
-	err = unWrapFile(flagBootDir, nodeID, flagOutputDir, unWrappedRandomBeaconPath)
-	if err != nil {
-		log.Fatal().Err(err).Msg("could not unwrap random beacon file")
-	}
-
-	log.Info().Msg("successfully downloaded root block and random beacon key")
 }

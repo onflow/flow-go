@@ -26,10 +26,10 @@ var generateVoteCmd = &cobra.Command{
 
 func init() {
 	rootCmd.AddCommand(generateVoteCmd)
-	addGenerateRootBlockCmdFlags()
+	addGenerateVoteCmdFlags()
 }
 
-func addGenerateRootBlockCmdFlags() {
+func addGenerateVoteCmdFlags() {
 	generateVoteCmd.Flags().StringVarP(&flagOutputDir, "outputDir", "o", "", "ouput directory for vote files; if not set defaults to bootstrap directory")
 }
 
@@ -83,6 +83,12 @@ func generateVote(c *cobra.Command, args []string) {
 	signer := verification.NewCombinedSigner(me, beaconKeyStore)
 
 	path = filepath.Join(flagBootDir, bootstrap.PathRootBlockData)
+
+	// If output directory is specified, use it for the root-block.json
+	if flagOutputDir != "" {
+		path = filepath.Join(flagOutputDir, "root-block.json")
+	}
+
 	data, err = io.ReadFile(path)
 	if err != nil {
 		log.Fatal().Err(err).Msg("could not read root block file")
