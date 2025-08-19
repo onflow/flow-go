@@ -23,7 +23,7 @@ func TestPayloadStoreRetrieve(t *testing.T) {
 		expected := unittest.PayloadFixture(unittest.WithAllTheFixins)
 		block := unittest.BlockWithParentAndPayload(unittest.BlockHeaderWithHeight(10), expected)
 		proposal := unittest.ProposalFromBlock(block)
-		require.Equal(t, &expected, block.Payload)
+		require.Equal(t, expected, block.Payload)
 		blockID := block.ID()
 
 		_, lctx := unittest.LockManagerWithContext(t, storage.LockInsertBlock)
@@ -36,7 +36,7 @@ func TestPayloadStoreRetrieve(t *testing.T) {
 		// fetch payload
 		payload, err := payloads.ByBlockID(blockID)
 		require.NoError(t, err)
-		require.Equal(t, &expected, payload)
+		require.Equal(t, expected, *payload)
 	})
 }
 
