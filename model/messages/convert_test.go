@@ -1,6 +1,8 @@
 package messages_test
 
 import (
+	"fmt"
+	"github.com/onflow/flow-go/network/codec"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -38,4 +40,11 @@ func TestClusterBlockResponse(t *testing.T) {
 	converted, err := res.BlocksInternal()
 	require.NoError(t, err)
 	assert.Equal(t, expected, converted)
+}
+
+func TestInterfaceFromMessageCode(t *testing.T) {
+	msg, _, _ := codec.InterfaceFromMessageCode(codec.CodeBlockProposal)
+	fmt.Printf("%T\n%v\n", msg, msg)
+	msgint, _ := msg.ToInternal()
+	fmt.Printf("%T\n%v\n", msgint, msgint)
 }

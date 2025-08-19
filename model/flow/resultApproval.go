@@ -136,7 +136,7 @@ type ResultApproval struct {
 	VerifierSignature crypto.Signature
 }
 
-func (ra ResultApproval) ToInternal() (any, error) {
+func (ra *ResultApproval) ToInternal() (any, error) {
 	// TODO(malleability, #7714) create typedef for this type in messages package and implement it there
 	return ra, nil
 }

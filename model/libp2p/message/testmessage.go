@@ -5,6 +5,6 @@ type TestMessage struct {
 	Text string
 }
 
-func (t TestMessage) ToInternal() (any, error) {
+func (t *TestMessage) ToInternal() (any, error) {
 	return t, nil
 }

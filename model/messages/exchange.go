@@ -14,7 +14,7 @@ type EntityRequest struct {
 	EntityIDs []flow.Identifier
 }
 
-func (e EntityRequest) ToInternal() (any, error) {
+func (e *EntityRequest) ToInternal() (any, error) {
 	// TODO(malleability, #7719) implement with validation checks
 	return e, nil
 }
@@ -28,7 +28,7 @@ type EntityResponse struct {
 	Blobs     [][]byte
 }
 
-func (e EntityResponse) ToInternal() (any, error) {
+func (e *EntityResponse) ToInternal() (any, error) {
 	// TODO(malleability, #7720) implement with validation checks
 	return e, nil
 }

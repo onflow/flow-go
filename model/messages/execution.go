@@ -11,7 +11,7 @@ type ChunkDataRequest struct {
 	Nonce   uint64 // so that we aren't deduplicated by the network layer
 }
 
-func (c ChunkDataRequest) ToInternal() (any, error) {
+func (c *ChunkDataRequest) ToInternal() (any, error) {
 	// TODO(malleability, #7715) implement with validation checks
 	return c, nil
 }
@@ -23,7 +23,7 @@ type ChunkDataResponse struct {
 	Nonce         uint64 // so that we aren't deduplicated by the network layer
 }
 
-func (c ChunkDataResponse) ToInternal() (any, error) {
+func (c *ChunkDataResponse) ToInternal() (any, error) {
 	// TODO(malleability, #7716) implement with validation checks
 	return c, nil
 }

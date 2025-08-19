@@ -12,7 +12,7 @@ type BlockVote struct {
 	SigData []byte
 }
 
-func (b BlockVote) ToInternal() (any, error) {
+func (b *BlockVote) ToInternal() (any, error) {
 	// TODO(malleability, #7702) implement with validation checks
 	return b, nil
 }
@@ -27,7 +27,7 @@ type TimeoutObject struct {
 	SigData     []byte
 }
 
-func (t TimeoutObject) ToInternal() (any, error) {
+func (t *TimeoutObject) ToInternal() (any, error) {
 	// TODO(malleability, #7700) implement with validation checks
 	return t, nil
 }

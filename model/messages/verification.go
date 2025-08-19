@@ -10,7 +10,7 @@ type ApprovalRequest struct {
 	ChunkIndex uint64
 }
 
-func (a ApprovalRequest) ToInternal() (any, error) {
+func (a *ApprovalRequest) ToInternal() (any, error) {
 	// TODO(malleability, #7717) implement with validation checks
 	return a, nil
 }
@@ -21,7 +21,7 @@ type ApprovalResponse struct {
 	Approval flow.ResultApproval
 }
 
-func (a ApprovalResponse) ToInternal() (any, error) {
+func (a *ApprovalResponse) ToInternal() (any, error) {
 	// TODO(malleability, #7718) implement with validation checks
 	return a, nil
 }

@@ -12,7 +12,7 @@ type DKGMessage struct {
 	DKGInstanceID string
 }
 
-func (D DKGMessage) ToInternal() (any, error) {
+func (D *DKGMessage) ToInternal() (any, error) {
 	// TODO(malleability, #7721) implement with validation checks
 	return D, nil
 }

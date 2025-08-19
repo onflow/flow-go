@@ -21,7 +21,7 @@ type CollectionResponse struct {
 // consensus; effectively a vote for a particular collection.
 type ClusterBlockVote BlockVote
 
-func (c ClusterBlockVote) ToInternal() (any, error) {
+func (c *ClusterBlockVote) ToInternal() (any, error) {
 	// TODO(malleability, #7702) implement with validation checks
 	return c, nil
 }
@@ -30,7 +30,7 @@ func (c ClusterBlockVote) ToInternal() (any, error) {
 // timing out in given round. Contains a sequential number for deduplication purposes.
 type ClusterTimeoutObject TimeoutObject
 
-func (c ClusterTimeoutObject) ToInternal() (any, error) {
+func (c *ClusterTimeoutObject) ToInternal() (any, error) {
 	// TODO(malleability, #7704) implement with validation checks
 	return c, nil
 }

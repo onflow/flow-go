@@ -50,7 +50,7 @@ type TransactionBody struct {
 	EnvelopeSignatures []TransactionSignature
 }
 
-func (tb TransactionBody) ToInternal() (any, error) {
+func (tb *TransactionBody) ToInternal() (any, error) {
 	// TODO(malleability, #7711) create typedef for this type in messages package and implement it there
 	return tb, nil
 }

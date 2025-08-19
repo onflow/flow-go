@@ -17,7 +17,7 @@ type SyncRequest struct {
 	Height uint64
 }
 
-func (s SyncRequest) ToInternal() (any, error) {
+func (s *SyncRequest) ToInternal() (any, error) {
 	// TODO(malleability, #7705) implement with validation checks
 	return s, nil
 }
@@ -30,7 +30,7 @@ type SyncResponse struct {
 	Height uint64
 }
 
-func (s SyncResponse) ToInternal() (any, error) {
+func (s *SyncResponse) ToInternal() (any, error) {
 	// TODO(malleability, #7706) implement with validation checks
 	return s, nil
 }
@@ -47,7 +47,7 @@ type RangeRequest struct {
 	ToHeight   uint64
 }
 
-func (r RangeRequest) ToInternal() (any, error) {
+func (r *RangeRequest) ToInternal() (any, error) {
 	// TODO(malleability, #7707) implement with validation checks
 	return r, nil
 }
@@ -62,7 +62,7 @@ type BatchRequest struct {
 	BlockIDs []flow.Identifier
 }
 
-func (b BatchRequest) ToInternal() (any, error) {
+func (b *BatchRequest) ToInternal() (any, error) {
 	// TODO(malleability, #7708) implement with validation checks
 	return b, nil
 }
