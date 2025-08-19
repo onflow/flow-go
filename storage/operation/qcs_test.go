@@ -23,7 +23,7 @@ func TestInsertQuorumCertificate(t *testing.T) {
 		require.NoError(t, lctx.AcquireLock(storage.LockInsertBlock))
 
 		err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			return operation.UpsertQuorumCertificate(lctx, rw, expected)
+			return operation.InsertQuorumCertificate(lctx, rw, expected)
 		})
 		require.NoError(t, err)
 		lctx.Release()
@@ -41,7 +41,7 @@ func TestInsertQuorumCertificate(t *testing.T) {
 		lctx2 := lockManager.NewContext()
 		require.NoError(t, lctx2.AcquireLock(storage.LockInsertBlock))
 		err = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			return operation.UpsertQuorumCertificate(lctx2, rw, different)
+			return operation.InsertQuorumCertificate(lctx2, rw, different)
 		})
 		lctx2.Release()
 		require.Error(t, err)

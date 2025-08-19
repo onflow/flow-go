@@ -9,9 +9,9 @@ import (
 	"github.com/onflow/flow-go/storage"
 )
 
-// UpsertQuorumCertificate upserts a quorum certificate by block ID
+// InsertQuorumCertificate upserts a quorum certificate by block ID
 // If a quorum certificate for the block already exists, it returns storage.ErrAlreadyExists.
-func UpsertQuorumCertificate(lctx lockctx.Proof, rw storage.ReaderBatchWriter, qc *flow.QuorumCertificate) error {
+func InsertQuorumCertificate(lctx lockctx.Proof, rw storage.ReaderBatchWriter, qc *flow.QuorumCertificate) error {
 	if !lctx.HoldsLock(storage.LockInsertBlock) {
 		return fmt.Errorf("cannot upsert quorum certificate without holding lock %s", storage.LockInsertBlock)
 	}

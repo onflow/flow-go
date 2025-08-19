@@ -23,7 +23,7 @@ var _ storage.QuorumCertificates = (*QuorumCertificates)(nil)
 // which supports storing, caching and retrieving by block ID.
 func NewQuorumCertificates(collector module.CacheMetrics, db storage.DB, cacheSize uint) *QuorumCertificates {
 	storeWithLock := func(lctx lockctx.Proof, rw storage.ReaderBatchWriter, _ flow.Identifier, qc *flow.QuorumCertificate) error {
-		return operation.UpsertQuorumCertificate(lctx, rw, qc)
+		return operation.InsertQuorumCertificate(lctx, rw, qc)
 	}
 
 	retrieve := func(r storage.Reader, blockID flow.Identifier) (*flow.QuorumCertificate, error) {
