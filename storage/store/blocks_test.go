@@ -20,15 +20,11 @@ func TestBlockStoreAndRetrieve(t *testing.T) {
 		block := unittest.FullBlockFixture()
 		prop := unittest.ProposalFromBlock(block)
 
-<<<<<<< HEAD:storage/store/blocks_test.go
 		_, lctx := unittest.LockManagerWithContext(t, storage.LockInsertBlock)
 		defer lctx.Release()
 		err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			return blocks.BatchStore(lctx, rw, &block)
+			return blocks.BatchStore(lctx, rw, prop)
 		})
-=======
-		err := blocks.Store(prop)
->>>>>>> @{-1}:storage/badger/blocks_test.go
 		require.NoError(t, err)
 
 		retrieved, err := blocks.ByID(block.ID())
