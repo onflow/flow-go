@@ -20,7 +20,6 @@ import (
 	"github.com/onflow/flow-go/state/protocol/invalid"
 	protocolmock "github.com/onflow/flow-go/state/protocol/mock"
 	"github.com/onflow/flow-go/storage"
-	bstorage "github.com/onflow/flow-go/storage/badger"
 	"github.com/onflow/flow-go/storage/locks"
 	"github.com/onflow/flow-go/storage/operation/badgerimpl"
 	"github.com/onflow/flow-go/storage/operation/pebbleimpl"
@@ -124,6 +123,14 @@ func TestMigrateLastSealedExecutedResultToPebble(t *testing.T) {
 			header.ID(), badgerResults, badgerCommits)
 		require.NoError(t, err)
 
+		// create a new executable block for the second test
+		secondCommit := computationResult.CurrentEndState()
+		secondExecutableBlock := unittest.ExecutableBlockFixtureWithParent(
+			nil,
+			newheader,
+			&secondCommit)
+		secondHeader := secondExecutableBlock.Block.ToHeader()
+
 		// mock that the executed block is the last executed and sealed block
 		ps := new(protocolmock.State)
 		params := new(protocolmock.Params)
@@ -136,6 +143,8 @@ func TestMigrateLastSealedExecutedResultToPebble(t *testing.T) {
 					return createSnapshot(header)
 				} else if height == newheader.Height {
 					return createSnapshot(newheader)
+				} else if height == secondHeader.Height {
+					return createSnapshot(secondHeader)
 				}
 				return invalid.NewSnapshot(fmt.Errorf("invalid height: %v", height))
 			})
@@ -147,6 +156,8 @@ func TestMigrateLastSealedExecutedResultToPebble(t *testing.T) {
 					return createSnapshot(genesis.ToHeader())
 				} else if blockID == newheader.ID() {
 					return createSnapshot(newheader)
+				} else if blockID == secondHeader.ID() {
+					return createSnapshot(secondHeader)
 				}
 				return invalid.NewSnapshot(fmt.Errorf("invalid block: %v", blockID))
 			})
@@ -170,17 +181,16 @@ func TestMigrateLastSealedExecutedResultToPebble(t *testing.T) {
 		require.Equal(t, bresult, presult)
 		require.Equal(t, bcommit, pcommit)
 
-		// store a new block in pebble now, simulating new block executed after migration
-		pbdb := pebbleimpl.ToDB(pdb)
-		txResults = store.NewTransactionResults(metrics, pbdb, bstorage.DefaultCacheSize)
-		commits = store.NewCommits(metrics, pbdb)
-		results = store.NewExecutionResults(metrics, pbdb)
-		receipts = store.NewExecutionReceipts(metrics, pbdb, results, bstorage.DefaultCacheSize)
-		myReceipts = store.NewMyExecutionReceipts(metrics, pbdb, receipts)
-		events = store.NewEvents(metrics, pbdb)
-		serviceEvents = store.NewServiceEvents(metrics, pbdb)
+		// store a new block in badger now, simulating new block executed before migration
+		txResults = store.NewTransactionResults(metrics, db, store.DefaultCacheSize)
+		commits = store.NewCommits(metrics, db)
+		results = store.NewExecutionResults(metrics, db)
+		receipts = store.NewExecutionReceipts(metrics, db, results, store.DefaultCacheSize)
+		myReceipts = store.NewMyExecutionReceipts(metrics, db, receipts)
+		events = store.NewEvents(metrics, db)
+		serviceEvents = store.NewServiceEvents(metrics, db)
 
-		// create execution state module
+		// create execution state module using badger database
 		newes := state.NewExecutionState(
 			nil,
 			commits,
@@ -199,27 +209,27 @@ func TestMigrateLastSealedExecutedResultToPebble(t *testing.T) {
 			false,
 			lockManager,
 		)
-		require.NotNil(t, es)
+		require.NotNil(t, newes)
 
 		lctx2 = manager.NewContext()
 		require.NoError(t, lctx2.AcquireLock(storage.LockInsertBlock))
 		err = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			return blocks.BatchStore(lctx2, rw, unittest.ProposalFromBlock(newexecutableBlock.Block))
+			return blocks.BatchStore(lctx2, rw, unittest.ProposalFromBlock(secondExecutableBlock.Block))
 		})
 		lctx2.Release()
 		require.NoError(t, err)
 
 		newcomputationResult := testutil.ComputationResultFixture(t)
-		newcomputationResult.ExecutableBlock = newexecutableBlock
-		newcomputationResult.ExecutionReceipt.ExecutionResult.BlockID = newheader.ID()
-		sealed = newheader
+		newcomputationResult.ExecutableBlock = secondExecutableBlock
+		newcomputationResult.ExecutionReceipt.ExecutionResult.BlockID = secondHeader.ID()
+		sealed = secondHeader
 
 		// save execution results
 		err = newes.SaveExecutionResults(context.Background(), newcomputationResult)
 		require.NoError(t, err)
 
 		bresult, bcommit, err = readResultsForBlock(
-			newheader.ID(), badgerResults, badgerCommits)
+			secondHeader.ID(), badgerResults, badgerCommits)
 		require.NoError(t, err)
 
 		// run the migration
@@ -227,7 +237,7 @@ func TestMigrateLastSealedExecutedResultToPebble(t *testing.T) {
 
 		// read the migrated results after migration
 		presult, pcommit, err = readResultsForBlock(
-			newheader.ID(), pebbleResults, pebbleCommits)
+			secondHeader.ID(), pebbleResults, pebbleCommits)
 		require.NoError(t, err)
 
 		// compare the migrated results
