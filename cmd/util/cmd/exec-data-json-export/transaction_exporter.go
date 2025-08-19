@@ -49,9 +49,8 @@ func ExportExecutedTransactions(blockID flow.Identifier, dbPath string, outputPa
 	defer db.Close()
 
 	cacheMetrics := &metrics.NoopCollector{}
-<<<<<<< HEAD
 	index := store.NewIndex(cacheMetrics, db)
-	guarantees := store.NewGuarantees(cacheMetrics, db, store.DefaultCacheSize)
+	guarantees := store.NewGuarantees(cacheMetrics, db, store.DefaultCacheSize, store.DefaultCacheSize)
 	seals := store.NewSeals(cacheMetrics, db)
 	results := store.NewExecutionResults(cacheMetrics, db)
 	receipts := store.NewExecutionReceipts(cacheMetrics, db, results, store.DefaultCacheSize)
@@ -60,18 +59,6 @@ func ExportExecutedTransactions(blockID flow.Identifier, dbPath string, outputPa
 	payloads := store.NewPayloads(db, index, guarantees, seals, receipts, results)
 	blocks := store.NewBlocks(db, headers, payloads)
 	collections := store.NewCollections(db, transactions)
-=======
-	index := badger.NewIndex(cacheMetrics, db)
-	guarantees := badger.NewGuarantees(cacheMetrics, db, badger.DefaultCacheSize, badger.DefaultCacheSize)
-	seals := badger.NewSeals(cacheMetrics, db)
-	results := badger.NewExecutionResults(cacheMetrics, db)
-	receipts := badger.NewExecutionReceipts(cacheMetrics, db, results, badger.DefaultCacheSize)
-	transactions := badger.NewTransactions(cacheMetrics, db)
-	headers := badger.NewHeaders(cacheMetrics, db)
-	payloads := badger.NewPayloads(db, index, guarantees, seals, receipts, results)
-	blocks := badger.NewBlocks(db, headers, payloads)
-	collections := badger.NewCollections(db, transactions)
->>>>>>> feature/malleability
 
 	activeBlockID := blockID
 	outputFile := filepath.Join(outputPath, "transactions.jsonl")
