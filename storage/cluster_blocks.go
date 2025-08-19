@@ -12,9 +12,6 @@ import (
 // `ByHeight` don't exist here (but might be added later).
 type ClusterBlocks interface {
 
-	// ByID returns the block with the given ID.
-	ByID(blockID flow.Identifier) (*cluster.Block, error)
-
 	// ProposalByID returns the collection with the given ID, along with the proposer's signature on it.
 	// It is available for all incorporated collections (validated blocks that have been appended to any
 	// of the known forks) no matter whether the collection has been finalized or not.

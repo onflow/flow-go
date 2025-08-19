@@ -20,7 +20,6 @@ type ClusterBlocks struct {
 var _ storage.ClusterBlocks = (*ClusterBlocks)(nil)
 
 func NewClusterBlocks(db storage.DB, chainID flow.ChainID, headers *Headers, payloads *ClusterPayloads) *ClusterBlocks {
-
 	b := &ClusterBlocks{
 		db:       db,
 		chainID:  chainID,
