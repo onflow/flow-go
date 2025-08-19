@@ -21,14 +21,14 @@ func TestInsertRetrieveClusterBlock(t *testing.T) {
 		require.NoError(t, lctx.AcquireLock(storage.LockInsertBlock))
 		defer lctx.Release()
 		require.NoError(t, db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			return InsertClusterBlock(lctx, rw, &block)
+			return InsertClusterBlock(lctx, rw, unittest.ClusterProposalFromBlock(block))
 		}))
 
 		var retrieved cluster.Block
-		err := RetrieveClusterBlock(db.Reader(), block.Header.ID(), &retrieved)
+		err := RetrieveClusterBlock(db.Reader(), block.ID(), &retrieved)
 		require.NoError(t, err)
 
-		require.Equal(t, block, retrieved)
+		require.Equal(t, *block, retrieved)
 	})
 }
 
@@ -36,7 +36,9 @@ func TestFinalizeClusterBlock(t *testing.T) {
 	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
 		parent := unittest.ClusterBlockFixture()
 
-		block := unittest.ClusterBlockWithParent(&parent)
+		block := unittest.ClusterBlockFixture(
+			unittest.ClusterBlock.WithParent(parent),
+		)
 
 		lockManager := storage.NewTestingLockManager()
 		lctx := lockManager.NewContext()
@@ -44,29 +46,29 @@ func TestFinalizeClusterBlock(t *testing.T) {
 		require.NoError(t, lctx.AcquireLock(storage.LockInsertOrFinalizeClusterBlock))
 		require.NoError(t, lctx.AcquireLock(storage.LockInsertBlock))
 		require.NoError(t, db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			return InsertClusterBlock(lctx, rw, &block)
+			return InsertClusterBlock(lctx, rw, unittest.ClusterProposalFromBlock(block))
 		}))
 
 		require.NoError(t, db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			return operation.IndexClusterBlockHeight(lctx, rw.Writer(), block.Header.ChainID, parent.Header.Height, parent.ID())
+			return operation.IndexClusterBlockHeight(lctx, rw.Writer(), block.ChainID, parent.Height, parent.ID())
 		}))
 
 		require.NoError(t, db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			return operation.UpsertClusterFinalizedHeight(lctx, rw.Writer(), block.Header.ChainID, parent.Header.Height)
+			return operation.UpsertClusterFinalizedHeight(lctx, rw.Writer(), block.ChainID, parent.Height)
 		}))
 
 		require.NoError(t, db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			return FinalizeClusterBlock(lctx, rw, block.Header.ID())
+			return FinalizeClusterBlock(lctx, rw, block.ID())
 		}))
 
 		var boundary uint64
 		var err error
-		err = operation.RetrieveClusterFinalizedHeight(db.Reader(), block.Header.ChainID, &boundary)
+		err = operation.RetrieveClusterFinalizedHeight(db.Reader(), block.ChainID, &boundary)
 		require.NoError(t, err)
-		require.Equal(t, block.Header.Height, boundary)
+		require.Equal(t, block.Height, boundary)
 
 		var headID flow.Identifier
-		err = operation.LookupClusterBlockHeight(db.Reader(), block.Header.ChainID, boundary, &headID)
+		err = operation.LookupClusterBlockHeight(db.Reader(), block.ChainID, boundary, &headID)
 		require.NoError(t, err)
 		require.Equal(t, block.ID(), headID)
 	})

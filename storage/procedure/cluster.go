@@ -15,14 +15,14 @@ import (
 
 // InsertClusterBlock inserts a cluster consensus block, updating all
 // associated indexes.
-func InsertClusterBlock(lctx lockctx.Proof, rw storage.ReaderBatchWriter, block *cluster.Block) error {
+func InsertClusterBlock(lctx lockctx.Proof, rw storage.ReaderBatchWriter, proposal *cluster.Proposal) error {
 	if !lctx.HoldsLock(storage.LockInsertOrFinalizeClusterBlock) {
 		return fmt.Errorf("missing required lock: %s", storage.LockInsertOrFinalizeClusterBlock)
 	}
 
 	// store the block header
-	blockID := block.ID()
-	err := operation.InsertHeader(lctx, rw, blockID, block.Header)
+	blockID := proposal.Block.ID()
+	err := operation.InsertHeader(lctx, rw, blockID, proposal.Block.ToHeader())
 	if err != nil {
 		return fmt.Errorf("could not insert header: %w", err)
 	}
@@ -32,13 +32,13 @@ func InsertClusterBlock(lctx lockctx.Proof, rw storage.ReaderBatchWriter, block 
 	// for other data related to this block ID.
 
 	// insert the block payload
-	err = InsertClusterPayload(lctx, rw.Writer(), blockID, block.Payload)
+	err = InsertClusterPayload(lctx, rw.Writer(), blockID, &proposal.Block.Payload)
 	if err != nil {
 		return fmt.Errorf("could not insert payload: %w", err)
 	}
 
 	// index the child block for recovery
-	err = InsertNewClusterBlock(lctx, rw, blockID, block.Header.ParentID)
+	err = InsertNewClusterBlock(lctx, rw, blockID, proposal.Block.ParentID)
 	if err != nil {
 		return fmt.Errorf("could not index new block: %w", err)
 	}
@@ -62,10 +62,16 @@ func RetrieveClusterBlock(r storage.Reader, blockID flow.Identifier, block *clus
 	}
 
 	// overwrite block
-	*block = cluster.Block{
-		Header:  &header,
-		Payload: &payload,
+	newBlock, err := cluster.NewBlock(
+		cluster.UntrustedBlock{
+			HeaderBody: header.HeaderBody,
+			Payload:    payload,
+		},
+	)
+	if err != nil {
+		return fmt.Errorf("could not build cluster block: %w", err)
 	}
+	*block = *newBlock
 
 	return nil
 }
@@ -131,7 +137,7 @@ func FinalizeClusterBlock(lctx lockctx.Proof, rw storage.ReaderBatchWriter, bloc
 	}
 
 	// index the block by its height
-	err = operation.IndexClusterBlockHeight(lctx, writer, chainID, header.Height, header.ID())
+	err = operation.IndexClusterBlockHeight(lctx, writer, chainID, header.Height, blockID)
 	if err != nil {
 		return fmt.Errorf("could not index cluster block height: %w", err)
 	}
@@ -165,7 +171,7 @@ func InsertClusterPayload(lctx lockctx.Proof, writer storage.Writer, blockID flo
 	// We allow duplicates, because it is valid for two competing forks to have the same payload.
 	// Payloads are keyed by content hash, so duplicate values have the same key.
 	light := payload.Collection.Light()
-	err := operation.UpsertCollection(writer, &light) // keyed by content hash so no lock needed
+	err := operation.UpsertCollection(writer, light) // keyed by content hash so no lock needed
 	if err != nil {
 		return fmt.Errorf("could not insert payload collection: %w", err)
 	}
@@ -221,7 +227,21 @@ func RetrieveClusterPayload(r storage.Reader, blockID flow.Identifier, payload *
 		colTransactions = append(colTransactions, &nextTx)
 	}
 
-	*payload = cluster.PayloadFromTransactions(refID, colTransactions...)
+	collection, err := flow.NewCollection(flow.UntrustedCollection{Transactions: colTransactions})
+	if err != nil {
+		return fmt.Errorf("could not build the collection from the transactions: %w", err)
+	}
+	newPayload, err := cluster.NewPayload(
+		cluster.UntrustedPayload{
+			ReferenceBlockID: refID,
+			Collection:       *collection,
+		},
+	)
+	if err != nil {
+		return fmt.Errorf("could not build the payload: %w", err)
+	}
+
+	*payload = *newPayload
 
 	return nil
 }
