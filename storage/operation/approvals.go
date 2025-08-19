@@ -16,9 +16,13 @@ func RetrieveResultApproval(r storage.Reader, approvalID flow.Identifier, approv
 	return RetrieveByKey(r, MakePrefix(codeResultApproval, approvalID), approval)
 }
 
-// InsertAndIndexResultApproval inserts a ResultApproval ID keyed by ExecutionResult ID
-// and chunk index.
-// chunk, and will overwrite the existing index.
+// InsertAndIndexResultApproval atomically performs the following storage operations:
+//  1. Store ResultApproval by its ID (in this step, accidental overwrites with inconsistent values
+//     are prevented by using a collision-resistant had to deriver the key from the value)
+//  2. Index approval by the executed chunk, specifically the key pair (ExecutionResultID, chunk index).
+//     - first, we ensure that no _different_ approval has already been indexed for the same key pair
+//     - only if the prior check succeeds, we write the index to the database
+//
 // CAUTION:
 //   - In general, the Flow protocol requires multiple approvals for the same chunk from different
 //     verification nodes. In other words, there are multiple different approvals for the same chunk.
@@ -29,12 +33,15 @@ func RetrieveResultApproval(r storage.Reader, approvalID flow.Identifier, approv
 //     `InsertAndIndexResultApproval` must be synchronized by the higher-logic. Currently, we have the
 //     lockctx.Proof to prove the higher logic is holding the lock inserting the approval after checking
 //     that the approval is not already indexed.
+//
+// Expected error returns:
+//   - `storage.ErrDataMismatch` if a *different* approval for the same key pair (ExecutionResultID, chunk index) is already indexed
 func InsertAndIndexResultApproval(approval *flow.ResultApproval) func(lctx lockctx.Proof, rw storage.ReaderBatchWriter) error {
 	approvalID := approval.ID()
 	resultID := approval.Body.ExecutionResultID
 	chunkIndex := approval.Body.ChunkIndex
 
-	// the following functors allows encoding to be done before acquiring the lock
+	// the following functors allow encoding to be done before acquiring the lock
 	inserting := Upserting(MakePrefix(codeResultApproval, approvalID), approval)
 	indexing := Upserting(MakePrefix(codeIndexResultApprovalByChunk, resultID, chunkIndex), approvalID)
 
@@ -50,11 +57,8 @@ func InsertAndIndexResultApproval(approval *flow.ResultApproval) func(lctx lockc
 				return fmt.Errorf("attempting to store conflicting approval (result: %v, chunk index: %d): storing: %v, stored: %v. %w",
 					resultID, chunkIndex, approvalID, storedApprovalID, storage.ErrDataMismatch)
 			}
-
-			// already stored and indexed
-			return nil
+			return nil // already stored and indexed
 		}
-
 		if !errors.Is(err, storage.ErrNotFound) {
 			return fmt.Errorf("could not lookup result approval ID: %w", err)
 		}
