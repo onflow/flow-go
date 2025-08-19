@@ -16,17 +16,17 @@ type Blocks struct {
 	mock.Mock
 }
 
-// BatchStore provides a mock function with given fields: lctx, rw, block
-func (_m *Blocks) BatchStore(lctx lockctx.Proof, rw storage.ReaderBatchWriter, block *flow.GenericBlock[flow.Payload]) error {
-	ret := _m.Called(lctx, rw, block)
+// BatchStore provides a mock function with given fields: lctx, rw, proposal
+func (_m *Blocks) BatchStore(lctx lockctx.Proof, rw storage.ReaderBatchWriter, proposal *flow.Proposal) error {
+	ret := _m.Called(lctx, rw, proposal)
 
 	if len(ret) == 0 {
 		panic("no return value specified for BatchStore")
 	}
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(lockctx.Proof, storage.ReaderBatchWriter, *flow.GenericBlock[flow.Payload]) error); ok {
-		r0 = rf(lctx, rw, block)
+	if rf, ok := ret.Get(0).(func(lockctx.Proof, storage.ReaderBatchWriter, *flow.Proposal) error); ok {
+		r0 = rf(lctx, rw, proposal)
 	} else {
 		r0 = ret.Error(0)
 	}

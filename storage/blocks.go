@@ -20,7 +20,7 @@ type Blocks interface {
 	// Error returns:
 	//   - storage.ErrAlreadyExists if the blockID already exists in the database.
 	//   - generic error in case of unexpected failure from the database layer or encoding failure.
-	BatchStore(lctx lockctx.Proof, rw ReaderBatchWriter, block *flow.Block) error
+	BatchStore(lctx lockctx.Proof, rw ReaderBatchWriter, proposal *flow.Proposal) error
 
 	// ByID returns the block with the given hash. It is available for all incorporated blocks (validated blocks
 	// that have been appended to any of the known forks) no matter whether the block has been finalized or not.
