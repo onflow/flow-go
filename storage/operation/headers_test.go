@@ -4,11 +4,6 @@ import (
 	"testing"
 	"time"
 
-<<<<<<< HEAD:storage/operation/headers_test.go
-	"github.com/onflow/crypto"
-=======
-	"github.com/dgraph-io/badger/v2"
->>>>>>> feature/malleability:storage/badger/operation/headers_test.go
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -57,12 +52,12 @@ func TestHeaderIDIndexByCollectionID(t *testing.T) {
 		collectionGuaranteeID := unittest.IdentifierFixture()
 
 		err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			return operation.IndexCollectionGuaranteeBlock(rw.Writer(), collectionID, headerID)
+			return operation.IndexCollectionGuaranteeBlock(rw.Writer(), collectionGuaranteeID, headerID)
 		})
 		require.NoError(t, err)
 
 		actualID := &flow.Identifier{}
-		err = operation.LookupCollectionGuaranteeBlock(db.Reader(), collectionID, actualID)
+		err = operation.LookupCollectionGuaranteeBlock(db.Reader(), collectionGuaranteeID, actualID)
 		require.NoError(t, err)
 		assert.Equal(t, headerID, *actualID)
 	})
