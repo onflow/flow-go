@@ -49,13 +49,7 @@ func Bootstrap(db storage.DB, lockManager lockctx.Manager, stateRoot *StateRoot)
 	rootQC := stateRoot.QC()
 
 	// bootstrap cluster state
-<<<<<<< HEAD
 	err = state.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-		chainID := genesis.Header.ChainID
-		// insert the block
-		err := procedure.InsertClusterBlock(lctx, rw, genesis)
-=======
-	err = operation.RetryOnConflict(state.db.Update, func(tx *badger.Txn) error {
 		chainID := genesis.ChainID
 		// insert the block - by protocol convention, the genesis block does not have a proposer signature, which must be handled by the implementation
 		proposal, err := clustermodel.NewRootProposal(
@@ -67,26 +61,17 @@ func Bootstrap(db storage.DB, lockManager lockctx.Manager, stateRoot *StateRoot)
 		if err != nil {
 			return fmt.Errorf("could not build root cluster proposal: %w", err)
 		}
-		err = procedure.InsertClusterBlock(proposal)(tx)
->>>>>>> @{-1}
+		err = procedure.InsertClusterBlock(lctx, rw, proposal)
 		if err != nil {
 			return fmt.Errorf("could not insert genesis block: %w", err)
 		}
 		// insert block height -> ID mapping
-<<<<<<< HEAD
-		err = operation.IndexClusterBlockHeight(lctx, rw.Writer(), chainID, genesis.Header.Height, genesis.ID())
-=======
-		err = operation.IndexClusterBlockHeight(chainID, genesis.Height, genesis.ID())(tx)
->>>>>>> @{-1}
+		err = operation.IndexClusterBlockHeight(lctx, rw.Writer(), chainID, genesis.Height, genesis.ID())
 		if err != nil {
 			return fmt.Errorf("failed to map genesis block height to block: %w", err)
 		}
 		// insert boundary
-<<<<<<< HEAD
-		err = operation.UpsertClusterFinalizedHeight(lctx, rw.Writer(), chainID, genesis.Header.Height)
-=======
-		err = operation.InsertClusterFinalizedHeight(chainID, genesis.Height)(tx)
->>>>>>> @{-1}
+		err = operation.UpsertClusterFinalizedHeight(lctx, rw.Writer(), chainID, genesis.Height)
 		// insert started view for hotstuff
 		if err != nil {
 			return fmt.Errorf("could not insert genesis boundary: %w", err)
