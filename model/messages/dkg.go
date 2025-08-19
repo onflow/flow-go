@@ -12,6 +12,12 @@ type DKGMessage struct {
 	DKGInstanceID string
 }
 
+// ToInternal converts the untrusted DKGMessage into its trusted internal
+// representation.
+//
+// This stub returns the receiver unchanged. A proper implementation
+// must perform validation checks and return a constructed internal
+// object.
 func (D *DKGMessage) ToInternal() (any, error) {
 	// TODO(malleability, #7721) implement with validation checks
 	return D, nil

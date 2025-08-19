@@ -17,6 +17,12 @@ type SyncRequest struct {
 	Height uint64
 }
 
+// ToInternal converts the untrusted SyncRequest into its trusted internal
+// representation.
+//
+// This stub returns the receiver unchanged. A proper implementation
+// must perform validation checks and return a constructed internal
+// object.
 func (s *SyncRequest) ToInternal() (any, error) {
 	// TODO(malleability, #7705) implement with validation checks
 	return s, nil
@@ -30,6 +36,12 @@ type SyncResponse struct {
 	Height uint64
 }
 
+// ToInternal converts the untrusted SyncResponse into its trusted internal
+// representation.
+//
+// This stub returns the receiver unchanged. A proper implementation
+// must perform validation checks and return a constructed internal
+// object.
 func (s *SyncResponse) ToInternal() (any, error) {
 	// TODO(malleability, #7706) implement with validation checks
 	return s, nil
@@ -47,6 +59,12 @@ type RangeRequest struct {
 	ToHeight   uint64
 }
 
+// ToInternal converts the untrusted RangeRequest into its trusted internal
+// representation.
+//
+// This stub returns the receiver unchanged. A proper implementation
+// must perform validation checks and return a constructed internal
+// object.
 func (r *RangeRequest) ToInternal() (any, error) {
 	// TODO(malleability, #7707) implement with validation checks
 	return r, nil
@@ -62,6 +80,12 @@ type BatchRequest struct {
 	BlockIDs []flow.Identifier
 }
 
+// ToInternal converts the untrusted BatchRequest into its trusted internal
+// representation.
+//
+// This stub returns the receiver unchanged. A proper implementation
+// must perform validation checks and return a constructed internal
+// object.
 func (b *BatchRequest) ToInternal() (any, error) {
 	// TODO(malleability, #7708) implement with validation checks
 	return b, nil
@@ -77,8 +101,8 @@ type BlockResponse struct {
 
 var _ UntrustedMessage = (*BlockResponse)(nil)
 
-// ToInternal converts all untrusted block proposals in the BlockResponse
-// into trusted flow.BlockResponse instances.
+// ToInternal converts the untrusted BlockResponse into its trusted internal
+// representation.
 //
 // All errors indicate that the message could not be converted to a valid BlockResponse.
 func (br *BlockResponse) ToInternal() (any, error) {
@@ -105,8 +129,8 @@ type ClusterBlockResponse struct {
 
 var _ UntrustedMessage = (*ClusterBlockResponse)(nil)
 
-// ToInternal converts all untrusted cluster block proposals in the ClusterBlockResponse
-// into trusted cluster.BlockResponse instance.
+// ToInternal converts the untrusted ClusterBlockResponse into its trusted internal
+// representation.
 //
 // All errors indicate that the message could not be converted to a valid ClusterBlockResponse.
 func (br *ClusterBlockResponse) ToInternal() (any, error) {

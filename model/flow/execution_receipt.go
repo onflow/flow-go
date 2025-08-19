@@ -19,6 +19,12 @@ type ExecutionReceipt struct {
 	ExecutorSignature crypto.Signature
 }
 
+// ToInternal converts the untrusted ApprovalResponse into its trusted internal
+// representation.
+//
+// This stub returns the receiver unchanged. A proper implementation
+// must perform validation checks and return a constructed internal
+// object.
 func (er *ExecutionReceipt) ToInternal() (any, error) {
 	// TODO(malleability, #7713) create typedef for this type in messages package and implement it there
 	return er, nil
