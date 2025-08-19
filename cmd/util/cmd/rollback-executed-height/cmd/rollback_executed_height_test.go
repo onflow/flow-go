@@ -33,7 +33,7 @@ func TestReExecuteBlock(t *testing.T) {
 			// bootstrap to init highest executed height
 			bootstrapper := bootstrap.NewBootstrapper(unittest.Logger())
 			genesis := unittest.BlockFixture()
-			rootSeal := unittest.Seal.Fixture(unittest.Seal.WithBlock(genesis.Header))
+			rootSeal := unittest.Seal.Fixture(unittest.Seal.WithBlock(genesis.ToHeader()))
 			db := badgerimpl.ToDB(bdb)
 			bootstrapLockManager := locks.NewTestingLockManager()
 			err := bootstrapper.BootstrapExecutionDatabase(bootstrapLockManager, db, rootSeal)
@@ -54,20 +54,15 @@ func TestReExecuteBlock(t *testing.T) {
 			events := store.NewEvents(metrics, db)
 			serviceEvents := store.NewServiceEvents(metrics, db)
 
-<<<<<<< HEAD
 			manager, lctx := unittest.LockManagerWithContext(t, storage.LockInsertBlock)
 			err = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-				return blocks.BatchStore(lctx, rw, &genesis)
+				return blocks.BatchStore(lctx, rw, &flow.Proposal{Block: *genesis, ProposerSigData: nil})
 			})
 			lctx.Release()
-=======
-			// By convention, root block has no proposer signature - implementation has to handle this edge case
-			err = headers.Store(&flow.ProposalHeader{Header: genesis, ProposerSigData: nil})
->>>>>>> feature/malleability
 			require.NoError(t, err)
 
 			getLatestFinalized := func() (uint64, error) {
-				return genesis.Header.Height, nil
+				return genesis.Height, nil
 			}
 
 			lockManager := locks.NewTestingLockManager()
@@ -96,16 +91,12 @@ func TestReExecuteBlock(t *testing.T) {
 			computationResult := testutil.ComputationResultFixture(t)
 			header := computationResult.Block.ToHeader()
 
-<<<<<<< HEAD
 			lctx2 := manager.NewContext()
 			require.NoError(t, lctx2.AcquireLock(storage.LockInsertBlock))
 			err = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-				return blocks.BatchStore(lctx2, rw, computationResult.Block)
+				return blocks.BatchStore(lctx2, rw, unittest.ProposalFromBlock(computationResult.Block))
 			})
 			lctx2.Release()
-=======
-			err = headers.Store(unittest.ProposalHeaderFromHeader(header))
->>>>>>> feature/malleability
 			require.NoError(t, err)
 
 			// save execution results
@@ -204,7 +195,7 @@ func TestReExecuteBlockWithDifferentResult(t *testing.T) {
 		bootstrapper := bootstrap.NewBootstrapper(unittest.Logger())
 		genesis := unittest.BlockFixture()
 		rootSeal := unittest.Seal.Fixture()
-		unittest.Seal.WithBlock(genesis.Header)(rootSeal)
+		unittest.Seal.WithBlock(genesis.ToHeader())(rootSeal)
 
 		db := pebbleimpl.ToDB(pdb)
 		bootstrapLockManage := locks.NewTestingLockManager()
@@ -218,7 +209,6 @@ func TestReExecuteBlockWithDifferentResult(t *testing.T) {
 		headers := all.Headers
 		blocks := all.Blocks
 
-<<<<<<< HEAD
 		txResults := store.NewTransactionResults(metrics, db, bstorage.DefaultCacheSize)
 		commits := store.NewCommits(metrics, db)
 		results := store.NewExecutionResults(metrics, db)
@@ -233,117 +223,12 @@ func TestReExecuteBlockWithDifferentResult(t *testing.T) {
 		lockManager := storage.NewTestingLockManager()
 		withLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
 			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-				return blocks.BatchStore(lctx, rw, &genesis)
+				return blocks.BatchStore(lctx, rw, &flow.Proposal{Block: *genesis, ProposerSigData: nil})
 			})
-=======
-			// By convention, root block has no proposer signature - implementation has to handle this edge case
-			err = headers.Store(&flow.ProposalHeader{Header: genesis, ProposerSigData: nil})
-			require.NoError(t, err)
-
-			getLatestFinalized := func() (uint64, error) {
-				return genesis.Height, nil
-			}
-
-			// create execution state module
-			es := state.NewExecutionState(
-				nil,
-				commits,
-				nil,
-				headers,
-				chunkDataPacks,
-				results,
-				myReceipts,
-				events,
-				serviceEvents,
-				txResults,
-				db,
-				getLatestFinalized,
-				trace.NewNoopTracer(),
-				nil,
-				false,
-			)
-			require.NotNil(t, es)
-
-			executableBlock := unittest.ExecutableBlockFixtureWithParent(
-				nil,
-				genesis,
-				&unittest.GenesisStateCommitment)
-			header := executableBlock.Block.ToHeader()
-
-			err = headers.Store(unittest.ProposalHeaderFromHeader(header))
-			require.NoError(t, err)
-
-			computationResult := testutil.ComputationResultFixture(t)
-			computationResult.ExecutableBlock = executableBlock
-			computationResult.ExecutionReceipt.ExecutionResult.BlockID = header.ID()
-
-			// save execution results
-			err = es.SaveExecutionResults(context.Background(), computationResult)
-			require.NoError(t, err)
-
-			batch := db.NewBatch()
-			defer batch.Close()
-
-			chunkBatch := pebbleimpl.ToDB(pdb).NewBatch()
-			defer chunkBatch.Close()
-
-			// remove execution results
-			err = removeForBlockID(
-				batch,
-				chunkBatch,
-				commits,
-				txResults,
-				results,
-				chunkDataPacks,
-				myReceipts,
-				events,
-				serviceEvents,
-				header.ID(),
-			)
-
-			require.NoError(t, err)
-			require.NoError(t, chunkBatch.Commit())
-			err2 := batch.Commit()
-			require.NoError(t, err2)
-
-			batch = db.NewBatch()
-			defer batch.Close()
-
-			chunkBatch = pebbleimpl.ToDB(pdb).NewBatch()
-			defer chunkBatch.Close()
-
-			// remove again to test for duplicates handling
-			err = removeForBlockID(
-				batch,
-				chunkBatch,
-				commits,
-				txResults,
-				results,
-				chunkDataPacks,
-				myReceipts,
-				events,
-				serviceEvents,
-				header.ID(),
-			)
-
-			require.NoError(t, err)
-			require.NoError(t, chunkBatch.Commit())
-
-			err2 = batch.Commit()
-			require.NoError(t, err2)
-
-			computationResult2 := testutil.ComputationResultFixture(t)
-			computationResult2.ExecutableBlock = executableBlock
-			computationResult2.ExecutionReceipt.ExecutionResult.BlockID = header.ID()
-
-			// re execute result
-			err = es.SaveExecutionResults(context.Background(), computationResult2)
-			require.NoError(t, err)
->>>>>>> feature/malleability
 		})
 
 		getLatestFinalized := func() (uint64, error) {
-			return genesis.Header.Height, nil
+			return genesis.Height, nil
 		}
 
 		// create execution state module
@@ -369,19 +254,19 @@ func TestReExecuteBlockWithDifferentResult(t *testing.T) {
 
 		executableBlock := unittest.ExecutableBlockFixtureWithParent(
 			nil,
-			genesis.Header,
+			genesis.ToHeader(),
 			&unittest.GenesisStateCommitment)
-		header := executableBlock.Block.Header
+		blockID := executableBlock.Block.ID()
 
 		withLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
 			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-				return blocks.BatchStore(lctx, rw, executableBlock.Block)
+				return blocks.BatchStore(lctx, rw, unittest.ProposalFromBlock(executableBlock.Block))
 			})
 		})
 
 		computationResult := testutil.ComputationResultFixture(t)
 		computationResult.ExecutableBlock = executableBlock
-		computationResult.ExecutionReceipt.ExecutionResult.BlockID = header.ID()
+		computationResult.ExecutionReceipt.ExecutionResult.BlockID = blockID
 
 		// save execution results
 		err = es.SaveExecutionResults(context.Background(), computationResult)
@@ -404,7 +289,7 @@ func TestReExecuteBlockWithDifferentResult(t *testing.T) {
 			myReceipts,
 			events,
 			serviceEvents,
-			header.ID(),
+			blockID,
 		)
 
 		require.NoError(t, err)
@@ -429,7 +314,7 @@ func TestReExecuteBlockWithDifferentResult(t *testing.T) {
 			myReceipts,
 			events,
 			serviceEvents,
-			header.ID(),
+			blockID,
 		)
 
 		require.NoError(t, err)
@@ -440,7 +325,7 @@ func TestReExecuteBlockWithDifferentResult(t *testing.T) {
 
 		computationResult2 := testutil.ComputationResultFixture(t)
 		computationResult2.ExecutableBlock = executableBlock
-		computationResult2.ExecutionResult.BlockID = header.ID()
+		computationResult2.ExecutionReceipt.ExecutionResult.BlockID = blockID
 
 		// re execute result
 		err = es.SaveExecutionResults(context.Background(), computationResult2)
