@@ -6,6 +6,8 @@ import (
 	"strings"
 
 	"github.com/onflow/flow-go/cmd/util/ledger/reporters"
+	"github.com/onflow/flow-go/ledger"
+	"github.com/onflow/flow-go/ledger/common/convert"
 
 	"github.com/onflow/cadence/common"
 	"github.com/rs/zerolog"
@@ -16,7 +18,42 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-const sequenceNumberStorageSize = 9 // RLP encoded math.MaxUint64 is 9 bytes
+// Sequence number registers are created on demand to reduce register count
+// and they are in their own registers to avoid blocking concurrent execution.
+// We also need to include sequence number register sizes in the storage used
+// computation before the sequence number register is created (i.e.,
+// we update storage used when account public key is created) to unblock
+// some use cases of concurrent execution.
+//
+// In other words,
+// - When account public key is appened, approximated sequence number register size
+// is included in storage used.
+// - When sequence number register is created, storage size isn't affected.
+//
+// To simplify computation and avoid blocking concurrent execution, the storage used
+// computation always uses 1 to indicate the number of bytes used to store each
+// sequence number's value.
+
+// approximateSequenceNumberPayloadSize returns sequence number register size.
+func approximateSequenceNumberPayloadSize(owner string, keyIndex uint32) uint64 {
+	// NOTE: We use 1 byte for register value size for reasons already mentioned.
+	sequenceNumberValueUsedForStorageSizeComputation := []byte{0x01}
+
+	ledgerKey := convert.RegisterIDToLedgerKey(flow.RegisterID{
+		Owner: owner,
+		Key:   fmt.Sprintf(sequenceNumberRegisterKeyPattern, keyIndex),
+	})
+	payload := ledger.NewPayload(ledgerKey, sequenceNumberValueUsedForStorageSizeComputation)
+	return uint64(payload.Size())
+}
+
+func approximateSequenceNumberPayloadSizes(owner string, startKeyIndex uint32, endKeyIndex uint32) uint64 {
+	size := uint64(0)
+	for i := startKeyIndex; i < endKeyIndex; i++ {
+		size += uint64(approximateSequenceNumberPayloadSize(owner, i))
+	}
+	return size
+}
 
 // AccountUsageMigration iterates through each payload, and calculate the storage usage
 // and update the accounts status with the updated storage usage. It also upgrades the
@@ -65,17 +102,9 @@ func (m *AccountUsageMigration) MigrateAccount(
 	err := accountRegisters.ForEach(func(owner, key string, value []byte) error {
 
 		if strings.HasPrefix(key, sequenceNumberRegisterKeyPrefix) {
-			// DO NOT include sequence number registers in storage used.
-			// Instead, storage used should include sequenceNumberStorageSize
-			// per key for all account public key at key index >= 1.
-
-			// Sequence number register is only created when account public key at key index >= 1 is used as proposal key.
-			// This approach stores sequence number separately on chain, while reducing register count.
-
-			// By including sequenceNumberStorageSize per key beforehand unblocks some cases for
-			// concurrent execution. In other words, account status register doesn't need to be updated
-			// for storage used when account public key is used as proposal key at a later time.
-
+			// DO NOT include individual sequence number registers in storage used here.
+			// Instead, we include storage used for all account public key at key index >= 1
+			// later in this function.
 			return nil
 		}
 
@@ -136,10 +165,10 @@ func (m *AccountUsageMigration) MigrateAccount(
 	}
 
 	if accountPublicKeyCount > 1 {
-		// Include sequenceNumberStorageSize per key for all account public key at index >= 1.
-		// NOTE: sequence number for first account public key is included in
+		// Include approximate sequence number payload size per key for all account public key at index >= 1.
+		// NOTE: sequence number for the first account public key is included in the
 		// first account public key register, so it doesn't need to be included here.
-		actualUsed += uint64(accountPublicKeyCount-1) * sequenceNumberStorageSize
+		actualUsed += approximateSequenceNumberPayloadSizes(string(address[:]), 1, accountPublicKeyCount)
 	}
 
 	currentUsed := status.StorageUsed()

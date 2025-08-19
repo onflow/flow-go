@@ -75,7 +75,8 @@ func TestAccountStatusMigration(t *testing.T) {
 		t.Parallel()
 
 		accountPublicKeyCount := uint32(5)
-		statusPayloadAndSequenceNubmerSize := sizeOfTheStatusPayload + uint64(accountPublicKeyCount-1)*sequenceNumberStorageSize
+		statusPayloadAndSequenceNubmerSize := sizeOfTheStatusPayload +
+			approximateSequenceNumberPayloadSizes(string(address[:]), 1, accountPublicKeyCount)
 
 		payloads := []*ledger.Payload{
 			ledger.NewPayload(
@@ -105,7 +106,8 @@ func TestAccountStatusMigration(t *testing.T) {
 		t.Parallel()
 
 		accountPublicKeyCount := uint32(5)
-		statusPayloadAndSequenceNubmerSize := sizeOfTheStatusPayload + uint64(accountPublicKeyCount-1)*sequenceNumberStorageSize
+		statusPayloadAndSequenceNubmerSize := sizeOfTheStatusPayload +
+			approximateSequenceNumberPayloadSizes(string(address[:]), 1, accountPublicKeyCount)
 
 		payloads := []*ledger.Payload{
 			ledger.NewPayload(
@@ -137,7 +139,8 @@ func TestAccountStatusMigration(t *testing.T) {
 		t.Parallel()
 
 		accountPublicKeyCount := uint32(5)
-		statusPayloadAndSequenceNubmerSize := sizeOfTheStatusPayload + uint64(accountPublicKeyCount-1)*sequenceNumberStorageSize
+		statusPayloadAndSequenceNubmerSize := sizeOfTheStatusPayload +
+			approximateSequenceNumberPayloadSizes(string(address[:]), 1, accountPublicKeyCount)
 
 		payloads := []*ledger.Payload{
 			ledger.NewPayload(
@@ -169,7 +172,8 @@ func TestAccountStatusMigration(t *testing.T) {
 		t.Parallel()
 
 		accountPublicKeyCount := uint32(5)
-		statusPayloadAndSequenceNubmerSize := sizeOfTheStatusPayload + uint64(accountPublicKeyCount-1)*sequenceNumberStorageSize
+		statusPayloadAndSequenceNubmerSize := sizeOfTheStatusPayload +
+			approximateSequenceNumberPayloadSizes(string(address[:]), 1, accountPublicKeyCount)
 
 		payloads := []*ledger.Payload{
 			ledger.NewPayload(
