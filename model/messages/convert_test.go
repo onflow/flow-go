@@ -2,7 +2,6 @@ package messages_test
 
 import (
 	"fmt"
-	"github.com/onflow/flow-go/network/codec"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -11,6 +10,7 @@ import (
 	"github.com/onflow/flow-go/model/cluster"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/messages"
+	"github.com/onflow/flow-go/network/codec"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 

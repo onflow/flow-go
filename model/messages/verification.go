@@ -10,6 +10,12 @@ type ApprovalRequest struct {
 	ChunkIndex uint64
 }
 
+// ToInternal converts the untrusted ApprovalRequest into its trusted internal
+// representation.
+//
+// This stub returns the receiver unchanged. A proper implementation
+// must perform validation checks and return a constructed internal
+// object.
 func (a *ApprovalRequest) ToInternal() (any, error) {
 	// TODO(malleability, #7717) implement with validation checks
 	return a, nil
@@ -21,6 +27,12 @@ type ApprovalResponse struct {
 	Approval flow.ResultApproval
 }
 
+// ToInternal converts the untrusted ApprovalResponse into its trusted internal
+// representation.
+//
+// This stub returns the receiver unchanged. A proper implementation
+// must perform validation checks and return a constructed internal
+// object.
 func (a *ApprovalResponse) ToInternal() (any, error) {
 	// TODO(malleability, #7718) implement with validation checks
 	return a, nil
