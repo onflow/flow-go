@@ -15,7 +15,8 @@ import (
 // different sub-sets of the received votes (provided more than the minimal number of consensus participants voted,
 // which is typically the case). In most cases, it is only important that a block has been certified, but it is
 // irrelevant who specifically contributed to the QC. Therefore, we only store the first QC.
-// If a quorum certificate for the block already exists, it returns storage.ErrAlreadyExists (typically benign).
+//
+// If *any* quorum certificate for the block already exists, it returns storage.ErrAlreadyExists (typically benign).
 func InsertQuorumCertificate(lctx lockctx.Proof, rw storage.ReaderBatchWriter, qc *flow.QuorumCertificate) error {
 	if !lctx.HoldsLock(storage.LockInsertBlock) {
 		return fmt.Errorf("cannot insert quorum certificate without holding lock %s", storage.LockInsertBlock)

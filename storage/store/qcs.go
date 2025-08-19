@@ -46,7 +46,13 @@ func (q *QuorumCertificates) StoreTx(qc *flow.QuorumCertificate) func(*transacti
 }
 
 // BatchStore stores a Quorum Certificate as part of database batch update. QC is indexed by QC.BlockID.
-// * storage.ErrAlreadyExists if a different QC for blockID is already stored
+//
+// Note: For the same block, different QCs can easily be constructed by selecting different sub-sets of the received votes
+// (provided more than the minimal number of consensus participants voted, which is typically the case). In most cases, it
+// is only important that a block has been certified, but irrelevant who specifically contributed to the QC. Therefore, we
+// only store the first QC.
+//
+// If *any* quorum certificate for QC.BlockID has already been stored, a `storage.ErrAlreadyExists` is returned (typically benign).
 func (q *QuorumCertificates) BatchStore(lctx lockctx.Proof, rw storage.ReaderBatchWriter, qc *flow.QuorumCertificate) error {
 	return q.cache.PutWithLockTx(lctx, rw, qc.BlockID, qc)
 }
