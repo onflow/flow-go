@@ -116,10 +116,13 @@ func TestStoreConflictingGuarantee(t *testing.T) {
 		proposal2 := unittest.ProposalFromBlock(block2)
 		lctx2 := manager.NewContext()
 		require.NoError(t, lctx2.AcquireLock(storage.LockInsertBlock))
-		require.NoError(t, db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+		err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 			return blocks.BatchStore(lctx2, rw, proposal2)
-		}))
+		})
 		lctx2.Release()
+
+		require.ErrorIs(t, err, storage.ErrDataMismatch)
+
 		actual, err := store1.ByID(expected.ID())
 		require.NoError(t, err)
 		require.Equal(t, expected, actual)
