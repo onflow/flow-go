@@ -12,16 +12,8 @@ import (
 // `ByHeight` don't exist here (but might be added later).
 type ClusterBlocks interface {
 
-<<<<<<< HEAD
 	// ByID returns the block with the given ID.
 	ByID(blockID flow.Identifier) (*cluster.Block, error)
-=======
-	// Store stores the proposed collection (aka cluster block).
-	//
-	// Error returns:
-	//   - storage.ErrAlreadyExists if the blockID already exists in the database.
-	//   - generic error in case of unexpected failure from the database layer or encoding failure.
-	Store(proposal *cluster.Proposal) error
 
 	// ProposalByID returns the collection with the given ID, along with the proposer's signature on it.
 	// It is available for all incorporated collections (validated blocks that have been appended to any
@@ -32,7 +24,6 @@ type ClusterBlocks interface {
 	//   - generic error in case of unexpected failure from the database layer, or failure
 	//     to decode an existing database value
 	ProposalByID(blockID flow.Identifier) (*cluster.Proposal, error)
->>>>>>> @{-1}
 
 	// ProposalByHeight returns the collection at the given height, along with the proposer's
 	// signature on it. It is only available for finalized collections.
