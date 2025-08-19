@@ -17,8 +17,7 @@ func (g *GetByIDRequest) Build(r *common.Request) error {
 }
 
 func (g *GetByIDRequest) Parse(rawID string) error {
-	var id parser.ID
-	err := id.Parse(rawID)
+	id, err := parser.NewID(rawID)
 	if err != nil {
 		return err
 	}

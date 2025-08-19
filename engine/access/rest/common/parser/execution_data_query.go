@@ -17,8 +17,8 @@ func NewExecutionDataQuery(
 	}
 
 	// 2. Parse requiredExecutorIds -> []flow.Identifier
-	var ids IDs
-	if err := ids.Parse(requiredExecutorIds); err != nil {
+	ids, err := NewIDs(requiredExecutorIds)
+	if err != nil {
 		return 0, nil, false, fmt.Errorf("invalid requiredExecutorIds: %w", err)
 	}
 

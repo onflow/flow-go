@@ -178,8 +178,7 @@ func parseStartBlock(arguments wsmodels.Arguments) (flow.Identifier, uint64, err
 		if !ok {
 			return flow.ZeroID, request.EmptyHeight, fmt.Errorf("'start_block_id' must be a string")
 		}
-		var startBlockID parser.ID
-		err := startBlockID.Parse(result)
+		startBlockID, err := parser.NewID(result)
 		if err != nil {
 			return flow.ZeroID, request.EmptyHeight, fmt.Errorf("invalid 'start_block_id': %w", err)
 		}

@@ -43,8 +43,7 @@ func (g *GetScript) Parse(rawHeight string, rawID string, rawScript io.Reader) e
 	}
 	g.BlockHeight = height.Flow()
 
-	var id parser.ID
-	err = id.Parse(rawID)
+	id, err := parser.NewID(rawID)
 	if err != nil {
 		return err
 	}

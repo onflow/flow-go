@@ -89,8 +89,7 @@ func (t *Transaction) Parse(raw io.Reader, chain flow.Chain) error {
 		return fmt.Errorf("invalid transaction script encoding")
 	}
 
-	var blockID ID
-	err = blockID.Parse(tx.ReferenceBlockId)
+	blockID, err := NewID(tx.ReferenceBlockId)
 	if err != nil {
 		return fmt.Errorf("invalid reference block ID: %w", err)
 	}

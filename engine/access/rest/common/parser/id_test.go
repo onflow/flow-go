@@ -15,9 +15,8 @@ func TestID_InvalidParse(t *testing.T) {
 		"foo": "invalid ID format",
 	}
 
-	var id ID
 	for in, outErr := range tests {
-		err := id.Parse(in)
+		_, err := NewID(in)
 		assert.EqualError(t, err, outErr)
 	}
 }
@@ -25,12 +24,11 @@ func TestID_InvalidParse(t *testing.T) {
 func TestID_ValidParse(t *testing.T) {
 	testID := unittest.IdentifierFixture()
 
-	var id ID
-	err := id.Parse(testID.String())
+	id, err := NewID(testID.String())
 	assert.NoError(t, err)
 	assert.Equal(t, id.Flow().String(), testID.String())
 
-	err = id.Parse("")
+	id, err = NewID("")
 	assert.NoError(t, err)
 	assert.Equal(t, id.Flow().String(), flow.ZeroID.String())
 }
@@ -38,13 +36,12 @@ func TestID_ValidParse(t *testing.T) {
 func TestIDs_ValidParse(t *testing.T) {
 	var testIDs []flow.Identifier = unittest.IdentifierListFixture(3)
 
-	var ids IDs
 	rawIDs := make([]string, 0)
 	for _, id := range testIDs {
 		rawIDs = append(rawIDs, id.String())
 	}
 
-	err := ids.Parse(rawIDs)
+	ids, err := NewIDs(rawIDs)
 	assert.NoError(t, err)
 	assert.Equal(t, testIDs, ids.Flow())
 
@@ -56,7 +53,7 @@ func TestIDs_ValidParse(t *testing.T) {
 		rawIDs = append(rawIDs, id.String())
 	}
 
-	err = ids.Parse(rawIDs)
+	ids, err = NewIDs(rawIDs)
 	assert.NoError(t, err)
 	assert.Equal(t, 1, len(ids.Flow()))
 	assert.Equal(t, ids.Flow()[0], id)
@@ -64,7 +61,6 @@ func TestIDs_ValidParse(t *testing.T) {
 
 func TestIDs_InvalidParse(t *testing.T) {
 	testIDs := make([]string, MaxIDsLength+1)
-	var ids IDs
-	err := ids.Parse(testIDs)
+	_, err := NewIDs(testIDs)
 	assert.EqualError(t, err, "at most 50 IDs can be requested at a time")
 }
