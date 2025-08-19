@@ -3,6 +3,7 @@ package verifier_test
 import (
 	"crypto/rand"
 	"errors"
+	"sync/atomic"
 	"testing"
 
 	"github.com/ipfs/go-cid"
@@ -151,7 +152,7 @@ func (suite *VerifierEngineTestSuite) TestVerifyHappyPath() {
 
 	for _, test := range tests {
 		suite.Run(test.name, func() {
-			var expectedApproval *flow.ResultApproval
+			var expectedApproval atomic.Pointer[flow.ResultApproval] // potentially accessed concurrently within engine
 
 			suite.approvals.
 				On("StoreMyApproval", mock.Anything).
@@ -172,7 +173,7 @@ func (suite *VerifierEngineTestSuite) TestVerifyHappyPath() {
 						// spock should be non-nil
 						suite.Assert().NotNil(ra.Body.Spock)
 
-						expectedApproval = ra
+						expectedApproval.Store(ra)
 						return nil
 					}
 				}).
@@ -185,7 +186,7 @@ func (suite *VerifierEngineTestSuite) TestVerifyHappyPath() {
 					// check that the approval matches the input execution result
 					ra, ok := args[0].(*flow.ResultApproval)
 					suite.Require().True(ok)
-					suite.Assert().Equal(expectedApproval, ra)
+					suite.Assert().Equal(expectedApproval.Load(), ra)
 
 					// note: mock includes each variadic argument as a separate element in slice
 					node, ok := args[1].(flow.Identifier)
