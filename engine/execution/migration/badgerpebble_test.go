@@ -20,7 +20,6 @@ import (
 	"github.com/onflow/flow-go/state/protocol/invalid"
 	protocolmock "github.com/onflow/flow-go/state/protocol/mock"
 	"github.com/onflow/flow-go/storage"
-	bstorage "github.com/onflow/flow-go/storage/badger"
 	"github.com/onflow/flow-go/storage/operation/badgerimpl"
 	"github.com/onflow/flow-go/storage/operation/pebbleimpl"
 	"github.com/onflow/flow-go/storage/store"
@@ -180,17 +179,16 @@ func TestMigrateLastSealedExecutedResultToPebble(t *testing.T) {
 		require.Equal(t, bresult, presult)
 		require.Equal(t, bcommit, pcommit)
 
-		// store a new block in pebble now, simulating new block executed after migration
-		pbdb := pebbleimpl.ToDB(pdb)
-		txResults = store.NewTransactionResults(metrics, pbdb, bstorage.DefaultCacheSize)
-		commits = store.NewCommits(metrics, pbdb)
-		results = store.NewExecutionResults(metrics, pbdb)
-		receipts = store.NewExecutionReceipts(metrics, pbdb, results, bstorage.DefaultCacheSize)
-		myReceipts = store.NewMyExecutionReceipts(metrics, pbdb, receipts)
-		events = store.NewEvents(metrics, pbdb)
-		serviceEvents = store.NewServiceEvents(metrics, pbdb)
+		// store a new block in badger now, simulating new block executed before migration
+		txResults = store.NewTransactionResults(metrics, db, store.DefaultCacheSize)
+		commits = store.NewCommits(metrics, db)
+		results = store.NewExecutionResults(metrics, db)
+		receipts = store.NewExecutionReceipts(metrics, db, results, store.DefaultCacheSize)
+		myReceipts = store.NewMyExecutionReceipts(metrics, db, receipts)
+		events = store.NewEvents(metrics, db)
+		serviceEvents = store.NewServiceEvents(metrics, db)
 
-		// create execution state module
+		// create execution state module using badger database
 		newes := state.NewExecutionState(
 			nil,
 			commits,
@@ -209,7 +207,7 @@ func TestMigrateLastSealedExecutedResultToPebble(t *testing.T) {
 			false,
 			lockManager,
 		)
-		require.NotNil(t, es)
+		require.NotNil(t, newes)
 
 		lctx2 = manager.NewContext()
 		require.NoError(t, lctx2.AcquireLock(storage.LockInsertBlock))
