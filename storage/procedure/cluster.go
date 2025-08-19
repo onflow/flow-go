@@ -27,6 +27,12 @@ func InsertClusterBlock(lctx lockctx.Proof, rw storage.ReaderBatchWriter, propos
 		return fmt.Errorf("could not insert header: %w", err)
 	}
 
+	// store the block proposer signature
+	err = operation.InsertProposalSignature(rw.Writer(), blockID, &proposal.ProposerSigData)
+	if err != nil {
+		return fmt.Errorf("could not insert proposer signature: %w", err)
+	}
+
 	// since InsertHeader already checks for duplicates, we can safely
 	// assume that the block header is new and there is no existing index
 	// for other data related to this block ID.
