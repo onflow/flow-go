@@ -103,12 +103,7 @@ func (p *PersisterSuite) populateInMemoryStorages() {
 
 	for i := 0; i < 2; i++ {
 		collection := unittest.CollectionFixture(2)
-<<<<<<< HEAD
 		_, err := p.inMemoryCollections.Store(&collection)
-=======
-		light := collection.Light()
-		err := p.inMemoryCollections.StoreLightAndIndexByTransaction(light)
->>>>>>> feature/malleability
 		p.Require().NoError(err)
 
 		for _, tx := range collection.Transactions {
