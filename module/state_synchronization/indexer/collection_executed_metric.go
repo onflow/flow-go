@@ -73,7 +73,7 @@ func (c *CollectionExecutedMetricImpl) CollectionFinalized(light *flow.LightColl
 }
 
 // CollectionExecuted tracks collections to mark executed
-func (c *CollectionExecutedMetricImpl) CollectionExecuted(light flow.LightCollection) {
+func (c *CollectionExecutedMetricImpl) CollectionExecuted(light *flow.LightCollection) {
 	if ti, found := c.collectionsToMarkExecuted.Get(light.ID()); found {
 		for _, t := range light.Transactions {
 			c.accessMetrics.TransactionExecuted(t, ti)
