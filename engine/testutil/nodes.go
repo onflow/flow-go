@@ -289,7 +289,7 @@ func CollectionNode(t *testing.T, hub *stub.Hub, identity bootstrap.NodeInfo, ro
 	require.NoError(t, err)
 	node.Me, err = local.New(identity.Identity().IdentitySkeleton, privKeys.StakingKey)
 	require.NoError(t, err)
-	lockManager := locks.NewTestingLockManager()
+	lockManager := storage.NewTestingLockManager()
 
 	pools := epochs.NewTransactionPools(
 		func(_ uint64) mempool.Transactions {
