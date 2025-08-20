@@ -26,6 +26,7 @@ import (
 func makeLockPolicy() lockctx.Policy {
 	return lockctx.NewDAGPolicyBuilder().
 		Add(storage.LockInsertBlock, storage.LockFinalizeBlock).
+		Add(storage.LockInsertOrFinalizeClusterBlock, storage.LockInsertBlock).
 		Build()
 }
 
