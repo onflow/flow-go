@@ -740,6 +740,9 @@ func bootstrapSporkInfo(
 			ProposerSigData: nil,
 		},
 	)
+	if err != nil {
+		return fmt.Errorf("could not create root proposal for spork root block: %w", err)
+	}
 
 	err = blocks.BatchStore(lctx, rw, proposal)
 	if err != nil {

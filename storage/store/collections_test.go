@@ -104,6 +104,7 @@ func TestCollections_IndexDuplicateTx(t *testing.T) {
 
 		// insert col2
 		_, err = collections.StoreAndIndexByTransaction(lctx, &col2)
+		require.NoError(t, err)
 
 		// should be able to retrieve col2 by ID
 		gotLightByCol2ID, err := collections.LightByID(col2.ID())
