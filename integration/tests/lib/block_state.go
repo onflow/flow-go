@@ -71,7 +71,7 @@ func (bs *BlockState) WaitForHalt(t *testing.T, requiredDurationWithoutProgress,
 }
 
 func (bs *BlockState) Add(t *testing.T, msg *messages.BlockProposal) {
-	b := msg.Block.ToInternal()
+	b := &msg.Block
 	bs.Lock()
 	defer bs.Unlock()
 
