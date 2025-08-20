@@ -3,6 +3,7 @@ package verifier_test
 import (
 	"crypto/rand"
 	"errors"
+	"sync/atomic"
 	"testing"
 
 	"github.com/ipfs/go-cid"
@@ -28,7 +29,6 @@ import (
 	"github.com/onflow/flow-go/network/mocknetwork"
 	protocol "github.com/onflow/flow-go/state/protocol/mock"
 	"github.com/onflow/flow-go/storage"
-	"github.com/onflow/flow-go/storage/locks"
 	mockstorage "github.com/onflow/flow-go/storage/mock"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -108,7 +108,7 @@ func (suite *VerifierEngineTestSuite) getTestNewEngine() *verifier.Engine {
 		suite.me,
 		suite.chunkVerifier,
 		suite.approvals,
-		locks.NewTestingLockManager(),
+		storage.NewTestingLockManager(),
 	)
 	require.NoError(suite.T(), err)
 
@@ -151,7 +151,7 @@ func (suite *VerifierEngineTestSuite) TestVerifyHappyPath() {
 
 	for _, test := range tests {
 		suite.Run(test.name, func() {
-			var expectedApproval *flow.ResultApproval
+			var expectedApproval atomic.Pointer[flow.ResultApproval] // potentially accessed concurrently within engine
 
 			suite.approvals.
 				On("StoreMyApproval", mock.Anything).
@@ -172,7 +172,7 @@ func (suite *VerifierEngineTestSuite) TestVerifyHappyPath() {
 						// spock should be non-nil
 						suite.Assert().NotNil(ra.Body.Spock)
 
-						expectedApproval = ra
+						expectedApproval.Store(ra)
 						return nil
 					}
 				}).
@@ -185,7 +185,7 @@ func (suite *VerifierEngineTestSuite) TestVerifyHappyPath() {
 					// check that the approval matches the input execution result
 					ra, ok := args[0].(*flow.ResultApproval)
 					suite.Require().True(ok)
-					suite.Assert().Equal(expectedApproval, ra)
+					suite.Assert().Equal(expectedApproval.Load(), ra)
 
 					// note: mock includes each variadic argument as a separate element in slice
 					node, ok := args[1].(flow.Identifier)

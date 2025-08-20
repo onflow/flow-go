@@ -123,6 +123,11 @@ func (s *Snapshot) Commit() (flow.StateCommitment, error) {
 	return seal.FinalState, nil
 }
 
+// SealedResult returns the most recent included seal as of this block and
+// the corresponding execution result. The seal may have been included in a
+// parent block, if this block is empty. If this block contains multiple
+// seals, this returns the seal for the block with the greatest height.
+// TODO document error returns
 func (s *Snapshot) SealedResult() (*flow.ExecutionResult, *flow.Seal, error) {
 	seal, err := s.state.seals.HighestInFork(s.blockID)
 	if err != nil {
@@ -150,7 +155,7 @@ func (s *Snapshot) SealingSegment() (*flow.SealingSegment, error) {
 	//  enough history to satisfy _all_ of the following conditions:
 	//   (i) The highest sealed block as of `head` needs to be included in the sealing segment.
 	//       This is relevant if `head` does not contain any seals.
-	//  (ii) All blocks that are sealed by `head`. This is relevant if head` contains _multiple_ seals.
+	//  (ii) All blocks that are sealed by `head`. This is relevant if `head` contains _multiple_ seals.
 	// (iii) The sealing segment should contain the history back to (including):
 	//       limitHeight := max(blockSealedAtHead.Height - flow.DefaultTransactionExpiry, SporkRootBlockHeight)
 	// Per convention, we include the blocks for (i) in the `SealingSegment.Blocks`, while the

@@ -456,6 +456,8 @@ func RunWithTypedPebbleDB(
 	})
 }
 
+// LockManagerWithContext creates a new lock manager, creates a new context and acquires the
+// specified locks within that context. Lock manager and context are returned.
 func LockManagerWithContext(t *testing.T, locks ...string) (lockctx.Manager, lockctx.Context) {
 	lockManager := storage.NewTestingLockManager()
 	lctx := lockManager.NewContext()

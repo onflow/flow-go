@@ -317,11 +317,12 @@ func (e *Engine) verify(ctx context.Context, originID flow.Identifier,
 }
 
 // storeApproval stores the result approval in the database.
+// Concurrency safe and guarantees that an approval for a result is never
+// overwritten by a different one (enforcing protocol rule that Verifier
+// must never publish two different approvals for the same chunk).
 // No errors are expected during normal operations.
-// concurrency safe and guarantees that an approval for a result
-// is never overwritten by a different one
 func (e *Engine) storeApproval(approval *flow.ResultApproval) error {
-	// store the approval in the database
+	// create deferred operation for storing approval in the database
 	storing := e.approvals.StoreMyApproval(approval)
 
 	lctx := e.lockManager.NewContext()

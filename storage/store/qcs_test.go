@@ -8,7 +8,6 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/storage"
-	"github.com/onflow/flow-go/storage/locks"
 	"github.com/onflow/flow-go/storage/operation/dbtest"
 	"github.com/onflow/flow-go/storage/store"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -21,7 +20,7 @@ func TestQuorumCertificates_StoreTx(t *testing.T) {
 		store := store.NewQuorumCertificates(metrics, db, 10)
 		qc := unittest.QuorumCertificateFixture()
 
-		lockManager := locks.NewTestingLockManager()
+		lockManager := storage.NewTestingLockManager()
 		lctx := lockManager.NewContext()
 		defer lctx.Release()
 		require.NoError(t, lctx.AcquireLock(storage.LockInsertBlock))
@@ -37,8 +36,32 @@ func TestQuorumCertificates_StoreTx(t *testing.T) {
 	})
 }
 
+// TestQuorumCertificates_LockEnforced verifies that storing a QC requires holding the
+// storage.LockInsertBlock lock. If the lock is not held, `BatchStore` should error.
+func TestQuorumCertificates_LockEnforced(t *testing.T) {
+	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
+		metrics := metrics.NewNoopCollector()
+		store := store.NewQuorumCertificates(metrics, db, 10)
+		qc := unittest.QuorumCertificateFixture()
+
+		// acquire wrong lock and attempt to store QC: should error
+		lockManager := storage.NewTestingLockManager()
+		lctx := lockManager.NewContext()
+		require.NoError(t, lctx.AcquireLock(storage.LockFinalizeBlock)) // INCORRECT LOCK
+		err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+			return store.BatchStore(lctx, rw, qc)
+		})
+		require.Error(t, err)
+		lctx.Release()
+
+		// qc should not be stored, so ByBlockID should return `storage.ErrNotFound`
+		_, err = store.ByBlockID(qc.BlockID)
+		require.ErrorIs(t, err, storage.ErrNotFound)
+	})
+}
+
 // TestQuorumCertificates_StoreTx_OtherQC checks if storing other QC for same blockID results in
-// expected storage error and already stored value is not overwritten.
+// `storage.ErrAlreadyExists` and already stored value is not overwritten.
 func TestQuorumCertificates_StoreTx_OtherQC(t *testing.T) {
 	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
 		metrics := metrics.NewNoopCollector()
@@ -49,7 +72,7 @@ func TestQuorumCertificates_StoreTx_OtherQC(t *testing.T) {
 			otherQC.BlockID = qc.BlockID
 		})
 
-		lockManager := locks.NewTestingLockManager()
+		lockManager := storage.NewTestingLockManager()
 		lctx := lockManager.NewContext()
 		defer lctx.Release()
 		require.NoError(t, lctx.AcquireLock(storage.LockInsertBlock))

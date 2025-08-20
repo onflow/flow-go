@@ -146,8 +146,8 @@ func Bootstrap(
 		return nil, fmt.Errorf("could not get sealed result for sealing segment: %w", err)
 	}
 
-	// sealing segment is in ascending height order, so the tail is the
-	// oldest ancestor and head is the newest child in the segment
+	// sealing segment lists blocks in order of ascending height, so the tail
+	// is the oldest ancestor and head is the newest child in the segment
 	// TAIL <- ... <- HEAD
 	lastFinalized := segment.Finalized() // the highest block in sealing segment is the last finalized block
 	lastSealed := segment.Sealed()       // the lowest block in sealing segment is the last sealed block
@@ -245,7 +245,7 @@ func Bootstrap(
 	)
 }
 
-// bootstrapProtocolState bootstraps data structures needed for Dynamic Protocol State.
+// bootstrapProtocolStates bootstraps data structures needed for Dynamic Protocol State.
 // The sealing segment may contain blocks committing to different Protocol State entries,
 // in which case each of these protocol state entries are stored in the database during
 // bootstrapping.
@@ -302,8 +302,18 @@ func bootstrapProtocolState(
 	return nil
 }
 
-// bootstrapSealingSegment inserts all blocks and associated metadata for the
-// protocol state root snapshot to disk.
+// bootstrapSealingSegment inserts all blocks and associated metadata for the protocol state root
+// snapshot to disk. We proceed as follows:
+//  1. we persist the auxiliary execution results from the sealing segment
+//  2. persist extra blocks from the sealing segment; these blocks are below the history cut-off and
+//     therefore not fully indexed (we only index the blocks by height).
+//  3. persist sealing segment Blocks and properly populate all indices as if those blocks:
+//     - blocks are index by their heights
+//     - latest seale is indexed for each block
+//     - children of each block is initialized with the set containing the child block
+//  4. For the highest seal (`rootSeal`), we index the sealed result ID in the database.
+//     This is necessary for the execution node to confirm that it is starting to execute from the
+//     correct state.
 func bootstrapSealingSegment(
 	lctx lockctx.Proof,
 	db storage.DB,
@@ -313,6 +323,7 @@ func bootstrapSealingSegment(
 	head *flow.Block,
 	rootSeal *flow.Seal,
 ) error {
+	// STEP 1: persist AUXILIARY EXECUTION RESULTS (should include the result sealed by segment.FirstSeal if that is not nil)
 	err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 		w := rw.Writer()
 		for _, result := range segment.ExecutionResults {
@@ -325,42 +336,31 @@ func bootstrapSealingSegment(
 				return fmt.Errorf("could not index execution result: %w", err)
 			}
 		}
-
-		// insert the first seal (in case the segment's first block contains no seal)
-		if segment.FirstSeal != nil {
-			err := operation.InsertSeal(w, segment.FirstSeal.ID(), segment.FirstSeal)
-			if err != nil {
-				return fmt.Errorf("could not insert first seal: %w", err)
-			}
-		}
-
-		// root seal contains the result ID for the sealed root block. If the sealed root block is
-		// different from the finalized root block, then it means the node dynamically bootstrapped.
-		// In that case, we should index the result of the sealed root block so that the EN is able
-		// to execute the next block.
-		err := operation.IndexExecutionResult(w, rootSeal.BlockID, rootSeal.ResultID)
-		if err != nil {
-			return fmt.Errorf("could not index root result: %w", err)
-		}
-
 		return nil
 	})
 	if err != nil {
 		return err
 	}
 
-	// why not storing all blocks in the same batch?
-	// because we need to ensure a block does not include a result that refers a unknown block.
-	// when validating the results, we could check if the referred block exists in the database,
-	// however if we are storing multiple blocks in the same batch, the previous block from the same
-	// batch has not been stored in database yet, so the check can't distinguish between a block that
-	// refers to a previous block in the same batch and a block that refers to a block that does not
-	// exist in the database. Unless we pass down the previous blocks to the validation function as well
-	// as the database operation functions, such as blocks.BatchStore method, which we consider a bad
-	// practice, since having the database operation function taking previous blocks (or previous results)
-	// as an argument is confusing and vulnerable to bugs.
-	// since storing multiple blocks in the same batch only happens during bootstrapping, we decided to
-	// store each block in a separate batch.
+	// STEP 2: persist EXTRA BLOCKS to the database
+	// These blocks are _ancestors_ of `segment.Blocks`, i.e. below the history cut-off. Therefore, we only persist the extra blocks
+	// and index them by height, while all the other indices are omitted, as they would potentially reference non-existent data.
+	//
+	// We PERSIST these blocks ONE-BY-ONE in order of increasing height,
+	// emulating the process during normal operations, the the following reason:
+	// * Execution Receipts are incorporated into blocks for bookkeeping when and which execution results the ENs published.
+	// * Typically, most ENs commit to the same results. Therefore, Results in blocks are stored separately from the Receipts
+	//   in blocks and deduplicated along the fork -- specifically, we only store the result along a fork in the first block
+	//   containing an execution receipt committing to that result. For receipts committing to the same result in descending
+	//   blocks, we only store the receipt and omit the result as it is already contained in an ancestor.
+	// * We want to ensure that for every receipt in a block that we store, the result is also going to be available in storage
+	//   [Blocks.BatchStore] automatically performs this check and errors when attempting to store a block referencing unknown
+	//   results.
+	// * During normal operations, we ingest and persist blocks one by one. However, during bootstrapping we need to store
+	//   multiple blocks. Hypothetically, if we were to store all blocks in the same batch, results included in ancestor blocks
+	//   would not be persisted in the database yet when attempting to persist their descendants. In other words, the check in
+	//   [Blocks.BatchStore] can't distinguish between a receipt referencing a missing result vs a receipt referencing a result
+	//   that is contained in a previous block being stored as part of the same batch.
 	for _, block := range segment.ExtraBlocks {
 		err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 			blockID := block.ID()
@@ -389,12 +389,36 @@ func bootstrapSealingSegment(
 		}
 	}
 
+	// STEP 3: persist sealing segment Blocks and properly populate all indices as if those blocks
+	// For each block B, we index the highest seal in the fork with head B. To sanity check proper state construction, we want to ensure that the referenced
+	// seal actually exists in the database at the end of the bootstrapping process. Therefore, we track all the seals that we are storing and error in case
+	// we attempt to reference a seal that is not in that set. It is fine to omit any seals in `segment.ExtraBlocks` for the following reason:
+	//  * Let's consider the lowest-height block in `segment.Blocks`, by convention `segment.Blocks[0]`, and call it B1.
+	//  * If B1 contains seals, then the latest seal as of B1 is part of the block's payload. S1 will be stored in the database while persisting B1.
+	//  * If and only if B1 contains no seal, then `segment.FirstSeal` is set to the latest seal included in an ancestor of B1 (see [flow.SealingSegment]
+	//    documentation). We explicitly store FirstSeal in the database.
+	//  * By induction, this argument can be applied to all subsequent blocks in `segment.Blocks`. Hence, the index `LatestSealAtBlock` is correctly populated
+	//    for all blocks in `segment.Blocks`.
 	sealsLookup := make(map[flow.Identifier]struct{})
 	sealsLookup[rootSeal.ID()] = struct{}{}
-	if segment.FirstSeal != nil {
+	if segment.FirstSeal != nil { // in case the segment's first block contains no seal, insert the first seal
 		sealsLookup[segment.FirstSeal.ID()] = struct{}{}
+		err = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+			if segment.FirstSeal != nil {
+				err := operation.InsertSeal(rw.Writer(), segment.FirstSeal.ID(), segment.FirstSeal)
+				if err != nil {
+					return fmt.Errorf("could not insert first seal: %w", err)
+				}
+			}
+			return nil
+		})
+		if err != nil {
+			return err
+		}
 	}
 
+	// PERSIST these blocks ONE-BY-ONE in order of increasing height, emulating the process during normal operations,
+	// so sanity checks from normal operations should continue to apply.
 	for i, block := range segment.Blocks {
 		err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 			w := rw.Writer()
@@ -438,10 +462,17 @@ func bootstrapSealingSegment(
 			}
 
 			// for all but the first block in the segment, index the parent->child relationship
+			// Populate parent->child relationship
 			if i > 0 {
 				err = operation.UpsertBlockChildren(lctx, w, block.Header.ParentID, []flow.Identifier{blockID})
 				if err != nil {
 					return fmt.Errorf("could not insert child index for block (id=%x): %w", blockID, err)
+				}
+			}
+			if i == len(segment.Blocks)-1 { // in addition, for the highest block in the sealing segment, the known set of children is empty:
+				err = operation.UpsertBlockChildren(lctx, rw.Writer(), head.ID(), nil)
+				if err != nil {
+					return fmt.Errorf("could not insert child index for head block (id=%x): %w", head.ID(), err)
 				}
 			}
 
@@ -452,25 +483,52 @@ func bootstrapSealingSegment(
 		}
 	}
 
-	// insert an empty child index for the final block in the segment
-	return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-		err := operation.UpsertBlockChildren(lctx, rw.Writer(), head.ID(), nil)
+	// STEP 4: For the highest seal (`rootSeal`), we index the sealed result ID in the database.
+	err = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+		// sanity check existence of referenced execution result (should have been stored in STEP 1)
+		var result flow.ExecutionResult
+		err := operation.RetrieveExecutionResult(rw.GlobalReader(), rootSeal.ResultID, &result)
 		if err != nil {
-			return fmt.Errorf("could not insert child index for head block (id=%x): %w", head.ID(), err)
+			return fmt.Errorf("missing sealed execution result %v: %w", rootSeal.ResultID, err)
 		}
+
+		// If the sealed root block is different from the finalized root block, then it means the node dynamically
+		// bootstrapped. In that case, we index the result of the latest sealed result, so that the EN is able
+		// to confirm that it is loading the correct state to execute the next block.
+		err = operation.IndexExecutionResult(rw.Writer(), rootSeal.BlockID, rootSeal.ResultID)
+		if err != nil {
+			return fmt.Errorf("could not index root result: %w", err)
+		}
+
 		return nil
 	})
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
-// bootstrapStatePointers instantiates special pointers used to by the protocol
-// state to keep track of special block heights and views.
+// bootstrapStatePointers instantiates central pointers used to by the protocol
+// state for keeping track of lifecycle variables:
+//   - Consensus Safety and Liveness Data (only used by consensus participants)
+//   - Root Block's Height (heighest block in sealing segment)
+//   - Sealed Root Block Height (block height sealed as of the Root Block)
+//   - Latest Finalized Height (initialized to height of Root Block)
+//   - Latest Sealed Block Height (initialized to block height sealed as of the Root Block)
+//   - initial entry in map:
+//     Finalized Block ID -> ID of latest seal in fork with this block as head
 func bootstrapStatePointers(lctx lockctx.Proof, rw storage.ReaderBatchWriter, root protocol.Snapshot) error {
+	// sealing segment lists blocks in order of ascending height, so the tail
+	// is the oldest ancestor and head is the newest child in the segment
+	// TAIL <- ... <- HEAD
 	segment, err := root.SealingSegment()
 	if err != nil {
 		return fmt.Errorf("could not get sealing segment: %w", err)
 	}
-	highest := segment.Finalized()
-	lowest := segment.Sealed()
+	highest := segment.Finalized() // the highest block in sealing segment is the last finalized block
+	lowest := segment.Sealed()     // the lowest block in sealing segment is the last sealed block
+
 	// find the finalized seal that seals the lowest block, meaning seal.BlockID == lowest.ID()
 	seal, err := segment.FinalizedSeal()
 	if err != nil {
@@ -556,8 +614,8 @@ func bootstrapStatePointers(lctx lockctx.Proof, rw storage.ReaderBatchWriter, ro
 // a particular Dynamic Protocol State entry.
 // There may be several such entries within a single root snapshot, in which case this
 // function is called once for each entry. Entries may overlap in which underlying
-// epoch information (service events) they reference, which case duplicate writes of
-// the same data are ignored.
+// epoch information (service events) they reference -- this only has a minor performance
+// cost, as duplicate writes of the same data are idempotent.
 func bootstrapEpochForProtocolStateEntry(
 	rw storage.ReaderBatchWriter,
 	epochProtocolStateSnapshots storage.EpochProtocolStateEntries,
@@ -589,19 +647,20 @@ func bootstrapEpochForProtocolStateEntry(
 		commits = append(commits, commit)
 	}
 
-	// validate and insert current epoch
-	setup := richEntry.CurrentEpochSetup
-	commit := richEntry.CurrentEpochCommit
+	{ // validate and insert current epoch (always exist)
+		setup := richEntry.CurrentEpochSetup
+		commit := richEntry.CurrentEpochCommit
 
-	if err := protocol.IsValidEpochSetup(setup, verifyNetworkAddress); err != nil {
-		return fmt.Errorf("invalid EpochSetup for current epoch: %w", err)
-	}
-	if err := protocol.IsValidEpochCommit(commit, setup); err != nil {
-		return fmt.Errorf("invalid EpochCommit for current epoch: %w", err)
-	}
+		if err := protocol.IsValidEpochSetup(setup, verifyNetworkAddress); err != nil {
+			return fmt.Errorf("invalid EpochSetup for current epoch: %w", err)
+		}
+		if err := protocol.IsValidEpochCommit(commit, setup); err != nil {
+			return fmt.Errorf("invalid EpochCommit for current epoch: %w", err)
+		}
 
-	setups = append(setups, setup)
-	commits = append(commits, commit)
+		setups = append(setups, setup)
+		commits = append(commits, commit)
+	}
 
 	// validate and insert next epoch, if it exists
 	if richEntry.NextEpoch != nil {
@@ -647,7 +706,6 @@ func bootstrapEpochForProtocolStateEntry(
 // bootstrapSporkInfo bootstraps the protocol state with information about the
 // spork which is used to disambiguate Flow networks.
 func bootstrapSporkInfo(rw storage.ReaderBatchWriter, root protocol.Snapshot) error {
-
 	w := rw.Writer()
 	params := root.Params()
 	sporkID := params.SporkID()

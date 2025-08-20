@@ -43,6 +43,6 @@ type MyExecutionReceipts interface {
 
 	// BatchRemoveIndexByBlockID removes blockID-to-my-execution-receipt index entry keyed by a blockID in a provided batch
 	// No errors are expected during normal operation, even if no entries are matched.
-	// If Badger unexpectedly fails to process the request, the error is wrapped in a generic error and returned.
+	// If database unexpectedly fails to process the request, the error is wrapped in a generic error and returned.
 	BatchRemoveIndexByBlockID(blockID flow.Identifier, batch ReaderBatchWriter) error
 }
