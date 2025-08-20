@@ -173,13 +173,12 @@ func (s *MessageHubSuite) TestProcessValidIncomingMessages() {
 	originID := unittest.IdentifierFixture()
 	s.Run("to-compliance-engine", func() {
 		proposal := unittest.ProposalFixture()
-		blockProposalMsg := messages.Proposal(*proposal)
 		expectedComplianceMsg := flow.Slashable[*flow.Proposal]{
 			OriginID: originID,
 			Message:  proposal,
 		}
 		s.compliance.On("OnBlockProposal", expectedComplianceMsg).Return(nil).Once()
-		err := s.hub.Process(channel, originID, &blockProposalMsg)
+		err := s.hub.Process(channel, originID, proposal)
 		require.NoError(s.T(), err)
 	})
 	s.Run("to-vote-aggregator", func() {
