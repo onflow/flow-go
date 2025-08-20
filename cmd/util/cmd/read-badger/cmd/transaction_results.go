@@ -58,7 +58,7 @@ var transactionResultsCmd = &cobra.Command{
 				if err != nil {
 					return fmt.Errorf("could not get transaction result for block id and transaction id: %v: %w", txID, err)
 				}
-				common.PrettyPrintEntity(transactionResult)
+				common.PrettyPrint(transactionResult)
 			}
 
 			return nil

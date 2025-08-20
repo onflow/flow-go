@@ -18,15 +18,23 @@ func TestGuaranteeInsertRetrieve(t *testing.T) {
 	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
 		g := unittest.CollectionGuaranteeFixture()
 
+<<<<<<< HEAD:storage/operation/guarantees_test.go
 		_, lctx := unittest.LockManagerWithContext(t, storage.LockInsertBlock)
 		err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 			return operation.UnsafeInsertGuarantee(lctx, rw.Writer(), g.CollectionID, g)
 		})
+=======
+		err := db.Update(InsertGuarantee(g.ID(), g))
+>>>>>>> @{-1}:storage/badger/operation/guarantees_test.go
 		require.NoError(t, err)
 		lctx.Release()
 
 		var retrieved flow.CollectionGuarantee
+<<<<<<< HEAD:storage/operation/guarantees_test.go
 		err = operation.RetrieveGuarantee(db.Reader(), g.CollectionID, &retrieved)
+=======
+		err = db.View(RetrieveGuarantee(g.ID(), &retrieved))
+>>>>>>> @{-1}:storage/badger/operation/guarantees_test.go
 		require.NoError(t, err)
 
 		assert.Equal(t, g, &retrieved)
@@ -64,7 +72,7 @@ func TestIndexGuaranteedCollectionByBlockHashInsertRetrieve(t *testing.T) {
 		err = operation.LookupPayloadGuarantees(db.Reader(), blockID, &actual)
 		require.NoError(t, err)
 
-		assert.Equal(t, []flow.Identifier{collID1, collID2}, actual)
+		assert.Equal(t, []flow.Identifier(expected), actual)
 	})
 }
 
@@ -91,7 +99,11 @@ func TestIndexGuaranteedCollectionByBlockHashMultipleBlocks(t *testing.T) {
 		_, lctx1 := unittest.LockManagerWithContext(t, storage.LockInsertBlock)
 		err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 			for _, guarantee := range set1 {
+<<<<<<< HEAD:storage/operation/guarantees_test.go
 				if err := operation.UnsafeInsertGuarantee(lctx1, rw.Writer(), guarantee.CollectionID, guarantee); err != nil {
+=======
+				if err := InsertGuarantee(guarantee.ID(), guarantee)(tx); err != nil {
+>>>>>>> @{-1}:storage/badger/operation/guarantees_test.go
 					return err
 				}
 			}
@@ -107,7 +119,11 @@ func TestIndexGuaranteedCollectionByBlockHashMultipleBlocks(t *testing.T) {
 		_, lctx2 := unittest.LockManagerWithContext(t, storage.LockInsertBlock)
 		err = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 			for _, guarantee := range set2 {
+<<<<<<< HEAD:storage/operation/guarantees_test.go
 				if err := operation.UnsafeInsertGuarantee(lctx2, rw.Writer(), guarantee.CollectionID, guarantee); err != nil {
+=======
+				if err := InsertGuarantee(guarantee.ID(), guarantee)(tx); err != nil {
+>>>>>>> @{-1}:storage/badger/operation/guarantees_test.go
 					return err
 				}
 			}
@@ -123,13 +139,13 @@ func TestIndexGuaranteedCollectionByBlockHashMultipleBlocks(t *testing.T) {
 			var actual1 []flow.Identifier
 			err = operation.LookupPayloadGuarantees(db.Reader(), blockID1, &actual1)
 			assert.NoError(t, err)
-			assert.ElementsMatch(t, []flow.Identifier{collID1}, actual1)
+			assert.ElementsMatch(t, []flow.Identifier(ids1), actual1)
 
 			// get block 2
 			var actual2 []flow.Identifier
 			err = operation.LookupPayloadGuarantees(db.Reader(), blockID2, &actual2)
 			assert.NoError(t, err)
-			assert.Equal(t, []flow.Identifier{collID2, collID3, collID4}, actual2)
+			assert.Equal(t, []flow.Identifier(ids2), actual2)
 		})
 	})
 }

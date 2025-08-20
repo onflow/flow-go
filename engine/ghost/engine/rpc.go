@@ -108,7 +108,7 @@ func registerConduits(net network.EngineRegistry, state protocol.State, eng netw
 		if err != nil {
 			return nil, fmt.Errorf("could not get cluster: %w", err)
 		}
-		clusterID := cluster.RootBlock().Header.ChainID
+		clusterID := cluster.RootBlock().ChainID
 
 		// add the dynamic channels for the cluster
 		channelList = append(

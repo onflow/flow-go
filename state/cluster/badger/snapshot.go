@@ -23,6 +23,7 @@ func (s *Snapshot) Collection() (*flow.Collection, error) {
 	}
 
 	var collection flow.Collection
+<<<<<<< HEAD
 	// get the header for this snapshot
 	var header flow.Header
 	err := s.head(&header)
@@ -39,6 +40,15 @@ func (s *Snapshot) Collection() (*flow.Collection, error) {
 
 	// set the collection
 	collection = payload.Collection
+=======
+	err := s.state.db.View(func(tx *badger.Txn) error {
+		// get the payload
+		var payload cluster.Payload
+		err := procedure.RetrieveClusterPayload(s.blockID, &payload)(tx)
+		if err != nil {
+			return fmt.Errorf("failed to get snapshot payload: %w", err)
+		}
+>>>>>>> @{-1}
 
 	return &collection, nil
 }

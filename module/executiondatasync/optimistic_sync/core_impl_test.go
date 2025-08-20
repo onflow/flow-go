@@ -81,14 +81,14 @@ func (c *CoreImplSuite) SetupTest() {
 // Returns a configured CoreImpl ready for testing.
 func (c *CoreImplSuite) createTestCoreImpl() *CoreImpl {
 	block := unittest.BlockFixture()
-	executionResult := unittest.ExecutionResultFixture(unittest.WithBlock(&block))
+	executionResult := unittest.ExecutionResultFixture(unittest.WithBlock(block))
 
 	lockManager := storage.NewTestingLockManager()
 
 	core := NewCoreImpl(
 		c.logger,
 		executionResult,
-		block.Header,
+		block.ToHeader(),
 		c.execDataRequester,
 		c.txResultErrMsgsRequester,
 		c.txResultErrMsgsRequestTimeout,

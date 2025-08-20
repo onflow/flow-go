@@ -59,10 +59,40 @@ func (m *MutableState) getExtendCtx(candidate *cluster.Block) (extendContext, er
 	var ctx extendContext
 	ctx.candidate = candidate
 
+<<<<<<< HEAD
 	r := m.State.db.Reader()
 	// get the latest finalized cluster block and latest finalized consensus height
 	ctx.finalizedClusterBlock = new(flow.Header)
 	err := procedure.RetrieveLatestFinalizedClusterHeader(r, candidate.Header.ChainID, ctx.finalizedClusterBlock)
+=======
+	err := m.State.db.View(func(tx *badger.Txn) error {
+		// get the latest finalized cluster block and latest finalized consensus height
+		ctx.finalizedClusterBlock = new(flow.Header)
+		err := procedure.RetrieveLatestFinalizedClusterHeader(candidate.ChainID, ctx.finalizedClusterBlock)(tx)
+		if err != nil {
+			return fmt.Errorf("could not retrieve finalized cluster head: %w", err)
+		}
+		err = operation.RetrieveFinalizedHeight(&ctx.finalizedConsensusHeight)(tx)
+		if err != nil {
+			return fmt.Errorf("could not retrieve finalized height on consensus chain: %w", err)
+		}
+
+		err = operation.RetrieveEpochFirstHeight(m.State.epoch, &ctx.epochFirstHeight)(tx)
+		if err != nil {
+			return fmt.Errorf("could not get operating epoch first height: %w", err)
+		}
+		err = operation.RetrieveEpochLastHeight(m.State.epoch, &ctx.epochLastHeight)(tx)
+		if err != nil {
+			if errors.Is(err, storage.ErrNotFound) {
+				ctx.epochHasEnded = false
+				return nil
+			}
+			return fmt.Errorf("unexpected failure to retrieve final height of operating epoch: %w", err)
+		}
+		ctx.epochHasEnded = true
+		return nil
+	})
+>>>>>>> @{-1}
 	if err != nil {
 		return extendContext{}, fmt.Errorf("could not retrieve finalized cluster head: %w", err)
 	}
@@ -96,19 +126,20 @@ func (m *MutableState) getExtendCtx(candidate *cluster.Block) (extendContext, er
 //   - state.OutdatedExtensionError if the candidate block is outdated (e.g. orphaned)
 //   - state.UnverifiableExtensionError if the reference block is _not_ a known finalized block
 //   - state.InvalidExtensionError if the candidate block is invalid
-func (m *MutableState) Extend(candidate *cluster.Block) error {
+func (m *MutableState) Extend(proposal *cluster.Proposal) error {
+	candidate := proposal.Block
 	parentSpan, ctx := m.tracer.StartCollectionSpan(context.Background(), candidate.ID(), trace.COLClusterStateMutatorExtend)
 	defer parentSpan.End()
 
 	span, _ := m.tracer.StartSpanFromContext(ctx, trace.COLClusterStateMutatorExtendCheckHeader)
-	err := m.checkHeaderValidity(candidate)
+	err := m.checkHeaderValidity(&candidate)
 	span.End()
 	if err != nil {
 		return fmt.Errorf("error checking header validity: %w", err)
 	}
 
 	span, _ = m.tracer.StartSpanFromContext(ctx, trace.COLClusterStateMutatorExtendGetExtendCtx)
-	extendCtx, err := m.getExtendCtx(candidate)
+	extendCtx, err := m.getExtendCtx(&candidate)
 	span.End()
 	if err != nil {
 		return fmt.Errorf("error gettting extend context data: %w", err)
@@ -143,10 +174,14 @@ func (m *MutableState) Extend(candidate *cluster.Block) error {
 	}
 
 	span, _ = m.tracer.StartSpanFromContext(ctx, trace.COLClusterStateMutatorExtendDBInsert)
+<<<<<<< HEAD
 
 	err = m.State.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 		return procedure.InsertClusterBlock(lctx, rw, candidate)
 	})
+=======
+	err = operation.RetryOnConflict(m.State.db.Update, procedure.InsertClusterBlock(proposal))
+>>>>>>> @{-1}
 	span.End()
 	if err != nil {
 		return fmt.Errorf("could not insert cluster block: %w", err)
@@ -159,29 +194,27 @@ func (m *MutableState) Extend(candidate *cluster.Block) error {
 // Expected error returns:
 //   - state.InvalidExtensionError if the candidate header is invalid
 func (m *MutableState) checkHeaderValidity(candidate *cluster.Block) error {
-	header := candidate.Header
-
 	// check chain ID
-	if header.ChainID != m.State.clusterID {
-		return state.NewInvalidExtensionErrorf("new block chain ID (%s) does not match configured (%s)", header.ChainID, m.State.clusterID)
+	if candidate.ChainID != m.State.clusterID {
+		return state.NewInvalidExtensionErrorf("new block chain ID (%s) does not match configured (%s)", candidate.ChainID, m.State.clusterID)
 	}
 
 	// get the header of the parent of the new block
-	parent, err := m.headers.ByBlockID(header.ParentID)
+	parent, err := m.headers.ByBlockID(candidate.ParentID)
 	if err != nil {
 		return irrecoverable.NewExceptionf("could not retrieve latest finalized header: %w", err)
 	}
 
 	// extending block must have correct parent view
-	if header.ParentView != parent.View {
+	if candidate.ParentView != parent.View {
 		return state.NewInvalidExtensionErrorf("candidate build with inconsistent parent view (candidate: %d, parent %d)",
-			header.ParentView, parent.View)
+			candidate.ParentView, parent.View)
 	}
 
 	// the extending block must increase height by 1 from parent
-	if header.Height != parent.Height+1 {
+	if candidate.Height != parent.Height+1 {
 		return state.NewInvalidExtensionErrorf("extending block height (%d) must be parent height + 1 (%d)",
-			header.Height, parent.Height)
+			candidate.Height, parent.Height)
 	}
 	return nil
 }
@@ -191,17 +224,16 @@ func (m *MutableState) checkHeaderValidity(candidate *cluster.Block) error {
 // Expected error returns:
 //   - state.OutdatedExtensionError if the candidate extends an orphaned fork
 func (m *MutableState) checkConnectsToFinalizedState(ctx extendContext) error {
-	header := ctx.candidate.Header
+	parentID := ctx.candidate.ParentID
 	finalizedID := ctx.finalizedClusterBlock.ID()
 	finalizedHeight := ctx.finalizedClusterBlock.Height
 
 	// start with the extending block's parent
-	parentID := header.ParentID
 	for parentID != finalizedID {
 		// get the parent of current block
 		ancestor, err := m.headers.ByBlockID(parentID)
 		if err != nil {
-			return irrecoverable.NewExceptionf("could not get parent which must be known (%x): %w", header.ParentID, err)
+			return irrecoverable.NewExceptionf("could not get parent which must be known (%x): %w", parentID, err)
 		}
 
 		// if its height is below current boundary, the block does not connect
@@ -358,7 +390,7 @@ func (m *MutableState) checkPayloadTransactions(lctx lockctx.Proof, ctx extendCo
 func (m *MutableState) checkDupeTransactionsInUnfinalizedAncestry(block *cluster.Block, includedTransactions map[flow.Identifier]struct{}, finalHeight uint64) ([]flow.Identifier, error) {
 
 	var duplicateTxIDs []flow.Identifier
-	err := fork.TraverseBackward(m.headers, block.Header.ParentID, func(ancestor *flow.Header) error {
+	err := fork.TraverseBackward(m.headers, block.ParentID, func(ancestor *flow.Header) error {
 		payload, err := m.payloads.ByBlockID(ancestor.ID())
 		if err != nil {
 			return fmt.Errorf("could not retrieve ancestor payload: %w", err)

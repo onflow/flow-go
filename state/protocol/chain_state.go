@@ -44,14 +44,15 @@ type FollowerState interface {
 
 	// ExtendCertified introduces the block with the given ID into the persistent
 	// protocol state without modifying the current finalized state. It allows us
-	// to execute fork-aware queries against the known protocol state. The caller
-	// must pass a QC for candidate block to prove that the candidate block has
-	// been certified, and it's safe to add it to the protocol state. The QC
-	// cannot be nil and must certify candidate block:
-	//   candidate.View == qc.View && candidate.BlockID == qc.BlockID
+	// to execute fork-aware queries against the known protocol state. As part of
+	// the CertifiedBlock, the caller must pass a Quorum Certificate [QC] (field
+	// `CertifyingQC`) to prove that the candidate block has been certified, and
+	// it's safe to add to it the protocol state. The QC cannot be nil and must
+	// certify candidate block:
+	//   candidate.View == QC.View && candidate.BlockID == QC.BlockID
 	//
 	// CAUTION:
-	//   - This function expects that `qc` has been validated. (otherwise, the state will be corrupted)
+	//   - This function expects that `QC` has been validated. (otherwise, the state will be corrupted)
 	//   - The parent block must already be stored.
 	//   - Attempts to extend the state with the _same block concurrently_ are not allowed.
 	//     (will not corrupt the state, but may lead to an exception)
@@ -65,7 +66,7 @@ type FollowerState interface {
 	// with the same block. Hence, for simplicity, the FollowerState may reject such requests with an exception.
 	//
 	// No errors are expected during normal operations.
-	ExtendCertified(ctx context.Context, candidate *flow.Block, qc *flow.QuorumCertificate) error
+	ExtendCertified(ctx context.Context, certified *flow.CertifiedBlock) error
 
 	// Finalize finalizes the block with the given hash.
 	// At this level, we can only finalize one block at a time. This implies
@@ -105,5 +106,5 @@ type ParticipantState interface {
 	// Expected errors during normal operations:
 	//  * state.OutdatedExtensionError if the candidate block is outdated (e.g. orphaned)
 	//  * state.InvalidExtensionError if the candidate block is invalid
-	Extend(ctx context.Context, candidate *flow.Block) error
+	Extend(ctx context.Context, candidate *flow.Proposal) error
 }

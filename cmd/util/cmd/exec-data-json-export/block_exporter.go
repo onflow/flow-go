@@ -41,6 +41,7 @@ func ExportBlocks(blockID flow.Identifier, dbPath string, outputPath string) (fl
 	defer db.Close()
 
 	cacheMetrics := &metrics.NoopCollector{}
+<<<<<<< HEAD
 	headers := store.NewHeaders(cacheMetrics, db)
 	index := store.NewIndex(cacheMetrics, db)
 	guarantees := store.NewGuarantees(cacheMetrics, db, store.DefaultCacheSize)
@@ -50,6 +51,17 @@ func ExportBlocks(blockID flow.Identifier, dbPath string, outputPath string) (fl
 	payloads := store.NewPayloads(db, index, guarantees, seals, receipts, results)
 	blocks := store.NewBlocks(db, headers, payloads)
 	commits := store.NewCommits(&metrics.NoopCollector{}, db)
+=======
+	headers := badger.NewHeaders(cacheMetrics, db)
+	index := badger.NewIndex(cacheMetrics, db)
+	guarantees := badger.NewGuarantees(cacheMetrics, db, badger.DefaultCacheSize, badger.DefaultCacheSize)
+	seals := badger.NewSeals(cacheMetrics, db)
+	results := badger.NewExecutionResults(cacheMetrics, db)
+	receipts := badger.NewExecutionReceipts(cacheMetrics, db, results, badger.DefaultCacheSize)
+	payloads := badger.NewPayloads(db, index, guarantees, seals, receipts, results)
+	blocks := badger.NewBlocks(db, headers, payloads)
+	commits := store.NewCommits(&metrics.NoopCollector{}, sdb)
+>>>>>>> @{-1}
 
 	activeBlockID := blockID
 	outputFile := filepath.Join(outputPath, "blocks.jsonl")
@@ -97,7 +109,7 @@ func ExportBlocks(blockID flow.Identifier, dbPath string, outputPath string) (fl
 			ParentVoterIndices: hex.EncodeToString(header.ParentVoterIndices),
 			ParentVoterSigData: hex.EncodeToString(header.ParentVoterSigData),
 			ProposerID:         hex.EncodeToString(header.ProposerID[:]),
-			Timestamp:          header.Timestamp,
+			Timestamp:          time.UnixMilli(int64(header.Timestamp)).UTC(),
 			CollectionIDs:      cols,
 			SealedBlocks:       seals,
 			SealedResults:      sealsResults,

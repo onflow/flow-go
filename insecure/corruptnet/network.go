@@ -14,7 +14,6 @@ import (
 	"github.com/rs/zerolog"
 	"google.golang.org/grpc"
 
-	"github.com/onflow/crypto"
 	"github.com/onflow/crypto/hash"
 
 	"github.com/onflow/flow-go/engine/execution/computation/computer"
@@ -29,6 +28,7 @@ import (
 	flownet "github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/utils/logging"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 // Network is a wrapper around the original flow network, that allows a remote attack orchestrator
@@ -425,7 +425,7 @@ func (n *Network) eventToIngressMessage(event interface{}, channel channels.Chan
 
 func (n *Network) generateExecutionReceipt(result *flow.ExecutionResult) (*flow.ExecutionReceipt, error) {
 	// TODO: fill spock secret with dictated spock data from attack orchestrator.
-	return computer.GenerateExecutionReceipt(n.me, n.receiptHasher, result, []crypto.Signature{})
+	return computer.GenerateExecutionReceipt(n.me, n.receiptHasher, result, unittest.SignaturesFixture(1))
 }
 
 func (n *Network) generateResultApproval(attestation *flow.Attestation) (*flow.ResultApproval, error) {

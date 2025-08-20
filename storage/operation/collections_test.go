@@ -26,12 +26,12 @@ func TestCollections(t *testing.T) {
 
 		t.Run("Save", func(t *testing.T) {
 			err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-				return operation.UpsertCollection(rw.Writer(), &expected)
+				return operation.UpsertCollection(rw.Writer(), expected)
 			})
 			require.NoError(t, err)
 
-			var actual flow.LightCollection
-			err = operation.RetrieveCollection(db.Reader(), expected.ID(), &actual)
+			actual := new(flow.LightCollection)
+			err = operation.RetrieveCollection(db.Reader(), expected.ID(), actual)
 			assert.NoError(t, err)
 
 			assert.Equal(t, expected, actual)
@@ -43,8 +43,8 @@ func TestCollections(t *testing.T) {
 			})
 			require.NoError(t, err)
 
-			var actual flow.LightCollection
-			err = operation.RetrieveCollection(db.Reader(), expected.ID(), &actual)
+			actual := new(flow.LightCollection)
+			err = operation.RetrieveCollection(db.Reader(), expected.ID(), actual)
 			assert.Error(t, err)
 			assert.ErrorIs(t, err, storage.ErrNotFound)
 
@@ -62,14 +62,14 @@ func TestCollections(t *testing.T) {
 			_, lctx := unittest.LockManagerWithContext(t, storage.LockInsertOrFinalizeClusterBlock)
 			defer lctx.Release()
 			_ = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-				err := operation.UpsertCollection(rw.Writer(), &expected)
+				err := operation.UpsertCollection(rw.Writer(), expected)
 				assert.NoError(t, err)
 				err = operation.IndexCollectionPayload(lctx, rw.Writer(), blockID, expected.Transactions)
 				assert.NoError(t, err)
 				return nil
 			})
 
-			var actual flow.LightCollection
+			actual := new(flow.LightCollection)
 			err := operation.LookupCollectionPayload(db.Reader(), blockID, &actual.Transactions)
 			assert.NoError(t, err)
 			assert.Equal(t, expected, actual)

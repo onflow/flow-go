@@ -102,7 +102,7 @@ func NewBuilder(
 // However, it will pass through all errors returned by `setter` and `sign`.
 // Callers must be aware of possible error returns from the `setter` and `sign` arguments they provide,
 // and handle them accordingly when handling errors returned from BuildOn.
-func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) error, sign func(*flow.Header) error) (*flow.Header, error) {
+func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.HeaderBodyBuilder) error, sign func(*flow.Header) ([]byte, error)) (*flow.ProposalHeader, error) {
 	parentSpan, ctx := b.tracer.StartSpanFromContext(context.Background(), trace.COLBuildOn)
 	defer parentSpan.End()
 
@@ -195,29 +195,48 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 	// STEP 3: we have a set of transactions that are valid to include on this fork.
 	// Now we create the header for the cluster block.
 	span, _ = b.tracer.StartSpanFromContext(ctx, trace.COLBuildOnCreateHeader)
-	header, err := b.buildHeader(buildCtx, payload, setter, sign)
+	proposal, err := b.buildHeader(buildCtx, payload, setter, sign)
 	span.End()
 	if err != nil {
 		return nil, fmt.Errorf("could not build header: %w", err)
 	}
 
-	proposal := cluster.Block{
-		Header:  header,
-		Payload: payload,
+	block, err := cluster.NewBlock(
+		cluster.UntrustedBlock{
+			HeaderBody: proposal.Header.HeaderBody,
+			Payload:    *payload,
+		},
+	)
+	if err != nil {
+		return nil, fmt.Errorf("could not build cluster block: %w", err)
+	}
+
+	blockProposal, err := cluster.NewProposal(
+		cluster.UntrustedProposal{
+			Block:           *block,
+			ProposerSigData: proposal.ProposerSigData,
+		},
+	)
+	if err != nil {
+		return nil, fmt.Errorf("could not build cluster proposal: %w", err)
 	}
 
 	// STEP 4: insert the cluster block to the database.
 	span, _ = b.tracer.StartSpanFromContext(ctx, trace.COLBuildOnDBInsert)
+<<<<<<< HEAD
 
 	err = b.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 		return procedure.InsertClusterBlock(lctx, rw, &proposal)
 	})
+=======
+	err = operation.RetryOnConflict(b.db.Update, procedure.InsertClusterBlock(blockProposal))
+>>>>>>> @{-1}
 	span.End()
 	if err != nil {
 		return nil, fmt.Errorf("could not insert built block: %w", err)
 	}
 
-	return proposal.Header, nil
+	return proposal, nil
 }
 
 // getBlockBuildContext retrieves the required contextual information from the database
@@ -383,7 +402,7 @@ func (b *Builder) buildPayload(buildCtx *blockBuildContext) (*cluster.Payload, e
 	var transactions []*flow.TransactionBody
 	var totalByteSize uint64
 	var totalGas uint64
-	for _, tx := range b.transactions.All() {
+	for _, tx := range b.transactions.Values() {
 
 		// if we have reached maximum number of transactions, stop
 		if uint(len(transactions)) >= b.config.MaxCollectionSize {
@@ -495,8 +514,21 @@ func (b *Builder) buildPayload(buildCtx *blockBuildContext) (*cluster.Payload, e
 	}
 
 	// build the payload from the transactions
-	payload := cluster.PayloadFromTransactions(minRefID, transactions...)
-	return &payload, nil
+	collection, err := flow.NewCollection(flow.UntrustedCollection{Transactions: transactions})
+	if err != nil {
+		return nil, fmt.Errorf("could not build the collection from the transactions: %w", err)
+	}
+
+	payload, err := cluster.NewPayload(
+		cluster.UntrustedPayload{
+			ReferenceBlockID: minRefID,
+			Collection:       *collection,
+		},
+	)
+	if err != nil {
+		return nil, fmt.Errorf("could not build a payload: %w", err)
+	}
+	return payload, nil
 }
 
 // buildHeader constructs the header for the cluster block being built.
@@ -505,31 +537,41 @@ func (b *Builder) buildPayload(buildCtx *blockBuildContext) (*cluster.Payload, e
 func (b *Builder) buildHeader(
 	ctx *blockBuildContext,
 	payload *cluster.Payload,
-	setter func(header *flow.Header) error,
-	sign func(*flow.Header) error,
-) (*flow.Header, error) {
-
-	header := &flow.Header{
-		ChainID:     ctx.parent.ChainID,
-		ParentID:    ctx.parentID,
-		Height:      ctx.parent.Height + 1,
-		PayloadHash: payload.Hash(),
-		Timestamp:   time.Now().UTC(),
-
-		// NOTE: we rely on the HotStuff-provided setter to set the other
-		// fields, which are related to signatures and HotStuff internals
-	}
+	setter func(header *flow.HeaderBodyBuilder) error,
+	sign func(header *flow.Header) ([]byte, error),
+) (*flow.ProposalHeader, error) {
+	// NOTE: we rely on the HotStuff-provided setter to set the other
+	// fields, which are related to signatures and HotStuff internals
+	headerBodyBuilder := flow.NewHeaderBodyBuilder().
+		WithChainID(ctx.parent.ChainID).
+		WithParentID(ctx.parentID).
+		WithHeight(ctx.parent.Height + 1).
+		WithTimestamp(uint64(time.Now().UnixMilli()))
 
 	// set fields specific to the consensus algorithm
-	err := setter(header)
+	err := setter(headerBodyBuilder)
 	if err != nil {
 		return nil, fmt.Errorf("could not set fields to header: %w", err)
 	}
-	err = sign(header)
+	headerBody, err := headerBodyBuilder.Build()
+	if err != nil {
+		return nil, irrecoverable.NewExceptionf("unexpected error when building header body: %w", err)
+	}
+	header, err := flow.NewHeader(flow.UntrustedHeader{
+		HeaderBody:  *headerBody,
+		PayloadHash: payload.Hash(),
+	})
+	if err != nil {
+		return nil, fmt.Errorf("could not build header: %w", err)
+	}
+	sig, err := sign(header)
 	if err != nil {
 		return nil, fmt.Errorf("could not sign proposal: %w", err)
 	}
-	return header, nil
+	return &flow.ProposalHeader{
+		Header:          header,
+		ProposerSigData: sig,
+	}, nil
 }
 
 // findRefHeightSearchRangeForConflictingClusterBlocks computes the range of reference

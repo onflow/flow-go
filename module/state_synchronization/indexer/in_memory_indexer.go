@@ -180,11 +180,31 @@ func (i *InMemoryIndexer) indexRegisters(registers map[ledger.Path]*ledger.Paylo
 
 // indexCollection processes a collection and its associated transactions.
 // No errors are expected during normal operation.
+<<<<<<< HEAD
 func (i *InMemoryIndexer) indexCollection(lctx lockctx.Proof, collection *flow.Collection) error {
 	// Store the light collection and index by transaction
 	_, err := i.collections.StoreAndIndexByTransaction(lctx, collection)
 	if err != nil {
 		return err
+=======
+func (i *InMemoryIndexer) indexCollection(collection *flow.Collection) error {
+	// Store the full collection
+	if err := i.collections.Store(collection); err != nil {
+		return fmt.Errorf("failed to store collection: %w", err)
+	}
+
+	// Store the light collection
+	light := collection.Light()
+	if err := i.collections.StoreLightAndIndexByTransaction(light); err != nil {
+		return fmt.Errorf("failed to store light collection and transaction index: %w", err)
+	}
+
+	// Store each of the transaction bodies
+	for _, tx := range collection.Transactions {
+		if err := i.transactions.Store(tx); err != nil {
+			return fmt.Errorf("could not store transaction (%s): %w", tx.ID().String(), err)
+		}
+>>>>>>> @{-1}
 	}
 
 	return nil
