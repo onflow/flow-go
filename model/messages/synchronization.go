@@ -99,12 +99,9 @@ type BlockResponse struct {
 	Blocks []flow.UntrustedProposal
 }
 
-var _ UntrustedMessage = (*BlockResponse)(nil)
-
-// ToInternal converts the untrusted BlockResponse into its trusted internal
-// representation.
+// ToInternal returns the internal type representation for BlockResponse.
 //
-// All errors indicate that the message could not be converted to a valid BlockResponse.
+// All errors indicate that the decode target contains a structurally invalid representation of the internal flow.BlockResponse model.
 func (br *BlockResponse) ToInternal() (any, error) {
 	internal := make([]flow.Proposal, len(br.Blocks))
 	for i, untrusted := range br.Blocks {
@@ -127,12 +124,9 @@ type ClusterBlockResponse struct {
 	Blocks []cluster.UntrustedProposal
 }
 
-var _ UntrustedMessage = (*ClusterBlockResponse)(nil)
-
-// ToInternal converts the untrusted ClusterBlockResponse into its trusted internal
-// representation.
+// ToInternal returns the internal type representation for ClusterBlockResponse.
 //
-// All errors indicate that the message could not be converted to a valid ClusterBlockResponse.
+// All errors indicate that the decode target contains a structurally invalid representation of the internal cluster.BlockResponse model.
 func (br *ClusterBlockResponse) ToInternal() (any, error) {
 	internal := make([]cluster.Proposal, len(br.Blocks))
 	for i, untrusted := range br.Blocks {
