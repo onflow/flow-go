@@ -63,7 +63,7 @@ func TestMyExecutionReceiptsStorage(t *testing.T) {
 		withStore(t, func(myReceipts storage.MyExecutionReceipts, _ storage.ExecutionResults, _ storage.ExecutionReceipts, db storage.DB) {
 			lockManager := storage.NewTestingLockManager()
 			block := unittest.BlockFixture()
-			receipt1 := unittest.ReceiptForBlockFixture(&block)
+			receipt1 := unittest.ReceiptForBlockFixture(block)
 
 			lctx := lockManager.NewContext()
 			require.NoError(t, lctx.AcquireLock(storage.LockInsertOwnReceipt))
