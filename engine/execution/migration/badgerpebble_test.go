@@ -36,8 +36,8 @@ func TestMigrateLastSealedExecutedResultToPebble(t *testing.T) {
 		unittest.Seal.WithBlock(genesis.Header)(rootSeal)
 
 		db := badgerimpl.ToDB(bdb)
-		bootstrapLockManager := locks.NewTestingLockManager()
-		err := bootstrapper.BootstrapExecutionDatabase(bootstrapLockManager, db, rootSeal)
+		lockManager := storage.NewTestingLockManager()
+		err := bootstrapper.BootstrapExecutionDatabase(lockManager, db, rootSeal)
 		require.NoError(t, err)
 
 		// create all modules
@@ -65,7 +65,6 @@ func TestMigrateLastSealedExecutedResultToPebble(t *testing.T) {
 		getLatestFinalized := func() (uint64, error) {
 			return genesis.Header.Height, nil
 		}
-		lockManager := storage.NewTestingLockManager()
 
 		// create execution state module
 		es := state.NewExecutionState(

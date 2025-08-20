@@ -33,7 +33,7 @@ func TestReExecuteBlock(t *testing.T) {
 			genesis := unittest.BlockFixture()
 			rootSeal := unittest.Seal.Fixture(unittest.Seal.WithBlock(genesis.Header))
 			db := badgerimpl.ToDB(bdb)
-			bootstrapLockManager := locks.NewTestingLockManager()
+			bootstrapLockManager := storage.NewTestingLockManager()
 			err := bootstrapper.BootstrapExecutionDatabase(bootstrapLockManager, db, rootSeal)
 			require.NoError(t, err)
 
@@ -196,8 +196,8 @@ func TestReExecuteBlockWithDifferentResult(t *testing.T) {
 		unittest.Seal.WithBlock(genesis.Header)(rootSeal)
 
 		db := pebbleimpl.ToDB(pdb)
-		bootstrapLockManage := locks.NewTestingLockManager()
-		err := bootstrapper.BootstrapExecutionDatabase(bootstrapLockManage, db, rootSeal)
+		lockManager := storage.NewTestingLockManager()
+		err := bootstrapper.BootstrapExecutionDatabase(lockManager, db, rootSeal)
 		require.NoError(t, err)
 
 		// create all modules
@@ -218,7 +218,6 @@ func TestReExecuteBlockWithDifferentResult(t *testing.T) {
 		collections := store.NewCollections(db, transactions)
 		chunkDataPacks := store.NewChunkDataPacks(metrics, pebbleimpl.ToDB(pdb), collections, bstorage.DefaultCacheSize)
 
-		lockManager := storage.NewTestingLockManager()
 		withLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
 			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 				return blocks.BatchStore(lctx, rw, &genesis)
