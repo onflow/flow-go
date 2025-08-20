@@ -3,6 +3,7 @@ package deferred_test
 import (
 	"errors"
 	"fmt"
+	"sync"
 	"testing"
 
 	"github.com/jordanschalm/lockctx"
@@ -82,14 +83,14 @@ func TestDeferredBlockPersist_AddNextOperation_Single(t *testing.T) {
 func TestDeferredBlockPersist_AddNextOperation_Multiple(t *testing.T) {
 	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
 		d := deferred.NewDeferredBlockPersist()
-		var executionOrder []int
+		executionOrderTracker := NewExecutionOrderTracker()
 
 		op1 := func(lctx lockctx.Proof, blockID flow.Identifier, rw storage.ReaderBatchWriter) error {
-			executionOrder = append(executionOrder, 1)
+			executionOrderTracker.Append("op1")
 			return nil
 		}
 		op2 := func(lctx lockctx.Proof, blockID flow.Identifier, rw storage.ReaderBatchWriter) error {
-			executionOrder = append(executionOrder, 2)
+			executionOrderTracker.Append("op2")
 			return nil
 		}
 
@@ -101,7 +102,7 @@ func TestDeferredBlockPersist_AddNextOperation_Multiple(t *testing.T) {
 		})
 
 		require.NoError(t, err)
-		assert.Equal(t, []int{1, 2}, executionOrder)
+		assert.Equal(t, []string{"op1", "op2"}, executionOrderTracker.Operations())
 	})
 }
 
@@ -139,18 +140,18 @@ func TestDeferredBlockPersist_AddNextOperation_Error(t *testing.T) {
 //   - maintains the order of operations (first operations from receiver, then from chained instance)
 func TestDeferredBlockPersist_Chain(t *testing.T) {
 	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
-		var executionOrder []int
+		executionOrderTracker := NewExecutionOrderTracker()
 
 		d1 := deferred.NewDeferredBlockPersist()
 		d1op1 := func(lctx lockctx.Proof, blockID flow.Identifier, rw storage.ReaderBatchWriter) error {
-			executionOrder = append(executionOrder, 1)
+			executionOrderTracker.Append("op1")
 			return nil
 		}
 		d1.AddNextOperation(d1op1)
 
 		d2 := deferred.NewDeferredBlockPersist()
 		d2op1 := func(lctx lockctx.Proof, blockID flow.Identifier, rw storage.ReaderBatchWriter) error {
-			executionOrder = append(executionOrder, 2)
+			executionOrderTracker.Append("op2")
 			return nil
 		}
 		d2.AddNextOperation(d2op1)
@@ -161,7 +162,7 @@ func TestDeferredBlockPersist_Chain(t *testing.T) {
 			return d1.Execute(nil, flow.Identifier{}, writer)
 		})
 		require.NoError(t, err)
-		assert.Equal(t, []int{1, 2}, executionOrder)
+		assert.Equal(t, []string{"op1", "op2"}, executionOrderTracker.Operations())
 	})
 }
 
@@ -297,4 +298,147 @@ func TestDeferredBlockPersist_Add_Operation_and_Callback(t *testing.T) {
 		assert.True(t, opExecuted)
 		assert.True(t, callbackExecuted)
 	})
+}
+
+// TestDeferredBlockPersist_method_chaining verifies method chaining with adding a normal
+// operation, adding a callback, and chaining another DeferredBlockPersist.
+func TestDeferredBlockPersist_method_chaining(t *testing.T) {
+	// makeDeferedOperation is a helper function that creates a deferred operation. Upon execution of the
+	// operation, it appends its `operationName` to the provided `executionOrderTracker` slice.
+	makeDeferedOperation := func(operationName string, executionOrderTracker *ExecutionOrderTracker) deferred.DBOp {
+		return func(lctx lockctx.Proof, blockID flow.Identifier, rw storage.ReaderBatchWriter) error {
+			executionOrderTracker.Append(operationName)
+			return nil
+		}
+	}
+
+	// makeSuccessCallback is a helper function that creates a success callback operation. Upon execution,
+	// it appends its `operationName` to the provided `executionOrderTracker` slice.
+	makeSuccessCallback := func(operationName string, executionOrderTracker *ExecutionOrderTracker) func() {
+		return func() { executionOrderTracker.Append(operationName) }
+	}
+
+	t.Run("chaining database operations", func(t *testing.T) {
+		dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
+			exOrder := NewExecutionOrderTracker()
+			deferredBlockPersist := deferred.NewDeferredBlockPersist()
+
+			deferredBlockPersist.
+				AddNextOperation(makeDeferedOperation("op1", exOrder)).
+				AddNextOperation(makeDeferedOperation("op2", exOrder)).
+				AddNextOperation(makeDeferedOperation("op3", exOrder))
+
+			err := db.WithReaderBatchWriter(func(writer storage.ReaderBatchWriter) error {
+				return deferredBlockPersist.Execute(nil, flow.Identifier{}, writer)
+			})
+			require.NoError(t, err)
+			assert.Equal(t, []string{"op1", "op2", "op3"}, exOrder.Operations())
+		})
+	})
+
+	t.Run("chaining database operations with success callbacks", func(t *testing.T) {
+		dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
+			exOrder := NewExecutionOrderTracker()
+			deferredBlockPersist := deferred.NewDeferredBlockPersist()
+
+			deferredBlockPersist.
+				AddNextOperation(makeDeferedOperation("op1", exOrder)).
+				AddSucceedCallback(makeSuccessCallback("sc", exOrder)).
+				AddNextOperation(makeDeferedOperation("op2", exOrder))
+
+			err := db.WithReaderBatchWriter(func(writer storage.ReaderBatchWriter) error {
+				return deferredBlockPersist.Execute(nil, flow.Identifier{}, writer)
+			})
+			require.NoError(t, err)
+			assert.Equal(t, []string{"op1", "op2", "sc"}, exOrder.Operations())
+		})
+
+		dbtest.RunWithDB(t, func(t *testing.T, db2 storage.DB) {
+			exOrder := NewExecutionOrderTracker()
+			deferredBlockPersist := deferred.NewDeferredBlockPersist()
+
+			deferredBlockPersist.
+				AddSucceedCallback(makeSuccessCallback("sc1", exOrder)).
+				AddNextOperation(makeDeferedOperation("op1", exOrder)).
+				AddSucceedCallback(makeSuccessCallback("sc2", exOrder))
+
+			err := db2.WithReaderBatchWriter(func(writer storage.ReaderBatchWriter) error {
+				return deferredBlockPersist.Execute(nil, flow.Identifier{}, writer)
+			})
+			require.NoError(t, err)
+			assert.Equal(t, []string{"op1", "sc1", "sc2"}, exOrder.Operations())
+		})
+	})
+
+	t.Run("chaining DeferredBlockPersis with deferred database operations and success callbacks", func(t *testing.T) {
+		dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
+			exOrder := NewExecutionOrderTracker()
+			deferredBlockPersist1 := deferred.NewDeferredBlockPersist()
+			deferredBlockPersist2 := deferred.NewDeferredBlockPersist()
+
+			deferredBlockPersist2.
+				AddNextOperation(makeDeferedOperation("opA", exOrder)).
+				AddSucceedCallback(makeSuccessCallback("scB", exOrder)).
+				AddNextOperation(makeDeferedOperation("opC", exOrder))
+
+			deferredBlockPersist1.
+				Chain(deferredBlockPersist2).
+				AddSucceedCallback(makeSuccessCallback("sc1", exOrder)).
+				AddNextOperation(makeDeferedOperation("op1", exOrder))
+
+			err := db.WithReaderBatchWriter(func(writer storage.ReaderBatchWriter) error {
+				return deferredBlockPersist1.Execute(nil, flow.Identifier{}, writer)
+			})
+			require.NoError(t, err)
+			assert.Equal(t, []string{"opA", "opC", "op1", "scB", "sc1"}, exOrder.Operations())
+		})
+
+		dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
+			exOrder := NewExecutionOrderTracker()
+			deferredBlockPersist1 := deferred.NewDeferredBlockPersist()
+			deferredBlockPersist2 := deferred.NewDeferredBlockPersist()
+
+			deferredBlockPersist2.
+				AddNextOperation(makeDeferedOperation("opA", exOrder)).
+				AddSucceedCallback(makeSuccessCallback("scB", exOrder)).
+				AddNextOperation(makeDeferedOperation("opC", exOrder))
+
+			deferredBlockPersist1.
+				AddSucceedCallback(makeSuccessCallback("sc1", exOrder)).
+				AddNextOperation(makeDeferedOperation("op1", exOrder)).
+				Chain(deferredBlockPersist2).
+				AddSucceedCallback(makeSuccessCallback("sc2", exOrder)).
+				AddNextOperation(makeDeferedOperation("op2", exOrder))
+
+			err := db.WithReaderBatchWriter(func(writer storage.ReaderBatchWriter) error {
+				return deferredBlockPersist1.Execute(nil, flow.Identifier{}, writer)
+			})
+			require.NoError(t, err)
+			assert.Equal(t, []string{"op1", "opA", "opC", "op2", "sc1", "scB", "sc2"}, exOrder.Operations())
+		})
+	})
+
+}
+
+type ExecutionOrderTracker struct {
+	executedOperations []string
+	mu                 *sync.Mutex
+}
+
+func NewExecutionOrderTracker() *ExecutionOrderTracker {
+	return &ExecutionOrderTracker{
+		mu: &sync.Mutex{},
+	}
+}
+
+func (e *ExecutionOrderTracker) Append(operationName string) {
+	e.mu.Lock()
+	e.executedOperations = append(e.executedOperations, operationName)
+	e.mu.Unlock()
+}
+
+func (e *ExecutionOrderTracker) Operations() []string {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	return e.executedOperations
 }

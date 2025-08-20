@@ -201,26 +201,25 @@ func newMutableProtocolState(
 //     in the node software or state corruption, i.e. case (b). This is the only scenario where the error return
 //     of this function is not nil. If such an exception is returned, continuing is not an option.
 func (s *MutableProtocolState) EvolveState(
-	deferredDBOps *deferred.DeferredBlockPersist,
 	parentBlockID flow.Identifier,
 	candidateView uint64,
 	candidateSeals []*flow.Seal,
-) (flow.Identifier, error) {
+) (flow.Identifier, *deferred.DeferredBlockPersist, error) {
 	serviceEvents, err := s.serviceEventsFromSeals(candidateSeals)
 	if err != nil {
-		return flow.ZeroID, fmt.Errorf("extracting service events from candidate seals failed: %w", err)
+		return flow.ZeroID, nil, fmt.Errorf("extracting service events from candidate seals failed: %w", err)
 	}
 
 	parentStateID, stateMachines, evolvingState, err := s.initializeOrthogonalStateMachines(parentBlockID, candidateView)
 	if err != nil {
-		return flow.ZeroID, fmt.Errorf("failure initializing sub-state machines for evolving the Protocol State: %w", err)
+		return flow.ZeroID, nil, fmt.Errorf("failure initializing sub-state machines for evolving the Protocol State: %w", err)
 	}
 
-	resultingStateID, err := s.build(deferredDBOps, parentStateID, stateMachines, serviceEvents, evolvingState)
+	resultingStateID, deferredDBOps, err := s.build(parentStateID, stateMachines, serviceEvents, evolvingState)
 	if err != nil {
-		return flow.ZeroID, fmt.Errorf("evolving and building the resulting Protocol State failed: %w", err)
+		return flow.ZeroID, nil, fmt.Errorf("evolving and building the resulting Protocol State failed: %w", err)
 	}
-	return resultingStateID, nil
+	return resultingStateID, deferredDBOps, nil
 }
 
 // initializeOrthogonalStateMachines instantiates the sub-state machines that in aggregate evolve the protocol state.
@@ -318,24 +317,24 @@ func (s *MutableProtocolState) serviceEventsFromSeals(candidateSeals []*flow.Sea
 //     on the candidate block's ID, which is still unknown at the time of block construction.
 //   - err: All error returns indicate potential state corruption and should therefore be treated as fatal.
 func (s *MutableProtocolState) build(
-	deferredDBOps *deferred.DeferredBlockPersist,
 	parentStateID flow.Identifier,
 	stateMachines []protocol_state.KeyValueStoreStateMachine,
 	serviceEvents []flow.ServiceEvent,
 	evolvingState protocol.KVStoreReader,
-) (flow.Identifier, error) {
+) (flow.Identifier, *deferred.DeferredBlockPersist, error) {
 	for _, stateMachine := range stateMachines {
 		err := stateMachine.EvolveState(serviceEvents) // state machine should only bubble up exceptions
 		if err != nil {
-			return flow.ZeroID, fmt.Errorf("exception from sub-state machine during state evolution: %w", err)
+			return flow.ZeroID, nil, fmt.Errorf("exception from sub-state machine during state evolution: %w", err)
 		}
 	}
 
 	// _after_ all state machines have ingested the available information, we build the resulting overall state
+	deferredDBOps := deferred.NewDeferredBlockPersist()
 	for _, stateMachine := range stateMachines {
 		dbOps, err := stateMachine.Build()
 		if err != nil {
-			return flow.ZeroID, fmt.Errorf("unexpected exception from sub-state machine while building its output state: %w", err)
+			return flow.ZeroID, nil, fmt.Errorf("unexpected exception from sub-state machine while building its output state: %w", err)
 		}
 
 		deferredDBOps.Chain(dbOps)
@@ -363,5 +362,5 @@ func (s *MutableProtocolState) build(
 		})
 	}
 
-	return resultingStateID, nil
+	return resultingStateID, deferredDBOps, nil
 }

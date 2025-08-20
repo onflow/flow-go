@@ -317,7 +317,7 @@ func (m *ParticipantState) Extend(ctx context.Context, candidate *flow.Block) er
 //
 // Expected errors during normal operations:
 //   - state.InvalidExtensionError if the candidate block is invalid
-func (m *FollowerState) headerExtend(ctx context.Context, candidate *flow.Block, certifyingQC *flow.QuorumCertificate, deferredBlockPersist *deferred.DeferredBlockPersist) error {
+func (m *FollowerState) headerExtend(ctx context.Context, candidate *flow.Block, certifyingQC *flow.QuorumCertificate) (*deferred.DeferredBlockPersist, error) {
 	span, _ := m.tracer.StartSpanFromContext(ctx, trace.ProtoStateMutatorExtendCheckHeader)
 	defer span.End()
 	blockID := candidate.ID()
@@ -325,7 +325,7 @@ func (m *FollowerState) headerExtend(ctx context.Context, candidate *flow.Block,
 
 	// STEP 1: Check that the payload is consistent with the payload hash in the header
 	if candidate.Payload.Hash() != header.PayloadHash {
-		return state.NewInvalidExtensionErrorf("payload integrity check failed")
+		return nil, state.NewInvalidExtensionErrorf("payload integrity check failed")
 	}
 
 	// STEP 2: check whether the candidate (i) connects to the known block tree and
@@ -335,18 +335,18 @@ func (m *FollowerState) headerExtend(ctx context.Context, candidate *flow.Block,
 		// The only sentinel error that can happen here is `storage.ErrNotFound`. However, by convention the
 		// protocol state must be extended in a parent-first order. This block's parent being unknown breaks
 		// with this API contract and results in an exception.
-		return irrecoverable.NewExceptionf("could not retrieve the candidate's parent block %v: %w", header.ParentID, err)
+		return nil, irrecoverable.NewExceptionf("could not retrieve the candidate's parent block %v: %w", header.ParentID, err)
 	}
 	if header.ChainID != parent.ChainID {
-		return state.NewInvalidExtensionErrorf("candidate built for invalid chain (candidate: %s, parent: %s)",
+		return nil, state.NewInvalidExtensionErrorf("candidate built for invalid chain (candidate: %s, parent: %s)",
 			header.ChainID, parent.ChainID)
 	}
 	if header.ParentView != parent.View {
-		return state.NewInvalidExtensionErrorf("candidate build with inconsistent parent view (candidate: %d, parent %d)",
+		return nil, state.NewInvalidExtensionErrorf("candidate build with inconsistent parent view (candidate: %d, parent %d)",
 			header.ParentView, parent.View)
 	}
 	if header.Height != parent.Height+1 {
-		return state.NewInvalidExtensionErrorf("candidate built with invalid height (candidate: %d, parent: %d)",
+		return nil, state.NewInvalidExtensionErrorf("candidate built with invalid height (candidate: %d, parent: %d)",
 			header.Height, parent.Height)
 	}
 
@@ -354,18 +354,18 @@ func (m *FollowerState) headerExtend(ctx context.Context, candidate *flow.Block,
 	err = m.blockTimer.Validate(parent.Timestamp, header.Timestamp)
 	if err != nil {
 		if protocol.IsInvalidBlockTimestampError(err) {
-			return state.NewInvalidExtensionErrorf("candidate contains invalid timestamp: %w", err)
+			return nil, state.NewInvalidExtensionErrorf("candidate contains invalid timestamp: %w", err)
 		}
-		return fmt.Errorf("validating block's time stamp failed with unexpected error: %w", err)
+		return nil, fmt.Errorf("validating block's time stamp failed with unexpected error: %w", err)
 	}
 
 	// STEP 4: if a certifying QC is given (can be nil), sanity-check that it actually certifies the candidate block
 	if certifyingQC != nil {
 		if certifyingQC.View != header.View {
-			return fmt.Errorf("qc doesn't certify candidate block, expect %d view, got %d", header.View, certifyingQC.View)
+			return nil, fmt.Errorf("qc doesn't certify candidate block, expect %d view, got %d", header.View, certifyingQC.View)
 		}
 		if certifyingQC.BlockID != blockID {
-			return fmt.Errorf("qc doesn't certify candidate block, expect %x blockID, got %x", blockID, certifyingQC.BlockID)
+			return nil, fmt.Errorf("qc doesn't certify candidate block, expect %x blockID, got %x", blockID, certifyingQC.BlockID)
 		}
 	}
 
@@ -560,20 +560,21 @@ func (m *ParticipantState) guaranteeExtend(ctx context.Context, candidate *flow.
 // operation for indexing the latest seal as of the candidate block and returns the latest seal.
 // Expected errors during normal operations:
 //   - state.InvalidExtensionError if the candidate block has invalid seals
-func (m *ParticipantState) sealExtend(ctx context.Context, candidate *flow.Block, deferredBlockPersist *deferred.DeferredBlockPersist) (*flow.Seal, error) {
+func (m *ParticipantState) sealExtend(ctx context.Context, candidate *flow.Block) (*flow.Seal, *deferred.DeferredBlockPersist, error) {
 	span, _ := m.tracer.StartSpanFromContext(ctx, trace.ProtoStateMutatorExtendCheckSeals)
 	defer span.End()
 
 	lastSeal, err := m.sealValidator.Validate(candidate)
 	if err != nil {
-		return nil, state.NewInvalidExtensionErrorf("seal validation error: %w", err)
+		return nil, nil, state.NewInvalidExtensionErrorf("seal validation error: %w", err)
 	}
 
-	deferredBlockPersist.AddNextOperation(func(lctx lockctx.Proof, blockID flow.Identifier, rw storage.ReaderBatchWriter) error {
-		return operation.IndexLatestSealAtBlock(lctx, rw.Writer(), blockID, lastSeal.ID())
-	})
+	deferredBlockPersist := deferred.NewDeferredBlockPersist().AddNextOperation(
+		func(lctx lockctx.Proof, blockID flow.Identifier, rw storage.ReaderBatchWriter) error {
+			return operation.IndexLatestSealAtBlock(lctx, rw.Writer(), blockID, lastSeal.ID())
+		})
 
-	return lastSeal, nil
+	return lastSeal, deferredBlockPersist, nil
 }
 
 // receiptExtend checks the compliance of the receipt payload.
@@ -650,23 +651,23 @@ func (m *FollowerState) lastSealed(candidate *flow.Block) (latestSeal *flow.Seal
 // Expected errors during normal operations:
 //   - state.InvalidExtensionError if the Protocol State commitment in the candidate block does
 //     not match the Protocol State we constructed locally
-func (m *FollowerState) evolveProtocolState(ctx context.Context, candidate *flow.Block, deferredBlockPersist *deferred.DeferredBlockPersist) error {
+func (m *FollowerState) evolveProtocolState(ctx context.Context, candidate *flow.Block) (*deferred.DeferredBlockPersist, error) {
 	span, _ := m.tracer.StartSpanFromContext(ctx, trace.ProtoStateMutatorEvolveProtocolState)
 	defer span.End()
 
 	// Evolve the Protocol State starting from the parent block's state. Information that may change the state is:
 	// the candidate block's view and Service Events from execution results sealed in the candidate block.
-	updatedStateID, err := m.protocolState.EvolveState(deferredBlockPersist, candidate.Header.ParentID, candidate.Header.View, candidate.Payload.Seals)
+	updatedStateID, deferredBlockPersist, err := m.protocolState.EvolveState(candidate.Header.ParentID, candidate.Header.View, candidate.Payload.Seals)
 	if err != nil {
-		return fmt.Errorf("evolving protocol state failed: %w", err)
+		return nil, fmt.Errorf("evolving protocol state failed: %w", err)
 	}
 
 	// verify Protocol State commitment in the candidate block matches the locally-constructed value
 	if updatedStateID != candidate.Payload.ProtocolStateID {
-		return state.NewInvalidExtensionErrorf("invalid protocol state commitment %x in block, which should be %x", candidate.Payload.ProtocolStateID, updatedStateID)
+		return nil, state.NewInvalidExtensionErrorf("invalid protocol state commitment %x in block, which should be %x", candidate.Payload.ProtocolStateID, updatedStateID)
 	}
 
-	return nil
+	return deferredBlockPersist, nil
 }
 
 // Finalize marks the specified block as finalized.

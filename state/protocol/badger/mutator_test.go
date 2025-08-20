@@ -38,7 +38,6 @@ import (
 	stoerr "github.com/onflow/flow-go/storage"
 	bstorage "github.com/onflow/flow-go/storage/badger"
 	"github.com/onflow/flow-go/storage/badger/operation"
-	"github.com/onflow/flow-go/storage/deferred"
 	storageoperation "github.com/onflow/flow-go/storage/operation"
 	"github.com/onflow/flow-go/storage/operation/badgerimpl"
 	"github.com/onflow/flow-go/storage/store"
@@ -3290,7 +3289,7 @@ func getRootProtocolStateID(t *testing.T, rootSnapshot *inmem.Snapshot) flow.Ide
 // calculateExpectedStateId is a utility function which makes easier to get expected protocol state ID after applying service events contained in seals.
 func calculateExpectedStateId(t *testing.T, mutableState realprotocol.MutableProtocolState) func(header *flow.Header, seals []*flow.Seal) flow.Identifier {
 	return func(header *flow.Header, seals []*flow.Seal) flow.Identifier {
-		expectedStateID, err := mutableState.EvolveState(deferred.NewDeferredBlockPersist(), header.ParentID, header.View, seals)
+		expectedStateID, _, err := mutableState.EvolveState(header.ParentID, header.View, seals)
 		require.NoError(t, err)
 		return expectedStateID
 	}
