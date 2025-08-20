@@ -164,7 +164,7 @@ func TestSnapshot_Descendants(t *testing.T) {
 		for i := 5; i > 3; i-- {
 			parent := head
 			for n := 0; n < i; n++ {
-				block := unittest.BlockWithParentFixtureAndUniqueView(
+				block := unittest.BlockWithParentAndPayloadAndUniqueView(
 					parent,
 					unittest.PayloadFixture(unittest.WithProtocolStateID(rootProtocolStateID)),
 					viewIndex,
@@ -482,6 +482,7 @@ func TestSealingSegment(t *testing.T) {
 					unittest.WithSeals(seal1),
 					unittest.WithProtocolStateID(rootProtocolStateID),
 				),
+				viewIndex,
 			)
 			buildFinalizedBlock(t, state, block4)
 
@@ -494,6 +495,7 @@ func TestSealingSegment(t *testing.T) {
 					unittest.WithSeals(seal2),
 					unittest.WithProtocolStateID(rootProtocolStateID),
 				),
+				viewIndex,
 			)
 			buildFinalizedBlock(t, state, block6)
 
@@ -612,6 +614,7 @@ func TestSealingSegment(t *testing.T) {
 			// get second receipt for Result_B, now we have 2 receipts for a single execution result
 			receiptB2 := unittest.ExecutionReceiptFixture(unittest.WithResult(&receiptB.ExecutionResult))
 
+			viewIndex := make(map[uint64]struct{})
 			block1 := unittest.BlockWithParentAndPayloadAndUniqueView(
 				head,
 				unittest.PayloadFixture(
