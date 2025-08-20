@@ -148,7 +148,7 @@ func MessageCodeFromInterface(v interface{}) (MessageCode, string, error) {
 // of the message code represents.
 // Expected error returns during normal operations:
 //   - ErrUnknownMsgCode if message code does not match any of the configured message codes above.
-func InterfaceFromMessageCode(code MessageCode) (interface{}, string, error) {
+func InterfaceFromMessageCode(code MessageCode) (messages.UntrustedMessage, string, error) {
 	switch code {
 	// consensus
 	case CodeBlockProposal:

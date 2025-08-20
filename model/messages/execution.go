@@ -11,9 +11,31 @@ type ChunkDataRequest struct {
 	Nonce   uint64 // so that we aren't deduplicated by the network layer
 }
 
+// ToInternal converts the untrusted ChunkDataRequest into its trusted internal
+// representation.
+//
+// This stub returns the receiver unchanged. A proper implementation
+// must perform validation checks and return a constructed internal
+// object.
+func (c *ChunkDataRequest) ToInternal() (any, error) {
+	// TODO(malleability, #7715) implement with validation checks
+	return c, nil
+}
+
 // ChunkDataResponse is the response to a chunk data pack request.
 // It contains the chunk data pack of the interest.
 type ChunkDataResponse struct {
 	ChunkDataPack flow.ChunkDataPack
 	Nonce         uint64 // so that we aren't deduplicated by the network layer
+}
+
+// ToInternal converts the untrusted ChunkDataResponse into its trusted internal
+// representation.
+//
+// This stub returns the receiver unchanged. A proper implementation
+// must perform validation checks and return a constructed internal
+// object.
+func (c *ChunkDataResponse) ToInternal() (any, error) {
+	// TODO(malleability, #7716) implement with validation checks
+	return c, nil
 }
