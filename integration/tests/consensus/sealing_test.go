@@ -15,7 +15,6 @@ import (
 	verUtils "github.com/onflow/flow-go/engine/verification/utils"
 	"github.com/onflow/flow-go/integration/testnet"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -167,14 +166,11 @@ SearchLoop:
 		}
 
 		// we only care about block proposals at the moment
-		// TODO(malleability immutable): Replace *messages.Proposal to *flow.Proposal and remove validation check when ToInternal() was added to decoder
-		proposal, ok := msg.(*messages.Proposal)
+		proposal, ok := msg.(*flow.Proposal)
 		if !ok {
 			continue
 		}
-		proposalTrusted, err := flow.NewProposal(flow.UntrustedProposal(*proposal))
-		require.NoError(ss.T(), err)
-		block := proposalTrusted.Block
+		block := proposal.Block
 
 		// make sure we skip duplicates
 		proposalID := block.ID()
@@ -361,14 +357,11 @@ SealingLoop:
 		}
 
 		// we only care about block proposals at the moment
-		// TODO(malleability immutable): Replace *messages.Proposal to *flow.Proposal and remove validation check when ToInternal() was added to decoder
-		proposal, ok := msg.(*messages.Proposal)
+		proposal, ok := msg.(*flow.Proposal)
 		if !ok {
 			continue
 		}
-		proposalTrusted, err := flow.NewProposal(flow.UntrustedProposal(*proposal))
-		require.NoError(ss.T(), err)
-		block := proposalTrusted.Block
+		block := proposal.Block
 
 		// log the proposal details
 		proposalID := block.ID()

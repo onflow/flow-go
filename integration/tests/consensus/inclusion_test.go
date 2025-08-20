@@ -12,7 +12,6 @@ import (
 	"github.com/onflow/flow-go/engine/ghost/client"
 	"github.com/onflow/flow-go/integration/testnet"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module/signature"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -147,14 +146,11 @@ func (is *InclusionSuite) waitUntilSeenProposal(deadline time.Time) {
 		}
 
 		// we only care about block proposals at the moment
-		// TODO(malleability immutable): Replace *messages.Proposal to *flow.Proposal and remove validation check when ToInternal() was added to decoder
-		proposal, ok := msg.(*messages.Proposal)
+		proposal, ok := msg.(*flow.Proposal)
 		if !ok {
 			continue
 		}
-		proposalTrusted, err := flow.NewProposal(flow.UntrustedProposal(*proposal))
-		require.NoError(is.T(), err)
-		block := proposalTrusted.Block
+		block := proposal.Block
 
 		is.T().Logf("receive block proposal from %v, height %v", originID, block.Height)
 		// wait until proposal finalized
@@ -199,14 +195,11 @@ func (is *InclusionSuite) waitUntilCollectionIncludeInProposal(deadline time.Tim
 		}
 
 		// we only care about block proposals at the moment
-		// TODO(malleability immutable): Replace *messages.Proposal to *flow.Proposal and remove validation check when ToInternal() was added to decoder
-		proposal, ok := msg.(*messages.Proposal)
+		proposal, ok := msg.(*flow.Proposal)
 		if !ok {
 			continue
 		}
-		proposalTrusted, err := flow.NewProposal(flow.UntrustedProposal(*proposal))
-		require.NoError(is.T(), err)
-		block := proposalTrusted.Block
+		block := proposal.Block
 
 		guarantees := block.Payload.Guarantees
 		height := block.Height
@@ -245,8 +238,7 @@ func (is *InclusionSuite) waitUntilProposalConfirmed(deadline time.Time, sentine
 		}
 
 		// we only care about block proposals at the moment
-		// TODO(malleability immutable): Replace *messages.Proposal to *flow.Proposal and remove validation check when ToInternal() was added to decoder
-		proposal, ok := msg.(*messages.Proposal)
+		proposal, ok := msg.(*flow.Proposal)
 		if !ok {
 			continue
 		}

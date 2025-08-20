@@ -122,7 +122,7 @@ func (s *EngineSuite) TestProcessGossipedValidBlock() {
 		close(done)
 	}).Once()
 
-	err := s.engine.Process(channels.ReceiveBlocks, originID, (*messages.Proposal)(proposal))
+	err := s.engine.Process(channels.ReceiveBlocks, originID, proposal)
 	require.NoError(s.T(), err)
 
 	unittest.AssertClosesBefore(s.T(), done, time.Second)

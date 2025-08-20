@@ -216,16 +216,6 @@ func (s *MessageHubSuite) TestProcessValidIncomingMessages() {
 func (s *MessageHubSuite) TestProcessInvalidIncomingMessages() {
 	var channel channels.Channel
 	originID := unittest.IdentifierFixture()
-	s.Run("to-compliance-engine", func() {
-		proposal := unittest.ProposalFixture()
-		proposal.ProposerSigData = nil // invalid value
-
-		err := s.hub.Process(channel, originID, (*flow.UntrustedProposal)(proposal))
-		require.NoError(s.T(), err)
-
-		// OnBlockRange should NOT be called for invalid proposal
-		s.compliance.AssertNotCalled(s.T(), "OnBlockProposal", mock.Anything)
-	})
 	s.Run("to-vote-aggregator", func() {
 		expectedVote := unittest.VoteFixture(unittest.WithVoteSignerID(originID))
 		msg := &messages.BlockVote{

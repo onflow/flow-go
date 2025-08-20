@@ -191,7 +191,7 @@ func (s *MessageHubSuite) TestProcessValidIncomingMessages() {
 			Message:  proposal,
 		}
 		s.compliance.On("OnClusterBlockProposal", expectedComplianceMsg).Return(nil).Once()
-		err := s.hub.Process(channel, originID, (*messages.ClusterProposal)(proposal))
+		err := s.hub.Process(channel, originID, proposal)
 		require.NoError(s.T(), err)
 	})
 	s.Run("to-vote-aggregator", func() {
@@ -228,16 +228,6 @@ func (s *MessageHubSuite) TestProcessValidIncomingMessages() {
 func (s *MessageHubSuite) TestProcessInvalidIncomingMessages() {
 	var channel channels.Channel
 	originID := unittest.IdentifierFixture()
-	s.Run("to-compliance-engine", func() {
-		proposal := unittest.ClusterProposalFixture()
-		proposal.ProposerSigData = nil // invalid value
-
-		err := s.hub.Process(channel, originID, (*messages.ClusterProposal)(proposal))
-		require.NoError(s.T(), err)
-
-		// OnBlockRange should NOT be called for invalid proposal
-		s.compliance.AssertNotCalled(s.T(), "OnClusterBlockProposal", mock.Anything)
-	})
 	s.Run("to-vote-aggregator", func() {
 		expectedVote := unittest.VoteFixture(unittest.WithVoteSignerID(originID))
 		msg := &messages.ClusterBlockVote{

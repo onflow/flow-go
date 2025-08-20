@@ -1,7 +1,6 @@
 package messages
 
 import (
-	"github.com/onflow/flow-go/model/cluster"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -15,11 +14,11 @@ type UntrustedMessage interface {
 }
 
 var (
-	_ UntrustedMessage = (*flow.UntrustedProposal)(nil)
+	_ UntrustedMessage = (*Proposal)(nil)
 	_ UntrustedMessage = (*BlockVote)(nil)
 	_ UntrustedMessage = (*TimeoutObject)(nil)
 
-	_ UntrustedMessage = (*cluster.UntrustedProposal)(nil)
+	_ UntrustedMessage = (*ClusterProposal)(nil)
 	_ UntrustedMessage = (*ClusterBlockVote)(nil)
 	_ UntrustedMessage = (*ClusterBlockResponse)(nil)
 	_ UntrustedMessage = (*ClusterTimeoutObject)(nil)

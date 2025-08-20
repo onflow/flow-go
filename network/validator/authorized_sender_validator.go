@@ -133,13 +133,8 @@ func (av *AuthorizedSenderValidator) isAuthorizedSender(identity *flow.Identity,
 		return "", fmt.Errorf("could not extract interface from message code %v: %w", msgCode, err)
 	}
 
-	trusted, err := msgInterface.ToInternal()
-	if err != nil {
-		return "", err
-	}
-
 	// get message auth config
-	conf, err := message.GetMessageAuthConfig(trusted)
+	conf, err := message.GetMessageAuthConfig(msgInterface)
 	if err != nil {
 		return "", fmt.Errorf("could not get authorization config for interface %T: %w", msgInterface, err)
 	}

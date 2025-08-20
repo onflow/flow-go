@@ -8,8 +8,10 @@ import (
 // untrusted signed block proposal.
 type Proposal flow.UntrustedProposal
 
-// TODO: Proposal should implement UntrustedMessage interface
-func (p *Proposal) ToInternal() (*flow.Proposal, error) {
+// ToInternal returns the internal type representation for Proposal.
+//
+// All errors indicate that the decode target contains a structurally invalid representation of the internal flow.Proposal.
+func (p *Proposal) ToInternal() (any, error) {
 	return flow.NewProposal(flow.UntrustedProposal(*p))
 }
 

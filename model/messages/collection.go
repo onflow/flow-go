@@ -9,8 +9,10 @@ import (
 // collection node cluster consensus.
 type ClusterProposal cluster.UntrustedProposal
 
-// TODO: ClusterProposal should implement UntrustedMessage interface
-func (p *ClusterProposal) ToInternal() (*cluster.Proposal, error) {
+// ToInternal returns the internal type representation for ClusterProposal.
+//
+// All errors indicate that the decode target contains a structurally invalid representation of the internal cluster.Proposal.
+func (p *ClusterProposal) ToInternal() (any, error) {
 	return cluster.NewProposal(cluster.UntrustedProposal(*p))
 }
 
