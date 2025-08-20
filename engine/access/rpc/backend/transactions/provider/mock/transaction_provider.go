@@ -19,9 +19,9 @@ type TransactionProvider struct {
 	mock.Mock
 }
 
-// TransactionResult provides a mock function with given fields: ctx, header, txID, encodingVersion
-func (_m *TransactionProvider) TransactionResult(ctx context.Context, header *flow.Header, txID flow.Identifier, encodingVersion entities.EventEncodingVersion) (*access.TransactionResult, error) {
-	ret := _m.Called(ctx, header, txID, encodingVersion)
+// TransactionResult provides a mock function with given fields: ctx, header, txID, encodingVersion, query
+func (_m *TransactionProvider) TransactionResult(ctx context.Context, header *flow.Header, txID flow.Identifier, encodingVersion entities.EventEncodingVersion, query entities.ExecutionStateQuery) (*access.TransactionResult, error) {
+	ret := _m.Called(ctx, header, txID, encodingVersion, query)
 
 	if len(ret) == 0 {
 		panic("no return value specified for TransactionResult")
@@ -29,19 +29,19 @@ func (_m *TransactionProvider) TransactionResult(ctx context.Context, header *fl
 
 	var r0 *access.TransactionResult
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, *flow.Header, flow.Identifier, entities.EventEncodingVersion) (*access.TransactionResult, error)); ok {
-		return rf(ctx, header, txID, encodingVersion)
+	if rf, ok := ret.Get(0).(func(context.Context, *flow.Header, flow.Identifier, entities.EventEncodingVersion, entities.ExecutionStateQuery) (*access.TransactionResult, error)); ok {
+		return rf(ctx, header, txID, encodingVersion, query)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, *flow.Header, flow.Identifier, entities.EventEncodingVersion) *access.TransactionResult); ok {
-		r0 = rf(ctx, header, txID, encodingVersion)
+	if rf, ok := ret.Get(0).(func(context.Context, *flow.Header, flow.Identifier, entities.EventEncodingVersion, entities.ExecutionStateQuery) *access.TransactionResult); ok {
+		r0 = rf(ctx, header, txID, encodingVersion, query)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*access.TransactionResult)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, *flow.Header, flow.Identifier, entities.EventEncodingVersion) error); ok {
-		r1 = rf(ctx, header, txID, encodingVersion)
+	if rf, ok := ret.Get(1).(func(context.Context, *flow.Header, flow.Identifier, entities.EventEncodingVersion, entities.ExecutionStateQuery) error); ok {
+		r1 = rf(ctx, header, txID, encodingVersion, query)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -49,9 +49,9 @@ func (_m *TransactionProvider) TransactionResult(ctx context.Context, header *fl
 	return r0, r1
 }
 
-// TransactionResultByIndex provides a mock function with given fields: ctx, block, index, encodingVersion
-func (_m *TransactionProvider) TransactionResultByIndex(ctx context.Context, block *flow.Block, index uint32, encodingVersion entities.EventEncodingVersion) (*access.TransactionResult, error) {
-	ret := _m.Called(ctx, block, index, encodingVersion)
+// TransactionResultByIndex provides a mock function with given fields: ctx, block, index, encodingVersion, query
+func (_m *TransactionProvider) TransactionResultByIndex(ctx context.Context, block *flow.Block, index uint32, encodingVersion entities.EventEncodingVersion, query entities.ExecutionStateQuery) (*access.TransactionResult, error) {
+	ret := _m.Called(ctx, block, index, encodingVersion, query)
 
 	if len(ret) == 0 {
 		panic("no return value specified for TransactionResultByIndex")
@@ -59,19 +59,19 @@ func (_m *TransactionProvider) TransactionResultByIndex(ctx context.Context, blo
 
 	var r0 *access.TransactionResult
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, *flow.Block, uint32, entities.EventEncodingVersion) (*access.TransactionResult, error)); ok {
-		return rf(ctx, block, index, encodingVersion)
+	if rf, ok := ret.Get(0).(func(context.Context, *flow.Block, uint32, entities.EventEncodingVersion, entities.ExecutionStateQuery) (*access.TransactionResult, error)); ok {
+		return rf(ctx, block, index, encodingVersion, query)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, *flow.Block, uint32, entities.EventEncodingVersion) *access.TransactionResult); ok {
-		r0 = rf(ctx, block, index, encodingVersion)
+	if rf, ok := ret.Get(0).(func(context.Context, *flow.Block, uint32, entities.EventEncodingVersion, entities.ExecutionStateQuery) *access.TransactionResult); ok {
+		r0 = rf(ctx, block, index, encodingVersion, query)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*access.TransactionResult)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, *flow.Block, uint32, entities.EventEncodingVersion) error); ok {
-		r1 = rf(ctx, block, index, encodingVersion)
+	if rf, ok := ret.Get(1).(func(context.Context, *flow.Block, uint32, entities.EventEncodingVersion, entities.ExecutionStateQuery) error); ok {
+		r1 = rf(ctx, block, index, encodingVersion, query)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -79,9 +79,9 @@ func (_m *TransactionProvider) TransactionResultByIndex(ctx context.Context, blo
 	return r0, r1
 }
 
-// TransactionResultsByBlockID provides a mock function with given fields: ctx, block, encodingVersion
-func (_m *TransactionProvider) TransactionResultsByBlockID(ctx context.Context, block *flow.Block, encodingVersion entities.EventEncodingVersion) ([]*access.TransactionResult, error) {
-	ret := _m.Called(ctx, block, encodingVersion)
+// TransactionResultsByBlockID provides a mock function with given fields: ctx, block, encodingVersion, query
+func (_m *TransactionProvider) TransactionResultsByBlockID(ctx context.Context, block *flow.Block, encodingVersion entities.EventEncodingVersion, query entities.ExecutionStateQuery) ([]*access.TransactionResult, error) {
+	ret := _m.Called(ctx, block, encodingVersion, query)
 
 	if len(ret) == 0 {
 		panic("no return value specified for TransactionResultsByBlockID")
@@ -89,19 +89,19 @@ func (_m *TransactionProvider) TransactionResultsByBlockID(ctx context.Context, 
 
 	var r0 []*access.TransactionResult
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, *flow.Block, entities.EventEncodingVersion) ([]*access.TransactionResult, error)); ok {
-		return rf(ctx, block, encodingVersion)
+	if rf, ok := ret.Get(0).(func(context.Context, *flow.Block, entities.EventEncodingVersion, entities.ExecutionStateQuery) ([]*access.TransactionResult, error)); ok {
+		return rf(ctx, block, encodingVersion, query)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, *flow.Block, entities.EventEncodingVersion) []*access.TransactionResult); ok {
-		r0 = rf(ctx, block, encodingVersion)
+	if rf, ok := ret.Get(0).(func(context.Context, *flow.Block, entities.EventEncodingVersion, entities.ExecutionStateQuery) []*access.TransactionResult); ok {
+		r0 = rf(ctx, block, encodingVersion, query)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]*access.TransactionResult)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, *flow.Block, entities.EventEncodingVersion) error); ok {
-		r1 = rf(ctx, block, encodingVersion)
+	if rf, ok := ret.Get(1).(func(context.Context, *flow.Block, entities.EventEncodingVersion, entities.ExecutionStateQuery) error); ok {
+		r1 = rf(ctx, block, encodingVersion, query)
 	} else {
 		r1 = ret.Error(1)
 	}

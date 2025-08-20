@@ -8,7 +8,7 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
-	"github.com/onflow/flow-go/access"
+	errors2 "github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/module/state_synchronization/indexer"
 	"github.com/onflow/flow-go/storage"
 )
@@ -27,21 +27,21 @@ func ErrorToStatus(err error) error {
 	}
 
 	switch {
-	case access.IsInvalidRequestError(err):
+	case errors2.IsInvalidRequestError(err):
 		return status.Error(codes.InvalidArgument, err.Error())
-	case access.IsDataNotFoundError(err):
+	case errors2.IsDataNotFoundError(err):
 		return status.Error(codes.NotFound, err.Error())
-	case access.IsPreconditionFailedError(err):
+	case errors2.IsPreconditionFailedError(err):
 		return status.Error(codes.FailedPrecondition, err.Error())
-	case access.IsOutOfRangeError(err):
+	case errors2.IsOutOfRangeError(err):
 		return status.Error(codes.OutOfRange, err.Error())
-	case access.IsInternalError(err):
+	case errors2.IsInternalError(err):
 		return status.Error(codes.Internal, err.Error())
-	case access.IsRequestCanceledError(err):
+	case errors2.IsRequestCanceledError(err):
 		return status.Error(codes.Canceled, err.Error())
-	case access.IsRequestTimedOutError(err):
+	case errors2.IsRequestTimedOutError(err):
 		return status.Error(codes.DeadlineExceeded, err.Error())
-	case access.IsServiceUnavailable(err):
+	case errors2.IsServiceUnavailable(err):
 		return status.Error(codes.Unavailable, err.Error())
 	default:
 		// all errors should have explicit sentinels. reporting them as `Unknown` will make them easier to find and fix.

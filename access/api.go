@@ -55,12 +55,17 @@ type TransactionsAPI interface {
 	GetTransaction(ctx context.Context, id flow.Identifier) (*flow.TransactionBody, error)
 	GetTransactionsByBlockID(ctx context.Context, blockID flow.Identifier) ([]*flow.TransactionBody, error)
 
-	GetTransactionResult(ctx context.Context, txID flow.Identifier, blockID flow.Identifier, collectionID flow.Identifier, encodingVersion entities.EventEncodingVersion) (*accessmodel.TransactionResult, error)
-	GetTransactionResultByIndex(ctx context.Context, blockID flow.Identifier, index uint32, encodingVersion entities.EventEncodingVersion) (*accessmodel.TransactionResult, error)
-	GetTransactionResultsByBlockID(ctx context.Context, blockID flow.Identifier, encodingVersion entities.EventEncodingVersion) ([]*accessmodel.TransactionResult, error)
+	GetTransactionResult(ctx context.Context, txID flow.Identifier, blockID flow.Identifier,
+		collectionID flow.Identifier, encodingVersion entities.EventEncodingVersion, executionStateQuery entities.ExecutionStateQuery) (*accessmodel.TransactionResult, entities.ExecutorMetadata, error)
+	GetTransactionResultByIndex(ctx context.Context, blockID flow.Identifier, index uint32,
+		encodingVersion entities.EventEncodingVersion, executionStateQuery entities.ExecutionStateQuery) (*accessmodel.TransactionResult, entities.ExecutorMetadata, error)
+	GetTransactionResultsByBlockID(ctx context.Context, blockID flow.Identifier,
+		encodingVersion entities.EventEncodingVersion, executionStateQuery entities.ExecutionStateQuery) (
+		[]*accessmodel.TransactionResult, entities.ExecutorMetadata, error)
 
 	GetSystemTransaction(ctx context.Context, blockID flow.Identifier) (*flow.TransactionBody, error)
-	GetSystemTransactionResult(ctx context.Context, blockID flow.Identifier, encodingVersion entities.EventEncodingVersion) (*accessmodel.TransactionResult, error)
+	GetSystemTransactionResult(ctx context.Context, blockID flow.Identifier, encodingVersion entities.EventEncodingVersion, executionStateQuery entities.ExecutionStateQuery) (
+		*accessmodel.TransactionResult, entities.ExecutorMetadata, error)
 }
 
 type TransactionStreamAPI interface {

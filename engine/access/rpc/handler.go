@@ -350,11 +350,26 @@ func (h *Handler) GetTransactionResult(
 	}
 
 	eventEncodingVersion := req.GetEventEncodingVersion()
-	result, err := h.api.GetTransactionResult(ctx, transactionID, blockId, collectionId, eventEncodingVersion)
+	var executionStateQuery entities.ExecutionStateQuery
+	if req.GetExecutionStateQuery() == nil {
+		executionStateQuery = *req.GetExecutionStateQuery()
+	}
+
+	result, executionMetadata, err := h.api.GetTransactionResult(
+		ctx,
+		transactionID,
+		blockId,
+		collectionId,
+		eventEncodingVersion,
+		executionStateQuery,
+	)
 	if err != nil {
 		return nil, err
 	}
 
+	if executionStateQuery.IncludeExecutorMetadata {
+		metadata.ExecutorMetadata = &executionMetadata
+	}
 	message := convert.TransactionResultToMessage(result)
 	message.Metadata = metadata
 
@@ -376,12 +391,18 @@ func (h *Handler) GetTransactionResultsByBlockID(
 	}
 
 	eventEncodingVersion := req.GetEventEncodingVersion()
-
-	results, err := h.api.GetTransactionResultsByBlockID(ctx, id, eventEncodingVersion)
+	var executionStateQuery entities.ExecutionStateQuery
+	if req.GetExecutionStateQuery() == nil {
+		executionStateQuery = *req.GetExecutionStateQuery()
+	}
+	results, executionMetadata, err := h.api.GetTransactionResultsByBlockID(ctx, id, eventEncodingVersion, executionStateQuery)
 	if err != nil {
 		return nil, err
 	}
 
+	if executionStateQuery.IncludeExecutorMetadata {
+		metadata.ExecutorMetadata = &executionMetadata
+	}
 	message := convert.TransactionResultsToMessage(results)
 	message.Metadata = metadata
 
@@ -427,11 +448,23 @@ func (h *Handler) GetSystemTransactionResult(
 		return nil, status.Errorf(codes.InvalidArgument, "invalid block id: %v", err)
 	}
 
-	result, err := h.api.GetSystemTransactionResult(ctx, id, req.GetEventEncodingVersion())
+	var executionStateQuery entities.ExecutionStateQuery
+	if req.GetExecutionStateQuery() == nil {
+		executionStateQuery = *req.GetExecutionStateQuery()
+	}
+	result, executionMetadata, err := h.api.GetSystemTransactionResult(
+		ctx,
+		id,
+		req.GetEventEncodingVersion(),
+		executionStateQuery,
+	)
 	if err != nil {
 		return nil, err
 	}
 
+	if executionStateQuery.IncludeExecutorMetadata {
+		metadata.ExecutorMetadata = &executionMetadata
+	}
 	message := convert.TransactionResultToMessage(result)
 	message.Metadata = metadata
 
@@ -480,12 +513,24 @@ func (h *Handler) GetTransactionResultByIndex(
 	}
 
 	eventEncodingVersion := req.GetEventEncodingVersion()
-
-	result, err := h.api.GetTransactionResultByIndex(ctx, blockID, req.GetIndex(), eventEncodingVersion)
+	var executionStateQuery entities.ExecutionStateQuery
+	if req.GetExecutionStateQuery() == nil {
+		executionStateQuery = *req.GetExecutionStateQuery()
+	}
+	result, executionMetadata, err := h.api.GetTransactionResultByIndex(
+		ctx,
+		blockID,
+		req.GetIndex(),
+		eventEncodingVersion,
+		executionStateQuery,
+	)
 	if err != nil {
 		return nil, err
 	}
 
+	if executionStateQuery.IncludeExecutorMetadata {
+		metadata.ExecutorMetadata = &executionMetadata
+	}
 	message := convert.TransactionResultToMessage(result)
 	message.Metadata = metadata
 

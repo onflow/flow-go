@@ -26,7 +26,8 @@ func (suite *Suite) TestHistoricalTransactionResult() {
 		Return(nil, status.Errorf(codes.NotFound, "not found on main node"))
 
 	accessEventReq := accessproto.GetTransactionRequest{
-		Id: txID[:],
+		Id:                  txID[:],
+		ExecutionStateQuery: &entities.ExecutionStateQuery{},
 	}
 
 	accessEventResp := accessproto.TransactionResultResponse{
@@ -47,12 +48,13 @@ func (suite *Suite) TestHistoricalTransactionResult() {
 		Once()
 
 	// Make the call for the transaction result
-	result, err := backend.GetTransactionResult(
+	result, _, err := backend.GetTransactionResult(
 		ctx,
 		txID,
 		flow.ZeroID,
 		flow.ZeroID,
 		entities.EventEncodingVersion_JSON_CDC_V0,
+		entities.ExecutionStateQuery{},
 	)
 	suite.Require().NoError(err)
 	suite.Require().NotNil(result)
