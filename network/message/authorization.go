@@ -1,7 +1,6 @@
 package message
 
 import (
-	"github.com/onflow/flow-go/model/cluster"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/libp2p/message"
 	"github.com/onflow/flow-go/model/messages"
@@ -62,7 +61,7 @@ func initializeMessageAuthConfigsMap() {
 	authorizationConfigs[BlockProposal] = MsgAuthConfig{
 		Name: BlockProposal,
 		Type: func() interface{} {
-			return new(flow.Proposal)
+			return new(messages.Proposal)
 		},
 		Config: map[channels.Channel]ChannelAuthConfig{
 			channels.ConsensusCommittee: {
@@ -182,7 +181,7 @@ func initializeMessageAuthConfigsMap() {
 	authorizationConfigs[ClusterBlockProposal] = MsgAuthConfig{
 		Name: ClusterBlockProposal,
 		Type: func() interface{} {
-			return new(cluster.Proposal)
+			return new(messages.ClusterProposal)
 		},
 		Config: map[channels.Channel]ChannelAuthConfig{
 			channels.ConsensusClusterPrefix: {
@@ -406,7 +405,7 @@ func initializeMessageAuthConfigsMap() {
 func GetMessageAuthConfig(v interface{}) (MsgAuthConfig, error) {
 	switch v.(type) {
 	// consensus
-	case *flow.Proposal:
+	case *messages.Proposal:
 		return authorizationConfigs[BlockProposal], nil
 	case *messages.BlockVote:
 		return authorizationConfigs[BlockVote], nil
@@ -426,7 +425,7 @@ func GetMessageAuthConfig(v interface{}) (MsgAuthConfig, error) {
 		return authorizationConfigs[BlockResponse], nil
 
 	// cluster consensus
-	case *cluster.Proposal:
+	case *messages.ClusterProposal:
 		return authorizationConfigs[ClusterBlockProposal], nil
 	case *messages.ClusterBlockVote:
 		return authorizationConfigs[ClusterBlockVote], nil
