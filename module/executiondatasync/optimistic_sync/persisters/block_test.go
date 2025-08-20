@@ -159,7 +159,7 @@ func (p *PersisterSuite) TestPersister_PersistWithData() {
 	p.populateInMemoryStorages()
 
 	storedEvents := make([]flow.EventsList, 0)
-	storedCollections := make([]flow.LightCollection, 0)
+	storedCollections := make([]*flow.LightCollection, 0)
 	storedTransactions := make([]flow.TransactionBody, 0)
 	storedResults := make([]flow.LightTransactionResult, 0)
 	storedTxResultErrMsgs := make([]flow.TransactionResultErrorMessage, 0)
@@ -180,9 +180,8 @@ func (p *PersisterSuite) TestPersister_PersistWithData() {
 	p.collections.On("BatchStoreAndIndexByTransaction", mock.Anything, mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
 		collection, ok := args.Get(1).(*flow.Collection)
 		p.Require().True(ok)
-		light := collection.Light()
-		storedCollections = append(storedCollections, light)
-	}).Return(flow.LightCollection{}, nil).Times(numberOfCollections)
+		storedCollections = append(storedCollections, collection.Light())
+	}).Return(nil, nil).Times(numberOfCollections)
 
 	p.transactions.On("BatchStore", mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
 		transaction, ok := args.Get(0).(*flow.TransactionBody)
@@ -202,7 +201,7 @@ func (p *PersisterSuite) TestPersister_PersistWithData() {
 	p.Require().NoError(err)
 
 	// Convert full collections to light collections for comparison
-	expectedLightCollections := make([]flow.LightCollection, 0, len(p.inMemoryCollections.Data()))
+	expectedLightCollections := make([]*flow.LightCollection, 0, len(p.inMemoryCollections.Data()))
 	for _, collection := range p.inMemoryCollections.Data() {
 		expectedLightCollections = append(expectedLightCollections, collection.Light())
 	}
