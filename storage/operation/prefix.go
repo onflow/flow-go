@@ -79,6 +79,7 @@ const (
 	codeBeaconPrivateKey   = 63 // BeaconPrivateKey, keyed by epoch counter
 	codeDKGStarted         = 64 // flag that the DKG for an epoch has been started
 	codeDKGEnded           = 65 // flag that the DKG for an epoch has ended (stores end state)
+	codeDKGState           = 66 // current state of Recoverable Random Beacon State Machine for given epoch
 	codeVersionBeacon      = 67 // flag for storing version beacons
 	codeEpochProtocolState = 68
 	codeProtocolKVStore    = 69
