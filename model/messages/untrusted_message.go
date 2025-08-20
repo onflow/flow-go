@@ -16,7 +16,8 @@ import (
 // It is the responsibility of engines operating on these models to fully validate them.
 type UntrustedMessage interface {
 
-	// ToInternal returns the validated internal type (from flow.* constructors)
+	// ToInternal returns the internal type (from flow.* constructors) representation.
+	// All errors indicate that the decode target contains a structurally invalid representation of the internal model.
 	ToInternal() (any, error)
 }
 
