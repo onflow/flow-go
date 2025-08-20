@@ -202,48 +202,6 @@ func (_m *Blocks) ProposalByID(blockID flow.Identifier) (*flow.Proposal, error) 
 	return r0, r1
 }
 
-<<<<<<< HEAD
-// Store provides a mock function with given fields: proposal
-func (_m *Blocks) Store(proposal *flow.Proposal) error {
-	ret := _m.Called(proposal)
-
-	if len(ret) == 0 {
-		panic("no return value specified for Store")
-	}
-
-	var r0 error
-	if rf, ok := ret.Get(0).(func(*flow.Proposal) error); ok {
-		r0 = rf(proposal)
-	} else {
-		r0 = ret.Error(0)
-	}
-
-	return r0
-}
-
-// StoreTx provides a mock function with given fields: proposal
-func (_m *Blocks) StoreTx(proposal *flow.Proposal) func(*transaction.Tx) error {
-	ret := _m.Called(proposal)
-
-	if len(ret) == 0 {
-		panic("no return value specified for StoreTx")
-	}
-
-	var r0 func(*transaction.Tx) error
-	if rf, ok := ret.Get(0).(func(*flow.Proposal) func(*transaction.Tx) error); ok {
-		r0 = rf(proposal)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(func(*transaction.Tx) error)
-		}
-	}
-
-	return r0
-}
-
->>>>>>> @{-1}
-=======
->>>>>>> 19546633c8 (update mocks)
 // NewBlocks creates a new instance of Blocks. It also registers a testing interface on the mock and a cleanup function to assert the mocks expectations.
 // The first argument is typically a *testing.T value.
 func NewBlocks(t interface {
