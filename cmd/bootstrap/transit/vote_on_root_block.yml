@@ -5,9 +5,11 @@
   gather_facts: false
 
   vars:
+
     # Required inputs (no defaults)
     # http(s) URL or absolute local path to boot-tools.tar (on controller)
     boot_tools_tar: "{{ boot_tools_tar }}"              
+    bootstrap_directory: "{{ bootstrap_directory }}"
     genesis_bucket: "{{ genesis_bucket }}"
     network_version_token: "{{ network_version_token }}"
     output_directory: "{{ output_directory }}"          
@@ -37,6 +39,13 @@
         that:
           - output_directory is match('^/')
         fail_msg: "output_directory must be an absolute path (e.g., /opt/flow/transit-bin)."
+      tags: [validate]
+
+    - name: Validate bootstrap_directory is an absolute path
+      assert:
+        that:
+          - bootstrap_directory is match('^/')
+        fail_msg: "bootstrap_directory must be an absolute path (e.g., /opt/flow/transit-bin)."
       tags: [validate]
 
     - name: Validate boot_tools_tar looks like a URL or an absolute file path
@@ -142,7 +151,7 @@
           - -t
           - "{{ network_version_token }}"
           - -b
-          - /var/flow/bootstrap
+          - "{{ bootstrap_directory }}"
           - -o
           - "{{ output_directory }}"
           - -g
@@ -162,7 +171,7 @@
           - "{{ transit_path }}"
           - generate-root-block-vote
           - -b
-          - /var/flow/bootstrap
+          - "{{ bootstrap_directory }}"
           - -o
           - "{{ output_directory }}"
       register: gen_vote_result
@@ -182,7 +191,7 @@
           - -t
           - "{{ network_version_token }}"
           - -b
-          - /var/flow/bootstrap
+          - "{{ bootstrap_directory }}"
           - -d
           - "{{ output_directory }}"
           - -g

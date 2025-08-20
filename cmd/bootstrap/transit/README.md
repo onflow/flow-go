@@ -101,9 +101,10 @@ Example usage:
 ```shell
 ansible-playbook -i inventories/mainnet/mainnet26.yml/ vote_on_root_block.yml \ 
     -e "boot_tools_tar=https://storage.googleapis.com/flow-genesis-bootstrap/boot-tools.tar" \
-    -e "output_directory=/var/flow/bootstrap" \
-    -e "network_version_token=mainnet-26" \
+    -e "bootstrap_directory=/var/flow/bootstrap"
     -e "genesis_bucket=flow-genesis-bootstrap" \
-    -e force_repull_transit=true
+    -e "network_version_token=mainnet-26" \
+    -e "output_directory=/var/flow/bootstrap" \
+    -e force_repull_transit=true \ 
 ```
 
