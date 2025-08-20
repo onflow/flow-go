@@ -385,9 +385,13 @@ func BlockWithParentAndPayload(parent *flow.Header, payload flow.Payload) *flow.
 	}
 }
 
+func BlockWithParentAndPayloadAndUniqueView(parent *flow.Header, payload flow.Payload, viewIndex map[uint64]struct{}) *flow.Block {
+	return BlockWithParentFixtureAndUniqueView(parent, payload, viewIndex)
+}
+
 // making sure the new block has a unique view
-func BlockWithParentFixtureAndUniqueView(parent *flow.Header, viewIndex map[uint64]struct{}) *flow.Block {
-	block := BlockWithParentFixture(parent)
+func BlockWithParentFixtureAndUniqueView(parent *flow.Header, payload flow.Payload, viewIndex map[uint64]struct{}) *flow.Block {
+	block := BlockWithParentAndPayload(parent, payload)
 	_, ok := viewIndex[block.View]
 	// if !ok, means can't find this view, then the block has unique view
 	if !ok {
@@ -397,7 +401,7 @@ func BlockWithParentFixtureAndUniqueView(parent *flow.Header, viewIndex map[uint
 	}
 
 	// retry until find a block with unique view
-	return BlockWithParentFixtureAndUniqueView(parent, viewIndex)
+	return BlockWithParentFixtureAndUniqueView(parent, payload, viewIndex)
 }
 
 func BlockWithParentProtocolState(parent *flow.Block) *flow.Block {
