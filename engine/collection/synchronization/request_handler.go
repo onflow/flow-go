@@ -235,7 +235,7 @@ func (r *RequestHandlerEngine) onRangeRequest(originID flow.Identifier, req *mes
 	}
 
 	// get all of the blocks, one by one
-	proposals := make([]clustermodel.UntrustedProposal, 0, req.ToHeight-req.FromHeight+1)
+	proposals := make([]clustermodel.Proposal, 0, req.ToHeight-req.FromHeight+1)
 	for height := req.FromHeight; height <= req.ToHeight; height++ {
 		proposal, err := r.blocks.ProposalByHeight(height)
 		if errors.Is(err, storage.ErrNotFound) {
@@ -245,7 +245,7 @@ func (r *RequestHandlerEngine) onRangeRequest(originID flow.Identifier, req *mes
 		if err != nil {
 			return fmt.Errorf("could not get block for height (%d): %w", height, err)
 		}
-		proposals = append(proposals, clustermodel.UntrustedProposal(*proposal))
+		proposals = append(proposals, *proposal)
 	}
 
 	// if there are no blocks to send, skip network message
@@ -255,7 +255,7 @@ func (r *RequestHandlerEngine) onRangeRequest(originID flow.Identifier, req *mes
 	}
 
 	// send the response
-	res := &messages.ClusterBlockResponse{
+	res := &clustermodel.BlockResponse{
 		Nonce:  req.Nonce,
 		Blocks: proposals,
 	}
@@ -304,7 +304,7 @@ func (r *RequestHandlerEngine) onBatchRequest(originID flow.Identifier, req *mes
 	}
 
 	// try to get all the blocks by ID
-	proposals := make([]clustermodel.UntrustedProposal, 0, len(blockIDs))
+	proposals := make([]clustermodel.Proposal, 0, len(blockIDs))
 	for blockID := range blockIDs {
 		proposal, err := r.blocks.ProposalByID(blockID)
 		if errors.Is(err, storage.ErrNotFound) {
@@ -314,7 +314,7 @@ func (r *RequestHandlerEngine) onBatchRequest(originID flow.Identifier, req *mes
 		if err != nil {
 			return fmt.Errorf("could not get block by ID (%s): %w", blockID, err)
 		}
-		proposals = append(proposals, clustermodel.UntrustedProposal(*proposal))
+		proposals = append(proposals, *proposal)
 	}
 
 	// if there are no blocks to send, skip network message
@@ -324,7 +324,7 @@ func (r *RequestHandlerEngine) onBatchRequest(originID flow.Identifier, req *mes
 	}
 
 	// send the response
-	res := &messages.ClusterBlockResponse{
+	res := &clustermodel.BlockResponse{
 		Nonce:  req.Nonce,
 		Blocks: proposals,
 	}
