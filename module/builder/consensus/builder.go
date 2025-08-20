@@ -641,12 +641,8 @@ func (b *Builder) createProposal(parentID flow.Identifier,
 
 	// Evolve the Protocol State starting from the parent block's state. Information that may change the state is:
 	// the candidate block's view and Service Events from execution results sealed in the candidate block.
-<<<<<<< HEAD
 	deferredBlockPersist := deferred.NewDeferredBlockPersist()
-	protocolStateID, err := b.mutableProtocolState.EvolveState(deferredBlockPersist, header.ParentID, header.View, seals)
-=======
-	protocolStateID, _, err := b.mutableProtocolState.EvolveState(headerBody.ParentID, headerBody.View, seals)
->>>>>>> @{-1}
+	protocolStateID, err := b.mutableProtocolState.EvolveState(deferredBlockPersist, headerBody.ParentID, headerBody.View, seals)
 	if err != nil {
 		return nil, fmt.Errorf("evolving protocol state failed: %w", err)
 	}
