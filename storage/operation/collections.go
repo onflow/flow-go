@@ -53,7 +53,7 @@ func RemoveCollectionPayloadIndices(w storage.Writer, blockID flow.Identifier) e
 // IndexCollectionByTransaction inserts a collection id keyed by a transaction id
 // A transaction can belong to multiple collections, indexing collection by a transaction
 // will overwrite the previous collection id that was indexed by the same transaction id
-// To prevent overwritting, the caller must acquire the storage.LockInsertCollection lock
+// To prevent overwritting, check any existing value while holding storage.LockInsertCollection lock
 func IndexCollectionByTransaction(lctx lockctx.Proof, w storage.Writer, txID flow.Identifier, collectionID flow.Identifier) error {
 	if !lctx.HoldsLock(storage.LockInsertCollection) {
 		return fmt.Errorf("missing lock: %v", storage.LockInsertOrFinalizeClusterBlock)

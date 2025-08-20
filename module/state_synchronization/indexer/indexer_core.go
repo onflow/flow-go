@@ -189,17 +189,9 @@ func (c *IndexerCore) IndexBlockData(data *execution_data.BlockExecutionDataEnti
 		indexedCount := 0
 		if len(data.ChunkExecutionDatas) > 0 {
 			for _, chunk := range data.ChunkExecutionDatas[0 : len(data.ChunkExecutionDatas)-1] {
-				lctx := c.lockManager.NewContext()
-				err := lctx.AcquireLock(storage.LockInsertCollection)
+				err := c.indexCollection(chunk.Collection)
 				if err != nil {
-					lctx.Release()
-					return fmt.Errorf("could not acquire lock for indexing collections: %w", err)
-				}
-
-				err = IndexCollection(lctx, chunk.Collection, c.collections, c.log, c.collectionExecutedMetric)
-				lctx.Release()
-				if err != nil {
-					return fmt.Errorf("could not handle collection")
+					return err
 				}
 				indexedCount++
 			}
@@ -337,6 +329,21 @@ func (c *IndexerCore) indexRegisters(registers map[ledger.Path]*ledger.Payload, 
 	return c.registers.Store(regEntries, height)
 }
 
+func (c *IndexerCore) indexCollection(collection *flow.Collection) error {
+	lctx := c.lockManager.NewContext()
+	defer lctx.Release()
+	err := lctx.AcquireLock(storage.LockInsertCollection)
+	if err != nil {
+		return fmt.Errorf("could not acquire lock for indexing collections: %w", err)
+	}
+
+	err = IndexCollection(lctx, collection, c.collections, c.log, c.collectionExecutedMetric)
+	if err != nil {
+		return fmt.Errorf("could not handle collection")
+	}
+	return nil
+}
+
 // IndexCollection handles the response of the collection request made earlier when a block was received.
 // No errors expected during normal operations.
 func IndexCollection(
@@ -350,8 +357,7 @@ func IndexCollection(
 	// FIX: we can't index guarantees here, as we might have more than one block
 	// with the same collection as long as it is not finalized
 
-	// store the light collection (collection minus the transaction body - those are stored separately)
-	// and add transaction ids as index
+	// store the collection, including constituent transactions, and index transactionID -> collectionID
 	light, err := collections.StoreAndIndexByTransaction(lctx, collection)
 	if err != nil {
 		return err

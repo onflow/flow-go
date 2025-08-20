@@ -395,12 +395,14 @@ func (s *CollectionSyncer) OnCollectionDownloaded(_ flow.Identifier, entity flow
 
 	// Create a lock context for indexing
 	lctx := s.lockManager.NewContext()
+	defer lctx.Release()
+
 	err := lctx.AcquireLock(storage.LockInsertCollection)
 	if err != nil {
-		s.logger.Error().Err(err).Msg("could not acquire lock for collection indexing")
+		// TODO(leo): should be using irrecoverable.Context
+		s.logger.Fatal().Err(err).Msg("could not acquire lock for collection indexing")
 		return
 	}
-	defer lctx.Release()
 
 	err = indexer.IndexCollection(lctx, collection, s.collections, s.logger, s.collectionExecutedMetric)
 	if err != nil {
