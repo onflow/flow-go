@@ -38,7 +38,7 @@ func TestTransactionSequenceNumProcess(t *testing.T) {
 		require.NoError(t, err)
 
 		// get fetch the sequence number and it should be updated
-		key, err := accounts.GetPublicKey(address, 0)
+		key, err := accounts.GetAccountPublicKey(address, 0)
 		require.NoError(t, err)
 		require.Equal(t, key.SeqNumber, uint64(1))
 	})
@@ -67,7 +67,7 @@ func TestTransactionSequenceNumProcess(t *testing.T) {
 		require.True(t, errors.HasErrorCode(err, errors.ErrCodeInvalidProposalSeqNumberError))
 
 		// get fetch the sequence number and check it to be  unchanged
-		key, err := accounts.GetPublicKey(address, 0)
+		key, err := accounts.GetAccountPublicKey(address, 0)
 		require.NoError(t, err)
 		require.Equal(t, key.SeqNumber, uint64(0))
 	})
@@ -95,7 +95,7 @@ func TestTransactionSequenceNumProcess(t *testing.T) {
 		require.Error(t, err)
 
 		// get fetch the sequence number and check it to be unchanged
-		key, err := accounts.GetPublicKey(address, 0)
+		key, err := accounts.GetAccountPublicKey(address, 0)
 		require.NoError(t, err)
 		require.Equal(t, key.SeqNumber, uint64(0))
 	})
