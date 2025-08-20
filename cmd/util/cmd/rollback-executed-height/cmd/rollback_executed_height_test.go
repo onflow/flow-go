@@ -15,7 +15,6 @@ import (
 	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/storage"
 	bstorage "github.com/onflow/flow-go/storage/badger"
-	"github.com/onflow/flow-go/storage/locks"
 	"github.com/onflow/flow-go/storage/operation/badgerimpl"
 	"github.com/onflow/flow-go/storage/operation/pebbleimpl"
 	"github.com/onflow/flow-go/storage/store"
@@ -62,7 +61,7 @@ func TestReExecuteBlock(t *testing.T) {
 				return genesis.Header.Height, nil
 			}
 
-			lockManager := locks.NewTestingLockManager()
+			lockManager := storage.NewTestingLockManager()
 
 			// create execution state module
 			es := state.NewExecutionState(
@@ -206,7 +205,7 @@ func TestReExecuteBlockWithDifferentResult(t *testing.T) {
 			collections := store.NewCollections(db, transactions)
 			chunkDataPacks := store.NewChunkDataPacks(metrics, pebbleimpl.ToDB(pdb), collections, bstorage.DefaultCacheSize)
 
-			lockManager := locks.NewTestingLockManager()
+			lockManager := storage.NewTestingLockManager()
 
 			err = headers.Store(genesis)
 			require.NoError(t, err)

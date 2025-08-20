@@ -103,8 +103,8 @@ import (
 	"github.com/onflow/flow-go/state/protocol/events"
 	"github.com/onflow/flow-go/state/protocol/events/gadgets"
 	"github.com/onflow/flow-go/state/protocol/util"
+	"github.com/onflow/flow-go/storage"
 	storagebadger "github.com/onflow/flow-go/storage/badger"
-	"github.com/onflow/flow-go/storage/locks"
 	"github.com/onflow/flow-go/storage/operation/badgerimpl"
 	storagepebble "github.com/onflow/flow-go/storage/pebble"
 	"github.com/onflow/flow-go/storage/store"
@@ -234,7 +234,7 @@ func CompleteStateFixture(
 	publicDBDir := filepath.Join(dataDir, "protocol")
 	secretsDBDir := filepath.Join(dataDir, "secrets")
 	db := unittest.TypedBadgerDB(t, publicDBDir, storagebadger.InitPublic)
-	lockManager := locks.NewTestingLockManager()
+	lockManager := storage.NewTestingLockManager()
 	s := storagebadger.InitAll(metric, db)
 	secretsDB := unittest.TypedBadgerDB(t, secretsDBDir, storagebadger.InitSecret)
 	consumer := events.NewDistributor()
@@ -648,7 +648,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity bootstrap.NodeInfo, ide
 		return final.Height, nil
 	}
 
-	lockManager := locks.NewTestingLockManager()
+	lockManager := storage.NewTestingLockManager()
 
 	execState := executionState.NewExecutionState(
 		ls, commitsStorage, node.Blocks, node.Headers, chunkDataPackStorage, results, myReceipts, eventsStorage, serviceEventsStorage, txResultStorage, db, getLatestFinalized, node.Tracer,
@@ -1025,7 +1025,7 @@ func VerificationNode(t testing.TB,
 	if node.ProcessedBlockHeight == nil {
 		node.ProcessedBlockHeight = store.NewConsumerProgress(badgerimpl.ToDB(node.PublicDB), module.ConsumeProgressVerificationBlockHeight)
 	}
-	lockManager := locks.NewTestingLockManager()
+	lockManager := storage.NewTestingLockManager()
 	if node.VerifierEngine == nil {
 		vm := fvm.NewVirtualMachine()
 

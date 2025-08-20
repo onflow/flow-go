@@ -8,7 +8,6 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/storage"
-	"github.com/onflow/flow-go/storage/locks"
 	"github.com/onflow/flow-go/storage/operation/dbtest"
 	"github.com/onflow/flow-go/storage/store"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -21,7 +20,7 @@ func TestQuorumCertificates_StoreTx(t *testing.T) {
 		store := store.NewQuorumCertificates(metrics, db, 10)
 		qc := unittest.QuorumCertificateFixture()
 
-		lockManager := locks.NewTestingLockManager()
+		lockManager := storage.NewTestingLockManager()
 		lctx := lockManager.NewContext()
 		defer lctx.Release()
 		require.NoError(t, lctx.AcquireLock(storage.LockInsertBlock))
@@ -46,7 +45,7 @@ func TestQuorumCertificates_LockEnforced(t *testing.T) {
 		qc := unittest.QuorumCertificateFixture()
 
 		// acquire wrong lock and attempt to store QC: should error
-		lockManager := locks.NewTestingLockManager()
+		lockManager := storage.NewTestingLockManager()
 		lctx := lockManager.NewContext()
 		require.NoError(t, lctx.AcquireLock(storage.LockFinalizeBlock)) // INCORRECT LOCK
 		err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
@@ -73,7 +72,7 @@ func TestQuorumCertificates_StoreTx_OtherQC(t *testing.T) {
 			otherQC.BlockID = qc.BlockID
 		})
 
-		lockManager := locks.NewTestingLockManager()
+		lockManager := storage.NewTestingLockManager()
 		lctx := lockManager.NewContext()
 		defer lctx.Release()
 		require.NoError(t, lctx.AcquireLock(storage.LockInsertBlock))

@@ -10,7 +10,6 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/storage"
-	"github.com/onflow/flow-go/storage/locks"
 	"github.com/onflow/flow-go/storage/operation/dbtest"
 	"github.com/onflow/flow-go/storage/store"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -19,7 +18,7 @@ import (
 func TestApprovalStoreAndRetrieve(t *testing.T) {
 	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
 		metrics := metrics.NewNoopCollector()
-		lockManager := locks.NewTestingLockManager()
+		lockManager := storage.NewTestingLockManager()
 		store := store.NewResultApprovals(metrics, db, lockManager)
 
 		// create the deferred database operation to store `approval`; we deliberately
@@ -48,7 +47,7 @@ func TestApprovalStoreAndRetrieve(t *testing.T) {
 func TestApprovalStoreTwice(t *testing.T) {
 	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
 		metrics := metrics.NewNoopCollector()
-		lockManager := locks.NewTestingLockManager()
+		lockManager := storage.NewTestingLockManager()
 		store := store.NewResultApprovals(metrics, db, lockManager)
 
 		// create the deferred database operation to store `approval`; we deliberately
@@ -73,7 +72,7 @@ func TestApprovalStoreTwice(t *testing.T) {
 func TestApprovalStoreTwoDifferentApprovalsShouldFail(t *testing.T) {
 	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
 		metrics := metrics.NewNoopCollector()
-		lockManager := locks.NewTestingLockManager()
+		lockManager := storage.NewTestingLockManager()
 		store := store.NewResultApprovals(metrics, db, lockManager)
 
 		approval1, approval2 := twoApprovalsForTheSameResult(t)
@@ -102,7 +101,7 @@ func TestApprovalStoreTwoDifferentApprovalsShouldFail(t *testing.T) {
 func TestApprovalStoreTwoDifferentApprovalsConcurrently(t *testing.T) {
 	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
 		metrics := metrics.NewNoopCollector()
-		lockManager := locks.NewTestingLockManager()
+		lockManager := storage.NewTestingLockManager()
 		store := store.NewResultApprovals(metrics, db, lockManager)
 
 		approval1, approval2 := twoApprovalsForTheSameResult(t)

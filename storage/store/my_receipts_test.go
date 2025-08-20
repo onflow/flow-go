@@ -9,7 +9,6 @@ import (
 
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/storage"
-	"github.com/onflow/flow-go/storage/locks"
 	"github.com/onflow/flow-go/storage/operation/dbtest"
 	"github.com/onflow/flow-go/storage/store"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -29,7 +28,7 @@ func TestMyExecutionReceiptsStorage(t *testing.T) {
 
 	t.Run("myReceipts store and retrieve from different storage layers", func(t *testing.T) {
 		withStore(t, func(myReceipts storage.MyExecutionReceipts, results storage.ExecutionResults, receipts storage.ExecutionReceipts, db storage.DB) {
-			lockManager := locks.NewTestingLockManager()
+			lockManager := storage.NewTestingLockManager()
 			block := unittest.BlockFixture()
 			receipt1 := unittest.ReceiptForBlockFixture(&block)
 
@@ -62,7 +61,7 @@ func TestMyExecutionReceiptsStorage(t *testing.T) {
 
 	t.Run("myReceipts store identical receipt for the same block", func(t *testing.T) {
 		withStore(t, func(myReceipts storage.MyExecutionReceipts, _ storage.ExecutionResults, _ storage.ExecutionReceipts, db storage.DB) {
-			lockManager := locks.NewTestingLockManager()
+			lockManager := storage.NewTestingLockManager()
 			block := unittest.BlockFixture()
 			receipt1 := unittest.ReceiptForBlockFixture(&block)
 
@@ -86,7 +85,7 @@ func TestMyExecutionReceiptsStorage(t *testing.T) {
 
 	t.Run("store different receipt for same block should fail", func(t *testing.T) {
 		withStore(t, func(myReceipts storage.MyExecutionReceipts, results storage.ExecutionResults, receipts storage.ExecutionReceipts, db storage.DB) {
-			lockManager := locks.NewTestingLockManager()
+			lockManager := storage.NewTestingLockManager()
 			block := unittest.BlockFixture()
 
 			executor1 := unittest.IdentifierFixture()
@@ -116,7 +115,7 @@ func TestMyExecutionReceiptsStorage(t *testing.T) {
 
 	t.Run("concurrent store different receipt for same block should fail", func(t *testing.T) {
 		withStore(t, func(myReceipts storage.MyExecutionReceipts, results storage.ExecutionResults, receipts storage.ExecutionReceipts, db storage.DB) {
-			lockManager := locks.NewTestingLockManager()
+			lockManager := storage.NewTestingLockManager()
 			block := unittest.BlockFixture()
 
 			executor1 := unittest.IdentifierFixture()
@@ -175,7 +174,7 @@ func TestMyExecutionReceiptsStorage(t *testing.T) {
 
 	t.Run("concurrent store of 10 different receipts for different blocks should succeed", func(t *testing.T) {
 		withStore(t, func(myReceipts storage.MyExecutionReceipts, results storage.ExecutionResults, receipts storage.ExecutionReceipts, db storage.DB) {
-			lockManager := locks.NewTestingLockManager()
+			lockManager := storage.NewTestingLockManager()
 
 			var startSignal sync.WaitGroup // goroutines attempting store operations will wait for this signal to start concurrently
 			startSignal.Add(1)             // expecting one signal from the main thread to start both goroutines
@@ -218,7 +217,7 @@ func TestMyExecutionReceiptsStorage(t *testing.T) {
 			block := unittest.BlockFixture()
 			receipt1 := unittest.ReceiptForBlockFixture(&block)
 
-			lockManager := locks.NewTestingLockManager()
+			lockManager := storage.NewTestingLockManager()
 			lctx := lockManager.NewContext()
 			defer lctx.Release()
 			require.NoError(t, lctx.AcquireLock(storage.LockInsertOwnReceipt))
@@ -263,7 +262,7 @@ func TestMyExecutionReceiptsStorageMultipleStoreInSameBatch(t *testing.T) {
 		receipt1 := unittest.ReceiptForBlockFixture(&block)
 		receipt2 := unittest.ReceiptForBlockFixture(&block)
 
-		lockManager := locks.NewTestingLockManager()
+		lockManager := storage.NewTestingLockManager()
 		lctx := lockManager.NewContext()
 		defer lctx.Release()
 		require.NoError(t, lctx.AcquireLock(storage.LockInsertOwnReceipt))
