@@ -137,7 +137,7 @@ func (av *AuthorizedSenderValidator) isAuthorizedSender(identity *flow.Identity,
 	if err != nil {
 		return "", err
 	}
-	
+
 	// get message auth config
 	conf, err := message.GetMessageAuthConfig(internal)
 	if err != nil {
