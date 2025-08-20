@@ -19,7 +19,7 @@ type ProtocolKVStore interface {
 	// Here, the ID is expected to be a collision-resistant hash of the snapshot (including the
 	// ProtocolStateVersion). Hence, for the same ID (key), BatchStore will reject changing the data (value).
 	// Expected errors during normal operations:
-	// - storage.ErrDataMismatch if a KV store for the given stateID has already been indexed, but different
+	// - storage.ErrDataMismatch if a _different_ KV store for the given stateID has already been persisted
 	BatchStore(lctx lockctx.Proof, rw ReaderBatchWriter, stateID flow.Identifier, data *flow.PSKeyValueStoreData) error
 
 	// BatchIndex appends the following operation to the provided write batch:
@@ -36,7 +36,7 @@ type ProtocolKVStore interface {
 	//     child block, _after_ validating the QC.
 	//
 	// Expected errors during normal operations:
-	//   - storage.ErrDataMismatch if a KV store for the given blockID has already been indexed, but different
+	// - storage.ErrDataMismatch if a _different_ KV store for the given stateID has already been persisted
 	BatchIndex(lctx lockctx.Proof, rw ReaderBatchWriter, blockID flow.Identifier, stateID flow.Identifier) error
 
 	// ByID retrieves the KV store snapshot with the given ID.

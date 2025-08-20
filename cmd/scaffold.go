@@ -85,7 +85,6 @@ import (
 	bstorage "github.com/onflow/flow-go/storage/badger"
 	"github.com/onflow/flow-go/storage/badger/operation"
 	"github.com/onflow/flow-go/storage/dbops"
-	"github.com/onflow/flow-go/storage/locks"
 	"github.com/onflow/flow-go/storage/operation/badgerimpl"
 	"github.com/onflow/flow-go/storage/operation/pebbleimpl"
 	"github.com/onflow/flow-go/storage/store"
@@ -1241,7 +1240,7 @@ func (fnb *FlowNodeBuilder) initStorageLockManager() error {
 		return nil
 	}
 
-	fnb.StorageLockMgr = locks.SingletonLockManager()
+	fnb.StorageLockMgr = storage.MakeSingletonLockManager()
 	return nil
 }
 

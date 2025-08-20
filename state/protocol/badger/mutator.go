@@ -611,7 +611,7 @@ func (m *ParticipantState) receiptExtend(ctx context.Context, candidate *flow.Bl
 // and 95 is the last sealed block at the state of block 100.
 // 95 (sealed) <- 96 <- 97 (finalized) <- 98 <- 99 <- 100
 // Now, if block 101 is extending block 100, and its payload has a seal for 96, then it will
-// be the last sealed for block 101.
+// be the last sealed as of block 101. The result is independent of finalization.
 // No errors are expected during normal operation.
 func (m *FollowerState) lastSealed(candidate *flow.Block) (latestSeal *flow.Seal, err error) {
 	payload := candidate.Payload
