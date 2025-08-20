@@ -44,10 +44,13 @@ func NewResultApprovals(collector module.CacheMetrics, db storage.DB, lockManage
 	}
 }
 
-// StoreMyApproval stores my own ResultApproval
-// No errors are expected during normal operations.
-// It requires storage.LockIndexResultApproval lock to be held by the caller.
-// it also indexes a ResultApproval by result ID and chunk index.
+// StoreMyApproval returns a functor, whose execution
+//   - will store the given ResultApproval
+//   - and index it by result ID and chunk index.
+//   - requires storage.LockIndexResultApproval lock to be held by the caller
+//
+// The functor's expected error returns during normal operation are:
+//   - `storage.ErrDataMismatch` if a *different* approval for the same key pair (ExecutionResultID, chunk index) is already indexed
 //
 // CAUTION: the Flow protocol requires multiple approvals for the same chunk from different verification
 // nodes. In other words, there are multiple different approvals for the same chunk. Therefore, the index
