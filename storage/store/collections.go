@@ -142,20 +142,20 @@ func (c *Collections) Remove(colID flow.Identifier) error {
 	return nil
 }
 
-// BatchStoreLightAndIndexByTransaction stores a light collection and indexes it by transaction ID within a batch.
-// This is the common implementation used by both StoreLightAndIndexByTransaction and BatchStoreLightAndIndexByTransaction.
+// BatchStoreAndIndexByTransaction stores a collection and indexes it by transaction ID within a batch.
+// This is the common implementation used by both StoreAndIndexByTransaction and BatchStoreAndIndexByTransaction.
 // No errors are expected during normal operations
 func (c *Collections) BatchStoreAndIndexByTransaction(lctx lockctx.Proof, collection *flow.Collection, rw storage.ReaderBatchWriter) (flow.LightCollection, error) {
 	light := collection.Light()
 	collectionID := light.ID()
 
+	if !lctx.HoldsLock(storage.LockInsertCollection) {
+		return flow.LightCollection{}, fmt.Errorf("missing lock: %v", storage.LockInsertCollection)
+	}
+
 	err := operation.UpsertCollection(rw.Writer(), &light)
 	if err != nil {
 		return flow.LightCollection{}, fmt.Errorf("could not insert collection: %w", err)
-	}
-
-	if !lctx.HoldsLock(storage.LockInsertCollection) {
-		return flow.LightCollection{}, fmt.Errorf("missing lock: %v", storage.LockInsertCollection)
 	}
 
 	for _, txID := range light.Transactions {
@@ -195,7 +195,7 @@ func (c *Collections) BatchStoreAndIndexByTransaction(lctx lockctx.Proof, collec
 	return light, nil
 }
 
-// StoreLightAndIndexByTransaction stores a light collection and indexes it by transaction ID.
+// StoreAndIndexByTransaction stores a collection and indexes it by transaction ID.
 // It's concurrent-safe.
 // NOTE: Currently it is possible in rare circumstances for two collections
 // to be guaranteed which both contain the same transaction (see https://github.com/dapperlabs/flow-go/issues/3556).

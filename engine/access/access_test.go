@@ -787,7 +787,7 @@ func (suite *Suite) TestGetSealedTransaction() {
 		suite.request.On("EntityByID", collection.ID(), mock.Anything).Return()
 		// 4. Indexer IndexCollection receives the requested collection and all the execution receipts
 		// Create a lock context for indexing
-		indexLctx := storage.NewTestingLockManager().NewContext()
+		indexLctx := manager.NewContext()
 		lockErr := indexLctx.AcquireLock(storage.LockInsertCollection)
 		require.NoError(suite.T(), lockErr)
 		defer indexLctx.Release()
@@ -999,7 +999,7 @@ func (suite *Suite) TestGetTransactionResult() {
 
 			// Indexer IndexCollection receives the requested collection and all the execution receipts
 			// Create a lock context for indexing
-			indexLctx := storage.NewTestingLockManager().NewContext()
+			indexLctx := manager.NewContext()
 			lockErr := indexLctx.AcquireLock(storage.LockInsertCollection)
 			require.NoError(suite.T(), lockErr)
 			defer indexLctx.Release()

@@ -9,17 +9,6 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-// noOpLockContext is a no-op implementation of lockctx.Proof for testing
-type noOpLockContext struct{}
-
-func (n *noOpLockContext) HoldsLock(lockName string) bool {
-	return true // Always return true since this is a no-op context
-}
-
-func (n *noOpLockContext) Release() {
-	// No-op
-}
-
 func TestCollection_HappyCase(t *testing.T) {
 	transactions := NewTransactions()
 	collections := NewCollections(transactions)
@@ -55,8 +44,7 @@ func TestLightByTransactionID_HappyCase(t *testing.T) {
 	collection := unittest.CollectionFixture(2)
 
 	// Create a no-op lock context for testing
-	noOpLockCtx := &noOpLockContext{}
-	_, err := collections.StoreAndIndexByTransaction(noOpLockCtx, &collection)
+	_, err := collections.StoreAndIndexByTransaction(nil, &collection)
 	require.NoError(t, err)
 
 	// Fetch by transaction ID and validate

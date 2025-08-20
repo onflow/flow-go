@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/dgraph-io/badger/v2"
+	"github.com/jordanschalm/lockctx"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -77,6 +78,7 @@ type Suite struct {
 	db                  *badger.DB
 	dbDir               string
 	lastFullBlockHeight *counters.PersistentStrictMonotonicCounter
+	lockManager         lockctx.Manager
 }
 
 func TestIngestEngine(t *testing.T) {
@@ -94,6 +96,7 @@ func (s *Suite) SetupTest() {
 	s.log = zerolog.New(os.Stderr)
 	s.ctx, s.cancel = context.WithCancel(context.Background())
 	s.db, s.dbDir = unittest.TempBadgerDB(s.T())
+	s.lockManager = storerr.NewTestingLockManager()
 
 	s.obsIdentity = unittest.IdentityFixture(unittest.WithRole(flow.RoleAccess))
 
@@ -205,7 +208,7 @@ func (s *Suite) initEngineAndSyncer(ctx irrecoverable.SignalerContext) (*Engine,
 		s.collections,
 		s.transactions,
 		s.lastFullBlockHeight,
-		storerr.NewTestingLockManager(),
+		s.lockManager,
 	)
 
 	eng, err := New(
@@ -408,7 +411,7 @@ func (s *Suite) TestOnCollection() {
 	s.collections.On("StoreAndIndexByTransaction", mock.Anything, &collection).Return(light, nil).Once()
 
 	// Create a lock context for indexing
-	lctx := storerr.NewTestingLockManager().NewContext()
+	lctx := s.lockManager.NewContext()
 	err := lctx.AcquireLock(storerr.LockInsertCollection)
 	require.NoError(s.T(), err)
 	defer lctx.Release()
@@ -482,7 +485,7 @@ func (s *Suite) TestOnCollectionDuplicate() {
 	s.collections.On("StoreAndIndexByTransaction", mock.Anything, &collection).Return(light, storerr.ErrAlreadyExists).Once()
 
 	// Create a lock context for indexing
-	lctx := storerr.NewTestingLockManager().NewContext()
+	lctx := s.lockManager.NewContext()
 	err := lctx.AcquireLock(storerr.LockInsertCollection)
 	require.NoError(s.T(), err)
 	defer lctx.Release()

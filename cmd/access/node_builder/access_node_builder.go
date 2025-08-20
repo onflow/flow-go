@@ -2154,7 +2154,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				notNil(builder.collections),
 				notNil(builder.transactions),
 				lastFullBlockHeight,
-				storage.NewTestingLockManager(),
+				node.StorageLockMgr,
 			)
 			builder.RequestEng.WithHandle(collectionSyncer.OnCollectionDownloaded)
 
