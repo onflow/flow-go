@@ -21,7 +21,6 @@ import (
 	protocolmock "github.com/onflow/flow-go/state/protocol/mock"
 	"github.com/onflow/flow-go/storage"
 	bstorage "github.com/onflow/flow-go/storage/badger"
-	"github.com/onflow/flow-go/storage/locks"
 	"github.com/onflow/flow-go/storage/operation/badgerimpl"
 	"github.com/onflow/flow-go/storage/operation/pebbleimpl"
 	"github.com/onflow/flow-go/storage/store"
@@ -65,7 +64,7 @@ func TestMigrateLastSealedExecutedResultToPebble(t *testing.T) {
 		getLatestFinalized := func() (uint64, error) {
 			return genesis.Header.Height, nil
 		}
-		lockManager := locks.NewTestingLockManager()
+		lockManager := storage.NewTestingLockManager()
 
 		// create execution state module
 		es := state.NewExecutionState(

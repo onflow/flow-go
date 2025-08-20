@@ -411,13 +411,11 @@ func (s *state) saveExecutionResults(
 		return err
 	}
 
-	// Write Batch is BadgerDB feature designed for handling lots of writes
-	// in efficient and atomic manner, hence pushing all the updates we can
-	// as tightly as possible to let Badger manage it.
-	// Note, that it does not guarantee atomicity as transactions has size limit,
-	// but it's the closest thing to atomicity we could have
+	// Save entire execution result (including all chunk data packs) within one batch to minimize
+	// the number of database interactions. This is a large batch of data, which might not be
+	// committed within a single operation (e.g. if using Badger DB as storage backend, which has
+	// a size limit for its transactions).
 	return s.db.WithReaderBatchWriter(func(batch storage.ReaderBatchWriter) error {
-
 		batch.AddCallback(func(err error) {
 			// Rollback if an error occurs during batch operations
 			if err != nil {
@@ -470,7 +468,6 @@ func (s *state) saveExecutionResults(
 
 		return nil
 	})
-
 }
 
 func (s *state) UpdateLastExecutedBlock(ctx context.Context, executedID flow.Identifier) error {

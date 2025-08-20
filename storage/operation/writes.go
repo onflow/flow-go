@@ -30,6 +30,8 @@ func UpsertByKey(w storage.Writer, key []byte, val interface{}) error {
 	return nil
 }
 
+// Upserting returns a functor, whose execution will append the given key-value-pair to the provided
+// storage writer (typically a pending batch of database writes).
 func Upserting(key []byte, val interface{}) func(storage.Writer) error {
 	value, err := msgpack.Marshal(val)
 	return func(w storage.Writer) error {

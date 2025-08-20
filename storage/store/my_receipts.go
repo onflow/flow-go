@@ -8,6 +8,7 @@ import (
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/operation"
@@ -65,50 +66,41 @@ func (m *MyExecutionReceipts) myReceipt(blockID flow.Identifier) (*flow.Executio
 // If Badger unexpectedly fails to process the request, the error is wrapped in a generic error and returned.
 // If a different my receipt has been indexed for the same block, the error is wrapped in a generic error and returned.
 func (m *MyExecutionReceipts) BatchStoreMyReceipt(lctx lockctx.Proof, receipt *flow.ExecutionReceipt, rw storage.ReaderBatchWriter) error {
-	// the lock guarantees that no other thread can concurrently update the index.
-	// Note, we should not unlock the lock after this function returns, because the data is not yet persisted, the result
-	// of whether there was a different own receipt for the same block might be stale, therefore, we should not unlock
-	// the lock until the batch is committed.
+	receiptID := receipt.ID()
+	blockID := receipt.ExecutionResult.BlockID
 
-	// the lock would not cause any deadlock, if
-	// 1) there is no other lock in the batch operation.
-	// 2) or there is other lock in the batch operation, but the locks are acquired and released in the same order.
 	if lctx == nil || !lctx.HoldsLock(storage.LockInsertOwnReceipt) {
 		return fmt.Errorf("cannot store my receipt, missing lock %v", storage.LockInsertOwnReceipt)
 	}
 
-	blockID := receipt.ExecutionResult.BlockID
-	// assemble DB operations to store receipt (no execution)
+	// add DB operation to batch for storing receipt (execution deferred until batch is committed)
 	err := m.genericReceipts.BatchStore(receipt, rw)
 	if err != nil {
 		return err
 	}
 
-	storage.OnCommitSucceed(rw, func() {
-		m.cache.Insert(blockID, receipt)
-	})
-
-	// assemble DB operations to index receipt as one of my own (no execution)
-	receiptID := receipt.ID()
-
+	// dd DB operation to batch for indexing receipt as one of my own (execution deferred until batch is committed)
 	var savedReceiptID flow.Identifier
 	err = operation.LookupOwnExecutionReceipt(rw.GlobalReader(), blockID, &savedReceiptID)
 	if err == nil {
 		if savedReceiptID == receiptID {
-			// if we are storing same receipt we shouldn't error
-			return nil
+			return nil // no-op we are storing *same* receipt
 		}
-
-		return fmt.Errorf("indexing my receipt %v failed: different receipt %v for the same block %v is already indexed", receiptID,
-			savedReceiptID, blockID)
+		return fmt.Errorf("indexing my receipt %v failed: different receipt %v for the same block %v is already indexed", receiptID, savedReceiptID, blockID)
 	}
-
-	// exception
-	if !errors.Is(err, storage.ErrNotFound) {
+	if !errors.Is(err, storage.ErrNotFound) { // `storage.ErrNotFound` is expected, as this indicates that no receipt is indexed yet; anything else is an exception
+		return irrecoverable.NewException(err)
+	}
+	err = operation.IndexOwnExecutionReceipt(rw.Writer(), blockID, receiptID)
+	if err != nil {
 		return err
 	}
 
-	return operation.IndexOwnExecutionReceipt(rw.Writer(), blockID, receiptID)
+	// TODO: ideally, adding the receipt to the cache on success, should be done by the cache itself
+	storage.OnCommitSucceed(rw, func() {
+		m.cache.Insert(blockID, receipt)
+	})
+	return nil
 }
 
 // MyReceipt retrieves my receipt for the given block.

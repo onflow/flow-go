@@ -29,7 +29,6 @@ import (
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/storage"
-	"github.com/onflow/flow-go/storage/locks"
 	storagemock "github.com/onflow/flow-go/storage/mock"
 	"github.com/onflow/flow-go/storage/operation"
 	"github.com/onflow/flow-go/storage/operation/badgerimpl"
@@ -37,7 +36,7 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-func prepareStorehouseTest(f func(t *testing.T, es state.ExecutionState, l *ledger.Ledger, headers storage.Headers, commits *storagemock.Commits, finalized *testutil.MockFinalizedReader)) func(*testing.T) {
+func prepareStorehouseTest(f func(t *testing.T, es state.ExecutionState, l *ledger.Ledger, headers *storagemock.Headers, commits *storagemock.Commits, finalized *testutil.MockFinalizedReader)) func(*testing.T) {
 	return func(t *testing.T) {
 		unittest.RunWithBadgerDB(t, func(badgerDB *badger.DB) {
 			metricsCollector := &metrics.NoopCollector{}
@@ -67,7 +66,7 @@ func prepareStorehouseTest(f func(t *testing.T, es state.ExecutionState, l *ledg
 			results.On("BatchIndex", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 			myReceipts := storagemock.NewMyExecutionReceipts(t)
 			myReceipts.On("BatchStoreMyReceipt", mock.Anything, mock.Anything, mock.Anything).Return(nil)
-			lockManager := locks.NewTestingLockManager()
+			lockManager := storage.NewTestingLockManager()
 
 			withRegisterStore(t, func(t *testing.T,
 				rs *storehouse.RegisterStore,
@@ -132,7 +131,7 @@ func withRegisterStore(t *testing.T, fn func(
 
 func TestExecutionStateWithStorehouse(t *testing.T) {
 	t.Run("commit write and read new state", prepareStorehouseTest(func(
-		t *testing.T, es state.ExecutionState, l *ledger.Ledger, headers storage.Headers, stateCommitments *storagemock.Commits, finalized *testutil.MockFinalizedReader) {
+		t *testing.T, es state.ExecutionState, l *ledger.Ledger, headers *storagemock.Headers, stateCommitments *storagemock.Commits, finalized *testutil.MockFinalizedReader) {
 
 		// block 11 is the block to be executed
 		block11 := finalized.BlockAtHeight(11)

@@ -2,7 +2,6 @@ package store
 
 import (
 	"errors"
-
 	"fmt"
 
 	"github.com/jordanschalm/lockctx"
@@ -98,7 +97,7 @@ func NewProtocolKVStore(collector module.CacheMetrics,
 // Here, the ID is expected to be a collision-resistant hash of the snapshot (including the
 // ProtocolStateVersion). Hence, for the same ID, BatchStore will reject changing the data.
 // Expected errors during normal operations:
-// - storage.ErrDataMismatch if a KV store for the given stateID has already been indexed, but different
+// - storage.ErrDataMismatch if a _different_ KV store for the given stateID has already been persisted
 func (s *ProtocolKVStore) BatchStore(lctx lockctx.Proof, rw storage.ReaderBatchWriter, stateID flow.Identifier, data *flow.PSKeyValueStoreData) error {
 	if !lctx.HoldsLock(storage.LockInsertBlock) {
 		return fmt.Errorf("missing required lock: %s", storage.LockInsertBlock)
@@ -115,8 +114,7 @@ func (s *ProtocolKVStore) BatchStore(lctx lockctx.Proof, rw storage.ReaderBatchW
 			existingData.Version, existingData.Data,
 			storage.ErrDataMismatch)
 	}
-
-	if !errors.Is(err, storage.ErrNotFound) {
+	if !errors.Is(err, storage.ErrNotFound) { // `storage.ErrNotFound` is expected, as this indicates that no receipt is indexed yet; anything else is an exception
 		return fmt.Errorf("unexpected error checking if kv-store snapshot %x exists: %w", stateID[:], irrecoverable.NewException(err))
 	}
 
@@ -139,7 +137,7 @@ func (s *ProtocolKVStore) BatchStore(lctx lockctx.Proof, rw storage.ReaderBatchW
 //     _after_ validating the QC.
 //
 // Expected errors during normal operations:
-//   - storage.ErrDataMismatch if a KV store for the given blockID has already been indexed, but different
+// - storage.ErrDataMismatch if a _different_ KV store for the given stateID has already been persisted
 func (s *ProtocolKVStore) BatchIndex(lctx lockctx.Proof, rw storage.ReaderBatchWriter, blockID flow.Identifier, stateID flow.Identifier) error {
 	if !lctx.HoldsLock(storage.LockInsertBlock) {
 		return fmt.Errorf("missing required lock: %s", storage.LockInsertBlock)
@@ -147,7 +145,7 @@ func (s *ProtocolKVStore) BatchIndex(lctx lockctx.Proof, rw storage.ReaderBatchW
 
 	existingStateID, err := s.byBlockIdCache.Get(s.db.Reader(), blockID)
 	if err == nil {
-		// if it's about to index the same state ID, then we can skip the operation
+		// no-op if the *same* stateID is already indexed for the blockID
 		if existingStateID == stateID {
 			return nil
 		}
@@ -157,8 +155,8 @@ func (s *ProtocolKVStore) BatchIndex(lctx lockctx.Proof, rw storage.ReaderBatchW
 			stateID, existingStateID,
 			storage.ErrDataMismatch)
 	}
-	if !errors.Is(err, storage.ErrNotFound) {
-		return fmt.Errorf("could not check if kv-store snapshot with block id (%x) exists: %w", blockID[:], err)
+	if !errors.Is(err, storage.ErrNotFound) { // `storage.ErrNotFound` is expected, as this indicates that no receipt is indexed yet; anything else is an exception
+		return fmt.Errorf("could not check if kv-store snapshot with block id (%x) exists: %w", blockID[:], irrecoverable.NewException(err))
 	}
 
 	return s.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
