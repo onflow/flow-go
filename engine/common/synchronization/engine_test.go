@@ -387,9 +387,9 @@ func (ss *SyncSuite) TestOnInvalidBlockResponse() {
 	proposal := unittest.ProposalFixture()
 	proposal.ProposerSigData = nil // invalid value
 
-	req := &messages.BlockResponse{
+	req := &flow.BlockResponse{
 		Nonce:  0,
-		Blocks: []flow.UntrustedProposal{flow.UntrustedProposal(*proposal)},
+		Blocks: []flow.Proposal{*proposal},
 	}
 
 	// Expect metrics to track message receipt and message drop for invalid block proposal
