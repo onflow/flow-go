@@ -69,8 +69,8 @@ func MigrateLastSealedExecutedResultToPebble(logger zerolog.Logger, badgerDB *ba
 		return fmt.Errorf("could not query database to know whether database has been bootstrapped: %w", err)
 	}
 
+	lockManager := storage.NewTestingLockManager()
 	if !bootstrapped {
-		lockManager := storage.NewTestingLockManager()
 		err = bootstrapper.BootstrapExecutionDatabase(lockManager, pdb, rootSeal)
 		if err != nil {
 			return fmt.Errorf("could not bootstrap pebble execution database: %w", err)
@@ -151,7 +151,6 @@ func MigrateLastSealedExecutedResultToPebble(logger zerolog.Logger, badgerDB *ba
 			return fmt.Errorf("failed to index result for block %s: %w", blockID, err)
 		}
 
-		lockManager := storage.NewTestingLockManager()
 		lctx := lockManager.NewContext()
 		defer lctx.Release()
 		if err := lctx.AcquireLock(storage.LockInsertOwnReceipt); err != nil {

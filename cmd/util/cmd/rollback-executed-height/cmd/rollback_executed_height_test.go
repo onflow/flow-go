@@ -33,8 +33,8 @@ func TestReExecuteBlock(t *testing.T) {
 			genesis := unittest.BlockFixture()
 			rootSeal := unittest.Seal.Fixture(unittest.Seal.WithBlock(genesis.Header))
 			db := badgerimpl.ToDB(bdb)
-			bootstrapLockManager := storage.NewTestingLockManager()
-			err := bootstrapper.BootstrapExecutionDatabase(bootstrapLockManager, db, rootSeal)
+			lockManager := storage.NewTestingLockManager()
+			err := bootstrapper.BootstrapExecutionDatabase(lockManager, db, rootSeal)
 			require.NoError(t, err)
 
 			// create all modules
@@ -62,8 +62,6 @@ func TestReExecuteBlock(t *testing.T) {
 			getLatestFinalized := func() (uint64, error) {
 				return genesis.Header.Height, nil
 			}
-
-			lockManager := storage.NewTestingLockManager()
 
 			// create execution state module
 			es := state.NewExecutionState(

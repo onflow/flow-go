@@ -28,8 +28,8 @@ func TestCommitsStoreAndRetrieve(t *testing.T) {
 		// store a commit in db
 		blockID := unittest.IdentifierFixture()
 		expected := unittest.StateCommitmentFixture()
+		lockManager := storage.NewTestingLockManager()
 		err = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			lockManager := storage.NewTestingLockManager()
 			lctx := lockManager.NewContext()
 			defer lctx.Release()
 			require.NoError(t, lctx.AcquireLock(storage.LockInsertOwnReceipt))
@@ -44,7 +44,6 @@ func TestCommitsStoreAndRetrieve(t *testing.T) {
 
 		// re-insert the commit - should be idempotent
 		err = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			lockManager := storage.NewTestingLockManager()
 			lctx := lockManager.NewContext()
 			defer lctx.Release()
 			require.NoError(t, lctx.AcquireLock(storage.LockInsertOwnReceipt))
@@ -62,8 +61,8 @@ func TestCommitStoreAndRemove(t *testing.T) {
 		// Create and store a commit
 		blockID := unittest.IdentifierFixture()
 		expected := unittest.StateCommitmentFixture()
+		lockManager := storage.NewTestingLockManager()
 		err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			lockManager := storage.NewTestingLockManager()
 			lctx := lockManager.NewContext()
 			defer lctx.Release()
 			require.NoError(t, lctx.AcquireLock(storage.LockInsertOwnReceipt))
