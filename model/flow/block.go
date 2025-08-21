@@ -169,17 +169,6 @@ type Proposal struct {
 // for the root proposal).
 type UntrustedProposal Proposal
 
-// ToInternal converts the untrusted UntrustedProposal into its trusted internal
-// representation.
-//
-// This stub returns the receiver unchanged. A proper implementation
-// must perform validation checks and return a constructed internal
-// object.
-func (u *UntrustedProposal) ToInternal() (any, error) {
-	// TODO(malleability, #7698) create typedef for this type in messages package and implement with validation checks there
-	return u, nil
-}
-
 // NewProposal creates a new Proposal.
 // This constructor enforces validation rules to ensure the Proposal is well-formed.
 // It must be used to construct all non-root proposal.
