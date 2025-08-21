@@ -2,6 +2,8 @@ package migrations
 
 import (
 	"crypto/rand"
+	"encoding/binary"
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -481,4 +483,269 @@ func TestAccountStatusV4Serialization(t *testing.T) {
 			require.NoError(t, err)
 		})
 	}
+}
+
+func decodeAccountPublicKeyWeightAndRevokedStatusGroups(b []byte) ([]accountPublicKeyWeightAndRevokedStatus, error) {
+	if len(b)%weightAndRevokedStatusGroupSize != 0 {
+		return nil, fmt.Errorf("failed to decode weight and revoked status: expect multiple of %d bytes, got %d", weightAndRevokedStatusGroupSize, len(b))
+	}
+
+	statuses := make([]accountPublicKeyWeightAndRevokedStatus, 0, len(b)/weightAndRevokedStatusGroupSize)
+
+	for i := 0; i < len(b); i += weightAndRevokedStatusGroupSize {
+		runLength := uint32(binary.BigEndian.Uint16(b[i:]))
+		weightAndRevoked := binary.BigEndian.Uint16(b[i+2 : i+4])
+
+		status := accountPublicKeyWeightAndRevokedStatus{
+			weight:  weightAndRevoked & weightMask,
+			revoked: (weightAndRevoked & revokedMask) > 0,
+		}
+
+		for range runLength {
+			statuses = append(statuses, status)
+		}
+	}
+
+	return statuses, nil
+}
+
+func decodeAccountPublicKeyMapping(b []byte) ([]uint32, error) {
+	if len(b)%mappingGroupSize != 0 {
+		return nil, fmt.Errorf("failed to decode mappings: expect multiple of %d bytes, got %d", mappingGroupSize, len(b))
+	}
+
+	mapping := make([]uint32, 0, len(b)/mappingGroupSize)
+
+	for i := 0; i < len(b); i += mappingGroupSize {
+		runLength := binary.BigEndian.Uint16(b[i:])
+		storedKeyIndex := binary.BigEndian.Uint32(b[i+runLengthSize:])
+
+		if highBit := (runLength & consecutiveGroupFlagMask) >> 15; highBit == 1 {
+			runLength &= lengthMask
+
+			for i := range runLength {
+				mapping = append(mapping, storedKeyIndex+uint32(i))
+			}
+		} else {
+			for range runLength {
+				mapping = append(mapping, storedKeyIndex)
+			}
+		}
+	}
+
+	return mapping, nil
+}
+
+func decodeDigestList(b []byte) ([]uint64, error) {
+	if len(b)%digestSize != 0 {
+		return nil, fmt.Errorf("failed to decode digest list: expect multiple of %d byte, got %d", digestSize, len(b))
+	}
+
+	storedDigestCount := len(b) / digestSize
+
+	digests := make([]uint64, 0, storedDigestCount)
+
+	for i := 0; i < len(b); i += digestSize {
+		digests = append(digests, binary.BigEndian.Uint64(b[i:]))
+	}
+
+	return digests, nil
+}
+
+func decodeBatchPublicKey(b []byte) ([][]byte, error) {
+	if len(b) == 0 {
+		return nil, nil
+	}
+
+	encodedPublicKeys := make([][]byte, 0, maxPublicKeyCountInBatch)
+
+	off := 0
+	for off < len(b) {
+		size := int(b[off])
+		off++
+
+		if off+size > len(b) {
+			return nil, fmt.Errorf("failed to decode batch public key: off %d + size %d out of bounds %d: %x", off, size, len(b), b)
+		}
+
+		encodedPublicKey := b[off : off+size]
+		off += size
+
+		encodedPublicKeys = append(encodedPublicKeys, encodedPublicKey)
+	}
+
+	if off != len(b) {
+		return nil, fmt.Errorf("failed to decode batch public key: trailing data (%d bytes): %x", len(b)-off, b)
+	}
+
+	return encodedPublicKeys, nil
+}
+
+func decodeAccountStatusV4(b []byte) (
+	requiredFields []byte,
+	weightAndRevokedStatus []accountPublicKeyWeightAndRevokedStatus,
+	startKeyIndexForDigests uint32,
+	digests []uint64,
+	startKeyIndexForMapping uint32,
+	accountPublicKeyMappings []uint32,
+	err error,
+) {
+	if len(b) < accountStatusV4MinimumSize {
+		return nil, nil, 0, nil, 0, nil, fmt.Errorf("failed to decode AccountStatusV4: expect at least %d byte, got %d bytes", accountStatusV4MinimumSize, len(b))
+	}
+
+	version, flag := b[0]&versionMask>>4, b[0]&flagMask
+
+	if version != 4 {
+		return nil, nil, 0, nil, 0, nil, fmt.Errorf("failed to decode AccountStatusV4: expect version 4, got %d", version)
+	}
+
+	if flag != 0 && flag != 1 {
+		return nil, nil, 0, nil, 0, nil, fmt.Errorf("failed to decode AccountStatusV4: expect flag 0 or 1, got %d", flag)
+	}
+
+	deduplicated := flag == 1
+
+	requiredFields = append([]byte(nil), b[:accountStatusV4MinimumSize]...)
+	optionalFields := append([]byte(nil), b[accountStatusV4MinimumSize:]...)
+
+	accountStatus, err := environment.AccountStatusFromBytes(requiredFields)
+	if err != nil {
+		return nil, nil, 0, nil, 0, nil, err
+	}
+
+	accountPublicKeyCount := accountStatus.PublicKeyCount()
+
+	if accountPublicKeyCount <= 1 {
+		if len(optionalFields) > 0 {
+			return nil, nil, 0, nil, 0, nil, fmt.Errorf("failed to decode AccountStatusV4: found optional fields when account public key count is %d", accountPublicKeyCount)
+		}
+
+		if deduplicated {
+			return nil, nil, 0, nil, 0, nil, fmt.Errorf("failed to create AccountStatusV4: deduplication flag should be off when account public key is less than 2")
+		}
+
+		return requiredFields, nil, 0, nil, 0, nil, err
+	}
+
+	// Decode weight and revoked list
+
+	var weightAndRevokedGroupsData []byte
+	weightAndRevokedGroupsData, optionalFields, err = parseNextLengthPrefixedData(optionalFields)
+	if err != nil {
+		return nil, nil, 0, nil, 0, nil, fmt.Errorf("failed to decode AccountStatusV4: %w", err)
+	}
+
+	weightAndRevokedStatus, err = decodeAccountPublicKeyWeightAndRevokedStatusGroups(weightAndRevokedGroupsData)
+	if err != nil {
+		return nil, nil, 0, nil, 0, nil, fmt.Errorf("failed to decode weight and revoked status list: %w", err)
+	}
+
+	// Decode account public key mapping if deduplication is on
+
+	if deduplicated {
+		if len(optionalFields) < 4 {
+			return nil, nil, 0, nil, 0, nil, fmt.Errorf("failed to decode AccountStatusV4: expect 4 bytes of start key index for mapping, got %d bytes", len(optionalFields))
+		}
+
+		startKeyIndexForMapping = binary.BigEndian.Uint32(optionalFields)
+
+		optionalFields = optionalFields[4:]
+
+		var mappingData []byte
+		mappingData, optionalFields, err = parseNextLengthPrefixedData(optionalFields)
+		if err != nil {
+			return nil, nil, 0, nil, 0, nil, fmt.Errorf("failed to decode AccountStatusV4: %w", err)
+		}
+
+		accountPublicKeyMappings, err = decodeAccountPublicKeyMapping(mappingData)
+		if err != nil {
+			return nil, nil, 0, nil, 0, nil, fmt.Errorf("failed to decode account public key mappings: %w", err)
+		}
+	}
+
+	// Decode digests list
+
+	if len(optionalFields) < 4 {
+		return nil, nil, 0, nil, 0, nil, fmt.Errorf("failed to decode AccountStatusV4: expect 4 bytes of start stored key index for digests, got %d bytes", len(optionalFields))
+	}
+
+	startKeyIndexForDigests = binary.BigEndian.Uint32(optionalFields)
+	optionalFields = optionalFields[4:]
+
+	var digestsData []byte
+	digestsData, optionalFields, err = parseNextLengthPrefixedData(optionalFields)
+	if err != nil {
+		return nil, nil, 0, nil, 0, nil, fmt.Errorf("failed to decode AccountStatusV4: %w", err)
+	}
+
+	digests, err = decodeDigestList(digestsData)
+	if err != nil {
+		return nil, nil, 0, nil, 0, nil, fmt.Errorf("failed to decode digests: %w", err)
+	}
+
+	// Check trailing data
+
+	if len(optionalFields) != 0 {
+		return nil, nil, 0, nil, 0, nil, fmt.Errorf("failed to decode AccountStatusV4: got %d extra bytes", len(optionalFields))
+	}
+
+	return
+}
+
+func parseNextLengthPrefixedData(b []byte) (next []byte, rest []byte, err error) {
+	if len(b) < lengthPrefixSize {
+		return nil, nil, fmt.Errorf("failed to decode data: expect at least 4 bytes, got %d bytes", len(b))
+	}
+
+	length := binary.BigEndian.Uint32(b[:lengthPrefixSize])
+
+	if len(b) < lengthPrefixSize+int(length) {
+		return nil, nil, fmt.Errorf("failed to decode data: expect at least %d bytes, got %d bytes", lengthPrefixSize+int(length), len(b))
+	}
+
+	b = b[lengthPrefixSize:]
+	return b[:length], b[length:], nil
+}
+
+func validateKeyMetadata(
+	deduplicated bool,
+	accountPublicKeyCount uint32,
+	weightAndRevokedStatus []accountPublicKeyWeightAndRevokedStatus,
+	startKeyIndexForDigests uint32,
+	digests []uint64,
+	startKeyIndexForMapping uint32,
+	accountPublicKeyMappings []uint32,
+) error {
+	if len(weightAndRevokedStatus) != int(accountPublicKeyCount)-1 {
+		return fmt.Errorf("found %d weight and revoked status, expect %d", len(weightAndRevokedStatus), accountPublicKeyCount-1)
+	}
+
+	if len(digests) > maxStoredDigests {
+		return fmt.Errorf("found %d digests, expect max %d digests", len(digests), maxStoredDigests)
+	}
+
+	if len(digests) > int(accountPublicKeyCount) {
+		return fmt.Errorf("found %d digest, expect fewer digests than account public key count %d", len(digests), accountPublicKeyCount)
+	}
+
+	if int(startKeyIndexForDigests)+len(digests) > int(accountPublicKeyCount) {
+		return fmt.Errorf("found %d digest at start index %d, expect fewer digests than account public key count %d", len(digests), startKeyIndexForDigests, accountPublicKeyCount)
+	}
+
+	if deduplicated {
+		if int(startKeyIndexForMapping)+len(accountPublicKeyMappings) != int(accountPublicKeyCount) {
+			return fmt.Errorf("found %d mappings at start index %d, expect %d",
+				len(accountPublicKeyMappings),
+				startKeyIndexForMapping,
+				accountPublicKeyCount,
+			)
+		}
+	} else {
+		if len(accountPublicKeyMappings) > 0 {
+			return fmt.Errorf("found %d account public key mappings for non-deduplicated account, expect 0", len(accountPublicKeyMappings))
+		}
+	}
+
+	return nil
 }
