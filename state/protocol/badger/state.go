@@ -88,6 +88,8 @@ func SkipNetworkAddressValidation(conf *BootstrapConfig) {
 	conf.SkipNetworkAddressValidation = true
 }
 
+// Bootstrap initializes a the protocol state from the provided root snapshot and persists it to the database.
+// No errors expected during normal operation.
 func Bootstrap(
 	metrics module.ComplianceMetrics,
 	db storage.DB,
@@ -149,8 +151,9 @@ func Bootstrap(
 	// sealing segment lists blocks in order of ascending height, so the tail
 	// is the oldest ancestor and head is the newest child in the segment
 	// TAIL <- ... <- HEAD
-	lastFinalized := segment.Finalized() // the highest block in sealing segment is the last finalized block
-	lastSealed := segment.Sealed()       // the lowest block in sealing segment is the last sealed block
+	// Per definition, the highest block in sealing segment is the last finalized block
+	// and the lowest block in sealing segment is the last sealed block.
+	lastFinalized := segment.Finalized()
 
 	// bootstrap the sealing segment
 	// creating sealed root block with the rootResult
@@ -188,27 +191,23 @@ func Bootstrap(
 		if err != nil {
 			return fmt.Errorf("could not bootstrap version beacon: %w", err)
 		}
-
-		err = updateEpochMetrics(metrics, root)
-		if err != nil {
-			return fmt.Errorf("could not update epoch metrics: %w", err)
-		}
-		metrics.BlockSealed(lastSealed)
-		metrics.SealedHeight(lastSealed.Header.Height)
-		metrics.FinalizedHeight(lastFinalized.Header.Height)
-		for _, block := range segment.Blocks {
-			metrics.BlockFinalized(block)
-		}
-
 		return nil
 	})
 	if err != nil {
 		return nil, fmt.Errorf("bootstrapping failed: %w", err)
 	}
 
-	// The reason bootstrapStatePointers is the last step is that it
-	// will Insert Finalized Height, which is used to determine if
-	// the database has been bootstrapped.
+	// CAUTION: INSERT FINALIZED HEIGHT must be LAST, because we use its existence in the database
+	// as indicator that the protocol database has been bootstrapped successfully. Before we write the
+	// final piece of data to complete the bootstrapping, we query the current state of the database
+	// (anity check) to ensure that it is still considered as not properly bootstrapped.
+	isBootstrapped, err = IsBootstrapped(db)
+	if err != nil {
+		return nil, fmt.Errorf("determining whether database is successfully bootstrapped failed with unexpected exception: %w", err)
+	}
+	if isBootstrapped { // we haven't written the latest finalized height yet, so this vaule must be false
+		return nil, fmt.Errorf("sanity check failed: while bootstrapping has not yet completed, the implementation already considers the protocol state as successfully bootstrapped")
+	}
 	err = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 		// initialize the current protocol state height/view pointers
 		return bootstrapStatePointers(lctx, rw, root)
@@ -217,32 +216,7 @@ func Bootstrap(
 		return nil, fmt.Errorf("could not bootstrap height/view pointers: %w", err)
 	}
 
-	instanceParams, err := datastore.ReadInstanceParams(db.Reader(), headers, seals)
-	if err != nil {
-		return nil, fmt.Errorf("could not read instance params: %w", err)
-	}
-
-	params := &datastore.Params{
-		GlobalParams:   root.Params(),
-		InstanceParams: instanceParams,
-	}
-
-	return newState(
-		metrics,
-		db,
-		lockManager,
-		headers,
-		seals,
-		results,
-		blocks,
-		qcs,
-		setups,
-		commits,
-		epochProtocolStateSnapshots,
-		protocolKVStoreSnapshots,
-		versionBeacons,
-		params,
-	)
+	return OpenState(metrics, db, lockManager, headers, seals, results, blocks, qcs, setups, commits, epochProtocolStateSnapshots, protocolKVStoreSnapshots, versionBeacons)
 }
 
 // bootstrapProtocolStates bootstraps data structures needed for Dynamic Protocol State.
@@ -815,20 +789,32 @@ func OpenState(
 		return nil, fmt.Errorf("could not create state: %w", err)
 	}
 
-	// report last finalized and sealed block height
+	// report information about latest known finalized block
 	finalSnapshot := state.Final()
-	head, err := finalSnapshot.Head()
+	latestFinalizedHeader, err := finalSnapshot.Head()
 	if err != nil {
 		return nil, fmt.Errorf("unexpected error to get finalized block: %w", err)
 	}
-	metrics.FinalizedHeight(head.Height)
-
-	sealed, err := state.Sealed().Head()
+	latestFinalizedBlock, err := state.blocks.ByHeight(latestFinalizedHeader.Height)
 	if err != nil {
-		return nil, fmt.Errorf("could not get latest sealed block: %w", err)
+		return nil, fmt.Errorf("could not retrieve the latest sealed block by height: %w", err)
 	}
-	metrics.SealedHeight(sealed.Height)
+	metrics.FinalizedHeight(latestFinalizedHeader.Height)
+	metrics.BlockFinalized(latestFinalizedBlock)
 
+	// report information about latest known finalized block
+	latestSealedHeader, err := state.Sealed().Head()
+	if err != nil {
+		return nil, fmt.Errorf("could not get latest sealed block header: %w", err)
+	}
+	latestSealedBlock, err := state.blocks.ByHeight(latestSealedHeader.Height)
+	if err != nil {
+		return nil, fmt.Errorf("could not retrieve the latest sealed block by height: %w", err)
+	}
+	metrics.SealedHeight(latestSealedHeader.Height)
+	metrics.BlockSealed(latestSealedBlock)
+
+	// report information about latest known epoch
 	err = updateEpochMetrics(metrics, finalSnapshot)
 	if err != nil {
 		return nil, fmt.Errorf("failed to update epoch metrics: %w", err)
