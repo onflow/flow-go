@@ -49,7 +49,9 @@ func TestBootstrapAndOpen(t *testing.T) {
 		complianceMetrics.On("CurrentEpochCounter", counter).Once()
 		complianceMetrics.On("CurrentEpochPhase", phase).Once()
 		complianceMetrics.On("CurrentEpochFinalView", epoch.FinalView()).Once()
+		complianceMetrics.On("BlockFinalized", testmock.Anything).Once()
 		complianceMetrics.On("FinalizedHeight", testmock.Anything).Once()
+		complianceMetrics.On("BlockSealed", testmock.Anything).Once()
 		complianceMetrics.On("SealedHeight", testmock.Anything).Once()
 
 		complianceMetrics.On("CurrentDKGPhaseViews",
@@ -126,13 +128,14 @@ func TestBootstrapAndOpen_EpochCommitted(t *testing.T) {
 		phase, err := committedPhaseSnapshot.EpochPhase()
 		require.NoError(t, err)
 		complianceMetrics.On("CurrentEpochPhase", phase).Once()
-
 		complianceMetrics.On("CurrentEpochFinalView", currentEpoch.FinalView()).Once()
+		complianceMetrics.On("CurrentDKGPhaseViews", currentEpoch.DKGPhase1FinalView(), currentEpoch.DKGPhase2FinalView(), currentEpoch.DKGPhase3FinalView()).Once()
 
-		complianceMetrics.On("CurrentDKGPhaseViews",
-			currentEpoch.DKGPhase1FinalView(), currentEpoch.DKGPhase2FinalView(), currentEpoch.DKGPhase3FinalView()).Once()
+		// expect finalized and sealed to be set to the latest block
 		complianceMetrics.On("FinalizedHeight", testmock.Anything).Once()
+		complianceMetrics.On("BlockFinalized", testmock.Anything).Once()
 		complianceMetrics.On("SealedHeight", testmock.Anything).Once()
+		complianceMetrics.On("BlockSealed", testmock.Anything).Once()
 
 		noopMetrics := new(metrics.NoopCollector)
 		all := storagebadger.InitAll(noopMetrics, db)

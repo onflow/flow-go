@@ -5,13 +5,12 @@ import (
 	"math"
 	"testing"
 
-	"github.com/onflow/flow-go/storage"
-
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/state/protocol/protocol_state/kvstore"
 	protocol_statemock "github.com/onflow/flow-go/state/protocol/protocol_state/mock"
+	"github.com/onflow/flow-go/storage"
 	storagemock "github.com/onflow/flow-go/storage/mock"
 	"github.com/onflow/flow-go/utils/unittest"
 )

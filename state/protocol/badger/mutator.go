@@ -126,7 +126,7 @@ func NewFullConsensusState(
 }
 
 // ExtendCertified extends the protocol state of a CONSENSUS FOLLOWER. While it checks
-// the validity of the header; it does _not_ check the validity of the payload.
+// the validity of the header, it does _not_ check the validity of the payload.
 // Instead, the consensus follower relies on the consensus participants to
 // validate the full payload. Payload validity can be proved by a valid quorum certificate.
 // Certifying QC must match candidate block:

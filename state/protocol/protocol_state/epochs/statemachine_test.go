@@ -103,10 +103,10 @@ func (s *EpochStateMachineSuite) TestBuild_NoChanges() {
 	dbUpdates, err := s.stateMachine.Build()
 	require.NoError(s.T(), err)
 
-	// Provide the blockID and execute the resulting `DBUpdate`. Thereby,
-	// the expected mock methods should be called, which is asserted by the testify framework
+	// Provide the blockID and execute the resulting `dbUpdates`. Thereby, the expected mock methods should be called,
+	// which is asserted by the testify framework. Passing nil lockctx proof because no operations require lock;
+	// operations are deferred only because block ID is not known yet.
 	blockID := s.candidate.ID()
-	// passing nil lockctx proof because no operations require lock; operations are deferred only because block ID is not known yet
 	err = dbUpdates.Execute(nil, blockID, rw)
 	require.NoError(s.T(), err)
 }
@@ -146,10 +146,11 @@ func (s *EpochStateMachineSuite) TestBuild_HappyPath() {
 
 	dbUpdates, err := s.stateMachine.Build()
 	require.NoError(s.T(), err)
-	// Provide the blockID and execute the resulting `DBUpdate`. Thereby,
-	// the expected mock methods should be called, which is asserted by the testify framework
+
+	// Provide the blockID and execute the resulting `dbUpdates`. Thereby, the expected mock methods should be called,
+	// which is asserted by the testify framework. Passing nil lockctx proof because no operations require lock;
+	// operations are deferred only because block ID is not known yet.
 	blockID := s.candidate.ID()
-	// passing nil lockctx proof because no operations require lock; operations are deferred only because block ID is not known yet
 	err = dbUpdates.Execute(nil, blockID, rw)
 	require.NoError(s.T(), err)
 }
@@ -550,10 +551,10 @@ func (s *EpochStateMachineSuite) TestEvolveStateTransitionToNextEpoch_WithInvali
 	rw := storagemock.NewReaderBatchWriter(s.T())
 	rw.On("Writer").Return(w).Once() // called by epochStateDB.BatchStore
 
-	// Provide the blockID and execute the resulting `DBUpdate`. Thereby,
-	// the expected mock methods should be called, which is asserted by the testify framework
+	// Provide the blockID and execute the resulting `dbUpdates`. Thereby, the expected mock methods should be called,
+	// which is asserted by the testify framework. Passing nil lockctx proof because no operations require lock;
+	// operations are deferred only because block ID is not known yet
 	blockID := s.candidate.ID()
-	// passing nil lockctx proof because no operations require lock; operations are deferred only because block ID is not known yet
 	err = dbOps.Execute(nil, blockID, rw)
 	require.NoError(s.T(), err)
 }
