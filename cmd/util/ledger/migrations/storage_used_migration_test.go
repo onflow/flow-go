@@ -76,7 +76,7 @@ func TestAccountStatusMigration(t *testing.T) {
 
 		accountPublicKeyCount := uint32(5)
 		statusPayloadAndSequenceNubmerSize := sizeOfTheStatusPayload +
-			approximateSequenceNumberPayloadSizes(string(address[:]), 1, accountPublicKeyCount)
+			predefinedSequenceNumberPayloadSizes(string(address[:]), 1, accountPublicKeyCount)
 
 		payloads := []*ledger.Payload{
 			ledger.NewPayload(
@@ -107,7 +107,7 @@ func TestAccountStatusMigration(t *testing.T) {
 
 		accountPublicKeyCount := uint32(5)
 		statusPayloadAndSequenceNubmerSize := sizeOfTheStatusPayload +
-			approximateSequenceNumberPayloadSizes(string(address[:]), 1, accountPublicKeyCount)
+			predefinedSequenceNumberPayloadSizes(string(address[:]), 1, accountPublicKeyCount)
 
 		payloads := []*ledger.Payload{
 			ledger.NewPayload(
@@ -140,7 +140,7 @@ func TestAccountStatusMigration(t *testing.T) {
 
 		accountPublicKeyCount := uint32(5)
 		statusPayloadAndSequenceNubmerSize := sizeOfTheStatusPayload +
-			approximateSequenceNumberPayloadSizes(string(address[:]), 1, accountPublicKeyCount)
+			predefinedSequenceNumberPayloadSizes(string(address[:]), 1, accountPublicKeyCount)
 
 		payloads := []*ledger.Payload{
 			ledger.NewPayload(
@@ -173,7 +173,7 @@ func TestAccountStatusMigration(t *testing.T) {
 
 		accountPublicKeyCount := uint32(5)
 		statusPayloadAndSequenceNubmerSize := sizeOfTheStatusPayload +
-			approximateSequenceNumberPayloadSizes(string(address[:]), 1, accountPublicKeyCount)
+			predefinedSequenceNumberPayloadSizes(string(address[:]), 1, accountPublicKeyCount)
 
 		payloads := []*ledger.Payload{
 			ledger.NewPayload(

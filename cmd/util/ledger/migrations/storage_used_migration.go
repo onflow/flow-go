@@ -6,8 +6,6 @@ import (
 	"strings"
 
 	"github.com/onflow/flow-go/cmd/util/ledger/reporters"
-	"github.com/onflow/flow-go/ledger"
-	"github.com/onflow/flow-go/ledger/common/convert"
 
 	"github.com/onflow/cadence/common"
 	"github.com/rs/zerolog"
@@ -26,7 +24,7 @@ import (
 // some use cases of concurrent execution.
 //
 // In other words,
-// - When account public key is appened, approximated sequence number register size
+// - When account public key is appened, predefined sequence number register size
 // is included in storage used.
 // - When sequence number register is created, storage size isn't affected.
 //
@@ -34,23 +32,10 @@ import (
 // computation always uses 1 to indicate the number of bytes used to store each
 // sequence number's value.
 
-// approximateSequenceNumberPayloadSize returns sequence number register size.
-func approximateSequenceNumberPayloadSize(owner string, keyIndex uint32) uint64 {
-	// NOTE: We use 1 byte for register value size for reasons already mentioned.
-	sequenceNumberValueUsedForStorageSizeComputation := []byte{0x01}
-
-	ledgerKey := convert.RegisterIDToLedgerKey(flow.RegisterID{
-		Owner: owner,
-		Key:   fmt.Sprintf(flow.SequenceNumberRegisterKeyPattern, keyIndex),
-	})
-	payload := ledger.NewPayload(ledgerKey, sequenceNumberValueUsedForStorageSizeComputation)
-	return uint64(payload.Size())
-}
-
-func approximateSequenceNumberPayloadSizes(owner string, startKeyIndex uint32, endKeyIndex uint32) uint64 {
+func predefinedSequenceNumberPayloadSizes(owner string, startKeyIndex uint32, endKeyIndex uint32) uint64 {
 	size := uint64(0)
 	for i := startKeyIndex; i < endKeyIndex; i++ {
-		size += uint64(approximateSequenceNumberPayloadSize(owner, i))
+		size += uint64(environment.PredefinedSequenceNumberPayloadSize(owner, i))
 	}
 	return size
 }
@@ -165,10 +150,10 @@ func (m *AccountUsageMigration) MigrateAccount(
 	}
 
 	if accountPublicKeyCount > 1 {
-		// Include approximate sequence number payload size per key for all account public key at index >= 1.
+		// Include predefined sequence number payload size per key for all account public key at index >= 1.
 		// NOTE: sequence number for the first account public key is included in the
 		// first account public key register, so it doesn't need to be included here.
-		actualUsed += approximateSequenceNumberPayloadSizes(string(address[:]), 1, accountPublicKeyCount)
+		actualUsed += predefinedSequenceNumberPayloadSizes(string(address[:]), 1, accountPublicKeyCount)
 	}
 
 	currentUsed := status.StorageUsed()
