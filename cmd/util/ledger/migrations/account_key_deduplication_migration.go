@@ -170,31 +170,30 @@ func migrateAndDeduplicateAccountPublicKeys(
 
 	accountPublicKeyCount := accountStatusV4.PublicKeyCount()
 
-	switch accountPublicKeyCount {
-	case 0:
+	if accountPublicKeyCount == 0 {
 		return false, nil
+	}
 
-	case 1:
+	if accountPublicKeyCount == 1 {
 		_, err := migrateAccountPublicKey0(accountRegisters, owner)
 		if err != nil {
 			return false, fmt.Errorf("failed to migrate account public key 0 for %x: %w", owner, err)
 		}
 		return false, nil
-
-	default:
-		encodedAccountPublicKey0, err := migrateAccountPublicKey0(accountRegisters, owner)
-		if err != nil {
-			return false, fmt.Errorf("failed to migrate account public key 0 for %x: %w", owner, err)
-		}
-
-		return migrateAndDeduplicateAccountPublicKeysIfNeeded(
-			log,
-			accountRegisters,
-			owner,
-			accountPublicKeyCount,
-			encodedAccountPublicKey0,
-		)
 	}
+
+	encodedAccountPublicKey0, err := migrateAccountPublicKey0(accountRegisters, owner)
+	if err != nil {
+		return false, fmt.Errorf("failed to migrate account public key 0 for %x: %w", owner, err)
+	}
+
+	return migrateAndDeduplicateAccountPublicKeysIfNeeded(
+		log,
+		accountRegisters,
+		owner,
+		accountPublicKeyCount,
+		encodedAccountPublicKey0,
+	)
 }
 
 func migrateAndDeduplicateAccountPublicKeysIfNeeded(
