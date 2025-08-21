@@ -312,7 +312,7 @@ func (info *accountInfo) GetAccountKeys(
 ) {
 	defer info.tracer.StartChildSpan(trace.FVMEnvGetAccountKeys).End()
 
-	accountKeys, err := info.accounts.GetPublicKeys(address)
+	accountKeys, err := info.accounts.GetAccountPublicKeys(address)
 
 	if err != nil {
 		return nil, err
@@ -330,7 +330,7 @@ func (info *accountInfo) GetAccountKeyByIndex(
 ) {
 	defer info.tracer.StartChildSpan(trace.FVMEnvGetAccountKey).End()
 
-	accountKey, err := info.accounts.GetPublicKey(address, index)
+	accountKey, err := info.accounts.GetAccountPublicKey(address, index)
 
 	if err != nil {
 		return nil, err
