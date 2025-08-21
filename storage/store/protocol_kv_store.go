@@ -2,9 +2,9 @@ package store
 
 import (
 	"errors"
-
 	"fmt"
-	"sync"
+
+	"github.com/jordanschalm/lockctx"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
@@ -39,8 +39,6 @@ type ProtocolKVStore struct {
 	// `byBlockIdCache` will contain an entry for every block. We want to be able to cover a broad interval of views
 	// without cache misses, so a cache size of roughly 1000 entries is reasonable.
 	byBlockIdCache *Cache[flow.Identifier, flow.Identifier]
-	storing        *sync.Mutex
-	indexing       *sync.Mutex
 }
 
 var _ storage.ProtocolKVStore = (*ProtocolKVStore)(nil)
@@ -82,9 +80,7 @@ func NewProtocolKVStore(collector module.CacheMetrics,
 	}
 
 	return &ProtocolKVStore{
-		db:       db,
-		storing:  new(sync.Mutex),
-		indexing: new(sync.Mutex),
+		db: db,
 		cache: newCache(collector, metrics.ResourceProtocolKVStore,
 			withLimit[flow.Identifier, *flow.PSKeyValueStoreData](kvStoreCacheSize),
 			withStore(storeByStateID),
@@ -102,9 +98,10 @@ func NewProtocolKVStore(collector module.CacheMetrics,
 // ProtocolStateVersion). Hence, for the same ID, BatchStore will reject changing the data.
 // Expected errors during normal operations:
 // - storage.ErrDataMismatch if a _different_ KV store for the given stateID has already been persisted
-func (s *ProtocolKVStore) BatchStore(rw storage.ReaderBatchWriter, stateID flow.Identifier, data *flow.PSKeyValueStoreData) error {
-	// TODO(7355): lockctx
-	rw.Lock(s.storing)
+func (s *ProtocolKVStore) BatchStore(lctx lockctx.Proof, rw storage.ReaderBatchWriter, stateID flow.Identifier, data *flow.PSKeyValueStoreData) error {
+	if !lctx.HoldsLock(storage.LockInsertBlock) {
+		return fmt.Errorf("missing required lock: %s", storage.LockInsertBlock)
+	}
 
 	existingData, err := s.ByID(stateID)
 	if err == nil {
@@ -117,8 +114,7 @@ func (s *ProtocolKVStore) BatchStore(rw storage.ReaderBatchWriter, stateID flow.
 			existingData.Version, existingData.Data,
 			storage.ErrDataMismatch)
 	}
-
-	if !errors.Is(err, storage.ErrNotFound) {
+	if !errors.Is(err, storage.ErrNotFound) { // `storage.ErrNotFound` is expected, as this indicates that no receipt is indexed yet; anything else is an exception
 		return fmt.Errorf("unexpected error checking if kv-store snapshot %x exists: %w", stateID[:], irrecoverable.NewException(err))
 	}
 
@@ -141,14 +137,15 @@ func (s *ProtocolKVStore) BatchStore(rw storage.ReaderBatchWriter, stateID flow.
 //     _after_ validating the QC.
 //
 // Expected errors during normal operations:
-//   - storage.ErrDataMismatch if a KV store for the given blockID has already been indexed, but different
-func (s *ProtocolKVStore) BatchIndex(rw storage.ReaderBatchWriter, blockID flow.Identifier, stateID flow.Identifier) error {
-	// TODO(7355): lockctx
-	rw.Lock(s.indexing)
+// - storage.ErrDataMismatch if a _different_ KV store for the given stateID has already been persisted
+func (s *ProtocolKVStore) BatchIndex(lctx lockctx.Proof, rw storage.ReaderBatchWriter, blockID flow.Identifier, stateID flow.Identifier) error {
+	if !lctx.HoldsLock(storage.LockInsertBlock) {
+		return fmt.Errorf("missing required lock: %s", storage.LockInsertBlock)
+	}
 
 	existingStateID, err := s.byBlockIdCache.Get(s.db.Reader(), blockID)
 	if err == nil {
-		// if it's about to index the same state ID, then we can skip the operation
+		// no-op if the *same* stateID is already indexed for the blockID
 		if existingStateID == stateID {
 			return nil
 		}
@@ -158,8 +155,8 @@ func (s *ProtocolKVStore) BatchIndex(rw storage.ReaderBatchWriter, blockID flow.
 			stateID, existingStateID,
 			storage.ErrDataMismatch)
 	}
-	if !errors.Is(err, storage.ErrNotFound) {
-		return fmt.Errorf("could not check if kv-store snapshot with block id (%x) exists: %w", blockID[:], err)
+	if !errors.Is(err, storage.ErrNotFound) { // `storage.ErrNotFound` is expected, as this indicates that no receipt is indexed yet; anything else is an exception
+		return fmt.Errorf("could not check if kv-store snapshot with block id (%x) exists: %w", blockID[:], irrecoverable.NewException(err))
 	}
 
 	return s.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
