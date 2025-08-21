@@ -1,6 +1,8 @@
 package optimistic_sync
 
-import "github.com/onflow/flow-go/model/flow"
+import (
+	"github.com/onflow/flow-go/model/flow"
+)
 
 // Criteria defines the filtering criteria for execution result queries.
 // It specifies requirements for execution result selection including the number
@@ -10,6 +12,11 @@ type Criteria struct {
 	AgreeingExecutorsCount uint
 	// RequiredExecutors is the list of EN node IDs, one of which must have produced the result
 	RequiredExecutors flow.IdentifierList
+}
+
+// DefaultCriteria is the system default criteria for execution result queries.
+var DefaultCriteria = Criteria{
+	AgreeingExecutorsCount: 2,
 }
 
 // OverrideWith overrides the original criteria with the incoming criteria, returning a new Criteria object.

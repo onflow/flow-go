@@ -173,6 +173,7 @@ func New(params Params) (*Backend, error) {
 		params.ExecNodeIdentitiesProvider,
 		params.ExecutionResultProvider,
 		params.ExecutionStateCache,
+		optimistic_sync.DefaultCriteria,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create events: %w", err)
