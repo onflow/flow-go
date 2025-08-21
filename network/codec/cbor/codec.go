@@ -112,10 +112,10 @@ func (c *Codec) Decode(data []byte) (interface{}, error) {
 		return nil, codec.NewMsgUnmarshalErr(data[0], what, err)
 	}
 
-	trusted, err := msgInterface.ToInternal()
+	internal, err := msgInterface.ToInternal()
 	if err != nil {
 		return nil, err
 	}
 
-	return trusted, nil
+	return internal, nil
 }
