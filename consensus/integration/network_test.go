@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/hashicorp/go-multierror"
+	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/messages"
@@ -19,14 +20,16 @@ import (
 // It maintains a set of network instances and enables them to directly exchange message
 // over the memory.
 type Hub struct {
+	log        zerolog.Logger
 	networks   map[flow.Identifier]*Network
 	filter     BlockOrDelayFunc
 	identities flow.IdentityList
 }
 
 // NewNetworkHub creates and returns a new Hub instance.
-func NewNetworkHub() *Hub {
+func NewNetworkHub(log zerolog.Logger) *Hub {
 	return &Hub{
+		log:        log,
 		networks:   make(map[flow.Identifier]*Network),
 		identities: flow.IdentityList{},
 	}
@@ -43,6 +46,7 @@ func (h *Hub) WithFilter(filter BlockOrDelayFunc) *Hub {
 func (h *Hub) AddNetwork(originID flow.Identifier, node *Node) *Network {
 	net := &Network{
 		ctx:      context.Background(),
+		log:      h.log.With().Str("network", originID.String()).Logger(),
 		hub:      h,
 		originID: originID,
 		conduits: make(map[channels.Channel]*Conduit),
@@ -61,6 +65,7 @@ func (h *Hub) AddNetwork(originID flow.Identifier, node *Node) *Network {
 // all engine's events to others using an in-memory delivery mechanism.
 type Network struct {
 	ctx      context.Context
+	log      zerolog.Logger
 	hub      *Hub
 	node     *Node
 	originID flow.Identifier
@@ -87,7 +92,8 @@ func (n *Network) Register(channel channels.Channel, engine network.MessageProce
 			go func(m message) {
 				internal, err := m.event.ToInternal()
 				if err != nil {
-					panic(err)
+					n.log.Err(err).Msgf("failed to convert UntrustedMessage %T to internal type", m.event)
+					return
 				}
 				_ = engine.Process(channel, m.originID, internal)
 			}(msg)
@@ -140,7 +146,11 @@ func (n *Network) unicast(event interface{}, channel channels.Channel, targetID 
 
 	// no delay, push to the receiver's message queue right away
 	if delay == 0 {
-		con.queue <- message{originID: n.originID, event: event.(messages.UntrustedMessage)}
+		msg, ok := event.(messages.UntrustedMessage)
+		if !ok {
+			return fmt.Errorf("invalid message type: expected messages.UntrustedMessage, got %T", event)
+		}
+		con.queue <- message{originID: n.originID, event: msg}
 		return nil
 	}
 
@@ -148,7 +158,13 @@ func (n *Network) unicast(event interface{}, channel channels.Channel, targetID 
 	go func(delay time.Duration, senderID flow.Identifier, receiver *Conduit, event interface{}) {
 		// sleep in order to simulate the network delay
 		time.Sleep(delay)
-		con.queue <- message{originID: senderID, event: event.(messages.UntrustedMessage)}
+		msg, ok := event.(messages.UntrustedMessage)
+		if !ok {
+			err := fmt.Errorf("invalid message type: expected messages.UntrustedMessage, got %T", event)
+			n.log.Err(err).Msg("failed to push to the receiver's message queue")
+			return
+		}
+		con.queue <- message{originID: senderID, event: msg}
 	}(delay, n.originID, con, event)
 
 	return nil
