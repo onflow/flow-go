@@ -166,13 +166,11 @@ SearchLoop:
 		}
 
 		// we only care about block proposals at the moment
-		proposal, ok := msg.(*flow.UntrustedProposal)
+		proposal, ok := msg.(*flow.Proposal)
 		if !ok {
 			continue
 		}
-		proposalTrusted, err := flow.NewProposal(*proposal)
-		require.NoError(ss.T(), err)
-		block := proposalTrusted.Block
+		block := proposal.Block
 
 		// make sure we skip duplicates
 		proposalID := block.ID()
@@ -359,13 +357,11 @@ SealingLoop:
 		}
 
 		// we only care about block proposals at the moment
-		proposal, ok := msg.(*flow.UntrustedProposal)
+		proposal, ok := msg.(*flow.Proposal)
 		if !ok {
 			continue
 		}
-		proposalTrusted, err := flow.NewProposal(*proposal)
-		require.NoError(ss.T(), err)
-		block := proposalTrusted.Block
+		block := proposal.Block
 
 		// log the proposal details
 		proposalID := block.ID()

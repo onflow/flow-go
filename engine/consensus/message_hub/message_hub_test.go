@@ -173,13 +173,12 @@ func (s *MessageHubSuite) TestProcessValidIncomingMessages() {
 	originID := unittest.IdentifierFixture()
 	s.Run("to-compliance-engine", func() {
 		proposal := unittest.ProposalFixture()
-		blockProposalMsg := flow.UntrustedProposal(*proposal)
 		expectedComplianceMsg := flow.Slashable[*flow.Proposal]{
 			OriginID: originID,
 			Message:  proposal,
 		}
 		s.compliance.On("OnBlockProposal", expectedComplianceMsg).Return(nil).Once()
-		err := s.hub.Process(channel, originID, &blockProposalMsg)
+		err := s.hub.Process(channel, originID, proposal)
 		require.NoError(s.T(), err)
 	})
 	s.Run("to-vote-aggregator", func() {
@@ -216,16 +215,6 @@ func (s *MessageHubSuite) TestProcessValidIncomingMessages() {
 func (s *MessageHubSuite) TestProcessInvalidIncomingMessages() {
 	var channel channels.Channel
 	originID := unittest.IdentifierFixture()
-	s.Run("to-compliance-engine", func() {
-		proposal := unittest.ProposalFixture()
-		proposal.ProposerSigData = nil // invalid value
-
-		err := s.hub.Process(channel, originID, (*flow.UntrustedProposal)(proposal))
-		require.NoError(s.T(), err)
-
-		// OnBlockRange should NOT be called for invalid proposal
-		s.compliance.AssertNotCalled(s.T(), "OnBlockProposal", mock.Anything)
-	})
 	s.Run("to-vote-aggregator", func() {
 		expectedVote := unittest.VoteFixture(unittest.WithVoteSignerID(originID))
 		msg := &messages.BlockVote{
@@ -299,7 +288,7 @@ func (s *MessageHubSuite) TestOnOwnProposal() {
 
 	s.Run("should broadcast proposal and pass to HotStuff for valid proposals", func() {
 		proposal := unittest.ProposalFromBlock(block)
-		expectedBroadcastMsg := flow.UntrustedProposal(*proposal)
+		expectedBroadcastMsg := (*messages.Proposal)(proposal)
 
 		submitted := make(chan struct{}) // closed when proposal is submitted to hotstuff
 		hotstuffProposal := model.SignedProposalFromBlock(proposal)
@@ -309,12 +298,12 @@ func (s *MessageHubSuite) TestOnOwnProposal() {
 			Once()
 
 		broadcast := make(chan struct{}) // closed when proposal is broadcast
-		s.con.On("Publish", &expectedBroadcastMsg, s.participants[1].NodeID, s.participants[2].NodeID).
+		s.con.On("Publish", expectedBroadcastMsg, s.participants[1].NodeID, s.participants[2].NodeID).
 			Run(func(_ mock.Arguments) { close(broadcast) }).
 			Return(nil).
 			Once()
 
-		s.pushBlocksCon.On("Publish", &expectedBroadcastMsg, s.participants[3].NodeID).Return(nil)
+		s.pushBlocksCon.On("Publish", expectedBroadcastMsg, s.participants[3].NodeID).Return(nil)
 
 		// submit to broadcast proposal
 		s.hub.OnOwnProposal(proposal.ProposalHeader(), time.Now())
@@ -371,11 +360,11 @@ func (s *MessageHubSuite) TestProcessMultipleMessagesHappyPath() {
 		hotstuffProposal := model.SignedProposalFromBlock(proposal)
 		s.voteAggregator.On("AddBlock", hotstuffProposal).Once()
 		s.hotstuff.On("SubmitProposal", hotstuffProposal)
-		expectedBroadcastMsg := flow.UntrustedProposal(*proposal)
-		s.con.On("Publish", &expectedBroadcastMsg, s.participants[1].NodeID, s.participants[2].NodeID).
+		expectedBroadcastMsg := (*messages.Proposal)(proposal)
+		s.con.On("Publish", expectedBroadcastMsg, s.participants[1].NodeID, s.participants[2].NodeID).
 			Run(func(_ mock.Arguments) { wg.Done() }).
 			Return(nil)
-		s.pushBlocksCon.On("Publish", &expectedBroadcastMsg, s.participants[3].NodeID).Return(nil)
+		s.pushBlocksCon.On("Publish", expectedBroadcastMsg, s.participants[3].NodeID).Return(nil)
 
 		// submit proposal
 		s.hub.OnOwnProposal(proposal.ProposalHeader(), time.Now())

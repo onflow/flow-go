@@ -210,10 +210,8 @@ func (suite *CollectorSuite) AwaitProposals(n uint) []cluster.Block {
 		suite.T().Logf("ghost recv: %T", msg)
 
 		switch val := msg.(type) {
-		case *cluster.UntrustedProposal:
-			internalClusterProposal, err := cluster.NewProposal(*val)
-			require.NoError(suite.T(), err)
-			blocks = append(blocks, internalClusterProposal.Block)
+		case *cluster.Proposal:
+			blocks = append(blocks, val.Block)
 			if len(blocks) == int(n) {
 				return blocks
 			}
@@ -260,10 +258,8 @@ func (suite *CollectorSuite) AwaitTransactionsIncluded(txIDs ...flow.Identifier)
 		require.Nil(suite.T(), err, "could not read next message")
 
 		switch val := msg.(type) {
-		case *cluster.UntrustedProposal:
-			internalClusterProposal, err := cluster.NewProposal(*val)
-			require.NoError(suite.T(), err)
-			block := internalClusterProposal.Block
+		case *cluster.Proposal:
+			block := val.Block
 			collection := block.Payload.Collection
 			suite.T().Logf("got collection from %v height=%d col_id=%x size=%d", originID, block.Height, collection.ID(), collection.Len())
 			if guarantees[collection.ID()] {
