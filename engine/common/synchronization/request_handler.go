@@ -225,7 +225,7 @@ func (r *RequestHandler) onRangeRequest(originID flow.Identifier, req *messages.
 	// Consensus Followers theoretically only need the last block to have a valid proposer signature,
 	// as the other blocks can be verified via included QCs. Though, for now we keep it simple and just
 	// uniformly use proposals, so all nodes (consensus participants and followers) maintain the same data.
-	blocks := make([]flow.Proposal, 0, req.ToHeight-req.FromHeight+1)
+	blocks := make([]flow.UntrustedProposal, 0, req.ToHeight-req.FromHeight+1)
 	for height := req.FromHeight; height <= req.ToHeight; height++ {
 		proposal, err := r.blocks.ProposalByHeight(height)
 		if errors.Is(err, storage.ErrNotFound) {
@@ -235,7 +235,7 @@ func (r *RequestHandler) onRangeRequest(originID flow.Identifier, req *messages.
 		if err != nil {
 			return fmt.Errorf("could not get block for height (%d): %w", height, err)
 		}
-		blocks = append(blocks, *proposal)
+		blocks = append(blocks, flow.UntrustedProposal(*proposal))
 	}
 
 	// if there are no blocks to send, skip network message
@@ -245,7 +245,7 @@ func (r *RequestHandler) onRangeRequest(originID flow.Identifier, req *messages.
 	}
 
 	// send the response
-	res := &flow.BlockResponse{
+	res := &messages.BlockResponse{
 		Nonce:  req.Nonce,
 		Blocks: blocks,
 	}
@@ -297,7 +297,7 @@ func (r *RequestHandler) onBatchRequest(originID flow.Identifier, req *messages.
 	}
 
 	// try to get all the blocks by ID
-	blocks := make([]flow.Proposal, 0, len(blockIDs))
+	blocks := make([]flow.UntrustedProposal, 0, len(blockIDs))
 	for blockID := range blockIDs {
 		proposal, err := r.blocks.ProposalByID(blockID)
 		if errors.Is(err, storage.ErrNotFound) {
@@ -307,7 +307,7 @@ func (r *RequestHandler) onBatchRequest(originID flow.Identifier, req *messages.
 		if err != nil {
 			return fmt.Errorf("could not get block by ID (%s): %w", blockID, err)
 		}
-		blocks = append(blocks, *proposal)
+		blocks = append(blocks, flow.UntrustedProposal(*proposal))
 	}
 
 	// if there are no blocks to send, skip network message
@@ -317,7 +317,7 @@ func (r *RequestHandler) onBatchRequest(originID flow.Identifier, req *messages.
 	}
 
 	// send the response
-	res := &flow.BlockResponse{
+	res := &messages.BlockResponse{
 		Nonce:  req.Nonce,
 		Blocks: blocks,
 	}

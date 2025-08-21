@@ -164,10 +164,13 @@ func (ss *SyncSuite) TestOnRangeRequest() {
 		req.ToHeight = ref - 1
 		ss.con.On("Unicast", mock.Anything, mock.Anything).Return(nil).Once().Run(
 			func(args mock.Arguments) {
-				res := args.Get(0).(*flow.BlockResponse)
+				res := args.Get(0).(*messages.BlockResponse)
 				expected := *ss.heights[ref-1]
-				actual := res.Blocks[0]
-				assert.Equal(ss.T(), expected, actual, "response should contain right block")
+				internal, err := res.ToInternal()
+				require.NoError(t, err)
+				actual, ok := internal.(*flow.BlockResponse)
+				require.True(t, ok)
+				assert.Equal(ss.T(), expected, actual.Blocks[0], "response should contain right block")
 				assert.Equal(ss.T(), req.Nonce, res.Nonce, "response should contain request nonce")
 				recipientID := args.Get(1).(flow.Identifier)
 				assert.Equal(ss.T(), originID, recipientID, "should send response to original requester")
@@ -189,9 +192,13 @@ func (ss *SyncSuite) TestOnRangeRequest() {
 		req.ToHeight = ref + 2
 		ss.con.On("Unicast", mock.Anything, mock.Anything).Return(nil).Once().Run(
 			func(args mock.Arguments) {
-				res := args.Get(0).(*flow.BlockResponse)
+				res := args.Get(0).(*messages.BlockResponse)
 				expected := []flow.Proposal{*ss.heights[ref-2], *ss.heights[ref-1], *ss.heights[ref]}
-				assert.ElementsMatch(ss.T(), expected, res.Blocks, "response should contain right blocks")
+				internal, err := res.ToInternal()
+				require.NoError(t, err)
+				actual, ok := internal.(*flow.BlockResponse)
+				require.True(t, ok)
+				assert.ElementsMatch(ss.T(), expected, actual.Blocks, "response should contain right blocks")
 				assert.Equal(ss.T(), req.Nonce, res.Nonce, "response should contain request nonce")
 				recipientID := args.Get(1).(flow.Identifier)
 				assert.Equal(ss.T(), originID, recipientID, "should send response to original requester")
@@ -213,9 +220,13 @@ func (ss *SyncSuite) TestOnRangeRequest() {
 		req.ToHeight = ref
 		ss.con.On("Unicast", mock.Anything, mock.Anything).Return(nil).Once().Run(
 			func(args mock.Arguments) {
-				res := args.Get(0).(*flow.BlockResponse)
+				res := args.Get(0).(*messages.BlockResponse)
 				expected := []flow.Proposal{*ss.heights[ref-2], *ss.heights[ref-1], *ss.heights[ref]}
-				assert.ElementsMatch(ss.T(), expected, res.Blocks, "response should contain right blocks")
+				internal, err := res.ToInternal()
+				require.NoError(t, err)
+				actual, ok := internal.(*flow.BlockResponse)
+				require.True(t, ok)
+				assert.ElementsMatch(ss.T(), expected, actual.Blocks, "response should contain right blocks")
 				assert.Equal(ss.T(), req.Nonce, res.Nonce, "response should contain request nonce")
 				recipientID := args.Get(1).(flow.Identifier)
 				assert.Equal(ss.T(), originID, recipientID, "should send response to original requester")
@@ -237,9 +248,13 @@ func (ss *SyncSuite) TestOnRangeRequest() {
 		req.ToHeight = math.MaxUint64
 		ss.con.On("Unicast", mock.Anything, mock.Anything).Return(nil).Once().Run(
 			func(args mock.Arguments) {
-				res := args.Get(0).(*flow.BlockResponse)
+				res := args.Get(0).(*messages.BlockResponse)
 				expected := []flow.Proposal{*ss.heights[ref-4], *ss.heights[ref-3], *ss.heights[ref-2]}
-				assert.ElementsMatch(ss.T(), expected, res.Blocks, "response should contain right blocks")
+				internal, err := res.ToInternal()
+				require.NoError(t, err)
+				actual, ok := internal.(*flow.BlockResponse)
+				require.True(t, ok)
+				assert.ElementsMatch(ss.T(), expected, actual.Blocks, "response should contain right blocks")
 				assert.Equal(ss.T(), req.Nonce, res.Nonce, "response should contain request nonce")
 				recipientID := args.Get(1).(flow.Identifier)
 				assert.Equal(ss.T(), originID, recipientID, "should send response to original requester")
@@ -301,9 +316,12 @@ func (ss *SyncSuite) TestOnBatchRequest() {
 		ss.blockIDs[block.ID()] = proposal
 		ss.con.On("Unicast", mock.Anything, mock.Anything).Return(nil).Run(
 			func(args mock.Arguments) {
-				res := args.Get(0).(*flow.BlockResponse)
-				actual := res.Blocks[0]
-				assert.Equal(ss.T(), proposal, &actual, "response should contain right block")
+				res := args.Get(0).(*messages.BlockResponse)
+				internal, err := res.ToInternal()
+				require.NoError(t, err)
+				actual, ok := internal.(*flow.BlockResponse)
+				require.True(t, ok)
+				assert.Equal(ss.T(), proposal, &actual.Blocks[0], "response should contain right block")
 				assert.Equal(ss.T(), req.Nonce, res.Nonce, "response should contain request nonce")
 				recipientID := args.Get(1).(flow.Identifier)
 				assert.Equal(ss.T(), originID, recipientID, "response should be send to original requester")
@@ -330,8 +348,13 @@ func (ss *SyncSuite) TestOnBatchRequest() {
 		}
 		ss.con.On("Unicast", mock.Anything, mock.Anything).Return(nil).Run(
 			func(args mock.Arguments) {
-				res := args.Get(0).(*flow.BlockResponse)
-				assert.ElementsMatch(ss.T(), []flow.Proposal{*ss.blockIDs[req.BlockIDs[0]], *ss.blockIDs[req.BlockIDs[1]]}, res.Blocks, "response should contain right block")
+				res := args.Get(0).(*messages.BlockResponse)
+				expected := []flow.Proposal{*ss.blockIDs[req.BlockIDs[0]], *ss.blockIDs[req.BlockIDs[1]]}
+				internal, err := res.ToInternal()
+				require.NoError(t, err)
+				actual, ok := internal.(*flow.BlockResponse)
+				require.True(t, ok)
+				assert.ElementsMatch(ss.T(), expected, actual.Blocks, "response should contain right block")
 				assert.Equal(ss.T(), req.Nonce, res.Nonce, "response should contain request nonce")
 				recipientID := args.Get(1).(flow.Identifier)
 				assert.Equal(ss.T(), originID, recipientID, "response should be send to original requester")

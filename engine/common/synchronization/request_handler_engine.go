@@ -27,7 +27,7 @@ type ResponseSenderImpl struct {
 
 func (r *ResponseSenderImpl) SendResponse(res interface{}, target flow.Identifier) error {
 	switch res.(type) {
-	case *flow.BlockResponse:
+	case *messages.BlockResponse:
 		err := r.con.Unicast(res, target)
 		if err != nil {
 			return fmt.Errorf("could not unicast block response to target %x: %w", target, err)
