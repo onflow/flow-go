@@ -168,9 +168,8 @@ func (m *FollowerState) ExtendCertified(ctx context.Context, candidate *flow.Blo
 		return fmt.Errorf("qc doesn't certify candidate block, expect %x blockID, got %x", blockID, certifyingQC.BlockID)
 	}
 
-	deferredBlockPersist := deferred.NewDeferredBlockPersist()
 	// check if the block header is a valid extension of parent block
-	err = m.headerExtend(ctx, candidate, certifyingQC, deferredBlockPersist)
+	deferredBlockPersist, err := m.headerExtend(ctx, candidate, certifyingQC)
 	if err != nil {
 		// since we have a QC for this block, it cannot be an invalid extension
 		return fmt.Errorf("unexpected invalid block (id=%x) with certifying qc (id=%x): %s",
@@ -186,14 +185,16 @@ func (m *FollowerState) ExtendCertified(ctx context.Context, candidate *flow.Blo
 		return operation.IndexLatestSealAtBlock(lctx, rw.Writer(), blockID, latestSeal.ID())
 	})
 
-	// TODO: we might not need the deferred db updates, because the candidate passed into
 	// the Extend method has already been fully constructed.
 	// evolve protocol state and verify consistency with commitment included in
-	err = m.evolveProtocolState(ctx, candidate, deferredBlockPersist)
+	deferredProtocolStatePersist, err := m.evolveProtocolState(ctx, candidate)
 	if err != nil {
 		return fmt.Errorf("evolving protocol state failed: %w", err)
 	}
+	deferredBlockPersist.Chain(deferredProtocolStatePersist)
 
+	// Final step: for atomicity we acquire lock and then execute the deferred operations
+	// within the protection of the lock.
 	lctx := m.lockManager.NewContext()
 	defer lctx.Release()
 	err = lctx.AcquireLock(storage.LockInsertBlock)
@@ -239,10 +240,8 @@ func (m *ParticipantState) Extend(ctx context.Context, candidate *flow.Block) er
 		return err
 	}
 
-	deferredBlockPersist := deferred.NewDeferredBlockPersist()
-
 	// check if the block header is a valid extension of parent block
-	err = m.headerExtend(ctx, candidate, nil, deferredBlockPersist)
+	deferredBlockPersist, err := m.headerExtend(ctx, candidate, nil)
 	if err != nil {
 		return fmt.Errorf("header not compliant with chain state: %w", err)
 	}
@@ -269,17 +268,21 @@ func (m *ParticipantState) Extend(ctx context.Context, candidate *flow.Block) er
 	}
 
 	// check if the seals in the payload is a valid extension of the finalized state
-	_, err = m.sealExtend(ctx, candidate, deferredBlockPersist)
+	_, deferredSealPersist, err := m.sealExtend(ctx, candidate)
 	if err != nil {
 		return fmt.Errorf("payload seal(s) not compliant with chain state: %w", err)
 	}
+	deferredBlockPersist.Chain(deferredSealPersist)
 
 	// evolve protocol state and verify consistency with commitment included in payload
-	err = m.evolveProtocolState(ctx, candidate, deferredBlockPersist)
+	deferredProtocolStatePersist, err := m.evolveProtocolState(ctx, candidate)
 	if err != nil {
 		return fmt.Errorf("evolving protocol state failed: %w", err)
 	}
+	deferredBlockPersist.Chain(deferredProtocolStatePersist)
 
+	// Final step: for atomicity we acquire lock and then execute the deferred operations
+	// within the protection of the lock.
 	lctx := m.lockManager.NewContext()
 	defer lctx.Release()
 	err = lctx.AcquireLock(storage.LockInsertBlock)
@@ -371,7 +374,7 @@ func (m *FollowerState) headerExtend(ctx context.Context, candidate *flow.Block,
 
 	// STEP 5:
 	qc := candidate.Header.ParentQC()
-	deferredBlockPersist.AddNextOperation(func(lctx lockctx.Proof, blockID flow.Identifier, rw storage.ReaderBatchWriter) error {
+	deferredBlockPersist := deferred.NewDeferredBlockPersist().AddNextOperation(func(lctx lockctx.Proof, blockID flow.Identifier, rw storage.ReaderBatchWriter) error {
 		// STEP 5a: Store QC for parent block and emit `BlockProcessable` notification if and only if
 		//  - the QC for the parent has not been stored before (otherwise, we already emitted the notification) and
 		//  - the parent block's height is larger than the finalized root height (the root block is already considered processed)
@@ -413,7 +416,7 @@ func (m *FollowerState) headerExtend(ctx context.Context, candidate *flow.Block,
 		return nil
 	})
 
-	return nil
+	return deferredBlockPersist, nil
 }
 
 // checkBlockAlreadyProcessed checks if block has been added to the protocol state.
