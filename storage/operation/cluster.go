@@ -38,8 +38,8 @@ func UpsertClusterFinalizedHeight(lctx lockctx.Proof, w storage.Writer, clusterI
 }
 
 // RetrieveClusterFinalizedHeight retrieves the finalized boundary for the given cluster.
-func RetrieveClusterFinalizedHeight(r storage.Reader, clusterID flow.ChainID, number *uint64) error {
-	return RetrieveByKey(r, MakePrefix(codeClusterHeight, clusterID), number)
+func RetrieveClusterFinalizedHeight(r storage.Reader, clusterID flow.ChainID, height *uint64) error {
+	return RetrieveByKey(r, MakePrefix(codeClusterHeight, clusterID), height)
 }
 
 // IndexReferenceBlockByClusterBlock UpsertByKeys the reference block ID for the given

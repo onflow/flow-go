@@ -137,12 +137,6 @@ func (f *Finalizer) MakeFinal(blockID flow.Identifier) error {
 				return fmt.Errorf("could not finalize cluster block (id=%x): %w", clusterBlockID, err)
 			}
 
-			// index the block by height
-			err = operation.IndexClusterBlockHeight(lctx, rw.Writer(), header.ChainID, step.Height, clusterBlockID)
-			if err != nil {
-				return fmt.Errorf("could not index cluster block (id=%x) by height (%d): %w", clusterBlockID, step.Height, err)
-			}
-
 			block := &cluster.Block{
 				Header:  step,
 				Payload: &payload,
