@@ -18,6 +18,7 @@ import (
 	"github.com/onflow/flow-go/module/execution"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data/cache"
+	"github.com/onflow/flow-go/module/executiondatasync/optimistic_sync"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
 )
@@ -80,6 +81,8 @@ type StateStreamBackend struct {
 	registerRequestLimit int
 }
 
+var _ state_stream.API = (*StateStreamBackend)(nil)
+
 func New(
 	log zerolog.Logger,
 	state protocol.State,
@@ -119,11 +122,13 @@ func New(
 	}
 
 	eventsProvider := EventsProvider{
-		log:              logger,
-		headers:          headers,
-		getExecutionData: b.getExecutionData,
-		useEventsIndex:   useEventsIndex,
-		eventsIndex:      eventsIndex,
+		log:                 logger,
+		headers:             headers,
+		getExecutionData:    b.getExecutionData,
+		fetchFromLocalCache: useEventsIndex,
+		execResultProvider:  nil,
+		execStateCache:      nil,
+		operatorCriteria:    optimistic_sync.DefaultCriteria,
 	}
 
 	b.EventsBackend = EventsBackend{

@@ -55,3 +55,80 @@ func extractHeartbeatInterval(args models.Arguments, defaultHeartbeatInterval ui
 
 	return heartbeatInterval, nil
 }
+
+func extractExecutionStateQueryFields(
+	args models.Arguments,
+	name string,
+	required bool,
+) (agreeingExecutorsCount uint64, requiredExecutorIDs [][]byte, includeExecutorMetadata bool, err error) {
+	executionStateRaw, exists := args[name]
+	if !exists {
+		if required {
+			return 0, nil, false, fmt.Errorf("missing 'execution_state_query' field")
+		}
+	}
+
+	executionStateQuery, ok := executionStateRaw.(map[string]interface{})
+	if !ok {
+		return 0, nil, false, fmt.Errorf("'execution_state_query' must be a map")
+	}
+
+	agreeingExecutorsCountRaw, exists := executionStateQuery["agreeing_executors_count"]
+	if !exists {
+		if required {
+			return 0, nil, false, fmt.Errorf("missing 'agreeing_executors_count' field")
+		}
+
+		agreeingExecutorsCount = 0
+	} else {
+		agreeingExecutorsCount, err = strconv.ParseUint(agreeingExecutorsCountRaw.(string), 10, 64)
+		if err != nil {
+			return 0, nil, false,
+				fmt.Errorf("'agreeing_executors_count' must be a number: %w", err)
+		}
+	}
+
+	requiredExecutorIDsRaw, exists := executionStateQuery["required_executor_ids"]
+	if !exists {
+		if required {
+			return 0, nil, false,
+				fmt.Errorf("missing 'required_executor_ids' field")
+		}
+		requiredExecutorIDs = nil
+	} else {
+		converted, err := common.ConvertInterfaceToArrayOfStrings(requiredExecutorIDsRaw)
+		if err != nil {
+			return 0, nil, false,
+				fmt.Errorf("'required_executor_ids' must be an array of strings: %w", err)
+		}
+
+		requiredExecutorIDs = stringsToBytes(converted)
+	}
+
+	includeExecutorMetadataRaw, exists := executionStateQuery["include_executor_metadata"]
+	if !exists {
+		if required {
+			return 0, nil, false,
+				fmt.Errorf("missing 'include_executor_metadata' field")
+		}
+
+		includeExecutorMetadata = false
+	} else {
+		includeExecutorMetadata, err = strconv.ParseBool(includeExecutorMetadataRaw.(string))
+		if err != nil {
+			return 0, nil, false,
+				fmt.Errorf("'include_executor_metadata' must be a boolean: %w", err)
+		}
+	}
+
+	return agreeingExecutorsCount, requiredExecutorIDs, includeExecutorMetadata, nil
+}
+
+func stringsToBytes(arr []string) [][]byte {
+	result := make([][]byte, len(arr))
+	for i, s := range arr {
+		result[i] = []byte(s)
+	}
+
+	return result
+}

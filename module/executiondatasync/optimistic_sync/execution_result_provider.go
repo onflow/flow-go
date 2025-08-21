@@ -1,6 +1,8 @@
 package optimistic_sync
 
-import "github.com/onflow/flow-go/model/flow"
+import (
+	"github.com/onflow/flow-go/model/flow"
+)
 
 // Criteria defines the filtering criteria for execution result queries.
 // It specifies requirements for execution result selection, including the number

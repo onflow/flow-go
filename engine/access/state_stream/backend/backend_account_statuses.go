@@ -4,12 +4,12 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/onflow/flow/protobuf/go/flow/entities"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/engine/access/state_stream"
 	"github.com/onflow/flow-go/engine/access/subscription"
 	"github.com/onflow/flow-go/engine/access/subscription/tracker"
-
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/storage"
@@ -30,13 +30,16 @@ type AccountStatusesBackend struct {
 	eventsProvider       EventsProvider
 }
 
+var _ state_stream.AccountsAPI = (*AccountStatusesBackend)(nil)
+
 // subscribe creates and returns a subscription to receive account status updates starting from the specified height.
 func (b *AccountStatusesBackend) subscribe(
 	ctx context.Context,
 	nextHeight uint64,
 	filter state_stream.AccountStatusFilter,
+	execStateQuery entities.ExecutionStateQuery,
 ) subscription.Subscription {
-	return b.subscriptionHandler.Subscribe(ctx, nextHeight, b.getAccountStatusResponseFactory(filter))
+	return b.subscriptionHandler.Subscribe(ctx, nextHeight, b.getAccountStatusResponseFactory(filter, execStateQuery))
 }
 
 // SubscribeAccountStatusesFromStartBlockID subscribes to the streaming of account status changes starting from
@@ -48,12 +51,13 @@ func (b *AccountStatusesBackend) SubscribeAccountStatusesFromStartBlockID(
 	ctx context.Context,
 	startBlockID flow.Identifier,
 	filter state_stream.AccountStatusFilter,
+	execStateQuery entities.ExecutionStateQuery,
 ) subscription.Subscription {
 	nextHeight, err := b.executionDataTracker.GetStartHeightFromBlockID(startBlockID)
 	if err != nil {
 		return subscription.NewFailedSubscription(err, "could not get start height from block id")
 	}
-	return b.subscribe(ctx, nextHeight, filter)
+	return b.subscribe(ctx, nextHeight, filter, execStateQuery)
 }
 
 // SubscribeAccountStatusesFromStartHeight subscribes to the streaming of account status changes starting from
@@ -65,12 +69,13 @@ func (b *AccountStatusesBackend) SubscribeAccountStatusesFromStartHeight(
 	ctx context.Context,
 	startHeight uint64,
 	filter state_stream.AccountStatusFilter,
+	execStateQuery entities.ExecutionStateQuery,
 ) subscription.Subscription {
 	nextHeight, err := b.executionDataTracker.GetStartHeightFromHeight(startHeight)
 	if err != nil {
 		return subscription.NewFailedSubscription(err, "could not get start height from block height")
 	}
-	return b.subscribe(ctx, nextHeight, filter)
+	return b.subscribe(ctx, nextHeight, filter, execStateQuery)
 }
 
 // SubscribeAccountStatusesFromLatestBlock subscribes to the streaming of account status changes starting from a
@@ -80,12 +85,13 @@ func (b *AccountStatusesBackend) SubscribeAccountStatusesFromStartHeight(
 func (b *AccountStatusesBackend) SubscribeAccountStatusesFromLatestBlock(
 	ctx context.Context,
 	filter state_stream.AccountStatusFilter,
+	execStateQuery entities.ExecutionStateQuery,
 ) subscription.Subscription {
 	nextHeight, err := b.executionDataTracker.GetStartHeightFromLatest(ctx)
 	if err != nil {
 		return subscription.NewFailedSubscription(err, "could not get start height from latest")
 	}
-	return b.subscribe(ctx, nextHeight, filter)
+	return b.subscribe(ctx, nextHeight, filter, execStateQuery)
 }
 
 // getAccountStatusResponseFactory returns a function that returns the account statuses response for a given height.
@@ -95,9 +101,11 @@ func (b *AccountStatusesBackend) SubscribeAccountStatusesFromLatestBlock(
 // - error: An error, if any, encountered during getting events from storage or execution data.
 func (b *AccountStatusesBackend) getAccountStatusResponseFactory(
 	filter state_stream.AccountStatusFilter,
+	execStateQuery entities.ExecutionStateQuery,
 ) subscription.GetDataByHeightFunc {
 	return func(ctx context.Context, height uint64) (interface{}, error) {
-		eventsResponse, err := b.eventsProvider.GetAllEventsResponse(ctx, height)
+		// TODO: I should use metadata
+		eventsResponse, _, err := b.eventsProvider.GetAllEventsResponse(ctx, height, execStateQuery)
 		if err != nil {
 			if errors.Is(err, storage.ErrNotFound) ||
 				errors.Is(err, storage.ErrHeightNotIndexed) {
