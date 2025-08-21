@@ -268,11 +268,11 @@ func (m *ParticipantState) Extend(ctx context.Context, candidate *flow.Block) er
 	}
 
 	// check if the seals in the payload is a valid extension of the finalized state
-	_, deferredSealPersist, err := m.sealExtend(ctx, candidate)
+	_, deferredIndexLatestSealed, err := m.sealExtend(ctx, candidate)
 	if err != nil {
 		return fmt.Errorf("payload seal(s) not compliant with chain state: %w", err)
 	}
-	deferredBlockPersist.Chain(deferredSealPersist)
+	deferredBlockPersist.Chain(deferredIndexLatestSealed)
 
 	// evolve protocol state and verify consistency with commitment included in payload
 	deferredProtocolStatePersist, err := m.evolveProtocolState(ctx, candidate)
