@@ -34,6 +34,10 @@ func InsertHeader(lctx lockctx.Proof, rw storage.ReaderBatchWriter, headerID flo
 	return UpsertByKey(rw.Writer(), key, header)
 }
 
+// RetrieveHeader retrieves a header by block ID.
+// Error returns:
+//   - storage.ErrNotFound if the key does not exist in the database
+//   - generic error in case of unexpected failure from the database layer
 func RetrieveHeader(r storage.Reader, blockID flow.Identifier, header *flow.Header) error {
 	return RetrieveByKey(r, MakePrefix(codeHeader, blockID), header)
 }
@@ -99,13 +103,13 @@ func BlockExists(r storage.Reader, blockID flow.Identifier) (bool, error) {
 	return KeyExists(r, MakePrefix(codeHeader, blockID))
 }
 
-// IndexCollectionBlock indexes a block by a collection within that block.
-func IndexCollectionBlock(w storage.Writer, collID flow.Identifier, blockID flow.Identifier) error {
+// IndexCollectionGuaranteeBlock indexes a block by a collection guarantee within that block.
+func IndexCollectionGuaranteeBlock(w storage.Writer, collID flow.Identifier, blockID flow.Identifier) error {
 	return UpsertByKey(w, MakePrefix(codeCollectionBlock, collID), blockID)
 }
 
-// LookupCollectionBlock looks up a block by a collection within that block.
-func LookupCollectionBlock(r storage.Reader, collID flow.Identifier, blockID *flow.Identifier) error {
+// LookupCollectionGuaranteeBlock looks up a block by a collection within that block.
+func LookupCollectionGuaranteeBlock(r storage.Reader, collID flow.Identifier, blockID *flow.Identifier) error {
 	return RetrieveByKey(r, MakePrefix(codeCollectionBlock, collID), blockID)
 }
 

@@ -84,7 +84,7 @@ func (c *Collections) LightByTransactionID(txID flow.Identifier) (*flow.LightCol
 
 // Store inserts the collection keyed by ID and all constituent transactions.
 // No errors are expected during normal operation.
-func (c *Collections) Store(collection *flow.Collection) (flow.LightCollection, error) {
+func (c *Collections) Store(collection *flow.Collection) (*flow.LightCollection, error) {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
@@ -107,20 +107,20 @@ func (c *Collections) Store(collection *flow.Collection) (flow.LightCollection, 
 // already exists.
 //
 // No errors are expected during normal operation.
-func (c *Collections) StoreAndIndexByTransaction(_ lockctx.Proof, collection *flow.Collection) (flow.LightCollection, error) {
+func (c *Collections) StoreAndIndexByTransaction(_ lockctx.Proof, collection *flow.Collection) (*flow.LightCollection, error) {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
 	c.collections[collection.ID()] = collection
 	light := collection.Light()
-	c.lightCollections[light.ID()] = &light
+	c.lightCollections[light.ID()] = light
 	for _, txID := range light.Transactions {
-		c.transactionIDToLightCollection[txID] = &light
+		c.transactionIDToLightCollection[txID] = light
 	}
 
 	for _, tx := range collection.Transactions {
 		if err := c.transactions.Store(tx); err != nil {
-			return flow.LightCollection{}, fmt.Errorf("could not index transaction: %w", err)
+			return nil, fmt.Errorf("could not index transaction: %w", err)
 		}
 	}
 
@@ -170,6 +170,6 @@ func (c *Collections) LightCollections() []flow.LightCollection {
 
 // BatchStoreAndIndexByTransaction stores a light collection and indexes it by transaction ID within a batch operation.
 // This method is not implemented and will always return an error.
-func (c *Collections) BatchStoreAndIndexByTransaction(_ lockctx.Proof, _ *flow.Collection, _ storage.ReaderBatchWriter) (flow.LightCollection, error) {
-	return flow.LightCollection{}, fmt.Errorf("not implemented")
+func (c *Collections) BatchStoreAndIndexByTransaction(_ lockctx.Proof, _ *flow.Collection, _ storage.ReaderBatchWriter) (*flow.LightCollection, error) {
+	return nil, fmt.Errorf("not implemented")
 }

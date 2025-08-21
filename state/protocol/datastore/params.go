@@ -5,7 +5,6 @@ import (
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/state/protocol"
-	"github.com/onflow/flow-go/state/protocol/inmem"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/operation"
 )
@@ -102,35 +101,6 @@ func (p *InstanceParams) SealedRoot() *flow.Header {
 // `SealedRoot` block that was used to bootstrap this state. It may differ from node to node.
 func (p *InstanceParams) Seal() *flow.Seal {
 	return p.rootSeal
-}
-
-// ReadGlobalParams reads the global parameters from the database and returns them as in-memory representation.
-// No errors are expected during normal operation.
-func ReadGlobalParams(r storage.Reader) (*inmem.Params, error) {
-	var sporkID flow.Identifier
-	err := operation.RetrieveSporkID(r, &sporkID)
-	if err != nil {
-		return nil, fmt.Errorf("could not get spork id: %w", err)
-	}
-
-	var sporkRootBlockHeight uint64
-	err = operation.RetrieveSporkRootBlockHeight(r, &sporkRootBlockHeight)
-	if err != nil {
-		return nil, fmt.Errorf("could not get spork root block height: %w", err)
-	}
-
-	root, err := ReadFinalizedRoot(r) // retrieve root header
-	if err != nil {
-		return nil, fmt.Errorf("could not get root: %w", err)
-	}
-
-	return inmem.NewParams(
-		inmem.EncodableParams{
-			ChainID:              root.ChainID,
-			SporkID:              sporkID,
-			SporkRootBlockHeight: sporkRootBlockHeight,
-		},
-	), nil
 }
 
 // ReadFinalizedRoot retrieves the root block's header from the database.

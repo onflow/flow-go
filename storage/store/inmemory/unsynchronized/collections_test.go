@@ -63,13 +63,13 @@ func TestLightByTransactionID_HappyCase(t *testing.T) {
 	retrieved, err := collections.LightByTransactionID(collection.Transactions[0].ID())
 	require.NoError(t, err)
 	lightCollection := collection.Light()
-	require.Equal(t, &lightCollection, retrieved)
+	require.Equal(t, *lightCollection, *retrieved)
 
 	retrieved, err = collections.LightByTransactionID(collection.Transactions[1].ID())
 	require.NoError(t, err)
-	require.Equal(t, &lightCollection, retrieved)
+	require.Equal(t, *lightCollection, *retrieved)
 
 	extracted := collections.LightCollections()
 	require.Len(t, extracted, 1)
-	require.Equal(t, lightCollection, extracted[0])
+	require.Equal(t, *lightCollection, extracted[0])
 }

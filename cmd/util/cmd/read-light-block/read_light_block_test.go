@@ -16,13 +16,8 @@ import (
 
 func TestReadClusterRange(t *testing.T) {
 
-<<<<<<< HEAD
 	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
-		chain := unittest.ClusterBlockChainFixture(5)
-=======
-	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 		chain := unittest.ClusterBlockFixtures(5)
->>>>>>> @{-1}
 		parent, blocks := chain[0], chain[1:]
 
 		lockManager := storage.NewTestingLockManager()
@@ -30,40 +25,26 @@ func TestReadClusterRange(t *testing.T) {
 		lctx := lockManager.NewContext()
 		require.NoError(t, lctx.AcquireLock(storage.LockInsertOrFinalizeClusterBlock))
 		// add parent as boundary
-<<<<<<< HEAD
 		err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			return operation.IndexClusterBlockHeight(lctx, rw.Writer(), parent.Header.ChainID, parent.Header.Height, parent.ID())
+			return operation.IndexClusterBlockHeight(lctx, rw.Writer(), parent.ChainID, parent.Height, parent.ID())
 		})
 		require.NoError(t, err)
 
 		err = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			return operation.UpsertClusterFinalizedHeight(lctx, rw.Writer(), parent.Header.ChainID, parent.Header.Height)
+			return operation.UpsertClusterFinalizedHeight(lctx, rw.Writer(), parent.ChainID, parent.Height)
 		})
-=======
-		err := db.Update(operation.IndexClusterBlockHeight(parent.ChainID, parent.Height, parent.ID()))
-		require.NoError(t, err)
-
-		err = db.Update(operation.InsertClusterFinalizedHeight(parent.ChainID, parent.Height))
->>>>>>> @{-1}
 		require.NoError(t, err)
 
 		// add blocks
 		for _, block := range blocks {
-<<<<<<< HEAD
 			err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-				return procedure.InsertClusterBlock(lctx, rw, &block)
+				return procedure.InsertClusterBlock(lctx, rw, unittest.ClusterProposalFromBlock(block))
 			})
 			require.NoError(t, err)
 
 			err = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-				return procedure.FinalizeClusterBlock(lctx, rw, block.Header.ID())
+				return procedure.FinalizeClusterBlock(lctx, rw, block.ID())
 			})
-=======
-			err := db.Update(procedure.InsertClusterBlock(unittest.ClusterProposalFromBlock(block)))
-			require.NoError(t, err)
-
-			err = db.Update(procedure.FinalizeClusterBlock(block.ID()))
->>>>>>> @{-1}
 			require.NoError(t, err)
 		}
 
@@ -71,15 +52,9 @@ func TestReadClusterRange(t *testing.T) {
 
 		clusterBlocks := store.NewClusterBlocks(
 			db,
-<<<<<<< HEAD
-			blocks[0].Header.ChainID,
+			blocks[0].ChainID,
 			store.NewHeaders(metrics.NewNoopCollector(), db),
 			store.NewClusterPayloads(metrics.NewNoopCollector(), db),
-=======
-			blocks[0].ChainID,
-			badgerstorage.NewHeaders(metrics.NewNoopCollector(), db),
-			badgerstorage.NewClusterPayloads(metrics.NewNoopCollector(), db),
->>>>>>> @{-1}
 		)
 
 		startHeight := blocks[0].Height

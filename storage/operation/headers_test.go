@@ -4,11 +4,6 @@ import (
 	"testing"
 	"time"
 
-<<<<<<< HEAD:storage/operation/headers_test.go
-	"github.com/onflow/crypto"
-=======
-	"github.com/dgraph-io/badger/v2"
->>>>>>> @{-1}:storage/badger/operation/headers_test.go
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -56,21 +51,13 @@ func TestHeaderIDIndexByCollectionID(t *testing.T) {
 		headerID := unittest.IdentifierFixture()
 		collectionGuaranteeID := unittest.IdentifierFixture()
 
-<<<<<<< HEAD:storage/operation/headers_test.go
 		err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			return operation.IndexCollectionBlock(rw.Writer(), collectionID, headerID)
+			return operation.IndexCollectionGuaranteeBlock(rw.Writer(), collectionGuaranteeID, headerID)
 		})
 		require.NoError(t, err)
 
 		actualID := &flow.Identifier{}
-		err = operation.LookupCollectionBlock(db.Reader(), collectionID, actualID)
-=======
-		err := db.Update(IndexCollectionGuaranteeBlock(collectionGuaranteeID, headerID))
-		require.NoError(t, err)
-
-		actualID := &flow.Identifier{}
-		err = db.View(LookupCollectionGuaranteeBlock(collectionGuaranteeID, actualID))
->>>>>>> @{-1}:storage/badger/operation/headers_test.go
+		err = operation.LookupCollectionGuaranteeBlock(db.Reader(), collectionGuaranteeID, actualID)
 		require.NoError(t, err)
 		assert.Equal(t, headerID, *actualID)
 	})

@@ -21,7 +21,7 @@ func InsertIndex(lctx lockctx.Proof, rw storage.ReaderBatchWriter, blockID flow.
 	// if there is no header stored for the block ID, it means no index data for the same block ID
 	// was stored either, as long as the same lock is held, the data is guaranteed to be consistent.
 	w := rw.Writer()
-	err := operation.IndexPayloadGuarantees(lctx, w, blockID, index.CollectionIDs)
+	err := operation.IndexPayloadGuarantees(lctx, w, blockID, index.GuaranteeIDs)
 	if err != nil {
 		return fmt.Errorf("could not store guarantee index: %w", err)
 	}
@@ -45,8 +45,8 @@ func InsertIndex(lctx lockctx.Proof, rw storage.ReaderBatchWriter, blockID flow.
 }
 
 func RetrieveIndex(r storage.Reader, blockID flow.Identifier, index *flow.Index) error {
-	var collIDs []flow.Identifier
-	err := operation.LookupPayloadGuarantees(r, blockID, &collIDs)
+	var guaranteeIDs []flow.Identifier
+	err := operation.LookupPayloadGuarantees(r, blockID, &guaranteeIDs)
 	if err != nil {
 		return fmt.Errorf("could not retrieve guarantee index: %w", err)
 	}
@@ -72,7 +72,7 @@ func RetrieveIndex(r storage.Reader, blockID flow.Identifier, index *flow.Index)
 	}
 
 	*index = flow.Index{
-		CollectionIDs:   collIDs,
+		GuaranteeIDs:    guaranteeIDs,
 		SealIDs:         sealIDs,
 		ReceiptIDs:      receiptIDs,
 		ResultIDs:       resultsIDs,

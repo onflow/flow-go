@@ -165,20 +165,9 @@ func runE(*cobra.Command, []string) error {
 			return fmt.Errorf("could not get block: %w", err)
 		}
 
-<<<<<<< HEAD
 		if flagHeight > 0 {
 			log.Info().Msgf("get block by height: %v", flagHeight)
 			block, err := reader.GetBlockByHeight(flagHeight)
-=======
-		root, err := reader.GetRoot()
-		if err != nil {
-			log.Fatal().Err(err).Msg("could not get root block")
-		}
-
-		// find the last executed and sealed block
-		for h := sealed.Height; h >= root.Height; h-- {
-			block, err := reader.GetBlockByHeight(h)
->>>>>>> @{-1}
 			if err != nil {
 				log.Fatal().Err(err).Msg("could not get block by height")
 			}
@@ -234,7 +223,7 @@ func runE(*cobra.Command, []string) error {
 			}
 
 			// find the last executed and sealed block
-			for h := sealed.Header.Height; h >= root.Header.Height; h-- {
+			for h := sealed.Height; h >= root.Height; h-- {
 				block, err := reader.GetBlockByHeight(h)
 				if err != nil {
 					return fmt.Errorf("could not get block by height: %v: %w", h, err)
