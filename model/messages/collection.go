@@ -21,6 +21,28 @@ type CollectionResponse struct {
 // consensus; effectively a vote for a particular collection.
 type ClusterBlockVote BlockVote
 
+// ToInternal converts the untrusted ClusterBlockVote into its trusted internal
+// representation.
+//
+// This stub returns the receiver unchanged. A proper implementation
+// must perform validation checks and return a constructed internal
+// object.
+func (c *ClusterBlockVote) ToInternal() (any, error) {
+	// TODO(malleability, #7702) implement with validation checks
+	return c, nil
+}
+
 // ClusterTimeoutObject is part of the collection cluster protocol and represents a collection node
 // timing out in given round. Contains a sequential number for deduplication purposes.
 type ClusterTimeoutObject TimeoutObject
+
+// ToInternal converts the untrusted ClusterTimeoutObject into its trusted internal
+// representation.
+//
+// This stub returns the receiver unchanged. A proper implementation
+// must perform validation checks and return a constructed internal
+// object.
+func (c *ClusterTimeoutObject) ToInternal() (any, error) {
+	// TODO(malleability, #7704) implement with validation checks
+	return c, nil
+}
