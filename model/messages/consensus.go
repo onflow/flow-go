@@ -1,6 +1,8 @@
 package messages
 
 import (
+	"fmt"
+
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -12,7 +14,11 @@ type Proposal flow.UntrustedProposal
 //
 // All errors indicate that the decode target contains a structurally invalid representation of the internal flow.Proposal.
 func (p *Proposal) ToInternal() (any, error) {
-	return flow.NewProposal(flow.UntrustedProposal(*p))
+	internal, err := flow.NewProposal(flow.UntrustedProposal(*p))
+	if err != nil {
+		return nil, fmt.Errorf("could not convert message.Proposal to internal type: %w", err)
+	}
+	return internal, nil
 }
 
 // BlockVote is part of the consensus protocol and represents a consensus node

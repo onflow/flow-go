@@ -9,7 +9,10 @@ import (
 
 	"github.com/onflow/flow-go/engine"
 	ghost "github.com/onflow/flow-go/engine/ghost/protobuf"
+	"github.com/onflow/flow-go/model/cluster"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/libp2p/message"
+	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/channels"
@@ -185,9 +188,12 @@ func (e *RPC) Process(channel channels.Channel, originID flow.Identifier, event 
 }
 
 func (e *RPC) process(originID flow.Identifier, event interface{}) error {
-
+	msg, err := InternalToMessage(event)
+	if err != nil {
+		return fmt.Errorf("failed to convert event to message: %v", err)
+	}
 	// json encode the message into bytes
-	encodedMsg, err := e.codec.Encode(event)
+	encodedMsg, err := e.codec.Encode(msg)
 	if err != nil {
 		return fmt.Errorf("failed to encode message: %v", err)
 	}
@@ -223,4 +229,64 @@ func (e *RPC) serve() {
 	if err != nil {
 		e.log.Err(err).Msg("fatal error in server")
 	}
+}
+
+func InternalToMessage(event interface{}) (messages.UntrustedMessage, error) {
+	// TODO(Uliana): temporary solution
+	var msg messages.UntrustedMessage
+	switch internal := event.(type) {
+	case *flow.Proposal:
+		msg = (*messages.Proposal)(internal)
+	case *cluster.Proposal:
+		msg = (*messages.ClusterProposal)(internal)
+	case *messages.BlockVote:
+		msg = internal
+	case *messages.TimeoutObject:
+		msg = internal
+	case *messages.ClusterBlockVote:
+		msg = internal
+	case *messages.ClusterBlockResponse:
+		msg = internal
+	case *messages.ClusterTimeoutObject:
+		msg = internal
+	case *messages.SyncRequest:
+		msg = internal
+	case *messages.SyncResponse:
+		msg = internal
+	case *messages.RangeRequest:
+		msg = internal
+	case *messages.BatchRequest:
+		msg = internal
+	case *messages.BlockResponse:
+		msg = internal
+	case *flow.CollectionGuarantee:
+		msg = internal
+	case *flow.TransactionBody:
+		msg = internal
+	case *flow.Transaction:
+		msg = internal
+	case *flow.ExecutionReceipt:
+		msg = internal
+	case *flow.ResultApproval:
+		msg = internal
+	case *messages.ChunkDataRequest:
+		msg = internal
+	case *messages.ChunkDataResponse:
+		msg = internal
+	case *messages.ApprovalRequest:
+		msg = internal
+	case *messages.ApprovalResponse:
+		msg = internal
+	case *messages.EntityRequest:
+		msg = internal
+	case *messages.EntityResponse:
+		msg = internal
+	case *message.TestMessage:
+		msg = internal
+	case *messages.DKGMessage:
+		msg = internal
+	default:
+		return nil, fmt.Errorf("cannot convert unsupported type %T", internal)
+	}
+	return msg, nil
 }

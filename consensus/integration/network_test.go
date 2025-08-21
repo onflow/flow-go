@@ -8,6 +8,7 @@ import (
 	"github.com/hashicorp/go-multierror"
 
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/mocknetwork"
@@ -84,7 +85,11 @@ func (n *Network) Register(channel channels.Channel, engine network.MessageProce
 	go func() {
 		for msg := range con.queue {
 			go func(m message) {
-				_ = engine.Process(channel, m.originID, m.event)
+				internal, err := m.event.ToInternal()
+				if err != nil {
+					panic(err)
+				}
+				_ = engine.Process(channel, m.originID, internal)
 			}(msg)
 		}
 	}()
@@ -135,7 +140,7 @@ func (n *Network) unicast(event interface{}, channel channels.Channel, targetID 
 
 	// no delay, push to the receiver's message queue right away
 	if delay == 0 {
-		con.queue <- message{originID: n.originID, event: event}
+		con.queue <- message{originID: n.originID, event: event.(messages.UntrustedMessage)}
 		return nil
 	}
 
@@ -143,7 +148,7 @@ func (n *Network) unicast(event interface{}, channel channels.Channel, targetID 
 	go func(delay time.Duration, senderID flow.Identifier, receiver *Conduit, event interface{}) {
 		// sleep in order to simulate the network delay
 		time.Sleep(delay)
-		con.queue <- message{originID: senderID, event: event}
+		con.queue <- message{originID: senderID, event: event.(messages.UntrustedMessage)}
 	}(delay, n.originID, con, event)
 
 	return nil
@@ -223,5 +228,5 @@ func (c *Conduit) Close() error {
 
 type message struct {
 	originID flow.Identifier
-	event    interface{}
+	event    messages.UntrustedMessage
 }

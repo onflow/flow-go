@@ -1,6 +1,8 @@
 package messages
 
 import (
+	"fmt"
+
 	"github.com/onflow/flow-go/model/cluster"
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -13,7 +15,11 @@ type ClusterProposal cluster.UntrustedProposal
 //
 // All errors indicate that the decode target contains a structurally invalid representation of the internal cluster.Proposal.
 func (p *ClusterProposal) ToInternal() (any, error) {
-	return cluster.NewProposal(cluster.UntrustedProposal(*p))
+	internal, err := cluster.NewProposal(cluster.UntrustedProposal(*p))
+	if err != nil {
+		return nil, fmt.Errorf("could not convert message.ClusterProposal to internal type: %w", err)
+	}
+	return internal, nil
 }
 
 // CollectionRequest request all transactions from a collection with the given
