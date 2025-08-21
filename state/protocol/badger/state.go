@@ -216,7 +216,11 @@ func Bootstrap(
 		return nil, fmt.Errorf("could not bootstrap height/view pointers: %w", err)
 	}
 
-	return OpenState(metrics, db, lockManager, headers, seals, results, blocks, qcs, setups, commits, epochProtocolStateSnapshots, protocolKVStoreSnapshots, versionBeacons)
+	state, err := OpenState(metrics, db, lockManager, headers, seals, results, blocks, qcs, setups, commits, epochProtocolStateSnapshots, protocolKVStoreSnapshots, versionBeacons)
+	if err != nil {
+		return nil, fmt.Errorf("bootstrapping failed, because the resulting database state is rejected: %w", err)
+	}
+	return state, nil
 }
 
 // bootstrapProtocolStates bootstraps data structures needed for Dynamic Protocol State.
