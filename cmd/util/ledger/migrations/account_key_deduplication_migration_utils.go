@@ -101,7 +101,7 @@ func migrateAccountPublicKey0(
 	if err != nil {
 		return nil, err
 	}
-	err = accountRegisters.Set(owner, accountPublicKey0RegisterKey, encodedAccountPublicKey0)
+	err = accountRegisters.Set(owner, flow.AccountPublicKey0RegisterKey, encodedAccountPublicKey0)
 	if err != nil {
 		return nil, err
 	}
@@ -121,7 +121,7 @@ func migrateSeqNumberIfNeeded(
 		return nil
 	}
 
-	seqNumberRegisterKey := fmt.Sprintf(sequenceNumberRegisterKeyPattern, keyIndex)
+	seqNumberRegisterKey := fmt.Sprintf(flow.SequenceNumberRegisterKeyPattern, keyIndex)
 
 	encodedSeqNumber, err := flow.EncodeSequenceNumber(seqNumber)
 	if err != nil {
@@ -187,7 +187,7 @@ func migrateAccountPublicKeysIfNeeded(
 	}
 
 	for batchIndex, encodedBatchPublicKey := range encodedBatchPublicKeys {
-		batchPublicKeyRegisterKey := fmt.Sprintf(batchPublicKeyRegisterKeyPattern, batchIndex)
+		batchPublicKeyRegisterKey := fmt.Sprintf(flow.BatchPublicKeyRegisterKeyPattern, batchIndex)
 		err = accountRegisters.Set(owner, batchPublicKeyRegisterKey, encodedBatchPublicKey)
 		if err != nil {
 			return err

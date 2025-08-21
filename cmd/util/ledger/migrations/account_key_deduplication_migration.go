@@ -49,10 +49,6 @@ import (
 const (
 	legacyAccountPublicKeyRegisterKeyPattern = "public_key_%d"
 	legacyAccountPublicKey0RegisterKey       = "public_key_0"
-	accountPublicKey0RegisterKey             = "apk_0"
-	sequenceNumberRegisterKeyPattern         = "sn_%d"
-	sequenceNumberRegisterKeyPrefix          = "sn_"
-	batchPublicKeyRegisterKeyPattern         = "pk_b%d"
 )
 
 const (

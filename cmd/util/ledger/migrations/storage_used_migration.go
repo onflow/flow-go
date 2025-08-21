@@ -41,7 +41,7 @@ func approximateSequenceNumberPayloadSize(owner string, keyIndex uint32) uint64 
 
 	ledgerKey := convert.RegisterIDToLedgerKey(flow.RegisterID{
 		Owner: owner,
-		Key:   fmt.Sprintf(sequenceNumberRegisterKeyPattern, keyIndex),
+		Key:   fmt.Sprintf(flow.SequenceNumberRegisterKeyPattern, keyIndex),
 	})
 	payload := ledger.NewPayload(ledgerKey, sequenceNumberValueUsedForStorageSizeComputation)
 	return uint64(payload.Size())
@@ -101,7 +101,7 @@ func (m *AccountUsageMigration) MigrateAccount(
 	// and calculate the storage usage
 	err := accountRegisters.ForEach(func(owner, key string, value []byte) error {
 
-		if strings.HasPrefix(key, sequenceNumberRegisterKeyPrefix) {
+		if strings.HasPrefix(key, flow.SequenceNumberRegisterKeyPrefix) {
 			// DO NOT include individual sequence number registers in storage used here.
 			// Instead, we include storage used for all account public key at key index >= 1
 			// later in this function.

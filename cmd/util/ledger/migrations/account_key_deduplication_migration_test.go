@@ -268,7 +268,7 @@ func TestMigration(t *testing.T) {
 		require.Equal(t, encodedAccountStatusV3[1:], encodedAccountStatusV4[1:])
 
 		// Test "apk_0" register
-		encodedAccountPublicKey0, err := accountRegisters.Get(string(owner[:]), accountPublicKey0RegisterKey)
+		encodedAccountPublicKey0, err := accountRegisters.Get(string(owner[:]), flow.AccountPublicKey0RegisterKey)
 		require.NoError(t, err)
 		require.Equal(t, encodedPk1, encodedAccountPublicKey0)
 	})
@@ -310,7 +310,7 @@ func TestMigration(t *testing.T) {
 		require.Equal(t, encodedAccountStatusV3[1:], encodedAccountStatusV4[1:])
 
 		// Test "apk_0" register
-		encodedAccountPublicKey0, err := accountRegisters.Get(string(owner[:]), accountPublicKey0RegisterKey)
+		encodedAccountPublicKey0, err := accountRegisters.Get(string(owner[:]), flow.AccountPublicKey0RegisterKey)
 		require.NoError(t, err)
 		require.Equal(t, encodedPk1, encodedAccountPublicKey0)
 	})
@@ -377,12 +377,12 @@ func TestMigration(t *testing.T) {
 		require.Nil(t, accountPublicKeyMappings)
 
 		// Test "apk_0" register
-		encodedAccountPublicKey0, err := accountRegisters.Get(string(owner[:]), accountPublicKey0RegisterKey)
+		encodedAccountPublicKey0, err := accountRegisters.Get(string(owner[:]), flow.AccountPublicKey0RegisterKey)
 		require.NoError(t, err)
 		require.Equal(t, encodedPk1, encodedAccountPublicKey0)
 
 		// Test "pk_b0" register
-		encodedBatchPublicKey0, err := accountRegisters.Get(string(owner[:]), fmt.Sprintf(batchPublicKeyRegisterKeyPattern, 0))
+		encodedBatchPublicKey0, err := accountRegisters.Get(string(owner[:]), fmt.Sprintf(flow.BatchPublicKeyRegisterKeyPattern, 0))
 		require.NoError(t, err)
 
 		encodedPks, err := decodeBatchPublicKey(encodedBatchPublicKey0)
@@ -455,12 +455,12 @@ func TestMigration(t *testing.T) {
 		require.Nil(t, accountPublicKeyMappings)
 
 		// Test "apk_0" register
-		encodedAccountPublicKey0, err := accountRegisters.Get(string(owner[:]), accountPublicKey0RegisterKey)
+		encodedAccountPublicKey0, err := accountRegisters.Get(string(owner[:]), flow.AccountPublicKey0RegisterKey)
 		require.NoError(t, err)
 		require.Equal(t, encodedPk1, encodedAccountPublicKey0)
 
 		// Test "pk_b0" register
-		encodedBatchPublicKey0, err := accountRegisters.Get(string(owner[:]), fmt.Sprintf(batchPublicKeyRegisterKeyPattern, 0))
+		encodedBatchPublicKey0, err := accountRegisters.Get(string(owner[:]), fmt.Sprintf(flow.BatchPublicKeyRegisterKeyPattern, 0))
 		require.NoError(t, err)
 
 		encodedPks, err := decodeBatchPublicKey(encodedBatchPublicKey0)
@@ -468,7 +468,7 @@ func TestMigration(t *testing.T) {
 		require.ElementsMatch(t, [][]byte{{}, encodedSpk2}, encodedPks)
 
 		// Test "sn_0" register
-		encodedSequenceNumber, err := accountRegisters.Get(string(owner[:]), fmt.Sprintf(sequenceNumberRegisterKeyPattern, 1))
+		encodedSequenceNumber, err := accountRegisters.Get(string(owner[:]), fmt.Sprintf(flow.SequenceNumberRegisterKeyPattern, 1))
 		require.NoError(t, err)
 
 		seqNum, err := flow.DecodeSequenceNumber(encodedSequenceNumber)
@@ -528,7 +528,7 @@ func TestMigration(t *testing.T) {
 		require.ElementsMatch(t, []uint32{0}, accountPublicKeyMappings)
 
 		// Test "apk_0" register
-		encodedAccountPublicKey0, err := accountRegisters.Get(string(owner[:]), accountPublicKey0RegisterKey)
+		encodedAccountPublicKey0, err := accountRegisters.Get(string(owner[:]), flow.AccountPublicKey0RegisterKey)
 		require.NoError(t, err)
 		require.Equal(t, encodedPk1, encodedAccountPublicKey0)
 	})
@@ -587,12 +587,12 @@ func TestMigration(t *testing.T) {
 		require.ElementsMatch(t, []uint32{0}, accountPublicKeyMappings)
 
 		// Test "apk_0" register
-		encodedAccountPublicKey0, err := accountRegisters.Get(string(owner[:]), accountPublicKey0RegisterKey)
+		encodedAccountPublicKey0, err := accountRegisters.Get(string(owner[:]), flow.AccountPublicKey0RegisterKey)
 		require.NoError(t, err)
 		require.Equal(t, encodedPk1, encodedAccountPublicKey0)
 
 		// Test "sn_0" register
-		encodedSequenceNumber, err := accountRegisters.Get(string(owner[:]), fmt.Sprintf(sequenceNumberRegisterKeyPattern, 1))
+		encodedSequenceNumber, err := accountRegisters.Get(string(owner[:]), fmt.Sprintf(flow.SequenceNumberRegisterKeyPattern, 1))
 		require.NoError(t, err)
 
 		seqNum, err := flow.DecodeSequenceNumber(encodedSequenceNumber)

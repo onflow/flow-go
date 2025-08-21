@@ -17,11 +17,16 @@ const (
 	AddressStateKey = "account_address_state"
 
 	// Account level keys
-	AccountKeyPrefix   = "a."
-	AccountStatusKey   = AccountKeyPrefix + "s"
-	CodeKeyPrefix      = "code."
-	ContractNamesKey   = "contract_names"
-	PublicKeyKeyPrefix = "public_key_"
+	AccountKeyPrefix                 = "a."
+	AccountStatusKey                 = AccountKeyPrefix + "s"
+	CodeKeyPrefix                    = "code."
+	ContractNamesKey                 = "contract_names"
+	PublicKeyKeyPrefix               = "public_key_"
+	AccountPublicKey0RegisterKey     = "apk_0"
+	SequenceNumberRegisterKeyPattern = "sn_%d"
+	SequenceNumberRegisterKeyPrefix  = "sn_"
+	BatchPublicKeyRegisterKeyPrefix  = "pk_b"
+	BatchPublicKeyRegisterKeyPattern = "pk_b%d"
 )
 
 func addressToOwner(address Address) string {
