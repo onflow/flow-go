@@ -213,6 +213,14 @@ func (b *Proposal) ProposalHeader() *ProposalHeader {
 	return &ProposalHeader{Header: b.Block.ToHeader(), ProposerSigData: b.ProposerSigData}
 }
 
+// BlockResponse is part of the synchronization protocol and represents the
+// reply to any active synchronization attempts. It contains a list of structurally validated block proposals
+// that should correspond to the request.
+type BlockResponse struct {
+	Nonce  uint64
+	Blocks []Proposal
+}
+
 // CertifiedBlock holds a certified block, which is a block and a Quorum Certificate [QC] pointing
 // to the block. A QC is the aggregated form of votes from a supermajority of HotStuff and therefore
 // proves validity of the block. A certified block satisfies:

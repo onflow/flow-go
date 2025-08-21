@@ -172,39 +172,11 @@ func (e *Engine) setupResponseMessageHandler() error {
 		},
 		engine.Pattern{
 			Match: func(msg *engine.Message) bool {
-				_, ok := msg.Payload.(*messages.BlockResponse)
+				_, ok := msg.Payload.(*flow.BlockResponse)
 				if ok {
 					e.metrics.MessageReceived(metrics.EngineSynchronization, metrics.MessageBlockResponse)
 				}
 				return ok
-			},
-			Map: func(msg *engine.Message) (*engine.Message, bool) {
-				blockResponse, ok := msg.Payload.(*messages.BlockResponse)
-				if !ok {
-					// should never happen, unless there is a bug.
-					e.log.Fatal().
-						Hex("origin_id", logging.ID(msg.OriginID)).
-						Interface("payload", msg.Payload).
-						Msg("cannot match the payload to BlockResponse")
-					return nil, false
-				}
-				proposals, err := blockResponse.BlocksInternal()
-				if err != nil {
-					// TODO(BFT, #7620): Replace this log statement with a call to the protocol violation consumer.
-					e.log.Warn().
-						Hex("origin_id", logging.ID(msg.OriginID)).
-						Uint64("nonce", blockResponse.Nonce).
-						Int("block_count", len(blockResponse.Blocks)).
-						Err(err).
-						Msgf("cannot convert untrusted proposal to trusted proposal")
-					e.metrics.InboundMessageDropped(metrics.EngineSynchronization, metrics.MessageBlockProposal)
-					return nil, false
-				}
-
-				return &engine.Message{
-					OriginID: msg.OriginID,
-					Payload:  proposals,
-				}, true
 			},
 			Store: e.pendingBlockResponses,
 		},
@@ -253,7 +225,7 @@ func (e *Engine) process(channel channels.Channel, originID flow.Identifier, eve
 		}
 		return e.requestHandler.Process(channel, originID, event)
 
-	case *messages.BlockResponse:
+	case *flow.BlockResponse:
 		err := e.validateBlockResponseForALSP(channel, originID, message)
 		if err != nil {
 			irrecoverable.Throw(context.TODO(), fmt.Errorf("failed to validate block response from %x: %w", originID[:], err))
@@ -305,7 +277,7 @@ func (e *Engine) processAvailableResponses(ctx context.Context) {
 
 		msg, ok = e.pendingBlockResponses.Get()
 		if ok {
-			e.onBlockResponse(msg.OriginID, msg.Payload.([]*flow.Proposal))
+			e.onBlockResponse(msg.OriginID, msg.Payload.(*flow.BlockResponse))
 			e.metrics.MessageHandled(metrics.EngineSynchronization, metrics.MessageBlockResponse)
 			continue
 		}
@@ -323,26 +295,27 @@ func (e *Engine) onSyncResponse(originID flow.Identifier, res *messages.SyncResp
 	e.core.HandleHeight(final, res.Height)
 }
 
-// onBlockResponse processes a structurally validated block proposal containing a specifically requested block.
-func (e *Engine) onBlockResponse(originID flow.Identifier, res []*flow.Proposal) {
+// onBlockResponse processes a structurally validated block proposal containing a specifically requested block response.
+func (e *Engine) onBlockResponse(originID flow.Identifier, res *flow.BlockResponse) {
 	// process the proposal one by one
-	if len(res) == 0 {
+	if len(res.Blocks) == 0 {
 		e.log.Debug().Msg("received empty proposals")
 		return
 	}
 
-	first := res[0].Block.Height
-	last := res[len(res)-1].Block.Height
+	proposals := res.Blocks
+	first := proposals[0].Block.Height
+	last := proposals[len(proposals)-1].Block.Height
 	e.log.Debug().Uint64("first", first).Uint64("last", last).Msg("received proposal")
 
-	filteredProposals := make([]*flow.Proposal, 0, len(res))
-	for _, proposal := range res {
+	filteredProposals := make([]*flow.Proposal, 0, len(proposals))
+	for _, proposal := range proposals {
 		header := proposal.Block.ToHeader()
 		if !e.core.HandleBlock(header) {
 			e.log.Debug().Uint64("height", header.Height).Msg("block handler rejected")
 			continue
 		}
-		filteredProposals = append(filteredProposals, proposal)
+		filteredProposals = append(filteredProposals, &proposal)
 	}
 
 	// forward the block to the compliance engine for validation and processing
@@ -556,7 +529,7 @@ func (e *Engine) validateBatchRequestForALSP(originID flow.Identifier, batchRequ
 }
 
 // TODO: implement spam reporting similar to validateSyncRequestForALSP
-func (e *Engine) validateBlockResponseForALSP(channel channels.Channel, id flow.Identifier, blockResponse *messages.BlockResponse) error {
+func (e *Engine) validateBlockResponseForALSP(channel channels.Channel, id flow.Identifier, blockResponse *flow.BlockResponse) error {
 	return nil
 }
 
