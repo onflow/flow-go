@@ -16,7 +16,6 @@ import (
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/blocktimer"
 	"github.com/onflow/flow-go/storage"
-	"github.com/onflow/flow-go/storage/deferred"
 )
 
 // Builder is the builder for consensus block payloads. Upon providing a payload
@@ -642,8 +641,7 @@ func (b *Builder) createProposal(parentID flow.Identifier,
 
 	// Evolve the Protocol State starting from the parent block's state. Information that may change the state is:
 	// the candidate block's view and Service Events from execution results sealed in the candidate block.
-	deferredBlockPersist := deferred.NewDeferredBlockPersist()
-	protocolStateID, err := b.mutableProtocolState.EvolveState(deferredBlockPersist, header.ParentID, header.View, seals)
+	protocolStateID, _, err := b.mutableProtocolState.EvolveState(header.ParentID, header.View, seals)
 	if err != nil {
 		return nil, fmt.Errorf("evolving protocol state failed: %w", err)
 	}

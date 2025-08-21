@@ -51,8 +51,13 @@ type FollowerState interface {
 	//   candidate.View == qc.View && candidate.BlockID == qc.BlockID
 	//
 	// CAUTION:
-	//   - This function expects that `qc` has been validated. (otherwise, the state will be corrupted)
-	//   - The parent block must already be stored.
+	//  - This function expects that `qc` has been validated. (otherwise, the state will be corrupted)
+	//  - The parent block must already be stored.
+	//  - Detection of duplicates is NOT CONCURRENCY SAFE
+	//    Ideally, `Extend` would be a concurrency-safe idempotent operation.
+	//    Though, `Extend` behaves accordingly, i.e. gracefully accepts repeated calls with
+	//    the same candidate block, only after the first call has successfully returned.
+	//    However, concurrent calls with the same candidate block may result in an error.
 	// Orphaned blocks are excepted.
 	//
 	// No errors are expected during normal operations.
@@ -64,6 +69,16 @@ type FollowerState interface {
 	// to be the last finalized block.
 	// It modifies the persistent immutable protocol state accordingly and
 	// forwards the pointer to the latest finalized state.
+	//
+	// CAUTION:
+	//  - This function expects that `qc` has been validated. (otherwise, the state will be corrupted)
+	//  - The parent block must already be stored.
+	//  - Detection of duplicates is NOT CONCURRENCY SAFE
+	//    Ideally, `Extend` would be a concurrency-safe idempotent operation.
+	//    Though, `Extend` behaves accordingly, i.e. gracefully accepts repeated calls with
+	//    the same candidate block, only after the first call has successfully returned.
+	//    However, concurrent calls with the same candidate block may result in an error.
+	//
 	// No errors are expected during normal operations.
 	Finalize(ctx context.Context, blockID flow.Identifier) error
 }
@@ -79,8 +94,14 @@ type ParticipantState interface {
 	// still checking that the given block is a valid extension of the protocol state.
 	// The candidate block must have passed HotStuff validation before being passed to Extend.
 	//
-	// CAUTION: per convention, the protocol state requires that the candidate's
-	// parent has already been ingested. Otherwise, an exception is returned.
+	// CAUTION:
+	//  * the protocol state requires that the candidate's parent has
+	//    already been ingested. Otherwise, an exception is returned.
+	//  * Detection of duplicates is NOT CONCURRENCY SAFE
+	//    Ideally, `Extend` would be a concurrency-safe idempotent operation.
+	//    Though, `Extend` behaves accordingly, i.e. gracefully accepts repeated calls with
+	//    the same candidate block, only after the first call has successfully returned.
+	//    However, concurrent calls with the same candidate block may result in an error.
 	//
 	// Expected errors during normal operations:
 	//  * state.OutdatedExtensionError if the candidate block is outdated (e.g. orphaned)

@@ -42,18 +42,19 @@ func (d *DeferredBlockPersist) IsEmpty() bool {
 // AddNextOperation adds a new deferred database operation to the queue of pending operations.
 // If there are already pending operations, this new operation will be composed to run after them.
 // This method ensures the operations execute sequentially and abort on the first error.
+// If `nil` is passed, this is a no-op — this might happen if chaining with an empty DeferredBlockPersist.
 //
-// If `nil` is passed, it is ignored — this might happen if chaining with an empty DeferredBlockPersist.
-func (d *DeferredBlockPersist) AddNextOperation(nextOperation DBOp) {
+// Returns a self-reference to allow method chaining.
+func (d *DeferredBlockPersist) AddNextOperation(nextOperation DBOp) *DeferredBlockPersist {
 	if nextOperation == nil {
 		// No-op if the provided operation is nil.
-		return
+		return d
 	}
 
 	if d.pending == nil {
 		// If this is the first operation being added, set it directly.
 		d.pending = nextOperation
-		return
+		return d
 	}
 
 	// Compose the prior and next operations into a single function.
@@ -69,21 +70,24 @@ func (d *DeferredBlockPersist) AddNextOperation(nextOperation DBOp) {
 		}
 		return nil
 	}
+	return d
 }
 
 // Chain merges the deferred operations from another DeferredBlockPersist into this one.
 // The resulting order of operations is:
 // 1. execute the operations in the receiver in the order they were added
 // 2. execute the operations from the input in the order they were added
-func (d *DeferredBlockPersist) Chain(deferred *DeferredBlockPersist) {
-	d.AddNextOperation(deferred.pending)
+// Returns a self-reference to allow method chaining.
+func (d *DeferredBlockPersist) Chain(deferred *DeferredBlockPersist) *DeferredBlockPersist {
+	return d.AddNextOperation(deferred.pending)
 }
 
 // AddSucceedCallback adds a callback to be executed **after** the pending database operations succeed.
 // This is useful for registering indexing tasks or post-commit hooks.
 // The callback is only invoked if no error occurred during batch updates execution.
-func (d *DeferredBlockPersist) AddSucceedCallback(callback func()) {
-	d.AddNextOperation(func(_ lockctx.Proof, blockID flow.Identifier, rw storage.ReaderBatchWriter) error {
+// Returns a self-reference to allow method chaining.
+func (d *DeferredBlockPersist) AddSucceedCallback(callback func()) *DeferredBlockPersist {
+	return d.AddNextOperation(func(_ lockctx.Proof, blockID flow.Identifier, rw storage.ReaderBatchWriter) error {
 		// Schedule the callback to run after a successful commit.
 		storage.OnCommitSucceed(rw, callback)
 		return nil

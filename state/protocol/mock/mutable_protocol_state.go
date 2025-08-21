@@ -46,34 +46,43 @@ func (_m *MutableProtocolState) EpochStateAtBlockID(blockID flow.Identifier) (pr
 	return r0, r1
 }
 
-// EvolveState provides a mock function with given fields: deferredDBOps, parentBlockID, candidateView, candidateSeals
-func (_m *MutableProtocolState) EvolveState(deferredDBOps *deferred.DeferredBlockPersist, parentBlockID flow.Identifier, candidateView uint64, candidateSeals []*flow.Seal) (flow.Identifier, error) {
-	ret := _m.Called(deferredDBOps, parentBlockID, candidateView, candidateSeals)
+// EvolveState provides a mock function with given fields: parentBlockID, candidateView, candidateSeals
+func (_m *MutableProtocolState) EvolveState(parentBlockID flow.Identifier, candidateView uint64, candidateSeals []*flow.Seal) (flow.Identifier, *deferred.DeferredBlockPersist, error) {
+	ret := _m.Called(parentBlockID, candidateView, candidateSeals)
 
 	if len(ret) == 0 {
 		panic("no return value specified for EvolveState")
 	}
 
 	var r0 flow.Identifier
-	var r1 error
-	if rf, ok := ret.Get(0).(func(*deferred.DeferredBlockPersist, flow.Identifier, uint64, []*flow.Seal) (flow.Identifier, error)); ok {
-		return rf(deferredDBOps, parentBlockID, candidateView, candidateSeals)
+	var r1 *deferred.DeferredBlockPersist
+	var r2 error
+	if rf, ok := ret.Get(0).(func(flow.Identifier, uint64, []*flow.Seal) (flow.Identifier, *deferred.DeferredBlockPersist, error)); ok {
+		return rf(parentBlockID, candidateView, candidateSeals)
 	}
-	if rf, ok := ret.Get(0).(func(*deferred.DeferredBlockPersist, flow.Identifier, uint64, []*flow.Seal) flow.Identifier); ok {
-		r0 = rf(deferredDBOps, parentBlockID, candidateView, candidateSeals)
+	if rf, ok := ret.Get(0).(func(flow.Identifier, uint64, []*flow.Seal) flow.Identifier); ok {
+		r0 = rf(parentBlockID, candidateView, candidateSeals)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(flow.Identifier)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(*deferred.DeferredBlockPersist, flow.Identifier, uint64, []*flow.Seal) error); ok {
-		r1 = rf(deferredDBOps, parentBlockID, candidateView, candidateSeals)
+	if rf, ok := ret.Get(1).(func(flow.Identifier, uint64, []*flow.Seal) *deferred.DeferredBlockPersist); ok {
+		r1 = rf(parentBlockID, candidateView, candidateSeals)
 	} else {
-		r1 = ret.Error(1)
+		if ret.Get(1) != nil {
+			r1 = ret.Get(1).(*deferred.DeferredBlockPersist)
+		}
 	}
 
-	return r0, r1
+	if rf, ok := ret.Get(2).(func(flow.Identifier, uint64, []*flow.Seal) error); ok {
+		r2 = rf(parentBlockID, candidateView, candidateSeals)
+	} else {
+		r2 = ret.Error(2)
+	}
+
+	return r0, r1, r2
 }
 
 // GlobalParams provides a mock function with no fields
