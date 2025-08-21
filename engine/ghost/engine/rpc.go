@@ -11,7 +11,6 @@ import (
 	ghost "github.com/onflow/flow-go/engine/ghost/protobuf"
 	"github.com/onflow/flow-go/model/cluster"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/model/libp2p/message"
 	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/network"
@@ -188,7 +187,7 @@ func (e *RPC) Process(channel channels.Channel, originID flow.Identifier, event 
 }
 
 func (e *RPC) process(originID flow.Identifier, event interface{}) error {
-	msg, err := InternalToMessage(event)
+	msg, err := internalToMessage(event)
 	if err != nil {
 		return fmt.Errorf("failed to convert event to message: %v", err)
 	}
@@ -231,62 +230,26 @@ func (e *RPC) serve() {
 	}
 }
 
-func InternalToMessage(event interface{}) (messages.UntrustedMessage, error) {
-	// TODO(Uliana): temporary solution
-	var msg messages.UntrustedMessage
+// internalToMessage converts an internal types into the
+// corresponding UntrustedMessage for network.
+//
+// This is the inverse of ToInternal: instead of decoding a network
+// message into an internal model, it wraps or casts internal objects
+// so they can be encoded and sent over the network. Encoding and always
+// requires an UntrustedMessage.
+//
+// No errors are expected during normal operation.
+func internalToMessage(event interface{}) (messages.UntrustedMessage, error) {
 	switch internal := event.(type) {
 	case *flow.Proposal:
-		msg = (*messages.Proposal)(internal)
+		return (*messages.Proposal)(internal), nil
 	case *cluster.Proposal:
-		msg = (*messages.ClusterProposal)(internal)
-	case *messages.BlockVote:
-		msg = internal
-	case *messages.TimeoutObject:
-		msg = internal
-	case *messages.ClusterBlockVote:
-		msg = internal
-	case *messages.ClusterBlockResponse:
-		msg = internal
-	case *messages.ClusterTimeoutObject:
-		msg = internal
-	case *messages.SyncRequest:
-		msg = internal
-	case *messages.SyncResponse:
-		msg = internal
-	case *messages.RangeRequest:
-		msg = internal
-	case *messages.BatchRequest:
-		msg = internal
-	case *messages.BlockResponse:
-		msg = internal
-	case *flow.CollectionGuarantee:
-		msg = internal
-	case *flow.TransactionBody:
-		msg = internal
-	case *flow.Transaction:
-		msg = internal
-	case *flow.ExecutionReceipt:
-		msg = internal
-	case *flow.ResultApproval:
-		msg = internal
-	case *messages.ChunkDataRequest:
-		msg = internal
-	case *messages.ChunkDataResponse:
-		msg = internal
-	case *messages.ApprovalRequest:
-		msg = internal
-	case *messages.ApprovalResponse:
-		msg = internal
-	case *messages.EntityRequest:
-		msg = internal
-	case *messages.EntityResponse:
-		msg = internal
-	case *message.TestMessage:
-		msg = internal
-	case *messages.DKGMessage:
-		msg = internal
+		return (*messages.ClusterProposal)(internal), nil
+	case messages.UntrustedMessage:
+		// Already a valid UntrustedMessage
+		// TODO(immutable M2): expand when ToInternal changes for other M2 types
+		return internal, nil
 	default:
-		return nil, fmt.Errorf("cannot convert unsupported type %T", internal)
+		return nil, fmt.Errorf("cannot convert unsupported type %T", event)
 	}
-	return msg, nil
 }
