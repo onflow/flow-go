@@ -101,7 +101,7 @@ type BlockResponse struct {
 
 // ToInternal returns the internal type representation for BlockResponse.
 //
-// All errors indicate that the decode target contains a structurally invalid representation of the internal flow.BlockResponse model.
+// All errors indicate that the decode target contains a structurally invalid representation of the internal flow.BlockResponse.
 func (br *BlockResponse) ToInternal() (any, error) {
 	internal := make([]flow.Proposal, len(br.Blocks))
 	for i, untrusted := range br.Blocks {
@@ -126,7 +126,7 @@ type ClusterBlockResponse struct {
 
 // ToInternal returns the internal type representation for ClusterBlockResponse.
 //
-// All errors indicate that the decode target contains a structurally invalid representation of the internal cluster.BlockResponse model.
+// All errors indicate that the decode target contains a structurally invalid representation of the internal cluster.BlockResponse.
 func (br *ClusterBlockResponse) ToInternal() (any, error) {
 	internal := make([]cluster.Proposal, len(br.Blocks))
 	for i, untrusted := range br.Blocks {
