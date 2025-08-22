@@ -65,7 +65,7 @@ func TestMakeFinalValidChain(t *testing.T) {
 
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 		// set up lock context
-		_, lctx := unittest.LockManagerWithContext(t, storage.LockFinalizeBlock)
+		manager, lctx := unittest.LockManagerWithContext(t, storage.LockFinalizeBlock)
 		defer lctx.Release()
 
 		dbImpl := badgerimpl.ToDB(db)
@@ -83,7 +83,9 @@ func TestMakeFinalValidChain(t *testing.T) {
 		require.NoError(t, err)
 
 		// insert the finalized block header into the DB
-		_, insertLctx := unittest.LockManagerWithContext(t, storage.LockInsertBlock)
+
+		insertLctx := manager.NewContext()
+		require.NoError(t, insertLctx.AcquireLock(storage.LockInsertBlock))
 		err = dbImpl.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 			return operation.InsertHeader(insertLctx, rw, final.ID(), final)
 		})
@@ -92,7 +94,8 @@ func TestMakeFinalValidChain(t *testing.T) {
 
 		// insert all of the pending blocks into the DB
 		for _, header := range pending {
-			_, insertLctx := unittest.LockManagerWithContext(t, storage.LockInsertBlock)
+			insertLctx := manager.NewContext()
+			require.NoError(t, insertLctx.AcquireLock(storage.LockInsertBlock))
 			err = dbImpl.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 				return operation.InsertHeader(insertLctx, rw, header.ID(), header)
 			})
@@ -140,7 +143,7 @@ func TestMakeFinalInvalidHeight(t *testing.T) {
 
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 		// set up lock context
-		_, lctx := unittest.LockManagerWithContext(t, storage.LockFinalizeBlock)
+		manager, lctx := unittest.LockManagerWithContext(t, storage.LockFinalizeBlock)
 		defer lctx.Release()
 
 		dbImpl := badgerimpl.ToDB(db)
@@ -158,7 +161,8 @@ func TestMakeFinalInvalidHeight(t *testing.T) {
 		require.NoError(t, err)
 
 		// insert the finalized block header into the DB
-		_, insertLctx := unittest.LockManagerWithContext(t, storage.LockInsertBlock)
+		insertLctx := manager.NewContext()
+		require.NoError(t, insertLctx.AcquireLock(storage.LockInsertBlock))
 		err = dbImpl.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 			return operation.InsertHeader(insertLctx, rw, final.ID(), final)
 		})
@@ -166,12 +170,13 @@ func TestMakeFinalInvalidHeight(t *testing.T) {
 		insertLctx.Release()
 
 		// insert all of the pending header into DB
-		_, insertLctx2 := unittest.LockManagerWithContext(t, storage.LockInsertBlock)
+		insertLctx = manager.NewContext()
+		require.NoError(t, insertLctx.AcquireLock(storage.LockInsertBlock))
 		err = dbImpl.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			return operation.InsertHeader(insertLctx2, rw, pending.ID(), pending)
+			return operation.InsertHeader(insertLctx, rw, pending.ID(), pending)
 		})
 		require.NoError(t, err)
-		insertLctx2.Release()
+		insertLctx.Release()
 
 		// initialize the finalizer with the dependencies and make the call
 		metrics := metrics.NewNoopCollector()
@@ -209,7 +214,7 @@ func TestMakeFinalDuplicate(t *testing.T) {
 
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 		// set up lock context
-		_, lctx := unittest.LockManagerWithContext(t, storage.LockFinalizeBlock)
+		manager, lctx := unittest.LockManagerWithContext(t, storage.LockFinalizeBlock)
 		defer lctx.Release()
 
 		dbImpl := badgerimpl.ToDB(db)
@@ -227,7 +232,8 @@ func TestMakeFinalDuplicate(t *testing.T) {
 		require.NoError(t, err)
 
 		// insert the finalized block header into the DB
-		_, insertLctx := unittest.LockManagerWithContext(t, storage.LockInsertBlock)
+		insertLctx := manager.NewContext()
+		require.NoError(t, insertLctx.AcquireLock(storage.LockInsertBlock))
 		err = dbImpl.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 			return operation.InsertHeader(insertLctx, rw, final.ID(), final)
 		})

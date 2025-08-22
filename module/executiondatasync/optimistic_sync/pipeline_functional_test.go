@@ -120,7 +120,8 @@ func (p *PipelineFunctionalSuite) SetupTest() {
 	lctx.Release()
 
 	// store and index the latest sealed block header
-	_, insertLctx2 := unittest.LockManagerWithContext(t, storage.LockInsertBlock)
+	insertLctx2 := manager.NewContext()
+	require.NoError(t, insertLctx2.AcquireLock(storage.LockInsertBlock))
 	err = p.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 		return operation.InsertHeader(insertLctx2, rw, sealedBlock.Header.ID(), sealedBlock.Header)
 	})

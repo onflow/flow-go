@@ -11,7 +11,7 @@ import (
 )
 
 // InsertHeader inserts a block header into the database.
-// The caller must ensure headerID is unique by deriving from header.ID()
+// The caller must ensure headerID is equal to header.ID()
 // It returns [storage.ErrAlreadyExists] if the header already exists, in other words, we only insert a new header once.
 // This error allows the caller to detect duplicate inserts. Since the header is stored along with other part
 // of the block in the same batch, similar duplication checks could be skipped for storing other parts of the block

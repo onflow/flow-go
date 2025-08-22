@@ -126,7 +126,6 @@ func (e *Engine) Start(ctx irrecoverable.SignalerContext) {
 	// (a) set up epoch-scoped epoch managed by this engine for the current epoch
 	err = e.checkShouldStartCurrentEpochComponentsOnStartup(ctx, finalSnapshot)
 	if err != nil {
-		fmt.Println("====>", err)
 		ctx.Throw(fmt.Errorf("could not check or start current epoch components: %w", err))
 	}
 
