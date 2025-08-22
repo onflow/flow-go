@@ -10,7 +10,6 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
-	"github.com/onflow/flow-go/engine/access/index"
 	"github.com/onflow/flow-go/engine/access/state_stream"
 	"github.com/onflow/flow-go/engine/access/subscription"
 	"github.com/onflow/flow-go/engine/access/subscription/tracker"
@@ -92,11 +91,12 @@ func New(
 	execDataStore execution_data.ExecutionDataStore,
 	execDataCache *cache.ExecutionDataCache,
 	registers *execution.RegistersAsyncStore,
-	eventsIndex *index.EventsIndex,
-	useEventsIndex bool,
+	fetchFromLocalStorage bool,
 	registerIDsRequestLimit int,
 	subscriptionHandler *subscription.SubscriptionHandler,
 	executionDataTracker tracker.ExecutionDataTracker,
+	executionResultProvider optimistic_sync.ExecutionResultProvider,
+	executionStateCache optimistic_sync.ExecutionStateCache,
 ) (*StateStreamBackend, error) {
 	logger := log.With().Str("module", "state_stream_api").Logger()
 
@@ -125,9 +125,9 @@ func New(
 		log:                 logger,
 		headers:             headers,
 		getExecutionData:    b.getExecutionData,
-		fetchFromLocalCache: useEventsIndex,
-		execResultProvider:  nil,
-		execStateCache:      nil,
+		fetchFromLocalCache: fetchFromLocalStorage,
+		execResultProvider:  executionResultProvider,
+		execStateCache:      executionStateCache,
 		operatorCriteria:    optimistic_sync.DefaultCriteria,
 	}
 

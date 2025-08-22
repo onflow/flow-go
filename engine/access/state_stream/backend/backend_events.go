@@ -25,7 +25,6 @@ type EventsBackend struct {
 
 var _ state_stream.EventsAPI = (*EventsBackend)(nil)
 
-
 // SubscribeEvents is deprecated and will be removed in a future version.
 // Use SubscribeEventsFromStartBlockID, SubscribeEventsFromStartHeight or SubscribeEventsFromLatest.
 //
@@ -160,8 +159,9 @@ func (b *EventsBackend) getResponseFactory(
 	execStateQuery entities.ExecutionStateQuery,
 ) subscription.GetDataByHeightFunc {
 	return func(ctx context.Context, height uint64) (response interface{}, err error) {
-		// TODO: I should use metadata
-		eventsResponse, _, err := b.eventsProvider.GetAllEventsResponse(ctx, height, execStateQuery)
+		// TODO: what should I do with metadata?
+		eventsResponse, _, err :=
+			b.eventsProvider.GetAllEventsResponse(ctx, height, execStateQuery)
 		if err != nil {
 			if errors.Is(err, storage.ErrNotFound) ||
 				errors.Is(err, storage.ErrHeightNotIndexed) {
