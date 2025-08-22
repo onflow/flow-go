@@ -342,6 +342,10 @@ func (m *MutableState) checkPayloadTransactions(lctx lockctx.Proof, ctx extendCo
 	}
 
 	// second, check for duplicate transactions in the finalized ancestry
+	// CAUTION: Finalization might progress while we are running this logic. However, finalization is not guaranteed to
+	// follow the same fork as the one we are extending here. Hence, we might apply the transaction de-duplication logic
+	// against blocks that do not belong to our fork. If we erroneously find a duplicated transaction, based on a block
+	// that is not part of our fork, we would be raising an invalid slashing challenge, which would get this node slashed.
 	duplicateTxIDs, err = m.checkDupeTransactionsInFinalizedAncestry(lctx, txLookup, minRefHeight, maxRefHeight)
 	if err != nil {
 		return fmt.Errorf("could not check for duplicate txs in finalized ancestry: %w", err)
@@ -356,7 +360,6 @@ func (m *MutableState) checkPayloadTransactions(lctx lockctx.Proof, ctx extendCo
 // checkDupeTransactionsInUnfinalizedAncestry checks for duplicate transactions in the un-finalized
 // ancestry of the given block, and returns a list of all duplicates if there are any.
 func (m *MutableState) checkDupeTransactionsInUnfinalizedAncestry(block *cluster.Block, includedTransactions map[flow.Identifier]struct{}, finalHeight uint64) ([]flow.Identifier, error) {
-
 	var duplicateTxIDs []flow.Identifier
 	err := fork.TraverseBackward(m.headers, block.Header.ParentID, func(ancestor *flow.Header) error {
 		payload, err := m.payloads.ByBlockID(ancestor.ID())
@@ -393,8 +396,8 @@ func (m *MutableState) checkDupeTransactionsInFinalizedAncestry(lctx lockctx.Pro
 	// Boundary conditions:
 	// 1. C's reference block height is equal to the lowest reference block height of
 	//    all its constituent transactions. Hence, for collection C to potentially contain T, it must satisfy c <= t.
-	// 2. For T to be eligible for inclusion in collection C, _none_ of the transactions within C are allowed
-	// to be expired w.r.t. C's reference block. Hence, for collection C to potentially contain T, it must satisfy t < c + E.
+	// 2. For T to be eligible for inclusion in collection C, _none_ of the transactions within C are allowed to be
+	//    expired w.r.t. C's reference block. Hence, for collection C to potentially contain T, it must satisfy t < c + E.
 	//
 	// Therefore, for collection C to potentially contain transaction T, it must satisfy t - E < c <= t.
 	// In other words, we only need to inspect collections with reference block height c ∈ (t-E, t].
