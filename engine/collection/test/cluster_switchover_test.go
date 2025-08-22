@@ -15,7 +15,6 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/factory"
 	"github.com/onflow/flow-go/model/flow/filter"
-	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/util"
 	"github.com/onflow/flow-go/network/channels"
@@ -439,7 +438,7 @@ func RunTestCase(tc *ClusterSwitchoverTestCase) {
 		Run(func(args mock.Arguments) {
 			id, ok := args[1].(flow.Identifier)
 			require.True(tc.T(), ok)
-			_, ok = args[2].(*messages.CollectionGuarantee)
+			_, ok = args[2].(*flow.CollectionGuarantee)
 			tc.T().Log("got guarantee from", id.String())
 			require.True(tc.T(), ok)
 			waitForGuarantees.Done()
