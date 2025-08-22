@@ -52,8 +52,13 @@ func generateVote(c *cobra.Command, args []string) {
 	}
 
 	// load DKG private key
-	path := fmt.Sprintf(bootstrap.PathRandomBeaconPriv, nodeID)
-	data, err := io.ReadFile(filepath.Join(flagBootDir, path))
+	path := filepath.Join(flagBootDir, fmt.Sprintf(bootstrap.PathRandomBeaconPriv, nodeID))
+	// If output directory is specified, use it for the root-block.json
+	if flagOutputDir != "" {
+		path = filepath.Join(flagOutputDir, bootstrap.FilenameRandomBeaconPriv)
+	}
+
+	data, err := io.ReadFile(path)
 	if err != nil {
 		log.Fatal().Err(err).Msg("could not read DKG private key file")
 	}
