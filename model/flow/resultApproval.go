@@ -184,3 +184,14 @@ func NewResultApproval(untrusted UntrustedResultApproval) (*ResultApproval, erro
 func (ra ResultApproval) ID() Identifier {
 	return MakeID(ra)
 }
+
+type ApprovalRequest struct {
+	Nonce      uint64
+	ResultID   Identifier
+	ChunkIndex uint64
+}
+
+type ApprovalResponse struct {
+	Nonce    uint64
+	Approval ResultApproval
+}
