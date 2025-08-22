@@ -15,6 +15,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/factory"
 	"github.com/onflow/flow-go/model/flow/filter"
+	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/util"
 	"github.com/onflow/flow-go/network/channels"
@@ -375,9 +376,9 @@ func (tc *ClusterSwitchoverTestCase) BlockInEpoch(epochCounter uint64) *flow.Hea
 // the given epoch and marks the transaction as expected for inclusion in
 // the corresponding cluster state.
 func (tc *ClusterSwitchoverTestCase) SubmitTransactionToCluster(
-	epochCounter uint64, // the epoch we are submitting the transacting w.r.t.
+	epochCounter uint64,         // the epoch we are submitting the transacting w.r.t.
 	clustering flow.ClusterList, // the clustering for the epoch
-	clusterIndex uint, // the index of the cluster we are targetting
+	clusterIndex uint,           // the index of the cluster we are targetting
 ) {
 
 	clusterMembers := clustering[int(clusterIndex)]
@@ -438,7 +439,7 @@ func RunTestCase(tc *ClusterSwitchoverTestCase) {
 		Run(func(args mock.Arguments) {
 			id, ok := args[1].(flow.Identifier)
 			require.True(tc.T(), ok)
-			_, ok = args[2].(*flow.CollectionGuarantee)
+			_, ok = args[2].(*messages.CollectionGuarantee)
 			tc.T().Log("got guarantee from", id.String())
 			require.True(tc.T(), ok)
 			waitForGuarantees.Done()
