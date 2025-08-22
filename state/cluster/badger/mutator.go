@@ -143,7 +143,6 @@ func (m *MutableState) Extend(candidate *cluster.Block) error {
 	}
 
 	span, _ = m.tracer.StartSpanFromContext(ctx, trace.COLClusterStateMutatorExtendDBInsert)
-
 	err = m.State.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 		return procedure.InsertClusterBlock(lctx, rw, candidate)
 	})
@@ -151,6 +150,7 @@ func (m *MutableState) Extend(candidate *cluster.Block) error {
 	if err != nil {
 		return fmt.Errorf("could not insert cluster block: %w", err)
 	}
+
 	return nil
 }
 
