@@ -14,11 +14,6 @@ import (
 	"github.com/onflow/flow-go/storage"
 )
 
-// DefaultCriteria is the system default criteria for execution result queries.
-var DefaultCriteria = optimistic_sync.Criteria{
-	AgreeingExecutorsCount: 2,
-}
-
 var _ optimistic_sync.ExecutionResultProvider = (*ExecutionResultQueryProvider)(nil)
 
 // ExecutionResultQueryProvider is a container for elements required to retrieve
@@ -68,11 +63,11 @@ func NewExecutionResultQueryProvider(
 		executionNodes:    executionNodes,
 		rootBlockID:       rootBlockID,
 		rootBlockResult:   rootBlockResult,
-		baseCriteria:      DefaultCriteria.OverrideWith(operatorCriteria),
+		baseCriteria:      optimistic_sync.DefaultCriteria.OverrideWith(operatorCriteria),
 	}, nil
 }
 
-// ExecutionResultQuery retrieves execution results and associated execution nodes for a given block ID
+// ExecutionResult retrieves execution results and associated execution nodes for a given block ID
 // based on the provided criteria.
 //
 // Expected errors during normal operations:

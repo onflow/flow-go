@@ -121,6 +121,7 @@ type Params struct {
 
 	ExecutionResultProvider optimistic_sync.ExecutionResultProvider
 	ExecutionStateCache     optimistic_sync.ExecutionStateCache
+	OperatorCriteria        optimistic_sync.Criteria
 }
 
 var _ access.API = (*Backend)(nil)
@@ -173,6 +174,7 @@ func New(params Params) (*Backend, error) {
 		params.ExecNodeIdentitiesProvider,
 		params.ExecutionResultProvider,
 		params.ExecutionStateCache,
+		params.OperatorCriteria,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create events: %w", err)
