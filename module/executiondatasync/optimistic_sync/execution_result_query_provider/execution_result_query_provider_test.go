@@ -81,7 +81,7 @@ func (suite *ExecutionResultQueryProviderSuite) setupIdentitiesMock(allExecution
 		func(flow.IdentityFilter[flow.Identity]) error { return nil })
 }
 
-// TestExecutionResultQuery tests the main ExecutionResultQuery function with various scenarios.
+// TestExecutionResultQuery tests the main ExecutionResult function with various scenarios.
 func (suite *ExecutionResultQueryProviderSuite) TestExecutionResultQuery() {
 	totalReceipts := 5
 	block := unittest.BlockFixture()
@@ -109,7 +109,7 @@ func (suite *ExecutionResultQueryProviderSuite) TestExecutionResultQuery() {
 		// Require specific executors (first two nodes)
 		requiredExecutors := allExecutionNodes[0:2].NodeIDs()
 
-		query, err := provider.ExecutionResultQuery(block.ID(), optimistic_sync.Criteria{
+		query, err := provider.ExecutionResult(block.ID(), optimistic_sync.Criteria{
 			AgreeingExecutorsCount: 2,
 			RequiredExecutors:      requiredExecutors,
 		})
@@ -144,7 +144,7 @@ func (suite *ExecutionResultQueryProviderSuite) TestExecutionResultQuery() {
 		suite.receipts.On("ByBlockID", block.ID()).Return(receipts, nil)
 		suite.setupIdentitiesMock(allExecutionNodes)
 
-		query, err := provider.ExecutionResultQuery(block.ID(), optimistic_sync.Criteria{})
+		query, err := provider.ExecutionResult(block.ID(), optimistic_sync.Criteria{})
 		suite.Require().NoError(err)
 
 		suite.Require().Equal(executionResult.ID(), query.ExecutionResult.ID())
@@ -171,7 +171,7 @@ func (suite *ExecutionResultQueryProviderSuite) TestExecutionResultQuery() {
 		suite.receipts.On("ByBlockID", insufficientBlock.ID()).Return(receipts, nil).Once()
 		suite.setupIdentitiesMock(allExecutionNodes)
 
-		_, err := provider.ExecutionResultQuery(insufficientBlock.ID(), optimistic_sync.Criteria{
+		_, err := provider.ExecutionResult(insufficientBlock.ID(), optimistic_sync.Criteria{
 			AgreeingExecutorsCount: 2,
 			RequiredExecutors:      allExecutionNodes[0:1].NodeIDs(),
 		})
@@ -194,7 +194,7 @@ func (suite *ExecutionResultQueryProviderSuite) TestExecutionResultQuery() {
 		suite.setupIdentitiesMock(allExecutionNodes)
 
 		// Require executors that didn't produce any receipts
-		_, err := provider.ExecutionResultQuery(block.ID(), optimistic_sync.Criteria{
+		_, err := provider.ExecutionResult(block.ID(), optimistic_sync.Criteria{
 			RequiredExecutors: unittest.IdentityListFixture(2, unittest.WithRole(flow.RoleExecution)).NodeIDs(),
 		})
 		suite.Require().Error(err)
@@ -211,7 +211,7 @@ func (suite *ExecutionResultQueryProviderSuite) TestRootBlockHandling() {
 	suite.Run("root block returns execution nodes without execution result", func() {
 		provider := suite.createProvider(flow.IdentifierList{}, optimistic_sync.Criteria{})
 
-		query, err := provider.ExecutionResultQuery(suite.rootBlock.ID(), optimistic_sync.Criteria{})
+		query, err := provider.ExecutionResult(suite.rootBlock.ID(), optimistic_sync.Criteria{})
 		suite.Require().NoError(err)
 
 		suite.Assert().Equal(suite.rootBlockResult, query.ExecutionResult)
@@ -228,7 +228,7 @@ func (suite *ExecutionResultQueryProviderSuite) TestRootBlockHandling() {
 			RequiredExecutors:      requiredExecutors,
 		}
 
-		query, err := provider.ExecutionResultQuery(suite.rootBlock.ID(), criteria)
+		query, err := provider.ExecutionResult(suite.rootBlock.ID(), criteria)
 		suite.Require().NoError(err)
 
 		suite.Assert().Equal(suite.rootBlockResult, query.ExecutionResult)
@@ -259,7 +259,7 @@ func (suite *ExecutionResultQueryProviderSuite) TestPreferredAndRequiredExecutio
 		provider := suite.createProvider(flow.IdentifierList{}, optimistic_sync.Criteria{})
 
 		// optimistic_sync.Criteria are empty to use operator defaults
-		query, err := provider.ExecutionResultQuery(block.ID(), optimistic_sync.Criteria{})
+		query, err := provider.ExecutionResult(block.ID(), optimistic_sync.Criteria{})
 		suite.Require().NoError(err)
 
 		expectedExecutors := allExecutionNodes[0:3].NodeIDs()
@@ -273,7 +273,7 @@ func (suite *ExecutionResultQueryProviderSuite) TestPreferredAndRequiredExecutio
 		provider := suite.createProvider(allExecutionNodes[1:5].NodeIDs(), optimistic_sync.Criteria{})
 
 		// optimistic_sync.Criteria are empty to use operator defaults
-		query, err := provider.ExecutionResultQuery(block.ID(), optimistic_sync.Criteria{})
+		query, err := provider.ExecutionResult(block.ID(), optimistic_sync.Criteria{})
 		suite.Require().NoError(err)
 
 		actualExecutors := query.ExecutionNodes.NodeIDs()
@@ -287,7 +287,7 @@ func (suite *ExecutionResultQueryProviderSuite) TestPreferredAndRequiredExecutio
 		})
 
 		// optimistic_sync.Criteria are empty to use operator defaults
-		query, err := provider.ExecutionResultQuery(block.ID(), optimistic_sync.Criteria{})
+		query, err := provider.ExecutionResult(block.ID(), optimistic_sync.Criteria{})
 		suite.Require().NoError(err)
 
 		actualExecutors := query.ExecutionNodes.NodeIDs()
@@ -304,7 +304,7 @@ func (suite *ExecutionResultQueryProviderSuite) TestPreferredAndRequiredExecutio
 		})
 
 		// optimistic_sync.Criteria are empty to use operator defaults
-		query, err := provider.ExecutionResultQuery(block.ID(), optimistic_sync.Criteria{})
+		query, err := provider.ExecutionResult(block.ID(), optimistic_sync.Criteria{})
 		suite.Require().NoError(err)
 
 		// `preferredENIdentifiers` contain 1 executor, that is not enough, so the logic will get 2 executors from `requiredENIdentifiers` to fill `defaultMaxNodesCnt` executors.
@@ -324,7 +324,7 @@ func (suite *ExecutionResultQueryProviderSuite) TestPreferredAndRequiredExecutio
 			RequiredExecutors: allExecutionNodes[5:6].NodeIDs(),
 		}
 
-		query, err := provider.ExecutionResultQuery(block.ID(), userCriteria)
+		query, err := provider.ExecutionResult(block.ID(), userCriteria)
 		suite.Require().NoError(err)
 
 		suite.Assert().ElementsMatch(userCriteria.RequiredExecutors, query.ExecutionNodes.NodeIDs())
