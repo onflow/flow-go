@@ -18,17 +18,6 @@ type CollectionGuarantee struct {
 	Signature        crypto.Signature // guarantor signatures
 }
 
-// ToInternal converts the untrusted CollectionGuarantee into its trusted internal
-// representation.
-//
-// This stub returns the receiver unchanged. A proper implementation
-// must perform validation checks and return a constructed internal
-// object.
-func (cg *CollectionGuarantee) ToInternal() (any, error) {
-	// TODO(malleability, #7710) create typedef for this type in messages package and implement it there
-	return cg, nil
-}
-
 // UntrustedCollectionGuarantee is an untrusted input-only representation of an CollectionGuarantee,
 // used for construction.
 //

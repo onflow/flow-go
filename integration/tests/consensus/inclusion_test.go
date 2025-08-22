@@ -12,6 +12,7 @@ import (
 	"github.com/onflow/flow-go/engine/ghost/client"
 	"github.com/onflow/flow-go/integration/testnet"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module/signature"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -124,7 +125,7 @@ func (is *InclusionSuite) TestCollectionGuaranteeIncluded() {
 	is.T().Logf("seen a proposal")
 
 	// send collection to one consensus node
-	is.sendCollectionToConsensus(deadline, sentinel, is.conIDs[0])
+	is.sendCollectionToConsensus(deadline, (*messages.CollectionGuarantee)(sentinel), is.conIDs[0])
 
 	proposal := is.waitUntilCollectionIncludeInProposal(deadline, sentinel)
 
@@ -161,7 +162,7 @@ func (is *InclusionSuite) waitUntilSeenProposal(deadline time.Time) {
 	is.T().Fatalf("%s timeout (deadline %s) waiting to see proposal", time.Now(), deadline)
 }
 
-func (is *InclusionSuite) sendCollectionToConsensus(deadline time.Time, sentinel *flow.CollectionGuarantee, conID flow.Identifier) {
+func (is *InclusionSuite) sendCollectionToConsensus(deadline time.Time, sentinel *messages.CollectionGuarantee, conID flow.Identifier) {
 	colID := sentinel.CollectionID
 
 	// keep trying to send collection guarantee to at least one consensus node

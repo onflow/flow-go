@@ -13,6 +13,7 @@ import (
 	"github.com/onflow/flow-go/engine/common/fifoqueue"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
+	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/irrecoverable"
@@ -116,7 +117,7 @@ func (e *Engine) processOutboundMessages(ctx context.Context) error {
 			return nil
 		}
 
-		guarantee, ok := item.(*flow.CollectionGuarantee)
+		guarantee, ok := item.(*messages.CollectionGuarantee)
 		if !ok {
 			return fmt.Errorf("invalid type in pusher engine queue")
 		}
@@ -158,7 +159,7 @@ func (e *Engine) Process(channel channels.Channel, originID flow.Identifier, mes
 
 // SubmitCollectionGuarantee adds a collection guarantee to the engine's queue
 // to later be published to consensus nodes.
-func (e *Engine) SubmitCollectionGuarantee(guarantee *flow.CollectionGuarantee) {
+func (e *Engine) SubmitCollectionGuarantee(guarantee *messages.CollectionGuarantee) {
 	if e.queue.Push(guarantee) {
 		e.notifier.Notify()
 	} else {
@@ -168,7 +169,7 @@ func (e *Engine) SubmitCollectionGuarantee(guarantee *flow.CollectionGuarantee) 
 
 // publishCollectionGuarantee publishes the collection guarantee to all consensus nodes.
 // No errors expected during normal operation.
-func (e *Engine) publishCollectionGuarantee(guarantee *flow.CollectionGuarantee) error {
+func (e *Engine) publishCollectionGuarantee(guarantee *messages.CollectionGuarantee) error {
 	consensusNodes, err := e.state.Final().Identities(filter.HasRole[flow.Identity](flow.RoleConsensus))
 	if err != nil {
 		return fmt.Errorf("could not get consensus nodes' identities: %w", err)
