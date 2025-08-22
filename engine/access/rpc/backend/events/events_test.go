@@ -450,6 +450,7 @@ func (s *EventsSuite) defaultBackend(mode query_mode.IndexQueryMode) *Events {
 		),
 		s.executionResultProvider,
 		s.executionStateCache,
+		optimistic_sync.DefaultCriteria,
 	)
 	require.NoError(s.T(), err)
 
