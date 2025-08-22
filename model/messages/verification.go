@@ -33,8 +33,7 @@ func (a *ApprovalRequest) ToInternal() (any, error) {
 // ApprovalResponse contains a response to an approval request.
 type ApprovalResponse struct {
 	Nonce    uint64
-	Approval flow.ResultApproval
-	//Approval flow.UntrustedResultApproval
+	Approval flow.UntrustedResultApproval
 }
 
 // ToInternal converts the untrusted ApprovalResponse into its trusted internal

@@ -170,7 +170,7 @@ func (s *SealingEngineSuite) TestMultipleProcessingItems() {
 			approval := unittest.ResultApprovalFixture(unittest.WithExecutionResultID(receipt.ExecutionResult.ID()),
 				unittest.WithApproverID(approverID))
 			responseApproval := &messages.ApprovalResponse{
-				Approval: *approval,
+				Approval: flow.UntrustedResultApproval(*approval),
 			}
 			responseApprovals = append(responseApprovals, responseApproval)
 			approvals = append(approvals, approval)
