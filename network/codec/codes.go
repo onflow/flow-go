@@ -3,7 +3,6 @@ package codec
 import (
 	"fmt"
 
-	"github.com/onflow/flow-go/model/cluster"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/libp2p/message"
 	"github.com/onflow/flow-go/model/messages"
@@ -71,7 +70,7 @@ func MessageCodeFromInterface(v interface{}) (MessageCode, string, error) {
 	s := what(v)
 	switch v.(type) {
 	// consensus
-	case *flow.UntrustedProposal:
+	case *messages.Proposal:
 		return CodeBlockProposal, s, nil
 	case *messages.BlockVote:
 		return CodeBlockVote, s, nil
@@ -79,7 +78,7 @@ func MessageCodeFromInterface(v interface{}) (MessageCode, string, error) {
 		return CodeTimeoutObject, s, nil
 
 	// cluster consensus
-	case *cluster.UntrustedProposal:
+	case *messages.ClusterProposal:
 		return CodeClusterBlockProposal, s, nil
 	case *messages.ClusterBlockVote:
 		return CodeClusterBlockVote, s, nil
@@ -153,7 +152,7 @@ func InterfaceFromMessageCode(code MessageCode) (messages.UntrustedMessage, stri
 	switch code {
 	// consensus
 	case CodeBlockProposal:
-		return &flow.UntrustedProposal{}, what(&flow.UntrustedProposal{}), nil
+		return &messages.Proposal{}, what(&messages.Proposal{}), nil
 	case CodeBlockVote:
 		return &messages.BlockVote{}, what(&messages.BlockVote{}), nil
 	case CodeTimeoutObject:
@@ -161,7 +160,7 @@ func InterfaceFromMessageCode(code MessageCode) (messages.UntrustedMessage, stri
 
 	// cluster consensus
 	case CodeClusterBlockProposal:
-		return &cluster.UntrustedProposal{}, what(&cluster.UntrustedProposal{}), nil
+		return &messages.ClusterProposal{}, what(&messages.ClusterProposal{}), nil
 	case CodeClusterBlockVote:
 		return &messages.ClusterBlockVote{}, what(&messages.ClusterBlockVote{}), nil
 	case CodeClusterBlockResponse:
