@@ -8,11 +8,11 @@ import (
 	"github.com/stretchr/testify/require"
 	"golang.org/x/exp/maps"
 
+	gethCommon "github.com/ethereum/go-ethereum/common"
 	"github.com/onflow/atree"
 	"github.com/onflow/cadence/common"
 	"github.com/onflow/cadence/interpreter"
 	"github.com/onflow/cadence/runtime"
-	gethCommon "github.com/onflow/go-ethereum/common"
 
 	"github.com/onflow/flow-go/cmd/util/ledger/util"
 	"github.com/onflow/flow-go/cmd/util/ledger/util/registers"

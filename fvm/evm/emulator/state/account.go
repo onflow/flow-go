@@ -1,10 +1,10 @@
 package state
 
 import (
+	gethCommon "github.com/ethereum/go-ethereum/common"
+	gethTypes "github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/holiman/uint256"
-	gethCommon "github.com/onflow/go-ethereum/common"
-	gethTypes "github.com/onflow/go-ethereum/core/types"
-	"github.com/onflow/go-ethereum/rlp"
 )
 
 // Account holds the metadata of an address and provides (de)serialization functionality

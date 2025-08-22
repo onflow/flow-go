@@ -151,21 +151,23 @@ var _ environment.Accounts = &FakeAccounts{}
 
 func (f FakeAccounts) Exists(address flow.Address) (bool, error)       { return true, nil }
 func (f FakeAccounts) Get(address flow.Address) (*flow.Account, error) { return &flow.Account{}, nil }
-func (f FakeAccounts) GetPublicKeyCount(_ flow.Address) (uint32, error) {
+func (f FakeAccounts) GetAccountPublicKeyCount(_ flow.Address) (uint32, error) {
 	return f.keyCount, nil
 }
-func (f FakeAccounts) AppendPublicKey(_ flow.Address, _ flow.AccountPublicKey) error { return nil }
-func (f FakeAccounts) GetPublicKey(address flow.Address, keyIndex uint32) (flow.AccountPublicKey, error) {
+func (f FakeAccounts) AppendAccountPublicKey(_ flow.Address, _ flow.AccountPublicKey) error {
+	return nil
+}
+func (f FakeAccounts) GetAccountPublicKey(address flow.Address, keyIndex uint32) (flow.AccountPublicKey, error) {
 	if keyIndex >= f.keyCount {
 		return flow.AccountPublicKey{}, errors.NewAccountPublicKeyNotFoundError(address, keyIndex)
 	}
 	return FakePublicKey{}.toAccountPublicKey(), nil
 }
 
-func (f FakeAccounts) SetPublicKey(_ flow.Address, _ uint32, _ flow.AccountPublicKey) ([]byte, error) {
+func (f FakeAccounts) SetAccountPublicKey(_ flow.Address, _ uint32, _ flow.AccountPublicKey) ([]byte, error) {
 	return nil, nil
 }
-func (f FakeAccounts) GetPublicKeys(address flow.Address) ([]flow.AccountPublicKey, error) {
+func (f FakeAccounts) GetAccountPublicKeys(address flow.Address) ([]flow.AccountPublicKey, error) {
 	return make([]flow.AccountPublicKey, f.keyCount), nil
 }
 func (f FakeAccounts) GetContractNames(_ flow.Address) ([]string, error)      { return nil, nil }

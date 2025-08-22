@@ -1,8 +1,8 @@
 package blocks
 
 import (
-	gethCommon "github.com/onflow/go-ethereum/common"
-	"github.com/onflow/go-ethereum/eth/tracers"
+	gethCommon "github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/eth/tracers"
 
 	"github.com/onflow/flow-go/fvm/evm/types"
 	"github.com/onflow/flow-go/model/flow"

@@ -4,10 +4,10 @@ import (
 	"bytes"
 	"fmt"
 
+	gethTypes "github.com/ethereum/go-ethereum/core/types"
+	gethTracer "github.com/ethereum/go-ethereum/eth/tracers"
+	gethTrie "github.com/ethereum/go-ethereum/trie"
 	"github.com/onflow/atree"
-	gethTypes "github.com/onflow/go-ethereum/core/types"
-	gethTracer "github.com/onflow/go-ethereum/eth/tracers"
-	gethTrie "github.com/onflow/go-ethereum/trie"
 
 	"github.com/onflow/flow-go/fvm/evm/emulator"
 	"github.com/onflow/flow-go/fvm/evm/events"

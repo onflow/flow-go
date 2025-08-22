@@ -3,11 +3,11 @@ package emulator
 import (
 	"math/big"
 
-	gethCommon "github.com/onflow/go-ethereum/common"
-	gethCore "github.com/onflow/go-ethereum/core"
-	gethVM "github.com/onflow/go-ethereum/core/vm"
-	"github.com/onflow/go-ethereum/eth/tracers"
-	gethParams "github.com/onflow/go-ethereum/params"
+	gethCommon "github.com/ethereum/go-ethereum/common"
+	gethCore "github.com/ethereum/go-ethereum/core"
+	gethVM "github.com/ethereum/go-ethereum/core/vm"
+	"github.com/ethereum/go-ethereum/eth/tracers"
+	gethParams "github.com/ethereum/go-ethereum/params"
 
 	"github.com/onflow/flow-go/fvm/evm/types"
 )
@@ -44,6 +44,10 @@ type Config struct {
 	// BlockTotalGasSoFar captures the total
 	// amount of gas used so far
 	BlockTotalGasUsedSoFar uint64
+	// PrecompiledContracts holds the applicable precompiled contracts
+	// for the current chain rules, as well as any extra precompiled
+	// contracts, such as Cadence Arch etc
+	PrecompiledContracts gethVM.PrecompiledContracts
 }
 
 // ChainRules returns the chain rules
@@ -133,7 +137,6 @@ func defaultConfig() *Config {
 			GetHash: func(n uint64) gethCommon.Hash {
 				return gethCommon.Hash{}
 			},
-			GetPrecompile: gethCore.GetPrecompile,
 		},
 		PCTracker: NewCallTracker(),
 	}
@@ -232,19 +235,14 @@ func WithDirectCallBaseGasUsage(gas uint64) Option {
 // WithExtraPrecompiledContracts appends the precompiled contract list with extra precompiled contracts
 func WithExtraPrecompiledContracts(precompiledContracts []types.PrecompiledContract) Option {
 	return func(c *Config) *Config {
-		extraPreCompMap := make(map[gethCommon.Address]gethVM.PrecompiledContract)
+		activePrecompiledContracts := gethVM.ActivePrecompiledContracts(c.ChainRules())
 		for _, pc := range precompiledContracts {
 			// wrap pcs for tracking
 			wpc := c.PCTracker.RegisterPrecompiledContract(pc)
-			extraPreCompMap[pc.Address().ToCommon()] = wpc
+			activePrecompiledContracts[pc.Address().ToCommon()] = wpc
 		}
-		c.BlockContext.GetPrecompile = func(rules gethParams.Rules, addr gethCommon.Address) (gethVM.PrecompiledContract, bool) {
-			prec, found := extraPreCompMap[addr]
-			if found {
-				return prec, true
-			}
-			return gethCore.GetPrecompile(rules, addr)
-		}
+		c.PrecompiledContracts = activePrecompiledContracts
+
 		return c
 	}
 }

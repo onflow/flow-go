@@ -4,7 +4,7 @@ import (
 	"encoding/binary"
 	"fmt"
 
-	gethCommon "github.com/onflow/go-ethereum/common"
+	gethCommon "github.com/ethereum/go-ethereum/common"
 )
 
 const (

@@ -14,14 +14,12 @@ import (
 const nodeID string = "0000000000000000000000000000000000000000000000000000000000000001"
 
 func TestEndToEnd(t *testing.T) {
-
 	// Create a temp directory to work as "bootstrap"
 	bootdir := t.TempDir()
 
 	t.Logf("Created dir %s", bootdir)
 
 	// Create test files
-	//bootcmd.WriteText(filepath.Join(bootdir, bootstrap.PathNodeId), []byte(nodeID)
 	randomBeaconPath := filepath.Join(bootdir, fmt.Sprintf(bootstrap.PathRandomBeaconPriv, nodeID))
 	err := os.MkdirAll(filepath.Dir(randomBeaconPath), 0755)
 	if err != nil {
@@ -46,9 +44,13 @@ func TestEndToEnd(t *testing.T) {
 		t.Fatalf("Error wrapping files: %s", err)
 	}
 
+	unWrappedFilePath := filepath.Join(
+		bootdir,
+		fmt.Sprintf(bootstrap.PathRandomBeaconPriv, nodeID),
+	)
 	// Client:
 	// Unwrap files
-	err = unWrapFile(bootdir, nodeID)
+	err = unWrapFile(bootdir, nodeID, bootdir, unWrappedFilePath)
 	if err != nil {
 		t.Fatalf("Error unwrapping response: %s", err)
 	}

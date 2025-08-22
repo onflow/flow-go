@@ -98,7 +98,7 @@ func newResultCollector(
 	receiptHasher hash.Hasher,
 	parentBlockExecutionResultID flow.Identifier,
 	block *entity.ExecutableBlock,
-	numTransactions int,
+	inputChannelSize int,
 	consumers []result.ExecutedCollectionConsumer,
 	previousBlockSnapshot snapshot.StorageSnapshot,
 ) *resultCollector {
@@ -108,7 +108,7 @@ func newResultCollector(
 		tracer:                       tracer,
 		blockSpan:                    blockSpan,
 		metrics:                      metrics,
-		processorInputChan:           make(chan transactionResult, numTransactions),
+		processorInputChan:           make(chan transactionResult, inputChannelSize),
 		processorDoneChan:            make(chan struct{}),
 		committer:                    committer,
 		signer:                       signer,

@@ -3,9 +3,9 @@ package state
 import (
 	"encoding/binary"
 
+	gethCommon "github.com/ethereum/go-ethereum/common"
 	"github.com/holiman/uint256"
 	"github.com/onflow/crypto/hash"
-	gethCommon "github.com/onflow/go-ethereum/common"
 )
 
 type OpCode byte

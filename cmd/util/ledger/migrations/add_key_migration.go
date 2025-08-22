@@ -149,12 +149,12 @@ func (m *AddKeyMigration) MigrateAccount(
 
 	flowAddress := flow.ConvertAddress(address)
 
-	keyIndex, err := migrationRuntime.Accounts.GetPublicKeyCount(flowAddress)
+	keyIndex, err := migrationRuntime.Accounts.GetAccountPublicKeyCount(flowAddress)
 	if err != nil {
 		return fmt.Errorf("failed to get public key count: %w", err)
 	}
 
-	err = migrationRuntime.Accounts.AppendPublicKey(flowAddress, key)
+	err = migrationRuntime.Accounts.AppendAccountPublicKey(flowAddress, key)
 	if err != nil {
 		return fmt.Errorf("failed to append public key: %w", err)
 	}

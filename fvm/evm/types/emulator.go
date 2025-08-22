@@ -4,10 +4,10 @@ import (
 	"math"
 	"math/big"
 
-	gethCommon "github.com/onflow/go-ethereum/common"
-	gethTypes "github.com/onflow/go-ethereum/core/types"
-	gethCrypto "github.com/onflow/go-ethereum/crypto"
-	"github.com/onflow/go-ethereum/eth/tracers"
+	gethCommon "github.com/ethereum/go-ethereum/common"
+	gethTypes "github.com/ethereum/go-ethereum/core/types"
+	gethCrypto "github.com/ethereum/go-ethereum/crypto"
+	"github.com/ethereum/go-ethereum/eth/tracers"
 )
 
 var (
