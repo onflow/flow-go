@@ -19,7 +19,7 @@ func TestBlockChildrenIndexUpdateLookup(t *testing.T) {
 		childrenIDs := unittest.IdentifierListFixture(8)
 		var retrievedIDs flow.IdentifierList
 
-		_, lctx := unittest.LockManagerWithContext(t, storage.LockInsertBlock)
+		manager, lctx := unittest.LockManagerWithContext(t, storage.LockInsertBlock)
 		err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 			return operation.UpsertBlockChildren(lctx, rw.Writer(), blockID, childrenIDs)
 		})
@@ -30,12 +30,13 @@ func TestBlockChildrenIndexUpdateLookup(t *testing.T) {
 		assert.Equal(t, childrenIDs, retrievedIDs)
 
 		altIDs := unittest.IdentifierListFixture(4)
-		_, lctx2 := unittest.LockManagerWithContext(t, storage.LockInsertBlock)
+		lctx = manager.NewContext()
+		require.NoError(t, lctx.AcquireLock(storage.LockInsertBlock))
 		err = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			return operation.UpsertBlockChildren(lctx2, rw.Writer(), blockID, altIDs)
+			return operation.UpsertBlockChildren(lctx, rw.Writer(), blockID, altIDs)
 		})
 		require.NoError(t, err)
-		lctx2.Release()
+		lctx.Release()
 		err = operation.RetrieveBlockChildren(db.Reader(), blockID, &retrievedIDs)
 		require.NoError(t, err)
 		assert.Equal(t, altIDs, retrievedIDs)
