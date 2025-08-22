@@ -15,9 +15,7 @@ import (
 
 	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/access/validator"
-	"github.com/onflow/flow-go/engine/access/index"
 	"github.com/onflow/flow-go/engine/access/rpc/backend/node_communicator"
-	"github.com/onflow/flow-go/engine/access/rpc/backend/transactions/error_messages"
 	"github.com/onflow/flow-go/engine/access/rpc/backend/transactions/provider"
 	"github.com/onflow/flow-go/engine/access/rpc/backend/transactions/retrier"
 	txstatus "github.com/onflow/flow-go/engine/access/rpc/backend/transactions/status"
@@ -84,13 +82,10 @@ type Params struct {
 	Blocks                      storage.Blocks
 	Collections                 storage.Collections
 	Transactions                storage.Transactions
-	TxErrorMessageProvider      error_messages.Provider
 	TxResultCache               *lru.Cache[flow.Identifier, *accessmodel.TransactionResult]
 	TxProvider                  provider.TransactionProvider
 	TxValidator                 *validator.TransactionValidator
 	TxStatusDeriver             *txstatus.TxStatusDeriver
-	EventsIndex                 *index.EventsIndex
-	TxResultsIndex              *index.TransactionResultsIndex
 }
 
 func NewTransactionsBackend(params Params) (*Transactions, error) {
@@ -262,14 +257,17 @@ func (t *Transactions) SendRawTransaction(
 	return t.trySendTransaction(ctx, tx)
 }
 
-func (t *Transactions) GetTransaction(ctx context.Context, txID flow.Identifier) (*flow.TransactionBody, error) {
+func (t *Transactions) GetTransaction(
+	ctx context.Context,
+	txID flow.Identifier,
+) (*flow.TransactionBody, error) {
 	// look up transaction from storage
 	tx, err := t.transactions.ByID(txID)
 	txErr := rpc.ConvertStorageError(err)
 
 	if txErr != nil {
 		if status.Code(txErr) == codes.NotFound {
-			return t.getHistoricalTransaction(ctx, txID)
+			return t.getHistoricalTransaction(ctx, txID, nil)
 		}
 		// Other Error trying to retrieve the transaction, return with err
 		return nil, txErr
@@ -310,7 +308,8 @@ func (t *Transactions) GetTransactionResult(
 	blockID flow.Identifier,
 	collectionID flow.Identifier,
 	requiredEventEncodingVersion entities.EventEncodingVersion,
-) (*accessmodel.TransactionResult, error) {
+	executionStateQuery entities.ExecutionStateQuery,
+) (*accessmodel.TransactionResult, entities.ExecutorMetadata, error) {
 	// look up transaction from storage
 	start := time.Now()
 
@@ -318,17 +317,17 @@ func (t *Transactions) GetTransactionResult(
 	if err != nil {
 		txErr := rpc.ConvertStorageError(err)
 		if status.Code(txErr) != codes.NotFound {
-			return nil, txErr
+			return nil, entities.ExecutorMetadata{}, txErr
 		}
 
 		// Tx not found. If we have historical Sporks setup, lets look through those as well
 		if t.txResultCache != nil {
 			val, ok := t.txResultCache.Get(txID)
 			if ok {
-				return val, nil
+				return val, entities.ExecutorMetadata{}, nil
 			}
 		}
-		historicalTxResult, err := t.getHistoricalTransactionResult(ctx, txID)
+		historicalTxResult, err := t.getHistoricalTransactionResult(ctx, txID, executionStateQuery)
 		if err != nil {
 			// if tx not found in old access nodes either, then assume that the tx was submitted to a different AN
 			// and return status as unknown
@@ -340,13 +339,13 @@ func (t *Transactions) GetTransactionResult(
 			if t.txResultCache != nil {
 				t.txResultCache.Add(txID, result)
 			}
-			return result, nil
+			return result, entities.ExecutorMetadata{}, nil
 		}
 
 		if t.txResultCache != nil {
 			t.txResultCache.Add(txID, historicalTxResult)
 		}
-		return historicalTxResult, nil
+		return historicalTxResult, entities.ExecutorMetadata{}, nil
 	}
 
 	block, err := t.retrieveBlock(blockID, collectionID, txID)
@@ -354,16 +353,16 @@ func (t *Transactions) GetTransactionResult(
 	// If looking up the block based solely on the txID returns not found, then no error is
 	// returned since the block may not be finalized yet.
 	if err != nil {
-		return nil, rpc.ConvertStorageError(err)
+		return nil, entities.ExecutorMetadata{}, rpc.ConvertStorageError(err)
 	}
 
 	var blockHeight uint64
 	var txResult *accessmodel.TransactionResult
 	// access node may not have the block if it hasn't yet been finalized, hence block can be nil at this point
 	if block != nil {
-		txResult, err = t.lookupTransactionResult(ctx, txID, block.Header, requiredEventEncodingVersion)
+		txResult, err = t.lookupTransactionResult(ctx, txID, block.Header, requiredEventEncodingVersion, executionStateQuery)
 		if err != nil {
-			return nil, rpc.ConvertError(err, "failed to retrieve result", codes.Internal)
+			return nil, entities.ExecutorMetadata{}, rpc.ConvertError(err, "failed to retrieve result", codes.Internal)
 		}
 
 		// an additional check to ensure the correctness of the collection ID.
@@ -374,14 +373,14 @@ func (t *Transactions) GetTransactionResult(
 			// should result in an error because it's not possible to guarantee that the result found
 			// is the correct one.
 			if blockID != flow.ZeroID || collectionID != flow.ZeroID {
-				return nil, rpc.ConvertStorageError(err)
+				return nil, entities.ExecutorMetadata{}, rpc.ConvertStorageError(err)
 			}
 		}
 
 		if collectionID == flow.ZeroID {
 			collectionID = expectedCollectionID
 		} else if collectionID != expectedCollectionID {
-			return nil, status.Error(codes.InvalidArgument, "transaction not found in provided collection")
+			return nil, entities.ExecutorMetadata{}, status.Error(codes.InvalidArgument, "transaction not found in provided collection")
 		}
 
 		blockID = block.ID()
@@ -402,7 +401,7 @@ func (t *Transactions) GetTransactionResult(
 			if !errors.Is(err, state.ErrUnknownSnapshotReference) {
 				irrecoverable.Throw(ctx, err)
 			}
-			return nil, rpc.ConvertStorageError(err)
+			return nil, entities.ExecutorMetadata{}, rpc.ConvertStorageError(err)
 		}
 
 		txResult = &accessmodel.TransactionResult{
@@ -418,7 +417,7 @@ func (t *Transactions) GetTransactionResult(
 
 	t.metrics.TransactionResultFetched(time.Since(start), len(tx.Script))
 
-	return txResult, nil
+	return txResult, entities.ExecutorMetadata{}, nil
 }
 
 // lookupCollectionIDInBlock returns the collection ID based on the transaction ID. The lookup is performed in block
@@ -477,14 +476,18 @@ func (t *Transactions) GetTransactionResultsByBlockID(
 	ctx context.Context,
 	blockID flow.Identifier,
 	requiredEventEncodingVersion entities.EventEncodingVersion,
-) ([]*accessmodel.TransactionResult, error) {
+	executionStateQuery entities.ExecutionStateQuery,
+) ([]*accessmodel.TransactionResult, entities.ExecutorMetadata, error) {
 	// TODO: consider using storage.Index.ByBlockID, the index contains collection id and seals ID
 	block, err := t.blocks.ByID(blockID)
 	if err != nil {
-		return nil, rpc.ConvertStorageError(err)
+		return nil, entities.ExecutorMetadata{}, rpc.ConvertStorageError(err)
 	}
 
-	return t.txProvider.TransactionResultsByBlockID(ctx, block, requiredEventEncodingVersion)
+	results, err := t.txProvider.TransactionResultsByBlockID(ctx, block, requiredEventEncodingVersion,
+		executionStateQuery)
+
+	return results, entities.ExecutorMetadata{}, err
 }
 
 // GetTransactionResultByIndex returns transactions Results for an index in a block that is executed,
@@ -494,13 +497,17 @@ func (t *Transactions) GetTransactionResultByIndex(
 	blockID flow.Identifier,
 	index uint32,
 	requiredEventEncodingVersion entities.EventEncodingVersion,
-) (*accessmodel.TransactionResult, error) {
+	executionStateQuery entities.ExecutionStateQuery,
+) (*accessmodel.TransactionResult, entities.ExecutorMetadata, error) {
 	block, err := t.blocks.ByID(blockID)
 	if err != nil {
-		return nil, rpc.ConvertStorageError(err)
+		return nil, entities.ExecutorMetadata{}, rpc.ConvertStorageError(err)
 	}
 
-	return t.txProvider.TransactionResultByIndex(ctx, block, index, requiredEventEncodingVersion)
+	result, err := t.txProvider.TransactionResultByIndex(ctx, block, index, requiredEventEncodingVersion,
+		executionStateQuery)
+
+	return result, entities.ExecutorMetadata{}, err
 }
 
 // GetSystemTransaction returns system transaction
@@ -509,13 +516,20 @@ func (t *Transactions) GetSystemTransaction(_ context.Context, _ flow.Identifier
 }
 
 // GetSystemTransactionResult returns system transaction result
-func (t *Transactions) GetSystemTransactionResult(ctx context.Context, blockID flow.Identifier, requiredEventEncodingVersion entities.EventEncodingVersion) (*accessmodel.TransactionResult, error) {
+func (t *Transactions) GetSystemTransactionResult(
+	ctx context.Context,
+	blockID flow.Identifier,
+	requiredEventEncodingVersion entities.EventEncodingVersion,
+	executionStateQuery entities.ExecutionStateQuery,
+) (*accessmodel.TransactionResult, entities.ExecutorMetadata, error) {
 	block, err := t.blocks.ByID(blockID)
 	if err != nil {
-		return nil, rpc.ConvertStorageError(err)
+		return nil, entities.ExecutorMetadata{}, rpc.ConvertStorageError(err)
 	}
 
-	return t.lookupTransactionResult(ctx, t.systemTxID, block.Header, requiredEventEncodingVersion)
+	results, err := t.lookupTransactionResult(ctx, t.systemTxID, block.Header, requiredEventEncodingVersion, executionStateQuery)
+
+	return results, entities.ExecutorMetadata{}, err
 }
 
 // Error returns:
@@ -540,8 +554,9 @@ func (t *Transactions) lookupTransactionResult(
 	txID flow.Identifier,
 	header *flow.Header,
 	requiredEventEncodingVersion entities.EventEncodingVersion,
+	executionStateQuery entities.ExecutionStateQuery,
 ) (*accessmodel.TransactionResult, error) {
-	txResult, err := t.txProvider.TransactionResult(ctx, header, txID, requiredEventEncodingVersion)
+	txResult, err := t.txProvider.TransactionResult(ctx, header, txID, requiredEventEncodingVersion, executionStateQuery)
 	if err != nil {
 		// if either the storage or execution node reported no results or there were not enough execution results
 		if status.Code(err) == codes.NotFound {
@@ -559,9 +574,10 @@ func (t *Transactions) lookupTransactionResult(
 func (t *Transactions) getHistoricalTransaction(
 	ctx context.Context,
 	txID flow.Identifier,
+	executionStateQuery *entities.ExecutionStateQuery,
 ) (*flow.TransactionBody, error) {
 	for _, historicalNode := range t.historicalAccessNodeClients {
-		txResp, err := historicalNode.GetTransaction(ctx, &accessproto.GetTransactionRequest{Id: txID[:]})
+		txResp, err := historicalNode.GetTransaction(ctx, &accessproto.GetTransactionRequest{Id: txID[:], ExecutionStateQuery: executionStateQuery})
 		if err == nil {
 			tx, err := convert.MessageToTransaction(txResp.Transaction, t.chainID.Chain())
 			if err != nil {
@@ -583,9 +599,11 @@ func (t *Transactions) getHistoricalTransaction(
 func (t *Transactions) getHistoricalTransactionResult(
 	ctx context.Context,
 	txID flow.Identifier,
+	executionStateQuery entities.ExecutionStateQuery,
 ) (*accessmodel.TransactionResult, error) {
 	for _, historicalNode := range t.historicalAccessNodeClients {
-		result, err := historicalNode.GetTransactionResult(ctx, &accessproto.GetTransactionRequest{Id: txID[:]})
+		result, err := historicalNode.GetTransactionResult(ctx, &accessproto.GetTransactionRequest{Id: txID[:],
+			ExecutionStateQuery: &executionStateQuery})
 		if err == nil {
 			// Found on a historical node. Report
 			if result.GetStatus() == entities.TransactionStatus_UNKNOWN {

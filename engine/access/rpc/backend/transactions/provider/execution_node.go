@@ -72,6 +72,7 @@ func (e *ENTransactionProvider) TransactionResult(
 	block *flow.Header,
 	transactionID flow.Identifier,
 	requiredEventEncodingVersion entities.EventEncodingVersion,
+	_ entities.ExecutionStateQuery,
 ) (*accessmodel.TransactionResult, error) {
 	blockID := block.ID()
 	// create an execution API request for events at blockID and transactionID
@@ -127,6 +128,7 @@ func (e *ENTransactionProvider) TransactionResultByIndex(
 	block *flow.Block,
 	index uint32,
 	encodingVersion entities.EventEncodingVersion,
+	_ entities.ExecutionStateQuery,
 ) (*accessmodel.TransactionResult, error) {
 	blockID := block.ID()
 	// create request and forward to EN
@@ -180,6 +182,7 @@ func (e *ENTransactionProvider) TransactionResultsByBlockID(
 	ctx context.Context,
 	block *flow.Block,
 	requiredEventEncodingVersion entities.EventEncodingVersion,
+	_ entities.ExecutionStateQuery,
 ) ([]*accessmodel.TransactionResult, error) {
 	blockID := block.ID()
 	req := &execproto.GetTransactionsByBlockIDRequest{

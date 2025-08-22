@@ -229,12 +229,9 @@ func (t *TransactionMetadata) refreshTransactionResult(ctx context.Context) erro
 		return nil
 	}
 
-	txResult, err := t.txProvider.TransactionResult(
-		ctx,
-		t.blockWithTx,
-		t.txResult.TransactionID,
-		t.eventEncodingVersion,
-	)
+	// TODO: Need to pass params here in scope of https://github.com/onflow/flow-go/issues/7654
+	txResult, err := t.txProvider.TransactionResult(ctx, t.blockWithTx, t.txResult.TransactionID,
+		t.eventEncodingVersion, entities.ExecutionStateQuery{})
 	if err != nil {
 		// TODO: I don't like the fact we propagate this error from txProvider.
 		// Fix it during error handling polishing project

@@ -28,13 +28,14 @@ func (f *FailoverTransactionProvider) TransactionResult(
 	header *flow.Header,
 	txID flow.Identifier,
 	encodingVersion entities.EventEncodingVersion,
+	query entities.ExecutionStateQuery,
 ) (*accessmodel.TransactionResult, error) {
-	localResult, localErr := f.localProvider.TransactionResult(ctx, header, txID, encodingVersion)
+	localResult, localErr := f.localProvider.TransactionResult(ctx, header, txID, encodingVersion, query)
 	if localErr == nil {
 		return localResult, nil
 	}
 
-	execNodeResult, execNodeErr := f.execNodeProvider.TransactionResult(ctx, header, txID, encodingVersion)
+	execNodeResult, execNodeErr := f.execNodeProvider.TransactionResult(ctx, header, txID, encodingVersion, entities.ExecutionStateQuery{})
 	return execNodeResult, execNodeErr
 }
 
@@ -43,13 +44,14 @@ func (f *FailoverTransactionProvider) TransactionResultByIndex(
 	block *flow.Block,
 	index uint32,
 	encodingVersion entities.EventEncodingVersion,
+	query entities.ExecutionStateQuery,
 ) (*accessmodel.TransactionResult, error) {
-	localResult, localErr := f.localProvider.TransactionResultByIndex(ctx, block, index, encodingVersion)
+	localResult, localErr := f.localProvider.TransactionResultByIndex(ctx, block, index, encodingVersion, query)
 	if localErr == nil {
 		return localResult, nil
 	}
 
-	execNodeResult, execNodeErr := f.execNodeProvider.TransactionResultByIndex(ctx, block, index, encodingVersion)
+	execNodeResult, execNodeErr := f.execNodeProvider.TransactionResultByIndex(ctx, block, index, encodingVersion, entities.ExecutionStateQuery{})
 	return execNodeResult, execNodeErr
 }
 
@@ -57,12 +59,14 @@ func (f *FailoverTransactionProvider) TransactionResultsByBlockID(
 	ctx context.Context,
 	block *flow.Block,
 	encodingVersion entities.EventEncodingVersion,
+	query entities.ExecutionStateQuery,
 ) ([]*accessmodel.TransactionResult, error) {
-	localResults, localErr := f.localProvider.TransactionResultsByBlockID(ctx, block, encodingVersion)
+	localResults, localErr := f.localProvider.TransactionResultsByBlockID(ctx, block, encodingVersion, query)
 	if localErr == nil {
 		return localResults, nil
 	}
 
-	execNodeResults, execNodeErr := f.execNodeProvider.TransactionResultsByBlockID(ctx, block, encodingVersion)
+	execNodeResults, execNodeErr := f.execNodeProvider.TransactionResultsByBlockID(ctx, block, encodingVersion,
+		entities.ExecutionStateQuery{})
 	return execNodeResults, execNodeErr
 }

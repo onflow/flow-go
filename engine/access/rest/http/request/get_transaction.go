@@ -1,6 +1,10 @@
 package request
 
 import (
+	"fmt"
+
+	"github.com/onflow/flow/protobuf/go/flow/entities"
+
 	"github.com/onflow/flow-go/engine/access/rest/common"
 	"github.com/onflow/flow-go/engine/access/rest/common/parser"
 	"github.com/onflow/flow-go/model/flow"
@@ -62,25 +66,54 @@ func (g *GetTransaction) Build(r *common.Request) error {
 type GetTransactionResult struct {
 	GetByIDRequest
 	TransactionOptionals
+	ExecutionState entities.ExecutionStateQuery
 }
 
-// GetTransactionResultRequest extracts necessary variables from the provided request,
-// builds a GetTransactionResult instance, and validates it.
+// NewGetTransactionResult extracts necessary variables from the provided request
+// and returns a validated GetTransactionResult.
 //
 // No errors are expected during normal operation.
-func GetTransactionResultRequest(r *common.Request) (GetTransactionResult, error) {
-	var req GetTransactionResult
-	err := req.Build(r)
-	return req, err
+func NewGetTransactionResult(r *common.Request) (GetTransactionResult, error) {
+	return parseGetTransactionResult(
+		r,
+		r.GetQueryParam(agreeingExecutorCountQuery),
+		r.GetQueryParams(requiredExecutorIdsQuery),
+		r.GetQueryParam(includeExecutorMetadataQuery),
+	)
 }
 
-func (g *GetTransactionResult) Build(r *common.Request) error {
-	err := g.TransactionOptionals.Parse(r)
-	if err != nil {
-		return err
+func parseGetTransactionResult(
+	r *common.Request,
+	rawAgreeingExecutorsCount string,
+	rawAgreeingExecutorsIds []string,
+	rawIncludeExecutorMetadata string,
+) (GetTransactionResult, error) {
+	var txOpts TransactionOptionals
+	if err := txOpts.Parse(r); err != nil {
+		return GetTransactionResult{}, fmt.Errorf("invalid transaction optionals: %w", err)
 	}
 
-	err = g.GetByIDRequest.Build(r)
+	var byID GetByIDRequest
+	if err := byID.Build(r); err != nil {
+		return GetTransactionResult{}, fmt.Errorf("invalid ID request: %w", err)
+	}
 
-	return err
+	agreeingExecutorsCount, agreeingExecutorsIds, includeExecutorMetadata, err := parser.NewExecutionDataQuery(
+		rawAgreeingExecutorsCount,
+		rawAgreeingExecutorsIds,
+		rawIncludeExecutorMetadata,
+	)
+	if err != nil {
+		return GetTransactionResult{}, err
+	}
+
+	return GetTransactionResult{
+		GetByIDRequest:       byID,
+		TransactionOptionals: txOpts,
+		ExecutionState: entities.ExecutionStateQuery{
+			AgreeingExecutorsCount:  agreeingExecutorsCount,
+			RequiredExecutorId:      agreeingExecutorsIds,
+			IncludeExecutorMetadata: includeExecutorMetadata,
+		},
+	}, nil
 }

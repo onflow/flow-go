@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/onflow/flow-go/access"
+	errors2 "github.com/onflow/flow-go/access"
 )
 
 // StatusError provides custom error with http status.
@@ -77,21 +77,21 @@ func ErrorToStatusError(err error) StatusError {
 	}
 
 	switch {
-	case access.IsInvalidRequestError(err):
+	case errors2.IsInvalidRequestError(err):
 		return NewBadRequestError(err)
-	case access.IsDataNotFoundError(err):
+	case errors2.IsDataNotFoundError(err):
 		return NewNotFoundError(fmt.Sprintf("Flow resource not found: %v", err.Error()), err)
-	case access.IsPreconditionFailedError(err):
+	case errors2.IsPreconditionFailedError(err):
 		return NewRestError(http.StatusPreconditionFailed, err.Error(), err)
-	case access.IsOutOfRangeError(err):
+	case errors2.IsOutOfRangeError(err):
 		return NewNotFoundError(err.Error(), err)
-	case access.IsInternalError(err):
+	case errors2.IsInternalError(err):
 		return NewRestError(http.StatusInternalServerError, err.Error(), err)
-	case access.IsRequestCanceledError(err):
+	case errors2.IsRequestCanceledError(err):
 		return NewRestError(http.StatusRequestTimeout, "Request canceled", err)
-	case access.IsRequestTimedOutError(err):
+	case errors2.IsRequestTimedOutError(err):
 		return NewRestError(http.StatusRequestTimeout, "Request deadline exceeded", err)
-	case access.IsServiceUnavailable(err):
+	case errors2.IsServiceUnavailable(err):
 		return NewRestError(http.StatusServiceUnavailable, err.Error(), err)
 	default:
 		return NewRestError(http.StatusInternalServerError, err.Error(), err)
