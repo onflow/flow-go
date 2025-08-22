@@ -26,6 +26,11 @@ var generateVoteCmd = &cobra.Command{
 
 func init() {
 	rootCmd.AddCommand(generateVoteCmd)
+	addGenerateVoteCmdFlags()
+}
+
+func addGenerateVoteCmdFlags() {
+	generateVoteCmd.Flags().StringVarP(&flagOutputDir, "outputDir", "o", "", "ouput directory for vote files; if not set defaults to bootstrap directory")
 }
 
 func generateVote(c *cobra.Command, args []string) {
@@ -78,6 +83,12 @@ func generateVote(c *cobra.Command, args []string) {
 	signer := verification.NewCombinedSigner(me, beaconKeyStore)
 
 	path = filepath.Join(flagBootDir, bootstrap.PathRootBlockData)
+
+	// If output directory is specified, use it for the root-block.json
+	if flagOutputDir != "" {
+		path = filepath.Join(flagOutputDir, "root-block.json")
+	}
+
 	data, err = io.ReadFile(path)
 	if err != nil {
 		log.Fatal().Err(err).Msg("could not read root block file")
@@ -96,7 +107,15 @@ func generateVote(c *cobra.Command, args []string) {
 
 	voteFile := fmt.Sprintf(bootstrap.PathNodeRootBlockVote, nodeID)
 
-	if err = io.WriteJSON(filepath.Join(flagBootDir, voteFile), vote); err != nil {
+	// By default, use the bootstrap directory for storing the vote file
+	voteFilePath := filepath.Join(flagBootDir, voteFile)
+
+	// If output directory is specified, use it for the vote file path
+	if flagOutputDir != "" {
+		voteFilePath = filepath.Join(flagOutputDir, "root-block-vote.json")
+	}
+
+	if err = io.WriteJSON(voteFilePath, vote); err != nil {
 		log.Fatal().Err(err).Msg("could not write vote to file")
 	}
 
