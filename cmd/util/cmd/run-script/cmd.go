@@ -447,8 +447,9 @@ func (a *api) GetEventsForHeightRange(
 	_ string,
 	_, _ uint64,
 	_ entities.EventEncodingVersion,
-) ([]flow.BlockEvents, error) {
-	return nil, errors.New("unimplemented")
+	_ entities.ExecutionStateQuery,
+) ([]flow.BlockEvents, entities.ExecutorMetadata, error) {
+	return nil, entities.ExecutorMetadata{}, errors.New("unimplemented")
 }
 
 func (a *api) GetEventsForBlockIDs(
@@ -456,8 +457,9 @@ func (a *api) GetEventsForBlockIDs(
 	_ string,
 	_ []flow.Identifier,
 	_ entities.EventEncodingVersion,
-) ([]flow.BlockEvents, error) {
-	return nil, errors.New("unimplemented")
+	_ entities.ExecutionStateQuery,
+) ([]flow.BlockEvents, entities.ExecutorMetadata, error) {
+	return nil, entities.ExecutorMetadata{}, errors.New("unimplemented")
 }
 
 func (*api) GetLatestProtocolStateSnapshot(_ context.Context) ([]byte, error) {

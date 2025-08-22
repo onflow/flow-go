@@ -12,35 +12,37 @@ const MaxIDsLength = 50
 
 type ID flow.Identifier
 
-func (i *ID) Parse(raw string) error {
-	if raw == "" { // allow empty
-		*i = ID(flow.ZeroID)
-		return nil
+func NewID(raw string) (ID, error) {
+	if raw == "" {
+		return ID(flow.ZeroID), nil
 	}
 
 	valid, _ := regexp.MatchString(`^[0-9a-fA-F]{64}$`, raw)
 	if !valid {
-		return errors.New("invalid ID format")
+		return ID(flow.Identifier{}), errors.New("invalid ID format")
 	}
 
 	flowID, err := flow.HexStringToIdentifier(raw)
 	if err != nil {
-		return fmt.Errorf("invalid ID: %w", err)
+		return ID(flow.Identifier{}), fmt.Errorf("invalid ID: %w", err)
 	}
 
-	*i = ID(flowID)
-	return nil
+	return ID(flowID), nil
 }
 
 func (i ID) Flow() flow.Identifier {
 	return flow.Identifier(i)
 }
 
+func (i ID) Bytes() []byte {
+	return []byte(i.Flow().String())
+}
+
 type IDs []ID
 
-func (i *IDs) Parse(raw []string) error {
+func NewIDs(raw []string) (IDs, error) {
 	if len(raw) > MaxIDsLength {
-		return fmt.Errorf("at most %d IDs can be requested at a time", MaxIDsLength)
+		return nil, fmt.Errorf("at most %d IDs can be requested at a time", MaxIDsLength)
 	}
 
 	// make a map to have only unique values as keys
@@ -48,9 +50,9 @@ func (i *IDs) Parse(raw []string) error {
 	uniqueIDs := make(map[string]bool)
 	for _, r := range raw {
 		var id ID
-		err := id.Parse(r)
+		id, err := NewID(r)
 		if err != nil {
-			return err
+			return nil, err
 		}
 
 		if !uniqueIDs[id.Flow().String()] {
@@ -59,14 +61,21 @@ func (i *IDs) Parse(raw []string) error {
 		}
 	}
 
-	*i = ids
-	return nil
+	return ids, nil
 }
 
 func (i IDs) Flow() []flow.Identifier {
 	ids := make([]flow.Identifier, len(i))
 	for j, id := range i {
 		ids[j] = id.Flow()
+	}
+	return ids
+}
+
+func (i IDs) Bytes() [][]byte {
+	ids := make([][]byte, len(i))
+	for j, id := range i {
+		ids[j] = id.Bytes()
 	}
 	return ids
 }

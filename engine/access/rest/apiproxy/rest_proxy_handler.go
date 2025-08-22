@@ -373,10 +373,11 @@ func (r *RestProxyHandler) GetEventsForHeightRange(
 	eventType string,
 	startHeight, endHeight uint64,
 	requiredEventEncodingVersion entities.EventEncodingVersion,
-) ([]flow.BlockEvents, error) {
+	executionStateQuery entities.ExecutionStateQuery,
+) ([]flow.BlockEvents, entities.ExecutorMetadata, error) {
 	upstream, closer, err := r.FaultTolerantClient()
 	if err != nil {
-		return nil, err
+		return nil, entities.ExecutorMetadata{}, err
 	}
 	defer closer.Close()
 
@@ -385,15 +386,16 @@ func (r *RestProxyHandler) GetEventsForHeightRange(
 		StartHeight:          startHeight,
 		EndHeight:            endHeight,
 		EventEncodingVersion: requiredEventEncodingVersion,
+		ExecutionStateQuery:  &executionStateQuery,
 	}
 	eventsResponse, err := upstream.GetEventsForHeightRange(ctx, getEventsForHeightRangeRequest)
 	r.log("upstream", "GetEventsForHeightRange", err)
 
 	if err != nil {
-		return nil, err
+		return nil, entities.ExecutorMetadata{}, err
 	}
 
-	return convert.MessagesToBlockEvents(eventsResponse.Results), nil
+	return convert.MessagesToBlockEvents(eventsResponse.Results), entities.ExecutorMetadata{}, nil
 }
 
 // GetEventsForBlockIDs returns events by their name in the specified block IDs.
@@ -402,10 +404,11 @@ func (r *RestProxyHandler) GetEventsForBlockIDs(
 	eventType string,
 	blockIDs []flow.Identifier,
 	requiredEventEncodingVersion entities.EventEncodingVersion,
-) ([]flow.BlockEvents, error) {
+	executionStateQuery entities.ExecutionStateQuery,
+) ([]flow.BlockEvents, entities.ExecutorMetadata, error) {
 	upstream, closer, err := r.FaultTolerantClient()
 	if err != nil {
-		return nil, err
+		return nil, entities.ExecutorMetadata{}, err
 	}
 	defer closer.Close()
 
@@ -415,15 +418,16 @@ func (r *RestProxyHandler) GetEventsForBlockIDs(
 		Type:                 eventType,
 		BlockIds:             blockIds,
 		EventEncodingVersion: requiredEventEncodingVersion,
+		ExecutionStateQuery:  &executionStateQuery,
 	}
 	eventsResponse, err := upstream.GetEventsForBlockIDs(ctx, getEventsForBlockIDsRequest)
 	r.log("upstream", "GetEventsForBlockIDs", err)
 
 	if err != nil {
-		return nil, err
+		return nil, entities.ExecutorMetadata{}, err
 	}
 
-	return convert.MessagesToBlockEvents(eventsResponse.Results), nil
+	return convert.MessagesToBlockEvents(eventsResponse.Results), entities.ExecutorMetadata{}, nil
 }
 
 // convertError converts a serialized access error formatted as a grpc error returned from the upstream AN,
