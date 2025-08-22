@@ -211,7 +211,13 @@ func (h *Handler) SubscribeEvents(request *executiondata.SubscribeEventsRequest,
 		return err
 	}
 
-	sub := h.api.SubscribeEvents(stream.Context(), startBlockID, request.GetStartBlockHeight(), filter)
+	sub := h.api.SubscribeEvents(
+		stream.Context(),
+		startBlockID,
+		request.GetStartBlockHeight(),
+		filter,
+		*request.GetExecutionStateQuery(),
+	)
 
 	return HandleRPCSubscription(sub, h.handleEventsResponse(stream.Send, request.HeartbeatInterval, request.GetEventEncodingVersion()))
 }
@@ -246,7 +252,12 @@ func (h *Handler) SubscribeEventsFromStartBlockID(request *executiondata.Subscri
 		return err
 	}
 
-	sub := h.api.SubscribeEventsFromStartBlockID(stream.Context(), startBlockID, filter)
+	sub := h.api.SubscribeEventsFromStartBlockID(
+		stream.Context(),
+		startBlockID,
+		filter,
+		*request.GetExecutionStateQuery(),
+	)
 
 	return HandleRPCSubscription(sub, h.handleEventsResponse(stream.Send, request.HeartbeatInterval, request.GetEventEncodingVersion()))
 }
@@ -276,7 +287,12 @@ func (h *Handler) SubscribeEventsFromStartHeight(request *executiondata.Subscrib
 		return err
 	}
 
-	sub := h.api.SubscribeEventsFromStartHeight(stream.Context(), request.GetStartBlockHeight(), filter)
+	sub := h.api.SubscribeEventsFromStartHeight(
+		stream.Context(),
+		request.GetStartBlockHeight(),
+		filter,
+		*request.GetExecutionStateQuery(),
+	)
 
 	return HandleRPCSubscription(sub, h.handleEventsResponse(stream.Send, request.HeartbeatInterval, request.GetEventEncodingVersion()))
 }
@@ -306,7 +322,11 @@ func (h *Handler) SubscribeEventsFromLatest(request *executiondata.SubscribeEven
 		return err
 	}
 
-	sub := h.api.SubscribeEventsFromLatest(stream.Context(), filter)
+	sub := h.api.SubscribeEventsFromLatest(
+		stream.Context(),
+		filter,
+		*request.GetExecutionStateQuery(),
+	)
 
 	return HandleRPCSubscription(sub, h.handleEventsResponse(stream.Send, request.HeartbeatInterval, request.GetEventEncodingVersion()))
 }
@@ -544,7 +564,12 @@ func (h *Handler) SubscribeAccountStatusesFromStartBlockID(
 		return status.Errorf(codes.InvalidArgument, "could not create account status filter: %v", err)
 	}
 
-	sub := h.api.SubscribeAccountStatusesFromStartBlockID(stream.Context(), startBlockID, filter)
+	sub := h.api.SubscribeAccountStatusesFromStartBlockID(
+		stream.Context(),
+		startBlockID,
+		filter,
+		*request.GetExecutionStateQuery(),
+	)
 
 	return HandleRPCSubscription(sub, h.handleAccountStatusesResponse(request.HeartbeatInterval, request.GetEventEncodingVersion(), stream.Send))
 }
@@ -571,7 +596,12 @@ func (h *Handler) SubscribeAccountStatusesFromStartHeight(
 		return status.Errorf(codes.InvalidArgument, "could not create account status filter: %v", err)
 	}
 
-	sub := h.api.SubscribeAccountStatusesFromStartHeight(stream.Context(), request.GetStartBlockHeight(), filter)
+	sub := h.api.SubscribeAccountStatusesFromStartHeight(
+		stream.Context(),
+		request.GetStartBlockHeight(),
+		filter,
+		*request.GetExecutionStateQuery(),
+	)
 
 	return HandleRPCSubscription(sub, h.handleAccountStatusesResponse(request.HeartbeatInterval, request.GetEventEncodingVersion(), stream.Send))
 }
@@ -598,7 +628,11 @@ func (h *Handler) SubscribeAccountStatusesFromLatestBlock(
 		return status.Errorf(codes.InvalidArgument, "could not create account status filter: %v", err)
 	}
 
-	sub := h.api.SubscribeAccountStatusesFromLatestBlock(stream.Context(), filter)
+	sub := h.api.SubscribeAccountStatusesFromLatestBlock(
+		stream.Context(),
+		filter,
+		*request.GetExecutionStateQuery(),
+	)
 
 	return HandleRPCSubscription(sub, h.handleAccountStatusesResponse(request.HeartbeatInterval, request.GetEventEncodingVersion(), stream.Send))
 }

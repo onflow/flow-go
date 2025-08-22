@@ -104,8 +104,9 @@ func (b *AccountStatusesBackend) getAccountStatusResponseFactory(
 	execStateQuery entities.ExecutionStateQuery,
 ) subscription.GetDataByHeightFunc {
 	return func(ctx context.Context, height uint64) (interface{}, error) {
-		// TODO: I should use metadata
-		eventsResponse, _, err := b.eventsProvider.GetAllEventsResponse(ctx, height, execStateQuery)
+		// TODO: what should I do with metadata?
+		eventsResponse, _, err :=
+			b.eventsProvider.GetAllEventsResponse(ctx, height, execStateQuery)
 		if err != nil {
 			if errors.Is(err, storage.ErrNotFound) ||
 				errors.Is(err, storage.ErrHeightNotIndexed) {
