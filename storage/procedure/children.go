@@ -24,7 +24,7 @@ import (
 //     There are two special cases for (2):
 //     - If the parent block is zero (i.e. genesis block), then we don't need to add this index.
 //     - If the parent block doesn't exist, then we will index the new block as the only child
-//     of the parent anyway. This is useful for bootstrapping nodes with truncated history.
+//       of the parent anyway. This is useful for bootstrapping nodes with truncated history.
 func IndexNewBlock(lctx lockctx.Proof, rw storage.ReaderBatchWriter, blockID flow.Identifier, parentID flow.Identifier) error {
 	if !lctx.HoldsLock(storage.LockInsertBlock) {
 		return fmt.Errorf("missing required lock: %s", storage.LockInsertBlock)
