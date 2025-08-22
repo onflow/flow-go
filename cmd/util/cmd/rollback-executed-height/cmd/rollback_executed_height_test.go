@@ -61,6 +61,8 @@ func TestReExecuteBlock(t *testing.T) {
 				return genesis.Header.Height, nil
 			}
 
+			lockManager := storage.NewTestingLockManager()
+
 			// create execution state module
 			es := state.NewExecutionState(
 				nil,
@@ -78,6 +80,7 @@ func TestReExecuteBlock(t *testing.T) {
 				trace.NewNoopTracer(),
 				nil,
 				false,
+				lockManager,
 			)
 			require.NotNil(t, es)
 
@@ -202,6 +205,8 @@ func TestReExecuteBlockWithDifferentResult(t *testing.T) {
 			collections := store.NewCollections(db, transactions)
 			chunkDataPacks := store.NewChunkDataPacks(metrics, pebbleimpl.ToDB(pdb), collections, bstorage.DefaultCacheSize)
 
+			lockManager := storage.NewTestingLockManager()
+
 			err = headers.Store(genesis)
 			require.NoError(t, err)
 
@@ -226,6 +231,7 @@ func TestReExecuteBlockWithDifferentResult(t *testing.T) {
 				trace.NewNoopTracer(),
 				nil,
 				false,
+				lockManager,
 			)
 			require.NotNil(t, es)
 

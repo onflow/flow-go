@@ -51,11 +51,13 @@ func prepareTest(f func(t *testing.T, es state.ExecutionState, l *ledger.Ledger,
 				return 0, nil
 			}
 
+			lockManager := storageerr.NewTestingLockManager()
 			db := badgerimpl.ToDB(badgerDB)
 			es := state.NewExecutionState(
 				ls, stateCommitments, blocks, headers, chunkDataPacks, results, myReceipts, events, serviceEvents, txResults, db, getLatestFinalized, trace.NewNoopTracer(),
 				nil,
 				false,
+				lockManager,
 			)
 
 			f(t, es, ls, headers, stateCommitments)

@@ -7,6 +7,8 @@ import (
 	"math"
 	"sync"
 
+	"github.com/jordanschalm/lockctx"
+
 	"github.com/onflow/flow-go/engine/execution"
 	"github.com/onflow/flow-go/engine/execution/storehouse"
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
@@ -101,6 +103,7 @@ type state struct {
 	transactionResults storage.TransactionResults
 	db                 storage.DB
 	getLatestFinalized func() (uint64, error)
+	lockManager        lockctx.Manager
 
 	registerStore execution.RegisterStore
 	// when it is true, registers are stored in both register store and ledger
@@ -125,6 +128,7 @@ func NewExecutionState(
 	tracer module.Tracer,
 	registerStore execution.RegisterStore,
 	enableRegisterStore bool,
+	lockManager lockctx.Manager,
 ) ExecutionState {
 	return &state{
 		tracer:              tracer,
@@ -142,6 +146,7 @@ func NewExecutionState(
 		getLatestFinalized:  getLatestFinalized,
 		registerStore:       registerStore,
 		enableRegisterStore: enableRegisterStore,
+		lockManager:         lockManager,
 	}
 
 }
@@ -399,13 +404,18 @@ func (s *state) saveExecutionResults(
 		return fmt.Errorf("can not store multiple chunk data pack: %w", err)
 	}
 
-	// Write Batch is BadgerDB feature designed for handling lots of writes
-	// in efficient and atomic manner, hence pushing all the updates we can
-	// as tightly as possible to let Badger manage it.
-	// Note, that it does not guarantee atomicity as transactions has size limit,
-	// but it's the closest thing to atomicity we could have
-	return s.db.WithReaderBatchWriter(func(batch storage.ReaderBatchWriter) error {
+	lctx := s.lockManager.NewContext()
+	defer lctx.Release()
+	err = lctx.AcquireLock(storage.LockInsertOwnReceipt)
+	if err != nil {
+		return err
+	}
 
+	// Save entire execution result (including all chunk data packs) within one batch to minimize
+	// the number of database interactions. This is a large batch of data, which might not be
+	// committed within a single operation (e.g. if using Badger DB as storage backend, which has
+	// a size limit for its transactions).
+	return s.db.WithReaderBatchWriter(func(batch storage.ReaderBatchWriter) error {
 		batch.AddCallback(func(err error) {
 			// Rollback if an error occurs during batch operations
 			if err != nil {
@@ -438,7 +448,7 @@ func (s *state) saveExecutionResults(
 
 		executionResult := &result.ExecutionReceipt.ExecutionResult
 		// saving my receipts will also save the execution result
-		err = s.myReceipts.BatchStoreMyReceipt(result.ExecutionReceipt, batch)
+		err = s.myReceipts.BatchStoreMyReceipt(lctx, result.ExecutionReceipt, batch)
 		if err != nil {
 			return fmt.Errorf("could not persist execution result: %w", err)
 		}
@@ -458,7 +468,6 @@ func (s *state) saveExecutionResults(
 
 		return nil
 	})
-
 }
 
 func (s *state) UpdateLastExecutedBlock(ctx context.Context, executedID flow.Identifier) error {

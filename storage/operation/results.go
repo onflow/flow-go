@@ -15,7 +15,7 @@ func RetrieveExecutionResult(r storage.Reader, resultID flow.Identifier, result 
 	return RetrieveByKey(r, MakePrefix(codeExecutionResult, resultID), result)
 }
 
-// IndexExecutionResult inserts an execution result ID keyed by block ID
+// IndexExecutionResult inserts an execution result ID keyed by the executed block's ID
 func IndexExecutionResult(w storage.Writer, blockID flow.Identifier, resultID flow.Identifier) error {
 	return UpsertByKey(w, MakePrefix(codeIndexExecutionResultByBlock, blockID), resultID)
 }

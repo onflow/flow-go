@@ -27,19 +27,23 @@ func TestKeyValueStoreStorage(t *testing.T) {
 		blockID := unittest.IdentifierFixture()
 
 		// store protocol state and auxiliary info
+		lockManager := storage.NewTestingLockManager()
+		lctx := lockManager.NewContext()
+		require.NoError(t, lctx.AcquireLock(storage.LockInsertBlock))
 		err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			err := store.BatchStore(rw, stateID, expected)
+			err := store.BatchStore(lctx, rw, stateID, expected)
 			require.NoError(t, err)
-			return store.BatchIndex(rw, blockID, stateID)
+			return store.BatchIndex(lctx, rw, blockID, stateID)
 		})
 		require.NoError(t, err)
+		defer lctx.Release() // While still holding the lock, retrieve values; this verifies that reads are not blocked by acquired locks
 
-		// fetch protocol state
+		// fetch protocol state by its own ID
 		actual, err := store.ByID(stateID)
 		require.NoError(t, err)
 		assert.Equal(t, expected, actual)
 
-		// fetch protocol state by block ID
+		// fetch protocol state index by the block ID
 		actualByBlockID, err := store.ByBlockID(blockID)
 		require.NoError(t, err)
 		assert.Equal(t, expected, actualByBlockID)
@@ -61,13 +65,17 @@ func TestProtocolKVStore_StoreTx(t *testing.T) {
 			Data:    unittest.RandomBytes(32),
 		}
 
+		lockManager := storage.NewTestingLockManager()
+		lctx := lockManager.NewContext()
+		require.NoError(t, lctx.AcquireLock(storage.LockInsertBlock))
 		err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			return store.BatchStore(rw, stateID, expected)
+			return store.BatchStore(lctx, rw, stateID, expected)
 		})
 		require.NoError(t, err)
+		defer lctx.Release() // While still holding the lock, retrieve values; this verifies that reads are not blocked by acquired locks
 
 		err = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			return store.BatchStore(rw, stateID, expected)
+			return store.BatchStore(lctx, rw, stateID, expected)
 		})
 		// No error when storing same data again
 		require.NoError(t, err)
@@ -79,7 +87,7 @@ func TestProtocolKVStore_StoreTx(t *testing.T) {
 		}
 
 		err = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			return store.BatchStore(rw, stateID, dataDifferent)
+			return store.BatchStore(lctx, rw, stateID, dataDifferent)
 		})
 		require.ErrorIs(t, err, storage.ErrDataMismatch)
 
@@ -90,7 +98,7 @@ func TestProtocolKVStore_StoreTx(t *testing.T) {
 		}
 
 		err = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			return store.BatchStore(rw, stateID, versionDifferent)
+			return store.BatchStore(lctx, rw, stateID, versionDifferent)
 		})
 		require.ErrorIs(t, err, storage.ErrDataMismatch)
 	})
@@ -108,19 +116,23 @@ func TestProtocolKVStore_IndexTx(t *testing.T) {
 		stateID := unittest.IdentifierFixture()
 		blockID := unittest.IdentifierFixture()
 
+		lockManager := storage.NewTestingLockManager()
+		lctx := lockManager.NewContext()
+		require.NoError(t, lctx.AcquireLock(storage.LockInsertBlock))
 		err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			return store.BatchIndex(rw, blockID, stateID)
+			return store.BatchIndex(lctx, rw, blockID, stateID)
 		})
 		require.NoError(t, err)
+		defer lctx.Release() // While still holding the lock, retrieve values; this verifies that reads are not blocked by acquired locks
 
 		err = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			return store.BatchIndex(rw, blockID, stateID)
+			return store.BatchIndex(lctx, rw, blockID, stateID)
 		})
 		require.NoError(t, err)
 
 		differentStateID := unittest.IdentifierFixture()
 		err = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			return store.BatchIndex(rw, blockID, differentStateID)
+			return store.BatchIndex(lctx, rw, blockID, differentStateID)
 		})
 		require.ErrorIs(t, err, storage.ErrDataMismatch)
 	})

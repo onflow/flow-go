@@ -34,9 +34,9 @@ import (
 	protocol_state "github.com/onflow/flow-go/state/protocol/protocol_state/state"
 	"github.com/onflow/flow-go/state/protocol/util"
 	"github.com/onflow/flow-go/storage"
-	stoerr "github.com/onflow/flow-go/storage"
 	bstorage "github.com/onflow/flow-go/storage/badger"
 	"github.com/onflow/flow-go/storage/badger/operation"
+	"github.com/onflow/flow-go/storage/deferred"
 	storageoperation "github.com/onflow/flow-go/storage/operation"
 	"github.com/onflow/flow-go/storage/operation/badgerimpl"
 	"github.com/onflow/flow-go/storage/store"
@@ -547,7 +547,7 @@ func TestExtendMissingParent(t *testing.T) {
 		var sealID flow.Identifier
 		err = storageoperation.LookupLatestSealAtBlock(storagedb.Reader(), extend.ID(), &sealID)
 		require.Error(t, err)
-		require.ErrorIs(t, err, stoerr.ErrNotFound)
+		require.ErrorIs(t, err, storage.ErrNotFound)
 	})
 }
 
@@ -582,7 +582,7 @@ func TestExtendHeightTooSmall(t *testing.T) {
 		var sealID flow.Identifier
 		err = storageoperation.LookupLatestSealAtBlock(storagedb.Reader(), extend.ID(), &sealID)
 		require.Error(t, err)
-		require.ErrorIs(t, err, stoerr.ErrNotFound)
+		require.ErrorIs(t, err, storage.ErrNotFound)
 	})
 }
 
@@ -654,7 +654,7 @@ func TestExtendBlockNotConnected(t *testing.T) {
 		var sealID flow.Identifier
 		err = storageoperation.LookupLatestSealAtBlock(storagedb.Reader(), extend.ID(), &sealID)
 		require.Error(t, err)
-		require.ErrorIs(t, err, stoerr.ErrNotFound)
+		require.ErrorIs(t, err, storage.ErrNotFound)
 	})
 }
 
@@ -857,7 +857,6 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 		require.NoError(t, err)
 		metrics.On("CurrentEpochCounter", counter).Once()
 		metrics.On("CurrentEpochPhase", initialPhase).Once()
-
 		metrics.On("CurrentEpochFinalView", finalView).Once()
 
 		metrics.On("CurrentDKGPhaseViews",
@@ -2719,7 +2718,7 @@ func TestHeaderExtendMissingParent(t *testing.T) {
 		var sealID flow.Identifier
 		err = storageoperation.LookupLatestSealAtBlock(storagedb.Reader(), extend.ID(), &sealID)
 		require.Error(t, err)
-		require.ErrorIs(t, err, stoerr.ErrNotFound)
+		require.ErrorIs(t, err, storage.ErrNotFound)
 	})
 }
 
@@ -2751,7 +2750,7 @@ func TestHeaderExtendHeightTooSmall(t *testing.T) {
 		// verify seal not indexed
 		var sealID flow.Identifier
 		err = storageoperation.LookupLatestSealAtBlock(storagedb.Reader(), block2.ID(), &sealID)
-		require.ErrorIs(t, err, stoerr.ErrNotFound)
+		require.ErrorIs(t, err, storage.ErrNotFound)
 	})
 }
 
@@ -2871,7 +2870,7 @@ func TestParticipantHeaderExtendBlockNotConnected(t *testing.T) {
 		// verify seal not indexed
 		var sealID flow.Identifier
 		err = storageoperation.LookupLatestSealAtBlock(storagedb.Reader(), block2.ID(), &sealID)
-		require.ErrorIs(t, err, stoerr.ErrNotFound)
+		require.ErrorIs(t, err, storage.ErrNotFound)
 	})
 }
 
@@ -3131,7 +3130,7 @@ func TestCacheAtomicity(t *testing.T) {
 			go func(blockID flow.Identifier) {
 				for range 100 {
 					_, err := headers.ByBlockID(blockID)
-					if errors.Is(err, stoerr.ErrNotFound) {
+					if errors.Is(err, storage.ErrNotFound) {
 						continue
 					}
 					require.NoError(t, err)
@@ -3288,7 +3287,7 @@ func getRootProtocolStateID(t *testing.T, rootSnapshot *inmem.Snapshot) flow.Ide
 // calculateExpectedStateId is a utility function which makes easier to get expected protocol state ID after applying service events contained in seals.
 func calculateExpectedStateId(t *testing.T, mutableState realprotocol.MutableProtocolState) func(header *flow.Header, seals []*flow.Seal) flow.Identifier {
 	return func(header *flow.Header, seals []*flow.Seal) flow.Identifier {
-		expectedStateID, _, err := mutableState.EvolveState(header.ParentID, header.View, seals)
+		expectedStateID, err := mutableState.EvolveState(deferred.NewDeferredBlockPersist(), header.ParentID, header.View, seals)
 		require.NoError(t, err)
 		return expectedStateID
 	}
