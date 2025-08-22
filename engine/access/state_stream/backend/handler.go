@@ -211,12 +211,17 @@ func (h *Handler) SubscribeEvents(request *executiondata.SubscribeEventsRequest,
 		return err
 	}
 
+	var stateQuery entities.ExecutionStateQuery
+	if request.GetExecutionStateQuery() != nil {
+		stateQuery = *request.GetExecutionStateQuery()
+	}
+
 	sub := h.api.SubscribeEvents(
 		stream.Context(),
 		startBlockID,
 		request.GetStartBlockHeight(),
 		filter,
-		*request.GetExecutionStateQuery(),
+		stateQuery,
 	)
 
 	return HandleRPCSubscription(sub, h.handleEventsResponse(stream.Send, request.HeartbeatInterval, request.GetEventEncodingVersion()))
