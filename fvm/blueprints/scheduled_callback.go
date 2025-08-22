@@ -28,21 +28,15 @@ const (
 	processedCallbackIDFieldName     = "ID"
 	processedCallbackEffortFieldName = "executionEffort"
 	processedEventTypeTemplate       = "A.%v.CallbackScheduler.CallbackProcessed"
+	callbackTransactionGasLimit      = flow.DefaultMaxTransactionGasLimit
 )
 
-func ProcessCallbacksTransaction(chain flow.Chain, maxEffortLeft uint64) (*flow.TransactionBody, error) {
+func ProcessCallbacksTransaction(chain flow.Chain) *flow.TransactionBody {
 	script := prepareScheduledContractTransaction(chain, processCallbacksTransaction)
-	effort, err := ccf.Encode(cadence.UInt64(maxEffortLeft))
-	if err != nil {
-		return nil, fmt.Errorf("failed to encode max effort left: %w", err)
-	}
 
-	tx := flow.NewTransactionBody().
+	return flow.NewTransactionBody().
 		SetScript(script).
-		AddArgument(effort).
-		SetComputeLimit(flow.DefaultMaxTransactionGasLimit)
-
-	return tx, nil
+		SetComputeLimit(callbackTransactionGasLimit)
 }
 
 func ExecuteCallbacksTransactions(chainID flow.Chain, processEvents flow.EventsList) ([]*flow.TransactionBody, error) {

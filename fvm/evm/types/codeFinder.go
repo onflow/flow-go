@@ -4,8 +4,8 @@ import (
 	"errors"
 	"fmt"
 
-	gethCore "github.com/onflow/go-ethereum/core"
-	gethVM "github.com/onflow/go-ethereum/core/vm"
+	gethCore "github.com/ethereum/go-ethereum/core"
+	gethVM "github.com/ethereum/go-ethereum/core/vm"
 )
 
 func ValidationErrorCode(err error) ErrorCode {
