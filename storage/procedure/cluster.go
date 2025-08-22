@@ -20,6 +20,11 @@ func InsertClusterBlock(lctx lockctx.Proof, rw storage.ReaderBatchWriter, block 
 		return fmt.Errorf("missing required lock: %s", storage.LockInsertBlock)
 	}
 
+	// check payload integrity
+	if block.Header.PayloadHash != block.Payload.Hash() {
+		return fmt.Errorf("computed payload hash does not match header")
+	}
+
 	// store the block header
 	blockID := block.ID()
 	err := operation.InsertHeader(rw.Writer(), blockID, block.Header)
