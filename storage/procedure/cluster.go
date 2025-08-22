@@ -34,7 +34,7 @@ func InsertClusterBlock(lctx lockctx.Proof, rw storage.ReaderBatchWriter, block 
 	}
 
 	// index the child block for recovery
-	err = InsertNewClusterBlock(lctx, rw, blockID, block.Header.ParentID)
+	err = IndexNewClusterBlock(lctx, rw, blockID, block.Header.ParentID)
 	if err != nil {
 		return fmt.Errorf("could not index new block: %w", err)
 	}

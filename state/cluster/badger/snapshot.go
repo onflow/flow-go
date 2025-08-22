@@ -5,6 +5,7 @@ import (
 
 	"github.com/onflow/flow-go/model/cluster"
 	"github.com/onflow/flow-go/model/flow"
+	clusterState "github.com/onflow/flow-go/state/cluster"
 	"github.com/onflow/flow-go/storage/operation"
 	"github.com/onflow/flow-go/storage/procedure"
 )
@@ -16,6 +17,8 @@ type Snapshot struct {
 	state   *State
 	blockID flow.Identifier
 }
+
+var _ clusterState.Snapshot = (*Snapshot)(nil)
 
 func (s *Snapshot) Collection() (*flow.Collection, error) {
 	if s.err != nil {
@@ -32,7 +35,7 @@ func (s *Snapshot) Collection() (*flow.Collection, error) {
 
 	// get the payload
 	var payload cluster.Payload
-	err = procedure.RetrieveClusterPayload(s.state.db.Reader(), header.ID(), &payload)
+	err = procedure.RetrieveClusterPayload(s.state.db.Reader(), s.blockID, &payload)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get snapshot payload: %w", err)
 	}
@@ -67,12 +70,10 @@ func (s *Snapshot) head(head *flow.Header) error {
 	if err != nil {
 		return fmt.Errorf("could not retrieve header for block (%s): %w", s.blockID, err)
 	}
-
 	return nil
 }
 
 func (s *Snapshot) pending(blockID flow.Identifier) ([]flow.Identifier, error) {
-
 	var pendingIDs flow.IdentifierList
 	err := procedure.LookupBlockChildren(s.state.db.Reader(), blockID, &pendingIDs)
 	if err != nil {
