@@ -114,7 +114,6 @@ func NewCoreImpl(
 	persistentRegisters storage.RegisterIndex,
 	persistentEvents storage.Events,
 	persistentCollections storage.Collections,
-	persistentTransactions storage.Transactions,
 	persistentResults storage.LightTransactionResults,
 	persistentTxResultErrMsg storage.TransactionResultErrorMessages,
 	latestPersistedSealedResult storage.LatestPersistedSealedResult,
@@ -151,7 +150,6 @@ func NewCoreImpl(
 		stores.NewEventsStore(inmemEvents, persistentEvents, executionResult.BlockID),
 		stores.NewResultsStore(inmemResults, persistentResults, executionResult.BlockID),
 		stores.NewCollectionsStore(inmemCollections, persistentCollections, lockManager),
-		stores.NewTransactionsStore(inmemTransactions, persistentTransactions),
 		stores.NewTxResultErrMsgStore(inmemTxResultErrMsgs, persistentTxResultErrMsg, executionResult.BlockID),
 		stores.NewLatestSealedResultStore(latestPersistedSealedResult, executionResult.ID(), header.Height),
 	}
