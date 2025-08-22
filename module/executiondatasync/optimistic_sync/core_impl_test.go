@@ -95,7 +95,6 @@ func (c *CoreImplSuite) createTestCoreImpl() *CoreImpl {
 		c.persistentRegisters,
 		c.persistentEvents,
 		c.persistentCollections,
-		c.persistentTransactions,
 		c.persistentResults,
 		c.persistentTxResultErrMsg,
 		c.latestPersistedSealedResult,

@@ -442,7 +442,6 @@ func (p *PipelineFunctionalSuite) WithRunningPipeline(
 		p.persistentRegisters,
 		p.persistentEvents,
 		p.persistentCollections,
-		p.persistentTransactions,
 		p.persistentResults,
 		p.persistentTxResultErrMsg,
 		p.persistentLatestSealedResult,
