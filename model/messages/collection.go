@@ -1,6 +1,8 @@
 package messages
 
 import (
+	"fmt"
+
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -45,4 +47,19 @@ type ClusterTimeoutObject TimeoutObject
 func (c *ClusterTimeoutObject) ToInternal() (any, error) {
 	// TODO(malleability, #7704) implement with validation checks
 	return c, nil
+}
+
+// CollectionGuarantee is an untrusted message representation of an CollectionGuarantee.
+type CollectionGuarantee flow.UntrustedCollectionGuarantee
+
+// ToInternal converts the CollectionGuarantee message into its trusted internal
+// representation.
+//
+// All errors indicate that the decode target contains a structurally invalid representation of the internal model.
+func (c *CollectionGuarantee) ToInternal() (any, error) {
+	internal, err := flow.NewCollectionGuarantee(flow.UntrustedCollectionGuarantee(*c))
+	if err != nil {
+		return nil, fmt.Errorf("could not construct guarantee: %w", err)
+	}
+	return internal, nil
 }

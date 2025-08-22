@@ -232,7 +232,7 @@ func initializeMessageAuthConfigsMap() {
 	authorizationConfigs[CollectionGuarantee] = MsgAuthConfig{
 		Name: CollectionGuarantee,
 		Type: func() interface{} {
-			return new(flow.CollectionGuarantee)
+			return new(messages.CollectionGuarantee)
 		},
 		Config: map[channels.Channel]ChannelAuthConfig{
 			channels.PushGuarantees: {
@@ -436,7 +436,7 @@ func GetMessageAuthConfig(v interface{}) (MsgAuthConfig, error) {
 		return authorizationConfigs[ClusterBlockResponse], nil
 
 	// collections, guarantees & transactions
-	case *flow.CollectionGuarantee:
+	case *messages.CollectionGuarantee:
 		return authorizationConfigs[CollectionGuarantee], nil
 	case *flow.TransactionBody:
 		return authorizationConfigs[TransactionBody], nil
