@@ -158,6 +158,8 @@ func NewFullConsensusState(
 // with the same block. Hence, for simplicity, the FollowerState may reject such requests with an exception.
 //
 // No errors are expected during normal operations.
+//   - In case of concurrent calls with the same `candidate` block, ExtendCertified may return a [storage.ErrAlreadyExists]
+//     or it may gracefully return. At the moment, ExtendCertified should be considered as not concurrency-safe.
 func (m *FollowerState) ExtendCertified(ctx context.Context, candidate *flow.Block, certifyingQC *flow.QuorumCertificate) error {
 	span, ctx := m.tracer.StartSpanFromContext(ctx, trace.ProtoStateMutatorHeaderExtend)
 	defer span.End()
@@ -212,6 +214,14 @@ func (m *FollowerState) ExtendCertified(ctx context.Context, candidate *flow.Blo
 
 	// Execute the deferred database operations as one atomic transaction and emit scheduled notifications on success.
 	// The `candidate` block _must be valid_ (otherwise, the state will be corrupted)!
+	//
+	// Note: The following database write is not concurrency-safe at the moment. If a candidate block is
+	// identified as a duplicate by `checkBlockAlreadyProcessed` in the beginning, `Extend` behaves as a no-op and
+	// gracefully returns. However, if two concurrent `Extend` calls with the same block pass the initial check
+	// for duplicates, both will eventually attempt to commit their deferred database operations. As documented
+	// in `headerExtend`, its deferred operations will abort the write batch with [storage.ErrAlreadyExists].
+	// In this edge case of two concurrent calls with the same `candidate` block, `Extend` does not behave as
+	// an idempotent operation.
 	return m.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 		return deferredBlockPersist.Execute(lctx, blockID, rw)
 	})
@@ -243,6 +253,8 @@ func (m *FollowerState) ExtendCertified(ctx context.Context, candidate *flow.Blo
 // Expected errors during normal operations:
 //   - [state.OutdatedExtensionError] if the candidate block is orphaned
 //   - state.InvalidExtensionError if the candidate block is invalid
+//   - In case of concurrent calls with the same `candidate` block, ExtendCertified may return a [storage.ErrAlreadyExists]
+//     or it may gracefully return. At the moment, ExtendCertified should be considered as not concurrency-safe.
 func (m *ParticipantState) Extend(ctx context.Context, candidate *flow.Block) error {
 	span, ctx := m.tracer.StartSpanFromContext(ctx, trace.ProtoStateMutatorExtend)
 	defer span.End()
@@ -307,6 +319,14 @@ func (m *ParticipantState) Extend(ctx context.Context, candidate *flow.Block) er
 
 	// Execute the deferred database operations and emit scheduled notifications on success.
 	// The `candidate` block _must be valid_ (otherwise, the state will be corrupted)!
+	//
+	// Note: The following database write is not concurrency-safe at the moment. If a candidate block is
+	// identified as a duplicate by `checkBlockAlreadyProcessed` in the beginning, `Extend` behaves as a no-op and
+	// gracefully returns. However, if two concurrent `Extend` calls with the same block pass the initial check
+	// for duplicates, both will eventually attempt to commit their deferred database operations. As documented
+	// in `headerExtend`, its deferred operations will abort the write batch with [storage.ErrAlreadyExists].
+	// In this edge case of two concurrent calls with the same `candidate` block, `Extend` does not behave as
+	// an idempotent operation.
 	return m.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 		return deferredBlockPersist.Execute(lctx, blockID, rw)
 	})
