@@ -1,6 +1,8 @@
 package store
 
 import (
+	"fmt"
+
 	"github.com/onflow/flow-go/model/cluster"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
@@ -17,7 +19,6 @@ type ClusterPayloads struct {
 }
 
 func NewClusterPayloads(cacheMetrics module.CacheMetrics, db storage.DB) *ClusterPayloads {
-
 	retrieve := func(r storage.Reader, blockID flow.Identifier) (*cluster.Payload, error) {
 		var payload cluster.Payload
 		err := procedure.RetrieveClusterPayload(r, blockID, &payload)
@@ -30,18 +31,13 @@ func NewClusterPayloads(cacheMetrics module.CacheMetrics, db storage.DB) *Cluste
 			withLimit[flow.Identifier, *cluster.Payload](flow.DefaultTransactionExpiry*4),
 			withRetrieve(retrieve)),
 	}
-
 	return cp
 }
 
-func (cp *ClusterPayloads) retrieveTx(r storage.Reader, blockID flow.Identifier) (*cluster.Payload, error) {
-	val, err := cp.cache.Get(r, blockID)
+func (cp *ClusterPayloads) ByBlockID(blockID flow.Identifier) (*cluster.Payload, error) {
+	val, err := cp.cache.Get(cp.db.Reader(), blockID)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to retrieve cluster block payload: %w", err)
 	}
 	return val, nil
-}
-
-func (cp *ClusterPayloads) ByBlockID(blockID flow.Identifier) (*cluster.Payload, error) {
-	return cp.retrieveTx(cp.db.Reader(), blockID)
 }

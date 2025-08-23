@@ -3,6 +3,7 @@ package collection_test
 import (
 	"context"
 	"errors"
+	"fmt"
 	"math/rand"
 	"os"
 	"testing"
@@ -67,6 +68,7 @@ type BuilderSuite struct {
 
 // runs before each test runs
 func (suite *BuilderSuite) SetupTest() {
+	fmt.Println("SetupTest>>>>")
 	var err error
 
 	suite.genesis = model.Genesis()

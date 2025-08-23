@@ -52,8 +52,7 @@ func (suite *SnapshotSuite) SetupTest() {
 	suite.dbdir = unittest.TempDir(suite.T())
 	suite.badgerdb = unittest.BadgerDB(suite.T(), suite.dbdir)
 	suite.db = badgerimpl.ToDB(suite.badgerdb)
-	lockManager := storage.NewTestingLockManager()
-	suite.lockManager = lockManager
+	suite.lockManager = storage.NewTestingLockManager()
 
 	metrics := metrics.NewNoopCollector()
 	tracer := trace.NewNoopTracer()
@@ -67,7 +66,7 @@ func (suite *SnapshotSuite) SetupTest() {
 	suite.protoState, err = pbadger.Bootstrap(
 		metrics,
 		suite.db,
-		lockManager,
+		suite.lockManager,
 		all.Headers,
 		all.Seals,
 		all.Results,
@@ -84,7 +83,7 @@ func (suite *SnapshotSuite) SetupTest() {
 
 	clusterStateRoot, err := NewStateRoot(suite.genesis, unittest.QuorumCertificateFixture(), suite.epochCounter)
 	suite.Require().NoError(err)
-	clusterState, err := Bootstrap(suite.db, lockManager, clusterStateRoot)
+	clusterState, err := Bootstrap(suite.db, suite.lockManager, clusterStateRoot)
 	suite.Require().NoError(err)
 	suite.state, err = NewMutableState(clusterState, suite.lockManager, tracer, all.Headers, colPayloads)
 	suite.Require().NoError(err)

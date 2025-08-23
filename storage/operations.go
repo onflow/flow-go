@@ -204,8 +204,9 @@ func OnlyWriter(fn func(Writer) error) func(ReaderBatchWriter) error {
 }
 
 // OnCommitSucceed adds a callback to execute after the batch has been successfully committed.
-// Why not add this method to the ReaderBatchWriter?
-// because the implementation of the ReaderBatchWriter interface would have to provide an implementation
+//
+// Context on why we don't add this method to the ReaderBatchWriter:
+// Because the implementation of the ReaderBatchWriter interface would have to provide an implementation
 // for AddSuccessCallback, which can be derived for free from the AddCallback method.
 // It's better avoid using AddCallback directly and use OnCommitSucceed instead,
 // because you might write `if err != nil` by mistake, which is a golang idiom for error handling
