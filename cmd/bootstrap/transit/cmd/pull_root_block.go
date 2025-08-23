@@ -78,7 +78,7 @@ func pullRootBlock(c *cobra.Command, args []string) {
 	// this will set the path used to download the random beacon file and unwrap it
 	if flagOutputDir != "" {
 		fullRandomBeaconPath = filepath.Join(flagOutputDir, filepath.Base(objectName))
-		unWrappedRandomBeaconPath = filepath.Join(flagOutputDir, filepath.Base(objectName))
+		unWrappedRandomBeaconPath = filepath.Join(flagOutputDir, bootstrap.FilenameRandomBeaconPriv)
 	}
 
 	log.Info().Msgf("downloading random beacon key: %s", objectName)
