@@ -88,7 +88,7 @@ func TestIndexGuaranteedCollectionByBlockHashMultipleBlocks(t *testing.T) {
 		ids2 := flow.GetIDs(set2)
 
 		// insert block 1
-		_, lctx1 := unittest.LockManagerWithContext(t, storage.LockInsertBlock)
+		manager, lctx1 := unittest.LockManagerWithContext(t, storage.LockInsertBlock)
 		err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 			for _, guarantee := range set1 {
 				if err := operation.UnsafeInsertGuarantee(lctx1, rw.Writer(), guarantee.CollectionID, guarantee); err != nil {
@@ -104,7 +104,8 @@ func TestIndexGuaranteedCollectionByBlockHashMultipleBlocks(t *testing.T) {
 		lctx1.Release()
 
 		// insert block 2
-		_, lctx2 := unittest.LockManagerWithContext(t, storage.LockInsertBlock)
+		lctx2 := manager.NewContext()
+		require.NoError(t, lctx2.AcquireLock(storage.LockInsertBlock))
 		err = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 			for _, guarantee := range set2 {
 				if err := operation.UnsafeInsertGuarantee(lctx2, rw.Writer(), guarantee.CollectionID, guarantee); err != nil {
