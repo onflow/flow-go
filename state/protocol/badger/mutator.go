@@ -139,8 +139,6 @@ func NewFullConsensusState(
 //   - Attempts to extend the state with the _same block concurrently_ are not allowed.
 //     (will not corrupt the state, but may lead to an exception)
 //
-// Orphaned blocks are excepted.
-//
 // Per convention, the protocol state requires that the candidate's parent has already been ingested.
 // Other than that, all valid extensions are accepted. Even if we have enough information to determine that
 // a candidate block is already orphaned (e.g. its view is below the latest finalized view), it is important
@@ -228,8 +226,6 @@ func (m *FollowerState) ExtendCertified(ctx context.Context, candidate *flow.Blo
 //   - Attempts to extend the state with the _same block concurrently_ are not allowed.
 //     (will not corrupt the state, but may lead to an exception)
 //
-// Orphaned blocks are excepted.
-//
 // Per convention, the protocol state requires that the candidate's parent has already been ingested.
 // Other than that, all valid extensions are accepted. Even if we have enough information to determine that
 // a candidate block is already orphaned (e.g. its view is below the latest finalized view), it is important
@@ -249,7 +245,7 @@ func (m *FollowerState) ExtendCertified(ctx context.Context, candidate *flow.Blo
 // with the same block. Hence, for simplicity, the Protocol State may reject such requests with an exception.
 //
 // Expected errors during normal operations:
-//   - state.OutdatedExtensionError if the candidate block is outdated (e.g. orphaned)
+//   - state.OutdatedExtensionError if the candidate block is orphaned
 //   - state.InvalidExtensionError if the candidate block is invalid
 func (m *ParticipantState) Extend(ctx context.Context, candidate *flow.Block) error {
 	span, ctx := m.tracer.StartSpanFromContext(ctx, trace.ProtoStateMutatorExtend)
@@ -262,21 +258,24 @@ func (m *ParticipantState) Extend(ctx context.Context, candidate *flow.Block) er
 		return err
 	}
 
-	deferredBlockPersist := deferred.NewDeferredBlockPersist()
-
-	// check if the block header is a valid extension of parent block
-	err = m.headerExtend(ctx, candidate, nil, deferredBlockPersist)
-	if err != nil {
-		return fmt.Errorf("header not compliant with chain state: %w", err)
-	}
-
-	// check if the block header is a valid extension of the finalized state
+	// The following function rejects the input block with an [state.OutdatedExtensionError] if and only if
+	// the block is orpahned or already finalized. If the block was to be finalized already, it would have been
+	// detected as already processed by the check above. Hence, `candidate` being orphaned is the only
+	// possible case to receive an [state.OutdatedExtensionError] here.
 	err = m.checkOutdatedExtension(candidate.Header)
 	if err != nil {
 		if state.IsOutdatedExtensionError(err) {
 			return fmt.Errorf("candidate block is an outdated extension: %w", err)
 		}
 		return fmt.Errorf("could not check if block is an outdated extension: %w", err)
+	}
+
+	deferredBlockPersist := deferred.NewDeferredBlockPersist()
+
+	// check if the block header is a valid extension of parent block
+	err = m.headerExtend(ctx, candidate, nil, deferredBlockPersist)
+	if err != nil {
+		return fmt.Errorf("header not compliant with chain state: %w", err)
 	}
 
 	// check if the guarantees in the payload is a valid extension of the finalized state
@@ -481,40 +480,60 @@ func (m *FollowerState) checkBlockAlreadyProcessed(blockID flow.Identifier) (boo
 	return true, nil
 }
 
-// checkOutdatedExtension checks whether given block is
-// valid in the context of the entire state. For this, the block needs to
-// directly connect, through its ancestors, to the last finalized block.
+// checkOutdatedExtension rejects blocks that are either orphaned or already finalized, in which cases
+// the sentinel [state.OutdatedExtensionError] is returned. Per convention, the ancestor blocks
+// for any ingested block must be known.
+//
+// APPROACH:
+// Starting with `block`s parent, we walk the fork backwards in order of decreasing height. Eventually,
+// we will reach a finalized block (this is always true, because a node starts with the genesis block
+// or a root block that is known to be finalized and only accepts blocks that descend from this block).
+// Let H denote the *latest* finalized height (in the implementation below called `finalizedHeight`).
+//
+// For `block.Height` > H, there are two cases:
+//  1. When walking the fork backward, we reach the *latest* finalized block. Hence, `block` descends
+//     from the latest finalized block, i.e. it is not orphaned (yet).
+//  2. Alternatively, we may encounter a block at height H that is different from the latest finalized
+//     block. Therefore, our fork contains a block at height H that conflicts with the latest
+//     finalized block. Hence, `block` is orphaned.
+//
+// For `block.Height` ≤ H:
+//   - We emphasize that the traversal starts with `block`'s *parent*. Hence, the first block we
+//     visit when traversing the fork is at height `block.Height - 1` < H. Also in this case, our
+//     traversal reaches height H or below, _without_ encountering the latest finalized block.
+//
+// In summary, in the context of this function, we define a `block` to be OUTDATED if and only if
+// `block` is orpahned or already finalized.
+//
 // Expected errors during normal operations:
-//   - state.OutdatedExtensionError if the candidate block is outdated (e.g. orphaned)
-func (m *ParticipantState) checkOutdatedExtension(header *flow.Header) error {
-	var finalizedHeight uint64
-	err := operation.RetrieveFinalizedHeight(m.db.Reader(), &finalizedHeight)
+//   - [state.OutdatedExtensionError] if the candidate block is orphaned or finalized
+func (m *ParticipantState) checkOutdatedExtension(block *flow.Header) error {
+	var latestFinalizedHeight uint64
+	err := operation.RetrieveFinalizedHeight(m.db.Reader(), &latestFinalizedHeight)
 	if err != nil {
 		return fmt.Errorf("could not retrieve finalized height: %w", err)
 	}
 	var finalID flow.Identifier
-	err = operation.LookupBlockHeight(m.db.Reader(), finalizedHeight, &finalID)
+	err = operation.LookupBlockHeight(m.db.Reader(), latestFinalizedHeight, &finalID)
 	if err != nil {
 		return fmt.Errorf("could not lookup finalized block: %w", err)
 	}
 
-	ancestorID := header.ParentID
+	ancestorID := block.ParentID
 	for ancestorID != finalID {
 		ancestor, err := m.headers.ByBlockID(ancestorID)
 		if err != nil {
 			return fmt.Errorf("could not retrieve ancestor (%x): %w", ancestorID, err)
 		}
-		if ancestor.Height < finalizedHeight {
-			// this happens when the candidate block is on a fork that does not include all the
-			// finalized blocks.
-			// for instance:
-			// A (Finalized) <- B (Finalized) <- C (Finalized) <- D <- E <- F
-			//                  ^- G             ^- H             ^- I
-			// block G is not a valid block, because it does not have C (which has been finalized) as an ancestor
-			// block H and I are valid, because they do have C as an ancestor
+		if ancestor.Height < latestFinalizedHeight {
+			// Candidate block is on a fork that does not include the latest finalized block. For instance:
+			// A (Finalized) ← B (Finalized) ← C (Finalized) ← D ← E ← F
+			//                  ↖ G             ↖ H              ↖ I
+			// Block G is outdated, because its ancestry does not include C (latest finalized).
+			// Block H and I are not outdated, because they do have C as an ancestor.
 			return state.NewOutdatedExtensionErrorf(
 				"candidate block (height: %d) conflicts with finalized state (ancestor: %d final: %d)",
-				header.Height, ancestor.Height, finalizedHeight)
+				block.Height, ancestor.Height, latestFinalizedHeight)
 		}
 		ancestorID = ancestor.ParentID
 	}

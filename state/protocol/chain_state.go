@@ -93,7 +93,6 @@ type ParticipantState interface {
 	//     parent has already been ingested. Otherwise, an exception is returned.
 	//   - Attempts to extend the state with the _same block concurrently_ are not allowed.
 	//     (will not corrupt the state, but may lead to an exception)
-	// Orphaned blocks are excepted.
 	//
 	// Note: To ensure that all ancestors of a candidate block are correct and known to the Protocol State, some external
 	// ordering and queuing of incoming blocks is generally necessary (responsibility of Compliance Layer). Once a block
@@ -103,7 +102,7 @@ type ParticipantState interface {
 	// with the same block. Hence, for simplicity, the FollowerState may reject such requests with an exception.
 	//
 	// Expected errors during normal operations:
-	//  * state.OutdatedExtensionError if the candidate block is outdated (e.g. orphaned)
+	//  * state.OutdatedExtensionError if the candidate block is orphaned
 	//  * state.InvalidExtensionError if the candidate block is invalid
 	Extend(ctx context.Context, candidate *flow.Block) error
 }
