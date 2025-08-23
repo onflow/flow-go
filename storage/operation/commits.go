@@ -1,6 +1,7 @@
 package operation
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/jordanschalm/lockctx"
@@ -27,6 +28,8 @@ func IndexStateCommitment(lctx lockctx.Proof, rw storage.ReaderBatchWriter, bloc
 		}
 		return fmt.Errorf("commit for block %v already exists with different value, (existing: %v, new: %v), %w", blockID,
 			existingCommit, commit, storage.ErrDataMismatch)
+	} else if !errors.Is(err, storage.ErrNotFound) {
+		return fmt.Errorf("could not check existing state commitment: %w", err)
 	}
 
 	return UpsertByKey(rw.Writer(), MakePrefix(codeCommit, blockID), commit)
