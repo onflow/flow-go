@@ -55,7 +55,9 @@ type FollowerState interface {
 	//   - The parent block must already be stored.
 	//   - Attempts to extend the state with the _same block concurrently_ are not allowed.
 	//     (will not corrupt the state, but may lead to an exception)
-	// Orphaned blocks are excepted.
+	//
+	// Aside from the requirement that ancestors must have been previously ingested, all blocks are
+	// accepted; no matter how old they are; or whether they are orphaned or not.
 	//
 	// Note: To ensure that all ancestors of a candidate block are correct and known to the FollowerState, some external
 	// ordering and queuing of incoming blocks is generally necessary (responsibility of Compliance Layer). Once a block
@@ -93,6 +95,13 @@ type ParticipantState interface {
 	//     parent has already been ingested. Otherwise, an exception is returned.
 	//   - Attempts to extend the state with the _same block concurrently_ are not allowed.
 	//     (will not corrupt the state, but may lead to an exception)
+	//   - We reject orphaned blocks with [state.OutdatedExtensionError] !
+	//     This is more performant, but requires careful handling by the calling code. Specifically,
+	//     the caller should not just drop orphaned blocks from the cache to avoid wasteful re-requests.
+	//     If we were to entirely forget orphaned blocks, e.g. block X of the orphaned fork X ← Y ← Z,
+	//     we might not have enough information to reject blocks Y, Z later if we receive them. We would
+	//     re-request X, then determine it is orphaned and drop it, attempt to ingest Y re-request the
+	//     unknown parent X and repeat potentially very often.
 	//
 	// Note: To ensure that all ancestors of a candidate block are correct and known to the Protocol State, some external
 	// ordering and queuing of incoming blocks is generally necessary (responsibility of Compliance Layer). Once a block

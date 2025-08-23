@@ -135,7 +135,7 @@ func NewFullConsensusState(
 //
 // CAUTION:
 //   - This function expects that `certifyingQC ` has been validated. (otherwise, the state will be corrupted)
-//   - The parent block must already have been ingested.
+//   - The PARENT block must already have been INGESTED.
 //   - Attempts to extend the state with the _same block concurrently_ are not allowed.
 //     (will not corrupt the state, but may lead to an exception)
 //
@@ -222,20 +222,16 @@ func (m *FollowerState) ExtendCertified(ctx context.Context, candidate *flow.Blo
 //
 // CAUTION:
 //   - per convention, the protocol state requires that the candidate's
-//     parent has already been ingested. Otherwise, an exception is returned.
+//     PARENT has already been INGESTED. Otherwise, an exception is returned.
 //   - Attempts to extend the state with the _same block concurrently_ are not allowed.
 //     (will not corrupt the state, but may lead to an exception)
-//
-// Per convention, the protocol state requires that the candidate's parent has already been ingested.
-// Other than that, all valid extensions are accepted. Even if we have enough information to determine that
-// a candidate block is already orphaned (e.g. its view is below the latest finalized view), it is important
-// to accept it nevertheless to avoid spamming vulnerabilities. If a block is orphaned, consensus rules
-// guarantee that there exists only a limited number of descendants which cannot increase anymore. So there
-// is only a finite (generally small) amount of work to do accepting orphaned blocks and all their descendants.
-// However, if we were to drop orphaned blocks, e.g. block X of the orphaned fork X <- Y <- Z, we might not
-// have enough information to reject blocks Y, Z later if we receive them. We would re-request X, then
-// determine it is orphaned and drop it, attempt to ingest Y re-request the unknown parent X and repeat
-// potentially very often.
+//   - We reject orphaned blocks with [state.OutdatedExtensionError] !
+//     This is more performant, but requires careful handling by the calling code. Specifically,
+//     the caller should not just drop orphaned blocks from the cache to avoid wasteful re-requests.
+//     If we were to entirely forget orphaned blocks, e.g. block X of the orphaned fork X ← Y ← Z,
+//     we might not have enough information to reject blocks Y, Z later if we receive them. We would
+//     re-request X, then determine it is orphaned and drop it, attempt to ingest Y re-request the
+//     unknown parent X and repeat potentially very often.
 //
 // To ensure that all ancestors of a candidate block are correct and known to the Protocol State, some external
 // ordering and queuing of incoming blocks is generally necessary (responsibility of Compliance Layer). Once a block
@@ -245,7 +241,7 @@ func (m *FollowerState) ExtendCertified(ctx context.Context, candidate *flow.Blo
 // with the same block. Hence, for simplicity, the Protocol State may reject such requests with an exception.
 //
 // Expected errors during normal operations:
-//   - state.OutdatedExtensionError if the candidate block is orphaned
+//   - [state.OutdatedExtensionError] if the candidate block is orphaned
 //   - state.InvalidExtensionError if the candidate block is invalid
 func (m *ParticipantState) Extend(ctx context.Context, candidate *flow.Block) error {
 	span, ctx := m.tracer.StartSpanFromContext(ctx, trace.ProtoStateMutatorExtend)
@@ -259,7 +255,7 @@ func (m *ParticipantState) Extend(ctx context.Context, candidate *flow.Block) er
 	}
 
 	// The following function rejects the input block with an [state.OutdatedExtensionError] if and only if
-	// the block is orpahned or already finalized. If the block was to be finalized already, it would have been
+	// the block is orphaned or already finalized. If the block was to be finalized already, it would have been
 	// detected as already processed by the check above. Hence, `candidate` being orphaned is the only
 	// possible case to receive an [state.OutdatedExtensionError] here.
 	err = m.checkOutdatedExtension(candidate.Header)
@@ -503,7 +499,7 @@ func (m *FollowerState) checkBlockAlreadyProcessed(blockID flow.Identifier) (boo
 //     traversal reaches height H or below, _without_ encountering the latest finalized block.
 //
 // In summary, in the context of this function, we define a `block` to be OUTDATED if and only if
-// `block` is orpahned or already finalized.
+// `block` is orphaned or already finalized.
 //
 // Expected errors during normal operations:
 //   - [state.OutdatedExtensionError] if the candidate block is orphaned or finalized
