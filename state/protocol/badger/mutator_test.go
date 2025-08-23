@@ -163,7 +163,7 @@ func TestExtendValid(t *testing.T) {
 
 			// verify that block2's view is not indexed
 			err = operation.LookupCertifiedBlockByView(badgerimpl.ToDB(db).Reader(), block2.Header.View, &indexedID)
-			require.ErrorIs(t, err, stoerr.ErrNotFound)
+			require.ErrorIs(t, err, storage.ErrNotFound)
 		})
 	})
 }
@@ -563,38 +563,46 @@ func TestExtendMissingParent(t *testing.T) {
 	})
 }
 
+// TestExtendHeightTooSmall tests the behaviour when attempting to extend the protocol state by a block
+// whose height is not larger than its parent's height. The protocol state requires that the candidate's
+// height is exactly one larger than its parent's height. Otherwise, an exception should be returned.
 func TestExtendHeightTooSmall(t *testing.T) {
 	rootSnapshot := unittest.RootSnapshotFixture(participants)
 	rootProtocolStateID := getRootProtocolStateID(t, rootSnapshot)
-	util.RunWithFullProtocolState(t, rootSnapshot, func(db *badger.DB, state *protocol.ParticipantState) {
-		head, err := rootSnapshot.Head()
-		require.NoError(t, err)
+	head, err := rootSnapshot.Head()
+	require.NoError(t, err)
+	//require.Equal(t, uint64(1), head.View)// sanity check: test code below assumes that root block has height 0;
 
-		extend := unittest.BlockFixture()
-		extend.SetPayload(unittest.PayloadFixture(unittest.WithProtocolStateID(rootProtocolStateID)))
-		extend.Header.Height = 1
-		extend.Header.View = 1
-		extend.Header.ParentID = head.ID()
-		extend.Header.ParentView = head.View
+	// we create the following to descendants of head:
+	//   head <- blockB  <- blockC
+	// where blockB and blockC have exactly the same height
+	blockB := unittest.BlockWithParentFixture(head) // creates child with height one larger, but view possibly much larger
+	blockB.SetPayload(unittest.PayloadFixture(unittest.WithProtocolStateID(rootProtocolStateID)))
+	blockB.Header.View = head.Height + 1
 
-		err = state.Extend(context.Background(), &extend)
-		require.NoError(t, err)
+	blockC := unittest.BlockWithParentFixture(blockB.Header) // creates child with height one larger, but view possibly much larger
+	blockC.SetPayload(unittest.PayloadFixture(unittest.WithProtocolStateID(rootProtocolStateID)))
+	blockC.Header.Height = blockB.Header.Height
+	//blockC.Header.View = blockB.Header.View + 1
 
-		// create another block with the same height and view, that is coming after
-		extend.Header.ParentID = extend.Header.ID()
-		extend.Header.Height = 1
-		extend.Header.View = 2
+	util.RunWithFullProtocolState(t, rootSnapshot, func(db *badger.DB, chainState *protocol.ParticipantState) {
+		require.NoError(t, chainState.Extend(context.Background(), blockB))
 
-		err = state.Extend(context.Background(), &extend)
+		err = chainState.Extend(context.Background(), blockC)
 		require.Error(t, err)
+		require.True(t, st.IsInvalidExtensionError(err))
 
+		// Whenever the state ingests a block, it indexes the latest seal as of this block.
+		// Therefore, we can use this as a check to confirm that blockB was successfully ingested,
+		// but the information from blockC was not.
 		storagedb := badgerimpl.ToDB(db)
-
-		// verify seal not indexed
 		var sealID flow.Identifier
-		err = operation.LookupLatestSealAtBlock(storagedb.Reader(), extend.ID(), &sealID)
-		require.Error(t, err)
-		require.ErrorIs(t, err, storage.ErrNotFound)
+		// latest seal for blockB should be found, as blockB was successfully ingested:
+		require.NoError(t, operation.LookupLatestSealAtBlock(storagedb.Reader(), blockB.ID(), &sealID))
+		// latest seal for blockC should NOT be found, because extending the state with blockC errored:
+		require.ErrorIs(t,
+			operation.LookupLatestSealAtBlock(storagedb.Reader(), blockC.ID(), &sealID),
+			storage.ErrNotFound)
 	})
 }
 
