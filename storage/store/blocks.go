@@ -81,7 +81,6 @@ func (b *Blocks) ByView(view uint64) (*flow.Block, error) {
 	if err != nil {
 		return nil, err
 	}
-
 	return b.ByID(blockID)
 }
 

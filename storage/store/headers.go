@@ -99,14 +99,13 @@ func (h *Headers) ByHeight(height uint64) (*flow.Header, error) {
 }
 
 // ByView returns block header for the given view. It is only available for certified blocks.
-// Certified blocks are the blocks that have received QC. Hotstuff guarantees that for each view,
+// Certified blocks are the blocks that have received a QC. Hotstuff guarantees that for each view,
 // at most one block is certified. Hence, the return value of `ByView` is guaranteed to be unique
 // even for non-finalized blocks.
 // Expected errors during normal operations:
 //   - `storage.ErrNotFound` if no certified block is known at given view.
 //
-// Note: this method is not available until next spork or a migration that builds the index.
-// Note: this method is not available until next spork or a migration that builds the index.
+// NOTE: this method is not available until next spork (mainnet27) or a migration that builds the index.
 func (h *Headers) ByView(view uint64) (*flow.Header, error) {
 	blockID, err := h.viewCache.Get(h.db.Reader(), view)
 	if err != nil {
@@ -178,8 +177,8 @@ func (h *Headers) FindHeaders(filter func(header *flow.Header) bool) ([]flow.Hea
 }
 
 // RollbackExecutedBlock update the executed block header to the given header.
-// only useful for execution node to roll back executed block height
-// This method is not concurrent safe, the caller should make sure to call
+// Intended to be used by Execution Nodes only, to roll back executed block height.
+// This method is NOT CONCURRENT SAFE, the caller should make sure to call
 // this method in a single thread.
 func (h *Headers) RollbackExecutedBlock(header *flow.Header) error {
 	var blockID flow.Identifier
