@@ -198,12 +198,9 @@ func TestReExecuteBlockWithDifferentResult(t *testing.T) {
 
 		// create all modules
 		metrics := &metrics.NoopCollector{}
-
 		all := store.InitAll(metrics, db)
 		headers := all.Headers
 		blocks := all.Blocks
-
-		txResults := store.NewTransactionResults(metrics, db, bstorage.DefaultCacheSize)
 		commits := store.NewCommits(metrics, db)
 		results := store.NewExecutionResults(metrics, db)
 		receipts := store.NewExecutionReceipts(metrics, db, results, bstorage.DefaultCacheSize)
@@ -213,6 +210,7 @@ func TestReExecuteBlockWithDifferentResult(t *testing.T) {
 		transactions := store.NewTransactions(metrics, db)
 		collections := store.NewCollections(db, transactions)
 		chunkDataPacks := store.NewChunkDataPacks(metrics, pebbleimpl.ToDB(pdb), collections, bstorage.DefaultCacheSize)
+		txResults := store.NewTransactionResults(metrics, db, bstorage.DefaultCacheSize)
 
 		lockManager := storage.NewTestingLockManager()
 		withLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {

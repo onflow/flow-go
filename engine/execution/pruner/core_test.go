@@ -93,7 +93,7 @@ func TestLoopPruneExecutionDataFromRootToLatestSealed(t *testing.T) {
 				parentID = block.ID()
 			}
 
-			// last seale and executed is the last sealed
+			// update the index "latest executed block (max height)" to latest sealed block
 			require.NoError(t, db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 				return operation.UpdateExecutedBlock(rw.Writer(), chunks[lastFinalizedHeight].Header.ID())
 			}))
