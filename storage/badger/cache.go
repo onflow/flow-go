@@ -1,15 +1,14 @@
-package badger
+package store
 
 import (
 	"errors"
 	"fmt"
 
-	"github.com/dgraph-io/badger/v2"
 	lru "github.com/hashicorp/golang-lru/v2"
+	"github.com/jordanschalm/lockctx"
 
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/storage"
-	"github.com/onflow/flow-go/storage/badger/transaction"
 )
 
 func withLimit[K comparable, V any](limit uint) func(*Cache[K, V]) {
@@ -18,7 +17,9 @@ func withLimit[K comparable, V any](limit uint) func(*Cache[K, V]) {
 	}
 }
 
-type storeFunc[K comparable, V any] func(key K, val V) func(*transaction.Tx) error
+type storeFunc[K comparable, V any] func(rw storage.ReaderBatchWriter, key K, val V) error
+
+type storeWithLockFunc[K comparable, V any] func(lctx lockctx.Proof, rw storage.ReaderBatchWriter, key K, val V) error
 
 const DefaultCacheSize = uint(1000)
 
@@ -28,13 +29,37 @@ func withStore[K comparable, V any](store storeFunc[K, V]) func(*Cache[K, V]) {
 	}
 }
 
-func noStore[K comparable, V any](_ K, _ V) func(*transaction.Tx) error {
-	return func(tx *transaction.Tx) error {
-		return fmt.Errorf("no store function for cache put available")
+func withStoreWithLock[K comparable, V any](store storeWithLockFunc[K, V]) func(*Cache[K, V]) {
+	return func(c *Cache[K, V]) {
+		c.storeWithLock = store
 	}
 }
 
-type retrieveFunc[K comparable, V any] func(key K) func(*badger.Txn) (V, error)
+func noStore[K comparable, V any](_ storage.ReaderBatchWriter, _ K, _ V) error {
+	return fmt.Errorf("no store function for cache put available")
+}
+
+func noStoreWithLock[K comparable, V any](_ lockctx.Proof, _ storage.ReaderBatchWriter, _ K, _ V) error {
+	return fmt.Errorf("no store function for cache put with lock available")
+}
+
+func noopStore[K comparable, V any](_ storage.ReaderBatchWriter, _ K, _ V) error {
+	return nil
+}
+
+type removeFunc[K comparable] func(storage.ReaderBatchWriter, K) error
+
+func withRemove[K comparable, V any](remove removeFunc[K]) func(*Cache[K, V]) {
+	return func(c *Cache[K, V]) {
+		c.remove = remove
+	}
+}
+
+func noRemove[K comparable](_ storage.ReaderBatchWriter, _ K) error {
+	return fmt.Errorf("no remove function for cache remove available")
+}
+
+type retrieveFunc[K comparable, V any] func(r storage.Reader, key K) (V, error)
 
 func withRetrieve[K comparable, V any](retrieve retrieveFunc[K, V]) func(*Cache[K, V]) {
 	return func(c *Cache[K, V]) {
@@ -42,29 +67,31 @@ func withRetrieve[K comparable, V any](retrieve retrieveFunc[K, V]) func(*Cache[
 	}
 }
 
-func noRetrieve[K comparable, V any](_ K) func(*badger.Txn) (V, error) {
-	return func(tx *badger.Txn) (V, error) {
-		var nullV V
-		return nullV, fmt.Errorf("no retrieve function for cache get available")
-	}
+func noRetrieve[K comparable, V any](_ storage.Reader, _ K) (V, error) {
+	var nullV V
+	return nullV, fmt.Errorf("no retrieve function for cache get available")
 }
 
 type Cache[K comparable, V any] struct {
-	metrics  module.CacheMetrics
-	limit    uint
-	store    storeFunc[K, V]
-	retrieve retrieveFunc[K, V]
-	resource string
-	cache    *lru.Cache[K, V]
+	metrics       module.CacheMetrics
+	limit         uint
+	store         storeFunc[K, V]
+	storeWithLock storeWithLockFunc[K, V]
+	retrieve      retrieveFunc[K, V]
+	remove        removeFunc[K]
+	resource      string
+	cache         *lru.Cache[K, V]
 }
 
 func newCache[K comparable, V any](collector module.CacheMetrics, resourceName string, options ...func(*Cache[K, V])) *Cache[K, V] {
 	c := Cache[K, V]{
-		metrics:  collector,
-		limit:    1000,
-		store:    noStore[K, V],
-		retrieve: noRetrieve[K, V],
-		resource: resourceName,
+		metrics:       collector,
+		limit:         1000,
+		store:         noStore[K, V],
+		storeWithLock: noStoreWithLock[K, V],
+		retrieve:      noRetrieve[K, V],
+		remove:        noRemove[K],
+		resource:      resourceName,
 	}
 	for _, option := range options {
 		option(&c)
@@ -83,36 +110,33 @@ func (c *Cache[K, V]) IsCached(key K) bool {
 // Get will try to retrieve the resource from cache first, and then from the
 // injected. During normal operations, the following error returns are expected:
 //   - `storage.ErrNotFound` if key is unknown.
-func (c *Cache[K, V]) Get(key K) func(*badger.Txn) (V, error) {
-	return func(tx *badger.Txn) (V, error) {
-
-		// check if we have it in the cache
-		resource, cached := c.cache.Get(key)
-		if cached {
-			c.metrics.CacheHit(c.resource)
-			return resource, nil
-		}
-
-		// get it from the database
-		resource, err := c.retrieve(key)(tx)
-		if err != nil {
-			if errors.Is(err, storage.ErrNotFound) {
-				c.metrics.CacheNotFound(c.resource)
-			}
-			var nullV V
-			return nullV, fmt.Errorf("could not retrieve resource: %w", err)
-		}
-
-		c.metrics.CacheMiss(c.resource)
-
-		// cache the resource and eject least recently used one if we reached limit
-		evicted := c.cache.Add(key, resource)
-		if !evicted {
-			c.metrics.CacheEntries(c.resource, uint(c.cache.Len()))
-		}
-
+func (c *Cache[K, V]) Get(r storage.Reader, key K) (V, error) {
+	// check if we have it in the cache
+	resource, cached := c.cache.Get(key)
+	if cached {
+		c.metrics.CacheHit(c.resource)
 		return resource, nil
 	}
+
+	// get it from the database
+	resource, err := c.retrieve(r, key)
+	if err != nil {
+		if errors.Is(err, storage.ErrNotFound) {
+			c.metrics.CacheNotFound(c.resource)
+		}
+		var nullV V
+		return nullV, fmt.Errorf("could not retrieve resource: %w", err)
+	}
+
+	c.metrics.CacheMiss(c.resource)
+
+	// cache the resource and eject least recently used one if we reached limit
+	evicted := c.cache.Add(key, resource)
+	if !evicted {
+		c.metrics.CacheEntries(c.resource, uint(c.cache.Len()))
+	}
+
+	return resource, nil
 }
 
 func (c *Cache[K, V]) Remove(key K) {
@@ -129,19 +153,41 @@ func (c *Cache[K, V]) Insert(key K, resource V) {
 }
 
 // PutTx will return tx which adds a resource to the cache with the given ID.
-func (c *Cache[K, V]) PutTx(key K, resource V) func(*transaction.Tx) error {
-	storeOps := c.store(key, resource) // assemble DB operations to store resource (no execution)
+func (c *Cache[K, V]) PutTx(rw storage.ReaderBatchWriter, key K, resource V) error {
+	storage.OnCommitSucceed(rw, func() {
+		c.Insert(key, resource)
+	})
 
-	return func(tx *transaction.Tx) error {
-		err := storeOps(tx) // execute operations to store resource
-		if err != nil {
-			return fmt.Errorf("could not store resource: %w", err)
-		}
-
-		tx.OnSucceed(func() {
-			c.Insert(key, resource)
-		})
-
-		return nil
+	err := c.store(rw, key, resource)
+	if err != nil {
+		return fmt.Errorf("could not store resource: %w", err)
 	}
+
+	return nil
+}
+
+func (c *Cache[K, V]) PutWithLockTx(lctx lockctx.Proof, rw storage.ReaderBatchWriter, key K, resource V) error {
+	storage.OnCommitSucceed(rw, func() {
+		c.Insert(key, resource)
+	})
+
+	err := c.storeWithLock(lctx, rw, key, resource)
+	if err != nil {
+		return fmt.Errorf("could not store resource: %w", err)
+	}
+
+	return nil
+}
+
+func (c *Cache[K, V]) RemoveTx(rw storage.ReaderBatchWriter, key K) error {
+	storage.OnCommitSucceed(rw, func() {
+		c.Remove(key)
+	})
+
+	err := c.remove(rw, key)
+	if err != nil {
+		return fmt.Errorf("could not remove resource: %w", err)
+	}
+
+	return nil
 }
