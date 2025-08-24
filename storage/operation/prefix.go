@@ -73,9 +73,10 @@ const (
 	// codes related to protocol level information
 	codeEpochSetup         = 61 // EpochSetup service event, keyed by ID
 	codeEpochCommit        = 62 // EpochCommit service event, keyed by ID
-	codeBeaconPrivateKey   = 63 // BeaconPrivateKey, keyed by epoch counter
-	codeDKGStarted         = 64 // flag that the DKG for an epoch has been started
-	codeDKGEnded           = 65 // flag that the DKG for an epoch has ended (stores end state)
+	_                      = 63 // USED BY SECRETS DATABASE: BeaconPrivateKey, keyed by epoch counter
+	_                      = 64 // DEPRECATED: flag that the DKG for an epoch has been started
+	_                      = 65 // DEPRECATED: flag that the DKG for an epoch has ended (stores end state)
+	_                      = 66 // USED BY SECRETS DATABASE: current state of Recoverable Random Beacon State Machine for given epoch
 	codeVersionBeacon      = 67 // flag for storing version beacons
 	codeEpochProtocolState = 68
 	codeProtocolKVStore    = 69
