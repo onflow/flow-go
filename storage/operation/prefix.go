@@ -11,8 +11,8 @@ import (
 const (
 
 	// codes for special database markers
-	// codeMax    = 1 // deprecated
-	codeDBType = 2 // specifies a database type
+	_ = 1 // DEPRECATED: previously used for badger to denote the max length of the storage codes in units of bytes
+	_ = 2 // DEPRECATED: previously used to differentiate the protocol database from the secrets database; now the former is pebble and the latter is badger
 
 	// codes for views with special meaning
 	codeSafetyData   = 10 // safety data for hotstuff state
