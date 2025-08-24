@@ -253,27 +253,17 @@ func (bs *BuilderSuite) SetupTest() {
 	_, lctx := unittest.LockManagerWithContext(bs.T(), storage.LockFinalizeBlock)
 	defer lctx.Release()
 
-	db := badgerimpl.ToDB(bs.db)
-
 	// insert finalized height and root height
+	db := badgerimpl.ToDB(bs.db)
 	require.NoError(bs.T(), db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-		return operation.InsertRootHeight(rw.Writer(), 13)
-	}))
-
-	require.NoError(bs.T(), db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-		return operation.UpsertFinalizedHeight(lctx, rw.Writer(), final.Header.Height)
-	}))
-
-	require.NoError(bs.T(), db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-		return operation.IndexFinalizedBlockByHeight(lctx, rw, final.Header.Height, bs.finalID)
-	}))
-
-	require.NoError(bs.T(), db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-		return operation.UpsertSealedHeight(lctx, rw.Writer(), first.Header.Height)
+		require.NoError(bs.T(), operation.InsertRootHeight(rw.Writer(), 13))
+		require.NoError(bs.T(), operation.UpsertFinalizedHeight(lctx, rw.Writer(), final.Header.Height))
+		require.NoError(bs.T(), operation.IndexFinalizedBlockByHeight(lctx, rw, final.Header.Height, bs.finalID))
+		require.NoError(bs.T(), operation.UpsertSealedHeight(lctx, rw.Writer(), first.Header.Height))
+		return nil
 	}))
 
 	bs.sentinel = 1337
-
 	bs.setter = func(header *flow.Header) error {
 		header.View = 1337
 		return nil
