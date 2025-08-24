@@ -253,8 +253,8 @@ func (m *FollowerState) ExtendCertified(ctx context.Context, candidate *flow.Blo
 // Expected errors during normal operations:
 //   - [state.OutdatedExtensionError] if the candidate block is orphaned
 //   - state.InvalidExtensionError if the candidate block is invalid
-//   - In case of concurrent calls with the same `candidate` block, ExtendCertified may return a [storage.ErrAlreadyExists]
-//     or it may gracefully return. At the moment, ExtendCertified should be considered as not concurrency-safe.
+//   - In case of concurrent calls with the same `candidate` block, `Extend` may return a [storage.ErrAlreadyExists]
+//     or it may gracefully return. At the moment, `Extend` should be considered as not concurrency-safe.
 func (m *ParticipantState) Extend(ctx context.Context, candidate *flow.Block) error {
 	span, ctx := m.tracer.StartSpanFromContext(ctx, trace.ProtoStateMutatorExtend)
 	defer span.End()
@@ -357,10 +357,10 @@ func (m *ParticipantState) Extend(ctx context.Context, candidate *flow.Block) er
 //
 // If `headerExtend` is called by `ParticipantState.Extend` (full consensus participant) then `certifyingQC` will be nil,
 // but the block payload will be validated. If `headerExtend` is called by `FollowerState.Extend` (consensus follower),
-// then `certifyingQC` must be not nil which proves payload validity.
+// then `certifyingQC` must be not nil, which proves payload validity.
 //
 // If the candidate block has already been ingested, the deferred database operations returned by this function call
-// will errors with the benign sentinel [storage.ErrAlreadyExists], aborting the database transaction (without corrupting
+// will error with the benign sentinel [storage.ErrAlreadyExists], aborting the database transaction (without corrupting
 // the protocol state).
 //
 // Expected errors during normal operations:
@@ -427,7 +427,7 @@ func (m *FollowerState) headerExtend(ctx context.Context, candidate *flow.Block,
 		// [storage.ErrAlreadyExists] sentinel if and only if step 5a has already been executed for the parent.
 		err = m.qcs.BatchStore(lctx, rw, qc)
 		if err != nil {
-			// storage.ErrAlreadyExists guarantees that 5a has already been executed for the parent.
+			// [storage.ErrAlreadyExists] guarantees that 5a has already been executed for the parent.
 			if !errors.Is(err, storage.ErrAlreadyExists) {
 				return fmt.Errorf("could not store incorporated qc: %w", err)
 			}
@@ -463,7 +463,7 @@ func (m *FollowerState) headerExtend(ctx context.Context, candidate *flow.Block,
 				return fmt.Errorf("could not store certifying qc: %w", err)
 			}
 
-			// add candidate to index of certified blocks:
+			// add candidate block to index of certified blocks:
 			err := operation.IndexCertifiedBlockByView(lctx, rw, candidate.Header.View, blockID)
 			if err != nil {
 				return fmt.Errorf("could not index certified block by view %v: %w", candidate.Header.View, err)
@@ -498,7 +498,7 @@ func (m *FollowerState) checkBlockAlreadyProcessed(blockID flow.Identifier) (boo
 
 // checkOutdatedExtension rejects blocks that are either orphaned or already finalized, in which cases
 // the sentinel [state.OutdatedExtensionError] is returned. Per convention, the ancestor blocks
-// for any ingested block must be known.
+// for any ingested block must be known (otherwise, we return an exception).
 //
 // APPROACH:
 // Starting with `block`s parent, we walk the fork backwards in order of decreasing height. Eventually,
@@ -507,11 +507,16 @@ func (m *FollowerState) checkBlockAlreadyProcessed(blockID flow.Identifier) (boo
 // Let H denote the *latest* finalized height (in the implementation below called `finalizedHeight`).
 //
 // For `block.Height` > H, there are two cases:
-//  1. When walking the fork backward, we reach the *latest* finalized block. Hence, `block` descends
-//     from the latest finalized block, i.e. it is not orphaned (yet).
-//  2. Alternatively, we may encounter a block at height H that is different from the latest finalized
-//     block. Therefore, our fork contains a block at height H that conflicts with the latest
+//  1. When walking the fork backward, we reach the *latest* finalized block. Hence, `block`
+//     descends from the latest finalized block, i.e. it is not orphaned (yet).
+//  2. We encounter a block at height H that is different from the latest finalized block.
+//     Therefore, our fork contains a block at height H that conflicts with the latest
 //     finalized block. Hence, `block` is orphaned.
+//  Example:
+//       A (Finalized) ← B (Finalized) ← C (Finalized) ← D ← E ← F
+//                     ↖ G             ↖ H              ↖ I
+//   Block G is outdated, because its ancestry does not include C (latest finalized).
+//   Block H and I are not outdated, because they do have C as an ancestor.
 //
 // For `block.Height` ≤ H:
 //   - We emphasize that the traversal starts with `block`'s *parent*. Hence, the first block we
@@ -539,14 +544,10 @@ func (m *ParticipantState) checkOutdatedExtension(block *flow.Header) error {
 	for ancestorID != finalID {
 		ancestor, err := m.headers.ByBlockID(ancestorID)
 		if err != nil {
-			return fmt.Errorf("could not retrieve ancestor (%x): %w", ancestorID, err)
+			return irrecoverable.NewExceptionf("could not retrieve ancestor %x: %w", ancestorID, err)
 		}
 		if ancestor.Height < latestFinalizedHeight {
-			// Candidate block is on a fork that does not include the latest finalized block. For instance:
-			// A (Finalized) ← B (Finalized) ← C (Finalized) ← D ← E ← F
-			//                  ↖ G             ↖ H              ↖ I
-			// Block G is outdated, because its ancestry does not include C (latest finalized).
-			// Block H and I are not outdated, because they do have C as an ancestor.
+			// Candidate block is on a fork that does not include the latest finalized block.
 			return state.NewOutdatedExtensionErrorf(
 				"candidate block (height: %d) conflicts with finalized state (ancestor: %d final: %d)",
 				block.Height, ancestor.Height, latestFinalizedHeight)
