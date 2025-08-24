@@ -560,17 +560,16 @@ func TestExtendMissingParent(t *testing.T) {
 }
 
 // TestExtendHeightTooSmall tests the behaviour when attempting to extend the protocol state by a block
-// whose height is not larger than its parent's height. The protocol state requires that the candidate's
+// whose height is not larger than its parent's height. The protocol mandates that the candidate's
 // height is exactly one larger than its parent's height. Otherwise, an exception should be returned.
 func TestExtendHeightTooSmall(t *testing.T) {
 	rootSnapshot := unittest.RootSnapshotFixture(participants)
 	rootProtocolStateID := getRootProtocolStateID(t, rootSnapshot)
 	head, err := rootSnapshot.Head()
 	require.NoError(t, err)
-	//require.Equal(t, uint64(1), head.View)// sanity check: test code below assumes that root block has height 0;
 
 	// we create the following to descendants of head:
-	//   head <- blockB  <- blockC
+	//   head <- blockB <- blockC
 	// where blockB and blockC have exactly the same height
 	blockB := unittest.BlockWithParentFixture(head) // creates child with height one larger, but view possibly much larger
 	blockB.SetPayload(unittest.PayloadFixture(unittest.WithProtocolStateID(rootProtocolStateID)))
@@ -579,7 +578,6 @@ func TestExtendHeightTooSmall(t *testing.T) {
 	blockC := unittest.BlockWithParentFixture(blockB.Header) // creates child with height one larger, but view possibly much larger
 	blockC.SetPayload(unittest.PayloadFixture(unittest.WithProtocolStateID(rootProtocolStateID)))
 	blockC.Header.Height = blockB.Header.Height
-	//blockC.Header.View = blockB.Header.View + 1
 
 	util.RunWithFullProtocolState(t, rootSnapshot, func(db *badger.DB, chainState *protocol.ParticipantState) {
 		require.NoError(t, chainState.Extend(context.Background(), blockB))
