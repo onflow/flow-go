@@ -379,19 +379,30 @@ func BlockWithParentFixture(parent *flow.Header) *flow.Block {
 	}
 }
 
-// making sure the new block has a unique view
-func BlockWithParentFixtureAndUniqueView(parent *flow.Header, viewIndex map[uint64]struct{}) *flow.Block {
-	block := BlockWithParentFixture(parent)
-	_, ok := viewIndex[block.Header.View]
-	// if !ok, means can't find this view, then the block has unique view
-	if !ok {
-		// add this view to the index
-		viewIndex[block.Header.View] = struct{}{}
-		return block
+// BlockWithParentFixtureAndUniqueView creates a child block of the given parent.
+// We provide a set of views that are _not_ allowed to be used for the new block. A typical usage
+// scenario is to create blocks of different forks, without accidentally creating two blocks with
+// the same view.
+// CAUTION:
+//   - modifies the set `forbiddenViews` by adding the view of the newly created block.
+//   - To generate the child's view, we randomly select a small increment and add it to the
+//     parent's view. If the set of views covers all possible increments, this function will panic
+func BlockWithParentFixtureAndUniqueView(parent *flow.Header, forbiddenViews map[uint64]struct{}) *flow.Block {
+	var block *flow.Block
+	counter := 0
+	for true {
+		block = BlockWithParentFixture(parent)
+		if _, hasForbiddenView := forbiddenViews[block.Header.View]; !hasForbiddenView {
+			break
+		}
+		counter += 1
+		if counter > 20 {
+			panic(fmt.Sprintf("BlockWithParentFixtureAndUniqueView failed to generate child despite %d attempts", counter))
+		}
 	}
-
-	// retry until find a block with unique view
-	return BlockWithParentFixtureAndUniqueView(parent, viewIndex)
+	// block has a view that is not forbidden:
+	forbiddenViews[block.Header.View] = struct{}{} // add the block's view to `forbiddenViews` to prevent future re-usage
+	return block
 }
 
 func BlockWithParentProtocolState(parent *flow.Block) *flow.Block {
@@ -404,18 +415,31 @@ func BlockWithParentProtocolState(parent *flow.Block) *flow.Block {
 	}
 }
 
-// making sure the new block has a unique view
-func BlockWithParentProtocolStateAndUniqueView(parent *flow.Block, viewIndex map[uint64]struct{}) *flow.Block {
-	block := BlockWithParentProtocolState(parent)
-	_, ok := viewIndex[block.Header.View]
-	// if !ok, means can't find this view, then the block has unique view
-	if !ok {
-		// add this view to the index
-		viewIndex[block.Header.View] = struct{}{}
-		return block
+// BlockWithParentProtocolStateAndUniqueView creates a child block of the given parent, such that
+// the child's protocol state is the same as the parent's.
+// We provide a set of views that are _not_ allowed to be used for the new block. A typical usage
+// scenario is to create blocks of different forks, without accidentally creating two blocks with
+// the same view.
+// CAUTION:
+//   - modifies the set `forbiddenViews` by adding the view of the newly created block.
+//   - To generate the child's view, we randomly select a small increment and add it to the
+//     parent's view. If the set of views covers all possible increments, this function will panic
+func BlockWithParentProtocolStateAndUniqueView(parent *flow.Block, forbiddenViews map[uint64]struct{}) *flow.Block {
+	var block *flow.Block
+	counter := 0
+	for true {
+		block = BlockWithParentProtocolState(parent)
+		if _, hasForbiddenView := forbiddenViews[block.Header.View]; !hasForbiddenView {
+			break
+		}
+		counter += 1
+		if counter > 20 {
+			panic(fmt.Sprintf("BlockWithParentFixtureAndUniqueView failed to generate child despite %d attempts", counter))
+		}
 	}
-
-	return BlockWithParentProtocolStateAndUniqueView(parent, viewIndex)
+	// block has a view that is not forbidden:
+	forbiddenViews[block.Header.View] = struct{}{} // add the block's view to `forbiddenViews` to prevent future re-usage
+	return block
 }
 
 func BlockWithGuaranteesFixture(guarantees []*flow.CollectionGuarantee) *flow.Block {

@@ -156,12 +156,12 @@ func TestExtendValid(t *testing.T) {
 			err := fullState.Extend(context.Background(), block2)
 			require.NoError(t, err)
 
-			// verify that block1's view is indexed
+			// verify that block1's view is indexed as certified, because it has a child (block2)
 			var indexedID flow.Identifier
 			require.NoError(t, operation.LookupCertifiedBlockByView(badgerimpl.ToDB(db).Reader(), block1.Header.View, &indexedID))
 			require.Equal(t, block1.ID(), indexedID)
 
-			// verify that block2's view is not indexed
+			// verify that block2's view is not indexed as certified, because it has no children
 			err = operation.LookupCertifiedBlockByView(badgerimpl.ToDB(db).Reader(), block2.Header.View, &indexedID)
 			require.ErrorIs(t, err, storage.ErrNotFound)
 		})
