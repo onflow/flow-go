@@ -176,12 +176,7 @@ func IsBadgerFolder(dataDir string) (bool, error) {
 // It returns error if the folder is empty or not exists.
 // it returns error if the folder is not empty, but misses some required pebble files.
 func IsPebbleFolder(dataDir string) (bool, error) {
-	err := pebblestorage.IsPebbleFolder(dataDir)
-	if err != nil {
-		return false, err
-	}
-
-	return true, nil
+	return pebblestorage.IsPebbleFolder(dataDir)
 }
 
 func InitStorages(db storage.DB) *store.All {
