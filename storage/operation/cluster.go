@@ -14,8 +14,7 @@ import (
 // for regular consensus, these functions include the cluster ID in order to
 // support storing multiple chains, for example during epoch switchover.
 
-// IndexClusterBlockHeight UpsertByKeys a block number to block ID mapping for
-// the given cluster.
+// IndexClusterBlockHeight indexes a cluster block from the specified cluster by its height.
 func IndexClusterBlockHeight(lctx lockctx.Proof, w storage.Writer, clusterID flow.ChainID, height uint64, blockID flow.Identifier) error {
 	if !lctx.HoldsLock(storage.LockInsertOrFinalizeClusterBlock) {
 		return fmt.Errorf("missing lock: %v", storage.LockInsertOrFinalizeClusterBlock)
@@ -25,11 +24,12 @@ func IndexClusterBlockHeight(lctx lockctx.Proof, w storage.Writer, clusterID flo
 }
 
 // LookupClusterBlockHeight retrieves a block ID by height for the given cluster
+// (only finalized cluster blocks are indexed by height to guarantee uniqueness).
 func LookupClusterBlockHeight(r storage.Reader, clusterID flow.ChainID, height uint64, blockID *flow.Identifier) error {
 	return RetrieveByKey(r, MakePrefix(codeFinalizedCluster, clusterID, height), blockID)
 }
 
-// UpsertByKeyClusterFinalizedHeight UpsertByKeys the finalized boundary for the given cluster.
+// UpsertClusterFinalizedHeight updates (overwrites!) the latest finalized cluster block height for the given cluster.
 func UpsertClusterFinalizedHeight(lctx lockctx.Proof, w storage.Writer, clusterID flow.ChainID, number uint64) error {
 	if !lctx.HoldsLock(storage.LockInsertOrFinalizeClusterBlock) {
 		return fmt.Errorf("missing lock: %v", storage.LockInsertOrFinalizeClusterBlock)
@@ -37,12 +37,12 @@ func UpsertClusterFinalizedHeight(lctx lockctx.Proof, w storage.Writer, clusterI
 	return UpsertByKey(w, MakePrefix(codeClusterHeight, clusterID), number)
 }
 
-// RetrieveClusterFinalizedHeight retrieves the finalized boundary for the given cluster.
-func RetrieveClusterFinalizedHeight(r storage.Reader, clusterID flow.ChainID, number *uint64) error {
-	return RetrieveByKey(r, MakePrefix(codeClusterHeight, clusterID), number)
+// RetrieveClusterFinalizedHeight retrieves the latest finalized cluster block height of the given cluster.
+func RetrieveClusterFinalizedHeight(r storage.Reader, clusterID flow.ChainID, height *uint64) error {
+	return RetrieveByKey(r, MakePrefix(codeClusterHeight, clusterID), height)
 }
 
-// IndexReferenceBlockByClusterBlock UpsertByKeys the reference block ID for the given
+// IndexReferenceBlockByClusterBlock updates the reference block ID for the given
 // cluster block ID. While each cluster block specifies a reference block in its
 // payload, we maintain this additional lookup for performance reasons.
 func IndexReferenceBlockByClusterBlock(lctx lockctx.Proof, w storage.Writer, clusterBlockID, refID flow.Identifier) error {

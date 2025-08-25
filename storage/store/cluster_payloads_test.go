@@ -17,7 +17,7 @@ import (
 func TestStoreRetrieveClusterPayload(t *testing.T) {
 	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
 		metrics := metrics.NewNoopCollector()
-		store1 := store.NewClusterPayloads(metrics, db)
+		payloads := store.NewClusterPayloads(metrics, db)
 
 		blockID := unittest.IdentifierFixture()
 		expected := unittest.ClusterPayloadFixture(5)
@@ -33,7 +33,7 @@ func TestStoreRetrieveClusterPayload(t *testing.T) {
 		require.NoError(t, err)
 
 		// fetch payload
-		payload, err := store1.ByBlockID(blockID)
+		payload, err := payloads.ByBlockID(blockID)
 		require.NoError(t, err)
 		require.Equal(t, expected, payload)
 	})
@@ -42,11 +42,9 @@ func TestStoreRetrieveClusterPayload(t *testing.T) {
 func TestClusterPayloadRetrieveWithoutStore(t *testing.T) {
 	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
 		metrics := metrics.NewNoopCollector()
-		store1 := store.NewClusterPayloads(metrics, db)
+		payloads := store.NewClusterPayloads(metrics, db)
 
-		blockID := unittest.IdentifierFixture()
-
-		_, err := store1.ByBlockID(blockID)
+		_, err := payloads.ByBlockID(unittest.IdentifierFixture()) // attempt to retrieve block for random ID
 		assert.ErrorIs(t, err, storage.ErrNotFound)
 	})
 }

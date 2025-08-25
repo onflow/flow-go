@@ -20,6 +20,7 @@ func TestClusterBlocks(t *testing.T) {
 		chain := unittest.ClusterBlockChainFixture(4)
 		parent, blocks := chain[0], chain[1:]
 
+		// add parent and mark its height as the latest finalized block
 		lctx := lockManager.NewContext()
 		require.NoError(t, lctx.AcquireLock(storage.LockInsertOrFinalizeClusterBlock))
 		err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
@@ -27,27 +28,26 @@ func TestClusterBlocks(t *testing.T) {
 		})
 		require.NoError(t, err)
 
-		// add parent as boundary
 		err = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 			return operation.UpsertClusterFinalizedHeight(lctx, rw.Writer(), parent.Header.ChainID, parent.Header.Height)
 		})
 		require.NoError(t, err)
 		lctx.Release()
 
-		// store a chain of blocks
+		// store chain of descending blocks
 		for _, block := range blocks {
-			_, lctx := unittest.LockManagerWithContext(t, storage.LockInsertOrFinalizeClusterBlock)
-			require.NoError(t, lctx.AcquireLock(storage.LockInsertBlock))
-			err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-				return procedure.InsertClusterBlock(lctx, rw, &block)
+			lctx2 := lockManager.NewContext()
+			require.NoError(t, lctx2.AcquireLock(storage.LockInsertOrFinalizeClusterBlock))
+			err = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+				return procedure.InsertClusterBlock(lctx2, rw, &block)
 			})
 			require.NoError(t, err)
 
 			err = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-				return procedure.FinalizeClusterBlock(lctx, rw, block.Header.ID())
+				return procedure.FinalizeClusterBlock(lctx2, rw, block.Header.ID())
 			})
 			require.NoError(t, err)
-			lctx.Release()
+			lctx2.Release()
 		}
 
 		clusterBlocks := NewClusterBlocks(

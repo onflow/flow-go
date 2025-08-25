@@ -1,5 +1,7 @@
 package badger
 
+// TODO(leo): rename to open.go
+
 import (
 	"errors"
 	"fmt"
@@ -10,6 +12,7 @@ import (
 
 	"github.com/dgraph-io/badger/v2"
 
+	"github.com/onflow/flow-go/module/util"
 	"github.com/onflow/flow-go/storage/badger/operation"
 )
 
@@ -100,8 +103,10 @@ func IsBadgerFolder(dataDir string) (bool, error) {
 	return isBadger, nil
 }
 
-func MustBeBadgerFolder(dataDir string) error {
-	ok, err := isEmptyOrNotExists(dataDir)
+// EnsureBadgerFolder ensures the given directory is either empty (including does not exist),
+// or is a valid Badger folder. It returns an error if the directory exists and is not a Badger folder.
+func EnsureBadgerFolder(dataDir string) error {
+	ok, err := util.IsEmptyOrNotExists(dataDir)
 	if err != nil {
 		return fmt.Errorf("error checking if folder is empty or does not exist: %w", err)
 	}
@@ -121,39 +126,13 @@ func MustBeBadgerFolder(dataDir string) error {
 	return nil
 }
 
-// isEmptyOrNotExists returns true if the directory does not exist or is empty.
-// It returns an error if there's an issue accessing the directory.
-func isEmptyOrNotExists(path string) (bool, error) {
-	// Check if the path exists
-	info, err := os.Stat(path)
-	if os.IsNotExist(err) {
-		// Directory does not exist
-		return true, nil
-	}
-	if err != nil {
-		return false, fmt.Errorf("error stating path %s: %w", path, err)
-	}
-	if !info.IsDir() {
-		return false, fmt.Errorf("path %s exists but is not a directory", path)
-	}
-
-	// Read directory contents
-	files, err := os.ReadDir(path)
-	if err != nil {
-		return false, fmt.Errorf("error reading directory %s: %w", path, err)
-	}
-
-	// If the directory has no entries, it's empty
-	return len(files) == 0, nil
-}
-
 // SafeOpen opens a Badger database with the provided options, ensuring that the
 // directory is a valid Badger folder. If the directory is not valid, it returns an error.
 // This is useful to prevent accidental opening of a non-Badger (pebble) directory as a Badger database,
 // which could wipe out the existing data.
 func SafeOpen(opts badger.Options) (*badger.DB, error) {
 	// Check if the directory is a Badger folder
-	err := MustBeBadgerFolder(opts.Dir)
+	err := EnsureBadgerFolder(opts.Dir)
 	if err != nil {
 		return nil, fmt.Errorf("could not assert badger folder: %w", err)
 	}

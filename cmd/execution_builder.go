@@ -741,7 +741,7 @@ func (exeNode *ExecutionNode) LoadExecutionState(
 	error,
 ) {
 
-	chunkDataPackDB, err := storagepebble.OpenDefaultPebbleDB(
+	chunkDataPackDB, err := storagepebble.SafeOpen(
 		node.Logger.With().Str("pebbledb", "cdp").Logger(),
 		exeNode.exeConf.chunkDataPackDir,
 	)
