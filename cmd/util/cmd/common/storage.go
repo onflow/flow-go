@@ -165,12 +165,18 @@ func InitStorageWithTruncate(datadir string, truncate bool) *badger.DB {
 	return db
 }
 
+// IsBadgerFolder checks if the given directory is a badger folder.
+// It returns error if the folder is empty or not exists.
+// it returns error if the folder is not empty, but misses some required badger files.
 func IsBadgerFolder(dataDir string) (bool, error) {
 	return storagebadger.IsBadgerFolder(dataDir)
 }
 
+// IsPebbleFolder checks if the given directory is a pebble folder.
+// It returns error if the folder is empty or not exists.
+// it returns error if the folder is not empty, but misses some required pebble files.
 func IsPebbleFolder(dataDir string) (bool, error) {
-	err := pebblestorage.IsPebbleInitialized(dataDir)
+	err := pebblestorage.IsPebbleFolder(dataDir)
 	if err != nil {
 		return false, err
 	}
