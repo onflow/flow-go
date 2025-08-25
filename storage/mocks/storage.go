@@ -11,7 +11,6 @@ import (
 	lockctx "github.com/jordanschalm/lockctx"
 	flow "github.com/onflow/flow-go/model/flow"
 	storage "github.com/onflow/flow-go/storage"
-	transaction "github.com/onflow/flow-go/storage/badger/transaction"
 )
 
 // MockBlocks is a mock of Blocks interface.
@@ -108,20 +107,6 @@ func (m *MockBlocks) IndexBlockForCollections(arg0 flow.Identifier, arg1 []flow.
 func (mr *MockBlocksMockRecorder) IndexBlockForCollections(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "IndexBlockForCollections", reflect.TypeOf((*MockBlocks)(nil).IndexBlockForCollections), arg0, arg1)
-}
-
-// StoreTx mocks base method.
-func (m *MockBlocks) StoreTx(arg0 *flow.Block) func(*transaction.Tx) error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "StoreTx", arg0)
-	ret0, _ := ret[0].(func(*transaction.Tx) error)
-	return ret0
-}
-
-// StoreTx indicates an expected call of StoreTx.
-func (mr *MockBlocksMockRecorder) StoreTx(arg0 interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "StoreTx", reflect.TypeOf((*MockBlocks)(nil).StoreTx), arg0)
 }
 
 // MockHeaders is a mock of Headers interface.

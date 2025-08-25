@@ -16,6 +16,7 @@ type Headers struct {
 	db          storage.DB
 	cache       *Cache[flow.Identifier, *flow.Header]
 	heightCache *Cache[uint64, flow.Identifier]
+	viewCache   *Cache[uint64, flow.Identifier]
 }
 
 var _ storage.Headers = (*Headers)(nil)
@@ -39,6 +40,12 @@ func NewHeaders(collector module.CacheMetrics, db storage.DB) *Headers {
 		return id, err
 	}
 
+	retrieveView := func(r storage.Reader, view uint64) (flow.Identifier, error) {
+		var id flow.Identifier
+		err := operation.LookupCertifiedBlockByView(r, view, &id)
+		return id, err
+	}
+
 	h := &Headers{
 		db: db,
 		cache: newCache(collector, metrics.ResourceHeader,
@@ -49,6 +56,10 @@ func NewHeaders(collector module.CacheMetrics, db storage.DB) *Headers {
 		heightCache: newCache(collector, metrics.ResourceFinalizedHeight,
 			withLimit[uint64, flow.Identifier](4*flow.DefaultTransactionExpiry),
 			withRetrieve(retrieveHeight)),
+
+		viewCache: newCache(collector, metrics.ResourceCertifiedView,
+			withLimit[uint64, flow.Identifier](4*flow.DefaultTransactionExpiry),
+			withRetrieve(retrieveView)),
 	}
 
 	return h
@@ -81,6 +92,22 @@ func (h *Headers) ByBlockID(blockID flow.Identifier) (*flow.Header, error) {
 
 func (h *Headers) ByHeight(height uint64) (*flow.Header, error) {
 	blockID, err := h.retrieveIdByHeightTx(height)
+	if err != nil {
+		return nil, err
+	}
+	return h.retrieveTx(blockID)
+}
+
+// ByView returns block header for the given view. It is only available for certified blocks.
+// Certified blocks are the blocks that have received a QC. Hotstuff guarantees that for each view,
+// at most one block is certified. Hence, the return value of `ByView` is guaranteed to be unique
+// even for non-finalized blocks.
+// Expected errors during normal operations:
+//   - `storage.ErrNotFound` if no certified block is known at given view.
+//
+// NOTE: this method is not available until next spork (mainnet27) or a migration that builds the index.
+func (h *Headers) ByView(view uint64) (*flow.Header, error) {
+	blockID, err := h.viewCache.Get(h.db.Reader(), view)
 	if err != nil {
 		return nil, err
 	}
@@ -130,6 +157,19 @@ func (h *Headers) ByParentID(parentID flow.Identifier) ([]*flow.Header, error) {
 	return headers, nil
 }
 
+// BlockIDByView returns the block ID that is certified at the given view. It is an optimized
+// version of `ByView` that skips retrieving the block. Expected errors during normal operations:
+//   - `storage.ErrNotFound` if no certified block is known at given view.
+//
+// NOTE: this method is not available until next spork (mainnet27) or a migration that builds the index.
+func (h *Headers) BlockIDByView(view uint64) (flow.Identifier, error) {
+	blockID, err := h.viewCache.Get(h.db.Reader(), view)
+	if err != nil {
+		return flow.ZeroID, fmt.Errorf("could not lookup block id by view %d: %w", view, err)
+	}
+	return blockID, nil
+}
+
 func (h *Headers) FindHeaders(filter func(header *flow.Header) bool) ([]flow.Header, error) {
 	blocks := make([]flow.Header, 0, 1)
 	err := operation.FindHeaders(h.db.Reader(), filter, &blocks)
@@ -137,8 +177,8 @@ func (h *Headers) FindHeaders(filter func(header *flow.Header) bool) ([]flow.Hea
 }
 
 // RollbackExecutedBlock update the executed block header to the given header.
-// only useful for execution node to roll back executed block height
-// This method is not concurrent safe, the caller should make sure to call
+// Intended to be used by Execution Nodes only, to roll back executed block height.
+// This method is NOT CONCURRENT SAFE, the caller should make sure to call
 // this method in a single thread.
 func (h *Headers) RollbackExecutedBlock(header *flow.Header) error {
 	var blockID flow.Identifier

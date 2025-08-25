@@ -4,19 +4,19 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/dgraph-io/badger/v2"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/metrics"
-	storagebadger "github.com/onflow/flow-go/storage/badger"
-	"github.com/onflow/flow-go/storage/badger/operation"
-	"github.com/onflow/flow-go/utils/unittest"
+	"github.com/onflow/flow-go/storage"
+	"github.com/onflow/flow-go/storage/operation"
+	"github.com/onflow/flow-go/storage/operation/dbtest"
+	"github.com/onflow/flow-go/storage/store"
 )
 
 func TestIterateHeight(t *testing.T) {
-	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
 		// create blocks with siblings
 		b1 := &flow.Header{Height: 1}
 		b2 := &flow.Header{Height: 2}
@@ -24,8 +24,15 @@ func TestIterateHeight(t *testing.T) {
 		bs := []*flow.Header{b1, b2, b3}
 
 		// index height
+		lockManager := storage.NewTestingLockManager()
 		for _, b := range bs {
-			require.NoError(t, db.Update(operation.IndexFinalizedBlockByHeight(b.Height, b.ID())))
+			lctx := lockManager.NewContext()
+			require.NoError(t, lctx.AcquireLock(storage.LockFinalizeBlock))
+			require.NoError(t, db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+				return operation.IndexFinalizedBlockByHeight(lctx, rw, b.Height, b.ID())
+			}))
+
+			lctx.Release()
 		}
 
 		progress := &saveNextHeight{}
@@ -33,7 +40,7 @@ func TestIterateHeight(t *testing.T) {
 		// create iterator
 		// b0 is the root block, iterate from b1 to b3
 		iterRange := module.IteratorRange{Start: b1.Height, End: b3.Height}
-		headers := storagebadger.NewHeaders(&metrics.NoopCollector{}, db)
+		headers := store.NewHeaders(&metrics.NoopCollector{}, db)
 		getBlockIDByIndex := func(height uint64) (flow.Identifier, bool, error) {
 			blockID, err := headers.BlockIDByHeight(height)
 			if err != nil {

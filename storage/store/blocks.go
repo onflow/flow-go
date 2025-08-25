@@ -7,7 +7,6 @@ import (
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/storage"
-	"github.com/onflow/flow-go/storage/badger/transaction"
 	"github.com/onflow/flow-go/storage/operation"
 )
 
@@ -28,11 +27,6 @@ func NewBlocks(db storage.DB, headers *Headers, payloads *Payloads) *Blocks {
 		payloads: payloads,
 	}
 	return b
-}
-
-// TODO: to be removed
-func (b *Blocks) StoreTx(block *flow.Block) func(*transaction.Tx) error {
-	panic("StoreTx is deprecated, use BatchStore instead")
 }
 
 // BatchStore stores a valid block in a batch.
@@ -74,6 +68,20 @@ func (b *Blocks) retrieve(blockID flow.Identifier) (*flow.Block, error) {
 // - storage.ErrNotFound if no block is found
 func (b *Blocks) ByID(blockID flow.Identifier) (*flow.Block, error) {
 	return b.retrieve(blockID)
+}
+
+// ByView returns the block with the given view. It is only available for certified blocks.
+// certified blocks are the blocks that have received QC. Hotstuff guarantees that for each view,
+// at most one block is certified. Hence, the return value of `ByView` is guaranteed to be unique
+// even for non-finalized blocks.
+// Expected errors during normal operations:
+//   - `storage.ErrNotFound` if no certified block is known at given view.
+func (b *Blocks) ByView(view uint64) (*flow.Block, error) {
+	blockID, err := b.headers.BlockIDByView(view)
+	if err != nil {
+		return nil, err
+	}
+	return b.ByID(blockID)
 }
 
 // ByHeight returns the block at the given height. It is only available

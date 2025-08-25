@@ -11,8 +11,8 @@ import (
 const (
 
 	// codes for special database markers
-	// codeMax    = 1 // deprecated
-	codeDBType = 2 // specifies a database type
+	_ = 1 // DEPRECATED: previously used for badger to denote the max length of the storage codes in units of bytes
+	_ = 2 // DEPRECATED: previously used to differentiate the protocol database from the secrets database; now the former is pebble and the latter is badger
 
 	// codes for views with special meaning
 	codeSafetyData   = 10 // safety data for hotstuff state
@@ -55,6 +55,7 @@ const (
 	codeBlockIDToQuorumCertificate  = 45 // index of quorum certificates by block ID
 	codeEpochProtocolStateByBlockID = 46 // index of epoch protocol state entry by block ID
 	codeProtocolKVStoreByBlockID    = 47 // index of protocol KV store entry by block ID
+	codeCertifiedBlockByView        = 48 // index mapping view to ID of certified block (guaranteed by HotStuff that there is at most one per view)
 
 	// codes for indexing multiple identifiers by identifier
 	codeBlockChildren          = 50 // index mapping block ID to children blocks
@@ -72,9 +73,10 @@ const (
 	// codes related to protocol level information
 	codeEpochSetup         = 61 // EpochSetup service event, keyed by ID
 	codeEpochCommit        = 62 // EpochCommit service event, keyed by ID
-	codeBeaconPrivateKey   = 63 // BeaconPrivateKey, keyed by epoch counter
-	codeDKGStarted         = 64 // flag that the DKG for an epoch has been started
-	codeDKGEnded           = 65 // flag that the DKG for an epoch has ended (stores end state)
+	_                      = 63 // USED BY SECRETS DATABASE: BeaconPrivateKey, keyed by epoch counter
+	_                      = 64 // DEPRECATED: flag that the DKG for an epoch has been started
+	_                      = 65 // DEPRECATED: flag that the DKG for an epoch has ended (stores end state)
+	_                      = 66 // USED BY SECRETS DATABASE: current state of Recoverable Random Beacon State Machine for given epoch
 	codeVersionBeacon      = 67 // flag for storing version beacons
 	codeEpochProtocolState = 68
 	codeProtocolKVStore    = 69

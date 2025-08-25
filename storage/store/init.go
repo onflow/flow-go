@@ -34,7 +34,6 @@ func InitAll(metrics module.CacheMetrics, db storage.DB) *All {
 	index := NewIndex(metrics, db)
 	results := NewExecutionResults(metrics, db)
 	receipts := NewExecutionReceipts(metrics, db, results, DefaultCacheSize)
-	commits := NewCommits(metrics, db)
 	payloads := NewPayloads(db, index, guarantees, seals, receipts, results)
 	blocks := NewBlocks(db, headers, payloads)
 	qcs := NewQuorumCertificates(metrics, db, DefaultCacheSize)
@@ -50,20 +49,17 @@ func InitAll(metrics module.CacheMetrics, db storage.DB) *All {
 	collections := NewCollections(db, transactions)
 
 	return &All{
-		Headers:            headers,
-		Guarantees:         guarantees,
-		Seals:              seals,
-		Index:              index,
-		Payloads:           payloads,
-		Blocks:             blocks,
-		QuorumCertificates: qcs,
-		Results:            results,
-		Receipts:           receipts,
-
-		Commits:     commits,
-		EpochSetups: setups,
-
+		Headers:                   headers,
+		Guarantees:                guarantees,
+		Seals:                     seals,
+		Index:                     index,
+		Payloads:                  payloads,
+		Blocks:                    blocks,
+		QuorumCertificates:        qcs,
+		Results:                   results,
+		Receipts:                  receipts,
 		EpochCommits:              epochCommits,
+		EpochSetups:               setups,
 		EpochProtocolStateEntries: epochProtocolStateEntries,
 		ProtocolKVStore:           protocolKVStore,
 		VersionBeacons:            versionBeacons,

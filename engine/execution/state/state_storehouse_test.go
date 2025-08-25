@@ -29,9 +29,8 @@ import (
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/storage"
-	badgerstorage "github.com/onflow/flow-go/storage/badger"
-	"github.com/onflow/flow-go/storage/badger/operation"
 	storagemock "github.com/onflow/flow-go/storage/mock"
+	"github.com/onflow/flow-go/storage/operation"
 	"github.com/onflow/flow-go/storage/operation/badgerimpl"
 	"github.com/onflow/flow-go/storage/pebble"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -80,13 +79,15 @@ func prepareStorehouseTest(f func(t *testing.T, es state.ExecutionState, l *ledg
 
 				rootID, err := finalized.FinalizedBlockIDAtHeight(10)
 				require.NoError(t, err)
-				require.NoError(t,
-					badgerDB.Update(operation.InsertExecutedBlock(rootID)),
-				)
 
-				metrics := metrics.NewNoopCollector()
-				headersDB := badgerstorage.NewHeaders(metrics, badgerDB)
-				require.NoError(t, headersDB.Store(finalizedHeaders[10]))
+				db := badgerimpl.ToDB(badgerDB)
+				require.NoError(t, db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+					return operation.UpdateExecutedBlock(rw.Writer(), rootID)
+				}))
+
+				require.NoError(t, badgerimpl.ToDB(badgerDB).WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+					return operation.InsertHeader(rw.Writer(), finalizedHeaders[10].ID(), finalizedHeaders[10])
+				}))
 
 				getLatestFinalized := func() (uint64, error) {
 					return rootHeight, nil

@@ -4,16 +4,10 @@ import (
 	"github.com/jordanschalm/lockctx"
 
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/storage/badger/transaction"
 )
 
 // Blocks represents persistent storage for blocks.
 type Blocks interface {
-
-	// StoreTx allows us to store a new block, including its payload & header, as part of a DB transaction, while
-	// still going through the caching layer.
-	// Deprecated: to be removed alongside Badger DB
-	StoreTx(block *flow.Block) func(*transaction.Tx) error
 
 	// BatchStore stores a valid block in a batch.
 	BatchStore(lctx lockctx.Proof, rw ReaderBatchWriter, block *flow.Block) error
@@ -30,7 +24,16 @@ type Blocks interface {
 	// - storage.ErrNotFound if no block is found for the given height
 	ByHeight(height uint64) (*flow.Block, error)
 
-	// ByCollectionID returns the block for the given collection ID.
+	// ByView returns the block with the given view. It is only available for certified blocks.
+	// Certified blocks are the blocks that have received a QC. Hotstuff guarantees that for each view,
+	// at most one block is certified. Hence, the return value of `ByView` is guaranteed to be unique
+	// even for non-finalized blocks.
+	// Expected errors during normal operations:
+	//   - `storage.ErrNotFound` if no certified block is known at given view.
+	//
+	// TODO: this method is not available until next spork (mainnet27) or a migration that builds the index.
+	// ByView(view uint64) (*flow.Header, error)
+
 	// ByCollectionID returns the *finalized** block that contains the collection with the given ID.
 	//
 	// Expected errors during normal operations:
