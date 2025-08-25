@@ -512,11 +512,11 @@ func (m *FollowerState) checkBlockAlreadyProcessed(blockID flow.Identifier) (boo
 //  2. We encounter a block at height H that is different from the latest finalized block.
 //     Therefore, our fork contains a block at height H that conflicts with the latest
 //     finalized block. Hence, `block` is orphaned.
-//  Example:
-//       A (Finalized) ← B (Finalized) ← C (Finalized) ← D ← E ← F
-//                     ↖ G             ↖ H              ↖ I
-//   Block G is outdated, because its ancestry does not include C (latest finalized).
-//   Block H and I are not outdated, because they do have C as an ancestor.
+//     Example:
+//     A (Finalized) ← B (Finalized) ← C (Finalized) ← D ← E ← F
+//     ↖ G             ↖ H              ↖ I
+//     Block G is outdated, because its ancestry does not include C (latest finalized).
+//     Block H and I are not outdated, because they do have C as an ancestor.
 //
 // For `block.Height` ≤ H:
 //   - We emphasize that the traversal starts with `block`'s *parent*. Hence, the first block we

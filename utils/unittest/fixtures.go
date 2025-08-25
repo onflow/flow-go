@@ -390,7 +390,7 @@ func BlockWithParentFixture(parent *flow.Header) *flow.Block {
 func BlockWithParentAndUniqueView(parent *flow.Header, forbiddenViews map[uint64]struct{}) *flow.Block {
 	var block *flow.Block
 	counter := 0
-	for true {
+	for {
 		block = BlockWithParentFixture(parent)
 		if _, hasForbiddenView := forbiddenViews[block.Header.View]; !hasForbiddenView {
 			break
@@ -427,7 +427,7 @@ func BlockWithParentProtocolState(parent *flow.Block) *flow.Block {
 func BlockWithParentProtocolStateAndUniqueView(parent *flow.Block, forbiddenViews map[uint64]struct{}) *flow.Block {
 	var block *flow.Block
 	counter := 0
-	for true {
+	for {
 		block = BlockWithParentProtocolState(parent)
 		if _, hasForbiddenView := forbiddenViews[block.Header.View]; !hasForbiddenView {
 			break
