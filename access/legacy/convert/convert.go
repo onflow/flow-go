@@ -55,7 +55,7 @@ func MessageToTransaction(m *entitiesproto.Transaction, chain flow.Chain) (flow.
 		if err != nil {
 			return *t, err
 		}
-		t.AddPayloadSignature(addr, sig.GetKeyId(), sig.GetSignature())
+		t.AddPayloadSignature(addr, sig.GetKeyId(), sig.GetSignature(), nil)
 	}
 
 	for _, sig := range m.GetEnvelopeSignatures() {
@@ -63,7 +63,7 @@ func MessageToTransaction(m *entitiesproto.Transaction, chain flow.Chain) (flow.
 		if err != nil {
 			return *t, err
 		}
-		t.AddEnvelopeSignature(addr, sig.GetKeyId(), sig.GetSignature())
+		t.AddEnvelopeSignature(addr, sig.GetKeyId(), sig.GetSignature(), nil)
 	}
 
 	t.SetScript(m.GetScript())

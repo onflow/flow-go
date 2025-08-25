@@ -210,6 +210,7 @@ func (t *testTransactionSender) Send(tx *sdk.Transaction) (sdk.TransactionResult
 			flow.BytesToAddress(sig.Address.Bytes()),
 			sig.KeyIndex,
 			sig.Signature,
+			sig.ExtensionData,
 		)
 	}
 	for _, sig := range tx.EnvelopeSignatures {
@@ -217,6 +218,7 @@ func (t *testTransactionSender) Send(tx *sdk.Transaction) (sdk.TransactionResult
 			flow.BytesToAddress(sig.Address.Bytes()),
 			sig.KeyIndex,
 			sig.Signature,
+			sig.ExtensionData,
 		)
 	}
 

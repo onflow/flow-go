@@ -235,11 +235,11 @@ func VerifySignatureFromTransaction(
 	}
 
 	// Default to Plain scheme if extension data is nil or empty
-	scheme := PlainScheme
+	scheme := flow.PlainScheme
 	if len(extensionData) > 0 {
-		scheme = AuthenticationSchemeFromByte(extensionData[0])
+		scheme = flow.AuthenticationSchemeFromByte(extensionData[0])
 	}
-	if scheme == InvalidScheme {
+	if scheme == flow.InvalidScheme {
 		return false, nil
 	}
 
@@ -272,14 +272,14 @@ func VerifySignatureFromTransaction(
 
 // validateExtensionDataAndReconstructMessage reconstructs the verification message based on the authentication scheme and extension data.
 // simply returns false if the extension data is invalid, could consider adding more visibility into reason of validation failure
-func validateExtensionDataAndReconstructMessage(scheme AuthenticationScheme, extensionData []byte, payload []byte) (bool, []byte) {
+func validateExtensionDataAndReconstructMessage(scheme flow.AuthenticationScheme, extensionData []byte, payload []byte) (bool, []byte) {
 	switch scheme {
-	case PlainScheme:
+	case flow.PlainScheme:
 		if len(extensionData) > 1 {
 			return false, nil
 		}
 		return true, slices.Concat(flow.TransactionDomainTag[:], payload)
-	case WebAuthnScheme: // See FLIP 264 for more details
+	case flow.WebAuthnScheme: // See FLIP 264 for more details
 		return validateWebAuthNExtensionData(extensionData, payload)
 	default:
 		// authentication scheme not found
