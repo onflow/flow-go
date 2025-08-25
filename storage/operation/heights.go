@@ -77,12 +77,14 @@ func InsertEpochFirstHeight(lctx lockctx.Proof, rw storage.ReaderBatchWriter, ep
 }
 
 // RetrieveEpochFirstHeight retrieves the height of the first block in the given epoch.
+// This operation does not require any locks, because the first height of an epoch does not change once set.
 // Returns storage.ErrNotFound if the first block of the epoch has not yet been finalized.
 func RetrieveEpochFirstHeight(r storage.Reader, epoch uint64, height *uint64) error {
 	return RetrieveByKey(r, MakePrefix(codeEpochFirstHeight, epoch), height)
 }
 
 // RetrieveEpochLastHeight retrieves the height of the last block in the given epoch.
+// This operation does not require any locks, because the first height of an epoch does not change once set.
 // It's a more readable, but equivalent query to RetrieveEpochFirstHeight when interested in the last height of an epoch.
 // Returns storage.ErrNotFound if the first block of the epoch has not yet been finalized.
 func RetrieveEpochLastHeight(r storage.Reader, epoch uint64, height *uint64) error {

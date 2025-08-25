@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/dgraph-io/badger/v2"
+	"github.com/jordanschalm/lockctx"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -27,18 +28,20 @@ import (
 	"github.com/onflow/flow-go/state/protocol/protocol_state/kvstore"
 	protocol_state "github.com/onflow/flow-go/state/protocol/protocol_state/state"
 	protocolutil "github.com/onflow/flow-go/state/protocol/util"
-	fstorage "github.com/onflow/flow-go/storage"
-	storage "github.com/onflow/flow-go/storage/badger"
-	"github.com/onflow/flow-go/storage/badger/operation"
-	"github.com/onflow/flow-go/storage/badger/procedure"
+	"github.com/onflow/flow-go/storage"
+	"github.com/onflow/flow-go/storage/operation"
 	"github.com/onflow/flow-go/storage/operation/badgerimpl"
+	"github.com/onflow/flow-go/storage/procedure"
+	"github.com/onflow/flow-go/storage/store"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
 type MutatorSuite struct {
 	suite.Suite
-	db    *badger.DB
-	dbdir string
+	db          storage.DB
+	badgerdb    *badger.DB
+	dbdir       string
+	lockManager lockctx.Manager
 
 	genesis      *model.Block
 	chainID      flow.ChainID
@@ -60,14 +63,16 @@ func (suite *MutatorSuite) SetupTest() {
 	suite.chainID = suite.genesis.Header.ChainID
 
 	suite.dbdir = unittest.TempDir(suite.T())
-	suite.db = unittest.BadgerDB(suite.T(), suite.dbdir)
-	lockManager := fstorage.NewTestingLockManager()
+	suite.badgerdb = unittest.BadgerDB(suite.T(), suite.dbdir)
+	suite.db = badgerimpl.ToDB(suite.badgerdb)
+	lockManager := storage.NewTestingLockManager()
+	suite.lockManager = lockManager
 
 	metrics := metrics.NewNoopCollector()
 	tracer := trace.NewNoopTracer()
 	log := zerolog.Nop()
-	all := storage.InitAll(metrics, suite.db)
-	colPayloads := storage.NewClusterPayloads(metrics, suite.db)
+	all := store.InitAll(metrics, suite.db)
+	colPayloads := store.NewClusterPayloads(metrics, suite.db)
 
 	// just bootstrap with a genesis block, we'll use this as reference
 	genesis, result, seal := unittest.BootstrapFixture(unittest.IdentityListFixture(5, unittest.WithAllRoles()))
@@ -98,14 +103,14 @@ func (suite *MutatorSuite) SetupTest() {
 	suite.protoGenesis = genesis
 	state, err := pbadger.Bootstrap(
 		metrics,
-		badgerimpl.ToDB(suite.db),
+		suite.db,
 		lockManager,
 		all.Headers,
 		all.Seals,
 		all.Results,
 		all.Blocks,
 		all.QuorumCertificates,
-		all.Setups,
+		all.EpochSetups,
 		all.EpochCommits,
 		all.EpochProtocolStateEntries,
 		all.ProtocolKVStore,
@@ -125,21 +130,21 @@ func (suite *MutatorSuite) SetupTest() {
 		state.Params(),
 		all.Headers,
 		all.Results,
-		all.Setups,
+		all.EpochSetups,
 		all.EpochCommits,
 	)
 
 	clusterStateRoot, err := NewStateRoot(suite.genesis, unittest.QuorumCertificateFixture(), suite.epochCounter)
 	suite.NoError(err)
-	clusterState, err := Bootstrap(suite.db, clusterStateRoot)
+	clusterState, err := Bootstrap(suite.db, suite.lockManager, clusterStateRoot)
 	suite.Assert().Nil(err)
-	suite.state, err = NewMutableState(clusterState, tracer, all.Headers, colPayloads)
+	suite.state, err = NewMutableState(clusterState, suite.lockManager, tracer, all.Headers, colPayloads)
 	suite.Assert().Nil(err)
 }
 
 // runs after each test finishes
 func (suite *MutatorSuite) TearDownTest() {
-	err := suite.db.Close()
+	err := suite.badgerdb.Close()
 	suite.Assert().Nil(err)
 	err = os.RemoveAll(suite.dbdir)
 	suite.Assert().Nil(err)
@@ -180,18 +185,21 @@ func (suite *MutatorSuite) Block() model.Block {
 }
 
 func (suite *MutatorSuite) FinalizeBlock(block model.Block) {
-	err := suite.db.Update(func(tx *badger.Txn) error {
-		var refBlock flow.Header
-		err := operation.RetrieveHeader(block.Payload.ReferenceBlockID, &refBlock)(tx)
+	var refBlock flow.Header
+	err := operation.RetrieveHeader(suite.db.Reader(), block.Payload.ReferenceBlockID, &refBlock)
+	suite.Require().Nil(err)
+
+	err = suite.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+		lctx := suite.lockManager.NewContext()
+		defer lctx.Release()
+		if err := lctx.AcquireLock(storage.LockInsertOrFinalizeClusterBlock); err != nil {
+			return err
+		}
+		err = procedure.FinalizeClusterBlock(lctx, rw, block.ID())
 		if err != nil {
 			return err
 		}
-		err = procedure.FinalizeClusterBlock(block.ID())(tx)
-		if err != nil {
-			return err
-		}
-		err = operation.IndexClusterBlockByReferenceHeight(refBlock.Height, block.ID())(tx)
-		return err
+		return operation.IndexClusterBlockByReferenceHeight(lctx, rw.Writer(), refBlock.Height, block.ID())
 	})
 	suite.Assert().NoError(err)
 }
@@ -239,40 +247,40 @@ func (suite *MutatorSuite) TestBootstrap_InvalidPayload() {
 }
 
 func (suite *MutatorSuite) TestBootstrap_Successful() {
-	err := suite.db.View(func(tx *badger.Txn) error {
+	err := (func(r storage.Reader) error {
 
 		// should insert collection
 		var collection flow.LightCollection
-		err := operation.RetrieveCollection(suite.genesis.Payload.Collection.ID(), &collection)(tx)
+		err := operation.RetrieveCollection(r, suite.genesis.Payload.Collection.ID(), &collection)
 		suite.Assert().Nil(err)
 		suite.Assert().Equal(suite.genesis.Payload.Collection.Light(), collection)
 
 		// should index collection
 		collection = flow.LightCollection{} // reset the collection
-		err = operation.LookupCollectionPayload(suite.genesis.ID(), &collection.Transactions)(tx)
+		err = operation.LookupCollectionPayload(r, suite.genesis.ID(), &collection.Transactions)
 		suite.Assert().Nil(err)
 		suite.Assert().Equal(suite.genesis.Payload.Collection.Light(), collection)
 
 		// should insert header
 		var header flow.Header
-		err = operation.RetrieveHeader(suite.genesis.ID(), &header)(tx)
+		err = operation.RetrieveHeader(r, suite.genesis.ID(), &header)
 		suite.Assert().Nil(err)
 		suite.Assert().Equal(suite.genesis.Header.ID(), header.ID())
 
 		// should insert block height -> ID lookup
 		var blockID flow.Identifier
-		err = operation.LookupClusterBlockHeight(suite.genesis.Header.ChainID, suite.genesis.Header.Height, &blockID)(tx)
+		err = operation.LookupClusterBlockHeight(r, suite.genesis.Header.ChainID, suite.genesis.Header.Height, &blockID)
 		suite.Assert().Nil(err)
 		suite.Assert().Equal(suite.genesis.ID(), blockID)
 
 		// should insert boundary
 		var boundary uint64
-		err = operation.RetrieveClusterFinalizedHeight(suite.genesis.Header.ChainID, &boundary)(tx)
+		err = operation.RetrieveClusterFinalizedHeight(r, suite.genesis.Header.ChainID, &boundary)
 		suite.Assert().Nil(err)
 		suite.Assert().Equal(suite.genesis.Header.Height, boundary)
 
 		return nil
-	})
+	})(suite.db.Reader())
 	suite.Assert().Nil(err)
 }
 
@@ -351,15 +359,16 @@ func (suite *MutatorSuite) TestExtend_Success() {
 	err := suite.state.Extend(&block)
 	suite.Assert().Nil(err)
 
+	r := suite.db.Reader()
 	// should be able to retrieve the block
 	var extended model.Block
-	err = suite.db.View(procedure.RetrieveClusterBlock(block.ID(), &extended))
+	err = procedure.RetrieveClusterBlock(r, block.ID(), &extended)
 	suite.Assert().Nil(err)
 	suite.Assert().Equal(*block.Payload, *extended.Payload)
 
 	// the block should be indexed by its parent
 	var childIDs flow.IdentifierList
-	err = suite.db.View(procedure.LookupBlockChildren(suite.genesis.ID(), &childIDs))
+	err = procedure.LookupBlockChildren(r, suite.genesis.ID(), &childIDs)
 	suite.Assert().Nil(err)
 	suite.Require().Len(childIDs, 1)
 	suite.Assert().Equal(block.ID(), childIDs[0])
@@ -597,7 +606,7 @@ func (suite *MutatorSuite) TestExtend_LargeHistory() {
 		// conflicting fork, build on the parent of the head
 		parent := head
 		if conflicting {
-			err = suite.db.View(procedure.RetrieveClusterBlock(parent.Header.ParentID, &parent))
+			err = procedure.RetrieveClusterBlock(suite.db.Reader(), parent.Header.ParentID, &parent)
 			assert.NoError(t, err)
 			// add the transaction to the invalidated list
 			invalidatedTransactions = append(invalidatedTransactions, &tx)

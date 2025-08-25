@@ -347,7 +347,7 @@ func bootstrapSealingSegment(
 			if err != nil {
 				return fmt.Errorf("could not insert SealingSegment extra block: %w", err)
 			}
-			err = operation.IndexBlockHeight(lctx, rw, height, blockID)
+			err = operation.IndexFinalizedBlockByHeight(lctx, rw, height, blockID)
 			if err != nil {
 				return fmt.Errorf("could not index SealingSegment extra block (id=%x): %w", blockID, err)
 			}
@@ -407,7 +407,7 @@ func bootstrapSealingSegment(
 			if err != nil {
 				return fmt.Errorf("could not insert SealingSegment block: %w", err)
 			}
-			err = operation.IndexBlockHeight(lctx, rw, height, blockID)
+			err = operation.IndexFinalizedBlockByHeight(lctx, rw, height, blockID)
 			if err != nil {
 				return fmt.Errorf("could not index SealingSegment block (id=%x): %w", blockID, err)
 			}

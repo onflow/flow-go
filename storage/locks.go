@@ -15,6 +15,10 @@ const (
 	LockFinalizeBlock = "lock_finalize_block"
 	// LockIndexResultApproval protects indexing result approvals by approval and chunk.
 	LockIndexResultApproval = "lock_index_result_approval"
+	// LockInsertOrFinalizeClusterBlock protects the entire cluster block insertion or finalization process.
+	// The reason they are combined is because insertion process reads some data updated by finalization process,
+	// in order to prevent dirty reads, we need to acquire the lock for both operations.
+	LockInsertOrFinalizeClusterBlock = "lock_insert_or_finalize_cluster_block"
 	// LockInsertOwnReceipt is intended for Execution Nodes to ensure that they never publish different receipts for the same block.
 	// Specifically, with this lock we prevent accidental overwrites of the index `executed block ID` ➜ `Receipt ID`.
 	LockInsertOwnReceipt = "lock_insert_own_receipt"
@@ -26,6 +30,7 @@ func Locks() []string {
 		LockInsertBlock,
 		LockFinalizeBlock,
 		LockIndexResultApproval,
+		LockInsertOrFinalizeClusterBlock,
 		LockInsertOwnReceipt,
 	}
 }

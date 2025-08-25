@@ -23,7 +23,7 @@ func InitProtocolState(db storage.DB, storages *store.All) (protocol.State, erro
 		storages.Results,
 		storages.Blocks,
 		storages.QuorumCertificates,
-		storages.Setups,
+		storages.EpochSetups,
 		storages.EpochCommits,
 		storages.EpochProtocolStateEntries,
 		storages.ProtocolKVStore,

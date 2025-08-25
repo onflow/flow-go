@@ -50,7 +50,7 @@ func TestReExecuteBlock(t *testing.T) {
 			events := store.NewEvents(metrics, db)
 			serviceEvents := store.NewServiceEvents(metrics, db)
 
-			manager, lctx := unittest.LockManagerWithContext(t, storage.LockInsertBlock)
+			lockManager, lctx := unittest.LockManagerWithContext(t, storage.LockInsertBlock)
 			err = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 				return blocks.BatchStore(lctx, rw, &genesis)
 			})
@@ -60,8 +60,6 @@ func TestReExecuteBlock(t *testing.T) {
 			getLatestFinalized := func() (uint64, error) {
 				return genesis.Header.Height, nil
 			}
-
-			lockManager := storage.NewTestingLockManager()
 
 			// create execution state module
 			es := state.NewExecutionState(
@@ -87,7 +85,7 @@ func TestReExecuteBlock(t *testing.T) {
 			computationResult := testutil.ComputationResultFixture(t)
 			header := computationResult.Block.Header
 
-			lctx2 := manager.NewContext()
+			lctx2 := lockManager.NewContext()
 			require.NoError(t, lctx2.AcquireLock(storage.LockInsertBlock))
 			err = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 				return blocks.BatchStore(lctx2, rw, computationResult.Block)

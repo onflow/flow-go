@@ -69,7 +69,7 @@ func TestMakeFinalValidChain(t *testing.T) {
 		require.NoError(t, err)
 
 		// map the finalized height to the finalized block ID
-		err = db.Update(operation.IndexBlockHeight(final.Height, final.ID()))
+		err = db.Update(operation.IndexFinalizedBlockByHeight(final.Height, final.ID()))
 		require.NoError(t, err)
 
 		// insert the finalized block header into the DB
@@ -127,7 +127,7 @@ func TestMakeFinalInvalidHeight(t *testing.T) {
 		require.NoError(t, err)
 
 		// map the finalized height to the finalized block ID
-		err = db.Update(operation.IndexBlockHeight(final.Height, final.ID()))
+		err = db.Update(operation.IndexFinalizedBlockByHeight(final.Height, final.ID()))
 		require.NoError(t, err)
 
 		// insert the finalized block header into the DB
@@ -179,7 +179,7 @@ func TestMakeFinalDuplicate(t *testing.T) {
 		require.NoError(t, err)
 
 		// map the finalized height to the finalized block ID
-		err = db.Update(operation.IndexBlockHeight(final.Height, final.ID()))
+		err = db.Update(operation.IndexFinalizedBlockByHeight(final.Height, final.ID()))
 		require.NoError(t, err)
 
 		// insert the finalized block header into the DB

@@ -416,7 +416,7 @@ func (suite *Suite) TestGetBlockByIDAndHeight() {
 		require.NoError(suite.T(), fctx.AcquireLock(storage.LockFinalizeBlock))
 		// the follower logic should update height index on the block storage when a block is finalized
 		require.NoError(suite.T(), bdb.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			return operation.IndexBlockHeight(fctx, rw, block2.Header.Height, block2.ID())
+			return operation.IndexFinalizedBlockByHeight(fctx, rw, block2.Header.Height, block2.ID())
 		}))
 		fctx.Release()
 
@@ -763,7 +763,7 @@ func (suite *Suite) TestGetSealedTransaction() {
 		defer fctx.Release()
 		require.NoError(suite.T(), fctx.AcquireLock(storage.LockFinalizeBlock))
 		require.NoError(suite.T(), bdb.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			return operation.IndexBlockHeight(fctx, rw, block.Header.Height, block.ID())
+			return operation.IndexFinalizedBlockByHeight(fctx, rw, block.Header.Height, block.ID())
 		}))
 
 		suite.sealedBlock = block.Header
@@ -1001,7 +1001,7 @@ func (suite *Suite) TestGetTransactionResult() {
 		fctx2 := manager.NewContext()
 		require.NoError(suite.T(), fctx2.AcquireLock(storage.LockFinalizeBlock))
 		require.NoError(suite.T(), bdb.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			return operation.IndexBlockHeight(fctx2, rw, block.Header.Height, block.ID())
+			return operation.IndexFinalizedBlockByHeight(fctx2, rw, block.Header.Height, block.ID())
 		}))
 		fctx2.Release()
 		finalSnapshot.On("Head").Return(block.Header, nil)
@@ -1248,7 +1248,7 @@ func (suite *Suite) TestExecuteScript() {
 		fctx := manager.NewContext()
 		require.NoError(suite.T(), fctx.AcquireLock(storage.LockFinalizeBlock))
 		require.NoError(suite.T(), db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			return operation.IndexBlockHeight(fctx, rw, lastBlock.Header.Height, lastBlock.ID())
+			return operation.IndexFinalizedBlockByHeight(fctx, rw, lastBlock.Header.Height, lastBlock.ID())
 		}))
 		fctx.Release()
 		require.NoError(suite.T(), err)
@@ -1271,7 +1271,7 @@ func (suite *Suite) TestExecuteScript() {
 				return err
 			}
 
-			return operation.IndexBlockHeight(fctx2, rw, prevBlock.Header.Height, prevBlock.ID())
+			return operation.IndexFinalizedBlockByHeight(fctx2, rw, prevBlock.Header.Height, prevBlock.ID())
 		}))
 		fctx2.Release()
 

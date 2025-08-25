@@ -17,13 +17,14 @@ type All struct {
 	Receipts           *ExecutionReceipts
 	Commits            *Commits
 
-	Setups                    *EpochSetups
+	EpochSetups               *EpochSetups
 	EpochCommits              *EpochCommits
 	EpochProtocolStateEntries *EpochProtocolStateEntries
 	ProtocolKVStore           *ProtocolKVStore
 	VersionBeacons            *VersionBeacons
-	Transactions              *Transactions
-	Collections               *Collections
+
+	Transactions *Transactions
+	Collections  *Collections
 }
 
 func InitAll(metrics module.CacheMetrics, db storage.DB) *All {
@@ -58,14 +59,16 @@ func InitAll(metrics module.CacheMetrics, db storage.DB) *All {
 		QuorumCertificates: qcs,
 		Results:            results,
 		Receipts:           receipts,
-		Commits:            commits,
 
-		Setups:                    setups,
+		Commits:     commits,
+		EpochSetups: setups,
+
 		EpochCommits:              epochCommits,
 		EpochProtocolStateEntries: epochProtocolStateEntries,
 		ProtocolKVStore:           protocolKVStore,
 		VersionBeacons:            versionBeacons,
-		Transactions:              transactions,
-		Collections:               collections,
+
+		Transactions: transactions,
+		Collections:  collections,
 	}
 }
