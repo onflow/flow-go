@@ -103,8 +103,8 @@ import (
 	"github.com/onflow/flow-go/state/protocol/events"
 	"github.com/onflow/flow-go/state/protocol/events/gadgets"
 	"github.com/onflow/flow-go/state/protocol/util"
+	"github.com/onflow/flow-go/storage"
 	storagebadger "github.com/onflow/flow-go/storage/badger"
-	"github.com/onflow/flow-go/storage/locks"
 	"github.com/onflow/flow-go/storage/operation/badgerimpl"
 	storagepebble "github.com/onflow/flow-go/storage/pebble"
 	"github.com/onflow/flow-go/storage/store"
@@ -199,6 +199,7 @@ func GenericNodeWithStateFixture(t testing.TB,
 		Tracer:             tracer,
 		PublicDB:           stateFixture.PublicDB,
 		SecretsDB:          stateFixture.SecretsDB,
+		LockManager:        stateFixture.LockManager,
 		Headers:            stateFixture.Storage.Headers,
 		Guarantees:         stateFixture.Storage.Guarantees,
 		Seals:              stateFixture.Storage.Seals,
@@ -233,13 +234,15 @@ func CompleteStateFixture(
 	publicDBDir := filepath.Join(dataDir, "protocol")
 	secretsDBDir := filepath.Join(dataDir, "secrets")
 	db := unittest.TypedBadgerDB(t, publicDBDir, storagebadger.InitPublic)
+	lockManager := storage.NewTestingLockManager()
 	s := storagebadger.InitAll(metric, db)
 	secretsDB := unittest.TypedBadgerDB(t, secretsDBDir, storagebadger.InitSecret)
 	consumer := events.NewDistributor()
 
 	state, err := badgerstate.Bootstrap(
 		metric,
-		db,
+		badgerimpl.ToDB(db),
+		lockManager,
 		s.Headers,
 		s.Seals,
 		s.Results,
@@ -274,6 +277,7 @@ func CompleteStateFixture(
 		DBDir:          dataDir,
 		ProtocolEvents: consumer,
 		State:          mutableState,
+		LockManager:    lockManager,
 	}
 }
 
@@ -285,14 +289,17 @@ func CollectionNode(t *testing.T, hub *stub.Hub, identity bootstrap.NodeInfo, ro
 	require.NoError(t, err)
 	node.Me, err = local.New(identity.Identity().IdentitySkeleton, privKeys.StakingKey)
 	require.NoError(t, err)
+	lockManager := storage.NewTestingLockManager()
 
 	pools := epochs.NewTransactionPools(
 		func(_ uint64) mempool.Transactions {
 			return herocache.NewTransactions(1000, node.Log, metrics.NewNoopCollector())
 		})
-	transactions := storagebadger.NewTransactions(node.Metrics, node.PublicDB)
-	collections := storagebadger.NewCollections(node.PublicDB, transactions)
-	clusterPayloads := storagebadger.NewClusterPayloads(node.Metrics, node.PublicDB)
+
+	db := badgerimpl.ToDB(node.PublicDB)
+	transactions := store.NewTransactions(node.Metrics, db)
+	collections := store.NewCollections(db, transactions)
+	clusterPayloads := store.NewClusterPayloads(node.Metrics, db)
 
 	ingestionEngine, err := collectioningest.New(node.Log, node.Net, node.State, node.Metrics, node.Metrics, node.Metrics, node.Me, node.ChainID.Chain(), pools, collectioningest.DefaultConfig(),
 		ingest.NewAddressRateLimiter(rate.Limit(1), 10)) // 10 tps
@@ -320,15 +327,17 @@ func CollectionNode(t *testing.T, hub *stub.Hub, identity bootstrap.NodeInfo, ro
 	require.NoError(t, err)
 
 	clusterStateFactory, err := factories.NewClusterStateFactory(
-		node.PublicDB,
+		db,
+		lockManager,
 		node.Metrics,
 		node.Tracer,
 	)
 	require.NoError(t, err)
 
 	builderFactory, err := factories.NewBuilderFactory(
-		node.PublicDB,
+		db,
 		node.State,
+		lockManager,
 		node.Headers,
 		node.Tracer,
 		node.Metrics,
@@ -365,7 +374,7 @@ func CollectionNode(t *testing.T, hub *stub.Hub, identity bootstrap.NodeInfo, ro
 	hotstuffFactory, err := factories.NewHotStuffFactory(
 		node.Log,
 		node.Me,
-		badgerimpl.ToDB(node.PublicDB),
+		db,
 		node.State,
 		node.Metrics,
 		node.Metrics,
@@ -533,8 +542,8 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity bootstrap.NodeInfo, ide
 	node := GenericNodeFromParticipants(t, hub, identity, identities, chainID)
 
 	db := badgerimpl.ToDB(node.PublicDB)
-	transactionsStorage := storagebadger.NewTransactions(node.Metrics, node.PublicDB)
-	collectionsStorage := storagebadger.NewCollections(node.PublicDB, transactionsStorage)
+	transactionsStorage := store.NewTransactions(node.Metrics, db)
+	collectionsStorage := store.NewCollections(db, transactionsStorage)
 	eventsStorage := store.NewEvents(node.Metrics, db)
 	serviceEventsStorage := store.NewServiceEvents(node.Metrics, db)
 	txResultStorage := store.NewTransactionResults(node.Metrics, db, storagebadger.DefaultCacheSize)
@@ -544,7 +553,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity bootstrap.NodeInfo, ide
 	receipts := store.NewExecutionReceipts(node.Metrics, db, results, storagebadger.DefaultCacheSize)
 	myReceipts := store.NewMyExecutionReceipts(node.Metrics, db, receipts)
 	versionBeacons := store.NewVersionBeacons(db)
-	headersStorage := storagebadger.NewHeaders(node.Metrics, node.PublicDB)
+	headersStorage := store.NewHeaders(node.Metrics, db)
 
 	checkAuthorizedAtBlock := func(blockID flow.Identifier) (bool, error) {
 		return protocol.IsNodeAuthorizedAt(node.State.AtBlockID(blockID), node.Me.NodeID())
@@ -641,11 +650,15 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity bootstrap.NodeInfo, ide
 		}
 		return final.Height, nil
 	}
+
+	lockManager := storage.NewTestingLockManager()
+
 	execState := executionState.NewExecutionState(
 		ls, commitsStorage, node.Blocks, node.Headers, chunkDataPackStorage, results, myReceipts, eventsStorage, serviceEventsStorage, txResultStorage, db, getLatestFinalized, node.Tracer,
 		// TODO: test with register store
 		registerStore,
 		storehouseEnabled,
+		lockManager,
 	)
 
 	requestEngine, err := requester.New(
@@ -922,7 +935,7 @@ func createFollowerCore(
 	rootHead *flow.Header,
 	rootQC *flow.QuorumCertificate,
 ) (module.HotStuffFollower, *confinalizer.Finalizer) {
-	finalizer := confinalizer.NewFinalizer(node.PublicDB, node.Headers, followerState, trace.NewNoopTracer())
+	finalizer := confinalizer.NewFinalizer(badgerimpl.ToDB(node.PublicDB).Reader(), node.Headers, followerState, trace.NewNoopTracer())
 
 	pending := make([]*flow.Header, 0)
 
@@ -1015,7 +1028,7 @@ func VerificationNode(t testing.TB,
 	if node.ProcessedBlockHeight == nil {
 		node.ProcessedBlockHeight = store.NewConsumerProgress(badgerimpl.ToDB(node.PublicDB), module.ConsumeProgressVerificationBlockHeight)
 	}
-	lockManager := locks.NewTestingLockManager()
+	lockManager := storage.NewTestingLockManager()
 	if node.VerifierEngine == nil {
 		vm := fvm.NewVirtualMachine()
 
@@ -1029,7 +1042,7 @@ func VerificationNode(t testing.TB,
 
 		chunkVerifier := chunks.NewChunkVerifier(vm, vmCtx, node.Log)
 
-		approvalStorage := store.NewResultApprovals(node.Metrics, badgerimpl.ToDB(node.PublicDB))
+		approvalStorage := store.NewResultApprovals(node.Metrics, badgerimpl.ToDB(node.PublicDB), node.LockManager)
 
 		node.VerifierEngine, err = verifier.New(node.Log,
 			collector,

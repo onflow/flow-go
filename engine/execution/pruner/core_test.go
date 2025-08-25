@@ -14,8 +14,7 @@ import (
 	"github.com/onflow/flow-go/model/verification"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/storage"
-	badgerstorage "github.com/onflow/flow-go/storage/badger"
-	"github.com/onflow/flow-go/storage/badger/operation"
+	"github.com/onflow/flow-go/storage/operation"
 	"github.com/onflow/flow-go/storage/operation/badgerimpl"
 	"github.com/onflow/flow-go/storage/operation/pebbleimpl"
 	"github.com/onflow/flow-go/storage/store"
@@ -32,13 +31,16 @@ func TestLoopPruneExecutionDataFromRootToLatestSealed(t *testing.T) {
 			genesis := blocks[0]
 			require.NoError(t, ps.Bootstrap(genesis, rootResult, rootSeal))
 
+			db := badgerimpl.ToDB(bdb)
 			ctx, cancel := context.WithCancel(context.Background())
 			metrics := metrics.NewNoopCollector()
-			headers := badgerstorage.NewHeaders(metrics, bdb)
-			results := badgerstorage.NewExecutionResults(metrics, bdb)
+			all := store.InitAll(metrics, db)
+			headers := all.Headers
+			blockstore := all.Blocks
+			results := all.Results
 
-			transactions := badgerstorage.NewTransactions(metrics, bdb)
-			collections := badgerstorage.NewCollections(bdb, transactions)
+			transactions := store.NewTransactions(metrics, db)
+			collections := store.NewCollections(db, transactions)
 			chunkDataPacks := store.NewChunkDataPacks(metrics, pebbleimpl.ToDB(pdb), collections, 1000)
 
 			lastSealedHeight := 30
@@ -46,15 +48,30 @@ func TestLoopPruneExecutionDataFromRootToLatestSealed(t *testing.T) {
 			// indexed by height
 			chunks := make([]*verification.VerifiableChunkData, lastFinalizedHeight+2)
 			parentID := genesis.ID()
-			require.NoError(t, headers.Store(genesis.Header))
+			manager, lctx := unittest.LockManagerWithContext(t, storage.LockInsertBlock)
+			require.NoError(t, db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+				return blockstore.BatchStore(lctx, rw, genesis)
+			}))
+			lctx.Release()
+
 			for i := 1; i <= lastFinalizedHeight; i++ {
 				chunk, block := unittest.VerifiableChunkDataFixture(0, func(header *flow.Header) {
 					header.Height = uint64(i)
 					header.ParentID = parentID
 				})
 				chunks[i] = chunk // index by height
-				require.NoError(t, headers.Store(chunk.Header))
-				require.NoError(t, bdb.Update(operation.IndexBlockHeight(chunk.Header.Height, chunk.Header.ID())))
+				lctx := manager.NewContext()
+				require.NoError(t, lctx.AcquireLock(storage.LockInsertBlock))
+				require.NoError(t, db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+					return blockstore.BatchStore(lctx, rw, block)
+				}))
+				lctx.Release()
+				lctx = manager.NewContext()
+				require.NoError(t, lctx.AcquireLock(storage.LockFinalizeBlock))
+				require.NoError(t, db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+					return operation.IndexFinalizedBlockByHeight(lctx, rw, chunk.Header.Height, chunk.Header.ID())
+				}))
+				lctx.Release()
 				require.NoError(t, results.Store(chunk.Result))
 				require.NoError(t, results.Index(chunk.Result.BlockID, chunk.Result.ID()))
 				require.NoError(t, chunkDataPacks.Store([]*flow.ChunkDataPack{chunk.ChunkDataPack}))
@@ -76,8 +93,11 @@ func TestLoopPruneExecutionDataFromRootToLatestSealed(t *testing.T) {
 				parentID = block.ID()
 			}
 
-			// last seale and executed is the last sealed
-			require.NoError(t, bdb.Update(operation.InsertExecutedBlock(chunks[lastFinalizedHeight].Header.ID())))
+			// update the index "latest executed block (max height)" to latest sealed block
+			require.NoError(t, db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+				return operation.UpdateExecutedBlock(rw.Writer(), chunks[lastFinalizedHeight].Header.ID())
+			}))
+
 			lastSealed := chunks[lastSealedHeight].Header
 			require.NoError(t, ps.MakeSeal(lastSealed.ID()))
 
