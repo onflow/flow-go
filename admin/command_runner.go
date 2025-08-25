@@ -277,11 +277,10 @@ func (r *CommandRunner) runAdminServer(ctx irrecoverable.SignalerContext) error 
 		<-ctx.Done()
 		r.logger.Info().Msg("admin server shutting down")
 
-		// Shutdown both servers with proper timeout handling
-		shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), CommandRunnerShutdownTimeout)
-		defer shutdownCancel()
+		// Shutdown gRPC server with timeout to prevent indefinite blocking
+		grpcShutdownCtx, grpcCancel := context.WithTimeout(context.Background(), CommandRunnerShutdownTimeout)
+		defer grpcCancel()
 
-		// Channel to track gRPC server shutdown completion
 		grpcDone := make(chan struct{})
 		go func() {
 			defer close(grpcDone)
@@ -293,16 +292,19 @@ func (r *CommandRunner) runAdminServer(ctx irrecoverable.SignalerContext) error 
 		select {
 		case <-grpcDone:
 			r.logger.Debug().Msg("gRPC server stopped gracefully")
-		case <-shutdownCtx.Done():
+		case <-grpcShutdownCtx.Done():
 			r.logger.Warn().Msg("gRPC server graceful shutdown timed out, forcing stop")
 			grpcServer.Stop()
 			<-grpcDone // Wait for forced shutdown to complete
 		}
 
-		// Shutdown HTTP server with remaining time in the context
+		// Shutdown HTTP server with its own fresh timeout
 		if httpServer != nil {
+			httpShutdownCtx, httpCancel := context.WithTimeout(context.Background(), CommandRunnerShutdownTimeout)
+			defer httpCancel()
+
 			r.logger.Debug().Msg("shutting down HTTP server")
-			if err := httpServer.Shutdown(shutdownCtx); err != nil {
+			if err := httpServer.Shutdown(httpShutdownCtx); err != nil {
 				r.logger.Err(err).Msg("failed to shutdown http server")
 				ctx.Throw(err)
 			}
