@@ -1637,16 +1637,19 @@ func (executor *callbackTestExecutor) Output() fvm.ProcedureOutput {
 
 	switch {
 	// scheduled callbacks process transaction
-	case strings.Contains(string(txBody.Script), "CallbackScheduler.process"):
+	case strings.Contains(string(txBody.Script), "scheduler.process"):
 		executor.vm.executedTransactions[txID] = "process_callback"
+		env := systemcontracts.SystemContractsForChain(flow.Mainnet.Chain().ChainID()).AsTemplateEnv()
+		eventTypeString := fmt.Sprintf("A.%v.CallbackScheduler.CallbackProcessed", env.FlowCallbackSchedulerAddress)
 
 		// return events for each scheduled callback
 		events := make([]flow.Event, len(executor.vm.eventPayloads))
 		for i, payload := range executor.vm.eventPayloads {
 			events[i] = flow.Event{
 				// TODO: we shouldn't hardcode this event types, refactor after the scheduler contract is done
-				Type:             flow.EventType("A.0x0000000000000000.CallbackScheduler.CallbackProcessed"),
-				TransactionID:    txProc.ID,
+				Type:          flow.EventType(eventTypeString),
+				TransactionID: txProc.ID,
+
 				TransactionIndex: txProc.TxIndex,
 				EventIndex:       uint32(i),
 				Payload:          payload,
@@ -1657,7 +1660,7 @@ func (executor *callbackTestExecutor) Output() fvm.ProcedureOutput {
 			Events: events,
 		}
 	// scheduled callbacks execute transaction
-	case strings.Contains(string(txBody.Script), "CallbackScheduler.executeCallback"):
+	case strings.Contains(string(txBody.Script), "scheduler.executeCallback"):
 		// extract the callback ID from the arguments
 		if len(txBody.Arguments) == 0 {
 			return fvm.ProcedureOutput{}

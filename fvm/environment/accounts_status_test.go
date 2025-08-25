@@ -17,14 +17,14 @@ func TestAccountStatus(t *testing.T) {
 	t.Run("test setting values", func(t *testing.T) {
 		index := atree.SlabIndex{1, 2, 3, 4, 5, 6, 7, 8}
 		s.SetStorageIndex(index)
-		s.SetPublicKeyCount(34)
+		s.SetAccountPublicKeyCount(34)
 		s.SetStorageUsed(56)
 		s.SetAccountIdCounter(78)
 
 		require.Equal(t, uint64(56), s.StorageUsed())
 		returnedIndex := s.SlabIndex()
 		require.True(t, bytes.Equal(index[:], returnedIndex[:]))
-		require.Equal(t, uint32(34), s.PublicKeyCount())
+		require.Equal(t, uint32(34), s.AccountPublicKeyCount())
 		require.Equal(t, uint64(78), s.AccountIdCounter())
 
 	})
@@ -34,7 +34,7 @@ func TestAccountStatus(t *testing.T) {
 		clone, err := environment.AccountStatusFromBytes(b)
 		require.NoError(t, err)
 		require.Equal(t, s.SlabIndex(), clone.SlabIndex())
-		require.Equal(t, s.PublicKeyCount(), clone.PublicKeyCount())
+		require.Equal(t, s.AccountPublicKeyCount(), clone.AccountPublicKeyCount())
 		require.Equal(t, s.StorageUsed(), clone.StorageUsed())
 		require.Equal(t, s.AccountIdCounter(), clone.AccountIdCounter())
 
@@ -60,7 +60,7 @@ func TestAccountStatus(t *testing.T) {
 		migrated, err := environment.AccountStatusFromBytes(oldBytes)
 		require.NoError(t, err)
 		require.Equal(t, atree.SlabIndex{0, 0, 0, 0, 0, 0, 0, 6}, migrated.SlabIndex())
-		require.Equal(t, uint32(5), migrated.PublicKeyCount())
+		require.Equal(t, uint32(5), migrated.AccountPublicKeyCount())
 		require.Equal(t, uint64(7)+increaseInSize, migrated.StorageUsed())
 		require.Equal(t, uint64(0), migrated.AccountIdCounter())
 	})
@@ -82,7 +82,7 @@ func TestAccountStatus(t *testing.T) {
 		migrated, err := environment.AccountStatusFromBytes(oldBytes)
 		require.NoError(t, err)
 		require.Equal(t, atree.SlabIndex{0, 0, 0, 0, 0, 0, 0, 6}, migrated.SlabIndex())
-		require.Equal(t, uint32(5), migrated.PublicKeyCount())
+		require.Equal(t, uint32(5), migrated.AccountPublicKeyCount())
 		require.Equal(t, uint64(7)-decreaseInSize, migrated.StorageUsed())
 		require.Equal(t, uint64(3), migrated.AccountIdCounter())
 	})

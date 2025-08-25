@@ -237,7 +237,7 @@ func (updater *accountKeyUpdater) addAccountKey(
 			errors.NewAccountNotFoundError(address))
 	}
 
-	keyIndex, err := updater.accounts.GetPublicKeyCount(address)
+	keyIndex, err := updater.accounts.GetAccountPublicKeyCount(address)
 	if err != nil {
 		return nil, fmt.Errorf("adding account key failed: %w", err)
 	}
@@ -251,7 +251,7 @@ func (updater *accountKeyUpdater) addAccountKey(
 		return nil, fmt.Errorf("adding account key failed: %w", err)
 	}
 
-	err = updater.accounts.AppendPublicKey(address, *accountPublicKey)
+	err = updater.accounts.AppendAccountPublicKey(address, *accountPublicKey)
 	if err != nil {
 		return nil, fmt.Errorf("adding account key failed: %w", err)
 	}
@@ -293,7 +293,7 @@ func (updater *accountKeyUpdater) revokeAccountKey(
 	}
 
 	var publicKey flow.AccountPublicKey
-	publicKey, err = updater.accounts.GetPublicKey(
+	publicKey, err = updater.accounts.GetAccountPublicKey(
 		address,
 		keyIndex)
 	if err != nil {
@@ -310,7 +310,7 @@ func (updater *accountKeyUpdater) revokeAccountKey(
 	// mark this key as revoked
 	publicKey.Revoked = true
 
-	_, err = updater.accounts.SetPublicKey(
+	_, err = updater.accounts.SetAccountPublicKey(
 		address,
 		keyIndex,
 		publicKey)
