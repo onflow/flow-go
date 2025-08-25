@@ -15,6 +15,7 @@ import (
 
 	"github.com/onflow/flow-go/cmd/bootstrap/gcs"
 	"github.com/onflow/flow-go/cmd/bootstrap/utils"
+	"github.com/onflow/flow-go/model/bootstrap"
 	model "github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -156,7 +157,8 @@ func pull(cmd *cobra.Command, args []string) {
 
 	// unwrap consensus node role files
 	if role == flow.RoleConsensus {
-		err = unWrapFile(flagBootDir, nodeID)
+		unWrappedFilePath := filepath.Join(flagBootDir, fmt.Sprintf(bootstrap.PathRandomBeaconPriv, nodeID))
+		err = unWrapFile(flagBootDir, nodeID, flagBootDir, unWrappedFilePath)
 		if err != nil {
 			log.Fatal().Err(err).Msg("failed to pull")
 		}
