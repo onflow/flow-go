@@ -189,7 +189,6 @@ func WithPruneCallback(callback PruneCallback) StorageOption {
 }
 
 func OpenStorage(dbPath string, startHeight uint64, logger zerolog.Logger, opts ...StorageOption) (*storage, error) {
-
 	lg := logger.With().Str("module", "tracker_storage").Logger()
 	db, err := badger.Open(badger.LSMOnlyOptions(dbPath))
 	if err != nil {

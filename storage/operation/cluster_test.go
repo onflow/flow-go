@@ -1,7 +1,6 @@
 package operation_test
 
 import (
-	"fmt"
 	"math/rand"
 	"testing"
 
@@ -48,13 +47,16 @@ func TestClusterHeights(t *testing.T) {
 		})
 
 		t.Run("multiple chain IDs", func(t *testing.T) {
-			for i := 0; i < 3; i++ {
-				// use different cluster ID but same block height
-				clusterID = flow.ChainID(fmt.Sprintf("cluster-%d", i))
-				expected = unittest.IdentifierFixture()
-
-				var actual flow.Identifier
-				err = operation.LookupClusterBlockHeight(db.Reader(), clusterID, height, &actual)
+			// use different cluster ID but same block height
+			// - we first index *all* three blocks from different clusters for the same height
+			// - then we retrieve *all* three block IDs in a second step
+			// First writing all three is important to detect bugs, where the logic ignores the cluster ID
+			// and only memorizes the latest block stored for a given height (irrespective of cluster ID).
+			clusterBlockIDs := unittest.IdentifierListFixture(3)
+			clusterIDs := []flow.ChainID{"cluster-0", "cluster-1", "cluster-2"}
+			var actual flow.Identifier
+			for i := 0; i < len(clusterBlockIDs); i++ {
+				err = operation.LookupClusterBlockHeight(db.Reader(), clusterIDs[i], height, &actual)
 				assert.ErrorIs(t, err, storage.ErrNotFound)
 
 				err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
@@ -63,19 +65,21 @@ func TestClusterHeights(t *testing.T) {
 					if err := lctx.AcquireLock(storage.LockInsertOrFinalizeClusterBlock); err != nil {
 						return err
 					}
-					return operation.IndexClusterBlockHeight(lctx, rw.Writer(), clusterID, height, expected)
+					return operation.IndexClusterBlockHeight(lctx, rw.Writer(), clusterIDs[i], height, clusterBlockIDs[i])
 				})
 				assert.NoError(t, err)
-
-				err = operation.LookupClusterBlockHeight(db.Reader(), clusterID, height, &actual)
+			}
+			for i := 0; i < len(clusterBlockIDs); i++ {
+				err = operation.LookupClusterBlockHeight(db.Reader(), clusterIDs[i], height, &actual)
 				assert.NoError(t, err)
-				assert.Equal(t, expected, actual)
+				assert.Equal(t, clusterBlockIDs[i], actual)
 			}
 		})
 	})
 }
 
-func TestClusterBoundaries(t *testing.T) {
+// Test_RetrieveClusterFinalizedHeight verifies proper retrieval of the latest finalized cluster block height.
+func Test_RetrieveClusterFinalizedHeight(t *testing.T) {
 	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
 		var (
 			clusterID flow.ChainID = "cluster"
@@ -113,26 +117,30 @@ func TestClusterBoundaries(t *testing.T) {
 		})
 
 		t.Run("multiple chain IDs", func(t *testing.T) {
+			// persist latest finalized cluster block height for three different collector clusters
+			// - we first index *all* three latest finalized block heights from different clusters
+			// - then we retrieve all three latest finalized block heights in a second step
+			// First writing all three is important to detect bugs, where the logic ignores the cluster ID
+			// and only memorizes the last value stored (irrespective of cluster ID).
+			clusterFinalizedHeights := []uint64{117, 11, 791}
+			clusterIDs := []flow.ChainID{"cluster-0", "cluster-1", "cluster-2"}
 			lockManager := storage.NewTestingLockManager()
-			for i := 0; i < 3; i++ {
-				lctx := lockManager.NewContext()
-				require.NoError(t, lctx.AcquireLock(storage.LockInsertOrFinalizeClusterBlock))
-				// use different cluster ID but same boundary
-				clusterID = flow.ChainID(fmt.Sprintf("cluster-%d", i))
-				expected = uint64(i)
-
-				var actual uint64
-				err = operation.RetrieveClusterFinalizedHeight(db.Reader(), clusterID, &actual)
+			var actual uint64
+			for i := 0; i < len(clusterFinalizedHeights); i++ {
+				err = operation.RetrieveClusterFinalizedHeight(db.Reader(), clusterIDs[i], &actual)
 				assert.ErrorIs(t, err, storage.ErrNotFound)
 
 				err = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-					return operation.UpsertClusterFinalizedHeight(lctx, rw.Writer(), clusterID, expected)
+					lctx := lockManager.NewContext()
+					defer lctx.Release()
+					require.NoError(t, lctx.AcquireLock(storage.LockInsertOrFinalizeClusterBlock))
+					return operation.UpsertClusterFinalizedHeight(lctx, rw.Writer(), clusterIDs[i], clusterFinalizedHeights[i])
 				})
-
-				err = operation.RetrieveClusterFinalizedHeight(db.Reader(), clusterID, &actual)
+			}
+			for i := 0; i < len(clusterFinalizedHeights); i++ {
+				err = operation.RetrieveClusterFinalizedHeight(db.Reader(), clusterIDs[i], &actual)
 				assert.NoError(t, err)
-				assert.Equal(t, expected, actual)
-				lctx.Release()
+				assert.Equal(t, clusterFinalizedHeights[i], actual)
 			}
 		})
 	})
@@ -198,13 +206,13 @@ func TestClusterBlockByReferenceHeight(t *testing.T) {
 				// randomly adjust the nextHeight, increasing on average
 				r := rand.Intn(100)
 				if r < 20 {
-					nextHeight -= 1 // 20%
+					nextHeight -= 1 // 20% probability
 				} else if r < 40 {
-					// nextHeight stays the same - 20%
+					// 20% probability: nextHeight stays the same
 				} else if r < 80 {
-					nextHeight += 1 // 40%
+					nextHeight += 1 // 40% probability
 				} else {
-					nextHeight += 2 // 20%
+					nextHeight += 2 // 20% probability
 				}
 
 				lookup[nextHeight] = append(lookup[nextHeight], ids[i])

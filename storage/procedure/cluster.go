@@ -17,26 +17,26 @@ import (
 // associated indexes.
 func InsertClusterBlock(lctx lockctx.Proof, rw storage.ReaderBatchWriter, block *cluster.Block) error {
 	if !lctx.HoldsLock(storage.LockInsertOrFinalizeClusterBlock) {
-		return fmt.Errorf("missing required lock: %s", storage.LockInsertBlock)
+		return fmt.Errorf("missing required lock: %s", storage.LockInsertOrFinalizeClusterBlock)
 	}
 
 	// store the block header
 	blockID := block.ID()
 	err := operation.InsertHeader(rw.Writer(), blockID, block.Header)
 	if err != nil {
-		return fmt.Errorf("could not insert header: %w", err)
+		return fmt.Errorf("could not insert cluster block header: %w", err)
 	}
 
 	// insert the block payload
 	err = InsertClusterPayload(lctx, rw, blockID, block.Payload)
 	if err != nil {
-		return fmt.Errorf("could not insert payload: %w", err)
+		return fmt.Errorf("could not insert cluster block payload: %w", err)
 	}
 
 	// index the child block for recovery
-	err = InsertNewClusterBlock(lctx, rw, blockID, block.Header.ParentID)
+	err = IndexNewClusterBlock(lctx, rw, blockID, block.Header.ParentID)
 	if err != nil {
-		return fmt.Errorf("could not index new block: %w", err)
+		return fmt.Errorf("could not index new cluster block block: %w", err)
 	}
 	return nil
 }
@@ -47,14 +47,14 @@ func RetrieveClusterBlock(r storage.Reader, blockID flow.Identifier, block *clus
 	var header flow.Header
 	err := operation.RetrieveHeader(r, blockID, &header)
 	if err != nil {
-		return fmt.Errorf("could not retrieve header: %w", err)
+		return fmt.Errorf("could not retrieve cluster block header: %w", err)
 	}
 
 	// retrieve payload
 	var payload cluster.Payload
 	err = RetrieveClusterPayload(r, blockID, &payload)
 	if err != nil {
-		return fmt.Errorf("could not retrieve payload: %w", err)
+		return fmt.Errorf("could not retrieve cluster block payload: %w", err)
 	}
 
 	// overwrite block
@@ -62,30 +62,27 @@ func RetrieveClusterBlock(r storage.Reader, blockID flow.Identifier, block *clus
 		Header:  &header,
 		Payload: &payload,
 	}
-
 	return nil
 }
 
-// RetrieveLatestFinalizedClusterHeader retrieves the latest finalized for the
-// given cluster chain ID.
-func RetrieveLatestFinalizedClusterHeader(r storage.Reader, chainID flow.ChainID, final *flow.Header) error {
-	var boundary uint64
-	err := operation.RetrieveClusterFinalizedHeight(r, chainID, &boundary)
+// RetrieveLatestFinalizedClusterHeader retrieves the latest finalized cluster block header from the specified cluster.
+func RetrieveLatestFinalizedClusterHeader(r storage.Reader, clusterID flow.ChainID, final *flow.Header) error {
+	var latestFinalizedHeight uint64
+	err := operation.RetrieveClusterFinalizedHeight(r, clusterID, &latestFinalizedHeight)
 	if err != nil {
-		return fmt.Errorf("could not retrieve boundary: %w", err)
+		return fmt.Errorf("could not retrieve latest finalized cluster block height: %w", err)
 	}
 
 	var finalID flow.Identifier
-	err = operation.LookupClusterBlockHeight(r, chainID, boundary, &finalID)
+	err = operation.LookupClusterBlockHeight(r, clusterID, latestFinalizedHeight, &finalID)
 	if err != nil {
-		return fmt.Errorf("could not retrieve final ID: %w", err)
+		return fmt.Errorf("could not retrieve ID of latest finalized cluster block: %w", err)
 	}
 
 	err = operation.RetrieveHeader(r, finalID, final)
 	if err != nil {
-		return fmt.Errorf("could not retrieve finalized header: %w", err)
+		return fmt.Errorf("could not retrieve header of latest finalized cluster block: %w", err)
 	}
-
 	return nil
 }
 
@@ -105,35 +102,35 @@ func FinalizeClusterBlock(lctx lockctx.Proof, rw storage.ReaderBatchWriter, bloc
 	}
 
 	// get the chain ID, which determines which cluster state to query
-	chainID := header.ChainID
+	clusterID := header.ChainID
 
-	// retrieve the current finalized state boundary
-	var boundary uint64
-	err = operation.RetrieveClusterFinalizedHeight(r, chainID, &boundary)
+	// retrieve the latest finalized cluster block height
+	var latestFinalizedHeight uint64
+	err = operation.RetrieveClusterFinalizedHeight(r, clusterID, &latestFinalizedHeight)
 	if err != nil {
 		return fmt.Errorf("could not retrieve boundary: %w", err)
 	}
 
-	// retrieve the ID of the boundary head
-	var headID flow.Identifier
-	err = operation.LookupClusterBlockHeight(r, chainID, boundary, &headID)
+	// retrieve the ID of the latest finalized cluster block
+	var latestFinalizedBlockID flow.Identifier
+	err = operation.LookupClusterBlockHeight(r, clusterID, latestFinalizedHeight, &latestFinalizedBlockID)
 	if err != nil {
 		return fmt.Errorf("could not retrieve head: %w", err)
 	}
 
-	// check that the head ID is the parent of the block we finalize
-	if header.ParentID != headID {
+	// sanity check: the previously latest finalized block is the parent of the block we are now finalizing
+	if header.ParentID != latestFinalizedBlockID {
 		return fmt.Errorf("can't finalize non-child of chain head")
 	}
 
 	// index the block by its height
-	err = operation.IndexClusterBlockHeight(lctx, writer, chainID, header.Height, header.ID())
+	err = operation.IndexClusterBlockHeight(lctx, writer, clusterID, header.Height, header.ID())
 	if err != nil {
 		return fmt.Errorf("could not index cluster block height: %w", err)
 	}
 
 	// update the finalized boundary
-	err = operation.UpsertClusterFinalizedHeight(lctx, writer, chainID, header.Height)
+	err = operation.UpsertClusterFinalizedHeight(lctx, writer, clusterID, header.Height)
 	if err != nil {
 		return fmt.Errorf("could not update finalized boundary: %w", err)
 	}
@@ -158,31 +155,38 @@ func InsertClusterPayload(lctx lockctx.Proof, rw storage.ReaderBatchWriter, bloc
 	if err == nil {
 		return fmt.Errorf("collection payload already exists for block %s: %w", blockID, storage.ErrAlreadyExists)
 	}
-
 	if err != storage.ErrNotFound {
-		return fmt.Errorf("could not look up collection payload: %w", err)
+		return fmt.Errorf("unexpected error while attempting to retrieve collection payload: %w", err)
 	}
 
-	// Cluster payloads only contain a single collection
-	// We allow duplicates, because it is valid for two competing forks to have the same payload.
-	// Payloads are keyed by content hash, so duplicate values have the same key.
-	light := payload.Collection.Light()
+	// STEP 1: persist the collection and constituent transactions.
+	// A cluster payload essentially represents a single collection (batch of transactions) plus some auxilluary
+	// information. Storing the collection on its own allows us to also retrieve it independently of the cluster
+	// block's payload. We expect repeated requests to persist the same collection data here, because it is valid
+	// to propose the same collection in two competing forks. However, we don't have to worry about repeated calls,
+	// because collections and transactions are keyed by their respective content hashes. So a different value
+	// should produce a different key, making accidental overwrites with inconsistent values impossible.
+	light := payload.Collection.Light() // persist reduced representation of collection, only listing the transaction by their hashes
 	writer := rw.Writer()
-	err = operation.UpsertCollection(writer, &light) // keyed by content hash so no lock needed
+	err = operation.UpsertCollection(writer, &light) // collection is keyed by content hash, hence no overwrite protection is needed
 	if err != nil {
 		return fmt.Errorf("could not insert payload collection: %w", err)
 	}
 
-	// insert constituent transactions
+	// persist constituent transactions:
 	for _, colTx := range payload.Collection.Transactions {
-		err = operation.UpsertTransaction(writer, colTx.ID(), colTx) // keyed by content hash so no lock needed
+		err = operation.UpsertTransaction(writer, colTx.ID(), colTx) // as transaction is keyed by content hash, hence no overwrite protection is needed
 		if err != nil {
 			return fmt.Errorf("could not insert payload transaction: %w", err)
 		}
 	}
 
-	// index the transaction IDs within the collection
-	txIDs = payload.Collection.Light().Transactions
+	// STEP 2: for the cluster block ID, index the consistent transactions plus the auxilluary data from the playload.
+	// Caution: Here we use the cluster block's ID as key, which is *not* uniquely determined by the indexed data.
+	// Hence, we must ensure that we are not accidentally overwriting existing data (in case of a bug in the calling
+	// code) with different values. This is ensured by the initial check confirming that the collection payload
+	// has not yet been indexed (and the assumption that `IndexReferenceBlockByClusterBlock` is called nowhere else).
+	txIDs = light.Transactions
 	err = operation.IndexCollectionPayload(lctx, writer, blockID, txIDs)
 	if err != nil {
 		return fmt.Errorf("could not index collection: %w", err)

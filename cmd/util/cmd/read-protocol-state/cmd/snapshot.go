@@ -88,7 +88,6 @@ func runSnapshotE(*cobra.Command, []string) error {
 				protocolSnapshot, sealedHeight, sealedCommit, checkpointFile, err = commonFuncs.GenerateProtocolSnapshotForCheckpointWithHeights(
 					log.Logger, state, storages.Headers, storages.Seals, flagCheckpointDir, flagCheckpointScanStep, uint64(flagCheckpointScanEndHeight))
 			}
-
 			if err != nil {
 				return fmt.Errorf("could not generate protocol snapshot for checkpoint in dir: %v: %w", flagCheckpointDir, err)
 			}

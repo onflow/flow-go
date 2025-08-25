@@ -78,7 +78,15 @@ func BlockExists(r storage.Reader, blockID flow.Identifier) (bool, error) {
 	return KeyExists(r, MakePrefix(codeHeader, blockID))
 }
 
-// IndexCollectionBlock indexes a block by a collection within that block.
+// IndexCollectionBlock produces a mapping from collection ID to the block ID containing this collection.
+//
+// CAUTION: a collection can be included in multiple *unfinalized* blocks. However, the implementation
+// assumes a one-to-one map from collection ID to a *single* block ID. This holds for FINALIZED BLOCKS ONLY
+// *and* only in the absence of byzantine collector clusters (which the mature protocol must tolerate).
+// Hence, this function should be treated as a temporary solution, which requires generalization
+// (one-to-many mapping) for soft finality and the mature protocol.
+//
+// TODO: USE LOCK, we want to protect this mapping from accidental overwrites (because the key is not derived from the value via a collision-resistant hash)
 func IndexCollectionBlock(w storage.Writer, collID flow.Identifier, blockID flow.Identifier) error {
 	return UpsertByKey(w, MakePrefix(codeCollectionBlock, collID), blockID)
 }
