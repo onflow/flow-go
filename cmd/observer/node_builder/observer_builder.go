@@ -1451,6 +1451,7 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 				builder.RootChainID.Chain(),
 				indexerDerivedChainData,
 				collectionExecutedMetric,
+				node.StorageLockMgr,
 			)
 			if err != nil {
 				return nil, err

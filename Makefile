@@ -250,12 +250,12 @@ tools/custom-gcl: tools/structwrite .custom-gcl.yml
 .PHONY: lint
 lint: tidy tools/custom-gcl
 	# revive -config revive.toml -exclude storage/ledger/trie ./...
-	./tools/custom-gcl run -v ./...
+	./tools/custom-gcl run -v $(or $(LINT_PATH),./...)
 
 .PHONY: fix-lint
 fix-lint:
 	# revive -config revive.toml -exclude storage/ledger/trie ./...
-	./tools/custom-gcl run -v --fix ./...
+	./tools/custom-gcl run -v --fix $(or $(LINT_PATH),./...)
 
 # Runs unit tests with different list of packages as passed by CI so they run in parallel
 .PHONY: ci

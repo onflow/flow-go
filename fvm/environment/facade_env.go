@@ -338,15 +338,6 @@ func (*facadeEnvironment) ResourceOwnerChanged(
 	// NO-OP
 }
 
-func (*facadeEnvironment) SetInterpreterSharedState(_ *interpreter.SharedState) {
-	// NO-OP
-}
-
-func (*facadeEnvironment) GetInterpreterSharedState() *interpreter.SharedState {
-	// NO-OP
-	return nil
-}
-
 func (env *facadeEnvironment) RecoverProgram(program *ast.Program, location common.Location) ([]byte, error) {
 	return RecoverProgram(
 		env.chain.ChainID(),

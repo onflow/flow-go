@@ -1,38 +1,23 @@
 package blueprints
 
 import (
-	_ "embed"
 	"fmt"
-	"strings"
 
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/encoding/ccf"
+	"github.com/rs/zerolog/log"
 
+	"github.com/onflow/flow-core-contracts/lib/go/templates"
+
+	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/model/flow"
 )
 
-// processScheduledCallbacksTransaction calls scheduled callback contract
-// and process new callbacks that should be executed.
-//
-//go:embed scripts/processScheduledCallbacksTransaction.cdc
-var processCallbacksTransaction string
-
-// executeCallbacksTransaction calls scheduled callback contract
-// to execute the provided callback by ID.
-//
-//go:embed scripts/executeScheduledCallbackTransaction.cdc
-var executeCallbacksTransaction string
-
-const (
-	placeholderScheduledContract     = "import \"CallbackScheduler\""
-	processedCallbackIDFieldName     = "ID"
-	processedCallbackEffortFieldName = "executionEffort"
-	processedEventTypeTemplate       = "A.%v.CallbackScheduler.CallbackProcessed"
-	callbackTransactionGasLimit      = flow.DefaultMaxTransactionGasLimit
-)
+const callbackTransactionGasLimit = flow.DefaultMaxTransactionGasLimit
 
 func ProcessCallbacksTransaction(chain flow.Chain) *flow.TransactionBody {
-	script := prepareScheduledContractTransaction(chain, processCallbacksTransaction)
+	sc := systemcontracts.SystemContractsForChain(chain.ChainID())
+	script := templates.GenerateProcessCallbackScript(sc.AsTemplateEnv())
 
 	return flow.NewTransactionBody().
 		SetScript(script).
@@ -41,22 +26,24 @@ func ProcessCallbacksTransaction(chain flow.Chain) *flow.TransactionBody {
 
 func ExecuteCallbacksTransactions(chainID flow.Chain, processEvents flow.EventsList) ([]*flow.TransactionBody, error) {
 	txs := make([]*flow.TransactionBody, 0, len(processEvents))
+	env := systemcontracts.SystemContractsForChain(chainID.ChainID()).AsTemplateEnv()
 
 	for _, event := range processEvents {
-		id, effort, err := callbackArgsFromEvent(event)
+		id, effort, err := callbackArgsFromEvent(env, event)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get callback args from event: %w", err)
 		}
 
-		tx := executeCallbackTransaction(chainID, id, effort)
+		tx := executeCallbackTransaction(env, id, effort)
 		txs = append(txs, tx)
 	}
 
 	return txs, nil
 }
 
-func executeCallbackTransaction(chain flow.Chain, id []byte, effort uint64) *flow.TransactionBody {
-	script := prepareScheduledContractTransaction(chain, executeCallbacksTransaction)
+func executeCallbackTransaction(env templates.Environment, id []byte, effort uint64) *flow.TransactionBody {
+	script := templates.GenerateExecuteCallbackScript(env)
+
 	return flow.NewTransactionBody().
 		SetScript(script).
 		AddArgument(id).
@@ -68,9 +55,17 @@ func executeCallbackTransaction(chain flow.Chain, id []byte, effort uint64) *flo
 // The event for processed callback event is emitted by the process callback transaction from
 // callback scheduler contract and has the following signature:
 // event CallbackProcessed(ID: UInt64, executionEffort: UInt64)
-func callbackArgsFromEvent(event flow.Event) ([]byte, uint64, error) {
-	scheduledContractAddress := "0x0000000000000000" // todo use contract addr
-	if string(event.Type) != fmt.Sprintf(processedEventTypeTemplate, scheduledContractAddress) {
+func callbackArgsFromEvent(env templates.Environment, event flow.Event) ([]byte, uint64, error) {
+	const (
+		processedCallbackIDFieldName     = "ID"
+		processedCallbackEffortFieldName = "executionEffort"
+		processedEventTypeTemplate       = "A.%v.CallbackScheduler.CallbackProcessed"
+	)
+
+	scheduledContractAddress := env.FlowCallbackSchedulerAddress
+	processedEventType := flow.EventType(fmt.Sprintf(processedEventTypeTemplate, scheduledContractAddress))
+
+	if event.Type != processedEventType {
 		return nil, 0, fmt.Errorf("wrong event type is passed")
 	}
 
@@ -99,9 +94,16 @@ func callbackArgsFromEvent(event flow.Event) ([]byte, uint64, error) {
 		return nil, 0, fmt.Errorf("id is not uint64")
 	}
 
-	effort, ok := effortValue.(cadence.UInt64)
+	cadenceEffort, ok := effortValue.(cadence.UInt64)
 	if !ok {
 		return nil, 0, fmt.Errorf("effort is not uint64")
+	}
+
+	effort := uint64(cadenceEffort)
+
+	if effort > flow.DefaultMaxTransactionGasLimit {
+		log.Warn().Uint64("effort", effort).Msg("effort is greater than max transaction gas limit, setting to max")
+		effort = flow.DefaultMaxTransactionGasLimit
 	}
 
 	encodedID, err := ccf.Encode(id)
@@ -109,19 +111,5 @@ func callbackArgsFromEvent(event flow.Event) ([]byte, uint64, error) {
 		return nil, 0, fmt.Errorf("failed to encode id: %w", err)
 	}
 
-	return encodedID, uint64(effort), nil
-}
-
-func prepareScheduledContractTransaction(_ flow.Chain, txScript string) []byte {
-	// todo use this instead of palceholder address
-	// _ = systemcontracts.SystemContractsForChain(chain.ChainID())
-	scheduledContractAddress := "0x0000000000000000"
-
-	code := strings.ReplaceAll(
-		txScript,
-		placeholderScheduledContract,
-		fmt.Sprintf("%s from %s", placeholderScheduledContract, scheduledContractAddress),
-	)
-
-	return []byte(code)
+	return encodedID, effort, nil
 }

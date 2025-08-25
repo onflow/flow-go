@@ -70,9 +70,12 @@ func TestFindBlockTransactions(t *testing.T) {
 			return storages.Blocks.BatchStore(lctx, rw, &b2)
 		}))
 
-		require.NoError(t, collections.Store(&col1.Collection))
-		require.NoError(t, collections.Store(&col2.Collection))
-		require.NoError(t, collections.Store(&col3.Collection))
+		_, err := collections.Store(&col1.Collection)
+		require.NoError(t, err)
+		_, err = collections.Store(&col2.Collection)
+		require.NoError(t, err)
+		_, err = collections.Store(&col3.Collection)
+		require.NoError(t, err)
 
 		f := &Finder{
 			State:       state,

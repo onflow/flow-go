@@ -1,6 +1,8 @@
 package storage
 
 import (
+	"github.com/jordanschalm/lockctx"
+
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -35,30 +37,21 @@ type Collections interface {
 
 	// Store inserts the collection keyed by ID and all constituent
 	// transactions.
+	// This is used by execution node storing collections
 	// No errors are expected during normal operation.
-	Store(collection *flow.Collection) error
+	// No errors are expected during normal operation.
+	Store(collection *flow.Collection) (flow.LightCollection, error)
 
 	// Remove removes the collection and all constituent transactions.
 	// No errors are expected during normal operation.
 	Remove(collID flow.Identifier) error
 
-	// StoreLightAndIndexByTransaction inserts the light collection (only
-	// transaction IDs) and adds a transaction id index for each of the
-	// transactions within the collection (transaction_id->collection_id).
-	//
-	// NOTE: Currently it is possible in rare circumstances for two collections
-	// to be guaranteed which both contain the same transaction (see https://github.com/dapperlabs/flow-go/issues/3556).
-	// The second of these will revert upon reaching the execution node, so
-	// this doesn't impact the execution state, but it can result in the Access
-	// node processing two collections which both contain the same transaction (see https://github.com/dapperlabs/flow-go/issues/5337).
-	// To handle this, we skip indexing the affected transaction when inserting
-	// the transaction_id->collection_id index when an index for the transaction
-	// already exists.
-	//
+	// StoreAndIndexByTransaction stores the collection and indexes it by transaction.
+	// This is used by access node storing collections for finalized blocks
 	// No errors are expected during normal operation.
-	StoreLightAndIndexByTransaction(collection *flow.LightCollection) error
+	StoreAndIndexByTransaction(lctx lockctx.Proof, collection *flow.Collection) (flow.LightCollection, error)
 
-	// BatchStoreLightAndIndexByTransaction stores a light collection and indexes it by transaction ID within a batch operation.
-	// No errors are expected during normal operation.
-	BatchStoreLightAndIndexByTransaction(collection *flow.LightCollection, batch ReaderBatchWriter) error
+	// BatchStoreAndIndexByTransaction stores the collection and indexes it by transaction within a batch.
+	// This is used by access node storing collections for finalized blocks
+	BatchStoreAndIndexByTransaction(lctx lockctx.Proof, collection *flow.Collection, batch ReaderBatchWriter) (flow.LightCollection, error)
 }

@@ -3,7 +3,6 @@ package badgerimpl
 import (
 	"fmt"
 	"slices"
-	"sync"
 
 	"github.com/dgraph-io/badger/v2"
 
@@ -22,9 +21,6 @@ type ReaderBatchWriter struct {
 
 	// for executing callbacks after the batch has been flushed, such as updating caches
 	callbacks *operation.Callbacks
-
-	// for repreventing re-entrant deadlock
-	locks *operation.BatchLocks
 }
 
 var _ storage.ReaderBatchWriter = (*ReaderBatchWriter)(nil)
@@ -49,14 +45,6 @@ func (b *ReaderBatchWriter) Writer() storage.Writer {
 // BadgerWriteBatch returns the badger write batch
 func (b *ReaderBatchWriter) BadgerWriteBatch() *badger.WriteBatch {
 	return b.batch
-}
-
-// Lock tries to acquire the lock for the batch.
-// if the lock is already acquired by this same batch from other pending db operations,
-// then it will not be blocked and can continue updating the batch, which prevents a re-entrant deadlock.
-// CAUTION: The caller must ensure that no other references exist for the input lock.
-func (b *ReaderBatchWriter) Lock(lock *sync.Mutex) {
-	b.locks.Lock(lock, b.callbacks)
 }
 
 // AddCallback adds a callback to execute after the batch has been flush
@@ -118,7 +106,6 @@ func NewReaderBatchWriter(db *badger.DB) *ReaderBatchWriter {
 		globalReader: ToReader(db),
 		batch:        db.NewWriteBatch(),
 		callbacks:    operation.NewCallbacks(),
-		locks:        operation.NewBatchLocks(),
 	}
 }
 
