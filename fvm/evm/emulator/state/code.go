@@ -4,8 +4,8 @@ import (
 	"encoding/binary"
 	"fmt"
 
-	gethCommon "github.com/onflow/go-ethereum/common"
-	"github.com/onflow/go-ethereum/rlp"
+	gethCommon "github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/rlp"
 )
 
 // CodeContainer contains codes and keeps
