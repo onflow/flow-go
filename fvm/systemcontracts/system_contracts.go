@@ -214,9 +214,10 @@ func (c SystemContracts) AsTemplateEnv() templates.Environment {
 		FungibleTokenSwitchboardAddress:   c.FungibleTokenSwitchboard.Address.Hex(),
 		FungibleTokenMetadataViewsAddress: c.FungibleTokenMetadataViews.Address.Hex(),
 
-		NonFungibleTokenAddress: c.NonFungibleToken.Address.Hex(),
-		MetadataViewsAddress:    c.MetadataViews.Address.Hex(),
-		ViewResolverAddress:     c.ViewResolver.Address.Hex(),
+		NonFungibleTokenAddress:     c.NonFungibleToken.Address.Hex(),
+		MetadataViewsAddress:        c.MetadataViews.Address.Hex(),
+		ViewResolverAddress:         c.ViewResolver.Address.Hex(),
+		CrossVMMetadataViewsAddress: c.CrossVMMetadataViews.Address.Hex(),
 
 		BurnerAddress: c.Burner.Address.Hex(),
 		CryptoAddress: c.Crypto.Address.Hex(),
