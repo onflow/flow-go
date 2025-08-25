@@ -32,6 +32,7 @@ const (
 	ContractNameServiceAccount             = "FlowServiceAccount"
 	ContractNameFlowFees                   = "FlowFees"
 	ContractNameStorageFees                = "FlowStorageFees"
+	ContractNameFlowCallbackScheduler      = "FlowCallbackScheduler"
 	ContractNameNodeVersionBeacon          = "NodeVersionBeacon"
 	ContractNameRandomBeaconHistory        = "RandomBeaconHistory"
 	ContractNameFungibleToken              = "FungibleToken"
@@ -161,6 +162,7 @@ type SystemContracts struct {
 
 	// service account related contracts
 	FlowServiceAccount         SystemContract
+	FlowCallbackScheduler      SystemContract
 	NodeVersionBeacon          SystemContract
 	RandomBeaconHistory        SystemContract
 	FlowStorageFees            SystemContract
@@ -214,8 +216,8 @@ func (c SystemContracts) AsTemplateEnv() templates.Environment {
 
 		NonFungibleTokenAddress:     c.NonFungibleToken.Address.Hex(),
 		MetadataViewsAddress:        c.MetadataViews.Address.Hex(),
-		CrossVMMetadataViewsAddress: c.CrossVMMetadataViews.Address.Hex(),
 		ViewResolverAddress:         c.ViewResolver.Address.Hex(),
+		CrossVMMetadataViewsAddress: c.CrossVMMetadataViews.Address.Hex(),
 
 		BurnerAddress: c.Burner.Address.Hex(),
 		CryptoAddress: c.Crypto.Address.Hex(),
@@ -231,6 +233,7 @@ func (c SystemContracts) All() []SystemContract {
 		c.DKG,
 
 		c.FlowServiceAccount,
+		c.FlowCallbackScheduler,
 		c.NodeVersionBeacon,
 		c.RandomBeaconHistory,
 		c.FlowStorageFees,
@@ -386,6 +389,7 @@ func init() {
 		ContractNameRandomBeaconHistory:       serviceAddressFunc,
 		ContractNameServiceAccount:            serviceAddressFunc,
 		ContractNameStorageFees:               serviceAddressFunc,
+		ContractNameFlowCallbackScheduler:     serviceAddressFunc,
 		AccountNameExecutionParametersAccount: executionParametersAccountFunc,
 
 		ContractNameFlowFees:                   nthAddressFunc(FlowFeesAccountIndex),
@@ -443,6 +447,7 @@ func init() {
 			DKG:            addressOfContract(ContractNameDKG),
 
 			FlowServiceAccount:         addressOfContract(ContractNameServiceAccount),
+			FlowCallbackScheduler:      addressOfContract(ContractNameFlowCallbackScheduler),
 			NodeVersionBeacon:          addressOfContract(ContractNameNodeVersionBeacon),
 			RandomBeaconHistory:        addressOfContract(ContractNameRandomBeaconHistory),
 			FlowStorageFees:            addressOfContract(ContractNameStorageFees),
