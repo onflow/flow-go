@@ -27,7 +27,7 @@ func TestStoreRetrieveClusterPayload(t *testing.T) {
 		lctx := manager.NewContext()
 		require.NoError(t, lctx.AcquireLock(storage.LockInsertOrFinalizeClusterBlock))
 		err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			return procedure.InsertClusterPayload(lctx, rw.Writer(), blockID, expected)
+			return procedure.InsertClusterPayload(lctx, rw, blockID, expected)
 		})
 		lctx.Release()
 		require.NoError(t, err)

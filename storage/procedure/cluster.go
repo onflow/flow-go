@@ -170,7 +170,9 @@ func InsertClusterPayload(lctx lockctx.Proof, rw storage.ReaderBatchWriter, bloc
 	// to propose the same collection in two competing forks. However, we don't have to worry about repeated calls,
 	// because collections and transactions are keyed by their respective content hashes. So a different value
 	// should produce a different key, making accidental overwrites with inconsistent values impossible.
-	light := payload.Collection.Light()              // persist reduced representation of collection, only listing the transaction by their hashes
+	// persist reduced representation of collection, only listing the transaction by their hashes
+	light := payload.Collection.Light()
+	writer := rw.Writer()
 	err = operation.UpsertCollection(writer, &light) // collection is keyed by content hash, hence no overwrite protection is needed
 	if err != nil {
 		return fmt.Errorf("could not insert payload collection: %w", err)
