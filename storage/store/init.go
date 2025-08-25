@@ -15,6 +15,7 @@ type All struct {
 	QuorumCertificates *QuorumCertificates
 	Results            *ExecutionResults
 	Receipts           *ExecutionReceipts
+	Commits            *Commits
 
 	EpochSetups               *EpochSetups
 	EpochCommits              *EpochCommits
@@ -33,6 +34,7 @@ func InitAll(metrics module.CacheMetrics, db storage.DB) *All {
 	index := NewIndex(metrics, db)
 	results := NewExecutionResults(metrics, db)
 	receipts := NewExecutionReceipts(metrics, db, results, DefaultCacheSize)
+	commits := NewCommits(metrics, db)
 	payloads := NewPayloads(db, index, guarantees, seals, receipts, results)
 	blocks := NewBlocks(db, headers, payloads)
 	qcs := NewQuorumCertificates(metrics, db, DefaultCacheSize)
@@ -58,7 +60,9 @@ func InitAll(metrics module.CacheMetrics, db storage.DB) *All {
 		Results:            results,
 		Receipts:           receipts,
 
-		EpochSetups:               setups,
+		Commits:     commits,
+		EpochSetups: setups,
+
 		EpochCommits:              epochCommits,
 		EpochProtocolStateEntries: epochProtocolStateEntries,
 		ProtocolKVStore:           protocolKVStore,

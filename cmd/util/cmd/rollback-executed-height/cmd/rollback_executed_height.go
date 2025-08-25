@@ -13,7 +13,6 @@ import (
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/badger"
-	"github.com/onflow/flow-go/storage/operation/badgerimpl"
 	"github.com/onflow/flow-go/storage/operation/pebbleimpl"
 	storagepebble "github.com/onflow/flow-go/storage/pebble"
 	"github.com/onflow/flow-go/storage/store"
@@ -28,7 +27,7 @@ var (
 var Cmd = &cobra.Command{
 	Use:   "rollback-executed-height",
 	Short: "Rollback the executed height",
-	Run:   run,
+	RunE:  runE,
 }
 
 func init() {
@@ -47,7 +46,7 @@ func init() {
 	_ = Cmd.MarkFlagRequired("chunk_data_pack_dir")
 }
 
-func run(*cobra.Command, []string) {
+func runE(*cobra.Command, []string) error {
 	log.Info().
 		Str("datadir", flagDataDir).
 		Str("chunk_data_pack_dir", flagChunkDataPackDir).
@@ -57,17 +56,19 @@ func run(*cobra.Command, []string) {
 	if flagHeight == 0 {
 		// this would be a mistake that the height flag is used but no height value
 		// was specified, so the default value 0 is used.
-		log.Fatal().Msg("height must be above 0")
+		return fmt.Errorf("height must be above 0: %v", flagHeight)
 	}
 
-	bdb := common.InitStorage(flagDataDir)
-	storages := common.InitStorages(bdb)
-	state, err := common.InitProtocolState(bdb, storages)
+	db, err := common.InitStorage(flagDataDir)
 	if err != nil {
-		log.Fatal().Err(err).Msg("could not init protocol states")
+		return err
+	}
+	storages := common.InitStorages(db)
+	state, err := common.InitProtocolState(db, storages)
+	if err != nil {
+		return fmt.Errorf("could not init protocol states: %w", err)
 	}
 
-	db := badgerimpl.ToDB(bdb)
 	metrics := &metrics.NoopCollector{}
 
 	transactionResults := store.NewTransactionResults(metrics, db, badger.DefaultCacheSize)
@@ -75,7 +76,7 @@ func run(*cobra.Command, []string) {
 	results := store.NewExecutionResults(metrics, db)
 	receipts := store.NewExecutionReceipts(metrics, db, results, badger.DefaultCacheSize)
 	myReceipts := store.NewMyExecutionReceipts(metrics, db, receipts)
-	headers := badger.NewHeaders(metrics, bdb)
+	headers := store.NewHeaders(metrics, db)
 	events := store.NewEvents(metrics, db)
 	serviceEvents := store.NewServiceEvents(metrics, db)
 	transactions := store.NewTransactions(metrics, db)
@@ -134,6 +135,7 @@ func run(*cobra.Command, []string) {
 
 	log.Info().Msgf("executed height rolled back to %v", flagHeight)
 
+	return nil
 }
 
 // use badger instances directly instead of stroage interfaces so that the interface don't
