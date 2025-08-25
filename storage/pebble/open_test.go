@@ -77,6 +77,20 @@ func TestNewBootstrappedRegistersWithPath(t *testing.T) {
 	})
 }
 
+func TestBadgerDBCannotBeOpenedAsPebbleDB(t *testing.T) {
+	t.Parallel()
+	unittest.RunWithTempDir(t, func(dir string) {
+		logger := unittest.Logger()
+		// create a badger db
+		badgerDB := unittest.BadgerDB(t, dir)
+		require.NoError(t, badgerDB.Close())
+
+		_, err := ShouldOpenDefaultPebbleDB(logger, dir)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "pebble db is not initialized")
+	})
+}
+
 func TestShouldOpenDefaultPebbleDB(t *testing.T) {
 	t.Parallel()
 	unittest.RunWithTempDir(t, func(dir string) {

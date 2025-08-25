@@ -100,7 +100,9 @@ func IsBadgerFolder(dataDir string) (bool, error) {
 	return isBadger, nil
 }
 
-func MustBeBadgerFolder(dataDir string) error {
+// EnsureBadgerFolder ensures the given directory is either empty (including does not exist),
+// or is a valid Badger folder. It returns an error if the directory exists and is not a Badger folder.
+func EnsureBadgerFolder(dataDir string) error {
 	ok, err := isEmptyOrNotExists(dataDir)
 	if err != nil {
 		return fmt.Errorf("error checking if folder is empty or does not exist: %w", err)
@@ -153,7 +155,7 @@ func isEmptyOrNotExists(path string) (bool, error) {
 // which could wipe out the existing data.
 func SafeOpen(opts badger.Options) (*badger.DB, error) {
 	// Check if the directory is a Badger folder
-	err := MustBeBadgerFolder(opts.Dir)
+	err := EnsureBadgerFolder(opts.Dir)
 	if err != nil {
 		return nil, fmt.Errorf("could not assert badger folder: %w", err)
 	}
