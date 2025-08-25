@@ -111,8 +111,13 @@ func TestShouldOpenDefaultPebbleDB(t *testing.T) {
 	t.Parallel()
 	unittest.RunWithTempDir(t, func(dir string) {
 		logger := unittest.Logger()
-		// verify error is returned when the db is not bootstrapped
-		_, err := ShouldOpenDefaultPebbleDB(logger, dir)
+		// verify error if directy not exist
+		_, err := ShouldOpenDefaultPebbleDB(logger, dir+"/not-exist")
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "not initialized")
+
+		// verify error if directory exist but not empty
+		_, err = ShouldOpenDefaultPebbleDB(logger, dir)
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "not initialized")
 
@@ -131,5 +136,19 @@ func TestShouldOpenDefaultPebbleDB(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, uint64(10), h)
 		require.NoError(t, db.Close())
+	})
+}
+
+func TestShouldOpenDefaultPebbleDBFailWhenOpeningBadgerDBDir(t *testing.T) {
+	t.Parallel()
+	unittest.RunWithTempDir(t, func(dir string) {
+		logger := unittest.Logger()
+		// create a badger db
+		badgerDB := unittest.BadgerDB(t, dir)
+		require.NoError(t, badgerDB.Close())
+
+		_, err := ShouldOpenDefaultPebbleDB(logger, dir)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "pebble db is not initialized")
 	})
 }
