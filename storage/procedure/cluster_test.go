@@ -40,12 +40,12 @@ func TestFinalizeClusterBlock(t *testing.T) {
 
 		lockManager := storage.NewTestingLockManager()
 		lctx := lockManager.NewContext()
+		defer lctx.Release()
 		require.NoError(t, lctx.AcquireLock(storage.LockInsertOrFinalizeClusterBlock))
 		require.NoError(t, lctx.AcquireLock(storage.LockInsertBlock))
 		require.NoError(t, db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			return InsertClusterBlock(lctx, rw, &block)
+			return InsertClusterBlock(lctx, rw, &parent)
 		}))
-		defer lctx.Release()
 
 		// index parent as latest finalized block (manually writing respective indexes like in bootstrapping to skip transitive consistency checks)
 		require.NoError(t, db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
