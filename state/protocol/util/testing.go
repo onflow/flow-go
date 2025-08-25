@@ -52,14 +52,14 @@ func MockSealValidator(sealsDB storage.Seals) module.SealValidator {
 			if len(candidate.Payload.Seals) > 0 {
 				return candidate.Payload.Seals[0]
 			}
-			last, _ := sealsDB.HighestInFork(candidate.Header.ParentID)
+			last, _ := sealsDB.HighestInFork(candidate.ParentID)
 			return last
 		},
 		func(candidate *flow.Block) error {
 			if len(candidate.Payload.Seals) > 0 {
 				return nil
 			}
-			_, err := sealsDB.HighestInFork(candidate.Header.ParentID)
+			_, err := sealsDB.HighestInFork(candidate.ParentID)
 			return err
 		}).Maybe()
 	return validator

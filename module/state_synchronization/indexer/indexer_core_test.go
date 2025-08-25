@@ -75,7 +75,7 @@ func (i *indexCoreTest) useDefaultBlockByHeight() *indexCoreTest {
 		On("BlockIDByHeight", mocks.AnythingOfType("uint64")).
 		Return(func(height uint64) (flow.Identifier, error) {
 			for _, b := range i.blocks {
-				if b.Header.Height == height {
+				if b.Height == height {
 					return b.ID(), nil
 				}
 			}
@@ -86,8 +86,8 @@ func (i *indexCoreTest) useDefaultBlockByHeight() *indexCoreTest {
 		On("ByHeight", mocks.AnythingOfType("uint64")).
 		Return(func(height uint64) (*flow.Header, error) {
 			for _, b := range i.blocks {
-				if b.Header.Height == height {
-					return b.Header, nil
+				if b.Height == height {
+					return b.ToHeader(), nil
 				}
 			}
 			return nil, fmt.Errorf("not found")
@@ -109,12 +109,12 @@ func (i *indexCoreTest) useDefaultHeights() *indexCoreTest {
 	i.registers.
 		On("FirstHeight").
 		Return(func() uint64 {
-			return i.blocks[0].Header.Height
+			return i.blocks[0].Height
 		})
 	i.registers.
 		On("LatestHeight").
 		Return(func() uint64 {
-			return i.blocks[len(i.blocks)-1].Header.Height
+			return i.blocks[len(i.blocks)-1].Height
 		})
 	return i
 }
@@ -188,14 +188,10 @@ func (i *indexCoreTest) initIndexer() *indexCoreTest {
 
 	i.useDefaultHeights()
 
-	collectionsToMarkFinalized, err := stdmap.NewTimes(100)
-	require.NoError(i.t, err)
-	collectionsToMarkExecuted, err := stdmap.NewTimes(100)
-	require.NoError(i.t, err)
-	blocksToMarkExecuted, err := stdmap.NewTimes(100)
-	require.NoError(i.t, err)
-	blockTransactions, err := stdmap.NewIdentifierMap(100)
-	require.NoError(i.t, err)
+	collectionsToMarkFinalized := stdmap.NewTimes(100)
+	collectionsToMarkExecuted := stdmap.NewTimes(100)
+	blocksToMarkExecuted := stdmap.NewTimes(100)
+	blockTransactions := stdmap.NewIdentifierMap(100)
 
 	log := zerolog.New(os.Stdout)
 	blocks := storagemock.NewBlocks(i.t)
@@ -270,7 +266,7 @@ func TestExecutionState_IndexBlockData(t *testing.T) {
 			useDefaultTransactionResults().
 			// make sure update registers match in length and are same as block data ledger payloads
 			setStoreRegisters(func(t *testing.T, entries flow.RegisterEntries, height uint64) error {
-				assert.Equal(t, height, block.Header.Height)
+				assert.Equal(t, height, block.Height)
 				assert.Len(t, trie.Payloads, entries.Len())
 
 				// make sure all the registers from the execution data have been stored as well the value matches
@@ -376,7 +372,7 @@ func TestExecutionState_IndexBlockData(t *testing.T) {
 			}).
 			// make sure an empty set of register entries was stored
 			setStoreRegisters(func(t *testing.T, entries flow.RegisterEntries, height uint64) error {
-				assert.Equal(t, height, block.Header.Height)
+				assert.Equal(t, height, block.Height)
 				assert.Equal(t, 0, entries.Len())
 				return nil
 			}).
@@ -424,7 +420,7 @@ func TestExecutionState_IndexBlockData(t *testing.T) {
 			}).
 			// make sure an empty set of register entries was stored
 			setStoreRegisters(func(t *testing.T, entries flow.RegisterEntries, height uint64) error {
-				assert.Equal(t, height, block.Header.Height)
+				assert.Equal(t, height, block.Height)
 				assert.Equal(t, 0, entries.Len())
 				return nil
 			}).
@@ -461,7 +457,7 @@ func TestExecutionState_IndexBlockData(t *testing.T) {
 			}).
 			// make sure an empty set of register entries was stored
 			setStoreRegisters(func(t *testing.T, entries flow.RegisterEntries, height uint64) error {
-				assert.Equal(t, height, block.Header.Height)
+				assert.Equal(t, height, block.Height)
 				assert.Equal(t, 0, entries.Len())
 				return nil
 			}).
@@ -522,7 +518,7 @@ func TestExecutionState_IndexBlockData(t *testing.T) {
 			}).
 			// make sure update registers match in length and are same as block data ledger payloads
 			setStoreRegisters(func(t *testing.T, entries flow.RegisterEntries, actualHeight uint64) error {
-				assert.Equal(t, actualHeight, block.Header.Height)
+				assert.Equal(t, actualHeight, block.Height)
 				assert.Equal(t, entries.Len(), len(expectedPayloads))
 
 				// make sure all the registers from the execution data have been stored as well the value matches
@@ -539,10 +535,10 @@ func TestExecutionState_IndexBlockData(t *testing.T) {
 	t.Run("Invalid Heights", func(t *testing.T) {
 		last := blocks[len(blocks)-1]
 		ed := &execution_data.BlockExecutionData{
-			BlockID: last.Header.ID(),
+			BlockID: last.ID(),
 		}
 		execData := execution_data.NewBlockExecutionDataEntity(last.ID(), ed)
-		latestHeight := blocks[len(blocks)-3].Header.Height
+		latestHeight := blocks[len(blocks)-3].Height
 
 		err := newIndexCoreTest(t, blocks, execData).
 			// return a height one smaller than the latest block in storage
@@ -551,7 +547,7 @@ func TestExecutionState_IndexBlockData(t *testing.T) {
 			}).
 			runIndexBlockData()
 
-		assert.EqualError(t, err, fmt.Sprintf("must index block data with the next height %d, but got %d", latestHeight+1, last.Header.Height))
+		assert.EqualError(t, err, fmt.Sprintf("must index block data with the next height %d, but got %d", latestHeight+1, last.Height))
 	})
 
 	// this test makes sure that if a block we try to index is not found in block storage
@@ -559,9 +555,9 @@ func TestExecutionState_IndexBlockData(t *testing.T) {
 	t.Run("Unknown block ID", func(t *testing.T) {
 		unknownBlock := unittest.BlockFixture()
 		ed := &execution_data.BlockExecutionData{
-			BlockID: unknownBlock.Header.ID(),
+			BlockID: unknownBlock.ID(),
 		}
-		execData := execution_data.NewBlockExecutionDataEntity(unknownBlock.Header.ID(), ed)
+		execData := execution_data.NewBlockExecutionDataEntity(unknownBlock.ID(), ed)
 
 		err := newIndexCoreTest(t, blocks, execData).runIndexBlockData()
 
@@ -573,7 +569,7 @@ func TestExecutionState_IndexBlockData(t *testing.T) {
 func TestExecutionState_RegisterValues(t *testing.T) {
 	t.Run("Get value for single register", func(t *testing.T) {
 		blocks := unittest.BlockchainFixture(5)
-		height := blocks[1].Header.Height
+		height := blocks[1].Height
 		id := flow.RegisterID{
 			Owner: "1",
 			Key:   "2",

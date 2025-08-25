@@ -44,10 +44,10 @@ func (r *ReadBlocksCommand) Handler(ctx context.Context, req *admin.CommandReque
 			return nil, fmt.Errorf("failed to get block by ID: %w", err)
 		}
 		result = append(result, block)
-		if block.Header.Height == 0 {
+		if block.Height == 0 {
 			break
 		}
-		blockID = block.Header.ParentID
+		blockID = block.ParentID
 	}
 
 	return commands.ConvertToInterfaceList(result)

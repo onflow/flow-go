@@ -101,7 +101,7 @@ func Test_Add(t *testing.T) {
 			// the value for IncorporatedResultSeal.IncorporatedResult.IncorporatedBlockID is randomly
 			// generated and therefore, will be different from for irSeal1
 			irSeal2 := unittest.IncorporatedResultSeal.Fixture(unittest.IncorporatedResultSeal.WithResult(result))
-			require.False(t, irSeal1.ID() == irSeal2.ID()) // incorporated in different block => different seal ID expected
+			require.False(t, irSeal1.IncorporatedResultID() == irSeal2.IncorporatedResultID()) // incorporated in different block => different result ID expected
 			wrappedMempool.On("Add", irSeal2).Return(true, nil).Once()
 			added, err = wrapper.Add(irSeal2)
 			require.NoError(t, err)
@@ -113,8 +113,8 @@ func Test_Add(t *testing.T) {
 				unittest.IncorporatedResultSeal.WithResult(result),
 				unittest.IncorporatedResultSeal.WithIncorporatedBlockID(irSeal1.IncorporatedResult.IncorporatedBlockID),
 			)
-			require.True(t, irSeal1.ID() == irSeal3.ID())               // same result incorporated same block as (1) => identical ID expected
-			wrappedMempool.On("Add", irSeal3).Return(false, nil).Once() // deduplicate
+			require.True(t, irSeal1.IncorporatedResultID() == irSeal3.IncorporatedResultID()) // same result incorporated same block as (1) => identical IncorporatedResultID expected
+			wrappedMempool.On("Add", irSeal3).Return(false, nil).Once()                       // deduplicate
 			added, err = wrapper.Add(irSeal3)
 			require.NoError(t, err)
 			require.False(t, added)
@@ -130,22 +130,22 @@ func Test_Remove(t *testing.T) {
 		// element is in wrapped mempool: Remove should be called
 		seal := unittest.IncorporatedResultSeal.Fixture()
 		wrappedMempool.On("Add", seal).Return(true, nil).Once()
-		wrappedMempool.On("ByID", seal.ID()).Return(seal, true)
+		wrappedMempool.On("Get", seal.IncorporatedResultID()).Return(seal, true)
 		added, err := wrapper.Add(seal)
 		require.NoError(t, err)
 		require.True(t, added)
 
-		wrappedMempool.On("ByID", seal.ID()).Return(seal, true)
-		wrappedMempool.On("Remove", seal.ID()).Return(true).Once()
-		removed := wrapper.Remove(seal.ID())
+		wrappedMempool.On("Get", seal.IncorporatedResultID()).Return(seal, true)
+		wrappedMempool.On("Remove", seal.IncorporatedResultID()).Return(true).Once()
+		removed := wrapper.Remove(seal.IncorporatedResultID())
 		require.True(t, removed)
 		wrappedMempool.AssertExpectations(t)
 
 		// element _not_ in wrapped mempool: Remove might be called
 		seal = unittest.IncorporatedResultSeal.Fixture()
-		wrappedMempool.On("ByID", seal.ID()).Return(seal, false)
-		wrappedMempool.On("Remove", seal.ID()).Return(false).Maybe()
-		removed = wrapper.Remove(seal.ID())
+		wrappedMempool.On("Get", seal.IncorporatedResultID()).Return(seal, false)
+		wrappedMempool.On("Remove", seal.IncorporatedResultID()).Return(false).Maybe()
+		removed = wrapper.Remove(seal.IncorporatedResultID())
 		require.False(t, removed)
 		wrappedMempool.AssertExpectations(t)
 	})
@@ -205,8 +205,8 @@ func Test_ConflictingResults(t *testing.T) {
 			}).Return().Once()
 			action(irSeals, conflictingSeal, wrapper, wrappedMempool)
 
-			wrappedMempool.On("ByID", conflictingSeal.ID()).Return(nil, false).Once()
-			byID, found := wrapper.ByID(conflictingSeal.ID())
+			wrappedMempool.On("Get", conflictingSeal.IncorporatedResultID()).Return(nil, false).Once()
+			byID, found := wrapper.Get(conflictingSeal.IncorporatedResultID())
 			require.False(t, found)
 			require.Nil(t, byID)
 
@@ -234,8 +234,8 @@ func Test_ConflictingResults(t *testing.T) {
 	})
 	t.Run("by-id-query", func(t *testing.T) {
 		assertConflictingResult(t, func(irSeals []*flow.IncorporatedResultSeal, conflictingSeal *flow.IncorporatedResultSeal, wrapper *ExecForkSuppressor, wrappedMempool *poolmock.IncorporatedResultSeals) {
-			wrappedMempool.On("ByID", conflictingSeal.ID()).Return(conflictingSeal, true).Once()
-			byID, found := wrapper.ByID(conflictingSeal.ID())
+			wrappedMempool.On("Get", conflictingSeal.IncorporatedResultID()).Return(conflictingSeal, true).Once()
+			byID, found := wrapper.Get(conflictingSeal.IncorporatedResultID())
 			require.False(t, found)
 			require.Nil(t, byID)
 		})
@@ -247,8 +247,8 @@ func Test_ConflictingResults(t *testing.T) {
 // persisted in the data base
 func Test_ForkDetectionPersisted(t *testing.T) {
 	block := unittest.BlockFixture()
-	sealA := unittest.IncorporatedResultSeal.Fixture(unittest.IncorporatedResultSeal.WithResult(unittest.ExecutionResultFixture(unittest.WithBlock(&block))))
-	sealB := unittest.IncorporatedResultSeal.Fixture(unittest.IncorporatedResultSeal.WithResult(unittest.ExecutionResultFixture(unittest.WithBlock(&block))))
+	sealA := unittest.IncorporatedResultSeal.Fixture(unittest.IncorporatedResultSeal.WithResult(unittest.ExecutionResultFixture(unittest.WithBlock(block))))
+	sealB := unittest.IncorporatedResultSeal.Fixture(unittest.IncorporatedResultSeal.WithResult(unittest.ExecutionResultFixture(unittest.WithBlock(block))))
 
 	dbtest.RunFuncsWithNewDBHandle(
 		t,
@@ -270,14 +270,14 @@ func Test_ForkDetectionPersisted(t *testing.T) {
 			added, _ := wrapper.Add(sealB) // should be rejected because it is conflicting with sealA
 			require.True(t, added)
 
-			wrappedMempool.On("ByID", sealA.ID()).Return(sealA, true).Once()
+			wrappedMempool.On("Get", sealA.IncorporatedResultID()).Return(sealA, true).Once()
 			execForkActor.On("OnExecFork", mock.Anything).Run(func(args mock.Arguments) {
 				conflictingSeals := args.Get(0).([]*flow.IncorporatedResultSeal)
 				require.ElementsMatch(t, []*flow.IncorporatedResultSeal{sealA, sealB}, conflictingSeals)
 			}).Return().Once()
 			wrappedMempool.On("Clear").Return().Once()
 			// try to query, at this point we will detect a conflicting seal
-			wrapper.ByID(sealA.ID())
+			wrapper.Get(sealA.IncorporatedResultID())
 
 			wrappedMempool.AssertExpectations(t)
 			execForkActor.AssertExpectations(t)
@@ -371,7 +371,7 @@ func Test_ConflictingSeal_SmokeTest(t *testing.T) {
 		// two of them are non-conflicting but for same block and one is conflicting.
 
 		block := unittest.BlockFixture()
-		sealA := unittest.IncorporatedResultSeal.Fixture(unittest.IncorporatedResultSeal.WithResult(unittest.ExecutionResultFixture(unittest.WithBlock(&block))))
+		sealA := unittest.IncorporatedResultSeal.Fixture(unittest.IncorporatedResultSeal.WithResult(unittest.ExecutionResultFixture(unittest.WithBlock(block))))
 		_, _ = wrapper.Add(sealA)
 
 		// different seal but for same result
@@ -395,7 +395,7 @@ func Test_ConflictingSeal_SmokeTest(t *testing.T) {
 		require.ElementsMatch(t, []*flow.IncorporatedResultSeal{sealA, sealB}, seals)
 
 		// add conflicting seal, which doesn't have any receipts yet
-		conflictingSeal := unittest.IncorporatedResultSeal.Fixture(unittest.IncorporatedResultSeal.WithResult(unittest.ExecutionResultFixture(unittest.WithBlock(&block))))
+		conflictingSeal := unittest.IncorporatedResultSeal.Fixture(unittest.IncorporatedResultSeal.WithResult(unittest.ExecutionResultFixture(unittest.WithBlock(block))))
 		_, _ = wrapper.Add(conflictingSeal)
 
 		// conflicting seal doesn't have any receipts yet

@@ -13,7 +13,6 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/model/cluster"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/model/messages"
 	realbuffer "github.com/onflow/flow-go/module/buffer"
 	"github.com/onflow/flow-go/module/compliance"
 	"github.com/onflow/flow-go/module/metrics"
@@ -39,12 +38,12 @@ type CoreSuite struct {
 type CommonSuite struct {
 	suite.Suite
 
-	head *cluster.Block
+	head *cluster.Proposal
 	// storage data
-	headerDB map[flow.Identifier]*cluster.Block
+	headerDB map[flow.Identifier]*flow.Header
 
-	pendingDB  map[flow.Identifier]flow.Slashable[*cluster.Block]
-	childrenDB map[flow.Identifier][]flow.Slashable[*cluster.Block]
+	pendingDB  map[flow.Identifier]flow.Slashable[*cluster.Proposal]
+	childrenDB map[flow.Identifier][]flow.Slashable[*cluster.Proposal]
 
 	// mocked dependencies
 	state                     *clusterstate.MutableState
@@ -65,22 +64,22 @@ type CommonSuite struct {
 
 func (cs *CommonSuite) SetupTest() {
 	block := unittest.ClusterBlockFixture()
-	cs.head = &block
+	cs.head = unittest.ClusterProposalFromBlock(block)
 
 	// initialize the storage data
-	cs.headerDB = make(map[flow.Identifier]*cluster.Block)
-	cs.pendingDB = make(map[flow.Identifier]flow.Slashable[*cluster.Block])
-	cs.childrenDB = make(map[flow.Identifier][]flow.Slashable[*cluster.Block])
+	cs.headerDB = make(map[flow.Identifier]*flow.Header)
+	cs.pendingDB = make(map[flow.Identifier]flow.Slashable[*cluster.Proposal])
+	cs.childrenDB = make(map[flow.Identifier][]flow.Slashable[*cluster.Proposal])
 
 	// store the head header and payload
-	cs.headerDB[block.ID()] = cs.head
+	cs.headerDB[block.ID()] = cs.head.Block.ToHeader()
 
 	// set up header storage mock
 	cs.headers = &storage.Headers{}
 	cs.headers.On("ByBlockID", mock.Anything).Return(
 		func(blockID flow.Identifier) *flow.Header {
 			if header := cs.headerDB[blockID]; header != nil {
-				return cs.headerDB[blockID].Header
+				return cs.headerDB[blockID]
 			}
 			return nil
 		},
@@ -118,7 +117,7 @@ func (cs *CommonSuite) SetupTest() {
 	cs.snapshot = &clusterstate.Snapshot{}
 	cs.snapshot.On("Head").Return(
 		func() *flow.Header {
-			return cs.head.Header
+			return cs.head.Block.ToHeader()
 		},
 		nil,
 	)
@@ -127,7 +126,7 @@ func (cs *CommonSuite) SetupTest() {
 	cs.pending = &module.PendingClusterBlockBuffer{}
 	cs.pending.On("Add", mock.Anything, mock.Anything).Return(true)
 	cs.pending.On("ByID", mock.Anything).Return(
-		func(blockID flow.Identifier) flow.Slashable[*cluster.Block] {
+		func(blockID flow.Identifier) flow.Slashable[*cluster.Proposal] {
 			return cs.pendingDB[blockID]
 		},
 		func(blockID flow.Identifier) bool {
@@ -136,7 +135,7 @@ func (cs *CommonSuite) SetupTest() {
 		},
 	)
 	cs.pending.On("ByParentID", mock.Anything).Return(
-		func(blockID flow.Identifier) []flow.Slashable[*cluster.Block] {
+		func(blockID flow.Identifier) []flow.Slashable[*cluster.Proposal] {
 			return cs.childrenDB[blockID]
 		},
 		func(blockID flow.Identifier) bool {
@@ -196,23 +195,20 @@ func (cs *CommonSuite) SetupTest() {
 }
 
 func (cs *CoreSuite) TestOnBlockProposalValidParent() {
-
 	// create a proposal that directly descends from the latest finalized header
 	originID := unittest.IdentifierFixture()
-	block := unittest.ClusterBlockWithParent(cs.head)
+	block := unittest.ClusterBlockFixture(
+		unittest.ClusterBlock.WithParent(&cs.head.Block),
+	)
+	proposal := unittest.ClusterProposalFromBlock(block)
 
-	proposal := messages.NewClusterBlockProposal(&block)
-
-	// store the data for retrieval
-	cs.headerDB[block.Header.ParentID] = cs.head
-
-	hotstuffProposal := model.SignedProposalFromFlow(block.Header)
+	hotstuffProposal := model.SignedProposalFromClusterBlock(proposal)
 	cs.validator.On("ValidateProposal", hotstuffProposal).Return(nil)
 	cs.voteAggregator.On("AddBlock", hotstuffProposal).Once()
 	cs.hotstuff.On("SubmitProposal", hotstuffProposal)
 
 	// it should be processed without error
-	err := cs.core.OnBlockProposal(flow.Slashable[*messages.ClusterBlockProposal]{
+	err := cs.core.OnBlockProposal(flow.Slashable[*cluster.Proposal]{
 		OriginID: originID,
 		Message:  proposal,
 	})
@@ -223,40 +219,47 @@ func (cs *CoreSuite) TestOnBlockProposalValidAncestor() {
 
 	// create a proposal that has two ancestors in the cache
 	originID := unittest.IdentifierFixture()
-	ancestor := unittest.ClusterBlockWithParent(cs.head)
-	parent := unittest.ClusterBlockWithParent(&ancestor)
-	block := unittest.ClusterBlockWithParent(&parent)
-	proposal := messages.NewClusterBlockProposal(&block)
+	ancestor := unittest.ClusterBlockFixture(
+		unittest.ClusterBlock.WithParent(&cs.head.Block),
+	)
+	parent := unittest.ClusterBlockFixture(
+		unittest.ClusterBlock.WithParent(ancestor),
+	)
+	block := unittest.ClusterBlockFixture(
+		unittest.ClusterBlock.WithParent(parent),
+	)
+	proposal := unittest.ClusterProposalFromBlock(block)
 
 	// store the data for retrieval
-	cs.headerDB[parent.ID()] = &parent
-	cs.headerDB[ancestor.ID()] = &ancestor
+	cs.headerDB[parent.ID()] = parent.ToHeader()
+	cs.headerDB[ancestor.ID()] = ancestor.ToHeader()
 
-	hotstuffProposal := model.SignedProposalFromFlow(block.Header)
+	hotstuffProposal := model.SignedProposalFromClusterBlock(proposal)
 	cs.validator.On("ValidateProposal", hotstuffProposal).Return(nil)
 	cs.voteAggregator.On("AddBlock", hotstuffProposal).Once()
 	cs.hotstuff.On("SubmitProposal", hotstuffProposal).Once()
 
 	// it should be processed without error
-	err := cs.core.OnBlockProposal(flow.Slashable[*messages.ClusterBlockProposal]{
+	err := cs.core.OnBlockProposal(flow.Slashable[*cluster.Proposal]{
 		OriginID: originID,
 		Message:  proposal,
 	})
 	require.NoError(cs.T(), err, "valid block proposal should pass")
 
 	// we should extend the state with the header
-	cs.state.AssertCalled(cs.T(), "Extend", &block)
+	cs.state.AssertCalled(cs.T(), "Extend", proposal)
 }
 
 func (cs *CoreSuite) TestOnBlockProposalSkipProposalThreshold() {
 
 	// create a proposal which is far enough ahead to be dropped
 	originID := unittest.IdentifierFixture()
-	block := unittest.ClusterBlockFixture()
-	block.Header.Height = cs.head.Header.Height + compliance.DefaultConfig().SkipNewProposalsThreshold + 1
-	proposal := unittest.ClusterProposalFromBlock(&block)
+	block := unittest.ClusterBlockFixture(
+		unittest.ClusterBlock.WithHeight(cs.head.Block.Height + compliance.DefaultConfig().SkipNewProposalsThreshold + 1),
+	)
+	proposal := unittest.ClusterProposalFromBlock(block)
 
-	err := cs.core.OnBlockProposal(flow.Slashable[*messages.ClusterBlockProposal]{
+	err := cs.core.OnBlockProposal(flow.Slashable[*cluster.Proposal]{
 		OriginID: originID,
 		Message:  proposal,
 	})
@@ -273,18 +276,23 @@ func (cs *CoreSuite) TestOnBlockProposalSkipProposalThreshold() {
 //   - we should not attempt to process its children
 //   - we should notify VoteAggregator, for known errors
 func (cs *CoreSuite) TestOnBlockProposal_FailsHotStuffValidation() {
-
 	// create a proposal that has two ancestors in the cache
 	originID := unittest.IdentifierFixture()
-	ancestor := unittest.ClusterBlockWithParent(cs.head)
-	parent := unittest.ClusterBlockWithParent(&ancestor)
-	block := unittest.ClusterBlockWithParent(&parent)
-	proposal := messages.NewClusterBlockProposal(&block)
-	hotstuffProposal := model.SignedProposalFromFlow(block.Header)
+	ancestor := unittest.ClusterBlockFixture(
+		unittest.ClusterBlock.WithParent(&cs.head.Block),
+	)
+	parent := unittest.ClusterBlockFixture(
+		unittest.ClusterBlock.WithParent(ancestor),
+	)
+	block := unittest.ClusterBlockFixture(
+		unittest.ClusterBlock.WithParent(parent),
+	)
+	proposal := unittest.ClusterProposalFromBlock(block)
+	hotstuffProposal := model.SignedProposalFromClusterBlock(proposal)
 
 	// store the data for retrieval
-	cs.headerDB[parent.ID()] = &parent
-	cs.headerDB[ancestor.ID()] = &ancestor
+	cs.headerDB[parent.ID()] = parent.ToHeader()
+	cs.headerDB[ancestor.ID()] = ancestor.ToHeader()
 
 	cs.Run("invalid block error", func() {
 		// the block fails HotStuff validation
@@ -299,7 +307,7 @@ func (cs *CoreSuite) TestOnBlockProposal_FailsHotStuffValidation() {
 		cs.voteAggregator.On("InvalidBlock", hotstuffProposal).Return(nil)
 
 		// the expected error should be handled within the Core
-		err := cs.core.OnBlockProposal(flow.Slashable[*messages.ClusterBlockProposal]{
+		err := cs.core.OnBlockProposal(flow.Slashable[*cluster.Proposal]{
 			OriginID: originID,
 			Message:  proposal,
 		})
@@ -317,7 +325,7 @@ func (cs *CoreSuite) TestOnBlockProposal_FailsHotStuffValidation() {
 		cs.validator.On("ValidateProposal", hotstuffProposal).Return(model.ErrViewForUnknownEpoch)
 
 		// this error is not expected should raise an exception
-		err := cs.core.OnBlockProposal(flow.Slashable[*messages.ClusterBlockProposal]{
+		err := cs.core.OnBlockProposal(flow.Slashable[*cluster.Proposal]{
 			OriginID: originID,
 			Message:  proposal,
 		})
@@ -337,7 +345,7 @@ func (cs *CoreSuite) TestOnBlockProposal_FailsHotStuffValidation() {
 		cs.validator.On("ValidateProposal", hotstuffProposal).Return(unexpectedErr)
 
 		// the error should be propagated
-		err := cs.core.OnBlockProposal(flow.Slashable[*messages.ClusterBlockProposal]{
+		err := cs.core.OnBlockProposal(flow.Slashable[*cluster.Proposal]{
 			OriginID: originID,
 			Message:  proposal,
 		})
@@ -359,15 +367,21 @@ func (cs *CoreSuite) TestOnBlockProposal_FailsProtocolStateValidation() {
 
 	// create a proposal that has two ancestors in the cache
 	originID := unittest.IdentifierFixture()
-	ancestor := unittest.ClusterBlockWithParent(cs.head)
-	parent := unittest.ClusterBlockWithParent(&ancestor)
-	block := unittest.ClusterBlockWithParent(&parent)
-	proposal := messages.NewClusterBlockProposal(&block)
-	hotstuffProposal := model.SignedProposalFromFlow(block.Header)
+	ancestor := unittest.ClusterBlockFixture(
+		unittest.ClusterBlock.WithParent(&cs.head.Block),
+	)
+	parent := unittest.ClusterBlockFixture(
+		unittest.ClusterBlock.WithParent(ancestor),
+	)
+	block := unittest.ClusterBlockFixture(
+		unittest.ClusterBlock.WithParent(parent),
+	)
+	proposal := unittest.ClusterProposalFromBlock(block)
+	hotstuffProposal := model.SignedProposalFromClusterBlock(proposal)
 
 	// store the data for retrieval
-	cs.headerDB[parent.ID()] = &parent
-	cs.headerDB[ancestor.ID()] = &ancestor
+	cs.headerDB[parent.ID()] = parent.ToHeader()
+	cs.headerDB[ancestor.ID()] = ancestor.ToHeader()
 
 	// the block passes HotStuff validation
 	cs.validator.On("ValidateProposal", hotstuffProposal).Return(nil)
@@ -388,14 +402,14 @@ func (cs *CoreSuite) TestOnBlockProposal_FailsProtocolStateValidation() {
 		cs.voteAggregator.On("InvalidBlock", hotstuffProposal).Return(nil)
 
 		// the expected error should be handled within the Core
-		err := cs.core.OnBlockProposal(flow.Slashable[*messages.ClusterBlockProposal]{
+		err := cs.core.OnBlockProposal(flow.Slashable[*cluster.Proposal]{
 			OriginID: originID,
 			Message:  proposal,
 		})
 		require.NoError(cs.T(), err, "proposal with invalid extension should fail")
 
 		// we should extend the state with the header
-		cs.state.AssertCalled(cs.T(), "Extend", &block)
+		cs.state.AssertCalled(cs.T(), "Extend", proposal)
 		// we should not pass the block to hotstuff
 		cs.hotstuff.AssertNotCalled(cs.T(), "SubmitProposal", mock.Anything)
 		// we should not attempt to process the children
@@ -409,14 +423,14 @@ func (cs *CoreSuite) TestOnBlockProposal_FailsProtocolStateValidation() {
 		cs.state.On("Extend", mock.Anything).Return(state.NewOutdatedExtensionErrorf(""))
 
 		// the expected error should be handled within the Core
-		err := cs.core.OnBlockProposal(flow.Slashable[*messages.ClusterBlockProposal]{
+		err := cs.core.OnBlockProposal(flow.Slashable[*cluster.Proposal]{
 			OriginID: originID,
 			Message:  proposal,
 		})
 		require.NoError(cs.T(), err, "proposal with invalid extension should fail")
 
 		// we should extend the state with the header
-		cs.state.AssertCalled(cs.T(), "Extend", &block)
+		cs.state.AssertCalled(cs.T(), "Extend", proposal)
 		// we should not pass the block to hotstuff
 		cs.hotstuff.AssertNotCalled(cs.T(), "SubmitProposal", mock.Anything)
 		// we should not attempt to process the children
@@ -431,14 +445,14 @@ func (cs *CoreSuite) TestOnBlockProposal_FailsProtocolStateValidation() {
 		cs.state.On("Extend", mock.Anything).Return(unexpectedErr)
 
 		// it should be processed without error
-		err := cs.core.OnBlockProposal(flow.Slashable[*messages.ClusterBlockProposal]{
+		err := cs.core.OnBlockProposal(flow.Slashable[*cluster.Proposal]{
 			OriginID: originID,
 			Message:  proposal,
 		})
 		require.ErrorIs(cs.T(), err, unexpectedErr)
 
 		// we should extend the state with the header
-		cs.state.AssertCalled(cs.T(), "Extend", &block)
+		cs.state.AssertCalled(cs.T(), "Extend", proposal)
 		// we should not pass the block to hotstuff
 		cs.hotstuff.AssertNotCalled(cs.T(), "SubmitProposal", mock.Anything, mock.Anything)
 		// we should not attempt to process the children
@@ -449,43 +463,56 @@ func (cs *CoreSuite) TestOnBlockProposal_FailsProtocolStateValidation() {
 func (cs *CoreSuite) TestProcessBlockAndDescendants() {
 
 	// create three children blocks
-	parent := unittest.ClusterBlockWithParent(cs.head)
-	block1 := unittest.ClusterBlockWithParent(&parent)
-	block2 := unittest.ClusterBlockWithParent(&parent)
-	block3 := unittest.ClusterBlockWithParent(&parent)
+	parent := unittest.ClusterBlockFixture(
+		unittest.ClusterBlock.WithParent(&cs.head.Block),
+	)
+	block1 := unittest.ClusterBlockFixture(
+		unittest.ClusterBlock.WithParent(parent),
+	)
+	block2 := unittest.ClusterBlockFixture(
+		unittest.ClusterBlock.WithParent(parent),
+	)
+	block3 := unittest.ClusterBlockFixture(
+		unittest.ClusterBlock.WithParent(parent),
+	)
 
-	pendingFromBlock := func(block *cluster.Block) flow.Slashable[*cluster.Block] {
-		return flow.Slashable[*cluster.Block]{
-			OriginID: block.Header.ProposerID,
+	proposal0 := unittest.ClusterProposalFromBlock(parent)
+	proposal1 := unittest.ClusterProposalFromBlock(block1)
+	proposal2 := unittest.ClusterProposalFromBlock(block2)
+	proposal3 := unittest.ClusterProposalFromBlock(block3)
+
+	pendingFromProposal := func(block *cluster.Proposal) flow.Slashable[*cluster.Proposal] {
+		return flow.Slashable[*cluster.Proposal]{
+			OriginID: block.Block.ProposerID,
 			Message:  block,
 		}
 	}
 
 	// create the pending blocks
-	pending1 := pendingFromBlock(&block1)
-	pending2 := pendingFromBlock(&block2)
-	pending3 := pendingFromBlock(&block3)
+	pending1 := pendingFromProposal(proposal1)
+	pending2 := pendingFromProposal(proposal2)
+	pending3 := pendingFromProposal(proposal3)
 
 	// store the parent on disk
 	parentID := parent.ID()
-	cs.headerDB[parentID] = &parent
+	cs.headerDB[parentID] = proposal0.Block.ToHeader()
 
 	// store the pending children in the cache
 	cs.childrenDB[parentID] = append(cs.childrenDB[parentID], pending1)
 	cs.childrenDB[parentID] = append(cs.childrenDB[parentID], pending2)
 	cs.childrenDB[parentID] = append(cs.childrenDB[parentID], pending3)
 
-	for _, block := range []cluster.Block{parent, block1, block2, block3} {
-		hotstuffProposal := model.SignedProposalFromFlow(block.Header)
+	for _, prop := range []*cluster.Proposal{proposal0, proposal1, proposal2, proposal3} {
+		hotstuffProposal := model.SignedProposalFromClusterBlock(prop)
 		cs.validator.On("ValidateProposal", hotstuffProposal).Return(nil)
 		cs.voteAggregator.On("AddBlock", hotstuffProposal).Once()
 		cs.hotstuff.On("SubmitProposal", hotstuffProposal).Once()
 	}
 
 	// execute the connected children handling
-	err := cs.core.processBlockAndDescendants(flow.Slashable[*cluster.Block]{
+	err := cs.core.processBlockAndDescendants(flow.Slashable[*cluster.Proposal]{
 		OriginID: unittest.IdentifierFixture(),
-		Message:  &parent,
+		Message:  proposal0,
 	})
 	require.NoError(cs.T(), err, "should pass handling children")
 
@@ -493,45 +520,47 @@ func (cs *CoreSuite) TestProcessBlockAndDescendants() {
 	cs.hotstuff.AssertExpectations(cs.T())
 
 	// make sure we drop the cache after trying to process
-	cs.pending.AssertCalled(cs.T(), "DropForParent", parent.Header.ID())
+	cs.pending.AssertCalled(cs.T(), "DropForParent", parent.ID())
 }
 
 func (cs *CoreSuite) TestProposalBufferingOrder() {
-
 	// create a proposal that we will not submit until the end
 	originID := unittest.IdentifierFixture()
-	block := unittest.ClusterBlockWithParent(cs.head)
-	missing := &block
+	block := unittest.ClusterBlockFixture(
+		unittest.ClusterBlock.WithParent(&cs.head.Block),
+	)
+	missing := block
 
 	// create a chain of descendants
-	var proposals []*cluster.Block
-	proposalsLookup := make(map[flow.Identifier]*cluster.Block)
+	var proposals []*cluster.Proposal
+	proposalsLookup := make(map[flow.Identifier]*cluster.Proposal)
 	parent := missing
 	for i := 0; i < 3; i++ {
-		proposal := unittest.ClusterBlockWithParent(parent)
-		proposals = append(proposals, &proposal)
-		proposalsLookup[proposal.ID()] = &proposal
-		parent = &proposal
+		block := unittest.ClusterBlockFixture(
+			unittest.ClusterBlock.WithParent(parent),
+		)
+		proposal := unittest.ClusterProposalFromBlock(block)
+		proposals = append(proposals, proposal)
+		proposalsLookup[block.ID()] = proposal
+		parent = block
 	}
 
 	// replace the engine buffer with the real one
 	cs.core.pending = realbuffer.NewPendingClusterBlocks()
 
 	// process all of the descendants
-	for _, block := range proposals {
+	for _, proposal := range proposals {
 
 		// check that we request the ancestor block each time
 		cs.sync.On("RequestBlock", mock.Anything, mock.AnythingOfType("uint64")).Once().Run(
 			func(args mock.Arguments) {
 				ancestorID := args.Get(0).(flow.Identifier)
-				assert.Equal(cs.T(), missing.Header.ID(), ancestorID, "should always request root block")
+				assert.Equal(cs.T(), missing.ID(), ancestorID, "should always request root block")
 			},
 		)
 
-		proposal := messages.NewClusterBlockProposal(block)
-
 		// process and make sure no error occurs (as they are unverifiable)
-		err := cs.core.OnBlockProposal(flow.Slashable[*messages.ClusterBlockProposal]{
+		err := cs.core.OnBlockProposal(flow.Slashable[*cluster.Proposal]{
 			OriginID: originID,
 			Message:  proposal,
 		})
@@ -545,28 +574,28 @@ func (cs *CoreSuite) TestProposalBufferingOrder() {
 	*cs.hotstuff = module.HotStuff{}
 	index := 0
 	order := []flow.Identifier{
-		missing.Header.ID(),
-		proposals[0].Header.ID(),
-		proposals[1].Header.ID(),
-		proposals[2].Header.ID(),
+		missing.ID(),
+		proposals[0].Block.ToHeader().ID(),
+		proposals[1].Block.ToHeader().ID(),
+		proposals[2].Block.ToHeader().ID(),
 	}
 	cs.hotstuff.On("SubmitProposal", mock.Anything).Times(4).Run(
 		func(args mock.Arguments) {
 			header := args.Get(0).(*model.SignedProposal).Block
 			assert.Equal(cs.T(), order[index], header.BlockID, "should submit correct header to hotstuff")
 			index++
-			cs.headerDB[header.BlockID] = proposalsLookup[header.BlockID]
+			cs.headerDB[header.BlockID] = proposalsLookup[header.BlockID].Block.ToHeader()
 		},
 	)
 	cs.voteAggregator.On("AddBlock", mock.Anything).Times(4)
 	cs.validator.On("ValidateProposal", mock.Anything).Times(4).Return(nil)
 
-	missingProposal := messages.NewClusterBlockProposal(missing)
+	missingProposal := unittest.ClusterProposalFromBlock(missing)
 
-	proposalsLookup[missing.ID()] = missing
+	proposalsLookup[missing.ID()] = missingProposal
 
 	// process the root proposal
-	err := cs.core.OnBlockProposal(flow.Slashable[*messages.ClusterBlockProposal]{
+	err := cs.core.OnBlockProposal(flow.Slashable[*cluster.Proposal]{
 		OriginID: originID,
 		Message:  missingProposal,
 	})

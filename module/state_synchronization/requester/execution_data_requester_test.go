@@ -138,7 +138,7 @@ func (suite *ExecutionDataRequesterSuite) mockProtocolState(blocksByHeight map[u
 	state := new(statemock.State)
 
 	suite.mockSnapshot = new(mockSnapshot)
-	suite.mockSnapshot.set(blocksByHeight[0].Header, nil) // genesis block
+	suite.mockSnapshot.set(blocksByHeight[0].ToHeader(), nil) // genesis block
 
 	state.On("Sealed").Return(suite.mockSnapshot).Maybe()
 	return state
@@ -547,7 +547,7 @@ func (suite *ExecutionDataRequesterSuite) consumeExecutionDataNotifications(cfg 
 			return
 		}
 
-		suite.T().Logf("notified of execution data for block %v height %d (%d/%d)", ed.BlockID, cfg.blocksByID[ed.BlockID].Header.Height, len(fetchedExecutionData), cfg.sealedCount)
+		suite.T().Logf("notified of execution data for block %v height %d (%d/%d)", ed.BlockID, cfg.blocksByID[ed.BlockID].Height, len(fetchedExecutionData), cfg.sealedCount)
 
 		if cfg.IsLastSeal(ed.BlockID) {
 			done()
@@ -559,11 +559,11 @@ func (suite *ExecutionDataRequesterSuite) finalizeBlocks(cfg *fetchTestRun, foll
 	for i := cfg.StartHeight(); i <= cfg.endHeight; i++ {
 		b := cfg.blocksByHeight[i]
 
-		suite.T().Log(">>>> Finalizing block", b.ID(), b.Header.Height)
+		suite.T().Log(">>>> Finalizing block", b.ID(), b.Height)
 
 		if len(b.Payload.Seals) > 0 {
 			seal := b.Payload.Seals[0]
-			sealedHeader := cfg.blocksByID[seal.BlockID].Header
+			sealedHeader := cfg.blocksByID[seal.BlockID].ToHeader()
 
 			suite.mockSnapshot.set(sealedHeader, nil)
 			suite.T().Log(">>>> Sealing block", sealedHeader.ID(), sealedHeader.Height)
@@ -659,7 +659,7 @@ func generateTestData(t *testing.T, blobstore blobs.Blobstore, blockCount int, s
 		if i >= firstSeal {
 			sealedBlock := blocksByHeight[uint64(i-firstSeal+1)]
 			seals = []*flow.Header{
-				sealedBlock.Header, // block 0 doesn't get sealed (it's pre-sealed in the genesis state)
+				sealedBlock.ToHeader(), // block 0 doesn't get sealed (it's pre-sealed in the genesis state)
 			}
 
 			sealsByBlockID[sealedBlock.ID()] = unittest.Seal.Fixture(
@@ -723,14 +723,14 @@ func generateTestData(t *testing.T, blobstore blobs.Blobstore, blockCount int, s
 
 func buildBlock(height uint64, parent *flow.Block, seals []*flow.Header) *flow.Block {
 	if parent == nil {
-		return unittest.GenesisFixture()
+		return unittest.Block.Genesis(flow.Emulator)
 	}
 
 	if len(seals) == 0 {
-		return unittest.BlockWithParentFixture(parent.Header)
+		return unittest.BlockWithParentFixture(parent.ToHeader())
 	}
 
-	return unittest.BlockWithParentAndSeals(parent.Header, seals)
+	return unittest.BlockWithParentAndSeals(parent.ToHeader(), seals)
 }
 
 func buildResult(block *flow.Block, cid flow.Identifier, previousResult *flow.ExecutionResult) *flow.ExecutionResult {

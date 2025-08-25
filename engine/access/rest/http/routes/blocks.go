@@ -72,7 +72,7 @@ func GetBlocksByHeight(r *common.Request, backend access.API, link commonmodels.
 			return nil, err
 		}
 
-		req.EndHeight = latest.Header.Height // overwrite special value height with fetched
+		req.EndHeight = latest.Height // overwrite special value height with fetched
 
 		if req.StartHeight > req.EndHeight {
 			return nil, common.NewBadRequestError(fmt.Errorf("start height must be less than or equal to end height"))
@@ -106,7 +106,7 @@ func GetBlockPayloadByID(r *common.Request, backend access.API, _ commonmodels.L
 	}
 
 	var payload commonmodels.BlockPayload
-	err = payload.Build(blk.Payload)
+	err = payload.Build(&blk.Payload)
 	if err != nil {
 		return nil, err
 	}

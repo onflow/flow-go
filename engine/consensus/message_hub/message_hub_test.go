@@ -71,7 +71,7 @@ func (s *MessageHubSuite) SetupTest() {
 	)
 	s.myID = s.participants[0].NodeID
 	block := unittest.BlockFixture()
-	s.head = block.Header
+	s.head = block.ToHeader()
 
 	s.payloads = storage.NewPayloads(s.T())
 	s.me = module.NewLocal(s.T())
@@ -166,21 +166,20 @@ func (s *MessageHubSuite) TearDownTest() {
 	}
 }
 
-// TestProcessIncomingMessages tests processing of incoming messages, MessageHub matches messages by type
+// TestProcessValidIncomingMessages tests processing of structurally valid incoming messages, MessageHub matches messages by type
 // and sends them to other modules which execute business logic.
-func (s *MessageHubSuite) TestProcessIncomingMessages() {
+func (s *MessageHubSuite) TestProcessValidIncomingMessages() {
 	var channel channels.Channel
 	originID := unittest.IdentifierFixture()
 	s.Run("to-compliance-engine", func() {
-		block := unittest.BlockFixture()
-
-		blockProposalMsg := messages.NewBlockProposal(&block)
-		expectedComplianceMsg := flow.Slashable[*messages.BlockProposal]{
+		proposal := unittest.ProposalFixture()
+		blockProposalMsg := flow.UntrustedProposal(*proposal)
+		expectedComplianceMsg := flow.Slashable[*flow.Proposal]{
 			OriginID: originID,
-			Message:  blockProposalMsg,
+			Message:  proposal,
 		}
 		s.compliance.On("OnBlockProposal", expectedComplianceMsg).Return(nil).Once()
-		err := s.hub.Process(channel, originID, blockProposalMsg)
+		err := s.hub.Process(channel, originID, &blockProposalMsg)
 		require.NoError(s.T(), err)
 	})
 	s.Run("to-vote-aggregator", func() {
@@ -212,6 +211,56 @@ func (s *MessageHubSuite) TestProcessIncomingMessages() {
 	})
 }
 
+// TestProcessInvalidIncomingMessages tests processing of structurally invalid incoming messages, MessageHub matches messages by type
+// and sends them to other modules which execute business logic.
+func (s *MessageHubSuite) TestProcessInvalidIncomingMessages() {
+	var channel channels.Channel
+	originID := unittest.IdentifierFixture()
+	s.Run("to-compliance-engine", func() {
+		proposal := unittest.ProposalFixture()
+		proposal.ProposerSigData = nil // invalid value
+
+		err := s.hub.Process(channel, originID, (*flow.UntrustedProposal)(proposal))
+		require.NoError(s.T(), err)
+
+		// OnBlockRange should NOT be called for invalid proposal
+		s.compliance.AssertNotCalled(s.T(), "OnBlockProposal", mock.Anything)
+	})
+	s.Run("to-vote-aggregator", func() {
+		expectedVote := unittest.VoteFixture(unittest.WithVoteSignerID(originID))
+		msg := &messages.BlockVote{
+			View:    expectedVote.View,
+			BlockID: flow.ZeroID, // invalid value
+			SigData: expectedVote.SigData,
+		}
+
+		err := s.hub.Process(channel, originID, msg)
+		require.NoError(s.T(), err)
+
+		// AddVote should NOT be called for invalid Vote
+		s.voteAggregator.AssertNotCalled(s.T(), "AddVote", mock.Anything)
+	})
+	s.Run("to-timeout-aggregator", func() {
+		expectedTimeout := helper.TimeoutObjectFixture(helper.WithTimeoutObjectSignerID(originID))
+		msg := &messages.TimeoutObject{
+			View:       expectedTimeout.View,
+			NewestQC:   expectedTimeout.NewestQC,
+			LastViewTC: expectedTimeout.LastViewTC,
+			SigData:    nil, // invalid value
+		}
+
+		err := s.hub.Process(channel, originID, msg)
+		require.NoError(s.T(), err)
+
+		// AddTimeout should NOT be called for invalid TimeoutObject
+		s.timeoutAggregator.AssertNotCalled(s.T(), "AddTimeout", mock.Anything)
+	})
+	s.Run("unsupported-msg-type", func() {
+		err := s.hub.Process(channel, originID, struct{}{})
+		require.NoError(s.T(), err)
+	})
+}
+
 // TestOnOwnProposal tests broadcasting proposals with different inputs
 func (s *MessageHubSuite) TestOnOwnProposal() {
 	// add execution node to participants to make sure we exclude them from broadcast
@@ -224,48 +273,51 @@ func (s *MessageHubSuite) TestOnOwnProposal() {
 
 	// create a block with the parent and store the payload with correct ID
 	block := unittest.BlockWithParentFixture(parent)
-	block.Header.ProposerID = s.myID
+	block.ProposerID = s.myID
 
-	s.payloads.On("ByBlockID", block.Header.ID()).Return(block.Payload, nil)
+	s.payloads.On("ByBlockID", block.ID()).Return(&block.Payload, nil)
 	s.payloads.On("ByBlockID", mock.Anything).Return(nil, storerr.ErrNotFound)
 
 	s.Run("should fail with wrong proposer", func() {
-		header := *block.Header
+		header := block.ToHeader()
 		header.ProposerID = unittest.IdentifierFixture()
-		err := s.hub.sendOwnProposal(&header)
+		proposal := unittest.ProposalHeaderFromHeader(header)
+		err := s.hub.sendOwnProposal(proposal)
 		require.Error(s.T(), err, "should fail with wrong proposer")
 		header.ProposerID = s.myID
 	})
 
 	// should fail with wrong block ID (payload unavailable)
 	s.Run("should fail with wrong block ID", func() {
-		header := *block.Header
+		header := block.ToHeader()
 		header.View++
-		err := s.hub.sendOwnProposal(&header)
+		proposal := unittest.ProposalHeaderFromHeader(header)
+		err := s.hub.sendOwnProposal(proposal)
 		require.Error(s.T(), err, "should fail with missing payload")
 		header.View--
 	})
 
 	s.Run("should broadcast proposal and pass to HotStuff for valid proposals", func() {
-		expectedBroadcastMsg := messages.NewBlockProposal(block)
+		proposal := unittest.ProposalFromBlock(block)
+		expectedBroadcastMsg := flow.UntrustedProposal(*proposal)
 
 		submitted := make(chan struct{}) // closed when proposal is submitted to hotstuff
-		hotstuffProposal := model.SignedProposalFromFlow(block.Header)
+		hotstuffProposal := model.SignedProposalFromBlock(proposal)
 		s.voteAggregator.On("AddBlock", hotstuffProposal).Once()
 		s.hotstuff.On("SubmitProposal", hotstuffProposal).
 			Run(func(args mock.Arguments) { close(submitted) }).
 			Once()
 
 		broadcast := make(chan struct{}) // closed when proposal is broadcast
-		s.con.On("Publish", expectedBroadcastMsg, s.participants[1].NodeID, s.participants[2].NodeID).
+		s.con.On("Publish", &expectedBroadcastMsg, s.participants[1].NodeID, s.participants[2].NodeID).
 			Run(func(_ mock.Arguments) { close(broadcast) }).
 			Return(nil).
 			Once()
 
-		s.pushBlocksCon.On("Publish", expectedBroadcastMsg, s.participants[3].NodeID).Return(nil)
+		s.pushBlocksCon.On("Publish", &expectedBroadcastMsg, s.participants[3].NodeID).Return(nil)
 
 		// submit to broadcast proposal
-		s.hub.OnOwnProposal(block.Header, time.Now())
+		s.hub.OnOwnProposal(proposal.ProposalHeader(), time.Now())
 
 		unittest.AssertClosesBefore(s.T(), util.AllClosed(broadcast, submitted), time.Second)
 	})
@@ -311,21 +363,22 @@ func (s *MessageHubSuite) TestProcessMultipleMessagesHappyPath() {
 	s.Run("proposal", func() {
 		wg.Add(1)
 		// prepare proposal fixture
-		proposal := unittest.BlockWithParentAndProposerFixture(s.T(), s.head, s.myID)
-		s.payloads.On("ByBlockID", proposal.Header.ID()).Return(proposal.Payload, nil)
+		block := unittest.BlockWithParentAndProposerFixture(s.T(), s.head, s.myID)
+		proposal := unittest.ProposalFromBlock(block)
+		s.payloads.On("ByBlockID", block.ID()).Return(&block.Payload, nil)
 
 		// unset chain and height to make sure they are correctly reconstructed
-		hotstuffProposal := model.SignedProposalFromFlow(proposal.Header)
+		hotstuffProposal := model.SignedProposalFromBlock(proposal)
 		s.voteAggregator.On("AddBlock", hotstuffProposal).Once()
 		s.hotstuff.On("SubmitProposal", hotstuffProposal)
-		expectedBroadcastMsg := messages.NewBlockProposal(&proposal)
-		s.con.On("Publish", expectedBroadcastMsg, s.participants[1].NodeID, s.participants[2].NodeID).
+		expectedBroadcastMsg := flow.UntrustedProposal(*proposal)
+		s.con.On("Publish", &expectedBroadcastMsg, s.participants[1].NodeID, s.participants[2].NodeID).
 			Run(func(_ mock.Arguments) { wg.Done() }).
 			Return(nil)
-		s.pushBlocksCon.On("Publish", expectedBroadcastMsg, s.participants[3].NodeID).Return(nil)
+		s.pushBlocksCon.On("Publish", &expectedBroadcastMsg, s.participants[3].NodeID).Return(nil)
 
 		// submit proposal
-		s.hub.OnOwnProposal(proposal.Header, time.Now())
+		s.hub.OnOwnProposal(proposal.ProposalHeader(), time.Now())
 	})
 
 	unittest.RequireReturnsBefore(s.T(), func() {

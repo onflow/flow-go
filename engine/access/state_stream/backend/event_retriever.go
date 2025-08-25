@@ -49,7 +49,7 @@ func (b *EventsProvider) GetAllEventsResponse(ctx context.Context, height uint64
 		if err != nil {
 			return nil, fmt.Errorf("could not get header for height %d: %w", height, err)
 		}
-		response.BlockTimestamp = header.Timestamp
+		response.BlockTimestamp = time.UnixMilli(int64(header.Timestamp)).UTC()
 
 		if b.log.GetLevel() == zerolog.TraceLevel {
 			b.log.Trace().

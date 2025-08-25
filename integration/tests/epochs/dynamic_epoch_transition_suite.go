@@ -409,7 +409,7 @@ func (s *DynamicEpochTransitionSuite) LatestSealedBlockHeader(ctx context.Contex
 	segment, err := snapshot.SealingSegment()
 	require.NoError(s.T(), err)
 	sealed := segment.Sealed()
-	return sealed.Header
+	return sealed.ToHeader()
 }
 
 // SubmitSmokeTestTransaction will submit a create account transaction to smoke test network
@@ -524,8 +524,8 @@ func (s *DynamicEpochTransitionSuite) RunTestEpochJoinAndLeave(role flow.Role, c
 
 	s.TimedLogf("retrieved header after entering EpochSetup phase: root_height=%d, root_view=%d, segment_heights=[%d-%d], segment_views=[%d-%d]",
 		header.Height, header.View,
-		segment.Sealed().Header.Height, segment.Highest().Header.Height,
-		segment.Sealed().Header.View, segment.Highest().Header.View)
+		segment.Sealed().Height, segment.Highest().Height,
+		segment.Sealed().View, segment.Highest().View)
 
 	testContainer.WriteRootSnapshot(rootSnapshot)
 	testContainer.Container.Start(s.Ctx)

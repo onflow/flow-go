@@ -46,7 +46,7 @@ func (c *Collections) StoreLight(collection *flow.LightCollection) error {
 func (c *Collections) Store(collection *flow.Collection) error {
 	return c.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 		light := collection.Light()
-		err := operation.UpsertCollection(rw.Writer(), &light)
+		err := operation.UpsertCollection(rw.Writer(), light)
 		if err != nil {
 			return fmt.Errorf("could not insert collection: %w", err)
 		}
@@ -65,8 +65,8 @@ func (c *Collections) Store(collection *flow.Collection) error {
 // ByID retrieves a collection by its ID.
 func (c *Collections) ByID(colID flow.Identifier) (*flow.Collection, error) {
 	var (
-		light      flow.LightCollection
-		collection flow.Collection
+		light flow.LightCollection
+		txs   []*flow.TransactionBody
 	)
 
 	err := operation.RetrieveCollection(c.db.Reader(), colID, &light)
@@ -74,16 +74,22 @@ func (c *Collections) ByID(colID flow.Identifier) (*flow.Collection, error) {
 		return nil, fmt.Errorf("could not retrieve collection: %w", err)
 	}
 
+	txs = make([]*flow.TransactionBody, 0, len(light.Transactions))
 	for _, txID := range light.Transactions {
 		tx, err := c.transactions.ByID(txID)
 		if err != nil {
 			return nil, fmt.Errorf("could not retrieve transaction %v: %w", txID, err)
 		}
 
-		collection.Transactions = append(collection.Transactions, tx)
+		txs = append(txs, tx)
 	}
 
-	return &collection, nil
+	collection, err := flow.NewCollection(flow.UntrustedCollection{Transactions: txs})
+	if err != nil {
+		return nil, fmt.Errorf("could not construct collection: %w", err)
+	}
+
+	return collection, nil
 }
 
 // LightByID retrieves a light collection by its ID.

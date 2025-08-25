@@ -1,7 +1,7 @@
 package flow
 
 type Index struct {
-	CollectionIDs   []Identifier
+	GuaranteeIDs    []Identifier
 	SealIDs         []Identifier
 	ReceiptIDs      []Identifier
 	ResultIDs       []Identifier

@@ -59,7 +59,7 @@ type TxErrorMessagesEngineSuite struct {
 	connFactory *connectionmock.ConnectionFactory
 
 	blockMap    map[uint64]*flow.Block
-	rootBlock   flow.Block
+	rootBlock   *flow.Block
 	sealedBlock *flow.Header
 
 	db    *badger.DB
@@ -103,15 +103,14 @@ func (s *TxErrorMessagesEngineSuite) SetupTest() {
 
 	blockCount := 5
 	s.blockMap = make(map[uint64]*flow.Block, blockCount)
-	s.rootBlock = unittest.BlockFixture()
-	s.rootBlock.Header.Height = 0
-	parent := s.rootBlock.Header
+	s.rootBlock = unittest.Block.Genesis(flow.Emulator)
+	parent := s.rootBlock.ToHeader()
 
 	for i := 0; i < blockCount; i++ {
 		block := unittest.BlockWithParentFixture(parent)
 		// update for next iteration
-		parent = block.Header
-		s.blockMap[block.Header.Height] = block
+		parent = block.ToHeader()
+		s.blockMap[block.Height] = block
 	}
 
 	s.sealedBlock = parent
@@ -119,15 +118,15 @@ func (s *TxErrorMessagesEngineSuite) SetupTest() {
 	s.headers.On("ByHeight", mock.AnythingOfType("uint64")).Return(
 		mocks.ConvertStorageOutput(
 			mocks.StorageMapGetter(s.blockMap),
-			func(block *flow.Block) *flow.Header { return block.Header },
+			func(block *flow.Block) *flow.Header { return block.ToHeader() },
 		),
 	).Maybe()
 
 	s.proto.state.On("Params").Return(s.proto.params)
 
 	// Mock the finalized and sealed root block header with height 0.
-	s.proto.params.On("FinalizedRoot").Return(s.rootBlock.Header, nil)
-	s.proto.params.On("SealedRoot").Return(s.rootBlock.Header, nil)
+	s.proto.params.On("FinalizedRoot").Return(s.rootBlock.ToHeader(), nil)
+	s.proto.params.On("SealedRoot").Return(s.rootBlock.ToHeader(), nil)
 
 	s.proto.snapshot.On("Head").Return(
 		func() *flow.Header {
@@ -198,8 +197,8 @@ func (s *TxErrorMessagesEngineSuite) TestOnFinalizedBlockHandleTxErrorMessages()
 
 	block := unittest.BlockWithParentFixture(s.sealedBlock)
 
-	s.blockMap[block.Header.Height] = block
-	s.sealedBlock = block.Header
+	s.blockMap[block.Height] = block
+	s.sealedBlock = block.ToHeader()
 
 	hotstuffBlock := hotmodel.Block{
 		BlockID: block.ID(),

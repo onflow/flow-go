@@ -18,7 +18,6 @@ import (
 // results for final block of the state
 // Root <- A <- B(result(A(VB))) <- C(seal(B))
 func AddVersionBeacon(t *testing.T, beacon *flow.VersionBeacon, state protocol.FollowerState) {
-
 	final, err := state.Final().Head()
 	require.NoError(t, err)
 
@@ -26,36 +25,41 @@ func AddVersionBeacon(t *testing.T, beacon *flow.VersionBeacon, state protocol.F
 	require.NoError(t, err)
 	protocolStateID := protocolState.ID()
 
-	A := BlockWithParentFixture(final)
-	A.SetPayload(PayloadFixture(WithProtocolStateID(protocolStateID)))
+	A := BlockWithParentAndPayload(
+		final,
+		PayloadFixture(WithProtocolStateID(protocolStateID)),
+	)
 	addToState(t, state, A, true)
 
 	receiptA := ReceiptForBlockFixture(A)
 	receiptA.ExecutionResult.ServiceEvents = []flow.ServiceEvent{beacon.ServiceEvent()}
 
-	B := BlockWithParentFixture(A.Header)
-	B.SetPayload(flow.Payload{
-		Receipts:        []*flow.ExecutionReceiptMeta{receiptA.Meta()},
-		Results:         []*flow.ExecutionResult{&receiptA.ExecutionResult},
-		ProtocolStateID: protocolStateID,
-	})
+	B := BlockWithParentAndPayload(
+		A.ToHeader(),
+		flow.Payload{
+			Receipts:        []*flow.ExecutionReceiptStub{receiptA.Stub()},
+			Results:         []*flow.ExecutionResult{&receiptA.ExecutionResult},
+			ProtocolStateID: protocolStateID,
+		},
+	)
 	addToState(t, state, B, true)
 
 	sealsForB := []*flow.Seal{
 		Seal.Fixture(Seal.WithResult(&receiptA.ExecutionResult)),
 	}
 
-	C := BlockWithParentFixture(B.Header)
-	C.SetPayload(flow.Payload{
-		Seals:           sealsForB,
-		ProtocolStateID: protocolStateID,
-	})
+	C := BlockWithParentAndPayload(
+		B.ToHeader(),
+		flow.Payload{
+			Seals:           sealsForB,
+			ProtocolStateID: protocolStateID,
+		},
+	)
 	addToState(t, state, C, true)
 }
 
 func addToState(t *testing.T, state protocol.FollowerState, block *flow.Block, finalize bool) {
-
-	err := state.ExtendCertified(context.Background(), block, CertifyBlock(block.Header))
+	err := state.ExtendCertified(context.Background(), NewCertifiedBlock(block))
 	require.NoError(t, err)
 
 	if finalize {

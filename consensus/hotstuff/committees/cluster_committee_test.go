@@ -49,7 +49,9 @@ func (suite *ClusterSuite) SetupTest() {
 	suite.members = unittest.IdentityListFixture(5, unittest.WithRole(flow.RoleCollection))
 	suite.me = suite.members[0]
 	counter := uint64(1)
-	suite.root = clusterstate.CanonicalRootBlock(counter, suite.members.ToSkeleton())
+	rootBlock, err := clusterstate.CanonicalRootBlock(counter, suite.members.ToSkeleton())
+	suite.Require().NoError(err)
+	suite.root = rootBlock
 
 	suite.cluster.On("EpochCounter").Return(counter)
 	suite.cluster.On("Index").Return(uint(1))
@@ -58,7 +60,6 @@ func (suite *ClusterSuite) SetupTest() {
 	suite.epoch.On("Counter").Return(counter, nil)
 	suite.epoch.On("RandomSource").Return(unittest.SeedFixture(prg.RandomSourceLength))
 
-	var err error
 	suite.com, err = NewClusterCommittee(
 		suite.state,
 		suite.payloads,
@@ -88,12 +89,12 @@ func (suite *ClusterSuite) TestInvalidSigner() {
 	nonRootBlockID := unittest.IdentifierFixture()
 	rootBlockID := suite.root.ID()
 
-	refID := unittest.IdentifierFixture()            // reference block on main chain
-	payload := cluster.EmptyPayload(refID)           // payload referencing main chain
-	rootPayload := cluster.EmptyPayload(flow.ZeroID) // root cluster block payload
+	refID := unittest.IdentifierFixture()               // reference block on main chain
+	payload := cluster.NewEmptyPayload(refID)           // payload referencing main chain
+	rootPayload := cluster.NewEmptyPayload(flow.ZeroID) // root cluster block payload
 
-	suite.payloads.On("ByBlockID", nonRootBlockID).Return(&payload, nil)
-	suite.payloads.On("ByBlockID", rootBlockID).Return(&rootPayload, nil)
+	suite.payloads.On("ByBlockID", nonRootBlockID).Return(payload, nil)
+	suite.payloads.On("ByBlockID", rootBlockID).Return(rootPayload, nil)
 
 	// a real cluster member which continues to be a valid member
 	realClusterMember := suite.members[1]

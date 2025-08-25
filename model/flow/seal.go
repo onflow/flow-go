@@ -1,7 +1,6 @@
 package flow
 
 import (
-	"encoding/json"
 	"fmt"
 )
 
@@ -80,35 +79,6 @@ func NewSeal(untrusted UntrustedSeal) (*Seal, error) {
 	}, nil
 }
 
-func (s Seal) Body() interface{} {
-	return struct {
-		BlockID                Identifier
-		ResultID               Identifier
-		FinalState             StateCommitment
-		AggregatedApprovalSigs []AggregatedSignature
-	}{
-		BlockID:                s.BlockID,
-		ResultID:               s.ResultID,
-		FinalState:             s.FinalState,
-		AggregatedApprovalSigs: s.AggregatedApprovalSigs,
-	}
-}
-
 func (s Seal) ID() Identifier {
-	return MakeID(s.Body())
-}
-
-func (s Seal) Checksum() Identifier {
 	return MakeID(s)
-}
-
-func (s Seal) MarshalJSON() ([]byte, error) {
-	type Alias Seal
-	return json.Marshal(struct {
-		Alias
-		ID string
-	}{
-		Alias: Alias(s),
-		ID:    s.ID().String(),
-	})
 }

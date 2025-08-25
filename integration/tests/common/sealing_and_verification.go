@@ -35,7 +35,7 @@ func SealingAndVerificationHappyPathTest(
 	// wait for next height finalized (potentially first height), called blockA, just to make sure consensus progresses.
 	currentFinalized := blockState.HighestFinalizedHeight()
 	blockA := blockState.WaitForHighestFinalizedProgress(t, currentFinalized)
-	t.Logf("blockA generated, height: %v ID: %v\n", blockA.Header.Height, blockA.Header.ID())
+	t.Logf("blockA generated, height: %v ID: %v\n", blockA.Height, blockA.ID())
 
 	// sends a transaction
 	tx, err := accessClient.DeployContract(context.Background(), sdk.Identifier(rootBlockId), lib.CounterContract)
@@ -73,7 +73,7 @@ func SealingAndVerificationHappyPathTest(
 	// then checks querying victim block by height returns the victim block itself.
 	blockByHeight, ok := blockState.FinalizedHeight(blockBHeight)
 	require.True(t, ok)
-	require.Equal(t, blockByHeight.Header.ID(), blockBID)
+	require.Equal(t, blockByHeight.ID(), blockBID)
 
 	return []*flow.ExecutionReceipt{receiptB1, receiptB2}, approvals
 }

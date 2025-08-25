@@ -5,24 +5,24 @@ import (
 )
 
 // IncorporatedResultSeals represents a concurrency safe memory pool for
-// incorporated result seals
+// incorporated result seals.
 type IncorporatedResultSeals interface {
-	// Add adds an IncorporatedResultSeal to the mempool
+	// Add adds an IncorporatedResultSeal to the mempool.
 	Add(irSeal *flow.IncorporatedResultSeal) (bool, error)
 
-	// All returns all the IncorporatedResultSeals in the mempool
+	// All returns all the IncorporatedResultSeals in the mempool.
 	All() []*flow.IncorporatedResultSeal
 
-	// ByID returns an IncorporatedResultSeal by ID
-	ByID(flow.Identifier) (*flow.IncorporatedResultSeal, bool)
+	// Get returns an IncorporatedResultSeal by IncorporatedResult ID.
+	Get(flow.Identifier) (*flow.IncorporatedResultSeal, bool)
 
-	// Limit returns the size limit of the mempool
+	// Limit returns the size limit of the mempool.
 	Limit() uint
 
-	// Remove removes an IncorporatedResultSeal from the mempool
+	// Remove removes an IncorporatedResultSeal from the mempool.
 	Remove(incorporatedResultID flow.Identifier) bool
 
-	// Size returns the number of items in the mempool
+	// Size returns the number of items in the mempool.
 	Size() uint
 
 	// Clear removes all entities from the pool.

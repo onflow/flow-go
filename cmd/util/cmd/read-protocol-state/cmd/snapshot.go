@@ -118,10 +118,10 @@ func runSnapshot(*cobra.Command, []string) {
 	}
 
 	log.Info().Msgf("snapshot created, sealed height %v, id %v",
-		sealingSegment.Sealed().Header.Height, sealingSegment.Sealed().Header.ID())
+		sealingSegment.Sealed().Height, sealingSegment.Sealed().ID())
 
 	log.Info().Msgf("highest finalized height %v, id %v",
-		sealingSegment.Highest().Header.Height, sealingSegment.Highest().Header.ID())
+		sealingSegment.Highest().Height, sealingSegment.Highest().ID())
 
 	encoded := serializable.Encodable()
 	common.PrettyPrint(encoded)

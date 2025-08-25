@@ -3,8 +3,6 @@ package convert
 import (
 	"fmt"
 
-	"google.golang.org/protobuf/types/known/timestamppb"
-
 	"github.com/onflow/flow/protobuf/go/flow/entities"
 
 	"github.com/onflow/flow-go/model/flow"
@@ -17,7 +15,6 @@ func BlockHeaderToMessage(
 ) (*entities.BlockHeader, error) {
 	id := h.ID()
 
-	t := timestamppb.New(h.Timestamp)
 	var lastViewTC *entities.TimeoutCertificate
 	if h.LastViewTC != nil {
 		newestQC := h.LastViewTC.NewestQC
@@ -41,14 +38,13 @@ func BlockHeaderToMessage(
 		ParentId:           h.ParentID[:],
 		Height:             h.Height,
 		PayloadHash:        h.PayloadHash[:],
-		Timestamp:          t,
+		Timestamp:          BlockTimestamp2ProtobufTime(h.Timestamp),
 		View:               h.View,
 		ParentView:         h.ParentView,
 		ParentVoterIndices: h.ParentVoterIndices,
 		ParentVoterIds:     parentVoterIds,
 		ParentVoterSigData: h.ParentVoterSigData,
 		ProposerId:         h.ProposerID[:],
-		ProposerSigData:    h.ProposerSigData,
 		ChainId:            h.ChainID.String(),
 		LastViewTc:         lastViewTC,
 	}, nil
@@ -92,18 +88,64 @@ func MessageToBlockHeader(m *entities.BlockHeader) (*flow.Header, error) {
 		lastViewTC = tc
 	}
 
-	return &flow.Header{
+	if IsRootBlockHeader(m) {
+		rootHeaderBody, err := flow.NewRootHeaderBody(flow.UntrustedHeaderBody{
+			ParentID:           MessageToIdentifier(m.ParentId),
+			Height:             m.Height,
+			Timestamp:          uint64(m.Timestamp.AsTime().UnixMilli()),
+			View:               m.View,
+			ParentView:         m.ParentView,
+			ParentVoterIndices: m.ParentVoterIndices,
+			ParentVoterSigData: m.ParentVoterSigData,
+			ProposerID:         MessageToIdentifier(m.ProposerId),
+			ChainID:            *chainId,
+			LastViewTC:         lastViewTC,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("failed to create root header body: %w", err)
+		}
+
+		rootHeader, err := flow.NewRootHeader(flow.UntrustedHeader{
+			HeaderBody:  *rootHeaderBody,
+			PayloadHash: MessageToIdentifier(m.PayloadHash),
+		})
+		if err != nil {
+			return nil, fmt.Errorf("failed to create root header: %w", err)
+		}
+
+		return rootHeader, nil
+	}
+
+	headerBody, err := flow.NewHeaderBody(flow.UntrustedHeaderBody{
 		ParentID:           MessageToIdentifier(m.ParentId),
 		Height:             m.Height,
-		PayloadHash:        MessageToIdentifier(m.PayloadHash),
-		Timestamp:          m.Timestamp.AsTime(),
+		Timestamp:          uint64(m.Timestamp.AsTime().UnixMilli()),
 		View:               m.View,
 		ParentView:         m.ParentView,
 		ParentVoterIndices: m.ParentVoterIndices,
 		ParentVoterSigData: m.ParentVoterSigData,
 		ProposerID:         MessageToIdentifier(m.ProposerId),
-		ProposerSigData:    m.ProposerSigData,
 		ChainID:            *chainId,
 		LastViewTC:         lastViewTC,
-	}, nil
+	})
+	if err != nil {
+		return nil, fmt.Errorf("could not build header body: %w", err)
+	}
+	header, err := flow.NewHeader(flow.UntrustedHeader{
+		HeaderBody:  *headerBody,
+		PayloadHash: MessageToIdentifier(m.PayloadHash),
+	})
+	if err != nil {
+		return nil, fmt.Errorf("could not build header: %w", err)
+	}
+
+	return header, nil
+}
+
+// IsRootBlockHeader reports whether this is a root block header.
+// It returns true only if all of the fields required to build a root Header are zero/nil.
+func IsRootBlockHeader(m *entities.BlockHeader) bool {
+	return m.ParentVoterIndices == nil &&
+		m.ParentVoterSigData == nil &&
+		MessageToIdentifier(m.ProposerId) == flow.ZeroID
 }

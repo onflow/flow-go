@@ -229,7 +229,7 @@ func run(*cobra.Command, []string) {
 		}
 
 		// find the last executed and sealed block
-		for h := sealed.Header.Height; h >= root.Header.Height; h-- {
+		for h := sealed.Height; h >= root.Height; h-- {
 			block, err := reader.GetBlockByHeight(h)
 			if err != nil {
 				log.Fatal().Err(err).Msgf("could not get block by height: %v", h)

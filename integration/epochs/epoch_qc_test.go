@@ -66,7 +66,8 @@ func (s *Suite) TestEpochQuorumCertificate() {
 
 		// find cluster and create root block
 		cluster, _, _ := clustering.ByNodeID(node.NodeID)
-		rootBlock := clusterstate.CanonicalRootBlock(uint64(epochCounter), cluster)
+		rootBlock, err := clusterstate.CanonicalRootBlock(uint64(epochCounter), cluster)
+		s.Require().NoError(err)
 
 		key, signer := test.AccountKeyGenerator().NewWithSigner()
 

@@ -67,7 +67,7 @@ func (t *TelemetryConsumer) OnReceiveProposal(currentView uint64, proposal *mode
 		Uint64("block_view", block.View).
 		Hex("block_id", logging.ID(block.BlockID)).
 		Hex("block_proposer_id", logging.ID(block.ProposerID)).
-		Time("block_time", block.Timestamp).
+		Time("block_time", time.UnixMilli(int64(block.Timestamp)).UTC()).
 		Uint64("qc_view", block.QC.View).
 		Hex("qc_block_id", logging.ID(block.QC.BlockID))
 
@@ -177,16 +177,16 @@ func (t *TelemetryConsumer) OnOwnVote(vote *model.Vote, recipientID flow.Identif
 		Msg("OnOwnVote")
 }
 
-func (t *TelemetryConsumer) OnOwnProposal(proposal *flow.Header, targetPublicationTime time.Time) {
+func (t *TelemetryConsumer) OnOwnProposal(proposal *flow.ProposalHeader, targetPublicationTime time.Time) {
 	step := t.pathHandler.NextStep().
-		Uint64("block_view", proposal.View).
-		Hex("block_id", logging.ID(proposal.ID())).
-		Hex("block_proposer_id", logging.ID(proposal.ProposerID)).
-		Time("block_time", proposal.Timestamp).
-		Uint64("qc_view", proposal.ParentView).
-		Hex("qc_block_id", logging.ID(proposal.ParentID)).
+		Uint64("block_view", proposal.Header.View).
+		Hex("block_id", logging.ID(proposal.Header.ID())).
+		Hex("block_proposer_id", logging.ID(proposal.Header.ProposerID)).
+		Time("block_time", time.UnixMilli(int64(proposal.Header.Timestamp)).UTC()).
+		Uint64("qc_view", proposal.Header.ParentView).
+		Hex("qc_block_id", logging.ID(proposal.Header.ParentID)).
 		Time("targetPublicationTime", targetPublicationTime)
-	lastViewTC := proposal.LastViewTC
+	lastViewTC := proposal.Header.LastViewTC
 	if lastViewTC != nil {
 		step.
 			Uint64("last_view_tc_view", lastViewTC.View).

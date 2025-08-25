@@ -2,7 +2,6 @@ package model
 
 import (
 	"fmt"
-	"time"
 
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -10,23 +9,21 @@ import (
 // Block is the HotStuff algorithm's concept of a block, which - in the bigger picture - corresponds
 // to the block header.
 type Block struct {
-	View        uint64
-	BlockID     flow.Identifier
-	ProposerID  flow.Identifier
-	QC          *flow.QuorumCertificate
-	PayloadHash flow.Identifier
-	Timestamp   time.Time
+	View       uint64
+	BlockID    flow.Identifier
+	ProposerID flow.Identifier
+	QC         *flow.QuorumCertificate
+	Timestamp  uint64 // Unix milliseconds
 }
 
 // BlockFromFlow converts a flow header to a hotstuff block.
 func BlockFromFlow(header *flow.Header) *Block {
 	block := Block{
-		BlockID:     header.ID(),
-		View:        header.View,
-		ProposerID:  header.ProposerID,
-		QC:          header.ParentQC(),
-		PayloadHash: header.PayloadHash,
-		Timestamp:   header.Timestamp,
+		BlockID:    header.ID(),
+		View:       header.View,
+		QC:         header.ParentQC(),
+		ProposerID: header.ProposerID,
+		Timestamp:  header.Timestamp,
 	}
 
 	return &block
@@ -36,12 +33,11 @@ func BlockFromFlow(header *flow.Header) *Block {
 // block based on the given header.
 func GenesisBlockFromFlow(header *flow.Header) *Block {
 	genesis := &Block{
-		BlockID:     header.ID(),
-		View:        header.View,
-		ProposerID:  header.ProposerID,
-		QC:          nil,
-		PayloadHash: header.PayloadHash,
-		Timestamp:   header.Timestamp,
+		BlockID:    header.ID(),
+		View:       header.View,
+		ProposerID: header.ProposerID,
+		QC:         nil,
+		Timestamp:  header.Timestamp,
 	}
 	return genesis
 }
@@ -69,10 +65,11 @@ func NewCertifiedBlock(block *Block, qc *flow.QuorumCertificate) (CertifiedBlock
 	return CertifiedBlock{Block: block, CertifyingQC: qc}, nil
 }
 
-// ID returns unique identifier for the block.
+// BlockID returns a unique identifier for the block (the ID signed to produce a block vote).
 // To avoid repeated computation, we use value from the QC.
-func (b *CertifiedBlock) ID() flow.Identifier {
-	return b.Block.BlockID
+// CAUTION: This is not a cryptographic commitment for the CertifiedBlock model.
+func (b *CertifiedBlock) BlockID() flow.Identifier {
+	return b.CertifyingQC.BlockID
 }
 
 // View returns view where the block was proposed.

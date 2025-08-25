@@ -1,12 +1,15 @@
 package cluster
 
 import (
-	"github.com/onflow/flow-go/model/fingerprint"
+	"fmt"
+
 	"github.com/onflow/flow-go/model/flow"
 )
 
 // Payload is the payload for blocks in collection node cluster consensus.
 // It contains only a single collection.
+//
+//structwrite:immutable - mutations allowed only within the constructor
 type Payload struct {
 
 	// Collection is the collection being created.
@@ -33,38 +36,62 @@ type Payload struct {
 	ReferenceBlockID flow.Identifier
 }
 
-// EmptyPayload returns a payload with an empty collection and the given
+// NewEmptyPayload returns a payload with an empty collection and the given
 // reference block ID.
-func EmptyPayload(refID flow.Identifier) Payload {
-	return PayloadFromTransactions(refID)
-}
-
-// PayloadFromTransactions creates a payload given a reference block ID and a
-// list of transaction hashes.
-func PayloadFromTransactions(refID flow.Identifier, transactions ...*flow.TransactionBody) Payload {
-	// avoid a nil transaction list
-	if len(transactions) == 0 {
-		transactions = []*flow.TransactionBody{}
-	}
-	return Payload{
-		Collection: flow.Collection{
-			Transactions: transactions,
-		},
+func NewEmptyPayload(refID flow.Identifier) *Payload {
+	return &Payload{
+		Collection:       *flow.NewEmptyCollection(),
 		ReferenceBlockID: refID,
 	}
+}
+
+// UntrustedPayload is an untrusted input-only representation of a cluster Payload,
+// used for construction.
+//
+// This type exists to ensure that constructor functions are invoked explicitly
+// with named fields, which improves clarity and reduces the risk of incorrect field
+// ordering during construction.
+//
+// An instance of UntrustedPayload should be validated and converted into
+// a trusted cluster Payload using NewPayload constructor.
+type UntrustedPayload Payload
+
+// NewPayload creates a payload given a reference block ID and a
+// list of transaction hashes.
+// Construction cluster Payload allowed only within the constructor.
+//
+// All errors indicate a valid Payload cannot be constructed from the input.
+func NewPayload(untrusted UntrustedPayload) (*Payload, error) {
+	collection, err := flow.NewCollection(flow.UntrustedCollection(untrusted.Collection))
+	if err != nil {
+		return nil, fmt.Errorf("could not construct collection: %w", err)
+	}
+	return &Payload{
+		Collection:       *collection,
+		ReferenceBlockID: untrusted.ReferenceBlockID,
+	}, nil
+}
+
+// NewRootPayload creates a root payload for a root cluster block.
+//
+// This constructor must be used **only** for constructing the root payload,
+// which is the only case where zero values are allowed.
+func NewRootPayload(untrusted UntrustedPayload) (*Payload, error) {
+	if untrusted.ReferenceBlockID != flow.ZeroID {
+		return nil, fmt.Errorf("ReferenceBlockID must be empty")
+	}
+
+	if len(untrusted.Collection.Transactions) != 0 {
+		return nil, fmt.Errorf("Collection must be empty")
+	}
+
+	return &Payload{
+		Collection:       untrusted.Collection,
+		ReferenceBlockID: untrusted.ReferenceBlockID,
+	}, nil
 }
 
 // Hash returns the hash of the payload.
 func (p Payload) Hash() flow.Identifier {
 	return flow.MakeID(p)
-}
-
-func (p Payload) Fingerprint() []byte {
-	return fingerprint.Fingerprint(struct {
-		Collection       []byte
-		ReferenceBlockID flow.Identifier
-	}{
-		Collection:       p.Collection.Fingerprint(),
-		ReferenceBlockID: p.ReferenceBlockID,
-	})
 }

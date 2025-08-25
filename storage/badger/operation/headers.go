@@ -6,10 +6,18 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-func InsertHeader(headerID flow.Identifier, header *flow.Header) func(*badger.Txn) error {
-	return insert(makePrefix(codeHeader, headerID), header)
+// InsertHeader inserts a header by block ID.
+// Error returns:
+//   - storage.ErrAlreadyExists if the key already exists in the database.
+//   - generic error in case of unexpected failure from the database layer or encoding failure.
+func InsertHeader(blockID flow.Identifier, header *flow.Header) func(*badger.Txn) error {
+	return insert(makePrefix(codeHeader, blockID), header)
 }
 
+// RetrieveHeader retrieves a header by block ID.
+// Error returns:
+//   - storage.ErrNotFound if the key does not exist in the database
+//   - generic error in case of unexpected failure from the database layer
 func RetrieveHeader(blockID flow.Identifier, header *flow.Header) func(*badger.Txn) error {
 	return retrieve(makePrefix(codeHeader, blockID), header)
 }
@@ -43,13 +51,13 @@ func RetrieveExecutedBlock(blockID *flow.Identifier) func(*badger.Txn) error {
 	return retrieve(makePrefix(codeExecutedBlock), blockID)
 }
 
-// IndexCollectionBlock indexes a block by a collection within that block.
-func IndexCollectionBlock(collID flow.Identifier, blockID flow.Identifier) func(*badger.Txn) error {
+// IndexCollectionGuaranteeBlock indexes a block by a collection guarantee within that block.
+func IndexCollectionGuaranteeBlock(collID flow.Identifier, blockID flow.Identifier) func(*badger.Txn) error {
 	return insert(makePrefix(codeCollectionBlock, collID), blockID)
 }
 
-// LookupCollectionBlock looks up a block by a collection within that block.
-func LookupCollectionBlock(collID flow.Identifier, blockID *flow.Identifier) func(*badger.Txn) error {
+// LookupCollectionGuaranteeBlock looks up a block by a collection guarantee within that block.
+func LookupCollectionGuaranteeBlock(collID flow.Identifier, blockID *flow.Identifier) func(*badger.Txn) error {
 	return retrieve(makePrefix(codeCollectionBlock, collID), blockID)
 }
 

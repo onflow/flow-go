@@ -31,14 +31,18 @@ const (
 	callbackTransactionGasLimit      = flow.DefaultMaxTransactionGasLimit
 )
 
-func ProcessCallbacksTransaction(chain flow.Chain) *flow.TransactionBody {
+// ProcessCallbacksTransaction constructs a transaction for processing callbacks, for the given callback.
+// No errors are expected during normal operation.
+func ProcessCallbacksTransaction(chain flow.Chain) (*flow.TransactionBody, error) {
 	script := prepareScheduledContractTransaction(chain, processCallbacksTransaction)
 
-	return flow.NewTransactionBody().
+	return flow.NewTransactionBodyBuilder().
 		SetScript(script).
-		SetComputeLimit(callbackTransactionGasLimit)
+		SetComputeLimit(callbackTransactionGasLimit).Build()
 }
 
+// ExecuteCallbacksTransactions constructs a list of transaction to execute callbacks, for the given chain.
+// No errors are expected during normal operation.
 func ExecuteCallbacksTransactions(chainID flow.Chain, processEvents flow.EventsList) ([]*flow.TransactionBody, error) {
 	txs := make([]*flow.TransactionBody, 0, len(processEvents))
 
@@ -48,19 +52,23 @@ func ExecuteCallbacksTransactions(chainID flow.Chain, processEvents flow.EventsL
 			return nil, fmt.Errorf("failed to get callback args from event: %w", err)
 		}
 
-		tx := executeCallbackTransaction(chainID, id, effort)
+		tx, err := executeCallbackTransaction(chainID, id, effort)
+		if err != nil {
+			return nil, fmt.Errorf("failed to construct execute callback transactions: %w", err)
+		}
 		txs = append(txs, tx)
 	}
 
 	return txs, nil
 }
 
-func executeCallbackTransaction(chain flow.Chain, id []byte, effort uint64) *flow.TransactionBody {
+func executeCallbackTransaction(chain flow.Chain, id []byte, effort uint64) (*flow.TransactionBody, error) {
 	script := prepareScheduledContractTransaction(chain, executeCallbacksTransaction)
-	return flow.NewTransactionBody().
+	return flow.NewTransactionBodyBuilder().
 		SetScript(script).
 		AddArgument(id).
-		SetComputeLimit(effort)
+		SetComputeLimit(effort).
+		Build()
 }
 
 // callbackArgsFromEvent decodes the event payload and returns the callback ID and effort.

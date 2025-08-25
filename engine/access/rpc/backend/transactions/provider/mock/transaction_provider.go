@@ -50,7 +50,7 @@ func (_m *TransactionProvider) TransactionResult(ctx context.Context, header *fl
 }
 
 // TransactionResultByIndex provides a mock function with given fields: ctx, block, index, encodingVersion
-func (_m *TransactionProvider) TransactionResultByIndex(ctx context.Context, block *flow.Block, index uint32, encodingVersion entities.EventEncodingVersion) (*access.TransactionResult, error) {
+func (_m *TransactionProvider) TransactionResultByIndex(ctx context.Context, block *flow.GenericBlock[flow.Payload], index uint32, encodingVersion entities.EventEncodingVersion) (*access.TransactionResult, error) {
 	ret := _m.Called(ctx, block, index, encodingVersion)
 
 	if len(ret) == 0 {
@@ -59,10 +59,10 @@ func (_m *TransactionProvider) TransactionResultByIndex(ctx context.Context, blo
 
 	var r0 *access.TransactionResult
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, *flow.Block, uint32, entities.EventEncodingVersion) (*access.TransactionResult, error)); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, *flow.GenericBlock[flow.Payload], uint32, entities.EventEncodingVersion) (*access.TransactionResult, error)); ok {
 		return rf(ctx, block, index, encodingVersion)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, *flow.Block, uint32, entities.EventEncodingVersion) *access.TransactionResult); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, *flow.GenericBlock[flow.Payload], uint32, entities.EventEncodingVersion) *access.TransactionResult); ok {
 		r0 = rf(ctx, block, index, encodingVersion)
 	} else {
 		if ret.Get(0) != nil {
@@ -70,7 +70,7 @@ func (_m *TransactionProvider) TransactionResultByIndex(ctx context.Context, blo
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, *flow.Block, uint32, entities.EventEncodingVersion) error); ok {
+	if rf, ok := ret.Get(1).(func(context.Context, *flow.GenericBlock[flow.Payload], uint32, entities.EventEncodingVersion) error); ok {
 		r1 = rf(ctx, block, index, encodingVersion)
 	} else {
 		r1 = ret.Error(1)
@@ -80,7 +80,7 @@ func (_m *TransactionProvider) TransactionResultByIndex(ctx context.Context, blo
 }
 
 // TransactionResultsByBlockID provides a mock function with given fields: ctx, block, encodingVersion
-func (_m *TransactionProvider) TransactionResultsByBlockID(ctx context.Context, block *flow.Block, encodingVersion entities.EventEncodingVersion) ([]*access.TransactionResult, error) {
+func (_m *TransactionProvider) TransactionResultsByBlockID(ctx context.Context, block *flow.GenericBlock[flow.Payload], encodingVersion entities.EventEncodingVersion) ([]*access.TransactionResult, error) {
 	ret := _m.Called(ctx, block, encodingVersion)
 
 	if len(ret) == 0 {
@@ -89,10 +89,10 @@ func (_m *TransactionProvider) TransactionResultsByBlockID(ctx context.Context, 
 
 	var r0 []*access.TransactionResult
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, *flow.Block, entities.EventEncodingVersion) ([]*access.TransactionResult, error)); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, *flow.GenericBlock[flow.Payload], entities.EventEncodingVersion) ([]*access.TransactionResult, error)); ok {
 		return rf(ctx, block, encodingVersion)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, *flow.Block, entities.EventEncodingVersion) []*access.TransactionResult); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, *flow.GenericBlock[flow.Payload], entities.EventEncodingVersion) []*access.TransactionResult); ok {
 		r0 = rf(ctx, block, encodingVersion)
 	} else {
 		if ret.Get(0) != nil {
@@ -100,7 +100,7 @@ func (_m *TransactionProvider) TransactionResultsByBlockID(ctx context.Context, 
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, *flow.Block, entities.EventEncodingVersion) error); ok {
+	if rf, ok := ret.Get(1).(func(context.Context, *flow.GenericBlock[flow.Payload], entities.EventEncodingVersion) error); ok {
 		r1 = rf(ctx, block, encodingVersion)
 	} else {
 		r1 = ret.Error(1)

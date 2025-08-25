@@ -6,26 +6,14 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-// InsertSporkID inserts the spork ID for the present spork. A single database
+// IndexSporkRootBlock indexes the spork root block ID for the present spork. A single database
 // and protocol state instance spans at most one spork, so this is inserted
 // exactly once, when bootstrapping the state.
-func InsertSporkID(sporkID flow.Identifier) func(*badger.Txn) error {
-	return insert(makePrefix(codeSporkID), sporkID)
+func IndexSporkRootBlock(blockID flow.Identifier) func(*badger.Txn) error {
+	return insert(makePrefix(codeSporkRootBlockID), blockID)
 }
 
-// RetrieveSporkID retrieves the spork ID for the present spork.
-func RetrieveSporkID(sporkID *flow.Identifier) func(*badger.Txn) error {
-	return retrieve(makePrefix(codeSporkID), sporkID)
-}
-
-// InsertSporkRootBlockHeight inserts the spork root block height for the present spork.
-// A single database and protocol state instance spans at most one spork, so this is inserted
-// exactly once, when bootstrapping the state.
-func InsertSporkRootBlockHeight(height uint64) func(*badger.Txn) error {
-	return insert(makePrefix(codeSporkRootBlockHeight), height)
-}
-
-// RetrieveSporkRootBlockHeight retrieves the spork root block height for the present spork.
-func RetrieveSporkRootBlockHeight(height *uint64) func(*badger.Txn) error {
-	return retrieve(makePrefix(codeSporkRootBlockHeight), height)
+// RetrieveSporkRootBlockID retrieves the spork root block ID for the present spork.
+func RetrieveSporkRootBlockID(blockID *flow.Identifier) func(*badger.Txn) error {
+	return retrieve(makePrefix(codeSporkRootBlockID), blockID)
 }

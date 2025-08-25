@@ -272,7 +272,7 @@ func main() {
 				getSealingConfigs,
 				conMetrics)
 
-			blockTimer, err = blocktimer.NewBlockTimer(minInterval, maxInterval)
+			blockTimer, err = blocktimer.NewBlockTimer(uint64(minInterval.Milliseconds()), uint64(maxInterval.Milliseconds()))
 			if err != nil {
 				return err
 			}
@@ -373,8 +373,8 @@ func main() {
 			return nil
 		}).
 		Module("collection guarantees mempool", func(node *cmd.NodeConfig) error {
-			guarantees, err = stdmap.NewGuarantees(guaranteeLimit)
-			return err
+			guarantees = stdmap.NewGuarantees(guaranteeLimit)
+			return nil
 		}).
 		Module("execution receipts mempool", func(node *cmd.NodeConfig) error {
 			receipts = consensusMempools.NewExecutionTree()
@@ -498,7 +498,7 @@ func main() {
 				node.State,
 				channels.RequestReceiptsByBlockID,
 				filter.HasRole[flow.Identity](flow.RoleExecution),
-				func() flow.Entity { return &flow.ExecutionReceipt{} },
+				func() flow.Entity { return new(flow.ExecutionReceipt) },
 				requester.WithRetryInitial(2*time.Second),
 				requester.WithRetryMaximum(30*time.Second),
 			)
@@ -637,7 +637,7 @@ func main() {
 				node.Storage.Headers,
 				finalize,
 				notifier,
-				node.FinalizedRootBlock.Header,
+				node.FinalizedRootBlock.ToHeader(),
 				node.RootQC,
 			)
 			if err != nil {

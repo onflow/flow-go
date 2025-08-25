@@ -138,7 +138,7 @@ func (r *RetrierImpl) retryTxsAtHeight(heightToRetry uint64) error {
 		if block == nil {
 			status, err = r.txStatusDeriver.DeriveUnknownTransactionStatus(tx.ReferenceBlockID)
 		} else {
-			status, err = r.txStatusDeriver.DeriveTransactionStatus(block.Header.Height, false)
+			status, err = r.txStatusDeriver.DeriveTransactionStatus(block.Height, false)
 		}
 
 		if err != nil {

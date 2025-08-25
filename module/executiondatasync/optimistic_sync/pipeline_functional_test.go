@@ -85,7 +85,7 @@ func (p *PipelineFunctionalSuite) SetupTest() {
 
 	// Create real storages
 	var err error
-	p.pdb = pebbleStorage.NewBootstrappedRegistersWithPathForTest(t, p.tmpDir, rootBlock.Height, sealedBlock.Header.Height)
+	p.pdb = pebbleStorage.NewBootstrappedRegistersWithPathForTest(t, p.tmpDir, rootBlock.Height, sealedBlock.Height)
 	p.persistentRegisters, err = pebbleStorage.NewRegisters(p.pdb, pebbleStorage.PruningDisabled)
 	p.Require().NoError(err)
 
@@ -96,23 +96,23 @@ func (p *PipelineFunctionalSuite) SetupTest() {
 	p.persistentTxResultErrMsg = store.NewTransactionResultErrorMessages(p.metrics, p.db, bstorage.DefaultCacheSize)
 	p.results = store.NewExecutionResults(p.metrics, p.db)
 
-	p.consumerProgress, err = store.NewConsumerProgress(p.db, "test_consumer").Initialize(sealedBlock.Header.Height)
+	p.consumerProgress, err = store.NewConsumerProgress(p.db, "test_consumer").Initialize(sealedBlock.Height)
 	p.Require().NoError(err)
 
 	// store and index the root header
 	p.headers = bstorage.NewHeaders(p.metrics, p.bdb)
 
-	err = p.headers.Store(rootBlock)
+	err = p.headers.Store(unittest.ProposalHeaderFromHeader(rootBlock))
 	p.Require().NoError(err)
 
 	err = p.bdb.Update(operation.IndexBlockHeight(rootBlock.Height, rootBlock.ID()))
 	p.Require().NoError(err)
 
 	// store and index the latest sealed block header
-	err = p.headers.Store(sealedBlock.Header)
+	err = p.headers.Store(unittest.ProposalHeaderFromHeader(sealedBlock.ToHeader()))
 	p.Require().NoError(err)
 
-	err = p.bdb.Update(operation.IndexBlockHeight(sealedBlock.Header.Height, sealedBlock.ID()))
+	err = p.bdb.Update(operation.IndexBlockHeight(sealedBlock.Height, sealedBlock.ID()))
 	p.Require().NoError(err)
 
 	// Store and index sealed block execution result
@@ -125,7 +125,7 @@ func (p *PipelineFunctionalSuite) SetupTest() {
 	p.persistentLatestSealedResult, err = store.NewLatestPersistedSealedResult(p.consumerProgress, p.headers, p.results)
 	p.Require().NoError(err)
 
-	p.block = unittest.BlockWithParentFixture(sealedBlock.Header)
+	p.block = unittest.BlockWithParentFixture(sealedBlock.ToHeader())
 	p.executionResult = unittest.ExecutionResultFixture(unittest.WithBlock(p.block))
 
 	p.execDataRequester = reqestermock.NewExecutionDataRequester(t)
@@ -413,7 +413,7 @@ func (p *PipelineFunctionalSuite) WithRunningPipeline(
 	p.core = NewCoreImpl(
 		p.logger,
 		p.executionResult,
-		p.block.Header,
+		p.block.ToHeader(),
 		p.execDataRequester,
 		p.txResultErrMsgsRequester,
 		p.txResultErrMsgsRequestTimeout,
@@ -513,7 +513,7 @@ func (p *PipelineFunctionalSuite) verifyCollectionPersisted(expectedCollection *
 	storedLightCollection, err := p.persistentCollections.LightByID(collectionID)
 	p.Require().NoError(err)
 
-	p.Assert().Equal(&expectedLightCollection, storedLightCollection)
+	p.Assert().Equal(expectedLightCollection, storedLightCollection)
 	p.Assert().ElementsMatch(expectedCollection.Light().Transactions, storedLightCollection.Transactions)
 }
 
@@ -537,7 +537,7 @@ func (p *PipelineFunctionalSuite) verifyRegistersPersisted(expectedTrieUpdate *l
 		registerID, err := convert.LedgerKeyToRegisterID(key)
 		p.Require().NoError(err)
 
-		storedValue, err := p.persistentRegisters.Get(registerID, p.block.Header.Height)
+		storedValue, err := p.persistentRegisters.Get(registerID, p.block.Height)
 		p.Require().NoError(err)
 
 		expectedValue := payload.Value()

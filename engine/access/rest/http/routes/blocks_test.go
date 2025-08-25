@@ -239,18 +239,19 @@ func generateMocks(backend *mock.API, count int) ([]string, []string, []*flow.Bl
 	executionResults := make([]*flow.ExecutionResult, count)
 
 	for i := 0; i < count; i++ {
-		block := unittest.BlockFixture()
-		block.Header.Height = uint64(i)
-		blocks[i] = &block
-		blockIDs[i] = block.Header.ID().String()
-		heights[i] = fmt.Sprintf("%d", block.Header.Height)
+		block := unittest.BlockFixture(
+			unittest.Block.WithHeight(uint64(i + 1)), // avoiding edge case of height = 0 (genesis block)
+		)
+		blocks[i] = block
+		blockIDs[i] = block.ID().String()
+		heights[i] = fmt.Sprintf("%d", block.Height)
 
 		executionResult := unittest.ExecutionResultFixture()
 		executionResult.BlockID = block.ID()
 		executionResults[i] = executionResult
 
-		backend.Mock.On("GetBlockByID", mocks.Anything, block.ID()).Return(&block, flow.BlockStatusSealed, nil)
-		backend.Mock.On("GetBlockByHeight", mocks.Anything, block.Header.Height).Return(&block, flow.BlockStatusSealed, nil)
+		backend.Mock.On("GetBlockByID", mocks.Anything, block.ID()).Return(block, flow.BlockStatusSealed, nil)
+		backend.Mock.On("GetBlockByHeight", mocks.Anything, block.Height).Return(block, flow.BlockStatusSealed, nil)
 		backend.Mock.On("GetExecutionResultForBlockID", mocks.Anything, block.ID()).Return(executionResults[i], nil)
 	}
 
@@ -299,7 +300,7 @@ func expectedBlockResponse(
 	blockLink := fmt.Sprintf("/v1/blocks/%s", id)
 	payloadLink := fmt.Sprintf("/v1/blocks/%s/payload", id)
 	execLink := fmt.Sprintf("/v1/execution_results/%s", execResultID)
-	timestamp := block.Header.Timestamp.Format(time.RFC3339Nano)
+	timestamp := time.UnixMilli(int64(block.Timestamp)).UTC().Format(time.RFC3339Nano)
 
 	header := fmt.Sprintf(`"header": {
 		"id": "%s",
@@ -307,7 +308,7 @@ func expectedBlockResponse(
 		"height": "%d",
 		"timestamp": "%s",
 		"parent_voter_signature": "%s"
-	}`, id, block.Header.ParentID.String(), block.Header.Height, timestamp, util.ToBase64(block.Header.ParentVoterSigData))
+	}`, id, block.ParentID.String(), block.Height, timestamp, util.ToBase64(block.ParentVoterSigData))
 
 	links := fmt.Sprintf(`"_links": {
 		"_self": "%s"

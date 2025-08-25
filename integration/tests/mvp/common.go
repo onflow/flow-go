@@ -24,7 +24,7 @@ const defaultTimeout = time.Second * 10
 
 func RunMVPTest(t *testing.T, ctx context.Context, net *testnet.FlowNetwork, accessNode *testnet.Container) {
 
-	chain := net.Root().Header.ChainID.Chain()
+	chain := net.Root().ChainID.Chain()
 
 	serviceAccountClient, err := accessNode.TestnetClient()
 	require.NoError(t, err)

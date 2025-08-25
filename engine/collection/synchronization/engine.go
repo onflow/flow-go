@@ -13,6 +13,7 @@ import (
 	"github.com/onflow/flow-go/engine/common/fifoqueue"
 	commonsync "github.com/onflow/flow-go/engine/common/synchronization"
 	"github.com/onflow/flow-go/model/chainsync"
+	clustermodel "github.com/onflow/flow-go/model/cluster"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/model/messages"
@@ -24,6 +25,7 @@ import (
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/state/cluster"
 	"github.com/onflow/flow-go/storage"
+	"github.com/onflow/flow-go/utils/logging"
 	"github.com/onflow/flow-go/utils/rand"
 )
 
@@ -154,6 +156,34 @@ func (e *Engine) setupResponseMessageHandler() error {
 				}
 				return ok
 			},
+			Map: func(msg *engine.Message) (*engine.Message, bool) {
+				blockResponse, ok := msg.Payload.(*messages.ClusterBlockResponse)
+				if !ok {
+					// should never happen, unless there is a bug.
+					e.log.Fatal().
+						Hex("origin_id", logging.ID(msg.OriginID)).
+						Interface("payload", msg.Payload).
+						Msg("cannot match the payload to ClusterBlockResponse")
+					return nil, false
+				}
+				proposals, err := blockResponse.BlocksInternal()
+				if err != nil {
+					// TODO(BFT, #7620): Replace this log statement with a call to the protocol violation consumer.
+					e.log.Warn().
+						Hex("origin_id", logging.ID(msg.OriginID)).
+						Uint64("nonce", blockResponse.Nonce).
+						Int("block_count", len(blockResponse.Blocks)).
+						Err(err).
+						Msgf("cannot convert untrusted proposal to trusted proposal")
+					e.metrics.InboundMessageDropped(metrics.EngineClusterSynchronization, metrics.MessageBlockProposal)
+					return nil, false
+				}
+
+				return &engine.Message{
+					OriginID: msg.OriginID,
+					Payload:  proposals,
+				}, true
+			},
 			Store: e.pendingBlockResponses,
 		},
 	)
@@ -268,7 +298,7 @@ func (e *Engine) processAvailableResponses() {
 
 		msg, ok = e.pendingBlockResponses.Get()
 		if ok {
-			e.onBlockResponse(msg.OriginID, msg.Payload.(*messages.ClusterBlockResponse))
+			e.onBlockResponse(msg.OriginID, msg.Payload.([]*clustermodel.Proposal))
 			e.metrics.MessageHandled(metrics.EngineClusterSynchronization, metrics.MessageBlockResponse)
 			continue
 		}
@@ -289,19 +319,17 @@ func (e *Engine) onSyncResponse(originID flow.Identifier, res *messages.SyncResp
 	e.core.HandleHeight(final, res.Height)
 }
 
-// onBlockResponse processes a response containing a specifically requested block.
-func (e *Engine) onBlockResponse(originID flow.Identifier, res *messages.ClusterBlockResponse) {
+// onBlockResponse processes a slice of requested block proposals.
+// Input proposals are structurally validated.
+func (e *Engine) onBlockResponse(originID flow.Identifier, proposals []*clustermodel.Proposal) {
 	// process the blocks one by one
-	for _, block := range res.Blocks {
-		header := block.Header
-		if !e.core.HandleBlock(&header) {
+	for _, proposal := range proposals {
+		if !e.core.HandleBlock(proposal.Block.ToHeader()) {
 			continue
 		}
-		synced := flow.Slashable[*messages.ClusterBlockProposal]{
+		synced := flow.Slashable[*clustermodel.Proposal]{
 			OriginID: originID,
-			Message: &messages.ClusterBlockProposal{
-				Block: block,
-			},
+			Message:  proposal,
 		}
 		// forward the block to the compliance engine for validation and processing
 		e.comp.OnSyncedClusterBlock(synced)

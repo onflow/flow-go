@@ -15,10 +15,11 @@ const (
 	codeLivenessData = 11 // liveness data for hotstuff state
 
 	// codes for fields associated with the root state
-	codeSporkID              = 13
-	_                        = 14 // DEPRECATED: 14 was used for ProtocolVersion before the versioned Protocol State
-	_                        = 15 // DEPRECATED: 15 was used to save the finalization safety threshold
-	codeSporkRootBlockHeight = 16
+	_                    = 13 // DEPRECATED: 13 was used for root spork ID
+	_                    = 14 // DEPRECATED: 14 was used for ProtocolVersion before the versioned Protocol State
+	_                    = 15 // DEPRECATED: 15 was used to save the finalization safety threshold
+	_                    = 16 // DEPRECATED: 16 was used for root spork height
+	codeSporkRootBlockID = 17 // the root spork block ID
 
 	// code for heights with special meaning
 	codeFinalizedHeight         = 20 // latest finalized block height
@@ -40,7 +41,7 @@ const (
 	codeExecutionResult      = 36
 	codeResultApproval       = 37
 	codeChunk                = 38
-	codeExecutionReceiptMeta = 39 // NOTE: prior to Mainnet25, this erroneously had the same value as codeExecutionResult (36)
+	codeExecutionReceiptStub = 39 // NOTE: prior to Mainnet25, this erroneously had the same value as codeExecutionResult (36)
 
 	// codes for indexing single identifier by identifier/integer
 	codeHeightToBlock               = 40 // index mapping height to block ID
@@ -51,6 +52,8 @@ const (
 	codeBlockIDToQuorumCertificate  = 45 // index of quorum certificates by block ID
 	codeEpochProtocolStateByBlockID = 46 // index of epoch protocol state entry by block ID
 	codeProtocolKVStoreByBlockID    = 47 // index of protocol KV store entry by block ID
+	codeBlockIDToProposalSignature  = 48 // index of proposer signatures by block ID
+	codeGuaranteeByCollectionID     = 49 // index of collection guarantee by collection ID
 
 	// codes for indexing multiple identifiers by identifier
 	codeBlockChildren          = 50 // index mapping block ID to children blocks

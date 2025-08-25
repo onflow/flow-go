@@ -89,19 +89,19 @@ func (_m *Cluster) Members() flow.GenericIdentityList[flow.IdentitySkeleton] {
 }
 
 // RootBlock provides a mock function with no fields
-func (_m *Cluster) RootBlock() *cluster.Block {
+func (_m *Cluster) RootBlock() *flow.GenericBlock[cluster.Payload] {
 	ret := _m.Called()
 
 	if len(ret) == 0 {
 		panic("no return value specified for RootBlock")
 	}
 
-	var r0 *cluster.Block
-	if rf, ok := ret.Get(0).(func() *cluster.Block); ok {
+	var r0 *flow.GenericBlock[cluster.Payload]
+	if rf, ok := ret.Get(0).(func() *flow.GenericBlock[cluster.Payload]); ok {
 		r0 = rf()
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*cluster.Block)
+			r0 = ret.Get(0).(*flow.GenericBlock[cluster.Payload])
 		}
 	}
 

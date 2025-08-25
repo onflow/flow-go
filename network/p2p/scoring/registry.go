@@ -166,7 +166,7 @@ func NewGossipSubAppSpecificScoreRegistry(config *GossipSubAppSpecificScoreRegis
 	invalidCtrlMsgNotificationStore := queue.NewHeroStore(config.Parameters.InvalidControlMessageNotificationQueueSize,
 		lg.With().Str("component", "invalid_control_message_notification_queue").Logger(),
 		metrics.RpcInspectorNotificationQueueMetricFactory(config.HeroCacheMetricsFactory, config.NetworkingType),
-		queue.WithMessageEntityFactory(queue.NewMessageEntityWithNonce))
+		queue.WithMessageKeyFactory(queue.IdentifierOfMessageWithNonce))
 	reg.invCtrlMsgNotifWorkerPool = worker.NewWorkerPoolBuilder[*p2p.InvCtrlMsgNotif](lg, invalidCtrlMsgNotificationStore, reg.handleMisbehaviourReport).Build()
 
 	builder := component.NewComponentManagerBuilder()

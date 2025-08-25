@@ -132,17 +132,6 @@ func (iy IdentitySkeleton) String() string {
 	return fmt.Sprintf("%s-%s@%s", iy.Role, iy.NodeID.String(), iy.Address)
 }
 
-// ID returns a unique, persistent identifier for the identity.
-// CAUTION: the ID may be chosen by a node operator, so long as it is unique.
-func (iy Identity) ID() Identifier {
-	return iy.NodeID
-}
-
-// Checksum returns a checksum for the identity including mutable attributes.
-func (iy Identity) Checksum() Identifier {
-	return MakeID(iy)
-}
-
 // GetNodeID returns node ID for the identity. It is needed to satisfy GenericIdentity constraint.
 func (iy IdentitySkeleton) GetNodeID() Identifier {
 	return iy.NodeID
@@ -183,8 +172,8 @@ type encodableIdentitySkeleton struct {
 }
 
 type encodableIdentity struct {
-	encodableIdentitySkeleton
-	ParticipationStatus string
+	EncodableIdentitySkeleton encodableIdentitySkeleton
+	ParticipationStatus       string
 }
 
 func encodableSkeletonFromIdentity(iy IdentitySkeleton) encodableIdentitySkeleton {
@@ -205,7 +194,7 @@ func encodableSkeletonFromIdentity(iy IdentitySkeleton) encodableIdentitySkeleto
 
 func encodableFromIdentity(iy Identity) encodableIdentity {
 	return encodableIdentity{
-		encodableIdentitySkeleton: encodableSkeletonFromIdentity(iy.IdentitySkeleton),
+		EncodableIdentitySkeleton: encodableSkeletonFromIdentity(iy.IdentitySkeleton),
 		ParticipationStatus:       iy.EpochParticipationStatus.String(),
 	}
 }
@@ -302,7 +291,7 @@ func identitySkeletonFromEncodable(ie encodableIdentitySkeleton, identity *Ident
 }
 
 func identityFromEncodable(ie encodableIdentity, identity *Identity) error {
-	err := identitySkeletonFromEncodable(ie.encodableIdentitySkeleton, &identity.IdentitySkeleton)
+	err := identitySkeletonFromEncodable(ie.EncodableIdentitySkeleton, &identity.IdentitySkeleton)
 	if err != nil {
 		return fmt.Errorf("could not decode identity skeleton: %w", err)
 	}

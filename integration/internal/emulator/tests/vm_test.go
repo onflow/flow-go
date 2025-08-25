@@ -54,7 +54,7 @@ func TestVm(t *testing.T) {
 				txnId := flowgo.Identifier(idGenerator.New())
 				output := fvm.ProcedureOutput{
 					Logs:            []string{"TestLog1", "TestLog2"},
-					Events:          []flowgo.Event{event1, event2},
+					Events:          []flowgo.Event{*event1, *event2},
 					ComputationUsed: 5,
 					MemoryEstimate:  1211,
 					Err:             nil,

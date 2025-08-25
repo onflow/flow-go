@@ -41,7 +41,7 @@ func (s *BlockHeadersProviderSuite) TestBlockHeadersDataProvider_HappyPath() {
 		s.validBlockHeadersArgumentsTestCases(),
 		func(dataChan chan interface{}) {
 			for _, block := range s.blocks {
-				dataChan <- block.Header
+				dataChan <- block.ToHeader()
 			}
 		},
 		s.requireBlockHeader,
@@ -54,7 +54,7 @@ func (s *BlockHeadersProviderSuite) validBlockHeadersArgumentsTestCases() []test
 	expectedResponses := make([]interface{}, len(s.blocks))
 	for i, b := range s.blocks {
 		var header commonmodels.BlockHeader
-		header.Build(b.Header)
+		header.Build(b.ToHeader())
 
 		expectedResponses[i] = &models.BaseDataProvidersResponse{
 			Topic:   BlockHeadersTopic,
@@ -82,14 +82,14 @@ func (s *BlockHeadersProviderSuite) validBlockHeadersArgumentsTestCases() []test
 		{
 			name: "happy path with start_block_height argument",
 			arguments: wsmodels.Arguments{
-				"start_block_height": strconv.FormatUint(s.rootBlock.Header.Height, 10),
+				"start_block_height": strconv.FormatUint(s.rootBlock.Height, 10),
 				"block_status":       parser.Finalized,
 			},
 			setupBackend: func(sub *statestreamsmock.Subscription) {
 				s.api.On(
 					"SubscribeBlockHeadersFromStartHeight",
 					mock.Anything,
-					s.rootBlock.Header.Height,
+					s.rootBlock.Height,
 					flow.BlockStatusFinalized,
 				).Return(sub).Once()
 			},

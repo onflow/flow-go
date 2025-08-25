@@ -30,10 +30,11 @@ import (
 	"github.com/onflow/flow-go-sdk/test"
 
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
-	emulator "github.com/onflow/flow-go/integration/internal/emulator"
+	"github.com/onflow/flow-go/integration/internal/emulator"
 	"github.com/onflow/flow-go/integration/internal/emulator/utils/unittest"
 	"github.com/onflow/flow-go/model/flow"
 	flowgo "github.com/onflow/flow-go/model/flow"
+	commonunittest "github.com/onflow/flow-go/utils/unittest"
 )
 
 func TestBlocks(t *testing.T) {
@@ -42,16 +43,13 @@ func TestBlocks(t *testing.T) {
 
 	store := setupStore(t)
 
-	block1 := &flowgo.Block{
-		Header: &flowgo.Header{
-			Height: 1,
-		},
-	}
-	block2 := &flowgo.Block{
-		Header: &flowgo.Header{
-			Height: 2,
-		},
-	}
+	block1 := commonunittest.BlockFixture(
+		commonunittest.Block.WithHeight(1),
+	)
+
+	block2 := commonunittest.BlockFixture(
+		commonunittest.Block.WithHeight(2),
+	)
 
 	t.Run("should return error for not found", func(t *testing.T) {
 		t.Run("BlockByID", func(t *testing.T) {
@@ -63,7 +61,7 @@ func TestBlocks(t *testing.T) {
 		})
 
 		t.Run("BlockByHeight", func(t *testing.T) {
-			_, err := store.BlockByHeight(context.Background(), block1.Header.Height)
+			_, err := store.BlockByHeight(context.Background(), block1.Height)
 			if assert.Error(t, err) {
 				assert.Equal(t, emulator.ErrNotFound, err)
 			}
@@ -88,7 +86,7 @@ func TestBlocks(t *testing.T) {
 
 	t.Run("should be able to get inserted block", func(t *testing.T) {
 		t.Run("BlockByHeight", func(t *testing.T) {
-			block, err := store.BlockByHeight(context.Background(), block1.Header.Height)
+			block, err := store.BlockByHeight(context.Background(), block1.Height)
 			assert.NoError(t, err)
 			assert.Equal(t, block1, block)
 		})
@@ -140,7 +138,7 @@ func TestCollections(t *testing.T) {
 		t.Run("should be able to get inserted collection", func(t *testing.T) {
 			storedCol, err := store.CollectionByID(context.Background(), col.ID())
 			require.NoError(t, err)
-			assert.Equal(t, col.Light(), storedCol)
+			assert.Equal(t, *col.Light(), storedCol)
 		})
 	})
 }
@@ -365,12 +363,14 @@ func TestInsertEvents(t *testing.T) {
 			events := test.EventGenerator(eventEncodingVersion)
 
 			t.Run("should be able to insert events", func(t *testing.T) {
-				event, _ := emulator.SDKEventToFlow(events.New())
-				events := []flowgo.Event{event}
+				event, err := emulator.SDKEventToFlow(events.New())
+				assert.NoError(t, err)
+
+				events := []flowgo.Event{*event}
 
 				var blockHeight uint64 = 1
 
-				err := store.InsertEvents(blockHeight, events)
+				err = store.InsertEvents(blockHeight, events)
 				assert.NoError(t, err)
 
 				t.Run("should be able to get inserted events", func(t *testing.T) {
@@ -417,13 +417,13 @@ func TestEventsByHeight(t *testing.T) {
 				// interleave events of both types
 				if i%2 == 0 {
 					event.Type = "A"
-					eventsA = append(eventsA, event)
+					eventsA = append(eventsA, *event)
 				} else {
 					event.Type = "B"
-					eventsB = append(eventsB, event)
+					eventsB = append(eventsB, *event)
 				}
 
-				allEvents[i] = event
+				allEvents[i] = *event
 			}
 
 			err := store.InsertEvents(nonEmptyBlockHeight, allEvents)

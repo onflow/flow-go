@@ -303,7 +303,6 @@ func (c *Core) processIncorporatedResult(incRes *flow.IncorporatedResult) error 
 // * exception in case of unexpected error
 // * nil - successfully processed incorporated result
 func (c *Core) ProcessIncorporatedResult(result *flow.IncorporatedResult) error {
-
 	span, _ := c.tracer.StartBlockSpan(context.Background(), result.Result.BlockID, trace.CONSealingProcessIncorporatedResult)
 	defer span.End()
 
@@ -655,7 +654,6 @@ func (c *Core) requestPendingApprovals(observation consensus.SealingObservation,
 //	     [  sealing segment       ]
 //	Z <- A <- B(RZ) <- C <- D <- E
 func (c *Core) getOutdatedBlockIDsFromRootSealingSegment(rootHeader *flow.Header) (map[flow.Identifier]struct{}, error) {
-
 	rootSealingSegment, err := c.state.AtBlockID(rootHeader.ID()).SealingSegment()
 	if err != nil {
 		return nil, fmt.Errorf("could not get root sealing segment: %w", err)
@@ -663,9 +661,9 @@ func (c *Core) getOutdatedBlockIDsFromRootSealingSegment(rootHeader *flow.Header
 
 	knownBlockIDs := make(map[flow.Identifier]struct{}) // track block IDs in the sealing segment
 	outdatedBlockIDs := make(flow.IdentifierList, 0)
-	for _, block := range rootSealingSegment.Blocks {
-		knownBlockIDs[block.ID()] = struct{}{}
-		for _, result := range block.Payload.Results {
+	for _, proposal := range rootSealingSegment.Blocks { // We iterate over the blocks in the sealing segment with increasing height.
+		knownBlockIDs[proposal.Block.ID()] = struct{}{} // Hence, we are guaranteed to encounter a block B *first* before its results if and only if B is in the sealing segment.
+		for _, result := range proposal.Block.Payload.Results {
 			_, known := knownBlockIDs[result.BlockID]
 			if !known {
 				outdatedBlockIDs = append(outdatedBlockIDs, result.BlockID)

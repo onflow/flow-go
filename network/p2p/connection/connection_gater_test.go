@@ -427,7 +427,7 @@ func ensureCommunicationSilenceAmongGroups(
 		blockTopic,
 		1,
 		func() interface{} {
-			return unittest.ProposalFixture()
+			return (*flow.UntrustedProposal)(unittest.ProposalFixture())
 		})
 	p2pfixtures.EnsureNoStreamCreationBetweenGroups(t, ctx, groupANodes, groupBNodes)
 }
@@ -437,7 +437,7 @@ func ensureCommunicationOverAllProtocols(t *testing.T, ctx context.Context, spor
 	blockTopic := channels.TopicFromChannel(channels.PushBlocks, sporkId)
 	p2ptest.TryConnectionAndEnsureConnected(t, ctx, nodes)
 	p2ptest.EnsurePubsubMessageExchange(t, ctx, nodes, blockTopic, 1, func() interface{} {
-		return unittest.ProposalFixture()
+		return (*flow.UntrustedProposal)(unittest.ProposalFixture())
 	})
 	p2pfixtures.EnsureMessageExchangeOverUnicast(t, ctx, nodes, inbounds, p2pfixtures.LongStringMessageFactoryFixture(t))
 }

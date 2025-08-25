@@ -117,7 +117,7 @@ func (s *BaseSuite) SetupTest() {
 		confs = append(confs, testnet.NewNodeConfig(flow.RoleConsensus, consensusConfigs...))
 	}
 
-	netConf := testnet.NewNetworkConfigWithEpochConfig("epochs-tests", confs, s.StakingAuctionLen, s.DKGPhaseLen, s.EpochLen, s.FinalizationSafetyThreshold)
+	netConf := testnet.NewNetworkConfigWithEpochConfig("epochs-tests", confs, s.StakingAuctionLen, s.DKGPhaseLen, s.EpochLen)
 
 	// initialize the network
 	s.Net = testnet.PrepareFlowNetwork(s.T(), netConf, flow.Localnet)

@@ -28,7 +28,7 @@ func NewCollections(db *badger.DB, transactions *Transactions) *Collections {
 func (c *Collections) Store(collection *flow.Collection) error {
 	return operation.RetryOnConflictTx(c.db, transaction.Update, func(ttx *transaction.Tx) error {
 		light := collection.Light()
-		err := transaction.WithTx(operation.SkipDuplicates(operation.InsertCollection(&light)))(ttx)
+		err := transaction.WithTx(operation.SkipDuplicates(operation.InsertCollection(light)))(ttx)
 		if err != nil {
 			return fmt.Errorf("could not insert collection: %w", err)
 		}
@@ -46,8 +46,8 @@ func (c *Collections) Store(collection *flow.Collection) error {
 
 func (c *Collections) ByID(colID flow.Identifier) (*flow.Collection, error) {
 	var (
-		light      flow.LightCollection
-		collection flow.Collection
+		light flow.LightCollection
+		txs   []*flow.TransactionBody
 	)
 
 	err := c.db.View(func(btx *badger.Txn) error {
@@ -56,13 +56,14 @@ func (c *Collections) ByID(colID flow.Identifier) (*flow.Collection, error) {
 			return fmt.Errorf("could not retrieve collection: %w", err)
 		}
 
+		txs = make([]*flow.TransactionBody, 0, len(light.Transactions))
 		for _, txID := range light.Transactions {
 			tx, err := c.transactions.ByID(txID)
 			if err != nil {
 				return fmt.Errorf("could not retrieve transaction: %w", err)
 			}
 
-			collection.Transactions = append(collection.Transactions, tx)
+			txs = append(txs, tx)
 		}
 
 		return nil
@@ -71,7 +72,12 @@ func (c *Collections) ByID(colID flow.Identifier) (*flow.Collection, error) {
 		return nil, err
 	}
 
-	return &collection, nil
+	collection, err := flow.NewCollection(flow.UntrustedCollection{Transactions: txs})
+	if err != nil {
+		return nil, fmt.Errorf("could not construct collection: %w", err)
+	}
+
+	return collection, nil
 }
 
 func (c *Collections) LightByID(colID flow.Identifier) (*flow.LightCollection, error) {

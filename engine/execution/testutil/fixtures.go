@@ -33,8 +33,7 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-func CreateContractDeploymentTransaction(contractName string, contract string, authorizer flow.Address, chain flow.Chain) *flow.TransactionBody {
-
+func CreateContractDeploymentTransaction(contractName string, contract string, authorizer flow.Address, chain flow.Chain) *flow.TransactionBodyBuilder {
 	encoded := hex.EncodeToString([]byte(contract))
 
 	script := []byte(fmt.Sprintf(`transaction {
@@ -43,18 +42,18 @@ func CreateContractDeploymentTransaction(contractName string, contract string, a
               }
             }`, contractName, encoded))
 
-	txBody := flow.NewTransactionBody().
+	txBodyBuilder := flow.NewTransactionBodyBuilder().
 		SetScript(script).
 		AddAuthorizer(authorizer).
 		AddAuthorizer(chain.ServiceAddress())
 
-	return txBody
+	return txBodyBuilder
 }
 
-func UpdateContractDeploymentTransaction(contractName string, contract string, authorizer flow.Address, chain flow.Chain) *flow.TransactionBody {
+func UpdateContractDeploymentTransaction(contractName string, contract string, authorizer flow.Address, chain flow.Chain) *flow.TransactionBodyBuilder {
 	encoded := hex.EncodeToString([]byte(contract))
 
-	return flow.NewTransactionBody().
+	return flow.NewTransactionBodyBuilder().
 		SetScript([]byte(fmt.Sprintf(`transaction {
               prepare(signer: auth(UpdateContract) &Account, service: &Account) {
                 signer.contracts.update(name: "%s", code: "%s".decodeHex())
@@ -65,10 +64,10 @@ func UpdateContractDeploymentTransaction(contractName string, contract string, a
 		AddAuthorizer(chain.ServiceAddress())
 }
 
-func UpdateContractUnathorizedDeploymentTransaction(contractName string, contract string, authorizer flow.Address) *flow.TransactionBody {
+func UpdateContractUnathorizedDeploymentTransaction(contractName string, contract string, authorizer flow.Address) *flow.TransactionBodyBuilder {
 	encoded := hex.EncodeToString([]byte(contract))
 
-	return flow.NewTransactionBody().
+	return flow.NewTransactionBodyBuilder().
 		SetScript([]byte(fmt.Sprintf(`transaction {
               prepare(signer: auth(UpdateContract) &Account) {
                 signer.contracts.update(name: "%s", code: "%s".decodeHex())
@@ -78,8 +77,8 @@ func UpdateContractUnathorizedDeploymentTransaction(contractName string, contrac
 		AddAuthorizer(authorizer)
 }
 
-func RemoveContractDeploymentTransaction(contractName string, authorizer flow.Address, chain flow.Chain) *flow.TransactionBody {
-	return flow.NewTransactionBody().
+func RemoveContractDeploymentTransaction(contractName string, authorizer flow.Address, chain flow.Chain) *flow.TransactionBodyBuilder {
+	return flow.NewTransactionBodyBuilder().
 		SetScript([]byte(fmt.Sprintf(`transaction {
               prepare(signer: auth(RemoveContract) &Account, service: &Account) {
                 signer.contracts.remove(name: "%s")
@@ -90,8 +89,8 @@ func RemoveContractDeploymentTransaction(contractName string, authorizer flow.Ad
 		AddAuthorizer(chain.ServiceAddress())
 }
 
-func RemoveContractUnathorizedDeploymentTransaction(contractName string, authorizer flow.Address) *flow.TransactionBody {
-	return flow.NewTransactionBody().
+func RemoveContractUnathorizedDeploymentTransaction(contractName string, authorizer flow.Address) *flow.TransactionBodyBuilder {
+	return flow.NewTransactionBodyBuilder().
 		SetScript([]byte(fmt.Sprintf(`transaction {
               prepare(signer: auth(RemoveContract) &Account) {
                 signer.contracts.remove(name: "%s")
@@ -101,10 +100,10 @@ func RemoveContractUnathorizedDeploymentTransaction(contractName string, authori
 		AddAuthorizer(authorizer)
 }
 
-func CreateUnauthorizedContractDeploymentTransaction(contractName string, contract string, authorizer flow.Address) *flow.TransactionBody {
+func CreateUnauthorizedContractDeploymentTransaction(contractName string, contract string, authorizer flow.Address) *flow.TransactionBodyBuilder {
 	encoded := hex.EncodeToString([]byte(contract))
 
-	return flow.NewTransactionBody().
+	return flow.NewTransactionBodyBuilder().
 		SetScript([]byte(fmt.Sprintf(`transaction {
               prepare(signer: auth(AddContract) &Account) {
                 signer.contracts.add(name: "%s", code: "%s".decodeHex())
@@ -114,8 +113,34 @@ func CreateUnauthorizedContractDeploymentTransaction(contractName string, contra
 		AddAuthorizer(authorizer)
 }
 
+func SignTransaction(
+	tx *flow.TransactionBodyBuilder,
+	address flow.Address,
+	privateKey flow.AccountPrivateKey,
+	seqNum uint64,
+) error {
+	tx.SetProposalKey(address, 0, seqNum)
+	tx.SetPayer(address)
+	return SignEnvelope(tx, address, privateKey)
+}
+
+func SignEnvelope(tx *flow.TransactionBodyBuilder, account flow.Address, privateKey flow.AccountPrivateKey) error {
+	hasher, err := utils.NewHasher(privateKey.HashAlgo)
+	if err != nil {
+		return fmt.Errorf("failed to create hasher: %w", err)
+	}
+
+	err = tx.SignEnvelope(account, 0, privateKey.PrivateKey, hasher)
+
+	if err != nil {
+		return fmt.Errorf("failed to sign transaction: %w", err)
+	}
+
+	return nil
+}
+
 func SignPayload(
-	tx *flow.TransactionBody,
+	tx *flow.TransactionBodyBuilder,
 	account flow.Address,
 	privateKey flow.AccountPrivateKey,
 ) error {
@@ -133,33 +158,7 @@ func SignPayload(
 	return nil
 }
 
-func SignEnvelope(tx *flow.TransactionBody, account flow.Address, privateKey flow.AccountPrivateKey) error {
-	hasher, err := utils.NewHasher(privateKey.HashAlgo)
-	if err != nil {
-		return fmt.Errorf("failed to create hasher: %w", err)
-	}
-
-	err = tx.SignEnvelope(account, 0, privateKey.PrivateKey, hasher)
-
-	if err != nil {
-		return fmt.Errorf("failed to sign transaction: %w", err)
-	}
-
-	return nil
-}
-
-func SignTransaction(
-	tx *flow.TransactionBody,
-	address flow.Address,
-	privateKey flow.AccountPrivateKey,
-	seqNum uint64,
-) error {
-	tx.SetProposalKey(address, 0, seqNum)
-	tx.SetPayer(address)
-	return SignEnvelope(tx, address, privateKey)
-}
-
-func SignTransactionAsServiceAccount(tx *flow.TransactionBody, seqNum uint64, chain flow.Chain) error {
+func SignTransactionAsServiceAccount(tx *flow.TransactionBodyBuilder, seqNum uint64, chain flow.Chain) error {
 	return SignTransaction(tx, chain.ServiceAddress(), unittest.ServiceAccountPrivateKey, seqNum)
 }
 
@@ -265,10 +264,17 @@ func CreateAccountsWithSimpleAddresses(
 			),
 		)
 
-		txBody := flow.NewTransactionBody().
+		txBody, err := flow.NewTransactionBodyBuilder().
 			SetScript(script).
+			SetPayer(serviceAddress).
 			AddArgument(encCadPublicKey).
-			AddAuthorizer(serviceAddress)
+			AddAuthorizer(serviceAddress).
+			Build()
+		if err != nil {
+			return snapshot.SnapshotTree{}, nil, fmt.Errorf(
+				"failed to build transaction body: %w",
+				err)
+		}
 
 		tx := fvm.Transaction(txBody, 0)
 		executionSnapshot, output, err := vm.Run(ctx, tx, snapshotTree)
@@ -357,7 +363,7 @@ func BytesToCadenceArray(l []byte) cadence.Array {
 // CreateAccountCreationTransaction creates a transaction which will create a new account.
 //
 // This function returns a randomly generated private key and the transaction.
-func CreateAccountCreationTransaction(t testing.TB, chain flow.Chain) (flow.AccountPrivateKey, *flow.TransactionBody) {
+func CreateAccountCreationTransaction(t testing.TB, chain flow.Chain) (flow.AccountPrivateKey, *flow.TransactionBodyBuilder) {
 	accountKey, err := GenerateAccountPrivateKey()
 	require.NoError(t, err)
 	encPublicKey := accountKey.PublicKey(1000).PublicKey.Encode()
@@ -386,7 +392,7 @@ func CreateAccountCreationTransaction(t testing.TB, chain flow.Chain) (flow.Acco
 	)
 
 	// create the transaction to create the account
-	tx := flow.NewTransactionBody().
+	tx := flow.NewTransactionBodyBuilder().
 		SetScript([]byte(script)).
 		AddArgument(encCadPublicKey).
 		AddAuthorizer(chain.ServiceAddress())
@@ -397,7 +403,7 @@ func CreateAccountCreationTransaction(t testing.TB, chain flow.Chain) (flow.Acco
 // CreateMultiAccountCreationTransaction creates a transaction which will create many (n) new account.
 //
 // This function returns a randomly generated private key and the transaction.
-func CreateMultiAccountCreationTransaction(t *testing.T, chain flow.Chain, n int) (flow.AccountPrivateKey, *flow.TransactionBody) {
+func CreateMultiAccountCreationTransaction(t *testing.T, chain flow.Chain, n int) (flow.AccountPrivateKey, *flow.TransactionBodyBuilder) {
 	accountKey, err := GenerateAccountPrivateKey()
 	require.NoError(t, err)
 	encPublicKey := accountKey.PublicKey(1000).PublicKey.Encode()
@@ -431,7 +437,7 @@ func CreateMultiAccountCreationTransaction(t *testing.T, chain flow.Chain, n int
 	)
 
 	// create the transaction to create the account
-	tx := flow.NewTransactionBody().
+	tx := flow.NewTransactionBodyBuilder().
 		SetScript([]byte(script)).
 		AddArgument(encCadPublicKey).
 		AddAuthorizer(chain.ServiceAddress())
@@ -441,7 +447,7 @@ func CreateMultiAccountCreationTransaction(t *testing.T, chain flow.Chain, n int
 
 // CreateAddAnAccountKeyMultipleTimesTransaction generates a tx that adds a key several times to an account.
 // this can be used to exhaust an account's storage.
-func CreateAddAnAccountKeyMultipleTimesTransaction(t *testing.T, accountKey *flow.AccountPrivateKey, counts int) *flow.TransactionBody {
+func CreateAddAnAccountKeyMultipleTimesTransaction(t *testing.T, accountKey *flow.AccountPrivateKey, counts int) *flow.TransactionBodyBuilder {
 	script := []byte(fmt.Sprintf(`
       transaction(counts: Int, key: [UInt8]) {
         prepare(signer: auth(AddKey) &Account) {
@@ -470,11 +476,12 @@ func CreateAddAnAccountKeyMultipleTimesTransaction(t *testing.T, accountKey *flo
 	arg2, err := jsoncdc.Encode(cadPublicKey)
 	require.NoError(t, err)
 
-	addKeysTx := &flow.TransactionBody{
-		Script: script,
-	}
-	addKeysTx = addKeysTx.AddArgument(arg1).AddArgument(arg2)
-	return addKeysTx
+	addKeysTxBuilder := flow.NewTransactionBodyBuilder().
+		SetScript(script).
+		AddArgument(arg1).
+		AddArgument(arg2)
+
+	return addKeysTxBuilder
 }
 
 // CreateAddAccountKeyTransaction generates a tx that adds a key to an account.
@@ -502,10 +509,9 @@ func CreateAddAccountKeyTransaction(t *testing.T, accountKey *flow.AccountPrivat
 	require.NoError(t, err)
 
 	addKeysTx := &flow.TransactionBody{
-		Script: script,
+		Script:    script,
+		Arguments: [][]byte{arg},
 	}
-	addKeysTx = addKeysTx.AddArgument(arg)
-
 	return addKeysTx
 }
 
@@ -588,8 +594,14 @@ func ComputationResultFixture(t *testing.T) *execution.ComputationResult {
 	blockExecResult := execution.NewPopulatedBlockExecutionResult(executableBlock)
 	blockExecResult.CollectionExecutionResultAt(0).AppendTransactionResults(
 		flow.EventsList{
-			unittest.EventFixture("what", 0, 0, unittest.IdentifierFixture(), 2),
-			unittest.EventFixture("ever", 0, 1, unittest.IdentifierFixture(), 22),
+			unittest.EventFixture(
+				unittest.Event.WithTransactionIndex(0),
+				unittest.Event.WithEventIndex(0),
+			),
+			unittest.EventFixture(
+				unittest.Event.WithTransactionIndex(0),
+				unittest.Event.WithEventIndex(1),
+			),
 		},
 		nil,
 		nil,
@@ -602,10 +614,22 @@ func ComputationResultFixture(t *testing.T) *execution.ComputationResult {
 	)
 	blockExecResult.CollectionExecutionResultAt(1).AppendTransactionResults(
 		flow.EventsList{
-			unittest.EventFixture("what", 2, 0, unittest.IdentifierFixture(), 2),
-			unittest.EventFixture("ever", 2, 1, unittest.IdentifierFixture(), 22),
-			unittest.EventFixture("ever", 2, 2, unittest.IdentifierFixture(), 2),
-			unittest.EventFixture("ever", 2, 3, unittest.IdentifierFixture(), 22),
+			unittest.EventFixture(
+				unittest.Event.WithTransactionIndex(2),
+				unittest.Event.WithEventIndex(0),
+			),
+			unittest.EventFixture(
+				unittest.Event.WithTransactionIndex(2),
+				unittest.Event.WithEventIndex(1),
+			),
+			unittest.EventFixture(
+				unittest.Event.WithTransactionIndex(2),
+				unittest.Event.WithEventIndex(2),
+			),
+			unittest.EventFixture(
+				unittest.Event.WithTransactionIndex(2),
+				unittest.Event.WithEventIndex(3),
+			),
 		},
 		nil,
 		nil,
@@ -616,6 +640,21 @@ func ComputationResultFixture(t *testing.T) *execution.ComputationResult {
 			MemoryUsed:      22,
 		},
 	)
+	executionReceipt := &flow.ExecutionReceipt{
+		UnsignedExecutionReceipt: flow.UnsignedExecutionReceipt{
+			ExecutorID: unittest.IdentifierFixture(),
+			ExecutionResult: flow.ExecutionResult{
+				Chunks: flow.ChunkList{
+					{EndState: unittest.StateCommitmentFixture()},
+					{EndState: unittest.StateCommitmentFixture()},
+					{EndState: unittest.StateCommitmentFixture()},
+					{EndState: unittest.StateCommitmentFixture()},
+				},
+			},
+			Spocks: unittest.SignaturesFixture(1),
+		},
+		ExecutorSignature: unittest.SignatureFixture(),
+	}
 
 	return &execution.ComputationResult{
 		BlockExecutionResult: blockExecResult,
@@ -629,16 +668,7 @@ func ComputationResultFixture(t *testing.T) *execution.ComputationResult {
 				},
 			},
 		},
-		ExecutionReceipt: &flow.ExecutionReceipt{
-			ExecutionResult: flow.ExecutionResult{
-				Chunks: flow.ChunkList{
-					{EndState: unittest.StateCommitmentFixture()},
-					{EndState: unittest.StateCommitmentFixture()},
-					{EndState: unittest.StateCommitmentFixture()},
-					{EndState: unittest.StateCommitmentFixture()},
-				},
-			},
-		},
+		ExecutionReceipt: executionReceipt,
 	}
 }
 

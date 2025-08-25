@@ -13,6 +13,7 @@ import (
 	"github.com/onflow/flow-go/fvm/meter"
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	flowgo "github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 func configureLedger(
@@ -44,12 +45,12 @@ func configureLedger(
 		}
 
 		// commit the genesis block to storage
-		genesis := flowgo.Genesis(conf.GetChainID())
+		genesis := unittest.Block.Genesis(conf.GetChainID())
 		latestBlock = *genesis
 
 		err = store.CommitBlock(
 			context.Background(),
-			*genesis,
+			genesis,
 			nil,
 			nil,
 			nil,
@@ -63,7 +64,7 @@ func configureLedger(
 
 	latestLedger, err := store.LedgerByHeight(
 		context.Background(),
-		latestBlock.Header.Height,
+		latestBlock.Height,
 	)
 
 	if err != nil {

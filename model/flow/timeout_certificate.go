@@ -1,6 +1,7 @@
 package flow
 
 import (
+	"bytes"
 	"fmt"
 
 	"github.com/onflow/crypto"
@@ -86,24 +87,34 @@ func NewTimeoutCertificate(untrusted UntrustedTimeoutCertificate) (*TimeoutCerti
 	}, nil
 }
 
+// Equals returns true if and only if receiver TimeoutCertificate is equal to the `other`. Nil values are supported.
+func (t *TimeoutCertificate) Equals(other *TimeoutCertificate) bool {
+	// Shortcut if `t` and `other` point to the same object; covers case where both are nil.
+	if t == other {
+		return true
+	}
+	if t == nil || other == nil { // only one is nil, the other not (otherwise we would have returned above)
+		return false
+	}
+	// both are not nil, so we can compare the fields
+	if len(t.NewestQCViews) != len(other.NewestQCViews) {
+		return false
+	}
+	for idx, v := range t.NewestQCViews {
+		if v != other.NewestQCViews[idx] {
+			return false
+		}
+	}
+	return (t.View == other.View) &&
+		t.NewestQC.Equals(other.NewestQC) &&
+		bytes.Equal(t.SignerIndices, other.SignerIndices) &&
+		bytes.Equal(t.SigData, other.SigData)
+}
+
 // ID returns the TimeoutCertificate's identifier
 func (t *TimeoutCertificate) ID() Identifier {
 	if t == nil {
 		return ZeroID
 	}
-
-	body := struct {
-		View          uint64
-		NewestQCViews []uint64
-		NewestQCID    Identifier
-		SignerIndices []byte
-		SigData       crypto.Signature
-	}{
-		View:          t.View,
-		NewestQCViews: t.NewestQCViews,
-		NewestQCID:    t.NewestQC.ID(),
-		SignerIndices: t.SignerIndices,
-		SigData:       t.SigData,
-	}
-	return MakeID(body)
+	return MakeID(t)
 }

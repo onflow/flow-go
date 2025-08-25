@@ -20,7 +20,6 @@ func TestEventConversion(t *testing.T) {
 	chainID := flow.Emulator
 
 	t.Run("epoch setup", func(t *testing.T) {
-
 		fixture, expected := unittest.EpochSetupFixtureByChainID(chainID)
 
 		// convert Cadence types to Go types
@@ -255,10 +254,12 @@ func TestVersionBeaconEventConversion(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			events := systemcontracts.ServiceEventsForChain(chainID)
 
-			var err error
-			event := unittest.EventFixture(events.VersionBeacon.EventType(), 1, 1, unittest.IdentifierFixture(), 0)
-			event.Payload, err = ccf.Encode(test.event)
+			payload, err := ccf.Encode(test.event)
 			require.NoError(t, err)
+			event := unittest.EventFixture(
+				unittest.Event.WithEventType(events.VersionBeacon.EventType()),
+				unittest.Event.WithPayload(payload),
+			)
 
 			// convert Cadence types to Go types
 			serviceEvent, err := convert.ServiceEvent(chainID, event)

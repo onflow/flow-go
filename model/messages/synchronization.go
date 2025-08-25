@@ -1,6 +1,8 @@
 package messages
 
 import (
+	"fmt"
+
 	"github.com/onflow/flow-go/model/cluster"
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -50,30 +52,40 @@ type BatchRequest struct {
 // that should correspond to the request.
 type BlockResponse struct {
 	Nonce  uint64
-	Blocks []UntrustedBlock
+	Blocks []flow.UntrustedProposal
 }
 
-func (br *BlockResponse) BlocksInternal() []*flow.Block {
-	internal := make([]*flow.Block, len(br.Blocks))
-	for i, block := range br.Blocks {
-		block := block
-		internal[i] = block.ToInternal()
+// BlocksInternal converts all untrusted block proposals in the BlockResponse
+// into trusted flow.Proposal instances.
+//
+// All errors indicate that the input message could not be converted to a valid proposal.
+func (br *BlockResponse) BlocksInternal() ([]*flow.Proposal, error) {
+	internal := make([]*flow.Proposal, len(br.Blocks))
+	for i, untrusted := range br.Blocks {
+		proposal, err := flow.NewProposal(untrusted)
+		if err != nil {
+			return nil, fmt.Errorf("could not build proposal: %w", err)
+		}
+		internal[i] = proposal
 	}
-	return internal
+	return internal, nil
 }
 
 // ClusterBlockResponse is the same thing as BlockResponse, but for cluster
 // consensus.
 type ClusterBlockResponse struct {
 	Nonce  uint64
-	Blocks []UntrustedClusterBlock
+	Blocks []cluster.UntrustedProposal
 }
 
-func (br *ClusterBlockResponse) BlocksInternal() []*cluster.Block {
-	internal := make([]*cluster.Block, len(br.Blocks))
-	for i, block := range br.Blocks {
-		block := block
-		internal[i] = block.ToInternal()
+func (br *ClusterBlockResponse) BlocksInternal() ([]*cluster.Proposal, error) {
+	internal := make([]*cluster.Proposal, len(br.Blocks))
+	for i, untrusted := range br.Blocks {
+		proposal, err := cluster.NewProposal(untrusted)
+		if err != nil {
+			return nil, fmt.Errorf("could not build proposal: %w", err)
+		}
+		internal[i] = proposal
 	}
-	return internal
+	return internal, nil
 }

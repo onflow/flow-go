@@ -44,7 +44,7 @@ func ExportBlocks(blockID flow.Identifier, dbPath string, outputPath string) (fl
 	cacheMetrics := &metrics.NoopCollector{}
 	headers := badger.NewHeaders(cacheMetrics, db)
 	index := badger.NewIndex(cacheMetrics, db)
-	guarantees := badger.NewGuarantees(cacheMetrics, db, badger.DefaultCacheSize)
+	guarantees := badger.NewGuarantees(cacheMetrics, db, badger.DefaultCacheSize, badger.DefaultCacheSize)
 	seals := badger.NewSeals(cacheMetrics, db)
 	results := badger.NewExecutionResults(cacheMetrics, db)
 	receipts := badger.NewExecutionReceipts(cacheMetrics, db, results, badger.DefaultCacheSize)
@@ -98,7 +98,7 @@ func ExportBlocks(blockID flow.Identifier, dbPath string, outputPath string) (fl
 			ParentVoterIndices: hex.EncodeToString(header.ParentVoterIndices),
 			ParentVoterSigData: hex.EncodeToString(header.ParentVoterSigData),
 			ProposerID:         hex.EncodeToString(header.ProposerID[:]),
-			Timestamp:          header.Timestamp,
+			Timestamp:          time.UnixMilli(int64(header.Timestamp)).UTC(),
 			CollectionIDs:      cols,
 			SealedBlocks:       seals,
 			SealedResults:      sealsResults,

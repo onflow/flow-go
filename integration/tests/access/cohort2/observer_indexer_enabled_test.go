@@ -677,7 +677,7 @@ func (s *ObserverIndexerEnabledSuite) getRestEndpoints() []RestEndpointTest {
 			name:   "createTransaction",
 			method: http.MethodPost,
 			path:   "/transactions",
-			body:   createTx(s.net),
+			body:   createTx(s.T(), s.net),
 		},
 		{
 			name:   "getTransactionResultByID",

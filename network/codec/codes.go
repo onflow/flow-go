@@ -3,6 +3,7 @@ package codec
 import (
 	"fmt"
 
+	"github.com/onflow/flow-go/model/cluster"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/libp2p/message"
 	"github.com/onflow/flow-go/model/messages"
@@ -70,7 +71,7 @@ func MessageCodeFromInterface(v interface{}) (MessageCode, string, error) {
 	s := what(v)
 	switch v.(type) {
 	// consensus
-	case *messages.BlockProposal:
+	case *flow.UntrustedProposal:
 		return CodeBlockProposal, s, nil
 	case *messages.BlockVote:
 		return CodeBlockVote, s, nil
@@ -78,7 +79,7 @@ func MessageCodeFromInterface(v interface{}) (MessageCode, string, error) {
 		return CodeTimeoutObject, s, nil
 
 	// cluster consensus
-	case *messages.ClusterBlockProposal:
+	case *cluster.UntrustedProposal:
 		return CodeClusterBlockProposal, s, nil
 	case *messages.ClusterBlockVote:
 		return CodeClusterBlockVote, s, nil
@@ -152,7 +153,7 @@ func InterfaceFromMessageCode(code MessageCode) (interface{}, string, error) {
 	switch code {
 	// consensus
 	case CodeBlockProposal:
-		return &messages.BlockProposal{}, what(&messages.BlockProposal{}), nil
+		return &flow.UntrustedProposal{}, what(&flow.UntrustedProposal{}), nil
 	case CodeBlockVote:
 		return &messages.BlockVote{}, what(&messages.BlockVote{}), nil
 	case CodeTimeoutObject:
@@ -160,7 +161,7 @@ func InterfaceFromMessageCode(code MessageCode) (interface{}, string, error) {
 
 	// cluster consensus
 	case CodeClusterBlockProposal:
-		return &messages.ClusterBlockProposal{}, what(&messages.ClusterBlockProposal{}), nil
+		return &cluster.UntrustedProposal{}, what(&cluster.UntrustedProposal{}), nil
 	case CodeClusterBlockVote:
 		return &messages.ClusterBlockVote{}, what(&messages.ClusterBlockVote{}), nil
 	case CodeClusterBlockResponse:
@@ -182,15 +183,18 @@ func InterfaceFromMessageCode(code MessageCode) (interface{}, string, error) {
 
 	// collections, guarantees & transactions
 	case CodeCollectionGuarantee:
-		return &flow.CollectionGuarantee{}, what(&flow.CollectionGuarantee{}), nil
+		var guarantee flow.CollectionGuarantee
+		return &guarantee, what(&guarantee), nil
 	case CodeTransactionBody:
-		return &flow.TransactionBody{}, what(&flow.TransactionBody{}), nil
+		var transactionBody flow.TransactionBody
+		return &transactionBody, what(&transactionBody), nil
 	case CodeTransaction:
-		return &flow.Transaction{}, what(&flow.Transaction{}), nil
+		var transaction flow.Transaction
+		return &transaction, what(&transaction), nil
 
 	// core messages for execution & verification
 	case CodeExecutionReceipt:
-		return &flow.ExecutionReceipt{}, what(&flow.ExecutionReceipt{}), nil
+		return new(flow.ExecutionReceipt), what(new(flow.ExecutionReceipt)), nil
 	case CodeResultApproval:
 		var approval flow.ResultApproval
 		return &approval, what(&approval), nil

@@ -1369,7 +1369,7 @@ func (h *Handler) SubscribeBlockDigestsFromLatest(request *accessproto.Subscribe
 func (h *Handler) handleBlockDigestsResponse(send sendSubscribeBlockDigestsResponseFunc) func(*flow.BlockDigest) error {
 	return func(blockDigest *flow.BlockDigest) error {
 		err := send(&accessproto.SubscribeBlockDigestsResponse{
-			BlockId:        convert.IdentifierToMessage(blockDigest.ID()),
+			BlockId:        convert.IdentifierToMessage(blockDigest.BlockID),
 			BlockHeight:    blockDigest.Height,
 			BlockTimestamp: timestamppb.New(blockDigest.Timestamp),
 		})
@@ -1458,7 +1458,7 @@ func (h *Handler) blockResponse(block *flow.Block, fullResponse bool, status flo
 		return nil, err
 	}
 
-	signerIDs, err := h.signerIndicesDecoder.DecodeSignerIDs(block.Header)
+	signerIDs, err := h.signerIndicesDecoder.DecodeSignerIDs(block.ToHeader())
 	if err != nil {
 		return nil, err // the block was retrieved from local storage - so no errors are expected
 	}

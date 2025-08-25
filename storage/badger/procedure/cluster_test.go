@@ -16,14 +16,14 @@ func TestInsertRetrieveClusterBlock(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 		block := unittest.ClusterBlockFixture()
 
-		err := db.Update(InsertClusterBlock(&block))
+		err := db.Update(InsertClusterBlock(unittest.ClusterProposalFromBlock(block)))
 		require.NoError(t, err)
 
 		var retrieved cluster.Block
-		err = db.View(RetrieveClusterBlock(block.Header.ID(), &retrieved))
+		err = db.View(RetrieveClusterBlock(block.ID(), &retrieved))
 		require.NoError(t, err)
 
-		require.Equal(t, block, retrieved)
+		require.Equal(t, *block, retrieved)
 	})
 }
 
@@ -31,27 +31,29 @@ func TestFinalizeClusterBlock(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 		parent := unittest.ClusterBlockFixture()
 
-		block := unittest.ClusterBlockWithParent(&parent)
+		block := unittest.ClusterBlockFixture(
+			unittest.ClusterBlock.WithParent(parent),
+		)
 
-		err := db.Update(InsertClusterBlock(&block))
+		err := db.Update(InsertClusterBlock(unittest.ClusterProposalFromBlock(block)))
 		require.NoError(t, err)
 
-		err = db.Update(operation.IndexClusterBlockHeight(block.Header.ChainID, parent.Header.Height, parent.ID()))
+		err = db.Update(operation.IndexClusterBlockHeight(block.ChainID, parent.Height, parent.ID()))
 		require.NoError(t, err)
 
-		err = db.Update(operation.InsertClusterFinalizedHeight(block.Header.ChainID, parent.Header.Height))
+		err = db.Update(operation.InsertClusterFinalizedHeight(block.ChainID, parent.Height))
 		require.NoError(t, err)
 
-		err = db.Update(FinalizeClusterBlock(block.Header.ID()))
+		err = db.Update(FinalizeClusterBlock(block.ID()))
 		require.NoError(t, err)
 
 		var boundary uint64
-		err = db.View(operation.RetrieveClusterFinalizedHeight(block.Header.ChainID, &boundary))
+		err = db.View(operation.RetrieveClusterFinalizedHeight(block.ChainID, &boundary))
 		require.NoError(t, err)
-		require.Equal(t, block.Header.Height, boundary)
+		require.Equal(t, block.Height, boundary)
 
 		var headID flow.Identifier
-		err = db.View(operation.LookupClusterBlockHeight(block.Header.ChainID, boundary, &headID))
+		err = db.View(operation.LookupClusterBlockHeight(block.ChainID, boundary, &headID))
 		require.NoError(t, err)
 		require.Equal(t, block.ID(), headID)
 	})

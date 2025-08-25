@@ -181,7 +181,7 @@ func (s *GrpcStateStreamSuite) TestHappyPath() {
 	// Let the network run for this many blocks
 	blockCount := uint64(5)
 	// wait for the requested number of sealed blocks
-	s.BlockState.WaitForSealedHeight(s.T(), blockA.Header.Height+blockCount)
+	s.BlockState.WaitForSealedHeight(s.T(), blockA.Height+blockCount)
 
 	txGenerator, err := s.net.ContainerByName(testnet.PrimaryAN).TestnetClient()
 	s.Require().NoError(err)
@@ -194,7 +194,7 @@ func (s *GrpcStateStreamSuite) TestHappyPath() {
 			if rpc.name == "SubscribeEventsFromStartBlockID" {
 				startValue = convert.IdentifierToMessage(blockA.ID())
 			} else {
-				startValue = blockA.Header.Height
+				startValue = blockA.Height
 			}
 
 			testANRecv := rpc.call(s.ctx, sdkClientTestAN, startValue, &executiondata.EventFilter{})
@@ -421,7 +421,10 @@ func (r *ResponseTracker[T]) Add(t *testing.T, blockHeight uint64, name string, 
 }
 
 func eventsResponseHandler(msg *executiondata.SubscribeEventsResponse) (*SubscribeEventsResponse, error) {
-	events := convert.MessagesToEvents(msg.GetEvents())
+	events, err := convert.MessagesToEvents(msg.GetEvents())
+	if err != nil {
+		return nil, err
+	}
 
 	return &SubscribeEventsResponse{
 		EventsResponse: backend.EventsResponse{

@@ -64,7 +64,7 @@ func (b *backendBlockDetails) GetBlockByID(ctx context.Context, id flow.Identifi
 		return nil, flow.BlockStatusUnknown, rpc.ConvertStorageError(err)
 	}
 
-	status, err := b.getBlockStatus(block.Header)
+	status, err := b.getBlockStatus(block.ToHeader())
 	if err != nil {
 		// Any error returned is an indication of a bug or state corruption. we must not continue processing.
 		err = irrecoverable.NewException(err)
@@ -80,12 +80,13 @@ func (b *backendBlockDetails) GetBlockByHeight(ctx context.Context, height uint6
 		return nil, flow.BlockStatusUnknown, rpc.ConvertStorageError(common.ResolveHeightError(b.state.Params(), height, err))
 	}
 
-	status, err := b.getBlockStatus(block.Header)
+	status, err := b.getBlockStatus(block.ToHeader())
 	if err != nil {
 		// Any error returned is an indication of a bug or state corruption. we must not continue processing.
 		err = irrecoverable.NewException(err)
 		irrecoverable.Throw(ctx, err)
 		return nil, flow.BlockStatusUnknown, err
 	}
+
 	return block, status, nil
 }

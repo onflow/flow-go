@@ -24,7 +24,8 @@ func TestEntityExpirySnapshotValidation(t *testing.T) {
 	})
 	t.Run("not-enough-history", func(t *testing.T) {
 		rootSnapshot := unittest.RootSnapshotFixture(participants)
-		rootSnapshot.Encodable().Head().Height += 10 // advance height to be not spork root snapshot
+		blockLen := len(rootSnapshot.Encodable().SealingSegment.Blocks)
+		rootSnapshot.Encodable().SealingSegment.Blocks[blockLen-1].Block.Height += 10 // advance height to be not spork root snapshot
 		err := ValidRootSnapshotContainsEntityExpiryRange(rootSnapshot)
 		require.Error(t, err)
 	})
@@ -33,7 +34,7 @@ func TestEntityExpirySnapshotValidation(t *testing.T) {
 		// advance height to be not spork root snapshot, but still lower than transaction expiry
 		rootSnapshot.Encodable().Head().Height += flow.DefaultTransactionExpiry / 2
 		// add blocks to sealing segment
-		rootSnapshot.Encodable().SealingSegment.ExtraBlocks = unittest.BlockFixtures(int(flow.DefaultTransactionExpiry / 2))
+		rootSnapshot.Encodable().SealingSegment.ExtraBlocks = unittest.ProposalFixtures(int(flow.DefaultTransactionExpiry / 2))
 		err := ValidRootSnapshotContainsEntityExpiryRange(rootSnapshot)
 		require.NoError(t, err)
 	})
@@ -42,7 +43,7 @@ func TestEntityExpirySnapshotValidation(t *testing.T) {
 		// advance height to be not spork root snapshot
 		rootSnapshot.Encodable().Head().Height += flow.DefaultTransactionExpiry * 2
 		// add blocks to sealing segment
-		rootSnapshot.Encodable().SealingSegment.ExtraBlocks = unittest.BlockFixtures(int(flow.DefaultTransactionExpiry) - 1)
+		rootSnapshot.Encodable().SealingSegment.ExtraBlocks = unittest.ProposalFixtures(int(flow.DefaultTransactionExpiry) - 1)
 		err := ValidRootSnapshotContainsEntityExpiryRange(rootSnapshot)
 		require.NoError(t, err)
 	})
@@ -51,7 +52,7 @@ func TestEntityExpirySnapshotValidation(t *testing.T) {
 		// advance height to be not spork root snapshot
 		rootSnapshot.Encodable().Head().Height += flow.DefaultTransactionExpiry * 2
 		// add blocks to sealing segment
-		rootSnapshot.Encodable().SealingSegment.ExtraBlocks = unittest.BlockFixtures(flow.DefaultTransactionExpiry * 2)
+		rootSnapshot.Encodable().SealingSegment.ExtraBlocks = unittest.ProposalFixtures(flow.DefaultTransactionExpiry * 2)
 		err := ValidRootSnapshotContainsEntityExpiryRange(rootSnapshot)
 		require.NoError(t, err)
 	})
@@ -68,8 +69,9 @@ func TestValidateVersionBeacon(t *testing.T) {
 	})
 	t.Run("valid version beacon is ok", func(t *testing.T) {
 		snap := new(mock.Snapshot)
-		block := unittest.BlockFixture()
-		block.Header.Height = 100
+		block := unittest.BlockFixture(
+			unittest.Block.WithHeight(100),
+		)
 
 		vb := &flow.SealedVersionBeacon{
 			VersionBeacon: &flow.VersionBeacon{
@@ -84,7 +86,7 @@ func TestValidateVersionBeacon(t *testing.T) {
 			SealHeight: uint64(37),
 		}
 
-		snap.On("Head").Return(block.Header, nil)
+		snap.On("Head").Return(block.ToHeader(), nil)
 		snap.On("VersionBeacon").Return(vb, nil)
 
 		err := validateVersionBeacon(snap)
@@ -92,8 +94,9 @@ func TestValidateVersionBeacon(t *testing.T) {
 	})
 	t.Run("height must be below highest block", func(t *testing.T) {
 		snap := new(mock.Snapshot)
-		block := unittest.BlockFixture()
-		block.Header.Height = 12
+		block := unittest.BlockFixture(
+			unittest.Block.WithHeight(12),
+		)
 
 		vb := &flow.SealedVersionBeacon{
 			VersionBeacon: &flow.VersionBeacon{
@@ -108,7 +111,7 @@ func TestValidateVersionBeacon(t *testing.T) {
 			SealHeight: uint64(37),
 		}
 
-		snap.On("Head").Return(block.Header, nil)
+		snap.On("Head").Return(block.ToHeader(), nil)
 		snap.On("VersionBeacon").Return(vb, nil)
 
 		err := validateVersionBeacon(snap)
@@ -117,8 +120,9 @@ func TestValidateVersionBeacon(t *testing.T) {
 	})
 	t.Run("version beacon must be valid", func(t *testing.T) {
 		snap := new(mock.Snapshot)
-		block := unittest.BlockFixture()
-		block.Header.Height = 12
+		block := unittest.BlockFixture(
+			unittest.Block.WithHeight(12),
+		)
 
 		vb := &flow.SealedVersionBeacon{
 			VersionBeacon: &flow.VersionBeacon{
@@ -133,7 +137,7 @@ func TestValidateVersionBeacon(t *testing.T) {
 			SealHeight: uint64(1),
 		}
 
-		snap.On("Head").Return(block.Header, nil)
+		snap.On("Head").Return(block.ToHeader(), nil)
 		snap.On("VersionBeacon").Return(vb, nil)
 
 		err := validateVersionBeacon(snap)

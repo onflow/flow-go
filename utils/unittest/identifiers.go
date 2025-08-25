@@ -1,4 +1,4 @@
-package generator
+package unittest
 
 import "github.com/onflow/flow-go/model/flow"
 

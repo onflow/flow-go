@@ -5,13 +5,13 @@ import (
 	"github.com/onflow/flow-go/storage"
 )
 
-// InsertExecutionReceiptMeta inserts an execution receipt meta by ID.
-func InsertExecutionReceiptMeta(w storage.Writer, receiptID flow.Identifier, meta *flow.ExecutionReceiptMeta) error {
+// InsertExecutionReceiptStub inserts an execution receipt meta by ID.
+func InsertExecutionReceiptStub(w storage.Writer, receiptID flow.Identifier, meta *flow.ExecutionReceiptStub) error {
 	return UpsertByKey(w, MakePrefix(codeExecutionReceiptMeta, receiptID), meta)
 }
 
-// RetrieveExecutionReceiptMeta retrieves a execution receipt meta by ID.
-func RetrieveExecutionReceiptMeta(r storage.Reader, receiptID flow.Identifier, meta *flow.ExecutionReceiptMeta) error {
+// RetrieveExecutionReceiptStub retrieves a execution receipt meta by ID.
+func RetrieveExecutionReceiptStub(r storage.Reader, receiptID flow.Identifier, meta *flow.ExecutionReceiptStub) error {
 	return RetrieveByKey(r, MakePrefix(codeExecutionReceiptMeta, receiptID), meta)
 }
 

@@ -13,12 +13,12 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-// TestMessageEntity_InspectRPCRequest_ID tests that the ID of a MessageEntity created from an InspectRPCRequest is
+// TestMessage_InspectRPCRequest_Key tests that the key for an engine.Message created from an InspectRPCRequest is
 // only dependent of the Nonce and PeerID fields of the InspectRPCRequest; and is independent of the RPC field.
 // Unique identifier for the HeroCache is imperative to prevent false-positive de-duplication.
-// However, the RPC field contains a bulk of the data in the InspectRPCRequest, and including it in the ID would
+// However, the RPC field contains a bulk of the data in the InspectRPCRequest, and including it in the key would
 // cause the InspectRPCRequest store and retrieval to be resource intensive.
-func TestMessageEntity_InspectRPCRequest_ID(t *testing.T) {
+func TestMessage_InspectRPCRequest_Key(t *testing.T) {
 	rpcs := p2ptest.GossipSubRpcFixtures(t, 2)
 	rpc1 := rpcs[0]
 	rpc2 := rpcs[1]
@@ -45,13 +45,12 @@ func TestMessageEntity_InspectRPCRequest_ID(t *testing.T) {
 	require.NoError(t, err)
 	req3.Nonce = req1.Nonce
 
-	// now convert to MessageEntity
-	entity1 := queue.NewMessageEntity(&engine.Message{Payload: req1})
-	entity2 := queue.NewMessageEntity(&engine.Message{Payload: req2})
-	entity3 := queue.NewMessageEntity(&engine.Message{Payload: req3})
+	message1 := &engine.Message{Payload: req1}
+	message2 := &engine.Message{Payload: req2}
+	message3 := &engine.Message{Payload: req3}
 
-	// as the Nonce and PeerID fields are the same, the ID of the MessageEntity should be the same accross all three
-	// in other words, the RPC field should not affect the ID
-	require.Equal(t, entity1.ID(), entity2.ID())
-	require.Equal(t, entity1.ID(), entity3.ID())
+	// as the Nonce and PeerID fields are the same, the key of the Message should be the same across all three
+	// in other words, the RPC field should not affect the key
+	require.Equal(t, queue.IdentifierOfMessage(message1), queue.IdentifierOfMessage(message2))
+	require.Equal(t, queue.IdentifierOfMessage(message1), queue.IdentifierOfMessage(message3))
 }

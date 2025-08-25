@@ -50,14 +50,14 @@ func NewMockBlockStore(t *testing.T) *MockBlockStore {
 	return &MockBlockStore{
 		ResultByBlock: byBlock,
 		Executed:      executed,
-		RootBlock:     rootBlock.Block.Header,
+		RootBlock:     rootBlock.Block.ToHeader(),
 	}
 }
 
 func (bs *MockBlockStore) MarkExecuted(computationResult *execution.ComputationResult) error {
 	bs.Lock()
 	defer bs.Unlock()
-	blockID := computationResult.ExecutableBlock.Block.Header.ID()
+	blockID := computationResult.ExecutableBlock.Block.ID()
 	_, executed := bs.Executed[blockID]
 	if executed {
 		return fmt.Errorf("block %s already executed", blockID)
@@ -78,11 +78,11 @@ func (bs *MockBlockStore) MarkExecuted(computationResult *execution.ComputationR
 func (bs *MockBlockStore) CreateBlockAndMockResult(t *testing.T, block *entity.ExecutableBlock) *execution.ComputationResult {
 	bs.Lock()
 	defer bs.Unlock()
-	blockID := block.ID()
+	blockID := block.BlockID()
 	_, exist := bs.ResultByBlock[blockID]
 	require.False(t, exist, "block %s already exists", blockID)
 
-	parent := block.Block.Header.ParentID
+	parent := block.Block.ParentID
 	parentResult, ok := bs.ResultByBlock[parent]
 	require.True(t, ok, "parent block %s not found", parent)
 

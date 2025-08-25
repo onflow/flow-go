@@ -6,57 +6,37 @@ import (
 )
 
 type PendingClusterBlocks struct {
-	backend *backend
+	backend *backend[*cluster.Proposal]
 }
 
 func NewPendingClusterBlocks() *PendingClusterBlocks {
-	b := &PendingClusterBlocks{backend: newBackend()}
+	b := &PendingClusterBlocks{backend: newBackend[*cluster.Proposal]()}
 	return b
 }
 
-func (b *PendingClusterBlocks) Add(block flow.Slashable[*cluster.Block]) bool {
-	return b.backend.add(flow.Slashable[*flow.Header]{
-		OriginID: flow.Identifier{},
-		Message:  block.Message.Header,
-	}, block.Message.Payload)
+func (b *PendingClusterBlocks) Add(block flow.Slashable[*cluster.Proposal]) bool {
+	return b.backend.add(block)
 }
 
-func (b *PendingClusterBlocks) ByID(blockID flow.Identifier) (flow.Slashable[*cluster.Block], bool) {
+func (b *PendingClusterBlocks) ByID(blockID flow.Identifier) (flow.Slashable[*cluster.Proposal], bool) {
 	item, ok := b.backend.byID(blockID)
 	if !ok {
-		return flow.Slashable[*cluster.Block]{}, false
+		return flow.Slashable[*cluster.Proposal]{}, false
 	}
-
-	block := flow.Slashable[*cluster.Block]{
-		OriginID: item.header.OriginID,
-		Message: &cluster.Block{
-			Header:  item.header.Message,
-			Payload: item.payload.(*cluster.Payload),
-		},
-	}
-
-	return block, true
+	return item.block, true
 }
 
-func (b *PendingClusterBlocks) ByParentID(parentID flow.Identifier) ([]flow.Slashable[*cluster.Block], bool) {
+func (b *PendingClusterBlocks) ByParentID(parentID flow.Identifier) ([]flow.Slashable[*cluster.Proposal], bool) {
 	items, ok := b.backend.byParentID(parentID)
 	if !ok {
 		return nil, false
 	}
 
-	blocks := make([]flow.Slashable[*cluster.Block], 0, len(items))
+	proposals := make([]flow.Slashable[*cluster.Proposal], 0, len(items))
 	for _, item := range items {
-		block := flow.Slashable[*cluster.Block]{
-			OriginID: item.header.OriginID,
-			Message: &cluster.Block{
-				Header:  item.header.Message,
-				Payload: item.payload.(*cluster.Payload),
-			},
-		}
-		blocks = append(blocks, block)
+		proposals = append(proposals, item.block)
 	}
-
-	return blocks, true
+	return proposals, true
 }
 
 func (b *PendingClusterBlocks) DropForParent(parentID flow.Identifier) {

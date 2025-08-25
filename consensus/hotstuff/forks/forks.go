@@ -44,7 +44,7 @@ func New(trustedRoot *model.CertifiedBlock, finalizationCallback module.Finalize
 	// verify and add root block to levelled forest
 	err := forks.EnsureBlockIsValidExtension(trustedRoot.Block)
 	if err != nil {
-		return nil, fmt.Errorf("invalid root block %v: %w", trustedRoot.ID(), err)
+		return nil, fmt.Errorf("invalid root block %v: %w", trustedRoot.BlockID(), err)
 	}
 	forks.forest.AddVertex(ToBlockContainer2(trustedRoot.Block))
 	return &forks, nil
@@ -74,7 +74,7 @@ func (f *Forks) FinalityProof() (*hotstuff.FinalityProof, bool) {
 	return f.finalityProof, f.finalityProof != nil
 }
 
-// GetBlock returns (BlockProposal, true) if the block with the specified
+// GetBlock returns (*model.Block, true) if the block with the specified
 // id was found and (nil, false) otherwise.
 func (f *Forks) GetBlock(blockID flow.Identifier) (*model.Block, bool) {
 	blockContainer, hasBlock := f.forest.GetVertex(blockID)

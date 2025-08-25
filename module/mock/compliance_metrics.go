@@ -13,12 +13,12 @@ type ComplianceMetrics struct {
 }
 
 // BlockFinalized provides a mock function with given fields: _a0
-func (_m *ComplianceMetrics) BlockFinalized(_a0 *flow.Block) {
+func (_m *ComplianceMetrics) BlockFinalized(_a0 *flow.GenericBlock[flow.Payload]) {
 	_m.Called(_a0)
 }
 
 // BlockSealed provides a mock function with given fields: _a0
-func (_m *ComplianceMetrics) BlockSealed(_a0 *flow.Block) {
+func (_m *ComplianceMetrics) BlockSealed(_a0 *flow.GenericBlock[flow.Payload]) {
 	_m.Called(_a0)
 }
 

@@ -121,7 +121,7 @@ func TestGenerateAuthorizationFixes(t *testing.T) {
       }
     `
 
-	deployTX := flow.NewTransactionBody().
+	deployTX, err := flow.NewTransactionBodyBuilder().
 		SetScript([]byte(`
           transaction(code: String) {
               prepare(signer: auth(Contracts) &Account) {
@@ -130,7 +130,9 @@ func TestGenerateAuthorizationFixes(t *testing.T) {
           }
         `)).
 		AddAuthorizer(address).
-		AddArgument(jsoncdc.MustEncode(cadence.String(contractCode)))
+		AddArgument(jsoncdc.MustEncode(cadence.String(contractCode))).
+		Build()
+	require.NoError(t, err)
 
 	runDeployTx := migrations.NewTransactionBasedMigration(
 		deployTX,
@@ -141,7 +143,7 @@ func TestGenerateAuthorizationFixes(t *testing.T) {
 	err = runDeployTx(registersByAccount)
 	require.NoError(t, err)
 
-	setupTx := flow.NewTransactionBody().
+	setupTx, err := flow.NewTransactionBodyBuilder().
 		SetScript([]byte(fmt.Sprintf(`
               import Test from %s
 
@@ -182,7 +184,9 @@ func TestGenerateAuthorizationFixes(t *testing.T) {
             `,
 			address.HexWithPrefix(),
 		))).
-		AddAuthorizer(address)
+		AddAuthorizer(address).
+		Build()
+	require.NoError(t, err)
 
 	runSetupTx := migrations.NewTransactionBasedMigration(
 		setupTx,

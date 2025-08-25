@@ -54,12 +54,12 @@ func (suite *ExecutionDataReaderSuite) SetupTest() {
 	parent := unittest.BlockHeaderFixture(unittest.WithHeaderHeight(1))
 	suite.block = unittest.BlockWithParentFixture(parent)
 	suite.blocksByHeight = map[uint64]*flow.Block{
-		suite.block.Header.Height: suite.block,
+		suite.block.Height: suite.block,
 	}
 
 	suite.executionData = unittest.BlockExecutionDataFixture(unittest.WithBlockExecutionDataBlockID(suite.block.ID()))
 
-	suite.highestAvailableHeight = func() uint64 { return suite.block.Header.Height + 1 }
+	suite.highestAvailableHeight = func() uint64 { return suite.block.Height + 1 }
 
 	suite.reset()
 }
@@ -141,7 +141,7 @@ func (suite *ExecutionDataReaderSuite) TestAtIndex() {
 
 			edEntity := execution_data.NewBlockExecutionDataEntity(suite.executionDataID, ed)
 
-			job, err := suite.reader.AtIndex(suite.block.Header.Height)
+			job, err := suite.reader.AtIndex(suite.block.Height)
 			require.NoError(suite.T(), err)
 
 			entry, err := JobToBlockEntry(job)
@@ -158,7 +158,7 @@ func (suite *ExecutionDataReaderSuite) TestAtIndex() {
 			expectedErr := errors.New("expected error: get failed")
 			setExecutionDataGet(nil, expectedErr)
 
-			job, err := suite.reader.AtIndex(suite.block.Header.Height)
+			job, err := suite.reader.AtIndex(suite.block.Height)
 			assert.Nil(suite.T(), job, "job should be nil")
 			assert.ErrorIs(suite.T(), err, expectedErr)
 		})
@@ -168,7 +168,7 @@ func (suite *ExecutionDataReaderSuite) TestAtIndex() {
 		suite.reset()
 		suite.runTest(func() {
 			// search for an index that doesn't have a header in storage
-			job, err := suite.reader.AtIndex(suite.block.Header.Height + 1)
+			job, err := suite.reader.AtIndex(suite.block.Height + 1)
 			assert.Nil(suite.T(), job, "job should be nil")
 			assert.ErrorIs(suite.T(), err, storage.ErrNotFound)
 		})
@@ -178,10 +178,10 @@ func (suite *ExecutionDataReaderSuite) TestAtIndex() {
 		suite.reset()
 		suite.runTest(func() {
 			// add a new block without an execution result
-			newBlock := unittest.BlockWithParentFixture(suite.block.Header)
-			suite.blocksByHeight[newBlock.Header.Height] = newBlock
+			newBlock := unittest.BlockWithParentFixture(suite.block.ToHeader())
+			suite.blocksByHeight[newBlock.Height] = newBlock
 
-			job, err := suite.reader.AtIndex(newBlock.Header.Height)
+			job, err := suite.reader.AtIndex(newBlock.Height)
 			assert.Nil(suite.T(), job, "job should be nil")
 			assert.ErrorIs(suite.T(), err, storage.ErrNotFound)
 		})

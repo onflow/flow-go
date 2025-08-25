@@ -434,8 +434,7 @@ func ConsensusNode(t *testing.T, hub *stub.Hub, identity bootstrap.NodeInfo, ide
 	resultsDB := store.NewExecutionResults(node.Metrics, db)
 	receiptsDB := store.NewExecutionReceipts(node.Metrics, db, resultsDB, storagebadger.DefaultCacheSize)
 
-	guarantees, err := stdmap.NewGuarantees(1000)
-	require.NoError(t, err)
+	guarantees := stdmap.NewGuarantees(1000)
 
 	receipts := consensusMempools.NewExecutionTree()
 
@@ -449,7 +448,7 @@ func ConsensusNode(t *testing.T, hub *stub.Hub, identity bootstrap.NodeInfo, ide
 	require.NoError(t, err)
 
 	// request receipts from execution nodes
-	receiptRequester, err := requester.New(node.Log.With().Str("entity", "receipt").Logger(), node.Metrics, node.Net, node.Me, node.State, channels.RequestReceiptsByBlockID, filter.Any, func() flow.Entity { return &flow.ExecutionReceipt{} })
+	receiptRequester, err := requester.New(node.Log.With().Str("entity", "receipt").Logger(), node.Metrics, node.Net, node.Me, node.State, channels.RequestReceiptsByBlockID, filter.Any, func() flow.Entity { return new(flow.ExecutionReceipt) })
 	require.NoError(t, err)
 
 	assigner, err := chunks.NewChunkAssigner(flow.DefaultChunkAssignmentAlpha, node.State)
@@ -652,7 +651,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity bootstrap.NodeInfo, ide
 		node.Log.With().Str("entity", "collection").Logger(), node.Metrics, node.Net, node.Me, node.State,
 		channels.RequestCollections,
 		filter.HasRole[flow.Identity](flow.RoleCollection),
-		func() flow.Entity { return &flow.Collection{} },
+		func() flow.Entity { return new(flow.Collection) },
 	)
 	require.NoError(t, err)
 
@@ -924,7 +923,7 @@ func createFollowerCore(
 ) (module.HotStuffFollower, *confinalizer.Finalizer) {
 	finalizer := confinalizer.NewFinalizer(node.PublicDB, node.Headers, followerState, trace.NewNoopTracer())
 
-	pending := make([]*flow.Header, 0)
+	pending := make([]*flow.ProposalHeader, 0)
 
 	// creates a consensus follower with noop consumer as the notifier
 	followerCore, err := consensus.NewFollower(

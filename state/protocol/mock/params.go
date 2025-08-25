@@ -128,6 +128,24 @@ func (_m *Params) SporkRootBlockHeight() uint64 {
 	return r0
 }
 
+// SporkRootBlockView provides a mock function with no fields
+func (_m *Params) SporkRootBlockView() uint64 {
+	ret := _m.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for SporkRootBlockView")
+	}
+
+	var r0 uint64
+	if rf, ok := ret.Get(0).(func() uint64); ok {
+		r0 = rf()
+	} else {
+		r0 = ret.Get(0).(uint64)
+	}
+
+	return r0
+}
+
 // NewParams creates a new instance of Params. It also registers a testing interface on the mock and a cleanup function to assert the mocks expectations.
 // The first argument is typically a *testing.T value.
 func NewParams(t interface {

@@ -33,12 +33,12 @@ var setIsContractDeploymentRestrictedTransactionTemplate string
 var DeployContractTransactionTemplate []byte
 
 // SetContractDeploymentAuthorizersTransaction returns a transaction for updating list of authorized accounts allowed to deploy/update contracts
-func SetContractDeploymentAuthorizersTransaction(serviceAccount flow.Address, authorized []flow.Address) (*flow.TransactionBody, error) {
+func SetContractDeploymentAuthorizersTransaction(serviceAccount flow.Address, authorized []flow.Address) (*flow.TransactionBodyBuilder, error) {
 	return setContractAuthorizersTransaction(ContractDeploymentAuthorizedAddressesPath, serviceAccount, authorized)
 }
 
 // SetContractRemovalAuthorizersTransaction returns a transaction for updating list of authorized accounts allowed to remove contracts
-func SetContractRemovalAuthorizersTransaction(serviceAccount flow.Address, authorized []flow.Address) (*flow.TransactionBody, error) {
+func SetContractRemovalAuthorizersTransaction(serviceAccount flow.Address, authorized []flow.Address) (*flow.TransactionBodyBuilder, error) {
 	return setContractAuthorizersTransaction(ContractRemovalAuthorizedAddressesPath, serviceAccount, authorized)
 }
 
@@ -46,7 +46,7 @@ func setContractAuthorizersTransaction(
 	path cadence.Path,
 	serviceAccount flow.Address,
 	authorized []flow.Address,
-) (*flow.TransactionBody, error) {
+) (*flow.TransactionBodyBuilder, error) {
 	addressValues := make([]cadence.Value, 0, len(authorized))
 	for _, address := range authorized {
 		addressValues = append(
@@ -64,8 +64,9 @@ func setContractAuthorizersTransaction(
 		return nil, err
 	}
 
-	return flow.NewTransactionBody().
+	return flow.NewTransactionBodyBuilder().
 		SetScript([]byte(setContractOperationAuthorizersTransactionTemplate)).
+		SetPayer(serviceAccount).
 		AddAuthorizer(serviceAccount).
 		AddArgument(addressesArg).
 		AddArgument(pathArg), nil
@@ -83,18 +84,21 @@ func SetIsContractDeploymentRestrictedTransaction(serviceAccount flow.Address, r
 		return nil, err
 	}
 
-	return flow.NewTransactionBody().
+	return flow.NewTransactionBodyBuilder().
 		SetScript([]byte(setIsContractDeploymentRestrictedTransactionTemplate)).
+		SetPayer(serviceAccount).
 		AddAuthorizer(serviceAccount).
 		AddArgument(argRestricted).
-		AddArgument(argPath), nil
+		AddArgument(argPath).
+		Build()
 }
 
 // TODO (ramtin) get rid of authorizers
-func DeployContractTransaction(address flow.Address, contract []byte, contractName string) *flow.TransactionBody {
-	return flow.NewTransactionBody().
+func DeployContractTransaction(address flow.Address, contract []byte, contractName string) *flow.TransactionBodyBuilder {
+	return flow.NewTransactionBodyBuilder().
 		SetScript(DeployContractTransactionTemplate).
 		AddArgument(jsoncdc.MustEncode(cadence.String(contractName))).
 		AddArgument(jsoncdc.MustEncode(cadence.String(contract))).
+		SetPayer(address).
 		AddAuthorizer(address)
 }

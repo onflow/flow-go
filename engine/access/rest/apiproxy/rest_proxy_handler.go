@@ -177,7 +177,7 @@ func (r *RestProxyHandler) GetTransactionResult(
 		return nil, err
 	}
 
-	return convert.MessageToTransactionResult(transactionResultResponse), nil
+	return convert.MessageToTransactionResult(transactionResultResponse)
 }
 
 // GetAccountAtBlockHeight returns account by account address and block height.
@@ -378,7 +378,7 @@ func (r *RestProxyHandler) GetEventsForHeightRange(
 		return nil, err
 	}
 
-	return convert.MessagesToBlockEvents(eventsResponse.Results), nil
+	return convert.MessagesToBlockEvents(eventsResponse.Results)
 }
 
 // GetEventsForBlockIDs returns events by their name in the specified block IDs.
@@ -408,7 +408,7 @@ func (r *RestProxyHandler) GetEventsForBlockIDs(
 		return nil, err
 	}
 
-	return convert.MessagesToBlockEvents(eventsResponse.Results), nil
+	return convert.MessagesToBlockEvents(eventsResponse.Results)
 }
 
 // GetExecutionResultForBlockID gets execution result by provided block ID.

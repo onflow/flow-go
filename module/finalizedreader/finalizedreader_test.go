@@ -23,37 +23,37 @@ func TestFinalizedReader(t *testing.T) {
 		block := unittest.BlockFixture()
 
 		// store header
-		err := headers.Store(block.Header)
+		err := headers.Store(unittest.ProposalHeaderFromHeader(block.ToHeader()))
 		require.NoError(t, err)
 
 		// index the header
-		err = db.Update(operation.IndexBlockHeight(block.Header.Height, block.ID()))
+		err = db.Update(operation.IndexBlockHeight(block.Height, block.ID()))
 		require.NoError(t, err)
 
 		// verify is able to reader the finalized block ID
-		reader := NewFinalizedReader(headers, block.Header.Height)
-		finalized, err := reader.FinalizedBlockIDAtHeight(block.Header.Height)
+		reader := NewFinalizedReader(headers, block.Height)
+		finalized, err := reader.FinalizedBlockIDAtHeight(block.Height)
 		require.NoError(t, err)
 		require.Equal(t, block.ID(), finalized)
 
 		// verify is able to return storage.NotFound when the height is not finalized
-		_, err = reader.FinalizedBlockIDAtHeight(block.Header.Height + 1)
+		_, err = reader.FinalizedBlockIDAtHeight(block.Height + 1)
 		require.Error(t, err)
 		require.True(t, errors.Is(err, storage.ErrNotFound), err)
 
 		// finalize one more block
-		block2 := unittest.BlockWithParentFixture(block.Header)
-		require.NoError(t, headers.Store(block2.Header))
-		err = db.Update(operation.IndexBlockHeight(block2.Header.Height, block2.ID()))
+		block2 := unittest.BlockWithParentFixture(block.ToHeader())
+		require.NoError(t, headers.Store(unittest.ProposalHeaderFromHeader(block2.ToHeader())))
+		err = db.Update(operation.IndexBlockHeight(block2.Height, block2.ID()))
 		require.NoError(t, err)
-		reader.BlockFinalized(block2.Header)
+		reader.BlockFinalized(block2.ToHeader())
 
 		// should be able to retrieve the block
-		finalized, err = reader.FinalizedBlockIDAtHeight(block2.Header.Height)
+		finalized, err = reader.FinalizedBlockIDAtHeight(block2.Height)
 		require.NoError(t, err)
 		require.Equal(t, block2.ID(), finalized)
 
 		// should noop and no panic
-		reader.BlockProcessable(block.Header, block2.Header.ParentQC())
+		reader.BlockProcessable(block.ToHeader(), block2.ParentQC())
 	})
 }

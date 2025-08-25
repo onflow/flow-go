@@ -93,10 +93,6 @@ func NewMissingCollection(untrusted UntrustedMissingCollection) (*MissingCollect
 	}, nil
 }
 
-func (m *MissingCollection) ID() flow.Identifier {
-	return m.Guarantee.ID()
-}
-
 // collectionInfo is an internal struct used to keep track of the state of a collection,
 // and the blocks that include the collection
 type collectionInfo struct {
@@ -136,7 +132,7 @@ func (q *BlockQueue) HandleBlock(block *flow.Block, parentFinalState *flow.State
 
 	q.log.Debug().
 		Str("blockID", blockID.String()).
-		Uint64("height", block.Header.Height).
+		Uint64("height", block.Height).
 		Bool("parent executed", parentFinalState != nil).
 		Msg("handle block")
 
@@ -147,14 +143,14 @@ func (q *BlockQueue) HandleBlock(block *flow.Block, parentFinalState *flow.State
 
 	// handling a new block
 
-	_, parentExists := q.blocks[block.Header.ParentID]
+	_, parentExists := q.blocks[block.ParentID]
 	// if parentFinalState is not provided, then its parent block must exists in the queue
 	// otherwise it's an exception
 	if parentFinalState == nil {
 		if !parentExists {
 			return nil, nil,
 				fmt.Errorf("block %s has no parent commitment, but its parent block %s does not exist in the queue: %w",
-					blockID, block.Header.ParentID, ErrMissingParent)
+					blockID, block.ParentID, ErrMissingParent)
 		}
 	} else {
 		if parentExists {
@@ -173,9 +169,9 @@ func (q *BlockQueue) HandleBlock(block *flow.Block, parentFinalState *flow.State
 			// See test case: TestHandleBlockChildCalledBeforeOnBlockExecutedParent
 			q.log.Warn().
 				Str("blockID", blockID.String()).
-				Uint64("height", block.Header.Height).
+				Uint64("height", block.Height).
 				Msgf("edge case: receiving block with parent commitment, but its parent block %s still exists",
-					block.Header.ParentID)
+					block.ParentID)
 
 			parentFinalState = nil
 		}
@@ -197,7 +193,7 @@ func (q *BlockQueue) HandleBlock(block *flow.Block, parentFinalState *flow.State
 	missingCollections := make([]*MissingCollection, 0, len(block.Payload.Guarantees))
 
 	for _, guarantee := range block.Payload.Guarantees {
-		colID := guarantee.ID()
+		colID := guarantee.CollectionID
 		colInfo, ok := q.collections[colID]
 		if ok {
 			// some other block also includes this collection
@@ -218,8 +214,8 @@ func (q *BlockQueue) HandleBlock(block *flow.Block, parentFinalState *flow.State
 			}
 
 			missingCollection, err := NewMissingCollection(UntrustedMissingCollection{
-				BlockID:   executable.ID(),
-				Height:    executable.Block.Header.Height,
+				BlockID:   executable.BlockID(),
+				Height:    executable.Block.Height,
 				Guarantee: col.Guarantee,
 			})
 			if err != nil {
@@ -234,10 +230,10 @@ func (q *BlockQueue) HandleBlock(block *flow.Block, parentFinalState *flow.State
 	}
 
 	// index height
-	blocksAtSameHeight, ok := q.blockIDsByHeight[block.Header.Height]
+	blocksAtSameHeight, ok := q.blockIDsByHeight[block.Height]
 	if !ok {
 		blocksAtSameHeight = make(map[flow.Identifier]*entity.ExecutableBlock)
-		q.blockIDsByHeight[block.Header.Height] = blocksAtSameHeight
+		q.blockIDsByHeight[block.Height] = blocksAtSameHeight
 	}
 	blocksAtSameHeight[blockID] = executable
 
@@ -278,7 +274,7 @@ func (q *BlockQueue) HandleCollection(collection *flow.Collection) ([]*entity.Ex
 	}
 
 	// update collection
-	colInfo.Collection.Transactions = collection.Transactions
+	colInfo.Collection.Collection = collection
 
 	// check if any block, which includes this collection, became executable
 	executables := make([]*entity.ExecutableBlock, 0, len(colInfo.IncludedIn))
@@ -331,15 +327,15 @@ func (q *BlockQueue) handleKnownBlock(executable *entity.ExecutableBlock, parent
 	// there is no need to create the executable block again, since it's already created.
 	if executable.StartState == nil && parentFinalState != nil {
 		q.log.Warn().
-			Str("blockID", executable.ID().String()).
-			Uint64("height", executable.Block.Header.Height).
-			Hex("parentID", executable.Block.Header.ParentID[:]).
+			Str("blockID", executable.BlockID().String()).
+			Uint64("height", executable.Block.Height).
+			Hex("parentID", executable.Block.ParentID[:]).
 			Msg("edge case: receiving block with no parent commitment, but its parent block actually has been executed")
 
-		executables, err := q.onBlockExecuted(executable.Block.Header.ParentID, *parentFinalState)
+		executables, err := q.onBlockExecuted(executable.Block.ParentID, *parentFinalState)
 		if err != nil {
 			return nil, nil, fmt.Errorf("receiving block %v with parent commitment %v, but parent block %v already exists with no commitment, fail to call mark parent as executed: %w",
-				executable.ID(), *parentFinalState, executable.Block.Header.ParentID, err)
+				executable.BlockID(), *parentFinalState, executable.Block.ParentID, err)
 		}
 
 		// we already have this block, its collection must have been fetched, so we only return the
@@ -353,9 +349,9 @@ func (q *BlockQueue) handleKnownBlock(executable *entity.ExecutableBlock, parent
 	// and we can simply ignore this call.
 	if executable.StartState != nil && parentFinalState == nil {
 		q.log.Warn().
-			Str("blockID", executable.ID().String()).
-			Uint64("height", executable.Block.Header.Height).
-			Hex("parentID", executable.Block.Header.ParentID[:]).
+			Str("blockID", executable.BlockID().String()).
+			Uint64("height", executable.Block.Height).
+			Hex("parentID", executable.Block.ParentID[:]).
 			Msg("edge case: receiving block with no parent commitment, but its parent block actually has been executed")
 		return nil, nil, nil
 	}
@@ -364,12 +360,12 @@ func (q *BlockQueue) handleKnownBlock(executable *entity.ExecutableBlock, parent
 	if *executable.StartState != *parentFinalState {
 		return nil, nil,
 			fmt.Errorf("block %s has already been executed with a different parent final state, %v != %v",
-				executable.ID(), *executable.StartState, parentFinalState)
+				executable.BlockID(), *executable.StartState, parentFinalState)
 	}
 
 	q.log.Warn().
-		Str("blockID", executable.ID().String()).
-		Uint64("height", executable.Block.Header.Height).
+		Str("blockID", executable.BlockID().String()).
+		Uint64("height", executable.Block.Height).
 		Msg("edge case: OnBlockExecuted is called with the same arguments again")
 	return nil, nil, nil
 }
@@ -390,16 +386,16 @@ func (q *BlockQueue) onBlockExecuted(
 	// sanity check
 	// if a block exists in the queue and is executed, then its parent block
 	// must not exist in the queue, otherwise the state is inconsistent
-	_, parentExists := q.blocks[block.Block.Header.ParentID]
+	_, parentExists := q.blocks[block.Block.ParentID]
 	if parentExists {
 		return nil, fmt.Errorf("parent block %s of block %s is in the queue",
-			block.Block.Header.ParentID, blockID)
+			block.Block.ParentID, blockID)
 	}
 
 	delete(q.blocks, blockID)
 
 	// remove height index
-	height := block.Block.Header.Height
+	height := block.Block.Height
 	delete(q.blockIDsByHeight[height], blockID)
 	if len(q.blockIDsByHeight[height]) == 0 {
 		delete(q.blockIDsByHeight, height)
@@ -427,7 +423,7 @@ func (q *BlockQueue) checkIfChildBlockBecomeExecutable(
 	block *entity.ExecutableBlock,
 	commit flow.StateCommitment,
 ) ([]*entity.ExecutableBlock, error) {
-	childHeight := block.Block.Header.Height + 1
+	childHeight := block.Block.Height + 1
 	blocksAtNextHeight, ok := q.blockIDsByHeight[childHeight]
 	if !ok {
 		// no block at next height
@@ -439,7 +435,7 @@ func (q *BlockQueue) checkIfChildBlockBecomeExecutable(
 	for _, childBlock := range blocksAtNextHeight {
 		// a child block at the next height must have the same parent ID
 		// as the current block
-		isChild := childBlock.Block.Header.ParentID == block.ID()
+		isChild := childBlock.Block.ParentID == block.BlockID()
 		if !isChild {
 			continue
 		}
@@ -487,8 +483,8 @@ func (q *BlockQueue) GetMissingCollections(blockID flow.Identifier) (
 		}
 
 		missingCollection, err := NewMissingCollection(UntrustedMissingCollection{
-			BlockID:   block.ID(),
-			Height:    block.Block.Header.Height,
+			BlockID:   block.BlockID(),
+			Height:    block.Block.Height,
 			Guarantee: col.Guarantee,
 		})
 		if err != nil {

@@ -149,7 +149,7 @@ func NewEmptyBlockAttestationResult(
 		BlockExecutionResult:         blockExecutionResult,
 		collectionAttestationResults: make([]CollectionAttestationResult, 0, colSize),
 		BlockExecutionData: &execution_data.BlockExecutionData{
-			BlockID: blockExecutionResult.ID(),
+			BlockID: blockExecutionResult.BlockID(),
 			ChunkExecutionDatas: make(
 				[]*execution_data.ChunkExecutionData,
 				0,
@@ -184,17 +184,24 @@ func (ar *BlockAttestationResult) AppendCollectionAttestationResult(
 	ar.ChunkExecutionDatas = append(ar.ChunkExecutionDatas, chunkExecutionDatas)
 }
 
-func (ar *BlockAttestationResult) AllChunks() []*flow.Chunk {
+func (ar *BlockAttestationResult) AllChunks() ([]*flow.Chunk, error) {
 	chunks := make([]*flow.Chunk, len(ar.collectionAttestationResults))
 	for i := 0; i < len(ar.collectionAttestationResults); i++ {
-		chunks[i] = ar.ChunkAt(i) // TODO(ramtin): cache and optimize this
+		chunk, err := ar.ChunkAt(i)
+		if err != nil {
+			return nil, fmt.Errorf("could not find chunk: %w", err)
+		}
+		chunks[i] = chunk // TODO(ramtin): cache and optimize this
 	}
-	return chunks
+	return chunks, nil
 }
 
-func (ar *BlockAttestationResult) ChunkAt(index int) *flow.Chunk {
+// ChunkAt returns the Chunk for the collection at the given index.
+// Receiver BlockAttestationResult is expected to be well-formed; callers must use an index that exists.
+// No errors are expected during normal operation.
+func (ar *BlockAttestationResult) ChunkAt(index int) (*flow.Chunk, error) {
 	if index < 0 || index >= len(ar.collectionAttestationResults) {
-		return nil
+		return nil, fmt.Errorf("chunk collection index is not valid: %v", index)
 	}
 
 	execRes := ar.collectionExecutionResults[index]
@@ -206,29 +213,45 @@ func (ar *BlockAttestationResult) ChunkAt(index int) *flow.Chunk {
 		panic(fmt.Sprintf("execution snapshot is nil. Block ID: %s, EndState: %s", ar.Block.ID(), attestRes.endStateCommit))
 	}
 
-	return flow.NewChunk(
-		ar.Block.ID(),
-		index,
-		attestRes.startStateCommit,
-		len(execRes.TransactionResults()),
-		attestRes.eventCommit,
-		ar.ServiceEventCountForChunk(index),
-		attestRes.endStateCommit,
-		execRes.executionSnapshot.TotalComputationUsed(),
-	)
+	chunk, err := flow.NewChunk(flow.UntrustedChunk{
+		ChunkBody: flow.ChunkBody{
+			BlockID:              ar.Block.ID(),
+			CollectionIndex:      uint(index),
+			StartState:           attestRes.startStateCommit,
+			EventCollection:      attestRes.eventCommit,
+			ServiceEventCount:    ar.ServiceEventCountForChunk(index),
+			TotalComputationUsed: execRes.executionSnapshot.TotalComputationUsed(),
+			NumberOfTransactions: uint64(len(execRes.TransactionResults())),
+		},
+		Index:    uint64(index),
+		EndState: attestRes.endStateCommit,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("could not build chunk: %w", err)
+	}
+
+	return chunk, nil
+
 }
 
-func (ar *BlockAttestationResult) AllChunkDataPacks() []*flow.ChunkDataPack {
+func (ar *BlockAttestationResult) AllChunkDataPacks() ([]*flow.ChunkDataPack, error) {
 	chunkDataPacks := make([]*flow.ChunkDataPack, len(ar.collectionAttestationResults))
 	for i := 0; i < len(ar.collectionAttestationResults); i++ {
-		chunkDataPacks[i] = ar.ChunkDataPackAt(i) // TODO(ramtin): cache and optimize this
+		chunkDataPack, err := ar.ChunkDataPackAt(i)
+		if err != nil {
+			return nil, fmt.Errorf("could not find chunk data pack: %w", err)
+		}
+		chunkDataPacks[i] = chunkDataPack // TODO(ramtin): cache and optimize this
 	}
-	return chunkDataPacks
+	return chunkDataPacks, nil
 }
 
-func (ar *BlockAttestationResult) ChunkDataPackAt(index int) *flow.ChunkDataPack {
+// ChunkDataPackAt returns the ChunkDataPack for the collection at the given index.
+// Receiver BlockAttestationResult is expected to be well-formed; callers must use an index that exists.
+// No errors are expected during normal operation.
+func (ar *BlockAttestationResult) ChunkDataPackAt(index int) (*flow.ChunkDataPack, error) {
 	if index < 0 || index >= len(ar.collectionAttestationResults) {
-		return nil
+		return nil, fmt.Errorf("chunk collection index is not valid: %v", index)
 	}
 
 	// Note: There's some inconsistency in how chunk execution data and
@@ -239,13 +262,23 @@ func (ar *BlockAttestationResult) ChunkDataPackAt(index int) *flow.ChunkDataPack
 
 	attestRes := ar.collectionAttestationResults[index]
 
-	return flow.NewChunkDataPack(
-		ar.ChunkAt(index).ID(), // TODO(ramtin): optimize this
-		attestRes.startStateCommit,
-		attestRes.stateProof,
-		collection,
-		*ar.ExecutionDataRoot,
-	)
+	chunk, err := ar.ChunkAt(index)
+	if err != nil {
+		return nil, fmt.Errorf("could not build chunk: %w", err)
+	}
+
+	chunkDataPack, err := flow.NewChunkDataPack(flow.UntrustedChunkDataPack{
+		ChunkID:           chunk.ID(), // TODO(ramtin): optimize this
+		StartState:        attestRes.startStateCommit,
+		Proof:             attestRes.stateProof,
+		Collection:        collection,
+		ExecutionDataRoot: *ar.ExecutionDataRoot,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("could not build chunk data pack: %w", err)
+	}
+
+	return chunkDataPack, nil
 }
 
 func (ar *BlockAttestationResult) AllEventCommitments() []flow.Identifier {

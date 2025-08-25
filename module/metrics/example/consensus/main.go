@@ -40,7 +40,7 @@ func main() {
 		for i := 0; i < 100; i++ {
 			block := unittest.BlockFixture()
 			collector.MempoolEntries(metrics.ResourceGuarantee, 22)
-			collector.BlockFinalized(&block)
+			collector.BlockFinalized(block)
 			collector.HotStuffBusyDuration(10, metrics.HotstuffEventTypeLocalTimeout)
 			collector.HotStuffWaitDuration(10, metrics.HotstuffEventTypeLocalTimeout)
 			collector.HotStuffIdleDuration(10)

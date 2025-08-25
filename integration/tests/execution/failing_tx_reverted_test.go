@@ -23,14 +23,14 @@ type FailingTxRevertedSuite struct {
 
 func (s *FailingTxRevertedSuite) TestExecutionFailingTxReverted() {
 
-	chainID := s.net.Root().Header.ChainID
+	chainID := s.net.Root().ChainID
 	chain := chainID.Chain()
 	serviceAddress := chain.ServiceAddress()
 
 	// wait for next height finalized (potentially first height), called blockA
 	currentFinalized := s.BlockState.HighestFinalizedHeight()
 	blockA := s.BlockState.WaitForHighestFinalizedProgress(s.T(), currentFinalized)
-	s.T().Logf("got blockA height %v ID %v\n", blockA.Header.Height, blockA.Header.ID())
+	s.T().Logf("got blockA height %v ID %v\n", blockA.Height, blockA.ID())
 
 	// send transaction
 	tx, err := s.AccessClient().DeployContract(context.Background(), sdk.Identifier(s.net.Root().ID()), lib.CounterContract)

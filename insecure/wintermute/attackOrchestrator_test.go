@@ -566,7 +566,7 @@ func TestPassingThroughMiscellaneousEvents(t *testing.T) {
 		Protocol:          insecure.Protocol_MULTICAST,
 		TargetNum:         3,
 		TargetIds:         unittest.IdentifierListFixture(10),
-		FlowProtocolEvent: unittest.BlockFixture(),
+		FlowProtocolEvent: *unittest.BlockFixture(),
 	}
 
 	eventPassThrough := &sync.WaitGroup{}

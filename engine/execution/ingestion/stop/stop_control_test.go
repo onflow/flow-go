@@ -31,7 +31,7 @@ func TestCannotSetNewValuesAfterStoppingCommenced(t *testing.T) {
 			nil,
 			nil,
 			nil,
-			&flow.Header{Height: 1},
+			&flow.Header{HeaderBody: flow.HeaderBody{Height: 1}},
 			false,
 			false,
 		)
@@ -77,7 +77,7 @@ func TestCannotSetNewValuesAfterStoppingCommenced(t *testing.T) {
 			nil,
 			nil,
 			nil,
-			&flow.Header{Height: 1},
+			&flow.Header{HeaderBody: flow.HeaderBody{Height: 1}},
 			false,
 			false,
 		)
@@ -133,7 +133,7 @@ func TestExecutionFallingBehind(t *testing.T) {
 		nil,
 		nil,
 		nil,
-		&flow.Header{Height: 1},
+		&flow.Header{HeaderBody: flow.HeaderBody{Height: 1}},
 		false,
 		false,
 	)
@@ -195,7 +195,7 @@ func TestAddStopForPastBlocks(t *testing.T) {
 		headers,
 		nil,
 		nil,
-		&flow.Header{Height: 1},
+		&flow.Header{HeaderBody: flow.HeaderBody{Height: 1}},
 		false,
 		false,
 	)
@@ -251,7 +251,7 @@ func TestAddStopForPastBlocksExecutionFallingBehind(t *testing.T) {
 		headers,
 		nil,
 		nil,
-		&flow.Header{Height: 1},
+		&flow.Header{HeaderBody: flow.HeaderBody{Height: 1}},
 		false,
 		false,
 	)
@@ -304,7 +304,7 @@ func TestStopControlWithVersionControl(t *testing.T) {
 			headers,
 			versionBeacons,
 			semver.New("1.0.0"),
-			&flow.Header{Height: 1},
+			&flow.Header{HeaderBody: flow.HeaderBody{Height: 1}},
 			false,
 			false,
 		)
@@ -406,7 +406,7 @@ func TestStopControlWithVersionControl(t *testing.T) {
 			headers,
 			versionBeacons,
 			semver.New("1.0.0"),
-			&flow.Header{Height: 1},
+			&flow.Header{HeaderBody: flow.HeaderBody{Height: 1}},
 			false,
 			false,
 		)
@@ -484,7 +484,7 @@ func TestStopControlWithVersionControl(t *testing.T) {
 			headers,
 			versionBeacons,
 			semver.New("1.0.0"),
-			&flow.Header{Height: 1},
+			&flow.Header{HeaderBody: flow.HeaderBody{Height: 1}},
 			false,
 			false,
 		)
@@ -562,7 +562,7 @@ func TestStopControlWithVersionControl(t *testing.T) {
 			headers,
 			versionBeacons,
 			semver.New("1.0.0"),
-			&flow.Header{Height: 1},
+			&flow.Header{HeaderBody: flow.HeaderBody{Height: 1}},
 			false,
 			false,
 		)
@@ -616,7 +616,7 @@ func TestStartingStopped(t *testing.T) {
 		nil,
 		nil,
 		nil,
-		&flow.Header{Height: 1},
+		&flow.Header{HeaderBody: flow.HeaderBody{Height: 1}},
 		true,
 		false,
 	)
@@ -637,7 +637,7 @@ func TestStoppedStateRejectsAllBlocksAndChanged(t *testing.T) {
 		nil,
 		nil,
 		nil,
-		&flow.Header{Height: 1},
+		&flow.Header{HeaderBody: flow.HeaderBody{Height: 1}},
 		true,
 		false,
 	)
@@ -667,7 +667,7 @@ func Test_StopControlWorkers(t *testing.T) {
 			nil,
 			nil,
 			nil,
-			&flow.Header{Height: 1},
+			&flow.Header{HeaderBody: flow.HeaderBody{Height: 1}},
 			true,
 			false,
 		)
@@ -694,7 +694,7 @@ func Test_StopControlWorkers(t *testing.T) {
 			nil,
 			nil,
 			nil,
-			&flow.Header{Height: 1},
+			&flow.Header{HeaderBody: flow.HeaderBody{Height: 1}},
 			false,
 			false,
 		)
