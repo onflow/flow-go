@@ -284,7 +284,7 @@ func DefaultBaseConfig() *BaseConfig {
 		BootstrapDir:     "bootstrap",
 		datadir:          datadir,
 		pebbleDir:        pebbleDir,
-		DBOps:            string(dbops.BadgerBatch), // "badger-batch" (default) or "pebble-batch"
+		DBOps:            string(dbops.PebbleBatch), // "badger-batch" (default) or "pebble-batch"
 		badgerDB:         nil,
 		pebbleDB:         nil,
 		secretsdir:       NotSet,
