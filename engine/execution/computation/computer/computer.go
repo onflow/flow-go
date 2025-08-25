@@ -184,7 +184,10 @@ func NewBlockComputer(
 		return nil, fmt.Errorf("could not build system chunk transaction: %w", err)
 	}
 
-	processCallbackTxn := blueprints.ProcessCallbacksTransaction(vmCtx.Chain)
+	processCallbackTxn, err := blueprints.ProcessCallbacksTransaction(vmCtx.Chain)
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate callbacks script: %w", err)
+	}
 
 	return &blockComputer{
 		vm:                    vm,
@@ -286,13 +289,8 @@ func (e *blockComputer) queueUserTransactions(
 			isSystemTransaction: false,
 		}
 
-<<<<<<< HEAD
 		for i, txnBody := range collection.Collection.Transactions {
-			requestQueue <- newTransactionRequest(
-=======
-		for i, txnBody := range collection.Transactions {
 			txQueue <- newTransactionRequest(
->>>>>>> master
 				collectionInfo,
 				collectionCtx,
 				collectionLogger,
@@ -444,17 +442,9 @@ func (e *blockComputer) executeUserTransactions(
 	rawCollections []*entity.CompleteCollection,
 	userTxCount int,
 ) {
-<<<<<<< HEAD
-	txQueue := make(chan TransactionRequest, userTxCount)
-
-	e.queueUserTransactions(
+	txQueue := e.queueUserTransactions(
 		block.BlockID(),
 		block.Block.ToHeader(),
-=======
-	txQueue := e.queueUserTransactions(
-		block.ID(),
-		block.Block.Header,
->>>>>>> master
 		rawCollections,
 		userTxCount,
 	)
@@ -578,21 +568,10 @@ func (e *blockComputer) executeProcessCallback(
 	blockSpan otelTrace.Span,
 	txnIndex uint32,
 	systemLogger zerolog.Logger,
-<<<<<<< HEAD
-) ([]*flow.TransactionBody, error) {
-	processTxn, err := blueprints.ProcessCallbacksTransaction(e.vmCtx.Chain)
-	if err != nil {
-		return nil, fmt.Errorf("failed to generate callbacks script: %w", err)
-	}
-
-	// add process callback transaction to the system collection info
-	// TODO(7749): fix illegal mutation
-	systemCollectionInfo.CompleteCollection.Collection.Transactions = append(systemCollectionInfo.CompleteCollection.Collection.Transactions, processTxn) //nolint:structwrite
-=======
 ) ([]*flow.TransactionBody, uint32, error) {
 	// add process callback transaction to the system collection info
-	systemCollectionInfo.CompleteCollection.Transactions = append(systemCollectionInfo.CompleteCollection.Transactions, e.processCallbackTxn)
->>>>>>> master
+	// TODO(7749): fix illegal mutation
+	systemCollectionInfo.CompleteCollection.Collection.Transactions = append(systemCollectionInfo.CompleteCollection.Collection.Transactions, e.processCallbackTxn) //nolint:structwrite
 
 	request := newTransactionRequest(
 		systemCollectionInfo,

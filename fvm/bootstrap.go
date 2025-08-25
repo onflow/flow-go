@@ -802,9 +802,13 @@ func (b *bootstrapExecutor) deployNFTStorefrontV2(deployTo flow.Address, env *te
 
 func (b *bootstrapExecutor) deployFlowCallbackScheduler(deployTo flow.Address, env *templates.Environment) {
 	contract := contracts.FlowCallbackScheduler(*env)
+	txBody, err := blueprints.DeployContractTransaction(deployTo, contract, "FlowCallbackScheduler").Build()
+	if err != nil {
+		panic(fmt.Sprintf("failed to create FlowCallbackScheduler deploy transaction: %s", err))
+	}
 	txError, err := b.invokeMetaTransaction(
 		b.ctx,
-		Transaction(blueprints.DeployContractTransaction(deployTo, contract, "FlowCallbackScheduler"), 0),
+		Transaction(txBody, 0),
 	)
 
 	panicOnMetaInvokeErrf("failed to deploy FlowCallbackScheduler contract: %s", txError, err)

@@ -15,16 +15,11 @@ import (
 
 const callbackTransactionGasLimit = flow.DefaultMaxTransactionGasLimit
 
-<<<<<<< HEAD
 // ProcessCallbacksTransaction constructs a transaction for processing callbacks, for the given callback.
 // No errors are expected during normal operation.
 func ProcessCallbacksTransaction(chain flow.Chain) (*flow.TransactionBody, error) {
-	script := prepareScheduledContractTransaction(chain, processCallbacksTransaction)
-=======
-func ProcessCallbacksTransaction(chain flow.Chain) *flow.TransactionBody {
 	sc := systemcontracts.SystemContractsForChain(chain.ChainID())
 	script := templates.GenerateProcessCallbackScript(sc.AsTemplateEnv())
->>>>>>> master
 
 	return flow.NewTransactionBodyBuilder().
 		SetScript(script).
@@ -43,30 +38,20 @@ func ExecuteCallbacksTransactions(chainID flow.Chain, processEvents flow.EventsL
 			return nil, fmt.Errorf("failed to get callback args from event: %w", err)
 		}
 
-<<<<<<< HEAD
-		tx, err := executeCallbackTransaction(chainID, id, effort)
+		tx, err := executeCallbackTransaction(env, id, effort)
 		if err != nil {
 			return nil, fmt.Errorf("failed to construct execute callback transactions: %w", err)
 		}
-=======
-		tx := executeCallbackTransaction(env, id, effort)
->>>>>>> master
 		txs = append(txs, tx)
 	}
 
 	return txs, nil
 }
 
-<<<<<<< HEAD
-func executeCallbackTransaction(chain flow.Chain, id []byte, effort uint64) (*flow.TransactionBody, error) {
-	script := prepareScheduledContractTransaction(chain, executeCallbacksTransaction)
-	return flow.NewTransactionBodyBuilder().
-=======
-func executeCallbackTransaction(env templates.Environment, id []byte, effort uint64) *flow.TransactionBody {
+func executeCallbackTransaction(env templates.Environment, id []byte, effort uint64) (*flow.TransactionBody, error) {
 	script := templates.GenerateExecuteCallbackScript(env)
 
-	return flow.NewTransactionBody().
->>>>>>> master
+	return flow.NewTransactionBodyBuilder().
 		SetScript(script).
 		AddArgument(id).
 		SetComputeLimit(effort).
