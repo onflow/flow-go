@@ -26,6 +26,8 @@ import (
 
 var _ component.Component = (*CommandRunner)(nil)
 
+// CommandRunnerShutdownTimeout defines the maximum time allowed for graceful shutdown
+// of both gRPC and HTTP servers. Each server gets this full timeout period independently.
 const CommandRunnerShutdownTimeout = 5 * time.Second
 
 type CommandHandler func(ctx context.Context, request *CommandRequest) (interface{}, error)
@@ -295,7 +297,20 @@ func (r *CommandRunner) runAdminServer(ctx irrecoverable.SignalerContext) error 
 		case <-grpcShutdownCtx.Done():
 			r.logger.Warn().Msg("gRPC server graceful shutdown timed out, forcing stop")
 			grpcServer.Stop()
-			<-grpcDone // Wait for forced shutdown to complete
+			
+			// Wait for forced shutdown to complete with an additional timeout
+			select {
+			case <-grpcDone:
+				r.logger.Debug().Msg("gRPC server force stop completed")
+			case <-time.After(time.Second):
+				r.logger.Error().Msg("gRPC server force stop timed out")
+				// At this point we can't do much more, continue with HTTP shutdown
+			}
+		}
+
+		// Clean up unix socket file
+		if err := os.Remove(r.grpcAddress); err != nil && !os.IsNotExist(err) {
+			r.logger.Warn().Err(err).Str("socket", r.grpcAddress).Msg("failed to remove unix socket file")
 		}
 
 		// Shutdown HTTP server with its own fresh timeout
@@ -304,9 +319,17 @@ func (r *CommandRunner) runAdminServer(ctx irrecoverable.SignalerContext) error 
 			defer httpCancel()
 
 			r.logger.Debug().Msg("shutting down HTTP server")
-			if err := httpServer.Shutdown(httpShutdownCtx); err != nil {
-				r.logger.Err(err).Msg("failed to shutdown http server")
-				ctx.Throw(err)
+			err := httpServer.Shutdown(httpShutdownCtx)
+			if err == nil {
+				r.logger.Debug().Msg("HTTP server shutdown completed gracefully")
+			} else if errors.Is(err, httpShutdownCtx.Err()) {
+				r.logger.Warn().Msg("HTTP server graceful shutdown timed out, forcing close")
+				if closeErr := httpServer.Close(); closeErr != nil {
+					r.logger.Err(closeErr).Msg("error force closing HTTP server")
+				}
+			} else {
+				r.logger.Err(err).Msg("error shutting down HTTP server")
+				// Don't throw during shutdown - just log the error
 			}
 		}
 
