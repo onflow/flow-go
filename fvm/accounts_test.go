@@ -1337,7 +1337,8 @@ func TestGetAccountKey(t *testing.T) {
 	)
 
 	t.Run("Multiple keys",
-		newVMTest().withContextOptions(options...).
+		newVMTest().
+			withContextOptions(options...).
 			run(func(t *testing.T, vm fvm.VM, chain flow.Chain, ctx fvm.Context, snapshotTree snapshot.SnapshotTree) {
 				snapshotTree, address := createAccount(
 					t,

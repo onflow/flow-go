@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"encoding/hex"
+	"flag"
 	"math/big"
 	"strings"
 	"testing"
@@ -30,6 +31,18 @@ import (
 	. "github.com/onflow/flow-go/fvm/evm/testutils"
 	"github.com/onflow/flow-go/fvm/evm/types"
 	"github.com/onflow/flow-go/model/flow"
+)
+
+var testWithVMTransactionExecution = flag.Bool(
+	"testWithVMTransactionExecution",
+	false,
+	"Run transactions in tests using the Cadence compiler/VM",
+)
+
+var testWithVMScriptExecution = flag.Bool(
+	"testWithVMScriptExecution",
+	false,
+	"Run scripts in tests using the Cadence compiler/VM",
 )
 
 func newLocationResolver(
@@ -326,6 +339,7 @@ func deployContracts(
 				Interface:   runtimeInterface,
 				Environment: transactionEnvironment,
 				Location:    nextTransactionLocation(),
+				UseVM:       *testWithVMTransactionExecution,
 			},
 		)
 		require.NoError(t, err)
@@ -333,11 +347,24 @@ func deployContracts(
 
 }
 
-func newEVMTransactionEnvironment(handler types.ContractHandler, contractAddress flow.Address) runtime.Environment {
-	transactionEnvironment := runtime.NewBaseInterpreterEnvironment(runtime.Config{})
+func newEVMTransactionEnvironment(
+	handler types.ContractHandler,
+	contractAddress flow.Address,
+) runtime.Environment {
+	var transactionEnvironment runtime.Environment
+	if *testWithVMTransactionExecution {
+		transactionEnvironment = runtime.NewBaseVMEnvironment(runtime.Config{})
+	} else {
+		transactionEnvironment = runtime.NewBaseInterpreterEnvironment(runtime.Config{})
+	}
 
 	internalEVMValue := impl.NewInternalEVMContractValue(
 		nil,
+		handler,
+		contractAddress,
+	)
+
+	internalEVMFunctions := impl.NewInternalEVMFunctions(
 		handler,
 		contractAddress,
 	)
@@ -345,6 +372,7 @@ func newEVMTransactionEnvironment(handler types.ContractHandler, contractAddress
 	stdlib.SetupEnvironment(
 		transactionEnvironment,
 		internalEVMValue,
+		internalEVMFunctions,
 		contractAddress,
 	)
 
@@ -352,7 +380,12 @@ func newEVMTransactionEnvironment(handler types.ContractHandler, contractAddress
 }
 
 func newEVMScriptEnvironment(handler types.ContractHandler, contractAddress flow.Address) runtime.Environment {
-	scriptEnvironment := runtime.NewScriptInterpreterEnvironment(runtime.Config{})
+	var scriptEnvironment runtime.Environment
+	if *testWithVMScriptExecution {
+		scriptEnvironment = runtime.NewScriptVMEnvironment(runtime.Config{})
+	} else {
+		scriptEnvironment = runtime.NewScriptInterpreterEnvironment(runtime.Config{})
+	}
 
 	internalEVMValue := impl.NewInternalEVMContractValue(
 		nil,
@@ -360,9 +393,15 @@ func newEVMScriptEnvironment(handler types.ContractHandler, contractAddress flow
 		contractAddress,
 	)
 
+	internalEVMFunctions := impl.NewInternalEVMFunctions(
+		handler,
+		contractAddress,
+	)
+
 	stdlib.SetupEnvironment(
 		scriptEnvironment,
 		internalEVMValue,
+		internalEVMFunctions,
 		contractAddress,
 	)
 
@@ -377,7 +416,7 @@ func TestEVMEncodeABI(t *testing.T) {
 
 	contractsAddress := flow.BytesToAddress([]byte{0x1})
 
-	transactionEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
+	deploymentEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
 	scriptEnvironment := newEVMScriptEnvironment(handler, contractsAddress)
 
 	rt := runtime.NewRuntime(runtime.Config{})
@@ -434,7 +473,7 @@ func TestEVMEncodeABI(t *testing.T) {
 		rt,
 		contractsAddress,
 		runtimeInterface,
-		transactionEnvironment,
+		deploymentEnvironment,
 		nextTransactionLocation,
 	)
 
@@ -442,13 +481,13 @@ func TestEVMEncodeABI(t *testing.T) {
 
 	result, err := rt.ExecuteScript(
 		runtime.Script{
-			Source:    script,
-			Arguments: [][]byte{},
+			Source: script,
 		},
 		runtime.Context{
 			Interface:   runtimeInterface,
 			Environment: scriptEnvironment,
 			Location:    nextScriptLocation(),
+			UseVM:       *testWithVMScriptExecution,
 		},
 	)
 	require.NoError(t, err)
@@ -488,8 +527,10 @@ func TestEVMEncodeABIByteTypes(t *testing.T) {
 
 	handler := &testContractHandler{}
 	contractsAddress := flow.BytesToAddress([]byte{0x1})
-	transactionEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
+
+	deploymentEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
 	scriptEnvironment := newEVMScriptEnvironment(handler, contractsAddress)
+
 	rt := runtime.NewRuntime(runtime.Config{})
 
 	accountCodes := map[common.Location][]byte{}
@@ -534,7 +575,7 @@ func TestEVMEncodeABIByteTypes(t *testing.T) {
 		rt,
 		contractsAddress,
 		runtimeInterface,
-		transactionEnvironment,
+		deploymentEnvironment,
 		nextTransactionLocation,
 	)
 
@@ -552,13 +593,13 @@ func TestEVMEncodeABIByteTypes(t *testing.T) {
 		// Run script
 		result, err := rt.ExecuteScript(
 			runtime.Script{
-				Source:    script,
-				Arguments: [][]byte{},
+				Source: script,
 			},
 			runtime.Context{
 				Interface:   runtimeInterface,
 				Environment: scriptEnvironment,
 				Location:    nextScriptLocation(),
+				UseVM:       *testWithVMScriptExecution,
 			},
 		)
 		require.NoError(t, err)
@@ -614,13 +655,13 @@ func TestEVMEncodeABIByteTypes(t *testing.T) {
 		// Run script
 		result, err := rt.ExecuteScript(
 			runtime.Script{
-				Source:    script,
-				Arguments: [][]byte{},
+				Source: script,
 			},
 			runtime.Context{
 				Interface:   runtimeInterface,
 				Environment: scriptEnvironment,
 				Location:    nextScriptLocation(),
+				UseVM:       *testWithVMScriptExecution,
 			},
 		)
 		require.NoError(t, err)
@@ -687,13 +728,13 @@ func TestEVMEncodeABIByteTypes(t *testing.T) {
 		// Run script
 		result, err := rt.ExecuteScript(
 			runtime.Script{
-				Source:    script,
-				Arguments: [][]byte{},
+				Source: script,
 			},
 			runtime.Context{
 				Interface:   runtimeInterface,
 				Environment: scriptEnvironment,
 				Location:    nextScriptLocation(),
+				UseVM:       *testWithVMScriptExecution,
 			},
 		)
 		require.NoError(t, err)
@@ -744,13 +785,13 @@ func TestEVMEncodeABIByteTypes(t *testing.T) {
 		// Run script
 		result, err := rt.ExecuteScript(
 			runtime.Script{
-				Source:    script,
-				Arguments: [][]byte{},
+				Source: script,
 			},
 			runtime.Context{
 				Interface:   runtimeInterface,
 				Environment: scriptEnvironment,
 				Location:    nextScriptLocation(),
+				UseVM:       *testWithVMScriptExecution,
 			},
 		)
 		require.NoError(t, err)
@@ -812,13 +853,13 @@ func TestEVMEncodeABIByteTypes(t *testing.T) {
 		// Run script
 		result, err := rt.ExecuteScript(
 			runtime.Script{
-				Source:    script,
-				Arguments: [][]byte{},
+				Source: script,
 			},
 			runtime.Context{
 				Interface:   runtimeInterface,
 				Environment: scriptEnvironment,
 				Location:    nextScriptLocation(),
+				UseVM:       *testWithVMScriptExecution,
 			},
 		)
 		require.NoError(t, err)
@@ -880,13 +921,13 @@ func TestEVMEncodeABIByteTypes(t *testing.T) {
 		// Run script
 		result, err := rt.ExecuteScript(
 			runtime.Script{
-				Source:    script,
-				Arguments: [][]byte{},
+				Source: script,
 			},
 			runtime.Context{
 				Interface:   runtimeInterface,
 				Environment: scriptEnvironment,
 				Location:    nextScriptLocation(),
+				UseVM:       *testWithVMScriptExecution,
 			},
 		)
 		require.NoError(t, err)
@@ -935,8 +976,10 @@ func TestEVMEncodeABIBytesRoundtrip(t *testing.T) {
 
 	handler := &testContractHandler{}
 	contractsAddress := flow.BytesToAddress([]byte{0x1})
-	transactionEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
+
+	deploymentEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
 	scriptEnvironment := newEVMScriptEnvironment(handler, contractsAddress)
+
 	rt := runtime.NewRuntime(runtime.Config{})
 
 	accountCodes := map[common.Location][]byte{}
@@ -981,7 +1024,7 @@ func TestEVMEncodeABIBytesRoundtrip(t *testing.T) {
 		rt,
 		contractsAddress,
 		runtimeInterface,
-		transactionEnvironment,
+		deploymentEnvironment,
 		nextTransactionLocation,
 	)
 
@@ -1007,13 +1050,13 @@ func TestEVMEncodeABIBytesRoundtrip(t *testing.T) {
 		// Run script
 		result, err := rt.ExecuteScript(
 			runtime.Script{
-				Source:    script,
-				Arguments: [][]byte{},
+				Source: script,
 			},
 			runtime.Context{
 				Interface:   runtimeInterface,
 				Environment: scriptEnvironment,
 				Location:    nextScriptLocation(),
+				UseVM:       *testWithVMScriptExecution,
 			},
 		)
 		require.NoError(t, err)
@@ -1050,13 +1093,13 @@ func TestEVMEncodeABIBytesRoundtrip(t *testing.T) {
 		// Run script
 		result, err := rt.ExecuteScript(
 			runtime.Script{
-				Source:    script,
-				Arguments: [][]byte{},
+				Source: script,
 			},
 			runtime.Context{
 				Interface:   runtimeInterface,
 				Environment: scriptEnvironment,
 				Location:    nextScriptLocation(),
+				UseVM:       *testWithVMScriptExecution,
 			},
 		)
 		require.NoError(t, err)
@@ -1092,13 +1135,13 @@ func TestEVMEncodeABIBytesRoundtrip(t *testing.T) {
 		// Run script
 		result, err := rt.ExecuteScript(
 			runtime.Script{
-				Source:    script,
-				Arguments: [][]byte{},
+				Source: script,
 			},
 			runtime.Context{
 				Interface:   runtimeInterface,
 				Environment: scriptEnvironment,
 				Location:    nextScriptLocation(),
+				UseVM:       *testWithVMScriptExecution,
 			},
 		)
 		require.NoError(t, err)
@@ -1135,13 +1178,13 @@ func TestEVMEncodeABIBytesRoundtrip(t *testing.T) {
 		// Run script
 		result, err := rt.ExecuteScript(
 			runtime.Script{
-				Source:    script,
-				Arguments: [][]byte{},
+				Source: script,
 			},
 			runtime.Context{
 				Interface:   runtimeInterface,
 				Environment: scriptEnvironment,
 				Location:    nextScriptLocation(),
+				UseVM:       *testWithVMScriptExecution,
 			},
 		)
 		require.NoError(t, err)
@@ -1187,13 +1230,13 @@ func TestEVMEncodeABIBytesRoundtrip(t *testing.T) {
 		// Run script
 		result, err := rt.ExecuteScript(
 			runtime.Script{
-				Source:    script,
-				Arguments: [][]byte{},
+				Source: script,
 			},
 			runtime.Context{
 				Interface:   runtimeInterface,
 				Environment: scriptEnvironment,
 				Location:    nextScriptLocation(),
+				UseVM:       *testWithVMScriptExecution,
 			},
 		)
 		require.NoError(t, err)
@@ -1240,13 +1283,13 @@ func TestEVMEncodeABIBytesRoundtrip(t *testing.T) {
 		// Run script
 		result, err := rt.ExecuteScript(
 			runtime.Script{
-				Source:    script,
-				Arguments: [][]byte{},
+				Source: script,
 			},
 			runtime.Context{
 				Interface:   runtimeInterface,
 				Environment: scriptEnvironment,
 				Location:    nextScriptLocation(),
+				UseVM:       *testWithVMScriptExecution,
 			},
 		)
 		require.NoError(t, err)
@@ -1269,7 +1312,7 @@ func TestEVMEncodeABIComputation(t *testing.T) {
 
 	contractsAddress := flow.BytesToAddress([]byte{0x1})
 
-	transactionEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
+	deploymentEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
 	scriptEnvironment := newEVMScriptEnvironment(handler, contractsAddress)
 
 	rt := runtime.NewRuntime(runtime.Config{})
@@ -1340,7 +1383,7 @@ func TestEVMEncodeABIComputation(t *testing.T) {
 		rt,
 		contractsAddress,
 		runtimeInterface,
-		transactionEnvironment,
+		deploymentEnvironment,
 		nextTransactionLocation,
 	)
 
@@ -1348,13 +1391,13 @@ func TestEVMEncodeABIComputation(t *testing.T) {
 
 	result, err := rt.ExecuteScript(
 		runtime.Script{
-			Source:    script,
-			Arguments: [][]byte{},
+			Source: script,
 		},
 		runtime.Context{
 			Interface:   runtimeInterface,
 			Environment: scriptEnvironment,
 			Location:    nextScriptLocation(),
+			UseVM:       *testWithVMScriptExecution,
 		},
 	)
 	require.NoError(t, err)
@@ -1373,7 +1416,7 @@ func TestEVMEncodeABIComputationEmptyDynamicVariables(t *testing.T) {
 
 	contractsAddress := flow.BytesToAddress([]byte{0x1})
 
-	transactionEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
+	deploymentEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
 	scriptEnvironment := newEVMScriptEnvironment(handler, contractsAddress)
 
 	rt := runtime.NewRuntime(runtime.Config{})
@@ -1435,7 +1478,7 @@ func TestEVMEncodeABIComputationEmptyDynamicVariables(t *testing.T) {
 		rt,
 		contractsAddress,
 		runtimeInterface,
-		transactionEnvironment,
+		deploymentEnvironment,
 		nextTransactionLocation,
 	)
 
@@ -1443,13 +1486,13 @@ func TestEVMEncodeABIComputationEmptyDynamicVariables(t *testing.T) {
 
 	result, err := rt.ExecuteScript(
 		runtime.Script{
-			Source:    script,
-			Arguments: [][]byte{},
+			Source: script,
 		},
 		runtime.Context{
 			Interface:   runtimeInterface,
 			Environment: scriptEnvironment,
 			Location:    nextScriptLocation(),
+			UseVM:       *testWithVMScriptExecution,
 		},
 	)
 	require.NoError(t, err)
@@ -1468,7 +1511,7 @@ func TestEVMEncodeABIComputationDynamicVariablesAboveChunkSize(t *testing.T) {
 
 	contractsAddress := flow.BytesToAddress([]byte{0x1})
 
-	transactionEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
+	deploymentEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
 	scriptEnvironment := newEVMScriptEnvironment(handler, contractsAddress)
 
 	rt := runtime.NewRuntime(runtime.Config{})
@@ -1539,7 +1582,7 @@ func TestEVMEncodeABIComputationDynamicVariablesAboveChunkSize(t *testing.T) {
 		rt,
 		contractsAddress,
 		runtimeInterface,
-		transactionEnvironment,
+		deploymentEnvironment,
 		nextTransactionLocation,
 	)
 
@@ -1547,13 +1590,13 @@ func TestEVMEncodeABIComputationDynamicVariablesAboveChunkSize(t *testing.T) {
 
 	result, err := rt.ExecuteScript(
 		runtime.Script{
-			Source:    script,
-			Arguments: [][]byte{},
+			Source: script,
 		},
 		runtime.Context{
 			Interface:   runtimeInterface,
 			Environment: scriptEnvironment,
 			Location:    nextScriptLocation(),
+			UseVM:       *testWithVMScriptExecution,
 		},
 	)
 	require.NoError(t, err)
@@ -1572,7 +1615,7 @@ func TestEVMDecodeABI(t *testing.T) {
 
 	contractsAddress := flow.BytesToAddress([]byte{0x1})
 
-	transactionEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
+	deploymentEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
 	scriptEnvironment := newEVMScriptEnvironment(handler, contractsAddress)
 
 	rt := runtime.NewRuntime(runtime.Config{})
@@ -1637,7 +1680,7 @@ func TestEVMDecodeABI(t *testing.T) {
 		rt,
 		contractsAddress,
 		runtimeInterface,
-		transactionEnvironment,
+		deploymentEnvironment,
 		nextTransactionLocation,
 	)
 
@@ -1675,6 +1718,7 @@ func TestEVMDecodeABI(t *testing.T) {
 			Interface:   runtimeInterface,
 			Environment: scriptEnvironment,
 			Location:    nextScriptLocation(),
+			UseVM:       *testWithVMScriptExecution,
 		},
 	)
 	require.NoError(t, err)
@@ -1691,7 +1735,7 @@ func TestEVMDecodeABIComputation(t *testing.T) {
 
 	contractsAddress := flow.BytesToAddress([]byte{0x1})
 
-	transactionEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
+	deploymentEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
 	scriptEnvironment := newEVMScriptEnvironment(handler, contractsAddress)
 
 	rt := runtime.NewRuntime(runtime.Config{})
@@ -1770,7 +1814,7 @@ func TestEVMDecodeABIComputation(t *testing.T) {
 		rt,
 		contractsAddress,
 		runtimeInterface,
-		transactionEnvironment,
+		deploymentEnvironment,
 		nextTransactionLocation,
 	)
 
@@ -1778,13 +1822,13 @@ func TestEVMDecodeABIComputation(t *testing.T) {
 
 	result, err := rt.ExecuteScript(
 		runtime.Script{
-			Source:    script,
-			Arguments: [][]byte{},
+			Source: script,
 		},
 		runtime.Context{
 			Interface:   runtimeInterface,
 			Environment: scriptEnvironment,
 			Location:    nextScriptLocation(),
+			UseVM:       *testWithVMScriptExecution,
 		},
 	)
 	require.NoError(t, err)
@@ -1801,7 +1845,8 @@ func TestEVMEncodeDecodeABIRoundtripForUintIntTypes(t *testing.T) {
 
 	handler := &testContractHandler{}
 	contractsAddress := flow.BytesToAddress([]byte{0x1})
-	transactionEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
+
+	deploymentEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
 	scriptEnvironment := newEVMScriptEnvironment(handler, contractsAddress)
 	rt := runtime.NewRuntime(runtime.Config{})
 
@@ -1848,7 +1893,7 @@ func TestEVMEncodeDecodeABIRoundtripForUintIntTypes(t *testing.T) {
 		rt,
 		contractsAddress,
 		runtimeInterface,
-		transactionEnvironment,
+		deploymentEnvironment,
 		nextTransactionLocation,
 	)
 
@@ -1882,13 +1927,13 @@ func TestEVMEncodeDecodeABIRoundtripForUintIntTypes(t *testing.T) {
 
 		result, err := rt.ExecuteScript(
 			runtime.Script{
-				Source:    script,
-				Arguments: [][]byte{},
+				Source: script,
 			},
 			runtime.Context{
 				Interface:   runtimeInterface,
 				Environment: scriptEnvironment,
 				Location:    nextScriptLocation(),
+				UseVM:       *testWithVMScriptExecution,
 			},
 		)
 		require.NoError(t, err)
@@ -1926,13 +1971,13 @@ func TestEVMEncodeDecodeABIRoundtripForUintIntTypes(t *testing.T) {
 
 		result, err := rt.ExecuteScript(
 			runtime.Script{
-				Source:    script,
-				Arguments: [][]byte{},
+				Source: script,
 			},
 			runtime.Context{
 				Interface:   runtimeInterface,
 				Environment: scriptEnvironment,
 				Location:    nextScriptLocation(),
+				UseVM:       *testWithVMScriptExecution,
 			},
 		)
 		require.NoError(t, err)
@@ -1960,13 +2005,13 @@ func TestEVMEncodeDecodeABIRoundtripForUintIntTypes(t *testing.T) {
 
 		_, err := rt.ExecuteScript(
 			runtime.Script{
-				Source:    script,
-				Arguments: [][]byte{},
+				Source: script,
 			},
 			runtime.Context{
 				Interface:   runtimeInterface,
 				Environment: scriptEnvironment,
 				Location:    nextScriptLocation(),
+				UseVM:       *testWithVMScriptExecution,
 			},
 		)
 		require.Error(t, err)
@@ -1998,13 +2043,13 @@ func TestEVMEncodeDecodeABIRoundtripForUintIntTypes(t *testing.T) {
 
 		_, err := rt.ExecuteScript(
 			runtime.Script{
-				Source:    script,
-				Arguments: [][]byte{},
+				Source: script,
 			},
 			runtime.Context{
 				Interface:   runtimeInterface,
 				Environment: scriptEnvironment,
 				Location:    nextScriptLocation(),
+				UseVM:       *testWithVMScriptExecution,
 			},
 		)
 		require.Error(t, err)
@@ -2036,13 +2081,13 @@ func TestEVMEncodeDecodeABIRoundtripForUintIntTypes(t *testing.T) {
 
 		_, err := rt.ExecuteScript(
 			runtime.Script{
-				Source:    script,
-				Arguments: [][]byte{},
+				Source: script,
 			},
 			runtime.Context{
 				Interface:   runtimeInterface,
 				Environment: scriptEnvironment,
 				Location:    nextScriptLocation(),
+				UseVM:       *testWithVMScriptExecution,
 			},
 		)
 		require.Error(t, err)
@@ -2063,7 +2108,7 @@ func TestEVMEncodeDecodeABIRoundtrip(t *testing.T) {
 
 	contractsAddress := flow.BytesToAddress([]byte{0x1})
 
-	transactionEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
+	deploymentEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
 	scriptEnvironment := newEVMScriptEnvironment(handler, contractsAddress)
 
 	rt := runtime.NewRuntime(runtime.Config{})
@@ -2307,7 +2352,7 @@ func TestEVMEncodeDecodeABIRoundtrip(t *testing.T) {
 		rt,
 		contractsAddress,
 		runtimeInterface,
-		transactionEnvironment,
+		deploymentEnvironment,
 		nextTransactionLocation,
 	)
 
@@ -2315,13 +2360,13 @@ func TestEVMEncodeDecodeABIRoundtrip(t *testing.T) {
 
 	result, err := rt.ExecuteScript(
 		runtime.Script{
-			Source:    script,
-			Arguments: [][]byte{},
+			Source: script,
 		},
 		runtime.Context{
 			Interface:   runtimeInterface,
 			Environment: scriptEnvironment,
 			Location:    nextScriptLocation(),
+			UseVM:       *testWithVMScriptExecution,
 		},
 	)
 	require.NoError(t, err)
@@ -2344,7 +2389,7 @@ func TestEVMEncodeDecodeABIErrors(t *testing.T) {
 
 		contractsAddress := flow.BytesToAddress([]byte{0x1})
 
-		transactionEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
+		deploymentEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
 		scriptEnvironment := newEVMScriptEnvironment(handler, contractsAddress)
 
 		rt := runtime.NewRuntime(runtime.Config{})
@@ -2385,7 +2430,7 @@ func TestEVMEncodeDecodeABIErrors(t *testing.T) {
 			rt,
 			contractsAddress,
 			runtimeInterface,
-			transactionEnvironment,
+			deploymentEnvironment,
 			nextTransactionLocation,
 		)
 
@@ -2405,13 +2450,13 @@ func TestEVMEncodeDecodeABIErrors(t *testing.T) {
 
 		_, err := rt.ExecuteScript(
 			runtime.Script{
-				Source:    script,
-				Arguments: [][]byte{},
+				Source: script,
 			},
 			runtime.Context{
 				Interface:   runtimeInterface,
 				Environment: scriptEnvironment,
 				Location:    nextScriptLocation(),
+				UseVM:       *testWithVMScriptExecution,
 			},
 		)
 		RequireError(t, err)
@@ -2430,7 +2475,7 @@ func TestEVMEncodeDecodeABIErrors(t *testing.T) {
 
 		contractsAddress := flow.BytesToAddress([]byte{0x1})
 
-		transactionEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
+		deploymentEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
 		scriptEnvironment := newEVMScriptEnvironment(handler, contractsAddress)
 
 		rt := runtime.NewRuntime(runtime.Config{})
@@ -2471,7 +2516,7 @@ func TestEVMEncodeDecodeABIErrors(t *testing.T) {
 			rt,
 			contractsAddress,
 			runtimeInterface,
-			transactionEnvironment,
+			deploymentEnvironment,
 			nextTransactionLocation,
 		)
 
@@ -2490,13 +2535,13 @@ func TestEVMEncodeDecodeABIErrors(t *testing.T) {
 
 		_, err := rt.ExecuteScript(
 			runtime.Script{
-				Source:    script,
-				Arguments: [][]byte{},
+				Source: script,
 			},
 			runtime.Context{
 				Interface:   runtimeInterface,
 				Environment: scriptEnvironment,
 				Location:    nextScriptLocation(),
+				UseVM:       *testWithVMScriptExecution,
 			},
 		)
 		RequireError(t, err)
@@ -2515,7 +2560,7 @@ func TestEVMEncodeDecodeABIErrors(t *testing.T) {
 
 		contractsAddress := flow.BytesToAddress([]byte{0x1})
 
-		transactionEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
+		deploymentEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
 		scriptEnvironment := newEVMScriptEnvironment(handler, contractsAddress)
 
 		rt := runtime.NewRuntime(runtime.Config{})
@@ -2556,7 +2601,7 @@ func TestEVMEncodeDecodeABIErrors(t *testing.T) {
 			rt,
 			contractsAddress,
 			runtimeInterface,
-			transactionEnvironment,
+			deploymentEnvironment,
 			nextTransactionLocation,
 		)
 
@@ -2576,13 +2621,13 @@ func TestEVMEncodeDecodeABIErrors(t *testing.T) {
 
 		_, err := rt.ExecuteScript(
 			runtime.Script{
-				Source:    script,
-				Arguments: [][]byte{},
+				Source: script,
 			},
 			runtime.Context{
 				Interface:   runtimeInterface,
 				Environment: scriptEnvironment,
 				Location:    nextScriptLocation(),
+				UseVM:       *testWithVMScriptExecution,
 			},
 		)
 		RequireError(t, err)
@@ -2601,7 +2646,7 @@ func TestEVMEncodeDecodeABIErrors(t *testing.T) {
 
 		contractsAddress := flow.BytesToAddress([]byte{0x1})
 
-		transactionEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
+		deploymentEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
 		scriptEnvironment := newEVMScriptEnvironment(handler, contractsAddress)
 
 		rt := runtime.NewRuntime(runtime.Config{})
@@ -2642,7 +2687,7 @@ func TestEVMEncodeDecodeABIErrors(t *testing.T) {
 			rt,
 			contractsAddress,
 			runtimeInterface,
-			transactionEnvironment,
+			deploymentEnvironment,
 			nextTransactionLocation,
 		)
 
@@ -2662,13 +2707,13 @@ func TestEVMEncodeDecodeABIErrors(t *testing.T) {
 
 		_, err := rt.ExecuteScript(
 			runtime.Script{
-				Source:    script,
-				Arguments: [][]byte{},
+				Source: script,
 			},
 			runtime.Context{
 				Interface:   runtimeInterface,
 				Environment: scriptEnvironment,
 				Location:    nextScriptLocation(),
+				UseVM:       *testWithVMScriptExecution,
 			},
 		)
 		RequireError(t, err)
@@ -2687,7 +2732,7 @@ func TestEVMEncodeDecodeABIErrors(t *testing.T) {
 
 		contractsAddress := flow.BytesToAddress([]byte{0x1})
 
-		transactionEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
+		deploymentEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
 		scriptEnvironment := newEVMScriptEnvironment(handler, contractsAddress)
 
 		rt := runtime.NewRuntime(runtime.Config{})
@@ -2728,7 +2773,7 @@ func TestEVMEncodeDecodeABIErrors(t *testing.T) {
 			rt,
 			contractsAddress,
 			runtimeInterface,
-			transactionEnvironment,
+			deploymentEnvironment,
 			nextTransactionLocation,
 		)
 
@@ -2758,13 +2803,13 @@ func TestEVMEncodeDecodeABIErrors(t *testing.T) {
 
 		_, err := rt.ExecuteScript(
 			runtime.Script{
-				Source:    script,
-				Arguments: [][]byte{},
+				Source: script,
 			},
 			runtime.Context{
 				Interface:   runtimeInterface,
 				Environment: scriptEnvironment,
 				Location:    nextScriptLocation(),
+				UseVM:       *testWithVMScriptExecution,
 			},
 		)
 		RequireError(t, err)
@@ -2783,7 +2828,7 @@ func TestEVMEncodeDecodeABIErrors(t *testing.T) {
 
 		contractsAddress := flow.BytesToAddress([]byte{0x1})
 
-		transactionEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
+		deploymentEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
 		scriptEnvironment := newEVMScriptEnvironment(handler, contractsAddress)
 
 		rt := runtime.NewRuntime(runtime.Config{})
@@ -2824,7 +2869,7 @@ func TestEVMEncodeDecodeABIErrors(t *testing.T) {
 			rt,
 			contractsAddress,
 			runtimeInterface,
-			transactionEnvironment,
+			deploymentEnvironment,
 			nextTransactionLocation,
 		)
 
@@ -2844,13 +2889,13 @@ func TestEVMEncodeDecodeABIErrors(t *testing.T) {
 
 		_, err := rt.ExecuteScript(
 			runtime.Script{
-				Source:    script,
-				Arguments: [][]byte{},
+				Source: script,
 			},
 			runtime.Context{
 				Interface:   runtimeInterface,
 				Environment: scriptEnvironment,
 				Location:    nextScriptLocation(),
+				UseVM:       *testWithVMScriptExecution,
 			},
 		)
 		RequireError(t, err)
@@ -2869,7 +2914,7 @@ func TestEVMEncodeDecodeABIErrors(t *testing.T) {
 
 		contractsAddress := flow.BytesToAddress([]byte{0x1})
 
-		transactionEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
+		deploymentEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
 		scriptEnvironment := newEVMScriptEnvironment(handler, contractsAddress)
 
 		rt := runtime.NewRuntime(runtime.Config{})
@@ -2910,7 +2955,7 @@ func TestEVMEncodeDecodeABIErrors(t *testing.T) {
 			rt,
 			contractsAddress,
 			runtimeInterface,
-			transactionEnvironment,
+			deploymentEnvironment,
 			nextTransactionLocation,
 		)
 
@@ -2930,13 +2975,13 @@ func TestEVMEncodeDecodeABIErrors(t *testing.T) {
 
 		_, err := rt.ExecuteScript(
 			runtime.Script{
-				Source:    script,
-				Arguments: [][]byte{},
+				Source: script,
 			},
 			runtime.Context{
 				Interface:   runtimeInterface,
 				Environment: scriptEnvironment,
 				Location:    nextScriptLocation(),
+				UseVM:       *testWithVMScriptExecution,
 			},
 		)
 		RequireError(t, err)
@@ -2955,7 +3000,7 @@ func TestEVMEncodeDecodeABIErrors(t *testing.T) {
 
 		contractsAddress := flow.BytesToAddress([]byte{0x1})
 
-		transactionEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
+		deploymentEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
 		scriptEnvironment := newEVMScriptEnvironment(handler, contractsAddress)
 
 		rt := runtime.NewRuntime(runtime.Config{})
@@ -2996,7 +3041,7 @@ func TestEVMEncodeDecodeABIErrors(t *testing.T) {
 			rt,
 			contractsAddress,
 			runtimeInterface,
-			transactionEnvironment,
+			deploymentEnvironment,
 			nextTransactionLocation,
 		)
 
@@ -3016,13 +3061,13 @@ func TestEVMEncodeDecodeABIErrors(t *testing.T) {
 
 		_, err := rt.ExecuteScript(
 			runtime.Script{
-				Source:    script,
-				Arguments: [][]byte{},
+				Source: script,
 			},
 			runtime.Context{
 				Interface:   runtimeInterface,
 				Environment: scriptEnvironment,
 				Location:    nextScriptLocation(),
+				UseVM:       *testWithVMScriptExecution,
 			},
 		)
 		RequireError(t, err)
@@ -3041,7 +3086,7 @@ func TestEVMEncodeDecodeABIErrors(t *testing.T) {
 
 		contractsAddress := flow.BytesToAddress([]byte{0x1})
 
-		transactionEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
+		deploymentEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
 		scriptEnvironment := newEVMScriptEnvironment(handler, contractsAddress)
 
 		rt := runtime.NewRuntime(runtime.Config{})
@@ -3082,7 +3127,7 @@ func TestEVMEncodeDecodeABIErrors(t *testing.T) {
 			rt,
 			contractsAddress,
 			runtimeInterface,
-			transactionEnvironment,
+			deploymentEnvironment,
 			nextTransactionLocation,
 		)
 
@@ -3102,13 +3147,13 @@ func TestEVMEncodeDecodeABIErrors(t *testing.T) {
 
 		_, err := rt.ExecuteScript(
 			runtime.Script{
-				Source:    script,
-				Arguments: [][]byte{},
+				Source: script,
 			},
 			runtime.Context{
 				Interface:   runtimeInterface,
 				Environment: scriptEnvironment,
 				Location:    nextScriptLocation(),
+				UseVM:       *testWithVMScriptExecution,
 			},
 		)
 		RequireError(t, err)
@@ -3127,7 +3172,7 @@ func TestEVMEncodeDecodeABIErrors(t *testing.T) {
 
 		contractsAddress := flow.BytesToAddress([]byte{0x1})
 
-		transactionEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
+		deploymentEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
 		scriptEnvironment := newEVMScriptEnvironment(handler, contractsAddress)
 
 		rt := runtime.NewRuntime(runtime.Config{})
@@ -3168,7 +3213,7 @@ func TestEVMEncodeDecodeABIErrors(t *testing.T) {
 			rt,
 			contractsAddress,
 			runtimeInterface,
-			transactionEnvironment,
+			deploymentEnvironment,
 			nextTransactionLocation,
 		)
 
@@ -3188,13 +3233,13 @@ func TestEVMEncodeDecodeABIErrors(t *testing.T) {
 
 		_, err := rt.ExecuteScript(
 			runtime.Script{
-				Source:    script,
-				Arguments: [][]byte{},
+				Source: script,
 			},
 			runtime.Context{
 				Interface:   runtimeInterface,
 				Environment: scriptEnvironment,
 				Location:    nextScriptLocation(),
+				UseVM:       *testWithVMScriptExecution,
 			},
 		)
 		RequireError(t, err)
@@ -3213,7 +3258,7 @@ func TestEVMEncodeDecodeABIErrors(t *testing.T) {
 
 		contractsAddress := flow.BytesToAddress([]byte{0x1})
 
-		transactionEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
+		deploymentEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
 		scriptEnvironment := newEVMScriptEnvironment(handler, contractsAddress)
 
 		rt := runtime.NewRuntime(runtime.Config{})
@@ -3254,7 +3299,7 @@ func TestEVMEncodeDecodeABIErrors(t *testing.T) {
 			rt,
 			contractsAddress,
 			runtimeInterface,
-			transactionEnvironment,
+			deploymentEnvironment,
 			nextTransactionLocation,
 		)
 
@@ -3284,13 +3329,13 @@ func TestEVMEncodeDecodeABIErrors(t *testing.T) {
 
 		_, err := rt.ExecuteScript(
 			runtime.Script{
-				Source:    script,
-				Arguments: [][]byte{},
+				Source: script,
 			},
 			runtime.Context{
 				Interface:   runtimeInterface,
 				Environment: scriptEnvironment,
 				Location:    nextScriptLocation(),
+				UseVM:       *testWithVMScriptExecution,
 			},
 		)
 		RequireError(t, err)
@@ -3310,7 +3355,7 @@ func TestEVMEncodeABIWithSignature(t *testing.T) {
 
 	contractsAddress := flow.BytesToAddress([]byte{0x1})
 
-	transactionEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
+	deploymentEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
 	scriptEnvironment := newEVMScriptEnvironment(handler, contractsAddress)
 
 	rt := runtime.NewRuntime(runtime.Config{})
@@ -3383,7 +3428,7 @@ func TestEVMEncodeABIWithSignature(t *testing.T) {
 		rt,
 		contractsAddress,
 		runtimeInterface,
-		transactionEnvironment,
+		deploymentEnvironment,
 		nextTransactionLocation,
 	)
 
@@ -3391,13 +3436,13 @@ func TestEVMEncodeABIWithSignature(t *testing.T) {
 
 	result, err := rt.ExecuteScript(
 		runtime.Script{
-			Source:    script,
-			Arguments: [][]byte{},
+			Source: script,
 		},
 		runtime.Context{
 			Interface:   runtimeInterface,
 			Environment: scriptEnvironment,
 			Location:    nextScriptLocation(),
+			UseVM:       *testWithVMScriptExecution,
 		},
 	)
 	require.NoError(t, err)
@@ -3434,7 +3479,7 @@ func TestEVMDecodeABIWithSignature(t *testing.T) {
 
 	contractsAddress := flow.BytesToAddress([]byte{0x1})
 
-	transactionEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
+	deploymentEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
 	scriptEnvironment := newEVMScriptEnvironment(handler, contractsAddress)
 
 	rt := runtime.NewRuntime(runtime.Config{})
@@ -3516,7 +3561,7 @@ func TestEVMDecodeABIWithSignature(t *testing.T) {
 		rt,
 		contractsAddress,
 		runtimeInterface,
-		transactionEnvironment,
+		deploymentEnvironment,
 		nextTransactionLocation,
 	)
 
@@ -3548,6 +3593,7 @@ func TestEVMDecodeABIWithSignature(t *testing.T) {
 			Interface:   runtimeInterface,
 			Environment: scriptEnvironment,
 			Location:    nextScriptLocation(),
+			UseVM:       *testWithVMScriptExecution,
 		},
 	)
 	require.NoError(t, err)
@@ -3565,7 +3611,7 @@ func TestEVMDecodeABIWithSignatureMismatch(t *testing.T) {
 
 	contractsAddress := flow.BytesToAddress([]byte{0x1})
 
-	transactionEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
+	deploymentEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
 	scriptEnvironment := newEVMScriptEnvironment(handler, contractsAddress)
 
 	rt := runtime.NewRuntime(runtime.Config{})
@@ -3630,7 +3676,7 @@ func TestEVMDecodeABIWithSignatureMismatch(t *testing.T) {
 		rt,
 		contractsAddress,
 		runtimeInterface,
-		transactionEnvironment,
+		deploymentEnvironment,
 		nextTransactionLocation,
 	)
 
@@ -3662,6 +3708,7 @@ func TestEVMDecodeABIWithSignatureMismatch(t *testing.T) {
 			Interface:   runtimeInterface,
 			Environment: scriptEnvironment,
 			Location:    nextScriptLocation(),
+			UseVM:       *testWithVMScriptExecution,
 		},
 	)
 	require.Error(t, err)
@@ -3676,7 +3723,7 @@ func TestEVMAddressConstructionAndReturn(t *testing.T) {
 
 	contractsAddress := flow.BytesToAddress([]byte{0x1})
 
-	transactionEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
+	deploymentEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
 	scriptEnvironment := newEVMScriptEnvironment(handler, contractsAddress)
 
 	rt := runtime.NewRuntime(runtime.Config{})
@@ -3739,7 +3786,7 @@ func TestEVMAddressConstructionAndReturn(t *testing.T) {
 		rt,
 		contractsAddress,
 		runtimeInterface,
-		transactionEnvironment,
+		deploymentEnvironment,
 		nextTransactionLocation,
 	)
 
@@ -3756,6 +3803,7 @@ func TestEVMAddressConstructionAndReturn(t *testing.T) {
 			Interface:   runtimeInterface,
 			Environment: scriptEnvironment,
 			Location:    nextScriptLocation(),
+			UseVM:       *testWithVMScriptExecution,
 		},
 	)
 	require.NoError(t, err)
@@ -3778,7 +3826,7 @@ func TestEVMAddressSerializationAndDeserialization(t *testing.T) {
 
 	contractsAddress := flow.BytesToAddress([]byte{0x1})
 
-	transactionEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
+	deploymentEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
 	scriptEnvironment := newEVMScriptEnvironment(handler, contractsAddress)
 
 	rt := runtime.NewRuntime(runtime.Config{})
@@ -3847,7 +3895,7 @@ func TestEVMAddressSerializationAndDeserialization(t *testing.T) {
 		rt,
 		contractsAddress,
 		runtimeInterface,
-		transactionEnvironment,
+		deploymentEnvironment,
 		nextTransactionLocation,
 	)
 
@@ -3864,6 +3912,7 @@ func TestEVMAddressSerializationAndDeserialization(t *testing.T) {
 			Interface:   runtimeInterface,
 			Environment: scriptEnvironment,
 			Location:    nextScriptLocation(),
+			UseVM:       *testWithVMScriptExecution,
 		},
 	)
 	require.NoError(t, err)
@@ -3900,6 +3949,7 @@ func TestEVMAddressSerializationAndDeserialization(t *testing.T) {
 			Interface:   runtimeInterface,
 			Environment: scriptEnvironment,
 			Location:    nextScriptLocation(),
+			UseVM:       *testWithVMScriptExecution,
 		},
 	)
 
@@ -3936,6 +3986,7 @@ func TestEVMAddressSerializationAndDeserialization(t *testing.T) {
 			Interface:   runtimeInterface,
 			Environment: scriptEnvironment,
 			Location:    nextScriptLocation(),
+			UseVM:       *testWithVMScriptExecution,
 		},
 	)
 
@@ -3955,7 +4006,7 @@ func TestBalanceConstructionAndReturn(t *testing.T) {
 
 	contractsAddress := flow.BytesToAddress([]byte{0x1})
 
-	transactionEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
+	deploymentEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
 	scriptEnvironment := newEVMScriptEnvironment(handler, contractsAddress)
 
 	rt := runtime.NewRuntime(runtime.Config{})
@@ -4005,7 +4056,7 @@ func TestBalanceConstructionAndReturn(t *testing.T) {
 		rt,
 		contractsAddress,
 		runtimeInterface,
-		transactionEnvironment,
+		deploymentEnvironment,
 		nextTransactionLocation,
 	)
 
@@ -4024,6 +4075,7 @@ func TestBalanceConstructionAndReturn(t *testing.T) {
 			Interface:   runtimeInterface,
 			Environment: scriptEnvironment,
 			Location:    nextScriptLocation(),
+			UseVM:       *testWithVMScriptExecution,
 		},
 	)
 	require.NoError(t, err)
@@ -4082,7 +4134,7 @@ func TestEVMRun(t *testing.T) {
 		},
 	}
 
-	transactionEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
+	deploymentEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
 	scriptEnvironment := newEVMScriptEnvironment(handler, contractsAddress)
 
 	rt := runtime.NewRuntime(runtime.Config{})
@@ -4135,7 +4187,7 @@ func TestEVMRun(t *testing.T) {
 		rt,
 		contractsAddress,
 		runtimeInterface,
-		transactionEnvironment,
+		deploymentEnvironment,
 		nextTransactionLocation,
 	)
 
@@ -4150,6 +4202,7 @@ func TestEVMRun(t *testing.T) {
 			Interface:   runtimeInterface,
 			Environment: scriptEnvironment,
 			Location:    nextScriptLocation(),
+			UseVM:       *testWithVMScriptExecution,
 		},
 	)
 	require.NoError(t, err)
@@ -4178,6 +4231,7 @@ func TestEVMRun(t *testing.T) {
 			Interface:   runtimeInterface,
 			Environment: scriptEnvironment,
 			Location:    nextScriptLocation(),
+			UseVM:       *testWithVMScriptExecution,
 		},
 	)
 	require.NoError(t, err)
@@ -4211,7 +4265,7 @@ func TestEVMDryRun(t *testing.T) {
 		},
 	}
 
-	transactionEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
+	deploymentEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
 	scriptEnvironment := newEVMScriptEnvironment(handler, contractsAddress)
 
 	rt := runtime.NewRuntime(runtime.Config{})
@@ -4252,7 +4306,7 @@ func TestEVMDryRun(t *testing.T) {
 		rt,
 		contractsAddress,
 		runtimeInterface,
-		transactionEnvironment,
+		deploymentEnvironment,
 		nextTransactionLocation,
 	)
 
@@ -4279,6 +4333,7 @@ func TestEVMDryRun(t *testing.T) {
 			Interface:   runtimeInterface,
 			Environment: scriptEnvironment,
 			Location:    nextScriptLocation(),
+			UseVM:       *testWithVMScriptExecution,
 		},
 	)
 	require.NoError(t, err)
@@ -4326,7 +4381,7 @@ func TestEVMDryCall(t *testing.T) {
 		},
 	}
 
-	transactionEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
+	deploymentEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
 	scriptEnvironment := newEVMScriptEnvironment(handler, contractsAddress)
 
 	rt := runtime.NewRuntime(runtime.Config{})
@@ -4367,7 +4422,7 @@ func TestEVMDryCall(t *testing.T) {
 		rt,
 		contractsAddress,
 		runtimeInterface,
-		transactionEnvironment,
+		deploymentEnvironment,
 		nextTransactionLocation,
 	)
 
@@ -4397,6 +4452,7 @@ func TestEVMDryCall(t *testing.T) {
 			Interface:   runtimeInterface,
 			Environment: scriptEnvironment,
 			Location:    nextScriptLocation(),
+			UseVM:       *testWithVMScriptExecution,
 		},
 	)
 	require.NoError(t, err)
@@ -4458,7 +4514,7 @@ func TestEVMBatchRun(t *testing.T) {
 		},
 	}
 
-	transactionEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
+	deploymentEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
 	scriptEnvironment := newEVMScriptEnvironment(handler, contractsAddress)
 
 	rt := runtime.NewRuntime(runtime.Config{})
@@ -4509,7 +4565,7 @@ func TestEVMBatchRun(t *testing.T) {
 		rt,
 		contractsAddress,
 		runtimeInterface,
-		transactionEnvironment,
+		deploymentEnvironment,
 		nextTransactionLocation,
 	)
 
@@ -4524,6 +4580,7 @@ func TestEVMBatchRun(t *testing.T) {
 			Interface:   runtimeInterface,
 			Environment: scriptEnvironment,
 			Location:    nextScriptLocation(),
+			UseVM:       *testWithVMScriptExecution,
 		},
 	)
 	require.NoError(t, err)
@@ -4553,8 +4610,9 @@ func TestEVMCreateCadenceOwnedAccount(t *testing.T) {
 
 	contractsAddress := flow.BytesToAddress([]byte{0x1})
 
-	transactionEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
+	deploymentEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
 	scriptEnvironment := newEVMScriptEnvironment(handler, contractsAddress)
+
 	rt := runtime.NewRuntime(runtime.Config{})
 
 	script := []byte(`
@@ -4613,7 +4671,7 @@ func TestEVMCreateCadenceOwnedAccount(t *testing.T) {
 		rt,
 		contractsAddress,
 		runtimeInterface,
-		transactionEnvironment,
+		deploymentEnvironment,
 		nextTransactionLocation,
 	)
 
@@ -4629,6 +4687,7 @@ func TestEVMCreateCadenceOwnedAccount(t *testing.T) {
 			Interface:   runtimeInterface,
 			Environment: scriptEnvironment,
 			Location:    nextScriptLocation(),
+			UseVM:       *testWithVMScriptExecution,
 		},
 	)
 	require.NoError(t, err)
@@ -4703,7 +4762,7 @@ func TestCadenceOwnedAccountCall(t *testing.T) {
 		},
 	}
 
-	transactionEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
+	deploymentEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
 	scriptEnvironment := newEVMScriptEnvironment(handler, contractsAddress)
 
 	rt := runtime.NewRuntime(runtime.Config{})
@@ -4765,7 +4824,7 @@ func TestCadenceOwnedAccountCall(t *testing.T) {
 		rt,
 		contractsAddress,
 		runtimeInterface,
-		transactionEnvironment,
+		deploymentEnvironment,
 		nextTransactionLocation,
 	)
 
@@ -4779,6 +4838,7 @@ func TestCadenceOwnedAccountCall(t *testing.T) {
 			Interface:   runtimeInterface,
 			Environment: scriptEnvironment,
 			Location:    nextScriptLocation(),
+			UseVM:       *testWithVMScriptExecution,
 		},
 	)
 	require.NoError(t, err)
@@ -4832,7 +4892,7 @@ func TestCadenceOwnedAccountDryCall(t *testing.T) {
 		},
 	}
 
-	transactionEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
+	deploymentEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
 	scriptEnvironment := newEVMScriptEnvironment(handler, contractsAddress)
 
 	rt := runtime.NewRuntime(runtime.Config{})
@@ -4894,7 +4954,7 @@ func TestCadenceOwnedAccountDryCall(t *testing.T) {
 		rt,
 		contractsAddress,
 		runtimeInterface,
-		transactionEnvironment,
+		deploymentEnvironment,
 		nextTransactionLocation,
 	)
 
@@ -4908,6 +4968,7 @@ func TestCadenceOwnedAccountDryCall(t *testing.T) {
 			Interface:   runtimeInterface,
 			Environment: scriptEnvironment,
 			Location:    nextScriptLocation(),
+			UseVM:       *testWithVMScriptExecution,
 		},
 	)
 	require.NoError(t, err)
@@ -4954,7 +5015,7 @@ func TestEVMAddressDeposit(t *testing.T) {
 
 	contractsAddress := flow.BytesToAddress([]byte{0x1})
 
-	transactionEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
+	deploymentEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
 	scriptEnvironment := newEVMScriptEnvironment(handler, contractsAddress)
 
 	rt := runtime.NewRuntime(runtime.Config{})
@@ -5014,7 +5075,7 @@ func TestEVMAddressDeposit(t *testing.T) {
 		rt,
 		contractsAddress,
 		runtimeInterface,
-		transactionEnvironment,
+		deploymentEnvironment,
 		nextTransactionLocation,
 	)
 
@@ -5028,6 +5089,7 @@ func TestEVMAddressDeposit(t *testing.T) {
 			Interface:   runtimeInterface,
 			Environment: scriptEnvironment,
 			Location:    nextScriptLocation(),
+			UseVM:       *testWithVMScriptExecution,
 		},
 	)
 	require.NoError(t, err)
@@ -5068,7 +5130,7 @@ func TestCOADeposit(t *testing.T) {
 
 	contractsAddress := flow.BytesToAddress([]byte{0x1})
 
-	transactionEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
+	deploymentEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
 	scriptEnvironment := newEVMScriptEnvironment(handler, contractsAddress)
 
 	rt := runtime.NewRuntime(runtime.Config{})
@@ -5127,7 +5189,7 @@ func TestCOADeposit(t *testing.T) {
 		rt,
 		contractsAddress,
 		runtimeInterface,
-		transactionEnvironment,
+		deploymentEnvironment,
 		nextTransactionLocation,
 	)
 
@@ -5144,6 +5206,7 @@ func TestCOADeposit(t *testing.T) {
 			Interface:   runtimeInterface,
 			Environment: scriptEnvironment,
 			Location:    nextScriptLocation(),
+			UseVM:       *testWithVMScriptExecution,
 		},
 	)
 	require.NoError(t, err)
@@ -5230,7 +5293,7 @@ func TestCadenceOwnedAccountWithdraw(t *testing.T) {
 		},
 	}
 
-	transactionEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
+	deploymentEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
 	scriptEnvironment := newEVMScriptEnvironment(handler, contractsAddress)
 
 	rt := runtime.NewRuntime(runtime.Config{})
@@ -5301,7 +5364,7 @@ func TestCadenceOwnedAccountWithdraw(t *testing.T) {
 		rt,
 		contractsAddress,
 		runtimeInterface,
-		transactionEnvironment,
+		deploymentEnvironment,
 		nextTransactionLocation,
 	)
 
@@ -5316,6 +5379,7 @@ func TestCadenceOwnedAccountWithdraw(t *testing.T) {
 			Interface:   runtimeInterface,
 			Environment: scriptEnvironment,
 			Location:    nextScriptLocation(),
+			UseVM:       *testWithVMScriptExecution,
 		},
 	)
 	require.NoError(t, err)
@@ -5392,7 +5456,7 @@ func TestCadenceOwnedAccountDeploy(t *testing.T) {
 		},
 	}
 
-	transactionEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
+	deploymentEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
 	scriptEnvironment := newEVMScriptEnvironment(handler, contractsAddress)
 
 	rt := runtime.NewRuntime(runtime.Config{})
@@ -5451,7 +5515,7 @@ func TestCadenceOwnedAccountDeploy(t *testing.T) {
 		rt,
 		contractsAddress,
 		runtimeInterface,
-		transactionEnvironment,
+		deploymentEnvironment,
 		nextTransactionLocation,
 	)
 
@@ -5465,6 +5529,7 @@ func TestCadenceOwnedAccountDeploy(t *testing.T) {
 			Interface:   runtimeInterface,
 			Environment: scriptEnvironment,
 			Location:    nextScriptLocation(),
+			UseVM:       *testWithVMScriptExecution,
 		},
 	)
 	require.NoError(t, err)
@@ -5485,7 +5550,8 @@ func RunEVMScript(
 	expectedValue cadence.Value,
 ) {
 	contractsAddress := flow.Address(handler.evmContractAddress)
-	transactionEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
+
+	deploymentEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
 	scriptEnvironment := newEVMScriptEnvironment(handler, contractsAddress)
 
 	rt := runtime.NewRuntime(runtime.Config{})
@@ -5526,7 +5592,7 @@ func RunEVMScript(
 		rt,
 		contractsAddress,
 		runtimeInterface,
-		transactionEnvironment,
+		deploymentEnvironment,
 		nextTransactionLocation,
 	)
 
@@ -5540,6 +5606,7 @@ func RunEVMScript(
 			Interface:   runtimeInterface,
 			Environment: scriptEnvironment,
 			Location:    nextScriptLocation(),
+			UseVM:       *testWithVMScriptExecution,
 		},
 	)
 	require.NoError(t, err)
@@ -5730,6 +5797,7 @@ func TestEVMValidateCOAOwnershipProof(t *testing.T) {
 				return proof.EVMAddress
 			},
 		}
+
 		transactionEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
 		scriptEnvironment := newEVMScriptEnvironment(handler, contractsAddress)
 
@@ -5803,6 +5871,7 @@ func TestEVMValidateCOAOwnershipProof(t *testing.T) {
 				Interface:   runtimeInterface,
 				Environment: transactionEnvironment,
 				Location:    nextTransactionLocation(),
+				UseVM:       *testWithVMTransactionExecution,
 			},
 		)
 		require.NoError(t, err)
@@ -5840,6 +5909,7 @@ func TestEVMValidateCOAOwnershipProof(t *testing.T) {
 				Interface:   runtimeInterface,
 				Environment: scriptEnvironment,
 				Location:    nextScriptLocation(),
+				UseVM:       *testWithVMScriptExecution,
 			},
 		)
 
@@ -6009,8 +6079,10 @@ func TestInternalEVMAccess(t *testing.T) {
 	handler := &testContractHandler{}
 
 	contractsAddress := flow.BytesToAddress([]byte{0x1})
-	transactionEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
+
+	deploymentEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
 	scriptEnvironment := newEVMScriptEnvironment(handler, contractsAddress)
+
 	rt := runtime.NewRuntime(runtime.Config{})
 
 	script := []byte(`
@@ -6056,7 +6128,7 @@ func TestInternalEVMAccess(t *testing.T) {
 		rt,
 		contractsAddress,
 		runtimeInterface,
-		transactionEnvironment,
+		deploymentEnvironment,
 		nextTransactionLocation,
 	)
 
@@ -6070,6 +6142,7 @@ func TestInternalEVMAccess(t *testing.T) {
 			Interface:   runtimeInterface,
 			Environment: scriptEnvironment,
 			Location:    nextScriptLocation(),
+			UseVM:       *testWithVMScriptExecution,
 		},
 	)
 	require.Error(t, err)

@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"os"
+	"strings"
 
 	client "github.com/onflow/flow-go-sdk/access/grpc"
 	"github.com/onflow/flow/protobuf/go/flow/execution"
@@ -36,6 +37,9 @@ var (
 	flagProposalKeySeq      uint64
 	flagUseExecutionDataAPI bool
 	flagDumpRegisters       bool
+	flagCollectionID        string
+	flagBlockID             string
+	flagUseVM               bool
 )
 
 var Cmd = &cobra.Command{
@@ -67,11 +71,15 @@ func init() {
 	Cmd.Flags().BoolVar(&flagUseExecutionDataAPI, "use-execution-data-api", false, "use the execution data API")
 
 	Cmd.Flags().BoolVar(&flagDumpRegisters, "dump-registers", false, "dump registers")
+
+	Cmd.Flags().StringVar(&flagCollectionID, "collection-id", "", "collection ID")
+
+	Cmd.Flags().StringVar(&flagBlockID, "block-id", "", "block ID")
+
+	Cmd.Flags().BoolVar(&flagUseVM, "use-vm", false, "use the VM for transaction execution (default: false)")
 }
 
 func run(_ *cobra.Command, args []string) {
-
-	log.Info().Msgf("Starting transaction debugger ... %v", args)
 
 	chainID := flow.ChainID(flagChain)
 	chain := chainID.Chain()
@@ -86,13 +94,74 @@ func run(_ *cobra.Command, args []string) {
 		log.Fatal().Err(err).Msg("failed to create client")
 	}
 
-	for _, rawTxID := range args {
-		txID, err := flow.HexStringToIdentifier(rawTxID)
-		if err != nil {
-			log.Fatal().Err(err).Msg("failed to parse transaction ID")
+	if flagCollectionID != "" {
+		if flagBlockID != "" {
+			log.Fatal().Msg("Cannot specify both collection ID and block ID")
 		}
 
-		runTransactionID(txID, flowClient, chain)
+		// Collection ID provided, fetch the collection and its transaction IDs
+
+		colID, err := flow.HexStringToIdentifier(flagCollectionID)
+		if err != nil {
+			log.Fatal().Err(err).Str("ID", flagCollectionID).Msg("failed to parse collection ID")
+		}
+
+		col, err := flowClient.GetCollectionByID(context.Background(), sdk.Identifier(colID))
+		if err != nil {
+			log.Fatal().Err(err).Str("ID", flagCollectionID).Msg("failed to fetch collection by ID")
+		}
+
+		var rawTxIDs []string
+		for _, txID := range col.TransactionIDs {
+			rawTxIDs = append(rawTxIDs, txID.String())
+		}
+		log.Info().Msgf("Fetched collection: %s. Transaction IDs: %s", col.ID(), strings.Join(rawTxIDs, " "))
+
+		if len(args) > 0 {
+			log.Warn().Msg("Collection ID provided, transaction IDs from args will be ignored!")
+		}
+
+		for _, txID := range col.TransactionIDs {
+			runTransactionID(flow.Identifier(txID), flowClient, chain)
+		}
+
+	} else if flagBlockID != "" {
+		if flagCollectionID != "" {
+			log.Fatal().Msg("Cannot specify both collection ID and block ID")
+		}
+
+		// Block ID provided, fetch the block and its transaction IDs
+
+		blockID, err := flow.HexStringToIdentifier(flagBlockID)
+		if err != nil {
+			log.Fatal().Err(err).Str("ID", flagBlockID).Msg("failed to parse block ID")
+		}
+
+		block, err := flowClient.GetBlockByID(context.Background(), sdk.Identifier(blockID))
+		if err != nil {
+			log.Fatal().Err(err).Str("ID", flagBlockID).Msg("failed to fetch block by ID")
+		}
+
+		runBlockID(
+			blockID,
+			block.Height,
+			flow.ZeroID,
+			flowClient,
+			chain,
+		)
+
+	} else {
+
+		// No collection ID provided, proceed with transaction IDs from args
+
+		for _, rawTxID := range args {
+			txID, err := flow.HexStringToIdentifier(rawTxID)
+			if err != nil {
+				log.Fatal().Err(err).Str("ID", rawTxID).Msg("failed to parse transaction ID")
+			}
+
+			runTransactionID(txID, flowClient, chain)
+		}
 	}
 }
 
@@ -114,7 +183,23 @@ func runTransactionID(txID flow.Identifier, flowClient *client.Client, chain flo
 		blockHeight,
 	)
 
-	log.Info().Msg("Fetching transactions of block ...")
+	runBlockID(
+		blockID,
+		blockHeight,
+		txID,
+		flowClient,
+		chain,
+	)
+}
+
+func runBlockID(
+	blockID flow.Identifier,
+	blockHeight uint64,
+	txID flow.Identifier,
+	flowClient *client.Client,
+	chain flow.Chain,
+) {
+	log.Info().Msgf("Fetching transactions of block %s ...", blockID)
 
 	txsResult, err := flowClient.GetTransactionsByBlockID(context.Background(), sdk.Identifier(blockID))
 	if err != nil {
@@ -178,14 +263,14 @@ func runTransactionID(txID flow.Identifier, flowClient *client.Client, chain flo
 
 	blockSnapshot := newBlockSnapshot(remoteSnapshot)
 
-	debugger := debug.NewRemoteDebugger(chain, log.Logger)
+	debugger := debug.NewRemoteDebugger(chain, log.Logger, flagUseVM, flagUseVM)
 
 	for _, blockTx := range txsResult {
 		blockTxID := flow.Identifier(blockTx.ID())
 
 		isDebuggedTx := blockTxID == txID
 
-		dumpRegisters := flagDumpRegisters && isDebuggedTx
+		dumpRegisters := flagDumpRegisters && (isDebuggedTx || txID == flow.ZeroID)
 
 		runTransaction(
 			debugger,
