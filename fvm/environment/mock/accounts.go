@@ -45,12 +45,12 @@ func (_m *Accounts) AllocateSlabIndex(address flow.Address) (atree.SlabIndex, er
 	return r0, r1
 }
 
-// AppendPublicKey provides a mock function with given fields: address, key
-func (_m *Accounts) AppendPublicKey(address flow.Address, key flow.AccountPublicKey) error {
+// AppendAccountPublicKey provides a mock function with given fields: address, key
+func (_m *Accounts) AppendAccountPublicKey(address flow.Address, key flow.AccountPublicKey) error {
 	ret := _m.Called(address, key)
 
 	if len(ret) == 0 {
-		panic("no return value specified for AppendPublicKey")
+		panic("no return value specified for AppendAccountPublicKey")
 	}
 
 	var r0 error
@@ -213,6 +213,92 @@ func (_m *Accounts) Get(address flow.Address) (*flow.Account, error) {
 	return r0, r1
 }
 
+// GetAccountPublicKey provides a mock function with given fields: address, keyIndex
+func (_m *Accounts) GetAccountPublicKey(address flow.Address, keyIndex uint32) (flow.AccountPublicKey, error) {
+	ret := _m.Called(address, keyIndex)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetAccountPublicKey")
+	}
+
+	var r0 flow.AccountPublicKey
+	var r1 error
+	if rf, ok := ret.Get(0).(func(flow.Address, uint32) (flow.AccountPublicKey, error)); ok {
+		return rf(address, keyIndex)
+	}
+	if rf, ok := ret.Get(0).(func(flow.Address, uint32) flow.AccountPublicKey); ok {
+		r0 = rf(address, keyIndex)
+	} else {
+		r0 = ret.Get(0).(flow.AccountPublicKey)
+	}
+
+	if rf, ok := ret.Get(1).(func(flow.Address, uint32) error); ok {
+		r1 = rf(address, keyIndex)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// GetAccountPublicKeyCount provides a mock function with given fields: address
+func (_m *Accounts) GetAccountPublicKeyCount(address flow.Address) (uint32, error) {
+	ret := _m.Called(address)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetAccountPublicKeyCount")
+	}
+
+	var r0 uint32
+	var r1 error
+	if rf, ok := ret.Get(0).(func(flow.Address) (uint32, error)); ok {
+		return rf(address)
+	}
+	if rf, ok := ret.Get(0).(func(flow.Address) uint32); ok {
+		r0 = rf(address)
+	} else {
+		r0 = ret.Get(0).(uint32)
+	}
+
+	if rf, ok := ret.Get(1).(func(flow.Address) error); ok {
+		r1 = rf(address)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// GetAccountPublicKeys provides a mock function with given fields: address
+func (_m *Accounts) GetAccountPublicKeys(address flow.Address) ([]flow.AccountPublicKey, error) {
+	ret := _m.Called(address)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetAccountPublicKeys")
+	}
+
+	var r0 []flow.AccountPublicKey
+	var r1 error
+	if rf, ok := ret.Get(0).(func(flow.Address) ([]flow.AccountPublicKey, error)); ok {
+		return rf(address)
+	}
+	if rf, ok := ret.Get(0).(func(flow.Address) []flow.AccountPublicKey); ok {
+		r0 = rf(address)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]flow.AccountPublicKey)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(flow.Address) error); ok {
+		r1 = rf(address)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // GetContract provides a mock function with given fields: contractName, address
 func (_m *Accounts) GetContract(contractName string, address flow.Address) ([]byte, error) {
 	ret := _m.Called(contractName, address)
@@ -261,92 +347,6 @@ func (_m *Accounts) GetContractNames(address flow.Address) ([]string, error) {
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]string)
-		}
-	}
-
-	if rf, ok := ret.Get(1).(func(flow.Address) error); ok {
-		r1 = rf(address)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
-// GetPublicKey provides a mock function with given fields: address, keyIndex
-func (_m *Accounts) GetPublicKey(address flow.Address, keyIndex uint32) (flow.AccountPublicKey, error) {
-	ret := _m.Called(address, keyIndex)
-
-	if len(ret) == 0 {
-		panic("no return value specified for GetPublicKey")
-	}
-
-	var r0 flow.AccountPublicKey
-	var r1 error
-	if rf, ok := ret.Get(0).(func(flow.Address, uint32) (flow.AccountPublicKey, error)); ok {
-		return rf(address, keyIndex)
-	}
-	if rf, ok := ret.Get(0).(func(flow.Address, uint32) flow.AccountPublicKey); ok {
-		r0 = rf(address, keyIndex)
-	} else {
-		r0 = ret.Get(0).(flow.AccountPublicKey)
-	}
-
-	if rf, ok := ret.Get(1).(func(flow.Address, uint32) error); ok {
-		r1 = rf(address, keyIndex)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
-// GetPublicKeyCount provides a mock function with given fields: address
-func (_m *Accounts) GetPublicKeyCount(address flow.Address) (uint32, error) {
-	ret := _m.Called(address)
-
-	if len(ret) == 0 {
-		panic("no return value specified for GetPublicKeyCount")
-	}
-
-	var r0 uint32
-	var r1 error
-	if rf, ok := ret.Get(0).(func(flow.Address) (uint32, error)); ok {
-		return rf(address)
-	}
-	if rf, ok := ret.Get(0).(func(flow.Address) uint32); ok {
-		r0 = rf(address)
-	} else {
-		r0 = ret.Get(0).(uint32)
-	}
-
-	if rf, ok := ret.Get(1).(func(flow.Address) error); ok {
-		r1 = rf(address)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
-// GetPublicKeys provides a mock function with given fields: address
-func (_m *Accounts) GetPublicKeys(address flow.Address) ([]flow.AccountPublicKey, error) {
-	ret := _m.Called(address)
-
-	if len(ret) == 0 {
-		panic("no return value specified for GetPublicKeys")
-	}
-
-	var r0 []flow.AccountPublicKey
-	var r1 error
-	if rf, ok := ret.Get(0).(func(flow.Address) ([]flow.AccountPublicKey, error)); ok {
-		return rf(address)
-	}
-	if rf, ok := ret.Get(0).(func(flow.Address) []flow.AccountPublicKey); ok {
-		r0 = rf(address)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]flow.AccountPublicKey)
 		}
 	}
 
@@ -417,30 +417,12 @@ func (_m *Accounts) GetValue(id flow.RegisterID) ([]byte, error) {
 	return r0, r1
 }
 
-// SetContract provides a mock function with given fields: contractName, address, contract
-func (_m *Accounts) SetContract(contractName string, address flow.Address, contract []byte) error {
-	ret := _m.Called(contractName, address, contract)
-
-	if len(ret) == 0 {
-		panic("no return value specified for SetContract")
-	}
-
-	var r0 error
-	if rf, ok := ret.Get(0).(func(string, flow.Address, []byte) error); ok {
-		r0 = rf(contractName, address, contract)
-	} else {
-		r0 = ret.Error(0)
-	}
-
-	return r0
-}
-
-// SetPublicKey provides a mock function with given fields: address, keyIndex, publicKey
-func (_m *Accounts) SetPublicKey(address flow.Address, keyIndex uint32, publicKey flow.AccountPublicKey) ([]byte, error) {
+// SetAccountPublicKey provides a mock function with given fields: address, keyIndex, publicKey
+func (_m *Accounts) SetAccountPublicKey(address flow.Address, keyIndex uint32, publicKey flow.AccountPublicKey) ([]byte, error) {
 	ret := _m.Called(address, keyIndex, publicKey)
 
 	if len(ret) == 0 {
-		panic("no return value specified for SetPublicKey")
+		panic("no return value specified for SetAccountPublicKey")
 	}
 
 	var r0 []byte
@@ -463,6 +445,24 @@ func (_m *Accounts) SetPublicKey(address flow.Address, keyIndex uint32, publicKe
 	}
 
 	return r0, r1
+}
+
+// SetContract provides a mock function with given fields: contractName, address, contract
+func (_m *Accounts) SetContract(contractName string, address flow.Address, contract []byte) error {
+	ret := _m.Called(contractName, address, contract)
+
+	if len(ret) == 0 {
+		panic("no return value specified for SetContract")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(string, flow.Address, []byte) error); ok {
+		r0 = rf(contractName, address, contract)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
 }
 
 // SetValue provides a mock function with given fields: id, value
