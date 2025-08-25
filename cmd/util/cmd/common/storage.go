@@ -115,7 +115,6 @@ func InitStorage(datadir string) (storage.DB, error) {
 	if err != nil {
 		return nil, err
 	}
-
 	if ok {
 		log.Info().Msgf("using badger db at %s", datadir)
 		return badgerimpl.ToDB(InitBadgerDBStorage(datadir)), nil
@@ -125,7 +124,6 @@ func InitStorage(datadir string) (storage.DB, error) {
 	if err != nil {
 		return nil, err
 	}
-
 	if ok {
 		db, err := pebblestorage.ShouldOpenDefaultPebbleDB(log.Logger, datadir)
 		if err != nil {
@@ -167,17 +165,18 @@ func InitStorageWithTruncate(datadir string, truncate bool) *badger.DB {
 	return db
 }
 
+// IsBadgerFolder checks if the given directory is a badger folder.
+// It returns error if the folder is empty or not exists.
+// it returns error if the folder is not empty, but misses some required badger files.
 func IsBadgerFolder(dataDir string) (bool, error) {
 	return storagebadger.IsBadgerFolder(dataDir)
 }
 
+// IsPebbleFolder checks if the given directory is a pebble folder.
+// It returns error if the folder is empty or not exists.
+// it returns error if the folder is not empty, but misses some required pebble files.
 func IsPebbleFolder(dataDir string) (bool, error) {
-	err := pebblestorage.IsPebbleInitialized(dataDir)
-	if err != nil {
-		return false, err
-	}
-
-	return true, nil
+	return pebblestorage.IsPebbleFolder(dataDir)
 }
 
 func InitStorages(db storage.DB) *store.All {
