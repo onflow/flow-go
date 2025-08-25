@@ -42,6 +42,7 @@ var _ module.HotstuffMetrics = (*NoopCollector)(nil)
 var _ module.EngineMetrics = (*NoopCollector)(nil)
 var _ module.HeroCacheMetrics = (*NoopCollector)(nil)
 var _ module.NetworkMetrics = (*NoopCollector)(nil)
+var _ module.CollectionMetrics = (*NoopCollector)(nil)
 
 func (nc *NoopCollector) Peers(prefix string, n int)                                             {}
 func (nc *NoopCollector) Wantlist(prefix string, n int)                                          {}
@@ -126,6 +127,7 @@ func (nc *NoopCollector) TimeoutCollectorsRange(uint64, uint64, int)            
 func (nc *NoopCollector) TransactionIngested(txID flow.Identifier)                       {}
 func (nc *NoopCollector) ClusterBlockProposed(*cluster.Block)                            {}
 func (nc *NoopCollector) ClusterBlockFinalized(*cluster.Block)                           {}
+func (nc *NoopCollector) CollectionMaxSize(uint)                                         {}
 func (nc *NoopCollector) StartCollectionToFinalized(collectionID flow.Identifier)        {}
 func (nc *NoopCollector) FinishCollectionToFinalized(collectionID flow.Identifier)       {}
 func (nc *NoopCollector) StartBlockToSeal(blockID flow.Identifier)                       {}

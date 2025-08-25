@@ -24,6 +24,11 @@ func (_m *CollectionMetrics) ClusterBlockProposed(block *cluster.Block) {
 	_m.Called(block)
 }
 
+// CollectionMaxSize provides a mock function with given fields: size
+func (_m *CollectionMetrics) CollectionMaxSize(size uint) {
+	_m.Called(size)
+}
+
 // TransactionIngested provides a mock function with given fields: txID
 func (_m *CollectionMetrics) TransactionIngested(txID flow.Identifier) {
 	_m.Called(txID)
