@@ -60,7 +60,6 @@ func TestFinalizer(t *testing.T) {
 			defer lctx.Release()
 			state, err = cluster.Bootstrap(db, lockManager, stateRoot)
 			require.NoError(t, err)
-			lockManager := storage.NewTestingLockManager()
 			insertLctx := lockManager.NewContext()
 			err = insertLctx.AcquireLock(storage.LockInsertBlock)
 			require.NoError(t, err)
