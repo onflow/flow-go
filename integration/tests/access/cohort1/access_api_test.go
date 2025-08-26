@@ -864,8 +864,8 @@ func (s *AccessAPISuite) TestTransactionSignatureWebAuthnExtensionData() {
 		expectSuccess bool
 	}{
 		{
-			name:          "webauthn_valid",
-			extensionData: nil,
+			name:          "webauthn_valid", // hardcoded name tested below
+			extensionData: nil,              // valid extension data is populated within test implementation below
 			description:   "WebAuthn scheme with minimal extension data",
 			expectSuccess: true,
 		},
