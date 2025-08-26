@@ -165,15 +165,24 @@ func (s *SealingEngineSuite) TestMultipleProcessingItems() {
 	approvals := make([]*flow.ResultApproval, 0, len(receipts)*numApprovalsPerReceipt)
 	responseApprovals := make([]*messages.ApprovalResponse, 0)
 	approverID := unittest.IdentifierFixture()
+
 	for _, receipt := range receipts {
 		for j := 0; j < numApprovalsPerReceipt; j++ {
-			approval := unittest.ResultApprovalFixture(unittest.WithExecutionResultID(receipt.ExecutionResult.ID()),
-				unittest.WithApproverID(approverID))
+			approval := unittest.ResultApprovalFixture(
+				unittest.WithExecutionResultID(receipt.ExecutionResult.ID()),
+				unittest.WithApproverID(approverID),
+			)
+			approval.Body.Spock = unittest.SignatureFixture()
+
 			responseApproval := &messages.ApprovalResponse{
+				Nonce:    0,
 				Approval: flow.UntrustedResultApproval(*approval),
 			}
+
 			responseApprovals = append(responseApprovals, responseApproval)
 			approvals = append(approvals, approval)
+
+			// Core should receive the trusted approval
 			s.core.On("ProcessApproval", approval).Return(nil).Twice()
 		}
 	}
@@ -184,15 +193,21 @@ func (s *SealingEngineSuite) TestMultipleProcessingItems() {
 		defer wg.Done()
 		for _, approval := range approvals {
 			err := s.engine.Process(channels.ReceiveApprovals, approverID, approval)
-			s.Require().NoError(err, "should process approval")
+			s.Require().NoError(err, "should process approval (trusted)")
 		}
 	}()
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		for _, approval := range responseApprovals {
-			err := s.engine.Process(channels.ReceiveApprovals, approverID, approval)
-			s.Require().NoError(err, "should process approval")
+		for _, resp := range responseApprovals {
+			//  convert wire → trusted *before* calling Process,
+			// so the queue only ever holds *flow.ResultApproval.
+			v, err := resp.ToInternal() // returns *flow.ApprovalResponse
+			s.Require().NoError(err, "ToInternal failed for ApprovalResponse")
+
+			ar := v.(*flow.ApprovalResponse)
+			err = s.engine.Process(channels.ReceiveApprovals, approverID, &ar.Approval)
+			s.Require().NoError(err, "should process approval (converted from wire)")
 		}
 	}()
 

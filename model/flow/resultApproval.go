@@ -185,12 +185,15 @@ func (ra ResultApproval) ID() Identifier {
 	return MakeID(ra)
 }
 
+// ApprovalRequest represents a request for a ResultApproval corresponding to
+// a specific chunk.
 type ApprovalRequest struct {
 	Nonce      uint64
 	ResultID   Identifier
 	ChunkIndex uint64
 }
 
+// ApprovalResponse contains a response to an approval request.
 type ApprovalResponse struct {
 	Nonce    uint64
 	Approval ResultApproval
