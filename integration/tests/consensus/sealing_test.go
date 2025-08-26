@@ -15,7 +15,6 @@ import (
 	verUtils "github.com/onflow/flow-go/engine/verification/utils"
 	"github.com/onflow/flow-go/integration/testnet"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -36,6 +35,7 @@ type SealingSuite struct {
 	exe2SK crypto.PrivateKey
 	verID  flow.Identifier
 	verSK  crypto.PrivateKey
+	spocks []crypto.Signature
 	reader *client.FlowMessageStreamReader
 }
 
@@ -93,6 +93,8 @@ func (ss *SealingSuite) SetupTest() {
 	verConfig := testnet.NewNodeConfig(flow.RoleVerification, testnet.WithLogLevel(zerolog.FatalLevel), testnet.WithID(ss.verID), testnet.AsGhost())
 	nodeConfigs = append(nodeConfigs, verConfig)
 	ss.log.Info().Msgf("verification ID: %v\n", ss.verID)
+
+	ss.spocks = unittest.SignaturesFixture(1)
 
 	nodeConfigs = append(nodeConfigs,
 		testnet.NewNodeConfig(flow.RoleAccess, testnet.WithLogLevel(zerolog.FatalLevel)),
@@ -164,14 +166,16 @@ SearchLoop:
 		}
 
 		// we only care about block proposals at the moment
-		proposal, ok := msg.(*messages.BlockProposal)
+		proposal, ok := msg.(*flow.UntrustedProposal)
 		if !ok {
 			continue
 		}
-		block := proposal.Block.ToInternal()
+		proposalTrusted, err := flow.NewProposal(*proposal)
+		require.NoError(ss.T(), err)
+		block := proposalTrusted.Block
 
 		// make sure we skip duplicates
-		proposalID := block.Header.ID()
+		proposalID := block.ID()
 		_, processed := confirmations[proposalID]
 		if processed {
 			continue
@@ -179,12 +183,12 @@ SearchLoop:
 		confirmations[proposalID] = 0
 
 		// we map the proposal to its parent for later
-		parentID := block.Header.ParentID
+		parentID := block.ParentID
 		parents[proposalID] = parentID
 
 		ss.T().Logf("received block proposal height %v, view %v, id %v",
-			block.Header.Height,
-			block.Header.View,
+			block.Height,
+			block.View,
 			proposalID)
 
 		// we add one confirmation for each ancestor
@@ -237,43 +241,46 @@ SearchLoop:
 
 	// create the execution result for the target block
 	result := flow.ExecutionResult{
-		PreviousResultID: resultID,               // need genesis result
-		BlockID:          targetID,               // refer the target block
-		Chunks:           flow.ChunkList{&chunk}, // include only chunk
+		PreviousResultID: resultID,                     // need genesis result
+		BlockID:          targetID,                     // refer the target block
+		Chunks:           flow.ChunkList{&chunk},       // include only chunk
+		ExecutionDataID:  unittest.IdentifierFixture(), // our fake execution data ID
 	}
 
 	ss.T().Logf("execution result generated (result: %x)\n", result.ID())
 
 	// create the execution receipt for the only execution node
-	receipt := flow.ExecutionReceipt{
-		ExecutorID:        ss.exeID, // our fake execution node
-		ExecutionResult:   result,   // result for target block
-		Spocks:            nil,      // ignored
-		ExecutorSignature: crypto.Signature{},
+	receiptBody := flow.UnsignedExecutionReceipt{
+		ExecutorID:      ss.exeID,  // our fake execution node
+		ExecutionResult: result,    // result for target block
+		Spocks:          ss.spocks, // our fake spocks
 	}
 
-	// generates a signature over the execution result
-	id := receipt.ID()
-	sig, err := ss.exeSK.Sign(id[:], exeUtils.NewExecutionReceiptHasher())
+	// create Full Execution Receipt by signing the previously-created receipt's body
+	unsignedReceiptID := receiptBody.ID()
+	sig, err := ss.exeSK.Sign(unsignedReceiptID[:], exeUtils.NewExecutionReceiptHasher())
 	require.NoError(ss.T(), err)
-
-	receipt.ExecutorSignature = sig
+	receipt := flow.ExecutionReceipt{
+		UnsignedExecutionReceipt: receiptBody,
+		ExecutorSignature:        sig,
+	}
 
 	// keep trying to send 2 matching execution receipt to the first consensus node
-	receipt2 := flow.ExecutionReceipt{
-		ExecutorID:        ss.exe2ID, // our fake execution node
-		ExecutionResult:   result,    // result for target block
-		Spocks:            nil,       // ignored
-		ExecutorSignature: crypto.Signature{},
+	receiptBody2 := flow.UnsignedExecutionReceipt{
+		ExecutorID:      ss.exe2ID, // our fake execution node
+		ExecutionResult: result,    // result for target block
+		Spocks:          ss.spocks, // our fake spocks
 	}
 
-	id = receipt2.ID()
-	sig2, err := ss.exe2SK.Sign(id[:], exeUtils.NewExecutionReceiptHasher())
+	unsignedReceiptID2 := receiptBody2.ID()
+	sig2, err := ss.exe2SK.Sign(unsignedReceiptID2[:], exeUtils.NewExecutionReceiptHasher())
 	require.NoError(ss.T(), err)
+	receipt2 := flow.ExecutionReceipt{
+		UnsignedExecutionReceipt: receiptBody2,
+		ExecutorSignature:        sig2,
+	}
 
-	receipt2.ExecutorSignature = sig2
-
-	valid, err := ss.exe2SK.PublicKey().Verify(receipt2.ExecutorSignature, id[:], exeUtils.NewExecutionReceiptHasher())
+	valid, err := ss.exe2SK.PublicKey().Verify(receipt2.ExecutorSignature, unsignedReceiptID2[:], exeUtils.NewExecutionReceiptHasher())
 	require.NoError(ss.T(), err)
 	require.True(ss.T(), valid)
 
@@ -352,14 +359,16 @@ SealingLoop:
 		}
 
 		// we only care about block proposals at the moment
-		proposal, ok := msg.(*messages.BlockProposal)
+		proposal, ok := msg.(*flow.UntrustedProposal)
 		if !ok {
 			continue
 		}
-		block := proposal.Block.ToInternal()
+		proposalTrusted, err := flow.NewProposal(*proposal)
+		require.NoError(ss.T(), err)
+		block := proposalTrusted.Block
 
 		// log the proposal details
-		proposalID := block.Header.ID()
+		proposalID := block.ID()
 		seals := block.Payload.Seals
 
 		// if the block seal is included, we add the block to those we

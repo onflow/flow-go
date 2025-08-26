@@ -48,7 +48,7 @@ func (suite *Suite) TestGetLatestFinalizedBlock_Success() {
 
 	// setup the mocks
 	block := unittest.BlockFixture()
-	header := block.Header
+	header := block.ToHeader()
 
 	suite.snapshot.
 		On("Head").
@@ -57,7 +57,7 @@ func (suite *Suite) TestGetLatestFinalizedBlock_Success() {
 
 	suite.blocks.
 		On("ByID", header.ID()).
-		Return(&block, nil).
+		Return(block, nil).
 		Once()
 
 	backend := New(suite.state, suite.blocks, suite.headers, nil)
@@ -67,7 +67,7 @@ func (suite *Suite) TestGetLatestFinalizedBlock_Success() {
 	suite.checkResponse(responseBlock, err)
 
 	// make sure we got the latest block
-	suite.Require().Equal(block, *responseBlock)
+	suite.Require().Equal(block, responseBlock)
 
 	suite.assertAllExpectations()
 }
@@ -77,7 +77,7 @@ func (suite *Suite) TestGetLatestSealedBlock_Success() {
 
 	// setup the mocks
 	block := unittest.BlockFixture()
-	header := block.Header
+	header := block.ToHeader()
 
 	suite.snapshot.
 		On("Head").
@@ -86,7 +86,7 @@ func (suite *Suite) TestGetLatestSealedBlock_Success() {
 
 	suite.blocks.
 		On("ByID", header.ID()).
-		Return(&block, nil).
+		Return(block, nil).
 		Once()
 
 	backend := New(suite.state, suite.blocks, suite.headers, nil)
@@ -96,7 +96,7 @@ func (suite *Suite) TestGetLatestSealedBlock_Success() {
 	suite.checkResponse(responseBlock, err)
 
 	// make sure we got the latest block
-	suite.Require().Equal(block, *responseBlock)
+	suite.Require().Equal(block, responseBlock)
 
 	suite.assertAllExpectations()
 }
@@ -106,7 +106,7 @@ func (suite *Suite) TestGetLatestBlock_StorageNotFoundFailure() {
 
 	// setup the mocks
 	block := unittest.BlockFixture()
-	header := block.Header
+	header := block.ToHeader()
 
 	suite.snapshot.
 		On("Head").
@@ -128,7 +128,7 @@ func (suite *Suite) TestGetLatestBlock_CodesNotFoundFailure() {
 
 	// setup the mocks
 	block := unittest.BlockFixture()
-	header := block.Header
+	header := block.ToHeader()
 
 	suite.snapshot.
 		On("Head").
@@ -150,7 +150,7 @@ func (suite *Suite) TestGetLatestBlock_InternalFailure() {
 
 	// setup the mocks
 	block := unittest.BlockFixture()
-	header := block.Header
+	header := block.ToHeader()
 
 	suite.snapshot.
 		On("Head").
@@ -173,7 +173,7 @@ func (suite *Suite) TestGetBlockById_Success() {
 
 	suite.blocks.
 		On("ByID", block.ID()).
-		Return(&block, nil).
+		Return(block, nil).
 		Once()
 
 	backend := New(suite.state, suite.blocks, suite.headers, nil)
@@ -194,7 +194,7 @@ func (suite *Suite) TestGetBlockById_StorageNotFoundFailure() {
 
 	suite.blocks.
 		On("ByID", block.ID()).
-		Return(&block, storage.ErrNotFound).
+		Return(block, storage.ErrNotFound).
 		Once()
 
 	backend := New(suite.state, suite.blocks, suite.headers, nil)
@@ -213,7 +213,7 @@ func (suite *Suite) TestGetBlockById_CodesNotFoundFailure() {
 
 	suite.blocks.
 		On("ByID", block.ID()).
-		Return(&block, CodesNotFoundErr).
+		Return(block, CodesNotFoundErr).
 		Once()
 
 	backend := New(suite.state, suite.blocks, suite.headers, nil)
@@ -232,7 +232,7 @@ func (suite *Suite) TestGetBlockById_InternalFailure() {
 
 	suite.blocks.
 		On("ByID", block.ID()).
-		Return(&block, InternalErr).
+		Return(block, InternalErr).
 		Once()
 
 	backend := New(suite.state, suite.blocks, suite.headers, nil)
@@ -248,11 +248,11 @@ func (suite *Suite) TestGetBlockById_InternalFailure() {
 func (suite *Suite) TestGetBlockByHeight_Success() {
 	// setup the mocks
 	block := unittest.BlockFixture()
-	height := block.Header.Height
+	height := block.Height
 
 	suite.blocks.
 		On("ByHeight", height).
-		Return(&block, nil).
+		Return(block, nil).
 		Once()
 
 	backend := New(suite.state, suite.blocks, suite.headers, nil)
@@ -270,11 +270,11 @@ func (suite *Suite) TestGetBlockByHeight_Success() {
 func (suite *Suite) TestGetBlockByHeight_StorageNotFoundFailure() {
 	// setup the mocks
 	block := unittest.BlockFixture()
-	height := block.Header.Height
+	height := block.Height
 
 	suite.blocks.
 		On("ByHeight", height).
-		Return(&block, StorageNotFoundErr).
+		Return(block, StorageNotFoundErr).
 		Once()
 
 	backend := New(suite.state, suite.blocks, suite.headers, nil)
@@ -290,11 +290,11 @@ func (suite *Suite) TestGetBlockByHeight_StorageNotFoundFailure() {
 func (suite *Suite) TestGetBlockByHeight_CodesNotFoundFailure() {
 	// setup the mocks
 	block := unittest.BlockFixture()
-	height := block.Header.Height
+	height := block.Height
 
 	suite.blocks.
 		On("ByHeight", height).
-		Return(&block, CodesNotFoundErr).
+		Return(block, CodesNotFoundErr).
 		Once()
 
 	backend := New(suite.state, suite.blocks, suite.headers, nil)
@@ -310,11 +310,11 @@ func (suite *Suite) TestGetBlockByHeight_CodesNotFoundFailure() {
 func (suite *Suite) TestGetBlockByHeight_InternalFailure() {
 	// setup the mocks
 	block := unittest.BlockFixture()
-	height := block.Header.Height
+	height := block.Height
 
 	suite.blocks.
 		On("ByHeight", height).
-		Return(&block, InternalErr).
+		Return(block, InternalErr).
 		Once()
 
 	backend := New(suite.state, suite.blocks, suite.headers, nil)
@@ -423,7 +423,7 @@ func (suite *Suite) TestGetLatestBlockHeader_InternalFailure() {
 func (suite *Suite) TestGetBlockHeaderByID_Success() {
 	// setup the mocks
 	block := unittest.BlockFixture()
-	header := block.Header
+	header := block.ToHeader()
 
 	suite.headers.
 		On("ByBlockID", block.ID()).
@@ -448,7 +448,7 @@ func (suite *Suite) TestGetBlockHeaderByID_Success() {
 func (suite *Suite) TestGetBlockHeaderByID_StorageNotFoundFailure() {
 	// setup the mocks
 	block := unittest.BlockFixture()
-	header := block.Header
+	header := block.ToHeader()
 
 	suite.headers.
 		On("ByBlockID", block.ID()).
@@ -468,7 +468,7 @@ func (suite *Suite) TestGetBlockHeaderByID_StorageNotFoundFailure() {
 func (suite *Suite) TestGetBlockHeaderByID_CodesNotFoundFailure() {
 	// setup the mocks
 	block := unittest.BlockFixture()
-	header := block.Header
+	header := block.ToHeader()
 
 	suite.headers.
 		On("ByBlockID", block.ID()).
@@ -488,7 +488,7 @@ func (suite *Suite) TestGetBlockHeaderByID_CodesNotFoundFailure() {
 func (suite *Suite) TestGetBlockHeaderByID_InternalFailure() {
 	// setup the mocks
 	block := unittest.BlockFixture()
-	header := block.Header
+	header := block.ToHeader()
 
 	suite.headers.
 		On("ByBlockID", block.ID()).
