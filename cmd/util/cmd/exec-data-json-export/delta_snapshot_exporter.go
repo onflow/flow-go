@@ -11,9 +11,8 @@ import (
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
-	"github.com/onflow/flow-go/storage/badger"
 	"github.com/onflow/flow-go/storage/operation"
-	"github.com/onflow/flow-go/storage/operation/badgerimpl"
+	"github.com/onflow/flow-go/storage/store"
 )
 
 type dSnapshot struct {
@@ -25,12 +24,14 @@ type dSnapshot struct {
 func ExportDeltaSnapshots(blockID flow.Identifier, dbPath string, outputPath string) error {
 
 	// traverse backward from the given block (parent block) and fetch by blockHash
-	db := common.InitStorage(dbPath)
+	db, err := common.InitStorage(dbPath)
+	if err != nil {
+		return fmt.Errorf("could not initialize storage: %w", err)
+	}
 	defer db.Close()
-	sdb := badgerimpl.ToDB(db)
 
 	cacheMetrics := &metrics.NoopCollector{}
-	headers := badger.NewHeaders(cacheMetrics, db)
+	headers := store.NewHeaders(cacheMetrics, db)
 
 	activeBlockID := blockID
 	outputFile := filepath.Join(outputPath, "delta.jsonl")
@@ -52,7 +53,7 @@ func ExportDeltaSnapshots(blockID flow.Identifier, dbPath string, outputPath str
 		}
 
 		var snap []*snapshot.ExecutionSnapshot
-		err = operation.RetrieveExecutionStateInteractions(sdb.Reader(), activeBlockID, &snap)
+		err = operation.RetrieveExecutionStateInteractions(db.Reader(), activeBlockID, &snap)
 		if err != nil {
 			return fmt.Errorf("could not load delta snapshot: %w", err)
 		}

@@ -19,8 +19,10 @@ import (
 	"github.com/onflow/flow-go/state/protocol/inmem"
 	"github.com/onflow/flow-go/state/protocol/util"
 	protoutil "github.com/onflow/flow-go/state/protocol/util"
+	"github.com/onflow/flow-go/storage"
 	bstorage "github.com/onflow/flow-go/storage/badger"
 	storagebadger "github.com/onflow/flow-go/storage/badger"
+	"github.com/onflow/flow-go/storage/operation/badgerimpl"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -35,6 +37,7 @@ func TestBootstrapAndOpen(t *testing.T) {
 	})
 
 	protoutil.RunWithBootstrapState(t, rootSnapshot, func(db *badger.DB, _ *bprotocol.State) {
+		lockManager := storage.NewTestingLockManager()
 		// expect the final view metric to be set to current epoch's final view
 		epoch, err := rootSnapshot.Epochs().Current()
 		require.NoError(t, err)
@@ -46,7 +49,9 @@ func TestBootstrapAndOpen(t *testing.T) {
 		complianceMetrics.On("CurrentEpochCounter", counter).Once()
 		complianceMetrics.On("CurrentEpochPhase", phase).Once()
 		complianceMetrics.On("CurrentEpochFinalView", epoch.FinalView()).Once()
+		complianceMetrics.On("BlockFinalized", testmock.Anything).Once()
 		complianceMetrics.On("FinalizedHeight", testmock.Anything).Once()
+		complianceMetrics.On("BlockSealed", testmock.Anything).Once()
 		complianceMetrics.On("SealedHeight", testmock.Anything).Once()
 
 		complianceMetrics.On("CurrentDKGPhaseViews",
@@ -57,7 +62,8 @@ func TestBootstrapAndOpen(t *testing.T) {
 		// protocol state has been bootstrapped, now open a protocol state with the database
 		state, err := bprotocol.OpenState(
 			complianceMetrics,
-			db,
+			badgerimpl.ToDB(db),
+			lockManager,
 			all.Headers,
 			all.Seals,
 			all.Results,
@@ -108,6 +114,7 @@ func TestBootstrapAndOpen_EpochCommitted(t *testing.T) {
 	})
 
 	protoutil.RunWithBootstrapState(t, committedPhaseSnapshot, func(db *badger.DB, _ *bprotocol.State) {
+		lockManager := storage.NewTestingLockManager()
 
 		complianceMetrics := new(mock.ComplianceMetrics)
 
@@ -121,19 +128,21 @@ func TestBootstrapAndOpen_EpochCommitted(t *testing.T) {
 		phase, err := committedPhaseSnapshot.EpochPhase()
 		require.NoError(t, err)
 		complianceMetrics.On("CurrentEpochPhase", phase).Once()
-
 		complianceMetrics.On("CurrentEpochFinalView", currentEpoch.FinalView()).Once()
+		complianceMetrics.On("CurrentDKGPhaseViews", currentEpoch.DKGPhase1FinalView(), currentEpoch.DKGPhase2FinalView(), currentEpoch.DKGPhase3FinalView()).Once()
 
-		complianceMetrics.On("CurrentDKGPhaseViews",
-			currentEpoch.DKGPhase1FinalView(), currentEpoch.DKGPhase2FinalView(), currentEpoch.DKGPhase3FinalView()).Once()
+		// expect finalized and sealed to be set to the latest block
 		complianceMetrics.On("FinalizedHeight", testmock.Anything).Once()
+		complianceMetrics.On("BlockFinalized", testmock.Anything).Once()
 		complianceMetrics.On("SealedHeight", testmock.Anything).Once()
+		complianceMetrics.On("BlockSealed", testmock.Anything).Once()
 
 		noopMetrics := new(metrics.NoopCollector)
 		all := storagebadger.InitAll(noopMetrics, db)
 		state, err := bprotocol.OpenState(
 			complianceMetrics,
-			db,
+			badgerimpl.ToDB(db),
+			lockManager,
 			all.Headers,
 			all.Seals,
 			all.Results,
@@ -809,11 +818,13 @@ func bootstrap(t *testing.T, rootSnapshot protocol.Snapshot, f func(*bprotocol.S
 	dir := unittest.TempDir(t)
 	defer os.RemoveAll(dir)
 	db := unittest.BadgerDB(t, dir)
+	lockManager := storage.NewTestingLockManager()
 	defer db.Close()
 	all := bstorage.InitAll(metrics, db)
 	state, err := bprotocol.Bootstrap(
 		metrics,
-		db,
+		badgerimpl.ToDB(db),
+		lockManager,
 		all.Headers,
 		all.Seals,
 		all.Results,
