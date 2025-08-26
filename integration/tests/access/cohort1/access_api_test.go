@@ -1022,9 +1022,11 @@ func (s *AccessAPISuite) TestExtensionDataPreservation() {
 			description:   "Plain authentication scheme ExtensionData preservation",
 		},
 		{
-			name:          "webauthn_scheme_preservation",
-			extensionData: []byte{0x1, 0xAA, 0xBB, 0xCC, 0xDD},
-			description:   "WebAuthn authentication scheme ExtensionData preservation",
+			name: "webauthn_scheme_preservation",
+			extensionData: []byte{0x9c, 0x4f, 0xe0, 0xe1, 0x4e, 0xe4, 0xa0, 0x97, 0xd0, 0x50, 0x43, 0x9a, 0xfd, 0xfe, 0x47, 0xe7,
+				0xc2, 0x9c, 0x80, 0xd5, 0x08, 0x0e, 0x96, 0x93, 0x60, 0xb4, 0x97, 0xa0, 0x3a, 0x66, 0xe7, 0xc4,
+				0x01, 0x09, 0x73, 0x71, 0x29}, // valid extension data that passes the access API check
+			description: "WebAuthn authentication scheme ExtensionData preservation",
 		},
 		{
 			name:          "custom_data_preservation",
