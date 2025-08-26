@@ -19,6 +19,9 @@ var _ module.BySealingLagRateLimiterConfigSetter = (*bySealingLagRateLimiterConf
 // DefaultBySealingLagRateLimiterConfigs returns a default config for collection throttling.
 // It performs binary throttling once the sealing lag reaches max sealing lag.
 func DefaultBySealingLagRateLimiterConfigs() module.BySealingLagRateLimiterConfigSetter {
+	// default config results in binary throttling once the sealing lag reaches max sealing lag, before that no throttling
+	// is being applied. The 600 blocks is chosen as it is roughly 5 minutes.
+	// 2 blocks / second * 60 seconds * 5 minutes = 600 blocks
 	return &bySealingLagRateLimiterConfigs{
 		minSealingLag:     atomic.NewUint32(300),
 		maxSealingLag:     atomic.NewUint32(600),
