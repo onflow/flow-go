@@ -59,12 +59,10 @@ func TestClusterHeights(t *testing.T) {
 				err = operation.LookupClusterBlockHeight(db.Reader(), clusterIDs[i], height, &actual)
 				assert.ErrorIs(t, err, storage.ErrNotFound)
 
+				lctx := lockManager.NewContext()
+				defer lctx.Release()
+				require.NoError(t, lctx.AcquireLock(storage.LockInsertOrFinalizeClusterBlock))
 				err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-					lctx := lockManager.NewContext()
-					defer lctx.Release()
-					if err := lctx.AcquireLock(storage.LockInsertOrFinalizeClusterBlock); err != nil {
-						return err
-					}
 					return operation.IndexClusterBlockHeight(lctx, rw.Writer(), clusterIDs[i], height, clusterBlockIDs[i])
 				})
 				assert.NoError(t, err)
@@ -130,10 +128,10 @@ func Test_RetrieveClusterFinalizedHeight(t *testing.T) {
 				err = operation.RetrieveClusterFinalizedHeight(db.Reader(), clusterIDs[i], &actual)
 				assert.ErrorIs(t, err, storage.ErrNotFound)
 
+				lctx := lockManager.NewContext()
+				defer lctx.Release()
+				require.NoError(t, lctx.AcquireLock(storage.LockInsertOrFinalizeClusterBlock))
 				err = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-					lctx := lockManager.NewContext()
-					defer lctx.Release()
-					require.NoError(t, lctx.AcquireLock(storage.LockInsertOrFinalizeClusterBlock))
 					return operation.UpsertClusterFinalizedHeight(lctx, rw.Writer(), clusterIDs[i], clusterFinalizedHeights[i])
 				})
 			}
@@ -348,21 +346,24 @@ func BenchmarkLookupClusterBlocksByReferenceHeightRange_100_000(b *testing.B) {
 func benchmarkLookupClusterBlocksByReferenceHeightRange(b *testing.B, n int) {
 	lockManager := storage.NewTestingLockManager()
 	dbtest.BenchWithStorages(b, func(b *testing.B, r storage.Reader, wr dbtest.WithWriter) {
-		lctx := lockManager.NewContext()
-		require.NoError(b, lctx.AcquireLock(storage.LockInsertOrFinalizeClusterBlock))
-		defer lctx.Release()
 		for i := 0; i < n; i++ {
+			lctx := lockManager.NewContext()
+			require.NoError(b, lctx.AcquireLock(storage.LockInsertOrFinalizeClusterBlock))
 			err := wr(func(w storage.Writer) error {
 				return operation.IndexClusterBlockByReferenceHeight(lctx, w, rand.Uint64()%1000, unittest.IdentifierFixture())
 			})
 			require.NoError(b, err)
+			lctx.Release()
 		}
 
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
 			var blockIDs []flow.Identifier
+			lctx := lockManager.NewContext()
+			require.NoError(b, lctx.AcquireLock(storage.LockInsertOrFinalizeClusterBlock))
 			err := operation.LookupClusterBlocksByReferenceHeightRange(lctx, r, 0, 1000, &blockIDs)
 			require.NoError(b, err)
+			lctx.Release()
 		}
 	})
 }

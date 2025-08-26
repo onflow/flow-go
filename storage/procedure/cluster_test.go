@@ -19,7 +19,6 @@ func TestInsertRetrieveClusterBlock(t *testing.T) {
 		block := unittest.ClusterBlockFixture()
 
 		_, lctx := unittest.LockManagerWithContext(t, storage.LockInsertOrFinalizeClusterBlock)
-		require.NoError(t, lctx.AcquireLock(storage.LockInsertBlock))
 		defer lctx.Release()
 		require.NoError(t, db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 			return InsertClusterBlock(lctx, rw, &block)
@@ -42,7 +41,6 @@ func TestFinalizeClusterBlock(t *testing.T) {
 		lctx := lockManager.NewContext()
 		defer lctx.Release()
 		require.NoError(t, lctx.AcquireLock(storage.LockInsertOrFinalizeClusterBlock))
-		require.NoError(t, lctx.AcquireLock(storage.LockInsertBlock))
 		require.NoError(t, db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 			return InsertClusterBlock(lctx, rw, &parent)
 		}))
