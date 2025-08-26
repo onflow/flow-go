@@ -51,18 +51,19 @@ func NewEventsBackend(
 	execNodeIdentitiesProvider *rpc.ExecutionNodeIdentitiesProvider,
 	executionResultProvider optimistic_sync.ExecutionResultProvider,
 	executionStateCache optimistic_sync.ExecutionStateCache,
+	operatorCriteria optimistic_sync.Criteria,
 ) (*Events, error) {
 	var eventProvider provider.EventProvider
 
 	switch queryMode {
 	case query_mode.IndexQueryModeLocalOnly:
-		eventProvider = provider.NewLocalEventProvider(executionResultProvider, executionStateCache)
+		eventProvider = provider.NewLocalEventProvider(executionResultProvider, executionStateCache, operatorCriteria)
 
 	case query_mode.IndexQueryModeExecutionNodesOnly:
 		eventProvider = provider.NewENEventProvider(log, execNodeIdentitiesProvider, connFactory, nodeCommunicator)
 
 	case query_mode.IndexQueryModeFailover:
-		local := provider.NewLocalEventProvider(executionResultProvider, executionStateCache)
+		local := provider.NewLocalEventProvider(executionResultProvider, executionStateCache, operatorCriteria)
 		execNode := provider.NewENEventProvider(log, execNodeIdentitiesProvider, connFactory, nodeCommunicator)
 		eventProvider = provider.NewFailoverEventProvider(log, local, execNode)
 

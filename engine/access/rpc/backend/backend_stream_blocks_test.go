@@ -22,6 +22,7 @@ import (
 	"github.com/onflow/flow-go/engine/access/subscription/tracker"
 	trackermock "github.com/onflow/flow-go/engine/access/subscription/tracker/mock"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/executiondatasync/optimistic_sync"
 	"github.com/onflow/flow-go/module/metrics"
 	protocol "github.com/onflow/flow-go/state/protocol/mock"
 	"github.com/onflow/flow-go/storage"
@@ -169,6 +170,10 @@ func (s *BackendBlocksSuite) backendParams() Params {
 		EventQueryMode:      query_mode.IndexQueryModeExecutionNodesOnly,
 		ScriptExecutionMode: query_mode.IndexQueryModeExecutionNodesOnly,
 		TxResultQueryMode:   query_mode.IndexQueryModeExecutionNodesOnly,
+		// TODO: set this once data result forest merged in
+		//ExecutionResultProvider:
+		//ExecutionStateCache:
+		OperatorCriteria: optimistic_sync.DefaultCriteria,
 	}
 }
 

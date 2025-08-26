@@ -79,6 +79,7 @@ import (
 	"github.com/onflow/flow-go/module/execution"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	execdatacache "github.com/onflow/flow-go/module/executiondatasync/execution_data/cache"
+	"github.com/onflow/flow-go/module/executiondatasync/optimistic_sync"
 	"github.com/onflow/flow-go/module/executiondatasync/pruner"
 	edstorage "github.com/onflow/flow-go/module/executiondatasync/storage"
 	"github.com/onflow/flow-go/module/executiondatasync/tracker"
@@ -2075,6 +2076,10 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				VersionControl:             notNil(builder.VersionControl),
 				ExecNodeIdentitiesProvider: notNil(builder.ExecNodeIdentitiesProvider),
 				TxErrorMessageProvider:     notNil(builder.txResultErrorMessageProvider),
+				// TODO: set this once data result forest merged in
+				//ExecutionResultProvider:
+				//ExecutionStateCache:
+				OperatorCriteria: optimistic_sync.DefaultCriteria,
 			})
 			if err != nil {
 				return nil, fmt.Errorf("could not initialize backend: %w", err)

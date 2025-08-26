@@ -20,6 +20,7 @@ import (
 type LocalEventProvider struct {
 	execResultProvider optimistic_sync.ExecutionResultProvider
 	execStateCache     optimistic_sync.ExecutionStateCache
+	operatorCriteria   optimistic_sync.Criteria
 }
 
 var _ EventProvider = (*LocalEventProvider)(nil)
@@ -27,10 +28,12 @@ var _ EventProvider = (*LocalEventProvider)(nil)
 func NewLocalEventProvider(
 	execResultProvider optimistic_sync.ExecutionResultProvider,
 	execStateCache optimistic_sync.ExecutionStateCache,
+	operatorCriteria optimistic_sync.Criteria,
 ) *LocalEventProvider {
 	return &LocalEventProvider{
 		execResultProvider: execResultProvider,
 		execStateCache:     execStateCache,
+		operatorCriteria:   operatorCriteria,
 	}
 }
 
@@ -50,13 +53,14 @@ func (l *LocalEventProvider) Events(
 			return Response{}, entities.ExecutorMetadata{}, rpc.ConvertError(ctx.Err(), "failed to get events from storage", codes.Canceled)
 		}
 
-		// TODO: use operator's criteria if one is not provided
+		clientCriteria := optimistic_sync.Criteria{
+			AgreeingExecutorsCount: uint(executionState.AgreeingExecutorsCount),
+			RequiredExecutors:      convert.MessagesToIdentifiers(executionState.RequiredExecutorId),
+		}
+
 		result, err := l.execResultProvider.ExecutionResult(
 			blockInfo.ID,
-			optimistic_sync.Criteria{
-				AgreeingExecutorsCount: uint(executionState.AgreeingExecutorsCount),
-				RequiredExecutors:      convert.MessagesToIdentifiers(executionState.RequiredExecutorId),
-			},
+			l.operatorCriteria.OverrideWith(clientCriteria),
 		)
 		if err != nil {
 			return Response{}, metadata, err

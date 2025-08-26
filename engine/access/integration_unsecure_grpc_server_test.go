@@ -35,6 +35,7 @@ import (
 	"github.com/onflow/flow-go/module/execution"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data/cache"
+	"github.com/onflow/flow-go/module/executiondatasync/optimistic_sync"
 	"github.com/onflow/flow-go/module/grpcserver"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/mempool/herocache"
@@ -203,6 +204,10 @@ func (suite *SameGRPCPortTestSuite) SetupTest() {
 		EventQueryMode:       query_mode.IndexQueryModeExecutionNodesOnly,
 		ScriptExecutionMode:  query_mode.IndexQueryModeExecutionNodesOnly,
 		TxResultQueryMode:    query_mode.IndexQueryModeExecutionNodesOnly,
+		// TODO: set this once data result forest merged in
+		//ExecutionResultProvider:
+		//ExecutionStateCache:
+		OperatorCriteria: optimistic_sync.DefaultCriteria,
 	})
 	require.NoError(suite.T(), err)
 

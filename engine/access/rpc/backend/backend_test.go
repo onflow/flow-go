@@ -41,6 +41,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/counters"
+	"github.com/onflow/flow-go/module/executiondatasync/optimistic_sync"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
 	realstate "github.com/onflow/flow-go/state"
@@ -2096,6 +2097,10 @@ func (suite *Suite) defaultBackendParams() Params {
 			suite.preferredExecutionNodeIDs,
 			suite.fixedExecutionNodeIDs,
 		),
+		// TODO: set this once data result forest merged in
+		//ExecutionResultProvider:
+		//ExecutionStateCache:
+		OperatorCriteria: optimistic_sync.DefaultCriteria,
 	}
 }
 
