@@ -157,6 +157,7 @@ func NewCoreImpl(
 	blockPersister := persisters.NewBlockPersister(
 		coreLogger,
 		protocolDB,
+		lockManager,
 		executionResult,
 		header,
 		persisterStores,

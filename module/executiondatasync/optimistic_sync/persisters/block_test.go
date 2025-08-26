@@ -43,6 +43,7 @@ func TestPersisterSuite(t *testing.T) {
 }
 
 func (p *PersisterSuite) SetupTest() {
+	lockManager := storage.NewTestingLockManager()
 	t := p.T()
 
 	block := unittest.BlockFixture()
@@ -71,11 +72,10 @@ func (p *PersisterSuite) SetupTest() {
 		},
 	)
 
-	lockManager := storage.NewTestingLockManager()
-
 	p.persister = NewBlockPersister(
 		zerolog.Nop(),
 		p.database,
+		lockManager,
 		p.executionResult,
 		p.header,
 		[]stores.PersisterStore{
