@@ -479,8 +479,12 @@ func (s TransactionSignature) Fingerprint() []byte {
 	return fingerprint.Fingerprint(s.canonicalForm())
 }
 
-// ValidateExtensionDataAndReconstructMessage checks the format validity of the extension data and reconstructs the verification
-// message based on the authentication scheme and extension data. The output message is the message that will be cryptographically
+// ValidateExtensionDataAndReconstructMessage checks the format validity of the extension data in the given TransactionSignature
+// and reconstructs the verification message based on payload, authentication scheme and extension data.
+//
+// The output message is constructed by adapting the input payload to the intended authentication scheme of the signature.
+//
+// The output message is the message that will be cryptographically
 // checked against the account public key and signature.
 //
 // returns

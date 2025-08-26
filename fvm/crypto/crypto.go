@@ -117,14 +117,14 @@ func ValidatePublicKey(signAlgo runtime.SignatureAlgorithm, pk []byte) error {
 	return nil
 }
 
-// VerifySignatureFromRuntime performs signature verification using raw values provided
+// VerifySignatureFromRuntime performs signature verification using values provided
 // by the Cadence runtime.
 //
 // The signature/hash function combinations accepted are:
 //   - ECDSA (on both curves P-256 and secp256k1) with any of SHA2-256/SHA3-256/Keccak256.
 //   - BLS (on BLS12-381 curve) with the specific KMAC128 for BLS.
 //
-// The tag is applied to the message depending on the hash function used.
+// The tag is applied to the message within the implementation depending on the hash function used.
 //
 // The function errors:
 //   - NewValueErrorf for any user error
@@ -198,13 +198,14 @@ func VerifySignatureFromRuntime(
 	return valid, nil
 }
 
-// VerifySignatureFromRuntime performs signature verification using raw values provided
-// by the Cadence runtime.
+// VerifySignatureFromTransaction performs signature verification using values provided
+// by the Transaction Verifier.
 //
 // The signature/hash function combinations accepted are:
 //   - ECDSA (on both curves P-256 and secp256k1) with any of SHA2-256/SHA3-256.
 //
-// No tagging is applied to the input `message`, any tagging/prefixing should be applied to the message.
+// No tagging is applied to the input `message` in the implementation.Any tagging/prefixing should be applied to the message prior
+// to calling the function.
 //
 // The function errors:
 //   - NewValueErrorf for any user error

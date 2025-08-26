@@ -335,19 +335,19 @@ func TestVerifySignatureFromTransaction(t *testing.T) {
 					tag := string(flow.TransactionDomainTag[:])
 					var hasher hash.Hasher
 					if h != hash.KMAC128 {
-						hasher, err = crypto.NewPrefixedHashing(h, tag)
+						hasher, err = crypto.NewHashing(h)
 						require.NoError(t, err)
 					} else {
 						hasher = msig.NewBLSHasher(tag)
 					}
 
-					signature := make([]byte, 0)
 					data := []byte("some_data")
 					sig, err := sk.Sign(data, hasher)
 					if _, shouldBeOk := correctCombinations[s][h]; shouldBeOk {
 						require.NoError(t, err)
 					}
 
+					signature := make([]byte, 0)
 					if sig != nil {
 						signature = sig.Bytes()
 					}
@@ -362,60 +362,6 @@ func TestVerifySignatureFromTransaction(t *testing.T) {
 						require.False(t, ok)
 					}
 				})
-			}
-		}
-	})
-
-	t.Run("tag combinations", func(t *testing.T) {
-
-		cases := []struct {
-			signTag string
-			require func(t *testing.T, sigOk bool, err error)
-		}{
-			{
-				signTag: string(flow.TransactionDomainTag[:]),
-				require: func(t *testing.T, sigOk bool, err error) {
-					require.NoError(t, err)
-					require.True(t, sigOk)
-				},
-			},
-			{
-				signTag: "",
-				require: func(t *testing.T, sigOk bool, err error) {
-					require.NoError(t, err)
-					require.False(t, sigOk)
-				},
-			}, {
-				signTag: "random_tag",
-				require: func(t *testing.T, sigOk bool, err error) {
-					require.NoError(t, err)
-					require.False(t, sigOk)
-				},
-			},
-		}
-
-		for _, c := range cases {
-			for s, hMaps := range correctCombinations {
-				for h := range hMaps {
-					t.Run(fmt.Sprintf("sign tag: %v [%v, %v]", c.signTag, s, h), func(t *testing.T) {
-						seed := make([]byte, seedLength)
-						_, err := rand.Read(seed)
-						require.NoError(t, err)
-						sk, err := onflowCrypto.GeneratePrivateKey(s, seed)
-						require.NoError(t, err)
-
-						hasher, err := crypto.NewPrefixedHashing(h, c.signTag)
-						require.NoError(t, err)
-
-						data := []byte("some data")
-						sig, err := sk.Sign(data, hasher)
-						require.NoError(t, err)
-						signature := sig.Bytes()
-
-						ok, err := crypto.VerifySignatureFromTransaction(signature, data, sk.PublicKey(), h)
-						c.require(t, ok, err)
-					})
-				}
 			}
 		}
 	})
