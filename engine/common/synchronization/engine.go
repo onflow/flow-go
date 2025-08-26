@@ -162,7 +162,7 @@ func (e *Engine) setupResponseMessageHandler() error {
 		engine.NewNotifier(),
 		engine.Pattern{
 			Match: func(msg *engine.Message) bool {
-				_, ok := msg.Payload.(*messages.SyncResponse)
+				_, ok := msg.Payload.(*flow.SyncResponse)
 				if ok {
 					e.metrics.MessageReceived(metrics.EngineSynchronization, metrics.MessageSyncResponse)
 				}
@@ -260,7 +260,7 @@ func (e *Engine) process(channel channels.Channel, originID flow.Identifier, eve
 		}
 		return e.responseMessageHandler.Process(originID, event)
 
-	case *messages.SyncResponse:
+	case *flow.SyncResponse:
 		err := e.validateSyncResponseForALSP(channel, originID, message)
 		if err != nil {
 			irrecoverable.Throw(context.TODO(), fmt.Errorf("failed to validate sync response from %x: %w", originID[:], err))
@@ -298,7 +298,7 @@ func (e *Engine) processAvailableResponses(ctx context.Context) {
 
 		msg, ok := e.pendingSyncResponses.Get()
 		if ok {
-			e.onSyncResponse(msg.OriginID, msg.Payload.(*messages.SyncResponse))
+			e.onSyncResponse(msg.OriginID, msg.Payload.(*flow.SyncResponse))
 			e.metrics.MessageHandled(metrics.EngineSynchronization, metrics.MessageSyncResponse)
 			continue
 		}
@@ -317,7 +317,7 @@ func (e *Engine) processAvailableResponses(ctx context.Context) {
 }
 
 // onSyncResponse processes a synchronization response.
-func (e *Engine) onSyncResponse(originID flow.Identifier, res *messages.SyncResponse) {
+func (e *Engine) onSyncResponse(originID flow.Identifier, res *flow.SyncResponse) {
 	e.log.Debug().Str("origin_id", originID.String()).Msg("received sync response")
 	final := e.finalizedHeaderCache.Get()
 	e.core.HandleHeight(final, res.Height)
@@ -675,6 +675,6 @@ func (e *Engine) validateSyncRequestForALSP(originID flow.Identifier) error {
 }
 
 // TODO: implement spam reporting similar to validateSyncRequestForALSP
-func (e *Engine) validateSyncResponseForALSP(channel channels.Channel, id flow.Identifier, syncResponse *messages.SyncResponse) error {
+func (e *Engine) validateSyncResponseForALSP(channel channels.Channel, id flow.Identifier, syncResponse *flow.SyncResponse) error {
 	return nil
 }

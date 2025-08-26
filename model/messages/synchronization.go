@@ -30,8 +30,7 @@ type SyncResponse flow.SyncResponse
 //
 // All errors indicate that the decode target contains a structurally invalid representation of the internal flow.SyncResponse.
 func (s *SyncResponse) ToInternal() (any, error) {
-	// TODO(malleability, #7706) implement with validation checks
-	return s, nil
+	return (*flow.SyncResponse)(s), nil
 }
 
 // RangeRequest is part of the synchronization protocol and represents an active

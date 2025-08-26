@@ -140,7 +140,7 @@ func (e *Engine) setupResponseMessageHandler() error {
 		engine.NewNotifier(),
 		engine.Pattern{
 			Match: func(msg *engine.Message) bool {
-				_, ok := msg.Payload.(*messages.SyncResponse)
+				_, ok := msg.Payload.(*flow.SyncResponse)
 				if ok {
 					e.metrics.MessageReceived(metrics.EngineClusterSynchronization, metrics.MessageSyncResponse)
 				}
@@ -260,7 +260,7 @@ func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 	switch event.(type) {
 	case *messages.RangeRequest, *messages.BatchRequest, *flow.SyncRequest:
 		return e.requestHandler.process(originID, event)
-	case *messages.SyncResponse, *messages.ClusterBlockResponse:
+	case *flow.SyncResponse, *messages.ClusterBlockResponse:
 		return e.responseMessageHandler.Process(originID, event)
 	default:
 		return fmt.Errorf("received input with type %T from %x: %w", event, originID[:], engine.IncompatibleInputTypeError)
@@ -291,7 +291,7 @@ func (e *Engine) processAvailableResponses() {
 
 		msg, ok := e.pendingSyncResponses.Get()
 		if ok {
-			e.onSyncResponse(msg.OriginID, msg.Payload.(*messages.SyncResponse))
+			e.onSyncResponse(msg.OriginID, msg.Payload.(*flow.SyncResponse))
 			e.metrics.MessageHandled(metrics.EngineClusterSynchronization, metrics.MessageSyncResponse)
 			continue
 		}
@@ -310,7 +310,7 @@ func (e *Engine) processAvailableResponses() {
 }
 
 // onSyncResponse processes a synchronization response.
-func (e *Engine) onSyncResponse(originID flow.Identifier, res *messages.SyncResponse) {
+func (e *Engine) onSyncResponse(_ flow.Identifier, res *flow.SyncResponse) {
 	final, err := e.state.Final().Head()
 	if err != nil {
 		e.log.Error().Err(err).Msg("could not get last finalized header")
