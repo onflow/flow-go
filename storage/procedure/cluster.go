@@ -22,10 +22,14 @@ func InsertClusterBlock(lctx lockctx.Proof, rw storage.ReaderBatchWriter, block 
 
 	// store the block header
 	blockID := block.ID()
-	err := operation.InsertHeader(rw.Writer(), blockID, block.Header)
+	err := operation.InsertHeader(lctx, rw, blockID, block.Header)
 	if err != nil {
 		return fmt.Errorf("could not insert cluster block header: %w", err)
 	}
+
+	// since InsertHeader already checks for duplicates, we can safely
+	// assume that the block header is new and there is no existing index
+	// for other data related to this block ID.
 
 	// insert the block payload
 	err = InsertClusterPayload(lctx, rw, blockID, block.Payload)
@@ -166,7 +170,8 @@ func InsertClusterPayload(lctx lockctx.Proof, rw storage.ReaderBatchWriter, bloc
 	// to propose the same collection in two competing forks. However, we don't have to worry about repeated calls,
 	// because collections and transactions are keyed by their respective content hashes. So a different value
 	// should produce a different key, making accidental overwrites with inconsistent values impossible.
-	light := payload.Collection.Light() // persist reduced representation of collection, only listing the transaction by their hashes
+	// persist reduced representation of collection, only listing the transaction by their hashes
+	light := payload.Collection.Light()
 	writer := rw.Writer()
 	err = operation.UpsertCollection(writer, &light) // collection is keyed by content hash, hence no overwrite protection is needed
 	if err != nil {

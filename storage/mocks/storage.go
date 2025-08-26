@@ -410,17 +410,17 @@ func (mr *MockCommitsMockRecorder) BatchRemoveByBlockID(arg0, arg1 interface{}) 
 }
 
 // BatchStore mocks base method.
-func (m *MockCommits) BatchStore(arg0 flow.Identifier, arg1 flow.StateCommitment, arg2 storage.ReaderBatchWriter) error {
+func (m *MockCommits) BatchStore(arg0 lockctx.Proof, arg1 flow.Identifier, arg2 flow.StateCommitment, arg3 storage.ReaderBatchWriter) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "BatchStore", arg0, arg1, arg2)
+	ret := m.ctrl.Call(m, "BatchStore", arg0, arg1, arg2, arg3)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // BatchStore indicates an expected call of BatchStore.
-func (mr *MockCommitsMockRecorder) BatchStore(arg0, arg1, arg2 interface{}) *gomock.Call {
+func (mr *MockCommitsMockRecorder) BatchStore(arg0, arg1, arg2, arg3 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "BatchStore", reflect.TypeOf((*MockCommits)(nil).BatchStore), arg0, arg1, arg2)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "BatchStore", reflect.TypeOf((*MockCommits)(nil).BatchStore), arg0, arg1, arg2, arg3)
 }
 
 // ByBlockID mocks base method.
@@ -436,20 +436,6 @@ func (m *MockCommits) ByBlockID(arg0 flow.Identifier) (flow.StateCommitment, err
 func (mr *MockCommitsMockRecorder) ByBlockID(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ByBlockID", reflect.TypeOf((*MockCommits)(nil).ByBlockID), arg0)
-}
-
-// Store mocks base method.
-func (m *MockCommits) Store(arg0 flow.Identifier, arg1 flow.StateCommitment) error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Store", arg0, arg1)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// Store indicates an expected call of Store.
-func (mr *MockCommitsMockRecorder) Store(arg0, arg1 interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Store", reflect.TypeOf((*MockCommits)(nil).Store), arg0, arg1)
 }
 
 // MockEvents is a mock of Events interface.

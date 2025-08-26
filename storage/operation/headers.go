@@ -10,8 +10,28 @@ import (
 	"github.com/onflow/flow-go/storage"
 )
 
-func InsertHeader(w storage.Writer, headerID flow.Identifier, header *flow.Header) error {
-	return UpsertByKey(w, MakePrefix(codeHeader, headerID), header)
+// InsertHeader inserts a block header into the database.
+// The caller must ensure headerID is equal to header.ID()
+// It returns [storage.ErrAlreadyExists] if the header already exists, in other words, we only insert a new header once.
+// This error allows the caller to detect duplicate inserts. Since the header is stored along with other part
+// of the block in the same batch, similar duplication checks could be skipped for storing other parts of the block
+func InsertHeader(lctx lockctx.Proof, rw storage.ReaderBatchWriter, headerID flow.Identifier, header *flow.Header) error {
+	held := lctx.HoldsLock(storage.LockInsertBlock) || lctx.HoldsLock(storage.LockInsertOrFinalizeClusterBlock)
+	if !held {
+		return fmt.Errorf("missing required lock: %s or %s", storage.LockInsertBlock, storage.LockInsertOrFinalizeClusterBlock)
+	}
+
+	key := MakePrefix(codeHeader, headerID)
+	exist, err := KeyExists(rw.GlobalReader(), key)
+	if err != nil {
+		return err
+	}
+
+	if exist {
+		return fmt.Errorf("header already exists: %w", storage.ErrAlreadyExists)
+	}
+
+	return UpsertByKey(rw.Writer(), key, header)
 }
 
 func RetrieveHeader(r storage.Reader, blockID flow.Identifier, header *flow.Header) error {
@@ -27,16 +47,17 @@ func IndexFinalizedBlockByHeight(lctx lockctx.Proof, rw storage.ReaderBatchWrite
 		return fmt.Errorf("missing required lock: %s", storage.LockFinalizeBlock)
 	}
 
-	var existingID flow.Identifier
-	err := RetrieveByKey(rw.GlobalReader(), MakePrefix(codeHeightToBlock, height), &existingID)
-	if err == nil {
-		return fmt.Errorf("block ID already exists for height %d: %w", height, storage.ErrAlreadyExists)
-	}
-	if !errors.Is(err, storage.ErrNotFound) {
+	key := MakePrefix(codeHeightToBlock, height)
+	exists, err := KeyExists(rw.GlobalReader(), key)
+	if err != nil {
 		return fmt.Errorf("failed to check existing block ID for height %d: %w", height, err)
 	}
 
-	return UpsertByKey(rw.Writer(), MakePrefix(codeHeightToBlock, height), blockID)
+	if exists {
+		return fmt.Errorf("block ID already exists for height %d: %w", height, storage.ErrAlreadyExists)
+	}
+
+	return UpsertByKey(rw.Writer(), key, blockID)
 }
 
 // IndexCertifiedBlockByView indexes a block by its view.

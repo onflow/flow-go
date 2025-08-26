@@ -146,12 +146,12 @@ func (c *Collections) Remove(colID flow.Identifier) error {
 // This is the common implementation used by both StoreAndIndexByTransaction and BatchStoreAndIndexByTransaction.
 // No errors are expected during normal operations
 func (c *Collections) BatchStoreAndIndexByTransaction(lctx lockctx.Proof, collection *flow.Collection, rw storage.ReaderBatchWriter) (flow.LightCollection, error) {
-	light := collection.Light()
-	collectionID := light.ID()
-
 	if !lctx.HoldsLock(storage.LockInsertCollection) {
 		return flow.LightCollection{}, fmt.Errorf("missing lock: %v", storage.LockInsertCollection)
 	}
+
+	light := collection.Light()
+	collectionID := light.ID()
 
 	err := operation.UpsertCollection(rw.Writer(), &light)
 	if err != nil {

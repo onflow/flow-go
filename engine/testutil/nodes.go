@@ -619,7 +619,8 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity bootstrap.NodeInfo, ide
 	require.Equal(t, fmt.Sprint(rootSeal.FinalState), fmt.Sprint(commit))
 	require.Equal(t, rootSeal.ResultID, rootResult.ID())
 
-	err = bootstrapper.BootstrapExecutionDatabase(db, rootSeal)
+	lockManager := storage.NewTestingLockManager()
+	err = bootstrapper.BootstrapExecutionDatabase(lockManager, db, rootSeal)
 	require.NoError(t, err)
 
 	registerDir := unittest.TempPebblePath(t)
@@ -650,8 +651,6 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity bootstrap.NodeInfo, ide
 		}
 		return final.Height, nil
 	}
-
-	lockManager := storage.NewTestingLockManager()
 
 	execState := executionState.NewExecutionState(
 		ls, commitsStorage, node.Blocks, node.Headers, chunkDataPackStorage, results, myReceipts, eventsStorage, serviceEventsStorage, txResultStorage, db, getLatestFinalized, node.Tracer,

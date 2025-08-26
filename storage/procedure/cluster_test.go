@@ -19,6 +19,7 @@ func TestInsertRetrieveClusterBlock(t *testing.T) {
 		block := unittest.ClusterBlockFixture()
 
 		_, lctx := unittest.LockManagerWithContext(t, storage.LockInsertOrFinalizeClusterBlock)
+		require.NoError(t, lctx.AcquireLock(storage.LockInsertBlock))
 		defer lctx.Release()
 		require.NoError(t, db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 			return InsertClusterBlock(lctx, rw, &block)
@@ -39,8 +40,12 @@ func TestFinalizeClusterBlock(t *testing.T) {
 
 		lockManager := storage.NewTestingLockManager()
 		lctx := lockManager.NewContext()
-		require.NoError(t, lctx.AcquireLock(storage.LockInsertOrFinalizeClusterBlock))
 		defer lctx.Release()
+		require.NoError(t, lctx.AcquireLock(storage.LockInsertOrFinalizeClusterBlock))
+		require.NoError(t, lctx.AcquireLock(storage.LockInsertBlock))
+		require.NoError(t, db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+			return InsertClusterBlock(lctx, rw, &parent)
+		}))
 
 		// index parent as latest finalized block (manually writing respective indexes like in bootstrapping to skip transitive consistency checks)
 		require.NoError(t, db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {

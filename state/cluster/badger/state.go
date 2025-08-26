@@ -31,6 +31,10 @@ func Bootstrap(db storage.DB, lockManager lockctx.Manager, stateRoot *StateRoot)
 	if err != nil {
 		return nil, fmt.Errorf("failed to acquire lock for inserting cluster block: %w", err)
 	}
+	err = lctx.AcquireLock(storage.LockInsertBlock)
+	if err != nil {
+		return nil, fmt.Errorf("failed to acquire lock for inserting block: %w", err)
+	}
 	isBootstrapped, err := IsBootstrapped(db, stateRoot.ClusterID())
 	if err != nil {
 		return nil, fmt.Errorf("failed to determine whether database contains bootstrapped state: %w", err)

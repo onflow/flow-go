@@ -31,7 +31,7 @@ func NewBlocks(db storage.DB, headers *Headers, payloads *Payloads) *Blocks {
 
 // BatchStore stores a valid block in a batch.
 func (b *Blocks) BatchStore(lctx lockctx.Proof, rw storage.ReaderBatchWriter, block *flow.Block) error {
-	err := b.headers.storeTx(rw, block.Header)
+	err := b.headers.storeTx(lctx, rw, block.Header)
 	if err != nil {
 		return fmt.Errorf("could not store header %v: %w", block.Header.ID(), err)
 	}

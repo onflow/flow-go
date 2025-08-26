@@ -42,11 +42,13 @@ func TestGuaranteeStoreRetrieve(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, expected, actual)
 
-		// OK to store again
+		// OK to store a different block
+		expected2 := unittest.CollectionGuaranteeFixture()
+		block2 := unittest.BlockWithGuaranteesFixture([]*flow.CollectionGuarantee{expected2})
 		lctx2 := manager.NewContext()
 		require.NoError(t, lctx2.AcquireLock(storage.LockInsertBlock))
 		require.NoError(t, db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			return blocks.BatchStore(lctx2, rw, block)
+			return blocks.BatchStore(lctx2, rw, block2)
 		}))
 		lctx2.Release()
 	})
