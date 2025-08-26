@@ -140,16 +140,16 @@ func TestExecuteCallbackTransaction(t *testing.T) {
 }
 
 func createValidCallbackEvent(t *testing.T, id uint64, effort uint64) flow.Event {
-	const processedEventTypeTemplate = "A.%v.FlowCallbackScheduler.CallbackProcessed"
+	const processedEventTypeTemplate = "A.%v.FlowCallbackScheduler.PendingExecution"
 	env := systemcontracts.SystemContractsForChain(flow.Mainnet.Chain().ChainID()).AsTemplateEnv()
 	eventTypeString := fmt.Sprintf(processedEventTypeTemplate, env.FlowCallbackSchedulerAddress)
 	loc, err := cadenceCommon.HexToAddress(env.FlowCallbackSchedulerAddress)
 	require.NoError(t, err)
-	location := cadenceCommon.NewAddressLocation(nil, loc, "CallbackProcessed")
+	location := cadenceCommon.NewAddressLocation(nil, loc, "PendingExecution")
 
 	eventType := cadence.NewEventType(
 		location,
-		"CallbackProcessed",
+		"PendingExecution",
 		[]cadence.Field{
 			{Identifier: "id", Type: cadence.UInt64Type},
 			{Identifier: "priority", Type: cadence.UInt8Type},
@@ -192,7 +192,7 @@ func createInvalidTypeEvent() flow.Event {
 
 func createInvalidPayloadEvent() flow.Event {
 	return flow.Event{
-		Type:             flow.EventType("A.0000000000000000.FlowCallbackScheduler.CallbackProcessed"),
+		Type:             flow.EventType("A.0000000000000000.FlowCallbackScheduler.PendingExecution"),
 		TransactionID:    unittest.IdentifierFixture(),
 		TransactionIndex: 0,
 		EventIndex:       0,
