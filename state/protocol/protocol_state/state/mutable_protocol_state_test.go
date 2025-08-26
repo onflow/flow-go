@@ -35,8 +35,8 @@ type StateMutatorSuite struct {
 	protocolKVStoreDB       protocol_statemock.ProtocolKVStore
 	epochProtocolStateDB    storagemock.EpochProtocolStateEntries
 	globalParams            psmock.GlobalParams
-	kvStateMachines         []protocol_statemock.OrthogonalStoreStateMachine[protocol.KVStoreReader]
-	kvStateMachineFactories []protocol_statemock.KeyValueStoreStateMachineFactory
+	kvStateMachines         []*protocol_statemock.OrthogonalStoreStateMachine[protocol.KVStoreReader]
+	kvStateMachineFactories []*protocol_statemock.KeyValueStoreStateMachineFactory
 
 	// basic setup for happy path test
 	parentState           protocol_statemock.KVStoreAPI // Protocol state of `candidate`s parent block
@@ -73,13 +73,12 @@ func (s *StateMutatorSuite) SetupTest() {
 
 	// Factories for the state machines expect `s.parentState` as parent state and `s.replicatedState` as target state.
 	// CAUTION: the behaviour of each state machine has to be defined by the tests.
-	s.kvStateMachines = make([]protocol_statemock.OrthogonalStoreStateMachine[protocol.KVStoreReader], 2)
-	s.kvStateMachineFactories = make([]protocol_statemock.KeyValueStoreStateMachineFactory, len(s.kvStateMachines))
+	s.kvStateMachines = make([]*protocol_statemock.OrthogonalStoreStateMachine[protocol.KVStoreReader], 2)
+	s.kvStateMachineFactories = make([]*protocol_statemock.KeyValueStoreStateMachineFactory, len(s.kvStateMachines))
 	kvStateMachineFactories := make([]protocol_state.KeyValueStoreStateMachineFactory, len(s.kvStateMachines)) // slice of interface-typed pointers to the elements of s.kvStateMachineFactories
 	for i := range s.kvStateMachines {
-		s.kvStateMachineFactories[i] = *protocol_statemock.NewKeyValueStoreStateMachineFactory(s.T())
-		s.kvStateMachineFactories[i].On("Create", s.candidate.View, s.candidate.ParentID, &s.parentState, &s.evolvingState).Return(&s.kvStateMachines[i], nil)
-		kvStateMachineFactories[i] = &s.kvStateMachineFactories[i]
+		s.kvStateMachineFactories[i] = protocol_statemock.NewKeyValueStoreStateMachineFactory(s.T())
+		kvStateMachineFactories[i] = s.kvStateMachineFactories[i]
 	}
 
 	s.mutableState = newMutableProtocolState(
@@ -199,8 +198,8 @@ func (s *StateMutatorSuite) Test_HappyPath_StateChange() {
 		modifyState := func(_ mock.Arguments) {
 			s.evolvingState.On("ID").Return(expectedResultingStateID, nil).Once()
 		}
-		s.kvStateMachines[0] = s.mockStateTransition().ServiceEventsMatch(emptySlice[flow.ServiceEvent]()).DuringEvolveState(modifyState).Mock()
-		s.kvStateMachines[1] = s.mockStateTransition().ServiceEventsMatch(emptySlice[flow.ServiceEvent]()).Mock()
+	s.kvStateMachines[0] = s.mockStateTransition().ServiceEventsMatch(emptySlice[flow.ServiceEvent]()).DuringEvolveState(modifyState).Mock()
+	s.kvStateMachines[1] = s.mockStateTransition().ServiceEventsMatch(emptySlice[flow.ServiceEvent]()).Mock()
 
 		s.testEvolveState(nil, expectedResultingStateID, true)
 	})
@@ -210,8 +209,8 @@ func (s *StateMutatorSuite) Test_HappyPath_StateChange() {
 		modifyState := func(_ mock.Arguments) {
 			s.evolvingState.On("ID").Return(expectedResultingStateID, nil).Once()
 		}
-		s.kvStateMachines[0] = s.mockStateTransition().ServiceEventsMatch(emptySlice[flow.ServiceEvent]()).DuringEvolveState(modifyState).Mock()
-		s.kvStateMachines[1] = s.mockStateTransition().ServiceEventsMatch(emptySlice[flow.ServiceEvent]()).Mock()
+	s.kvStateMachines[0] = s.mockStateTransition().ServiceEventsMatch(emptySlice[flow.ServiceEvent]()).DuringEvolveState(modifyState).Mock()
+	s.kvStateMachines[1] = s.mockStateTransition().ServiceEventsMatch(emptySlice[flow.ServiceEvent]()).Mock()
 
 		s.testEvolveState([]*flow.Seal{}, expectedResultingStateID, true)
 	})
@@ -227,8 +226,8 @@ func (s *StateMutatorSuite) Test_HappyPath_StateChange() {
 		modifyState := func(_ mock.Arguments) {
 			s.evolvingState.On("ID").Return(expectedResultingStateID, nil).Once()
 		}
-		s.kvStateMachines[0] = s.mockStateTransition().ServiceEventsMatch(emptySlice[flow.ServiceEvent]()).DuringEvolveState(modifyState).Mock()
-		s.kvStateMachines[1] = s.mockStateTransition().ServiceEventsMatch(emptySlice[flow.ServiceEvent]()).Mock()
+	s.kvStateMachines[0] = s.mockStateTransition().ServiceEventsMatch(emptySlice[flow.ServiceEvent]()).DuringEvolveState(modifyState).Mock()
+	s.kvStateMachines[1] = s.mockStateTransition().ServiceEventsMatch(emptySlice[flow.ServiceEvent]()).Mock()
 
 		s.testEvolveState([]*flow.Seal{seal}, expectedResultingStateID, true)
 	})
@@ -247,8 +246,10 @@ func (s *StateMutatorSuite) Test_HappyPath_StateChange() {
 		modifyState := func(_ mock.Arguments) {
 			s.evolvingState.On("ID").Return(expectedResultingStateID, nil).Once()
 		}
-		s.kvStateMachines[0] = s.mockStateTransition().ExpectedServiceEvents(serviceEvents).DuringEvolveState(modifyState).Mock()
-		s.kvStateMachines[1] = s.mockStateTransition().ExpectedServiceEvents(serviceEvents).Mock()
+		mockObj0 := s.mockStateTransition().ExpectedServiceEvents(serviceEvents).DuringEvolveState(modifyState).Mock()
+		mockObj1 := s.mockStateTransition().ExpectedServiceEvents(serviceEvents).Mock()
+		s.kvStateMachines[0] = mockObj0
+		s.kvStateMachines[1] = mockObj1
 
 		s.testEvolveState([]*flow.Seal{seal}, expectedResultingStateID, true)
 	})
@@ -376,8 +377,10 @@ func (s *StateMutatorSuite) Test_SealsOrdered() {
 		parentProtocolStateID := s.parentState.ID()
 		s.evolvingState.On("ID").Return(parentProtocolStateID, nil).Once()
 
-		s.kvStateMachines[0] = s.mockStateTransition().ExpectedServiceEvents(orderedServiceEvents).Mock()
-		s.kvStateMachines[1] = s.mockStateTransition().ExpectedServiceEvents(orderedServiceEvents).Mock()
+	mockObj0 := s.mockStateTransition().ExpectedServiceEvents(orderedServiceEvents).Mock()
+	mockObj1 := s.mockStateTransition().ExpectedServiceEvents(orderedServiceEvents).Mock()
+	s.kvStateMachines[0] = mockObj0
+	s.kvStateMachines[1] = mockObj1
 
 		s.testEvolveState(seals, parentProtocolStateID, false)
 	})
@@ -387,8 +390,8 @@ func (s *StateMutatorSuite) Test_SealsOrdered() {
 		modifyState := func(_ mock.Arguments) {
 			s.evolvingState.On("ID").Return(expectedResultingStateID, nil).Once()
 		}
-		s.kvStateMachines[0] = s.mockStateTransition().ExpectedServiceEvents(orderedServiceEvents).DuringEvolveState(modifyState).Mock()
-		s.kvStateMachines[1] = s.mockStateTransition().ExpectedServiceEvents(orderedServiceEvents).Mock()
+	s.kvStateMachines[0] = s.mockStateTransition().ExpectedServiceEvents(orderedServiceEvents).DuringEvolveState(modifyState).Mock()
+	s.kvStateMachines[1] = s.mockStateTransition().ExpectedServiceEvents(orderedServiceEvents).Mock()
 
 		s.testEvolveState(seals, expectedResultingStateID, true)
 	})
@@ -417,8 +420,8 @@ func (s *StateMutatorSuite) Test_ReplicateFails() {
 	s.parentState.On("Replicate", s.latestProtocolVersion).Return(nil, exception).Once()
 
 	// `SetupTest` initializes the mock factories to expect to be called, so we overwrite the mocks here:
-	s.kvStateMachineFactories[0] = *protocol_statemock.NewKeyValueStoreStateMachineFactory(s.T())
-	s.kvStateMachineFactories[1] = *protocol_statemock.NewKeyValueStoreStateMachineFactory(s.T())
+	s.kvStateMachineFactories[0] = protocol_statemock.NewKeyValueStoreStateMachineFactory(s.T())
+	s.kvStateMachineFactories[1] = protocol_statemock.NewKeyValueStoreStateMachineFactory(s.T())
 
 	_, dbUpdates, err := s.mutableState.EvolveState(s.candidate.ParentID, s.candidate.View, []*flow.Seal{})
 	require.ErrorIs(s.T(), err, exception)
@@ -436,16 +439,16 @@ func (s *StateMutatorSuite) Test_ReplicateFails() {
 //
 // This test also verifies that the `MutableProtocolState` does not engage in step (ii) or (iii) before the completing step (i) on all state machines.
 func (s *StateMutatorSuite) Test_StateMachineFactoryFails() {
-	workingFactory := *protocol_statemock.NewKeyValueStoreStateMachineFactory(s.T())
+	workingFactory := protocol_statemock.NewKeyValueStoreStateMachineFactory(s.T())
 	stateMachine := protocol_statemock.NewOrthogonalStoreStateMachine[protocol.KVStoreReader](s.T()) // we expect no methods to be called on this state machine
 	workingFactory.On("Create", s.candidate.View, s.candidate.ParentID, &s.parentState, &s.evolvingState).Return(stateMachine, nil).Maybe()
 
 	exception := errors.New("exception")
-	failingFactory := *protocol_statemock.NewKeyValueStoreStateMachineFactory(s.T())
+	failingFactory := protocol_statemock.NewKeyValueStoreStateMachineFactory(s.T())
 	failingFactory.On("Create", s.candidate.View, s.candidate.ParentID, &s.parentState, &s.evolvingState).Return(nil, exception).Once()
 
 	s.Run("failing factory is last", func() {
-		s.kvStateMachineFactories[0], s.kvStateMachineFactories[1] = workingFactory, failingFactory //nolint:govet
+		s.kvStateMachineFactories[0], s.kvStateMachineFactories[1] = workingFactory, failingFactory
 		_, dbUpdates, err := s.mutableState.EvolveState(s.candidate.ParentID, s.candidate.View, []*flow.Seal{})
 		require.ErrorIs(s.T(), err, exception)
 		require.True(s.T(), dbUpdates.IsEmpty())
@@ -453,7 +456,7 @@ func (s *StateMutatorSuite) Test_StateMachineFactoryFails() {
 
 	failingFactory.On("Create", s.candidate.View, s.candidate.ParentID, &s.parentState, &s.evolvingState).Return(nil, exception).Once()
 	s.Run("failing factory is first", func() {
-		s.kvStateMachineFactories[0], s.kvStateMachineFactories[1] = failingFactory, workingFactory //nolint:govet
+		s.kvStateMachineFactories[0], s.kvStateMachineFactories[1] = failingFactory, workingFactory
 		_, dbUpdates, err := s.mutableState.EvolveState(s.candidate.ParentID, s.candidate.View, []*flow.Seal{})
 		require.ErrorIs(s.T(), err, exception)
 		require.True(s.T(), dbUpdates.IsEmpty())
@@ -474,15 +477,15 @@ func (s *StateMutatorSuite) Test_StateMachineFactoryFails() {
 //
 // This test also verifies that the `MutableProtocolState` does not engage in step (iii) before the completing step (ii) on all state machines.
 func (s *StateMutatorSuite) Test_StateMachineProcessingServiceEventsFails() {
-	workingStateMachine := *protocol_statemock.NewOrthogonalStoreStateMachine[protocol.KVStoreReader](s.T())
+	workingStateMachine := protocol_statemock.NewOrthogonalStoreStateMachine[protocol.KVStoreReader](s.T())
 	workingStateMachine.On("EvolveState", mock.MatchedBy(emptySlice[flow.ServiceEvent]())).Return(nil).Once()
 
 	exception := errors.New("exception")
-	failingStateMachine := *protocol_statemock.NewOrthogonalStoreStateMachine[protocol.KVStoreReader](s.T())
+	failingStateMachine := protocol_statemock.NewOrthogonalStoreStateMachine[protocol.KVStoreReader](s.T())
 	failingStateMachine.On("EvolveState", mock.MatchedBy(emptySlice[flow.ServiceEvent]())).Return(exception).Once()
 
 	s.Run("failing state machine is last", func() {
-		s.kvStateMachines[0], s.kvStateMachines[1] = workingStateMachine, failingStateMachine //nolint:govet
+		s.kvStateMachines[0], s.kvStateMachines[1] = workingStateMachine, failingStateMachine
 		_, dbUpdates, err := s.mutableState.EvolveState(s.candidate.ParentID, s.candidate.View, []*flow.Seal{})
 		require.ErrorIs(s.T(), err, exception)
 		require.False(s.T(), protocol.IsInvalidServiceEventError(err))
@@ -491,7 +494,7 @@ func (s *StateMutatorSuite) Test_StateMachineProcessingServiceEventsFails() {
 
 	failingStateMachine.On("EvolveState", mock.MatchedBy(emptySlice[flow.ServiceEvent]())).Return(exception).Once()
 	s.Run("failing state machine is first", func() {
-		s.kvStateMachines[0], s.kvStateMachines[1] = failingStateMachine, workingStateMachine //nolint:govet
+		s.kvStateMachines[0], s.kvStateMachines[1] = failingStateMachine, workingStateMachine
 		_, dbUpdates, err := s.mutableState.EvolveState(s.candidate.ParentID, s.candidate.View, []*flow.Seal{})
 		require.ErrorIs(s.T(), err, exception)
 		require.False(s.T(), protocol.IsInvalidServiceEventError(err))
@@ -503,17 +506,17 @@ func (s *StateMutatorSuite) Test_StateMachineProcessingServiceEventsFails() {
 // during their `Build` step. Specifically, the state machine should handle invalid events internally and only escalate internal
 // errors in case of an irrecoverable problem.
 func (s *StateMutatorSuite) Test_StateMachineBuildFails() {
-	workingStateMachine := *protocol_statemock.NewOrthogonalStoreStateMachine[protocol.KVStoreReader](s.T())
+	workingStateMachine := protocol_statemock.NewOrthogonalStoreStateMachine[protocol.KVStoreReader](s.T())
 	workingStateMachine.On("EvolveState", mock.MatchedBy(emptySlice[flow.ServiceEvent]())).Return(nil).Twice()
 	workingStateMachine.On("Build").Return(transaction.NewDeferredBlockPersist(), nil).Maybe()
 
 	exception := errors.New("exception")
-	failingStateMachine := *protocol_statemock.NewOrthogonalStoreStateMachine[protocol.KVStoreReader](s.T())
+	failingStateMachine := protocol_statemock.NewOrthogonalStoreStateMachine[protocol.KVStoreReader](s.T())
 	failingStateMachine.On("EvolveState", mock.MatchedBy(emptySlice[flow.ServiceEvent]())).Return(nil).Twice()
 	failingStateMachine.On("Build").Return(nil, exception).Once()
 
 	s.Run("failing state machine is last", func() {
-		s.kvStateMachines[0], s.kvStateMachines[1] = workingStateMachine, failingStateMachine //nolint:govet
+		s.kvStateMachines[0], s.kvStateMachines[1] = workingStateMachine, failingStateMachine
 		_, dbUpdates, err := s.mutableState.EvolveState(s.candidate.ParentID, s.candidate.View, []*flow.Seal{})
 		require.ErrorIs(s.T(), err, exception)
 		require.False(s.T(), protocol.IsInvalidServiceEventError(err))
@@ -522,7 +525,7 @@ func (s *StateMutatorSuite) Test_StateMachineBuildFails() {
 
 	failingStateMachine.On("Build").Return(nil, exception).Once()
 	s.Run("failing state machine is first", func() {
-		s.kvStateMachines[0], s.kvStateMachines[1] = failingStateMachine, workingStateMachine //nolint:govet
+		s.kvStateMachines[0], s.kvStateMachines[1] = failingStateMachine, workingStateMachine
 		_, dbUpdates, err := s.mutableState.EvolveState(s.candidate.ParentID, s.candidate.View, []*flow.Seal{})
 		require.ErrorIs(s.T(), err, exception)
 		require.False(s.T(), protocol.IsInvalidServiceEventError(err))
@@ -616,24 +619,24 @@ func (m *mockStateTransition) DuringEvolveState(fn func(mock.Arguments)) *mockSt
 }
 
 // Mock constructs and configures the OrthogonalStoreStateMachine mock.
-func (m *mockStateTransition) Mock() protocol_statemock.OrthogonalStoreStateMachine[protocol.KVStoreReader] {
+func (m *mockStateTransition) Mock() *protocol_statemock.OrthogonalStoreStateMachine[protocol.KVStoreReader] {
 	evolveStateCalled := false
 	stateMachine := protocol_statemock.NewOrthogonalStoreStateMachine[protocol.KVStoreReader](m.T)
 	if m.expectedServiceEvents == nil {
 		m.expectedServiceEvents = mock.Anything
 	}
 	stateMachine.On("EvolveState", m.expectedServiceEvents).Run(func(args mock.Arguments) {
-		evolveStateCalled = true // repeated `EvolveState` calls will be denied by the mock
+		evolveStateCalled = true
 		if m.runInEvolveState != nil {
 			m.runInEvolveState(args)
 		}
-	}).Return(nil).Once()
+	}).Return(nil)
 
 	deferredUpdate := storagemock.NewDeferredDBUpdate(m.T)
-	deferredUpdate.On("Execute", mock.Anything).Return(nil).Once()
+	deferredUpdate.On("Execute", mock.Anything).Return(nil)
 	deferredDBUpdates := transaction.NewDeferredBlockPersist().AddDbOp(deferredUpdate.Execute)
 	stateMachine.On("Build").Run(func(args mock.Arguments) {
 		require.True(m.T, evolveStateCalled, "Method `OrthogonalStoreStateMachine.Build` called before `EvolveState`!")
-	}).Return(deferredDBUpdates, nil).Once()
-	return *stateMachine //nolint:govet
+	}).Return(deferredDBUpdates, nil)
+	return stateMachine
 }
