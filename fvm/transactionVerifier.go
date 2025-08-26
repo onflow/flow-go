@@ -17,7 +17,7 @@ import (
 )
 
 type signatureType struct {
-	message []byte
+	payload []byte
 
 	errorBuilder func(flow.TransactionSignature, error) errors.CodedError
 
@@ -66,12 +66,16 @@ func (entry *signatureContinuation) verify() errors.CodedError {
 
 	entry.invokedVerify = true
 
+	valid, message := entry.ValidateExtensionDataAndReconstructMessage(entry.payload)
+	if !valid {
+		entry.verifyErr = entry.newError(fmt.Errorf("signature extension data is not valid"))
+	}
+
 	valid, err := crypto.VerifySignatureFromTransaction(
 		entry.Signature,
-		entry.message,
+		message,
 		entry.accountKey.PublicKey,
 		entry.accountKey.HashAlgo,
-		entry.ExtensionData,
 	)
 	if err != nil {
 		entry.verifyErr = entry.newError(err)
