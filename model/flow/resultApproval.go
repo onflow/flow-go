@@ -187,6 +187,10 @@ func (ra ResultApproval) ID() Identifier {
 
 // ApprovalRequest represents a request for a ResultApproval corresponding to
 // a specific chunk.
+//
+// It is created from the corresponding untrusted network message
+// (messages.ApprovalRequest) during decoding. Construction is only allowed
+// through validation logic, ensuring the fields have passed structural checks.
 type ApprovalRequest struct {
 	Nonce      uint64
 	ResultID   Identifier
@@ -194,6 +198,10 @@ type ApprovalRequest struct {
 }
 
 // ApprovalResponse contains a response to an approval request.
+//
+// It is created from the corresponding untrusted network message
+// (messages.ApprovalResponse) during decoding and validation. The embedded
+// ResultApproval is guaranteed to have passed all structural validity checks.
 type ApprovalResponse struct {
 	Nonce    uint64
 	Approval ResultApproval

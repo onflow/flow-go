@@ -39,7 +39,7 @@ type ApprovalResponse struct {
 // ToInternal converts the untrusted ApprovalResponse into its trusted internal
 // representation.
 func (a *ApprovalResponse) ToInternal() (any, error) {
-	approval, err := flow.NewResultApproval(flow.UntrustedResultApproval(a.Approval))
+	approval, err := flow.NewResultApproval(a.Approval)
 	if err != nil {
 		return nil, fmt.Errorf("invalid result approval: %w", err)
 	}
