@@ -59,10 +59,12 @@ func TestCollections(t *testing.T) {
 			expected := unittest.CollectionFixture(1).Light()
 			blockID := unittest.IdentifierFixture()
 
+			_, lctx := unittest.LockManagerWithContext(t, storage.LockInsertOrFinalizeClusterBlock)
+			defer lctx.Release()
 			_ = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 				err := operation.UpsertCollection(rw.Writer(), &expected)
 				assert.NoError(t, err)
-				err = operation.IndexCollectionPayload(rw.Writer(), blockID, expected.Transactions)
+				err = operation.IndexCollectionPayload(lctx, rw.Writer(), blockID, expected.Transactions)
 				assert.NoError(t, err)
 				return nil
 			})
