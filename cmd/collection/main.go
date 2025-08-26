@@ -332,6 +332,8 @@ func main() {
 				return err
 			}
 
+			// report the initial config value
+			colMetrics.CollectionMaxSize(maxCollectionSize)
 			return nil
 		}).
 		Component("machine account config validator", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {

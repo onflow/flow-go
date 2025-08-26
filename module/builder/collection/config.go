@@ -92,7 +92,7 @@ func WithMaxPayerTransactionRate(rate float64) Opt {
 }
 
 func WithUnlimitedPayers(payers ...flow.Address) Opt {
-	lookup := make(map[flow.Address]struct{})
+	lookup := make(map[flow.Address]struct{}, len(payers))
 	for _, payer := range payers {
 		lookup[payer] = struct{}{}
 	}
@@ -102,7 +102,7 @@ func WithUnlimitedPayers(payers ...flow.Address) Opt {
 }
 
 func WithPriorityPayers(payers ...flow.Address) Opt {
-	lookup := make(map[flow.Address]struct{})
+	lookup := make(map[flow.Address]struct{}, len(payers))
 	for _, payer := range payers {
 		lookup[payer] = struct{}{}
 	}
