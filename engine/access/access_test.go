@@ -1417,8 +1417,7 @@ func (suite *Suite) TestLastFinalizedBlockHeightResult() {
 		newFinalizedBlock := unittest.BlockWithParentFixture(block.Header)
 
 		db := badgerimpl.ToDB(badgerdb)
-		testLockManager := storage.NewTestingLockManager()
-		lctx := testLockManager.NewContext()
+		lctx := suite.lockManager.NewContext()
 		err := lctx.AcquireLock(storage.LockInsertBlock)
 		require.NoError(suite.T(), err)
 		defer lctx.Release()

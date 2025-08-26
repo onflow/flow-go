@@ -106,8 +106,7 @@ func (p *PipelineFunctionalSuite) SetupTest() {
 	// store and index the root header
 	p.headers = store.NewHeaders(p.metrics, p.db)
 
-	lockManager := storage.NewTestingLockManager()
-	insertLctx := lockManager.NewContext()
+	insertLctx := p.lockManager.NewContext()
 	err = insertLctx.AcquireLock(storage.LockInsertBlock)
 	p.Require().NoError(err)
 
