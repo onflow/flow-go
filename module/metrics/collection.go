@@ -70,7 +70,7 @@ func (cc *CollectionCollector) ClusterBlockProposed(block *cluster.Block) {
 	collection := block.Payload.Collection.Light()
 
 	cc.proposals.
-		With(prometheus.Labels{LabelChain: block.Header.ChainID.String()}).
+		With(prometheus.Labels{LabelChain: block.ChainID.String()}).
 		Observe(float64(collection.Len()))
 }
 
@@ -78,11 +78,11 @@ func (cc *CollectionCollector) ClusterBlockProposed(block *cluster.Block) {
 // finishes the tx->collection span for each constituent transaction.
 func (cc *CollectionCollector) ClusterBlockFinalized(block *cluster.Block) {
 	collection := block.Payload.Collection.Light()
-	chainID := block.Header.ChainID
+	chainID := block.ChainID
 
 	cc.finalizedHeight.
 		With(prometheus.Labels{LabelChain: chainID.String()}).
-		Set(float64(block.Header.Height))
+		Set(float64(block.Height))
 	cc.guarantees.
 		With(prometheus.Labels{
 			LabelChain: chainID.String(),

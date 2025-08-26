@@ -144,10 +144,10 @@ func TestGetAccount(t *testing.T) {
 		bl, err := b.CommitBlock()
 		assert.NoError(t, err)
 
-		accNow, err := adapter.GetAccountAtBlockHeight(context.Background(), serviceAccountAddress, bl.Header.Height)
+		accNow, err := adapter.GetAccountAtBlockHeight(context.Background(), serviceAccountAddress, bl.Height)
 		assert.NoError(t, err)
 
-		accPrev, err := adapter.GetAccountAtBlockHeight(context.Background(), serviceAccountAddress, bl.Header.Height-uint64(1))
+		accPrev, err := adapter.GetAccountAtBlockHeight(context.Background(), serviceAccountAddress, bl.Height-uint64(1))
 		assert.NoError(t, err)
 
 		assert.Equal(t, accNow.Keys[0].SequenceNumber, uint64(1))
@@ -509,7 +509,7 @@ func TestCreateAccount(t *testing.T) {
 		block, err := b.CommitBlock()
 		require.NoError(t, err)
 
-		events, err := adapter.GetEventsForHeightRange(context.Background(), flowsdk.EventAccountCreated, block.Header.Height, block.Header.Height)
+		events, err := adapter.GetEventsForHeightRange(context.Background(), flowsdk.EventAccountCreated, block.Height, block.Height)
 		require.NoError(t, err)
 		require.Len(t, events, 1)
 

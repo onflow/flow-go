@@ -3,7 +3,7 @@ package convert_test
 import (
 	"testing"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	accessmodel "github.com/onflow/flow-go/model/access"
@@ -17,9 +17,10 @@ func TestConvertTransactionResult(t *testing.T) {
 	expected := txResultFixture()
 
 	msg := convert.TransactionResultToMessage(expected)
-	converted := convert.MessageToTransactionResult(msg)
+	converted, err := convert.MessageToTransactionResult(msg)
+	require.NoError(t, err)
 
-	assert.Equal(t, expected, converted)
+	require.Equal(t, expected, converted)
 }
 
 func TestConvertTransactionResults(t *testing.T) {
@@ -31,9 +32,10 @@ func TestConvertTransactionResults(t *testing.T) {
 	}
 
 	msg := convert.TransactionResultsToMessage(expected)
-	converted := convert.MessageToTransactionResults(msg)
+	converted, err := convert.MessageToTransactionResults(msg)
+	require.NoError(t, err)
 
-	assert.Equal(t, expected, converted)
+	require.Equal(t, expected, converted)
 }
 
 func txResultFixture() *accessmodel.TransactionResult {

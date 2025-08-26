@@ -1,8 +1,6 @@
 package module
 
-import (
-	"github.com/onflow/flow-go/model/flow"
-)
+import "github.com/onflow/flow-go/model/flow"
 
 // Builder represents an abstracted block construction module that can be used
 // in more than one consensus algorithm. The resulting block is consistent
@@ -23,5 +21,5 @@ type Builder interface {
 	// However, it will pass through all errors returned by `setter` and `sign`.
 	// Callers must be aware of possible error returns from the `setter` and `sign` arguments they provide,
 	// and handle them accordingly when handling errors returned from BuildOn.
-	BuildOn(parentID flow.Identifier, setter func(*flow.Header) error, sign func(*flow.Header) error) (*flow.Header, error)
+	BuildOn(parentID flow.Identifier, setter func(*flow.HeaderBodyBuilder) error, sign func(*flow.Header) ([]byte, error)) (*flow.ProposalHeader, error)
 }

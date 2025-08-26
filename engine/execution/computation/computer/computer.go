@@ -25,7 +25,6 @@ import (
 	"github.com/onflow/flow-go/module/mempool/entity"
 	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/state/protocol"
-	"github.com/onflow/flow-go/utils/logging"
 )
 
 const (
@@ -185,7 +184,10 @@ func NewBlockComputer(
 		return nil, fmt.Errorf("could not build system chunk transaction: %w", err)
 	}
 
-	processCallbackTxn := blueprints.ProcessCallbacksTransaction(vmCtx.Chain)
+	processCallbackTxn, err := blueprints.ProcessCallbacksTransaction(vmCtx.Chain)
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate callbacks script: %w", err)
+	}
 
 	return &blockComputer{
 		vm:                    vm,
@@ -235,12 +237,23 @@ func (e *blockComputer) ExecuteBlock(
 func (e *blockComputer) userTransactionsCount(collections []*entity.CompleteCollection) int {
 	count := 0
 	for _, collection := range collections {
-		count += len(collection.Transactions)
+		count += len(collection.Collection.Transactions)
 	}
 
 	return count
 }
 
+// queueUserTransactions enqueues transaction processing requests for all user and
+// system transactions in the given block.
+//
+// If constructing the Collection for the system transaction fails (for example, because
+// NewCollection returned an error due to invalid input), this method returns an
+// irrecoverable exception. Such an error indicates a fatal, unexpected condition and
+// should abort block execution.
+//
+// Returns:
+//   - nil on success,
+//   - error if an irrecoverable error is received if the system transaction’s Collection cannot be constructed.
 func (e *blockComputer) queueUserTransactions(
 	blockId flow.Identifier,
 	blockHeader *flow.Header,
@@ -276,14 +289,14 @@ func (e *blockComputer) queueUserTransactions(
 			isSystemTransaction: false,
 		}
 
-		for i, txnBody := range collection.Transactions {
+		for i, txnBody := range collection.Collection.Transactions {
 			txQueue <- newTransactionRequest(
 				collectionInfo,
 				collectionCtx,
 				collectionLogger,
 				txnIndex,
 				txnBody,
-				i == len(collection.Transactions)-1)
+				i == len(collection.Collection.Transactions)-1)
 			txnIndex += 1
 		}
 	}
@@ -302,8 +315,9 @@ func (e *blockComputer) queueSystemTransactions(
 ) chan TransactionRequest {
 	allTxs := append(executeCallbackTxs, systemTxn)
 	// add execute callback transactions to the system collection info along to existing process transaction
-	systemTxs := systemColection.CompleteCollection.Transactions
-	systemColection.CompleteCollection.Transactions = append(systemTxs, allTxs...)
+	// TODO(7749): fix illegal mutation
+	systemTxs := systemColection.CompleteCollection.Collection.Transactions
+	systemColection.CompleteCollection.Collection.Transactions = append(systemTxs, allTxs...) //nolint:structwrite
 	systemLogger = systemLogger.With().Uint32("num_txs", uint32(len(systemTxs))).Logger()
 
 	txQueue := make(chan TransactionRequest, len(allTxs))
@@ -351,10 +365,10 @@ func (e *blockComputer) executeBlock(
 	userTxCount := e.userTransactionsCount(rawCollections)
 
 	blockSpan := e.tracer.StartSpanFromParent(
-		e.tracer.BlockRootSpan(block.ID()),
+		e.tracer.BlockRootSpan(block.BlockID()),
 		trace.EXEComputeBlock)
 	blockSpan.SetAttributes(
-		attribute.String("block_id", block.ID().String()),
+		attribute.String("block_id", block.BlockID().String()),
 		attribute.Int("collection_counts", len(rawCollections)))
 	defer blockSpan.End()
 
@@ -411,7 +425,7 @@ func (e *blockComputer) executeBlock(
 	}
 
 	e.log.Debug().
-		Hex("block_id", logging.Entity(block)).
+		Str("block_id", block.BlockID().String()).
 		Msg("all views committed")
 
 	e.metrics.ExecutionBlockCachedPrograms(derivedBlockData.CachedPrograms())
@@ -429,8 +443,8 @@ func (e *blockComputer) executeUserTransactions(
 	userTxCount int,
 ) {
 	txQueue := e.queueUserTransactions(
-		block.ID(),
-		block.Block.Header,
+		block.BlockID(),
+		block.Block.ToHeader(),
 		rawCollections,
 		userTxCount,
 	)
@@ -460,30 +474,32 @@ func (e *blockComputer) executeSystemTransactions(
 
 	callbackCtx := fvm.NewContextFromParent(
 		e.callbackCtx,
-		fvm.WithBlockHeader(block.Block.Header),
-		fvm.WithProtocolStateSnapshot(e.protocolState.AtBlockID(block.ID())),
+		fvm.WithBlockHeader(block.Block.ToHeader()),
+		fvm.WithProtocolStateSnapshot(e.protocolState.AtBlockID(block.BlockID())),
 	)
 
 	systemChunkCtx := fvm.NewContextFromParent(
 		e.systemChunkCtx,
-		fvm.WithBlockHeader(block.Block.Header),
-		fvm.WithProtocolStateSnapshot(e.protocolState.AtBlockID(block.ID())),
+		fvm.WithBlockHeader(block.Block.ToHeader()),
+		fvm.WithProtocolStateSnapshot(e.protocolState.AtBlockID(block.BlockID())),
 	)
 
 	systemLogger := callbackCtx.Logger.With().
-		Str("block_id", block.ID().String()).
-		Uint64("height", block.Block.Header.Height).
+		Str("block_id", block.BlockID().String()).
+		Uint64("height", block.Block.Height).
 		Bool("system_chunk", true).
 		Bool("system_transaction", true).
 		Int("num_collections", userCollectionCount).
 		Logger()
 
 	systemCollectionInfo := collectionInfo{
-		blockId:             block.ID(),
-		blockIdStr:          block.ID().String(),
-		blockHeight:         block.Block.Header.Height,
-		collectionIndex:     len(rawCollections),
-		CompleteCollection:  &entity.CompleteCollection{},
+		blockId:         block.BlockID(),
+		blockIdStr:      block.BlockID().String(),
+		blockHeight:     block.Block.Height,
+		collectionIndex: len(rawCollections),
+		CompleteCollection: &entity.CompleteCollection{
+			Collection: flow.NewEmptyCollection(), // TODO(7749)
+		},
 		isSystemTransaction: true,
 	}
 
@@ -554,7 +570,8 @@ func (e *blockComputer) executeProcessCallback(
 	systemLogger zerolog.Logger,
 ) ([]*flow.TransactionBody, uint32, error) {
 	// add process callback transaction to the system collection info
-	systemCollectionInfo.CompleteCollection.Transactions = append(systemCollectionInfo.CompleteCollection.Transactions, e.processCallbackTxn)
+	// TODO(7749): fix illegal mutation
+	systemCollectionInfo.CompleteCollection.Collection.Transactions = append(systemCollectionInfo.CompleteCollection.Collection.Transactions, e.processCallbackTxn) //nolint:structwrite
 
 	request := newTransactionRequest(
 		systemCollectionInfo,
