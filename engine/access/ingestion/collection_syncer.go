@@ -396,7 +396,6 @@ func (s *CollectionSyncer) OnCollectionDownloaded(_ flow.Identifier, entity flow
 	// Create a lock context for indexing
 	lctx := s.lockManager.NewContext()
 	defer lctx.Release()
-
 	err := lctx.AcquireLock(storage.LockInsertCollection)
 	if err != nil {
 		// TODO(leo): should be using irrecoverable.Context

@@ -29,6 +29,8 @@ type CollectionExecutedMetricImpl struct {
 	blockTransactions *stdmap.IdentifierMap // Map to track transactions for each block for sealed metrics
 }
 
+var _ module.CollectionExecutedMetric = (*CollectionExecutedMetricImpl)(nil)
+
 func NewCollectionExecutedMetricImpl(
 	log zerolog.Logger,
 	accessMetrics module.AccessMetrics,

@@ -82,10 +82,9 @@ func (c *CoreImplSuite) SetupTest() {
 func (c *CoreImplSuite) createTestCoreImpl() *CoreImpl {
 	block := unittest.BlockFixture()
 	executionResult := unittest.ExecutionResultFixture(unittest.WithBlock(&block))
-
 	lockManager := storage.NewTestingLockManager()
 
-	core := NewCoreImpl(
+	return NewCoreImpl(
 		c.logger,
 		executionResult,
 		block.Header,
@@ -101,8 +100,6 @@ func (c *CoreImplSuite) createTestCoreImpl() *CoreImpl {
 		c.db,
 		lockManager,
 	)
-
-	return core
 }
 
 // TestCoreImpl_Download tests the Download method which retrieves execution data and transaction error messages.

@@ -96,7 +96,6 @@ func (i *InMemoryIndexer) IndexBlockData(data *execution_data.BlockExecutionData
 	if err != nil {
 		return fmt.Errorf("could not acquire lock for collection insert: %w", err)
 	}
-
 	defer lctx.Release()
 
 	// Process all chunk data in a single pass

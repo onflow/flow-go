@@ -97,14 +97,12 @@ func (c *Collections) Store(collection *flow.Collection) (flow.LightCollection, 
 // transaction IDs) and adds a transaction id index for each of the
 // transactions within the collection (transaction_id->collection_id).
 //
-// NOTE: Currently it is possible in rare circumstances for two collections
-// to be guaranteed which both contain the same transaction (see https://github.com/dapperlabs/flow-go/issues/3556).
-// The second of these will revert upon reaching the execution node, so
-// this doesn't impact the execution state, but it can result in the Access
-// node processing two collections which both contain the same transaction (see https://github.com/dapperlabs/flow-go/issues/5337).
-// To handle this, we skip indexing the affected transaction when inserting
-// the transaction_id->collection_id index when an index for the transaction
-// already exists.
+// CAUTION: current approach is NOT BFT and needs to be revised in the future.
+// Honest clusters ensure a transaction can only belong to one collection. However, in rare
+// cases, the collector clusters can exceed byzantine thresholds -- making it possible to
+// produce multiple finalized collections (aka guaranteed collections) containing the same
+// transaction repeatedly.
+// TODO: eventually we need to handle Byzantine clusters
 //
 // No errors are expected during normal operation.
 func (c *Collections) StoreAndIndexByTransaction(_ lockctx.Proof, collection *flow.Collection) (flow.LightCollection, error) {
@@ -169,6 +167,14 @@ func (c *Collections) LightCollections() []flow.LightCollection {
 }
 
 // BatchStoreAndIndexByTransaction stores a light collection and indexes it by transaction ID within a batch operation.
+//
+// CAUTION: current approach is NOT BFT and needs to be revised in the future.
+// Honest clusters ensure a transaction can only belong to one collection. However, in rare
+// cases, the collector clusters can exceed byzantine thresholds -- making it possible to
+// produce multiple finalized collections (aka guaranteed collections) containing the same
+// transaction repeatedly.
+// TODO: eventually we need to handle Byzantine clusters
+//
 // This method is not implemented and will always return an error.
 func (c *Collections) BatchStoreAndIndexByTransaction(_ lockctx.Proof, _ *flow.Collection, _ storage.ReaderBatchWriter) (flow.LightCollection, error) {
 	return flow.LightCollection{}, fmt.Errorf("not implemented")
