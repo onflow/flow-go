@@ -81,6 +81,26 @@ func (_m *Transactions) ByID(txID flow.Identifier) (*flow.TransactionBody, bool)
 	return r0, r1
 }
 
+// ByPayer provides a mock function with given fields: payer
+func (_m *Transactions) ByPayer(payer flow.Address) []*flow.TransactionBody {
+	ret := _m.Called(payer)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ByPayer")
+	}
+
+	var r0 []*flow.TransactionBody
+	if rf, ok := ret.Get(0).(func(flow.Address) []*flow.TransactionBody); ok {
+		r0 = rf(payer)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]*flow.TransactionBody)
+		}
+	}
+
+	return r0
+}
+
 // Clear provides a mock function with no fields
 func (_m *Transactions) Clear() {
 	_m.Called()
