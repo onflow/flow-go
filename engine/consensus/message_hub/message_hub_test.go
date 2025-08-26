@@ -174,7 +174,7 @@ func (s *MessageHubSuite) TestProcessIncomingMessages() {
 	s.Run("to-compliance-engine", func() {
 		block := unittest.BlockFixture()
 
-		blockProposalMsg := messages.NewBlockProposal(&block)
+		blockProposalMsg := messages.NewBlockProposalFromInternal(&block)
 		expectedComplianceMsg := flow.Slashable[*messages.BlockProposal]{
 			OriginID: originID,
 			Message:  blockProposalMsg,
@@ -247,7 +247,7 @@ func (s *MessageHubSuite) TestOnOwnProposal() {
 	})
 
 	s.Run("should broadcast proposal and pass to HotStuff for valid proposals", func() {
-		expectedBroadcastMsg := messages.NewBlockProposal(block)
+		expectedBroadcastMsg := messages.NewBlockProposalFromInternal(block)
 
 		submitted := make(chan struct{}) // closed when proposal is submitted to hotstuff
 		hotstuffProposal := model.SignedProposalFromFlow(block.Header)
@@ -318,7 +318,7 @@ func (s *MessageHubSuite) TestProcessMultipleMessagesHappyPath() {
 		hotstuffProposal := model.SignedProposalFromFlow(proposal.Header)
 		s.voteAggregator.On("AddBlock", hotstuffProposal).Once()
 		s.hotstuff.On("SubmitProposal", hotstuffProposal)
-		expectedBroadcastMsg := messages.NewBlockProposal(&proposal)
+		expectedBroadcastMsg := messages.NewBlockProposalFromInternal(&proposal)
 		s.con.On("Publish", expectedBroadcastMsg, s.participants[1].NodeID, s.participants[2].NodeID).
 			Run(func(_ mock.Arguments) { wg.Done() }).
 			Return(nil)
