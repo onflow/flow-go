@@ -51,10 +51,10 @@ require (
 	github.com/onflow/cadence v1.7.0-preview.1
 	github.com/onflow/crypto v0.25.3
 	github.com/onflow/flow v0.3.4
-	github.com/onflow/flow-core-contracts/lib/go/contracts v1.7.3
+	github.com/onflow/flow-core-contracts/lib/go/contracts v1.7.4-0.20250825173510-91e6f28b0224
+	github.com/onflow/flow-core-contracts/lib/go/templates v1.7.2-0.20250825173510-91e6f28b0224
 	github.com/onflow/flow-go-sdk v1.7.0
 	github.com/onflow/flow/protobuf/go/flow v0.4.11
-	github.com/onflow/flow-core-contracts/lib/go/templates v1.7.2-0.20250728154452-d0868d39ff28
 	github.com/pbnjay/memory v0.0.0-20210728143218-7b4eea64cf58
 	github.com/pierrec/lz4 v2.6.1+incompatible
 	github.com/pkg/errors v0.9.1
@@ -106,7 +106,6 @@ require (
 	github.com/jordanschalm/lockctx v0.0.0-20250412215529-226f85c10956
 	github.com/libp2p/go-libp2p-routing-helpers v0.7.4
 	github.com/mitchellh/mapstructure v1.5.0
-	github.com/onflow/flow-core-contracts/lib/go/contracts v1.7.4-0.20250728154452-d0868d39ff28
 	github.com/onflow/flow-evm-bridge v0.1.0
 	github.com/onflow/nft-storefront/lib/go/contracts v1.0.0
 	github.com/onflow/wal v1.0.2
