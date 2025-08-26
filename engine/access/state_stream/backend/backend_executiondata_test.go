@@ -8,6 +8,7 @@ import (
 
 	"github.com/ipfs/go-datastore"
 	dssync "github.com/ipfs/go-datastore/sync"
+	"github.com/onflow/flow/protobuf/go/flow/entities"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -27,6 +28,8 @@ import (
 	"github.com/onflow/flow-go/module/execution"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data/cache"
+	"github.com/onflow/flow-go/module/executiondatasync/optimistic_sync"
+	osmock "github.com/onflow/flow-go/module/executiondatasync/optimistic_sync/mock"
 	"github.com/onflow/flow-go/module/mempool/herocache"
 	"github.com/onflow/flow-go/module/metrics"
 	protocolmock "github.com/onflow/flow-go/state/protocol/mock"
@@ -65,6 +68,10 @@ type BackendExecutionDataSuite struct {
 	execDataCache            *cache.ExecutionDataCache
 	execDataHeroCache        *herocache.BlockExecutionData
 	executionDataTracker     *trackermock.ExecutionDataTracker
+	executionResultProvider  *osmock.ExecutionResultProvider
+	executionStateSnapshot   *osmock.Snapshot
+	executionStateCache      *osmock.ExecutionStateCache
+	executionStateQuery      entities.ExecutionStateQuery
 	backend                  *StateStreamBackend
 	executionDataTrackerReal tracker.ExecutionDataTracker
 
@@ -175,6 +182,32 @@ func (s *BackendExecutionDataSuite) SetupTestSuite(blockCount int) {
 	s.highestBlockHeader = s.rootBlock.Header
 
 	s.T().Logf("Generating %d blocks, root block: %d %s", blockCount, s.rootBlock.Header.Height, s.rootBlock.ID())
+
+	s.executionStateSnapshot = osmock.NewSnapshot(s.T())
+	s.executionStateSnapshot.
+		On("Events").
+		Return(s.events).
+		Maybe()
+
+	s.executionStateCache = osmock.NewExecutionStateCache(s.T())
+	s.executionStateCache.
+		On("Snapshot", mock.Anything).
+		Return(s.executionStateSnapshot, nil).
+		Maybe()
+
+	s.executionResultProvider = osmock.NewExecutionResultProvider(s.T())
+	s.executionResultProvider.
+		On("ExecutionResult", mock.Anything, mock.Anything).
+		Return(func(blockID flow.Identifier, criteria optimistic_sync.Criteria) (*optimistic_sync.ExecutionResultInfo, error) {
+			ids := unittest.IdentityListFixture(2)
+			return &optimistic_sync.ExecutionResultInfo{
+				ExecutionResult: unittest.ExecutionResultFixture(),
+				ExecutionNodes:  ids.ToSkeleton(),
+			}, nil
+		}, nil).
+		Maybe()
+
+	s.executionStateQuery = entities.ExecutionStateQuery{}
 }
 
 func (s *BackendExecutionDataSuite) SetupTestMocks() {
@@ -234,7 +267,7 @@ func (s *BackendExecutionDataSuite) SetupTestMocks() {
 	s.SetupBackend(false)
 }
 
-func (s *BackendExecutionDataSuite) SetupBackend(useEventsIndex bool) {
+func (s *BackendExecutionDataSuite) SetupBackend(fetchFromLocalStorage bool) {
 	var err error
 	s.backend, err = New(
 		s.logger,
@@ -245,8 +278,7 @@ func (s *BackendExecutionDataSuite) SetupBackend(useEventsIndex bool) {
 		s.eds,
 		s.execDataCache,
 		s.registersAsync,
-		s.eventsIndex,
-		useEventsIndex,
+		fetchFromLocalStorage,
 		state_stream.DefaultRegisterIDsRequestLimit,
 		subscription.NewSubscriptionHandler(
 			s.logger,
@@ -256,6 +288,8 @@ func (s *BackendExecutionDataSuite) SetupBackend(useEventsIndex bool) {
 			subscription.DefaultSendBufferSize,
 		),
 		s.executionDataTracker,
+		s.executionResultProvider,
+		s.executionStateCache,
 	)
 	require.NoError(s.T(), err)
 
@@ -268,7 +302,7 @@ func (s *BackendExecutionDataSuite) SetupBackend(useEventsIndex bool) {
 		s.broadcaster,
 		s.rootBlock.Header.Height,
 		s.eventsIndex,
-		useEventsIndex,
+		fetchFromLocalStorage,
 	)
 
 	s.executionDataTracker.On(

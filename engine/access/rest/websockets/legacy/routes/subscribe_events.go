@@ -3,6 +3,8 @@ package routes
 import (
 	"context"
 
+	"github.com/onflow/flow/protobuf/go/flow/entities"
+
 	"github.com/onflow/flow-go/engine/access/rest/common"
 	"github.com/onflow/flow-go/engine/access/rest/websockets/legacy"
 	"github.com/onflow/flow-go/engine/access/rest/websockets/legacy/request"
@@ -37,5 +39,11 @@ func SubscribeEvents(
 		wsController.HeartbeatInterval = req.HeartbeatInterval
 	}
 
-	return wsController.Api.SubscribeEvents(ctx, req.StartBlockID, req.StartHeight, filter), nil
+	return wsController.Api.SubscribeEvents(
+		ctx,
+		req.StartBlockID,
+		req.StartHeight,
+		filter,
+		entities.ExecutionStateQuery{},
+	), nil
 }

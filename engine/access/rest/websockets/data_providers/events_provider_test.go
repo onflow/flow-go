@@ -110,6 +110,7 @@ func (s *EventsProviderSuite) subscribeEventsDataProviderTestCases(backendRespon
 					mock.Anything,
 					s.rootBlock.ID(),
 					mock.Anything,
+					mock.Anything,
 				).Return(sub).Once()
 			},
 			expectedResponses: expectedResponses,
@@ -129,6 +130,7 @@ func (s *EventsProviderSuite) subscribeEventsDataProviderTestCases(backendRespon
 					mock.Anything,
 					s.rootBlock.Header.Height,
 					mock.Anything,
+					mock.Anything,
 				).Return(sub).Once()
 			},
 			expectedResponses: expectedResponses,
@@ -144,6 +146,7 @@ func (s *EventsProviderSuite) subscribeEventsDataProviderTestCases(backendRespon
 			setupBackend: func(sub *ssmock.Subscription) {
 				s.api.On(
 					"SubscribeEventsFromLatest",
+					mock.Anything,
 					mock.Anything,
 					mock.Anything,
 				).Return(sub).Once()
@@ -225,7 +228,9 @@ func (s *EventsProviderSuite) TestMessageIndexEventProviderResponse_HappyPath() 
 	sub.On("Channel").Return((<-chan interface{})(eventChan))
 	sub.On("Err").Return(nil).Once()
 
-	s.api.On("SubscribeEventsFromStartBlockID", mock.Anything, mock.Anything, mock.Anything).Return(sub)
+	s.api.
+		On("SubscribeEventsFromStartBlockID", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+		Return(sub)
 
 	arguments :=
 		map[string]interface{}{
@@ -397,6 +402,39 @@ func invalidEventsArgumentsTestCases() []testErrType {
 				"heartbeat_interval": "-1",
 			},
 			expectedErrorMsg: "'heartbeat_interval' must be convertible to uint64",
+		},
+		{
+			name: "invalid 'execution_state_query' argument (invalid 'agreeing_executors_count')",
+			arguments: map[string]interface{}{
+				"execution_state_query": map[string]interface{}{
+					"agreeing_executors_count":  "-1",
+					"required_executor_ids":     []string{},
+					"include_executor_metadata": "false",
+				},
+			},
+			expectedErrorMsg: "'agreeing_executors_count' must be a number",
+		},
+		{
+			name: "invalid 'execution_state_query' argument (invalid 'required_executor_ids')",
+			arguments: map[string]interface{}{
+				"execution_state_query": map[string]interface{}{
+					"agreeing_executors_count":  "5",
+					"required_executor_ids":     "not-array-of-strings",
+					"include_executor_metadata": "false",
+				},
+			},
+			expectedErrorMsg: "'required_executor_ids' must be an array of strings",
+		},
+		{
+			name: "invalid 'execution_state_query' argument (invalid 'include_executor_metadata')",
+			arguments: map[string]interface{}{
+				"execution_state_query": map[string]interface{}{
+					"agreeing_executors_count":  "5",
+					"required_executor_ids":     []string{unittest.IdentifierFixture().String()},
+					"include_executor_metadata": "not-bool",
+				},
+			},
+			expectedErrorMsg: "'include_executor_metadata' must be a boolean",
 		},
 		{
 			name: "unexpected argument",
