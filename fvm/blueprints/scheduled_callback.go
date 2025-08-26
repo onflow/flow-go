@@ -35,6 +35,11 @@ func ExecuteCallbacksTransactions(chainID flow.Chain, processEvents flow.EventsL
 		// todo make sure to check event index to ensure order is indeed correct
 		// event.EventIndex
 
+		// skip any fee events or other events that are not pending execution events
+		if !isPendingExecutionEvent(env, event) {
+			continue
+		}
+
 		id, effort, err := callbackArgsFromEvent(env, event)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get callback args from event: %w", err)
@@ -68,19 +73,6 @@ func executeCallbackTransaction(
 // callback scheduler contract and has the following signature:
 // event PendingExecution(id: UInt64, priority: UInt8, executionEffort: UInt64, fees: UFix64, callbackOwner: Address)
 func callbackArgsFromEvent(env templates.Environment, event flow.Event) ([]byte, uint64, error) {
-	const (
-		processedCallbackIDFieldName     = "id"
-		processedCallbackEffortFieldName = "executionEffort"
-		processedEventTypeTemplate       = "A.%v.FlowCallbackScheduler.PendingExecution"
-	)
-
-	scheduledContractAddress := env.FlowCallbackSchedulerAddress
-	processedEventType := flow.EventType(fmt.Sprintf(processedEventTypeTemplate, scheduledContractAddress))
-
-	if event.Type != processedEventType {
-		return nil, 0, fmt.Errorf("wrong event type is passed")
-	}
-
 	eventData, err := ccf.Decode(nil, event.Payload)
 	if err != nil {
 		return nil, 0, fmt.Errorf("failed to decode event: %w", err)
@@ -124,4 +116,13 @@ func callbackArgsFromEvent(env templates.Environment, event flow.Event) ([]byte,
 	}
 
 	return encID, uint64(effort), nil
+}
+
+func isPendingExecutionEvent(env templates.Environment, event flow.Event) bool {
+	const processedEventTypeTemplate = "A.%v.FlowCallbackScheduler.PendingExecution"
+
+	scheduledContractAddress := env.FlowCallbackSchedulerAddress
+	processedEventType := flow.EventType(fmt.Sprintf(processedEventTypeTemplate, scheduledContractAddress))
+
+	return event.Type == processedEventType
 }
