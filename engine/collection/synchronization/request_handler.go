@@ -136,7 +136,7 @@ func (r *RequestHandlerEngine) setupRequestMessageHandler() {
 		engine.NewNotifier(),
 		engine.Pattern{
 			Match: func(msg *engine.Message) bool {
-				_, ok := msg.Payload.(*messages.SyncRequest)
+				_, ok := msg.Payload.(*flow.SyncRequest)
 				if ok {
 					r.metrics.MessageReceived(metrics.EngineClusterSynchronization, metrics.MessageSyncRequest)
 				}
@@ -170,7 +170,7 @@ func (r *RequestHandlerEngine) setupRequestMessageHandler() {
 // onSyncRequest processes an outgoing handshake; if we have a higher height, we
 // inform the other node of it, so they can organize their block downloads. If
 // we have a lower height, we add the difference to our own download queue.
-func (r *RequestHandlerEngine) onSyncRequest(originID flow.Identifier, req *messages.SyncRequest) error {
+func (r *RequestHandlerEngine) onSyncRequest(originID flow.Identifier, req *flow.SyncRequest) error {
 	final, err := r.state.Final().Head()
 	if err != nil {
 		return fmt.Errorf("could not get last finalized header: %w", err)
@@ -349,7 +349,7 @@ func (r *RequestHandlerEngine) processAvailableRequests() error {
 
 		msg, ok := r.pendingSyncRequests.Get()
 		if ok {
-			err := r.onSyncRequest(msg.OriginID, msg.Payload.(*messages.SyncRequest))
+			err := r.onSyncRequest(msg.OriginID, msg.Payload.(*flow.SyncRequest))
 			if err != nil {
 				return fmt.Errorf("processing sync request failed: %w", err)
 			}

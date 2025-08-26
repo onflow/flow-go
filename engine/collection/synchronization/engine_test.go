@@ -161,7 +161,7 @@ func (ss *SyncSuite) SetupTest() {
 func (ss *SyncSuite) TestOnSyncRequest() {
 	// generate origin and request message
 	originID := unittest.IdentifierFixture()
-	req := &messages.SyncRequest{
+	req := &flow.SyncRequest{
 		Nonce:  rand.Uint64(),
 		Height: 0,
 	}
@@ -568,7 +568,7 @@ func (ss *SyncSuite) TestProcessingMultipleItems() {
 
 	finalHeight := ss.head.Height
 	for i := 0; i < 5; i++ {
-		msg := &messages.SyncRequest{
+		msg := &flow.SyncRequest{
 			Nonce:  uint64(i),
 			Height: finalHeight - 100,
 		}

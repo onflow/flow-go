@@ -258,7 +258,7 @@ func (e *Engine) Process(channel channels.Channel, originID flow.Identifier, eve
 //   - All other errors are potential symptoms of internal state corruption or bugs (fatal).
 func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 	switch event.(type) {
-	case *messages.RangeRequest, *messages.BatchRequest, *messages.SyncRequest:
+	case *messages.RangeRequest, *messages.BatchRequest, *flow.SyncRequest:
 		return e.requestHandler.process(originID, event)
 	case *messages.SyncResponse, *messages.ClusterBlockResponse:
 		return e.responseMessageHandler.Process(originID, event)

@@ -18,8 +18,7 @@ type SyncRequest flow.SyncRequest
 //
 // All errors indicate that the decode target contains a structurally invalid representation of the internal flow.SyncRequest.
 func (s *SyncRequest) ToInternal() (any, error) {
-	// TODO(malleability, #7705) implement with validation checks
-	return s, nil
+	return (*flow.SyncRequest)(s), nil
 }
 
 // SyncResponse is part of the synchronization protocol and represents the reply

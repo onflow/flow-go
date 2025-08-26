@@ -246,7 +246,7 @@ func (e *Engine) process(channel channels.Channel, originID flow.Identifier, eve
 		}
 		return e.requestHandler.Process(channel, originID, event)
 
-	case *messages.SyncRequest:
+	case *flow.SyncRequest:
 		err := e.validateSyncRequestForALSP(originID)
 		if err != nil {
 			irrecoverable.Throw(context.TODO(), fmt.Errorf("failed to validate sync request from %x: %w", originID[:], err))

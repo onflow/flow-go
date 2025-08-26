@@ -41,7 +41,7 @@ func (ss *SyncSuite) TestLoad_Process_SyncRequest_HigherThanReceiver_OutsideTole
 		nonce, err := rand.Uint64()
 		require.NoError(ss.T(), err, "should generate nonce")
 
-		req := &messages.SyncRequest{
+		req := &flow.SyncRequest{
 			Nonce:  nonce,
 			Height: 0,
 		}
@@ -131,7 +131,7 @@ func (ss *SyncSuite) TestLoad_Process_SyncRequest_HigherThanReceiver_OutsideTole
 
 				// generate origin and request message
 				originID := unittest.IdentifierFixture()
-				req := &messages.SyncRequest{
+				req := &flow.SyncRequest{
 					Nonce:  nonce,
 					Height: 0,
 				}
