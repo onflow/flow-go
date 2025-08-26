@@ -73,6 +73,11 @@ func executeCallbackTransaction(
 // callback scheduler contract and has the following signature:
 // event PendingExecution(id: UInt64, priority: UInt8, executionEffort: UInt64, fees: UFix64, callbackOwner: Address)
 func callbackArgsFromEvent(env templates.Environment, event flow.Event) ([]byte, uint64, error) {
+	const (
+		processedCallbackIDFieldName     = "id"
+		processedCallbackEffortFieldName = "executionEffort"
+	)
+
 	eventData, err := ccf.Decode(nil, event.Payload)
 	if err != nil {
 		return nil, 0, fmt.Errorf("failed to decode event: %w", err)
