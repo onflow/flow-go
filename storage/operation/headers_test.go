@@ -57,7 +57,7 @@ func TestHeaderIDIndexByCollectionID(t *testing.T) {
 		require.NoError(t, err)
 
 		actualID := &flow.Identifier{}
-		err = operation.LookupCollectionBlock(db.Reader(), collectionID, actualID)
+		err = operation.LookupBlockContainingCollection(db.Reader(), collectionID, actualID)
 		require.NoError(t, err)
 		assert.Equal(t, headerID, *actualID)
 	})

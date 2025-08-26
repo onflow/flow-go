@@ -103,7 +103,7 @@ func (b *Blocks) ByHeight(height uint64) (*flow.Block, error) {
 // - storage.ErrNotFound if finalized block is known that contains the collection
 func (b *Blocks) ByCollectionID(collID flow.Identifier) (*flow.Block, error) {
 	var blockID flow.Identifier
-	err := operation.LookupCollectionBlock(b.db.Reader(), collID, &blockID)
+	err := operation.LookupBlockContainingCollection(b.db.Reader(), collID, &blockID)
 	if err != nil {
 		return nil, fmt.Errorf("could not look up block: %w", err)
 	}
