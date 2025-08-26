@@ -7,8 +7,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-// ClusterProposal is an untrusted signed cluster block proposal in
-// collection node cluster consensus.
+// ClusterProposal is a signed cluster block proposal in collection node cluster consensus.
 type ClusterProposal cluster.UntrustedProposal
 
 // ToInternal returns the internal type representation for ClusterProposal.

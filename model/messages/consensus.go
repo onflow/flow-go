@@ -6,8 +6,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-// Proposal is part of the consensus protocol and represents a consensus node
-// untrusted signed block proposal.
+// Proposal is part of the consensus protocol and represents a signed proposal from a consensus node.
 type Proposal flow.UntrustedProposal
 
 // ToInternal returns the internal type representation for Proposal.
