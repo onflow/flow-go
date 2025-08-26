@@ -69,6 +69,7 @@ type BuilderSuite struct {
 // runs before each test runs
 func (suite *BuilderSuite) SetupTest() {
 	fmt.Println("SetupTest>>>>")
+	lockManager := storage.NewTestingLockManager()
 	var err error
 
 	suite.genesis = model.Genesis()
@@ -79,7 +80,6 @@ func (suite *BuilderSuite) SetupTest() {
 	suite.dbdir = unittest.TempDir(suite.T())
 	suite.badgerDB = unittest.BadgerDB(suite.T(), suite.dbdir)
 	suite.db = badgerimpl.ToDB(suite.badgerDB)
-	lockManager := storage.NewTestingLockManager()
 	suite.lockManager = lockManager
 
 	metrics := metrics.NewNoopCollector()
@@ -1131,12 +1131,10 @@ func benchmarkBuildOn(b *testing.B, size int) {
 
 		// finalize the block 80% of the time, resulting in a fork-rate of 20%
 		if rand.Intn(100) < 80 {
+			lctx := suite.lockManager.NewContext()
+			defer lctx.Release()
+			require.NoError(suite.T(), lctx.AcquireLock(storage.LockInsertOrFinalizeClusterBlock))
 			err = suite.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-				lctx := suite.lockManager.NewContext()
-				defer lctx.Release()
-				if err := lctx.AcquireLock(storage.LockInsertOrFinalizeClusterBlock); err != nil {
-					return err
-				}
 				return procedure.FinalizeClusterBlock(lctx, rw, block.ID())
 			})
 			require.NoError(b, err)

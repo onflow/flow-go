@@ -25,6 +25,7 @@ import (
 func TestLoopPruneExecutionDataFromRootToLatestSealed(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(bdb *badger.DB) {
 		unittest.RunWithPebbleDB(t, func(pdb *pebble.DB) {
+			lockManager := storage.NewTestingLockManager()
 			// create dependencies
 			ps := unittestMocks.NewProtocolState()
 			blocks, rootResult, rootSeal := unittest.ChainFixture(0)
@@ -48,7 +49,8 @@ func TestLoopPruneExecutionDataFromRootToLatestSealed(t *testing.T) {
 			// indexed by height
 			chunks := make([]*verification.VerifiableChunkData, lastFinalizedHeight+2)
 			parentID := genesis.ID()
-			manager, lctx := unittest.LockManagerWithContext(t, storage.LockInsertBlock)
+			lctx := lockManager.NewContext()
+			require.NoError(t, lctx.AcquireLock(storage.LockInsertBlock))
 			require.NoError(t, db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 				return blockstore.BatchStore(lctx, rw, genesis)
 			}))

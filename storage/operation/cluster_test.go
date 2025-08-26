@@ -79,6 +79,7 @@ func TestClusterHeights(t *testing.T) {
 // Test_RetrieveClusterFinalizedHeight verifies proper retrieval of the latest finalized cluster block height.
 func Test_RetrieveClusterFinalizedHeight(t *testing.T) {
 	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
+		lockManager := storage.NewTestingLockManager()
 		var (
 			clusterID flow.ChainID = "cluster"
 			expected  uint64       = 42
@@ -93,7 +94,6 @@ func Test_RetrieveClusterFinalizedHeight(t *testing.T) {
 		})
 
 		t.Run("insert/retrieve", func(t *testing.T) {
-			lockManager := storage.NewTestingLockManager()
 
 			lctx := lockManager.NewContext()
 			require.NoError(t, lctx.AcquireLock(storage.LockInsertOrFinalizeClusterBlock))
@@ -122,7 +122,6 @@ func Test_RetrieveClusterFinalizedHeight(t *testing.T) {
 			// and only memorizes the last value stored (irrespective of cluster ID).
 			clusterFinalizedHeights := []uint64{117, 11, 791}
 			clusterIDs := []flow.ChainID{"cluster-0", "cluster-1", "cluster-2"}
-			lockManager := storage.NewTestingLockManager()
 			var actual uint64
 			for i := 0; i < len(clusterFinalizedHeights); i++ {
 				err = operation.RetrieveClusterFinalizedHeight(db.Reader(), clusterIDs[i], &actual)
@@ -145,8 +144,8 @@ func Test_RetrieveClusterFinalizedHeight(t *testing.T) {
 }
 
 func TestClusterBlockByReferenceHeight(t *testing.T) {
-	lockManager := storage.NewTestingLockManager()
 	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
+		lockManager := storage.NewTestingLockManager()
 		t.Run("should be able to index cluster block by reference height", func(t *testing.T) {
 			id := unittest.IdentifierFixture()
 			height := rand.Uint64()

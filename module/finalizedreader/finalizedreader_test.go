@@ -25,6 +25,7 @@ func withLock(t *testing.T, manager lockctx.Manager, lockID string, fn func(lctx
 
 func TestFinalizedReader(t *testing.T) {
 	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
+		lockManager := storage.NewTestingLockManager()
 		// prepare the storage.Headers instance
 		metrics := metrics.NewNoopCollector()
 		all := store.InitAll(metrics, db)
@@ -33,7 +34,6 @@ func TestFinalizedReader(t *testing.T) {
 		block1 := unittest.BlockFixture()
 
 		// store `block1`
-		lockManager := storage.NewTestingLockManager()
 		withLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
 			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 				return blocks.BatchStore(lctx, rw, &block1)

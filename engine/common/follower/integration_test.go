@@ -44,6 +44,7 @@ import (
 // Each worker submits batchesPerWorker*blocksPerBatch blocks
 // In total we will submit workers*batchesPerWorker*blocksPerBatch
 func TestFollowerHappyPath(t *testing.T) {
+	lockManager := storage.NewTestingLockManager()
 	allIdentities := unittest.CompleteIdentitySet()
 	rootSnapshot := unittest.RootSnapshotFixture(allIdentities)
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
@@ -51,7 +52,6 @@ func TestFollowerHappyPath(t *testing.T) {
 		tracer := trace.NewNoopTracer()
 		log := unittest.Logger()
 		consumer := events.NewNoop()
-		lockManager := storage.NewTestingLockManager()
 		all := bstorage.InitAll(metrics, db)
 
 		// bootstrap root snapshot

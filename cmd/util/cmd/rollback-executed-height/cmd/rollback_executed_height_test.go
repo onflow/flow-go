@@ -25,9 +25,9 @@ import (
 // Test save block execution related data, then remove it, and then
 // save again should still work
 func TestReExecuteBlock(t *testing.T) {
-	lockManager := storage.NewTestingLockManager()
 	unittest.RunWithBadgerDB(t, func(bdb *badger.DB) {
 		unittest.RunWithPebbleDB(t, func(pdb *pebble.DB) {
+			lockManager := storage.NewTestingLockManager()
 
 			// bootstrap to init highest executed height
 			bootstrapper := bootstrap.NewBootstrapper(unittest.Logger())
@@ -52,7 +52,8 @@ func TestReExecuteBlock(t *testing.T) {
 			events := store.NewEvents(metrics, db)
 			serviceEvents := store.NewServiceEvents(metrics, db)
 
-			lockManager, lctx := unittest.LockManagerWithContext(t, storage.LockInsertBlock)
+			lctx := lockManager.NewContext()
+			require.NoError(t, lctx.AcquireLock(storage.LockInsertBlock))
 			err = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 				return blocks.BatchStore(lctx, rw, &genesis)
 			})

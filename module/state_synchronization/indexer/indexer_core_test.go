@@ -181,6 +181,7 @@ func (i *indexCoreTest) useDefaultTransactionResults() *indexCoreTest {
 }
 
 func (i *indexCoreTest) initIndexer() *indexCoreTest {
+	lockManager := storage.NewTestingLockManager()
 	db, dbDir := unittest.TempBadgerDB(i.t)
 	i.t.Cleanup(func() {
 		require.NoError(i.t, db.Close())
@@ -229,7 +230,7 @@ func (i *indexCoreTest) initIndexer() *indexCoreTest {
 		flow.Testnet.Chain(),
 		derivedChainData,
 		collectionExecutedMetric,
-		storage.NewTestingLockManager(),
+		lockManager,
 	)
 	require.NoError(i.t, err)
 	i.indexer = indexer
@@ -642,6 +643,7 @@ func TestIndexerIntegration_StoreAndGet(t *testing.T) {
 
 	// this test makes sure index values for a single register are correctly updated and always last value is returned
 	t.Run("Single Index Value Changes", func(t *testing.T) {
+		lockManager := storage.NewTestingLockManager()
 		pebbleStorage.RunWithRegistersStorageAtInitialHeights(t, 0, 0, func(registers *pebbleStorage.Registers) {
 			index, err := New(
 				logger,
@@ -656,7 +658,7 @@ func TestIndexerIntegration_StoreAndGet(t *testing.T) {
 				flow.Testnet.Chain(),
 				derivedChainData,
 				nil,
-				storage.NewTestingLockManager(),
+				lockManager,
 			)
 			require.NoError(t, err)
 
@@ -677,6 +679,7 @@ func TestIndexerIntegration_StoreAndGet(t *testing.T) {
 	// this test makes sure if a register is not found the value returned is nil and without an error in order for this to be
 	// up to the specification script executor requires
 	t.Run("Missing Register", func(t *testing.T) {
+		lockManager := storage.NewTestingLockManager()
 		pebbleStorage.RunWithRegistersStorageAtInitialHeights(t, 0, 0, func(registers *pebbleStorage.Registers) {
 			index, err := New(
 				logger,
@@ -691,7 +694,7 @@ func TestIndexerIntegration_StoreAndGet(t *testing.T) {
 				flow.Testnet.Chain(),
 				derivedChainData,
 				nil,
-				storage.NewTestingLockManager(),
+				lockManager,
 			)
 			require.NoError(t, err)
 
@@ -705,6 +708,7 @@ func TestIndexerIntegration_StoreAndGet(t *testing.T) {
 	// the correct highest height indexed value is returned.
 	// e.g. we index A{h(1) -> X}, A{h(2) -> Y}, when we request h(4) we get value Y
 	t.Run("Single Index Value At Later Heights", func(t *testing.T) {
+		lockManager := storage.NewTestingLockManager()
 		pebbleStorage.RunWithRegistersStorageAtInitialHeights(t, 0, 0, func(registers *pebbleStorage.Registers) {
 			index, err := New(
 				logger,
@@ -719,7 +723,7 @@ func TestIndexerIntegration_StoreAndGet(t *testing.T) {
 				flow.Testnet.Chain(),
 				derivedChainData,
 				nil,
-				storage.NewTestingLockManager(),
+				lockManager,
 			)
 			require.NoError(t, err)
 
@@ -750,6 +754,7 @@ func TestIndexerIntegration_StoreAndGet(t *testing.T) {
 
 	// this test makes sure we correctly handle weird payloads
 	t.Run("Empty and Nil Payloads", func(t *testing.T) {
+		lockManager := storage.NewTestingLockManager()
 		pebbleStorage.RunWithRegistersStorageAtInitialHeights(t, 0, 0, func(registers *pebbleStorage.Registers) {
 			index, err := New(
 				logger,
@@ -764,7 +769,7 @@ func TestIndexerIntegration_StoreAndGet(t *testing.T) {
 				flow.Testnet.Chain(),
 				derivedChainData,
 				nil,
-				storage.NewTestingLockManager(),
+				lockManager,
 			)
 			require.NoError(t, err)
 

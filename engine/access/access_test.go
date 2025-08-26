@@ -8,6 +8,7 @@ import (
 
 	"github.com/dgraph-io/badger/v2"
 	"github.com/google/go-cmp/cmp"
+	"github.com/jordanschalm/lockctx"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -83,6 +84,7 @@ type Suite struct {
 	backend              *backend.Backend
 	sporkID              flow.Identifier
 	protocolStateVersion uint64
+	lockManager          lockctx.Manager
 }
 
 // TestAccess tests scenarios which exercise multiple API calls using both the RPC handler and the ingest engine
@@ -92,6 +94,7 @@ func TestAccess(t *testing.T) {
 }
 
 func (suite *Suite) SetupTest() {
+	suite.lockManager = storage.NewTestingLockManager()
 	suite.log = zerolog.New(os.Stderr)
 	suite.net = new(mocknetwork.Network)
 	suite.state = new(protocol.State)
@@ -400,7 +403,8 @@ func (suite *Suite) TestGetBlockByIDAndHeight() {
 		block2.Header.Height = 2
 
 		bdb := badgerimpl.ToDB(db)
-		manager, lctx := unittest.LockManagerWithContext(suite.T(), storage.LockInsertBlock)
+		lctx := suite.lockManager.NewContext()
+		require.NoError(suite.T(), lctx.AcquireLock(storage.LockInsertBlock))
 		require.NoError(suite.T(), bdb.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 			if err := all.Blocks.BatchStore(lctx, rw, &block1); err != nil {
 				return err
@@ -412,7 +416,7 @@ func (suite *Suite) TestGetBlockByIDAndHeight() {
 		}))
 		lctx.Release()
 
-		fctx := manager.NewContext()
+		fctx := suite.lockManager.NewContext()
 		require.NoError(suite.T(), fctx.AcquireLock(storage.LockFinalizeBlock))
 		// the follower logic should update height index on the block storage when a block is finalized
 		require.NoError(suite.T(), bdb.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
@@ -623,6 +627,7 @@ func (suite *Suite) TestGetExecutionResultByBlockID() {
 // TestGetSealedTransaction tests that transactions status of transaction that belongs to a sealed block
 // is reported as sealed
 func (suite *Suite) TestGetSealedTransaction() {
+	lockManager := storage.NewTestingLockManager()
 	unittest.RunWithBadgerDB(suite.T(), func(db *badger.DB) {
 		all := bstorage.InitAll(metrics.NewNoopCollector(), db)
 		en := util.ExecutionStorageLayer(suite.T(), db)
@@ -724,7 +729,6 @@ func (suite *Suite) TestGetSealedTransaction() {
 		// create the ingest engine
 		processedHeight := store.NewConsumerProgress(badgerimpl.ToDB(db), module.ConsumeProgressIngestionEngineBlockHeight)
 
-		lockManager := storage.NewTestingLockManager()
 		collectionSyncer := ingestion.NewCollectionSyncer(
 			suite.log,
 			module.CollectionExecutedMetric(collectionExecutedMetric),
@@ -841,13 +845,14 @@ func (suite *Suite) TestGetTransactionResult() {
 		suite.sealedSnapshot.On("Head").Return(sealedBlock, nil)
 
 		bdb := badgerimpl.ToDB(db)
-		lockManager, lctx := unittest.LockManagerWithContext(suite.T(), storage.LockInsertBlock)
+		lctx := suite.lockManager.NewContext()
+		require.NoError(suite.T(), lctx.AcquireLock(storage.LockInsertBlock))
 		require.NoError(suite.T(), bdb.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 			return all.Blocks.BatchStore(lctx, rw, block)
 		}))
 		lctx.Release()
 
-		lctx2 := lockManager.NewContext()
+		lctx2 := suite.lockManager.NewContext()
 		require.NoError(suite.T(), lctx2.AcquireLock(storage.LockInsertBlock))
 		require.NoError(suite.T(), bdb.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 			return all.Blocks.BatchStore(lctx2, rw, blockNegative)
@@ -1140,6 +1145,7 @@ func (suite *Suite) TestGetTransactionResult() {
 // TestExecuteScript tests the three execute Script related calls to make sure that the execution api is called with
 // the correct block id
 func (suite *Suite) TestExecuteScript() {
+	lockManager := storage.NewTestingLockManager()
 	unittest.RunWithBadgerDB(suite.T(), func(badgerdb *badger.DB) {
 		db := badgerimpl.ToDB(badgerdb)
 		all := bstorage.InitAll(metrics.NewNoopCollector(), badgerdb)
@@ -1222,7 +1228,6 @@ func (suite *Suite) TestExecuteScript() {
 		lastFullBlockHeight, err := counters.NewPersistentStrictMonotonicCounter(lastFullBlockHeightProgress)
 		require.NoError(suite.T(), err)
 
-		lockManager := storage.NewTestingLockManager()
 		collectionSyncer := ingestion.NewCollectionSyncer(
 			suite.log,
 			module.CollectionExecutedMetric(collectionExecutedMetric),

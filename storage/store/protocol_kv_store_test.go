@@ -16,6 +16,7 @@ import (
 // TesKeyValueStoreStorage tests if the KV store is stored, retrieved and indexed correctly
 func TestKeyValueStoreStorage(t *testing.T) {
 	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
+		lockManager := storage.NewTestingLockManager()
 		metrics := metrics.NewNoopCollector()
 		store := NewProtocolKVStore(metrics, db, DefaultProtocolKVStoreCacheSize, DefaultProtocolKVStoreByBlockIDCacheSize)
 
@@ -27,7 +28,6 @@ func TestKeyValueStoreStorage(t *testing.T) {
 		blockID := unittest.IdentifierFixture()
 
 		// store protocol state and auxiliary info
-		lockManager := storage.NewTestingLockManager()
 		lctx := lockManager.NewContext()
 		require.NoError(t, lctx.AcquireLock(storage.LockInsertBlock))
 		err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
@@ -56,6 +56,7 @@ func TestKeyValueStoreStorage(t *testing.T) {
 //   - if we request to store a _different_  KV-store snapshot, an `storage.ErrDataMismatch` should be returned.
 func TestProtocolKVStore_StoreTx(t *testing.T) {
 	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
+		lockManager := storage.NewTestingLockManager()
 		metrics := metrics.NewNoopCollector()
 		store := NewProtocolKVStore(metrics, db, DefaultProtocolKVStoreCacheSize, DefaultProtocolKVStoreByBlockIDCacheSize)
 
@@ -65,7 +66,6 @@ func TestProtocolKVStore_StoreTx(t *testing.T) {
 			Data:    unittest.RandomBytes(32),
 		}
 
-		lockManager := storage.NewTestingLockManager()
 		lctx := lockManager.NewContext()
 		require.NoError(t, lctx.AcquireLock(storage.LockInsertBlock))
 		err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
@@ -110,13 +110,13 @@ func TestProtocolKVStore_StoreTx(t *testing.T) {
 //   - if we request to index a different ID, an `storage.ErrDataMismatch` should be returned.
 func TestProtocolKVStore_IndexTx(t *testing.T) {
 	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
+		lockManager := storage.NewTestingLockManager()
 		metrics := metrics.NewNoopCollector()
 		store := NewProtocolKVStore(metrics, db, DefaultProtocolKVStoreCacheSize, DefaultProtocolKVStoreByBlockIDCacheSize)
 
 		stateID := unittest.IdentifierFixture()
 		blockID := unittest.IdentifierFixture()
 
-		lockManager := storage.NewTestingLockManager()
 		lctx := lockManager.NewContext()
 		require.NoError(t, lctx.AcquireLock(storage.LockInsertBlock))
 		err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {

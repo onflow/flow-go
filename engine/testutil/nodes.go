@@ -289,7 +289,6 @@ func CollectionNode(t *testing.T, hub *stub.Hub, identity bootstrap.NodeInfo, ro
 	require.NoError(t, err)
 	node.Me, err = local.New(identity.Identity().IdentitySkeleton, privKeys.StakingKey)
 	require.NoError(t, err)
-	lockManager := storage.NewTestingLockManager()
 
 	pools := epochs.NewTransactionPools(
 		func(_ uint64) mempool.Transactions {
@@ -328,7 +327,7 @@ func CollectionNode(t *testing.T, hub *stub.Hub, identity bootstrap.NodeInfo, ro
 
 	clusterStateFactory, err := factories.NewClusterStateFactory(
 		db,
-		lockManager,
+		node.LockManager,
 		node.Metrics,
 		node.Tracer,
 	)
@@ -337,7 +336,7 @@ func CollectionNode(t *testing.T, hub *stub.Hub, identity bootstrap.NodeInfo, ro
 	builderFactory, err := factories.NewBuilderFactory(
 		db,
 		node.State,
-		lockManager,
+		node.LockManager,
 		node.Headers,
 		node.Tracer,
 		node.Metrics,
@@ -619,8 +618,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity bootstrap.NodeInfo, ide
 	require.Equal(t, fmt.Sprint(rootSeal.FinalState), fmt.Sprint(commit))
 	require.Equal(t, rootSeal.ResultID, rootResult.ID())
 
-	lockManager := storage.NewTestingLockManager()
-	err = bootstrapper.BootstrapExecutionDatabase(lockManager, db, rootSeal)
+	err = bootstrapper.BootstrapExecutionDatabase(node.LockManager, db, rootSeal)
 	require.NoError(t, err)
 
 	registerDir := unittest.TempPebblePath(t)
@@ -657,7 +655,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity bootstrap.NodeInfo, ide
 		// TODO: test with register store
 		registerStore,
 		storehouseEnabled,
-		lockManager,
+		node.LockManager,
 	)
 
 	requestEngine, err := requester.New(
@@ -1027,7 +1025,6 @@ func VerificationNode(t testing.TB,
 	if node.ProcessedBlockHeight == nil {
 		node.ProcessedBlockHeight = store.NewConsumerProgress(badgerimpl.ToDB(node.PublicDB), module.ConsumeProgressVerificationBlockHeight)
 	}
-	lockManager := storage.NewTestingLockManager()
 	if node.VerifierEngine == nil {
 		vm := fvm.NewVirtualMachine()
 

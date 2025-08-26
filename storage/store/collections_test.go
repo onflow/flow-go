@@ -17,6 +17,7 @@ import (
 
 func TestCollections(t *testing.T) {
 	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
+		lockManager := storage.NewTestingLockManager()
 
 		metrics := metrics.NewNoopCollector()
 		transactions := store.NewTransactions(metrics, db)
@@ -26,7 +27,6 @@ func TestCollections(t *testing.T) {
 		expected := unittest.CollectionFixture(3)
 
 		// Create a lock manager and context for testing
-		lockManager := storage.NewTestingLockManager()
 		lctx := lockManager.NewContext()
 		err := lctx.AcquireLock(storage.LockInsertCollection)
 		require.NoError(t, err)
@@ -80,6 +80,7 @@ func TestCollections(t *testing.T) {
 // indexed by the tx will be the one that is indexed in storage
 func TestCollections_IndexDuplicateTx(t *testing.T) {
 	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
+		lockManager := storage.NewTestingLockManager()
 		metrics := metrics.NewNoopCollector()
 		transactions := store.NewTransactions(metrics, db)
 		collections := store.NewCollections(db, transactions)
@@ -92,7 +93,6 @@ func TestCollections_IndexDuplicateTx(t *testing.T) {
 		col2.Transactions = append(col2.Transactions, dupTx)
 
 		// Create a lock manager and context for testing
-		lockManager := storage.NewTestingLockManager()
 		lctx := lockManager.NewContext()
 		err := lctx.AcquireLock(storage.LockInsertCollection)
 		require.NoError(t, err)
@@ -129,6 +129,7 @@ func TestCollections_IndexDuplicateTx(t *testing.T) {
 // different collection both will succeed, and one of the collection will be indexed by the tx
 func TestCollections_ConcurrentIndexByTx(t *testing.T) {
 	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
+		lockManager := storage.NewTestingLockManager()
 		metrics := metrics.NewNoopCollector()
 		transactions := store.NewTransactions(metrics, db)
 		collections := store.NewCollections(db, transactions)
@@ -143,7 +144,6 @@ func TestCollections_ConcurrentIndexByTx(t *testing.T) {
 		col2.Transactions[0] = sharedTx
 
 		// Create a lock manager and context for testing
-		lockManager := storage.NewTestingLockManager()
 		lctx := lockManager.NewContext()
 		err := lctx.AcquireLock(storage.LockInsertCollection)
 		require.NoError(t, err)

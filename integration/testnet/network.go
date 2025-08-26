@@ -679,7 +679,8 @@ func PrepareFlowNetwork(t *testing.T, networkConf NetworkConfig, chainID flow.Ch
 	return flowNetwork
 }
 
-func (net *FlowNetwork) addConsensusFollower(t *testing.T, rootProtocolSnapshotPath string, followerConf ConsensusFollowerConfig, containers []ContainerConfig) {
+func (net *FlowNetwork) addConsensusFollower(t *testing.T, rootProtocolSnapshotPath string, followerConf ConsensusFollowerConfig, _ []ContainerConfig) {
+	lockManager := storage.NewTestingLockManager()
 	tmpdir := makeTempSubDir(t, net.baseTempdir, "flow-consensus-follower")
 
 	// create a directory for the follower database
@@ -717,7 +718,7 @@ func (net *FlowNetwork) addConsensusFollower(t *testing.T, rootProtocolSnapshotP
 		consensus_follower.WithPebbleDB(pebbleDB),
 		consensus_follower.WithBootstrapDir(followerBootstrapDir),
 		// each consenesus follower will have a different lock manager singleton
-		consensus_follower.WithLockManager(storage.NewTestingLockManager()),
+		consensus_follower.WithLockManager(lockManager),
 	)
 
 	stakedANContainer := net.ContainerByID(followerConf.StakedNodeID)

@@ -98,8 +98,6 @@ func (s *Suite) SetupTest() {
 	s.db, s.dbDir = unittest.TempBadgerDB(s.T())
 	s.lockManager = storerr.NewTestingLockManager()
 
-	s.lockManager = storerr.NewTestingLockManager()
-
 	s.obsIdentity = unittest.IdentityFixture(unittest.WithRole(flow.RoleAccess))
 
 	s.blocks = storage.NewBlocks(s.T())

@@ -9,6 +9,7 @@ import (
 
 	"github.com/cockroachdb/pebble/v2"
 	"github.com/dgraph-io/badger/v2"
+	"github.com/jordanschalm/lockctx"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -43,6 +44,7 @@ type PipelineFunctionalSuite struct {
 	bdb                           *badger.DB
 	pdb                           *pebble.DB
 	db                            storage.DB
+	lockManager                   lockctx.Manager
 	persistentRegisters           *pebbleStorage.Registers
 	persistentEvents              storage.Events
 	persistentCollections         *store.Collections
@@ -73,6 +75,7 @@ func TestPipelineFunctionalSuite(t *testing.T) {
 // the core implementation with all required dependencies.
 func (p *PipelineFunctionalSuite) SetupTest() {
 	t := p.T()
+	p.lockManager = storage.NewTestingLockManager()
 
 	p.tmpDir = unittest.TempDir(t)
 	p.logger = zerolog.Nop()
@@ -110,8 +113,7 @@ func (p *PipelineFunctionalSuite) SetupTest() {
 	p.Require().NoError(err)
 	insertLctx.Release()
 
-	manager := storage.NewTestingLockManager()
-	lctx := manager.NewContext()
+	lctx := p.lockManager.NewContext()
 	require.NoError(t, lctx.AcquireLock(storage.LockFinalizeBlock))
 	err = p.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 		return operation.IndexFinalizedBlockByHeight(lctx, rw, rootBlock.Height, rootBlock.ID())
@@ -120,7 +122,7 @@ func (p *PipelineFunctionalSuite) SetupTest() {
 	lctx.Release()
 
 	// store and index the latest sealed block header
-	insertLctx2 := manager.NewContext()
+	insertLctx2 := p.lockManager.NewContext()
 	require.NoError(t, insertLctx2.AcquireLock(storage.LockInsertBlock))
 	err = p.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 		return operation.InsertHeader(insertLctx2, rw, sealedBlock.Header.ID(), sealedBlock.Header)
@@ -128,7 +130,7 @@ func (p *PipelineFunctionalSuite) SetupTest() {
 	p.Require().NoError(err)
 	insertLctx2.Release()
 
-	lctx = manager.NewContext()
+	lctx = p.lockManager.NewContext()
 	require.NoError(t, lctx.AcquireLock(storage.LockFinalizeBlock))
 	err = p.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 		return operation.IndexFinalizedBlockByHeight(lctx, rw, sealedBlock.Header.Height, sealedBlock.ID())
@@ -431,7 +433,6 @@ func (p *PipelineFunctionalSuite) WithRunningPipeline(
 	testFunc func(pipeline Pipeline, updateChan chan State, errChan chan error, cancel context.CancelFunc),
 	pipelineConfig PipelineConfig,
 ) {
-	lockManager := storage.NewTestingLockManager()
 
 	p.core = NewCoreImpl(
 		p.logger,
@@ -447,7 +448,7 @@ func (p *PipelineFunctionalSuite) WithRunningPipeline(
 		p.persistentTxResultErrMsg,
 		p.persistentLatestSealedResult,
 		p.db,
-		lockManager,
+		p.lockManager,
 	)
 
 	pipelineStateConsumer := NewMockStateConsumer()
