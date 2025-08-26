@@ -81,7 +81,7 @@ func TestFlowCallbackHandlerContract(callbackScheduler sdk.Address, flowToken sd
 				
 				access(all) resource Handler: FlowCallbackScheduler.CallbackHandler {
 					
-					access(FlowCallbackScheduler.ExecuteCallback) 
+					access(FlowCallbackScheduler.Execute) 
 					fun executeCallback(id: UInt64, data: AnyStruct?) {
 						TestFlowCallbackHandler.executedCallbacks.append(id)
 					}
