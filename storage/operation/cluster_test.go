@@ -166,6 +166,7 @@ func TestClusterBlockByReferenceHeight(t *testing.T) {
 	})
 
 	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
+		lockManager := storage.NewTestingLockManager()
 		t.Run("should be able to index multiple cluster blocks at same reference height", func(t *testing.T) {
 			ids := unittest.IdentifierListFixture(10)
 			height := rand.Uint64()
@@ -188,6 +189,7 @@ func TestClusterBlockByReferenceHeight(t *testing.T) {
 	})
 
 	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
+		lockManager := storage.NewTestingLockManager()
 		t.Run("should be able to lookup cluster blocks across height range", func(t *testing.T) {
 			ids := unittest.IdentifierListFixture(100)
 			nextHeight := rand.Uint64()

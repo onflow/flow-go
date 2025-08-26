@@ -62,13 +62,13 @@ func TestLoopPruneExecutionDataFromRootToLatestSealed(t *testing.T) {
 					header.ParentID = parentID
 				})
 				chunks[i] = chunk // index by height
-				lctx := manager.NewContext()
+				lctx := lockManager.NewContext()
 				require.NoError(t, lctx.AcquireLock(storage.LockInsertBlock))
 				require.NoError(t, db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 					return blockstore.BatchStore(lctx, rw, block)
 				}))
 				lctx.Release()
-				lctx = manager.NewContext()
+				lctx = lockManager.NewContext()
 				require.NoError(t, lctx.AcquireLock(storage.LockFinalizeBlock))
 				require.NoError(t, db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 					return operation.IndexFinalizedBlockByHeight(lctx, rw, chunk.Header.Height, chunk.Header.ID())
