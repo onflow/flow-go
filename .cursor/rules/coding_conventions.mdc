@@ -3,4 +3,4 @@ description: Coding Conventions
 globs: *.go
 alwaysApply: false
 ---
-@docs/agents/AgentsCodingConvention.md
+@docs/agents/CodingConventions.md
