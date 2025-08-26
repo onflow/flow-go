@@ -151,7 +151,6 @@ func (c *Collections) Remove(colID flow.Identifier) error {
 // transaction repeatedly.
 // TODO: eventually we need to handle Byzantine clusters
 //
-// This is the common implementation used by both StoreAndIndexByTransaction and BatchStoreAndIndexByTransaction.
 // No errors are expected during normal operations
 func (c *Collections) BatchStoreAndIndexByTransaction(lctx lockctx.Proof, collection *flow.Collection, rw storage.ReaderBatchWriter) (flow.LightCollection, error) {
 	light := collection.Light()
