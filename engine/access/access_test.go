@@ -1417,12 +1417,16 @@ func (suite *Suite) TestLastFinalizedBlockHeightResult() {
 		newFinalizedBlock := unittest.BlockWithParentFixture(block.Header)
 
 		db := badgerimpl.ToDB(badgerdb)
-		_, lctx := unittest.LockManagerWithContext(suite.T(), storage.LockInsertBlock)
+		testLockManager := storage.NewTestingLockManager()
+		lctx := testLockManager.NewContext()
+		err := lctx.AcquireLock(storage.LockInsertBlock)
+		require.NoError(suite.T(), err)
+		defer lctx.Release()
+		
 		// store new block
 		require.NoError(suite.T(), db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 			return all.Blocks.BatchStore(lctx, rw, block)
 		}))
-		lctx.Release()
 
 		assertFinalizedBlockHeader := func(resp *accessproto.BlockHeaderResponse, err error) {
 			require.NoError(suite.T(), err)

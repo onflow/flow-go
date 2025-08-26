@@ -1048,7 +1048,7 @@ func VerificationNode(t testing.TB,
 			node.Me,
 			chunkVerifier,
 			approvalStorage,
-			lockManager,
+			node.LockManager,
 		)
 		require.NoError(t, err)
 	}

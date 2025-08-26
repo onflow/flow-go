@@ -106,12 +106,16 @@ func (p *PipelineFunctionalSuite) SetupTest() {
 	// store and index the root header
 	p.headers = store.NewHeaders(p.metrics, p.db)
 
-	_, insertLctx := unittest.LockManagerWithContext(t, storage.LockInsertBlock)
+	lockManager := storage.NewTestingLockManager()
+	insertLctx := lockManager.NewContext()
+	err = insertLctx.AcquireLock(storage.LockInsertBlock)
+	p.Require().NoError(err)
+	defer insertLctx.Release()
+	
 	err = p.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 		return operation.InsertHeader(insertLctx, rw, rootBlock.ID(), rootBlock)
 	})
 	p.Require().NoError(err)
-	insertLctx.Release()
 
 	lctx := p.lockManager.NewContext()
 	require.NoError(t, lctx.AcquireLock(storage.LockFinalizeBlock))

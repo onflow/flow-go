@@ -41,8 +41,13 @@ func TestSealIndexAndLookup(t *testing.T) {
 
 		expected := []flow.Identifier(flow.GetIDs(seals))
 
-		_, lctx := unittest.LockManagerWithContext(t, storage.LockInsertBlock)
-		err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+		lockManager := storage.NewTestingLockManager()
+		lctx := lockManager.NewContext()
+		err := lctx.AcquireLock(storage.LockInsertBlock)
+		require.NoError(t, err)
+		defer lctx.Release()
+		
+		err = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 			for _, seal := range seals {
 				if err := operation.InsertSeal(rw.Writer(), seal.ID(), seal); err != nil {
 					return err
@@ -54,7 +59,6 @@ func TestSealIndexAndLookup(t *testing.T) {
 			return nil
 		})
 		require.NoError(t, err)
-		lctx.Release()
 
 		var actual []flow.Identifier
 		err = operation.LookupPayloadSeals(db.Reader(), blockID, &actual)

@@ -14,15 +14,19 @@ import (
 
 func TestBlockStoreAndRetrieve(t *testing.T) {
 	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
+		lockManager := storage.NewTestingLockManager()
 		cacheMetrics := &metrics.NoopCollector{}
 		// verify after storing a block should be able to retrieve it back
 		blocks := store.InitAll(cacheMetrics, db).Blocks
 		block := unittest.FullBlockFixture()
 		block.SetPayload(unittest.PayloadFixture(unittest.WithAllTheFixins))
 
-		_, lctx := unittest.LockManagerWithContext(t, storage.LockInsertBlock)
+		lctx := lockManager.NewContext()
+		err := lctx.AcquireLock(storage.LockInsertBlock)
+		require.NoError(t, err)
 		defer lctx.Release()
-		err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+
+		err = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 			return blocks.BatchStore(lctx, rw, &block)
 		})
 		require.NoError(t, err)
