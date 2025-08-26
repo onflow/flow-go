@@ -8,11 +8,13 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/jordanschalm/lockctx"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 
 	"github.com/onflow/flow-go/cmd/util/cmd/common"
 	"github.com/onflow/flow-go/cmd/util/cmd/export-json-transactions/transactions"
+	"github.com/onflow/flow-go/storage"
 )
 
 var flagDatadir string
@@ -47,7 +49,8 @@ func init() {
 
 func run(*cobra.Command, []string) {
 	log.Info().Msg("start exporting transactions")
-	err := ExportTransactions(flagDatadir, flagOutputDir, flagStartHeight, flagEndHeight)
+	lockManager := storage.MakeSingletonLockManager()
+	err := ExportTransactions(lockManager, flagDatadir, flagOutputDir, flagStartHeight, flagEndHeight)
 	if err != nil {
 		log.Fatal().Err(err).Msg("cannot get export transactions")
 	}
@@ -61,7 +64,7 @@ func writeJSONTo(writer io.Writer, jsonData []byte) error {
 
 // ExportTransactions exports transactions to JSON to the outputDir for height range specified by
 // startHeight and endHeight
-func ExportTransactions(dataDir string, outputDir string, startHeight uint64, endHeight uint64) error {
+func ExportTransactions(lockManager lockctx.Manager, dataDir string, outputDir string, startHeight uint64, endHeight uint64) error {
 
 	// init dependencies
 	db, err := common.InitStorage(flagDatadir)
@@ -71,7 +74,7 @@ func ExportTransactions(dataDir string, outputDir string, startHeight uint64, en
 	storages := common.InitStorages(db)
 	defer db.Close()
 
-	state, err := common.InitProtocolState(db, storages)
+	state, err := common.InitProtocolState(lockManager, db, storages)
 	if err != nil {
 		return fmt.Errorf("could not init protocol state: %w", err)
 	}

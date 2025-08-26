@@ -148,10 +148,11 @@ func (r *Reader) IsExecuted(blockID flow.Identifier) (bool, error) {
 }
 
 func runE(*cobra.Command, []string) error {
+	lockManager := storage.MakeSingletonLockManager()
 	flagDBs := common.ReadDBFlags()
 	return common.WithStorage(flagDBs, func(db storage.DB) error {
 		storages := common.InitStorages(db)
-		state, err := common.InitProtocolState(db, storages)
+		state, err := common.InitProtocolState(lockManager, db, storages)
 
 		if err != nil {
 			log.Fatal().Err(err).Msg("could not init protocol state")
