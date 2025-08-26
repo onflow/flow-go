@@ -4,8 +4,8 @@ import (
 	"bytes"
 	"fmt"
 
-	gethVM "github.com/onflow/go-ethereum/core/vm"
-	"github.com/onflow/go-ethereum/rlp"
+	gethVM "github.com/ethereum/go-ethereum/core/vm"
+	"github.com/ethereum/go-ethereum/rlp"
 )
 
 // PrecompiledContract wraps gethVM precompiles with

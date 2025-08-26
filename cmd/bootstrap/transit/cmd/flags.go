@@ -11,8 +11,9 @@ var (
 	flagTimeout       time.Duration
 	flagConcurrency   int64
 
-	flagWrapID    string // wrap ID
-	flagVoteFile  string
-	flagNodeID    string
-	flagOutputDir string
+	flagWrapID       string // wrap ID
+	flagVoteFile     string
+	flagVoteFilePath string
+	flagNodeID       string
+	flagOutputDir    string
 )
