@@ -15,7 +15,7 @@ type Proposal flow.UntrustedProposal
 func (p *Proposal) ToInternal() (any, error) {
 	internal, err := flow.NewProposal(flow.UntrustedProposal(*p))
 	if err != nil {
-		return nil, fmt.Errorf("could not convert message.Proposal to internal type: %w", err)
+		return nil, fmt.Errorf("could not convert %T to internal type: %w", p, err)
 	}
 	return internal, nil
 }

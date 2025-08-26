@@ -16,7 +16,7 @@ type ClusterProposal cluster.UntrustedProposal
 func (p *ClusterProposal) ToInternal() (any, error) {
 	internal, err := cluster.NewProposal(cluster.UntrustedProposal(*p))
 	if err != nil {
-		return nil, fmt.Errorf("could not convert message.ClusterProposal to internal type: %w", err)
+		return nil, fmt.Errorf("could not convert %T to internal type: %w", p, err)
 	}
 	return internal, nil
 }
