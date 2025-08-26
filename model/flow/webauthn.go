@@ -100,8 +100,14 @@ func validateWebAuthNExtensionData(extensionData []byte, payload []byte) (bool, 
 
 	// make sure the challenge is the hash of the transaction payload
 	hasher := hash.NewSHA2_256()
-	hasher.Write(TransactionDomainTag[:])
-	hasher.Write(payload)
+	_, err = hasher.Write(TransactionDomainTag[:])
+	if err != nil {
+		return false, nil
+	}
+	_, err = hasher.Write(payload)
+	if err != nil {
+		return false, nil
+	}
 	computedChallenge := hasher.SumHash()
 	if !computedChallenge.Equal(clientDataChallenge) {
 		return false, nil
