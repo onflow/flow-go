@@ -30,6 +30,7 @@ func TestProcessCallbacksTransaction(t *testing.T) {
 	assert.NotEmpty(t, tx.Script)
 	require.False(t, strings.Contains(string(tx.Script), `import "FlowCallbackScheduler"`), "should resolve callback scheduler import")
 	assert.Equal(t, uint64(flow.DefaultMaxTransactionGasLimit), tx.GasLimit)
+	assert.Equal(t, tx.Authorizers, []flow.Address{chain.ServiceAddress()})
 	assert.Empty(t, tx.Arguments)
 }
 
@@ -102,6 +103,7 @@ func TestExecuteCallbacksTransactions(t *testing.T) {
 				assert.NotEmpty(t, tx.Script)
 				expectedEffort := uint64(100 * (i + 1)) // Events created with efforts 100, 200, 300
 				assert.Equal(t, expectedEffort, tx.GasLimit)
+				assert.Equal(t, tx.Authorizers, []flow.Address{chain.ServiceAddress()})
 				assert.Len(t, tx.Arguments, 1)
 				assert.NotEmpty(t, tx.Arguments[0])
 
