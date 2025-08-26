@@ -16,6 +16,7 @@ import (
 func TestCollections(t *testing.T) {
 	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
 		expected := unittest.CollectionFixture(2).Light()
+		lockManager := storage.NewTestingLockManager()
 
 		t.Run("Retrieve nonexistant", func(t *testing.T) {
 			var actual flow.LightCollection
@@ -59,7 +60,8 @@ func TestCollections(t *testing.T) {
 			expected := unittest.CollectionFixture(1).Light()
 			blockID := unittest.IdentifierFixture()
 
-			_, lctx := unittest.LockManagerWithContext(t, storage.LockInsertOrFinalizeClusterBlock)
+			lctx := lockManager.NewContext()
+			require.NoError(t, lctx.AcquireLock(storage.LockInsertOrFinalizeClusterBlock))
 			defer lctx.Release()
 			_ = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 				err := operation.UpsertCollection(rw.Writer(), &expected)
@@ -80,7 +82,8 @@ func TestCollections(t *testing.T) {
 			transactionID := unittest.IdentifierFixture()
 			actual := flow.Identifier{}
 
-			_, lctx := unittest.LockManagerWithContext(t, storage.LockInsertCollection)
+			lctx := lockManager.NewContext()
+			require.NoError(t, lctx.AcquireLock(storage.LockInsertCollection))
 			defer lctx.Release()
 			_ = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 				err := operation.IndexCollectionByTransaction(lctx, rw.Writer(), transactionID, expected)

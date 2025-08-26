@@ -96,6 +96,7 @@ func (s *Suite) SetupTest() {
 	s.log = unittest.Logger()
 	s.ctx, s.cancel = context.WithCancel(context.Background())
 	s.db, s.dbDir = unittest.TempBadgerDB(s.T())
+	s.lockManager = storerr.NewTestingLockManager()
 
 	s.obsIdentity = unittest.IdentityFixture(unittest.WithRole(flow.RoleAccess))
 
@@ -213,7 +214,7 @@ func (s *Suite) initEngineAndSyncer(ctx irrecoverable.SignalerContext) (*Engine,
 
 	syncer, err := NewCollectionSyncer(
 		s.log,
-		module.CollectionExecutedMetric(s.collectionExecutedMetric),
+		s.collectionExecutedMetric,
 		module.Requester(s.request),
 		s.proto.state,
 		s.blocks,
@@ -431,11 +432,10 @@ func (s *Suite) TestOnCollection() {
 
 	// Create a lock context for indexing
 	lctx := s.lockManager.NewContext()
-	err := lctx.AcquireLock(storerr.LockInsertCollection)
-	require.NoError(s.T(), err)
+	require.NoError(s.T(), lctx.AcquireLock(storerr.LockInsertCollection))
 	defer lctx.Release()
 
-	err = indexer.IndexCollection(lctx, &collection, s.collections, s.log, module.CollectionExecutedMetric(s.collectionExecutedMetric))
+	err := indexer.IndexCollection(lctx, &collection, s.collections, s.log, s.collectionExecutedMetric)
 	require.NoError(s.T(), err)
 
 	// check that the collection was stored and indexed
@@ -508,7 +508,7 @@ func (s *Suite) TestOnCollectionDuplicate() {
 	require.NoError(s.T(), err)
 	defer lctx.Release()
 
-	err = indexer.IndexCollection(lctx, &collection, s.collections, s.log, module.CollectionExecutedMetric(s.collectionExecutedMetric))
+	err = indexer.IndexCollection(lctx, &collection, s.collections, s.log, s.collectionExecutedMetric)
 	require.Error(s.T(), err)
 	require.ErrorIs(s.T(), err, storerr.ErrAlreadyExists)
 

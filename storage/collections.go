@@ -37,8 +37,7 @@ type Collections interface {
 
 	// Store inserts the collection keyed by ID and all constituent
 	// transactions.
-	// This is used by execution node storing collections
-	// No errors are expected during normal operation.
+	// This is used by execution node storing collections.
 	// No errors are expected during normal operation.
 	Store(collection *flow.Collection) (flow.LightCollection, error)
 
@@ -47,11 +46,27 @@ type Collections interface {
 	Remove(collID flow.Identifier) error
 
 	// StoreAndIndexByTransaction stores the collection and indexes it by transaction.
-	// This is used by access node storing collections for finalized blocks
+	// This is used by access node storing collections for finalized blocks.
+	//
+	// CAUTION: current approach is NOT BFT and needs to be revised in the future.
+	// Honest clusters ensure a transaction can only belong to one collection. However, in rare
+	// cases, the collector clusters can exceed byzantine thresholds -- making it possible to
+	// produce multiple finalized collections (aka guaranteed collections) containing the same
+	// transaction repeatedly.
+	// TODO: eventually we need to handle Byzantine clusters
+	//
 	// No errors are expected during normal operation.
 	StoreAndIndexByTransaction(lctx lockctx.Proof, collection *flow.Collection) (flow.LightCollection, error)
 
 	// BatchStoreAndIndexByTransaction stores the collection and indexes it by transaction within a batch.
+	//
+	// CAUTION: current approach is NOT BFT and needs to be revised in the future.
+	// Honest clusters ensure a transaction can only belong to one collection. However, in rare
+	// cases, the collector clusters can exceed byzantine thresholds -- making it possible to
+	// produce multiple finalized collections (aka guaranteed collections) containing the same
+	// transaction repeatedly.
+	// TODO: eventually we need to handle Byzantine clusters
+	//
 	// This is used by access node storing collections for finalized blocks
 	BatchStoreAndIndexByTransaction(lctx lockctx.Proof, collection *flow.Collection, batch ReaderBatchWriter) (flow.LightCollection, error)
 }

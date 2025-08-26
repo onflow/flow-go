@@ -201,7 +201,7 @@ func (s *Suite) initEngineAndSyncer(ctx irrecoverable.SignalerContext) (*Engine,
 
 	syncer := NewCollectionSyncer(
 		s.log,
-		module.CollectionExecutedMetric(s.collectionExecutedMetric),
+		s.collectionExecutedMetric,
 		s.request,
 		s.proto.state,
 		s.blocks,
@@ -416,7 +416,7 @@ func (s *Suite) TestOnCollection() {
 	require.NoError(s.T(), err)
 	defer lctx.Release()
 
-	err = indexer.IndexCollection(lctx, &collection, s.collections, s.log, module.CollectionExecutedMetric(s.collectionExecutedMetric))
+	err = indexer.IndexCollection(lctx, &collection, s.collections, s.log, s.collectionExecutedMetric)
 	require.NoError(s.T(), err)
 
 	// check that the collection was stored and indexed
@@ -490,8 +490,7 @@ func (s *Suite) TestOnCollectionDuplicate() {
 	require.NoError(s.T(), err)
 	defer lctx.Release()
 
-	err = indexer.IndexCollection(lctx, &collection, s.collections, s.log, module.CollectionExecutedMetric(s.collectionExecutedMetric))
-	require.Error(s.T(), err)
+	err = indexer.IndexCollection(lctx, &collection, s.collections, s.log, s.collectionExecutedMetric)
 	require.ErrorIs(s.T(), err, storerr.ErrAlreadyExists)
 
 	// check that the collection was stored and indexed
