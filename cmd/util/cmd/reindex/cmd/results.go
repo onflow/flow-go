@@ -15,7 +15,10 @@ var resultsCmd = &cobra.Command{
 	Use:   "results",
 	Short: "reindex sealed result IDs by block ID",
 	Run: func(cmd *cobra.Command, args []string) {
-		db := common.InitStorage(flagDatadir)
+		db, err := common.InitStorage(flagDatadir)
+		if err != nil {
+			log.Fatal().Err(err).Msg("could not initialize storage")
+		}
 		defer db.Close()
 		storages := common.InitStorages(db)
 		state, err := common.InitProtocolState(db, storages)

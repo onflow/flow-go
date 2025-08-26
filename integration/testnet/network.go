@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/onflow/flow-go/follower/database"
+	"github.com/onflow/flow-go/state/protocol/datastore"
 	"github.com/onflow/flow-go/state/protocol/protocol_state"
 
 	"github.com/dapperlabs/testingdock"
@@ -52,11 +53,10 @@ import (
 	"github.com/onflow/flow-go/network/p2p/keyutils"
 	"github.com/onflow/flow-go/network/p2p/translator"
 	clusterstate "github.com/onflow/flow-go/state/cluster"
-	"github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/state/protocol/inmem"
 	"github.com/onflow/flow-go/state/protocol/protocol_state/kvstore"
+	"github.com/onflow/flow-go/storage"
 	badgerstorage "github.com/onflow/flow-go/storage/badger"
-	"github.com/onflow/flow-go/storage/locks"
 	"github.com/onflow/flow-go/utils/io"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -717,7 +717,7 @@ func (net *FlowNetwork) addConsensusFollower(t *testing.T, rootProtocolSnapshotP
 		consensus_follower.WithPebbleDB(pebbleDB),
 		consensus_follower.WithBootstrapDir(followerBootstrapDir),
 		// each consenesus follower will have a different lock manager singleton
-		consensus_follower.WithLockManager(locks.NewTestingLockManager()),
+		consensus_follower.WithLockManager(storage.NewTestingLockManager()),
 	)
 
 	stakedANContainer := net.ContainerByID(followerConf.StakedNodeID)
@@ -1321,7 +1321,7 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string, chainID fl
 		return nil, fmt.Errorf("could not create bootstrap state snapshot: %w", err)
 	}
 
-	err = badger.IsValidRootSnapshotQCs(snapshot)
+	err = datastore.IsValidRootSnapshotQCs(snapshot)
 	if err != nil {
 		return nil, fmt.Errorf("invalid root snapshot qcs: %w", err)
 	}

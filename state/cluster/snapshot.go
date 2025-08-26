@@ -18,7 +18,7 @@ type Snapshot interface {
 	// latest finalized block.
 	Head() (*flow.Header, error)
 
-	// Pending returns all children IDs for the snapshot head, which thus were
+	// Pending returns the IDs of all blocks descending from the snapshot head, which thus were
 	// potential extensions of the protocol state at this snapshot. The result
 	// is ordered such that parents are included before their children. These
 	// are NOT guaranteed to have been validated by HotStuff.
