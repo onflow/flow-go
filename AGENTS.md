@@ -4,8 +4,8 @@ This file provides guidance to AI Agents when working with code in this reposito
 
 ## Agents Docs
 
-- Coding Conventions: @docs/agents/AgentsCodingConvention.md
-- Agents Directive: @docs/agents/AgentsDirective.md
+- Coding Conventions: @docs/agents/CodingConventions.md
+- Agents Directive: @docs/agents/OperationalDoctrine.md
 - GoDocs: @docs/agents/GoDocs.md
 
 ## Behavior Guidance
@@ -124,6 +124,7 @@ Flow uses a high-assurance approach where:
 - Use mock generators: run `make generate-mocks` after interface changes
 - Follow the existing pattern of `*_test.go` files
 - Use fixtures for realistic test data. Defined in `/utils/unittest/`
+- Some tests may be flaky. If unrelated tests fail, try them again before debugging.
 
 ### Build System
 - Uses Make and Go modules
