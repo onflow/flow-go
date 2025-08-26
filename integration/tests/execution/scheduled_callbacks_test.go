@@ -32,11 +32,10 @@ func (s *ScheduledCallbacksSuite) TestScheduleCallback_DeployAndGetStatus() {
 	blockA := s.BlockState.WaitForHighestFinalizedProgress(s.T(), currentFinalized)
 	s.T().Logf("got blockA height %v ID %v", blockA.Header.Height, blockA.Header.ID())
 
-	// Execute script to call getStatus(id: 0) on the contract
-	result, ok := s.getCallbackStatus(0)
-	s.T().Logf("result: %v", result)
-	require.False(s.T(), ok)
-	require.Nil(s.T(), result, "getStatus(0) should return nil for non-existent callback")
+	// Execute script to call getStatus(id: 10) on the contract
+	result, ok := s.getCallbackStatus(10)
+	s.T().Logf("result: %v, ok: %v", result, ok)
+	require.False(s.T(), ok, "getStatus(10) should return false for non-existent callback")
 
 	// Wait for a block to be executed to ensure everything is processed
 	blockB := s.BlockState.WaitForHighestFinalizedProgress(s.T(), blockA.Header.Height)
@@ -180,19 +179,19 @@ func (s *ScheduledCallbacksSuite) scheduleCallback(timestamp int64) uint64 {
 		transaction(timestamp: UFix64) {
 
 			prepare(account: auth(BorrowValue, SaveValue, IssueStorageCapabilityController, PublishCapability, GetStorageCapabilityController) &Account) {
-				if !account.storage.check<@TestFlowCallbackHandler.Handler>(from: TestFlowCallbackHandler.HandlerStoragePath) {
-					let handler <- TestFlowCallbackHandler.createHandler()
+        		if !account.storage.check<@TestFlowCallbackHandler.Handler>(from: TestFlowCallbackHandler.HandlerStoragePath) {
+            		let handler <- TestFlowCallbackHandler.createHandler()
 				
 					account.storage.save(<-handler, to: TestFlowCallbackHandler.HandlerStoragePath)
-					account.capabilities.storage.issue<auth(FlowCallbackScheduler.ExecuteCallback) &{FlowCallbackScheduler.CallbackHandler}>(TestFlowCallbackHandler.HandlerStoragePath)
+            		account.capabilities.storage.issue<auth(FlowCallbackScheduler.Execute) &{FlowCallbackScheduler.CallbackHandler}>(TestFlowCallbackHandler.HandlerStoragePath)
 				}
 
 				let callbackCap = account.capabilities.storage
-									.getControllers(forPath: TestFlowCallbackHandler.HandlerStoragePath)[0]
-									.capability as! Capability<auth(FlowCallbackScheduler.ExecuteCallback) &{FlowCallbackScheduler.CallbackHandler}>
+					.getControllers(forPath: TestFlowCallbackHandler.HandlerStoragePath)[0]
+					.capability as! Capability<auth(FlowCallbackScheduler.Execute) &{FlowCallbackScheduler.CallbackHandler}>
 				
 				let vault = account.storage.borrow<auth(FungibleToken.Withdraw) &FlowToken.Vault>(from: /storage/flowTokenVault)
-				?? panic("Could not borrow FlowToken vault")
+					?? panic("Could not borrow FlowToken vault")
 				
 				let testData = "test data"
 				let feeAmount = 1.0
@@ -345,10 +344,10 @@ func (s *ScheduledCallbacksSuite) sendCallbackTx(script []byte, args []cadence.V
 
 func (s *ScheduledCallbacksSuite) extractCallbackIDFromEvents(result *sdk.TransactionResult) uint64 {
 	for _, event := range result.Events {
-		if strings.Contains(string(event.Type), "FlowCallbackScheduler.CallbackScheduled") ||
-			strings.Contains(string(event.Type), "FlowCallbackScheduler.CallbackCanceled") ||
-			strings.Contains(string(event.Type), "FlowCallbackScheduler.CallbackExecuted") ||
-			strings.Contains(string(event.Type), "FlowCallbackScheduler.CallbackProcessed") {
+		if strings.Contains(string(event.Type), "FlowCallbackScheduler.Scheduled") ||
+			strings.Contains(string(event.Type), "FlowCallbackScheduler.Canceled") ||
+			strings.Contains(string(event.Type), "FlowCallbackScheduler.Executed") ||
+			strings.Contains(string(event.Type), "FlowCallbackScheduler.PendingExecution") {
 
 			if id := event.Value.SearchFieldByName("id"); id != nil {
 				return uint64(id.(cadence.UInt64))
