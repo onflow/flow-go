@@ -23,7 +23,7 @@ func TestInsertRetrieveClusterBlock(t *testing.T) {
 		err := lctx.AcquireLock(storage.LockInsertOrFinalizeClusterBlock)
 		require.NoError(t, err)
 		defer lctx.Release()
-		
+
 		require.NoError(t, db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 			return InsertClusterBlock(lctx, rw, &block)
 		}))

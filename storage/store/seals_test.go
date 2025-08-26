@@ -56,7 +56,7 @@ func TestSealIndexAndRetrieve(t *testing.T) {
 		err := lctx.AcquireLock(storage.LockInsertBlock)
 		require.NoError(t, err)
 		defer lctx.Release()
-		
+
 		metrics := metrics.NewNoopCollector()
 		s := store.NewSeals(metrics, db)
 

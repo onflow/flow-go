@@ -23,7 +23,7 @@ func TestGuaranteeInsertRetrieve(t *testing.T) {
 		err := lctx.AcquireLock(storage.LockInsertBlock)
 		require.NoError(t, err)
 		defer lctx.Release()
-		
+
 		err = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 			return operation.UnsafeInsertGuarantee(lctx, rw.Writer(), g.CollectionID, g)
 		})
@@ -53,7 +53,7 @@ func TestIndexGuaranteedCollectionByBlockHashInsertRetrieve(t *testing.T) {
 		err := lctx.AcquireLock(storage.LockInsertBlock)
 		require.NoError(t, err)
 		defer lctx.Release()
-		
+
 		err = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 			for _, guarantee := range guarantees {
 				if err := operation.UnsafeInsertGuarantee(lctx, rw.Writer(), guarantee.ID(), guarantee); err != nil {
@@ -101,7 +101,7 @@ func TestIndexGuaranteedCollectionByBlockHashMultipleBlocks(t *testing.T) {
 		err := lctx1.AcquireLock(storage.LockInsertBlock)
 		require.NoError(t, err)
 		defer lctx1.Release()
-		
+
 		err = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 			for _, guarantee := range set1 {
 				if err := operation.UnsafeInsertGuarantee(lctx1, rw.Writer(), guarantee.CollectionID, guarantee); err != nil {

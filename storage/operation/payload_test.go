@@ -46,7 +46,7 @@ func TestSealIndexAndLookup(t *testing.T) {
 		err := lctx.AcquireLock(storage.LockInsertBlock)
 		require.NoError(t, err)
 		defer lctx.Release()
-		
+
 		err = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 			for _, seal := range seals {
 				if err := operation.InsertSeal(rw.Writer(), seal.ID(), seal); err != nil {

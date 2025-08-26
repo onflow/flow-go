@@ -65,7 +65,7 @@ func TestFinalizer(t *testing.T) {
 			err = insertLctx.AcquireLock(storage.LockInsertBlock)
 			require.NoError(t, err)
 			defer insertLctx.Release()
-			
+
 			err = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 				return operation.InsertHeader(insertLctx, rw, refBlock.ID(), refBlock)
 			})

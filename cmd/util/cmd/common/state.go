@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/jordanschalm/lockctx"
+
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/state/protocol"
 	protocolbadger "github.com/onflow/flow-go/state/protocol/badger"

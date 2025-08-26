@@ -111,7 +111,7 @@ func (p *PipelineFunctionalSuite) SetupTest() {
 	err = insertLctx.AcquireLock(storage.LockInsertBlock)
 	p.Require().NoError(err)
 	defer insertLctx.Release()
-	
+
 	err = p.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 		return operation.InsertHeader(insertLctx, rw, rootBlock.ID(), rootBlock)
 	})
