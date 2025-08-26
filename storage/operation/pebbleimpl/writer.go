@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/cockroachdb/pebble"
+	"github.com/cockroachdb/pebble/v2"
 
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/operation"
@@ -66,11 +66,10 @@ func (b *ReaderBatchWriter) AddCallback(callback func(error)) {
 }
 
 // Commit flushes the batch to the database.
-// No errors are expected during normal operation.
+// Commit may be called at most once per Batch.
 // ReaderBatchWriter can't be reused after Commit() is called.
+// No errors are expected during normal operation.
 func (b *ReaderBatchWriter) Commit() error {
-	defer b.batch.Close() // Release batch resource
-
 	err := b.batch.Commit(pebble.Sync)
 
 	b.callbacks.NotifyCallbacks(err)
@@ -79,15 +78,16 @@ func (b *ReaderBatchWriter) Commit() error {
 }
 
 // Close releases memory of the batch and no error is returned.
+// Close must be called exactly once per batch.
 // This can be called as a defer statement immediately after creating Batch
 // to reduce risk of unbounded memory consumption.
+// No errors are expected during normal operation.
 func (b *ReaderBatchWriter) Close() error {
 	// Pebble v2 docs for Batch.Close():
 	//
 	// "Close closes the batch without committing it."
 
-	b.batch.Close()
-	return nil
+	return b.batch.Close()
 }
 
 func WithReaderBatchWriter(db *pebble.DB, fn func(storage.ReaderBatchWriter) error) error {

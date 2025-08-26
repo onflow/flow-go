@@ -23,9 +23,10 @@ func TransactionToMessage(tb flow.TransactionBody) *entities.Transaction {
 
 	for i, sig := range tb.PayloadSignatures {
 		payloadSigMessages[i] = &entities.Transaction_Signature{
-			Address:   sig.Address.Bytes(),
-			KeyId:     uint32(sig.KeyIndex),
-			Signature: sig.Signature,
+			Address:       sig.Address.Bytes(),
+			KeyId:         uint32(sig.KeyIndex),
+			Signature:     sig.Signature,
+			ExtensionData: sig.ExtensionData,
 		}
 	}
 
@@ -33,9 +34,10 @@ func TransactionToMessage(tb flow.TransactionBody) *entities.Transaction {
 
 	for i, sig := range tb.EnvelopeSignatures {
 		envelopeSigMessages[i] = &entities.Transaction_Signature{
-			Address:   sig.Address.Bytes(),
-			KeyId:     uint32(sig.KeyIndex),
-			Signature: sig.Signature,
+			Address:       sig.Address.Bytes(),
+			KeyId:         uint32(sig.KeyIndex),
+			Signature:     sig.Signature,
+			ExtensionData: sig.ExtensionData,
 		}
 	}
 

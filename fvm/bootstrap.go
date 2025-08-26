@@ -22,6 +22,7 @@ import (
 	"github.com/onflow/flow-go/fvm/storage"
 	"github.com/onflow/flow-go/fvm/storage/logical"
 	"github.com/onflow/flow-go/fvm/systemcontracts"
+	"github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/epochs"
 )
@@ -109,7 +110,7 @@ type BootstrapParams struct {
 
 	// list of initial network participants for whom we will create/stake flow
 	// accounts and retrieve epoch-related resources
-	identities flow.IdentityList
+	nodes []bootstrap.NodeInfo
 }
 
 type BootstrapAccountKeys struct {
@@ -200,9 +201,9 @@ func WithRootBlock(rootBlock *flow.Header) BootstrapProcedureOption {
 	}
 }
 
-func WithIdentities(identities flow.IdentityList) BootstrapProcedureOption {
+func WithNodes(nodes []bootstrap.NodeInfo) BootstrapProcedureOption {
 	return func(bp *BootstrapProcedure) *BootstrapProcedure {
-		bp.identities = identities
+		bp.nodes = nodes
 		return bp
 	}
 }
@@ -453,6 +454,11 @@ func (b *bootstrapExecutor) Execute() error {
 	// deploy staking collection contract to the service account
 	b.deployStakingCollection(service, &env)
 
+	if b.ctx.ScheduleCallbacksEnabled {
+		// deploy flow callback scheduler contract to the service account
+		b.deployFlowCallbackScheduler(service, &env)
+	}
+
 	// sets up the EVM environment
 	b.setupEVM(service, nonFungibleToken, fungibleToken, flowToken, &env)
 	b.setupVMBridge(service, &env)
@@ -467,7 +473,7 @@ func (b *bootstrapExecutor) Execute() error {
 	b.registerNodes(service, fungibleToken, flowToken)
 
 	// set the list of nodes which are allowed to stake in this network
-	b.setStakingAllowlist(service, b.identities.NodeIDs())
+	b.setStakingAllowlist(service, bootstrap.ToIdentityList(b.nodes).NodeIDs())
 
 	b.deployMigrationContract(service)
 
@@ -803,6 +809,16 @@ func (b *bootstrapExecutor) deployNFTStorefrontV2(deployTo flow.Address, env *te
 			0),
 	)
 	panicOnMetaInvokeErrf("failed to deploy NFTStorefrontV2 contract: %s", txError, err)
+}
+
+func (b *bootstrapExecutor) deployFlowCallbackScheduler(deployTo flow.Address, env *templates.Environment) {
+	contract := contracts.FlowCallbackScheduler(*env)
+	txError, err := b.invokeMetaTransaction(
+		b.ctx,
+		Transaction(blueprints.DeployContractTransaction(deployTo, contract, "FlowCallbackScheduler"), 0),
+	)
+
+	panicOnMetaInvokeErrf("failed to deploy FlowCallbackScheduler contract: %s", txError, err)
 }
 
 func (b *bootstrapExecutor) mintInitialTokens(
@@ -1277,7 +1293,7 @@ func getContractAddressFromEVMEvent(output ProcedureOutput) (string, error) {
 }
 
 func (b *bootstrapExecutor) registerNodes(service, fungibleToken, flowToken flow.Address) {
-	for _, id := range b.identities {
+	for _, node := range b.nodes {
 
 		// create a staking account for the node
 		nodeAddress := b.createAccount(b.accountKeys.NodeAccountPublicKeys)
@@ -1316,7 +1332,7 @@ func (b *bootstrapExecutor) registerNodes(service, fungibleToken, flowToken flow
 				flowToken,
 				fungibleToken,
 				nodeAddress,
-				id),
+				node),
 				0),
 		)
 		panicOnMetaInvokeErrf("failed to register node: %s", txError, err)

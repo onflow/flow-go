@@ -209,7 +209,13 @@ generate-mocks: install-mock-generators
 	mockery --name 'LinkGenerator' --dir="./engine/access/rest/common/models" --case=underscore --output="./engine/access/rest/common/models/mock"  --outpkg="mock"
 	mockery --name 'WebsocketConnection' --dir="./engine/access/rest/websockets" --case=underscore --output="./engine/access/rest/websockets/mock"  --outpkg="mock"
 	mockery --name 'ConnectionFactory' --dir="./engine/access/rpc/connection" --case=underscore --output="./engine/access/rpc/connection/mock" --outpkg="mock"
-	mockery --name 'Communicator' --dir="./engine/access/rpc/backend" --case=underscore --output="./engine/access/rpc/backend/mock" --outpkg="mock"
+	mockery --name 'Communicator' --dir="./engine/access/rpc/backend/node_communicator" --case=underscore --output="./engine/access/rpc/backend/node_communicator/mock" --outpkg="mock"
+	mockery --name 'AccountProvider' --dir="./engine/access/rpc/backend/accounts/provider" --case=underscore --output="./engine/access/rpc/backend/accounts/provider/mock" --outpkg="mock"
+	mockery --name 'EventProvider' --dir="./engine/access/rpc/backend/events/provider" --case=underscore --output="./engine/access/rpc/backend/events/provider/mock" --outpkg="mock"
+	mockery --name 'TransactionProvider' --dir="./engine/access/rpc/backend/transactions/provider" --case=underscore --output="./engine/access/rpc/backend/transactions/provider/mock" --outpkg="mock"
+	mockery --name 'Provider' --dir="./engine/access/rpc/backend/transactions/error_messages" --case=underscore --output="./engine/access/rpc/backend/transactions/error_messages/mock" --outpkg="mock"
+	mockery --name 'TransactionSender' --dir="./engine/access/rpc/backend/transactions/retrier" --case=underscore --output="./engine/access/rpc/backend/transactions/retrier/mock" --outpkg="mock"
+	mockery --name 'Retrier' --dir="./engine/access/rpc/backend/transactions/retrier" --case=underscore --output="./engine/access/rpc/backend/transactions/retrier/mock" --outpkg="mock"
 	mockery --name '.*' --dir=model/fingerprint --case=underscore --output="./model/fingerprint/mock" --outpkg="mock"
 	mockery --name 'ExecForkActor' --structname 'ExecForkActorMock' --dir=module/mempool/consensus/mock/ --case=underscore --output="./module/mempool/consensus/mock/" --outpkg="mock"
 	mockery --name '.*' --dir=engine/verification/fetcher/ --case=underscore --output="./engine/verification/fetcher/mock" --outpkg="mockfetcher"
@@ -217,7 +223,9 @@ generate-mocks: install-mock-generators
 	mockery --name 'Storage' --dir=module/executiondatasync/tracker --case=underscore --output="module/executiondatasync/tracker/mock" --outpkg="mocktracker"
 	mockery --name 'ScriptExecutor' --dir=module/execution --case=underscore --output="module/execution/mock" --outpkg="mock"
 	mockery --name 'StorageSnapshot' --dir=fvm/storage/snapshot --case=underscore --output="fvm/storage/snapshot/mock" --outpkg="mock"
-	mockery --name 'Core' --dir=module/executiondatasync/optimistic_syncing --case=underscore --output="module/executiondatasync/optimistic_syncing/mock" --outpkg="mock"
+	mockery --name 'Core' --dir=module/executiondatasync/optimistic_sync --case=underscore --output="module/executiondatasync/optimistic_sync/mock" --outpkg="mock"
+	mockery --name 'Requester' --dir=engine/access/ingestion/tx_error_messages --case=underscore --output="engine/access/ingestion/tx_error_messages/mock" --outpkg="mock"
+	mockery --name 'ExecutionDataRequester' --dir=module/state_synchronization/requester --case=underscore --output="module/state_synchronization/requester/mock" --outpkg="mock"
 
 	#temporarily make insecure/ a non-module to allow mockery to create mocks
 	mv insecure/go.mod insecure/go2.mod
@@ -243,12 +251,12 @@ tools/custom-gcl: tools/structwrite .custom-gcl.yml
 .PHONY: lint
 lint: tidy tools/custom-gcl
 	# revive -config revive.toml -exclude storage/ledger/trie ./...
-	./tools/custom-gcl run -v ./...
+	./tools/custom-gcl run -v $(or $(LINT_PATH),./...)
 
 .PHONY: fix-lint
 fix-lint:
 	# revive -config revive.toml -exclude storage/ledger/trie ./...
-	./tools/custom-gcl run -v --fix ./...
+	./tools/custom-gcl run -v --fix $(or $(LINT_PATH),./...)
 
 # Runs unit tests with different list of packages as passed by CI so they run in parallel
 .PHONY: ci

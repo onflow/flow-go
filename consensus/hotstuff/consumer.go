@@ -307,7 +307,7 @@ type CommunicatorConsumer interface {
 	// Prerequisites:
 	// Implementation must be concurrency safe; Non-blocking;
 	// and must handle repetition of the same events (with some processing overhead).
-	OnOwnVote(blockID flow.Identifier, view uint64, sigData []byte, recipientID flow.Identifier)
+	OnOwnVote(vote *model.Vote, recipientID flow.Identifier)
 
 	// OnOwnTimeout notifies about intent to broadcast the given timeout object(TO) to all actors of the consensus process.
 	// Prerequisites:

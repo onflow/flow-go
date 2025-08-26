@@ -43,7 +43,15 @@ jobs:
         with:
           # Key should change whenever implementation (tools/structwrite), or compilation config (.custom-gcl.yml) changes
           # When the key is different, it is a cache miss, and the custom linter binary is recompiled
-          key: custom-linter-${{ env.GO_VERSION }}-${{ runner.os }}-${{ hashFiles('.custom-gcl.yml', 'tools/structwrite/**') }}
+          # We include the SHA in the hash key because:
+          #    - cache keys are branch/reference-scoped, with some exceptions (see https://docs.github.com/en/actions/writing-workflows/choosing-what-your-workflow-does/caching-dependencies-to-speed-up-workflows#restrictions-for-accessing-a-cache)
+          #    - (we believe) cache keys for a repo share one namespace (sort of implied by https://docs.github.com/en/actions/writing-workflows/choosing-what-your-workflow-does/caching-dependencies-to-speed-up-workflows#matching-a-cache-key)
+          #    - (we believe) the same cache being written by two different branches may cause contention,
+          #       as a result of the shared namespace and branch-scoped permissions
+          key: custom-linter-${{ env.GO_VERSION }}-${{ runner.os }}-${{ hashFiles('.custom-gcl.yml', 'tools/structwrite/**') }}-${{ github.sha }}
+          # If a matching cache item from a different branch exists, and we have permission to access it, use it.
+          restore-keys: |
+            custom-linter-${{ env.GO_VERSION }}-${{ runner.os }}-${{ hashFiles('.custom-gcl.yml', 'tools/structwrite/**') }}
           path: tools/custom-gcl # path defined in .custom-gcl.yml
           lookup-only: 'true'    # if already cached, don't download here
       # We install the non-custom golangci-lint binary using the golangci-lint action.
@@ -83,8 +91,11 @@ jobs:
       id: cache-linter
       uses: actions/cache@v3
       with:
-        # key should change whenever your linter code or Go version changes
-        key: custom-linter-${{ env.GO_VERSION }}-${{ runner.os }}-${{ hashFiles('.custom-gcl.yml', 'tools/structwrite/**') }}
+        # See "Cache custom linter binary" job for information about the key structure
+        key: custom-linter-${{ env.GO_VERSION }}-${{ runner.os }}-${{ hashFiles('.custom-gcl.yml', 'tools/structwrite/**') }}-${{ github.sha }}
+        # If a matching cache item from a different branch exists, and we have permission to access it, use it.
+        restore-keys: |
+          custom-linter-${{ env.GO_VERSION }}-${{ runner.os }}-${{ hashFiles('.custom-gcl.yml', 'tools/structwrite/**') }}
         path: tools/custom-gcl
         # We are using the cache to share data between the build-linter job and the 3 lint jobs
         # If there is a cache miss, it likely means either the build-linter job failed or the cache entry was evicted
@@ -303,6 +314,15 @@ jobs:
         with:
           go-version: ${{ env.GO_VERSION }}
           cache: true
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ vars.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+        if: ${{ (github.event_name == 'merge_group' || (github.event.pull_request && (github.event.pull_request.author_association == 'MEMBER' || github.event.pull_request.author_association == 'COLLABORATOR'))) }}
+
+
       - name: Docker build
         env:
           CADENCE_DEPLOY_KEY: ${{ secrets.CADENCE_DEPLOY_KEY }}

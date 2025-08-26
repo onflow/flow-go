@@ -2847,6 +2847,54 @@ func TestTransientNetworkCoreContractAddresses(t *testing.T) {
 			})
 }
 
+func TestFlowCallbackScheduler(t *testing.T) {
+	ctxOpts := []fvm.Option{
+		fvm.WithScheduleCallbacksEnabled(true),
+	}
+
+	newVMTest().
+		withContextOptions(ctxOpts...).
+		run(func(
+			t *testing.T,
+			vm fvm.VM,
+			chain flow.Chain,
+			ctx fvm.Context,
+			snapshotTree snapshot.SnapshotTree,
+		) {
+			sc := systemcontracts.SystemContractsForChain(chain.ChainID())
+			require.NotNil(t, sc.FlowCallbackScheduler.Address)
+			require.NotNil(t, sc.FlowCallbackScheduler.Name)
+
+			script := fvm.Script([]byte(fmt.Sprintf(`
+				import FlowCallbackScheduler from %s
+				access(all) fun main(): FlowCallbackScheduler.Status? {
+					return FlowCallbackScheduler.getStatus(id: 1)
+				}
+			`, sc.FlowCallbackScheduler.Address.HexWithPrefix())))
+
+			_, output, err := vm.Run(ctx, script, snapshotTree)
+			require.NoError(t, err)
+			require.NoError(t, output.Err)
+			require.NotNil(t, output.Value)
+			require.Equal(t, output.Value, cadence.NewOptional(nil))
+
+			script = fvm.Script([]byte(fmt.Sprintf(`
+				import FlowCallbackScheduler from %s
+				access(all) fun main(): UInt64 {
+					return FlowCallbackScheduler.getSlotAvailableEffort(timestamp: 1.0, priority: FlowCallbackScheduler.Priority.High)
+				}
+			`, sc.FlowCallbackScheduler.Address.HexWithPrefix())))
+
+			const maxEffortAvailable = 30_000 // FLIP 330
+			_, output, err = vm.Run(ctx, script, snapshotTree)
+			require.NoError(t, err)
+			require.NoError(t, output.Err)
+			require.NotNil(t, output.Value)
+			require.Equal(t, cadence.UInt64(maxEffortAvailable), output.Value)
+		},
+		)(t)
+}
+
 func TestEVM(t *testing.T) {
 	blocks := new(envMock.Blocks)
 	block1 := unittest.BlockFixture()

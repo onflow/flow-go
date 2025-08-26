@@ -12,7 +12,7 @@ import (
 	"time"
 
 	gcemd "cloud.google.com/go/compute/metadata"
-	"github.com/cockroachdb/pebble"
+	"github.com/cockroachdb/pebble/v2"
 	"github.com/dgraph-io/badger/v2"
 	"github.com/hashicorp/go-multierror"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
@@ -84,6 +84,7 @@ import (
 	bstorage "github.com/onflow/flow-go/storage/badger"
 	"github.com/onflow/flow-go/storage/badger/operation"
 	"github.com/onflow/flow-go/storage/dbops"
+	"github.com/onflow/flow-go/storage/locks"
 	"github.com/onflow/flow-go/storage/operation/badgerimpl"
 	"github.com/onflow/flow-go/storage/operation/pebbleimpl"
 	"github.com/onflow/flow-go/storage/store"
@@ -276,6 +277,13 @@ func (fnb *FlowNodeBuilder) BaseFlags() {
 		"observer-mode-bootstrap-node-addresses",
 		[]string{},
 		"the network addresses of the bootstrap access node if this is an observer e.g. access-001.mainnet.flow.org:9653,access-002.mainnet.flow.org:9653")
+
+	// TransactionFeesDisabled is a temporary convenience flag for easier testing of cadence compiler changes. This option should not be used if we need to disable fees on a network.
+	// To disable fees on a network, we need to set the fee price to 0.0.
+	fnb.flags.BoolVar(&fnb.TransactionFeesDisabled,
+		"disable-fees",
+		false,
+		"Disables calling the transaction fee deduction. This is only for testing purposes. To disable fees on a network it is better to set the fee price to 0.0 .")
 }
 
 func (fnb *FlowNodeBuilder) EnqueuePingService() {
@@ -1224,6 +1232,18 @@ func (fnb *FlowNodeBuilder) initSecretsDB() error {
 	return nil
 }
 
+// initStorageLockManager initializes the lock manager used by the storage layer.
+// This manager must be a process-wide singleton.
+func (fnb *FlowNodeBuilder) initStorageLockManager() error {
+	if fnb.StorageLockMgr != nil {
+		fnb.Logger.Warn().Msgf("storage lock manager already initialized, skipping re-initialization, this should only happen in test case")
+		return nil
+	}
+
+	fnb.StorageLockMgr = locks.SingletonLockManager()
+	return nil
+}
+
 func (fnb *FlowNodeBuilder) initStorage() error {
 
 	// in order to void long iterations with big keys when initializing with an
@@ -1588,7 +1608,9 @@ func (fnb *FlowNodeBuilder) initLocal() error {
 
 func (fnb *FlowNodeBuilder) initFvmOptions() {
 	fnb.FvmOptions = initialize.InitFvmOptions(
-		fnb.RootChainID, fnb.Storage.Headers,
+		fnb.RootChainID,
+		fnb.Storage.Headers,
+		fnb.BaseConfig.TransactionFeesDisabled,
 	)
 }
 
@@ -2135,6 +2157,10 @@ func (fnb *FlowNodeBuilder) onStart() error {
 	}
 
 	if err := fnb.initLogger(); err != nil {
+		return err
+	}
+
+	if err := fnb.initStorageLockManager(); err != nil {
 		return err
 	}
 
