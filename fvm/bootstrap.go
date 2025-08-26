@@ -454,6 +454,11 @@ func (b *bootstrapExecutor) Execute() error {
 	// deploy staking collection contract to the service account
 	b.deployStakingCollection(service, &env)
 
+	if b.ctx.ScheduleCallbacksEnabled {
+		// deploy flow callback scheduler contract to the service account
+		b.deployFlowCallbackScheduler(service, &env)
+	}
+
 	// sets up the EVM environment
 	b.setupEVM(service, nonFungibleToken, fungibleToken, flowToken, &env)
 	b.setupVMBridge(service, &env)
@@ -804,6 +809,16 @@ func (b *bootstrapExecutor) deployNFTStorefrontV2(deployTo flow.Address, env *te
 			0),
 	)
 	panicOnMetaInvokeErrf("failed to deploy NFTStorefrontV2 contract: %s", txError, err)
+}
+
+func (b *bootstrapExecutor) deployFlowCallbackScheduler(deployTo flow.Address, env *templates.Environment) {
+	contract := contracts.FlowCallbackScheduler(*env)
+	txError, err := b.invokeMetaTransaction(
+		b.ctx,
+		Transaction(blueprints.DeployContractTransaction(deployTo, contract, "FlowCallbackScheduler"), 0),
+	)
+
+	panicOnMetaInvokeErrf("failed to deploy FlowCallbackScheduler contract: %s", txError, err)
 }
 
 func (b *bootstrapExecutor) mintInitialTokens(
