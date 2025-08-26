@@ -21,6 +21,7 @@ func ProcessCallbacksTransaction(chain flow.Chain) *flow.TransactionBody {
 	script := templates.GenerateProcessCallbackScript(sc.AsTemplateEnv())
 
 	return flow.NewTransactionBody().
+		AddAuthorizer(sc.FlowServiceAccount.Address).
 		SetScript(script).
 		SetComputeLimit(callbackTransactionGasLimit)
 }
@@ -28,6 +29,7 @@ func ProcessCallbacksTransaction(chain flow.Chain) *flow.TransactionBody {
 func ExecuteCallbacksTransactions(chainID flow.Chain, processEvents flow.EventsList) ([]*flow.TransactionBody, error) {
 	txs := make([]*flow.TransactionBody, 0, len(processEvents))
 	env := systemcontracts.SystemContractsForChain(chainID.ChainID()).AsTemplateEnv()
+	sc := systemcontracts.SystemContractsForChain(chainID.ChainID())
 
 	for _, event := range processEvents {
 		// todo make sure to check event index to ensure order is indeed correct
@@ -38,17 +40,23 @@ func ExecuteCallbacksTransactions(chainID flow.Chain, processEvents flow.EventsL
 			return nil, fmt.Errorf("failed to get callback args from event: %w", err)
 		}
 
-		tx := executeCallbackTransaction(env, id, effort)
+		tx := executeCallbackTransaction(sc, env, id, effort)
 		txs = append(txs, tx)
 	}
 
 	return txs, nil
 }
 
-func executeCallbackTransaction(env templates.Environment, id []byte, effort uint64) *flow.TransactionBody {
+func executeCallbackTransaction(
+	sc *systemcontracts.SystemContracts,
+	env templates.Environment,
+	id []byte,
+	effort uint64,
+) *flow.TransactionBody {
 	script := templates.GenerateExecuteCallbackScript(env)
 
 	return flow.NewTransactionBody().
+		AddAuthorizer(sc.FlowServiceAccount.Address).
 		SetScript(script).
 		AddArgument(id).
 		SetComputeLimit(effort)
