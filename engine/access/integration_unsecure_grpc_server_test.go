@@ -175,14 +175,18 @@ func (suite *SameGRPCPortTestSuite) SetupTest() {
 		false,
 		nil,
 		nil,
-		grpcserver.WithTransportCredentials(config.TransportCredentials)).Build()
+		grpcserver.WithTransportCredentials(config.TransportCredentials),
+		grpcserver.WithLoggingInterceptor(),
+	).Build()
 
 	suite.unsecureGrpcServer = grpcserver.NewGrpcServerBuilder(suite.log,
 		config.UnsecureGRPCListenAddr,
 		grpcutils.DefaultMaxMsgSize,
 		false,
 		nil,
-		nil).Build()
+		nil,
+		grpcserver.WithLoggingInterceptor(),
+	).Build()
 
 	block := unittest.BlockHeaderFixture()
 	suite.snapshot.On("Head").Return(block, nil)

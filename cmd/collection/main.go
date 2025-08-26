@@ -46,6 +46,7 @@ import (
 	"github.com/onflow/flow-go/module/epochs"
 	confinalizer "github.com/onflow/flow-go/module/finalizer/consensus"
 	"github.com/onflow/flow-go/module/grpcclient"
+	"github.com/onflow/flow-go/module/grpcserver"
 	"github.com/onflow/flow-go/module/mempool"
 	epochpool "github.com/onflow/flow-go/module/mempool/epochs"
 	"github.com/onflow/flow-go/module/mempool/herocache"
@@ -437,15 +438,24 @@ func main() {
 			return ing, err
 		}).
 		Component("transaction ingress rpc server", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-			server := rpc.New(
-				rpcConf,
-				ing,
+			server := grpcserver.NewGrpcServerBuilder(
 				node.Logger,
-				node.RootChainID,
+				rpcConf.ListenAddr,
+				rpcConf.MaxMsgSize,
+				rpcConf.RpcMetricsEnabled,
 				apiRatelimits,
 				apiBurstlimits,
+			).Build()
+
+			eng := rpc.New(
+				node.Logger,
+				server,
+				rpcConf,
+				ing,
+				node.RootChainID,
 			)
-			return server, nil
+
+			return eng, nil
 		}).
 		Component("collection provider engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			retrieve := func(collID flow.Identifier) (flow.Entity, error) {

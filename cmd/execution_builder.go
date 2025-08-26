@@ -82,6 +82,7 @@ import (
 	"github.com/onflow/flow-go/module/executiondatasync/tracker"
 	"github.com/onflow/flow-go/module/finalizedreader"
 	finalizer "github.com/onflow/flow-go/module/finalizer/consensus"
+	"github.com/onflow/flow-go/module/grpcserver"
 	"github.com/onflow/flow-go/module/mempool/queue"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/network"
@@ -1353,8 +1354,18 @@ func (exeNode *ExecutionNode) LoadGrpcServer(
 	module.ReadyDoneAware,
 	error,
 ) {
-	return rpc.New(
+	server := grpcserver.NewGrpcServerBuilder(
 		node.Logger,
+		exeNode.exeConf.rpcConf.ListenAddr,
+		exeNode.exeConf.rpcConf.MaxMsgSize,
+		exeNode.exeConf.rpcConf.RpcMetricsEnabled,
+		exeNode.exeConf.apiRatelimits,
+		exeNode.exeConf.apiBurstlimits,
+	).Build()
+
+	eng := rpc.New(
+		node.Logger,
+		server,
 		exeNode.exeConf.rpcConf,
 		exeNode.scriptsEng,
 		node.Storage.Headers,
@@ -1366,9 +1377,9 @@ func (exeNode *ExecutionNode) LoadGrpcServer(
 		exeNode.metricsProvider,
 		node.RootChainID,
 		signature.NewBlockSignerDecoder(exeNode.committee),
-		exeNode.exeConf.apiRatelimits,
-		exeNode.exeConf.apiBurstlimits,
-	), nil
+	)
+
+	return eng, nil
 }
 
 func (exeNode *ExecutionNode) LoadBootstrapper(node *NodeConfig) error {
