@@ -65,13 +65,13 @@ func (c *ClusterTimeoutObject) ToInternal() (any, error) {
 	return c, nil
 }
 
-// CollectionGuarantee is an untrusted message representation of an CollectionGuarantee.
+// CollectionGuarantee is a message representation of an CollectionGuarantee, which is used
+// to announce collections to consensus nodes.
 type CollectionGuarantee flow.UntrustedCollectionGuarantee
 
-// ToInternal converts the CollectionGuarantee message into its trusted internal
-// representation.
+// ToInternal returns the internal type representation for CollectionGuarantee.
 //
-// All errors indicate that the decode target contains a structurally invalid representation of the internal model.
+// All errors indicate that the decode target contains a structurally invalid representation of the internal flow.CollectionGuarantee.
 func (c *CollectionGuarantee) ToInternal() (any, error) {
 	internal, err := flow.NewCollectionGuarantee(flow.UntrustedCollectionGuarantee(*c))
 	if err != nil {
