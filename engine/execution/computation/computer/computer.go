@@ -300,15 +300,14 @@ func (e *blockComputer) queueSystemTransactions(
 	txnIndex uint32,
 	systemLogger zerolog.Logger,
 ) chan TransactionRequest {
-	// queue size for callback transactions + 1 system transaction (process callback already executed)
-	txQueue := make(chan TransactionRequest, len(executeCallbackTxs)+1)
-	defer close(txQueue)
-
 	allTxs := append(executeCallbackTxs, systemTxn)
 	// add execute callback transactions to the system collection info along to existing process transaction
 	systemTxs := systemColection.CompleteCollection.Transactions
 	systemColection.CompleteCollection.Transactions = append(systemTxs, allTxs...)
 	systemLogger = systemLogger.With().Uint32("num_txs", uint32(len(systemTxs))).Logger()
+
+	txQueue := make(chan TransactionRequest, len(allTxs))
+	defer close(txQueue)
 
 	for i, txBody := range allTxs {
 		last := i == len(allTxs)-1 // Is this last tx in collection

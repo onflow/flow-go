@@ -1697,12 +1697,10 @@ func (c *callbackTestExecutor) Output() fvm.ProcedureOutput {
 
 	switch {
 	// scheduled callbacks process transaction
-	case strings.Contains(script, "FlowCallbackScheduler.process"):
-		require.False(c.t, strings.Contains(script, callbackSchedulerImport), "should resolve callback scheduler import")
-
-		c.vm.executedTransactions[txID] = "process_callback"
-		env := systemcontracts.SystemContractsForChain(c.ctx.Chain.ChainID()).AsTemplateEnv()
-		eventTypeString := fmt.Sprintf("A.%v.FlowCallbackScheduler.CallbackProcessed", env.FlowCallbackSchedulerAddress)
+	case strings.Contains(string(txBody.Script), "scheduler.process"):
+		executor.vm.executedTransactions[txID] = "process_callback"
+		env := systemcontracts.SystemContractsForChain(flow.Mainnet.Chain().ChainID()).AsTemplateEnv()
+		eventTypeString := fmt.Sprintf("A.%v.CallbackScheduler.CallbackProcessed", env.FlowCallbackSchedulerAddress)
 
 		// return events for each scheduled callback
 		events := make([]flow.Event, len(c.vm.eventPayloads))
@@ -1720,9 +1718,7 @@ func (c *callbackTestExecutor) Output() fvm.ProcedureOutput {
 			Events: events,
 		}
 	// scheduled callbacks execute transaction
-	case strings.Contains(script, "FlowCallbackScheduler.executeCallback"):
-		require.False(c.t, strings.Contains(script, callbackSchedulerImport), "should resolve callback scheduler import")
-
+	case strings.Contains(string(txBody.Script), "scheduler.executeCallback"):
 		// extract the callback ID from the arguments
 		if len(txBody.Arguments) == 0 {
 			return fvm.ProcedureOutput{}
