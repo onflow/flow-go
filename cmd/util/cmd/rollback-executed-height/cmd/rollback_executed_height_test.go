@@ -25,6 +25,7 @@ import (
 // Test save block execution related data, then remove it, and then
 // save again should still work
 func TestReExecuteBlock(t *testing.T) {
+	lockManager := storage.NewTestingLockManager()
 	unittest.RunWithBadgerDB(t, func(bdb *badger.DB) {
 		unittest.RunWithPebbleDB(t, func(pdb *pebble.DB) {
 
@@ -33,7 +34,6 @@ func TestReExecuteBlock(t *testing.T) {
 			genesis := unittest.BlockFixture()
 			rootSeal := unittest.Seal.Fixture(unittest.Seal.WithBlock(genesis.Header))
 			db := badgerimpl.ToDB(bdb)
-			lockManager := storage.NewTestingLockManager()
 			err := bootstrapper.BootstrapExecutionDatabase(lockManager, db, rootSeal)
 			require.NoError(t, err)
 
@@ -185,6 +185,7 @@ func withLock(t *testing.T, manager lockctx.Manager, lockID string, fn func(lctx
 // Test save block execution related data, then remove it, and then
 // save again with different result should work
 func TestReExecuteBlockWithDifferentResult(t *testing.T) {
+	lockManager := storage.NewTestingLockManager()
 	unittest.RunWithPebbleDB(t, func(pdb *pebble.DB) {
 
 		// bootstrap to init highest executed height
@@ -194,7 +195,6 @@ func TestReExecuteBlockWithDifferentResult(t *testing.T) {
 		unittest.Seal.WithBlock(genesis.Header)(rootSeal)
 
 		db := pebbleimpl.ToDB(pdb)
-		lockManager := storage.NewTestingLockManager()
 		err := bootstrapper.BootstrapExecutionDatabase(lockManager, db, rootSeal)
 		require.NoError(t, err)
 
