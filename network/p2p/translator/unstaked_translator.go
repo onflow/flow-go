@@ -29,7 +29,7 @@ func NewPublicNetworkIDTranslator() *PublicNetworkIDTranslator {
 var _ p2p.IDTranslator = (*PublicNetworkIDTranslator)(nil)
 
 // GetPeerID returns the peer ID for the given Flow ID.
-// TODO: implement BFT-compliant error handling -> https://github.com/onflow/flow-go/blob/master/CodingConventions.md
+// TODO: implement BFT-compliant error handling -> https://github.com/onflow/flow-go/blob/master/docs/CodingConventions.md
 func (t *PublicNetworkIDTranslator) GetPeerID(flowID flow.Identifier) (peer.ID, error) {
 	data := append([]byte{0x02}, flowID[:]...)
 
@@ -48,7 +48,7 @@ func (t *PublicNetworkIDTranslator) GetPeerID(flowID flow.Identifier) (peer.ID, 
 }
 
 // GetFlowID returns the Flow ID for the given peer ID.
-// TODO: implement BFT-compliant error handling -> https://github.com/onflow/flow-go/blob/master/CodingConventions.md
+// TODO: implement BFT-compliant error handling -> https://github.com/onflow/flow-go/blob/master/docs/CodingConventions.md
 func (t *PublicNetworkIDTranslator) GetFlowID(peerID peer.ID) (flow.Identifier, error) {
 	pk, err := peerID.ExtractPublicKey()
 	if err != nil {

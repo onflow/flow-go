@@ -54,7 +54,7 @@ Formally, we define:
   `c[r[B]] --> c[r_parent]` in the Assignment Collector Tree.
 * Lastly, for an `AssignmentCollector`, we define a `level` as the height of the executed block.
 
-![Assignment Collector Tree](/docs/AssignmentCollectorTree_1.png)
+![Assignment Collector Tree](/docs/images/AssignmentCollectorTree_1.png)
 
 
 ### Orphaning forks in the Assignment Collector Tree
@@ -86,7 +86,7 @@ that the parent is not yet present (see following figure for illustration). This
   it is likely that the result is already sealed by the time it caught up. We permit a simple implementation that is to not
   keep track of the order in which it received the approvals.
 
-![Assignment Collector Tree](/docs/AssignmentCollectorTree_2.png)
+![Assignment Collector Tree](/docs/images/AssignmentCollectorTree_2.png)
 
 In the future, we will also add further states for 'Extensive Checking Mode':
 * `ExtensiveCheckingMode`: the `AssignmentCollector` has not received sufficient approvals and sealing is lagging behind
@@ -144,7 +144,7 @@ The decision whether the ER can be emergency sealed is governed by two protocol 
 `DefaultEmergencySealingThresholdForFinalization` and `DefaultEmergencySealingThresholdForVerification`.
 For an ER to be emergency sealed, all of the following conditions have to be satisfied:
 
-![Emergency sealing](/docs/Emergency_Sealing.png)
+![Emergency sealing](/docs/images/Emergency_Sealing.png)
 
 1. Let Δh<sub>1</sub> be the height difference between the latest finalized block and block `A`.
    We require that Δh<sub>1</sub> > `DefaultEmergencySealingThresholdForFinalization`.

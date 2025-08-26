@@ -111,7 +111,7 @@ Per convention, a vertex should throw any unexpected exceptions using the relate
 
 3. **Whether a particular error is benign or an exception depends on the caller's context. Errors _cannot_ be categorized as benign or exception based on their type alone.**
 
-   ![Error Handling](/docs/ErrorHandling.png)
+   ![Error Handling](/docs/images/ErrorHandling.png)
 
    * For example, consider `storage.ErrNotFound` that could be returned by the storage lager, when querying a block by ID
    (method [`Headers.ByBlockID(flow.Identifier)`](https://github.com/onflow/flow-go/blob/a918616c7b541b772c254e7eaaae3573561e6c0a/storage/headers.go#L15-L18)).

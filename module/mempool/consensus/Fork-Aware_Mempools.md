@@ -16,7 +16,7 @@ We use the following notation
 * an Execution Receipt `r` has the following fields:
   * `PreviousResultID` denotes the result `ID` for the parent block that has been used as starting state for computing the current block
 
-![Execution Tree](/docs/ExecutionResultTrees.png)
+![Execution Tree](/docs/images/ExecutionResultTrees.png)
 
 ### Criteria for Incorporating Execution Receipts
 
@@ -45,7 +45,7 @@ Note that the condition cannot be relaxed to: "there must be any ExecutionResult
 
 As illustrated by the figure above, the ExecutionResults form a tree, with the last sealed result as the root. 
 * All Execution Receipts committing to the same result from an [equivalence class](https://en.wikipedia.org/wiki/Equivalence_class) and can be 
-represented as one vertex in the [Execution Tree](/docs/ExecutionResultTrees.png).
+represented as one vertex in the [Execution Tree](/docs/images/ExecutionResultTrees.png).
 * Consider the results `r[A]` and `r[B]`. As `r[A]`'s output state is used as the staring state to compute block `B`, 
   we can say: "from result `r[A]` `computation` (denoted by symbol `Σ`) leads to `r[B]`". Formally:     
   ```

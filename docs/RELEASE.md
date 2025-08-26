@@ -40,7 +40,7 @@ incl. migrations of the entire execution state to a new formats become reasonabl
 Additional context on HCU vs sporks can be found [here](https://developers.flow.com/networks/node-ops/node-operation/hcu#hcu-versus-spork).   
 
 
-<img src='./docs/flow-go_branching-convention.png' width='350'>
+<img src='./docs/images/flow-go_branching-convention.png' width='350'>
 
 
 

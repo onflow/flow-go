@@ -148,7 +148,7 @@ For primary section, we use a randomized, weight-proportional selection.
 HotStuff's core logic is broken down into multiple components. 
 The figure below illustrates the dependencies of the core components and information flow between these components.
 
-![](/docs/ComponentInteraction.png)
+![](/docs/images/ComponentInteraction.png)
 <!--- source: https://drive.google.com/file/d/1rZsYta0F9Uz5_HM84MlMmMbiR62YALX-/ -->
 
 * `MessageHub` is responsible for relaying HotStuff messages. Incoming messages are relayed to the respective modules depending on their message type.
@@ -156,7 +156,7 @@ Outgoing messages are relayed to the committee though the networking layer via e
 * `compliance.Engine` is responsible for processing incoming blocks, caching if needed, validating, extending state and forwarding them to HotStuff for further processing.
   Note: The embedded `compliance.Core` component is responsible for business logic and maintaining state; `compliance.Engine` schedules work and manages worker threads for the `Core`.
 * `EventLoop` buffers all incoming events. It manages a single worker routine executing the EventHandler`'s logic.
-* `EventHandler` orchestrates all HotStuff components and implements the [HotStuff's state machine](/docs/StateMachine.png).
+* `EventHandler` orchestrates all HotStuff components and implements the [HotStuff's state machine](/docs/images/StateMachine.png).
 The event handler is designed to be executed single-threaded.
 * `SafetyRules` tracks the latest vote, the latest timeout and determines whether to vote for a block and if it's safe to timeout current round. 
 * `Pacemaker` implements Jolteon's PaceMaker.  It manages and updates a replica's local view and synchronizes it with other replicas.
@@ -190,7 +190,7 @@ The event handler is designed to be executed single-threaded.
 
 We have translated the HotStuff protocol into the state machine shown below. The state machine is implemented in `EventHandler`.
 
-![](/docs/StateMachine.png)
+![](/docs/images/StateMachine.png)
 <!--- source: https://drive.google.com/file/d/1la4jxyaEJJfip7NCWBM9YBTz6PK4-N9e/ -->
 
 
@@ -222,7 +222,7 @@ In contrast to HotStuff, Jolteon only allows a transition into view `V+1` after 
 A central, non-trivial functionality of the PaceMaker is to _skip views_. 
 Specifically, given a QC or TC with view `V`, the Pacemaker will skip ahead to view `V + 1` if `currentView ≤ V`.
 
-![](/docs/PaceMaker.png)
+![](/docs/images/PaceMaker.png)
  <!--- source: https://drive.google.com/file/d/1la4jxyaEJJfip7NCWBM9YBTz6PK4-N9e/ -->
  
 
@@ -273,7 +273,7 @@ For completeness, we list the component implemented in each sub-folder below:
 The HotStuff state machine exposes some details about its internal progress as notification through the `hotstuff.Consumer`.
 The following figure depicts at which points notifications are emitted. 
 
-![](/docs/StateMachine_with_notifications.png)
+![](/docs/images/StateMachine_with_notifications.png)
  <!--- source: https://drive.google.com/file/d/1la4jxyaEJJfip7NCWBM9YBTz6PK4-N9e/ -->
 
 We have implemented a telemetry system (`hotstuff.notifications.TelemetryConsumer`) which implements the `Consumer` interface.

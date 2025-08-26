@@ -1,6 +1,6 @@
 # Notifier
 The Notifier implements the following state machine
-![Notifier State Machine](/docs/NotifierStateMachine.png)
+![Notifier State Machine](/docs/images/NotifierStateMachine.png)
 
 The intended usage pattern is:
 * there are goroutines, aka `Producer`s, that append work to a queue `pendingWorkQueue`
@@ -9,7 +9,7 @@ The intended usage pattern is:
    * when they find that the `pendingWorkQueue` contains no more work, they go back to 
      the notifier and await notification 
 
-![Notifier Usage Pattern](/docs/NotifierUsagePattern.png)
+![Notifier Usage Pattern](/docs/images/NotifierUsagePattern.png)
 
 Note that the consumer / producer interact in a _different_ order with the `pendingWorkQueue` vs the `notifier`:
 * the producer first drops its work into the queue and subsequently sends the notification 
