@@ -58,12 +58,12 @@ func executeCallbackTransaction(env templates.Environment, id []byte, effort uin
 //
 // The event for processed callback event is emitted by the process callback transaction from
 // callback scheduler contract and has the following signature:
-// event CallbackProcessed(ID: UInt64, executionEffort: UInt64)
+// event PendingExecution(id: UInt64, priority: UInt8, executionEffort: UInt64, fees: UFix64, callbackOwner: Address)
 func callbackArgsFromEvent(env templates.Environment, event flow.Event) ([]byte, uint64, error) {
 	const (
 		processedCallbackIDFieldName     = "id"
 		processedCallbackEffortFieldName = "executionEffort"
-		processedEventTypeTemplate       = "A.%v.FlowCallbackScheduler.CallbackProcessed"
+		processedEventTypeTemplate       = "A.%v.FlowCallbackScheduler.PendingExecution"
 	)
 
 	scheduledContractAddress := env.FlowCallbackSchedulerAddress
