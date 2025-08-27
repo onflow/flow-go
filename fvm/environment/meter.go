@@ -4,8 +4,6 @@ import (
 	"context"
 
 	"github.com/onflow/cadence/common"
-	"github.com/onflow/cadence/runtime"
-
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/meter"
 	"github.com/onflow/flow-go/fvm/storage/state"
@@ -71,7 +69,11 @@ var MainnetExecutionEffortWeights = meter.ExecutionEffortWeights{
 }
 
 type Meter interface {
-	runtime.MeterInterface
+	common.Gauge
+
+	ComputationUsed() (uint64, error)
+	MemoryUsed() (uint64, error)
+	InteractionUsed() (uint64, error)
 
 	ComputationIntensities() meter.MeteredComputationIntensities
 	ComputationAvailable(common.ComputationUsage) bool

@@ -214,7 +214,7 @@ require (
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
 	github.com/olekukonko/tablewriter v0.0.5 // indirect
 	github.com/onflow/atree v0.10.0 // indirect
-	github.com/onflow/cadence v1.7.0-preview.1 // indirect
+	github.com/onflow/cadence v1.7.0-preview.1.0.20250822213412-b827934e69cf // indirect
 	github.com/onflow/flow-core-contracts/lib/go/contracts v1.7.4-0.20250825171851-5a0da78d0022 // indirect
 	github.com/onflow/flow-core-contracts/lib/go/templates v1.7.2-0.20250825171851-5a0da78d0022 // indirect
 	github.com/onflow/flow-evm-bridge v0.1.0 // indirect
