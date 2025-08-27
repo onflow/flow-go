@@ -3,9 +3,9 @@ package events
 import (
 	"fmt"
 
+	gethCommon "github.com/ethereum/go-ethereum/common"
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/encoding/ccf"
-	gethCommon "github.com/onflow/go-ethereum/common"
 
 	"github.com/onflow/flow-go/fvm/evm/stdlib"
 	"github.com/onflow/flow-go/fvm/evm/types"

@@ -95,6 +95,6 @@ func runtimeBlockFromHeader(header *flow.Header) runtime.Block {
 		Height:    header.Height,
 		View:      header.View,
 		Hash:      stdlib.BlockHash(header.ID()),
-		Timestamp: header.Timestamp.UnixNano(),
+		Timestamp: int64(header.Timestamp * 1e6), // CAUTION: `runtime.Block` has time stamp in NANO-seconds, while `flow.Header` uses milliseconds
 	}
 }

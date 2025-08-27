@@ -24,6 +24,7 @@ import (
 	"github.com/onflow/flow-go/fvm/tracing"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/trace"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 var TestFlowEVMRootAddress = flow.Address{1, 2, 3, 4}
@@ -49,14 +50,6 @@ func RunWithTestBackend(t testing.TB, f func(*TestBackend)) {
 		TestLoggerProvider:          &TestLoggerProvider{},
 	}
 	f(tb)
-}
-
-func ConvertToCadence(data []byte) []cadence.Value {
-	ret := make([]cadence.Value, len(data))
-	for i, v := range data {
-		ret[i] = cadence.UInt8(v)
-	}
-	return ret
 }
 
 func fullKey(owner, key []byte) string {
@@ -169,11 +162,20 @@ func getSimpleEventEmitter() *testEventEmitter {
 			if err != nil {
 				return err
 			}
-			eventType := flow.EventType(event.EventType.ID())
-			events = append(events, flow.Event{
-				Type:    eventType,
-				Payload: payload,
-			})
+			e, err := flow.NewEvent(
+				flow.UntrustedEvent{
+					Type:             flow.EventType(event.EventType.ID()),
+					TransactionID:    unittest.IdentifierFixture(),
+					TransactionIndex: 0,
+					EventIndex:       0,
+					Payload:          payload,
+				},
+			)
+			if err != nil {
+				return fmt.Errorf("could not construct event: %w", err)
+			}
+
+			events = append(events, *e)
 			return nil
 		},
 		events: func() flow.EventsList {

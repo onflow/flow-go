@@ -210,10 +210,12 @@ func (lc *LogConsumer) OnVoteForInvalidBlockDetected(vote *model.Vote, proposal 
 func (lc *LogConsumer) OnDoubleTimeoutDetected(timeout *model.TimeoutObject, alt *model.TimeoutObject) {
 	lc.log.Warn().
 		Str(logging.KeySuspicious, "true").
+		Hex("timeout_signer_id", logging.ID(timeout.SignerID)).
 		Uint64("timeout_view", timeout.View).
-		Hex("signer_id", logging.ID(timeout.SignerID)).
-		Hex("timeout_id", logging.ID(timeout.ID())).
-		Hex("alt_id", logging.ID(alt.ID())).
+		Uint64("timeout_newest_qc_view", timeout.NewestQC.View).
+		Hex("alt_signer_id", logging.ID(alt.SignerID)).
+		Uint64("alt_view", alt.View).
+		Uint64("alt_newest_qc_view", alt.NewestQC.View).
 		Msg("double timeout detected")
 }
 
@@ -229,7 +231,6 @@ func (lc *LogConsumer) logBasicBlockData(loggerEvent *zerolog.Event, block *mode
 		Uint64("block_view", block.View).
 		Hex("block_id", logging.ID(block.BlockID)).
 		Hex("proposer_id", logging.ID(block.ProposerID)).
-		Hex("payload_hash", logging.ID(block.PayloadHash)).
 		Uint64("qc_view", block.QC.View).
 		Hex("qc_block_id", logging.ID(block.QC.BlockID))
 
@@ -281,7 +282,8 @@ func (lc *LogConsumer) OnOwnTimeout(timeout *model.TimeoutObject) {
 	log.Debug().Msg("publishing HotStuff timeout object")
 }
 
-func (lc *LogConsumer) OnOwnProposal(header *flow.Header, targetPublicationTime time.Time) {
+func (lc *LogConsumer) OnOwnProposal(proposal *flow.ProposalHeader, targetPublicationTime time.Time) {
+	header := proposal.Header
 	lc.log.Debug().
 		Str("chain_id", header.ChainID.String()).
 		Uint64("block_height", header.Height).
@@ -289,7 +291,7 @@ func (lc *LogConsumer) OnOwnProposal(header *flow.Header, targetPublicationTime 
 		Hex("block_id", logging.Entity(header)).
 		Hex("parent_id", header.ParentID[:]).
 		Hex("payload_hash", header.PayloadHash[:]).
-		Time("timestamp", header.Timestamp).
+		Time("timestamp", time.UnixMilli(int64(header.Timestamp)).UTC()).
 		Hex("parent_signer_indices", header.ParentVoterIndices).
 		Time("target_publication_time", targetPublicationTime).
 		Msg("publishing HotStuff block proposal")
