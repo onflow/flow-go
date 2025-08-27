@@ -452,7 +452,6 @@ func (rf *ResultsForest) getContainer(resultID flow.Identifier) (*ExecutionResul
 }
 
 // IterateChildren iterates over all children of the given result ID and calls the provided function on each child.
-// CAUTION: this will aquire a read lock on the ResultsForest, so it is safe to call concurrently.
 // Callback function should return false to stop iteration
 func (rf *ResultsForest) IterateChildren(resultID flow.Identifier, fn func(*ExecutionResultContainer) bool) {
 	rf.mu.RLock()

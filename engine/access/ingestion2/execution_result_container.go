@@ -35,7 +35,12 @@ type ExecutionResultContainer struct {
 // specified block.
 //
 // No errors are expected during normal operation.
-func NewExecutionResultContainer(result *flow.ExecutionResult, header *flow.Header, blockStatus BlockStatus, pipeline optimistic_sync.Pipeline) (*ExecutionResultContainer, error) {
+func NewExecutionResultContainer(
+	result *flow.ExecutionResult,
+	header *flow.Header,
+	blockStatus BlockStatus,
+	pipeline optimistic_sync.Pipeline,
+) (*ExecutionResultContainer, error) {
 	// sanity check: initial result must be for block
 	if header.ID() != result.BlockID {
 		return nil, fmt.Errorf("initial result is for different block")
@@ -163,7 +168,7 @@ func (c *ExecutionResultContainer) BlockStatus() BlockStatus {
 
 // SetBlockStatus sets the block status of the block executed by this result.
 func (c *ExecutionResultContainer) SetBlockStatus(blockStatus BlockStatus) {
-	if blockStatus > c.BlockStatus() && c.blockStatus.Set(uint64(blockStatus)) {
+	if c.blockStatus.Set(uint64(blockStatus)) {
 		if blockStatus == BlockStatusSealed {
 			c.pipeline.SetSealed()
 		}
