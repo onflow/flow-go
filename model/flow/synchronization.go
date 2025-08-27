@@ -15,3 +15,11 @@ type SyncResponse struct {
 	Nonce  uint64
 	Height uint64
 }
+
+// BatchRequest is part of the synchronization protocol and represents an active
+// (pulling) attempt to synchronize with the consensus state of the network. It
+// requests finalized or unfinalized blocks by a list of block IDs.
+type BatchRequest struct {
+	Nonce    uint64
+	BlockIDs []Identifier
+}

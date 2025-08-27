@@ -233,7 +233,7 @@ func (e *Engine) Process(channel channels.Channel, originID flow.Identifier, eve
 //   - All other errors are potential symptoms of internal state corruption or bugs (fatal).
 func (e *Engine) process(channel channels.Channel, originID flow.Identifier, event interface{}) error {
 	switch message := event.(type) {
-	case *messages.BatchRequest:
+	case *flow.BatchRequest:
 		err := e.validateBatchRequestForALSP(originID, message)
 		if err != nil {
 			irrecoverable.Throw(context.TODO(), fmt.Errorf("failed to validate batch request from %x: %w", originID[:], err))
@@ -496,7 +496,7 @@ func (e *Engine) sendRequests(participants flow.IdentifierList, ranges []chainsy
 // - batchRequest: the batch request to validate
 // Returns:
 // - error: If an error is encountered while validating the batch request. Error is assumed to be irrecoverable because of internal processes that didn't allow validation to complete.
-func (e *Engine) validateBatchRequestForALSP(originID flow.Identifier, batchRequest *messages.BatchRequest) error {
+func (e *Engine) validateBatchRequestForALSP(originID flow.Identifier, batchRequest *flow.BatchRequest) error {
 	// Generate a random integer between 0 and spamProbabilityMultiplier (exclusive)
 	n, err := rand.Uint32n(spamProbabilityMultiplier)
 	if err != nil {

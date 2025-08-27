@@ -355,7 +355,7 @@ func (ss *SyncSuite) TestOnRangeRequest() {
 func (ss *SyncSuite) TestOnBatchRequest() {
 	// generate origin ID and batch request
 	originID := unittest.IdentifierFixture()
-	req := &messages.BatchRequest{
+	req := &flow.BatchRequest{
 		Nonce:    rand.Uint64(),
 		BlockIDs: nil,
 	}

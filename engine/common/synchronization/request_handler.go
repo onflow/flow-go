@@ -135,7 +135,7 @@ func (r *RequestHandler) setupRequestMessageHandler() {
 		},
 		engine.Pattern{
 			Match: func(msg *engine.Message) bool {
-				_, ok := msg.Payload.(*messages.BatchRequest)
+				_, ok := msg.Payload.(*flow.BatchRequest)
 				if ok {
 					r.metrics.MessageReceived(metrics.EngineSynchronization, metrics.MessageBatchRequest)
 				}
@@ -260,7 +260,7 @@ func (r *RequestHandler) onRangeRequest(originID flow.Identifier, req *messages.
 }
 
 // onBatchRequest processes a request for a specific block by block ID.
-func (r *RequestHandler) onBatchRequest(originID flow.Identifier, req *messages.BatchRequest) error {
+func (r *RequestHandler) onBatchRequest(originID flow.Identifier, req *flow.BatchRequest) error {
 	logger := r.log.With().Str("origin_id", originID.String()).Logger()
 	logger.Debug().Msg("received new batch request")
 
@@ -360,7 +360,7 @@ func (r *RequestHandler) processAvailableRequests(ctx context.Context) error {
 
 		msg, ok = r.pendingBatchRequests.Get()
 		if ok {
-			err := r.onBatchRequest(msg.OriginID, msg.Payload.(*messages.BatchRequest))
+			err := r.onBatchRequest(msg.OriginID, msg.Payload.(*flow.BatchRequest))
 			if err != nil {
 				return fmt.Errorf("processing batch request failed: %w", err)
 			}

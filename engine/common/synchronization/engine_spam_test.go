@@ -348,7 +348,7 @@ func (ss *SyncSuite) TestLoad_Process_BatchRequest_SometimesReportSpam() {
 
 			// generate origin and request message
 			originID := unittest.IdentifierFixture()
-			req := &messages.BatchRequest{
+			req := &flow.BatchRequest{
 				Nonce:    nonce,
 				BlockIDs: loadGroup.blockIDs,
 			}

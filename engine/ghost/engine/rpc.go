@@ -249,6 +249,8 @@ func internalToMessage(event interface{}) (messages.UntrustedMessage, error) {
 		return (*messages.SyncRequest)(internal), nil
 	case *flow.SyncResponse:
 		return (*messages.SyncResponse)(internal), nil
+	case *flow.BatchRequest:
+		return (*messages.BatchRequest)(internal), nil
 	case messages.UntrustedMessage:
 		// Already a valid UntrustedMessage
 		// TODO(immutable M2): expand when ToInternal changes for other M2 types
