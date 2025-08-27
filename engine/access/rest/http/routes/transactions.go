@@ -31,7 +31,8 @@ func GetTransactionByID(r *common.Request, backend access.API, link commonmodels
 			req.BlockID,
 			req.CollectionID,
 			entitiesproto.EventEncodingVersion_JSON_CDC_V0,
-			entitiesproto.ExecutionStateQuery{}, //TODO: This needs to be added to protobuf with e
+			//TODO: This needs to be added to protobuf with https://github.com/onflow/flow-go/issues/7647
+			entitiesproto.ExecutionStateQuery{},
 		)
 		if err != nil {
 			return nil, err
@@ -50,7 +51,8 @@ func GetTransactionResultByID(r *common.Request, backend access.API, link common
 		return nil, common.NewBadRequestError(err)
 	}
 
-	txr, _, err := backend.GetTransactionResult(
+	// TODO:
+	txr, executorMetadata, err := backend.GetTransactionResult(
 		r.Context(),
 		req.ID,
 		req.BlockID,
@@ -64,6 +66,11 @@ func GetTransactionResultByID(r *common.Request, backend access.API, link common
 
 	var response commonmodels.TransactionResult
 	response.Build(txr, req.ID, link)
+
+	if req.ExecutionState.IncludeExecutorMetadata {
+		response.Metadata = commonmodels.NewMetaData(executorMetadata)
+	}
+
 	return response, nil
 }
 
