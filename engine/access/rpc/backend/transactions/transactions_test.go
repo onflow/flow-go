@@ -21,7 +21,9 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
+	. "github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/module/executiondatasync/optimistic_sync"
+	"github.com/onflow/flow-go/module/executiondatasync/optimistic_sync/execution_result_query_provider"
 	optimisticsyncmock "github.com/onflow/flow-go/module/executiondatasync/optimistic_sync/mock"
 
 	"github.com/onflow/flow-go/access/validator"
@@ -32,7 +34,6 @@ import (
 	"github.com/onflow/flow-go/engine/access/rpc/backend/transactions/retrier"
 	txstatus "github.com/onflow/flow-go/engine/access/rpc/backend/transactions/status"
 	connectionmock "github.com/onflow/flow-go/engine/access/rpc/connection/mock"
-	commonrpc "github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/fvm/blueprints"
 	accessmodel "github.com/onflow/flow-go/model/access"
@@ -146,13 +147,23 @@ func (suite *Suite) TearDownTest() {
 }
 
 func (suite *Suite) defaultTransactionsParams() Params {
-	nodeProvider := commonrpc.NewExecutionNodeIdentitiesProvider(
+	nodeProvider := NewExecutionNodeIdentitiesProvider(
 		suite.log,
 		suite.state,
 		suite.receipts,
 		suite.preferredExecutionNodeIDs,
 		suite.fixedExecutionNodeIDs,
 	)
+
+	executionResultProvider, err := execution_result_query_provider.NewExecutionResultQueryProvider(
+		suite.log,
+		suite.state,
+		suite.headers,
+		suite.receipts,
+		execution_result_query_provider.NewExecutionNodes(suite.preferredExecutionNodeIDs, suite.fixedExecutionNodeIDs),
+		optimistic_sync.Criteria{},
+	)
+	suite.Require().NoError(err)
 
 	txStatusDeriver := txstatus.NewTxStatusDeriver(
 		suite.state,
@@ -176,7 +187,7 @@ func (suite *Suite) defaultTransactionsParams() Params {
 		suite.collections,
 		suite.connectionFactory,
 		nodeCommunicator,
-		nodeProvider,
+		executionResultProvider,
 		txStatusDeriver,
 		suite.systemTx.ID(),
 		suite.systemTx,

@@ -252,7 +252,7 @@ func (s *TransactionStreamSuite) initializeBackend() {
 		s.collections,
 		s.connectionFactory,
 		nodeCommunicator,
-		execNodeProvider,
+		s.executionResultProvider,
 		txStatusDeriver,
 		s.systemTx.ID(),
 		s.systemTx,

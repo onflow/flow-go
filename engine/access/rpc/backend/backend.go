@@ -234,7 +234,7 @@ func New(params Params) (*Backend, error) {
 		params.Collections,
 		params.ConnFactory,
 		params.Communicator,
-		params.ExecNodeIdentitiesProvider,
+		params.ExecutionResultProvider,
 		txStatusDeriver,
 		systemTxID,
 		systemTx,
