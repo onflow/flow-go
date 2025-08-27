@@ -14,37 +14,37 @@ import (
 
 func TestClusterBlocksByHeight(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
-		chain := unittest.ClusterBlockChainFixture(5)
+		chain := unittest.ClusterBlockFixtures(5)
 		parent, blocks := chain[0], chain[1:]
 
 		// add parent as boundary
-		err := db.Update(operation.IndexClusterBlockHeight(parent.Header.ChainID, parent.Header.Height, parent.ID()))
+		err := db.Update(operation.IndexClusterBlockHeight(parent.ChainID, parent.Height, parent.ID()))
 		require.NoError(t, err)
 
-		err = db.Update(operation.InsertClusterFinalizedHeight(parent.Header.ChainID, parent.Header.Height))
+		err = db.Update(operation.InsertClusterFinalizedHeight(parent.ChainID, parent.Height))
 		require.NoError(t, err)
 
 		// store a chain of blocks
 		for _, block := range blocks {
-			err := db.Update(procedure.InsertClusterBlock(&block))
+			err := db.Update(procedure.InsertClusterBlock(unittest.ClusterProposalFromBlock(block)))
 			require.NoError(t, err)
 
-			err = db.Update(procedure.FinalizeClusterBlock(block.Header.ID()))
+			err = db.Update(procedure.FinalizeClusterBlock(block.ID()))
 			require.NoError(t, err)
 		}
 
 		clusterBlocks := NewClusterBlocks(
 			db,
-			blocks[0].Header.ChainID,
+			blocks[0].ChainID,
 			NewHeaders(metrics.NewNoopCollector(), db),
 			NewClusterPayloads(metrics.NewNoopCollector(), db),
 		)
 
 		// check if the block can be retrieved by height
 		for _, block := range blocks {
-			retrievedBlock, err := clusterBlocks.ByHeight(block.Header.Height)
+			retrievedBlock, err := clusterBlocks.ProposalByHeight(block.Height)
 			require.NoError(t, err)
-			require.Equal(t, block.ID(), retrievedBlock.ID())
+			require.Equal(t, block.ID(), retrievedBlock.Block.ID())
 		}
 	})
 }

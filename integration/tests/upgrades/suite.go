@@ -100,7 +100,6 @@ func (s *Suite) SetupTest() {
 		// set long staking phase to avoid QC/DKG transactions during test run
 		testnet.WithViewsInStakingAuction(10_000),
 		testnet.WithViewsInEpoch(100_000),
-		testnet.WithFinalizationSafetyThreshold(5),
 	}
 	if s.KVStoreFactory != nil {
 		netConfigOpts = append(netConfigOpts, testnet.WithKVStoreFactory(s.KVStoreFactory))

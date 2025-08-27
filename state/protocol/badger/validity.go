@@ -75,10 +75,10 @@ func IsValidRootSnapshot(snap protocol.Snapshot, verifyResultID bool) error {
 	finalView := currentEpoch.FinalView()
 
 	// the segment must be fully within the current epoch
-	if firstView > lowest.Header.View {
+	if firstView > lowest.View {
 		return fmt.Errorf("lowest block of sealing segment has lower view than first view of epoch")
 	}
-	if highest.Header.View >= finalView {
+	if highest.View >= finalView {
 		return fmt.Errorf("final view of epoch less than first block view")
 	}
 

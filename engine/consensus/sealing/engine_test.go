@@ -121,7 +121,7 @@ func (s *SealingEngineSuite) TestOnBlockIncorporated() {
 	index := &flow.Index{}
 
 	for _, result := range payload.Results {
-		index.ResultIDs = append(index.ReceiptIDs, result.ID())
+		index.ResultIDs = append(index.ResultIDs, result.ID())
 		s.results.On("ByID", result.ID()).Return(result, nil).Once()
 
 		IR, err := flow.NewIncorporatedResult(flow.UntrustedIncorporatedResult{
@@ -156,7 +156,7 @@ func (s *SealingEngineSuite) TestMultipleProcessingItems() {
 	for i := range receipts {
 		receipt := unittest.ExecutionReceiptFixture(
 			unittest.WithExecutorID(originID),
-			unittest.WithResult(unittest.ExecutionResultFixture(unittest.WithBlock(&block))),
+			unittest.WithResult(unittest.ExecutionResultFixture(unittest.WithBlock(block))),
 		)
 		receipts[i] = receipt
 	}
@@ -167,7 +167,7 @@ func (s *SealingEngineSuite) TestMultipleProcessingItems() {
 	approverID := unittest.IdentifierFixture()
 	for _, receipt := range receipts {
 		for j := 0; j < numApprovalsPerReceipt; j++ {
-			approval := unittest.ResultApprovalFixture(unittest.WithExecutionResultID(receipt.ID()),
+			approval := unittest.ResultApprovalFixture(unittest.WithExecutionResultID(receipt.ExecutionResult.ID()),
 				unittest.WithApproverID(approverID))
 			responseApproval := &messages.ApprovalResponse{
 				Approval: *approval,

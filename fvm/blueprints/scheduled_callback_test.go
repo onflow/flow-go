@@ -24,7 +24,8 @@ func TestProcessCallbacksTransaction(t *testing.T) {
 	t.Parallel()
 
 	chain := flow.Mainnet.Chain()
-	tx := blueprints.ProcessCallbacksTransaction(chain)
+	tx, err := blueprints.ProcessCallbacksTransaction(chain)
+	require.NoError(t, err)
 
 	assert.NotNil(t, tx)
 	assert.NotEmpty(t, tx.Script)

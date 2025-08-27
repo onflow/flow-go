@@ -554,7 +554,7 @@ func (s *WsControllerSuite) TestSubscribeBlocks() {
 		dataProvider.On("Close").Return(nil).Maybe()
 
 		// Simulate data provider write a block to the controller
-		expectedBlock := unittest.BlockFixture()
+		expectedBlock := *unittest.BlockFixture()
 		dataProvider.
 			On("Run", mock.Anything).
 			Run(func(args mock.Arguments) {

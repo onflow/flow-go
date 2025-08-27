@@ -132,9 +132,9 @@ func bootstrapVM(t *testing.T, chain flow.Chain) (*fvm.VirtualMachine, fvm.Conte
 	blocks := new(envMock.Blocks)
 	block1 := unittest.BlockFixture()
 	blocks.On("ByHeightFrom",
-		block1.Header.Height,
-		block1.Header,
-	).Return(block1.Header, nil)
+		block1.Height,
+		block1.ToHeader(),
+	).Return(block1.ToHeader(), nil)
 
 	opts := computation.DefaultFVMOptions(chain.ChainID(), false, false, false)
 	opts = append(opts,
@@ -143,7 +143,7 @@ func bootstrapVM(t *testing.T, chain flow.Chain) (*fvm.VirtualMachine, fvm.Conte
 		fvm.WithContractDeploymentRestricted(false),
 		fvm.WithEntropyProvider(source),
 		fvm.WithBlocks(blocks),
-		fvm.WithBlockHeader(block1.Header),
+		fvm.WithBlockHeader(block1.ToHeader()),
 	)
 
 	ctx := fvm.NewContext(opts...)
@@ -187,8 +187,8 @@ type testTransactionSender struct {
 var _ common.TransactionSender = (*testTransactionSender)(nil)
 
 func (t *testTransactionSender) Send(tx *sdk.Transaction) (sdk.TransactionResult, error) {
-	txBody :=
-		flow.NewTransactionBody().
+	txBodyBuilder :=
+		flow.NewTransactionBodyBuilder().
 			SetScript(tx.Script).
 			SetReferenceBlockID(convert.IDFromSDK(tx.ReferenceBlockID)).
 			SetComputeLimit(tx.GasLimit).
@@ -200,24 +200,29 @@ func (t *testTransactionSender) Send(tx *sdk.Transaction) (sdk.TransactionResult
 			SetPayer(flow.BytesToAddress(tx.Payer.Bytes()))
 
 	for _, auth := range tx.Authorizers {
-		txBody.AddAuthorizer(flow.BytesToAddress(auth.Bytes()))
+		txBodyBuilder.AddAuthorizer(flow.BytesToAddress(auth.Bytes()))
 	}
 	for _, arg := range tx.Arguments {
-		txBody.AddArgument(arg)
+		txBodyBuilder.AddArgument(arg)
 	}
 	for _, sig := range tx.PayloadSignatures {
-		txBody.AddPayloadSignature(
+		txBodyBuilder.AddPayloadSignature(
 			flow.BytesToAddress(sig.Address.Bytes()),
 			sig.KeyIndex,
 			sig.Signature,
 		)
 	}
 	for _, sig := range tx.EnvelopeSignatures {
-		txBody.AddEnvelopeSignature(
+		txBodyBuilder.AddEnvelopeSignature(
 			flow.BytesToAddress(sig.Address.Bytes()),
 			sig.KeyIndex,
 			sig.Signature,
 		)
+	}
+
+	txBody, err := txBodyBuilder.Build()
+	if err != nil {
+		return sdk.TransactionResult{}, fmt.Errorf("failed to build transaction body: %w", err)
 	}
 
 	require.Equal(t.t, string(tx.PayloadMessage()), string(txBody.PayloadMessage()))

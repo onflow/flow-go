@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"testing"
 
-	badger "github.com/dgraph-io/badger/v2"
+	"github.com/dgraph-io/badger/v2"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/cmd/util/cmd/common"
@@ -23,44 +23,54 @@ func TestFindBlockTransactions(t *testing.T) {
 		col2 := unittest.ClusterPayloadFixture(2)
 		col3 := unittest.ClusterPayloadFixture(3)
 
-		b1 := unittest.BlockFixture()
-		b1.Payload.Guarantees = []*flow.CollectionGuarantee{
-			&flow.CollectionGuarantee{
-				CollectionID:     col1.Collection.ID(),
-				ReferenceBlockID: col1.ReferenceBlockID,
-			},
-			&flow.CollectionGuarantee{
-				CollectionID:     col2.Collection.ID(),
-				ReferenceBlockID: col2.ReferenceBlockID,
-			},
-		}
-		b1.Header.PayloadHash = b1.Payload.Hash()
-		b1.Header.Height = 4
+		b1 := unittest.BlockFixture(
+			unittest.Block.WithHeight(4),
+			unittest.Block.WithPayload(
+				flow.Payload{
+					Guarantees: []*flow.CollectionGuarantee{
+						&flow.CollectionGuarantee{
+							CollectionID:     col1.Collection.ID(),
+							ReferenceBlockID: col1.ReferenceBlockID,
+						},
+						&flow.CollectionGuarantee{
+							CollectionID:     col2.Collection.ID(),
+							ReferenceBlockID: col2.ReferenceBlockID,
+						},
+					},
+					ProtocolStateID: unittest.IdentifierFixture(),
+				},
+			),
+		)
 
-		b2 := unittest.BlockFixture()
-		b2.Payload.Guarantees = []*flow.CollectionGuarantee{
-			&flow.CollectionGuarantee{
-				CollectionID:     col3.Collection.ID(),
-				ReferenceBlockID: col3.ReferenceBlockID,
-			},
-		}
-		b2.Header.PayloadHash = b2.Payload.Hash()
-		b1.Header.Height = 5
+		b2 := unittest.BlockFixture(
+			unittest.Block.WithHeight(5),
+			unittest.Block.WithPayload(
+				flow.Payload{
+					Guarantees: []*flow.CollectionGuarantee{
+						&flow.CollectionGuarantee{
+							CollectionID:     col3.Collection.ID(),
+							ReferenceBlockID: col3.ReferenceBlockID,
+						},
+					},
+					ProtocolStateID: unittest.IdentifierFixture(),
+				},
+			),
+		)
 
 		// prepare dependencies
 		storages := common.InitStorages(db)
 		payloads, collections := storages.Payloads, storages.Collections
 		snap4 := &mock.Snapshot{}
-		snap4.On("Head").Return(b1.Header, nil)
+		snap4.On("Head").Return(b1.ToHeader(), nil)
 		snap5 := &mock.Snapshot{}
-		snap5.On("Head").Return(b2.Header, nil)
+		snap5.On("Head").Return(b2.ToHeader(), nil)
 		state := &mock.State{}
 		state.On("AtHeight", uint64(4)).Return(snap4, nil)
 		state.On("AtHeight", uint64(5)).Return(snap5, nil)
 
 		// store into database
-		require.NoError(t, payloads.Store(b1.ID(), b1.Payload))
-		require.NoError(t, payloads.Store(b2.ID(), b2.Payload))
+		require.NoError(t, payloads.Store(b1.ID(), &b1.Payload))
+		require.NoError(t, payloads.Store(b2.ID(), &b2.Payload))
 
 		require.NoError(t, collections.Store(&col1.Collection))
 		require.NoError(t, collections.Store(&col2.Collection))
