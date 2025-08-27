@@ -42,11 +42,7 @@ func (g *CollectionGenerator) Fixture(t testing.TB, opts ...func(*collectionConf
 	}
 
 	if len(config.transactions) == 0 {
-		txs := g.transactionGen.List(t, config.count)
-		config.transactions = make([]*flow.TransactionBody, len(txs))
-		for i := range txs {
-			config.transactions[i] = &txs[i]
-		}
+		config.transactions = g.transactionGen.List(t, config.count)
 	}
 
 	return &flow.Collection{Transactions: config.transactions}

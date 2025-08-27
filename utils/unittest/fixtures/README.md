@@ -452,11 +452,7 @@ col := colGen.Fixture(t, colGen.WithTxCount(3))
 
 // Collection with specific transactions
 transactions := suite.Transactions().List(t, 2)
-txPointers := make([]*flow.TransactionBody, len(transactions))
-for i := range transactions {
-    txPointers[i] = &transactions[i]
-}
-col := colGen.Fixture(t, colGen.WithTransactions(txPointers))
+col := colGen.Fixture(t, colGen.WithTransactions(transactions))
 
 // List of collections each with 3 transactions
 colList := colGen.List(t, 2, colGen.WithTxCount(3))

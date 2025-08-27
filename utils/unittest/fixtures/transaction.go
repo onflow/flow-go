@@ -114,10 +114,10 @@ func (g *TransactionGenerator) Fixture(t testing.TB, opts ...func(*transactionCo
 }
 
 // List generates a list of transaction bodies.
-func (g *TransactionGenerator) List(t testing.TB, n int, opts ...func(*transactionConfig)) []flow.TransactionBody {
-	list := make([]flow.TransactionBody, n)
+func (g *TransactionGenerator) List(t testing.TB, n int, opts ...func(*transactionConfig)) []*flow.TransactionBody {
+	list := make([]*flow.TransactionBody, n)
 	for i := range n {
-		list[i] = *g.Fixture(t, opts...)
+		list[i] = g.Fixture(t, opts...)
 	}
 	return list
 }
@@ -128,14 +128,14 @@ type FullTransactionGenerator struct {
 }
 
 // Transaction generates a complete transaction with optional configuration.
-func (g *FullTransactionGenerator) Fixture(t testing.TB, opts ...func(*transactionConfig)) flow.Transaction {
+func (g *FullTransactionGenerator) Fixture(t testing.TB, opts ...func(*transactionConfig)) *flow.Transaction {
 	tb := g.TransactionGenerator.Fixture(t, opts...)
-	return flow.Transaction{TransactionBody: *tb}
+	return &flow.Transaction{TransactionBody: *tb}
 }
 
 // TransactionList generates a list of complete transactions.
-func (g *FullTransactionGenerator) List(t testing.TB, n int, opts ...func(*transactionConfig)) []flow.Transaction {
-	list := make([]flow.Transaction, n)
+func (g *FullTransactionGenerator) List(t testing.TB, n int, opts ...func(*transactionConfig)) []*flow.Transaction {
+	list := make([]*flow.Transaction, n)
 	for i := range n {
 		list[i] = g.Fixture(t, opts...)
 	}
