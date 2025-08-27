@@ -20,7 +20,7 @@ var ErrIncompatibleReceipt = errors.New("incompatible execution receipt")
 // same block. For optimized storage, we only store the result once. Mathematically, an
 // ExecutionResultContainer struct represents an Equivalence Class of Execution Receipts.
 type ExecutionResultContainer struct {
-	receipts    map[flow.Identifier]*flow.ExecutionReceiptMeta // map from ExecutionReceipt.ID -> ExecutionReceiptMeta
+	receipts    map[flow.Identifier]*flow.ExecutionReceiptStub // map from ExecutionReceipt.ID -> ExecutionReceiptStub
 	result      *flow.ExecutionResult
 	resultID    flow.Identifier // precomputed ID of result to avoid expensive hashing on each call
 	blockHeader *flow.Header    // header of the block which the result is for
@@ -42,7 +42,7 @@ func NewExecutionResultContainer(result *flow.ExecutionResult, header *flow.Head
 	}
 
 	c := &ExecutionResultContainer{
-		receipts:    make(map[flow.Identifier]*flow.ExecutionReceiptMeta),
+		receipts:    make(map[flow.Identifier]*flow.ExecutionReceiptStub),
 		result:      result,
 		resultID:    result.ID(),
 		blockHeader: header,
@@ -107,7 +107,7 @@ func (c *ExecutionResultContainer) addReceipt(receipt *flow.ExecutionReceipt) (u
 	if c.has(receiptID) {
 		return 0, nil
 	}
-	c.receipts[receiptID] = receipt.Meta()
+	c.receipts[receiptID] = receipt.Stub()
 	return 1, nil
 }
 

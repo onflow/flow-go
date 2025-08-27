@@ -531,7 +531,7 @@ func (rf *ResultsForest) OnBlockFinalized(finalized *flow.Block) {
 	// 2. For each result
 	//   i. if its executed block is the finalized block, mark it as finalized
 	//   ii. abandon all other forks
-	rf.iterateView(finalized.Header.ParentView, func(container *ExecutionResultContainer) bool {
+	rf.iterateView(finalized.ParentView, func(container *ExecutionResultContainer) bool {
 		rf.iterateChildren(container.ResultID(), func(child *ExecutionResultContainer) bool {
 			if child.Result().BlockID == finalizedBlockID {
 				child.SetBlockStatus(BlockStatusFinalized)
