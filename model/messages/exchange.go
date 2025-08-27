@@ -21,8 +21,12 @@ type EntityRequest struct {
 // must perform validation checks and return a constructed internal
 // object.
 func (e *EntityRequest) ToInternal() (any, error) {
-	// TODO(malleability, #7719) implement with validation checks
-	return e, nil
+	er := &flow.EntityRequest{
+		Nonce:     e.Nonce,
+		EntityIDs: e.EntityIDs,
+	}
+
+	return &er, nil
 }
 
 // EntityResponse is a response to an entity request, containing a set of
@@ -41,6 +45,11 @@ type EntityResponse struct {
 // must perform validation checks and return a constructed internal
 // object.
 func (e *EntityResponse) ToInternal() (any, error) {
-	// TODO(malleability, #7720) implement with validation checks
-	return e, nil
+	er := &flow.EntityResponse{
+		Nonce:     e.Nonce,
+		EntityIDs: e.EntityIDs,
+		Blobs:     e.Blobs,
+	}
+
+	return &er, nil
 }
