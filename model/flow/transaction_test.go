@@ -442,7 +442,6 @@ func TestTransactionAuthenticationSchemes(t *testing.T) {
 
 		// For use in cases where you're testing the other value
 		validAuthenticatorData := slices.Concat(rpIDHash, []byte{validUserFlag}, sigCounter)
-		fmt.Printf("%x\n", validAuthenticatorData)
 		validClientDataJSON := map[string]string{
 			"type":      flow.WebAuthnTypeGet,
 			"challenge": authNChallengeBase64Url,
