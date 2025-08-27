@@ -174,6 +174,10 @@ func (c *Client) SignTransaction(tx *sdk.Transaction) (*sdk.Transaction, error) 
 	return tx, err
 }
 
+func (c *Client) SignWebAuthnExtensionData(extensionData []byte) ([]byte, error) {
+	return c.signer.Sign(extensionData)
+}
+
 // SendTransaction submits the transaction to the Access API. The caller must
 // set up the transaction, including signing it.
 func (c *Client) SendTransaction(ctx context.Context, tx *sdk.Transaction) error {

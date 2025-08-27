@@ -844,10 +844,13 @@ func (s *AccessAPISuite) TestTransactionSignatureWebAuthnExtensionData() {
 	convertToMessageSigWithExtensionData := func(sigs []sdk.TransactionSignature, extensionData []byte) []*entities.Transaction_Signature {
 		msgSigs := make([]*entities.Transaction_Signature, len(sigs))
 		for i, sig := range sigs {
+			sigBytes, err := serviceClient.SignWebAuthnExtensionData(sig.ExtensionData)
+			s.Require().NoError(err)
+
 			msgSigs[i] = &entities.Transaction_Signature{
 				Address:       sig.Address.Bytes(),
 				KeyId:         uint32(sig.KeyIndex),
-				Signature:     sig.Signature,
+				Signature:     sigBytes,
 				ExtensionData: extensionData,
 			}
 		}
