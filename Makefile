@@ -252,6 +252,11 @@ lint: tidy tools/custom-gcl
 	# revive -config revive.toml -exclude storage/ledger/trie ./...
 	./tools/custom-gcl run -v $(or $(LINT_PATH),./...)
 
+.PHONY: lint-new
+lint-new: tidy tools/custom-gcl
+	# revive -config revive.toml -exclude storage/ledger/trie ./...
+	./tools/custom-gcl run -v --new-from-rev=master
+
 .PHONY: fix-lint
 fix-lint:
 	# revive -config revive.toml -exclude storage/ledger/trie ./...

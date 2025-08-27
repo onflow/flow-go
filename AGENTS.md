@@ -51,6 +51,7 @@ This file provides guidance to AI Agents when working with code in this reposito
 
 ### Code Quality and Generation
 - `make lint` - Run linter (includes tidy and custom checks)
+- `make fix-new` - Run linter for files changed since master
 - `make fix-lint` - Automatically fix linting issues
 - `make fix-lint-new` - Automatically fix linting issues for files changed since master
 - `make fix-imports` - Automatically fix imports
