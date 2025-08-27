@@ -64,3 +64,12 @@ func (g *TimeGenerator) Fixture(t testing.TB, opts ...func(*timeConfig)) time.Ti
 
 	return config.baseTime.Add(config.offset)
 }
+
+// List generates a list of time.Time values.
+func (g *TimeGenerator) List(t testing.TB, n int, opts ...func(*timeConfig)) []time.Time {
+	times := make([]time.Time, n)
+	for i := range n {
+		times[i] = g.Fixture(t, opts...)
+	}
+	return times
+}

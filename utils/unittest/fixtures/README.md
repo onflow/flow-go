@@ -198,6 +198,8 @@ str := randomGen.RandomString(16)
 // Generate random number in range
 num := randomGen.Uint64InRange(1, 100)
 
+// randomGen also exposes all methods from *rand.Rand
+
 // Generate random uint32
 val := randomGen.Uint32()
 
@@ -301,21 +303,21 @@ addr := addrGen.Fixture(t, addrGen.WithChainID(flow.Testnet))
 addr := addrGen.Fixture(t, addrGen.ServiceAddress())
 
 // Invalid address
-invalidAddr := CorruptAddress(t, addrGen.Fixture(t))
+invalidAddr := CorruptAddress(t, addrGen.Fixture(t), flow.Testnet)
 ```
 
 #### Signer Indices Generator
 ```go
 indicesGen := suite.SignerIndices()
 
-// Generate indices with count
-indices := indicesGen.Fixture(t, 4)
+// Generate indices with total validators and signer count
+indices := indicesGen.Fixture(t, indicesGen.WithSignerCount(10, 4))
 
 // Generate indices at specific positions
-indices := indicesGen.ByIndices(t, []int{0, 2, 4})
+indices := indicesGen.Fixture(t, indicesGen.WithIndices([]int{0, 2, 4}))
 
 // Generate list of indices
-indicesList := indicesGen.List(t, 3, 2)
+indicesList := indicesGen.List(t, 3, indicesGen.WithSignerCount(10, 2))
 ```
 
 ### Consensus Generators
@@ -442,14 +444,22 @@ txList := fullTxGen.List(t, 2)
 ```go
 colGen := suite.Collections()
 
-// Collection with 1 transaction
-col := colGen.Fixture(t, 1)
+// Collection with 1 transaction (default)
+col := colGen.Fixture(t)
 
-// Collection with 3 transactions
-col := colGen.Fixture(t, 3)
+// Collection with specific transaction count
+col := colGen.Fixture(t, colGen.WithTxCount(3))
 
-// List of collections
-colList := colGen.List(t, 2, 1)
+// Collection with specific transactions
+transactions := suite.Transactions().List(t, 2)
+txPointers := make([]*flow.TransactionBody, len(transactions))
+for i := range transactions {
+    txPointers[i] = &transactions[i]
+}
+col := colGen.Fixture(t, colGen.WithTransactions(txPointers))
+
+// List of collections each with 3 transactions
+colList := colGen.List(t, 2, colGen.WithTxCount(3))
 ```
 
 ### Ledger Generators

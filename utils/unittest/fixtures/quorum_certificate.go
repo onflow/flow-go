@@ -73,7 +73,7 @@ func (g *QuorumCertificateGenerator) Fixture(t testing.TB, opts ...func(*quorumC
 	config := &quorumCertificateConfig{
 		view:          uint64(g.randomGen.Uint32()),
 		blockID:       g.identifierGen.Fixture(t),
-		signerIndices: g.signerIndicesGen.Fixture(t, 3),
+		signerIndices: g.signerIndicesGen.Fixture(t, g.signerIndicesGen.WithSignerCount(10, 3)),
 		source:        nil,
 	}
 

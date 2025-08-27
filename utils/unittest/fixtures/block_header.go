@@ -100,7 +100,7 @@ func (g *BlockHeaderGenerator) fixtureWithParent(t testing.TB, parent *flow.Head
 			View:          view - 1,
 			NewestQCViews: []uint64{newestQC.View},
 			NewestQC:      newestQC,
-			SignerIndices: g.signerIndicesGen.Fixture(t, 4),
+			SignerIndices: g.signerIndicesGen.Fixture(t, g.signerIndicesGen.WithSignerCount(10, 4)),
 			SigData:       g.signatureGen.Fixture(t),
 		}
 	}
@@ -113,10 +113,19 @@ func (g *BlockHeaderGenerator) fixtureWithParent(t testing.TB, parent *flow.Head
 		Timestamp:          g.timeGen.Fixture(t),
 		View:               view,
 		ParentView:         parent.View,
-		ParentVoterIndices: g.signerIndicesGen.Fixture(t, 4),
+		ParentVoterIndices: g.signerIndicesGen.Fixture(t, g.signerIndicesGen.WithSignerCount(10, 4)),
 		ParentVoterSigData: g.quorumCertGen.QCSigDataWithSoR(t, source),
 		ProposerID:         g.identifierGen.Fixture(t),
 		ProposerSigData:    g.signatureGen.Fixture(t),
 		LastViewTC:         lastViewTC,
 	}
+}
+
+// List generates a list of block headers.
+func (g *BlockHeaderGenerator) List(t testing.TB, n int, opts ...func(*blockHeaderConfig)) []*flow.Header {
+	headers := make([]*flow.Header, n)
+	for i := range n {
+		headers[i] = g.Fixture(t, opts...)
+	}
+	return headers
 }

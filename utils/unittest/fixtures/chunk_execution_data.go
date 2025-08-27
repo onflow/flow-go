@@ -67,7 +67,7 @@ func (g *ChunkExecutionDataGenerator) WithMinSize(minSize int) func(*chunkExecut
 // Fixture generates chunk execution data with optional configuration.
 func (g *ChunkExecutionDataGenerator) Fixture(t testing.TB, opts ...func(*chunkExecutionDataConfig)) *execution_data.ChunkExecutionData {
 	config := &chunkExecutionDataConfig{
-		collection: g.collectionGen.Fixture(t, 5),
+		collection: g.collectionGen.Fixture(t, g.collectionGen.WithTxCount(5)),
 		trieUpdate: g.trieUpdateGen.Fixture(t),
 	}
 

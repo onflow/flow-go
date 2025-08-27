@@ -99,13 +99,13 @@ func ExampleAllGenerators() {
 	addr1 := addGen.Fixture(t)
 	addr2 := addGen.Fixture(t, addGen.WithChainID(flow.Emulator))
 	addr3 := addGen.Fixture(t, addGen.ServiceAddress())
-	addr4 := CorruptAddress(t, addGen.Fixture(t))
+	addr4 := CorruptAddress(t, addGen.Fixture(t), flow.Testnet)
 
 	// Test signer indices generator
 	indicesGen := suite.SignerIndices()
-	indices1 := indicesGen.Fixture(t, 4)
-	indices2 := indicesGen.ByIndices(t, []int{0, 2, 4})
-	indicesList := indicesGen.List(t, 3, 2)
+	indices1 := indicesGen.Fixture(t, indicesGen.WithSignerCount(10, 4))
+	indices2 := indicesGen.Fixture(t, indicesGen.WithIndices([]int{0, 2, 4}))
+	indicesList := indicesGen.List(t, 3, indicesGen.WithSignerCount(10, 2))
 
 	// Test quorum certificate generator
 	qcGen := suite.QuorumCertificates()
@@ -139,9 +139,9 @@ func ExampleAllGenerators() {
 
 	// Test collection generator
 	colGen := suite.Collections()
-	col1 := colGen.Fixture(t, 1)
-	col2 := colGen.Fixture(t, 3)
-	colList := colGen.List(t, 2, 1)
+	col1 := colGen.Fixture(t, colGen.WithTxCount(1))
+	col2 := colGen.Fixture(t, colGen.WithTxCount(3))
+	colList := colGen.List(t, 2, colGen.WithTxCount(3))
 
 	// Test trie update generator
 	trieGen := suite.TrieUpdates()

@@ -13,7 +13,15 @@ type CollectionGenerator struct {
 
 // collectionConfig holds the configuration for collection generation.
 type collectionConfig struct {
+	count        int
 	transactions []*flow.TransactionBody
+}
+
+// WithTxCount returns an option to set the number of transactions in the collection.
+func (g *CollectionGenerator) WithTxCount(count int) func(*collectionConfig) {
+	return func(config *collectionConfig) {
+		config.count = count
+	}
 }
 
 // WithTransactions returns an option to set the transactions for the collection.
@@ -24,15 +32,17 @@ func (g *CollectionGenerator) WithTransactions(transactions []*flow.TransactionB
 }
 
 // Fixture generates a collection with optional configuration.
-func (g *CollectionGenerator) Fixture(t testing.TB, n int, opts ...func(*collectionConfig)) *flow.Collection {
-	config := &collectionConfig{}
+func (g *CollectionGenerator) Fixture(t testing.TB, opts ...func(*collectionConfig)) *flow.Collection {
+	config := &collectionConfig{
+		count: 1,
+	}
 
 	for _, opt := range opts {
 		opt(config)
 	}
 
 	if len(config.transactions) == 0 {
-		txs := g.transactionGen.List(t, n)
+		txs := g.transactionGen.List(t, config.count)
 		config.transactions = make([]*flow.TransactionBody, len(txs))
 		for i := range txs {
 			config.transactions[i] = &txs[i]
@@ -43,10 +53,10 @@ func (g *CollectionGenerator) Fixture(t testing.TB, n int, opts ...func(*collect
 }
 
 // List generates a list of collections.
-func (g *CollectionGenerator) List(t testing.TB, n int, txCount int, opts ...func(*collectionConfig)) []*flow.Collection {
+func (g *CollectionGenerator) List(t testing.TB, n int, opts ...func(*collectionConfig)) []*flow.Collection {
 	list := make([]*flow.Collection, n)
 	for i := range n {
-		list[i] = g.Fixture(t, txCount, opts...)
+		list[i] = g.Fixture(t, opts...)
 	}
 	return list
 }

@@ -71,8 +71,8 @@ func ToSDKAddress(addr flow.Address) sdk.Address {
 }
 
 // CorruptAddress corrupts the first byte of the address.
-func CorruptAddress(t testing.TB, addr flow.Address) flow.Address {
+func CorruptAddress(t testing.TB, addr flow.Address, chainID flow.ChainID) flow.Address {
 	addr[0] ^= 1
-	require.False(t, flow.Testnet.Chain().IsValid(addr), "invalid address fixture generated valid address")
+	require.False(t, chainID.Chain().IsValid(addr), "invalid address fixture generated valid address")
 	return addr
 }

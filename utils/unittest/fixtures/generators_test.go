@@ -61,17 +61,17 @@ func TestGeneratorSuite(t *testing.T) {
 	addr3 := suite.Addresses().Fixture(t, suite.Addresses().ServiceAddress())
 	require.NotNil(t, addr3)
 
-	addr4 := CorruptAddress(t, suite.Addresses().Fixture(t))
+	addr4 := CorruptAddress(t, suite.Addresses().Fixture(t), flow.Testnet)
 	require.NotNil(t, addr4)
 
 	// Test signer indices
-	indices1 := suite.SignerIndices().Fixture(t, 4)
+	indices1 := suite.SignerIndices().Fixture(t, suite.SignerIndices().WithSignerCount(10, 4))
 	require.NotNil(t, indices1)
 
-	indices2 := suite.SignerIndices().ByIndices(t, []int{0, 2, 4})
+	indices2 := suite.SignerIndices().Fixture(t, suite.SignerIndices().WithIndices([]int{0, 2, 4}))
 	require.NotNil(t, indices2)
 
-	indicesList := suite.SignerIndices().List(t, 3, 2)
+	indicesList := suite.SignerIndices().List(t, 3, suite.SignerIndices().WithSignerCount(10, 2))
 	assert.Len(t, indicesList, 3)
 
 	// Test quorum certificates
@@ -121,13 +121,13 @@ func TestGeneratorSuite(t *testing.T) {
 	assert.Len(t, txCompleteList, 2)
 
 	// Test collections
-	col1 := suite.Collections().Fixture(t, 1)
+	col1 := suite.Collections().Fixture(t, suite.Collections().WithTxCount(1))
 	require.NotNil(t, col1)
 
-	col2 := suite.Collections().Fixture(t, 3)
+	col2 := suite.Collections().Fixture(t, suite.Collections().WithTxCount(3))
 	assert.Len(t, col2.Transactions, 3)
 
-	colList := suite.Collections().List(t, 2, 1)
+	colList := suite.Collections().List(t, 2, suite.Collections().WithTxCount(1))
 	assert.Len(t, colList, 2)
 
 	// Test trie updates
@@ -241,129 +241,244 @@ func TestGeneratorSuiteRandomSeed(t *testing.T) {
 }
 
 func TestGeneratorsDeterministic(t *testing.T) {
-	// Test that primitive generators produce same results with same seed
+	// Test that generators produce same results with same seed
 	suite1 := NewGeneratorSuite(t, WithSeed(42))
 	suite2 := NewGeneratorSuite(t, WithSeed(42))
 
-	// Test block headers
-	header1 := suite1.BlockHeaders().Fixture(t)
-	header2 := suite2.BlockHeaders().Fixture(t)
-	assert.Equal(t, header1, header2)
+	// Test all generators
+	tests := []struct {
+		name    string
+		fixture func() (any, any)
+		list    func() (any, any)
+	}{
+		// All generators have both Fixture and List methods
+		{
+			name: "BlockHeaders",
+			fixture: func() (any, any) {
+				return suite1.BlockHeaders().Fixture(t), suite2.BlockHeaders().Fixture(t)
+			},
+			list: func() (any, any) {
+				return suite1.BlockHeaders().List(t, 2), suite2.BlockHeaders().List(t, 2)
+			},
+		},
+		{
+			name: "Time",
+			fixture: func() (any, any) {
+				return suite1.Time().Fixture(t), suite2.Time().Fixture(t)
+			},
+			list: func() (any, any) {
+				return suite1.Time().List(t, 2), suite2.Time().List(t, 2)
+			},
+		},
+		{
+			name: "Identifiers",
+			fixture: func() (any, any) {
+				return suite1.Identifiers().Fixture(t), suite2.Identifiers().Fixture(t)
+			},
+			list: func() (any, any) {
+				return suite1.Identifiers().List(t, 3), suite2.Identifiers().List(t, 3)
+			},
+		},
+		{
+			name: "Signatures",
+			fixture: func() (any, any) {
+				return suite1.Signatures().Fixture(t), suite2.Signatures().Fixture(t)
+			},
+			list: func() (any, any) {
+				return suite1.Signatures().List(t, 2), suite2.Signatures().List(t, 2)
+			},
+		},
+		{
+			name: "Addresses",
+			fixture: func() (any, any) {
+				return suite1.Addresses().Fixture(t), suite2.Addresses().Fixture(t)
+			},
+			list: func() (any, any) {
+				return suite1.Addresses().List(t, 3), suite2.Addresses().List(t, 3)
+			},
+		},
+		{
+			name: "SignerIndices",
+			fixture: func() (any, any) {
+				return suite1.SignerIndices().Fixture(t, suite1.SignerIndices().WithSignerCount(10, 4)), suite2.SignerIndices().Fixture(t, suite2.SignerIndices().WithSignerCount(10, 4))
+			},
+			list: func() (any, any) {
+				return suite1.SignerIndices().List(t, 3, suite1.SignerIndices().WithSignerCount(10, 2)), suite2.SignerIndices().List(t, 3, suite2.SignerIndices().WithSignerCount(10, 2))
+			},
+		},
+		{
+			name: "QuorumCertificates",
+			fixture: func() (any, any) {
+				return suite1.QuorumCertificates().Fixture(t), suite2.QuorumCertificates().Fixture(t)
+			},
+			list: func() (any, any) {
+				return suite1.QuorumCertificates().List(t, 2), suite2.QuorumCertificates().List(t, 2)
+			},
+		},
+		{
+			name: "ChunkExecutionDatas",
+			fixture: func() (any, any) {
+				return suite1.ChunkExecutionDatas().Fixture(t), suite2.ChunkExecutionDatas().Fixture(t)
+			},
+			list: func() (any, any) {
+				return suite1.ChunkExecutionDatas().List(t, 2), suite2.ChunkExecutionDatas().List(t, 2)
+			},
+		},
+		{
+			name: "BlockExecutionDatas",
+			fixture: func() (any, any) {
+				return suite1.BlockExecutionDatas().Fixture(t), suite2.BlockExecutionDatas().Fixture(t)
+			},
+			list: func() (any, any) {
+				return suite1.BlockExecutionDatas().List(t, 2), suite2.BlockExecutionDatas().List(t, 2)
+			},
+		},
+		{
+			name: "BlockExecutionDataEntities",
+			fixture: func() (any, any) {
+				return suite1.BlockExecutionDataEntities().Fixture(t), suite2.BlockExecutionDataEntities().Fixture(t)
+			},
+			list: func() (any, any) {
+				return suite1.BlockExecutionDataEntities().List(t, 2), suite2.BlockExecutionDataEntities().List(t, 2)
+			},
+		},
+		{
+			name: "Transactions",
+			fixture: func() (any, any) {
+				return suite1.Transactions().Fixture(t), suite2.Transactions().Fixture(t)
+			},
+			list: func() (any, any) {
+				return suite1.Transactions().List(t, 2), suite2.Transactions().List(t, 2)
+			},
+		},
+		{
+			name: "FullTransactions",
+			fixture: func() (any, any) {
+				return suite1.FullTransactions().Fixture(t), suite2.FullTransactions().Fixture(t)
+			},
+			list: func() (any, any) {
+				return suite1.FullTransactions().List(t, 2), suite2.FullTransactions().List(t, 2)
+			},
+		},
+		{
+			name: "Collections",
+			fixture: func() (any, any) {
+				return suite1.Collections().Fixture(t), suite2.Collections().Fixture(t)
+			},
+			list: func() (any, any) {
+				return suite1.Collections().List(t, 2), suite2.Collections().List(t, 2)
+			},
+		},
+		{
+			name: "TrieUpdates",
+			fixture: func() (any, any) {
+				return suite1.TrieUpdates().Fixture(t), suite2.TrieUpdates().Fixture(t)
+			},
+			list: func() (any, any) {
+				return suite1.TrieUpdates().List(t, 2), suite2.TrieUpdates().List(t, 2)
+			},
+		},
+		{
+			name: "TransactionResults",
+			fixture: func() (any, any) {
+				return suite1.TransactionResults().Fixture(t), suite2.TransactionResults().Fixture(t)
+			},
+			list: func() (any, any) {
+				return suite1.TransactionResults().List(t, 2), suite2.TransactionResults().List(t, 2)
+			},
+		},
+		{
+			name: "LightTransactionResults",
+			fixture: func() (any, any) {
+				return suite1.LightTransactionResults().Fixture(t), suite2.LightTransactionResults().Fixture(t)
+			},
+			list: func() (any, any) {
+				return suite1.LightTransactionResults().List(t, 2), suite2.LightTransactionResults().List(t, 2)
+			},
+		},
+		{
+			name: "TransactionSignatures",
+			fixture: func() (any, any) {
+				return suite1.TransactionSignatures().Fixture(t), suite2.TransactionSignatures().Fixture(t)
+			},
+			list: func() (any, any) {
+				return suite1.TransactionSignatures().List(t, 2), suite2.TransactionSignatures().List(t, 2)
+			},
+		},
+		{
+			name: "ProposalKeys",
+			fixture: func() (any, any) {
+				return suite1.ProposalKeys().Fixture(t), suite2.ProposalKeys().Fixture(t)
+			},
+			list: func() (any, any) {
+				return suite1.ProposalKeys().List(t, 2), suite2.ProposalKeys().List(t, 2)
+			},
+		},
+		{
+			name: "Events",
+			fixture: func() (any, any) {
+				return suite1.Events().Fixture(t), suite2.Events().Fixture(t)
+			},
+			list: func() (any, any) {
+				return suite1.Events().List(t, 2), suite2.Events().List(t, 2)
+			},
+		},
+		{
+			name: "EventTypes",
+			fixture: func() (any, any) {
+				return suite1.EventTypes().Fixture(t), suite2.EventTypes().Fixture(t)
+			},
+			list: func() (any, any) {
+				return suite1.EventTypes().List(t, 2), suite2.EventTypes().List(t, 2)
+			},
+		},
+		{
+			name: "LedgerPaths",
+			fixture: func() (any, any) {
+				return suite1.LedgerPaths().Fixture(t), suite2.LedgerPaths().Fixture(t)
+			},
+			list: func() (any, any) {
+				return suite1.LedgerPaths().List(t, 3), suite2.LedgerPaths().List(t, 3)
+			},
+		},
+		{
+			name: "LedgerPayloads",
+			fixture: func() (any, any) {
+				return suite1.LedgerPayloads().Fixture(t), suite2.LedgerPayloads().Fixture(t)
+			},
+			list: func() (any, any) {
+				return suite1.LedgerPayloads().List(t, 2), suite2.LedgerPayloads().List(t, 2)
+			},
+		},
+		{
+			name: "LedgerValues",
+			fixture: func() (any, any) {
+				return suite1.LedgerValues().Fixture(t), suite2.LedgerValues().Fixture(t)
+			},
+			list: func() (any, any) {
+				return suite1.LedgerValues().List(t, 3), suite2.LedgerValues().List(t, 3)
+			},
+		},
+	}
 
-	// Test identifiers
-	id1 := suite1.Identifiers().Fixture(t)
-	id2 := suite2.Identifiers().Fixture(t)
-	assert.Equal(t, id1, id2)
+	// Test all generators
+	for _, tt := range tests {
+		t.Run(tt.name+" Fixture", func(t *testing.T) {
+			fixture1, fixture2 := tt.fixture()
+			assert.Equal(t, fixture1, fixture2)
+		})
 
-	// Test signatures
-	sig1 := suite1.Signatures().Fixture(t)
-	sig2 := suite2.Signatures().Fixture(t)
-	assert.Equal(t, sig1, sig2)
+		t.Run(tt.name+" List", func(t *testing.T) {
+			list1, list2 := tt.list()
+			assert.Equal(t, list1, list2)
+		})
+	}
 
-	// Test addresses
-	addr1 := suite1.Addresses().Fixture(t)
-	addr2 := suite2.Addresses().Fixture(t)
-	assert.Equal(t, addr1, addr2)
-
-	// Test signer indices
-	indices1 := suite1.SignerIndices().Fixture(t, 4)
-	indices2 := suite2.SignerIndices().Fixture(t, 4)
-	assert.Equal(t, indices1, indices2)
-
-	// Test quorum certificates
-	qc1 := suite1.QuorumCertificates().Fixture(t)
-	qc2 := suite2.QuorumCertificates().Fixture(t)
-	assert.Equal(t, qc1, qc2)
-
-	// Test chunk execution data
-	ced1 := suite1.ChunkExecutionDatas().Fixture(t)
-	ced2 := suite2.ChunkExecutionDatas().Fixture(t)
-	assert.Equal(t, ced1, ced2)
-
-	// Test block execution data
-	bed1 := suite1.BlockExecutionDatas().Fixture(t)
-	bed2 := suite2.BlockExecutionDatas().Fixture(t)
-	assert.Equal(t, bed1, bed2)
-
-	// Test transactions
-	tx1 := suite1.Transactions().Fixture(t)
-	tx2 := suite2.Transactions().Fixture(t)
-	assert.Equal(t, tx1, tx2)
-
-	// Test collections
-	col1 := suite1.Collections().Fixture(t, 1)
-	col2 := suite2.Collections().Fixture(t, 1)
-	assert.Equal(t, col1, col2)
-
-	// Test trie updates
-	trie1 := suite1.TrieUpdates().Fixture(t)
-	trie2 := suite2.TrieUpdates().Fixture(t)
-	assert.Equal(t, trie1, trie2)
-
-	// Test transaction results
-	tr1 := suite1.TransactionResults().Fixture(t)
-	tr2 := suite2.TransactionResults().Fixture(t)
-	assert.Equal(t, tr1, tr2)
-
-	// Test transaction signatures
-	ts1 := suite1.TransactionSignatures().Fixture(t)
-	ts2 := suite2.TransactionSignatures().Fixture(t)
-	assert.Equal(t, ts1, ts2)
-
-	// Test proposal keys
-	pk1 := suite1.ProposalKeys().Fixture(t)
-	pk2 := suite2.ProposalKeys().Fixture(t)
-	assert.Equal(t, pk1, pk2)
-
-	// Test lists
-	idList1 := suite1.Identifiers().List(t, 3)
-	idList2 := suite2.Identifiers().List(t, 3)
-	assert.Equal(t, idList1, idList2)
-
-	sigList1 := suite1.Signatures().List(t, 2)
-	sigList2 := suite2.Signatures().List(t, 2)
-	assert.Equal(t, sigList1, sigList2)
-
-	// Test events
-	event1 := suite1.Events().Fixture(t)
-	event2 := suite2.Events().Fixture(t)
-	assert.Equal(t, event1, event2)
-
-	// Test time generator
-	time1 := suite1.Time().Fixture(t)
-	time2 := suite2.Time().Fixture(t)
-	assert.Equal(t, time1, time2)
-
-	// Test time with specific base time
-	baseTime := time.Date(2023, 1, 1, 12, 0, 0, 0, time.UTC)
-	time3 := suite1.Time().Fixture(t, suite1.Time().WithBaseTime(baseTime))
-	time4 := suite2.Time().Fixture(t, suite2.Time().WithBaseTime(baseTime))
-	assert.Equal(t, time3, time4)
-
-	// Test ledger path generator
-	path1 := suite1.LedgerPaths().Fixture(t)
-	path2 := suite2.LedgerPaths().Fixture(t)
-	assert.Equal(t, path1, path2)
-
-	paths1 := suite1.LedgerPaths().List(t, 3)
-	paths2 := suite2.LedgerPaths().List(t, 3)
-	assert.Equal(t, paths1, paths2)
-
-	// Test ledger payload generator
-	payload1 := suite1.LedgerPayloads().Fixture(t)
-	payload2 := suite2.LedgerPayloads().Fixture(t)
-	assert.Equal(t, payload1, payload2)
-
-	payloads1 := suite1.LedgerPayloads().List(t, 2)
-	payloads2 := suite2.LedgerPayloads().List(t, 2)
-	assert.Equal(t, payloads1, payloads2)
-
-	// Test ledger value generator
-	value1 := suite1.LedgerValues().Fixture(t)
-	value2 := suite2.LedgerValues().Fixture(t)
-	assert.Equal(t, value1, value2)
-
-	values1 := suite1.LedgerValues().List(t, 3)
-	values2 := suite2.LedgerValues().List(t, 3)
-	assert.Equal(t, values1, values2)
+	// Test time with specific base time (special case)
+	t.Run("TimeWithBaseTime", func(t *testing.T) {
+		baseTime := time.Date(2023, 1, 1, 12, 0, 0, 0, time.UTC)
+		time1 := suite1.Time().Fixture(t, suite1.Time().WithBaseTime(baseTime))
+		time2 := suite2.Time().Fixture(t, suite2.Time().WithBaseTime(baseTime))
+		assert.Equal(t, time1, time2)
+	})
 }

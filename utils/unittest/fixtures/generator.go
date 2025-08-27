@@ -52,7 +52,7 @@ func (g *GeneratorSuite) RNG() *rand.Rand {
 // Random returns a random generator for this suite.
 func (g *GeneratorSuite) Random() *RandomGenerator {
 	return &RandomGenerator{
-		rng: g.rng,
+		Rand: g.rng,
 	}
 }
 
