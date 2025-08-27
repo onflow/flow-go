@@ -40,7 +40,7 @@ func (p *FixedIdentityProvider) Identities(filter flow.IdentityFilter[flow.Ident
 
 func (p *FixedIdentityProvider) ByNodeID(flowID flow.Identifier) (*flow.Identity, bool) {
 	for _, v := range p.identities {
-		if v.ID() == flowID {
+		if v.NodeID == flowID {
 			return v, true
 		}
 	}

@@ -74,8 +74,8 @@ func mockUnexecutedBlock(t *testing.T, es *stateMock.ExecutionState, unexecuted 
 func TestCheckPassIfLastSealedIsExecutedAndMatch(t *testing.T) {
 	// ..<- LastSealed(executed) <- .. <- LastFinalized <- .. <- LastExecuted <- ...
 	chain, _, _ := unittest.ChainFixture(10)
-	lastFinal := chain[7].Header
-	lastSealed := chain[5].Header
+	lastFinal := chain[7].ToHeader()
+	lastSealed := chain[5].ToHeader()
 
 	core, state, es := makeCore(t)
 	lastSealedResult, _ := mockFinalizedSealedBlock(t, state, lastFinal, lastSealed)
@@ -88,8 +88,8 @@ func TestCheckPassIfLastSealedIsExecutedAndMatch(t *testing.T) {
 func TestCheckFailIfLastSealedIsExecutedButMismatch(t *testing.T) {
 	// ..<- LastSealed(executed) <- .. <- LastFinalized <- .. <- LastExecuted <- ...
 	chain, _, _ := unittest.ChainFixture(10)
-	lastFinal := chain[7].Header
-	lastSealed := chain[5].Header
+	lastFinal := chain[7].ToHeader()
+	lastSealed := chain[5].ToHeader()
 
 	core, state, es := makeCore(t)
 	_, _ = mockFinalizedSealedBlock(t, state, lastFinal, lastSealed)
@@ -106,10 +106,10 @@ func TestCheckFailIfLastSealedIsExecutedButMismatch(t *testing.T) {
 func TestCheckPassIfLastSealedIsNotExecutedAndLastExecutedMatch(t *testing.T) {
 	// LastSealedExecuted (sealed) <..<- LastExecuted(finalized) <..<- LastSealed(not executed) <..<- LastFinalized
 	chain, _, _ := unittest.ChainFixture(10)
-	lastFinal := chain[7].Header
-	lastSealed := chain[5].Header
-	lastExecuted := chain[3].Header
-	lastSealedExecuted := chain[1].Header
+	lastFinal := chain[7].ToHeader()
+	lastSealed := chain[5].ToHeader()
+	lastExecuted := chain[3].ToHeader()
+	lastSealedExecuted := chain[1].ToHeader()
 
 	core, state, es := makeCore(t)
 	// mock that last sealed is not executed
@@ -131,10 +131,10 @@ func TestCheckPassIfLastSealedIsNotExecutedAndLastExecutedMatch(t *testing.T) {
 func TestCheckFailIfLastSealedIsNotExecutedAndLastExecutedMismatch(t *testing.T) {
 	// LastSealedExecuted (sealed) <..<- LastExecuted(finalized) <..<- LastSealed(not executed) <..<- LastFinalized
 	chain, _, _ := unittest.ChainFixture(10)
-	lastFinal := chain[7].Header
-	lastSealed := chain[5].Header
-	lastExecuted := chain[3].Header
-	lastSealedExecuted := chain[1].Header
+	lastFinal := chain[7].ToHeader()
+	lastSealed := chain[5].ToHeader()
+	lastExecuted := chain[3].ToHeader()
+	lastSealedExecuted := chain[1].ToHeader()
 
 	core, state, es := makeCore(t)
 	// mock that last sealed is not executed

@@ -8,10 +8,17 @@ import (
 // SpamRecordCache is a cache of spam records for the ALSP module.
 // It is used to keep track of the spam records of the nodes that have been reported for spamming.
 type SpamRecordCache interface {
-	// Adjust applies the given adjust function to the spam record of the given origin id.
+	// AdjustWithInit applies the given adjust function to the spam record of the given origin id.
 	// Returns the Penalty value of the record after the adjustment.
 	// It returns an error if the adjustFunc returns an error or if the record does not exist.
-	// Assuming that adjust is always called when the record exists, the error is irrecoverable and indicates a bug.
+	// Note that if the record does not exist, the record is initialized and the
+	// adjust function is applied to the initialized record again.
+	// Args:
+	// - originId: the origin id of the spam record.
+	// - adjustFunc: the function that adjusts the spam record.
+	// Returns:
+	//   - Penalty value of the record after the adjustment.
+	//   - error any returned error should be considered as an irrecoverable error and indicates a bug.
 	AdjustWithInit(originId flow.Identifier, adjustFunc model.RecordAdjustFunc) (float64, error)
 
 	// Identities returns the list of identities of the nodes that have a spam record in the cache.
