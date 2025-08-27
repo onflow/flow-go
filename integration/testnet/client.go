@@ -191,7 +191,7 @@ func (c *Client) SignTransactionWebAuthN(tx *sdk.Transaction) (*sdk.Transaction,
 		return nil, err
 	}
 	tx.AddEnvelopeSignature(tx.Payer, tx.ProposalKey.KeyIndex, sig)
-	tx.EnvelopeSignatures[0].ExtensionData = extensionData
+	tx.EnvelopeSignatures[0].ExtensionData = slices.Concat([]byte{1}, extensionData)
 	return tx, nil
 }
 
