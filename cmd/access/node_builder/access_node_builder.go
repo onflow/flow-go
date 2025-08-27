@@ -49,6 +49,10 @@ import (
 	"github.com/onflow/flow-go/engine/access/rest/websockets"
 	"github.com/onflow/flow-go/engine/access/rpc"
 	"github.com/onflow/flow-go/engine/access/rpc/backend"
+	"github.com/onflow/flow-go/engine/access/rpc/backend/events"
+	"github.com/onflow/flow-go/engine/access/rpc/backend/node_communicator"
+	"github.com/onflow/flow-go/engine/access/rpc/backend/query_mode"
+	"github.com/onflow/flow-go/engine/access/rpc/backend/transactions/error_messages"
 	rpcConnection "github.com/onflow/flow-go/engine/access/rpc/connection"
 	"github.com/onflow/flow-go/engine/access/state_stream"
 	statestreambackend "github.com/onflow/flow-go/engine/access/state_stream/backend"
@@ -207,7 +211,7 @@ func DefaultAccessNodeConfig() *AccessNodeConfig {
 				CollectionClientTimeout:   3 * time.Second,
 				ExecutionClientTimeout:    3 * time.Second,
 				ConnectionPoolSize:        backend.DefaultConnectionPoolSize,
-				MaxHeightRange:            backend.DefaultMaxHeightRange,
+				MaxHeightRange:            events.DefaultMaxHeightRange,
 				PreferredExecutionNodeIDs: nil,
 				FixedExecutionNodeIDs:     nil,
 				CircuitBreakerConfig: rpcConnection.CircuitBreakerConfig{
@@ -216,9 +220,9 @@ func DefaultAccessNodeConfig() *AccessNodeConfig {
 					MaxFailures:    5,
 					MaxRequests:    1,
 				},
-				ScriptExecutionMode: backend.IndexQueryModeExecutionNodesOnly.String(), // default to ENs only for now
-				EventQueryMode:      backend.IndexQueryModeExecutionNodesOnly.String(), // default to ENs only for now
-				TxResultQueryMode:   backend.IndexQueryModeExecutionNodesOnly.String(), // default to ENs only for now
+				ScriptExecutionMode: query_mode.IndexQueryModeExecutionNodesOnly.String(), // default to ENs only for now
+				EventQueryMode:      query_mode.IndexQueryModeExecutionNodesOnly.String(), // default to ENs only for now
+				TxResultQueryMode:   query_mode.IndexQueryModeExecutionNodesOnly.String(), // default to ENs only for now
 			},
 			RestConfig: rest.Config{
 				ListenAddress:  "",
@@ -318,7 +322,7 @@ type FlowAccessNodeBuilder struct {
 	PingMetrics                  module.PingMetrics
 	Committee                    hotstuff.DynamicCommittee
 	Finalized                    *flow.Header // latest finalized block that the node knows of at startup time
-	Pending                      []*flow.Header
+	Pending                      []*flow.ProposalHeader
 	FollowerCore                 module.HotStuffFollower
 	Validator                    hotstuff.Validator
 	ExecutionDataDownloader      execution_data.Downloader
@@ -369,8 +373,9 @@ type FlowAccessNodeBuilder struct {
 	stateStreamBackend *statestreambackend.StateStreamBackend
 	nodeBackend        *backend.Backend
 
-	ExecNodeIdentitiesProvider *commonrpc.ExecutionNodeIdentitiesProvider
-	TxResultErrorMessagesCore  *tx_error_messages.TxErrorMessagesCore
+	ExecNodeIdentitiesProvider   *commonrpc.ExecutionNodeIdentitiesProvider
+	TxResultErrorMessagesCore    *tx_error_messages.TxErrorMessagesCore
+	txResultErrorMessageProvider error_messages.Provider
 }
 
 func (builder *FlowAccessNodeBuilder) buildFollowerState() *FlowAccessNodeBuilder {
@@ -453,7 +458,7 @@ func (builder *FlowAccessNodeBuilder) buildFollowerCore() *FlowAccessNodeBuilder
 			node.Storage.Headers,
 			final,
 			builder.FollowerDistributor,
-			node.FinalizedRootBlock.Header,
+			node.FinalizedRootBlock.ToHeader(),
 			node.RootQC,
 			builder.Finalized,
 			builder.Pending,
@@ -704,10 +709,10 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 		Component("execution data requester", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			// Validation of the start block height needs to be done after loading state
 			if builder.executionDataStartHeight > 0 {
-				if builder.executionDataStartHeight <= builder.FinalizedRootBlock.Header.Height {
+				if builder.executionDataStartHeight <= builder.FinalizedRootBlock.Height {
 					return nil, fmt.Errorf(
 						"execution data start block height (%d) must be greater than the root block height (%d)",
-						builder.executionDataStartHeight, builder.FinalizedRootBlock.Header.Height)
+						builder.executionDataStartHeight, builder.FinalizedRootBlock.Height)
 				}
 
 				latestSeal, err := builder.State.Sealed().Head()
@@ -729,7 +734,7 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 				// requester expects the initial last processed height, which is the first height - 1
 				builder.executionDataConfig.InitialBlockHeight = builder.executionDataStartHeight - 1
 			} else {
-				builder.executionDataConfig.InitialBlockHeight = builder.SealedRootBlock.Header.Height
+				builder.executionDataConfig.InitialBlockHeight = builder.SealedRootBlock.Height
 			}
 
 			execDataDistributor = edrequester.NewExecutionDataDistributor()
@@ -891,7 +896,7 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 						return nil, fmt.Errorf("could not verify checkpoint file: %w", err)
 					}
 
-					checkpointHeight := builder.SealedRootBlock.Header.Height
+					checkpointHeight := builder.SealedRootBlock.Height
 
 					if builder.SealedRootBlock.ID() != builder.RootSeal.BlockID {
 						return nil, fmt.Errorf("mismatching sealed root block and root seal: %v != %v",
@@ -1036,7 +1041,7 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 			}
 			broadcaster := engine.NewBroadcaster()
 
-			eventQueryMode, err := backend.ParseIndexQueryMode(builder.rpcConf.BackendConfig.EventQueryMode)
+			eventQueryMode, err := query_mode.ParseIndexQueryMode(builder.rpcConf.BackendConfig.EventQueryMode)
 			if err != nil {
 				return nil, fmt.Errorf("could not parse event query mode: %w", err)
 			}
@@ -1044,7 +1049,7 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 			// use the events index for events if enabled and the node is configured to use it for
 			// regular event queries
 			useIndex := builder.executionDataIndexingEnabled &&
-				eventQueryMode != backend.IndexQueryModeExecutionNodesOnly
+				eventQueryMode != query_mode.IndexQueryModeExecutionNodesOnly
 
 			executionDataTracker := subscriptiontracker.NewExecutionDataTracker(
 				builder.Logger,
@@ -1708,30 +1713,13 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 			return nil
 		}).
 		Module("transaction timing mempools", func(node *cmd.NodeConfig) error {
-			var err error
-			builder.TransactionTimings, err = stdmap.NewTransactionTimings(1500 * 300) // assume 1500 TPS * 300 seconds
-			if err != nil {
-				return err
-			}
+			builder.TransactionTimings = stdmap.NewTransactionTimings(1500 * 300) // assume 1500 TPS * 300 seconds
+			builder.CollectionsToMarkFinalized = stdmap.NewTimes(50 * 300)        // assume 50 collection nodes * 300 seconds
+			builder.CollectionsToMarkExecuted = stdmap.NewTimes(50 * 300)         // assume 50 collection nodes * 300 seconds
+			builder.BlockTransactions = stdmap.NewIdentifierMap(10000)
+			builder.BlocksToMarkExecuted = stdmap.NewTimes(1 * 300) // assume 1 block per second * 300 seconds
 
-			builder.CollectionsToMarkFinalized, err = stdmap.NewTimes(50 * 300) // assume 50 collection nodes * 300 seconds
-			if err != nil {
-				return err
-			}
-
-			builder.CollectionsToMarkExecuted, err = stdmap.NewTimes(50 * 300) // assume 50 collection nodes * 300 seconds
-			if err != nil {
-				return err
-			}
-
-			builder.BlockTransactions, err = stdmap.NewIdentifierMap(10000)
-			if err != nil {
-				return err
-			}
-
-			builder.BlocksToMarkExecuted, err = stdmap.NewTimes(1 * 300) // assume 1 block per second * 300 seconds
-
-			return err
+			return nil
 		}).
 		Module("transaction metrics", func(node *cmd.NodeConfig) error {
 			builder.TransactionMetrics = metrics.NewTransactionCollector(
@@ -1898,7 +1886,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				builder.Logger,
 				node.Storage.VersionBeacons,
 				nodeVersion,
-				builder.SealedRootBlock.Header.Height,
+				builder.SealedRootBlock.Height,
 				builder.LastFinalizedHeader.Height,
 			)
 			if err != nil {
@@ -1963,16 +1951,16 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				),
 			}
 
-			scriptExecMode, err := backend.ParseIndexQueryMode(config.BackendConfig.ScriptExecutionMode)
+			scriptExecMode, err := query_mode.ParseIndexQueryMode(config.BackendConfig.ScriptExecutionMode)
 			if err != nil {
 				return nil, fmt.Errorf("could not parse script execution mode: %w", err)
 			}
 
-			eventQueryMode, err := backend.ParseIndexQueryMode(config.BackendConfig.EventQueryMode)
+			eventQueryMode, err := query_mode.ParseIndexQueryMode(config.BackendConfig.EventQueryMode)
 			if err != nil {
 				return nil, fmt.Errorf("could not parse event query mode: %w", err)
 			}
-			if eventQueryMode == backend.IndexQueryModeCompare {
+			if eventQueryMode == query_mode.IndexQueryModeCompare {
 				return nil, fmt.Errorf("event query mode 'compare' is not supported")
 			}
 
@@ -1981,18 +1969,18 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 			// handles block-related operations.
 			blockTracker, err := subscriptiontracker.NewBlockTracker(
 				node.State,
-				builder.FinalizedRootBlock.Header.Height,
+				builder.FinalizedRootBlock.Height,
 				node.Storage.Headers,
 				broadcaster,
 			)
 			if err != nil {
 				return nil, fmt.Errorf("failed to initialize block tracker: %w", err)
 			}
-			txResultQueryMode, err := backend.ParseIndexQueryMode(config.BackendConfig.TxResultQueryMode)
+			txResultQueryMode, err := query_mode.ParseIndexQueryMode(config.BackendConfig.TxResultQueryMode)
 			if err != nil {
 				return nil, fmt.Errorf("could not parse transaction result query mode: %w", err)
 			}
-			if txResultQueryMode == backend.IndexQueryModeCompare {
+			if txResultQueryMode == query_mode.IndexQueryModeCompare {
 				return nil, fmt.Errorf("transaction result query mode 'compare' is not supported")
 			}
 
@@ -2026,6 +2014,16 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				fixedENIdentifiers,
 			)
 
+			nodeCommunicator := node_communicator.NewNodeCommunicator(backendConfig.CircuitBreakerConfig.Enabled)
+			builder.txResultErrorMessageProvider = error_messages.NewTxErrorMessageProvider(
+				node.Logger,
+				builder.transactionResultErrorMessages, // might be nil
+				notNil(builder.TxResultsIndex),
+				connFactory,
+				nodeCommunicator,
+				notNil(builder.ExecNodeIdentitiesProvider),
+			)
+
 			builder.nodeBackend, err = backend.New(backend.Params{
 				State:                 node.State,
 				CollectionRPC:         builder.CollectionRPC, // might be nil
@@ -2044,7 +2042,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				MaxHeightRange:        backendConfig.MaxHeightRange,
 				Log:                   node.Logger,
 				SnapshotHistoryLimit:  backend.DefaultSnapshotHistoryLimit,
-				Communicator:          backend.NewNodeCommunicator(backendConfig.CircuitBreakerConfig.Enabled),
+				Communicator:          nodeCommunicator,
 				TxResultCacheSize:     builder.TxResultCacheSize,
 				ScriptExecutor:        notNil(builder.ScriptExecutor),
 				ScriptExecutionMode:   scriptExecMode,
@@ -2065,6 +2063,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				IndexReporter:              indexReporter,
 				VersionControl:             notNil(builder.VersionControl),
 				ExecNodeIdentitiesProvider: notNil(builder.ExecNodeIdentitiesProvider),
+				TxErrorMessageProvider:     notNil(builder.txResultErrorMessageProvider),
 			})
 			if err != nil {
 				return nil, fmt.Errorf("could not initialize backend: %w", err)
@@ -2112,7 +2111,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				node.State,
 				channels.RequestCollections,
 				filter.HasRole[flow.Identity](flow.RoleCollection),
-				func() flow.Entity { return &flow.Collection{} },
+				func() flow.Entity { return new(flow.Collection) },
 			)
 			if err != nil {
 				return nil, fmt.Errorf("could not create requester engine: %w", err)
@@ -2121,7 +2120,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 			if builder.storeTxResultErrorMessages {
 				builder.TxResultErrorMessagesCore = tx_error_messages.NewTxErrorMessagesCore(
 					node.Logger,
-					notNil(builder.nodeBackend),
+					notNil(builder.txResultErrorMessageProvider),
 					builder.transactionResultErrorMessages,
 					notNil(builder.ExecNodeIdentitiesProvider),
 				)

@@ -6,8 +6,6 @@ import (
 	flow "github.com/onflow/flow-go/model/flow"
 	irrecoverable "github.com/onflow/flow-go/module/irrecoverable"
 
-	messages "github.com/onflow/flow-go/model/messages"
-
 	mock "github.com/stretchr/testify/mock"
 )
 
@@ -37,12 +35,12 @@ func (_m *Compliance) Done() <-chan struct{} {
 }
 
 // OnBlockProposal provides a mock function with given fields: proposal
-func (_m *Compliance) OnBlockProposal(proposal flow.Slashable[*messages.BlockProposal]) {
+func (_m *Compliance) OnBlockProposal(proposal flow.Slashable[*flow.Proposal]) {
 	_m.Called(proposal)
 }
 
 // OnSyncedBlocks provides a mock function with given fields: blocks
-func (_m *Compliance) OnSyncedBlocks(blocks flow.Slashable[[]*messages.BlockProposal]) {
+func (_m *Compliance) OnSyncedBlocks(blocks flow.Slashable[[]*flow.Proposal]) {
 	_m.Called(blocks)
 }
 

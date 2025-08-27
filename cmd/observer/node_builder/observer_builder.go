@@ -46,6 +46,9 @@ import (
 	"github.com/onflow/flow-go/engine/access/rest/websockets"
 	"github.com/onflow/flow-go/engine/access/rpc"
 	"github.com/onflow/flow-go/engine/access/rpc/backend"
+	"github.com/onflow/flow-go/engine/access/rpc/backend/events"
+	"github.com/onflow/flow-go/engine/access/rpc/backend/node_communicator"
+	"github.com/onflow/flow-go/engine/access/rpc/backend/query_mode"
 	rpcConnection "github.com/onflow/flow-go/engine/access/rpc/connection"
 	"github.com/onflow/flow-go/engine/access/state_stream"
 	statestreambackend "github.com/onflow/flow-go/engine/access/state_stream/backend"
@@ -187,12 +190,12 @@ func DefaultObserverServiceConfig() *ObserverServiceConfig {
 				CollectionClientTimeout:   3 * time.Second,
 				ExecutionClientTimeout:    3 * time.Second,
 				ConnectionPoolSize:        backend.DefaultConnectionPoolSize,
-				MaxHeightRange:            backend.DefaultMaxHeightRange,
+				MaxHeightRange:            events.DefaultMaxHeightRange,
 				PreferredExecutionNodeIDs: nil,
 				FixedExecutionNodeIDs:     nil,
-				ScriptExecutionMode:       backend.IndexQueryModeExecutionNodesOnly.String(), // default to ENs only for now
-				EventQueryMode:            backend.IndexQueryModeExecutionNodesOnly.String(), // default to ENs only for now
-				TxResultQueryMode:         backend.IndexQueryModeExecutionNodesOnly.String(), // default to ENs only for now
+				ScriptExecutionMode:       query_mode.IndexQueryModeExecutionNodesOnly.String(), // default to ENs only for now
+				EventQueryMode:            query_mode.IndexQueryModeExecutionNodesOnly.String(), // default to ENs only for now
+				TxResultQueryMode:         query_mode.IndexQueryModeExecutionNodesOnly.String(), // default to ENs only for now
 			},
 			RestConfig: rest.Config{
 				ListenAddress:  "",
@@ -276,7 +279,7 @@ type ObserverServiceBuilder struct {
 	FollowerDistributor  *pubsub.FollowerDistributor
 	Committee            hotstuff.DynamicCommittee
 	Finalized            *flow.Header
-	Pending              []*flow.Header
+	Pending              []*flow.ProposalHeader
 	FollowerCore         module.HotStuffFollower
 	ExecutionIndexer     *indexer.Indexer
 	ExecutionIndexerCore *indexer.IndexerCore
@@ -470,7 +473,7 @@ func (builder *ObserverServiceBuilder) buildFollowerCore() *ObserverServiceBuild
 			node.Storage.Headers,
 			final,
 			builder.FollowerDistributor,
-			node.FinalizedRootBlock.Header,
+			node.FinalizedRootBlock.ToHeader(),
 			node.RootQC,
 			builder.Finalized,
 			builder.Pending,
@@ -1243,10 +1246,10 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 		Component("execution data requester", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			// Validation of the start block height needs to be done after loading state
 			if builder.executionDataStartHeight > 0 {
-				if builder.executionDataStartHeight <= builder.FinalizedRootBlock.Header.Height {
+				if builder.executionDataStartHeight <= builder.FinalizedRootBlock.Height {
 					return nil, fmt.Errorf(
 						"execution data start block height (%d) must be greater than the root block height (%d)",
-						builder.executionDataStartHeight, builder.FinalizedRootBlock.Header.Height)
+						builder.executionDataStartHeight, builder.FinalizedRootBlock.Height)
 				}
 
 				latestSeal, err := builder.State.Sealed().Head()
@@ -1268,7 +1271,7 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 				// requester expects the initial last processed height, which is the first height - 1
 				builder.executionDataConfig.InitialBlockHeight = builder.executionDataStartHeight - 1
 			} else {
-				builder.executionDataConfig.InitialBlockHeight = builder.SealedRootBlock.Header.Height
+				builder.executionDataConfig.InitialBlockHeight = builder.SealedRootBlock.Height
 			}
 
 			execDataDistributor = edrequester.NewExecutionDataDistributor()
@@ -1388,7 +1391,7 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 					return nil, fmt.Errorf("could not verify checkpoint file: %w", err)
 				}
 
-				checkpointHeight := builder.SealedRootBlock.Header.Height
+				checkpointHeight := builder.SealedRootBlock.Height
 
 				if builder.SealedRootBlock.ID() != builder.RootSeal.BlockID {
 					return nil, fmt.Errorf("mismatching sealed root block and root seal: %v != %v",
@@ -1534,7 +1537,7 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 			}
 			broadcaster := engine.NewBroadcaster()
 
-			eventQueryMode, err := backend.ParseIndexQueryMode(builder.rpcConf.BackendConfig.EventQueryMode)
+			eventQueryMode, err := query_mode.ParseIndexQueryMode(builder.rpcConf.BackendConfig.EventQueryMode)
 			if err != nil {
 				return nil, fmt.Errorf("could not parse event query mode: %w", err)
 			}
@@ -1542,7 +1545,7 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 			// use the events index for events if enabled and the node is configured to use it for
 			// regular event queries
 			useIndex := builder.executionDataIndexingEnabled &&
-				eventQueryMode != backend.IndexQueryModeExecutionNodesOnly
+				eventQueryMode != query_mode.IndexQueryModeExecutionNodesOnly
 
 			executionDataTracker := subscriptiontracker.NewExecutionDataTracker(
 				builder.Logger,
@@ -1714,12 +1717,7 @@ func (builder *ObserverServiceBuilder) enqueueConnectWithStakedAN() {
 
 func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 	builder.Module("transaction metrics", func(node *cmd.NodeConfig) error {
-		var err error
-		builder.TransactionTimings, err = stdmap.NewTransactionTimings(1500 * 300) // assume 1500 TPS * 300 seconds
-		if err != nil {
-			return err
-		}
-
+		builder.TransactionTimings = stdmap.NewTransactionTimings(1500 * 300) // assume 1500 TPS * 300 seconds
 		builder.TransactionMetrics = metrics.NewTransactionCollector(
 			node.Logger,
 			builder.TransactionTimings,
@@ -1834,7 +1832,7 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 			builder.Logger,
 			node.Storage.VersionBeacons,
 			nodeVersion,
-			builder.SealedRootBlock.Header.Height,
+			builder.SealedRootBlock.Height,
 			builder.LastFinalizedHeader.Height,
 		)
 		if err != nil {
@@ -1905,7 +1903,7 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 		// handles block-related operations.
 		blockTracker, err := subscriptiontracker.NewBlockTracker(
 			node.State,
-			builder.FinalizedRootBlock.Header.Height,
+			builder.FinalizedRootBlock.Height,
 			node.Storage.Headers,
 			broadcaster,
 		)
@@ -1927,6 +1925,27 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 		fixedENIdentifiers, err := flow.IdentifierListFromHex(backendConfig.FixedExecutionNodeIDs)
 		if err != nil {
 			return nil, fmt.Errorf("failed to convert node id string to Flow Identifier for fixed EN map: %w", err)
+		}
+
+		scriptExecMode, err := query_mode.ParseIndexQueryMode(config.BackendConfig.ScriptExecutionMode)
+		if err != nil {
+			return nil, fmt.Errorf("could not parse script execution mode: %w", err)
+		}
+
+		eventQueryMode, err := query_mode.ParseIndexQueryMode(config.BackendConfig.EventQueryMode)
+		if err != nil {
+			return nil, fmt.Errorf("could not parse event query mode: %w", err)
+		}
+		if eventQueryMode == query_mode.IndexQueryModeCompare {
+			return nil, fmt.Errorf("event query mode 'compare' is not supported")
+		}
+
+		txResultQueryMode, err := query_mode.ParseIndexQueryMode(config.BackendConfig.TxResultQueryMode)
+		if err != nil {
+			return nil, fmt.Errorf("could not parse transaction result query mode: %w", err)
+		}
+		if txResultQueryMode == query_mode.IndexQueryModeCompare {
+			return nil, fmt.Errorf("transaction result query mode 'compare' is not supported")
 		}
 
 		execNodeIdentitiesProvider := commonrpc.NewExecutionNodeIdentitiesProvider(
@@ -1952,8 +1971,11 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 			MaxHeightRange:       backendConfig.MaxHeightRange,
 			Log:                  node.Logger,
 			SnapshotHistoryLimit: backend.DefaultSnapshotHistoryLimit,
-			Communicator:         backend.NewNodeCommunicator(backendConfig.CircuitBreakerConfig.Enabled),
+			Communicator:         node_communicator.NewNodeCommunicator(backendConfig.CircuitBreakerConfig.Enabled),
 			BlockTracker:         blockTracker,
+			ScriptExecutionMode:  scriptExecMode,
+			EventQueryMode:       eventQueryMode,
+			TxResultQueryMode:    txResultQueryMode,
 			SubscriptionHandler: subscription.NewSubscriptionHandler(
 				builder.Logger,
 				broadcaster,
@@ -1967,8 +1989,8 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 		}
 
 		if builder.localServiceAPIEnabled {
-			backendParams.ScriptExecutionMode = backend.IndexQueryModeLocalOnly
-			backendParams.EventQueryMode = backend.IndexQueryModeLocalOnly
+			backendParams.ScriptExecutionMode = query_mode.IndexQueryModeLocalOnly
+			backendParams.EventQueryMode = query_mode.IndexQueryModeLocalOnly
 			backendParams.TxResultsIndex = builder.TxResultsIndex
 			backendParams.EventsIndex = builder.EventsIndex
 			backendParams.ScriptExecutor = builder.ScriptExecutor

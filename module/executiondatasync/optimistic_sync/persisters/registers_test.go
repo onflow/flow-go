@@ -29,7 +29,7 @@ func TestRegistersPersisterSuite(t *testing.T) {
 
 func (r *RegistersPersisterSuite) SetupTest() {
 	block := unittest.BlockFixture()
-	r.header = block.Header
+	r.header = block.ToHeader()
 
 	r.inMemoryRegisters = unsynchronized.NewRegisters(r.header.Height)
 	r.registers = storagemock.NewRegisterIndex(r.T())

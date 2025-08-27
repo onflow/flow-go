@@ -104,9 +104,12 @@ func TestFungibleTokenTracker(t *testing.T) {
 	}
 	`, "WrappedToken", hex.EncodeToString([]byte(testContract))))
 
-	txBody := flow.NewTransactionBody().
+	txBody, err := flow.NewTransactionBodyBuilder().
 		SetScript(deployingTestContractScript).
-		AddAuthorizer(chain.ServiceAddress())
+		SetPayer(chain.ServiceAddress()).
+		AddAuthorizer(chain.ServiceAddress()).
+		Build()
+	require.NoError(t, err)
 
 	tx := fvm.Transaction(txBody, 0)
 	snapshot, output, err := vm.Run(ctx, tx, view)
@@ -137,10 +140,13 @@ func TestFungibleTokenTracker(t *testing.T) {
 		sc.FlowServiceAccount.Address.Hex(),
 	))
 
-	txBody = flow.NewTransactionBody().
+	txBody, err = flow.NewTransactionBodyBuilder().
 		SetScript(wrapTokenScript).
+		SetPayer(chain.ServiceAddress()).
 		AddArgument(jsoncdc.MustEncode(cadence.UFix64(105))).
-		AddAuthorizer(chain.ServiceAddress())
+		AddAuthorizer(chain.ServiceAddress()).
+		Build()
+	require.NoError(t, err)
 
 	tx = fvm.Transaction(txBody, 0)
 	snapshot, output, err = vm.Run(ctx, tx, view)

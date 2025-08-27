@@ -88,4 +88,4 @@ This helps identify nodes in the system which are unreachable.
 
 ### Access node sequence diagram
 
-![Access node sequence diagram](/docs/AccessNodeSequenceDiagram.png)
+![Access node sequence diagram](/docs/images/AccessNodeSequenceDiagram.png)

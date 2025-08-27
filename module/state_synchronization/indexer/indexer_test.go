@@ -30,7 +30,7 @@ type indexerTest struct {
 	registers     *storagemock.RegisterIndex
 	indexTest     *indexCoreTest
 	worker        *Indexer
-	executionData *mempool.ExecutionData
+	executionData *mempool.Mempool[flow.Identifier, *execution_data.BlockExecutionDataEntity]
 	t             *testing.T
 }
 
@@ -40,7 +40,7 @@ type indexerTest struct {
 func newIndexerTest(t *testing.T, availableBlocks int, lastIndexedIndex int) *indexerTest {
 	blocks := unittest.BlockchainFixture(availableBlocks)
 	// we use 5th index as the latest indexed height, so we leave 5 more blocks to be indexed by the indexer in this test
-	lastIndexedHeight := blocks[lastIndexedIndex].Header.Height
+	lastIndexedHeight := blocks[lastIndexedIndex].Height
 	progress := newMockProgress()
 	err := progress.SetProcessedIndex(lastIndexedHeight)
 	require.NoError(t, err)
@@ -59,7 +59,7 @@ func newIndexerTest(t *testing.T, availableBlocks int, lastIndexedIndex int) *in
 		useDefaultTransactionResults().
 		initIndexer()
 
-	executionData := mempool.NewExecutionData(t)
+	executionData := &mempool.Mempool[flow.Identifier, *execution_data.BlockExecutionDataEntity]{}
 	exeCache := cache.NewExecutionDataCache(
 		mock.NewExecutionDataStore(t),
 		indexerCoreTest.indexer.headers,
@@ -78,7 +78,7 @@ func newIndexerTest(t *testing.T, availableBlocks int, lastIndexedIndex int) *in
 
 	test.worker, err = NewIndexer(
 		unittest.Logger(),
-		test.first().Header.Height,
+		test.first().Height,
 		registers,
 		indexerCoreTest.indexer,
 		exeCache,
@@ -90,14 +90,14 @@ func newIndexerTest(t *testing.T, availableBlocks int, lastIndexedIndex int) *in
 	return test
 }
 
-func (w *indexerTest) setBlockDataByID(f func(ID flow.Identifier) (*execution_data.BlockExecutionDataEntity, bool)) {
+func (w *indexerTest) setBlockDataGet(f func(ID flow.Identifier) (*execution_data.BlockExecutionDataEntity, bool)) {
 	w.executionData.
-		On("ByID", mocks.AnythingOfType("flow.Identifier")).
+		On("Get", mocks.AnythingOfType("flow.Identifier")).
 		Return(f)
 }
 
 func (w *indexerTest) latestHeight() (uint64, error) {
-	return w.last().Header.Height, nil
+	return w.last().Height, nil
 }
 
 func (w *indexerTest) last() *flow.Block {
@@ -161,8 +161,8 @@ func (w *mockProgress) SetProcessedIndex(index uint64) error {
 	return nil
 }
 
-func (w *mockProgress) BatchSetProcessedIndex(uint64, storage.ReaderBatchWriter) error {
-	return fmt.Errorf("not implemented")
+func (w *mockProgress) BatchSetProcessedIndex(_ uint64, _ storage.ReaderBatchWriter) error {
+	return fmt.Errorf("batch not supported")
 }
 
 func (w *mockProgress) InitProcessedIndex(index uint64) error {
@@ -182,8 +182,8 @@ func TestIndexer_Success(t *testing.T) {
 	lastIndexedIndex := 5
 	test := newIndexerTest(t, blocks, lastIndexedIndex)
 
-	test.setBlockDataByID(func(ID flow.Identifier) (*execution_data.BlockExecutionDataEntity, bool) {
-		trie := trieUpdateFixture(t)
+	test.setBlockDataGet(func(ID flow.Identifier) (*execution_data.BlockExecutionDataEntity, bool) {
+		trie := TrieUpdateRandomLedgerPayloadsFixture(t)
 		collection := unittest.CollectionFixture(0)
 		ed := &execution_data.BlockExecutionData{
 			BlockID: ID,
@@ -200,7 +200,7 @@ func TestIndexer_Success(t *testing.T) {
 			var blockHeight uint64
 			for _, b := range test.blocks {
 				if b.ID() == ID {
-					blockHeight = b.Header.Height
+					blockHeight = b.Height
 				}
 			}
 
@@ -213,7 +213,7 @@ func TestIndexer_Success(t *testing.T) {
 	})
 
 	signalerCtx, cancel := irrecoverable.NewMockSignalerContextWithCancel(t, context.Background())
-	lastHeight := test.blocks[len(test.blocks)-1].Header.Height
+	lastHeight := test.blocks[len(test.blocks)-1].Height
 	test.run(signalerCtx, lastHeight, cancel)
 
 	// make sure store was called correct number of times
@@ -226,8 +226,8 @@ func TestIndexer_Failure(t *testing.T) {
 	lastIndexedIndex := 5
 	test := newIndexerTest(t, blocks, lastIndexedIndex)
 
-	test.setBlockDataByID(func(ID flow.Identifier) (*execution_data.BlockExecutionDataEntity, bool) {
-		trie := trieUpdateFixture(t)
+	test.setBlockDataGet(func(ID flow.Identifier) (*execution_data.BlockExecutionDataEntity, bool) {
+		trie := TrieUpdateRandomLedgerPayloadsFixture(t)
 		collection := unittest.CollectionFixture(0)
 		ed := &execution_data.BlockExecutionData{
 			BlockID: ID,
@@ -248,14 +248,14 @@ func TestIndexer_Failure(t *testing.T) {
 	// make sure the error returned is as expected
 	expectedErr := fmt.Errorf(
 		"failed to index block data at height %d: %w",
-		test.blocks[lastIndexedIndex].Header.Height+1,
+		test.blocks[lastIndexedIndex].Height+1,
 		fmt.Errorf(
-			"could not index register payloads at height %d: %w", test.blocks[lastIndexedIndex].Header.Height+1, fmt.Errorf("error persisting data")),
+			"could not index register payloads at height %d: %w", test.blocks[lastIndexedIndex].Height+1, fmt.Errorf("error persisting data")),
 	)
 
 	_, cancel := context.WithCancel(context.Background())
 	signalerCtx := irrecoverable.NewMockSignalerContextExpectError(t, context.Background(), expectedErr)
-	lastHeight := test.blocks[lastIndexedIndex].Header.Height
+	lastHeight := test.blocks[lastIndexedIndex].Height
 	test.run(signalerCtx, lastHeight, cancel)
 
 	// make sure store was called correct number of times

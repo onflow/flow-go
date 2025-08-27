@@ -82,9 +82,9 @@ func (s *BackendBlockDigestSuite) requireBlockDigests(v interface{}, expectedBlo
 	actualBlock, ok := v.(*flow.BlockDigest)
 	require.True(s.T(), ok, "unexpected response type: %T", v)
 
-	s.Require().Equal(expectedBlock.Header.ID(), actualBlock.ID())
-	s.Require().Equal(expectedBlock.Header.Height, actualBlock.Height)
-	s.Require().Equal(expectedBlock.Header.Timestamp, actualBlock.Timestamp)
+	s.Require().Equal(expectedBlock.ID(), actualBlock.BlockID)
+	s.Require().Equal(expectedBlock.Height, actualBlock.Height)
+	s.Require().Equal(expectedBlock.Timestamp, uint64(actualBlock.Timestamp.UnixMilli()))
 }
 
 // TestSubscribeBlockDigestsHandlesErrors tests error handling scenarios for the SubscribeBlockDigestsFromStartBlockID and SubscribeBlockDigestsFromStartHeight methods in the Backend.
@@ -134,7 +134,7 @@ func (s *BackendBlockDigestSuite) TestSubscribeBlockDigestsHandlesErrors() {
 		subCtx, subCancel := context.WithCancel(ctx)
 		defer subCancel()
 
-		sub := s.backend.SubscribeBlockDigestsFromStartHeight(subCtx, s.rootBlock.Header.Height-1, flow.BlockStatusFinalized)
+		sub := s.backend.SubscribeBlockDigestsFromStartHeight(subCtx, s.rootBlock.Height-1, flow.BlockStatusFinalized)
 		assert.Equal(s.T(), codes.InvalidArgument, status.Code(sub.Err()), "expected %s, got %v: %v", codes.InvalidArgument, status.Code(sub.Err()).String(), sub.Err())
 	})
 
@@ -142,7 +142,7 @@ func (s *BackendBlockDigestSuite) TestSubscribeBlockDigestsHandlesErrors() {
 		subCtx, subCancel := context.WithCancel(ctx)
 		defer subCancel()
 
-		sub := s.backend.SubscribeBlockDigestsFromStartHeight(subCtx, s.blocksArray[len(s.blocksArray)-1].Header.Height+10, flow.BlockStatusFinalized)
+		sub := s.backend.SubscribeBlockDigestsFromStartHeight(subCtx, s.blocksArray[len(s.blocksArray)-1].Height+10, flow.BlockStatusFinalized)
 		assert.Equal(s.T(), codes.NotFound, status.Code(sub.Err()), "expected %s, got %v: %v", codes.NotFound, status.Code(sub.Err()).String(), sub.Err())
 	})
 }
