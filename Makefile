@@ -257,13 +257,26 @@ fix-lint:
 	# revive -config revive.toml -exclude storage/ledger/trie ./...
 	./tools/custom-gcl run -v --fix $(or $(LINT_PATH),./...)
 
+.PHONY: fix-lint-new
+fix-lint-new:
+	# revive -config revive.toml -exclude storage/ledger/trie ./...
+	./tools/custom-gcl run -v --fix --new-from-rev=master
+
 .PHONY: fix-imports
 fix-imports:
-	./tools/custom-gcl run --disable-all --enable=gci --fix $(or $(LINT_PATH),./...)
+	./tools/custom-gcl run --enable-only=gci --fix $(or $(LINT_PATH),./...)
+
+.PHONY: fix-imports-new
+fix-imports-new:
+	./tools/custom-gcl run --enable-only=gci --fix --new-from-rev=master
 
 .PHONY: vet
 vet:
-	./tools/custom-gcl run --disable-all --enable=govet $(or $(LINT_PATH),./...)
+	./tools/custom-gcl run --enable-only=govet $(or $(LINT_PATH),./...)
+
+.PHONY: vet-new
+vet-new:
+	./tools/custom-gcl run --enable-only=govet --new-from-rev=master
 
 # Runs unit tests with different list of packages as passed by CI so they run in parallel
 .PHONY: ci

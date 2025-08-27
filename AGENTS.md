@@ -52,8 +52,11 @@ This file provides guidance to AI Agents when working with code in this reposito
 ### Code Quality and Generation
 - `make lint` - Run linter (includes tidy and custom checks)
 - `make fix-lint` - Automatically fix linting issues
+- `make fix-lint-new` - Automatically fix linting issues for files changed since master
 - `make fix-imports` - Automatically fix imports
+- `make fix-imports-new` - Automatically fix imports for files changed since master
 - `make vet` - Run go vet
+- `make vet-new` - Run go vet for files changed since master
 - `make generate` - Run all code generators (proto, mocks, fvm wrappers)
 - `make generate-mocks` - Generate mocks for unit tests
 - `make generate-proto` - Generate protobuf stubs
@@ -61,7 +64,6 @@ This file provides guidance to AI Agents when working with code in this reposito
 
 `lint`, `vet`, `fix-lint`, and `fix-imports` support passing `LINT_PATH`, which sets the path used by golangci-lint
 - `make lint -e LINT_PATH=./path/to/lint/...` - Run linter for a specific module
-- `make lint -e LINT_PATH="./path/to/lint/file1.go ./path/to/lint/file2.go"` - Run linter for a set of paths
 
 ### Dependency Management
 - `make install-tools` - Install all required development tools
