@@ -69,9 +69,7 @@ func (s *AccountsSuite) SetupTest() {
 
 	s.execClient = access.NewExecutionAPIClient(s.T())
 	s.executionNodes = unittest.IdentityListFixture(2, unittest.WithRole(flow.RoleExecution))
-
-	block := unittest.BlockFixture()
-	s.block = &block
+	s.block = unittest.BlockFixture()
 
 	var err error
 	s.account, err = unittest.AccountFixture()
@@ -135,7 +133,7 @@ func (s *AccountsSuite) TestGetAccountFromStorage_HappyPath() {
 	ctx := context.Background()
 
 	scriptExecutor := execmock.NewScriptExecutor(s.T())
-	scriptExecutor.On("GetAccountAtBlockHeight", mock.Anything, s.account.Address, s.block.Header.Height).
+	scriptExecutor.On("GetAccountAtBlockHeight", mock.Anything, s.account.Address, s.block.Height).
 		Return(s.account, nil)
 
 	backend := s.defaultAccountsBackend(query_mode.IndexQueryModeLocalOnly, scriptExecutor)
@@ -180,7 +178,7 @@ func (s *AccountsSuite) TestGetAccountFromStorage_Fails() {
 	}
 
 	for _, tt := range testCases {
-		scriptExecutor.On("GetAccountAtBlockHeight", mock.Anything, s.failingAddress, s.block.Header.Height).
+		scriptExecutor.On("GetAccountAtBlockHeight", mock.Anything, s.failingAddress, s.block.Height).
 			Return(nil, tt.err).Times(3)
 
 		s.state.On("Params").Return(s.params).Times(3)
@@ -194,8 +192,8 @@ func (s *AccountsSuite) TestGetAccountFromStorage_Fails() {
 		})
 
 		s.Run(fmt.Sprintf("GetAccountAtBlockHeight - fails with %v", tt.err), func() {
-			s.params.On("SporkRootBlockHeight").Return(s.block.Header.Height-10, nil)
-			s.params.On("SealedRoot").Return(s.block.Header, nil)
+			s.params.On("SporkRootBlockHeight").Return(s.block.Height-10, nil)
+			s.params.On("SealedRoot").Return(s.block.ToHeader(), nil)
 
 			s.testGetAccountAtBlockHeight(ctx, backend, tt.statusCode)
 		})
@@ -214,7 +212,7 @@ func (s *AccountsSuite) TestGetAccountFromFailover_HappyPath() {
 	backend := s.defaultAccountsBackend(query_mode.IndexQueryModeFailover, scriptExecutor)
 
 	for _, errToReturn := range []error{storage.ErrHeightNotIndexed, storage.ErrNotFound} {
-		scriptExecutor.On("GetAccountAtBlockHeight", mock.Anything, s.account.Address, s.block.Header.Height).
+		scriptExecutor.On("GetAccountAtBlockHeight", mock.Anything, s.account.Address, s.block.Height).
 			Return(nil, errToReturn).Times(3)
 
 		s.Run(fmt.Sprintf("GetAccount - happy path - recovers %v", errToReturn), func() {
@@ -226,8 +224,8 @@ func (s *AccountsSuite) TestGetAccountFromFailover_HappyPath() {
 		})
 
 		s.Run(fmt.Sprintf("GetAccountAtBlockHeight - happy path - recovers %v", errToReturn), func() {
-			s.params.On("SporkRootBlockHeight").Return(s.block.Header.Height-10, nil)
-			s.params.On("SealedRoot").Return(s.block.Header, nil)
+			s.params.On("SporkRootBlockHeight").Return(s.block.Height-10, nil)
+			s.params.On("SealedRoot").Return(s.block.ToHeader(), nil)
 
 			s.testGetAccountAtBlockHeight(ctx, backend, codes.OK)
 		})
@@ -247,7 +245,7 @@ func (s *AccountsSuite) TestGetAccountFromFailover_ReturnsENErrors() {
 	s.setupENFailingResponse(s.block.ID(), errToReturn)
 
 	scriptExecutor := execmock.NewScriptExecutor(s.T())
-	scriptExecutor.On("GetAccountAtBlockHeight", mock.Anything, s.failingAddress, s.block.Header.Height).
+	scriptExecutor.On("GetAccountAtBlockHeight", mock.Anything, s.failingAddress, s.block.Height).
 		Return(nil, storage.ErrHeightNotIndexed)
 
 	backend := s.defaultAccountsBackend(query_mode.IndexQueryModeFailover, scriptExecutor)
@@ -291,7 +289,7 @@ func (s *AccountsSuite) TestGetAccountBalanceFromStorage_HappyPath() {
 	ctx := context.Background()
 
 	scriptExecutor := execmock.NewScriptExecutor(s.T())
-	scriptExecutor.On("GetAccountBalance", mock.Anything, s.account.Address, s.block.Header.Height).
+	scriptExecutor.On("GetAccountBalance", mock.Anything, s.account.Address, s.block.Height).
 		Return(s.account.Balance, nil)
 
 	backend := s.defaultAccountsBackend(query_mode.IndexQueryModeLocalOnly, scriptExecutor)
@@ -301,7 +299,7 @@ func (s *AccountsSuite) TestGetAccountBalanceFromStorage_HappyPath() {
 	})
 
 	s.Run("GetAccountBalanceAtBlockHeight - happy path", func() {
-		s.headers.On("BlockIDByHeight", s.block.Header.Height).Return(s.block.Header.ID(), nil).Once()
+		s.headers.On("BlockIDByHeight", s.block.Height).Return(s.block.ID(), nil).Once()
 		s.testGetAccountBalanceAtBlockHeight(ctx, backend)
 	})
 }
@@ -321,7 +319,7 @@ func (s *AccountsSuite) TestGetAccountBalanceFromExecutionNode_HappyPath() {
 	})
 
 	s.Run("GetAccountBalanceAtBlockHeight - happy path", func() {
-		s.headers.On("BlockIDByHeight", s.block.Header.Height).Return(s.block.Header.ID(), nil).Once()
+		s.headers.On("BlockIDByHeight", s.block.Height).Return(s.block.ID(), nil).Once()
 		s.testGetAccountBalanceAtBlockHeight(ctx, backend)
 	})
 }
@@ -338,7 +336,7 @@ func (s *AccountsSuite) TestGetAccountBalanceFromFailover_HappyPath() {
 	backend := s.defaultAccountsBackend(query_mode.IndexQueryModeFailover, scriptExecutor)
 
 	for _, errToReturn := range []error{storage.ErrHeightNotIndexed, storage.ErrNotFound} {
-		scriptExecutor.On("GetAccountBalance", mock.Anything, s.account.Address, s.block.Header.Height).
+		scriptExecutor.On("GetAccountBalance", mock.Anything, s.account.Address, s.block.Height).
 			Return(uint64(0), errToReturn).Times(2)
 
 		s.Run(fmt.Sprintf("GetAccountBalanceAtLatestBlock - happy path -recovers %v", errToReturn), func() {
@@ -346,7 +344,7 @@ func (s *AccountsSuite) TestGetAccountBalanceFromFailover_HappyPath() {
 		})
 
 		s.Run(fmt.Sprintf("GetAccountBalanceAtBlockHeight - happy path -recovers %v", errToReturn), func() {
-			s.headers.On("BlockIDByHeight", s.block.Header.Height).Return(s.block.Header.ID(), nil).Once()
+			s.headers.On("BlockIDByHeight", s.block.Height).Return(s.block.ID(), nil).Once()
 			s.testGetAccountBalanceAtBlockHeight(ctx, backend)
 		})
 
@@ -359,7 +357,7 @@ func (s *AccountsSuite) TestGetAccountKeysFromStorage_HappyPath() {
 	ctx := context.Background()
 
 	scriptExecutor := execmock.NewScriptExecutor(s.T())
-	scriptExecutor.On("GetAccountKeys", mock.Anything, s.account.Address, s.block.Header.Height).
+	scriptExecutor.On("GetAccountKeys", mock.Anything, s.account.Address, s.block.Height).
 		Return(s.account.Keys, nil)
 
 	backend := s.defaultAccountsBackend(query_mode.IndexQueryModeLocalOnly, scriptExecutor)
@@ -369,7 +367,7 @@ func (s *AccountsSuite) TestGetAccountKeysFromStorage_HappyPath() {
 	})
 
 	s.Run("GetAccountKeysAtBlockHeight - happy path", func() {
-		s.headers.On("BlockIDByHeight", s.block.Header.Height).Return(s.block.Header.ID(), nil).Once()
+		s.headers.On("BlockIDByHeight", s.block.Height).Return(s.block.ID(), nil).Once()
 
 		s.testGetAccountKeysAtBlockHeight(ctx, backend)
 
@@ -385,7 +383,7 @@ func (s *AccountsSuite) TestGetAccountKeyFromStorage_HappyPath() {
 
 	var keyIndex uint32 = 0
 	keyByIndex := findAccountKeyByIndex(s.account.Keys, keyIndex)
-	scriptExecutor.On("GetAccountKey", mock.Anything, s.account.Address, keyIndex, s.block.Header.Height).
+	scriptExecutor.On("GetAccountKey", mock.Anything, s.account.Address, keyIndex, s.block.Height).
 		Return(keyByIndex, nil).Twice()
 
 	s.Run("GetAccountKeyAtLatestBlock - by key index - happy path", func() {
@@ -393,7 +391,7 @@ func (s *AccountsSuite) TestGetAccountKeyFromStorage_HappyPath() {
 	})
 
 	s.Run("GetAccountKeyAtBlockHeight - by key index - happy path", func() {
-		s.headers.On("BlockIDByHeight", s.block.Header.Height).Return(s.block.Header.ID(), nil).Once()
+		s.headers.On("BlockIDByHeight", s.block.Height).Return(s.block.ID(), nil).Once()
 
 		s.testGetAccountKeyAtBlockHeight(ctx, backend, keyIndex)
 	})
@@ -414,7 +412,7 @@ func (s *AccountsSuite) TestGetAccountKeysFromExecutionNode_HappyPath() {
 	})
 
 	s.Run("GetAccountKeysAtBlockHeight - all keys - happy path", func() {
-		s.headers.On("BlockIDByHeight", s.block.Header.Height).Return(s.block.Header.ID(), nil).Once()
+		s.headers.On("BlockIDByHeight", s.block.Height).Return(s.block.ID(), nil).Once()
 
 		s.testGetAccountKeysAtBlockHeight(ctx, backend)
 	})
@@ -438,7 +436,7 @@ func (s *AccountsSuite) TestGetAccountKeyFromExecutionNode_HappyPath() {
 	})
 
 	s.Run("GetAccountKeysAtLatestBlock - by key index - happy path", func() {
-		s.headers.On("BlockIDByHeight", s.block.Header.Height).Return(s.block.Header.ID(), nil).Once()
+		s.headers.On("BlockIDByHeight", s.block.Height).Return(s.block.ID(), nil).Once()
 
 		s.testGetAccountKeyAtBlockHeight(ctx, backend, keyIndex)
 	})
@@ -456,7 +454,7 @@ func (s *AccountsSuite) TestGetAccountKeysFromFailover_HappyPath() {
 	backend := s.defaultAccountsBackend(query_mode.IndexQueryModeFailover, scriptExecutor)
 
 	for _, errToReturn := range []error{storage.ErrHeightNotIndexed, storage.ErrNotFound} {
-		scriptExecutor.On("GetAccountKeys", mock.Anything, s.account.Address, s.block.Header.Height).
+		scriptExecutor.On("GetAccountKeys", mock.Anything, s.account.Address, s.block.Height).
 			Return(nil, errToReturn).Times(2)
 
 		s.Run(fmt.Sprintf("testGetAccountKeysAtLatestBlock -all keys - happy path - recovers %v", errToReturn), func() {
@@ -464,7 +462,7 @@ func (s *AccountsSuite) TestGetAccountKeysFromFailover_HappyPath() {
 		})
 
 		s.Run(fmt.Sprintf("GetAccountKeysAtBlockHeight - all keys - happy path - recovers %v", errToReturn), func() {
-			s.headers.On("BlockIDByHeight", s.block.Header.Height).Return(s.block.Header.ID(), nil).Once()
+			s.headers.On("BlockIDByHeight", s.block.Height).Return(s.block.ID(), nil).Once()
 
 			s.testGetAccountKeysAtBlockHeight(ctx, backend)
 		})
@@ -484,7 +482,7 @@ func (s *AccountsSuite) TestGetAccountKeyFromFailover_HappyPath() {
 	var keyIndex uint32 = 0
 
 	for _, errToReturn := range []error{storage.ErrHeightNotIndexed, storage.ErrNotFound} {
-		scriptExecutor.On("GetAccountKey", mock.Anything, s.account.Address, keyIndex, s.block.Header.Height).
+		scriptExecutor.On("GetAccountKey", mock.Anything, s.account.Address, keyIndex, s.block.Height).
 			Return(nil, errToReturn).Times(2)
 
 		s.Run(fmt.Sprintf("testGetAccountKeysAtLatestBlock - by key index - happy path - recovers %v", errToReturn), func() {
@@ -492,7 +490,7 @@ func (s *AccountsSuite) TestGetAccountKeyFromFailover_HappyPath() {
 		})
 
 		s.Run(fmt.Sprintf("GetAccountKeysAtBlockHeight - by key index - happy path - recovers %v", errToReturn), func() {
-			s.headers.On("BlockIDByHeight", s.block.Header.Height).Return(s.block.Header.ID(), nil).Once()
+			s.headers.On("BlockIDByHeight", s.block.Height).Return(s.block.ID(), nil).Once()
 
 			s.testGetAccountKeyAtBlockHeight(ctx, backend, keyIndex)
 		})
@@ -501,7 +499,7 @@ func (s *AccountsSuite) TestGetAccountKeyFromFailover_HappyPath() {
 
 func (s *AccountsSuite) testGetAccount(ctx context.Context, backend *Accounts, statusCode codes.Code) {
 	s.state.On("Sealed").Return(s.snapshot, nil).Once()
-	s.snapshot.On("Head").Return(s.block.Header, nil).Once()
+	s.snapshot.On("Head").Return(s.block.ToHeader(), nil).Once()
 
 	if statusCode == codes.OK {
 		actual, err := backend.GetAccount(ctx, s.account.Address)
@@ -517,7 +515,7 @@ func (s *AccountsSuite) testGetAccount(ctx context.Context, backend *Accounts, s
 
 func (s *AccountsSuite) testGetAccountAtLatestBlock(ctx context.Context, backend *Accounts, statusCode codes.Code) {
 	s.state.On("Sealed").Return(s.snapshot, nil).Once()
-	s.snapshot.On("Head").Return(s.block.Header, nil).Once()
+	s.snapshot.On("Head").Return(s.block.ToHeader(), nil).Once()
 
 	if statusCode == codes.OK {
 		actual, err := backend.GetAccountAtLatestBlock(ctx, s.account.Address)
@@ -532,8 +530,8 @@ func (s *AccountsSuite) testGetAccountAtLatestBlock(ctx context.Context, backend
 }
 
 func (s *AccountsSuite) testGetAccountAtBlockHeight(ctx context.Context, backend *Accounts, statusCode codes.Code) {
-	height := s.block.Header.Height
-	s.headers.On("BlockIDByHeight", height).Return(s.block.Header.ID(), nil).Once()
+	height := s.block.Height
+	s.headers.On("BlockIDByHeight", height).Return(s.block.ID(), nil).Once()
 
 	if statusCode == codes.OK {
 		actual, err := backend.GetAccountAtBlockHeight(ctx, s.account.Address, height)
@@ -549,7 +547,7 @@ func (s *AccountsSuite) testGetAccountAtBlockHeight(ctx context.Context, backend
 
 func (s *AccountsSuite) testGetAccountBalanceAtLatestBlock(ctx context.Context, backend *Accounts) {
 	s.state.On("Sealed").Return(s.snapshot, nil).Once()
-	s.snapshot.On("Head").Return(s.block.Header, nil).Once()
+	s.snapshot.On("Head").Return(s.block.ToHeader(), nil).Once()
 
 	actual, err := backend.GetAccountBalanceAtLatestBlock(ctx, s.account.Address)
 	s.Require().NoError(err)
@@ -557,14 +555,14 @@ func (s *AccountsSuite) testGetAccountBalanceAtLatestBlock(ctx context.Context, 
 }
 
 func (s *AccountsSuite) testGetAccountBalanceAtBlockHeight(ctx context.Context, backend *Accounts) {
-	actual, err := backend.GetAccountBalanceAtBlockHeight(ctx, s.account.Address, s.block.Header.Height)
+	actual, err := backend.GetAccountBalanceAtBlockHeight(ctx, s.account.Address, s.block.Height)
 	s.Require().NoError(err)
 	s.Require().Equal(s.account.Balance, actual)
 }
 
 func (s *AccountsSuite) testGetAccountKeysAtLatestBlock(ctx context.Context, backend *Accounts) {
 	s.state.On("Sealed").Return(s.snapshot, nil).Once()
-	s.snapshot.On("Head").Return(s.block.Header, nil).Once()
+	s.snapshot.On("Head").Return(s.block.ToHeader(), nil).Once()
 
 	actual, err := backend.GetAccountKeysAtLatestBlock(ctx, s.account.Address)
 	s.Require().NoError(err)
@@ -573,7 +571,7 @@ func (s *AccountsSuite) testGetAccountKeysAtLatestBlock(ctx context.Context, bac
 
 func (s *AccountsSuite) testGetAccountKeyAtLatestBlock(ctx context.Context, backend *Accounts, keyIndex uint32) {
 	s.state.On("Sealed").Return(s.snapshot, nil).Once()
-	s.snapshot.On("Head").Return(s.block.Header, nil).Once()
+	s.snapshot.On("Head").Return(s.block.ToHeader(), nil).Once()
 
 	actual, err := backend.GetAccountKeyAtLatestBlock(ctx, s.account.Address, keyIndex)
 	expectedKeyByIndex := findAccountKeyByIndex(s.account.Keys, keyIndex)
@@ -582,13 +580,13 @@ func (s *AccountsSuite) testGetAccountKeyAtLatestBlock(ctx context.Context, back
 }
 
 func (s *AccountsSuite) testGetAccountKeysAtBlockHeight(ctx context.Context, backend *Accounts) {
-	actual, err := backend.GetAccountKeysAtBlockHeight(ctx, s.account.Address, s.block.Header.Height)
+	actual, err := backend.GetAccountKeysAtBlockHeight(ctx, s.account.Address, s.block.Height)
 	s.Require().NoError(err)
 	s.Require().Equal(s.account.Keys, actual)
 }
 
 func (s *AccountsSuite) testGetAccountKeyAtBlockHeight(ctx context.Context, backend *Accounts, keyIndex uint32) {
-	actual, err := backend.GetAccountKeyAtBlockHeight(ctx, s.account.Address, keyIndex, s.block.Header.Height)
+	actual, err := backend.GetAccountKeyAtBlockHeight(ctx, s.account.Address, keyIndex, s.block.Height)
 	expectedKeyByIndex := findAccountKeyByIndex(s.account.Keys, keyIndex)
 	s.Require().NoError(err)
 	s.Require().Equal(expectedKeyByIndex, actual)
