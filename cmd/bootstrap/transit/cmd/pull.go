@@ -15,6 +15,7 @@ import (
 
 	"github.com/onflow/flow-go/cmd/bootstrap/gcs"
 	"github.com/onflow/flow-go/cmd/bootstrap/utils"
+	"github.com/onflow/flow-go/model/bootstrap"
 	model "github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -37,6 +38,7 @@ func addPullCmdFlags() {
 	pullCmd.Flags().StringVarP(&flagNodeRole, "role", "r", "", `node role (can be "collection", "consensus", "execution", "verification" or "access")`)
 	pullCmd.Flags().DurationVar(&flagTimeout, "timeout", time.Second*300, `timeout for pull`)
 	pullCmd.Flags().Int64Var(&flagConcurrency, "concurrency", 2, `concurrency limit for pull`)
+	pullCmd.Flags().StringVarP(&flagBucketName, "bucket-name", "g", "flow-genesis-bootstrap", `bucket for pulling bootstrap files`)
 
 	_ = pullCmd.MarkFlagRequired("token")
 	_ = pullCmd.MarkFlagRequired("role")
@@ -155,7 +157,8 @@ func pull(cmd *cobra.Command, args []string) {
 
 	// unwrap consensus node role files
 	if role == flow.RoleConsensus {
-		err = unWrapFile(flagBootDir, nodeID)
+		unWrappedFilePath := filepath.Join(flagBootDir, fmt.Sprintf(bootstrap.PathRandomBeaconPriv, nodeID))
+		err = unWrapFile(flagBootDir, nodeID, flagBootDir, unWrappedFilePath)
 		if err != nil {
 			log.Fatal().Err(err).Msg("failed to pull")
 		}

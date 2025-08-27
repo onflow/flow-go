@@ -8,6 +8,8 @@ import (
 
 	"github.com/rs/zerolog"
 
+	"github.com/onflow/flow-go/engine"
+	"github.com/onflow/flow-go/engine/common/fifoqueue"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module"
@@ -73,6 +75,10 @@ type CollectionSyncer struct {
 	state     protocol.State
 	requester module.Requester
 
+	// collections to be indexed
+	pendingCollections        *engine.FifoMessageStore
+	pendingCollectionsHandler *engine.MessageHandler
+
 	blocks       storage.Blocks
 	collections  storage.Collections
 	transactions storage.Transactions
@@ -91,19 +97,39 @@ func NewCollectionSyncer(
 	collections storage.Collections,
 	transactions storage.Transactions,
 	lastFullBlockHeight *counters.PersistentStrictMonotonicCounter,
-) *CollectionSyncer {
+) (*CollectionSyncer, error) {
 	collectionExecutedMetric.UpdateLastFullBlockHeight(lastFullBlockHeight.Value())
 
-	return &CollectionSyncer{
-		logger:                   logger,
-		state:                    state,
-		requester:                requester,
-		blocks:                   blocks,
-		collections:              collections,
-		transactions:             transactions,
-		lastFullBlockHeight:      lastFullBlockHeight,
-		collectionExecutedMetric: collectionExecutedMetric,
+	collectionsQueue, err := fifoqueue.NewFifoQueue(defaultQueueCapacity)
+	if err != nil {
+		return nil, fmt.Errorf("could not create collections queue: %w", err)
 	}
+
+	pendingCollections := &engine.FifoMessageStore{FifoQueue: collectionsQueue}
+	pendingCollectionsHandler := engine.NewMessageHandler(
+		logger,
+		engine.NewNotifier(),
+		engine.Pattern{
+			Match: func(msg *engine.Message) bool {
+				_, ok := msg.Payload.(*flow.Collection)
+				return ok
+			},
+			Store: pendingCollections,
+		},
+	)
+
+	return &CollectionSyncer{
+		logger:                    logger,
+		state:                     state,
+		requester:                 requester,
+		pendingCollectionsHandler: pendingCollectionsHandler,
+		pendingCollections:        pendingCollections,
+		blocks:                    blocks,
+		collections:               collections,
+		transactions:              transactions,
+		lastFullBlockHeight:       lastFullBlockHeight,
+		collectionExecutedMetric:  collectionExecutedMetric,
+	}, nil
 }
 
 // StartWorkerLoop continuously monitors and triggers collection sync operations.
@@ -144,6 +170,24 @@ func (s *CollectionSyncer) StartWorkerLoop(ctx irrecoverable.SignalerContext, re
 			err := s.updateLastFullBlockHeight()
 			if err != nil {
 				ctx.Throw(err)
+			}
+
+		case <-s.pendingCollectionsHandler.GetNotifier():
+			msg, ok := s.pendingCollections.Get()
+			if !ok {
+				ctx.Throw(fmt.Errorf("could not get pending collection"))
+			}
+
+			collection, ok := msg.Payload.(*flow.Collection)
+			if !ok {
+				ctx.Throw(fmt.Errorf("could not cast pending collection to *flow.Collection. got: %T", msg.Payload))
+				return
+			}
+
+			err := indexer.IndexCollection(collection, s.collections, s.transactions, s.logger, s.collectionExecutedMetric)
+			if err != nil {
+				ctx.Throw(fmt.Errorf("error indexing collection: %w", err))
+				return
 			}
 		}
 	}
@@ -330,13 +374,13 @@ func (s *CollectionSyncer) RequestCollectionsForBlock(height uint64, missingColl
 // requestCollections registers collection download requests in the requester engine,
 // optionally forcing immediate dispatch.
 func (s *CollectionSyncer) requestCollections(collections []*flow.CollectionGuarantee, immediately bool) {
-	for _, collection := range collections {
-		guarantors, err := protocol.FindGuarantors(s.state, collection)
+	for _, guarantee := range collections {
+		guarantors, err := protocol.FindGuarantors(s.state, guarantee)
 		if err != nil {
 			// failed to find guarantors for guarantees contained in a finalized block is fatal error
-			s.logger.Fatal().Err(err).Msgf("could not find guarantors for guarantee %v", collection.ID())
+			s.logger.Fatal().Err(err).Msgf("could not find guarantors for collection %v", guarantee.CollectionID)
 		}
-		s.requester.EntityByID(collection.ID(), filter.HasNodeID[flow.Identity](guarantors...))
+		s.requester.EntityByID(guarantee.CollectionID, filter.HasNodeID[flow.Identity](guarantors...))
 	}
 
 	if immediately {
@@ -405,17 +449,15 @@ func (s *CollectionSyncer) findLowestBlockHeightWithMissingCollections(
 }
 
 // OnCollectionDownloaded indexes and persists a downloaded collection.
-// This is a callback intended to be used with the requester engine.
-func (s *CollectionSyncer) OnCollectionDownloaded(_ flow.Identifier, entity flow.Entity) {
-	collection, ok := entity.(*flow.Collection)
-	if !ok {
-		s.logger.Error().Msgf("invalid entity type (%T)", entity)
-		return
-	}
-
-	err := indexer.IndexCollection(collection, s.collections, s.transactions, s.logger, s.collectionExecutedMetric)
+// This function is a callback intended to be used by the requester engine.
+func (s *CollectionSyncer) OnCollectionDownloaded(id flow.Identifier, entity flow.Entity) {
+	err := s.pendingCollectionsHandler.Process(id, entity)
 	if err != nil {
-		s.logger.Error().Err(err).Msg("could not index collection after it has been downloaded")
+		// this is an unexpected error condition. The only expected error returned from Process
+		// is for an unexpected type. since OnCollectionDownloaded is called from the requester engine,
+		// which is configured to only process collections, any error returned here indicates
+		// a bug or state corruption.
+		s.logger.Fatal().Err(err).Msg("failed to process pending collections")
 		return
 	}
 }

@@ -5,13 +5,13 @@ import (
 	"github.com/onflow/flow-go/storage"
 )
 
-// InsertExecutionReceiptMeta inserts an execution receipt meta by ID.
-func InsertExecutionReceiptMeta(w storage.Writer, receiptID flow.Identifier, meta *flow.ExecutionReceiptMeta) error {
+// InsertExecutionReceiptStub inserts an execution receipt meta by ID.
+func InsertExecutionReceiptStub(w storage.Writer, receiptID flow.Identifier, meta *flow.ExecutionReceiptStub) error {
 	return UpsertByKey(w, MakePrefix(codeExecutionReceiptMeta, receiptID), meta)
 }
 
-// RetrieveExecutionReceiptMeta retrieves a execution receipt meta by ID.
-func RetrieveExecutionReceiptMeta(r storage.Reader, receiptID flow.Identifier, meta *flow.ExecutionReceiptMeta) error {
+// RetrieveExecutionReceiptStub retrieves a execution receipt meta by ID.
+func RetrieveExecutionReceiptStub(r storage.Reader, receiptID flow.Identifier, meta *flow.ExecutionReceiptStub) error {
 	return RetrieveByKey(r, MakePrefix(codeExecutionReceiptMeta, receiptID), meta)
 }
 
@@ -43,20 +43,14 @@ func LookupExecutionReceipts(r storage.Reader, blockID flow.Identifier, receiptI
 }
 
 // receiptIterationFunc returns an in iteration function which returns all receipt IDs found during traversal
-func receiptIterationFunc(receiptIDs *[]flow.Identifier) func() (CheckFunc, CreateFunc, HandleFunc) {
-	check := func(key []byte) (bool, error) {
-		return true, nil
-	}
-
-	var receiptID flow.Identifier
-	create := func() interface{} {
-		return &receiptID
-	}
-	handle := func() error {
+func receiptIterationFunc(receiptIDs *[]flow.Identifier) IterationFunc {
+	return func(keyCopy []byte, getValue func(destVal any) error) (bail bool, err error) {
+		var receiptID flow.Identifier
+		err = getValue(&receiptID)
+		if err != nil {
+			return true, err
+		}
 		*receiptIDs = append(*receiptIDs, receiptID)
-		return nil
-	}
-	return func() (CheckFunc, CreateFunc, HandleFunc) {
-		return check, create, handle
+		return false, nil
 	}
 }

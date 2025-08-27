@@ -6,7 +6,7 @@ type State int32
 const (
 	// StatePending is the initial state after instantiation, before Run is called
 	StatePending State = iota
-	// StateDownloading represents the state where data download is in progress
+	// StateProcessing represents the state where data processing (download and indexing) has been started
 	StateProcessing
 	// StateWaitingPersist represents the state where all data is indexed, but conditions to persist are not met
 	StateWaitingPersist

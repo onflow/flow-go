@@ -199,7 +199,7 @@ func (b *BadgerRetryableUploaderWrapper) reconstructComputationResult(
 
 	// grabbing collections and guarantees from BadgerDB
 	guarantees := make([]*flow.CollectionGuarantee, 0)
-	if block != nil && block.Payload != nil {
+	if block != nil {
 		guarantees = block.Payload.Guarantees
 	}
 
@@ -214,8 +214,8 @@ func (b *BadgerRetryableUploaderWrapper) reconstructComputationResult(
 		}
 
 		completeCollections[collectionID] = &entity.CompleteCollection{
-			Guarantee:    guarantees[inx],
-			Transactions: collection.Transactions,
+			Guarantee:  guarantees[inx],
+			Collection: collection,
 		}
 	}
 
@@ -239,7 +239,7 @@ func (b *BadgerRetryableUploaderWrapper) reconstructComputationResult(
 
 	// NOTE(#6777): The entity ultimately uploaded by this component is [uploader.BlockData],
 	// which does not include chunks, so we do not need to implement version-aware chunk construction here.
-	compRes := execution.NewEmptyComputationResult(executableBlock, flow.NewChunk)
+	compRes := execution.NewEmptyComputationResult(executableBlock)
 
 	eventsByTxIndex := make(map[int]flow.EventsList, 0)
 	for _, event := range events {

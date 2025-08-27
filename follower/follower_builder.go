@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/jordanschalm/lockctx"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/onflow/crypto"
 	"github.com/rs/zerolog"
@@ -78,6 +79,7 @@ type FollowerServiceConfig struct {
 	bootstrapIdentities flow.IdentitySkeletonList // the identity list of bootstrap peers the node uses to discover other nodes
 	NetworkKey          crypto.PrivateKey         // the networking key passed in by the caller when being used as a library
 	baseOptions         []cmd.Option
+	lockManager         lockctx.Manager // the lock manager used by the follower service, can be nil if not used
 }
 
 // DefaultFollowerServiceConfig defines all the default values for the FollowerServiceConfig
@@ -99,7 +101,7 @@ type FollowerServiceBuilder struct {
 	FollowerDistributor *pubsub.FollowerDistributor
 	Committee           hotstuff.DynamicCommittee
 	Finalized           *flow.Header
-	Pending             []*flow.Header
+	Pending             []*flow.ProposalHeader
 	FollowerCore        module.HotStuffFollower
 	// for the observer, the sync engine participants provider is the libp2p peer store which is not
 	// available until after the network has started. Hence, a factory function that needs to be called just before
@@ -207,7 +209,7 @@ func (builder *FollowerServiceBuilder) buildFollowerCore() *FollowerServiceBuild
 			node.Storage.Headers,
 			final,
 			builder.FollowerDistributor,
-			node.FinalizedRootBlock.Header,
+			node.FinalizedRootBlock.ToHeader(),
 			node.RootQC,
 			builder.Finalized,
 			builder.Pending,
@@ -329,6 +331,14 @@ func WithNetworkKey(key crypto.PrivateKey) FollowerOption {
 	}
 }
 
+func WithStorageLockManager(lockManager lockctx.Manager) FollowerOption {
+	return func(config *FollowerServiceConfig) {
+		// LockManager is not used in the follower service, but we keep this option for compatibility
+		// with the staked node builder.
+		config.lockManager = lockManager
+	}
+}
+
 func WithBaseOptions(baseOptions []cmd.Option) FollowerOption {
 	return func(config *FollowerServiceConfig) {
 		config.baseOptions = baseOptions
@@ -350,6 +360,7 @@ func FlowConsensusFollowerService(opts ...FollowerOption) *FollowerServiceBuilde
 	// the observer gets a version of the root snapshot file that does not contain any node addresses
 	// hence skip all the root snapshot validations that involved an identity address
 	ret.FlowNodeBuilder.SkipNwAddressBasedValidations = true
+	ret.StorageLockMgr = config.lockManager
 	return ret
 }
 

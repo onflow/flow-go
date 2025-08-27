@@ -2,7 +2,6 @@ package ingestion2
 
 import (
 	"fmt"
-	"sort"
 	"sync"
 
 	"github.com/rs/zerolog"
@@ -253,7 +252,7 @@ func (rf *ResultsForest) ResetLowestRejectedView() (uint64, bool) {
 //   - ErrMaxViewDeltaExceeded: if the result's block view is more than maxViewDelta views ahead of the last sealed view
 //   - All other errors are potential indicators of bugs or corrupted internal state (continuation impossible)
 func (rf *ResultsForest) AddSealedResult(result *flow.ExecutionResult) error {
-	container, err := rf.getOrCreateContainer(result)
+	container, err := rf.getOrCreateContainer(result, BlockStatusSealed)
 	if err != nil {
 		return fmt.Errorf("failed to get container for result (%s): %w", result.ID(), err)
 	}
@@ -263,7 +262,7 @@ func (rf *ResultsForest) AddSealedResult(result *flow.ExecutionResult) error {
 	}
 
 	// This call might be the first time, where the ResultsForest learns that the result is sealed.
-	container.Pipeline().SetSealed()
+	container.SetBlockStatus(BlockStatusSealed)
 	return nil
 }
 
@@ -273,8 +272,8 @@ func (rf *ResultsForest) AddSealedResult(result *flow.ExecutionResult) error {
 // Expected errors during normal operations:
 //   - ErrMaxViewDeltaExceeded: if the result's block view is more than maxViewDelta views ahead of the last sealed view
 //   - All other errors are potential indicators of bugs or corrupted internal state (continuation impossible)
-func (rf *ResultsForest) AddReceipt(receipt *flow.ExecutionReceipt) (bool, error) {
-	container, err := rf.getOrCreateContainer(&receipt.ExecutionResult)
+func (rf *ResultsForest) AddReceipt(receipt *flow.ExecutionReceipt, blockStatus BlockStatus) (bool, error) {
+	container, err := rf.getOrCreateContainer(&receipt.ExecutionResult, blockStatus)
 	if err != nil {
 		return false, fmt.Errorf("failed to get container for result (%s): %w", receipt.ExecutionResult.ID(), err)
 	}
@@ -282,6 +281,8 @@ func (rf *ResultsForest) AddReceipt(receipt *flow.ExecutionReceipt) (bool, error
 		// noop if the result's block view is lower than the lowest view.
 		return false, nil
 	}
+
+	container.SetBlockStatus(blockStatus)
 
 	added, err := container.AddReceipt(receipt)
 	if err != nil {
@@ -302,7 +303,7 @@ func (rf *ResultsForest) AddReceipt(receipt *flow.ExecutionReceipt) (bool, error
 // Expected errors during normal operations:
 //   - ErrMaxViewDeltaExceeded: if the result's block view is more than maxViewDelta views ahead of the last sealed view
 //   - All other errors are potential indicators of bugs or corrupted internal state (continuation impossible)
-func (rf *ResultsForest) getOrCreateContainer(result *flow.ExecutionResult) (*ExecutionResultContainer, error) {
+func (rf *ResultsForest) getOrCreateContainer(result *flow.ExecutionResult, blockStatus BlockStatus) (*ExecutionResultContainer, error) {
 	// First, try to get existing container - this will acquire read-lock only
 	resultID := result.ID()
 	container, found := rf.GetContainer(resultID)
@@ -323,7 +324,7 @@ func (rf *ResultsForest) getOrCreateContainer(result *flow.ExecutionResult) (*Ex
 	}
 
 	pipeline := rf.pipelineFactory.NewPipeline(result)
-	container, err = NewExecutionResultContainer(result, executedBlock, pipeline)
+	newContainer, err := NewExecutionResultContainer(result, executedBlock, blockStatus, pipeline)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create container for result (%s): %w", resultID, err)
 	}
@@ -347,6 +348,7 @@ func (rf *ResultsForest) getOrCreateContainer(result *flow.ExecutionResult) (*Ex
 	if found {
 		return container, nil
 	}
+	container = newContainer
 
 	// drop receipts for block views lower than the lowest view.
 	if executedBlock.View < rf.forest.LowestLevel {
@@ -355,9 +357,7 @@ func (rf *ResultsForest) getOrCreateContainer(result *flow.ExecutionResult) (*Ex
 
 	// make sure the result's block view is within the accepted range
 	if executedBlock.View > rf.forest.LowestLevel+rf.maxViewDelta {
-		if rf.lowestRejectedView == 0 || executedBlock.View < rf.lowestRejectedView {
-			rf.lowestRejectedView = executedBlock.View
-		}
+		rf.updateLowestRejectedView(executedBlock.View)
 		return nil, ErrMaxViewDeltaExceeded
 	}
 
@@ -395,6 +395,14 @@ func (rf *ResultsForest) getOrCreateContainer(result *flow.ExecutionResult) (*Ex
 	}
 
 	return container, nil
+}
+
+// updateLowestRejectedView updates the lowest rejected view if the new view is lower.
+// CAUTION: not concurrency safe! Caller must hold a lock.
+func (rf *ResultsForest) updateLowestRejectedView(view uint64) {
+	if rf.lowestRejectedView == 0 || view < rf.lowestRejectedView {
+		rf.lowestRejectedView = view
+	}
 }
 
 // HasReceipt checks if a receipt exists in the forest.
@@ -449,7 +457,6 @@ func (rf *ResultsForest) getContainer(resultID flow.Identifier) (*ExecutionResul
 }
 
 // IterateChildren iterates over all children of the given result ID and calls the provided function on each child.
-// CAUTION: this will aquire a read lock on the ResultsForest, so it is safe to call concurrently.
 // Callback function should return false to stop iteration
 func (rf *ResultsForest) IterateChildren(resultID flow.Identifier, fn func(*ExecutionResultContainer) bool) {
 	rf.mu.RLock()
@@ -470,123 +477,74 @@ func (rf *ResultsForest) iterateChildren(resultID flow.Identifier, fn func(*Exec
 	}
 }
 
-// OnResultSealed marks the execution result as sealed and updates the state of related pipelines.
-//
-// No errors are expected during normal operation.
-func (rf *ResultsForest) OnResultSealed(resultID flow.Identifier) error {
-	rf.mu.Lock()
-	defer rf.mu.Unlock()
-
-	// Get the container for the newly sealed result
-	sealedContainer, found := rf.getContainer(resultID)
-	if !found {
-		// the sealed result may not be loaded yet. we can ignore this notification for now and
-		// handle it during a future call.
-		return nil
-	}
-
-	// collect all unsealed containers in the path from the sealed result to the last sealed result.
-	// this ensures:
-	// 1. the newly sealed result descends from the last sealed result (state is consistent)
-	// 2. any sealing notifications that were missed due to undiscovered results are handled
-	// 3. sealing notifications are processed in sealing order
-	unsealedContainers, err := rf.findUnsealedAncestors(sealedContainer)
-	if err != nil {
-		return err
-	}
-
-	// if this notification is for an already sealed result, we can ignore it.
-	if len(unsealedContainers) == 0 {
-		return nil
-	}
-
-	for _, container := range unsealedContainers {
-		rf.markResultSealed(container)
-	}
-
-	rf.lastSealedResultID = resultID
-	rf.lastSealedView = sealedContainer.BlockView()
-
-	return nil
+// IterateView iterates over containers who's executed block has the given view, and calls the
+// provided function on each container.
+// Callback function should return false to stop iteration
+func (rf *ResultsForest) IterateView(view uint64, fn func(*ExecutionResultContainer) bool) {
+	rf.mu.RLock()
+	defer rf.mu.RUnlock()
+	rf.iterateView(view, fn)
 }
 
-// findUnsealedAncestors returns all unsealed containers between the last sealed container (excluded)
-// and the provided `head` of an execution fork. The returned containers are ordered by ascending views
-// of the executed blocks.
-// CAUTION: not concurrency safe!
-//
-// findUnsealedAncestors expects that `head` is a descendant of the last sealed result and that all
-// intermediate results are also in the forest. Otherwise, an exception is returned.
-//
-// No errors are expected during normal operation.
-func (rf *ResultsForest) findUnsealedAncestors(head *ExecutionResultContainer) ([]*ExecutionResultContainer, error) {
-	unsealedContainers := make([]*ExecutionResultContainer, 0)
-
-	if rf.lastSealedView >= head.BlockView() {
-		return unsealedContainers, nil
-	}
-	unsealedContainers = append(unsealedContainers, head)
-
-	for {
-		parentID, _ := head.Parent()
-		if parentID == rf.lastSealedResultID {
-			break
-		}
-
-		parent, found := rf.getContainer(parentID)
-		if !found {
-			return nil, fmt.Errorf("ancestor result %s of %s not found in forest", parentID, head.ResultID())
-		}
-
-		unsealedContainers = append(unsealedContainers, parent)
-		head = parent
-	}
-
-	// Sort containers by view in ascending order
-	sort.Slice(unsealedContainers, func(i, j int) bool {
-		return unsealedContainers[i].BlockView() < unsealedContainers[j].BlockView()
-	})
-
-	return unsealedContainers, nil
-}
-
-// markResultSealed marks a result as sealed and updates its siblings' pipelines to abandoned.
+// IterateView iterates over containers who's executed block has the given view, and calls the
+// provided function on each container.
+// Callback function should return false to stop iteration
 // CAUTION: not concurrency safe! Caller must hold a lock.
-func (rf *ResultsForest) markResultSealed(container *ExecutionResultContainer) {
-	container.Pipeline().SetSealed()
-
-	// abandon all conflicting forks
-	parentID, _ := container.Parent()
-	rf.iterateChildren(parentID, func(sibling *ExecutionResultContainer) bool {
-		if sibling.ResultID() != container.ResultID() {
-			rf.abandonFork(sibling)
+func (rf *ResultsForest) iterateView(view uint64, fn func(*ExecutionResultContainer) bool) {
+	containers := rf.forest.GetVerticesAtLevel(view)
+	for containers.HasNext() {
+		containers := containers.NextVertex().(*ExecutionResultContainer)
+		if !fn(containers) {
+			return
 		}
-		return true
-	})
+	}
 }
 
-// OnBlockStatusUpdated signals that the block status has been updated.
-// It finds all vertices for results of blocks that conflict with the finalized block and abort them.
-func (rf *ResultsForest) OnBlockStatusUpdated(finalized *flow.Header, sealed *flow.Header, parentBlockResultIDs []flow.Identifier) error {
+// OnBlockFinalized notifies the ResultsForest that a block has been finalized.
+// The forest updates the state of all results affected by the finalized block and its seals.
+func (rf *ResultsForest) OnBlockFinalized(finalized *flow.Block) {
 	finalizedBlockID := finalized.ID()
 	rf.mu.Lock()
 	defer rf.mu.Unlock()
 
-	// 1. Get all ExecutionResults for the finalized block's parent (done by caller)
-	// 2. For each of these results, get all child vertices
-	// 3. For each child vertex, cancel if it does not reference the finalized block
+	// Mark all sealed results as sealed and abandon all conflicting forks.
+	for _, seal := range finalized.Payload.Seals {
+		container, found := rf.getContainer(seal.ResultID)
+		if found {
+			container.SetBlockStatus(BlockStatusSealed)
 
-	for _, parentResultID := range parentBlockResultIDs {
-		rf.iterateChildren(parentResultID, func(child *ExecutionResultContainer) bool {
-			if child.Result().BlockID != finalizedBlockID {
+			// abandon all conflicting forks
+			parentID, _ := container.Parent()
+			rf.iterateChildren(parentID, func(sibling *ExecutionResultContainer) bool {
+				if sibling.ResultID() != container.ResultID() {
+					rf.abandonFork(sibling)
+				}
+				return true
+			})
+
+			if container.BlockView() > rf.lastSealedView {
+				rf.lastSealedResultID = container.ResultID()
+				rf.lastSealedView = container.BlockView()
+			}
+		}
+	}
+
+	// Abandon all forks who's executed block conflicts with the new finalized block.
+	// 1. Iterate all results for the finalized block's parent
+	// 2. For each result
+	//   i. if its executed block is the finalized block, mark it as finalized
+	//   ii. abandon all other forks
+	rf.iterateView(finalized.ParentView, func(container *ExecutionResultContainer) bool {
+		rf.iterateChildren(container.ResultID(), func(child *ExecutionResultContainer) bool {
+			if child.Result().BlockID == finalizedBlockID {
+				child.SetBlockStatus(BlockStatusFinalized)
+			} else {
 				rf.abandonFork(child)
 			}
 			return true
 		})
-	}
-
-	rf.manager.OnBlockStatusUpdated(finalized, sealed)
-	return nil
+		return true
+	})
 }
 
 // abandonFork recursively abandons a container and all its descendants.

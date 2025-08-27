@@ -66,14 +66,14 @@ func (e *Core) OnGuarantee(originID flow.Identifier, guarantee *flow.CollectionG
 	)
 	defer span.End()
 
-	guaranteeID := guarantee.ID()
-
 	log := e.log.With().
 		Hex("origin_id", originID[:]).
-		Hex("collection_id", guaranteeID[:]).
+		Hex("collection_id", guarantee.CollectionID[:]).
 		Hex("signers", guarantee.SignerIndices).
 		Logger()
 	log.Info().Msg("collection guarantee received")
+
+	guaranteeID := guarantee.ID()
 
 	// skip collection guarantees that are already in our memory pool
 	exists := e.pool.Has(guaranteeID)
@@ -97,7 +97,7 @@ func (e *Core) OnGuarantee(originID flow.Identifier, guarantee *flow.CollectionG
 	}
 
 	// at this point, we can add the guarantee to the memory pool
-	added := e.pool.Add(guarantee)
+	added := e.pool.Add(guaranteeID, guarantee)
 	if !added {
 		log.Debug().Msg("discarding guarantee already in pool")
 		return nil
@@ -159,19 +159,19 @@ func (e *Core) validateGuarantors(guarantee *flow.CollectionGuarantee) error {
 	if err != nil {
 		return fmt.Errorf("could not get current epoch: %w", err)
 	}
-	cluster, err := epoch.ClusterByChainID(guarantee.ChainID)
+	cluster, err := epoch.ClusterByChainID(guarantee.ClusterChainID)
 	// reference block not found
 	if errors.Is(err, state.ErrUnknownSnapshotReference) {
 		return engine.NewUnverifiableInputError(
-			"could not get clusters with chainID %v for unknown reference block (id=%x): %w", guarantee.ChainID, guarantee.ReferenceBlockID, err)
+			"could not get clusters with chainID %v for unknown reference block (id=%x): %w", guarantee.ClusterChainID, guarantee.ReferenceBlockID, err)
 	}
 	// cluster not found by the chain ID
 	if errors.Is(err, protocol.ErrClusterNotFound) {
-		return engine.NewInvalidInputErrorf("cluster not found by chain ID %v: %w", guarantee.ChainID, err)
+		return engine.NewInvalidInputErrorf("cluster not found by chain ID %v: %w", guarantee.ClusterChainID, err)
 	}
 	if err != nil {
-		return fmt.Errorf("internal error retrieving collector clusters for guarantee (ReferenceBlockID: %v, ChainID: %v): %w",
-			guarantee.ReferenceBlockID, guarantee.ChainID, err)
+		return fmt.Errorf("internal error retrieving collector clusters for guarantee (ReferenceBlockID: %v, ClusterChainID: %v): %w",
+			guarantee.ReferenceBlockID, guarantee.ClusterChainID, err)
 	}
 
 	// ensure the guarantors are from the same cluster

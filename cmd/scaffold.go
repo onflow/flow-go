@@ -12,7 +12,7 @@ import (
 	"time"
 
 	gcemd "cloud.google.com/go/compute/metadata"
-	"github.com/cockroachdb/pebble"
+	"github.com/cockroachdb/pebble/v2"
 	"github.com/dgraph-io/badger/v2"
 	"github.com/hashicorp/go-multierror"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
@@ -84,6 +84,7 @@ import (
 	bstorage "github.com/onflow/flow-go/storage/badger"
 	"github.com/onflow/flow-go/storage/badger/operation"
 	"github.com/onflow/flow-go/storage/dbops"
+	"github.com/onflow/flow-go/storage/locks"
 	"github.com/onflow/flow-go/storage/operation/badgerimpl"
 	"github.com/onflow/flow-go/storage/operation/pebbleimpl"
 	"github.com/onflow/flow-go/storage/store"
@@ -1231,6 +1232,18 @@ func (fnb *FlowNodeBuilder) initSecretsDB() error {
 	return nil
 }
 
+// initStorageLockManager initializes the lock manager used by the storage layer.
+// This manager must be a process-wide singleton.
+func (fnb *FlowNodeBuilder) initStorageLockManager() error {
+	if fnb.StorageLockMgr != nil {
+		fnb.Logger.Warn().Msgf("storage lock manager already initialized, skipping re-initialization, this should only happen in test case")
+		return nil
+	}
+
+	fnb.StorageLockMgr = locks.SingletonLockManager()
+	return nil
+}
+
 func (fnb *FlowNodeBuilder) initStorage() error {
 
 	// in order to void long iterations with big keys when initializing with an
@@ -1244,7 +1257,8 @@ func (fnb *FlowNodeBuilder) initStorage() error {
 	}
 
 	headers := bstorage.NewHeaders(fnb.Metrics.Cache, fnb.DB)
-	guarantees := bstorage.NewGuarantees(fnb.Metrics.Cache, fnb.DB, fnb.BaseConfig.guaranteesCacheSize)
+	guarantees := bstorage.NewGuarantees(fnb.Metrics.Cache, fnb.DB,
+		fnb.BaseConfig.guaranteesCacheSize, bstorage.DefaultCacheSize)
 	seals := bstorage.NewSeals(fnb.Metrics.Cache, fnb.DB)
 	results := bstorage.NewExecutionResults(fnb.Metrics.Cache, fnb.DB)
 	receipts := bstorage.NewExecutionReceipts(fnb.Metrics.Cache, fnb.DB, results, fnb.BaseConfig.receiptsCacheSize)
@@ -1435,9 +1449,9 @@ func (fnb *FlowNodeBuilder) initState() error {
 			Hex("root_result_id", logging.Entity(fnb.RootResult)).
 			Hex("root_state_commitment", fnb.RootSeal.FinalState[:]).
 			Hex("finalized_root_block_id", logging.Entity(fnb.FinalizedRootBlock)).
-			Uint64("finalized_root_block_height", fnb.FinalizedRootBlock.Header.Height).
+			Uint64("finalized_root_block_height", fnb.FinalizedRootBlock.Height).
 			Hex("sealed_root_block_id", logging.Entity(fnb.SealedRootBlock)).
-			Uint64("sealed_root_block_height", fnb.SealedRootBlock.Header.Height).
+			Uint64("sealed_root_block_height", fnb.SealedRootBlock.Height).
 			Msg("protocol state bootstrapped")
 	}
 
@@ -1465,9 +1479,9 @@ func (fnb *FlowNodeBuilder) initState() error {
 		Hex("last_sealed_block_id", logging.Entity(lastSealed)).
 		Uint64("last_sealed_block_height", lastSealed.Height).
 		Hex("finalized_root_block_id", logging.Entity(fnb.FinalizedRootBlock)).
-		Uint64("finalized_root_block_height", fnb.FinalizedRootBlock.Header.Height).
+		Uint64("finalized_root_block_height", fnb.FinalizedRootBlock.Height).
 		Hex("sealed_root_block_id", logging.Entity(fnb.SealedRootBlock)).
-		Uint64("sealed_root_block_height", fnb.SealedRootBlock.Header.Height).
+		Uint64("sealed_root_block_height", fnb.SealedRootBlock.Height).
 		Msg("successfully opened protocol state")
 
 	return nil
@@ -1510,7 +1524,7 @@ func (fnb *FlowNodeBuilder) setRootSnapshot(rootSnapshot protocol.Snapshot) erro
 		return fmt.Errorf("failed to read root QC: %w", err)
 	}
 
-	fnb.RootChainID = fnb.FinalizedRootBlock.Header.ChainID
+	fnb.RootChainID = fnb.FinalizedRootBlock.ChainID
 	fnb.SporkID = fnb.RootSnapshot.Params().SporkID()
 
 	return nil
@@ -2144,6 +2158,10 @@ func (fnb *FlowNodeBuilder) onStart() error {
 	}
 
 	if err := fnb.initLogger(); err != nil {
+		return err
+	}
+
+	if err := fnb.initStorageLockManager(); err != nil {
 		return err
 	}
 

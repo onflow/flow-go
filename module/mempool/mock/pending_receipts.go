@@ -31,9 +31,9 @@ func (_m *PendingReceipts) Add(receipt *flow.ExecutionReceipt) bool {
 	return r0
 }
 
-// ByPreviousResultID provides a mock function with given fields: previousReusltID
-func (_m *PendingReceipts) ByPreviousResultID(previousReusltID flow.Identifier) []*flow.ExecutionReceipt {
-	ret := _m.Called(previousReusltID)
+// ByPreviousResultID provides a mock function with given fields: previousResultID
+func (_m *PendingReceipts) ByPreviousResultID(previousResultID flow.Identifier) []*flow.ExecutionReceipt {
+	ret := _m.Called(previousResultID)
 
 	if len(ret) == 0 {
 		panic("no return value specified for ByPreviousResultID")
@@ -41,7 +41,7 @@ func (_m *PendingReceipts) ByPreviousResultID(previousReusltID flow.Identifier) 
 
 	var r0 []*flow.ExecutionReceipt
 	if rf, ok := ret.Get(0).(func(flow.Identifier) []*flow.ExecutionReceipt); ok {
-		r0 = rf(previousReusltID)
+		r0 = rf(previousResultID)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]*flow.ExecutionReceipt)

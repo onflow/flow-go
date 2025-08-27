@@ -8,6 +8,7 @@ import (
 	"go.uber.org/atomic"
 
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/counters"
 	"github.com/onflow/flow-go/module/executiondatasync/optimistic_sync"
 )
 
@@ -21,12 +22,13 @@ var ErrIncompatibleReceipt = errors.New("incompatible execution receipt")
 // same block. For optimized storage, we only store the result once. Mathematically, an
 // ExecutionResultContainer struct represents an Equivalence Class of Execution Receipts.
 type ExecutionResultContainer struct {
-	receipts    map[flow.Identifier]*flow.ExecutionReceiptMeta // map from ExecutionReceipt.ID -> ExecutionReceiptMeta
+	receipts    map[flow.Identifier]*flow.ExecutionReceiptStub // map from ExecutionReceipt.ID -> ExecutionReceiptStub
 	result      *flow.ExecutionResult
 	resultID    flow.Identifier // precomputed ID of result to avoid expensive hashing on each call
 	blockHeader *flow.Header    // header of the block which the result is for
 	pipeline    optimistic_sync.Pipeline
 	enqueued    *atomic.Bool
+	blockStatus counters.StrictMonotonicCounter
 
 	mu sync.RWMutex
 }
@@ -36,20 +38,30 @@ type ExecutionResultContainer struct {
 // specified block.
 //
 // No errors are expected during normal operation.
-func NewExecutionResultContainer(result *flow.ExecutionResult, header *flow.Header, pipeline optimistic_sync.Pipeline) (*ExecutionResultContainer, error) {
+func NewExecutionResultContainer(
+	result *flow.ExecutionResult,
+	header *flow.Header,
+	blockStatus BlockStatus,
+	pipeline optimistic_sync.Pipeline,
+) (*ExecutionResultContainer, error) {
 	// sanity check: initial result must be for block
 	if header.ID() != result.BlockID {
 		return nil, fmt.Errorf("initial result is for different block")
 	}
 
-	return &ExecutionResultContainer{
-		receipts:    make(map[flow.Identifier]*flow.ExecutionReceiptMeta),
+	c := &ExecutionResultContainer{
+		receipts:    make(map[flow.Identifier]*flow.ExecutionReceiptStub),
 		result:      result,
 		resultID:    result.ID(),
 		blockHeader: header,
 		pipeline:    pipeline,
 		enqueued:    atomic.NewBool(false),
-	}, nil
+		blockStatus: counters.NewMonotonicCounter(uint64(BlockStatusCertified)),
+	}
+
+	c.SetBlockStatus(blockStatus)
+
+	return c, nil
 }
 
 // IsEnqueued returns true if the container is enqueued for processing.
@@ -98,7 +110,7 @@ func (c *ExecutionResultContainer) AddReceipts(receipts ...*flow.ExecutionReceip
 	defer c.mu.Unlock()
 
 	receiptsAdded := uint(0)
-	for i := 0; i < len(receipts); i++ {
+	for i := range receipts {
 		added, err := c.addReceipt(receipts[i])
 		if err != nil {
 			return receiptsAdded, fmt.Errorf("failed to add receipt (%x) to equivalence class: %w", receipts[i].ID(), err)
@@ -126,7 +138,7 @@ func (c *ExecutionResultContainer) addReceipt(receipt *flow.ExecutionReceipt) (u
 	if c.has(receiptID) {
 		return 0, nil
 	}
-	c.receipts[receiptID] = receipt.Meta()
+	c.receipts[receiptID] = receipt.Stub()
 	return 1, nil
 }
 
@@ -173,6 +185,20 @@ func (c *ExecutionResultContainer) BlockView() uint64 {
 func (c *ExecutionResultContainer) Pipeline() optimistic_sync.Pipeline {
 	// No locking is required here since the pipeline is immutable after instantiation.
 	return c.pipeline
+}
+
+// BlockStatus returns the block status of the block executed by this result.
+func (c *ExecutionResultContainer) BlockStatus() BlockStatus {
+	return BlockStatus(c.blockStatus.Value())
+}
+
+// SetBlockStatus sets the block status of the block executed by this result.
+func (c *ExecutionResultContainer) SetBlockStatus(blockStatus BlockStatus) {
+	if c.blockStatus.Set(uint64(blockStatus)) {
+		if blockStatus == BlockStatusSealed {
+			c.pipeline.SetSealed()
+		}
+	}
 }
 
 // Methods implementing LevelledForest's Vertex interface

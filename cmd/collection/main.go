@@ -151,7 +151,7 @@ func main() {
 		// Collection Nodes use a lower min timeout than Consensus Nodes (1.5s vs 2.5s) because:
 		//  - they tend to have higher happy-path view rate, allowing a shorter timeout
 		//  - since they have smaller committees, 1-2 offline replicas has a larger negative impact, which is mitigating with a smaller timeout
-		flags.DurationVar(&hotstuffMinTimeout, "hotstuff-min-timeout", 1500*time.Millisecond,
+		flags.DurationVar(&hotstuffMinTimeout, "hotstuff-min-timeout", 1000*time.Millisecond,
 			"the lower timeout bound for the hotstuff pacemaker, this is also used as initial timeout")
 		flags.Float64Var(&hotstuffTimeoutAdjustmentFactor, "hotstuff-timeout-adjustment-factor", timeout.DefaultConfig.TimeoutAdjustmentFactor,
 			"adjustment of timeout duration in case of time out event")
@@ -340,7 +340,7 @@ func main() {
 				node.Storage.Headers,
 				finalizer,
 				followerDistributor,
-				node.FinalizedRootBlock.Header,
+				node.FinalizedRootBlock.ToHeader(),
 				node.RootQC,
 				finalized,
 				pending,

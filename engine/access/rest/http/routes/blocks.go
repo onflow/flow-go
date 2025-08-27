@@ -72,7 +72,7 @@ func GetBlocksByHeight(r *common.Request, backend access.API, link commonmodels.
 			return nil, err
 		}
 
-		req.EndHeight = latest.Header.Height // overwrite special value height with fetched
+		req.EndHeight = latest.Height // overwrite special value height with fetched
 
 		if req.StartHeight > req.EndHeight {
 			return nil, common.NewBadRequestError(fmt.Errorf("start height must be less than or equal to end height"))
@@ -106,7 +106,7 @@ func GetBlockPayloadByID(r *common.Request, backend access.API, _ commonmodels.L
 	}
 
 	var payload commonmodels.BlockPayload
-	err = payload.Build(blk.Payload)
+	err = payload.Build(&blk.Payload)
 	if err != nil {
 		return nil, err
 	}
@@ -195,13 +195,13 @@ func NewBlockProvider(backend access.API, options ...blockProviderOption) *block
 
 func (blkProvider *blockProvider) getBlock(ctx context.Context) (*flow.Block, flow.BlockStatus, error) {
 	if blkProvider.id != nil {
-		blk, _, err := blkProvider.backend.GetBlockByID(ctx, *blkProvider.id)
+		blk, status, err := blkProvider.backend.GetBlockByID(ctx, *blkProvider.id)
 		if err != nil { // unfortunately backend returns internal error status if not found
 			return nil, flow.BlockStatusUnknown, common.NewNotFoundError(
 				fmt.Sprintf("error looking up block with ID %s", blkProvider.id.String()), err,
 			)
 		}
-		return blk, flow.BlockStatusUnknown, nil
+		return blk, status, nil
 	}
 
 	if blkProvider.latest {

@@ -51,9 +51,9 @@ func MessageToLightCollection(m *entities.Collection) (*flow.LightCollection, er
 		transactions = append(transactions, MessageToIdentifier(txId))
 	}
 
-	return &flow.LightCollection{
+	return flow.NewLightCollection(flow.UntrustedLightCollection{
 		Transactions: transactions,
-	}, nil
+	}), nil
 }
 
 func FullCollectionToMessage(c *flow.Collection) ([]*entities.Transaction, error) {
@@ -79,32 +79,30 @@ func MessageToFullCollection(m []*entities.Transaction, chain flow.Chain) (*flow
 		transactions[i] = &t
 	}
 
-	return &flow.Collection{
-		Transactions: transactions,
-	}, nil
+	return flow.NewCollection(flow.UntrustedCollection{Transactions: transactions})
 }
 
 // CollectionGuaranteeToMessage converts a collection guarantee to a protobuf message
 func CollectionGuaranteeToMessage(g *flow.CollectionGuarantee) *entities.CollectionGuarantee {
-	id := g.ID()
-
 	return &entities.CollectionGuarantee{
-		CollectionId:     id[:],
+		CollectionId:     IdentifierToMessage(g.CollectionID),
 		Signatures:       [][]byte{g.Signature},
 		ReferenceBlockId: IdentifierToMessage(g.ReferenceBlockID),
 		Signature:        g.Signature,
 		SignerIndices:    g.SignerIndices,
+		ClusterChainId:   []byte(g.ClusterChainID),
 	}
 }
 
 // MessageToCollectionGuarantee converts a protobuf message to a collection guarantee
-func MessageToCollectionGuarantee(m *entities.CollectionGuarantee) *flow.CollectionGuarantee {
-	return &flow.CollectionGuarantee{
+func MessageToCollectionGuarantee(m *entities.CollectionGuarantee) (*flow.CollectionGuarantee, error) {
+	return flow.NewCollectionGuarantee(flow.UntrustedCollectionGuarantee{
 		CollectionID:     MessageToIdentifier(m.CollectionId),
 		ReferenceBlockID: MessageToIdentifier(m.ReferenceBlockId),
+		ClusterChainID:   flow.ChainID(m.ClusterChainId),
 		SignerIndices:    m.SignerIndices,
 		Signature:        MessageToSignature(m.Signature),
-	}
+	})
 }
 
 // CollectionGuaranteesToMessages converts a slice of collection guarantees to a slice of protobuf messages
@@ -117,10 +115,14 @@ func CollectionGuaranteesToMessages(c []*flow.CollectionGuarantee) []*entities.C
 }
 
 // MessagesToCollectionGuarantees converts a slice of protobuf messages to a slice of collection guarantees
-func MessagesToCollectionGuarantees(m []*entities.CollectionGuarantee) []*flow.CollectionGuarantee {
+func MessagesToCollectionGuarantees(m []*entities.CollectionGuarantee) ([]*flow.CollectionGuarantee, error) {
 	cg := make([]*flow.CollectionGuarantee, len(m))
 	for i, g := range m {
-		cg[i] = MessageToCollectionGuarantee(g)
+		guarantee, err := MessageToCollectionGuarantee(g)
+		if err != nil {
+			return nil, fmt.Errorf("could not convert message to collection guarantee: %w", err)
+		}
+		cg[i] = guarantee
 	}
-	return cg
+	return cg, nil
 }

@@ -20,7 +20,6 @@ func TestEventConversion(t *testing.T) {
 	chainID := flow.Emulator
 
 	t.Run("epoch setup", func(t *testing.T) {
-
 		fixture, expected := unittest.EpochSetupFixtureByChainID(chainID)
 
 		// convert Cadence types to Go types
@@ -86,25 +85,6 @@ func TestEventConversion(t *testing.T) {
 	t.Run("epoch commit", func(t *testing.T) {
 
 		fixture, expected := unittest.EpochCommitFixtureByChainID(chainID)
-
-		// convert Cadence types to Go types
-		event, err := convert.ServiceEvent(chainID, fixture)
-		require.NoError(t, err)
-		require.NotNil(t, event)
-
-		// cast event type to epoch commit
-		actual, ok := event.Event.(*flow.EpochCommit)
-		require.True(t, ok)
-
-		assert.Equal(t, expected, actual)
-	},
-	)
-
-	// TODO(EFM, #6794): Remove this once we complete the network upgrade, this is only to test
-	//  backward compatibility of EpochCommit service event
-	t.Run("epoch commit, backward compatibility", func(t *testing.T) {
-
-		fixture, expected := unittest.EpochCommitV0FixtureByChainID(chainID)
 
 		// convert Cadence types to Go types
 		event, err := convert.ServiceEvent(chainID, fixture)
@@ -274,10 +254,12 @@ func TestVersionBeaconEventConversion(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			events := systemcontracts.ServiceEventsForChain(chainID)
 
-			var err error
-			event := unittest.EventFixture(events.VersionBeacon.EventType(), 1, 1, unittest.IdentifierFixture(), 0)
-			event.Payload, err = ccf.Encode(test.event)
+			payload, err := ccf.Encode(test.event)
 			require.NoError(t, err)
+			event := unittest.EventFixture(
+				unittest.Event.WithEventType(events.VersionBeacon.EventType()),
+				unittest.Event.WithPayload(payload),
+			)
 
 			// convert Cadence types to Go types
 			serviceEvent, err := convert.ServiceEvent(chainID, event)

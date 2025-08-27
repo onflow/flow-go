@@ -26,6 +26,8 @@ import (
 	"github.com/onflow/flow-go/engine/access/rest/websockets"
 	"github.com/onflow/flow-go/engine/access/rpc"
 	"github.com/onflow/flow-go/engine/access/rpc/backend"
+	"github.com/onflow/flow-go/engine/access/rpc/backend/node_communicator"
+	"github.com/onflow/flow-go/engine/access/rpc/backend/query_mode"
 	statestreambackend "github.com/onflow/flow-go/engine/access/state_stream/backend"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/grpcserver"
@@ -153,8 +155,11 @@ func (suite *IrrecoverableStateTestSuite) SetupTest() {
 		MaxHeightRange:       0,
 		Log:                  suite.log,
 		SnapshotHistoryLimit: 0,
-		Communicator:         backend.NewNodeCommunicator(false),
+		Communicator:         node_communicator.NewNodeCommunicator(false),
 		BlockTracker:         nil,
+		EventQueryMode:       query_mode.IndexQueryModeExecutionNodesOnly,
+		ScriptExecutionMode:  query_mode.IndexQueryModeExecutionNodesOnly,
+		TxResultQueryMode:    query_mode.IndexQueryModeExecutionNodesOnly,
 	})
 	suite.Require().NoError(err)
 
@@ -228,10 +233,13 @@ func (suite *IrrecoverableStateTestSuite) TestGRPCInconsistentNodeState() {
 // TestRestInconsistentNodeState tests the behavior when the REST API encounters an inconsistent node state.
 func (suite *IrrecoverableStateTestSuite) TestRestInconsistentNodeState() {
 	collections := unittest.CollectionListFixture(1)
-	blockHeader := unittest.BlockWithGuaranteesFixture(
-		unittest.CollectionGuaranteesWithCollectionIDFixture(collections),
+	block := unittest.BlockFixture(
+		unittest.Block.WithPayload(
+			unittest.PayloadFixture(unittest.WithGuarantees(unittest.CollectionGuaranteesWithCollectionIDFixture(collections)...)),
+		),
 	)
-	suite.blocks.On("ByID", blockHeader.ID()).Return(blockHeader, nil)
+	suite.blocks.On("ByID", block.ID()).Return(block, nil)
+	suite.headers.On("BlockIDByHeight", block.Height).Return(block.ID(), nil)
 
 	err := fmt.Errorf("inconsistent node's state")
 	suite.snapshot.On("Head").Return(nil, err)
@@ -243,7 +251,7 @@ func (suite *IrrecoverableStateTestSuite) TestRestInconsistentNodeState() {
 	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
 	defer cancel()
 
-	actual, _, err := client.BlocksApi.BlocksIdGet(ctx, []string{blockHeader.ID().String()}, optionsForBlocksIdGetOpts())
+	actual, _, err := client.BlocksApi.BlocksIdGet(ctx, []string{block.ID().String()}, optionsForBlocksIdGetOpts())
 	suite.Require().Error(err)
 	suite.Require().Nil(actual)
 }

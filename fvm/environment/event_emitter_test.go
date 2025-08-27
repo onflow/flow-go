@@ -170,7 +170,7 @@ func createTestEventEmitterWithLimit(chain flow.ChainID, address flow.Address, e
 		environment.NewMeter(txnState),
 		chain.Chain(),
 		environment.TransactionInfoParams{
-			TxId:    flow.ZeroID,
+			TxId:    unittest.IdentifierFixture(),
 			TxIndex: 0,
 			TxBody: &flow.TransactionBody{
 				Payer: address,
