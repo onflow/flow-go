@@ -170,6 +170,26 @@ func (_m *TransactionTimings) Size() uint {
 	return r0
 }
 
+// Values provides a mock function with no fields
+func (_m *TransactionTimings) Values() []*flow.TransactionTiming {
+	ret := _m.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for Values")
+	}
+
+	var r0 []*flow.TransactionTiming
+	if rf, ok := ret.Get(0).(func() []*flow.TransactionTiming); ok {
+		r0 = rf()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]*flow.TransactionTiming)
+		}
+	}
+
+	return r0
+}
+
 // NewTransactionTimings creates a new instance of TransactionTimings. It also registers a testing interface on the mock and a cleanup function to assert the mocks expectations.
 // The first argument is typically a *testing.T value.
 func NewTransactionTimings(t interface {
