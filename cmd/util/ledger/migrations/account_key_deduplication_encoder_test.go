@@ -450,7 +450,7 @@ func TestAccountStatusV4Serialization(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 
 			s := environment.NewAccountStatus()
-			s.SetPublicKeyCount(tc.accountPublicKeyCount)
+			s.SetAccountPublicKeyCount(tc.accountPublicKeyCount)
 
 			b, err := encodeAccountStatusV4WithPublicKeyMetadata(
 				s.ToBytes(),
@@ -614,7 +614,7 @@ func decodeAccountStatusV4(b []byte) (
 		return nil, nil, 0, nil, 0, nil, err
 	}
 
-	accountPublicKeyCount := accountStatus.PublicKeyCount()
+	accountPublicKeyCount := accountStatus.AccountPublicKeyCount()
 
 	if accountPublicKeyCount <= 1 {
 		if len(optionalFields) > 0 {

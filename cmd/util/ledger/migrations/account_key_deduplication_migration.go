@@ -168,7 +168,7 @@ func migrateAndDeduplicateAccountPublicKeys(
 		return false, fmt.Errorf("failed to create AccountStatus from migrated payload for %x: %w", owner, err)
 	}
 
-	accountPublicKeyCount := accountStatusV4.PublicKeyCount()
+	accountPublicKeyCount := accountStatusV4.AccountPublicKeyCount()
 
 	if accountPublicKeyCount == 0 {
 		return false, nil

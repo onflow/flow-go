@@ -102,7 +102,7 @@ func (m *AccountUsageMigration) MigrateAccount(
 				return fmt.Errorf("could not parse account status: %w", err)
 			}
 
-			accountPublicKeyCount = status.PublicKeyCount()
+			accountPublicKeyCount = status.AccountPublicKeyCount()
 		}
 
 		actualUsed += uint64(environment.RegisterSize(

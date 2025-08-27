@@ -11,12 +11,12 @@ import (
 )
 
 const (
-	flagSize               = 1
-	storageUsedSize        = 8
-	storageIndexSize       = 8
-	oldPublicKeyCountsSize = 8
-	publicKeyCountsSize    = 4
-	addressIdCounterSize   = 8
+	flagSize                      = 1
+	storageUsedSize               = 8
+	storageIndexSize              = 8
+	oldAccountPublicKeyCountsSize = 8
+	accountPublicKeyCountsSize    = 4
+	addressIdCounterSize          = 8
 
 	// accountStatusSizeV1 is the size of the account status before the address
 	// id counter was added. After Crescendo check if it can be removed as all accounts
@@ -24,7 +24,7 @@ const (
 	accountStatusSizeV1 = flagSize +
 		storageUsedSize +
 		storageIndexSize +
-		oldPublicKeyCountsSize
+		oldAccountPublicKeyCountsSize
 
 	// accountStatusSizeV2 is the size of the account status before
 	// the public key count was changed from 8 to 4 bytes long.
@@ -33,20 +33,20 @@ const (
 	accountStatusSizeV2 = flagSize +
 		storageUsedSize +
 		storageIndexSize +
-		oldPublicKeyCountsSize +
+		oldAccountPublicKeyCountsSize +
 		addressIdCounterSize
 
 	accountStatusSizeV3 = flagSize +
 		storageUsedSize +
 		storageIndexSize +
-		publicKeyCountsSize +
+		accountPublicKeyCountsSize +
 		addressIdCounterSize
 
-	flagIndex                  = 0
-	storageUsedStartIndex      = flagIndex + flagSize
-	storageIndexStartIndex     = storageUsedStartIndex + storageUsedSize
-	publicKeyCountsStartIndex  = storageIndexStartIndex + storageIndexSize
-	addressIdCounterStartIndex = publicKeyCountsStartIndex + publicKeyCountsSize
+	flagIndex                        = 0
+	storageUsedStartIndex            = flagIndex + flagSize
+	storageIndexStartIndex           = storageUsedStartIndex + storageUsedSize
+	accountPublicKeyCountsStartIndex = storageIndexStartIndex + storageIndexSize
+	addressIdCounterStartIndex       = accountPublicKeyCountsStartIndex + accountPublicKeyCountsSize
 
 	accountStatusV4DefaultVersionAndFlag = 0x40
 )
@@ -143,7 +143,7 @@ func accountStatusV3FromBytes(inp []byte) (accountStatusV3, []byte, error) {
 		cutEnd := flagSize +
 			storageUsedSize +
 			storageIndexSize +
-			(oldPublicKeyCountsSize - publicKeyCountsSize)
+			(oldAccountPublicKeyCountsSize - accountPublicKeyCountsSize)
 
 		// check if the public key count is larger than 4 bytes
 		for i := cutStart; i < cutEnd; i++ {
@@ -153,7 +153,7 @@ func accountStatusV3FromBytes(inp []byte) (accountStatusV3, []byte, error) {
 					storageIndexSize:flagSize+
 					storageUsedSize+
 					storageIndexSize+
-					oldPublicKeyCountsSize]), inp2[i])
+					oldAccountPublicKeyCountsSize]), inp2[i])
 			}
 		}
 
@@ -221,14 +221,14 @@ func (a *accountStatusV3) SlabIndex() atree.SlabIndex {
 	return index
 }
 
-// SetPublicKeyCount updates the public key count of the account
-func (a *accountStatusV3) SetPublicKeyCount(count uint32) {
-	binary.BigEndian.PutUint32(a[publicKeyCountsStartIndex:publicKeyCountsStartIndex+publicKeyCountsSize], count)
+// SetAccountPublicKeyCount updates the account public key count of the account
+func (a *accountStatusV3) SetAccountPublicKeyCount(count uint32) {
+	binary.BigEndian.PutUint32(a[accountPublicKeyCountsStartIndex:accountPublicKeyCountsStartIndex+accountPublicKeyCountsSize], count)
 }
 
-// PublicKeyCount returns the public key count of the account
-func (a *accountStatusV3) PublicKeyCount() uint32 {
-	return binary.BigEndian.Uint32(a[publicKeyCountsStartIndex : publicKeyCountsStartIndex+publicKeyCountsSize])
+// AccountPublicKeyCount returns the account public key count of the account
+func (a *accountStatusV3) AccountPublicKeyCount() uint32 {
+	return binary.BigEndian.Uint32(a[accountPublicKeyCountsStartIndex : accountPublicKeyCountsStartIndex+accountPublicKeyCountsSize])
 }
 
 // SetAccountIdCounter updates id counter of the account
