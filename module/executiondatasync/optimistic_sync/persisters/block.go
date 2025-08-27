@@ -46,6 +46,7 @@ func NewBlockPersister(
 		protocolDB:      protocolDB,
 		executionResult: executionResult,
 		header:          header,
+		lockManager:     lockManager,
 	}
 
 	persister.log.Info().
