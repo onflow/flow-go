@@ -13,7 +13,7 @@ import (
 // IndexStateCommitment indexes a state commitment.
 //
 // State commitments are keyed by the block whose execution results in the state with the given commit.
-// It returns storage.ErrDataMismatch if the commit already exists with a different value.
+// It returns [storage.ErrDataMismatch] if the commit already exists with a different value.
 func IndexStateCommitment(lctx lockctx.Proof, rw storage.ReaderBatchWriter, blockID flow.Identifier, commit flow.StateCommitment) error {
 	if !lctx.HoldsLock(storage.LockInsertOwnReceipt) {
 		return fmt.Errorf("cannot index state commitment without holding lock %s", storage.LockInsertOwnReceipt)

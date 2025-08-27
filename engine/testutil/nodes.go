@@ -283,7 +283,6 @@ func CompleteStateFixture(
 
 // CollectionNode returns a mock collection node.
 func CollectionNode(t *testing.T, hub *stub.Hub, identity bootstrap.NodeInfo, rootSnapshot protocol.Snapshot) testmock.CollectionNode {
-
 	node := GenericNode(t, hub, identity, rootSnapshot)
 	privKeys, err := identity.PrivateKeys()
 	require.NoError(t, err)

@@ -60,11 +60,11 @@ func TestClusterHeights(t *testing.T) {
 				assert.ErrorIs(t, err, storage.ErrNotFound)
 
 				lctx := lockManager.NewContext()
-				defer lctx.Release()
 				require.NoError(t, lctx.AcquireLock(storage.LockInsertOrFinalizeClusterBlock))
 				err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 					return operation.IndexClusterBlockHeight(lctx, rw.Writer(), clusterIDs[i], height, clusterBlockIDs[i])
 				})
+				lctx.Release() // Release lock immediately after operation
 				assert.NoError(t, err)
 			}
 			for i := 0; i < len(clusterBlockIDs); i++ {
@@ -128,11 +128,12 @@ func Test_RetrieveClusterFinalizedHeight(t *testing.T) {
 				assert.ErrorIs(t, err, storage.ErrNotFound)
 
 				lctx := lockManager.NewContext()
-				defer lctx.Release()
 				require.NoError(t, lctx.AcquireLock(storage.LockInsertOrFinalizeClusterBlock))
 				err = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 					return operation.UpsertClusterFinalizedHeight(lctx, rw.Writer(), clusterIDs[i], clusterFinalizedHeights[i])
 				})
+				lctx.Release() // Release lock immediately after operation
+				assert.NoError(t, err)
 			}
 			for i := 0; i < len(clusterFinalizedHeights); i++ {
 				err = operation.RetrieveClusterFinalizedHeight(db.Reader(), clusterIDs[i], &actual)
