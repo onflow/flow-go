@@ -52,12 +52,11 @@ func TestReExecuteBlock(t *testing.T) {
 			events := store.NewEvents(metrics, db)
 			serviceEvents := store.NewServiceEvents(metrics, db)
 
-			lctx := lockManager.NewContext()
-			err = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-				return blocks.BatchStore(lctx, rw, &genesis)
+			withLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
+				return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+					return blocks.BatchStore(lctx, rw, &genesis)
+				})
 			})
-			lctx.Release()
-			require.NoError(t, err)
 
 			getLatestFinalized := func() (uint64, error) {
 				return genesis.Header.Height, nil
