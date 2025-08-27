@@ -60,13 +60,15 @@ func IndexFinalizedBlockByHeight(lctx lockctx.Proof, rw storage.ReaderBatchWrite
 		return fmt.Errorf("missing required lock: %s", storage.LockFinalizeBlock)
 	}
 
+	var existingID flow.Identifier
 	key := MakePrefix(codeHeightToBlock, height)
-	exists, err := KeyExists(rw.GlobalReader(), key)
-	if err != nil {
-		return fmt.Errorf("failed to check existing block ID for height %d: %w", height, err)
+	err := RetrieveByKey(rw.GlobalReader(), key, &existingID)
+	if err == nil {
+		return fmt.Errorf("block ID already exists for height %d with existing ID %v, cannot reindex with blockID %v: %w",
+			height, existingID, blockID, storage.ErrAlreadyExists)
 	}
-	if exists {
-		return fmt.Errorf("block ID already exists for height %d: %w", height, storage.ErrAlreadyExists)
+	if !errors.Is(err, storage.ErrNotFound) {
+		return fmt.Errorf("failed to check existing block ID for height %d: %w", height, err)
 	}
 
 	return UpsertByKey(rw.Writer(), key, blockID)
@@ -88,15 +90,17 @@ func IndexCertifiedBlockByView(lctx lockctx.Proof, rw storage.ReaderBatchWriter,
 	}
 
 	var existingID flow.Identifier
-	err := RetrieveByKey(rw.GlobalReader(), MakePrefix(codeCertifiedBlockByView, view), &existingID)
+	key := MakePrefix(codeCertifiedBlockByView, view)
+	err := RetrieveByKey(rw.GlobalReader(), key, &existingID)
 	if err == nil {
-		return fmt.Errorf("block ID already exists for view %d: %w", view, storage.ErrAlreadyExists)
+		return fmt.Errorf("block ID already exists for view %d with existingID %v, cannot reindex with blockID %v: %w",
+			view, existingID, blockID, storage.ErrAlreadyExists)
 	}
 	if !errors.Is(err, storage.ErrNotFound) {
 		return fmt.Errorf("failed to check existing block ID for view %d: %w", view, err)
 	}
 
-	return UpsertByKey(rw.Writer(), MakePrefix(codeCertifiedBlockByView, view), blockID)
+	return UpsertByKey(rw.Writer(), key, blockID)
 }
 
 // LookupBlockHeight retrieves finalized blocks by height.
