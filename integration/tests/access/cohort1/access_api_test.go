@@ -903,15 +903,15 @@ func (s *AccessAPISuite) TestTransactionSignatureWebAuthnExtensionData() {
 					KeyId:          uint32(tx.ProposalKey.KeyIndex),
 					SequenceNumber: tx.ProposalKey.SequenceNumber,
 				},
-				Payer:              tx.Payer.Bytes(),
-				Authorizers:        authorizers,
-				PayloadSignatures:  convertToMessageSigWithExtensionData(tx.PayloadSignatures, nil),
-				EnvelopeSignatures: convertToMessageSigWithExtensionData(tx.EnvelopeSignatures, tc.extensionData),
+				Payer:             tx.Payer.Bytes(),
+				Authorizers:       authorizers,
+				PayloadSignatures: convertToMessageSigWithExtensionData(tx.PayloadSignatures, nil),
 			}
 
 			if tc.name == "webauthn_valid" {
 				tc.extensionData = s.validWebAuthnExtensionData(transactionMsg)
 			}
+			transactionMsg.EnvelopeSignatures = convertToMessageSigWithExtensionData(tx.EnvelopeSignatures, tc.extensionData)
 
 			// Send and subscribe to the transaction status using the access API
 			subClient, err := accessClient.SendAndSubscribeTransactionStatuses(s.ctx, &accessproto.SendAndSubscribeTransactionStatusesRequest{
