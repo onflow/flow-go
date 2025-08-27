@@ -20,7 +20,6 @@ import (
 type LocalEventProvider struct {
 	execResultProvider optimistic_sync.ExecutionResultProvider
 	execStateCache     optimistic_sync.ExecutionStateCache
-	operatorCriteria   optimistic_sync.Criteria
 }
 
 var _ EventProvider = (*LocalEventProvider)(nil)
@@ -28,12 +27,10 @@ var _ EventProvider = (*LocalEventProvider)(nil)
 func NewLocalEventProvider(
 	execResultProvider optimistic_sync.ExecutionResultProvider,
 	execStateCache optimistic_sync.ExecutionStateCache,
-	operatorCriteria optimistic_sync.Criteria,
 ) *LocalEventProvider {
 	return &LocalEventProvider{
 		execResultProvider: execResultProvider,
 		execStateCache:     execStateCache,
-		operatorCriteria:   operatorCriteria,
 	}
 }
 
@@ -42,38 +39,37 @@ func (l *LocalEventProvider) Events(
 	blocks []BlockMetadata,
 	eventType flow.EventType,
 	encodingVersion entities.EventEncodingVersion,
-	executionState entities.ExecutionStateQuery,
+	criteria optimistic_sync.Criteria,
 ) (Response, entities.ExecutorMetadata, error) {
-	missing := make([]BlockMetadata, 0)
-	resp := make([]flow.BlockEvents, 0)
+	missingBlocks := make([]BlockMetadata, 0)
+	blockEvents := make([]flow.BlockEvents, 0)
 	metadata := entities.ExecutorMetadata{}
+
+	if len(blocks) == 0 {
+		return Response{}, metadata, nil
+	}
+
+	result, err := l.execResultProvider.ExecutionResult(
+		blocks[len(blocks)-1].ID,
+		criteria,
+	)
+	if err != nil {
+		return Response{}, metadata, err
+	}
+
+	snapshot, err := l.execStateCache.Snapshot(result.ExecutionResult.ID())
+	if err != nil {
+		return Response{}, metadata, fmt.Errorf("failed to get snapshot for execution result %s: %w", result.ExecutionResult.ID(), err)
+	}
+
+	metadata = entities.ExecutorMetadata{
+		ExecutionResultId: convert.IdentifierToMessage(result.ExecutionResult.ID()),
+		ExecutorId:        convert.IdentifiersToMessages(result.ExecutionNodes.NodeIDs()),
+	}
 
 	for _, blockInfo := range blocks {
 		if ctx.Err() != nil {
 			return Response{}, entities.ExecutorMetadata{}, rpc.ConvertError(ctx.Err(), "failed to get events from storage", codes.Canceled)
-		}
-
-		clientCriteria := optimistic_sync.Criteria{
-			AgreeingExecutorsCount: uint(executionState.AgreeingExecutorsCount),
-			RequiredExecutors:      convert.MessagesToIdentifiers(executionState.RequiredExecutorId),
-		}
-
-		result, err := l.execResultProvider.ExecutionResult(
-			blockInfo.ID,
-			l.operatorCriteria.OverrideWith(clientCriteria),
-		)
-		if err != nil {
-			return Response{}, metadata, err
-		}
-
-		metadata = entities.ExecutorMetadata{
-			ExecutionResultId: convert.IdentifierToMessage(result.ExecutionResult.ID()),
-			ExecutorId:        convert.IdentifiersToMessages(result.ExecutionNodes.NodeIDs()),
-		}
-
-		snapshot, err := l.execStateCache.Snapshot(result.ExecutionResult.ID())
-		if err != nil {
-			return Response{}, metadata, fmt.Errorf("failed to get snapshot for execution result %s: %w", result.ExecutionResult.ID(), err)
 		}
 
 		events, err := snapshot.Events().ByBlockID(blockInfo.ID)
@@ -81,7 +77,7 @@ func (l *LocalEventProvider) Events(
 			if errors.Is(err, storage.ErrNotFound) ||
 				errors.Is(err, storage.ErrHeightNotIndexed) ||
 				errors.Is(err, indexer.ErrIndexNotInitialized) {
-				missing = append(missing, blockInfo)
+				missingBlocks = append(missingBlocks, blockInfo)
 				continue
 			}
 			err = fmt.Errorf("failed to get events for block %s: %w", blockInfo.ID, err)
@@ -107,7 +103,7 @@ func (l *LocalEventProvider) Events(
 			filteredEvents = append(filteredEvents, event)
 		}
 
-		resp = append(resp, flow.BlockEvents{
+		blockEvents = append(blockEvents, flow.BlockEvents{
 			BlockID:        blockInfo.ID,
 			BlockHeight:    blockInfo.Height,
 			BlockTimestamp: blockInfo.Timestamp,
@@ -116,7 +112,7 @@ func (l *LocalEventProvider) Events(
 	}
 
 	return Response{
-		Events:        resp,
-		MissingBlocks: missing,
+		Events:        blockEvents,
+		MissingBlocks: missingBlocks,
 	}, metadata, nil
 }

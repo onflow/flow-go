@@ -19,13 +19,15 @@ import (
 	"github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/executiondatasync/optimistic_sync"
 )
 
 type ENEventProvider struct {
-	log              zerolog.Logger
-	nodeProvider     *rpc.ExecutionNodeIdentitiesProvider
-	connFactory      connection.ConnectionFactory
-	nodeCommunicator node_communicator.Communicator
+	log                zerolog.Logger
+	nodeProvider       *rpc.ExecutionNodeIdentitiesProvider
+	connFactory        connection.ConnectionFactory
+	nodeCommunicator   node_communicator.Communicator
+	execResultProvider optimistic_sync.ExecutionResultProvider
 }
 
 var _ EventProvider = (*ENEventProvider)(nil)
@@ -35,12 +37,14 @@ func NewENEventProvider(
 	nodeProvider *rpc.ExecutionNodeIdentitiesProvider,
 	connFactory connection.ConnectionFactory,
 	nodeCommunicator node_communicator.Communicator,
+	execResultProvider optimistic_sync.ExecutionResultProvider,
 ) *ENEventProvider {
 	return &ENEventProvider{
-		log:              log.With().Str("event_provider", "execution_node").Logger(),
-		nodeProvider:     nodeProvider,
-		connFactory:      connFactory,
-		nodeCommunicator: nodeCommunicator,
+		log:                log.With().Str("event_provider", "execution_node").Logger(),
+		nodeProvider:       nodeProvider,
+		connFactory:        connFactory,
+		nodeCommunicator:   nodeCommunicator,
+		execResultProvider: execResultProvider,
 	}
 }
 
@@ -49,7 +53,7 @@ func (e *ENEventProvider) Events(
 	blocks []BlockMetadata,
 	eventType flow.EventType,
 	encodingVersion entities.EventEncodingVersion,
-	_ entities.ExecutionStateQuery,
+	criteria optimistic_sync.Criteria,
 ) (Response, entities.ExecutorMetadata, error) {
 	if len(blocks) == 0 {
 		return Response{}, entities.ExecutorMetadata{}, nil
@@ -74,7 +78,11 @@ func (e *ENEventProvider) Events(
 		lastBlockID,
 	)
 	if err != nil {
-		return Response{}, entities.ExecutorMetadata{},
+		return Response{},
+			entities.ExecutorMetadata{
+				ExecutionResultId: nil,
+				ExecutorId:        stringsToBytes(execNodes.NodeIDs().Strings()),
+			},
 			rpc.ConvertError(err, "failed to get execution nodes for events query", codes.Internal)
 	}
 
@@ -102,9 +110,23 @@ func (e *ENEventProvider) Events(
 			status.Errorf(codes.Internal, "failed to verify retrieved events from execution node: %v", err)
 	}
 
+	execResultInfo, err := e.execResultProvider.ExecutionResult(
+		lastBlockID,
+		criteria,
+	)
+	if err != nil {
+		return Response{}, entities.ExecutorMetadata{},
+			status.Errorf(codes.Internal, "failed to get execution result: %v", err)
+	}
+
+	metadata := entities.ExecutorMetadata{
+		ExecutionResultId: []byte(successfulNode.NodeID.String()),
+		ExecutorId:        stringsToBytes(execResultInfo.ExecutionNodes.NodeIDs().Strings()),
+	}
+
 	return Response{
 		Events: results,
-	}, entities.ExecutorMetadata{}, nil
+	}, metadata, nil
 }
 
 // getEventsFromAnyExeNode retrieves the given events from any EN in `execNodes`.
@@ -208,4 +230,16 @@ func verifyAndConvertToAccessEvents(
 	}
 
 	return results, nil
+}
+
+func stringsToBytes(strs []string) [][]byte {
+	if len(strs) == 0 {
+		return nil
+	}
+
+	bytes := make([][]byte, len(strs))
+	for i, s := range strs {
+		bytes[i] = []byte(s)
+	}
+	return bytes
 }

@@ -25,6 +25,7 @@ import (
 	"github.com/onflow/flow-go/ledger"
 	accessmodel "github.com/onflow/flow-go/model/access"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/executiondatasync/optimistic_sync"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
 	modutil "github.com/onflow/flow-go/module/util"
@@ -447,7 +448,7 @@ func (a *api) GetEventsForHeightRange(
 	_ string,
 	_, _ uint64,
 	_ entities.EventEncodingVersion,
-	_ entities.ExecutionStateQuery,
+	_ optimistic_sync.Criteria,
 ) ([]flow.BlockEvents, entities.ExecutorMetadata, error) {
 	return nil, entities.ExecutorMetadata{}, errors.New("unimplemented")
 }
@@ -457,7 +458,7 @@ func (a *api) GetEventsForBlockIDs(
 	_ string,
 	_ []flow.Identifier,
 	_ entities.EventEncodingVersion,
-	_ entities.ExecutionStateQuery,
+	_ optimistic_sync.Criteria,
 ) ([]flow.BlockEvents, entities.ExecutorMetadata, error) {
 	return nil, entities.ExecutorMetadata{}, errors.New("unimplemented")
 }

@@ -29,12 +29,13 @@ import (
 const DefaultMaxHeightRange = 250
 
 type Events struct {
-	headers        storage.Headers
-	state          protocol.State
-	chain          flow.Chain
-	maxHeightRange uint
-	provider       provider.EventProvider
-	queryMode      query_mode.IndexQueryMode
+	headers          storage.Headers
+	state            protocol.State
+	chain            flow.Chain
+	maxHeightRange   uint
+	provider         provider.EventProvider
+	queryMode        query_mode.IndexQueryMode
+	operatorCriteria optimistic_sync.Criteria
 }
 
 var _ access.EventsAPI = (*Events)(nil)
@@ -57,14 +58,14 @@ func NewEventsBackend(
 
 	switch queryMode {
 	case query_mode.IndexQueryModeLocalOnly:
-		eventProvider = provider.NewLocalEventProvider(executionResultProvider, executionStateCache, operatorCriteria)
+		eventProvider = provider.NewLocalEventProvider(executionResultProvider, executionStateCache)
 
 	case query_mode.IndexQueryModeExecutionNodesOnly:
-		eventProvider = provider.NewENEventProvider(log, execNodeIdentitiesProvider, connFactory, nodeCommunicator)
+		eventProvider = provider.NewENEventProvider(log, execNodeIdentitiesProvider, connFactory, nodeCommunicator, executionResultProvider)
 
 	case query_mode.IndexQueryModeFailover:
-		local := provider.NewLocalEventProvider(executionResultProvider, executionStateCache, operatorCriteria)
-		execNode := provider.NewENEventProvider(log, execNodeIdentitiesProvider, connFactory, nodeCommunicator)
+		local := provider.NewLocalEventProvider(executionResultProvider, executionStateCache)
+		execNode := provider.NewENEventProvider(log, execNodeIdentitiesProvider, connFactory, nodeCommunicator, executionResultProvider)
 		eventProvider = provider.NewFailoverEventProvider(log, local, execNode)
 
 	default:
@@ -72,12 +73,13 @@ func NewEventsBackend(
 	}
 
 	return &Events{
-		state:          state,
-		chain:          chain,
-		maxHeightRange: maxHeightRange,
-		headers:        headers,
-		provider:       eventProvider,
-		queryMode:      queryMode,
+		state:            state,
+		chain:            chain,
+		maxHeightRange:   maxHeightRange,
+		headers:          headers,
+		provider:         eventProvider,
+		queryMode:        queryMode,
+		operatorCriteria: operatorCriteria,
 	}, nil
 }
 
@@ -88,7 +90,7 @@ func (e *Events) GetEventsForHeightRange(
 	eventType string,
 	startHeight, endHeight uint64,
 	requiredEventEncodingVersion entities.EventEncodingVersion,
-	executionState entities.ExecutionStateQuery,
+	criteria optimistic_sync.Criteria,
 ) ([]flow.BlockEvents, entities.ExecutorMetadata, error) {
 	if _, err := events.ValidateEvent(flow.EventType(eventType), e.chain); err != nil {
 		return nil, entities.ExecutorMetadata{},
@@ -157,7 +159,13 @@ func (e *Events) GetEventsForHeightRange(
 		})
 	}
 
-	resp, metadata, err := e.provider.Events(ctx, blockHeaders, flow.EventType(eventType), requiredEventEncodingVersion, executionState)
+	resp, metadata, err := e.provider.Events(
+		ctx,
+		blockHeaders,
+		flow.EventType(eventType),
+		requiredEventEncodingVersion,
+		e.operatorCriteria.OverrideWith(criteria),
+	)
 	if err != nil {
 		return nil, metadata, err
 	}
@@ -171,7 +179,7 @@ func (e *Events) GetEventsForBlockIDs(
 	eventType string,
 	blockIDs []flow.Identifier,
 	requiredEventEncodingVersion entities.EventEncodingVersion,
-	executionState entities.ExecutionStateQuery,
+	criteria optimistic_sync.Criteria,
 ) ([]flow.BlockEvents, entities.ExecutorMetadata, error) {
 	if _, err := events.ValidateEvent(flow.EventType(eventType), e.chain); err != nil {
 		return nil, entities.ExecutorMetadata{}, status.Errorf(codes.InvalidArgument, "invalid event type: %v", err)
@@ -198,7 +206,13 @@ func (e *Events) GetEventsForBlockIDs(
 		})
 	}
 
-	resp, metadata, err := e.provider.Events(ctx, blockHeaders, flow.EventType(eventType), requiredEventEncodingVersion, executionState)
+	resp, metadata, err := e.provider.Events(
+		ctx,
+		blockHeaders,
+		flow.EventType(eventType),
+		requiredEventEncodingVersion,
+		e.operatorCriteria.OverrideWith(criteria),
+	)
 	if err != nil {
 		return nil, metadata, err
 	}

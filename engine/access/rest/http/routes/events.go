@@ -9,6 +9,7 @@ import (
 	"github.com/onflow/flow-go/engine/access/rest/common"
 	commonmodels "github.com/onflow/flow-go/engine/access/rest/common/models"
 	"github.com/onflow/flow-go/engine/access/rest/http/request"
+	"github.com/onflow/flow-go/module/executiondatasync/optimistic_sync"
 )
 
 const BlockQueryParam = "block_ids"
@@ -29,7 +30,7 @@ func GetEvents(r *common.Request, backend access.API, _ commonmodels.LinkGenerat
 			req.Type,
 			req.BlockIDs,
 			entitiesproto.EventEncodingVersion_JSON_CDC_V0,
-			req.ExecutionState,
+			optimistic_sync.NewCriteria(&req.ExecutionState),
 		)
 		if err != nil {
 			return nil, err
@@ -60,7 +61,7 @@ func GetEvents(r *common.Request, backend access.API, _ commonmodels.LinkGenerat
 		req.StartHeight,
 		req.EndHeight,
 		entitiesproto.EventEncodingVersion_JSON_CDC_V0,
-		req.ExecutionState,
+		optimistic_sync.NewCriteria(&req.ExecutionState),
 	)
 	if err != nil {
 		return nil, err

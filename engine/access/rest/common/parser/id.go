@@ -34,10 +34,6 @@ func (i ID) Flow() flow.Identifier {
 	return flow.Identifier(i)
 }
 
-func (i ID) Bytes() []byte {
-	return []byte(i.Flow().String())
-}
-
 type IDs []ID
 
 func NewIDs(raw []string) (IDs, error) {
@@ -68,14 +64,6 @@ func (i IDs) Flow() []flow.Identifier {
 	ids := make([]flow.Identifier, len(i))
 	for j, id := range i {
 		ids[j] = id.Flow()
-	}
-	return ids
-}
-
-func (i IDs) Bytes() [][]byte {
-	ids := make([][]byte, len(i))
-	for j, id := range i {
-		ids[j] = id.Bytes()
 	}
 	return ids
 }
