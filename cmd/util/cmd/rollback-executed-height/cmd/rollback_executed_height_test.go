@@ -52,7 +52,7 @@ func TestReExecuteBlock(t *testing.T) {
 			events := store.NewEvents(metrics, db)
 			serviceEvents := store.NewServiceEvents(metrics, db)
 
-			lockManager, lctx := unittest.LockManagerWithContext(t, storage.LockInsertBlock)
+			lctx := lockManager.NewContext()
 			err = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 				return blocks.BatchStore(lctx, rw, &genesis)
 			})

@@ -19,7 +19,7 @@ func RetrieveResultApproval(r storage.Reader, approvalID flow.Identifier, approv
 
 // InsertAndIndexResultApproval atomically performs the following storage operations:
 //  1. Store ResultApproval by its ID (in this step, accidental overwrites with inconsistent values
-//     are prevented by using a collision-resistant had to deriver the key from the value)
+//     are prevented by using a collision-resistant hash to derive the key from the value)
 //  2. Index approval by the executed chunk, specifically the key pair (ExecutionResultID, chunk index).
 //     - first, we ensure that no _different_ approval has already been indexed for the same key pair
 //     - only if the prior check succeeds, we write the index to the database

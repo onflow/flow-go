@@ -34,10 +34,9 @@ func TestFinalizer(t *testing.T) {
 		genesis := model.Genesis()
 
 		metrics := metrics.NewNoopCollector()
+		pool := herocache.NewTransactions(1000, unittest.Logger(), metrics)
 
 		var state *cluster.State
-
-		pool := herocache.NewTransactions(1000, unittest.Logger(), metrics)
 
 		// a helper function to clean up shared state between tests
 		cleanup := func() {
@@ -55,17 +54,16 @@ func TestFinalizer(t *testing.T) {
 		bootstrap := func() {
 			stateRoot, err := cluster.NewStateRoot(genesis, unittest.QuorumCertificateFixture(), 0)
 			require.NoError(t, err)
-
-			lctx := lockManager.NewContext()
-			defer lctx.Release()
 			state, err = cluster.Bootstrap(db, lockManager, stateRoot)
 			require.NoError(t, err)
-			_, insertLctx := unittest.LockManagerWithContext(t, storage.LockInsertBlock)
+
+			lctx := lockManager.NewContext()
+			require.NoError(t, lctx.AcquireLock(storage.LockInsertOrFinalizeClusterBlock))
 			err = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-				return operation.InsertHeader(insertLctx, rw, refBlock.ID(), refBlock)
+				return operation.InsertHeader(lctx, rw, refBlock.ID(), refBlock)
 			})
 			require.NoError(t, err)
-			insertLctx.Release()
+			lctx.Release()
 		}
 
 		// a helper function to insert a block
@@ -73,7 +71,6 @@ func TestFinalizer(t *testing.T) {
 			lctx := lockManager.NewContext()
 			defer lctx.Release()
 			require.NoError(t, lctx.AcquireLock(storage.LockInsertOrFinalizeClusterBlock))
-			require.NoError(t, lctx.AcquireLock(storage.LockInsertBlock))
 			err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 				return procedure.InsertClusterBlock(lctx, rw, &block)
 			})
