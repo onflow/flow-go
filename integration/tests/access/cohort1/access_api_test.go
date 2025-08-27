@@ -2,15 +2,11 @@ package cohort1
 
 import (
 	"context"
-	"encoding/base64"
-	"encoding/json"
 	"fmt"
 	"io"
-	"slices"
 	"testing"
 	"time"
 
-	"github.com/onflow/crypto/hash"
 	"github.com/onflow/flow-go-sdk/templates"
 	"github.com/onflow/flow-go-sdk/test"
 
@@ -20,7 +16,6 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 
 	"github.com/onflow/flow-go/engine/access/rpc/backend/query_mode"
-	"github.com/onflow/flow-go/fvm/crypto"
 	"github.com/onflow/flow-go/integration/tests/mvp"
 	"github.com/onflow/flow-go/utils/dsl"
 
@@ -37,7 +32,6 @@ import (
 	"github.com/onflow/flow-go/integration/testnet"
 	"github.com/onflow/flow-go/integration/tests/lib"
 	"github.com/onflow/flow-go/integration/utils"
-	"github.com/onflow/flow-go/model/encoding/rlp"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -590,40 +584,6 @@ func notOutOfRangeError(err error) bool {
 		return true
 	}
 	return statusErr.Code() != codes.OutOfRange
-}
-
-func (s *AccessAPISuite) validWebAuthnExtensionData(transactionMessage []byte) ([]byte, []byte) {
-	hasher, err := crypto.NewPrefixedHashing(hash.SHA2_256, flow.TransactionTagString)
-	s.Require().NoError(err)
-	authNChallenge := hasher.ComputeHash(transactionMessage)
-	authNChallengeBase64Url := base64.URLEncoding.EncodeToString(authNChallenge)
-	validUserFlag := byte(0x01)
-	validClientDataOrigin := "https://testing.com"
-	rpIDHash := unittest.RandomBytes(32)
-	sigCounter := unittest.RandomBytes(4)
-
-	// For use in cases where you're testing the other value
-	validAuthenticatorData := slices.Concat(rpIDHash, []byte{validUserFlag}, sigCounter)
-	validClientDataJSON := map[string]string{
-		"type":      crypto.WebAuthnTypeGet,
-		"challenge": authNChallengeBase64Url,
-		"origin":    validClientDataOrigin,
-	}
-
-	clientDataJsonBytes, err := json.Marshal(validClientDataJSON)
-	s.Require().NoError(err)
-
-	extensionData := crypto.WebAuthnExtensionData{
-		AuthenticatorData: validAuthenticatorData,
-		ClientDataJson:    clientDataJsonBytes,
-	}
-	extensionDataRLPBytes := rlp.NewMarshaler().MustMarshal(extensionData)
-
-	var clientDataHash [hash.HashLenSHA2_256]byte
-	hash.ComputeSHA2_256(&clientDataHash, clientDataJsonBytes)
-	messageToSign := slices.Concat(validAuthenticatorData, clientDataHash[:])
-
-	return extensionDataRLPBytes, messageToSign
 }
 
 // TestTransactionSignaturePlainExtensionData tests that the Access API properly handles the ExtensionData field
