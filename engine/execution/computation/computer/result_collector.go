@@ -98,10 +98,9 @@ func newResultCollector(
 	receiptHasher hash.Hasher,
 	parentBlockExecutionResultID flow.Identifier,
 	block *entity.ExecutableBlock,
-	numTransactions int,
+	inputChannelSize int,
 	consumers []result.ExecutedCollectionConsumer,
 	previousBlockSnapshot snapshot.StorageSnapshot,
-	versionAwareChunkConstructor flow.ChunkConstructor,
 ) *resultCollector {
 	numCollections := len(block.Collections()) + 1
 	now := time.Now()
@@ -109,7 +108,7 @@ func newResultCollector(
 		tracer:                       tracer,
 		blockSpan:                    blockSpan,
 		metrics:                      metrics,
-		processorInputChan:           make(chan transactionResult, numTransactions),
+		processorInputChan:           make(chan transactionResult, inputChannelSize),
 		processorDoneChan:            make(chan struct{}),
 		committer:                    committer,
 		signer:                       signer,
@@ -117,7 +116,7 @@ func newResultCollector(
 		receiptHasher:                receiptHasher,
 		executionDataProvider:        executionDataProvider,
 		parentBlockExecutionResultID: parentBlockExecutionResultID,
-		result:                       execution.NewEmptyComputationResult(block, versionAwareChunkConstructor),
+		result:                       execution.NewEmptyComputationResult(block),
 		consumers:                    consumers,
 		spockSignatures:              make([]crypto.Signature, 0, numCollections),
 		blockStartTime:               now,
@@ -170,9 +169,8 @@ func (collector *resultCollector) commitCollection(
 	txResults := execColRes.TransactionResults()
 	convertedTxResults := execution_data.ConvertTransactionResults(txResults)
 
-	col := collection.Collection()
 	chunkExecData := &execution_data.ChunkExecutionData{
-		Collection:         &col,
+		Collection:         collection.Collection,
 		Events:             events,
 		TrieUpdate:         trieUpdate,
 		TransactionResults: convertedTxResults,
@@ -188,7 +186,7 @@ func (collector *resultCollector) commitCollection(
 
 	collector.metrics.ExecutionChunkDataPackGenerated(
 		len(proof),
-		len(collection.Transactions))
+		len(collection.Collection.Transactions))
 
 	spock, err := collector.signer.SignFunc(
 		collectionExecutionSnapshot.SpockSecret,
@@ -403,12 +401,21 @@ func (collector *resultCollector) Finalize(
 		return nil, fmt.Errorf("failed to provide execution data: %w", err)
 	}
 
-	executionResult := flow.NewExecutionResult(
-		collector.parentBlockExecutionResultID,
-		collector.result.ExecutableBlock.ID(),
-		collector.result.AllChunks(),
-		collector.result.AllConvertedServiceEvents(),
-		executionDataID)
+	chunks, err := collector.result.AllChunks()
+	if err != nil {
+		return nil, fmt.Errorf("failed to retrieve chunks data: %w", err)
+	}
+
+	executionResult, err := flow.NewExecutionResult(flow.UntrustedExecutionResult{
+		PreviousResultID: collector.parentBlockExecutionResultID,
+		BlockID:          collector.result.ExecutableBlock.BlockID(),
+		Chunks:           chunks,
+		ServiceEvents:    collector.result.AllConvertedServiceEvents(),
+		ExecutionDataID:  executionDataID,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("could not build execution result: %w", err)
+	}
 
 	executionReceipt, err := GenerateExecutionReceipt(
 		collector.signer,
@@ -444,21 +451,33 @@ func GenerateExecutionReceipt(
 	*flow.ExecutionReceipt,
 	error,
 ) {
-	receipt := &flow.ExecutionReceipt{
-		ExecutionResult:   *result,
-		Spocks:            spockSignatures,
-		ExecutorSignature: crypto.Signature{},
-		ExecutorID:        signer.NodeID(),
+	unsignedExecutionReceipt, err := flow.NewUnsignedExecutionReceipt(
+		flow.UntrustedUnsignedExecutionReceipt{
+			ExecutionResult: *result,
+			Spocks:          spockSignatures,
+			ExecutorID:      signer.NodeID(),
+		},
+	)
+	if err != nil {
+		return nil, fmt.Errorf("could not construct unsigned execution receipt: %w", err)
 	}
 
-	// generates a signature over the execution result
-	id := receipt.ID()
-	sig, err := signer.Sign(id[:], receiptHasher)
+	// generates a signature over the execution receipt's body
+	unsignedReceiptID := unsignedExecutionReceipt.ID()
+	sig, err := signer.Sign(unsignedReceiptID[:], receiptHasher)
 	if err != nil {
 		return nil, fmt.Errorf("could not sign execution result: %w", err)
 	}
 
-	receipt.ExecutorSignature = sig
+	executionReceipt, err := flow.NewExecutionReceipt(
+		flow.UntrustedExecutionReceipt{
+			UnsignedExecutionReceipt: *unsignedExecutionReceipt,
+			ExecutorSignature:        sig,
+		},
+	)
+	if err != nil {
+		return nil, fmt.Errorf("could not construct execution receipt: %w", err)
+	}
 
-	return receipt, nil
+	return executionReceipt, nil
 }

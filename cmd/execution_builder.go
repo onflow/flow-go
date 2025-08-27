@@ -13,7 +13,7 @@ import (
 
 	awsconfig "github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
-	"github.com/cockroachdb/pebble"
+	"github.com/cockroachdb/pebble/v2"
 	"github.com/ipfs/boxo/bitswap"
 	"github.com/ipfs/go-cid"
 	"github.com/onflow/cadence"
@@ -1093,7 +1093,7 @@ func (exeNode *ExecutionNode) LoadIngestionEngine(
 		reqEng, err := requester.New(node.Logger.With().Str("entity", "collection").Logger(), node.Metrics.Engine, node.EngineRegistry, node.Me, node.State,
 			channels.RequestCollections,
 			filter.Any,
-			func() flow.Entity { return &flow.Collection{} },
+			func() flow.Entity { return new(flow.Collection) },
 			// we are manually triggering batches in execution, but lets still send off a batch once a minute, as a safety net for the sake of retries
 			requester.WithBatchInterval(exeNode.exeConf.requestInterval),
 			// consistency of collection can be checked by checking hash, and hash comes from trusted source (blocks from consensus follower)
@@ -1204,7 +1204,7 @@ func (exeNode *ExecutionNode) LoadFollowerCore(
 		node.Storage.Headers,
 		final,
 		exeNode.followerDistributor,
-		node.FinalizedRootBlock.Header,
+		node.FinalizedRootBlock.ToHeader(),
 		node.RootQC,
 		finalized,
 		pending,

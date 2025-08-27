@@ -10,7 +10,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -123,12 +122,4 @@ func TestInvalidAddressSubprocess(t *testing.T) {
 		keyCmdRun(nil, nil)
 		return
 	}
-}
-
-type zeroLoggerHook struct {
-	logs *strings.Builder
-}
-
-func (h zeroLoggerHook) Run(_ *zerolog.Event, _ zerolog.Level, msg string) {
-	h.logs.WriteString(msg)
 }

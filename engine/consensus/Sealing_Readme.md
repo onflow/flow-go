@@ -8,7 +8,7 @@
    - The sealing logic works with **height**  as opposed to view (height is denoted at the bottom of each block)
    - **Whether or not a block can incorporate an `ExecutionReceipt` or `Seal`** only depends on the fork and **is independent of finality**
 
-   ![Forks](/docs/Chain_and_ExecutionResult_trees_A.png)
+   ![Forks](/docs/images/Chain_and_ExecutionResult_trees_A.png)
 
 
 2. An `ExecutionResult` is a claim that
@@ -25,7 +25,7 @@
        Chunks           ChunkList
    }
    ```
-   ![Forks with execution results](/docs/Chain_and_ExecutionResult_trees_B.png)
+   ![Forks with execution results](/docs/images/Chain_and_ExecutionResult_trees_B.png)
    
    Notation: `r[B]` is an execution result for block `B`
 
@@ -36,7 +36,7 @@
    * Example: result `r[C]_1` and `r[C]_2`
    * 💡 insight: **The `ExecutionResults` form a tree.**
 
-   ![For a single fork of blocks, the execution results can form a tree](/docs/Chain_and_ExecutionResult_trees_C.png)
+   ![For a single fork of blocks, the execution results can form a tree](/docs/images/Chain_and_ExecutionResult_trees_C.png)
 
    Notation: `r[C]` denotes an execution result for block `C`. If there are multiple results, we denote them as `r[C]_1`,  `r[C]_2`, ...
 
@@ -53,14 +53,14 @@
      which _both have the same parent_ (referenced by `PreviousResultID`).
      For example, `Er[r[C]_1]` and `Er[r[C]_2]` could be published by the same Execution Node
 
-   ![Blocks with execution results and execution receipts](/docs/Chain_and_ExecutionResult_trees_D.png)
+   ![Blocks with execution results and execution receipts](/docs/images/Chain_and_ExecutionResult_trees_D.png)
 
    Notation: `Er[r]` is an execution receipt vouching for result `r`. For example `Er[r[C]_2]` is the receipt for result `r[C]_2`
 
 
 5. `ResultApprovals` approve results (*not* receipts).
 
-   ![Blocks with execution results and execution receipts and result approvals](/docs/Chain_and_ExecutionResult_trees_E.png)
+   ![Blocks with execution results and execution receipts and result approvals](/docs/images/Chain_and_ExecutionResult_trees_E.png)
 
 
 # Embedding of Execution results and Receipts into _descending_ blocks
@@ -70,7 +70,7 @@
 Execution receipts and results are embedded into downstream blocks, to record what results the execution nodes [ENs] committed to
 and to generate verifier assignment. Let's take a look at the following example:
 
-![Verifier Assignments](/docs/VerifierAssignment.png)
+![Verifier Assignments](/docs/images/VerifierAssignment.png)
 
 * Execution nodes 'Alice' and 'Bob' have both generated the Execution Result `r[A]_1` for block `A`.
   The Execution Result contains no information about the node generating it. As long as Execution Nodes generate exactly the same result for a particular block (a.g. block `A`),

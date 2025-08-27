@@ -141,7 +141,7 @@ func (e *Engine) pingAllNodes(ctx context.Context) {
 
 // pingNode pings the given peer and updates the metrics with the result and the additional node information
 func (e *Engine) pingNode(ctx context.Context, peer *flow.Identity) {
-	pid, err := e.idTranslator.GetPeerID(peer.ID())
+	pid, err := e.idTranslator.GetPeerID(peer.NodeID)
 
 	if err != nil {
 		e.log.Error().Err(err).Str("peer", peer.String()).Msg("failed to get peer ID")
@@ -154,13 +154,13 @@ func (e *Engine) pingNode(ctx context.Context, peer *flow.Identity) {
 	// ping the node
 	resp, rtt, pingErr := e.pingService.Ping(ctx, pid) // ping will timeout in PingTimeout seconds
 	if pingErr != nil {
-		e.log.Debug().Err(pingErr).Str("target", peer.ID().String()).Msg("failed to ping")
+		e.log.Debug().Err(pingErr).Str("target", peer.NodeID.String()).Msg("failed to ping")
 		// report the rtt duration as negative to make it easier to distinguish between pingable and non-pingable nodes
 		rtt = -1
 	}
 
 	// get the additional info about the node
-	info := e.nodeInfo[peer.ID()]
+	info := e.nodeInfo[peer.NodeID]
 
 	// update metric
 	e.metrics.NodeReachable(peer, info, rtt)

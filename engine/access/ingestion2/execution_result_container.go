@@ -20,7 +20,7 @@ var ErrIncompatibleReceipt = errors.New("incompatible execution receipt")
 // same block. For optimized storage, we only store the result once. Mathematically, an
 // ExecutionResultContainer struct represents an Equivalence Class of Execution Receipts.
 type ExecutionResultContainer struct {
-	receipts    map[flow.Identifier]*flow.ExecutionReceiptMeta // map from ExecutionReceipt.ID -> ExecutionReceiptMeta
+	receipts    map[flow.Identifier]*flow.ExecutionReceiptStub // map from ExecutionReceipt.ID -> ExecutionReceiptStub
 	result      *flow.ExecutionResult
 	resultID    flow.Identifier // precomputed ID of result to avoid expensive hashing on each call
 	blockHeader *flow.Header    // header of the block which the result is for
@@ -35,14 +35,19 @@ type ExecutionResultContainer struct {
 // specified block.
 //
 // No errors are expected during normal operation.
-func NewExecutionResultContainer(result *flow.ExecutionResult, header *flow.Header, blockStatus BlockStatus, pipeline optimistic_sync.Pipeline) (*ExecutionResultContainer, error) {
+func NewExecutionResultContainer(
+	result *flow.ExecutionResult,
+	header *flow.Header,
+	blockStatus BlockStatus,
+	pipeline optimistic_sync.Pipeline,
+) (*ExecutionResultContainer, error) {
 	// sanity check: initial result must be for block
 	if header.ID() != result.BlockID {
 		return nil, fmt.Errorf("initial result is for different block")
 	}
 
 	c := &ExecutionResultContainer{
-		receipts:    make(map[flow.Identifier]*flow.ExecutionReceiptMeta),
+		receipts:    make(map[flow.Identifier]*flow.ExecutionReceiptStub),
 		result:      result,
 		resultID:    result.ID(),
 		blockHeader: header,
@@ -107,7 +112,7 @@ func (c *ExecutionResultContainer) addReceipt(receipt *flow.ExecutionReceipt) (u
 	if c.has(receiptID) {
 		return 0, nil
 	}
-	c.receipts[receiptID] = receipt.Meta()
+	c.receipts[receiptID] = receipt.Stub()
 	return 1, nil
 }
 
@@ -163,7 +168,7 @@ func (c *ExecutionResultContainer) BlockStatus() BlockStatus {
 
 // SetBlockStatus sets the block status of the block executed by this result.
 func (c *ExecutionResultContainer) SetBlockStatus(blockStatus BlockStatus) {
-	if blockStatus > c.BlockStatus() && c.blockStatus.Set(uint64(blockStatus)) {
+	if c.blockStatus.Set(uint64(blockStatus)) {
 		if blockStatus == BlockStatusSealed {
 			c.pipeline.SetSealed()
 		}

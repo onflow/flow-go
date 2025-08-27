@@ -144,17 +144,14 @@ func (o *Orchestrator) corruptExecutionResult(receipt *flow.ExecutionReceipt) *f
 		BlockID:          receipt.ExecutionResult.BlockID,
 		// replace all chunks with new ones to simulate chunk corruption
 		Chunks: flow.ChunkList{
-			unittest.ChunkFixture(receipt.ExecutionResult.BlockID, 0,
-				receiptStartState,
-				unittest.WithServiceEventCount(nil)), // TODO(mainnet27, #6773): remove this line
+			unittest.ChunkFixture(receipt.ExecutionResult.BlockID, 0, receiptStartState),
 		},
 		ServiceEvents:   receipt.ExecutionResult.ServiceEvents,
 		ExecutionDataID: receipt.ExecutionResult.ExecutionDataID,
 	}
 
 	if chunksNum > 1 {
-		result.Chunks = append(result.Chunks, unittest.ChunkListFixture(uint(chunksNum-1), receipt.ExecutionResult.BlockID, result.Chunks[0].EndState,
-			unittest.WithServiceEventCount(nil))...) // TODO(mainnet27, #6773): remove this line
+		result.Chunks = append(result.Chunks, unittest.ChunkListFixture(uint(chunksNum-1), receipt.ExecutionResult.BlockID, result.Chunks[0].EndState)...)
 	}
 
 	return result
@@ -235,7 +232,7 @@ func (o *Orchestrator) handleExecutionReceiptEvent(receiptEvent *insecure.Egress
 			TargetIds:       receiptEvent.TargetIds,
 
 			// wrapping execution result in an execution receipt for sake of encoding and decoding.
-			FlowProtocolEvent: &flow.ExecutionReceipt{ExecutionResult: *corruptedResult},
+			FlowProtocolEvent: &flow.ExecutionReceipt{UnsignedExecutionReceipt: flow.UnsignedExecutionReceipt{ExecutionResult: *corruptedResult}},
 		})
 		if err != nil {
 			return fmt.Errorf("could not send rpc on channel: %w", err)
@@ -343,7 +340,7 @@ func (o *Orchestrator) handleChunkDataPackResponseEvent(chunkDataPackReplyEvent 
 	}
 	o.logger.Debug().
 		Hex("corrupted_id", logging.ID(chunkDataPackReplyEvent.CorruptOriginId)).
-		Hex("chunk_id", logging.ID(cdpRep.ChunkDataPack.ID())).
+		Hex("chunk_id", logging.ID(cdpRep.ChunkDataPack.ChunkID)).
 		Msg("chunk data pack response passed through")
 	return nil
 }

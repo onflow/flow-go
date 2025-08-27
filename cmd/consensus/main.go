@@ -68,7 +68,6 @@ import (
 	"github.com/onflow/flow-go/state/protocol/events/gadgets"
 	protocol_state "github.com/onflow/flow-go/state/protocol/protocol_state/state"
 	bstorage "github.com/onflow/flow-go/storage/badger"
-	"github.com/onflow/flow-go/storage/badger/operation"
 	"github.com/onflow/flow-go/utils/io"
 )
 
@@ -202,15 +201,6 @@ func main() {
 	nodeBuilder.
 		PreInit(cmd.DynamicStartPreInit).
 		ValidateRootSnapshot(badgerState.ValidRootSnapshotContainsEntityExpiryRange).
-		PostInit(func(nodeConfig *cmd.NodeConfig) error {
-			// TODO(EFM, #6794): This function is introduced to implement a backward-compatible upgrade from v1 to v2.
-			// Remove this once we complete the network upgrade.
-			log := nodeConfig.Logger.With().Str("postinit", "dkg_end_state_migration").Logger()
-			if err := operation.RetryOnConflict(nodeBuilder.SecretsDB.Update, operation.MigrateDKGEndStateFromV1(log)); err != nil {
-				return fmt.Errorf("could not migrate DKG end state from v1 to v2: %w", err)
-			}
-			return nil
-		}).
 		Module("machine account config", func(node *cmd.NodeConfig) error {
 			machineAccountInfo, err = cmd.LoadNodeMachineAccountInfoFile(node.BootstrapDir, node.NodeID)
 			return err
@@ -282,7 +272,7 @@ func main() {
 				getSealingConfigs,
 				conMetrics)
 
-			blockTimer, err = blocktimer.NewBlockTimer(minInterval, maxInterval)
+			blockTimer, err = blocktimer.NewBlockTimer(uint64(minInterval.Milliseconds()), uint64(maxInterval.Milliseconds()))
 			if err != nil {
 				return err
 			}
@@ -383,8 +373,8 @@ func main() {
 			return nil
 		}).
 		Module("collection guarantees mempool", func(node *cmd.NodeConfig) error {
-			guarantees, err = stdmap.NewGuarantees(guaranteeLimit)
-			return err
+			guarantees = stdmap.NewGuarantees(guaranteeLimit)
+			return nil
 		}).
 		Module("execution receipts mempool", func(node *cmd.NodeConfig) error {
 			receipts = consensusMempools.NewExecutionTree()
@@ -508,7 +498,7 @@ func main() {
 				node.State,
 				channels.RequestReceiptsByBlockID,
 				filter.HasRole[flow.Identity](flow.RoleExecution),
-				func() flow.Entity { return &flow.ExecutionReceipt{} },
+				func() flow.Entity { return new(flow.ExecutionReceipt) },
 				requester.WithRetryInitial(2*time.Second),
 				requester.WithRetryMaximum(30*time.Second),
 			)
@@ -647,7 +637,7 @@ func main() {
 				node.Storage.Headers,
 				finalize,
 				notifier,
-				node.FinalizedRootBlock.Header,
+				node.FinalizedRootBlock.ToHeader(),
 				node.RootQC,
 			)
 			if err != nil {

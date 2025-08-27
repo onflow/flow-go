@@ -10,17 +10,20 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
-	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
 	"github.com/onflow/flow-go/admin"
 	"github.com/onflow/flow-go/admin/commands"
+	"github.com/onflow/flow-go/engine/access/index"
 	"github.com/onflow/flow-go/engine/access/ingestion/tx_error_messages"
 	accessmock "github.com/onflow/flow-go/engine/access/mock"
 	"github.com/onflow/flow-go/engine/access/rpc/backend"
+	"github.com/onflow/flow-go/engine/access/rpc/backend/node_communicator"
+	"github.com/onflow/flow-go/engine/access/rpc/backend/transactions/error_messages"
 	connectionmock "github.com/onflow/flow-go/engine/access/rpc/connection/mock"
 	commonrpc "github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/model/flow"
+	syncmock "github.com/onflow/flow-go/module/state_synchronization/mock"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/invalid"
 	protocolmock "github.com/onflow/flow-go/state/protocol/mock"
@@ -47,6 +50,10 @@ type BackfillTxErrorMessagesSuite struct {
 	receipts           *storagemock.ExecutionReceipts
 	headers            *storagemock.Headers
 
+	reporter       *syncmock.IndexReporter
+	indexReporter  *index.Reporter
+	txResultsIndex *index.TransactionResultsIndex
+
 	execClient *accessmock.ExecutionAPIClient
 
 	connFactory *connectionmock.ConnectionFactory
@@ -57,7 +64,7 @@ type BackfillTxErrorMessagesSuite struct {
 
 	blockHeadersMap map[uint64]*flow.Header
 
-	nodeRootBlock flow.Block
+	nodeRootBlock *flow.Block
 	sealedBlock   *flow.Block
 	blockCount    int
 }
@@ -75,32 +82,39 @@ func (suite *BackfillTxErrorMessagesSuite) SetupTest() {
 	suite.receipts = new(storagemock.ExecutionReceipts)
 	suite.transactionResults = storagemock.NewLightTransactionResults(suite.T())
 	suite.txErrorMessages = new(storagemock.TransactionResultErrorMessages)
+	suite.reporter = syncmock.NewIndexReporter(suite.T())
+
+	suite.indexReporter = index.NewReporter()
+	err := suite.indexReporter.Initialize(suite.reporter)
+	suite.Require().NoError(err)
+	suite.txResultsIndex = index.NewTransactionResultsIndex(suite.indexReporter, suite.transactionResults)
+
 	suite.execClient = new(accessmock.ExecutionAPIClient)
 
 	suite.blockCount = 5
 	suite.blockHeadersMap = make(map[uint64]*flow.Header, suite.blockCount)
-	suite.nodeRootBlock = unittest.BlockFixture()
-	suite.nodeRootBlock.Header.Height = 0
-	suite.blockHeadersMap[suite.nodeRootBlock.Header.Height] = suite.nodeRootBlock.Header
 
-	parent := suite.nodeRootBlock.Header
+	suite.nodeRootBlock = unittest.Block.Genesis(flow.Emulator)
+	suite.blockHeadersMap[suite.nodeRootBlock.Height] = suite.nodeRootBlock.ToHeader()
+
+	parent := suite.nodeRootBlock.ToHeader()
 
 	for i := 1; i <= suite.blockCount; i++ {
 		block := unittest.BlockWithParentFixture(parent)
 		// update for next iteration
-		parent = block.Header
-		suite.blockHeadersMap[block.Header.Height] = block.Header
+		parent = block.ToHeader()
+		suite.blockHeadersMap[block.Height] = block.ToHeader()
 		suite.sealedBlock = block
 	}
 
 	suite.params = protocolmock.NewParams(suite.T())
 	suite.params.On("SealedRoot").Return(
 		func() *flow.Header {
-			return suite.nodeRootBlock.Header
+			return suite.nodeRootBlock.ToHeader()
 		}, nil)
 	suite.state.On("Params").Return(suite.params, nil).Maybe()
 
-	suite.snapshot = createSnapshot(suite.T(), suite.sealedBlock.Header)
+	suite.snapshot = createSnapshot(suite.T(), suite.sealedBlock.ToHeader())
 	suite.state.On("Sealed").Return(suite.snapshot)
 	suite.state.On("Final").Return(suite.snapshot)
 
@@ -132,25 +146,18 @@ func (suite *BackfillTxErrorMessagesSuite) SetupTest() {
 		nil,
 	)
 
-	var err error
-	suite.backend, err = backend.New(backend.Params{
-		State:                      suite.state,
-		ExecutionReceipts:          suite.receipts,
-		ConnFactory:                suite.connFactory,
-		MaxHeightRange:             backend.DefaultMaxHeightRange,
-		Log:                        suite.log,
-		SnapshotHistoryLimit:       backend.DefaultSnapshotHistoryLimit,
-		Communicator:               backend.NewNodeCommunicator(false),
-		ScriptExecutionMode:        backend.IndexQueryModeExecutionNodesOnly,
-		TxResultQueryMode:          backend.IndexQueryModeExecutionNodesOnly,
-		ChainID:                    flow.Testnet,
-		ExecNodeIdentitiesProvider: executionNodeIdentitiesProvider,
-	})
-	require.NoError(suite.T(), err)
+	errorMessageProvider := error_messages.NewTxErrorMessageProvider(
+		suite.log,
+		suite.txErrorMessages,
+		suite.txResultsIndex,
+		suite.connFactory,
+		node_communicator.NewNodeCommunicator(false),
+		executionNodeIdentitiesProvider,
+	)
 
 	suite.txResultErrorMessagesCore = tx_error_messages.NewTxErrorMessagesCore(
 		suite.log,
-		suite.backend,
+		errorMessageProvider,
 		suite.txErrorMessages,
 		executionNodeIdentitiesProvider,
 	)
@@ -190,12 +197,12 @@ func (suite *BackfillTxErrorMessagesSuite) TestValidateInvalidFormat() {
 		})
 		suite.Error(err)
 		suite.Equal(err, admin.NewInvalidAdminReqErrorf(
-			"'start-height' %d must not be greater than latest sealed block %d", startHeight, suite.sealedBlock.Header.Height))
+			"'start-height' %d must not be greater than latest sealed block %d", startHeight, suite.sealedBlock.Height))
 	})
 
 	// invalid start-height, start-height is less than root block
 	suite.Run("start-height is less than root block", func() {
-		suite.nodeRootBlock.Header = suite.blockHeadersMap[2] // mock sealed root block to height 2
+		suite.nodeRootBlock.HeaderBody = suite.blockHeadersMap[2].HeaderBody // mock sealed root block to height 2
 
 		startHeight := 1
 		err := suite.command.Validator(&admin.CommandRequest{
@@ -205,9 +212,9 @@ func (suite *BackfillTxErrorMessagesSuite) TestValidateInvalidFormat() {
 		})
 		suite.Error(err)
 		suite.Equal(err, admin.NewInvalidAdminReqErrorf(
-			"'start-height' %d must not be less than root block %d", startHeight, suite.nodeRootBlock.Header.Height))
+			"'start-height' %d must not be less than root block %d", startHeight, suite.nodeRootBlock.Height))
 
-		suite.nodeRootBlock.Header = suite.blockHeadersMap[0] // mock sealed root block back to height 0
+		suite.nodeRootBlock.HeaderBody = suite.blockHeadersMap[0].HeaderBody // mock sealed root block back to height 0
 	})
 
 	// invalid end-height
@@ -230,14 +237,14 @@ func (suite *BackfillTxErrorMessagesSuite) TestValidateInvalidFormat() {
 			Data: map[string]interface{}{
 				"start-height":       float64(1),         // raw json parses to float64
 				"end-height":         float64(endHeight), // raw json parses to float64
-				"execution-node-ids": []string{suite.allENIDs[0].ID().String()},
+				"execution-node-ids": []string{suite.allENIDs[0].NodeID.String()},
 			},
 		})
 		suite.Error(err)
 		suite.Equal(err, admin.NewInvalidAdminReqErrorf(
 			"'end-height' %d must not be greater than latest sealed block %d",
 			endHeight,
-			suite.sealedBlock.Header.Height,
+			suite.sealedBlock.Height,
 		))
 	})
 
@@ -314,7 +321,7 @@ func (suite *BackfillTxErrorMessagesSuite) TestValidateValidFormat() {
 			Data: map[string]interface{}{
 				"start-height":       float64(1), // raw json parses to float64
 				"end-height":         float64(3), // raw json parses to float64
-				"execution-node-ids": []string{suite.allENIDs[0].ID().String()},
+				"execution-node-ids": []string{suite.allENIDs[0].NodeID.String()},
 			},
 		})
 		suite.NoError(err)
@@ -337,7 +344,7 @@ func (suite *BackfillTxErrorMessagesSuite) TestHandleBackfillTxErrorMessages() {
 		// Create a mock execution client to simulate communication with execution nodes.
 		suite.connFactory.On("GetExecutionAPIClient", mock.Anything).Return(suite.execClient, &unittestMocks.MockCloser{}, nil)
 
-		for i := suite.nodeRootBlock.Header.Height; i <= suite.blockHeadersMap[uint64(suite.blockCount)].Height; i++ {
+		for i := suite.nodeRootBlock.Height; i <= suite.blockHeadersMap[uint64(suite.blockCount)].Height; i++ {
 			blockId := suite.blockHeadersMap[i].ID()
 
 			// Setup mock storing the transaction error message after retrieving the failed result.
@@ -349,7 +356,7 @@ func (suite *BackfillTxErrorMessagesSuite) TestHandleBackfillTxErrorMessages() {
 			suite.mockTransactionErrorMessagesResponseByBlockID(blockId, results)
 
 			// Setup mock storing the transaction error message after retrieving the failed result.
-			suite.mockStoreTxErrorMessages(blockId, results, suite.allENIDs[0].ID())
+			suite.mockStoreTxErrorMessages(blockId, results, suite.allENIDs[0].NodeID)
 		}
 
 		_, err := suite.command.Handler(ctx, req)
@@ -358,7 +365,7 @@ func (suite *BackfillTxErrorMessagesSuite) TestHandleBackfillTxErrorMessages() {
 	})
 
 	suite.Run("happy case, all default parameters, tx error messages exist in db", func() {
-		for i := suite.nodeRootBlock.Header.Height; i <= suite.blockHeadersMap[uint64(suite.blockCount)].Height; i++ {
+		for i := suite.nodeRootBlock.Height; i <= suite.blockHeadersMap[uint64(suite.blockCount)].Height; i++ {
 			blockId := suite.blockHeadersMap[i].ID()
 
 			// Setup mock storing the transaction error message after retrieving the failed result.
@@ -377,7 +384,7 @@ func (suite *BackfillTxErrorMessagesSuite) TestHandleBackfillTxErrorMessages() {
 
 		suite.allENIDs = unittest.IdentityListFixture(3, unittest.WithRole(flow.RoleExecution))
 
-		executorID := suite.allENIDs[1].ID()
+		executorID := suite.allENIDs[1].NodeID
 		req = &admin.CommandRequest{
 			Data: map[string]interface{}{
 				"start-height":       float64(startHeight), // raw json parses to float64

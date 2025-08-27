@@ -452,7 +452,6 @@ func (rf *ResultsForest) getContainer(resultID flow.Identifier) (*ExecutionResul
 }
 
 // IterateChildren iterates over all children of the given result ID and calls the provided function on each child.
-// CAUTION: this will aquire a read lock on the ResultsForest, so it is safe to call concurrently.
 // Callback function should return false to stop iteration
 func (rf *ResultsForest) IterateChildren(resultID flow.Identifier, fn func(*ExecutionResultContainer) bool) {
 	rf.mu.RLock()
@@ -531,7 +530,7 @@ func (rf *ResultsForest) OnBlockFinalized(finalized *flow.Block) {
 	// 2. For each result
 	//   i. if its executed block is the finalized block, mark it as finalized
 	//   ii. abandon all other forks
-	rf.iterateView(finalized.Header.ParentView, func(container *ExecutionResultContainer) bool {
+	rf.iterateView(finalized.ParentView, func(container *ExecutionResultContainer) bool {
 		rf.iterateChildren(container.ResultID(), func(child *ExecutionResultContainer) bool {
 			if child.Result().BlockID == finalizedBlockID {
 				child.SetBlockStatus(BlockStatusFinalized)

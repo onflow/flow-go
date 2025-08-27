@@ -15,13 +15,16 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	hotmodel "github.com/onflow/flow-go/consensus/hotstuff/model"
+	"github.com/onflow/flow-go/engine/access/index"
 	accessmock "github.com/onflow/flow-go/engine/access/mock"
-	"github.com/onflow/flow-go/engine/access/rpc/backend"
+	"github.com/onflow/flow-go/engine/access/rpc/backend/node_communicator"
+	"github.com/onflow/flow-go/engine/access/rpc/backend/transactions/error_messages"
 	connectionmock "github.com/onflow/flow-go/engine/access/rpc/connection/mock"
 	commonrpc "github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/irrecoverable"
+	syncmock "github.com/onflow/flow-go/module/state_synchronization/mock"
 	protocol "github.com/onflow/flow-go/state/protocol/mock"
 	storage "github.com/onflow/flow-go/storage/mock"
 	"github.com/onflow/flow-go/storage/operation/badgerimpl"
@@ -45,13 +48,18 @@ type TxErrorMessagesEngineSuite struct {
 	headers         *storage.Headers
 	receipts        *storage.ExecutionReceipts
 	txErrorMessages *storage.TransactionResultErrorMessages
+	lightTxResults  *storage.LightTransactionResults
+
+	reporter       *syncmock.IndexReporter
+	indexReporter  *index.Reporter
+	txResultsIndex *index.TransactionResultsIndex
 
 	enNodeIDs   flow.IdentityList
 	execClient  *accessmock.ExecutionAPIClient
 	connFactory *connectionmock.ConnectionFactory
 
 	blockMap    map[uint64]*flow.Block
-	rootBlock   flow.Block
+	rootBlock   *flow.Block
 	sealedBlock *flow.Header
 
 	db    *badger.DB
@@ -86,18 +94,23 @@ func (s *TxErrorMessagesEngineSuite) SetupTest() {
 	s.headers = storage.NewHeaders(s.T())
 	s.receipts = storage.NewExecutionReceipts(s.T())
 	s.txErrorMessages = storage.NewTransactionResultErrorMessages(s.T())
+	s.lightTxResults = storage.NewLightTransactionResults(s.T())
+	s.reporter = syncmock.NewIndexReporter(s.T())
+	s.indexReporter = index.NewReporter()
+	err := s.indexReporter.Initialize(s.reporter)
+	s.Require().NoError(err)
+	s.txResultsIndex = index.NewTransactionResultsIndex(s.indexReporter, s.lightTxResults)
 
 	blockCount := 5
 	s.blockMap = make(map[uint64]*flow.Block, blockCount)
-	s.rootBlock = unittest.BlockFixture()
-	s.rootBlock.Header.Height = 0
-	parent := s.rootBlock.Header
+	s.rootBlock = unittest.Block.Genesis(flow.Emulator)
+	parent := s.rootBlock.ToHeader()
 
 	for i := 0; i < blockCount; i++ {
 		block := unittest.BlockWithParentFixture(parent)
 		// update for next iteration
-		parent = block.Header
-		s.blockMap[block.Header.Height] = block
+		parent = block.ToHeader()
+		s.blockMap[block.Height] = block
 	}
 
 	s.sealedBlock = parent
@@ -105,15 +118,15 @@ func (s *TxErrorMessagesEngineSuite) SetupTest() {
 	s.headers.On("ByHeight", mock.AnythingOfType("uint64")).Return(
 		mocks.ConvertStorageOutput(
 			mocks.StorageMapGetter(s.blockMap),
-			func(block *flow.Block) *flow.Header { return block.Header },
+			func(block *flow.Block) *flow.Header { return block.ToHeader() },
 		),
 	).Maybe()
 
 	s.proto.state.On("Params").Return(s.proto.params)
 
 	// Mock the finalized and sealed root block header with height 0.
-	s.proto.params.On("FinalizedRoot").Return(s.rootBlock.Header, nil)
-	s.proto.params.On("SealedRoot").Return(s.rootBlock.Header, nil)
+	s.proto.params.On("FinalizedRoot").Return(s.rootBlock.ToHeader(), nil)
+	s.proto.params.On("SealedRoot").Return(s.rootBlock.ToHeader(), nil)
 
 	s.proto.snapshot.On("Head").Return(
 		func() *flow.Header {
@@ -145,26 +158,18 @@ func (s *TxErrorMessagesEngineSuite) initEngine(ctx irrecoverable.SignalerContex
 		flow.IdentifierList{},
 	)
 
-	// Initialize the backend with the mocked state, blocks, headers, transactions, etc.
-	backend, err := backend.New(backend.Params{
-		State:                      s.proto.state,
-		Headers:                    s.headers,
-		ExecutionReceipts:          s.receipts,
-		ConnFactory:                s.connFactory,
-		MaxHeightRange:             backend.DefaultMaxHeightRange,
-		Log:                        s.log,
-		SnapshotHistoryLimit:       backend.DefaultSnapshotHistoryLimit,
-		Communicator:               backend.NewNodeCommunicator(false),
-		ScriptExecutionMode:        backend.IndexQueryModeExecutionNodesOnly,
-		TxResultQueryMode:          backend.IndexQueryModeExecutionNodesOnly,
-		ChainID:                    flow.Testnet,
-		ExecNodeIdentitiesProvider: execNodeIdentitiesProvider,
-	})
-	require.NoError(s.T(), err)
+	errorMessageProvider := error_messages.NewTxErrorMessageProvider(
+		s.log,
+		s.txErrorMessages,
+		s.txResultsIndex,
+		s.connFactory,
+		node_communicator.NewNodeCommunicator(false),
+		execNodeIdentitiesProvider,
+	)
 
 	txResultErrorMessagesCore := NewTxErrorMessagesCore(
 		s.log,
-		backend,
+		errorMessageProvider,
 		s.txErrorMessages,
 		execNodeIdentitiesProvider,
 	)
@@ -192,8 +197,8 @@ func (s *TxErrorMessagesEngineSuite) TestOnFinalizedBlockHandleTxErrorMessages()
 
 	block := unittest.BlockWithParentFixture(s.sealedBlock)
 
-	s.blockMap[block.Header.Height] = block
-	s.sealedBlock = block.Header
+	s.blockMap[block.Height] = block
+	s.sealedBlock = block.ToHeader()
 
 	hotstuffBlock := hotmodel.Block{
 		BlockID: block.ID(),

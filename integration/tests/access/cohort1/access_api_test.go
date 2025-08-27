@@ -15,6 +15,7 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 
+	"github.com/onflow/flow-go/engine/access/rpc/backend/query_mode"
 	"github.com/onflow/flow-go/integration/tests/mvp"
 	"github.com/onflow/flow-go/utils/dsl"
 
@@ -28,7 +29,6 @@ import (
 	sdk "github.com/onflow/flow-go-sdk"
 	client "github.com/onflow/flow-go-sdk/access/grpc"
 
-	"github.com/onflow/flow-go/engine/access/rpc/backend"
 	"github.com/onflow/flow-go/integration/testnet"
 	"github.com/onflow/flow-go/integration/tests/lib"
 	"github.com/onflow/flow-go/integration/utils"
@@ -115,8 +115,8 @@ func (s *AccessAPISuite) SetupTest() {
 		flow.RoleAccess,
 		testnet.WithLogLevel(zerolog.FatalLevel),
 		// make sure test continues to test as expected if the default config changes
-		testnet.WithAdditionalFlagf("--script-execution-mode=%s", backend.IndexQueryModeExecutionNodesOnly),
-		testnet.WithAdditionalFlagf("--tx-result-query-mode=%s", backend.IndexQueryModeExecutionNodesOnly),
+		testnet.WithAdditionalFlagf("--script-execution-mode=%s", query_mode.IndexQueryModeExecutionNodesOnly),
+		testnet.WithAdditionalFlagf("--tx-result-query-mode=%s", query_mode.IndexQueryModeExecutionNodesOnly),
 	)
 
 	indexingAccessConfig := testnet.NewNodeConfig(
@@ -127,7 +127,7 @@ func (s *AccessAPISuite) SetupTest() {
 		testnet.WithAdditionalFlag("--execution-data-retry-delay=1s"),
 		testnet.WithAdditionalFlag("--execution-data-indexing-enabled=true"),
 		testnet.WithAdditionalFlagf("--execution-state-dir=%s", testnet.DefaultExecutionStateDir),
-		testnet.WithAdditionalFlagf("--script-execution-mode=%s", backend.IndexQueryModeLocalOnly),
+		testnet.WithAdditionalFlagf("--script-execution-mode=%s", query_mode.IndexQueryModeLocalOnly),
 	)
 
 	consensusConfigs := []func(config *testnet.NodeConfig){

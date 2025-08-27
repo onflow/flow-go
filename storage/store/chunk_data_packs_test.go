@@ -3,7 +3,7 @@ package store_test
 import (
 	"testing"
 
-	"github.com/cockroachdb/pebble"
+	"github.com/cockroachdb/pebble/v2"
 	"github.com/dgraph-io/badger/v2"
 
 	"github.com/onflow/flow-go/model/flow"
@@ -46,7 +46,7 @@ func TestChunkDataPack_Remove(t *testing.T) {
 
 			chunkIDs := make([]flow.Identifier, 0, len(chunkDataPacks))
 			for _, chunk := range chunkDataPacks {
-				chunkIDs = append(chunkIDs, chunk.ID())
+				chunkIDs = append(chunkIDs, chunk.ChunkID)
 			}
 
 			require.NoError(t, chunkDataPackStore.Store(chunkDataPacks))

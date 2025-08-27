@@ -2,7 +2,6 @@ package indexer
 
 import (
 	"context"
-	"crypto/rand"
 	"fmt"
 	"os"
 	"testing"
@@ -16,8 +15,6 @@ import (
 	"github.com/onflow/flow-go/fvm/storage/derived"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/convert"
-	"github.com/onflow/flow-go/ledger/common/pathfinder"
-	"github.com/onflow/flow-go/ledger/complete"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	"github.com/onflow/flow-go/module/mempool/stdmap"
@@ -78,7 +75,7 @@ func (i *indexCoreTest) useDefaultBlockByHeight() *indexCoreTest {
 		On("BlockIDByHeight", mocks.AnythingOfType("uint64")).
 		Return(func(height uint64) (flow.Identifier, error) {
 			for _, b := range i.blocks {
-				if b.Header.Height == height {
+				if b.Height == height {
 					return b.ID(), nil
 				}
 			}
@@ -89,8 +86,8 @@ func (i *indexCoreTest) useDefaultBlockByHeight() *indexCoreTest {
 		On("ByHeight", mocks.AnythingOfType("uint64")).
 		Return(func(height uint64) (*flow.Header, error) {
 			for _, b := range i.blocks {
-				if b.Header.Height == height {
-					return b.Header, nil
+				if b.Height == height {
+					return b.ToHeader(), nil
 				}
 			}
 			return nil, fmt.Errorf("not found")
@@ -112,12 +109,12 @@ func (i *indexCoreTest) useDefaultHeights() *indexCoreTest {
 	i.registers.
 		On("FirstHeight").
 		Return(func() uint64 {
-			return i.blocks[0].Header.Height
+			return i.blocks[0].Height
 		})
 	i.registers.
 		On("LatestHeight").
 		Return(func() uint64 {
-			return i.blocks[len(i.blocks)-1].Header.Height
+			return i.blocks[len(i.blocks)-1].Height
 		})
 	return i
 }
@@ -191,14 +188,10 @@ func (i *indexCoreTest) initIndexer() *indexCoreTest {
 
 	i.useDefaultHeights()
 
-	collectionsToMarkFinalized, err := stdmap.NewTimes(100)
-	require.NoError(i.t, err)
-	collectionsToMarkExecuted, err := stdmap.NewTimes(100)
-	require.NoError(i.t, err)
-	blocksToMarkExecuted, err := stdmap.NewTimes(100)
-	require.NoError(i.t, err)
-	blockTransactions, err := stdmap.NewIdentifierMap(100)
-	require.NoError(i.t, err)
+	collectionsToMarkFinalized := stdmap.NewTimes(100)
+	collectionsToMarkExecuted := stdmap.NewTimes(100)
+	blocksToMarkExecuted := stdmap.NewTimes(100)
+	blockTransactions := stdmap.NewIdentifierMap(100)
 
 	log := zerolog.New(os.Stdout)
 	blocks := storagemock.NewBlocks(i.t)
@@ -255,7 +248,7 @@ func TestExecutionState_IndexBlockData(t *testing.T) {
 	// this test makes sure the index block data is correctly calling store register with the
 	// same entries we create as a block execution data test, and correctly converts the registers
 	t.Run("Index Single Chunk and Single Register", func(t *testing.T) {
-		trie := trieUpdateFixture(t)
+		trie := TrieUpdateRandomLedgerPayloadsFixture(t)
 		ed := &execution_data.BlockExecutionData{
 			BlockID: block.ID(),
 			ChunkExecutionDatas: []*execution_data.ChunkExecutionData{
@@ -273,7 +266,7 @@ func TestExecutionState_IndexBlockData(t *testing.T) {
 			useDefaultTransactionResults().
 			// make sure update registers match in length and are same as block data ledger payloads
 			setStoreRegisters(func(t *testing.T, entries flow.RegisterEntries, height uint64) error {
-				assert.Equal(t, height, block.Header.Height)
+				assert.Equal(t, height, block.Height)
 				assert.Len(t, trie.Payloads, entries.Len())
 
 				// make sure all the registers from the execution data have been stored as well the value matches
@@ -290,7 +283,7 @@ func TestExecutionState_IndexBlockData(t *testing.T) {
 	// we only update that register once with the latest value, so this makes sure merging of
 	// registers is done correctly.
 	t.Run("Index Multiple Chunks and Merge Same Register Updates", func(t *testing.T) {
-		tries := []*ledger.TrieUpdate{trieUpdateFixture(t), trieUpdateFixture(t)}
+		tries := []*ledger.TrieUpdate{TrieUpdateRandomLedgerPayloadsFixture(t), TrieUpdateRandomLedgerPayloadsFixture(t)}
 		// make sure we have two register updates that are updating the same value, so we can check
 		// if the value from the second update is being persisted instead of first
 		tries[1].Paths[0] = tries[0].Paths[0]
@@ -379,7 +372,7 @@ func TestExecutionState_IndexBlockData(t *testing.T) {
 			}).
 			// make sure an empty set of register entries was stored
 			setStoreRegisters(func(t *testing.T, entries flow.RegisterEntries, height uint64) error {
-				assert.Equal(t, height, block.Header.Height)
+				assert.Equal(t, height, block.Height)
 				assert.Equal(t, 0, entries.Len())
 				return nil
 			}).
@@ -427,7 +420,7 @@ func TestExecutionState_IndexBlockData(t *testing.T) {
 			}).
 			// make sure an empty set of register entries was stored
 			setStoreRegisters(func(t *testing.T, entries flow.RegisterEntries, height uint64) error {
-				assert.Equal(t, height, block.Header.Height)
+				assert.Equal(t, height, block.Height)
 				assert.Equal(t, 0, entries.Len())
 				return nil
 			}).
@@ -464,7 +457,7 @@ func TestExecutionState_IndexBlockData(t *testing.T) {
 			}).
 			// make sure an empty set of register entries was stored
 			setStoreRegisters(func(t *testing.T, entries flow.RegisterEntries, height uint64) error {
-				assert.Equal(t, height, block.Header.Height)
+				assert.Equal(t, height, block.Height)
 				assert.Equal(t, 0, entries.Len())
 				return nil
 			}).
@@ -477,7 +470,7 @@ func TestExecutionState_IndexBlockData(t *testing.T) {
 		expectedEvents := unittest.EventsFixture(20)
 		expectedResults := unittest.LightTransactionResultsFixture(20)
 		expectedCollections := unittest.CollectionListFixture(2)
-		expectedTries := []*ledger.TrieUpdate{trieUpdateFixture(t), trieUpdateFixture(t)}
+		expectedTries := []*ledger.TrieUpdate{TrieUpdateRandomLedgerPayloadsFixture(t), TrieUpdateRandomLedgerPayloadsFixture(t)}
 		expectedPayloads := make([]*ledger.Payload, 0)
 		for _, trie := range expectedTries {
 			expectedPayloads = append(expectedPayloads, trie.Payloads...)
@@ -525,7 +518,7 @@ func TestExecutionState_IndexBlockData(t *testing.T) {
 			}).
 			// make sure update registers match in length and are same as block data ledger payloads
 			setStoreRegisters(func(t *testing.T, entries flow.RegisterEntries, actualHeight uint64) error {
-				assert.Equal(t, actualHeight, block.Header.Height)
+				assert.Equal(t, actualHeight, block.Height)
 				assert.Equal(t, entries.Len(), len(expectedPayloads))
 
 				// make sure all the registers from the execution data have been stored as well the value matches
@@ -542,10 +535,10 @@ func TestExecutionState_IndexBlockData(t *testing.T) {
 	t.Run("Invalid Heights", func(t *testing.T) {
 		last := blocks[len(blocks)-1]
 		ed := &execution_data.BlockExecutionData{
-			BlockID: last.Header.ID(),
+			BlockID: last.ID(),
 		}
 		execData := execution_data.NewBlockExecutionDataEntity(last.ID(), ed)
-		latestHeight := blocks[len(blocks)-3].Header.Height
+		latestHeight := blocks[len(blocks)-3].Height
 
 		err := newIndexCoreTest(t, blocks, execData).
 			// return a height one smaller than the latest block in storage
@@ -554,7 +547,7 @@ func TestExecutionState_IndexBlockData(t *testing.T) {
 			}).
 			runIndexBlockData()
 
-		assert.EqualError(t, err, fmt.Sprintf("must index block data with the next height %d, but got %d", latestHeight+1, last.Header.Height))
+		assert.EqualError(t, err, fmt.Sprintf("must index block data with the next height %d, but got %d", latestHeight+1, last.Height))
 	})
 
 	// this test makes sure that if a block we try to index is not found in block storage
@@ -562,9 +555,9 @@ func TestExecutionState_IndexBlockData(t *testing.T) {
 	t.Run("Unknown block ID", func(t *testing.T) {
 		unknownBlock := unittest.BlockFixture()
 		ed := &execution_data.BlockExecutionData{
-			BlockID: unknownBlock.Header.ID(),
+			BlockID: unknownBlock.ID(),
 		}
-		execData := execution_data.NewBlockExecutionDataEntity(unknownBlock.Header.ID(), ed)
+		execData := execution_data.NewBlockExecutionDataEntity(unknownBlock.ID(), ed)
 
 		err := newIndexCoreTest(t, blocks, execData).runIndexBlockData()
 
@@ -576,7 +569,7 @@ func TestExecutionState_IndexBlockData(t *testing.T) {
 func TestExecutionState_RegisterValues(t *testing.T) {
 	t.Run("Get value for single register", func(t *testing.T) {
 		blocks := unittest.BlockchainFixture(5)
-		height := blocks[1].Header.Height
+		height := blocks[1].Height
 		id := flow.RegisterID{
 			Owner: "1",
 			Key:   "2",
@@ -602,58 +595,6 @@ func newBlockHeadersStorage(blocks []*flow.Block) storage.Headers {
 	}
 
 	return synctest.MockBlockHeaderStorage(synctest.WithByID(blocksByID))
-}
-
-func trieUpdateWithPayloadsFixture(payloads []*ledger.Payload) *ledger.TrieUpdate {
-	keys := make([]ledger.Key, 0)
-	values := make([]ledger.Value, 0)
-	for _, payload := range payloads {
-		key, _ := payload.Key()
-		keys = append(keys, key)
-		values = append(values, payload.Value())
-	}
-
-	update, _ := ledger.NewUpdate(ledger.DummyState, keys, values)
-	trie, _ := pathfinder.UpdateToTrieUpdate(update, complete.DefaultPathFinderVersion)
-	return trie
-}
-
-func trieUpdateFixture(t *testing.T) *ledger.TrieUpdate {
-	return trieUpdateWithPayloadsFixture(
-		[]*ledger.Payload{
-			ledgerPayloadFixture(t),
-			ledgerPayloadFixture(t),
-			ledgerPayloadFixture(t),
-			ledgerPayloadFixture(t),
-		})
-}
-
-func ledgerPayloadFixture(t *testing.T) *ledger.Payload {
-	owner := unittest.RandomAddressFixture()
-	key := make([]byte, 8)
-	_, err := rand.Read(key)
-	require.NoError(t, err)
-	val := make([]byte, 8)
-	_, err = rand.Read(key)
-	require.NoError(t, err)
-	return ledgerPayloadWithValuesFixture(owner.String(), fmt.Sprintf("%x", key), val)
-}
-
-func ledgerPayloadWithValuesFixture(owner string, key string, value []byte) *ledger.Payload {
-	k := ledger.Key{
-		KeyParts: []ledger.KeyPart{
-			{
-				Type:  ledger.KeyPartOwner,
-				Value: []byte(owner),
-			},
-			{
-				Type:  ledger.KeyPartKey,
-				Value: []byte(key),
-			},
-		},
-	}
-
-	return ledger.NewPayload(k, value)
 }
 
 // trieRegistersPayloadComparer checks that trie payloads and register payloads are same, used for testing.
@@ -826,6 +767,6 @@ func TestIndexerIntegration_StoreAndGet(t *testing.T) {
 
 // helper to store register at height and increment index range
 func storeRegisterWithValue(indexer *IndexerCore, height uint64, owner string, key string, value []byte) error {
-	payload := ledgerPayloadWithValuesFixture(owner, key, value)
+	payload := LedgerPayloadFixture(owner, key, value)
 	return indexer.indexRegisters(map[ledger.Path]*ledger.Payload{ledger.DummyPath: payload}, height)
 }

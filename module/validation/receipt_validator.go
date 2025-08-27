@@ -11,7 +11,6 @@ import (
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/signature"
-	"github.com/onflow/flow-go/state"
 	"github.com/onflow/flow-go/state/fork"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
@@ -50,9 +49,9 @@ func NewReceiptValidator(state protocol.State,
 // verifySignature ensures that the given receipt has a valid signature from nodeIdentity.
 // Expected errors during normal operations:
 //   - engine.InvalidInputError if the signature is invalid
-func (v *receiptValidator) verifySignature(receipt *flow.ExecutionReceiptMeta, nodeIdentity *flow.Identity) error {
-	id := receipt.ID()
-	valid, err := nodeIdentity.StakingPubKey.Verify(receipt.ExecutorSignature, id[:], v.signatureHasher)
+func (v *receiptValidator) verifySignature(receipt *flow.ExecutionReceiptStub, nodeIdentity *flow.Identity) error {
+	unsignedReceiptID := receipt.UnsignedExecutionReceiptStub.ID()
+	valid, err := nodeIdentity.StakingPubKey.Verify(receipt.ExecutorSignature, unsignedReceiptID[:], v.signatureHasher)
 	if err != nil { // Verify(..) returns (false,nil) for invalid signature. Any error indicates unexpected internal failure.
 		return irrecoverable.NewExceptionf("failed to verify signature: %w", err)
 	}
@@ -66,51 +65,14 @@ func (v *receiptValidator) verifySignature(receipt *flow.ExecutionReceiptMeta, n
 // The sum over all chunks must equal the number of elements in [flow.ExecutionResult.ServiceEvents]
 // Expected errors during normal operations:
 //   - engine.InvalidInputError if the result has malformed chunks
-//   - module.UnknownBlockError when the executed block is unknown
-//
-// TODO(mainnet27, #6773): remove logic for ServiceEventCount being nil after changing this field to value type https://github.com/onflow/flow-go/issues/6773
-// For backwards compatibility, we add TEMPORARY extension to this rule:
-//   - We represent [flow.Chunk.ServiceEventCount] as a pointer.
-//   - The ServiceEventCount being nil for _all_ chunks of the ExecutionResult, indicates that this chunk was
-//     created by an older software version which assumes that _all_ service events were emitted in the system
-//     chunk (last chunk). This was the implicit behaviour prior to the introduction of this field.
-//
-// (2) Otherwise, the ServiceEventCount must be non-nil for _all_ chunks of the ExecutionResult
-// Within an ExecutionResult, all chunks must use either representation (1) or (2), not both.
 func (v *receiptValidator) verifyChunkServiceEvents(result *flow.ExecutionResult) error {
-	kvstore, err := v.state.AtBlockID(result.BlockID).ProtocolState()
-	if err != nil {
-		if errors.Is(err, state.ErrUnknownSnapshotReference) {
-			return module.NewUnknownBlockError("could not read protocol state for block %x: %w", result.BlockID, err)
-		}
-		return irrecoverable.NewExceptionf("could not read kvstore version: %w", err)
-	}
-	version := kvstore.GetProtocolStateVersion()
-
-	// PROTOCOL VERSION <2: all Chunk.ServiceEventCount must be nil
-	// TODO(mainnet27, #6773): remove this codepath
-	if version < 2 {
-		for i, chunk := range result.Chunks {
-			if chunk.ServiceEventCount != nil {
-				return engine.NewInvalidInputErrorf("invalid chunk format for protocol version %d: chunk %d has non-nil ServiceEventCount %d",
-					version, i, *chunk.ServiceEventCount)
-			}
-		}
-		return nil
-	}
-
-	// PROTOCOL VERSION >=2: all Chunk.ServiceEventCount must be populated and sum to len(result.ServiceEvents)
 	chunkServiceEventCountTotal := 0
-	for i, chunk := range result.Chunks {
-		if chunk.ServiceEventCount == nil {
-			return engine.NewInvalidInputErrorf("invalid chunk format for protocol version %d: chunk %d has nil ServiceEventCount",
-				version, i)
-		}
-		chunkServiceEventCountTotal += int(*chunk.ServiceEventCount)
+	for _, chunk := range result.Chunks {
+		chunkServiceEventCountTotal += int(chunk.ServiceEventCount)
 	}
 	if chunkServiceEventCountTotal != len(result.ServiceEvents) {
-		return engine.NewInvalidInputErrorf("invalid chunk format for protocol version %d: service event count mismatch (%d != %d)",
-			version, chunkServiceEventCountTotal, len(result.ServiceEvents))
+		return engine.NewInvalidInputErrorf("invalid chunk format: service event count mismatch (%d != %d)",
+			chunkServiceEventCountTotal, len(result.ServiceEvents))
 	}
 	return nil
 }
@@ -146,7 +108,7 @@ func (v *receiptValidator) verifyChunksFormat(result *flow.ExecutionResult) erro
 		}
 		return irrecoverable.NewExceptionf("unexpected failure retrieving index for executed block %v: %w", result.BlockID, err)
 	}
-	requiredChunks := 1 + len(index.CollectionIDs) // one chunk per collection + 1 system chunk
+	requiredChunks := 1 + len(index.GuaranteeIDs) // one chunk per collection + 1 system chunk
 	if result.Chunks.Len() != requiredChunks {
 		return engine.NewInvalidInputErrorf("invalid number of chunks, expected %d got %d", requiredChunks, result.Chunks.Len())
 	}
@@ -244,7 +206,7 @@ func (v *receiptValidator) Validate(receipt *flow.ExecutionReceipt) error {
 		return fmt.Errorf("could not validate single result %v at index: %w", receipt.ExecutionResult.ID(), err)
 	}
 
-	err = v.validateReceipt(receipt.Meta(), receipt.ExecutionResult.BlockID)
+	err = v.validateReceipt(receipt.Stub(), receipt.ExecutionResult.BlockID)
 	if err != nil {
 		return fmt.Errorf("could not validate receipt %v: %w", receipt.ID(), err)
 	}
@@ -274,19 +236,19 @@ func (v *receiptValidator) Validate(receipt *flow.ExecutionReceipt) error {
 // Note that module.UnknownResultError is not possible; we have either an invalid candidate block
 // (yields engine.InvalidInputError) or a missing parent block (yields module.UnknownBlockError).
 func (v *receiptValidator) ValidatePayload(candidate *flow.Block) error {
-	header := candidate.Header
 	payload := candidate.Payload
+	parentID := candidate.ParentID
 
 	// As a prerequisite, we check that candidate's parent block is known. Otherwise, we cannot validate it.
 	// This check is important to distinguish expected error cases from unexpected exceptions. By confirming
 	// that the protocol state knows the parent block, we guarantee that we can successfully traverse the
 	// candidate's ancestry below.
-	exists, err := v.headers.Exists(header.ParentID)
+	exists, err := v.headers.Exists(parentID)
 	if err != nil {
-		return irrecoverable.NewExceptionf("unexpected exception retrieving the candidate block's parent %v: %w", header.ParentID, err)
+		return irrecoverable.NewExceptionf("unexpected exception retrieving the candidate block's parent %v: %w", parentID, err)
 	}
 	if !exists {
-		return module.NewUnknownBlockError("cannot validate receipts in block, as its parent block is unknown %v", header.ParentID)
+		return module.NewUnknownBlockError("cannot validate receipts in block, as its parent block is unknown %v", parentID)
 	}
 
 	// return if nothing to validate
@@ -296,9 +258,9 @@ func (v *receiptValidator) ValidatePayload(candidate *flow.Block) error {
 
 	// Get the latest sealed result on this fork and the corresponding block,
 	// whose result is sealed. This block is not necessarily finalized.
-	lastSeal, err := v.seals.HighestInFork(header.ParentID)
+	lastSeal, err := v.seals.HighestInFork(parentID)
 	if err != nil {
-		return fmt.Errorf("could not retrieve latest seal for fork with head %x: %w", header.ParentID, err)
+		return fmt.Errorf("could not retrieve latest seal for fork with head %x: %w", parentID, err)
 	}
 	latestSealedResult, err := v.results.ByID(lastSeal.ResultID)
 	if err != nil {
@@ -350,7 +312,7 @@ func (v *receiptValidator) ValidatePayload(candidate *flow.Block) error {
 		}
 		return nil
 	}
-	err = fork.TraverseForward(v.headers, header.ParentID, bookKeeper, fork.ExcludingBlock(lastSeal.BlockID))
+	err = fork.TraverseForward(v.headers, parentID, bookKeeper, fork.ExcludingBlock(lastSeal.BlockID))
 	if err != nil {
 		// At the beginning, we checked that candidate's parent exists in the protocol state, i.e. its
 		// ancestry is known and valid. Hence, any error here is a symptom of internal state corruption.
@@ -471,7 +433,7 @@ func (v *receiptValidator) validateResult(result *flow.ExecutionResult, prevResu
 // Error returns:
 //   - engine.InvalidInputError if `receipt` is invalid
 //   - module.UnknownBlockError if executedBlockID is unknown
-func (v *receiptValidator) validateReceipt(receipt *flow.ExecutionReceiptMeta, executedBlockID flow.Identifier) error {
+func (v *receiptValidator) validateReceipt(receipt *flow.ExecutionReceiptStub, executedBlockID flow.Identifier) error {
 	identity, err := identityForNode(v.state, executedBlockID, receipt.ExecutorID)
 	if err != nil {
 		return fmt.Errorf("retrieving idenity of node %v at block %v failed: %w", receipt.ExecutorID, executedBlockID, err)

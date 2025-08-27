@@ -32,7 +32,7 @@ func TestExecutionForkEvidenceStoreAndRetrieve(t *testing.T) {
 				conflictingSeals[i] = unittest.IncorporatedResultSeal.Fixture(
 					unittest.IncorporatedResultSeal.WithResult(
 						unittest.ExecutionResultFixture(
-							unittest.WithBlock(&block))))
+							unittest.WithBlock(block))))
 			}
 
 			evidenceStore := store.NewExecutionForkEvidence(db)
@@ -55,7 +55,7 @@ func TestExecutionForkEvidenceStoreAndRetrieve(t *testing.T) {
 				conflictingSeals[i] = unittest.IncorporatedResultSeal.Fixture(
 					unittest.IncorporatedResultSeal.WithResult(
 						unittest.ExecutionResultFixture(
-							unittest.WithBlock(&block))))
+							unittest.WithBlock(block))))
 			}
 
 			conflictingSeals2 := make([]*flow.IncorporatedResultSeal, 2)
@@ -63,7 +63,7 @@ func TestExecutionForkEvidenceStoreAndRetrieve(t *testing.T) {
 				conflictingSeals2[i] = unittest.IncorporatedResultSeal.Fixture(
 					unittest.IncorporatedResultSeal.WithResult(
 						unittest.ExecutionResultFixture(
-							unittest.WithBlock(&block))))
+							unittest.WithBlock(block))))
 			}
 
 			evidenceStore := store.NewExecutionForkEvidence(db)
