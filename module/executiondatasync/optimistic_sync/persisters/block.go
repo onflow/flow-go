@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/jordanschalm/lockctx"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/model/flow"
@@ -19,6 +20,7 @@ type BlockPersister struct {
 
 	persisterStores []stores.PersisterStore
 	protocolDB      storage.DB
+	lockManager     lockctx.Manager
 	executionResult *flow.ExecutionResult
 	header          *flow.Header
 }
@@ -27,6 +29,7 @@ type BlockPersister struct {
 func NewBlockPersister(
 	log zerolog.Logger,
 	protocolDB storage.DB,
+	lockManager lockctx.Manager,
 	executionResult *flow.ExecutionResult,
 	header *flow.Header,
 	persisterStores []stores.PersisterStore,
@@ -43,6 +46,7 @@ func NewBlockPersister(
 		protocolDB:      protocolDB,
 		executionResult: executionResult,
 		header:          header,
+		lockManager:     lockManager,
 	}
 
 	persister.log.Info().
@@ -58,9 +62,16 @@ func (p *BlockPersister) Persist() error {
 	p.log.Debug().Msg("started to persist execution data")
 	start := time.Now()
 
-	err := p.protocolDB.WithReaderBatchWriter(func(batch storage.ReaderBatchWriter) error {
+	lctx := p.lockManager.NewContext()
+	err := lctx.AcquireLock(storage.LockInsertCollection)
+	if err != nil {
+		return fmt.Errorf("could not acquire lock for inserting light collections: %w", err)
+	}
+	defer lctx.Release()
+
+	err = p.protocolDB.WithReaderBatchWriter(func(batch storage.ReaderBatchWriter) error {
 		for _, persister := range p.persisterStores {
-			if err := persister.Persist(batch); err != nil {
+			if err := persister.Persist(lctx, batch); err != nil {
 				return err
 			}
 		}

@@ -724,15 +724,17 @@ func (suite *Suite) TestGetSealedTransaction() {
 		// create the ingest engine
 		processedHeight := store.NewConsumerProgress(badgerimpl.ToDB(db), module.ConsumeProgressIngestionEngineBlockHeight)
 
+		lockManager := storage.NewTestingLockManager()
 		collectionSyncer := ingestion.NewCollectionSyncer(
 			suite.log,
-			collectionExecutedMetric,
+			module.CollectionExecutedMetric(collectionExecutedMetric),
 			suite.request,
 			suite.state,
 			all.Blocks,
 			collections,
 			transactions,
 			lastFullBlockHeight,
+			lockManager,
 		)
 
 		ingestEng, err := ingestion.New(
@@ -752,14 +754,14 @@ func (suite *Suite) TestGetSealedTransaction() {
 
 		// 1. Assume that follower engine updated the block storage and the protocol state. The block is reported as sealed
 		bdb := badgerimpl.ToDB(db)
-		manager, lctx := unittest.LockManagerWithContext(suite.T(), storage.LockInsertBlock)
+		lctx := lockManager.NewContext()
+		require.NoError(suite.T(), lctx.AcquireLock(storage.LockInsertBlock))
 		require.NoError(suite.T(), bdb.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 			return all.Blocks.BatchStore(lctx, rw, block)
 		}))
 		lctx.Release()
-		require.NoError(suite.T(), err)
 
-		fctx := manager.NewContext()
+		fctx := lockManager.NewContext()
 		defer fctx.Release()
 		require.NoError(suite.T(), fctx.AcquireLock(storage.LockFinalizeBlock))
 		require.NoError(suite.T(), bdb.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
@@ -785,7 +787,13 @@ func (suite *Suite) TestGetSealedTransaction() {
 		// 3. Request engine is used to request missing collection
 		suite.request.On("EntityByID", collection.ID(), mock.Anything).Return()
 		// 4. Indexer IndexCollection receives the requested collection and all the execution receipts
-		err = indexer.IndexCollection(collection, collections, transactions, suite.log, collectionExecutedMetric)
+		// Create a lock context for indexing
+		indexLctx := lockManager.NewContext()
+		lockErr := indexLctx.AcquireLock(storage.LockInsertCollection)
+		require.NoError(suite.T(), lockErr)
+		defer indexLctx.Release()
+
+		err = indexer.IndexCollection(indexLctx, collection, collections, suite.log, module.CollectionExecutedMetric(collectionExecutedMetric))
 		require.NoError(suite.T(), err)
 
 		for _, r := range executionReceipts {
@@ -833,13 +841,13 @@ func (suite *Suite) TestGetTransactionResult() {
 		suite.sealedSnapshot.On("Head").Return(sealedBlock, nil)
 
 		bdb := badgerimpl.ToDB(db)
-		manager, lctx := unittest.LockManagerWithContext(suite.T(), storage.LockInsertBlock)
+		lockManager, lctx := unittest.LockManagerWithContext(suite.T(), storage.LockInsertBlock)
 		require.NoError(suite.T(), bdb.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 			return all.Blocks.BatchStore(lctx, rw, block)
 		}))
 		lctx.Release()
 
-		lctx2 := manager.NewContext()
+		lctx2 := lockManager.NewContext()
 		require.NoError(suite.T(), lctx2.AcquireLock(storage.LockInsertBlock))
 		require.NoError(suite.T(), bdb.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 			return all.Blocks.BatchStore(lctx2, rw, blockNegative)
@@ -877,7 +885,7 @@ func (suite *Suite) TestGetTransactionResult() {
 		storedb := badgerimpl.ToDB(db)
 		transactions := store.NewTransactions(metrics, storedb)
 		collections := store.NewCollections(storedb, transactions)
-		err := collections.Store(collectionNegative)
+		_, err := collections.Store(collectionNegative)
 		require.NoError(suite.T(), err)
 		collectionsToMarkFinalized, err := stdmap.NewTimes(100)
 		require.NoError(suite.T(), err)
@@ -943,13 +951,14 @@ func (suite *Suite) TestGetTransactionResult() {
 
 		collectionSyncer := ingestion.NewCollectionSyncer(
 			suite.log,
-			collectionExecutedMetric,
+			module.CollectionExecutedMetric(collectionExecutedMetric),
 			suite.request,
 			suite.state,
 			all.Blocks,
 			collections,
 			transactions,
 			lastFullBlockHeight,
+			lockManager,
 		)
 
 		ingestEng, err := ingestion.New(
@@ -990,7 +999,13 @@ func (suite *Suite) TestGetTransactionResult() {
 			ingestEng.OnFinalizedBlock(mb)
 
 			// Indexer IndexCollection receives the requested collection and all the execution receipts
-			err = indexer.IndexCollection(collection, collections, transactions, suite.log, collectionExecutedMetric)
+			// Create a lock context for indexing
+			indexLctx := lockManager.NewContext()
+			lockErr := indexLctx.AcquireLock(storage.LockInsertCollection)
+			require.NoError(suite.T(), lockErr)
+			defer indexLctx.Release()
+
+			err = indexer.IndexCollection(indexLctx, collection, collections, suite.log, module.CollectionExecutedMetric(collectionExecutedMetric))
 			require.NoError(suite.T(), err)
 
 			for _, r := range executionReceipts {
@@ -998,7 +1013,7 @@ func (suite *Suite) TestGetTransactionResult() {
 				require.NoError(suite.T(), err)
 			}
 		}
-		fctx2 := manager.NewContext()
+		fctx2 := lockManager.NewContext()
 		require.NoError(suite.T(), fctx2.AcquireLock(storage.LockFinalizeBlock))
 		require.NoError(suite.T(), bdb.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 			return operation.IndexFinalizedBlockByHeight(fctx2, rw, block.Header.Height, block.ID())
@@ -1207,15 +1222,17 @@ func (suite *Suite) TestExecuteScript() {
 		lastFullBlockHeight, err := counters.NewPersistentStrictMonotonicCounter(lastFullBlockHeightProgress)
 		require.NoError(suite.T(), err)
 
+		lockManager := storage.NewTestingLockManager()
 		collectionSyncer := ingestion.NewCollectionSyncer(
 			suite.log,
-			collectionExecutedMetric,
+			module.CollectionExecutedMetric(collectionExecutedMetric),
 			suite.request,
 			suite.state,
 			all.Blocks,
 			all.Collections,
 			all.Transactions,
 			lastFullBlockHeight,
+			lockManager,
 		)
 
 		ingestEng, err := ingestion.New(
@@ -1238,14 +1255,15 @@ func (suite *Suite) TestExecuteScript() {
 
 		// create a block and a seal pointing to that block
 		lastBlock := unittest.BlockWithParentFixture(prevBlock.Header)
-		manager, lctx := unittest.LockManagerWithContext(suite.T(), storage.LockInsertBlock)
+		lctx := lockManager.NewContext()
+		require.NoError(suite.T(), lctx.AcquireLock(storage.LockInsertBlock))
 		require.NoError(suite.T(), db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 			return all.Blocks.BatchStore(lctx, rw, lastBlock)
 		}))
 		lctx.Release()
 		require.NoError(suite.T(), err)
 
-		fctx := manager.NewContext()
+		fctx := lockManager.NewContext()
 		require.NoError(suite.T(), fctx.AcquireLock(storage.LockFinalizeBlock))
 		require.NoError(suite.T(), db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 			return operation.IndexFinalizedBlockByHeight(fctx, rw, lastBlock.Header.Height, lastBlock.ID())
@@ -1262,7 +1280,7 @@ func (suite *Suite) TestExecuteScript() {
 			require.NoError(suite.T(), err)
 		}
 
-		fctx2 := manager.NewContext()
+		fctx2 := lockManager.NewContext()
 		require.NoError(suite.T(), fctx2.AcquireLock(storage.LockInsertBlock))
 		require.NoError(suite.T(), fctx2.AcquireLock(storage.LockFinalizeBlock))
 		require.NoError(suite.T(), db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {

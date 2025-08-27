@@ -268,18 +268,19 @@ func (m *MockCollections) EXPECT() *MockCollectionsMockRecorder {
 	return m.recorder
 }
 
-// BatchStoreLightAndIndexByTransaction mocks base method.
-func (m *MockCollections) BatchStoreLightAndIndexByTransaction(arg0 *flow.LightCollection, arg1 storage.ReaderBatchWriter) error {
+// BatchStoreAndIndexByTransaction mocks base method.
+func (m *MockCollections) BatchStoreAndIndexByTransaction(arg0 lockctx.Proof, arg1 *flow.Collection, arg2 storage.ReaderBatchWriter) (flow.LightCollection, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "BatchStoreLightAndIndexByTransaction", arg0, arg1)
-	ret0, _ := ret[0].(error)
-	return ret0
+	ret := m.ctrl.Call(m, "BatchStoreAndIndexByTransaction", arg0, arg1, arg2)
+	ret0, _ := ret[0].(flow.LightCollection)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
 }
 
-// BatchStoreLightAndIndexByTransaction indicates an expected call of BatchStoreLightAndIndexByTransaction.
-func (mr *MockCollectionsMockRecorder) BatchStoreLightAndIndexByTransaction(arg0, arg1 interface{}) *gomock.Call {
+// BatchStoreAndIndexByTransaction indicates an expected call of BatchStoreAndIndexByTransaction.
+func (mr *MockCollectionsMockRecorder) BatchStoreAndIndexByTransaction(arg0, arg1, arg2 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "BatchStoreLightAndIndexByTransaction", reflect.TypeOf((*MockCollections)(nil).BatchStoreLightAndIndexByTransaction), arg0, arg1)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "BatchStoreAndIndexByTransaction", reflect.TypeOf((*MockCollections)(nil).BatchStoreAndIndexByTransaction), arg0, arg1, arg2)
 }
 
 // ByID mocks base method.
@@ -342,11 +343,12 @@ func (mr *MockCollectionsMockRecorder) Remove(arg0 interface{}) *gomock.Call {
 }
 
 // Store mocks base method.
-func (m *MockCollections) Store(arg0 *flow.Collection) error {
+func (m *MockCollections) Store(arg0 *flow.Collection) (flow.LightCollection, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Store", arg0)
-	ret0, _ := ret[0].(error)
-	return ret0
+	ret0, _ := ret[0].(flow.LightCollection)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
 }
 
 // Store indicates an expected call of Store.
@@ -355,18 +357,19 @@ func (mr *MockCollectionsMockRecorder) Store(arg0 interface{}) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Store", reflect.TypeOf((*MockCollections)(nil).Store), arg0)
 }
 
-// StoreLightAndIndexByTransaction mocks base method.
-func (m *MockCollections) StoreLightAndIndexByTransaction(arg0 *flow.LightCollection) error {
+// StoreAndIndexByTransaction mocks base method.
+func (m *MockCollections) StoreAndIndexByTransaction(arg0 lockctx.Proof, arg1 *flow.Collection) (flow.LightCollection, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "StoreLightAndIndexByTransaction", arg0)
-	ret0, _ := ret[0].(error)
-	return ret0
+	ret := m.ctrl.Call(m, "StoreAndIndexByTransaction", arg0, arg1)
+	ret0, _ := ret[0].(flow.LightCollection)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
 }
 
-// StoreLightAndIndexByTransaction indicates an expected call of StoreLightAndIndexByTransaction.
-func (mr *MockCollectionsMockRecorder) StoreLightAndIndexByTransaction(arg0 interface{}) *gomock.Call {
+// StoreAndIndexByTransaction indicates an expected call of StoreAndIndexByTransaction.
+func (mr *MockCollectionsMockRecorder) StoreAndIndexByTransaction(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "StoreLightAndIndexByTransaction", reflect.TypeOf((*MockCollections)(nil).StoreLightAndIndexByTransaction), arg0)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "StoreAndIndexByTransaction", reflect.TypeOf((*MockCollections)(nil).StoreAndIndexByTransaction), arg0, arg1)
 }
 
 // MockCommits is a mock of Commits interface.

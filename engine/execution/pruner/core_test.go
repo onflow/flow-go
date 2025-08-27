@@ -75,7 +75,8 @@ func TestLoopPruneExecutionDataFromRootToLatestSealed(t *testing.T) {
 				require.NoError(t, results.Store(chunk.Result))
 				require.NoError(t, results.Index(chunk.Result.BlockID, chunk.Result.ID()))
 				require.NoError(t, chunkDataPacks.Store([]*flow.ChunkDataPack{chunk.ChunkDataPack}))
-				require.NoError(t, collections.Store(chunk.ChunkDataPack.Collection))
+				_, storeErr := collections.Store(chunk.ChunkDataPack.Collection)
+				require.NoError(t, storeErr)
 				// verify that chunk data pack fixture can be found by the result
 				for _, c := range chunk.Result.Chunks {
 					chunkID := c.ID()

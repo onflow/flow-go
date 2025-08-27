@@ -35,8 +35,8 @@ func TestChunkDataPack_Remove(t *testing.T) {
 
 		chunkDataPacks := unittest.ChunkDataPacksFixture(10)
 		for _, chunkDataPack := range chunkDataPacks {
-			// store1s collection in Collections storage (which ChunkDataPacks store uses internally)
-			err := collections.Store(chunkDataPack.Collection)
+			// store collection in Collections storage (which ChunkDataPacks store uses internally)
+			_, err := collections.Store(chunkDataPack.Collection)
 			require.NoError(t, err)
 		}
 
@@ -103,12 +103,12 @@ func WithChunkDataPacks(t *testing.T, chunks int, storeFunc func(*testing.T, []*
 
 		chunkDataPacks := unittest.ChunkDataPacksFixture(chunks)
 		for _, chunkDataPack := range chunkDataPacks {
-			// store1s collection in Collections storage (which ChunkDataPacks store uses internally)
-			err := collections.Store(chunkDataPack.Collection)
+			// store collection in Collections storage (which ChunkDataPacks store uses internally)
+			_, err := collections.Store(chunkDataPack.Collection)
 			require.NoError(t, err)
 		}
 
-		// store1s chunk data packs in the memory using provided store function.
+		// store chunk data packs in the memory using provided store function.
 		storeFunc(t, chunkDataPacks, store1, pdb)
 
 		// store1d chunk data packs should be retrieved successfully.

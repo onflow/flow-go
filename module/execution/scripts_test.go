@@ -190,6 +190,7 @@ func (s *scriptTestSuite) SetupTest() {
 		flow.Testnet.Chain(),
 		derivedChainData,
 		nil,
+		storage.NewTestingLockManager(),
 	)
 	s.Require().NoError(err)
 

@@ -22,6 +22,8 @@ const (
 	// LockInsertOwnReceipt is intended for Execution Nodes to ensure that they never publish different receipts for the same block.
 	// Specifically, with this lock we prevent accidental overwrites of the index `executed block ID` ➜ `Receipt ID`.
 	LockInsertOwnReceipt = "lock_insert_own_receipt"
+	// LockInsertCollection protects the insertion of collections.
+	LockInsertCollection = "lock_insert_collection"
 )
 
 // Locks returns a list of all named locks used by the storage layer.
@@ -32,8 +34,11 @@ func Locks() []string {
 		LockIndexResultApproval,
 		LockInsertOrFinalizeClusterBlock,
 		LockInsertOwnReceipt,
+		LockInsertCollection,
 	}
 }
+
+type LockManager = lockctx.Manager
 
 // makeLockPolicy constructs the policy used by the storage layer to prevent deadlocks.
 // We use a policy defined by a directed acyclic graph, where vertices represent named locks.
