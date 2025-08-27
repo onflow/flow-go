@@ -1088,6 +1088,9 @@ func (suite *BuilderSuite) TestBuildOn_MaxCollectionSizeRateLimiting() {
 	// start with an empty mempool
 	suite.ClearPool()
 
+	cfg := updatable_configs.DefaultBySealingLagRateLimiterConfigs()
+	suite.Require().NoError(cfg.SetMinSealingLag(50)) // set min sealing lag to 50 blocks so we can hit rate limiting
+	suite.Require().NoError(cfg.SetMaxSealingLag(50)) // set max sealing lag to 50 blocks so we can hit rate limiting
 	suite.builder, _ = builder.NewBuilder(
 		suite.db,
 		trace.NewNoopTracer(),
@@ -1100,7 +1103,7 @@ func (suite *BuilderSuite) TestBuildOn_MaxCollectionSizeRateLimiting() {
 		suite.pool,
 		unittest.Logger(),
 		suite.epochCounter,
-		updatable_configs.DefaultBySealingLagRateLimiterConfigs(),
+		cfg,
 		builder.WithMaxCollectionSize(100),
 	)
 
@@ -1125,27 +1128,36 @@ func (suite *BuilderSuite) TestBuildOn_MaxCollectionSizeRateLimiting() {
 	// build a long chain of blocks that were finalized but not sealed
 	// this will lead to a big sealing lag.
 	for i := 0; i < 100; i++ {
-		block := unittest.BlockWithParentFixture(head)
-		block.SetPayload(unittest.PayloadFixture(unittest.WithProtocolStateID(protocolStateID)))
-		err = suite.protoState.ExtendCertified(context.Background(), block, unittest.CertifyBlock(block.Header))
+		block := unittest.BlockWithParentAndPayload(head, unittest.PayloadFixture(unittest.WithProtocolStateID(protocolStateID)))
+		err = suite.protoState.ExtendCertified(context.Background(), unittest.NewCertifiedBlock(block))
 		suite.Require().NoError(err)
 		err = suite.protoState.Finalize(context.Background(), block.ID())
 		suite.Require().NoError(err)
-		head = block.Header
+		head = block.ToHeader()
 	}
 
 	rateLimiterCfg := updatable_configs.DefaultBySealingLagRateLimiterConfigs()
 
 	// rate-limiting should be applied, resulting in minimum collection size.
 	parentID := suite.genesis.ID()
+	setter := func(h *flow.HeaderBodyBuilder) error {
+		h.WithChainID(flow.Emulator).
+			WithParentID(parentID).
+			WithView(1337).
+			WithParentView(1336).
+			WithParentVoterIndices(unittest.SignerIndicesFixture(4)).
+			WithParentVoterSigData(unittest.QCSigDataFixture()).
+			WithProposerID(unittest.IdentifierFixture())
+		return nil
+	}
 	for i := 0; i < 10; i++ {
-		header, err := suite.builder.BuildOn(parentID, noopSetter, noopSigner)
+		header, err := suite.builder.BuildOn(parentID, setter, signer)
 		suite.Require().NoError(err)
-		parentID = header.ID()
+		parentID = header.Header.ID()
 
-		// each collection should be half-full with 5 transactions
+		// each collection should be equal to the minimum collection size
 		var built model.Block
-		err = suite.db.View(procedure.RetrieveClusterBlock(header.ID(), &built))
+		err = suite.db.View(procedure.RetrieveClusterBlock(header.Header.ID(), &built))
 		suite.Assert().NoError(err)
 		suite.Assert().Len(built.Payload.Collection.Transactions, int(rateLimiterCfg.MinCollectionSize()))
 	}
@@ -1382,11 +1394,11 @@ func (suite *BuilderSuite) TestBuildOn_SystemTxAlwaysIncluded() {
 
 	// rate-limiting should not be applied, since the payer is marked as unlimited
 	parentID := suite.genesis.ID()
-	header, err := suite.builder.BuildOn(parentID, noopSetter, noopSigner)
+	header, err := suite.builder.BuildOn(parentID, setter, signer)
 	suite.Require().NoError(err)
 
 	var built model.Block
-	err = suite.db.View(procedure.RetrieveClusterBlock(header.ID(), &built))
+	err = suite.db.View(procedure.RetrieveClusterBlock(header.Header.ID(), &built))
 	suite.Assert().NoError(err)
 	suite.Assert().Len(built.Payload.Collection.Transactions, 2)
 	for _, tx := range built.Payload.Collection.Transactions {

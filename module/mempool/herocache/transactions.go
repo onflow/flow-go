@@ -16,6 +16,8 @@ type Transactions struct {
 	byPayer map[flow.Address]map[flow.Identifier]struct{}
 }
 
+var _ mempool.Transactions = (*Transactions)(nil)
+
 // NewTransactions implements a transactions mempool based on hero cache.
 func NewTransactions(limit uint32, logger zerolog.Logger, collector module.HeroCacheMetrics) *Transactions {
 	byPayer := make(map[flow.Address]map[flow.Identifier]struct{})
@@ -37,12 +39,11 @@ func NewTransactions(limit uint32, logger zerolog.Logger, collector module.HeroC
 }
 
 // Add adds a transaction to the mempool.
-func (t *Transactions) Add(tx *flow.TransactionBody) bool {
+func (t *Transactions) Add(txID flow.Identifier, tx *flow.TransactionBody) bool {
 	added := false
 	err := t.Run(func(backdata mempool.BackData[flow.Identifier, *flow.TransactionBody]) error {
 		// Warning! reference pointer must be dereferenced before adding to HeroCache.
 		// This is crucial for its heap object optimizations.
-		txID := tx.ID()
 		added = backdata.Add(txID, tx)
 		if !added {
 			return nil
@@ -77,12 +78,11 @@ func (t *Transactions) Clear() {
 func (t *Transactions) Remove(id flow.Identifier) bool {
 	removed := false
 	err := t.Run(func(backdata mempool.BackData[flow.Identifier, *flow.TransactionBody]) error {
-		var entity flow.Entity
-		entity, removed = backdata.Remove(id)
+		var txBody *flow.TransactionBody
+		txBody, removed = backdata.Remove(id)
 		if !removed {
 			return nil
 		}
-		txBody := entity.(flow.TransactionBody)
 		t.removeFromIndex(id, txBody.Payer)
 		return nil
 	})
