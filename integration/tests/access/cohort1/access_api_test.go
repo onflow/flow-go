@@ -592,24 +592,7 @@ func notOutOfRangeError(err error) bool {
 	return statusErr.Code() != codes.OutOfRange
 }
 
-func (s *AccessAPISuite) validWebAuthnExtensionData(tx *entities.Transaction) []byte {
-	transactionBody := flow.TransactionBody{
-		Script:           tx.Script,
-		Arguments:        tx.Arguments,
-		ReferenceBlockID: flow.Identifier(tx.ReferenceBlockId),
-		GasLimit:         tx.GasLimit,
-		ProposalKey: flow.ProposalKey{
-			Address:        flow.BytesToAddress(tx.ProposalKey.Address),
-			KeyIndex:       tx.ProposalKey.KeyId,
-			SequenceNumber: tx.ProposalKey.SequenceNumber,
-		},
-		Payer:       flow.BytesToAddress(tx.Payer),
-		Authorizers: make([]flow.Address, len(tx.Authorizers)),
-	}
-	for i, auth := range tx.Authorizers {
-		transactionBody.Authorizers[i] = flow.BytesToAddress(auth)
-	}
-	transactionMessage := transactionBody.EnvelopeMessage()
+func (s *AccessAPISuite) validWebAuthnExtensionData(transactionMessage []byte) ([]byte, []byte) {
 	hasher, err := crypto.NewPrefixedHashing(hash.SHA2_256, flow.TransactionTagString)
 	s.Require().NoError(err)
 	authNChallenge := hasher.ComputeHash(transactionMessage)
@@ -636,7 +619,11 @@ func (s *AccessAPISuite) validWebAuthnExtensionData(tx *entities.Transaction) []
 	}
 	extensionDataRLPBytes := rlp.NewMarshaler().MustMarshal(extensionData)
 
-	return extensionDataRLPBytes
+	var clientDataHash [hash.HashLenSHA2_256]byte
+	hash.ComputeSHA2_256(&clientDataHash, clientDataJsonBytes)
+	messageToSign := slices.Concat(validAuthenticatorData, clientDataHash[:])
+
+	return extensionDataRLPBytes, messageToSign
 }
 
 // TestTransactionSignaturePlainExtensionData tests that the Access API properly handles the ExtensionData field
@@ -831,7 +818,7 @@ func (s *AccessAPISuite) TestTransactionSignatureWebAuthnExtensionData() {
 		SetProposalKey(payer, 0, serviceClient.GetAndIncrementSeqNumber()).
 		SetPayer(payer)
 
-	tx, err = serviceClient.SignTransaction(tx)
+	tx, err = serviceClient.SignTransactionWebAuthN(tx)
 	s.Require().NoError(err)
 
 	// Convert the transaction to a message format expected by the access API
@@ -844,14 +831,14 @@ func (s *AccessAPISuite) TestTransactionSignatureWebAuthnExtensionData() {
 	convertToMessageSigWithExtensionData := func(sigs []sdk.TransactionSignature, extensionData []byte) []*entities.Transaction_Signature {
 		msgSigs := make([]*entities.Transaction_Signature, len(sigs))
 		for i, sig := range sigs {
-			sigBytes, err := serviceClient.SignWebAuthnExtensionData(sig.ExtensionData)
-			s.Require().NoError(err)
-
 			msgSigs[i] = &entities.Transaction_Signature{
 				Address:       sig.Address.Bytes(),
 				KeyId:         uint32(sig.KeyIndex),
-				Signature:     sigBytes,
-				ExtensionData: extensionData,
+				Signature:     sig.Signature,
+				ExtensionData: sig.ExtensionData,
+			}
+			if extensionData != nil {
+				msgSigs[i].ExtensionData = extensionData
 			}
 		}
 		return msgSigs
@@ -906,15 +893,11 @@ func (s *AccessAPISuite) TestTransactionSignatureWebAuthnExtensionData() {
 					KeyId:          uint32(tx.ProposalKey.KeyIndex),
 					SequenceNumber: tx.ProposalKey.SequenceNumber,
 				},
-				Payer:             tx.Payer.Bytes(),
-				Authorizers:       authorizers,
-				PayloadSignatures: convertToMessageSigWithExtensionData(tx.PayloadSignatures, nil),
+				Payer:              tx.Payer.Bytes(),
+				Authorizers:        authorizers,
+				PayloadSignatures:  convertToMessageSigWithExtensionData(tx.PayloadSignatures, nil),
+				EnvelopeSignatures: convertToMessageSigWithExtensionData(tx.EnvelopeSignatures, tc.extensionData),
 			}
-
-			if tc.name == "webauthn_valid" {
-				tc.extensionData = s.validWebAuthnExtensionData(transactionMsg)
-			}
-			transactionMsg.EnvelopeSignatures = convertToMessageSigWithExtensionData(tx.EnvelopeSignatures, tc.extensionData)
 
 			// Send and subscribe to the transaction status using the access API
 			subClient, err := accessClient.SendAndSubscribeTransactionStatuses(s.ctx, &accessproto.SendAndSubscribeTransactionStatusesRequest{
