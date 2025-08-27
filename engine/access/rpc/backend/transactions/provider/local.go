@@ -400,13 +400,11 @@ func (t *LocalTransactionProvider) getSnapshotForBlock(
 		RequiredExecutors:      convert.MessagesToIdentifiers(query.RequiredExecutorId),
 	})
 	if err != nil {
-		// TODO: Need to wrap to meaningful error
 		return nil, nil, err
 	}
 
 	snapshot, err := t.executionStateCache.Snapshot(executionResultInfo.ExecutionResult.ID())
 	if err != nil {
-		// TODO: Need to wrap to meaningful error
 		return nil, nil, err
 	}
 

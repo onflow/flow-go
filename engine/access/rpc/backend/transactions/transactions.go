@@ -647,6 +647,8 @@ func (t *Transactions) registerTransactionForRetry(tx *flow.TransactionBody) {
 	t.retrier.RegisterTransaction(referenceBlock.Height, tx)
 }
 
+// convertExecutionResultInfoToMetadata converts an ExecutionResultInfo from the optimistic sync
+// package into ExecutorMetadata for the entities package.
 func convertExecutionResultInfoToMetadata(executionResultInfo *optimistic_sync.ExecutionResultInfo) entities.ExecutorMetadata {
 	if executionResultInfo == nil {
 		return entities.ExecutorMetadata{}
