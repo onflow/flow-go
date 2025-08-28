@@ -46,28 +46,3 @@ func Deduplicate[T IDEntity](entities []T) []T {
 
 	return result
 }
-
-// EntityRequest is the trusted internal representation of a request
-// for one or more entities identified by their unique identifiers.
-//
-// This type is derived from the untrusted network-level message
-// (messages.EntityRequest) during decoding. Construction of this type
-// is only allowed through validation logic, ensuring the request
-// contains structurally valid data.
-type EntityRequest struct {
-	Nonce     uint64
-	EntityIDs []Identifier
-}
-
-// EntityResponse is the trusted internal representation of a response
-// to an EntityRequest. It contains the set of serialized entities and
-// the identifiers corresponding to each entity.
-//
-// This type is created from the untrusted network-level message
-// (messages.EntityResponse) during decoding and validation, ensuring
-// that all returned data meets structural integrity requirements.
-type EntityResponse struct {
-	Nonce     uint64
-	EntityIDs []Identifier
-	Blobs     [][]byte
-}
