@@ -1,3 +1,4 @@
 ignore:
   - "fvm/environment/mock/**/*"
   - "fvm/utils/test"
+  - "integration/**/*"
