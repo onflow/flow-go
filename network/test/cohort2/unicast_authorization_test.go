@@ -480,16 +480,19 @@ func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_ReceiverHasSubs
 		EntityIDs: unittest.IdentifierListFixture(10),
 	}
 
+	internal, err := msg.ToInternal()
+	require.NoError(u.T(), err)
+
 	// both sender and receiver must have an authorized role to send and receive messages on the ConsensusCommittee channel.
 	u.senderID.Role = flow.RoleConsensus
 	u.receiverID.Role = flow.RoleExecution
 
 	receiverEngine := &mocknetwork.MessageProcessor{}
-	receiverEngine.On("Process", channels.RequestReceiptsByBlockID, u.senderID.NodeID, msg).Run(
+	receiverEngine.On("Process", channels.RequestReceiptsByBlockID, u.senderID.NodeID, internal).Run(
 		func(args mockery.Arguments) {
 			close(u.waitCh)
 		}).Return(nil).Once()
-	_, err := u.receiverNetwork.Register(channels.RequestReceiptsByBlockID, receiverEngine)
+	_, err = u.receiverNetwork.Register(channels.RequestReceiptsByBlockID, receiverEngine)
 	require.NoError(u.T(), err)
 
 	senderCon, err := u.senderNetwork.Register(channels.RequestReceiptsByBlockID, &mocknetwork.MessageProcessor{})
