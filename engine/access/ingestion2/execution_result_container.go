@@ -6,6 +6,7 @@ import (
 	"sync"
 
 	"go.uber.org/atomic"
+	"golang.org/x/exp/maps"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/counters"
@@ -65,23 +66,11 @@ func NewExecutionResultContainer(
 }
 
 // IsEnqueued returns true if the container is enqueued for processing.
-//
-// Returns:
-//   - bool: true if the container is enqueued, false otherwise
-//
-// Concurrency safety:
-//   - Safe for concurrent access
 func (c *ExecutionResultContainer) IsEnqueued() bool {
 	return c.enqueued.Load()
 }
 
 // SetEnqueued sets the container as enqueued for processing.
-//
-// Returns:
-//   - bool: true if the container was successfully set as enqueued, false if it was already enqueued
-//
-// Concurrency safety:
-//   - Safe for concurrent access
 func (c *ExecutionResultContainer) SetEnqueued() bool {
 	return c.enqueued.CompareAndSwap(false, true)
 }
@@ -173,6 +162,19 @@ func (c *ExecutionResultContainer) Result() *flow.ExecutionResult {
 func (c *ExecutionResultContainer) ResultID() flow.Identifier {
 	// No locking is required here since the resultID is immutable after instantiation.
 	return c.resultID
+}
+
+// Receipts returns the execution receipts for this container.
+func (c *ExecutionResultContainer) Receipts() flow.ExecutionReceiptStubList {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	return maps.Values(c.receipts)
+}
+
+// BlockHeader returns the header of the block executed by this result.
+func (c *ExecutionResultContainer) BlockHeader() *flow.Header {
+	// No locking is required here since the blockHeader is immutable after instantiation.
+	return c.blockHeader
 }
 
 // BlockView returns the view of the block executed by this result.

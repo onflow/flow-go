@@ -180,16 +180,6 @@ var (
 //
 // Safe for concurrent access. Internally, the mempool utilizes the LevelledForrest.
 type ResultsForest struct {
-<<<<<<< HEAD
-	log                         zerolog.Logger
-	forest                      forest.LevelledForest
-	manager                     *ForestManager
-	headers                     storage.Headers
-	maxViewDelta                uint64
-	lowestRejectedView          uint64
-	lastSealedResultID          flow.Identifier
-	lastSealedView              uint64
-=======
 	log             zerolog.Logger
 	forest          forest.LevelledForest
 	headers         storage.Headers
@@ -206,7 +196,6 @@ type ResultsForest struct {
 
 	// latestPersistedSealedResult tracks metadata about the latest persisted sealed result.
 	// this represents the lowest sealed result within the forest.
->>>>>>> peter/results-forest-workers
 	latestPersistedSealedResult storage.LatestPersistedSealedResultReader
 
 	// maxViewDelta specifies the number of views past its lowest view that the forest will accept.
@@ -229,7 +218,6 @@ func NewResultsForest(
 	headers storage.Headers,
 	pipelineFactory optimistic_sync.PipelineFactory,
 	latestPersistedSealedResult storage.LatestPersistedSealedResultReader,
-	manager *ForestManager,
 	maxViewDelta uint64,
 ) (*ResultsForest, error) {
 	resultID, sealedHeight := latestPersistedSealedResult.Latest()
@@ -238,10 +226,9 @@ func NewResultsForest(
 		return nil, fmt.Errorf("failed to get block header for latest persisted sealed result (height: %d): %w", sealedHeight, err)
 	}
 
-	rf := &ResultsForest{
+	return &ResultsForest{
 		log:                         log.With().Str("component", "results_forest").Logger(),
 		forest:                      *forest.NewLevelledForest(sealedHeader.View),
-		manager:                     manager,
 		headers:                     headers,
 		pipelineFactory:             pipelineFactory,
 		maxViewDelta:                maxViewDelta,
@@ -249,8 +236,7 @@ func NewResultsForest(
 		lastSealedView:              counters.NewMonotonicCounter(sealedHeader.View),
 		lastFinalizedView:           counters.NewMonotonicCounter(sealedHeader.View),
 		latestPersistedSealedResult: latestPersistedSealedResult,
-	}
-	return rf, nil
+	}, nil
 }
 
 // ResetLowestRejectedView resets the rejected results flag, and returns the last sealed view processed
@@ -328,8 +314,6 @@ func (rf *ResultsForest) AddReceipt(receipt *flow.ExecutionReceipt, blockStatus 
 	if err != nil {
 		return false, fmt.Errorf("failed to add receipt to its container: %w", err)
 	}
-
-	rf.manager.OnReceiptAdded(container)
 
 	return added > 0, nil
 }
@@ -569,10 +553,6 @@ func (rf *ResultsForest) abandonFork(container *ExecutionResultContainer) {
 
 // OnStateUpdated is called by pipeline state machines when their state changes, and propagates the
 // state update to all children of the result.
-//
-// WARNING: we are assuming a strict ordering of events of the type `OnStateUpdated` from different pipelines
-// across the forest. This is because `processCompleted` requires a strict ancestor first order of `StateComplete`
-// in order of sealing.
 func (rf *ResultsForest) OnStateUpdated(resultID flow.Identifier, newState optimistic_sync.State) {
 	// abandoned status is propagated to all descendants synchronously, so no need to traverse again here.
 	if newState == optimistic_sync.StateAbandoned {
@@ -583,25 +563,19 @@ func (rf *ResultsForest) OnStateUpdated(resultID flow.Identifier, newState optim
 	for child := range rf.IterateChildren(resultID) {
 		child.Pipeline().OnParentStateUpdated(newState)
 	}
-
-	// process completed pipelines
-	if newState == optimistic_sync.StateComplete {
-		rf.mu.Lock()
-		defer rf.mu.Unlock()
-
-		if err := rf.processCompleted(resultID); err != nil {
-			// TODO: handle with a irrecoverable error
-			rf.log.Fatal().Err(err).Msg("irrecoverable exception: failed to process completed pipeline")
-			return
-		}
-	}
 }
 
 // processCompleted processes a completed pipeline and prunes the forest.
-// CAUTION: not concurrency safe! Caller must hold a lock.
+//
+// WARNING: we are assuming a strict ordering of calls to `processCompleted` from completed pipelines.
+// This is because we require a strict ancestor first order of `StateComplete`in order of sealing to
+// ensure that the forest is in a consistent state.
 //
 // No errors are expected during normal operation.
 func (rf *ResultsForest) processCompleted(resultID flow.Identifier) error {
+	rf.mu.Lock()
+	defer rf.mu.Unlock()
+
 	// first, ensure that the result ID is in the forest, otherwise the forest is in an inconsistent state
 	container, found := rf.getContainer(resultID)
 	if !found {
