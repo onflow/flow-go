@@ -324,7 +324,8 @@ func (e *blockComputer) queueSystemTransactions(
 	defer close(txQueue)
 
 	for i, txBody := range allTxs {
-		last := i == len(allTxs)-1
+		last := i == len(allTxs)-1 // Is this last tx in collection
+
 		ctx := callbackCtx
 		// last transaction is system chunk and has own context
 		if last {
@@ -383,7 +384,8 @@ func (e *blockComputer) executeBlock(
 		e.receiptHasher,
 		parentBlockExecutionResultID,
 		block,
-		e.maxConcurrency*2, // we add some buffer just in case result collection becomes slower than the execution
+		// Add buffer just in case result collection becomes slower than the execution
+		e.maxConcurrency*2,
 		e.colResCons,
 		baseSnapshot,
 	)
@@ -454,14 +456,16 @@ func (e *blockComputer) executeUserTransactions(
 
 // executeSystemTransactions executes all system transactions in the block as part of the system collection.
 //
-// System transactions are executed in the following order:
-// 1. system transaction that processes the scheduled callbacks which is a blocking transaction and
-// the result is used for the next system transaction
-// 2. system transactions that each execute a single scheduled callback by the ID obtained from events
-// of the previous system transaction
-// 3. system transaction that executes the system chunk
+// When scheduled callbacks are enabled, system transactions are executed in the following order:
+//  1. Process callback transaction - queries the scheduler contract to identify ready callbacks
+//     and emits events containing callback IDs and execution effort requirements
+//  2. Callback execution transactions - one transaction per callback ID from step 1 events,
+//     each executing a single scheduled callback with its specified effort limit
+//  3. System chunk transaction - performs standard system operations
 //
-// An error can be returned if the process callback transaction fails. This is a fatal error.
+// When scheduled callbacks are disabled, only the system chunk transaction is executed.
+//
+// All errors are indicators of bugs or corrupted internal state (continuation impossible)
 func (e *blockComputer) executeSystemTransactions(
 	block *entity.ExecutableBlock,
 	blockSpan otelTrace.Span,
@@ -496,7 +500,7 @@ func (e *blockComputer) executeSystemTransactions(
 		blockId:         block.BlockID(),
 		blockIdStr:      block.BlockID().String(),
 		blockHeight:     block.Block.Height,
-		collectionIndex: len(rawCollections),
+		collectionIndex: userCollectionCount,
 		CompleteCollection: &entity.CompleteCollection{
 			Collection: flow.NewEmptyCollection(), // TODO(7749)
 		},
@@ -521,6 +525,12 @@ func (e *blockComputer) executeSystemTransactions(
 		callbackTxs = callbacks
 		txIndex = updatedTxnIndex
 	}
+
+	// Update logger with number of transactions once they've become known
+	// (user tx + callbacks + 2 (process, system)
+	systemLogger = systemLogger.With().
+		Uint32("num_txs", uint32(userTxCount+len(callbackTxs)+2)).
+		Logger()
 
 	txQueue := e.queueSystemTransactions(
 		callbackCtx,
@@ -557,10 +567,20 @@ func (e *blockComputer) executeQueue(
 	wg.Wait()
 }
 
-// executeProcessCallback executes a transaction that calls callback scheduler contract process method.
-// The execution result contains events that are emitted for each callback which is ready for execution.
-// We use these events to prepare callback execution transactions, which are later executed as part of the system collection.
-// An error can be returned if the process callback transaction fails. This is a fatal error.
+// executeProcessCallback submits a transaction that invokes the `process` method
+// on the callback scheduler contract.
+//
+// The `process` method scans for scheduled callbacks and emits an event for each that should
+// be executed. These emitted events are used to construct callback execution transactions,
+// which are then added to the system transaction collection.
+//
+// If the `process` transaction fails, a fatal error is returned.
+//
+// Note: this transaction is executed serially and not concurrently with the system transaction.
+// This is because it's unclear whether the callback executions triggered by `process`
+// will result in additional system transactions.
+// In theory, if no additional transactions are emitted, concurrent execution could be optimized.
+// However, due to the added complexity, this optimization was deferred.
 func (e *blockComputer) executeProcessCallback(
 	systemCtx fvm.Context,
 	systemCollectionInfo collectionInfo,
@@ -591,8 +611,7 @@ func (e *blockComputer) executeProcessCallback(
 		}
 
 		return nil, 0, fmt.Errorf(
-			"failed to execute %s transaction %v (%d@%d) for block %s at height %v: %w",
-			"system",
+			"failed to execute system process transaction %v (%d@%d) for block %s at height %v: %w",
 			request.txnIdStr,
 			request.txnIndex,
 			snapshotTime,
