@@ -149,19 +149,14 @@ func (suite *SnapshotSuite) Proposal() model.Proposal {
 	return suite.ProposalWithParentAndPayload(suite.genesis, suite.Payload())
 }
 
-<<<<<<< HEAD
-func (suite *SnapshotSuite) InsertBlock(block model.Block) {
+func (suite *SnapshotSuite) InsertBlock(proposal model.Proposal) {
 	lctx := suite.lockManager.NewContext()
 	defer lctx.Release()
 	err := lctx.AcquireLock(storage.LockInsertOrFinalizeClusterBlock)
 	suite.Assert().Nil(err)
 	err = suite.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-		return procedure.InsertClusterBlock(lctx, rw, &block)
+		return procedure.InsertClusterBlock(lctx, rw, &proposal)
 	})
-=======
-func (suite *SnapshotSuite) InsertBlock(proposal model.Proposal) {
-	err := suite.db.Update(procedure.InsertClusterBlock(&proposal))
->>>>>>> @{-1}
 	suite.Assert().Nil(err)
 }
 
@@ -247,18 +242,14 @@ func (suite *SnapshotSuite) TestFinalizedBlock() {
 	assert.NoError(t, err)
 
 	// finalize the block
-<<<<<<< HEAD
 	err = suite.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 		lctx := suite.lockManager.NewContext()
 		defer lctx.Release()
 		if err := lctx.AcquireLock(storage.LockInsertOrFinalizeClusterBlock); err != nil {
 			return err
 		}
-		return procedure.FinalizeClusterBlock(lctx, rw, finalizedBlock1.ID())
+		return procedure.FinalizeClusterBlock(lctx, rw, finalizedProposal1.Block.ID())
 	})
-=======
-	err = suite.db.Update(procedure.FinalizeClusterBlock(finalizedProposal1.Block.ID()))
->>>>>>> @{-1}
 	assert.NoError(t, err)
 
 	// get the final snapshot, should map to finalizedProposal1

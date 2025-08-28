@@ -16,6 +16,8 @@ type ClusterPayloads struct {
 	cache *Cache[flow.Identifier, *cluster.Payload]
 }
 
+var _ storage.ClusterPayloads = (*ClusterPayloads)(nil)
+
 func NewClusterPayloads(cacheMetrics module.CacheMetrics, db storage.DB) *ClusterPayloads {
 
 	retrieve := func(r storage.Reader, blockID flow.Identifier) (*cluster.Payload, error) {

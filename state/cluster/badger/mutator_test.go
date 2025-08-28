@@ -258,25 +258,9 @@ func (suite *MutatorSuite) TestBootstrap_InvalidPayload() {
 func (suite *MutatorSuite) TestBootstrap_Successful() {
 	err := (func(r storage.Reader) error {
 
-		// should insert collection
-<<<<<<< HEAD
-		var collection flow.LightCollection
-		err := operation.RetrieveCollection(r, suite.genesis.Payload.Collection.ID(), &collection)
-=======
-		collection := new(flow.LightCollection)
-		err := operation.RetrieveCollection(suite.genesis.Payload.Collection.ID(), collection)(tx)
->>>>>>> @{-1}
-		suite.Assert().Nil(err)
-		suite.Assert().Equal(suite.genesis.Payload.Collection.Light(), collection)
-
 		// should index collection
-<<<<<<< HEAD
-		collection = flow.LightCollection{} // reset the collection
-		err = operation.LookupCollectionPayload(r, suite.genesis.ID(), &collection.Transactions)
-=======
-		collection = new(flow.LightCollection) // reset the collection
-		err = operation.LookupCollectionPayload(suite.genesis.ID(), &collection.Transactions)(tx)
->>>>>>> @{-1}
+		collection := new(flow.LightCollection) // reset the collection
+		err := operation.LookupCollectionPayload(r, suite.genesis.ID(), &collection.Transactions)
 		suite.Assert().Nil(err)
 		suite.Assert().Equal(suite.genesis.Payload.Collection.Light(), collection)
 
@@ -288,21 +272,13 @@ func (suite *MutatorSuite) TestBootstrap_Successful() {
 
 		// should insert block height -> ID lookup
 		var blockID flow.Identifier
-<<<<<<< HEAD
-		err = operation.LookupClusterBlockHeight(r, suite.genesis.Header.ChainID, suite.genesis.Header.Height, &blockID)
-=======
-		err = operation.LookupClusterBlockHeight(suite.genesis.ChainID, suite.genesis.Height, &blockID)(tx)
->>>>>>> @{-1}
+		err = operation.LookupClusterBlockHeight(r, suite.genesis.ChainID, suite.genesis.Height, &blockID)
 		suite.Assert().Nil(err)
 		suite.Assert().Equal(suite.genesis.ID(), blockID)
 
 		// should insert boundary
 		var boundary uint64
-<<<<<<< HEAD
-		err = operation.RetrieveClusterFinalizedHeight(r, suite.genesis.Header.ChainID, &boundary)
-=======
-		err = operation.RetrieveClusterFinalizedHeight(suite.genesis.ChainID, &boundary)(tx)
->>>>>>> @{-1}
+		err = operation.RetrieveClusterFinalizedHeight(r, suite.genesis.ChainID, &boundary)
 		suite.Assert().Nil(err)
 		suite.Assert().Equal(suite.genesis.Height, boundary)
 
@@ -400,11 +376,7 @@ func (suite *MutatorSuite) TestExtend_Success() {
 	r := suite.db.Reader()
 	// should be able to retrieve the block
 	var extended model.Block
-<<<<<<< HEAD
-	err = procedure.RetrieveClusterBlock(r, block.ID(), &extended)
-=======
-	err = suite.db.View(procedure.RetrieveClusterBlock(proposal.Block.ID(), &extended))
->>>>>>> @{-1}
+	err = procedure.RetrieveClusterBlock(r, proposal.Block.ID(), &extended)
 	suite.Assert().Nil(err)
 	suite.Assert().Equal(proposal.Block.Payload, extended.Payload)
 
@@ -629,11 +601,7 @@ func (suite *MutatorSuite) TestExtend_LargeHistory() {
 		// conflicting fork, build on the parent of the head
 		parent := *head
 		if conflicting {
-<<<<<<< HEAD
-			err = procedure.RetrieveClusterBlock(suite.db.Reader(), parent.Header.ParentID, &parent)
-=======
-			err = suite.db.View(procedure.RetrieveClusterBlock(parent.ParentID, &parent))
->>>>>>> @{-1}
+			err = procedure.RetrieveClusterBlock(suite.db.Reader(), parent.ParentID, &parent)
 			assert.NoError(t, err)
 			// add the transaction to the invalidated list
 			invalidatedTransactions = append(invalidatedTransactions, &tx)

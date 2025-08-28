@@ -21,14 +21,14 @@ func TestPayloadStoreRetrieve(t *testing.T) {
 		blocks := all.Blocks
 
 		expected := unittest.PayloadFixture(unittest.WithAllTheFixins)
-		block := unittest.BlockWithParentFixture(unittest.BlockHeaderWithHeight(10))
-		block.SetPayload(expected)
-		require.Equal(t, &expected, block.Payload)
+		block := unittest.BlockWithParentAndPayload(unittest.BlockHeaderWithHeight(10), expected)
+		proposal := unittest.ProposalFromBlock(block)
+		require.Equal(t, expected, block.Payload)
 		blockID := block.ID()
 
 		_, lctx := unittest.LockManagerWithContext(t, storage.LockInsertBlock)
 		err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			return blocks.BatchStore(lctx, rw, block)
+			return blocks.BatchStore(lctx, rw, proposal)
 		})
 		lctx.Release()
 		require.NoError(t, err)
@@ -36,7 +36,7 @@ func TestPayloadStoreRetrieve(t *testing.T) {
 		// fetch payload
 		payload, err := payloads.ByBlockID(blockID)
 		require.NoError(t, err)
-		require.Equal(t, &expected, payload)
+		require.Equal(t, expected, *payload)
 	})
 }
 
@@ -46,7 +46,7 @@ func TestPayloadRetreiveWithoutStore(t *testing.T) {
 
 		index := store.NewIndex(metrics, db)
 		seals := store.NewSeals(metrics, db)
-		guarantees := store.NewGuarantees(metrics, db, store.DefaultCacheSize)
+		guarantees := store.NewGuarantees(metrics, db, store.DefaultCacheSize, store.DefaultCacheSize)
 		results := store.NewExecutionResults(metrics, db)
 		receipts := store.NewExecutionReceipts(metrics, db, results, store.DefaultCacheSize)
 		s := store.NewPayloads(db, index, guarantees, seals, receipts, results)

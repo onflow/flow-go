@@ -391,13 +391,12 @@ func (c *Container) OpenState() (*state.State, error) {
 	db := badgerimpl.ToDB(badgerdb)
 
 	metrics := metrics.NewNoopCollector()
-<<<<<<< HEAD
 	index := store.NewIndex(metrics, db)
 	headers := store.NewHeaders(metrics, db)
 	seals := store.NewSeals(metrics, db)
 	results := store.NewExecutionResults(metrics, db)
 	receipts := store.NewExecutionReceipts(metrics, db, results, store.DefaultCacheSize)
-	guarantees := store.NewGuarantees(metrics, db, store.DefaultCacheSize)
+	guarantees := store.NewGuarantees(metrics, db, store.DefaultCacheSize, store.DefaultCacheSize)
 	payloads := store.NewPayloads(db, index, guarantees, seals, receipts, results)
 	blocks := store.NewBlocks(db, headers, payloads)
 	qcs := store.NewQuorumCertificates(metrics, db, store.DefaultCacheSize)
@@ -408,25 +407,6 @@ func (c *Container) OpenState() (*state.State, error) {
 	protocolKVStates := store.NewProtocolKVStore(metrics, db,
 		store.DefaultProtocolKVStoreCacheSize, store.DefaultProtocolKVStoreByBlockIDCacheSize)
 	versionBeacons := store.NewVersionBeacons(db)
-=======
-	index := storage.NewIndex(metrics, db)
-	headers := storage.NewHeaders(metrics, db)
-	seals := storage.NewSeals(metrics, db)
-	results := storage.NewExecutionResults(metrics, db)
-	receipts := storage.NewExecutionReceipts(metrics, db, results, storage.DefaultCacheSize)
-	guarantees := storage.NewGuarantees(metrics, db,
-		storage.DefaultCacheSize, storage.DefaultCacheSize)
-	payloads := storage.NewPayloads(db, index, guarantees, seals, receipts, results)
-	blocks := storage.NewBlocks(db, headers, payloads)
-	qcs := storage.NewQuorumCertificates(metrics, db, storage.DefaultCacheSize)
-	setups := storage.NewEpochSetups(metrics, db)
-	commits := storage.NewEpochCommits(metrics, db)
-	protocolState := storage.NewEpochProtocolStateEntries(metrics, setups, commits, db,
-		storage.DefaultEpochProtocolStateCacheSize, storage.DefaultProtocolStateIndexCacheSize)
-	protocolKVStates := storage.NewProtocolKVStore(metrics, db,
-		storage.DefaultProtocolKVStoreCacheSize, storage.DefaultProtocolKVStoreByBlockIDCacheSize)
-	versionBeacons := store.NewVersionBeacons(badgerimpl.ToDB(db))
->>>>>>> @{-1}
 
 	lockManager := storage.NewTestingLockManager()
 	return state.OpenState(

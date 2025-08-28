@@ -422,11 +422,7 @@ func (s *Suite) TestOnCollection() {
 	light := collection.Light()
 
 	// we should store the light collection and index its transactions
-<<<<<<< HEAD
 	s.collections.On("StoreAndIndexByTransaction", mock.Anything, &collection).Return(light, nil).Once()
-=======
-	s.collections.On("StoreLightAndIndexByTransaction", light).Return(nil).Once()
->>>>>>> @{-1}
 
 	// Create a lock context for indexing
 	lctx := storerr.NewTestingLockManager().NewContext()
@@ -450,21 +446,13 @@ func (s *Suite) TestExecutionReceiptsAreIndexed() {
 	light := collection.Light()
 
 	// we should store the light collection and index its transactions
-<<<<<<< HEAD
 	s.collections.On("StoreAndIndexByTransaction", &collection).Return(light, nil).Once()
-	block := &flow.Block{
-		Header:  &flow.Header{Height: 0},
-		Payload: &flow.Payload{Guarantees: []*flow.CollectionGuarantee{}},
-	}
-=======
-	s.collections.On("StoreLightAndIndexByTransaction", light).Return(nil).Once()
 	block := unittest.BlockFixture(
 		unittest.Block.WithHeight(0),
 		unittest.Block.WithPayload(
 			unittest.PayloadFixture(unittest.WithGuarantees([]*flow.CollectionGuarantee{}...)),
 		),
 	)
->>>>>>> @{-1}
 	s.blocks.On("ByID", mock.Anything).Return(block, nil)
 
 	// for each transaction in the collection, we should store it
@@ -509,11 +497,7 @@ func (s *Suite) TestOnCollectionDuplicate() {
 	light := collection.Light()
 
 	// we should store the light collection and index its transactions
-<<<<<<< HEAD
 	s.collections.On("StoreAndIndexByTransaction", mock.Anything, &collection).Return(light, storerr.ErrAlreadyExists).Once()
-=======
-	s.collections.On("StoreLightAndIndexByTransaction", light).Return(storerr.ErrAlreadyExists).Once()
->>>>>>> @{-1}
 
 	// Create a lock context for indexing
 	lctx := storerr.NewTestingLockManager().NewContext()

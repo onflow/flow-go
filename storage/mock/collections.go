@@ -17,22 +17,24 @@ type Collections struct {
 }
 
 // BatchStoreAndIndexByTransaction provides a mock function with given fields: lctx, collection, batch
-func (_m *Collections) BatchStoreAndIndexByTransaction(lctx lockctx.Proof, collection *flow.Collection, batch storage.ReaderBatchWriter) (flow.LightCollection, error) {
+func (_m *Collections) BatchStoreAndIndexByTransaction(lctx lockctx.Proof, collection *flow.Collection, batch storage.ReaderBatchWriter) (*flow.LightCollection, error) {
 	ret := _m.Called(lctx, collection, batch)
 
 	if len(ret) == 0 {
 		panic("no return value specified for BatchStoreAndIndexByTransaction")
 	}
 
-	var r0 flow.LightCollection
+	var r0 *flow.LightCollection
 	var r1 error
-	if rf, ok := ret.Get(0).(func(lockctx.Proof, *flow.Collection, storage.ReaderBatchWriter) (flow.LightCollection, error)); ok {
+	if rf, ok := ret.Get(0).(func(lockctx.Proof, *flow.Collection, storage.ReaderBatchWriter) (*flow.LightCollection, error)); ok {
 		return rf(lctx, collection, batch)
 	}
-	if rf, ok := ret.Get(0).(func(lockctx.Proof, *flow.Collection, storage.ReaderBatchWriter) flow.LightCollection); ok {
+	if rf, ok := ret.Get(0).(func(lockctx.Proof, *flow.Collection, storage.ReaderBatchWriter) *flow.LightCollection); ok {
 		r0 = rf(lctx, collection, batch)
 	} else {
-		r0 = ret.Get(0).(flow.LightCollection)
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*flow.LightCollection)
+		}
 	}
 
 	if rf, ok := ret.Get(1).(func(lockctx.Proof, *flow.Collection, storage.ReaderBatchWriter) error); ok {
@@ -153,22 +155,24 @@ func (_m *Collections) Remove(collID flow.Identifier) error {
 }
 
 // Store provides a mock function with given fields: collection
-func (_m *Collections) Store(collection *flow.Collection) (flow.LightCollection, error) {
+func (_m *Collections) Store(collection *flow.Collection) (*flow.LightCollection, error) {
 	ret := _m.Called(collection)
 
 	if len(ret) == 0 {
 		panic("no return value specified for Store")
 	}
 
-	var r0 flow.LightCollection
+	var r0 *flow.LightCollection
 	var r1 error
-	if rf, ok := ret.Get(0).(func(*flow.Collection) (flow.LightCollection, error)); ok {
+	if rf, ok := ret.Get(0).(func(*flow.Collection) (*flow.LightCollection, error)); ok {
 		return rf(collection)
 	}
-	if rf, ok := ret.Get(0).(func(*flow.Collection) flow.LightCollection); ok {
+	if rf, ok := ret.Get(0).(func(*flow.Collection) *flow.LightCollection); ok {
 		r0 = rf(collection)
 	} else {
-		r0 = ret.Get(0).(flow.LightCollection)
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*flow.LightCollection)
+		}
 	}
 
 	if rf, ok := ret.Get(1).(func(*flow.Collection) error); ok {
@@ -181,22 +185,24 @@ func (_m *Collections) Store(collection *flow.Collection) (flow.LightCollection,
 }
 
 // StoreAndIndexByTransaction provides a mock function with given fields: lctx, collection
-func (_m *Collections) StoreAndIndexByTransaction(lctx lockctx.Proof, collection *flow.Collection) (flow.LightCollection, error) {
+func (_m *Collections) StoreAndIndexByTransaction(lctx lockctx.Proof, collection *flow.Collection) (*flow.LightCollection, error) {
 	ret := _m.Called(lctx, collection)
 
 	if len(ret) == 0 {
 		panic("no return value specified for StoreAndIndexByTransaction")
 	}
 
-	var r0 flow.LightCollection
+	var r0 *flow.LightCollection
 	var r1 error
-	if rf, ok := ret.Get(0).(func(lockctx.Proof, *flow.Collection) (flow.LightCollection, error)); ok {
+	if rf, ok := ret.Get(0).(func(lockctx.Proof, *flow.Collection) (*flow.LightCollection, error)); ok {
 		return rf(lctx, collection)
 	}
-	if rf, ok := ret.Get(0).(func(lockctx.Proof, *flow.Collection) flow.LightCollection); ok {
+	if rf, ok := ret.Get(0).(func(lockctx.Proof, *flow.Collection) *flow.LightCollection); ok {
 		r0 = rf(lctx, collection)
 	} else {
-		r0 = ret.Get(0).(flow.LightCollection)
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*flow.LightCollection)
+		}
 	}
 
 	if rf, ok := ret.Get(1).(func(lockctx.Proof, *flow.Collection) error); ok {

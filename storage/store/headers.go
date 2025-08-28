@@ -15,14 +15,18 @@ import (
 
 // Headers implements a simple read-only header storage around a DB.
 type Headers struct {
-	db          storage.DB
+	db storage.DB
+	// cache is essentially an in-memory map from `Block.ID()` -> `Header`
 	cache       *Cache[flow.Identifier, *flow.Header]
 	heightCache *Cache[uint64, flow.Identifier]
 	viewCache   *Cache[uint64, flow.Identifier]
+	sigs        *proposalSignatures
 }
 
 var _ storage.Headers = (*Headers)(nil)
 
+// NewHeaders creates a Headers instance, which stores block headers.
+// It supports storing, caching and retrieving by block ID and the additionally indexed by header height.
 func NewHeaders(collector module.CacheMetrics, db storage.DB) *Headers {
 
 	storeWithLock := func(lctx lockctx.Proof, rw storage.ReaderBatchWriter, blockID flow.Identifier, header *flow.Header) error {
@@ -61,13 +65,26 @@ func NewHeaders(collector module.CacheMetrics, db storage.DB) *Headers {
 		viewCache: newCache(collector, metrics.ResourceCertifiedView,
 			withLimit[uint64, flow.Identifier](4*flow.DefaultTransactionExpiry),
 			withRetrieve(retrieveView)),
+
+		sigs: newProposalSignatures(collector, db),
 	}
 
 	return h
 }
 
-func (h *Headers) storeTx(lctx lockctx.Proof, rw storage.ReaderBatchWriter, header *flow.Header) error {
-	return h.cache.PutWithLockTx(lctx, rw, header.ID(), header)
+func (h *Headers) storeTx(
+	lctx lockctx.Proof,
+	rw storage.ReaderBatchWriter,
+	blockID flow.Identifier,
+	header *flow.Header,
+	proposalSig []byte,
+) error {
+	err := h.cache.PutWithLockTx(lctx, rw, blockID, header)
+	if err != nil {
+		return err
+	}
+
+	return h.sigs.storeTx(rw, blockID, proposalSig)
 }
 
 func (h *Headers) retrieveTx(blockID flow.Identifier) (*flow.Header, error) {
@@ -76,6 +93,18 @@ func (h *Headers) retrieveTx(blockID flow.Identifier) (*flow.Header, error) {
 		return nil, err
 	}
 	return val, nil
+}
+
+func (h *Headers) retrieveProposalTx(blockID flow.Identifier) (*flow.ProposalHeader, error) {
+	header, err := h.cache.Get(h.db.Reader(), blockID)
+	if err != nil {
+		return nil, fmt.Errorf("could not retrieve header: %w", err)
+	}
+	sig, err := h.sigs.retrieveTx(blockID)
+	if err != nil {
+		return nil, fmt.Errorf("could not retrieve proposer signature for id %x: %w", blockID, err)
+	}
+	return &flow.ProposalHeader{Header: header, ProposerSigData: sig}, nil
 }
 
 // results in `storage.ErrNotFound` for unknown height
@@ -89,6 +118,10 @@ func (h *Headers) retrieveIdByHeightTx(height uint64) (flow.Identifier, error) {
 
 func (h *Headers) ByBlockID(blockID flow.Identifier) (*flow.Header, error) {
 	return h.retrieveTx(blockID)
+}
+
+func (h *Headers) ProposalByBlockID(blockID flow.Identifier) (*flow.ProposalHeader, error) {
+	return h.retrieveProposalTx(blockID)
 }
 
 func (h *Headers) ByHeight(height uint64) (*flow.Header, error) {

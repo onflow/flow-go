@@ -78,7 +78,6 @@ func prepareStorehouseTest(f func(t *testing.T, es state.ExecutionState, l *ledg
 				rootID, err := finalized.FinalizedBlockIDAtHeight(10)
 				require.NoError(t, err)
 
-<<<<<<< HEAD
 				db := badgerimpl.ToDB(badgerDB)
 				require.NoError(t, db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 					return operation.UpdateExecutedBlock(rw.Writer(), rootID)
@@ -90,11 +89,6 @@ func prepareStorehouseTest(f func(t *testing.T, es state.ExecutionState, l *ledg
 					return operation.InsertHeader(lctx, rw, finalizedHeaders[10].ID(), finalizedHeaders[10])
 				}))
 				lctx.Release()
-=======
-				metrics := metrics.NewNoopCollector()
-				headersDB := badgerstorage.NewHeaders(metrics, badgerDB)
-				require.NoError(t, headersDB.Store(unittest.ProposalHeaderFromHeader(finalizedHeaders[10])))
->>>>>>> @{-1}
 
 				getLatestFinalized := func() (uint64, error) {
 					return rootHeight, nil
