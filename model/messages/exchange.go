@@ -45,13 +45,11 @@ type EntityResponse struct {
 // must perform validation checks and return a constructed internal
 // object.
 func (e *EntityResponse) ToInternal() (any, error) {
-	//er := &flow.EntityResponse{
-	//	Nonce:     e.Nonce,
-	//	EntityIDs: e.EntityIDs,
-	//	Blobs:     e.Blobs,
-	//}
+	er := &flow.EntityResponse{
+		Nonce:     e.Nonce,
+		EntityIDs: e.EntityIDs,
+		Blobs:     e.Blobs,
+	}
 
-	//return &er, nil
-
-	return e, nil
+	return &er, nil
 }
