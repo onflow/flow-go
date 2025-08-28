@@ -1212,6 +1212,7 @@ func benchmarkBuildOn(b *testing.B, size int) {
 		err := suite.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 			return procedure.InsertClusterBlock(lctx, rw, unittest.ClusterProposalFromBlock(block))
 		})
+		require.NoError(b, err)
 		lctx.Release()
 
 		// finalize the block 80% of the time, resulting in a fork-rate of 20%

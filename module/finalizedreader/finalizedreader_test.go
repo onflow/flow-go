@@ -72,8 +72,8 @@ func TestFinalizedReader(t *testing.T) {
 
 		// should be able to retrieve the block
 		finalized, err = reader.FinalizedBlockIDAtHeight(block2.Height)
-		require.Error(t, err)
-		require.True(t, errors.Is(err, storage.ErrNotFound), err)
+		require.NoError(t, err)
+		require.Equal(t, block2.ID(), finalized)
 
 		// should noop and no panic
 		reader.BlockProcessable(block.ToHeader(), block2.ParentQC())
