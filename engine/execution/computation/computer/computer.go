@@ -503,7 +503,7 @@ func (e *blockComputer) executeSystemTransactions(
 	if e.vmCtx.ScheduleCallbacksEnabled {
 		// We pass in the `systemCollectionInfo` here. However, note that at this point, the composition of the system chunk
 		// is not yet known. Specifically, the `entity.CompleteCollection` represents the *final* output of a process and is
-		// immutable by protocol mandate. If we had a bug in our software that accidentally illegally mutated such stucts,
+		// immutable by protocol mandate. If we had a bug in our software that accidentally illegally mutated such structs,
 		// likely the node encountering that bug would misbehave and get slashed, or in the worst case the flow protocol might
 		// be compromised. Therefore, we have the rigorous convention in our code base that the `CompleteCollection` is only
 		// constructed once the final composition of the system chunk has been determined.
