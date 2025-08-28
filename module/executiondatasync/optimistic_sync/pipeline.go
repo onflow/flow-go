@@ -335,7 +335,6 @@ func (p *PipelineImpl) OnParentStateUpdated(parentState State) {
 
 // Abandon marks the pipeline as abandoned
 // This will cause the pipeline to eventually transition to the Abandoned state and halt processing
-// This will cause the pipeline to eventually transition to the Abandoned state and halt processing
 func (p *PipelineImpl) Abandon() {
 	if p.isAbandoned.CompareAndSwap(false, true) {
 		p.stateChangedNotifier.Notify()

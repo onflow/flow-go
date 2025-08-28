@@ -319,6 +319,7 @@ func (rf *ResultsForest) AddReceipt(receipt *flow.ExecutionReceipt, blockStatus 
 }
 
 // setSealed marks a container as sealed, updates internal state.
+// CAUTION: not concurrency safe! Caller must hold a lock.
 func (rf *ResultsForest) setSealed(container *ExecutionResultContainer) {
 	if rf.lastSealedView.Set(container.BlockView()) {
 		rf.lastSealedResultID = container.ResultID()
@@ -626,60 +627,49 @@ func (rf *ResultsForest) processCompleted(resultID flow.Identifier) error {
 
 // isAbandonedFork checks if a container's result descends from an abandoned result.
 // This requires that there is a direct path from the container's result to an abandoned result
-// within the forest, or it is a sibling of a sealed result.
-// If any result is missing, the fork is not known to be abandoned and the function returns false.
+// within the forest, otherwise the function cannot determine if the fork is abandoned and returns false.
 //
-// consider the following case:
-// X is the result that was just added
-// A was previously sealed, and B was sealed before X was added
-//
-// |   ↙ X
-// | A ← B ← C
-//
-// in this case, we know that X conflicts with B and will never be sealed. We should abandon X
-// immediately.
-//
-// consider another case:
-// Y is the result that was just added
-// X is its parent, but does not exist in the forest yet
-//
-// |   ↙ [X] ← Y
-// | A ←  B  ← C
-//
-// in this case, we do not know if Y will eventually be sealed since we don't know which result
-// X will descend from. We must wait until we eventually receive X, or for a result with a higher
-// view to be sealed, to determine if X and Y should be abandoned.
+// A container is known to be in an abandoned fork if:
+// 1. it's parent is abandoned
+// 2. one of its siblings is sealed
+// 3. its block conflicts with a finalized block
+// In the case of 3, it is difficult to determine the block conflicts without traversal. However,
+// one of the container's siblings will eventually be sealed, so we can ignore the case here, and
+// rely on the block finalization processing to handle it later.
 //
 // CAUTION: not concurrency safe! Caller must hold a lock.
 func (rf *ResultsForest) isAbandonedFork(container *ExecutionResultContainer) bool {
+	// optimization: if the container is sealed, it can't be in an abandoned fork
 	if container.BlockStatus() == BlockStatusSealed {
 		return false
 	}
 
-	parentID, parentView := container.Parent()
-
-	// the parent is the last sealed result, so the fork is most likely not abandoned.
-	// the only exception is if the result's block conflicts with a finalized block, but
-	// that case will be handled by the finalized check in `OnBlockFinalized`.
-	if parentID == rf.lastSealedResultID {
-		return false
-	}
-
-	// sealed views are strictly increasing, so if the parent's view is lower than the last sealed
-	// view, then this result will never be sealed. This catches the case where the result's sibling
-	// is sealed.
-	if parentView < rf.lastSealedView.Value() {
-		return true
-	}
-
 	// if the parent is not found, that means either the parent has not been added to the forest yet,
 	// or it has already been pruned. either way, we can't confirm if the fork is abandoned.
+	parentID, _ := container.Parent()
 	parent, found := rf.getContainer(parentID)
 	if !found {
 		return false
 	}
 
-	// if the parent is abandoned, then the container does not descend from the latest sealed
-	// result, and we can guarantee that the container will never be started.
-	return parent.Pipeline().GetState() == optimistic_sync.StateAbandoned
+	// 1. the parent is abandoned
+	if parent.Pipeline().GetState() == optimistic_sync.StateAbandoned {
+		return true
+	}
+
+	isAbandoned := false
+	rf.iterateChildren(parentID, func(sibling *ExecutionResultContainer) bool {
+		if sibling.ResultID() == container.ResultID() {
+			return true // skip self
+		}
+
+		// 2. a sibling is sealed
+		if sibling.BlockStatus() == BlockStatusSealed {
+			isAbandoned = true
+			return false
+		}
+		return true
+	})
+
+	return isAbandoned
 }
