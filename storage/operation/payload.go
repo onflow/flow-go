@@ -51,7 +51,9 @@ func IndexPayloadSeals(lctx lockctx.Proof, w storage.Writer, blockID flow.Identi
 }
 
 // LookupPayloadSeals retrieves the list of Seals that were included in the payload
-// of the specified block. For every known block, this index should be populated (at or above the root block).
+// of the specified block. For every known block (at or above the root block height),
+// this index should be populated.
+//
 // Expected errors during normal operations:
 //   - [storage.ErrNotFound] if `blockID` does not refer to a known block
 func LookupPayloadSeals(r storage.Reader, blockID flow.Identifier, sealIDs *[]flow.Identifier) error {

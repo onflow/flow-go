@@ -70,7 +70,8 @@ func IndexExecutionReceipts(w storage.Writer, blockID, receiptID flow.Identifier
 }
 
 // LookupExecutionReceipts retrieves the set of all execution receipts for the specified block.
-// For every known block, this index should be populated with all known receipts for that block.
+// For every known block (at or above the root block height), this index should be populated
+// with all known receipts for that block.
 //
 // Expected errors during normal operations:
 //   - [storage.ErrNotFound] if `blockID` does not refer to a known block
