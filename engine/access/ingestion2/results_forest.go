@@ -2,6 +2,7 @@ package ingestion2
 
 import (
 	"fmt"
+	"iter"
 	"sync"
 
 	"github.com/rs/zerolog"
@@ -357,7 +358,7 @@ func (rf *ResultsForest) getOrCreateContainer(result *flow.ExecutionResult, bloc
 		return nil, fmt.Errorf("failed to get block header for result (%s): %w", resultID, err)
 	}
 
-	pipeline := rf.pipelineFactory.NewPipeline(result)
+	pipeline := rf.pipelineFactory.NewPipeline(result, blockStatus == BlockStatusSealed)
 	newContainer, err := NewExecutionResultContainer(result, executedBlock, blockStatus, pipeline)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create container for result (%s): %w", resultID, err)
@@ -440,11 +441,6 @@ func (rf *ResultsForest) LowestView() uint64 {
 }
 
 // GetContainer retrieves the ExecutionResultContainer for the given result ID.
-// CAUTION:
-//   - The returned ExecutionResultContainer is not concurrency safe!
-//   - Code outside of the ResultsForest should NEVER MODIFY the returned ExecutionResultContainer.
-//   - Accessing the returned ExecutionResultContainer in a thread other than the thread servicing the ResultsForest,
-//     may lead to panics.
 func (rf *ResultsForest) GetContainer(resultID flow.Identifier) (*ExecutionResultContainer, bool) {
 	rf.mu.RLock()
 	defer rf.mu.RUnlock()
@@ -463,21 +459,23 @@ func (rf *ResultsForest) getContainer(resultID flow.Identifier) (*ExecutionResul
 
 // IterateChildren iterates over all children of the given result ID and calls the provided function on each child.
 // Callback function should return false to stop iteration
-func (rf *ResultsForest) IterateChildren(resultID flow.Identifier, fn func(*ExecutionResultContainer) bool) {
+func (rf *ResultsForest) IterateChildren(resultID flow.Identifier) iter.Seq[*ExecutionResultContainer] {
 	rf.mu.RLock()
 	defer rf.mu.RUnlock()
-	rf.iterateChildren(resultID, fn)
+	return rf.iterateChildren(resultID)
 }
 
 // iterateChildren iterates over all children of the given result ID and calls the provided function on each child.
 // Callback function should return false to stop iteration
 // CAUTION: not concurrency safe! Caller must hold a lock.
-func (rf *ResultsForest) iterateChildren(resultID flow.Identifier, fn func(*ExecutionResultContainer) bool) {
-	siblings := rf.forest.GetChildren(resultID)
-	for siblings.HasNext() {
-		sibling := siblings.NextVertex().(*ExecutionResultContainer)
-		if !fn(sibling) {
-			return
+func (rf *ResultsForest) iterateChildren(resultID flow.Identifier) iter.Seq[*ExecutionResultContainer] {
+	return func(yield func(*ExecutionResultContainer) bool) {
+		siblings := rf.forest.GetChildren(resultID)
+		for siblings.HasNext() {
+			sibling := siblings.NextVertex().(*ExecutionResultContainer)
+			if !yield(sibling) {
+				return
+			}
 		}
 	}
 }
@@ -485,22 +483,24 @@ func (rf *ResultsForest) iterateChildren(resultID flow.Identifier, fn func(*Exec
 // IterateView iterates over containers who's executed block has the given view, and calls the
 // provided function on each container.
 // Callback function should return false to stop iteration
-func (rf *ResultsForest) IterateView(view uint64, fn func(*ExecutionResultContainer) bool) {
+func (rf *ResultsForest) IterateView(view uint64) iter.Seq[*ExecutionResultContainer] {
 	rf.mu.RLock()
 	defer rf.mu.RUnlock()
-	rf.iterateView(view, fn)
+	return rf.iterateView(view)
 }
 
 // IterateView iterates over containers who's executed block has the given view, and calls the
 // provided function on each container.
 // Callback function should return false to stop iteration
 // CAUTION: not concurrency safe! Caller must hold a lock.
-func (rf *ResultsForest) iterateView(view uint64, fn func(*ExecutionResultContainer) bool) {
-	containers := rf.forest.GetVerticesAtLevel(view)
-	for containers.HasNext() {
-		containers := containers.NextVertex().(*ExecutionResultContainer)
-		if !fn(containers) {
-			return
+func (rf *ResultsForest) iterateView(view uint64) iter.Seq[*ExecutionResultContainer] {
+	return func(yield func(*ExecutionResultContainer) bool) {
+		containers := rf.forest.GetVerticesAtLevel(view)
+		for containers.HasNext() {
+			container := containers.NextVertex().(*ExecutionResultContainer)
+			if !yield(container) {
+				return
+			}
 		}
 	}
 }
@@ -526,41 +526,37 @@ func (rf *ResultsForest) OnBlockFinalized(finalized *flow.Block) {
 
 			// abandon all conflicting forks
 			parentID, _ := container.Parent()
-			rf.iterateChildren(parentID, func(sibling *ExecutionResultContainer) bool {
+			for sibling := range rf.iterateChildren(parentID) {
 				if sibling.ResultID() != container.ResultID() {
 					rf.abandonFork(sibling)
 				}
-				return true
-			})
+			}
 		}
 	}
 
 	// Abandon all forks who's executed block conflicts with the new finalized block.
 	// 1. Iterate all results for the finalized block's parent
-	// 2. For each result
+	// 2. For each results' children
 	//   i. if its executed block is the finalized block, mark it as finalized
 	//   ii. abandon all other forks
-	rf.iterateView(finalized.ParentView, func(container *ExecutionResultContainer) bool {
-		rf.iterateChildren(container.ResultID(), func(child *ExecutionResultContainer) bool {
+	for container := range rf.iterateView(finalized.ParentView) {
+		for child := range rf.iterateChildren(container.ResultID()) {
 			if child.Result().BlockID == finalizedBlockID {
 				child.SetBlockStatus(BlockStatusFinalized)
 			} else {
 				rf.abandonFork(child)
 			}
-			return true
-		})
-		return true
-	})
+		}
+	}
 }
 
 // abandonFork recursively abandons a container and all its descendants.
 // CAUTION: not concurrency safe! Caller must hold a lock.
 func (rf *ResultsForest) abandonFork(container *ExecutionResultContainer) {
 	container.Pipeline().Abandon()
-	rf.iterateChildren(container.ResultID(), func(child *ExecutionResultContainer) bool {
+	for child := range rf.iterateChildren(container.ResultID()) {
 		rf.abandonFork(child)
-		return true
-	})
+	}
 }
 
 // OnStateUpdated is called by pipeline state machines when their state changes, and propagates the
@@ -576,10 +572,9 @@ func (rf *ResultsForest) OnStateUpdated(resultID flow.Identifier, newState optim
 	}
 
 	// send state update to all children.
-	rf.IterateChildren(resultID, func(child *ExecutionResultContainer) bool {
+	for child := range rf.IterateChildren(resultID) {
 		child.Pipeline().OnParentStateUpdated(newState)
-		return true
-	})
+	}
 
 	// process completed pipelines
 	if newState == optimistic_sync.StateComplete {
@@ -630,12 +625,14 @@ func (rf *ResultsForest) processCompleted(resultID flow.Identifier) error {
 // within the forest, otherwise the function cannot determine if the fork is abandoned and returns false.
 //
 // A container is known to be in an abandoned fork if:
-// 1. it's parent is abandoned
-// 2. one of its siblings is sealed
-// 3. its block conflicts with a finalized block
-// In the case of 3, it is difficult to determine the block conflicts without traversal. However,
-// one of the container's siblings will eventually be sealed, so we can ignore the case here, and
-// rely on the block finalization processing to handle it later.
+//  1. its parent is abandoned
+//  2. one of its siblings is sealed
+//  3. its block conflicts with a finalized block
+//
+// In the case of 3, it is difficult to determine that the block conflicts without traversal.
+// However, one of the result's siblings will eventually be sealed, at which point this result
+// will be abandoned. Skipping the check here simplifies the logic, at the expense of some amount
+// of wasted work before the result is abandoned.
 //
 // CAUTION: not concurrency safe! Caller must hold a lock.
 func (rf *ResultsForest) isAbandonedFork(container *ExecutionResultContainer) bool {
@@ -658,18 +655,17 @@ func (rf *ResultsForest) isAbandonedFork(container *ExecutionResultContainer) bo
 	}
 
 	isAbandoned := false
-	rf.iterateChildren(parentID, func(sibling *ExecutionResultContainer) bool {
+	for sibling := range rf.iterateChildren(parentID) {
 		if sibling.ResultID() == container.ResultID() {
-			return true // skip self
+			continue // skip self
 		}
 
 		// 2. a sibling is sealed
 		if sibling.BlockStatus() == BlockStatusSealed {
 			isAbandoned = true
-			return false
+			break
 		}
-		return true
-	})
+	}
 
 	return isAbandoned
 }
