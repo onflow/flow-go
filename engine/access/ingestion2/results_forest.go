@@ -457,16 +457,14 @@ func (rf *ResultsForest) getContainer(resultID flow.Identifier) (*ExecutionResul
 	return container.(*ExecutionResultContainer), true
 }
 
-// IterateChildren iterates over all children of the given result ID and calls the provided function on each child.
-// Callback function should return false to stop iteration
+// IterateChildren returns an iter.Seq that iterates over all children of the given result ID
 func (rf *ResultsForest) IterateChildren(resultID flow.Identifier) iter.Seq[*ExecutionResultContainer] {
 	rf.mu.RLock()
 	defer rf.mu.RUnlock()
 	return rf.iterateChildren(resultID)
 }
 
-// iterateChildren iterates over all children of the given result ID and calls the provided function on each child.
-// Callback function should return false to stop iteration
+// iterateChildren returns an iter.Seq that iterates over all children of the given result ID
 // CAUTION: not concurrency safe! Caller must hold a lock.
 func (rf *ResultsForest) iterateChildren(resultID flow.Identifier) iter.Seq[*ExecutionResultContainer] {
 	return func(yield func(*ExecutionResultContainer) bool) {
@@ -480,18 +478,14 @@ func (rf *ResultsForest) iterateChildren(resultID flow.Identifier) iter.Seq[*Exe
 	}
 }
 
-// IterateView iterates over containers who's executed block has the given view, and calls the
-// provided function on each container.
-// Callback function should return false to stop iteration
+// IterateView returns an iter.Seq that iterates over all containers who's executed block has the given view
 func (rf *ResultsForest) IterateView(view uint64) iter.Seq[*ExecutionResultContainer] {
 	rf.mu.RLock()
 	defer rf.mu.RUnlock()
 	return rf.iterateView(view)
 }
 
-// IterateView iterates over containers who's executed block has the given view, and calls the
-// provided function on each container.
-// Callback function should return false to stop iteration
+// iterateView returns an iter.Seq that iterates over all containers who's executed block has the given view
 // CAUTION: not concurrency safe! Caller must hold a lock.
 func (rf *ResultsForest) iterateView(view uint64) iter.Seq[*ExecutionResultContainer] {
 	return func(yield func(*ExecutionResultContainer) bool) {
