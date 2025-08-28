@@ -21,12 +21,14 @@ type EntityRequest struct {
 // must perform validation checks and return a constructed internal
 // object.
 func (e *EntityRequest) ToInternal() (any, error) {
-	er := &flow.EntityRequest{
-		Nonce:     e.Nonce,
-		EntityIDs: e.EntityIDs,
-	}
+	//er := &flow.EntityRequest{
+	//	Nonce:     e.Nonce,
+	//	EntityIDs: e.EntityIDs,
+	//}
+	//
+	//return &er, nil
 
-	return &er, nil
+	return e, nil
 }
 
 // EntityResponse is a response to an entity request, containing a set of
