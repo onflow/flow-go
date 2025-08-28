@@ -133,26 +133,18 @@ func TestAccountPublicKeyWeightsAndRevokedStatusSerizliation(t *testing.T) {
 func TestMappingGroupSerialization(t *testing.T) {
 	testcases := []struct {
 		name     string
-		groups   []mappingGroup
 		mappings []uint32
 		expected []byte
 	}{
 		{
-			name: "1 group",
-			groups: []mappingGroup{
-				{1, 1},
-			},
+			name:     "1 group",
 			mappings: []uint32{1},
 			expected: []byte{
 				0, 1, 0, 0, 0, 1,
 			},
 		},
 		{
-			name: "2 groups",
-			groups: []mappingGroup{
-				{2, 1},
-				{1, 2},
-			},
+			name:     "2 groups",
 			mappings: []uint32{1, 1, 2},
 			expected: []byte{
 				0, 2, 0, 0, 0, 1,
@@ -160,11 +152,7 @@ func TestMappingGroupSerialization(t *testing.T) {
 			},
 		},
 		{
-			name: "group count not consecutive",
-			groups: []mappingGroup{
-				{1, 1},
-				{2, 2},
-			},
+			name:     "group count not consecutive",
 			mappings: []uint32{1, 2, 2},
 			expected: []byte{
 				0, 1, 0, 0, 0, 1,
@@ -172,11 +160,7 @@ func TestMappingGroupSerialization(t *testing.T) {
 			},
 		},
 		{
-			name: "group value not consecutive",
-			groups: []mappingGroup{
-				{1, 1},
-				{1, 3},
-			},
+			name:     "group value not consecutive",
 			mappings: []uint32{1, 3},
 			expected: []byte{
 				0, 1, 0, 0, 0, 1,
@@ -184,38 +168,21 @@ func TestMappingGroupSerialization(t *testing.T) {
 			},
 		},
 		{
-			name: "2 consecutive groups",
-			groups: []mappingGroup{
-				{1, 1},
-				{1, 2},
-			},
+			name:     "2 consecutive groups",
 			mappings: []uint32{1, 2},
 			expected: []byte{
 				0x80, 2, 0, 0, 0, 1,
 			},
 		},
 		{
-			name: ">2 consecutive groups",
-			groups: []mappingGroup{
-				{1, 1},
-				{1, 2},
-				{1, 3},
-			},
+			name:     ">2 consecutive groups",
 			mappings: []uint32{1, 2, 3},
 			expected: []byte{
 				0x80, 3, 0, 0, 0, 1,
 			},
 		},
 		{
-			name: "consecutive groups mixed with non-consecutive groups",
-			groups: []mappingGroup{
-				{1, 1},
-				{1, 3},
-				{1, 4},
-				{2, 5},
-				{1, 6},
-				{1, 7},
-			},
+			name:     "consecutive groups mixed with non-consecutive groups",
 			mappings: []uint32{1, 3, 4, 5, 5, 6, 7},
 			expected: []byte{
 				0, 1, 0, 0, 0, 1,
