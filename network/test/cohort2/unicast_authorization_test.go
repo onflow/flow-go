@@ -484,12 +484,15 @@ func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_ReceiverHasSubs
 	u.senderID.Role = flow.RoleConsensus
 	u.receiverID.Role = flow.RoleExecution
 
+	internalEntityRequest, err := msg.ToInternal()
+	require.NoError(u.T(), err)
+
 	receiverEngine := &mocknetwork.MessageProcessor{}
-	receiverEngine.On("Process", channels.RequestReceiptsByBlockID, u.senderID.NodeID, msg).Run(
+	receiverEngine.On("Process", channels.RequestReceiptsByBlockID, u.senderID.NodeID, internalEntityRequest).Run(
 		func(args mockery.Arguments) {
 			close(u.waitCh)
 		}).Return(nil).Once()
-	_, err := u.receiverNetwork.Register(channels.RequestReceiptsByBlockID, receiverEngine)
+	_, err = u.receiverNetwork.Register(channels.RequestReceiptsByBlockID, receiverEngine)
 	require.NoError(u.T(), err)
 
 	senderCon, err := u.senderNetwork.Register(channels.RequestReceiptsByBlockID, &mocknetwork.MessageProcessor{})
