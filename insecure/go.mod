@@ -214,7 +214,7 @@ require (
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
 	github.com/olekukonko/tablewriter v0.0.5 // indirect
 	github.com/onflow/atree v0.10.0 // indirect
-	github.com/onflow/cadence v1.6.3 // indirect
+	github.com/onflow/cadence v1.6.5 // indirect
 	github.com/onflow/flow-core-contracts/lib/go/contracts v1.7.3 // indirect
 	github.com/onflow/flow-core-contracts/lib/go/templates v1.7.1 // indirect
 	github.com/onflow/flow-evm-bridge v0.1.0 // indirect
@@ -223,7 +223,7 @@ require (
 	github.com/onflow/flow-go-sdk v1.6.2 // indirect
 	github.com/onflow/flow-nft/lib/go/contracts v1.2.4 // indirect
 	github.com/onflow/flow-nft/lib/go/templates v1.2.1 // indirect
-	github.com/onflow/flow/protobuf/go/flow v0.4.10 // indirect
+	github.com/onflow/flow/protobuf/go/flow v0.4.15-0.20250828110814-0c82ce571c14 // indirect
 	github.com/onflow/go-ethereum v1.16.2 // indirect
 	github.com/onflow/nft-storefront/lib/go/contracts v1.0.0 // indirect
 	github.com/onflow/sdks v0.6.0-preview.1 // indirect

@@ -10,13 +10,12 @@ import (
 	"github.com/onflow/flow/protobuf/go/flow/entities"
 	"google.golang.org/grpc/codes"
 
-	"github.com/onflow/flow-go/engine/access/index"
-	"github.com/onflow/flow-go/engine/access/rpc/backend/transactions/error_messages"
 	txstatus "github.com/onflow/flow-go/engine/access/rpc/backend/transactions/status"
 	"github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	accessmodel "github.com/onflow/flow-go/model/access"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/executiondatasync/optimistic_sync"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/state"
 	"github.com/onflow/flow-go/state/protocol"
@@ -28,14 +27,13 @@ var ErrTransactionNotInBlock = errors.New("transaction not in block")
 
 // LocalTransactionProvider provides functionality for retrieving transaction results and error messages from local storages
 type LocalTransactionProvider struct {
-	state           protocol.State
-	collections     storage.Collections
-	blocks          storage.Blocks
-	eventsIndex     *index.EventsIndex
-	txResultsIndex  *index.TransactionResultsIndex
-	txErrorMessages error_messages.Provider
-	systemTxID      flow.Identifier
-	txStatusDeriver *txstatus.TxStatusDeriver
+	state                   protocol.State
+	collections             storage.Collections
+	blocks                  storage.Blocks
+	systemTxID              flow.Identifier
+	txStatusDeriver         *txstatus.TxStatusDeriver
+	executionResultProvider optimistic_sync.ExecutionResultProvider
+	executionStateCache     optimistic_sync.ExecutionStateCache
 }
 
 var _ TransactionProvider = (*LocalTransactionProvider)(nil)
@@ -44,21 +42,19 @@ func NewLocalTransactionProvider(
 	state protocol.State,
 	collections storage.Collections,
 	blocks storage.Blocks,
-	eventsIndex *index.EventsIndex,
-	txResultsIndex *index.TransactionResultsIndex,
-	txErrorMessages error_messages.Provider,
 	systemTxID flow.Identifier,
 	txStatusDeriver *txstatus.TxStatusDeriver,
+	executionResultProvider optimistic_sync.ExecutionResultProvider,
+	executionStateCache optimistic_sync.ExecutionStateCache,
 ) *LocalTransactionProvider {
 	return &LocalTransactionProvider{
-		state:           state,
-		collections:     collections,
-		blocks:          blocks,
-		eventsIndex:     eventsIndex,
-		txResultsIndex:  txResultsIndex,
-		txErrorMessages: txErrorMessages,
-		systemTxID:      systemTxID,
-		txStatusDeriver: txStatusDeriver,
+		state:                   state,
+		collections:             collections,
+		blocks:                  blocks,
+		systemTxID:              systemTxID,
+		txStatusDeriver:         txStatusDeriver,
+		executionResultProvider: executionResultProvider,
+		executionStateCache:     executionStateCache,
 	}
 }
 
@@ -74,30 +70,41 @@ func (t *LocalTransactionProvider) TransactionResult(
 	block *flow.Header,
 	transactionID flow.Identifier,
 	encodingVersion entities.EventEncodingVersion,
-) (*accessmodel.TransactionResult, error) {
+	query entities.ExecutionStateQuery,
+) (*accessmodel.TransactionResult, *optimistic_sync.ExecutionResultInfo, error) {
 	blockID := block.ID()
-	txResult, err := t.txResultsIndex.ByBlockIDTransactionID(blockID, block.Height, transactionID)
+
+	snapshot, executionResultInfo, err := t.getSnapshotForBlock(blockID, query)
 	if err != nil {
-		return nil, rpc.ConvertIndexError(err, block.Height, "failed to get transaction result")
+		return nil, nil, err
 	}
 
-	var txErrorMessage string
+	txResultsReader := snapshot.LightTransactionResults()
+
+	txResult, err := txResultsReader.ByBlockIDTransactionID(blockID, transactionID)
+	if err != nil {
+		return nil, executionResultInfo, rpc.ConvertIndexError(err, block.Height, "failed to get transaction result")
+	}
+
+	var txErrorMessageStr string
 	var txStatusCode uint = 0
 	if txResult.Failed {
-		txErrorMessage, err = t.txErrorMessages.ErrorMessageByTransactionID(ctx, blockID, block.Height, transactionID)
+		txErrorMessagesReader := snapshot.TransactionResultErrorMessages()
+		txErrorMessage, err := txErrorMessagesReader.ByBlockIDTransactionID(blockID, transactionID)
 		if err != nil {
-			return nil, err
+			return nil, executionResultInfo, err
 		}
 
-		if len(txErrorMessage) == 0 {
-			return nil, status.Errorf(
+		if len(txErrorMessage.ErrorMessage) == 0 {
+			return nil, executionResultInfo, status.Errorf(
 				codes.Internal,
 				"transaction failed but error message is empty for tx ID: %s block ID: %s",
-				txResult.TransactionID,
+				txErrorMessage.TransactionID,
 				blockID,
 			)
 		}
 
+		txErrorMessageStr = txErrorMessage.ErrorMessage
 		txStatusCode = 1 // statusCode of 1 indicates an error and 0 indicates no error, the same as on EN
 	}
 
@@ -106,19 +113,20 @@ func (t *LocalTransactionProvider) TransactionResult(
 		if !errors.Is(err, state.ErrUnknownSnapshotReference) {
 			irrecoverable.Throw(ctx, err)
 		}
-		return nil, rpc.ConvertStorageError(err)
+		return nil, executionResultInfo, rpc.ConvertStorageError(err)
 	}
 
-	events, err := t.eventsIndex.ByBlockIDTransactionID(blockID, block.Height, transactionID)
+	eventsReader := snapshot.Events()
+	events, err := eventsReader.ByBlockIDTransactionID(blockID, transactionID)
 	if err != nil {
-		return nil, rpc.ConvertIndexError(err, block.Height, "failed to get events")
+		return nil, executionResultInfo, rpc.ConvertIndexError(err, block.Height, "failed to get events")
 	}
 
 	// events are encoded in CCF format in storage. convert to JSON-CDC if requested
 	if encodingVersion == entities.EventEncodingVersion_JSON_CDC_V0 {
 		events, err = convert.CcfEventsToJsonEvents(events)
 		if err != nil {
-			return nil, rpc.ConvertError(err, "failed to convert event payload", codes.Internal)
+			return nil, executionResultInfo, rpc.ConvertError(err, "failed to convert event payload", codes.Internal)
 		}
 	}
 
@@ -127,10 +135,10 @@ func (t *LocalTransactionProvider) TransactionResult(
 		Status:        txStatus,
 		StatusCode:    txStatusCode,
 		Events:        events,
-		ErrorMessage:  txErrorMessage,
+		ErrorMessage:  txErrorMessageStr,
 		BlockID:       blockID,
 		BlockHeight:   block.Height,
-	}, nil
+	}, executionResultInfo, nil
 }
 
 // TransactionResultByIndex retrieves a transaction result by index from storage.
@@ -145,25 +153,42 @@ func (t *LocalTransactionProvider) TransactionResultByIndex(
 	block *flow.Block,
 	index uint32,
 	requiredEventEncodingVersion entities.EventEncodingVersion,
-) (*accessmodel.TransactionResult, error) {
+	query entities.ExecutionStateQuery,
+) (*accessmodel.TransactionResult, *optimistic_sync.ExecutionResultInfo, error) {
 	blockID := block.ID()
-	txResult, err := t.txResultsIndex.ByBlockIDTransactionIndex(blockID, block.Header.Height, index)
+
+	snapshot, executionResultInfo, err := t.getSnapshotForBlock(blockID, query)
 	if err != nil {
-		return nil, rpc.ConvertIndexError(err, block.Header.Height, "failed to get transaction result")
+		return nil, nil, err
 	}
 
-	var txErrorMessage string
+	txResultsReader := snapshot.LightTransactionResults()
+
+	txResult, err := txResultsReader.ByBlockIDTransactionIndex(blockID, index)
+	if err != nil {
+		return nil, executionResultInfo, rpc.ConvertIndexError(err, block.Header.Height,
+			"failed to get transaction result")
+	}
+
+	var txErrorMessageStr string
 	var txStatusCode uint = 0
 	if txResult.Failed {
-		txErrorMessage, err = t.txErrorMessages.ErrorMessageByIndex(ctx, blockID, block.Header.Height, index)
+		txErrorMessagesReader := snapshot.TransactionResultErrorMessages()
+		txErrorMessage, err := txErrorMessagesReader.ByBlockIDTransactionIndex(blockID, index)
 		if err != nil {
-			return nil, err
+			return nil, executionResultInfo, err
 		}
 
-		if len(txErrorMessage) == 0 {
-			return nil, status.Errorf(codes.Internal, "transaction failed but error message is empty for tx ID: %s block ID: %s", txResult.TransactionID, blockID)
+		if len(txErrorMessage.ErrorMessage) == 0 {
+			return nil, executionResultInfo, status.Errorf(
+				codes.Internal,
+				"transaction failed but error message is empty for tx ID: %s block ID: %s",
+				txErrorMessage.TransactionID,
+				blockID,
+			)
 		}
 
+		txErrorMessageStr = txErrorMessage.ErrorMessage
 		txStatusCode = 1 // statusCode of 1 indicates an error and 0 indicates no error, the same as on EN
 	}
 
@@ -172,25 +197,27 @@ func (t *LocalTransactionProvider) TransactionResultByIndex(
 		if !errors.Is(err, state.ErrUnknownSnapshotReference) {
 			irrecoverable.Throw(ctx, err)
 		}
-		return nil, rpc.ConvertStorageError(err)
+		return nil, executionResultInfo, rpc.ConvertStorageError(err)
 	}
 
-	events, err := t.eventsIndex.ByBlockIDTransactionIndex(blockID, block.Header.Height, index)
+	eventsReader := snapshot.Events()
+	events, err := eventsReader.ByBlockIDTransactionIndex(blockID, index)
 	if err != nil {
-		return nil, rpc.ConvertIndexError(err, block.Header.Height, "failed to get events")
+		return nil, executionResultInfo, rpc.ConvertIndexError(err, block.Header.Height, "failed to get events")
 	}
 
 	// events are encoded in CCF format in storage. convert to JSON-CDC if requested
 	if requiredEventEncodingVersion == entities.EventEncodingVersion_JSON_CDC_V0 {
 		events, err = convert.CcfEventsToJsonEvents(events)
 		if err != nil {
-			return nil, rpc.ConvertError(err, "failed to convert event payload", codes.Internal)
+			return nil, executionResultInfo, rpc.ConvertError(err, "failed to convert event payload", codes.Internal)
 		}
 	}
 
-	collectionID, err := t.lookupCollectionIDInBlock(block, txResult.TransactionID)
+	// TODO: Do we need lookupCollectionID
+	collectionID, err := t.lookupCollectionIDInBlock(block, txResult.TransactionID, snapshot.Collections())
 	if err != nil {
-		return nil, err
+		return nil, executionResultInfo, err
 	}
 
 	return &accessmodel.TransactionResult{
@@ -198,11 +225,11 @@ func (t *LocalTransactionProvider) TransactionResultByIndex(
 		Status:        txStatus,
 		StatusCode:    txStatusCode,
 		Events:        events,
-		ErrorMessage:  txErrorMessage,
+		ErrorMessage:  txErrorMessageStr,
 		BlockID:       blockID,
 		BlockHeight:   block.Header.Height,
 		CollectionID:  collectionID,
-	}, nil
+	}, executionResultInfo, nil
 }
 
 // TransactionResultsByBlockID retrieves transaction results by block ID from storage
@@ -216,43 +243,63 @@ func (t *LocalTransactionProvider) TransactionResultsByBlockID(
 	ctx context.Context,
 	block *flow.Block,
 	requiredEventEncodingVersion entities.EventEncodingVersion,
-) ([]*accessmodel.TransactionResult, error) {
+	query entities.ExecutionStateQuery,
+) ([]*accessmodel.TransactionResult, *optimistic_sync.ExecutionResultInfo, error) {
 	blockID := block.ID()
-	txResults, err := t.txResultsIndex.ByBlockID(blockID, block.Header.Height)
+
+	snapshot, executionResultInfo, err := t.getSnapshotForBlock(blockID, query)
 	if err != nil {
-		return nil, rpc.ConvertIndexError(err, block.Header.Height, "failed to get transaction result")
+		return nil, nil, err
 	}
 
-	txErrors, err := t.txErrorMessages.ErrorMessagesByBlockID(ctx, blockID, block.Header.Height)
+	txResultsReader := snapshot.LightTransactionResults()
+
+	txResults, err := txResultsReader.ByBlockID(blockID)
 	if err != nil {
-		return nil, err
+		return nil, executionResultInfo, rpc.ConvertIndexError(err, block.Header.Height,
+			"failed to get transaction result")
 	}
+
+	txErrorMessagesReader := snapshot.TransactionResultErrorMessages()
 
 	numberOfTxResults := len(txResults)
 	results := make([]*accessmodel.TransactionResult, 0, numberOfTxResults)
 
 	// cache the tx to collectionID mapping to avoid repeated lookups
-	txToCollectionID, err := t.buildTxIDToCollectionIDMapping(block)
+	txToCollectionID, err := t.buildTxIDToCollectionIDMapping(block, snapshot.Collections())
 	if err != nil {
 		// this indicates that one or more of the collections for the block are not indexed. Since
 		// lookups are gated on the indexer signaling it has finished processing all data for the
 		// block, all data must be available in storage, otherwise there is an inconsistency in the
 		// state.
 		irrecoverable.Throw(ctx, fmt.Errorf("inconsistent index state: %w", err))
-		return nil, status.Errorf(codes.Internal, "failed to map tx to collection ID: %v", err)
+		return nil, executionResultInfo, status.Errorf(codes.Internal, "failed to map tx to collection ID: %v", err)
 	}
+
+	eventsReader := snapshot.Events()
 
 	for _, txResult := range txResults {
 		txID := txResult.TransactionID
 
-		var txErrorMessage string
+		var txErrorMessageStr string
 		var txStatusCode uint = 0
 		if txResult.Failed {
-			txErrorMessage = txErrors[txResult.TransactionID]
-			if len(txErrorMessage) == 0 {
-				return nil, status.Errorf(codes.Internal, "transaction failed but error message is empty for tx ID: %s block ID: %s", txID, blockID)
+			txErrorMessage, err := txErrorMessagesReader.ByBlockIDTransactionID(blockID, txID)
+			if err != nil {
+				return nil, executionResultInfo, err
 			}
-			txStatusCode = 1
+
+			if len(txErrorMessage.ErrorMessage) == 0 {
+				return nil, executionResultInfo, status.Errorf(
+					codes.Internal,
+					"transaction failed but error message is empty for tx ID: %s block ID: %s",
+					txErrorMessage.TransactionID,
+					blockID,
+				)
+			}
+
+			txErrorMessageStr = txErrorMessage.ErrorMessage
+			txStatusCode = 1 // statusCode of 1 indicates an error and 0 indicates no error, the same as on EN
 		}
 
 		txStatus, err := t.txStatusDeriver.DeriveTransactionStatus(block.Header.Height, true)
@@ -260,32 +307,34 @@ func (t *LocalTransactionProvider) TransactionResultsByBlockID(
 			if !errors.Is(err, state.ErrUnknownSnapshotReference) {
 				irrecoverable.Throw(ctx, err)
 			}
-			return nil, rpc.ConvertStorageError(err)
+			return nil, executionResultInfo, rpc.ConvertStorageError(err)
 		}
 
-		events, err := t.eventsIndex.ByBlockIDTransactionID(blockID, block.Header.Height, txResult.TransactionID)
+		events, err := eventsReader.ByBlockIDTransactionID(blockID, txResult.TransactionID)
 		if err != nil {
-			return nil, rpc.ConvertIndexError(err, block.Header.Height, "failed to get events")
+			return nil, executionResultInfo, rpc.ConvertIndexError(err, block.Header.Height, "failed to get events")
 		}
 
 		// events are encoded in CCF format in storage. convert to JSON-CDC if requested
 		if requiredEventEncodingVersion == entities.EventEncodingVersion_JSON_CDC_V0 {
 			events, err = convert.CcfEventsToJsonEvents(events)
 			if err != nil {
-				return nil, rpc.ConvertError(err, "failed to convert event payload", codes.Internal)
+				return nil, executionResultInfo, rpc.ConvertError(err, "failed to convert event payload",
+					codes.Internal)
 			}
 		}
 
 		collectionID, ok := txToCollectionID[txID]
 		if !ok {
-			return nil, status.Errorf(codes.Internal, "transaction %s not found in block %s", txID, blockID)
+			return nil, executionResultInfo, status.Errorf(codes.Internal, "transaction %s not found in block %s",
+				txID, blockID)
 		}
 
 		results = append(results, &accessmodel.TransactionResult{
 			Status:        txStatus,
 			StatusCode:    txStatusCode,
 			Events:        events,
-			ErrorMessage:  txErrorMessage,
+			ErrorMessage:  txErrorMessageStr,
 			BlockID:       blockID,
 			TransactionID: txID,
 			CollectionID:  collectionID,
@@ -293,7 +342,7 @@ func (t *LocalTransactionProvider) TransactionResultsByBlockID(
 		})
 	}
 
-	return results, nil
+	return results, executionResultInfo, nil
 }
 
 // lookupCollectionIDInBlock returns the collection ID based on the transaction ID.
@@ -301,16 +350,18 @@ func (t *LocalTransactionProvider) TransactionResultsByBlockID(
 func (t *LocalTransactionProvider) lookupCollectionIDInBlock(
 	block *flow.Block,
 	txID flow.Identifier,
+	collectionsReader storage.CollectionsReader,
 ) (flow.Identifier, error) {
 	for _, guarantee := range block.Payload.Guarantees {
-		collection, err := t.collections.LightByID(guarantee.ID())
+		collectionID := guarantee.ID()
+		collection, err := collectionsReader.LightByID(collectionID)
 		if err != nil {
-			return flow.ZeroID, fmt.Errorf("failed to get collection %s in indexed block: %w", guarantee.ID(), err)
+			return flow.ZeroID, fmt.Errorf("failed to get collection %s in indexed block: %w", collectionID, err)
 		}
 
 		for _, collectionTxID := range collection.Transactions {
 			if collectionTxID == txID {
-				return guarantee.ID(), nil
+				return collectionID, nil
 			}
 		}
 	}
@@ -319,19 +370,43 @@ func (t *LocalTransactionProvider) lookupCollectionIDInBlock(
 
 // buildTxIDToCollectionIDMapping returns a map of transaction ID to collection ID based on the provided block.
 // No errors expected during normal operations.
-func (t *LocalTransactionProvider) buildTxIDToCollectionIDMapping(block *flow.Block) (map[flow.Identifier]flow.Identifier, error) {
+func (t *LocalTransactionProvider) buildTxIDToCollectionIDMapping(block *flow.Block, collectionsReader storage.CollectionsReader) (map[flow.Identifier]flow.Identifier, error) {
 	txToCollectionID := make(map[flow.Identifier]flow.Identifier)
 	for _, guarantee := range block.Payload.Guarantees {
-		collection, err := t.collections.LightByID(guarantee.ID())
+		collectionID := guarantee.ID()
+		collection, err := collectionsReader.LightByID(collectionID)
 		if err != nil {
 			// if the tx result is in storage, the collection must be too.
-			return nil, fmt.Errorf("failed to get collection %s in indexed block: %w", guarantee.ID(), err)
+			return nil, fmt.Errorf("failed to get collection %s in indexed block: %w", collectionID, err)
 		}
 		for _, txID := range collection.Transactions {
-			txToCollectionID[txID] = guarantee.ID()
+			txToCollectionID[txID] = collectionID
 		}
 	}
 	txToCollectionID[t.systemTxID] = flow.ZeroID
 
 	return txToCollectionID, nil
+}
+
+// getSnapshotForBlock retrieves a snapshot for the given block ID and query parameters.
+// It uses the executionResultProvider to get an execution result query and then
+// uses the executionStateCache to get a snapshot based on the execution result ID.
+func (t *LocalTransactionProvider) getSnapshotForBlock(
+	blockID flow.Identifier,
+	query entities.ExecutionStateQuery,
+) (optimistic_sync.Snapshot, *optimistic_sync.ExecutionResultInfo, error) {
+	executionResultInfo, err := t.executionResultProvider.ExecutionResult(blockID, optimistic_sync.Criteria{
+		AgreeingExecutorsCount: uint(query.AgreeingExecutorsCount),
+		RequiredExecutors:      convert.MessagesToIdentifiers(query.RequiredExecutorIds),
+	})
+	if err != nil {
+		return nil, nil, err
+	}
+
+	snapshot, err := t.executionStateCache.Snapshot(executionResultInfo.ExecutionResult.ID())
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return snapshot, executionResultInfo, nil
 }

@@ -36,6 +36,8 @@ type RestProxyHandler struct {
 	chain   flow.Chain
 }
 
+var _ access.API = (*RestProxyHandler)(nil)
+
 // NewRestProxyHandler returns a new rest proxy handler for observer node.
 func NewRestProxyHandler(
 	api access.API,
@@ -171,11 +173,12 @@ func (r *RestProxyHandler) GetTransactionResult(
 	blockID flow.Identifier,
 	collectionID flow.Identifier,
 	requiredEventEncodingVersion entities.EventEncodingVersion,
-) (*accessmodel.TransactionResult, error) {
+	executionStateQuery entities.ExecutionStateQuery,
+) (*accessmodel.TransactionResult, entities.ExecutorMetadata, error) {
 	upstream, closer, err := r.FaultTolerantClient()
 	if err != nil {
 
-		return nil, err
+		return nil, entities.ExecutorMetadata{}, err
 	}
 	defer closer.Close()
 
@@ -184,16 +187,18 @@ func (r *RestProxyHandler) GetTransactionResult(
 		BlockId:              blockID[:],
 		CollectionId:         collectionID[:],
 		EventEncodingVersion: requiredEventEncodingVersion,
+		ExecutionStateQuery:  &executionStateQuery,
 	}
 
 	transactionResultResponse, err := upstream.GetTransactionResult(ctx, getTransactionResultRequest)
 	r.log("upstream", "GetTransactionResult", err)
 
 	if err != nil {
-		return nil, err
+		return nil, entities.ExecutorMetadata{}, err
 	}
 
-	return convert.MessageToTransactionResult(transactionResultResponse), nil
+	return convert.MessageToTransactionResult(transactionResultResponse),
+		*transactionResultResponse.Metadata.GetExecutorMetadata(), nil
 }
 
 // GetAccountAtBlockHeight returns account by account address and block height.

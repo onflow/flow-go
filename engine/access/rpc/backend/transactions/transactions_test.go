@@ -21,17 +21,19 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
+	. "github.com/onflow/flow-go/engine/common/rpc"
+	"github.com/onflow/flow-go/module/executiondatasync/optimistic_sync"
+	"github.com/onflow/flow-go/module/executiondatasync/optimistic_sync/execution_result_provider"
+	optimisticsyncmock "github.com/onflow/flow-go/module/executiondatasync/optimistic_sync/mock"
+
 	"github.com/onflow/flow-go/access/validator"
 	validatormock "github.com/onflow/flow-go/access/validator/mock"
-	"github.com/onflow/flow-go/engine/access/index"
 	accessmock "github.com/onflow/flow-go/engine/access/mock"
 	"github.com/onflow/flow-go/engine/access/rpc/backend/node_communicator"
-	"github.com/onflow/flow-go/engine/access/rpc/backend/transactions/error_messages"
 	"github.com/onflow/flow-go/engine/access/rpc/backend/transactions/provider"
 	"github.com/onflow/flow-go/engine/access/rpc/backend/transactions/retrier"
 	txstatus "github.com/onflow/flow-go/engine/access/rpc/backend/transactions/status"
 	connectionmock "github.com/onflow/flow-go/engine/access/rpc/connection/mock"
-	commonrpc "github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/fvm/blueprints"
 	accessmodel "github.com/onflow/flow-go/model/access"
@@ -41,7 +43,6 @@ import (
 	"github.com/onflow/flow-go/module/counters"
 	execmock "github.com/onflow/flow-go/module/execution/mock"
 	"github.com/onflow/flow-go/module/metrics"
-	syncmock "github.com/onflow/flow-go/module/state_synchronization/mock"
 	"github.com/onflow/flow-go/state/protocol"
 	bprotocol "github.com/onflow/flow-go/state/protocol/badger"
 	protocolmock "github.com/onflow/flow-go/state/protocol/mock"
@@ -84,18 +85,13 @@ type Suite struct {
 
 	connectionFactory *connectionmock.ConnectionFactory
 
-	reporter       *syncmock.IndexReporter
-	indexReporter  *index.Reporter
-	eventsIndex    *index.EventsIndex
-	txResultsIndex *index.TransactionResultsIndex
-
-	errorMessageProvider error_messages.Provider
-
 	chainID  flow.ChainID
 	systemTx *flow.TransactionBody
 
 	fixedExecutionNodeIDs     flow.IdentifierList
 	preferredExecutionNodeIDs flow.IdentifierList
+
+	rootBlockHeader *flow.Header
 }
 
 func TestTransactionsBackend(t *testing.T) {
@@ -106,12 +102,12 @@ func (suite *Suite) SetupTest() {
 	suite.log = zerolog.New(zerolog.NewConsoleWriter())
 	suite.snapshot = protocolmock.NewSnapshot(suite.T())
 
-	header := unittest.BlockHeaderFixture()
+	suite.rootBlockHeader = unittest.BlockHeaderFixture()
 	params := protocolmock.NewParams(suite.T())
-	params.On("FinalizedRoot").Return(header, nil).Maybe()
+	params.On("FinalizedRoot").Return(suite.rootBlockHeader, nil).Maybe()
 	params.On("SporkID").Return(unittest.IdentifierFixture(), nil).Maybe()
-	params.On("SporkRootBlockHeight").Return(header.Height, nil).Maybe()
-	params.On("SealedRoot").Return(header, nil).Maybe()
+	params.On("SporkRootBlockHeight").Return(suite.rootBlockHeader.Height, nil).Maybe()
+	params.On("SealedRoot").Return(suite.rootBlockHeader, nil).Maybe()
 
 	suite.state = protocolmock.NewState(suite.T())
 	suite.state.On("Params").Return(params).Maybe()
@@ -134,13 +130,6 @@ func (suite *Suite) SetupTest() {
 	suite.Require().NoError(err)
 	suite.txResultCache = txResCache
 
-	suite.reporter = syncmock.NewIndexReporter(suite.T())
-	suite.indexReporter = index.NewReporter()
-	err = suite.indexReporter.Initialize(suite.reporter)
-	suite.Require().NoError(err)
-	suite.eventsIndex = index.NewEventsIndex(suite.indexReporter, suite.events)
-	suite.txResultsIndex = index.NewTransactionResultsIndex(suite.indexReporter, suite.lightTxResults)
-
 	suite.systemTx, err = blueprints.SystemChunkTransaction(flow.Testnet.Chain())
 	suite.Require().NoError(err)
 
@@ -152,7 +141,6 @@ func (suite *Suite) SetupTest() {
 
 	suite.fixedExecutionNodeIDs = nil
 	suite.preferredExecutionNodeIDs = nil
-	suite.errorMessageProvider = nil
 }
 
 func (suite *Suite) TearDownTest() {
@@ -160,14 +148,33 @@ func (suite *Suite) TearDownTest() {
 	suite.Require().NoError(err)
 }
 
+func (suite *Suite) defaultTransactionsParamsWithExecutionResultProviderMocks() Params {
+	executionResult := unittest.ExecutionResultFixture(unittest.WithExecutionResultBlockID(suite.rootBlockHeader.ID()))
+	suite.snapshot.On("SealedResult").Return(executionResult, nil, nil).Once()
+	suite.state.On("AtBlockID", mock.AnythingOfType("flow.Identifier")).Return(suite.snapshot).Once()
+	suite.headers.On("BlockIDByHeight", mock.AnythingOfType("uint64")).Return(suite.rootBlockHeader.ID(), nil).Once()
+
+	return suite.defaultTransactionsParams()
+}
+
 func (suite *Suite) defaultTransactionsParams() Params {
-	nodeProvider := commonrpc.NewExecutionNodeIdentitiesProvider(
+	nodeProvider := NewExecutionNodeIdentitiesProvider(
 		suite.log,
 		suite.state,
 		suite.receipts,
 		suite.preferredExecutionNodeIDs,
 		suite.fixedExecutionNodeIDs,
 	)
+
+	executionResultProvider, err := execution_result_provider.NewExecutionResultProvider(
+		suite.log,
+		suite.state,
+		suite.headers,
+		suite.receipts,
+		execution_result_provider.NewExecutionNodes(suite.preferredExecutionNodeIDs, suite.fixedExecutionNodeIDs),
+		optimistic_sync.Criteria{},
+	)
+	suite.Require().NoError(err)
 
 	txStatusDeriver := txstatus.NewTxStatusDeriver(
 		suite.state,
@@ -191,7 +198,7 @@ func (suite *Suite) defaultTransactionsParams() Params {
 		suite.collections,
 		suite.connectionFactory,
 		nodeCommunicator,
-		nodeProvider,
+		executionResultProvider,
 		txStatusDeriver,
 		suite.systemTx.ID(),
 		suite.systemTx,
@@ -213,13 +220,10 @@ func (suite *Suite) defaultTransactionsParams() Params {
 		Blocks:                      suite.blocks,
 		Collections:                 suite.collections,
 		Transactions:                suite.transactions,
-		TxErrorMessageProvider:      suite.errorMessageProvider,
 		TxResultCache:               suite.txResultCache,
 		TxProvider:                  txProvider,
 		TxValidator:                 txValidator,
 		TxStatusDeriver:             txStatusDeriver,
-		EventsIndex:                 suite.eventsIndex,
-		TxResultsIndex:              suite.txResultsIndex,
 	}
 }
 
@@ -235,15 +239,16 @@ func (suite *Suite) TestGetTransactionResult_UnknownTx() {
 		On("ByID", tx.ID()).
 		Return(nil, storage.ErrNotFound)
 
-	params := suite.defaultTransactionsParams()
+	params := suite.defaultTransactionsParamsWithExecutionResultProviderMocks()
 	txBackend, err := NewTransactionsBackend(params)
 	require.NoError(suite.T(), err)
-	res, err := txBackend.GetTransactionResult(
+	res, _, err := txBackend.GetTransactionResult(
 		context.Background(),
 		tx.ID(),
 		block.ID(),
 		coll.ID(),
 		entities.EventEncodingVersion_JSON_CDC_V0,
+		entities.ExecutionStateQuery{},
 	)
 	suite.Require().NoError(err)
 	suite.Require().Equal(res.Status, flow.TransactionStatusUnknown)
@@ -267,16 +272,17 @@ func (suite *Suite) TestGetTransactionResult_TxLookupFailure() {
 		On("ByID", tx.ID()).
 		Return(nil, expectedErr)
 
-	params := suite.defaultTransactionsParams()
+	params := suite.defaultTransactionsParamsWithExecutionResultProviderMocks()
 	txBackend, err := NewTransactionsBackend(params)
 	require.NoError(suite.T(), err)
 
-	_, err = txBackend.GetTransactionResult(
+	_, _, err = txBackend.GetTransactionResult(
 		context.Background(),
 		tx.ID(),
 		block.ID(),
 		coll.ID(),
 		entities.EventEncodingVersion_JSON_CDC_V0,
+		entities.ExecutionStateQuery{},
 	)
 	suite.Require().Equal(err, status.Errorf(codes.Internal, "failed to find: %v", expectedErr))
 }
@@ -306,17 +312,18 @@ func (suite *Suite) TestGetTransactionResult_HistoricNodes_Success() {
 		Return(&transactionResultResponse, nil).
 		Once()
 
-	params := suite.defaultTransactionsParams()
+	params := suite.defaultTransactionsParamsWithExecutionResultProviderMocks()
 	params.HistoricalAccessNodeClients = []access.AccessAPIClient{suite.historicalAccessAPIClient}
 	txBackend, err := NewTransactionsBackend(params)
 	require.NoError(suite.T(), err)
 
-	resp, err := txBackend.GetTransactionResult(
+	resp, _, err := txBackend.GetTransactionResult(
 		context.Background(),
 		tx.ID(),
 		block.ID(),
 		coll.ID(),
 		entities.EventEncodingVersion_JSON_CDC_V0,
+		entities.ExecutionStateQuery{},
 	)
 	suite.Require().NoError(err)
 	suite.Require().Equal(flow.TransactionStatusExecuted, resp.Status)
@@ -347,29 +354,31 @@ func (suite *Suite) TestGetTransactionResult_HistoricNodes_FromCache() {
 		Return(&transactionResultResponse, nil).
 		Once()
 
-	params := suite.defaultTransactionsParams()
+	params := suite.defaultTransactionsParamsWithExecutionResultProviderMocks()
 	params.HistoricalAccessNodeClients = []access.AccessAPIClient{suite.historicalAccessAPIClient}
 	txBackend, err := NewTransactionsBackend(params)
 	require.NoError(suite.T(), err)
 
 	coll := flow.CollectionFromTransactions([]*flow.Transaction{&tx})
-	resp, err := txBackend.GetTransactionResult(
+	resp, _, err := txBackend.GetTransactionResult(
 		context.Background(),
 		tx.ID(),
 		block.ID(),
 		coll.ID(),
 		entities.EventEncodingVersion_JSON_CDC_V0,
+		entities.ExecutionStateQuery{},
 	)
 	suite.Require().NoError(err)
 	suite.Require().Equal(flow.TransactionStatusExecuted, resp.Status)
 	suite.Require().Equal(uint(flow.TransactionStatusExecuted), resp.StatusCode)
 
-	resp2, err := txBackend.GetTransactionResult(
+	resp2, _, err := txBackend.GetTransactionResult(
 		context.Background(),
 		tx.ID(),
 		block.ID(),
 		coll.ID(),
 		entities.EventEncodingVersion_JSON_CDC_V0,
+		entities.ExecutionStateQuery{},
 	)
 	suite.Require().NoError(err)
 	suite.Require().Equal(flow.TransactionStatusExecuted, resp2.Status)
@@ -395,18 +404,19 @@ func (suite *Suite) TestGetTransactionResultUnknownFromCache() {
 		Return(nil, status.Errorf(codes.NotFound, "no known transaction with ID %s", tx.ID())).
 		Once()
 
-	params := suite.defaultTransactionsParams()
+	params := suite.defaultTransactionsParamsWithExecutionResultProviderMocks()
 	params.HistoricalAccessNodeClients = []access.AccessAPIClient{suite.historicalAccessAPIClient}
 	txBackend, err := NewTransactionsBackend(params)
 	require.NoError(suite.T(), err)
 
 	coll := flow.CollectionFromTransactions([]*flow.Transaction{&tx})
-	resp, err := txBackend.GetTransactionResult(
+	resp, _, err := txBackend.GetTransactionResult(
 		context.Background(),
 		tx.ID(),
 		block.ID(),
 		coll.ID(),
 		entities.EventEncodingVersion_JSON_CDC_V0,
+		entities.ExecutionStateQuery{},
 	)
 	suite.Require().NoError(err)
 	suite.Require().Equal(flow.TransactionStatusUnknown, resp.Status)
@@ -422,12 +432,13 @@ func (suite *Suite) TestGetTransactionResultUnknownFromCache() {
 	})
 
 	// ensure underlying GetTransactionResult() won't be called the second time
-	resp2, err := txBackend.GetTransactionResult(
+	resp2, _, err := txBackend.GetTransactionResult(
 		context.Background(),
 		tx.ID(),
 		block.ID(),
 		coll.ID(),
 		entities.EventEncodingVersion_JSON_CDC_V0,
+		entities.ExecutionStateQuery{},
 	)
 	suite.Require().NoError(err)
 	suite.Require().Equal(flow.TransactionStatusUnknown, resp2.Status)
@@ -436,7 +447,7 @@ func (suite *Suite) TestGetTransactionResultUnknownFromCache() {
 
 // TestGetSystemTransaction_HappyPath tests that GetSystemTransaction call returns system chunk transaction.
 func (suite *Suite) TestGetSystemTransaction_HappyPath() {
-	params := suite.defaultTransactionsParams()
+	params := suite.defaultTransactionsParamsWithExecutionResultProviderMocks()
 	txBackend, err := NewTransactionsBackend(params)
 	require.NoError(suite.T(), err)
 
@@ -465,9 +476,10 @@ func (suite *Suite) TestGetSystemTransactionResult_HappyPath() {
 
 		block := unittest.BlockWithParentFixture(lastBlock)
 		blockID := block.ID()
+		stateSnapshotForKnownBlock := unittest.StateSnapshotForKnownBlock(block.Header, identities.Lookup())
 		suite.state.
 			On("AtBlockID", blockID).
-			Return(unittest.StateSnapshotForKnownBlock(block.Header, identities.Lookup()), nil).
+			Return(stateSnapshotForKnownBlock, nil).
 			Once()
 
 		// block storage returns the corresponding block
@@ -476,10 +488,10 @@ func (suite *Suite) TestGetSystemTransactionResult_HappyPath() {
 			Return(block, nil).
 			Once()
 
+		suite.headers.On("BlockIDByHeight", mock.AnythingOfType("uint64")).Return(blockID, nil)
+
 		receipt1 := unittest.ReceiptForBlockFixture(block)
-		suite.receipts.
-			On("ByBlockID", block.ID()).
-			Return(flow.ExecutionReceiptList{receipt1}, nil)
+		stateSnapshotForKnownBlock.On("SealedResult").Return(&receipt1.ExecutionResult, nil, nil)
 
 		// Generating events with event generator
 		exeNodeEventEncodingVersion := entities.EventEncodingVersion_CCF_V0
@@ -512,10 +524,11 @@ func (suite *Suite) TestGetSystemTransactionResult_HappyPath() {
 		backend, err := NewTransactionsBackend(params)
 		suite.Require().NoError(err)
 
-		res, err := backend.GetSystemTransactionResult(
+		res, _, err := backend.GetSystemTransactionResult(
 			context.Background(),
 			block.ID(),
 			entities.EventEncodingVersion_JSON_CDC_V0,
+			entities.ExecutionStateQuery{},
 		)
 		suite.Require().NoError(err)
 
@@ -591,33 +604,35 @@ func (suite *Suite) TestGetSystemTransactionResultFromStorage() {
 	suite.state.On("Sealed").Return(suite.snapshot, nil)
 	suite.snapshot.On("Head").Return(block.Header, nil)
 
-	// create a mock index reporter
-	reporter := syncmock.NewIndexReporter(suite.T())
-	reporter.On("LowestIndexedHeight").Return(block.Header.Height, nil)
-	reporter.On("HighestIndexedHeight").Return(block.Header.Height+10, nil)
-
-	indexReporter := index.NewReporter()
-	err = indexReporter.Initialize(reporter)
-	suite.Require().NoError(err)
-
 	// Set up the backend parameters and the backend instance
-	params := suite.defaultTransactionsParams()
-	params.EventsIndex = index.NewEventsIndex(indexReporter, suite.events)
-	params.TxResultsIndex = index.NewTransactionResultsIndex(indexReporter, suite.lightTxResults)
+	params := suite.defaultTransactionsParamsWithExecutionResultProviderMocks()
+	// Set up optimistic sync mocks to provide snapshot-backed readers
+	execQueryProvider := optimisticsyncmock.NewExecutionResultProvider(suite.T())
+	execStateCache := optimisticsyncmock.NewExecutionStateCache(suite.T())
+	snapshot := optimisticsyncmock.NewSnapshot(suite.T())
+	// ExecutionResultQuery can return any result with an ID; only ID is used to fetch snapshot
+	fakeRes := &flow.ExecutionResult{PreviousResultID: unittest.IdentifierFixture()}
+	execQueryProvider.On("ExecutionResult", blockId, mock.Anything).
+		Return(&optimistic_sync.ExecutionResultInfo{ExecutionResult: fakeRes}, nil)
+	execStateCache.On("Snapshot", mock.Anything).Return(snapshot, nil)
+	// Snapshot readers delegate to our storage mocks
+	snapshot.On("Events").Return(suite.events)
+	snapshot.On("LightTransactionResults").Return(suite.lightTxResults)
+
 	params.TxProvider = provider.NewLocalTransactionProvider(
 		params.State,
 		params.Collections,
 		params.Blocks,
-		params.EventsIndex,
-		params.TxResultsIndex,
-		params.TxErrorMessageProvider,
 		params.SystemTxID,
 		params.TxStatusDeriver,
+		execQueryProvider,
+		execStateCache,
 	)
 
 	txBackend, err := NewTransactionsBackend(params)
 	suite.Require().NoError(err)
-	response, err := txBackend.GetSystemTransactionResult(context.Background(), blockId, entities.EventEncodingVersion_JSON_CDC_V0)
+	response, _, err := txBackend.GetSystemTransactionResult(context.Background(), blockId,
+		entities.EventEncodingVersion_JSON_CDC_V0, entities.ExecutionStateQuery{})
 	suite.assertTransactionResultResponse(err, response, block, txId, lightTxShouldFail, eventsForTx)
 }
 
@@ -629,13 +644,14 @@ func (suite *Suite) TestGetSystemTransactionResult_BlockNotFound() {
 		Return(nil, storage.ErrNotFound).
 		Once()
 
-	params := suite.defaultTransactionsParams()
+	params := suite.defaultTransactionsParamsWithExecutionResultProviderMocks()
 	txBackend, err := NewTransactionsBackend(params)
 	suite.Require().NoError(err)
-	res, err := txBackend.GetSystemTransactionResult(
+	res, _, err := txBackend.GetSystemTransactionResult(
 		context.Background(),
 		block.ID(),
 		entities.EventEncodingVersion_JSON_CDC_V0,
+		entities.ExecutionStateQuery{},
 	)
 
 	suite.Require().Nil(res)
@@ -687,14 +703,15 @@ func (suite *Suite) TestGetSystemTransactionResult_FailedEncodingConversion() {
 		Return(suite.executionAPIClient, &mocks.MockCloser{}, nil).
 		Once()
 
-	params := suite.defaultTransactionsParams()
+	params := suite.defaultTransactionsParamsWithExecutionResultProviderMocks()
 	txBackend, err := NewTransactionsBackend(params)
 	suite.Require().NoError(err)
 
-	res, err := txBackend.GetSystemTransactionResult(
+	res, _, err := txBackend.GetSystemTransactionResult(
 		context.Background(),
 		block.ID(),
 		entities.EventEncodingVersion_CCF_V0,
+		entities.ExecutionStateQuery{},
 	)
 
 	suite.Require().Nil(res)
@@ -743,67 +760,48 @@ func (suite *Suite) TestGetTransactionResult_FromStorage() {
 	}
 	// expect a call to lookup events by block ID and transaction ID
 	suite.events.On("ByBlockIDTransactionID", blockId, txId).Return(eventsForTx, nil)
-
-	// Set up the state and snapshot mocks
-	_, fixedENIDs := suite.setupReceipts(&block)
-	suite.fixedExecutionNodeIDs = fixedENIDs.NodeIDs()
-
-	suite.state.On("Final").Return(suite.snapshot, nil)
 	suite.state.On("Sealed").Return(suite.snapshot, nil)
-	suite.snapshot.On("Identities", mock.Anything).Return(fixedENIDs, nil)
 	suite.snapshot.On("Head").Return(block.Header, nil)
 
-	suite.reporter.On("LowestIndexedHeight").Return(block.Header.Height, nil)
-	suite.reporter.On("HighestIndexedHeight").Return(block.Header.Height+10, nil)
+	suite.txResultErrorMessages.On("ByBlockIDTransactionID", mock.Anything, mock.Anything).Return(
+		&flow.TransactionResultErrorMessage{
+			TransactionID: txId,
+			ErrorMessage:  expectedErrorMsg,
+			Index:         0,
+			ExecutorID:    unittest.IdentifierFixture(),
+		}, nil)
 
-	suite.connectionFactory.
-		On("GetExecutionAPIClient", mock.Anything).
-		Return(suite.executionAPIClient, &mocks.MockCloser{}, nil).
-		Once()
-
-	// Set up the expected error message for the execution node response
-	exeEventReq := &execproto.GetTransactionErrorMessageRequest{
-		BlockId:       blockId[:],
-		TransactionId: txId[:],
-	}
-	exeEventResp := &execproto.GetTransactionErrorMessageResponse{
-		TransactionId: txId[:],
-		ErrorMessage:  expectedErrorMsg,
-	}
-	suite.executionAPIClient.
-		On("GetTransactionErrorMessage", mock.Anything, exeEventReq).
-		Return(exeEventResp, nil).
-		Once()
-
-	params := suite.defaultTransactionsParams()
-	params.TxErrorMessageProvider = error_messages.NewTxErrorMessageProvider(
-		params.Log,
-		nil,
-		params.TxResultsIndex,
-		params.ConnFactory,
-		params.NodeCommunicator,
-		params.NodeProvider,
-	)
+	params := suite.defaultTransactionsParamsWithExecutionResultProviderMocks()
+	// Set up optimistic sync mocks to provide snapshot-backed readers
+	execQueryProvider := optimisticsyncmock.NewExecutionResultProvider(suite.T())
+	execStateCache := optimisticsyncmock.NewExecutionStateCache(suite.T())
+	snapshot := optimisticsyncmock.NewSnapshot(suite.T())
+	// ExecutionResultQuery can return any result with an ID; only ID is used to fetch snapshot
+	fakeRes := &flow.ExecutionResult{PreviousResultID: unittest.IdentifierFixture()}
+	execQueryProvider.On("ExecutionResult", blockId, mock.Anything).
+		Return(&optimistic_sync.ExecutionResultInfo{ExecutionResult: fakeRes}, nil)
+	execStateCache.On("Snapshot", mock.Anything).Return(snapshot, nil)
+	// Snapshot readers delegate to our storage mocks
+	snapshot.On("Events").Return(suite.events)
+	snapshot.On("LightTransactionResults").Return(suite.lightTxResults)
+	snapshot.On("TransactionResultErrorMessages").Return(suite.txResultErrorMessages)
 	params.TxProvider = provider.NewLocalTransactionProvider(
 		params.State,
 		params.Collections,
 		params.Blocks,
-		params.EventsIndex,
-		params.TxResultsIndex,
-		params.TxErrorMessageProvider,
 		params.SystemTxID,
 		params.TxStatusDeriver,
+		execQueryProvider,
+		execStateCache,
 	)
 
 	txBackend, err := NewTransactionsBackend(params)
 	suite.Require().NoError(err)
 
-	response, err := txBackend.GetTransactionResult(context.Background(), txId, blockId, flow.ZeroID, entities.EventEncodingVersion_JSON_CDC_V0)
+	response, _, err := txBackend.GetTransactionResult(context.Background(), txId, blockId, flow.ZeroID,
+		entities.EventEncodingVersion_JSON_CDC_V0, entities.ExecutionStateQuery{})
 	suite.assertTransactionResultResponse(err, response, block, txId, true, eventsForTx)
 
-	suite.reporter.AssertExpectations(suite.T())
-	suite.connectionFactory.AssertExpectations(suite.T())
-	suite.executionAPIClient.AssertExpectations(suite.T())
 	suite.blocks.AssertExpectations(suite.T())
 	suite.events.AssertExpectations(suite.T())
 	suite.state.AssertExpectations(suite.T())
@@ -850,61 +848,46 @@ func (suite *Suite) TestTransactionByIndexFromStorage() {
 	suite.events.On("ByBlockIDTransactionIndex", blockId, txIndex).Return(eventsForTx, nil)
 
 	// Set up the state and snapshot mocks
-	_, fixedENIDs := suite.setupReceipts(&block)
-	suite.fixedExecutionNodeIDs = fixedENIDs.NodeIDs()
-	suite.state.On("Final").Return(suite.snapshot, nil)
 	suite.state.On("Sealed").Return(suite.snapshot, nil)
-	suite.snapshot.On("Identities", mock.Anything).Return(fixedENIDs, nil)
 	suite.snapshot.On("Head").Return(block.Header, nil)
+	suite.txResultErrorMessages.On("ByBlockIDTransactionIndex", mock.Anything, mock.Anything).Return(
+		&flow.TransactionResultErrorMessage{
+			TransactionID: txId,
+			ErrorMessage:  expectedErrorMsg,
+			Index:         0,
+			ExecutorID:    unittest.IdentifierFixture(),
+		}, nil)
 
-	suite.reporter.On("LowestIndexedHeight").Return(block.Header.Height, nil)
-	suite.reporter.On("HighestIndexedHeight").Return(block.Header.Height+10, nil)
-
-	suite.connectionFactory.
-		On("GetExecutionAPIClient", mock.Anything).
-		Return(suite.executionAPIClient, &mocks.MockCloser{}, nil).
-		Once()
-
-	params := suite.defaultTransactionsParams()
-	params.TxErrorMessageProvider = error_messages.NewTxErrorMessageProvider(
-		params.Log,
-		nil,
-		params.TxResultsIndex,
-		params.ConnFactory,
-		params.NodeCommunicator,
-		params.NodeProvider,
-	)
+	params := suite.defaultTransactionsParamsWithExecutionResultProviderMocks()
+	// Set up optimistic sync mocks to provide snapshot-backed readers
+	execQueryProvider := optimisticsyncmock.NewExecutionResultProvider(suite.T())
+	execStateCache := optimisticsyncmock.NewExecutionStateCache(suite.T())
+	snapshot := optimisticsyncmock.NewSnapshot(suite.T())
+	// ExecutionResultQuery can return any result with an ID; only ID is used to fetch snapshot
+	fakeRes := &flow.ExecutionResult{PreviousResultID: unittest.IdentifierFixture()}
+	execQueryProvider.On("ExecutionResult", blockId, mock.Anything).
+		Return(&optimistic_sync.ExecutionResultInfo{ExecutionResult: fakeRes}, nil)
+	execStateCache.On("Snapshot", mock.Anything).Return(snapshot, nil)
+	// Snapshot readers delegate to our storage mocks
+	snapshot.On("Events").Return(suite.events)
+	snapshot.On("LightTransactionResults").Return(suite.lightTxResults)
+	snapshot.On("Collections").Return(suite.collections)
+	snapshot.On("TransactionResultErrorMessages").Return(suite.txResultErrorMessages)
 	params.TxProvider = provider.NewLocalTransactionProvider(
 		params.State,
 		params.Collections,
 		params.Blocks,
-		params.EventsIndex,
-		params.TxResultsIndex,
-		params.TxErrorMessageProvider,
 		params.SystemTxID,
 		params.TxStatusDeriver,
+		execQueryProvider,
+		execStateCache,
 	)
 
 	txBackend, err := NewTransactionsBackend(params)
 	suite.Require().NoError(err)
 
-	// Set up the expected error message for the execution node response
-	exeEventReq := &execproto.GetTransactionErrorMessageByIndexRequest{
-		BlockId: blockId[:],
-		Index:   txIndex,
-	}
-
-	exeEventResp := &execproto.GetTransactionErrorMessageResponse{
-		TransactionId: txId[:],
-		ErrorMessage:  expectedErrorMsg,
-	}
-
-	suite.executionAPIClient.
-		On("GetTransactionErrorMessageByIndex", mock.Anything, exeEventReq).
-		Return(exeEventResp, nil).
-		Once()
-
-	response, err := txBackend.GetTransactionResultByIndex(context.Background(), blockId, txIndex, entities.EventEncodingVersion_JSON_CDC_V0)
+	response, _, err := txBackend.GetTransactionResultByIndex(context.Background(), blockId, txIndex,
+		entities.EventEncodingVersion_JSON_CDC_V0, entities.ExecutionStateQuery{})
 	suite.assertTransactionResultResponse(err, response, block, txId, true, eventsForTx)
 }
 
@@ -963,64 +946,47 @@ func (suite *Suite) TestTransactionResultsByBlockIDFromStorage() {
 		On("ByBlockIDTransactionID", blockId, mock.Anything).
 		Return(eventsForTx, nil)
 
+	suite.txResultErrorMessages.On("ByBlockIDTransactionID", mock.Anything, mock.Anything).Return(
+		&flow.TransactionResultErrorMessage{
+			TransactionID: lightTxResults[0].TransactionID,
+			ErrorMessage:  expectedErrorMsg,
+			Index:         0,
+			ExecutorID:    unittest.IdentifierFixture(),
+		}, nil)
+
 	// Set up the state and snapshot mocks
-	_, fixedENIDs := suite.setupReceipts(&block)
-	suite.fixedExecutionNodeIDs = fixedENIDs.NodeIDs()
-	suite.state.On("Final").Return(suite.snapshot, nil)
 	suite.state.On("Sealed").Return(suite.snapshot, nil)
-	suite.snapshot.On("Identities", mock.Anything).Return(fixedENIDs, nil)
 	suite.snapshot.On("Head").Return(block.Header, nil)
 
-	suite.reporter.On("LowestIndexedHeight").Return(block.Header.Height, nil)
-	suite.reporter.On("HighestIndexedHeight").Return(block.Header.Height+10, nil)
-
-	suite.connectionFactory.
-		On("GetExecutionAPIClient", mock.Anything).
-		Return(suite.executionAPIClient, &mocks.MockCloser{}, nil).
-		Once()
-
-	params := suite.defaultTransactionsParams()
-	params.TxErrorMessageProvider = error_messages.NewTxErrorMessageProvider(
-		params.Log,
-		nil,
-		params.TxResultsIndex,
-		params.ConnFactory,
-		params.NodeCommunicator,
-		params.NodeProvider,
-	)
+	params := suite.defaultTransactionsParamsWithExecutionResultProviderMocks()
+	// Set up optimistic sync mocks to provide snapshot-backed readers
+	execQueryProvider := optimisticsyncmock.NewExecutionResultProvider(suite.T())
+	execStateCache := optimisticsyncmock.NewExecutionStateCache(suite.T())
+	snapshot := optimisticsyncmock.NewSnapshot(suite.T())
+	// ExecutionResultQuery can return any result with an ID; only ID is used to fetch snapshot
+	fakeRes := &flow.ExecutionResult{PreviousResultID: unittest.IdentifierFixture()}
+	execQueryProvider.On("ExecutionResult", blockId, mock.Anything).
+		Return(&optimistic_sync.ExecutionResultInfo{ExecutionResult: fakeRes}, nil)
+	execStateCache.On("Snapshot", mock.Anything).Return(snapshot, nil)
+	// Snapshot readers delegate to our storage mocks
+	snapshot.On("Events").Return(suite.events)
+	snapshot.On("LightTransactionResults").Return(suite.lightTxResults)
+	snapshot.On("Collections").Return(suite.collections)
+	snapshot.On("TransactionResultErrorMessages").Return(suite.txResultErrorMessages)
 	params.TxProvider = provider.NewLocalTransactionProvider(
 		params.State,
 		params.Collections,
 		params.Blocks,
-		params.EventsIndex,
-		params.TxResultsIndex,
-		params.TxErrorMessageProvider,
 		params.SystemTxID,
 		params.TxStatusDeriver,
+		execQueryProvider,
+		execStateCache,
 	)
 	txBackend, err := NewTransactionsBackend(params)
 	suite.Require().NoError(err)
 
-	// Set up the expected error message for the execution node response
-	exeEventReq := &execproto.GetTransactionErrorMessagesByBlockIDRequest{
-		BlockId: blockId[:],
-	}
-	res := &execproto.GetTransactionErrorMessagesResponse_Result{
-		TransactionId: lightTxResults[0].TransactionID[:],
-		ErrorMessage:  expectedErrorMsg,
-		Index:         1,
-	}
-	exeEventResp := &execproto.GetTransactionErrorMessagesResponse{
-		Results: []*execproto.GetTransactionErrorMessagesResponse_Result{
-			res,
-		},
-	}
-	suite.executionAPIClient.
-		On("GetTransactionErrorMessagesByBlockID", mock.Anything, exeEventReq).
-		Return(exeEventResp, nil).
-		Once()
-
-	response, err := txBackend.GetTransactionResultsByBlockID(context.Background(), blockId, entities.EventEncodingVersion_JSON_CDC_V0)
+	response, _, err := txBackend.GetTransactionResultsByBlockID(context.Background(), blockId,
+		entities.EventEncodingVersion_JSON_CDC_V0, entities.ExecutionStateQuery{})
 	suite.Require().NoError(err)
 	suite.Assert().Equal(len(lightTxResults), len(response))
 
@@ -1042,6 +1008,7 @@ func (suite *Suite) TestTransactionRetry() {
 	headBlock := unittest.BlockFixture()
 	headBlock.Header.Height = block.Header.Height - 1 // head is behind the current block
 	suite.state.On("Final").Return(suite.snapshot, nil)
+	suite.headers.On("BlockIDByHeight", mock.AnythingOfType("uint64")).Return(headBlock.ID(), nil).Once()
 
 	suite.snapshot.On("Head").Return(headBlock.Header, nil)
 	snapshotAtBlock := protocolmock.NewSnapshot(suite.T())
@@ -1127,7 +1094,7 @@ func (suite *Suite) TestSuccessfulTransactionsDontRetry() {
 		Return(suite.executionAPIClient, &mocks.MockCloser{}, nil).
 		Times(len(fixedENIDs))
 
-	params := suite.defaultTransactionsParams()
+	params := suite.defaultTransactionsParamsWithExecutionResultProviderMocks()
 	client := accessmock.NewAccessAPIClient(suite.T())
 	params.StaticCollectionRPCClient = client
 	txBackend, err := NewTransactionsBackend(params)
@@ -1143,12 +1110,13 @@ func (suite *Suite) TestSuccessfulTransactionsDontRetry() {
 	retry.RegisterTransaction(block.Header.Height, transactionBody)
 
 	// first call - when block under test is greater height than the sealed head, but execution node does not know about Tx
-	result, err := txBackend.GetTransactionResult(
+	result, _, err := txBackend.GetTransactionResult(
 		context.Background(),
 		txID,
 		flow.ZeroID,
 		flow.ZeroID,
 		entities.EventEncodingVersion_JSON_CDC_V0,
+		entities.ExecutionStateQuery{},
 	)
 	suite.Require().NoError(err)
 	suite.Require().NotNil(result)

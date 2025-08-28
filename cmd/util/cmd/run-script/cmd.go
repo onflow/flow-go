@@ -319,8 +319,9 @@ func (*api) GetTransactionResult(
 	_ flow.Identifier,
 	_ flow.Identifier,
 	_ entities.EventEncodingVersion,
-) (*accessmodel.TransactionResult, error) {
-	return nil, errors.New("unimplemented")
+	_ entities.ExecutionStateQuery,
+) (*accessmodel.TransactionResult, entities.ExecutorMetadata, error) {
+	return nil, entities.ExecutorMetadata{}, errors.New("unimplemented")
 }
 
 func (*api) GetTransactionResultByIndex(
@@ -328,16 +329,18 @@ func (*api) GetTransactionResultByIndex(
 	_ flow.Identifier,
 	_ uint32,
 	_ entities.EventEncodingVersion,
-) (*accessmodel.TransactionResult, error) {
-	return nil, errors.New("unimplemented")
+	_ entities.ExecutionStateQuery,
+) (*accessmodel.TransactionResult, entities.ExecutorMetadata, error) {
+	return nil, entities.ExecutorMetadata{}, errors.New("unimplemented")
 }
 
 func (*api) GetTransactionResultsByBlockID(
 	_ context.Context,
 	_ flow.Identifier,
 	_ entities.EventEncodingVersion,
-) ([]*accessmodel.TransactionResult, error) {
-	return nil, errors.New("unimplemented")
+	_ entities.ExecutionStateQuery,
+) ([]*accessmodel.TransactionResult, entities.ExecutorMetadata, error) {
+	return nil, entities.ExecutorMetadata{}, errors.New("unimplemented")
 }
 
 func (*api) GetSystemTransaction(
@@ -351,8 +354,9 @@ func (*api) GetSystemTransactionResult(
 	_ context.Context,
 	_ flow.Identifier,
 	_ entities.EventEncodingVersion,
-) (*accessmodel.TransactionResult, error) {
-	return nil, errors.New("unimplemented")
+	_ entities.ExecutionStateQuery,
+) (*accessmodel.TransactionResult, entities.ExecutorMetadata, error) {
+	return nil, entities.ExecutorMetadata{}, errors.New("unimplemented")
 }
 
 func (*api) GetAccount(_ context.Context, _ flow.Address) (*flow.Account, error) {
