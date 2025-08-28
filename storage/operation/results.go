@@ -48,7 +48,9 @@ func ExistExecutionResult(r storage.Reader, blockID flow.Identifier) (bool, erro
 }
 
 // RemoveExecutionResultIndex removes execution node's OWN Execution Result for the given blockID.
+// It returns nil if the collection does not exist.
 // CAUTION: this is for recovery purposes only, and should not be used during normal operations
+// No errors are expected during normal operation.
 func RemoveExecutionResultIndex(w storage.Writer, blockID flow.Identifier) error {
 	return RemoveByKey(w, MakePrefix(codeIndexExecutionResultByBlock, blockID))
 }

@@ -9,7 +9,7 @@ import (
 	"github.com/onflow/flow-go/storage"
 )
 
-// InsertSeal inserts a seal into the database.
+// InsertSeal inserts a [flow.Seal] into the database, keyed by its ID.
 //
 // CAUTION: The caller must ensure sealID is a collision-resistant hash of the provided seal!
 // This method silently overrides existing data, which is safe only if for the same key, we
@@ -20,6 +20,9 @@ func InsertSeal(w storage.Writer, sealID flow.Identifier, seal *flow.Seal) error
 	return UpsertByKey(w, MakePrefix(codeSeal, sealID), seal)
 }
 
+// RetrieveSeal retrieves [flow.Seal] by its ID.
+// Expected errors during normal operations:
+//   - [storage.ErrNotFound] if no seal with the specified `sealID` is known.
 func RetrieveSeal(r storage.Reader, sealID flow.Identifier, seal *flow.Seal) error {
 	return RetrieveByKey(r, MakePrefix(codeSeal, sealID), seal)
 }
@@ -45,6 +48,10 @@ func IndexPayloadSeals(lctx lockctx.Proof, w storage.Writer, blockID flow.Identi
 	return UpsertByKey(w, MakePrefix(codePayloadSeals, blockID), sealIDs)
 }
 
+// LookupPayloadSeals retrieves the list of Seals that were included in the payload
+// of the specified block. For every known block, this index should be populated (at or above the root block).
+// Expected errors during normal operations:
+//   - [storage.ErrNotFound] if `blockID` does not refer to a known block
 func LookupPayloadSeals(r storage.Reader, blockID flow.Identifier, sealIDs *[]flow.Identifier) error {
 	return RetrieveByKey(r, MakePrefix(codePayloadSeals, blockID), sealIDs)
 }
@@ -112,14 +119,27 @@ func IndexPayloadProtocolStateID(lctx lockctx.Proof, w storage.Writer, blockID f
 	return UpsertByKey(w, MakePrefix(codePayloadProtocolStateID, blockID), stateID)
 }
 
+// LookupPayloadProtocolStateID retrieves the Protocol State ID for the specified block.
+// For every known block, the protocol state at the end of the block should be specified
+// in the payload, and hence be indexed.
+// Expected errors during normal operations:
+//   - [storage.ErrNotFound] if `blockID` does not refer to a known block
 func LookupPayloadProtocolStateID(r storage.Reader, blockID flow.Identifier, stateID *flow.Identifier) error {
 	return RetrieveByKey(r, MakePrefix(codePayloadProtocolStateID, blockID), stateID)
 }
 
+// LookupPayloadReceipts retrieves the list of Execution Receipts that were included in the payload
+// of the specified block. For every known block, this index should be populated (at or above the root block).
+// Expected errors during normal operations:
+//   - [storage.ErrNotFound] if `blockID` does not refer to a known block.
 func LookupPayloadReceipts(r storage.Reader, blockID flow.Identifier, receiptIDs *[]flow.Identifier) error {
 	return RetrieveByKey(r, MakePrefix(codePayloadReceipts, blockID), receiptIDs)
 }
 
+// LookupPayloadResults retrieves the list of Execution Results that were included in the payload
+// of the specified block. For every known block, this index should be populated (at or above the root block).
+// Expected errors during normal operations:
+//   - [storage.ErrNotFound] if `blockID` does not refer to a known block
 func LookupPayloadResults(r storage.Reader, blockID flow.Identifier, resultIDs *[]flow.Identifier) error {
 	return RetrieveByKey(r, MakePrefix(codePayloadResults, blockID), resultIDs)
 }
@@ -149,6 +169,8 @@ func IndexLatestSealAtBlock(lctx lockctx.Proof, w storage.Writer, blockID flow.I
 // LookupLatestSealAtBlock finds the highest seal that was included in the fork up to (and including) blockID.
 // In most cases, it is the highest seal included in this block's payload. However, if there are no
 // seals in this block, sealID should reference the highest seal in blockID's ancestor.
+// Expected errors during normal operations:
+//   - [storage.ErrNotFound] if the specified block is unknown
 func LookupLatestSealAtBlock(r storage.Reader, blockID flow.Identifier, sealID *flow.Identifier) error {
 	return RetrieveByKey(r, MakePrefix(codeBlockIDToLatestSealID, blockID), &sealID)
 }
@@ -173,7 +195,10 @@ func IndexFinalizedSealByBlockID(w storage.Writer, sealedBlockID flow.Identifier
 	return UpsertByKey(w, MakePrefix(codeBlockIDToFinalizedSeal, sealedBlockID), sealID)
 }
 
-// LookupBySealedBlockID finds the seal for the given sealed block ID.
-func LookupBySealedBlockID(r storage.Reader, sealedBlockID flow.Identifier, sealID *flow.Identifier) error {
-	return RetrieveByKey(r, MakePrefix(codeBlockIDToFinalizedSeal, sealedBlockID), &sealID)
+// LookupBySealedBlockID finds the latest seal in the fork with head `blockID`.
+// For every block, the latest seal should be indexed.
+// Expected errors during normal operations:
+//   - [storage.ErrNotFound] if no seal for the specified block is known.
+func LookupBySealedBlockID(r storage.Reader, blockID flow.Identifier, sealID *flow.Identifier) error {
+	return RetrieveByKey(r, MakePrefix(codeBlockIDToFinalizedSeal, blockID), &sealID)
 }

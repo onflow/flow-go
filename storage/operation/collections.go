@@ -13,41 +13,57 @@ import (
 // to the constituent transactions. They do not modify transactions contained
 // by the collections.
 
-// UpsertCollection inserts a light collection into the storage.
+// UpsertCollection inserts a light collection into the storage, keyed by its ID.
+//
 // If the collection already exists, it will be overwritten. Note that here, the key (collection ID) is derived
 // from the value (collection) via a collision-resistant hash function. Hence, unchecked overwrites pose no risk
 // of data corruption, because for the same key, we expect the same value.
+//
+// No other errors are expected during normal operation.
 func UpsertCollection(w storage.Writer, collection *flow.LightCollection) error {
 	return UpsertByKey(w, MakePrefix(codeCollection, collection.ID()), collection)
 }
 
+// RetrieveCollection retrieves a collection by its ID. For efficiency, only a reduced representation is retrieved,
+// where the constituent transactions are
+// Expected errors during normal operations:
+//   - [storage.ErrNotFound] if no collection with the specified `sealID` is known.
 func RetrieveCollection(r storage.Reader, collID flow.Identifier, collection *flow.LightCollection) error {
 	return RetrieveByKey(r, MakePrefix(codeCollection, collID), collection)
 }
 
 // RemoveCollection removes a collection from the storage.
 // It returns nil if the collection does not exist.
+// CAUTION: this is for recovery purposes only, and should not be used during normal operations
 // No errors are expected during normal operation.
 func RemoveCollection(w storage.Writer, collID flow.Identifier) error {
 	return RemoveByKey(w, MakePrefix(codeCollection, collID))
 }
 
-// IndexCollectionPayload will overwrite any existing index, which is acceptable
-// because the blockID is derived from txIDs within the payload, ensuring its uniqueness.
-func IndexCollectionPayload(lctx lockctx.Proof, w storage.Writer, blockID flow.Identifier, txIDs []flow.Identifier) error {
+// IndexCollectionPayload populates the map from a cluster block ID to the batch of transactions it contains.
+//
+// CAUTION:
+//   - The caller must acquire the [storage.LockInsertOrFinalizeClusterBlock] and hold it until the database write has been
+//     committed.
+//   - OVERWRITES existing data (potential for data corruption):
+//     This method silently overrides existing data without any sanity checks whether data for the same key already exits.
+//     Note that the Flow protocol mandates that for a previously persisted key, the data is never changed to a different
+//     value. Changing data could cause the node to publish inconsistent data and to be slashed, or the protocol to be
+//     compromised as a whole. This method does not contain any safeguards to prevent such data corruption. The lock proof
+//     serves as a reminder that the CALLER is responsible to ensure that the DEDUPLICATION CHECK is done elsewhere
+//     ATOMICALLY with this write operation.
+//
+// No other errors are expected during normal operation.
+func IndexCollectionPayload(lctx lockctx.Proof, w storage.Writer, clusterBlockID flow.Identifier, txIDs []flow.Identifier) error {
 	if !lctx.HoldsLock(storage.LockInsertOrFinalizeClusterBlock) {
 		return fmt.Errorf("missing lock: %v", storage.LockInsertOrFinalizeClusterBlock)
 	}
-
-	// Only need to check if the lock is held, no need to check if is already stored,
-	// because the duplication check is done when storing a header, which is in the same
-	// batch update and holding the same lock.
-	return UpsertByKey(w, MakePrefix(codeIndexCollection, blockID), txIDs)
+	return UpsertByKey(w, MakePrefix(codeIndexCollection, clusterBlockID), txIDs)
 }
 
-// LookupCollection looks up the collection for a given cluster payload.
-func LookupCollectionPayload(r storage.Reader, blockID flow.Identifier, txIDs *[]flow.Identifier) error {
-	return RetrieveByKey(r, MakePrefix(codeIndexCollection, blockID), txIDs)
+// LookupCollectionPayload retrieves the list of transaction IDs that constitute the payload of the specified cluster block.
+func LookupCollectionPayload(r storage.Reader, clusterBlockID flow.Identifier, txIDs *[]flow.Identifier) error {
+	return RetrieveByKey(r, MakePrefix(codeIndexCollection, clusterBlockID), txIDs)
 }
 
 // RemoveCollectionPayloadIndices removes a collection id indexed by a block id
