@@ -23,12 +23,12 @@ func TestBlockChildrenIndexUpdateLookup(t *testing.T) {
 		lctx := lockManager.NewContext()
 		err := lctx.AcquireLock(storage.LockInsertBlock)
 		require.NoError(t, err)
-		defer lctx.Release()
 
 		err = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 			return operation.UpsertBlockChildren(lctx, rw.Writer(), blockID, childrenIDs)
 		})
 		require.NoError(t, err)
+		lctx.Release()
 		err = operation.RetrieveBlockChildren(db.Reader(), blockID, &retrievedIDs)
 		require.NoError(t, err)
 		assert.Equal(t, childrenIDs, retrievedIDs)

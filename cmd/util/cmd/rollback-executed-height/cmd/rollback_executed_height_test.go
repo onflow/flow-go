@@ -52,7 +52,7 @@ func TestReExecuteBlock(t *testing.T) {
 			events := store.NewEvents(metrics, db)
 			serviceEvents := store.NewServiceEvents(metrics, db)
 
-			withLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
+			unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
 				return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 					return blocks.BatchStore(lctx, rw, &genesis)
 				})
@@ -173,14 +173,6 @@ func TestReExecuteBlock(t *testing.T) {
 	})
 }
 
-func withLock(t *testing.T, manager lockctx.Manager, lockID string, fn func(lctx lockctx.Context) error) {
-	t.Helper()
-	lctx := manager.NewContext()
-	require.NoError(t, lctx.AcquireLock(lockID))
-	defer lctx.Release()
-	require.NoError(t, fn(lctx))
-}
-
 // Test save block execution related data, then remove it, and then
 // save again with different result should work
 func TestReExecuteBlockWithDifferentResult(t *testing.T) {
@@ -213,7 +205,7 @@ func TestReExecuteBlockWithDifferentResult(t *testing.T) {
 		chunkDataPacks := store.NewChunkDataPacks(metrics, pebbleimpl.ToDB(pdb), collections, bstorage.DefaultCacheSize)
 		txResults := store.NewTransactionResults(metrics, db, bstorage.DefaultCacheSize)
 
-		withLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
+		unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
 			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 				return blocks.BatchStore(lctx, rw, &genesis)
 			})
@@ -250,7 +242,7 @@ func TestReExecuteBlockWithDifferentResult(t *testing.T) {
 			&unittest.GenesisStateCommitment)
 		header := executableBlock.Block.Header
 
-		withLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
+		unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
 			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 				return blocks.BatchStore(lctx, rw, executableBlock.Block)
 			})
