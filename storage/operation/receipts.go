@@ -5,6 +5,7 @@ import (
 	"github.com/onflow/flow-go/storage"
 )
 
+<<<<<<< HEAD
 // InsertExecutionReceiptMeta inserts a [flow.ExecutionReceiptMeta] into the database, keyed by its ID.
 //
 // CAUTION: The caller must ensure receiptID is a collision-resistant hash of the provided
@@ -21,6 +22,15 @@ func InsertExecutionReceiptMeta(w storage.Writer, receiptID flow.Identifier, met
 // Expected errors during normal operations:
 //   - [storage.ErrNotFound] if no receipt meta with the specified ID is known.
 func RetrieveExecutionReceiptMeta(r storage.Reader, receiptID flow.Identifier, meta *flow.ExecutionReceiptMeta) error {
+=======
+// InsertExecutionReceiptStub inserts an execution receipt meta by ID.
+func InsertExecutionReceiptStub(w storage.Writer, receiptID flow.Identifier, meta *flow.ExecutionReceiptStub) error {
+	return UpsertByKey(w, MakePrefix(codeExecutionReceiptMeta, receiptID), meta)
+}
+
+// RetrieveExecutionReceiptStub retrieves a execution receipt meta by ID.
+func RetrieveExecutionReceiptStub(r storage.Reader, receiptID flow.Identifier, meta *flow.ExecutionReceiptStub) error {
+>>>>>>> master
 	return RetrieveByKey(r, MakePrefix(codeExecutionReceiptMeta, receiptID), meta)
 }
 

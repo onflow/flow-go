@@ -31,7 +31,7 @@ func TestMyExecutionReceiptsStorage(t *testing.T) {
 	t.Run("myReceipts store and retrieve from different storage layers", func(t *testing.T) {
 		withStore(t, func(myReceipts storage.MyExecutionReceipts, results storage.ExecutionResults, receipts storage.ExecutionReceipts, db storage.DB, lockManager lockctx.Manager) {
 			block := unittest.BlockFixture()
-			receipt1 := unittest.ReceiptForBlockFixture(&block)
+			receipt1 := unittest.ReceiptForBlockFixture(block)
 
 			// STEP 1: Store receipt
 			lctx := lockManager.NewContext()
@@ -63,7 +63,12 @@ func TestMyExecutionReceiptsStorage(t *testing.T) {
 	t.Run("myReceipts store identical receipt for the same block", func(t *testing.T) {
 		withStore(t, func(myReceipts storage.MyExecutionReceipts, _ storage.ExecutionResults, _ storage.ExecutionReceipts, db storage.DB, lockManager lockctx.Manager) {
 			block := unittest.BlockFixture()
+<<<<<<< HEAD
 			receipt1 := unittest.ReceiptForBlockFixture(&block)
+=======
+
+			receipt1 := unittest.ReceiptForBlockFixture(block)
+>>>>>>> master
 
 			lctx := lockManager.NewContext()
 			require.NoError(t, lctx.AcquireLock(storage.LockInsertOwnReceipt))
@@ -90,8 +95,8 @@ func TestMyExecutionReceiptsStorage(t *testing.T) {
 			executor1 := unittest.IdentifierFixture()
 			executor2 := unittest.IdentifierFixture()
 
-			receipt1 := unittest.ReceiptForBlockExecutorFixture(&block, executor1)
-			receipt2 := unittest.ReceiptForBlockExecutorFixture(&block, executor2)
+			receipt1 := unittest.ReceiptForBlockExecutorFixture(block, executor1)
+			receipt2 := unittest.ReceiptForBlockExecutorFixture(block, executor2)
 
 			lctx := lockManager.NewContext()
 			require.NoError(t, lctx.AcquireLock(storage.LockInsertOwnReceipt))
@@ -119,8 +124,8 @@ func TestMyExecutionReceiptsStorage(t *testing.T) {
 			executor1 := unittest.IdentifierFixture()
 			executor2 := unittest.IdentifierFixture()
 
-			receipt1 := unittest.ReceiptForBlockExecutorFixture(&block, executor1)
-			receipt2 := unittest.ReceiptForBlockExecutorFixture(&block, executor2)
+			receipt1 := unittest.ReceiptForBlockExecutorFixture(block, executor1)
+			receipt2 := unittest.ReceiptForBlockExecutorFixture(block, executor2)
 
 			var startSignal sync.WaitGroup // goroutines attempting store operations will wait for this signal to start concurrently
 			startSignal.Add(1)             // expecting one signal from the main thread to start both goroutines
@@ -183,8 +188,12 @@ func TestMyExecutionReceiptsStorage(t *testing.T) {
 				go func(i int) {
 					block := unittest.BlockFixture() // Each iteration gets a new block
 					executor := unittest.IdentifierFixture()
+<<<<<<< HEAD
 					receipt := unittest.ReceiptForBlockExecutorFixture(&block, executor)
 					lctx := lockManager.NewContext()
+=======
+					receipt := unittest.ReceiptForBlockExecutorFixture(block, executor)
+>>>>>>> master
 
 					startSignal.Wait()
 					require.NoError(t, lctx.AcquireLock(storage.LockInsertOwnReceipt))
@@ -211,7 +220,7 @@ func TestMyExecutionReceiptsStorage(t *testing.T) {
 	t.Run("store and remove", func(t *testing.T) {
 		withStore(t, func(myReceipts storage.MyExecutionReceipts, results storage.ExecutionResults, receipts storage.ExecutionReceipts, db storage.DB, lockManager lockctx.Manager) {
 			block := unittest.BlockFixture()
-			receipt1 := unittest.ReceiptForBlockFixture(&block)
+			receipt1 := unittest.ReceiptForBlockFixture(block)
 
 			lctx := lockManager.NewContext()
 			defer lctx.Release()
@@ -255,8 +264,8 @@ func TestMyExecutionReceiptsStorageMultipleStoreInSameBatch(t *testing.T) {
 		myReceipts := store.NewMyExecutionReceipts(metrics, db, receipts)
 
 		block := unittest.BlockFixture()
-		receipt1 := unittest.ReceiptForBlockFixture(&block)
-		receipt2 := unittest.ReceiptForBlockFixture(&block)
+		receipt1 := unittest.ReceiptForBlockFixture(block)
+		receipt2 := unittest.ReceiptForBlockFixture(block)
 
 		lctx := lockManager.NewContext()
 		defer lctx.Release()

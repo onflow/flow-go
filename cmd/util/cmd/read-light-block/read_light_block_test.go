@@ -16,14 +16,20 @@ import (
 
 func TestReadClusterRange(t *testing.T) {
 
+<<<<<<< HEAD
 	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
 		lockManager := storage.NewTestingLockManager()
 		chain := unittest.ClusterBlockChainFixture(5)
+=======
+	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+		chain := unittest.ClusterBlockFixtures(5)
+>>>>>>> master
 		parent, blocks := chain[0], chain[1:]
 
 		lctx := lockManager.NewContext()
 		require.NoError(t, lctx.AcquireLock(storage.LockInsertOrFinalizeClusterBlock))
 		// add parent as boundary
+<<<<<<< HEAD
 		err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 			return operation.IndexClusterBlockHeight(lctx, rw.Writer(), parent.Header.ChainID, parent.Header.Height, parent.ID())
 		})
@@ -32,10 +38,17 @@ func TestReadClusterRange(t *testing.T) {
 		err = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 			return operation.UpsertClusterFinalizedHeight(lctx, rw.Writer(), parent.Header.ChainID, parent.Header.Height)
 		})
+=======
+		err := db.Update(operation.IndexClusterBlockHeight(parent.ChainID, parent.Height, parent.ID()))
+		require.NoError(t, err)
+
+		err = db.Update(operation.InsertClusterFinalizedHeight(parent.ChainID, parent.Height))
+>>>>>>> master
 		require.NoError(t, err)
 
 		// add blocks
 		for _, block := range blocks {
+<<<<<<< HEAD
 			err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 				return procedure.InsertClusterBlock(lctx, rw, &block)
 			})
@@ -44,6 +57,12 @@ func TestReadClusterRange(t *testing.T) {
 			err = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 				return procedure.FinalizeClusterBlock(lctx, rw, block.Header.ID())
 			})
+=======
+			err := db.Update(procedure.InsertClusterBlock(unittest.ClusterProposalFromBlock(block)))
+			require.NoError(t, err)
+
+			err = db.Update(procedure.FinalizeClusterBlock(block.ID()))
+>>>>>>> master
 			require.NoError(t, err)
 		}
 
@@ -51,12 +70,18 @@ func TestReadClusterRange(t *testing.T) {
 
 		clusterBlocks := store.NewClusterBlocks(
 			db,
+<<<<<<< HEAD
 			blocks[0].Header.ChainID,
 			store.NewHeaders(metrics.NewNoopCollector(), db),
 			store.NewClusterPayloads(metrics.NewNoopCollector(), db),
+=======
+			blocks[0].ChainID,
+			badgerstorage.NewHeaders(metrics.NewNoopCollector(), db),
+			badgerstorage.NewClusterPayloads(metrics.NewNoopCollector(), db),
+>>>>>>> master
 		)
 
-		startHeight := blocks[0].Header.Height
+		startHeight := blocks[0].Height
 		endHeight := startHeight + 10 // if end height is exceeded the last finalized height, only return up to the last finalized
 		lights, err := ReadClusterLightBlockByHeightRange(clusterBlocks, startHeight, endHeight)
 		require.NoError(t, err)

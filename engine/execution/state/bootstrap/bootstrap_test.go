@@ -57,7 +57,7 @@ func TestBootstrapLedger(t *testing.T) {
 }
 
 func TestBootstrapLedger_ZeroTokenSupply(t *testing.T) {
-	expectedStateCommitmentBytes, _ := hex.DecodeString("a278821691c3c112d263a3e4e13ff9c37c5b1ebb4d17510ed1c689afe6fa6241")
+	expectedStateCommitmentBytes, _ := hex.DecodeString("ec0655b333e74b523c633d22d1e021ab192b7fa80dda15322289d0ba58fd1d3b")
 	expectedStateCommitment, err := flow.ToStateCommitment(expectedStateCommitmentBytes)
 	require.NoError(t, err)
 
@@ -104,7 +104,7 @@ func TestBootstrapLedger_ZeroTokenSupply(t *testing.T) {
 // - transaction fee deduction
 // This tests that the state commitment has not changed for the bookkeeping parts of the transaction.
 func TestBootstrapLedger_EmptyTransaction(t *testing.T) {
-	expectedStateCommitmentBytes, _ := hex.DecodeString("f4e318531ad48464e15dcd0fac520faedd9b31c7de2e326c4c944d2c9d5e56f0")
+	expectedStateCommitmentBytes, _ := hex.DecodeString("11446409cf1155564e3a8295e7303b51dba633837e826249dabd1341b3d80ff4")
 	expectedStateCommitment, err := flow.ToStateCommitment(expectedStateCommitmentBytes)
 	require.NoError(t, err)
 
@@ -149,7 +149,7 @@ func TestBootstrapLedger_EmptyTransaction(t *testing.T) {
 		sc := systemcontracts.SystemContractsForChain(chain.ChainID())
 
 		// create an empty transaction
-		txBody := flow.NewTransactionBody().
+		txBody, err := flow.NewTransactionBodyBuilder().
 			SetScript([]byte(`
 				transaction() {
 					prepare() {}
@@ -157,7 +157,9 @@ func TestBootstrapLedger_EmptyTransaction(t *testing.T) {
 				}
 			`)).
 			SetProposalKey(sc.FlowServiceAccount.Address, 0, 0).
-			SetPayer(sc.FlowServiceAccount.Address)
+			SetPayer(sc.FlowServiceAccount.Address).
+			Build()
+		require.NoError(t, err)
 
 		executionSnapshot, output, err := vm.Run(ctx, fvm.Transaction(txBody, 0), storageSnapshot)
 		require.NoError(t, err)

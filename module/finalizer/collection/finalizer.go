@@ -137,10 +137,16 @@ func (f *Finalizer) MakeFinal(blockID flow.Identifier) error {
 				return fmt.Errorf("could not finalize cluster block (id=%x): %w", clusterBlockID, err)
 			}
 
-			block := &cluster.Block{
-				Header:  step,
-				Payload: &payload,
+			block, err := cluster.NewBlock(
+				cluster.UntrustedBlock{
+					HeaderBody: step.HeaderBody,
+					Payload:    payload,
+				},
+			)
+			if err != nil {
+				return fmt.Errorf("could not build cluster block: %w", err)
 			}
+
 			f.metrics.ClusterBlockFinalized(block)
 
 			// if the finalized collection is empty, we don't need to include it
@@ -171,6 +177,7 @@ func (f *Finalizer) MakeFinal(blockID flow.Identifier) error {
 			// For now, we just use the parent signers as the guarantors of this
 			// collection.
 
+<<<<<<< HEAD
 			// only submit the collection guarantee if the write is successful
 			storage.OnCommitSucceed(rw, func() {
 				// TODO add real signatures here (https://github.com/onflow/flow-go-internal/issues/4569)
@@ -182,6 +189,23 @@ func (f *Finalizer) MakeFinal(blockID flow.Identifier) error {
 					Signature:        nil, // TODO: to remove because it's not easily verifiable by consensus nodes
 				})
 			})
+=======
+			// TODO add real signatures here (https://github.com/onflow/flow-go-internal/issues/4569)
+			// TODO: after adding real signature here add check for signature in NewCollectionGuarantee
+			guarantee, err := flow.NewCollectionGuarantee(flow.UntrustedCollectionGuarantee{
+				CollectionID:     payload.Collection.ID(),
+				ReferenceBlockID: payload.ReferenceBlockID,
+				ClusterChainID:   header.ChainID,
+				SignerIndices:    step.ParentVoterIndices,
+				Signature:        nil, // TODO: to remove because it's not easily verifiable by consensus nodes
+			})
+			if err != nil {
+				return fmt.Errorf("could not construct guarantee: %w", err)
+			}
+
+			f.pusher.SubmitCollectionGuarantee(guarantee)
+		}
+>>>>>>> master
 
 			return nil
 		})

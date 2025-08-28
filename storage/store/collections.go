@@ -35,10 +35,17 @@ func NewCollections(db storage.DB, transactions *Transactions) *Collections {
 
 // Store stores a collection in the database.
 // any error returned are exceptions
+<<<<<<< HEAD
 func (c *Collections) Store(collection *flow.Collection) (flow.LightCollection, error) {
 	light := collection.Light()
 	err := c.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 		err := operation.UpsertCollection(rw.Writer(), &light)
+=======
+func (c *Collections) Store(collection *flow.Collection) error {
+	return c.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+		light := collection.Light()
+		err := operation.UpsertCollection(rw.Writer(), light)
+>>>>>>> master
 		if err != nil {
 			return fmt.Errorf("could not insert collection: %w", err)
 		}
@@ -66,8 +73,8 @@ func (c *Collections) Store(collection *flow.Collection) (flow.LightCollection, 
 //   - `storage.ErrNotFound` if no light collection was found.
 func (c *Collections) ByID(colID flow.Identifier) (*flow.Collection, error) {
 	var (
-		light      flow.LightCollection
-		collection flow.Collection
+		light flow.LightCollection
+		txs   []*flow.TransactionBody
 	)
 
 	err := operation.RetrieveCollection(c.db.Reader(), colID, &light)
@@ -75,16 +82,22 @@ func (c *Collections) ByID(colID flow.Identifier) (*flow.Collection, error) {
 		return nil, fmt.Errorf("could not retrieve collection: %w", err)
 	}
 
+	txs = make([]*flow.TransactionBody, 0, len(light.Transactions))
 	for _, txID := range light.Transactions {
 		tx, err := c.transactions.ByID(txID)
 		if err != nil {
 			return nil, fmt.Errorf("could not retrieve transaction %v: %w", txID, err)
 		}
 
-		collection.Transactions = append(collection.Transactions, tx)
+		txs = append(txs, tx)
 	}
 
-	return &collection, nil
+	collection, err := flow.NewCollection(flow.UntrustedCollection{Transactions: txs})
+	if err != nil {
+		return nil, fmt.Errorf("could not construct collection: %w", err)
+	}
+
+	return collection, nil
 }
 
 // LightByID returns a reduced representation of the collection with the given ID.

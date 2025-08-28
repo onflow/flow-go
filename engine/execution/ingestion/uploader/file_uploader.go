@@ -20,7 +20,7 @@ type FileUploader struct {
 }
 
 func (f *FileUploader) Upload(computationResult *execution.ComputationResult) error {
-	file, err := os.Create(path.Join(f.dir, fmt.Sprintf("%s.cbor", computationResult.ExecutableBlock.ID())))
+	file, err := os.Create(path.Join(f.dir, fmt.Sprintf("%s.cbor", computationResult.ExecutableBlock.BlockID())))
 	if err != nil {
 		return fmt.Errorf("cannot create file for writing block data: %w", err)
 	}

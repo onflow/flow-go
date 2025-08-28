@@ -12,6 +12,7 @@ import (
 	"github.com/onflow/flow-go/engine/execution/state"
 	"github.com/onflow/flow-go/engine/execution/state/bootstrap"
 	"github.com/onflow/flow-go/engine/execution/testutil"
+	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/storage"
@@ -52,11 +53,17 @@ func TestReExecuteBlock(t *testing.T) {
 			events := store.NewEvents(metrics, db)
 			serviceEvents := store.NewServiceEvents(metrics, db)
 
+<<<<<<< HEAD
 			unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
 				return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 					return blocks.BatchStore(lctx, rw, &genesis)
 				})
 			})
+=======
+			// By convention, root block has no proposer signature - implementation has to handle this edge case
+			err = headers.Store(&flow.ProposalHeader{Header: genesis, ProposerSigData: nil})
+			require.NoError(t, err)
+>>>>>>> master
 
 			getLatestFinalized := func() (uint64, error) {
 				return genesis.Header.Height, nil
@@ -84,14 +91,18 @@ func TestReExecuteBlock(t *testing.T) {
 			require.NotNil(t, es)
 
 			computationResult := testutil.ComputationResultFixture(t)
-			header := computationResult.Block.Header
+			header := computationResult.Block.ToHeader()
 
+<<<<<<< HEAD
 			lctx2 := lockManager.NewContext()
 			require.NoError(t, lctx2.AcquireLock(storage.LockInsertBlock))
 			err = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 				return blocks.BatchStore(lctx2, rw, computationResult.Block)
 			})
 			lctx2.Release()
+=======
+			err = headers.Store(unittest.ProposalHeaderFromHeader(header))
+>>>>>>> master
 			require.NoError(t, err)
 
 			// save execution results
@@ -205,10 +216,128 @@ func TestReExecuteBlockWithDifferentResult(t *testing.T) {
 		chunkDataPacks := store.NewChunkDataPacks(metrics, pebbleimpl.ToDB(pdb), collections, bstorage.DefaultCacheSize)
 		txResults := store.NewTransactionResults(metrics, db, bstorage.DefaultCacheSize)
 
+<<<<<<< HEAD
 		unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
 			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 				return blocks.BatchStore(lctx, rw, &genesis)
 			})
+=======
+			headers := bstorage.NewHeaders(metrics, bdb)
+			txResults := store.NewTransactionResults(metrics, db, bstorage.DefaultCacheSize)
+			commits := store.NewCommits(metrics, db)
+			results := store.NewExecutionResults(metrics, db)
+			receipts := store.NewExecutionReceipts(metrics, db, results, bstorage.DefaultCacheSize)
+			myReceipts := store.NewMyExecutionReceipts(metrics, db, receipts)
+			events := store.NewEvents(metrics, db)
+			serviceEvents := store.NewServiceEvents(metrics, db)
+			transactions := bstorage.NewTransactions(metrics, bdb)
+			collections := bstorage.NewCollections(bdb, transactions)
+			chunkDataPacks := store.NewChunkDataPacks(metrics, pebbleimpl.ToDB(pdb), collections, bstorage.DefaultCacheSize)
+
+			// By convention, root block has no proposer signature - implementation has to handle this edge case
+			err = headers.Store(&flow.ProposalHeader{Header: genesis, ProposerSigData: nil})
+			require.NoError(t, err)
+
+			getLatestFinalized := func() (uint64, error) {
+				return genesis.Height, nil
+			}
+
+			// create execution state module
+			es := state.NewExecutionState(
+				nil,
+				commits,
+				nil,
+				headers,
+				chunkDataPacks,
+				results,
+				myReceipts,
+				events,
+				serviceEvents,
+				txResults,
+				db,
+				getLatestFinalized,
+				trace.NewNoopTracer(),
+				nil,
+				false,
+			)
+			require.NotNil(t, es)
+
+			executableBlock := unittest.ExecutableBlockFixtureWithParent(
+				nil,
+				genesis,
+				&unittest.GenesisStateCommitment)
+			header := executableBlock.Block.ToHeader()
+
+			err = headers.Store(unittest.ProposalHeaderFromHeader(header))
+			require.NoError(t, err)
+
+			computationResult := testutil.ComputationResultFixture(t)
+			computationResult.ExecutableBlock = executableBlock
+			computationResult.ExecutionReceipt.ExecutionResult.BlockID = header.ID()
+
+			// save execution results
+			err = es.SaveExecutionResults(context.Background(), computationResult)
+			require.NoError(t, err)
+
+			batch := db.NewBatch()
+			defer batch.Close()
+
+			chunkBatch := pebbleimpl.ToDB(pdb).NewBatch()
+			defer chunkBatch.Close()
+
+			// remove execution results
+			err = removeForBlockID(
+				batch,
+				chunkBatch,
+				commits,
+				txResults,
+				results,
+				chunkDataPacks,
+				myReceipts,
+				events,
+				serviceEvents,
+				header.ID(),
+			)
+
+			require.NoError(t, err)
+			require.NoError(t, chunkBatch.Commit())
+			err2 := batch.Commit()
+			require.NoError(t, err2)
+
+			batch = db.NewBatch()
+			defer batch.Close()
+
+			chunkBatch = pebbleimpl.ToDB(pdb).NewBatch()
+			defer chunkBatch.Close()
+
+			// remove again to test for duplicates handling
+			err = removeForBlockID(
+				batch,
+				chunkBatch,
+				commits,
+				txResults,
+				results,
+				chunkDataPacks,
+				myReceipts,
+				events,
+				serviceEvents,
+				header.ID(),
+			)
+
+			require.NoError(t, err)
+			require.NoError(t, chunkBatch.Commit())
+
+			err2 = batch.Commit()
+			require.NoError(t, err2)
+
+			computationResult2 := testutil.ComputationResultFixture(t)
+			computationResult2.ExecutableBlock = executableBlock
+			computationResult2.ExecutionReceipt.ExecutionResult.BlockID = header.ID()
+
+			// re execute result
+			err = es.SaveExecutionResults(context.Background(), computationResult2)
+			require.NoError(t, err)
+>>>>>>> master
 		})
 
 		getLatestFinalized := func() (uint64, error) {

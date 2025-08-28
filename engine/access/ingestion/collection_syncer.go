@@ -310,13 +310,13 @@ func (s *CollectionSyncer) RequestCollectionsForBlock(height uint64, missingColl
 // requestCollections registers collection download requests in the requester engine,
 // optionally forcing immediate dispatch.
 func (s *CollectionSyncer) requestCollections(collections []*flow.CollectionGuarantee, immediately bool) {
-	for _, collection := range collections {
-		guarantors, err := protocol.FindGuarantors(s.state, collection)
+	for _, guarantee := range collections {
+		guarantors, err := protocol.FindGuarantors(s.state, guarantee)
 		if err != nil {
 			// failed to find guarantors for guarantees contained in a finalized block is fatal error
-			s.logger.Fatal().Err(err).Msgf("could not find guarantors for guarantee %v", collection.ID())
+			s.logger.Fatal().Err(err).Msgf("could not find guarantors for collection %v", guarantee.CollectionID)
 		}
-		s.requester.EntityByID(collection.ID(), filter.HasNodeID[flow.Identity](guarantors...))
+		s.requester.EntityByID(guarantee.CollectionID, filter.HasNodeID[flow.Identity](guarantors...))
 	}
 
 	if immediately {

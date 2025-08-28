@@ -30,9 +30,10 @@ func TestFinalizer(t *testing.T) {
 		lockManager := storage.NewTestingLockManager()
 		db := badgerimpl.ToDB(badgerdb)
 		// reference block on the main consensus chain
-		refBlock := unittest.BlockHeaderFixture()
+		refBlock := unittest.ClusterBlockFixture()
 		// genesis block for the cluster chain
-		genesis := model.Genesis()
+		genesis, err := unittest.ClusterBlock.Genesis()
+		require.NoError(t, err)
 
 		metrics := metrics.NewNoopCollector()
 		pool := herocache.NewTransactions(1000, unittest.Logger(), metrics)
@@ -56,17 +57,22 @@ func TestFinalizer(t *testing.T) {
 			require.NoError(t, err)
 			state, err = cluster.Bootstrap(db, lockManager, stateRoot)
 			require.NoError(t, err)
+<<<<<<< HEAD
 
 			lctx := lockManager.NewContext()
 			require.NoError(t, lctx.AcquireLock(storage.LockInsertOrFinalizeClusterBlock))
 			err = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 				return operation.InsertHeader(lctx, rw, refBlock.ID(), refBlock)
 			})
+=======
+			err = db.Update(operation.InsertHeader(refBlock.ID(), refBlock.ToHeader()))
+>>>>>>> master
 			require.NoError(t, err)
 			lctx.Release()
 		}
 
 		// a helper function to insert a block
+<<<<<<< HEAD
 		insert := func(db storage.DB, lockManager lockctx.Manager, block model.Block) {
 			lctx := lockManager.NewContext()
 			defer lctx.Release()
@@ -74,6 +80,10 @@ func TestFinalizer(t *testing.T) {
 			err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 				return procedure.InsertClusterBlock(lctx, rw, &block)
 			})
+=======
+		insert := func(block *model.Block) {
+			err := db.Update(procedure.InsertClusterBlock(unittest.ClusterProposalFromBlock(block)))
+>>>>>>> master
 			assert.NoError(t, err)
 		}
 
@@ -99,15 +109,30 @@ func TestFinalizer(t *testing.T) {
 
 			// tx1 is included in the finalized block
 			tx1 := unittest.TransactionBodyFixture(func(tx *flow.TransactionBody) { tx.ProposalKey.SequenceNumber = 1 })
-			assert.True(t, pool.Add(&tx1))
+			assert.True(t, pool.Add(tx1.ID(), &tx1))
 
 			// create a new block on genesis
+<<<<<<< HEAD
 			block := unittest.ClusterBlockWithParent(genesis)
 			block.SetPayload(model.PayloadFromTransactions(refBlock.ID(), &tx1))
 			insert(db, lockManager, block)
+=======
+			payload, err := model.NewPayload(
+				model.UntrustedPayload{
+					ReferenceBlockID: refBlock.ID(),
+					Collection:       flow.Collection{Transactions: []*flow.TransactionBody{&tx1}},
+				},
+			)
+			require.NoError(t, err)
+			block := unittest.ClusterBlockFixture(
+				unittest.ClusterBlock.WithParent(genesis),
+				unittest.ClusterBlock.WithPayload(*payload),
+			)
+			insert(block)
+>>>>>>> master
 
 			// finalize the block
-			err := finalizer.MakeFinal(block.ID())
+			err = finalizer.MakeFinal(block.ID())
 			assert.NoError(t, err)
 
 			// finalize the block again - this should be a no-op
@@ -123,10 +148,19 @@ func TestFinalizer(t *testing.T) {
 			finalizer := collection.NewFinalizer(db, lockManager, pool, pusher, metrics)
 
 			// create a new block that isn't connected to a parent
+<<<<<<< HEAD
 			block := unittest.ClusterBlockWithParent(genesis)
 			block.Header.ParentID = unittest.IdentifierFixture()
 			block.SetPayload(model.EmptyPayload(refBlock.ID()))
 			insert(db, lockManager, block)
+=======
+			block := unittest.ClusterBlockFixture(
+				unittest.ClusterBlock.WithParent(genesis),
+				unittest.ClusterBlock.WithPayload(*model.NewEmptyPayload(refBlock.ID())),
+			)
+			block.ParentID = unittest.IdentifierFixture()
+			insert(block)
+>>>>>>> master
 
 			// try to finalize - this should fail
 			err := finalizer.MakeFinal(block.ID())
@@ -141,9 +175,17 @@ func TestFinalizer(t *testing.T) {
 			finalizer := collection.NewFinalizer(db, lockManager, pool, pusher, metrics)
 
 			// create a block with empty payload on genesis
+<<<<<<< HEAD
 			block := unittest.ClusterBlockWithParent(genesis)
 			block.SetPayload(model.EmptyPayload(refBlock.ID()))
 			insert(db, lockManager, block)
+=======
+			block := unittest.ClusterBlockFixture(
+				unittest.ClusterBlock.WithParent(genesis),
+				unittest.ClusterBlock.WithPayload(*model.NewEmptyPayload(refBlock.ID())),
+			)
+			insert(block)
+>>>>>>> master
 
 			// finalize the block
 			err := finalizer.MakeFinal(block.ID())
@@ -152,7 +194,7 @@ func TestFinalizer(t *testing.T) {
 			// check finalized boundary using cluster state
 			final, err := state.Final().Head()
 			assert.NoError(t, err)
-			assert.Equal(t, block.ID(), final.ID())
+			assert.Equal(t, block.ToHeader().ID(), final.ID())
 
 			// collection should not have been propagated
 		})
@@ -166,27 +208,42 @@ func TestFinalizer(t *testing.T) {
 
 			// tx1 is included in the finalized block and mempool
 			tx1 := unittest.TransactionBodyFixture(func(tx *flow.TransactionBody) { tx.ProposalKey.SequenceNumber = 1 })
-			assert.True(t, pool.Add(&tx1))
+			assert.True(t, pool.Add(tx1.ID(), &tx1))
 			// tx2 is only in the mempool
 			tx2 := unittest.TransactionBodyFixture(func(tx *flow.TransactionBody) { tx.ProposalKey.SequenceNumber = 2 })
-			assert.True(t, pool.Add(&tx2))
+			assert.True(t, pool.Add(tx2.ID(), &tx2))
 
 			// create a block containing tx1 on top of genesis
+<<<<<<< HEAD
 			block := unittest.ClusterBlockWithParent(genesis)
 			block.SetPayload(model.PayloadFromTransactions(refBlock.ID(), &tx1))
 			insert(db, lockManager, block)
+=======
+			payload, err := model.NewPayload(
+				model.UntrustedPayload{
+					ReferenceBlockID: refBlock.ID(),
+					Collection:       flow.Collection{Transactions: []*flow.TransactionBody{&tx1}},
+				},
+			)
+			require.NoError(t, err)
+			block := unittest.ClusterBlockFixture(
+				unittest.ClusterBlock.WithParent(genesis),
+				unittest.ClusterBlock.WithPayload(*payload),
+			)
+			insert(block)
+>>>>>>> master
 
 			// block should be passed to pusher
 			pusher.On("SubmitCollectionGuarantee", &flow.CollectionGuarantee{
 				CollectionID:     block.Payload.Collection.ID(),
 				ReferenceBlockID: refBlock.ID(),
-				ChainID:          block.Header.ChainID,
-				SignerIndices:    block.Header.ParentVoterIndices,
+				ClusterChainID:   block.ChainID,
+				SignerIndices:    block.ParentVoterIndices,
 				Signature:        nil,
 			}).Once()
 
 			// finalize the block
-			err := finalizer.MakeFinal(block.ID())
+			err = finalizer.MakeFinal(block.ID())
 			assert.NoError(t, err)
 
 			// tx1 should have been removed from mempool
@@ -197,8 +254,13 @@ func TestFinalizer(t *testing.T) {
 			// check finalized boundary using cluster state
 			final, err := state.Final().Head()
 			assert.NoError(t, err)
+<<<<<<< HEAD
 			assert.Equal(t, block.ID(), final.ID())
 			assertClusterBlocksIndexedByReferenceHeight(t, lockManager, db, refBlock.Height, final.ID())
+=======
+			assert.Equal(t, block.ToHeader().ID(), final.ID())
+			assertClusterBlocksIndexedByReferenceHeight(t, db, refBlock.Height, final.ID())
+>>>>>>> master
 		})
 
 		// when finalizing a block with un-finalized ancestors, those ancestors should be finalized as well
@@ -211,12 +273,13 @@ func TestFinalizer(t *testing.T) {
 
 			// tx1 is included in the first finalized block and mempool
 			tx1 := unittest.TransactionBodyFixture(func(tx *flow.TransactionBody) { tx.ProposalKey.SequenceNumber = 1 })
-			assert.True(t, pool.Add(&tx1))
+			assert.True(t, pool.Add(tx1.ID(), &tx1))
 			// tx2 is included in the second finalized block and mempool
 			tx2 := unittest.TransactionBodyFixture(func(tx *flow.TransactionBody) { tx.ProposalKey.SequenceNumber = 2 })
-			assert.True(t, pool.Add(&tx2))
+			assert.True(t, pool.Add(tx2.ID(), &tx2))
 
 			// create a block containing tx1 on top of genesis
+<<<<<<< HEAD
 			block1 := unittest.ClusterBlockWithParent(genesis)
 			block1.SetPayload(model.PayloadFromTransactions(refBlock.ID(), &tx1))
 			insert(db, lockManager, block1)
@@ -225,25 +288,53 @@ func TestFinalizer(t *testing.T) {
 			block2 := unittest.ClusterBlockWithParent(&block1)
 			block2.SetPayload(model.PayloadFromTransactions(refBlock.ID(), &tx2))
 			insert(db, lockManager, block2)
+=======
+			payload, err := model.NewPayload(
+				model.UntrustedPayload{
+					ReferenceBlockID: refBlock.ID(),
+					Collection:       flow.Collection{Transactions: []*flow.TransactionBody{&tx1}},
+				},
+			)
+			require.NoError(t, err)
+			block1 := unittest.ClusterBlockFixture(
+				unittest.ClusterBlock.WithParent(genesis),
+				unittest.ClusterBlock.WithPayload(*payload),
+			)
+			insert(block1)
+
+			// create a block containing tx2 on top of block1
+			payload, err = model.NewPayload(
+				model.UntrustedPayload{
+					ReferenceBlockID: refBlock.ID(),
+					Collection:       flow.Collection{Transactions: []*flow.TransactionBody{&tx2}},
+				},
+			)
+			require.NoError(t, err)
+			block2 := unittest.ClusterBlockFixture(
+				unittest.ClusterBlock.WithParent(block1),
+				unittest.ClusterBlock.WithPayload(*payload),
+			)
+			insert(block2)
+>>>>>>> master
 
 			// both blocks should be passed to pusher
 			pusher.On("SubmitCollectionGuarantee", &flow.CollectionGuarantee{
 				CollectionID:     block1.Payload.Collection.ID(),
 				ReferenceBlockID: refBlock.ID(),
-				ChainID:          block1.Header.ChainID,
-				SignerIndices:    block1.Header.ParentVoterIndices,
+				ClusterChainID:   block1.ChainID,
+				SignerIndices:    block1.ParentVoterIndices,
 				Signature:        nil,
 			}).Once()
 			pusher.On("SubmitCollectionGuarantee", &flow.CollectionGuarantee{
 				CollectionID:     block2.Payload.Collection.ID(),
 				ReferenceBlockID: refBlock.ID(),
-				ChainID:          block2.Header.ChainID,
-				SignerIndices:    block2.Header.ParentVoterIndices,
+				ClusterChainID:   block2.ChainID,
+				SignerIndices:    block2.ParentVoterIndices,
 				Signature:        nil,
 			}).Once()
 
 			// finalize block2 (should indirectly finalize block1 as well)
-			err := finalizer.MakeFinal(block2.ID())
+			err = finalizer.MakeFinal(block2.ID())
 			assert.NoError(t, err)
 
 			// tx1 and tx2 should have been removed from mempool
@@ -253,8 +344,13 @@ func TestFinalizer(t *testing.T) {
 			// check finalized boundary using cluster state
 			final, err := state.Final().Head()
 			assert.NoError(t, err)
+<<<<<<< HEAD
 			assert.Equal(t, block2.ID(), final.ID())
 			assertClusterBlocksIndexedByReferenceHeight(t, lockManager, db, refBlock.Height, block1.ID(), block2.ID())
+=======
+			assert.Equal(t, block2.ToHeader().ID(), final.ID())
+			assertClusterBlocksIndexedByReferenceHeight(t, db, refBlock.Height, block1.ID(), block2.ID())
+>>>>>>> master
 		})
 
 		t.Run("finalize with un-finalized child", func(t *testing.T) {
@@ -266,12 +362,13 @@ func TestFinalizer(t *testing.T) {
 
 			// tx1 is included in the finalized parent block and mempool
 			tx1 := unittest.TransactionBodyFixture(func(tx *flow.TransactionBody) { tx.ProposalKey.SequenceNumber = 1 })
-			assert.True(t, pool.Add(&tx1))
+			assert.True(t, pool.Add(tx1.ID(), &tx1))
 			// tx2 is included in the un-finalized block and mempool
 			tx2 := unittest.TransactionBodyFixture(func(tx *flow.TransactionBody) { tx.ProposalKey.SequenceNumber = 2 })
-			assert.True(t, pool.Add(&tx2))
+			assert.True(t, pool.Add(tx2.ID(), &tx2))
 
 			// create a block containing tx1 on top of genesis
+<<<<<<< HEAD
 			block1 := unittest.ClusterBlockWithParent(genesis)
 			block1.SetPayload(model.PayloadFromTransactions(refBlock.ID(), &tx1))
 			insert(db, lockManager, block1)
@@ -280,18 +377,46 @@ func TestFinalizer(t *testing.T) {
 			block2 := unittest.ClusterBlockWithParent(&block1)
 			block2.SetPayload(model.PayloadFromTransactions(refBlock.ID(), &tx2))
 			insert(db, lockManager, block2)
+=======
+			payload, err := model.NewPayload(
+				model.UntrustedPayload{
+					ReferenceBlockID: refBlock.ID(),
+					Collection:       flow.Collection{Transactions: []*flow.TransactionBody{&tx1}},
+				},
+			)
+			require.NoError(t, err)
+			block1 := unittest.ClusterBlockFixture(
+				unittest.ClusterBlock.WithParent(genesis),
+				unittest.ClusterBlock.WithPayload(*payload),
+			)
+			insert(block1)
+
+			// create a block containing tx2 on top of block1
+			payload, err = model.NewPayload(
+				model.UntrustedPayload{
+					ReferenceBlockID: refBlock.ID(),
+					Collection:       flow.Collection{Transactions: []*flow.TransactionBody{&tx2}},
+				},
+			)
+			require.NoError(t, err)
+			block2 := unittest.ClusterBlockFixture(
+				unittest.ClusterBlock.WithParent(block1),
+				unittest.ClusterBlock.WithPayload(*payload),
+			)
+			insert(block2)
+>>>>>>> master
 
 			// block should be passed to pusher
 			pusher.On("SubmitCollectionGuarantee", &flow.CollectionGuarantee{
 				CollectionID:     block1.Payload.Collection.ID(),
 				ReferenceBlockID: refBlock.ID(),
-				ChainID:          block1.Header.ChainID,
-				SignerIndices:    block1.Header.ParentVoterIndices,
+				ClusterChainID:   block1.ChainID,
+				SignerIndices:    block1.ParentVoterIndices,
 				Signature:        nil,
 			}).Once()
 
 			// finalize block1 (should NOT finalize block2)
-			err := finalizer.MakeFinal(block1.ID())
+			err = finalizer.MakeFinal(block1.ID())
 			assert.NoError(t, err)
 
 			// tx1 should have been removed from mempool
@@ -302,8 +427,13 @@ func TestFinalizer(t *testing.T) {
 			// check finalized boundary using cluster state
 			final, err := state.Final().Head()
 			assert.NoError(t, err)
+<<<<<<< HEAD
 			assert.Equal(t, block1.ID(), final.ID())
 			assertClusterBlocksIndexedByReferenceHeight(t, lockManager, db, refBlock.Height, block1.ID())
+=======
+			assert.Equal(t, block1.ToHeader().ID(), final.ID())
+			assertClusterBlocksIndexedByReferenceHeight(t, db, refBlock.Height, block1.ID())
+>>>>>>> master
 		})
 
 		// when finalizing a block with a conflicting fork, the fork should not be finalized.
@@ -316,12 +446,13 @@ func TestFinalizer(t *testing.T) {
 
 			// tx1 is included in the finalized block and mempool
 			tx1 := unittest.TransactionBodyFixture(func(tx *flow.TransactionBody) { tx.ProposalKey.SequenceNumber = 1 })
-			assert.True(t, pool.Add(&tx1))
+			assert.True(t, pool.Add(tx1.ID(), &tx1))
 			// tx2 is included in the conflicting block and mempool
 			tx2 := unittest.TransactionBodyFixture(func(tx *flow.TransactionBody) { tx.ProposalKey.SequenceNumber = 2 })
-			assert.True(t, pool.Add(&tx2))
+			assert.True(t, pool.Add(tx2.ID(), &tx2))
 
 			// create a block containing tx1 on top of genesis
+<<<<<<< HEAD
 			block1 := unittest.ClusterBlockWithParent(genesis)
 			block1.SetPayload(model.PayloadFromTransactions(refBlock.ID(), &tx1))
 			insert(db, lockManager, block1)
@@ -330,18 +461,46 @@ func TestFinalizer(t *testing.T) {
 			block2 := unittest.ClusterBlockWithParent(genesis)
 			block2.SetPayload(model.PayloadFromTransactions(refBlock.ID(), &tx2))
 			insert(db, lockManager, block2)
+=======
+			payload, err := model.NewPayload(
+				model.UntrustedPayload{
+					ReferenceBlockID: refBlock.ID(),
+					Collection:       flow.Collection{Transactions: []*flow.TransactionBody{&tx1}},
+				},
+			)
+			require.NoError(t, err)
+			block1 := unittest.ClusterBlockFixture(
+				unittest.ClusterBlock.WithParent(genesis),
+				unittest.ClusterBlock.WithPayload(*payload),
+			)
+			insert(block1)
+
+			// create a block containing tx2 on top of genesis (conflicting with block1)
+			payload, err = model.NewPayload(
+				model.UntrustedPayload{
+					ReferenceBlockID: refBlock.ID(),
+					Collection:       flow.Collection{Transactions: []*flow.TransactionBody{&tx2}},
+				},
+			)
+			require.NoError(t, err)
+			block2 := unittest.ClusterBlockFixture(
+				unittest.ClusterBlock.WithParent(genesis),
+				unittest.ClusterBlock.WithPayload(*payload),
+			)
+			insert(block2)
+>>>>>>> master
 
 			// block should be passed to pusher
 			pusher.On("SubmitCollectionGuarantee", &flow.CollectionGuarantee{
 				CollectionID:     block1.Payload.Collection.ID(),
 				ReferenceBlockID: refBlock.ID(),
-				ChainID:          block1.Header.ChainID,
-				SignerIndices:    block1.Header.ParentVoterIndices,
+				ClusterChainID:   block1.ChainID,
+				SignerIndices:    block1.ParentVoterIndices,
 				Signature:        nil,
 			}).Once()
 
 			// finalize block1
-			err := finalizer.MakeFinal(block1.ID())
+			err = finalizer.MakeFinal(block1.ID())
 			assert.NoError(t, err)
 
 			// tx1 should have been removed from mempool
@@ -352,8 +511,13 @@ func TestFinalizer(t *testing.T) {
 			// check finalized boundary using cluster state
 			final, err := state.Final().Head()
 			assert.NoError(t, err)
+<<<<<<< HEAD
 			assert.Equal(t, block1.ID(), final.ID())
 			assertClusterBlocksIndexedByReferenceHeight(t, lockManager, db, refBlock.Height, block1.ID())
+=======
+			assert.Equal(t, block1.ToHeader().ID(), final.ID())
+			assertClusterBlocksIndexedByReferenceHeight(t, db, refBlock.Height, block1.ID())
+>>>>>>> master
 		})
 	})
 }

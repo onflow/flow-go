@@ -1256,6 +1256,7 @@ func (fnb *FlowNodeBuilder) initStorage() error {
 		return fmt.Errorf("could not initialize max tracker: %w", err)
 	}
 
+<<<<<<< HEAD
 	headers := store.NewHeaders(fnb.Metrics.Cache, fnb.ProtocolDB)
 	guarantees := store.NewGuarantees(fnb.Metrics.Cache, fnb.ProtocolDB, fnb.BaseConfig.guaranteesCacheSize)
 	seals := store.NewSeals(fnb.Metrics.Cache, fnb.ProtocolDB)
@@ -1274,6 +1275,27 @@ func (fnb *FlowNodeBuilder) initStorage() error {
 	protocolKVStores := store.NewProtocolKVStore(fnb.Metrics.Cache, fnb.ProtocolDB,
 		store.DefaultProtocolKVStoreCacheSize, store.DefaultProtocolKVStoreByBlockIDCacheSize)
 	versionBeacons := store.NewVersionBeacons(fnb.ProtocolDB)
+=======
+	headers := bstorage.NewHeaders(fnb.Metrics.Cache, fnb.DB)
+	guarantees := bstorage.NewGuarantees(fnb.Metrics.Cache, fnb.DB,
+		fnb.BaseConfig.guaranteesCacheSize, bstorage.DefaultCacheSize)
+	seals := bstorage.NewSeals(fnb.Metrics.Cache, fnb.DB)
+	results := bstorage.NewExecutionResults(fnb.Metrics.Cache, fnb.DB)
+	receipts := bstorage.NewExecutionReceipts(fnb.Metrics.Cache, fnb.DB, results, fnb.BaseConfig.receiptsCacheSize)
+	index := bstorage.NewIndex(fnb.Metrics.Cache, fnb.DB)
+	payloads := bstorage.NewPayloads(fnb.DB, index, guarantees, seals, receipts, results)
+	blocks := bstorage.NewBlocks(fnb.DB, headers, payloads)
+	qcs := bstorage.NewQuorumCertificates(fnb.Metrics.Cache, fnb.DB, bstorage.DefaultCacheSize)
+	transactions := bstorage.NewTransactions(fnb.Metrics.Cache, fnb.DB)
+	collections := bstorage.NewCollections(fnb.DB, transactions)
+	setups := bstorage.NewEpochSetups(fnb.Metrics.Cache, fnb.DB)
+	epochCommits := bstorage.NewEpochCommits(fnb.Metrics.Cache, fnb.DB)
+	protocolState := bstorage.NewEpochProtocolStateEntries(fnb.Metrics.Cache, setups, epochCommits, fnb.DB,
+		bstorage.DefaultEpochProtocolStateCacheSize, bstorage.DefaultProtocolStateIndexCacheSize)
+	protocolKVStores := bstorage.NewProtocolKVStore(fnb.Metrics.Cache, fnb.DB,
+		bstorage.DefaultProtocolKVStoreCacheSize, bstorage.DefaultProtocolKVStoreByBlockIDCacheSize)
+	versionBeacons := store.NewVersionBeacons(badgerimpl.ToDB(fnb.DB))
+>>>>>>> master
 
 	fnb.Storage = Storage{
 		Headers:                   headers,
@@ -1450,9 +1472,9 @@ func (fnb *FlowNodeBuilder) initState() error {
 			Hex("root_result_id", logging.Entity(fnb.RootResult)).
 			Hex("root_state_commitment", fnb.RootSeal.FinalState[:]).
 			Hex("finalized_root_block_id", logging.Entity(fnb.FinalizedRootBlock)).
-			Uint64("finalized_root_block_height", fnb.FinalizedRootBlock.Header.Height).
+			Uint64("finalized_root_block_height", fnb.FinalizedRootBlock.Height).
 			Hex("sealed_root_block_id", logging.Entity(fnb.SealedRootBlock)).
-			Uint64("sealed_root_block_height", fnb.SealedRootBlock.Header.Height).
+			Uint64("sealed_root_block_height", fnb.SealedRootBlock.Height).
 			Msg("protocol state bootstrapped")
 	}
 
@@ -1480,9 +1502,9 @@ func (fnb *FlowNodeBuilder) initState() error {
 		Hex("last_sealed_block_id", logging.Entity(lastSealed)).
 		Uint64("last_sealed_block_height", lastSealed.Height).
 		Hex("finalized_root_block_id", logging.Entity(fnb.FinalizedRootBlock)).
-		Uint64("finalized_root_block_height", fnb.FinalizedRootBlock.Header.Height).
+		Uint64("finalized_root_block_height", fnb.FinalizedRootBlock.Height).
 		Hex("sealed_root_block_id", logging.Entity(fnb.SealedRootBlock)).
-		Uint64("sealed_root_block_height", fnb.SealedRootBlock.Header.Height).
+		Uint64("sealed_root_block_height", fnb.SealedRootBlock.Height).
 		Msg("successfully opened protocol state")
 
 	return nil
@@ -1525,7 +1547,7 @@ func (fnb *FlowNodeBuilder) setRootSnapshot(rootSnapshot protocol.Snapshot) erro
 		return fmt.Errorf("failed to read root QC: %w", err)
 	}
 
-	fnb.RootChainID = fnb.FinalizedRootBlock.Header.ChainID
+	fnb.RootChainID = fnb.FinalizedRootBlock.ChainID
 	fnb.SporkID = fnb.RootSnapshot.Params().SporkID()
 
 	return nil
