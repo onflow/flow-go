@@ -342,7 +342,7 @@ func (suite *BuilderSuite) TestBuildOn_WithUnknownReferenceBlock() {
 
 	// should be able to retrieve built block from storage
 	var built model.Block
-	err = procedure.RetrieveClusterBlock(suite.db.Reader(), header.ID(), &built)
+	err = procedure.RetrieveClusterBlock(suite.db.Reader(), header.Header.ID(), &built)
 	suite.Assert().NoError(err)
 	builtCollection := built.Payload.Collection
 
@@ -383,7 +383,7 @@ func (suite *BuilderSuite) TestBuildOn_WithUnfinalizedReferenceBlock() {
 
 	// should be able to retrieve built block from storage
 	var built model.Block
-	err = procedure.RetrieveClusterBlock(suite.db.Reader(), header.ID(), &built)
+	err = procedure.RetrieveClusterBlock(suite.db.Reader(), header.Header.ID(), &built)
 	suite.Assert().NoError(err)
 	builtCollection := built.Payload.Collection
 
@@ -434,7 +434,7 @@ func (suite *BuilderSuite) TestBuildOn_WithOrphanedReferenceBlock() {
 
 	// should be able to retrieve built block from storage
 	var built model.Block
-	err = procedure.RetrieveClusterBlock(suite.db.Reader(), header.ID(), &built)
+	err = procedure.RetrieveClusterBlock(suite.db.Reader(), header.Header.ID(), &built)
 	suite.Assert().NoError(err)
 	builtCollection := built.Payload.Collection
 
@@ -477,7 +477,7 @@ func (suite *BuilderSuite) TestBuildOn_WithForks() {
 
 	// should be able to retrieve built block from storage
 	var built model.Block
-	err = procedure.RetrieveClusterBlock(suite.db.Reader(), header.ID(), &built)
+	err = procedure.RetrieveClusterBlock(suite.db.Reader(), header.Header.ID(), &built)
 	assert.NoError(t, err)
 	builtCollection := built.Payload.Collection
 
@@ -524,7 +524,7 @@ func (suite *BuilderSuite) TestBuildOn_ConflictingFinalizedBlock() {
 
 	// retrieve the built block from storage
 	var built model.Block
-	err = procedure.RetrieveClusterBlock(suite.db.Reader(), header.ID(), &built)
+	err = procedure.RetrieveClusterBlock(suite.db.Reader(), header.Header.ID(), &built)
 	assert.NoError(t, err)
 	builtCollection := built.Payload.Collection
 
@@ -574,7 +574,7 @@ func (suite *BuilderSuite) TestBuildOn_ConflictingInvalidatedForks() {
 
 	// retrieve the built block from storage
 	var built model.Block
-	err = procedure.RetrieveClusterBlock(suite.db.Reader(), header.ID(), &built)
+	err = procedure.RetrieveClusterBlock(suite.db.Reader(), header.Header.ID(), &built)
 	assert.NoError(t, err)
 	builtCollection := built.Payload.Collection
 
@@ -794,7 +794,6 @@ func (suite *BuilderSuite) TestBuildOn_EmptyMempool() {
 	suite.Require().NoError(err)
 
 	var built model.Block
-	err = suite.db.View(procedure.RetrieveClusterBlock(header.Header.ID(), &built))
 	err = procedure.RetrieveClusterBlock(suite.db.Reader(), header.Header.ID(), &built)
 	suite.Require().NoError(err)
 
@@ -1214,11 +1213,6 @@ func benchmarkBuildOn(b *testing.B, size int) {
 			return procedure.InsertClusterBlock(lctx, rw, unittest.ClusterProposalFromBlock(block))
 		})
 		lctx.Release()
-		block := unittest.ClusterBlockFixture(
-			unittest.ClusterBlock.WithParent(final),
-		)
-		err := suite.db.Update(procedure.InsertClusterBlock(unittest.ClusterProposalFromBlock(block)))
-		require.NoError(b, err)
 
 		// finalize the block 80% of the time, resulting in a fork-rate of 20%
 		if rand.Intn(100) < 80 {
