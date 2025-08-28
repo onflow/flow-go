@@ -9,7 +9,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/model/messages"
 )
 
 const msgStateTimeout = 20 * time.Second
@@ -78,7 +77,7 @@ func (ms *MsgState) WaitForMsgFrom(t *testing.T, predicate func(msg interface{})
 }
 
 func MsgIsChunkDataPackResponse(msg interface{}) bool {
-	_, ok := msg.(*messages.ChunkDataResponse)
+	_, ok := msg.(*flow.ChunkDataResponse)
 	return ok
 }
 

@@ -114,24 +114,29 @@ func TestHandleChunkDataPack_HappyPath(t *testing.T) {
 	s := setupTest()
 	e := newRequesterEngine(t, s)
 
-	response := unittest.ChunkDataResponseMsgFixture(unittest.IdentifierFixture())
-	request := unittest.ChunkDataPackRequestFixture(unittest.WithChunkID(response.ChunkDataPack.ChunkID))
+	responseMsg := unittest.ChunkDataResponseMsgFixture(unittest.IdentifierFixture())
+	internal, err := responseMsg.ToInternal()
+	require.NoError(t, err)
+	responseInternal, ok := internal.(*flow.ChunkDataResponse)
+	require.True(t, ok)
+
+	request := unittest.ChunkDataPackRequestFixture(unittest.WithChunkID(responseMsg.ChunkDataPack.ChunkID))
 	originID := unittest.IdentifierFixture()
 
 	// we remove pending request on receiving this response
 	locators := chunks.LocatorMap{}
 	locator := unittest.ChunkLocatorFixture(request.ResultID, request.Index)
 	locators[locator.ID()] = locator
-	s.pendingRequests.On("PopAll", response.ChunkDataPack.ChunkID).Return(locators, true).Once()
+	s.pendingRequests.On("PopAll", responseMsg.ChunkDataPack.ChunkID).Return(locators, true).Once()
 
 	s.handler.On("HandleChunkDataPack", originID, &verification.ChunkDataPackResponse{
 		Locator: *unittest.ChunkLocatorFixture(request.ResultID, request.Index),
-		Cdp:     &response.ChunkDataPack,
+		Cdp:     &responseInternal.ChunkDataPack,
 	}).Return().Once()
 	s.metrics.On("OnChunkDataPackResponseReceivedFromNetworkByRequester").Return().Once()
 	s.metrics.On("OnChunkDataPackSentToFetcher").Return().Once()
 
-	err := e.Process(channels.RequestChunks, originID, response)
+	err = e.Process(channels.RequestChunks, originID, responseInternal)
 	require.NoError(t, err)
 
 	testifymock.AssertExpectationsForObjects(t, s.con, s.handler, s.pendingRequests, s.metrics)
@@ -149,18 +154,22 @@ func TestHandleChunkDataPack_HappyPath_Multiple(t *testing.T) {
 	requests := unittest.ChunkDataPackRequestListFixture(count)
 	originID := unittest.IdentifierFixture()
 	chunkIDs := toChunkIDs(t, requests)
-	responses := unittest.ChunkDataResponseMessageListFixture(chunkIDs)
+	responsesMsg := unittest.ChunkDataResponseMessageListFixture(chunkIDs)
 
 	// we remove pending request on receiving this response
 	mockPendingRequestsPopAll(t, s.pendingRequests, requests)
 	// we pass each chunk data pack and its collection to chunk data pack handler
 	handlerWG := mockChunkDataPackHandler(t, s.handler, requests)
 
-	s.metrics.On("OnChunkDataPackResponseReceivedFromNetworkByRequester").Return().Times(len(responses))
-	s.metrics.On("OnChunkDataPackSentToFetcher").Return().Times(len(responses))
+	s.metrics.On("OnChunkDataPackResponseReceivedFromNetworkByRequester").Return().Times(len(responsesMsg))
+	s.metrics.On("OnChunkDataPackSentToFetcher").Return().Times(len(responsesMsg))
 
-	for _, response := range responses {
-		err := e.Process(channels.RequestChunks, originID, response)
+	for _, response := range responsesMsg {
+		internal, err := response.ToInternal()
+		require.NoError(t, err)
+		responseInternal, ok := internal.(*flow.ChunkDataResponse)
+		require.True(t, ok)
+		err = e.Process(channels.RequestChunks, originID, responseInternal)
 		require.NoError(t, err)
 	}
 
@@ -177,16 +186,20 @@ func TestHandleChunkDataPack_FailedRequestRemoval(t *testing.T) {
 	s := setupTest()
 	e := newRequesterEngine(t, s)
 
-	response := unittest.ChunkDataResponseMsgFixture(unittest.IdentifierFixture())
+	responseMsg := unittest.ChunkDataResponseMsgFixture(unittest.IdentifierFixture())
+	internal, err := responseMsg.ToInternal()
+	require.NoError(t, err)
+	responseInternal, ok := internal.(*flow.ChunkDataResponse)
+	require.True(t, ok)
 	originID := unittest.IdentifierFixture()
 
 	// however by the time we try remove it, the request has gone.
 	// this can happen when duplicate chunk data packs are coming concurrently.
 	// the concurrency is safe with pending requests mempool's mutex lock.
-	s.pendingRequests.On("PopAll", response.ChunkDataPack.ChunkID).Return(nil, false).Once()
+	s.pendingRequests.On("PopAll", responseMsg.ChunkDataPack.ChunkID).Return(nil, false).Once()
 	s.metrics.On("OnChunkDataPackResponseReceivedFromNetworkByRequester").Return().Once()
 
-	err := e.Process(channels.RequestChunks, originID, response)
+	err = e.Process(channels.RequestChunks, originID, responseInternal)
 	require.NoError(t, err)
 
 	testifymock.AssertExpectationsForObjects(t, s.pendingRequests, s.con, s.metrics)
@@ -242,7 +255,12 @@ func TestCompleteRequestingUnsealedChunkLifeCycle(t *testing.T) {
 		unittest.WithHeightGreaterThan(sealedHeight),
 		unittest.WithAgrees(agrees),
 		unittest.WithDisagrees(disagrees))
-	response := unittest.ChunkDataResponseMsgFixture(requests[0].ChunkID)
+
+	responseMsg := unittest.ChunkDataResponseMsgFixture(requests[0].ChunkID)
+	internal, err := responseMsg.ToInternal()
+	require.NoError(t, err)
+	responseInternal, ok := internal.(*flow.ChunkDataResponse)
+	require.True(t, ok)
 
 	// mocks the requester pipeline
 	vertestutils.MockLastSealedHeight(s.state, sealedHeight)
@@ -266,7 +284,7 @@ func TestCompleteRequestingUnsealedChunkLifeCycle(t *testing.T) {
 
 	// we wait till the engine submits the chunk request to the network, and receive the response
 	conduitWG := mockConduitForChunkDataPackRequest(t, s.con, requests, 1, func(request *flow.ChunkDataRequest) {
-		err := e.Process(channels.RequestChunks, requests[0].Agrees[0], response)
+		err := e.Process(channels.RequestChunks, requests[0].Agrees[0], responseInternal)
 		require.NoError(t, err)
 	})
 	unittest.RequireReturnsBefore(t, requestHistoryWG.Wait, time.Duration(2)*s.retryInterval, "could not check chunk requests qualification on time")
@@ -346,7 +364,9 @@ func TestReceivingChunkDataResponseForDuplicateChunkRequests(t *testing.T) {
 	resultA, _, _, _ := vertestutils.ExecutionResultForkFixture(t)
 
 	duplicateChunkID := resultA.Chunks[0].ID()
-	responseA := unittest.ChunkDataResponseMsgFixture(duplicateChunkID)
+	responseMsgA := unittest.ChunkDataResponseMsgFixture(duplicateChunkID)
+	responseInternalA, err := responseMsgA.ToInternal()
+	require.NoError(t, err)
 
 	requestA := unittest.ChunkDataPackRequestFixture(unittest.WithChunkID(duplicateChunkID))
 	requestB := unittest.ChunkDataPackRequestFixture(unittest.WithChunkID(duplicateChunkID))
@@ -360,7 +380,7 @@ func TestReceivingChunkDataResponseForDuplicateChunkRequests(t *testing.T) {
 	s.metrics.On("OnChunkDataPackResponseReceivedFromNetworkByRequester").Return().Once()
 	s.metrics.On("OnChunkDataPackSentToFetcher").Return().Twice()
 
-	err := e.Process(channels.RequestChunks, originID, responseA)
+	err = e.Process(channels.RequestChunks, originID, responseInternalA)
 	require.NoError(t, err)
 
 	unittest.RequireReturnsBefore(t, handlerWG.Wait, time.Second, "could not handle chunk data responses on time")

@@ -342,7 +342,7 @@ func (e *Engine) deliverChunkDataResponse(chunkDataPack *flow.ChunkDataPack, req
 	}
 
 	response := &messages.ChunkDataResponse{
-		ChunkDataPack: *chunkDataPack,
+		ChunkDataPack: (flow.UntrustedChunkDataPack)(*chunkDataPack),
 		Nonce:         nonce,
 	}
 
