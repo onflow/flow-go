@@ -15,19 +15,21 @@ import (
 // This method silently overrides existing data, which is safe only if for the same key, we
 // always write the same value.
 //
-// No other errors are expected during normal operation.
+// No errors are expected during normal operation.
 func InsertSeal(w storage.Writer, sealID flow.Identifier, seal *flow.Seal) error {
 	return UpsertByKey(w, MakePrefix(codeSeal, sealID), seal)
 }
 
-// RetrieveSeal retrieves [flow.Seal] by its ID.
+// RetrieveSeal retrieves the [flow.Seal] by its ID.
 // Expected errors during normal operations:
 //   - [storage.ErrNotFound] if no seal with the specified `sealID` is known.
 func RetrieveSeal(r storage.Reader, sealID flow.Identifier, seal *flow.Seal) error {
 	return RetrieveByKey(r, MakePrefix(codeSeal, sealID), seal)
 }
 
-// IndexPayloadSeals indexes the given Seal IDs by the block ID.
+// IndexPayloadSeals indexes the list of Seals that were included in the specified block by the block ID.
+// It produces a mapping from block ID to the list of seals contained in the block's payload.
+// The seals are represented by their respective IDs.
 //
 // CAUTION:
 //   - The caller must acquire the [storage.LockInsertBlock] and hold it until the database write has been committed.
@@ -39,7 +41,7 @@ func RetrieveSeal(r storage.Reader, sealID flow.Identifier, seal *flow.Seal) err
 //     serves as a reminder that the CALLER is responsible to ensure that the DEDUPLICATION CHECK is done elsewhere
 //     ATOMICALLY with this write operation.
 //
-// No other errors are expected during normal operation.
+// No errors are expected during normal operation.
 func IndexPayloadSeals(lctx lockctx.Proof, w storage.Writer, blockID flow.Identifier, sealIDs []flow.Identifier) error {
 	if !lctx.HoldsLock(storage.LockInsertBlock) {
 		return fmt.Errorf("cannot index seal for blockID %v without holding lock %s",
@@ -56,7 +58,9 @@ func LookupPayloadSeals(r storage.Reader, blockID flow.Identifier, sealIDs *[]fl
 	return RetrieveByKey(r, MakePrefix(codePayloadSeals, blockID), sealIDs)
 }
 
-// IndexPayloadReceipts indexes the given Execution Receipt IDs by the block ID.
+// IndexPayloadReceipts indexes the list of Execution Receipts that were included in the specified block by the block ID.
+// It produces a mapping from block ID to the list of Receipts contained in the block's payload.
+// Execution Receipts are represented by their respective IDs.
 //
 // CAUTION:
 //   - The caller must acquire the [storage.LockInsertBlock] and hold it until the database write has been committed.
@@ -68,7 +72,7 @@ func LookupPayloadSeals(r storage.Reader, blockID flow.Identifier, sealIDs *[]fl
 //     serves as a reminder that the CALLER is responsible to ensure that the DEDUPLICATION CHECK is done elsewhere
 //     ATOMICALLY with this write operation.
 //
-// No other errors are expected during normal operation.
+// No errors are expected during normal operation.
 func IndexPayloadReceipts(lctx lockctx.Proof, w storage.Writer, blockID flow.Identifier, receiptIDs []flow.Identifier) error {
 	if !lctx.HoldsLock(storage.LockInsertBlock) {
 		return fmt.Errorf("cannot index seal for blockID %v without holding lock %s",
@@ -77,7 +81,9 @@ func IndexPayloadReceipts(lctx lockctx.Proof, w storage.Writer, blockID flow.Ide
 	return UpsertByKey(w, MakePrefix(codePayloadReceipts, blockID), receiptIDs)
 }
 
-// IndexPayloadResults indexes the given Execution Result IDs by the block ID.
+// IndexPayloadResults indexes the list of Execution Results that were included in the specified block by the block ID.
+// It produces a mapping from block ID to the list of Results contained in the block's payload.
+// Execution Results are represented by their respective IDs.
 //
 // CAUTION:
 //   - The caller must acquire the [storage.LockInsertBlock] and hold it until the database write has been committed.
@@ -89,7 +95,7 @@ func IndexPayloadReceipts(lctx lockctx.Proof, w storage.Writer, blockID flow.Ide
 //     serves as a reminder that the CALLER is responsible to ensure that the DEDUPLICATION CHECK is done elsewhere
 //     ATOMICALLY with this write operation.
 //
-// No other errors are expected during normal operation.
+// No errors are expected during normal operation.
 func IndexPayloadResults(lctx lockctx.Proof, w storage.Writer, blockID flow.Identifier, resultIDs []flow.Identifier) error {
 	if !lctx.HoldsLock(storage.LockInsertBlock) {
 		return fmt.Errorf("cannot index seal for blockID %v without holding lock %s",
@@ -99,6 +105,8 @@ func IndexPayloadResults(lctx lockctx.Proof, w storage.Writer, blockID flow.Iden
 }
 
 // IndexPayloadProtocolStateID indexes the given Protocol State ID by the block ID.
+// The Protocol State ID represents the configuration, which the block proposes to become active *after* the
+// block's certification. Every block states the ID of the Protocol State it proposes as part of the payload.
 //
 // CAUTION:
 //   - The caller must acquire the [storage.LockInsertBlock] and hold it until the database write has been committed.
@@ -110,7 +118,7 @@ func IndexPayloadResults(lctx lockctx.Proof, w storage.Writer, blockID flow.Iden
 //     serves as a reminder that the CALLER is responsible to ensure that the DEDUPLICATION CHECK is done elsewhere
 //     ATOMICALLY with this write operation.
 //
-// No other errors are expected during normal operation.
+// No errors are expected during normal operation.
 func IndexPayloadProtocolStateID(lctx lockctx.Proof, w storage.Writer, blockID flow.Identifier, stateID flow.Identifier) error {
 	if !lctx.HoldsLock(storage.LockInsertBlock) {
 		return fmt.Errorf("cannot index seal for blockID %v without holding lock %s",
@@ -120,33 +128,34 @@ func IndexPayloadProtocolStateID(lctx lockctx.Proof, w storage.Writer, blockID f
 }
 
 // LookupPayloadProtocolStateID retrieves the Protocol State ID for the specified block.
-// For every known block, the protocol state at the end of the block should be specified
-// in the payload, and hence be indexed.
+// The Protocol State ID represents the configuration, which the block proposes to become active *after*
+// the block's certification. For every known block (at or above the root block height), the protocol
+// state at the end of the block should be specified in the payload, and hence be indexed.
 // Expected errors during normal operations:
 //   - [storage.ErrNotFound] if `blockID` does not refer to a known block
 func LookupPayloadProtocolStateID(r storage.Reader, blockID flow.Identifier, stateID *flow.Identifier) error {
 	return RetrieveByKey(r, MakePrefix(codePayloadProtocolStateID, blockID), stateID)
 }
 
-// LookupPayloadReceipts retrieves the list of Execution Receipts that were included in the payload
-// of the specified block. For every known block, this index should be populated (at or above the root block).
+// LookupPayloadReceipts retrieves the list of Execution Receipts that were included in the payload of the
+// specified block. For every known block (at or above the root block height), this index should be populated.
 // Expected errors during normal operations:
 //   - [storage.ErrNotFound] if `blockID` does not refer to a known block.
 func LookupPayloadReceipts(r storage.Reader, blockID flow.Identifier, receiptIDs *[]flow.Identifier) error {
 	return RetrieveByKey(r, MakePrefix(codePayloadReceipts, blockID), receiptIDs)
 }
 
-// LookupPayloadResults retrieves the list of Execution Results that were included in the payload
-// of the specified block. For every known block, this index should be populated (at or above the root block).
+// LookupPayloadResults retrieves the list of Execution Results that were included in the payload of the
+// specified block. For every known block (at or above the root block height), this index should be populated.
 // Expected errors during normal operations:
 //   - [storage.ErrNotFound] if `blockID` does not refer to a known block
 func LookupPayloadResults(r storage.Reader, blockID flow.Identifier, resultIDs *[]flow.Identifier) error {
 	return RetrieveByKey(r, MakePrefix(codePayloadResults, blockID), resultIDs)
 }
 
-// IndexLatestSealAtBlock persists the highest seal that was included in the fork up to (and including) blockID.
-// In most cases, it is the highest seal included in this block's payload. However, if there are no
-// seals in this block, sealID should reference the highest seal in blockID's ancestor.
+// IndexLatestSealAtBlock persists the highest seal that was included in the fork with head blockID.
+// Frequently, the highest seal included in this block's payload. However, if there are no seals in
+// this block, sealID should reference the highest seal in blockID's ancestors.
 //
 // CAUTION:
 //   - The caller must acquire the [storage.LockInsertBlock] and hold it until the database write has been committed.
@@ -158,7 +167,7 @@ func LookupPayloadResults(r storage.Reader, blockID flow.Identifier, resultIDs *
 //     serves as a reminder that the CALLER is responsible to ensure that the DEDUPLICATION CHECK is done elsewhere
 //     ATOMICALLY with this write operation.
 //
-// No other errors are expected during normal operation.
+// No errors are expected during normal operation.
 func IndexLatestSealAtBlock(lctx lockctx.Proof, w storage.Writer, blockID flow.Identifier, sealID flow.Identifier) error {
 	if !lctx.HoldsLock(storage.LockInsertBlock) {
 		return fmt.Errorf("missing required lock: %s", storage.LockInsertBlock)
@@ -167,8 +176,9 @@ func IndexLatestSealAtBlock(lctx lockctx.Proof, w storage.Writer, blockID flow.I
 }
 
 // LookupLatestSealAtBlock finds the highest seal that was included in the fork up to (and including) blockID.
-// In most cases, it is the highest seal included in this block's payload. However, if there are no
-// seals in this block, sealID should reference the highest seal in blockID's ancestor.
+// Frequently, the highest seal included in this block's payload. However, if there are no seals in
+// this block, sealID should reference the highest seal in blockID's ancestors.
+//
 // Expected errors during normal operations:
 //   - [storage.ErrNotFound] if the specified block is unknown
 func LookupLatestSealAtBlock(r storage.Reader, blockID flow.Identifier, sealID *flow.Identifier) error {
@@ -190,13 +200,16 @@ func LookupLatestSealAtBlock(r storage.Reader, blockID flow.Identifier, sealID *
 //     serves as a reminder that the CALLER is responsible to ensure that the DEDUPLICATION CHECK is done elsewhere
 //     ATOMICALLY with this write operation.
 //
-// No other errors are expected during normal operation.
+// No errors are expected during normal operation.
 func IndexFinalizedSealByBlockID(w storage.Writer, sealedBlockID flow.Identifier, sealID flow.Identifier) error {
 	return UpsertByKey(w, MakePrefix(codeBlockIDToFinalizedSeal, sealedBlockID), sealID)
 }
 
-// LookupBySealedBlockID finds the latest seal in the fork with head `blockID`.
-// For every block, the latest seal should be indexed.
+// LookupBySealedBlockID returns the finalized seal for the specified FINALIZED block ID.
+// In order for a block to have a seal in a finalized block, it must itself be finalized. Hence,
+// this function only works for finalized blocks. However, note that there might be finalized
+// for which no seal exits (or the block containing the seal might not yet be finalized).
+//
 // Expected errors during normal operations:
 //   - [storage.ErrNotFound] if no seal for the specified block is known.
 func LookupBySealedBlockID(r storage.Reader, blockID flow.Identifier, sealID *flow.Identifier) error {
