@@ -127,7 +127,9 @@ func run(*cobra.Command, []string) {
 		}
 	}
 
-	debugger := debug.NewRemoteDebugger(chain, log.Logger)
+	// TODO:
+	const traceCadence = false
+	debugger := debug.NewRemoteDebugger(chain, log.Logger, traceCadence)
 
 	// TODO: add support for arguments
 	var arguments [][]byte
