@@ -29,7 +29,7 @@ type All struct {
 
 func InitAll(metrics module.CacheMetrics, db storage.DB) *All {
 	headers := NewHeaders(metrics, db)
-	guarantees := NewGuarantees(metrics, db, DefaultCacheSize)
+	guarantees := NewGuarantees(metrics, db, DefaultCacheSize, DefaultCacheSize)
 	seals := NewSeals(metrics, db)
 	index := NewIndex(metrics, db)
 	results := NewExecutionResults(metrics, db)

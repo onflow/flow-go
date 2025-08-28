@@ -17,8 +17,18 @@ import (
 type Blocks interface {
 
 	// BatchStore stores a valid block in a batch.
+	// Error returns:
+	//   - storage.ErrAlreadyExists if the blockID already exists in the database.
+	//   - generic error in case of unexpected failure from the database layer or encoding failure.
 	BatchStore(lctx lockctx.Proof, rw ReaderBatchWriter, proposal *flow.Proposal) error
 
+	// ByID returns the block with the given hash. It is available for all incorporated blocks (validated blocks
+	// that have been appended to any of the known forks) no matter whether the block has been finalized or not.
+	//
+	// Error returns:
+	//   - storage.ErrNotFound if no block with the corresponding ID was found
+	//   - generic error in case of unexpected failure from the database layer, or failure
+	//     to decode an existing database value
 	ByID(blockID flow.Identifier) (*flow.Block, error)
 
 	// ProposalByID returns the block with the given ID, along with the proposer's signature on it.
@@ -40,15 +50,6 @@ type Blocks interface {
 	//     to decode an existing database value
 	ByHeight(height uint64) (*flow.Block, error)
 
-	// ByView returns the block with the given view. It is only available for certified blocks.
-	// Certified blocks are the blocks that have received a QC. Hotstuff guarantees that for each view,
-	// at most one block is certified. Hence, the return value of `ByView` is guaranteed to be unique
-	// even for non-finalized blocks.
-	// Expected errors during normal operations:
-	//   - `storage.ErrNotFound` if no certified block is known at given view.
-	//
-	// ByView(view uint64) (*flow.Header, error)
-
 	// ProposalByHeight returns the block at the given height, along with the proposer's
 	// signature on it. It is only available for finalized blocks.
 	//
@@ -57,6 +58,15 @@ type Blocks interface {
 	//   - generic error in case of unexpected failure from the database layer, or failure
 	//     to decode an existing database value
 	ProposalByHeight(height uint64) (*flow.Proposal, error)
+
+	// ByView returns the block with the given view. It is only available for certified blocks.
+	// Certified blocks are the blocks that have received a QC. Hotstuff guarantees that for each view,
+	// at most one block is certified. Hence, the return value of `ByView` is guaranteed to be unique
+	// even for non-finalized blocks.
+	// Expected errors during normal operations:
+	//   - `storage.ErrNotFound` if no certified block is known at given view.
+	//
+	// ByView(view uint64) (*flow.Header, error)
 
 	// ByCollectionID returns the block for the given collection ID.
 	// This method is only available for collections included in finalized blocks.

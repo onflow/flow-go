@@ -11,7 +11,7 @@ import (
 	"github.com/onflow/flow-go/storage/operation"
 )
 
-// IndexNewBlock will add parent-child index for the new block.
+// IndexNewBlock and IndexNewClusterBlock will add parent-child index for the new block.
 //   - Each block has a parent, we use this parent-child relationship to build a reverse index
 //     for looking up children blocks for a given block. This is useful for forks recovery
 //     where we want to find all the pending children blocks for the lastest finalized block.
@@ -35,7 +35,7 @@ func IndexNewBlock(lctx lockctx.Proof, rw storage.ReaderBatchWriter, blockID flo
 
 func IndexNewClusterBlock(lctx lockctx.Proof, rw storage.ReaderBatchWriter, blockID flow.Identifier, parentID flow.Identifier) error {
 	if !lctx.HoldsLock(storage.LockInsertOrFinalizeClusterBlock) {
-		return fmt.Errorf("missing required lock: %s", storage.LockInsertBlock)
+		return fmt.Errorf("missing required lock: %s", storage.LockInsertOrFinalizeClusterBlock)
 	}
 
 	return insertNewBlock(lctx, rw, blockID, parentID)

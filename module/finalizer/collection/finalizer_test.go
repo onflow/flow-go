@@ -57,33 +57,24 @@ func TestFinalizer(t *testing.T) {
 			require.NoError(t, err)
 			state, err = cluster.Bootstrap(db, lockManager, stateRoot)
 			require.NoError(t, err)
-<<<<<<< HEAD
 
 			lctx := lockManager.NewContext()
 			require.NoError(t, lctx.AcquireLock(storage.LockInsertOrFinalizeClusterBlock))
 			err = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-				return operation.InsertHeader(lctx, rw, refBlock.ID(), refBlock)
+				return operation.InsertHeader(lctx, rw, refBlock.ID(), refBlock.ToHeader())
 			})
-=======
-			err = db.Update(operation.InsertHeader(refBlock.ID(), refBlock.ToHeader()))
->>>>>>> master
 			require.NoError(t, err)
 			lctx.Release()
 		}
 
 		// a helper function to insert a block
-<<<<<<< HEAD
-		insert := func(db storage.DB, lockManager lockctx.Manager, block model.Block) {
+		insert := func(db storage.DB, lockManager lockctx.Manager, block *model.Block) {
 			lctx := lockManager.NewContext()
 			defer lctx.Release()
 			require.NoError(t, lctx.AcquireLock(storage.LockInsertOrFinalizeClusterBlock))
 			err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-				return procedure.InsertClusterBlock(lctx, rw, &block)
+				return procedure.InsertClusterBlock(lctx, rw, unittest.ClusterProposalFromBlock(block))
 			})
-=======
-		insert := func(block *model.Block) {
-			err := db.Update(procedure.InsertClusterBlock(unittest.ClusterProposalFromBlock(block)))
->>>>>>> master
 			assert.NoError(t, err)
 		}
 
@@ -112,11 +103,6 @@ func TestFinalizer(t *testing.T) {
 			assert.True(t, pool.Add(tx1.ID(), &tx1))
 
 			// create a new block on genesis
-<<<<<<< HEAD
-			block := unittest.ClusterBlockWithParent(genesis)
-			block.SetPayload(model.PayloadFromTransactions(refBlock.ID(), &tx1))
-			insert(db, lockManager, block)
-=======
 			payload, err := model.NewPayload(
 				model.UntrustedPayload{
 					ReferenceBlockID: refBlock.ID(),
@@ -128,8 +114,8 @@ func TestFinalizer(t *testing.T) {
 				unittest.ClusterBlock.WithParent(genesis),
 				unittest.ClusterBlock.WithPayload(*payload),
 			)
-			insert(block)
->>>>>>> master
+
+			insert(db, lockManager, block)
 
 			// finalize the block
 			err = finalizer.MakeFinal(block.ID())
@@ -148,19 +134,13 @@ func TestFinalizer(t *testing.T) {
 			finalizer := collection.NewFinalizer(db, lockManager, pool, pusher, metrics)
 
 			// create a new block that isn't connected to a parent
-<<<<<<< HEAD
-			block := unittest.ClusterBlockWithParent(genesis)
-			block.Header.ParentID = unittest.IdentifierFixture()
-			block.SetPayload(model.EmptyPayload(refBlock.ID()))
-			insert(db, lockManager, block)
-=======
 			block := unittest.ClusterBlockFixture(
 				unittest.ClusterBlock.WithParent(genesis),
 				unittest.ClusterBlock.WithPayload(*model.NewEmptyPayload(refBlock.ID())),
 			)
 			block.ParentID = unittest.IdentifierFixture()
-			insert(block)
->>>>>>> master
+
+			insert(db, lockManager, block)
 
 			// try to finalize - this should fail
 			err := finalizer.MakeFinal(block.ID())
@@ -175,17 +155,11 @@ func TestFinalizer(t *testing.T) {
 			finalizer := collection.NewFinalizer(db, lockManager, pool, pusher, metrics)
 
 			// create a block with empty payload on genesis
-<<<<<<< HEAD
-			block := unittest.ClusterBlockWithParent(genesis)
-			block.SetPayload(model.EmptyPayload(refBlock.ID()))
-			insert(db, lockManager, block)
-=======
 			block := unittest.ClusterBlockFixture(
 				unittest.ClusterBlock.WithParent(genesis),
 				unittest.ClusterBlock.WithPayload(*model.NewEmptyPayload(refBlock.ID())),
 			)
-			insert(block)
->>>>>>> master
+			insert(db, lockManager, block)
 
 			// finalize the block
 			err := finalizer.MakeFinal(block.ID())
@@ -214,11 +188,6 @@ func TestFinalizer(t *testing.T) {
 			assert.True(t, pool.Add(tx2.ID(), &tx2))
 
 			// create a block containing tx1 on top of genesis
-<<<<<<< HEAD
-			block := unittest.ClusterBlockWithParent(genesis)
-			block.SetPayload(model.PayloadFromTransactions(refBlock.ID(), &tx1))
-			insert(db, lockManager, block)
-=======
 			payload, err := model.NewPayload(
 				model.UntrustedPayload{
 					ReferenceBlockID: refBlock.ID(),
@@ -230,8 +199,7 @@ func TestFinalizer(t *testing.T) {
 				unittest.ClusterBlock.WithParent(genesis),
 				unittest.ClusterBlock.WithPayload(*payload),
 			)
-			insert(block)
->>>>>>> master
+			insert(db, lockManager, block)
 
 			// block should be passed to pusher
 			pusher.On("SubmitCollectionGuarantee", &flow.CollectionGuarantee{
@@ -254,13 +222,8 @@ func TestFinalizer(t *testing.T) {
 			// check finalized boundary using cluster state
 			final, err := state.Final().Head()
 			assert.NoError(t, err)
-<<<<<<< HEAD
-			assert.Equal(t, block.ID(), final.ID())
-			assertClusterBlocksIndexedByReferenceHeight(t, lockManager, db, refBlock.Height, final.ID())
-=======
 			assert.Equal(t, block.ToHeader().ID(), final.ID())
-			assertClusterBlocksIndexedByReferenceHeight(t, db, refBlock.Height, final.ID())
->>>>>>> master
+			assertClusterBlocksIndexedByReferenceHeight(t, lockManager, db, refBlock.Height, final.ID())
 		})
 
 		// when finalizing a block with un-finalized ancestors, those ancestors should be finalized as well
@@ -279,16 +242,6 @@ func TestFinalizer(t *testing.T) {
 			assert.True(t, pool.Add(tx2.ID(), &tx2))
 
 			// create a block containing tx1 on top of genesis
-<<<<<<< HEAD
-			block1 := unittest.ClusterBlockWithParent(genesis)
-			block1.SetPayload(model.PayloadFromTransactions(refBlock.ID(), &tx1))
-			insert(db, lockManager, block1)
-
-			// create a block containing tx2 on top of block1
-			block2 := unittest.ClusterBlockWithParent(&block1)
-			block2.SetPayload(model.PayloadFromTransactions(refBlock.ID(), &tx2))
-			insert(db, lockManager, block2)
-=======
 			payload, err := model.NewPayload(
 				model.UntrustedPayload{
 					ReferenceBlockID: refBlock.ID(),
@@ -300,7 +253,7 @@ func TestFinalizer(t *testing.T) {
 				unittest.ClusterBlock.WithParent(genesis),
 				unittest.ClusterBlock.WithPayload(*payload),
 			)
-			insert(block1)
+			insert(db, lockManager, block1)
 
 			// create a block containing tx2 on top of block1
 			payload, err = model.NewPayload(
@@ -314,8 +267,7 @@ func TestFinalizer(t *testing.T) {
 				unittest.ClusterBlock.WithParent(block1),
 				unittest.ClusterBlock.WithPayload(*payload),
 			)
-			insert(block2)
->>>>>>> master
+			insert(db, lockManager, block2)
 
 			// both blocks should be passed to pusher
 			pusher.On("SubmitCollectionGuarantee", &flow.CollectionGuarantee{
@@ -344,13 +296,8 @@ func TestFinalizer(t *testing.T) {
 			// check finalized boundary using cluster state
 			final, err := state.Final().Head()
 			assert.NoError(t, err)
-<<<<<<< HEAD
-			assert.Equal(t, block2.ID(), final.ID())
-			assertClusterBlocksIndexedByReferenceHeight(t, lockManager, db, refBlock.Height, block1.ID(), block2.ID())
-=======
 			assert.Equal(t, block2.ToHeader().ID(), final.ID())
-			assertClusterBlocksIndexedByReferenceHeight(t, db, refBlock.Height, block1.ID(), block2.ID())
->>>>>>> master
+			assertClusterBlocksIndexedByReferenceHeight(t, lockManager, db, refBlock.Height, block1.ID(), block2.ID())
 		})
 
 		t.Run("finalize with un-finalized child", func(t *testing.T) {
@@ -368,16 +315,6 @@ func TestFinalizer(t *testing.T) {
 			assert.True(t, pool.Add(tx2.ID(), &tx2))
 
 			// create a block containing tx1 on top of genesis
-<<<<<<< HEAD
-			block1 := unittest.ClusterBlockWithParent(genesis)
-			block1.SetPayload(model.PayloadFromTransactions(refBlock.ID(), &tx1))
-			insert(db, lockManager, block1)
-
-			// create a block containing tx2 on top of block1
-			block2 := unittest.ClusterBlockWithParent(&block1)
-			block2.SetPayload(model.PayloadFromTransactions(refBlock.ID(), &tx2))
-			insert(db, lockManager, block2)
-=======
 			payload, err := model.NewPayload(
 				model.UntrustedPayload{
 					ReferenceBlockID: refBlock.ID(),
@@ -389,7 +326,7 @@ func TestFinalizer(t *testing.T) {
 				unittest.ClusterBlock.WithParent(genesis),
 				unittest.ClusterBlock.WithPayload(*payload),
 			)
-			insert(block1)
+			insert(db, lockManager, block1)
 
 			// create a block containing tx2 on top of block1
 			payload, err = model.NewPayload(
@@ -403,8 +340,7 @@ func TestFinalizer(t *testing.T) {
 				unittest.ClusterBlock.WithParent(block1),
 				unittest.ClusterBlock.WithPayload(*payload),
 			)
-			insert(block2)
->>>>>>> master
+			insert(db, lockManager, block2)
 
 			// block should be passed to pusher
 			pusher.On("SubmitCollectionGuarantee", &flow.CollectionGuarantee{
@@ -427,13 +363,8 @@ func TestFinalizer(t *testing.T) {
 			// check finalized boundary using cluster state
 			final, err := state.Final().Head()
 			assert.NoError(t, err)
-<<<<<<< HEAD
-			assert.Equal(t, block1.ID(), final.ID())
-			assertClusterBlocksIndexedByReferenceHeight(t, lockManager, db, refBlock.Height, block1.ID())
-=======
 			assert.Equal(t, block1.ToHeader().ID(), final.ID())
-			assertClusterBlocksIndexedByReferenceHeight(t, db, refBlock.Height, block1.ID())
->>>>>>> master
+			assertClusterBlocksIndexedByReferenceHeight(t, lockManager, db, refBlock.Height, block1.ID())
 		})
 
 		// when finalizing a block with a conflicting fork, the fork should not be finalized.
@@ -452,16 +383,6 @@ func TestFinalizer(t *testing.T) {
 			assert.True(t, pool.Add(tx2.ID(), &tx2))
 
 			// create a block containing tx1 on top of genesis
-<<<<<<< HEAD
-			block1 := unittest.ClusterBlockWithParent(genesis)
-			block1.SetPayload(model.PayloadFromTransactions(refBlock.ID(), &tx1))
-			insert(db, lockManager, block1)
-
-			// create a block containing tx2 on top of genesis (conflicting with block1)
-			block2 := unittest.ClusterBlockWithParent(genesis)
-			block2.SetPayload(model.PayloadFromTransactions(refBlock.ID(), &tx2))
-			insert(db, lockManager, block2)
-=======
 			payload, err := model.NewPayload(
 				model.UntrustedPayload{
 					ReferenceBlockID: refBlock.ID(),
@@ -473,7 +394,7 @@ func TestFinalizer(t *testing.T) {
 				unittest.ClusterBlock.WithParent(genesis),
 				unittest.ClusterBlock.WithPayload(*payload),
 			)
-			insert(block1)
+			insert(db, lockManager, block1)
 
 			// create a block containing tx2 on top of genesis (conflicting with block1)
 			payload, err = model.NewPayload(
@@ -487,8 +408,7 @@ func TestFinalizer(t *testing.T) {
 				unittest.ClusterBlock.WithParent(genesis),
 				unittest.ClusterBlock.WithPayload(*payload),
 			)
-			insert(block2)
->>>>>>> master
+			insert(db, lockManager, block2)
 
 			// block should be passed to pusher
 			pusher.On("SubmitCollectionGuarantee", &flow.CollectionGuarantee{
@@ -511,13 +431,8 @@ func TestFinalizer(t *testing.T) {
 			// check finalized boundary using cluster state
 			final, err := state.Final().Head()
 			assert.NoError(t, err)
-<<<<<<< HEAD
-			assert.Equal(t, block1.ID(), final.ID())
-			assertClusterBlocksIndexedByReferenceHeight(t, lockManager, db, refBlock.Height, block1.ID())
-=======
 			assert.Equal(t, block1.ToHeader().ID(), final.ID())
-			assertClusterBlocksIndexedByReferenceHeight(t, db, refBlock.Height, block1.ID())
->>>>>>> master
+			assertClusterBlocksIndexedByReferenceHeight(t, lockManager, db, refBlock.Height, block1.ID())
 		})
 	})
 }

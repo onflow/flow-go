@@ -126,30 +126,18 @@ func NewFullConsensusState(
 }
 
 // ExtendCertified extends the protocol state of a CONSENSUS FOLLOWER. While it checks
-<<<<<<< HEAD
-// the validity of the header, it does _not_ check the validity of the payload.
-// Instead, the consensus follower relies on the consensus participants to
-// validate the full payload. Payload validity can be proved by a valid quorum certificate.
-// Certifying QC must match candidate block:
-=======
 // the validity of the header; it does _not_ check the validity of the payload.
 // Instead, the consensus follower relies on the consensus participants to validate the
 // full payload. Payload validity must be proven by a valid quorum certificate
 // (field `CertifiedBlock.CertifyingQC`). The certifying QC must match candidate block:
->>>>>>> master
 //
 //	candidate.View == certifyingQC.View && candidate.ID() == certifyingQC.BlockID
 //
 // CAUTION:
-<<<<<<< HEAD
-//   - This function expects that `certifyingQC ` has been validated. (otherwise, the state will be corrupted)
+//   - This function expects that `certified.CertifyingQC` has been validated. (otherwise, the state will be corrupted)
 //   - The PARENT block must already have been INGESTED.
 //   - Attempts to extend the state with the _same block concurrently_ are not allowed.
 //     (will not corrupt the state, but may lead to an exception)
-=======
-//   - This function expects that `certified.CertifyingQC` has been validated. (otherwise, the state will be corrupted)
-//   - The parent block must already have been ingested.
->>>>>>> master
 //
 // Per convention, the protocol state requires that the candidate's parent has already been ingested.
 // Other than that, all valid extensions are accepted. Even if we have enough information to determine that
@@ -170,15 +158,11 @@ func NewFullConsensusState(
 // with the same block. Hence, for simplicity, the FollowerState may reject such requests with an exception.
 //
 // No errors are expected during normal operations.
-<<<<<<< HEAD
 //   - In case of concurrent calls with the same `candidate` block, ExtendCertified may return a [storage.ErrAlreadyExists]
 //     or it may gracefully return. At the moment, ExtendCertified should be considered as not concurrency-safe.
-func (m *FollowerState) ExtendCertified(ctx context.Context, candidate *flow.Block, certifyingQC *flow.QuorumCertificate) error {
-=======
 func (m *FollowerState) ExtendCertified(ctx context.Context, certified *flow.CertifiedBlock) error {
 	candidate := &certified.Proposal.Block
 	certifyingQC := certified.CertifyingQC
->>>>>>> master
 	span, ctx := m.tracer.StartSpanFromContext(ctx, trace.ProtoStateMutatorHeaderExtend)
 	defer span.End()
 
@@ -199,11 +183,7 @@ func (m *FollowerState) ExtendCertified(ctx context.Context, certified *flow.Cer
 
 	deferredBlockPersist := deferred.NewDeferredBlockPersist()
 	// check if the block header is a valid extension of parent block
-<<<<<<< HEAD
-	err = m.headerExtend(ctx, candidate, certifyingQC, deferredBlockPersist)
-=======
-	err = m.headerExtend(ctx, certified.Proposal, certifyingQC, deferredDbOps)
->>>>>>> master
+	err = m.headerExtend(ctx, certified.Proposal, certifyingQC, deferredBlockPersist)
 	if err != nil {
 		// since we have a QC for this block, it cannot be an invalid extension
 		return fmt.Errorf("unexpected invalid block (id=%x) with certifying qc (id=%x): %s",
@@ -275,13 +255,9 @@ func (m *FollowerState) ExtendCertified(ctx context.Context, certified *flow.Cer
 // Expected errors during normal operations:
 //   - [state.OutdatedExtensionError] if the candidate block is orphaned
 //   - state.InvalidExtensionError if the candidate block is invalid
-<<<<<<< HEAD
 //   - In case of concurrent calls with the same `candidate` block, `Extend` may return a [storage.ErrAlreadyExists]
 //     or it may gracefully return. At the moment, `Extend` should be considered as not concurrency-safe.
-func (m *ParticipantState) Extend(ctx context.Context, candidate *flow.Block) error {
-=======
 func (m *ParticipantState) Extend(ctx context.Context, candidateProposal *flow.Proposal) error {
->>>>>>> master
 	span, ctx := m.tracer.StartSpanFromContext(ctx, trace.ProtoStateMutatorExtend)
 	defer span.End()
 	candidate := &candidateProposal.Block
@@ -293,22 +269,15 @@ func (m *ParticipantState) Extend(ctx context.Context, candidateProposal *flow.P
 		return err
 	}
 
-<<<<<<< HEAD
-	// The following function rejects the input block with an [state.OutdatedExtensionError] if and only if
-	// the block is orphaned or already finalized. If the block was to be finalized already, it would have been
-	// detected as already processed by the check above. Hence, `candidate` being orphaned is the only
-	// possible case to receive an [state.OutdatedExtensionError] here.
-	err = m.checkOutdatedExtension(candidate.Header)
-=======
-	// check if the block header is a valid extension of parent block
-	err = m.headerExtend(ctx, candidateProposal, nil, deferredDbOps)
 	if err != nil {
 		return fmt.Errorf("header not compliant with chain state: %w", err)
 	}
 
-	// check if the block header is a valid extension of the finalized state
-	err = m.checkOutdatedExtension(candidate.HeaderBody)
->>>>>>> master
+	// The following function rejects the input block with an [state.OutdatedExtensionError] if and only if
+	// the block is orphaned or already finalized. If the block was to be finalized already, it would have been
+	// detected as already processed by the check above. Hence, `candidate` being orphaned is the only
+	// possible case to receive an [state.OutdatedExtensionError] here.
+	err = m.checkOutdatedExtension(candidate.ToHeader())
 	if err != nil {
 		if state.IsOutdatedExtensionError(err) {
 			return fmt.Errorf("candidate block is an outdated extension: %w", err)
@@ -319,7 +288,7 @@ func (m *ParticipantState) Extend(ctx context.Context, candidateProposal *flow.P
 	deferredBlockPersist := deferred.NewDeferredBlockPersist()
 
 	// check if the block header is a valid extension of parent block
-	err = m.headerExtend(ctx, candidate, nil, deferredBlockPersist)
+	err = m.headerExtend(ctx, candidateProposal, nil, deferredBlockPersist)
 	if err != nil {
 		return fmt.Errorf("header not compliant with chain state: %w", err)
 	}
@@ -382,29 +351,6 @@ func (m *ParticipantState) Extend(ctx context.Context, candidateProposal *flow.P
 // If all checks pass, this method queues the following operations to persist the candidate block and
 // schedules `BlockProcessable` notification to be emitted in order of increasing height:
 //
-<<<<<<< HEAD
-//	5a. if and only if the candidate block's parent has not been certified yet:
-//	  - store QC embedded into the candidate block
-//	  - add the parent to the index of certified blocks (index: view → parent block's ID)
-//	  - queue a `BlockProcessable` notification for the parent
-//	5b. store candidate block and index it as a child of its parent (needed for recovery to traverse unfinalized blocks)
-//	5c. if and only if we are given a `certifyingQC`
-//	  - store this QC certifying the candidate block
-//	  - add candidate to the index of certified blocks (index: view → candidate block's ID)
-//	  - queue a `BlockProcessable` notification for the candidate block
-//
-// If `headerExtend` is called by `ParticipantState.Extend` (full consensus participant) then `certifyingQC` will be nil,
-// but the block payload will be validated. If `headerExtend` is called by `FollowerState.Extend` (consensus follower),
-// then `certifyingQC` must be not nil, which proves payload validity.
-//
-// If the candidate block has already been ingested, the deferred database operations returned by this function call
-// will error with the benign sentinel [storage.ErrAlreadyExists], aborting the database transaction (without corrupting
-// the protocol state).
-//
-// Expected errors during normal operations:
-//   - state.InvalidExtensionError if the candidate block is invalid
-func (m *FollowerState) headerExtend(ctx context.Context, candidate *flow.Block, certifyingQC *flow.QuorumCertificate, deferredBlockPersist *deferred.DeferredBlockPersist) error {
-=======
 //	4a. store QC embedded into the candidate block and emit `BlockProcessable` notification for the parent
 //	4b. store candidate block and populate corresponding indices:
 //	    - store candidate block's proposer signature along with the block (needed to re-create an authenticated proposal)
@@ -415,9 +361,15 @@ func (m *FollowerState) headerExtend(ctx context.Context, candidate *flow.Block,
 // but the block payload will be validated and proposer signature will be present. If `headerExtend` is called by
 // `FollowerState.Extend` (consensus follower), then `certifyingQC` must be not nil which proves payload validity.
 //
+// If the candidate block has already been ingested, the deferred database operations returned by this function call
+// will error with the benign sentinel [storage.ErrAlreadyExists], aborting the database transaction (without corrupting
+// the protocol state).
+//
+// Expected errors during normal operations:
+//   - state.InvalidExtensionError if the candidate block is invalid
+//
 // No errors are expected during normal operation.
-func (m *FollowerState) headerExtend(ctx context.Context, candidate *flow.Proposal, certifyingQC *flow.QuorumCertificate, deferredDbOps *transaction.DeferredDbOps) error {
->>>>>>> master
+func (m *FollowerState) headerExtend(ctx context.Context, candidate *flow.Proposal, certifyingQC *flow.QuorumCertificate, deferredBlockPersist *deferred.DeferredBlockPersist) error {
 	span, _ := m.tracer.StartSpanFromContext(ctx, trace.ProtoStateMutatorExtendCheckHeader)
 	defer span.End()
 	blockID := candidate.Block.ID()
@@ -464,26 +416,14 @@ func (m *FollowerState) headerExtend(ctx context.Context, candidate *flow.Propos
 		}
 	}
 
-<<<<<<< HEAD
-	// STEP 5:
-	qc := candidate.Header.ParentQC()
-	deferredBlockPersist.AddNextOperation(func(lctx lockctx.Proof, blockID flow.Identifier, rw storage.ReaderBatchWriter) error {
-		// STEP 5a: Deciding whether the candidate's parent has already been certified or not.
-		// Here, we populate the [storage.QuorumCertificates] index: certified block ID → QC. Except for bootstrapping, this is the
-		// only place where this index is updated. Therefore, the parent is certified if and only if [storage.QuorumCertificates]
-		// contains an entry for `qc.BlockID`. We optimistically attempt to add a new element to the index. We receive a
-		// [storage.ErrAlreadyExists] sentinel if and only if step 5a has already been executed for the parent.
-		err = m.qcs.BatchStore(lctx, rw, qc)
-=======
 	// STEP 4:
 	qc := candidate.Block.ParentQC()
-	deferredDbOps.AddDbOp(func(tx *transaction.Tx) error {
+	deferredBlockPersist.AddNextOperation(func(lctx lockctx.Proof, blockID flow.Identifier, rw storage.ReaderBatchWriter) error {
 		// STEP 4a: Store QC for parent block and emit `BlockProcessable` notification if and only if
 		//  - the QC for the parent has not been stored before (otherwise, we already emitted the notification) and
 		//  - the parent block's height is larger than the finalized root height (the root block is already considered processed)
 		// Thereby, we reduce duplicated `BlockProcessable` notifications.
-		err := m.qcs.StoreTx(qc)(tx)
->>>>>>> master
+		err = m.qcs.BatchStore(lctx, rw, qc)
 		if err != nil {
 			// [storage.ErrAlreadyExists] guarantees that 5a has already been executed for the parent.
 			if !errors.Is(err, storage.ErrAlreadyExists) {
@@ -504,21 +444,12 @@ func (m *FollowerState) headerExtend(ctx context.Context, candidate *flow.Propos
 			}
 		}
 
-<<<<<<< HEAD
 		// STEP 5b: Store candidate block and index it as a child of its parent (needed for recovery to traverse unfinalized blocks)
 		err = m.blocks.BatchStore(lctx, rw, candidate) // insert the block into the database AND cache
 		if err != nil {
 			return fmt.Errorf("could not store candidate block: %w", err)
 		}
-		err = procedure.IndexNewBlock(lctx, rw, blockID, candidate.Header.ParentID)
-=======
-		// STEP 4b: Store candidate block proposal, and index it as a child of its parent (needed for recovery to traverse unfinalized blocks)
-		err = m.blocks.StoreTx(candidate)(tx) // insert the block into the database AND cache (with proposer signature)
-		if err != nil {
-			return fmt.Errorf("could not store candidate block: %w", err)
-		}
-		err = transaction.WithTx(procedure.IndexNewBlock(blockID, headerBody.ParentID))(tx)
->>>>>>> master
+		err = procedure.IndexNewBlock(lctx, rw, blockID, headerBody.ParentID)
 		if err != nil {
 			return fmt.Errorf("could not index new block: %w", err)
 		}
@@ -529,20 +460,15 @@ func (m *FollowerState) headerExtend(ctx context.Context, candidate *flow.Propos
 			if err != nil {
 				return fmt.Errorf("could not store certifying qc: %w", err)
 			}
-<<<<<<< HEAD
 
-			// add candidate block to index of certified blocks:
-			err := operation.IndexCertifiedBlockByView(lctx, rw, candidate.Header.View, blockID)
+			// add candidate to index of certified blocks:
+			err := operation.IndexCertifiedBlockByView(lctx, rw, headerBody.View, blockID)
 			if err != nil {
-				return fmt.Errorf("could not index certified block by view %v: %w", candidate.Header.View, err)
+				return fmt.Errorf("could not index certified block by view %v: %w", headerBody.View, err)
 			}
 
 			storage.OnCommitSucceed(rw, func() { // queue a BlockProcessable event for candidate block, since it is certified
-				m.consumer.BlockProcessable(candidate.Header, certifyingQC)
-=======
-			tx.OnSucceed(func() { // queue a BlockProcessable event for candidate block, since it is certified
 				m.consumer.BlockProcessable(candidate.Block.ToHeader(), certifyingQC)
->>>>>>> master
 			})
 		}
 		return nil
@@ -599,17 +525,10 @@ func (m *FollowerState) checkBlockAlreadyProcessed(blockID flow.Identifier) (boo
 // `block` is orphaned or already finalized.
 //
 // Expected errors during normal operations:
-<<<<<<< HEAD
 //   - [state.OutdatedExtensionError] if the candidate block is orphaned or finalized
 func (m *ParticipantState) checkOutdatedExtension(block *flow.Header) error {
 	var latestFinalizedHeight uint64
 	err := operation.RetrieveFinalizedHeight(m.db.Reader(), &latestFinalizedHeight)
-=======
-//   - state.OutdatedExtensionError if the candidate block is outdated (e.g. orphaned)
-func (m *ParticipantState) checkOutdatedExtension(header flow.HeaderBody) error {
-	var finalizedHeight uint64
-	err := m.db.View(operation.RetrieveFinalizedHeight(&finalizedHeight))
->>>>>>> master
 	if err != nil {
 		return fmt.Errorf("could not retrieve finalized height: %w", err)
 	}
@@ -820,11 +739,7 @@ func (m *FollowerState) evolveProtocolState(ctx context.Context, candidate *flow
 
 	// Evolve the Protocol State starting from the parent block's state. Information that may change the state is:
 	// the candidate block's view and Service Events from execution results sealed in the candidate block.
-<<<<<<< HEAD
-	updatedStateID, err := m.protocolState.EvolveState(deferredBlockPersist, candidate.Header.ParentID, candidate.Header.View, candidate.Payload.Seals)
-=======
-	updatedStateID, dbUpdates, err := m.protocolState.EvolveState(candidate.ParentID, candidate.View, candidate.Payload.Seals)
->>>>>>> master
+	updatedStateID, err := m.protocolState.EvolveState(deferredBlockPersist, candidate.ParentID, candidate.View, candidate.Payload.Seals)
 	if err != nil {
 		return fmt.Errorf("evolving protocol state failed: %w", err)
 	}

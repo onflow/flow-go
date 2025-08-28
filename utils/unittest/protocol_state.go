@@ -87,14 +87,10 @@ func SealBlock(t *testing.T, st protocol.ParticipantState, mutableProtocolState 
 	require.NoError(t, err)
 
 	seals := []*flow.Seal{seal}
-<<<<<<< HEAD
 
 	dbUpdates := deferred.NewDeferredBlockPersist()
-	updatedStateId, err := mutableProtocolState.EvolveState(dbUpdates, block3.Header.ParentID, block3.Header.View, seals)
-=======
 	block3View := block2.View + 1
-	updatedStateId, dbUpdates, err := mutableProtocolState.EvolveState(block2.ID(), block3View, seals)
->>>>>>> master
+	updatedStateId, err := mutableProtocolState.EvolveState(dbUpdates, block2.ID(), block3View, seals)
 	require.NoError(t, err)
 	require.False(t, dbUpdates.IsEmpty())
 

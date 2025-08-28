@@ -223,14 +223,10 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.HeaderBody
 
 	// STEP 4: insert the cluster block to the database.
 	span, _ = b.tracer.StartSpanFromContext(ctx, trace.COLBuildOnDBInsert)
-<<<<<<< HEAD
 
 	err = b.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-		return procedure.InsertClusterBlock(lctx, rw, &proposal)
+		return procedure.InsertClusterBlock(lctx, rw, blockProposal)
 	})
-=======
-	err = operation.RetryOnConflict(b.db.Update, procedure.InsertClusterBlock(blockProposal))
->>>>>>> master
 	span.End()
 	if err != nil {
 		return nil, fmt.Errorf("could not insert built block: %w", err)

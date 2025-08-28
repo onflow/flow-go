@@ -43,6 +43,7 @@ func InsertHeader(lctx lockctx.Proof, rw storage.ReaderBatchWriter, headerID flo
 // RetrieveHeader retrieves the header of the block with the specified ID.
 // Expected errors during normal operations:
 //   - [storage.ErrNotFound] if no block with the specified `blockID` is known.
+//   - generic error in case of unexpected failure from the database layer
 func RetrieveHeader(r storage.Reader, blockID flow.Identifier, header *flow.Header) error {
 	return RetrieveByKey(r, MakePrefix(codeHeader, blockID), header)
 }
@@ -140,7 +141,7 @@ func IndexCollectionBlock(w storage.Writer, collID flow.Identifier, blockID flow
 	return UpsertByKey(w, MakePrefix(codeCollectionBlock, collID), blockID)
 }
 
-// LookupBlockContainingCollection retrieves the block containing the collection with the given ID.
+// IndexCollectionGuaranteeBlock retrieves the block containing the collection with the given ID.
 //
 // CAUTION: A collection can be included in multiple *unfinalized* blocks. However, the implementation
 // assumes a one-to-one map from collection ID to a *single* block ID. This holds for FINALIZED BLOCKS ONLY
@@ -150,7 +151,14 @@ func IndexCollectionBlock(w storage.Writer, collID flow.Identifier, blockID flow
 //
 // Expected errors during normal operations:
 //   - [storage.ErrNotFound] if no block is known that contains the specified collection ID.
-func LookupBlockContainingCollection(r storage.Reader, collID flow.Identifier, blockID *flow.Identifier) error {
+//
+// IndexCollectionGuaranteeBlock indexes a block by a collection guarantee within that block.
+func IndexCollectionGuaranteeBlock(w storage.Writer, collID flow.Identifier, blockID flow.Identifier) error {
+	return UpsertByKey(w, MakePrefix(codeCollectionBlock, collID), blockID)
+}
+
+// LookupCollectionGuaranteeBlock looks up a block by a collection within that block.
+func LookupCollectionGuaranteeBlock(r storage.Reader, collID flow.Identifier, blockID *flow.Identifier) error {
 	return RetrieveByKey(r, MakePrefix(codeCollectionBlock, collID), blockID)
 }
 

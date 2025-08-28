@@ -254,33 +254,15 @@ func (bs *BuilderSuite) SetupTest() {
 	require.NoError(bs.T(), lctx.AcquireLock(storage.LockFinalizeBlock))
 	defer lctx.Release()
 
-<<<<<<< HEAD
 	// insert finalized height and root height
 	db := badgerimpl.ToDB(bs.db)
 	require.NoError(bs.T(), db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 		require.NoError(bs.T(), operation.InsertRootHeight(rw.Writer(), 13))
-		require.NoError(bs.T(), operation.UpsertFinalizedHeight(lctx, rw.Writer(), final.Header.Height))
-		require.NoError(bs.T(), operation.IndexFinalizedBlockByHeight(lctx, rw, final.Header.Height, bs.finalID))
-		require.NoError(bs.T(), operation.UpsertSealedHeight(lctx, rw.Writer(), first.Header.Height))
+		require.NoError(bs.T(), operation.UpsertFinalizedHeight(lctx, rw.Writer(), final.Height))
+		require.NoError(bs.T(), operation.IndexFinalizedBlockByHeight(lctx, rw, final.Height, bs.finalID))
+		require.NoError(bs.T(), operation.UpsertSealedHeight(lctx, rw.Writer(), first.Height))
 		return nil
 	}))
-
-	bs.sentinel = 1337
-	bs.setter = func(header *flow.Header) error {
-		header.View = 1337
-=======
-	err := bs.db.Update(operation.InsertFinalizedHeight(final.Height))
-	bs.Require().NoError(err)
-	err = bs.db.Update(operation.IndexBlockHeight(final.Height, bs.finalID))
-	bs.Require().NoError(err)
-
-	err = bs.db.Update(operation.InsertRootHeight(13))
-	bs.Require().NoError(err)
-
-	err = bs.db.Update(operation.InsertSealedHeight(first.Height))
-	bs.Require().NoError(err)
-	err = bs.db.Update(operation.IndexBlockHeight(first.Height, first.ID()))
-	bs.Require().NoError(err)
 
 	bs.sentinel = 1337
 	bs.setter = func(h *flow.HeaderBodyBuilder) error {
@@ -293,7 +275,6 @@ func (bs *BuilderSuite) SetupTest() {
 			WithParentVoterSigData(unittest.QCSigDataFixture()).
 			WithProposerID(unittest.IdentifierFixture())
 
->>>>>>> master
 		return nil
 	}
 	bs.sign = func(_ *flow.Header) ([]byte, error) {

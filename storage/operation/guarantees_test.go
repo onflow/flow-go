@@ -26,12 +26,12 @@ func TestGuaranteeInsertRetrieve(t *testing.T) {
 		defer lctx.Release()
 
 		err = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			return operation.UnsafeInsertGuarantee(lctx, rw.Writer(), g.CollectionID, g)
+			return operation.InsertGuarantee(rw.Writer(), g.ID(), g)
 		})
 		require.NoError(t, err)
 
 		var retrieved flow.CollectionGuarantee
-		err = operation.RetrieveGuarantee(db.Reader(), g.CollectionID, &retrieved)
+		err = operation.RetrieveGuarantee(db.Reader(), g.ID(), &retrieved)
 		require.NoError(t, err)
 
 		assert.Equal(t, g, &retrieved)
@@ -57,7 +57,7 @@ func TestIndexGuaranteedCollectionByBlockHashInsertRetrieve(t *testing.T) {
 
 		err = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 			for _, guarantee := range guarantees {
-				if err := operation.UnsafeInsertGuarantee(lctx, rw.Writer(), guarantee.ID(), guarantee); err != nil {
+				if err := operation.InsertGuarantee(rw.Writer(), guarantee.ID(), guarantee); err != nil {
 					return err
 				}
 			}
@@ -101,7 +101,7 @@ func TestIndexGuaranteedCollectionByBlockHashMultipleBlocks(t *testing.T) {
 		unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
 			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 				for _, guarantee := range set1 {
-					if err := operation.UnsafeInsertGuarantee(lctx, rw.Writer(), guarantee.CollectionID, guarantee); err != nil {
+					if err := operation.InsertGuarantee(rw.Writer(), guarantee.ID(), guarantee); err != nil {
 						return err
 					}
 				}
@@ -116,7 +116,7 @@ func TestIndexGuaranteedCollectionByBlockHashMultipleBlocks(t *testing.T) {
 		unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
 			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 				for _, guarantee := range set2 {
-					if err := operation.UnsafeInsertGuarantee(lctx, rw.Writer(), guarantee.CollectionID, guarantee); err != nil {
+					if err := operation.InsertGuarantee(rw.Writer(), guarantee.ID(), guarantee); err != nil {
 						return err
 					}
 				}

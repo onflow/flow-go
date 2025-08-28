@@ -177,19 +177,6 @@ func (f *Finalizer) MakeFinal(blockID flow.Identifier) error {
 			// For now, we just use the parent signers as the guarantors of this
 			// collection.
 
-<<<<<<< HEAD
-			// only submit the collection guarantee if the write is successful
-			storage.OnCommitSucceed(rw, func() {
-				// TODO add real signatures here (https://github.com/onflow/flow-go-internal/issues/4569)
-				f.pusher.SubmitCollectionGuarantee(&flow.CollectionGuarantee{
-					CollectionID:     payload.Collection.ID(),
-					ReferenceBlockID: payload.ReferenceBlockID,
-					ChainID:          header.ChainID,
-					SignerIndices:    step.ParentVoterIndices,
-					Signature:        nil, // TODO: to remove because it's not easily verifiable by consensus nodes
-				})
-			})
-=======
 			// TODO add real signatures here (https://github.com/onflow/flow-go-internal/issues/4569)
 			// TODO: after adding real signature here add check for signature in NewCollectionGuarantee
 			guarantee, err := flow.NewCollectionGuarantee(flow.UntrustedCollectionGuarantee{
@@ -204,8 +191,6 @@ func (f *Finalizer) MakeFinal(blockID flow.Identifier) error {
 			}
 
 			f.pusher.SubmitCollectionGuarantee(guarantee)
-		}
->>>>>>> master
 
 			return nil
 		})

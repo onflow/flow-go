@@ -1,6 +1,8 @@
 package store
 
 import (
+	"fmt"
+
 	"github.com/jordanschalm/lockctx"
 
 	"github.com/onflow/flow-go/model/flow"
@@ -12,45 +14,99 @@ import (
 
 // Guarantees implements persistent storage for collection guarantees.
 type Guarantees struct {
-	db    storage.DB
+	db storage.DB
+	// cache is essentially an in-memory map from `CollectionGuarantee.ID()` -> `CollectionGuarantee`
 	cache *Cache[flow.Identifier, *flow.CollectionGuarantee]
+
+	// byCollectionIdCache is essentially an in-memory map from `CollectionGuarantee.CollectionID` -> `CollectionGuarantee.ID()`.
+	//The full flow.CollectionGuarantee can be retrieved from the `cache` above.
+	byCollectionIdCache *Cache[flow.Identifier, flow.Identifier]
 }
 
-func NewGuarantees(collector module.CacheMetrics, db storage.DB, cacheSize uint) *Guarantees {
+// NewGuarantees creates a Guarantees instance, which stores collection guarantees.
+// It supports storing, caching and retrieving by guaranteeID or the additionally indexed collection ID.
+func NewGuarantees(
+	collector module.CacheMetrics,
+	db storage.DB,
+	cacheSize uint,
+	byCollectionIDCacheSize uint,
+) *Guarantees {
 
-	storeWithLock := func(lctx lockctx.Proof, rw storage.ReaderBatchWriter, collID flow.Identifier, guarantee *flow.CollectionGuarantee) error {
-		return operation.UnsafeInsertGuarantee(lctx, rw.Writer(), collID, guarantee)
+	storeByGuaranteeIDWithLock := func(rw storage.ReaderBatchWriter, guaranteeID flow.Identifier, guarantee *flow.CollectionGuarantee) error {
+		return operation.InsertGuarantee(rw.Writer(), guaranteeID, guarantee)
 	}
 
-	retrieve := func(r storage.Reader, collID flow.Identifier) (*flow.CollectionGuarantee, error) {
+	retrieveByGuaranteeID := func(r storage.Reader, guaranteeID flow.Identifier) (*flow.CollectionGuarantee, error) {
 		var guarantee flow.CollectionGuarantee
-		err := operation.RetrieveGuarantee(r, collID, &guarantee)
+		err := operation.RetrieveGuarantee(r, guaranteeID, &guarantee)
 		return &guarantee, err
+	}
+
+	// While a collection guarantee can only be present once in the finalized chain,
+	// across different consensus forks we may encounter the same guarantee multiple times.
+	// On the happy path there is a 1:1 correspondence between CollectionGuarantees and Collections.
+	// However, the finalization status of guarantees is not yet verified by consensus nodes,
+	// nor is the possibility of byzantine collection nodes dealt with, so we check here that
+	// there are no conflicting guarantees for the same collection.
+	indexByCollectionID := operation.IndexGuarantee
+
+	lookupByCollectionID := func(r storage.Reader, collID flow.Identifier) (flow.Identifier, error) {
+		var guaranteeID flow.Identifier
+		err := operation.LookupGuarantee(r, collID, &guaranteeID)
+		if err != nil {
+			return flow.ZeroID, fmt.Errorf("could not lookup guarantee ID for collection (%x): %w", collID[:], err)
+		}
+		return guaranteeID, nil
 	}
 
 	g := &Guarantees{
 		db: db,
 		cache: newCache(collector, metrics.ResourceGuarantee,
 			withLimit[flow.Identifier, *flow.CollectionGuarantee](cacheSize),
-			withStoreWithLock(storeWithLock),
-			withRetrieve(retrieve)),
+			withStore(storeByGuaranteeIDWithLock),
+			withRetrieve(retrieveByGuaranteeID)),
+		byCollectionIdCache: newCache[flow.Identifier, flow.Identifier](collector, metrics.ResourceGuaranteeByCollectionID,
+			withLimit[flow.Identifier, flow.Identifier](byCollectionIDCacheSize),
+			withStoreWithLock(indexByCollectionID),
+			withRetrieve(lookupByCollectionID)),
 	}
 
 	return g
 }
 
 func (g *Guarantees) storeTx(lctx lockctx.Proof, rw storage.ReaderBatchWriter, guarantee *flow.CollectionGuarantee) error {
-	return g.cache.PutWithLockTx(lctx, rw, guarantee.ID(), guarantee)
+	guaranteeID := guarantee.ID()
+	err := g.cache.PutTx(rw, guaranteeID, guarantee)
+	if err != nil {
+		return err
+	}
+
+	err = g.byCollectionIdCache.PutWithLockTx(lctx, rw, guarantee.CollectionID, guaranteeID)
+	if err != nil {
+		return fmt.Errorf("could not index guarantee %x under collection %x: %w",
+			guaranteeID, guarantee.CollectionID[:], err)
+	}
+
+	return nil
 }
 
-func (g *Guarantees) retrieveTx(collID flow.Identifier) (*flow.CollectionGuarantee, error) {
-	val, err := g.cache.Get(g.db.Reader(), collID)
+func (g *Guarantees) retrieveTx(guaranteeID flow.Identifier) (*flow.CollectionGuarantee, error) {
+	val, err := g.cache.Get(g.db.Reader(), guaranteeID)
 	if err != nil {
 		return nil, err
 	}
 	return val, nil
 }
 
+func (g *Guarantees) ByID(guaranteeID flow.Identifier) (*flow.CollectionGuarantee, error) {
+	return g.retrieveTx(guaranteeID)
+}
+
 func (g *Guarantees) ByCollectionID(collID flow.Identifier) (*flow.CollectionGuarantee, error) {
-	return g.retrieveTx(collID)
+	guaranteeID, err := g.byCollectionIdCache.Get(g.db.Reader(), collID)
+	if err != nil {
+		return nil, fmt.Errorf("could not lookup collection guarantee ID for collection (%x): %w", collID[:], err)
+	}
+
+	return g.retrieveTx(guaranteeID)
 }

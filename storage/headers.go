@@ -7,17 +7,7 @@ import (
 // Headers represents persistent storage for blocks.
 type Headers interface {
 
-<<<<<<< HEAD
-	// ByBlockID returns the header with the given ID. It is available for finalized and ambiguous blocks.
-=======
-	// Store will store a header.
-	// Error returns:
-	//   - storage.ErrAlreadyExists if a header for the given blockID already exists in the database.
-	//   - generic error in case of unexpected failure from the database layer or encoding failure.
-	Store(proposal *flow.ProposalHeader) error
-
 	// ByBlockID returns the header with the given ID. It is available for finalized blocks and those pending finalization.
->>>>>>> master
 	// Error returns:
 	//  - ErrNotFound if no block header with the given ID exists
 	ByBlockID(blockID flow.Identifier) (*flow.Header, error)

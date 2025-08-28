@@ -23,6 +23,7 @@ import (
 	hotstuff "github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/access/rest/util"
+	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/bitutils"
 	"github.com/onflow/flow-go/ledger/common/testutils"
@@ -397,7 +398,7 @@ func BlockWithParentAndUniqueView(parent *flow.Header, forbiddenViews map[uint64
 	counter := 0
 	for {
 		block = BlockWithParentFixture(parent)
-		if _, hasForbiddenView := forbiddenViews[block.Header.View]; !hasForbiddenView {
+		if _, hasForbiddenView := forbiddenViews[block.View]; !hasForbiddenView {
 			break
 		}
 		counter += 1
@@ -406,8 +407,22 @@ func BlockWithParentAndUniqueView(parent *flow.Header, forbiddenViews map[uint64
 		}
 	}
 	// block has a view that is not forbidden:
-	forbiddenViews[block.Header.View] = struct{}{} // add the block's view to `forbiddenViews` to prevent future re-usage
+	forbiddenViews[block.View] = struct{}{} // add the block's view to `forbiddenViews` to prevent future re-usage
 	return block
+}
+
+func BlockWithParentAndPayloadAndUniqueView(parent *flow.Header, payload flow.Payload, forbiddenViews map[uint64]struct{}) *flow.Block {
+	block := BlockWithParentAndPayload(parent, payload)
+	_, ok := forbiddenViews[block.View]
+	// if !ok, means can't find this view, then the block has unique view
+	if !ok {
+		// add this view to the index
+		forbiddenViews[block.View] = struct{}{}
+		return block
+	}
+
+	// retry until find a block with unique view
+	return BlockWithParentAndPayloadAndUniqueView(parent, payload, forbiddenViews)
 }
 
 func BlockWithParentProtocolState(parent *flow.Block) *flow.Block {
@@ -417,7 +432,6 @@ func BlockWithParentProtocolState(parent *flow.Block) *flow.Block {
 	}
 }
 
-<<<<<<< HEAD
 // BlockWithParentProtocolStateAndUniqueView creates a child block of the given parent, such that
 // the child's protocol state is the same as the parent's.
 // We provide a set of views that are _not_ allowed to be used for the new block. A typical usage
@@ -432,7 +446,7 @@ func BlockWithParentProtocolStateAndUniqueView(parent *flow.Block, forbiddenView
 	counter := 0
 	for {
 		block = BlockWithParentProtocolState(parent)
-		if _, hasForbiddenView := forbiddenViews[block.Header.View]; !hasForbiddenView {
+		if _, hasForbiddenView := forbiddenViews[block.View]; !hasForbiddenView {
 			break
 		}
 		counter += 1
@@ -441,17 +455,14 @@ func BlockWithParentProtocolStateAndUniqueView(parent *flow.Block, forbiddenView
 		}
 	}
 	// block has a view that is not forbidden:
-	forbiddenViews[block.Header.View] = struct{}{} // add the block's view to `forbiddenViews` to prevent future re-usage
+	forbiddenViews[block.View] = struct{}{} // add the block's view to `forbiddenViews` to prevent future re-usage
 	return block
 }
 
 func BlockWithGuaranteesFixture(guarantees []*flow.CollectionGuarantee) *flow.Block {
-	payload := PayloadFixture(WithGuarantees(guarantees...))
-	header := BlockHeaderFixture()
-	header.PayloadHash = payload.Hash()
 	return &flow.Block{
-		Header:  header,
-		Payload: &payload,
+		HeaderBody: HeaderBodyFixture(),
+		Payload:    PayloadFixture(WithGuarantees(guarantees...)),
 	}
 
 }
@@ -464,8 +475,6 @@ func StateInteractionsFixture() *snapshot.ExecutionSnapshot {
 	return &snapshot.ExecutionSnapshot{}
 }
 
-=======
->>>>>>> master
 func BlockWithParentAndProposerFixture(
 	t *testing.T,
 	parent *flow.Header,

@@ -25,55 +25,57 @@ func TestInsertRetrieveClusterBlock(t *testing.T) {
 		defer lctx.Release()
 
 		require.NoError(t, db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			return InsertClusterBlock(lctx, rw, &block)
+			return InsertClusterBlock(lctx, rw, unittest.ClusterProposalFromBlock(block))
 		}))
 
 		var retrieved cluster.Block
 		err = RetrieveClusterBlock(db.Reader(), block.ID(), &retrieved)
 		require.NoError(t, err)
 
-		require.Equal(t, block, retrieved)
+		require.Equal(t, *block, retrieved)
 	})
 }
 
 func TestFinalizeClusterBlock(t *testing.T) {
 	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
 		parent := unittest.ClusterBlockFixture()
-		block := unittest.ClusterBlockWithParent(&parent)
+		block := unittest.ClusterBlockFixture(
+			unittest.ClusterBlock.WithParent(parent),
+		)
 
 		lockManager := storage.NewTestingLockManager()
 		lctx := lockManager.NewContext()
 		defer lctx.Release()
 		require.NoError(t, lctx.AcquireLock(storage.LockInsertOrFinalizeClusterBlock))
 		require.NoError(t, db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			return InsertClusterBlock(lctx, rw, &parent)
+			return InsertClusterBlock(lctx, rw, unittest.ClusterProposalFromBlock(block))
 		}))
 
 		// index parent as latest finalized block (manually writing respective indexes like in bootstrapping to skip transitive consistency checks)
 		require.NoError(t, db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			return operation.IndexClusterBlockHeight(lctx, rw.Writer(), block.Header.ChainID, parent.Header.Height, parent.ID())
+			return operation.IndexClusterBlockHeight(lctx, rw.Writer(), block.ChainID, parent.Height, parent.ID())
 		}))
 		require.NoError(t, db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			return operation.UpsertClusterFinalizedHeight(lctx, rw.Writer(), block.Header.ChainID, parent.Header.Height)
+			return operation.UpsertClusterFinalizedHeight(lctx, rw.Writer(), block.ChainID, parent.Height)
 		}))
 
 		// Insert new block and verify `FinalizeClusterBlock` procedure accepts it
 		require.NoError(t, db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			return InsertClusterBlock(lctx, rw, &block)
+			return InsertClusterBlock(lctx, rw, unittest.ClusterProposalFromBlock(block))
 		}))
 		require.NoError(t, db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			return FinalizeClusterBlock(lctx, rw, block.Header.ID())
+			return FinalizeClusterBlock(lctx, rw, block.ID())
 		}))
 
 		// verify that the new block as been properly indexed as the latest finalized
 		var latestFinalizedHeight uint64
 		var err error
-		err = operation.RetrieveClusterFinalizedHeight(db.Reader(), block.Header.ChainID, &latestFinalizedHeight)
+		err = operation.RetrieveClusterFinalizedHeight(db.Reader(), block.ChainID, &latestFinalizedHeight)
 		require.NoError(t, err)
-		require.Equal(t, block.Header.Height, latestFinalizedHeight)
+		require.Equal(t, block.Height, latestFinalizedHeight)
 
 		var headID flow.Identifier
-		err = operation.LookupClusterBlockHeight(db.Reader(), block.Header.ChainID, latestFinalizedHeight, &headID)
+		err = operation.LookupClusterBlockHeight(db.Reader(), block.ChainID, latestFinalizedHeight, &headID)
 		require.NoError(t, err)
 		require.Equal(t, block.ID(), headID)
 	})
@@ -129,25 +131,23 @@ func TestDisconnectedFinalizedBlock(t *testing.T) {
 //
 //	A ← B ← C
 //	  ↖ D
-func constructState(t *testing.T, db storage.DB, lctx lockctx.Proof) (blockA, blockB, blockC, blockD cluster.Block) {
-	blockA = unittest.ClusterBlockFixture()
-	blockB = unittest.ClusterBlockWithParent(&blockA)
-	blockC = unittest.ClusterBlockWithParent(&blockB)
-	blockD = unittest.ClusterBlockWithParent(&blockA)
+func constructState(t *testing.T, db storage.DB, lctx lockctx.Proof) (blockA, blockB, blockC, blockD *cluster.Block) {
+	blocks := unittest.ClusterBlockFixtures(4)
+	blockA, blockB, blockC, blockD = blocks[0], blocks[1], blocks[2], blocks[3]
 
 	// Store all blocks
-	for _, b := range []cluster.Block{blockA, blockB, blockC, blockD} {
+	for _, b := range []*cluster.Block{blockA, blockB, blockC, blockD} {
 		require.NoError(t, db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			return InsertClusterBlock(lctx, rw, &b)
+			return InsertClusterBlock(lctx, rw, unittest.ClusterProposalFromBlock(b))
 		}))
 	}
 
 	// index `blockA` as latest finalized block (manually writing respective indexes like in bootstrapping to skip transitive consistency checks)
 	require.NoError(t, db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-		return operation.IndexClusterBlockHeight(lctx, rw.Writer(), blockA.Header.ChainID, blockA.Header.Height, blockA.ID())
+		return operation.IndexClusterBlockHeight(lctx, rw.Writer(), blockA.ChainID, blockA.Height, blockA.ID())
 	}))
 	require.NoError(t, db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-		return operation.UpsertClusterFinalizedHeight(lctx, rw.Writer(), blockA.Header.ChainID, blockA.Header.Height)
+		return operation.UpsertClusterFinalizedHeight(lctx, rw.Writer(), blockA.ChainID, blockA.Height)
 	}))
 
 	return blockA, blockB, blockC, blockD

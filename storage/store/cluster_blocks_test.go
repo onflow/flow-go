@@ -17,34 +17,39 @@ import (
 func TestClusterBlocks(t *testing.T) {
 	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
 		lockManager := storage.NewTestingLockManager()
-		chain := unittest.ClusterBlockChainFixture(4)
+		chain := unittest.ClusterBlockFixtures(5)
 		parent, blocks := chain[0], chain[1:]
 
 		// add parent and mark its height as the latest finalized block
 		lctx := lockManager.NewContext()
 		require.NoError(t, lctx.AcquireLock(storage.LockInsertOrFinalizeClusterBlock))
 		err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			return operation.IndexClusterBlockHeight(lctx, rw.Writer(), parent.Header.ChainID, parent.Header.Height, parent.ID())
+			return operation.IndexClusterBlockHeight(lctx, rw.Writer(), parent.ChainID, parent.Height, parent.ID())
 		})
 		require.NoError(t, err)
 
 		err = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			return operation.UpsertClusterFinalizedHeight(lctx, rw.Writer(), parent.Header.ChainID, parent.Header.Height)
+			return operation.UpsertClusterFinalizedHeight(lctx, rw.Writer(), parent.ChainID, parent.Height)
 		})
 		require.NoError(t, err)
 		lctx.Release()
 
 		// store chain of descending blocks
 		for _, block := range blocks {
+			// InsertClusterBlock only needs LockInsertOrFinalizeClusterBlock
 			lctx2 := lockManager.NewContext()
 			require.NoError(t, lctx2.AcquireLock(storage.LockInsertOrFinalizeClusterBlock))
 			err = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-				return procedure.InsertClusterBlock(lctx2, rw, &block)
+				return procedure.InsertClusterBlock(lctx2, rw, unittest.ClusterProposalFromBlock(block))
 			})
 			require.NoError(t, err)
+			lctx2.Release()
 
+			// FinalizeClusterBlock only needs LockInsertOrFinalizeClusterBlock
+			lctx2 = lockManager.NewContext()
+			require.NoError(t, lctx2.AcquireLock(storage.LockInsertOrFinalizeClusterBlock))
 			err = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-				return procedure.FinalizeClusterBlock(lctx2, rw, block.Header.ID())
+				return procedure.FinalizeClusterBlock(lctx2, rw, block.ID())
 			})
 			require.NoError(t, err)
 			lctx2.Release()
@@ -52,7 +57,7 @@ func TestClusterBlocks(t *testing.T) {
 
 		clusterBlocks := NewClusterBlocks(
 			db,
-			blocks[0].Header.ChainID,
+			blocks[0].ChainID,
 			NewHeaders(metrics.NewNoopCollector(), db),
 			NewClusterPayloads(metrics.NewNoopCollector(), db),
 		)
@@ -60,18 +65,18 @@ func TestClusterBlocks(t *testing.T) {
 		t.Run("ByHeight", func(t *testing.T) {
 			// check if the block can be retrieved by height
 			for _, block := range blocks {
-				retrievedBlock, err := clusterBlocks.ByHeight(block.Header.Height)
+				retrievedBlock, err := clusterBlocks.ProposalByHeight(block.Height)
 				require.NoError(t, err)
-				require.Equal(t, block.ID(), retrievedBlock.ID())
+				require.Equal(t, block.ID(), retrievedBlock.Block.ID())
 			}
 		})
 
 		t.Run("ByID", func(t *testing.T) {
 			// check if the block can be retrieved by ID
 			for _, block := range blocks {
-				retrievedBlock, err := clusterBlocks.ByID(block.ID())
+				retrievedBlock, err := clusterBlocks.ProposalByID(block.ID())
 				require.NoError(t, err)
-				require.Equal(t, block.ID(), retrievedBlock.ID())
+				require.Equal(t, block.ID(), retrievedBlock.Block.ID())
 			}
 		})
 	})
