@@ -23,9 +23,8 @@ func GetEvents(r *common.Request, backend access.API, _ commonmodels.LinkGenerat
 	}
 
 	// if the request has block IDs provided then return events for block IDs
-	var blocksEvents commonmodels.BlocksEvents
 	if len(req.BlockIDs) > 0 {
-		events, _, err := backend.GetEventsForBlockIDs(
+		events, metadata, err := backend.GetEventsForBlockIDs(
 			r.Context(),
 			req.Type,
 			req.BlockIDs,
@@ -36,8 +35,7 @@ func GetEvents(r *common.Request, backend access.API, _ commonmodels.LinkGenerat
 			return nil, err
 		}
 
-		blocksEvents.Build(events)
-		return blocksEvents, nil
+		return commonmodels.NewBlockEventsList(events, metadata), nil
 	}
 
 	// if end height is provided with special values then load the height
@@ -55,7 +53,7 @@ func GetEvents(r *common.Request, backend access.API, _ commonmodels.LinkGenerat
 	}
 
 	// if request provided block height range then return events for that range
-	events, _, err := backend.GetEventsForHeightRange(
+	events, metadata, err := backend.GetEventsForHeightRange(
 		r.Context(),
 		req.Type,
 		req.StartHeight,
@@ -67,6 +65,5 @@ func GetEvents(r *common.Request, backend access.API, _ commonmodels.LinkGenerat
 		return nil, err
 	}
 
-	blocksEvents.Build(events)
-	return blocksEvents, nil
+	return commonmodels.NewBlockEventsList(events, metadata), nil
 }

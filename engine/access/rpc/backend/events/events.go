@@ -29,13 +29,14 @@ import (
 const DefaultMaxHeightRange = 250
 
 type Events struct {
-	headers          storage.Headers
-	state            protocol.State
-	chain            flow.Chain
-	maxHeightRange   uint
-	provider         provider.EventProvider
-	queryMode        query_mode.IndexQueryMode
-	operatorCriteria optimistic_sync.Criteria
+	headers            storage.Headers
+	state              protocol.State
+	chain              flow.Chain
+	maxHeightRange     uint
+	provider           provider.EventProvider
+	queryMode          query_mode.IndexQueryMode
+	execResultProvider optimistic_sync.ExecutionResultProvider
+	operatorCriteria   optimistic_sync.Criteria
 }
 
 var _ access.EventsAPI = (*Events)(nil)
@@ -58,14 +59,14 @@ func NewEventsBackend(
 
 	switch queryMode {
 	case query_mode.IndexQueryModeLocalOnly:
-		eventProvider = provider.NewLocalEventProvider(executionResultProvider, executionStateCache)
+		eventProvider = provider.NewLocalEventProvider(executionStateCache)
 
 	case query_mode.IndexQueryModeExecutionNodesOnly:
-		eventProvider = provider.NewENEventProvider(log, execNodeIdentitiesProvider, connFactory, nodeCommunicator, executionResultProvider)
+		eventProvider = provider.NewENEventProvider(log, execNodeIdentitiesProvider, connFactory, nodeCommunicator)
 
 	case query_mode.IndexQueryModeFailover:
-		local := provider.NewLocalEventProvider(executionResultProvider, executionStateCache)
-		execNode := provider.NewENEventProvider(log, execNodeIdentitiesProvider, connFactory, nodeCommunicator, executionResultProvider)
+		local := provider.NewLocalEventProvider(executionStateCache)
+		execNode := provider.NewENEventProvider(log, execNodeIdentitiesProvider, connFactory, nodeCommunicator)
 		eventProvider = provider.NewFailoverEventProvider(log, local, execNode)
 
 	default:
@@ -73,13 +74,14 @@ func NewEventsBackend(
 	}
 
 	return &Events{
-		state:            state,
-		chain:            chain,
-		maxHeightRange:   maxHeightRange,
-		headers:          headers,
-		provider:         eventProvider,
-		queryMode:        queryMode,
-		operatorCriteria: operatorCriteria,
+		state:              state,
+		chain:              chain,
+		maxHeightRange:     maxHeightRange,
+		headers:            headers,
+		provider:           eventProvider,
+		queryMode:          queryMode,
+		operatorCriteria:   operatorCriteria,
+		execResultProvider: executionResultProvider,
 	}, nil
 }
 
@@ -159,12 +161,22 @@ func (e *Events) GetEventsForHeightRange(
 		})
 	}
 
+	// TODO: can block headers len be equal to 0?
+	lastBlockID := blockHeaders[len(blockHeaders)-1].ID
+	execResultInfo, err := e.execResultProvider.ExecutionResult(
+		lastBlockID,
+		criteria,
+	)
+	if err != nil {
+		return nil, entities.ExecutorMetadata{}, fmt.Errorf("failed to get execution result for last block: %w", err)
+	}
+
 	resp, metadata, err := e.provider.Events(
 		ctx,
 		blockHeaders,
 		flow.EventType(eventType),
 		requiredEventEncodingVersion,
-		e.operatorCriteria.OverrideWith(criteria),
+		execResultInfo,
 	)
 	if err != nil {
 		return nil, metadata, err
@@ -206,12 +218,22 @@ func (e *Events) GetEventsForBlockIDs(
 		})
 	}
 
+	// TODO: can block headers len be equal to 0?
+	lastBlockID := blockHeaders[len(blockHeaders)-1].ID
+	execResultInfo, err := e.execResultProvider.ExecutionResult(
+		lastBlockID,
+		criteria,
+	)
+	if err != nil {
+		return nil, entities.ExecutorMetadata{}, fmt.Errorf("failed to get execution result for last block: %w", err)
+	}
+
 	resp, metadata, err := e.provider.Events(
 		ctx,
 		blockHeaders,
 		flow.EventType(eventType),
 		requiredEventEncodingVersion,
-		e.operatorCriteria.OverrideWith(criteria),
+		execResultInfo,
 	)
 	if err != nil {
 		return nil, metadata, err

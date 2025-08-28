@@ -18,19 +18,14 @@ import (
 )
 
 type LocalEventProvider struct {
-	execResultProvider optimistic_sync.ExecutionResultProvider
-	execStateCache     optimistic_sync.ExecutionStateCache
+	execStateCache optimistic_sync.ExecutionStateCache
 }
 
 var _ EventProvider = (*LocalEventProvider)(nil)
 
-func NewLocalEventProvider(
-	execResultProvider optimistic_sync.ExecutionResultProvider,
-	execStateCache optimistic_sync.ExecutionStateCache,
-) *LocalEventProvider {
+func NewLocalEventProvider(execStateCache optimistic_sync.ExecutionStateCache) *LocalEventProvider {
 	return &LocalEventProvider{
-		execResultProvider: execResultProvider,
-		execStateCache:     execStateCache,
+		execStateCache: execStateCache,
 	}
 }
 
@@ -39,7 +34,7 @@ func (l *LocalEventProvider) Events(
 	blocks []BlockMetadata,
 	eventType flow.EventType,
 	encodingVersion entities.EventEncodingVersion,
-	criteria optimistic_sync.Criteria,
+	result *optimistic_sync.ExecutionResultInfo,
 ) (Response, entities.ExecutorMetadata, error) {
 	missingBlocks := make([]BlockMetadata, 0)
 	blockEvents := make([]flow.BlockEvents, 0)
@@ -47,14 +42,6 @@ func (l *LocalEventProvider) Events(
 
 	if len(blocks) == 0 {
 		return Response{}, metadata, nil
-	}
-
-	result, err := l.execResultProvider.ExecutionResult(
-		blocks[len(blocks)-1].ID,
-		criteria,
-	)
-	if err != nil {
-		return Response{}, metadata, err
 	}
 
 	snapshot, err := l.execStateCache.Snapshot(result.ExecutionResult.ID())

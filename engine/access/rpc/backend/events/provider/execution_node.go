@@ -23,11 +23,10 @@ import (
 )
 
 type ENEventProvider struct {
-	log                zerolog.Logger
-	nodeProvider       *rpc.ExecutionNodeIdentitiesProvider
-	connFactory        connection.ConnectionFactory
-	nodeCommunicator   node_communicator.Communicator
-	execResultProvider optimistic_sync.ExecutionResultProvider
+	log              zerolog.Logger
+	nodeProvider     *rpc.ExecutionNodeIdentitiesProvider
+	connFactory      connection.ConnectionFactory
+	nodeCommunicator node_communicator.Communicator
 }
 
 var _ EventProvider = (*ENEventProvider)(nil)
@@ -37,14 +36,12 @@ func NewENEventProvider(
 	nodeProvider *rpc.ExecutionNodeIdentitiesProvider,
 	connFactory connection.ConnectionFactory,
 	nodeCommunicator node_communicator.Communicator,
-	execResultProvider optimistic_sync.ExecutionResultProvider,
 ) *ENEventProvider {
 	return &ENEventProvider{
-		log:                log.With().Str("event_provider", "execution_node").Logger(),
-		nodeProvider:       nodeProvider,
-		connFactory:        connFactory,
-		nodeCommunicator:   nodeCommunicator,
-		execResultProvider: execResultProvider,
+		log:              log.With().Str("event_provider", "execution_node").Logger(),
+		nodeProvider:     nodeProvider,
+		connFactory:      connFactory,
+		nodeCommunicator: nodeCommunicator,
 	}
 }
 
@@ -53,13 +50,12 @@ func (e *ENEventProvider) Events(
 	blocks []BlockMetadata,
 	eventType flow.EventType,
 	encodingVersion entities.EventEncodingVersion,
-	criteria optimistic_sync.Criteria,
+	execResultInfo *optimistic_sync.ExecutionResultInfo,
 ) (Response, entities.ExecutorMetadata, error) {
 	if len(blocks) == 0 {
 		return Response{}, entities.ExecutorMetadata{}, nil
 	}
 
-	// create an execution API request for events at block ID
 	blockIDs := make([]flow.Identifier, len(blocks))
 	for i := range blocks {
 		blockIDs[i] = blocks[i].ID
@@ -70,33 +66,25 @@ func (e *ENEventProvider) Events(
 		BlockIds: convert.IdentifiersToMessages(blockIDs),
 	}
 
-	// choose the last block ID to find the list of execution nodes
-	lastBlockID := blockIDs[len(blockIDs)-1]
-
-	execNodes, err := e.nodeProvider.ExecutionNodesForBlockID(
-		ctx,
-		lastBlockID,
-	)
-	if err != nil {
-		return Response{},
-			entities.ExecutorMetadata{
-				ExecutionResultId: nil,
-				ExecutorId:        stringsToBytes(execNodes.NodeIDs().Strings()),
-			},
-			rpc.ConvertError(err, "failed to get execution nodes for events query", codes.Internal)
-	}
-
 	var resp *execproto.GetEventsForBlockIDsResponse
 	var successfulNode *flow.IdentitySkeleton
-	resp, successfulNode, err = e.getEventsFromAnyExeNode(ctx, execNodes, req)
+	resp, successfulNode, err := e.getEventsFromAnyExeNode(ctx, execResultInfo.ExecutionNodes, req)
 	if err != nil {
 		return Response{}, entities.ExecutorMetadata{},
 			rpc.ConvertError(err, "failed to get execution nodes for events query", codes.Internal)
 	}
+
+	lastBlockID := blocks[len(blocks)-1].ID
 	e.log.Trace().
-		Str("execution_id", successfulNode.String()).
+		Str("execution_node_id", successfulNode.String()).
+		Str("execution_result_id", execResultInfo.ExecutionResult.ID().String()).
 		Str("last_block_id", lastBlockID.String()).
 		Msg("successfully got events")
+
+	metadata := entities.ExecutorMetadata{
+		ExecutionResultId: []byte(successfulNode.NodeID.String()),
+		ExecutorId:        stringsToBytes(execResultInfo.ExecutionNodes.NodeIDs().Strings()),
+	}
 
 	// convert execution node api result to access node api result
 	results, err := verifyAndConvertToAccessEvents(
@@ -108,20 +96,6 @@ func (e *ENEventProvider) Events(
 	if err != nil {
 		return Response{}, entities.ExecutorMetadata{},
 			status.Errorf(codes.Internal, "failed to verify retrieved events from execution node: %v", err)
-	}
-
-	execResultInfo, err := e.execResultProvider.ExecutionResult(
-		lastBlockID,
-		criteria,
-	)
-	if err != nil {
-		return Response{}, entities.ExecutorMetadata{},
-			status.Errorf(codes.Internal, "failed to get execution result: %v", err)
-	}
-
-	metadata := entities.ExecutorMetadata{
-		ExecutionResultId: []byte(successfulNode.NodeID.String()),
-		ExecutorId:        stringsToBytes(execResultInfo.ExecutionNodes.NodeIDs().Strings()),
 	}
 
 	return Response{

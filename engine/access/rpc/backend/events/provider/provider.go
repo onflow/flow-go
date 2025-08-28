@@ -16,7 +16,7 @@ type EventProvider interface {
 		blocks []BlockMetadata,
 		eventType flow.EventType,
 		encodingVersion entities.EventEncodingVersion,
-		criteria optimistic_sync.Criteria,
+		executionResultInfo *optimistic_sync.ExecutionResultInfo,
 	) (Response, entities.ExecutorMetadata, error)
 }
 

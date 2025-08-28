@@ -1,50 +1,49 @@
 package models
 
 import (
+	"github.com/onflow/flow/protobuf/go/flow/entities"
+
 	"github.com/onflow/flow-go/engine/access/rest/util"
 	"github.com/onflow/flow-go/model/flow"
 )
 
-func (e *Event) Build(event flow.Event) {
-	e.Type_ = string(event.Type)
-	e.TransactionId = event.TransactionID.String()
-	e.TransactionIndex = util.FromUint(uint64(event.TransactionIndex))
-	e.EventIndex = util.FromUint(uint64(event.EventIndex))
-	e.Payload = util.ToBase64(event.Payload)
+func NewEvent(event flow.Event) Event {
+	return Event{
+		Type_:            string(event.Type),
+		TransactionId:    event.TransactionID.String(),
+		TransactionIndex: util.FromUint(uint64(event.TransactionIndex)),
+		EventIndex:       util.FromUint(uint64(event.EventIndex)),
+		Payload:          util.ToBase64(event.Payload),
+	}
 }
 
 type Events []Event
 
-func (e *Events) Build(events []flow.Event) {
-	evs := make([]Event, len(events))
-	for i, ev := range events {
-		var event Event
-		event.Build(ev)
-		evs[i] = event
+func NewEvents(events []flow.Event) Events {
+	convertedEvents := make([]Event, len(events))
+	for i, event := range events {
+		convertedEvents[i] = NewEvent(event)
 	}
-
-	*e = evs
+	return convertedEvents
 }
 
-func (b *BlockEvents) Build(blockEvents flow.BlockEvents) {
-	b.BlockHeight = util.FromUint(blockEvents.BlockHeight)
-	b.BlockId = blockEvents.BlockID.String()
-	b.BlockTimestamp = blockEvents.BlockTimestamp
-
-	var events Events
-	events.Build(blockEvents.Events)
-	b.Events = events
+func NewBlockEvents(events flow.BlockEvents, metadata entities.ExecutorMetadata) *BlockEvents {
+	return &BlockEvents{
+		BlockId:        events.BlockID.String(),
+		BlockHeight:    util.FromUint(events.BlockHeight),
+		BlockTimestamp: events.BlockTimestamp,
+		Events:         NewEvents(events.Events),
+		Metadata:       NewMetadata(metadata),
+		Links:          nil,
+	}
 }
 
-type BlocksEvents []BlockEvents
+type BlockEventsList []BlockEvents
 
-func (b *BlocksEvents) Build(blocksEvents []flow.BlockEvents) {
-	evs := make([]BlockEvents, 0)
-	for _, ev := range blocksEvents {
-		var blockEvent BlockEvents
-		blockEvent.Build(ev)
-		evs = append(evs, blockEvent)
+func NewBlockEventsList(blocksEvents []flow.BlockEvents, metadata entities.ExecutorMetadata) BlockEventsList {
+	converted := make([]BlockEvents, len(blocksEvents))
+	for i, be := range blocksEvents {
+		converted[i] = *NewBlockEvents(be, metadata)
 	}
-
-	*b = evs
+	return converted
 }

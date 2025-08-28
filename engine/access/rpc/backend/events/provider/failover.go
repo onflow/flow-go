@@ -37,9 +37,15 @@ func (f *FailoverEventProvider) Events(
 	blocks []BlockMetadata,
 	eventType flow.EventType,
 	encodingVersion entities.EventEncodingVersion,
-	criteria optimistic_sync.Criteria,
+	result *optimistic_sync.ExecutionResultInfo,
 ) (Response, entities.ExecutorMetadata, error) {
-	localEvents, metadata, localErr := f.localProvider.Events(ctx, blocks, eventType, encodingVersion, criteria)
+	localEvents, metadata, localErr := f.localProvider.Events(
+		ctx,
+		blocks,
+		eventType,
+		encodingVersion,
+		result,
+	)
 	if localErr != nil {
 		f.log.Debug().Err(localErr).
 			Msg("failed to get events from local storage. will try to get them from execution node")
@@ -60,7 +66,7 @@ func (f *FailoverEventProvider) Events(
 		localEvents.MissingBlocks,
 		eventType,
 		encodingVersion,
-		criteria,
+		result,
 	)
 	if execNodeErr != nil {
 		return Response{}, metadata, execNodeErr
