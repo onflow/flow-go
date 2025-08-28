@@ -35,28 +35,27 @@ func (l *LocalEventProvider) Events(
 	eventType flow.EventType,
 	encodingVersion entities.EventEncodingVersion,
 	result *optimistic_sync.ExecutionResultInfo,
-) (Response, entities.ExecutorMetadata, error) {
+) (Response, flow.ExecutorMetadata, error) {
+	if len(blocks) == 0 {
+		return Response{}, flow.ExecutorMetadata{}, nil
+	}
+
 	missingBlocks := make([]BlockMetadata, 0)
 	blockEvents := make([]flow.BlockEvents, 0)
-	metadata := entities.ExecutorMetadata{}
-
-	if len(blocks) == 0 {
-		return Response{}, metadata, nil
-	}
 
 	snapshot, err := l.execStateCache.Snapshot(result.ExecutionResult.ID())
 	if err != nil {
-		return Response{}, metadata, fmt.Errorf("failed to get snapshot for execution result %s: %w", result.ExecutionResult.ID(), err)
+		return Response{}, flow.ExecutorMetadata{}, fmt.Errorf("failed to get snapshot for execution result %s: %w", result.ExecutionResult.ID(), err)
 	}
 
-	metadata = entities.ExecutorMetadata{
-		ExecutionResultId: convert.IdentifierToMessage(result.ExecutionResult.ID()),
-		ExecutorId:        convert.IdentifiersToMessages(result.ExecutionNodes.NodeIDs()),
+	metadata := flow.ExecutorMetadata{
+		ExecutionResultID: result.ExecutionResult.ID(),
+		ExecutorIDs:       result.ExecutionNodes.NodeIDs(),
 	}
 
 	for _, blockInfo := range blocks {
 		if ctx.Err() != nil {
-			return Response{}, entities.ExecutorMetadata{}, rpc.ConvertError(ctx.Err(), "failed to get events from storage", codes.Canceled)
+			return Response{}, flow.ExecutorMetadata{}, rpc.ConvertError(ctx.Err(), "failed to get events from storage", codes.Canceled)
 		}
 
 		events, err := snapshot.Events().ByBlockID(blockInfo.ID)

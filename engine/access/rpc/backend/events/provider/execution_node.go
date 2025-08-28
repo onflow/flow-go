@@ -51,9 +51,9 @@ func (e *ENEventProvider) Events(
 	eventType flow.EventType,
 	encodingVersion entities.EventEncodingVersion,
 	execResultInfo *optimistic_sync.ExecutionResultInfo,
-) (Response, entities.ExecutorMetadata, error) {
+) (Response, flow.ExecutorMetadata, error) {
 	if len(blocks) == 0 {
-		return Response{}, entities.ExecutorMetadata{}, nil
+		return Response{}, flow.ExecutorMetadata{}, nil
 	}
 
 	blockIDs := make([]flow.Identifier, len(blocks))
@@ -70,7 +70,7 @@ func (e *ENEventProvider) Events(
 	var successfulNode *flow.IdentitySkeleton
 	resp, successfulNode, err := e.getEventsFromAnyExeNode(ctx, execResultInfo.ExecutionNodes, req)
 	if err != nil {
-		return Response{}, entities.ExecutorMetadata{},
+		return Response{}, flow.ExecutorMetadata{},
 			rpc.ConvertError(err, "failed to get execution nodes for events query", codes.Internal)
 	}
 
@@ -81,9 +81,9 @@ func (e *ENEventProvider) Events(
 		Str("last_block_id", lastBlockID.String()).
 		Msg("successfully got events")
 
-	metadata := entities.ExecutorMetadata{
-		ExecutionResultId: []byte(successfulNode.NodeID.String()),
-		ExecutorId:        stringsToBytes(execResultInfo.ExecutionNodes.NodeIDs().Strings()),
+	metadata := flow.ExecutorMetadata{
+		ExecutionResultID: successfulNode.NodeID,
+		ExecutorIDs:       execResultInfo.ExecutionNodes.NodeIDs(),
 	}
 
 	// convert execution node api result to access node api result
@@ -94,7 +94,7 @@ func (e *ENEventProvider) Events(
 		encodingVersion,
 	)
 	if err != nil {
-		return Response{}, entities.ExecutorMetadata{},
+		return Response{}, flow.ExecutorMetadata{},
 			status.Errorf(codes.Internal, "failed to verify retrieved events from execution node: %v", err)
 	}
 

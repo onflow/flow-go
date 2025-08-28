@@ -1,8 +1,6 @@
 package models
 
 import (
-	"github.com/onflow/flow/protobuf/go/flow/entities"
-
 	"github.com/onflow/flow-go/engine/access/rest/util"
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -27,7 +25,7 @@ func NewEvents(events []flow.Event) Events {
 	return convertedEvents
 }
 
-func NewBlockEvents(events flow.BlockEvents, metadata entities.ExecutorMetadata) *BlockEvents {
+func NewBlockEvents(events flow.BlockEvents, metadata flow.ExecutorMetadata) *BlockEvents {
 	return &BlockEvents{
 		BlockId:        events.BlockID.String(),
 		BlockHeight:    util.FromUint(events.BlockHeight),
@@ -40,10 +38,10 @@ func NewBlockEvents(events flow.BlockEvents, metadata entities.ExecutorMetadata)
 
 type BlockEventsList []BlockEvents
 
-func NewBlockEventsList(blocksEvents []flow.BlockEvents, metadata entities.ExecutorMetadata) BlockEventsList {
+func NewBlockEventsList(blocksEvents []flow.BlockEvents, metadata flow.ExecutorMetadata) BlockEventsList {
 	converted := make([]BlockEvents, len(blocksEvents))
-	for i, be := range blocksEvents {
-		converted[i] = *NewBlockEvents(be, metadata)
+	for i, evs := range blocksEvents {
+		converted[i] = *NewBlockEvents(evs, metadata)
 	}
 	return converted
 }

@@ -1,23 +1,23 @@
 package models
 
 import (
-	"github.com/onflow/flow/protobuf/go/flow/entities"
+	"github.com/onflow/flow-go/model/flow"
 )
 
-func NewMetadata(metadata entities.ExecutorMetadata) *Metadata {
+func NewMetadata(metadata flow.ExecutorMetadata) *Metadata {
 	return &Metadata{
 		ExecutorMetadata: NewExecutorMetadata(metadata),
 	}
 }
 
-func NewExecutorMetadata(metadata entities.ExecutorMetadata) *ExecutorMetadata {
-	executorIDs := make([]string, len(metadata.ExecutorId))
-	for i, id := range metadata.ExecutorId {
-		executorIDs[i] = string(id)
+func NewExecutorMetadata(metadata flow.ExecutorMetadata) *ExecutorMetadata {
+	executorIDs := make([]string, len(metadata.ExecutorIDs))
+	for i, id := range metadata.ExecutorIDs {
+		executorIDs[i] = id.String()
 	}
 
 	return &ExecutorMetadata{
-		ExecutionResultId: string(metadata.ExecutionResultId),
+		ExecutionResultId: metadata.ExecutionResultID.String(),
 		ExecutorIds:       executorIDs,
 	}
 }
