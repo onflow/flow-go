@@ -431,14 +431,14 @@ func (v *TransactionValidator) checkSignatureFormat(tx *flow.TransactionBody) er
 	for _, signature := range tx.PayloadSignatures {
 		valid, _ := signature.ValidateExtensionDataAndReconstructMessage(tx.PayloadMessage())
 		if !valid {
-			return InvalidSignatureError{Signature: signature}
+			return InvalidAuthenticationSchemeFormatError{Signature: signature}
 		}
 	}
 
 	for _, signature := range tx.EnvelopeSignatures {
 		valid, _ := signature.ValidateExtensionDataAndReconstructMessage(tx.EnvelopeMessage())
 		if !valid {
-			return InvalidSignatureError{Signature: signature}
+			return InvalidAuthenticationSchemeFormatError{Signature: signature}
 		}
 	}
 
@@ -465,7 +465,7 @@ func (v *TransactionValidator) checkSignatureFormat(tx *flow.TransactionBody) er
 			continue
 		}
 
-		return InvalidSignatureError{Signature: signature}
+		return InvalidRawSignatureError{Signature: signature}
 	}
 
 	return nil
