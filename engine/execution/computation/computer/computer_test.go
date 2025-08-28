@@ -1379,11 +1379,12 @@ func Test_ScheduledCallback(t *testing.T) {
 
 		eventType := cadence.NewEventType(
 			location,
-			"CallbackProcessed",
+			"PendingExecution",
 			[]cadence.Field{
 				{Identifier: "id", Type: cadence.UInt64Type},
 				{Identifier: "priority", Type: cadence.UInt8Type},
 				{Identifier: "executionEffort", Type: cadence.UInt64Type},
+				{Identifier: "fees", Type: cadence.UFix64Type},
 				{Identifier: "callbackOwner", Type: cadence.AddressType},
 			},
 			nil,
@@ -1392,11 +1393,15 @@ func Test_ScheduledCallback(t *testing.T) {
 		callbackID1 := uint64(1)
 		callbackID2 := uint64(2)
 
+		fees, err := cadence.NewUFix64("0.0")
+		require.NoError(t, err)
+
 		callbackEvent1 := cadence.NewEvent(
 			[]cadence.Value{
 				cadence.NewUInt64(callbackID1),
 				cadence.NewUInt8(1),
 				cadence.NewUInt64(1000), // execution effort
+				fees,
 				cadence.NewAddress(env.FlowServiceAccount.Address),
 			},
 		).WithType(eventType)
@@ -1406,6 +1411,7 @@ func Test_ScheduledCallback(t *testing.T) {
 				cadence.NewUInt64(callbackID2),
 				cadence.NewUInt8(1),
 				cadence.NewUInt64(2000), // execution effort
+				fees,
 				cadence.NewAddress(env.FlowServiceAccount.Address),
 			},
 		).WithType(eventType)
@@ -1659,7 +1665,7 @@ func (c *callbackTestExecutor) Execute() error {
 		txProc, ok := c.proc.(*fvm.TransactionProcedure)
 		if ok {
 			script := string(txProc.Transaction.Script)
-			if strings.Contains(script, "FlowCallbackScheduler.process") {
+			if strings.Contains(script, "scheduler.process") {
 				return c.vm.err
 			}
 		}
@@ -1676,7 +1682,7 @@ func (c *callbackTestExecutor) Output() fvm.ProcedureOutput {
 		txProc, ok := c.proc.(*fvm.TransactionProcedure)
 		if ok {
 			script := string(txProc.Transaction.Script)
-			if strings.Contains(script, "FlowCallbackScheduler.process") {
+			if strings.Contains(script, "scheduler.process") {
 				return fvm.ProcedureOutput{
 					Err: c.vm.err,
 				}
@@ -1699,8 +1705,8 @@ func (c *callbackTestExecutor) Output() fvm.ProcedureOutput {
 	// scheduled callbacks process transaction
 	case strings.Contains(string(txBody.Script), "scheduler.process"):
 		c.vm.executedTransactions[txID] = "process_callback"
-		env := systemcontracts.SystemContractsForChain(flow.Mainnet.Chain().ChainID()).AsTemplateEnv()
-		eventTypeString := fmt.Sprintf("A.%v.CallbackScheduler.CallbackProcessed", env.FlowCallbackSchedulerAddress)
+		env := systemcontracts.SystemContractsForChain(c.ctx.Chain.ChainID()).AsTemplateEnv()
+		eventTypeString := fmt.Sprintf("A.%v.FlowCallbackScheduler.PendingExecution", env.FlowCallbackSchedulerAddress)
 
 		// return events for each scheduled callback
 		events := make([]flow.Event, len(c.vm.eventPayloads))
