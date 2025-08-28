@@ -116,7 +116,7 @@ func (s *ScheduledCallbacksSuite) TestScheduleCallback_ScheduleAndCancelCallback
 	callbackID := s.scheduleCallback(futureTimestamp)
 	s.T().Logf("scheduled callback with ID: %d", callbackID)
 
-	const scheduledStatus = 0
+	const scheduledStatus = 1
 	const canceledStatus = 3
 
 	// Wait fraction of the scheduled time
