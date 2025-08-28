@@ -9,6 +9,7 @@ import (
 	"github.com/onflow/flow/protobuf/go/flow/entities"
 
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/executiondatasync/optimistic_sync"
 )
 
 type FailoverEventProvider struct {
@@ -35,9 +36,16 @@ func (f *FailoverEventProvider) Events(
 	ctx context.Context,
 	blocks []BlockMetadata,
 	eventType flow.EventType,
-	encoding entities.EventEncodingVersion,
-) (Response, error) {
-	localEvents, localErr := f.localProvider.Events(ctx, blocks, eventType, encoding)
+	encodingVersion entities.EventEncodingVersion,
+	result *optimistic_sync.ExecutionResultInfo,
+) (Response, flow.ExecutorMetadata, error) {
+	localEvents, metadata, localErr := f.localProvider.Events(
+		ctx,
+		blocks,
+		eventType,
+		encodingVersion,
+		result,
+	)
 	if localErr != nil {
 		f.log.Debug().Err(localErr).
 			Msg("failed to get events from local storage. will try to get them from execution node")
@@ -46,16 +54,22 @@ func (f *FailoverEventProvider) Events(
 	}
 
 	if len(localEvents.MissingBlocks) == 0 {
-		return localEvents, nil
+		return localEvents, metadata, nil
 	}
 
 	f.log.Debug().
 		Int("missing_blocks", len(localEvents.MissingBlocks)).
 		Msg("querying execution nodes for events from missing blocks")
 
-	execNodeEvents, execNodeErr := f.execNodeProvider.Events(ctx, localEvents.MissingBlocks, eventType, encoding)
+	execNodeEvents, _, execNodeErr := f.execNodeProvider.Events(
+		ctx,
+		localEvents.MissingBlocks,
+		eventType,
+		encodingVersion,
+		result,
+	)
 	if execNodeErr != nil {
-		return Response{}, execNodeErr
+		return Response{}, metadata, execNodeErr
 	}
 
 	// sort ascending by block height
@@ -71,5 +85,5 @@ func (f *FailoverEventProvider) Events(
 
 	return Response{
 		Events: combinedEvents,
-	}, nil
+	}, metadata, nil
 }

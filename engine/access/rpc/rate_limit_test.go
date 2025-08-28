@@ -27,6 +27,7 @@ import (
 	"github.com/onflow/flow-go/engine/access/rpc/backend/query_mode"
 	statestreambackend "github.com/onflow/flow-go/engine/access/state_stream/backend"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/executiondatasync/optimistic_sync"
 	"github.com/onflow/flow-go/module/grpcserver"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
@@ -175,6 +176,10 @@ func (suite *RateLimitTestSuite) SetupTest() {
 		EventQueryMode:       query_mode.IndexQueryModeExecutionNodesOnly,
 		ScriptExecutionMode:  query_mode.IndexQueryModeExecutionNodesOnly,
 		TxResultQueryMode:    query_mode.IndexQueryModeExecutionNodesOnly,
+		// TODO: set this once data result forest merged in
+		//ExecutionResultProvider:
+		//ExecutionStateCache:
+		OperatorCriteria: optimistic_sync.DefaultCriteria,
 	})
 	suite.Require().NoError(err)
 
