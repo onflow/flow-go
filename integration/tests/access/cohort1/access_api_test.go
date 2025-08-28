@@ -594,6 +594,7 @@ func convertToMessageSigWithExtensionData(sigs []sdk.TransactionSignature, exten
 
 	for i, sig := range sigs {
 		if *extensionData == nil {
+			// replace extension data by sig.ExtensionData
 			newExtensionData := make([]byte, len(sig.ExtensionData))
 			copy(newExtensionData, sig.ExtensionData)
 			*extensionData = newExtensionData
@@ -1064,7 +1065,7 @@ func (s *AccessAPISuite) TestExtensionDataPreservation() {
 
 // TestInvalidTransactionSignature tests that the access API performs sanity checks
 // on the transaction signature format and rejects invalid formats
-func (s *AccessAPISuite) TestInvalidTransactionSignature() {
+func (s *AccessAPISuite) TestRejectedInvalidSignatureFormat() {
 	accessNodeContainer := s.net.ContainerByName(testnet.PrimaryAN)
 
 	// Establish a gRPC connection to the access API
@@ -1149,10 +1150,10 @@ func (s *AccessAPISuite) TestInvalidTransactionSignature() {
 			})
 			s.Require().NoError(err)
 
-			// check that the tx submission errors
+			// check that the tx submission errors at the access API level
 			_, err = subClient.Recv()
 			s.Require().Error(err)
-			//s.Require().ErrorContains(err, "invalid signature")
+			s.Require().ErrorContains(err, "has invalid extension data")
 		})
 	}
 }
