@@ -808,34 +808,34 @@ func (s *AccessAPISuite) TestTransactionSignatureWebAuthnExtensionData() {
 
 	// Test WebAuthn extension data with different scenarios
 	testCases := []struct {
-		name          string
-		extensionData []byte
-		description   string
-		expectSuccess bool
+		name                     string
+		extensionDataReplacement []byte // If nil, use the original extension data from the signed transaction
+		description              string
+		expectSuccess            bool
 	}{
 		{
-			name:          "webauthn_valid",
-			extensionData: nil,
-			description:   "WebAuthn scheme with minimal extension data",
-			expectSuccess: true,
+			name:                     "webauthn_valid",
+			extensionDataReplacement: nil, // Use the original extension data from the signed transaction, which should be valid
+			description:              "WebAuthn scheme with minimal extension data",
+			expectSuccess:            true,
 		},
 		{
-			name:          "webauthn_invalid_minimal",
-			extensionData: []byte{0x1}, // WebAuthn scheme identifier only
-			description:   "WebAuthn scheme with minimal extension data",
-			expectSuccess: false, // Should fail validation due to incomplete WebAuthn data
+			name:                     "webauthn_invalid_minimal",
+			extensionDataReplacement: []byte{0x1}, // WebAuthn scheme identifier only
+			description:              "WebAuthn scheme with minimal extension data",
+			expectSuccess:            false, // Should fail validation due to incomplete WebAuthn data
 		},
 		{
-			name:          "webauthn_invalid_scheme",
-			extensionData: []byte{0x3, 0x01, 0x02, 0x03}, // Invalid scheme identifier
-			description:   "Invalid authentication scheme",
-			expectSuccess: false,
+			name:                     "webauthn_invalid_scheme",
+			extensionDataReplacement: []byte{0x3, 0x01, 0x02, 0x03}, // Invalid scheme identifier
+			description:              "Invalid authentication scheme",
+			expectSuccess:            false,
 		},
 		{
-			name:          "webauthn_malformed_data",
-			extensionData: []byte{0x1, 0x01, 0x02}, // WebAuthn scheme with malformed data
-			description:   "WebAuthn scheme with malformed extension data",
-			expectSuccess: false,
+			name:                     "webauthn_malformed_data",
+			extensionDataReplacement: []byte{0x1, 0x01, 0x02}, // WebAuthn scheme with malformed data
+			description:              "WebAuthn scheme with malformed extension data",
+			expectSuccess:            false,
 		},
 	}
 
@@ -856,7 +856,13 @@ func (s *AccessAPISuite) TestTransactionSignatureWebAuthnExtensionData() {
 				Payer:              tx.Payer.Bytes(),
 				Authorizers:        authorizers,
 				PayloadSignatures:  convertToMessageSigWithExtensionData(tx.PayloadSignatures, nil),
-				EnvelopeSignatures: convertToMessageSigWithExtensionData(tx.EnvelopeSignatures, tc.extensionData),
+				EnvelopeSignatures: convertToMessageSigWithExtensionData(tx.EnvelopeSignatures, tc.extensionDataReplacement),
+			}
+
+			// Validate that the ExtensionData is set correctly before sending
+			for _, sig := range transactionMsg.EnvelopeSignatures {
+				// For these test cases specifically, we expect ExtensionData to be set
+				s.Assert().GreaterOrEqual(len(sig.ExtensionData), 1, "ExtensionData should have at least 1 byte for scheme identifier")
 			}
 
 			// Send and subscribe to the transaction status using the access API
