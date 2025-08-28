@@ -112,7 +112,7 @@ func parseGetTransactionResult(
 		TransactionOptionals: txOpts,
 		ExecutionState: entities.ExecutionStateQuery{
 			AgreeingExecutorsCount:  agreeingExecutorsCount,
-			RequiredExecutorId:      agreeingExecutorsIds,
+			RequiredExecutorIds:     agreeingExecutorsIds,
 			IncludeExecutorMetadata: includeExecutorMetadata,
 		},
 	}, nil

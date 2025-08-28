@@ -397,7 +397,7 @@ func (t *LocalTransactionProvider) getSnapshotForBlock(
 ) (optimistic_sync.Snapshot, *optimistic_sync.ExecutionResultInfo, error) {
 	executionResultInfo, err := t.executionResultProvider.ExecutionResult(blockID, optimistic_sync.Criteria{
 		AgreeingExecutorsCount: uint(query.AgreeingExecutorsCount),
-		RequiredExecutors:      convert.MessagesToIdentifiers(query.RequiredExecutorId),
+		RequiredExecutors:      convert.MessagesToIdentifiers(query.RequiredExecutorIds),
 	})
 	if err != nil {
 		return nil, nil, err

@@ -19,6 +19,7 @@ import (
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	accessmodel "github.com/onflow/flow-go/model/access"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/executiondatasync/optimistic_sync"
 	"github.com/onflow/flow-go/module/metrics"
 )
 
@@ -378,7 +379,7 @@ func (r *RestProxyHandler) GetEventsForHeightRange(
 	eventType string,
 	startHeight, endHeight uint64,
 	requiredEventEncodingVersion entities.EventEncodingVersion,
-	executionStateQuery entities.ExecutionStateQuery,
+	criteria optimistic_sync.Criteria,
 ) ([]flow.BlockEvents, entities.ExecutorMetadata, error) {
 	upstream, closer, err := r.FaultTolerantClient()
 	if err != nil {
@@ -391,7 +392,11 @@ func (r *RestProxyHandler) GetEventsForHeightRange(
 		StartHeight:          startHeight,
 		EndHeight:            endHeight,
 		EventEncodingVersion: requiredEventEncodingVersion,
-		ExecutionStateQuery:  &executionStateQuery,
+		ExecutionStateQuery: &entities.ExecutionStateQuery{
+			AgreeingExecutorsCount:  uint64(criteria.AgreeingExecutorsCount),
+			RequiredExecutorIds:     convert.IdentifiersToMessages(criteria.RequiredExecutors),
+			IncludeExecutorMetadata: false, //TODO: what should I do with this field?
+		},
 	}
 	eventsResponse, err := upstream.GetEventsForHeightRange(ctx, getEventsForHeightRangeRequest)
 	r.log("upstream", "GetEventsForHeightRange", err)
@@ -409,7 +414,7 @@ func (r *RestProxyHandler) GetEventsForBlockIDs(
 	eventType string,
 	blockIDs []flow.Identifier,
 	requiredEventEncodingVersion entities.EventEncodingVersion,
-	executionStateQuery entities.ExecutionStateQuery,
+	criteria optimistic_sync.Criteria,
 ) ([]flow.BlockEvents, entities.ExecutorMetadata, error) {
 	upstream, closer, err := r.FaultTolerantClient()
 	if err != nil {
@@ -423,7 +428,11 @@ func (r *RestProxyHandler) GetEventsForBlockIDs(
 		Type:                 eventType,
 		BlockIds:             blockIds,
 		EventEncodingVersion: requiredEventEncodingVersion,
-		ExecutionStateQuery:  &executionStateQuery,
+		ExecutionStateQuery: &entities.ExecutionStateQuery{
+			AgreeingExecutorsCount:  uint64(criteria.AgreeingExecutorsCount),
+			RequiredExecutorIds:     convert.IdentifiersToMessages(criteria.RequiredExecutors),
+			IncludeExecutorMetadata: false, //TODO: what should I do with this field?
+		},
 	}
 	eventsResponse, err := upstream.GetEventsForBlockIDs(ctx, getEventsForBlockIDsRequest)
 	r.log("upstream", "GetEventsForBlockIDs", err)

@@ -21,6 +21,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/counters"
+	"github.com/onflow/flow-go/module/executiondatasync/optimistic_sync"
 	"github.com/onflow/flow-go/module/state_synchronization"
 	"github.com/onflow/flow-go/module/state_synchronization/indexer"
 )
@@ -939,15 +940,27 @@ func (h *Handler) GetEventsForHeightRange(
 
 	eventEncodingVersion := req.GetEventEncodingVersion()
 
-	results, _, err := h.api.GetEventsForHeightRange(ctx, eventType, startHeight, endHeight, eventEncodingVersion, *req.ExecutionStateQuery)
+	results, executorMetadata, err := h.api.GetEventsForHeightRange(
+		ctx,
+		eventType,
+		startHeight,
+		endHeight,
+		eventEncodingVersion,
+		optimistic_sync.NewCriteria(req.GetExecutionStateQuery()),
+	)
 	if err != nil {
 		return nil, err
+	}
+
+	if query := req.GetExecutionStateQuery(); query != nil && query.GetIncludeExecutorMetadata() {
+		metadata.ExecutorMetadata = &executorMetadata
 	}
 
 	resultEvents, err := convert.BlockEventsToMessages(results)
 	if err != nil {
 		return nil, err
 	}
+
 	return &accessproto.EventsResponse{
 		Results:  resultEvents,
 		Metadata: metadata,
@@ -976,9 +989,19 @@ func (h *Handler) GetEventsForBlockIDs(
 
 	eventEncodingVersion := req.GetEventEncodingVersion()
 
-	results, _, err := h.api.GetEventsForBlockIDs(ctx, eventType, blockIDs, eventEncodingVersion, *req.ExecutionStateQuery)
+	results, executorMetadata, err := h.api.GetEventsForBlockIDs(
+		ctx,
+		eventType,
+		blockIDs,
+		eventEncodingVersion,
+		optimistic_sync.NewCriteria(req.GetExecutionStateQuery()),
+	)
 	if err != nil {
 		return nil, err
+	}
+
+	if query := req.GetExecutionStateQuery(); query != nil && query.GetIncludeExecutorMetadata() {
+		metadata.ExecutorMetadata = &executorMetadata
 	}
 
 	resultEvents, err := convert.BlockEventsToMessages(results)

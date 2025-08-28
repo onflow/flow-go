@@ -1,4 +1,4 @@
-package execution_result_query_provider
+package execution_result_provider
 
 import (
 	"testing"
@@ -15,7 +15,7 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-// ExecutionResultQueryProviderSuite is a test suite for testing the ExecutionResultQueryProvider.
+// ExecutionResultQueryProviderSuite is a test suite for testing the ExecutionResultProvider.
 type ExecutionResultQueryProviderSuite struct {
 	suite.Suite
 
@@ -58,8 +58,8 @@ func (suite *ExecutionResultQueryProviderSuite) SetupTest() {
 	suite.state.On("AtBlockID", mock.Anything).Return(suite.snapshot).Maybe()
 }
 
-func (suite *ExecutionResultQueryProviderSuite) createProvider(preferredExecutors flow.IdentifierList, operatorCriteria optimistic_sync.Criteria) *ExecutionResultQueryProvider {
-	provider, err := NewExecutionResultQueryProvider(
+func (suite *ExecutionResultQueryProviderSuite) createProvider(preferredExecutors flow.IdentifierList, operatorCriteria optimistic_sync.Criteria) *ExecutionResultProvider {
+	provider, err := NewExecutionResultProvider(
 		suite.log,
 		suite.state,
 		suite.headers,

@@ -26,8 +26,15 @@ func TestNewExecutionDataQuery(t *testing.T) {
 			wantErr:               false,
 		},
 		{
-			name:                  "invalid agreeingExecutorCount",
+			name:                  "invalid agreeingExecutorCount (not a number)",
 			agreeingExecutorCount: "not-a-number",
+			requiredExecutorIds:   validIDs.Strings(),
+			includeExecutorMeta:   "true",
+			wantErr:               true,
+		},
+		{
+			name:                  "invalid agreeingExecutorCount (count equals zero)",
+			agreeingExecutorCount: "0",
 			requiredExecutorIds:   validIDs.Strings(),
 			includeExecutorMeta:   "true",
 			wantErr:               true,

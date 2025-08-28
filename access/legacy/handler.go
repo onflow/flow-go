@@ -12,6 +12,7 @@ import (
 	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/access/legacy/convert"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/executiondatasync/optimistic_sync"
 )
 
 type Handler struct {
@@ -321,7 +322,7 @@ func (h *Handler) GetEventsForHeightRange(
 	startHeight := req.GetStartHeight()
 	endHeight := req.GetEndHeight()
 
-	results, _, err := h.api.GetEventsForHeightRange(ctx, eventType, startHeight, endHeight, entities.EventEncodingVersion_JSON_CDC_V0, entities.ExecutionStateQuery{})
+	results, _, err := h.api.GetEventsForHeightRange(ctx, eventType, startHeight, endHeight, entities.EventEncodingVersion_JSON_CDC_V0, optimistic_sync.Criteria{})
 	if err != nil {
 		return nil, err
 	}
@@ -339,7 +340,7 @@ func (h *Handler) GetEventsForBlockIDs(
 	eventType := req.GetType()
 	blockIDs := convert.MessagesToIdentifiers(req.GetBlockIds())
 
-	results, _, err := h.api.GetEventsForBlockIDs(ctx, eventType, blockIDs, entities.EventEncodingVersion_JSON_CDC_V0, entities.ExecutionStateQuery{})
+	results, _, err := h.api.GetEventsForBlockIDs(ctx, eventType, blockIDs, entities.EventEncodingVersion_JSON_CDC_V0, optimistic_sync.Criteria{})
 	if err != nil {
 		return nil, err
 	}

@@ -27,7 +27,7 @@ require (
 	github.com/onflow/flow-go v0.38.0-preview.0.0.20241021221952-af9cd6e99de1
 	github.com/onflow/flow-go-sdk v1.6.2
 	github.com/onflow/flow-go/insecure v0.0.0-00010101000000-000000000000
-	github.com/onflow/flow/protobuf/go/flow v0.4.13-0.20250820140947-cae298378c27
+	github.com/onflow/flow/protobuf/go/flow v0.4.15-0.20250828110814-0c82ce571c14
 	github.com/onflow/go-ethereum v1.16.2
 	github.com/prometheus/client_golang v1.20.5
 	github.com/prometheus/client_model v0.6.1

@@ -10,6 +10,8 @@ import (
 
 	mock "github.com/stretchr/testify/mock"
 
+	optimistic_sync "github.com/onflow/flow-go/module/executiondatasync/optimistic_sync"
+
 	provider "github.com/onflow/flow-go/engine/access/rpc/backend/events/provider"
 )
 
@@ -18,9 +20,9 @@ type EventProvider struct {
 	mock.Mock
 }
 
-// Events provides a mock function with given fields: ctx, blocks, eventType, encodingVersion, executionState
-func (_m *EventProvider) Events(ctx context.Context, blocks []provider.BlockMetadata, eventType flow.EventType, encodingVersion entities.EventEncodingVersion, executionState entities.ExecutionStateQuery) (provider.Response, entities.ExecutorMetadata, error) {
-	ret := _m.Called(ctx, blocks, eventType, encodingVersion, executionState)
+// Events provides a mock function with given fields: ctx, blocks, eventType, encodingVersion, criteria
+func (_m *EventProvider) Events(ctx context.Context, blocks []provider.BlockMetadata, eventType flow.EventType, encodingVersion entities.EventEncodingVersion, criteria optimistic_sync.Criteria) (provider.Response, entities.ExecutorMetadata, error) {
+	ret := _m.Called(ctx, blocks, eventType, encodingVersion, criteria)
 
 	if len(ret) == 0 {
 		panic("no return value specified for Events")
@@ -29,23 +31,23 @@ func (_m *EventProvider) Events(ctx context.Context, blocks []provider.BlockMeta
 	var r0 provider.Response
 	var r1 entities.ExecutorMetadata
 	var r2 error
-	if rf, ok := ret.Get(0).(func(context.Context, []provider.BlockMetadata, flow.EventType, entities.EventEncodingVersion, entities.ExecutionStateQuery) (provider.Response, entities.ExecutorMetadata, error)); ok {
-		return rf(ctx, blocks, eventType, encodingVersion, executionState)
+	if rf, ok := ret.Get(0).(func(context.Context, []provider.BlockMetadata, flow.EventType, entities.EventEncodingVersion, optimistic_sync.Criteria) (provider.Response, entities.ExecutorMetadata, error)); ok {
+		return rf(ctx, blocks, eventType, encodingVersion, criteria)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, []provider.BlockMetadata, flow.EventType, entities.EventEncodingVersion, entities.ExecutionStateQuery) provider.Response); ok {
-		r0 = rf(ctx, blocks, eventType, encodingVersion, executionState)
+	if rf, ok := ret.Get(0).(func(context.Context, []provider.BlockMetadata, flow.EventType, entities.EventEncodingVersion, optimistic_sync.Criteria) provider.Response); ok {
+		r0 = rf(ctx, blocks, eventType, encodingVersion, criteria)
 	} else {
 		r0 = ret.Get(0).(provider.Response)
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, []provider.BlockMetadata, flow.EventType, entities.EventEncodingVersion, entities.ExecutionStateQuery) entities.ExecutorMetadata); ok {
-		r1 = rf(ctx, blocks, eventType, encodingVersion, executionState)
+	if rf, ok := ret.Get(1).(func(context.Context, []provider.BlockMetadata, flow.EventType, entities.EventEncodingVersion, optimistic_sync.Criteria) entities.ExecutorMetadata); ok {
+		r1 = rf(ctx, blocks, eventType, encodingVersion, criteria)
 	} else {
 		r1 = ret.Get(1).(entities.ExecutorMetadata)
 	}
 
-	if rf, ok := ret.Get(2).(func(context.Context, []provider.BlockMetadata, flow.EventType, entities.EventEncodingVersion, entities.ExecutionStateQuery) error); ok {
-		r2 = rf(ctx, blocks, eventType, encodingVersion, executionState)
+	if rf, ok := ret.Get(2).(func(context.Context, []provider.BlockMetadata, flow.EventType, entities.EventEncodingVersion, optimistic_sync.Criteria) error); ok {
+		r2 = rf(ctx, blocks, eventType, encodingVersion, criteria)
 	} else {
 		r2 = ret.Error(2)
 	}

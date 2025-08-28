@@ -119,7 +119,7 @@ func parseGetEvents(
 		BlockIDs:    blockIDs.Flow(),
 		ExecutionState: entities.ExecutionStateQuery{
 			AgreeingExecutorsCount:  agreeingExecutorsCount,
-			RequiredExecutorId:      agreeingExecutorsIds,
+			RequiredExecutorIds:     agreeingExecutorsIds,
 			IncludeExecutorMetadata: includeExecutorMetadata,
 		},
 	}, nil

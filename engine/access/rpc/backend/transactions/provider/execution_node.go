@@ -84,7 +84,7 @@ func (e *ENTransactionProvider) TransactionResult(
 
 	executionResultInfo, err := e.executionResultProvider.ExecutionResult(blockID, optimistic_sync.Criteria{
 		AgreeingExecutorsCount: uint(query.AgreeingExecutorsCount),
-		RequiredExecutors:      convert.MessagesToIdentifiers(query.RequiredExecutorId),
+		RequiredExecutors:      convert.MessagesToIdentifiers(query.RequiredExecutorIds),
 	})
 	if err != nil {
 		// if no execution receipt were found, return a NotFound GRPC error
@@ -140,7 +140,7 @@ func (e *ENTransactionProvider) TransactionResultByIndex(
 
 	executionResultInfo, err := e.executionResultProvider.ExecutionResult(blockID, optimistic_sync.Criteria{
 		AgreeingExecutorsCount: uint(query.AgreeingExecutorsCount),
-		RequiredExecutors:      convert.MessagesToIdentifiers(query.RequiredExecutorId),
+		RequiredExecutors:      convert.MessagesToIdentifiers(query.RequiredExecutorIds),
 	})
 	if err != nil {
 		if common.IsInsufficientExecutionReceipts(err) {
@@ -194,7 +194,7 @@ func (e *ENTransactionProvider) TransactionResultsByBlockID(
 
 	executionResultInfo, err := e.executionResultProvider.ExecutionResult(blockID, optimistic_sync.Criteria{
 		AgreeingExecutorsCount: uint(query.AgreeingExecutorsCount),
-		RequiredExecutors:      convert.MessagesToIdentifiers(query.RequiredExecutorId),
+		RequiredExecutors:      convert.MessagesToIdentifiers(query.RequiredExecutorIds),
 	})
 	if err != nil {
 		if common.IsInsufficientExecutionReceipts(err) {

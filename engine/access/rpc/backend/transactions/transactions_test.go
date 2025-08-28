@@ -23,7 +23,7 @@ import (
 
 	. "github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/module/executiondatasync/optimistic_sync"
-	"github.com/onflow/flow-go/module/executiondatasync/optimistic_sync/execution_result_query_provider"
+	"github.com/onflow/flow-go/module/executiondatasync/optimistic_sync/execution_result_provider"
 	optimisticsyncmock "github.com/onflow/flow-go/module/executiondatasync/optimistic_sync/mock"
 
 	"github.com/onflow/flow-go/access/validator"
@@ -166,12 +166,12 @@ func (suite *Suite) defaultTransactionsParams() Params {
 		suite.fixedExecutionNodeIDs,
 	)
 
-	executionResultProvider, err := execution_result_query_provider.NewExecutionResultQueryProvider(
+	executionResultProvider, err := execution_result_provider.NewExecutionResultProvider(
 		suite.log,
 		suite.state,
 		suite.headers,
 		suite.receipts,
-		execution_result_query_provider.NewExecutionNodes(suite.preferredExecutionNodeIDs, suite.fixedExecutionNodeIDs),
+		execution_result_provider.NewExecutionNodes(suite.preferredExecutionNodeIDs, suite.fixedExecutionNodeIDs),
 		optimistic_sync.Criteria{},
 	)
 	suite.Require().NoError(err)
