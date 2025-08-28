@@ -147,9 +147,19 @@ func migrateAccountStatusWithPublicKeyMetadata(
 		return err
 	}
 
+	// After the migration and spork, the runtime needs to detect duplicate public keys
+	// being added and store them efficiently. Detection rate doesn't need to be 100%
+	// to be effective and we don't want to read all existing keys or store all digests.
+	// We only need to compute and store the hash digest of the last N public keys added.
+	// For example, N=2 showed good balance of tradeoffs in tests using mainnet snapshot.
 	startIndexForDigests, digests := generateLastNPublicKeyDigests(log, owner, encodedPublicKeys, maxStoredDigests, nil)
 
+	// startIndexForMapping stores the start index of the first deduplicated public key.
+	// This is used to avoid unnecessary key index mapping overhead (both speed & storage).
 	startIndexForMapping := firstDeduplicatedKeyIndexInMappings(keyIndexMappings)
+
+	// keyIndexMappings is a slice containing stored key index where the slice index is
+	// the account key index starting from startIndexForMapping.
 	keyIndexMappings = keyIndexMappings[startIndexForMapping:]
 
 	newAccountStatus, err := encodeAccountStatusV4WithPublicKeyMetadata(
@@ -181,6 +191,12 @@ func migrateAccountPublicKeysIfNeeded(
 		return nil
 	}
 
+	// Storing public keys in batch reduces payload count and reduces number of reads for multiple public keys.
+	// About 65% of accounts have 1 public key so the first public key is not deduplicated to avoid overhead.
+	// About 90% of accounts have fewer than 10 account public keys, so with batching 90% of accounts have at
+	// most 2 payloads for public keys (since the first key is always by itself to avoid overhead).
+	// - apk_0 payload for account public key 0, and
+	// - pb_b0 payload for rest of deduplicated public keys
 	encodedBatchPublicKeys, err := encodePublicKeysInBatches(encodedUniquePublicKeys, maxPublicKeyCountInBatch)
 	if err != nil {
 		return err

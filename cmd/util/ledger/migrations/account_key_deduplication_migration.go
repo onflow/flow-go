@@ -20,28 +20,38 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-// Public key deduplication migration deduplicates public keys and migrates related registers.
+// NOTE: The term "payload" and "register" are used interchangeably here.
+
+// Public key deduplication migration deduplicates public keys and migrates related payloads.
 // Migration includes:
-// - Optionally appending account public key metadata in "a.s" (account status) register.
-// - Renaming "public_key_0" register to "apk_0"
-// - Migrating public keys from individual registers to batch public key registers, starting from account public key 1.
-// - Migrating non-zero sequence number to its register
+// - Optionally appending account public key metadata in "a.s" (account status) payload.
+//   - Weight and revoked status of each account public key, encoded using RLE to save space.
+//     The weight cannot be modified and revoke status is infrequently modified.
+//   - Key index mapping to stored key index mapping (only for accounts with duplication flag)
+//     encoded in RLE to save space.
+//   - Last N digests to detect duplicate keys being added at runtime (after migration and spork).
+// - Renaming "public_key_0" payload to "apk_0".
+// - Migrating public keys from individual payloads to batch deduplicated public key payloads,
+//   starting from the second unique public key.
+// - Migrating non-zero sequence number of account public key to its own payload.
+//   NOTE: We store and update the sequence number of each account public key in a separate payload
+//   to avoid blocking some use cases of concurrent execution.
 //
 // Using a data format (account public key metadata) that can detect duplicates and store deduplication data
 // requires storing some related information (overhead) but in most cases the overhead is more than offset
 // by deduplication.
 // To avoid or reduce overhead,
-// - migration only adds key metadata section to "a.s" register for accounts with at least two keys.
+// - migration only adds key metadata section to "a.s" payload for accounts with at least two keys.
 // - migration only stores digests of the last N unique public keys (N=2 is good, using more wasn't always better).
 // - migration only stores account public keys to stored public keys mappings if key deduplication occurred.
 //
 // More specifically:
 // - For accounts with 0 public keys, migration skips them
-// - For accounts with 1 public key, migration only renames the "public_key_0" register to "apk_0" (no other changes)
+// - For accounts with 1 public key, migration only renames the "public_key_0" payload to "apk_0" (no other changes)
 // - For accounts with at least two keys, migration:
-//   * renames the "public_key_0" register to "apk_0"
-//   * stores unique keys in batch public key registers, starting from public key 1
-//   * stores non-zero sequence numbers in sequence number registers
+//   * renames the "public_key_0" payload to "apk_0"
+//   * stores unique keys in batch public key payload, starting from public key 1
+//   * stores non-zero sequence numbers in sequence number payloads
 //   * adds account key weights and revoked statuses to the key metadata section in key metadata section
 //   * adds digests of only the last N unique public keys in key metadata section (N=2 is the default)
 //   * adds account public key to unique key mappings if any key is deduplicated
@@ -53,7 +63,7 @@ const (
 
 const (
 	maxPublicKeyCountInBatch = 20 // 20 public key payload is ~1420 bytes
-	maxStoredDigests         = 2  // Account status register stores up to 2 digests from last 2 stored keys.
+	maxStoredDigests         = 2  // Account status payload stores up to 2 digests from last 2 stored keys.
 )
 
 const (
@@ -61,7 +71,7 @@ const (
 )
 
 // AccountPublicKeyDeduplicationMigration deduplicates account public keys,
-// and migrates account status and account public key related registers.
+// and migrates account status and account public key related payloads.
 type AccountPublicKeyDeduplicationMigration struct {
 	log                     zerolog.Logger
 	chainID                 flow.ChainID
@@ -243,7 +253,7 @@ func migrateAndDeduplicateAccountPublicKeysIfNeeded(
 		)
 
 		// Migrate sequence number for account public key
-		// NOTE: sequence number is stored in its own register, decoupled from public key.
+		// NOTE: sequence number is stored in its own payload, decoupled from public key.
 		err = migrateSeqNumberIfNeeded(accountRegisters, owner, keyIndex, decodedAccountPublicKey.SeqNumber)
 		if err != nil {
 			return false, fmt.Errorf("failed to migrate sequence number at index %d for owner %x: %w", keyIndex, owner, err)
