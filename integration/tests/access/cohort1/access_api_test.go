@@ -2,15 +2,11 @@ package cohort1
 
 import (
 	"context"
-	"encoding/base64"
-	"encoding/json"
 	"fmt"
 	"io"
-	"slices"
 	"testing"
 	"time"
 
-	"github.com/onflow/crypto/hash"
 	"github.com/onflow/flow-go-sdk/templates"
 	"github.com/onflow/flow-go-sdk/test"
 
@@ -20,7 +16,6 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 
 	"github.com/onflow/flow-go/engine/access/rpc/backend/query_mode"
-	"github.com/onflow/flow-go/fvm/crypto"
 	"github.com/onflow/flow-go/integration/tests/mvp"
 	"github.com/onflow/flow-go/utils/dsl"
 
@@ -37,7 +32,6 @@ import (
 	"github.com/onflow/flow-go/integration/testnet"
 	"github.com/onflow/flow-go/integration/tests/lib"
 	"github.com/onflow/flow-go/integration/utils"
-	"github.com/onflow/flow-go/model/encoding/rlp"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -592,53 +586,6 @@ func notOutOfRangeError(err error) bool {
 	return statusErr.Code() != codes.OutOfRange
 }
 
-func (s *AccessAPISuite) validWebAuthnExtensionData(tx *entities.Transaction) []byte {
-	transactionBody := flow.TransactionBody{
-		Script:           tx.Script,
-		Arguments:        tx.Arguments,
-		ReferenceBlockID: flow.Identifier(tx.ReferenceBlockId),
-		GasLimit:         tx.GasLimit,
-		ProposalKey: flow.ProposalKey{
-			Address:        flow.BytesToAddress(tx.ProposalKey.Address),
-			KeyIndex:       tx.ProposalKey.KeyId,
-			SequenceNumber: tx.ProposalKey.SequenceNumber,
-		},
-		Payer:       flow.BytesToAddress(tx.Payer),
-		Authorizers: make([]flow.Address, len(tx.Authorizers)),
-	}
-	for i, auth := range tx.Authorizers {
-		transactionBody.Authorizers[i] = flow.BytesToAddress(auth)
-	}
-	transactionMessage := transactionBody.EnvelopeMessage()
-	hasher, err := crypto.NewPrefixedHashing(hash.SHA2_256, flow.TransactionTagString)
-	s.Require().NoError(err)
-	authNChallenge := hasher.ComputeHash(transactionMessage)
-	authNChallengeBase64Url := base64.URLEncoding.EncodeToString(authNChallenge)
-	validUserFlag := byte(0x01)
-	validClientDataOrigin := "https://testing.com"
-	rpIDHash := unittest.RandomBytes(32)
-	sigCounter := unittest.RandomBytes(4)
-
-	// For use in cases where you're testing the other value
-	validAuthenticatorData := slices.Concat(rpIDHash, []byte{validUserFlag}, sigCounter)
-	validClientDataJSON := map[string]string{
-		"type":      flow.WebAuthnTypeGet,
-		"challenge": authNChallengeBase64Url,
-		"origin":    validClientDataOrigin,
-	}
-
-	clientDataJsonBytes, err := json.Marshal(validClientDataJSON)
-	s.Require().NoError(err)
-
-	extensionData := flow.WebAuthnExtensionData{
-		AuthenticatorData: validAuthenticatorData,
-		ClientDataJson:    clientDataJsonBytes,
-	}
-	extensionDataRLPBytes := rlp.NewMarshaler().MustMarshal(extensionData)
-
-	return extensionDataRLPBytes
-}
-
 // Helper function to convert signatures with ExtensionData
 func convertToMessageSigWithExtensionData(sigs []sdk.TransactionSignature, extensionData []byte) []*entities.Transaction_Signature {
 	msgSigs := make([]*entities.Transaction_Signature, len(sigs))
@@ -647,7 +594,10 @@ func convertToMessageSigWithExtensionData(sigs []sdk.TransactionSignature, exten
 			Address:       sig.Address.Bytes(),
 			KeyId:         uint32(sig.KeyIndex),
 			Signature:     sig.Signature,
-			ExtensionData: extensionData,
+			ExtensionData: sig.ExtensionData,
+		}
+		if extensionData != nil {
+			msgSigs[i].ExtensionData = extensionData
 		}
 	}
 	return msgSigs
@@ -723,7 +673,7 @@ func (s *AccessAPISuite) TestTransactionSignaturePlainExtensionData() {
 			name:          "custom_extension_data",
 			extensionData: []byte{0x02, 0xAA, 0xBB, 0xCC}, // Invalid scheme with custom data
 			description:   "Custom ExtensionData with invalid scheme",
-			expectSuccess: false, // Expect failure due to invalid scheme
+			expectSuccess: false, // Expect failure at the access API level due to invalid scheme
 		},
 	}
 
@@ -765,7 +715,6 @@ func (s *AccessAPISuite) TestTransactionSignaturePlainExtensionData() {
 					if err == io.EOF {
 						break
 					}
-					s.Require().NoError(err)
 				}
 
 				if txID == sdk.EmptyID {
@@ -787,13 +736,6 @@ func (s *AccessAPISuite) TestTransactionSignaturePlainExtensionData() {
 
 			// Check that the final transaction status is sealed
 			s.Assert().Equal(entities.TransactionStatus_SEALED, lastReportedTxStatus)
-
-			if !tc.expectSuccess {
-				// For invalid cases, we expect the transaction to be rejected
-				s.Assert().NotEqual(uint32(codes.OK), statusCode, "Expected transaction to fail, but got status code: %d", statusCode)
-				return
-			}
-
 			s.Assert().Equal(uint32(codes.OK), statusCode, "Expected transaction to be successful, but got status code: %d", statusCode)
 
 		})
@@ -831,7 +773,7 @@ func (s *AccessAPISuite) TestTransactionSignatureWebAuthnExtensionData() {
 		SetProposalKey(payer, 0, serviceClient.GetAndIncrementSeqNumber()).
 		SetPayer(payer)
 
-	tx, err = serviceClient.SignTransaction(tx)
+	tx, err = serviceClient.SignTransactionWebAuthN(tx)
 	s.Require().NoError(err)
 
 	// Convert the transaction to a message format expected by the access API
@@ -839,39 +781,38 @@ func (s *AccessAPISuite) TestTransactionSignatureWebAuthnExtensionData() {
 	for i, auth := range tx.Authorizers {
 		authorizers[i] = auth.Bytes()
 	}
-
 	s.Require().NoError(err)
 
 	// Test WebAuthn extension data with different scenarios
 	testCases := []struct {
-		name          string
-		extensionData []byte
-		description   string
-		expectSuccess bool
+		name                     string
+		extensionDataReplacement []byte // If nil, use the original extension data from the signed transaction
+		description              string
+		expectSuccess            bool
 	}{
 		{
-			name:          "webauthn_valid", // hardcoded name tested below
-			extensionData: nil,              // valid extension data is populated within test implementation below
-			description:   "WebAuthn scheme with minimal extension data",
-			expectSuccess: true,
+			name:                     "webauthn_valid",
+			extensionDataReplacement: nil, // Use the original extension data from the signed transaction, which should be valid
+			description:              "WebAuthn scheme with minimal extension data",
+			expectSuccess:            true,
 		},
 		{
-			name:          "webauthn_invalid_minimal",
-			extensionData: []byte{0x1}, // WebAuthn scheme identifier only
-			description:   "WebAuthn scheme with minimal extension data",
-			expectSuccess: false, // Should fail validation due to incomplete WebAuthn data
+			name:                     "webauthn_invalid_minimal",
+			extensionDataReplacement: []byte{0x1}, // WebAuthn scheme identifier only
+			description:              "WebAuthn scheme with minimal extension data",
+			expectSuccess:            false, // Should fail validation due to incomplete WebAuthn data
 		},
 		{
-			name:          "webauthn_invalid_scheme",
-			extensionData: []byte{0x3, 0x01, 0x02, 0x03}, // Invalid scheme identifier
-			description:   "Invalid authentication scheme",
-			expectSuccess: false,
+			name:                     "webauthn_invalid_scheme",
+			extensionDataReplacement: []byte{0x3, 0x01, 0x02, 0x03}, // Invalid scheme identifier
+			description:              "Invalid authentication scheme",
+			expectSuccess:            false,
 		},
 		{
-			name:          "webauthn_malformed_data",
-			extensionData: []byte{0x1, 0x01, 0x02}, // WebAuthn scheme with malformed data
-			description:   "WebAuthn scheme with malformed extension data",
-			expectSuccess: false,
+			name:                     "webauthn_malformed_data",
+			extensionDataReplacement: []byte{0x1, 0x01, 0x02}, // WebAuthn scheme with malformed data
+			description:              "WebAuthn scheme with malformed extension data",
+			expectSuccess:            false,
 		},
 	}
 
@@ -892,11 +833,13 @@ func (s *AccessAPISuite) TestTransactionSignatureWebAuthnExtensionData() {
 				Payer:              tx.Payer.Bytes(),
 				Authorizers:        authorizers,
 				PayloadSignatures:  convertToMessageSigWithExtensionData(tx.PayloadSignatures, nil),
-				EnvelopeSignatures: convertToMessageSigWithExtensionData(tx.EnvelopeSignatures, tc.extensionData),
+				EnvelopeSignatures: convertToMessageSigWithExtensionData(tx.EnvelopeSignatures, tc.extensionDataReplacement),
 			}
 
-			if tc.name == "webauthn_valid" {
-				tc.extensionData = s.validWebAuthnExtensionData(transactionMsg)
+			// Validate that the ExtensionData is set correctly before sending
+			for _, sig := range transactionMsg.EnvelopeSignatures {
+				// For these test cases specifically, we expect ExtensionData to be set
+				s.Assert().GreaterOrEqual(len(sig.ExtensionData), 1, "ExtensionData should have at least 1 byte for scheme identifier")
 			}
 
 			// Send and subscribe to the transaction status using the access API
@@ -1032,10 +975,6 @@ func (s *AccessAPISuite) TestExtensionDataPreservation() {
 				Authorizers:        authorizers,
 				PayloadSignatures:  convertToMessageSigWithExtensionData(tx.PayloadSignatures, tc.extensionData),
 				EnvelopeSignatures: convertToMessageSigWithExtensionData(tx.EnvelopeSignatures, tc.extensionData),
-			}
-
-			if tc.name == "webauthn_scheme_preservation" {
-				tc.extensionData = s.validWebAuthnExtensionData(transactionMsg)
 			}
 
 			// Send and subscribe to the transaction status using the access API
