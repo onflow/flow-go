@@ -15,8 +15,8 @@ import (
 // CAUTION:
 //   - The caller must ensure that headerID is a collision-resistant hash of the provided header!
 //     Otherwise, data corruption may occur.
-//   - The caller must acquire the locks [storage.LockInsertBlock] and [storage.LockInsertOrFinalizeClusterBlock]
-//     and hold them until the database write has been committed.
+//   - The caller must acquire one (but not both) of the following locks and hold it until the database
+//     write has been committed: either [storage.LockInsertBlock] or [storage.LockInsertOrFinalizeClusterBlock].
 //
 // It returns [storage.ErrAlreadyExists] if the header already exists, i.e. we only insert a new header once.
 // This error allows the caller to detect duplicate inserts. If the header is stored along with other parts
@@ -40,14 +40,14 @@ func InsertHeader(lctx lockctx.Proof, rw storage.ReaderBatchWriter, headerID flo
 	return UpsertByKey(rw.Writer(), key, header)
 }
 
-// RetrieveHeader retrieves a block header by its ID.
+// RetrieveHeader retrieves the header of the block with the specified ID.
 // Expected errors during normal operations:
 //   - [storage.ErrNotFound] if no block with the specified `blockID` is known.
 func RetrieveHeader(r storage.Reader, blockID flow.Identifier, header *flow.Header) error {
 	return RetrieveByKey(r, MakePrefix(codeHeader, blockID), header)
 }
 
-// IndexFinalizedBlockByHeight indexes the height of a block. It must only be called on finalized blocks.
+// IndexFinalizedBlockByHeight indexes a block by its height. It must ONLY be called on FINALIZED BLOCKS.
 //
 // CAUTION: The caller must acquire the [storage.LockFinalizeBlock] and hold it until the database
 // write has been committed.
@@ -74,7 +74,7 @@ func IndexFinalizedBlockByHeight(lctx lockctx.Proof, rw storage.ReaderBatchWrite
 	return UpsertByKey(rw.Writer(), key, blockID)
 }
 
-// IndexCertifiedBlockByView indexes a block by its view.
+// IndexCertifiedBlockByView indexes a CERTIFIED block by its view.
 // HotStuff guarantees that there is at most one certified block per view. Note that this does not hold
 // for uncertified proposals, as a byzantine leader might produce multiple proposals for the same view.
 //
@@ -110,7 +110,7 @@ func LookupBlockHeight(r storage.Reader, height uint64, blockID *flow.Identifier
 	return RetrieveByKey(r, MakePrefix(codeHeightToBlock, height), blockID)
 }
 
-// LookupCertifiedBlockByView retrieves the certified block by view. (certified blocks are blocks that have received QC)
+// LookupCertifiedBlockByView retrieves the certified block by view. (Certified blocks are blocks that have received QC.)
 // Expected errors during normal operations:
 //   - [storage.ErrNotFound] if no certified block for the specified view is known.
 func LookupCertifiedBlockByView(r storage.Reader, view uint64, blockID *flow.Identifier) error {
@@ -126,7 +126,7 @@ func BlockExists(r storage.Reader, blockID flow.Identifier) (bool, error) {
 // IndexCollectionBlock produces a mapping from collection ID to the block ID containing this collection.
 //
 // CAUTION:
-//   - The caller must acquire the ??? and hold it until the database write has been committed.
+//   - The caller must acquire the lock ??? and hold it until the database write has been committed.
 //     TODO: USE LOCK, we want to protect this mapping from accidental overwrites (because the key is not derived from the value via a collision-resistant hash)
 //   - A collection can be included in multiple *unfinalized* blocks. However, the implementation
 //     assumes a one-to-one map from collection ID to a *single* block ID. This holds for FINALIZED BLOCKS ONLY
@@ -134,12 +134,13 @@ func BlockExists(r storage.Reader, blockID flow.Identifier) (bool, error) {
 //     Hence, this function should be treated as a temporary solution, which requires generalization
 //     (one-to-many mapping) for soft finality and the mature protocol.
 //
+// Expected errors during normal operations:
 // TODO: return [storage.ErrAlreadyExists] or [storage.ErrDataMismatch]
 func IndexCollectionBlock(w storage.Writer, collID flow.Identifier, blockID flow.Identifier) error {
 	return UpsertByKey(w, MakePrefix(codeCollectionBlock, collID), blockID)
 }
 
-// LookupBlockContainingCollection retrieves the block that contains the collection the given ID
+// LookupBlockContainingCollection retrieves the block containing the collection with the given ID.
 //
 // CAUTION: A collection can be included in multiple *unfinalized* blocks. However, the implementation
 // assumes a one-to-one map from collection ID to a *single* block ID. This holds for FINALIZED BLOCKS ONLY

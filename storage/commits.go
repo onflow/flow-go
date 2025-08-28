@@ -17,11 +17,11 @@ type Commits interface {
 
 	// BatchStore stores Commit keyed by blockID in provided batch
 	// No errors are expected during normal operation, even if no entries are matched.
-	// If Badger unexpectedly fails to process the request, the error is wrapped in a generic error and returned.
+	// If the database unexpectedly fails to process the request, the error is wrapped in a generic error and returned.
 	BatchStore(lctx lockctx.Proof, blockID flow.Identifier, commit flow.StateCommitment, batch ReaderBatchWriter) error
 
 	// BatchRemoveByBlockID removes Commit keyed by blockID in provided batch
 	// No errors are expected during normal operation, even if no entries are matched.
-	// If Badger unexpectedly fails to process the request, the error is wrapped in a generic error and returned.
+	// If the database unexpectedly fails to process the request, the error is wrapped in a generic error and returned.
 	BatchRemoveByBlockID(blockID flow.Identifier, batch ReaderBatchWriter) error
 }

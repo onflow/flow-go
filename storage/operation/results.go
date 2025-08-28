@@ -5,9 +5,12 @@ import (
 	"github.com/onflow/flow-go/storage"
 )
 
-// InsertExecutionResult inserts an Execution Result by its ID.
-// Accidental overwrites with inconsistent values are prevented by the collision-resistant hash
-// that is used to deriver the key from the value,
+// InsertExecutionResult inserts a [flow.ExecutionResult] into the storage, keyed by its ID.
+//
+// If the result already exists, it will be overwritten. Note that here, the key (result ID) is derived
+// from the value (result) via a collision-resistant hash function. Hence, unchecked overwrites pose no risk
+// of data corruption, because for the same key, we expect the same value.
+//
 // No errors are expected during normal operation.
 func InsertExecutionResult(w storage.Writer, result *flow.ExecutionResult) error {
 	return UpsertByKey(w, MakePrefix(codeExecutionResult, result.ID()), result)
@@ -20,7 +23,7 @@ func RetrieveExecutionResult(r storage.Reader, resultID flow.Identifier, result 
 	return RetrieveByKey(r, MakePrefix(codeExecutionResult, resultID), result)
 }
 
-// IndexExecutionResult indexes the execution node's OWN Execution Result ID keyed by the executed block's ID
+// IndexExecutionResult indexes the Execution Node's OWN Execution Result by the executed block's ID.
 //
 // CAUTION:
 //   - OVERWRITES existing data (potential for data corruption):
@@ -30,13 +33,17 @@ func RetrieveExecutionResult(r storage.Reader, resultID flow.Identifier, result 
 //     compromised as a whole. This method does not contain any safeguards to prevent such data corruption.
 //
 // TODO: USE LOCK, we want to protect this mapping from accidental overwrites (because the key is not derived from the value via a collision-resistant hash)
+//
+// No errors are expected during normal operation.
 func IndexExecutionResult(w storage.Writer, blockID flow.Identifier, resultID flow.Identifier) error {
 	return UpsertByKey(w, MakePrefix(codeIndexExecutionResultByBlock, blockID), resultID)
 }
 
-// LookupExecutionResult finds the execution node's OWN Execution Result for the specified block.
+// LookupExecutionResult retrieves the Execution Node's OWN Execution Result ID for the specified block.
+// Intended for Execution Node only. For every block executed by this node, this index should be populated.
+//
 // Expected errors during normal operations:
-//   - [storage.ErrNotFound] if no result for the `blockID` is known.
+//   - [storage.ErrNotFound] if `blockID` does not refer to a block executed by this node
 func LookupExecutionResult(r storage.Reader, blockID flow.Identifier, resultID *flow.Identifier) error {
 	return RetrieveByKey(r, MakePrefix(codeIndexExecutionResultByBlock, blockID), resultID)
 }
@@ -47,8 +54,10 @@ func ExistExecutionResult(r storage.Reader, blockID flow.Identifier) (bool, erro
 	return KeyExists(r, MakePrefix(codeIndexExecutionResultByBlock, blockID))
 }
 
-// RemoveExecutionResultIndex removes execution node's OWN Execution Result for the given blockID.
+// RemoveExecutionResultIndex removes Execution Node's OWN Execution Result for the given blockID.
 // CAUTION: this is for recovery purposes only, and should not be used during normal operations
+// It returns nil if the collection does not exist.
+// No errors are expected during normal operation.
 func RemoveExecutionResultIndex(w storage.Writer, blockID flow.Identifier) error {
 	return RemoveByKey(w, MakePrefix(codeIndexExecutionResultByBlock, blockID))
 }

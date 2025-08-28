@@ -97,13 +97,13 @@ func TestMakeFinalValidChain(t *testing.T) {
 
 		// insert all of the pending blocks into the DB
 		for _, header := range pending {
-			insertLctx := lockManager.NewContext()
-			require.NoError(t, insertLctx.AcquireLock(storage.LockInsertBlock))
+			insertLctx2 := lockManager.NewContext()
+			require.NoError(t, insertLctx2.AcquireLock(storage.LockInsertBlock))
 			err = dbImpl.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-				return operation.InsertHeader(insertLctx, rw, header.ID(), header)
+				return operation.InsertHeader(insertLctx2, rw, header.ID(), header)
 			})
 			require.NoError(t, err)
-			insertLctx.Release()
+			insertLctx2.Release()
 		}
 
 		// initialize the finalizer with the dependencies and make the call

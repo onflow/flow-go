@@ -24,24 +24,31 @@ func TestBlockStoreAndRetrieve(t *testing.T) {
 		lctx := lockManager.NewContext()
 		err := lctx.AcquireLock(storage.LockInsertBlock)
 		require.NoError(t, err)
-		defer lctx.Release()
 
 		err = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 			return blocks.BatchStore(lctx, rw, &block)
 		})
 		require.NoError(t, err)
+		lctx.Release()
 
 		retrieved, err := blocks.ByID(block.ID())
 		require.NoError(t, err)
-
 		require.Equal(t, &block, retrieved)
+
+		// repeated storage of the same block should return
+		lctx2 := lockManager.NewContext()
+		require.NoError(t, lctx2.AcquireLock(storage.LockInsertBlock))
+		err = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+			return blocks.BatchStore(lctx2, rw, &block)
+		})
+		require.ErrorIs(t, err, storage.ErrAlreadyExists)
+		lctx2.Release()
 
 		// verify after a restart, the block stored in the database is the same
 		// as the original
 		blocksAfterRestart := store.InitAll(cacheMetrics, db).Blocks
 		receivedAfterRestart, err := blocksAfterRestart.ByID(block.ID())
 		require.NoError(t, err)
-
 		require.Equal(t, &block, receivedAfterRestart)
 	})
 }

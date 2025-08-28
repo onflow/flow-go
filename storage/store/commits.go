@@ -50,8 +50,8 @@ func (c *Commits) retrieveTx(r storage.Reader, blockID flow.Identifier) (flow.St
 }
 
 // BatchStore stores Commit keyed by blockID in provided batch
-// No errors are expected during normal operation, even if no entries are matched.
-// If Badger unexpectedly fails to process the request, the error is wrapped in a generic error and returned.
+// No errors are expected during normal operation.
+// If the database unexpectedly fails to process the request, the error is wrapped in a generic error and returned.
 func (c *Commits) BatchStore(lctx lockctx.Proof, blockID flow.Identifier, commit flow.StateCommitment, rw storage.ReaderBatchWriter) error {
 	// we can't cache while using batches, as it's unknown at this point when, and if
 	// the batch will be committed. Cache will be populated on read however.
@@ -70,7 +70,7 @@ func (c *Commits) RemoveByBlockID(blockID flow.Identifier) error {
 
 // BatchRemoveByBlockID removes Commit keyed by blockID in provided batch
 // No errors are expected during normal operation, even if no entries are matched.
-// If Badger unexpectedly fails to process the request, the error is wrapped in a generic error and returned.
+// If the database unexpectedly fails to process the request, the error is wrapped in a generic error and returned.
 func (c *Commits) BatchRemoveByBlockID(blockID flow.Identifier, rw storage.ReaderBatchWriter) error {
 	return c.cache.RemoveTx(rw, blockID)
 }

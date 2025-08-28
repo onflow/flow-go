@@ -30,6 +30,9 @@ func NewBlocks(db storage.DB, headers *Headers, payloads *Payloads) *Blocks {
 }
 
 // BatchStore stores a valid block in a batch.
+//
+// Expected errors during normal operations:
+// - [storage.ErrAlreadyExists] if some block with the same ID has already been stored
 func (b *Blocks) BatchStore(lctx lockctx.Proof, rw storage.ReaderBatchWriter, block *flow.Block) error {
 	err := b.headers.storeTx(lctx, rw, block.Header)
 	if err != nil {

@@ -36,9 +36,7 @@ func TestSealIndexAndLookup(t *testing.T) {
 		seal2 := unittest.Seal.Fixture()
 
 		seals := []*flow.Seal{seal1, seal2}
-
 		blockID := flow.MakeID([]byte{0x42})
-
 		expected := []flow.Identifier(flow.GetIDs(seals))
 
 		lockManager := storage.NewTestingLockManager()
