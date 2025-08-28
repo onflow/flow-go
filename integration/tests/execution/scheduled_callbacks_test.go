@@ -30,7 +30,7 @@ func (s *ScheduledCallbacksSuite) TestScheduleCallback_DeployAndGetStatus() {
 	// wait for next height finalized (potentially first height)
 	currentFinalized := s.BlockState.HighestFinalizedHeight()
 	blockA := s.BlockState.WaitForHighestFinalizedProgress(s.T(), currentFinalized)
-	s.T().Logf("got blockA height %v ID %v", blockA.Header.Height, blockA.Header.ID())
+	s.T().Logf("got blockA height %v ID %v", blockA.HeaderBody.Height, blockA.ID())
 
 	// Execute script to call getStatus(id: 10) on the contract
 	result, ok := s.getCallbackStatus(10)
@@ -38,8 +38,8 @@ func (s *ScheduledCallbacksSuite) TestScheduleCallback_DeployAndGetStatus() {
 	require.False(s.T(), ok, "getStatus(10) should return false for non-existent callback")
 
 	// Wait for a block to be executed to ensure everything is processed
-	blockB := s.BlockState.WaitForHighestFinalizedProgress(s.T(), blockA.Header.Height)
-	erBlock := s.ReceiptState.WaitForReceiptFrom(s.T(), flow.Identifier(blockB.Header.ID()), s.exe1ID)
+	blockB := s.BlockState.WaitForHighestFinalizedProgress(s.T(), blockA.HeaderBody.Height)
+	erBlock := s.ReceiptState.WaitForReceiptFrom(s.T(), flow.Identifier(blockB.ID()), s.exe1ID)
 	s.T().Logf("got block result ID %v", erBlock.ExecutionResult.BlockID)
 }
 
@@ -48,7 +48,7 @@ func (s *ScheduledCallbacksSuite) TestScheduleCallback_ScheduledAndExecuted() {
 	// Wait for next height finalized (potentially first height)
 	currentFinalized := s.BlockState.HighestFinalizedHeight()
 	blockA := s.BlockState.WaitForHighestFinalizedProgress(s.T(), currentFinalized)
-	s.T().Logf("got blockA height %v ID %v", blockA.Header.Height, blockA.Header.ID())
+	s.T().Logf("got blockA height %v ID %v", blockA.HeaderBody.Height, blockA.ID())
 
 	// Deploy the test contract first
 	s.deployTestContract()
@@ -147,7 +147,7 @@ func (s *ScheduledCallbacksSuite) TestScheduleCallback_ScheduledAndExecuted() {
 // }
 
 func (s *ScheduledCallbacksSuite) deployTestContract() {
-	chainID := s.net.Root().Header.ChainID
+	chainID := s.net.Root().HeaderBody.ChainID
 	sc := systemcontracts.SystemContractsForChain(chainID)
 
 	testContract := lib.TestFlowCallbackHandlerContract(
@@ -166,7 +166,7 @@ func (s *ScheduledCallbacksSuite) deployTestContract() {
 }
 
 func (s *ScheduledCallbacksSuite) scheduleCallback(timestamp int64) uint64 {
-	chainID := s.net.Root().Header.ChainID
+	chainID := s.net.Root().HeaderBody.ChainID
 	sc := systemcontracts.SystemContractsForChain(chainID)
 
 	scheduledTx := fmt.Sprintf(`
@@ -220,7 +220,7 @@ func (s *ScheduledCallbacksSuite) scheduleCallback(timestamp int64) uint64 {
 }
 
 func (s *ScheduledCallbacksSuite) cancelCallback(callbackID uint64) uint64 {
-	chainID := s.net.Root().Header.ChainID
+	chainID := s.net.Root().HeaderBody.ChainID
 	sc := systemcontracts.SystemContractsForChain(chainID)
 
 	cancelTx := fmt.Sprintf(`
