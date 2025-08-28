@@ -328,6 +328,13 @@ type ChunkDataRequest struct {
 	Nonce   uint64
 }
 
+// ChunkDataResponse is the structurally validated response to a chunk data pack request.
+// It contains the chunk data pack of the interest.
+type ChunkDataResponse struct {
+	ChunkDataPack ChunkDataPack
+	Nonce         uint64
+}
+
 // Helper function to convert a slice of cid.Cid to a slice of strings
 func cidsToStrings(cids []cid.Cid) []string {
 	if cids == nil {
