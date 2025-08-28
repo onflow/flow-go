@@ -321,6 +321,13 @@ func (b *BlockExecutionDataRoot) UnmarshalMsgpack(data []byte) error {
 	return nil
 }
 
+// ChunkDataRequest represents a request for the chunk data pack
+// which is specified by a chunk ID.
+type ChunkDataRequest struct {
+	ChunkID Identifier
+	Nonce   uint64
+}
+
 // Helper function to convert a slice of cid.Cid to a slice of strings
 func cidsToStrings(cids []cid.Cid) []string {
 	if cids == nil {

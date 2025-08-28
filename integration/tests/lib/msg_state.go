@@ -77,11 +77,6 @@ func (ms *MsgState) WaitForMsgFrom(t *testing.T, predicate func(msg interface{})
 	return m
 }
 
-func MsgIsChunkDataRequest(msg interface{}) bool {
-	_, ok := msg.(*messages.ChunkDataRequest)
-	return ok
-}
-
 func MsgIsChunkDataPackResponse(msg interface{}) bool {
 	_, ok := msg.(*messages.ChunkDataResponse)
 	return ok

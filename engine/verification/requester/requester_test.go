@@ -265,7 +265,7 @@ func TestCompleteRequestingUnsealedChunkLifeCycle(t *testing.T) {
 	unittest.RequireCloseBefore(t, e.Ready(), time.Second, "could not start engine on time")
 
 	// we wait till the engine submits the chunk request to the network, and receive the response
-	conduitWG := mockConduitForChunkDataPackRequest(t, s.con, requests, 1, func(request *messages.ChunkDataRequest) {
+	conduitWG := mockConduitForChunkDataPackRequest(t, s.con, requests, 1, func(request *flow.ChunkDataRequest) {
 		err := e.Process(channels.RequestChunks, requests[0].Agrees[0], response)
 		require.NoError(t, err)
 	})
@@ -322,7 +322,7 @@ func TestRequestPendingChunkSealedBlock_Hybrid(t *testing.T) {
 	mockPendingRequestsPopAll(t, s.pendingRequests, sealedRequests)
 	notifierWG := mockNotifyBlockSealedHandler(t, s.handler, sealedRequests)
 	// unsealed requests should be submitted to the network once
-	conduitWG := mockConduitForChunkDataPackRequest(t, s.con, unsealedRequests, 1, func(*messages.ChunkDataRequest) {})
+	conduitWG := mockConduitForChunkDataPackRequest(t, s.con, unsealedRequests, 1, func(*flow.ChunkDataRequest) {})
 
 	unittest.RequireReturnsBefore(t, requestHistoryWG.Wait, time.Duration(2)*s.retryInterval, "could not check chunk requests qualification on time")
 	unittest.RequireReturnsBefore(t, updateHistoryWG.Wait, s.retryInterval, "could not update chunk request history on time")
@@ -452,7 +452,7 @@ func testRequestPendingChunkDataPack(t *testing.T, count int, attempts int) {
 
 	unittest.RequireCloseBefore(t, e.Ready(), time.Second, "could not start engine on time")
 
-	conduitWG := mockConduitForChunkDataPackRequest(t, s.con, requests, attempts, func(*messages.ChunkDataRequest) {})
+	conduitWG := mockConduitForChunkDataPackRequest(t, s.con, requests, attempts, func(*flow.ChunkDataRequest) {})
 	unittest.RequireReturnsBefore(t, requestHistory.Wait, time.Duration(2*attempts)*s.retryInterval, "could not check chunk requests qualification on time")
 	unittest.RequireReturnsBefore(t, updateHistoryWG.Wait, s.retryInterval, "could not update chunk request history on time")
 	unittest.RequireReturnsBefore(t, conduitWG.Wait, time.Duration(2*attempts)*s.retryInterval, "could not request and handle chunks on time")
@@ -510,7 +510,7 @@ func TestDispatchingRequests_Hybrid(t *testing.T) {
 	unittest.RequireCloseBefore(t, e.Ready(), time.Second, "could not start engine on time")
 
 	// mocks only instantly qualified requests are dispatched in the network.
-	conduitWG := mockConduitForChunkDataPackRequest(t, s.con, instantQualifiedRequests, attempts, func(*messages.ChunkDataRequest) {})
+	conduitWG := mockConduitForChunkDataPackRequest(t, s.con, instantQualifiedRequests, attempts, func(*flow.ChunkDataRequest) {})
 	s.metrics.On("OnChunkDataPackRequestDispatchedInNetworkByRequester").Return().Times(len(instantQualifiedRequests) * attempts)
 	// each instantly qualified one is requested only once, hence the maximum is updated only once from 0 -> 1, and
 	// is kept at 1 during all cycles of this test.
@@ -545,7 +545,7 @@ func mockConduitForChunkDataPackRequest(t *testing.T,
 	con *mocknetwork.Conduit,
 	reqList verification.ChunkDataPackRequestList,
 	count int,
-	requestHandler func(*messages.ChunkDataRequest)) *sync.WaitGroup {
+	requestHandler func(*flow.ChunkDataRequest)) *sync.WaitGroup {
 
 	// counts number of requests for each chunk data pack
 	reqCount := make(map[flow.Identifier]int)
@@ -583,7 +583,9 @@ func mockConduitForChunkDataPackRequest(t *testing.T,
 			require.Contains(t, reqMap[req.ChunkID].Agrees, target2)
 
 			go func() {
-				requestHandler(req)
+				internal, err := req.ToInternal()
+				require.NoError(t, err)
+				requestHandler(internal.(*flow.ChunkDataRequest))
 				wg.Done()
 			}()
 

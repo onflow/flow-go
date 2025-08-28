@@ -109,10 +109,10 @@ func New(
 		engine.NewNotifier(),
 		engine.Pattern{
 			// Match is called on every new message coming to this engine.
-			// Provider enigne only expects ChunkDataRequests.
+			// Provider engine only expects ChunkDataRequests.
 			// Other message types are discarded by Match.
 			Match: func(message *engine.Message) bool {
-				chdpReq, ok := message.Payload.(*messages.ChunkDataRequest)
+				chdpReq, ok := message.Payload.(*flow.ChunkDataRequest)
 				if ok {
 					log.Info().
 						Hex("chunk_id", logging.ID(chdpReq.ChunkID)).
@@ -125,7 +125,7 @@ func New(
 			// ChunkDataRequests.
 			// It replaces the payload of message with requested chunk id.
 			Map: func(message *engine.Message) (*engine.Message, bool) {
-				chdpReq := message.Payload.(*messages.ChunkDataRequest)
+				chdpReq := message.Payload.(*flow.ChunkDataRequest)
 				return &engine.Message{
 					OriginID: message.OriginID,
 					Payload:  chdpReq.ChunkID,
