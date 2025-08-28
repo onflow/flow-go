@@ -77,24 +77,56 @@ func TestAccountPublicKeyWeightsAndRevokedStatusSerizliation(t *testing.T) {
 		})
 	}
 
-	t.Run("same status exceeding max group count", func(t *testing.T) {
-		count := maxRunLengthInEncodedStatusGroup + 10
-		status := make([]accountPublicKeyWeightAndRevokedStatus, count)
-		for i := range len(status) {
-			status[i] = accountPublicKeyWeightAndRevokedStatus{weight: 1000, revoked: true}
+	t.Run("run length around max group count", func(t *testing.T) {
+		testcases := []struct {
+			name     string
+			status   accountPublicKeyWeightAndRevokedStatus
+			count    uint32
+			expected []byte
+		}{
+			{
+				name:   "run length maxRunLengthInEncodedStatusGroup - 1",
+				status: accountPublicKeyWeightAndRevokedStatus{weight: 1000, revoked: true},
+				count:  maxRunLengthInEncodedStatusGroup - 1,
+				expected: []byte{
+					0xff, 0xfe, 0x83, 0xe8,
+				},
+			},
+			{
+				name:   "run length maxRunLengthInEncodedStatusGroup ",
+				status: accountPublicKeyWeightAndRevokedStatus{weight: 1000, revoked: true},
+				count:  maxRunLengthInEncodedStatusGroup,
+				expected: []byte{
+					0xff, 0xff, 0x83, 0xe8,
+				},
+			},
+			{
+				name:   "run length maxRunLengthInEncodedStatusGroup + 1",
+				status: accountPublicKeyWeightAndRevokedStatus{weight: 1000, revoked: true},
+				count:  maxRunLengthInEncodedStatusGroup + 1,
+				expected: []byte{
+					0xff, 0xff, 0x83, 0xe8,
+					0x00, 0x01, 0x83, 0xe8,
+				},
+			},
 		}
 
-		expected := []byte{
-			0xff, 0xff, 0x83, 0xe8,
-			0x00, 0x0a, 0x83, 0xe8}
+		for _, tc := range testcases {
+			t.Run(tc.name, func(t *testing.T) {
+				status := make([]accountPublicKeyWeightAndRevokedStatus, tc.count)
+				for i := range len(status) {
+					status[i] = tc.status
+				}
 
-		b, err := encodeAccountPublicKeyWeightsAndRevokedStatus(status)
-		require.NoError(t, err)
-		require.Equal(t, expected, b)
+				b, err := encodeAccountPublicKeyWeightsAndRevokedStatus(status)
+				require.NoError(t, err)
+				require.Equal(t, tc.expected, b)
 
-		decodedStatus, err := decodeAccountPublicKeyWeightAndRevokedStatusGroups(b)
-		require.NoError(t, err)
-		require.ElementsMatch(t, status, decodedStatus)
+				decodedStatus, err := decodeAccountPublicKeyWeightAndRevokedStatusGroups(b)
+				require.NoError(t, err)
+				require.ElementsMatch(t, status, decodedStatus)
+			})
+		}
 	})
 }
 
