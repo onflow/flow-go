@@ -4,6 +4,7 @@ import (
 	"math/rand"
 	"testing"
 
+	"github.com/jordanschalm/lockctx"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -151,15 +152,14 @@ func TestClusterBlockByReferenceHeight(t *testing.T) {
 			id := unittest.IdentifierFixture()
 			height := rand.Uint64()
 			lctx := lockManager.NewContext()
-			require.NoError(t, lctx.AcquireLock(storage.LockInsertOrFinalizeClusterBlock))
-			defer lctx.Release()
-			err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-				return operation.IndexClusterBlockByReferenceHeight(lctx, rw.Writer(), height, id)
+			unittest.WithLock(t, lockManager, storage.LockInsertOrFinalizeClusterBlock, func(lctx lockctx.Context) error {
+				return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+					return operation.IndexClusterBlockByReferenceHeight(lctx, rw.Writer(), height, id)
+				})
 			})
-			assert.NoError(t, err)
 
 			var retrieved []flow.Identifier
-			err = operation.LookupClusterBlocksByReferenceHeightRange(lctx, db.Reader(), height, height, &retrieved)
+			err := operation.LookupClusterBlocksByReferenceHeightRange(lctx, db.Reader(), height, height, &retrieved)
 			assert.NoError(t, err)
 			require.Len(t, retrieved, 1)
 			assert.Equal(t, id, retrieved[0])
