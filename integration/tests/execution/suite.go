@@ -113,8 +113,7 @@ func (s *Suite) SetupTest() {
 	// Reset state to ensure clean state between tests
 	s.nodeConfigs = nil
 	s.accessClient = nil
-	
-	s.log.Info().Msgf("Adding access node config: %v", s.nodeConfigs)
+
 	s.nodeConfigs = append(s.nodeConfigs, testnet.NewNodeConfig(flow.RoleAccess))
 
 	// generate the four consensus identities
