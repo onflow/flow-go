@@ -501,8 +501,12 @@ func (e *blockComputer) executeSystemTransactions(
 	var callbackTxs []*flow.TransactionBody
 
 	if e.vmCtx.ScheduleCallbacksEnabled {
-		// We pass in the systemCollectionInfo here. However, the underlying flow.Collection object
-		// must not be used, because it cannot represent the final state of the system collection.
+		// We pass in the `systemCollectionInfo` here. However, note that at this point, the composition of the system chunk
+		// is not yet known. Specifically, the `entity.CompleteCollection` represents the *final* output of a process and is
+		// immutable by protocol mandate. If we had a bug in our software that accidentally illegally mutated such stucts,
+		// likely the node encountering that bug would misbehave and get slashed, or in the worst case the flow protocol might
+		// be compromised. Therefore, we have the rigorous convention in our code base that the `CompleteCollection` is only
+		// constructed once the final composition of the system chunk has been determined.
 		// To that end, the CompleteCollection is nil here, such that any attempt to access the Collection will panic.
 		callbacks, updatedTxnIndex, err := e.executeProcessCallback(
 			callbackCtx,
