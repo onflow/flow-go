@@ -35,7 +35,7 @@ func GetEvents(r *common.Request, backend access.API, _ commonmodels.LinkGenerat
 			return nil, err
 		}
 
-		return commonmodels.NewBlockEventsList(events, metadata), nil
+		return commonmodels.NewBlockEventsList(events, &metadata, req.ExecutionState.GetIncludeExecutorMetadata()), nil
 	}
 
 	// if end height is provided with special values then load the height
@@ -65,5 +65,5 @@ func GetEvents(r *common.Request, backend access.API, _ commonmodels.LinkGenerat
 		return nil, err
 	}
 
-	return commonmodels.NewBlockEventsList(events, metadata), nil
+	return commonmodels.NewBlockEventsList(events, &metadata, req.ExecutionState.GetIncludeExecutorMetadata()), nil
 }

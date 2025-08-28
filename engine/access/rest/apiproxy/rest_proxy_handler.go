@@ -375,10 +375,10 @@ func (r *RestProxyHandler) GetEventsForHeightRange(
 	startHeight, endHeight uint64,
 	requiredEventEncodingVersion entities.EventEncodingVersion,
 	criteria optimistic_sync.Criteria,
-) ([]flow.BlockEvents, entities.ExecutorMetadata, error) {
+) ([]flow.BlockEvents, flow.ExecutorMetadata, error) {
 	upstream, closer, err := r.FaultTolerantClient()
 	if err != nil {
-		return nil, entities.ExecutorMetadata{}, err
+		return nil, flow.ExecutorMetadata{}, err
 	}
 	defer closer.Close()
 
@@ -397,10 +397,10 @@ func (r *RestProxyHandler) GetEventsForHeightRange(
 	r.log("upstream", "GetEventsForHeightRange", err)
 
 	if err != nil {
-		return nil, entities.ExecutorMetadata{}, err
+		return nil, flow.ExecutorMetadata{}, err
 	}
 
-	return convert.MessagesToBlockEvents(eventsResponse.Results), entities.ExecutorMetadata{}, nil
+	return convert.MessagesToBlockEvents(eventsResponse.Results), flow.ExecutorMetadata{}, nil
 }
 
 // GetEventsForBlockIDs returns events by their name in the specified block IDs.
@@ -410,10 +410,10 @@ func (r *RestProxyHandler) GetEventsForBlockIDs(
 	blockIDs []flow.Identifier,
 	requiredEventEncodingVersion entities.EventEncodingVersion,
 	criteria optimistic_sync.Criteria,
-) ([]flow.BlockEvents, entities.ExecutorMetadata, error) {
+) ([]flow.BlockEvents, flow.ExecutorMetadata, error) {
 	upstream, closer, err := r.FaultTolerantClient()
 	if err != nil {
-		return nil, entities.ExecutorMetadata{}, err
+		return nil, flow.ExecutorMetadata{}, err
 	}
 	defer closer.Close()
 
@@ -433,10 +433,10 @@ func (r *RestProxyHandler) GetEventsForBlockIDs(
 	r.log("upstream", "GetEventsForBlockIDs", err)
 
 	if err != nil {
-		return nil, entities.ExecutorMetadata{}, err
+		return nil, flow.ExecutorMetadata{}, err
 	}
 
-	return convert.MessagesToBlockEvents(eventsResponse.Results), entities.ExecutorMetadata{}, nil
+	return convert.MessagesToBlockEvents(eventsResponse.Results), flow.ExecutorMetadata{}, nil
 }
 
 // convertError converts a serialized access error formatted as a grpc error returned from the upstream AN,

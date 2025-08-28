@@ -25,23 +25,36 @@ func NewEvents(events []flow.Event) Events {
 	return convertedEvents
 }
 
-func NewBlockEvents(events flow.BlockEvents, metadata flow.ExecutorMetadata) *BlockEvents {
+func NewBlockEvents(
+	events flow.BlockEvents,
+	metadata *flow.ExecutorMetadata,
+	shouldIncludeMetadata bool,
+) *BlockEvents {
+	var meta *Metadata
+	if shouldIncludeMetadata {
+		meta = NewMetadata(metadata)
+	}
+
 	return &BlockEvents{
 		BlockId:        events.BlockID.String(),
 		BlockHeight:    util.FromUint(events.BlockHeight),
 		BlockTimestamp: events.BlockTimestamp,
 		Events:         NewEvents(events.Events),
-		Metadata:       NewMetadata(metadata),
+		Metadata:       meta,
 		Links:          nil,
 	}
 }
 
 type BlockEventsList []BlockEvents
 
-func NewBlockEventsList(blocksEvents []flow.BlockEvents, metadata flow.ExecutorMetadata) BlockEventsList {
+func NewBlockEventsList(
+	blocksEvents []flow.BlockEvents,
+	metadata *flow.ExecutorMetadata,
+	shouldIncludeMetadata bool,
+) BlockEventsList {
 	converted := make([]BlockEvents, len(blocksEvents))
 	for i, evs := range blocksEvents {
-		converted[i] = *NewBlockEvents(evs, metadata)
+		converted[i] = *NewBlockEvents(evs, metadata, shouldIncludeMetadata)
 	}
 	return converted
 }

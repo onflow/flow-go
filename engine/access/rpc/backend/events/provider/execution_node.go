@@ -205,15 +205,3 @@ func verifyAndConvertToAccessEvents(
 
 	return results, nil
 }
-
-func stringsToBytes(strs []string) [][]byte {
-	if len(strs) == 0 {
-		return nil
-	}
-
-	bytes := make([][]byte, len(strs))
-	for i, s := range strs {
-		bytes[i] = []byte(s)
-	}
-	return bytes
-}
