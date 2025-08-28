@@ -3,6 +3,7 @@ package store_test
 import (
 	"testing"
 
+	"github.com/jordanschalm/lockctx"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/model/flow"
@@ -32,14 +33,11 @@ func TestGuaranteeStoreRetrieve(t *testing.T) {
 		require.ErrorIs(t, err, storage.ErrNotFound)
 
 		// store guarantee
-		lctx := lockManager.NewContext()
-		err = lctx.AcquireLock(storage.LockInsertBlock)
-		require.NoError(t, err)
-		defer lctx.Release()
-
-		require.NoError(t, db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			return blocks.BatchStore(lctx, rw, block)
-		}))
+		unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
+			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+				return blocks.BatchStore(lctx, rw, block)
+			})
+		})
 
 		// retrieve the guarantee by the ID of the collection
 		actual, err := guarantees.ByCollectionID(expected.ID())
