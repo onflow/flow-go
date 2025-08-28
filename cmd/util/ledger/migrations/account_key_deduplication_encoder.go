@@ -40,9 +40,8 @@ func encodeAccountPublicKeyWeightsAndRevokedStatus(weightsAndRevoked []accountPu
 
 	buf := make([]byte, 0, len(weightsAndRevoked)*(weightAndRevokedStatusGroupSize))
 
-	i := 0
 	off := 0
-	for i < len(weightsAndRevoked) {
+	for i := 0; i < len(weightsAndRevoked); {
 		runLength := 1
 		value := weightsAndRevoked[i]
 		i++
@@ -216,11 +215,11 @@ func encodeDigestList(digests []uint64) []byte {
 	if len(digests) == 0 {
 		return nil
 	}
-	encodedDigestList := make([]byte, 8*len(digests))
+	encodedDigestList := make([]byte, digestSize*len(digests))
 	off := 0
 	for _, digest := range digests {
 		binary.BigEndian.PutUint64(encodedDigestList[off:], digest)
-		off += 8
+		off += digestSize
 	}
 	return encodedDigestList
 }
@@ -234,7 +233,7 @@ const (
 // PublicKeyBatch register contains up to maxBatchPublicKeyCount number of encoded public keys.
 // Each public key is encoded as:
 // - length prefixed encoded public key
-func encodePublicKeysInBatches(encodedPublicKey [][]byte) ([][]byte, error) {
+func encodePublicKeysInBatches(encodedPublicKey [][]byte, maxPublicKeyCountInBatch int) ([][]byte, error) {
 	// Return early if there is only one encoded public key (first public key).
 	// First public key is stored in its own register, not in batch public key register.
 	if len(encodedPublicKey) <= 1 {
@@ -334,7 +333,7 @@ func encodeAccountStatusV4WithPublicKeyMetadata(
 	// Encode list of key digests
 	encodedKeyDigests := encodeDigestList(keyDigests)
 
-	// Encode mappings for deduplicated account status
+	// Encode mappings for deduplicated account public keys
 	var encodedAccountPublicKeyMapping []byte
 	if deduplicated {
 		encodedAccountPublicKeyMapping, err = encodeAccountPublicKeyMapping(accountPublicKeyMappings)

@@ -174,14 +174,14 @@ func migrateAccountStatusWithPublicKeyMetadata(
 func migrateAccountPublicKeysIfNeeded(
 	accountRegisters *registers.AccountRegisters,
 	owner string,
-	encodedPublicKeys [][]byte,
+	encodedUniquePublicKeys [][]byte,
 ) error {
 	// Return early if encodedPublicKeys only contains public key 0 (which always stores in register apk_0)
-	if len(encodedPublicKeys) == 1 {
+	if len(encodedUniquePublicKeys) == 1 {
 		return nil
 	}
 
-	encodedBatchPublicKeys, err := encodePublicKeysInBatches(encodedPublicKeys)
+	encodedBatchPublicKeys, err := encodePublicKeysInBatches(encodedUniquePublicKeys, maxPublicKeyCountInBatch)
 	if err != nil {
 		return err
 	}

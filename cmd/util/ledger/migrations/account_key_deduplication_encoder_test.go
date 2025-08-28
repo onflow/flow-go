@@ -281,7 +281,7 @@ func TestDigestListSerialization(t *testing.T) {
 
 func TestBatchPublicKeySerialization(t *testing.T) {
 	t.Run("empty", func(t *testing.T) {
-		b, err := encodePublicKeysInBatches(nil)
+		b, err := encodePublicKeysInBatches(nil, maxPublicKeyCountInBatch)
 		require.NoError(t, err)
 		require.Empty(t, b)
 
@@ -294,7 +294,7 @@ func TestBatchPublicKeySerialization(t *testing.T) {
 		encodedPublicKey := make([]byte, 73)
 		_, _ = rand.Read(encodedPublicKey)
 
-		b, err := encodePublicKeysInBatches([][]byte{encodedPublicKey})
+		b, err := encodePublicKeysInBatches([][]byte{encodedPublicKey}, maxPublicKeyCountInBatch)
 		require.NoError(t, err)
 		require.Empty(t, b)
 	})
@@ -308,7 +308,7 @@ func TestBatchPublicKeySerialization(t *testing.T) {
 
 		encodedPublicKeys := [][]byte{encodedPublicKey1, encodedPublicKey2}
 
-		b, err := encodePublicKeysInBatches(encodedPublicKeys)
+		b, err := encodePublicKeysInBatches(encodedPublicKeys, maxPublicKeyCountInBatch)
 		require.NoError(t, err)
 		require.True(t, len(b) == 1)
 
@@ -327,7 +327,7 @@ func TestBatchPublicKeySerialization(t *testing.T) {
 			_, _ = rand.Read(encodedPublicKeys[i])
 		}
 
-		b, err := encodePublicKeysInBatches(encodedPublicKeys)
+		b, err := encodePublicKeysInBatches(encodedPublicKeys, maxPublicKeyCountInBatch)
 		require.NoError(t, err)
 		require.True(t, len(b) == 2)
 
