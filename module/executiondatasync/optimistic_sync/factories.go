@@ -9,5 +9,5 @@ type CoreFactory interface {
 
 // PipelineFactory is a factory object for creating new Pipeline instances.
 type PipelineFactory interface {
-	NewPipeline(result *flow.ExecutionResult) Pipeline
+	NewPipeline(result *flow.ExecutionResult, isSealed bool) Pipeline
 }
