@@ -189,7 +189,7 @@ func (c *Client) SignTransactionWebAuthN(tx *sdk.Transaction) (*sdk.Transaction,
 		return nil, err
 	}
 	tx.AddEnvelopeSignature(tx.Payer, tx.ProposalKey.KeyIndex, sig)
-	tx.EnvelopeSignatures[0].ExtensionData = slices.Concat([]byte{1}, extensionData)
+	tx.EnvelopeSignatures[0].ExtensionData = slices.Concat([]byte{byte(flow.WebAuthnScheme)}, extensionData)
 	return tx, nil
 }
 
@@ -208,7 +208,7 @@ func (c *Client) validWebAuthnExtensionData(transactionMessage []byte) ([]byte, 
 	// For use in cases where you're testing the other value
 	validAuthenticatorData := slices.Concat(rpIDHash, []byte{validUserFlag}, sigCounter)
 	validClientDataJSON := map[string]string{
-		"type":      crypto.WebAuthnTypeGet,
+		"type":      flow.WebAuthnTypeGet,
 		"challenge": authNChallengeBase64Url,
 		"origin":    validClientDataOrigin,
 	}
@@ -218,7 +218,7 @@ func (c *Client) validWebAuthnExtensionData(transactionMessage []byte) ([]byte, 
 		return nil, nil, err
 	}
 
-	extensionData := crypto.WebAuthnExtensionData{
+	extensionData := flow.WebAuthnExtensionData{
 		AuthenticatorData: validAuthenticatorData,
 		ClientDataJson:    clientDataJsonBytes,
 	}
