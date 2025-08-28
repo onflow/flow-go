@@ -16,11 +16,27 @@ const (
 // Account Public Key Weight and Revoked Status
 
 const (
+	// maxRunLengthInEncodedStatusGroup (65535) is the max run length that
+	// can be stored in each RLE encoded status group.
 	maxRunLengthInEncodedStatusGroup = math.MaxUint16
-	weightAndRevokedStatusSize       = 2
-	weightAndRevokedStatusGroupSize  = runLengthSize + weightAndRevokedStatusSize
-	revokedMask                      = 0x8000
-	weightMask                       = 0x7fff
+
+	// weightAndRevokedStatusSize (2) is the number of bytes used to store
+	// the weight and status together as a uint16:
+	// - the high bit is the revoked status
+	// - the remaining 15 bits is the weight (more than enough for its 0..1000 range)
+	weightAndRevokedStatusSize = 2
+
+	// weightAndRevokedStatusGroupSize (4) is the number of bytes used to store
+	// the uint16 run length and the uint16 representing weight and revoked status.
+	weightAndRevokedStatusGroupSize = runLengthSize + weightAndRevokedStatusSize
+
+	// revokedMask is the bitmask for setting or getting the revoked flag stored
+	// as the high bit of a uint16.
+	revokedMask = 0x8000
+
+	// weightMask is the bitmask for getting the weight from the low 15 bits (fifteen bits) of
+	// the uint16 containing the unsigned 15-bit weight.
+	weightMask = 0x7fff
 )
 
 type accountPublicKeyWeightAndRevokedStatus struct {
