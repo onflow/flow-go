@@ -313,12 +313,16 @@ func (fm *ForestManager) canProcessResult(container, parentContainer *ExecutionR
 		return false
 	}
 
-	// we do not need to check executors for sealed blocks
+	// Execution Results that have passed verification and were sealed are guaranteed to be correct.
+	// Hence, we can process them without further checks.
 	if blockStatus == BlockStatusSealed {
 		return true
 	}
+	// We need to be careful with results _before_ they are sealed though, as they could still turn out to
+	// be incorrect (or orphaned). For the interim period between a result being published and a result being
+	// sealed (or slashed), we fall back on human-specified trust assumptions evaluated below.
 
-	// 4. There must be enough agreeing executors
+	// 4. A minimal number of Execution Nodes must have committed to the result:
 	if uint(container.Size()) < fm.config.RequiredAgreeingExecutors {
 		lg.Debug().
 			Uint("receipt_count", container.Size()).
@@ -327,13 +331,13 @@ func (fm *ForestManager) canProcessResult(container, parentContainer *ExecutionR
 		return false
 	}
 
-	// 5. The result must have at least one of the configured required executors
+	// 5. At least one of the configured (trusted) executors must have committed to the result
 	if len(fm.config.RequiredExecutors) > 0 {
 		hasRequiredExecutor := false
 		for _, receipt := range container.receipts {
 			if _, ok := fm.config.RequiredExecutors[receipt.ExecutorID]; ok {
 				hasRequiredExecutor = true
-				break
+				break // do not return here, so further rules can be added at the bottom
 			}
 		}
 		if !hasRequiredExecutor {
