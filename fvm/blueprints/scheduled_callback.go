@@ -44,7 +44,7 @@ func ExecuteCallbacksTransactions(chainID flow.Chain, processEvents flow.EventsL
 			continue
 		}
 
-		id, effort, err := callbackArgsFromEvent(env, event)
+		id, effort, err := callbackArgsFromEvent(event)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get callback args from event: %w", err)
 		}
@@ -80,7 +80,7 @@ func executeCallbackTransaction(
 // The event for processed callback event is emitted by the process callback transaction from
 // callback scheduler contract and has the following signature:
 // event PendingExecution(id: UInt64, priority: UInt8, executionEffort: UInt64, fees: UFix64, callbackOwner: Address)
-func callbackArgsFromEvent(env templates.Environment, event flow.Event) ([]byte, uint64, error) {
+func callbackArgsFromEvent(event flow.Event) ([]byte, uint64, error) {
 	const (
 		processedCallbackIDFieldName     = "id"
 		processedCallbackEffortFieldName = "executionEffort"
