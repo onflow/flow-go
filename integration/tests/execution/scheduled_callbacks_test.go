@@ -101,7 +101,7 @@ func (s *ScheduledCallbacksSuite) TestScheduleCallback_ScheduleAndCancelCallback
 	// Wait for next height finalized (potentially first height)
 	currentFinalized := s.BlockState.HighestFinalizedHeight()
 	blockA := s.BlockState.WaitForHighestFinalizedProgress(s.T(), currentFinalized)
-	s.T().Logf("got blockA height %v ID %v", blockA.Header.Height, blockA.Header.ID())
+	s.T().Logf("got blockA height %v ID %v", blockA.HeaderBody.Height, blockA.ID())
 
 	// Deploy the test contract first
 	s.deployTestContract()
