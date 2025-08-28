@@ -156,7 +156,7 @@ func migrateAccountStatusWithPublicKeyMetadata(
 
 	// startIndexForMapping stores the start index of the first deduplicated public key.
 	// This is used to avoid unnecessary key index mapping overhead (both speed & storage).
-	startIndexForMapping := firstDeduplicatedKeyIndexInMappings(keyIndexMappings)
+	startIndexForMapping := firstIndexOfDuplicateKeyInMappings(keyIndexMappings)
 
 	// keyIndexMappings is a slice containing stored key index where the slice index is
 	// the account key index starting from startIndexForMapping.
@@ -213,7 +213,7 @@ func migrateAccountPublicKeysIfNeeded(
 	return nil
 }
 
-func firstDeduplicatedKeyIndexInMappings(accountPublicKeyMappings []uint32) int {
+func firstIndexOfDuplicateKeyInMappings(accountPublicKeyMappings []uint32) int {
 	for keyIndex, storedKeyIndex := range accountPublicKeyMappings {
 		if uint32(keyIndex) != storedKeyIndex {
 			return keyIndex

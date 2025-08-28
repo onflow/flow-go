@@ -30,7 +30,7 @@ import (
 //   - Key index mapping to stored key index mapping (only for accounts with duplication flag)
 //     encoded in RLE to save space.
 //   - Last N digests to detect duplicate keys being added at runtime (after migration and spork).
-// - Renaming "public_key_0" payload to "apk_0".
+// - Renaming the payload key from "public_key_0" to "apk_0" without changing the payload value.
 // - Migrating public keys from individual payloads to batch deduplicated public key payloads,
 //   starting from the second unique public key.
 // - Migrating non-zero sequence number of account public key to its own payload.

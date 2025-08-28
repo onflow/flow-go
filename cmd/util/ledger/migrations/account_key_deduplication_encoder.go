@@ -100,11 +100,43 @@ const (
 type mappingGroup struct {
 	runLength      uint32 // runLength is uint32 to prevent overflow
 	storedKeyIndex uint32
+	consecutive    bool
+}
+
+func (g mappingGroup) Encode(buf []byte, off int) ([]byte, int) {
+	encodedRunLength := uint32(0)
+
+	for encodedRunLength < g.runLength {
+		// NOTE: if number of elements in a group exceeds maxMappingCountInGroup, a new group is created with the same value.
+
+		runLength := min(g.runLength-encodedRunLength, maxRunLengthInEncodedMappingGroup)
+
+		if cap(buf) >= off+mappingGroupSize {
+			buf = buf[:off+mappingGroupSize]
+		} else {
+			buf = append(buf, make([]byte, mappingGroupSize)...)
+		}
+
+		if g.consecutive {
+			binary.BigEndian.PutUint16(buf[off:], uint16(runLength)|consecutiveGroupFlagMask)
+		} else {
+			binary.BigEndian.PutUint16(buf[off:], uint16(runLength))
+		}
+		off += runLengthSize
+
+		binary.BigEndian.PutUint32(buf[off:], g.storedKeyIndex)
+		off += storedKeyIndexSize
+
+		encodedRunLength += runLength
+	}
+
+	return buf, off
 }
 
 type mappingGroups []mappingGroup
 
-// mappingGroups is encoded using RLE:
+// mappingGroups is encoded using a new variant of RLE created by fxamacker to efficiently store
+// long runs of unique and incrementing integer values (stored key indexes):
 // - run length (2 bytes): consecutive group flag in high 1 bit and run length in 15 bits
 // - value (4 bytes): stored key index
 // NOTE:
@@ -118,95 +150,32 @@ func (groups mappingGroups) Encode() []byte {
 	}
 
 	buf := make([]byte, 0, len(groups)*(mappingGroupSize))
+
 	off := 0
-
-	for i := 0; i < len(groups); {
-		group := groups[i]
-
-		switch group.runLength {
-		case 0:
-			panic(fmt.Sprintf("run length shouldn't be 0, mapping groups %+v", groups))
-
-		case 1:
-			// Handle consecutive groups
-
-			consecutiveGroupCount := uint32(1)
-			consecutiveStartStoredKeyIndex := group.storedKeyIndex
-
-			nextGroupIndex := i + 1
-			for nextGroupIndex < len(groups) {
-				nextGroup := groups[nextGroupIndex]
-				if nextGroup.runLength == 1 &&
-					nextGroup.storedKeyIndex == consecutiveStartStoredKeyIndex+consecutiveGroupCount {
-					consecutiveGroupCount++
-					nextGroupIndex++
-				} else {
-					break
-				}
-			}
-
-			if consecutiveGroupCount == 1 {
-				// Encode regular mapping group
-				buf, off = encodeMappingGroup(buf, off, group.runLength, group.storedKeyIndex, false)
-			} else {
-				// Encode consecutive mapping groups
-				buf, off = encodeMappingGroup(buf, off, consecutiveGroupCount, consecutiveStartStoredKeyIndex, true)
-			}
-
-			i = nextGroupIndex
-
-		default:
-			buf, off = encodeMappingGroup(buf, off, group.runLength, group.storedKeyIndex, false)
-			i++
-		}
+	for _, group := range groups {
+		buf, off = group.Encode(buf, off)
 	}
 
 	return buf
 }
 
-func encodeMappingGroup(buf []byte, off int, runLength uint32, value uint32, isConsecutiveGroup bool) ([]byte, int) {
-	encodedRunLength := uint32(0)
-
-	for encodedRunLength < runLength {
-		// NOTE: if number of elements in a group exceeds maxMappingCountInGroup, a new group is created with the same value.
-
-		runLength := min(runLength-encodedRunLength, maxRunLengthInEncodedMappingGroup)
-
-		if cap(buf) >= off+mappingGroupSize {
-			buf = buf[:off+mappingGroupSize]
-		} else {
-			buf = append(buf, make([]byte, mappingGroupSize)...)
-		}
-
-		if isConsecutiveGroup {
-			binary.BigEndian.PutUint16(buf[off:], uint16(runLength)|consecutiveGroupFlagMask)
-		} else {
-			binary.BigEndian.PutUint16(buf[off:], uint16(runLength))
-		}
-		off += runLengthSize
-
-		binary.BigEndian.PutUint32(buf[off:], value)
-		off += storedKeyIndexSize
-
-		encodedRunLength += runLength
-	}
-
-	return buf, off
-}
-
 // encodeAccountPublicKeyMapping encodes keyIndexMappings into concatenated run-length groups.
 // Each run-length group is encoded as:
-// - length (2 bytes) with max length as 2<<15-1
-// - stored key index (4 bytes)
+// - length in the low 15 bits of uint16 (2 bytes)
+// - stored key index as uint32 (4 bytes)
+// For example, account has 8 account keys with 5 unique keys.
+// Unique key index mapping is {Key0, Key1, Key1, Key1, Key1, Key2, Key3, Key4}.
+// The example's encoded mapping would be:
+// { {run-length 1, value 0}, {run-length 4, value 1}, {consecutive-run-length 3, start-value 2}}
 func encodeAccountPublicKeyMapping(mapping []uint32) ([]byte, error) {
 	if len(mapping) == 0 {
 		return nil, nil
 	}
 
-	groups := make(mappingGroups, 0, len(mapping))
+	regularGroups := make(mappingGroups, 0, len(mapping))
 
-	i := 0
-	for i < len(mapping) {
+	// Iterate mapping to create regular mappingGroups (no consecutive groups)
+	for i := 0; i < len(mapping); {
 		runLength := 1
 		value := mapping[i]
 		i++
@@ -216,10 +185,63 @@ func encodeAccountPublicKeyMapping(mapping []uint32) ([]byte, error) {
 			i++
 		}
 
-		groups = append(groups, mappingGroup{runLength: uint32(runLength), storedKeyIndex: value})
+		regularGroups = append(regularGroups, mappingGroup{runLength: uint32(runLength), storedKeyIndex: value})
 	}
 
-	return groups.Encode(), nil
+	optimizedGroups := make(mappingGroups, 0, len(regularGroups))
+
+	// Iterate regular mappingGroups to create consecutive mappingGroups
+	for i := 0; i < len(regularGroups); {
+		group := regularGroups[i]
+
+		if group.runLength > 1 {
+			optimizedGroups = append(optimizedGroups, group)
+			i++
+			continue
+		}
+
+		// Handle consecutive groups
+
+		// We encode stored key indexes using a new variant of RLE designed to efficiently store
+		// long runs of unique integers that increment by 1.
+		// For example, if an account has 1000 keys and the first 2 keys are the same, followed
+		// by 998 unique keys (e.g., {key0, key0, key1, key2, ..., key998}).
+		// Using regular RLE would bloat the storage size by storing 999 mapping groups with run length 1.
+		// By comparison, our optimized encoding would only store 2 mapping groups.
+		// We support a maximum run length of 32767 because we use the low 15 bits of uint16
+		// to store the run length (the high bit is used as a flag).
+
+		consecutiveGroupCount := uint32(1)
+		consecutiveStartStoredKeyIndex := group.storedKeyIndex
+
+		nextGroupIndex := i + 1
+		for nextGroupIndex < len(regularGroups) {
+			nextGroup := regularGroups[nextGroupIndex]
+			if nextGroup.runLength == 1 &&
+				nextGroup.storedKeyIndex == consecutiveStartStoredKeyIndex+consecutiveGroupCount {
+				consecutiveGroupCount++
+				nextGroupIndex++
+			} else {
+				break
+			}
+		}
+
+		if consecutiveGroupCount == 1 {
+			optimizedGroups = append(optimizedGroups, group)
+		} else {
+			optimizedGroups = append(
+				optimizedGroups,
+				mappingGroup{
+					consecutive:    true,
+					runLength:      consecutiveGroupCount,
+					storedKeyIndex: consecutiveStartStoredKeyIndex,
+				})
+		}
+
+		i = nextGroupIndex
+	}
+
+	return optimizedGroups.Encode(), nil
 }
 
 // Digest list
@@ -339,6 +361,11 @@ func encodeAccountStatusV4WithPublicKeyMetadata(
 	accountPublicKeyMappings []uint32,
 	deduplicated bool,
 ) ([]byte, error) {
+
+	// Return early if the original account status payload contains any optional fields.
+	if len(original) != accountStatusV4MinimumSize {
+		return nil, fmt.Errorf("failed to encode account status payload: original payload has %d bytes, expect %d bytes", len(original), accountStatusV4MinimumSize)
+	}
 
 	// Encode list of account public key weight and revoked status
 	encodedAccountPublicKeyWeightAndRevokedStatus, err := encodeAccountPublicKeyWeightsAndRevokedStatus(weightAndRevokedStatus)
