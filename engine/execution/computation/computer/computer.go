@@ -314,10 +314,7 @@ func (e *blockComputer) queueSystemTransactions(
 	systemLogger zerolog.Logger,
 ) chan TransactionRequest {
 	allTxs := append(executeCallbackTxs, systemTxn)
-	// add execute callback transactions to the system collection info along to existing process transaction
-	// TODO(7749): fix illegal mutation
 	systemTxs := systemColection.CompleteCollection.Collection.Transactions
-	systemColection.CompleteCollection.Collection.Transactions = append(systemTxs, allTxs...) //nolint:structwrite
 	systemLogger = systemLogger.With().Uint32("num_txs", uint32(len(systemTxs))).Logger()
 
 	txQueue := make(chan TransactionRequest, len(allTxs))
@@ -497,19 +494,24 @@ func (e *blockComputer) executeSystemTransactions(
 		Logger()
 
 	systemCollectionInfo := collectionInfo{
-		blockId:         block.BlockID(),
-		blockIdStr:      block.BlockID().String(),
-		blockHeight:     block.Block.Height,
-		collectionIndex: userCollectionCount,
-		CompleteCollection: &entity.CompleteCollection{
-			Collection: flow.NewEmptyCollection(), // TODO(7749)
-		},
+		blockId:             block.BlockID(),
+		blockIdStr:          block.BlockID().String(),
+		blockHeight:         block.Block.Height,
+		collectionIndex:     userCollectionCount,
+		CompleteCollection:  nil, // We do not yet know all the scheduled callbacks, so postpone construction of the collection.
 		isSystemTransaction: true,
 	}
 
 	var callbackTxs []*flow.TransactionBody
 
 	if e.vmCtx.ScheduleCallbacksEnabled {
+		// We pass in the `systemCollectionInfo` here. However, note that at this point, the composition of the system chunk
+		// is not yet known. Specifically, the `entity.CompleteCollection` represents the *final* output of a process and is
+		// immutable by protocol mandate. If we had a bug in our software that accidentally illegally mutated such structs,
+		// likely the node encountering that bug would misbehave and get slashed, or in the worst case the flow protocol might
+		// be compromised. Therefore, we have the rigorous convention in our code base that the `CompleteCollection` is only
+		// constructed once the final composition of the system chunk has been determined.
+		// To that end, the CompleteCollection is nil here, such that any attempt to access the Collection will panic.
 		callbacks, updatedTxnIndex, err := e.executeProcessCallback(
 			callbackCtx,
 			systemCollectionInfo,
@@ -524,6 +526,26 @@ func (e *blockComputer) executeSystemTransactions(
 
 		callbackTxs = callbacks
 		txIndex = updatedTxnIndex
+
+		finalCollection, err := flow.NewCollection(flow.UntrustedCollection{
+			Transactions: append(append([]*flow.TransactionBody{e.processCallbackTxn}, callbackTxs...), e.systemTxn),
+		})
+		if err != nil {
+			return err
+		}
+		systemCollectionInfo.CompleteCollection = &entity.CompleteCollection{
+			Collection: finalCollection,
+		}
+	} else {
+		finalCollection, err := flow.NewCollection(flow.UntrustedCollection{
+			Transactions: []*flow.TransactionBody{e.systemTxn},
+		})
+		if err != nil {
+			return err
+		}
+		systemCollectionInfo.CompleteCollection = &entity.CompleteCollection{
+			Collection: finalCollection,
+		}
 	}
 
 	// Update logger with number of transactions once they've become known
@@ -589,10 +611,6 @@ func (e *blockComputer) executeProcessCallback(
 	txnIndex uint32,
 	systemLogger zerolog.Logger,
 ) ([]*flow.TransactionBody, uint32, error) {
-	// add process callback transaction to the system collection info
-	// TODO(7749): fix illegal mutation
-	systemCollectionInfo.CompleteCollection.Collection.Transactions = append(systemCollectionInfo.CompleteCollection.Collection.Transactions, e.processCallbackTxn) //nolint:structwrite
-
 	request := newTransactionRequest(
 		systemCollectionInfo,
 		systemCtx,
