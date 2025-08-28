@@ -36,6 +36,8 @@ type RestProxyHandler struct {
 	chain   flow.Chain
 }
 
+var _ access.API = (*RestProxyHandler)(nil)
+
 // NewRestProxyHandler returns a new rest proxy handler for observer node.
 func NewRestProxyHandler(
 	api access.API,
@@ -390,7 +392,7 @@ func (r *RestProxyHandler) GetEventsForHeightRange(
 		ExecutionStateQuery: &entities.ExecutionStateQuery{
 			AgreeingExecutorsCount:  uint64(criteria.AgreeingExecutorsCount),
 			RequiredExecutorIds:     convert.IdentifiersToMessages(criteria.RequiredExecutors),
-			IncludeExecutorMetadata: false, //TODO: what should I do with this field?
+			IncludeExecutorMetadata: true,
 		},
 	}
 	eventsResponse, err := upstream.GetEventsForHeightRange(ctx, getEventsForHeightRangeRequest)
@@ -426,7 +428,7 @@ func (r *RestProxyHandler) GetEventsForBlockIDs(
 		ExecutionStateQuery: &entities.ExecutionStateQuery{
 			AgreeingExecutorsCount:  uint64(criteria.AgreeingExecutorsCount),
 			RequiredExecutorIds:     convert.IdentifiersToMessages(criteria.RequiredExecutors),
-			IncludeExecutorMetadata: false, //TODO: what should I do with this field?
+			IncludeExecutorMetadata: true,
 		},
 	}
 	eventsResponse, err := upstream.GetEventsForBlockIDs(ctx, getEventsForBlockIDsRequest)
