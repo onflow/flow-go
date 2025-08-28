@@ -97,54 +97,54 @@ func (s *ScheduledCallbacksSuite) TestScheduleCallback_ScheduledAndExecuted() {
 	require.Contains(s.T(), executedCallbacksAfter, callbackID, "callback should have been executed")
 }
 
-// func (s *ScheduledCallbacksSuite) TestScheduleCallback_ScheduleAndCancelCallback() {
-// 	// Wait for next height finalized (potentially first height)
-// 	currentFinalized := s.BlockState.HighestFinalizedHeight()
-// 	blockA := s.BlockState.WaitForHighestFinalizedProgress(s.T(), currentFinalized)
-// 	s.T().Logf("got blockA height %v ID %v", blockA.Header.Height, blockA.Header.ID())
+func (s *ScheduledCallbacksSuite) TestScheduleCallback_ScheduleAndCancelCallback() {
+	// Wait for next height finalized (potentially first height)
+	currentFinalized := s.BlockState.HighestFinalizedHeight()
+	blockA := s.BlockState.WaitForHighestFinalizedProgress(s.T(), currentFinalized)
+	s.T().Logf("got blockA height %v ID %v", blockA.Header.Height, blockA.Header.ID())
 
-// 	// Deploy the test contract first
-// 	s.deployTestContract()
+	// Deploy the test contract first
+	s.deployTestContract()
 
-// 	// Wait for next height finalized before scheduling callback
-// 	s.BlockState.WaitForHighestFinalizedProgress(s.T(), s.BlockState.HighestFinalizedHeight())
+	// Wait for next height finalized before scheduling callback
+	s.BlockState.WaitForHighestFinalizedProgress(s.T(), s.BlockState.HighestFinalizedHeight())
 
-// 	// Schedule a callback for 10 seconds in the future
-// 	scheduleDelta := int64(10)
-// 	futureTimestamp := time.Now().Unix() + scheduleDelta
-// 	s.T().Logf("scheduling callback at timestamp: %v, current timestamp: %v", futureTimestamp, time.Now().Unix())
-// 	callbackID := s.scheduleCallback(futureTimestamp)
-// 	s.T().Logf("scheduled callback with ID: %d", callbackID)
+	// Schedule a callback for 10 seconds in the future
+	scheduleDelta := int64(10)
+	futureTimestamp := time.Now().Unix() + scheduleDelta
+	s.T().Logf("scheduling callback at timestamp: %v, current timestamp: %v", futureTimestamp, time.Now().Unix())
+	callbackID := s.scheduleCallback(futureTimestamp)
+	s.T().Logf("scheduled callback with ID: %d", callbackID)
 
-// 	const scheduledStatus = 0
-// 	const canceledStatus = 3
+	const scheduledStatus = 0
+	const canceledStatus = 3
 
-// 	// Wait fraction of the scheduled time
-// 	s.T().Log("waiting for callback execution...")
-// 	time.Sleep(time.Second + 2)
+	// Wait fraction of the scheduled time
+	s.T().Log("waiting for callback execution...")
+	time.Sleep(time.Second + 2)
 
-// 	// Check the status of the callback
-// 	status, ok := s.getCallbackStatus(callbackID)
-// 	require.True(s.T(), ok, "callback status should not be nil after scheduling")
-// 	require.Equal(s.T(), scheduledStatus, status, "status should be equal to scheduled")
-// 	s.T().Logf("callback status after scheduling: %v", status)
+	// Check the status of the callback
+	status, ok := s.getCallbackStatus(callbackID)
+	require.True(s.T(), ok, "callback status should not be nil after scheduling")
+	require.Equal(s.T(), scheduledStatus, status, "status should be equal to scheduled")
+	s.T().Logf("callback status after scheduling: %v", status)
 
-// 	// Verify the callback is scheduled (not executed yet)
-// 	executedCallbacks := s.getExecutedCallbacks()
-// 	require.NotContains(s.T(), executedCallbacks, callbackID, "callback should not be executed immediately")
+	// Verify the callback is scheduled (not executed yet)
+	executedCallbacks := s.getExecutedCallbacks()
+	require.NotContains(s.T(), executedCallbacks, callbackID, "callback should not be executed immediately")
 
-// 	// Cancel the callback
-// 	canceledID := s.cancelCallback(callbackID)
-// 	require.Equal(s.T(), callbackID, canceledID, "canceled callback ID should be the same as scheduled")
+	// Cancel the callback
+	canceledID := s.cancelCallback(callbackID)
+	require.Equal(s.T(), callbackID, canceledID, "canceled callback ID should be the same as scheduled")
 
-// 	// Wait for callback scheduled time to make sure it was not executed
-// 	time.Sleep(time.Duration(scheduleDelta) * time.Second)
+	// Wait for callback scheduled time to make sure it was not executed
+	time.Sleep(time.Duration(scheduleDelta) * time.Second)
 
-// 	// Check the status of the callback
-// 	status, ok = s.getCallbackStatus(callbackID)
-// 	require.True(s.T(), ok, "callback status should not be nil after scheduling")
-// 	require.Equal(s.T(), canceledStatus, status, "status should be equal to canceled")
-// }
+	// Check the status of the callback
+	status, ok = s.getCallbackStatus(callbackID)
+	require.True(s.T(), ok, "callback status should not be nil after scheduling")
+	require.Equal(s.T(), canceledStatus, status, "status should be equal to canceled")
+}
 
 func (s *ScheduledCallbacksSuite) deployTestContract() {
 	chainID := s.net.Root().HeaderBody.ChainID
