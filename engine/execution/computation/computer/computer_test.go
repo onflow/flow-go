@@ -1693,13 +1693,12 @@ func (c *callbackTestExecutor) Output() fvm.ProcedureOutput {
 
 	const callbackSchedulerImport = `import "FlowCallbackScheduler"`
 	txBody := txProc.Transaction
-	script := string(txBody.Script)
 	txID := fmt.Sprintf("tx_%d", txProc.TxIndex)
 
 	switch {
 	// scheduled callbacks process transaction
 	case strings.Contains(string(txBody.Script), "scheduler.process"):
-		executor.vm.executedTransactions[txID] = "process_callback"
+		c.vm.executedTransactions[txID] = "process_callback"
 		env := systemcontracts.SystemContractsForChain(flow.Mainnet.Chain().ChainID()).AsTemplateEnv()
 		eventTypeString := fmt.Sprintf("A.%v.CallbackScheduler.CallbackProcessed", env.FlowCallbackSchedulerAddress)
 
