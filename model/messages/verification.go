@@ -21,13 +21,11 @@ func (a *ApprovalRequest) ToInternal() (any, error) {
 		return nil, fmt.Errorf("ResultID of approval request must not be zero")
 	}
 
-	ar := &flow.ApprovalRequest{
+	return &flow.ApprovalRequest{
 		Nonce:      a.Nonce,
 		ResultID:   a.ResultID,
 		ChunkIndex: a.ChunkIndex,
-	}
-
-	return ar, nil
+	}, nil
 }
 
 // ApprovalResponse contains a response to an approval request.
@@ -44,10 +42,8 @@ func (a *ApprovalResponse) ToInternal() (any, error) {
 		return nil, fmt.Errorf("invalid result approval: %w", err)
 	}
 
-	ar := &flow.ApprovalResponse{
+	return &flow.ApprovalResponse{
 		Nonce:    a.Nonce,
 		Approval: *approval,
-	}
-
-	return ar, nil
+	}, nil
 }
