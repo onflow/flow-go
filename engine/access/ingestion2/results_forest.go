@@ -271,7 +271,7 @@ func NewResultsForest(
 		return nil, fmt.Errorf("failed to get block header for latest persisted sealed result (height: %d): %w", sealedHeight, err)
 	}
 
-	rf := &ResultsForest{
+	return &ResultsForest{
 		log:                         log.With().Str("component", "results_forest").Logger(),
 		forest:                      *forest.NewLevelledForest(sealedHeader.View),
 		headers:                     headers,
@@ -280,8 +280,7 @@ func NewResultsForest(
 		lastSealedView:              counters.NewMonotonicCounter(sealedHeader.View),
 		lastFinalizedView:           counters.NewMonotonicCounter(sealedHeader.View),
 		latestPersistedSealedResult: latestPersistedSealedResult,
-	}
-	return rf, nil
+	}, nil
 }
 
 // ResetLowestRejectedView returns the last sealed view processed by the forest, and resets the
@@ -672,10 +671,6 @@ func (rf *ResultsForest) abandonFork(container *ExecutionResultContainer) {
 
 // OnStateUpdated is called by pipeline state machines when their state changes, and propagates the
 // state update to all children of the result.
-//
-// WARNING: we are assuming a strict ordering of events of the type `OnStateUpdated` from different pipelines
-// across the forest. This is because `processCompleted` requires a strict ancestor first order of `StateComplete`
-// in order of sealing.
 func (rf *ResultsForest) OnStateUpdated(resultID flow.Identifier, newState optimistic_sync.State) {
 	// abandoned status is propagated to all descendants synchronously, so no need to traverse again here.
 	if newState == optimistic_sync.StateAbandoned {
@@ -686,25 +681,19 @@ func (rf *ResultsForest) OnStateUpdated(resultID flow.Identifier, newState optim
 	for child := range rf.IterateChildren(resultID) {
 		child.Pipeline().OnParentStateUpdated(newState)
 	}
-
-	// process completed pipelines
-	if newState == optimistic_sync.StateComplete {
-		rf.mu.Lock()
-		defer rf.mu.Unlock()
-
-		if err := rf.processCompleted(resultID); err != nil {
-			// TODO: handle with a irrecoverable error
-			rf.log.Fatal().Err(err).Msg("irrecoverable exception: failed to process completed pipeline")
-			return
-		}
-	}
 }
 
 // processCompleted processes a completed pipeline and prunes the forest.
-// CAUTION: not concurrency safe! Caller must hold a lock.
+//
+// WARNING: we are assuming a strict ordering of calls to `processCompleted` from completed pipelines.
+// This is because we require a strict ancestor first order of `StateComplete`in order of sealing to
+// ensure that the forest is in a consistent state.
 //
 // No errors are expected during normal operation.
 func (rf *ResultsForest) processCompleted(resultID flow.Identifier) error {
+	rf.mu.Lock()
+	defer rf.mu.Unlock()
+
 	// first, ensure that the result ID is in the forest, otherwise the forest is in an inconsistent state
 	container, found := rf.getContainer(resultID)
 	if !found {

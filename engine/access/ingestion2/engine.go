@@ -31,7 +31,8 @@ import (
 const defaultQueueCapacity = 10_000
 
 // PipelineTask is a function that executes a pipeline task within the engine's worker pool.
-type PipelineTask func() error
+// No errors are expected during normal operations.
+type PipelineTask func(context.Context) error
 
 type Engine struct {
 	*component.ComponentManager
@@ -231,7 +232,7 @@ func (e *Engine) processAllPipelineTasks(ctx context.Context) error {
 		if !ok {
 			return nil
 		}
-		if err := execute(); err != nil {
+		if err := execute(ctx); err != nil {
 			return err
 		}
 	}

@@ -5,6 +5,9 @@ import (
 	"fmt"
 	"sync"
 
+	"go.uber.org/atomic"
+	"golang.org/x/exp/maps"
+
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/counters"
 	"github.com/onflow/flow-go/module/executiondatasync/optimistic_sync"
@@ -25,6 +28,7 @@ type ExecutionResultContainer struct {
 	resultID    flow.Identifier // precomputed ID of result to avoid expensive hashing on each call
 	blockHeader *flow.Header    // header of the block which the result is for
 	pipeline    optimistic_sync.Pipeline
+	enqueued    *atomic.Bool
 	blockStatus counters.StrictMonotonicCounter
 
 	mu sync.RWMutex
@@ -52,12 +56,23 @@ func NewExecutionResultContainer(
 		resultID:    result.ID(),
 		blockHeader: header,
 		pipeline:    pipeline,
+		enqueued:    atomic.NewBool(false),
 		blockStatus: counters.NewMonotonicCounter(uint64(BlockStatusCertified)),
 	}
 
 	c.SetBlockStatus(blockStatus)
 
 	return c, nil
+}
+
+// IsEnqueued returns true if the container is enqueued for processing.
+func (c *ExecutionResultContainer) IsEnqueued() bool {
+	return c.enqueued.Load()
+}
+
+// SetEnqueued sets the container as enqueued for processing.
+func (c *ExecutionResultContainer) SetEnqueued() bool {
+	return c.enqueued.CompareAndSwap(false, true)
 }
 
 // AddReceipt adds the given execution receipt to the container.
@@ -147,6 +162,13 @@ func (c *ExecutionResultContainer) Result() *flow.ExecutionResult {
 func (c *ExecutionResultContainer) ResultID() flow.Identifier {
 	// No locking is required here since the resultID is immutable after instantiation.
 	return c.resultID
+}
+
+// Receipts returns the execution receipts for this container.
+func (c *ExecutionResultContainer) Receipts() flow.ExecutionReceiptStubList {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	return maps.Values(c.receipts)
 }
 
 // BlockHeader returns the header of the block executed by this result.
