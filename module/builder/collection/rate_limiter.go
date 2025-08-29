@@ -1,6 +1,7 @@
 package collection
 
 import (
+	"fmt"
 	"math"
 
 	"github.com/onflow/flow-go/model/flow"
@@ -120,19 +121,15 @@ func (limiter *rateLimiter) shouldRateLimit(tx *flow.TransactionBody) bool {
 // No errors are expected during normal operations.
 func GetMaxCollectionSizeForSealingLag(
 	state protocol.State,
-	minSealingLag uint,
-	maxSealingLag uint,
-	halvingInterval uint,
-	minCollectionSize uint,
-	maxCollectionSize uint) (uint, error) {
-
+	minSealingLag, maxSealingLag, halvingInterval, minCollectionSize, maxCollectionSize uint,
+) (uint, error) {
 	lastFinalized, err := state.Final().Head()
 	if err != nil {
-		return 0, err
+		return 0, fmt.Errorf("could not retrieve finalized block: %w", err)
 	}
 	lastSealed, err := state.Sealed().Head()
 	if err != nil {
-		return 0, err
+		return 0, fmt.Errorf("could not retrieve sealed block: %w", err)
 	}
 	sealingLag := uint(lastFinalized.Height - lastSealed.Height)
 	collectionSize := StepHalving(
