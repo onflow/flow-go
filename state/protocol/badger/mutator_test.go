@@ -1451,9 +1451,10 @@ func TestExtendDuplicateEpochEvents(t *testing.T) {
 		err = state.Extend(context.Background(), unittest.ProposalFromBlock(block1))
 		require.NoError(t, err)
 
-		block2 := unittest.BlockWithParentAndPayload(
+		block2 := unittest.BlockWithParentAndPayloadAndUniqueView(
 			head,
 			unittest.PayloadFixture(unittest.WithProtocolStateID(rootProtocolStateID)),
+			usedViews,
 		)
 		err = state.Extend(context.Background(), unittest.ProposalFromBlock(block2))
 		require.NoError(t, err)
