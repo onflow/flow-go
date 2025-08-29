@@ -3,6 +3,7 @@ package ingestion2
 import (
 	"fmt"
 	"iter"
+	"sort"
 	"sync"
 
 	"github.com/rs/zerolog"
@@ -96,6 +97,13 @@ var (
 //   - When calling `ResetLowestRejectedView`, all prior contracts are annulled, and we engage again in the
 //     contract of delivering all sealed results with views ≥ 𝒔, where 𝒔 denotes the value returned by the
 //     most recent call to `ResetLowestRejectedView`.
+//   - The higher-level business logic must perform the following backfill process:
+//     (i) provide sealed results from the returned 𝓼.Level up to and including the latest sealed result
+//     from the consensus follower.
+//     (ii) inform the forest about sealing of results that are being backfilled.
+//     This ensures that the forest is fully up to date with the higher-level business logic's view of the
+//     protocol's global state such that seals within any new OnFinalizedBlock event extend from the
+//     forest's latest sealed result 𝓼.
 //
 // Safety here means that only results marked as sealed by the protocol will be considered sealed by the ResultsForest.
 // Liveness means that every result sealed by the protocol will eventually be considered as processed by the ResultsForest.
@@ -140,6 +148,35 @@ var (
 //   - Repeated addition of the same result and/or receipt should be a no-op.
 //   - <additional conditions?>
 //
+// It is the forest's responsibility to make progress up to its 𝙡𝙖𝙩𝙚𝙨𝙩 𝘀𝗲𝗮𝗹𝗲𝗱 𝗿𝗲𝘀𝘂𝗹𝘁 𝓼.
+// Per definition of 𝓼, the ancestry of 𝓼 is stored in the forest, so the forest has the means to
+// progress up to 𝓼. If the forest satisfies this design decision (specific argument why this is
+// the case for our implementation at had is still to be written down), the following statement is
+// true:
+//   - As long as the forest does not reject any results, the forest 𝙡𝙖𝙩𝙚𝙨𝙩 𝘀𝗲𝗮𝗹𝗲𝗱 𝗿𝗲𝘀𝘂𝗹𝘁 𝓼 𝘄𝗶𝘁𝗵𝗶𝗻 𝘁𝗵𝗲 𝗳𝗼𝗿𝗲𝘀𝘁
+//     will continue to grow, because the forest is being fed with results in ancestor-first order.
+//     Hence, the indexing process is guaranteed to be live up to 𝓼.
+//
+// The Consensus follower guarantees that blocks are incorporated in "ancestor first order".
+// Specifically that means that when the consensus follower ingests block B, it has previously
+// incorporated block B.ParentID.
+//   - By induction, this means that all blocks that the consensus follower declares as
+//     "incorporated" (via OnBlockIncorporated notifications) descend from the root block the node
+//     was boostrapped with.
+//   - Furthermore, OnBlockIncorporated are delivered in an order-preserving manner. Meaning, a
+//     component subscribed to the OnBlockIncorporated notifications also hears about blocks in an
+//     ancestor-first order.
+//   - Unless the node crashes, OnBlockIncorporated notifications are delivered to the subscribers for
+//     every block that the consensus follower ingests.
+//
+// Consensus makes a similar guarantee for results included in blocks:
+//   - Results are included into a fork in an ancestor-first ordering. Meaning, the proposer of
+//     block B may include a result R only if the result referenced by R.PreviousResultID was
+//     included in B or its ancestors.
+//
+// The result forest requires that finalized block and sealed result notifications are both delivered
+// in ancestor first order. This is relaxed for unsealed results which may be delivered in any order.
+//
 // The ResultsForest mempool supports pruning by view:
 // only results descending from the latest sealed and finalized result are relevant.
 // By convention, the ResultsForest always contains the latest sealed result. Thereby, the
@@ -178,15 +215,22 @@ var (
 //     be extended by new blocks or (ii) a rogue execution node pursuing its own execution fork will
 //     eventually be slashed and can no longer submit new results.
 //
+// Finalized block tracking:
+//   - The ResultsForest tracks the finalized block status of results within the forest. This is used
+//     exclusively by higher-level business logic (e.g. ForestManager) to determine whether a result
+//     can be processed.
+//   - Since results for finalized blocks are not guaranteed by the protocol to exist before sealing,
+//     the process used to guarantee a fully connected chain from 𝓹 to 𝓼 is not possible for finalized
+//     results.
+//   - Given this, the forest does not make any guarantees about the connectedness of finalized results,
+//     except that a result for the finalized block will eventually processed once
+//
 // Safe for concurrent access. Internally, the mempool utilizes the LevelledForrest.
 type ResultsForest struct {
 	log             zerolog.Logger
 	forest          forest.LevelledForest
 	headers         storage.Headers
 	pipelineFactory optimistic_sync.PipelineFactory
-
-	// lastSealedResultID is the ID of the last sealed result processed by the forest.
-	lastSealedResultID flow.Identifier
 
 	// lastSealedView is the view of the last sealed result.
 	lastSealedView counters.StrictMonotonicCounter
@@ -220,7 +264,7 @@ func NewResultsForest(
 	latestPersistedSealedResult storage.LatestPersistedSealedResultReader,
 	maxViewDelta uint64,
 ) (*ResultsForest, error) {
-	resultID, sealedHeight := latestPersistedSealedResult.Latest()
+	_, sealedHeight := latestPersistedSealedResult.Latest()
 	sealedHeader, err := headers.ByHeight(sealedHeight) // by protocol convention, this should always exist (initialized during bootstrapping)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get block header for latest persisted sealed result (height: %d): %w", sealedHeight, err)
@@ -232,7 +276,6 @@ func NewResultsForest(
 		headers:                     headers,
 		pipelineFactory:             pipelineFactory,
 		maxViewDelta:                maxViewDelta,
-		lastSealedResultID:          resultID,
 		lastSealedView:              counters.NewMonotonicCounter(sealedHeader.View),
 		lastFinalizedView:           counters.NewMonotonicCounter(sealedHeader.View),
 		latestPersistedSealedResult: latestPersistedSealedResult,
@@ -255,6 +298,11 @@ func (rf *ResultsForest) ResetLowestRejectedView() (uint64, bool) {
 // AddSealedResult adds a SEALED Execution Result to the Result Forest (without any receipts),
 // in case the result is not already stored in the tree. If the result is already stored,
 // its status is set to sealed.
+//
+// IMPORTANT: The caller MUST provide sealed results in ancestor first order to allow the forest to
+// guarantee liveness. If a sealed result is provided who's parent is either missing or not sealed,
+// an error is returned.
+//
 // Execution results with a finalized seal are committed to the chain and considered final
 // irrespective of which Execution Nodes [ENs] produced them. Therefore, it is fine to not track
 // which ENs produced the result (but we also don't preclude a receipt from being added for the
@@ -269,9 +317,11 @@ func (rf *ResultsForest) ResetLowestRejectedView() (uint64, bool) {
 //   - ErrMaxViewDeltaExceeded: if the result's block view is more than maxViewDelta views ahead of the last sealed view
 //   - All other errors are potential indicators of bugs or corrupted internal state (continuation impossible)
 func (rf *ResultsForest) AddSealedResult(result *flow.ExecutionResult) error {
+	resultID := result.ID()
+
 	container, err := rf.getOrCreateContainer(result, BlockStatusSealed)
 	if err != nil {
-		return fmt.Errorf("failed to get container for result (%s): %w", result.ID(), err)
+		return fmt.Errorf("failed to get container for result (%s): %w", resultID, err)
 	}
 	if container == nil {
 		// noop if the result's block view is lower than the lowest view.
@@ -281,34 +331,31 @@ func (rf *ResultsForest) AddSealedResult(result *flow.ExecutionResult) error {
 	rf.mu.Lock()
 	defer rf.mu.Unlock()
 
-	// This call might be the first time, where the ResultsForest learns that the result is sealed.
-	rf.setSealed(container)
+	// sealed results must be provided in ancestor first order. if updating the last sealed view fails,
+	// this indicates that a sealed result was provided out of order, which is strictly disallowed.
+	if !rf.updateLastSealed(container) {
+		return fmt.Errorf("failed to update last sealed view for result (%s): parent result not found in forest or is not sealed", resultID)
+	}
 
 	return nil
 }
 
 // AddReceipt adds the given execution result to the forest. Furthermore, we track which Execution Node issued
-// receipts committing to this result. This method is idempotent
+// receipts committing to this result. This method is idempotent.
 //
 // Expected errors during normal operations:
 //   - ErrMaxViewDeltaExceeded: if the result's block view is more than maxViewDelta views ahead of the last sealed view
 //   - All other errors are potential indicators of bugs or corrupted internal state (continuation impossible)
 func (rf *ResultsForest) AddReceipt(receipt *flow.ExecutionReceipt, blockStatus BlockStatus) (bool, error) {
+	resultID := receipt.ExecutionResult.ID()
+
 	container, err := rf.getOrCreateContainer(&receipt.ExecutionResult, blockStatus)
 	if err != nil {
-		return false, fmt.Errorf("failed to get container for result (%s): %w", receipt.ExecutionResult.ID(), err)
+		return false, fmt.Errorf("failed to get container for result (%s): %w", resultID, err)
 	}
 	if container == nil {
 		// noop if the result's block view is lower than the lowest view.
 		return false, nil
-	}
-
-	if blockStatus == BlockStatusSealed {
-		rf.mu.Lock()
-		rf.setSealed(container)
-		rf.mu.Unlock()
-	} else {
-		container.SetBlockStatus(blockStatus)
 	}
 
 	added, err := container.AddReceipt(receipt)
@@ -316,17 +363,47 @@ func (rf *ResultsForest) AddReceipt(receipt *flow.ExecutionReceipt, blockStatus 
 		return false, fmt.Errorf("failed to add receipt to its container: %w", err)
 	}
 
+	rf.mu.Lock()
+	defer rf.mu.Unlock()
+
+	container.SetBlockStatus(blockStatus)
+
+	if blockStatus == BlockStatusSealed {
+		// it is OK to receive out of order receipt notifications since they may be provided based
+		// on network events.
+		_ = rf.updateLastSealed(container)
+	}
+
 	return added > 0, nil
 }
 
-// setSealed marks a container as sealed, updates internal state.
+// updateLastSealed updates the last sealed view and abandons all orphaned sibling forks if and only
+// if the result's parent exists in the forest and is already sealed. Otherwise, false is returned
+// and the operation is a no-op. This function is idempotent.
+//
+// This guarantees that there is always a direct ancestoral connection from the latest persisted
+// sealed result to the latest sealed result.
+//
 // CAUTION: not concurrency safe! Caller must hold a lock.
-func (rf *ResultsForest) setSealed(container *ExecutionResultContainer) {
-	if rf.lastSealedView.Set(container.BlockView()) {
-		rf.lastSealedResultID = container.ResultID()
+func (rf *ResultsForest) updateLastSealed(container *ExecutionResultContainer) bool {
+	parentID, _ := container.Parent()
+	parent, found := rf.getContainer(parentID)
+	if !found || parent.BlockStatus() != BlockStatusSealed {
+		return false // invariant violation, do not update
 	}
 
-	container.SetBlockStatus(BlockStatusSealed)
+	if !rf.lastSealedView.Set(container.BlockView()) {
+		return true // duplicate event
+	}
+
+	// abandon all orphaned sibling forks
+	for sibling := range rf.iterateChildren(parentID) {
+		if sibling.ResultID() != container.ResultID() {
+			rf.abandonFork(sibling)
+		}
+	}
+
+	return true
 }
 
 // getOrCreateContainer retrieves or creates the container for the given result within the forest.
@@ -501,47 +578,71 @@ func (rf *ResultsForest) iterateView(view uint64) iter.Seq[*ExecutionResultConta
 
 // OnBlockFinalized notifies the ResultsForest that a block has been finalized.
 // The forest updates the state of all results affected by the finalized block and its seals.
-func (rf *ResultsForest) OnBlockFinalized(finalized *flow.Block) {
-	finalizedBlockID := finalized.ID()
-
+func (rf *ResultsForest) OnBlockFinalized(finalized *flow.Block) error {
 	rf.mu.Lock()
 	defer rf.mu.Unlock()
 
-	// avoid reprocessing blocks, otherwise we could revert a container's block status update.
+	// ignore duplicate events
 	if !rf.lastFinalizedView.Set(finalized.View) {
-		return
+		return nil
 	}
 
-	// Mark all sealed results as sealed and abandon all conflicting forks.
-	for _, seal := range finalized.Payload.Seals {
-		container, found := rf.getContainer(seal.ResultID)
-		if found {
-			rf.setSealed(container)
-
-			// abandon all conflicting forks
-			parentID, _ := container.Parent()
-			for sibling := range rf.iterateChildren(parentID) {
-				if sibling.ResultID() != container.ResultID() {
-					rf.abandonFork(sibling)
-				}
-			}
-		}
-	}
-
-	// Abandon all forks who's executed block conflicts with the new finalized block.
+	// abandon all forks who's executed block conflicts with the new finalized block. This is an
+	// optimization since all results for these conflicting results will eventually be abandoned
+	// when sealing catches up.
+	//
+	// Note: it is possible that there are no results in the forest for either/both the finalized
+	// block or its parent. That is OK since they will eventually be abandoned.
+	//
+	// Steps:
 	// 1. Iterate all results for the finalized block's parent
-	// 2. For each results' children
-	//   i. if its executed block is the finalized block, mark it as finalized
-	//   ii. abandon all other forks
+	// 2. For each of the results' children, mark the result as finalized if its executed block
+	//    matches the finalized block, otherwise, abandon the fork.
 	for container := range rf.iterateView(finalized.ParentView) {
 		for child := range rf.iterateChildren(container.ResultID()) {
-			if child.Result().BlockID == finalizedBlockID {
-				child.SetBlockStatus(BlockStatusFinalized)
+			if child.BlockView() == finalized.View {
+				container.SetBlockStatus(BlockStatusFinalized)
 			} else {
 				rf.abandonFork(child)
 			}
 		}
 	}
+
+	// the following logic guarantees the sealed result notifications are processed in ancestor
+	// first order, which is required by the forest to ensure the last sealed view invariant holds.
+	// However, the protocol does not guarantee an order for seals within a block, only that all
+	// seals within the block form a continuous chain extending from the seals in its ancestors.
+	// Therefore, we need to explicitly sort the seals by view before processing.
+
+	// 1. collect the containers pertaining to the seals
+	sealedContainers := make([]*ExecutionResultContainer, 0, len(finalized.Payload.Seals))
+	for _, seal := range finalized.Payload.Seals {
+		container, found := rf.getContainer(seal.ResultID)
+		if found {
+			sealedContainers = append(sealedContainers, container)
+		}
+	}
+
+	// 2. sort the containers by view in ascending order
+	sort.Slice(sealedContainers, func(i, j int) bool {
+		return sealedContainers[i].BlockView() < sealedContainers[j].BlockView()
+	})
+
+	// 3. process the seals -> mark the containers as sealed, update the last sealed view, and
+	// abandon all conflicting forks.
+	for _, container := range sealedContainers {
+		container.SetBlockStatus(BlockStatusSealed)
+		if !rf.updateLastSealed(container) {
+			if rf.rejectedResults {
+				// if results have been rejected, then it's expected some sealed results are missing.
+				// abort after the first failure since all subsequent results will also fail.
+				break
+			}
+			// otherwise, this is an invariant violation and the forest is in an inconsistent state.
+			return fmt.Errorf("failed to update last sealed view for result (%s): parent result not found in forest or is not sealed", container.ResultID())
+		}
+	}
+	return nil
 }
 
 // abandonFork recursively abandons a container and all its descendants.
@@ -618,15 +719,15 @@ func (rf *ResultsForest) processCompleted(resultID flow.Identifier) error {
 // This requires that there is a direct path from the container's result to an abandoned result
 // within the forest, otherwise the function cannot determine if the fork is abandoned and returns false.
 //
-// A container is known to be in an abandoned fork if:
+// A container is known to be on an abandoned fork if:
 //  1. its parent is abandoned
 //  2. one of its siblings is sealed
 //  3. its block conflicts with a finalized block
 //
 // In the case of 3, it is difficult to determine that the block conflicts without traversal.
 // However, one of the result's siblings will eventually be sealed, at which point this result
-// will be abandoned. Skipping the check here simplifies the logic, at the expense of some amount
-// of wasted work before the result is abandoned.
+// will be abandoned. Skipping the check here simplifies the logic, and forgoes the optimization
+// of abandoning the fork early.
 //
 // CAUTION: not concurrency safe! Caller must hold a lock.
 func (rf *ResultsForest) isAbandonedFork(container *ExecutionResultContainer) bool {
