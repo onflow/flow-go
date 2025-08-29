@@ -105,7 +105,7 @@ func TestOnEntityRequestFull(t *testing.T) {
 		retrieve)
 	require.NoError(t, err)
 
-	request := &messages.EntityRequest{
+	request := &flow.EntityRequest{
 		Nonce:     rand.Uint64(),
 		EntityIDs: []flow.Identifier{coll1.ID(), coll2.ID(), coll3.ID(), coll4.ID(), coll5.ID()},
 	}
@@ -199,7 +199,7 @@ func TestOnEntityRequestPartial(t *testing.T) {
 		retrieve)
 	require.NoError(t, err)
 
-	request := &messages.EntityRequest{
+	request := &flow.EntityRequest{
 		Nonce:     rand.Uint64(),
 		EntityIDs: []flow.Identifier{coll1.ID(), coll2.ID(), coll3.ID(), coll4.ID(), coll5.ID()},
 	}
@@ -288,7 +288,7 @@ func TestOnEntityRequestDuplicates(t *testing.T) {
 	require.NoError(t, err)
 
 	// create entity requests with some duplicate entity IDs
-	request := &messages.EntityRequest{
+	request := &flow.EntityRequest{
 		Nonce:     rand.Uint64(),
 		EntityIDs: []flow.Identifier{coll1.ID(), coll2.ID(), coll3.ID(), coll3.ID(), coll2.ID(), coll1.ID()},
 	}
@@ -366,7 +366,7 @@ func TestOnEntityRequestEmpty(t *testing.T) {
 		retrieve)
 	require.NoError(t, err)
 
-	request := &messages.EntityRequest{
+	request := &flow.EntityRequest{
 		Nonce:     rand.Uint64(),
 		EntityIDs: []flow.Identifier{coll1.ID(), coll2.ID(), coll3.ID(), coll4.ID(), coll5.ID()},
 	}
@@ -440,7 +440,7 @@ func TestOnEntityRequestInvalidOrigin(t *testing.T) {
 		retrieve)
 	require.NoError(t, err)
 
-	request := &messages.EntityRequest{
+	request := &flow.EntityRequest{
 		Nonce:     rand.Uint64(),
 		EntityIDs: []flow.Identifier{coll1.ID(), coll2.ID(), coll3.ID(), coll4.ID(), coll5.ID()},
 	}
