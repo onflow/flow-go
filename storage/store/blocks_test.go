@@ -33,7 +33,7 @@ func TestBlockStoreAndRetrieve(t *testing.T) {
 
 		retrieved, err := blocks.ByID(block.ID())
 		require.NoError(t, err)
-		require.Equal(t, &block, retrieved)
+		require.Equal(t, *block, *retrieved)
 
 		// repeated storage of the same block should return
 		lctx2 := lockManager.NewContext()
@@ -49,6 +49,6 @@ func TestBlockStoreAndRetrieve(t *testing.T) {
 		blocksAfterRestart := store.InitAll(cacheMetrics, db).Blocks
 		receivedAfterRestart, err := blocksAfterRestart.ByID(block.ID())
 		require.NoError(t, err)
-		require.Equal(t, &block, receivedAfterRestart)
+		require.Equal(t, *block, *receivedAfterRestart)
 	})
 }
