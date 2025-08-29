@@ -390,33 +390,6 @@ func (ss *SyncSuite) TestOnValidBlockResponse() {
 	ss.core.AssertExpectations(ss.T())
 }
 
-// TestOnInvalidBlockResponse verifies that the engine correctly handles a BlockResponse
-// containing an invalid block proposal that cannot be converted to a trusted proposal.
-func (ss *SyncSuite) TestOnInvalidBlockResponse() {
-	// generate origin and block response
-	originID := unittest.IdentifierFixture()
-
-	proposal := unittest.ProposalFixture()
-	proposal.ProposerSigData = nil // invalid value
-
-	req := &messages.BlockResponse{
-		Nonce:  0,
-		Blocks: []flow.UntrustedProposal{flow.UntrustedProposal(*proposal)},
-	}
-
-	// Expect metrics to track message receipt and message drop for invalid block proposal
-	ss.metrics.On("MessageReceived", metrics.EngineSynchronization, metrics.MessageBlockResponse).Once()
-	ss.metrics.On("InboundMessageDropped", metrics.EngineSynchronization, metrics.MessageBlockProposal).Once()
-
-	// Process the block response message through the engine
-	require.NoError(ss.T(), ss.e.Process(channels.SyncCommittee, originID, req))
-
-	// HandleBlock should NOT be called for invalid Proposal
-	ss.core.AssertNotCalled(ss.T(), "HandleBlock", mock.Anything)
-	// OnSyncedBlocks should NOT be called for invalid Proposal
-	ss.comp.AssertNotCalled(ss.T(), "onBlockResponse", mock.Anything)
-}
-
 func (ss *SyncSuite) TestPollHeight() {
 
 	// check that we send to three nodes from our total list

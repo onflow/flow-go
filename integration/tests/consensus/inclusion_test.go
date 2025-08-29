@@ -146,13 +146,11 @@ func (is *InclusionSuite) waitUntilSeenProposal(deadline time.Time) {
 		}
 
 		// we only care about block proposals at the moment
-		proposal, ok := msg.(*flow.UntrustedProposal)
+		proposal, ok := msg.(*flow.Proposal)
 		if !ok {
 			continue
 		}
-		proposalTrusted, err := flow.NewProposal(*proposal)
-		require.NoError(is.T(), err)
-		block := proposalTrusted.Block
+		block := proposal.Block
 
 		is.T().Logf("receive block proposal from %v, height %v", originID, block.Height)
 		// wait until proposal finalized
@@ -197,13 +195,11 @@ func (is *InclusionSuite) waitUntilCollectionIncludeInProposal(deadline time.Tim
 		}
 
 		// we only care about block proposals at the moment
-		proposal, ok := msg.(*flow.UntrustedProposal)
+		proposal, ok := msg.(*flow.Proposal)
 		if !ok {
 			continue
 		}
-		proposalTrusted, err := flow.NewProposal(*proposal)
-		require.NoError(is.T(), err)
-		block := proposalTrusted.Block
+		block := proposal.Block
 
 		guarantees := block.Payload.Guarantees
 		height := block.Height
@@ -242,13 +238,11 @@ func (is *InclusionSuite) waitUntilProposalConfirmed(deadline time.Time, sentine
 		}
 
 		// we only care about block proposals at the moment
-		proposal, ok := msg.(*flow.UntrustedProposal)
+		proposal, ok := msg.(*flow.Proposal)
 		if !ok {
 			continue
 		}
-		proposalTrusted, err := flow.NewProposal(*proposal)
-		require.NoError(is.T(), err)
-		nextBlock := proposalTrusted.Block
+		nextBlock := proposal.Block
 
 		// check if the proposal was already processed
 		proposalID := nextBlock.ID()
