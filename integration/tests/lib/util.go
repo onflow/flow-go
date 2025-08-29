@@ -53,11 +53,80 @@ var (
 	}
 )
 
+// TestFlowCallbackHandlerContract creates a test contract DSL for testing FlowCallbackScheduler
+func TestFlowCallbackHandlerContract(callbackScheduler sdk.Address, flowToken sdk.Address, fungibleToken sdk.Address) dsl.Contract {
+	return dsl.Contract{
+		Name: "TestFlowCallbackHandler",
+		Imports: []dsl.Import{
+			{
+				Names:   []string{"FlowCallbackScheduler"},
+				Address: callbackScheduler,
+			},
+			{
+				Names:   []string{"FlowToken"},
+				Address: flowToken,
+			},
+			{
+				Names:   []string{"FungibleToken"},
+				Address: fungibleToken,
+			},
+		},
+		Members: []dsl.CadenceCode{
+			dsl.Code(`
+				access(all) var scheduledCallbacks: {UInt64: FlowCallbackScheduler.ScheduledCallback}
+				access(all) var executedCallbacks: [UInt64]
+
+				access(all) let HandlerStoragePath: StoragePath
+				access(all) let HandlerPublicPath: PublicPath
+				
+				access(all) resource Handler: FlowCallbackScheduler.CallbackHandler {
+					
+					access(FlowCallbackScheduler.Execute) 
+					fun executeCallback(id: UInt64, data: AnyStruct?) {
+						TestFlowCallbackHandler.executedCallbacks.append(id)
+					}
+				}
+
+				access(all) fun createHandler(): @Handler {
+					return <- create Handler()
+				}
+
+				access(all) fun addScheduledCallback(callback: FlowCallbackScheduler.ScheduledCallback) {
+					self.scheduledCallbacks[callback.id] = callback
+				}
+
+				access(all) fun cancelCallback(id: UInt64): @FlowToken.Vault {
+					let callback = self.scheduledCallbacks[id]
+						?? panic("Invalid ID: \(id) callback not found")
+					self.scheduledCallbacks[id] = nil
+					return <-FlowCallbackScheduler.cancel(callback: callback)
+				}
+
+				access(all) fun getExecutedCallbacks(): [UInt64] {
+					return self.executedCallbacks
+				}
+
+				access(all) init() {
+					self.scheduledCallbacks = {}
+					self.executedCallbacks = []
+
+					self.HandlerStoragePath = /storage/testCallbackHandler
+					self.HandlerPublicPath = /public/testCallbackHandler
+				}
+			`),
+		},
+	}
+}
+
 // CreateCounterTx is a transaction script for creating an instance of the counter in the account storage of the
 // authorizing account NOTE: the counter contract must be deployed first
 func CreateCounterTx(counterAddress sdk.Address) dsl.Transaction {
 	return dsl.Transaction{
-		Import: dsl.Import{Address: counterAddress},
+		Imports: dsl.Imports{
+			dsl.Import{
+				Address: counterAddress,
+			},
+		},
 		Content: dsl.Prepare{
 			Content: dsl.Code(fmt.Sprintf(
 				`
@@ -104,7 +173,11 @@ func ReadCounterScript(contractAddress sdk.Address, accountAddress sdk.Address) 
 // contract must be deployed first
 func CreateCounterPanicTx(chain flow.Chain) dsl.Transaction {
 	return dsl.Transaction{
-		Import: dsl.Import{Address: sdk.Address(chain.ServiceAddress())},
+		Imports: dsl.Imports{
+			dsl.Import{
+				Address: sdk.Address(chain.ServiceAddress()),
+			},
+		},
 		Content: dsl.Prepare{
 			Content: dsl.Code(`
 				var maybeCounter <- signer.storage.load<@Testing.Counter>(from: /storage/counter)
