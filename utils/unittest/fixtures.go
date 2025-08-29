@@ -244,8 +244,30 @@ func ProposalFixture() *flow.Proposal {
 	return ProposalFromBlock(BlockFixture())
 }
 
+func BlockResponseFixture(count int) *flow.BlockResponse {
+	blocks := make([]flow.Proposal, count)
+	for i := 0; i < count; i++ {
+		blocks[i] = *ProposalFixture()
+	}
+	return &flow.BlockResponse{
+		Nonce:  rand.Uint64(),
+		Blocks: blocks,
+	}
+}
+
 func ClusterProposalFixture() *cluster.Proposal {
 	return ClusterProposalFromBlock(ClusterBlockFixture())
+}
+
+func ClusterBlockResponseFixture(count int) *cluster.BlockResponse {
+	blocks := make([]cluster.Proposal, count)
+	for i := 0; i < count; i++ {
+		blocks[i] = *ClusterProposalFixture()
+	}
+	return &cluster.BlockResponse{
+		Nonce:  rand.Uint64(),
+		Blocks: blocks,
+	}
 }
 
 func ProposalHeaderFromHeader(header *flow.Header) *flow.ProposalHeader {
