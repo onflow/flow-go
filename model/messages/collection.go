@@ -1,8 +1,25 @@
 package messages
 
 import (
+	"fmt"
+
+	"github.com/onflow/flow-go/model/cluster"
 	"github.com/onflow/flow-go/model/flow"
 )
+
+// ClusterProposal is a signed cluster block proposal in collection node cluster consensus.
+type ClusterProposal cluster.UntrustedProposal
+
+// ToInternal returns the internal type representation for ClusterProposal.
+//
+// All errors indicate that the decode target contains a structurally invalid representation of the internal cluster.Proposal.
+func (p *ClusterProposal) ToInternal() (any, error) {
+	internal, err := cluster.NewProposal(cluster.UntrustedProposal(*p))
+	if err != nil {
+		return nil, fmt.Errorf("could not convert %T to internal type: %w", p, err)
+	}
+	return internal, nil
+}
 
 // CollectionRequest request all transactions from a collection with the given
 // fingerprint.
