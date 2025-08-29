@@ -401,6 +401,7 @@ func prepareVerificationService(container testnet.ContainerConfig, i int, n int)
 
 	service.Command = append(service.Command,
 		"--chunk-alpha=1",
+		"--scheduled-callbacks-enabled=true",
 	)
 
 	return service
@@ -440,6 +441,7 @@ func prepareExecutionService(container testnet.ContainerConfig, i int, n int) Se
 		"--chunk-data-pack-dir=/data/chunk-data-pack",
 		"--pruning-config-threshold=20",
 		"--pruning-config-sleep-after-iteration=1m",
+		"--scheduled-callbacks-enabled=true",
 	)
 
 	service.Volumes = append(service.Volumes,
