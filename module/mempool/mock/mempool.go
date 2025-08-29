@@ -166,6 +166,26 @@ func (_m *Mempool[K, V]) Size() uint {
 	return r0
 }
 
+// Values provides a mock function with no fields
+func (_m *Mempool[K, V]) Values() []V {
+	ret := _m.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for Values")
+	}
+
+	var r0 []V
+	if rf, ok := ret.Get(0).(func() []V); ok {
+		r0 = rf()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]V)
+		}
+	}
+
+	return r0
+}
+
 // NewMempool creates a new instance of Mempool. It also registers a testing interface on the mock and a cleanup function to assert the mocks expectations.
 // The first argument is typically a *testing.T value.
 func NewMempool[K comparable, V interface{}](t interface {

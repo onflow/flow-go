@@ -22,6 +22,8 @@ type Mempool[K comparable, V any] interface {
 	Adjust(key K, f func(V) V) (V, bool)
 	// Size will return the size of the mempool.
 	Size() uint
+	// Values returns all stored values from the mempool.
+	Values() []V
 	// All returns all stored key-value pairs as a map from the mempool.
 	All() map[K]V
 	// Clear removes all key-value pairs from the mempool.

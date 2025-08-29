@@ -51,6 +51,7 @@ import (
 	"github.com/onflow/flow-go/module/mempool/herocache"
 	"github.com/onflow/flow-go/module/mempool/queue"
 	"github.com/onflow/flow-go/module/metrics"
+	"github.com/onflow/flow-go/module/updatable_configs"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/state/protocol"
 	badgerState "github.com/onflow/flow-go/state/protocol/badger"
@@ -73,6 +74,7 @@ func main() {
 		builderPayerRateLimitDryRun       bool
 		builderPayerRateLimit             float64
 		builderUnlimitedPayers            []string
+		builderPriorityPayers             []string
 		hotstuffMinTimeout                time.Duration
 		hotstuffTimeoutAdjustmentFactor   float64
 		hotstuffHappyPathMaxRoundFailures uint64
@@ -100,15 +102,16 @@ func main() {
 		err                   error
 
 		// epoch qc contract client
-		machineAccountInfo *bootstrap.NodeMachineAccountInfo
-		flowClientConfigs  []*grpcclient.FlowClientConfig
-		insecureAccessAPI  bool
-		accessNodeIDS      []string
-		apiRatelimits      map[string]int
-		apiBurstlimits     map[string]int
-		txRatelimits       float64
-		txBurstlimits      int
-		txRatelimitPayers  string
+		machineAccountInfo                  *bootstrap.NodeMachineAccountInfo
+		flowClientConfigs                   []*grpcclient.FlowClientConfig
+		insecureAccessAPI                   bool
+		accessNodeIDS                       []string
+		apiRatelimits                       map[string]int
+		apiBurstlimits                      map[string]int
+		txRatelimits                        float64
+		txBurstlimits                       int
+		txRatelimitPayers                   string
+		bySealingLagRateLimiterConfigGetter module.ReadonlySealingLagRateLimiterConfig
 	)
 	var deprecatedFlagBlockRateDelay time.Duration
 
@@ -142,6 +145,8 @@ func main() {
 			"rate limit for each payer (transactions/collection)")
 		flags.StringSliceVar(&builderUnlimitedPayers, "builder-unlimited-payers", []string{}, // no unlimited payers
 			"set of payer addresses which are omitted from rate limiting")
+		flags.StringSliceVar(&builderPriorityPayers, "builder-priority-payers", []string{}, // no priority payers
+			"set of payer addresses which are prioritized in tx selection algorithm")
 		flags.UintVar(&maxCollectionSize, "builder-max-collection-size", flow.DefaultMaxCollectionSize,
 			"maximum number of transactions in proposed collections")
 		flags.Uint64Var(&maxCollectionByteSize, "builder-max-collection-byte-size", flow.DefaultMaxCollectionByteSize,
@@ -292,6 +297,43 @@ func main() {
 				return fmt.Errorf("failed to prepare flow client connection configs for each access node id %w", err)
 			}
 
+			return nil
+		}).
+		Module("updatable collection rate limiting config", func(node *cmd.NodeConfig) error {
+			setter := updatable_configs.DefaultBySealingLagRateLimiterConfigs()
+
+			// update the getter with the setter, so other modules can only get, but not set
+			bySealingLagRateLimiterConfigGetter = setter
+
+			// admin tool is the only instance that have access to the setter interface, therefore, is
+			// the only module can change this config
+			err = node.ConfigManager.RegisterUintConfig("collection-builder-rate-limiter-min-sealing-lag",
+				setter.MinSealingLag,
+				setter.SetMinSealingLag)
+			if err != nil {
+				return err
+			}
+			err = node.ConfigManager.RegisterUintConfig("collection-builder-rate-limiter-max-sealing-lag",
+				setter.MaxSealingLag,
+				setter.SetMaxSealingLag)
+			if err != nil {
+				return err
+			}
+			err = node.ConfigManager.RegisterUintConfig("collection-builder-rate-limiter-halving-interval",
+				setter.HalvingInterval,
+				setter.SetHalvingInterval)
+			if err != nil {
+				return err
+			}
+			err = node.ConfigManager.RegisterUintConfig("collection-builder-rate-limiter-min-collection-size",
+				setter.MinCollectionSize,
+				setter.SetMinCollectionSize)
+			if err != nil {
+				return err
+			}
+
+			// report the initial config value
+			colMetrics.CollectionMaxSize(maxCollectionSize)
 			return nil
 		}).
 		Component("machine account config validator", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
@@ -501,6 +543,13 @@ func main() {
 				unlimitedPayers = append(unlimitedPayers, payerAddr)
 			}
 
+			// convert hex string flag values to addresses
+			priorityPayers := make([]flow.Address, 0, len(builderPriorityPayers))
+			for _, payerStr := range builderPriorityPayers {
+				payerAddr := flow.HexToAddress(payerStr)
+				priorityPayers = append(priorityPayers, payerAddr)
+			}
+
 			builderFactory, err := factories.NewBuilderFactory(
 				node.DB,
 				node.State,
@@ -509,6 +558,7 @@ func main() {
 				colMetrics,
 				push,
 				node.Logger,
+				bySealingLagRateLimiterConfigGetter,
 				builder.WithMaxCollectionSize(maxCollectionSize),
 				builder.WithMaxCollectionByteSize(maxCollectionByteSize),
 				builder.WithMaxCollectionTotalGas(maxCollectionTotalGas),
@@ -516,6 +566,7 @@ func main() {
 				builder.WithRateLimitDryRun(builderPayerRateLimitDryRun),
 				builder.WithMaxPayerTransactionRate(builderPayerRateLimit),
 				builder.WithUnlimitedPayers(unlimitedPayers...),
+				builder.WithPriorityPayers(priorityPayers...),
 			)
 			if err != nil {
 				return nil, err

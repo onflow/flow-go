@@ -14,6 +14,7 @@ type CollectionCollector struct {
 	tracer               module.Tracer
 	transactionsIngested prometheus.Counter       // tracks the number of ingested transactions
 	finalizedHeight      *prometheus.GaugeVec     // tracks the finalized height
+	maxCollectionSize    prometheus.Gauge         // tracks the maximum collection size
 	proposals            *prometheus.HistogramVec // tracks the number/size of PROPOSED collections
 	guarantees           *prometheus.HistogramVec // counts the number/size of FINALIZED collections
 }
@@ -37,6 +38,13 @@ func NewCollectionCollector(tracer module.Tracer) *CollectionCollector {
 			Name:      "finalized_height",
 			Help:      "tracks the latest finalized height",
 		}, []string{LabelChain}),
+
+		maxCollectionSize: promauto.NewGauge(prometheus.GaugeOpts{
+			Namespace: namespaceCollection,
+			Subsystem: subsystemProposal,
+			Name:      "max_collection_size",
+			Help:      "last used max collection size",
+		}),
 
 		proposals: promauto.NewHistogramVec(prometheus.HistogramOpts{
 			Namespace: namespaceCollection,
@@ -88,4 +96,9 @@ func (cc *CollectionCollector) ClusterBlockFinalized(block *cluster.Block) {
 			LabelChain: chainID.String(),
 		}).
 		Observe(float64(collection.Len()))
+}
+
+// CollectionMaxSize measures the current maximum size of a collection.
+func (cc *CollectionCollector) CollectionMaxSize(size uint) {
+	cc.maxCollectionSize.Set(float64(size))
 }
