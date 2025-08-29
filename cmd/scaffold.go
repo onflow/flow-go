@@ -1269,7 +1269,8 @@ func (fnb *FlowNodeBuilder) initStorage() error {
 	}
 
 	headers := bstorage.NewHeaders(fnb.Metrics.Cache, fnb.DB)
-	guarantees := bstorage.NewGuarantees(fnb.Metrics.Cache, fnb.DB, fnb.BaseConfig.guaranteesCacheSize)
+	guarantees := bstorage.NewGuarantees(fnb.Metrics.Cache, fnb.DB,
+		fnb.BaseConfig.guaranteesCacheSize, bstorage.DefaultCacheSize)
 	seals := bstorage.NewSeals(fnb.Metrics.Cache, fnb.DB)
 	results := bstorage.NewExecutionResults(fnb.Metrics.Cache, fnb.DB)
 	receipts := bstorage.NewExecutionReceipts(fnb.Metrics.Cache, fnb.DB, results, fnb.BaseConfig.receiptsCacheSize)
@@ -1460,9 +1461,9 @@ func (fnb *FlowNodeBuilder) initState() error {
 			Hex("root_result_id", logging.Entity(fnb.RootResult)).
 			Hex("root_state_commitment", fnb.RootSeal.FinalState[:]).
 			Hex("finalized_root_block_id", logging.Entity(fnb.FinalizedRootBlock)).
-			Uint64("finalized_root_block_height", fnb.FinalizedRootBlock.Header.Height).
+			Uint64("finalized_root_block_height", fnb.FinalizedRootBlock.Height).
 			Hex("sealed_root_block_id", logging.Entity(fnb.SealedRootBlock)).
-			Uint64("sealed_root_block_height", fnb.SealedRootBlock.Header.Height).
+			Uint64("sealed_root_block_height", fnb.SealedRootBlock.Height).
 			Msg("protocol state bootstrapped")
 	}
 
@@ -1490,9 +1491,9 @@ func (fnb *FlowNodeBuilder) initState() error {
 		Hex("last_sealed_block_id", logging.Entity(lastSealed)).
 		Uint64("last_sealed_block_height", lastSealed.Height).
 		Hex("finalized_root_block_id", logging.Entity(fnb.FinalizedRootBlock)).
-		Uint64("finalized_root_block_height", fnb.FinalizedRootBlock.Header.Height).
+		Uint64("finalized_root_block_height", fnb.FinalizedRootBlock.Height).
 		Hex("sealed_root_block_id", logging.Entity(fnb.SealedRootBlock)).
-		Uint64("sealed_root_block_height", fnb.SealedRootBlock.Header.Height).
+		Uint64("sealed_root_block_height", fnb.SealedRootBlock.Height).
 		Msg("successfully opened protocol state")
 
 	return nil
@@ -1535,7 +1536,7 @@ func (fnb *FlowNodeBuilder) setRootSnapshot(rootSnapshot protocol.Snapshot) erro
 		return fmt.Errorf("failed to read root QC: %w", err)
 	}
 
-	fnb.RootChainID = fnb.FinalizedRootBlock.Header.ChainID
+	fnb.RootChainID = fnb.FinalizedRootBlock.ChainID
 	fnb.SporkID = fnb.RootSnapshot.Params().SporkID()
 
 	return nil

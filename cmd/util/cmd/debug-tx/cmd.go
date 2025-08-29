@@ -307,17 +307,17 @@ func runTransaction(
 
 	log.Info().Msgf("Debugging transaction %s ...", tx.ID())
 
-	txBody := flow.NewTransactionBody().
+	txBodyBuilder := flow.NewTransactionBodyBuilder().
 		SetScript(tx.Script).
 		SetComputeLimit(flagComputeLimit).
 		SetPayer(flow.Address(tx.Payer))
 
 	for _, argument := range tx.Arguments {
-		txBody.AddArgument(argument)
+		txBodyBuilder.AddArgument(argument)
 	}
 
 	for _, authorizer := range tx.Authorizers {
-		txBody.AddAuthorizer(flow.Address(authorizer))
+		txBodyBuilder.AddAuthorizer(flow.Address(authorizer))
 	}
 
 	proposalKeySequenceNumber := tx.ProposalKey.SequenceNumber
@@ -325,11 +325,16 @@ func runTransaction(
 		proposalKeySequenceNumber = flagProposalKeySeq
 	}
 
-	txBody.SetProposalKey(
+	txBodyBuilder.SetProposalKey(
 		flow.Address(tx.ProposalKey.Address),
 		tx.ProposalKey.KeyIndex,
 		proposalKeySequenceNumber,
 	)
+
+	txBody, err := txBodyBuilder.Build()
+	if err != nil {
+		log.Fatal().Err(err).Msg("Failed to build transaction body")
+	}
 
 	resultSnapshot, txErr, processErr := debugger.RunTransaction(
 		txBody,

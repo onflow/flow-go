@@ -166,7 +166,6 @@ generate-fvm-env-wrappers:
 .PHONY: generate-mocks
 generate-mocks: install-mock-generators
 	mockery --name '(Connector|PingInfoProvider)' --dir=network/p2p --case=underscore --output="./network/mocknetwork" --outpkg="mocknetwork"
-	CGO_CFLAGS=$(CRYPTO_FLAG) mockgen -destination=storage/mocks/storage.go -package=mocks github.com/onflow/flow-go/storage Blocks,Headers,Payloads,Collections,Commits,Events,ServiceEvents,TransactionResults
 	CGO_CFLAGS=$(CRYPTO_FLAG) mockgen -destination=network/mocknetwork/mock_network.go -package=mocknetwork github.com/onflow/flow-go/network EngineRegistry
 	mockery --name=ExecutionDataStore --dir=module/executiondatasync/execution_data --case=underscore --output="./module/executiondatasync/execution_data/mock" --outpkg="mock"
 	mockery --name=Downloader --dir=module/executiondatasync/execution_data --case=underscore --output="./module/executiondatasync/execution_data/mock" --outpkg="mock"
@@ -262,12 +261,12 @@ tools/custom-gcl: tools/structwrite .custom-gcl.yml
 .PHONY: lint
 lint: tidy tools/custom-gcl
 	# revive -config revive.toml -exclude storage/ledger/trie ./...
-	./tools/custom-gcl run -v ./...
+	./tools/custom-gcl run -v $(or $(LINT_PATH),./...)
 
 .PHONY: fix-lint
 fix-lint:
 	# revive -config revive.toml -exclude storage/ledger/trie ./...
-	./tools/custom-gcl run -v --fix ./...
+	./tools/custom-gcl run -v --fix $(or $(LINT_PATH),./...)
 
 # Runs unit tests with different list of packages as passed by CI so they run in parallel
 .PHONY: ci

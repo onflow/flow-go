@@ -26,7 +26,7 @@ func TestCollections(t *testing.T) {
 		expected := unittest.CollectionFixture(3).Light()
 
 		// store the light collection and the transaction index
-		err := collections.StoreLightAndIndexByTransaction(&expected)
+		err := collections.StoreLightAndIndexByTransaction(expected)
 		require.NoError(t, err)
 
 		// retrieve the light collection by collection id
@@ -34,7 +34,7 @@ func TestCollections(t *testing.T) {
 		require.NoError(t, err)
 
 		// check if the light collection was indeed persisted
-		assert.Equal(t, &expected, actual)
+		assert.Equal(t, expected, actual)
 
 		expectedID := expected.ID()
 
@@ -85,18 +85,18 @@ func TestCollections_IndexDuplicateTx(t *testing.T) {
 
 		// insert col1
 		col1Light := col1.Light()
-		err := collections.StoreLightAndIndexByTransaction(&col1Light)
+		err := collections.StoreLightAndIndexByTransaction(col1Light)
 		require.NoError(t, err)
 
 		// insert col2
 		col2Light := col2.Light()
-		err = collections.StoreLightAndIndexByTransaction(&col2Light)
+		err = collections.StoreLightAndIndexByTransaction(col2Light)
 		require.NoError(t, err)
 
 		// should be able to retrieve col2 by ID
 		gotLightByCol2ID, err := collections.LightByID(col2.ID())
 		require.NoError(t, err)
-		assert.Equal(t, &col2Light, gotLightByCol2ID)
+		assert.Equal(t, col2Light, gotLightByCol2ID)
 
 		// should be able to retrieve col2 by the transaction which only appears in col2
 		_, err = collections.LightByTransactionID(col2Tx.ID())
@@ -106,7 +106,7 @@ func TestCollections_IndexDuplicateTx(t *testing.T) {
 		// since col1 is the first collection to be indexed by the shared transaction (dupTx)
 		gotLightByDupTxID, err := collections.LightByTransactionID(dupTx.ID())
 		require.NoError(t, err)
-		assert.Equal(t, &col1Light, gotLightByDupTxID)
+		assert.Equal(t, col1Light, gotLightByDupTxID)
 	})
 }
 
@@ -138,7 +138,7 @@ func TestCollections_ConcurrentIndexByTx(t *testing.T) {
 				col := unittest.CollectionFixture(1)
 				col.Transactions[0] = sharedTx // Ensure it shares the same transaction
 				light := col.Light()
-				err := collections.StoreLightAndIndexByTransaction(&light)
+				err := collections.StoreLightAndIndexByTransaction(light)
 				errChan <- err
 			}
 		}()
@@ -151,7 +151,7 @@ func TestCollections_ConcurrentIndexByTx(t *testing.T) {
 				col := unittest.CollectionFixture(1)
 				col.Transactions[0] = sharedTx // Ensure it shares the same transaction
 				light := col.Light()
-				err := collections.StoreLightAndIndexByTransaction(&light)
+				err := collections.StoreLightAndIndexByTransaction(light)
 				errChan <- err
 			}
 		}()

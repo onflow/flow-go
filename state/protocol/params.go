@@ -50,4 +50,10 @@ type GlobalParams interface {
 	// If node uses a sealing segment for bootstrapping then this value will be carried over
 	// as part of snapshot.
 	SporkRootBlockHeight() uint64
+
+	// SporkRootBlockView returns the view of the spork's root block.
+	// This value is determined at the beginning of a spork during bootstrapping.
+	// If node uses a sealing segment for bootstrapping then this value will be carried over
+	// as part of snapshot.
+	SporkRootBlockView() uint64
 }

@@ -17,23 +17,23 @@ access(all) contract EventContract {
 }
 `
 
-func DeployEventContractTransaction(authorizer flow.Address, chain flow.Chain, eventValue int) *flow.TransactionBody {
+func DeployEventContractTransaction(authorizer flow.Address, chain flow.Chain, eventValue int) *flow.TransactionBodyBuilder {
 	contract := fmt.Sprintf(EventContract, eventValue)
 	return CreateContractDeploymentTransaction("EventContract", contract, authorizer, chain)
 }
 
-func UnauthorizedDeployEventContractTransaction(authorizer flow.Address, chain flow.Chain, eventValue int) *flow.TransactionBody {
+func UnauthorizedDeployEventContractTransaction(authorizer flow.Address, chain flow.Chain, eventValue int) *flow.TransactionBodyBuilder {
 	contract := fmt.Sprintf(EventContract, eventValue)
 	return CreateUnauthorizedContractDeploymentTransaction("EventContract", contract, authorizer)
 }
 
-func UpdateEventContractTransaction(authorizer flow.Address, chain flow.Chain, eventValue int) *flow.TransactionBody {
+func UpdateEventContractTransaction(authorizer flow.Address, chain flow.Chain, eventValue int) *flow.TransactionBodyBuilder {
 	contract := fmt.Sprintf(EventContract, eventValue)
 	return UpdateContractDeploymentTransaction("EventContract", contract, authorizer, chain)
 }
 
-func CreateEmitEventTransaction(contractAccount, signer flow.Address) *flow.TransactionBody {
-	return flow.NewTransactionBody().
+func CreateEmitEventTransaction(contractAccount, signer flow.Address) *flow.TransactionBodyBuilder {
+	return flow.NewTransactionBodyBuilder().
 		SetScript([]byte(fmt.Sprintf(`
 			import EventContract from 0x%s
 
