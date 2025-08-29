@@ -146,7 +146,4 @@ func (p *Proposal) ProposalHeader() *flow.ProposalHeader {
 // BlockResponse is the same as flow.BlockResponse, but for cluster
 // consensus. It contains a list of structurally validated cluster block proposals
 // that should correspond to the request.
-type BlockResponse struct {
-	Nonce  uint64
-	Blocks []Proposal
-}
+type BlockResponse flow.GenericBlockResponse[Proposal]

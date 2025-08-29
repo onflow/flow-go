@@ -213,13 +213,18 @@ func (b *Proposal) ProposalHeader() *ProposalHeader {
 	return &ProposalHeader{Header: b.Block.ToHeader(), ProposerSigData: b.ProposerSigData}
 }
 
-// BlockResponse is part of the synchronization protocol and represents the
-// reply to any active synchronization attempts. It contains a list of structurally validated block proposals
-// that should correspond to the request.
-type BlockResponse struct {
+// GenericBlockResponse is part of the synchronization protocol and represents the
+// reply to any active synchronization attempts. It is a generic container that
+// holds a list of structurally validated blocks of type T, which should
+// correspond to the synchronization request.
+type GenericBlockResponse[T any] struct {
 	Nonce  uint64
-	Blocks []Proposal
+	Blocks []T
 }
+
+// BlockResponse is a specialization of GenericBlockResponse for Proposal blocks.
+// It is used as the concrete response type for block synchronization requests.
+type BlockResponse GenericBlockResponse[Proposal]
 
 // CertifiedBlock holds a certified block, which is a block and a Quorum Certificate [QC] pointing
 // to the block. A QC is the aggregated form of votes from a supermajority of HotStuff and therefore
