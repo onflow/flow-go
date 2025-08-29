@@ -25,6 +25,10 @@ type ReaderBatchWriter struct {
 
 	// for repreventing re-entrant deadlock
 	locks *operation.BatchLocks
+
+	// values store value for this batch.
+	// NOTE: b.values is only initialized when needed.
+	values map[string]any
 }
 
 var _ storage.ReaderBatchWriter = (*ReaderBatchWriter)(nil)
@@ -160,4 +164,19 @@ func (b *ReaderBatchWriter) DeleteByRange(globalReader storage.Reader, startPref
 		}
 		return nil
 	})
+}
+
+func (b *ReaderBatchWriter) SetValue(key string, value any) {
+	if value == nil {
+		delete(b.values, key)
+		return
+	}
+	if b.values == nil {
+		b.values = make(map[string]any)
+	}
+	b.values[key] = value
+}
+
+func (b *ReaderBatchWriter) Value(key string) any {
+	return b.values[key]
 }
