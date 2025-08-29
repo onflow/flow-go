@@ -40,7 +40,7 @@ func TestProviderEngine_onChunkDataRequest(t *testing.T) {
 
 		chunkID := unittest.IdentifierFixture()
 
-		req := &messages.ChunkDataRequest{
+		req := &flow.ChunkDataRequest{
 			ChunkID: chunkID,
 			Nonce:   rand.Uint64(),
 		}
@@ -89,7 +89,7 @@ func TestProviderEngine_onChunkDataRequest(t *testing.T) {
 
 		es.On("ChunkDataPackByChunkID", chunkID).Return(chunkDataPack, nil)
 
-		req := &messages.ChunkDataRequest{
+		req := &flow.ChunkDataRequest{
 			ChunkID: chunkID,
 			Nonce:   rand.Uint64(),
 		}

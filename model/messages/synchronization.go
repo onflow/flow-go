@@ -53,21 +53,13 @@ func (s *SyncResponse) ToInternal() (any, error) {
 // heights.
 // All RangeRequest messages are validated before being processed. If validation fails, then a misbehavior report is created.
 // See synchronization.validateRangeRequestForALSP for more details.
-type RangeRequest struct {
-	Nonce      uint64
-	FromHeight uint64
-	ToHeight   uint64
-}
+type RangeRequest flow.RangeRequest
 
-// ToInternal converts the untrusted RangeRequest into its trusted internal
-// representation.
+// ToInternal returns the internal type representation for RangeRequest.
 //
-// This stub returns the receiver unchanged. A proper implementation
-// must perform validation checks and return a constructed internal
-// object.
+// All errors indicate that the decode target contains a structurally invalid representation of the internal flow.RangeRequest.
 func (r *RangeRequest) ToInternal() (any, error) {
-	// TODO(malleability, #7707) implement with validation checks
-	return r, nil
+	return (*flow.RangeRequest)(r), nil
 }
 
 // BatchRequest is part of the synchronization protocol and represents an active

@@ -125,7 +125,7 @@ func (r *RequestHandler) setupRequestMessageHandler() {
 		},
 		engine.Pattern{
 			Match: func(msg *engine.Message) bool {
-				_, ok := msg.Payload.(*messages.RangeRequest)
+				_, ok := msg.Payload.(*flow.RangeRequest)
 				if ok {
 					r.metrics.MessageReceived(metrics.EngineSynchronization, metrics.MessageRangeRequest)
 				}
@@ -187,7 +187,7 @@ func (r *RequestHandler) onSyncRequest(originID flow.Identifier, req *messages.S
 
 // onRangeRequest processes a request for a range of blocks by height.
 // No errors are expected during normal operation.
-func (r *RequestHandler) onRangeRequest(originID flow.Identifier, req *messages.RangeRequest) error {
+func (r *RequestHandler) onRangeRequest(originID flow.Identifier, req *flow.RangeRequest) error {
 	logger := r.log.With().Str("origin_id", originID.String()).Logger()
 	logger.Debug().Msg("received new range request")
 
@@ -351,7 +351,7 @@ func (r *RequestHandler) processAvailableRequests(ctx context.Context) error {
 
 		msg, ok = r.pendingRangeRequests.Get()
 		if ok {
-			err := r.onRangeRequest(msg.OriginID, msg.Payload.(*messages.RangeRequest))
+			err := r.onRangeRequest(msg.OriginID, msg.Payload.(*flow.RangeRequest))
 			if err != nil {
 				return fmt.Errorf("processing range request failed: %w", err)
 			}

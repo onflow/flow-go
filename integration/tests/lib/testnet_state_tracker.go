@@ -10,7 +10,6 @@ import (
 
 	"github.com/onflow/flow-go/engine/ghost/client"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/model/messages"
 )
 
 type TestnetStateTracker struct {
@@ -112,7 +111,7 @@ func (tst *TestnetStateTracker) Track(t *testing.T, ctx context.Context, ghost *
 					finalState,
 					m.ExecutionResult.ID(),
 					len(m.ExecutionResult.Chunks))
-			case *messages.ChunkDataResponse:
+			case *flow.ChunkDataResponse:
 				// consuming this explicitly to avoid logging full msg which is usually very large because of proof
 				t.Logf("%x chunk data pack received from %x\n",
 					m.ChunkDataPack.ChunkID,

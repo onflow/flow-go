@@ -841,9 +841,13 @@ func (suite *NetworkTestSuite) TestLargeMessageSize_SendDirect() {
 			require.True(suite.T(), ok)
 			require.Equal(suite.T(), suite.ids[sourceIndex].NodeID, msgOriginID) // sender id
 
-			msgPayload, ok := args[2].(*messages.ChunkDataResponse)
+			msgPayload, ok := args[2].(*flow.ChunkDataResponse)
 			require.True(suite.T(), ok)
-			require.Equal(suite.T(), event, msgPayload) // payload
+
+			internal, err := event.ToInternal()
+			require.NoError(suite.T(), err)
+
+			require.Equal(suite.T(), internal, msgPayload) // payload
 		}).Return(nil).Once()
 
 	// sends a direct message from source node to the target node
@@ -950,7 +954,7 @@ func TestChunkDataPackMaxMessageSize(t *testing.T) {
 		flow.IdentifierList{unittest.IdentifierFixture()},
 		channels.TopicFromChannel(channels.ProvideChunks, unittest.IdentifierFixture()),
 		&messages.ChunkDataResponse{
-			ChunkDataPack: *unittest.ChunkDataPackFixture(unittest.IdentifierFixture()),
+			ChunkDataPack: (flow.UntrustedChunkDataPack)(*unittest.ChunkDataPackFixture(unittest.IdentifierFixture())),
 			Nonce:         rand.Uint64(),
 		},
 		unittest.NetworkCodec().Encode,
