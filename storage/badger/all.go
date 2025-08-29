@@ -9,6 +9,7 @@ import (
 	"github.com/onflow/flow-go/storage/store"
 )
 
+// deprecated
 func InitAll(metrics module.CacheMetrics, db *badger.DB) *storage.All {
 	sdb := badgerimpl.ToDB(db)
 	headers := store.NewHeaders(metrics, sdb)

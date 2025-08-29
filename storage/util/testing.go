@@ -5,19 +5,15 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/dgraph-io/badger/v2"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/storage"
-	"github.com/onflow/flow-go/storage/operation/badgerimpl"
 	"github.com/onflow/flow-go/storage/store"
 )
 
-func ExecutionStorageLayer(_ testing.TB, bdb *badger.DB) *storage.Execution {
+func ExecutionStorageLayer(_ testing.TB, db storage.DB) *storage.Execution {
 	metrics := metrics.NewNoopCollector()
-
-	db := badgerimpl.ToDB(bdb)
 
 	results := store.NewExecutionResults(metrics, db)
 	receipts := store.NewExecutionReceipts(metrics, db, results, store.DefaultCacheSize)
