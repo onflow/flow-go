@@ -222,8 +222,9 @@ var (
 //   - Since results for finalized blocks are not guaranteed by the protocol to exist before sealing,
 //     the process used to guarantee a fully connected chain from 𝓹 to 𝓼 is not possible for finalized
 //     results.
-//   - Given this, the forest does not make any guarantees about the connectedness of finalized results,
-//     except that a result for the finalized block will eventually processed once
+//   - Given this, the forest does not make any guarantees about the connectedness of finalized results.
+//   - Since finalized blocks are guaranteed by the protocol to eventually be executed (except in rare
+//     cases involving sporks), a result for the finalized block will eventually be sealed.
 //
 // Safe for concurrent access. Internally, the mempool utilizes the LevelledForrest.
 type ResultsForest struct {
@@ -282,8 +283,15 @@ func NewResultsForest(
 	}, nil
 }
 
-// ResetLowestRejectedView resets the rejected results flag, and returns the last sealed view processed
-// by the forest. If no results have been rejected since the last call, false is returned.
+// ResetLowestRejectedView returns the last sealed view processed by the forest, and resets the
+// rejected flag. If no results have been rejected since the last call, false is returned.
+//
+// This is used by higher-level business logic to implement the backfill process. The caller should:
+//   - Call `ResetLowestRejectedView` to get the last sealed view processed by the forest.
+//   - If false is returned, no results have been rejected so the forest is up to date with all
+//     previously submitted results.
+//   - Otherwise, the caller should resubmit all sealed results from the returned view up to and
+//     including the latest sealed result from the consensus follower using `AddSealedResult`.
 func (rf *ResultsForest) ResetLowestRejectedView() (uint64, bool) {
 	rf.mu.Lock()
 	defer rf.mu.Unlock()
@@ -311,6 +319,10 @@ func (rf *ResultsForest) ResetLowestRejectedView() (uint64, bool) {
 // are willing to place in the results correctness - potentially depending on how many ENs and/or
 // which ENs specifically produced the result. Therefore, unsealed results must be added using
 // the `AddReceipt` method.
+//
+// If ErrMaxViewDeltaExceeded is returned, the provided result was not added to the forest, and
+// the caller must use `ResetLowestRejectedView` to perform the backfill process once the forest
+// has available capacity.
 //
 // Expected errors during normal operations:
 //   - ErrMaxViewDeltaExceeded: if the result's block view is more than maxViewDelta views ahead of the last sealed view
@@ -341,6 +353,10 @@ func (rf *ResultsForest) AddSealedResult(result *flow.ExecutionResult) error {
 
 // AddReceipt adds the given execution result to the forest. Furthermore, we track which Execution Node issued
 // receipts committing to this result. This method is idempotent.
+//
+// If ErrMaxViewDeltaExceeded is returned, the result for the provided receipt was not added to the
+// forest, and the caller must use `ResetLowestRejectedView` to perform the backfill process once
+// the forest has available capacity.
 //
 // Expected errors during normal operations:
 //   - ErrMaxViewDeltaExceeded: if the result's block view is more than maxViewDelta views ahead of the last sealed view
