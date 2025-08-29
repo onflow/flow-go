@@ -10,16 +10,18 @@ import (
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/operation"
 	"github.com/onflow/flow-go/storage/operation/dbtest"
-	"github.com/onflow/flow-go/utils/unittest"
 )
 
 func TestFinalizedInsertUpdateRetrieve(t *testing.T) {
 	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
-		_, lctx := unittest.LockManagerWithContext(t, storage.LockFinalizeBlock)
+		lockManager := storage.NewTestingLockManager()
+		lctx := lockManager.NewContext()
+		err := lctx.AcquireLock(storage.LockFinalizeBlock)
+		require.NoError(t, err)
 		defer lctx.Release()
 
 		height := uint64(1337)
-		err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+		err = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 			return operation.UpsertFinalizedHeight(lctx, rw.Writer(), height)
 		})
 		require.NoError(t, err)
@@ -45,11 +47,14 @@ func TestFinalizedInsertUpdateRetrieve(t *testing.T) {
 
 func TestSealedInsertUpdateRetrieve(t *testing.T) {
 	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
-		_, lctx := unittest.LockManagerWithContext(t, storage.LockFinalizeBlock)
+		lockManager := storage.NewTestingLockManager()
+		lctx := lockManager.NewContext()
+		err := lctx.AcquireLock(storage.LockFinalizeBlock)
+		require.NoError(t, err)
 		defer lctx.Release()
 		height := uint64(1337)
 
-		err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+		err = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 			return operation.UpsertSealedHeight(lctx, rw.Writer(), height)
 		})
 		require.NoError(t, err)
@@ -75,13 +80,17 @@ func TestSealedInsertUpdateRetrieve(t *testing.T) {
 
 func TestEpochFirstBlockIndex_InsertRetrieve(t *testing.T) {
 	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
-		_, lctx := unittest.LockManagerWithContext(t, storage.LockFinalizeBlock)
+		lockManager := storage.NewTestingLockManager()
+		lctx := lockManager.NewContext()
+		err := lctx.AcquireLock(storage.LockFinalizeBlock)
+		require.NoError(t, err)
+		defer lctx.Release()
 		height := rand.Uint64()
 		epoch := rand.Uint64()
 
 		// retrieve when empty errors
 		var retrieved uint64
-		err := operation.RetrieveEpochFirstHeight(db.Reader(), epoch, &retrieved)
+		err = operation.RetrieveEpochFirstHeight(db.Reader(), epoch, &retrieved)
 		require.ErrorIs(t, err, storage.ErrNotFound)
 
 		// can insert

@@ -56,6 +56,10 @@ type ScriptExecutionState interface {
 	IsBlockExecuted(height uint64, blockID flow.Identifier) (bool, error)
 }
 
+// IsParentExecuted returns true if and only if the parent of the given block (header) is executed.
+// TODO: Check whether `header` is a root block is potentially flawed, because it only works for the genesis block.
+//
+//	Neither spork root blocks nor dynamically boostrapped Execution Nodes (with truncated history) are supported.
 func IsParentExecuted(state ReadOnlyExecutionState, header *flow.Header) (bool, error) {
 	// sanity check, caller should not pass a root block
 	if header.Height == 0 {
@@ -461,7 +465,7 @@ func (s *state) saveExecutionResults(
 		// the state commitment is the last data item to be stored, so that
 		// IsBlockExecuted can be implemented by checking whether state commitment exists
 		// in the database
-		err = s.commits.BatchStore(blockID, result.CurrentEndState(), batch)
+		err = s.commits.BatchStore(lctx, blockID, result.CurrentEndState(), batch)
 		if err != nil {
 			return fmt.Errorf("cannot store state commitment: %w", err)
 		}

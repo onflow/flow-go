@@ -25,6 +25,7 @@ import (
 func TestLoopPruneExecutionDataFromRootToLatestSealed(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(bdb *badger.DB) {
 		unittest.RunWithPebbleDB(t, func(pdb *pebble.DB) {
+			lockManager := storage.NewTestingLockManager()
 			// create dependencies
 			ps := unittestMocks.NewProtocolState()
 			blocks, rootResult, rootSeal := unittest.ChainFixture(0)
@@ -48,11 +49,12 @@ func TestLoopPruneExecutionDataFromRootToLatestSealed(t *testing.T) {
 			// indexed by height
 			chunks := make([]*verification.VerifiableChunkData, lastFinalizedHeight+2)
 			parentID := genesis.ID()
-			manager, lctx := unittest.LockManagerWithContext(t, storage.LockInsertBlock)
+			lctxGenesis := lockManager.NewContext()
+			require.NoError(t, lctxGenesis.AcquireLock(storage.LockInsertBlock))
 			require.NoError(t, db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-				return blockstore.BatchStore(lctx, rw, genesis)
+				return blockstore.BatchStore(lctxGenesis, rw, genesis)
 			}))
-			lctx.Release()
+			lctxGenesis.Release()
 
 			for i := 1; i <= lastFinalizedHeight; i++ {
 				chunk, block := unittest.VerifiableChunkDataFixture(0, func(header *flow.Header) {
@@ -60,18 +62,18 @@ func TestLoopPruneExecutionDataFromRootToLatestSealed(t *testing.T) {
 					header.ParentID = parentID
 				})
 				chunks[i] = chunk // index by height
-				lctx := manager.NewContext()
-				require.NoError(t, lctx.AcquireLock(storage.LockInsertBlock))
+				lctxBlock := lockManager.NewContext()
+				require.NoError(t, lctxBlock.AcquireLock(storage.LockInsertBlock))
 				require.NoError(t, db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-					return blockstore.BatchStore(lctx, rw, block)
+					return blockstore.BatchStore(lctxBlock, rw, block)
 				}))
-				lctx.Release()
-				lctx = manager.NewContext()
-				require.NoError(t, lctx.AcquireLock(storage.LockFinalizeBlock))
+				lctxBlock.Release()
+				lctxFinality := lockManager.NewContext()
+				require.NoError(t, lctxFinality.AcquireLock(storage.LockFinalizeBlock))
 				require.NoError(t, db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-					return operation.IndexFinalizedBlockByHeight(lctx, rw, chunk.Header.Height, chunk.Header.ID())
+					return operation.IndexFinalizedBlockByHeight(lctxFinality, rw, chunk.Header.Height, chunk.Header.ID())
 				}))
-				lctx.Release()
+				lctxFinality.Release()
 				require.NoError(t, results.Store(chunk.Result))
 				require.NoError(t, results.Index(chunk.Result.BlockID, chunk.Result.ID()))
 				require.NoError(t, chunkDataPacks.Store([]*flow.ChunkDataPack{chunk.ChunkDataPack}))

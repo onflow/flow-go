@@ -65,8 +65,7 @@ func (suite *MutatorSuite) SetupTest() {
 	suite.dbdir = unittest.TempDir(suite.T())
 	suite.badgerdb = unittest.BadgerDB(suite.T(), suite.dbdir)
 	suite.db = badgerimpl.ToDB(suite.badgerdb)
-	lockManager := storage.NewTestingLockManager()
-	suite.lockManager = lockManager
+	suite.lockManager = storage.NewTestingLockManager()
 
 	metrics := metrics.NewNoopCollector()
 	tracer := trace.NewNoopTracer()
@@ -104,7 +103,7 @@ func (suite *MutatorSuite) SetupTest() {
 	state, err := pbadger.Bootstrap(
 		metrics,
 		suite.db,
-		lockManager,
+		suite.lockManager,
 		all.Headers,
 		all.Seals,
 		all.Results,
@@ -189,12 +188,10 @@ func (suite *MutatorSuite) FinalizeBlock(block model.Block) {
 	err := operation.RetrieveHeader(suite.db.Reader(), block.Payload.ReferenceBlockID, &refBlock)
 	suite.Require().Nil(err)
 
+	lctx := suite.lockManager.NewContext()
+	defer lctx.Release()
+	require.NoError(suite.T(), lctx.AcquireLock(storage.LockInsertOrFinalizeClusterBlock))
 	err = suite.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-		lctx := suite.lockManager.NewContext()
-		defer lctx.Release()
-		if err := lctx.AcquireLock(storage.LockInsertOrFinalizeClusterBlock); err != nil {
-			return err
-		}
 		err = procedure.FinalizeClusterBlock(lctx, rw, block.ID())
 		if err != nil {
 			return err

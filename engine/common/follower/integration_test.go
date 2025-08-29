@@ -47,11 +47,11 @@ func TestFollowerHappyPath(t *testing.T) {
 	allIdentities := unittest.CompleteIdentitySet()
 	rootSnapshot := unittest.RootSnapshotFixture(allIdentities)
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+		lockManager := storage.NewTestingLockManager()
 		metrics := metrics.NewNoopCollector()
 		tracer := trace.NewNoopTracer()
 		log := unittest.Logger()
 		consumer := events.NewNoop()
-		lockManager := storage.NewTestingLockManager()
 		all := bstorage.InitAll(metrics, db)
 
 		// bootstrap root snapshot

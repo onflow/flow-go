@@ -384,6 +384,7 @@ func (c *Container) Connect() error {
 }
 
 func (c *Container) OpenState() (*state.State, error) {
+	lockManager := storage.NewTestingLockManager()
 	badgerdb, err := c.DB()
 	if err != nil {
 		return nil, err
@@ -408,7 +409,6 @@ func (c *Container) OpenState() (*state.State, error) {
 		store.DefaultProtocolKVStoreCacheSize, store.DefaultProtocolKVStoreByBlockIDCacheSize)
 	versionBeacons := store.NewVersionBeacons(db)
 
-	lockManager := storage.NewTestingLockManager()
 	return state.OpenState(
 		metrics,
 		db,

@@ -181,6 +181,7 @@ func (i *indexCoreTest) useDefaultTransactionResults() *indexCoreTest {
 }
 
 func (i *indexCoreTest) initIndexer() *indexCoreTest {
+	lockManager := storage.NewTestingLockManager()
 	db, dbDir := unittest.TempBadgerDB(i.t)
 	i.t.Cleanup(func() {
 		require.NoError(i.t, db.Close())
@@ -229,7 +230,7 @@ func (i *indexCoreTest) initIndexer() *indexCoreTest {
 		flow.Testnet.Chain(),
 		derivedChainData,
 		collectionExecutedMetric,
-		storage.NewTestingLockManager(),
+		lockManager,
 	)
 	require.NoError(i.t, err)
 	i.indexer = indexer
@@ -624,6 +625,7 @@ func trieRegistersPayloadComparer(t *testing.T, triePayloads []*ledger.Payload, 
 }
 
 func TestIndexerIntegration_StoreAndGet(t *testing.T) {
+	lockManager := storage.NewTestingLockManager()
 	regOwnerAddress := unittest.RandomAddressFixture()
 	regOwner := string(regOwnerAddress.Bytes())
 	regKey := "code"
@@ -656,7 +658,7 @@ func TestIndexerIntegration_StoreAndGet(t *testing.T) {
 				flow.Testnet.Chain(),
 				derivedChainData,
 				nil,
-				storage.NewTestingLockManager(),
+				lockManager,
 			)
 			require.NoError(t, err)
 
@@ -691,7 +693,7 @@ func TestIndexerIntegration_StoreAndGet(t *testing.T) {
 				flow.Testnet.Chain(),
 				derivedChainData,
 				nil,
-				storage.NewTestingLockManager(),
+				lockManager,
 			)
 			require.NoError(t, err)
 
@@ -719,7 +721,7 @@ func TestIndexerIntegration_StoreAndGet(t *testing.T) {
 				flow.Testnet.Chain(),
 				derivedChainData,
 				nil,
-				storage.NewTestingLockManager(),
+				lockManager,
 			)
 			require.NoError(t, err)
 
@@ -764,7 +766,7 @@ func TestIndexerIntegration_StoreAndGet(t *testing.T) {
 				flow.Testnet.Chain(),
 				derivedChainData,
 				nil,
-				storage.NewTestingLockManager(),
+				lockManager,
 			)
 			require.NoError(t, err)
 

@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/jordanschalm/lockctx"
 	"github.com/spf13/cobra"
 
 	"github.com/onflow/flow-go/cmd/util/cmd/common"
@@ -36,7 +37,8 @@ func init() {
 }
 
 func run(*cobra.Command, []string) {
-	err := findFirstMismatch(flagDatadir, flagStartHeight, flagEndHeight)
+	lockManager := storage.MakeSingletonLockManager()
+	err := findFirstMismatch(flagDatadir, flagStartHeight, flagEndHeight, lockManager)
 	if err != nil {
 		if errors.Is(err, NoMissmatchFoundError) {
 			fmt.Printf("no mismatch found: %v\n", err)
@@ -46,9 +48,9 @@ func run(*cobra.Command, []string) {
 	}
 }
 
-func findFirstMismatch(datadir string, startHeight, endHeight uint64) error {
+func findFirstMismatch(datadir string, startHeight, endHeight uint64, lockManager lockctx.Manager) error {
 	fmt.Printf("initializing database\n")
-	headers, results, seals, state, db, err := createStorages(datadir)
+	headers, results, seals, state, db, err := createStorages(datadir, lockManager)
 	defer db.Close()
 	if err != nil {
 		return fmt.Errorf("could not create storages: %v", err)
@@ -91,7 +93,7 @@ func findFirstMismatch(datadir string, startHeight, endHeight uint64) error {
 	return nil
 }
 
-func createStorages(dir string) (
+func createStorages(dir string, lockManager lockctx.Manager) (
 	storage.Headers, storage.ExecutionResults, storage.Seals, protocol.State, storage.DB, error) {
 	db, err := common.InitStorage(dir)
 	if err != nil {
@@ -99,9 +101,9 @@ func createStorages(dir string) (
 	}
 
 	storages := common.InitStorages(db)
-	state, err := common.InitProtocolState(db, storages)
+	state, err := common.OpenProtocolState(lockManager, db, storages)
 	if err != nil {
-		return nil, nil, nil, nil, db, fmt.Errorf("could not init protocol state: %v", err)
+		return nil, nil, nil, nil, db, fmt.Errorf("could not open protocol state: %v", err)
 	}
 
 	return storages.Headers, storages.Results, storages.Seals, state, db, err

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/jordanschalm/lockctx"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 
@@ -31,6 +32,7 @@ import (
 // pruned.
 // Note, it returns nil if certain block is not executed, in this case warning will be logged
 func VerifyLastKHeight(
+	lockManager lockctx.Manager,
 	k uint64,
 	chainID flow.ChainID,
 	protocolDataDir string,
@@ -39,7 +41,7 @@ func VerifyLastKHeight(
 	stopOnMismatch bool,
 	transactionFeesDisabled bool,
 ) (err error) {
-	closer, storages, chunkDataPacks, state, verifier, err := initStorages(chainID, protocolDataDir, chunkDataPackDir, transactionFeesDisabled)
+	closer, storages, chunkDataPacks, state, verifier, err := initStorages(lockManager, chainID, protocolDataDir, chunkDataPackDir, transactionFeesDisabled)
 	if err != nil {
 		return fmt.Errorf("could not init storages: %w", err)
 	}
@@ -86,6 +88,7 @@ func VerifyLastKHeight(
 // VerifyRange verifies all chunks in the results of the blocks in the given range.
 // Note, it returns nil if certain block is not executed, in this case warning will be logged
 func VerifyRange(
+	lockManager lockctx.Manager,
 	from, to uint64,
 	chainID flow.ChainID,
 	protocolDataDir string, chunkDataPackDir string,
@@ -93,7 +96,7 @@ func VerifyRange(
 	stopOnMismatch bool,
 	transactionFeesDisabled bool,
 ) (err error) {
-	closer, storages, chunkDataPacks, state, verifier, err := initStorages(chainID, protocolDataDir, chunkDataPackDir, transactionFeesDisabled)
+	closer, storages, chunkDataPacks, state, verifier, err := initStorages(lockManager, chainID, protocolDataDir, chunkDataPackDir, transactionFeesDisabled)
 	if err != nil {
 		return fmt.Errorf("could not init storages: %w", err)
 	}
@@ -217,6 +220,7 @@ func verifyConcurrently(
 }
 
 func initStorages(
+	lockManager lockctx.Manager,
 	chainID flow.ChainID,
 	dataDir string,
 	chunkDataPackDir string,
@@ -235,9 +239,9 @@ func initStorages(
 	}
 
 	storages := common.InitStorages(db)
-	state, err := common.InitProtocolState(db, storages)
+	state, err := common.OpenProtocolState(lockManager, db, storages)
 	if err != nil {
-		return nil, nil, nil, nil, nil, fmt.Errorf("could not init protocol state: %w", err)
+		return nil, nil, nil, nil, nil, fmt.Errorf("could not open protocol state: %w", err)
 	}
 
 	// require the chunk data pack data must exist before returning the storage module

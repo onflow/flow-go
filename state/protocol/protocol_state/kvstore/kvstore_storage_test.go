@@ -28,6 +28,7 @@ func TestProtocolKVStore_StoreTx(t *testing.T) {
 	// On the happy path, where the input `kvState` encodes its state successfully, the wrapped store
 	// should be called to persist the version-encoded snapshot.
 	t.Run("happy path", func(t *testing.T) {
+		lockManager := storage.NewTestingLockManager()
 		expectedVersion := uint64(13)
 		encData := unittest.RandomBytes(117)
 		versionedSnapshot := &flow.PSKeyValueStoreData{
@@ -36,7 +37,6 @@ func TestProtocolKVStore_StoreTx(t *testing.T) {
 		}
 		kvState.On("VersionedEncode").Return(expectedVersion, encData, nil).Once()
 
-		lockManager := storage.NewTestingLockManager()
 		lctx := lockManager.NewContext()
 		defer lctx.Release()
 		require.NoError(t, lctx.AcquireLock(storage.LockInsertBlock))
@@ -54,11 +54,11 @@ func TestProtocolKVStore_StoreTx(t *testing.T) {
 	// On the unhappy path, i.e. when the encoding of input `kvState` failed, `ProtocolKVStore` should produce
 	// a deferred database update that always returns the encoding error.
 	t.Run("encoding fails", func(t *testing.T) {
+		lockManager := storage.NewTestingLockManager()
 		encodingError := errors.New("encoding error")
 
 		kvState.On("VersionedEncode").Return(uint64(0), nil, encodingError).Once()
 
-		lockManager := storage.NewTestingLockManager()
 		lctx := lockManager.NewContext()
 		defer lctx.Release()
 		require.NoError(t, lctx.AcquireLock(storage.LockInsertBlock))

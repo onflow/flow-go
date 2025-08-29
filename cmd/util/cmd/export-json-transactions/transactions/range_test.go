@@ -16,6 +16,7 @@ import (
 
 func TestFindBlockTransactions(t *testing.T) {
 	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
+		lockManager := storage.NewTestingLockManager()
 		// prepare two blocks
 		// block 1 has 2 collections
 		// block 2 has 1 collection
@@ -59,7 +60,8 @@ func TestFindBlockTransactions(t *testing.T) {
 		state.On("AtHeight", uint64(5)).Return(snap5, nil)
 
 		// store into database
-		_, lctx := unittest.LockManagerWithContext(t, storage.LockInsertBlock)
+		lctx := lockManager.NewContext()
+		require.NoError(t, lctx.AcquireLock(storage.LockInsertBlock))
 		defer lctx.Release()
 		require.NoError(t, db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 			err := storages.Blocks.BatchStore(lctx, rw, &b1)

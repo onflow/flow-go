@@ -3,6 +3,8 @@ package common
 import (
 	"fmt"
 
+	"github.com/jordanschalm/lockctx"
+
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/state/protocol"
 	protocolbadger "github.com/onflow/flow-go/state/protocol/badger"
@@ -10,9 +12,8 @@ import (
 	"github.com/onflow/flow-go/storage/store"
 )
 
-func InitProtocolState(db storage.DB, storages *store.All) (protocol.State, error) {
+func OpenProtocolState(lockManager lockctx.Manager, db storage.DB, storages *store.All) (protocol.State, error) {
 	metrics := &metrics.NoopCollector{}
-	lockManager := storage.NewTestingLockManager()
 
 	protocolState, err := protocolbadger.OpenState(
 		metrics,
@@ -31,7 +32,7 @@ func InitProtocolState(db storage.DB, storages *store.All) (protocol.State, erro
 	)
 
 	if err != nil {
-		return nil, fmt.Errorf("could not init protocol state: %w", err)
+		return nil, fmt.Errorf("could not open protocol state: %w", err)
 	}
 
 	return protocolState, nil

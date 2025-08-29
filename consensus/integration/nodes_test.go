@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/gammazero/workerpool"
-	"github.com/jordanschalm/lockctx"
 	"github.com/onflow/crypto"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/mock"
@@ -140,7 +139,6 @@ func (p *ConsensusParticipants) Update(epochCounter uint64, data *run.Participan
 
 type Node struct {
 	db                fstorage.DB
-	lockManager       lockctx.Manager
 	dbCloser          io.Closer
 	dbDir             string
 	index             int

@@ -30,8 +30,11 @@ func NewBlocks(db storage.DB, headers *Headers, payloads *Payloads) *Blocks {
 }
 
 // BatchStore stores a valid block in a batch.
+//
+// Expected errors during normal operations:
+// - [storage.ErrAlreadyExists] if some block with the same ID has already been stored
 func (b *Blocks) BatchStore(lctx lockctx.Proof, rw storage.ReaderBatchWriter, block *flow.Block) error {
-	err := b.headers.storeTx(rw, block.Header)
+	err := b.headers.storeTx(lctx, rw, block.Header)
 	if err != nil {
 		return fmt.Errorf("could not store header %v: %w", block.Header.ID(), err)
 	}
@@ -103,7 +106,7 @@ func (b *Blocks) ByHeight(height uint64) (*flow.Block, error) {
 // - storage.ErrNotFound if finalized block is known that contains the collection
 func (b *Blocks) ByCollectionID(collID flow.Identifier) (*flow.Block, error) {
 	var blockID flow.Identifier
-	err := operation.LookupCollectionBlock(b.db.Reader(), collID, &blockID)
+	err := operation.LookupBlockContainingCollection(b.db.Reader(), collID, &blockID)
 	if err != nil {
 		return nil, fmt.Errorf("could not look up block: %w", err)
 	}

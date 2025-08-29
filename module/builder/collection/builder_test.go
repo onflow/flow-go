@@ -69,6 +69,7 @@ type BuilderSuite struct {
 // runs before each test runs
 func (suite *BuilderSuite) SetupTest() {
 	fmt.Println("SetupTest>>>>")
+	suite.lockManager = storage.NewTestingLockManager()
 	var err error
 
 	suite.genesis = model.Genesis()
@@ -79,8 +80,6 @@ func (suite *BuilderSuite) SetupTest() {
 	suite.dbdir = unittest.TempDir(suite.T())
 	suite.badgerDB = unittest.BadgerDB(suite.T(), suite.dbdir)
 	suite.db = badgerimpl.ToDB(suite.badgerDB)
-	lockManager := storage.NewTestingLockManager()
-	suite.lockManager = lockManager
 
 	metrics := metrics.NewNoopCollector()
 	tracer := trace.NewNoopTracer()
@@ -131,16 +130,16 @@ func (suite *BuilderSuite) SetupTest() {
 	root.Payload.ProtocolStateID = rootProtocolState.ID()
 	clusterStateRoot, err := clusterkv.NewStateRoot(suite.genesis, clusterQC, suite.epochCounter)
 	suite.Require().NoError(err)
-	clusterState, err := clusterkv.Bootstrap(suite.db, lockManager, clusterStateRoot)
+	clusterState, err := clusterkv.Bootstrap(suite.db, suite.lockManager, clusterStateRoot)
 	suite.Require().NoError(err)
 
-	suite.state, err = clusterkv.NewMutableState(clusterState, lockManager, tracer, suite.headers, suite.payloads)
+	suite.state, err = clusterkv.NewMutableState(clusterState, suite.lockManager, tracer, suite.headers, suite.payloads)
 	suite.Require().NoError(err)
 
 	state, err := pbadger.Bootstrap(
 		metrics,
 		suite.db,
-		lockManager,
+		suite.lockManager,
 		all.Headers,
 		all.Seals,
 		all.Results,
@@ -177,7 +176,7 @@ func (suite *BuilderSuite) SetupTest() {
 		suite.Assert().True(added)
 	}
 
-	suite.builder, _ = builder.NewBuilder(suite.db, tracer, lockManager, suite.protoState, suite.state, suite.headers, suite.headers, suite.payloads, suite.pool, unittest.Logger(), suite.epochCounter)
+	suite.builder, _ = builder.NewBuilder(suite.db, tracer, suite.lockManager, suite.protoState, suite.state, suite.headers, suite.headers, suite.payloads, suite.pool, unittest.Logger(), suite.epochCounter)
 }
 
 // runs after each test finishes
@@ -200,15 +199,15 @@ func (suite *BuilderSuite) InsertBlock(block model.Block) {
 }
 
 func (suite *BuilderSuite) FinalizeBlock(block model.Block) {
-	err := suite.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+	lctx := suite.lockManager.NewContext()
+	defer lctx.Release()
+	err := lctx.AcquireLock(storage.LockInsertOrFinalizeClusterBlock)
+	suite.Assert().NoError(err)
+
+	err = suite.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 		var refBlock flow.Header
 		err := operation.RetrieveHeader(rw.GlobalReader(), block.Payload.ReferenceBlockID, &refBlock)
 		if err != nil {
-			return err
-		}
-		lctx := suite.lockManager.NewContext()
-		defer lctx.Release()
-		if err := lctx.AcquireLock(storage.LockInsertOrFinalizeClusterBlock); err != nil {
 			return err
 		}
 		err = procedure.FinalizeClusterBlock(lctx, rw, block.ID())
@@ -1122,7 +1121,6 @@ func benchmarkBuildOn(b *testing.B, size int) {
 		block := unittest.ClusterBlockWithParent(final)
 		lctx := suite.lockManager.NewContext()
 		require.NoError(b, lctx.AcquireLock(storage.LockInsertOrFinalizeClusterBlock))
-
 		err := suite.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 			return procedure.InsertClusterBlock(lctx, rw, &block)
 		})
@@ -1131,12 +1129,10 @@ func benchmarkBuildOn(b *testing.B, size int) {
 
 		// finalize the block 80% of the time, resulting in a fork-rate of 20%
 		if rand.Intn(100) < 80 {
+			lctx := suite.lockManager.NewContext()
+			defer lctx.Release()
+			require.NoError(suite.T(), lctx.AcquireLock(storage.LockInsertOrFinalizeClusterBlock))
 			err = suite.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-				lctx := suite.lockManager.NewContext()
-				defer lctx.Release()
-				if err := lctx.AcquireLock(storage.LockInsertOrFinalizeClusterBlock); err != nil {
-					return err
-				}
 				return procedure.FinalizeClusterBlock(lctx, rw, block.ID())
 			})
 			require.NoError(b, err)

@@ -17,10 +17,9 @@ import (
 func TestReadClusterRange(t *testing.T) {
 
 	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
+		lockManager := storage.NewTestingLockManager()
 		chain := unittest.ClusterBlockChainFixture(5)
 		parent, blocks := chain[0], chain[1:]
-
-		lockManager := storage.NewTestingLockManager()
 
 		lctx := lockManager.NewContext()
 		require.NoError(t, lctx.AcquireLock(storage.LockInsertOrFinalizeClusterBlock))

@@ -27,6 +27,7 @@ func TestFinalizer(t *testing.T) {
 	// This test has to build on top of badgerdb, because the cleanup method depends
 	// on the badgerdb.DropAll method to wipe the database, which pebble does not support.
 	unittest.RunWithBadgerDB(t, func(badgerdb *badger.DB) {
+		lockManager := storage.NewTestingLockManager()
 		db := badgerimpl.ToDB(badgerdb)
 		// reference block on the main consensus chain
 		refBlock := unittest.BlockHeaderFixture()
@@ -34,10 +35,9 @@ func TestFinalizer(t *testing.T) {
 		genesis := model.Genesis()
 
 		metrics := metrics.NewNoopCollector()
+		pool := herocache.NewTransactions(1000, unittest.Logger(), metrics)
 
 		var state *cluster.State
-
-		pool := herocache.NewTransactions(1000, unittest.Logger(), metrics)
 
 		// a helper function to clean up shared state between tests
 		cleanup := func() {
@@ -50,20 +50,20 @@ func TestFinalizer(t *testing.T) {
 			}
 		}
 
-		lockManager := storage.NewTestingLockManager()
 		// a helper function to bootstrap with the genesis block
 		bootstrap := func() {
 			stateRoot, err := cluster.NewStateRoot(genesis, unittest.QuorumCertificateFixture(), 0)
 			require.NoError(t, err)
-
-			lctx := lockManager.NewContext()
-			defer lctx.Release()
 			state, err = cluster.Bootstrap(db, lockManager, stateRoot)
 			require.NoError(t, err)
+
+			lctx := lockManager.NewContext()
+			require.NoError(t, lctx.AcquireLock(storage.LockInsertOrFinalizeClusterBlock))
 			err = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-				return operation.InsertHeader(rw.Writer(), refBlock.ID(), refBlock)
+				return operation.InsertHeader(lctx, rw, refBlock.ID(), refBlock)
 			})
 			require.NoError(t, err)
+			lctx.Release()
 		}
 
 		// a helper function to insert a block

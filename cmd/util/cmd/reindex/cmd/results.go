@@ -5,6 +5,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/onflow/flow-go/cmd/util/cmd/common"
+	"github.com/onflow/flow-go/storage"
 )
 
 func init() {
@@ -15,15 +16,16 @@ var resultsCmd = &cobra.Command{
 	Use:   "results",
 	Short: "reindex sealed result IDs by block ID",
 	Run: func(cmd *cobra.Command, args []string) {
+		lockManager := storage.MakeSingletonLockManager()
 		db, err := common.InitStorage(flagDatadir)
 		if err != nil {
 			log.Fatal().Err(err).Msg("could not initialize storage")
 		}
 		defer db.Close()
 		storages := common.InitStorages(db)
-		state, err := common.InitProtocolState(db, storages)
+		state, err := common.OpenProtocolState(lockManager, db, storages)
 		if err != nil {
-			log.Fatal().Err(err).Msg("could not init protocol state")
+			log.Fatal().Err(err).Msg("could not open protocol state")
 		}
 
 		results := storages.Results
