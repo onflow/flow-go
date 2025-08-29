@@ -100,6 +100,8 @@ func TestBlockContext_ExecuteTransaction(t *testing.T) {
 	ctx := fvm.NewContext(
 		fvm.WithChain(chain),
 		fvm.WithCadenceLogging(true),
+		fvm.WithVMTransactionExecutionEnabled(*testWithVMTransactionExecution),
+		fvm.WithVMScriptExecutionEnabled(*testWithVMScriptExecution),
 	)
 
 	t.Run("Success", func(t *testing.T) {
@@ -223,6 +225,8 @@ func TestBlockContext_DeployContract(t *testing.T) {
 	ctx := fvm.NewContext(
 		fvm.WithChain(chain),
 		fvm.WithCadenceLogging(true),
+		fvm.WithVMTransactionExecutionEnabled(*testWithVMTransactionExecution),
+		fvm.WithVMScriptExecutionEnabled(*testWithVMScriptExecution),
 	)
 
 	t.Run("account update with set code succeeds as service account", func(t *testing.T) {
@@ -480,6 +484,8 @@ func TestBlockContext_DeployContract(t *testing.T) {
 			fvm.WithChain(chain),
 			fvm.WithCadenceLogging(true),
 			fvm.WithContractDeploymentRestricted(false),
+			fvm.WithVMTransactionExecutionEnabled(*testWithVMTransactionExecution),
+			fvm.WithVMScriptExecutionEnabled(*testWithVMScriptExecution),
 		)
 		restricted := true
 
@@ -813,6 +819,8 @@ func TestBlockContext_ExecuteTransaction_WithArguments(t *testing.T) {
 	ctx := fvm.NewContext(
 		fvm.WithChain(chain),
 		fvm.WithCadenceLogging(true),
+		fvm.WithVMTransactionExecutionEnabled(*testWithVMTransactionExecution),
+		fvm.WithVMScriptExecutionEnabled(*testWithVMScriptExecution),
 	)
 
 	arg1, _ := jsoncdc.Encode(cadence.NewInt(42))
@@ -922,6 +930,8 @@ func TestBlockContext_ExecuteTransaction_GasLimit(t *testing.T) {
 	ctx := fvm.NewContext(
 		fvm.WithChain(chain),
 		fvm.WithCadenceLogging(true),
+		fvm.WithVMTransactionExecutionEnabled(*testWithVMTransactionExecution),
+		fvm.WithVMScriptExecutionEnabled(*testWithVMScriptExecution),
 	)
 
 	var tests = []struct {
@@ -1345,6 +1355,8 @@ func TestBlockContext_ExecuteScript(t *testing.T) {
 	ctx := fvm.NewContext(
 		fvm.WithChain(chain),
 		fvm.WithCadenceLogging(true),
+		fvm.WithVMTransactionExecutionEnabled(*testWithVMTransactionExecution),
+		fvm.WithVMScriptExecutionEnabled(*testWithVMScriptExecution),
 	)
 
 	t.Run("script success", func(t *testing.T) {
@@ -1493,6 +1505,8 @@ func TestBlockContext_GetBlockInfo(t *testing.T) {
 	ctx := fvm.NewContext(
 		fvm.WithChain(chain),
 		fvm.WithCadenceLogging(true),
+		fvm.WithVMTransactionExecutionEnabled(*testWithVMTransactionExecution),
+		fvm.WithVMScriptExecutionEnabled(*testWithVMScriptExecution),
 	)
 
 	blocks := new(envMock.Blocks)
@@ -1654,6 +1668,8 @@ func TestBlockContext_GetAccount(t *testing.T) {
 	ctx := fvm.NewContext(
 		fvm.WithChain(chain),
 		fvm.WithCadenceLogging(true),
+		fvm.WithVMTransactionExecutionEnabled(*testWithVMTransactionExecution),
+		fvm.WithVMScriptExecutionEnabled(*testWithVMScriptExecution),
 	)
 
 	snapshotTree := testutil.RootBootstrappedLedger(vm, ctx)
@@ -1759,6 +1775,8 @@ func TestBlockContext_Random(t *testing.T) {
 		fvm.WithBlockHeader(header),
 		fvm.WithEntropyProvider(source),
 		fvm.WithCadenceLogging(true),
+		fvm.WithVMTransactionExecutionEnabled(*testWithVMTransactionExecution),
+		fvm.WithVMScriptExecutionEnabled(*testWithVMScriptExecution),
 	)
 
 	txCode := []byte(`
@@ -1868,6 +1886,8 @@ func TestBlockContext_ExecuteTransaction_CreateAccount_WithMonotonicAddresses(t 
 
 	ctx := fvm.NewContext(
 		fvm.WithChain(chain),
+		fvm.WithVMTransactionExecutionEnabled(*testWithVMTransactionExecution),
+		fvm.WithVMScriptExecutionEnabled(*testWithVMScriptExecution),
 	)
 
 	txBodyBuilder := flow.NewTransactionBodyBuilder().
