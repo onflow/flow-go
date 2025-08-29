@@ -331,7 +331,7 @@ func (e *Engine) processAvailableMessages(ctx irrecoverable.SignalerContext) err
 
 			ra, ok := msg.Payload.(*flow.ResultApproval)
 			if !ok {
-				return fmt.Errorf("unexpected approval payload type %T; expected *flow.ResultApproval", msg.Payload)
+				return irrecoverable.NewExceptionf("unexpected approval payload type %T; expected *flow.ResultApproval", msg.Payload)
 			}
 			err := e.onApproval(msg.OriginID, ra)
 			if err != nil {

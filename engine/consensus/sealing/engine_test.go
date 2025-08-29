@@ -170,8 +170,10 @@ func (s *SealingEngineSuite) TestMultipleProcessingItems() {
 			approval := unittest.ResultApprovalFixture(
 				unittest.WithExecutionResultID(receipt.ExecutionResult.ID()),
 				unittest.WithApproverID(approverID),
+				func(approval *flow.ResultApproval) {
+					approval.Body.Spock = unittest.SignatureFixture()
+				},
 			)
-			approval.Body.Spock = unittest.SignatureFixture()
 
 			responseApproval := &messages.ApprovalResponse{
 				Nonce:    0,
@@ -181,7 +183,6 @@ func (s *SealingEngineSuite) TestMultipleProcessingItems() {
 			responseApprovals = append(responseApprovals, responseApproval)
 			approvals = append(approvals, approval)
 
-			// Core should receive the trusted approval
 			s.core.On("ProcessApproval", approval).Return(nil).Twice()
 		}
 	}
