@@ -387,9 +387,8 @@ func createNode(
 	db := badgerimpl.ToDB(badgerdb)
 	lockManager := fstorage.NewTestingLockManager()
 
-<<<<<<< HEAD
 	headersDB := store.NewHeaders(metricsCollector, db)
-	guaranteesDB := store.NewGuarantees(metricsCollector, db, store.DefaultCacheSize)
+	guaranteesDB := store.NewGuarantees(metricsCollector, db, store.DefaultCacheSize, store.DefaultCacheSize)
 	sealsDB := store.NewSeals(metricsCollector, db)
 	indexDB := store.NewIndex(metricsCollector, db)
 	resultsDB := store.NewExecutionResults(metricsCollector, db)
@@ -401,28 +400,9 @@ func createNode(
 	commitsDB := store.NewEpochCommits(metricsCollector, db)
 	protocolStateDB := store.NewEpochProtocolStateEntries(metricsCollector, setupsDB, commitsDB, db,
 		store.DefaultEpochProtocolStateCacheSize, store.DefaultProtocolStateIndexCacheSize)
-	protocokKVStoreDB := store.NewProtocolKVStore(metricsCollector, db,
+	protocolKVStoreDB := store.NewProtocolKVStore(metricsCollector, db,
 		store.DefaultProtocolKVStoreCacheSize, store.DefaultProtocolKVStoreByBlockIDCacheSize)
 	versionBeaconDB := store.NewVersionBeacons(db)
-=======
-	headersDB := storage.NewHeaders(metricsCollector, db)
-	guaranteesDB := storage.NewGuarantees(metricsCollector, db,
-		storage.DefaultCacheSize, storage.DefaultCacheSize)
-	sealsDB := storage.NewSeals(metricsCollector, db)
-	indexDB := storage.NewIndex(metricsCollector, db)
-	resultsDB := storage.NewExecutionResults(metricsCollector, db)
-	receiptsDB := storage.NewExecutionReceipts(metricsCollector, db, resultsDB, storage.DefaultCacheSize)
-	payloadsDB := storage.NewPayloads(db, indexDB, guaranteesDB, sealsDB, receiptsDB, resultsDB)
-	blocksDB := storage.NewBlocks(db, headersDB, payloadsDB)
-	qcsDB := storage.NewQuorumCertificates(metricsCollector, db, storage.DefaultCacheSize)
-	setupsDB := storage.NewEpochSetups(metricsCollector, db)
-	commitsDB := storage.NewEpochCommits(metricsCollector, db)
-	protocolStateDB := storage.NewEpochProtocolStateEntries(metricsCollector, setupsDB, commitsDB, db,
-		storage.DefaultEpochProtocolStateCacheSize, storage.DefaultProtocolStateIndexCacheSize)
-	protocolKVStoreDB := storage.NewProtocolKVStore(metricsCollector, db,
-		storage.DefaultProtocolKVStoreCacheSize, storage.DefaultProtocolKVStoreByBlockIDCacheSize)
-	versionBeaconDB := store.NewVersionBeacons(badgerimpl.ToDB(db))
->>>>>>> master
 	protocolStateEvents := events.NewDistributor()
 
 	localNodeID := identity.NodeID

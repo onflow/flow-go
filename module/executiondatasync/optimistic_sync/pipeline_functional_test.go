@@ -106,12 +106,8 @@ func (p *PipelineFunctionalSuite) SetupTest() {
 	// store and index the root header
 	p.headers = store.NewHeaders(p.metrics, p.db)
 
-<<<<<<< HEAD
 	insertLctx := p.lockManager.NewContext()
 	err = insertLctx.AcquireLock(storage.LockInsertBlock)
-=======
-	err = p.headers.Store(unittest.ProposalHeaderFromHeader(rootBlock))
->>>>>>> master
 	p.Require().NoError(err)
 
 	err = p.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
@@ -129,27 +125,19 @@ func (p *PipelineFunctionalSuite) SetupTest() {
 	lctx.Release()
 
 	// store and index the latest sealed block header
-<<<<<<< HEAD
 	insertLctx2 := p.lockManager.NewContext()
 	require.NoError(t, insertLctx2.AcquireLock(storage.LockInsertBlock))
 	err = p.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-		return operation.InsertHeader(insertLctx2, rw, sealedBlock.Header.ID(), sealedBlock.Header)
+		return operation.InsertHeader(insertLctx2, rw, sealedBlock.ID(), sealedBlock.ToHeader())
 	})
-=======
-	err = p.headers.Store(unittest.ProposalHeaderFromHeader(sealedBlock.ToHeader()))
->>>>>>> master
 	p.Require().NoError(err)
 	insertLctx2.Release()
 
-<<<<<<< HEAD
 	lctx = p.lockManager.NewContext()
 	require.NoError(t, lctx.AcquireLock(storage.LockFinalizeBlock))
 	err = p.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-		return operation.IndexFinalizedBlockByHeight(lctx, rw, sealedBlock.Header.Height, sealedBlock.ID())
+		return operation.IndexFinalizedBlockByHeight(lctx, rw, sealedBlock.Height, sealedBlock.ID())
 	})
-=======
-	err = p.bdb.Update(operation.IndexBlockHeight(sealedBlock.Height, sealedBlock.ID()))
->>>>>>> master
 	p.Require().NoError(err)
 	lctx.Release()
 

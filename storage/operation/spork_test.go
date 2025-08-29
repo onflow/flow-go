@@ -15,17 +15,17 @@ import (
 
 func TestSporkID_InsertRetrieve(t *testing.T) {
 	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
-		sporkID := unittest.IdentifierFixture()
+		sporkRootBlockID := unittest.IdentifierFixture()
 
 		err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			return operation.InsertSporkID(rw.Writer(), sporkID)
+			return operation.IndexSporkRootBlock(rw.Writer(), sporkRootBlockID)
 		})
 		require.NoError(t, err)
 
 		var actual flow.Identifier
-		err = operation.RetrieveSporkID(db.Reader(), &actual)
+		err = operation.RetrieveSporkRootBlockID(db.Reader(), &actual)
 		require.NoError(t, err)
 
-		assert.Equal(t, sporkID, actual)
+		assert.Equal(t, sporkRootBlockID, actual)
 	})
 }

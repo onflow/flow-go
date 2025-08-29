@@ -19,27 +19,27 @@ func TestBlockStoreAndRetrieve(t *testing.T) {
 		// verify after storing a block should be able to retrieve it back
 		blocks := store.InitAll(cacheMetrics, db).Blocks
 		block := unittest.FullBlockFixture()
-		block.SetPayload(unittest.PayloadFixture(unittest.WithAllTheFixins))
+		prop := unittest.ProposalFromBlock(block)
 
 		lctx := lockManager.NewContext()
 		err := lctx.AcquireLock(storage.LockInsertBlock)
 		require.NoError(t, err)
 
 		err = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			return blocks.BatchStore(lctx, rw, &block)
+			return blocks.BatchStore(lctx, rw, prop)
 		})
 		require.NoError(t, err)
 		lctx.Release()
 
 		retrieved, err := blocks.ByID(block.ID())
 		require.NoError(t, err)
-		require.Equal(t, &block, retrieved)
+		require.Equal(t, *block, *retrieved)
 
 		// repeated storage of the same block should return
 		lctx2 := lockManager.NewContext()
 		require.NoError(t, lctx2.AcquireLock(storage.LockInsertBlock))
 		err = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			return blocks.BatchStore(lctx2, rw, &block)
+			return blocks.BatchStore(lctx2, rw, prop)
 		})
 		require.ErrorIs(t, err, storage.ErrAlreadyExists)
 		lctx2.Release()
@@ -49,6 +49,6 @@ func TestBlockStoreAndRetrieve(t *testing.T) {
 		blocksAfterRestart := store.InitAll(cacheMetrics, db).Blocks
 		receivedAfterRestart, err := blocksAfterRestart.ByID(block.ID())
 		require.NoError(t, err)
-		require.Equal(t, &block, receivedAfterRestart)
+		require.Equal(t, *block, *receivedAfterRestart)
 	})
 }

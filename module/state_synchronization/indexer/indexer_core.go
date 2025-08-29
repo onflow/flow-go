@@ -354,25 +354,11 @@ func IndexCollection(
 	collectionExecutedMetric module.CollectionExecutedMetric,
 ) error {
 
-<<<<<<< HEAD
 	// FIX: we can't index guarantees here, as we might have more than one block
 	// with the same collection as long as it is not finalized
 
 	// store the collection, including constituent transactions, and index transactionID -> collectionID
 	light, err := collections.StoreAndIndexByTransaction(lctx, collection)
-=======
-	light := collection.Light()
-
-	collectionExecutedMetric.CollectionFinalized(*light)
-	collectionExecutedMetric.CollectionExecuted(*light)
-
-	// FIX: we can't index guarantees here, as we might have more than one block
-	// with the same collection as long as it is not finalized
-
-	// store the light collection (collection minus the transaction body - those are stored separately)
-	// and add transaction ids as index
-	err := collections.StoreLightAndIndexByTransaction(light)
->>>>>>> master
 	if err != nil {
 		return err
 	}

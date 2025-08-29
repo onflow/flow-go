@@ -4,10 +4,6 @@ import (
 	"fmt"
 	"testing"
 
-<<<<<<< HEAD
-=======
-	"github.com/dgraph-io/badger/v2"
->>>>>>> master
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/cmd/util/cmd/common"
@@ -74,22 +70,19 @@ func TestFindBlockTransactions(t *testing.T) {
 		state.On("AtHeight", uint64(5)).Return(snap5, nil)
 
 		// store into database
-<<<<<<< HEAD
+		p1 := unittest.ProposalFromBlock(b1)
+		p2 := unittest.ProposalFromBlock(b2)
 		lctx := lockManager.NewContext()
 		require.NoError(t, lctx.AcquireLock(storage.LockInsertBlock))
-		defer lctx.Release()
 		require.NoError(t, db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			err := storages.Blocks.BatchStore(lctx, rw, &b1)
+			err := storages.Blocks.BatchStore(lctx, rw, p1)
 			if err != nil {
 				return err
 			}
-=======
-		require.NoError(t, payloads.Store(b1.ID(), &b1.Payload))
-		require.NoError(t, payloads.Store(b2.ID(), &b2.Payload))
->>>>>>> master
 
-			return storages.Blocks.BatchStore(lctx, rw, &b2)
+			return storages.Blocks.BatchStore(lctx, rw, p2)
 		}))
+		lctx.Release()
 
 		_, err := collections.Store(&col1.Collection)
 		require.NoError(t, err)

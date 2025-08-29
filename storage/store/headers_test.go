@@ -22,7 +22,8 @@ func TestHeaderStoreRetrieve(t *testing.T) {
 		headers := all.Headers
 		blocks := all.Blocks
 
-		block := unittest.BlockFixture()
+		proposal := unittest.ProposalFixture()
+		block := proposal.Block
 
 		lctx := lockManager.NewContext()
 		err := lctx.AcquireLock(storage.LockInsertBlock)
@@ -31,7 +32,7 @@ func TestHeaderStoreRetrieve(t *testing.T) {
 
 		// store block which will also store header
 		err = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			return blocks.BatchStore(lctx, rw, &block)
+			return blocks.BatchStore(lctx, rw, proposal)
 		})
 		require.NoError(t, err)
 
@@ -39,15 +40,15 @@ func TestHeaderStoreRetrieve(t *testing.T) {
 		require.NoError(t, lctx2.AcquireLock(storage.LockFinalizeBlock))
 		// index the header
 		err = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			return operation.IndexFinalizedBlockByHeight(lctx2, rw, block.Header.Height, block.ID())
+			return operation.IndexFinalizedBlockByHeight(lctx2, rw, block.Height, block.ID())
 		})
 		lctx2.Release()
 		require.NoError(t, err)
 
 		// retrieve header by height
-		actual, err := headers.ByHeight(block.Header.Height)
+		actual, err := headers.ByHeight(block.Height)
 		require.NoError(t, err)
-		require.Equal(t, block.Header, actual)
+		require.Equal(t, block.ToHeader(), actual)
 	})
 }
 

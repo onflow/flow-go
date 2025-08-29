@@ -59,40 +59,10 @@ func (m *MutableState) getExtendCtx(candidate *cluster.Block) (extendContext, er
 	var ctx extendContext
 	ctx.candidate = candidate
 
-<<<<<<< HEAD
 	r := m.State.db.Reader()
 	// get the latest finalized cluster block and latest finalized consensus height
 	ctx.finalizedClusterBlock = new(flow.Header)
-	err := procedure.RetrieveLatestFinalizedClusterHeader(r, candidate.Header.ChainID, ctx.finalizedClusterBlock)
-=======
-	err := m.State.db.View(func(tx *badger.Txn) error {
-		// get the latest finalized cluster block and latest finalized consensus height
-		ctx.finalizedClusterBlock = new(flow.Header)
-		err := procedure.RetrieveLatestFinalizedClusterHeader(candidate.ChainID, ctx.finalizedClusterBlock)(tx)
-		if err != nil {
-			return fmt.Errorf("could not retrieve finalized cluster head: %w", err)
-		}
-		err = operation.RetrieveFinalizedHeight(&ctx.finalizedConsensusHeight)(tx)
-		if err != nil {
-			return fmt.Errorf("could not retrieve finalized height on consensus chain: %w", err)
-		}
-
-		err = operation.RetrieveEpochFirstHeight(m.State.epoch, &ctx.epochFirstHeight)(tx)
-		if err != nil {
-			return fmt.Errorf("could not get operating epoch first height: %w", err)
-		}
-		err = operation.RetrieveEpochLastHeight(m.State.epoch, &ctx.epochLastHeight)(tx)
-		if err != nil {
-			if errors.Is(err, storage.ErrNotFound) {
-				ctx.epochHasEnded = false
-				return nil
-			}
-			return fmt.Errorf("unexpected failure to retrieve final height of operating epoch: %w", err)
-		}
-		ctx.epochHasEnded = true
-		return nil
-	})
->>>>>>> master
+	err := procedure.RetrieveLatestFinalizedClusterHeader(r, candidate.ChainID, ctx.finalizedClusterBlock)
 	if err != nil {
 		return extendContext{}, fmt.Errorf("could not retrieve finalized cluster head: %w", err)
 	}
@@ -174,13 +144,9 @@ func (m *MutableState) Extend(proposal *cluster.Proposal) error {
 	}
 
 	span, _ = m.tracer.StartSpanFromContext(ctx, trace.COLClusterStateMutatorExtendDBInsert)
-<<<<<<< HEAD
 	err = m.State.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-		return procedure.InsertClusterBlock(lctx, rw, candidate)
+		return procedure.InsertClusterBlock(lctx, rw, proposal)
 	})
-=======
-	err = operation.RetryOnConflict(m.State.db.Update, procedure.InsertClusterBlock(proposal))
->>>>>>> master
 	span.End()
 	if err != nil {
 		return fmt.Errorf("could not insert cluster block: %w", err)

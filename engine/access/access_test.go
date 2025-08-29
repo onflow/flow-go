@@ -411,37 +411,27 @@ func (suite *Suite) TestGetBlockByIDAndHeight() {
 		)
 		proposal2 := unittest.ProposalFromBlock(block2)
 
-<<<<<<< HEAD
 		bdb := badgerimpl.ToDB(db)
 		lctx := suite.lockManager.NewContext()
 		require.NoError(suite.T(), lctx.AcquireLock(storage.LockInsertBlock))
 		require.NoError(suite.T(), bdb.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			if err := all.Blocks.BatchStore(lctx, rw, &block1); err != nil {
+			if err := all.Blocks.BatchStore(lctx, rw, proposal1); err != nil {
 				return err
 			}
-			if err := all.Blocks.BatchStore(lctx, rw, &block2); err != nil {
+			if err := all.Blocks.BatchStore(lctx, rw, proposal2); err != nil {
 				return err
 			}
 			return nil
 		}))
 		lctx.Release()
-=======
-		require.NoError(suite.T(), all.Blocks.Store(proposal1))
-		require.NoError(suite.T(), all.Blocks.Store(proposal2))
->>>>>>> master
 
 		fctx := suite.lockManager.NewContext()
 		require.NoError(suite.T(), fctx.AcquireLock(storage.LockFinalizeBlock))
 		// the follower logic should update height index on the block storage when a block is finalized
-<<<<<<< HEAD
 		require.NoError(suite.T(), bdb.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			return operation.IndexFinalizedBlockByHeight(fctx, rw, block2.Header.Height, block2.ID())
+			return operation.IndexFinalizedBlockByHeight(fctx, rw, block2.Height, block2.ID())
 		}))
 		fctx.Release()
-=======
-		err := db.Update(operation.IndexBlockHeight(block2.Height, block2.ID()))
-		require.NoError(suite.T(), err)
->>>>>>> master
 
 		assertHeaderResp := func(
 			resp *accessproto.BlockHeaderResponse,
@@ -684,26 +674,13 @@ func (suite *Suite) TestGetSealedTransaction() {
 
 		// initialize storage
 		metrics := metrics.NewNoopCollector()
-<<<<<<< HEAD
 		storedb := badgerimpl.ToDB(db)
 		transactions := store.NewTransactions(metrics, storedb)
 		collections := store.NewCollections(storedb, transactions)
-		collectionsToMarkFinalized, err := stdmap.NewTimes(100)
-		require.NoError(suite.T(), err)
-		collectionsToMarkExecuted, err := stdmap.NewTimes(100)
-		require.NoError(suite.T(), err)
-		blocksToMarkExecuted, err := stdmap.NewTimes(100)
-		require.NoError(suite.T(), err)
-		blockTransactions, err := stdmap.NewIdentifierMap(100)
-		require.NoError(suite.T(), err)
-=======
-		transactions := bstorage.NewTransactions(metrics, db)
-		collections := bstorage.NewCollections(db, transactions)
 		collectionsToMarkFinalized := stdmap.NewTimes(100)
 		collectionsToMarkExecuted := stdmap.NewTimes(100)
 		blocksToMarkExecuted := stdmap.NewTimes(100)
 		blockTransactions := stdmap.NewIdentifierMap(100)
->>>>>>> master
 
 		execNodeIdentitiesProvider := commonrpc.NewExecutionNodeIdentitiesProvider(
 			suite.log,
@@ -786,12 +763,11 @@ func (suite *Suite) TestGetSealedTransaction() {
 		require.NoError(suite.T(), err)
 
 		// 1. Assume that follower engine updated the block storage and the protocol state. The block is reported as sealed
-<<<<<<< HEAD
 		bdb := badgerimpl.ToDB(db)
 		lctx := suite.lockManager.NewContext()
 		require.NoError(suite.T(), lctx.AcquireLock(storage.LockInsertBlock))
 		require.NoError(suite.T(), bdb.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			return all.Blocks.BatchStore(lctx, rw, block)
+			return all.Blocks.BatchStore(lctx, rw, proposal)
 		}))
 		lctx.Release()
 
@@ -799,15 +775,8 @@ func (suite *Suite) TestGetSealedTransaction() {
 		defer fctx.Release()
 		require.NoError(suite.T(), fctx.AcquireLock(storage.LockFinalizeBlock))
 		require.NoError(suite.T(), bdb.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			return operation.IndexFinalizedBlockByHeight(fctx, rw, block.Header.Height, block.ID())
+			return operation.IndexFinalizedBlockByHeight(fctx, rw, block.Height, block.ID())
 		}))
-=======
-		err = all.Blocks.Store(proposal)
-		require.NoError(suite.T(), err)
-
-		err = db.Update(operation.IndexBlockHeight(block.Height, block.ID()))
-		require.NoError(suite.T(), err)
->>>>>>> master
 
 		suite.sealedBlock = block.ToHeader()
 
@@ -883,27 +852,20 @@ func (suite *Suite) TestGetTransactionResult() {
 		// specifically for this test we will consider that sealed block is far behind finalized, so we get EXECUTED status
 		suite.sealedSnapshot.On("Head").Return(sealedBlock, nil)
 
-<<<<<<< HEAD
 		bdb := badgerimpl.ToDB(db)
 		lctx := suite.lockManager.NewContext()
 		require.NoError(suite.T(), lctx.AcquireLock(storage.LockInsertBlock))
 		require.NoError(suite.T(), bdb.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			return all.Blocks.BatchStore(lctx, rw, block)
+			return all.Blocks.BatchStore(lctx, rw, proposal)
 		}))
 		lctx.Release()
 
 		lctx2 := suite.lockManager.NewContext()
 		require.NoError(suite.T(), lctx2.AcquireLock(storage.LockInsertBlock))
 		require.NoError(suite.T(), bdb.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			return all.Blocks.BatchStore(lctx2, rw, blockNegative)
+			return all.Blocks.BatchStore(lctx2, rw, proposalNegative)
 		}))
 		lctx2.Release()
-=======
-		err := all.Blocks.Store(proposal)
-		require.NoError(suite.T(), err)
-		err = all.Blocks.Store(proposalNegative)
-		require.NoError(suite.T(), err)
->>>>>>> master
 
 		suite.state.On("AtBlockID", blockId).Return(suite.sealedSnapshot)
 
@@ -1060,19 +1022,13 @@ func (suite *Suite) TestGetTransactionResult() {
 				require.NoError(suite.T(), err)
 			}
 		}
-<<<<<<< HEAD
 		fctx2 := suite.lockManager.NewContext()
 		require.NoError(suite.T(), fctx2.AcquireLock(storage.LockFinalizeBlock))
 		require.NoError(suite.T(), bdb.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			return operation.IndexFinalizedBlockByHeight(fctx2, rw, block.Header.Height, block.ID())
+			return operation.IndexFinalizedBlockByHeight(fctx2, rw, block.Height, block.ID())
 		}))
 		fctx2.Release()
-		finalSnapshot.On("Head").Return(block.Header, nil)
-=======
-		err = db.Update(operation.IndexBlockHeight(block.Height, block.ID()))
-		require.NoError(suite.T(), err)
 		finalSnapshot.On("Head").Return(block.ToHeader(), nil)
->>>>>>> master
 
 		processExecutionReceipts(&block, collection, enNodeIDs, originID, ingestEng)
 		processExecutionReceipts(&blockNegative, collectionNegative, enNodeIDs, originID, ingestEng)
@@ -1301,15 +1257,13 @@ func (suite *Suite) TestExecuteScript() {
 
 		// create another block as a predecessor of the block created earlier
 		prevBlock := unittest.BlockWithParentFixture(suite.finalizedBlock)
-		prevProposal := unittest.ProposalFromBlock(prevBlock)
 
 		// create a block and a seal pointing to that block
-<<<<<<< HEAD
-		lastBlock := unittest.BlockWithParentFixture(prevBlock.Header)
+		lastBlock := unittest.BlockWithParentFixture(prevBlock.ToHeader())
 		lctx := lockManager.NewContext()
 		require.NoError(suite.T(), lctx.AcquireLock(storage.LockInsertBlock))
 		require.NoError(suite.T(), db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			return all.Blocks.BatchStore(lctx, rw, lastBlock)
+			return all.Blocks.BatchStore(lctx, rw, unittest.ProposalFromBlock(lastBlock))
 		}))
 		lctx.Release()
 		require.NoError(suite.T(), err)
@@ -1317,16 +1271,9 @@ func (suite *Suite) TestExecuteScript() {
 		fctx := lockManager.NewContext()
 		require.NoError(suite.T(), fctx.AcquireLock(storage.LockFinalizeBlock))
 		require.NoError(suite.T(), db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			return operation.IndexFinalizedBlockByHeight(fctx, rw, lastBlock.Header.Height, lastBlock.ID())
+			return operation.IndexFinalizedBlockByHeight(fctx, rw, lastBlock.Height, lastBlock.ID())
 		}))
 		fctx.Release()
-=======
-		lastBlock := unittest.BlockWithParentFixture(prevBlock.ToHeader())
-		lastProposal := unittest.ProposalFromBlock(lastBlock)
-		err = all.Blocks.Store(lastProposal)
-		require.NoError(suite.T(), err)
-		err = db.Update(operation.IndexBlockHeight(lastBlock.Height, lastBlock.ID()))
->>>>>>> master
 		require.NoError(suite.T(), err)
 		// update latest sealed block
 		suite.sealedBlock = lastBlock.ToHeader()
@@ -1338,25 +1285,18 @@ func (suite *Suite) TestExecuteScript() {
 			require.NoError(suite.T(), err)
 		}
 
-<<<<<<< HEAD
 		fctx2 := lockManager.NewContext()
 		require.NoError(suite.T(), fctx2.AcquireLock(storage.LockInsertBlock))
 		require.NoError(suite.T(), fctx2.AcquireLock(storage.LockFinalizeBlock))
 		require.NoError(suite.T(), db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			err := all.Blocks.BatchStore(fctx2, rw, prevBlock)
+			err := all.Blocks.BatchStore(fctx2, rw, unittest.ProposalFromBlock(prevBlock))
 			if err != nil {
 				return err
 			}
 
-			return operation.IndexFinalizedBlockByHeight(fctx2, rw, prevBlock.Header.Height, prevBlock.ID())
+			return operation.IndexFinalizedBlockByHeight(fctx2, rw, prevBlock.Height, prevBlock.ID())
 		}))
 		fctx2.Release()
-=======
-		err = all.Blocks.Store(prevProposal)
-		require.NoError(suite.T(), err)
-		err = db.Update(operation.IndexBlockHeight(prevBlock.Height, prevBlock.ID()))
-		require.NoError(suite.T(), err)
->>>>>>> master
 
 		// create execution receipts for each of the execution node and the previous block
 		executionReceipts = unittest.ReceiptsForBlockFixture(prevBlock, identities.NodeIDs())
@@ -1481,16 +1421,12 @@ func (suite *Suite) TestLastFinalizedBlockHeightResult() {
 		lctx := suite.lockManager.NewContext()
 		err := lctx.AcquireLock(storage.LockInsertBlock)
 		require.NoError(suite.T(), err)
-		defer lctx.Release()
 
 		// store new block
-<<<<<<< HEAD
 		require.NoError(suite.T(), db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			return all.Blocks.BatchStore(lctx, rw, block)
+			return all.Blocks.BatchStore(lctx, rw, proposal)
 		}))
-=======
-		require.NoError(suite.T(), all.Blocks.Store(proposal))
->>>>>>> master
+		lctx.Release()
 
 		assertFinalizedBlockHeader := func(resp *accessproto.BlockHeaderResponse, err error) {
 			require.NoError(suite.T(), err)

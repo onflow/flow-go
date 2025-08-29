@@ -18,12 +18,12 @@ func (_m *CollectionExecutedMetric) BlockFinalized(block *flow.GenericBlock[flow
 }
 
 // CollectionExecuted provides a mock function with given fields: light
-func (_m *CollectionExecutedMetric) CollectionExecuted(light flow.LightCollection) {
+func (_m *CollectionExecutedMetric) CollectionExecuted(light *flow.LightCollection) {
 	_m.Called(light)
 }
 
 // CollectionFinalized provides a mock function with given fields: light
-func (_m *CollectionExecutedMetric) CollectionFinalized(light flow.LightCollection) {
+func (_m *CollectionExecutedMetric) CollectionFinalized(light *flow.LightCollection) {
 	_m.Called(light)
 }
 
