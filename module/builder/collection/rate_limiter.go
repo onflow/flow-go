@@ -114,18 +114,10 @@ func (limiter *rateLimiter) shouldRateLimit(tx *flow.TransactionBody) bool {
 	return false
 }
 
-// BySealingLagRateLimiter implements collection throttling based on the sealing lag.
-// It can be configured to allow a minimum and maximum sealing lag, as well as a halving interval.
-type BySealingLagRateLimiter struct {
-	state                 protocol.State
-	minSealingLag         uint
-	maxSealingLag         uint
-	halvingInterval       uint
-	minCollectionSize     uint
-	maxCollectionSize     uint
-	currentCollectionSize uint
-}
-
+// GetMaxCollectionSizeForSealingLag computes the maximum collection size based on the sealing lag using a step halving algorithm.
+// The function takes the current protocol state, minimum and maximum sealing lag, halving interval, minimum and maximum collection size as input parameters
+// and outputs a single uint representing the maximum collection size allowed for the current sealing lag.
+// No errors are expected during normal operations.
 func GetMaxCollectionSizeForSealingLag(
 	state protocol.State,
 	minSealingLag uint,
