@@ -1510,6 +1510,9 @@ func TestExtendDuplicateEpochEvents(t *testing.T) {
 
 		// block 5 builds on block 3, contains seal for block 1
 		block5View := block3.View + 1
+		if block5View == block4.View {
+			block5View++
+		}
 		block5 := unittest.BlockFixture(
 			unittest.Block.WithParent(block3.ID(), block3.View, block3.Height),
 			unittest.Block.WithView(block5View),
@@ -1525,6 +1528,12 @@ func TestExtendDuplicateEpochEvents(t *testing.T) {
 
 		// block 6 builds on block 4, contains seal for block 2
 		block6View := block4.View + 1
+		for {
+			if _, ok := usedViews[block6View]; !ok {
+				break
+			}
+			block6View++
+		}
 		block6 := unittest.BlockFixture(
 			unittest.Block.WithParent(block4.ID(), block4.View, block4.Height),
 			unittest.Block.WithView(block6View),
@@ -1539,7 +1548,7 @@ func TestExtendDuplicateEpochEvents(t *testing.T) {
 		require.NoError(t, err)
 
 		// block 7 builds on block 5, contains QC for block 5
-		block7 := unittest.BlockWithParentProtocolState(block5)
+		block7 := unittest.BlockWithParentProtocolStateAndUniqueView(block5, usedViews)
 		err = state.Extend(context.Background(), unittest.ProposalFromBlock(block7))
 		require.NoError(t, err)
 
