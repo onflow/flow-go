@@ -177,7 +177,7 @@ func Bootstrap(
 		}
 
 		// initialize spork params
-		err = bootstrapSporkInfo(rw, sporkRootBlock)
+		err = bootstrapSporkInfo(lctx, rw, blocks, sporkRootBlock)
 		if err != nil {
 			return fmt.Errorf("could not bootstrap spork info: %w", err)
 		}
@@ -709,7 +709,9 @@ func bootstrapEpochForProtocolStateEntry(
 // bootstrapSporkInfo bootstraps the protocol state with information about the
 // spork which is used to disambiguate Flow networks.
 func bootstrapSporkInfo(
+	lctx lockctx.Proof,
 	rw storage.ReaderBatchWriter,
+	blocks storage.Blocks,
 	sporkRootBlock *flow.Block,
 ) error {
 
@@ -721,8 +723,24 @@ func bootstrapSporkInfo(
 		return fmt.Errorf("could not insert spork ID: %w", err)
 	}
 
-	// no need to store the spork root block, because bootstrapSealingSegment
-	// has stored it
+	proposal, err := flow.NewRootProposal(
+		flow.UntrustedProposal{
+			Block:           *sporkRootBlock,
+			ProposerSigData: nil,
+		},
+	)
+	if err != nil {
+		return fmt.Errorf("could not create root proposal for spork root block: %w", err)
+	}
+
+	err = blocks.BatchStore(lctx, rw, proposal)
+	if err != nil {
+		if errors.Is(err, storage.ErrAlreadyExists) {
+			return nil
+		}
+		return fmt.Errorf("could not store spork root block: %w", err)
+	}
+
 	return nil
 }
 
