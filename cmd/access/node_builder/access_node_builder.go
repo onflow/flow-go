@@ -1793,7 +1793,9 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				builder.rpcMetricsEnabled,
 				builder.apiRatelimits,
 				builder.apiBurstlimits,
-				grpcserver.WithTransportCredentials(builder.rpcConf.TransportCredentials)).Build()
+				grpcserver.WithTransportCredentials(builder.rpcConf.TransportCredentials),
+				grpcserver.WithLoggingInterceptor(),
+			).Build()
 
 			builder.stateStreamGrpcServer = grpcserver.NewGrpcServerBuilder(
 				node.Logger,
@@ -1802,7 +1804,9 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				builder.rpcMetricsEnabled,
 				builder.apiRatelimits,
 				builder.apiBurstlimits,
-				grpcserver.WithStreamInterceptor()).Build()
+				grpcserver.WithStreamInterceptor(),
+				grpcserver.WithLoggingInterceptor(),
+			).Build()
 
 			if builder.rpcConf.UnsecureGRPCListenAddr != builder.stateStreamConf.ListenAddr {
 				builder.unsecureGrpcServer = grpcserver.NewGrpcServerBuilder(node.Logger,
@@ -1810,7 +1814,9 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 					builder.rpcConf.MaxMsgSize,
 					builder.rpcMetricsEnabled,
 					builder.apiRatelimits,
-					builder.apiBurstlimits).Build()
+					builder.apiBurstlimits,
+					grpcserver.WithLoggingInterceptor(),
+				).Build()
 			} else {
 				builder.unsecureGrpcServer = builder.stateStreamGrpcServer
 			}

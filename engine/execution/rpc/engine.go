@@ -5,7 +5,6 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"net"
 	"sort"
 	"strings"
 	"unicode/utf8"
@@ -24,13 +23,13 @@ import (
 	_ "github.com/onflow/flow-go/engine/common/grpc/compressor/snappy"  // required for gRPC compression
 
 	"github.com/onflow/flow-go/consensus/hotstuff"
-	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	exeEng "github.com/onflow/flow-go/engine/execution"
 	"github.com/onflow/flow-go/engine/execution/computation/metrics"
 	"github.com/onflow/flow-go/engine/execution/state"
 	fvmerrors "github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/grpcserver"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
@@ -47,16 +46,16 @@ type Config struct {
 
 // Engine implements a gRPC server with a simplified version of the Observation API.
 type Engine struct {
-	unit    *engine.Unit
+	component.Component
+	server  *grpcserver.GrpcServer
+	handler *handler
 	log     zerolog.Logger
-	handler *handler     // the gRPC service implementation
-	server  *grpc.Server // the gRPC server
-	config  Config
 }
 
 // New returns a new RPC engine.
 func New(
 	log zerolog.Logger,
+	server *grpcserver.GrpcServer,
 	config Config,
 	scriptsExecutor exeEng.ScriptExecutor,
 	headers storage.Headers,
@@ -68,94 +67,40 @@ func New(
 	transactionMetrics metrics.TransactionExecutionMetricsProvider,
 	chainID flow.ChainID,
 	signerIndicesDecoder hotstuff.BlockSignerDecoder,
-	apiRatelimits map[string]int, // the api rate limit (max calls per second) for each of the gRPC API e.g. Ping->100, ExecuteScriptAtBlockID->300
-	apiBurstLimits map[string]int, // the api burst limit (max calls at the same time) for each of the gRPC API e.g. Ping->50, ExecuteScriptAtBlockID->10
 ) *Engine {
 	log = log.With().Str("engine", "rpc").Logger()
-	serverOptions := []grpc.ServerOption{
-		grpc.MaxRecvMsgSize(int(config.MaxMsgSize)),
-		grpc.MaxSendMsgSize(int(config.MaxMsgSize)),
-	}
 
-	var interceptors []grpc.UnaryServerInterceptor // ordered list of interceptors
-	// if rpc metrics is enabled, add the grpc metrics interceptor as a server option
-	if config.RpcMetricsEnabled {
-		interceptors = append(interceptors, grpc_prometheus.UnaryServerInterceptor)
-	}
-
-	if len(apiRatelimits) > 0 {
-		// create a rate limit interceptor
-		rateLimitInterceptor := grpcserver.NewRateLimiterInterceptor(log, apiRatelimits, apiBurstLimits).UnaryServerInterceptor
-		// append the rate limit interceptor to the list of interceptors
-		interceptors = append(interceptors, rateLimitInterceptor)
-	}
-
-	// create a chained unary interceptor
-	chainedInterceptors := grpc.ChainUnaryInterceptor(interceptors...)
-	serverOptions = append(serverOptions, chainedInterceptors)
-
-	server := grpc.NewServer(serverOptions...)
-
-	eng := &Engine{
-		log:  log,
-		unit: engine.NewUnit(),
-		handler: &handler{
-			engine:               scriptsExecutor,
-			chain:                chainID,
-			headers:              headers,
-			state:                state,
-			signerIndicesDecoder: signerIndicesDecoder,
-			events:               events,
-			exeResults:           exeResults,
-			transactionResults:   txResults,
-			commits:              commits,
-			transactionMetrics:   transactionMetrics,
-			log:                  log,
-			maxBlockRange:        DefaultMaxBlockRange,
-		},
-		server: server,
-		config: config,
+	handler := &handler{
+		engine:               scriptsExecutor,
+		chain:                chainID,
+		headers:              headers,
+		state:                state,
+		signerIndicesDecoder: signerIndicesDecoder,
+		events:               events,
+		exeResults:           exeResults,
+		transactionResults:   txResults,
+		commits:              commits,
+		transactionMetrics:   transactionMetrics,
+		log:                  log,
+		maxBlockRange:        DefaultMaxBlockRange,
 	}
 
 	if config.RpcMetricsEnabled {
 		grpc_prometheus.EnableHandlingTimeHistogram()
-		grpc_prometheus.Register(server)
+		server.RegisterService(func(s *grpc.Server) {
+			grpc_prometheus.Register(s)
+		})
 	}
 
-	execution.RegisterExecutionAPIServer(eng.server, eng.handler)
+	server.RegisterService(func(s *grpc.Server) {
+		execution.RegisterExecutionAPIServer(s, handler)
+	})
 
-	return eng
-}
-
-// Ready returns a ready channel that is closed once the engine has fully
-// started. The RPC engine is ready when the gRPC server has successfully
-// started.
-func (e *Engine) Ready() <-chan struct{} {
-	e.unit.Launch(e.serve)
-	return e.unit.Ready()
-}
-
-// Done returns a done channel that is closed once the engine has fully stopped.
-// It sends a signal to stop the gRPC server, then closes the channel.
-func (e *Engine) Done() <-chan struct{} {
-	return e.unit.Done(e.server.GracefulStop)
-}
-
-// serve starts the gRPC server .
-//
-// When this function returns, the server is considered ready.
-func (e *Engine) serve() {
-	e.log.Info().Msgf("starting server on address %s", e.config.ListenAddr)
-
-	l, err := net.Listen("tcp", e.config.ListenAddr)
-	if err != nil {
-		e.log.Err(err).Msg("failed to start server")
-		return
-	}
-
-	err = e.server.Serve(l)
-	if err != nil {
-		e.log.Err(err).Msg("fatal error in server")
+	return &Engine{
+		Component: server,
+		server:    server,
+		handler:   handler,
+		log:       log,
 	}
 }
 
