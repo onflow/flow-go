@@ -2,9 +2,11 @@ package debug
 
 import (
 	"github.com/onflow/cadence"
+	"github.com/onflow/cadence/runtime"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/fvm"
+	reusableRuntime "github.com/onflow/flow-go/fvm/runtime"
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -13,6 +15,10 @@ type RemoteDebugger struct {
 	vm  fvm.VM
 	ctx fvm.Context
 }
+
+// ReusableCadenceRuntimePoolSize is the size of the reusable cadence runtime pool.
+// Copied from engine/execution/computation/manager.go to avoid circular dependency.
+const reusableCadenceRuntimePoolSize = 1000
 
 // NewRemoteDebugger creates a new remote debugger.
 // NOTE: Make sure to use the same version of flow-go as the network
@@ -23,18 +29,31 @@ func NewRemoteDebugger(
 	logger zerolog.Logger,
 	vmTransactionExecutionEnabled bool,
 	vmScriptExecutionEnabled bool,
+	options ...fvm.Option,
 ) *RemoteDebugger {
 	vm := fvm.NewVirtualMachine()
 
 	// no signature processor here
 	// TODO Maybe we add fee-deduction step as well
+
 	ctx := fvm.NewContext(
-		fvm.WithLogger(logger),
-		fvm.WithChain(chain),
-		fvm.WithAuthorizationChecksEnabled(false),
-		fvm.WithEVMEnabled(true),
-		fvm.WithVMTransactionExecutionEnabled(vmTransactionExecutionEnabled),
-		fvm.WithVMScriptExecutionEnabled(vmScriptExecutionEnabled),
+		append(
+			[]fvm.Option{
+				fvm.WithLogger(logger),
+				fvm.WithChain(chain),
+				fvm.WithAuthorizationChecksEnabled(false),
+				fvm.WithEVMEnabled(true),
+				fvm.WithVMTransactionExecutionEnabled(vmTransactionExecutionEnabled),
+				fvm.WithVMScriptExecutionEnabled(vmScriptExecutionEnabled),
+				fvm.WithReusableCadenceRuntimePool(
+					reusableRuntime.NewReusableCadenceRuntimePool(
+						reusableCadenceRuntimePoolSize,
+						runtime.Config{},
+					)),
+				fvm.WithEVMEnabled(true),
+			},
+			options...,
+		)...,
 	)
 
 	return &RemoteDebugger{
