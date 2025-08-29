@@ -117,8 +117,6 @@ func TestStoreConflictingGuarantee(t *testing.T) {
 		block := unittest.BlockWithGuaranteesFixture([]*flow.CollectionGuarantee{expected})
 		proposal := unittest.ProposalFromBlock(block)
 
-		lctx := lockManager.NewContext()
-		require.NoError(t, lctx.AcquireLock(storage.LockInsertBlock))
 		unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
 			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 				return blocks.BatchStore(lctx, rw, proposal)
