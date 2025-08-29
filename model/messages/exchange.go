@@ -31,5 +31,4 @@ type EntityResponse flow.EntityResponse
 // representation.
 func (e *EntityResponse) ToInternal() (any, error) {
 	return (*flow.EntityResponse)(e), nil
-	//return e, nil
 }
