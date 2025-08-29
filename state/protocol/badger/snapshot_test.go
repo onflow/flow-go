@@ -161,12 +161,15 @@ func TestSnapshot_Descendants(t *testing.T) {
 	require.NoError(t, err)
 	util.RunWithFullProtocolState(t, rootSnapshot, func(db *badger.DB, state *bprotocol.ParticipantState) {
 		var expectedBlocks []flow.Identifier
+		usedViews := make(map[uint64]struct{})
+		usedViews[head.View] = struct{}{}
 		for i := 5; i > 3; i-- {
 			parent := head
 			for n := 0; n < i; n++ {
-				block := unittest.BlockWithParentAndPayload(
+				block := unittest.BlockWithParentAndPayloadAndUniqueView(
 					parent,
 					unittest.PayloadFixture(unittest.WithProtocolStateID(rootProtocolStateID)),
+					usedViews,
 				)
 				err := state.Extend(context.Background(), unittest.ProposalFromBlock(block))
 				require.NoError(t, err)
