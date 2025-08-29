@@ -24,7 +24,7 @@ type BuilderFactory struct {
 	opts             []builder.Opt
 	metrics          module.CollectionMetrics
 	pusher           collection.GuaranteedCollectionPublisher // engine for pushing finalized collection to consensus committee
-	configGetter     module.BySealingLagRateLimiterConfigGetter
+	configGetter     module.ReadonlySealingLagRateLimiterConfig
 	log              zerolog.Logger
 }
 
@@ -36,7 +36,7 @@ func NewBuilderFactory(
 	metrics module.CollectionMetrics,
 	pusher collection.GuaranteedCollectionPublisher,
 	log zerolog.Logger,
-	configGetter module.BySealingLagRateLimiterConfigGetter,
+	configGetter module.ReadonlySealingLagRateLimiterConfig,
 	opts ...builder.Opt,
 ) (*BuilderFactory, error) {
 

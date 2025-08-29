@@ -126,54 +126,30 @@ type BySealingLagRateLimiter struct {
 	currentCollectionSize uint
 }
 
-// NewBySealingLagRateLimiter creates a new BySealingLagRateLimiter instance.
-// No errors are expected during normal operations.
-func NewBySealingLagRateLimiter(
+func GetMaxCollectionSizeForSealingLag(
 	state protocol.State,
 	minSealingLag uint,
 	maxSealingLag uint,
 	halvingInterval uint,
 	minCollectionSize uint,
-	maxCollectionSize uint,
-) (*BySealingLagRateLimiter, error) {
-	limiter := &BySealingLagRateLimiter{
-		state:             state,
-		minSealingLag:     minSealingLag,
-		maxSealingLag:     maxSealingLag,
-		halvingInterval:   halvingInterval,
-		minCollectionSize: minCollectionSize,
-		maxCollectionSize: maxCollectionSize,
-	}
-	err := limiter.update()
-	if err != nil {
-		return nil, err
-	}
-	return limiter, nil
-}
+	maxCollectionSize uint) (uint, error) {
 
-// update updates the current collection size based on the sealing lag.
-func (limiter *BySealingLagRateLimiter) update() error {
-	lastFinalized, err := limiter.state.Final().Head()
+	lastFinalized, err := state.Final().Head()
 	if err != nil {
-		return err
+		return 0, err
 	}
-	lastSealed, err := limiter.state.Sealed().Head()
+	lastSealed, err := state.Sealed().Head()
 	if err != nil {
-		return err
+		return 0, err
 	}
 	sealingLag := uint(lastFinalized.Height - lastSealed.Height)
-	limiter.currentCollectionSize = StepHalving(
-		[2]uint{limiter.minSealingLag, limiter.maxSealingLag},         // [minSealingLag, maxSealingLag] is the range of input values where the halving is applied
-		[2]uint{limiter.minCollectionSize, limiter.maxCollectionSize}, // [minCollectionSize, maxCollectionSize] is the range of collection sizes that halving function outputs
-		sealingLag,              // the current sealing lag
-		limiter.halvingInterval, // interval in blocks in which the halving is applied
+	collectionSize := StepHalving(
+		[2]uint{minSealingLag, maxSealingLag},         // [minSealingLag, maxSealingLag] is the range of input values where the halving is applied
+		[2]uint{minCollectionSize, maxCollectionSize}, // [minCollectionSize, maxCollectionSize] is the range of collection sizes that halving function outputs
+		sealingLag,      // the current sealing lag
+		halvingInterval, // interval in blocks in which the halving is applied
 	)
-	return nil
-}
-
-// MaxCollectionSize returns the maximum size of a collection that this rate limiter allows.
-func (limiter *BySealingLagRateLimiter) MaxCollectionSize() uint {
-	return limiter.currentCollectionSize
+	return collectionSize, nil
 }
 
 // StepHalving applies a step halving algorithm to determine the maximum collection size based on the sealing lag.

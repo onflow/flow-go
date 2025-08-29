@@ -14,11 +14,11 @@ type bySealingLagRateLimiterConfigs struct {
 	minCollectionSize *atomic.Uint32
 }
 
-var _ module.BySealingLagRateLimiterConfigSetter = (*bySealingLagRateLimiterConfigs)(nil)
+var _ module.SealingLagRateLimiterConfig = (*bySealingLagRateLimiterConfigs)(nil)
 
 // DefaultBySealingLagRateLimiterConfigs returns a default config for collection throttling.
 // It performs binary throttling once the sealing lag reaches max sealing lag.
-func DefaultBySealingLagRateLimiterConfigs() module.BySealingLagRateLimiterConfigSetter {
+func DefaultBySealingLagRateLimiterConfigs() module.SealingLagRateLimiterConfig {
 	// default config results in binary throttling once the sealing lag reaches max sealing lag, before that no throttling
 	// is being applied. The 600 blocks is chosen as it is roughly 5 minutes.
 	// 2 blocks / second * 60 seconds * 5 minutes = 600 blocks

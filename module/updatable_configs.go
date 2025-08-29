@@ -29,15 +29,15 @@ type SealingConfigsSetter interface {
 	SetRequiredApprovalsForSealingConstruction(newVal uint) error
 }
 
-// BySealingLagRateLimiterConfigGetter is an interface for the actual updatable configs module.
+// ReadonlySealingLagRateLimiterConfig is an interface for the actual updatable configs module.
 // but only exposes its getter methods to return the config values without exposing
 // its setter methods.
-// BySealingLagRateLimiterConfigGetter contains several configs:
+// ReadonlySealingLagRateLimiterConfig contains several configs:
 // - MinSealingLag (updatable)
 // - MaxSealingLag (updatable)
 // - HalvingInterval (updatable)
 // - MinCollectionSize (updatable)
-type BySealingLagRateLimiterConfigGetter interface {
+type ReadonlySealingLagRateLimiterConfig interface {
 	// MinSealingLag is the minimum sealing lag that the rate limiter will allow.
 	MinSealingLag() uint
 	// MaxSealingLag is the maximum sealing lag that the rate limiter will allow.
@@ -48,9 +48,9 @@ type BySealingLagRateLimiterConfigGetter interface {
 	MinCollectionSize() uint
 }
 
-// BySealingLagRateLimiterConfigSetter is an interface that allows the caller to update updatable configs
-type BySealingLagRateLimiterConfigSetter interface {
-	BySealingLagRateLimiterConfigGetter
+// SealingLagRateLimiterConfig is an interface that allows the caller to update updatable configs
+type SealingLagRateLimiterConfig interface {
+	ReadonlySealingLagRateLimiterConfig
 	// SetMinSealingLag takes a new config value and updates the config
 	// if the new value is valid.
 	// Returns ValidationError if the new value results in an invalid config.

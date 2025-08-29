@@ -41,7 +41,7 @@ type Builder struct {
 	transactions               mempool.Transactions
 	tracer                     module.Tracer
 	config                     Config
-	bySealingRateLimiterConfig module.BySealingLagRateLimiterConfigGetter
+	bySealingRateLimiterConfig module.ReadonlySealingLagRateLimiterConfig
 	log                        zerolog.Logger
 	clusterEpoch               uint64 // the operating epoch for this cluster
 	// cache of values about the operating epoch which never change
@@ -61,7 +61,7 @@ func NewBuilder(
 	transactions mempool.Transactions,
 	log zerolog.Logger,
 	epochCounter uint64,
-	bySealingRateLimiterConfig module.BySealingLagRateLimiterConfigGetter,
+	bySealingRateLimiterConfig module.ReadonlySealingLagRateLimiterConfig,
 	opts ...Opt,
 ) (*Builder, error) {
 	b := Builder{
@@ -236,7 +236,8 @@ func (b *Builder) getBlockBuildContext(parentID flow.Identifier) (*blockBuildCon
 	ctx.config = b.config
 	ctx.parentID = parentID
 	ctx.lookup = newTransactionLookup()
-	bySealingLagRateLimiter, err := NewBySealingLagRateLimiter(
+	var err error
+	ctx.config.MaxCollectionSize, err = GetMaxCollectionSizeForSealingLag(
 		b.protoState,
 		b.bySealingRateLimiterConfig.MinSealingLag(),
 		b.bySealingRateLimiterConfig.MaxSealingLag(),
@@ -247,7 +248,6 @@ func (b *Builder) getBlockBuildContext(parentID flow.Identifier) (*blockBuildCon
 	if err != nil {
 		return nil, fmt.Errorf("could not create by sealing lag rate limiter: %w", err)
 	}
-	ctx.config.MaxCollectionSize = bySealingLagRateLimiter.MaxCollectionSize()
 	b.metrics.CollectionMaxSize(ctx.config.MaxCollectionSize)
 
 	ctx.parent, err = b.clusterHeaders.ByBlockID(parentID)

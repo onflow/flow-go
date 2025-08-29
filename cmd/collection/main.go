@@ -111,7 +111,7 @@ func main() {
 		txRatelimits                        float64
 		txBurstlimits                       int
 		txRatelimitPayers                   string
-		bySealingLagRateLimiterConfigGetter module.BySealingLagRateLimiterConfigGetter
+		bySealingLagRateLimiterConfigGetter module.ReadonlySealingLagRateLimiterConfig
 	)
 	var deprecatedFlagBlockRateDelay time.Duration
 
