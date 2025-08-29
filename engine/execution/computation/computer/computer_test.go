@@ -126,7 +126,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 
 	me := new(modulemock.Local)
 	me.On("NodeID").Return(executorID)
-	me.On("Sign", mock.Anything, mock.Anything).Return(nil, nil)
+	me.On("Sign", mock.Anything, mock.Anything).Return(unittest.SignatureFixture(), nil)
 	me.On("SignFunc", mock.Anything, mock.Anything, mock.Anything).
 		Return(nil, nil)
 
@@ -219,7 +219,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 
 		require.Equal(t, 2, committer.callCount)
 
-		assert.Equal(t, block.ID(), result.BlockExecutionData.BlockID)
+		assert.Equal(t, block.BlockID(), result.BlockExecutionData.BlockID)
 
 		expectedChunk1EndState := incStateCommitment(*block.StartState)
 		expectedChunk2EndState := incStateCommitment(expectedChunk1EndState)
@@ -236,7 +236,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			t,
 			parentBlockExecutionResultID,
 			receipt.PreviousResultID)
-		assert.Equal(t, block.ID(), receipt.BlockID)
+		assert.Equal(t, block.BlockID(), receipt.BlockID)
 		assert.NotEqual(t, flow.ZeroID, receipt.ExecutionDataID)
 
 		assert.Len(t, receipt.Chunks, 1+1) // +1 system chunk
@@ -244,7 +244,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		chunk1 := receipt.Chunks[0]
 
 		eventCommits := result.AllEventCommitments()
-		assert.Equal(t, block.ID(), chunk1.BlockID)
+		assert.Equal(t, block.BlockID(), chunk1.BlockID)
 		assert.Equal(t, uint(0), chunk1.CollectionIndex)
 		assert.Equal(t, uint64(2), chunk1.NumberOfTransactions)
 		assert.Equal(t, eventCommits[0], chunk1.EventCollection)
@@ -256,7 +256,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		assert.Equal(t, expectedChunk1EndState, chunk1.EndState)
 
 		chunk2 := receipt.Chunks[1]
-		assert.Equal(t, block.ID(), chunk2.BlockID)
+		assert.Equal(t, block.BlockID(), chunk2.BlockID)
 		assert.Equal(t, uint(1), chunk2.CollectionIndex)
 		assert.Equal(t, uint64(1), chunk2.NumberOfTransactions)
 		assert.Equal(t, eventCommits[1], chunk2.EventCollection)
@@ -270,7 +270,8 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 
 		// Verify ChunkDataPacks
 
-		chunkDataPacks := result.AllChunkDataPacks()
+		chunkDataPacks, err := result.AllChunkDataPacks()
+		require.NoError(t, err)
 		assert.Len(t, chunkDataPacks, 1+1) // +1 system chunk
 
 		chunkDataPack1 := chunkDataPacks[0]
@@ -564,7 +565,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 
 		expectedResults := make([]flow.TransactionResult, 0)
 		for _, c := range block.CompleteCollections {
-			for _, t := range c.Transactions {
+			for _, t := range c.Collection.Transactions {
 				txResult := flow.TransactionResult{
 					TransactionID: t.ID(),
 					ErrorMessage: fvmErrors.NewInvalidAddressErrorf(
@@ -637,7 +638,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 
 			transactions := []*flow.TransactionBody{}
 			for _, col := range block.Collections() {
-				transactions = append(transactions, col.Transactions...)
+				transactions = append(transactions, col.Collection.Transactions...)
 			}
 
 			// events to emit for each iteration/transaction
@@ -886,7 +887,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 
 		normalTransactions := map[common.Location]struct{}{}
 		for _, col := range block.Collections() {
-			for _, txn := range col.Transactions {
+			for _, txn := range col.Collection.Transactions {
 				loc := common.TransactionLocation(txn.ID())
 				normalTransactions[loc] = struct{}{}
 			}
@@ -1326,7 +1327,7 @@ func Test_ExecutingSystemCollection(t *testing.T) {
 
 	me := new(modulemock.Local)
 	me.On("NodeID").Return(unittest.IdentifierFixture())
-	me.On("Sign", mock.Anything, mock.Anything).Return(nil, nil)
+	me.On("Sign", mock.Anything, mock.Anything).Return(unittest.SignatureFixture(), nil)
 	me.On("SignFunc", mock.Anything, mock.Anything, mock.Anything).
 		Return(nil, nil)
 
@@ -1378,11 +1379,12 @@ func Test_ScheduledCallback(t *testing.T) {
 
 		eventType := cadence.NewEventType(
 			location,
-			"CallbackProcessed",
+			"PendingExecution",
 			[]cadence.Field{
 				{Identifier: "id", Type: cadence.UInt64Type},
 				{Identifier: "priority", Type: cadence.UInt8Type},
 				{Identifier: "executionEffort", Type: cadence.UInt64Type},
+				{Identifier: "fees", Type: cadence.UFix64Type},
 				{Identifier: "callbackOwner", Type: cadence.AddressType},
 			},
 			nil,
@@ -1391,11 +1393,15 @@ func Test_ScheduledCallback(t *testing.T) {
 		callbackID1 := uint64(1)
 		callbackID2 := uint64(2)
 
+		fees, err := cadence.NewUFix64("0.0")
+		require.NoError(t, err)
+
 		callbackEvent1 := cadence.NewEvent(
 			[]cadence.Value{
 				cadence.NewUInt64(callbackID1),
 				cadence.NewUInt8(1),
 				cadence.NewUInt64(1000), // execution effort
+				fees,
 				cadence.NewAddress(env.FlowServiceAccount.Address),
 			},
 		).WithType(eventType)
@@ -1405,6 +1411,7 @@ func Test_ScheduledCallback(t *testing.T) {
 				cadence.NewUInt64(callbackID2),
 				cadence.NewUInt8(1),
 				cadence.NewUInt64(2000), // execution effort
+				fees,
 				cadence.NewAddress(env.FlowServiceAccount.Address),
 			},
 		).WithType(eventType)
@@ -1481,9 +1488,9 @@ func testScheduledCallbackWithError(t *testing.T, chain flow.Chain, callbackEven
 
 	me := new(modulemock.Local)
 	me.On("NodeID").Return(executorID)
-	me.On("Sign", mock.Anything, mock.Anything).Return(nil, nil)
+	me.On("Sign", mock.Anything, mock.Anything).Return(unittest.SignatureFixture(), nil)
 	me.On("SignFunc", mock.Anything, mock.Anything, mock.Anything).
-		Return(nil, nil)
+		Return(unittest.SignatureFixture(), nil)
 
 	exemetrics := new(modulemock.ExecutionMetrics)
 	exemetrics.On("ExecutionBlockExecuted",
@@ -1607,12 +1614,12 @@ func testScheduledCallbackWithError(t *testing.T, chain flow.Chain, callbackEven
 	receipt := result.ExecutionReceipt
 	assert.Equal(t, executorID, receipt.ExecutorID)
 	assert.Equal(t, parentBlockExecutionResultID, receipt.PreviousResultID)
-	assert.Equal(t, block.ID(), receipt.BlockID)
+	assert.Equal(t, block.BlockID(), receipt.BlockID)
 	assert.Len(t, receipt.Chunks, 1) // Only system chunk
 
 	// verify system chunk details
 	systemChunk := receipt.Chunks[0]
-	assert.Equal(t, block.ID(), systemChunk.BlockID)
+	assert.Equal(t, block.BlockID(), systemChunk.BlockID)
 	assert.Equal(t, uint(0), systemChunk.CollectionIndex) // System collection is at index 0 for empty block
 	assert.Equal(t, uint64(expectedTransactionCount), systemChunk.NumberOfTransactions)
 
@@ -1658,7 +1665,7 @@ func (c *callbackTestExecutor) Execute() error {
 		txProc, ok := c.proc.(*fvm.TransactionProcedure)
 		if ok {
 			script := string(txProc.Transaction.Script)
-			if strings.Contains(script, "FlowCallbackScheduler.process") {
+			if strings.Contains(script, "scheduler.process") {
 				return c.vm.err
 			}
 		}
@@ -1675,7 +1682,7 @@ func (c *callbackTestExecutor) Output() fvm.ProcedureOutput {
 		txProc, ok := c.proc.(*fvm.TransactionProcedure)
 		if ok {
 			script := string(txProc.Transaction.Script)
-			if strings.Contains(script, "FlowCallbackScheduler.process") {
+			if strings.Contains(script, "scheduler.process") {
 				return fvm.ProcedureOutput{
 					Err: c.vm.err,
 				}
@@ -1692,17 +1699,14 @@ func (c *callbackTestExecutor) Output() fvm.ProcedureOutput {
 
 	const callbackSchedulerImport = `import "FlowCallbackScheduler"`
 	txBody := txProc.Transaction
-	script := string(txBody.Script)
 	txID := fmt.Sprintf("tx_%d", txProc.TxIndex)
 
 	switch {
 	// scheduled callbacks process transaction
-	case strings.Contains(script, "FlowCallbackScheduler.process"):
-		require.False(c.t, strings.Contains(script, callbackSchedulerImport), "should resolve callback scheduler import")
-
+	case strings.Contains(string(txBody.Script), "scheduler.process"):
 		c.vm.executedTransactions[txID] = "process_callback"
 		env := systemcontracts.SystemContractsForChain(c.ctx.Chain.ChainID()).AsTemplateEnv()
-		eventTypeString := fmt.Sprintf("A.%v.FlowCallbackScheduler.CallbackProcessed", env.FlowCallbackSchedulerAddress)
+		eventTypeString := fmt.Sprintf("A.%v.FlowCallbackScheduler.PendingExecution", env.FlowCallbackSchedulerAddress)
 
 		// return events for each scheduled callback
 		events := make([]flow.Event, len(c.vm.eventPayloads))
@@ -1720,9 +1724,7 @@ func (c *callbackTestExecutor) Output() fvm.ProcedureOutput {
 			Events: events,
 		}
 	// scheduled callbacks execute transaction
-	case strings.Contains(script, "FlowCallbackScheduler.executeCallback"):
-		require.False(c.t, strings.Contains(script, callbackSchedulerImport), "should resolve callback scheduler import")
-
+	case strings.Contains(string(txBody.Script), "scheduler.executeCallback"):
 		// extract the callback ID from the arguments
 		if len(txBody.Arguments) == 0 {
 			return fvm.ProcedureOutput{}
@@ -1777,22 +1779,20 @@ func generateBlockWithVisitor(
 		collection := generateCollection(transactionCount, addressGenerator, visitor)
 		collections[i] = collection
 		guarantees[i] = collection.Guarantee
-		completeCollections[collection.Guarantee.ID()] = collection
+		completeCollections[collection.Guarantee.CollectionID] = collection
 	}
 
-	block := flow.Block{
-		Header: &flow.Header{
-			Timestamp: flow.GenesisTime,
-			Height:    42,
-			View:      42,
-		},
-		Payload: &flow.Payload{
-			Guarantees: guarantees,
-		},
-	}
+	block := unittest.BlockFixture(
+		unittest.Block.WithHeight(42),
+		unittest.Block.WithView(42),
+		unittest.Block.WithParentView(41),
+		unittest.Block.WithPayload(
+			unittest.PayloadFixture(unittest.WithGuarantees(guarantees...)),
+		),
+	)
 
 	return &entity.ExecutableBlock{
-		Block:               &block,
+		Block:               block,
 		CompleteCollections: completeCollections,
 		StartState:          unittest.StateCommitmentPointerFixture(),
 	}
@@ -1825,8 +1825,8 @@ func generateCollection(
 	guarantee := &flow.CollectionGuarantee{CollectionID: collection.ID()}
 
 	return &entity.CompleteCollection{
-		Guarantee:    guarantee,
-		Transactions: transactions,
+		Guarantee:  guarantee,
+		Collection: &flow.Collection{Transactions: transactions},
 	}
 }
 

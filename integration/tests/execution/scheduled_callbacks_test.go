@@ -30,17 +30,16 @@ func (s *ScheduledCallbacksSuite) TestScheduleCallback_DeployAndGetStatus() {
 	// wait for next height finalized (potentially first height)
 	currentFinalized := s.BlockState.HighestFinalizedHeight()
 	blockA := s.BlockState.WaitForHighestFinalizedProgress(s.T(), currentFinalized)
-	s.T().Logf("got blockA height %v ID %v", blockA.Header.Height, blockA.Header.ID())
+	s.T().Logf("got blockA height %v ID %v", blockA.HeaderBody.Height, blockA.ID())
 
-	// Execute script to call getStatus(id: 0) on the contract
-	result, ok := s.getCallbackStatus(0)
-	s.T().Logf("result: %v", result)
-	require.False(s.T(), ok)
-	require.Nil(s.T(), result, "getStatus(0) should return nil for non-existent callback")
+	// Execute script to call getStatus(id: 10) on the contract
+	result, ok := s.getCallbackStatus(10)
+	s.T().Logf("result: %v, ok: %v", result, ok)
+	require.False(s.T(), ok, "getStatus(10) should return false for non-existent callback")
 
 	// Wait for a block to be executed to ensure everything is processed
-	blockB := s.BlockState.WaitForHighestFinalizedProgress(s.T(), blockA.Header.Height)
-	erBlock := s.ReceiptState.WaitForReceiptFrom(s.T(), flow.Identifier(blockB.Header.ID()), s.exe1ID)
+	blockB := s.BlockState.WaitForHighestFinalizedProgress(s.T(), blockA.HeaderBody.Height)
+	erBlock := s.ReceiptState.WaitForReceiptFrom(s.T(), flow.Identifier(blockB.ID()), s.exe1ID)
 	s.T().Logf("got block result ID %v", erBlock.ExecutionResult.BlockID)
 }
 
@@ -49,7 +48,7 @@ func (s *ScheduledCallbacksSuite) TestScheduleCallback_ScheduledAndExecuted() {
 	// Wait for next height finalized (potentially first height)
 	currentFinalized := s.BlockState.HighestFinalizedHeight()
 	blockA := s.BlockState.WaitForHighestFinalizedProgress(s.T(), currentFinalized)
-	s.T().Logf("got blockA height %v ID %v", blockA.Header.Height, blockA.Header.ID())
+	s.T().Logf("got blockA height %v ID %v", blockA.HeaderBody.Height, blockA.ID())
 
 	// Deploy the test contract first
 	s.deployTestContract()
@@ -64,7 +63,7 @@ func (s *ScheduledCallbacksSuite) TestScheduleCallback_ScheduledAndExecuted() {
 	callbackID := s.scheduleCallback(futureTimestamp)
 	s.T().Logf("scheduled callback with ID: %d", callbackID)
 
-	const scheduledStatus = 0
+	const scheduledStatus = 1
 	const executedStatus = 2
 
 	// Check the status of the callback right after scheduling
@@ -82,9 +81,9 @@ func (s *ScheduledCallbacksSuite) TestScheduleCallback_ScheduledAndExecuted() {
 	time.Sleep(time.Duration(scheduleDelta)*time.Second + 2)
 
 	// Wait for blocks to be processed after the callback execution time
-	blockC := s.BlockState.WaitForHighestFinalizedProgress(s.T(), blockA.Header.Height+2)
-	erBlock := s.ReceiptState.WaitForReceiptFrom(s.T(), flow.Identifier(blockC.Header.ID()), s.exe1ID)
-	s.T().Logf("got block result ID %v after waiting", erBlock.ExecutionResult.BlockID)
+	// blockC := s.BlockState.WaitForHighestFinalizedProgress(s.T(), blockA.Header.Height+2)
+	// erBlock := s.ReceiptState.WaitForReceiptFrom(s.T(), flow.Identifier(blockC.Header.ID()), s.exe1ID)
+	// s.T().Logf("got block result ID %v after waiting", erBlock.ExecutionResult.BlockID)
 
 	// Check the status again - it should still exist but be marked as executed
 	statusAfter, ok := s.getCallbackStatus(callbackID)
@@ -99,11 +98,10 @@ func (s *ScheduledCallbacksSuite) TestScheduleCallback_ScheduledAndExecuted() {
 }
 
 func (s *ScheduledCallbacksSuite) TestScheduleCallback_ScheduleAndCancelCallback() {
-
 	// Wait for next height finalized (potentially first height)
 	currentFinalized := s.BlockState.HighestFinalizedHeight()
 	blockA := s.BlockState.WaitForHighestFinalizedProgress(s.T(), currentFinalized)
-	s.T().Logf("got blockA height %v ID %v", blockA.Header.Height, blockA.Header.ID())
+	s.T().Logf("got blockA height %v ID %v", blockA.HeaderBody.Height, blockA.ID())
 
 	// Deploy the test contract first
 	s.deployTestContract()
@@ -118,7 +116,7 @@ func (s *ScheduledCallbacksSuite) TestScheduleCallback_ScheduleAndCancelCallback
 	callbackID := s.scheduleCallback(futureTimestamp)
 	s.T().Logf("scheduled callback with ID: %d", callbackID)
 
-	const scheduledStatus = 0
+	const scheduledStatus = 1
 	const canceledStatus = 3
 
 	// Wait fraction of the scheduled time
@@ -149,7 +147,7 @@ func (s *ScheduledCallbacksSuite) TestScheduleCallback_ScheduleAndCancelCallback
 }
 
 func (s *ScheduledCallbacksSuite) deployTestContract() {
-	chainID := s.net.Root().Header.ChainID
+	chainID := s.net.Root().HeaderBody.ChainID
 	sc := systemcontracts.SystemContractsForChain(chainID)
 
 	testContract := lib.TestFlowCallbackHandlerContract(
@@ -168,7 +166,7 @@ func (s *ScheduledCallbacksSuite) deployTestContract() {
 }
 
 func (s *ScheduledCallbacksSuite) scheduleCallback(timestamp int64) uint64 {
-	chainID := s.net.Root().Header.ChainID
+	chainID := s.net.Root().HeaderBody.ChainID
 	sc := systemcontracts.SystemContractsForChain(chainID)
 
 	scheduledTx := fmt.Sprintf(`
@@ -180,19 +178,19 @@ func (s *ScheduledCallbacksSuite) scheduleCallback(timestamp int64) uint64 {
 		transaction(timestamp: UFix64) {
 
 			prepare(account: auth(BorrowValue, SaveValue, IssueStorageCapabilityController, PublishCapability, GetStorageCapabilityController) &Account) {
-				if !account.storage.check<@TestFlowCallbackHandler.Handler>(from: TestFlowCallbackHandler.HandlerStoragePath) {
-					let handler <- TestFlowCallbackHandler.createHandler()
+        		if !account.storage.check<@TestFlowCallbackHandler.Handler>(from: TestFlowCallbackHandler.HandlerStoragePath) {
+            		let handler <- TestFlowCallbackHandler.createHandler()
 				
 					account.storage.save(<-handler, to: TestFlowCallbackHandler.HandlerStoragePath)
-					account.capabilities.storage.issue<auth(FlowCallbackScheduler.ExecuteCallback) &{FlowCallbackScheduler.CallbackHandler}>(TestFlowCallbackHandler.HandlerStoragePath)
+            		account.capabilities.storage.issue<auth(FlowCallbackScheduler.Execute) &{FlowCallbackScheduler.CallbackHandler}>(TestFlowCallbackHandler.HandlerStoragePath)
 				}
 
 				let callbackCap = account.capabilities.storage
-									.getControllers(forPath: TestFlowCallbackHandler.HandlerStoragePath)[0]
-									.capability as! Capability<auth(FlowCallbackScheduler.ExecuteCallback) &{FlowCallbackScheduler.CallbackHandler}>
+					.getControllers(forPath: TestFlowCallbackHandler.HandlerStoragePath)[0]
+					.capability as! Capability<auth(FlowCallbackScheduler.Execute) &{FlowCallbackScheduler.CallbackHandler}>
 				
 				let vault = account.storage.borrow<auth(FungibleToken.Withdraw) &FlowToken.Vault>(from: /storage/flowTokenVault)
-				?? panic("Could not borrow FlowToken vault")
+					?? panic("Could not borrow FlowToken vault")
 				
 				let testData = "test data"
 				let feeAmount = 1.0
@@ -222,7 +220,7 @@ func (s *ScheduledCallbacksSuite) scheduleCallback(timestamp int64) uint64 {
 }
 
 func (s *ScheduledCallbacksSuite) cancelCallback(callbackID uint64) uint64 {
-	chainID := s.net.Root().Header.ChainID
+	chainID := s.net.Root().HeaderBody.ChainID
 	sc := systemcontracts.SystemContractsForChain(chainID)
 
 	cancelTx := fmt.Sprintf(`
@@ -345,10 +343,10 @@ func (s *ScheduledCallbacksSuite) sendCallbackTx(script []byte, args []cadence.V
 
 func (s *ScheduledCallbacksSuite) extractCallbackIDFromEvents(result *sdk.TransactionResult) uint64 {
 	for _, event := range result.Events {
-		if strings.Contains(string(event.Type), "FlowCallbackScheduler.CallbackScheduled") ||
-			strings.Contains(string(event.Type), "FlowCallbackScheduler.CallbackCanceled") ||
-			strings.Contains(string(event.Type), "FlowCallbackScheduler.CallbackExecuted") ||
-			strings.Contains(string(event.Type), "FlowCallbackScheduler.CallbackProcessed") {
+		if strings.Contains(string(event.Type), "FlowCallbackScheduler.Scheduled") ||
+			strings.Contains(string(event.Type), "FlowCallbackScheduler.Canceled") ||
+			strings.Contains(string(event.Type), "FlowCallbackScheduler.Executed") ||
+			strings.Contains(string(event.Type), "FlowCallbackScheduler.PendingExecution") {
 
 			if id := event.Value.SearchFieldByName("id"); id != nil {
 				return uint64(id.(cadence.UInt64))

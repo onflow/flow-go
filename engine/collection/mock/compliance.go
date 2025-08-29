@@ -3,10 +3,11 @@
 package mock
 
 import (
-	flow "github.com/onflow/flow-go/model/flow"
-	irrecoverable "github.com/onflow/flow-go/module/irrecoverable"
+	cluster "github.com/onflow/flow-go/model/cluster"
 
-	messages "github.com/onflow/flow-go/model/messages"
+	flow "github.com/onflow/flow-go/model/flow"
+
+	irrecoverable "github.com/onflow/flow-go/module/irrecoverable"
 
 	mock "github.com/stretchr/testify/mock"
 )
@@ -37,12 +38,12 @@ func (_m *Compliance) Done() <-chan struct{} {
 }
 
 // OnClusterBlockProposal provides a mock function with given fields: proposal
-func (_m *Compliance) OnClusterBlockProposal(proposal flow.Slashable[*messages.ClusterBlockProposal]) {
+func (_m *Compliance) OnClusterBlockProposal(proposal flow.Slashable[*cluster.Proposal]) {
 	_m.Called(proposal)
 }
 
 // OnSyncedClusterBlock provides a mock function with given fields: block
-func (_m *Compliance) OnSyncedClusterBlock(block flow.Slashable[*messages.ClusterBlockProposal]) {
+func (_m *Compliance) OnSyncedClusterBlock(block flow.Slashable[*cluster.Proposal]) {
 	_m.Called(block)
 }
 

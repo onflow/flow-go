@@ -81,7 +81,7 @@ func TestFlowCallbackHandlerContract(callbackScheduler sdk.Address, flowToken sd
 				
 				access(all) resource Handler: FlowCallbackScheduler.CallbackHandler {
 					
-					access(FlowCallbackScheduler.ExecuteCallback) 
+					access(FlowCallbackScheduler.Execute) 
 					fun executeCallback(id: UInt64, data: AnyStruct?) {
 						TestFlowCallbackHandler.executedCallbacks.append(id)
 					}
@@ -317,10 +317,10 @@ func LogStatus(t *testing.T, ctx context.Context, log zerolog.Logger, client *te
 	require.NoError(t, err)
 	counter := epoch.Counter()
 
-	log.Info().Uint64("final_height", finalized.Header.Height).
-		Uint64("final_view", finalized.Header.View).
-		Uint64("sealed_height", sealed.Header.Height).
-		Uint64("sealed_view", sealed.Header.View).
+	log.Info().Uint64("final_height", finalized.Height).
+		Uint64("final_view", finalized.View).
+		Uint64("sealed_height", sealed.Height).
+		Uint64("sealed_view", sealed.View).
 		Str("cur_epoch_phase", phase.String()).
 		Uint64("cur_epoch_counter", counter).
 		Msg("test run status")
