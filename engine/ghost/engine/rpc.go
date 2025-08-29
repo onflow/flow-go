@@ -252,6 +252,8 @@ func internalToMessage(event interface{}) (messages.UntrustedMessage, error) {
 			ChunkDataPack: flow.UntrustedChunkDataPack(internal.ChunkDataPack),
 			Nonce:         internal.Nonce,
 		}, nil
+	case *flow.RangeRequest:
+		return (*messages.RangeRequest)(internal), nil
 	case messages.UntrustedMessage:
 		// Already a valid UntrustedMessage
 		// TODO(immutable M2): expand when ToInternal changes for other M2 types
