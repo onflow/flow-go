@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/jordanschalm/lockctx"
 	"github.com/rs/zerolog"
 	"golang.org/x/sync/errgroup"
 
@@ -35,6 +36,7 @@ type IndexerCore struct {
 
 	derivedChainData *derived.DerivedChainData
 	serviceAddress   flow.Address
+	lockManager      lockctx.Manager
 }
 
 // New execution state indexer used to ingest block execution data and index it by height.
@@ -53,6 +55,7 @@ func New(
 	chain flow.Chain,
 	derivedChainData *derived.DerivedChainData,
 	collectionExecutedMetric module.CollectionExecutedMetric,
+	lockManager lockctx.Manager,
 ) (*IndexerCore, error) {
 	log = log.With().Str("component", "execution_indexer").Logger()
 	metrics.InitializeLatestHeight(registers.LatestHeight())
@@ -76,6 +79,7 @@ func New(
 		derivedChainData: derivedChainData,
 
 		collectionExecutedMetric: collectionExecutedMetric,
+		lockManager:              lockManager,
 	}, nil
 }
 
@@ -185,9 +189,9 @@ func (c *IndexerCore) IndexBlockData(data *execution_data.BlockExecutionDataEnti
 		indexedCount := 0
 		if len(data.ChunkExecutionDatas) > 0 {
 			for _, chunk := range data.ChunkExecutionDatas[0 : len(data.ChunkExecutionDatas)-1] {
-				err := IndexCollection(chunk.Collection, c.collections, c.transactions, c.log, c.collectionExecutedMetric)
+				err := c.indexCollection(chunk.Collection)
 				if err != nil {
-					return fmt.Errorf("could not handle collection")
+					return err
 				}
 				indexedCount++
 			}
@@ -325,45 +329,41 @@ func (c *IndexerCore) indexRegisters(registers map[ledger.Path]*ledger.Payload, 
 	return c.registers.Store(regEntries, height)
 }
 
+func (c *IndexerCore) indexCollection(collection *flow.Collection) error {
+	lctx := c.lockManager.NewContext()
+	defer lctx.Release()
+	err := lctx.AcquireLock(storage.LockInsertCollection)
+	if err != nil {
+		return fmt.Errorf("could not acquire lock for indexing collections: %w", err)
+	}
+
+	err = IndexCollection(lctx, collection, c.collections, c.log, c.collectionExecutedMetric)
+	if err != nil {
+		return fmt.Errorf("could not handle collection")
+	}
+	return nil
+}
+
 // IndexCollection handles the response of the collection request made earlier when a block was received.
 // No errors expected during normal operations.
 func IndexCollection(
+	lctx lockctx.Proof,
 	collection *flow.Collection,
 	collections storage.Collections,
-	transactions storage.Transactions,
 	logger zerolog.Logger,
 	collectionExecutedMetric module.CollectionExecutedMetric,
 ) error {
 
-	light := collection.Light()
-
-	collectionExecutedMetric.CollectionFinalized(*light)
-	collectionExecutedMetric.CollectionExecuted(*light)
-
 	// FIX: we can't index guarantees here, as we might have more than one block
 	// with the same collection as long as it is not finalized
 
-	// store the light collection (collection minus the transaction body - those are stored separately)
-	// and add transaction ids as index
-	err := collections.StoreLightAndIndexByTransaction(light)
+	// store the collection, including constituent transactions, and index transactionID -> collectionID
+	light, err := collections.StoreAndIndexByTransaction(lctx, collection)
 	if err != nil {
-		// ignore collection if already seen
-		if errors.Is(err, storage.ErrAlreadyExists) {
-			logger.Debug().
-				Hex("collection_id", logging.Entity(light)).
-				Msg("collection is already seen")
-			return nil
-		}
 		return err
 	}
 
-	// now store each of the transaction body
-	for _, tx := range collection.Transactions {
-		err := transactions.Store(tx)
-		if err != nil {
-			return fmt.Errorf("could not store transaction (%x): %w", tx.ID(), err)
-		}
-	}
-
+	collectionExecutedMetric.CollectionFinalized(light)
+	collectionExecutedMetric.CollectionExecuted(light)
 	return nil
 }

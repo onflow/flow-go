@@ -447,7 +447,7 @@ func storeCollectionIfMissing(collections storage.Collections, col *flow.Collect
 			return fmt.Errorf("failed to get collection %v: %w", col.ID(), err)
 		}
 
-		err := collections.Store(col)
+		_, err = collections.Store(col)
 		if err != nil {
 			return fmt.Errorf("failed to store collection %v: %w", col.ID(), err)
 		}

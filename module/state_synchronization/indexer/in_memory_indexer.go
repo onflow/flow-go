@@ -4,12 +4,14 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/jordanschalm/lockctx"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/convert"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
+	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/store/inmemory/unsynchronized"
 	"github.com/onflow/flow-go/utils/logging"
 )
@@ -22,11 +24,11 @@ type InMemoryIndexer struct {
 	registers       *unsynchronized.Registers
 	events          *unsynchronized.Events
 	collections     *unsynchronized.Collections
-	transactions    *unsynchronized.Transactions
 	results         *unsynchronized.LightTransactionResults
 	txResultErrMsgs *unsynchronized.TransactionResultErrorMessages
 	executionResult *flow.ExecutionResult
 	header          *flow.Header
+	lockManager     storage.LockManager
 }
 
 // NewInMemoryIndexer creates a new indexer that uses in-memory storage implementations.
@@ -38,22 +40,22 @@ func NewInMemoryIndexer(
 	registers *unsynchronized.Registers,
 	events *unsynchronized.Events,
 	collections *unsynchronized.Collections,
-	transactions *unsynchronized.Transactions,
 	results *unsynchronized.LightTransactionResults,
 	txResultErrMsgs *unsynchronized.TransactionResultErrorMessages,
 	executionResult *flow.ExecutionResult,
 	header *flow.Header,
+	lockManager storage.LockManager,
 ) *InMemoryIndexer {
 	indexer := &InMemoryIndexer{
 		log:             log.With().Str("component", "in_memory_indexer").Logger(),
 		registers:       registers,
 		events:          events,
 		collections:     collections,
-		transactions:    transactions,
 		results:         results,
 		txResultErrMsgs: txResultErrMsgs,
 		executionResult: executionResult,
 		header:          header,
+		lockManager:     lockManager,
 	}
 
 	indexer.log.Info().
@@ -89,6 +91,13 @@ func (i *InMemoryIndexer) IndexBlockData(data *execution_data.BlockExecutionData
 	registers := make(map[ledger.Path]*ledger.Payload)
 	indexedCollections := 0
 
+	lctx := i.lockManager.NewContext()
+	err := lctx.AcquireLock(storage.LockInsertCollection)
+	if err != nil {
+		return fmt.Errorf("could not acquire lock for collection insert: %w", err)
+	}
+	defer lctx.Release()
+
 	// Process all chunk data in a single pass
 	for idx, chunk := range data.ChunkExecutionDatas {
 		// Collect events
@@ -99,7 +108,7 @@ func (i *InMemoryIndexer) IndexBlockData(data *execution_data.BlockExecutionData
 
 		// Process collections (except system chunk)
 		if idx < len(data.ChunkExecutionDatas)-1 {
-			if err := i.indexCollection(chunk.Collection); err != nil {
+			if err := i.indexCollection(lctx, chunk.Collection); err != nil {
 				return fmt.Errorf("could not handle collection: %w", err)
 			}
 			indexedCollections++
@@ -170,23 +179,11 @@ func (i *InMemoryIndexer) indexRegisters(registers map[ledger.Path]*ledger.Paylo
 
 // indexCollection processes a collection and its associated transactions.
 // No errors are expected during normal operation.
-func (i *InMemoryIndexer) indexCollection(collection *flow.Collection) error {
-	// Store the full collection
-	if err := i.collections.Store(collection); err != nil {
-		return fmt.Errorf("failed to store collection: %w", err)
-	}
-
-	// Store the light collection
-	light := collection.Light()
-	if err := i.collections.StoreLightAndIndexByTransaction(light); err != nil {
-		return fmt.Errorf("failed to store light collection and transaction index: %w", err)
-	}
-
-	// Store each of the transaction bodies
-	for _, tx := range collection.Transactions {
-		if err := i.transactions.Store(tx); err != nil {
-			return fmt.Errorf("could not store transaction (%s): %w", tx.ID().String(), err)
-		}
+func (i *InMemoryIndexer) indexCollection(lctx lockctx.Proof, collection *flow.Collection) error {
+	// Store the light collection and index by transaction
+	_, err := i.collections.StoreAndIndexByTransaction(lctx, collection)
+	if err != nil {
+		return err
 	}
 
 	return nil

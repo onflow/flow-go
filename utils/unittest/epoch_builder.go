@@ -10,6 +10,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/state/protocol"
+	"github.com/onflow/flow-go/storage/deferred"
 )
 
 // EpochHeights is a structure caching the results of building an epoch with
@@ -365,7 +366,8 @@ func (builder *EpochBuilder) CompleteEpoch() *EpochBuilder {
 // addBlock adds the given block to the state by: extending the state,
 // finalizing the block, and caching the block.
 func (builder *EpochBuilder) addBlock(block *flow.Block) {
-	updatedStateId, dbUpdates, err := builder.mutableProtocolState.EvolveState(block.ParentID, block.View, block.Payload.Seals)
+	dbUpdates := deferred.NewDeferredBlockPersist()
+	updatedStateId, err := builder.mutableProtocolState.EvolveState(dbUpdates, block.ParentID, block.View, block.Payload.Seals)
 	require.NoError(builder.t, err)
 	require.False(builder.t, dbUpdates.IsEmpty())
 

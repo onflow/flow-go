@@ -21,6 +21,7 @@ import (
 	protocol_state "github.com/onflow/flow-go/state/protocol/protocol_state/state"
 	"github.com/onflow/flow-go/storage"
 	bstorage "github.com/onflow/flow-go/storage/badger"
+	"github.com/onflow/flow-go/storage/operation/badgerimpl"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -67,11 +68,13 @@ func MockSealValidator(sealsDB storage.Seals) module.SealValidator {
 
 func RunWithBootstrapState(t testing.TB, rootSnapshot protocol.Snapshot, f func(*badger.DB, *pbadger.State)) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+		lockManager := storage.NewTestingLockManager()
 		metrics := metrics.NewNoopCollector()
 		all := bstorage.InitAll(metrics, db)
 		state, err := pbadger.Bootstrap(
 			metrics,
-			db,
+			badgerimpl.ToDB(db),
+			lockManager,
 			all.Headers,
 			all.Seals,
 			all.Results,
@@ -91,6 +94,7 @@ func RunWithBootstrapState(t testing.TB, rootSnapshot protocol.Snapshot, f func(
 
 func RunWithFullProtocolState(t testing.TB, rootSnapshot protocol.Snapshot, f func(*badger.DB, *pbadger.ParticipantState)) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+		lockManager := storage.NewTestingLockManager()
 		metrics := metrics.NewNoopCollector()
 		tracer := trace.NewNoopTracer()
 		log := zerolog.Nop()
@@ -98,7 +102,8 @@ func RunWithFullProtocolState(t testing.TB, rootSnapshot protocol.Snapshot, f fu
 		all := bstorage.InitAll(metrics, db)
 		state, err := pbadger.Bootstrap(
 			metrics,
-			db,
+			badgerimpl.ToDB(db),
+			lockManager,
 			all.Headers,
 			all.Seals,
 			all.Results,
@@ -133,13 +138,15 @@ func RunWithFullProtocolState(t testing.TB, rootSnapshot protocol.Snapshot, f fu
 
 func RunWithFullProtocolStateAndMetrics(t testing.TB, rootSnapshot protocol.Snapshot, metrics module.ComplianceMetrics, f func(*badger.DB, *pbadger.ParticipantState)) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+		lockManager := storage.NewTestingLockManager()
 		tracer := trace.NewNoopTracer()
 		log := zerolog.Nop()
 		consumer := events.NewNoop()
 		all := bstorage.InitAll(mmetrics.NewNoopCollector(), db)
 		state, err := pbadger.Bootstrap(
 			metrics,
-			db,
+			badgerimpl.ToDB(db),
+			lockManager,
 			all.Headers,
 			all.Seals,
 			all.Results,
@@ -156,6 +163,7 @@ func RunWithFullProtocolStateAndMetrics(t testing.TB, rootSnapshot protocol.Snap
 		receiptValidator := MockReceiptValidator()
 		sealValidator := MockSealValidator(all.Seals)
 		mockTimer := MockBlockTimer()
+
 		fullState, err := pbadger.NewFullConsensusState(
 			log,
 			tracer,
@@ -174,6 +182,7 @@ func RunWithFullProtocolStateAndMetrics(t testing.TB, rootSnapshot protocol.Snap
 
 func RunWithFullProtocolStateAndValidator(t testing.TB, rootSnapshot protocol.Snapshot, validator module.ReceiptValidator, f func(*badger.DB, *pbadger.ParticipantState)) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+		lockManager := storage.NewTestingLockManager()
 		metrics := metrics.NewNoopCollector()
 		tracer := trace.NewNoopTracer()
 		log := zerolog.Nop()
@@ -181,7 +190,8 @@ func RunWithFullProtocolStateAndValidator(t testing.TB, rootSnapshot protocol.Sn
 		all := bstorage.InitAll(metrics, db)
 		state, err := pbadger.Bootstrap(
 			metrics,
-			db,
+			badgerimpl.ToDB(db),
+			lockManager,
 			all.Headers,
 			all.Seals,
 			all.Results,
@@ -215,6 +225,7 @@ func RunWithFullProtocolStateAndValidator(t testing.TB, rootSnapshot protocol.Sn
 
 func RunWithFollowerProtocolState(t testing.TB, rootSnapshot protocol.Snapshot, f func(*badger.DB, *pbadger.FollowerState)) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+		lockManager := storage.NewTestingLockManager()
 		metrics := metrics.NewNoopCollector()
 		tracer := trace.NewNoopTracer()
 		log := zerolog.Nop()
@@ -222,7 +233,8 @@ func RunWithFollowerProtocolState(t testing.TB, rootSnapshot protocol.Snapshot, 
 		all := bstorage.InitAll(metrics, db)
 		state, err := pbadger.Bootstrap(
 			metrics,
-			db,
+			badgerimpl.ToDB(db),
+			lockManager,
 			all.Headers,
 			all.Seals,
 			all.Results,
@@ -253,13 +265,15 @@ func RunWithFollowerProtocolState(t testing.TB, rootSnapshot protocol.Snapshot, 
 
 func RunWithFullProtocolStateAndConsumer(t testing.TB, rootSnapshot protocol.Snapshot, consumer protocol.Consumer, f func(*badger.DB, *pbadger.ParticipantState)) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+		lockManager := storage.NewTestingLockManager()
 		metrics := metrics.NewNoopCollector()
 		tracer := trace.NewNoopTracer()
 		log := zerolog.Nop()
 		all := bstorage.InitAll(metrics, db)
 		state, err := pbadger.Bootstrap(
 			metrics,
-			db,
+			badgerimpl.ToDB(db),
+			lockManager,
 			all.Headers,
 			all.Seals,
 			all.Results,
@@ -294,12 +308,14 @@ func RunWithFullProtocolStateAndConsumer(t testing.TB, rootSnapshot protocol.Sna
 
 func RunWithFullProtocolStateAndMetricsAndConsumer(t testing.TB, rootSnapshot protocol.Snapshot, metrics module.ComplianceMetrics, consumer protocol.Consumer, f func(*badger.DB, *pbadger.ParticipantState, protocol.MutableProtocolState)) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+		lockManager := storage.NewTestingLockManager()
 		tracer := trace.NewNoopTracer()
 		log := zerolog.Nop()
 		all := bstorage.InitAll(mmetrics.NewNoopCollector(), db)
 		state, err := pbadger.Bootstrap(
 			metrics,
-			db,
+			badgerimpl.ToDB(db),
+			lockManager,
 			all.Headers,
 			all.Seals,
 			all.Results,
@@ -344,6 +360,7 @@ func RunWithFullProtocolStateAndMetricsAndConsumer(t testing.TB, rootSnapshot pr
 
 func RunWithFollowerProtocolStateAndHeaders(t testing.TB, rootSnapshot protocol.Snapshot, f func(*badger.DB, *pbadger.FollowerState, storage.Headers, storage.Index)) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+		lockManager := storage.NewTestingLockManager()
 		metrics := metrics.NewNoopCollector()
 		tracer := trace.NewNoopTracer()
 		log := zerolog.Nop()
@@ -351,7 +368,8 @@ func RunWithFollowerProtocolStateAndHeaders(t testing.TB, rootSnapshot protocol.
 		all := bstorage.InitAll(metrics, db)
 		state, err := pbadger.Bootstrap(
 			metrics,
-			db,
+			badgerimpl.ToDB(db),
+			lockManager,
 			all.Headers,
 			all.Seals,
 			all.Results,
@@ -382,6 +400,7 @@ func RunWithFollowerProtocolStateAndHeaders(t testing.TB, rootSnapshot protocol.
 
 func RunWithFullProtocolStateAndMutator(t testing.TB, rootSnapshot protocol.Snapshot, f func(*badger.DB, *pbadger.ParticipantState, protocol.MutableProtocolState)) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+		lockManager := storage.NewTestingLockManager()
 		metrics := metrics.NewNoopCollector()
 		tracer := trace.NewNoopTracer()
 		log := zerolog.Nop()
@@ -389,7 +408,8 @@ func RunWithFullProtocolStateAndMutator(t testing.TB, rootSnapshot protocol.Snap
 		all := bstorage.InitAll(metrics, db)
 		state, err := pbadger.Bootstrap(
 			metrics,
-			db,
+			badgerimpl.ToDB(db),
+			lockManager,
 			all.Headers,
 			all.Seals,
 			all.Results,
@@ -418,6 +438,7 @@ func RunWithFullProtocolStateAndMutator(t testing.TB, rootSnapshot protocol.Snap
 			sealValidator,
 		)
 		require.NoError(t, err)
+
 		mutableProtocolState := protocol_state.NewMutableProtocolState(
 			log,
 			all.EpochProtocolStateEntries,

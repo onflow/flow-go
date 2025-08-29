@@ -27,7 +27,9 @@ import (
 	pbadger "github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/state/protocol/events"
 	"github.com/onflow/flow-go/state/protocol/util"
+	"github.com/onflow/flow-go/storage"
 	bstorage "github.com/onflow/flow-go/storage/badger"
+	"github.com/onflow/flow-go/storage/operation/badgerimpl"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -41,6 +43,7 @@ import (
 // Each worker submits batchesPerWorker*blocksPerBatch blocks
 // In total we will submit workers*batchesPerWorker*blocksPerBatch
 func TestFollowerHappyPath(t *testing.T) {
+	lockManager := storage.NewTestingLockManager()
 	allIdentities := unittest.CompleteIdentitySet()
 	rootSnapshot := unittest.RootSnapshotFixture(allIdentities)
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
@@ -53,7 +56,8 @@ func TestFollowerHappyPath(t *testing.T) {
 		// bootstrap root snapshot
 		state, err := pbadger.Bootstrap(
 			metrics,
-			db,
+			badgerimpl.ToDB(db),
+			lockManager,
 			all.Headers,
 			all.Seals,
 			all.Results,
@@ -80,7 +84,7 @@ func TestFollowerHappyPath(t *testing.T) {
 			mockTimer,
 		)
 		require.NoError(t, err)
-		finalizer := moduleconsensus.NewFinalizer(db, all.Headers, followerState, tracer)
+		finalizer := moduleconsensus.NewFinalizer(badgerimpl.ToDB(db).Reader(), all.Headers, followerState, tracer)
 		rootHeader, err := rootSnapshot.Head()
 		require.NoError(t, err)
 		rootQC, err := rootSnapshot.QuorumCertificate()

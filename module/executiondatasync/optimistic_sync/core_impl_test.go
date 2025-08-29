@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/jordanschalm/lockctx"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -27,6 +28,7 @@ type CoreImplSuite struct {
 	txResultErrMsgsRequester      *txerrmsgsmock.Requester
 	txResultErrMsgsRequestTimeout time.Duration
 	db                            *storagemock.DB
+	lockManager                   lockctx.Manager
 	persistentRegisters           *storagemock.RegisterIndex
 	persistentEvents              *storagemock.Events
 	persistentCollections         *storagemock.Collections
@@ -42,6 +44,7 @@ func TestCoreImplSuiteSuite(t *testing.T) {
 }
 
 func (c *CoreImplSuite) SetupTest() {
+	c.lockManager = storage.NewTestingLockManager()
 	t := c.T()
 	c.logger = zerolog.Nop()
 
@@ -83,7 +86,7 @@ func (c *CoreImplSuite) createTestCoreImpl() *CoreImpl {
 	block := unittest.BlockFixture()
 	executionResult := unittest.ExecutionResultFixture(unittest.WithBlock(block))
 
-	core := NewCoreImpl(
+	return NewCoreImpl(
 		c.logger,
 		executionResult,
 		block.ToHeader(),
@@ -93,14 +96,12 @@ func (c *CoreImplSuite) createTestCoreImpl() *CoreImpl {
 		c.persistentRegisters,
 		c.persistentEvents,
 		c.persistentCollections,
-		c.persistentTransactions,
 		c.persistentResults,
 		c.persistentTxResultErrMsg,
 		c.latestPersistedSealedResult,
 		c.db,
+		c.lockManager,
 	)
-
-	return core
 }
 
 // TestCoreImpl_Download tests the Download method which retrieves execution data and transaction error messages.
