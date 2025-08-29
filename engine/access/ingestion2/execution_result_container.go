@@ -149,6 +149,12 @@ func (c *ExecutionResultContainer) ResultID() flow.Identifier {
 	return c.resultID
 }
 
+// BlockHeader returns the header of the block executed by this result.
+func (c *ExecutionResultContainer) BlockHeader() *flow.Header {
+	// No locking is required here since the blockHeader is immutable after instantiation.
+	return c.blockHeader
+}
+
 // BlockView returns the view of the block executed by this result.
 func (c *ExecutionResultContainer) BlockView() uint64 {
 	// No locking is required here since the blockHeader is immutable after instantiation.
