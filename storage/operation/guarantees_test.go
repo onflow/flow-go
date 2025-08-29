@@ -67,13 +67,12 @@ func TestIndexGuaranteedCollectionByBlockHashInsertRetrieve(t *testing.T) {
 			return nil
 		})
 		require.NoError(t, err)
-		require.NoError(t, err)
 
 		var actual []flow.Identifier
 		err = operation.LookupPayloadGuarantees(db.Reader(), blockID, &actual)
 		require.NoError(t, err)
 
-		assert.Equal(t, []flow.Identifier{collID1, collID2}, actual)
+		assert.Equal(t, []flow.Identifier(expected), actual)
 	})
 }
 
@@ -131,13 +130,13 @@ func TestIndexGuaranteedCollectionByBlockHashMultipleBlocks(t *testing.T) {
 			var actual1 []flow.Identifier
 			err := operation.LookupPayloadGuarantees(db.Reader(), blockID1, &actual1)
 			assert.NoError(t, err)
-			assert.ElementsMatch(t, []flow.Identifier{collID1}, actual1)
+			assert.ElementsMatch(t, []flow.Identifier(ids1), actual1)
 
 			// get block 2
 			var actual2 []flow.Identifier
 			err = operation.LookupPayloadGuarantees(db.Reader(), blockID2, &actual2)
 			assert.NoError(t, err)
-			assert.Equal(t, []flow.Identifier{collID2, collID3, collID4}, actual2)
+			assert.Equal(t, []flow.Identifier(ids2), actual2)
 		})
 	})
 }
