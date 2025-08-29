@@ -88,14 +88,28 @@ func (tb *TransactionBodyBuilder) AddAuthorizer(authorizer Address) *Transaction
 
 // AddPayloadSignature adds a payload signature to the transaction for the given address and key ID.
 func (tb *TransactionBodyBuilder) AddPayloadSignature(address Address, keyID uint32, sig []byte) *TransactionBodyBuilder {
-	s := tb.createSignature(address, keyID, sig)
+	s := tb.createSignature(address, keyID, sig, nil)
 	tb.u.PayloadSignatures = append(tb.u.PayloadSignatures, s)
 	return tb
 }
 
 // AddEnvelopeSignature adds an envelope signature to the transaction for the given address and key ID.
 func (tb *TransactionBodyBuilder) AddEnvelopeSignature(address Address, keyID uint32, sig []byte) *TransactionBodyBuilder {
-	s := tb.createSignature(address, keyID, sig)
+	s := tb.createSignature(address, keyID, sig, nil)
+	tb.u.EnvelopeSignatures = append(tb.u.EnvelopeSignatures, s)
+	return tb
+}
+
+// AddPayloadSignature adds a payload signature to the transaction for the given address and key ID.
+func (tb *TransactionBodyBuilder) AddPayloadSignatureWithExtensionData(address Address, keyID uint32, sig []byte, extensionData []byte) *TransactionBodyBuilder {
+	s := tb.createSignature(address, keyID, sig, extensionData)
+	tb.u.PayloadSignatures = append(tb.u.PayloadSignatures, s)
+	return tb
+}
+
+// AddEnvelopeSignature adds an envelope signature to the transaction for the given address and key ID.
+func (tb *TransactionBodyBuilder) AddEnvelopeSignatureWithExtensionData(address Address, keyID uint32, sig []byte, extensionData []byte) *TransactionBodyBuilder {
+	s := tb.createSignature(address, keyID, sig, extensionData)
 	tb.u.EnvelopeSignatures = append(tb.u.EnvelopeSignatures, s)
 	return tb
 }
@@ -150,17 +164,18 @@ func (tb *TransactionBodyBuilder) envelopeCanonicalForm() interface{} {
 	}
 }
 
-func (tb *TransactionBodyBuilder) createSignature(address Address, keyID uint32, sig []byte) TransactionSignature {
+func (tb *TransactionBodyBuilder) createSignature(address Address, keyID uint32, sig []byte, extensionData []byte) TransactionSignature {
 	signerIndex, signerExists := tb.signerMap()[address]
 	if !signerExists {
 		signerIndex = -1
 	}
 
 	return TransactionSignature{
-		Address:     address,
-		SignerIndex: signerIndex,
-		KeyIndex:    keyID,
-		Signature:   sig,
+		Address:       address,
+		SignerIndex:   signerIndex,
+		KeyIndex:      keyID,
+		Signature:     sig,
+		ExtensionData: extensionData,
 	}
 }
 

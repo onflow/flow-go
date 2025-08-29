@@ -585,3 +585,575 @@ func notOutOfRangeError(err error) bool {
 	}
 	return statusErr.Code() != codes.OutOfRange
 }
+
+// Helper function to convert signatures with ExtensionData
+// - if input `extensionData` is non-nil, its value is used as the transaction signature extension data.
+// - if input `extensionData` is nil, `sigs` extension data is used, and input `extensionData` is replaced
+func convertToMessageSigWithExtensionData(sigs []sdk.TransactionSignature, extensionData *[]byte) []*entities.Transaction_Signature {
+	msgSigs := make([]*entities.Transaction_Signature, len(sigs))
+
+	for i, sig := range sigs {
+		if *extensionData == nil {
+			// replace extension data by sig.ExtensionData
+			newExtensionData := make([]byte, len(sig.ExtensionData))
+			copy(newExtensionData, sig.ExtensionData)
+			*extensionData = newExtensionData
+		}
+
+		msgSigs[i] = &entities.Transaction_Signature{
+			Address:       sig.Address.Bytes(),
+			KeyId:         uint32(sig.KeyIndex),
+			Signature:     sig.Signature,
+			ExtensionData: *extensionData,
+		}
+	}
+	return msgSigs
+}
+
+// TestTransactionSignaturePlainExtensionData tests that the Access API properly handles the ExtensionData field
+// in transaction signatures for different authentication schemes.
+func (s *AccessAPISuite) TestTransactionSignaturePlainExtensionData() {
+	accessNodeContainer := s.net.ContainerByName(testnet.PrimaryAN)
+
+	// Establish a gRPC connection to the access API
+	conn, err := grpc.Dial(accessNodeContainer.Addr(testnet.GRPCPort), grpc.WithTransportCredentials(insecure.NewCredentials()))
+	s.Require().NoError(err)
+	s.Require().NotNil(conn)
+	defer conn.Close()
+
+	// Create a client for the access API
+	accessClient := accessproto.NewAccessAPIClient(conn)
+	serviceClient, err := accessNodeContainer.TestnetClient()
+	s.Require().NoError(err)
+	s.Require().NotNil(serviceClient)
+
+	// Get the latest block ID
+	latestBlockID, err := serviceClient.GetLatestBlockID(s.ctx)
+	s.Require().NoError(err)
+
+	// Generate a new account transaction
+	accountKey := test.AccountKeyGenerator().New()
+	payer := serviceClient.SDKServiceAddress()
+
+	tx, err := templates.CreateAccount([]*sdk.AccountKey{accountKey}, nil, payer)
+	s.Require().NoError(err)
+	tx.SetComputeLimit(1000).
+		SetReferenceBlockID(sdk.HexToID(latestBlockID.String())).
+		SetProposalKey(payer, 0, serviceClient.GetAndIncrementSeqNumber()).
+		SetPayer(payer)
+
+	tx, err = serviceClient.SignTransaction(tx)
+	s.Require().NoError(err)
+
+	// Convert the transaction to a message format expected by the access API
+	authorizers := make([][]byte, len(tx.Authorizers))
+	for i, auth := range tx.Authorizers {
+		authorizers[i] = auth.Bytes()
+	}
+
+	// Test cases for different ExtensionData values
+	testCases := []struct {
+		name          string
+		extensionData []byte
+		description   string
+		expectSuccess bool
+	}{
+		{
+			name:          "plain_scheme_nil",
+			extensionData: nil,
+			description:   "Plain authentication scheme with nil ExtensionData",
+			expectSuccess: true,
+		},
+		{
+			name:          "plain_scheme_empty",
+			extensionData: []byte{},
+			description:   "Plain authentication scheme with empty ExtensionData",
+			expectSuccess: true,
+		},
+		{
+			name:          "plain_scheme_explicit",
+			extensionData: []byte{0x0},
+			description:   "Plain authentication scheme with explicit ExtensionData",
+			expectSuccess: true,
+		},
+		{
+			name:          "custom_extension_data",
+			extensionData: []byte{0x02, 0xAA, 0xBB, 0xCC}, // Invalid scheme with custom data
+			description:   "Custom ExtensionData with invalid scheme",
+			expectSuccess: false, // Expect failure at the access API level due to invalid scheme
+		},
+	}
+
+	for _, tc := range testCases {
+		s.Run(tc.name, func() {
+			s.T().Logf("Testing: %s", tc.description)
+
+			transactionMsg := &entities.Transaction{
+				Script:           tx.Script,
+				Arguments:        tx.Arguments,
+				ReferenceBlockId: tx.ReferenceBlockID.Bytes(),
+				GasLimit:         tx.GasLimit,
+				ProposalKey: &entities.Transaction_ProposalKey{
+					Address:        tx.ProposalKey.Address.Bytes(),
+					KeyId:          uint32(tx.ProposalKey.KeyIndex),
+					SequenceNumber: tx.ProposalKey.SequenceNumber,
+				},
+				Payer:              tx.Payer.Bytes(),
+				Authorizers:        authorizers,
+				PayloadSignatures:  convertToMessageSigWithExtensionData(tx.PayloadSignatures, &tc.extensionData),
+				EnvelopeSignatures: convertToMessageSigWithExtensionData(tx.EnvelopeSignatures, &tc.extensionData),
+			}
+
+			// Send and subscribe to the transaction status using the access API
+			subClient, err := accessClient.SendAndSubscribeTransactionStatuses(s.ctx, &accessproto.SendAndSubscribeTransactionStatusesRequest{
+				Transaction:          transactionMsg,
+				EventEncodingVersion: entities.EventEncodingVersion_CCF_V0,
+			})
+			s.Require().NoError(err)
+
+			expectedCounter := uint64(0)
+			lastReportedTxStatus := entities.TransactionStatus_UNKNOWN
+			var txID sdk.Identifier
+			var statusCode uint32
+
+			for {
+				resp, err := subClient.Recv()
+				if err != nil {
+					if err == io.EOF {
+						break
+					}
+					if tc.expectSuccess { // For invalid cases, access API rejects the transaction
+						s.Require().NoError(err)
+					} else {
+						s.Require().Error(err)
+						s.Require().ErrorContains(err, "has invalid extension data")
+						break
+					}
+				}
+
+				if txID == sdk.EmptyID {
+					txID = sdk.Identifier(resp.TransactionResults.TransactionId)
+				}
+
+				s.Assert().Equal(expectedCounter, resp.GetMessageIndex())
+				s.Assert().Equal(txID, sdk.Identifier(resp.TransactionResults.TransactionId))
+
+				// Check if all statuses received one by one. The subscription should send responses for each of the statuses,
+				// and the message should be sent in the order of transaction statuses.
+				// Expected order: pending(1) -> finalized(2) -> executed(3) -> sealed(4)
+				s.Assert().Equal(lastReportedTxStatus, resp.TransactionResults.Status-1)
+
+				expectedCounter++
+				lastReportedTxStatus = resp.TransactionResults.Status
+				statusCode = resp.TransactionResults.GetStatusCode()
+			}
+
+			if tc.expectSuccess {
+				// Check that the final transaction status is sealed
+				s.Assert().Equal(entities.TransactionStatus_SEALED, lastReportedTxStatus)
+				s.Assert().Equal(uint32(codes.OK), statusCode, "Expected transaction to be successful, but got status code: %d", statusCode)
+			}
+		})
+	}
+}
+
+// TestTransactionSignatureWebAuthnExtensionData tests the WebAuthn authentication scheme with properly constructed extension data.
+func (s *AccessAPISuite) TestTransactionSignatureWebAuthnExtensionData() {
+	accessNodeContainer := s.net.ContainerByName(testnet.PrimaryAN)
+
+	// Establish a gRPC connection to the access API
+	conn, err := grpc.Dial(accessNodeContainer.Addr(testnet.GRPCPort), grpc.WithTransportCredentials(insecure.NewCredentials()))
+	s.Require().NoError(err)
+	s.Require().NotNil(conn)
+	defer conn.Close()
+
+	// Create a client for the access API
+	accessClient := accessproto.NewAccessAPIClient(conn)
+	serviceClient, err := accessNodeContainer.TestnetClient()
+	s.Require().NoError(err)
+	s.Require().NotNil(serviceClient)
+
+	// Get the latest block ID
+	latestBlockID, err := serviceClient.GetLatestBlockID(s.ctx)
+	s.Require().NoError(err)
+
+	// Generate a new account transaction
+	accountKey := test.AccountKeyGenerator().New()
+	payer := serviceClient.SDKServiceAddress()
+
+	tx, err := templates.CreateAccount([]*sdk.AccountKey{accountKey}, nil, payer)
+	s.Require().NoError(err)
+	tx.SetComputeLimit(1000).
+		SetReferenceBlockID(sdk.HexToID(latestBlockID.String())).
+		SetProposalKey(payer, 0, serviceClient.GetAndIncrementSeqNumber()).
+		SetPayer(payer)
+
+	tx, err = serviceClient.SignTransactionWebAuthN(tx)
+	s.Require().NoError(err)
+
+	// Convert the transaction to a message format expected by the access API
+	authorizers := make([][]byte, len(tx.Authorizers))
+	for i, auth := range tx.Authorizers {
+		authorizers[i] = auth.Bytes()
+	}
+	s.Require().NoError(err)
+
+	// Test WebAuthn extension data with different scenarios
+	testCases := []struct {
+		name                     string
+		extensionDataReplacement []byte // If nil, use the original extension data from the signed transaction
+		description              string
+		expectSuccess            bool
+	}{
+		{
+			name:                     "webauthn_valid",
+			extensionDataReplacement: nil, // Use the original extension data from the signed transaction, which should be valid
+			description:              "WebAuthn scheme with minimal extension data",
+			expectSuccess:            true,
+		},
+		{
+			name:                     "webauthn_invalid_minimal",
+			extensionDataReplacement: []byte{0x1}, // WebAuthn scheme identifier only
+			description:              "WebAuthn scheme with minimal extension data",
+			expectSuccess:            false, // Should fail validation due to incomplete WebAuthn data
+		},
+		{
+			name:                     "webauthn_invalid_scheme",
+			extensionDataReplacement: []byte{0x3, 0x01, 0x02, 0x03}, // Invalid scheme identifier
+			description:              "Invalid authentication scheme",
+			expectSuccess:            false,
+		},
+		{
+			name:                     "webauthn_malformed_data",
+			extensionDataReplacement: []byte{0x1, 0x01, 0x02}, // WebAuthn scheme with malformed data
+			description:              "WebAuthn scheme with malformed extension data",
+			expectSuccess:            false,
+		},
+	}
+
+	for _, tc := range testCases {
+		s.Run(tc.name, func() {
+			s.T().Logf("Testing: %s", tc.description)
+
+			transactionMsg := &entities.Transaction{
+				Script:           tx.Script,
+				Arguments:        tx.Arguments,
+				ReferenceBlockId: tx.ReferenceBlockID.Bytes(),
+				GasLimit:         tx.GasLimit,
+				ProposalKey: &entities.Transaction_ProposalKey{
+					Address:        tx.ProposalKey.Address.Bytes(),
+					KeyId:          uint32(tx.ProposalKey.KeyIndex),
+					SequenceNumber: tx.ProposalKey.SequenceNumber,
+				},
+				Payer:              tx.Payer.Bytes(),
+				Authorizers:        authorizers,
+				PayloadSignatures:  convertToMessageSigWithExtensionData(tx.PayloadSignatures, nil),
+				EnvelopeSignatures: convertToMessageSigWithExtensionData(tx.EnvelopeSignatures, &tc.extensionDataReplacement),
+			}
+
+			// Validate that the ExtensionData is set correctly before sending
+			for _, sig := range transactionMsg.EnvelopeSignatures {
+				// For these test cases specifically, we expect ExtensionData to be set
+				s.Assert().GreaterOrEqual(len(sig.ExtensionData), 1, "ExtensionData should have at least 1 byte for scheme identifier")
+			}
+
+			// Send and subscribe to the transaction status using the access API
+			subClient, err := accessClient.SendAndSubscribeTransactionStatuses(s.ctx, &accessproto.SendAndSubscribeTransactionStatusesRequest{
+				Transaction:          transactionMsg,
+				EventEncodingVersion: entities.EventEncodingVersion_CCF_V0,
+			})
+
+			s.Require().NoError(err)
+
+			expectedCounter := uint64(0)
+			lastReportedTxStatus := entities.TransactionStatus_UNKNOWN
+			var txID sdk.Identifier
+			var statusCode uint32
+			var errorMessage string
+
+			for {
+				resp, err := subClient.Recv()
+				if err != nil {
+					if err == io.EOF {
+						break
+					}
+					if tc.expectSuccess { // For invalid cases, access API rejects the transaction
+						s.Require().NoError(err)
+					} else {
+						s.Require().Error(err)
+						s.Require().ErrorContains(err, "has invalid extension data")
+						break
+					}
+				}
+
+				if txID == sdk.EmptyID {
+					txID = sdk.Identifier(resp.TransactionResults.TransactionId)
+				}
+
+				s.Assert().Equal(expectedCounter, resp.GetMessageIndex())
+				s.Assert().Equal(txID, sdk.Identifier(resp.TransactionResults.TransactionId))
+
+				// Check if all statuses received one by one. The subscription should send responses for each of the statuses,
+				// and the message should be sent in the order of transaction statuses.
+				// Expected order: pending(1) -> finalized(2) -> executed(3) -> sealed(4)
+				s.Assert().Equal(lastReportedTxStatus, resp.TransactionResults.Status-1)
+
+				expectedCounter++
+				lastReportedTxStatus = resp.TransactionResults.Status
+				statusCode = resp.TransactionResults.GetStatusCode()
+				errorMessage = resp.TransactionResults.GetErrorMessage()
+			}
+
+			if tc.expectSuccess {
+				// Check that the final transaction status is sealed
+				s.Assert().Equal(entities.TransactionStatus_SEALED, lastReportedTxStatus)
+
+				if !tc.expectSuccess {
+					// For invalid cases, we expect the transaction to be rejected
+					s.Assert().NotEqual(uint32(codes.OK), statusCode, "Expected transaction to fail, but got status code: %d", statusCode)
+					return
+				}
+
+				s.Assert().Equal(uint32(codes.OK), statusCode, "Expected transaction to be successful, but got status code: %d with message: %s", statusCode, errorMessage)
+			}
+		})
+	}
+}
+
+// TestExtensionDataPreservation tests that the ExtensionData field is properly preserved
+// when transactions are submitted and retrieved through the Access API.
+func (s *AccessAPISuite) TestExtensionDataPreservation() {
+	accessNodeContainer := s.net.ContainerByName(testnet.PrimaryAN)
+
+	// Establish a gRPC connection to the access API
+	conn, err := grpc.Dial(accessNodeContainer.Addr(testnet.GRPCPort), grpc.WithTransportCredentials(insecure.NewCredentials()))
+	s.Require().NoError(err)
+	s.Require().NotNil(conn)
+	defer conn.Close()
+
+	// Create a client for the access API
+	accessClient := accessproto.NewAccessAPIClient(conn)
+	serviceClient, err := accessNodeContainer.TestnetClient()
+	s.Require().NoError(err)
+	s.Require().NotNil(serviceClient)
+
+	// Get the latest block ID
+	latestBlockID, err := serviceClient.GetLatestBlockID(s.ctx)
+	s.Require().NoError(err)
+
+	// Generate a new account transaction
+	accountKey := test.AccountKeyGenerator().New()
+	payer := serviceClient.SDKServiceAddress()
+
+	// Test with different ExtensionData values to ensure they are preserved
+	testCases := []struct {
+		name          string
+		extensionData []byte
+		description   string
+	}{
+		{
+			name:          "plain_scheme_preservation",
+			extensionData: []byte{0x0},
+			description:   "Plain authentication scheme ExtensionData preservation",
+		},
+		{
+			name:          "webauthn_scheme_preservation",
+			extensionData: nil, // valid extension data is populated below in the test
+			description:   "WebAuthn authentication scheme ExtensionData preservation",
+		},
+	}
+
+	for _, tc := range testCases {
+		s.Run(tc.name, func() {
+			s.T().Logf("Testing: %s", tc.description)
+
+			tx, err := templates.CreateAccount([]*sdk.AccountKey{accountKey}, nil, payer)
+			s.Require().NoError(err)
+			tx.SetComputeLimit(1000).
+				SetReferenceBlockID(sdk.HexToID(latestBlockID.String())).
+				SetProposalKey(payer, 0, serviceClient.GetAndIncrementSeqNumber()).
+				SetPayer(payer)
+
+			switch tc.name {
+			case "plain_scheme_preservation":
+				tx, err = serviceClient.SignTransaction(tx)
+			case "webauthn_scheme_preservation":
+				tx, err = serviceClient.SignTransactionWebAuthN(tx)
+			default:
+				err = fmt.Errorf("test must be signed for plain or webauthn schemes")
+			}
+			s.Require().NoError(err)
+
+			// Convert the transaction to a message format expected by the access API
+			authorizers := make([][]byte, len(tx.Authorizers))
+			for i, auth := range tx.Authorizers {
+				authorizers[i] = auth.Bytes()
+			}
+
+			transactionMsg := &entities.Transaction{
+				Script:           tx.Script,
+				Arguments:        tx.Arguments,
+				ReferenceBlockId: tx.ReferenceBlockID.Bytes(),
+				GasLimit:         tx.GasLimit,
+				ProposalKey: &entities.Transaction_ProposalKey{
+					Address:        tx.ProposalKey.Address.Bytes(),
+					KeyId:          uint32(tx.ProposalKey.KeyIndex),
+					SequenceNumber: tx.ProposalKey.SequenceNumber,
+				},
+				Payer:              tx.Payer.Bytes(),
+				Authorizers:        authorizers,
+				PayloadSignatures:  convertToMessageSigWithExtensionData(tx.PayloadSignatures, &tc.extensionData),
+				EnvelopeSignatures: convertToMessageSigWithExtensionData(tx.EnvelopeSignatures, &tc.extensionData),
+			}
+
+			// Validate that the ExtensionData is set correctly before sending in the webauthn case
+			if tc.name == "webauthn_scheme_preservation" {
+				for _, sig := range transactionMsg.EnvelopeSignatures {
+					// For these test cases specifically, we expect ExtensionData to be at least 2 bytes
+					s.Assert().GreaterOrEqual(len(sig.ExtensionData), 2, "ExtensionData should have at least 2 byte for webauthn scheme")
+				}
+			}
+
+			// Send and subscribe to the transaction status using the access API
+			subClient, err := accessClient.SendAndSubscribeTransactionStatuses(s.ctx, &accessproto.SendAndSubscribeTransactionStatusesRequest{
+				Transaction:          transactionMsg,
+				EventEncodingVersion: entities.EventEncodingVersion_CCF_V0,
+			})
+			s.Require().NoError(err)
+
+			var txID sdk.Identifier
+			lastReportedTxStatus := entities.TransactionStatus_UNKNOWN
+
+			// Wait for the transaction to be sealed
+			for {
+				resp, err := subClient.Recv()
+				if err != nil {
+					if err == io.EOF {
+						break
+					}
+					s.Require().NoError(err)
+				}
+
+				if txID == sdk.EmptyID {
+					txID = sdk.Identifier(resp.TransactionResults.TransactionId)
+				}
+
+				lastReportedTxStatus = resp.TransactionResults.Status
+
+				if lastReportedTxStatus == entities.TransactionStatus_SEALED {
+					break
+				}
+			}
+
+			// Verify the transaction was sealed
+			s.Assert().Equal(entities.TransactionStatus_SEALED, lastReportedTxStatus)
+
+			// Now retrieve the transaction and verify ExtensionData is preserved
+			s.T().Logf("Transaction %s was successfully processed with ExtensionData: %v", txID, tc.extensionData)
+
+			txFromAccess, err := accessClient.GetTransaction(s.ctx, &accessproto.GetTransactionRequest{
+				Id: txID.Bytes(),
+			})
+			s.Require().NoError(err)
+
+			// Verify the retrieved transaction matches the original
+			envelopSigs := txFromAccess.GetTransaction().EnvelopeSignatures
+			s.Assert().Equal(tc.extensionData, envelopSigs[0].ExtensionData, "ExtensionData should be preserved in the envelope signature")
+		})
+	}
+}
+
+// TestInvalidTransactionSignature tests that the access API performs sanity checks
+// on the transaction signature format and rejects invalid formats
+func (s *AccessAPISuite) TestRejectedInvalidSignatureFormat() {
+	accessNodeContainer := s.net.ContainerByName(testnet.PrimaryAN)
+
+	// Establish a gRPC connection to the access API
+	conn, err := grpc.Dial(accessNodeContainer.Addr(testnet.GRPCPort), grpc.WithTransportCredentials(insecure.NewCredentials()))
+	s.Require().NoError(err)
+	s.Require().NotNil(conn)
+	defer conn.Close()
+
+	// Create a client for the access API
+	accessClient := accessproto.NewAccessAPIClient(conn)
+	serviceClient, err := accessNodeContainer.TestnetClient()
+	s.Require().NoError(err)
+	s.Require().NotNil(serviceClient)
+
+	// Get the latest block ID
+	latestBlockID, err := serviceClient.GetLatestBlockID(s.ctx)
+	s.Require().NoError(err)
+
+	// Generate a new account transaction
+	accountKey := test.AccountKeyGenerator().New()
+	payer := serviceClient.SDKServiceAddress()
+
+	tx, err := templates.CreateAccount([]*sdk.AccountKey{accountKey}, nil, payer)
+	s.Require().NoError(err)
+	tx.SetComputeLimit(1000).
+		SetReferenceBlockID(sdk.HexToID(latestBlockID.String())).
+		SetProposalKey(payer, 0, serviceClient.GetAndIncrementSeqNumber()).
+		SetPayer(payer)
+
+	tx, err = serviceClient.SignTransaction(tx)
+	s.Require().NoError(err)
+
+	// Convert the transaction to a message format expected by the access API
+	authorizers := make([][]byte, len(tx.Authorizers))
+	for i, auth := range tx.Authorizers {
+		authorizers[i] = auth.Bytes()
+	}
+
+	// Test with different ExtensionData values to ensure they are preserved
+	testCases := []struct {
+		name          string
+		extensionData []byte
+	}{
+		{
+			name:          "invalid_plain_scheme",
+			extensionData: []byte{0x0, 0x1},
+		},
+		{
+			name:          "invalid_webauthn_scheme",
+			extensionData: []byte{0x1, 0x2, 0x3, 0x4, 0x5},
+		},
+		{
+			name:          "invalid_authentication_scheme",
+			extensionData: []byte{0x02, 0x11, 0x22, 0x33, 0x44, 0x55},
+		},
+	}
+
+	for _, tc := range testCases {
+		s.Run(tc.name, func() {
+			s.T().Logf("Testing: %s", tc.name)
+
+			transactionMsg := &entities.Transaction{
+				Script:           tx.Script,
+				Arguments:        tx.Arguments,
+				ReferenceBlockId: tx.ReferenceBlockID.Bytes(),
+				GasLimit:         tx.GasLimit,
+				ProposalKey: &entities.Transaction_ProposalKey{
+					Address:        tx.ProposalKey.Address.Bytes(),
+					KeyId:          uint32(tx.ProposalKey.KeyIndex),
+					SequenceNumber: tx.ProposalKey.SequenceNumber,
+				},
+				Payer:              tx.Payer.Bytes(),
+				Authorizers:        authorizers,
+				PayloadSignatures:  convertToMessageSigWithExtensionData(tx.PayloadSignatures, &tc.extensionData),
+				EnvelopeSignatures: convertToMessageSigWithExtensionData(tx.EnvelopeSignatures, &tc.extensionData),
+			}
+
+			// Send and subscribe to the transaction status using the access API
+			subClient, err := accessClient.SendAndSubscribeTransactionStatuses(s.ctx, &accessproto.SendAndSubscribeTransactionStatusesRequest{
+				Transaction:          transactionMsg,
+				EventEncodingVersion: entities.EventEncodingVersion_CCF_V0,
+			})
+			s.Require().NoError(err)
+
+			// check that the tx submission errors at the access API level
+			_, err = subClient.Recv()
+			s.Require().Error(err)
+			s.Require().ErrorContains(err, "has invalid extension data")
+		})
+	}
+}

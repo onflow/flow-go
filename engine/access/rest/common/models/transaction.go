@@ -82,6 +82,7 @@ func (t *TransactionSignature) Build(sig flow.TransactionSignature) {
 	t.Address = sig.Address.String()
 	t.KeyIndex = util.FromUint(sig.KeyIndex)
 	t.Signature = util.ToBase64(sig.Signature)
+	t.ExtensionData = util.ToBase64(sig.ExtensionData)
 }
 
 func (t *TransactionResult) Build(txr *accessmodel.TransactionResult, txID flow.Identifier, link LinkGenerator) {
