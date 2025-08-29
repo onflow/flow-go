@@ -39,3 +39,11 @@ var FactoryContractABIJSON string
 
 //go:embed factory_deployable_abi.json
 var FactoryDeployableContractABIJSON string
+
+//go:embed file_system_bytes.hex
+var fileSystemContractBytesInHex string
+
+var FileSystemContractBytes, _ = hex.DecodeString(fileSystemContractBytesInHex)
+
+//go:embed file_system_abi.json
+var FileSystemContractABIJSON string
