@@ -1,6 +1,8 @@
 package convert
 
 import (
+	"fmt"
+
 	"github.com/onflow/flow/protobuf/go/flow/entities"
 
 	"github.com/onflow/flow-go/model/flow"
@@ -59,60 +61,64 @@ func MessageToTransaction(
 	m *entities.Transaction,
 	chain flow.Chain,
 ) (flow.TransactionBody, error) {
+	var t flow.TransactionBody
 	if m == nil {
-		return flow.TransactionBody{}, ErrEmptyMessage
+		return t, ErrEmptyMessage
 	}
-
-	t := flow.NewTransactionBody()
+	tb := flow.NewTransactionBodyBuilder()
 
 	proposalKey := m.GetProposalKey()
 	if proposalKey != nil {
 		proposalAddress, err := Address(proposalKey.GetAddress(), chain)
 		if err != nil {
-			return *t, err
+			return t, err
 		}
-		t.SetProposalKey(proposalAddress, proposalKey.GetKeyId(), proposalKey.GetSequenceNumber())
+		tb.SetProposalKey(proposalAddress, proposalKey.GetKeyId(), proposalKey.GetSequenceNumber())
 	}
 
 	payer := m.GetPayer()
 	if payer != nil {
 		payerAddress, err := Address(payer, chain)
 		if err != nil {
-			return *t, err
+			return t, err
 		}
-		t.SetPayer(payerAddress)
+		tb.SetPayer(payerAddress)
 	}
 
 	for _, authorizer := range m.GetAuthorizers() {
 		authorizerAddress, err := Address(authorizer, chain)
 		if err != nil {
-			return *t, err
+			return t, err
 		}
-		t.AddAuthorizer(authorizerAddress)
+		tb.AddAuthorizer(authorizerAddress)
 	}
 
 	for _, sig := range m.GetPayloadSignatures() {
 		addr, err := Address(sig.GetAddress(), chain)
 		if err != nil {
-			return *t, err
+			return t, err
 		}
-		t.AddPayloadSignature(addr, sig.GetKeyId(), sig.GetSignature(), sig.GetExtensionData())
+		tb.AddPayloadSignatureWithExtensionData(addr, sig.GetKeyId(), sig.GetSignature(), sig.GetExtensionData())
 	}
 
 	for _, sig := range m.GetEnvelopeSignatures() {
 		addr, err := Address(sig.GetAddress(), chain)
 		if err != nil {
-			return *t, err
+			return t, err
 		}
-		t.AddEnvelopeSignature(addr, sig.GetKeyId(), sig.GetSignature(), sig.GetExtensionData())
+		tb.AddEnvelopeSignatureWithExtensionData(addr, sig.GetKeyId(), sig.GetSignature(), sig.GetExtensionData())
 	}
 
-	t.SetScript(m.GetScript())
-	t.SetArguments(m.GetArguments())
-	t.SetReferenceBlockID(flow.HashToID(m.GetReferenceBlockId()))
-	t.SetComputeLimit(m.GetGasLimit())
+	transactionBody, err := tb.SetScript(m.GetScript()).
+		SetArguments(m.GetArguments()).
+		SetReferenceBlockID(flow.HashToID(m.GetReferenceBlockId())).
+		SetComputeLimit(m.GetGasLimit()).
+		Build()
+	if err != nil {
+		return t, fmt.Errorf("could not build transaction body: %w", err)
+	}
 
-	return *t, nil
+	return *transactionBody, nil
 }
 
 // TransactionsToMessages converts a slice of flow.TransactionBody to a slice of protobuf messages

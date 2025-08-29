@@ -12,7 +12,7 @@ func CreateNParticipantsWithMyRole(myRole flow.Role, otherRoles ...flow.Role) (
 	// participants := IdentityFixture(myRole)
 	participants := make(flow.IdentityList, 0)
 	myIdentity := IdentityFixture(WithRole(myRole))
-	myID := myIdentity.ID()
+	myNodeID := myIdentity.NodeID
 	participants = append(participants, myIdentity)
 	for _, role := range otherRoles {
 		id := IdentityFixture(WithRole(role))
@@ -23,8 +23,8 @@ func CreateNParticipantsWithMyRole(myRole flow.Role, otherRoles ...flow.Role) (
 	me := &module.Local{}
 	me.On("NodeID").Return(
 		func() flow.Identifier {
-			return myID
+			return myNodeID
 		},
 	)
-	return participants, myID, me
+	return participants, myNodeID, me
 }

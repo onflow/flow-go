@@ -40,6 +40,7 @@ const MaxViewIncrease = 3
 type pendingBlock struct {
 	height    uint64
 	view      uint64
+	chainID   flowgo.ChainID
 	parentID  flowgo.Identifier
 	timestamp time.Time
 	// mapping from transaction ID to transaction
@@ -60,13 +61,15 @@ type pendingBlock struct {
 func newPendingBlock(
 	prevBlock *flowgo.Block,
 	ledgerSnapshot snapshot.StorageSnapshot,
+	chainID flowgo.ChainID,
 	timestamp time.Time,
 ) *pendingBlock {
-	return &pendingBlock{
-		height: prevBlock.Header.Height + 1,
+	pb := &pendingBlock{
+		height: prevBlock.Height + 1,
 		// the view increments by between 1 and MaxViewIncrease to match
 		// behaviour on a real network, where views are not consecutive
-		view:               prevBlock.Header.View + uint64(rand.Intn(MaxViewIncrease)+1),
+		view:               prevBlock.View + uint64(rand.Intn(MaxViewIncrease)+1),
+		chainID:            chainID,
 		parentID:           prevBlock.ID(),
 		timestamp:          timestamp,
 		transactions:       make(map[flowgo.Identifier]*flowgo.TransactionBody),
@@ -78,11 +81,8 @@ func newPendingBlock(
 		events: make([]flowgo.Event, 0),
 		index:  0,
 	}
-}
 
-// ID returns the ID of the pending block.
-func (b *pendingBlock) ID() flowgo.Identifier {
-	return b.Block().ID()
+	return pb
 }
 
 // Block returns the block information for the pending block.
@@ -96,14 +96,16 @@ func (b *pendingBlock) Block() *flowgo.Block {
 		}
 	}
 
+	//nolint:structwrite - safe because Emulator is strictly used for integration tests
 	return &flowgo.Block{
-		Header: &flowgo.Header{
+		HeaderBody: flowgo.HeaderBody{
+			ChainID:   b.chainID,
 			Height:    b.height,
 			View:      b.view,
 			ParentID:  b.parentID,
-			Timestamp: b.timestamp,
+			Timestamp: uint64(b.timestamp.UnixMilli()),
 		},
-		Payload: &flowgo.Payload{
+		Payload: flowgo.Payload{
 			Guarantees: guarantees,
 		},
 	}

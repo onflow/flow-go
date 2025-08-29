@@ -2,15 +2,21 @@ package flow
 
 import (
 	"fmt"
+	"io"
 	"slices"
 
 	"github.com/onflow/crypto"
 	"github.com/onflow/crypto/hash"
 
+	"github.com/ethereum/go-ethereum/rlp"
+
+	flowrlp "github.com/onflow/flow-go/model/encoding/rlp"
 	"github.com/onflow/flow-go/model/fingerprint"
 )
 
 // TransactionBody includes the main contents of a transaction
+//
+//structwrite:immutable - mutations allowed only within the constructor
 type TransactionBody struct {
 
 	// A reference to a previous block
@@ -35,7 +41,7 @@ type TransactionBody struct {
 	// Account that pays for this transaction fees
 	Payer Address
 
-	// A ordered (ascending) list of addresses that scripts will touch their assets (including payer address)
+	// An ordered (ascending) list of addresses that scripts will touch their assets (including payer address)
 	// Accounts listed here all have to provide signatures
 	// Each account might provide multiple signatures (sum of weight should be at least 1)
 	// If code touches accounts that is not listed here, tx fails
@@ -48,13 +54,51 @@ type TransactionBody struct {
 	EnvelopeSignatures []TransactionSignature
 }
 
-// NewTransactionBody initializes and returns an empty transaction body
-func NewTransactionBody() *TransactionBody {
-	return &TransactionBody{}
+// UntrustedTransactionBody is an untrusted input-only representation of a TransactionBody,
+// used for construction.
+//
+// This type exists to ensure that constructor functions are invoked explicitly
+// with named fields, which improves clarity and reduces the risk of incorrect field
+// ordering during construction.
+//
+// An instance of UntrustedTransactionBody should be validated and converted into
+// a trusted TransactionBody using NewTransactionBody constructor.
+type UntrustedTransactionBody TransactionBody
+
+// NewTransactionBody creates a new instance of TransactionBody.
+// Construction of TransactionBody is allowed only within the constructor.
+//
+// All errors indicate a valid TransactionBody cannot be constructed from the input.
+func NewTransactionBody(untrusted UntrustedTransactionBody) (*TransactionBody, error) {
+
+	if len(untrusted.Script) == 0 {
+		return nil, fmt.Errorf("Script must not be empty")
+	}
+
+	return &TransactionBody{
+		ReferenceBlockID:   untrusted.ReferenceBlockID,
+		Script:             untrusted.Script,
+		Arguments:          untrusted.Arguments,
+		GasLimit:           untrusted.GasLimit,
+		ProposalKey:        untrusted.ProposalKey,
+		Payer:              untrusted.Payer,
+		Authorizers:        untrusted.Authorizers,
+		PayloadSignatures:  untrusted.PayloadSignatures,
+		EnvelopeSignatures: untrusted.EnvelopeSignatures,
+	}, nil
 }
 
+// Fingerprint returns the canonical, unique byte representation for the TransactionBody.
+// As RLP encoding logic for TransactionBody is over-ridden by EncodeRLP below, this is
+// equivalent to directly RLP encoding the TransactionBody.
+// This public function is retained primarily for backward compatibility.
 func (tb TransactionBody) Fingerprint() []byte {
-	return fingerprint.Fingerprint(struct {
+	return flowrlp.NewMarshaler().MustMarshal(tb)
+}
+
+// EncodeRLP defines RLP encoding behaviour for TransactionBody.
+func (tb TransactionBody) EncodeRLP(w io.Writer) error {
+	encodingCanonicalForm := struct {
 		Payload            interface{}
 		PayloadSignatures  interface{}
 		EnvelopeSignatures interface{}
@@ -62,7 +106,8 @@ func (tb TransactionBody) Fingerprint() []byte {
 		Payload:            tb.PayloadCanonicalForm(),
 		PayloadSignatures:  signaturesList(tb.PayloadSignatures).canonicalForm(),
 		EnvelopeSignatures: signaturesList(tb.EnvelopeSignatures).canonicalForm(),
-	})
+	}
+	return rlp.Encode(w, encodingCanonicalForm)
 }
 
 func (tb TransactionBody) ByteSize() uint {
@@ -97,67 +142,9 @@ func (tb TransactionBody) ID() Identifier {
 	return MakeID(tb)
 }
 
-func (tb TransactionBody) Checksum() Identifier {
-	return MakeID(tb)
-}
-
-// SetScript sets the Cadence script for this transaction.
-func (tb *TransactionBody) SetScript(script []byte) *TransactionBody {
-	tb.Script = script
-	return tb
-}
-
-// SetArguments sets the Cadence arguments list for this transaction.
-func (tb *TransactionBody) SetArguments(args [][]byte) *TransactionBody {
-	tb.Arguments = args
-	return tb
-}
-
-// AddArgument adds an argument to the Cadence arguments list for this transaction.
-func (tb *TransactionBody) AddArgument(arg []byte) *TransactionBody {
-	tb.Arguments = append(tb.Arguments, arg)
-	return tb
-}
-
-// SetReferenceBlockID sets the reference block ID for this transaction.
-func (tb *TransactionBody) SetReferenceBlockID(blockID Identifier) *TransactionBody {
-	tb.ReferenceBlockID = blockID
-	return tb
-}
-
-// SetComputeLimit sets the gas limit for this transaction.
-func (tb *TransactionBody) SetComputeLimit(limit uint64) *TransactionBody {
-	tb.GasLimit = limit
-	return tb
-}
-
-// SetProposalKey sets the proposal key and sequence number for this transaction.
-//
-// The first two arguments specify the account key to be used, and the last argument is the sequence
-// number being declared.
-func (tb *TransactionBody) SetProposalKey(address Address, keyID uint32, sequenceNum uint64) *TransactionBody {
-	proposalKey := ProposalKey{
-		Address:        address,
-		KeyIndex:       keyID,
-		SequenceNumber: sequenceNum,
-	}
-	tb.ProposalKey = proposalKey
-	return tb
-}
-
-// SetPayer sets the payer account for this transaction.
-func (tb *TransactionBody) SetPayer(address Address) *TransactionBody {
-	tb.Payer = address
-	return tb
-}
-
-// AddAuthorizer adds an authorizer account to this transaction.
-func (tb *TransactionBody) AddAuthorizer(address Address) *TransactionBody {
-	tb.Authorizers = append(tb.Authorizers, address)
-	return tb
-}
-
 // Transaction is the smallest unit of task.
+//
+//structwrite:immutable - mutations allowed only within the constructor
 type Transaction struct {
 	TransactionBody
 	Status           TransactionStatus
