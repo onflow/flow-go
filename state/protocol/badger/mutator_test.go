@@ -945,7 +945,6 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 		initialPhase, err := rootSnapshot.EpochPhase()
 		require.NoError(t, err)
 
-		fmt.Println("counter", counter)
 		metrics.On("CurrentEpochCounter", counter)     // .Once() I have to comment out this because it's called more than once
 		metrics.On("CurrentEpochPhase", initialPhase)  // .Once() I have to comment out this because it's called more than once
 		metrics.On("CurrentEpochFinalView", finalView) // .Once() I have to comment out this because it's called more than once
