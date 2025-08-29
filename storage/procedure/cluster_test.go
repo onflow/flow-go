@@ -48,7 +48,7 @@ func TestFinalizeClusterBlock(t *testing.T) {
 		defer lctx.Release()
 		require.NoError(t, lctx.AcquireLock(storage.LockInsertOrFinalizeClusterBlock))
 		require.NoError(t, db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			return InsertClusterBlock(lctx, rw, unittest.ClusterProposalFromBlock(block))
+			return InsertClusterBlock(lctx, rw, unittest.ClusterProposalFromBlock(parent))
 		}))
 
 		// index parent as latest finalized block (manually writing respective indexes like in bootstrapping to skip transitive consistency checks)
