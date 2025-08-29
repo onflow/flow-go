@@ -12,7 +12,7 @@ import (
 	"github.com/onflow/flow-go/storage/store"
 )
 
-func InitProtocolState(lockManager lockctx.Manager, db storage.DB, storages *store.All) (protocol.State, error) {
+func OpenProtocolState(lockManager lockctx.Manager, db storage.DB, storages *store.All) (protocol.State, error) {
 	metrics := &metrics.NoopCollector{}
 
 	protocolState, err := protocolbadger.OpenState(
@@ -32,7 +32,7 @@ func InitProtocolState(lockManager lockctx.Manager, db storage.DB, storages *sto
 	)
 
 	if err != nil {
-		return nil, fmt.Errorf("could not init protocol state: %w", err)
+		return nil, fmt.Errorf("could not open protocol state: %w", err)
 	}
 
 	return protocolState, nil

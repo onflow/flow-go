@@ -239,9 +239,9 @@ func initStorages(
 	}
 
 	storages := common.InitStorages(db)
-	state, err := common.InitProtocolState(lockManager, db, storages)
+	state, err := common.OpenProtocolState(lockManager, db, storages)
 	if err != nil {
-		return nil, nil, nil, nil, nil, fmt.Errorf("could not init protocol state: %w", err)
+		return nil, nil, nil, nil, nil, fmt.Errorf("could not open protocol state: %w", err)
 	}
 
 	// require the chunk data pack data must exist before returning the storage module

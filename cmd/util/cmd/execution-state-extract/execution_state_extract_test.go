@@ -37,7 +37,6 @@ func TestExtractExecutionState(t *testing.T) {
 	metr := &metrics.NoopCollector{}
 
 	t.Run("missing block->state commitment mapping", func(t *testing.T) {
-
 		withDirs(t, func(datadir, execdir, outdir string) {
 			// Initialize a proper Badger database instead of using empty directory
 			db := unittest.PebbleDB(t, datadir)
@@ -96,7 +95,6 @@ func TestExtractExecutionState(t *testing.T) {
 		lockManager := storage.NewTestingLockManager()
 
 		withDirs(t, func(datadir, execdir, _ string) {
-
 			const (
 				checkpointDistance = math.MaxInt // A large number to prevent checkpoint creation.
 				checkpointsToKeep  = 1
