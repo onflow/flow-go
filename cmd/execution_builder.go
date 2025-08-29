@@ -575,7 +575,9 @@ func (exeNode *ExecutionNode) LoadProviderEngine(
 	opts = append(opts, computation.DefaultFVMOptions(
 		node.RootChainID,
 		exeNode.exeConf.computationConfig.CadenceTracing,
-		exeNode.exeConf.computationConfig.ExtensiveTracing)...)
+		exeNode.exeConf.computationConfig.ExtensiveTracing,
+		exeNode.exeConf.scheduleCallbacksEnabled)...)
+
 	vmCtx := fvm.NewContext(opts...)
 
 	var collector module.ExecutionMetrics
