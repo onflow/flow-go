@@ -319,7 +319,7 @@ func (executor *transactionExecutor) deductTransactionFees() (err error) {
 		return nil
 	}
 
-	computationLimit := uint64(executor.txnState.TotalComputationLimit())
+	computationLimit := executor.txnState.TotalComputationLimit()
 
 	computationUsed, err := executor.env.ComputationUsed()
 	if err != nil {

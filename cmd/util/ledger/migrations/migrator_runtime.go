@@ -189,6 +189,8 @@ func NewInterpreterMigrationRuntime(
 		runtime.NewCodesAndPrograms(),
 		basicMigrationRuntime.Storage,
 		nil,
+		nil,
+		nil,
 	)
 
 	inter, err := interpreter.NewInterpreter(
