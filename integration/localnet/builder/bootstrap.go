@@ -73,7 +73,6 @@ var (
 	profiler                    bool
 	profileUploader             bool
 	tracing                     bool
-	cadenceTracing              bool
 	extensiveTracing            bool
 	consensusDelay              time.Duration
 	collectionDelay             time.Duration
