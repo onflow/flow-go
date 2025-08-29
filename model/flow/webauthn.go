@@ -1,4 +1,4 @@
-package crypto
+package flow
 
 import (
 	"bytes"
@@ -11,16 +11,13 @@ import (
 	"github.com/ethereum/go-ethereum/rlp"
 
 	"github.com/onflow/crypto/hash"
-
-	"github.com/onflow/flow-go/model/flow"
 )
 
 // Consolidation of WebAuthn related constants, types and functions
 // All WebAuthn related constants, types and functions should be defined here
-// and used in crypto.go
 
-const WebAuthnChallengeLength = 32
-const WebAuthnExtensionDataMinimumLength = 37
+const webAuthnChallengeLength = 32
+const webAuthnExtensionDataMinimumLength = 37
 const WebAuthnTypeGet = "webauthn.get"
 
 type WebAuthnExtensionData struct {
@@ -96,33 +93,36 @@ func validateWebAuthNExtensionData(extensionData []byte, payload []byte) (bool, 
 		return false, nil
 	}
 
-	if strings.Compare(clientData.Type, WebAuthnTypeGet) != 0 || len(clientDataChallenge) != WebAuthnChallengeLength {
+	if strings.Compare(clientData.Type, WebAuthnTypeGet) != 0 || len(clientDataChallenge) != webAuthnChallengeLength {
 		// invalid client data
 		return false, nil
 	}
 
 	// make sure the challenge is the hash of the transaction payload
-	hasher, err := NewPrefixedHashing(hash.SHA2_256, flow.TransactionTagString)
+	hasher := hash.NewSHA2_256()
+	_, err = hasher.Write(TransactionDomainTag[:])
 	if err != nil {
-		// could not create hasher for challenge validation, panic here, but should never occur
-		panic(err)
+		return false, nil
 	}
-
-	computedChallenge := hasher.ComputeHash(payload)
+	_, err = hasher.Write(payload)
+	if err != nil {
+		return false, nil
+	}
+	computedChallenge := hasher.SumHash()
 	if !computedChallenge.Equal(clientDataChallenge) {
 		return false, nil
 	}
 
 	// Validate authenticatorData
-	if len(decodedWebAuthnData.AuthenticatorData) < WebAuthnExtensionDataMinimumLength {
+	if len(decodedWebAuthnData.AuthenticatorData) < webAuthnExtensionDataMinimumLength {
 		return false, nil
 	}
 
 	// extract rpIdHash, userFlags, sigCounter, extensions
-	rpIdHash := decodedWebAuthnData.AuthenticatorData[:WebAuthnChallengeLength]
-	userFlags := decodedWebAuthnData.AuthenticatorData[WebAuthnChallengeLength]
-	extensions := decodedWebAuthnData.AuthenticatorData[WebAuthnExtensionDataMinimumLength:]
-	if bytes.Equal(flow.TransactionDomainTag[:], rpIdHash) {
+	rpIdHash := decodedWebAuthnData.AuthenticatorData[:webAuthnChallengeLength]
+	userFlags := decodedWebAuthnData.AuthenticatorData[webAuthnChallengeLength]
+	extensions := decodedWebAuthnData.AuthenticatorData[webAuthnExtensionDataMinimumLength:]
+	if bytes.Equal(TransactionDomainTag[:], rpIdHash) {
 		return false, nil
 	}
 

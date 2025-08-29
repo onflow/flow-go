@@ -2,10 +2,10 @@ package flow
 
 import (
 	"fmt"
+	"slices"
 
 	"github.com/onflow/crypto"
 	"github.com/onflow/crypto/hash"
-	"golang.org/x/exp/slices"
 
 	"github.com/onflow/flow-go/model/fingerprint"
 )
@@ -59,7 +59,7 @@ func (tb TransactionBody) Fingerprint() []byte {
 		PayloadSignatures  interface{}
 		EnvelopeSignatures interface{}
 	}{
-		Payload:            tb.payloadCanonicalForm(),
+		Payload:            tb.PayloadCanonicalForm(),
 		PayloadSignatures:  signaturesList(tb.PayloadSignatures).canonicalForm(),
 		EnvelopeSignatures: signaturesList(tb.EnvelopeSignatures).canonicalForm(),
 	})
@@ -338,10 +338,10 @@ func (tb *TransactionBody) createSignature(address Address, keyID uint32, sig []
 }
 
 func (tb *TransactionBody) PayloadMessage() []byte {
-	return fingerprint.Fingerprint(tb.payloadCanonicalForm())
+	return fingerprint.Fingerprint(tb.PayloadCanonicalForm())
 }
 
-func (tb *TransactionBody) payloadCanonicalForm() interface{} {
+func (tb *TransactionBody) PayloadCanonicalForm() interface{} {
 	authorizers := make([][]byte, len(tb.Authorizers))
 	for i, auth := range tb.Authorizers {
 		authorizers[i] = auth.Bytes()
@@ -382,13 +382,13 @@ func (tb *TransactionBody) envelopeCanonicalForm() interface{} {
 		Payload           interface{}
 		PayloadSignatures interface{}
 	}{
-		tb.payloadCanonicalForm(),
+		tb.PayloadCanonicalForm(),
 		signaturesList(tb.PayloadSignatures).canonicalForm(),
 	}
 }
 
 func (tx *Transaction) PayloadMessage() []byte {
-	return fingerprint.Fingerprint(tx.TransactionBody.payloadCanonicalForm())
+	return fingerprint.Fingerprint(tx.TransactionBody.PayloadCanonicalForm())
 }
 
 // Checksum provides a cryptographic commitment for a chunk content
@@ -464,7 +464,7 @@ type TransactionSignature struct {
 
 // String returns the string representation of a transaction signature.
 func (s TransactionSignature) String() string {
-	return fmt.Sprintf("Address: %s. SignerIndex: %d. KeyID: %d. Signature: %s. Info: %s",
+	return fmt.Sprintf("Address: %s. SignerIndex: %d. KeyID: %d. Signature: %x. Extension Data: %x",
 		s.Address, s.SignerIndex, s.KeyIndex, s.Signature, s.ExtensionData)
 }
 
@@ -479,6 +479,41 @@ func (s TransactionSignature) Fingerprint() []byte {
 	return fingerprint.Fingerprint(s.canonicalForm())
 }
 
+// ValidateExtensionDataAndReconstructMessage checks the format validity of the extension data in the given TransactionSignature
+// and reconstructs the verification message based on payload, authentication scheme and extension data.
+//
+// The output message is constructed by adapting the input payload to the intended authentication scheme of the signature.
+//
+// The output message is the message that will be cryptographically
+// checked against the account public key and signature.
+//
+// returns
+// - (false, nil) if the extension data is not formed correctly
+// - (true, message) if the extension data is valid
+//
+// The current implementation simply returns false if the extension data is invalid, could consider adding more visibility
+// into reason of validation failure
+func (s TransactionSignature) ValidateExtensionDataAndReconstructMessage(payload []byte) (bool, []byte) {
+	// Default to Plain scheme if extension data is nil or empty
+	scheme := PlainScheme
+	if len(s.ExtensionData) > 0 {
+		scheme = AuthenticationSchemeFromByte(s.ExtensionData[0])
+	}
+
+	switch scheme {
+	case PlainScheme:
+		if len(s.ExtensionData) > 1 {
+			return false, nil
+		}
+		return true, slices.Concat(TransactionDomainTag[:], payload)
+	case WebAuthnScheme: // See FLIP 264 for more details
+		return validateWebAuthNExtensionData(s.ExtensionData, payload)
+	default:
+		// authentication scheme not found
+		return false, nil
+	}
+}
+
 // Checks if the scheme is plain authentication scheme, and indicate that it
 // is required to use the legacy canonical form.
 // We check for a valid scheme identifier, as this should be the only case
@@ -486,9 +521,8 @@ func (s TransactionSignature) Fingerprint() []byte {
 // All other non-valid cases that are similar to the plain scheme, but is not valid,
 // should be included in the canonical form, as they are not valid signatures
 func (s TransactionSignature) shouldUseLegacyCanonicalForm() bool {
-	plainSchemeIdentifier := byte(0)
 	// len check covers nil case
-	return len(s.ExtensionData) == 0 || (len(s.ExtensionData) == 1 && s.ExtensionData[0] == plainSchemeIdentifier)
+	return len(s.ExtensionData) == 0 || (len(s.ExtensionData) == 1 && s.ExtensionData[0] == byte(PlainScheme))
 }
 
 func (s TransactionSignature) canonicalForm() interface{} {
