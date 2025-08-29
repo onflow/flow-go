@@ -51,6 +51,8 @@ func TestGetMaxCollectionSizeForSealingLag(t *testing.T) {
 	}
 }
 
+// TestTestGetMaxCollectionSizeForSealingLag_Errors tests error scenarios when retrieving finalized or sealed snapshots fails and the
+// error is propagated to the caller.
 func TestTestGetMaxCollectionSizeForSealingLag_Errors(t *testing.T) {
 	t.Run("finalized-err", func(t *testing.T) {
 		state := protocol.NewState(t)
