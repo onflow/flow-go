@@ -30,7 +30,7 @@ import (
 	storagemock "github.com/onflow/flow-go/storage/mock"
 	"github.com/onflow/flow-go/storage/operation"
 	"github.com/onflow/flow-go/storage/operation/badgerimpl"
-	"github.com/onflow/flow-go/storage/pebble"
+	pebblestorage "github.com/onflow/flow-go/storage/pebble"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -120,7 +120,7 @@ func withRegisterStore(t *testing.T, fn func(
 	headers map[uint64]*flow.Header,
 )) {
 	// block 10 is executed block
-	pebble.RunWithRegistersStorageAtInitialHeights(t, 10, 10, func(diskStore *pebble.Registers) {
+	pebblestorage.RunWithRegistersStorageAtInitialHeights(t, 10, 10, func(diskStore *pebblestorage.Registers) {
 		log := unittest.Logger()
 		var wal execution.ExecutedFinalizedWAL
 		finalized, headerByHeight, highest := testutil.NewMockFinalizedReader(10, 100)

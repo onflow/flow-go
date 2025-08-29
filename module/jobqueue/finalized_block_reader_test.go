@@ -3,7 +3,7 @@ package jobqueue_test
 import (
 	"testing"
 
-	"github.com/dgraph-io/badger/v2"
+	"github.com/cockroachdb/pebble/v2"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/engine/testutil"
@@ -47,7 +47,7 @@ func withReader(
 	withBlockReader func(*jobqueue.FinalizedBlockReader, []*flow.Block),
 ) {
 	require.Equal(t, blockCount%2, 0, "block count for this test should be even")
-	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+	unittest.RunWithPebbleDB(t, func(pdb *pebble.DB) {
 
 		collector := &metrics.NoopCollector{}
 		tracer := trace.NewNoopTracer()
