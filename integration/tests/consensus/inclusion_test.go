@@ -242,9 +242,7 @@ func (is *InclusionSuite) waitUntilProposalConfirmed(deadline time.Time, sentine
 		if !ok {
 			continue
 		}
-		proposalTrusted, err := flow.NewProposal(flow.UntrustedProposal(*proposal))
-		require.NoError(is.T(), err)
-		nextBlock := proposalTrusted.Block
+		nextBlock := proposal.Block
 
 		// check if the proposal was already processed
 		proposalID := nextBlock.ID()
