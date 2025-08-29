@@ -1,12 +1,14 @@
 package collection
 
 import (
+	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
 	statepkg "github.com/onflow/flow-go/state"
 	protocol "github.com/onflow/flow-go/state/protocol/mock"
 	"github.com/onflow/flow-go/utils/unittest"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
-	"testing"
 )
 
 // TestGetMaxCollectionSizeForSealingLag tests different sealing lag values and their corresponding to the expected value.
