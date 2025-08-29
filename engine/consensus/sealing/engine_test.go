@@ -200,9 +200,8 @@ func (s *SealingEngineSuite) TestMultipleProcessingItems() {
 	go func() {
 		defer wg.Done()
 		for _, resp := range responseApprovals {
-			//  convert wire → trusted *before* calling Process,
-			// so the queue only ever holds *flow.ResultApproval.
 			v, err := resp.ToInternal() // returns *flow.ApprovalResponse
+			s.Require().IsType(&flow.ApprovalResponse{}, v, "response should be approval")
 			s.Require().NoError(err, "ToInternal failed for ApprovalResponse")
 
 			ar := v.(*flow.ApprovalResponse)
