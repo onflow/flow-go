@@ -139,7 +139,8 @@ func (s *ChunkVerifierTestSuite) SetupSuite() {
 	require.NoError(s.T(), err)
 	serviceTxBody = txBody
 
-	processTxBody = blueprints.ProcessCallbacksTransaction(testChain.Chain())
+	processTxBody, err = blueprints.ProcessCallbacksTransaction(testChain.Chain())
+	require.NoError(s.T(), err)
 }
 
 func (s *ChunkVerifierTestSuite) SetupTest() {
@@ -286,7 +287,8 @@ func (s *ChunkVerifierTestSuite) TestServiceEventsMismatch_SystemChunk() {
 		Events:                 meta.ChunkEvents,
 	}
 
-	processTxBody := blueprints.ProcessCallbacksTransaction(testChain.Chain())
+	processTxBody, err := blueprints.ProcessCallbacksTransaction(testChain.Chain())
+	require.NoError(s.T(), err)
 
 	s.snapshots[string(processTxBody.Script)] = &snapshot.ExecutionSnapshot{}
 	s.outputs[string(processTxBody.Script)] = fvm.ProcedureOutput{
@@ -459,7 +461,7 @@ func (s *ChunkVerifierTestSuite) TestSystemChunkWithScheduledCallbackReturningEv
 
 	// create the event returned for processed callback
 	processedEventName := fmt.Sprintf(
-		"A.%s.FlowCallbackScheduler.CallbackProcessed",
+		"A.%s.FlowCallbackScheduler.PendingExecution",
 		systemContracts.FlowCallbackScheduler.Address,
 	)
 	callbackEventPayload, err := ccf.Encode(cadence.NewEvent(

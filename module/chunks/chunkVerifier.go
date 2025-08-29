@@ -446,7 +446,10 @@ func (fcv *ChunkVerifier) createSystemChunk(
 		}, nil, nil
 	}
 
-	processBody := blueprints.ProcessCallbacksTransaction(fcv.vmCtx.Chain)
+	processBody, err := blueprints.ProcessCallbacksTransaction(fcv.vmCtx.Chain)
+	if err != nil {
+		return nil, nil, fmt.Errorf("could not get process callback transaction: %w", err)
+	}
 	processTx := fvm.Transaction(processBody, txIndex)
 
 	// Execute process callback transaction
