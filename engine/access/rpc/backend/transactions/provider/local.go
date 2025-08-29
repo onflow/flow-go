@@ -70,11 +70,11 @@ func (t *LocalTransactionProvider) TransactionResult(
 	block *flow.Header,
 	transactionID flow.Identifier,
 	encodingVersion entities.EventEncodingVersion,
-	query entities.ExecutionStateQuery,
+	criteria optimistic_sync.Criteria,
 ) (*accessmodel.TransactionResult, *optimistic_sync.ExecutionResultInfo, error) {
 	blockID := block.ID()
 
-	snapshot, executionResultInfo, err := t.getSnapshotForBlock(blockID, query)
+	snapshot, executionResultInfo, err := t.getSnapshotForBlock(blockID, criteria)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -153,11 +153,11 @@ func (t *LocalTransactionProvider) TransactionResultByIndex(
 	block *flow.Block,
 	index uint32,
 	requiredEventEncodingVersion entities.EventEncodingVersion,
-	query entities.ExecutionStateQuery,
+	criteria optimistic_sync.Criteria,
 ) (*accessmodel.TransactionResult, *optimistic_sync.ExecutionResultInfo, error) {
 	blockID := block.ID()
 
-	snapshot, executionResultInfo, err := t.getSnapshotForBlock(blockID, query)
+	snapshot, executionResultInfo, err := t.getSnapshotForBlock(blockID, criteria)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -243,11 +243,11 @@ func (t *LocalTransactionProvider) TransactionResultsByBlockID(
 	ctx context.Context,
 	block *flow.Block,
 	requiredEventEncodingVersion entities.EventEncodingVersion,
-	query entities.ExecutionStateQuery,
+	criteria optimistic_sync.Criteria,
 ) ([]*accessmodel.TransactionResult, *optimistic_sync.ExecutionResultInfo, error) {
 	blockID := block.ID()
 
-	snapshot, executionResultInfo, err := t.getSnapshotForBlock(blockID, query)
+	snapshot, executionResultInfo, err := t.getSnapshotForBlock(blockID, criteria)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -393,12 +393,9 @@ func (t *LocalTransactionProvider) buildTxIDToCollectionIDMapping(block *flow.Bl
 // uses the executionStateCache to get a snapshot based on the execution result ID.
 func (t *LocalTransactionProvider) getSnapshotForBlock(
 	blockID flow.Identifier,
-	query entities.ExecutionStateQuery,
+	criteria optimistic_sync.Criteria,
 ) (optimistic_sync.Snapshot, *optimistic_sync.ExecutionResultInfo, error) {
-	executionResultInfo, err := t.executionResultProvider.ExecutionResult(blockID, optimistic_sync.Criteria{
-		AgreeingExecutorsCount: uint(query.AgreeingExecutorsCount),
-		RequiredExecutors:      convert.MessagesToIdentifiers(query.RequiredExecutorIds),
-	})
+	executionResultInfo, err := t.executionResultProvider.ExecutionResult(blockID, criteria)
 	if err != nil {
 		return nil, nil, err
 	}

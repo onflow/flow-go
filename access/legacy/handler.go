@@ -197,7 +197,7 @@ func (h *Handler) GetTransactionResult(
 		flow.ZeroID,
 		flow.ZeroID,
 		entities.EventEncodingVersion_JSON_CDC_V0,
-		entities.ExecutionStateQuery{},
+		optimistic_sync.Criteria{},
 	)
 	if err != nil {
 		return nil, err

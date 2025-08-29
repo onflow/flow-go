@@ -248,7 +248,7 @@ func (suite *Suite) TestGetTransactionResult_UnknownTx() {
 		block.ID(),
 		coll.ID(),
 		entities.EventEncodingVersion_JSON_CDC_V0,
-		entities.ExecutionStateQuery{},
+		optimistic_sync.Criteria{},
 	)
 	suite.Require().NoError(err)
 	suite.Require().Equal(res.Status, flow.TransactionStatusUnknown)
@@ -282,7 +282,7 @@ func (suite *Suite) TestGetTransactionResult_TxLookupFailure() {
 		block.ID(),
 		coll.ID(),
 		entities.EventEncodingVersion_JSON_CDC_V0,
-		entities.ExecutionStateQuery{},
+		optimistic_sync.Criteria{},
 	)
 	suite.Require().Equal(err, status.Errorf(codes.Internal, "failed to find: %v", expectedErr))
 }
@@ -323,7 +323,7 @@ func (suite *Suite) TestGetTransactionResult_HistoricNodes_Success() {
 		block.ID(),
 		coll.ID(),
 		entities.EventEncodingVersion_JSON_CDC_V0,
-		entities.ExecutionStateQuery{},
+		optimistic_sync.Criteria{},
 	)
 	suite.Require().NoError(err)
 	suite.Require().Equal(flow.TransactionStatusExecuted, resp.Status)
@@ -366,7 +366,7 @@ func (suite *Suite) TestGetTransactionResult_HistoricNodes_FromCache() {
 		block.ID(),
 		coll.ID(),
 		entities.EventEncodingVersion_JSON_CDC_V0,
-		entities.ExecutionStateQuery{},
+		optimistic_sync.Criteria{},
 	)
 	suite.Require().NoError(err)
 	suite.Require().Equal(flow.TransactionStatusExecuted, resp.Status)
@@ -378,7 +378,7 @@ func (suite *Suite) TestGetTransactionResult_HistoricNodes_FromCache() {
 		block.ID(),
 		coll.ID(),
 		entities.EventEncodingVersion_JSON_CDC_V0,
-		entities.ExecutionStateQuery{},
+		optimistic_sync.Criteria{},
 	)
 	suite.Require().NoError(err)
 	suite.Require().Equal(flow.TransactionStatusExecuted, resp2.Status)
@@ -416,7 +416,7 @@ func (suite *Suite) TestGetTransactionResultUnknownFromCache() {
 		block.ID(),
 		coll.ID(),
 		entities.EventEncodingVersion_JSON_CDC_V0,
-		entities.ExecutionStateQuery{},
+		optimistic_sync.Criteria{},
 	)
 	suite.Require().NoError(err)
 	suite.Require().Equal(flow.TransactionStatusUnknown, resp.Status)
@@ -438,7 +438,7 @@ func (suite *Suite) TestGetTransactionResultUnknownFromCache() {
 		block.ID(),
 		coll.ID(),
 		entities.EventEncodingVersion_JSON_CDC_V0,
-		entities.ExecutionStateQuery{},
+		optimistic_sync.Criteria{},
 	)
 	suite.Require().NoError(err)
 	suite.Require().Equal(flow.TransactionStatusUnknown, resp2.Status)
@@ -528,7 +528,7 @@ func (suite *Suite) TestGetSystemTransactionResult_HappyPath() {
 			context.Background(),
 			block.ID(),
 			entities.EventEncodingVersion_JSON_CDC_V0,
-			entities.ExecutionStateQuery{},
+			optimistic_sync.Criteria{},
 		)
 		suite.Require().NoError(err)
 
@@ -632,7 +632,7 @@ func (suite *Suite) TestGetSystemTransactionResultFromStorage() {
 	txBackend, err := NewTransactionsBackend(params)
 	suite.Require().NoError(err)
 	response, _, err := txBackend.GetSystemTransactionResult(context.Background(), blockId,
-		entities.EventEncodingVersion_JSON_CDC_V0, entities.ExecutionStateQuery{})
+		entities.EventEncodingVersion_JSON_CDC_V0, optimistic_sync.Criteria{})
 	suite.assertTransactionResultResponse(err, response, block, txId, lightTxShouldFail, eventsForTx)
 }
 
@@ -651,7 +651,7 @@ func (suite *Suite) TestGetSystemTransactionResult_BlockNotFound() {
 		context.Background(),
 		block.ID(),
 		entities.EventEncodingVersion_JSON_CDC_V0,
-		entities.ExecutionStateQuery{},
+		optimistic_sync.Criteria{},
 	)
 
 	suite.Require().Nil(res)
@@ -711,7 +711,7 @@ func (suite *Suite) TestGetSystemTransactionResult_FailedEncodingConversion() {
 		context.Background(),
 		block.ID(),
 		entities.EventEncodingVersion_CCF_V0,
-		entities.ExecutionStateQuery{},
+		optimistic_sync.Criteria{},
 	)
 
 	suite.Require().Nil(res)
@@ -799,7 +799,7 @@ func (suite *Suite) TestGetTransactionResult_FromStorage() {
 	suite.Require().NoError(err)
 
 	response, _, err := txBackend.GetTransactionResult(context.Background(), txId, blockId, flow.ZeroID,
-		entities.EventEncodingVersion_JSON_CDC_V0, entities.ExecutionStateQuery{})
+		entities.EventEncodingVersion_JSON_CDC_V0, optimistic_sync.Criteria{})
 	suite.assertTransactionResultResponse(err, response, block, txId, true, eventsForTx)
 
 	suite.blocks.AssertExpectations(suite.T())
@@ -887,7 +887,7 @@ func (suite *Suite) TestTransactionByIndexFromStorage() {
 	suite.Require().NoError(err)
 
 	response, _, err := txBackend.GetTransactionResultByIndex(context.Background(), blockId, txIndex,
-		entities.EventEncodingVersion_JSON_CDC_V0, entities.ExecutionStateQuery{})
+		entities.EventEncodingVersion_JSON_CDC_V0, optimistic_sync.Criteria{})
 	suite.assertTransactionResultResponse(err, response, block, txId, true, eventsForTx)
 }
 
@@ -986,7 +986,7 @@ func (suite *Suite) TestTransactionResultsByBlockIDFromStorage() {
 	suite.Require().NoError(err)
 
 	response, _, err := txBackend.GetTransactionResultsByBlockID(context.Background(), blockId,
-		entities.EventEncodingVersion_JSON_CDC_V0, entities.ExecutionStateQuery{})
+		entities.EventEncodingVersion_JSON_CDC_V0, optimistic_sync.Criteria{})
 	suite.Require().NoError(err)
 	suite.Assert().Equal(len(lightTxResults), len(response))
 
@@ -1116,7 +1116,7 @@ func (suite *Suite) TestSuccessfulTransactionsDontRetry() {
 		flow.ZeroID,
 		flow.ZeroID,
 		entities.EventEncodingVersion_JSON_CDC_V0,
-		entities.ExecutionStateQuery{},
+		optimistic_sync.Criteria{},
 	)
 	suite.Require().NoError(err)
 	suite.Require().NotNil(result)

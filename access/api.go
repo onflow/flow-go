@@ -57,15 +57,16 @@ type TransactionsAPI interface {
 	GetTransactionsByBlockID(ctx context.Context, blockID flow.Identifier) ([]*flow.TransactionBody, error)
 
 	GetTransactionResult(ctx context.Context, txID flow.Identifier, blockID flow.Identifier,
-		collectionID flow.Identifier, encodingVersion entities.EventEncodingVersion, executionStateQuery entities.ExecutionStateQuery) (*accessmodel.TransactionResult, entities.ExecutorMetadata, error)
+		collectionID flow.Identifier, encodingVersion entities.EventEncodingVersion,
+		criteria optimistic_sync.Criteria) (*accessmodel.TransactionResult, entities.ExecutorMetadata, error)
 	GetTransactionResultByIndex(ctx context.Context, blockID flow.Identifier, index uint32,
-		encodingVersion entities.EventEncodingVersion, executionStateQuery entities.ExecutionStateQuery) (*accessmodel.TransactionResult, entities.ExecutorMetadata, error)
+		encodingVersion entities.EventEncodingVersion, criteria optimistic_sync.Criteria) (*accessmodel.TransactionResult, entities.ExecutorMetadata, error)
 	GetTransactionResultsByBlockID(ctx context.Context, blockID flow.Identifier,
-		encodingVersion entities.EventEncodingVersion, executionStateQuery entities.ExecutionStateQuery) (
+		encodingVersion entities.EventEncodingVersion, criteria optimistic_sync.Criteria) (
 		[]*accessmodel.TransactionResult, entities.ExecutorMetadata, error)
 
 	GetSystemTransaction(ctx context.Context, blockID flow.Identifier) (*flow.TransactionBody, error)
-	GetSystemTransactionResult(ctx context.Context, blockID flow.Identifier, encodingVersion entities.EventEncodingVersion, executionStateQuery entities.ExecutionStateQuery) (
+	GetSystemTransactionResult(ctx context.Context, blockID flow.Identifier, encodingVersion entities.EventEncodingVersion, criteria optimistic_sync.Criteria) (
 		*accessmodel.TransactionResult, entities.ExecutorMetadata, error)
 }
 

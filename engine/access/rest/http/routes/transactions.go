@@ -8,6 +8,7 @@ import (
 	commonmodels "github.com/onflow/flow-go/engine/access/rest/common/models"
 	"github.com/onflow/flow-go/engine/access/rest/http/request"
 	accessmodel "github.com/onflow/flow-go/model/access"
+	"github.com/onflow/flow-go/module/executiondatasync/optimistic_sync"
 )
 
 // GetTransactionByID gets a transaction by requested ID.
@@ -32,7 +33,7 @@ func GetTransactionByID(r *common.Request, backend access.API, link commonmodels
 			req.CollectionID,
 			entitiesproto.EventEncodingVersion_JSON_CDC_V0,
 			//TODO: This needs to be added to protobuf with https://github.com/onflow/flow-go/issues/7647
-			entitiesproto.ExecutionStateQuery{},
+			optimistic_sync.NewCriteria(nil),
 		)
 		if err != nil {
 			return nil, err
@@ -58,7 +59,7 @@ func GetTransactionResultByID(r *common.Request, backend access.API, link common
 		req.BlockID,
 		req.CollectionID,
 		entitiesproto.EventEncodingVersion_JSON_CDC_V0,
-		req.ExecutionState,
+		optimistic_sync.NewCriteria(&req.ExecutionState),
 	)
 	if err != nil {
 		return nil, err

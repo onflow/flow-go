@@ -73,7 +73,7 @@ func (e *ENTransactionProvider) TransactionResult(
 	block *flow.Header,
 	transactionID flow.Identifier,
 	requiredEventEncodingVersion entities.EventEncodingVersion,
-	query entities.ExecutionStateQuery,
+	criteria optimistic_sync.Criteria,
 ) (*accessmodel.TransactionResult, *optimistic_sync.ExecutionResultInfo, error) {
 	blockID := block.ID()
 	// create an execution API request for events at blockID and transactionID
@@ -82,10 +82,7 @@ func (e *ENTransactionProvider) TransactionResult(
 		TransactionId: transactionID[:],
 	}
 
-	executionResultInfo, err := e.executionResultProvider.ExecutionResult(blockID, optimistic_sync.Criteria{
-		AgreeingExecutorsCount: uint(query.AgreeingExecutorsCount),
-		RequiredExecutors:      convert.MessagesToIdentifiers(query.RequiredExecutorIds),
-	})
+	executionResultInfo, err := e.executionResultProvider.ExecutionResult(blockID, criteria)
 	if err != nil {
 		// if no execution receipt were found, return a NotFound GRPC error
 		if common.IsInsufficientExecutionReceipts(err) {
@@ -129,7 +126,7 @@ func (e *ENTransactionProvider) TransactionResultByIndex(
 	block *flow.Block,
 	index uint32,
 	encodingVersion entities.EventEncodingVersion,
-	query entities.ExecutionStateQuery,
+	criteria optimistic_sync.Criteria,
 ) (*accessmodel.TransactionResult, *optimistic_sync.ExecutionResultInfo, error) {
 	blockID := block.ID()
 	// create request and forward to EN
@@ -138,10 +135,7 @@ func (e *ENTransactionProvider) TransactionResultByIndex(
 		Index:   index,
 	}
 
-	executionResultInfo, err := e.executionResultProvider.ExecutionResult(blockID, optimistic_sync.Criteria{
-		AgreeingExecutorsCount: uint(query.AgreeingExecutorsCount),
-		RequiredExecutors:      convert.MessagesToIdentifiers(query.RequiredExecutorIds),
-	})
+	executionResultInfo, err := e.executionResultProvider.ExecutionResult(blockID, criteria)
 	if err != nil {
 		if common.IsInsufficientExecutionReceipts(err) {
 			return nil, nil, status.Error(codes.NotFound, err.Error())
@@ -185,17 +179,14 @@ func (e *ENTransactionProvider) TransactionResultsByBlockID(
 	ctx context.Context,
 	block *flow.Block,
 	requiredEventEncodingVersion entities.EventEncodingVersion,
-	query entities.ExecutionStateQuery,
+	criteria optimistic_sync.Criteria,
 ) ([]*accessmodel.TransactionResult, *optimistic_sync.ExecutionResultInfo, error) {
 	blockID := block.ID()
 	req := &execproto.GetTransactionsByBlockIDRequest{
 		BlockId: blockID[:],
 	}
 
-	executionResultInfo, err := e.executionResultProvider.ExecutionResult(blockID, optimistic_sync.Criteria{
-		AgreeingExecutorsCount: uint(query.AgreeingExecutorsCount),
-		RequiredExecutors:      convert.MessagesToIdentifiers(query.RequiredExecutorIds),
-	})
+	executionResultInfo, err := e.executionResultProvider.ExecutionResult(blockID, criteria)
 	if err != nil {
 		if common.IsInsufficientExecutionReceipts(err) {
 			return nil, nil, status.Error(codes.NotFound, err.Error())

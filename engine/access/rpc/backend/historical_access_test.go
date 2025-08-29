@@ -10,6 +10,7 @@ import (
 
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/executiondatasync/optimistic_sync"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -54,7 +55,7 @@ func (suite *Suite) TestHistoricalTransactionResult() {
 		flow.ZeroID,
 		flow.ZeroID,
 		entities.EventEncodingVersion_JSON_CDC_V0,
-		entities.ExecutionStateQuery{},
+		optimistic_sync.Criteria{},
 	)
 	suite.Require().NoError(err)
 	suite.Require().NotNil(result)

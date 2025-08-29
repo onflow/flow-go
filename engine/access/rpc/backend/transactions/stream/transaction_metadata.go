@@ -14,6 +14,7 @@ import (
 	"github.com/onflow/flow-go/engine/common/rpc"
 	accessmodel "github.com/onflow/flow-go/model/access"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/executiondatasync/optimistic_sync"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/state"
 	"github.com/onflow/flow-go/storage"
@@ -231,7 +232,7 @@ func (t *TransactionMetadata) refreshTransactionResult(ctx context.Context) erro
 
 	// TODO: Need to pass params here in scope of https://github.com/onflow/flow-go/issues/7654
 	txResult, _, err := t.txProvider.TransactionResult(ctx, t.blockWithTx, t.txResult.TransactionID,
-		t.eventEncodingVersion, entities.ExecutionStateQuery{})
+		t.eventEncodingVersion, optimistic_sync.Criteria{})
 	if err != nil {
 		// TODO: I don't like the fact we propagate this error from txProvider.
 		// Fix it during error handling polishing project

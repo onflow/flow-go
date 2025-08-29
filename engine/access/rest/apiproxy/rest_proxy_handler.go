@@ -173,7 +173,7 @@ func (r *RestProxyHandler) GetTransactionResult(
 	blockID flow.Identifier,
 	collectionID flow.Identifier,
 	requiredEventEncodingVersion entities.EventEncodingVersion,
-	executionStateQuery entities.ExecutionStateQuery,
+	criteria optimistic_sync.Criteria,
 ) (*accessmodel.TransactionResult, entities.ExecutorMetadata, error) {
 	upstream, closer, err := r.FaultTolerantClient()
 	if err != nil {
@@ -187,7 +187,11 @@ func (r *RestProxyHandler) GetTransactionResult(
 		BlockId:              blockID[:],
 		CollectionId:         collectionID[:],
 		EventEncodingVersion: requiredEventEncodingVersion,
-		ExecutionStateQuery:  &executionStateQuery,
+		ExecutionStateQuery: &entities.ExecutionStateQuery{
+			AgreeingExecutorsCount:  uint64(criteria.AgreeingExecutorsCount),
+			RequiredExecutorIds:     convert.IdentifiersToMessages(criteria.RequiredExecutors),
+			IncludeExecutorMetadata: true, //TODO: what should I do with this field?
+		},
 	}
 
 	transactionResultResponse, err := upstream.GetTransactionResult(ctx, getTransactionResultRequest)
