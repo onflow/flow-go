@@ -30,6 +30,7 @@ type ChunkVerifier struct {
 	vm             fvm.VM
 	vmCtx          fvm.Context
 	systemChunkCtx fvm.Context
+	callbackCtx    fvm.Context
 	logger         zerolog.Logger
 }
 
@@ -39,6 +40,7 @@ func NewChunkVerifier(vm fvm.VM, vmCtx fvm.Context, logger zerolog.Logger) *Chun
 		vm:             vm,
 		vmCtx:          vmCtx,
 		systemChunkCtx: computer.SystemChunkContext(vmCtx, metrics.NewNoopCollector()),
+		callbackCtx:    computer.CallbackContext(vmCtx, metrics.NewNoopCollector()),
 		logger:         logger.With().Str("component", "chunk_verifier").Logger(),
 	}
 }
@@ -55,20 +57,14 @@ func (fcv *ChunkVerifier) Verify(
 ) {
 
 	var ctx fvm.Context
+	var callbackCtx fvm.Context
 	var transactions []*fvm.TransactionProcedure
 	if vc.IsSystemChunk {
-		ctx = fvm.NewContextFromParent(
-			fcv.systemChunkCtx,
-			fvm.WithBlockHeader(vc.Header),
-			fvm.WithProtocolStateSnapshot(vc.Snapshot),
-		)
+		ctx = contextFromVerifiableChunk(fcv.systemChunkCtx, vc)
+		callbackCtx = contextFromVerifiableChunk(fcv.callbackCtx, vc)
 		// transactions will be dynamically created for system chunk
 	} else {
-		ctx = fvm.NewContextFromParent(
-			fcv.vmCtx,
-			fvm.WithBlockHeader(vc.Header),
-			fvm.WithProtocolStateSnapshot(vc.Snapshot),
-		)
+		ctx = contextFromVerifiableChunk(fcv.vmCtx, vc)
 
 		transactions = make(
 			[]*fvm.TransactionProcedure,
@@ -80,8 +76,9 @@ func (fcv *ChunkVerifier) Verify(
 		}
 	}
 
-	return fcv.verifyTransactionsInContext(
+	res, err := fcv.verifyTransactionsInContext(
 		ctx,
+		callbackCtx,
 		vc.TransactionOffset,
 		vc.Chunk,
 		vc.ChunkDataPack,
@@ -89,6 +86,22 @@ func (fcv *ChunkVerifier) Verify(
 		transactions,
 		vc.EndState,
 		vc.IsSystemChunk)
+
+	return res, err
+}
+
+func contextFromVerifiableChunk(
+	parentCtx fvm.Context,
+	vc *verification.VerifiableChunkData,
+) fvm.Context {
+	return fvm.NewContextFromParent(
+		parentCtx,
+		fvm.WithBlockHeader(vc.Header),
+		fvm.WithProtocolStateSnapshot(vc.Snapshot),
+		fvm.WithDerivedBlockData(
+			derived.NewEmptyDerivedBlockData(logical.Time(vc.TransactionOffset)),
+		),
+	)
 }
 
 type partialLedgerStorageSnapshot struct {
@@ -121,6 +134,7 @@ func (storage *partialLedgerStorageSnapshot) Get(
 
 func (fcv *ChunkVerifier) verifyTransactionsInContext(
 	context fvm.Context,
+	callbackCtx fvm.Context,
 	transactionOffset uint32,
 	chunk *flow.Chunk,
 	chunkDataPack *flow.ChunkDataPack,
@@ -167,7 +181,6 @@ func (fcv *ChunkVerifier) verifyTransactionsInContext(
 
 	// constructing a partial trie given chunk data package
 	psmt, err := partial.NewLedger(chunkDataPack.Proof, ledger.State(chunkDataPack.StartState), partial.DefaultPathFinderVersion)
-
 	if err != nil {
 		// TODO provide more details based on the error type
 		return nil, chmodels.NewCFInvalidVerifiableChunk(
@@ -176,11 +189,6 @@ func (fcv *ChunkVerifier) verifyTransactionsInContext(
 			chIndex,
 			execResID)
 	}
-
-	context = fvm.NewContextFromParent(
-		context,
-		fvm.WithDerivedBlockData(
-			derived.NewEmptyDerivedBlockData(logical.Time(transactionOffset))))
 
 	// chunk view construction
 	// unknown register tracks access to parts of the partial trie which
@@ -196,14 +204,13 @@ func (fcv *ChunkVerifier) verifyTransactionsInContext(
 	chunkState := fvmState.NewExecutionState(nil, fvmState.DefaultParameters())
 
 	var problematicTx flow.Identifier
-
 	// collect execution data formatted transaction results
 	var txStartIndex int
 	var systemResult *flow.LightTransactionResult
 
 	if systemChunk {
 		transactions, systemResult, err = fcv.createSystemChunk(
-			context,
+			callbackCtx,
 			&snapshotTree,
 			chunkState,
 			transactionOffset,
@@ -420,7 +427,7 @@ func (fcv *ChunkVerifier) verifyTransactionsInContext(
 // 2. add one transaction for each callback event
 // 3. add the system transaction as last transaction
 func (fcv *ChunkVerifier) createSystemChunk(
-	context fvm.Context,
+	callbackCtx fvm.Context,
 	snapshotTree *snapshot.SnapshotTree,
 	chunkState *fvmState.ExecutionState,
 	transactionOffset uint32,
@@ -453,7 +460,7 @@ func (fcv *ChunkVerifier) createSystemChunk(
 	processTx := fvm.Transaction(processBody, txIndex)
 
 	// Execute process callback transaction
-	executionSnapshot, processOutput, err := fcv.vm.Run(context, processTx, *snapshotTree)
+	executionSnapshot, processOutput, err := fcv.vm.Run(callbackCtx, processTx, *snapshotTree)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to execute process callback transaction: %w", err)
 	}
@@ -476,7 +483,7 @@ func (fcv *ChunkVerifier) createSystemChunk(
 	}
 
 	// Generate callback execution transactions from the events
-	callbackTxs, err := blueprints.ExecuteCallbacksTransactions(context.Chain, processOutput.Events)
+	callbackTxs, err := blueprints.ExecuteCallbacksTransactions(callbackCtx.Chain, processOutput.Events)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to generate callback execution transactions: %w", err)
 	}
