@@ -67,7 +67,6 @@ func TestFinalizedReader(t *testing.T) {
 
 		// We declare `block2` as via the `FinalizedReader`
 		reader.BlockFinalized(block2.ToHeader())
-		require.NoError(t, err)
 		require.Equal(t, block.ID(), finalized)
 
 		// should be able to retrieve the block
