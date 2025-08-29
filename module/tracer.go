@@ -35,12 +35,22 @@ type Tracer interface {
 		context.Context,
 	)
 
-	// StartCollectionSpan starts an span for a collection, built as a child of
+	// StartCollectionSpan starts a span for a collection, built as a child of
 	// rootSpan.  It also returns the context including this span which can be
 	// used for nested calls.
 	StartCollectionSpan(
 		ctx context.Context,
 		collectionID flow.Identifier,
+		spanName trace.SpanName,
+		opts ...otelTrace.SpanStartOption,
+	) (
+		otelTrace.Span,
+		context.Context,
+	)
+
+	StartTransactionSpan(
+		ctx context.Context,
+		transactionID flow.Identifier,
 		spanName trace.SpanName,
 		opts ...otelTrace.SpanStartOption,
 	) (
