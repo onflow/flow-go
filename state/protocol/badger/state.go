@@ -564,8 +564,16 @@ func bootstrapStatePointers(lctx lockctx.Proof, rw storage.ReaderBatchWriter, ro
 		return fmt.Errorf("root QC is for block %v, which does not match the highest block %v in sealing segment", rootQC.BlockID, highest.ID())
 	}
 
+	// when bootstrapping, the view of the spork root block must be lower than the view of the first block
+	// that the PaceMaker will attempt to produce.
+	sporkRootBlockView := root.Params().SporkRootBlockView()
+	currentView := highest.View + 1
+	if sporkRootBlockView >= currentView {
+		return fmt.Errorf("PaceMaker cannot start in view %d which is less or equal than spork root view %d", currentView, sporkRootBlockView)
+	}
+
 	livenessData := &hotstuff.LivenessData{
-		CurrentView: highest.View + 1,
+		CurrentView: currentView,
 		NewestQC:    rootQC,
 	}
 
