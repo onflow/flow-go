@@ -63,3 +63,18 @@ func (c *ClusterTimeoutObject) ToInternal() (any, error) {
 	// TODO(malleability, #7704) implement with validation checks
 	return c, nil
 }
+
+// CollectionGuarantee is a message representation of an CollectionGuarantee, which is used
+// to announce collections to consensus nodes.
+type CollectionGuarantee flow.UntrustedCollectionGuarantee
+
+// ToInternal returns the internal type representation for CollectionGuarantee.
+//
+// All errors indicate that the decode target contains a structurally invalid representation of the internal flow.CollectionGuarantee.
+func (c *CollectionGuarantee) ToInternal() (any, error) {
+	internal, err := flow.NewCollectionGuarantee(flow.UntrustedCollectionGuarantee(*c))
+	if err != nil {
+		return nil, fmt.Errorf("could not construct guarantee: %w", err)
+	}
+	return internal, nil
+}
