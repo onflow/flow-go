@@ -13,13 +13,8 @@ type EntityRequest flow.EntityRequest
 
 // ToInternal converts the untrusted EntityRequest into its trusted internal
 // representation.
-//
-// This stub returns the receiver unchanged. A proper implementation
-// must perform validation checks and return a constructed internal
-// object.
 func (e *EntityRequest) ToInternal() (any, error) {
 	return (*flow.EntityRequest)(e), nil
-	//return e, nil
 }
 
 // EntityResponse is a response to an entity request, containing a set of
