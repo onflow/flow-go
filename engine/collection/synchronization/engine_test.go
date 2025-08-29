@@ -161,7 +161,7 @@ func (ss *SyncSuite) SetupTest() {
 func (ss *SyncSuite) TestOnSyncRequest() {
 	// generate origin and request message
 	originID := unittest.IdentifierFixture()
-	req := &messages.SyncRequest{
+	req := &flow.SyncRequest{
 		Nonce:  rand.Uint64(),
 		Height: 0,
 	}
@@ -205,7 +205,7 @@ func (ss *SyncSuite) TestOnSyncRequest() {
 func (ss *SyncSuite) TestOnSyncResponse() {
 	// generate origin ID and response message
 	originID := unittest.IdentifierFixture()
-	res := &messages.SyncResponse{
+	res := &flow.SyncResponse{
 		Nonce:  rand.Uint64(),
 		Height: rand.Uint64(),
 	}
@@ -355,7 +355,7 @@ func (ss *SyncSuite) TestOnRangeRequest() {
 func (ss *SyncSuite) TestOnBatchRequest() {
 	// generate origin ID and batch request
 	originID := unittest.IdentifierFixture()
-	req := &messages.BatchRequest{
+	req := &flow.BatchRequest{
 		Nonce:    rand.Uint64(),
 		BlockIDs: nil,
 	}
@@ -555,7 +555,7 @@ func (ss *SyncSuite) TestProcessingMultipleItems() {
 
 	originID := unittest.IdentifierFixture()
 	for i := 0; i < 5; i++ {
-		msg := &messages.SyncResponse{
+		msg := &flow.SyncResponse{
 			Nonce:  uint64(i),
 			Height: uint64(1000 + i),
 		}
@@ -568,7 +568,7 @@ func (ss *SyncSuite) TestProcessingMultipleItems() {
 
 	finalHeight := ss.head.Height
 	for i := 0; i < 5; i++ {
-		msg := &messages.SyncRequest{
+		msg := &flow.SyncRequest{
 			Nonce:  uint64(i),
 			Height: finalHeight - 100,
 		}

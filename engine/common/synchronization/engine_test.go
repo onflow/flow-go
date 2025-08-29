@@ -29,7 +29,7 @@ func (ss *SyncSuite) TestOnSyncRequest_LowerThanReceiver_WithinTolerance() {
 	require.NoError(ss.T(), err, "should generate nonce")
 	// generate origin and request message
 	originID := unittest.IdentifierFixture()
-	req := &messages.SyncRequest{
+	req := &flow.SyncRequest{
 		Nonce:  nonce,
 		Height: 0,
 	}
@@ -49,7 +49,7 @@ func (ss *SyncSuite) TestOnSyncRequest_HigherThanReceiver_OutsideTolerance() {
 	require.NoError(ss.T(), err, "should generate nonce")
 	// generate origin and request message
 	originID := unittest.IdentifierFixture()
-	req := &messages.SyncRequest{
+	req := &flow.SyncRequest{
 		Nonce:  nonce,
 		Height: 0,
 	}
@@ -72,7 +72,7 @@ func (ss *SyncSuite) TestOnSyncRequest_LowerThanReceiver_OutsideTolerance() {
 
 	// generate origin and request message
 	originID := unittest.IdentifierFixture()
-	req := &messages.SyncRequest{
+	req := &flow.SyncRequest{
 		Nonce:  nonce,
 		Height: 0,
 	}
@@ -107,7 +107,7 @@ func (ss *SyncSuite) TestOnSyncResponse() {
 
 	// generate origin ID and response message
 	originID := unittest.IdentifierFixture()
-	res := &messages.SyncResponse{
+	res := &flow.SyncResponse{
 		Nonce:  nonce,
 		Height: height,
 	}
@@ -277,7 +277,7 @@ func (ss *SyncSuite) TestOnBatchRequest() {
 
 	// generate origin ID and batch request
 	originID := unittest.IdentifierFixture()
-	req := &messages.BatchRequest{
+	req := &flow.BatchRequest{
 		Nonce:    nonce,
 		BlockIDs: nil,
 	}
@@ -455,7 +455,7 @@ func (ss *SyncSuite) TestProcessingMultipleItems() {
 
 	originID := unittest.IdentifierFixture()
 	for i := 0; i < 5; i++ {
-		msg := &messages.SyncResponse{
+		msg := &flow.SyncResponse{
 			Nonce:  uint64(i),
 			Height: uint64(1000 + i),
 		}
@@ -469,7 +469,7 @@ func (ss *SyncSuite) TestProcessingMultipleItems() {
 
 	finalHeight := ss.head.Height
 	for i := 0; i < 5; i++ {
-		msg := &messages.SyncRequest{
+		msg := &flow.SyncRequest{
 			Nonce:  uint64(i),
 			Height: finalHeight - 100,
 		}
