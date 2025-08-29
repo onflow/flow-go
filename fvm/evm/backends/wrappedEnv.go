@@ -101,12 +101,6 @@ func (we *WrappedEnvironment) TotalEmittedEventBytes() uint64 {
 	return we.env.TotalEmittedEventBytes()
 }
 
-// InteractionUsed returns the total storage interaction used.
-func (we *WrappedEnvironment) InteractionUsed() (uint64, error) {
-	val, err := we.env.InteractionUsed()
-	return val, handleEnvironmentError(err)
-}
-
 // EmitEvent emits an event.
 func (we *WrappedEnvironment) EmitEvent(event cadence.Event) error {
 	err := we.env.EmitEvent(event)

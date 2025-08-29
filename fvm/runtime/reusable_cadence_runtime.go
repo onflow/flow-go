@@ -15,6 +15,7 @@ import (
 // circular dependency.
 type Environment interface {
 	runtime.Interface
+	common.Gauge
 
 	RandomSourceHistory() ([]byte, error)
 }
@@ -117,8 +118,10 @@ func (reusable *ReusableCadenceRuntime) ReadStored(
 		address,
 		path,
 		runtime.Context{
-			Interface:   reusable.fvmEnv,
-			Environment: reusable.TxRuntimeEnv,
+			Interface:        reusable.fvmEnv,
+			Environment:      reusable.TxRuntimeEnv,
+			MemoryGauge:      reusable.fvmEnv,
+			ComputationGauge: reusable.fvmEnv,
 		},
 	)
 }
@@ -138,8 +141,10 @@ func (reusable *ReusableCadenceRuntime) InvokeContractFunction(
 		arguments,
 		argumentTypes,
 		runtime.Context{
-			Interface:   reusable.fvmEnv,
-			Environment: reusable.TxRuntimeEnv,
+			Interface:        reusable.fvmEnv,
+			Environment:      reusable.TxRuntimeEnv,
+			MemoryGauge:      reusable.fvmEnv,
+			ComputationGauge: reusable.fvmEnv,
 		},
 	)
 }
@@ -151,9 +156,11 @@ func (reusable *ReusableCadenceRuntime) NewTransactionExecutor(
 	return reusable.Runtime.NewTransactionExecutor(
 		script,
 		runtime.Context{
-			Interface:   reusable.fvmEnv,
-			Location:    location,
-			Environment: reusable.TxRuntimeEnv,
+			Interface:        reusable.fvmEnv,
+			Location:         location,
+			Environment:      reusable.TxRuntimeEnv,
+			MemoryGauge:      reusable.fvmEnv,
+			ComputationGauge: reusable.fvmEnv,
 		},
 	)
 }
@@ -168,9 +175,11 @@ func (reusable *ReusableCadenceRuntime) ExecuteScript(
 	return reusable.Runtime.ExecuteScript(
 		script,
 		runtime.Context{
-			Interface:   reusable.fvmEnv,
-			Location:    location,
-			Environment: reusable.ScriptRuntimeEnv,
+			Interface:        reusable.fvmEnv,
+			Location:         location,
+			Environment:      reusable.ScriptRuntimeEnv,
+			MemoryGauge:      reusable.fvmEnv,
+			ComputationGauge: reusable.fvmEnv,
 		},
 	)
 }

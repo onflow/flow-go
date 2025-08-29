@@ -29,6 +29,7 @@ import (
 	"github.com/onflow/flow-go/fvm/evm/stdlib"
 	. "github.com/onflow/flow-go/fvm/evm/testutils"
 	"github.com/onflow/flow-go/fvm/evm/types"
+	"github.com/onflow/flow-go/fvm/meter"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -394,7 +395,6 @@ func TestEVMEncodeABI(t *testing.T) {
 	accountCodes := map[common.Location][]byte{}
 	var events []cadence.Event
 
-	computation := uint64(0)
 	runtimeInterface := &TestRuntimeInterface{
 		Storage: NewTestLedger(nil, nil),
 		OnGetSigningAccounts: func() ([]runtime.Address, error) {
@@ -416,12 +416,6 @@ func TestEVMEncodeABI(t *testing.T) {
 		OnDecodeArgument: func(b []byte, t cadence.Type) (cadence.Value, error) {
 			return json.Decode(nil, b)
 		},
-		OnMeterComputation: func(usage common.ComputationUsage) error {
-			if usage.Kind == environment.ComputationKindEVMEncodeABI {
-				computation += usage.Intensity
-			}
-			return nil
-		},
 	}
 
 	nextTransactionLocation := NewTransactionLocationGenerator()
@@ -438,17 +432,22 @@ func TestEVMEncodeABI(t *testing.T) {
 		nextTransactionLocation,
 	)
 
-	// Run script
+	gauge := meter.NewMeter(meter.DefaultParameters().WithComputationWeights(meter.ExecutionEffortWeights{
+		environment.ComputationKindEVMEncodeABI: 1 << meter.MeterExecutionInternalPrecisionBytes,
+	}))
 
+	// Run script
 	result, err := rt.ExecuteScript(
 		runtime.Script{
 			Source:    script,
 			Arguments: [][]byte{},
 		},
 		runtime.Context{
-			Interface:   runtimeInterface,
-			Environment: scriptEnvironment,
-			Location:    nextScriptLocation(),
+			Interface:        runtimeInterface,
+			Environment:      scriptEnvironment,
+			Location:         nextScriptLocation(),
+			MemoryGauge:      gauge,
+			ComputationGauge: gauge,
 		},
 	)
 	require.NoError(t, err)
@@ -479,7 +478,7 @@ func TestEVMEncodeABI(t *testing.T) {
 		encodedABI,
 		result,
 	)
-	assert.Equal(t, uint64(len(cdcBytes)), computation)
+	assert.Equal(t, uint64(len(cdcBytes)), gauge.TotalComputationUsed())
 }
 
 func TestEVMEncodeABIByteTypes(t *testing.T) {
@@ -495,7 +494,6 @@ func TestEVMEncodeABIByteTypes(t *testing.T) {
 	accountCodes := map[common.Location][]byte{}
 	var events []cadence.Event
 
-	computation := uint64(0)
 	runtimeInterface := &TestRuntimeInterface{
 		Storage: NewTestLedger(nil, nil),
 		OnGetSigningAccounts: func() ([]runtime.Address, error) {
@@ -516,12 +514,6 @@ func TestEVMEncodeABIByteTypes(t *testing.T) {
 		},
 		OnDecodeArgument: func(b []byte, t cadence.Type) (cadence.Value, error) {
 			return json.Decode(nil, b)
-		},
-		OnMeterComputation: func(usage common.ComputationUsage) error {
-			if usage.Kind == environment.ComputationKindEVMEncodeABI {
-				computation += usage.Intensity
-			}
-			return nil
 		},
 	}
 
@@ -548,6 +540,9 @@ func TestEVMEncodeABIByteTypes(t *testing.T) {
             return EVM.encodeABI([bytes])
           }
 		`)
+		gauge := meter.NewMeter(meter.DefaultParameters().WithComputationWeights(meter.ExecutionEffortWeights{
+			environment.ComputationKindEVMEncodeABI: 1 << meter.MeterExecutionInternalPrecisionBytes,
+		}))
 
 		// Run script
 		result, err := rt.ExecuteScript(
@@ -556,9 +551,11 @@ func TestEVMEncodeABIByteTypes(t *testing.T) {
 				Arguments: [][]byte{},
 			},
 			runtime.Context{
-				Interface:   runtimeInterface,
-				Environment: scriptEnvironment,
-				Location:    nextScriptLocation(),
+				Interface:        runtimeInterface,
+				Environment:      scriptEnvironment,
+				Location:         nextScriptLocation(),
+				MemoryGauge:      gauge,
+				ComputationGauge: gauge,
 			},
 		)
 		require.NoError(t, err)
@@ -591,10 +588,7 @@ func TestEVMEncodeABIByteTypes(t *testing.T) {
 			encodedABI,
 			result,
 		)
-		assert.Equal(t, uint64(len(cdcBytes)), computation)
-
-		// Reset computation
-		computation = 0
+		assert.Equal(t, uint64(len(cdcBytes)), gauge.TotalComputationUsed())
 	})
 
 	t.Run("ABI encode into `bytes[]` Solidity type", func(t *testing.T) {
@@ -611,6 +605,10 @@ func TestEVMEncodeABIByteTypes(t *testing.T) {
           }
 		`)
 
+		gauge := meter.NewMeter(meter.DefaultParameters().WithComputationWeights(meter.ExecutionEffortWeights{
+			environment.ComputationKindEVMEncodeABI: 1 << meter.MeterExecutionInternalPrecisionBytes,
+		}))
+
 		// Run script
 		result, err := rt.ExecuteScript(
 			runtime.Script{
@@ -618,9 +616,11 @@ func TestEVMEncodeABIByteTypes(t *testing.T) {
 				Arguments: [][]byte{},
 			},
 			runtime.Context{
-				Interface:   runtimeInterface,
-				Environment: scriptEnvironment,
-				Location:    nextScriptLocation(),
+				Interface:        runtimeInterface,
+				Environment:      scriptEnvironment,
+				Location:         nextScriptLocation(),
+				MemoryGauge:      gauge,
+				ComputationGauge: gauge,
 			},
 		)
 		require.NoError(t, err)
@@ -667,10 +667,7 @@ func TestEVMEncodeABIByteTypes(t *testing.T) {
 			encodedABI,
 			result,
 		)
-		assert.Equal(t, uint64(len(cdcBytes)), computation)
-
-		// Reset computation
-		computation = 0
+		assert.Equal(t, uint64(len(cdcBytes)), gauge.TotalComputationUsed())
 	})
 
 	t.Run("ABI encode into `bytes4` Solidity type", func(t *testing.T) {
@@ -684,6 +681,9 @@ func TestEVMEncodeABIByteTypes(t *testing.T) {
           }
 		`)
 
+		gauge := meter.NewMeter(meter.DefaultParameters().WithComputationWeights(meter.ExecutionEffortWeights{
+			environment.ComputationKindEVMEncodeABI: 1 << meter.MeterExecutionInternalPrecisionBytes,
+		}))
 		// Run script
 		result, err := rt.ExecuteScript(
 			runtime.Script{
@@ -691,9 +691,11 @@ func TestEVMEncodeABIByteTypes(t *testing.T) {
 				Arguments: [][]byte{},
 			},
 			runtime.Context{
-				Interface:   runtimeInterface,
-				Environment: scriptEnvironment,
-				Location:    nextScriptLocation(),
+				Interface:        runtimeInterface,
+				Environment:      scriptEnvironment,
+				Location:         nextScriptLocation(),
+				MemoryGauge:      gauge,
+				ComputationGauge: gauge,
 			},
 		)
 		require.NoError(t, err)
@@ -721,10 +723,7 @@ func TestEVMEncodeABIByteTypes(t *testing.T) {
 			encodedABI,
 			result,
 		)
-		assert.Equal(t, uint64(len(cdcBytes)), computation)
-
-		// Reset computation
-		computation = 0
+		assert.Equal(t, uint64(len(cdcBytes)), gauge.TotalComputationUsed())
 	})
 
 	t.Run("ABI encode into `bytes4[]` Solidity type", func(t *testing.T) {
@@ -741,6 +740,10 @@ func TestEVMEncodeABIByteTypes(t *testing.T) {
           }
 		`)
 
+		gauge := meter.NewMeter(meter.DefaultParameters().WithComputationWeights(meter.ExecutionEffortWeights{
+			environment.ComputationKindEVMEncodeABI: 1 << meter.MeterExecutionInternalPrecisionBytes,
+		}))
+
 		// Run script
 		result, err := rt.ExecuteScript(
 			runtime.Script{
@@ -748,9 +751,11 @@ func TestEVMEncodeABIByteTypes(t *testing.T) {
 				Arguments: [][]byte{},
 			},
 			runtime.Context{
-				Interface:   runtimeInterface,
-				Environment: scriptEnvironment,
-				Location:    nextScriptLocation(),
+				Interface:        runtimeInterface,
+				Environment:      scriptEnvironment,
+				Location:         nextScriptLocation(),
+				MemoryGauge:      gauge,
+				ComputationGauge: gauge,
 			},
 		)
 		require.NoError(t, err)
@@ -786,10 +791,7 @@ func TestEVMEncodeABIByteTypes(t *testing.T) {
 			encodedABI,
 			result,
 		)
-		assert.Equal(t, uint64(len(cdcBytes)), computation)
-
-		// Reset computation
-		computation = 0
+		assert.Equal(t, uint64(len(cdcBytes)), gauge.TotalComputationUsed())
 	})
 
 	t.Run("ABI encode into `bytes32` Solidity type", func(t *testing.T) {
@@ -809,6 +811,10 @@ func TestEVMEncodeABIByteTypes(t *testing.T) {
           }
 		`)
 
+		gauge := meter.NewMeter(meter.DefaultParameters().WithComputationWeights(meter.ExecutionEffortWeights{
+			environment.ComputationKindEVMEncodeABI: 1 << meter.MeterExecutionInternalPrecisionBytes,
+		}))
+
 		// Run script
 		result, err := rt.ExecuteScript(
 			runtime.Script{
@@ -816,9 +822,11 @@ func TestEVMEncodeABIByteTypes(t *testing.T) {
 				Arguments: [][]byte{},
 			},
 			runtime.Context{
-				Interface:   runtimeInterface,
-				Environment: scriptEnvironment,
-				Location:    nextScriptLocation(),
+				Interface:        runtimeInterface,
+				Environment:      scriptEnvironment,
+				Location:         nextScriptLocation(),
+				MemoryGauge:      gauge,
+				ComputationGauge: gauge,
 			},
 		)
 		require.NoError(t, err)
@@ -846,10 +854,7 @@ func TestEVMEncodeABIByteTypes(t *testing.T) {
 			encodedABI,
 			result,
 		)
-		assert.Equal(t, uint64(len(cdcBytes)), computation)
-
-		// Reset computation
-		computation = 0
+		assert.Equal(t, uint64(len(cdcBytes)), gauge.TotalComputationUsed())
 	})
 
 	t.Run("ABI encode into `bytes32[]` Solidity type", func(t *testing.T) {
@@ -877,6 +882,10 @@ func TestEVMEncodeABIByteTypes(t *testing.T) {
           }
 		`)
 
+		gauge := meter.NewMeter(meter.DefaultParameters().WithComputationWeights(meter.ExecutionEffortWeights{
+			environment.ComputationKindEVMEncodeABI: 1 << meter.MeterExecutionInternalPrecisionBytes,
+		}))
+
 		// Run script
 		result, err := rt.ExecuteScript(
 			runtime.Script{
@@ -884,9 +893,11 @@ func TestEVMEncodeABIByteTypes(t *testing.T) {
 				Arguments: [][]byte{},
 			},
 			runtime.Context{
-				Interface:   runtimeInterface,
-				Environment: scriptEnvironment,
-				Location:    nextScriptLocation(),
+				Interface:        runtimeInterface,
+				Environment:      scriptEnvironment,
+				Location:         nextScriptLocation(),
+				MemoryGauge:      gauge,
+				ComputationGauge: gauge,
 			},
 		)
 		require.NoError(t, err)
@@ -922,10 +933,7 @@ func TestEVMEncodeABIByteTypes(t *testing.T) {
 			encodedABI,
 			result,
 		)
-		assert.Equal(t, uint64(len(cdcBytes)), computation)
-
-		// Reset computation
-		computation = 0
+		assert.Equal(t, uint64(len(cdcBytes)), gauge.TotalComputationUsed())
 	})
 }
 
@@ -942,7 +950,6 @@ func TestEVMEncodeABIBytesRoundtrip(t *testing.T) {
 	accountCodes := map[common.Location][]byte{}
 	var events []cadence.Event
 
-	computation := uint64(0)
 	runtimeInterface := &TestRuntimeInterface{
 		Storage: NewTestLedger(nil, nil),
 		OnGetSigningAccounts: func() ([]runtime.Address, error) {
@@ -963,12 +970,6 @@ func TestEVMEncodeABIBytesRoundtrip(t *testing.T) {
 		},
 		OnDecodeArgument: func(b []byte, t cadence.Type) (cadence.Value, error) {
 			return json.Decode(nil, b)
-		},
-		OnMeterComputation: func(usage common.ComputationUsage) error {
-			if usage.Kind == environment.ComputationKindEVMDecodeABI {
-				computation += usage.Intensity
-			}
-			return nil
 		},
 	}
 
@@ -1004,6 +1005,10 @@ func TestEVMEncodeABIBytesRoundtrip(t *testing.T) {
           }
 		`)
 
+		gauge := meter.NewMeter(meter.DefaultParameters().WithComputationWeights(meter.ExecutionEffortWeights{
+			environment.ComputationKindEVMEncodeABI: 1 << meter.MeterExecutionInternalPrecisionBytes,
+		}))
+
 		// Run script
 		result, err := rt.ExecuteScript(
 			runtime.Script{
@@ -1011,9 +1016,11 @@ func TestEVMEncodeABIBytesRoundtrip(t *testing.T) {
 				Arguments: [][]byte{},
 			},
 			runtime.Context{
-				Interface:   runtimeInterface,
-				Environment: scriptEnvironment,
-				Location:    nextScriptLocation(),
+				Interface:        runtimeInterface,
+				Environment:      scriptEnvironment,
+				Location:         nextScriptLocation(),
+				MemoryGauge:      gauge,
+				ComputationGauge: gauge,
 			},
 		)
 		require.NoError(t, err)
@@ -1023,8 +1030,7 @@ func TestEVMEncodeABIBytesRoundtrip(t *testing.T) {
 			result,
 		)
 
-		// Reset computation
-		computation = 0
+		assert.Equal(t, uint64(96), gauge.TotalComputationUsed())
 	})
 
 	t.Run("ABI encode/decode into `bytes[]` Solidity type", func(t *testing.T) {
@@ -1047,6 +1053,10 @@ func TestEVMEncodeABIBytesRoundtrip(t *testing.T) {
           }
 		`)
 
+		gauge := meter.NewMeter(meter.DefaultParameters().WithComputationWeights(meter.ExecutionEffortWeights{
+			environment.ComputationKindEVMEncodeABI: 1 << meter.MeterExecutionInternalPrecisionBytes,
+		}))
+
 		// Run script
 		result, err := rt.ExecuteScript(
 			runtime.Script{
@@ -1054,9 +1064,11 @@ func TestEVMEncodeABIBytesRoundtrip(t *testing.T) {
 				Arguments: [][]byte{},
 			},
 			runtime.Context{
-				Interface:   runtimeInterface,
-				Environment: scriptEnvironment,
-				Location:    nextScriptLocation(),
+				Interface:        runtimeInterface,
+				Environment:      scriptEnvironment,
+				Location:         nextScriptLocation(),
+				MemoryGauge:      gauge,
+				ComputationGauge: gauge,
 			},
 		)
 		require.NoError(t, err)
@@ -1066,8 +1078,7 @@ func TestEVMEncodeABIBytesRoundtrip(t *testing.T) {
 			result,
 		)
 
-		// Reset computation
-		computation = 0
+		assert.Equal(t, uint64(160), gauge.TotalComputationUsed())
 	})
 
 	t.Run("ABI encode/decode into `bytes4` Solidity type", func(t *testing.T) {
@@ -1088,6 +1099,9 @@ func TestEVMEncodeABIBytesRoundtrip(t *testing.T) {
             return true
           }
 		`)
+		gauge := meter.NewMeter(meter.DefaultParameters().WithComputationWeights(meter.ExecutionEffortWeights{
+			environment.ComputationKindEVMEncodeABI: 1 << meter.MeterExecutionInternalPrecisionBytes,
+		}))
 
 		// Run script
 		result, err := rt.ExecuteScript(
@@ -1096,9 +1110,11 @@ func TestEVMEncodeABIBytesRoundtrip(t *testing.T) {
 				Arguments: [][]byte{},
 			},
 			runtime.Context{
-				Interface:   runtimeInterface,
-				Environment: scriptEnvironment,
-				Location:    nextScriptLocation(),
+				Interface:        runtimeInterface,
+				Environment:      scriptEnvironment,
+				Location:         nextScriptLocation(),
+				MemoryGauge:      gauge,
+				ComputationGauge: gauge,
 			},
 		)
 		require.NoError(t, err)
@@ -1108,8 +1124,7 @@ func TestEVMEncodeABIBytesRoundtrip(t *testing.T) {
 			result,
 		)
 
-		// Reset computation
-		computation = 0
+		assert.Equal(t, uint64(32), gauge.TotalComputationUsed())
 	})
 
 	t.Run("ABI encode/decode into `bytes4[]` Solidity type", func(t *testing.T) {
@@ -1131,6 +1146,9 @@ func TestEVMEncodeABIBytesRoundtrip(t *testing.T) {
             return true
           }
 		`)
+		gauge := meter.NewMeter(meter.DefaultParameters().WithComputationWeights(meter.ExecutionEffortWeights{
+			environment.ComputationKindEVMEncodeABI: 1 << meter.MeterExecutionInternalPrecisionBytes,
+		}))
 
 		// Run script
 		result, err := rt.ExecuteScript(
@@ -1139,9 +1157,11 @@ func TestEVMEncodeABIBytesRoundtrip(t *testing.T) {
 				Arguments: [][]byte{},
 			},
 			runtime.Context{
-				Interface:   runtimeInterface,
-				Environment: scriptEnvironment,
-				Location:    nextScriptLocation(),
+				Interface:        runtimeInterface,
+				Environment:      scriptEnvironment,
+				Location:         nextScriptLocation(),
+				MemoryGauge:      gauge,
+				ComputationGauge: gauge,
 			},
 		)
 		require.NoError(t, err)
@@ -1151,8 +1171,7 @@ func TestEVMEncodeABIBytesRoundtrip(t *testing.T) {
 			result,
 		)
 
-		// Reset computation
-		computation = 0
+		assert.Equal(t, uint64(96), gauge.TotalComputationUsed())
 	})
 
 	t.Run("ABI encode/decode into `bytes32` Solidity type", func(t *testing.T) {
@@ -1183,6 +1202,9 @@ func TestEVMEncodeABIBytesRoundtrip(t *testing.T) {
             return true
           }
 		`)
+		gauge := meter.NewMeter(meter.DefaultParameters().WithComputationWeights(meter.ExecutionEffortWeights{
+			environment.ComputationKindEVMEncodeABI: 1 << meter.MeterExecutionInternalPrecisionBytes,
+		}))
 
 		// Run script
 		result, err := rt.ExecuteScript(
@@ -1191,9 +1213,11 @@ func TestEVMEncodeABIBytesRoundtrip(t *testing.T) {
 				Arguments: [][]byte{},
 			},
 			runtime.Context{
-				Interface:   runtimeInterface,
-				Environment: scriptEnvironment,
-				Location:    nextScriptLocation(),
+				Interface:        runtimeInterface,
+				Environment:      scriptEnvironment,
+				Location:         nextScriptLocation(),
+				MemoryGauge:      gauge,
+				ComputationGauge: gauge,
 			},
 		)
 		require.NoError(t, err)
@@ -1203,8 +1227,7 @@ func TestEVMEncodeABIBytesRoundtrip(t *testing.T) {
 			result,
 		)
 
-		// Reset computation
-		computation = 0
+		assert.Equal(t, uint64(32), gauge.TotalComputationUsed())
 	})
 
 	t.Run("ABI encode/decode into `bytes32[]` Solidity type", func(t *testing.T) {
@@ -1236,6 +1259,9 @@ func TestEVMEncodeABIBytesRoundtrip(t *testing.T) {
             return true
           }
 		`)
+		gauge := meter.NewMeter(meter.DefaultParameters().WithComputationWeights(meter.ExecutionEffortWeights{
+			environment.ComputationKindEVMEncodeABI: 1 << meter.MeterExecutionInternalPrecisionBytes,
+		}))
 
 		// Run script
 		result, err := rt.ExecuteScript(
@@ -1244,9 +1270,11 @@ func TestEVMEncodeABIBytesRoundtrip(t *testing.T) {
 				Arguments: [][]byte{},
 			},
 			runtime.Context{
-				Interface:   runtimeInterface,
-				Environment: scriptEnvironment,
-				Location:    nextScriptLocation(),
+				Interface:        runtimeInterface,
+				Environment:      scriptEnvironment,
+				Location:         nextScriptLocation(),
+				MemoryGauge:      gauge,
+				ComputationGauge: gauge,
 			},
 		)
 		require.NoError(t, err)
@@ -1256,8 +1284,7 @@ func TestEVMEncodeABIBytesRoundtrip(t *testing.T) {
 			result,
 		)
 
-		// Reset computation
-		computation = 0
+		assert.Equal(t, uint64(96), gauge.TotalComputationUsed())
 	})
 }
 
@@ -1300,7 +1327,6 @@ func TestEVMEncodeABIComputation(t *testing.T) {
 	accountCodes := map[common.Location][]byte{}
 	var events []cadence.Event
 
-	computation := uint64(0)
 	runtimeInterface := &TestRuntimeInterface{
 		Storage: NewTestLedger(nil, nil),
 		OnGetSigningAccounts: func() ([]runtime.Address, error) {
@@ -1322,12 +1348,6 @@ func TestEVMEncodeABIComputation(t *testing.T) {
 		OnDecodeArgument: func(b []byte, t cadence.Type) (cadence.Value, error) {
 			return json.Decode(nil, b)
 		},
-		OnMeterComputation: func(usage common.ComputationUsage) error {
-			if usage.Kind == environment.ComputationKindEVMEncodeABI {
-				computation += usage.Intensity
-			}
-			return nil
-		},
 	}
 
 	nextTransactionLocation := NewTransactionLocationGenerator()
@@ -1343,18 +1363,22 @@ func TestEVMEncodeABIComputation(t *testing.T) {
 		transactionEnvironment,
 		nextTransactionLocation,
 	)
+	gauge := meter.NewMeter(meter.DefaultParameters().WithComputationWeights(meter.ExecutionEffortWeights{
+		environment.ComputationKindEVMEncodeABI: 1 << meter.MeterExecutionInternalPrecisionBytes,
+	}))
 
 	// Run script
-
 	result, err := rt.ExecuteScript(
 		runtime.Script{
 			Source:    script,
 			Arguments: [][]byte{},
 		},
 		runtime.Context{
-			Interface:   runtimeInterface,
-			Environment: scriptEnvironment,
-			Location:    nextScriptLocation(),
+			Interface:        runtimeInterface,
+			Environment:      scriptEnvironment,
+			Location:         nextScriptLocation(),
+			MemoryGauge:      gauge,
+			ComputationGauge: gauge,
 		},
 	)
 	require.NoError(t, err)
@@ -1362,7 +1386,7 @@ func TestEVMEncodeABIComputation(t *testing.T) {
 	cdcBytes, ok := result.(cadence.Array)
 	require.True(t, ok)
 	// computation & len(cdcBytes.Values) is equal to 832
-	assert.Equal(t, uint64(len(cdcBytes.Values)), computation)
+	assert.Equal(t, uint64(len(cdcBytes.Values)), gauge.TotalComputationUsed())
 }
 
 func TestEVMEncodeABIComputationEmptyDynamicVariables(t *testing.T) {
@@ -1395,7 +1419,6 @@ func TestEVMEncodeABIComputationEmptyDynamicVariables(t *testing.T) {
 	accountCodes := map[common.Location][]byte{}
 	var events []cadence.Event
 
-	computation := uint64(0)
 	runtimeInterface := &TestRuntimeInterface{
 		Storage: NewTestLedger(nil, nil),
 		OnGetSigningAccounts: func() ([]runtime.Address, error) {
@@ -1417,12 +1440,6 @@ func TestEVMEncodeABIComputationEmptyDynamicVariables(t *testing.T) {
 		OnDecodeArgument: func(b []byte, t cadence.Type) (cadence.Value, error) {
 			return json.Decode(nil, b)
 		},
-		OnMeterComputation: func(usage common.ComputationUsage) error {
-			if usage.Kind == environment.ComputationKindEVMEncodeABI {
-				computation += usage.Intensity
-			}
-			return nil
-		},
 	}
 
 	nextTransactionLocation := NewTransactionLocationGenerator()
@@ -1439,6 +1456,10 @@ func TestEVMEncodeABIComputationEmptyDynamicVariables(t *testing.T) {
 		nextTransactionLocation,
 	)
 
+	gauge := meter.NewMeter(meter.DefaultParameters().WithComputationWeights(meter.ExecutionEffortWeights{
+		environment.ComputationKindEVMEncodeABI: 1 << meter.MeterExecutionInternalPrecisionBytes,
+	}))
+
 	// Run script
 
 	result, err := rt.ExecuteScript(
@@ -1447,9 +1468,11 @@ func TestEVMEncodeABIComputationEmptyDynamicVariables(t *testing.T) {
 			Arguments: [][]byte{},
 		},
 		runtime.Context{
-			Interface:   runtimeInterface,
-			Environment: scriptEnvironment,
-			Location:    nextScriptLocation(),
+			Interface:        runtimeInterface,
+			Environment:      scriptEnvironment,
+			Location:         nextScriptLocation(),
+			MemoryGauge:      gauge,
+			ComputationGauge: gauge,
 		},
 	)
 	require.NoError(t, err)
@@ -1457,7 +1480,7 @@ func TestEVMEncodeABIComputationEmptyDynamicVariables(t *testing.T) {
 	cdcBytes, ok := result.(cadence.Array)
 	require.True(t, ok)
 	// computation & len(cdcBytes.Values) is equal to 832
-	assert.Equal(t, uint64(len(cdcBytes.Values)), computation)
+	assert.Equal(t, uint64(len(cdcBytes.Values)), gauge.TotalComputationUsed())
 }
 
 func TestEVMEncodeABIComputationDynamicVariablesAboveChunkSize(t *testing.T) {
@@ -1499,7 +1522,6 @@ func TestEVMEncodeABIComputationDynamicVariablesAboveChunkSize(t *testing.T) {
 	accountCodes := map[common.Location][]byte{}
 	var events []cadence.Event
 
-	computation := uint64(0)
 	runtimeInterface := &TestRuntimeInterface{
 		Storage: NewTestLedger(nil, nil),
 		OnGetSigningAccounts: func() ([]runtime.Address, error) {
@@ -1521,12 +1543,6 @@ func TestEVMEncodeABIComputationDynamicVariablesAboveChunkSize(t *testing.T) {
 		OnDecodeArgument: func(b []byte, t cadence.Type) (cadence.Value, error) {
 			return json.Decode(nil, b)
 		},
-		OnMeterComputation: func(usage common.ComputationUsage) error {
-			if usage.Kind == environment.ComputationKindEVMEncodeABI {
-				computation += usage.Intensity
-			}
-			return nil
-		},
 	}
 
 	nextTransactionLocation := NewTransactionLocationGenerator()
@@ -1543,6 +1559,10 @@ func TestEVMEncodeABIComputationDynamicVariablesAboveChunkSize(t *testing.T) {
 		nextTransactionLocation,
 	)
 
+	gauge := meter.NewMeter(meter.DefaultParameters().WithComputationWeights(meter.ExecutionEffortWeights{
+		environment.ComputationKindEVMEncodeABI: 1 << meter.MeterExecutionInternalPrecisionBytes,
+	}))
+
 	// Run script
 
 	result, err := rt.ExecuteScript(
@@ -1551,9 +1571,11 @@ func TestEVMEncodeABIComputationDynamicVariablesAboveChunkSize(t *testing.T) {
 			Arguments: [][]byte{},
 		},
 		runtime.Context{
-			Interface:   runtimeInterface,
-			Environment: scriptEnvironment,
-			Location:    nextScriptLocation(),
+			Interface:        runtimeInterface,
+			Environment:      scriptEnvironment,
+			Location:         nextScriptLocation(),
+			MemoryGauge:      gauge,
+			ComputationGauge: gauge,
 		},
 	)
 	require.NoError(t, err)
@@ -1561,7 +1583,7 @@ func TestEVMEncodeABIComputationDynamicVariablesAboveChunkSize(t *testing.T) {
 	cdcBytes, ok := result.(cadence.Array)
 	require.True(t, ok)
 	// computation & len(cdcBytes.Values) is equal to 832
-	assert.Equal(t, uint64(len(cdcBytes.Values)), computation)
+	assert.Equal(t, uint64(len(cdcBytes.Values)), gauge.TotalComputationUsed())
 }
 
 func TestEVMDecodeABI(t *testing.T) {
@@ -1597,7 +1619,6 @@ func TestEVMDecodeABI(t *testing.T) {
 	accountCodes := map[common.Location][]byte{}
 	var events []cadence.Event
 
-	computation := uint64(0)
 	runtimeInterface := &TestRuntimeInterface{
 		Storage: NewTestLedger(nil, nil),
 		OnGetSigningAccounts: func() ([]runtime.Address, error) {
@@ -1619,12 +1640,6 @@ func TestEVMDecodeABI(t *testing.T) {
 		OnDecodeArgument: func(b []byte, t cadence.Type) (cadence.Value, error) {
 			return json.Decode(nil, b)
 		},
-		OnMeterComputation: func(usage common.ComputationUsage) error {
-			if usage.Kind == environment.ComputationKindEVMDecodeABI {
-				computation += usage.Intensity
-			}
-			return nil
-		},
 	}
 
 	nextTransactionLocation := NewTransactionLocationGenerator()
@@ -1640,6 +1655,10 @@ func TestEVMDecodeABI(t *testing.T) {
 		transactionEnvironment,
 		nextTransactionLocation,
 	)
+
+	gauge := meter.NewMeter(meter.DefaultParameters().WithComputationWeights(meter.ExecutionEffortWeights{
+		environment.ComputationKindEVMDecodeABI: 1 << meter.MeterExecutionInternalPrecisionBytes,
+	}))
 
 	// Run script
 	abiBytes := []byte{
@@ -1672,15 +1691,17 @@ func TestEVMDecodeABI(t *testing.T) {
 			}),
 		},
 		runtime.Context{
-			Interface:   runtimeInterface,
-			Environment: scriptEnvironment,
-			Location:    nextScriptLocation(),
+			Interface:        runtimeInterface,
+			Environment:      scriptEnvironment,
+			Location:         nextScriptLocation(),
+			MemoryGauge:      gauge,
+			ComputationGauge: gauge,
 		},
 	)
 	require.NoError(t, err)
 
 	assert.Equal(t, cadence.NewBool(true), result)
-	assert.Equal(t, uint64(len(cdcBytes)), computation)
+	assert.Equal(t, uint64(len(cdcBytes)), gauge.TotalComputationUsed())
 }
 
 func TestEVMDecodeABIComputation(t *testing.T) {
@@ -1730,7 +1751,6 @@ func TestEVMDecodeABIComputation(t *testing.T) {
 	accountCodes := map[common.Location][]byte{}
 	var events []cadence.Event
 
-	computation := uint64(0)
 	runtimeInterface := &TestRuntimeInterface{
 		Storage: NewTestLedger(nil, nil),
 		OnGetSigningAccounts: func() ([]runtime.Address, error) {
@@ -1752,12 +1772,6 @@ func TestEVMDecodeABIComputation(t *testing.T) {
 		OnDecodeArgument: func(b []byte, t cadence.Type) (cadence.Value, error) {
 			return json.Decode(nil, b)
 		},
-		OnMeterComputation: func(usage common.ComputationUsage) error {
-			if usage.Kind == environment.ComputationKindEVMDecodeABI {
-				computation += usage.Intensity
-			}
-			return nil
-		},
 	}
 
 	nextTransactionLocation := NewTransactionLocationGenerator()
@@ -1773,6 +1787,9 @@ func TestEVMDecodeABIComputation(t *testing.T) {
 		transactionEnvironment,
 		nextTransactionLocation,
 	)
+	gauge := meter.NewMeter(meter.DefaultParameters().WithComputationWeights(meter.ExecutionEffortWeights{
+		environment.ComputationKindEVMEncodeABI: 1 << meter.MeterExecutionInternalPrecisionBytes,
+	}))
 
 	// Run script
 
@@ -1782,9 +1799,11 @@ func TestEVMDecodeABIComputation(t *testing.T) {
 			Arguments: [][]byte{},
 		},
 		runtime.Context{
-			Interface:   runtimeInterface,
-			Environment: scriptEnvironment,
-			Location:    nextScriptLocation(),
+			Interface:        runtimeInterface,
+			Environment:      scriptEnvironment,
+			Location:         nextScriptLocation(),
+			MemoryGauge:      gauge,
+			ComputationGauge: gauge,
 		},
 	)
 	require.NoError(t, err)
@@ -1792,7 +1811,7 @@ func TestEVMDecodeABIComputation(t *testing.T) {
 	cdcBytes, ok := result.(cadence.Array)
 	require.True(t, ok)
 	// computation & len(cdcBytes.Values) is equal to 832
-	assert.Equal(t, uint64(len(cdcBytes.Values)), computation)
+	assert.Equal(t, uint64(len(cdcBytes.Values)), gauge.TotalComputationUsed())
 }
 
 func TestEVMEncodeDecodeABIRoundtripForUintIntTypes(t *testing.T) {
@@ -3336,7 +3355,6 @@ func TestEVMEncodeABIWithSignature(t *testing.T) {
 	accountCodes := map[common.Location][]byte{}
 	var events []cadence.Event
 
-	computation := uint64(0)
 	runtimeInterface := &TestRuntimeInterface{
 		Storage: NewTestLedger(nil, nil),
 		OnGetSigningAccounts: func() ([]runtime.Address, error) {
@@ -3357,12 +3375,6 @@ func TestEVMEncodeABIWithSignature(t *testing.T) {
 		},
 		OnDecodeArgument: func(b []byte, t cadence.Type) (cadence.Value, error) {
 			return json.Decode(nil, b)
-		},
-		OnMeterComputation: func(usage common.ComputationUsage) error {
-			if usage.Kind == environment.ComputationKindEVMEncodeABI {
-				computation += usage.Intensity
-			}
-			return nil
 		},
 		OnHash: func(
 			data []byte,
@@ -3386,6 +3398,9 @@ func TestEVMEncodeABIWithSignature(t *testing.T) {
 		transactionEnvironment,
 		nextTransactionLocation,
 	)
+	gauge := meter.NewMeter(meter.DefaultParameters().WithComputationWeights(meter.ExecutionEffortWeights{
+		environment.ComputationKindEVMEncodeABI: 1 << meter.MeterExecutionInternalPrecisionBytes,
+	}))
 
 	// Run script
 
@@ -3395,9 +3410,11 @@ func TestEVMEncodeABIWithSignature(t *testing.T) {
 			Arguments: [][]byte{},
 		},
 		runtime.Context{
-			Interface:   runtimeInterface,
-			Environment: scriptEnvironment,
-			Location:    nextScriptLocation(),
+			Interface:        runtimeInterface,
+			Environment:      scriptEnvironment,
+			Location:         nextScriptLocation(),
+			MemoryGauge:      gauge,
+			ComputationGauge: gauge,
 		},
 	)
 	require.NoError(t, err)
@@ -3423,7 +3440,7 @@ func TestEVMEncodeABIWithSignature(t *testing.T) {
 		result,
 	)
 	// The method ID is a byte array of length 4
-	assert.Equal(t, uint64(len(cdcBytes)), computation+4)
+	assert.Equal(t, uint64(len(cdcBytes)), gauge.TotalComputationUsed()+4)
 }
 
 func TestEVMDecodeABIWithSignature(t *testing.T) {
@@ -3469,7 +3486,6 @@ func TestEVMDecodeABIWithSignature(t *testing.T) {
 	accountCodes := map[common.Location][]byte{}
 	var events []cadence.Event
 
-	computation := uint64(0)
 	runtimeInterface := &TestRuntimeInterface{
 		Storage: NewTestLedger(nil, nil),
 		OnGetSigningAccounts: func() ([]runtime.Address, error) {
@@ -3490,12 +3506,6 @@ func TestEVMDecodeABIWithSignature(t *testing.T) {
 		},
 		OnDecodeArgument: func(b []byte, t cadence.Type) (cadence.Value, error) {
 			return json.Decode(nil, b)
-		},
-		OnMeterComputation: func(usage common.ComputationUsage) error {
-			if usage.Kind == environment.ComputationKindEVMDecodeABI {
-				computation += usage.Intensity
-			}
-			return nil
 		},
 		OnHash: func(
 			data []byte,
@@ -3519,6 +3529,10 @@ func TestEVMDecodeABIWithSignature(t *testing.T) {
 		transactionEnvironment,
 		nextTransactionLocation,
 	)
+
+	gauge := meter.NewMeter(meter.DefaultParameters().WithComputationWeights(meter.ExecutionEffortWeights{
+		environment.ComputationKindEVMDecodeABI: 1 << meter.MeterExecutionInternalPrecisionBytes,
+	}))
 
 	// Run script
 	abiBytes := []byte{
@@ -3545,16 +3559,18 @@ func TestEVMDecodeABIWithSignature(t *testing.T) {
 			}),
 		},
 		runtime.Context{
-			Interface:   runtimeInterface,
-			Environment: scriptEnvironment,
-			Location:    nextScriptLocation(),
+			Interface:        runtimeInterface,
+			Environment:      scriptEnvironment,
+			Location:         nextScriptLocation(),
+			MemoryGauge:      gauge,
+			ComputationGauge: gauge,
 		},
 	)
 	require.NoError(t, err)
 
 	assert.Equal(t, cadence.NewBool(true), result)
 	// The method ID is a byte array of length 4
-	assert.Equal(t, uint64(len(cdcBytes)), computation+4)
+	assert.Equal(t, uint64(len(cdcBytes)), gauge.TotalComputationUsed()+4)
 }
 
 func TestEVMDecodeABIWithSignatureMismatch(t *testing.T) {

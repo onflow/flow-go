@@ -21,7 +21,6 @@ PROFILER=false
 PROFILE_UPLOADER=false
 TRACING=true
 EXTENSIVE_TRACING=false
-CADENCE_TRACING=false
 LOGLEVEL=DEBUG
 
 # The Git commit hash
@@ -73,7 +72,6 @@ else
 		-profiler=$(PROFILER) \
 		-profile-uploader=$(PROFILE_UPLOADER) \
 		-tracing=$(TRACING) \
-		-cadence-tracing=$(CADENCE_TRACING) \
 		-extensive-tracing=$(EXTENSIVE_TRACING) \
 		-consensus-delay=$(CONSENSUS_DELAY) \
 		-collection-delay=$(COLLECTION_DELAY)
