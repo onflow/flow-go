@@ -14,6 +14,7 @@ import (
 )
 
 // ForestManagerConfig contains configuration for processing execution result containers
+// TODO: refactor this to use optimistic_sync.Criteria for shared configuration and enforcement.
 type ForestManagerConfig struct {
 	// RequiredAgreeingExecutors is the minimum number of executors that must agree on the result
 	// Must be 1 or greater.
@@ -89,8 +90,7 @@ func NewForestManager(
 // OnResultUpdated notifies the manager that a result was updated.
 func (fm *ForestManager) OnResultUpdated(container *ExecutionResultContainer) {
 	if container.IsEnqueued() {
-		// already enqueued, adding this receipt will not change processability of any of its
-		// descendants
+		// updates to the container will not affect processability of its descendants
 		return
 	}
 
@@ -123,14 +123,16 @@ func (fm *ForestManager) OnBlockFinalized(finalized *flow.Block) {
 		return
 
 	case BlockStatusFinalized:
+		// the results forest does not guarantee that results marked finalized have a connected
+		// ancestral relationship back to the last sealed result. Therefore, there may be cases
+		// where finalized results within the forest are not processable until they are sealed.
+		//
+		// TODO (peter): there are probably ways to address this, but I am not going to implement
+		// them in the first version until we have more data about how often this happens.
 		containers := make([]*ExecutionResultContainer, 0)
-
 		for container := range fm.resultsForest.IterateView(finalized.View) {
-			if pendingAncestor, found := fm.oldestPendingAncestor(container); found {
-				containers = append(containers, pendingAncestor)
-			}
+			containers = append(containers, container)
 		}
-
 		fm.traverseDescendants(containers...)
 		return
 
@@ -177,7 +179,7 @@ func (fm *ForestManager) traverseDescendants(heads ...*ExecutionResultContainer)
 		parent := element.Value.(*ExecutionResultContainer)
 		for child := range fm.resultsForest.IterateChildren(parent.resultID) {
 			if fm.enqueueIfProcessable(child, parent) {
-				queue.PushBack(child)
+				queue.PushBack(child) // add processable containers for further traversal
 			}
 		}
 	}
@@ -218,9 +220,10 @@ func (fm *ForestManager) canProcessResult(container, parentContainer *ExecutionR
 
 	// 1. Container must be pending
 	// Any other state means the container is either already running or abandoned.
-	if container.Pipeline().GetState() != optimistic_sync.StatePending {
+	containerState := container.Pipeline().GetState()
+	if containerState != optimistic_sync.StatePending {
 		lg.Debug().
-			Str("state", container.Pipeline().GetState().String()).
+			Str("state", containerState.String()).
 			Msg("container not in pending state. skipping")
 		return false
 	}
@@ -317,16 +320,9 @@ func (fm *ForestManager) ExecutePipelineTask(container *ExecutionResultContainer
 			return fmt.Errorf("failed to execute pipeline for result %s: %w", container.ResultID(), err)
 		}
 
-		// Note: the pipeline guarantees the latest persisted sealed result is updated sequentially
-		// by requiring the following before persisting:
-		// 1. the pipeline's result is sealed
-		// 2. the pipeline's parent is completed (persisted)
-		// Only after persisting is the latest persisted sealed result updated.
-
-		// TODO: there is a missing liveness check. It is possible for state to be corrupted such
-		// that the last sealed result does not descend from the latest persisted sealed result.
-		// In this case, the pipeline's result may never be marked sealed, and the forest manager
-		// will never progress.
+		// the pipeline guarantees sequential, ancestor first execution of the persisting step
+		// which updates the latest persisted sealed result. Therefore, calls to processCompleted
+		// are guaranteed to be sequential in ancestor first order.
 
 		if err := fm.resultsForest.processCompleted(container.ResultID()); err != nil {
 			return fmt.Errorf("failed to process completed pipeline for result %s: %w", container.ResultID(), err)
