@@ -66,9 +66,9 @@ func runE(*cobra.Command, []string) error {
 		return err
 	}
 	storages := common.InitStorages(db)
-	state, err := common.InitProtocolState(lockManager, db, storages)
+	state, err := common.OpenProtocolState(lockManager, db, storages)
 	if err != nil {
-		return fmt.Errorf("could not init protocol states: %w", err)
+		return fmt.Errorf("could not open protocol states: %w", err)
 	}
 
 	metrics := &metrics.NoopCollector{}

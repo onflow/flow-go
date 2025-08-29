@@ -152,7 +152,7 @@ func runE(*cobra.Command, []string) error {
 	flagDBs := common.ReadDBFlags()
 	return common.WithStorage(flagDBs, func(db storage.DB) error {
 		storages := common.InitStorages(db)
-		state, err := common.InitProtocolState(lockManager, db, storages)
+		state, err := common.OpenProtocolState(lockManager, db, storages)
 
 		if err != nil {
 			log.Fatal().Err(err).Msg("could not init protocol state")
