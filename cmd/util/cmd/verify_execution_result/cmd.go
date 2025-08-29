@@ -10,6 +10,7 @@ import (
 
 	"github.com/onflow/flow-go/engine/verification/verifier"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/storage"
 )
 
 var (
@@ -60,6 +61,7 @@ func init() {
 }
 
 func run(*cobra.Command, []string) {
+	lockManager := storage.MakeSingletonLockManager()
 	chainID := flow.ChainID(flagChain)
 	_ = chainID.Chain()
 
@@ -84,7 +86,7 @@ func run(*cobra.Command, []string) {
 		}
 
 		lg.Info().Msgf("verifying range from %d to %d", from, to)
-		err = verifier.VerifyRange(from, to, chainID, flagDatadir, flagChunkDataPackDir, flagWorkerCount, flagStopOnMismatch, flagtransactionFeesDisabled)
+		err = verifier.VerifyRange(lockManager, from, to, chainID, flagDatadir, flagChunkDataPackDir, flagWorkerCount, flagStopOnMismatch, flagtransactionFeesDisabled)
 		if err != nil {
 			lg.Fatal().Err(err).Msgf("could not verify range from %d to %d", from, to)
 		}
@@ -92,7 +94,7 @@ func run(*cobra.Command, []string) {
 
 	} else {
 		lg.Info().Msgf("verifying last %d sealed blocks", flagLastK)
-		err := verifier.VerifyLastKHeight(flagLastK, chainID, flagDatadir, flagChunkDataPackDir, flagWorkerCount, flagStopOnMismatch, flagtransactionFeesDisabled)
+		err := verifier.VerifyLastKHeight(lockManager, flagLastK, chainID, flagDatadir, flagChunkDataPackDir, flagWorkerCount, flagStopOnMismatch, flagtransactionFeesDisabled)
 		if err != nil {
 			lg.Fatal().Err(err).Msg("could not verify last k height")
 		}

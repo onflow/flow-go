@@ -25,6 +25,7 @@ import (
 
 func prepareTest(f func(t *testing.T, es state.ExecutionState, l *ledger.Ledger, headers *storage.Headers, commits *storage.Commits)) func(*testing.T) {
 	return func(t *testing.T) {
+		lockManager := storageerr.NewTestingLockManager()
 		unittest.RunWithBadgerDB(t, func(badgerDB *badger.DB) {
 			metricsCollector := &metrics.NoopCollector{}
 			diskWal := &fixtures.NoopWAL{}
@@ -51,7 +52,6 @@ func prepareTest(f func(t *testing.T, es state.ExecutionState, l *ledger.Ledger,
 				return 0, nil
 			}
 
-			lockManager := storageerr.NewTestingLockManager()
 			db := badgerimpl.ToDB(badgerDB)
 			es := state.NewExecutionState(
 				ls, stateCommitments, blocks, headers, chunkDataPacks, results, myReceipts, events, serviceEvents, txResults, db, getLatestFinalized, trace.NewNoopTracer(),

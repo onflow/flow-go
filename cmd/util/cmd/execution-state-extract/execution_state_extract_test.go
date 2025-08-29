@@ -37,7 +37,6 @@ func TestExtractExecutionState(t *testing.T) {
 	metr := &metrics.NoopCollector{}
 
 	t.Run("missing block->state commitment mapping", func(t *testing.T) {
-
 		withDirs(t, func(datadir, execdir, outdir string) {
 			// Initialize a proper Badger database instead of using empty directory
 			db := unittest.PebbleDB(t, datadir)
@@ -53,6 +52,7 @@ func TestExtractExecutionState(t *testing.T) {
 	})
 
 	t.Run("retrieves block->state mapping", func(t *testing.T) {
+		lockManager := storage.NewTestingLockManager()
 
 		withDirs(t, func(datadir, execdir, outdir string) {
 			// Initialize a proper Badger database instead of using empty directory
@@ -66,14 +66,13 @@ func TestExtractExecutionState(t *testing.T) {
 			blockID := unittest.IdentifierFixture()
 			stateCommitment := unittest.StateCommitmentFixture()
 
+			lctx := lockManager.NewContext()
+			require.NoError(t, lctx.AcquireLock(storage.LockInsertOwnReceipt))
 			require.NoError(t, storageDB.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 				// Store the state commitment for the block ID
-				lockManager := storage.NewTestingLockManager()
-				lctx := lockManager.NewContext()
-				defer lctx.Release()
-				require.NoError(t, lctx.AcquireLock(storage.LockInsertOwnReceipt))
 				return operation.IndexStateCommitment(lctx, rw, blockID, stateCommitment)
 			}))
+			lctx.Release()
 
 			retrievedStateCommitment, err := commits.ByBlockID(blockID)
 			require.NoError(t, err)
@@ -93,9 +92,9 @@ func TestExtractExecutionState(t *testing.T) {
 	})
 
 	t.Run("happy path", func(t *testing.T) {
+		lockManager := storage.NewTestingLockManager()
 
 		withDirs(t, func(datadir, execdir, _ string) {
-
 			const (
 				checkpointDistance = math.MaxInt // A large number to prevent checkpoint creation.
 				checkpointsToKeep  = 1
@@ -139,13 +138,12 @@ func TestExtractExecutionState(t *testing.T) {
 				// generate random block and map it to state commitment
 				blockID := unittest.IdentifierFixture()
 
+				lctx := lockManager.NewContext()
+				require.NoError(t, lctx.AcquireLock(storage.LockInsertOwnReceipt))
 				require.NoError(t, storageDB.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-					lockManager := storage.NewTestingLockManager()
-					lctx := lockManager.NewContext()
-					defer lctx.Release()
-					require.NoError(t, lctx.AcquireLock(storage.LockInsertOwnReceipt))
 					return operation.IndexStateCommitment(lctx, rw, blockID, flow.StateCommitment(stateCommitment))
 				}))
+				lctx.Release()
 
 				data := make(map[string]keyPair, len(keys))
 				for j, key := range keys {

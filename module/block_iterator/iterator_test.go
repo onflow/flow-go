@@ -16,6 +16,7 @@ import (
 )
 
 func TestIterateHeight(t *testing.T) {
+	lockManager := storage.NewTestingLockManager()
 	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
 		// create blocks with siblings
 		b1 := &flow.Header{Height: 1}
@@ -24,7 +25,6 @@ func TestIterateHeight(t *testing.T) {
 		bs := []*flow.Header{b1, b2, b3}
 
 		// index height
-		lockManager := storage.NewTestingLockManager()
 		for _, b := range bs {
 			lctx := lockManager.NewContext()
 			require.NoError(t, lctx.AcquireLock(storage.LockFinalizeBlock))

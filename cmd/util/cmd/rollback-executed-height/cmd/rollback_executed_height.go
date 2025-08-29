@@ -47,6 +47,8 @@ func init() {
 }
 
 func runE(*cobra.Command, []string) error {
+	lockManager := storage.MakeSingletonLockManager()
+
 	log.Info().
 		Str("datadir", flagDataDir).
 		Str("chunk_data_pack_dir", flagChunkDataPackDir).
@@ -64,9 +66,9 @@ func runE(*cobra.Command, []string) error {
 		return err
 	}
 	storages := common.InitStorages(db)
-	state, err := common.InitProtocolState(db, storages)
+	state, err := common.OpenProtocolState(lockManager, db, storages)
 	if err != nil {
-		return fmt.Errorf("could not init protocol states: %w", err)
+		return fmt.Errorf("could not open protocol states: %w", err)
 	}
 
 	metrics := &metrics.NoopCollector{}

@@ -15,12 +15,16 @@ import (
 // after indexing a block by its parent, it should be able to retrieve the child block by the parentID
 func TestIndexAndLookupChild(t *testing.T) {
 	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
-		_, lctx := unittest.LockManagerWithContext(t, storage.LockInsertBlock)
+		lockManager := storage.NewTestingLockManager()
+		lctx := lockManager.NewContext()
+		err := lctx.AcquireLock(storage.LockInsertBlock)
+		require.NoError(t, err)
+		defer lctx.Release()
 
 		parentID := unittest.IdentifierFixture()
 		childID := unittest.IdentifierFixture()
 
-		err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+		err = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 			return procedure.IndexNewBlock(lctx, rw, childID, parentID)
 		})
 		require.NoError(t, err)
@@ -40,14 +44,18 @@ func TestIndexAndLookupChild(t *testing.T) {
 // was indexed.
 func TestIndexTwiceAndRetrieve(t *testing.T) {
 	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
-		_, lctx := unittest.LockManagerWithContext(t, storage.LockInsertBlock)
+		lockManager := storage.NewTestingLockManager()
+		lctx := lockManager.NewContext()
+		err := lctx.AcquireLock(storage.LockInsertBlock)
+		require.NoError(t, err)
+		defer lctx.Release()
 
 		parentID := unittest.IdentifierFixture()
 		child1ID := unittest.IdentifierFixture()
 		child2ID := unittest.IdentifierFixture()
 
 		// index the first child
-		err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+		err = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 			return procedure.IndexNewBlock(lctx, rw, child1ID, parentID)
 		})
 		require.NoError(t, err)
@@ -69,11 +77,15 @@ func TestIndexTwiceAndRetrieve(t *testing.T) {
 // if parent is zero, then we don't index it
 func TestIndexZeroParent(t *testing.T) {
 	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
-		_, lctx := unittest.LockManagerWithContext(t, storage.LockInsertBlock)
+		lockManager := storage.NewTestingLockManager()
+		lctx := lockManager.NewContext()
+		err := lctx.AcquireLock(storage.LockInsertBlock)
+		require.NoError(t, err)
+		defer lctx.Release()
 
 		childID := unittest.IdentifierFixture()
 
-		err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+		err = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 			return procedure.IndexNewBlock(lctx, rw, childID, flow.ZeroID)
 		})
 		require.NoError(t, err)
@@ -88,14 +100,18 @@ func TestIndexZeroParent(t *testing.T) {
 // lookup block children will only return direct childrens
 func TestDirectChildren(t *testing.T) {
 	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
-		_, lctx := unittest.LockManagerWithContext(t, storage.LockInsertBlock)
+		lockManager := storage.NewTestingLockManager()
+		lctx := lockManager.NewContext()
+		err := lctx.AcquireLock(storage.LockInsertBlock)
+		require.NoError(t, err)
+		defer lctx.Release()
 
 		b1 := unittest.IdentifierFixture()
 		b2 := unittest.IdentifierFixture()
 		b3 := unittest.IdentifierFixture()
 		b4 := unittest.IdentifierFixture()
 
-		err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+		err = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 			return procedure.IndexNewBlock(lctx, rw, b2, b1)
 		})
 		require.NoError(t, err)

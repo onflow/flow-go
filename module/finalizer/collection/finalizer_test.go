@@ -27,6 +27,7 @@ func TestFinalizer(t *testing.T) {
 	// This test has to build on top of badgerdb, because the cleanup method depends
 	// on the badgerdb.DropAll method to wipe the database, which pebble does not support.
 	unittest.RunWithBadgerDB(t, func(badgerdb *badger.DB) {
+		lockManager := storage.NewTestingLockManager()
 		db := badgerimpl.ToDB(badgerdb)
 		// reference block on the main consensus chain
 		refBlock := unittest.BlockHeaderFixture()
@@ -49,7 +50,6 @@ func TestFinalizer(t *testing.T) {
 			}
 		}
 
-		lockManager := storage.NewTestingLockManager()
 		// a helper function to bootstrap with the genesis block
 		bootstrap := func() {
 			stateRoot, err := cluster.NewStateRoot(genesis, unittest.QuorumCertificateFixture(), 0)

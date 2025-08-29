@@ -16,11 +16,11 @@ import (
 // TestQuorumCertificates_StoreTx tests storing and retrieving of QC.
 func TestQuorumCertificates_StoreTx(t *testing.T) {
 	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
+		lockManager := storage.NewTestingLockManager()
 		metrics := metrics.NewNoopCollector()
 		store := store.NewQuorumCertificates(metrics, db, 10)
 		qc := unittest.QuorumCertificateFixture()
 
-		lockManager := storage.NewTestingLockManager()
 		lctx := lockManager.NewContext()
 		defer lctx.Release()
 		require.NoError(t, lctx.AcquireLock(storage.LockInsertBlock))
@@ -40,12 +40,12 @@ func TestQuorumCertificates_StoreTx(t *testing.T) {
 // storage.LockInsertBlock lock. If the lock is not held, `BatchStore` should error.
 func TestQuorumCertificates_LockEnforced(t *testing.T) {
 	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
+		lockManager := storage.NewTestingLockManager()
 		metrics := metrics.NewNoopCollector()
 		store := store.NewQuorumCertificates(metrics, db, 10)
 		qc := unittest.QuorumCertificateFixture()
 
 		// acquire wrong lock and attempt to store QC: should error
-		lockManager := storage.NewTestingLockManager()
 		lctx := lockManager.NewContext()
 		require.NoError(t, lctx.AcquireLock(storage.LockFinalizeBlock)) // INCORRECT LOCK
 		err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
@@ -64,6 +64,7 @@ func TestQuorumCertificates_LockEnforced(t *testing.T) {
 // `storage.ErrAlreadyExists` and already stored value is not overwritten.
 func TestQuorumCertificates_StoreTx_OtherQC(t *testing.T) {
 	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
+		lockManager := storage.NewTestingLockManager()
 		metrics := metrics.NewNoopCollector()
 		s := store.NewQuorumCertificates(metrics, db, 10)
 		qc := unittest.QuorumCertificateFixture()
@@ -72,7 +73,6 @@ func TestQuorumCertificates_StoreTx_OtherQC(t *testing.T) {
 			otherQC.BlockID = qc.BlockID
 		})
 
-		lockManager := storage.NewTestingLockManager()
 		lctx := lockManager.NewContext()
 		defer lctx.Release()
 		require.NoError(t, lctx.AcquireLock(storage.LockInsertBlock))

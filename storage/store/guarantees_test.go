@@ -3,6 +3,7 @@ package store_test
 import (
 	"testing"
 
+	"github.com/jordanschalm/lockctx"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/model/flow"
@@ -15,6 +16,7 @@ import (
 
 func TestGuaranteeStoreRetrieve(t *testing.T) {
 	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
+		lockManager := storage.NewTestingLockManager()
 		metrics := metrics.NewNoopCollector()
 		all := store.InitAll(metrics, db)
 		blocks := all.Blocks
@@ -31,11 +33,11 @@ func TestGuaranteeStoreRetrieve(t *testing.T) {
 		require.ErrorIs(t, err, storage.ErrNotFound)
 
 		// store guarantee
-		manager, lctx := unittest.LockManagerWithContext(t, storage.LockInsertBlock)
-		require.NoError(t, db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			return blocks.BatchStore(lctx, rw, block)
-		}))
-		lctx.Release()
+		unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
+			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+				return blocks.BatchStore(lctx, rw, block)
+			})
+		})
 
 		// retrieve the guarantee by the ID of the collection
 		actual, err := guarantees.ByCollectionID(expected.ID())
@@ -43,7 +45,7 @@ func TestGuaranteeStoreRetrieve(t *testing.T) {
 		require.Equal(t, expected, actual)
 
 		// repeated storage of the same block should return
-		lctx2 := manager.NewContext()
+		lctx2 := lockManager.NewContext()
 		require.NoError(t, lctx2.AcquireLock(storage.LockInsertBlock))
 		err = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 			return blocks.BatchStore(lctx2, rw, block)
@@ -54,7 +56,7 @@ func TestGuaranteeStoreRetrieve(t *testing.T) {
 		// OK to store a different block
 		expected2 := unittest.CollectionGuaranteeFixture()
 		block2 := unittest.BlockWithGuaranteesFixture([]*flow.CollectionGuarantee{expected2})
-		lctx3 := manager.NewContext()
+		lctx3 := lockManager.NewContext()
 		require.NoError(t, lctx3.AcquireLock(storage.LockInsertBlock))
 		require.NoError(t, db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 			return blocks.BatchStore(lctx3, rw, block2)

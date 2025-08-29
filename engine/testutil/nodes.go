@@ -1024,7 +1024,6 @@ func VerificationNode(t testing.TB,
 	if node.ProcessedBlockHeight == nil {
 		node.ProcessedBlockHeight = store.NewConsumerProgress(badgerimpl.ToDB(node.PublicDB), module.ConsumeProgressVerificationBlockHeight)
 	}
-	lockManager := storage.NewTestingLockManager()
 	if node.VerifierEngine == nil {
 		vm := fvm.NewVirtualMachine()
 
@@ -1048,7 +1047,7 @@ func VerificationNode(t testing.TB,
 			node.Me,
 			chunkVerifier,
 			approvalStorage,
-			lockManager,
+			node.LockManager,
 		)
 		require.NoError(t, err)
 	}

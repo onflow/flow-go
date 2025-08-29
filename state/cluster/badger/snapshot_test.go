@@ -8,6 +8,7 @@ import (
 	"github.com/dgraph-io/badger/v2"
 	"github.com/jordanschalm/lockctx"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
 	model "github.com/onflow/flow-go/model/cluster"
@@ -225,12 +226,10 @@ func (suite *SnapshotSuite) TestFinalizedBlock() {
 	assert.NoError(t, err)
 
 	// finalize the block
+	lctx := suite.lockManager.NewContext()
+	defer lctx.Release()
+	require.NoError(suite.T(), lctx.AcquireLock(storage.LockInsertOrFinalizeClusterBlock))
 	err = suite.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-		lctx := suite.lockManager.NewContext()
-		defer lctx.Release()
-		if err := lctx.AcquireLock(storage.LockInsertOrFinalizeClusterBlock); err != nil {
-			return err
-		}
 		return procedure.FinalizeClusterBlock(lctx, rw, finalizedBlock1.ID())
 	})
 	assert.NoError(t, err)

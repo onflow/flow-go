@@ -14,13 +14,13 @@ import (
 
 func TestStateCommitments(t *testing.T) {
 	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
+		lockManager := storage.NewTestingLockManager()
 		expected := unittest.StateCommitmentFixture()
 		id := unittest.IdentifierFixture()
+		lctx := lockManager.NewContext()
+		defer lctx.Release()
+		require.NoError(t, lctx.AcquireLock(storage.LockInsertOwnReceipt))
 		require.NoError(t, db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			lockManager := storage.NewTestingLockManager()
-			lctx := lockManager.NewContext()
-			defer lctx.Release()
-			require.NoError(t, lctx.AcquireLock(storage.LockInsertOwnReceipt))
 			return operation.IndexStateCommitment(lctx, rw, id, expected)
 		}))
 
