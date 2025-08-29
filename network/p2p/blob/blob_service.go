@@ -16,6 +16,7 @@ import (
 	blocks "github.com/ipfs/go-block-format"
 	"github.com/ipfs/go-cid"
 	"github.com/ipfs/go-datastore"
+	ipld "github.com/ipfs/go-ipld-format"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/protocol"
@@ -32,8 +33,6 @@ import (
 	"github.com/onflow/flow-go/network"
 	p2plogging "github.com/onflow/flow-go/network/p2p/logging"
 	"github.com/onflow/flow-go/utils/logging"
-
-	ipld "github.com/ipfs/go-ipld-format"
 )
 
 const (
