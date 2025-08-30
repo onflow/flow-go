@@ -16,6 +16,7 @@ import (
 
 	"github.com/rs/zerolog"
 
+	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/common/fifoqueue"
@@ -81,6 +82,7 @@ type Engine struct {
 }
 
 var _ network.MessageProcessor = (*Engine)(nil)
+var _ hotstuff.FinalizationConsumer = (*Engine)(nil)
 
 func New(
 	log zerolog.Logger,
@@ -204,6 +206,19 @@ func (e *Engine) Process(chanName channels.Channel, originID flow.Identifier, ev
 	}
 }
 
+// OnFinalizedBlock is called by the follower engine after a block has been finalized and the state has been updated.
+// Receives block finalized events from the finalization distributor and forwards them to the consumer.
+func (e *Engine) OnFinalizedBlock(_ *model.Block) {
+	e.finalizedBlocksNotifier.Notify()
+}
+
+// OnBlockIncorporated is called by the follower engine after a block has been incorporated and the state has been updated.
+// Receives block incorporated events from the finalization distributor and forwards them to the consumer.
+func (e *Engine) OnBlockIncorporated(block *model.Block) {
+	e.incorporatedBlocksQueue.Push(block)
+	e.incorporatedBlocksNotifier.Notify()
+}
+
 // messageHandlerLoop reacts to message handler notifications and processes available execution receipts
 // once notification has arrived.
 func (e *Engine) messageHandlerLoop(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
@@ -241,16 +256,16 @@ func (e *Engine) processAvailableExecutionReceipts(ctx context.Context) error {
 		}
 
 		receipt := msg.Payload.(*flow.ExecutionReceipt)
-		if err := e.persistExecutionReceipt(receipt); err != nil {
+		if err := e.processExecutionReceipt(receipt); err != nil {
 			return err
 		}
 	}
 }
 
-// persistExecutionReceipt persists the execution receipt.
+// processExecutionReceipt processes the execution receipt.
 //
 // No errors are expected during normal operations.
-func (e *Engine) persistExecutionReceipt(receipt *flow.ExecutionReceipt) error {
+func (e *Engine) processExecutionReceipt(receipt *flow.ExecutionReceipt) error {
 	// since execution nodes optimistically execute blocks, it is expected that we will occasionally
 	// receive receipts for blocks that are not yet locally certified. In this case, we should ignore
 	// the receipts to avoid a byzantine spamming attack from the execution nodes.
@@ -264,25 +279,27 @@ func (e *Engine) persistExecutionReceipt(receipt *flow.ExecutionReceipt) error {
 		return fmt.Errorf("failed to get header for block %s: %w", receipt.BlockID, err)
 	}
 
-	// persist the execution receipt locally, storing will also index the receipt
+	// persist the execution receipt locally, storing will also index the result
 	err = e.receipts.Store(receipt)
 	if err != nil {
 		return fmt.Errorf("failed to store execution receipt: %w", err)
 	}
 
 	e.collectionExecutedMetric.ExecutionReceiptReceived(receipt)
+
+	// most likely the block is certified, but we could receive delayed receipts
+	blockStatus, _, err := e.resolveBlockStatus(receipt.BlockID)
+	if err != nil {
+		return fmt.Errorf("failed to resolve block status for block %s: %w", receipt.BlockID, err)
+	}
+
+	if _, err := e.resultsForest.AddReceipt(receipt.Stub(), blockStatus); err != nil {
+		if !errors.Is(err, ErrMaxViewDeltaExceeded) {
+			return fmt.Errorf("failed to add receipt to results forest: %w", err)
+		}
+	}
+
 	return nil
-}
-
-// OnFinalizedBlock is called by the follower engine after a block has been finalized and the state has been updated.
-// Receives block finalized events from the finalization distributor and forwards them to the consumer.
-func (e *Engine) OnFinalizedBlock(_ *model.Block) {
-	e.finalizedBlocksNotifier.Notify()
-}
-
-func (e *Engine) OnBlockIncorporated(hotstuffBlock *flow.Block) {
-	e.incorporatedBlocksQueue.Push(hotstuffBlock)
-	e.incorporatedBlocksNotifier.Notify()
 }
 
 // incorporatedBlocksProcessorLoop is a component.ComponentWorker that continuously processes incorporated blocks.
@@ -318,8 +335,7 @@ func (e *Engine) processAvailableIncorporatedBlocks(ctx context.Context) error {
 			return nil
 		}
 
-		hotstuffBlock := block.(*model.Block)
-		if err := e.processIncorporatedBlock(ctx, hotstuffBlock); err != nil {
+		if err := e.processIncorporatedBlock(ctx, block.(*model.Block)); err != nil {
 			return err
 		}
 	}
@@ -334,19 +350,123 @@ func (e *Engine) processIncorporatedBlock(ctx context.Context, hotstuffBlock *mo
 	}
 
 	// extract all execution receipts from the block, and add them into the forest
-	for _, receipt := range block.Payload.Receipts {
-		if _, err := e.resultsForest.AddReceipt(receipt, BlockStatusCertified); err != nil {
-			if errors.Is(err, ErrMaxViewDeltaExceeded) {
-				// stop processing receipts after the forest rejects the receipt, and initiate the
-				// backfill process
-				// TODO: mark that we need to transition into backfill process
-				return nil
-			}
-
-			return fmt.Errorf("failed to add receipt to results forest: %w", err)
+	_, err = e.resultsForest.AddReceipts(block.Payload.Receipts, BlockStatusCertified)
+	if err != nil {
+		if errors.Is(err, ErrMaxViewDeltaExceeded) {
+			// stop processing receipts after the forest rejects the receipt
+			return nil
 		}
+		return fmt.Errorf("failed to add receipt to results forest: %w", err)
 	}
 	return nil
+}
+
+// finalizedBlockProcessorLoop runs the finalized blocks jobqueue consumer.
+func (e *Engine) finalizedBlockProcessorLoop(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+	e.finalizedBlocksConsumer.Start(ctx)
+
+	err := util.WaitClosed(ctx, e.finalizedBlocksConsumer.Ready())
+	if err == nil {
+		ready()
+	}
+
+	<-e.finalizedBlocksConsumer.Done()
+}
+
+// processFinalizedBlockJobCallback is a jobqueue callback that processes a finalized block job.
+func (e *Engine) processFinalizedBlockJobCallback(
+	ctx irrecoverable.SignalerContext,
+	job module.Job,
+	done func(),
+) {
+	block, err := jobqueue.JobToBlock(job)
+	if err != nil {
+		ctx.Throw(fmt.Errorf("failed to convert job to block: %w", err))
+		return
+	}
+
+	err = e.indexFinalizedBlock(block)
+	if err != nil {
+		e.log.Error().Err(err).
+			Str("job_id", string(job.ID())).
+			Msg("unexpected error during finalized block processing job")
+		ctx.Throw(fmt.Errorf("failed to index finalized block: %w", err))
+		return
+	}
+
+	done()
+}
+
+// indexFinalizedBlock indexes the given finalized block’s collection guarantees and execution results,
+// and requests related collections from the syncer.
+//
+// No errors are expected during normal operations.
+func (e *Engine) indexFinalizedBlock(block *flow.Block) error {
+	err := e.blocks.IndexBlockForCollectionGuarantees(block.ID(), flow.GetIDs(block.Payload.Guarantees))
+	if err != nil {
+		return fmt.Errorf("could not index block for collections: %w", err)
+	}
+
+	// loop through seals and index ID -> result ID
+	for _, seal := range block.Payload.Seals {
+		err := e.executionResults.Index(seal.BlockID, seal.ResultID)
+		if err != nil {
+			return fmt.Errorf("could not index block for execution result: %w", err)
+		}
+	}
+
+	e.collectionSyncer.RequestCollectionsForBlock(block.Height, block.Payload.Guarantees)
+	e.collectionExecutedMetric.BlockFinalized(block)
+
+	// OnBlockFinalized should be called on the results forest first to ensure that the forest state
+	// is up-to-date.
+	if err := e.resultsForest.OnBlockFinalized(block); err != nil {
+		return fmt.Errorf("result forest failed to process finalized block: %w", err)
+	}
+
+	e.forestManager.OnBlockFinalized(block)
+
+	return nil
+}
+
+// pipelineWorkerLoop is a component.ComponentWorker that continuously processes pipeline tasks.
+func (e *Engine) pipelineWorkerLoop(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+	ready()
+
+	ch := e.pipelineTaskQueue.Channel()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ch:
+			if err := e.processAllPipelineTasks(ctx); err != nil {
+				ctx.Throw(fmt.Errorf("failed to process pipeline tasks: %w", err))
+				return
+			}
+		}
+	}
+}
+
+// processAllPipelineTasks processes all pipeline tasks availablein the queue.
+// It continues processing until all tasks are processed or the context is canceled.
+//
+// No errors are expected during normal operations.
+func (e *Engine) processAllPipelineTasks(ctx context.Context) error {
+	for {
+		select {
+		case <-ctx.Done():
+			return nil
+		default:
+		}
+
+		execute, ok := e.pipelineTaskQueue.Pop()
+		if !ok {
+			return nil
+		}
+		if err := execute(ctx); err != nil {
+			return err
+		}
+	}
 }
 
 func (e *Engine) forestFeederLoop(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
@@ -556,112 +676,4 @@ func (e *Engine) resolveBlockStatus(blockID flow.Identifier) (status BlockStatus
 	}
 
 	return BlockStatusFinalized, false, nil
-}
-
-// pipelineWorkerLoop is a component.ComponentWorker that continuously processes pipeline tasks.
-func (e *Engine) pipelineWorkerLoop(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
-	ready()
-
-	ch := e.pipelineTaskQueue.Channel()
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case <-ch:
-			if err := e.processAllPipelineTasks(ctx); err != nil {
-				ctx.Throw(fmt.Errorf("failed to process pipeline tasks: %w", err))
-				return
-			}
-		}
-	}
-}
-
-// processAllPipelineTasks processes all pipeline tasks availablein the queue.
-// It continues processing until all tasks are processed or the context is canceled.
-//
-// No errors are expected during normal operations.
-func (e *Engine) processAllPipelineTasks(ctx context.Context) error {
-	for {
-		select {
-		case <-ctx.Done():
-			return nil
-		default:
-		}
-
-		execute, ok := e.pipelineTaskQueue.Pop()
-		if !ok {
-			return nil
-		}
-		if err := execute(ctx); err != nil {
-			return err
-		}
-	}
-}
-
-// finalizedBlockProcessorLoop runs the finalized blocks jobqueue consumer.
-func (e *Engine) finalizedBlockProcessorLoop(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
-	e.finalizedBlocksConsumer.Start(ctx)
-
-	err := util.WaitClosed(ctx, e.finalizedBlocksConsumer.Ready())
-	if err == nil {
-		ready()
-	}
-
-	<-e.finalizedBlocksConsumer.Done()
-}
-
-// processFinalizedBlockJobCallback is a jobqueue callback that processes a finalized block job.
-func (e *Engine) processFinalizedBlockJobCallback(
-	ctx irrecoverable.SignalerContext,
-	job module.Job,
-	done func(),
-) {
-	block, err := jobqueue.JobToBlock(job)
-	if err != nil {
-		ctx.Throw(fmt.Errorf("failed to convert job to block: %w", err))
-		return
-	}
-
-	err = e.indexFinalizedBlock(block)
-	if err != nil {
-		e.log.Error().Err(err).
-			Str("job_id", string(job.ID())).
-			Msg("unexpected error during finalized block processing job")
-		ctx.Throw(fmt.Errorf("failed to index finalized block: %w", err))
-		return
-	}
-
-	done()
-}
-
-// indexFinalizedBlock indexes the given finalized block’s collection guarantees and execution results,
-// and requests related collections from the syncer.
-//
-// No errors are expected during normal operations.
-func (e *Engine) indexFinalizedBlock(block *flow.Block) error {
-	err := e.blocks.IndexBlockForCollectionGuarantees(block.ID(), flow.GetIDs(block.Payload.Guarantees))
-	if err != nil {
-		return fmt.Errorf("could not index block for collections: %w", err)
-	}
-
-	// loop through seals and index ID -> result ID
-	for _, seal := range block.Payload.Seals {
-		err := e.executionResults.Index(seal.BlockID, seal.ResultID)
-		if err != nil {
-			return fmt.Errorf("could not index block for execution result: %w", err)
-		}
-	}
-
-	e.collectionSyncer.RequestCollectionsForBlock(block.Height, block.Payload.Guarantees)
-	e.collectionExecutedMetric.BlockFinalized(block)
-
-	// OnBlockFinalized should be called on the results forest first to ensure that the forest state
-	// is up-to-date.
-	if err := e.resultsForest.OnBlockFinalized(block); err != nil {
-		return fmt.Errorf("result forest failed to process finalized block: %w", err)
-	}
-
-	e.forestManager.OnBlockFinalized(block)
-
-	return nil
 }

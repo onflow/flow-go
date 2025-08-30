@@ -382,6 +382,10 @@ func (rf *ResultsForest) AddReceipt(receipt *flow.ExecutionReceiptStub, blockSta
 //   - ErrMaxViewDeltaExceeded: if the result's block view is more than maxViewDelta views ahead of the last sealed view
 //   - All other errors are potential indicators of bugs or corrupted internal state (continuation impossible)
 func (rf *ResultsForest) AddReceipts(receipts []*flow.ExecutionReceiptStub, blockStatus BlockStatus) (bool, error) {
+	if len(receipts) == 0 {
+		return false, nil
+	}
+
 	resultID := receipts[0].ResultID
 	for _, receipt := range receipts[1:] {
 		if receipt.ResultID != resultID {
