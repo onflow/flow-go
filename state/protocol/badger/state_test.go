@@ -6,7 +6,6 @@ import (
 	"os"
 	"testing"
 
-	"github.com/dgraph-io/badger/v2"
 	"github.com/stretchr/testify/assert"
 	testmock "github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -21,8 +20,8 @@ import (
 	protoutil "github.com/onflow/flow-go/state/protocol/util"
 	"github.com/onflow/flow-go/storage"
 	bstorage "github.com/onflow/flow-go/storage/badger"
-	storagebadger "github.com/onflow/flow-go/storage/badger"
 	"github.com/onflow/flow-go/storage/operation/badgerimpl"
+	"github.com/onflow/flow-go/storage/store"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -58,18 +57,18 @@ func TestBootstrapAndOpen(t *testing.T) {
 			epoch.DKGPhase1FinalView(), epoch.DKGPhase2FinalView(), epoch.DKGPhase3FinalView()).Once()
 
 		noopMetrics := new(metrics.NoopCollector)
-		all := storagebadger.InitAll(noopMetrics, db)
+		all := store.InitAll(noopMetrics, db)
 		// protocol state has been bootstrapped, now open a protocol state with the database
 		state, err := bprotocol.OpenState(
 			complianceMetrics,
-			badgerimpl.ToDB(db),
+			db,
 			lockManager,
 			all.Headers,
 			all.Seals,
 			all.Results,
 			all.Blocks,
 			all.QuorumCertificates,
-			all.Setups,
+			all.EpochSetups,
 			all.EpochCommits,
 			all.EpochProtocolStateEntries,
 			all.ProtocolKVStore,
@@ -138,17 +137,17 @@ func TestBootstrapAndOpen_EpochCommitted(t *testing.T) {
 		complianceMetrics.On("BlockSealed", testmock.Anything).Once()
 
 		noopMetrics := new(metrics.NoopCollector)
-		all := storagebadger.InitAll(noopMetrics, db)
+		all := store.InitAll(noopMetrics, db)
 		state, err := bprotocol.OpenState(
 			complianceMetrics,
-			badgerimpl.ToDB(db),
+			db,
 			lockManager,
 			all.Headers,
 			all.Seals,
 			all.Results,
 			all.Blocks,
 			all.QuorumCertificates,
-			all.Setups,
+			all.EpochSetups,
 			all.EpochCommits,
 			all.EpochProtocolStateEntries,
 			all.ProtocolKVStore,
