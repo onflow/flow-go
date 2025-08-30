@@ -4,7 +4,6 @@ import (
 	"testing"
 
 	"github.com/cockroachdb/pebble/v2"
-	"github.com/dgraph-io/badger/v2"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -21,8 +20,6 @@ import (
 	mockprotocol "github.com/onflow/flow-go/state/protocol/mock"
 	protocol_state "github.com/onflow/flow-go/state/protocol/protocol_state/state"
 	"github.com/onflow/flow-go/storage"
-	bstorage "github.com/onflow/flow-go/storage/badger"
-	"github.com/onflow/flow-go/storage/operation/badgerimpl"
 	"github.com/onflow/flow-go/storage/operation/pebbleimpl"
 	"github.com/onflow/flow-go/storage/store"
 	"github.com/onflow/flow-go/utils/unittest"

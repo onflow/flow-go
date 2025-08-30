@@ -35,7 +35,6 @@ import (
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/deferred"
 	"github.com/onflow/flow-go/storage/operation"
-	"github.com/onflow/flow-go/storage/operation/badgerimpl"
 	"github.com/onflow/flow-go/storage/operation/pebbleimpl"
 	"github.com/onflow/flow-go/storage/store"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -51,27 +50,24 @@ func TestBootstrapValid(t *testing.T) {
 		require.NoError(t, err)
 
 		var sealed uint64
-		bdb := badgerimpl.ToDB(db)
-		err = operation.RetrieveSealedHeight(bdb.Reader(), &sealed)
+		err = operation.RetrieveSealedHeight(db.Reader(), &sealed)
 		require.NoError(t, err)
 
 		var genesisID flow.Identifier
-		err = operation.LookupBlockHeight(badgerimpl.ToDB(db).Reader(), 0, &genesisID)
+		err = operation.LookupBlockHeight(db.Reader(), 0, &genesisID)
 		require.NoError(t, err)
 
 		var header flow.Header
-		err = operation.RetrieveHeader(badgerimpl.ToDB(db).Reader(), genesisID, &header)
+		err = operation.RetrieveHeader(db.Reader(), genesisID, &header)
 		require.NoError(t, err)
 
-		storagedb := badgerimpl.ToDB(db)
-
 		var sealID flow.Identifier
-		err = operation.LookupLatestSealAtBlock(storagedb.Reader(), genesisID, &sealID)
+		err = operation.LookupLatestSealAtBlock(db.Reader(), genesisID, &sealID)
 		require.NoError(t, err)
 
 		_, seal, err := rootSnapshot.SealedResult()
 		require.NoError(t, err)
-		err = operation.RetrieveSeal(storagedb.Reader(), sealID, seal)
+		err = operation.RetrieveSeal(db.Reader(), sealID, seal)
 		require.NoError(t, err)
 
 		block, err := rootSnapshot.Head()
@@ -269,8 +265,7 @@ func TestSealedIndex(t *testing.T) {
 		require.NoError(t, err)
 
 		metrics := metrics.NewNoopCollector()
-		storedb := badgerimpl.ToDB(db)
-		seals := store.NewSeals(metrics, storedb)
+		seals := store.NewSeals(metrics, db)
 
 		// can only find seal for G
 		_, err = seals.FinalizedSealForBlock(rootHeader.ID())
@@ -444,7 +439,7 @@ func TestVersionBeaconIndex(t *testing.T) {
 		err = state.Extend(context.Background(), unittest.ProposalFromBlock(b6))
 		require.NoError(t, err)
 
-		versionBeacons := store.NewVersionBeacons(badgerimpl.ToDB(db))
+		versionBeacons := store.NewVersionBeacons(db)
 
 		// No VB can be found before finalizing anything
 		vb, err := versionBeacons.Highest(b6.Height)
@@ -591,7 +586,7 @@ func TestExtendMissingParent(t *testing.T) {
 		require.False(t, st.IsInvalidExtensionError(err), err)
 		require.False(t, st.IsOutdatedExtensionError(err), err)
 
-		storagedb := badgerimpl.ToDB(db)
+		storagedb := db
 
 		// verify seal that was contained in candidate block is not indexed
 		var sealID flow.Identifier
@@ -611,7 +606,7 @@ func TestExtendHeightTooSmall(t *testing.T) {
 		head, err := rootSnapshot.Head()
 		require.NoError(t, err)
 
-		db := badgerimpl.ToDB(bdb)
+		db := bdb
 
 		extend := unittest.BlockFixture(
 			unittest.Block.WithParent(head.ID(), head.View, head.Height),
@@ -710,7 +705,7 @@ func TestExtendBlockNotConnected(t *testing.T) {
 		err = state.Extend(context.Background(), unittest.ProposalFromBlock(extend))
 		require.Error(t, err)
 
-		storagedb := badgerimpl.ToDB(db)
+		storagedb := db
 
 		// verify seal not indexed
 		var sealID flow.Identifier
@@ -3018,7 +3013,7 @@ func TestHeaderExtendMissingParent(t *testing.T) {
 		require.Error(t, err)
 		require.False(t, st.IsInvalidExtensionError(err), err)
 
-		storagedb := badgerimpl.ToDB(db)
+		storagedb := db
 
 		// verify seal not indexed
 		var sealID flow.Identifier
@@ -3055,7 +3050,7 @@ func TestHeaderExtendHeightTooSmall(t *testing.T) {
 		err = state.ExtendCertified(context.Background(), unittest.NewCertifiedBlock(block2))
 		require.False(t, st.IsInvalidExtensionError(err))
 
-		storagedb := badgerimpl.ToDB(db)
+		storagedb := db
 
 		// verify seal not indexed
 		var sealID flow.Identifier
@@ -3156,7 +3151,7 @@ func TestFollowerHeaderExtendBlockNotConnected(t *testing.T) {
 		err = state.ExtendCertified(context.Background(), unittest.NewCertifiedBlock(block2))
 		require.NoError(t, err)
 
-		storagedb := badgerimpl.ToDB(db)
+		storagedb := db
 
 		// verify seal not indexed
 		var sealID flow.Identifier
@@ -3202,7 +3197,7 @@ func TestParticipantHeaderExtendBlockNotConnected(t *testing.T) {
 		err = state.Extend(context.Background(), unittest.ProposalFromBlock(block2))
 		require.True(t, st.IsOutdatedExtensionError(err), err)
 
-		storagedb := badgerimpl.ToDB(db)
+		storagedb := db
 
 		// verify seal not indexed
 		var sealID flow.Identifier

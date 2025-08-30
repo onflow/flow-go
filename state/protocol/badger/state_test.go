@@ -36,7 +36,7 @@ func TestBootstrapAndOpen(t *testing.T) {
 		block.ParentID = unittest.IdentifierFixture()
 	})
 
-	protoutil.RunWithBootstrapState(t, rootSnapshot, func(db *badger.DB, _ *bprotocol.State) {
+	protoutil.RunWithBootstrapState(t, rootSnapshot, func(db storage.DB, _ *bprotocol.State) {
 		lockManager := storage.NewTestingLockManager()
 		// expect the final view metric to be set to current epoch's final view
 		epoch, err := rootSnapshot.Epochs().Current()
@@ -113,7 +113,7 @@ func TestBootstrapAndOpen_EpochCommitted(t *testing.T) {
 		}
 	})
 
-	protoutil.RunWithBootstrapState(t, committedPhaseSnapshot, func(db *badger.DB, _ *bprotocol.State) {
+	protoutil.RunWithBootstrapState(t, committedPhaseSnapshot, func(db storage.DB, _ *bprotocol.State) {
 		lockManager := storage.NewTestingLockManager()
 
 		complianceMetrics := new(mock.ComplianceMetrics)
@@ -181,7 +181,7 @@ func TestBootstrap_EpochHeightBoundaries(t *testing.T) {
 	// For the spork root snapshot, only the first height of the root epoch should be indexed.
 	// [x]
 	t.Run("spork root snapshot", func(t *testing.T) {
-		util.RunWithFollowerProtocolState(t, rootSnapshot, func(db *badger.DB, state *bprotocol.FollowerState) {
+		util.RunWithFollowerProtocolState(t, rootSnapshot, func(db storage.DB, state *bprotocol.FollowerState) {
 			currentEpoch, err := state.Final().Epochs().Current()
 			require.NoError(t, err)
 			// first height of started current epoch should be known
@@ -882,7 +882,7 @@ func bootstrap(t *testing.T, rootSnapshot protocol.Snapshot, f func(*bprotocol.S
 // from non-root states.
 func snapshotAfter(t *testing.T, rootSnapshot protocol.Snapshot, f func(*bprotocol.FollowerState, protocol.MutableProtocolState) protocol.Snapshot) protocol.Snapshot {
 	var after protocol.Snapshot
-	protoutil.RunWithFullProtocolStateAndMutator(t, rootSnapshot, func(_ *badger.DB, state *bprotocol.ParticipantState, mutableState protocol.MutableProtocolState) {
+	protoutil.RunWithFullProtocolStateAndMutator(t, rootSnapshot, func(_ storage.DB, state *bprotocol.ParticipantState, mutableState protocol.MutableProtocolState) {
 		snap := f(state.FollowerState, mutableState)
 		var err error
 		after, err = inmem.FromSnapshot(snap)
@@ -944,7 +944,7 @@ func assertSealingSegmentBlocksQueryableAfterBootstrap(t *testing.T, snapshot pr
 
 // BenchmarkFinal benchmarks retrieving the latest finalized block from storage.
 func BenchmarkFinal(b *testing.B) {
-	util.RunWithBootstrapState(b, unittest.RootSnapshotFixture(unittest.CompleteIdentitySet()), func(db *badger.DB, state *bprotocol.State) {
+	util.RunWithBootstrapState(b, unittest.RootSnapshotFixture(unittest.CompleteIdentitySet()), func(db storage.DB, state *bprotocol.State) {
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
 			header, err := state.Final().Head()
@@ -956,7 +956,7 @@ func BenchmarkFinal(b *testing.B) {
 
 // BenchmarkFinal benchmarks retrieving the block by height from storage.
 func BenchmarkByHeight(b *testing.B) {
-	util.RunWithBootstrapState(b, unittest.RootSnapshotFixture(unittest.CompleteIdentitySet()), func(db *badger.DB, state *bprotocol.State) {
+	util.RunWithBootstrapState(b, unittest.RootSnapshotFixture(unittest.CompleteIdentitySet()), func(db storage.DB, state *bprotocol.State) {
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
 			header, err := state.AtHeight(0).Head()
