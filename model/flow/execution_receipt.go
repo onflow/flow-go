@@ -303,6 +303,15 @@ func (l ExecutionReceiptList) Size() int {
 	return len(l)
 }
 
+// Stubs returns a slice of ExecutionReceiptStub corresponding to the receipts in the list.
+func (l ExecutionReceiptList) Stubs() []*ExecutionReceiptStub {
+	stubs := make([]*ExecutionReceiptStub, len(l))
+	for i, receipt := range l {
+		stubs[i] = receipt.Stub()
+	}
+	return stubs
+}
+
 // GetGroup returns the receipts that were mapped to the same identifier by the
 // grouping function. Returns an empty (nil) ExecutionReceiptList if groupID does not exist.
 func (g ExecutionReceiptGroupedList) GetGroup(groupID Identifier) ExecutionReceiptList {
