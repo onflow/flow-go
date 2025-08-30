@@ -81,7 +81,7 @@ func (c *ExecutionResultContainer) SetEnqueued() bool {
 // Expected errors during normal operations:
 //   - ErrIncompatibleReceipt: if the receipt's execution result is different from the container's result ID
 //   - All other errors are potential indicators of bugs or corrupted internal state (continuation impossible)
-func (c *ExecutionResultContainer) AddReceipt(receipt *flow.ExecutionReceipt) (uint, error) {
+func (c *ExecutionResultContainer) AddReceipt(receipt *flow.ExecutionReceiptStub) (uint, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
@@ -94,7 +94,7 @@ func (c *ExecutionResultContainer) AddReceipt(receipt *flow.ExecutionReceipt) (u
 // Expected errors during normal operations:
 //   - ErrIncompatibleReceipt: if any of the receipts is for a result that is different from the container's result ID
 //   - All other errors are potential indicators of bugs or corrupted internal state (continuation impossible)
-func (c *ExecutionResultContainer) AddReceipts(receipts ...*flow.ExecutionReceipt) (uint, error) {
+func (c *ExecutionResultContainer) AddReceipts(receipts ...*flow.ExecutionReceiptStub) (uint, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
@@ -116,18 +116,17 @@ func (c *ExecutionResultContainer) AddReceipts(receipts ...*flow.ExecutionReceip
 // Expected errors during normal operations:
 //   - ErrIncompatibleReceipt: if the receipt's execution result is different from the container's result ID
 //   - All other errors are potential indicators of bugs or corrupted internal state (continuation impossible)
-func (c *ExecutionResultContainer) addReceipt(receipt *flow.ExecutionReceipt) (uint, error) {
-	resultID := receipt.ExecutionResult.ID()
-	if resultID != c.resultID {
+func (c *ExecutionResultContainer) addReceipt(receipt *flow.ExecutionReceiptStub) (uint, error) {
+	if receipt.ResultID != c.resultID {
 		return 0, fmt.Errorf("receipt is for result %v, while ExecutionResultContainer pertains to result %v: %w",
-			resultID, c.resultID, ErrIncompatibleReceipt)
+			receipt.ResultID, c.resultID, ErrIncompatibleReceipt)
 	}
 
 	receiptID := receipt.ID()
 	if c.has(receiptID) {
 		return 0, nil
 	}
-	c.receipts[receiptID] = receipt.Stub()
+	c.receipts[receiptID] = receipt
 	return 1, nil
 }
 

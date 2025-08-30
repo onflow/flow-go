@@ -228,10 +228,11 @@ var (
 //
 // Safe for concurrent access. Internally, the mempool utilizes the LevelledForrest.
 type ResultsForest struct {
-	log             zerolog.Logger
-	forest          forest.LevelledForest
-	headers         storage.Headers
-	pipelineFactory optimistic_sync.PipelineFactory
+	log              zerolog.Logger
+	forest           forest.LevelledForest
+	headers          storage.Headers
+	executionResults storage.ExecutionResults
+	pipelineFactory  optimistic_sync.PipelineFactory
 
 	// lastSealedView is the view of the last sealed result.
 	lastSealedView counters.StrictMonotonicCounter
@@ -261,6 +262,7 @@ type ResultsForest struct {
 func NewResultsForest(
 	log zerolog.Logger,
 	headers storage.Headers,
+	executionResults storage.ExecutionResults,
 	pipelineFactory optimistic_sync.PipelineFactory,
 	latestPersistedSealedResult storage.LatestPersistedSealedResultReader,
 	maxViewDelta uint64,
@@ -275,6 +277,7 @@ func NewResultsForest(
 		log:                         log.With().Str("component", "results_forest").Logger(),
 		forest:                      *forest.NewLevelledForest(sealedHeader.View),
 		headers:                     headers,
+		executionResults:            executionResults,
 		pipelineFactory:             pipelineFactory,
 		maxViewDelta:                maxViewDelta,
 		lastSealedView:              counters.NewMonotonicCounter(sealedHeader.View),
@@ -351,8 +354,7 @@ func (rf *ResultsForest) AddSealedResult(result *flow.ExecutionResult) error {
 	return nil
 }
 
-// AddReceipt adds the given execution result to the forest. Furthermore, we track which Execution Node issued
-// receipts committing to this result. This method is idempotent.
+// AddReceipt adds the given execution receipt to the forest. This method is idempotent.
 //
 // If ErrMaxViewDeltaExceeded is returned, the result for the provided receipt was not added to the
 // forest, and the caller must use `ResetLowestRejectedView` to perform the backfill process once
@@ -361,12 +363,66 @@ func (rf *ResultsForest) AddSealedResult(result *flow.ExecutionResult) error {
 // Expected errors during normal operations:
 //   - ErrMaxViewDeltaExceeded: if the result's block view is more than maxViewDelta views ahead of the last sealed view
 //   - All other errors are potential indicators of bugs or corrupted internal state (continuation impossible)
-func (rf *ResultsForest) AddReceipt(receipt *flow.ExecutionReceipt, blockStatus BlockStatus) (bool, error) {
-	resultID := receipt.ExecutionResult.ID()
-
-	container, err := rf.getOrCreateContainer(&receipt.ExecutionResult, blockStatus)
+func (rf *ResultsForest) AddReceipt(receipt *flow.ExecutionReceiptStub, blockStatus BlockStatus) (bool, error) {
+	executionResult, err := rf.executionResults.ByID(receipt.ResultID)
 	if err != nil {
-		return false, fmt.Errorf("failed to get container for result (%s): %w", resultID, err)
+		return false, fmt.Errorf("failed to get execution result for receipt (%s): %w", receipt.ID(), err)
+	}
+
+	return rf.addReceipt(receipt, executionResult, blockStatus)
+}
+
+// AddReceipts adds the given execution receipts to the forest. This method is idempotent.
+//
+// If ErrMaxViewDeltaExceeded is returned, the result for the provided receipt was not added to the
+// forest, and the caller must use `ResetLowestRejectedView` to perform the backfill process once
+// the forest has available capacity.
+//
+// Expected errors during normal operations:
+//   - ErrMaxViewDeltaExceeded: if the result's block view is more than maxViewDelta views ahead of the last sealed view
+//   - All other errors are potential indicators of bugs or corrupted internal state (continuation impossible)
+func (rf *ResultsForest) AddReceipts(receipts []*flow.ExecutionReceiptStub, blockStatus BlockStatus) (bool, error) {
+	if len(receipts) == 0 {
+		return false, nil
+	}
+
+	resultID := receipts[0].ResultID
+	for _, receipt := range receipts[1:] {
+		if receipt.ResultID != resultID {
+			return false, fmt.Errorf("receipts must have the same result ID")
+		}
+	}
+
+	executionResult, err := rf.executionResults.ByID(resultID)
+	if err != nil {
+		return false, fmt.Errorf("failed to get execution result %s: %w", resultID, err)
+	}
+
+	added := false
+	for _, receipt := range receipts {
+		receiptAdded, err := rf.addReceipt(receipt, executionResult, blockStatus)
+		if err != nil {
+			return false, err
+		}
+		added = added || receiptAdded
+	}
+
+	return added, nil
+}
+
+// addReceipt adds the given execution receipt and result to the forest. This method is idempotent.
+//
+// If ErrMaxViewDeltaExceeded is returned, the result for the provided receipt was not added to the
+// forest, and the caller must use `ResetLowestRejectedView` to perform the backfill process once
+// the forest has available capacity.
+//
+// Expected errors during normal operations:
+//   - ErrMaxViewDeltaExceeded: if the result's block view is more than maxViewDelta views ahead of the last sealed view
+//   - All other errors are potential indicators of bugs or corrupted internal state (continuation impossible)
+func (rf *ResultsForest) addReceipt(receipt *flow.ExecutionReceiptStub, executionResult *flow.ExecutionResult, blockStatus BlockStatus) (bool, error) {
+	container, err := rf.getOrCreateContainer(executionResult, blockStatus)
+	if err != nil {
+		return false, fmt.Errorf("failed to get container for result (%s): %w", receipt.ResultID, err)
 	}
 	if container == nil {
 		// noop if the result's block view is lower than the lowest view.
@@ -504,14 +560,13 @@ func (rf *ResultsForest) getOrCreateContainer(result *flow.ExecutionResult, bloc
 }
 
 // HasReceipt checks if a receipt exists in the forest.
-func (rf *ResultsForest) HasReceipt(receipt *flow.ExecutionReceipt) bool {
-	resultID := receipt.ExecutionResult.ID()
+func (rf *ResultsForest) HasReceipt(receipt *flow.ExecutionReceiptStub) bool {
 	receiptID := receipt.ID()
 
 	rf.mu.RLock()
 	defer rf.mu.RUnlock()
 
-	container, found := rf.getContainer(resultID)
+	container, found := rf.getContainer(receipt.ResultID)
 	if !found {
 		return false
 	}
@@ -530,6 +585,16 @@ func (rf *ResultsForest) LowestView() uint64 {
 	rf.mu.RLock()
 	defer rf.mu.RUnlock()
 	return rf.forest.LowestLevel
+}
+
+// LastSealedView returns the last sealed view.
+func (rf *ResultsForest) LastSealedView() uint64 {
+	rf.mu.RLock()
+	defer rf.mu.RUnlock()
+	// CAUTION: locking IS required to access the last sealed view counter value to ensure consistency
+	// with the rest of the forest's state. While the counter itself is thread-safe, a mutex must still
+	// be used here.
+	return rf.lastSealedView.Value()
 }
 
 // GetContainer retrieves the ExecutionResultContainer for the given result ID.

@@ -23,6 +23,11 @@ type Headers interface {
 	//  - ErrNotFound if no finalized block is known at the given height
 	ByHeight(height uint64) (*flow.Header, error)
 
+	// ByView returns the block with the given view.
+	// Error returns:
+	//  - ErrNotFound if no finalized block is known at the given view
+	ByView(view uint64) (*flow.Header, error)
+
 	// Exists returns true if a header with the given ID has been stored.
 	// CAUTION: this method is not backed by a cache and therefore comparatively slow!
 	// No errors are expected during normal operation.
