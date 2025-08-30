@@ -3,6 +3,7 @@ package util
 import (
 	"testing"
 
+	"github.com/cockroachdb/pebble/v2"
 	"github.com/dgraph-io/badger/v2"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/mock"
@@ -22,6 +23,8 @@ import (
 	"github.com/onflow/flow-go/storage"
 	bstorage "github.com/onflow/flow-go/storage/badger"
 	"github.com/onflow/flow-go/storage/operation/badgerimpl"
+	"github.com/onflow/flow-go/storage/operation/pebbleimpl"
+	"github.com/onflow/flow-go/storage/store"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -66,21 +69,22 @@ func MockSealValidator(sealsDB storage.Seals) module.SealValidator {
 	return validator
 }
 
-func RunWithBootstrapState(t testing.TB, rootSnapshot protocol.Snapshot, f func(*badger.DB, *pbadger.State)) {
-	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+func RunWithBootstrapState(t testing.TB, rootSnapshot protocol.Snapshot, f func(storage.DB, *pbadger.State)) {
+	unittest.RunWithPebbleDB(t, func(pdb *pebble.DB) {
 		lockManager := storage.NewTestingLockManager()
+		db := pebbleimpl.ToDB(pdb)
 		metrics := metrics.NewNoopCollector()
-		all := bstorage.InitAll(metrics, db)
+		all := store.InitAll(metrics, db)
 		state, err := pbadger.Bootstrap(
 			metrics,
-			badgerimpl.ToDB(db),
+			db,
 			lockManager,
 			all.Headers,
 			all.Seals,
 			all.Results,
 			all.Blocks,
 			all.QuorumCertificates,
-			all.Setups,
+			all.EpochSetups,
 			all.EpochCommits,
 			all.EpochProtocolStateEntries,
 			all.ProtocolKVStore,
@@ -92,24 +96,25 @@ func RunWithBootstrapState(t testing.TB, rootSnapshot protocol.Snapshot, f func(
 	})
 }
 
-func RunWithFullProtocolState(t testing.TB, rootSnapshot protocol.Snapshot, f func(*badger.DB, *pbadger.ParticipantState)) {
-	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+func RunWithFullProtocolState(t testing.TB, rootSnapshot protocol.Snapshot, f func(storage.DB, *pbadger.ParticipantState)) {
+	unittest.RunWithPebbleDB(t, func(pdb *pebble.DB) {
 		lockManager := storage.NewTestingLockManager()
+		db := pebbleimpl.ToDB(pdb)
 		metrics := metrics.NewNoopCollector()
 		tracer := trace.NewNoopTracer()
 		log := zerolog.Nop()
 		consumer := events.NewNoop()
-		all := bstorage.InitAll(metrics, db)
+		all := store.InitAll(metrics, db)
 		state, err := pbadger.Bootstrap(
 			metrics,
-			badgerimpl.ToDB(db),
+			db,
 			lockManager,
 			all.Headers,
 			all.Seals,
 			all.Results,
 			all.Blocks,
 			all.QuorumCertificates,
-			all.Setups,
+			all.EpochSetups,
 			all.EpochCommits,
 			all.EpochProtocolStateEntries,
 			all.ProtocolKVStore,
@@ -136,23 +141,24 @@ func RunWithFullProtocolState(t testing.TB, rootSnapshot protocol.Snapshot, f fu
 	})
 }
 
-func RunWithFullProtocolStateAndMetrics(t testing.TB, rootSnapshot protocol.Snapshot, metrics module.ComplianceMetrics, f func(*badger.DB, *pbadger.ParticipantState)) {
-	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+func RunWithFullProtocolStateAndMetrics(t testing.TB, rootSnapshot protocol.Snapshot, metrics module.ComplianceMetrics, f func(storage.DB, *pbadger.ParticipantState)) {
+	unittest.RunWithPebbleDB(t, func(pdb *pebble.DB) {
 		lockManager := storage.NewTestingLockManager()
+		db := pebbleimpl.ToDB(pdb)
 		tracer := trace.NewNoopTracer()
 		log := zerolog.Nop()
 		consumer := events.NewNoop()
-		all := bstorage.InitAll(mmetrics.NewNoopCollector(), db)
+		all := store.InitAll(mmetrics.NewNoopCollector(), db)
 		state, err := pbadger.Bootstrap(
 			metrics,
-			badgerimpl.ToDB(db),
+			db,
 			lockManager,
 			all.Headers,
 			all.Seals,
 			all.Results,
 			all.Blocks,
 			all.QuorumCertificates,
-			all.Setups,
+			all.EpochSetups,
 			all.EpochCommits,
 			all.EpochProtocolStateEntries,
 			all.ProtocolKVStore,
@@ -180,24 +186,25 @@ func RunWithFullProtocolStateAndMetrics(t testing.TB, rootSnapshot protocol.Snap
 	})
 }
 
-func RunWithFullProtocolStateAndValidator(t testing.TB, rootSnapshot protocol.Snapshot, validator module.ReceiptValidator, f func(*badger.DB, *pbadger.ParticipantState)) {
-	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+func RunWithFullProtocolStateAndValidator(t testing.TB, rootSnapshot protocol.Snapshot, validator module.ReceiptValidator, f func(storage.DB, *pbadger.ParticipantState)) {
+	unittest.RunWithPebbleDB(t, func(pdb *pebble.DB) {
 		lockManager := storage.NewTestingLockManager()
+		db := pebbleimpl.ToDB(pdb)
 		metrics := metrics.NewNoopCollector()
 		tracer := trace.NewNoopTracer()
 		log := zerolog.Nop()
 		consumer := events.NewNoop()
-		all := bstorage.InitAll(metrics, db)
+		all := store.InitAll(metrics, db)
 		state, err := pbadger.Bootstrap(
 			metrics,
-			badgerimpl.ToDB(db),
+			db,
 			lockManager,
 			all.Headers,
 			all.Seals,
 			all.Results,
 			all.Blocks,
 			all.QuorumCertificates,
-			all.Setups,
+			all.EpochSetups,
 			all.EpochCommits,
 			all.EpochProtocolStateEntries,
 			all.ProtocolKVStore,
@@ -223,24 +230,25 @@ func RunWithFullProtocolStateAndValidator(t testing.TB, rootSnapshot protocol.Sn
 	})
 }
 
-func RunWithFollowerProtocolState(t testing.TB, rootSnapshot protocol.Snapshot, f func(*badger.DB, *pbadger.FollowerState)) {
-	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+func RunWithFollowerProtocolState(t testing.TB, rootSnapshot protocol.Snapshot, f func(storage.DB, *pbadger.FollowerState)) {
+	unittest.RunWithPebbleDB(t, func(pdb *pebble.DB) {
 		lockManager := storage.NewTestingLockManager()
+		db := pebbleimpl.ToDB(pdb)
 		metrics := metrics.NewNoopCollector()
 		tracer := trace.NewNoopTracer()
 		log := zerolog.Nop()
 		consumer := events.NewNoop()
-		all := bstorage.InitAll(metrics, db)
+		all := store.InitAll(metrics, db)
 		state, err := pbadger.Bootstrap(
 			metrics,
-			badgerimpl.ToDB(db),
+			db,
 			lockManager,
 			all.Headers,
 			all.Seals,
 			all.Results,
 			all.Blocks,
 			all.QuorumCertificates,
-			all.Setups,
+			all.EpochSetups,
 			all.EpochCommits,
 			all.EpochProtocolStateEntries,
 			all.ProtocolKVStore,
@@ -306,22 +314,23 @@ func RunWithFullProtocolStateAndConsumer(t testing.TB, rootSnapshot protocol.Sna
 	})
 }
 
-func RunWithFullProtocolStateAndMetricsAndConsumer(t testing.TB, rootSnapshot protocol.Snapshot, metrics module.ComplianceMetrics, consumer protocol.Consumer, f func(*badger.DB, *pbadger.ParticipantState, protocol.MutableProtocolState)) {
-	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+func RunWithFullProtocolStateAndMetricsAndConsumer(t testing.TB, rootSnapshot protocol.Snapshot, metrics module.ComplianceMetrics, consumer protocol.Consumer, f func(storage.DB, *pbadger.ParticipantState, protocol.MutableProtocolState)) {
+	unittest.RunWithPebbleDB(t, func(pdb *pebble.DB) {
 		lockManager := storage.NewTestingLockManager()
+		db := pebbleimpl.ToDB(pdb)
 		tracer := trace.NewNoopTracer()
 		log := zerolog.Nop()
-		all := bstorage.InitAll(mmetrics.NewNoopCollector(), db)
+		all := store.InitAll(mmetrics.NewNoopCollector(), db)
 		state, err := pbadger.Bootstrap(
 			metrics,
-			badgerimpl.ToDB(db),
+			db,
 			lockManager,
 			all.Headers,
 			all.Seals,
 			all.Results,
 			all.Blocks,
 			all.QuorumCertificates,
-			all.Setups,
+			all.EpochSetups,
 			all.EpochCommits,
 			all.EpochProtocolStateEntries,
 			all.ProtocolKVStore,
@@ -351,31 +360,32 @@ func RunWithFullProtocolStateAndMetricsAndConsumer(t testing.TB, rootSnapshot pr
 			state.Params(),
 			all.Headers,
 			all.Results,
-			all.Setups,
+			all.EpochSetups,
 			all.EpochCommits,
 		)
 		f(db, fullState, mutableProtocolState)
 	})
 }
 
-func RunWithFollowerProtocolStateAndHeaders(t testing.TB, rootSnapshot protocol.Snapshot, f func(*badger.DB, *pbadger.FollowerState, storage.Headers, storage.Index)) {
-	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+func RunWithFollowerProtocolStateAndHeaders(t testing.TB, rootSnapshot protocol.Snapshot, f func(storage.DB, *pbadger.FollowerState, storage.Headers, storage.Index)) {
+	unittest.RunWithPebbleDB(t, func(pdb *pebble.DB) {
 		lockManager := storage.NewTestingLockManager()
+		db := pebbleimpl.ToDB(pdb)
 		metrics := metrics.NewNoopCollector()
 		tracer := trace.NewNoopTracer()
 		log := zerolog.Nop()
 		consumer := events.NewNoop()
-		all := bstorage.InitAll(metrics, db)
+		all := store.InitAll(metrics, db)
 		state, err := pbadger.Bootstrap(
 			metrics,
-			badgerimpl.ToDB(db),
+			db,
 			lockManager,
 			all.Headers,
 			all.Seals,
 			all.Results,
 			all.Blocks,
 			all.QuorumCertificates,
-			all.Setups,
+			all.EpochSetups,
 			all.EpochCommits,
 			all.EpochProtocolStateEntries,
 			all.ProtocolKVStore,
@@ -398,24 +408,25 @@ func RunWithFollowerProtocolStateAndHeaders(t testing.TB, rootSnapshot protocol.
 	})
 }
 
-func RunWithFullProtocolStateAndMutator(t testing.TB, rootSnapshot protocol.Snapshot, f func(*badger.DB, *pbadger.ParticipantState, protocol.MutableProtocolState)) {
-	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+func RunWithFullProtocolStateAndMutator(t testing.TB, rootSnapshot protocol.Snapshot, f func(storage.DB, *pbadger.ParticipantState, protocol.MutableProtocolState)) {
+	unittest.RunWithPebbleDB(t, func(pdb *pebble.DB) {
 		lockManager := storage.NewTestingLockManager()
+		db := pebbleimpl.ToDB(pdb)
 		metrics := metrics.NewNoopCollector()
 		tracer := trace.NewNoopTracer()
 		log := zerolog.Nop()
 		consumer := events.NewNoop()
-		all := bstorage.InitAll(metrics, db)
+		all := store.InitAll(metrics, db)
 		state, err := pbadger.Bootstrap(
 			metrics,
-			badgerimpl.ToDB(db),
+			db,
 			lockManager,
 			all.Headers,
 			all.Seals,
 			all.Results,
 			all.Blocks,
 			all.QuorumCertificates,
-			all.Setups,
+			all.EpochSetups,
 			all.EpochCommits,
 			all.EpochProtocolStateEntries,
 			all.ProtocolKVStore,
@@ -446,7 +457,7 @@ func RunWithFullProtocolStateAndMutator(t testing.TB, rootSnapshot protocol.Snap
 			state.Params(),
 			all.Headers,
 			all.Results,
-			all.Setups,
+			all.EpochSetups,
 			all.EpochCommits,
 		)
 		f(db, fullState, mutableProtocolState)
