@@ -14,7 +14,6 @@ import (
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/jobqueue"
 	"github.com/onflow/flow-go/storage"
-	"github.com/onflow/flow-go/storage/operation/badgerimpl"
 	"github.com/onflow/flow-go/storage/operation/pebbleimpl"
 	"github.com/onflow/flow-go/storage/store"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -471,7 +470,7 @@ func testWorkOnNextAfterFastforward(t *testing.T) {
 		// rebuild a consumer with the dependencies to simulate a restart
 		// jobs need to be reused, since it stores all the jobs
 		reWorker := newMockWorker()
-		reProgress := store.NewConsumerProgress(badgerimpl.ToDB(db), ConsumerTag)
+		reProgress := store.NewConsumerProgress(pebbleimpl.ToDB(db), ConsumerTag)
 		reConsumer := newTestConsumer(t, reProgress, j, reWorker, 0, DefaultIndex)
 
 		progress, err := reProgress.Initialize(DefaultIndex)
