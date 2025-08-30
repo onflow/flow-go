@@ -469,6 +469,7 @@ func (e *Engine) processAllPipelineTasks(ctx context.Context) error {
 	}
 }
 
+// forestFeederLoop loads results into the results forest during startup and when backfilling is needed.
 func (e *Engine) forestFeederLoop(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 	ticker := time.NewTicker(forestLoadInterval)
 	defer ticker.Stop()
@@ -605,18 +606,9 @@ func (e *Engine) loadAllUnsealedResults(ctx context.Context, startView uint64) (
 			return false, ctx.Err()
 		}
 
-		blockStatus, conflictsWithFinalized, err := e.resolveBlockStatus(blockID)
+		blockStatus, err := e.resolveBlockStatus(blockID)
 		if err != nil {
 			return false, fmt.Errorf("failed to resolve block status for block %s: %w", blockID, err)
-		}
-
-		if conflictsWithFinalized {
-			// this block conflicts with a finalized block, do not add it to avoid unncessary
-			// processing since any results for the block will never be sealed.
-			// Note: this does not guarantee that results for this block will not be added to the
-			// forest during incorporated block processing. also, any blocks built on top of this
-			// one will be orphaned within the forest and never started.
-			continue
 		}
 
 		receipts, err := e.receipts.ByBlockID(blockID)
@@ -632,29 +624,26 @@ func (e *Engine) loadAllUnsealedResults(ctx context.Context, startView uint64) (
 			}
 			return false, fmt.Errorf("failed to add unsealed result to forest: %w", err)
 		}
-
 	}
 
 	return true, nil
 }
 
 // resolveBlockStatus resolves the block status for the given block ID.
-// Returns the block status and a boolean indicating if the block conflicts with a finalized block
-// at the same height.
 // No errors are expected during normal operations.
-func (e *Engine) resolveBlockStatus(blockID flow.Identifier) (status BlockStatus, conflicts bool, err error) {
+func (e *Engine) resolveBlockStatus(blockID flow.Identifier) (status BlockStatus, err error) {
 	header, err := e.headers.ByBlockID(blockID)
 	if err != nil {
-		return 0, false, fmt.Errorf("failed to get header for block %s: %w", blockID, err)
+		return 0, fmt.Errorf("failed to get header for block %s: %w", blockID, err)
 	}
 
 	sealed, err := e.state.Sealed().Head()
 	if err != nil {
-		return 0, false, fmt.Errorf("failed to get sealed block: %w", err)
+		return 0, fmt.Errorf("failed to get sealed block: %w", err)
 	}
 
 	if header.View <= sealed.View {
-		return BlockStatusSealed, false, nil
+		return BlockStatusSealed, nil
 	}
 
 	// the headers by height index is only populated for finalized blocks. further, consensus
@@ -665,15 +654,15 @@ func (e *Engine) resolveBlockStatus(blockID flow.Identifier) (status BlockStatus
 	if err != nil {
 		if errors.Is(err, storage.ErrNotFound) {
 			// there is no finalized block at this height
-			return BlockStatusCertified, false, nil
+			return BlockStatusCertified, nil
 		}
-		return 0, false, fmt.Errorf("failed to get header by height for block %s: %w", blockID, err)
+		return 0, fmt.Errorf("failed to get header by height for block %s: %w", blockID, err)
 	}
 
 	if headerByHeight.View != header.View {
 		// this block conflicts with the finalized block at this height
-		return BlockStatusCertified, true, nil
+		return BlockStatusCertified, nil
 	}
 
-	return BlockStatusFinalized, false, nil
+	return BlockStatusFinalized, nil
 }
