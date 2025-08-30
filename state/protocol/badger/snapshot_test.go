@@ -79,7 +79,7 @@ func TestHead(t *testing.T) {
 	rootSnapshot := unittest.RootSnapshotFixture(participants)
 	head, err := rootSnapshot.Head()
 	require.NoError(t, err)
-	util.RunWithBootstrapState(t, rootSnapshot, func(db *badger.DB, state *bprotocol.State) {
+	util.RunWithBootstrapState(t, rootSnapshot, func(db storage.DB, state *bprotocol.State) {
 
 		t.Run("works with block number", func(t *testing.T) {
 			retrieved, err := state.AtHeight(head.Height).Head()

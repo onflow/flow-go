@@ -271,23 +271,24 @@ func RunWithFollowerProtocolState(t testing.TB, rootSnapshot protocol.Snapshot, 
 	})
 }
 
-func RunWithFullProtocolStateAndConsumer(t testing.TB, rootSnapshot protocol.Snapshot, consumer protocol.Consumer, f func(*badger.DB, *pbadger.ParticipantState)) {
-	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+func RunWithFullProtocolStateAndConsumer(t testing.TB, rootSnapshot protocol.Snapshot, consumer protocol.Consumer, f func(storage.DB, *pbadger.ParticipantState)) {
+	unittest.RunWithPebbleDB(t, func(pdb *pebble.DB) {
 		lockManager := storage.NewTestingLockManager()
+		db := pebbleimpl.ToDB(pdb)
 		metrics := metrics.NewNoopCollector()
 		tracer := trace.NewNoopTracer()
 		log := zerolog.Nop()
-		all := bstorage.InitAll(metrics, db)
+		all := store.InitAll(metrics, db)
 		state, err := pbadger.Bootstrap(
 			metrics,
-			badgerimpl.ToDB(db),
+			db,
 			lockManager,
 			all.Headers,
 			all.Seals,
 			all.Results,
 			all.Blocks,
 			all.QuorumCertificates,
-			all.Setups,
+			all.EpochSetups,
 			all.EpochCommits,
 			all.EpochProtocolStateEntries,
 			all.ProtocolKVStore,
