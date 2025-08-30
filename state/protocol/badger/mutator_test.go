@@ -8,6 +8,7 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/cockroachdb/pebble/v2"
 	"github.com/dgraph-io/badger/v2"
 	"github.com/onflow/crypto"
 	"github.com/rs/zerolog"
@@ -33,10 +34,10 @@ import (
 	protocol_state "github.com/onflow/flow-go/state/protocol/protocol_state/state"
 	"github.com/onflow/flow-go/state/protocol/util"
 	"github.com/onflow/flow-go/storage"
-	bstorage "github.com/onflow/flow-go/storage/badger"
 	"github.com/onflow/flow-go/storage/deferred"
 	"github.com/onflow/flow-go/storage/operation"
 	"github.com/onflow/flow-go/storage/operation/badgerimpl"
+	"github.com/onflow/flow-go/storage/operation/pebbleimpl"
 	"github.com/onflow/flow-go/storage/store"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -88,12 +89,13 @@ func TestBootstrapValid(t *testing.T) {
 // * BlockFinalized is emitted when the block is finalized
 // * BlockProcessable is emitted when a block's child is inserted
 func TestExtendValid(t *testing.T) {
-	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+	unittest.RunWithPebbleDB(t, func(pdb *pebble.DB) {
 		lockManager := storage.NewTestingLockManager()
 		metrics := metrics.NewNoopCollector()
 		tracer := trace.NewNoopTracer()
+		db := pebbleimpl.ToDB(pdb)
 		log := zerolog.Nop()
-		all := bstorage.InitAll(metrics, db)
+		all := store.InitAll(metrics, db)
 
 		distributor := events.NewDistributor()
 		consumer := mockprotocol.NewConsumer(t)
@@ -106,14 +108,14 @@ func TestExtendValid(t *testing.T) {
 
 		state, err := protocol.Bootstrap(
 			metrics,
-			badgerimpl.ToDB(db),
+			db,
 			lockManager,
 			all.Headers,
 			all.Seals,
 			all.Results,
 			all.Blocks,
 			all.QuorumCertificates,
-			all.Setups,
+			all.EpochSetups,
 			all.EpochCommits,
 			all.EpochProtocolStateEntries,
 			all.ProtocolKVStore,
@@ -157,11 +159,11 @@ func TestExtendValid(t *testing.T) {
 
 			// verify that block1's view is indexed as certified, because it has a child (block2)
 			var indexedID flow.Identifier
-			require.NoError(t, operation.LookupCertifiedBlockByView(badgerimpl.ToDB(db).Reader(), block1.View, &indexedID))
+			require.NoError(t, operation.LookupCertifiedBlockByView(db.Reader(), block1.View, &indexedID))
 			require.Equal(t, block1.ID(), indexedID)
 
 			// verify that block2's view is not indexed as certified, because it has no children
-			err = operation.LookupCertifiedBlockByView(badgerimpl.ToDB(db).Reader(), block2.View, &indexedID)
+			err = operation.LookupCertifiedBlockByView(db.Reader(), block2.View, &indexedID)
 			require.ErrorIs(t, err, storage.ErrNotFound)
 		})
 	})
@@ -926,8 +928,9 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 	consumer.On("BlockProcessable", mock.Anything, mock.Anything)
 	rootSnapshot := unittest.RootSnapshotFixture(participants)
 	rootProtocolStateID := getRootProtocolStateID(t, rootSnapshot)
-	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+	unittest.RunWithPebbleDB(t, func(pdb *pebble.DB) {
 		lockManager := storage.NewTestingLockManager()
+		db := pebbleimpl.ToDB(pdb)
 
 		// set up state and mock ComplianceMetrics object
 		metrics := mockmodule.NewComplianceMetrics(t)
@@ -955,17 +958,17 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 
 		tracer := trace.NewNoopTracer()
 		log := zerolog.Nop()
-		all := bstorage.InitAll(mmetrics.NewNoopCollector(), db)
+		all := store.InitAll(mmetrics.NewNoopCollector(), db)
 		protoState, err := protocol.Bootstrap(
 			metrics,
-			badgerimpl.ToDB(db),
+			db,
 			lockManager,
 			all.Headers,
 			all.Seals,
 			all.Results,
 			all.Blocks,
 			all.QuorumCertificates,
-			all.Setups,
+			all.EpochSetups,
 			all.EpochCommits,
 			all.EpochProtocolStateEntries,
 			all.ProtocolKVStore,
@@ -995,7 +998,7 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 			state.Params(),
 			all.Headers,
 			all.Results,
-			all.Setups,
+			all.EpochSetups,
 			all.EpochCommits,
 		)
 		expectedStateIdCalculator := calculateExpectedStateId(t, mutableState)
@@ -2875,12 +2878,13 @@ func TestEpochTargetDuration(t *testing.T) {
 }
 
 func TestExtendInvalidSealsInBlock(t *testing.T) {
-	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+	unittest.RunWithPebbleDB(t, func(pdb *pebble.DB) {
 		lockManager := storage.NewTestingLockManager()
 		metrics := metrics.NewNoopCollector()
 		tracer := trace.NewNoopTracer()
 		log := zerolog.Nop()
-		all := bstorage.InitAll(metrics, db)
+		db := pebbleimpl.ToDB(pdb)
+		all := store.InitAll(metrics, db)
 
 		// create a event consumer to test epoch transition events
 		distributor := events.NewDistributor()
@@ -2893,14 +2897,14 @@ func TestExtendInvalidSealsInBlock(t *testing.T) {
 
 		state, err := protocol.Bootstrap(
 			metrics,
-			badgerimpl.ToDB(db),
+			db,
 			lockManager,
 			all.Headers,
 			all.Seals,
 			all.Results,
 			all.Blocks,
 			all.QuorumCertificates,
-			all.Setups,
+			all.EpochSetups,
 			all.EpochCommits,
 			all.EpochProtocolStateEntries,
 			all.ProtocolKVStore,
@@ -3561,12 +3565,13 @@ func TestCacheAtomicity(t *testing.T) {
 
 // TestHeaderInvalidTimestamp tests that extending header with invalid timestamp results in sentinel error
 func TestHeaderInvalidTimestamp(t *testing.T) {
-	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+	unittest.RunWithPebbleDB(t, func(pdb *pebble.DB) {
 		lockManager := storage.NewTestingLockManager()
 		metrics := metrics.NewNoopCollector()
 		tracer := trace.NewNoopTracer()
 		log := zerolog.Nop()
-		all := bstorage.InitAll(metrics, db)
+		db := pebbleimpl.ToDB(pdb)
+		all := store.InitAll(metrics, db)
 
 		// create a event consumer to test epoch transition events
 		distributor := events.NewDistributor()
@@ -3580,14 +3585,14 @@ func TestHeaderInvalidTimestamp(t *testing.T) {
 
 		state, err := protocol.Bootstrap(
 			metrics,
-			badgerimpl.ToDB(db),
+			db,
 			lockManager,
 			all.Headers,
 			all.Seals,
 			all.Results,
 			all.Blocks,
 			all.QuorumCertificates,
-			all.Setups,
+			all.EpochSetups,
 			all.EpochCommits,
 			all.EpochProtocolStateEntries,
 			all.ProtocolKVStore,
