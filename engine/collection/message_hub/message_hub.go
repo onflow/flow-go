@@ -448,7 +448,7 @@ func (h *MessageHub) Process(channel channels.Channel, originID flow.Identifier,
 			OriginID: originID,
 			Message:  msg,
 		})
-	case *messages.ClusterBlockVote:
+	case *flow.BlockVote:
 		vote, err := model.NewVote(model.UntrustedVote{
 			View:     msg.View,
 			BlockID:  msg.BlockID,

@@ -36,17 +36,20 @@ type CollectionResponse struct {
 
 // ClusterBlockVote is a vote for a proposed block in collection node cluster
 // consensus; effectively a vote for a particular collection.
-type ClusterBlockVote BlockVote
+type ClusterBlockVote flow.BlockVote
 
 // ToInternal converts the untrusted ClusterBlockVote into its trusted internal
 // representation.
-//
-// This stub returns the receiver unchanged. A proper implementation
-// must perform validation checks and return a constructed internal
-// object.
 func (c *ClusterBlockVote) ToInternal() (any, error) {
-	// TODO(malleability, #7702) implement with validation checks
-	return c, nil
+	if c.BlockID == flow.ZeroID {
+		return nil, fmt.Errorf("BlockID must not be empty")
+	}
+
+	if len(c.SigData) == 0 {
+		return nil, fmt.Errorf("SigData must not be empty")
+	}
+
+	return (*flow.BlockVote)(c), nil
 }
 
 // ClusterTimeoutObject is part of the collection cluster protocol and represents a collection node
