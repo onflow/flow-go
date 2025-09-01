@@ -50,17 +50,6 @@ type TransactionBody struct {
 	EnvelopeSignatures []TransactionSignature
 }
 
-// ToInternal converts the untrusted TransactionBody into its trusted internal
-// representation.
-//
-// This stub returns the receiver unchanged. A proper implementation
-// must perform validation checks and return a constructed internal
-// object.
-func (tb *TransactionBody) ToInternal() (any, error) {
-	// TODO(malleability, #7711) create typedef for this type in messages package and implement it there
-	return tb, nil
-}
-
 // UntrustedTransactionBody is an untrusted input-only representation of a TransactionBody,
 // used for construction.
 //
@@ -159,6 +148,35 @@ type Transaction struct {
 	ComputationSpent uint64
 	StartState       StateCommitment
 	EndState         StateCommitment
+}
+
+// UntrustedTransaction is an untrusted input-only representation of a Transaction,
+// used for construction.
+//
+// This type exists to ensure that constructor functions are invoked explicitly
+// with named fields, which improves clarity and reduces the risk of incorrect field
+// ordering during construction.
+//
+// An instance of UntrustedTransaction should be validated and converted into
+// a trusted Transaction using NewTransaction constructor.
+type UntrustedTransaction Transaction
+
+// NewTransaction creates a new instance of Transaction.
+// Construction of Transaction is allowed only within the constructor.
+//
+// All errors indicate a valid Transaction cannot be constructed from the input.
+func NewTransaction(untrusted UntrustedTransaction) (*Transaction, error) {
+
+	// TODO: add validation checks for transaction
+
+	return &Transaction{
+		TransactionBody:  untrusted.TransactionBody,
+		Status:           untrusted.Status,
+		Events:           untrusted.Events,
+		ComputationSpent: untrusted.ComputationSpent,
+		StartState:       untrusted.StartState,
+		EndState:         untrusted.EndState,
+	}, nil
 }
 
 // MissingFields checks if a transaction is missing any required fields and returns those that are missing.

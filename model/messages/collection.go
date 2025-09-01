@@ -81,3 +81,29 @@ func (c *CollectionGuarantee) ToInternal() (any, error) {
 	}
 	return internal, nil
 }
+
+// TransactionBody is a message representation of a TransactionBody, which includes the main contents of a transaction
+type TransactionBody flow.UntrustedTransactionBody
+
+// ToInternal converts the untrusted TransactionBody into its trusted internal
+// representation.
+func (tb *TransactionBody) ToInternal() (any, error) {
+	internal, err := flow.NewTransactionBody(flow.UntrustedTransactionBody(*tb))
+	if err != nil {
+		return nil, fmt.Errorf("could not construct transaction body: %w", err)
+	}
+	return internal, nil
+}
+
+// Transaction is a message representation of a Transaction, which is the smallest unit of task
+type Transaction flow.UntrustedTransaction
+
+// ToInternal converts the untrusted Transaction into its trusted internal
+// representation.
+func (t *Transaction) ToInternal() (any, error) {
+	internal, err := flow.NewTransaction(flow.UntrustedTransaction(*t))
+	if err != nil {
+		return nil, fmt.Errorf("could not construct transaction : %w", err)
+	}
+	return internal, nil
+}
