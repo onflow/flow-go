@@ -209,8 +209,6 @@ func (fcv *ChunkVerifier) verifyTransactionsInContext(
 	var txStartIndex int
 	var systemResult *flow.LightTransactionResult
 
-	fmt.Println("###### events: ", len(events))
-
 	if systemChunk {
 		transactions, systemResult, err = fcv.createSystemChunk(
 			callbackCtx,
@@ -238,11 +236,6 @@ func (fcv *ChunkVerifier) verifyTransactionsInContext(
 	if systemResult != nil {
 		txResults[0] = *systemResult
 		txStartIndex = 1
-	}
-
-	fmt.Println("### events after process callback: ", len(events))
-	for _, e := range events {
-		fmt.Println("### event: ", e.Type, "event index: ", e.EventIndex, "transaction ID: ", e.TransactionID)
 	}
 
 	// Executes all transactions in this chunk (or remaining transactions for callbacks)
