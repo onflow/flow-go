@@ -3,7 +3,7 @@
 package mock
 
 import (
-	flow "github.com/onflow/flow-go/model/flow"
+	messages "github.com/onflow/flow-go/model/messages"
 	mock "github.com/stretchr/testify/mock"
 )
 
@@ -13,7 +13,7 @@ type GuaranteedCollectionPublisher struct {
 }
 
 // SubmitCollectionGuarantee provides a mock function with given fields: guarantee
-func (_m *GuaranteedCollectionPublisher) SubmitCollectionGuarantee(guarantee *flow.CollectionGuarantee) {
+func (_m *GuaranteedCollectionPublisher) SubmitCollectionGuarantee(guarantee *messages.CollectionGuarantee) {
 	_m.Called(guarantee)
 }
 
