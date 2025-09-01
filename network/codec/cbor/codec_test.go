@@ -16,15 +16,13 @@ func TestCodec_Decode(t *testing.T) {
 	c := cbor.NewCodec()
 	t.Run("decodes message successfully", func(t *testing.T) {
 		data := messages.Proposal(*unittest.ProposalFixture())
-		internal, err := data.ToInternal()
-		require.NoError(t, err)
 
 		encoded, err := c.Encode(&data)
 		require.NoError(t, err)
 
 		decoded, err := c.Decode(encoded)
 		require.NoError(t, err)
-		require.Equal(t, internal, decoded)
+		require.Equal(t, &data, decoded)
 	})
 
 	t.Run("returns error when data is empty", func(t *testing.T) {
