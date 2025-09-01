@@ -2,33 +2,26 @@
 
 This file provides guidance to AI Agents when working with code in this repository.
 
-## Agents Docs
-
-- Coding Conventions: @docs/agents/CodingConventions.md
-- Agents Directive: @docs/agents/OperationalDoctrine.md
-- GoDocs: @docs/agents/GoDocs.md
-
 ## Behavior Guidance
 
-### Git Operations
+### Git branches names
+By default, use origin/master as the base for new branches unless the user specifies otherwise.
+Use the following format
+```
+[user]/[github issue number]-[brief description in kebab-case]
+```
 
-- By default, use origin/master as the base for new branches.
-- Create branches using the following naming scheme:
-    ```
-    [user]/[github issue number]-[brief description in kebab-case]
-    ```
-- Git commit messages should be a brief single line message.
+### Git commit messages
+Git commit messages should be a brief single line message.
 
-### Github Operations
-
-#### Creating PRs
-- if there is an associated issue AND the PR will complete the issue, add a "closes" statement as the first line in the description
-    e.g. `Closes: #[Issue Number]
-- Include a high level overview of the problem and changes in the PR. Be concise. DO NOT add tons of unnecessary detail or boilerplate.
+### Github PRs
+- if there is an associated issue AND the PR will complete the issue, add a "Closes" statement as the first line in the description
+    e.g. `Closes: #[Issue Number]`
+- Include a high level overview of the problem and changes in the PR. Be concise. DO NOT add unnecessary detail or boilerplate.
 - Check available labels and suggest any that seem appropriate. Ask user to confirm.
-- If the branch was created from a branch other than master, update the base branch used for the PR to the correct branch.
+- If the branch was created from a branch other than master, update the base branch field for the PR to the correct branch.
 
-#### Creating or Commenting on Issues
+### Github Issues
 - Include a note that the message was produced in collaboration with [your agent name - e.g. claude, gemini, cursor, etc].
 
 ### Answering Questions
@@ -39,6 +32,10 @@ This file provides guidance to AI Agents when working with code in this reposito
 - Be direct and straight forward.
 - DO NO be overly dramatic or jump to conclusions. e.g. don't say "Critical Memory Safety Issue Found" unless you are certain that is true. If you are not certain, then frame it "Potential Memory Issue Found".
 - DO NOT be sycophantic or use unnecessary flattery. Avoid phrases like "You're absolutely right".
+
+### 3rd Party Module Code
+
+On standard installs of go, 3rd party modules can be found at $GOPATH/pkg/src
 
 ## Development Commands
 
