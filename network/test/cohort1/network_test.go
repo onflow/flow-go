@@ -954,7 +954,7 @@ func TestChunkDataPackMaxMessageSize(t *testing.T) {
 		flow.IdentifierList{unittest.IdentifierFixture()},
 		channels.TopicFromChannel(channels.ProvideChunks, unittest.IdentifierFixture()),
 		&messages.ChunkDataResponse{
-			ChunkDataPack: (flow.UntrustedChunkDataPack)(*unittest.ChunkDataPackFixture(unittest.IdentifierFixture())),
+			ChunkDataPack: flow.UntrustedChunkDataPack(*unittest.ChunkDataPackFixture(unittest.IdentifierFixture())),
 			Nonce:         rand.Uint64(),
 		},
 		unittest.NetworkCodec().Encode,
