@@ -1631,8 +1631,7 @@ func WithApproximateSize(bytes uint64) func(*messages.ChunkDataResponse) {
 		// 1 tx fixture is approximately 350 bytes
 		txCount := bytes / 350
 		collection := CollectionFixture(int(txCount) + 1)
-		pack := ChunkDataPackFixture(request.ChunkDataPack.ChunkID, WithChunkDataPackCollection(&collection))
-		request.ChunkDataPack = flow.UntrustedChunkDataPack(*pack)
+		request.ChunkDataPack = flow.UntrustedChunkDataPack(*ChunkDataPackFixture(request.ChunkDataPack.ChunkID, WithChunkDataPackCollection(&collection)))
 	}
 }
 
@@ -1691,7 +1690,7 @@ func WithChunkID(chunkID flow.Identifier) func(*verification.ChunkDataPackReques
 // and height of zero.
 // Use options to customize the request.
 func ChunkDataPackRequestFixture(opts ...func(*verification.ChunkDataPackRequest)) *verification.
-	ChunkDataPackRequest {
+ChunkDataPackRequest {
 	req := &verification.ChunkDataPackRequest{
 		Locator:                  *ChunkLocatorFixture(IdentifierFixture(), 0),
 		ChunkDataPackRequestInfo: *ChunkDataPackRequestInfoFixture(),
