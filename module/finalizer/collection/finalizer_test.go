@@ -11,6 +11,7 @@ import (
 	collectionmock "github.com/onflow/flow-go/engine/collection/mock"
 	model "github.com/onflow/flow-go/model/cluster"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module/finalizer/collection"
 	"github.com/onflow/flow-go/module/mempool/herocache"
 	"github.com/onflow/flow-go/module/metrics"
@@ -184,7 +185,7 @@ func TestFinalizer(t *testing.T) {
 			insert(block)
 
 			// block should be passed to pusher
-			pusher.On("SubmitCollectionGuarantee", &flow.CollectionGuarantee{
+			pusher.On("SubmitCollectionGuarantee", &messages.CollectionGuarantee{
 				CollectionID:     block.Payload.Collection.ID(),
 				ReferenceBlockID: refBlock.ID(),
 				ClusterChainID:   block.ChainID,
@@ -252,14 +253,14 @@ func TestFinalizer(t *testing.T) {
 			insert(block2)
 
 			// both blocks should be passed to pusher
-			pusher.On("SubmitCollectionGuarantee", &flow.CollectionGuarantee{
+			pusher.On("SubmitCollectionGuarantee", &messages.CollectionGuarantee{
 				CollectionID:     block1.Payload.Collection.ID(),
 				ReferenceBlockID: refBlock.ID(),
 				ClusterChainID:   block1.ChainID,
 				SignerIndices:    block1.ParentVoterIndices,
 				Signature:        nil,
 			}).Once()
-			pusher.On("SubmitCollectionGuarantee", &flow.CollectionGuarantee{
+			pusher.On("SubmitCollectionGuarantee", &messages.CollectionGuarantee{
 				CollectionID:     block2.Payload.Collection.ID(),
 				ReferenceBlockID: refBlock.ID(),
 				ClusterChainID:   block2.ChainID,
@@ -325,7 +326,7 @@ func TestFinalizer(t *testing.T) {
 			insert(block2)
 
 			// block should be passed to pusher
-			pusher.On("SubmitCollectionGuarantee", &flow.CollectionGuarantee{
+			pusher.On("SubmitCollectionGuarantee", &messages.CollectionGuarantee{
 				CollectionID:     block1.Payload.Collection.ID(),
 				ReferenceBlockID: refBlock.ID(),
 				ClusterChainID:   block1.ChainID,
@@ -393,7 +394,7 @@ func TestFinalizer(t *testing.T) {
 			insert(block2)
 
 			// block should be passed to pusher
-			pusher.On("SubmitCollectionGuarantee", &flow.CollectionGuarantee{
+			pusher.On("SubmitCollectionGuarantee", &messages.CollectionGuarantee{
 				CollectionID:     block1.Payload.Collection.ID(),
 				ReferenceBlockID: refBlock.ID(),
 				ClusterChainID:   block1.ChainID,
