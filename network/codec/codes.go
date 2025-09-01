@@ -100,7 +100,7 @@ func MessageCodeFromInterface(v interface{}) (MessageCode, string, error) {
 		return CodeBlockResponse, s, nil
 
 	// collections, guarantees & transactions
-	case *flow.CollectionGuarantee:
+	case *messages.CollectionGuarantee:
 		return CodeCollectionGuarantee, s, nil
 	case *flow.TransactionBody:
 		return CodeTransactionBody, s, nil
@@ -182,7 +182,7 @@ func InterfaceFromMessageCode(code MessageCode) (messages.UntrustedMessage, stri
 
 	// collections, guarantees & transactions
 	case CodeCollectionGuarantee:
-		var guarantee flow.CollectionGuarantee
+		var guarantee messages.CollectionGuarantee
 		return &guarantee, what(&guarantee), nil
 	case CodeTransactionBody:
 		var transactionBody flow.TransactionBody

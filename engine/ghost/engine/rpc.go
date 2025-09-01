@@ -245,6 +245,8 @@ func internalToMessage(event interface{}) (messages.UntrustedMessage, error) {
 		return (*messages.Proposal)(internal), nil
 	case *cluster.Proposal:
 		return (*messages.ClusterProposal)(internal), nil
+	case *flow.CollectionGuarantee:
+		return (*messages.CollectionGuarantee)(internal), nil
 	case *flow.ChunkDataRequest:
 		return (*messages.ChunkDataRequest)(internal), nil
 	case *flow.ChunkDataResponse:
