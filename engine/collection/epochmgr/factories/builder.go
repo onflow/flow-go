@@ -24,6 +24,7 @@ type BuilderFactory struct {
 	opts             []builder.Opt
 	metrics          module.CollectionMetrics
 	pusher           collection.GuaranteedCollectionPublisher // engine for pushing finalized collection to consensus committee
+	configGetter     module.ReadonlySealingLagRateLimiterConfig
 	log              zerolog.Logger
 }
 
@@ -35,6 +36,7 @@ func NewBuilderFactory(
 	metrics module.CollectionMetrics,
 	pusher collection.GuaranteedCollectionPublisher,
 	log zerolog.Logger,
+	configGetter module.ReadonlySealingLagRateLimiterConfig,
 	opts ...builder.Opt,
 ) (*BuilderFactory, error) {
 
@@ -46,6 +48,7 @@ func NewBuilderFactory(
 		metrics:          metrics,
 		pusher:           pusher,
 		log:              log,
+		configGetter:     configGetter,
 		opts:             opts,
 	}
 	return factory, nil
@@ -62,6 +65,7 @@ func (f *BuilderFactory) Create(
 	build, err := builder.NewBuilder(
 		f.db,
 		f.trace,
+		f.metrics,
 		f.protoState,
 		clusterState,
 		f.mainChainHeaders,
@@ -70,6 +74,7 @@ func (f *BuilderFactory) Create(
 		pool,
 		f.log,
 		epoch,
+		f.configGetter,
 		f.opts...,
 	)
 	if err != nil {
