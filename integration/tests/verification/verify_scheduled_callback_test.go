@@ -63,8 +63,7 @@ func (s *VerifyScheduledCallbackSuite) TestVerifyScheduledCallback() {
 
 	eventCount := 0
 	for _, event := range events {
-		for _, e := range event.Events {
-			fmt.Println("### event type: ", e.Type, "event index: ", e.EventIndex, "transaction ID: ", e.TransactionID)
+		for range event.Events {
 			eventCount++
 		}
 	}
