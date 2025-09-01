@@ -3,6 +3,7 @@ package common
 import (
 	"context"
 	"fmt"
+	"github.com/onflow/flow-go/model/messages"
 	"testing"
 	"time"
 
@@ -59,7 +60,7 @@ func TestGhostNodeExample_Send(t *testing.T) {
 	assert.NoError(t, err)
 
 	// generate a test transaction
-	tx := unittest.TransactionBodyFixture()
+	tx := (messages.TransactionBody)(unittest.TransactionBodyFixture())
 
 	// send the transaction as an event to a real collection node
 	err = ghostClient.Send(ctx, channels.PushTransactions, &tx, realCollNode.Identifier)
