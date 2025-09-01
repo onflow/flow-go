@@ -349,7 +349,7 @@ func LogStatusPeriodically(t *testing.T, parent context.Context, log zerolog.Log
 func ScheduleCallbackAtTimestamp(
 	timestamp int64,
 	client *testnet.Client,
-	callbackScheduler sdk.Address,
+	flowCallbackScheduler sdk.Address,
 	flowToken sdk.Address,
 	fungibleToken sdk.Address,
 ) (uint64, error) {
@@ -405,7 +405,7 @@ func ScheduleCallbackAtTimestamp(
 				TestFlowCallbackHandler.addScheduledCallback(callback: scheduledCallback)
 			}
 		} 
-	`, callbackScheduler.Hex(), flowToken.Hex(), fungibleToken.Hex()))
+	`, serviceAccount.Address.Hex(), flowCallbackScheduler.Hex(), flowToken.Hex(), fungibleToken.Hex()))
 
 	timeArg, err := cadence.NewUFix64(fmt.Sprintf("%d.0", timestamp))
 	if err != nil {
@@ -431,7 +431,7 @@ func ScheduleCallbackAtTimestamp(
 func CancelCallbackByID(
 	callbackID uint64,
 	client *testnet.Client,
-	callbackScheduler sdk.Address,
+	flowCallbackScheduler sdk.Address,
 	flowToken sdk.Address,
 	fungibleToken sdk.Address,
 ) (uint64, error) {
@@ -462,7 +462,7 @@ func CancelCallbackByID(
 				vault.deposit(from: <-TestFlowCallbackHandler.cancelCallback(id: id))
 			}
 		} 
-	`, callbackScheduler.Hex(), flowToken.Hex(), fungibleToken.Hex())
+	`, serviceAccount.Address.Hex(), flowCallbackScheduler.Hex(), flowToken.Hex(), fungibleToken.Hex())
 
 	tx := sdk.NewTransaction().
 		SetScript([]byte(cancelTx)).
