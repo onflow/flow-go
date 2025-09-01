@@ -282,3 +282,11 @@ func NewBlockDigest(
 		Timestamp: timestamp,
 	}
 }
+
+// BlockVote is part of the consensus protocol and represents a consensus node
+// voting on the proposal of the leader of a given round.
+type BlockVote struct {
+	BlockID Identifier
+	View    uint64
+	SigData []byte
+}

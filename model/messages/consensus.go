@@ -22,21 +22,20 @@ func (p *Proposal) ToInternal() (any, error) {
 
 // BlockVote is part of the consensus protocol and represents a consensus node
 // voting on the proposal of the leader of a given round.
-type BlockVote struct {
-	BlockID flow.Identifier
-	View    uint64
-	SigData []byte
-}
+type BlockVote flow.BlockVote
 
 // ToInternal converts the untrusted BlockVote into its trusted internal
 // representation.
-//
-// This stub returns the receiver unchanged. A proper implementation
-// must perform validation checks and return a constructed internal
-// object.
 func (b *BlockVote) ToInternal() (any, error) {
-	// TODO(malleability, #7702) implement with validation checks
-	return b, nil
+	if b.BlockID == flow.ZeroID {
+		return nil, fmt.Errorf("BlockID must not be empty")
+	}
+
+	if len(b.SigData) == 0 {
+		return nil, fmt.Errorf("SigData must not be empty")
+	}
+
+	return (*flow.BlockVote)(b), nil
 }
 
 // TimeoutObject is part of the consensus protocol and represents a consensus node
