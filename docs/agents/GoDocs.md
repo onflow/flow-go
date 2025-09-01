@@ -193,7 +193,7 @@ Example 4: Method with context-dependent error handling
 - By default, we assume methods and functions to be concurrency safe.
 - Every struct and interface must explicitly state whether it is safe for concurrent access.
 - If not thread-safe, explain why
-- For methods or functions that are not concurrency safe (deviating from the default), it is **MUST** be explicitly documented by including the following call-out:
+- For methods or functions that are not concurrency safe (deviating from the default), it **MUST** be explicitly documented by including the following call-out:
   ```go
   // CAUTION: not concurrency safe!
   ```

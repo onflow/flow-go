@@ -35,7 +35,7 @@ Git commit messages should be a brief single line message.
 
 ### 3rd Party Module Code
 
-On standard installs of go, 3rd party modules can be found at $GOPATH/pkg/src
+On standard installs of go, 3rd party modules can be found at $GOPATH/pkg/mod
 
 ## Development Commands
 
