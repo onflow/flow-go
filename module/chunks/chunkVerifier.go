@@ -59,12 +59,14 @@ func (fcv *ChunkVerifier) Verify(
 	var ctx fvm.Context
 	var callbackCtx fvm.Context
 	var transactions []*fvm.TransactionProcedure
+	derivedBlockData := derived.NewEmptyDerivedBlockData(logical.Time(vc.TransactionOffset))
+
 	if vc.IsSystemChunk {
-		ctx = contextFromVerifiableChunk(fcv.systemChunkCtx, vc)
-		callbackCtx = contextFromVerifiableChunk(fcv.callbackCtx, vc)
+		ctx = contextFromVerifiableChunk(fcv.systemChunkCtx, vc, derivedBlockData)
+		callbackCtx = contextFromVerifiableChunk(fcv.callbackCtx, vc, derivedBlockData)
 		// transactions will be dynamically created for system chunk
 	} else {
-		ctx = contextFromVerifiableChunk(fcv.vmCtx, vc)
+		ctx = contextFromVerifiableChunk(fcv.vmCtx, vc, derivedBlockData)
 
 		transactions = make(
 			[]*fvm.TransactionProcedure,
@@ -93,14 +95,13 @@ func (fcv *ChunkVerifier) Verify(
 func contextFromVerifiableChunk(
 	parentCtx fvm.Context,
 	vc *verification.VerifiableChunkData,
+	derivedBlockData *derived.DerivedBlockData,
 ) fvm.Context {
 	return fvm.NewContextFromParent(
 		parentCtx,
 		fvm.WithBlockHeader(vc.Header),
 		fvm.WithProtocolStateSnapshot(vc.Snapshot),
-		fvm.WithDerivedBlockData(
-			derived.NewEmptyDerivedBlockData(logical.Time(vc.TransactionOffset)),
-		),
+		fvm.WithDerivedBlockData(derivedBlockData),
 	)
 }
 
@@ -208,6 +209,8 @@ func (fcv *ChunkVerifier) verifyTransactionsInContext(
 	var txStartIndex int
 	var systemResult *flow.LightTransactionResult
 
+	fmt.Println("###### events: ", len(events))
+
 	if systemChunk {
 		transactions, systemResult, err = fcv.createSystemChunk(
 			callbackCtx,
@@ -237,11 +240,25 @@ func (fcv *ChunkVerifier) verifyTransactionsInContext(
 		txStartIndex = 1
 	}
 
+	fmt.Println("### events after process callback: ", len(events))
+	for _, e := range events {
+		fmt.Println("### event: ", e.Type, "event index: ", e.EventIndex, "transaction ID: ", e.TransactionID)
+	}
+
 	// Executes all transactions in this chunk (or remaining transactions for callbacks)
 	for i := txStartIndex; i < len(transactions); i++ {
 		tx := transactions[i]
+		ctx := context
+
+		// For system chunks with callbacks:
+		// - Process callback transaction and callback executions use callbackCtx
+		// - System transaction (last one) uses the original system chunk context
+		if systemChunk && context.ScheduleCallbacksEnabled && i < len(transactions)-1 {
+			ctx = callbackCtx
+		}
+
 		executionSnapshot, output, err := fcv.vm.Run(
-			context,
+			ctx,
 			tx,
 			snapshotTree)
 		if err != nil {
@@ -483,7 +500,7 @@ func (fcv *ChunkVerifier) createSystemChunk(
 	}
 
 	// Generate callback execution transactions from the events
-	callbackTxs, err := blueprints.ExecuteCallbacksTransactions(callbackCtx.Chain, processOutput.Events)
+	callbackTxs, err := blueprints.ExecuteCallbacksTransactions(fcv.vmCtx.Chain, processOutput.Events)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to generate callback execution transactions: %w", err)
 	}
