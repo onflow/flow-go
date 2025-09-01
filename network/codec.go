@@ -31,5 +31,5 @@ type Encoder interface {
 //   - codec.ErrUnknownMsgCode if message code byte does not match any of the configured message codes.
 //   - codec.ErrMsgUnmarshal if the codec fails to unmarshal the data to the message type denoted by the message code.
 type Decoder interface {
-	Decode() (interface{}, error)
+	Decode() (messages.UntrustedMessage, error)
 }
