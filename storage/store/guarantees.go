@@ -19,7 +19,7 @@ type Guarantees struct {
 	cache *Cache[flow.Identifier, *flow.CollectionGuarantee]
 
 	// byCollectionIdCache is essentially an in-memory map from `CollectionGuarantee.CollectionID` -> `CollectionGuarantee.ID()`.
-	//The full flow.CollectionGuarantee can be retrieved from the `cache` above.
+	// The full flow.CollectionGuarantee can be retrieved from the `cache` above.
 	byCollectionIdCache *Cache[flow.Identifier, flow.Identifier]
 }
 

@@ -68,6 +68,7 @@ func TestGuaranteeStoreRetrieve(t *testing.T) {
 	})
 }
 
+// Storing the same guarantee should be idempotent
 func TestStoreDuplicateGuarantee(t *testing.T) {
 	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
 		lockManager := storage.NewTestingLockManager()
@@ -106,6 +107,7 @@ func TestStoreDuplicateGuarantee(t *testing.T) {
 	})
 }
 
+// Storing a different guarantee for the same collection should return an error
 func TestStoreConflictingGuarantee(t *testing.T) {
 	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
 		lockManager := storage.NewTestingLockManager()
