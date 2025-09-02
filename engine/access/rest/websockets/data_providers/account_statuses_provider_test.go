@@ -34,7 +34,6 @@ type AccountStatusesProviderSuite struct {
 
 	chain          flow.Chain
 	rootBlock      flow.Block
-	finalizedBlock *flow.Header
 
 	factory *DataProviderFactoryImpl
 }

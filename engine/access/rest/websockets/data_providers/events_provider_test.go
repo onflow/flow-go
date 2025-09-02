@@ -31,9 +31,8 @@ type EventsProviderSuite struct {
 	log zerolog.Logger
 	api *ssmock.API
 
-	chain          flow.Chain
-	rootBlock      flow.Block
-	finalizedBlock *flow.Header
+	chain     flow.Chain
+	rootBlock flow.Block
 
 	factory *DataProviderFactoryImpl
 }
