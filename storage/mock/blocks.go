@@ -124,6 +124,36 @@ func (_m *Blocks) ByID(blockID flow.Identifier) (*flow.GenericBlock[flow.Payload
 	return r0, r1
 }
 
+// ByView provides a mock function with given fields: view
+func (_m *Blocks) ByView(view uint64) (*flow.GenericBlock[flow.Payload], error) {
+	ret := _m.Called(view)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ByView")
+	}
+
+	var r0 *flow.GenericBlock[flow.Payload]
+	var r1 error
+	if rf, ok := ret.Get(0).(func(uint64) (*flow.GenericBlock[flow.Payload], error)); ok {
+		return rf(view)
+	}
+	if rf, ok := ret.Get(0).(func(uint64) *flow.GenericBlock[flow.Payload]); ok {
+		r0 = rf(view)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*flow.GenericBlock[flow.Payload])
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(uint64) error); ok {
+		r1 = rf(view)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // IndexBlockForCollectionGuarantees provides a mock function with given fields: blockID, collIDs
 func (_m *Blocks) IndexBlockForCollectionGuarantees(blockID flow.Identifier, collIDs []flow.Identifier) error {
 	ret := _m.Called(blockID, collIDs)
@@ -195,6 +225,36 @@ func (_m *Blocks) ProposalByID(blockID flow.Identifier) (*flow.Proposal, error) 
 
 	if rf, ok := ret.Get(1).(func(flow.Identifier) error); ok {
 		r1 = rf(blockID)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// ProposalByView provides a mock function with given fields: view
+func (_m *Blocks) ProposalByView(view uint64) (*flow.Proposal, error) {
+	ret := _m.Called(view)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ProposalByView")
+	}
+
+	var r0 *flow.Proposal
+	var r1 error
+	if rf, ok := ret.Get(0).(func(uint64) (*flow.Proposal, error)); ok {
+		return rf(view)
+	}
+	if rf, ok := ret.Get(0).(func(uint64) *flow.Proposal); ok {
+		r0 = rf(view)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*flow.Proposal)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(uint64) error); ok {
+		r1 = rf(view)
 	} else {
 		r1 = ret.Error(1)
 	}
