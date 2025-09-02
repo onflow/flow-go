@@ -12,9 +12,9 @@ import (
 	"github.com/onflow/flow/protobuf/go/flow/entities"
 	"github.com/stretchr/testify/require"
 
-	"github.com/onflow/flow-go/fvm/evm/testutils"
 	"github.com/onflow/flow-go/model/events"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 // EventGenerator generates events with consistent randomness.
@@ -248,7 +248,7 @@ func (g *EventGenerator) generateProtocolEventData(t testing.TB, eventName strin
 		contractName, err := cadence.NewString("EventContract")
 		require.NoError(t, err)
 
-		codeHash := testutils.ConvertToCadence(g.randomGen.RandomBytes(t, 32))
+		codeHash := unittest.BytesToCdcUInt8(g.randomGen.RandomBytes(t, 32))
 
 		fields := []cadence.Field{
 			{

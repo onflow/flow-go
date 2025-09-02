@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/stretchr/testify/require"
 )
 
 // BlockHeaderGenerator generates block headers with consistent randomness.
@@ -77,21 +78,27 @@ func (g *BlockHeaderGenerator) Fixture(t testing.TB, opts ...func(*blockHeaderCo
 	}
 
 	if config.parent == nil {
-		config.parent = &flow.Header{
-			ChainID:  config.chainID,
-			Height:   config.height - 1,
-			View:     config.view - 1,
-			ParentID: g.identifierGen.Fixture(t),
-		}
+		parent, err := flow.NewHeader(flow.UntrustedHeader{
+			HeaderBody: flow.HeaderBody{
+				ChainID:  config.chainID,
+				Height:   config.height - 1,
+				View:     config.view - 1,
+				ParentID: g.identifierGen.Fixture(t),
+			},
+			PayloadHash: g.identifierGen.Fixture(t),
+		})
+		require.NoError(t, err)
+		config.parent = parent
 	}
 
-	return g.fixtureWithParent(t, config.parent, config.source)
+	return g.fixtureWithParent(t, config)
 }
 
 // fixtureWithParent generates a block header that is a child of the given parent header.
-func (g *BlockHeaderGenerator) fixtureWithParent(t testing.TB, parent *flow.Header, source []byte) *flow.Header {
-	height := parent.Height + 1
-	view := parent.View + 1 + uint64(g.randomGen.Intn(10)) // Intn returns [0, n)
+func (g *BlockHeaderGenerator) fixtureWithParent(t testing.TB, config *blockHeaderConfig) *flow.Header {
+	height := config.height
+	view := config.view
+	parent := config.parent
 
 	var lastViewTC *flow.TimeoutCertificate
 	if view != parent.View+1 {
@@ -100,25 +107,30 @@ func (g *BlockHeaderGenerator) fixtureWithParent(t testing.TB, parent *flow.Head
 			View:          view - 1,
 			NewestQCViews: []uint64{newestQC.View},
 			NewestQC:      newestQC,
-			SignerIndices: g.signerIndicesGen.Fixture(t, g.signerIndicesGen.WithSignerCount(10, 4)),
+			SignerIndices: g.signerIndicesGen.Fixture(t),
 			SigData:       g.signatureGen.Fixture(t),
 		}
 	}
 
-	return &flow.Header{
-		ChainID:            parent.ChainID,
-		ParentID:           parent.ID(),
-		Height:             height,
-		PayloadHash:        g.identifierGen.Fixture(t),
-		Timestamp:          g.timeGen.Fixture(t),
-		View:               view,
-		ParentView:         parent.View,
-		ParentVoterIndices: g.signerIndicesGen.Fixture(t, g.signerIndicesGen.WithSignerCount(10, 4)),
-		ParentVoterSigData: g.quorumCertGen.QCSigDataWithSoR(t, source),
-		ProposerID:         g.identifierGen.Fixture(t),
-		ProposerSigData:    g.signatureGen.Fixture(t),
-		LastViewTC:         lastViewTC,
-	}
+	// Create the header using the new constructor pattern
+	header, err := flow.NewHeader(flow.UntrustedHeader{
+		HeaderBody: flow.HeaderBody{
+			ChainID:            parent.ChainID,
+			ParentID:           parent.ID(),
+			Height:             height,
+			Timestamp:          uint64(g.timeGen.Fixture(t).UnixMilli()),
+			View:               view,
+			ParentView:         parent.View,
+			ParentVoterIndices: g.signerIndicesGen.Fixture(t),
+			ParentVoterSigData: g.quorumCertGen.QCSigDataWithSoR(t, config.source),
+			ProposerID:         g.identifierGen.Fixture(t),
+			LastViewTC:         lastViewTC,
+		},
+		PayloadHash: g.identifierGen.Fixture(t),
+	})
+	require.NoError(t, err)
+
+	return header
 }
 
 // List generates a list of block headers.
