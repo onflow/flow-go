@@ -171,6 +171,26 @@ func (_m *Assignments) Size() uint {
 	return r0
 }
 
+// Values provides a mock function with no fields
+func (_m *Assignments) Values() []*chunks.Assignment {
+	ret := _m.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for Values")
+	}
+
+	var r0 []*chunks.Assignment
+	if rf, ok := ret.Get(0).(func() []*chunks.Assignment); ok {
+		r0 = rf()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]*chunks.Assignment)
+		}
+	}
+
+	return r0
+}
+
 // NewAssignments creates a new instance of Assignments. It also registers a testing interface on the mock and a cleanup function to assert the mocks expectations.
 // The first argument is typically a *testing.T value.
 func NewAssignments(t interface {

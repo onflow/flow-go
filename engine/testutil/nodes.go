@@ -93,6 +93,7 @@ import (
 	"github.com/onflow/flow-go/module/signature"
 	requesterunit "github.com/onflow/flow-go/module/state_synchronization/requester/unittest"
 	"github.com/onflow/flow-go/module/trace"
+	"github.com/onflow/flow-go/module/updatable_configs"
 	"github.com/onflow/flow-go/module/validation"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/p2p/cache"
@@ -341,6 +342,7 @@ func CollectionNode(t *testing.T, hub *stub.Hub, identity bootstrap.NodeInfo, ro
 		node.Metrics,
 		pusherEngine,
 		node.Log,
+		updatable_configs.DefaultBySealingLagRateLimiterConfigs(),
 	)
 	require.NoError(t, err)
 
