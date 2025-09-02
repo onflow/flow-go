@@ -67,19 +67,20 @@ func NewBuilder(
 	opts ...Opt,
 ) (*Builder, error) {
 	b := Builder{
-		db:             db,
-		tracer:         tracer,
-		lockManager:    lockManager,
-		metrics:        metrics,
-		protoState:     protoState,
-		clusterState:   clusterState,
-		mainHeaders:    mainHeaders,
-		clusterHeaders: clusterHeaders,
-		payloads:       payloads,
-		transactions:   transactions,
-		config:         DefaultConfig(),
-		log:            log.With().Str("component", "cluster_builder").Logger(),
-		clusterEpoch:   epochCounter,
+		db:                         db,
+		tracer:                     tracer,
+		lockManager:                lockManager,
+		metrics:                    metrics,
+		protoState:                 protoState,
+		clusterState:               clusterState,
+		mainHeaders:                mainHeaders,
+		clusterHeaders:             clusterHeaders,
+		payloads:                   payloads,
+		transactions:               transactions,
+		config:                     DefaultConfig(),
+		bySealingRateLimiterConfig: bySealingRateLimiterConfig,
+		log:                        log.With().Str("component", "cluster_builder").Logger(),
+		clusterEpoch:               epochCounter,
 	}
 
 	for _, apply := range opts {
