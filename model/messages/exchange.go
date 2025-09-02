@@ -25,6 +25,7 @@ type EntityResponse flow.EntityResponse
 
 // ToInternal converts the untrusted EntityResponse into its trusted internal
 // representation.
+// No errors are expected during normal operations.
 func (e *EntityResponse) ToInternal() (any, error) {
 	return (*flow.EntityResponse)(e), nil
 }
