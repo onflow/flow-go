@@ -1201,7 +1201,7 @@ func (n *Network) processAuthenticatedMessage(msg *message.Message, peerID peer.
 		n.slashingViolationsConsumer.OnInvalidMsgError(violation)
 		return
 	}
-	scope, err := message.NewIncomingScope(originId, protocol, msg, internal)
+	scope, err := message.NewIncomingScope(originId, protocol, msg, internalMsg)
 	if err != nil {
 		n.logger.Error().
 			Err(err).
