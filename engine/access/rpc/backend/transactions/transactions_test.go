@@ -440,7 +440,7 @@ func (suite *Suite) TestGetSystemTransaction_HappyPath() {
 	require.NoError(suite.T(), err)
 
 	block := unittest.BlockFixture()
-	res, err := txBackend.GetSystemTransaction(context.Background(), block.ID())
+	res, err := txBackend.GetSystemTransaction(context.Background(), flow.ZeroID, block.ID())
 	suite.Require().NoError(err)
 
 	systemTx, err := blueprints.SystemChunkTransaction(suite.chainID.Chain())
@@ -513,6 +513,7 @@ func (suite *Suite) TestGetSystemTransactionResult_HappyPath() {
 
 		res, err := backend.GetSystemTransactionResult(
 			context.Background(),
+			flow.ZeroID,
 			block.ID(),
 			entities.EventEncodingVersion_JSON_CDC_V0,
 		)
@@ -616,7 +617,7 @@ func (suite *Suite) TestGetSystemTransactionResultFromStorage() {
 
 	txBackend, err := NewTransactionsBackend(params)
 	suite.Require().NoError(err)
-	response, err := txBackend.GetSystemTransactionResult(context.Background(), blockId, entities.EventEncodingVersion_JSON_CDC_V0)
+	response, err := txBackend.GetSystemTransactionResult(context.Background(), flow.ZeroID, blockId, entities.EventEncodingVersion_JSON_CDC_V0)
 	suite.assertTransactionResultResponse(err, response, *block, txId, lightTxShouldFail, eventsForTx)
 }
 
@@ -633,6 +634,7 @@ func (suite *Suite) TestGetSystemTransactionResult_BlockNotFound() {
 	suite.Require().NoError(err)
 	res, err := txBackend.GetSystemTransactionResult(
 		context.Background(),
+		flow.ZeroID,
 		block.ID(),
 		entities.EventEncodingVersion_JSON_CDC_V0,
 	)
@@ -692,6 +694,7 @@ func (suite *Suite) TestGetSystemTransactionResult_FailedEncodingConversion() {
 
 	res, err := txBackend.GetSystemTransactionResult(
 		context.Background(),
+		flow.ZeroID,
 		block.ID(),
 		entities.EventEncodingVersion_CCF_V0,
 	)
