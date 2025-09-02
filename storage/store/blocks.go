@@ -78,6 +78,7 @@ func (b *Blocks) retrieve(blockID flow.Identifier) (*flow.Block, error) {
 	return block, nil
 }
 
+// retrieveProposal returns the proposal with the given hash.
 func (b *Blocks) retrieveProposal(blockID flow.Identifier) (*flow.Proposal, error) {
 	block, err := b.retrieve(blockID)
 	if err != nil {
@@ -116,6 +117,9 @@ func (b *Blocks) ByID(blockID flow.Identifier) (*flow.Block, error) {
 	return b.retrieve(blockID)
 }
 
+// ProposalByID returns the proposal with the given hash.
+// Expected errors during normal operations:
+// - storage.ErrNotFound if no block is found
 func (b *Blocks) ProposalByID(blockID flow.Identifier) (*flow.Proposal, error) {
 	return b.retrieveProposal(blockID)
 }
@@ -147,6 +151,10 @@ func (b *Blocks) ByHeight(height uint64) (*flow.Block, error) {
 	return b.retrieve(blockID)
 }
 
+// ProposalByHeight returns the proposal at the given height. It is only available
+// for finalized blocks.
+// Expected errors during normal operations:
+// - storage.ErrNotFound if no block is found for the given height
 func (b *Blocks) ProposalByHeight(height uint64) (*flow.Proposal, error) {
 	blockID, err := b.headers.retrieveIdByHeightTx(height)
 	if err != nil {
