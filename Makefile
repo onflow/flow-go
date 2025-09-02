@@ -241,6 +241,7 @@ tidy:
 	cd crypto; go mod tidy -v
 	cd cmd/testclient; go mod tidy -v
 	cd insecure; go mod tidy -v
+	git diff --exit-code
 
 # Builds a custom version of the golangci-lint binary which includes custom plugins
 tools/custom-gcl: tools/structwrite .custom-gcl.yml
