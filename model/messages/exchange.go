@@ -13,6 +13,7 @@ type EntityRequest flow.EntityRequest
 
 // ToInternal converts the untrusted EntityRequest into its trusted internal
 // representation.
+// No errors are expected during normal operations.
 func (e *EntityRequest) ToInternal() (any, error) {
 	return (*flow.EntityRequest)(e), nil
 }
