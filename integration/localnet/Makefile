@@ -12,8 +12,8 @@ EPOCHLEN=10000                  # 0 means use default
 STAKINGLEN=2000                 # 0 means use default
 DKGLEN=2000                     # 0 means use default
 KVSTORE_VERSION=default
-EPOCH_EXTENSION_VIEW_COUNT=50
-FINALIZATION_SAFETY_THRESHOLD=1000 # 0 means use default
+EPOCH_EXTENSION_LEN=600
+FINALIZATION_SAFETY_THRESHOLD=100 # 0 means use default
 CONSENSUS_DELAY=800ms
 COLLECTION_DELAY=950ms
 
@@ -67,8 +67,8 @@ else
 		-epoch-staking-phase-length=$(STAKINGLEN) \
 		-epoch-dkg-phase-length=$(DKGLEN) \
 		-kvstore-version=$(KVSTORE_VERSION) \
-       	-kvstore-epoch-extension-view-count=$(EPOCH_EXTENSION_VIEW_COUNT) \
-        -kvstore-finalization-safety-threshold=$(FINALIZATION_SAFETY_THRESHOLD) \
+		-kvstore-epoch-extension-view-count=$(EPOCH_EXTENSION_LEN) \
+		-kvstore-finalization-safety-threshold=$(FINALIZATION_SAFETY_THRESHOLD) \
 		-profiler=$(PROFILER) \
 		-profile-uploader=$(PROFILE_UPLOADER) \
 		-tracing=$(TRACING) \
