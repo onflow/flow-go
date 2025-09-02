@@ -582,7 +582,7 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 		}).
 		Module("transactions and collections storage", func(node *cmd.NodeConfig) error {
 
-			dbStore := cmd.GetStorageMultiDBStoreIfNeeded(node)
+			dbStore := node.ProtocolDB
 
 			transactions := store.NewTransactions(node.Metrics.Cache, dbStore)
 			collections := store.NewCollections(dbStore, transactions)
@@ -854,7 +854,7 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 				return nil
 			}).
 			Module("transaction results storage", func(node *cmd.NodeConfig) error {
-				dbStore := cmd.GetStorageMultiDBStoreIfNeeded(node)
+				dbStore := node.ProtocolDB
 				builder.lightTransactionResults = store.NewLightTransactionResults(node.Metrics.Cache, dbStore, bstorage.DefaultCacheSize)
 				return nil
 			}).
@@ -1828,7 +1828,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 			return nil
 		}).
 		Module("events storage", func(node *cmd.NodeConfig) error {
-			dbStore := cmd.GetStorageMultiDBStoreIfNeeded(node)
+			dbStore := node.ProtocolDB
 			builder.events = store.NewEvents(node.Metrics.Cache, dbStore)
 			return nil
 		}).
@@ -1865,7 +1865,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 		}).
 		Module("transaction result error messages storage", func(node *cmd.NodeConfig) error {
 			if builder.storeTxResultErrorMessages {
-				dbStore := cmd.GetStorageMultiDBStoreIfNeeded(node)
+				dbStore := node.ProtocolDB
 				builder.transactionResultErrorMessages = store.NewTransactionResultErrorMessages(node.Metrics.Cache, dbStore, bstorage.DefaultCacheSize)
 			}
 
