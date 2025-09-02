@@ -32,13 +32,14 @@ func (s *VerifyScheduledCallbackSuite) TestVerifyScheduledCallback() {
 	s.T().Logf("got blockA height %v ID %v", blockA.HeaderBody.Height, blockA.ID())
 
 	// Deploy the test contract first
-	lib.DeployScheduledCallbackTestContract(
+	err := lib.DeployScheduledCallbackTestContract(
 		s.AccessClient(),
 		sdk.Address(sc.FlowCallbackScheduler.Address),
 		sdk.Address(sc.FlowToken.Address),
 		sdk.Address(sc.FungibleToken.Address),
 		sdk.Identifier(s.net.Root().ID()),
 	)
+	require.NoError(s.T(), err, "could not deploy test contract")
 
 	// Wait for next height finalized before scheduling callback
 	s.BlockState.WaitForHighestFinalizedProgress(s.T(), s.BlockState.HighestFinalizedHeight())
