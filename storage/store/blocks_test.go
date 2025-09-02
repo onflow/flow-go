@@ -7,6 +7,7 @@ import (
 
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/storage"
+	"github.com/onflow/flow-go/storage/operation"
 	"github.com/onflow/flow-go/storage/operation/dbtest"
 	"github.com/onflow/flow-go/storage/store"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -48,6 +49,126 @@ func TestBlockStoreAndRetrieve(t *testing.T) {
 		// as the original
 		blocksAfterRestart := store.InitAll(cacheMetrics, db).Blocks
 		receivedAfterRestart, err := blocksAfterRestart.ByID(block.ID())
+		require.NoError(t, err)
+		require.Equal(t, *block, *receivedAfterRestart)
+	})
+}
+
+func TestBlockIndexByHeightAndRetrieve(t *testing.T) {
+	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
+		lockManager := storage.NewTestingLockManager()
+		cacheMetrics := &metrics.NoopCollector{}
+		blocks := store.InitAll(cacheMetrics, db).Blocks
+		block := unittest.FullBlockFixture()
+		prop := unittest.ProposalFromBlock(block)
+
+		// First store the block
+		lctx := lockManager.NewContext()
+		err := lctx.AcquireLock(storage.LockInsertBlock)
+		require.NoError(t, err)
+
+		err = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+			return blocks.BatchStore(lctx, rw, prop)
+		})
+		require.NoError(t, err)
+		lctx.Release()
+
+		// Now index the block by height (requires LockFinalizeBlock)
+		lctx2 := lockManager.NewContext()
+		err = lctx2.AcquireLock(storage.LockFinalizeBlock)
+		require.NoError(t, err)
+
+		err = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+			return operation.IndexFinalizedBlockByHeight(lctx2, rw, block.Height, block.ID())
+		})
+		require.NoError(t, err)
+		lctx2.Release()
+
+		// Verify we can retrieve the block by height
+		retrievedByHeight, err := blocks.ByHeight(block.Height)
+		require.NoError(t, err)
+		require.Equal(t, *block, *retrievedByHeight)
+
+		// Verify we can retrieve the proposal by height
+		retrievedProposalByHeight, err := blocks.ProposalByHeight(block.Height)
+		require.NoError(t, err)
+		require.Equal(t, *prop, *retrievedProposalByHeight)
+
+		// Test that indexing the same height again returns ErrAlreadyExists
+		lctx3 := lockManager.NewContext()
+		err = lctx3.AcquireLock(storage.LockFinalizeBlock)
+		require.NoError(t, err)
+
+		err = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+			return operation.IndexFinalizedBlockByHeight(lctx3, rw, block.Height, block.ID())
+		})
+		require.ErrorIs(t, err, storage.ErrAlreadyExists)
+		lctx3.Release()
+
+		// Test that retrieving by non-existent height returns ErrNotFound
+		_, err = blocks.ByHeight(block.Height + 1000)
+		require.ErrorIs(t, err, storage.ErrNotFound)
+
+		// Verify after a restart, the block indexed by height is still retrievable
+		blocksAfterRestart := store.InitAll(cacheMetrics, db).Blocks
+		receivedAfterRestart, err := blocksAfterRestart.ByHeight(block.Height)
+		require.NoError(t, err)
+		require.Equal(t, *block, *receivedAfterRestart)
+	})
+}
+
+func TestBlockIndexByViewAndRetrieve(t *testing.T) {
+	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
+		lockManager := storage.NewTestingLockManager()
+		cacheMetrics := &metrics.NoopCollector{}
+		blocks := store.InitAll(cacheMetrics, db).Blocks
+		block := unittest.FullBlockFixture()
+		prop := unittest.ProposalFromBlock(block)
+
+		// First store the block
+		lctx := lockManager.NewContext()
+		err := lctx.AcquireLock(storage.LockInsertBlock)
+		require.NoError(t, err)
+
+		err = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+			err := blocks.BatchStore(lctx, rw, prop)
+			if err != nil {
+				return err
+			}
+			// Now index the block by view (requires LockInsertBlock)
+			return operation.IndexCertifiedBlockByView(lctx, rw, block.View, block.ID())
+		})
+		require.NoError(t, err)
+		lctx.Release()
+
+		// Verify we can retrieve the block by view
+		retrievedByView, err := blocks.ByView(block.View)
+		require.NoError(t, err)
+		require.Equal(t, *block, *retrievedByView)
+
+		// Verify we can retrieve the proposal by view
+		retrievedProposalByView, err := blocks.ProposalByView(block.View)
+		require.NoError(t, err)
+		require.Equal(t, *prop, *retrievedProposalByView)
+
+		// Test that indexing the same view again returns ErrAlreadyExists
+		lctx2 := lockManager.NewContext()
+		err = lctx2.AcquireLock(storage.LockInsertBlock)
+		require.NoError(t, err)
+
+		err = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+			return operation.IndexCertifiedBlockByView(lctx2, rw, block.View, block.ID())
+		})
+		require.ErrorIs(t, err, storage.ErrAlreadyExists)
+		lctx2.Release()
+
+		// Test that retrieving by non-existent view returns ErrNotFound
+		_, err = blocks.ByView(block.View + 1000)
+		require.ErrorIs(t, err, storage.ErrNotFound)
+
+		// Verify after a restart, the block indexed by view is still retrievable
+		blocksAfterRestart := store.InitAll(cacheMetrics, db).Blocks
+		receivedAfterRestart, err := blocksAfterRestart.ByView(block.View)
 		require.NoError(t, err)
 		require.Equal(t, *block, *receivedAfterRestart)
 	})

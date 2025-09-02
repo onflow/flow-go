@@ -90,3 +90,28 @@ func TestBlockHeightIndexLookup(t *testing.T) {
 		assert.Equal(t, expected, actual)
 	})
 }
+
+func TestBlockViewIndexLookup(t *testing.T) {
+	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
+
+		view := uint64(1337)
+		expected := flow.Identifier{0x01, 0x02, 0x03}
+
+		lockManager := storage.NewTestingLockManager()
+		lctx := lockManager.NewContext()
+		err := lctx.AcquireLock(storage.LockInsertBlock)
+		require.NoError(t, err)
+		defer lctx.Release()
+
+		err = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+			return operation.IndexCertifiedBlockByView(lctx, rw, view, expected)
+		})
+		require.NoError(t, err)
+
+		var actual flow.Identifier
+		err = operation.LookupCertifiedBlockByView(db.Reader(), view, &actual)
+		require.NoError(t, err)
+
+		assert.Equal(t, expected, actual)
+	})
+}

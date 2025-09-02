@@ -136,10 +136,9 @@ func (h *Headers) ByHeight(height uint64) (*flow.Header, error) {
 // Certified blocks are the blocks that have received a QC. Hotstuff guarantees that for each view,
 // at most one block is certified. Hence, the return value of `ByView` is guaranteed to be unique
 // even for non-finalized blocks.
+//
 // Expected errors during normal operations:
 //   - `storage.ErrNotFound` if no certified block is known at given view.
-//
-// NOTE: this method is not available until next spork (mainnet27) or a migration that builds the index.
 func (h *Headers) ByView(view uint64) (*flow.Header, error) {
 	blockID, err := h.viewCache.Get(h.db.Reader(), view)
 	if err != nil {

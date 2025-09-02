@@ -21,11 +21,10 @@ type Headers interface {
 	// Certified blocks are the blocks that have received QC. Hotstuff guarantees that for each view,
 	// at most one block is certified. Hence, the return value of `ByView` is guaranteed to be unique
 	// even for non-finalized blocks.
+	//
 	// Expected errors during normal operations:
 	//   - `storage.ErrNotFound` if no certified block is known at given view.
-	//
-	// TODO: this method is not available until next spork (mainnet27) or a migration that builds the index.
-	// ByView(view uint64) (*flow.Header, error)
+	ByView(view uint64) (*flow.Header, error)
 
 	// Exists returns true if a header with the given ID has been stored.
 	// CAUTION: this method is not backed by a cache and therefore comparatively slow!
