@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/cockroachdb/pebble/v2"
 	"github.com/coreos/go-semver/semver"
 	"github.com/ipfs/boxo/blockstore"
 	"github.com/ipfs/go-datastore"
@@ -106,6 +107,7 @@ import (
 	"github.com/onflow/flow-go/storage"
 	storagebadger "github.com/onflow/flow-go/storage/badger"
 	"github.com/onflow/flow-go/storage/operation/badgerimpl"
+	"github.com/onflow/flow-go/storage/operation/pebbleimpl"
 	storagepebble "github.com/onflow/flow-go/storage/pebble"
 	"github.com/onflow/flow-go/storage/store"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -233,7 +235,7 @@ func CompleteStateFixture(
 	dataDir := unittest.TempDir(t)
 	publicDBDir := filepath.Join(dataDir, "protocol")
 	secretsDBDir := filepath.Join(dataDir, "secrets")
-	db := unittest.TypedBadgerDB(t, publicDBDir, storagebadger.InitPublic)
+	db := unittest.TypedPebbleDB(t, publicDBDir, pebble.Open)
 	lockManager := storage.NewTestingLockManager()
 	s := storagebadger.InitAll(metric, db)
 	secretsDB := unittest.TypedBadgerDB(t, secretsDBDir, storagebadger.InitSecret)
@@ -241,7 +243,7 @@ func CompleteStateFixture(
 
 	state, err := badgerstate.Bootstrap(
 		metric,
-		badgerimpl.ToDB(db),
+		pebbleimpl.ToDB(db),
 		lockManager,
 		s.Headers,
 		s.Seals,
