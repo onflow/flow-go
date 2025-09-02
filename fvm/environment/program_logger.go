@@ -138,9 +138,14 @@ func (logger *ProgramLogger) Logs() []string {
 
 func (logger *ProgramLogger) RecordTrace(
 	operation string,
+	location common.Location,
 	duration time.Duration,
 	attrs []attribute.KeyValue,
 ) {
+	if location != nil {
+		attrs = append(attrs, attribute.String("location", location.String()))
+	}
+
 	end := time.Now()
 
 	span := logger.tracer.StartChildSpan(
@@ -155,7 +160,7 @@ func (logger *ProgramLogger) ProgramParsed(
 	location common.Location,
 	duration time.Duration,
 ) {
-	logger.RecordTrace("parseProgram", duration, nil)
+	logger.RecordTrace("parseProgram", location, duration, nil)
 
 	// These checks prevent re-reporting durations, the metrics collection is
 	// a bit counter-intuitive:
@@ -177,7 +182,7 @@ func (logger *ProgramLogger) ProgramChecked(
 	location common.Location,
 	duration time.Duration,
 ) {
-	logger.RecordTrace("checkProgram", duration, nil)
+	logger.RecordTrace("checkProgram", location, duration, nil)
 
 	// see the comment for ProgramParsed
 	if location == nil {
@@ -193,7 +198,7 @@ func (logger *ProgramLogger) ProgramInterpreted(
 	location common.Location,
 	duration time.Duration,
 ) {
-	logger.RecordTrace("interpretProgram", duration, nil)
+	logger.RecordTrace("interpretProgram", location, duration, nil)
 
 	// see the comment for ProgramInterpreted
 	if location == nil {
@@ -206,10 +211,10 @@ func (logger *ProgramLogger) ProgramInterpreted(
 
 // ValueEncoded accumulates time spend on runtime value encoding
 func (logger *ProgramLogger) ValueEncoded(duration time.Duration) {
-	logger.RecordTrace("encodeValue", duration, nil)
+	logger.RecordTrace("encodeValue", nil, duration, nil)
 }
 
 // ValueDecoded accumulates time spend on runtime value decoding
 func (logger *ProgramLogger) ValueDecoded(duration time.Duration) {
-	logger.RecordTrace("decodeValue", duration, nil)
+	logger.RecordTrace("decodeValue", nil, duration, nil)
 }
