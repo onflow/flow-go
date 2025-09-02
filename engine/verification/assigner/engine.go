@@ -123,9 +123,14 @@ func (e *Engine) processChunk(chunk *flow.Chunk, resultID flow.Identifier, block
 		Uint64("block_height", blockHeight).
 		Logger()
 
-	locator := &chunks.Locator{
-		ResultID: resultID,
-		Index:    chunk.Index,
+	locator, err := chunks.NewLocator(
+		chunks.UntrustedLocator{
+			ResultID: resultID,
+			Index:    chunk.Index,
+		},
+	)
+	if err != nil {
+		return false, fmt.Errorf("could not construct locator: %w", err)
 	}
 
 	// pushes chunk locator to the chunks queue
@@ -165,7 +170,7 @@ func (e *Engine) ProcessFinalizedBlock(block *flow.Block) {
 // processes the chunks assigned to this verification node by pushing them to the chunks consumer.
 func (e *Engine) processFinalizedBlock(ctx context.Context, block *flow.Block) {
 
-	if e.stopAtHeight > 0 && block.Header.Height == e.stopAtHeight {
+	if e.stopAtHeight > 0 && block.Height == e.stopAtHeight {
 		e.stopAtBlockID.Store(block.ID())
 	}
 
@@ -180,7 +185,7 @@ func (e *Engine) processFinalizedBlock(ctx context.Context, block *flow.Block) {
 
 	lg := e.log.With().
 		Hex("block_id", logging.ID(blockID)).
-		Uint64("block_height", block.Header.Height).
+		Uint64("block_height", block.Height).
 		Int("result_num", len(block.Payload.Results)).Logger()
 	lg.Debug().Msg("new finalized block arrived")
 
@@ -211,7 +216,7 @@ func (e *Engine) processFinalizedBlock(ctx context.Context, block *flow.Block) {
 					Msgf("Chunk for block at finalized height %d received - stopping node", e.stopAtHeight)
 			}
 
-			processed, err := e.processChunkWithTracing(ctx, chunk, resultID, block.Header.Height)
+			processed, err := e.processChunkWithTracing(ctx, chunk, resultID, block.Height)
 			if err != nil {
 				resultLog.Fatal().
 					Err(err).
@@ -226,7 +231,7 @@ func (e *Engine) processFinalizedBlock(ctx context.Context, block *flow.Block) {
 		}
 	}
 
-	e.metrics.OnFinalizedBlockArrivedAtAssigner(block.Header.Height)
+	e.metrics.OnFinalizedBlockArrivedAtAssigner(block.Height)
 	lg.Debug().
 		Uint64("total_assigned_chunks", assignedChunksCount).
 		Uint64("total_processed_chunks", processedChunksCount).
