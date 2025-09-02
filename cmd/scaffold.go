@@ -85,7 +85,6 @@ import (
 	bstorage "github.com/onflow/flow-go/storage/badger"
 	"github.com/onflow/flow-go/storage/badger/operation"
 	"github.com/onflow/flow-go/storage/dbops"
-	"github.com/onflow/flow-go/storage/operation/badgerimpl"
 	"github.com/onflow/flow-go/storage/operation/pebbleimpl"
 	"github.com/onflow/flow-go/storage/store"
 	sutil "github.com/onflow/flow-go/storage/util"
@@ -1163,10 +1162,9 @@ func (fnb *FlowNodeBuilder) initPebbleDB() error {
 }
 
 // create protocol db according to the badger or pebble db
-func (fnb *FlowNodeBuilder) initProtocolDB(bdb *badger.DB, pdb *pebble.DB) error {
+func (fnb *FlowNodeBuilder) initProtocolDB(_ *badger.DB, pdb *pebble.DB) error {
 	if dbops.IsBadgerBased(fnb.DBOps) {
-		fnb.ProtocolDB = badgerimpl.ToDB(bdb)
-		fnb.Logger.Info().Msg("initProtocolDB: using badger protocol db")
+		return fmt.Errorf("badger protocol db not supported anymore, use pebble instead")
 	} else if dbops.IsPebbleBatch(fnb.DBOps) {
 		fnb.ProtocolDB = pebbleimpl.ToDB(pdb)
 		fnb.Logger.Info().Msgf("initProtocolDB: using pebble protocol db")

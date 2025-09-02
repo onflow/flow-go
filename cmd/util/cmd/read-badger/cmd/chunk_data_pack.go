@@ -11,7 +11,6 @@ import (
 	"github.com/onflow/flow-go/cmd/util/cmd/common"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
-	"github.com/onflow/flow-go/storage/operation/badgerimpl"
 	"github.com/onflow/flow-go/storage/operation/pebbleimpl"
 	"github.com/onflow/flow-go/storage/store"
 )
@@ -29,7 +28,7 @@ var chunkDataPackCmd = &cobra.Command{
 	Use:   "chunk-data-packs",
 	Short: "get chunk data pack by chunk ID",
 	Run: func(cmd *cobra.Command, args []string) {
-		err := WithBadgerAndPebble(func(bdb *badger.DB, pdb *pebble.DB) error {
+		err := WithBadgerAndPebble(func(_ *badger.DB, pdb *pebble.DB) error {
 			log.Info().Msgf("got flag chunk id: %s", flagChunkID)
 			chunkID, err := flow.HexStringToIdentifier(flagChunkID)
 			if err != nil {
@@ -37,7 +36,7 @@ var chunkDataPackCmd = &cobra.Command{
 			}
 
 			metrics := metrics.NewNoopCollector()
-			db := badgerimpl.ToDB(bdb)
+			db := pebbleimpl.ToDB(pdb)
 			collections := store.NewCollections(db, store.NewTransactions(metrics, db))
 			chunkDataPacks := store.NewChunkDataPacks(metrics,
 				pebbleimpl.ToDB(pdb), collections, 1)

@@ -116,8 +116,7 @@ func InitStorage(datadir string) (storage.DB, error) {
 		return nil, err
 	}
 	if ok {
-		log.Info().Msgf("using badger db at %s", datadir)
-		return badgerimpl.ToDB(InitBadgerDBStorage(datadir)), nil
+		return nil, fmt.Errorf("badger db are no longer supported, datadir: %v", datadir)
 	}
 
 	ok, err = IsPebbleFolder(datadir)
@@ -230,10 +229,7 @@ func WithStorage(flags DBFlags, f func(storage.DB) error) error {
 	}
 
 	if usedDir.UseDB == UsedDBBadger {
-		db := InitBadgerDBStorage(usedDir.DBDir)
-		defer db.Close()
-
-		return f(badgerimpl.ToDB(db))
+		return fmt.Errorf("badger db are no longer supported, please use pebble db")
 	}
 
 	return fmt.Errorf("unexpected error")
