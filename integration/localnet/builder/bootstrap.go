@@ -73,7 +73,6 @@ var (
 	profiler                    bool
 	profileUploader             bool
 	tracing                     bool
-	cadenceTracing              bool
 	extensiveTracing            bool
 	consensusDelay              time.Duration
 	collectionDelay             time.Duration
@@ -433,7 +432,6 @@ func prepareExecutionService(container testnet.ContainerConfig, i int, n int) Se
 	service.Command = append(service.Command,
 		"--triedir=/trie",
 		fmt.Sprintf("--rpc-addr=%s:%s", container.ContainerName, testnet.GRPCPort),
-		fmt.Sprintf("--cadence-tracing=%t", cadenceTracing),
 		fmt.Sprintf("--extensive-tracing=%t", extensiveTracing),
 		"--execution-data-dir=/data/execution-data",
 		"--chunk-data-pack-dir=/data/chunk-data-pack",
