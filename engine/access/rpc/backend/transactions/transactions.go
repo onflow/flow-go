@@ -25,6 +25,7 @@ import (
 	"github.com/onflow/flow-go/engine/common/rpc"
 	commonrpc "github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
+	"github.com/onflow/flow-go/fvm/blueprints"
 	accessmodel "github.com/onflow/flow-go/model/access"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
@@ -45,7 +46,6 @@ type Transactions struct {
 	chainID flow.ChainID
 
 	systemTxID flow.Identifier
-	systemTx   *flow.TransactionBody
 
 	// RPC Clients & Network
 	collectionRPCClient         accessproto.AccessAPIClient // RPC client tied to a fixed collection node
@@ -58,6 +58,7 @@ type Transactions struct {
 	blocks       storage.Blocks
 	collections  storage.Collections
 	transactions storage.Transactions
+	events       storage.Events
 
 	txResultCache *lru.Cache[flow.Identifier, *accessmodel.TransactionResult]
 
@@ -74,7 +75,6 @@ type Params struct {
 	State                       protocol.State
 	ChainID                     flow.ChainID
 	SystemTxID                  flow.Identifier
-	SystemTx                    *flow.TransactionBody
 	StaticCollectionRPCClient   accessproto.AccessAPIClient
 	HistoricalAccessNodeClients []accessproto.AccessAPIClient
 	NodeCommunicator            node_communicator.Communicator
@@ -84,6 +84,7 @@ type Params struct {
 	Blocks                      storage.Blocks
 	Collections                 storage.Collections
 	Transactions                storage.Transactions
+	Events                      storage.Events
 	TxErrorMessageProvider      error_messages.Provider
 	TxResultCache               *lru.Cache[flow.Identifier, *accessmodel.TransactionResult]
 	TxProvider                  provider.TransactionProvider
@@ -100,7 +101,6 @@ func NewTransactionsBackend(params Params) (*Transactions, error) {
 		state:                       params.State,
 		chainID:                     params.ChainID,
 		systemTxID:                  params.SystemTxID,
-		systemTx:                    params.SystemTx,
 		collectionRPCClient:         params.StaticCollectionRPCClient,
 		historicalAccessNodeClients: params.HistoricalAccessNodeClients,
 		nodeCommunicator:            params.NodeCommunicator,
@@ -108,6 +108,7 @@ func NewTransactionsBackend(params Params) (*Transactions, error) {
 		blocks:                      params.Blocks,
 		collections:                 params.Collections,
 		transactions:                params.Transactions,
+		events:                      params.Events,
 		txResultCache:               params.TxResultCache,
 		txValidator:                 params.TxValidator,
 		txProvider:                  params.TxProvider,
@@ -299,7 +300,17 @@ func (t *Transactions) GetTransactionsByBlockID(
 		transactions = append(transactions, collection.Transactions...)
 	}
 
-	transactions = append(transactions, t.systemTx)
+	events, err := t.events.ByBlockID(blockID)
+	if err != nil {
+		return nil, rpc.ConvertStorageError(err)
+	}
+
+	sysCollection, err := blueprints.SystemCollection(t.chainID.Chain(), events)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "could not construct system collection: %v", err)
+	}
+
+	transactions = append(transactions, sysCollection.Transactions...)
 
 	return transactions, nil
 }
@@ -504,30 +515,47 @@ func (t *Transactions) GetTransactionResultByIndex(
 }
 
 // GetSystemTransaction returns system transaction
-func (t *Transactions) GetSystemTransaction(_ context.Context, txID flow.Identifier, _ flow.Identifier) (*flow.TransactionBody, error) {
-	// todo implement other system transaction look up
-	if txID != flow.ZeroID && txID != t.systemTxID {
-		return nil, status.Errorf(codes.Unimplemented, "system transaction by transaction ID not implemented")
+func (t *Transactions) GetSystemTransaction(_ context.Context, txID flow.Identifier, blockID flow.Identifier) (*flow.TransactionBody, error) {
+	if txID == flow.ZeroID {
+		// todo add metric for usage and deprecate the optional txID parameter
+		txID = t.systemTxID
 	}
 
-	return t.systemTx, nil
+	events, err := t.events.ByBlockID(blockID)
+	if err != nil {
+		return nil, rpc.ConvertStorageError(err)
+	}
+
+	sysCollection, err := blueprints.SystemCollection(t.chainID.Chain(), events)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "could not construct system collection: %v", err)
+	}
+
+	for _, tx := range sysCollection.Transactions {
+		if tx.ID() == txID {
+			return tx, nil
+		}
+	}
+
+	return nil, status.Errorf(codes.NotFound, "system transaction not found")
 }
 
 // GetSystemTransactionResult returns system transaction result
 func (t *Transactions) GetSystemTransactionResult(ctx context.Context, txID flow.Identifier, blockID flow.Identifier, requiredEventEncodingVersion entities.EventEncodingVersion) (*accessmodel.TransactionResult, error) {
-	// todo implement other system transaction look up
-	if txID != flow.ZeroID && txID != t.systemTxID {
-		return nil, status.Errorf(codes.Unimplemented, "system transaction result by transaction ID not implemented")
+	if txID == flow.ZeroID {
+		// todo add metric for usage and deprecate the optional txID parameter
+		txID = t.systemTxID
+	}
+
+	// make sure the system transaction exists
+	_, err := t.GetSystemTransaction(ctx, txID, blockID)
+	if err != nil {
+		return nil, err
 	}
 
 	block, err := t.blocks.ByID(blockID)
 	if err != nil {
 		return nil, rpc.ConvertStorageError(err)
-	}
-
-	// If txID is ZeroID, use the system transaction ID
-	if txID == flow.ZeroID {
-		txID = t.systemTxID
 	}
 
 	return t.lookupTransactionResult(ctx, txID, block.ToHeader(), requiredEventEncodingVersion)
