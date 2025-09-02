@@ -174,15 +174,9 @@ func (br *BlobChannelReader) receiveNewBlob() bool {
 		return false
 	}
 
-	// Create a defensive copy of the blob data to prevent corruption
-	// if the underlying IPFS block data gets modified or reused
-	rawData := blob.RawData()
-	blobDataCopy := make([]byte, len(rawData))
-	copy(blobDataCopy, rawData)
-
-	br.buf = bytes.NewBuffer(blobDataCopy)
+	br.buf = bytes.NewBuffer(blob.RawData())
 	br.cids = append(br.cids, blob.Cid())
-	br.bytesReceived += uint64(len(blobDataCopy))
+	br.bytesReceived += uint64(len(blob.RawData()))
 
 	return true
 }
