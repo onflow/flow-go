@@ -241,7 +241,6 @@ func New(params Params) (*Backend, error) {
 		Metrics:                     params.AccessMetrics,
 		State:                       params.State,
 		ChainID:                     params.ChainID,
-		SystemTx:                    systemTx,
 		SystemTxID:                  systemTxID,
 		StaticCollectionRPCClient:   params.CollectionRPC,
 		HistoricalAccessNodeClients: params.HistoricalAccessNodes,
