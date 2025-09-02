@@ -507,7 +507,7 @@ func (t *Transactions) GetTransactionResultByIndex(
 func (t *Transactions) GetSystemTransaction(_ context.Context, txID flow.Identifier, _ flow.Identifier) (*flow.TransactionBody, error) {
 	// todo implement other system transaction look up
 	if txID != flow.ZeroID && txID != t.systemTxID {
-		return nil, nil
+		return nil, status.Errorf(codes.Unimplemented, "system transaction by transaction ID not implemented")
 	}
 
 	return t.systemTx, nil
@@ -517,7 +517,7 @@ func (t *Transactions) GetSystemTransaction(_ context.Context, txID flow.Identif
 func (t *Transactions) GetSystemTransactionResult(ctx context.Context, txID flow.Identifier, blockID flow.Identifier, requiredEventEncodingVersion entities.EventEncodingVersion) (*accessmodel.TransactionResult, error) {
 	// todo implement other system transaction look up
 	if txID != flow.ZeroID && txID != t.systemTxID {
-		return nil, nil
+		return nil, status.Errorf(codes.Unimplemented, "system transaction result by transaction ID not implemented")
 	}
 
 	block, err := t.blocks.ByID(blockID)
