@@ -292,6 +292,19 @@ func (a *AccountRegisters) ForEachKey(f func(key string) error) error {
 	return nil
 }
 
+func (a *AccountRegisters) PayloadSize() int {
+	size := 0
+	for key, value := range a.registers {
+		ledgerKey := convert.RegisterIDToLedgerKey(flow.RegisterID{
+			Owner: a.owner,
+			Key:   key,
+		})
+		payload := ledger.NewPayload(ledgerKey, value)
+		size += payload.Size()
+	}
+	return size
+}
+
 func NewAccountRegistersFromPayloads(owner string, payloads []*ledger.Payload) (*AccountRegisters, error) {
 	accountRegisters := NewAccountRegisters(owner)
 

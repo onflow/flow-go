@@ -13,6 +13,8 @@ import (
 
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/storage/state"
+	"github.com/onflow/flow-go/ledger"
+	"github.com/onflow/flow-go/ledger/common/convert"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -772,6 +774,19 @@ func (a *StatefulAccounts) setAccountStatus(
 			err)
 	}
 	return nil
+}
+
+// PredefinedSequenceNumberPayloadSize returns sequence number register size.
+func PredefinedSequenceNumberPayloadSize(owner string, keyIndex uint32) uint64 {
+	// NOTE: We use 1 byte for register value size as predefined value size.
+	sequenceNumberValueUsedForStorageSizeComputation := []byte{0x01}
+
+	ledgerKey := convert.RegisterIDToLedgerKey(flow.RegisterID{
+		Owner: owner,
+		Key:   fmt.Sprintf(flow.SequenceNumberRegisterKeyPattern, keyIndex),
+	})
+	payload := ledger.NewPayload(ledgerKey, sequenceNumberValueUsedForStorageSizeComputation)
+	return uint64(payload.Size())
 }
 
 // contractNames container for a list of contract names. Should always be
