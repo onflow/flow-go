@@ -269,6 +269,10 @@ func (m *ParticipantState) Extend(ctx context.Context, candidateProposal *flow.P
 		return err
 	}
 
+	deferredBlockPersist := deferred.NewDeferredBlockPersist()
+
+	// check if the block header is a valid extension of parent block
+	err = m.headerExtend(ctx, candidateProposal, nil, deferredBlockPersist)
 	if err != nil {
 		return fmt.Errorf("header not compliant with chain state: %w", err)
 	}
@@ -283,14 +287,6 @@ func (m *ParticipantState) Extend(ctx context.Context, candidateProposal *flow.P
 			return fmt.Errorf("candidate block is an outdated extension: %w", err)
 		}
 		return fmt.Errorf("could not check if block is an outdated extension: %w", err)
-	}
-
-	deferredBlockPersist := deferred.NewDeferredBlockPersist()
-
-	// check if the block header is a valid extension of parent block
-	err = m.headerExtend(ctx, candidateProposal, nil, deferredBlockPersist)
-	if err != nil {
-		return fmt.Errorf("header not compliant with chain state: %w", err)
 	}
 
 	// check if the guarantees in the payload is a valid extension of the finalized state
@@ -367,8 +363,6 @@ func (m *ParticipantState) Extend(ctx context.Context, candidateProposal *flow.P
 //
 // Expected errors during normal operations:
 //   - state.InvalidExtensionError if the candidate block is invalid
-//
-// No errors are expected during normal operation.
 func (m *FollowerState) headerExtend(ctx context.Context, candidate *flow.Proposal, certifyingQC *flow.QuorumCertificate, deferredBlockPersist *deferred.DeferredBlockPersist) error {
 	span, _ := m.tracer.StartSpanFromContext(ctx, trace.ProtoStateMutatorExtendCheckHeader)
 	defer span.End()
