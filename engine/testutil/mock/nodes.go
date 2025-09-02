@@ -47,6 +47,7 @@ import (
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/events"
 	"github.com/onflow/flow-go/storage"
+	"github.com/onflow/flow-go/storage/store"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -56,7 +57,7 @@ type StateFixture struct {
 	DBDir          string
 	PublicDB       storage.DB
 	SecretsDB      *badger.DB
-	Storage        *storage.All
+	Storage        *store.All
 	ProtocolEvents *events.Distributor
 	State          protocol.ParticipantState
 	LockManager    lockctx.Manager
@@ -220,7 +221,7 @@ type ExecutionNode struct {
 	FollowerEngine      *followereng.ComplianceEngine
 	SyncEngine          *synchronization.Engine
 	Compactor           *complete.Compactor
-	BadgerDB            *badger.DB
+	ProtocolDB          storage.DB
 	VM                  fvm.VM
 	ExecutionState      state.ExecutionState
 	Ledger              ledger.Ledger
