@@ -54,6 +54,9 @@ git
 language/tools/vscode-extension/cadence-*.vsix
 language/tools/vscode-extension/out/*
 
+# Local development files
+.local
+
 # Go mod ignores
 .history
 

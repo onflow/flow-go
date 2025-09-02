@@ -43,7 +43,7 @@ Example
 //
 // CAUTION: not concurrency safe! (if applicable, documentation is obligatory)
 //
-// Expected errors returned during normal operations:
+// Expected error returns during normal operations:
 //   - ErrType1: when and why this error occurs
 //   - ErrType2: when and why this error occurs
 //   - All other errors are potential indicators of bugs or corrupted internal state (continuation impossible)
@@ -59,7 +59,7 @@ Example
   ```go
   // ByBlockID returns the header with the given ID. It is available for finalized and ambiguous blocks.
   //
-  // Expected errors returned during normal operations:
+  // Expected error returns during normal operations:
   //  - ErrNotFound if no block header with the given ID exists
   //  - All other errors are potential indicators of bugs or corrupted internal state (continuation impossible)
   ByBlockID(blockID flow.Identifier) (*flow.Header, error)
@@ -141,7 +141,7 @@ Error documentation must follow one of these 2 formats:
 
 For methods with expected benign errors:
 ```go
-// Expected errors returned during normal operations:
+// Expected error returns during normal operations:
 //   - ErrTypeName: when and why this error occurs (for sentinel errors)
 //   - ErrWrapped: when wrapped via fmt.Errorf, document the original sentinel error
 //   - All other errors are potential indicators of bugs or corrupted internal state (continuation impossible)
@@ -158,7 +158,7 @@ Example 1: Method with sentinel errors
 ```go
 // GetBlock returns the block with the given ID.
 //
-// Expected errors returned during normal operations:
+// Expected error returns during normal operations:
 //   - ErrNotFound: when the block doesn't exist
 //   - All other errors are potential indicators of bugs or corrupted internal state (continuation impossible)
 ```
@@ -167,7 +167,7 @@ Example 2: Method wrapping a sentinel error
 ```go
 // ValidateTransaction validates the transaction against the current state.
 //
-// Expected errors returned during normal operations:
+// Expected error returns during normal operations:
 //   - ErrInvalidSignature: when the transaction signature is invalid (wrapped)
 //   - All other errors are potential indicators of bugs or corrupted internal state (continuation impossible)
 ```
@@ -183,7 +183,7 @@ Example 4: Method with context-dependent error handling
 ```go
 // ByBlockID returns the block with the given ID.
 //
-// Expected errors returned during normal operations:
+// Expected error returns during normal operations:
 //   - ErrNotFound: when requesting non-finalized blocks that don't exist
 //   - All other errors are potential indicators of bugs or corrupted internal state (continuation impossible)
 // Note: ErrNotFound is NOT expected when requesting finalized blocks
@@ -239,7 +239,7 @@ Example 4: Method with context-dependent error handling
 //
 // Safe for concurrent access.
 //
-// Expected errors returned during normal operations:
+// Expected error returns during normal operations:
 //   - ErrInvalidReceipt: when the receipt is malformed
 //   - ErrDuplicateReceipt: when the receipt already exists
 //   - All other errors are potential indicators of bugs or corrupted internal state (continuation impossible)

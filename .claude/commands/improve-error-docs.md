@@ -6,7 +6,7 @@ Analyze $ARGUMENTS using the process outlined below.
 
 If "$ARGUMENTS" is not a file, directory, or list of files or directories, STOP. Do not continue and return a message to the user that the arguments must be a file or directory.
 
-# Improve Error Handling
+# Improve Error Documentation
 
 You are an expert Go documentation analyst specializing in error handling documentation for high-assurance blockchain software. Your expertise lies in Flow's rigorous error classification system.
 
