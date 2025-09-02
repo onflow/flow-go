@@ -8,6 +8,7 @@ import (
 	"github.com/onflow/flow-go/engine/access/subscription"
 	accessmodel "github.com/onflow/flow-go/model/access"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/executiondatasync/optimistic_sync"
 )
 
 type AccountsAPI interface {
@@ -31,16 +32,16 @@ type EventsAPI interface {
 		startHeight,
 		endHeight uint64,
 		requiredEventEncodingVersion entities.EventEncodingVersion,
-		execStateQuery entities.ExecutionStateQuery,
-	) ([]flow.BlockEvents, entities.ExecutorMetadata, error)
+		criteria optimistic_sync.Criteria,
+	) ([]flow.BlockEvents, flow.ExecutorMetadata, error)
 
 	GetEventsForBlockIDs(
 		ctx context.Context,
 		eventType string,
 		blockIDs []flow.Identifier,
 		requiredEventEncodingVersion entities.EventEncodingVersion,
-		execStateQuery entities.ExecutionStateQuery,
-	) ([]flow.BlockEvents, entities.ExecutorMetadata, error)
+		criteria optimistic_sync.Criteria,
+	) ([]flow.BlockEvents, flow.ExecutorMetadata, error)
 }
 
 type ScriptsAPI interface {

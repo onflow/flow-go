@@ -1,6 +1,9 @@
 package optimistic_sync
 
 import (
+	"github.com/onflow/flow/protobuf/go/flow/entities"
+
+	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -12,6 +15,18 @@ type Criteria struct {
 	AgreeingExecutorsCount uint
 	// RequiredExecutors is the list of EN node IDs, one of which must have produced the result
 	RequiredExecutors flow.IdentifierList
+}
+
+func NewCriteria(query *entities.ExecutionStateQuery) Criteria {
+	if query == nil {
+		// TODO: or return empty criteria?
+		return DefaultCriteria
+	}
+
+	return Criteria{
+		AgreeingExecutorsCount: uint(query.AgreeingExecutorsCount),
+		RequiredExecutors:      convert.MessagesToIdentifiers(query.RequiredExecutorIds),
+	}
 }
 
 // DefaultCriteria is the operator's default criteria for execution result queries.
