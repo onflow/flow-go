@@ -54,7 +54,7 @@ import (
 // as well as all of its backend dependencies.
 type StateFixture struct {
 	DBDir          string
-	PublicDB       *badger.DB
+	PublicDB       storage.DB
 	SecretsDB      *badger.DB
 	Storage        *storage.All
 	ProtocolEvents *events.Distributor
@@ -72,7 +72,7 @@ type GenericNode struct {
 	Log                zerolog.Logger
 	Metrics            *metrics.NoopCollector
 	Tracer             module.Tracer
-	PublicDB           *badger.DB
+	PublicDB           storage.DB
 	SecretsDB          *badger.DB
 	LockManager        lockctx.Manager
 	Headers            storage.Headers
