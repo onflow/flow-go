@@ -3,7 +3,6 @@ package common
 import (
 	"context"
 	"fmt"
-	"github.com/onflow/flow-go/model/messages"
 	"testing"
 	"time"
 
@@ -12,6 +11,7 @@ import (
 
 	"github.com/onflow/flow-go/integration/testnet"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/utils/unittest"
 )
