@@ -31,19 +31,20 @@ import (
 // HotStuff event loop is the only consumer of this interface and is single
 // threaded, this is OK.
 type Builder struct {
-	db             storage.DB
-	lockManager    lockctx.Manager
-	mainHeaders    storage.Headers
-	metrics        module.CollectionMetrics
-	clusterHeaders storage.Headers
-	protoState     protocol.State
-	clusterState   clusterstate.State
-	payloads       storage.ClusterPayloads
-	transactions   mempool.Transactions
-	tracer         module.Tracer
-	config         Config
-	log            zerolog.Logger
-	clusterEpoch   uint64 // the operating epoch for this cluster
+	db                         storage.DB
+	lockManager                lockctx.Manager
+	mainHeaders                storage.Headers
+	metrics                    module.CollectionMetrics
+	clusterHeaders             storage.Headers
+	protoState                 protocol.State
+	clusterState               clusterstate.State
+	payloads                   storage.ClusterPayloads
+	transactions               mempool.Transactions
+	tracer                     module.Tracer
+	config                     Config
+	bySealingRateLimiterConfig module.ReadonlySealingLagRateLimiterConfig
+	log                        zerolog.Logger
+	clusterEpoch               uint64 // the operating epoch for this cluster
 	// cache of values about the operating epoch which never change
 	epochFinalHeight *uint64          // last height of this cluster's operating epoch (nil if epoch not ended)
 	epochFinalID     *flow.Identifier // ID of last block in this cluster's operating epoch (nil if epoch not ended)
