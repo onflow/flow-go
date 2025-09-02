@@ -2,6 +2,7 @@ package state
 
 import (
 	"fmt"
+
 	"github.com/onflow/cadence/common"
 	"github.com/onflow/crypto/hash"
 
