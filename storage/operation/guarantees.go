@@ -12,13 +12,12 @@ import (
 
 // InsertGuarantee inserts a collection guarantee by ID.
 // Error returns:
-//   - storage.ErrAlreadyExists if the key already exists in the database.
 //   - generic error in case of unexpected failure from the database layer or encoding failure.
 func InsertGuarantee(w storage.Writer, guaranteeID flow.Identifier, guarantee *flow.CollectionGuarantee) error {
 	return UpsertByKey(w, MakePrefix(codeGuarantee, guaranteeID), guarantee)
 }
 
-// InsertGuarantee inserts a [flow.CollectionGuarantee] into the database, keyed by the collection ID.
+// IndexGuarantee inserts a [flow.CollectionGuarantee] into the database, keyed by the collection ID.
 //
 // CAUTION:
 //   - The caller must acquire the [storage.LockInsertBlock] and hold it until the database write has been committed.
