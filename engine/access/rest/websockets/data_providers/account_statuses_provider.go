@@ -15,6 +15,7 @@ import (
 	"github.com/onflow/flow-go/engine/access/subscription"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/counters"
+	"github.com/onflow/flow-go/module/executiondatasync/optimistic_sync"
 )
 
 // accountStatusesArguments contains the arguments required for subscribing to account statuses
@@ -137,15 +138,16 @@ func (p *AccountStatusesDataProvider) createAndStartSubscription(
 	ctx context.Context,
 	args accountStatusesArguments,
 ) subscription.Subscription {
+	criteria := optimistic_sync.NewCriteria(&args.ExecutionStateQuery)
 	if args.StartBlockID != flow.ZeroID {
-		return p.stateStreamApi.SubscribeAccountStatusesFromStartBlockID(ctx, args.StartBlockID, args.Filter, args.ExecutionStateQuery)
+		return p.stateStreamApi.SubscribeAccountStatusesFromStartBlockID(ctx, args.StartBlockID, args.Filter, criteria)
 	}
 
 	if args.StartBlockHeight != request.EmptyHeight {
-		return p.stateStreamApi.SubscribeAccountStatusesFromStartHeight(ctx, args.StartBlockHeight, args.Filter, args.ExecutionStateQuery)
+		return p.stateStreamApi.SubscribeAccountStatusesFromStartHeight(ctx, args.StartBlockHeight, args.Filter, criteria)
 	}
 
-	return p.stateStreamApi.SubscribeAccountStatusesFromLatestBlock(ctx, args.Filter, args.ExecutionStateQuery)
+	return p.stateStreamApi.SubscribeAccountStatusesFromLatestBlock(ctx, args.Filter, criteria)
 }
 
 // convertAccountStatusesResponse converts events in the provided AccountStatusesResponse from CCF
@@ -163,9 +165,10 @@ func convertAccountStatusesResponse(resp *backend.AccountStatusesResponse) (*bac
 	}
 
 	return &backend.AccountStatusesResponse{
-		BlockID:       resp.BlockID,
-		Height:        resp.Height,
-		AccountEvents: jsoncdcEvents,
+		BlockID:          resp.BlockID,
+		Height:           resp.Height,
+		AccountEvents:    jsoncdcEvents,
+		ExecutorMetadata: resp.ExecutorMetadata,
 	}, nil
 }
 
@@ -232,7 +235,7 @@ func parseAccountStatusesArguments(
 	}
 	args.ExecutionStateQuery = entities.ExecutionStateQuery{
 		AgreeingExecutorsCount:  agreeingExecutorCount,
-		RequiredExecutorId:      requiredExecutorIDs,
+		RequiredExecutorIds:     requiredExecutorIDs,
 		IncludeExecutorMetadata: includeExecutorMetadata,
 	}
 

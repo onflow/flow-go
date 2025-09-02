@@ -6,7 +6,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/onflow/flow/protobuf/go/flow/entities"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -370,7 +369,7 @@ func (s *BackendAccountStatusesSuite) TestSubscribeAccountStatusesFromStartBlock
 	}, nil)
 
 	call := func(ctx context.Context, startValue interface{}, filter state_stream.AccountStatusFilter) subscription.Subscription {
-		return s.backend.SubscribeAccountStatusesFromStartBlockID(ctx, startValue.(flow.Identifier), filter, s.executionStateQuery)
+		return s.backend.SubscribeAccountStatusesFromStartBlockID(ctx, startValue.(flow.Identifier), filter, s.criteria)
 	}
 
 	s.subscribeToAccountStatuses(call, s.subscribeFromStartBlockIdTestCases())
@@ -386,7 +385,7 @@ func (s *BackendAccountStatusesSuite) TestSubscribeAccountStatusesFromStartHeigh
 	}, nil)
 
 	call := func(ctx context.Context, startValue interface{}, filter state_stream.AccountStatusFilter) subscription.Subscription {
-		return s.backend.SubscribeAccountStatusesFromStartHeight(ctx, startValue.(uint64), filter, s.executionStateQuery)
+		return s.backend.SubscribeAccountStatusesFromStartHeight(ctx, startValue.(uint64), filter, s.criteria)
 	}
 
 	s.subscribeToAccountStatuses(call, s.subscribeFromStartHeightTestCases())
@@ -402,7 +401,7 @@ func (s *BackendAccountStatusesSuite) TestSubscribeAccountStatusesFromLatestBloc
 	}, nil)
 
 	call := func(ctx context.Context, startValue interface{}, filter state_stream.AccountStatusFilter) subscription.Subscription {
-		return s.backend.SubscribeAccountStatusesFromLatestBlock(ctx, filter, s.executionStateQuery)
+		return s.backend.SubscribeAccountStatusesFromLatestBlock(ctx, filter, s.criteria)
 	}
 
 	s.subscribeToAccountStatuses(call, s.subscribeFromLatestTestCases())
@@ -429,7 +428,7 @@ func (s *BackendExecutionDataSuite) TestSubscribeAccountStatusesHandlesErrors() 
 			subCtx,
 			unittest.IdentifierFixture(),
 			state_stream.AccountStatusFilter{},
-			entities.ExecutionStateQuery{},
+			s.criteria,
 		)
 		assert.Equal(s.T(), codes.NotFound, status.Code(sub.Err()), "expected NotFound, got %v: %v", status.Code(sub.Err()).String(), sub.Err())
 	})
@@ -449,7 +448,7 @@ func (s *BackendExecutionDataSuite) TestSubscribeAccountStatusesHandlesErrors() 
 			subCtx,
 			s.rootBlock.Header.Height-1,
 			state_stream.AccountStatusFilter{},
-			entities.ExecutionStateQuery{},
+			s.criteria,
 		)
 		assert.Equal(s.T(), codes.InvalidArgument, status.Code(sub.Err()), "expected InvalidArgument, got %v: %v", status.Code(sub.Err()).String(), sub.Err())
 	})
@@ -465,7 +464,7 @@ func (s *BackendExecutionDataSuite) TestSubscribeAccountStatusesHandlesErrors() 
 			subCtx,
 			s.blocks[len(s.blocks)-1].Header.Height+10,
 			state_stream.AccountStatusFilter{},
-			entities.ExecutionStateQuery{},
+			s.criteria,
 		)
 		assert.Equal(s.T(), codes.NotFound, status.Code(sub.Err()), "expected NotFound, got %v: %v", status.Code(sub.Err()).String(), sub.Err())
 	})

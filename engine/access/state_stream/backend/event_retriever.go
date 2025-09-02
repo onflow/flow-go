@@ -5,10 +5,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/onflow/flow/protobuf/go/flow/entities"
 	"github.com/rs/zerolog"
 
-	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/executiondatasync/optimistic_sync"
 	"github.com/onflow/flow-go/storage"
@@ -17,10 +15,11 @@ import (
 
 // EventsResponse represents the response containing events for a specific block.
 type EventsResponse struct {
-	BlockID        flow.Identifier
-	Height         uint64
-	Events         flow.EventsList
-	BlockTimestamp time.Time
+	BlockID          flow.Identifier
+	Height           uint64
+	Events           flow.EventsList
+	BlockTimestamp   time.Time
+	ExecutorMetadata flow.ExecutorMetadata
 }
 
 // EventsProvider retrieves events by block height. It can be configured to retrieve events from
@@ -43,14 +42,13 @@ type EventsProvider struct {
 func (b *EventsProvider) GetAllEventsResponse(
 	ctx context.Context,
 	height uint64,
-	execStateQuery entities.ExecutionStateQuery,
-) (*EventsResponse, entities.ExecutorMetadata, error) {
+	criteria optimistic_sync.Criteria,
+) (*EventsResponse, error) {
 	var response *EventsResponse
 	var err error
-	var metadata entities.ExecutorMetadata
 
 	if b.fetchFromLocalCache {
-		response, metadata, err = b.getEventsFromStorage(height, execStateQuery)
+		response, err = b.getEventsFromStorage(height, criteria)
 	} else {
 		response, err = b.getEventsFromExecutionData(ctx, height)
 	}
@@ -58,7 +56,7 @@ func (b *EventsProvider) GetAllEventsResponse(
 	if err == nil {
 		header, err := b.headers.ByHeight(height)
 		if err != nil {
-			return nil, metadata, fmt.Errorf("could not get header for height %d: %w", height, err)
+			return nil, fmt.Errorf("could not get header for height %d: %w", height, err)
 		}
 		response.BlockTimestamp = header.Timestamp
 
@@ -71,7 +69,7 @@ func (b *EventsProvider) GetAllEventsResponse(
 		}
 	}
 
-	return response, metadata, err
+	return response, err
 }
 
 // getEventsFromExecutionData returns the events for a given height extract from the execution data.
@@ -101,46 +99,41 @@ func (b *EventsProvider) getEventsFromExecutionData(ctx context.Context, height 
 // an error indicating issue with getting events for a block.
 func (b *EventsProvider) getEventsFromStorage(
 	height uint64,
-	executionState entities.ExecutionStateQuery,
-) (*EventsResponse, entities.ExecutorMetadata, error) {
-	metadata := entities.ExecutorMetadata{}
+	criteria optimistic_sync.Criteria,
+) (*EventsResponse, error) {
 	blockID, err := b.headers.BlockIDByHeight(height)
 	if err != nil {
-		return nil, metadata, fmt.Errorf("could not get header for height %d: %w", height, err)
-	}
-
-	clientCriteria := optimistic_sync.Criteria{
-		AgreeingExecutorsCount: uint(executionState.AgreeingExecutorsCount),
-		RequiredExecutors:      convert.MessagesToIdentifiers(executionState.RequiredExecutorId),
+		return nil, fmt.Errorf("could not get header for height %d: %w", height, err)
 	}
 
 	result, err := b.execResultProvider.ExecutionResult(
 		blockID,
-		b.operatorCriteria.OverrideWith(clientCriteria),
+		b.operatorCriteria.OverrideWith(criteria),
 	)
 	if err != nil {
-		return &EventsResponse{}, metadata, fmt.Errorf("error fetching execution result: %w", err)
-	}
-
-	metadata = entities.ExecutorMetadata{
-		ExecutionResultId: convert.IdentifierToMessage(result.ExecutionResult.ID()),
-		ExecutorId:        convert.IdentifiersToMessages(result.ExecutionNodes.NodeIDs()),
+		return &EventsResponse{}, fmt.Errorf("error fetching execution result: %w", err)
 	}
 
 	snapshot, err := b.execStateCache.Snapshot(result.ExecutionResult.ID())
 	if err != nil {
-		return &EventsResponse{}, metadata,
+		return &EventsResponse{},
 			fmt.Errorf("failed to get snapshot for execution result %s: %w", result.ExecutionResult.ID(), err)
 	}
 
 	events, err := snapshot.Events().ByBlockID(blockID)
 	if err != nil {
-		return nil, metadata, fmt.Errorf("could not get events for block %d: %w", blockID, err)
+		return nil, fmt.Errorf("could not get events for block %d: %w", blockID, err)
+	}
+
+	metadata := flow.ExecutorMetadata{
+		ExecutionResultID: result.ExecutionResult.ID(),
+		ExecutorIDs:       result.ExecutionNodes.NodeIDs(),
 	}
 
 	return &EventsResponse{
-		BlockID: blockID,
-		Height:  height,
-		Events:  events,
-	}, metadata, nil
+		BlockID:          blockID,
+		Height:           height,
+		Events:           events,
+		ExecutorMetadata: metadata,
+	}, nil
 }

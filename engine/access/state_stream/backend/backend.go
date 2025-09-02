@@ -58,6 +58,8 @@ type Config struct {
 
 	// HeartbeatInterval specifies the block interval at which heartbeat messages should be sent.
 	HeartbeatInterval uint64
+
+	OperatorCriteria optimistic_sync.Criteria
 }
 
 type GetExecutionDataFunc func(context.Context, uint64) (*execution_data.BlockExecutionDataEntity, error)

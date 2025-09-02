@@ -16,6 +16,7 @@ import (
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/counters"
+	"github.com/onflow/flow-go/module/executiondatasync/optimistic_sync"
 )
 
 // eventsArguments contains the arguments a user passes to subscribe to events
@@ -136,15 +137,16 @@ func (p *EventsDataProvider) sendResponse(eventsResponse *backend.EventsResponse
 
 // createAndStartSubscription creates a new subscription using the specified input arguments.
 func (p *EventsDataProvider) createAndStartSubscription(ctx context.Context, args eventsArguments) subscription.Subscription {
+	criteria := optimistic_sync.NewCriteria(&args.ExecutionStateQuery)
 	if args.StartBlockID != flow.ZeroID {
-		return p.stateStreamApi.SubscribeEventsFromStartBlockID(ctx, args.StartBlockID, args.Filter, args.ExecutionStateQuery)
+		return p.stateStreamApi.SubscribeEventsFromStartBlockID(ctx, args.StartBlockID, args.Filter, criteria)
 	}
 
 	if args.StartBlockHeight != request.EmptyHeight {
-		return p.stateStreamApi.SubscribeEventsFromStartHeight(ctx, args.StartBlockHeight, args.Filter, args.ExecutionStateQuery)
+		return p.stateStreamApi.SubscribeEventsFromStartHeight(ctx, args.StartBlockHeight, args.Filter, criteria)
 	}
 
-	return p.stateStreamApi.SubscribeEventsFromLatest(ctx, args.Filter, args.ExecutionStateQuery)
+	return p.stateStreamApi.SubscribeEventsFromLatest(ctx, args.Filter, criteria)
 }
 
 // convertEventsResponse converts events in the provided EventsResponse from CCF to JSON-CDC format.
@@ -254,7 +256,7 @@ func parseEventsArguments(
 	}
 	args.ExecutionStateQuery = entities.ExecutionStateQuery{
 		AgreeingExecutorsCount:  agreeingExecutorCount,
-		RequiredExecutorId:      requiredExecutorIDs,
+		RequiredExecutorIds:     requiredExecutorIDs,
 		IncludeExecutorMetadata: includeExecutorMetadata,
 	}
 

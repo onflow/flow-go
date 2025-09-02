@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/onflow/flow/protobuf/go/flow/entities"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/engine/access/state_stream"
@@ -12,6 +11,7 @@ import (
 	"github.com/onflow/flow-go/engine/access/subscription/tracker"
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/executiondatasync/optimistic_sync"
 	"github.com/onflow/flow-go/storage"
 )
 
@@ -52,14 +52,14 @@ func (b *EventsBackend) SubscribeEvents(
 	startBlockID flow.Identifier,
 	startHeight uint64,
 	filter state_stream.EventFilter,
-	execStateQuery entities.ExecutionStateQuery,
+	criteria optimistic_sync.Criteria,
 ) subscription.Subscription {
 	nextHeight, err := b.executionDataTracker.GetStartHeight(ctx, startBlockID, startHeight)
 	if err != nil {
 		return subscription.NewFailedSubscription(err, "could not get start height")
 	}
 
-	return b.subscriptionHandler.Subscribe(ctx, nextHeight, b.getResponseFactory(filter, execStateQuery))
+	return b.subscriptionHandler.Subscribe(ctx, nextHeight, b.getResponseFactory(filter, criteria))
 }
 
 // SubscribeEventsFromStartBlockID streams events starting at the specified block ID,
@@ -81,14 +81,14 @@ func (b *EventsBackend) SubscribeEventsFromStartBlockID(
 	ctx context.Context,
 	startBlockID flow.Identifier,
 	filter state_stream.EventFilter,
-	execStateQuery entities.ExecutionStateQuery,
+	criteria optimistic_sync.Criteria,
 ) subscription.Subscription {
 	nextHeight, err := b.executionDataTracker.GetStartHeightFromBlockID(startBlockID)
 	if err != nil {
 		return subscription.NewFailedSubscription(err, "could not get start height from block id")
 	}
 
-	return b.subscriptionHandler.Subscribe(ctx, nextHeight, b.getResponseFactory(filter, execStateQuery))
+	return b.subscriptionHandler.Subscribe(ctx, nextHeight, b.getResponseFactory(filter, criteria))
 }
 
 // SubscribeEventsFromStartHeight streams events starting at the specified block height,
@@ -110,14 +110,14 @@ func (b *EventsBackend) SubscribeEventsFromStartHeight(
 	ctx context.Context,
 	startHeight uint64,
 	filter state_stream.EventFilter,
-	execStateQuery entities.ExecutionStateQuery,
+	criteria optimistic_sync.Criteria,
 ) subscription.Subscription {
 	nextHeight, err := b.executionDataTracker.GetStartHeightFromHeight(startHeight)
 	if err != nil {
 		return subscription.NewFailedSubscription(err, "could not get start height from block height")
 	}
 
-	return b.subscriptionHandler.Subscribe(ctx, nextHeight, b.getResponseFactory(filter, execStateQuery))
+	return b.subscriptionHandler.Subscribe(ctx, nextHeight, b.getResponseFactory(filter, criteria))
 }
 
 // SubscribeEventsFromLatest subscribes to events starting at the latest sealed block,
@@ -137,14 +137,14 @@ func (b *EventsBackend) SubscribeEventsFromStartHeight(
 func (b *EventsBackend) SubscribeEventsFromLatest(
 	ctx context.Context,
 	filter state_stream.EventFilter,
-	execStateQuery entities.ExecutionStateQuery,
+	criteria optimistic_sync.Criteria,
 ) subscription.Subscription {
 	nextHeight, err := b.executionDataTracker.GetStartHeightFromLatest(ctx)
 	if err != nil {
 		return subscription.NewFailedSubscription(err, "could not get start height from block height")
 	}
 
-	return b.subscriptionHandler.Subscribe(ctx, nextHeight, b.getResponseFactory(filter, execStateQuery))
+	return b.subscriptionHandler.Subscribe(ctx, nextHeight, b.getResponseFactory(filter, criteria))
 }
 
 // getResponseFactory returns a function that retrieves the event response for a given height.
@@ -156,12 +156,10 @@ func (b *EventsBackend) SubscribeEventsFromLatest(
 // - subscription.ErrBlockNotReady: execution data for the given block height is not available.
 func (b *EventsBackend) getResponseFactory(
 	filter state_stream.EventFilter,
-	execStateQuery entities.ExecutionStateQuery,
+	criteria optimistic_sync.Criteria,
 ) subscription.GetDataByHeightFunc {
 	return func(ctx context.Context, height uint64) (response interface{}, err error) {
-		// TODO: what should I do with metadata?
-		eventsResponse, _, err :=
-			b.eventsProvider.GetAllEventsResponse(ctx, height, execStateQuery)
+		eventsResponse, err := b.eventsProvider.GetAllEventsResponse(ctx, height, criteria)
 		if err != nil {
 			if errors.Is(err, storage.ErrNotFound) ||
 				errors.Is(err, storage.ErrHeightNotIndexed) {

@@ -3,13 +3,12 @@ package routes
 import (
 	"context"
 
-	"github.com/onflow/flow/protobuf/go/flow/entities"
-
 	"github.com/onflow/flow-go/engine/access/rest/common"
 	"github.com/onflow/flow-go/engine/access/rest/websockets/legacy"
 	"github.com/onflow/flow-go/engine/access/rest/websockets/legacy/request"
 	"github.com/onflow/flow-go/engine/access/state_stream"
 	"github.com/onflow/flow-go/engine/access/subscription"
+	"github.com/onflow/flow-go/module/executiondatasync/optimistic_sync"
 )
 
 // SubscribeEvents create websocket connection and write to it requested events.
@@ -44,6 +43,6 @@ func SubscribeEvents(
 		req.StartBlockID,
 		req.StartHeight,
 		filter,
-		entities.ExecutionStateQuery{},
+		optimistic_sync.DefaultCriteria,
 	), nil
 }

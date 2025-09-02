@@ -6,9 +6,9 @@ import (
 	context "context"
 
 	flow "github.com/onflow/flow-go/model/flow"
-	entities "github.com/onflow/flow/protobuf/go/flow/entities"
-
 	mock "github.com/stretchr/testify/mock"
+
+	optimistic_sync "github.com/onflow/flow-go/module/executiondatasync/optimistic_sync"
 
 	state_stream "github.com/onflow/flow-go/engine/access/state_stream"
 
@@ -20,17 +20,17 @@ type EventsAPI struct {
 	mock.Mock
 }
 
-// SubscribeEvents provides a mock function with given fields: ctx, startBlockID, startHeight, filter, execStateQuery
-func (_m *EventsAPI) SubscribeEvents(ctx context.Context, startBlockID flow.Identifier, startHeight uint64, filter state_stream.EventFilter, execStateQuery entities.ExecutionStateQuery) subscription.Subscription {
-	ret := _m.Called(ctx, startBlockID, startHeight, filter, execStateQuery)
+// SubscribeEvents provides a mock function with given fields: ctx, startBlockID, startHeight, filter, criteria
+func (_m *EventsAPI) SubscribeEvents(ctx context.Context, startBlockID flow.Identifier, startHeight uint64, filter state_stream.EventFilter, criteria optimistic_sync.Criteria) subscription.Subscription {
+	ret := _m.Called(ctx, startBlockID, startHeight, filter, criteria)
 
 	if len(ret) == 0 {
 		panic("no return value specified for SubscribeEvents")
 	}
 
 	var r0 subscription.Subscription
-	if rf, ok := ret.Get(0).(func(context.Context, flow.Identifier, uint64, state_stream.EventFilter, entities.ExecutionStateQuery) subscription.Subscription); ok {
-		r0 = rf(ctx, startBlockID, startHeight, filter, execStateQuery)
+	if rf, ok := ret.Get(0).(func(context.Context, flow.Identifier, uint64, state_stream.EventFilter, optimistic_sync.Criteria) subscription.Subscription); ok {
+		r0 = rf(ctx, startBlockID, startHeight, filter, criteria)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(subscription.Subscription)
@@ -40,17 +40,17 @@ func (_m *EventsAPI) SubscribeEvents(ctx context.Context, startBlockID flow.Iden
 	return r0
 }
 
-// SubscribeEventsFromLatest provides a mock function with given fields: ctx, filter, execStateQuery
-func (_m *EventsAPI) SubscribeEventsFromLatest(ctx context.Context, filter state_stream.EventFilter, execStateQuery entities.ExecutionStateQuery) subscription.Subscription {
-	ret := _m.Called(ctx, filter, execStateQuery)
+// SubscribeEventsFromLatest provides a mock function with given fields: ctx, filter, criteria
+func (_m *EventsAPI) SubscribeEventsFromLatest(ctx context.Context, filter state_stream.EventFilter, criteria optimistic_sync.Criteria) subscription.Subscription {
+	ret := _m.Called(ctx, filter, criteria)
 
 	if len(ret) == 0 {
 		panic("no return value specified for SubscribeEventsFromLatest")
 	}
 
 	var r0 subscription.Subscription
-	if rf, ok := ret.Get(0).(func(context.Context, state_stream.EventFilter, entities.ExecutionStateQuery) subscription.Subscription); ok {
-		r0 = rf(ctx, filter, execStateQuery)
+	if rf, ok := ret.Get(0).(func(context.Context, state_stream.EventFilter, optimistic_sync.Criteria) subscription.Subscription); ok {
+		r0 = rf(ctx, filter, criteria)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(subscription.Subscription)
@@ -60,17 +60,17 @@ func (_m *EventsAPI) SubscribeEventsFromLatest(ctx context.Context, filter state
 	return r0
 }
 
-// SubscribeEventsFromStartBlockID provides a mock function with given fields: ctx, startBlockID, filter, execStateQuery
-func (_m *EventsAPI) SubscribeEventsFromStartBlockID(ctx context.Context, startBlockID flow.Identifier, filter state_stream.EventFilter, execStateQuery entities.ExecutionStateQuery) subscription.Subscription {
-	ret := _m.Called(ctx, startBlockID, filter, execStateQuery)
+// SubscribeEventsFromStartBlockID provides a mock function with given fields: ctx, startBlockID, filter, criteria
+func (_m *EventsAPI) SubscribeEventsFromStartBlockID(ctx context.Context, startBlockID flow.Identifier, filter state_stream.EventFilter, criteria optimistic_sync.Criteria) subscription.Subscription {
+	ret := _m.Called(ctx, startBlockID, filter, criteria)
 
 	if len(ret) == 0 {
 		panic("no return value specified for SubscribeEventsFromStartBlockID")
 	}
 
 	var r0 subscription.Subscription
-	if rf, ok := ret.Get(0).(func(context.Context, flow.Identifier, state_stream.EventFilter, entities.ExecutionStateQuery) subscription.Subscription); ok {
-		r0 = rf(ctx, startBlockID, filter, execStateQuery)
+	if rf, ok := ret.Get(0).(func(context.Context, flow.Identifier, state_stream.EventFilter, optimistic_sync.Criteria) subscription.Subscription); ok {
+		r0 = rf(ctx, startBlockID, filter, criteria)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(subscription.Subscription)
@@ -80,17 +80,17 @@ func (_m *EventsAPI) SubscribeEventsFromStartBlockID(ctx context.Context, startB
 	return r0
 }
 
-// SubscribeEventsFromStartHeight provides a mock function with given fields: ctx, startHeight, filter, execStateQuery
-func (_m *EventsAPI) SubscribeEventsFromStartHeight(ctx context.Context, startHeight uint64, filter state_stream.EventFilter, execStateQuery entities.ExecutionStateQuery) subscription.Subscription {
-	ret := _m.Called(ctx, startHeight, filter, execStateQuery)
+// SubscribeEventsFromStartHeight provides a mock function with given fields: ctx, startHeight, filter, criteria
+func (_m *EventsAPI) SubscribeEventsFromStartHeight(ctx context.Context, startHeight uint64, filter state_stream.EventFilter, criteria optimistic_sync.Criteria) subscription.Subscription {
+	ret := _m.Called(ctx, startHeight, filter, criteria)
 
 	if len(ret) == 0 {
 		panic("no return value specified for SubscribeEventsFromStartHeight")
 	}
 
 	var r0 subscription.Subscription
-	if rf, ok := ret.Get(0).(func(context.Context, uint64, state_stream.EventFilter, entities.ExecutionStateQuery) subscription.Subscription); ok {
-		r0 = rf(ctx, startHeight, filter, execStateQuery)
+	if rf, ok := ret.Get(0).(func(context.Context, uint64, state_stream.EventFilter, optimistic_sync.Criteria) subscription.Subscription); ok {
+		r0 = rf(ctx, startHeight, filter, criteria)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(subscription.Subscription)

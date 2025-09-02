@@ -220,6 +220,7 @@ func DefaultObserverServiceConfig() *ObserverServiceConfig {
 			ResponseLimit:           subscription.DefaultResponseLimit,
 			HeartbeatInterval:       subscription.DefaultHeartbeatInterval,
 			RegisterIDsRequestLimit: state_stream.DefaultRegisterIDsRequestLimit,
+			OperatorCriteria:        optimistic_sync.DefaultCriteria,
 		},
 		stateStreamFilterConf:                nil,
 		rpcMetricsEnabled:                    false,
@@ -1545,7 +1546,7 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 
 			// use the events index for events if enabled and the node is configured to use it for
 			// regular event queries
-			useIndex := builder.executionDataIndexingEnabled &&
+			fetchFromLocalStorage := builder.executionDataIndexingEnabled &&
 				eventQueryMode != query_mode.IndexQueryModeExecutionNodesOnly
 
 			executionDataTracker := subscriptiontracker.NewExecutionDataTracker(
@@ -1556,7 +1557,7 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 				broadcaster,
 				highestAvailableHeight,
 				builder.EventsIndex,
-				useIndex,
+				fetchFromLocalStorage,
 			)
 
 			builder.stateStreamBackend, err = statestreambackend.New(
@@ -1568,8 +1569,7 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 				builder.ExecutionDataStore,
 				executionDataStoreCache,
 				builder.RegistersAsyncStore,
-				builder.EventsIndex,
-				useIndex,
+				fetchFromLocalStorage,
 				int(builder.stateStreamConf.RegisterIDsRequestLimit),
 				subscription.NewSubscriptionHandler(
 					builder.Logger,
@@ -1579,6 +1579,8 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 					builder.stateStreamConf.ClientSendBufferSize,
 				),
 				executionDataTracker,
+				nil, //TODO: add later
+				nil, //TODO: add later
 			)
 			if err != nil {
 				return nil, fmt.Errorf("could not create state stream backend: %w", err)

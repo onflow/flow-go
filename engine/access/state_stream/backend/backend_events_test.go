@@ -8,7 +8,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/onflow/flow/protobuf/go/flow/entities"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -224,7 +223,7 @@ func (s *BackendEventsSuite) runTestSubscribeEvents() {
 	}
 
 	call := func(ctx context.Context, startBlockID flow.Identifier, startHeight uint64, filter state_stream.EventFilter) subscription.Subscription {
-		return s.backend.SubscribeEvents(ctx, startBlockID, startHeight, filter, entities.ExecutionStateQuery{})
+		return s.backend.SubscribeEvents(ctx, startBlockID, startHeight, filter, s.criteria)
 	}
 
 	s.subscribe(call, s.requireEventsResponse, s.setupFilterForTestCases(tests))
@@ -263,7 +262,7 @@ func (s *BackendEventsSuite) runTestSubscribeEventsFromStartBlockID() {
 	}, nil)
 
 	call := func(ctx context.Context, startBlockID flow.Identifier, _ uint64, filter state_stream.EventFilter) subscription.Subscription {
-		return s.backend.SubscribeEventsFromStartBlockID(ctx, startBlockID, filter, entities.ExecutionStateQuery{})
+		return s.backend.SubscribeEventsFromStartBlockID(ctx, startBlockID, filter, s.criteria)
 	}
 
 	s.subscribe(call, s.requireEventsResponse, s.setupFilterForTestCases(tests))
@@ -302,7 +301,7 @@ func (s *BackendEventsSuite) runTestSubscribeEventsFromStartHeight() {
 	}, nil)
 
 	call := func(ctx context.Context, _ flow.Identifier, startHeight uint64, filter state_stream.EventFilter) subscription.Subscription {
-		return s.backend.SubscribeEventsFromStartHeight(ctx, startHeight, filter, entities.ExecutionStateQuery{})
+		return s.backend.SubscribeEventsFromStartHeight(ctx, startHeight, filter, s.criteria)
 	}
 
 	s.subscribe(call, s.requireEventsResponse, s.setupFilterForTestCases(tests))
@@ -333,7 +332,7 @@ func (s *BackendEventsSuite) runTestSubscribeEventsFromLatest() {
 	}, nil)
 
 	call := func(ctx context.Context, _ flow.Identifier, _ uint64, filter state_stream.EventFilter) subscription.Subscription {
-		return s.backend.SubscribeEventsFromLatest(ctx, filter, entities.ExecutionStateQuery{})
+		return s.backend.SubscribeEventsFromLatest(ctx, filter, s.criteria)
 	}
 
 	s.subscribe(call, s.requireEventsResponse, s.setupFilterForTestCases(tests))
@@ -492,7 +491,7 @@ func (s *BackendExecutionDataSuite) TestSubscribeEventsHandlesErrors() {
 			unittest.IdentifierFixture(),
 			1,
 			state_stream.EventFilter{},
-			entities.ExecutionStateQuery{},
+			s.criteria,
 		)
 		assert.Equal(s.T(), codes.InvalidArgument, status.Code(sub.Err()))
 	})
@@ -506,7 +505,7 @@ func (s *BackendExecutionDataSuite) TestSubscribeEventsHandlesErrors() {
 			flow.ZeroID,
 			s.rootBlock.Header.Height-1,
 			state_stream.EventFilter{},
-			entities.ExecutionStateQuery{},
+			s.criteria,
 		)
 		assert.Equal(s.T(), codes.InvalidArgument, status.Code(sub.Err()), "expected InvalidArgument, got %v: %v", status.Code(sub.Err()).String(), sub.Err())
 	})
@@ -520,7 +519,7 @@ func (s *BackendExecutionDataSuite) TestSubscribeEventsHandlesErrors() {
 			unittest.IdentifierFixture(),
 			0,
 			state_stream.EventFilter{},
-			entities.ExecutionStateQuery{},
+			s.criteria,
 		)
 		assert.Equal(s.T(), codes.NotFound, status.Code(sub.Err()), "expected NotFound, got %v: %v", status.Code(sub.Err()).String(), sub.Err())
 	})
@@ -536,7 +535,7 @@ func (s *BackendExecutionDataSuite) TestSubscribeEventsHandlesErrors() {
 			subCtx,
 			flow.ZeroID,
 			s.blocks[len(s.blocks)-1].Header.Height+10,
-			state_stream.EventFilter{}, entities.ExecutionStateQuery{},
+			state_stream.EventFilter{}, s.criteria,
 		)
 		assert.Equal(s.T(), codes.NotFound, status.Code(sub.Err()), "expected NotFound, got %v: %v", status.Code(sub.Err()).String(), sub.Err())
 	})
@@ -558,7 +557,7 @@ func (s *BackendExecutionDataSuite) TestSubscribeEventsHandlesErrors() {
 			flow.ZeroID,
 			0,
 			state_stream.EventFilter{},
-			entities.ExecutionStateQuery{},
+			s.criteria,
 		)
 		assert.Equal(s.T(), codes.FailedPrecondition, status.Code(sub.Err()), "expected FailedPrecondition, got %v: %v", status.Code(sub.Err()).String(), sub.Err())
 	})
@@ -576,7 +575,7 @@ func (s *BackendExecutionDataSuite) TestSubscribeEventsHandlesErrors() {
 			flow.ZeroID,
 			s.blocks[0].Header.Height,
 			state_stream.EventFilter{},
-			entities.ExecutionStateQuery{},
+			s.criteria,
 		)
 		assert.Equal(s.T(), codes.InvalidArgument, status.Code(sub.Err()), "expected InvalidArgument, got %v: %v", status.Code(sub.Err()).String(), sub.Err())
 	})
@@ -593,7 +592,7 @@ func (s *BackendExecutionDataSuite) TestSubscribeEventsHandlesErrors() {
 			subCtx,
 			flow.ZeroID,
 			s.blocks[len(s.blocks)-1].Header.Height,
-			state_stream.EventFilter{}, entities.ExecutionStateQuery{},
+			state_stream.EventFilter{}, s.criteria,
 		)
 		assert.Equal(s.T(), codes.InvalidArgument, status.Code(sub.Err()), "expected InvalidArgument, got %v: %v", status.Code(sub.Err()).String(), sub.Err())
 	})
@@ -633,7 +632,7 @@ func (s *BackendExecutionDataSuite) TestSubscribeEventsFromStartBlockIDHandlesEr
 			subCtx,
 			unittest.IdentifierFixture(),
 			state_stream.EventFilter{},
-			entities.ExecutionStateQuery{},
+			s.criteria,
 		)
 		assert.Equal(s.T(), codes.NotFound, status.Code(sub.Err()), "expected NotFound, got %v: %v", status.Code(sub.Err()).String(), sub.Err())
 	})
@@ -654,7 +653,7 @@ func (s *BackendExecutionDataSuite) TestSubscribeEventsFromStartBlockIDHandlesEr
 			subCtx,
 			flow.ZeroID,
 			state_stream.EventFilter{},
-			entities.ExecutionStateQuery{},
+			s.criteria,
 		)
 		assert.Equal(s.T(), codes.FailedPrecondition, status.Code(sub.Err()), "expected FailedPrecondition, got %v: %v", status.Code(sub.Err()).String(), sub.Err())
 	})
@@ -671,7 +670,7 @@ func (s *BackendExecutionDataSuite) TestSubscribeEventsFromStartBlockIDHandlesEr
 			subCtx,
 			s.blocks[0].ID(),
 			state_stream.EventFilter{},
-			entities.ExecutionStateQuery{},
+			s.criteria,
 		)
 		assert.Equal(s.T(), codes.InvalidArgument, status.Code(sub.Err()), "expected InvalidArgument, got %v: %v", status.Code(sub.Err()).String(), sub.Err())
 	})
@@ -688,7 +687,7 @@ func (s *BackendExecutionDataSuite) TestSubscribeEventsFromStartBlockIDHandlesEr
 			subCtx,
 			s.blocks[len(s.blocks)-1].ID(),
 			state_stream.EventFilter{},
-			entities.ExecutionStateQuery{},
+			s.criteria,
 		)
 		assert.Equal(s.T(), codes.InvalidArgument, status.Code(sub.Err()), "expected InvalidArgument, got %v: %v", status.Code(sub.Err()).String(), sub.Err())
 	})
@@ -731,7 +730,7 @@ func (s *BackendExecutionDataSuite) TestSubscribeEventsFromStartHeightHandlesErr
 			subCtx,
 			s.rootBlock.Header.Height-1,
 			state_stream.EventFilter{},
-			entities.ExecutionStateQuery{},
+			s.criteria,
 		)
 		assert.Equal(s.T(), codes.InvalidArgument, status.Code(sub.Err()), "expected InvalidArgument, got %v: %v", status.Code(sub.Err()).String(), sub.Err())
 	})
@@ -747,7 +746,7 @@ func (s *BackendExecutionDataSuite) TestSubscribeEventsFromStartHeightHandlesErr
 			subCtx,
 			s.blocks[len(s.blocks)-1].Header.Height+10,
 			state_stream.EventFilter{},
-			entities.ExecutionStateQuery{},
+			s.criteria,
 		)
 		assert.Equal(s.T(), codes.NotFound, status.Code(sub.Err()), "expected NotFound, got %v: %v", status.Code(sub.Err()).String(), sub.Err())
 	})
@@ -768,7 +767,7 @@ func (s *BackendExecutionDataSuite) TestSubscribeEventsFromStartHeightHandlesErr
 			subCtx,
 			s.blocks[0].Header.Height,
 			state_stream.EventFilter{},
-			entities.ExecutionStateQuery{},
+			s.criteria,
 		)
 		assert.Equal(s.T(), codes.FailedPrecondition, status.Code(sub.Err()), "expected FailedPrecondition, got %v: %v", status.Code(sub.Err()).String(), sub.Err())
 	})
@@ -785,7 +784,7 @@ func (s *BackendExecutionDataSuite) TestSubscribeEventsFromStartHeightHandlesErr
 			subCtx,
 			s.blocks[0].Header.Height,
 			state_stream.EventFilter{},
-			entities.ExecutionStateQuery{},
+			s.criteria,
 		)
 		assert.Equal(s.T(), codes.InvalidArgument, status.Code(sub.Err()), "expected InvalidArgument, got %v: %v", status.Code(sub.Err()).String(), sub.Err())
 	})
@@ -802,7 +801,7 @@ func (s *BackendExecutionDataSuite) TestSubscribeEventsFromStartHeightHandlesErr
 			subCtx,
 			s.blocks[len(s.blocks)-1].Header.Height,
 			state_stream.EventFilter{},
-			entities.ExecutionStateQuery{},
+			s.criteria,
 		)
 		assert.Equal(s.T(), codes.InvalidArgument, status.Code(sub.Err()), "expected InvalidArgument, got %v: %v", status.Code(sub.Err()).String(), sub.Err())
 	})

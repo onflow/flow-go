@@ -3,11 +3,10 @@ package state_stream
 import (
 	"context"
 
-	"github.com/onflow/flow/protobuf/go/flow/entities"
-
 	"github.com/onflow/flow-go/engine/access/subscription"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
+	"github.com/onflow/flow-go/module/executiondatasync/optimistic_sync"
 )
 
 const (
@@ -43,7 +42,7 @@ type EventsAPI interface {
 		startBlockID flow.Identifier,
 		startHeight uint64,
 		filter EventFilter,
-		execStateQuery entities.ExecutionStateQuery,
+		criteria optimistic_sync.Criteria,
 	) subscription.Subscription
 
 	// SubscribeEventsFromStartBlockID streams events starting at the specified block ID,
@@ -65,7 +64,7 @@ type EventsAPI interface {
 		ctx context.Context,
 		startBlockID flow.Identifier,
 		filter EventFilter,
-		execStateQuery entities.ExecutionStateQuery,
+		criteria optimistic_sync.Criteria,
 	) subscription.Subscription
 
 	// SubscribeEventsFromStartHeight streams events starting at the specified block height,
@@ -87,7 +86,7 @@ type EventsAPI interface {
 		ctx context.Context,
 		startHeight uint64,
 		filter EventFilter,
-		execStateQuery entities.ExecutionStateQuery,
+		criteria optimistic_sync.Criteria,
 	) subscription.Subscription
 
 	// SubscribeEventsFromLatest subscribes to events starting at the latest sealed block,
@@ -107,7 +106,7 @@ type EventsAPI interface {
 	SubscribeEventsFromLatest(
 		ctx context.Context,
 		filter EventFilter,
-		execStateQuery entities.ExecutionStateQuery,
+		criteria optimistic_sync.Criteria,
 	) subscription.Subscription
 }
 
@@ -118,7 +117,7 @@ type AccountsAPI interface {
 		ctx context.Context,
 		startBlockID flow.Identifier,
 		filter AccountStatusFilter,
-		execStateQuery entities.ExecutionStateQuery,
+		criteria optimistic_sync.Criteria,
 	) subscription.Subscription
 
 	// SubscribeAccountStatusesFromStartHeight subscribes to the streaming of account status changes starting from
@@ -128,7 +127,7 @@ type AccountsAPI interface {
 		ctx context.Context,
 		startHeight uint64,
 		filter AccountStatusFilter,
-		execStateQuery entities.ExecutionStateQuery,
+		criteria optimistic_sync.Criteria,
 	) subscription.Subscription
 
 	// SubscribeAccountStatusesFromLatestBlock subscribes to the streaming of account status changes starting from a
@@ -136,7 +135,7 @@ type AccountsAPI interface {
 	SubscribeAccountStatusesFromLatestBlock(
 		ctx context.Context,
 		filter AccountStatusFilter,
-		execStateQuery entities.ExecutionStateQuery,
+		criteria optimistic_sync.Criteria,
 	) subscription.Subscription
 }
 

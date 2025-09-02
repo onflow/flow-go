@@ -247,6 +247,7 @@ func DefaultAccessNodeConfig() *AccessNodeConfig {
 			RegisterIDsRequestLimit: state_stream.DefaultRegisterIDsRequestLimit,
 			ResponseLimit:           subscription.DefaultResponseLimit,
 			HeartbeatInterval:       subscription.DefaultHeartbeatInterval,
+			OperatorCriteria:        optimistic_sync.DefaultCriteria,
 		},
 		stateStreamFilterConf:        nil,
 		ExecutionNodeAddress:         "localhost:9000",
@@ -1049,7 +1050,7 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 
 			// use the events index for events if enabled and the node is configured to use it for
 			// regular event queries
-			useIndex := builder.executionDataIndexingEnabled &&
+			fetchFromLocalStorage := builder.executionDataIndexingEnabled &&
 				eventQueryMode != query_mode.IndexQueryModeExecutionNodesOnly
 
 			executionDataTracker := subscriptiontracker.NewExecutionDataTracker(
@@ -1060,7 +1061,7 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 				broadcaster,
 				highestAvailableHeight,
 				builder.EventsIndex,
-				useIndex,
+				fetchFromLocalStorage,
 			)
 
 			builder.stateStreamBackend, err = statestreambackend.New(
@@ -1072,8 +1073,7 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 				builder.ExecutionDataStore,
 				executionDataStoreCache,
 				builder.RegistersAsyncStore,
-				builder.EventsIndex,
-				useIndex,
+				fetchFromLocalStorage,
 				int(builder.stateStreamConf.RegisterIDsRequestLimit),
 				subscription.NewSubscriptionHandler(
 					builder.Logger,
@@ -1083,6 +1083,8 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 					builder.stateStreamConf.ClientSendBufferSize,
 				),
 				executionDataTracker,
+				nil, //TODO: add later
+				nil, //TODO: add later
 			)
 			if err != nil {
 				return nil, fmt.Errorf("could not create state stream backend: %w", err)

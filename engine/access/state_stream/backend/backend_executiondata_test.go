@@ -8,7 +8,6 @@ import (
 
 	"github.com/ipfs/go-datastore"
 	dssync "github.com/ipfs/go-datastore/sync"
-	"github.com/onflow/flow/protobuf/go/flow/entities"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -71,7 +70,7 @@ type BackendExecutionDataSuite struct {
 	executionResultProvider  *osmock.ExecutionResultProvider
 	executionStateSnapshot   *osmock.Snapshot
 	executionStateCache      *osmock.ExecutionStateCache
-	executionStateQuery      entities.ExecutionStateQuery
+	criteria                 optimistic_sync.Criteria
 	backend                  *StateStreamBackend
 	executionDataTrackerReal tracker.ExecutionDataTracker
 
@@ -207,7 +206,7 @@ func (s *BackendExecutionDataSuite) SetupTestSuite(blockCount int) {
 		}, nil).
 		Maybe()
 
-	s.executionStateQuery = entities.ExecutionStateQuery{}
+	s.criteria = optimistic_sync.DefaultCriteria
 }
 
 func (s *BackendExecutionDataSuite) SetupTestMocks() {

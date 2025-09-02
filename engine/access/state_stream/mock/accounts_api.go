@@ -6,9 +6,9 @@ import (
 	context "context"
 
 	flow "github.com/onflow/flow-go/model/flow"
-	entities "github.com/onflow/flow/protobuf/go/flow/entities"
-
 	mock "github.com/stretchr/testify/mock"
+
+	optimistic_sync "github.com/onflow/flow-go/module/executiondatasync/optimistic_sync"
 
 	state_stream "github.com/onflow/flow-go/engine/access/state_stream"
 
@@ -20,17 +20,17 @@ type AccountsAPI struct {
 	mock.Mock
 }
 
-// SubscribeAccountStatusesFromLatestBlock provides a mock function with given fields: ctx, filter, execStateQuery
-func (_m *AccountsAPI) SubscribeAccountStatusesFromLatestBlock(ctx context.Context, filter state_stream.AccountStatusFilter, execStateQuery entities.ExecutionStateQuery) subscription.Subscription {
-	ret := _m.Called(ctx, filter, execStateQuery)
+// SubscribeAccountStatusesFromLatestBlock provides a mock function with given fields: ctx, filter, criteria
+func (_m *AccountsAPI) SubscribeAccountStatusesFromLatestBlock(ctx context.Context, filter state_stream.AccountStatusFilter, criteria optimistic_sync.Criteria) subscription.Subscription {
+	ret := _m.Called(ctx, filter, criteria)
 
 	if len(ret) == 0 {
 		panic("no return value specified for SubscribeAccountStatusesFromLatestBlock")
 	}
 
 	var r0 subscription.Subscription
-	if rf, ok := ret.Get(0).(func(context.Context, state_stream.AccountStatusFilter, entities.ExecutionStateQuery) subscription.Subscription); ok {
-		r0 = rf(ctx, filter, execStateQuery)
+	if rf, ok := ret.Get(0).(func(context.Context, state_stream.AccountStatusFilter, optimistic_sync.Criteria) subscription.Subscription); ok {
+		r0 = rf(ctx, filter, criteria)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(subscription.Subscription)
@@ -40,17 +40,17 @@ func (_m *AccountsAPI) SubscribeAccountStatusesFromLatestBlock(ctx context.Conte
 	return r0
 }
 
-// SubscribeAccountStatusesFromStartBlockID provides a mock function with given fields: ctx, startBlockID, filter, execStateQuery
-func (_m *AccountsAPI) SubscribeAccountStatusesFromStartBlockID(ctx context.Context, startBlockID flow.Identifier, filter state_stream.AccountStatusFilter, execStateQuery entities.ExecutionStateQuery) subscription.Subscription {
-	ret := _m.Called(ctx, startBlockID, filter, execStateQuery)
+// SubscribeAccountStatusesFromStartBlockID provides a mock function with given fields: ctx, startBlockID, filter, criteria
+func (_m *AccountsAPI) SubscribeAccountStatusesFromStartBlockID(ctx context.Context, startBlockID flow.Identifier, filter state_stream.AccountStatusFilter, criteria optimistic_sync.Criteria) subscription.Subscription {
+	ret := _m.Called(ctx, startBlockID, filter, criteria)
 
 	if len(ret) == 0 {
 		panic("no return value specified for SubscribeAccountStatusesFromStartBlockID")
 	}
 
 	var r0 subscription.Subscription
-	if rf, ok := ret.Get(0).(func(context.Context, flow.Identifier, state_stream.AccountStatusFilter, entities.ExecutionStateQuery) subscription.Subscription); ok {
-		r0 = rf(ctx, startBlockID, filter, execStateQuery)
+	if rf, ok := ret.Get(0).(func(context.Context, flow.Identifier, state_stream.AccountStatusFilter, optimistic_sync.Criteria) subscription.Subscription); ok {
+		r0 = rf(ctx, startBlockID, filter, criteria)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(subscription.Subscription)
@@ -60,17 +60,17 @@ func (_m *AccountsAPI) SubscribeAccountStatusesFromStartBlockID(ctx context.Cont
 	return r0
 }
 
-// SubscribeAccountStatusesFromStartHeight provides a mock function with given fields: ctx, startHeight, filter, execStateQuery
-func (_m *AccountsAPI) SubscribeAccountStatusesFromStartHeight(ctx context.Context, startHeight uint64, filter state_stream.AccountStatusFilter, execStateQuery entities.ExecutionStateQuery) subscription.Subscription {
-	ret := _m.Called(ctx, startHeight, filter, execStateQuery)
+// SubscribeAccountStatusesFromStartHeight provides a mock function with given fields: ctx, startHeight, filter, criteria
+func (_m *AccountsAPI) SubscribeAccountStatusesFromStartHeight(ctx context.Context, startHeight uint64, filter state_stream.AccountStatusFilter, criteria optimistic_sync.Criteria) subscription.Subscription {
+	ret := _m.Called(ctx, startHeight, filter, criteria)
 
 	if len(ret) == 0 {
 		panic("no return value specified for SubscribeAccountStatusesFromStartHeight")
 	}
 
 	var r0 subscription.Subscription
-	if rf, ok := ret.Get(0).(func(context.Context, uint64, state_stream.AccountStatusFilter, entities.ExecutionStateQuery) subscription.Subscription); ok {
-		r0 = rf(ctx, startHeight, filter, execStateQuery)
+	if rf, ok := ret.Get(0).(func(context.Context, uint64, state_stream.AccountStatusFilter, optimistic_sync.Criteria) subscription.Subscription); ok {
+		r0 = rf(ctx, startHeight, filter, criteria)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(subscription.Subscription)
