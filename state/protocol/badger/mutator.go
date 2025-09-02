@@ -281,7 +281,7 @@ func (m *ParticipantState) Extend(ctx context.Context, candidateProposal *flow.P
 	// the block is orphaned or already finalized. If the block was to be finalized already, it would have been
 	// detected as already processed by the check above. Hence, `candidate` being orphaned is the only
 	// possible case to receive an [state.OutdatedExtensionError] here.
-	err = m.checkOutdatedExtension(candidate.ToHeader())
+	err = m.checkOutdatedExtension(candidate.HeaderBody)
 	if err != nil {
 		if state.IsOutdatedExtensionError(err) {
 			return fmt.Errorf("candidate block is an outdated extension: %w", err)
@@ -520,7 +520,7 @@ func (m *FollowerState) checkBlockAlreadyProcessed(blockID flow.Identifier) (boo
 //
 // Expected errors during normal operations:
 //   - [state.OutdatedExtensionError] if the candidate block is orphaned or finalized
-func (m *ParticipantState) checkOutdatedExtension(block *flow.Header) error {
+func (m *ParticipantState) checkOutdatedExtension(header flow.HeaderBody) error {
 	var latestFinalizedHeight uint64
 	err := operation.RetrieveFinalizedHeight(m.db.Reader(), &latestFinalizedHeight)
 	if err != nil {
@@ -532,7 +532,7 @@ func (m *ParticipantState) checkOutdatedExtension(block *flow.Header) error {
 		return fmt.Errorf("could not lookup finalized block: %w", err)
 	}
 
-	ancestorID := block.ParentID
+	ancestorID := header.ParentID
 	for ancestorID != finalID {
 		ancestor, err := m.headers.ByBlockID(ancestorID)
 		if err != nil {
@@ -542,7 +542,7 @@ func (m *ParticipantState) checkOutdatedExtension(block *flow.Header) error {
 			// Candidate block is on a fork that does not include the latest finalized block.
 			return state.NewOutdatedExtensionErrorf(
 				"candidate block (height: %d) conflicts with finalized state (ancestor: %d final: %d)",
-				block.Height, ancestor.Height, latestFinalizedHeight)
+				header.Height, ancestor.Height, latestFinalizedHeight)
 		}
 		ancestorID = ancestor.ParentID
 	}
