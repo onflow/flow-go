@@ -16,6 +16,7 @@ import (
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/counters"
+	"github.com/onflow/flow-go/module/executiondatasync/optimistic_sync"
 )
 
 type Handler struct {
@@ -26,6 +27,7 @@ type Handler struct {
 
 	eventFilterConfig        state_stream.EventFilterConfig
 	defaultHeartbeatInterval uint64
+	operatorCriteria         optimistic_sync.Criteria
 }
 
 // sendSubscribeEventsResponseFunc is a callback function used to send
@@ -45,6 +47,7 @@ func NewHandler(api state_stream.API, chain flow.Chain, config Config) *Handler 
 		chain:                    chain,
 		eventFilterConfig:        config.EventFilterConfig,
 		defaultHeartbeatInterval: config.HeartbeatInterval,
+		operatorCriteria:         config.OperatorCriteria,
 	}
 	return h
 }
@@ -211,9 +214,29 @@ func (h *Handler) SubscribeEvents(request *executiondata.SubscribeEventsRequest,
 		return err
 	}
 
-	sub := h.api.SubscribeEvents(stream.Context(), startBlockID, request.GetStartBlockHeight(), filter)
+	execStateQuery := request.GetExecutionStateQuery()
+	criteria := h.operatorCriteria.OverrideWith(
+		optimistic_sync.NewCriteria(
+			execStateQuery,
+		),
+	)
 
-	return HandleRPCSubscription(sub, h.handleEventsResponse(stream.Send, request.HeartbeatInterval, request.GetEventEncodingVersion()))
+	sub := h.api.SubscribeEvents(
+		stream.Context(),
+		startBlockID,
+		request.GetStartBlockHeight(),
+		filter,
+		criteria,
+	)
+
+	handleFunc := h.createEventsResponseHandler(
+		stream.Send,
+		request.HeartbeatInterval,
+		request.GetEventEncodingVersion(),
+		GetIncludeExecutorMetadata(execStateQuery),
+	)
+
+	return HandleRPCSubscription(sub, handleFunc)
 }
 
 // SubscribeEventsFromStartBlockID handles subscription requests for events starting at the specified block ID.
@@ -246,9 +269,26 @@ func (h *Handler) SubscribeEventsFromStartBlockID(request *executiondata.Subscri
 		return err
 	}
 
-	sub := h.api.SubscribeEventsFromStartBlockID(stream.Context(), startBlockID, filter)
+	execStateQuery := request.GetExecutionStateQuery()
+	criteria := h.operatorCriteria.OverrideWith(
+		optimistic_sync.NewCriteria(execStateQuery),
+	)
 
-	return HandleRPCSubscription(sub, h.handleEventsResponse(stream.Send, request.HeartbeatInterval, request.GetEventEncodingVersion()))
+	sub := h.api.SubscribeEventsFromStartBlockID(
+		stream.Context(),
+		startBlockID,
+		filter,
+		criteria,
+	)
+
+	handleFunc := h.createEventsResponseHandler(
+		stream.Send,
+		request.HeartbeatInterval,
+		request.GetEventEncodingVersion(),
+		GetIncludeExecutorMetadata(execStateQuery),
+	)
+
+	return HandleRPCSubscription(sub, handleFunc)
 }
 
 // SubscribeEventsFromStartHeight handles subscription requests for events starting at the specified block height.
@@ -276,9 +316,26 @@ func (h *Handler) SubscribeEventsFromStartHeight(request *executiondata.Subscrib
 		return err
 	}
 
-	sub := h.api.SubscribeEventsFromStartHeight(stream.Context(), request.GetStartBlockHeight(), filter)
+	execStateQuery := request.GetExecutionStateQuery()
+	criteria := h.operatorCriteria.OverrideWith(
+		optimistic_sync.NewCriteria(execStateQuery),
+	)
 
-	return HandleRPCSubscription(sub, h.handleEventsResponse(stream.Send, request.HeartbeatInterval, request.GetEventEncodingVersion()))
+	sub := h.api.SubscribeEventsFromStartHeight(
+		stream.Context(),
+		request.GetStartBlockHeight(),
+		filter,
+		criteria,
+	)
+
+	handleFunc := h.createEventsResponseHandler(
+		stream.Send,
+		request.HeartbeatInterval,
+		request.GetEventEncodingVersion(),
+		GetIncludeExecutorMetadata(execStateQuery),
+	)
+
+	return HandleRPCSubscription(sub, handleFunc)
 }
 
 // SubscribeEventsFromLatest handles subscription requests for events started from latest sealed block..
@@ -306,9 +363,25 @@ func (h *Handler) SubscribeEventsFromLatest(request *executiondata.SubscribeEven
 		return err
 	}
 
-	sub := h.api.SubscribeEventsFromLatest(stream.Context(), filter)
+	execStateQuery := request.GetExecutionStateQuery()
+	criteria := h.operatorCriteria.OverrideWith(
+		optimistic_sync.NewCriteria(execStateQuery),
+	)
 
-	return HandleRPCSubscription(sub, h.handleEventsResponse(stream.Send, request.HeartbeatInterval, request.GetEventEncodingVersion()))
+	sub := h.api.SubscribeEventsFromLatest(
+		stream.Context(),
+		filter,
+		criteria,
+	)
+
+	handleFunc := h.createEventsResponseHandler(
+		stream.Send,
+		request.HeartbeatInterval,
+		request.GetEventEncodingVersion(),
+		GetIncludeExecutorMetadata(execStateQuery),
+	)
+
+	return HandleRPCSubscription(sub, handleFunc)
 }
 
 // handleSubscribeExecutionData handles the subscription to execution data and sends it to the client via the provided stream.
@@ -343,7 +416,7 @@ func handleSubscribeExecutionData(send sendSubscribeExecutionDataResponseFunc, e
 	}
 }
 
-// handleEventsResponse handles the event subscription and sends subscribed events to the client via the provided stream.
+// createEventsResponseHandler handles the event subscription and sends subscribed events to the client via the provided stream.
 // This function is designed to be used as a callback for events updates in a subscription.
 // It takes a EventsResponse, processes it, and sends the corresponding response to the client using the provided send function.
 //
@@ -354,7 +427,12 @@ func handleSubscribeExecutionData(send sendSubscribeExecutionDataResponseFunc, e
 //
 // Expected errors during normal operation:
 //   - codes.Internal - could not convert events to entity or the stream could not send a response.
-func (h *Handler) handleEventsResponse(send sendSubscribeEventsResponseFunc, heartbeatInterval uint64, eventEncodingVersion entities.EventEncodingVersion) func(*EventsResponse) error {
+func (h *Handler) createEventsResponseHandler(
+	send sendSubscribeEventsResponseFunc,
+	heartbeatInterval uint64,
+	eventEncodingVersion entities.EventEncodingVersion,
+	includeExecutorMetadata bool,
+) func(*EventsResponse) error {
 	if heartbeatInterval == 0 {
 		heartbeatInterval = h.defaultHeartbeatInterval
 	}
@@ -376,7 +454,11 @@ func (h *Handler) handleEventsResponse(send sendSubscribeEventsResponseFunc, hea
 		// BlockExecutionData contains CCF encoded events, and the Access API returns JSON-CDC events.
 		// convert event payload formats.
 		// This is a temporary solution until the Access API supports specifying the encoding in the request
-		events, err := convert.EventsToMessagesWithEncodingConversion(resp.Events, entities.EventEncodingVersion_CCF_V0, eventEncodingVersion)
+		events, err := convert.EventsToMessagesWithEncodingConversion(
+			resp.Events,
+			entities.EventEncodingVersion_CCF_V0,
+			eventEncodingVersion,
+		)
 		if err != nil {
 			return status.Errorf(codes.Internal, "could not convert events to entity: %v", err)
 		}
@@ -386,13 +468,18 @@ func (h *Handler) handleEventsResponse(send sendSubscribeEventsResponseFunc, hea
 			return status.Errorf(codes.Internal, "message index already incremented to %d", messageIndex.Value())
 		}
 
-		err = send(&executiondata.SubscribeEventsResponse{
+		response := &executiondata.SubscribeEventsResponse{
 			BlockHeight:    resp.Height,
 			BlockId:        convert.IdentifierToMessage(resp.BlockID),
 			Events:         events,
 			BlockTimestamp: timestamppb.New(resp.BlockTimestamp),
 			MessageIndex:   index,
-		})
+		}
+		if includeExecutorMetadata {
+			response.ExecutorMetadata = convert.ExecutorMetadataToMessage(resp.ExecutorMetadata)
+		}
+
+		err = send(response)
 		if err != nil {
 			return rpc.ConvertError(err, "could not send response", codes.Internal)
 		}
@@ -469,11 +556,12 @@ func convertAccountsStatusesResultsToMessage(
 // sendSubscribeAccountStatusesResponseFunc defines the function signature for sending account status responses
 type sendSubscribeAccountStatusesResponseFunc func(*executiondata.SubscribeAccountStatusesResponse) error
 
-// handleAccountStatusesResponse handles account status responses by converting them to the message and sending them to the subscriber.
-func (h *Handler) handleAccountStatusesResponse(
+// createAccountStatusesHandler handles account status responses by converting them to the message and sending them to the subscriber.
+func (h *Handler) createAccountStatusesHandler(
 	heartbeatInterval uint64,
 	evenVersion entities.EventEncodingVersion,
 	send sendSubscribeAccountStatusesResponseFunc,
+	includeExecutorMetadata bool,
 ) func(resp *AccountStatusesResponse) error {
 	if heartbeatInterval == 0 {
 		heartbeatInterval = h.defaultHeartbeatInterval
@@ -503,12 +591,17 @@ func (h *Handler) handleAccountStatusesResponse(
 			return status.Errorf(codes.Internal, "message index already incremented to %d", messageIndex.Value())
 		}
 
-		err = send(&executiondata.SubscribeAccountStatusesResponse{
+		response := &executiondata.SubscribeAccountStatusesResponse{
 			BlockId:      convert.IdentifierToMessage(resp.BlockID),
 			BlockHeight:  resp.Height,
 			Results:      results,
 			MessageIndex: index,
-		})
+		}
+		if includeExecutorMetadata {
+			response.ExecutorMetadata = convert.ExecutorMetadataToMessage(resp.ExecutorMetadata)
+		}
+
+		err = send(response)
 		if err != nil {
 			return rpc.ConvertError(err, "could not send response", codes.Internal)
 		}
@@ -544,9 +637,26 @@ func (h *Handler) SubscribeAccountStatusesFromStartBlockID(
 		return status.Errorf(codes.InvalidArgument, "could not create account status filter: %v", err)
 	}
 
-	sub := h.api.SubscribeAccountStatusesFromStartBlockID(stream.Context(), startBlockID, filter)
+	execStateQuery := request.GetExecutionStateQuery()
+	criteria := h.operatorCriteria.OverrideWith(
+		optimistic_sync.NewCriteria(execStateQuery),
+	)
 
-	return HandleRPCSubscription(sub, h.handleAccountStatusesResponse(request.HeartbeatInterval, request.GetEventEncodingVersion(), stream.Send))
+	sub := h.api.SubscribeAccountStatusesFromStartBlockID(
+		stream.Context(),
+		startBlockID,
+		filter,
+		criteria,
+	)
+
+	handleFunc := h.createAccountStatusesHandler(
+		request.HeartbeatInterval,
+		request.GetEventEncodingVersion(),
+		stream.Send,
+		GetIncludeExecutorMetadata(execStateQuery),
+	)
+
+	return HandleRPCSubscription(sub, handleFunc)
 }
 
 // SubscribeAccountStatusesFromStartHeight streams account statuses for all blocks starting at the requested
@@ -571,9 +681,26 @@ func (h *Handler) SubscribeAccountStatusesFromStartHeight(
 		return status.Errorf(codes.InvalidArgument, "could not create account status filter: %v", err)
 	}
 
-	sub := h.api.SubscribeAccountStatusesFromStartHeight(stream.Context(), request.GetStartBlockHeight(), filter)
+	execStateQuery := request.GetExecutionStateQuery()
+	criteria := h.operatorCriteria.OverrideWith(
+		optimistic_sync.NewCriteria(execStateQuery),
+	)
 
-	return HandleRPCSubscription(sub, h.handleAccountStatusesResponse(request.HeartbeatInterval, request.GetEventEncodingVersion(), stream.Send))
+	sub := h.api.SubscribeAccountStatusesFromStartHeight(
+		stream.Context(),
+		request.GetStartBlockHeight(),
+		filter,
+		criteria,
+	)
+
+	handleFunc := h.createAccountStatusesHandler(
+		request.HeartbeatInterval,
+		request.GetEventEncodingVersion(),
+		stream.Send,
+		GetIncludeExecutorMetadata(execStateQuery),
+	)
+
+	return HandleRPCSubscription(sub, handleFunc)
 }
 
 // SubscribeAccountStatusesFromLatestBlock streams account statuses for all blocks starting
@@ -598,9 +725,25 @@ func (h *Handler) SubscribeAccountStatusesFromLatestBlock(
 		return status.Errorf(codes.InvalidArgument, "could not create account status filter: %v", err)
 	}
 
-	sub := h.api.SubscribeAccountStatusesFromLatestBlock(stream.Context(), filter)
+	execStateQuery := request.GetExecutionStateQuery()
+	criteria := h.operatorCriteria.OverrideWith(
+		optimistic_sync.NewCriteria(execStateQuery),
+	)
 
-	return HandleRPCSubscription(sub, h.handleAccountStatusesResponse(request.HeartbeatInterval, request.GetEventEncodingVersion(), stream.Send))
+	sub := h.api.SubscribeAccountStatusesFromLatestBlock(
+		stream.Context(),
+		filter,
+		criteria,
+	)
+
+	handleFunc := h.createAccountStatusesHandler(
+		request.HeartbeatInterval,
+		request.GetEventEncodingVersion(),
+		stream.Send,
+		GetIncludeExecutorMetadata(execStateQuery),
+	)
+
+	return HandleRPCSubscription(sub, handleFunc)
 }
 
 // HandleRPCSubscription is a generic handler for subscriptions to a specific type for rpc calls.
@@ -618,4 +761,12 @@ func HandleRPCSubscription[T any](sub subscription.Subscription, handleResponse 
 	}
 
 	return nil
+}
+
+func GetIncludeExecutorMetadata(query *entities.ExecutionStateQuery) bool {
+	if query != nil {
+		return query.GetIncludeExecutorMetadata()
+	}
+
+	return false
 }

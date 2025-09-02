@@ -284,11 +284,12 @@ func (suite *SameGRPCPortTestSuite) SetupTest() {
 		nil,
 		suite.execDataCache,
 		suite.registers,
-		eventIndexer,
 		false,
 		state_stream.DefaultRegisterIDsRequestLimit,
 		subscriptionHandler,
 		suite.executionDataTracker,
+		nil,
+		nil,
 	)
 	assert.NoError(suite.T(), err)
 

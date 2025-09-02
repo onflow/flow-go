@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/onflow/flow/protobuf/go/flow/entities"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/engine/access/rest/http/request"
@@ -14,14 +15,16 @@ import (
 	"github.com/onflow/flow-go/engine/access/subscription"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/counters"
+	"github.com/onflow/flow-go/module/executiondatasync/optimistic_sync"
 )
 
 // accountStatusesArguments contains the arguments required for subscribing to account statuses
 type accountStatusesArguments struct {
-	StartBlockID      flow.Identifier                  // ID of the block to start subscription from
-	StartBlockHeight  uint64                           // Height of the block to start subscription from
-	Filter            state_stream.AccountStatusFilter // Filter applied to events for a given subscription
-	HeartbeatInterval uint64                           // Maximum number of blocks message won't be sent
+	StartBlockID        flow.Identifier                  // ID of the block to start subscription from
+	StartBlockHeight    uint64                           // Height of the block to start subscription from
+	Filter              state_stream.AccountStatusFilter // Filter applied to events for a given subscription
+	HeartbeatInterval   uint64                           // Maximum number of blocks message won't be sent
+	ExecutionStateQuery entities.ExecutionStateQuery
 }
 
 type AccountStatusesDataProvider struct {
@@ -135,15 +138,16 @@ func (p *AccountStatusesDataProvider) createAndStartSubscription(
 	ctx context.Context,
 	args accountStatusesArguments,
 ) subscription.Subscription {
+	criteria := optimistic_sync.NewCriteria(&args.ExecutionStateQuery)
 	if args.StartBlockID != flow.ZeroID {
-		return p.stateStreamApi.SubscribeAccountStatusesFromStartBlockID(ctx, args.StartBlockID, args.Filter)
+		return p.stateStreamApi.SubscribeAccountStatusesFromStartBlockID(ctx, args.StartBlockID, args.Filter, criteria)
 	}
 
 	if args.StartBlockHeight != request.EmptyHeight {
-		return p.stateStreamApi.SubscribeAccountStatusesFromStartHeight(ctx, args.StartBlockHeight, args.Filter)
+		return p.stateStreamApi.SubscribeAccountStatusesFromStartHeight(ctx, args.StartBlockHeight, args.Filter, criteria)
 	}
 
-	return p.stateStreamApi.SubscribeAccountStatusesFromLatestBlock(ctx, args.Filter)
+	return p.stateStreamApi.SubscribeAccountStatusesFromLatestBlock(ctx, args.Filter, criteria)
 }
 
 // convertAccountStatusesResponse converts events in the provided AccountStatusesResponse from CCF
@@ -161,9 +165,10 @@ func convertAccountStatusesResponse(resp *backend.AccountStatusesResponse) (*bac
 	}
 
 	return &backend.AccountStatusesResponse{
-		BlockID:       resp.BlockID,
-		Height:        resp.Height,
-		AccountEvents: jsoncdcEvents,
+		BlockID:          resp.BlockID,
+		Height:           resp.Height,
+		AccountEvents:    jsoncdcEvents,
+		ExecutorMetadata: resp.ExecutorMetadata,
 	}, nil
 }
 
@@ -175,11 +180,12 @@ func parseAccountStatusesArguments(
 	defaultHeartbeatInterval uint64,
 ) (accountStatusesArguments, error) {
 	allowedFields := map[string]struct{}{
-		"start_block_id":     {},
-		"start_block_height": {},
-		"event_types":        {},
-		"account_addresses":  {},
-		"heartbeat_interval": {},
+		"start_block_id":        {},
+		"start_block_height":    {},
+		"event_types":           {},
+		"account_addresses":     {},
+		"heartbeat_interval":    {},
+		"execution_state_query": {},
 	}
 	err := ensureAllowedFields(arguments, allowedFields)
 	if err != nil {
@@ -219,6 +225,18 @@ func parseAccountStatusesArguments(
 	args.Filter, err = state_stream.NewAccountStatusFilter(eventFilterConfig, chain, eventTypes, accountAddresses)
 	if err != nil {
 		return accountStatusesArguments{}, fmt.Errorf("failed to create event filter: %w", err)
+	}
+
+	// Parse 'execution_state_query' as JSON object
+	agreeingExecutorCount, requiredExecutorIDs, includeExecutorMetadata, err :=
+		extractExecutionStateQueryFields(arguments, "execution_state_query", false)
+	if err != nil {
+		return accountStatusesArguments{}, fmt.Errorf("error extracting execution_state_query fields: %w", err)
+	}
+	args.ExecutionStateQuery = entities.ExecutionStateQuery{
+		AgreeingExecutorsCount:  agreeingExecutorCount,
+		RequiredExecutorIds:     requiredExecutorIDs,
+		IncludeExecutorMetadata: includeExecutorMetadata,
 	}
 
 	return args, nil

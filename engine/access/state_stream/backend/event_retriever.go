@@ -7,18 +7,19 @@ import (
 
 	"github.com/rs/zerolog"
 
-	"github.com/onflow/flow-go/engine/access/index"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/executiondatasync/optimistic_sync"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/utils/logging"
 )
 
 // EventsResponse represents the response containing events for a specific block.
 type EventsResponse struct {
-	BlockID        flow.Identifier
-	Height         uint64
-	Events         flow.EventsList
-	BlockTimestamp time.Time
+	BlockID          flow.Identifier
+	Height           uint64
+	Events           flow.EventsList
+	BlockTimestamp   time.Time
+	ExecutorMetadata flow.ExecutorMetadata
 }
 
 // EventsProvider retrieves events by block height. It can be configured to retrieve events from
@@ -27,19 +28,27 @@ type EventsProvider struct {
 	log              zerolog.Logger
 	headers          storage.Headers
 	getExecutionData GetExecutionDataFunc
-	eventsIndex      *index.EventsIndex
-	useEventsIndex   bool
+
+	fetchFromLocalCache bool
+	execResultProvider  optimistic_sync.ExecutionResultProvider
+	execStateCache      optimistic_sync.ExecutionStateCache
+	operatorCriteria    optimistic_sync.Criteria
 }
 
 // GetAllEventsResponse returns a function that retrieves the event response for a given block height.
 // Expected errors:
 // - codes.NotFound: If block header for the specified block height is not found.
 // - error: An error, if any, encountered during getting events from storage or execution data.
-func (b *EventsProvider) GetAllEventsResponse(ctx context.Context, height uint64) (*EventsResponse, error) {
+func (b *EventsProvider) GetAllEventsResponse(
+	ctx context.Context,
+	height uint64,
+	criteria optimistic_sync.Criteria,
+) (*EventsResponse, error) {
 	var response *EventsResponse
 	var err error
-	if b.useEventsIndex {
-		response, err = b.getEventsFromStorage(height)
+
+	if b.fetchFromLocalCache {
+		response, err = b.getEventsFromStorage(height, criteria)
 	} else {
 		response, err = b.getEventsFromExecutionData(ctx, height)
 	}
@@ -88,20 +97,43 @@ func (b *EventsProvider) getEventsFromExecutionData(ctx context.Context, height 
 // Expected errors:
 // - error: An error indicating any issues with the provided block height or
 // an error indicating issue with getting events for a block.
-func (b *EventsProvider) getEventsFromStorage(height uint64) (*EventsResponse, error) {
+func (b *EventsProvider) getEventsFromStorage(
+	height uint64,
+	criteria optimistic_sync.Criteria,
+) (*EventsResponse, error) {
 	blockID, err := b.headers.BlockIDByHeight(height)
 	if err != nil {
 		return nil, fmt.Errorf("could not get header for height %d: %w", height, err)
 	}
 
-	events, err := b.eventsIndex.ByBlockID(blockID, height)
+	result, err := b.execResultProvider.ExecutionResult(
+		blockID,
+		b.operatorCriteria.OverrideWith(criteria),
+	)
 	if err != nil {
-		return nil, fmt.Errorf("could not get events for block %d: %w", height, err)
+		return &EventsResponse{}, fmt.Errorf("error fetching execution result: %w", err)
+	}
+
+	snapshot, err := b.execStateCache.Snapshot(result.ExecutionResult.ID())
+	if err != nil {
+		return &EventsResponse{},
+			fmt.Errorf("failed to get snapshot for execution result %s: %w", result.ExecutionResult.ID(), err)
+	}
+
+	events, err := snapshot.Events().ByBlockID(blockID)
+	if err != nil {
+		return nil, fmt.Errorf("could not get events for block %d: %w", blockID, err)
+	}
+
+	metadata := flow.ExecutorMetadata{
+		ExecutionResultID: result.ExecutionResult.ID(),
+		ExecutorIDs:       result.ExecutionNodes.NodeIDs(),
 	}
 
 	return &EventsResponse{
-		BlockID: blockID,
-		Height:  height,
-		Events:  events,
+		BlockID:          blockID,
+		Height:           height,
+		Events:           events,
+		ExecutorMetadata: metadata,
 	}, nil
 }
