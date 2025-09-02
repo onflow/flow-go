@@ -47,7 +47,7 @@ func (h Handler) SendEvent(_ context.Context, req *ghost.SendEventRequest) (*emp
 
 	message := req.GetMessage()
 
-	msg, err := h.codec.Decode(message)
+	decodedMsg, err := h.codec.Decode(message)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, "failed to decode message")
 	}

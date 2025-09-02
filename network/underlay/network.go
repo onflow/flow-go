@@ -1192,7 +1192,7 @@ func (n *Network) processAuthenticatedMessage(msg *message.Message, peerID peer.
 		return
 	}
 
-	internal, err := decodedMsgPayload.ToInternal()
+	internalMsg, err := decodedMsgPayload.ToInternal()
 	if err != nil {
 		err = fmt.Errorf("failed to convert message to internal: %w", err)
 		violation := &network.Violation{
