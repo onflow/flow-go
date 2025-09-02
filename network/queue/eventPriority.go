@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"math"
 
+	"github.com/onflow/flow-go/model/cluster"
 	"github.com/onflow/flow-go/model/flow"
 	libp2pmessage "github.com/onflow/flow-go/model/libp2p/message"
 	"github.com/onflow/flow-go/model/messages"
@@ -40,7 +41,7 @@ func GetEventPriority(message interface{}) (Priority, error) {
 func getPriorityByType(message interface{}) Priority {
 	switch message.(type) {
 	// consensus
-	case *messages.BlockProposal:
+	case *flow.UntrustedProposal:
 		return HighPriority
 	case *messages.BlockVote:
 		return HighPriority
@@ -58,7 +59,7 @@ func getPriorityByType(message interface{}) Priority {
 		return HighPriority
 
 	// cluster consensus
-	case *messages.ClusterBlockProposal:
+	case *cluster.UntrustedProposal:
 		return HighPriority
 	case *messages.ClusterBlockVote:
 		return HighPriority

@@ -160,7 +160,20 @@ func (wsController *WebsocketController) writeEvents(sub subscription.Subscripti
 					wsController.wsErrorHandler(err)
 					return
 				}
-				resp.Events[i].Payload = payload
+				convertedEvent, err := flow.NewEvent(
+					flow.UntrustedEvent{
+						Type:             e.Type,
+						TransactionID:    e.TransactionID,
+						TransactionIndex: e.TransactionIndex,
+						EventIndex:       e.EventIndex,
+						Payload:          payload,
+					},
+				)
+				if err != nil {
+					wsController.wsErrorHandler(common.NewRestError(http.StatusInternalServerError, "could not construct event: ", err))
+					return
+				}
+				resp.Events[i] = *convertedEvent
 			}
 
 			// Write the response to the WebSocket connection

@@ -201,7 +201,7 @@ func (e *Engine) processAssignedChunk(chunk *flow.Chunk, result *flow.ExecutionR
 		ExecutionResult: result,
 		BlockHeight:     blockHeight,
 	}
-	added := e.pendingChunks.Add(status)
+	added := e.pendingChunks.Add(chunkLocatorID, status)
 	if !added {
 		return false, blockHeight, nil
 	}
@@ -243,7 +243,8 @@ func (e *Engine) HandleChunkDataPack(originID flow.Identifier, response *verific
 	e.metrics.OnChunkDataPackArrivedAtFetcher()
 
 	// make sure we still need it
-	status, exists := e.pendingChunks.Get(response.Index, response.ResultID)
+	locatorID := response.Locator.ID()
+	status, exists := e.pendingChunks.Get(locatorID)
 	if !exists {
 		lg.Debug().Msg("could not fetch pending status from mempool, dropping chunk data")
 		return
@@ -277,7 +278,7 @@ func (e *Engine) HandleChunkDataPack(originID flow.Identifier, response *verific
 		e.metrics.OnVerifiableChunkSentToVerifier()
 
 		// we need to report that the job has been finished eventually
-		e.chunkConsumerNotifier.Notify(status.ChunkLocatorID())
+		e.chunkConsumerNotifier.Notify(locatorID)
 		lg.Info().Msg("verifiable chunk pushed to verifier engine")
 	}
 
@@ -293,18 +294,20 @@ func (e *Engine) handleChunkDataPackWithTracing(
 	ctx context.Context,
 	originID flow.Identifier,
 	status *verification.ChunkStatus,
-	chunkDataPack *flow.ChunkDataPack) (bool, error) {
-
+	chunkDataPack *flow.ChunkDataPack,
+) (bool, error) {
 	// make sure the chunk data pack is valid
 	err := e.validateChunkDataPackWithTracing(ctx, status.ChunkIndex, originID, chunkDataPack, status.ExecutionResult)
 	if err != nil {
-		return false, NewChunkDataPackValidationError(originID,
+		return false, NewChunkDataPackValidationError(
+			originID,
 			status.ExecutionResult.ID(),
 			status.ChunkIndex,
 			chunkDataPack.ID(),
 			chunkDataPack.ChunkID,
 			chunkDataPack.Collection.ID(),
-			err)
+			err,
+		)
 	}
 
 	processed, err := e.handleValidatedChunkDataPack(ctx, status, chunkDataPack)
@@ -318,11 +321,22 @@ func (e *Engine) handleChunkDataPackWithTracing(
 // handleValidatedChunkDataPack receives a validated chunk data pack, removes its status from the memory, and pushes a verifiable chunk for it to
 // verifier engine.
 // Boolean return value determines whether verifiable chunk pushed to verifier or not.
-func (e *Engine) handleValidatedChunkDataPack(ctx context.Context,
+func (e *Engine) handleValidatedChunkDataPack(
+	ctx context.Context,
 	status *verification.ChunkStatus,
-	chunkDataPack *flow.ChunkDataPack) (bool, error) {
+	chunkDataPack *flow.ChunkDataPack,
+) (bool, error) {
+	locator, err := chunks.NewLocator(
+		chunks.UntrustedLocator{
+			ResultID: status.ExecutionResult.ID(),
+			Index:    status.ChunkIndex,
+		},
+	)
+	if err != nil {
+		return false, fmt.Errorf("could not construct locator: %w", err)
+	}
 
-	removed := e.pendingChunks.Remove(status.ChunkIndex, status.ExecutionResult.ID())
+	removed := e.pendingChunks.Remove(locator.ID())
 	if !removed {
 		// we deduplicate the chunk data responses at this point, reaching here means a
 		// duplicate chunk data response is under process concurrently, so we give up
@@ -332,7 +346,7 @@ func (e *Engine) handleValidatedChunkDataPack(ctx context.Context,
 
 	// pushes chunk data pack to verifier, and waits for it to be verified.
 	chunk := status.ExecutionResult.Chunks[status.ChunkIndex]
-	err := e.pushToVerifierWithTracing(ctx, chunk, status.ExecutionResult, chunkDataPack)
+	err = e.pushToVerifierWithTracing(ctx, chunk, status.ExecutionResult, chunkDataPack)
 	if err != nil {
 		return false, fmt.Errorf("could not push the chunk to verifier engine")
 	}
@@ -476,20 +490,29 @@ func (e *Engine) NotifyChunkDataPackSealed(chunkIndex uint64, resultID flow.Iden
 		Logger()
 
 	// we need to report that the job has been finished eventually
-	status, exists := e.pendingChunks.Get(chunkIndex, resultID)
+	locator, err := chunks.NewLocator(
+		chunks.UntrustedLocator{
+			ResultID: resultID,
+			Index:    chunkIndex,
+		},
+	)
+	// TODO: update this engine to use SignallerContext and throw an exception here
+	if err != nil {
+		e.log.Fatal().Err(err).Msg("could not construct locator")
+	}
+	status, exists := e.pendingChunks.Get(locator.ID())
 	if !exists {
 		lg.Debug().
 			Msg("could not fetch pending status for sealed chunk from mempool, dropping chunk data")
 		return
 	}
 
-	chunkLocatorID := status.ChunkLocatorID()
 	lg = lg.With().
 		Uint64("block_height", status.BlockHeight).
 		Hex("result_id", logging.ID(status.ExecutionResult.ID())).Logger()
-	removed := e.pendingChunks.Remove(chunkIndex, resultID)
+	removed := e.pendingChunks.Remove(locator.ID())
 
-	e.chunkConsumerNotifier.Notify(chunkLocatorID)
+	e.chunkConsumerNotifier.Notify(locator.ID())
 	lg.Info().
 		Bool("removed", removed).
 		Msg("discards fetching chunk of an already sealed block and notified consumer")
@@ -572,12 +595,19 @@ func (e *Engine) requestChunkDataPack(chunkIndex uint64, chunkID flow.Identifier
 		return fmt.Errorf("could not fetch execution node ids at block %x: %w", blockID, err)
 	}
 
+	locator, err := chunks.NewLocator(
+		chunks.UntrustedLocator{
+			ResultID: resultID,
+			Index:    chunkIndex,
+		},
+	)
+	if err != nil {
+		return fmt.Errorf("could not construct locator: %w", err)
+	}
+
 	request, err := verification.NewChunkDataPackRequest(
 		verification.UntrustedChunkDataPackRequest{
-			Locator: chunks.Locator{
-				ResultID: resultID,
-				Index:    chunkIndex,
-			},
+			Locator: *locator,
 			ChunkDataPackRequestInfo: verification.ChunkDataPackRequestInfo{
 				ChunkID:   chunkID,
 				Height:    header.Height,

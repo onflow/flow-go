@@ -44,7 +44,7 @@ func (s *ProtocolVersionUpgradeSuite) SetupTest() {
 func (s *ProtocolVersionUpgradeSuite) TestProtocolStateVersionUpgradeServiceEvent() {
 	ctx := context.Background()
 
-	serviceAddress := sdk.Address(s.net.Root().Header.ChainID.Chain().ServiceAddress())
+	serviceAddress := sdk.Address(s.net.Root().ChainID.Chain().ServiceAddress())
 	env := templates.Environment{
 		NodeVersionBeaconAddress: serviceAddress.String(),
 	}
@@ -71,7 +71,7 @@ func (s *ProtocolVersionUpgradeSuite) TestProtocolStateVersionUpgradeServiceEven
 
 	executedInBlock, ok := s.BlockState.ByBlockID(flow.Identifier(txResult.BlockID))
 	require.True(s.T(), ok)
-	invalidUpgradeActiveView := executedInBlock.Header.View + 1 // because we use a too-short activeViewDiff of 1
+	invalidUpgradeActiveView := executedInBlock.View + 1 // because we use a too-short activeViewDiff of 1
 
 	// after an invalid protocol version upgrade event, we should still have a v0 kvstore
 	snapshot = s.AwaitSnapshotAtView(invalidUpgradeActiveView, time.Minute, 500*time.Millisecond)
@@ -86,7 +86,7 @@ func (s *ProtocolVersionUpgradeSuite) TestProtocolStateVersionUpgradeServiceEven
 
 	executedInBlock, ok = s.BlockState.ByBlockID(flow.Identifier(txResult.BlockID))
 	require.True(s.T(), ok)
-	v1ActiveView := executedInBlock.Header.View + ACTIVE_VIEW_DIFF
+	v1ActiveView := executedInBlock.View + ACTIVE_VIEW_DIFF
 
 	// wait for the version to become active, then validate our kvstore has upgraded to v1
 	snapshot = s.AwaitSnapshotAtView(v1ActiveView, time.Minute, 500*time.Millisecond)
@@ -106,7 +106,7 @@ func (s *ProtocolVersionUpgradeSuite) TestProtocolStateVersionUpgradeServiceEven
 
 	executedInBlock, ok = s.BlockState.ByBlockID(flow.Identifier(txResult.BlockID))
 	require.True(s.T(), ok)
-	unknownVersionActiveView := executedInBlock.Header.View + ACTIVE_VIEW_DIFF
+	unknownVersionActiveView := executedInBlock.View + ACTIVE_VIEW_DIFF
 
 	// once consensus reaches unknownVersionActiveView, progress should halt
 	s.BlockState.WaitForHalt(s.T(), 10*time.Second, 100*time.Millisecond, time.Minute)

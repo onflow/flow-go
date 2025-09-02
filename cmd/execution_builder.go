@@ -575,7 +575,9 @@ func (exeNode *ExecutionNode) LoadProviderEngine(
 	opts = append(opts, computation.DefaultFVMOptions(
 		node.RootChainID,
 		exeNode.exeConf.computationConfig.CadenceTracing,
-		exeNode.exeConf.computationConfig.ExtensiveTracing)...)
+		exeNode.exeConf.computationConfig.ExtensiveTracing,
+		exeNode.exeConf.scheduleCallbacksEnabled)...)
+
 	vmCtx := fvm.NewContext(opts...)
 
 	var collector module.ExecutionMetrics
@@ -1093,7 +1095,7 @@ func (exeNode *ExecutionNode) LoadIngestionEngine(
 		reqEng, err := requester.New(node.Logger.With().Str("entity", "collection").Logger(), node.Metrics.Engine, node.EngineRegistry, node.Me, node.State,
 			channels.RequestCollections,
 			filter.Any,
-			func() flow.Entity { return &flow.Collection{} },
+			func() flow.Entity { return new(flow.Collection) },
 			// we are manually triggering batches in execution, but lets still send off a batch once a minute, as a safety net for the sake of retries
 			requester.WithBatchInterval(exeNode.exeConf.requestInterval),
 			// consistency of collection can be checked by checking hash, and hash comes from trusted source (blocks from consensus follower)
@@ -1204,7 +1206,7 @@ func (exeNode *ExecutionNode) LoadFollowerCore(
 		node.Storage.Headers,
 		final,
 		exeNode.followerDistributor,
-		node.FinalizedRootBlock.Header,
+		node.FinalizedRootBlock.ToHeader(),
 		node.RootQC,
 		finalized,
 		pending,

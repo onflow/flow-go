@@ -16,33 +16,33 @@ import (
 func TestReadClusterRange(t *testing.T) {
 
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
-		chain := unittest.ClusterBlockChainFixture(5)
+		chain := unittest.ClusterBlockFixtures(5)
 		parent, blocks := chain[0], chain[1:]
 
 		// add parent as boundary
-		err := db.Update(operation.IndexClusterBlockHeight(parent.Header.ChainID, parent.Header.Height, parent.ID()))
+		err := db.Update(operation.IndexClusterBlockHeight(parent.ChainID, parent.Height, parent.ID()))
 		require.NoError(t, err)
 
-		err = db.Update(operation.InsertClusterFinalizedHeight(parent.Header.ChainID, parent.Header.Height))
+		err = db.Update(operation.InsertClusterFinalizedHeight(parent.ChainID, parent.Height))
 		require.NoError(t, err)
 
 		// add blocks
 		for _, block := range blocks {
-			err := db.Update(procedure.InsertClusterBlock(&block))
+			err := db.Update(procedure.InsertClusterBlock(unittest.ClusterProposalFromBlock(block)))
 			require.NoError(t, err)
 
-			err = db.Update(procedure.FinalizeClusterBlock(block.Header.ID()))
+			err = db.Update(procedure.FinalizeClusterBlock(block.ID()))
 			require.NoError(t, err)
 		}
 
 		clusterBlocks := badgerstorage.NewClusterBlocks(
 			db,
-			blocks[0].Header.ChainID,
+			blocks[0].ChainID,
 			badgerstorage.NewHeaders(metrics.NewNoopCollector(), db),
 			badgerstorage.NewClusterPayloads(metrics.NewNoopCollector(), db),
 		)
 
-		startHeight := blocks[0].Header.Height
+		startHeight := blocks[0].Height
 		endHeight := startHeight + 10 // if end height is exceeded the last finalized height, only return up to the last finalized
 		lights, err := ReadClusterLightBlockByHeightRange(clusterBlocks, startHeight, endHeight)
 		require.NoError(t, err)

@@ -26,8 +26,13 @@ func TestTransactionSequenceNumProcess(t *testing.T) {
 		err = accounts.Create([]flow.AccountPublicKey{privKey.PublicKey(1000)}, address)
 		require.NoError(t, err)
 
-		tx := flow.TransactionBody{}
-		tx.SetProposalKey(address, 0, 0)
+		tx := flow.TransactionBody{
+			ProposalKey: flow.ProposalKey{
+				Address:        address,
+				KeyIndex:       0,
+				SequenceNumber: 0,
+			},
+		}
 		proc := fvm.Transaction(&tx, 0)
 
 		seqChecker := fvm.TransactionSequenceNumberChecker{}
@@ -38,7 +43,7 @@ func TestTransactionSequenceNumProcess(t *testing.T) {
 		require.NoError(t, err)
 
 		// get fetch the sequence number and it should be updated
-		key, err := accounts.GetPublicKey(address, 0)
+		key, err := accounts.GetAccountPublicKey(address, 0)
 		require.NoError(t, err)
 		require.Equal(t, key.SeqNumber, uint64(1))
 	})
@@ -53,9 +58,14 @@ func TestTransactionSequenceNumProcess(t *testing.T) {
 		err = accounts.Create([]flow.AccountPublicKey{privKey.PublicKey(1000)}, address)
 		require.NoError(t, err)
 
-		tx := flow.TransactionBody{}
-		// invalid sequence number is 2
-		tx.SetProposalKey(address, 0, 2)
+		tx := flow.TransactionBody{
+			// invalid sequence number is 2
+			ProposalKey: flow.ProposalKey{
+				Address:        address,
+				KeyIndex:       0,
+				SequenceNumber: 2,
+			},
+		}
 		proc := fvm.Transaction(&tx, 0)
 
 		seqChecker := fvm.TransactionSequenceNumberChecker{}
@@ -67,7 +77,7 @@ func TestTransactionSequenceNumProcess(t *testing.T) {
 		require.True(t, errors.HasErrorCode(err, errors.ErrCodeInvalidProposalSeqNumberError))
 
 		// get fetch the sequence number and check it to be  unchanged
-		key, err := accounts.GetPublicKey(address, 0)
+		key, err := accounts.GetAccountPublicKey(address, 0)
 		require.NoError(t, err)
 		require.Equal(t, key.SeqNumber, uint64(0))
 	})
@@ -82,9 +92,14 @@ func TestTransactionSequenceNumProcess(t *testing.T) {
 		err = accounts.Create([]flow.AccountPublicKey{privKey.PublicKey(1000)}, address)
 		require.NoError(t, err)
 
-		tx := flow.TransactionBody{}
 		// wrong address
-		tx.SetProposalKey(flow.HexToAddress("2222"), 0, 0)
+		tx := flow.TransactionBody{
+			ProposalKey: flow.ProposalKey{
+				Address:        flow.HexToAddress("2222"),
+				KeyIndex:       0,
+				SequenceNumber: 0,
+			},
+		}
 		proc := fvm.Transaction(&tx, 0)
 
 		seqChecker := &fvm.TransactionSequenceNumberChecker{}
@@ -95,7 +110,7 @@ func TestTransactionSequenceNumProcess(t *testing.T) {
 		require.Error(t, err)
 
 		// get fetch the sequence number and check it to be unchanged
-		key, err := accounts.GetPublicKey(address, 0)
+		key, err := accounts.GetAccountPublicKey(address, 0)
 		require.NoError(t, err)
 		require.Equal(t, key.SeqNumber, uint64(0))
 	})

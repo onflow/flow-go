@@ -33,7 +33,7 @@ func (s *TransactionMetricsSuite) TestTransactionMetrics() {
 	// wait for next height finalized (potentially first height), called blockA
 	currentFinalized := s.BlockState.HighestFinalizedHeight()
 	blockA := s.BlockState.WaitForHighestFinalizedProgress(s.T(), currentFinalized)
-	s.T().Logf("got blockA height %v ID %v\n", blockA.Header.Height, blockA.Header.ID())
+	s.T().Logf("got blockA height %v ID %v\n", blockA.Height, blockA.ID())
 
 	// send transaction
 	tx, err := accessClient.DeployContract(context.Background(), sdk.Identifier(s.net.Root().ID()), lib.CounterContract)
