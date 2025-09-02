@@ -13,7 +13,7 @@ const (
 	// codes related to protocol level information
 	codeBeaconPrivateKey = 63 // BeaconPrivateKey, keyed by epoch counter
 	_                    = 64 // DEPRECATED: flag that the DKG for an epoch has been started
-	_                    = 65 // DEPRECATED: flag that the DKG for an epoch has ended (stores end state)
+	codeDKGEndState      = 65 // DEPRECATED: flag that the DKG for an epoch has ended (stores end state)
 	codeDKGState         = 66 // current state of Recoverable Random Beacon State Machine for given epoch
 )
 
