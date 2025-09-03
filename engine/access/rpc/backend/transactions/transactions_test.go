@@ -449,6 +449,18 @@ func (suite *Suite) TestGetSystemTransaction_HappyPath() {
 	suite.Require().Equal(systemTx, res)
 }
 
+// TestGetSystemTransaction_Unimplemented tests that GetSystemTransaction call returns error when passing specific transaction ID.
+func (suite *Suite) TestGetSystemTransaction_Unimplemented() {
+	params := suite.defaultTransactionsParams()
+	txBackend, err := NewTransactionsBackend(params)
+	require.NoError(suite.T(), err)
+
+	block := unittest.BlockFixture()
+	res, err := txBackend.GetSystemTransaction(context.Background(), flow.Identifier{0x1}, block.ID())
+	suite.Require().Nil(res)
+	suite.Require().Equal(err, status.Errorf(codes.Unimplemented, "system transaction by transaction ID not implemented"))
+}
+
 func (suite *Suite) TestGetSystemTransactionResult_HappyPath() {
 	test := func(snapshot protocol.Snapshot) {
 		suite.state.

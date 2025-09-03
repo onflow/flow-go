@@ -517,7 +517,7 @@ func (t *Transactions) GetTransactionResultByIndex(
 // GetSystemTransaction returns system transaction
 func (t *Transactions) GetSystemTransaction(_ context.Context, txID flow.Identifier, blockID flow.Identifier) (*flow.TransactionBody, error) {
 	if txID == flow.ZeroID {
-		// todo add metric for usage and deprecate the optional txID parameter
+		// TODO: add metric for usage and deprecate the optional txID parameter
 		txID = t.systemTxID
 	}
 
