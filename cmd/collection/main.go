@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -201,6 +202,12 @@ func main() {
 		}
 		if deprecatedFlagBlockRateDelay > 0 {
 			nodeBuilder.Logger.Warn().Msg("A deprecated flag was specified (--block-rate-delay). This flag is deprecated as of v0.30 (Jun 2023), has no effect, and will eventually be removed.")
+		}
+		if rpcConf.MaxRequestMsgSize <= 0 {
+			return errors.New("rpc-max-request-message-size must be greater than 0")
+		}
+		if rpcConf.MaxResponseMsgSize <= 0 {
+			return errors.New("rpc-max-response-message-size must be greater than 0")
 		}
 		return nil
 	})

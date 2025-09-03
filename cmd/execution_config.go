@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"errors"
 	"fmt"
 	"path/filepath"
 	"strings"
@@ -169,6 +170,12 @@ func (exeConf *ExecutionConfig) ValidateFlags() error {
 				return fmt.Errorf("invalid node ID in execution-data-allowed-requesters %s: %w", id, err)
 			}
 		}
+	}
+	if exeConf.rpcConf.MaxRequestMsgSize <= 0 {
+		return errors.New("rpc-max-request-message-size must be greater than 0")
+	}
+	if exeConf.rpcConf.MaxResponseMsgSize <= 0 {
+		return errors.New("rpc-max-response-message-size must be greater than 0")
 	}
 	return nil
 }
