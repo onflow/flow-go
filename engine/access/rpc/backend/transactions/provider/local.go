@@ -283,8 +283,9 @@ func (t *LocalTransactionProvider) TransactionResultsByBlockID(
 		}
 
 		collectionID, ok := txToCollectionID[txID]
+		// for all the transactions that are not in the block user collections we assign the zeroID indicating system collection
 		if !ok {
-			return nil, status.Errorf(codes.Internal, "transaction %s not found in block %s", txID, blockID)
+			collectionID = flow.ZeroID
 		}
 
 		results = append(results, &accessmodel.TransactionResult{
@@ -337,7 +338,6 @@ func (t *LocalTransactionProvider) buildTxIDToCollectionIDMapping(block *flow.Bl
 			txToCollectionID[txID] = guarantee.CollectionID
 		}
 	}
-	txToCollectionID[t.systemTxID] = flow.ZeroID
 
 	return txToCollectionID, nil
 }
