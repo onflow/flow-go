@@ -345,6 +345,7 @@ func (e *ENTransactionProvider) systemTransactionResults(
 		}
 
 		// if scheduled callbacks are enabled we calculate and cache the tx ids by reconstructing the system collection
+		// the first transaction will be the process transaction so we only need the events from the process callback tx
 		if scheduledCallbacksEnabled && len(systemTxIDs) == 0 {
 			sysCollection, err := blueprints.SystemCollection(e.chainID.Chain(), events)
 			if err != nil {
