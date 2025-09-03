@@ -8,8 +8,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/cockroachdb/pebble/v2"
 	"github.com/dapperlabs/testingdock"
-	"github.com/dgraph-io/badger/v2"
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/go-connections/nat"
@@ -32,8 +32,10 @@ import (
 	state "github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/state/protocol/inmem"
 	"github.com/onflow/flow-go/storage"
-	"github.com/onflow/flow-go/storage/operation/badgerimpl"
+	"github.com/onflow/flow-go/storage/operation/pebbleimpl"
+	storagepebble "github.com/onflow/flow-go/storage/pebble"
 	"github.com/onflow/flow-go/storage/store"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 var (
@@ -238,25 +240,13 @@ func (c *Container) Name() string {
 }
 
 // DB returns the node's database.
-func (c *Container) DB() (*badger.DB, error) {
-	opts := badger.
-		DefaultOptions(c.DBPath()).
-		WithKeepL0InMemory(true).
-		WithLogger(nil)
-
-	db, err := badger.Open(opts)
-	return db, err
+func (c *Container) DB() (*pebble.DB, error) {
+	return storagepebble.SafeOpen(unittest.Logger(), c.DBPath())
 }
 
 // DB returns the node's execution data database.
-func (c *Container) ExecutionDataDB() (*badger.DB, error) {
-	opts := badger.
-		DefaultOptions(c.ExecutionDataDBPath()).
-		WithKeepL0InMemory(true).
-		WithLogger(nil)
-
-	db, err := badger.Open(opts)
-	return db, err
+func (c *Container) ExecutionDataDB() (*pebble.DB, error) {
+	return storagepebble.SafeOpen(unittest.Logger(), c.ExecutionDataDBPath())
 }
 
 func (c *Container) DBPath() string {
@@ -385,11 +375,11 @@ func (c *Container) Connect() error {
 
 func (c *Container) OpenState() (*state.State, error) {
 	lockManager := storage.NewTestingLockManager()
-	badgerdb, err := c.DB()
+	pdb, err := c.DB()
 	if err != nil {
 		return nil, err
 	}
-	db := badgerimpl.ToDB(badgerdb)
+	db := pebbleimpl.ToDB(pdb)
 
 	metrics := metrics.NewNoopCollector()
 	index := store.NewIndex(metrics, db)
