@@ -505,7 +505,7 @@ func (t *Transactions) GetTransactionResultByIndex(
 
 // GetSystemTransaction returns system transaction
 func (t *Transactions) GetSystemTransaction(_ context.Context, txID flow.Identifier, _ flow.Identifier) (*flow.TransactionBody, error) {
-	// todo implement other system transaction look up
+	// TODO: implement other system transaction look up
 	if txID != flow.ZeroID && txID != t.systemTxID {
 		return nil, status.Errorf(codes.Unimplemented, "system transaction by transaction ID not implemented")
 	}
