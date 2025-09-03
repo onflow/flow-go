@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -15,6 +16,7 @@ import (
 	"google.golang.org/grpc/status"
 
 	"github.com/onflow/flow-go/access/mock"
+	"github.com/onflow/flow-go/engine/access/rest/common/models"
 	"github.com/onflow/flow-go/engine/access/rest/http/routes"
 	"github.com/onflow/flow-go/engine/access/rest/router"
 	"github.com/onflow/flow-go/engine/access/rest/util"
@@ -53,9 +55,9 @@ func TestGetEvents(t *testing.T) {
 				"",
 				"",
 				[]string{events[0].BlockID.String()},
-				2,
+				"2",
 				[]string{},
-				true,
+				"true",
 			),
 			expectedStatus:   http.StatusOK,
 			expectedResponse: testBlockEventResponse(t, []flow.BlockEvents{events[0]}),
@@ -68,9 +70,9 @@ func TestGetEvents(t *testing.T) {
 				"",
 				"",
 				allBlockIDs,
-				2,
+				"2",
 				[]string{},
-				true,
+				"true",
 			),
 			expectedStatus:   http.StatusOK,
 			expectedResponse: testBlockEventResponse(t, events),
@@ -83,9 +85,9 @@ func TestGetEvents(t *testing.T) {
 				startHeight,
 				endHeight,
 				nil,
-				2,
+				"2",
 				[]string{},
-				true,
+				"true",
 			),
 			expectedStatus:   http.StatusOK,
 			expectedResponse: testBlockEventResponse(t, events),
@@ -98,9 +100,9 @@ func TestGetEvents(t *testing.T) {
 				"0",
 				"sealed",
 				nil,
-				2,
+				"2",
 				[]string{},
-				true,
+				"true",
 			),
 			expectedStatus:   http.StatusOK,
 			expectedResponse: testBlockEventResponse(t, events),
@@ -113,9 +115,9 @@ func TestGetEvents(t *testing.T) {
 				"0",
 				fmt.Sprint(events[len(events)-1].BlockHeight+5),
 				nil,
-				2,
+				"2",
 				[]string{},
-				true,
+				"true",
 			),
 			expectedStatus:   http.StatusOK,
 			expectedResponse: testBlockEventResponse(t, truncatedEvents),
@@ -129,9 +131,9 @@ func TestGetEvents(t *testing.T) {
 				"",
 				"",
 				nil,
-				2,
+				"2",
 				[]string{},
-				true,
+				"true",
 			),
 			expectedStatus:   http.StatusBadRequest,
 			expectedResponse: `{"code":400,"message":"must provide either block IDs or start and end height range"}`,
@@ -144,12 +146,12 @@ func TestGetEvents(t *testing.T) {
 				"",
 				"",
 				[]string{events[0].BlockID.String()},
-				2,
+				"2",
 				[]string{},
-				true,
+				"true",
 			),
 			expectedStatus:   http.StatusBadRequest,
-			expectedResponse: `{"code":400,"message":"event type must be provided"}`,
+			expectedResponse: `{"code":400,"message":"invalid event type format"}`,
 		},
 		{
 			description: "Get invalid - missing end height",
@@ -158,9 +160,9 @@ func TestGetEvents(t *testing.T) {
 				"A.179b6b1cb6755e31.Foo.Bar",
 				"100",
 				"", nil,
-				2,
+				"2",
 				[]string{},
-				true,
+				"true",
 			),
 			expectedStatus:   http.StatusBadRequest,
 			expectedResponse: `{"code":400,"message":"must provide either block IDs or start and end height range"}`,
@@ -173,9 +175,9 @@ func TestGetEvents(t *testing.T) {
 				"100",
 				"50",
 				nil,
-				2,
+				"2",
 				[]string{},
-				true,
+				"true",
 			),
 			expectedStatus:   http.StatusBadRequest,
 			expectedResponse: `{"code":400,"message":"start height must be less than or equal to end height"}`,
@@ -188,9 +190,9 @@ func TestGetEvents(t *testing.T) {
 				"0",
 				"5000",
 				nil,
-				2,
+				"2",
 				[]string{},
-				true,
+				"true",
 			),
 			expectedStatus:   http.StatusBadRequest,
 			expectedResponse: `{"code":400,"message":"height range 5000 exceeds maximum allowed of 250"}`,
@@ -203,9 +205,9 @@ func TestGetEvents(t *testing.T) {
 				"100",
 				"120",
 				[]string{"10e782612a014b5c9c7d17994d7e67157064f3dd42fa92cd080bfb0fe22c3f71"},
-				2,
+				"2",
 				[]string{},
-				true,
+				"true",
 			),
 			expectedStatus:   http.StatusBadRequest,
 			expectedResponse: `{"code":400,"message":"can only provide either block IDs or start and end height range"}`,
@@ -218,9 +220,9 @@ func TestGetEvents(t *testing.T) {
 				"foo",
 				"120",
 				nil,
-				2,
+				"2",
 				[]string{},
-				true,
+				"true",
 			),
 			expectedStatus:   http.StatusBadRequest,
 			expectedResponse: `{"code":400,"message":"invalid start height: invalid height format"}`,
@@ -233,9 +235,9 @@ func TestGetEvents(t *testing.T) {
 				"100000",
 				"sealed",
 				nil,
-				2,
+				"2",
 				[]string{},
-				true,
+				"true",
 			),
 			expectedStatus:   http.StatusBadRequest,
 			expectedResponse: `{"code":400,"message":"current retrieved end height value is lower than start height"}`,
@@ -256,9 +258,9 @@ func buildRequest(
 	start string,
 	end string,
 	blockIDs []string,
-	agreeingExecutorsCount int,
+	agreeingExecutorsCount string,
 	requiredExecutors []string,
-	includeExecutorMetadata bool,
+	includeExecutorMetadata string,
 ) *http.Request {
 	u, _ := url.Parse("/v1/events")
 	q := u.Query()
@@ -272,12 +274,16 @@ func buildRequest(
 		q.Add(router.EndHeightQueryParam, end)
 	}
 
-	require.NotEqual(t, agreeingExecutorsCount, 0, "agreeingExecutorsCount must be greater than 0")
-	q.Add(router.AgreeingExecutorsCountQueryParam, fmt.Sprint(agreeingExecutorsCount))
+	count, err := strconv.Atoi(agreeingExecutorsCount)
+	require.NoError(t, err)
+	require.Greater(t, count, 0, "agreeingExecutorsCount must be greater than 0")
+	q.Add(router.AgreeingExecutorsCountQueryParam, agreeingExecutorsCount)
 
 	q.Add(router.RequiredExecutorIdsQueryParam, strings.Join(requiredExecutors, ","))
 
-	if includeExecutorMetadata {
+	includeMetadata, err := strconv.ParseBool(includeExecutorMetadata)
+	require.NoError(t, err)
+	if includeMetadata {
 		q.Add(router.IncludeExecutorMetadataQueryParam, fmt.Sprint(includeExecutorMetadata))
 	}
 
@@ -303,15 +309,28 @@ func generateEventsMocks(backend *mock.API, n int) []flow.BlockEvents {
 		events[i] = unittest.BlockEventsFixture(header, 2)
 
 		backend.Mock.
-			On("GetEventsForBlockIDs", mocks.Anything, mocks.Anything, []flow.Identifier{header.ID()}, entities.EventEncodingVersion_JSON_CDC_V0).
-			Return([]flow.BlockEvents{events[i]}, nil)
+			On(
+				"GetEventsForBlockIDs",
+				mocks.Anything,
+				mocks.Anything,
+				[]flow.Identifier{header.ID()},
+				entities.EventEncodingVersion_JSON_CDC_V0,
+				mocks.Anything,
+			).
+			Return([]flow.BlockEvents{events[i]}, flow.ExecutorMetadata{}, nil)
 
 		lastHeader = header
 	}
 
 	backend.Mock.
-		On("GetEventsForBlockIDs", mocks.Anything, mocks.Anything, ids, entities.EventEncodingVersion_JSON_CDC_V0).
-		Return(events, nil)
+		On(
+			"GetEventsForBlockIDs",
+			mocks.Anything,
+			mocks.Anything, ids,
+			entities.EventEncodingVersion_JSON_CDC_V0,
+			mocks.Anything,
+		).
+		Return(events, flow.ExecutorMetadata{}, nil)
 
 	// range from first to last block
 	backend.Mock.On(
@@ -321,7 +340,8 @@ func generateEventsMocks(backend *mock.API, n int) []flow.BlockEvents {
 		events[0].BlockHeight,
 		events[len(events)-1].BlockHeight,
 		entities.EventEncodingVersion_JSON_CDC_V0,
-	).Return(events, nil)
+		mocks.Anything,
+	).Return(events, flow.ExecutorMetadata{}, nil)
 
 	// range from first to last block + 5
 	backend.Mock.On(
@@ -331,19 +351,35 @@ func generateEventsMocks(backend *mock.API, n int) []flow.BlockEvents {
 		events[0].BlockHeight,
 		events[len(events)-1].BlockHeight+5,
 		entities.EventEncodingVersion_JSON_CDC_V0,
-	).Return(append(events[:len(events)-1], unittest.BlockEventsFixture(lastHeader, 0)), nil)
+		mocks.Anything,
+	).Return(append(events[:len(events)-1], unittest.BlockEventsFixture(lastHeader, 0)), flow.ExecutorMetadata{}, nil)
 
 	latestBlock := unittest.BlockHeaderFixture()
 	latestBlock.Height = uint64(n - 1)
 
 	// default not found
 	backend.Mock.
-		On("GetEventsForBlockIDs", mocks.Anything, mocks.Anything, mocks.Anything, entities.EventEncodingVersion_JSON_CDC_V0).
-		Return(nil, status.Error(codes.NotFound, "not found"))
+		On(
+			"GetEventsForBlockIDs",
+			mocks.Anything,
+			mocks.Anything,
+			mocks.Anything,
+			entities.EventEncodingVersion_JSON_CDC_V0,
+			mocks.Anything,
+		).
+		Return(nil, flow.ExecutorMetadata{}, status.Error(codes.NotFound, "not found"))
 
 	backend.Mock.
-		On("GetEventsForHeightRange", mocks.Anything, mocks.Anything).
-		Return(nil, status.Error(codes.NotFound, "not found"))
+		On(
+			"GetEventsForHeightRange",
+			mocks.Anything,
+			mocks.Anything,
+			mocks.Anything,
+			mocks.Anything,
+			mocks.Anything,
+			mocks.Anything,
+		).
+		Return(nil, flow.ExecutorMetadata{}, status.Error(codes.NotFound, "not found"))
 
 	backend.Mock.
 		On("GetLatestBlockHeader", mocks.Anything, true).
@@ -353,6 +389,11 @@ func generateEventsMocks(backend *mock.API, n int) []flow.BlockEvents {
 }
 
 func testBlockEventResponse(t *testing.T, events []flow.BlockEvents) string {
+	// TODO: why don't we reuse types from rest/common/models package here?
+
+	// TODO(illia): We need to refactor this test to support include/exclude metadata field
+	// We should pass in includeMetadata boolean value here and fix it in TestGetEvents.
+	// Currently, if one exclude metadata field, we still include it in the response object.
 
 	type eventResponse struct {
 		Type             flow.EventType  `json:"type"`
@@ -363,10 +404,11 @@ func testBlockEventResponse(t *testing.T, events []flow.BlockEvents) string {
 	}
 
 	type blockEventsResponse struct {
-		BlockID        flow.Identifier `json:"block_id"`
-		BlockHeight    string          `json:"block_height"`
-		BlockTimestamp string          `json:"block_timestamp"`
-		Events         []eventResponse `json:"events,omitempty"`
+		BlockID        flow.Identifier  `json:"block_id"`
+		BlockHeight    string           `json:"block_height"`
+		BlockTimestamp string           `json:"block_timestamp"`
+		Events         []eventResponse  `json:"events,omitempty"`
+		Metadata       *models.Metadata `json:"metadata,omitempty"`
 	}
 
 	res := make([]blockEventsResponse, len(events))

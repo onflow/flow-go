@@ -30,7 +30,7 @@ func NewBlockEvents(
 	metadata *flow.ExecutorMetadata,
 	shouldIncludeMetadata bool,
 ) *BlockEvents {
-	var meta *Metadata
+	var meta *Metadata = nil
 	if shouldIncludeMetadata {
 		meta = NewMetadata(metadata)
 	}
@@ -41,7 +41,6 @@ func NewBlockEvents(
 		BlockTimestamp: events.BlockTimestamp,
 		Events:         NewEvents(events.Events),
 		Metadata:       meta,
-		Links:          nil,
 	}
 }
 
@@ -52,9 +51,9 @@ func NewBlockEventsList(
 	metadata *flow.ExecutorMetadata,
 	shouldIncludeMetadata bool,
 ) BlockEventsList {
-	converted := make([]BlockEvents, len(blocksEvents))
-	for i, evs := range blocksEvents {
-		converted[i] = *NewBlockEvents(evs, metadata, shouldIncludeMetadata)
+	var converted BlockEventsList
+	for _, evs := range blocksEvents {
+		converted = append(converted, *NewBlockEvents(evs, metadata, shouldIncludeMetadata))
 	}
 	return converted
 }
