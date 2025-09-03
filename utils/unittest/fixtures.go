@@ -1520,7 +1520,12 @@ func WithReferenceBlock(id flow.Identifier) func(tx *flow.TransactionBody) {
 
 func TransactionDSLFixture(chain flow.Chain) dsl.Transaction {
 	return dsl.Transaction{
-		Import: dsl.Import{Address: sdk.Address(chain.ServiceAddress())},
+		Imports: dsl.Imports{
+			dsl.Import{
+				Address: sdk.Address(chain.ServiceAddress()),
+				Names:   []string{"FlowCallbackScheduler"},
+			},
+		},
 		Content: dsl.Prepare{
 			Content: dsl.Code(`
 				access(all) fun main() {}
