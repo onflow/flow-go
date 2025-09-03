@@ -4,12 +4,20 @@ import (
 	"errors"
 	"fmt"
 
-	lru "github.com/hashicorp/golang-lru/v2"
+	lru "github.com/fxamacker/golang-lru/v2"
 	"github.com/jordanschalm/lockctx"
 
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/storage"
 )
+
+type lruCache[K comparable, V any] interface {
+	Add(key K, value V) bool
+	Get(key K) (value V, ok bool)
+	Contains(key K) (ok bool)
+	Remove(key K) bool
+	Len() int
+}
 
 func withLimit[K comparable, V any](limit uint) func(*Cache[K, V]) {
 	return func(c *Cache[K, V]) {
@@ -80,7 +88,7 @@ type Cache[K comparable, V any] struct {
 	retrieve      retrieveFunc[K, V]
 	remove        removeFunc[K]
 	resource      string
-	cache         *lru.Cache[K, V]
+	cache         lruCache[K, V]
 }
 
 func newCache[K comparable, V any](collector module.CacheMetrics, resourceName string, options ...func(*Cache[K, V])) *Cache[K, V] {
