@@ -3,6 +3,7 @@ package store_test
 import (
 	"testing"
 
+	"github.com/jordanschalm/lockctx"
 	"github.com/onflow/flow-go/storage/operation"
 	"github.com/onflow/flow-go/storage/operation/dbtest"
 	"github.com/onflow/flow-go/storage/store"
@@ -63,25 +64,19 @@ func TestHeaderIndexByViewAndRetrieve(t *testing.T) {
 		proposal := unittest.ProposalFixture()
 		block := proposal.Block
 
-		lctx := lockManager.NewContext()
-		err := lctx.AcquireLock(storage.LockInsertBlock)
-		require.NoError(t, err)
-		defer lctx.Release()
-
 		// store block which will also store header
-		err = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			return blocks.BatchStore(lctx, rw, proposal)
+		unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
+			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+				return blocks.BatchStore(lctx, rw, proposal)
+			})
 		})
-		require.NoError(t, err)
 
-		lctx2 := lockManager.NewContext()
-		require.NoError(t, lctx2.AcquireLock(storage.LockFinalizeBlock))
-		// index the header
-		err = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			return operation.IndexCertifiedBlockByView(lctx2, rw, block.View, block.ID())
+		unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
+			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+				// index the header
+				return operation.IndexCertifiedBlockByView(lctx, rw, block.View, block.ID())
+			})
 		})
-		lctx2.Release()
-		require.NoError(t, err)
 
 		// retrieve header by view
 		actual, err := headers.ByView(block.View)
