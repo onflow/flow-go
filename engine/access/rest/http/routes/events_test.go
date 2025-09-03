@@ -46,81 +46,197 @@ func TestGetEvents(t *testing.T) {
 	testVectors := []testVector{
 		// valid
 		{
-			description:      "Get events for a single block by ID",
-			request:          getEventReq(t, "A.179b6b1cb6755e31.Foo.Bar", "", "", []string{events[0].BlockID.String()}),
+			description: "Get events for a single block by ID",
+			request: buildRequest(
+				t,
+				"A.179b6b1cb6755e31.Foo.Bar",
+				"",
+				"",
+				[]string{events[0].BlockID.String()},
+				2,
+				[]string{},
+				true,
+			),
 			expectedStatus:   http.StatusOK,
 			expectedResponse: testBlockEventResponse(t, []flow.BlockEvents{events[0]}),
 		},
 		{
-			description:      "Get events by all block IDs",
-			request:          getEventReq(t, "A.179b6b1cb6755e31.Foo.Bar", "", "", allBlockIDs),
+			description: "Get events by all block IDs",
+			request: buildRequest(
+				t,
+				"A.179b6b1cb6755e31.Foo.Bar",
+				"",
+				"",
+				allBlockIDs,
+				2,
+				[]string{},
+				true,
+			),
 			expectedStatus:   http.StatusOK,
 			expectedResponse: testBlockEventResponse(t, events),
 		},
 		{
-			description:      "Get events for height range",
-			request:          getEventReq(t, "A.179b6b1cb6755e31.Foo.Bar", startHeight, endHeight, nil),
+			description: "Get events for height range",
+			request: buildRequest(
+				t,
+				"A.179b6b1cb6755e31.Foo.Bar",
+				startHeight,
+				endHeight,
+				nil,
+				2,
+				[]string{},
+				true,
+			),
 			expectedStatus:   http.StatusOK,
 			expectedResponse: testBlockEventResponse(t, events),
 		},
 		{
-			description:      "Get events range ending at sealed block",
-			request:          getEventReq(t, "A.179b6b1cb6755e31.Foo.Bar", "0", "sealed", nil),
+			description: "Get events range ending at sealed block",
+			request: buildRequest(
+				t,
+				"A.179b6b1cb6755e31.Foo.Bar",
+				"0",
+				"sealed",
+				nil,
+				2,
+				[]string{},
+				true,
+			),
 			expectedStatus:   http.StatusOK,
 			expectedResponse: testBlockEventResponse(t, events),
 		},
 		{
-			description:      "Get events range ending after last block",
-			request:          getEventReq(t, "A.179b6b1cb6755e31.Foo.Bar", "0", fmt.Sprint(events[len(events)-1].BlockHeight+5), nil),
+			description: "Get events range ending after last block",
+			request: buildRequest(
+				t,
+				"A.179b6b1cb6755e31.Foo.Bar",
+				"0",
+				fmt.Sprint(events[len(events)-1].BlockHeight+5),
+				nil,
+				2,
+				[]string{},
+				true,
+			),
 			expectedStatus:   http.StatusOK,
 			expectedResponse: testBlockEventResponse(t, truncatedEvents),
 		},
 		// invalid
 		{
-			description:      "Get invalid - missing all fields",
-			request:          getEventReq(t, "", "", "", nil),
+			description: "Get invalid - missing all fields",
+			request: buildRequest(
+				t,
+				"",
+				"",
+				"",
+				nil,
+				2,
+				[]string{},
+				true,
+			),
 			expectedStatus:   http.StatusBadRequest,
 			expectedResponse: `{"code":400,"message":"must provide either block IDs or start and end height range"}`,
 		},
 		{
-			description:      "Get invalid - missing query event type",
-			request:          getEventReq(t, "", "", "", []string{events[0].BlockID.String()}),
+			description: "Get invalid - missing query event type",
+			request: buildRequest(
+				t,
+				"",
+				"",
+				"",
+				[]string{events[0].BlockID.String()},
+				2,
+				[]string{},
+				true,
+			),
 			expectedStatus:   http.StatusBadRequest,
 			expectedResponse: `{"code":400,"message":"event type must be provided"}`,
 		},
 		{
-			description:      "Get invalid - missing end height",
-			request:          getEventReq(t, "A.179b6b1cb6755e31.Foo.Bar", "100", "", nil),
+			description: "Get invalid - missing end height",
+			request: buildRequest(
+				t,
+				"A.179b6b1cb6755e31.Foo.Bar",
+				"100",
+				"", nil,
+				2,
+				[]string{},
+				true,
+			),
 			expectedStatus:   http.StatusBadRequest,
 			expectedResponse: `{"code":400,"message":"must provide either block IDs or start and end height range"}`,
 		},
 		{
-			description:      "Get invalid - start height bigger than end height",
-			request:          getEventReq(t, "A.179b6b1cb6755e31.Foo.Bar", "100", "50", nil),
+			description: "Get invalid - start height bigger than end height",
+			request: buildRequest(
+				t,
+				"A.179b6b1cb6755e31.Foo.Bar",
+				"100",
+				"50",
+				nil,
+				2,
+				[]string{},
+				true,
+			),
 			expectedStatus:   http.StatusBadRequest,
 			expectedResponse: `{"code":400,"message":"start height must be less than or equal to end height"}`,
 		},
 		{
-			description:      "Get invalid - too big interval",
-			request:          getEventReq(t, "A.179b6b1cb6755e31.Foo.Bar", "0", "5000", nil),
+			description: "Get invalid - too big interval",
+			request: buildRequest(
+				t,
+				"A.179b6b1cb6755e31.Foo.Bar",
+				"0",
+				"5000",
+				nil,
+				2,
+				[]string{},
+				true,
+			),
 			expectedStatus:   http.StatusBadRequest,
 			expectedResponse: `{"code":400,"message":"height range 5000 exceeds maximum allowed of 250"}`,
 		},
 		{
-			description:      "Get invalid - can not provide all params",
-			request:          getEventReq(t, "A.179b6b1cb6755e31.Foo.Bar", "100", "120", []string{"10e782612a014b5c9c7d17994d7e67157064f3dd42fa92cd080bfb0fe22c3f71"}),
+			description: "Get invalid - can not provide all params",
+			request: buildRequest(
+				t,
+				"A.179b6b1cb6755e31.Foo.Bar",
+				"100",
+				"120",
+				[]string{"10e782612a014b5c9c7d17994d7e67157064f3dd42fa92cd080bfb0fe22c3f71"},
+				2,
+				[]string{},
+				true,
+			),
 			expectedStatus:   http.StatusBadRequest,
 			expectedResponse: `{"code":400,"message":"can only provide either block IDs or start and end height range"}`,
 		},
 		{
-			description:      "Get invalid - invalid height format",
-			request:          getEventReq(t, "A.179b6b1cb6755e31.Foo.Bar", "foo", "120", nil),
+			description: "Get invalid - invalid height format",
+			request: buildRequest(
+				t,
+				"A.179b6b1cb6755e31.Foo.Bar",
+				"foo",
+				"120",
+				nil,
+				2,
+				[]string{},
+				true,
+			),
 			expectedStatus:   http.StatusBadRequest,
 			expectedResponse: `{"code":400,"message":"invalid start height: invalid height format"}`,
 		},
 		{
-			description:      "Get invalid - latest block smaller than start",
-			request:          getEventReq(t, "A.179b6b1cb6755e31.Foo.Bar", "100000", "sealed", nil),
+			description: "Get invalid - latest block smaller than start",
+			request: buildRequest(
+				t,
+				"A.179b6b1cb6755e31.Foo.Bar",
+				"100000",
+				"sealed",
+				nil,
+				2,
+				[]string{},
+				true,
+			),
 			expectedStatus:   http.StatusBadRequest,
 			expectedResponse: `{"code":400,"message":"current retrieved end height value is lower than start height"}`,
 		},
@@ -134,7 +250,16 @@ func TestGetEvents(t *testing.T) {
 
 }
 
-func getEventReq(t *testing.T, eventType string, start string, end string, blockIDs []string) *http.Request {
+func buildRequest(
+	t *testing.T,
+	eventType string,
+	start string,
+	end string,
+	blockIDs []string,
+	agreeingExecutorsCount int,
+	requiredExecutors []string,
+	includeExecutorMetadata bool,
+) *http.Request {
 	u, _ := url.Parse("/v1/events")
 	q := u.Query()
 
@@ -145,6 +270,15 @@ func getEventReq(t *testing.T, eventType string, start string, end string, block
 	if start != "" && end != "" {
 		q.Add(router.StartHeightQueryParam, start)
 		q.Add(router.EndHeightQueryParam, end)
+	}
+
+	require.NotEqual(t, agreeingExecutorsCount, 0, "agreeingExecutorsCount must be greater than 0")
+	q.Add(router.AgreeingExecutorsCountQueryParam, fmt.Sprint(agreeingExecutorsCount))
+
+	q.Add(router.RequiredExecutorIdsQueryParam, strings.Join(requiredExecutors, ","))
+
+	if includeExecutorMetadata {
+		q.Add(router.IncludeExecutorMetadataQueryParam, fmt.Sprint(includeExecutorMetadata))
 	}
 
 	q.Add(routes.EventTypeQuery, eventType)
