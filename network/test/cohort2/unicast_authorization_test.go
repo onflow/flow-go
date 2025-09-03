@@ -544,6 +544,6 @@ func (u *overridableMessageEncoder) Encode(v interface{}) ([]byte, error) {
 }
 
 // Decode decodes a byte slice into a value. It uses the default decoder.
-func (u *overridableMessageEncoder) Decode(data []byte) (interface{}, error) {
+func (u *overridableMessageEncoder) Decode(data []byte) (messages.UntrustedMessage, error) {
 	return u.codec.Decode(data)
 }

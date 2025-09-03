@@ -47,7 +47,7 @@ func (h Handler) SendEvent(_ context.Context, req *ghost.SendEventRequest) (*emp
 
 	message := req.GetMessage()
 
-	internal, err := h.codec.Decode(message)
+	decodedMsg, err := h.codec.Decode(message)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, "failed to decode message")
 	}
@@ -61,7 +61,7 @@ func (h Handler) SendEvent(_ context.Context, req *ghost.SendEventRequest) (*emp
 	}
 
 	h.log.Info().
-		Interface("event", internal).
+		Interface("event", decodedMsg).
 		Str("flow_ids", fmt.Sprintf("%v", flowIDs)).
 		Str("target_ids", fmt.Sprintf("%v", targetIDs)).
 		Msg("sending message")
@@ -70,15 +70,11 @@ func (h Handler) SendEvent(_ context.Context, req *ghost.SendEventRequest) (*emp
 	// TODO: there is an issue in the Publish method for the ghost node,
 	// sometimes, it fails to deliver the message to the target without returning any error.
 	// This becomes one of the big factors contributing to the tests flakeiness.
-	msg, err := internalToMessage(internal)
-	if err != nil {
-		return nil, fmt.Errorf("failed to convert event to message: %v", err)
-	}
-	err = conduit.Publish(msg, flowIDs...)
+	err = conduit.Publish(decodedMsg, flowIDs...)
 	if err != nil {
 		h.log.Error().
 			Err(err).
-			Interface("message", msg).
+			Interface("message", decodedMsg).
 			Str("flow_ids", fmt.Sprintf("%v", flowIDs)).
 			Str("target_ids", fmt.Sprintf("%v", targetIDs)).
 			Msg("error publishing message")
