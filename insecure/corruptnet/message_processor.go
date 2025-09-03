@@ -44,6 +44,7 @@ func (m *MessageProcessor) Process(channel channels.Channel, originID flow.Ident
 	}
 	attackerRegistered := m.ingressController.HandleIncomingEvent(msg, channel, originID)
 	if !attackerRegistered {
+		// No attack orchestrator registered yet, hence pass the ingress message back to the original processor.
 		err := m.originalProcessor.Process(channel, originID, event)
 		if err != nil {
 			m.logger.Fatal().Err(err).Msg("could not send message back to original message processor")
