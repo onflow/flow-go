@@ -39,7 +39,7 @@ func TestExecutionForkWithDuplicateAssignedChunks(t *testing.T) {
 	mockStateAtBlockIDForIdentities(s.state, block.ID(), executorsA.Union(executorsB))
 
 	// the chunks belong to an unsealed block, so their chunk data pack is requested.
-	mockBlockSealingStatus(s.state, s.headers, block.Header, false)
+	mockBlockSealingStatus(s.state, s.headers, block.ToHeader(), false)
 
 	// mocks resources on fetcher engine side.
 	mockResultsByIDs(s.results, []*flow.ExecutionResult{resultA, resultB})
@@ -57,8 +57,8 @@ func TestExecutionForkWithDuplicateAssignedChunks(t *testing.T) {
 	s.metrics.On("OnChunkDataPackRequestSentByFetcher").Return().Times(len(assignedChunkStatuses))
 
 	// each chunk data request is answered by requester engine on a distinct chunk data response
-	chunkALocatorID := statusA.ChunkLocatorID()
-	chunkBLocatorID := statusB.ChunkLocatorID()
+	chunkALocatorID := unittest.ChunkLocatorFixture(statusA.ExecutionResult.ID(), statusA.ChunkIndex).ID()
+	chunkBLocatorID := unittest.ChunkLocatorFixture(statusB.ExecutionResult.ID(), statusB.ChunkIndex).ID()
 	chunkDataResponse := make(map[flow.Identifier]*verification.ChunkDataPackResponse)
 	chunkDataResponse[chunkALocatorID] = chunkDataPackResponseFixture(t, statusA.Chunk(), collMap[statusA.Chunk().ID()], resultA)
 	chunkDataResponse[chunkBLocatorID] = chunkDataPackResponseFixture(t, statusB.Chunk(), collMap[statusA.Chunk().ID()], resultB)
@@ -83,16 +83,12 @@ func TestExecutionForkWithDuplicateAssignedChunks(t *testing.T) {
 	processWG := &sync.WaitGroup{}
 	processWG.Add(len(assignedChunkStatuses))
 	for _, status := range assignedChunkStatuses {
-		locator := &chunks.Locator{
-			Index:    status.ChunkIndex,
-			ResultID: status.ExecutionResult.ID(),
-		}
+		locator := unittest.ChunkLocatorFixture(status.ExecutionResult.ID(), status.ChunkIndex)
 
 		go func(l *chunks.Locator) {
 			e.ProcessAssignedChunk(l)
 			processWG.Done()
 		}(locator)
-
 	}
 
 	unittest.RequireReturnsBefore(t, requesterWg.Wait, 100*time.Millisecond, "could not handle received chunk data pack on time")
@@ -121,12 +117,12 @@ func executionResultForkFixture(t *testing.T) (*flow.Block,
 	statusA := &verification.ChunkStatus{
 		ChunkIndex:      0,
 		ExecutionResult: resultA,
-		BlockHeight:     block.Header.Height,
+		BlockHeight:     block.Height,
 	}
 	statusB := &verification.ChunkStatus{
 		ChunkIndex:      0,
 		ExecutionResult: resultB,
-		BlockHeight:     block.Header.Height,
+		BlockHeight:     block.Height,
 	}
 
 	// keeps collections of assigned chunks

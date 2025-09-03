@@ -97,7 +97,7 @@ func (suite *ExecutionResultQueryProviderSuite) TestExecutionResultQuery() {
 
 		receipts := make(flow.ExecutionReceiptList, totalReceipts)
 		for i := 0; i < totalReceipts; i++ {
-			r := unittest.ReceiptForBlockFixture(&block)
+			r := unittest.ReceiptForBlockFixture(block)
 			r.ExecutorID = allExecutionNodes[i].NodeID
 			r.ExecutionResult = *executionResult
 			receipts[i] = r
@@ -129,13 +129,13 @@ func (suite *ExecutionResultQueryProviderSuite) TestExecutionResultQuery() {
 		// Create 3 receipts with the same result (executionResult) and 2 with a different result (otherResult)
 		receipts := make(flow.ExecutionReceiptList, totalReceipts)
 		for i := 0; i < 3; i++ {
-			r := unittest.ReceiptForBlockFixture(&block)
+			r := unittest.ReceiptForBlockFixture(block)
 			r.ExecutorID = allExecutionNodes[i].NodeID
 			r.ExecutionResult = *executionResult
 			receipts[i] = r
 		}
 		for i := 3; i < totalReceipts; i++ {
-			r := unittest.ReceiptForBlockFixture(&block)
+			r := unittest.ReceiptForBlockFixture(block)
 			r.ExecutorID = allExecutionNodes[i].NodeID
 			r.ExecutionResult = *otherResult
 			receipts[i] = r
@@ -160,7 +160,7 @@ func (suite *ExecutionResultQueryProviderSuite) TestExecutionResultQuery() {
 		// Create a scenario where we have receipts but no result has enough agreeing executors
 
 		// Create only 1 receipt with 1 execution result
-		r := unittest.ReceiptForBlockFixture(&insufficientBlock)
+		r := unittest.ReceiptForBlockFixture(insufficientBlock)
 		r.ExecutorID = allExecutionNodes[0].NodeID
 		r.ExecutionResult = *unittest.ExecutionResultFixture()
 		receipts := flow.ExecutionReceiptList{
@@ -184,7 +184,7 @@ func (suite *ExecutionResultQueryProviderSuite) TestExecutionResultQuery() {
 		provider := suite.createProvider(flow.IdentifierList{}, optimistic_sync.Criteria{})
 		receipts := make(flow.ExecutionReceiptList, totalReceipts)
 		for i := 0; i < totalReceipts; i++ {
-			r := unittest.ReceiptForBlockFixture(&block)
+			r := unittest.ReceiptForBlockFixture(block)
 			r.ExecutorID = allExecutionNodes[i].NodeID
 			r.ExecutionResult = *executionResult
 			receipts[i] = r
@@ -246,7 +246,7 @@ func (suite *ExecutionResultQueryProviderSuite) TestPreferredAndRequiredExecutio
 	// Create receipts from the first `numReceipts` execution nodes
 	receipts := make(flow.ExecutionReceiptList, numReceipts)
 	for i := 0; i < numReceipts; i++ {
-		r := unittest.ReceiptForBlockFixture(&block)
+		r := unittest.ReceiptForBlockFixture(block)
 		r.ExecutorID = allExecutionNodes[i].NodeID
 		r.ExecutionResult = *executionResult
 		receipts[i] = r

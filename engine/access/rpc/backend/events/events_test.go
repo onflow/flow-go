@@ -34,7 +34,6 @@ import (
 	"github.com/onflow/flow-go/storage"
 	storagemock "github.com/onflow/flow-go/storage/mock"
 	"github.com/onflow/flow-go/utils/unittest"
-	"github.com/onflow/flow-go/utils/unittest/generator"
 	"github.com/onflow/flow-go/utils/unittest/mocks"
 )
 
@@ -106,15 +105,19 @@ func (s *EventsSuite) SetupTest() {
 		if i == 0 {
 			header = unittest.BlockHeaderFixture()
 		} else {
-			header = unittest.BlockHeaderWithParentFixture(s.blocks[i-1].Header)
+			header = unittest.BlockHeaderWithParentFixture(s.blocks[i-1].ToHeader())
 		}
 
 		payload := unittest.PayloadFixture()
 		header.PayloadHash = payload.Hash()
-		block := &flow.Block{
-			Header:  header,
-			Payload: &payload,
-		}
+		block, err := flow.NewBlock(
+			flow.UntrustedBlock{
+				HeaderBody: header.HeaderBody,
+				Payload:    payload,
+			},
+		)
+		require.NoError(s.T(), err)
+
 		// the last block is sealed
 		if i == blockCount-1 {
 			s.sealedHead = header
@@ -126,7 +129,7 @@ func (s *EventsSuite) SetupTest() {
 		s.T().Logf("block %d: %s", header.Height, block.ID())
 	}
 
-	s.blockEvents = generator.GetEventsWithEncoding(10, entities.EventEncodingVersion_CCF_V0)
+	s.blockEvents = unittest.EventGenerator.GetEventsWithEncoding(10, entities.EventEncodingVersion_CCF_V0)
 	targetEvent = string(s.blockEvents[0].Type)
 
 	// events returned from the db are sorted by txID, txIndex, then eventIndex.
@@ -149,7 +152,7 @@ func (s *EventsSuite) SetupTest() {
 
 	s.headers.On("BlockIDByHeight", mock.Anything).Return(func(height uint64) (flow.Identifier, error) {
 		for _, block := range s.blocks {
-			if height == block.Header.Height {
+			if height == block.Height {
 				return block.ID(), nil
 			}
 		}
@@ -159,7 +162,7 @@ func (s *EventsSuite) SetupTest() {
 	s.headers.On("ByBlockID", mock.Anything).Return(func(blockID flow.Identifier) (*flow.Header, error) {
 		for _, block := range s.blocks {
 			if blockID == block.ID() {
-				return block.Header, nil
+				return block.ToHeader(), nil
 			}
 		}
 		return nil, storage.ErrNotFound
@@ -212,7 +215,7 @@ func (s *EventsSuite) SetupTest() {
 func (s *EventsSuite) TestGetEvents_HappyPaths() {
 	ctx := context.Background()
 
-	startHeight := s.blocks[0].Header.Height
+	startHeight := s.blocks[0].Height
 	endHeight := s.sealedHead.Height
 
 	s.state.On("Sealed").Return(s.snapshot)
@@ -310,7 +313,7 @@ func (s *EventsSuite) TestGetEvents_HappyPaths() {
 func (s *EventsSuite) TestGetEventsForHeightRange_HandlesErrors() {
 	ctx := context.Background()
 
-	startHeight := s.blocks[0].Header.Height
+	startHeight := s.blocks[0].Height
 	endHeight := s.sealedHead.Height
 	encoding := entities.EventEncodingVersion_CCF_V0
 
@@ -391,7 +394,7 @@ func (s *EventsSuite) TestGetEventsForHeightRange_HandlesErrors() {
 	s.state.On("Params").Return(s.params)
 
 	s.Run("returns error for startHeight < spork root height", func() {
-		sporkRootHeight := s.blocks[0].Header.Height - 10
+		sporkRootHeight := s.blocks[0].Height - 10
 		startHeight := sporkRootHeight - 1
 
 		s.params.On("SporkRootBlockHeight").Return(sporkRootHeight).Once()
@@ -414,8 +417,8 @@ func (s *EventsSuite) TestGetEventsForHeightRange_HandlesErrors() {
 	s.Run("returns error for startHeight < node root height", func() {
 		backend := s.defaultBackend(query_mode.IndexQueryModeExecutionNodesOnly)
 
-		sporkRootHeight := s.blocks[0].Header.Height - 10
-		nodeRootHeader := unittest.BlockHeaderWithHeight(s.blocks[0].Header.Height)
+		sporkRootHeight := s.blocks[0].Height - 10
+		nodeRootHeader := unittest.BlockHeaderWithHeight(s.blocks[0].Height)
 		startHeight := nodeRootHeader.Height - 5
 
 		s.params.On("SporkRootBlockHeight").Return(sporkRootHeight).Once()
@@ -466,7 +469,7 @@ func (s *EventsSuite) TestGetEventsForBlockIDs_HandlesErrors() {
 				continue
 			}
 
-			headers.On("ByBlockID", blockID).Return(s.blocks[i].Header, nil)
+			headers.On("ByBlockID", blockID).Return(s.blocks[i].ToHeader(), nil)
 		}
 
 		response, _, err := backend.GetEventsForBlockIDs(
@@ -484,8 +487,8 @@ func (s *EventsSuite) TestGetEventsForBlockIDs_HandlesErrors() {
 func (s *EventsSuite) assertResponse(response []flow.BlockEvents, encoding entities.EventEncodingVersion) {
 	s.Assert().Len(response, len(s.blocks))
 	for i, block := range s.blocks {
-		s.Assert().Equal(block.Header.Height, response[i].BlockHeight)
-		s.Assert().Equal(block.Header.ID(), response[i].BlockID)
+		s.Assert().Equal(block.Height, response[i].BlockHeight)
+		s.Assert().Equal(block.ID(), response[i].BlockID)
 		s.Assert().Len(response[i].Events, 1)
 
 		s.assertEncoding(&response[i].Events[0], encoding)
@@ -568,7 +571,7 @@ func (s *EventsSuite) setupENSuccessResponse(eventType string, blocks []*flow.Bl
 		ids[i] = id[:]
 		results[i] = &execproto.GetEventsForBlockIDsResponse_Result{
 			BlockId:     id[:],
-			BlockHeight: block.Header.Height,
+			BlockHeight: block.Height,
 			Events:      events,
 		}
 	}

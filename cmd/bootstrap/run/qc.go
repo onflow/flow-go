@@ -99,7 +99,7 @@ func GenerateRootQC(block *flow.Block, votes []*model.Vote, participantData *Par
 
 	// STEP 1: create VoteProcessor
 	var createdQC *flow.QuorumCertificate
-	hotBlock := model.GenesisBlockFromFlow(block.Header)
+	hotBlock := model.GenesisBlockFromFlow(block.ToHeader())
 	processor, err := votecollector.NewBootstrapCombinedVoteProcessor(zerolog.Logger{}, committee, hotBlock, func(qc *flow.QuorumCertificate) {
 		createdQC = qc
 	})
@@ -146,7 +146,7 @@ func GenerateRootQC(block *flow.Block, votes []*model.Vote, participantData *Par
 
 // GenerateRootBlockVotes generates votes for root block based on participantData
 func GenerateRootBlockVotes(block *flow.Block, participantData *ParticipantData) ([]*model.Vote, error) {
-	hotBlock := model.GenesisBlockFromFlow(block.Header)
+	hotBlock := model.GenesisBlockFromFlow(block.ToHeader())
 	n := len(participantData.Participants)
 	fmt.Println("Number of staked consensus nodes: ", n)
 

@@ -195,7 +195,7 @@ func (r *RestProxyHandler) GetTransactionResult(
 		return nil, err
 	}
 
-	return convert.MessageToTransactionResult(transactionResultResponse), nil
+	return convert.MessageToTransactionResult(transactionResultResponse)
 }
 
 // GetAccountAtBlockHeight returns account by account address and block height.
@@ -402,7 +402,8 @@ func (r *RestProxyHandler) GetEventsForHeightRange(
 		return nil, flow.ExecutorMetadata{}, err
 	}
 
-	return convert.MessagesToBlockEvents(eventsResponse.Results), flow.ExecutorMetadata{}, nil
+	res, err := convert.MessagesToBlockEvents(eventsResponse.Results)
+	return res, flow.ExecutorMetadata{}, err
 }
 
 // GetEventsForBlockIDs returns events by their name in the specified block IDs.
@@ -438,7 +439,8 @@ func (r *RestProxyHandler) GetEventsForBlockIDs(
 		return nil, flow.ExecutorMetadata{}, err
 	}
 
-	return convert.MessagesToBlockEvents(eventsResponse.Results), flow.ExecutorMetadata{}, nil
+	res, err := convert.MessagesToBlockEvents(eventsResponse.Results)
+	return res, flow.ExecutorMetadata{}, err
 }
 
 // convertError converts a serialized access error formatted as a grpc error returned from the upstream AN,
