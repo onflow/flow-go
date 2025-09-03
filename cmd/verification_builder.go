@@ -218,7 +218,7 @@ func (v *VerificationNodeBuilder) LoadComponentsAndModules() {
 				computation.DefaultFVMOptions(
 					node.RootChainID,
 					false,
-					v.verConf.scheduleCallbacksEnabled,
+					v.verConf.scheduledCallbacksEnabled,
 				)...,
 			)
 			vmCtx := fvm.NewContext(fvmOptions...)
