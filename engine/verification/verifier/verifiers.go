@@ -337,18 +337,14 @@ func makeVerifier(
 	)
 
 	// TODO(JanezP): cleanup creation of fvm context github.com/onflow/flow-go/issues/5249
-<<<<<<< HEAD
-	fvmOptions = append(fvmOptions, computation.DefaultFVMOptions(chainID, false, false, scheduledCallbacksEnabled)...)
-=======
 	fvmOptions = append(
 		fvmOptions,
 		computation.DefaultFVMOptions(
 			chainID,
 			false,
-			true,
+			scheduledCallbacksEnabled,
 		)...,
 	)
->>>>>>> master
 	vmCtx := fvm.NewContext(fvmOptions...)
 
 	chunkVerifier := chunks.NewChunkVerifier(vm, vmCtx, logger)
