@@ -320,7 +320,7 @@ func (e *ENTransactionProvider) systemTransactionResults(
 	allTxCount := len(resp.TransactionResults)
 	systemTxCount := allTxCount - userTxCount
 	systemTxStartIndex := allTxCount - systemTxCount
-	scheduledCallbacksEnabled := systemTxCount > 1 // if we have more than one system tx, scheduled callbacks are enabled, todo improve assumption
+	scheduledCallbacksEnabled := systemTxCount > 1 // if we have more than one system tx, scheduled callbacks are enabled. TODO: improve this assumption
 	// should never happen
 	if systemTxCount <= 0 {
 		return nil, status.Errorf(codes.Internal, "no system transaction results")
