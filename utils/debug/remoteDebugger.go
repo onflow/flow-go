@@ -2,11 +2,9 @@ package debug
 
 import (
 	"github.com/onflow/cadence"
-	"github.com/onflow/cadence/runtime"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/fvm"
-	reusableRuntime "github.com/onflow/flow-go/fvm/runtime"
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -27,7 +25,6 @@ const reusableCadenceRuntimePoolSize = 1000
 func NewRemoteDebugger(
 	chain flow.Chain,
 	logger zerolog.Logger,
-	traceCadence bool,
 	options ...fvm.Option,
 ) *RemoteDebugger {
 	vm := fvm.NewVirtualMachine()
@@ -41,13 +38,6 @@ func NewRemoteDebugger(
 				fvm.WithLogger(logger),
 				fvm.WithChain(chain),
 				fvm.WithAuthorizationChecksEnabled(false),
-				fvm.WithReusableCadenceRuntimePool(
-					reusableRuntime.NewReusableCadenceRuntimePool(
-						reusableCadenceRuntimePoolSize,
-						runtime.Config{
-							TracingEnabled: traceCadence,
-						},
-					)),
 				fvm.WithEVMEnabled(true),
 			},
 			options...,

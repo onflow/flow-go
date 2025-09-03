@@ -40,7 +40,6 @@ var (
 	flagUseExecutionDataAPI bool
 	flagDumpRegisters       bool
 	flagTracePath           string
-	flagTraceCadence        bool
 )
 
 var Cmd = &cobra.Command{
@@ -74,8 +73,6 @@ func init() {
 	Cmd.Flags().BoolVar(&flagDumpRegisters, "dump-registers", false, "dump registers")
 
 	Cmd.Flags().StringVar(&flagTracePath, "trace", "", "enable tracing to given path")
-
-	Cmd.Flags().BoolVar(&flagTraceCadence, "trace-cadence", false, "trace Cadence")
 }
 
 func run(_ *cobra.Command, args []string) {
@@ -233,7 +230,6 @@ func runTransactionID(txID flow.Identifier, flowClient *client.Client, chain flo
 	debugger := debug.NewRemoteDebugger(
 		chain,
 		log.Logger,
-		flagTraceCadence,
 		fvmOptions...,
 	)
 
