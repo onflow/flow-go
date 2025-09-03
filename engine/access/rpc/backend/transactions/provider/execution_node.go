@@ -38,7 +38,6 @@ type ENTransactionProvider struct {
 	txStatusDeriver *txstatus.TxStatusDeriver
 
 	systemTxID flow.Identifier
-	systemTx   *flow.TransactionBody
 	chainID    flow.ChainID
 }
 
@@ -53,7 +52,6 @@ func NewENTransactionProvider(
 	execNodeIdentitiesProvider *rpc.ExecutionNodeIdentitiesProvider,
 	txStatusDeriver *txstatus.TxStatusDeriver,
 	systemTxID flow.Identifier,
-	systemTx *flow.TransactionBody,
 	chainID flow.ChainID,
 ) *ENTransactionProvider {
 
@@ -66,7 +64,6 @@ func NewENTransactionProvider(
 		nodeProvider:     execNodeIdentitiesProvider,
 		txStatusDeriver:  txStatusDeriver,
 		systemTxID:       systemTxID,
-		systemTx:         systemTx,
 		chainID:          chainID,
 	}
 }
