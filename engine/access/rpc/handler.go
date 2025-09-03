@@ -401,7 +401,7 @@ func (h *Handler) GetSystemTransaction(
 	if err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, "invalid block id: %v", err)
 	}
-	
+
 	var txID flow.Identifier
 	if id := req.GetId(); id == nil {
 		txID = flow.ZeroID
