@@ -74,7 +74,7 @@ func (a *StatefulAccounts) AllocateSlabIndex(
 	// compute storage size changes)
 	// this way the getValue would load this value from deltas
 	key := atree.SlabIndexToLedgerKey(index)
-	a.txnState.RunWithAllLimitsDisabled(func() {
+	a.txnState.RunWithMeteringDisabled(func() {
 		err = a.txnState.Set(
 			flow.NewRegisterID(address, string(key)),
 			[]byte{})
