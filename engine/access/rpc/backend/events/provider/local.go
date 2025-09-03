@@ -93,7 +93,7 @@ func (l *LocalEventProvider) Events(
 					},
 				)
 				if err != nil {
-					return Response{}, rpc.ConvertError(err, "could not construct event", codes.Internal)
+					return Response{}, metadata, rpc.ConvertError(err, "could not construct event", codes.Internal)
 				}
 				event = *filteredEvent
 			}
