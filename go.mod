@@ -50,7 +50,7 @@ require (
 	github.com/onflow/atree v0.10.1
 	github.com/onflow/cadence v1.7.0-preview.2
 	github.com/onflow/crypto v0.25.3
-	github.com/onflow/flow v0.3.4
+	github.com/onflow/flow v0.4.15
 	github.com/onflow/flow-core-contracts/lib/go/contracts v1.7.4-0.20250825173510-91e6f28b0224
 	github.com/onflow/flow-core-contracts/lib/go/templates v1.7.2-0.20250825173510-91e6f28b0224
 	github.com/onflow/flow-go-sdk v1.7.0
@@ -359,6 +359,3 @@ require (
 
 // Using custom fork until https://github.com/onflow/flow-go/issues/5338 is resolved
 replace github.com/ipfs/boxo => github.com/onflow/boxo v0.0.0-20240201202436-f2477b92f483
-
-// TODO replace this after PR https://github.com/onflow/flow/pull/1627 is merged
-replace github.com/onflow/flow => github.com/devbugging/flow v0.0.0-20250902143659-563c7660e39b
