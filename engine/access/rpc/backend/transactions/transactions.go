@@ -547,15 +547,16 @@ func (t *Transactions) GetSystemTransactionResult(ctx context.Context, txID flow
 		txID = t.systemTxID
 	}
 
-	// make sure the system transaction exists
-	_, err := t.GetSystemTransaction(ctx, txID, blockID)
-	if err != nil {
-		return nil, err
-	}
-
+	// first check if the block exists
 	block, err := t.blocks.ByID(blockID)
 	if err != nil {
 		return nil, rpc.ConvertStorageError(err)
+	}
+
+	// make sure the system transaction exists
+	_, err = t.GetSystemTransaction(ctx, txID, blockID)
+	if err != nil {
+		return nil, err
 	}
 
 	return t.lookupTransactionResult(ctx, txID, block.ToHeader(), requiredEventEncodingVersion)
