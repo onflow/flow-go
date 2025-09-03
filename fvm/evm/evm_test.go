@@ -14,10 +14,10 @@ import (
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/onflow/cadence/encoding/ccf"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/encoding/json"
-	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/engine/execution/testutil"
 	"github.com/onflow/flow-go/fvm"
@@ -3178,19 +3178,23 @@ func TestEVMDeployFileSystemContract(t *testing.T) {
 			)
 
 			innerTx := cadence.NewArray(
-				ConvertToCadence(innerTxBytes),
+				unittest.BytesToCdcUInt8(innerTxBytes),
 			).WithType(stdlib.EVMTransactionBytesCadenceType)
 
 			coinbase := cadence.NewArray(
-				ConvertToCadence(coinbaseAddr.Bytes()),
+				unittest.BytesToCdcUInt8(coinbaseAddr.Bytes()),
 			).WithType(stdlib.EVMAddressBytesCadenceType)
 
+			txBody, err := flow.NewTransactionBodyBuilder().
+				SetScript(code).
+				AddAuthorizer(sc.FlowServiceAccount.Address).
+				AddArgument(json.MustEncode(innerTx)).
+				AddArgument(json.MustEncode(coinbase)).
+				Build()
+			require.NoError(t, err)
+
 			tx := fvm.Transaction(
-				flow.NewTransactionBody().
-					SetScript(code).
-					AddAuthorizer(sc.FlowServiceAccount.Address).
-					AddArgument(json.MustEncode(innerTx)).
-					AddArgument(json.MustEncode(coinbase)),
+				txBody,
 				0,
 			)
 
@@ -3532,20 +3536,12 @@ func getEVMAccountNonce(
 func RunWithNewEnvironment(
 	t *testing.T,
 	chain flow.Chain,
-	f func(
-		fvm.Context,
-		fvm.VM,
-		snapshot.SnapshotTree,
-		*TestContract,
-		*EOATestAccount,
-	),
+	f func(fvm.Context, fvm.VM, snapshot.SnapshotTree, *TestContract, *EOATestAccount),
 ) {
 	rootAddr := evm.StorageAccountAddress(chain.ChainID())
-
 	RunWithTestBackend(t, func(backend *TestBackend) {
 		RunWithDeployedContract(t, GetStorageTestContract(t), backend, rootAddr, func(testContract *TestContract) {
 			RunWithEOATestAccount(t, backend, rootAddr, func(testAccount *EOATestAccount) {
-
 				blocks := new(envMock.Blocks)
 				block1 := unittest.BlockFixture()
 				blocks.On("ByHeightFrom",
@@ -3612,14 +3608,15 @@ func RunContractWithNewEnvironment(
 
 				blocks := new(envMock.Blocks)
 				block1 := unittest.BlockFixture()
+				header1 := block1.ToHeader()
 				blocks.On("ByHeightFrom",
-					block1.Header.Height,
-					block1.Header,
-				).Return(block1.Header, nil)
+					header1.Height,
+					header1,
+				).Return(header1, nil)
 
 				opts := []fvm.Option{
 					fvm.WithChain(chain),
-					fvm.WithBlockHeader(block1.Header),
+					fvm.WithBlockHeader(header1),
 					fvm.WithAuthorizationChecksEnabled(false),
 					fvm.WithSequenceNumberCheckAndIncrementEnabled(false),
 					fvm.WithEntropyProvider(testutil.EntropyProviderFixture(nil)),
