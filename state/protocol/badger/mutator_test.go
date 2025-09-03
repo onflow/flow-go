@@ -180,26 +180,22 @@ func TestSealedIndex(t *testing.T) {
 		// 					 when B5 is finalized, can find seal for B1
 		//					 when B7 is finalized, can find seals for B2, B3
 
-		usedViews := make(map[uint64]struct{})
-
 		// block 1
-		b1 := unittest.BlockWithParentAndPayloadAndUniqueView(
+		b1 := unittest.BlockWithParentAndPayload(
 			rootHeader,
 			unittest.PayloadFixture(unittest.WithProtocolStateID(rootProtocolStateID)),
-			usedViews,
 		)
 		err = state.Extend(context.Background(), unittest.ProposalFromBlock(b1))
 		require.NoError(t, err)
 
 		// block 2(result B1)
 		b1Receipt := unittest.ReceiptForBlockFixture(b1)
-		b2 := unittest.BlockWithParentAndPayloadAndUniqueView(
+		b2 := unittest.BlockWithParentAndPayload(
 			b1.ToHeader(),
 			unittest.PayloadFixture(
 				unittest.WithReceipts(b1Receipt),
 				unittest.WithProtocolStateID(rootProtocolStateID),
 			),
-			usedViews,
 		)
 		err = state.Extend(context.Background(), unittest.ProposalFromBlock(b2))
 		require.NoError(t, err)
@@ -212,27 +208,25 @@ func TestSealedIndex(t *testing.T) {
 		// block 4 (resultB2, resultB3)
 		b2Receipt := unittest.ReceiptForBlockFixture(b2)
 		b3Receipt := unittest.ReceiptForBlockFixture(b3)
-		b4 := unittest.BlockWithParentAndPayloadAndUniqueView(
+		b4 := unittest.BlockWithParentAndPayload(
 			b3.ToHeader(),
 			flow.Payload{
 				Receipts:        []*flow.ExecutionReceiptStub{b2Receipt.Stub(), b3Receipt.Stub()},
 				Results:         []*flow.ExecutionResult{&b2Receipt.ExecutionResult, &b3Receipt.ExecutionResult},
 				ProtocolStateID: rootProtocolStateID,
 			},
-			usedViews,
 		)
 		err = state.Extend(context.Background(), unittest.ProposalFromBlock(b4))
 		require.NoError(t, err)
 
 		// block 5 (sealB1)
 		b1Seal := unittest.Seal.Fixture(unittest.Seal.WithResult(&b1Receipt.ExecutionResult))
-		b5 := unittest.BlockWithParentAndPayloadAndUniqueView(
+		b5 := unittest.BlockWithParentAndPayload(
 			b4.ToHeader(),
 			flow.Payload{
 				Seals:           []*flow.Seal{b1Seal},
 				ProtocolStateID: rootProtocolStateID,
 			},
-			usedViews,
 		)
 		err = state.Extend(context.Background(), unittest.ProposalFromBlock(b5))
 		require.NoError(t, err)
@@ -240,13 +234,12 @@ func TestSealedIndex(t *testing.T) {
 		// block 6 (sealB2, sealB3)
 		b2Seal := unittest.Seal.Fixture(unittest.Seal.WithResult(&b2Receipt.ExecutionResult))
 		b3Seal := unittest.Seal.Fixture(unittest.Seal.WithResult(&b3Receipt.ExecutionResult))
-		b6 := unittest.BlockWithParentAndPayloadAndUniqueView(
+		b6 := unittest.BlockWithParentAndPayload(
 			b5.ToHeader(),
 			flow.Payload{
 				Seals:           []*flow.Seal{b2Seal, b3Seal},
 				ProtocolStateID: rootProtocolStateID,
 			},
-			usedViews,
 		)
 		err = state.Extend(context.Background(), unittest.ProposalFromBlock(b6))
 		require.NoError(t, err)
