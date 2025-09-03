@@ -23,7 +23,7 @@ import (
 	synctest "github.com/onflow/flow-go/module/state_synchronization/requester/unittest"
 	"github.com/onflow/flow-go/storage"
 	storagemock "github.com/onflow/flow-go/storage/mock"
-	"github.com/onflow/flow-go/storage/operation/badgerimpl"
+	"github.com/onflow/flow-go/storage/operation/pebbleimpl"
 	pebbleStorage "github.com/onflow/flow-go/storage/pebble"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -182,7 +182,8 @@ func (i *indexCoreTest) useDefaultTransactionResults() *indexCoreTest {
 
 func (i *indexCoreTest) initIndexer() *indexCoreTest {
 	lockManager := storage.NewTestingLockManager()
-	db, dbDir := unittest.TempBadgerDB(i.t)
+	pdb, dbDir := unittest.TempPebbleDB(i.t)
+	db := pebbleimpl.ToDB(pdb)
 	i.t.Cleanup(func() {
 		require.NoError(i.t, db.Close())
 		require.NoError(i.t, os.RemoveAll(dbDir))
@@ -216,7 +217,7 @@ func (i *indexCoreTest) initIndexer() *indexCoreTest {
 	indexer, err := New(
 		log,
 		metrics.NewNoopCollector(),
-		badgerimpl.ToDB(db),
+		db,
 		i.registers,
 		i.headers,
 		i.events,
@@ -626,7 +627,7 @@ func TestIndexerIntegration_StoreAndGet(t *testing.T) {
 	regKey := "code"
 	registerID := flow.NewRegisterID(regOwnerAddress, regKey)
 
-	db, dbDir := unittest.TempBadgerDB(t)
+	pdb, dbDir := unittest.TempPebbleDB(t)
 	t.Cleanup(func() {
 		require.NoError(t, os.RemoveAll(dbDir))
 	})
@@ -644,7 +645,7 @@ func TestIndexerIntegration_StoreAndGet(t *testing.T) {
 			index, err := New(
 				logger,
 				module.ExecutionStateIndexerMetrics(metrics),
-				badgerimpl.ToDB(db),
+				pebbleimpl.ToDB(pdb),
 				registers,
 				nil,
 				nil,
@@ -680,7 +681,7 @@ func TestIndexerIntegration_StoreAndGet(t *testing.T) {
 			index, err := New(
 				logger,
 				module.ExecutionStateIndexerMetrics(metrics),
-				badgerimpl.ToDB(db),
+				pebbleimpl.ToDB(pdb),
 				registers,
 				nil,
 				nil,
@@ -700,7 +701,7 @@ func TestIndexerIntegration_StoreAndGet(t *testing.T) {
 		})
 	})
 
-	// this test makes sure that even if indexed values for a specific register are requested with higher height
+	// this test makes sure that even if indexed values for a single register are requested with higher height
 	// the correct highest height indexed value is returned.
 	// e.g. we index A{h(1) -> X}, A{h(2) -> Y}, when we request h(4) we get value Y
 	t.Run("Single Index Value At Later Heights", func(t *testing.T) {
@@ -709,7 +710,7 @@ func TestIndexerIntegration_StoreAndGet(t *testing.T) {
 			index, err := New(
 				logger,
 				module.ExecutionStateIndexerMetrics(metrics),
-				badgerimpl.ToDB(db),
+				pebbleimpl.ToDB(pdb),
 				registers,
 				nil,
 				nil,
@@ -755,7 +756,7 @@ func TestIndexerIntegration_StoreAndGet(t *testing.T) {
 			index, err := New(
 				logger,
 				module.ExecutionStateIndexerMetrics(metrics),
-				badgerimpl.ToDB(db),
+				pebbleimpl.ToDB(pdb),
 				registers,
 				nil,
 				nil,
