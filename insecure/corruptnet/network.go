@@ -251,7 +251,11 @@ func (n *Network) processAttackerIngressMessage(msg *insecure.IngressMessage) er
 		lg.Fatal().Msg("corrupt network received ingress message for an unknown channel")
 	}
 
-	err = originalProcessor.(flownet.MessageProcessor).Process(channels.Channel(msg.ChannelID), senderId, event)
+	internal, err := event.ToInternal()
+	if err != nil {
+		lg.Fatal().Err(err).Msg("failed to convert event to internal")
+	}
+	err = originalProcessor.(flownet.MessageProcessor).Process(channels.Channel(msg.ChannelID), senderId, internal)
 	if err != nil {
 		lg.Fatal().Err(err).Msg("could not relay ingress message to original processor")
 	}

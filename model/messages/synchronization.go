@@ -12,39 +12,25 @@ import (
 // the same information from the recipient.
 // All SyncRequest messages are validated before being processed. If validation fails, then a misbehavior report is created.
 // See synchronization.validateSyncRequestForALSP for more details.
-type SyncRequest struct {
-	Nonce  uint64
-	Height uint64
-}
+type SyncRequest flow.SyncRequest
 
-// ToInternal converts the untrusted SyncRequest into its trusted internal
-// representation.
+// ToInternal returns the internal type representation for SyncRequest.
 //
-// This stub returns the receiver unchanged. A proper implementation
-// must perform validation checks and return a constructed internal
-// object.
+// All errors indicate that the decode target contains a structurally invalid representation of the internal flow.SyncRequest.
 func (s *SyncRequest) ToInternal() (any, error) {
-	// TODO(malleability, #7705) implement with validation checks
-	return s, nil
+	return (*flow.SyncRequest)(s), nil
 }
 
 // SyncResponse is part of the synchronization protocol and represents the reply
 // to a synchronization request that contains the latest finalized block height
 // of the responding node.
-type SyncResponse struct {
-	Nonce  uint64
-	Height uint64
-}
+type SyncResponse flow.SyncResponse
 
-// ToInternal converts the untrusted SyncResponse into its trusted internal
-// representation.
+// ToInternal returns the internal type representation for SyncResponse.
 //
-// This stub returns the receiver unchanged. A proper implementation
-// must perform validation checks and return a constructed internal
-// object.
+// All errors indicate that the decode target contains a structurally invalid representation of the internal flow.SyncResponse.
 func (s *SyncResponse) ToInternal() (any, error) {
-	// TODO(malleability, #7706) implement with validation checks
-	return s, nil
+	return (*flow.SyncResponse)(s), nil
 }
 
 // RangeRequest is part of the synchronization protocol and represents an active
@@ -75,20 +61,13 @@ func (r *RangeRequest) ToInternal() (any, error) {
 // requests finalized or unfinalized blocks by a list of block IDs.
 // All BatchRequest messages are validated before being processed. If validation fails, then a misbehavior report is created.
 // See synchronization.validateBatchRequestForALSP for more details.
-type BatchRequest struct {
-	Nonce    uint64
-	BlockIDs []flow.Identifier
-}
+type BatchRequest flow.BatchRequest
 
-// ToInternal converts the untrusted BatchRequest into its trusted internal
-// representation.
+// ToInternal returns the internal type representation for BatchRequest.
 //
-// This stub returns the receiver unchanged. A proper implementation
-// must perform validation checks and return a constructed internal
-// object.
+// All errors indicate that the decode target contains a structurally invalid representation of the internal flow.BatchRequest.
 func (b *BatchRequest) ToInternal() (any, error) {
-	// TODO(malleability, #7708) implement with validation checks
-	return b, nil
+	return (*flow.BatchRequest)(b), nil
 }
 
 // BlockResponse is part of the synchronization protocol and represents the
@@ -99,31 +78,22 @@ type BlockResponse struct {
 	Blocks []flow.UntrustedProposal
 }
 
-// ToInternal converts the untrusted BlockResponse into its trusted internal
-// representation.
+// ToInternal returns the internal type representation for BlockResponse.
 //
-// This stub returns the receiver unchanged. A proper implementation
-// must perform validation checks and return a constructed internal
-// object.
+// All errors indicate that the decode target contains a structurally invalid representation of the internal flow.BlockResponse.
 func (br *BlockResponse) ToInternal() (any, error) {
-	// TODO(malleability, #7709) implement with validation checks
-	return br, nil
-}
-
-// BlocksInternal converts all untrusted block proposals in the BlockResponse
-// into trusted flow.Proposal instances.
-//
-// All errors indicate that the input message could not be converted to a valid proposal.
-func (br *BlockResponse) BlocksInternal() ([]*flow.Proposal, error) {
-	internal := make([]*flow.Proposal, len(br.Blocks))
+	internal := make([]flow.Proposal, len(br.Blocks))
 	for i, untrusted := range br.Blocks {
 		proposal, err := flow.NewProposal(untrusted)
 		if err != nil {
 			return nil, fmt.Errorf("could not build proposal: %w", err)
 		}
-		internal[i] = proposal
+		internal[i] = *proposal
 	}
-	return internal, nil
+	return &flow.BlockResponse{
+		Nonce:  br.Nonce,
+		Blocks: internal,
+	}, nil
 }
 
 // ClusterBlockResponse is the same thing as BlockResponse, but for cluster
@@ -133,25 +103,20 @@ type ClusterBlockResponse struct {
 	Blocks []cluster.UntrustedProposal
 }
 
-// ToInternal converts the untrusted ClusterBlockResponse into its trusted internal
-// representation.
+// ToInternal returns the internal type representation for ClusterBlockResponse.
 //
-// This stub returns the receiver unchanged. A proper implementation
-// must perform validation checks and return a constructed internal
-// object.
+// All errors indicate that the decode target contains a structurally invalid representation of the internal cluster.BlockResponse.
 func (br *ClusterBlockResponse) ToInternal() (any, error) {
-	// TODO(malleability, #7703) implement with validation checks
-	return br, nil
-}
-
-func (br *ClusterBlockResponse) BlocksInternal() ([]*cluster.Proposal, error) {
-	internal := make([]*cluster.Proposal, len(br.Blocks))
+	internal := make([]cluster.Proposal, len(br.Blocks))
 	for i, untrusted := range br.Blocks {
 		proposal, err := cluster.NewProposal(untrusted)
 		if err != nil {
 			return nil, fmt.Errorf("could not build proposal: %w", err)
 		}
-		internal[i] = proposal
+		internal[i] = *proposal
 	}
-	return internal, nil
+	return &cluster.BlockResponse{
+		Nonce:  br.Nonce,
+		Blocks: internal,
+	}, nil
 }
