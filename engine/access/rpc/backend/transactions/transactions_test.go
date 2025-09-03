@@ -10,6 +10,9 @@ import (
 
 	"github.com/dgraph-io/badger/v2"
 	lru "github.com/hashicorp/golang-lru/v2"
+	"github.com/onflow/cadence"
+	cadenceCommon "github.com/onflow/cadence/common"
+	"github.com/onflow/cadence/encoding/ccf"
 	jsoncdc "github.com/onflow/cadence/encoding/json"
 	"github.com/onflow/flow/protobuf/go/flow/access"
 	"github.com/onflow/flow/protobuf/go/flow/entities"
@@ -34,6 +37,7 @@ import (
 	commonrpc "github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/fvm/blueprints"
+	"github.com/onflow/flow-go/fvm/systemcontracts"
 	accessmodel "github.com/onflow/flow-go/model/access"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
@@ -193,7 +197,7 @@ func (suite *Suite) defaultTransactionsParams() Params {
 		nodeProvider,
 		txStatusDeriver,
 		suite.systemTx.ID(),
-		suite.systemTx,
+		suite.chainID,
 	)
 
 	return Params{
@@ -202,7 +206,6 @@ func (suite *Suite) defaultTransactionsParams() Params {
 		State:                       suite.state,
 		ChainID:                     flow.Testnet,
 		SystemTxID:                  suite.systemTx.ID(),
-		SystemTx:                    suite.systemTx,
 		StaticCollectionRPCClient:   suite.historicalAccessAPIClient,
 		HistoricalAccessNodeClients: nil,
 		NodeCommunicator:            nodeCommunicator,
@@ -212,6 +215,7 @@ func (suite *Suite) defaultTransactionsParams() Params {
 		Blocks:                      suite.blocks,
 		Collections:                 suite.collections,
 		Transactions:                suite.transactions,
+		Events:                      suite.events,
 		TxErrorMessageProvider:      suite.errorMessageProvider,
 		TxResultCache:               suite.txResultCache,
 		TxProvider:                  txProvider,
@@ -440,6 +444,10 @@ func (suite *Suite) TestGetSystemTransaction_HappyPath() {
 	require.NoError(suite.T(), err)
 
 	block := unittest.BlockFixture()
+
+	// Mock the events.ByBlockID call - return empty events list (no scheduled callbacks)
+	suite.events.On("ByBlockID", block.ID()).Return([]flow.Event{}, nil).Once()
+
 	res, err := txBackend.GetSystemTransaction(context.Background(), flow.ZeroID, block.ID())
 	suite.Require().NoError(err)
 
@@ -447,18 +455,6 @@ func (suite *Suite) TestGetSystemTransaction_HappyPath() {
 	suite.Require().NoError(err)
 
 	suite.Require().Equal(systemTx, res)
-}
-
-// TestGetSystemTransaction_Unimplemented tests that GetSystemTransaction call returns error when passing specific transaction ID.
-func (suite *Suite) TestGetSystemTransaction_Unimplemented() {
-	params := suite.defaultTransactionsParams()
-	txBackend, err := NewTransactionsBackend(params)
-	require.NoError(suite.T(), err)
-
-	block := unittest.BlockFixture()
-	res, err := txBackend.GetSystemTransaction(context.Background(), flow.Identifier{0x1}, block.ID())
-	suite.Require().Nil(res)
-	suite.Require().Equal(err, status.Errorf(codes.Unimplemented, "system transaction by transaction ID not implemented"))
 }
 
 func (suite *Suite) TestGetSystemTransactionResult_HappyPath() {
@@ -486,6 +482,9 @@ func (suite *Suite) TestGetSystemTransactionResult_HappyPath() {
 			On("ByID", blockID).
 			Return(block, nil).
 			Once()
+
+		// Mock the events.ByBlockID call for GetSystemTransaction - return empty events list (no scheduled callbacks)
+		suite.events.On("ByBlockID", blockID).Return([]flow.Event{}, nil).Once()
 
 		receipt1 := unittest.ReceiptForBlockFixture(block)
 		suite.receipts.
@@ -599,6 +598,9 @@ func (suite *Suite) TestGetSystemTransactionResultFromStorage() {
 	// expect a call to lookup events by block ID and transaction ID
 	suite.events.On("ByBlockIDTransactionID", blockId, txId).Return(eventsForTx, nil)
 
+	// Mock the events.ByBlockID call for GetSystemTransaction - return empty events list (no scheduled callbacks)
+	suite.events.On("ByBlockID", blockId).Return([]flow.Event{}, nil).Once()
+
 	// Set up the state and snapshot mocks
 	suite.state.On("Sealed").Return(suite.snapshot, nil)
 	suite.snapshot.On("Head").Return(block.ToHeader(), nil)
@@ -675,6 +677,9 @@ func (suite *Suite) TestGetSystemTransactionResult_FailedEncodingConversion() {
 		On("ByID", blockID).
 		Return(block, nil).
 		Once()
+
+	// Mock the events.ByBlockID call for GetSystemTransaction - return empty events list (no scheduled callbacks)
+	suite.events.On("ByBlockID", blockID).Return([]flow.Event{}, nil).Once()
 
 	// create empty events
 	eventsPerBlock := 10
@@ -1048,6 +1053,178 @@ func (suite *Suite) TestTransactionResultsByBlockIDFromStorage() {
 	}
 }
 
+// TestTransactionResultsByBlockIDFromExecutionNode_ScheduledCallbacks tests the retrieval of transaction results
+// for system collection with scheduled callbacks by block ID from execution node.
+func (suite *Suite) TestTransactionResultsByBlockIDFromExecutionNode_ScheduledCallbacks() {
+	// Create fixtures for the block and collection
+	col := unittest.CollectionFixture(2)
+	guarantee := &flow.CollectionGuarantee{CollectionID: col.ID()}
+	block := unittest.BlockFixture(
+		unittest.Block.WithPayload(unittest.PayloadFixture(unittest.WithGuarantees(guarantee))),
+	)
+	blockId := block.ID()
+
+	// Mock the behavior of the blocks, collections and light transaction results objects
+	suite.blocks.
+		On("ByID", blockId).
+		Return(block, nil)
+	lightCol := col.Light()
+	suite.collections.
+		On("LightByID", mock.Anything).
+		Return(lightCol, nil).
+		Once()
+
+	// Execute callback transactions will be reconstructed from PendingExecution events
+	// We don't create them manually - they'll be generated by blueprints.SystemCollection
+	// System collection will be reconstructed from events, so we don't need to pre-populate lightTxResults
+
+	lightTxResults := make([]flow.LightTransactionResult, len(lightCol.Transactions))
+	for i, txID := range lightCol.Transactions {
+		lightTxResults[i] = flow.LightTransactionResult{
+			TransactionID:   txID,
+			Failed:          false,
+			ComputationUsed: 0,
+		}
+	}
+
+	// Create PendingExecution events that would be emitted by the process callback transaction
+	pendingExecutionEvents := suite.createPendingExecutionEvents(2) // 2 callbacks
+
+	// Convert PendingExecution events to protobuf messages for execution node response
+	pendingEventMessages := make([]*entities.Event, len(pendingExecutionEvents))
+	for i, event := range pendingExecutionEvents {
+		pendingEventMessages[i] = convert.EventToMessage(event)
+	}
+
+	// Reconstruct the expected system collection to get the actual transaction IDs
+	expectedSystemCollection, err := blueprints.SystemCollection(suite.chainID.Chain(), pendingExecutionEvents)
+	suite.Require().NoError(err)
+
+	// Extract the expected transaction IDs in order: process, execute callbacks, system chunk
+	expectedSystemTxIDs := make([]flow.Identifier, len(expectedSystemCollection.Transactions))
+	for i, tx := range expectedSystemCollection.Transactions {
+		expectedSystemTxIDs[i] = tx.ID()
+	}
+
+	suite.Require().Equal(4, len(expectedSystemTxIDs), "should have 4 system transactions: process + 2 execute callbacks + system chunk")
+
+	// Build the execution response with all transaction results including proper events
+	userTxResults := make([]*execproto.GetTransactionResultResponse, len(lightCol.Transactions))
+	for i := 0; i < len(lightCol.Transactions); i++ {
+		userTxResults[i] = &execproto.GetTransactionResultResponse{
+			Events:               []*entities.Event{},
+			EventEncodingVersion: entities.EventEncodingVersion_CCF_V0,
+		}
+	}
+
+	// System transaction results: process (with events), execute callback txs, system chunk
+	systemTxResults := []*execproto.GetTransactionResultResponse{
+		// Process callback transaction with PendingExecution events
+		{
+			Events:               pendingEventMessages,
+			EventEncodingVersion: entities.EventEncodingVersion_CCF_V0,
+		},
+		// Execute callback transaction 1
+		{
+			Events:               []*entities.Event{},
+			EventEncodingVersion: entities.EventEncodingVersion_CCF_V0,
+		},
+		// Execute callback transaction 2
+		{
+			Events:               []*entities.Event{},
+			EventEncodingVersion: entities.EventEncodingVersion_CCF_V0,
+		},
+		// System chunk transaction
+		{
+			Events:               []*entities.Event{},
+			EventEncodingVersion: entities.EventEncodingVersion_CCF_V0,
+		},
+	}
+
+	allTxResults := append(userTxResults, systemTxResults...)
+
+	// Set up execution node response with system transactions
+	// The execution node response should include: user txs + process tx (with PendingExecution events) + execute txs + system chunk tx
+	exeGetTxReq := &execproto.GetTransactionsByBlockIDRequest{
+		BlockId: blockId[:],
+	}
+	exeGetTxResp := &execproto.GetTransactionResultsResponse{
+		TransactionResults:   allTxResults,
+		EventEncodingVersion: entities.EventEncodingVersion_CCF_V0,
+	}
+	suite.executionAPIClient.
+		On("GetTransactionResultsByBlockID", mock.Anything, exeGetTxReq).
+		Return(exeGetTxResp, nil).
+		Once()
+
+	// Set up the state and snapshot mocks
+	_, fixedENIDs := suite.setupReceipts(block)
+	suite.fixedExecutionNodeIDs = fixedENIDs.NodeIDs()
+	suite.state.On("Final").Return(suite.snapshot, nil)
+	suite.state.On("Sealed").Return(suite.snapshot, nil)
+	suite.snapshot.On("Identities", mock.Anything).Return(fixedENIDs, nil)
+	suite.snapshot.On("Head").Return(block.ToHeader(), nil)
+
+	suite.connectionFactory.
+		On("GetExecutionAPIClient", mock.Anything).
+		Return(suite.executionAPIClient, &mocks.MockCloser{}, nil).
+		Once()
+
+	params := suite.defaultTransactionsParams()
+	params.TxErrorMessageProvider = error_messages.NewTxErrorMessageProvider(
+		params.Log,
+		nil,
+		params.TxResultsIndex,
+		params.ConnFactory,
+		params.NodeCommunicator,
+		params.NodeProvider,
+	)
+
+	params.TxProvider = provider.NewENTransactionProvider(
+		params.Log,
+		params.State,
+		params.Collections,
+		params.ConnFactory,
+		params.NodeCommunicator,
+		params.NodeProvider,
+		params.TxStatusDeriver,
+		params.SystemTxID,
+		suite.chainID,
+	)
+	txBackend, err := NewTransactionsBackend(params)
+	suite.Require().NoError(err)
+
+	response, err := txBackend.GetTransactionResultsByBlockID(context.Background(), blockId, entities.EventEncodingVersion_CCF_V0)
+	suite.Require().NoError(err)
+
+	// Expected total: user transactions + system transactions (process + 2 execute callbacks + system chunk)
+	expectedTotal := len(lightTxResults) + len(expectedSystemTxIDs)
+	suite.Assert().Equal(expectedTotal, len(response), "should have user txs + system txs")
+
+	// Verify user transactions
+	userTxCount := len(lightCol.Transactions)
+	for i := 0; i < userTxCount; i++ {
+		suite.Assert().Equal(lightTxResults[i].TransactionID, response[i].TransactionID)
+		suite.Assert().Equal(block.Payload.Guarantees[0].CollectionID, response[i].CollectionID)
+		suite.Assert().Equal(block.ID(), response[i].BlockID)
+		suite.Assert().Equal(block.Height, response[i].BlockHeight)
+		suite.Assert().Equal(flow.TransactionStatusSealed, response[i].Status)
+	}
+
+	// Verify system collection transactions (all should have ZeroID as collectionID)
+	systemTxCount := len(response) - userTxCount
+	suite.Assert().Equal(len(expectedSystemTxIDs), systemTxCount, "should have 4 system transactions: process + 2 execute callbacks + system chunk")
+
+	for i := 0; i < systemTxCount; i++ {
+		systemTxIndex := userTxCount + i
+		suite.Assert().Equal(flow.ZeroID, response[systemTxIndex].CollectionID)
+		suite.Assert().Equal(block.ID(), response[systemTxIndex].BlockID)
+		suite.Assert().Equal(block.Height, response[systemTxIndex].BlockHeight)
+		suite.Assert().Equal(flow.TransactionStatusSealed, response[systemTxIndex].Status)
+		suite.Assert().Equal(expectedSystemTxIDs[i], response[userTxCount+i].TransactionID, "system transaction %d should match reconstructed ID", i)
+	}
+}
+
 // TestTransactionRetry tests that the retry mechanism will send retries at specific times
 func (suite *Suite) TestTransactionRetry() {
 	block := unittest.BlockFixture(
@@ -1235,4 +1412,61 @@ func (suite *Suite) assertTransactionResultResponse(
 		suite.Assert().Equal("", response.ErrorMessage)
 	}
 	suite.Assert().Equal(flow.TransactionStatusSealed, response.Status)
+}
+
+// createPendingExecutionEvents creates properly formatted PendingExecution events
+// that blueprints.SystemCollection expects for reconstructing the system collection.
+func (suite *Suite) createPendingExecutionEvents(numCallbacks int) []flow.Event {
+	events := make([]flow.Event, numCallbacks)
+
+	// Get system contracts for the test chain
+	env := systemcontracts.SystemContractsForChain(suite.chainID).AsTemplateEnv()
+
+	for i := 0; i < numCallbacks; i++ {
+		// Create the PendingExecution event as it would be emitted by the process callback transaction
+		const processedEventTypeTemplate = "A.%v.FlowCallbackScheduler.PendingExecution"
+		eventTypeString := fmt.Sprintf(processedEventTypeTemplate, env.FlowCallbackSchedulerAddress)
+
+		// Create Cadence event type
+		loc, err := cadenceCommon.HexToAddress(env.FlowCallbackSchedulerAddress)
+		suite.Require().NoError(err)
+		location := cadenceCommon.NewAddressLocation(nil, loc, "PendingExecution")
+
+		eventType := cadence.NewEventType(
+			location,
+			"PendingExecution",
+			[]cadence.Field{
+				{Identifier: "id", Type: cadence.UInt64Type},
+				{Identifier: "priority", Type: cadence.UInt8Type},
+				{Identifier: "executionEffort", Type: cadence.UInt64Type},
+				{Identifier: "callbackOwner", Type: cadence.AddressType},
+			},
+			nil,
+		)
+
+		// Create the Cadence event with proper values
+		event := cadence.NewEvent(
+			[]cadence.Value{
+				cadence.NewUInt64(uint64(i + 1)),           // id: unique callback ID
+				cadence.NewUInt8(1),                        // priority
+				cadence.NewUInt64(uint64((i+1)*100 + 100)), // executionEffort (200, 300, etc.)
+				cadence.NewAddress([8]byte{}),              // callbackOwner
+			},
+		).WithType(eventType)
+
+		// Encode the event using CCF
+		payload, err := ccf.Encode(event)
+		suite.Require().NoError(err)
+
+		// Create the Flow event
+		events[i] = flow.Event{
+			Type:             flow.EventType(eventTypeString),
+			TransactionID:    unittest.IdentifierFixture(), // Process callback transaction ID
+			TransactionIndex: 0,
+			EventIndex:       uint32(i),
+			Payload:          payload,
+		}
+	}
+
+	return events
 }
