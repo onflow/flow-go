@@ -534,27 +534,11 @@ func (s *EventsSuite) defaultBackend(mode query_mode.IndexQueryMode) *Events {
 	return e
 }
 
-// setupExecutionNodes sets up the mocks required to test against an EN backend
-func (s *EventsSuite) setupExecutionNodes(block *flow.Block) {
-	s.params.On("FinalizedRoot").Return(s.rootHeader, nil)
-	s.state.On("Params").Return(s.params)
-	s.state.On("Final").Return(s.snapshot)
-	s.snapshot.On("Identities", mock.Anything).Return(s.executionNodes, nil)
-
-	// this line causes a S1021 lint error because receipts is explicitly declared. this is required
-	// to ensure the mock library handles the response type correctly
-	var receipts flow.ExecutionReceiptList //nolint:gosimple
-	receipts = unittest.ReceiptsForBlockFixture(block, s.executionNodes.NodeIDs())
-	s.receipts.On("ByBlockID", block.ID()).Return(receipts, nil)
-
+// setupENSuccessResponse configures the execution node client to return a successful response
+func (s *EventsSuite) setupENSuccessResponse(eventType string, blocks []*flow.Block) {
 	s.connectionFactory.
 		On("GetExecutionAPIClient", mock.Anything).
 		Return(s.execClient, &mocks.MockCloser{}, nil)
-}
-
-// setupENSuccessResponse configures the execution node client to return a successful response
-func (s *EventsSuite) setupENSuccessResponse(eventType string, blocks []*flow.Block) {
-	s.setupExecutionNodes(blocks[len(blocks)-1])
 
 	ids := make([][]byte, len(blocks))
 	results := make([]*execproto.GetEventsForBlockIDsResponse_Result, len(blocks))
