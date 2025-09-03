@@ -154,7 +154,6 @@ func Bootstrap(
 	// Per definition, the highest block in sealing segment is the last finalized block
 	// and the lowest block in sealing segment is the last sealed block.
 	lastFinalized := segment.Finalized()
-	lastSealed := segment.Sealed() // the lowest block in sealing segment is the last sealed block
 	sporkRootBlock := segment.SporkRootBlock
 
 	// bootstrap the sealing segment
@@ -192,17 +191,6 @@ func Bootstrap(
 		err = boostrapVersionBeacon(rw, root)
 		if err != nil {
 			return fmt.Errorf("could not bootstrap version beacon: %w", err)
-		}
-
-		err = updateEpochMetrics(metrics, root)
-		if err != nil {
-			return fmt.Errorf("could not update epoch metrics: %w", err)
-		}
-		metrics.BlockSealed(lastSealed)
-		metrics.SealedHeight(lastSealed.Height)
-		metrics.FinalizedHeight(lastFinalized.Height)
-		for _, proposal := range segment.Blocks {
-			metrics.BlockFinalized(&proposal.Block)
 		}
 
 		return nil
