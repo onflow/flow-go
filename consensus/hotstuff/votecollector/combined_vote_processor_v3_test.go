@@ -854,7 +854,7 @@ func TestCombinedVoteProcessorV3_PropertyCreatingQCLiveness(testifyT *testing.T)
 		// prepare votes
 		for _, signer := range stakingSigners {
 			vote := unittest.VoteForBlockFixture(processor.Block(), unittest.VoteWithStakingSig())
-			vote.SignerID = signer.ID()
+			vote.SignerID = signer.NodeID
 			weight := signer.InitialWeight
 			expectedSig := crypto.Signature(vote.SigData[1:])
 			stakingAggregator.On("Verify", vote.SignerID, expectedSig).Return(nil).Maybe()
@@ -865,7 +865,7 @@ func TestCombinedVoteProcessorV3_PropertyCreatingQCLiveness(testifyT *testing.T)
 		}
 		for _, signer := range beaconSigners {
 			vote := unittest.VoteForBlockFixture(processor.Block(), unittest.VoteWithBeaconSig())
-			vote.SignerID = signer.ID()
+			vote.SignerID = signer.NodeID
 			weight := signer.InitialWeight
 			expectedSig := crypto.Signature(vote.SigData[1:])
 			rbSigAggregator.On("Verify", vote.SignerID, expectedSig).Return(nil).Maybe()

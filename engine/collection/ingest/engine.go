@@ -70,6 +70,7 @@ func New(
 			CheckScriptsParse:      config.CheckScriptsParse,
 			MaxTransactionByteSize: config.MaxTransactionByteSize,
 			MaxCollectionByteSize:  config.MaxCollectionByteSize,
+			CheckPayerBalanceMode:  validator.Disabled,
 		},
 		colMetrics,
 		limiter,
@@ -355,7 +356,7 @@ func (e *Engine) ingestTransaction(
 
 	// if our cluster is responsible for the transaction, add it to our local mempool
 	if localClusterFingerprint == txClusterFingerprint {
-		_ = pool.Add(tx)
+		_ = pool.Add(tx.ID(), tx)
 		e.colMetrics.TransactionIngested(txID)
 	}
 

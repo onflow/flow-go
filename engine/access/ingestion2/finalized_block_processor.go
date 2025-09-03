@@ -145,7 +145,7 @@ func (p *FinalizedBlockProcessor) processFinalizedBlockJobCallback(
 //
 // No errors are expected during normal operations.
 func (p *FinalizedBlockProcessor) indexFinalizedBlock(block *flow.Block) error {
-	err := p.blocks.IndexBlockForCollections(block.Header.ID(), flow.GetIDs(block.Payload.Guarantees))
+	err := p.blocks.IndexBlockForCollectionGuarantees(block.ID(), flow.GetIDs(block.Payload.Guarantees))
 	if err != nil {
 		return fmt.Errorf("could not index block for collections: %w", err)
 	}
@@ -158,7 +158,7 @@ func (p *FinalizedBlockProcessor) indexFinalizedBlock(block *flow.Block) error {
 		}
 	}
 
-	p.collectionSyncer.RequestCollectionsForBlock(block.Header.Height, block.Payload.Guarantees)
+	p.collectionSyncer.RequestCollectionsForBlock(block.Height, block.Payload.Guarantees)
 	p.collectionExecutedMetric.BlockFinalized(block)
 
 	return nil

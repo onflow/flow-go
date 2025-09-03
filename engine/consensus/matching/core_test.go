@@ -101,7 +101,7 @@ func (ms *MatchingSuite) TestOnReceiptPendingResult() {
 	ms.receiptValidator.On("Validate", receipt).Return(nil)
 
 	// Expect the receipt to be added to mempool and persistent storage
-	ms.ReceiptsPL.On("AddReceipt", receipt, ms.UnfinalizedBlock.Header).Return(true, nil).Once()
+	ms.ReceiptsPL.On("AddReceipt", receipt, ms.UnfinalizedBlock.ToHeader()).Return(true, nil).Once()
 	ms.ReceiptsDB.On("Store", receipt).Return(nil).Once()
 
 	_, err := ms.core.processReceipt(receipt)
@@ -124,7 +124,7 @@ func (ms *MatchingSuite) TestOnReceipt_ReceiptInPersistentStorage() {
 	// Persistent storage layer for Receipts has the receipt already stored
 	ms.ReceiptsDB.On("Store", receipt).Return(storage.ErrAlreadyExists).Once()
 	// The receipt should be added to the receipts mempool
-	ms.ReceiptsPL.On("AddReceipt", receipt, ms.UnfinalizedBlock.Header).Return(true, nil).Once()
+	ms.ReceiptsPL.On("AddReceipt", receipt, ms.UnfinalizedBlock.ToHeader()).Return(true, nil).Once()
 
 	_, err := ms.core.processReceipt(receipt)
 	ms.Require().NoError(err, "should process receipts, even if it is already in storage")
@@ -143,7 +143,7 @@ func (ms *MatchingSuite) TestOnReceiptValid() {
 	ms.receiptValidator.On("Validate", receipt).Return(nil).Once()
 
 	// Expect the receipt to be added to mempool and persistent storage
-	ms.ReceiptsPL.On("AddReceipt", receipt, ms.UnfinalizedBlock.Header).Return(true, nil).Once()
+	ms.ReceiptsPL.On("AddReceipt", receipt, ms.UnfinalizedBlock.ToHeader()).Return(true, nil).Once()
 	ms.ReceiptsDB.On("Store", receipt).Return(nil).Once()
 
 	// onReceipt should run to completion without throwing an error
@@ -236,7 +236,7 @@ func (ms *MatchingSuite) TestRequestPendingReceipts() {
 	orderedBlocks := make([]flow.Block, 0, n)
 	parentBlock := ms.UnfinalizedBlock
 	for i := 0; i < n; i++ {
-		block := unittest.BlockWithParentFixture(parentBlock.Header)
+		block := unittest.BlockWithParentFixture(parentBlock.ToHeader())
 		ms.Extend(block)
 		orderedBlocks = append(orderedBlocks, *block)
 		parentBlock = *block
@@ -272,7 +272,6 @@ func (ms *MatchingSuite) TestRequestPendingReceipts() {
 //
 // TODO: this test is temporarily requires as long as sealing.Core requires _two_ receipts from different ENs to seal
 func (ms *MatchingSuite) TestRequestSecondPendingReceipt() {
-
 	ms.core.config.SealingThreshold = 0 // request receipts for all unsealed finalized blocks
 
 	result := unittest.ExecutionResultFixture(unittest.WithBlock(ms.LatestFinalizedBlock))
@@ -282,8 +281,8 @@ func (ms *MatchingSuite) TestRequestSecondPendingReceipt() {
 	receipt2 := unittest.ExecutionReceiptFixture(unittest.WithResult(result))
 
 	// receipts from storage are potentially added to receipts mempool and incorporated results mempool
-	ms.ReceiptsPL.On("AddReceipt", receipt1, ms.LatestFinalizedBlock.Header).Return(false, nil).Maybe()
-	ms.ReceiptsPL.On("AddReceipt", receipt2, ms.LatestFinalizedBlock.Header).Return(false, nil).Maybe()
+	ms.ReceiptsPL.On("AddReceipt", receipt1, ms.LatestFinalizedBlock.ToHeader()).Return(false, nil).Maybe()
+	ms.ReceiptsPL.On("AddReceipt", receipt2, ms.LatestFinalizedBlock.ToHeader()).Return(false, nil).Maybe()
 
 	// Situation A: we have _once_ receipt for an unsealed finalized block in storage
 	ms.ReceiptsDB.On("ByBlockID", ms.LatestFinalizedBlock.ID()).Return(flow.ExecutionReceiptList{receipt1}, nil).Once()

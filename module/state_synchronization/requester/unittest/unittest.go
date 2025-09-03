@@ -118,7 +118,7 @@ func WithByHeight(blocksByHeight map[uint64]*flow.Block) BlockHeaderMockOptions 
 				if _, has := blocksByHeight[height]; !has {
 					return nil
 				}
-				return blocksByHeight[height].Header
+				return blocksByHeight[height].ToHeader()
 			},
 			func(height uint64) error {
 				if _, has := blocksByHeight[height]; !has {
@@ -137,7 +137,7 @@ func WithByID(blocksByID map[flow.Identifier]*flow.Block) BlockHeaderMockOptions
 				if _, has := blocksByID[blockID]; !has {
 					return nil
 				}
-				return blocksByID[blockID].Header
+				return blocksByID[blockID].ToHeader()
 			},
 			func(blockID flow.Identifier) error {
 				if _, has := blocksByID[blockID]; !has {
@@ -156,7 +156,7 @@ func WithBlockIDByHeight(blocksByHeight map[uint64]*flow.Block) BlockHeaderMockO
 				if _, has := blocksByHeight[height]; !has {
 					return flow.ZeroID
 				}
-				return blocksByHeight[height].Header.ID()
+				return blocksByHeight[height].ID()
 			},
 			func(height uint64) error {
 				if _, has := blocksByHeight[height]; !has {

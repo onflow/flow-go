@@ -99,12 +99,12 @@ func FindGuarantors(state State, guarantee *flow.CollectionGuarantee) ([]flow.Id
 	if err != nil {
 		return nil, fmt.Errorf("could not get current epoch: %w", err)
 	}
-	cluster, err := epoch.ClusterByChainID(guarantee.ChainID)
+	cluster, err := epoch.ClusterByChainID(guarantee.ClusterChainID)
 
 	if err != nil {
 		return nil, fmt.Errorf(
-			"fail to retrieve collector clusters for guarantee (ReferenceBlockID: %v, ChainID: %v): %w",
-			guarantee.ReferenceBlockID, guarantee.ChainID, err)
+			"fail to retrieve collector clusters for guarantee (ReferenceBlockID: %v, ClusterChainID: %v): %w",
+			guarantee.ReferenceBlockID, guarantee.ClusterChainID, err)
 	}
 
 	guarantorIDs, err := signature.DecodeSignerIndicesToIdentifiers(cluster.Members().NodeIDs(), guarantee.SignerIndices)
