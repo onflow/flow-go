@@ -207,10 +207,10 @@ func (fcv *ChunkVerifier) verifyTransactionsInContext(
 	var problematicTx flow.Identifier
 	// collect execution data formatted transaction results
 	var txStartIndex int
-	var systemResult *flow.LightTransactionResult
+	var processResult *flow.LightTransactionResult
 
 	if systemChunk {
-		transactions, systemResult, err = fcv.createSystemChunk(
+		transactions, processResult, err = fcv.createSystemChunk(
 			callbackCtx,
 			&snapshotTree,
 			chunkState,
@@ -226,15 +226,13 @@ func (fcv *ChunkVerifier) verifyTransactionsInContext(
 		}
 	}
 
-	var txResults []flow.LightTransactionResult
-	if len(transactions) > 0 {
-		txResults = make([]flow.LightTransactionResult, len(transactions))
-	}
+	txResults := make([]flow.LightTransactionResult, len(transactions))
 
 	// If system chunk, we already executed the process callback transaction so skip it
 	// by setting the start index to 1 and assigning existing process result to tx results
-	if systemResult != nil {
-		txResults[0] = *systemResult
+	if processResult != nil {
+		// if process was executed, transaction length should always be at least 2 (process + system)
+		txResults[0] = *processResult
 		txStartIndex = 1
 	}
 
@@ -431,6 +429,11 @@ func (fcv *ChunkVerifier) verifyTransactionsInContext(
 // createSystemChunk recreates the system chunk transactions and executes the
 // process callback transaction if scheduled callbacks are enabled.
 //
+// Returns system transaction list, which contains the system chunk transaction
+// and if the scheduled callbacks are enabled it also includes process / execute
+// callback transactions, and if callbacks enabled it returns the result of the
+// process callback transaction. No errors are expected during normal operation.
+//
 // If scheduled callbacks are dissabled it will only contain the system transaction.
 // If scheduled callbacks are enabled we need to do the following actions:
 // 1. add and execute the process callback transaction that returns events for execute callbacks
@@ -478,7 +481,7 @@ func (fcv *ChunkVerifier) createSystemChunk(
 		return nil, nil, fmt.Errorf("process callback transaction failed: %w", processOutput.Err)
 	}
 
-	result := &flow.LightTransactionResult{
+	processResult := &flow.LightTransactionResult{
 		TransactionID:   processTx.ID,
 		ComputationUsed: processOutput.ComputationUsed,
 		Failed:          false,
@@ -527,5 +530,5 @@ func (fcv *ChunkVerifier) createSystemChunk(
 		return nil, nil, fmt.Errorf("failed to merge process callback: %w", err)
 	}
 
-	return transactions, result, nil
+	return transactions, processResult, nil
 }
