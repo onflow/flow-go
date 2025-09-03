@@ -70,31 +70,22 @@ type BlockResponse struct {
 	Blocks []flow.UntrustedProposal
 }
 
-// ToInternal converts the untrusted BlockResponse into its trusted internal
-// representation.
+// ToInternal returns the internal type representation for BlockResponse.
 //
-// This stub returns the receiver unchanged. A proper implementation
-// must perform validation checks and return a constructed internal
-// object.
+// All errors indicate that the decode target contains a structurally invalid representation of the internal flow.BlockResponse.
 func (br *BlockResponse) ToInternal() (any, error) {
-	// TODO(malleability, #7709) implement with validation checks
-	return br, nil
-}
-
-// BlocksInternal converts all untrusted block proposals in the BlockResponse
-// into trusted flow.Proposal instances.
-//
-// All errors indicate that the input message could not be converted to a valid proposal.
-func (br *BlockResponse) BlocksInternal() ([]*flow.Proposal, error) {
-	internal := make([]*flow.Proposal, len(br.Blocks))
+	internal := make([]flow.Proposal, len(br.Blocks))
 	for i, untrusted := range br.Blocks {
 		proposal, err := flow.NewProposal(untrusted)
 		if err != nil {
 			return nil, fmt.Errorf("could not build proposal: %w", err)
 		}
-		internal[i] = proposal
+		internal[i] = *proposal
 	}
-	return internal, nil
+	return &flow.BlockResponse{
+		Nonce:  br.Nonce,
+		Blocks: internal,
+	}, nil
 }
 
 // ClusterBlockResponse is the same thing as BlockResponse, but for cluster
@@ -104,25 +95,20 @@ type ClusterBlockResponse struct {
 	Blocks []cluster.UntrustedProposal
 }
 
-// ToInternal converts the untrusted ClusterBlockResponse into its trusted internal
-// representation.
+// ToInternal returns the internal type representation for ClusterBlockResponse.
 //
-// This stub returns the receiver unchanged. A proper implementation
-// must perform validation checks and return a constructed internal
-// object.
+// All errors indicate that the decode target contains a structurally invalid representation of the internal cluster.BlockResponse.
 func (br *ClusterBlockResponse) ToInternal() (any, error) {
-	// TODO(malleability, #7703) implement with validation checks
-	return br, nil
-}
-
-func (br *ClusterBlockResponse) BlocksInternal() ([]*cluster.Proposal, error) {
-	internal := make([]*cluster.Proposal, len(br.Blocks))
+	internal := make([]cluster.Proposal, len(br.Blocks))
 	for i, untrusted := range br.Blocks {
 		proposal, err := cluster.NewProposal(untrusted)
 		if err != nil {
 			return nil, fmt.Errorf("could not build proposal: %w", err)
 		}
-		internal[i] = proposal
+		internal[i] = *proposal
 	}
-	return internal, nil
+	return &cluster.BlockResponse{
+		Nonce:  br.Nonce,
+		Blocks: internal,
+	}, nil
 }

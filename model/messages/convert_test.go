@@ -13,29 +13,33 @@ import (
 )
 
 func TestBlockResponse(t *testing.T) {
-	expected := []*flow.Proposal{unittest.ProposalFixture(), unittest.ProposalFixture()}
+	expected := []flow.Proposal{*unittest.ProposalFixture(), *unittest.ProposalFixture()}
 	res := messages.BlockResponse{
 		Blocks: []flow.UntrustedProposal{
-			flow.UntrustedProposal(*expected[0]),
-			flow.UntrustedProposal(*expected[1]),
+			flow.UntrustedProposal(expected[0]),
+			flow.UntrustedProposal(expected[1]),
 		},
 	}
-	converted, err := res.BlocksInternal()
+	internal, err := res.ToInternal()
 	require.NoError(t, err)
-	assert.Equal(t, expected, converted)
+	converted, ok := internal.(*flow.BlockResponse)
+	require.True(t, ok)
+	assert.Equal(t, expected, converted.Blocks)
 }
 
 func TestClusterBlockResponse(t *testing.T) {
 	b1 := unittest.ClusterBlockFixture()
 	b2 := unittest.ClusterBlockFixture()
-	expected := []*cluster.Proposal{unittest.ClusterProposalFromBlock(b1), unittest.ClusterProposalFromBlock(b2)}
+	expected := []cluster.Proposal{*unittest.ClusterProposalFromBlock(b1), *unittest.ClusterProposalFromBlock(b2)}
 	res := messages.ClusterBlockResponse{
 		Blocks: []cluster.UntrustedProposal{
-			cluster.UntrustedProposal(*expected[0]),
-			cluster.UntrustedProposal(*expected[1]),
+			cluster.UntrustedProposal(expected[0]),
+			cluster.UntrustedProposal(expected[1]),
 		},
 	}
-	converted, err := res.BlocksInternal()
+	internal, err := res.ToInternal()
 	require.NoError(t, err)
-	assert.Equal(t, expected, converted)
+	converted, ok := internal.(*cluster.BlockResponse)
+	require.True(t, ok)
+	assert.Equal(t, expected, converted.Blocks)
 }
