@@ -15,6 +15,7 @@ import (
 	"google.golang.org/grpc/status"
 
 	"github.com/onflow/flow-go/access/mock"
+	"github.com/onflow/flow-go/engine/access/rest/common/models"
 	"github.com/onflow/flow-go/engine/access/rest/http/routes"
 	"github.com/onflow/flow-go/engine/access/rest/router"
 	"github.com/onflow/flow-go/engine/access/rest/util"
@@ -134,7 +135,13 @@ func TestGetEvents(t *testing.T) {
 
 }
 
-func getEventReq(t *testing.T, eventType string, start string, end string, blockIDs []string) *http.Request {
+func getEventReq(
+	t *testing.T,
+	eventType string,
+	start string,
+	end string,
+	blockIDs []string,
+) *http.Request {
 	u, _ := url.Parse("/v1/events")
 	q := u.Query()
 
@@ -146,6 +153,10 @@ func getEventReq(t *testing.T, eventType string, start string, end string, block
 		q.Add(router.StartHeightQueryParam, start)
 		q.Add(router.EndHeightQueryParam, end)
 	}
+
+	q.Add(router.AgreeingExecutorsCountQueryParam, "2")
+	q.Add(router.RequiredExecutorsIdsQueryParam, "")
+	q.Add(router.IncludeExecutorMetadataQueryParam, "true")
 
 	q.Add(routes.EventTypeQuery, eventType)
 
@@ -169,15 +180,29 @@ func generateEventsMocks(backend *mock.API, n int) []flow.BlockEvents {
 		events[i] = unittest.BlockEventsFixture(header, 2)
 
 		backend.Mock.
-			On("GetEventsForBlockIDs", mocks.Anything, mocks.Anything, []flow.Identifier{header.ID()}, entities.EventEncodingVersion_JSON_CDC_V0).
-			Return([]flow.BlockEvents{events[i]}, nil)
+			On(
+				"GetEventsForBlockIDs",
+				mocks.Anything,
+				mocks.Anything,
+				[]flow.Identifier{header.ID()},
+				entities.EventEncodingVersion_JSON_CDC_V0,
+				mocks.Anything,
+			).
+			Return([]flow.BlockEvents{events[i]}, flow.ExecutorMetadata{}, nil)
 
 		lastHeader = header
 	}
 
 	backend.Mock.
-		On("GetEventsForBlockIDs", mocks.Anything, mocks.Anything, ids, entities.EventEncodingVersion_JSON_CDC_V0).
-		Return(events, nil)
+		On(
+			"GetEventsForBlockIDs",
+			mocks.Anything,
+			mocks.Anything,
+			ids,
+			entities.EventEncodingVersion_JSON_CDC_V0,
+			mocks.Anything,
+		).
+		Return(events, flow.ExecutorMetadata{}, nil)
 
 	// range from first to last block
 	backend.Mock.On(
@@ -204,8 +229,15 @@ func generateEventsMocks(backend *mock.API, n int) []flow.BlockEvents {
 
 	// default not found
 	backend.Mock.
-		On("GetEventsForBlockIDs", mocks.Anything, mocks.Anything, mocks.Anything, entities.EventEncodingVersion_JSON_CDC_V0).
-		Return(nil, status.Error(codes.NotFound, "not found"))
+		On(
+			"GetEventsForBlockIDs",
+			mocks.Anything,
+			mocks.Anything,
+			mocks.Anything,
+			entities.EventEncodingVersion_JSON_CDC_V0,
+			mocks.Anything,
+		).
+		Return(nil, flow.ExecutorMetadata{}, status.Error(codes.NotFound, "not found"))
 
 	backend.Mock.
 		On("GetEventsForHeightRange", mocks.Anything, mocks.Anything).
@@ -219,7 +251,6 @@ func generateEventsMocks(backend *mock.API, n int) []flow.BlockEvents {
 }
 
 func testBlockEventResponse(t *testing.T, events []flow.BlockEvents) string {
-
 	type eventResponse struct {
 		Type             flow.EventType  `json:"type"`
 		TransactionID    flow.Identifier `json:"transaction_id"`
@@ -233,6 +264,8 @@ func testBlockEventResponse(t *testing.T, events []flow.BlockEvents) string {
 		BlockHeight    string          `json:"block_height"`
 		BlockTimestamp string          `json:"block_timestamp"`
 		Events         []eventResponse `json:"events,omitempty"`
+		//TOOD: should add Metadata: ExecutorMetadata{ ... }
+		models.Metadata `json:",inline"`
 	}
 
 	res := make([]blockEventsResponse, len(events))
@@ -255,6 +288,12 @@ func testBlockEventResponse(t *testing.T, events []flow.BlockEvents) string {
 			BlockHeight:    fmt.Sprint(e.BlockHeight),
 			BlockTimestamp: e.BlockTimestamp.Format(time.RFC3339Nano),
 			Events:         events,
+			Metadata: models.Metadata{
+				ExecutorMetadata: &models.ExecutorMetadata{
+					ExecutionResultId: "",
+					ExecutorIds:       nil,
+				},
+			},
 		}
 	}
 
