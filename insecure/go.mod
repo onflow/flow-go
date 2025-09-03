@@ -10,7 +10,6 @@ require (
 	github.com/libp2p/go-libp2p v0.38.2
 	github.com/libp2p/go-libp2p-pubsub v0.13.0
 	github.com/multiformats/go-multiaddr-dns v0.4.1
-	github.com/onflow/cadence v1.6.5
 	github.com/onflow/crypto v0.25.3
 	github.com/onflow/flow-go v0.36.2-0.20240717162253-d5d2e606ef53
 	github.com/rs/zerolog v1.29.0
@@ -215,6 +214,7 @@ require (
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
 	github.com/olekukonko/tablewriter v0.0.5 // indirect
 	github.com/onflow/atree v0.10.0 // indirect
+	github.com/onflow/cadence v1.6.5 // indirect
 	github.com/onflow/flow-core-contracts/lib/go/contracts v1.7.4-0.20250825171851-5a0da78d0022 // indirect
 	github.com/onflow/flow-core-contracts/lib/go/templates v1.7.2-0.20250825171851-5a0da78d0022 // indirect
 	github.com/onflow/flow-evm-bridge v0.1.0 // indirect
