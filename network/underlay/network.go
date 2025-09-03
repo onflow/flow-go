@@ -1192,7 +1192,7 @@ func (n *Network) processAuthenticatedMessage(msg *message.Message, peerID peer.
 		return
 	}
 
-	internal, err := decodedMsgPayload.ToInternal()
+	internalMsg, err := decodedMsgPayload.ToInternal()
 	if err != nil {
 		err = fmt.Errorf("failed to convert message to internal: %w", err)
 		violation := &network.Violation{
@@ -1201,7 +1201,7 @@ func (n *Network) processAuthenticatedMessage(msg *message.Message, peerID peer.
 		n.slashingViolationsConsumer.OnInvalidMsgError(violation)
 		return
 	}
-	scope, err := message.NewIncomingScope(originId, protocol, msg, internal)
+	scope, err := message.NewIncomingScope(originId, protocol, msg, internalMsg)
 	if err != nil {
 		n.logger.Error().
 			Err(err).

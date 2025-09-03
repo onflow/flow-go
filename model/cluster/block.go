@@ -142,3 +142,8 @@ func NewRootProposal(untrusted UntrustedProposal) (*Proposal, error) {
 func (p *Proposal) ProposalHeader() *flow.ProposalHeader {
 	return &flow.ProposalHeader{Header: p.Block.ToHeader(), ProposerSigData: p.ProposerSigData}
 }
+
+// BlockResponse is the same as flow.BlockResponse, but for cluster
+// consensus. It contains a list of structurally validated cluster block proposals
+// that should correspond to the request.
+type BlockResponse flow.GenericBlockResponse[Proposal]
