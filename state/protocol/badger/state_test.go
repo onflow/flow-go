@@ -19,8 +19,7 @@ import (
 	"github.com/onflow/flow-go/state/protocol/util"
 	protoutil "github.com/onflow/flow-go/state/protocol/util"
 	"github.com/onflow/flow-go/storage"
-	bstorage "github.com/onflow/flow-go/storage/badger"
-	"github.com/onflow/flow-go/storage/operation/badgerimpl"
+	"github.com/onflow/flow-go/storage/operation/pebbleimpl"
 	"github.com/onflow/flow-go/storage/store"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -850,20 +849,21 @@ func bootstrap(t *testing.T, rootSnapshot protocol.Snapshot, f func(*bprotocol.S
 	metrics := metrics.NewNoopCollector()
 	dir := unittest.TempDir(t)
 	defer os.RemoveAll(dir)
-	db := unittest.BadgerDB(t, dir)
+	pdb := unittest.PebbleDB(t, dir)
+	db := pebbleimpl.ToDB(pdb)
 	lockManager := storage.NewTestingLockManager()
 	defer db.Close()
-	all := bstorage.InitAll(metrics, db)
+	all := store.InitAll(metrics, db)
 	state, err := bprotocol.Bootstrap(
 		metrics,
-		badgerimpl.ToDB(db),
+		db,
 		lockManager,
 		all.Headers,
 		all.Seals,
 		all.Results,
 		all.Blocks,
 		all.QuorumCertificates,
-		all.Setups,
+		all.EpochSetups,
 		all.EpochCommits,
 		all.EpochProtocolStateEntries,
 		all.ProtocolKVStore,
