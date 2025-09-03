@@ -132,8 +132,17 @@ func TestDisconnectedFinalizedBlock(t *testing.T) {
 //	A ← B ← C
 //	  ↖ D
 func constructState(t *testing.T, db storage.DB, lctx lockctx.Proof) (blockA, blockB, blockC, blockD *cluster.Block) {
-	blocks := unittest.ClusterBlockFixtures(4)
-	blockA, blockB, blockC, blockD = blocks[0], blocks[1], blocks[2], blocks[3]
+	// Create block A as the root
+	blockA = unittest.ClusterBlockFixture()
+
+	// Create block B as a child of A
+	blockB = unittest.ClusterBlockFixture(unittest.ClusterBlock.WithParent(blockA))
+
+	// Create block C as a child of B
+	blockC = unittest.ClusterBlockFixture(unittest.ClusterBlock.WithParent(blockB))
+
+	// Create block D as a child of A (creating a fork)
+	blockD = unittest.ClusterBlockFixture(unittest.ClusterBlock.WithParent(blockA))
 
 	// Store all blocks
 	for _, b := range []*cluster.Block{blockA, blockB, blockC, blockD} {
