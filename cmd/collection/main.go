@@ -34,6 +34,7 @@ import (
 	"github.com/onflow/flow-go/engine/collection/rpc"
 	followereng "github.com/onflow/flow-go/engine/common/follower"
 	"github.com/onflow/flow-go/engine/common/provider"
+	commonrpc "github.com/onflow/flow-go/engine/common/rpc"
 	consync "github.com/onflow/flow-go/engine/common/synchronization"
 	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/model/bootstrap"
@@ -58,7 +59,6 @@ import (
 	"github.com/onflow/flow-go/state/protocol/blocktimer"
 	"github.com/onflow/flow-go/state/protocol/events/gadgets"
 	"github.com/onflow/flow-go/storage/badger"
-	"github.com/onflow/flow-go/utils/grpcutils"
 )
 
 func main() {
@@ -121,8 +121,12 @@ func main() {
 			"maximum number of transactions in the memory pool")
 		flags.StringVarP(&rpcConf.ListenAddr, "ingress-addr", "i", "localhost:9000",
 			"the address the ingress server listens on")
-		flags.UintVar(&rpcConf.MaxMsgSize, "rpc-max-message-size", grpcutils.DefaultMaxMsgSize,
-			"the maximum message size in bytes for messages sent or received over grpc")
+		flags.UintVar(&rpcConf.DeprecatedMaxMsgSize, "rpc-max-message-size", 0,
+			"[deprecated] the maximum message size in bytes for messages sent or received over grpc")
+		flags.UintVar(&rpcConf.MaxRequestMsgSize, "rpc-max-request-message-size", commonrpc.DefaultCollectionMaxRequestSize,
+			"the maximum request message size in bytes for request messages received over grpc by the server")
+		flags.UintVar(&rpcConf.MaxResponseMsgSize, "rpc-max-response-message-size", commonrpc.DefaultCollectionMaxResponseSize,
+			"the maximum message size in bytes for response messages sent over grpc by the server")
 		flags.BoolVar(&rpcConf.RpcMetricsEnabled, "rpc-metrics-enabled", false,
 			"whether to enable the rpc metrics")
 		flags.Uint64Var(&ingestConf.MaxGasLimit, "ingest-max-gas-limit", flow.DefaultMaxTransactionGasLimit,
@@ -479,6 +483,13 @@ func main() {
 			return ing, err
 		}).
 		Component("transaction ingress rpc server", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+			// maintain backwards compatibility with the deprecated flag
+			if rpcConf.DeprecatedMaxMsgSize != 0 {
+				node.Logger.Warn().Msg("A deprecated flag was specified (--rpc-max-message-size). Use --rpc-max-request-message-size and --rpc-max-response-message-size instead. This flag will be removed in a future release.")
+				rpcConf.MaxRequestMsgSize = rpcConf.DeprecatedMaxMsgSize
+				rpcConf.MaxResponseMsgSize = rpcConf.DeprecatedMaxMsgSize
+			}
+
 			server := rpc.New(
 				rpcConf,
 				ing,

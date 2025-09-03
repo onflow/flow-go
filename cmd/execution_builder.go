@@ -1357,6 +1357,12 @@ func (exeNode *ExecutionNode) LoadGrpcServer(
 	module.ReadyDoneAware,
 	error,
 ) {
+	// maintain backwards compatibility with the deprecated flag
+	if exeNode.exeConf.rpcConf.DeprecatedMaxMsgSize != 0 {
+		node.Logger.Warn().Msg("A deprecated flag was specified (--rpc-max-message-size). Use --rpc-max-request-message-size and --rpc-max-response-message-size instead. This flag will be removed in a future release.")
+		exeNode.exeConf.rpcConf.MaxRequestMsgSize = exeNode.exeConf.rpcConf.DeprecatedMaxMsgSize
+		exeNode.exeConf.rpcConf.MaxResponseMsgSize = exeNode.exeConf.rpcConf.DeprecatedMaxMsgSize
+	}
 	return rpc.New(
 		node.Logger,
 		exeNode.exeConf.rpcConf,

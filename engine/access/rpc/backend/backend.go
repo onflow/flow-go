@@ -109,6 +109,7 @@ type Params struct {
 	EventQueryMode        query_mode.IndexQueryMode
 	BlockTracker          tracker.BlockTracker
 	SubscriptionHandler   *subscription.SubscriptionHandler
+	MaxScriptAndArgumentSize uint
 
 	EventsIndex                *index.EventsIndex
 	TxResultQueryMode          query_mode.IndexQueryMode
@@ -185,6 +186,7 @@ func New(params Params) (*Backend, error) {
 		params.ScriptExecutionMode,
 		params.ExecNodeIdentitiesProvider,
 		loggedScripts,
+		params.MaxScriptAndArgumentSize,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create scripts: %w", err)
