@@ -304,8 +304,6 @@ github.com/decred/dcrd/dcrec/secp256k1/v4 v4.3.0 h1:rpfIENRNNilwHwZeG5+P150SMrnN
 github.com/decred/dcrd/dcrec/secp256k1/v4 v4.3.0/go.mod h1:v57UDF4pDQJcEfFUCRop3lJL149eHGSe9Jvczhzjo/0=
 github.com/desertbit/timer v0.0.0-20180107155436-c41aec40b27f h1:U5y3Y5UE0w7amNe7Z5G/twsBW0KEalRQXZzf8ufSh9I=
 github.com/desertbit/timer v0.0.0-20180107155436-c41aec40b27f/go.mod h1:xH/i4TFMt8koVQZ6WFms69WAsDWr2XsYL3Hkl7jkoLE=
-github.com/devbugging/flow v0.0.0-20250902143659-563c7660e39b h1:iFVO5KfkT+uUmF4m7CJs5OvmNsBREmsneU8o2/a4HGw=
-github.com/devbugging/flow v0.0.0-20250902143659-563c7660e39b/go.mod h1:YKZvjXQybs+uHPJU3cofrpkpJSYGeKz1cPsP7hucT1Q=
 github.com/dgraph-io/badger/v2 v2.2007.4 h1:TRWBQg8UrlUhaFdco01nO2uXwzKS7zd+HVdwV/GHc4o=
 github.com/dgraph-io/badger/v2 v2.2007.4/go.mod h1:vSw/ax2qojzbN6eXHIx6KPKtCSHJN/Uz0X0VPruTIhk=
 github.com/dgraph-io/ristretto v0.0.3-0.20200630154024-f66de99634de/go.mod h1:KPxhHT9ZxKefz+PCeOGsrHpl1qZ7i70dGTu2u+Ahh6E=
@@ -945,6 +943,8 @@ github.com/onflow/cadence v1.7.0-preview.2 h1:9gmKIeP51x43zk1Jy0z6XM5sY396GeMWA7
 github.com/onflow/cadence v1.7.0-preview.2/go.mod h1:vUPS9e8Ng1ev320CiaSYKDOmzmAlP1KA5weVvb7WwBQ=
 github.com/onflow/crypto v0.25.3 h1:XQ3HtLsw8h1+pBN+NQ1JYM9mS2mVXTyg55OldaAIF7U=
 github.com/onflow/crypto v0.25.3/go.mod h1:+1igaXiK6Tjm9wQOBD1EGwW7bYWMUGKtwKJ/2QL/OWs=
+github.com/onflow/flow v0.4.15 h1:MdrhULSE5iSYNyLCihH8DI4uab5VciVZUKDFON6zylY=
+github.com/onflow/flow v0.4.15/go.mod h1:lzyAYmbu1HfkZ9cfnL5/sjrrsnJiUU8fRL26CqLP7+c=
 github.com/onflow/flow-core-contracts/lib/go/contracts v1.7.4-0.20250825173510-91e6f28b0224 h1:YKdTSG+6uu+dZpKCB2fmNWOmKGLn7+0MxFbtUFZdBjc=
 github.com/onflow/flow-core-contracts/lib/go/contracts v1.7.4-0.20250825173510-91e6f28b0224/go.mod h1:/Yne6g7V2Fy1sm/vE78us221bYvVvL5cA8cOzN/uTCI=
 github.com/onflow/flow-core-contracts/lib/go/templates v1.7.2-0.20250825173510-91e6f28b0224 h1:6ZBTrqPQIbnek7mdtJwbQux87qcJPTz82DDgGhpsHzI=
