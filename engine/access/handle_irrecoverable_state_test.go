@@ -66,8 +66,6 @@ type IrrecoverableStateTestSuite struct {
 	transactions *storagemock.Transactions
 	receipts     *storagemock.ExecutionReceipts
 
-	ctx irrecoverable.SignalerContext
-
 	// grpc servers
 	secureGrpcServer   *grpcserver.GrpcServer
 	unsecureGrpcServer *grpcserver.GrpcServer

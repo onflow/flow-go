@@ -691,6 +691,7 @@ func (suite *Suite) TestGetSealedTransaction() {
 			EventQueryMode:             query_mode.IndexQueryModeExecutionNodesOnly,
 			ScriptExecutionMode:        query_mode.IndexQueryModeExecutionNodesOnly,
 			ExecNodeIdentitiesProvider: execNodeIdentitiesProvider,
+			MaxScriptAndArgumentSize:   commonrpc.DefaultAccessMaxRequestSize,
 		})
 		require.NoError(suite.T(), err)
 
@@ -867,7 +868,8 @@ func (suite *Suite) TestGetTransactionResult() {
 			nil,
 		)
 
-		bnd, err := backend.New(backend.Params{State: suite.state,
+		bnd, err := backend.New(backend.Params{
+			State:                      suite.state,
 			CollectionRPC:              suite.collClient,
 			Blocks:                     all.Blocks,
 			Headers:                    all.Headers,
@@ -886,6 +888,7 @@ func (suite *Suite) TestGetTransactionResult() {
 			EventQueryMode:             query_mode.IndexQueryModeExecutionNodesOnly,
 			ScriptExecutionMode:        query_mode.IndexQueryModeExecutionNodesOnly,
 			ExecNodeIdentitiesProvider: execNodeIdentitiesProvider,
+			MaxScriptAndArgumentSize:   commonrpc.DefaultAccessMaxRequestSize,
 		})
 		require.NoError(suite.T(), err)
 
@@ -1132,6 +1135,7 @@ func (suite *Suite) TestExecuteScript() {
 			ScriptExecutionMode:        query_mode.IndexQueryModeExecutionNodesOnly,
 			TxResultQueryMode:          query_mode.IndexQueryModeExecutionNodesOnly,
 			ExecNodeIdentitiesProvider: execNodeIdentitiesProvider,
+			MaxScriptAndArgumentSize:   commonrpc.DefaultAccessMaxRequestSize,
 		})
 		require.NoError(suite.T(), err)
 
