@@ -717,7 +717,7 @@ func createNode(
 
 	hotstuffDistributor.AddConsumer(messageHub)
 
-	node.dbCloser = badgerdb
+	node.dbCloser = db
 	node.compliance = comp
 	node.sync = sync
 	node.state = fullState
