@@ -50,9 +50,10 @@ func init() {
 }
 
 func runSnapshotE(*cobra.Command, []string) error {
+	lockManager := storage.MakeSingletonLockManager()
 	return common.WithStorage(common.ReadDBFlags(), func(db storage.DB) error {
 		storages := common.InitStorages(db)
-		state, err := common.InitProtocolState(db, storages)
+		state, err := common.OpenProtocolState(lockManager, db, storages)
 		if err != nil {
 			return fmt.Errorf("could not init protocol state")
 		}

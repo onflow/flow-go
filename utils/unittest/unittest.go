@@ -16,7 +16,6 @@ import (
 
 	"github.com/cockroachdb/pebble/v2"
 	"github.com/dgraph-io/badger/v2"
-	"github.com/jordanschalm/lockctx"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/onflow/crypto"
 	"github.com/stretchr/testify/assert"
@@ -29,7 +28,6 @@ import (
 	cborcodec "github.com/onflow/flow-go/network/codec/cbor"
 	"github.com/onflow/flow-go/network/p2p/keyutils"
 	"github.com/onflow/flow-go/network/topology"
-	"github.com/onflow/flow-go/storage"
 )
 
 type SkipReason int
@@ -454,18 +452,6 @@ func RunWithTypedPebbleDB(
 		}()
 		f(db)
 	})
-}
-
-// LockManagerWithContext creates a new lock manager, creates a new context and acquires the
-// specified locks within that context. Lock manager and context are returned.
-func LockManagerWithContext(t *testing.T, locks ...string) (lockctx.Manager, lockctx.Context) {
-	lockManager := storage.NewTestingLockManager()
-	lctx := lockManager.NewContext()
-	for _, lock := range locks {
-		err := lctx.AcquireLock(lock)
-		require.NoError(t, err)
-	}
-	return lockManager, lctx
 }
 
 func Concurrently(n int, f func(int)) {

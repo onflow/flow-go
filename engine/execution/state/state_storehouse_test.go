@@ -38,6 +38,7 @@ import (
 
 func prepareStorehouseTest(f func(t *testing.T, es state.ExecutionState, l *ledger.Ledger, headers *storagemock.Headers, commits *storagemock.Commits, finalized *testutil.MockFinalizedReader)) func(*testing.T) {
 	return func(t *testing.T) {
+		lockManager := storage.NewTestingLockManager()
 		unittest.RunWithBadgerDB(t, func(badgerDB *badger.DB) {
 			metricsCollector := &metrics.NoopCollector{}
 			diskWal := &fixtures.NoopWAL{}
@@ -51,7 +52,7 @@ func prepareStorehouseTest(f func(t *testing.T, es state.ExecutionState, l *ledg
 			}()
 
 			stateCommitments := storagemock.NewCommits(t)
-			stateCommitments.On("BatchStore", mock.Anything, mock.Anything, mock.Anything).Return(nil)
+			stateCommitments.On("BatchStore", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
 			headers := storagemock.NewHeaders(t)
 			blocks := storagemock.NewBlocks(t)
 			events := storagemock.NewEvents(t)
@@ -66,7 +67,6 @@ func prepareStorehouseTest(f func(t *testing.T, es state.ExecutionState, l *ledg
 			results.On("BatchIndex", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 			myReceipts := storagemock.NewMyExecutionReceipts(t)
 			myReceipts.On("BatchStoreMyReceipt", mock.Anything, mock.Anything, mock.Anything).Return(nil)
-			lockManager := storage.NewTestingLockManager()
 
 			withRegisterStore(t, func(t *testing.T,
 				rs *storehouse.RegisterStore,
@@ -85,9 +85,12 @@ func prepareStorehouseTest(f func(t *testing.T, es state.ExecutionState, l *ledg
 					return operation.UpdateExecutedBlock(rw.Writer(), rootID)
 				}))
 
+				lctx := lockManager.NewContext()
+				require.NoError(t, lctx.AcquireLock(storage.LockInsertBlock))
 				require.NoError(t, badgerimpl.ToDB(badgerDB).WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-					return operation.InsertHeader(rw.Writer(), finalizedHeaders[10].ID(), finalizedHeaders[10])
+					return operation.InsertHeader(lctx, rw, finalizedHeaders[10].ID(), finalizedHeaders[10])
 				}))
+				lctx.Release()
 
 				getLatestFinalized := func() (uint64, error) {
 					return rootHeight, nil
@@ -217,7 +220,7 @@ func makeComputationResult(
 	commit flow.StateCommitment,
 ) *execution.ComputationResult {
 
-	computationResult := execution.NewEmptyComputationResult(completeBlock)
+	computationResult := execution.NewEmptyComputationResult(completeBlock, flow.NewChunk)
 	numberOfChunks := 1
 	ceds := make([]*execution_data.ChunkExecutionData, numberOfChunks)
 	ceds[0] = unittest.ChunkExecutionDataFixture(t, 1024)

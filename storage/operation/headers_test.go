@@ -29,8 +29,14 @@ func TestHeaderInsertCheckRetrieve(t *testing.T) {
 		}
 		blockID := expected.ID()
 
-		err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			return operation.InsertHeader(rw.Writer(), expected.ID(), expected)
+		lockManager := storage.NewTestingLockManager()
+		lctx := lockManager.NewContext()
+		err := lctx.AcquireLock(storage.LockInsertBlock)
+		require.NoError(t, err)
+		defer lctx.Release()
+
+		err = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+			return operation.InsertHeader(lctx, rw, expected.ID(), expected)
 		})
 		require.NoError(t, err)
 
@@ -54,7 +60,7 @@ func TestHeaderIDIndexByCollectionID(t *testing.T) {
 		require.NoError(t, err)
 
 		actualID := &flow.Identifier{}
-		err = operation.LookupCollectionBlock(db.Reader(), collectionID, actualID)
+		err = operation.LookupBlockContainingCollection(db.Reader(), collectionID, actualID)
 		require.NoError(t, err)
 		assert.Equal(t, headerID, *actualID)
 	})
@@ -66,10 +72,13 @@ func TestBlockHeightIndexLookup(t *testing.T) {
 		height := uint64(1337)
 		expected := flow.Identifier{0x01, 0x02, 0x03}
 
-		_, lctx := unittest.LockManagerWithContext(t, storage.LockFinalizeBlock)
+		lockManager := storage.NewTestingLockManager()
+		lctx := lockManager.NewContext()
+		err := lctx.AcquireLock(storage.LockFinalizeBlock)
+		require.NoError(t, err)
 		defer lctx.Release()
 
-		err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+		err = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 			return operation.IndexFinalizedBlockByHeight(lctx, rw, height, expected)
 		})
 		require.NoError(t, err)

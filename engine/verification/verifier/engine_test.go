@@ -48,6 +48,7 @@ type VerifierEngineTestSuite struct {
 	metrics       *mockmodule.VerificationMetrics // mocks performance monitoring metrics
 	approvals     *mockstorage.ResultApprovals
 	chunkVerifier *mockmodule.ChunkVerifier
+	lockManager   lockctx.Manager
 }
 
 func TestVerifierEngine(t *testing.T) {
@@ -55,6 +56,7 @@ func TestVerifierEngine(t *testing.T) {
 }
 
 func (suite *VerifierEngineTestSuite) SetupTest() {
+	suite.lockManager = storage.NewTestingLockManager()
 	suite.state = new(protocol.State)
 	suite.net = mocknetwork.NewNetwork(suite.T())
 	suite.tracer = trace.NewNoopTracer()
@@ -108,7 +110,7 @@ func (suite *VerifierEngineTestSuite) getTestNewEngine() *verifier.Engine {
 		suite.me,
 		suite.chunkVerifier,
 		suite.approvals,
-		storage.NewTestingLockManager(),
+		suite.lockManager,
 	)
 	require.NoError(suite.T(), err)
 

@@ -153,9 +153,6 @@ func (c *Collections) Remove(colID flow.Identifier) error {
 //
 // No errors are expected during normal operations
 func (c *Collections) BatchStoreAndIndexByTransaction(lctx lockctx.Proof, collection *flow.Collection, rw storage.ReaderBatchWriter) (flow.LightCollection, error) {
-	light := collection.Light()
-	collectionID := light.ID()
-
 	// - This lock is to ensure there is no race condition when indexing collection by transaction ID
 	// - The access node uses this index to report the transaction status. It's done by first
 	//   find the collection for a given transaction ID, and then find the block by the collection,
@@ -171,6 +168,9 @@ func (c *Collections) BatchStoreAndIndexByTransaction(lctx lockctx.Proof, collec
 	if !lctx.HoldsLock(storage.LockInsertCollection) {
 		return flow.LightCollection{}, fmt.Errorf("missing lock: %v", storage.LockInsertCollection)
 	}
+
+	light := collection.Light()
+	collectionID := light.ID()
 
 	err := operation.UpsertCollection(rw.Writer(), &light)
 	if err != nil {

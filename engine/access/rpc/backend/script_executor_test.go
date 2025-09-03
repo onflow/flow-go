@@ -97,6 +97,7 @@ func (s *ScriptExecutorSuite) bootstrap() {
 // SetupTest sets up the test environment for each test in the suite.
 // This includes initializing various components and mock objects needed for the tests.
 func (s *ScriptExecutorSuite) SetupTest() {
+	lockManager := storage.NewTestingLockManager()
 	s.log = unittest.Logger()
 	s.chain = flow.Emulator.Chain()
 
@@ -141,7 +142,7 @@ func (s *ScriptExecutorSuite) SetupTest() {
 		s.chain,
 		derivedChainData,
 		module.CollectionExecutedMetric(metrics.NewNoopCollector()),
-		storage.NewTestingLockManager(),
+		lockManager,
 	)
 	s.Require().NoError(err)
 

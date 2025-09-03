@@ -15,16 +15,9 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-func withLock(t *testing.T, manager lockctx.Manager, lockID string, fn func(lctx lockctx.Context) error) {
-	t.Helper()
-	lctx := manager.NewContext()
-	require.NoError(t, lctx.AcquireLock(lockID))
-	defer lctx.Release()
-	require.NoError(t, fn(lctx))
-}
-
 func TestFinalizedReader(t *testing.T) {
 	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
+		lockManager := storage.NewTestingLockManager()
 		// prepare the storage.Headers instance
 		metrics := metrics.NewNoopCollector()
 		all := store.InitAll(metrics, db)
@@ -33,15 +26,14 @@ func TestFinalizedReader(t *testing.T) {
 		block1 := unittest.BlockFixture()
 
 		// store `block1`
-		lockManager := storage.NewTestingLockManager()
-		withLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
+		unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
 			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 				return blocks.BatchStore(lctx, rw, &block1)
 			})
 		})
 
 		// finalize `block1`
-		withLock(t, lockManager, storage.LockFinalizeBlock, func(lctx lockctx.Context) error {
+		unittest.WithLock(t, lockManager, storage.LockFinalizeBlock, func(lctx lockctx.Context) error {
 			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 				return operation.IndexFinalizedBlockByHeight(lctx, rw, block1.Header.Height, block1.ID())
 			})
@@ -60,12 +52,12 @@ func TestFinalizedReader(t *testing.T) {
 
 		// store and finalize one more block
 		block2 := unittest.BlockWithParentFixture(block1.Header)
-		withLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
+		unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
 			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 				return blocks.BatchStore(lctx, rw, block2)
 			})
 		})
-		withLock(t, lockManager, storage.LockFinalizeBlock, func(lctx lockctx.Context) error {
+		unittest.WithLock(t, lockManager, storage.LockFinalizeBlock, func(lctx lockctx.Context) error {
 			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 				return operation.IndexFinalizedBlockByHeight(lctx, rw, block2.Header.Height, block2.ID())
 			})

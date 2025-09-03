@@ -18,14 +18,18 @@ func TestInsertRetrieveClusterBlock(t *testing.T) {
 	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
 		block := unittest.ClusterBlockFixture()
 
-		_, lctx := unittest.LockManagerWithContext(t, storage.LockInsertOrFinalizeClusterBlock)
+		lockManager := storage.NewTestingLockManager()
+		lctx := lockManager.NewContext()
+		err := lctx.AcquireLock(storage.LockInsertOrFinalizeClusterBlock)
+		require.NoError(t, err)
 		defer lctx.Release()
+
 		require.NoError(t, db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 			return InsertClusterBlock(lctx, rw, &block)
 		}))
 
 		var retrieved cluster.Block
-		err := RetrieveClusterBlock(db.Reader(), block.ID(), &retrieved)
+		err = RetrieveClusterBlock(db.Reader(), block.ID(), &retrieved)
 		require.NoError(t, err)
 
 		require.Equal(t, block, retrieved)
@@ -39,8 +43,11 @@ func TestFinalizeClusterBlock(t *testing.T) {
 
 		lockManager := storage.NewTestingLockManager()
 		lctx := lockManager.NewContext()
-		require.NoError(t, lctx.AcquireLock(storage.LockInsertOrFinalizeClusterBlock))
 		defer lctx.Release()
+		require.NoError(t, lctx.AcquireLock(storage.LockInsertOrFinalizeClusterBlock))
+		require.NoError(t, db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+			return InsertClusterBlock(lctx, rw, &parent)
+		}))
 
 		// index parent as latest finalized block (manually writing respective indexes like in bootstrapping to skip transitive consistency checks)
 		require.NoError(t, db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {

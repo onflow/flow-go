@@ -16,6 +16,7 @@ import (
 
 func TestHeaderStoreRetrieve(t *testing.T) {
 	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
+		lockManager := storage.NewTestingLockManager()
 		metrics := metrics.NewNoopCollector()
 		all := store.InitAll(metrics, db)
 		headers := all.Headers
@@ -23,15 +24,18 @@ func TestHeaderStoreRetrieve(t *testing.T) {
 
 		block := unittest.BlockFixture()
 
-		manager, lctx := unittest.LockManagerWithContext(t, storage.LockInsertBlock)
+		lctx := lockManager.NewContext()
+		err := lctx.AcquireLock(storage.LockInsertBlock)
+		require.NoError(t, err)
+		defer lctx.Release()
+
 		// store block which will also store header
-		err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+		err = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 			return blocks.BatchStore(lctx, rw, &block)
 		})
-		lctx.Release()
 		require.NoError(t, err)
 
-		lctx2 := manager.NewContext()
+		lctx2 := lockManager.NewContext()
 		require.NoError(t, lctx2.AcquireLock(storage.LockFinalizeBlock))
 		// index the header
 		err = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
