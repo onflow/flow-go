@@ -43,7 +43,6 @@ func TestFinalizedReader(t *testing.T) {
 		// verify that `FinalizedReader` reads values from database that are not yet cached, eg. right after initialization
 		reader := NewFinalizedReader(headers, block.Height)
 		finalized, err := reader.FinalizedBlockIDAtHeight(block.Height)
-		// store header
 		require.NoError(t, err)
 		require.Equal(t, block.ID(), finalized)
 
