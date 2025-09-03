@@ -18,8 +18,6 @@ func TestDecoder_Decode(t *testing.T) {
 	c := cbor.NewCodec()
 
 	blockProposal := messages.Proposal(*unittest.ProposalFixture())
-	internal, err := blockProposal.ToInternal()
-	require.NoError(t, err)
 
 	t.Run("decodes message successfully", func(t *testing.T) {
 		var buf bytes.Buffer
@@ -29,7 +27,7 @@ func TestDecoder_Decode(t *testing.T) {
 
 		decoded, err := c.NewDecoder(&buf).Decode()
 		require.NoError(t, err)
-		require.Equal(t, internal, decoded)
+		require.Equal(t, &blockProposal, decoded.(*messages.Proposal))
 	})
 
 	t.Run("returns error when data is empty", func(t *testing.T) {
