@@ -75,7 +75,7 @@ func (o *Orchestrator) HandleEgressEvent(event *insecure.EgressEvent) error {
 
 	switch event.FlowProtocolEvent.(type) {
 
-	case *flow.ExecutionReceipt:
+	case *messages.ExecutionReceipt:
 		// orchestrator received execution receipt from corrupted EN after EN executed a block.
 		if err := o.handleExecutionReceiptEvent(event); err != nil {
 			return fmt.Errorf("could not handle execution receipt event: %w", err)
@@ -179,7 +179,7 @@ func (o *Orchestrator) handleExecutionReceiptEvent(receiptEvent *insecure.Egress
 		return fmt.Errorf("wrong sender role for execution receipt: %s", corruptedIdentity.Role.String())
 	}
 
-	receipt, ok := receiptEvent.FlowProtocolEvent.(*flow.ExecutionReceipt)
+	receipt, ok := receiptEvent.FlowProtocolEvent.(*messages.ExecutionReceipt)
 	if !ok {
 		return fmt.Errorf("protocol event is not an execution receipt: %T", receiptEvent.FlowProtocolEvent)
 	}
@@ -213,8 +213,13 @@ func (o *Orchestrator) handleExecutionReceiptEvent(receiptEvent *insecure.Egress
 		return nil
 	}
 
+	internalMsg, err := receipt.ToInternal()
+	if err != nil {
+		lg.Fatal().Err(err).Msg("failed to convert event to internal")
+	}
+
 	// replace honest receipt with corrupted receipt
-	corruptedResult := o.corruptExecutionResult(receipt)
+	corruptedResult := o.corruptExecutionResult(internalMsg.(*flow.ExecutionReceipt))
 
 	corruptedExecutionIds := o.allNodeIds.Filter(
 		filter.And(filter.HasRole[flow.Identity](flow.RoleExecution),

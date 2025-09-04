@@ -257,7 +257,7 @@ func initializeMessageAuthConfigsMap() {
 	authorizationConfigs[ExecutionReceipt] = MsgAuthConfig{
 		Name: ExecutionReceipt,
 		Type: func() interface{} {
-			return new(flow.ExecutionReceipt)
+			return new(messages.ExecutionReceipt)
 		},
 		Config: map[channels.Channel]ChannelAuthConfig{
 			channels.PushReceipts: {
@@ -441,7 +441,7 @@ func GetMessageAuthConfig(v interface{}) (MsgAuthConfig, error) {
 		return authorizationConfigs[TransactionBody], nil
 
 	// core messages for execution & verification
-	case *flow.ExecutionReceipt:
+	case *messages.ExecutionReceipt:
 		return authorizationConfigs[ExecutionReceipt], nil
 	case *flow.ResultApproval:
 		return authorizationConfigs[ResultApproval], nil
