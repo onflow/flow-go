@@ -78,21 +78,82 @@ func (g *BlockHeaderGenerator) Fixture(t testing.TB, opts ...func(*blockHeaderCo
 		opt(config)
 	}
 
-	if config.parent == nil {
-		parent, err := flow.NewHeader(flow.UntrustedHeader{
-			HeaderBody: flow.HeaderBody{
-				ChainID:  config.chainID,
-				Height:   config.height - 1,
-				View:     config.view - 1,
-				ParentID: g.identifierGen.Fixture(t),
-			},
-			PayloadHash: g.identifierGen.Fixture(t),
-		})
-		require.NoError(t, err)
-		config.parent = parent
+	if config.parent != nil {
+		// make sure the view and height are valid with respect to the parent
+		if config.height <= config.parent.Height {
+			if config.height != height {
+				// user provided height is invalid
+				t.Fatalf("height must be greater than parent height")
+			}
+			config.height = config.parent.Height + 1
+		}
+		if config.view <= config.parent.View {
+			if config.view != view {
+				// user provided view is invalid
+				t.Fatalf("view must be greater than parent view")
+			}
+			config.view = config.parent.View + 1
+		}
+		return g.fixtureWithParent(t, config)
 	}
 
+	if config.height == 0 && config.view == 0 {
+		// this is the genesis block
+		return g.Genesis(t, opts...)
+	}
+
+	if config.height == 0 || config.view == 0 {
+		t.Fatalf("height and view must either both be greater than 0 or both be 0 (genesis)")
+	}
+
+	// Use minimal fixed values for parent header to avoid disrupting deterministic generation
+	// while satisfying validation requirements
+	parent, err := flow.NewHeader(flow.UntrustedHeader{
+		HeaderBody: flow.HeaderBody{
+			ChainID:            config.chainID,
+			Height:             config.height - 1,
+			View:               config.view - 1,
+			ParentID:           g.identifierGen.Fixture(t),
+			ParentVoterIndices: g.signerIndicesGen.Fixture(t),
+			ParentVoterSigData: g.signatureGen.Fixture(t),
+			ProposerID:         g.identifierGen.Fixture(t),
+			Timestamp:          uint64(g.timeGen.Fixture(t).UnixMilli()),
+		},
+		PayloadHash: g.identifierGen.Fixture(t),
+	})
+	require.NoError(t, err)
+	config.parent = parent
+
 	return g.fixtureWithParent(t, config)
+}
+
+// Genesis generates a genesis block header.
+func (g *BlockHeaderGenerator) Genesis(t testing.TB, opts ...func(*blockHeaderConfig)) *flow.Header {
+	config := &blockHeaderConfig{
+		chainID: flow.Emulator,
+	}
+
+	for _, opt := range opts {
+		opt(config)
+	}
+
+	headerBody, err := flow.NewRootHeaderBody(
+		flow.UntrustedHeaderBody{
+			ChainID:   config.chainID,
+			ParentID:  flow.ZeroID,
+			Height:    0,
+			Timestamp: uint64(flow.GenesisTime.UnixMilli()),
+			View:      0,
+		},
+	)
+	require.NoError(t, err)
+
+	parent, err := flow.NewHeader(flow.UntrustedHeader{
+		HeaderBody: *headerBody,
+	})
+	require.NoError(t, err)
+
+	return parent
 }
 
 // fixtureWithParent generates a block header that is a child of the given parent header.

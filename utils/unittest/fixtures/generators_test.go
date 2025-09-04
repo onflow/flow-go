@@ -30,7 +30,7 @@ func TestGeneratorSuite(t *testing.T) {
 	// Test with parent
 	parent := suite.BlockHeaders().Fixture(t)
 	child := suite.BlockHeaders().Fixture(t, suite.BlockHeaders().WithParent(parent))
-	assert.Equal(t, parent.Height+1, child.Height)
+	assert.Less(t, parent.Height, child.Height)
 	assert.Equal(t, parent.ID(), child.ParentID)
 	assert.Equal(t, parent.ChainID, child.ChainID)
 
