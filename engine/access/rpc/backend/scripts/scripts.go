@@ -87,7 +87,7 @@ func (b *Scripts) ExecuteScriptAtLatestBlock(
 	arguments [][]byte,
 ) ([]byte, error) {
 	if !commonrpc.CheckScriptSize(script, arguments, b.maxScriptAndArgumentSize) {
-		return nil, status.Errorf(codes.InvalidArgument, commonrpc.ErrScriptTooLarge.Error())
+		return nil, status.Error(codes.InvalidArgument, commonrpc.ErrScriptTooLarge.Error())
 	}
 
 	latestHeader, err := b.state.Sealed().Head()
@@ -110,7 +110,7 @@ func (b *Scripts) ExecuteScriptAtBlockID(
 	arguments [][]byte,
 ) ([]byte, error) {
 	if !commonrpc.CheckScriptSize(script, arguments, b.maxScriptAndArgumentSize) {
-		return nil, status.Errorf(codes.InvalidArgument, commonrpc.ErrScriptTooLarge.Error())
+		return nil, status.Error(codes.InvalidArgument, commonrpc.ErrScriptTooLarge.Error())
 	}
 
 	header, err := b.headers.ByBlockID(blockID)
@@ -130,7 +130,7 @@ func (b *Scripts) ExecuteScriptAtBlockHeight(
 	arguments [][]byte,
 ) ([]byte, error) {
 	if !commonrpc.CheckScriptSize(script, arguments, b.maxScriptAndArgumentSize) {
-		return nil, status.Errorf(codes.InvalidArgument, commonrpc.ErrScriptTooLarge.Error())
+		return nil, status.Error(codes.InvalidArgument, commonrpc.ErrScriptTooLarge.Error())
 	}
 
 	header, err := b.headers.ByHeight(blockHeight)
