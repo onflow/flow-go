@@ -158,8 +158,7 @@ type BaseConfig struct {
 	pebbleDir                   string
 	pebbleCheckpointsDir        string
 	DBOps                       string
-	badgerDB                    *badger.DB
-	pebbleDB                    *pebble.DB
+	protocolDB                  storage.DB
 	secretsdir                  string
 	secretsDBEnabled            bool
 	InsecureSecretsDB           bool
@@ -265,7 +264,7 @@ type StateExcerptAtBoot struct {
 }
 
 func DefaultBaseConfig() *BaseConfig {
-	datadir := "/data/protocol"
+	datadir := "/data/protocol-pebble"
 	pebbleDir := "/data/protocol-pebble"
 
 	// NOTE: if the codec used in the network component is ever changed any code relying on
@@ -285,8 +284,7 @@ func DefaultBaseConfig() *BaseConfig {
 		datadir:          datadir,
 		pebbleDir:        pebbleDir,
 		DBOps:            string(dbops.PebbleBatch), // "pebble-batch" (default) or "badger-batch" (deprecated)
-		badgerDB:         nil,
-		pebbleDB:         nil,
+		protocolDB:       nil,
 		secretsdir:       NotSet,
 		secretsDBEnabled: true,
 		level:            "info",

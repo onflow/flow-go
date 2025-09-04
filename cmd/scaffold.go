@@ -1973,12 +1973,12 @@ func WithBindAddress(bindAddress string) Option {
 	}
 }
 
-// WithDataDir set the data directory for the badger database
-// It will be ignored if WithBadgerDB is used
-func WithDataDir(dataDir string) Option {
+// WithProtocolDir set the protocol data directory for the database
+// It will be ignored if WithProtocolDB is used
+func WithProtocolDir(dataDir string) Option {
 	return func(config *BaseConfig) {
-		if config.badgerDB != nil {
-			log.Warn().Msgf("ignoring data directory %s as badger database is already set", dataDir)
+		if config.protocolDB != nil {
+			log.Warn().Msgf("ignoring data directory %s as storage database is already set", dataDir)
 			return
 		}
 
@@ -1986,42 +1986,16 @@ func WithDataDir(dataDir string) Option {
 	}
 }
 
-// WithBadgerDB sets the badger database instance
+// WithProtocolDB sets the storage database instance
 // If used, then WithDataDir method will be ignored
-func WithBadgerDB(db *badger.DB) Option {
+func WithProtocolDB(db storage.DB) Option {
 	return func(config *BaseConfig) {
 		if config.datadir != "" && config.datadir != NotSet {
 			log.Warn().Msgf("ignoring data directory is already set for badger %v", config.datadir)
 			config.datadir = ""
 		}
 
-		config.badgerDB = db
-	}
-}
-
-// WithPebbleDir set the data directory for the pebble database
-// It will be ignored if WithPebbleDB is used
-func WithPebbleDir(dataDir string) Option {
-	return func(config *BaseConfig) {
-		if config.pebbleDB != nil {
-			log.Warn().Msgf("ignoring data directory %s as pebble database is already set", dataDir)
-			return
-		}
-
-		config.pebbleDir = dataDir
-	}
-}
-
-// WithPebbleDB sets the pebble database instance
-// If used, then WithPebbleDir method will be ignored
-func WithPebbleDB(db *pebble.DB) Option {
-	return func(config *BaseConfig) {
-		if config.pebbleDir != "" && config.pebbleDir != NotSet {
-			log.Warn().Msgf("ignoring data directory is already set for pebble %v", config.pebbleDir)
-			config.pebbleDir = ""
-		}
-
-		config.pebbleDB = db
+		config.protocolDB = db
 	}
 }
 
