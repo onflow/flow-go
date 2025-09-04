@@ -16,6 +16,15 @@ import (
 //   - Consecutive groups are adjoining groups that run-length is 1 and value is increased by 1.
 //   - When consecutive group flag is on, run-length is number of consecutive groups, and value is the value of the first group.
 
+// We encode stored key indexes using a new variant of RLE designed to efficiently store
+// long runs of unique integers that increment by 1.
+// For example, if an account has 1000 keys and the first 2 keys are the same, followed
+// by 998 unique keys (e.g., {key0, key0, key1, key2, ..., key998}).
+// Using regular RLE would bloat the storage size by storing 999 mapping groups with run length 1.
+// By comparison, our optimized encoding would only store 2 mapping groups.
+// We support a maximum run length of 32767 because we use the low 15 bits of uint16
+// to store the run length (the high bit is used as a flag).
+
 const (
 	maxRunLengthInMappingGroup = 1<<15 - 1
 
@@ -65,8 +74,8 @@ func appendStoredKeyIndexToMappings(b []byte, storedKeyIndex uint32) (_ []byte, 
 	lastGroupOff := len(b) - mappingGroupSize
 	lastGroup := parseMappingGroup(b, lastGroupOff)
 
-	if lastGroup.tryMerge(storedKeyIndex) {
-		b = append(b[:lastGroupOff], lastGroup.encode()...)
+	if lastGroup.TryMerge(storedKeyIndex) {
+		b = append(b[:lastGroupOff], lastGroup.Encode()...)
 		return b, nil
 	}
 
@@ -77,13 +86,21 @@ func appendStoredKeyIndexToMappings(b []byte, storedKeyIndex uint32) (_ []byte, 
 
 // Utils
 
-type mappingGroup struct {
+type MappingGroup struct {
 	runLength        uint16
 	storedKeyIndex   uint32
 	consecutiveGroup bool
 }
 
-func (g *mappingGroup) tryMerge(storedKeyIndex uint32) bool {
+func NewMappingGroup(runLength uint16, storedKeyIndex uint32, consecutive bool) *MappingGroup {
+	return &MappingGroup{
+		runLength:        runLength,
+		storedKeyIndex:   storedKeyIndex,
+		consecutiveGroup: consecutive,
+	}
+}
+
+func (g *MappingGroup) TryMerge(storedKeyIndex uint32) bool {
 	if g.runLength == maxRunLengthInMappingGroup {
 		// Can't be merged because run length limit is reached.
 		return false
@@ -115,8 +132,22 @@ func (g *mappingGroup) tryMerge(storedKeyIndex uint32) bool {
 	return false
 }
 
-func (g *mappingGroup) encode() []byte {
+func (g *MappingGroup) Encode() []byte {
 	return encodeKeyIndexToStoredKeyIndexMapping(g.consecutiveGroup, g.runLength, g.storedKeyIndex)
+}
+
+type MappingGroups []*MappingGroup
+
+func (groups MappingGroups) Encode() []byte {
+	if len(groups) == 0 {
+		return nil
+	}
+
+	buf := make([]byte, 0, len(groups)*(mappingGroupSize))
+	for _, group := range groups {
+		buf = append(buf, group.Encode()...)
+	}
+	return buf
 }
 
 func encodeKeyIndexToStoredKeyIndexMapping(isConsecutiveGroup bool, runLength uint16, storedKeyIndex uint32) []byte {
@@ -134,11 +165,11 @@ func encodeKeyIndexToStoredKeyIndexMapping(isConsecutiveGroup bool, runLength ui
 	return b[:]
 }
 
-func parseMappingGroup(b []byte, off int) *mappingGroup {
+func parseMappingGroup(b []byte, off int) *MappingGroup {
 	_ = b[off+mappingGroupSize-1] // bounds check
 	isConsecutiveGroup, runLength := parseMappingRunLength(b, off)
 	storedKeyIndex := binary.BigEndian.Uint32(b[off+runLengthSize:])
-	return &mappingGroup{
+	return &MappingGroup{
 		runLength:        runLength,
 		storedKeyIndex:   storedKeyIndex,
 		consecutiveGroup: isConsecutiveGroup,
