@@ -376,6 +376,7 @@ func (e *ENTransactionProvider) systemTransactionIDs(
 	}
 
 	// Get events from the process scheduled callback transaction to reconstruct the system collection
+	// the process callbacks transaction is always the first transaction in the system collection
 	processResult := systemTxResults[0]
 	events, err := convert.MessagesToEventsWithEncodingConversion(
 		processResult.GetEvents(),
