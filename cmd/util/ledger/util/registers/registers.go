@@ -7,6 +7,7 @@ import (
 	"github.com/onflow/atree"
 	"github.com/rs/zerolog"
 
+	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/convert"
@@ -295,12 +296,11 @@ func (a *AccountRegisters) ForEachKey(f func(key string) error) error {
 func (a *AccountRegisters) PayloadSize() int {
 	size := 0
 	for key, value := range a.registers {
-		ledgerKey := convert.RegisterIDToLedgerKey(flow.RegisterID{
+		registerKey := flow.RegisterID{
 			Owner: a.owner,
 			Key:   key,
-		})
-		payload := ledger.NewPayload(ledgerKey, value)
-		size += payload.Size()
+		}
+		size += environment.RegisterSize(registerKey, value)
 	}
 	return size
 }
