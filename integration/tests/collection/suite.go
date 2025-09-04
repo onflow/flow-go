@@ -251,7 +251,7 @@ func (suite *CollectorSuite) AwaitTransactionsIncluded(txIDs ...flow.Identifier)
 	}
 
 	waitFor := defaultTimeout + time.Duration(len(lookup))*200*time.Millisecond
-	deadline := time.Now().Add(waitFor * 3)
+	deadline := time.Now().Add(waitFor)
 	for time.Now().Before(deadline) {
 
 		originID, msg, err := suite.reader.Next()
@@ -303,11 +303,7 @@ func (suite *CollectorSuite) AwaitTransactionsIncluded(txIDs ...flow.Identifier)
 
 		case *flow.TransactionBody:
 			suite.T().Logf("got tx from %v: %v", originID, val.ID())
-
-		default:
-			suite.T().Logf("MSG TYPE FROM NEXT IS %v", val)
 		}
-
 	}
 
 	suite.T().Logf(
