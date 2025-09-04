@@ -2697,7 +2697,6 @@ func TestEpochTargetEndTime(t *testing.T) {
 
 		expectedStateIdCalculator := calculateExpectedStateId(t, mutableState)
 
-		usedViews := make(map[uint64]struct{})
 		// add a block that will trigger EFM and add an epoch extension since the view of the epoch exceeds the safety threshold
 		block1View := epoch1Setup.FinalView
 		block1 := unittest.BlockFixture(
@@ -2708,7 +2707,6 @@ func TestEpochTargetEndTime(t *testing.T) {
 					ProtocolStateID: expectedStateIdCalculator(head.ID(), block1View, nil),
 				}),
 		)
-		usedViews[block1View] = struct{}{}
 		unittest.InsertAndFinalize(t, state, block1)
 
 		block1snap := state.Final()
@@ -2735,7 +2733,6 @@ func TestEpochTargetEndTime(t *testing.T) {
 					ProtocolStateID: expectedStateIdCalculator(block1.ID(), block2View, nil),
 				}),
 		)
-		usedViews[block2View] = struct{}{}
 		unittest.InsertAndFinalize(t, state, block2)
 
 		block2snap := state.Final()
@@ -2770,8 +2767,6 @@ func TestEpochTargetDuration(t *testing.T) {
 
 		expectedStateIdCalculator := calculateExpectedStateId(t, mutableState)
 
-		usedViews := make(map[uint64]struct{})
-
 		// add a block that will trigger EFM and add an epoch extension since the view of the epoch exceeds the safety threshold
 		block1View := epoch1Setup.FinalView
 		block1 := unittest.BlockFixture(
@@ -2782,7 +2777,6 @@ func TestEpochTargetDuration(t *testing.T) {
 					ProtocolStateID: expectedStateIdCalculator(head.ID(), block1View, nil),
 				}),
 		)
-		usedViews[block1View] = struct{}{}
 		unittest.InsertAndFinalize(t, state, block1)
 
 		assertEpochFallbackTriggered(t, state.Final(), true)
@@ -2808,7 +2802,6 @@ func TestEpochTargetDuration(t *testing.T) {
 					ProtocolStateID: expectedStateIdCalculator(block1.ID(), block2View, nil),
 				}),
 		)
-		usedViews[block2View] = struct{}{}
 		unittest.InsertAndFinalize(t, state, block2)
 
 		epochState, err = state.Final().EpochProtocolState()
@@ -2976,18 +2969,16 @@ func TestHeaderExtendHeightTooSmall(t *testing.T) {
 		head, err := rootSnapshot.Head()
 		require.NoError(t, err)
 
-		usedViews := make(map[uint64]struct{})
-		block1 := unittest.BlockWithParentAndPayloadAndUniqueView(
+		block1 := unittest.BlockWithParentAndPayload(
 			head,
 			unittest.PayloadFixture(unittest.WithProtocolStateID(rootProtocolStateID)),
-			usedViews,
 		)
 
 		// create another block that points to the previous block `extend` as parent
 		// but has _same_ height as parent. This violates the condition that a child's
 		// height must increment the parent's height by one, i.e. it should be rejected
 		// by the follower right away
-		block2 := unittest.BlockWithParentAndUniqueView(block1.ToHeader(), usedViews)
+		block2 := unittest.BlockWithParentFixture(block1.ToHeader())
 		block2.Height = block1.Height
 
 		err = state.ExtendCertified(context.Background(), unittest.CertifiedByChild(block1, block2))
