@@ -313,26 +313,24 @@ func (e *ENTransactionProvider) systemTransactionResults(
 	requiredEventEncodingVersion entities.EventEncodingVersion,
 ) ([]*accessmodel.TransactionResult, error) {
 
-	// resp.TransactionResultsByBlockID includes the system tx results plus the user transactions
-	allTxCount := len(resp.TransactionResults)
-	systemTxCount := allTxCount - userTxCount
-	systemTxStartIndex := allTxCount - systemTxCount
-	// should never happen
-	if systemTxCount <= 0 {
+	// TransactionResults includes the system tx results plus the user transactions
+	if userTxCount >= len(resp.TransactionResults) {
 		return nil, status.Errorf(codes.Internal, "no system transaction results")
 	}
-
+	systemTxStartIndex := userTxCount
 	systemTxResults := resp.TransactionResults[systemTxStartIndex:]
+	systemTxCount := len(systemTxResults)
 	results := make([]*accessmodel.TransactionResult, 0, systemTxCount)
 
 	systemTxIDs, err := e.systemTransactionIDs(
 		systemTxResults,
 		resp.GetEventEncodingVersion(),
-		requiredEventEncodingVersion,
 	)
 	if err != nil {
 		return nil, rpc.ConvertError(err, "failed to determine system transaction IDs", codes.Internal)
 	}
+
+	events := make([]flow.Event, 0, systemTxCount)
 
 	for i, systemTxResult := range systemTxResults {
 		systemTxStatus, err := e.txStatusDeriver.DeriveTransactionStatus(block.Height, true)
@@ -343,10 +341,11 @@ func (e *ENTransactionProvider) systemTransactionResults(
 			return nil, rpc.ConvertStorageError(err)
 		}
 
-		events, err := convert.MessagesToEventsWithEncodingConversion(systemTxResult.GetEvents(), resp.GetEventEncodingVersion(), requiredEventEncodingVersion)
+		txEvents, err := convert.MessagesToEventsWithEncodingConversion(systemTxResult.GetEvents(), resp.GetEventEncodingVersion(), requiredEventEncodingVersion)
 		if err != nil {
 			return nil, rpc.ConvertError(err, "failed to convert events from system tx result", codes.Internal)
 		}
+		events = append(events, txEvents...)
 
 		results = append(results, &accessmodel.TransactionResult{
 			Status:        systemTxStatus,
@@ -366,7 +365,6 @@ func (e *ENTransactionProvider) systemTransactionResults(
 func (e *ENTransactionProvider) systemTransactionIDs(
 	systemTxResults []*execproto.GetTransactionResultResponse,
 	actualEventEncodingVersion entities.EventEncodingVersion,
-	requiredEventEncodingVersion entities.EventEncodingVersion,
 ) ([]flow.Identifier, error) {
 	var systemTxIDs []flow.Identifier
 	scheduledCallbacksEnabled := len(systemTxResults) > 1 // TODO: improve this assumption
@@ -376,12 +374,11 @@ func (e *ENTransactionProvider) systemTransactionIDs(
 	}
 
 	// Get events from the process scheduled callback transaction to reconstruct the system collection
-	// the process callbacks transaction is always the first transaction in the system collection
 	processResult := systemTxResults[0]
 	events, err := convert.MessagesToEventsWithEncodingConversion(
 		processResult.GetEvents(),
 		actualEventEncodingVersion,
-		requiredEventEncodingVersion,
+		entities.EventEncodingVersion_CCF_V0,
 	)
 	if err != nil {
 		return nil, rpc.ConvertError(err, "failed to convert events", codes.Internal)
@@ -397,7 +394,7 @@ func (e *ENTransactionProvider) systemTransactionIDs(
 	}
 
 	if len(systemTxIDs) != len(systemTxResults) {
-		return nil, status.Errorf(codes.Internal, "system transaction count mismatch: expected %d, got %d", len(systemTxResults), len(systemTxIDs))
+		return nil, status.Errorf(codes.Internal, "mismatch: expected %d, got %d", len(systemTxResults), len(systemTxIDs))
 	}
 
 	return systemTxIDs, nil
