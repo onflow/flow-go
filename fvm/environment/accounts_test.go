@@ -282,7 +282,7 @@ func TestAccounts_GetPublicKey(t *testing.T) {
 		address := flow.HexToAddress("01")
 		registerId := flow.NewRegisterID(
 			address,
-			"public_key_0")
+			"apk_0")
 
 		for _, value := range [][]byte{{}, nil} {
 			txnState := testutils.NewSimpleTransaction(

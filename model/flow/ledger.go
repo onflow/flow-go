@@ -21,7 +21,6 @@ const (
 	AccountStatusKey                 = AccountKeyPrefix + "s"
 	CodeKeyPrefix                    = "code."
 	ContractNamesKey                 = "contract_names"
-	PublicKeyKeyPrefix               = "public_key_" // TODO(faye): remove PublicKeyKeyPrefix
 	AccountPublicKey0RegisterKey     = "apk_0"
 	SequenceNumberRegisterKeyPattern = "sn_%d"
 	SequenceNumberRegisterKeyPrefix  = "sn_"
@@ -60,14 +59,6 @@ func AccountStatusRegisterID(address Address) RegisterID {
 	return RegisterID{
 		Owner: addressToOwner(address),
 		Key:   AccountStatusKey,
-	}
-}
-
-// TODO(faye): remove PublicKeyRegisterID
-func PublicKeyRegisterID(address Address, index uint32) RegisterID {
-	return RegisterID{
-		Owner: addressToOwner(address),
-		Key:   fmt.Sprintf("public_key_%d", index),
 	}
 }
 
