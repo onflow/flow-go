@@ -4,6 +4,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/jordanschalm/lockctx"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -98,18 +99,15 @@ func TestBlockViewIndexLookup(t *testing.T) {
 		expected := flow.Identifier{0x01, 0x02, 0x03}
 
 		lockManager := storage.NewTestingLockManager()
-		lctx := lockManager.NewContext()
-		err := lctx.AcquireLock(storage.LockInsertBlock)
-		require.NoError(t, err)
-		defer lctx.Release()
 
-		err = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			return operation.IndexCertifiedBlockByView(lctx, rw, view, expected)
+		unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
+			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+				return operation.IndexCertifiedBlockByView(lctx, rw, view, expected)
+			})
 		})
-		require.NoError(t, err)
 
 		var actual flow.Identifier
-		err = operation.LookupCertifiedBlockByView(db.Reader(), view, &actual)
+		err := operation.LookupCertifiedBlockByView(db.Reader(), view, &actual)
 		require.NoError(t, err)
 
 		assert.Equal(t, expected, actual)
