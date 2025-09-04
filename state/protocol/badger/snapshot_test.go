@@ -161,11 +161,13 @@ func TestSnapshot_Descendants(t *testing.T) {
 	require.NoError(t, err)
 	util.RunWithFullProtocolState(t, rootSnapshot, func(db *badger.DB, state *bprotocol.ParticipantState) {
 		var expectedBlocks []flow.Identifier
+		// In this test, we create two conflicting forks. To prevent accidentally creating byzantine scenarios, where
+		// multiple blocks have the same view, we keep track of used views and ensure that each new block has a unique view.
 		usedViews := make(map[uint64]struct{})
 		usedViews[head.View] = struct{}{}
-		for i := 5; i > 3; i-- {
+		for forkLength := range []int{5, 4} { // construct two forks with length 5 and 4, respectively
 			parent := head
-			for n := 0; n < i; n++ {
+			for n := 0; n < forkLength; n++ {
 				block := unittest.BlockWithParentAndPayloadAndUniqueView(
 					parent,
 					unittest.PayloadFixture(unittest.WithProtocolStateID(rootProtocolStateID)),
@@ -998,7 +1000,7 @@ func TestSealingSegment_FailureCases(t *testing.T) {
 	// SCENARIO 2a: A pending block is chosen as head; at this height no block has been finalized.
 	t.Run("sealing segment from unfinalized, pending block", func(t *testing.T) {
 		util.RunWithFollowerProtocolState(t, sporkRootSnapshot, func(db *badger.DB, state *bprotocol.FollowerState) {
-			// add _unfinalized_ blocks b1 and b2 to state (block b5 is necessary, so b1 has a QC, which is a consistency requirement for subsequent finality)
+			// add _unfinalized_ blocks b1 and b2 to state (block b2 is necessary, so b1 has a QC, which is a consistency requirement for subsequent finality)
 			b1 := unittest.BlockWithParentAndPayload(
 				sporkRoot,
 				unittest.PayloadFixture(unittest.WithProtocolStateID(rootProtocolStateID)),

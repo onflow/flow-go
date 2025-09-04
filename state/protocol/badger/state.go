@@ -719,6 +719,8 @@ func bootstrapSporkInfo(
 
 	err = blocks.BatchStore(lctx, rw, proposal)
 	if err != nil {
+		// the spork root block may or may not have already been persisted, depending
+		// on whether the root snapshot sealing segment contained it.
 		if errors.Is(err, storage.ErrAlreadyExists) {
 			return nil
 		}
