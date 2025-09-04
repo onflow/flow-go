@@ -734,8 +734,8 @@ func TestExtendReceiptsNotSorted(t *testing.T) {
 	rootProtocolStateID := getRootProtocolStateID(t, rootSnapshot)
 	head, err := rootSnapshot.Head()
 	require.NoError(t, err)
-	util.RunWithFullProtocolState(t, rootSnapshot, func(db *badger.DB, state *protocol.ParticipantState) {
 
+	util.RunWithFullProtocolState(t, rootSnapshot, func(db *badger.DB, state *protocol.ParticipantState) {
 		// create block2 and block3
 		block2 := unittest.BlockWithParentAndPayload(
 			head,
@@ -1341,7 +1341,6 @@ func TestExtendConflictingEpochEvents(t *testing.T) {
 					ProtocolStateID: expectedStateIdCalculator(block3.ID(), block5View, seals1),
 				}),
 		)
-		usedViews[block5View] = struct{}{}
 		err = state.Extend(context.Background(), unittest.ProposalFromBlock(block5))
 		require.NoError(t, err)
 
@@ -1356,7 +1355,6 @@ func TestExtendConflictingEpochEvents(t *testing.T) {
 					ProtocolStateID: expectedStateIdCalculator(block4.ID(), block6View, seals2),
 				}),
 		)
-		usedViews[block6View] = struct{}{}
 		err = state.Extend(context.Background(), unittest.ProposalFromBlock(block6))
 		require.NoError(t, err)
 
@@ -1479,9 +1477,6 @@ func TestExtendDuplicateEpochEvents(t *testing.T) {
 
 		// block 5 builds on block 3, contains seal for block 1
 		block5View := nextUnusedViewSince(block3.View, usedViews)
-		if block5View == block4.View {
-			block5View++
-		}
 		block5 := unittest.BlockFixture(
 			unittest.Block.WithParent(block3.ID(), block3.View, block3.Height),
 			unittest.Block.WithView(block5View),
@@ -1491,7 +1486,6 @@ func TestExtendDuplicateEpochEvents(t *testing.T) {
 					ProtocolStateID: expectedStateIdCalculator(block3.ID(), block5View, seals1),
 				}),
 		)
-		usedViews[block5View] = struct{}{}
 		err = state.Extend(context.Background(), unittest.ProposalFromBlock(block5))
 		require.NoError(t, err)
 
@@ -1506,7 +1500,6 @@ func TestExtendDuplicateEpochEvents(t *testing.T) {
 					ProtocolStateID: expectedStateIdCalculator(block4.ID(), block6View, seals2),
 				}),
 		)
-		usedViews[block6View] = struct{}{}
 		err = state.Extend(context.Background(), unittest.ProposalFromBlock(block6))
 		require.NoError(t, err)
 
@@ -2449,9 +2442,8 @@ func TestRecoveryFromEpochFallbackMode(t *testing.T) {
 			// Block B4 incorporates the Execution Result [ER] for block 2 and the EpochCommit service event. Block B5 seals the EpochCommit event.
 			// We expect that the Protocol state at B5 enters `epoch committed` phase.
 
-			usedViews := make(map[uint64]struct{})
 			// add a block for the first seal to reference
-			block1View := nextUnusedViewSince(head.View, usedViews)
+			block1View := head.View + 1
 			block1 := unittest.BlockFixture(
 				unittest.Block.WithParent(head.ID(), head.View, head.Height),
 				unittest.Block.WithView(block1View),
@@ -2460,7 +2452,6 @@ func TestRecoveryFromEpochFallbackMode(t *testing.T) {
 						ProtocolStateID: expectedStateIdCalculator(head.ID(), block1View, nil),
 					}),
 			)
-			usedViews[block1View] = struct{}{}
 			unittest.InsertAndFinalize(t, state, block1)
 
 			// add a participant for the next epoch
@@ -2555,7 +2546,6 @@ func TestRecoveryFromEpochFallbackMode(t *testing.T) {
 					}),
 			)
 
-			usedViews[block8View] = struct{}{}
 			metricsMock.On("CurrentEpochCounter", epoch2Setup.Counter).Once()
 			metricsMock.On("EpochTransitionHeight", block8.Height).Once()
 			metricsMock.On("CurrentEpochFinalView", epoch2Setup.FinalView).Once()
@@ -2581,7 +2571,6 @@ func TestRecoveryFromEpochFallbackMode(t *testing.T) {
 						ProtocolStateID: expectedStateIdCalculator(block8.ID(), block9View, nil),
 					}),
 			)
-			usedViews[block9View] = struct{}{}
 			err = state.Extend(context.Background(), unittest.ProposalFromBlock(block9))
 			require.NoError(t, err)
 
@@ -2672,7 +2661,6 @@ func TestRecoveryFromEpochFallbackMode(t *testing.T) {
 						ProtocolStateID: expectedStateIdCalculator(block13.ID(), block14View, nil),
 					}),
 			)
-			usedViews[block14View] = struct{}{}
 
 			metricsMock.On("CurrentEpochCounter", epochRecover.EpochSetup.Counter).Once()
 			metricsMock.On("EpochTransitionHeight", block14.Height).Once()
@@ -3654,11 +3642,15 @@ func calculateExpectedStateId(t *testing.T, mutableProtocolState realprotocol.Mu
 	}
 }
 
-// nextUnusedViewSince is a utility function to get the next unused view number since the given `view`
+// nextUnusedViewSince is a utility function which:
+//   - returns the smallest view number which is greater than the given `view`
+//     and NOT contained in the `forbiddenViews` set.
+//   - the next unused view number is added to `forbiddenViews` to prevent it from being used again.
 func nextUnusedViewSince(view uint64, forbiddenViews map[uint64]struct{}) uint64 {
 	next := view + 1
 	for {
 		if _, exists := forbiddenViews[next]; !exists {
+			forbiddenViews[next] = struct{}{}
 			return next
 		}
 		next++
