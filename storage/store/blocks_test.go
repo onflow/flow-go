@@ -3,6 +3,7 @@ package store_test
 import (
 	"testing"
 
+	"github.com/jordanschalm/lockctx"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/module/metrics"
@@ -63,26 +64,18 @@ func TestBlockIndexByHeightAndRetrieve(t *testing.T) {
 		prop := unittest.ProposalFromBlock(block)
 
 		// First store the block
-		lctx := lockManager.NewContext()
-		err := lctx.AcquireLock(storage.LockInsertBlock)
-		require.NoError(t, err)
-
-		err = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			return blocks.BatchStore(lctx, rw, prop)
+		unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
+			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+				return blocks.BatchStore(lctx, rw, prop)
+			})
 		})
-		require.NoError(t, err)
-		lctx.Release()
 
 		// Now index the block by height (requires LockFinalizeBlock)
-		lctx2 := lockManager.NewContext()
-		err = lctx2.AcquireLock(storage.LockFinalizeBlock)
-		require.NoError(t, err)
-
-		err = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			return operation.IndexFinalizedBlockByHeight(lctx2, rw, block.Height, block.ID())
+		unittest.WithLock(t, lockManager, storage.LockFinalizeBlock, func(lctx2 lockctx.Context) error {
+			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+				return operation.IndexFinalizedBlockByHeight(lctx2, rw, block.Height, block.ID())
+			})
 		})
-		require.NoError(t, err)
-		lctx2.Release()
 
 		// Verify we can retrieve the block by height
 		retrievedByHeight, err := blocks.ByHeight(block.Height)
