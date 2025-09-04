@@ -152,7 +152,7 @@ func TestGetEvents(t *testing.T) {
 				"true",
 			),
 			expectedStatus:   http.StatusBadRequest,
-			expectedResponse: `{"code":400,"message":"invalid event type format"}`,
+			expectedResponse: `{"code":400,"message":"event type must be provided"}`,
 		},
 		{
 			description: "Get invalid - missing end height",
