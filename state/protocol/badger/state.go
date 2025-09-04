@@ -148,8 +148,8 @@ func Bootstrap(
 		return nil, fmt.Errorf("could not get sealed result for sealing segment: %w", err)
 	}
 
-	// sealing segment is in ascending height order, so the tail is the
-	// oldest ancestor and head is the newest child in the segment
+	// sealing segment lists blocks in order of ascending height, so the tail
+	// is the oldest ancestor and head is the newest child in the segment
 	// TAIL <- ... <- HEAD
 	// Per definition, the highest block in sealing segment is the last finalized block
 	// and the lowest block in sealing segment is the last sealed block.
@@ -327,7 +327,7 @@ func bootstrapSealingSegment(
 	// and index them by height, while all the other indices are omitted, as they would potentially reference non-existent data.
 	//
 	// We PERSIST these blocks ONE-BY-ONE in order of increasing height,
-	// emulating the process during normal operations, the the following reason:
+	// emulating the process during normal operations, the following reason:
 	// * Execution Receipts are incorporated into blocks for bookkeeping when and which execution results the ENs published.
 	// * Typically, most ENs commit to the same results. Therefore, Results in blocks are stored separately from the Receipts
 	//   in blocks and deduplicated along the fork -- specifically, we only store the result along a fork in the first block
@@ -341,18 +341,6 @@ func bootstrapSealingSegment(
 	//   would not be persisted in the database yet when attempting to persist their descendants. In other words, the check in
 	//   [Blocks.BatchStore] can't distinguish between a receipt referencing a missing result vs a receipt referencing a result
 	//   that is contained in a previous block being stored as part of the same batch.
-	// why not storing all blocks in the same batch?
-	// because we need to ensure a block does not include a result that refers a unknown block.
-	// when validating the results, we could check if the referred block exists in the database,
-	// however if we are storing multiple blocks in the same batch, the previous block from the same
-	// batch has not been stored in database yet, so the check can't distinguish between a block that
-	// refers to a previous block in the same batch and a block that refers to a block that does not
-	// exist in the database. Unless we pass down the previous blocks to the validation function as well
-	// as the database operation functions, such as blocks.BatchStore method, which we consider a bad
-	// practice, since having the database operation function taking previous blocks (or previous results)
-	// as an argument is confusing and vulnerable to bugs.
-	// since storing multiple blocks in the same batch only happens during bootstrapping, we decided to
-	// store each block in a separate batch.
 	for _, proposal := range segment.ExtraBlocks {
 		err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 			blockID := proposal.Block.ID()

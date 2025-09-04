@@ -923,13 +923,13 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 		require.NoError(t, err)
 
 		metrics.On("CurrentEpochCounter", counter).Once()
-		metrics.On("CurrentEpochPhase", initialPhase)  // .Once() I have to comment out this because it's called more than once
-		metrics.On("CurrentEpochFinalView", finalView) // .Once() I have to comment out this because it's called more than once
+		metrics.On("CurrentEpochPhase", initialPhase).Once()
+		metrics.On("CurrentEpochFinalView", finalView).Once()
 
 		metrics.On("CurrentDKGPhaseViews",
 			initialCurrentEpoch.DKGPhase1FinalView(),
 			initialCurrentEpoch.DKGPhase2FinalView(),
-			initialCurrentEpoch.DKGPhase3FinalView()) // .Once() I have to comment out this because it's called more than once
+			initialCurrentEpoch.DKGPhase3FinalView()).Once()
 
 		tracer := trace.NewNoopTracer()
 		log := zerolog.Nop()
@@ -1200,8 +1200,9 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 		consumer.On("EpochTransition", epoch2Setup.Counter, block8.ToHeader()).Once()
 		metrics.On("EpochTransitionHeight", block8.Height).Once()
 		metrics.On("CurrentEpochCounter", epoch2Setup.Counter).Once()
-		// Note: CurrentEpochPhase and CurrentDKGPhaseViews are called during bootstrap, not during epoch transition
+		metrics.On("CurrentEpochPhase", flow.EpochPhaseStaking).Once()
 		metrics.On("CurrentEpochFinalView", epoch2Setup.FinalView).Once()
+		metrics.On("CurrentDKGPhaseViews", epoch2Setup.DKGPhase1FinalView, epoch2Setup.DKGPhase2FinalView, epoch2Setup.DKGPhase3FinalView).Once()
 
 		// before block 9 is finalized, the epoch 1-2 boundary is unknown
 		_, err = block8epoch.FinalHeight()
