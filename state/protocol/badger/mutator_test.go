@@ -3055,24 +3055,23 @@ func TestExtendBlockProcessable(t *testing.T) {
 // first block is added and then finalized;
 // second block is a sibling to the finalized block
 // The Follower should accept this block since tracking of orphan blocks is implemented by another component.
-func TestFollowerHeaderExtendBlockNotConnected(t *testing.T) {
+func TestFollowerHeaderExtendBlockNotConnectedTestFollowerHeaderExtendBlockNotConnected(t *testing.T) {
 	rootSnapshot := unittest.RootSnapshotFixture(participants)
 	rootProtocolStateID := getRootProtocolStateID(t, rootSnapshot)
 	util.RunWithFollowerProtocolState(t, rootSnapshot, func(db *badger.DB, state *protocol.FollowerState) {
 		head, err := rootSnapshot.Head()
 		require.NoError(t, err)
 
+		// In this test, we create two conflicting forks. To prevent accidentally creating byzantine scenarios, where
+		// multiple blocks have the same view, we keep track of used views and ensure that each new block has a unique view.
 		usedViews := make(map[uint64]struct{})
 		usedViews[head.View] = struct{}{}
 
-		// In this test, we create two conflicting forks. To prevent accidentally creating byzantine scenarios, where
-		// multiple blocks have the same view, we keep track of used views and ensure that each new block has a unique view.
 		block1 := unittest.BlockWithParentAndPayloadAndUniqueView(
 			head,
 			unittest.PayloadFixture(unittest.WithProtocolStateID(rootProtocolStateID)),
 			usedViews,
 		)
-
 		err = state.ExtendCertified(context.Background(), unittest.NewCertifiedBlock(block1))
 		require.NoError(t, err)
 
@@ -3088,9 +3087,8 @@ func TestFollowerHeaderExtendBlockNotConnected(t *testing.T) {
 		err = state.ExtendCertified(context.Background(), unittest.NewCertifiedBlock(block2))
 		require.NoError(t, err)
 
-		storagedb := badgerimpl.ToDB(db)
-
 		// verify seal not indexed
+		storagedb := badgerimpl.ToDB(db)
 		var sealID flow.Identifier
 		err = operation.LookupLatestSealAtBlock(storagedb.Reader(), block2.ID(), &sealID)
 		require.NoError(t, err)
