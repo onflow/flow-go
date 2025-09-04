@@ -65,7 +65,7 @@ type Transactions struct {
 	txProvider      provider.TransactionProvider
 	txStatusDeriver *txstatus.TxStatusDeriver
 
-	scheduleCallbacksEnabled bool
+	scheduledCallbacksEnabled bool
 }
 
 var _ access.TransactionsAPI = (*Transactions)(nil)
@@ -93,7 +93,7 @@ type Params struct {
 	TxStatusDeriver             *txstatus.TxStatusDeriver
 	EventsIndex                 *index.EventsIndex
 	TxResultsIndex              *index.TransactionResultsIndex
-	ScheduleCallbacksEnabled    bool
+	ScheduledCallbacksEnabled   bool
 }
 
 func NewTransactionsBackend(params Params) (*Transactions, error) {
@@ -115,7 +115,7 @@ func NewTransactionsBackend(params Params) (*Transactions, error) {
 		txValidator:                 params.TxValidator,
 		txProvider:                  params.TxProvider,
 		txStatusDeriver:             params.TxStatusDeriver,
-		scheduleCallbacksEnabled:    params.ScheduleCallbacksEnabled,
+		scheduledCallbacksEnabled:   params.ScheduledCallbacksEnabled,
 	}
 
 	if params.EnableRetries {
@@ -308,7 +308,7 @@ func (t *Transactions) GetTransactionsByBlockID(
 		return nil, rpc.ConvertStorageError(err)
 	}
 
-	if !t.scheduleCallbacksEnabled {
+	if !t.scheduledCallbacksEnabled {
 		systemTx, err := blueprints.SystemChunkTransaction(t.chainID.Chain())
 		if err != nil {
 			return nil, fmt.Errorf("failed to construct system chunk transaction: %w", err)
@@ -536,7 +536,19 @@ func (t *Transactions) GetSystemTransaction(_ context.Context, txID flow.Identif
 		return nil, rpc.ConvertStorageError(err)
 	}
 
-	sysCollection, err := blueprints.SystemCollectionWithCallbacks(t.chainID.Chain(), events, t.scheduleCallbacksEnabled)
+	if !t.scheduledCallbacksEnabled {
+		systemTx, err := blueprints.SystemChunkTransaction(t.chainID.Chain())
+		if err != nil {
+			return nil, status.Errorf(codes.Internal, "failed to construct system chunk transaction: %v", err)
+		}
+
+		if txID == systemTx.ID() {
+			return systemTx, nil
+		}
+		return nil, fmt.Errorf("transaction %s not found in block %s", txID, blockID)
+	}
+
+	sysCollection, err := blueprints.SystemCollection(t.chainID.Chain(), events)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "could not construct system collection: %v", err)
 	}
