@@ -23,7 +23,6 @@ import (
 	txstatus "github.com/onflow/flow-go/engine/access/rpc/backend/transactions/status"
 	"github.com/onflow/flow-go/engine/access/rpc/connection"
 	"github.com/onflow/flow-go/engine/common/rpc"
-	commonrpc "github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/fvm/blueprints"
 	accessmodel "github.com/onflow/flow-go/model/access"
@@ -65,6 +64,8 @@ type Transactions struct {
 	txValidator     *validator.TransactionValidator
 	txProvider      provider.TransactionProvider
 	txStatusDeriver *txstatus.TxStatusDeriver
+
+	scheduleCallbacksEnabled bool
 }
 
 var _ access.TransactionsAPI = (*Transactions)(nil)
@@ -80,7 +81,7 @@ type Params struct {
 	NodeCommunicator            node_communicator.Communicator
 	ConnFactory                 connection.ConnectionFactory
 	EnableRetries               bool
-	NodeProvider                *commonrpc.ExecutionNodeIdentitiesProvider
+	NodeProvider                *rpc.ExecutionNodeIdentitiesProvider
 	Blocks                      storage.Blocks
 	Collections                 storage.Collections
 	Transactions                storage.Transactions
@@ -92,6 +93,7 @@ type Params struct {
 	TxStatusDeriver             *txstatus.TxStatusDeriver
 	EventsIndex                 *index.EventsIndex
 	TxResultsIndex              *index.TransactionResultsIndex
+	ScheduleCallbacksEnabled    bool
 }
 
 func NewTransactionsBackend(params Params) (*Transactions, error) {
@@ -113,6 +115,7 @@ func NewTransactionsBackend(params Params) (*Transactions, error) {
 		txValidator:                 params.TxValidator,
 		txProvider:                  params.TxProvider,
 		txStatusDeriver:             params.TxStatusDeriver,
+		scheduleCallbacksEnabled:    params.ScheduleCallbacksEnabled,
 	}
 
 	if params.EnableRetries {
@@ -305,14 +308,21 @@ func (t *Transactions) GetTransactionsByBlockID(
 		return nil, rpc.ConvertStorageError(err)
 	}
 
+	if !t.scheduleCallbacksEnabled {
+		systemTx, err := blueprints.SystemChunkTransaction(t.chainID.Chain())
+		if err != nil {
+			return nil, fmt.Errorf("failed to construct system chunk transaction: %w", err)
+		}
+
+		return append(transactions, systemTx), nil
+	}
+
 	sysCollection, err := blueprints.SystemCollection(t.chainID.Chain(), events)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "could not construct system collection: %v", err)
 	}
 
-	transactions = append(transactions, sysCollection.Transactions...)
-
-	return transactions, nil
+	return append(transactions, sysCollection.Transactions...), nil
 }
 
 func (t *Transactions) GetTransactionResult(
@@ -526,7 +536,7 @@ func (t *Transactions) GetSystemTransaction(_ context.Context, txID flow.Identif
 		return nil, rpc.ConvertStorageError(err)
 	}
 
-	sysCollection, err := blueprints.SystemCollection(t.chainID.Chain(), events)
+	sysCollection, err := blueprints.SystemCollectionWithCallbacks(t.chainID.Chain(), events, t.scheduleCallbacksEnabled)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "could not construct system collection: %v", err)
 	}
