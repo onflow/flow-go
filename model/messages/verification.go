@@ -1,6 +1,10 @@
 package messages
 
-import "github.com/onflow/flow-go/model/flow"
+import (
+	"fmt"
+
+	"github.com/onflow/flow-go/model/flow"
+)
 
 // ApprovalRequest represents a request for a ResultApproval corresponding to
 // a specific chunk.
@@ -36,4 +40,17 @@ type ApprovalResponse struct {
 func (a *ApprovalResponse) ToInternal() (any, error) {
 	// TODO(malleability, #7718) implement with validation checks
 	return a, nil
+}
+
+// ResultApproval is a message representation of a ResultApproval, which includes an approval for a chunk, verified by a verification n
+type ResultApproval flow.UntrustedResultApproval
+
+// ToInternal converts the untrusted ResultApproval into its trusted internal
+// representation.
+func (a *ResultApproval) ToInternal() (any, error) {
+	internal, err := flow.NewResultApproval(flow.UntrustedResultApproval(*a))
+	if err != nil {
+		return nil, fmt.Errorf("could not construct result approval: %w", err)
+	}
+	return internal, nil
 }

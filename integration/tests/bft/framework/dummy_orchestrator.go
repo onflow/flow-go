@@ -66,8 +66,18 @@ func (o *orchestrator) trackEgressEvents(event *insecure.EgressEvent) error {
 		o.egressEventTracker[typeChunkDataRequest] = append(o.egressEventTracker[typeChunkDataRequest], e.ChunkID)
 	case *messages.ChunkDataResponse:
 		o.egressEventTracker[typeChunkDataResponse] = append(o.egressEventTracker[typeChunkDataResponse], e.ChunkDataPack.ChunkID)
-	case *flow.ResultApproval:
-		o.egressEventTracker[typeResultApproval] = append(o.egressEventTracker[typeResultApproval], e.ID())
+	case *messages.ResultApproval:
+		internalResultApproval, err := e.ToInternal()
+		if err != nil {
+			return err
+		}
+
+		resultApproval, ok := internalResultApproval.(flow.ResultApproval)
+		if !ok {
+			return fmt.Errorf("expected flow.ResultApproval, got %T", internalResultApproval)
+		}
+
+		o.egressEventTracker[typeResultApproval] = append(o.egressEventTracker[typeResultApproval], resultApproval.ID())
 	}
 	return nil
 }
