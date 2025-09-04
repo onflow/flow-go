@@ -494,9 +494,7 @@ func (s *Suite) TestExecutionReceiptsAreIndexed() {
 func (s *Suite) TestOnCollectionDuplicate() {
 	irrecoverableCtx := irrecoverable.NewMockSignalerContext(s.T(), s.ctx)
 	s.initEngineAndSyncer(irrecoverableCtx)
-
 	collection := unittest.CollectionFixture(5)
-	light := collection.Light()
 
 	// we should store the collection and index its transactions
 	s.collections.On("StoreAndIndexByTransaction", mock.Anything, &collection).Return(nil, storerr.ErrAlreadyExists).Once()
