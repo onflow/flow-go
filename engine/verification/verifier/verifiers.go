@@ -42,11 +42,7 @@ func VerifyLastKHeight(
 	transactionFeesDisabled bool,
 	scheduledCallbacksEnabled bool,
 ) (err error) {
-<<<<<<< HEAD
-	closer, storages, chunkDataPacks, state, verifier, err := initStorages(lockManager, chainID, protocolDataDir, chunkDataPackDir, transactionFeesDisabled)
-=======
-	closer, storages, chunkDataPacks, state, verifier, err := initStorages(chainID, protocolDataDir, chunkDataPackDir, transactionFeesDisabled, scheduledCallbacksEnabled)
->>>>>>> master
+	closer, storages, chunkDataPacks, state, verifier, err := initStorages(lockManager, chainID, protocolDataDir, chunkDataPackDir, transactionFeesDisabled, scheduledCallbacksEnabled)
 	if err != nil {
 		return fmt.Errorf("could not init storages: %w", err)
 	}
@@ -102,11 +98,7 @@ func VerifyRange(
 	transactionFeesDisabled bool,
 	scheduledCallbacksEnabled bool,
 ) (err error) {
-<<<<<<< HEAD
-	closer, storages, chunkDataPacks, state, verifier, err := initStorages(lockManager, chainID, protocolDataDir, chunkDataPackDir, transactionFeesDisabled)
-=======
-	closer, storages, chunkDataPacks, state, verifier, err := initStorages(chainID, protocolDataDir, chunkDataPackDir, transactionFeesDisabled, scheduledCallbacksEnabled)
->>>>>>> master
+	closer, storages, chunkDataPacks, state, verifier, err := initStorages(lockManager, chainID, protocolDataDir, chunkDataPackDir, transactionFeesDisabled, scheduledCallbacksEnabled)
 	if err != nil {
 		return fmt.Errorf("could not init storages: %w", err)
 	}
