@@ -1489,12 +1489,6 @@ func TestExtendDuplicateEpochEvents(t *testing.T) {
 
 		// block 6 builds on block 4, contains seal for block 2
 		block6View := nextUnusedViewSince(block4.View, usedViews)
-		for {
-			if _, ok := usedViews[block6View]; !ok {
-				break
-			}
-			block6View++
-		}
 		block6 := unittest.BlockFixture(
 			unittest.Block.WithParent(block4.ID(), block4.View, block4.Height),
 			unittest.Block.WithView(block6View),
