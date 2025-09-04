@@ -3081,11 +3081,15 @@ func TestFollowerHeaderExtendBlockNotConnected(t *testing.T) {
 		head, err := rootSnapshot.Head()
 		require.NoError(t, err)
 
+		usedViews := make(map[uint64]struct{})
+		usedViews[head.View] = struct{}{}
+
 		// In this test, we create two conflicting forks. To prevent accidentally creating byzantine scenarios, where
 		// multiple blocks have the same view, we keep track of used views and ensure that each new block has a unique view.
-		block1 := unittest.BlockWithParentAndPayload(
+		block1 := unittest.BlockWithParentAndPayloadAndUniqueView(
 			head,
 			unittest.PayloadFixture(unittest.WithProtocolStateID(rootProtocolStateID)),
+			usedViews,
 		)
 
 		err = state.ExtendCertified(context.Background(), unittest.NewCertifiedBlock(block1))
@@ -3095,9 +3099,10 @@ func TestFollowerHeaderExtendBlockNotConnected(t *testing.T) {
 		require.NoError(t, err)
 
 		// create a fork at view/height 1 and try to connect it to root
-		block2 := unittest.BlockWithParentAndPayload(
+		block2 := unittest.BlockWithParentAndPayloadAndUniqueView(
 			head,
 			unittest.PayloadFixture(unittest.WithProtocolStateID(rootProtocolStateID)),
+			usedViews,
 		)
 		err = state.ExtendCertified(context.Background(), unittest.NewCertifiedBlock(block2))
 		require.NoError(t, err)
