@@ -3,10 +3,12 @@ package environment
 import (
 	"encoding/binary"
 	"encoding/hex"
+	goerrors "errors"
 	"fmt"
 
 	"github.com/onflow/atree"
 
+	accountkeymetadata "github.com/onflow/flow-go/fvm/environment/account-key-metadata"
 	"github.com/onflow/flow-go/fvm/errors"
 )
 
@@ -48,7 +50,17 @@ const (
 	accountPublicKeyCountsStartIndex = storageIndexStartIndex + storageIndexSize
 	addressIdCounterStartIndex       = accountPublicKeyCountsStartIndex + accountPublicKeyCountsSize
 
+	versionMask           = 0xf0
+	flagMask              = 0x0f
+	deduplicationFlagMask = 0x01
+
 	accountStatusV4DefaultVersionAndFlag = 0x40
+
+	AccountStatusMinSizeV4 = accountStatusSizeV3
+)
+
+const (
+	maxStoredDigests = 2 // Account status register stores up to 2 digests from last 2 stored keys.
 )
 
 // AccountStatus holds meta information about an account
@@ -63,7 +75,7 @@ type accountStatusV3 [accountStatusSizeV3]byte
 
 type AccountStatus struct {
 	accountStatusV3
-	optionalFields []byte
+	keyMetadataBytes []byte
 }
 
 // NewAccountStatus returns a new AccountStatus
@@ -87,10 +99,10 @@ func NewAccountStatus() *AccountStatus {
 // we decided to move on to use a struct to represent
 // account status.
 func (a *AccountStatus) ToBytes() []byte {
-	if len(a.optionalFields) == 0 {
+	if len(a.keyMetadataBytes) == 0 {
 		return a.accountStatusV3[:]
 	}
-	return append(a.accountStatusV3[:], a.optionalFields...)
+	return append(a.accountStatusV3[:], a.keyMetadataBytes...)
 }
 
 // AccountStatusFromBytes constructs an AccountStatus from the given byte slice
@@ -100,9 +112,10 @@ func AccountStatusFromBytes(inp []byte) (*AccountStatus, error) {
 		return nil, err
 	}
 
+	// NOTE: both accountStatusV3 and keyMetadataBytes are copies.
 	return &AccountStatus{
-		accountStatusV3: asv3,
-		optionalFields:  append([]byte(nil), rest...),
+		accountStatusV3:  asv3,
+		keyMetadataBytes: append([]byte(nil), rest...),
 	}, nil
 }
 
@@ -199,6 +212,18 @@ func accountStatusV3FromBytes(inp []byte) (accountStatusV3, []byte, error) {
 	return as, rest, nil
 }
 
+func (a *accountStatusV3) Version() uint8 {
+	return (a[0] & versionMask) >> 4
+}
+
+func (a *accountStatusV3) IsAccountKeyDeduplicated() bool {
+	return (a[0] & deduplicationFlagMask) != 0
+}
+
+func (a *accountStatusV3) setAccountKeyDeduplicationFlag() {
+	a[0] |= deduplicationFlagMask
+}
+
 // SetStorageUsed updates the storage used by the account
 func (a *accountStatusV3) SetStorageUsed(used uint64) {
 	binary.BigEndian.PutUint64(a[storageUsedStartIndex:storageUsedStartIndex+storageUsedSize], used)
@@ -239,4 +264,160 @@ func (a *accountStatusV3) SetAccountIdCounter(id uint64) {
 // AccountIdCounter returns id counter of the account
 func (a *accountStatusV3) AccountIdCounter() uint64 {
 	return binary.BigEndian.Uint64(a[addressIdCounterStartIndex : addressIdCounterStartIndex+addressIdCounterSize])
+}
+
+// AccountPublicKeyRevokedStatus returns revoked status of account public key at the given key index stored in key metadata.
+// NOTE: To avoid checking keyIndex range repeatedly at different levels, caller must ensure keyIndex > 0 and < AccountPublicKeyCount().
+func (a *AccountStatus) AccountPublicKeyRevokedStatus(keyIndex uint32) (bool, error) {
+	return accountkeymetadata.GetRevokedStatus(a.keyMetadataBytes, keyIndex)
+}
+
+// AccountPublicKeyMetadata returns weight, revoked status, and stored key index of account public key at the given key index stored in key metadata.
+// NOTE: To avoid checking keyIndex range repeatedly at different levels, caller must ensure keyIndex > 0 and < AccountPublicKeyCount().
+func (a *AccountStatus) AccountPublicKeyMetadata(keyIndex uint32) (
+	weight uint16,
+	revoked bool,
+	storedKeyIndex uint32,
+	err error,
+) {
+	return accountkeymetadata.GetKeyMetadata(a.keyMetadataBytes, keyIndex, a.IsAccountKeyDeduplicated())
+}
+
+// RevokeAccountPublicKey revokes account public key at the given key index stored in key metadata.
+// NOTE: To avoid checking keyIndex range repeatedly at different levels, caller must ensure keyIndex > 0 and < AccountPublicKeyCount().
+func (a *AccountStatus) RevokeAccountPublicKey(keyIndex uint32) error {
+	var err error
+	a.keyMetadataBytes, err = accountkeymetadata.SetRevokedStatus(a.keyMetadataBytes, keyIndex)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// AppendAccountPublicKeyMetadata appends and deduplicates account public key metadata.
+// NOTE: If AppendAccountPublicKeyMetadata returns true for saveKey, caller is responsible for
+// saving the key corresponding to the given key metadata to storage.
+func (a *AccountStatus) AppendAccountPublicKeyMetadata(
+	revoked bool,
+	weight uint16,
+	encodedKey []byte,
+	getKeyDigest func([]byte) uint64,
+	getStoredKey func(uint32) ([]byte, error),
+) (storedKeyIndex uint32, saveKey bool, err error) {
+
+	accountPublicKeyCount := a.AccountPublicKeyCount()
+	keyIndex := accountPublicKeyCount
+
+	if keyIndex == 0 {
+		// First account public key's metadata is not saved in order to
+		// reduce storage overhead because most accounts only have one key.
+
+		// Increment public key count.
+		a.SetAccountPublicKeyCount(accountPublicKeyCount + 1)
+		return 0, true, nil
+	}
+
+	var keyMetadata *accountkeymetadata.KeyMetadataAppender
+
+	if len(a.keyMetadataBytes) == 0 {
+		// NOTE: new key index must be 1 when key metadata is empty.
+
+		if keyIndex != 1 {
+			return 0, false, accountkeymetadata.NewKeyMetadataMalfromedError(fmt.Sprintf("public key metadata cannot be empty at index %d", keyIndex))
+		}
+
+		// To avoid storage overhead for most accounts, account key 0 digest is computed and stored when account key 1 is added.
+		// So if new key index is 1, we need to compute and append key 0 digest to keyMetadata before appending key 1 metadata.
+
+		// Get public key 0.
+		var key0 []byte
+		key0, err = getStoredKey(0)
+		if err != nil {
+			return 0, false, err
+		}
+
+		// Get public key 0 digest.
+		key0Digest := getKeyDigest(key0)
+
+		// Create empty KeyMetadataAppender with key 0 digest.
+		keyMetadata = accountkeymetadata.NewKeyMetadataAppender(key0Digest, maxStoredDigests)
+	} else {
+		// Create KeyMetadataAppender with stored key metadata bytes.
+		keyMetadata, err = accountkeymetadata.NewKeyMetadataAppenderFromBytes(a.keyMetadataBytes, a.IsAccountKeyDeduplicated(), maxStoredDigests)
+		if err != nil {
+			return 0, false, err
+		}
+	}
+
+	defer func() {
+		if err == nil {
+			// Serialize key metadata and set account duplication flag if needed.
+			var deduplicated bool
+			a.keyMetadataBytes, deduplicated = keyMetadata.ToBytes()
+			if deduplicated {
+				a.setAccountKeyDeduplicationFlag()
+			}
+
+			a.SetAccountPublicKeyCount(accountPublicKeyCount + 1)
+		}
+	}()
+
+	digest, isDuplicateKey, duplicateStoredKeyIndex, err := isKeyDuplicate(keyMetadata, encodedKey, getKeyDigest, getStoredKey)
+	if err != nil {
+		return 0, false, err
+	}
+
+	// Handle duplicate key.
+	if isDuplicateKey {
+		err = keyMetadata.AppendDuplicateKeyMetadata(keyIndex, duplicateStoredKeyIndex, revoked, weight)
+		if err != nil {
+			return 0, false, err
+		}
+
+		return duplicateStoredKeyIndex, false, nil
+	}
+
+	// Handle non-duplicate key.
+	storedKeyIndex, err = keyMetadata.AppendUniqueKeyMetadata(revoked, weight, digest)
+	if err != nil {
+		return 0, false, err
+	}
+
+	return storedKeyIndex, true, nil
+}
+
+func isKeyDuplicate(
+	keyMetadata *accountkeymetadata.KeyMetadataAppender,
+	encodedKey []byte,
+	getKeyDigest func([]byte) uint64,
+	getStoredKey func(uint32) ([]byte, error),
+) (
+	digest uint64,
+	isDuplicateKey bool,
+	duplicateStoredKeyIndex uint32,
+	err error,
+) {
+	// To balance tradeoffs, it is OK to have detection rate less than 100%, for the
+	// same reasons compression programs/libraries don't use max compression by default.
+
+	// We use a fast non-cryptographic hash algorithm for efficiency, so
+	// we need to handle hash collisions (same digest from different hash inputs).
+	// When a hash collision is detected, sentinel digest (0) is stored in place
+	// of new key digest, and subsequent digest comparison excludes stored sentinel digest.
+	// This means keys with the sentinel digest will not be deduplicated and that is OK.
+
+	digest = getKeyDigest(encodedKey)
+
+	isDuplicateKey, duplicateStoredKeyIndex, err = accountkeymetadata.FindDuplicateKey(keyMetadata, encodedKey, digest, getStoredKey)
+	if err != nil {
+		var collisionErr *accountkeymetadata.CollisionError
+		if goerrors.As(err, &collisionErr) {
+			// Return sentinel digest on collision.
+			return accountkeymetadata.SentinelFastDigest64, false, 0, nil
+		}
+		return 0, false, 0, err
+	}
+
+	return digest, isDuplicateKey, duplicateStoredKeyIndex, nil
 }

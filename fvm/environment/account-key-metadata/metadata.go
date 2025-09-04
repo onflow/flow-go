@@ -339,31 +339,3 @@ func (m *KeyMetadataAppender) FindDuplicateDigest(digest uint64) (found bool, du
 
 	return false, 0
 }
-
-func FindDuplicateKey(
-	keyMetadata *KeyMetadataAppender,
-	encodedKey []byte,
-	digest uint64,
-	getStoredKey func(uint32) ([]byte, error),
-) (found bool, duplicateStoredKeyIndex uint32, _ error) {
-	// Find duplicate digest
-	found, duplicateStoredKeyIndex = keyMetadata.FindDuplicateDigest(digest)
-
-	if !found {
-		return false, 0, nil
-	}
-
-	// Get encoded key with duplicate digest
-	encodedKeyWithDuplicateDigest, err := getStoredKey(duplicateStoredKeyIndex)
-	if err != nil {
-		return false, 0, err
-	}
-
-	// Confirm keys are duplicate
-	if bytes.Equal(encodedKeyWithDuplicateDigest, encodedKey) {
-		return true, duplicateStoredKeyIndex, nil
-	}
-
-	// Found a collision
-	return false, 0, NewCollisionError(encodedKeyWithDuplicateDigest, encodedKey, digest)
-}

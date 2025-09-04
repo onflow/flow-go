@@ -4,6 +4,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"math"
+	"slices"
 
 	"github.com/fxamacker/circlehash"
 
@@ -313,7 +314,7 @@ func getRawStoredPublicKey(
 
 		if i == keyIndexInBatch {
 			encodedPublicKey := b[off : off+size]
-			return encodedPublicKey, nil
+			return slices.Clone(encodedPublicKey), nil
 		}
 
 		off += size
