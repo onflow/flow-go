@@ -57,6 +57,10 @@ func InternalToMessage(event interface{}) (UntrustedMessage, error) {
 		}, nil
 	case *flow.RangeRequest:
 		return (*RangeRequest)(internal), nil
+	case *flow.EntityRequest:
+		return (*EntityRequest)(internal), nil
+	case *flow.EntityResponse:
+		return (*EntityResponse)(internal), nil
 	case UntrustedMessage:
 		// Already a valid UntrustedMessage
 		// TODO(immutable M2): expand when ToInternal changes for other M2 types
