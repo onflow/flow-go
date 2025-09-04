@@ -116,21 +116,17 @@ func TestBlockIndexByViewAndRetrieve(t *testing.T) {
 		block := unittest.FullBlockFixture()
 		prop := unittest.ProposalFromBlock(block)
 
-		// First store the block
-		lctx := lockManager.NewContext()
-		err := lctx.AcquireLock(storage.LockInsertBlock)
-		require.NoError(t, err)
-
-		err = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			err := blocks.BatchStore(lctx, rw, prop)
-			if err != nil {
-				return err
-			}
-			// Now index the block by view (requires LockInsertBlock)
-			return operation.IndexCertifiedBlockByView(lctx, rw, block.View, block.ID())
+		// First store the block and index by view
+		unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
+			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+				err := blocks.BatchStore(lctx, rw, prop)
+				if err != nil {
+					return err
+				}
+				// Now index the block by view (requires LockInsertBlock)
+				return operation.IndexCertifiedBlockByView(lctx, rw, block.View, block.ID())
+			})
 		})
-		require.NoError(t, err)
-		lctx.Release()
 
 		// Verify we can retrieve the block by view
 		retrievedByView, err := blocks.ByView(block.View)
@@ -143,15 +139,13 @@ func TestBlockIndexByViewAndRetrieve(t *testing.T) {
 		require.Equal(t, *prop, *retrievedProposalByView)
 
 		// Test that indexing the same view again returns ErrAlreadyExists
-		lctx2 := lockManager.NewContext()
-		err = lctx2.AcquireLock(storage.LockInsertBlock)
-		require.NoError(t, err)
-
-		err = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			return operation.IndexCertifiedBlockByView(lctx2, rw, block.View, block.ID())
+		unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
+			err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+				return operation.IndexCertifiedBlockByView(lctx, rw, block.View, block.ID())
+			})
+			require.ErrorIs(t, err, storage.ErrAlreadyExists)
+			return nil
 		})
-		require.ErrorIs(t, err, storage.ErrAlreadyExists)
-		lctx2.Release()
 
 		// Test that retrieving by non-existent view returns ErrNotFound
 		_, err = blocks.ByView(block.View + 1000)
