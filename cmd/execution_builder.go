@@ -1408,7 +1408,7 @@ func (exeNode *ExecutionNode) LoadBootstrapper(node *NodeConfig) error {
 			return fmt.Errorf("could not load bootstrap state from checkpoint file: %w", err)
 		}
 
-		err = bootstrapper.BootstrapExecutionDatabase(node.StorageLockMgr, pebbleimpl.ToDB(node.PebbleDB), node.RootSeal)
+		err = bootstrapper.BootstrapExecutionDatabase(node.StorageLockMgr, node.ProtocolDB, node.RootSeal)
 		if err != nil {
 			return fmt.Errorf("could not bootstrap execution database: %w", err)
 		}
