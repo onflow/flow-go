@@ -88,8 +88,7 @@ func run(*cobra.Command, []string) {
 		if err != nil {
 			lg.Fatal().Err(err).Msgf("could not verify range from %d to %d", from, to)
 		}
-		lg.Info().Msgf("successfully verified range from %d to %d", from, to)
-
+		lg.Info().Msgf("finished verified range from %d to %d", from, to)
 	} else {
 		lg.Info().Msgf("verifying last %d sealed blocks", flagLastK)
 		err := verifier.VerifyLastKHeight(flagLastK, chainID, flagDatadir, flagChunkDataPackDir, flagWorkerCount, flagStopOnMismatch, flagtransactionFeesDisabled)
@@ -97,7 +96,12 @@ func run(*cobra.Command, []string) {
 			lg.Fatal().Err(err).Msg("could not verify last k height")
 		}
 
-		lg.Info().Msgf("successfully verified last %d sealed blocks", flagLastK)
+		lg.Info().Msgf("finished verified last %d sealed blocks", flagLastK)
+	}
+
+	if !flagStopOnMismatch {
+		lg.Info().Msgf("note flag --stop_on_mismatch is false, so mismatches (if any) are logged but do not stop the verification")
+		lg.Info().Msgf("look for 'could not verify' in the log for any mismatch, or try again with --stop_on_mismatch true to stop on first mismatch")
 	}
 }
 
