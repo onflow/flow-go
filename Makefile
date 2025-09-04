@@ -248,7 +248,7 @@ tools/custom-gcl: tools/structwrite .custom-gcl.yml
 	golangci-lint custom
 
 .PHONY: lint
-lint: tools/custom-gcl
+lint: tidy tools/custom-gcl
 	# revive -config revive.toml -exclude storage/ledger/trie ./...
 	./tools/custom-gcl run -v $(or $(LINT_PATH),./...)
 
