@@ -201,7 +201,7 @@ func (h *handler) ExecuteScriptAtBlockID(
 	arguments := req.GetArguments()
 
 	if !rpc.CheckScriptSize(script, arguments, h.maxScriptSize) {
-		return nil, status.Errorf(codes.InvalidArgument, rpc.ErrScriptTooLarge.Error())
+		return nil, status.Error(codes.InvalidArgument, rpc.ErrScriptTooLarge.Error())
 	}
 
 	blockID, err := convert.BlockID(req.GetBlockId())
