@@ -232,7 +232,7 @@ func New(params Params) (*Backend, error) {
 		params.ExecNodeIdentitiesProvider,
 		txStatusDeriver,
 		systemTxID,
-		systemTx,
+		params.ChainID,
 	)
 	failoverTxProvider := provider.NewFailoverTransactionProvider(localTxProvider, execNodeTxProvider)
 
