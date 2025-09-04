@@ -1028,16 +1028,18 @@ func TestSealingSegment_FailureCases(t *testing.T) {
 		usedViews[sporkRoot.View] = struct{}{}
 
 		util.RunWithFollowerProtocolState(t, sporkRootSnapshot, func(db *badger.DB, state *bprotocol.FollowerState) {
-			orphaned := unittest.BlockWithParentAndPayload(
+			orphaned := unittest.BlockWithParentAndPayloadAndUniqueView(
 				sporkRoot,
 				unittest.PayloadFixture(unittest.WithProtocolStateID(rootProtocolStateID)),
+				usedViews,
 			)
-			orphanedChild := unittest.BlockWithParentProtocolState(orphaned)
+			orphanedChild := unittest.BlockWithParentProtocolStateAndUniqueView(orphaned, usedViews)
 			require.NoError(t, state.ExtendCertified(context.Background(), unittest.CertifiedByChild(orphaned, orphanedChild)))
 			require.NoError(t, state.ExtendCertified(context.Background(), unittest.NewCertifiedBlock(orphanedChild)))
-			block := unittest.BlockWithParentAndPayload(
+			block := unittest.BlockWithParentAndPayloadAndUniqueView(
 				sporkRoot,
 				unittest.PayloadFixture(unittest.WithProtocolStateID(rootProtocolStateID)),
+				usedViews,
 			)
 			buildFinalizedBlock(t, state, block)
 
