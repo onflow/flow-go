@@ -185,6 +185,7 @@ type AccessNodeConfig struct {
 	storeTxResultErrorMessages           bool
 	stopControlEnabled                   bool
 	registerDBPruneThreshold             uint64
+	scheduleCallbacksEnabled             bool
 }
 
 type PublicNetworkConfig struct {
@@ -294,6 +295,7 @@ func DefaultAccessNodeConfig() *AccessNodeConfig {
 		storeTxResultErrorMessages:           false,
 		stopControlEnabled:                   false,
 		registerDBPruneThreshold:             0,
+		scheduleCallbacksEnabled:             false,
 	}
 }
 
@@ -1292,6 +1294,10 @@ func (builder *FlowAccessNodeBuilder) extraFlags() {
 			"stop-control-enabled",
 			defaultConfig.stopControlEnabled,
 			"whether to enable the stop control feature. Default value is false")
+		flags.BoolVar(&builder.scheduleCallbacksEnabled,
+			"scheduled-callbacks-enabled",
+			defaultConfig.scheduleCallbacksEnabled,
+			"whether to include scheduled callback transactions in system collections. Default value is false")
 		// ExecutionDataRequester config
 		flags.BoolVar(&builder.executionDataSyncEnabled,
 			"execution-data-sync-enabled",
@@ -2064,6 +2070,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				VersionControl:             notNil(builder.VersionControl),
 				ExecNodeIdentitiesProvider: notNil(builder.ExecNodeIdentitiesProvider),
 				TxErrorMessageProvider:     notNil(builder.txResultErrorMessageProvider),
+				ScheduleCallbacksEnabled:   builder.scheduleCallbacksEnabled,
 			})
 			if err != nil {
 				return nil, fmt.Errorf("could not initialize backend: %w", err)
