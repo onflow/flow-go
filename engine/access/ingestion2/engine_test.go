@@ -424,7 +424,7 @@ func (s *Suite) TestOnCollection() {
 	collection := unittest.CollectionFixture(5)
 	light := collection.Light()
 
-	// we should store the light collection and index its transactions
+	// we should store the collection and index its transactions
 	s.collections.On("StoreAndIndexByTransaction", mock.Anything, &collection).Return(light, nil).Once()
 
 	// Create a lock context for indexing
@@ -447,7 +447,7 @@ func (s *Suite) TestExecutionReceiptsAreIndexed() {
 	collection := unittest.CollectionFixture(5)
 	light := collection.Light()
 
-	// we should store the light collection and index its transactions
+	// we should store the collection and index its transactions
 	s.collections.On("StoreAndIndexByTransaction", &collection).Return(light, nil).Once()
 	block := unittest.BlockFixture(
 		unittest.Block.WithHeight(0),
@@ -498,8 +498,8 @@ func (s *Suite) TestOnCollectionDuplicate() {
 	collection := unittest.CollectionFixture(5)
 	light := collection.Light()
 
-	// we should store the light collection and index its transactions
-	s.collections.On("StoreAndIndexByTransaction", mock.Anything, &collection).Return(light, storerr.ErrAlreadyExists).Once()
+	// we should store the collection and index its transactions
+	s.collections.On("StoreAndIndexByTransaction", mock.Anything, &collection).Return(nil, storerr.ErrAlreadyExists).Once()
 
 	// Create a lock context for indexing
 	lctx := s.lockManager.NewContext()
