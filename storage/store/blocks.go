@@ -78,7 +78,10 @@ func (b *Blocks) retrieve(blockID flow.Identifier) (*flow.Block, error) {
 	return block, nil
 }
 
-// retrieveProposal returns the proposal with the given hash.
+// retrieveProposal returns the proposal with the given block ID.
+// It is available for finalized and pending blocks.
+// Expected errors during normal operations:
+// - storage.ErrNotFound if no block is found
 func (b *Blocks) retrieveProposal(blockID flow.Identifier) (*flow.Proposal, error) {
 	block, err := b.retrieve(blockID)
 	if err != nil {
@@ -109,17 +112,25 @@ func (b *Blocks) retrieveProposal(blockID flow.Identifier) (*flow.Proposal, erro
 	return proposal, nil
 }
 
-// ByID returns the block with the given hash. It is available for
-// finalized and pending blocks.
-// Expected errors during normal operations:
-// - storage.ErrNotFound if no block is found
+// ByID returns the block with the given hash. It is available for all incorporated blocks (validated blocks
+// that have been appended to any of the known forks) no matter whether the block has been finalized or not.
+//
+// Error returns:
+//   - storage.ErrNotFound if no block with the corresponding ID was found
+//   - generic error in case of unexpected failure from the database layer, or failure
+//     to decode an existing database value
 func (b *Blocks) ByID(blockID flow.Identifier) (*flow.Block, error) {
 	return b.retrieve(blockID)
 }
 
-// ProposalByID returns the proposal with the given hash.
-// Expected errors during normal operations:
-// - storage.ErrNotFound if no block is found
+// ProposalByID returns the block with the given ID, along with the proposer's signature on it.
+// It is available for all incorporated blocks (validated blocks that have been appended to any
+// of the known forks) no matter whether the block has been finalized or not.
+//
+// Error returns:
+//   - storage.ErrNotFound if no block with the corresponding ID was found
+//   - generic error in case of unexpected failure from the database layer, or failure
+//     to decode an existing database value
 func (b *Blocks) ProposalByID(blockID flow.Identifier) (*flow.Proposal, error) {
 	return b.retrieveProposal(blockID)
 }
@@ -141,8 +152,10 @@ func (b *Blocks) ByView(view uint64) (*flow.Block, error) {
 // ByHeight returns the block at the given height. It is only available
 // for finalized blocks.
 //
-// Expected errors during normal operations:
-// - storage.ErrNotFound if no block is found for the given height
+// Error returns:
+//   - storage.ErrNotFound if no block for the corresponding height was found
+//   - generic error in case of unexpected failure from the database layer, or failure
+//     to decode an existing database value
 func (b *Blocks) ByHeight(height uint64) (*flow.Block, error) {
 	blockID, err := b.headers.retrieveIdByHeightTx(height)
 	if err != nil {
@@ -151,10 +164,13 @@ func (b *Blocks) ByHeight(height uint64) (*flow.Block, error) {
 	return b.retrieve(blockID)
 }
 
-// ProposalByHeight returns the proposal at the given height. It is only available
-// for finalized blocks.
-// Expected errors during normal operations:
-// - storage.ErrNotFound if no block is found for the given height
+// ProposalByHeight returns the block at the given height, along with the proposer's
+// signature on it. It is only available for finalized blocks.
+//
+// Error returns:
+//   - storage.ErrNotFound if no block proposal for the corresponding height was found
+//   - generic error in case of unexpected failure from the database layer, or failure
+//     to decode an existing database value
 func (b *Blocks) ProposalByHeight(height uint64) (*flow.Proposal, error) {
 	blockID, err := b.headers.retrieveIdByHeightTx(height)
 	if err != nil {
@@ -163,10 +179,17 @@ func (b *Blocks) ProposalByHeight(height uint64) (*flow.Proposal, error) {
 	return b.retrieveProposal(blockID)
 }
 
-// ByCollectionID returns the *finalized** block that contains the collection with the given ID.
+// ByCollectionID returns the block for the given collection ID.
+// This method is only available for collections included in finalized blocks.
+// While consensus nodes verify that collections are not repeated within the same fork,
+// each different fork can contain a recent collection once. Therefore, we must wait for
+// finality.
+// CAUTION: this method is not backed by a cache and therefore comparatively slow!
 //
-// Expected errors during normal operations:
-// - storage.ErrNotFound if finalized block is known that contains the collection
+// Error returns:
+//   - storage.ErrNotFound if the collection ID was not found
+//   - generic error in case of unexpected failure from the database layer, or failure
+//     to decode an existing database value
 func (b *Blocks) ByCollectionID(collID flow.Identifier) (*flow.Block, error) {
 	guarantee, err := b.payloads.guarantees.ByCollectionID(collID)
 	if err != nil {
@@ -188,7 +211,8 @@ func (b *Blocks) ByCollectionID(collID flow.Identifier) (*flow.Block, error) {
 // Hence, this function should be treated as a temporary solution, which requires generalization
 // (one-to-many mapping) for soft finality and the mature protocol.
 //
-// No errors expected during normal operation.
+// Error returns:
+//   - generic error in case of unexpected failure from the database layer or encoding failure.
 func (b *Blocks) IndexBlockForCollectionGuarantees(blockID flow.Identifier, guaranteeIDs []flow.Identifier) error {
 	return b.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 		for _, guaranteeID := range guaranteeIDs {
