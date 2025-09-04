@@ -261,7 +261,7 @@ type StateExcerptAtBoot struct {
 }
 
 func DefaultBaseConfig() *BaseConfig {
-	datadir := "/data/protocol-pebble"
+	datadir := "/data/protocol"
 	pebbleDir := "/data/protocol-pebble"
 
 	// NOTE: if the codec used in the network component is ever changed any code relying on
