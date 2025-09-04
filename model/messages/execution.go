@@ -1,6 +1,8 @@
 package messages
 
 import (
+	"fmt"
+
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -38,4 +40,19 @@ type ChunkDataResponse struct {
 func (c *ChunkDataResponse) ToInternal() (any, error) {
 	// TODO(malleability, #7716) implement with validation checks
 	return c, nil
+}
+
+// ExecutionReceipt is the full execution receipt, as sent by the Execution Node.
+// Specifically, it contains the detailed execution result.
+type ExecutionReceipt flow.UntrustedExecutionReceipt
+
+// ToInternal returns the internal type representation for ExecutionReceipt.
+//
+// All errors indicate that the decode target contains a structurally invalid representation of the internal flow.ExecutionReceipt.
+func (er *ExecutionReceipt) ToInternal() (any, error) {
+	internal, err := flow.NewExecutionReceipt(flow.UntrustedExecutionReceipt(*er))
+	if err != nil {
+		return nil, fmt.Errorf("could not convert %T to internal type: %w", er, err)
+	}
+	return internal, nil
 }
