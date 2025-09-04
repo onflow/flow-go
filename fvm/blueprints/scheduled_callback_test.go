@@ -270,13 +270,13 @@ func TestSystemCollection(t *testing.T) {
 	chain := flow.Mainnet.Chain()
 
 	tests := []struct {
-		name                    string
-		events                  []flow.Event
-		expectedTxCount         int
-		expectProcessTx         bool
-		expectSystemChunkTx     bool
-		expectError             bool
-		errorMessage            string
+		name                string
+		events              []flow.Event
+		expectedTxCount     int
+		expectProcessTx     bool
+		expectSystemChunkTx bool
+		expectError         bool
+		errorMessage        string
 	}{
 		{
 			name:                "no events",
