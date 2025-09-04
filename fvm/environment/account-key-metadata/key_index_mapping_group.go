@@ -1,0 +1,154 @@
+package accountkeymetadata
+
+import (
+	"encoding/binary"
+	"fmt"
+)
+
+// Account Public Key Index to Stored Public Key Index Mappings
+
+// Key index mapping is encoded using RLE:
+// - run length (2 bytes): consecutive group flag in high 1 bit and run length in 15 bits
+// - value (4 bytes): stored key index
+// NOTE:
+//   - If number of elements in a run-length group exceeds maxRunLengthInMappingGroup,
+//     a new group is created with remaining run-length and the same storedKeyIndex.
+//   - Consecutive groups are adjoining groups that run-length is 1 and value is increased by 1.
+//   - When consecutive group flag is on, run-length is number of consecutive groups, and value is the value of the first group.
+
+const (
+	maxRunLengthInMappingGroup = 1<<15 - 1
+
+	storedKeyIndexSize = 4
+	mappingGroupSize   = runLengthSize + storedKeyIndexSize
+
+	consecutiveGroupFlagMask = 0x8000
+	lengthMask               = 0x7fff
+)
+
+// getStoredKeyIndexFromMappings returns stored key index of the given key index from encoded data.
+// Received b is expected to only contain encoded mappings.
+func getStoredKeyIndexFromMappings(b []byte, keyIndex uint32) (uint32, error) {
+	if len(b)%mappingGroupSize != 0 {
+		return 0, NewKeyMetadataMalfromedError(fmt.Sprintf("failed to get stored key index: existing metadata is %d bytes, expect multiples of %d", len(b), mappingGroupSize))
+	}
+
+	for off := 0; off < len(b); off += mappingGroupSize {
+		isConsecutiveGroup, runLength := parseMappingRunLength(b, off)
+
+		if keyIndex < uint32(runLength) {
+			storedKeyIndex := binary.BigEndian.Uint32(b[off+runLengthSize : off+mappingGroupSize])
+
+			if isConsecutiveGroup {
+				return storedKeyIndex + keyIndex, nil
+			}
+
+			return storedKeyIndex, nil
+		}
+
+		keyIndex -= uint32(runLength)
+	}
+
+	return 0, NewKeyMetadataNotFoundError("failed to query stored key index", keyIndex)
+}
+
+func appendStoredKeyIndexToMappings(b []byte, storedKeyIndex uint32) (_ []byte, _ error) {
+	if len(b) == 0 {
+		return encodeKeyIndexToStoredKeyIndexMapping(false, 1, storedKeyIndex), nil
+	}
+
+	if len(b)%mappingGroupSize != 0 {
+		return nil, NewKeyMetadataMalfromedError(fmt.Sprintf("failed to append stored key mapping: existing metadata is %d bytes, expect multiples of %d", len(b), mappingGroupSize))
+	}
+
+	// Merge to last group
+	lastGroupOff := len(b) - mappingGroupSize
+	lastGroup := parseMappingGroup(b, lastGroupOff)
+
+	if lastGroup.tryMerge(storedKeyIndex) {
+		b = append(b[:lastGroupOff], lastGroup.encode()...)
+		return b, nil
+	}
+
+	// Append new group
+	b = append(b, encodeKeyIndexToStoredKeyIndexMapping(false, 1, storedKeyIndex)...)
+	return b, nil
+}
+
+// Utils
+
+type mappingGroup struct {
+	runLength        uint16
+	storedKeyIndex   uint32
+	consecutiveGroup bool
+}
+
+func (g *mappingGroup) tryMerge(storedKeyIndex uint32) bool {
+	if g.runLength == maxRunLengthInMappingGroup {
+		// Can't be merged because run length limit is reached.
+		return false
+	}
+
+	if g.consecutiveGroup {
+		if g.storedKeyIndex+uint32(g.runLength) == storedKeyIndex {
+			// Merge into consecutive group
+			g.runLength++
+			return true
+		}
+		// Can't be merged because new stored key index isn't consecutive.
+		return false
+	}
+
+	if g.storedKeyIndex == storedKeyIndex {
+		// Merge into regular group
+		g.runLength++
+		return true
+	}
+
+	if g.runLength == 1 && g.storedKeyIndex+1 == storedKeyIndex {
+		// Make last group a consecutive group and merge into it
+		g.consecutiveGroup = true
+		g.runLength++
+		return true
+	}
+
+	return false
+}
+
+func (g *mappingGroup) encode() []byte {
+	return encodeKeyIndexToStoredKeyIndexMapping(g.consecutiveGroup, g.runLength, g.storedKeyIndex)
+}
+
+func encodeKeyIndexToStoredKeyIndexMapping(isConsecutiveGroup bool, runLength uint16, storedKeyIndex uint32) []byte {
+	var b [mappingGroupSize]byte
+
+	if isConsecutiveGroup {
+		runLength |= consecutiveGroupFlagMask
+	}
+	// Set runlength
+	binary.BigEndian.PutUint16(b[:], runLength)
+
+	// Set value
+	binary.BigEndian.PutUint32(b[runLengthSize:], storedKeyIndex)
+
+	return b[:]
+}
+
+func parseMappingGroup(b []byte, off int) *mappingGroup {
+	_ = b[off+mappingGroupSize-1] // bounds check
+	isConsecutiveGroup, runLength := parseMappingRunLength(b, off)
+	storedKeyIndex := binary.BigEndian.Uint32(b[off+runLengthSize:])
+	return &mappingGroup{
+		runLength:        runLength,
+		storedKeyIndex:   storedKeyIndex,
+		consecutiveGroup: isConsecutiveGroup,
+	}
+}
+
+func parseMappingRunLength(b []byte, off int) (isConsecutiveGroup bool, runLength uint16) {
+	_ = b[off+1] // bounds check
+	runLength = binary.BigEndian.Uint16(b[off : off+runLengthSize])
+	isConsecutiveGroup = runLength&consecutiveGroupFlagMask > 0
+	runLength &= lengthMask
+	return
+}
