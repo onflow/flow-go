@@ -974,7 +974,9 @@ func (a *StatefulAccounts) accountPublicKeyIndexInRange(
 ) error {
 	publicKeyCount, err := a.GetAccountPublicKeyCount(address)
 	if err != nil {
-		return err
+		return errors.NewAccountPublicKeyNotFoundError(
+			address,
+			keyIndex)
 	}
 
 	if keyIndex >= publicKeyCount {
