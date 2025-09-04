@@ -16,7 +16,6 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-
 // HttpHandler is custom http handler implementing custom handler function.
 // HttpHandler function allows easier handling of errors and responses as it
 // wraps functionality for handling error and responses outside of endpoint handling.
