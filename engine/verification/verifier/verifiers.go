@@ -38,8 +38,9 @@ func VerifyLastKHeight(
 	nWorker uint,
 	stopOnMismatch bool,
 	transactionFeesDisabled bool,
+	scheduledCallbacksEnabled bool,
 ) (err error) {
-	closer, storages, chunkDataPacks, state, verifier, err := initStorages(chainID, protocolDataDir, chunkDataPackDir, transactionFeesDisabled)
+	closer, storages, chunkDataPacks, state, verifier, err := initStorages(chainID, protocolDataDir, chunkDataPackDir, transactionFeesDisabled, scheduledCallbacksEnabled)
 	if err != nil {
 		return fmt.Errorf("could not init storages: %w", err)
 	}
@@ -92,8 +93,9 @@ func VerifyRange(
 	nWorker uint,
 	stopOnMismatch bool,
 	transactionFeesDisabled bool,
+	scheduledCallbacksEnabled bool,
 ) (err error) {
-	closer, storages, chunkDataPacks, state, verifier, err := initStorages(chainID, protocolDataDir, chunkDataPackDir, transactionFeesDisabled)
+	closer, storages, chunkDataPacks, state, verifier, err := initStorages(chainID, protocolDataDir, chunkDataPackDir, transactionFeesDisabled, scheduledCallbacksEnabled)
 	if err != nil {
 		return fmt.Errorf("could not init storages: %w", err)
 	}
@@ -221,6 +223,7 @@ func initStorages(
 	dataDir string,
 	chunkDataPackDir string,
 	transactionFeesDisabled bool,
+	scheduledCallbacksEnabled bool,
 ) (
 	func() error,
 	*storage.All,
@@ -246,7 +249,7 @@ func initStorages(
 	chunkDataPacks := store.NewChunkDataPacks(metrics.NewNoopCollector(),
 		pebbleimpl.ToDB(chunkDataPackDB), storages.Collections, 1000)
 
-	verifier := makeVerifier(log.Logger, chainID, storages.Headers, transactionFeesDisabled)
+	verifier := makeVerifier(log.Logger, chainID, storages.Headers, transactionFeesDisabled, scheduledCallbacksEnabled)
 	closer := func() error {
 		var dbErr, chunkDataPackDBErr error
 
@@ -319,6 +322,7 @@ func makeVerifier(
 	chainID flow.ChainID,
 	headers storage.Headers,
 	transactionFeesDisabled bool,
+	scheduledCallbacksEnabled bool,
 ) module.ChunkVerifier {
 
 	vm := fvm.NewVirtualMachine()
@@ -338,7 +342,7 @@ func makeVerifier(
 		computation.DefaultFVMOptions(
 			chainID,
 			false,
-			true,
+			scheduledCallbacksEnabled,
 		)...,
 	)
 	vmCtx := fvm.NewContext(fvmOptions...)

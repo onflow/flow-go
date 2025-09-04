@@ -55,8 +55,8 @@ type VerificationConfig struct {
 	blockWorkers uint64 // number of blocks processed in parallel.
 	chunkWorkers uint64 // number of chunks processed in parallel.
 
-	stopAtHeight             uint64 // height to stop the node on
-	scheduleCallbacksEnabled bool   // enable execution of scheduled callbacks
+	stopAtHeight              uint64 // height to stop the node on
+	scheduledCallbacksEnabled bool   // enable execution of scheduled callbacks
 }
 
 type VerificationNodeBuilder struct {
@@ -84,7 +84,7 @@ func (v *VerificationNodeBuilder) LoadFlags() {
 			flags.Uint64Var(&v.verConf.blockWorkers, "block-workers", blockconsumer.DefaultBlockWorkers, "maximum number of blocks being processed in parallel")
 			flags.Uint64Var(&v.verConf.chunkWorkers, "chunk-workers", chunkconsumer.DefaultChunkWorkers, "maximum number of execution nodes a chunk data pack request is dispatched to")
 			flags.Uint64Var(&v.verConf.stopAtHeight, "stop-at-height", 0, "height to stop the node at (0 to disable)")
-			flags.BoolVar(&v.verConf.scheduleCallbacksEnabled, "scheduled-callbacks-enabled", false, "enable execution of scheduled callbacks")
+			flags.BoolVar(&v.verConf.scheduledCallbacksEnabled, "scheduled-callbacks-enabled", false, "enable execution of scheduled callbacks")
 		})
 }
 
@@ -218,7 +218,7 @@ func (v *VerificationNodeBuilder) LoadComponentsAndModules() {
 				computation.DefaultFVMOptions(
 					node.RootChainID,
 					false,
-					v.verConf.scheduleCallbacksEnabled,
+					v.verConf.scheduledCallbacksEnabled,
 				)...,
 			)
 			vmCtx := fvm.NewContext(fvmOptions...)
