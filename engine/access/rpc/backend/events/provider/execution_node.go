@@ -18,6 +18,7 @@ import (
 	"github.com/onflow/flow-go/engine/access/rpc/connection"
 	"github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
+	"github.com/onflow/flow-go/model/access"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/executiondatasync/optimistic_sync"
 )
@@ -51,9 +52,9 @@ func (e *ENEventProvider) Events(
 	eventType flow.EventType,
 	encodingVersion entities.EventEncodingVersion,
 	execResultInfo *optimistic_sync.ExecutionResultInfo,
-) (Response, flow.ExecutorMetadata, error) {
+) (Response, access.ExecutorMetadata, error) {
 	if len(blocks) == 0 {
-		return Response{}, flow.ExecutorMetadata{}, nil
+		return Response{}, access.ExecutorMetadata{}, nil
 	}
 
 	blockIDs := make([]flow.Identifier, len(blocks))
@@ -70,7 +71,7 @@ func (e *ENEventProvider) Events(
 	var successfulNode *flow.IdentitySkeleton
 	resp, successfulNode, err := e.getEventsFromAnyExeNode(ctx, execResultInfo.ExecutionNodes, req)
 	if err != nil {
-		return Response{}, flow.ExecutorMetadata{},
+		return Response{}, access.ExecutorMetadata{},
 			rpc.ConvertError(err, "failed to get execution nodes for events query", codes.Internal)
 	}
 
@@ -81,7 +82,7 @@ func (e *ENEventProvider) Events(
 		Str("last_block_id", lastBlockID.String()).
 		Msg("successfully got events")
 
-	metadata := flow.ExecutorMetadata{
+	metadata := access.ExecutorMetadata{
 		ExecutionResultID: successfulNode.NodeID,
 		ExecutorIDs:       execResultInfo.ExecutionNodes.NodeIDs(),
 	}
@@ -94,7 +95,7 @@ func (e *ENEventProvider) Events(
 		encodingVersion,
 	)
 	if err != nil {
-		return Response{}, flow.ExecutorMetadata{},
+		return Response{}, access.ExecutorMetadata{},
 			status.Errorf(codes.Internal, "failed to verify retrieved events from execution node: %v", err)
 	}
 

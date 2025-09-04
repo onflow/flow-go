@@ -3,10 +3,9 @@ package request
 import (
 	"fmt"
 
-	"github.com/onflow/flow/protobuf/go/flow/entities"
-
 	"github.com/onflow/flow-go/engine/access/rest/common"
 	"github.com/onflow/flow-go/engine/access/rest/common/parser"
+	"github.com/onflow/flow-go/engine/access/rest/http/models"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -22,7 +21,7 @@ type GetEvents struct {
 	EndHeight      uint64
 	Type           string
 	BlockIDs       []flow.Identifier
-	ExecutionState entities.ExecutionStateQuery
+	ExecutionState models.ExecutionStateQuery
 }
 
 func NewGetEvents(r *common.Request) (GetEvents, error) {
@@ -80,6 +79,10 @@ func parseGetEvents(
 		return GetEvents{}, fmt.Errorf("must provide either block IDs or start and end height range")
 	}
 
+	if rawEventType == "" {
+		return GetEvents{}, fmt.Errorf("event type must be provided")
+	}
+
 	eventType, err := parser.NewEventType(rawEventType)
 	if err != nil {
 		return GetEvents{}, err
@@ -117,7 +120,7 @@ func parseGetEvents(
 		EndHeight:   endHeight.Flow(),
 		Type:        eventType.Flow(),
 		BlockIDs:    blockIDs.Flow(),
-		ExecutionState: entities.ExecutionStateQuery{
+		ExecutionState: models.ExecutionStateQuery{
 			AgreeingExecutorsCount:  agreeingExecutorsCount,
 			RequiredExecutorIds:     agreeingExecutorsIds,
 			IncludeExecutorMetadata: includeExecutorMetadata,

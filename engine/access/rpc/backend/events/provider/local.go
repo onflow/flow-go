@@ -11,6 +11,7 @@ import (
 
 	"github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
+	"github.com/onflow/flow-go/model/access"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/executiondatasync/optimistic_sync"
 	"github.com/onflow/flow-go/module/state_synchronization/indexer"
@@ -35,9 +36,9 @@ func (l *LocalEventProvider) Events(
 	eventType flow.EventType,
 	encodingVersion entities.EventEncodingVersion,
 	result *optimistic_sync.ExecutionResultInfo,
-) (Response, flow.ExecutorMetadata, error) {
+) (Response, access.ExecutorMetadata, error) {
 	if len(blocks) == 0 {
-		return Response{}, flow.ExecutorMetadata{}, nil
+		return Response{}, access.ExecutorMetadata{}, nil
 	}
 
 	missingBlocks := make([]BlockMetadata, 0)
@@ -45,17 +46,17 @@ func (l *LocalEventProvider) Events(
 
 	snapshot, err := l.execStateCache.Snapshot(result.ExecutionResult.ID())
 	if err != nil {
-		return Response{}, flow.ExecutorMetadata{}, fmt.Errorf("failed to get snapshot for execution result %s: %w", result.ExecutionResult.ID(), err)
+		return Response{}, access.ExecutorMetadata{}, fmt.Errorf("failed to get snapshot for execution result %s: %w", result.ExecutionResult.ID(), err)
 	}
 
-	metadata := flow.ExecutorMetadata{
+	metadata := access.ExecutorMetadata{
 		ExecutionResultID: result.ExecutionResult.ID(),
 		ExecutorIDs:       result.ExecutionNodes.NodeIDs(),
 	}
 
 	for _, blockInfo := range blocks {
 		if ctx.Err() != nil {
-			return Response{}, flow.ExecutorMetadata{}, rpc.ConvertError(ctx.Err(), "failed to get events from storage", codes.Canceled)
+			return Response{}, access.ExecutorMetadata{}, rpc.ConvertError(ctx.Err(), "failed to get events from storage", codes.Canceled)
 		}
 
 		events, err := snapshot.Events().ByBlockID(blockInfo.ID)

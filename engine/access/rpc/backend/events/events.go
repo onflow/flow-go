@@ -18,6 +18,7 @@ import (
 	"github.com/onflow/flow-go/engine/access/rpc/backend/query_mode"
 	"github.com/onflow/flow-go/engine/access/rpc/connection"
 	"github.com/onflow/flow-go/engine/common/rpc"
+	accessmodel "github.com/onflow/flow-go/model/access"
 	"github.com/onflow/flow-go/model/events"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/executiondatasync/optimistic_sync"
@@ -94,20 +95,20 @@ func (e *Events) GetEventsForHeightRange(
 	startHeight, endHeight uint64,
 	requiredEventEncodingVersion entities.EventEncodingVersion,
 	criteria optimistic_sync.Criteria,
-) ([]flow.BlockEvents, flow.ExecutorMetadata, error) {
+) ([]flow.BlockEvents, accessmodel.ExecutorMetadata, error) {
 	if _, err := events.ValidateEvent(flow.EventType(eventType), e.chain); err != nil {
-		return nil, flow.ExecutorMetadata{},
+		return nil, accessmodel.ExecutorMetadata{},
 			status.Errorf(codes.InvalidArgument, "invalid event type: %v", err)
 	}
 
 	if endHeight < startHeight {
-		return nil, flow.ExecutorMetadata{},
+		return nil, accessmodel.ExecutorMetadata{},
 			status.Error(codes.InvalidArgument, "start height must not be larger than end height")
 	}
 
 	rangeSize := endHeight - startHeight + 1 // range is inclusive on both ends
 	if rangeSize > uint64(e.maxHeightRange) {
-		return nil, flow.ExecutorMetadata{},
+		return nil, accessmodel.ExecutorMetadata{},
 			status.Errorf(codes.InvalidArgument, "requested block range (%d) exceeded maximum (%d)", rangeSize, e.maxHeightRange)
 	}
 
@@ -117,12 +118,12 @@ func (e *Events) GetEventsForHeightRange(
 		// sealed block must be in the store, so throw an exception for any error
 		err := irrecoverable.NewExceptionf("failed to lookup sealed header: %w", err)
 		irrecoverable.Throw(ctx, err)
-		return nil, flow.ExecutorMetadata{}, err
+		return nil, accessmodel.ExecutorMetadata{}, err
 	}
 
 	// start height should not be beyond the last sealed height
 	if startHeight > sealed.Height {
-		return nil, flow.ExecutorMetadata{},
+		return nil, accessmodel.ExecutorMetadata{},
 			status.Errorf(codes.OutOfRange, "start height %d is greater than the last sealed block height %d", startHeight, sealed.Height)
 	}
 
@@ -148,11 +149,11 @@ func (e *Events) GetEventsForHeightRange(
 		// and avoids calculating header.ID() for each block.
 		blockID, err := e.headers.BlockIDByHeight(i)
 		if err != nil {
-			return nil, flow.ExecutorMetadata{}, rpc.ConvertStorageError(common.ResolveHeightError(e.state.Params(), i, err))
+			return nil, accessmodel.ExecutorMetadata{}, rpc.ConvertStorageError(common.ResolveHeightError(e.state.Params(), i, err))
 		}
 		header, err := e.headers.ByBlockID(blockID)
 		if err != nil {
-			return nil, flow.ExecutorMetadata{}, rpc.ConvertStorageError(fmt.Errorf("failed to get block header for %d: %w", i, err))
+			return nil, accessmodel.ExecutorMetadata{}, rpc.ConvertStorageError(fmt.Errorf("failed to get block header for %d: %w", i, err))
 		}
 
 		blockHeaders = append(blockHeaders, provider.BlockMetadata{
@@ -162,14 +163,16 @@ func (e *Events) GetEventsForHeightRange(
 		})
 	}
 
-	// TODO: can block headers len be equal to 0?
+	// get the result for the block with the highest height. all data queried for this set of blocks
+	// must be from the execution fork terminating at this result. this guarantees the response
+	// contains a consistent view of the state.
 	lastBlockID := blockHeaders[len(blockHeaders)-1].ID
 	execResultInfo, err := e.execResultProvider.ExecutionResult(
 		lastBlockID,
 		criteria,
 	)
 	if err != nil {
-		return nil, flow.ExecutorMetadata{}, fmt.Errorf("failed to get execution result for last block: %w", err)
+		return nil, accessmodel.ExecutorMetadata{}, fmt.Errorf("failed to get execution result for last block: %w", err)
 	}
 
 	resp, metadata, err := e.provider.Events(
@@ -193,23 +196,27 @@ func (e *Events) GetEventsForBlockIDs(
 	blockIDs []flow.Identifier,
 	requiredEventEncodingVersion entities.EventEncodingVersion,
 	criteria optimistic_sync.Criteria,
-) ([]flow.BlockEvents, flow.ExecutorMetadata, error) {
+) ([]flow.BlockEvents, accessmodel.ExecutorMetadata, error) {
 	if _, err := events.ValidateEvent(flow.EventType(eventType), e.chain); err != nil {
-		return nil, flow.ExecutorMetadata{}, status.Errorf(codes.InvalidArgument, "invalid event type: %v", err)
+		return nil, accessmodel.ExecutorMetadata{}, status.Errorf(codes.InvalidArgument, "invalid event type: %v", err)
 	}
 
 	if uint(len(blockIDs)) > e.maxHeightRange {
-		return nil, flow.ExecutorMetadata{},
+		return nil, accessmodel.ExecutorMetadata{},
 			status.Errorf(codes.InvalidArgument, "requested block range (%d) exceeded maximum (%d)", len(blockIDs), e.maxHeightRange)
 	}
 
 	// find the block headers for all the block IDs
 	blockHeaders := make([]provider.BlockMetadata, 0, len(blockIDs))
+	var newestBlockHeader flow.Header
 	for _, blockID := range blockIDs {
 		header, err := e.headers.ByBlockID(blockID)
 		if err != nil {
-			return nil, flow.ExecutorMetadata{},
+			return nil, accessmodel.ExecutorMetadata{},
 				rpc.ConvertStorageError(fmt.Errorf("failed to get block header for %s: %w", blockID, err))
+		}
+		if header.View > newestBlockHeader.View {
+			newestBlockHeader = *header
 		}
 
 		blockHeaders = append(blockHeaders, provider.BlockMetadata{
@@ -219,14 +226,16 @@ func (e *Events) GetEventsForBlockIDs(
 		})
 	}
 
-	// TODO: can block headers len be equal to 0?
-	lastBlockID := blockHeaders[len(blockHeaders)-1].ID
+	// get the result for the block with the highest height. all data queried for this set of blocks
+	// must be from the execution fork terminating at this result. this guarantees the response
+	// contains a consistent view of the state.
 	execResultInfo, err := e.execResultProvider.ExecutionResult(
-		lastBlockID,
+		newestBlockHeader.ID(),
 		criteria,
 	)
 	if err != nil {
-		return nil, flow.ExecutorMetadata{}, fmt.Errorf("failed to get execution result for last block: %w", err)
+		return nil, accessmodel.ExecutorMetadata{},
+			fmt.Errorf("failed to get execution result for block %v: %w", newestBlockHeader.ID(), err)
 	}
 
 	resp, metadata, err := e.provider.Events(

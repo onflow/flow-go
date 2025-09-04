@@ -2,6 +2,7 @@ package models
 
 import (
 	"github.com/onflow/flow-go/engine/access/rest/util"
+	"github.com/onflow/flow-go/model/access"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -27,7 +28,7 @@ func NewEvents(events []flow.Event) Events {
 
 func NewBlockEvents(
 	events flow.BlockEvents,
-	metadata *flow.ExecutorMetadata,
+	metadata *access.ExecutorMetadata,
 	shouldIncludeMetadata bool,
 ) *BlockEvents {
 	var meta *Metadata = nil
@@ -48,7 +49,7 @@ type BlockEventsList []BlockEvents
 
 func NewBlockEventsList(
 	blocksEvents []flow.BlockEvents,
-	metadata *flow.ExecutorMetadata,
+	metadata *access.ExecutorMetadata,
 	shouldIncludeMetadata bool,
 ) BlockEventsList {
 	var converted BlockEventsList

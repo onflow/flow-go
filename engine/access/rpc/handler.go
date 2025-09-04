@@ -901,14 +901,17 @@ func (h *Handler) GetEventsForHeightRange(
 		startHeight,
 		endHeight,
 		eventEncodingVersion,
-		optimistic_sync.NewCriteria(req.GetExecutionStateQuery()),
+		NewCriteria(req.GetExecutionStateQuery()),
 	)
 	if err != nil {
 		return nil, err
 	}
 
 	if query := req.GetExecutionStateQuery(); query != nil && query.GetIncludeExecutorMetadata() {
-		metadata.ExecutionStateQuery = convert.ExecutorMetadataToMessage(executorMetadata)
+		metadata.ExecutionStateQuery, err = convert.ExecutorMetadataToMessage(&executorMetadata)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	resultEvents, err := convert.BlockEventsToMessages(results)
@@ -949,14 +952,17 @@ func (h *Handler) GetEventsForBlockIDs(
 		eventType,
 		blockIDs,
 		eventEncodingVersion,
-		optimistic_sync.NewCriteria(req.GetExecutionStateQuery()),
+		NewCriteria(req.GetExecutionStateQuery()),
 	)
 	if err != nil {
 		return nil, err
 	}
 
 	if query := req.GetExecutionStateQuery(); query != nil && query.GetIncludeExecutorMetadata() {
-		metadata.ExecutionStateQuery = convert.ExecutorMetadataToMessage(executorMetadata)
+		metadata.ExecutionStateQuery, err = convert.ExecutorMetadataToMessage(&executorMetadata)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	resultEvents, err := convert.BlockEventsToMessages(results)
@@ -1608,4 +1614,15 @@ func HandleRPCSubscription[T any](sub subscription.Subscription, handleResponse 
 	}
 
 	return nil
+}
+
+func NewCriteria(query *entities.ExecutionStateQuery) optimistic_sync.Criteria {
+	if query == nil {
+		return optimistic_sync.Criteria{}
+	}
+
+	return optimistic_sync.Criteria{
+		AgreeingExecutorsCount: uint(query.AgreeingExecutorsCount),
+		RequiredExecutors:      convert.MessagesToIdentifiers(query.RequiredExecutorIds),
+	}
 }

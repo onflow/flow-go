@@ -377,10 +377,10 @@ func (r *RestProxyHandler) GetEventsForHeightRange(
 	startHeight, endHeight uint64,
 	requiredEventEncodingVersion entities.EventEncodingVersion,
 	criteria optimistic_sync.Criteria,
-) ([]flow.BlockEvents, flow.ExecutorMetadata, error) {
+) ([]flow.BlockEvents, accessmodel.ExecutorMetadata, error) {
 	upstream, closer, err := r.FaultTolerantClient()
 	if err != nil {
-		return nil, flow.ExecutorMetadata{}, err
+		return nil, accessmodel.ExecutorMetadata{}, err
 	}
 	defer closer.Close()
 
@@ -396,14 +396,18 @@ func (r *RestProxyHandler) GetEventsForHeightRange(
 		},
 	}
 	eventsResponse, err := upstream.GetEventsForHeightRange(ctx, getEventsForHeightRangeRequest)
+	if err != nil {
+		return nil, accessmodel.ExecutorMetadata{}, err
+	}
 	r.log("upstream", "GetEventsForHeightRange", err)
 
+	metadata, err := convert.MessageToExecutorMetadata(eventsResponse.Metadata.ExecutionStateQuery)
 	if err != nil {
-		return nil, flow.ExecutorMetadata{}, err
+		return nil, accessmodel.ExecutorMetadata{}, err
 	}
 
 	res, err := convert.MessagesToBlockEvents(eventsResponse.Results)
-	return res, flow.ExecutorMetadata{}, err
+	return res, *metadata, err
 }
 
 // GetEventsForBlockIDs returns events by their name in the specified block IDs.
@@ -413,10 +417,10 @@ func (r *RestProxyHandler) GetEventsForBlockIDs(
 	blockIDs []flow.Identifier,
 	requiredEventEncodingVersion entities.EventEncodingVersion,
 	criteria optimistic_sync.Criteria,
-) ([]flow.BlockEvents, flow.ExecutorMetadata, error) {
+) ([]flow.BlockEvents, accessmodel.ExecutorMetadata, error) {
 	upstream, closer, err := r.FaultTolerantClient()
 	if err != nil {
-		return nil, flow.ExecutorMetadata{}, err
+		return nil, accessmodel.ExecutorMetadata{}, err
 	}
 	defer closer.Close()
 
@@ -436,11 +440,16 @@ func (r *RestProxyHandler) GetEventsForBlockIDs(
 	r.log("upstream", "GetEventsForBlockIDs", err)
 
 	if err != nil {
-		return nil, flow.ExecutorMetadata{}, err
+		return nil, accessmodel.ExecutorMetadata{}, err
+	}
+
+	metadata, err := convert.MessageToExecutorMetadata(eventsResponse.Metadata.ExecutionStateQuery)
+	if err != nil {
+		return nil, accessmodel.ExecutorMetadata{}, err
 	}
 
 	res, err := convert.MessagesToBlockEvents(eventsResponse.Results)
-	return res, flow.ExecutorMetadata{}, err
+	return res, *metadata, err
 }
 
 // convertError converts a serialized access error formatted as a grpc error returned from the upstream AN,

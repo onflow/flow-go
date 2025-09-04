@@ -189,7 +189,7 @@ func (s *EventsSuite) SetupTest() {
 		Return(s.resultForestSnapshot, nil).
 		Maybe() // it is called only for local query mode
 
-	s.criteria = optimistic_sync.NewCriteria(nil)
+	s.criteria = optimistic_sync.Criteria{}
 
 	s.testCases = make([]testCase, 0)
 

@@ -20,6 +20,7 @@ import (
 	"github.com/onflow/flow-go/engine/access/rest/http/routes"
 	"github.com/onflow/flow-go/engine/access/rest/router"
 	"github.com/onflow/flow-go/engine/access/rest/util"
+	"github.com/onflow/flow-go/model/access"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
 
@@ -317,7 +318,7 @@ func generateEventsMocks(backend *mock.API, n int) []flow.BlockEvents {
 				entities.EventEncodingVersion_JSON_CDC_V0,
 				mocks.Anything,
 			).
-			Return([]flow.BlockEvents{events[i]}, flow.ExecutorMetadata{}, nil)
+			Return([]flow.BlockEvents{events[i]}, access.ExecutorMetadata{}, nil)
 
 		lastHeader = header
 	}
@@ -330,7 +331,7 @@ func generateEventsMocks(backend *mock.API, n int) []flow.BlockEvents {
 			entities.EventEncodingVersion_JSON_CDC_V0,
 			mocks.Anything,
 		).
-		Return(events, flow.ExecutorMetadata{}, nil)
+		Return(events, access.ExecutorMetadata{}, nil)
 
 	// range from first to last block
 	backend.Mock.On(
@@ -341,7 +342,7 @@ func generateEventsMocks(backend *mock.API, n int) []flow.BlockEvents {
 		events[len(events)-1].BlockHeight,
 		entities.EventEncodingVersion_JSON_CDC_V0,
 		mocks.Anything,
-	).Return(events, flow.ExecutorMetadata{}, nil)
+	).Return(events, access.ExecutorMetadata{}, nil)
 
 	// range from first to last block + 5
 	backend.Mock.On(
@@ -352,7 +353,7 @@ func generateEventsMocks(backend *mock.API, n int) []flow.BlockEvents {
 		events[len(events)-1].BlockHeight+5,
 		entities.EventEncodingVersion_JSON_CDC_V0,
 		mocks.Anything,
-	).Return(append(events[:len(events)-1], unittest.BlockEventsFixture(lastHeader, 0)), flow.ExecutorMetadata{}, nil)
+	).Return(append(events[:len(events)-1], unittest.BlockEventsFixture(lastHeader, 0)), access.ExecutorMetadata{}, nil)
 
 	latestBlock := unittest.BlockHeaderFixture()
 	latestBlock.Height = uint64(n - 1)
@@ -367,7 +368,7 @@ func generateEventsMocks(backend *mock.API, n int) []flow.BlockEvents {
 			entities.EventEncodingVersion_JSON_CDC_V0,
 			mocks.Anything,
 		).
-		Return(nil, flow.ExecutorMetadata{}, status.Error(codes.NotFound, "not found"))
+		Return(nil, access.ExecutorMetadata{}, status.Error(codes.NotFound, "not found"))
 
 	backend.Mock.
 		On(
@@ -379,7 +380,7 @@ func generateEventsMocks(backend *mock.API, n int) []flow.BlockEvents {
 			mocks.Anything,
 			mocks.Anything,
 		).
-		Return(nil, flow.ExecutorMetadata{}, status.Error(codes.NotFound, "not found"))
+		Return(nil, access.ExecutorMetadata{}, status.Error(codes.NotFound, "not found"))
 
 	backend.Mock.
 		On("GetLatestBlockHeader", mocks.Anything, true).

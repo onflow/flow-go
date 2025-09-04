@@ -3,17 +3,27 @@ package convert
 import (
 	"github.com/onflow/flow/protobuf/go/flow/entities"
 
-	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/access"
 )
 
-func ExecutorMetadataToMessage(metadata flow.ExecutorMetadata) *entities.ExecutorMetadata {
-	executorIDs := make([][]byte, 0)
-	for _, id := range metadata.ExecutorIDs {
-		executorIDs = append(executorIDs, []byte(id.String()))
+func ExecutorMetadataToMessage(metadata *access.ExecutorMetadata) (*entities.ExecutorMetadata, error) {
+	if metadata == nil {
+		return nil, ErrEmptyMessage
 	}
 
 	return &entities.ExecutorMetadata{
-		ExecutionResultId: []byte(metadata.ExecutionResultID.String()),
-		ExecutorId:        executorIDs,
+		ExecutionResultId: IdentifierToMessage(metadata.ExecutionResultID),
+		ExecutorId:        IdentifiersToMessages(metadata.ExecutorIDs),
+	}, nil
+}
+
+func MessageToExecutorMetadata(metadata *entities.ExecutorMetadata) (*access.ExecutorMetadata, error) {
+	if metadata == nil {
+		return nil, ErrEmptyMessage
 	}
+
+	return &access.ExecutorMetadata{
+		ExecutionResultID: MessageToIdentifier(metadata.ExecutionResultId),
+		ExecutorIDs:       MessagesToIdentifiers(metadata.ExecutorId),
+	}, nil
 }
