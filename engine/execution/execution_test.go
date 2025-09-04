@@ -154,7 +154,7 @@ func TestExecutionFlow(t *testing.T) {
 	providerEngine.On("Process", mock.AnythingOfType("channels.Channel"), exeID.NodeID, mock.Anything).
 		Run(func(args mock.Arguments) {
 			originID := args.Get(1).(flow.Identifier)
-			req := args.Get(2).(*messages.EntityRequest)
+			req := args.Get(2).(*flow.EntityRequest)
 
 			var entities []flow.Entity
 			for _, entityID := range req.EntityIDs {
@@ -531,7 +531,7 @@ func mockCollectionEngineToReturnCollections(t *testing.T, collectionNode *testm
 	collectionEngine.On("Process", mock.AnythingOfType("channels.Channel"), mock.Anything, mock.Anything).
 		Run(func(args mock.Arguments) {
 			originID := args[1].(flow.Identifier)
-			req := args[2].(*messages.EntityRequest)
+			req := args[2].(*flow.EntityRequest)
 			blob, ok := colMap[req.EntityIDs[0]]
 			if !ok {
 				assert.FailNow(t, "requesting unexpected collection", req.EntityIDs[0])
