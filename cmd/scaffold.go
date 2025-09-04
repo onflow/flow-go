@@ -1094,6 +1094,11 @@ func (fnb *FlowNodeBuilder) initProtocolDB() error {
 		return err
 	}
 
+	fnb.AdminCommand("create-pebble-checkpoint", func(config *NodeConfig) commands.AdminCommand {
+		// by default checkpoints will be created under "/data/protocol_pebble_checkpoints"
+		return storageCommands.NewPebbleDBCheckpointCommand(config.pebbleCheckpointsDir, "protocol", pebbleDB)
+	})
+
 	fnb.ProtocolDB = pebbleimpl.ToDB(pebbleDB)
 	fnb.ShutdownFunc(closer.Close)
 	return nil
@@ -2015,9 +2020,6 @@ func (fnb *FlowNodeBuilder) RegisterDefaultAdminCommands() {
 		return storageCommands.NewReadSealsCommand(config.State, config.Storage.Seals, config.Storage.Index)
 	}).AdminCommand("get-latest-identity", func(config *NodeConfig) commands.AdminCommand {
 		return common.NewGetIdentityCommand(config.IdentityProvider)
-	}).AdminCommand("create-pebble-checkpoint", func(config *NodeConfig) commands.AdminCommand {
-		// by default checkpoints will be created under "/data/protocol_pebble_checkpoints"
-		return storageCommands.NewPebbleDBCheckpointCommand(config.pebbleCheckpointsDir, "protocol", config.PebbleDB)
 	})
 }
 
