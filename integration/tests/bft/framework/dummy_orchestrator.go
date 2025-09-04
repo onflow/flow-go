@@ -61,7 +61,12 @@ func NewDummyOrchestrator(t *testing.T, Logger zerolog.Logger) *orchestrator {
 func (o *orchestrator) trackEgressEvents(event *insecure.EgressEvent) error {
 	switch e := event.FlowProtocolEvent.(type) {
 	case *messages.ExecutionReceipt:
-		o.egressEventTracker[typeExecutionReceipt] = append(o.egressEventTracker[typeExecutionReceipt], e.ID())
+		internalEvent, err := e.ToInternal()
+		if err != nil {
+			o.Logger.Err(err).Msgf("failed to convert event %T to internal", e)
+			return nil
+		}
+		o.egressEventTracker[typeExecutionReceipt] = append(o.egressEventTracker[typeExecutionReceipt], internalEvent.(*flow.ExecutionReceipt).ID())
 	case *messages.ChunkDataRequest:
 		o.egressEventTracker[typeChunkDataRequest] = append(o.egressEventTracker[typeChunkDataRequest], e.ChunkID)
 	case *messages.ChunkDataResponse:

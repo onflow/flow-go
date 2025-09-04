@@ -102,7 +102,7 @@ func receiptsWithSameResultFixture(
 
 			require.Equal(t, result.ID(), receipt.ExecutionResult.ID())
 
-			event := executionReceiptEvent(receipt, targetIds)
+			event := executionReceiptEvent((*messages.ExecutionReceipt)(receipt), targetIds)
 
 			_, ok := eventMap[receipt.ID()]
 			require.False(t, ok) // check for duplicate receipts.
@@ -117,7 +117,7 @@ func receiptsWithSameResultFixture(
 }
 
 // executionReceiptEvent creates the orchestrator network event of the corresponding execution receipt.
-func executionReceiptEvent(receipt *flow.ExecutionReceipt, targetIds flow.IdentifierList) *insecure.EgressEvent {
+func executionReceiptEvent(receipt *messages.ExecutionReceipt, targetIds flow.IdentifierList) *insecure.EgressEvent {
 	return &insecure.EgressEvent{
 		CorruptOriginId:   receipt.ExecutorID,
 		Channel:           channels.PushReceipts,
@@ -263,7 +263,7 @@ func receiptsWithDistinctResultFixture(
 	for i := 0; i < count; i++ {
 		for _, exeId := range exeIds {
 			receipt := unittest.ExecutionReceiptFixture(unittest.WithExecutorID(exeId))
-			event := executionReceiptEvent(receipt, targetIds)
+			event := executionReceiptEvent((*messages.ExecutionReceipt)(receipt), targetIds)
 
 			_, ok := eventMap[receipt.ID()]
 			require.False(t, ok) // checks for duplicate receipts.
