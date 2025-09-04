@@ -256,8 +256,6 @@ func (suite *MutatorSuite) TestBootstrap_InvalidPayload() {
 func (suite *MutatorSuite) TestBootstrap_Successful() {
 	err := (func(r storage.Reader) error {
 
-		// should index collection
-		// should index collection
 		collection := new(flow.LightCollection) // reset the collection
 		err := operation.LookupCollectionPayload(r, suite.genesis.ID(), &collection.Transactions)
 		suite.Assert().Nil(err)
