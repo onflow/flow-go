@@ -89,8 +89,7 @@ func TestDKGState_UninitializedState(t *testing.T) {
 			expectedKey := unittest.StakingPrivKeyFixture()
 			evidence := unittest.EpochCommitFixture(func(commit *flow.EpochCommit) {
 				commit.Counter = epochCounter
-				commit.DKGParticipantKeys = []crypto.PublicKey{expectedKey.PublicKey()}
-				commit.DKGIndexMap = flow.DKGIndexMap{myNodeID: 0}
+				commit.DKGParticipantKeys[0] = expectedKey.PublicKey()
 			})
 			err = store.UpsertMyBeaconPrivateKey(epochCounter, expectedKey, evidence)
 			require.NoError(t, err)
@@ -193,8 +192,7 @@ func TestDKGState_StartedState(t *testing.T) {
 			expectedKey := unittest.StakingPrivKeyFixture()
 			evidence := unittest.EpochCommitFixture(func(commit *flow.EpochCommit) {
 				commit.Counter = epochCounter
-				commit.DKGParticipantKeys = []crypto.PublicKey{expectedKey.PublicKey()}
-				commit.DKGIndexMap = flow.DKGIndexMap{myNodeID: 0}
+				commit.DKGParticipantKeys[0] = expectedKey.PublicKey()
 			})
 			err = store.UpsertMyBeaconPrivateKey(epochCounter, expectedKey, evidence)
 			require.NoError(t, err)
@@ -230,8 +228,7 @@ func TestDKGState_CompletedState(t *testing.T) {
 			expectedKey = unittest.StakingPrivKeyFixture()
 			evidence = unittest.EpochCommitFixture(func(commit *flow.EpochCommit) {
 				commit.Counter = epochCounter
-				commit.DKGParticipantKeys = []crypto.PublicKey{expectedKey.PublicKey()}
-				commit.DKGIndexMap = flow.DKGIndexMap{myNodeID: 0}
+				commit.DKGParticipantKeys[0] = expectedKey.PublicKey()
 			})
 			err = store.InsertMyBeaconPrivateKey(epochCounter, expectedKey)
 			require.NoError(t, err)
@@ -311,8 +308,7 @@ func TestDKGState_CompletedState(t *testing.T) {
 			expectedKey := unittest.StakingPrivKeyFixture()
 			evidence := unittest.EpochCommitFixture(func(commit *flow.EpochCommit) {
 				commit.Counter = epochCounter
-				commit.DKGParticipantKeys = []crypto.PublicKey{expectedKey.PublicKey()}
-				commit.DKGIndexMap = flow.DKGIndexMap{myNodeID: 0}
+				commit.DKGParticipantKeys[0] = expectedKey.PublicKey()
 			})
 			err = store.UpsertMyBeaconPrivateKey(epochCounter, expectedKey, evidence)
 			require.NoError(t, err)
@@ -407,8 +403,7 @@ func TestDKGState_FailureState(t *testing.T) {
 			expectedKey := unittest.StakingPrivKeyFixture()
 			evidence := unittest.EpochCommitFixture(func(commit *flow.EpochCommit) {
 				commit.Counter = epochCounter
-				commit.DKGParticipantKeys = []crypto.PublicKey{expectedKey.PublicKey()}
-				commit.DKGIndexMap = flow.DKGIndexMap{myNodeID: 0}
+				commit.DKGParticipantKeys[0] = expectedKey.PublicKey()
 			})
 			err = store.UpsertMyBeaconPrivateKey(epochCounter, expectedKey, evidence)
 			require.NoError(t, err)
@@ -510,8 +505,7 @@ func TestDKGState_FailureStateAfterCompleted(t *testing.T) {
 			expectedKey := unittest.StakingPrivKeyFixture()
 			evidence := unittest.EpochCommitFixture(func(commit *flow.EpochCommit) {
 				commit.Counter = epochCounter
-				commit.DKGParticipantKeys = []crypto.PublicKey{expectedKey.PublicKey()}
-				commit.DKGIndexMap = flow.DKGIndexMap{myNodeID: 0}
+				commit.DKGParticipantKeys[0] = expectedKey.PublicKey()
 			})
 			err = store.UpsertMyBeaconPrivateKey(epochCounter, expectedKey, evidence)
 			require.NoError(t, err)
@@ -545,8 +539,7 @@ func TestDKGState_RandomBeaconKeyCommittedState(t *testing.T) {
 			privateKey = unittest.StakingPrivKeyFixture()
 			evidence = unittest.EpochCommitFixture(func(commit *flow.EpochCommit) {
 				commit.Counter = epochCounter
-				commit.DKGParticipantKeys = []crypto.PublicKey{privateKey.PublicKey()}
-				commit.DKGIndexMap = flow.DKGIndexMap{myNodeID: 0}
+				commit.DKGParticipantKeys[0] = privateKey.PublicKey()
 			})
 			err = store.UpsertMyBeaconPrivateKey(epochCounter, privateKey, evidence)
 			require.NoError(t, err)
@@ -637,8 +630,7 @@ func TestDKGState_RandomBeaconKeyCommittedState(t *testing.T) {
 			otherKey := unittest.StakingPrivKeyFixture()
 			otherEvidence := unittest.EpochCommitFixture(func(commit *flow.EpochCommit) {
 				commit.Counter = epochCounter
-				commit.DKGParticipantKeys = []crypto.PublicKey{otherKey.PublicKey()}
-				commit.DKGIndexMap = flow.DKGIndexMap{myNodeID: 0}
+				commit.DKGParticipantKeys[0] = otherKey.PublicKey()
 			})
 			err = store.UpsertMyBeaconPrivateKey(epochCounter, otherKey, otherEvidence)
 			require.Error(t, err, "cannot overwrite previously committed key")
@@ -681,6 +673,34 @@ func TestDKGState_InsertedKeyIsIncludedInTheEpoch(t *testing.T) {
 			})
 			err = store.CommitMyBeaconPrivateKey(epochCounter, evidence)
 			require.NoError(t, err)
+		})
+
+		// TODO(EFM, #6794): allowing a nil DKGIndexMap is a temporary shortcut for backwards compatibility. This should be removed once we complete the network upgrade:
+		t.Run("inserted key is included in the epoch, evidence without DKGIndexMap", func(t *testing.T) {
+			epochCounter := setupState()
+			expectedKey := unittest.StakingPrivKeyFixture()
+			err = store.InsertMyBeaconPrivateKey(epochCounter, expectedKey)
+			require.NoError(t, err)
+			evidence := unittest.EpochCommitFixture(func(commit *flow.EpochCommit) {
+				commit.Counter = epochCounter
+				commit.DKGParticipantKeys[0] = expectedKey.PublicKey()
+			})
+			err = store.CommitMyBeaconPrivateKey(epochCounter, evidence)
+			require.NoError(t, err)
+		})
+
+		// TODO(EFM, #6794): allowing a nil DKGIndexMap is a temporary shortcut for backwards compatibility. This should be removed once we complete the network upgrade:
+		t.Run("inserted key is not included in the epoch, evidence without DKGIndexMap", func(t *testing.T) {
+			epochCounter := setupState()
+			expectedKey := unittest.StakingPrivKeyFixture()
+			err = store.InsertMyBeaconPrivateKey(epochCounter, expectedKey)
+			require.NoError(t, err)
+			evidence := unittest.EpochCommitFixture(func(commit *flow.EpochCommit) {
+				commit.Counter = epochCounter
+			})
+			err = store.CommitMyBeaconPrivateKey(epochCounter, evidence)
+			require.Error(t, err)
+			require.True(t, storage.IsInvalidDKGStateTransitionError(err))
 		})
 
 		t.Run("inserted key is included in the epoch but current node is not part of the random beacon committee", func(t *testing.T) {
@@ -749,6 +769,30 @@ func TestDKGState_UpsertedKeyIsIncludedInTheEpoch(t *testing.T) {
 			})
 			err = store.UpsertMyBeaconPrivateKey(epochCounter, expectedKey, evidence)
 			require.NoError(t, err)
+		})
+
+		// TODO(EFM, #6794): allowing a nil DKGIndexMap is a temporary shortcut for backwards compatibility. This should be removed once we complete the network upgrade:
+		t.Run("upserted key is included in the epoch, evidence without DKGIndexMap", func(t *testing.T) {
+			epochCounter := setupState()
+			expectedKey := unittest.StakingPrivKeyFixture()
+			evidence := unittest.EpochCommitFixture(func(commit *flow.EpochCommit) {
+				commit.Counter = epochCounter
+				commit.DKGParticipantKeys[0] = expectedKey.PublicKey()
+			})
+			err = store.UpsertMyBeaconPrivateKey(epochCounter, expectedKey, evidence)
+			require.NoError(t, err)
+		})
+
+		// TODO(EFM, #6794): allowing a nil DKGIndexMap is a temporary shortcut for backwards compatibility. This should be removed once we complete the network upgrade:
+		t.Run("upserted key is not included in the epoch, evidence without DKGIndexMap", func(t *testing.T) {
+			epochCounter := setupState()
+			expectedKey := unittest.StakingPrivKeyFixture()
+			evidence := unittest.EpochCommitFixture(func(commit *flow.EpochCommit) {
+				commit.Counter = epochCounter
+			})
+			err = store.UpsertMyBeaconPrivateKey(epochCounter, expectedKey, evidence)
+			require.Error(t, err)
+			require.True(t, storage.IsInvalidDKGStateTransitionError(err))
 		})
 
 		t.Run("upserted key is included in the epoch but current node is not part of the random beacon committee", func(t *testing.T) {

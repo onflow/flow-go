@@ -696,7 +696,7 @@ func (m *testMetadata) RefreshChunkData(t *testing.T) *verification.VerifiableCh
 			StartState:      flow.StateCommitment(m.StartState),
 			BlockID:         m.Header.ID(),
 			// in these test cases, all defined service events correspond to the current chunk
-			ServiceEventCount: uint16(len(m.ServiceEvents)),
+			ServiceEventCount: unittest.PtrTo(uint16(len(m.ServiceEvents))),
 			EventCollection:   eventsMerkleRootHash,
 		},
 		Index: 0,
