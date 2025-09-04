@@ -30,8 +30,8 @@ func InsertGuarantee(w storage.Writer, guaranteeID flow.Identifier, guarantee *f
 //     ATOMICALLY with this write operation.
 //
 // Error returns:
-//   - storage.ErrAlreadyExists if the key already exists in the database.
-//   - generic error in case of unexpected failure from the database layer
+//   - [storage.ErrAlreadyExists] if the key already exists in the database.
+//   - All other errors have to be treated as unexpected failures from the database layer.
 func IndexGuarantee(lctx lockctx.Proof, rw storage.ReaderBatchWriter, collectionID flow.Identifier, guaranteeID flow.Identifier) error {
 	if !lctx.HoldsLock(storage.LockInsertBlock) {
 		return fmt.Errorf("cannot index guarantee for collectionID %v without holding lock %s",
@@ -61,6 +61,7 @@ func IndexGuarantee(lctx lockctx.Proof, rw storage.ReaderBatchWriter, collection
 //
 // Expected errors during normal operations:
 //   - [storage.ErrNotFound] if `collID` does not refer to a known guaranteed collection
+//   - All other errors have to be treated as unexpected failures from the database layer.
 func RetrieveGuarantee(r storage.Reader, collID flow.Identifier, guarantee *flow.CollectionGuarantee) error {
 	return RetrieveByKey(r, MakePrefix(codeGuarantee, collID), guarantee)
 }
@@ -68,15 +69,15 @@ func RetrieveGuarantee(r storage.Reader, collID flow.Identifier, guarantee *flow
 // LookupGuarantee finds collection guarantee ID by collection ID.
 // Error returns:
 //   - storage.ErrNotFound if the key does not exist in the database
-//   - generic error in case of unexpected failure from the database layer
+//   - All other errors have to be treated as unexpected failures from the database layer.
 func LookupGuarantee(r storage.Reader, collectionID flow.Identifier, guaranteeID *flow.Identifier) error {
 	return RetrieveByKey(r, MakePrefix(codeGuaranteeByCollectionID, collectionID), guaranteeID)
 }
 
 // IndexPayloadGuarantees indexes a collection guarantees by block ID.
 // Error returns:
-//   - storage.ErrAlreadyExists if the key already exists in the database.
-//   - generic error in case of unexpected failure from the database layer
+//   - [storage.ErrAlreadyExists] if the key already exists in the database.
+//   - All other errors have to be treated as unexpected failures from the database layer.
 func IndexPayloadGuarantees(lctx lockctx.Proof, w storage.Writer, blockID flow.Identifier, guarIDs []flow.Identifier) error {
 	if !lctx.HoldsLock(storage.LockInsertBlock) {
 		return fmt.Errorf("cannot index guarantee for blockID %v without holding lock %s",
@@ -90,7 +91,7 @@ func IndexPayloadGuarantees(lctx lockctx.Proof, w storage.Writer, blockID flow.I
 //
 // Expected errors during normal operations:
 //   - [storage.ErrNotFound] if `blockID` does not refer to a known block
-//   - generic error in case of unexpected failure from the database layer
+//   - All other errors have to be treated as unexpected failures from the database layer.
 func LookupPayloadGuarantees(r storage.Reader, blockID flow.Identifier, guarIDs *[]flow.Identifier) error {
 	return RetrieveByKey(r, MakePrefix(codePayloadGuarantees, blockID), guarIDs)
 }
