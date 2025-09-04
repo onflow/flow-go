@@ -71,9 +71,9 @@ func TestBlockIndexByHeightAndRetrieve(t *testing.T) {
 		})
 
 		// Now index the block by height (requires LockFinalizeBlock)
-		unittest.WithLock(t, lockManager, storage.LockFinalizeBlock, func(lctx2 lockctx.Context) error {
+		unittest.WithLock(t, lockManager, storage.LockFinalizeBlock, func(lctx lockctx.Context) error {
 			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-				return operation.IndexFinalizedBlockByHeight(lctx2, rw, block.Height, block.ID())
+				return operation.IndexFinalizedBlockByHeight(lctx, rw, block.Height, block.ID())
 			})
 		})
 
@@ -88,15 +88,13 @@ func TestBlockIndexByHeightAndRetrieve(t *testing.T) {
 		require.Equal(t, *prop, *retrievedProposalByHeight)
 
 		// Test that indexing the same height again returns ErrAlreadyExists
-		lctx3 := lockManager.NewContext()
-		err = lctx3.AcquireLock(storage.LockFinalizeBlock)
-		require.NoError(t, err)
-
-		err = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			return operation.IndexFinalizedBlockByHeight(lctx3, rw, block.Height, block.ID())
+		unittest.WithLock(t, lockManager, storage.LockFinalizeBlock, func(lctx lockctx.Context) error {
+			err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+				return operation.IndexFinalizedBlockByHeight(lctx, rw, block.Height, block.ID())
+			})
+			require.ErrorIs(t, err, storage.ErrAlreadyExists)
+			return nil
 		})
-		require.ErrorIs(t, err, storage.ErrAlreadyExists)
-		lctx3.Release()
 
 		// Test that retrieving by non-existent height returns ErrNotFound
 		_, err = blocks.ByHeight(block.Height + 1000)
