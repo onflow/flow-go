@@ -317,15 +317,22 @@ func (e *ENTransactionProvider) systemTransactionResults(
 	allTxCount := len(resp.TransactionResults)
 	systemTxCount := allTxCount - userTxCount
 	systemTxStartIndex := allTxCount - systemTxCount
-	scheduledCallbacksEnabled := systemTxCount > 1 // if we have more than one system tx, scheduled callbacks are enabled. TODO: improve this assumption
 	// should never happen
 	if systemTxCount <= 0 {
 		return nil, status.Errorf(codes.Internal, "no system transaction results")
 	}
 
 	systemTxResults := resp.TransactionResults[systemTxStartIndex:]
-	systemTxIDs := make([]flow.Identifier, 0, systemTxCount)
 	results := make([]*accessmodel.TransactionResult, 0, systemTxCount)
+
+	systemTxIDs, err := e.systemTransactionIDs(
+		systemTxResults,
+		resp.GetEventEncodingVersion(),
+		requiredEventEncodingVersion,
+	)
+	if err != nil {
+		return nil, rpc.ConvertError(err, "failed to determine system transaction IDs", codes.Internal)
+	}
 
 	for i, systemTxResult := range systemTxResults {
 		systemTxStatus, err := e.txStatusDeriver.DeriveTransactionStatus(block.Height, true)
@@ -341,24 +348,6 @@ func (e *ENTransactionProvider) systemTransactionResults(
 			return nil, rpc.ConvertError(err, "failed to convert events from system tx result", codes.Internal)
 		}
 
-		// if scheduled callbacks are enabled we calculate and cache the tx ids by reconstructing the system collection
-		// the first transaction will be the process transaction so we only need the events from the process callback tx
-		if scheduledCallbacksEnabled && len(systemTxIDs) == 0 {
-			sysCollection, err := blueprints.SystemCollection(e.chainID.Chain(), events)
-			if err != nil {
-				return nil, rpc.ConvertError(err, "failed to construct system collection", codes.Internal)
-			}
-			for _, tx := range sysCollection.Transactions {
-				systemTxIDs = append(systemTxIDs, tx.ID())
-			}
-
-			if len(systemTxIDs) != systemTxCount {
-				return nil, status.Errorf(codes.Internal, "invalid number of system transactions, expected %d, got %d", systemTxCount, len(systemTxIDs))
-			}
-		} else {
-			systemTxIDs[0] = e.systemTxID
-		}
-
 		results = append(results, &accessmodel.TransactionResult{
 			Status:        systemTxStatus,
 			StatusCode:    uint(systemTxResult.GetStatusCode()),
@@ -371,6 +360,46 @@ func (e *ENTransactionProvider) systemTransactionResults(
 	}
 
 	return results, nil
+}
+
+// systemTransactionIDs determines the system transaction IDs upfront
+func (e *ENTransactionProvider) systemTransactionIDs(
+	systemTxResults []*execproto.GetTransactionResultResponse,
+	actualEventEncodingVersion entities.EventEncodingVersion,
+	requiredEventEncodingVersion entities.EventEncodingVersion,
+) ([]flow.Identifier, error) {
+	var systemTxIDs []flow.Identifier
+	scheduledCallbacksEnabled := len(systemTxResults) > 1 // TODO: improve this assumption
+
+	if !scheduledCallbacksEnabled {
+		return []flow.Identifier{e.systemTxID}, nil
+	}
+
+	// Get events from the process scheduled callback transaction to reconstruct the system collection
+	processResult := systemTxResults[0]
+	events, err := convert.MessagesToEventsWithEncodingConversion(
+		processResult.GetEvents(),
+		actualEventEncodingVersion,
+		requiredEventEncodingVersion,
+	)
+	if err != nil {
+		return nil, rpc.ConvertError(err, "failed to convert events", codes.Internal)
+	}
+
+	sysCollection, err := blueprints.SystemCollection(e.chainID.Chain(), events)
+	if err != nil {
+		return nil, rpc.ConvertError(err, "failed to construct system collection", codes.Internal)
+	}
+
+	for _, tx := range sysCollection.Transactions {
+		systemTxIDs = append(systemTxIDs, tx.ID())
+	}
+
+	if len(systemTxIDs) != len(systemTxResults) {
+		return nil, status.Errorf(codes.Internal, "mismatch: expected %d, got %d", len(systemTxResults), len(systemTxIDs))
+	}
+
+	return systemTxIDs, nil
 }
 
 func (e *ENTransactionProvider) getTransactionResultFromAnyExeNode(
