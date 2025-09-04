@@ -3055,7 +3055,7 @@ func TestExtendBlockProcessable(t *testing.T) {
 // first block is added and then finalized;
 // second block is a sibling to the finalized block
 // The Follower should accept this block since tracking of orphan blocks is implemented by another component.
-func TestFollowerHeaderExtendBlockNotConnectedTestFollowerHeaderExtendBlockNotConnected(t *testing.T) {
+func TestFollowerHeaderExtendBlockNotConnected(t *testing.T) {
 	rootSnapshot := unittest.RootSnapshotFixture(participants)
 	rootProtocolStateID := getRootProtocolStateID(t, rootSnapshot)
 	util.RunWithFollowerProtocolState(t, rootSnapshot, func(db *badger.DB, state *protocol.FollowerState) {
