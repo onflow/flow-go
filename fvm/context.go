@@ -48,6 +48,9 @@ type Context struct {
 	// AllowProgramCacheWritesInScripts determines if the program cache can be written to in scripts
 	// By default, the program cache is only updated by transactions.
 	AllowProgramCacheWritesInScripts bool
+
+	VMScriptExecutionEnabled      bool
+	VMTransactionExecutionEnabled bool
 }
 
 // NewContext initializes a new execution context with the provided options.
@@ -233,7 +236,7 @@ func WithServiceAccount(enabled bool) Option {
 	}
 }
 
-// WithRestrictContractRemoval enables or disables restricted contract removal for a
+// WithContractRemovalRestricted enables or disables restricted contract removal for a
 // virtual machine context. Warning! this would be overridden with the flag stored on chain.
 // this is just a fallback value
 func WithContractRemovalRestricted(enabled bool) Option {
@@ -243,7 +246,7 @@ func WithContractRemovalRestricted(enabled bool) Option {
 	}
 }
 
-// WithRestrictedContractDeployment enables or disables restricted contract deployment for a
+// WithContractDeploymentRestricted enables or disables restricted contract deployment for a
 // virtual machine context. Warning! this would be overridden with the flag stored on chain.
 // this is just a fallback value
 func WithContractDeploymentRestricted(enabled bool) Option {
@@ -271,7 +274,7 @@ func WithAccountStorageLimit(enabled bool) Option {
 	}
 }
 
-// WithAuthorizationCheckxEnabled enables or disables pre-execution
+// WithAuthorizationChecksEnabled enables or disables pre-execution
 // authorization checks.
 func WithAuthorizationChecksEnabled(enabled bool) Option {
 	return func(ctx Context) Context {
@@ -320,6 +323,22 @@ func WithTransactionFeesEnabled(enabled bool) Option {
 	}
 }
 
+// WithVMScriptExecutionEnabled enables or disables execution of scripts with the Cadence VM.
+func WithVMScriptExecutionEnabled(enabled bool) Option {
+	return func(ctx Context) Context {
+		ctx.VMScriptExecutionEnabled = enabled
+		return ctx
+	}
+}
+
+// WithVMTransactionExecutionEnabled enables or disables execution of transactions with the Cadence VM.
+func WithVMTransactionExecutionEnabled(enabled bool) Option {
+	return func(ctx Context) Context {
+		ctx.VMTransactionExecutionEnabled = enabled
+		return ctx
+	}
+}
+
 // WithRandomSourceHistoryCallAllowed enables or disables calling the `entropy` function
 // within cadence
 func WithRandomSourceHistoryCallAllowed(allowed bool) Option {
@@ -329,7 +348,7 @@ func WithRandomSourceHistoryCallAllowed(allowed bool) Option {
 	}
 }
 
-// WithReusableCadenceRuntimePool set the (shared) RedusableCadenceRuntimePool
+// WithReusableCadenceRuntimePool set the (shared) ReusableCadenceRuntimePool
 // use for creating the cadence runtime.
 func WithReusableCadenceRuntimePool(
 	pool reusableRuntime.ReusableCadenceRuntimePool,
