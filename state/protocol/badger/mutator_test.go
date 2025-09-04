@@ -587,37 +587,44 @@ func TestExtendMissingParent(t *testing.T) {
 func TestExtendHeightTooSmall(t *testing.T) {
 	rootSnapshot := unittest.RootSnapshotFixture(participants)
 	rootProtocolStateID := getRootProtocolStateID(t, rootSnapshot)
-	util.RunWithFullProtocolState(t, rootSnapshot, func(bdb *badger.DB, state *protocol.ParticipantState) {
-		head, err := rootSnapshot.Head()
-		require.NoError(t, err)
+	head, err := rootSnapshot.Head()
+	require.NoError(t, err)
 
+	// we create the following to descendants of head:
+	//   head <- blockB <- blockC
+	// where blockB and blockC have exactly the same height
+	emptyPayload := unittest.PayloadFixture(unittest.WithProtocolStateID(rootProtocolStateID))
+	blockB := unittest.BlockFixture( // creates child with increased height and view (protocol compliant)
+		unittest.Block.WithParent(head.ID(), head.View, head.Height),
+		unittest.Block.WithHeight(head.Height+1),
+		unittest.Block.WithView(head.View+1),
+		unittest.Block.WithPayload(emptyPayload))
+
+	blockC := unittest.BlockFixture( // creates child with height identical to parent (protocol violation) but increased view (protocol compliant)
+		unittest.Block.WithParent(blockB.ID(), blockB.View, blockB.Height),
+		unittest.Block.WithHeight(blockB.Height),
+		unittest.Block.WithView(blockB.View+1),
+		unittest.Block.WithPayload(emptyPayload))
+
+	util.RunWithFullProtocolState(t, rootSnapshot, func(bdb *badger.DB, chainState *protocol.ParticipantState) {
 		db := badgerimpl.ToDB(bdb)
 
-		extend := unittest.BlockFixture(
-			unittest.Block.WithParent(head.ID(), head.View, head.Height),
-			unittest.Block.WithHeight(1),
-			unittest.Block.WithView(1),
-			unittest.Block.WithPayload(unittest.PayloadFixture(unittest.WithProtocolStateID(rootProtocolStateID))))
+		require.NoError(t, chainState.Extend(context.Background(), unittest.ProposalFromBlock(blockB)))
 
-		err = state.Extend(context.Background(), unittest.ProposalFromBlock(extend))
-		require.NoError(t, err)
-
-		// create another block with the same height and view, that is coming after
-		extend2 := unittest.BlockWithParentAndPayload(
-			extend.ToHeader(),
-			unittest.PayloadFixture(unittest.WithProtocolStateID(rootProtocolStateID)),
-		)
-		extend2.Height = 1
-		err = state.Extend(context.Background(), unittest.ProposalFromBlock(extend2))
+		err = chainState.Extend(context.Background(), unittest.ProposalFromBlock(blockC))
+		require.Error(t, err)
 		require.True(t, st.IsInvalidExtensionError(err))
 
-		// verify seal not indexed
+		// Whenever the state ingests a block, it indexes the latest seal as of this block.
+		// Therefore, we can use this as a check to confirm that blockB was successfully ingested,
+		// but the information from blockC was not.
 		var sealID flow.Identifier
-		err = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			return operation.LookupLatestSealAtBlock(rw.GlobalReader(), extend2.ID(), &sealID)
-		})
-		require.Error(t, err)
-		require.ErrorIs(t, err, storage.ErrNotFound)
+		// latest seal for blockB should be found, as blockB was successfully ingested:
+		require.NoError(t, operation.LookupLatestSealAtBlock(db.Reader(), blockB.ID(), &sealID))
+		// latest seal for blockC should NOT be found, because extending the state with blockC errored:
+		require.ErrorIs(t,
+			operation.LookupLatestSealAtBlock(db.Reader(), blockC.ID(), &sealID),
+			storage.ErrNotFound)
 	})
 }
 
