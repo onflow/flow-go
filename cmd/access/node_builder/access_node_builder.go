@@ -1751,7 +1751,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				Str("collection_node", builder.rpcConf.CollectionAddr).
 				Msg("using the static collection node address")
 
-			collectionRPCConn, err := grpc.NewClient(
+			collectionRPCConn, err := grpc.Dial(
 				builder.rpcConf.CollectionAddr,
 				grpc.WithDefaultCallOptions(
 					grpc.MaxCallSendMsgSize(int(builder.rpcConf.BackendConfig.CollectionConfig.MaxRequestMsgSize)),
@@ -1788,7 +1788,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 					)
 				}
 
-				historicalAccessRPCConn, err := grpc.NewClient(
+				historicalAccessRPCConn, err := grpc.Dial(
 					addr,
 					grpc.WithDefaultCallOptions(callOpts...),
 					grpc.WithTransportCredentials(insecure.NewCredentials()))

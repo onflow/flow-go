@@ -268,7 +268,7 @@ func newFlowLite(network string, address string, done chan int) (*grpc.Server, *
 }
 
 func openFlowLite(address string) error {
-	c, err := grpc.NewClient(
+	c, err := grpc.Dial(
 		"unix://"+address,
 		grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(commonrpc.DefaultAccessMaxResponseSize)),
 		grpc.WithTransportCredentials(grpcinsecure.NewCredentials()))
