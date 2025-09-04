@@ -3,7 +3,6 @@ package ingest
 import (
 	"context"
 	"errors"
-	"github.com/onflow/flow-go/model/messages"
 	"io"
 	"testing"
 	"time"
@@ -18,6 +17,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/factory"
 	"github.com/onflow/flow-go/model/flow/filter"
+	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/mempool"

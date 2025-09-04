@@ -167,10 +167,13 @@ type UntrustedTransaction Transaction
 // All errors indicate a valid Transaction cannot be constructed from the input.
 func NewTransaction(untrusted UntrustedTransaction) (*Transaction, error) {
 
-	// TODO: add validation checks for transaction
+	trustedTxBody, err := NewTransactionBody(UntrustedTransactionBody(untrusted.TransactionBody))
+	if err != nil {
+		return nil, fmt.Errorf("invalid transaction body: %w", err)
+	}
 
 	return &Transaction{
-		TransactionBody:  untrusted.TransactionBody,
+		TransactionBody:  *trustedTxBody,
 		Status:           untrusted.Status,
 		Events:           untrusted.Events,
 		ComputationSpent: untrusted.ComputationSpent,
