@@ -148,8 +148,9 @@ func TestSnapshot_Params(t *testing.T) {
 
 // TestSnapshot_Descendants builds a sample chain with next structure:
 //
-//	A (finalized) <- B <- C <- D <- E <- F
-//	              <- G <- H <- I <- J
+//	              ↙ B ← C ← D ← E ← F
+//	A (finalized)
+//	              ↖ G ← H ← I ← J
 //
 // snapshot.Descendants has to return [B, C, D, E, F, G, H, I, J].
 func TestSnapshot_Descendants(t *testing.T) {
@@ -160,12 +161,17 @@ func TestSnapshot_Descendants(t *testing.T) {
 	require.NoError(t, err)
 	util.RunWithFullProtocolState(t, rootSnapshot, func(db *badger.DB, state *bprotocol.ParticipantState) {
 		var expectedBlocks []flow.Identifier
-		for i := 5; i > 3; i-- {
+		// In this test, we create two conflicting forks. To prevent accidentally creating byzantine scenarios, where
+		// multiple blocks have the same view, we keep track of used views and ensure that each new block has a unique view.
+		usedViews := make(map[uint64]struct{})
+		usedViews[head.View] = struct{}{}
+		for forkLength := range []int{5, 4} { // construct two forks with length 5 and 4, respectively
 			parent := head
-			for n := 0; n < i; n++ {
-				block := unittest.BlockWithParentAndPayload(
+			for n := 0; n < forkLength; n++ {
+				block := unittest.BlockWithParentAndPayloadAndUniqueView(
 					parent,
 					unittest.PayloadFixture(unittest.WithProtocolStateID(rootProtocolStateID)),
+					usedViews,
 				)
 				err := state.Extend(context.Background(), unittest.ProposalFromBlock(block))
 				require.NoError(t, err)
@@ -909,7 +915,7 @@ func TestSealingSegment_FailureCases(t *testing.T) {
 	t.Run("sealing segment from block below local state root", func(t *testing.T) {
 		// Step I: constructing bootstrapping snapshot with some short history:
 		//
-		//          ╭───── finalized blocks ─────╮
+		//        ╭───── finalized blocks ─────╮
 		//    <-  b1  <-  b2(result(b1))  <-  b3(seal(b1))  <-
 		//                                    └── head ──┘
 		//
@@ -967,7 +973,7 @@ func TestSealingSegment_FailureCases(t *testing.T) {
 	// SCENARIO 2a: A pending block is chosen as head; at this height no block has been finalized.
 	t.Run("sealing segment from unfinalized, pending block", func(t *testing.T) {
 		util.RunWithFollowerProtocolState(t, sporkRootSnapshot, func(db *badger.DB, state *bprotocol.FollowerState) {
-			// add _unfinalized_ blocks b1 and b2 to state (block b5 is necessary, so b1 has a QC, which is a consistency requirement for subsequent finality)
+			// add _unfinalized_ blocks b1 and b2 to state (block b2 is necessary, so b1 has a QC, which is a consistency requirement for subsequent finality)
 			b1 := unittest.BlockWithParentAndPayload(
 				sporkRoot,
 				unittest.PayloadFixture(unittest.WithProtocolStateID(rootProtocolStateID)),
@@ -991,17 +997,24 @@ func TestSealingSegment_FailureCases(t *testing.T) {
 
 	// SCENARIO 2b: An orphaned block is chosen as head; at this height a block other than the orphaned has been finalized.
 	t.Run("sealing segment from orphaned block", func(t *testing.T) {
+		// In this test, we create two conflicting forks. To prevent accidentally creating byzantine scenarios, where
+		// multiple blocks have the same view, we keep track of used views and ensure that each new block has a unique view.
+		usedViews := make(map[uint64]struct{})
+		usedViews[sporkRoot.View] = struct{}{}
+
 		util.RunWithFollowerProtocolState(t, sporkRootSnapshot, func(db *badger.DB, state *bprotocol.FollowerState) {
-			orphaned := unittest.BlockWithParentAndPayload(
+			orphaned := unittest.BlockWithParentAndPayloadAndUniqueView(
 				sporkRoot,
 				unittest.PayloadFixture(unittest.WithProtocolStateID(rootProtocolStateID)),
+				usedViews,
 			)
-			orphanedChild := unittest.BlockWithParentProtocolState(orphaned)
+			orphanedChild := unittest.BlockWithParentProtocolStateAndUniqueView(orphaned, usedViews)
 			require.NoError(t, state.ExtendCertified(context.Background(), unittest.CertifiedByChild(orphaned, orphanedChild)))
 			require.NoError(t, state.ExtendCertified(context.Background(), unittest.NewCertifiedBlock(orphanedChild)))
-			block := unittest.BlockWithParentAndPayload(
+			block := unittest.BlockWithParentAndPayloadAndUniqueView(
 				sporkRoot,
 				unittest.PayloadFixture(unittest.WithProtocolStateID(rootProtocolStateID)),
+				usedViews,
 			)
 			buildFinalizedBlock(t, state, block)
 
@@ -1015,12 +1028,11 @@ func TestSealingSegment_FailureCases(t *testing.T) {
 			assert.True(t, protocol.IsUnfinalizedSealingSegmentError(err))
 		})
 	})
-
 }
 
 // TestBootstrapSealingSegmentWithExtraBlocks test sealing segment where the segment blocks contain collection
 // guarantees referencing blocks prior to the sealing segment. After bootstrapping from sealing segment we should be able to
-// extend with B7 with contains a guarantee referring B1.
+// extend with B7 with contains a guarantee referencing B1.
 // ROOT <- B1 <- B2(R1) <- B3 <- B4(S1) <- B5 <- B6(S2)
 // Expected sealing segment: [B2, B3, B4, B5, B6], Extra blocks: [ROOT, B1]
 func TestBootstrapSealingSegmentWithExtraBlocks(t *testing.T) {

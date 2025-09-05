@@ -53,6 +53,7 @@ const (
 	ResourceProposalSignature                                = "proposal_signature"
 	ResourceHeader                                           = "header"
 	ResourceFinalizedHeight                                  = "finalized_height"
+	ResourceCertifiedView                                    = "certified_view"
 	ResourceIndex                                            = "index"
 	ResourceIdentity                                         = "identity"
 	ResourceGuarantee                                        = "guarantee"

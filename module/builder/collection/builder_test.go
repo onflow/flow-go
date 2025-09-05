@@ -3,11 +3,13 @@ package collection_test
 import (
 	"context"
 	"errors"
+	"fmt"
 	"math/rand"
 	"os"
 	"testing"
 
 	"github.com/dgraph-io/badger/v2"
+	"github.com/jordanschalm/lockctx"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -31,9 +33,10 @@ import (
 	"github.com/onflow/flow-go/state/protocol/protocol_state/kvstore"
 	"github.com/onflow/flow-go/state/protocol/util"
 	"github.com/onflow/flow-go/storage"
-	bstorage "github.com/onflow/flow-go/storage/badger"
-	"github.com/onflow/flow-go/storage/badger/operation"
-	"github.com/onflow/flow-go/storage/badger/procedure"
+	"github.com/onflow/flow-go/storage/operation"
+	"github.com/onflow/flow-go/storage/operation/badgerimpl"
+	"github.com/onflow/flow-go/storage/procedure"
+	"github.com/onflow/flow-go/storage/store"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -53,8 +56,10 @@ var setter = func(h *flow.HeaderBodyBuilder) error {
 
 type BuilderSuite struct {
 	suite.Suite
-	db    *badger.DB
-	dbdir string
+	db          storage.DB
+	badgerDB    *badger.DB
+	dbdir       string
+	lockManager lockctx.Manager
 
 	genesis      *model.Block
 	chainID      flow.ChainID
@@ -75,6 +80,8 @@ type BuilderSuite struct {
 
 // runs before each test runs
 func (suite *BuilderSuite) SetupTest() {
+	fmt.Println("SetupTest>>>>")
+	lockManager := storage.NewTestingLockManager()
 	var err error
 
 	suite.genesis, err = unittest.ClusterBlock.Genesis()
@@ -84,18 +91,20 @@ func (suite *BuilderSuite) SetupTest() {
 	suite.pool = herocache.NewTransactions(1000, unittest.Logger(), metrics.NewNoopCollector())
 
 	suite.dbdir = unittest.TempDir(suite.T())
-	suite.db = unittest.BadgerDB(suite.T(), suite.dbdir)
+	suite.badgerDB = unittest.BadgerDB(suite.T(), suite.dbdir)
+	suite.db = badgerimpl.ToDB(suite.badgerDB)
+	suite.lockManager = lockManager
 
 	metrics := metrics.NewNoopCollector()
 	tracer := trace.NewNoopTracer()
 	log := zerolog.Nop()
 
-	all := bstorage.InitAll(metrics, suite.db)
+	all := store.InitAll(metrics, suite.db)
 	consumer := events.NewNoop()
 
 	suite.headers = all.Headers
 	suite.blocks = all.Blocks
-	suite.payloads = bstorage.NewClusterPayloads(metrics, suite.db)
+	suite.payloads = store.NewClusterPayloads(metrics, suite.db)
 
 	// just bootstrap with a genesis block, we'll use this as reference
 	root, result, seal := unittest.BootstrapFixture(unittest.IdentityListFixture(5, unittest.WithAllRoles()))
@@ -124,21 +133,22 @@ func (suite *BuilderSuite) SetupTest() {
 	clusterQC := unittest.QuorumCertificateFixture(unittest.QCWithRootBlockID(suite.genesis.ID()))
 	clusterStateRoot, err := clusterkv.NewStateRoot(suite.genesis, clusterQC, suite.epochCounter)
 	suite.Require().NoError(err)
-	clusterState, err := clusterkv.Bootstrap(suite.db, clusterStateRoot)
+	clusterState, err := clusterkv.Bootstrap(suite.db, lockManager, clusterStateRoot)
 	suite.Require().NoError(err)
 
-	suite.state, err = clusterkv.NewMutableState(clusterState, tracer, suite.headers, suite.payloads)
+	suite.state, err = clusterkv.NewMutableState(clusterState, lockManager, tracer, suite.headers, suite.payloads)
 	suite.Require().NoError(err)
 
 	state, err := pbadger.Bootstrap(
 		metrics,
 		suite.db,
+		lockManager,
 		all.Headers,
 		all.Seals,
 		all.Results,
 		all.Blocks,
 		all.QuorumCertificates,
-		all.Setups,
+		all.EpochSetups,
 		all.EpochCommits,
 		all.EpochProtocolStateEntries,
 		all.ProtocolKVStore,
@@ -172,6 +182,7 @@ func (suite *BuilderSuite) SetupTest() {
 	suite.builder, _ = builder.NewBuilder(
 		suite.db,
 		tracer,
+		lockManager,
 		metrics,
 		suite.protoState,
 		suite.state,
@@ -187,30 +198,40 @@ func (suite *BuilderSuite) SetupTest() {
 
 // runs after each test finishes
 func (suite *BuilderSuite) TearDownTest() {
-	err := suite.db.Close()
+	err := suite.badgerDB.Close()
 	suite.Assert().NoError(err)
 	err = os.RemoveAll(suite.dbdir)
 	suite.Assert().NoError(err)
 }
 
 func (suite *BuilderSuite) InsertBlock(block *model.Block) {
-	err := suite.db.Update(procedure.InsertClusterBlock(unittest.ClusterProposalFromBlock(block)))
+	lctx := suite.lockManager.NewContext()
+	defer lctx.Release()
+	err := lctx.AcquireLock(storage.LockInsertOrFinalizeClusterBlock)
+	suite.Assert().NoError(err)
+	err = suite.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+		return procedure.InsertClusterBlock(lctx, rw, unittest.ClusterProposalFromBlock(block))
+	})
 	suite.Assert().NoError(err)
 }
 
 func (suite *BuilderSuite) FinalizeBlock(block model.Block) {
-	err := suite.db.Update(func(tx *badger.Txn) error {
+	err := suite.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 		var refBlock flow.Header
-		err := operation.RetrieveHeader(block.Payload.ReferenceBlockID, &refBlock)(tx)
+		err := operation.RetrieveHeader(rw.GlobalReader(), block.Payload.ReferenceBlockID, &refBlock)
 		if err != nil {
 			return err
 		}
-		err = procedure.FinalizeClusterBlock(block.ID())(tx)
+		lctx := suite.lockManager.NewContext()
+		defer lctx.Release()
+		if err := lctx.AcquireLock(storage.LockInsertOrFinalizeClusterBlock); err != nil {
+			return err
+		}
+		err = procedure.FinalizeClusterBlock(lctx, rw, block.ID())
 		if err != nil {
 			return err
 		}
-		err = operation.IndexClusterBlockByReferenceHeight(refBlock.Height, block.ID())(tx)
-		return err
+		return operation.IndexClusterBlockByReferenceHeight(lctx, rw.Writer(), refBlock.Height, block.ID())
 	})
 	suite.Assert().NoError(err)
 }
@@ -273,7 +294,7 @@ func (suite *BuilderSuite) TestBuildOn_Success() {
 
 	// should be able to retrieve built block from storage
 	var built model.Block
-	err = suite.db.View(procedure.RetrieveClusterBlock(proposal.Header.ID(), &built))
+	err = procedure.RetrieveClusterBlock(suite.db.Reader(), proposal.Header.ID(), &built)
 	suite.Assert().NoError(err)
 	builtCollection := built.Payload.Collection
 
@@ -336,7 +357,7 @@ func (suite *BuilderSuite) TestBuildOn_WithUnknownReferenceBlock() {
 
 	// should be able to retrieve built block from storage
 	var built model.Block
-	err = suite.db.View(procedure.RetrieveClusterBlock(header.Header.ID(), &built))
+	err = procedure.RetrieveClusterBlock(suite.db.Reader(), header.Header.ID(), &built)
 	suite.Assert().NoError(err)
 	builtCollection := built.Payload.Collection
 
@@ -377,7 +398,7 @@ func (suite *BuilderSuite) TestBuildOn_WithUnfinalizedReferenceBlock() {
 
 	// should be able to retrieve built block from storage
 	var built model.Block
-	err = suite.db.View(procedure.RetrieveClusterBlock(header.Header.ID(), &built))
+	err = procedure.RetrieveClusterBlock(suite.db.Reader(), header.Header.ID(), &built)
 	suite.Assert().NoError(err)
 	builtCollection := built.Payload.Collection
 
@@ -428,7 +449,7 @@ func (suite *BuilderSuite) TestBuildOn_WithOrphanedReferenceBlock() {
 
 	// should be able to retrieve built block from storage
 	var built model.Block
-	err = suite.db.View(procedure.RetrieveClusterBlock(header.Header.ID(), &built))
+	err = procedure.RetrieveClusterBlock(suite.db.Reader(), header.Header.ID(), &built)
 	suite.Assert().NoError(err)
 	builtCollection := built.Payload.Collection
 
@@ -471,7 +492,7 @@ func (suite *BuilderSuite) TestBuildOn_WithForks() {
 
 	// should be able to retrieve built block from storage
 	var built model.Block
-	err = suite.db.View(procedure.RetrieveClusterBlock(header.Header.ID(), &built))
+	err = procedure.RetrieveClusterBlock(suite.db.Reader(), header.Header.ID(), &built)
 	assert.NoError(t, err)
 	builtCollection := built.Payload.Collection
 
@@ -518,7 +539,7 @@ func (suite *BuilderSuite) TestBuildOn_ConflictingFinalizedBlock() {
 
 	// retrieve the built block from storage
 	var built model.Block
-	err = suite.db.View(procedure.RetrieveClusterBlock(header.Header.ID(), &built))
+	err = procedure.RetrieveClusterBlock(suite.db.Reader(), header.Header.ID(), &built)
 	assert.NoError(t, err)
 	builtCollection := built.Payload.Collection
 
@@ -568,7 +589,7 @@ func (suite *BuilderSuite) TestBuildOn_ConflictingInvalidatedForks() {
 
 	// retrieve the built block from storage
 	var built model.Block
-	err = suite.db.View(procedure.RetrieveClusterBlock(header.Header.ID(), &built))
+	err = procedure.RetrieveClusterBlock(suite.db.Reader(), header.Header.ID(), &built)
 	assert.NoError(t, err)
 	builtCollection := built.Payload.Collection
 
@@ -586,6 +607,7 @@ func (suite *BuilderSuite) TestBuildOn_LargeHistory() {
 	suite.builder, _ = builder.NewBuilder(
 		suite.db,
 		trace.NewNoopTracer(),
+		suite.lockManager,
 		metrics.NewNoopCollector(),
 		suite.protoState,
 		suite.state,
@@ -631,7 +653,7 @@ func (suite *BuilderSuite) TestBuildOn_LargeHistory() {
 		// conflicting fork, build on the parent of the head
 		parent := *head
 		if conflicting {
-			err = suite.db.View(procedure.RetrieveClusterBlock(parent.ParentID, &parent))
+			err = procedure.RetrieveClusterBlock(suite.db.Reader(), parent.ParentID, &parent)
 			assert.NoError(t, err)
 			// add the transaction to the invalidated list
 			invalidatedTxIds = append(invalidatedTxIds, tx.ID())
@@ -667,7 +689,7 @@ func (suite *BuilderSuite) TestBuildOn_LargeHistory() {
 
 	// retrieve the built block from storage
 	var built model.Block
-	err = suite.db.View(procedure.RetrieveClusterBlock(header.Header.ID(), &built))
+	err = procedure.RetrieveClusterBlock(suite.db.Reader(), header.Header.ID(), &built)
 	require.NoError(t, err)
 	builtCollection := built.Payload.Collection
 
@@ -681,6 +703,7 @@ func (suite *BuilderSuite) TestBuildOn_MaxCollectionSize() {
 	suite.builder, _ = builder.NewBuilder(
 		suite.db,
 		trace.NewNoopTracer(),
+		suite.lockManager,
 		metrics.NewNoopCollector(),
 		suite.protoState,
 		suite.state,
@@ -700,7 +723,7 @@ func (suite *BuilderSuite) TestBuildOn_MaxCollectionSize() {
 
 	// retrieve the built block from storage
 	var built model.Block
-	err = suite.db.View(procedure.RetrieveClusterBlock(header.Header.ID(), &built))
+	err = procedure.RetrieveClusterBlock(suite.db.Reader(), header.Header.ID(), &built)
 	suite.Require().NoError(err)
 	builtCollection := built.Payload.Collection
 
@@ -713,6 +736,7 @@ func (suite *BuilderSuite) TestBuildOn_MaxCollectionByteSize() {
 	suite.builder, _ = builder.NewBuilder(
 		suite.db,
 		trace.NewNoopTracer(),
+		suite.lockManager,
 		metrics.NewNoopCollector(),
 		suite.protoState,
 		suite.state,
@@ -732,7 +756,7 @@ func (suite *BuilderSuite) TestBuildOn_MaxCollectionByteSize() {
 
 	// retrieve the built block from storage
 	var built model.Block
-	err = suite.db.View(procedure.RetrieveClusterBlock(header.Header.ID(), &built))
+	err = procedure.RetrieveClusterBlock(suite.db.Reader(), header.Header.ID(), &built)
 	suite.Require().NoError(err)
 	builtCollection := built.Payload.Collection
 
@@ -745,6 +769,7 @@ func (suite *BuilderSuite) TestBuildOn_MaxCollectionTotalGas() {
 	suite.builder, _ = builder.NewBuilder(
 		suite.db,
 		trace.NewNoopTracer(),
+		suite.lockManager,
 		metrics.NewNoopCollector(),
 		suite.protoState,
 		suite.state,
@@ -764,7 +789,7 @@ func (suite *BuilderSuite) TestBuildOn_MaxCollectionTotalGas() {
 
 	// retrieve the built block from storage
 	var built model.Block
-	err = suite.db.View(procedure.RetrieveClusterBlock(header.Header.ID(), &built))
+	err = procedure.RetrieveClusterBlock(suite.db.Reader(), header.Header.ID(), &built)
 	suite.Require().NoError(err)
 	builtCollection := built.Payload.Collection
 
@@ -803,6 +828,7 @@ func (suite *BuilderSuite) TestBuildOn_ExpiredTransaction() {
 	suite.builder, _ = builder.NewBuilder(
 		suite.db,
 		trace.NewNoopTracer(),
+		suite.lockManager,
 		metrics.NewNoopCollector(),
 		suite.protoState,
 		suite.state,
@@ -840,7 +866,7 @@ func (suite *BuilderSuite) TestBuildOn_ExpiredTransaction() {
 
 	// retrieve the built block from storage
 	var built model.Block
-	err = suite.db.View(procedure.RetrieveClusterBlock(header.Header.ID(), &built))
+	err = procedure.RetrieveClusterBlock(suite.db.Reader(), header.Header.ID(), &built)
 	suite.Require().NoError(err)
 	builtCollection := built.Payload.Collection
 
@@ -858,6 +884,7 @@ func (suite *BuilderSuite) TestBuildOn_EmptyMempool() {
 	suite.builder, _ = builder.NewBuilder(
 		suite.db,
 		trace.NewNoopTracer(),
+		suite.lockManager,
 		metrics.NewNoopCollector(),
 		suite.protoState,
 		suite.state,
@@ -874,7 +901,7 @@ func (suite *BuilderSuite) TestBuildOn_EmptyMempool() {
 	suite.Require().NoError(err)
 
 	var built model.Block
-	err = suite.db.View(procedure.RetrieveClusterBlock(header.Header.ID(), &built))
+	err = procedure.RetrieveClusterBlock(suite.db.Reader(), header.Header.ID(), &built)
 	suite.Require().NoError(err)
 
 	// should reference a valid reference block
@@ -898,6 +925,7 @@ func (suite *BuilderSuite) TestBuildOn_NoRateLimiting() {
 	suite.builder, _ = builder.NewBuilder(
 		suite.db,
 		trace.NewNoopTracer(),
+		suite.lockManager,
 		metrics.NewNoopCollector(),
 		suite.protoState,
 		suite.state,
@@ -944,7 +972,7 @@ func (suite *BuilderSuite) TestBuildOn_NoRateLimiting() {
 
 		// each collection should be full with 10 transactions
 		var built model.Block
-		err = suite.db.View(procedure.RetrieveClusterBlock(header.Header.ID(), &built))
+		err = procedure.RetrieveClusterBlock(suite.db.Reader(), header.Header.ID(), &built)
 		suite.Assert().NoError(err)
 		suite.Assert().Len(built.Payload.Collection.Transactions, 10)
 	}
@@ -964,6 +992,7 @@ func (suite *BuilderSuite) TestBuildOn_RateLimitNonPayer() {
 	suite.builder, _ = builder.NewBuilder(
 		suite.db,
 		trace.NewNoopTracer(),
+		suite.lockManager,
 		metrics.NewNoopCollector(),
 		suite.protoState,
 		suite.state,
@@ -1014,7 +1043,7 @@ func (suite *BuilderSuite) TestBuildOn_RateLimitNonPayer() {
 
 		// each collection should be full with 10 transactions
 		var built model.Block
-		err = suite.db.View(procedure.RetrieveClusterBlock(header.Header.ID(), &built))
+		err = procedure.RetrieveClusterBlock(suite.db.Reader(), header.Header.ID(), &built)
 		suite.Assert().NoError(err)
 		suite.Assert().Len(built.Payload.Collection.Transactions, 10)
 	}
@@ -1031,6 +1060,7 @@ func (suite *BuilderSuite) TestBuildOn_HighRateLimit() {
 	suite.builder, _ = builder.NewBuilder(
 		suite.db,
 		trace.NewNoopTracer(),
+		suite.lockManager,
 		metrics.NewNoopCollector(),
 		suite.protoState,
 		suite.state,
@@ -1075,7 +1105,7 @@ func (suite *BuilderSuite) TestBuildOn_HighRateLimit() {
 
 		// each collection should be half-full with 5 transactions
 		var built model.Block
-		err = suite.db.View(procedure.RetrieveClusterBlock(header.Header.ID(), &built))
+		err = procedure.RetrieveClusterBlock(suite.db.Reader(), header.Header.ID(), &built)
 		suite.Assert().NoError(err)
 		suite.Assert().Len(built.Payload.Collection.Transactions, 5)
 	}
@@ -1094,6 +1124,7 @@ func (suite *BuilderSuite) TestBuildOn_MaxCollectionSizeRateLimiting() {
 	suite.builder, _ = builder.NewBuilder(
 		suite.db,
 		trace.NewNoopTracer(),
+		suite.lockManager,
 		metrics.NewNoopCollector(),
 		suite.protoState,
 		suite.state,
@@ -1157,7 +1188,7 @@ func (suite *BuilderSuite) TestBuildOn_MaxCollectionSizeRateLimiting() {
 
 		// each collection should be equal to the minimum collection size
 		var built model.Block
-		err = suite.db.View(procedure.RetrieveClusterBlock(header.Header.ID(), &built))
+		err = procedure.RetrieveClusterBlock(suite.db.Reader(), header.Header.ID(), &built)
 		suite.Assert().NoError(err)
 		suite.Assert().Len(built.Payload.Collection.Transactions, int(rateLimiterCfg.MinCollectionSize()))
 	}
@@ -1174,6 +1205,7 @@ func (suite *BuilderSuite) TestBuildOn_LowRateLimit() {
 	suite.builder, _ = builder.NewBuilder(
 		suite.db,
 		trace.NewNoopTracer(),
+		suite.lockManager,
 		metrics.NewNoopCollector(),
 		suite.protoState,
 		suite.state,
@@ -1219,7 +1251,7 @@ func (suite *BuilderSuite) TestBuildOn_LowRateLimit() {
 
 		// collections should either be empty or have 1 transaction
 		var built model.Block
-		err = suite.db.View(procedure.RetrieveClusterBlock(header.Header.ID(), &built))
+		err = procedure.RetrieveClusterBlock(suite.db.Reader(), header.Header.ID(), &built)
 		suite.Assert().NoError(err)
 		if i%2 == 0 {
 			suite.Assert().Len(built.Payload.Collection.Transactions, 1)
@@ -1239,6 +1271,7 @@ func (suite *BuilderSuite) TestBuildOn_UnlimitedPayer() {
 	suite.builder, _ = builder.NewBuilder(
 		suite.db,
 		trace.NewNoopTracer(),
+		suite.lockManager,
 		metrics.NewNoopCollector(),
 		suite.protoState,
 		suite.state,
@@ -1283,7 +1316,7 @@ func (suite *BuilderSuite) TestBuildOn_UnlimitedPayer() {
 
 		// each collection should be full with 10 transactions
 		var built model.Block
-		err = suite.db.View(procedure.RetrieveClusterBlock(header.Header.ID(), &built))
+		err = procedure.RetrieveClusterBlock(suite.db.Reader(), header.Header.ID(), &built)
 		suite.Assert().NoError(err)
 		suite.Assert().Len(built.Payload.Collection.Transactions, 10)
 
@@ -1303,6 +1336,7 @@ func (suite *BuilderSuite) TestBuildOn_RateLimitDryRun() {
 	suite.builder, _ = builder.NewBuilder(
 		suite.db,
 		trace.NewNoopTracer(),
+		suite.lockManager,
 		metrics.NewNoopCollector(),
 		suite.protoState,
 		suite.state,
@@ -1347,7 +1381,7 @@ func (suite *BuilderSuite) TestBuildOn_RateLimitDryRun() {
 
 		// each collection should be full with 10 transactions
 		var built model.Block
-		err = suite.db.View(procedure.RetrieveClusterBlock(header.Header.ID(), &built))
+		err = procedure.RetrieveClusterBlock(suite.db.Reader(), header.Header.ID(), &built)
 		suite.Assert().NoError(err)
 		suite.Assert().Len(built.Payload.Collection.Transactions, 10)
 	}
@@ -1365,6 +1399,7 @@ func (suite *BuilderSuite) TestBuildOn_SystemTxAlwaysIncluded() {
 	suite.builder, _ = builder.NewBuilder(
 		suite.db,
 		trace.NewNoopTracer(),
+		suite.lockManager,
 		metrics.NewNoopCollector(),
 		suite.protoState,
 		suite.state,
@@ -1398,7 +1433,7 @@ func (suite *BuilderSuite) TestBuildOn_SystemTxAlwaysIncluded() {
 	suite.Require().NoError(err)
 
 	var built model.Block
-	err = suite.db.View(procedure.RetrieveClusterBlock(header.Header.ID(), &built))
+	err = procedure.RetrieveClusterBlock(suite.db.Reader(), header.Header.ID(), &built)
 	suite.Assert().NoError(err)
 	suite.Assert().Len(built.Payload.Collection.Transactions, 2)
 	for _, tx := range built.Payload.Collection.Transactions {
@@ -1446,13 +1481,15 @@ func benchmarkBuildOn(b *testing.B, size int) {
 		suite.genesis, err = unittest.ClusterBlock.Genesis()
 		require.NoError(suite.T(), err)
 		suite.chainID = suite.genesis.ChainID
+		suite.lockManager = storage.NewTestingLockManager()
 
 		suite.pool = herocache.NewTransactions(1000, unittest.Logger(), metrics.NewNoopCollector())
 
 		suite.dbdir = unittest.TempDir(b)
-		suite.db = unittest.BadgerDB(b, suite.dbdir)
+		suite.badgerDB = unittest.BadgerDB(b, suite.dbdir)
+		suite.db = badgerimpl.ToDB(suite.badgerDB)
 		defer func() {
-			err = suite.db.Close()
+			err = suite.badgerDB.Close()
 			assert.NoError(b, err)
 			err = os.RemoveAll(suite.dbdir)
 			assert.NoError(b, err)
@@ -1460,18 +1497,18 @@ func benchmarkBuildOn(b *testing.B, size int) {
 
 		metrics := metrics.NewNoopCollector()
 		tracer := trace.NewNoopTracer()
-		all := bstorage.InitAll(metrics, suite.db)
+		all := store.InitAll(metrics, suite.db)
 		suite.headers = all.Headers
 		suite.blocks = all.Blocks
-		suite.payloads = bstorage.NewClusterPayloads(metrics, suite.db)
+		suite.payloads = store.NewClusterPayloads(metrics, suite.db)
 
 		qc := unittest.QuorumCertificateFixture(unittest.QCWithRootBlockID(suite.genesis.ID()))
 		stateRoot, err := clusterkv.NewStateRoot(suite.genesis, qc, suite.epochCounter)
 
-		state, err := clusterkv.Bootstrap(suite.db, stateRoot)
+		state, err := clusterkv.Bootstrap(suite.db, suite.lockManager, stateRoot)
 		assert.NoError(b, err)
 
-		suite.state, err = clusterkv.NewMutableState(state, tracer, suite.headers, suite.payloads)
+		suite.state, err = clusterkv.NewMutableState(state, suite.lockManager, tracer, suite.headers, suite.payloads)
 		assert.NoError(b, err)
 
 		// add some transactions to transaction pool
@@ -1485,6 +1522,7 @@ func benchmarkBuildOn(b *testing.B, size int) {
 		suite.builder, _ = builder.NewBuilder(
 			suite.db,
 			tracer,
+			suite.lockManager,
 			metrics,
 			suite.protoState,
 			suite.state,
@@ -1504,12 +1542,23 @@ func benchmarkBuildOn(b *testing.B, size int) {
 		block := unittest.ClusterBlockFixture(
 			unittest.ClusterBlock.WithParent(final),
 		)
-		err := suite.db.Update(procedure.InsertClusterBlock(unittest.ClusterProposalFromBlock(block)))
+		lctx := suite.lockManager.NewContext()
+		require.NoError(b, lctx.AcquireLock(storage.LockInsertOrFinalizeClusterBlock))
+
+		err := suite.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+			return procedure.InsertClusterBlock(lctx, rw, unittest.ClusterProposalFromBlock(block))
+		})
 		require.NoError(b, err)
+		lctx.Release()
 
 		// finalize the block 80% of the time, resulting in a fork-rate of 20%
 		if rand.Intn(100) < 80 {
-			err = suite.db.Update(procedure.FinalizeClusterBlock(block.ID()))
+			lctx := suite.lockManager.NewContext()
+			defer lctx.Release()
+			require.NoError(suite.T(), lctx.AcquireLock(storage.LockInsertOrFinalizeClusterBlock))
+			err = suite.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+				return procedure.FinalizeClusterBlock(lctx, rw, block.ID())
+			})
 			require.NoError(b, err)
 			final = block
 		}
