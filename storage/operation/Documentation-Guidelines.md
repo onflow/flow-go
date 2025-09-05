@@ -1,24 +1,31 @@
 # Guidelines for documenting low-level primitives for persistent storage
 
 The folder `storage/operation` contains low-level primitives for persistent storage and retrieval of data structures from a database.
-We accept that these functions have to be used _carefully_ to avoid data corruption by engineers that are knowledgeable about the
-safety limitations of these functions. In order to facilitate correct usage, we need to diligently document what aspects have to be paid
+We accept that these functions have to be used _carefully_ by engineers that are knowledgeable about the
+safety limitations of these functions to avoid data corruption . In order to facilitate correct usage, we need to diligently document what aspects have to be paid
 attention to when calling these functions.
 
 Proceed as follows
 1. look at one file in `storage/operation` at a time (skip test files for now)
-2. Go over the functions contained in the file one by one and decide whether for each function decide whether it is for writing or reading data.
+2. Go over the functions contained in the file one by one and for each function decide whether it is for writing or reading data.
 3. For each function, provide a concise yet precise documentation covering
     - what this function is for
     - the assumptions this function makes about its inputs
     - what has to be payed attention to when calling this function
     - expected error returns during normal operations
+    - follow our godocs policy `docs/agents/GoDocs.md`
 
-Tune your documentation on a case by case basis to reflect the function's specific detail. Avoid overly generic documentation, but try to stick to a uniform framing and wording. Be very concise but precise. Analyze the implementation to make the correct statements! Double check your work.
+Guidelines:
+- Tune your documentation on a case by case basis to reflect the function's specific detail.
+- Avoid overly generic documentation.
+- Stick to a uniform framing and wording.
+- Be very concise and precise.
+- Analyze the implementation to make the correct statements!
+- Double check your work.
 
 ## High level structure
 
-On the highest level, there are function for storing data and other functions for retrieving data. The naming indicate which class a function belongs to, though there is no absolutely uniform convention. For example, some function for loading data are start with `Retrieve`, while others start with `Lookup`, and additional names might be used as well. So pay close attention to the naming of the function.
+On the highest level, there are function for storing data and other functions for retrieving data. The naming indicate which class a function belongs to, though there is no absolutely uniform convention. For example, some function for loading data start with `Retrieve`, while others start with `Lookup`, and additional names might be used as well. So pay close attention to the naming of the function.
 
 Conceptually, we have data structures that contain certain fields. Furthermore, most data structures we deal with provide the functionality to compute a cryptographic hash of their contents, which is typically referred to as "ID". We store data as key-value pairs.
 (i) keys are either: the cryptographic hashes of the data structures.
@@ -29,7 +36,7 @@ Conceptually, we have data structures that contain certain fields. Furthermore, 
 
 ### Functions for reading data
 
-When generating documentation for functions reading data, carefully differentiate between functions of type (i) and (ii).
+When generating documentation for functions that read data, carefully differentiate between functions of type (i) and (ii).
 
 #### Type (i) functions for reading data
 
@@ -56,14 +63,14 @@ As an example for functions of type (ii), consider `operation.LookupPayloadSeals
 func LookupPayloadSeals(r storage.Reader, blockID flow.Identifier, sealIDs *[]flow.Identifier) error error
 ```
 * We document the struct type that is retrieved, here list of Seals. Be mindful whether we are retrieving an individual struct or a slice.
-* We document that the key we look up is the bock containing the data structure. A lot of times, we are brief and omit the detail that we are referring to the ID(s) of the struct(s), and just write that we are looking up X by Y containing X.
+* Document that the lookup key is the ID of the bock containing the data structure. You can use our standard shorthand in this case, and just write that we are looking up X by Y containing X.
 * We state if the index is populated for every known struct (which is typically the case). Consult the places in the code, where the corresponding index is written, to determine when the index is populated.
 * We document the "Expected errors during normal operations" (use this phrase). Typically, the error explanation is that no struct Y is known, which contains X.
 
 
 ### Functions for writing data
 
-When generating documentation for functions reading data, carefully differentiate between functions of type (i) and (ii).
+When generating documentation for functions that write data, carefully differentiate between functions of type (i) and (ii).
 For type (i), you need to carefully differentiate two sub-cases (i.a) and (i.b). Analogously, for type (ii), you need to carefully differentiate two sub-cases (ii.a) and (ii.b)
 
 #### Type (i.a) functions for writing data
