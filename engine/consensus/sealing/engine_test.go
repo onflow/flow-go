@@ -170,9 +170,6 @@ func (s *SealingEngineSuite) TestMultipleProcessingItems() {
 			approval := unittest.ResultApprovalFixture(
 				unittest.WithExecutionResultID(receipt.ExecutionResult.ID()),
 				unittest.WithApproverID(approverID),
-				func(approval *flow.ResultApproval) {
-					approval.Body.Spock = unittest.SignatureFixture()
-				},
 			)
 
 			responseApproval := &messages.ApprovalResponse{

@@ -1004,7 +1004,7 @@ func ResultApprovalFixture(opts ...func(*flow.ResultApproval)) *flow.ResultAppro
 			Attestation:          attestation,
 			ApproverID:           IdentifierFixture(),
 			AttestationSignature: SignatureFixture(),
-			Spock:                nil,
+			Spock:                SignatureFixture(),
 		},
 		VerifierSignature: SignatureFixture(),
 	}
@@ -1712,7 +1712,7 @@ func WithChunkID(chunkID flow.Identifier) func(*verification.ChunkDataPackReques
 // and height of zero.
 // Use options to customize the request.
 func ChunkDataPackRequestFixture(opts ...func(*verification.ChunkDataPackRequest)) *verification.
-	ChunkDataPackRequest {
+ChunkDataPackRequest {
 	req := &verification.ChunkDataPackRequest{
 		Locator:                  *ChunkLocatorFixture(IdentifierFixture(), 0),
 		ChunkDataPackRequestInfo: *ChunkDataPackRequestInfoFixture(),
