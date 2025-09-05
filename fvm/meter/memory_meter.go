@@ -155,7 +155,6 @@ var (
 		common.MemoryKindMembers:           276,
 		common.MemoryKindTypeAnnotation:    25,
 		common.MemoryKindDictionaryEntry:   33,
-		common.MemoryKindSwitchCase:        17,
 
 		common.MemoryKindFunctionDeclaration:           49,
 		common.MemoryKindCompositeDeclaration:          65,
@@ -253,16 +252,6 @@ var (
 		common.MemoryKindCadenceInclusiveRangeValue: 81,
 		common.MemoryKindCadenceInclusiveRangeType:  33,
 		common.MemoryKindInclusiveRangeSemaType:     17,
-
-		common.MemoryKindContractVariable: 17,
-		common.MemoryKindGoSliceLength:    17,
-
-		common.MemoryKindCompiler:         17,
-		common.MemoryKindCompilerGlobal:   17,
-		common.MemoryKindCompilerConstant: 17,
-
-		common.MemoryKindBoundFunctionVMValue:     17,
-		common.MemoryKindImplicitReferenceVMValue: 17,
 	}
 )
 
