@@ -380,7 +380,7 @@ func run(*cobra.Command, []string) {
 							reporters.NewReportFileWriterFactory(flagOutputDir, log.Logger),
 						),
 						migrations.NewAccountUsageMigration(
-							reporters.NewReportFileWriterFactoryWithFormat(flagOutputDir, log.Logger, reporters.ReportFormatJSONL),
+							reporters.NewReportFileWriterFactoryWithFormat(flagOutputDir, log.Logger, reporters.ReportFormatCSV),
 						),
 					},
 				),
