@@ -1,41 +1,39 @@
 package messages
 
 import (
+	"fmt"
+
 	"github.com/onflow/flow-go/model/flow"
 )
 
-// ChunkDataRequest represents a request for the a chunk data pack
+// ChunkDataRequest represents a request for the chunk data pack
 // which is specified by a chunk ID.
-type ChunkDataRequest struct {
-	ChunkID flow.Identifier
-	Nonce   uint64 // so that we aren't deduplicated by the network layer
-}
+type ChunkDataRequest flow.ChunkDataRequest
 
-// ToInternal converts the untrusted ChunkDataRequest into its trusted internal
-// representation.
+// ToInternal returns the internal type representation for ChunkDataRequest.
 //
-// This stub returns the receiver unchanged. A proper implementation
-// must perform validation checks and return a constructed internal
-// object.
+// All errors indicate that the decode target contains a structurally invalid representation of the internal flow.ChunkDataRequest.
 func (c *ChunkDataRequest) ToInternal() (any, error) {
-	// TODO(malleability, #7715) implement with validation checks
-	return c, nil
+	return (*flow.ChunkDataRequest)(c), nil
 }
 
 // ChunkDataResponse is the response to a chunk data pack request.
 // It contains the chunk data pack of the interest.
 type ChunkDataResponse struct {
-	ChunkDataPack flow.ChunkDataPack
+	ChunkDataPack flow.UntrustedChunkDataPack
 	Nonce         uint64 // so that we aren't deduplicated by the network layer
 }
 
-// ToInternal converts the untrusted ChunkDataResponse into its trusted internal
-// representation.
+// ToInternal returns the internal type representation for ChunkDataResponse.
 //
-// This stub returns the receiver unchanged. A proper implementation
-// must perform validation checks and return a constructed internal
-// object.
+// All errors indicate that the decode target contains a structurally invalid representation of the internal flow.ChunkDataResponse.
 func (c *ChunkDataResponse) ToInternal() (any, error) {
-	// TODO(malleability, #7716) implement with validation checks
-	return c, nil
+	chunkDataPack, err := flow.NewChunkDataPack(c.ChunkDataPack)
+	if err != nil {
+		return nil, fmt.Errorf("could not convert %T to internal type: %w", c.ChunkDataPack, err)
+	}
+	return &flow.ChunkDataResponse{
+		Nonce:         c.Nonce,
+		ChunkDataPack: *chunkDataPack,
+	}, nil
 }

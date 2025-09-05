@@ -33,6 +33,7 @@ type UntrustedMessage interface {
 // requires an UntrustedMessage.
 //
 // No errors are expected during normal operation.
+// TODO: investigate how to eliminate this workaround in both ghost/rpc.go and corruptnet/message_processor.go
 func InternalToMessage(event interface{}) (UntrustedMessage, error) {
 	switch internal := event.(type) {
 	case *flow.Proposal:
@@ -43,18 +44,27 @@ func InternalToMessage(event interface{}) (UntrustedMessage, error) {
 		return (*EntityRequest)(internal), nil
 	case *flow.EntityResponse:
 		return (*EntityResponse)(internal), nil
-	case *flow.CollectionGuarantee:
-		return (*CollectionGuarantee)(internal), nil
 	case *flow.TransactionBody:
 		return (*TransactionBody)(internal), nil
 	case *flow.Transaction:
 		return (*Transaction)(internal), nil
+	case *flow.CollectionGuarantee:
+		return (*CollectionGuarantee)(internal), nil
 	case *flow.SyncRequest:
 		return (*SyncRequest)(internal), nil
 	case *flow.SyncResponse:
 		return (*SyncResponse)(internal), nil
 	case *flow.BatchRequest:
 		return (*BatchRequest)(internal), nil
+	case *flow.ChunkDataRequest:
+		return (*ChunkDataRequest)(internal), nil
+	case *flow.ChunkDataResponse:
+		return &ChunkDataResponse{
+			ChunkDataPack: flow.UntrustedChunkDataPack(internal.ChunkDataPack),
+			Nonce:         internal.Nonce,
+		}, nil
+	case *flow.RangeRequest:
+		return (*RangeRequest)(internal), nil
 	case UntrustedMessage:
 		// Already a valid UntrustedMessage
 		// TODO(immutable M2): expand when ToInternal changes for other M2 types
