@@ -229,7 +229,7 @@ func (v *VerificationNodeBuilder) LoadComponentsAndModules() {
 			if dbops.IsBadgerTransaction(v.DBOps) {
 				return nil, fmt.Errorf("badger transaction is not supported for approval storage")
 			} else if dbops.IsBatchUpdate(v.DBOps) {
-				approvalStorage = store.NewResultApprovals(node.Metrics.Cache, node.ProtocolDB)
+				approvalStorage = store.NewResultApprovals(node.Metrics.Cache, node.ProtocolDB, node.StorageLockMgr)
 			} else {
 				return nil, fmt.Errorf("invalid db opts type: %v", v.DBOps)
 			}
@@ -366,7 +366,7 @@ func (v *VerificationNodeBuilder) LoadComponentsAndModules() {
 		Component("follower core", func(node *NodeConfig) (module.ReadyDoneAware, error) {
 			// create a finalizer that handles updating the protocol
 			// state when the follower detects newly finalized blocks
-			final := finalizer.NewFinalizer(node.DB, node.Storage.Headers, followerState, node.Tracer)
+			final := finalizer.NewFinalizer(node.ProtocolDB.Reader(), node.Storage.Headers, followerState, node.Tracer)
 
 			finalized, pending, err := recoveryprotocol.FindLatest(node.State, node.Storage.Headers)
 			if err != nil {

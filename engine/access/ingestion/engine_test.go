@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/dgraph-io/badger/v2"
+	"github.com/jordanschalm/lockctx"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -77,6 +78,7 @@ type Suite struct {
 	db                  *badger.DB
 	dbDir               string
 	lastFullBlockHeight *counters.PersistentStrictMonotonicCounter
+	lockManager         lockctx.Manager
 }
 
 func TestIngestEngine(t *testing.T) {
@@ -94,6 +96,7 @@ func (s *Suite) SetupTest() {
 	s.log = zerolog.New(os.Stderr)
 	s.ctx, s.cancel = context.WithCancel(context.Background())
 	s.db, s.dbDir = unittest.TempBadgerDB(s.T())
+	s.lockManager = storerr.NewTestingLockManager()
 
 	s.obsIdentity = unittest.IdentityFixture(unittest.WithRole(flow.RoleAccess))
 
@@ -201,6 +204,7 @@ func (s *Suite) initEngineAndSyncer(ctx irrecoverable.SignalerContext) (*Engine,
 		s.collections,
 		s.transactions,
 		s.lastFullBlockHeight,
+		s.lockManager,
 	)
 
 	eng, err := New(
@@ -289,7 +293,7 @@ func (s *Suite) TestOnFinalizedBlockSingle() {
 	}
 
 	// expect that the block storage is indexed with each of the collection guarantee
-	s.blocks.On("IndexBlockForCollectionGuarantees", block.ID(), []flow.Identifier(flow.GetIDs(block.Payload.Guarantees))).Return(nil).Once()
+	s.blocks.On("IndexBlockContainingCollectionGuarantees", block.ID(), []flow.Identifier(flow.GetIDs(block.Payload.Guarantees))).Return(nil).Once()
 	for _, seal := range block.Payload.Seals {
 		s.results.On("Index", seal.BlockID, seal.ResultID).Return(nil).Once()
 	}
@@ -362,7 +366,7 @@ func (s *Suite) TestOnFinalizedBlockSeveralBlocksAhead() {
 
 	// expected all new blocks after last block processed
 	for _, block := range blocks {
-		s.blocks.On("IndexBlockForCollectionGuarantees", block.ID(), []flow.Identifier(flow.GetIDs(block.Payload.Guarantees))).Return(nil).Once()
+		s.blocks.On("IndexBlockContainingCollectionGuarantees", block.ID(), []flow.Identifier(flow.GetIDs(block.Payload.Guarantees))).Return(nil).Once()
 
 		for _, cg := range block.Payload.Guarantees {
 			s.request.On("EntityByID", cg.CollectionID, mock.Anything).Return().Run(func(args mock.Arguments) {
@@ -387,7 +391,7 @@ func (s *Suite) TestOnFinalizedBlockSeveralBlocksAhead() {
 	}
 
 	s.headers.AssertExpectations(s.T())
-	s.blocks.AssertNumberOfCalls(s.T(), "IndexBlockForCollectionGuarantees", newBlocksCount)
+	s.blocks.AssertNumberOfCalls(s.T(), "IndexBlockContainingCollectionGuarantees", newBlocksCount)
 	s.request.AssertNumberOfCalls(s.T(), "EntityByID", expectedEntityByIDCalls)
 	s.results.AssertNumberOfCalls(s.T(), "Index", expectedIndexCalls)
 }
@@ -400,28 +404,20 @@ func (s *Suite) TestOnCollection() {
 	collection := unittest.CollectionFixture(5)
 	light := collection.Light()
 
-	// we should store the light collection and index its transactions
-	s.collections.On("StoreLightAndIndexByTransaction", light).Return(nil).Once()
+	// we should store the collection and index its transactions
+	s.collections.On("StoreAndIndexByTransaction", mock.Anything, &collection).Return(light, nil).Once()
 
-	// for each transaction in the collection, we should store it
-	needed := make(map[flow.Identifier]struct{})
-	for _, txID := range light.Transactions {
-		needed[txID] = struct{}{}
-	}
-	s.transactions.On("Store", mock.Anything).Return(nil).Run(
-		func(args mock.Arguments) {
-			tx := args.Get(0).(*flow.TransactionBody)
-			_, pending := needed[tx.ID()]
-			s.Assert().True(pending, "tx not pending (%x)", tx.ID())
-		},
-	)
+	// Create a lock context for indexing
+	lctx := s.lockManager.NewContext()
+	err := lctx.AcquireLock(storerr.LockInsertCollection)
+	require.NoError(s.T(), err)
+	defer lctx.Release()
 
-	err := indexer.IndexCollection(&collection, s.collections, s.transactions, s.log, s.collectionExecutedMetric)
+	err = indexer.IndexCollection(lctx, &collection, s.collections, s.log, s.collectionExecutedMetric)
 	require.NoError(s.T(), err)
 
-	// check that the collection was stored and indexed, and we stored all transactions
+	// check that the collection was stored and indexed
 	s.collections.AssertExpectations(s.T())
-	s.transactions.AssertNumberOfCalls(s.T(), "Store", len(collection.Transactions))
 }
 
 // TestExecutionReceiptsAreIndexed checks that execution receipts are properly indexed
@@ -433,8 +429,8 @@ func (s *Suite) TestExecutionReceiptsAreIndexed() {
 	collection := unittest.CollectionFixture(5)
 	light := collection.Light()
 
-	// we should store the light collection and index its transactions
-	s.collections.On("StoreLightAndIndexByTransaction", light).Return(nil).Once()
+	// we should store the collection and index its transactions
+	s.collections.On("StoreAndIndexByTransaction", &collection).Return(light, nil).Once()
 	block := unittest.BlockFixture(
 		unittest.Block.WithHeight(0),
 		unittest.Block.WithPayload(
@@ -484,28 +480,20 @@ func (s *Suite) TestOnCollectionDuplicate() {
 	collection := unittest.CollectionFixture(5)
 	light := collection.Light()
 
-	// we should store the light collection and index its transactions
-	s.collections.On("StoreLightAndIndexByTransaction", light).Return(storerr.ErrAlreadyExists).Once()
+	// we should store the collection and index its transactions
+	s.collections.On("StoreAndIndexByTransaction", mock.Anything, &collection).Return(light, storerr.ErrAlreadyExists).Once()
 
-	// for each transaction in the collection, we should store it
-	needed := make(map[flow.Identifier]struct{})
-	for _, txID := range light.Transactions {
-		needed[txID] = struct{}{}
-	}
-	s.transactions.On("Store", mock.Anything).Return(nil).Run(
-		func(args mock.Arguments) {
-			tx := args.Get(0).(*flow.TransactionBody)
-			_, pending := needed[tx.ID()]
-			s.Assert().True(pending, "tx not pending (%x)", tx.ID())
-		},
-	)
-
-	err := indexer.IndexCollection(&collection, s.collections, s.transactions, s.log, s.collectionExecutedMetric)
+	// Create a lock context for indexing
+	lctx := s.lockManager.NewContext()
+	err := lctx.AcquireLock(storerr.LockInsertCollection)
 	require.NoError(s.T(), err)
+	defer lctx.Release()
 
-	// check that the collection was stored and indexed, and we stored all transactions
+	err = indexer.IndexCollection(lctx, &collection, s.collections, s.log, s.collectionExecutedMetric)
+	require.ErrorIs(s.T(), err, storerr.ErrAlreadyExists)
+
+	// check that the collection was stored and indexed
 	s.collections.AssertExpectations(s.T())
-	s.transactions.AssertNotCalled(s.T(), "Store", "should not store any transactions")
 }
 
 // TestRequestMissingCollections tests that the all missing collections are requested on the call to requestMissingCollections
