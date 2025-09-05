@@ -52,6 +52,7 @@ func TestLoopPruneExecutionDataFromRootToLatestSealed(t *testing.T) {
 			lctxGenesis := lockManager.NewContext()
 			require.NoError(t, lctxGenesis.AcquireLock(storage.LockInsertBlock))
 			require.NoError(t, db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+				// By convention, root block has no proposer signature - implementation has to handle this edge case
 				return blockstore.BatchStore(lctxGenesis, rw, &flow.Proposal{Block: *genesis, ProposerSigData: nil})
 			}))
 			lctxGenesis.Release()

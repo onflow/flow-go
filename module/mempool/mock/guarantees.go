@@ -170,6 +170,26 @@ func (_m *Guarantees) Size() uint {
 	return r0
 }
 
+// Values provides a mock function with no fields
+func (_m *Guarantees) Values() []*flow.CollectionGuarantee {
+	ret := _m.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for Values")
+	}
+
+	var r0 []*flow.CollectionGuarantee
+	if rf, ok := ret.Get(0).(func() []*flow.CollectionGuarantee); ok {
+		r0 = rf()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]*flow.CollectionGuarantee)
+		}
+	}
+
+	return r0
+}
+
 // NewGuarantees creates a new instance of Guarantees. It also registers a testing interface on the mock and a cleanup function to assert the mocks expectations.
 // The first argument is typically a *testing.T value.
 func NewGuarantees(t interface {

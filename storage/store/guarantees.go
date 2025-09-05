@@ -19,9 +19,11 @@ type Guarantees struct {
 	cache *Cache[flow.Identifier, *flow.CollectionGuarantee]
 
 	// byCollectionIdCache is essentially an in-memory map from `CollectionGuarantee.CollectionID` -> `CollectionGuarantee.ID()`.
-	//The full flow.CollectionGuarantee can be retrieved from the `cache` above.
+	// The full flow.CollectionGuarantee can be retrieved from the `cache` above.
 	byCollectionIdCache *Cache[flow.Identifier, flow.Identifier]
 }
+
+var _ storage.Guarantees = (*Guarantees)(nil)
 
 // NewGuarantees creates a Guarantees instance, which stores collection guarantees.
 // It supports storing, caching and retrieving by guaranteeID or the additionally indexed collection ID.
@@ -98,10 +100,16 @@ func (g *Guarantees) retrieveTx(guaranteeID flow.Identifier) (*flow.CollectionGu
 	return val, nil
 }
 
+// ByID returns the [flow.CollectionGuarantee] by its ID.
+// Expected errors during normal operations:
+//   - [storage.ErrNotFound] if no collection guarantee with the given Identifier is known.
 func (g *Guarantees) ByID(guaranteeID flow.Identifier) (*flow.CollectionGuarantee, error) {
 	return g.retrieveTx(guaranteeID)
 }
 
+// ByCollectionID retrieves the collection guarantee by collection ID.
+// Expected errors during normal operations:
+//   - [storage.ErrNotFound] if no collection guarantee has been indexed for the given collection ID.
 func (g *Guarantees) ByCollectionID(collID flow.Identifier) (*flow.CollectionGuarantee, error) {
 	guaranteeID, err := g.byCollectionIdCache.Get(g.db.Reader(), collID)
 	if err != nil {

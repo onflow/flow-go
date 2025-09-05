@@ -47,7 +47,7 @@ const (
 	codeChunk                = 38
 	codeExecutionReceiptMeta = 39 // NOTE: prior to Mainnet25, this erroneously had the same value as codeExecutionResult (36)
 
-	// codes for indexing single identifier by identifier/integer
+	// codes for indexing multiple identifiers by identifier -- to be continued with 80+
 	codeHeightToBlock               = 40 // index mapping height to block ID
 	codeBlockIDToLatestSealID       = 41 // index mapping a block its last payload seal
 	codeClusterBlockToRefBlock      = 42 // index cluster block ID to reference block ID
@@ -56,9 +56,7 @@ const (
 	codeBlockIDToQuorumCertificate  = 45 // index of quorum certificates by block ID
 	codeEpochProtocolStateByBlockID = 46 // index of epoch protocol state entry by block ID
 	codeProtocolKVStoreByBlockID    = 47 // index of protocol KV store entry by block ID
-	codeBlockIDToProposalSignature  = 48 // index of proposer signatures by block ID
-	codeGuaranteeByCollectionID     = 49 // index of collection guarantee by collection ID
-	codeCertifiedBlockByView        = 50 // index mapping view to ID of certified block (guaranteed by HotStuff that there is at most one per view)
+	codeCertifiedBlockByView        = 48 // index mapping view to ID of certified block (guaranteed by HotStuff that there is at most one per view)
 
 	// codes for indexing multiple identifiers by identifier
 	codeBlockChildren          = 50 // index mapping block ID to children blocks
@@ -93,6 +91,10 @@ const (
 	codeJobConsumerProcessed = 70
 	codeJobQueue             = 71
 	codeJobQueuePointer      = 72
+
+	// codes for indexing multiple identifiers by identifier -- continued from 40-49
+	codeBlockIDToProposalSignature = 80 // index of proposer signatures by block ID
+	codeGuaranteeByCollectionID    = 81 // index of collection guarantee by collection ID
 
 	// legacy codes (should be cleaned up)
 	codeChunkDataPack                      = 100

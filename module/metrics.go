@@ -621,6 +621,9 @@ type CollectionMetrics interface {
 
 	// ClusterBlockFinalized is called when a collection is finalized.
 	ClusterBlockFinalized(block *cluster.Block)
+
+	// CollectionMaxSize measures the current maximum size of a collection.
+	CollectionMaxSize(size uint)
 }
 
 type ConsensusMetrics interface {

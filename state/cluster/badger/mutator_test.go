@@ -252,33 +252,45 @@ func (suite *MutatorSuite) TestBootstrap_InvalidPayload() {
 	suite.Assert().Error(err)
 }
 
+// TestBootstrap_Successful verifies that basic information is successfully persisted during bootstrapping.
+//  1. The collector's root block was inserted and indexed. Specifically:
+//     - The collection contained in the root block can be retrieved by its ID.
+//     - The transactions contained in the root block's collection can be looked up by the root block's ID.
+//     - The root block's header can be retrieved by its ID.
+//     (The payload, i.e. the collection, we already retrieved above.)
+//     - The root block can be looked up by its height.
+//     - The latest finalized cluster block height should be the height of the root block.
 func (suite *MutatorSuite) TestBootstrap_Successful() {
 	err := (func(r storage.Reader) error {
-
-		// should index collection
-		// should index collection
-		collection := new(flow.LightCollection) // reset the collection
-		err := operation.LookupCollectionPayload(r, suite.genesis.ID(), &collection.Transactions)
+		// Bootstrapping should have inserted the collection contained in the root block
+		collection := new(flow.LightCollection)
+		err := operation.RetrieveCollection(r, suite.genesis.Payload.Collection.ID(), collection)
 		suite.Assert().Nil(err)
 		suite.Assert().Equal(suite.genesis.Payload.Collection.Light(), collection)
 
-		// should insert header
+		// Bootstrapping should have indexed the transactions contained in the collector's root block.
+		var txIDs []flow.Identifier // reset the collection
+		err = operation.LookupCollectionPayload(r, suite.genesis.ID(), &txIDs)
+		suite.Assert().Nil(err)
+		suite.Assert().Equal(suite.genesis.Payload.Collection.Light(), collection)
+
+		// Bootstrapping should have inserted the collector's root block header
 		var header flow.Header
 		err = operation.RetrieveHeader(r, suite.genesis.ID(), &header)
 		suite.Assert().Nil(err)
 		suite.Assert().Equal(suite.genesis.ToHeader().ID(), header.ID())
 
-		// should insert block height -> ID lookup
+		// Bootstrapping should have indexed the root block's by the root block's height.
 		var blockID flow.Identifier
 		err = operation.LookupClusterBlockHeight(r, suite.genesis.ChainID, suite.genesis.Height, &blockID)
 		suite.Assert().Nil(err)
 		suite.Assert().Equal(suite.genesis.ID(), blockID)
 
-		// should insert boundary
-		var boundary uint64
-		err = operation.RetrieveClusterFinalizedHeight(r, suite.genesis.ChainID, &boundary)
+		// As the latest finalized cluster block height, bootstrapping should have indexed the root block.
+		var latestFinalizedClusterBlockHeight uint64
+		err = operation.RetrieveClusterFinalizedHeight(r, suite.genesis.ChainID, &latestFinalizedClusterBlockHeight)
 		suite.Assert().Nil(err)
-		suite.Assert().Equal(suite.genesis.Height, boundary)
+		suite.Assert().Equal(suite.genesis.Height, latestFinalizedClusterBlockHeight)
 
 		return nil
 	})(suite.db.Reader())
@@ -371,8 +383,8 @@ func (suite *MutatorSuite) TestExtend_Success() {
 	err := suite.state.Extend(&proposal)
 	suite.Assert().Nil(err)
 
-	r := suite.db.Reader()
 	// should be able to retrieve the block
+	r := suite.db.Reader()
 	var extended model.Block
 	err = procedure.RetrieveClusterBlock(r, proposal.Block.ID(), &extended)
 	suite.Assert().Nil(err)
