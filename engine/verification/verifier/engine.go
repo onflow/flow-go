@@ -449,7 +449,7 @@ func (e *Engine) approvalRequestHandler(originID flow.Identifier, req *messages.
 
 	response := &messages.ApprovalResponse{
 		Nonce:    req.Nonce,
-		Approval: *approval,
+		Approval: flow.UntrustedResultApproval(*approval),
 	}
 
 	err = e.pullConduit.Unicast(response, originID)
