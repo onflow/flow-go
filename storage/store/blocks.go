@@ -196,7 +196,7 @@ func (b *Blocks) ByCollectionID(collID flow.Identifier) (*flow.Block, error) {
 		return nil, fmt.Errorf("could not look up guarantee: %w", err)
 	}
 	var blockID flow.Identifier
-	err = operation.LookupCollectionGuaranteeByBlock(b.db.Reader(), guarantee.ID(), &blockID)
+	err = operation.LookupBlockContainingCollection(b.db.Reader(), guarantee.ID(), &blockID)
 	if err != nil {
 		return nil, fmt.Errorf("could not look up block: %w", err)
 	}
@@ -216,7 +216,7 @@ func (b *Blocks) ByCollectionID(collID flow.Identifier) (*flow.Block, error) {
 func (b *Blocks) IndexBlockForCollectionGuarantees(blockID flow.Identifier, guaranteeIDs []flow.Identifier) error {
 	return b.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 		for _, guaranteeID := range guaranteeIDs {
-			err := operation.IndexCollectionGuaranteeByBlock(rw.Writer(), guaranteeID, blockID)
+			err := operation.IndexBlockContainingCollection(rw.Writer(), guaranteeID, blockID)
 			if err != nil {
 				return fmt.Errorf("could not index collection block (%x): %w", guaranteeID, err)
 			}
