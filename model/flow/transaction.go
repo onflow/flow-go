@@ -221,15 +221,6 @@ func (tb *TransactionBody) envelopeCanonicalForm() interface{} {
 	}
 }
 
-func (tx *Transaction) PayloadMessage() []byte {
-	return fingerprint.Fingerprint(tx.TransactionBody.PayloadCanonicalForm())
-}
-
-// Checksum provides a cryptographic commitment for a chunk content
-func (tx *Transaction) Checksum() Identifier {
-	return MakeID(tx)
-}
-
 func (tx *Transaction) String() string {
 	return fmt.Sprintf("Transaction %v submitted by %v (block %v)",
 		tx.ID(), tx.Payer.Hex(), tx.ReferenceBlockID)
