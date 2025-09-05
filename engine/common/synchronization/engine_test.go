@@ -124,7 +124,7 @@ func (ss *SyncSuite) TestOnRangeRequest() {
 
 	// generate originID and range request
 	originID := unittest.IdentifierFixture()
-	req := &messages.RangeRequest{
+	req := &flow.RangeRequest{
 		Nonce:      nonce,
 		FromHeight: 0,
 		ToHeight:   0,

@@ -1636,7 +1636,7 @@ func ChunkDataResponseMsgFixture(
 	opts ...func(*messages.ChunkDataResponse),
 ) *messages.ChunkDataResponse {
 	cdp := &messages.ChunkDataResponse{
-		ChunkDataPack: *ChunkDataPackFixture(chunkID),
+		ChunkDataPack: flow.UntrustedChunkDataPack(*ChunkDataPackFixture(chunkID)),
 		Nonce:         rand.Uint64(),
 	}
 
@@ -1653,8 +1653,7 @@ func WithApproximateSize(bytes uint64) func(*messages.ChunkDataResponse) {
 		// 1 tx fixture is approximately 350 bytes
 		txCount := bytes / 350
 		collection := CollectionFixture(int(txCount) + 1)
-		pack := ChunkDataPackFixture(request.ChunkDataPack.ChunkID, WithChunkDataPackCollection(&collection))
-		request.ChunkDataPack = *pack
+		request.ChunkDataPack = flow.UntrustedChunkDataPack(*ChunkDataPackFixture(request.ChunkDataPack.ChunkID, WithChunkDataPackCollection(&collection)))
 	}
 }
 
