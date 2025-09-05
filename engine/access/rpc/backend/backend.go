@@ -118,6 +118,7 @@ type Params struct {
 	VersionControl             *version.VersionControl
 	ExecNodeIdentitiesProvider *commonrpc.ExecutionNodeIdentitiesProvider
 	TxErrorMessageProvider     error_messages.Provider
+	ScheduledCallbacksEnabled  bool
 }
 
 var _ access.API = (*Backend)(nil)
@@ -232,7 +233,7 @@ func New(params Params) (*Backend, error) {
 		params.ExecNodeIdentitiesProvider,
 		txStatusDeriver,
 		systemTxID,
-		systemTx,
+		params.ChainID,
 	)
 	failoverTxProvider := provider.NewFailoverTransactionProvider(localTxProvider, execNodeTxProvider)
 
@@ -241,7 +242,6 @@ func New(params Params) (*Backend, error) {
 		Metrics:                     params.AccessMetrics,
 		State:                       params.State,
 		ChainID:                     params.ChainID,
-		SystemTx:                    systemTx,
 		SystemTxID:                  systemTxID,
 		StaticCollectionRPCClient:   params.CollectionRPC,
 		HistoricalAccessNodeClients: params.HistoricalAccessNodes,
@@ -258,6 +258,7 @@ func New(params Params) (*Backend, error) {
 		TxStatusDeriver:             txStatusDeriver,
 		EventsIndex:                 params.EventsIndex,
 		TxResultsIndex:              params.TxResultsIndex,
+		ScheduledCallbacksEnabled:   params.ScheduledCallbacksEnabled,
 	}
 
 	switch params.TxResultQueryMode {
