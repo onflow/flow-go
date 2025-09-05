@@ -12,7 +12,6 @@ import (
 
 	"github.com/onflow/flow-go/model/chainsync"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/network/channels"
@@ -248,7 +247,7 @@ func (ss *SyncSuite) TestLoad_Process_RangeRequest_SometimesReportSpam() {
 
 			// generate origin and request message
 			originID := unittest.IdentifierFixture()
-			req := &messages.RangeRequest{
+			req := &flow.RangeRequest{
 				Nonce:      nonce,
 				FromHeight: loadGroup.fromHeight,
 				ToHeight:   loadGroup.toHeight,
