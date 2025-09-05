@@ -1032,7 +1032,7 @@ func TestSealingSegment_FailureCases(t *testing.T) {
 
 // TestBootstrapSealingSegmentWithExtraBlocks test sealing segment where the segment blocks contain collection
 // guarantees referencing blocks prior to the sealing segment. After bootstrapping from sealing segment we should be able to
-// extend with B7 with contains a guarantee referring B1.
+// extend with B7 with contains a guarantee referencing B1.
 // ROOT <- B1 <- B2(R1) <- B3 <- B4(S1) <- B5 <- B6(S2)
 // Expected sealing segment: [B2, B3, B4, B5, B6], Extra blocks: [ROOT, B1]
 func TestBootstrapSealingSegmentWithExtraBlocks(t *testing.T) {
