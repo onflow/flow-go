@@ -143,7 +143,7 @@ func chunkDataPackResponseForReceipts(receipts []*flow.ExecutionReceipt, verIds 
 			}
 
 			cdpRep := &messages.ChunkDataResponse{
-				ChunkDataPack: *unittest.ChunkDataPackFixture(chunkId),
+				ChunkDataPack: flow.UntrustedChunkDataPack(*unittest.ChunkDataPackFixture(chunkId)),
 			}
 			chunkIds = chunkIds.Union(flow.IdentifierList{chunkId})
 
