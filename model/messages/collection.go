@@ -41,15 +41,11 @@ type ClusterBlockVote flow.BlockVote
 // ToInternal converts the untrusted ClusterBlockVote into its trusted internal
 // representation.
 func (c *ClusterBlockVote) ToInternal() (any, error) {
-	if c.BlockID == flow.ZeroID {
-		return nil, fmt.Errorf("BlockID must not be empty")
+	internal, err := flow.NewBlockVote(c.BlockID, c.View, c.SigData)
+	if err != nil {
+		return nil, fmt.Errorf("could not construct cluster block vote: %w", err)
 	}
-
-	if len(c.SigData) == 0 {
-		return nil, fmt.Errorf("SigData must not be empty")
-	}
-
-	return (*flow.BlockVote)(c), nil
+	return internal, nil
 }
 
 // ClusterTimeoutObject is part of the collection cluster protocol and represents a collection node

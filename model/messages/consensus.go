@@ -27,15 +27,11 @@ type BlockVote flow.BlockVote
 // ToInternal converts the untrusted BlockVote into its trusted internal
 // representation.
 func (b *BlockVote) ToInternal() (any, error) {
-	if b.BlockID == flow.ZeroID {
-		return nil, fmt.Errorf("BlockID must not be empty")
+	internal, err := flow.NewBlockVote(b.BlockID, b.View, b.SigData)
+	if err != nil {
+		return nil, fmt.Errorf("could not construct cluster block vote: %w", err)
 	}
-
-	if len(b.SigData) == 0 {
-		return nil, fmt.Errorf("SigData must not be empty")
-	}
-
-	return (*flow.BlockVote)(b), nil
+	return internal, nil
 }
 
 // TimeoutObject is part of the consensus protocol and represents a consensus node

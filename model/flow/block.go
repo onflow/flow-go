@@ -303,3 +303,20 @@ type BlockVote struct {
 	View    uint64
 	SigData []byte
 }
+
+func NewBlockVote(blockID Identifier, view uint64, sigData []byte) (*BlockVote, error) {
+
+	if blockID == ZeroID {
+		return nil, fmt.Errorf("BlockID must not be empty")
+	}
+
+	if len(sigData) == 0 {
+		return nil, fmt.Errorf("SigData must not be empty")
+	}
+
+	return &BlockVote{
+		BlockID: blockID,
+		View:    view,
+		SigData: sigData,
+	}, nil
+}
