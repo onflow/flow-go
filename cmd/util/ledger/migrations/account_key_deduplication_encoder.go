@@ -90,11 +90,10 @@ func encodeAccountPublicKeyWeightsAndRevokedStatus(weightsAndRevoked []accountPu
 
 // Account Public Key Index to Stored Public Key Index Mappings
 const (
-	maxRunLengthInEncodedMappingGroup = 1<<15 - 1
-	storedKeyIndexSize                = 4
-	mappingGroupSize                  = runLengthSize + storedKeyIndexSize
-	consecutiveGroupFlagMask          = 0x8000
-	lengthMask                        = 0x7fff
+	storedKeyIndexSize       = 4
+	mappingGroupSize         = runLengthSize + storedKeyIndexSize
+	consecutiveGroupFlagMask = 0x8000
+	lengthMask               = 0x7fff
 )
 
 // encodeAccountPublicKeyMapping encodes keyIndexMappings into concatenated run-length groups.

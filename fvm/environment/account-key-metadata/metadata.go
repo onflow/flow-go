@@ -323,7 +323,7 @@ func (m *KeyMetadataAppender) storedKeyCount() uint32 {
 	return m.startIndexForDigests + uint32(len(m.digestBytes)/digestSize)
 }
 
-func (m *KeyMetadataAppender) FindDuplicateDigest(digest uint64) (found bool, duplicateStoredKeyIndex uint32) {
+func (m *KeyMetadataAppender) findDuplicateDigest(digest uint64) (found bool, duplicateStoredKeyIndex uint32) {
 	if len(m.digestBytes) == 0 {
 		return false, 0
 	}

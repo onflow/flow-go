@@ -73,8 +73,10 @@ func parseNextLengthPrefixedData(b []byte) (next []byte, rest []byte, err error)
 
 	length := binary.BigEndian.Uint32(b[:lengthPrefixSize])
 
+	// NOTE: here, int is always int64 (never int32) because this software can cannot run on 32-bit platforms,
+	// so it is safe to cast length (uint32) to int (which is int64 on 64-bit platforms).
 	if len(b) < lengthPrefixSize+int(length) {
-		return nil, nil, NewKeyMetadataMalfromedError(fmt.Sprintf("expect %d bytes for next data, got %d bytes", lengthPrefixSize+int(length), len(b)))
+		return nil, nil, NewKeyMetadataMalfromedError(fmt.Sprintf("expect %d bytes for next data, got %d bytes", lengthPrefixSize+length, len(b)))
 	}
 
 	b = b[lengthPrefixSize:]

@@ -51,7 +51,6 @@ const (
 	addressIdCounterStartIndex       = accountPublicKeyCountsStartIndex + accountPublicKeyCountsSize
 
 	versionMask           = 0xf0
-	flagMask              = 0x0f
 	deduplicationFlagMask = 0x01
 
 	accountStatusV4DefaultVersionAndFlag = 0x40

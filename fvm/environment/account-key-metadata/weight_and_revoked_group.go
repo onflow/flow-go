@@ -49,7 +49,7 @@ func getWeightAndRevokedStatus(b []byte, index uint32) (bool, uint16, error) {
 // New weight and revoked status can be appended in a new run-length group, or included in
 // last group by incrementing last group's run-length.
 // NOTE: this function can modify the given data.
-func appendWeightAndRevokedStatus(b []byte, revoked bool, weight uint16) (_ []byte, _ error) {
+func appendWeightAndRevokedStatus(b []byte, revoked bool, weight uint16) ([]byte, error) {
 	if len(b) == 0 {
 		return encodeWeightAndRevokedStatusGroup(1, revoked, weight), nil
 	}
@@ -83,6 +83,8 @@ func setRevokedStatus(b []byte, index uint32) ([]byte, error) {
 	for ; curOff < len(b); curOff += weightAndRevokedStatusGroupSize {
 		runLength := parseRunLength(b, curOff)
 
+		// When this loop exits, index is guaranteed to be less than math.MaxUint16 (65535)
+		// because runlength is uint16.
 		if index < uint32(runLength) {
 			foundGroup = true
 			break
