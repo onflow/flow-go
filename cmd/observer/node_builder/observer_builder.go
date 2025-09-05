@@ -527,7 +527,8 @@ func (builder *ObserverServiceBuilder) buildFollowerEngine() *ObserverServiceBui
 		if err != nil {
 			return nil, fmt.Errorf("could not create follower engine: %w", err)
 		}
-		builder.FollowerDistributor.AddOnBlockFinalizedConsumer(builder.FollowerEng.OnFinalizedBlock)
+		builder.FollowerDistributor.
+			AddOnBlockFinalizedConsumer(builder.FollowerEng.OnFinalizedBlock)
 
 		return builder.FollowerEng, nil
 	})

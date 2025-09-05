@@ -4,6 +4,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/jordanschalm/lockctx"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -55,12 +56,12 @@ func TestHeaderIDIndexByCollectionID(t *testing.T) {
 		collectionGuaranteeID := unittest.IdentifierFixture()
 
 		err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			return operation.IndexCollectionGuaranteeBlock(rw.Writer(), collectionGuaranteeID, headerID)
+			return operation.IndexBlockContainingCollectionGuarantee(rw.Writer(), collectionGuaranteeID, headerID)
 		})
 		require.NoError(t, err)
 
 		actualID := &flow.Identifier{}
-		err = operation.LookupCollectionGuaranteeBlock(db.Reader(), collectionGuaranteeID, actualID)
+		err = operation.LookupBlockContainingCollectionGuarantee(db.Reader(), collectionGuaranteeID, actualID)
 		require.NoError(t, err)
 		assert.Equal(t, headerID, *actualID)
 	})
@@ -85,6 +86,28 @@ func TestBlockHeightIndexLookup(t *testing.T) {
 
 		var actual flow.Identifier
 		err = operation.LookupBlockHeight(db.Reader(), height, &actual)
+		require.NoError(t, err)
+
+		assert.Equal(t, expected, actual)
+	})
+}
+
+func TestBlockViewIndexLookup(t *testing.T) {
+	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
+
+		view := uint64(1337)
+		expected := flow.Identifier{0x01, 0x02, 0x03}
+
+		lockManager := storage.NewTestingLockManager()
+
+		unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
+			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+				return operation.IndexCertifiedBlockByView(lctx, rw, view, expected)
+			})
+		})
+
+		var actual flow.Identifier
+		err := operation.LookupCertifiedBlockByView(db.Reader(), view, &actual)
 		require.NoError(t, err)
 
 		assert.Equal(t, expected, actual)

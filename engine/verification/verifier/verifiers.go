@@ -40,8 +40,9 @@ func VerifyLastKHeight(
 	nWorker uint,
 	stopOnMismatch bool,
 	transactionFeesDisabled bool,
+	scheduledCallbacksEnabled bool,
 ) (err error) {
-	closer, storages, chunkDataPacks, state, verifier, err := initStorages(lockManager, chainID, protocolDataDir, chunkDataPackDir, transactionFeesDisabled)
+	closer, storages, chunkDataPacks, state, verifier, err := initStorages(lockManager, chainID, protocolDataDir, chunkDataPackDir, transactionFeesDisabled, scheduledCallbacksEnabled)
 	if err != nil {
 		return fmt.Errorf("could not init storages: %w", err)
 	}
@@ -95,8 +96,9 @@ func VerifyRange(
 	nWorker uint,
 	stopOnMismatch bool,
 	transactionFeesDisabled bool,
+	scheduledCallbacksEnabled bool,
 ) (err error) {
-	closer, storages, chunkDataPacks, state, verifier, err := initStorages(lockManager, chainID, protocolDataDir, chunkDataPackDir, transactionFeesDisabled)
+	closer, storages, chunkDataPacks, state, verifier, err := initStorages(lockManager, chainID, protocolDataDir, chunkDataPackDir, transactionFeesDisabled, scheduledCallbacksEnabled)
 	if err != nil {
 		return fmt.Errorf("could not init storages: %w", err)
 	}
@@ -225,6 +227,7 @@ func initStorages(
 	dataDir string,
 	chunkDataPackDir string,
 	transactionFeesDisabled bool,
+	scheduledCallbacksEnabled bool,
 ) (
 	func() error,
 	*store.All,
@@ -239,9 +242,9 @@ func initStorages(
 	}
 
 	storages := common.InitStorages(db)
-	state, err := common.InitProtocolState(lockManager, db, storages)
+	state, err := common.OpenProtocolState(lockManager, db, storages)
 	if err != nil {
-		return nil, nil, nil, nil, nil, fmt.Errorf("could not init protocol state: %w", err)
+		return nil, nil, nil, nil, nil, fmt.Errorf("could not open protocol state: %w", err)
 	}
 
 	// require the chunk data pack data must exist before returning the storage module
@@ -253,7 +256,7 @@ func initStorages(
 	chunkDataPacks := store.NewChunkDataPacks(metrics.NewNoopCollector(),
 		pebbleimpl.ToDB(chunkDataPackDB), storages.Collections, 1000)
 
-	verifier := makeVerifier(log.Logger, chainID, storages.Headers, transactionFeesDisabled)
+	verifier := makeVerifier(log.Logger, chainID, storages.Headers, transactionFeesDisabled, scheduledCallbacksEnabled)
 	closer := func() error {
 		var dbErr, chunkDataPackDBErr error
 
@@ -326,6 +329,7 @@ func makeVerifier(
 	chainID flow.ChainID,
 	headers storage.Headers,
 	transactionFeesDisabled bool,
+	scheduledCallbacksEnabled bool,
 ) module.ChunkVerifier {
 
 	vm := fvm.NewVirtualMachine()
@@ -340,7 +344,14 @@ func makeVerifier(
 	)
 
 	// TODO(JanezP): cleanup creation of fvm context github.com/onflow/flow-go/issues/5249
-	fvmOptions = append(fvmOptions, computation.DefaultFVMOptions(chainID, false, false, true)...)
+	fvmOptions = append(
+		fvmOptions,
+		computation.DefaultFVMOptions(
+			chainID,
+			false,
+			scheduledCallbacksEnabled,
+		)...,
+	)
 	vmCtx := fvm.NewContext(fvmOptions...)
 
 	chunkVerifier := chunks.NewChunkVerifier(vm, vmCtx, logger)

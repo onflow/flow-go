@@ -48,7 +48,7 @@ func TestFinalizeClusterBlock(t *testing.T) {
 		defer lctx.Release()
 		require.NoError(t, lctx.AcquireLock(storage.LockInsertOrFinalizeClusterBlock))
 		require.NoError(t, db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			return InsertClusterBlock(lctx, rw, unittest.ClusterProposalFromBlock(block))
+			return InsertClusterBlock(lctx, rw, unittest.ClusterProposalFromBlock(parent))
 		}))
 
 		// index parent as latest finalized block (manually writing respective indexes like in bootstrapping to skip transitive consistency checks)
@@ -132,8 +132,10 @@ func TestDisconnectedFinalizedBlock(t *testing.T) {
 //	A ← B ← C
 //	  ↖ D
 func constructState(t *testing.T, db storage.DB, lctx lockctx.Proof) (blockA, blockB, blockC, blockD *cluster.Block) {
-	blocks := unittest.ClusterBlockFixtures(4)
-	blockA, blockB, blockC, blockD = blocks[0], blocks[1], blocks[2], blocks[3]
+	blockA = unittest.ClusterBlockFixture()                                         // Create block A as the root
+	blockB = unittest.ClusterBlockFixture(unittest.ClusterBlock.WithParent(blockA)) // Create block B as a child of A
+	blockC = unittest.ClusterBlockFixture(unittest.ClusterBlock.WithParent(blockB)) // Create block C as a child of B
+	blockD = unittest.ClusterBlockFixture(unittest.ClusterBlock.WithParent(blockA)) // Create block D as a child of A (creating a fork)
 
 	// Store all blocks
 	for _, b := range []*cluster.Block{blockA, blockB, blockC, blockD} {

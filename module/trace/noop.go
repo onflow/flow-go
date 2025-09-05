@@ -63,6 +63,18 @@ func (t *NoopTracer) StartCollectionSpan(
 	return NoopSpan, ctx
 }
 
+func (t *NoopTracer) StartTransactionSpan(
+	ctx context.Context,
+	entityID flow.Identifier,
+	spanName SpanName,
+	opts ...trace.SpanStartOption,
+) (
+	trace.Span,
+	context.Context,
+) {
+	return NoopSpan, ctx
+}
+
 func (t *NoopTracer) StartSpanFromContext(
 	ctx context.Context,
 	operationName SpanName,

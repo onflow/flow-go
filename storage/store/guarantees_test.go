@@ -14,6 +14,14 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
+// TestGuaranteeStoreRetrieve tests storing and retrieving collection guarantees.
+// Generally, collection guarantees are persisted as part of storing a block proposal -- we follow that approach here.
+// We test the following:
+//   - retrieving an unknown guarantee returns [storage.ErrNotFound]
+//   - storing a guarantee as part of a block proposal and then retrieving it by its ID
+//   - repeated storage of the same block returns [storage.ErrAlreadyExists]
+//     and collection guarantee can still be retrieved
+//   - storing a different block with holding the same guarantee also works
 func TestGuaranteeStoreRetrieve(t *testing.T) {
 	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
 		lockManager := storage.NewTestingLockManager()
@@ -25,13 +33,12 @@ func TestGuaranteeStoreRetrieve(t *testing.T) {
 		s := store.NewGuarantees(metrics, db, 1000, 1000)
 
 		// make block with a collection guarantee:
-		expected := unittest.CollectionGuaranteeFixture()
-
-		block := unittest.BlockWithGuaranteesFixture([]*flow.CollectionGuarantee{expected})
+		guarantee1 := unittest.CollectionGuaranteeFixture()
+		block := unittest.BlockWithGuaranteesFixture([]*flow.CollectionGuarantee{guarantee1})
 		proposal := unittest.ProposalFromBlock(block)
 
 		// attempt to retrieve (still) unknown guarantee
-		_, err := s.ByCollectionID(expected.ID())
+		_, err := s.ByCollectionID(guarantee1.ID())
 		require.ErrorIs(t, err, storage.ErrNotFound)
 
 		// store guarantee
@@ -42,11 +49,12 @@ func TestGuaranteeStoreRetrieve(t *testing.T) {
 		})
 
 		// retrieve the guarantee by the ID of the collection
-		actual, err := guarantees.ByCollectionID(expected.CollectionID)
+		actual, err := guarantees.ByCollectionID(guarantee1.CollectionID)
 		require.NoError(t, err)
-		require.Equal(t, expected, actual)
+		require.Equal(t, guarantee1, actual)
 
-		// repeated storage of the same block should return
+		// Repeated storage of the same block should return [storage.ErrAlreadyExists].
+		// Yet, the guarantee can still be retrieved.
 		lctx2 := lockManager.NewContext()
 		require.NoError(t, lctx2.AcquireLock(storage.LockInsertBlock))
 		err = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
@@ -54,10 +62,13 @@ func TestGuaranteeStoreRetrieve(t *testing.T) {
 		})
 		require.ErrorIs(t, err, storage.ErrAlreadyExists)
 		lctx2.Release()
+		actual, err = guarantees.ByCollectionID(guarantee1.CollectionID)
+		require.NoError(t, err)
+		require.Equal(t, guarantee1, actual)
 
-		// OK to store a different block
-		expected2 := unittest.CollectionGuaranteeFixture()
-		block2 := unittest.BlockWithGuaranteesFixture([]*flow.CollectionGuarantee{expected2})
+		// OK to store a different block holding the _same_ guarantee (this is possible across forks).
+		guarantee2 := unittest.CollectionGuaranteeFixture()
+		block2 := unittest.BlockWithGuaranteesFixture([]*flow.CollectionGuarantee{guarantee2, guarantee1})
 		proposal2 := unittest.ProposalFromBlock(block2)
 		lctx3 := lockManager.NewContext()
 		require.NoError(t, lctx3.AcquireLock(storage.LockInsertBlock))
@@ -65,9 +76,18 @@ func TestGuaranteeStoreRetrieve(t *testing.T) {
 			return blocks.BatchStore(lctx3, rw, proposal2)
 		}))
 		lctx3.Release()
+		// retrieving guarantee 1 (contained in both blocks) still works
+		actual, err = guarantees.ByCollectionID(guarantee1.CollectionID)
+		require.NoError(t, err)
+		require.Equal(t, guarantee1, actual)
+		// retrieving guarantee 2 (contained only in the second block):
+		actual, err = guarantees.ByCollectionID(guarantee2.CollectionID)
+		require.NoError(t, err)
+		require.Equal(t, guarantee2, actual)
 	})
 }
 
+// Storing the same guarantee should be idempotent
 func TestStoreDuplicateGuarantee(t *testing.T) {
 	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
 		lockManager := storage.NewTestingLockManager()
@@ -106,6 +126,7 @@ func TestStoreDuplicateGuarantee(t *testing.T) {
 	})
 }
 
+// Storing a different guarantee for the same collection should return [storage.ErrDataMismatch]
 func TestStoreConflictingGuarantee(t *testing.T) {
 	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
 		lockManager := storage.NewTestingLockManager()
@@ -117,15 +138,13 @@ func TestStoreConflictingGuarantee(t *testing.T) {
 		block := unittest.BlockWithGuaranteesFixture([]*flow.CollectionGuarantee{expected})
 		proposal := unittest.ProposalFromBlock(block)
 
-		lctx := lockManager.NewContext()
-		require.NoError(t, lctx.AcquireLock(storage.LockInsertBlock))
 		unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
 			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 				return blocks.BatchStore(lctx, rw, proposal)
 			})
 		})
 
-		// a differing guarantee for the same collection is potentially byzantine and should return an error
+		// a differing guarantee for the same collection is potentially byzantine and should return [storage.ErrDataMismatch]
 		conflicting := *expected
 		conflicting.SignerIndices = []byte{99}
 		block2 := unittest.BlockWithGuaranteesFixture([]*flow.CollectionGuarantee{&conflicting})
