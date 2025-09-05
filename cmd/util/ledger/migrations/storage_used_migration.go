@@ -193,6 +193,7 @@ func (m *AccountUsageMigration) MigrateAccount(
 	return nil
 }
 
+// nolint:unused
 type accountUsageMigrationReportData struct {
 	AccountAddress string
 	OldStorageUsed uint64
