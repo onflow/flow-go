@@ -3,6 +3,7 @@ package messages
 import (
 	"fmt"
 
+	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -41,21 +42,15 @@ func (b *BlockVote) ToInternal() (any, error) {
 
 // TimeoutObject is part of the consensus protocol and represents a consensus node
 // timing out in given round. Contains a sequential number for deduplication purposes.
-type TimeoutObject struct {
-	TimeoutTick uint64
-	View        uint64
-	NewestQC    *flow.QuorumCertificate
-	LastViewTC  *flow.TimeoutCertificate
-	SigData     []byte
-}
+type TimeoutObject model.UntrustedTimeoutObject
 
-// ToInternal converts the untrusted TimeoutObject into its trusted internal
-// representation.
+// ToInternal returns the internal type representation for TimeoutObject.
 //
-// This stub returns the receiver unchanged. A proper implementation
-// must perform validation checks and return a constructed internal
-// object.
+// All errors indicate that the decode target contains a structurally invalid representation of the internal model.TimeoutObject.
 func (t *TimeoutObject) ToInternal() (any, error) {
-	// TODO(malleability, #7700) implement with validation checks
-	return t, nil
+	internal, err := model.NewTimeoutObject(model.UntrustedTimeoutObject(*t))
+	if err != nil {
+		return nil, fmt.Errorf("could not convert %T to internal type: %w", t, err)
+	}
+	return internal, nil
 }
