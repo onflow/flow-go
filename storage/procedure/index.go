@@ -28,10 +28,10 @@ func InsertIndex(lctx lockctx.Proof, rw storage.ReaderBatchWriter, blockID flow.
 		return fmt.Errorf("missing required lock: %s", storage.LockInsertBlock)
 	}
 
-	// The following database operations are all indexing data by block ID,
-	// they don't need to check if the data is already stored, because the same check has been done
-	// when storing the block header, which is in the same batch update and holding the same lock.
-	// if there is no header stored for the block ID, it means no index data for the same block ID
+	// The following database operations are all indexing data by block ID. If used correctly,
+	// we don't need to check here if the data is already stored, because the same check should have
+	// been done when storing the block header, which is in the same batch update and holding the same lock.
+	// If there is no header stored for the block ID, it means no index data for the same block ID
 	// was stored either, as long as the same lock is held, the data is guaranteed to be consistent.
 	w := rw.Writer()
 	err := operation.IndexPayloadGuarantees(lctx, w, blockID, index.GuaranteeIDs)

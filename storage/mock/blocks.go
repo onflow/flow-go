@@ -124,12 +124,12 @@ func (_m *Blocks) ByID(blockID flow.Identifier) (*flow.GenericBlock[flow.Payload
 	return r0, r1
 }
 
-// IndexBlockForCollectionGuarantees provides a mock function with given fields: blockID, collIDs
-func (_m *Blocks) IndexBlockForCollectionGuarantees(blockID flow.Identifier, collIDs []flow.Identifier) error {
+// IndexBlockContainingCollectionGuarantee provides a mock function with given fields: blockID, collIDs
+func (_m *Blocks) IndexBlockContainingCollectionGuarantee(blockID flow.Identifier, collIDs []flow.Identifier) error {
 	ret := _m.Called(blockID, collIDs)
 
 	if len(ret) == 0 {
-		panic("no return value specified for IndexBlockForCollectionGuarantees")
+		panic("no return value specified for IndexBlockContainingCollectionGuarantee")
 	}
 
 	var r0 error
