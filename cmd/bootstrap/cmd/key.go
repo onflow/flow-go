@@ -100,27 +100,30 @@ func keyCmdRun(_ *cobra.Command, _ []string) {
 	}
 	log.Info().Msgf("wrote file %s/%s", flagOutdir, model.PathNodeID)
 
-	err = common.WriteJSON(fmt.Sprintf(model.PathNodeInfoPriv, nodeInfo.NodeID), flagOutdir, private)
+	privKeyPath := fmt.Sprintf(model.PathNodeInfoPriv, nodeInfo.NodeID)
+	err = common.WriteJSON(privKeyPath, flagOutdir, private)
 	if err != nil {
 		log.Fatal().Err(err).Msg("failed to write json")
 	}
-	log.Info().Msgf("wrote file %s/%s", flagOutdir, model.PathNodeInfoPriv)
+	log.Info().Msgf("wrote file %s/%s", flagOutdir, privKeyPath)
 
-	err = common.WriteText(fmt.Sprintf(model.PathSecretsEncryptionKey, nodeInfo.NodeID), flagOutdir, secretsDBKey)
+	secretsKeyPath := fmt.Sprintf(model.PathSecretsEncryptionKey, nodeInfo.NodeID)
+	err = common.WriteText(secretsKeyPath, flagOutdir, secretsDBKey)
 	if err != nil {
 		log.Fatal().Err(err).Msg("failed to write file")
 	}
-	log.Info().Msgf("wrote file %s/%s", flagOutdir, model.PathSecretsEncryptionKey)
+	log.Info().Msgf("wrote file %s/%s", flagOutdir, secretsKeyPath)
 
 	public, err := nodeInfo.Public()
 	if err != nil {
 		log.Fatal().Err(err).Msg("could not access public keys")
 	}
-	err = common.WriteJSON(fmt.Sprintf(model.PathNodeInfoPub, nodeInfo.NodeID), flagOutdir, public)
+	pubNodeInfoPath := fmt.Sprintf(model.PathNodeInfoPub, nodeInfo.NodeID)
+	err = common.WriteJSON(pubNodeInfoPath, flagOutdir, public)
 	if err != nil {
 		log.Fatal().Err(err).Msg("failed to write json")
 	}
-	log.Info().Msgf("wrote file %s/%s", flagOutdir, model.PathNodeInfoPub)
+	log.Info().Msgf("wrote file %s/%s", flagOutdir, pubNodeInfoPath)
 
 	// write machine account info
 	if role == flow.RoleCollection || role == flow.RoleConsensus {
@@ -134,11 +137,12 @@ func keyCmdRun(_ *cobra.Command, _ []string) {
 		log.Debug().Str("address", flagAddress).Msg("assembling machine account information")
 		// write the public key to terminal for entry in Flow Port
 		machineAccountPriv := assembleNodeMachineAccountKey(machineKey)
-		err = common.WriteJSON(fmt.Sprintf(model.PathNodeMachineAccountPrivateKey, nodeInfo.NodeID), flagOutdir, machineAccountPriv)
+		privateKeyPath := fmt.Sprintf(model.PathNodeMachineAccountPrivateKey, nodeInfo.NodeID)
+		err = common.WriteJSON(privateKeyPath, flagOutdir, machineAccountPriv)
 		if err != nil {
 			log.Fatal().Err(err).Msg("failed to write json")
 		}
-		log.Info().Msgf("wrote file %s/%s", flagOutdir, model.PathNodeMachineAccountPrivateKey)
+		log.Info().Msgf("wrote file %s/%s", flagOutdir, privateKeyPath)
 	}
 }
 
