@@ -13,6 +13,8 @@ import (
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/fvm/storage/testutils"
+	"github.com/onflow/flow-go/ledger"
+	"github.com/onflow/flow-go/ledger/common/convert"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -442,7 +444,7 @@ func TestAccounts_SetContracts(t *testing.T) {
 }
 
 func TestAccount_StorageUsed(t *testing.T) {
-	emptyAccountSize := uint64(44)
+	emptyAccountSize := uint64(54)
 
 	t.Run("Storage used on account creation is deterministic", func(t *testing.T) {
 		txnState := testutils.NewSimpleTransaction(nil)
@@ -471,7 +473,7 @@ func TestAccount_StorageUsed(t *testing.T) {
 
 		storageUsed, err := accounts.GetStorageUsed(address)
 		require.NoError(t, err)
-		require.Equal(t, emptyAccountSize+uint64(32), storageUsed)
+		require.Equal(t, emptyAccountSize+uint64(42), storageUsed)
 	})
 
 	t.Run("Storage used, set twice on same register to same value, stays the same", func(t *testing.T) {
@@ -490,7 +492,7 @@ func TestAccount_StorageUsed(t *testing.T) {
 
 		storageUsed, err := accounts.GetStorageUsed(address)
 		require.NoError(t, err)
-		require.Equal(t, emptyAccountSize+uint64(32), storageUsed)
+		require.Equal(t, emptyAccountSize+uint64(42), storageUsed)
 	})
 
 	t.Run("Storage used, set twice on same register to larger value, increases", func(t *testing.T) {
@@ -509,7 +511,7 @@ func TestAccount_StorageUsed(t *testing.T) {
 
 		storageUsed, err := accounts.GetStorageUsed(address)
 		require.NoError(t, err)
-		require.Equal(t, emptyAccountSize+uint64(33), storageUsed)
+		require.Equal(t, emptyAccountSize+uint64(43), storageUsed)
 	})
 
 	t.Run("Storage used, set twice on same register to smaller value, decreases", func(t *testing.T) {
@@ -528,7 +530,7 @@ func TestAccount_StorageUsed(t *testing.T) {
 
 		storageUsed, err := accounts.GetStorageUsed(address)
 		require.NoError(t, err)
-		require.Equal(t, emptyAccountSize+uint64(31), storageUsed)
+		require.Equal(t, emptyAccountSize+uint64(41), storageUsed)
 	})
 
 	t.Run("Storage used, after register deleted, decreases", func(t *testing.T) {
@@ -578,7 +580,7 @@ func TestAccount_StorageUsed(t *testing.T) {
 
 		storageUsed, err := accounts.GetStorageUsed(address)
 		require.NoError(t, err)
-		require.Equal(t, emptyAccountSize+uint64(33+42), storageUsed)
+		require.Equal(t, emptyAccountSize+uint64(43+52), storageUsed)
 	})
 }
 
@@ -1975,4 +1977,19 @@ func TestAccounts_IncrementAndGetAccountPublicKeySequenceNumber(t *testing.T) {
 			require.Equal(t, expectedStorageUsed, storageUsed)
 		})
 	}
+}
+
+func TestRegisterSize(t *testing.T) {
+	address := flow.Address{0x01}
+
+	registerID := flow.AccountStatusRegisterID(address)
+	registerValue := environment.NewAccountStatus().ToBytes()
+	registerSize := environment.RegisterSize(registerID, registerValue)
+
+	payload := ledger.NewPayload(
+		convert.RegisterIDToLedgerKey(registerID),
+		registerValue)
+	payloadSize := payload.Size()
+
+	require.Equal(t, payloadSize, registerSize)
 }

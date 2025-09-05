@@ -778,15 +778,16 @@ func (a *StatefulAccounts) updateRegisterSizeChange(
 }
 
 func RegisterSize(id flow.RegisterID, value flow.RegisterValue) int {
+	// NOTE: RegisterSize() needs to be in sync with encodedKeyLength() in ledger/trie_encoder.go.
 	if len(value) == 0 {
 		// registers with empty value won't (or don't) exist when stored
 		return 0
 	}
-	size := 0
-	// additional 2 is for len prefixes when encoding is happening
-	// we might get rid of these 2s in the future
-	size += 2 + len(id.Owner)
-	size += 2 + len(id.Key)
+	size := 2 // number of key parts (2 bytes)
+	// Size for each key part:
+	// length prefix (4 bytes) + encoded key part type (2 bytes) + key part value
+	size += 4 + 2 + len(id.Owner)
+	size += 4 + 2 + len(id.Key)
 	size += len(value)
 	return size
 }
