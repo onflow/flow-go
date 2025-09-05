@@ -504,18 +504,33 @@ func (t *Transactions) GetTransactionResultByIndex(
 }
 
 // GetSystemTransaction returns system transaction
-func (t *Transactions) GetSystemTransaction(_ context.Context, _ flow.Identifier) (*flow.TransactionBody, error) {
+func (t *Transactions) GetSystemTransaction(_ context.Context, txID flow.Identifier, _ flow.Identifier) (*flow.TransactionBody, error) {
+	// TODO: implement other system transaction look up
+	if txID != flow.ZeroID && txID != t.systemTxID {
+		return nil, status.Errorf(codes.Unimplemented, "system transaction by transaction ID not implemented")
+	}
+
 	return t.systemTx, nil
 }
 
 // GetSystemTransactionResult returns system transaction result
-func (t *Transactions) GetSystemTransactionResult(ctx context.Context, blockID flow.Identifier, requiredEventEncodingVersion entities.EventEncodingVersion) (*accessmodel.TransactionResult, error) {
+func (t *Transactions) GetSystemTransactionResult(ctx context.Context, txID flow.Identifier, blockID flow.Identifier, requiredEventEncodingVersion entities.EventEncodingVersion) (*accessmodel.TransactionResult, error) {
+	// todo implement other system transaction look up
+	if txID != flow.ZeroID && txID != t.systemTxID {
+		return nil, status.Errorf(codes.Unimplemented, "system transaction result by transaction ID not implemented")
+	}
+
 	block, err := t.blocks.ByID(blockID)
 	if err != nil {
 		return nil, rpc.ConvertStorageError(err)
 	}
 
-	return t.lookupTransactionResult(ctx, t.systemTxID, block.ToHeader(), requiredEventEncodingVersion)
+	// If txID is ZeroID, use the system transaction ID
+	if txID == flow.ZeroID {
+		txID = t.systemTxID
+	}
+
+	return t.lookupTransactionResult(ctx, txID, block.ToHeader(), requiredEventEncodingVersion)
 }
 
 // Error returns:
