@@ -18,7 +18,9 @@ import (
 	"github.com/onflow/flow-go/engine/access/rpc/connection"
 	"github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
+	"github.com/onflow/flow-go/model/access"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/executiondatasync/optimistic_sync"
 )
 
 type ENEventProvider struct {
@@ -48,13 +50,13 @@ func (e *ENEventProvider) Events(
 	ctx context.Context,
 	blocks []BlockMetadata,
 	eventType flow.EventType,
-	encoding entities.EventEncodingVersion,
-) (Response, error) {
+	encodingVersion entities.EventEncodingVersion,
+	execResultInfo *optimistic_sync.ExecutionResultInfo,
+) (Response, access.ExecutorMetadata, error) {
 	if len(blocks) == 0 {
-		return Response{}, nil
+		return Response{}, access.ExecutorMetadata{}, nil
 	}
 
-	// create an execution API request for events at block ID
 	blockIDs := make([]flow.Identifier, len(blocks))
 	for i := range blocks {
 		blockIDs[i] = blocks[i].ID
@@ -65,42 +67,41 @@ func (e *ENEventProvider) Events(
 		BlockIds: convert.IdentifiersToMessages(blockIDs),
 	}
 
-	// choose the last block ID to find the list of execution nodes
-	lastBlockID := blockIDs[len(blockIDs)-1]
-
-	execNodes, err := e.nodeProvider.ExecutionNodesForBlockID(
-		ctx,
-		lastBlockID,
-	)
-	if err != nil {
-		return Response{}, rpc.ConvertError(err, "failed to get execution nodes for events query", codes.Internal)
-	}
-
 	var resp *execproto.GetEventsForBlockIDsResponse
 	var successfulNode *flow.IdentitySkeleton
-	resp, successfulNode, err = e.getEventsFromAnyExeNode(ctx, execNodes, req)
+	resp, successfulNode, err := e.getEventsFromAnyExeNode(ctx, execResultInfo.ExecutionNodes, req)
 	if err != nil {
-		return Response{}, rpc.ConvertError(err, "failed to get execution nodes for events query", codes.Internal)
+		return Response{}, access.ExecutorMetadata{},
+			rpc.ConvertError(err, "failed to get execution nodes for events query", codes.Internal)
 	}
+
+	lastBlockID := blocks[len(blocks)-1].ID
 	e.log.Trace().
-		Str("execution_id", successfulNode.String()).
+		Str("execution_node_id", successfulNode.String()).
+		Str("execution_result_id", execResultInfo.ExecutionResult.ID().String()).
 		Str("last_block_id", lastBlockID.String()).
 		Msg("successfully got events")
+
+	metadata := access.ExecutorMetadata{
+		ExecutionResultID: successfulNode.NodeID,
+		ExecutorIDs:       execResultInfo.ExecutionNodes.NodeIDs(),
+	}
 
 	// convert execution node api result to access node api result
 	results, err := verifyAndConvertToAccessEvents(
 		resp.GetResults(),
 		blocks,
 		resp.GetEventEncodingVersion(),
-		encoding,
+		encodingVersion,
 	)
 	if err != nil {
-		return Response{}, status.Errorf(codes.Internal, "failed to verify retrieved events from execution node: %v", err)
+		return Response{}, access.ExecutorMetadata{},
+			status.Errorf(codes.Internal, "failed to verify retrieved events from execution node: %v", err)
 	}
 
 	return Response{
 		Events: results,
-	}, nil
+	}, metadata, nil
 }
 
 // getEventsFromAnyExeNode retrieves the given events from any EN in `execNodes`.

@@ -31,8 +31,7 @@ func (g *GetExecutionResultByBlockIDs) Build(r *common.Request) error {
 }
 
 func (g *GetExecutionResultByBlockIDs) Parse(rawIDs []string) error {
-	var ids parser.IDs
-	err := ids.Parse(rawIDs)
+	ids, err := parser.NewIDs(rawIDs)
 	if err != nil {
 		return err
 	}

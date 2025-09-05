@@ -1,4 +1,4 @@
-package execution_result_query_provider
+package execution_result_provider
 
 import (
 	"fmt"
@@ -14,16 +14,9 @@ import (
 	"github.com/onflow/flow-go/storage"
 )
 
-// DefaultCriteria is the system default criteria for execution result queries.
-var DefaultCriteria = optimistic_sync.Criteria{
-	AgreeingExecutorsCount: 2,
-}
-
-var _ optimistic_sync.ExecutionResultQueryProvider = (*ExecutionResultQueryProvider)(nil)
-
-// ExecutionResultQueryProvider is a container for elements required to retrieve
+// ExecutionResultProvider is a container for elements required to retrieve
 // execution results and execution node identities for a given block ID based on specified criteria.
-type ExecutionResultQueryProvider struct {
+type ExecutionResultProvider struct {
 	log zerolog.Logger
 
 	executionReceipts storage.ExecutionReceipts
@@ -37,18 +30,20 @@ type ExecutionResultQueryProvider struct {
 	baseCriteria optimistic_sync.Criteria
 }
 
-// NewExecutionResultQueryProvider creates and returns a new instance of
-// ExecutionResultQueryProvider.
+var _ optimistic_sync.ExecutionResultProvider = (*ExecutionResultProvider)(nil)
+
+// NewExecutionResultProvider creates and returns a new instance of
+// ExecutionResultProvider.
 //
 // No errors are expected during normal operations
-func NewExecutionResultQueryProvider(
+func NewExecutionResultProvider(
 	log zerolog.Logger,
 	state protocol.State,
 	headers storage.Headers,
 	executionReceipts storage.ExecutionReceipts,
 	executionNodes *ExecutionNodesSelector,
 	operatorCriteria optimistic_sync.Criteria,
-) (*ExecutionResultQueryProvider, error) {
+) (*ExecutionResultProvider, error) {
 	// Root block ID and result should not change and could be cached.
 	sporkRootBlockHeight := state.Params().SporkRootBlockHeight()
 	rootBlockID, err := headers.BlockIDByHeight(sporkRootBlockHeight)
@@ -61,23 +56,23 @@ func NewExecutionResultQueryProvider(
 		return nil, fmt.Errorf("failed to retrieve root block result: %w", err)
 	}
 
-	return &ExecutionResultQueryProvider{
+	return &ExecutionResultProvider{
 		log:               log.With().Str("module", "execution_result_query").Logger(),
 		executionReceipts: executionReceipts,
 		state:             state,
 		executionNodes:    executionNodes,
 		rootBlockID:       rootBlockID,
 		rootBlockResult:   rootBlockResult,
-		baseCriteria:      DefaultCriteria.OverrideWith(operatorCriteria),
+		baseCriteria:      optimistic_sync.DefaultCriteria.OverrideWith(operatorCriteria),
 	}, nil
 }
 
-// ExecutionResultQuery retrieves execution results and associated execution nodes for a given block ID
+// ExecutionResult retrieves execution results and associated execution nodes for a given block ID
 // based on the provided criteria.
 //
 // Expected errors during normal operations:
 //   - backend.InsufficientExecutionReceipts - found insufficient receipts for given block ID.
-func (e *ExecutionResultQueryProvider) ExecutionResultQuery(blockID flow.Identifier, criteria optimistic_sync.Criteria) (*optimistic_sync.Query, error) {
+func (e *ExecutionResultProvider) ExecutionResult(blockID flow.Identifier, criteria optimistic_sync.Criteria) (*optimistic_sync.ExecutionResultInfo, error) {
 	executorIdentities, err := e.state.Final().Identities(filter.HasRole[flow.Identity](flow.RoleExecution))
 	if err != nil {
 		return nil, fmt.Errorf("failed to retrieve execution IDs for root block: %w", err)
@@ -91,7 +86,7 @@ func (e *ExecutionResultQueryProvider) ExecutionResultQuery(blockID flow.Identif
 			return nil, fmt.Errorf("failed to choose execution nodes for root block ID %v: %w", e.rootBlockID, err)
 		}
 
-		return &optimistic_sync.Query{
+		return &optimistic_sync.ExecutionResultInfo{
 			ExecutionResult: e.rootBlockResult,
 			ExecutionNodes:  subsetENs,
 		}, nil
@@ -120,7 +115,7 @@ func (e *ExecutionResultQueryProvider) ExecutionResultQuery(blockID flow.Identif
 		return nil, fmt.Errorf("no execution nodes found for result %v (blockID: %v): %w", result.ID(), blockID, err)
 	}
 
-	return &optimistic_sync.Query{
+	return &optimistic_sync.ExecutionResultInfo{
 		ExecutionResult: result,
 		ExecutionNodes:  subsetENs,
 	}, nil
@@ -132,7 +127,7 @@ func (e *ExecutionResultQueryProvider) ExecutionResultQuery(blockID flow.Identif
 //
 // Expected errors during normal operations:
 //   - backend.InsufficientExecutionReceipts - found insufficient receipts for given block ID.
-func (e *ExecutionResultQueryProvider) findResultAndExecutors(
+func (e *ExecutionResultProvider) findResultAndExecutors(
 	blockID flow.Identifier,
 	criteria optimistic_sync.Criteria,
 ) (*flow.ExecutionResult, flow.IdentifierList, error) {

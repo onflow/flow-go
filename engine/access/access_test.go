@@ -36,6 +36,7 @@ import (
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/counters"
+	"github.com/onflow/flow-go/module/executiondatasync/optimistic_sync"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/mempool/stdmap"
 	"github.com/onflow/flow-go/module/metrics"
@@ -179,6 +180,10 @@ func (suite *Suite) RunTest(
 			EventQueryMode:       query_mode.IndexQueryModeExecutionNodesOnly,
 			ScriptExecutionMode:  query_mode.IndexQueryModeExecutionNodesOnly,
 			TxResultQueryMode:    query_mode.IndexQueryModeExecutionNodesOnly,
+			// TODO: set this once data result forest merged in
+			//ExecutionResultProvider:
+			//ExecutionStateCache:
+			OperatorCriteria: optimistic_sync.DefaultCriteria,
 		})
 		require.NoError(suite.T(), err)
 
@@ -356,6 +361,10 @@ func (suite *Suite) TestSendTransactionToRandomCollectionNode() {
 			EventQueryMode:       query_mode.IndexQueryModeExecutionNodesOnly,
 			ScriptExecutionMode:  query_mode.IndexQueryModeExecutionNodesOnly,
 			TxResultQueryMode:    query_mode.IndexQueryModeExecutionNodesOnly,
+			// TODO: set this once data result forest merged in
+			//ExecutionResultProvider:
+			//ExecutionStateCache:
+			OperatorCriteria: optimistic_sync.DefaultCriteria,
 		})
 		require.NoError(suite.T(), err)
 
@@ -689,6 +698,10 @@ func (suite *Suite) TestGetSealedTransaction() {
 			EventQueryMode:             query_mode.IndexQueryModeExecutionNodesOnly,
 			ScriptExecutionMode:        query_mode.IndexQueryModeExecutionNodesOnly,
 			ExecNodeIdentitiesProvider: execNodeIdentitiesProvider,
+			// TODO: set this once data result forest merged in
+			//ExecutionResultProvider:
+			//ExecutionStateCache:
+			OperatorCriteria: optimistic_sync.DefaultCriteria,
 		})
 		require.NoError(suite.T(), err)
 
@@ -884,6 +897,10 @@ func (suite *Suite) TestGetTransactionResult() {
 			EventQueryMode:             query_mode.IndexQueryModeExecutionNodesOnly,
 			ScriptExecutionMode:        query_mode.IndexQueryModeExecutionNodesOnly,
 			ExecNodeIdentitiesProvider: execNodeIdentitiesProvider,
+			// TODO: set this once data result forest merged in
+			//ExecutionResultProvider:
+			//ExecutionStateCache:
+			OperatorCriteria: optimistic_sync.DefaultCriteria,
 		})
 		require.NoError(suite.T(), err)
 
@@ -1130,6 +1147,10 @@ func (suite *Suite) TestExecuteScript() {
 			ScriptExecutionMode:        query_mode.IndexQueryModeExecutionNodesOnly,
 			TxResultQueryMode:          query_mode.IndexQueryModeExecutionNodesOnly,
 			ExecNodeIdentitiesProvider: execNodeIdentitiesProvider,
+			// TODO: set this once data result forest merged in
+			//ExecutionResultProvider:
+			//ExecutionStateCache:
+			OperatorCriteria: optimistic_sync.DefaultCriteria,
 		})
 		require.NoError(suite.T(), err)
 

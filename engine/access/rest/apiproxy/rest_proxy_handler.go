@@ -19,6 +19,7 @@ import (
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	accessmodel "github.com/onflow/flow-go/model/access"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/executiondatasync/optimistic_sync"
 	"github.com/onflow/flow-go/module/metrics"
 )
 
@@ -34,6 +35,8 @@ type RestProxyHandler struct {
 	metrics metrics.ObserverMetrics
 	chain   flow.Chain
 }
+
+var _ access.API = (*RestProxyHandler)(nil)
 
 // NewRestProxyHandler returns a new rest proxy handler for observer node.
 func NewRestProxyHandler(
@@ -373,10 +376,11 @@ func (r *RestProxyHandler) GetEventsForHeightRange(
 	eventType string,
 	startHeight, endHeight uint64,
 	requiredEventEncodingVersion entities.EventEncodingVersion,
-) ([]flow.BlockEvents, error) {
+	criteria optimistic_sync.Criteria,
+) ([]flow.BlockEvents, accessmodel.ExecutorMetadata, error) {
 	upstream, closer, err := r.FaultTolerantClient()
 	if err != nil {
-		return nil, err
+		return nil, accessmodel.ExecutorMetadata{}, err
 	}
 	defer closer.Close()
 
@@ -385,15 +389,25 @@ func (r *RestProxyHandler) GetEventsForHeightRange(
 		StartHeight:          startHeight,
 		EndHeight:            endHeight,
 		EventEncodingVersion: requiredEventEncodingVersion,
+		ExecutionStateQuery: &entities.ExecutionStateQuery{
+			AgreeingExecutorsCount:  uint64(criteria.AgreeingExecutorsCount),
+			RequiredExecutorIds:     convert.IdentifiersToMessages(criteria.RequiredExecutors),
+			IncludeExecutorMetadata: true,
+		},
 	}
 	eventsResponse, err := upstream.GetEventsForHeightRange(ctx, getEventsForHeightRangeRequest)
+	if err != nil {
+		return nil, accessmodel.ExecutorMetadata{}, err
+	}
 	r.log("upstream", "GetEventsForHeightRange", err)
 
+	metadata, err := convert.MessageToExecutorMetadata(eventsResponse.Metadata.ExecutionStateQuery)
 	if err != nil {
-		return nil, err
+		return nil, accessmodel.ExecutorMetadata{}, err
 	}
 
-	return convert.MessagesToBlockEvents(eventsResponse.Results)
+	res, err := convert.MessagesToBlockEvents(eventsResponse.Results)
+	return res, *metadata, err
 }
 
 // GetEventsForBlockIDs returns events by their name in the specified block IDs.
@@ -402,10 +416,11 @@ func (r *RestProxyHandler) GetEventsForBlockIDs(
 	eventType string,
 	blockIDs []flow.Identifier,
 	requiredEventEncodingVersion entities.EventEncodingVersion,
-) ([]flow.BlockEvents, error) {
+	criteria optimistic_sync.Criteria,
+) ([]flow.BlockEvents, accessmodel.ExecutorMetadata, error) {
 	upstream, closer, err := r.FaultTolerantClient()
 	if err != nil {
-		return nil, err
+		return nil, accessmodel.ExecutorMetadata{}, err
 	}
 	defer closer.Close()
 
@@ -415,15 +430,26 @@ func (r *RestProxyHandler) GetEventsForBlockIDs(
 		Type:                 eventType,
 		BlockIds:             blockIds,
 		EventEncodingVersion: requiredEventEncodingVersion,
+		ExecutionStateQuery: &entities.ExecutionStateQuery{
+			AgreeingExecutorsCount:  uint64(criteria.AgreeingExecutorsCount),
+			RequiredExecutorIds:     convert.IdentifiersToMessages(criteria.RequiredExecutors),
+			IncludeExecutorMetadata: true,
+		},
 	}
 	eventsResponse, err := upstream.GetEventsForBlockIDs(ctx, getEventsForBlockIDsRequest)
 	r.log("upstream", "GetEventsForBlockIDs", err)
 
 	if err != nil {
-		return nil, err
+		return nil, accessmodel.ExecutorMetadata{}, err
 	}
 
-	return convert.MessagesToBlockEvents(eventsResponse.Results)
+	metadata, err := convert.MessageToExecutorMetadata(eventsResponse.Metadata.ExecutionStateQuery)
+	if err != nil {
+		return nil, accessmodel.ExecutorMetadata{}, err
+	}
+
+	res, err := convert.MessagesToBlockEvents(eventsResponse.Results)
+	return res, *metadata, err
 }
 
 // convertError converts a serialized access error formatted as a grpc error returned from the upstream AN,
