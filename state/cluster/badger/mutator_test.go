@@ -384,8 +384,8 @@ func (suite *MutatorSuite) TestExtend_Success() {
 	err := suite.state.Extend(&proposal)
 	suite.Assert().Nil(err)
 
-	r := suite.db.Reader()
 	// should be able to retrieve the block
+	r := suite.db.Reader()
 	var extended model.Block
 	err = procedure.RetrieveClusterBlock(r, proposal.Block.ID(), &extended)
 	suite.Assert().Nil(err)
