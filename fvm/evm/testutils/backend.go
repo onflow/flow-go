@@ -374,11 +374,16 @@ type testMeter struct {
 	totalEmittedEventBytes func() uint64
 
 	interactionUsed func() (uint64, error)
+
+	disabled bool
 }
 
 var _ environment.Meter = &testMeter{}
 
 func (m *testMeter) MeterComputation(usage common.ComputationUsage) error {
+	if m.disabled {
+		return nil
+	}
 	meterComputation := m.meterComputation
 	if meterComputation == nil {
 		panic("method not set")
@@ -410,7 +415,17 @@ func (m *testMeter) ComputationUsed() (uint64, error) {
 	return computationUsed()
 }
 
+func (m *testMeter) RunWithMeteringDisabled(f func()) {
+	disabled := m.disabled
+	m.disabled = true
+	f()
+	m.disabled = disabled
+}
+
 func (m *testMeter) MeterMemory(usage common.MemoryUsage) error {
+	if m.disabled {
+		return nil
+	}
 	meterMemory := m.meterMemory
 	if meterMemory == nil {
 		panic("method not set")
@@ -435,6 +450,9 @@ func (m *testMeter) InteractionUsed() (uint64, error) {
 }
 
 func (m *testMeter) MeterEmittedEvent(byteSize uint64) error {
+	if m.disabled {
+		return nil
+	}
 	meterEmittedEvent := m.meterEmittedEvent
 	if meterEmittedEvent == nil {
 		panic("method not set")
