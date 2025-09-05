@@ -203,7 +203,7 @@ func (b *Blocks) ByCollectionID(collID flow.Identifier) (*flow.Block, error) {
 	return b.ByID(blockID)
 }
 
-// IndexBlockForCollectionGuarantees creates an index `guaranteeID->blockID` for each guarantee
+// IndexBlockForCollectionGuarantees populates an index `guaranteeID->blockID` for each guarantee
 // which appears in the block.
 // CAUTION: a collection can be included in multiple *unfinalized* blocks. However, the implementation
 // assumes a one-to-one map from collection ID to a *single* block ID. This holds for FINALIZED BLOCKS ONLY
