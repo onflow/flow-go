@@ -110,7 +110,7 @@ func MessageCodeFromInterface(v interface{}) (MessageCode, string, error) {
 	// core messages for execution & verification
 	case *flow.ExecutionReceipt:
 		return CodeExecutionReceipt, s, nil
-	case *flow.ResultApproval:
+	case *messages.ResultApproval:
 		return CodeResultApproval, s, nil
 
 	// data exchange for execution of blocks
@@ -195,7 +195,7 @@ func InterfaceFromMessageCode(code MessageCode) (messages.UntrustedMessage, stri
 	case CodeExecutionReceipt:
 		return new(flow.ExecutionReceipt), what(new(flow.ExecutionReceipt)), nil
 	case CodeResultApproval:
-		var approval flow.ResultApproval
+		var approval messages.ResultApproval
 		return &approval, what(&approval), nil
 
 	// data exchange for execution of blocks

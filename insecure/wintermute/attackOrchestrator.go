@@ -90,7 +90,7 @@ func (o *Orchestrator) HandleEgressEvent(event *insecure.EgressEvent) error {
 		if err := o.handleChunkDataPackResponseEvent(event); err != nil {
 			return fmt.Errorf("could not handle chunk data pack response event: %w", err)
 		}
-	case *flow.ResultApproval:
+	case *messages.ResultApproval:
 		// orchestrator receives a result approval from corrupted VN. If it is an approval for the original result, it should
 		// be wintermuted, i.e., a corrupted VN must not approve any conflicting result with the corrupted result (otherwise, it
 		// causes a sealing halt at consensus nodes).
