@@ -26,14 +26,14 @@ func TestFinalizedReader(t *testing.T) {
 		proposal := unittest.ProposalFixture()
 		block := proposal.Block
 
-		// store `block1`
+		// store `block`
 		unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
 			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 				return blocks.BatchStore(lctx, rw, proposal)
 			})
 		})
 
-		// finalize `block1`
+		// index `block` as finalized
 		unittest.WithLock(t, lockManager, storage.LockFinalizeBlock, func(lctx lockctx.Context) error {
 			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 				return operation.IndexFinalizedBlockByHeight(lctx, rw, block.Height, block.ID())
