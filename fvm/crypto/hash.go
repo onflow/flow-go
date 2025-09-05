@@ -49,7 +49,7 @@ var hasherCreators = map[hash.HashingAlgorithm](func() hash.Hasher){
 func NewHashing(algo hash.HashingAlgorithm) (hash.Hasher, error) {
 	hasherCreator, hasCreator := hasherCreators[algo]
 	if !hasCreator {
-		return nil, errors.New("hashing algorithm is not supported for prefixed algorithm")
+		return nil, errors.New("hashing algorithm is not supported")
 	}
 
 	return hasherCreator(), nil

@@ -230,7 +230,7 @@ func VerifySignatureFromTransaction(
 			hashAlgo.String(), "is not supported in transactions"))
 	}
 
-	// No prefix logic is implemented here, any prefixing shoulf be applied directly to the `message` input
+	// No prefix logic is implemented here, any prefixing should be applied directly to the `message` input
 	hasher, err := NewHashing(hashAlgo)
 	if err != nil {
 		// should not happen
