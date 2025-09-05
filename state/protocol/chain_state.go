@@ -68,6 +68,8 @@ type FollowerState interface {
 	// with the same block. Hence, for simplicity, the FollowerState may reject such requests with an exception.
 	//
 	// No errors are expected during normal operations.
+	//   - In case of concurrent calls with the same `candidate` block, `ExtendCertified` may return a [storage.ErrAlreadyExists]
+	//     or it may gracefully return. At the moment, `ExtendCertified` should be considered as NOT CONCURRENCY-SAFE.
 	ExtendCertified(ctx context.Context, certified *flow.CertifiedBlock) error
 
 	// Finalize finalizes the block with the given hash.
@@ -112,7 +114,9 @@ type ParticipantState interface {
 	// with the same block. Hence, for simplicity, the FollowerState may reject such requests with an exception.
 	//
 	// Expected errors during normal operations:
-	//  * state.OutdatedExtensionError if the candidate block is orphaned
-	//  * state.InvalidExtensionError if the candidate block is invalid
+	//  * [state.OutdatedExtensionError] if the candidate block is orphaned
+	//  * [state.InvalidExtensionError] if the candidate block is invalid
+	//  * In case of concurrent calls with the same `candidate` block, `Extend` may return a [storage.ErrAlreadyExists]
+	//    or it may gracefully return. At the moment, `Extend` should be considered as NOT CONCURRENCY-SAFE.
 	Extend(ctx context.Context, candidate *flow.Proposal) error
 }
