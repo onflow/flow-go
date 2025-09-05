@@ -69,7 +69,7 @@ type Blocks interface {
 	// TODO: this method is not available until next spork (mainnet27) or a migration that builds the index.
 	// ByView(view uint64) (*flow.Header, error)
 
-	// ByCollectionID returns the block for the given collection ID.
+	// ByCollectionID returns the block for the given [flow.CollectionGuarantee] ID.
 	// This method is only available for collections included in finalized blocks.
 	// While consensus nodes verify that collections are not repeated within the same fork,
 	// each different fork can contain a recent collection once. Therefore, we must wait for

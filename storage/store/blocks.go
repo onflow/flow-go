@@ -179,7 +179,7 @@ func (b *Blocks) ProposalByHeight(height uint64) (*flow.Proposal, error) {
 	return b.retrieveProposal(blockID)
 }
 
-// ByCollectionID returns the block for the given collection ID.
+// ByCollectionID returns the block for the given [flow.CollectionGuarantee] ID.
 // This method is only available for collections included in finalized blocks.
 // While consensus nodes verify that collections are not repeated within the same fork,
 // each different fork can contain a recent collection once. Therefore, we must wait for

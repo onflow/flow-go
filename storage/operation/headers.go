@@ -124,7 +124,7 @@ func BlockExists(r storage.Reader, blockID flow.Identifier) (bool, error) {
 	return KeyExists(r, MakePrefix(codeHeader, blockID))
 }
 
-// IndexBlockContainingCollectionGuarantee produces a mapping from collection ID to the block ID containing this collection.
+// IndexBlockContainingCollectionGuarantee produces a mapping from the ID of a [flow.CollectionGuarantee] to the block ID containing this guarantee.
 //
 // CAUTION:
 //   - The caller must acquire the lock ??? and hold it until the database write has been committed.
@@ -141,7 +141,7 @@ func IndexBlockContainingCollectionGuarantee(w storage.Writer, collID flow.Ident
 	return UpsertByKey(w, MakePrefix(codeCollectionBlock, collID), blockID)
 }
 
-// LookupBlockContainingCollectionGuarantee retrieves the block containing the collection with the given ID.
+// LookupBlockContainingCollectionGuarantee retrieves the block containing the [flow.CollectionGuarantee] with the given ID.
 //
 // CAUTION: A collection can be included in multiple *unfinalized* blocks. However, the implementation
 // assumes a one-to-one map from collection ID to a *single* block ID. This holds for FINALIZED BLOCKS ONLY
