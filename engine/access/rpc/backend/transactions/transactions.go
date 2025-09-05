@@ -223,7 +223,7 @@ func (t *Transactions) sendTransactionToCollector(
 	tx *flow.TransactionBody,
 	collectionNodeAddr string,
 ) error {
-	collectionRPC, closer, err := t.connectionFactory.GetAccessAPIClient(collectionNodeAddr, nil)
+	collectionRPC, closer, err := t.connectionFactory.GetCollectionAPIClient(collectionNodeAddr, nil)
 	if err != nil {
 		return fmt.Errorf("failed to connect to collection node at %s: %w", collectionNodeAddr, err)
 	}

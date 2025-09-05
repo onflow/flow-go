@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"errors"
 	"fmt"
 	"path/filepath"
 	"strings"
@@ -16,8 +17,8 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	"github.com/onflow/flow-go/module/mempool"
-	"github.com/onflow/flow-go/utils/grpcutils"
 
+	commonrpc "github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/engine/execution/computation"
 	"github.com/onflow/flow-go/engine/execution/ingestion/stop"
 	"github.com/onflow/flow-go/engine/execution/rpc"
@@ -85,7 +86,12 @@ func (exeConf *ExecutionConfig) SetupFlags(flags *pflag.FlagSet) {
 	datadir := "/data"
 
 	flags.StringVarP(&exeConf.rpcConf.ListenAddr, "rpc-addr", "i", "localhost:9000", "the address the gRPC server listens on")
-	flags.UintVar(&exeConf.rpcConf.MaxMsgSize, "rpc-max-message-size", grpcutils.DefaultMaxMsgSize, "the maximum message size in bytes for messages sent or received over grpc")
+	flags.UintVar(&exeConf.rpcConf.DeprecatedMaxMsgSize, "rpc-max-message-size", 0,
+		"[deprecated] the maximum message size in bytes for messages sent or received over grpc")
+	flags.UintVar(&exeConf.rpcConf.MaxRequestMsgSize, "rpc-max-request-message-size", commonrpc.DefaultExecutionMaxRequestSize,
+		"the maximum request message size in bytes for request messages received over grpc by the server")
+	flags.UintVar(&exeConf.rpcConf.MaxResponseMsgSize, "rpc-max-response-message-size", commonrpc.DefaultExecutionMaxResponseSize,
+		"the maximum message size in bytes for response messages sent over grpc by the server")
 	flags.BoolVar(&exeConf.rpcConf.RpcMetricsEnabled, "rpc-metrics-enabled", false, "whether to enable the rpc metrics")
 	flags.StringVar(&exeConf.triedir, "triedir", filepath.Join(datadir, "trie"), "directory to store the execution State")
 	flags.StringVar(&exeConf.executionDataDir, "execution-data-dir", filepath.Join(datadir, "execution_data"), "directory to use for storing Execution Data")
@@ -164,6 +170,12 @@ func (exeConf *ExecutionConfig) ValidateFlags() error {
 				return fmt.Errorf("invalid node ID in execution-data-allowed-requesters %s: %w", id, err)
 			}
 		}
+	}
+	if exeConf.rpcConf.MaxRequestMsgSize <= 0 {
+		return errors.New("rpc-max-request-message-size must be greater than 0")
+	}
+	if exeConf.rpcConf.MaxResponseMsgSize <= 0 {
+		return errors.New("rpc-max-response-message-size must be greater than 0")
 	}
 	return nil
 }

@@ -52,9 +52,11 @@ type GrpcServerBuilder struct {
 // If transport credentials are provided, a secure gRPC server is created; otherwise, an unsecured server is initialized.
 //
 // Note: The gRPC server is created with the specified options and is ready for further configuration or starting.
-func NewGrpcServerBuilder(log zerolog.Logger,
+func NewGrpcServerBuilder(
+	log zerolog.Logger,
 	gRPCListenAddr string,
-	maxMsgSize uint,
+	maxRequestMsgSize uint,
+	maxResponseMsgSize uint,
 	rpcMetricsEnabled bool,
 	apiRateLimits map[string]int, // the api rate limit (max calls per second) for each of the Access API e.g. Ping->100, GetTransaction->300
 	apiBurstLimits map[string]int, // the api burst limit (max calls at the same time) for each of the Access API e.g. Ping->50, GetTransaction->10
@@ -78,8 +80,8 @@ func NewGrpcServerBuilder(log zerolog.Logger,
 
 	// create a GRPC server to serve GRPC clients
 	grpcOpts := []grpc.ServerOption{
-		grpc.MaxRecvMsgSize(int(maxMsgSize)),
-		grpc.MaxSendMsgSize(int(maxMsgSize)),
+		grpc.MaxRecvMsgSize(int(maxRequestMsgSize)),
+		grpc.MaxSendMsgSize(int(maxResponseMsgSize)),
 	}
 
 	var unaryInterceptors []grpc.UnaryServerInterceptor

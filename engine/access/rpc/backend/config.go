@@ -1,15 +1,14 @@
 package backend
 
 import (
-	"time"
-
 	"github.com/onflow/flow-go/engine/access/rpc/connection"
 )
 
 // Config defines the configurable options for creating Backend
 type Config struct {
-	ExecutionClientTimeout    time.Duration                   // execution API GRPC client timeout
-	CollectionClientTimeout   time.Duration                   // collection API GRPC client timeout
+	AccessConfig              connection.Config               // access API GRPC client config
+	ExecutionConfig           connection.Config               // execution API GRPC client config
+	CollectionConfig          connection.Config               // collection API GRPC client config
 	ConnectionPoolSize        uint                            // size of the cache for storing collection and execution connections
 	MaxHeightRange            uint                            // max size of height range requests
 	PreferredExecutionNodeIDs []string                        // preferred list of upstream execution node IDs

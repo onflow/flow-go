@@ -33,9 +33,14 @@ type Backend interface {
 
 // Config defines the configurable options for the ingress server.
 type Config struct {
-	ListenAddr        string
-	MaxMsgSize        uint // in bytes
-	RpcMetricsEnabled bool // enable GRPC metrics
+	ListenAddr         string
+	MaxRequestMsgSize  uint // in bytes
+	MaxResponseMsgSize uint // in bytes
+	RpcMetricsEnabled  bool // enable GRPC metrics
+
+	// holds value of deprecated MaxMsgSize flag for use during bootstrapping.
+	// will be removed in a future release.
+	DeprecatedMaxMsgSize uint // in bytes
 }
 
 // Engine implements a gRPC server with a simplified version of the Observation
@@ -59,8 +64,8 @@ func New(
 ) *Engine {
 	// create a GRPC server to serve GRPC clients
 	grpcOpts := []grpc.ServerOption{
-		grpc.MaxRecvMsgSize(int(config.MaxMsgSize)),
-		grpc.MaxSendMsgSize(int(config.MaxMsgSize)),
+		grpc.MaxRecvMsgSize(int(config.MaxRequestMsgSize)),
+		grpc.MaxSendMsgSize(int(config.MaxResponseMsgSize)),
 	}
 
 	var interceptors []grpc.UnaryServerInterceptor // ordered list of interceptors
