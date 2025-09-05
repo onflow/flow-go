@@ -14,7 +14,7 @@ func InsertExecutionReceiptStub(w storage.Writer, receiptID flow.Identifier, met
 	return UpsertByKey(w, MakePrefix(codeExecutionReceiptMeta, receiptID), meta)
 }
 
-// RetrieveExecutionReceiptMeta retrieves a [flow.ExecutionReceiptStub] by its ID.
+// RetrieveExecutionReceiptStub retrieves a [flow.ExecutionReceiptStub] by its ID.
 //
 // Expected errors during normal operations:
 //   - [storage.ErrNotFound] if no receipt stub with the specified ID is known.
