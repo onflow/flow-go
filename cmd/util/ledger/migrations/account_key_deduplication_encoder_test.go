@@ -137,14 +137,14 @@ func TestMappingGroupSerialization(t *testing.T) {
 		expected []byte
 	}{
 		{
-			name:     "1 group",
+			name:     "1 group with run length 1",
 			mappings: []uint32{1},
 			expected: []byte{
 				0, 1, 0, 0, 0, 1,
 			},
 		},
 		{
-			name:     "2 groups",
+			name:     "2 groups with different run length",
 			mappings: []uint32{1, 1, 2},
 			expected: []byte{
 				0, 2, 0, 0, 0, 1,
@@ -152,11 +152,11 @@ func TestMappingGroupSerialization(t *testing.T) {
 			},
 		},
 		{
-			name:     "group count not consecutive",
+			name:     "consecutive group count followed by regular group",
 			mappings: []uint32{1, 2, 2},
 			expected: []byte{
-				0, 1, 0, 0, 0, 1,
-				0, 2, 0, 0, 0, 2,
+				0x80, 2, 0, 0, 0, 1,
+				0, 1, 0, 0, 0, 2,
 			},
 		},
 		{
@@ -168,27 +168,44 @@ func TestMappingGroupSerialization(t *testing.T) {
 			},
 		},
 		{
-			name:     "2 consecutive groups",
+			name:     "consecutive group with run length 2",
 			mappings: []uint32{1, 2},
 			expected: []byte{
 				0x80, 2, 0, 0, 0, 1,
 			},
 		},
 		{
-			name:     ">2 consecutive groups",
+			name:     "consecutive group with run length 3",
 			mappings: []uint32{1, 2, 3},
 			expected: []byte{
 				0x80, 3, 0, 0, 0, 1,
 			},
 		},
 		{
+			name:     "consecutive group followed by non-consecutive group",
+			mappings: []uint32{1, 2, 2},
+			expected: []byte{
+				0x80, 2, 0, 0, 0, 1,
+				0, 1, 0, 0, 0, 2,
+			},
+		},
+		{
+			name:     "consecutive group followed by consecutive group",
+			mappings: []uint32{1, 2, 2, 3},
+			expected: []byte{
+				0x80, 2, 0, 0, 0, 1,
+				0x80, 2, 0, 0, 0, 2,
+			},
+		},
+		{
 			name:     "consecutive groups mixed with non-consecutive groups",
-			mappings: []uint32{1, 3, 4, 5, 5, 6, 7},
+			mappings: []uint32{1, 3, 4, 5, 5, 5, 5, 6, 7, 7},
 			expected: []byte{
 				0, 1, 0, 0, 0, 1,
-				0x80, 2, 0, 0, 0, 3,
-				0, 2, 0, 0, 0, 5,
+				0x80, 3, 0, 0, 0, 3,
+				0, 3, 0, 0, 0, 5,
 				0x80, 2, 0, 0, 0, 6,
+				0, 1, 0, 0, 0, 7,
 			},
 		},
 	}

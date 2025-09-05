@@ -36,7 +36,7 @@ import (
 func predefinedSequenceNumberPayloadSizes(owner string, startKeyIndex uint32, endKeyIndex uint32) uint64 {
 	size := uint64(0)
 	for i := startKeyIndex; i < endKeyIndex; i++ {
-		size += uint64(environment.PredefinedSequenceNumberPayloadSize(owner, i))
+		size += environment.PredefinedSequenceNumberPayloadSize(flow.BytesToAddress([]byte(owner)), i)
 	}
 	return size
 }
