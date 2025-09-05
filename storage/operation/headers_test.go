@@ -55,12 +55,12 @@ func TestHeaderIDIndexByCollectionID(t *testing.T) {
 		collectionGuaranteeID := unittest.IdentifierFixture()
 
 		err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			return operation.IndexCollectionGuaranteeBlock(rw.Writer(), collectionGuaranteeID, headerID)
+			return operation.IndexCollectionGuaranteeByBlock(rw.Writer(), collectionGuaranteeID, headerID)
 		})
 		require.NoError(t, err)
 
 		actualID := &flow.Identifier{}
-		err = operation.LookupCollectionGuaranteeBlock(db.Reader(), collectionGuaranteeID, actualID)
+		err = operation.LookupCollectionGuaranteeByBlock(db.Reader(), collectionGuaranteeID, actualID)
 		require.NoError(t, err)
 		assert.Equal(t, headerID, *actualID)
 	})
