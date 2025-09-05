@@ -304,8 +304,7 @@ func (updater *accountKeyUpdater) revokeAccountKey(
 		return nil, fmt.Errorf("revoking account key failed: %w", err)
 	}
 
-	// TODO (faye): replace GetAccountPublicKey with GetStoredPublicKey
-	publicKey, err := updater.accounts.GetAccountPublicKey(address, keyIndex)
+	publicKey, err := updater.accounts.GetRuntimeAccountPublicKey(address, keyIndex)
 	if err != nil {
 		return nil, err
 	}
