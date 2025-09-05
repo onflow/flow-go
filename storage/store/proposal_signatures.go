@@ -48,6 +48,11 @@ func (h *proposalSignatures) retrieveTx(blockID flow.Identifier) ([]byte, error)
 	return h.cache.Get(h.db.Reader(), blockID)
 }
 
+// ByBlockID returns the proposer signature for the specified block.
+// Currently, we store the proposer signature for all blocks, even though this is only strictly
+// necessary for blocks that do not have a QC yet. However, this might change in the future.
+// Expected errors during normal operations:
+//   - [storage.ErrNotFound] if no block with the specified ID is known
 func (h *proposalSignatures) ByBlockID(blockID flow.Identifier) ([]byte, error) {
 	return h.retrieveTx(blockID)
 }

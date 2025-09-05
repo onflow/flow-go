@@ -832,14 +832,14 @@ func TestBootstrap_InvalidSporkBlockView(t *testing.T) {
 	segment, err := rootSnapshot.SealingSegment()
 	require.NoError(t, err)
 
-	currentView := segment.Finalized().View + 1       // according to creating LivenessData
-	encodable.Params.SporkRootBlockView = currentView // update spork root block view
+	// invalid configuration, where the latest finalized block's view is lower than the spork root block's view:
+	encodable.Params.SporkRootBlockView = segment.Finalized().View + 1
 
 	rootSnapshot = inmem.SnapshotFromEncodable(encodable)
 
 	bootstrap(t, rootSnapshot, func(state *bprotocol.State, err error) {
 		require.Error(t, err)
-		require.Contains(t, err.Error(), fmt.Sprintf("PaceMaker cannot start in view %d which is less or equal than spork root view %d", currentView, rootSnapshot.Params().SporkRootBlockView()))
+		require.Contains(t, err.Error(), fmt.Sprintf("sealing segment is invalid, because the latest finalized block's view %d is lower than the spork root block's view %d", segment.Finalized().View, rootSnapshot.Params().SporkRootBlockView()))
 	})
 }
 

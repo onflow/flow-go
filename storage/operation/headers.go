@@ -124,7 +124,7 @@ func BlockExists(r storage.Reader, blockID flow.Identifier) (bool, error) {
 	return KeyExists(r, MakePrefix(codeHeader, blockID))
 }
 
-// IndexCollectionBlock produces a mapping from collection ID to the block ID containing this collection.
+// IndexBlockContainingCollectionGuarantee produces a mapping from the ID of a [flow.CollectionGuarantee] to the block ID containing this guarantee.
 //
 // CAUTION:
 //   - The caller must acquire the lock ??? and hold it until the database write has been committed.
@@ -137,11 +137,11 @@ func BlockExists(r storage.Reader, blockID flow.Identifier) (bool, error) {
 //
 // Expected errors during normal operations:
 // TODO: return [storage.ErrAlreadyExists] or [storage.ErrDataMismatch]
-func IndexCollectionBlock(w storage.Writer, collID flow.Identifier, blockID flow.Identifier) error {
+func IndexBlockContainingCollectionGuarantee(w storage.Writer, collID flow.Identifier, blockID flow.Identifier) error {
 	return UpsertByKey(w, MakePrefix(codeCollectionBlock, collID), blockID)
 }
 
-// IndexCollectionGuaranteeBlock retrieves the block containing the collection with the given ID.
+// LookupBlockContainingCollectionGuarantee retrieves the block containing the [flow.CollectionGuarantee] with the given ID.
 //
 // CAUTION: A collection can be included in multiple *unfinalized* blocks. However, the implementation
 // assumes a one-to-one map from collection ID to a *single* block ID. This holds for FINALIZED BLOCKS ONLY
@@ -151,14 +151,7 @@ func IndexCollectionBlock(w storage.Writer, collID flow.Identifier, blockID flow
 //
 // Expected errors during normal operations:
 //   - [storage.ErrNotFound] if no block is known that contains the specified collection ID.
-//
-// IndexCollectionGuaranteeBlock indexes a block by a collection guarantee within that block.
-func IndexCollectionGuaranteeBlock(w storage.Writer, collID flow.Identifier, blockID flow.Identifier) error {
-	return UpsertByKey(w, MakePrefix(codeCollectionBlock, collID), blockID)
-}
-
-// LookupCollectionGuaranteeBlock looks up a block by a collection within that block.
-func LookupCollectionGuaranteeBlock(r storage.Reader, collID flow.Identifier, blockID *flow.Identifier) error {
+func LookupBlockContainingCollectionGuarantee(r storage.Reader, collID flow.Identifier, blockID *flow.Identifier) error {
 	return RetrieveByKey(r, MakePrefix(codeCollectionBlock, collID), blockID)
 }
 

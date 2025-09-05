@@ -171,6 +171,26 @@ func (_m *ExecutionData) Size() uint {
 	return r0
 }
 
+// Values provides a mock function with no fields
+func (_m *ExecutionData) Values() []*execution_data.BlockExecutionDataEntity {
+	ret := _m.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for Values")
+	}
+
+	var r0 []*execution_data.BlockExecutionDataEntity
+	if rf, ok := ret.Get(0).(func() []*execution_data.BlockExecutionDataEntity); ok {
+		r0 = rf()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]*execution_data.BlockExecutionDataEntity)
+		}
+	}
+
+	return r0
+}
+
 // NewExecutionData creates a new instance of ExecutionData. It also registers a testing interface on the mock and a cleanup function to assert the mocks expectations.
 // The first argument is typically a *testing.T value.
 func NewExecutionData(t interface {

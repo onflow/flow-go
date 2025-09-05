@@ -52,6 +52,7 @@ func TestReExecuteBlock(t *testing.T) {
 
 		unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
 			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+				// By convention, root block has no proposer signature - implementation has to handle this edge case
 				return blocks.BatchStore(lctx, rw, &flow.Proposal{Block: *genesis, ProposerSigData: nil})
 			})
 		})
@@ -205,6 +206,7 @@ func TestReExecuteBlockWithDifferentResult(t *testing.T) {
 
 		unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
 			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+				// By convention, root block has no proposer signature - implementation has to handle this edge case
 				return blocks.BatchStore(lctx, rw, &flow.Proposal{Block: *genesis, ProposerSigData: nil})
 			})
 		})

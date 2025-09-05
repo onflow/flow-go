@@ -26,14 +26,14 @@ func TestFinalizedReader(t *testing.T) {
 		proposal := unittest.ProposalFixture()
 		block := proposal.Block
 
-		// store `block1`
+		// store `block`
 		unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
 			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 				return blocks.BatchStore(lctx, rw, proposal)
 			})
 		})
 
-		// finalize `block1`
+		// index `block` as finalized
 		unittest.WithLock(t, lockManager, storage.LockFinalizeBlock, func(lctx lockctx.Context) error {
 			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 				return operation.IndexFinalizedBlockByHeight(lctx, rw, block.Height, block.ID())
@@ -43,7 +43,6 @@ func TestFinalizedReader(t *testing.T) {
 		// verify that `FinalizedReader` reads values from database that are not yet cached, eg. right after initialization
 		reader := NewFinalizedReader(headers, block.Height)
 		finalized, err := reader.FinalizedBlockIDAtHeight(block.Height)
-		// store header
 		require.NoError(t, err)
 		require.Equal(t, block.ID(), finalized)
 
@@ -67,7 +66,6 @@ func TestFinalizedReader(t *testing.T) {
 
 		// We declare `block2` as via the `FinalizedReader`
 		reader.BlockFinalized(block2.ToHeader())
-		require.NoError(t, err)
 		require.Equal(t, block.ID(), finalized)
 
 		// should be able to retrieve the block
