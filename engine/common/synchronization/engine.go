@@ -211,7 +211,7 @@ func (e *Engine) process(channel channels.Channel, originID flow.Identifier, eve
 			irrecoverable.Throw(context.TODO(), fmt.Errorf("failed to validate batch request from %x: %w", originID[:], err))
 		}
 		return e.requestHandler.Process(channel, originID, event)
-	case *messages.RangeRequest:
+	case *flow.RangeRequest:
 		err := e.validateRangeRequestForALSP(originID, message)
 		if err != nil {
 			irrecoverable.Throw(context.TODO(), fmt.Errorf("failed to validate range request from %x: %w", originID[:], err))
@@ -544,7 +544,7 @@ func (e *Engine) validateBlockResponseForALSP(channel channels.Channel, id flow.
 // - rangeRequest: the range request to validate
 // Returns:
 // - error: If an error is encountered while validating the range request. Error is assumed to be irrecoverable because of internal processes that didn't allow validation to complete.
-func (e *Engine) validateRangeRequestForALSP(originID flow.Identifier, rangeRequest *messages.RangeRequest) error {
+func (e *Engine) validateRangeRequestForALSP(originID flow.Identifier, rangeRequest *flow.RangeRequest) error {
 	// Generate a random integer between 0 and spamProbabilityMultiplier (exclusive)
 	n, err := rand.Uint32n(spamProbabilityMultiplier)
 	if err != nil {
