@@ -440,12 +440,16 @@ func (suite *Suite) TestGetSystemTransaction_HappyPath() {
 	require.NoError(suite.T(), err)
 
 	block := unittest.BlockFixture()
-	res, err := txBackend.GetSystemTransaction(context.Background(), flow.ZeroID, block.ID())
-	suite.Require().NoError(err)
 
 	systemTx, err := blueprints.SystemChunkTransaction(suite.chainID.Chain())
 	suite.Require().NoError(err)
 
+	res, err := txBackend.GetSystemTransaction(context.Background(), flow.ZeroID, block.ID())
+	suite.Require().NoError(err)
+	suite.Require().Equal(systemTx, res)
+
+	res, err = txBackend.GetSystemTransaction(context.Background(), systemTx.ID(), block.ID())
+	suite.Require().NoError(err)
 	suite.Require().Equal(systemTx, res)
 }
 
@@ -466,7 +470,7 @@ func (suite *Suite) TestGetSystemTransactionResult_HappyPath() {
 		suite.state.
 			On("Sealed").
 			Return(snapshot, nil).
-			Once()
+			Twice()
 
 		lastBlock, err := snapshot.Head()
 		suite.Require().NoError(err)
@@ -479,13 +483,13 @@ func (suite *Suite) TestGetSystemTransactionResult_HappyPath() {
 		suite.state.
 			On("AtBlockID", blockID).
 			Return(unittest.StateSnapshotForKnownBlock(block.ToHeader(), identities.Lookup()), nil).
-			Once()
+			Twice()
 
 		// block storage returns the corresponding block
 		suite.blocks.
 			On("ByID", blockID).
 			Return(block, nil).
-			Once()
+			Twice()
 
 		receipt1 := unittest.ReceiptForBlockFixture(block)
 		suite.receipts.
@@ -511,12 +515,12 @@ func (suite *Suite) TestGetSystemTransactionResult_HappyPath() {
 				return bytes.Equal(txID[:], req.TransactionId)
 			})).
 			Return(exeEventResp.TransactionResults[0], nil).
-			Once()
+			Twice()
 
 		suite.connectionFactory.
 			On("GetExecutionAPIClient", mock.Anything).
 			Return(suite.executionAPIClient, &mocks.MockCloser{}, nil).
-			Once()
+			Twice()
 
 		// the connection factory should be used to get the execution node client
 		params := suite.defaultTransactionsParams()
@@ -530,6 +534,15 @@ func (suite *Suite) TestGetSystemTransactionResult_HappyPath() {
 			entities.EventEncodingVersion_JSON_CDC_V0,
 		)
 		suite.Require().NoError(err)
+
+		res2, err := backend.GetSystemTransactionResult(
+			context.Background(),
+			suite.systemTx.ID(),
+			block.ID(),
+			entities.EventEncodingVersion_JSON_CDC_V0,
+		)
+		suite.Require().NoError(err)
+		suite.Require().Equal(res.TransactionID, res2.TransactionID)
 
 		// Expected system chunk transaction
 		suite.Require().Equal(flow.TransactionStatusExecuted, res.Status)
@@ -569,6 +582,17 @@ func (suite *Suite) TestGetSystemTransactionResult_HappyPath() {
 			test(snapshot)
 		},
 	)
+}
+
+func (suite *Suite) TestGetSystemTransactionResult_Unimplemented() {
+	params := suite.defaultTransactionsParams()
+	txBackend, err := NewTransactionsBackend(params)
+	require.NoError(suite.T(), err)
+
+	block := unittest.BlockFixture()
+	res, err := txBackend.GetSystemTransactionResult(context.Background(), flow.Identifier{0x1}, block.ID(), entities.EventEncodingVersion_JSON_CDC_V0)
+	suite.Require().Nil(res)
+	suite.Require().Equal(err, status.Errorf(codes.Unimplemented, "system transaction result by transaction ID not implemented"))
 }
 
 func (suite *Suite) TestGetSystemTransactionResultFromStorage() {
