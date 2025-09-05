@@ -10,6 +10,8 @@ import (
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/fvm/storage/testutils"
+	"github.com/onflow/flow-go/ledger"
+	"github.com/onflow/flow-go/ledger/common/convert"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -435,4 +437,19 @@ func TestAccounts_AllocateSlabIndex(t *testing.T) {
 	i, err = accounts.AllocateSlabIndex(address)
 	require.NoError(t, err)
 	require.Equal(t, i, atree.SlabIndex([8]byte{0, 0, 0, 0, 0, 0, 0, 3}))
+}
+
+func TestRegisterSize(t *testing.T) {
+	address := flow.Address{0x01}
+
+	registerID := flow.AccountStatusRegisterID(address)
+	registerValue := environment.NewAccountStatus().ToBytes()
+	registerSize := environment.RegisterSize(registerID, registerValue)
+
+	payload := ledger.NewPayload(
+		convert.RegisterIDToLedgerKey(registerID),
+		registerValue)
+	payloadSize := payload.Size()
+
+	require.Equal(t, payloadSize, registerSize)
 }
