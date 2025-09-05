@@ -93,6 +93,7 @@ import (
 	"github.com/onflow/flow-go/module/signature"
 	requesterunit "github.com/onflow/flow-go/module/state_synchronization/requester/unittest"
 	"github.com/onflow/flow-go/module/trace"
+	"github.com/onflow/flow-go/module/updatable_configs"
 	"github.com/onflow/flow-go/module/validation"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/p2p/cache"
@@ -341,6 +342,7 @@ func CollectionNode(t *testing.T, hub *stub.Hub, identity bootstrap.NodeInfo, ro
 		node.Metrics,
 		pusherEngine,
 		node.Log,
+		updatable_configs.DefaultBySealingLagRateLimiterConfigs(),
 	)
 	require.NoError(t, err)
 
@@ -441,8 +443,7 @@ func ConsensusNode(t *testing.T, hub *stub.Hub, identity bootstrap.NodeInfo, ide
 	resultsDB := store.NewExecutionResults(node.Metrics, db)
 	receiptsDB := store.NewExecutionReceipts(node.Metrics, db, resultsDB, storagebadger.DefaultCacheSize)
 
-	guarantees, err := stdmap.NewGuarantees(1000)
-	require.NoError(t, err)
+	guarantees := stdmap.NewGuarantees(1000)
 
 	receipts := consensusMempools.NewExecutionTree()
 
@@ -456,7 +457,7 @@ func ConsensusNode(t *testing.T, hub *stub.Hub, identity bootstrap.NodeInfo, ide
 	require.NoError(t, err)
 
 	// request receipts from execution nodes
-	receiptRequester, err := requester.New(node.Log.With().Str("entity", "receipt").Logger(), node.Metrics, node.Net, node.Me, node.State, channels.RequestReceiptsByBlockID, filter.Any, func() flow.Entity { return &flow.ExecutionReceipt{} })
+	receiptRequester, err := requester.New(node.Log.With().Str("entity", "receipt").Logger(), node.Metrics, node.Net, node.Me, node.State, channels.RequestReceiptsByBlockID, filter.Any, func() flow.Entity { return new(flow.ExecutionReceipt) })
 	require.NoError(t, err)
 
 	assigner, err := chunks.NewChunkAssigner(flow.DefaultChunkAssignmentAlpha, node.State)
@@ -661,7 +662,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity bootstrap.NodeInfo, ide
 		node.Log.With().Str("entity", "collection").Logger(), node.Metrics, node.Net, node.Me, node.State,
 		channels.RequestCollections,
 		filter.HasRole[flow.Identity](flow.RoleCollection),
-		func() flow.Entity { return &flow.Collection{} },
+		func() flow.Entity { return new(flow.Collection) },
 	)
 	require.NoError(t, err)
 
@@ -933,7 +934,7 @@ func createFollowerCore(
 ) (module.HotStuffFollower, *confinalizer.Finalizer) {
 	finalizer := confinalizer.NewFinalizer(badgerimpl.ToDB(node.PublicDB).Reader(), node.Headers, followerState, trace.NewNoopTracer())
 
-	pending := make([]*flow.Header, 0)
+	pending := make([]*flow.ProposalHeader, 0)
 
 	// creates a consensus follower with noop consumer as the notifier
 	followerCore, err := consensus.NewFollower(

@@ -17,23 +17,16 @@ import (
 
 func TestCollections(t *testing.T) {
 	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
-		lockManager := storage.NewTestingLockManager()
 
 		metrics := metrics.NewNoopCollector()
 		transactions := store.NewTransactions(metrics, db)
 		collections := store.NewCollections(db, transactions)
 
-		// create a collection with three transactions
-		expected := unittest.CollectionFixture(3)
+		// create a light collection with three transactions
+		expected := unittest.CollectionFixture(3).Light()
 
-		// Create a lock manager and context for testing
-		lctx := lockManager.NewContext()
-		err := lctx.AcquireLock(storage.LockInsertCollection)
-		require.NoError(t, err)
-		defer lctx.Release()
-
-		// store the collection and the transaction index
-		_, err = collections.StoreAndIndexByTransaction(lctx, &expected)
+		// store the light collection and the transaction index
+		err := collections.StoreLightAndIndexByTransaction(expected)
 		require.NoError(t, err)
 
 		// retrieve the light collection by collection id
@@ -41,14 +34,13 @@ func TestCollections(t *testing.T) {
 		require.NoError(t, err)
 
 		// check if the light collection was indeed persisted
-		expectedLight := expected.Light()
-		assert.Equal(t, &expectedLight, actual)
+		assert.Equal(t, expected, actual)
 
 		expectedID := expected.ID()
 
 		// retrieve the collection light id by each of its transaction id
-		for _, tx := range expected.Transactions {
-			collLight, err := collections.LightByTransactionID(tx.ID())
+		for _, txID := range expected.Transactions {
+			collLight, err := collections.LightByTransactionID(txID)
 			actualID := collLight.ID()
 			// check that the collection id can indeed be retrieved by transaction id
 			require.NoError(t, err)
@@ -65,11 +57,11 @@ func TestCollections(t *testing.T) {
 
 		// check that the collection was indeed removed from the transaction index
 		for _, tx := range expected.Transactions {
-			_, err = collections.LightByTransactionID(tx.ID())
+			_, err = collections.LightByTransactionID(tx)
 			assert.Error(t, err)
 			assert.ErrorIs(t, err, storage.ErrNotFound)
 
-			_, err = transactions.ByID(tx.ID())
+			_, err = transactions.ByID(tx)
 			assert.Error(t, err)
 			assert.ErrorIs(t, err, storage.ErrNotFound)
 		}
@@ -80,7 +72,6 @@ func TestCollections(t *testing.T) {
 // indexed by the tx will be the one that is indexed in storage
 func TestCollections_IndexDuplicateTx(t *testing.T) {
 	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
-		lockManager := storage.NewTestingLockManager()
 		metrics := metrics.NewNoopCollector()
 		transactions := store.NewTransactions(metrics, db)
 		collections := store.NewCollections(db, transactions)
@@ -92,25 +83,20 @@ func TestCollections_IndexDuplicateTx(t *testing.T) {
 		col2Tx := col2.Transactions[0] // transaction that's only in col2
 		col2.Transactions = append(col2.Transactions, dupTx)
 
-		// Create a lock manager and context for testing
-		lctx := lockManager.NewContext()
-		err := lctx.AcquireLock(storage.LockInsertCollection)
-		require.NoError(t, err)
-		defer lctx.Release()
-
 		// insert col1
-		_, err = collections.StoreAndIndexByTransaction(lctx, &col1)
+		col1Light := col1.Light()
+		err := collections.StoreLightAndIndexByTransaction(col1Light)
 		require.NoError(t, err)
 
 		// insert col2
-		_, err = collections.StoreAndIndexByTransaction(lctx, &col2)
+		col2Light := col2.Light()
+		err = collections.StoreLightAndIndexByTransaction(col2Light)
 		require.NoError(t, err)
 
 		// should be able to retrieve col2 by ID
 		gotLightByCol2ID, err := collections.LightByID(col2.ID())
 		require.NoError(t, err)
-		col2Light := col2.Light()
-		assert.Equal(t, &col2Light, gotLightByCol2ID)
+		assert.Equal(t, col2Light, gotLightByCol2ID)
 
 		// should be able to retrieve col2 by the transaction which only appears in col2
 		_, err = collections.LightByTransactionID(col2Tx.ID())
@@ -120,8 +106,7 @@ func TestCollections_IndexDuplicateTx(t *testing.T) {
 		// since col1 is the first collection to be indexed by the shared transaction (dupTx)
 		gotLightByDupTxID, err := collections.LightByTransactionID(dupTx.ID())
 		require.NoError(t, err)
-		col1Light := col1.Light()
-		assert.Equal(t, &col1Light, gotLightByDupTxID)
+		assert.Equal(t, col1Light, gotLightByDupTxID)
 	})
 }
 
@@ -129,7 +114,6 @@ func TestCollections_IndexDuplicateTx(t *testing.T) {
 // different collection both will succeed, and one of the collection will be indexed by the tx
 func TestCollections_ConcurrentIndexByTx(t *testing.T) {
 	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
-		lockManager := storage.NewTestingLockManager()
 		metrics := metrics.NewNoopCollector()
 		transactions := store.NewTransactions(metrics, db)
 		collections := store.NewCollections(db, transactions)
@@ -143,12 +127,6 @@ func TestCollections_ConcurrentIndexByTx(t *testing.T) {
 		sharedTx := col1.Transactions[0] // The shared transaction
 		col2.Transactions[0] = sharedTx
 
-		// Create a lock manager and context for testing
-		lctx := lockManager.NewContext()
-		err := lctx.AcquireLock(storage.LockInsertCollection)
-		require.NoError(t, err)
-		defer lctx.Release()
-
 		var wg sync.WaitGroup
 		errChan := make(chan error, 2*numCollections)
 
@@ -159,7 +137,8 @@ func TestCollections_ConcurrentIndexByTx(t *testing.T) {
 			for i := 0; i < numCollections; i++ {
 				col := unittest.CollectionFixture(1)
 				col.Transactions[0] = sharedTx // Ensure it shares the same transaction
-				_, err := collections.StoreAndIndexByTransaction(lctx, &col)
+				light := col.Light()
+				err := collections.StoreLightAndIndexByTransaction(light)
 				errChan <- err
 			}
 		}()
@@ -171,7 +150,8 @@ func TestCollections_ConcurrentIndexByTx(t *testing.T) {
 			for i := 0; i < numCollections; i++ {
 				col := unittest.CollectionFixture(1)
 				col.Transactions[0] = sharedTx // Ensure it shares the same transaction
-				_, err := collections.StoreAndIndexByTransaction(lctx, &col)
+				light := col.Light()
+				err := collections.StoreLightAndIndexByTransaction(light)
 				errChan <- err
 			}
 		}()

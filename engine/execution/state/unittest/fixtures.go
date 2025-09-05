@@ -4,7 +4,6 @@ import (
 	"context"
 	"testing"
 
-	"github.com/onflow/crypto"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/engine/execution"
@@ -79,18 +78,34 @@ func ComputationResultForBlockFixture(
 		serviceEventVersionBeaconProtocol.ServiceEvent(),
 	}
 
-	executionResult := flow.NewExecutionResult(
-		parentBlockExecutionResultID,
-		completeBlock.ID(),
-		computationResult.AllChunks(),
-		convertedServiceEvents,
-		executionDataID)
+	chunks, err := computationResult.AllChunks()
+	require.NoError(t, err)
 
-	computationResult.ExecutionReceipt = &flow.ExecutionReceipt{
-		ExecutionResult:   *executionResult,
-		Spocks:            make([]crypto.Signature, numberOfChunks),
-		ExecutorSignature: crypto.Signature{},
-	}
+	executionResult, err := flow.NewExecutionResult(flow.UntrustedExecutionResult{
+		PreviousResultID: parentBlockExecutionResultID,
+		BlockID:          completeBlock.BlockID(),
+		Chunks:           chunks,
+		ServiceEvents:    convertedServiceEvents,
+		ExecutionDataID:  executionDataID,
+	})
+	require.NoError(t, err)
+
+	unsignedExecutionReceipt, err := flow.NewUnsignedExecutionReceipt(
+		flow.UntrustedUnsignedExecutionReceipt{
+			ExecutionResult: *executionResult,
+			ExecutorID:      unittest.IdentifierFixture(),
+			Spocks:          unittest.SignaturesFixture(numberOfChunks),
+		},
+	)
+	require.NoError(t, err)
+	receipt, err := flow.NewExecutionReceipt(
+		flow.UntrustedExecutionReceipt{
+			UnsignedExecutionReceipt: *unsignedExecutionReceipt,
+			ExecutorSignature:        unittest.SignatureFixture(),
+		},
+	)
+	require.NoError(t, err)
+	computationResult.ExecutionReceipt = receipt
 
 	return computationResult
 }

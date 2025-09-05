@@ -28,7 +28,7 @@ type Forks interface {
 	// GetBlocksForView returns all known blocks for the given view
 	GetBlocksForView(view uint64) []*model.Block
 
-	// GetBlock returns (BlockProposal, true) if the block with the specified
+	// GetBlock returns (*model.Block, true) if the block with the specified
 	// id was found and (nil, false) otherwise.
 	GetBlock(blockID flow.Identifier) (*model.Block, bool)
 

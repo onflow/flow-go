@@ -14,7 +14,8 @@ import (
 	"github.com/onflow/flow-go/model/verification"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/storage"
-	"github.com/onflow/flow-go/storage/operation"
+	badgerstorage "github.com/onflow/flow-go/storage/badger"
+	"github.com/onflow/flow-go/storage/badger/operation"
 	"github.com/onflow/flow-go/storage/operation/badgerimpl"
 	"github.com/onflow/flow-go/storage/operation/pebbleimpl"
 	"github.com/onflow/flow-go/storage/store"
@@ -25,23 +26,19 @@ import (
 func TestLoopPruneExecutionDataFromRootToLatestSealed(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(bdb *badger.DB) {
 		unittest.RunWithPebbleDB(t, func(pdb *pebble.DB) {
-			lockManager := storage.NewTestingLockManager()
 			// create dependencies
 			ps := unittestMocks.NewProtocolState()
 			blocks, rootResult, rootSeal := unittest.ChainFixture(0)
 			genesis := blocks[0]
 			require.NoError(t, ps.Bootstrap(genesis, rootResult, rootSeal))
 
-			db := badgerimpl.ToDB(bdb)
 			ctx, cancel := context.WithCancel(context.Background())
 			metrics := metrics.NewNoopCollector()
-			all := store.InitAll(metrics, db)
-			headers := all.Headers
-			blockstore := all.Blocks
-			results := all.Results
+			headers := badgerstorage.NewHeaders(metrics, bdb)
+			results := badgerstorage.NewExecutionResults(metrics, bdb)
 
-			transactions := store.NewTransactions(metrics, db)
-			collections := store.NewCollections(db, transactions)
+			transactions := badgerstorage.NewTransactions(metrics, bdb)
+			collections := badgerstorage.NewCollections(bdb, transactions)
 			chunkDataPacks := store.NewChunkDataPacks(metrics, pebbleimpl.ToDB(pdb), collections, 1000)
 
 			lastSealedHeight := 30
@@ -49,40 +46,24 @@ func TestLoopPruneExecutionDataFromRootToLatestSealed(t *testing.T) {
 			// indexed by height
 			chunks := make([]*verification.VerifiableChunkData, lastFinalizedHeight+2)
 			parentID := genesis.ID()
-			lctxGenesis := lockManager.NewContext()
-			require.NoError(t, lctxGenesis.AcquireLock(storage.LockInsertBlock))
-			require.NoError(t, db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-				return blockstore.BatchStore(lctxGenesis, rw, genesis)
-			}))
-			lctxGenesis.Release()
-
+			// By convention, root block has no proposer signature - implementation has to handle this edge case
+			require.NoError(t, headers.Store(&flow.ProposalHeader{Header: genesis.ToHeader(), ProposerSigData: nil}))
 			for i := 1; i <= lastFinalizedHeight; i++ {
-				chunk, block := unittest.VerifiableChunkDataFixture(0, func(header *flow.Header) {
-					header.Height = uint64(i)
-					header.ParentID = parentID
+				chunk, block := unittest.VerifiableChunkDataFixture(0, func(headerBody *flow.HeaderBody) {
+					headerBody.Height = uint64(i)
+					headerBody.ParentID = parentID
 				})
 				chunks[i] = chunk // index by height
-				lctxBlock := lockManager.NewContext()
-				require.NoError(t, lctxBlock.AcquireLock(storage.LockInsertBlock))
-				require.NoError(t, db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-					return blockstore.BatchStore(lctxBlock, rw, block)
-				}))
-				lctxBlock.Release()
-				lctxFinality := lockManager.NewContext()
-				require.NoError(t, lctxFinality.AcquireLock(storage.LockFinalizeBlock))
-				require.NoError(t, db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-					return operation.IndexFinalizedBlockByHeight(lctxFinality, rw, chunk.Header.Height, chunk.Header.ID())
-				}))
-				lctxFinality.Release()
+				require.NoError(t, headers.Store(unittest.ProposalHeaderFromHeader(chunk.Header)))
+				require.NoError(t, bdb.Update(operation.IndexBlockHeight(chunk.Header.Height, chunk.Header.ID())))
 				require.NoError(t, results.Store(chunk.Result))
 				require.NoError(t, results.Index(chunk.Result.BlockID, chunk.Result.ID()))
 				require.NoError(t, chunkDataPacks.Store([]*flow.ChunkDataPack{chunk.ChunkDataPack}))
-				_, storeErr := collections.Store(chunk.ChunkDataPack.Collection)
-				require.NoError(t, storeErr)
+				require.NoError(t, collections.Store(chunk.ChunkDataPack.Collection))
 				// verify that chunk data pack fixture can be found by the result
 				for _, c := range chunk.Result.Chunks {
 					chunkID := c.ID()
-					require.Equal(t, chunk.ChunkDataPack.ID(), chunkID)
+					require.Equal(t, chunk.ChunkDataPack.ChunkID, chunkID)
 					_, err := chunkDataPacks.ByChunkID(chunkID)
 					require.NoError(t, err)
 				}
@@ -96,11 +77,8 @@ func TestLoopPruneExecutionDataFromRootToLatestSealed(t *testing.T) {
 				parentID = block.ID()
 			}
 
-			// update the index "latest executed block (max height)" to latest sealed block
-			require.NoError(t, db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-				return operation.UpdateExecutedBlock(rw.Writer(), chunks[lastFinalizedHeight].Header.ID())
-			}))
-
+			// last seale and executed is the last sealed
+			require.NoError(t, bdb.Update(operation.InsertExecutedBlock(chunks[lastFinalizedHeight].Header.ID())))
 			lastSealed := chunks[lastSealedHeight].Header
 			require.NoError(t, ps.MakeSeal(lastSealed.ID()))
 
@@ -130,7 +108,7 @@ func TestLoopPruneExecutionDataFromRootToLatestSealed(t *testing.T) {
 			lastPrunedHeight := lastSealedHeight - int(cfg.Threshold) // 90
 			for i := 1; i <= lastPrunedHeight; i++ {
 				expected := chunks[i]
-				_, err := chunkDataPacks.ByChunkID(expected.ChunkDataPack.ID())
+				_, err := chunkDataPacks.ByChunkID(expected.ChunkDataPack.ChunkID)
 				require.Error(t, err, fmt.Errorf("chunk data pack at height %v should be pruned, but not", i))
 				require.ErrorIs(t, err, storage.ErrNotFound)
 			}
@@ -138,7 +116,7 @@ func TestLoopPruneExecutionDataFromRootToLatestSealed(t *testing.T) {
 			// verify the chunk data packs within the threshold are not pruned
 			for i := lastPrunedHeight + 1; i <= lastFinalizedHeight; i++ {
 				expected := chunks[i]
-				actual, err := chunkDataPacks.ByChunkID(expected.ChunkDataPack.ID())
+				actual, err := chunkDataPacks.ByChunkID(expected.ChunkDataPack.ChunkID)
 				require.NoError(t, err)
 				require.Equal(t, expected.ChunkDataPack, actual)
 			}

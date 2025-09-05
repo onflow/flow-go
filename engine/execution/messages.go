@@ -5,11 +5,15 @@ import (
 	"github.com/onflow/flow-go/module/mempool/entity"
 )
 
+// ComputationResult captures artifacts of execution of block collections, collection attestation results and
+// the full execution receipt, as sent by the Execution Node.
+// CAUTION: This type is used to represent both a complete ComputationResult and a partially constructed ComputationResult.
+// TODO: Consider using a Builder type to represent the partially constructed model.
 type ComputationResult struct {
 	*BlockExecutionResult
 	*BlockAttestationResult
 
-	*flow.ExecutionReceipt
+	ExecutionReceipt *flow.ExecutionReceipt
 }
 
 // NewEmptyComputationResult creates an empty ComputationResult.

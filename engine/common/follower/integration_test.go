@@ -16,7 +16,6 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/mocks"
 	"github.com/onflow/flow-go/consensus/hotstuff/notifications/pubsub"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module/compliance"
 	moduleconsensus "github.com/onflow/flow-go/module/finalizer/consensus"
 	"github.com/onflow/flow-go/module/irrecoverable"
@@ -155,19 +154,28 @@ func TestFollowerHappyPath(t *testing.T) {
 		batchesPerWorker := 10
 		blocksPerBatch := 100
 		blocksPerWorker := blocksPerBatch * batchesPerWorker
-		flowBlocks := unittest.ChainFixtureFrom(workers*blocksPerWorker, rootHeader)
-		require.Greaterf(t, len(flowBlocks), defaultPendingBlocksCacheCapacity, "this test assumes that we operate with more blocks than cache's upper limit")
+		pendingBlocks := unittest.ProposalChainFixtureFrom(workers*blocksPerWorker, rootHeader)
+		require.Greaterf(t, len(pendingBlocks), defaultPendingBlocksCacheCapacity, "this test assumes that we operate with more blocks than cache's upper limit")
 
 		// ensure sequential block views - that way we can easily know which block will be finalized after the test
-		for i, block := range flowBlocks {
-			block.Header.View = block.Header.Height
-			block.SetPayload(unittest.PayloadFixture(unittest.WithProtocolStateID(rootProtocolStateID)))
+		for i, proposal := range pendingBlocks {
+			proposal.Block.View = proposal.Block.Height
+			proposal.Block.ParentView = proposal.Block.View - 1
+			block, err := flow.NewBlock(
+				flow.UntrustedBlock{
+					HeaderBody: proposal.Block.HeaderBody,
+					Payload:    unittest.PayloadFixture(unittest.WithProtocolStateID(rootProtocolStateID)),
+				},
+			)
+			require.NoError(t, err)
+
+			proposal.Block = *block
+
 			if i > 0 {
-				block.Header.ParentView = flowBlocks[i-1].Header.View
-				block.Header.ParentID = flowBlocks[i-1].Header.ID()
+				proposal.Block.ParentView = pendingBlocks[i-1].Block.View
+				proposal.Block.ParentID = pendingBlocks[i-1].Block.ID()
 			}
 		}
-		pendingBlocks := flowBlocksToBlockProposals(flowBlocks...)
 
 		// Regarding the block that we expect to be finalized based on 2-chain finalization rule, we consider the last few blocks in `pendingBlocks`
 		//  ... <-- X <-- Y <-- Z
@@ -177,7 +185,7 @@ func TestFollowerHappyPath(t *testing.T) {
 		// Note: the HotStuff Follower does not see block Z (as there is no QC for X proving its validity). Instead, it sees the certified block
 		//  [◄(X) Y] ◄(Y)
 		// where ◄(B) denotes a QC for block B
-		targetBlockHeight := pendingBlocks[len(pendingBlocks)-3].Block.Header.Height
+		targetBlockHeight := pendingBlocks[len(pendingBlocks)-3].Block.Height
 
 		// emulate syncing logic, where we push same blocks over and over.
 		originID := unittest.IdentifierFixture()
@@ -185,11 +193,11 @@ func TestFollowerHappyPath(t *testing.T) {
 		var wg sync.WaitGroup
 		wg.Add(workers)
 		for i := 0; i < workers; i++ {
-			go func(blocks []*messages.BlockProposal) {
+			go func(blocks []*flow.Proposal) {
 				defer wg.Done()
 				for submittingBlocks.Load() {
 					for batch := 0; batch < batchesPerWorker; batch++ {
-						engine.OnSyncedBlocks(flow.Slashable[[]*messages.BlockProposal]{
+						engine.OnSyncedBlocks(flow.Slashable[[]*flow.Proposal]{
 							OriginID: originID,
 							Message:  blocks[batch*blocksPerBatch : (batch+1)*blocksPerBatch],
 						})

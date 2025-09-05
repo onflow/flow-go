@@ -9,10 +9,8 @@ import (
 
 	"github.com/cockroachdb/pebble/v2"
 	"github.com/dgraph-io/badger/v2"
-	"github.com/jordanschalm/lockctx"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/mock"
-	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
 	txerrmsgsmock "github.com/onflow/flow-go/engine/access/ingestion/tx_error_messages/mock"
@@ -26,8 +24,8 @@ import (
 	reqestermock "github.com/onflow/flow-go/module/state_synchronization/requester/mock"
 	"github.com/onflow/flow-go/storage"
 	bstorage "github.com/onflow/flow-go/storage/badger"
+	"github.com/onflow/flow-go/storage/badger/operation"
 	storagemock "github.com/onflow/flow-go/storage/mock"
-	"github.com/onflow/flow-go/storage/operation"
 	"github.com/onflow/flow-go/storage/operation/badgerimpl"
 	pebbleStorage "github.com/onflow/flow-go/storage/pebble"
 	"github.com/onflow/flow-go/storage/store"
@@ -44,7 +42,6 @@ type PipelineFunctionalSuite struct {
 	bdb                           *badger.DB
 	pdb                           *pebble.DB
 	db                            storage.DB
-	lockManager                   lockctx.Manager
 	persistentRegisters           *pebbleStorage.Registers
 	persistentEvents              storage.Events
 	persistentCollections         *store.Collections
@@ -52,7 +49,7 @@ type PipelineFunctionalSuite struct {
 	persistentResults             *store.LightTransactionResults
 	persistentTxResultErrMsg      *store.TransactionResultErrorMessages
 	consumerProgress              storage.ConsumerProgress
-	headers                       *store.Headers
+	headers                       *bstorage.Headers
 	results                       *store.ExecutionResults
 	persistentLatestSealedResult  *store.LatestPersistedSealedResult
 	core                          *CoreImpl
@@ -75,7 +72,6 @@ func TestPipelineFunctionalSuite(t *testing.T) {
 // the core implementation with all required dependencies.
 func (p *PipelineFunctionalSuite) SetupTest() {
 	t := p.T()
-	p.lockManager = storage.NewTestingLockManager()
 
 	p.tmpDir = unittest.TempDir(t)
 	p.logger = zerolog.Nop()
@@ -89,7 +85,7 @@ func (p *PipelineFunctionalSuite) SetupTest() {
 
 	// Create real storages
 	var err error
-	p.pdb = pebbleStorage.NewBootstrappedRegistersWithPathForTest(t, p.tmpDir, rootBlock.Height, sealedBlock.Header.Height)
+	p.pdb = pebbleStorage.NewBootstrappedRegistersWithPathForTest(t, p.tmpDir, rootBlock.Height, sealedBlock.Height)
 	p.persistentRegisters, err = pebbleStorage.NewRegisters(p.pdb, pebbleStorage.PruningDisabled)
 	p.Require().NoError(err)
 
@@ -100,46 +96,24 @@ func (p *PipelineFunctionalSuite) SetupTest() {
 	p.persistentTxResultErrMsg = store.NewTransactionResultErrorMessages(p.metrics, p.db, bstorage.DefaultCacheSize)
 	p.results = store.NewExecutionResults(p.metrics, p.db)
 
-	p.consumerProgress, err = store.NewConsumerProgress(p.db, "test_consumer").Initialize(sealedBlock.Header.Height)
+	p.consumerProgress, err = store.NewConsumerProgress(p.db, "test_consumer").Initialize(sealedBlock.Height)
 	p.Require().NoError(err)
 
 	// store and index the root header
-	p.headers = store.NewHeaders(p.metrics, p.db)
+	p.headers = bstorage.NewHeaders(p.metrics, p.bdb)
 
-	insertLctx := p.lockManager.NewContext()
-	err = insertLctx.AcquireLock(storage.LockInsertBlock)
+	err = p.headers.Store(unittest.ProposalHeaderFromHeader(rootBlock))
 	p.Require().NoError(err)
 
-	err = p.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-		return operation.InsertHeader(insertLctx, rw, rootBlock.ID(), rootBlock)
-	})
+	err = p.bdb.Update(operation.IndexBlockHeight(rootBlock.Height, rootBlock.ID()))
 	p.Require().NoError(err)
-	insertLctx.Release()
-
-	lctx := p.lockManager.NewContext()
-	require.NoError(t, lctx.AcquireLock(storage.LockFinalizeBlock))
-	err = p.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-		return operation.IndexFinalizedBlockByHeight(lctx, rw, rootBlock.Height, rootBlock.ID())
-	})
-	p.Require().NoError(err)
-	lctx.Release()
 
 	// store and index the latest sealed block header
-	insertLctx2 := p.lockManager.NewContext()
-	require.NoError(t, insertLctx2.AcquireLock(storage.LockInsertBlock))
-	err = p.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-		return operation.InsertHeader(insertLctx2, rw, sealedBlock.Header.ID(), sealedBlock.Header)
-	})
+	err = p.headers.Store(unittest.ProposalHeaderFromHeader(sealedBlock.ToHeader()))
 	p.Require().NoError(err)
-	insertLctx2.Release()
 
-	lctx = p.lockManager.NewContext()
-	require.NoError(t, lctx.AcquireLock(storage.LockFinalizeBlock))
-	err = p.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-		return operation.IndexFinalizedBlockByHeight(lctx, rw, sealedBlock.Header.Height, sealedBlock.ID())
-	})
+	err = p.bdb.Update(operation.IndexBlockHeight(sealedBlock.Height, sealedBlock.ID()))
 	p.Require().NoError(err)
-	lctx.Release()
 
 	// Store and index sealed block execution result
 	err = p.results.Store(sealedExecutionResult)
@@ -151,7 +125,7 @@ func (p *PipelineFunctionalSuite) SetupTest() {
 	p.persistentLatestSealedResult, err = store.NewLatestPersistedSealedResult(p.consumerProgress, p.headers, p.results)
 	p.Require().NoError(err)
 
-	p.block = unittest.BlockWithParentFixture(sealedBlock.Header)
+	p.block = unittest.BlockWithParentFixture(sealedBlock.ToHeader())
 	p.executionResult = unittest.ExecutionResultFixture(unittest.WithBlock(p.block))
 
 	p.execDataRequester = reqestermock.NewExecutionDataRequester(t)
@@ -337,7 +311,7 @@ func (p *PipelineFunctionalSuite) TestMainCtxCancellationDuringRequestingTxResul
 				<-ctx.Done()
 
 				return nil, ctx.Err()
-			}).Maybe()
+			}).Once()
 
 		pipeline.OnParentStateUpdated(StateComplete)
 
@@ -436,22 +410,21 @@ func (p *PipelineFunctionalSuite) WithRunningPipeline(
 	testFunc func(pipeline Pipeline, updateChan chan State, errChan chan error, cancel context.CancelFunc),
 	pipelineConfig PipelineConfig,
 ) {
-
 	p.core = NewCoreImpl(
 		p.logger,
 		p.executionResult,
-		p.block.Header,
+		p.block.ToHeader(),
 		p.execDataRequester,
 		p.txResultErrMsgsRequester,
 		p.txResultErrMsgsRequestTimeout,
 		p.persistentRegisters,
 		p.persistentEvents,
 		p.persistentCollections,
+		p.persistentTransactions,
 		p.persistentResults,
 		p.persistentTxResultErrMsg,
 		p.persistentLatestSealedResult,
 		p.db,
-		p.lockManager,
 	)
 
 	pipelineStateConsumer := NewMockStateConsumer()
@@ -540,7 +513,7 @@ func (p *PipelineFunctionalSuite) verifyCollectionPersisted(expectedCollection *
 	storedLightCollection, err := p.persistentCollections.LightByID(collectionID)
 	p.Require().NoError(err)
 
-	p.Assert().Equal(&expectedLightCollection, storedLightCollection)
+	p.Assert().Equal(expectedLightCollection, storedLightCollection)
 	p.Assert().ElementsMatch(expectedCollection.Light().Transactions, storedLightCollection.Transactions)
 }
 
@@ -564,7 +537,7 @@ func (p *PipelineFunctionalSuite) verifyRegistersPersisted(expectedTrieUpdate *l
 		registerID, err := convert.LedgerKeyToRegisterID(key)
 		p.Require().NoError(err)
 
-		storedValue, err := p.persistentRegisters.Get(registerID, p.block.Header.Height)
+		storedValue, err := p.persistentRegisters.Get(registerID, p.block.Height)
 		p.Require().NoError(err)
 
 		expectedValue := payload.Value()

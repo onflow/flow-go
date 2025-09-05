@@ -24,7 +24,7 @@ var (
 var Cmd = &cobra.Command{
 	Use:   "blocks",
 	Short: "Read block from protocol state",
-	RunE:  runE,
+	Run:   run,
 }
 
 func init() {
@@ -147,105 +147,109 @@ func (r *Reader) IsExecuted(blockID flow.Identifier) (bool, error) {
 	return false, err
 }
 
-func runE(*cobra.Command, []string) error {
-	lockManager := storage.MakeSingletonLockManager()
+func run(*cobra.Command, []string) {
 	flagDBs := common.ReadDBFlags()
-	return common.WithStorage(flagDBs, func(db storage.DB) error {
-		storages := common.InitStorages(db)
-		state, err := common.OpenProtocolState(lockManager, db, storages)
+	db, err := common.InitBadgerStorage(flagDBs)
+	if err != nil {
+		log.Fatal().Err(err).Msg("could not init badger db")
+	}
+	defer db.Close()
 
+	storages := common.InitStorages(db)
+	state, err := common.InitProtocolState(db, storages)
+	en := common.InitExecutionStorages(db)
+
+	if err != nil {
+		log.Fatal().Err(err).Msg("could not init protocol state")
+	}
+
+	reader := NewReader(state, storages.Blocks, en.Commits)
+
+	// making sure only one flag is being used
+	err = checkOnlyOneFlagIsUsed(flagHeight, flagBlockID, flagFinal, flagSealed, flagExecuted)
+	if err != nil {
+		log.Fatal().Err(err).Msg("could not get block")
+	}
+
+	if flagHeight > 0 {
+		log.Info().Msgf("get block by height: %v", flagHeight)
+		block, err := reader.GetBlockByHeight(flagHeight)
 		if err != nil {
-			log.Fatal().Err(err).Msg("could not init protocol state")
+			log.Fatal().Err(err).Msg("could not get block by height")
 		}
 
-		reader := NewReader(state, storages.Blocks, storages.Commits)
+		common.PrettyPrintEntity(block)
+		return
+	}
 
-		// making sure only one flag is being used
-		err = checkOnlyOneFlagIsUsed(flagHeight, flagBlockID, flagFinal, flagSealed, flagExecuted)
+	if flagBlockID != "" {
+		blockID, err := flow.HexStringToIdentifier(flagBlockID)
 		if err != nil {
-			return fmt.Errorf("could not get block: %w", err)
+			log.Fatal().Err(err).Msgf("malformed block ID: %v", flagBlockID)
+		}
+		log.Info().Msgf("get block by ID: %v", blockID)
+		block, err := reader.GetBlockByID(blockID)
+		if err != nil {
+			log.Fatal().Err(err).Msg("could not get block by ID")
+		}
+		common.PrettyPrintEntity(block)
+		return
+	}
+
+	if flagFinal {
+		log.Info().Msgf("get last finalized block")
+		block, err := reader.GetFinal()
+		if err != nil {
+			log.Fatal().Err(err).Msg("could not get finalized block")
+		}
+		common.PrettyPrintEntity(block)
+		return
+	}
+
+	if flagSealed {
+		log.Info().Msgf("get last sealed block")
+		block, err := reader.GetSealed()
+		if err != nil {
+			log.Fatal().Err(err).Msg("could not get sealed block")
+		}
+		common.PrettyPrintEntity(block)
+		return
+	}
+
+	if flagExecuted {
+		log.Info().Msgf("get last executed and sealed block")
+		sealed, err := reader.GetSealed()
+		if err != nil {
+			log.Fatal().Err(err).Msg("could not get sealed block")
 		}
 
-		if flagHeight > 0 {
-			log.Info().Msgf("get block by height: %v", flagHeight)
-			block, err := reader.GetBlockByHeight(flagHeight)
-			if err != nil {
-				log.Fatal().Err(err).Msg("could not get block by height")
-			}
-
-			common.PrettyPrintEntity(block)
-			return nil
+		root, err := reader.GetRoot()
+		if err != nil {
+			log.Fatal().Err(err).Msg("could not get root block")
 		}
 
-		if flagBlockID != "" {
-			blockID, err := flow.HexStringToIdentifier(flagBlockID)
+		// find the last executed and sealed block
+		for h := sealed.Height; h >= root.Height; h-- {
+			block, err := reader.GetBlockByHeight(h)
 			if err != nil {
-				return fmt.Errorf("malformed block ID: %v: %w", flagBlockID, err)
+				log.Fatal().Err(err).Msgf("could not get block by height: %v", h)
 			}
-			log.Info().Msgf("get block by ID: %v", blockID)
-			block, err := reader.GetBlockByID(blockID)
+
+			executed, err := reader.IsExecuted(block.ID())
 			if err != nil {
-				return fmt.Errorf("could not get block by ID: %w", err)
+				log.Fatal().Err(err).Msgf("could not check block executed or not: %v", h)
 			}
-			common.PrettyPrintEntity(block)
-			return nil
+
+			if executed {
+				common.PrettyPrintEntity(block)
+				return
+			}
 		}
 
-		if flagFinal {
-			log.Info().Msgf("get last finalized block")
-			block, err := reader.GetFinal()
-			if err != nil {
-				return fmt.Errorf("could not get finalized block: %w", err)
-			}
-			common.PrettyPrintEntity(block)
-			return nil
-		}
+		log.Fatal().Msg("could not find executed block")
+	}
 
-		if flagSealed {
-			log.Info().Msgf("get last sealed block")
-			block, err := reader.GetSealed()
-			if err != nil {
-				return fmt.Errorf("could not get sealed block: %w", err)
-			}
-			common.PrettyPrintEntity(block)
-			return nil
-		}
-
-		if flagExecuted {
-			log.Info().Msgf("get last executed and sealed block")
-			sealed, err := reader.GetSealed()
-			if err != nil {
-				return fmt.Errorf("could not get sealed block: %w", err)
-			}
-
-			root, err := reader.GetRoot()
-			if err != nil {
-				return fmt.Errorf("could not get root block: %w", err)
-			}
-
-			// find the last executed and sealed block
-			for h := sealed.Header.Height; h >= root.Header.Height; h-- {
-				block, err := reader.GetBlockByHeight(h)
-				if err != nil {
-					return fmt.Errorf("could not get block by height: %v: %w", h, err)
-				}
-
-				executed, err := reader.IsExecuted(block.ID())
-				if err != nil {
-					log.Fatal().Err(err).Msgf("could not check block executed or not: %v", h)
-				}
-
-				if executed {
-					common.PrettyPrintEntity(block)
-					return nil
-				}
-			}
-
-			return fmt.Errorf("could not find executed block")
-		}
-
-		return fmt.Errorf("missing flag, try --final or --sealed or --height or --executed or --block-id, note that only one flag can be used at a time")
-	})
+	log.Fatal().Msgf("missing flag, try --final or --sealed or --height or --executed or --block-id, note that only one flag can be used at a time")
 }
 
 func checkOnlyOneFlagIsUsed(height uint64, blockID string, final, sealed, executed bool) error {

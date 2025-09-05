@@ -63,7 +63,7 @@ func TestScriptExecutorSuite(t *testing.T) {
 func newBlockHeadersStorage(blocks []*flow.Block) storage.Headers {
 	blocksByHeight := make(map[uint64]*flow.Block)
 	for _, b := range blocks {
-		blocksByHeight[b.Header.Height] = b
+		blocksByHeight[b.Height] = b
 	}
 
 	return synctest.MockBlockHeaderStorage(synctest.WithByHeight(blocksByHeight))
@@ -108,7 +108,7 @@ func (s *ScriptExecutorSuite) SetupTest() {
 
 	blockchain := unittest.BlockchainFixture(10)
 	s.headers = newBlockHeadersStorage(blockchain)
-	s.height = blockchain[0].Header.Height
+	s.height = blockchain[0].Height
 
 	protocolState := testutil.ProtocolStateWithSourceFixture(nil)
 
