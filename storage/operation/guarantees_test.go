@@ -140,3 +140,36 @@ func TestIndexGuaranteedCollectionByBlockHashMultipleBlocks(t *testing.T) {
 		})
 	})
 }
+
+func TestIndexGuaranteeDataMismatch(t *testing.T) {
+	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
+		collectionID := flow.Identifier{0x01}
+		guaranteeID1 := flow.Identifier{0x10}
+		guaranteeID2 := flow.Identifier{0x20}
+
+		lockManager := storage.NewTestingLockManager()
+
+		// First, index a guarantee for the collection
+		unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
+			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+				return operation.IndexGuarantee(lctx, rw, collectionID, guaranteeID1)
+			})
+		})
+
+		// Now try to index a different guarantee ID for the same collection
+		// This should return storage.ErrDataMismatch
+		unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
+			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+				err := operation.IndexGuarantee(lctx, rw, collectionID, guaranteeID2)
+				require.ErrorIs(t, err, storage.ErrDataMismatch)
+				return nil // Always return nil to satisfy WithLock, we'll check the error outside
+			})
+		})
+
+		// Verify that the original guarantee ID is still stored
+		var retrievedGuaranteeID flow.Identifier
+		err := operation.LookupGuarantee(db.Reader(), collectionID, &retrievedGuaranteeID)
+		require.NoError(t, err)
+		assert.Equal(t, guaranteeID1, retrievedGuaranteeID)
+	})
+}
