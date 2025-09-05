@@ -10,7 +10,6 @@ import (
 
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/storage"
-	bstorage "github.com/onflow/flow-go/storage/badger"
 	"github.com/onflow/flow-go/storage/operation/badgerimpl"
 	"github.com/onflow/flow-go/storage/store"
 )
@@ -21,9 +20,9 @@ func ExecutionStorageLayer(_ testing.TB, bdb *badger.DB) *storage.Execution {
 	db := badgerimpl.ToDB(bdb)
 
 	results := store.NewExecutionResults(metrics, db)
-	receipts := store.NewExecutionReceipts(metrics, db, results, bstorage.DefaultCacheSize)
+	receipts := store.NewExecutionReceipts(metrics, db, results, store.DefaultCacheSize)
 	commits := store.NewCommits(metrics, db)
-	transactionResults := store.NewTransactionResults(metrics, db, bstorage.DefaultCacheSize)
+	transactionResults := store.NewTransactionResults(metrics, db, store.DefaultCacheSize)
 	events := store.NewEvents(metrics, db)
 	return &storage.Execution{
 		Results:            results,

@@ -178,7 +178,7 @@ func (v *TransactionVerifier) CheckAuthorization(
 ) error {
 	// TODO(Janez): verification is part of inclusion fees, not execution fees.
 	var err error
-	txnState.RunWithAllLimitsDisabled(func() {
+	txnState.RunWithMeteringDisabled(func() {
 		err = v.verifyTransaction(tracer, proc, txnState, keyWeightThreshold)
 	})
 	if err != nil {
