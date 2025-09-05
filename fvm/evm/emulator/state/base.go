@@ -357,6 +357,8 @@ func (v *BaseView) PurgeAllSlotsOfAnAccount(addr gethCommon.Address) error {
 		return err
 	}
 	// if account doesn't exist, return
+	// len(acc.CollectionID) == 0 means the account is a non smart contract
+	// account, which has no slots to purge, so we naturally return
 	if acc == nil || len(acc.CollectionID) == 0 {
 		return nil
 	}
