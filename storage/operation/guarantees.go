@@ -16,23 +16,12 @@ import (
 // guarantee! This method silently overrides existing data, which is safe only if for the same
 // key, we always write the same value.
 //
-// Expected errors during normal operations:
-//   - generic error in case of unexpected failure from the database layer or encoding failure.
+// No errors expected during normal operations.
 func InsertGuarantee(w storage.Writer, guaranteeID flow.Identifier, guarantee *flow.CollectionGuarantee) error {
 	return UpsertByKey(w, MakePrefix(codeGuarantee, guaranteeID), guarantee)
 }
 
 // IndexGuarantee inserts a [flow.CollectionGuarantee] into the database, keyed by the collection ID.
-//
-// CAUTION:
-//   - The caller must acquire the [storage.LockInsertBlock] and hold it until the database write has been committed.
-//   - OVERWRITES existing data (potential for data corruption):
-//     This method silently overrides existing data without any sanity checks whether data for the same key already exists.
-//     Note that the Flow protocol mandates that for a previously persisted key, the data is never changed to a different
-//     value. Changing data could cause the node to publish inconsistent data and to be slashed, or the protocol to be
-//     compromised as a whole. This method does not contain any safeguards to prevent such data corruption. The lock proof
-//     serves as a reminder that the CALLER is responsible to ensure that the DEDUPLICATION CHECK is done elsewhere
-//     ATOMICALLY with this write operation.
 //
 // Expected errors during normal operations:
 //   - [storage.ErrDataMismatch] if a different [flow.CollectionGuarantee] has already been indexed for the given collection ID.
@@ -91,9 +80,7 @@ func LookupGuarantee(r storage.Reader, collectionID flow.Identifier, guaranteeID
 //     serves as a reminder that the CALLER is responsible to ensure that the DEDUPLICATION CHECK is done elsewhere
 //     ATOMICALLY with this write operation.
 //
-// Error returns:
-//   - [storage.ErrAlreadyExists] if the key already exists in the database.
-//   - All other errors have to be treated as unexpected failures from the database layer.
+// No errors expected during normal operations.
 func IndexPayloadGuarantees(lctx lockctx.Proof, w storage.Writer, blockID flow.Identifier, guarIDs []flow.Identifier) error {
 	if !lctx.HoldsLock(storage.LockInsertBlock) {
 		return fmt.Errorf("cannot index guarantee for blockID %v without holding lock %s",
