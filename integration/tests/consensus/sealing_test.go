@@ -15,6 +15,7 @@ import (
 	verUtils "github.com/onflow/flow-go/engine/verification/utils"
 	"github.com/onflow/flow-go/integration/testnet"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -258,7 +259,7 @@ SearchLoop:
 	unsignedReceiptID := receiptBody.ID()
 	sig, err := ss.exeSK.Sign(unsignedReceiptID[:], exeUtils.NewExecutionReceiptHasher())
 	require.NoError(ss.T(), err)
-	receipt := flow.ExecutionReceipt{
+	receipt := messages.ExecutionReceipt{
 		UnsignedExecutionReceipt: receiptBody,
 		ExecutorSignature:        sig,
 	}
@@ -273,7 +274,7 @@ SearchLoop:
 	unsignedReceiptID2 := receiptBody2.ID()
 	sig2, err := ss.exe2SK.Sign(unsignedReceiptID2[:], exeUtils.NewExecutionReceiptHasher())
 	require.NoError(ss.T(), err)
-	receipt2 := flow.ExecutionReceipt{
+	receipt2 := messages.ExecutionReceipt{
 		UnsignedExecutionReceipt: receiptBody2,
 		ExecutorSignature:        sig2,
 	}

@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/network/channels"
 
 	"github.com/golang/protobuf/ptypes/empty"
@@ -332,7 +333,7 @@ func TestProcessAttackerMessage_ExecutionReceipt_Dictated(t *testing.T) {
 			// corrupted execution receipt dictated by attacker needs to only have the result field, as the rest will be
 			// filled up by the CCF.
 			dictatedResult := *unittest.ExecutionResultFixture()
-			msg, _, _ := insecure.EgressMessageFixture(t, unittest.NetworkCodec(), insecure.Protocol_PUBLISH, &flow.ExecutionReceipt{
+			msg, _, _ := insecure.EgressMessageFixture(t, unittest.NetworkCodec(), insecure.Protocol_PUBLISH, &messages.ExecutionReceipt{
 				UnsignedExecutionReceipt: flow.UnsignedExecutionReceipt{ExecutionResult: dictatedResult},
 			})
 
@@ -346,7 +347,7 @@ func TestProcessAttackerMessage_ExecutionReceipt_Dictated(t *testing.T) {
 			corruptedEventDispatchedOnFlowNetWg := sync.WaitGroup{}
 			corruptedEventDispatchedOnFlowNetWg.Add(1)
 			adapter.On("PublishOnChannel", params...).Run(func(args mock.Arguments) {
-				receipt, ok := args[1].(*flow.ExecutionReceipt)
+				receipt, ok := args[1].(*messages.ExecutionReceipt)
 				require.True(t, ok)
 
 				// result part of the receipt must be the same as attacker dictates.
@@ -387,8 +388,7 @@ func TestProcessAttackerMessage_ExecutionReceipt_PassThrough(t *testing.T) {
 			adapter *mocknetwork.Adapter, // mock flow network that ccf uses to communicate with authorized flow nodes.
 			stream insecure.CorruptNetwork_ProcessAttackerMessageClient, // gRPC interface that orchestrator network uses to send messages to the corrupt network.
 		) {
-
-			passThroughReceipt := unittest.ExecutionReceiptFixture()
+			passThroughReceipt := (*messages.ExecutionReceipt)(unittest.ExecutionReceiptFixture())
 			msg, _, _ := insecure.EgressMessageFixture(t, unittest.NetworkCodec(), insecure.Protocol_PUBLISH, passThroughReceipt)
 
 			params := []interface{}{channels.Channel(msg.Egress.ChannelID), mock.Anything}
@@ -401,7 +401,7 @@ func TestProcessAttackerMessage_ExecutionReceipt_PassThrough(t *testing.T) {
 			corruptedEventDispatchedOnFlowNetWg := sync.WaitGroup{}
 			corruptedEventDispatchedOnFlowNetWg.Add(1)
 			adapter.On("PublishOnChannel", params...).Run(func(args mock.Arguments) {
-				receipt, ok := args[1].(*flow.ExecutionReceipt)
+				receipt, ok := args[1].(*messages.ExecutionReceipt)
 				require.True(t, ok)
 
 				// receipt should be completely intact.

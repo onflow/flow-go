@@ -419,7 +419,7 @@ func (e *Engine) BroadcastExecutionReceipt(ctx context.Context, height uint64, r
 		return false, fmt.Errorf("could not get consensus and verification identities: %w", err)
 	}
 
-	err = e.receiptCon.Publish(receipt, identities.NodeIDs()...)
+	err = e.receiptCon.Publish((*messages.ExecutionReceipt)(receipt), identities.NodeIDs()...)
 	if err != nil {
 		return false, fmt.Errorf("could not submit execution receipts: %w", err)
 	}

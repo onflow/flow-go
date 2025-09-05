@@ -250,7 +250,7 @@ func mockOrchestratorNetworkForCorruptedExecutionResult(
 			// make sure message being sent on correct channel
 			require.Equal(t, channels.PushReceipts, event.Channel)
 
-			corruptedResult, ok := event.FlowProtocolEvent.(*flow.ExecutionReceipt)
+			corruptedResult, ok := event.FlowProtocolEvent.(*messages.ExecutionReceipt)
 			require.True(t, ok)
 
 			// make sure the original uncorrupted execution receipt is NOT sent to orchestrator
