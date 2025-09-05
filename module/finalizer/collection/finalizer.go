@@ -190,10 +190,10 @@ func (f *Finalizer) MakeFinal(blockID flow.Identifier) error {
 				return fmt.Errorf("could not construct guarantee: %w", err)
 			}
 
-			// TODO: collections should only be pushed to consensus nodes, once they are successfully persisted as finalized:
-			//storage.OnCommitSucceed(rw, func() {
-			f.pusher.SubmitCollectionGuarantee(guarantee)
-			//})
+			// collections should only be pushed to consensus nodes, once they are successfully persisted as finalized:
+			storage.OnCommitSucceed(rw, func() {
+				f.pusher.SubmitCollectionGuarantee(guarantee)
+			})
 
 			return nil
 		})
