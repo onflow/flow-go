@@ -53,9 +53,9 @@ func run(*cobra.Command, []string) {
 	defer db.Close()
 
 	storages := common.InitStorages(db)
-	state, err := common.InitProtocolState(lockManager, db, storages)
+	state, err := common.OpenProtocolState(lockManager, db, storages)
 	if err != nil {
-		log.Fatal().Err(err).Msg("could not init protocol state")
+		log.Fatal().Err(err).Msg("could not open protocol state")
 	}
 
 	log := log.With().Uint64("block_height", flagHeight).Logger()

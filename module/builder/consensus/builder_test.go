@@ -178,8 +178,6 @@ func (bs *BuilderSuite) chainSeal(incorporatedResult *flow.IncorporatedResult) {
 // For the verifiers to start checking a result R, they need a source of randomness for the block _incorporating_
 // result R. The result for block [A3] is incorporated in [parent], which does _not_ have a child yet.
 func (bs *BuilderSuite) SetupTest() {
-
-	lockManager := storage.NewTestingLockManager()
 	// set up no-op dependencies
 	noopMetrics := metrics.NewNoopCollector()
 	noopTracer := trace.NewNoopTracer()
@@ -250,6 +248,8 @@ func (bs *BuilderSuite) SetupTest() {
 
 	// set up temporary database for tests
 	bs.db, bs.dir = unittest.TempBadgerDB(bs.T())
+	lockManager := storage.NewTestingLockManager()
+
 	lctx := lockManager.NewContext()
 	require.NoError(bs.T(), lctx.AcquireLock(storage.LockFinalizeBlock))
 	defer lctx.Release()

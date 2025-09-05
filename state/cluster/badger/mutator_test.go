@@ -66,8 +66,7 @@ func (suite *MutatorSuite) SetupTest() {
 	suite.dbdir = unittest.TempDir(suite.T())
 	suite.badgerdb = unittest.BadgerDB(suite.T(), suite.dbdir)
 	suite.db = badgerimpl.ToDB(suite.badgerdb)
-	lockManager := storage.NewTestingLockManager()
-	suite.lockManager = lockManager
+	suite.lockManager = storage.NewTestingLockManager()
 
 	metrics := metrics.NewNoopCollector()
 	tracer := trace.NewNoopTracer()
@@ -105,7 +104,7 @@ func (suite *MutatorSuite) SetupTest() {
 	state, err := pbadger.Bootstrap(
 		metrics,
 		suite.db,
-		lockManager,
+		suite.lockManager,
 		all.Headers,
 		all.Seals,
 		all.Results,

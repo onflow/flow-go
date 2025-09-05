@@ -81,7 +81,7 @@ type BuilderSuite struct {
 // runs before each test runs
 func (suite *BuilderSuite) SetupTest() {
 	fmt.Println("SetupTest>>>>")
-	lockManager := storage.NewTestingLockManager()
+	suite.lockManager = storage.NewTestingLockManager()
 	var err error
 
 	suite.genesis, err = unittest.ClusterBlock.Genesis()
@@ -93,7 +93,6 @@ func (suite *BuilderSuite) SetupTest() {
 	suite.dbdir = unittest.TempDir(suite.T())
 	suite.badgerDB = unittest.BadgerDB(suite.T(), suite.dbdir)
 	suite.db = badgerimpl.ToDB(suite.badgerDB)
-	suite.lockManager = lockManager
 
 	metrics := metrics.NewNoopCollector()
 	tracer := trace.NewNoopTracer()
@@ -133,16 +132,16 @@ func (suite *BuilderSuite) SetupTest() {
 	clusterQC := unittest.QuorumCertificateFixture(unittest.QCWithRootBlockID(suite.genesis.ID()))
 	clusterStateRoot, err := clusterkv.NewStateRoot(suite.genesis, clusterQC, suite.epochCounter)
 	suite.Require().NoError(err)
-	clusterState, err := clusterkv.Bootstrap(suite.db, lockManager, clusterStateRoot)
+	clusterState, err := clusterkv.Bootstrap(suite.db, suite.lockManager, clusterStateRoot)
 	suite.Require().NoError(err)
 
-	suite.state, err = clusterkv.NewMutableState(clusterState, lockManager, tracer, suite.headers, suite.payloads)
+	suite.state, err = clusterkv.NewMutableState(clusterState, suite.lockManager, tracer, suite.headers, suite.payloads)
 	suite.Require().NoError(err)
 
 	state, err := pbadger.Bootstrap(
 		metrics,
 		suite.db,
-		lockManager,
+		suite.lockManager,
 		all.Headers,
 		all.Seals,
 		all.Results,
@@ -182,7 +181,7 @@ func (suite *BuilderSuite) SetupTest() {
 	suite.builder, _ = builder.NewBuilder(
 		suite.db,
 		tracer,
-		lockManager,
+		suite.lockManager,
 		metrics,
 		suite.protoState,
 		suite.state,
@@ -216,15 +215,15 @@ func (suite *BuilderSuite) InsertBlock(block *model.Block) {
 }
 
 func (suite *BuilderSuite) FinalizeBlock(block model.Block) {
-	err := suite.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+	lctx := suite.lockManager.NewContext()
+	defer lctx.Release()
+	err := lctx.AcquireLock(storage.LockInsertOrFinalizeClusterBlock)
+	suite.Assert().NoError(err)
+
+	err = suite.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 		var refBlock flow.Header
 		err := operation.RetrieveHeader(rw.GlobalReader(), block.Payload.ReferenceBlockID, &refBlock)
 		if err != nil {
-			return err
-		}
-		lctx := suite.lockManager.NewContext()
-		defer lctx.Release()
-		if err := lctx.AcquireLock(storage.LockInsertOrFinalizeClusterBlock); err != nil {
 			return err
 		}
 		err = procedure.FinalizeClusterBlock(lctx, rw, block.ID())
@@ -1544,7 +1543,6 @@ func benchmarkBuildOn(b *testing.B, size int) {
 		)
 		lctx := suite.lockManager.NewContext()
 		require.NoError(b, lctx.AcquireLock(storage.LockInsertOrFinalizeClusterBlock))
-
 		err := suite.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 			return procedure.InsertClusterBlock(lctx, rw, unittest.ClusterProposalFromBlock(block))
 		})
