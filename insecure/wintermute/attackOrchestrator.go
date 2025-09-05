@@ -237,7 +237,7 @@ func (o *Orchestrator) handleExecutionReceiptEvent(receiptEvent *insecure.Egress
 			TargetIds:       receiptEvent.TargetIds,
 
 			// wrapping execution result in an execution receipt for sake of encoding and decoding.
-			FlowProtocolEvent: &flow.ExecutionReceipt{UnsignedExecutionReceipt: flow.UnsignedExecutionReceipt{ExecutionResult: *corruptedResult}},
+			FlowProtocolEvent: &messages.ExecutionReceipt{UnsignedExecutionReceipt: flow.UnsignedExecutionReceipt{ExecutionResult: *corruptedResult}},
 		})
 		if err != nil {
 			return fmt.Errorf("could not send rpc on channel: %w", err)
