@@ -2,8 +2,8 @@
 
 The folder `storage/operation` contains low-level primitives for persistent storage and retrieval of data structures from a database.
 We accept that these functions have to be used _carefully_ by engineers that are knowledgeable about the
-safety limitations of these functions to avoid data corruption . In order to facilitate correct usage, we need to diligently document what aspects have to be paid
-attention to when calling these functions.
+safety limitations of these functions to avoid data corruption . In order to facilitate correct usage, we need to diligently document
+what aspects have to be paid attention to when calling these functions.
 
 Proceed as follows
 1. look at one file in `storage/operation` at a time (skip test files for now)
@@ -25,13 +25,22 @@ Guidelines:
 
 ## High level structure
 
-On the highest level, there are function for storing data and other functions for retrieving data. The naming indicate which class a function belongs to, though there is no absolutely uniform convention. For example, some function for loading data start with `Retrieve`, while others start with `Lookup`, and additional names might be used as well. So pay close attention to the naming of the function.
+On the highest level, there are function for storing data and other functions for retrieving data. The naming indicate which class
+a function belongs to, though there is no absolutely uniform convention. For example, some function for loading data start with `Retrieve`,
+while others start with `Lookup`, and additional names might be used as well. So pay close attention to the naming of the function.
 
-Conceptually, we have data structures that contain certain fields. Furthermore, most data structures we deal with provide the functionality to compute a cryptographic hash of their contents, which is typically referred to as "ID". We store data as key-value pairs.
+Conceptually, we have data structures that contain certain fields. Furthermore, most data structures we deal with provide the functionality
+to compute a cryptographic hash of their contents, which is typically referred to as "ID". We store data as key-value pairs.
 (i) keys are either: the cryptographic hashes of the data structures.
 (ii) Frequently, we break up the storage of compound objects, storing their sub-data structures individually. For example, a block contains the payload, the payload contains Seals. Frequently, we create mappings from the ID of the high-level data structure (e.g. block ID) to the IDs of the lower-level objects it contains (e.g. Seals). For example, `operation.IndexPayloadSeals`.
 
-(i) and (ii) are fundamentally different: In case (i) the key is derived from the value in a collision-resistant manner (via cryptographic hash). Meaning, if we change the value, the key should also change. Hence, unchecked overwrites pose no risk of data corruption, because for the same key, we expect the same value. In comparison, for case (ii) we derive the key from the _context_ of the value. Note that the Flow protocol mandates that for a previously persisted key, the data is never changed to a different value. Changing data could cause the node to publish inconsistent data and to be slashed, or the protocol to be compromised as a whole. In many cases, the caller has to be cautious about avoiding usages causing data corruption. This is because we don't wan't to implement override protections in all low-level storage functions of type (ii) for performance reasons. Rather, we delegate the responsibility for cohesive checks to the caller, which must be clearly documented.
+(i) and (ii) are fundamentally different: In case (i) the key is derived from the value in a collision-resistant manner (via cryptographic hash).
+Meaning, if we change the value, the key should also change. Hence, unchecked overwrites pose no risk of data corruption, because for the same key,
+we expect the same value. In comparison, for case (ii) we derive the key from the _context_ of the value. Note that the Flow protocol mandates that
+for a previously persisted key, the data is never changed to a different value. Changing data could cause the node to publish inconsistent data and
+to be slashed, or the protocol to be compromised as a whole. In many cases, the caller has to be cautious about avoiding usages causing data
+corruption. This is because we don't wan't to implement override protections in all low-level storage functions of type (ii) for performance
+reasons. Rather, we delegate the responsibility for cohesive checks to the caller, which must be clearly documented.
 
 
 ### Functions for reading data
@@ -71,7 +80,8 @@ func LookupPayloadSeals(r storage.Reader, blockID flow.Identifier, sealIDs *[]fl
 ### Functions for writing data
 
 When generating documentation for functions that write data, carefully differentiate between functions of type (i) and (ii).
-For type (i), you need to carefully differentiate two sub-cases (i.a) and (i.b). Analogously, for type (ii), you need to carefully differentiate two sub-cases (ii.a) and (ii.b)
+For type (i), you need to carefully differentiate two sub-cases (i.a) and (i.b). Analogously, for type (ii),
+you need to carefully differentiate two sub-cases (ii.a) and (ii.b)
 
 #### Type (i.a) functions for writing data
 
@@ -83,12 +93,14 @@ As an example for functions of type (i.a), consider `operation.UpsertCollection`
 // from the value (collection) via a collision-resistant hash function. Hence, unchecked overwrites pose no risk
 // of data corruption, because for the same key, we expect the same value.
 //
-// No other errors are expected during normal operation.
+// No other error returns are expected during normal operation.
 func UpsertCollection(w storage.Writer, collection *flow.LightCollection) error {
 	return UpsertByKey(w, MakePrefix(codeCollection, collection.ID()), collection)
 }
 ```
-Analyze the implementation! Here, the method itself computes the ID (i.e. cryptographic hash). In this case, the function contains internal protections against the caller accidentally corrupting data. Only functions that store the struct by its own ID _and_ contain internal safeguards against accidentally corrupting data are of type (i.a)!
+Analyze the implementation! Here, the method itself computes the ID (i.e. cryptographic hash).
+In this case, the function contains internal protections against the caller accidentally corrupting data.
+Only functions that store the struct by its own ID _and_ contain internal safeguards against accidentally corrupting data are of type (i.a)!
 
 * We document the struct type that is stored, here light collection. Be mindful whether we are storing an individual struct or a slice.
 * We state whether the method will overwrite existing data. And then explain why this is safe.
@@ -105,7 +117,7 @@ As an example for functions of type (i.b), consider `operation.InsertSeal`:
 // This method silently overrides existing data, which is safe only if for the same key, we
 // always write the same value.
 //
-// No other errors are expected during normal operation.
+// No other error returns are expected during normal operation.
 func InsertSeal(w storage.Writer, sealID flow.Identifier, seal *flow.Seal) error {
 	return UpsertByKey(w, MakePrefix(codeSeal, sealID), seal)
 }
@@ -140,7 +152,7 @@ As an example for functions of type (i.b), consider `operation.InsertAndIndexRes
 //     lockctx.Proof to prove the higher logic is holding the lock inserting the approval after checking
 //     that the approval is not already indexed.
 //
-// Expected error returns:
+// Expected error returns during normal operations
 //   - [storage.ErrDataMismatch] if a *different* approval for the same key pair (ExecutionResultID, chunk index) is already indexed
 func InsertAndIndexResultApproval(approval *flow.ResultApproval) func(lctx lockctx.Proof, rw storage.ReaderBatchWriter) error {
 ```
@@ -170,7 +182,7 @@ As an example for functions of type (i.b), consider `operation.IndexPayloadSeals
 //     serves as a reminder that the CALLER is responsible to ensure that the DEDUPLICATION CHECK is done elsewhere
 //     ATOMICALLY with this write operation.
 //
-// No other errors are expected during normal operation.
+// No other error returns are expected during normal operation.
 func IndexPayloadSeals(lctx lockctx.Proof, w storage.Writer, blockID flow.Identifier, sealIDs []flow.Identifier) error {
 	if !lctx.HoldsLock(storage.LockInsertBlock) {
 		return fmt.Errorf("cannot index seal for blockID %v without holding lock %s",
