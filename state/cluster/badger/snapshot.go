@@ -25,8 +25,6 @@ func (s *Snapshot) Collection() (*flow.Collection, error) {
 		return nil, s.err
 	}
 
-	var collection flow.Collection
-
 	// get the payload
 	var payload cluster.Payload
 	err := procedure.RetrieveClusterPayload(s.state.db.Reader(), s.blockID, &payload)
@@ -34,9 +32,7 @@ func (s *Snapshot) Collection() (*flow.Collection, error) {
 		return nil, fmt.Errorf("failed to get snapshot payload: %w", err)
 	}
 
-	// set the collection
-	collection = payload.Collection
-
+	collection := payload.Collection
 	return &collection, nil
 }
 

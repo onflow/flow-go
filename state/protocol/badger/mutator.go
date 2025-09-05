@@ -159,7 +159,7 @@ func NewFullConsensusState(
 //
 // No errors are expected during normal operations.
 //   - In case of concurrent calls with the same `candidate` block, ExtendCertified may return a [storage.ErrAlreadyExists]
-//     or it may gracefully return. At the moment, ExtendCertified should be considered as not concurrency-safe.
+//     or it may gracefully return. At the moment, ExtendCertified should be considered as NOT CONCURRENCY-SAFE.
 func (m *FollowerState) ExtendCertified(ctx context.Context, certified *flow.CertifiedBlock) error {
 	candidate := &certified.Proposal.Block
 	certifyingQC := certified.CertifyingQC
@@ -254,9 +254,9 @@ func (m *FollowerState) ExtendCertified(ctx context.Context, certified *flow.Cer
 //
 // Expected errors during normal operations:
 //   - [state.OutdatedExtensionError] if the candidate block is orphaned
-//   - state.InvalidExtensionError if the candidate block is invalid
+//   - [state.InvalidExtensionError] if the candidate block is invalid
 //   - In case of concurrent calls with the same `candidate` block, `Extend` may return a [storage.ErrAlreadyExists]
-//     or it may gracefully return. At the moment, `Extend` should be considered as not concurrency-safe.
+//     or it may gracefully return. At the moment, `Extend` should be considered as NOT CONCURRENCY-SAFE.
 func (m *ParticipantState) Extend(ctx context.Context, candidateProposal *flow.Proposal) error {
 	span, ctx := m.tracer.StartSpanFromContext(ctx, trace.ProtoStateMutatorExtend)
 	defer span.End()
@@ -419,11 +419,11 @@ func (m *FollowerState) headerExtend(ctx context.Context, candidate *flow.Propos
 		// Thereby, we reduce duplicated `BlockProcessable` notifications.
 		err = m.qcs.BatchStore(lctx, rw, qc)
 		if err != nil {
-			// [storage.ErrAlreadyExists] guarantees that 5a has already been executed for the parent.
+			// [storage.ErrAlreadyExists] guarantees that 4a has already been executed for the parent.
 			if !errors.Is(err, storage.ErrAlreadyExists) {
 				return fmt.Errorf("could not store incorporated qc: %w", err)
 			}
-		} else { // no error entails that 5a has never been executed for the parent block
+		} else { // no error entails that 4a has never been executed for the parent block
 			// add parent to index of certified blocks:
 			err := operation.IndexCertifiedBlockByView(lctx, rw, parent.View, qc.BlockID)
 			if err != nil {

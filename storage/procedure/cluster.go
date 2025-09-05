@@ -58,10 +58,6 @@ func InsertClusterBlock(lctx lockctx.Proof, rw storage.ReaderBatchWriter, propos
 		return fmt.Errorf("could not insert proposer signature: %w", err)
 	}
 
-	// since InsertHeader already checks for duplicates, we can safely
-	// assume that the block header is new and there is no existing index
-	// for other data related to this block ID.
-
 	// insert the block payload
 	err = InsertClusterPayload(lctx, rw, blockID, &proposal.Block.Payload)
 	if err != nil {
@@ -102,7 +98,6 @@ func RetrieveClusterBlock(r storage.Reader, blockID flow.Identifier, block *clus
 	if err != nil {
 		return fmt.Errorf("could not build cluster block: %w", err)
 	}
-
 	*block = *newBlock
 
 	return nil
@@ -212,7 +207,7 @@ func InsertClusterPayload(lctx lockctx.Proof, rw storage.ReaderBatchWriter, bloc
 	// Here, we persist a reduced representation of the collection, only listing the constituent transactions by their hashes.
 	light := payload.Collection.Light()
 	writer := rw.Writer()
-	err = operation.UpsertCollection(writer, light) // keyed by content hash so no lock needed
+	err = operation.UpsertCollection(writer, light) // collection is keyed by content hash, hence no overwrite protection is needed
 	if err != nil {
 		return fmt.Errorf("could not insert payload collection: %w", err)
 	}
@@ -285,7 +280,6 @@ func RetrieveClusterPayload(r storage.Reader, blockID flow.Identifier, payload *
 	if err != nil {
 		return fmt.Errorf("could not build the payload: %w", err)
 	}
-
 	*payload = *newPayload
 
 	return nil
