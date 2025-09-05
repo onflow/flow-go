@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/onflow/crypto"
+	"github.com/jordanschalm/lockctx"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -18,19 +18,26 @@ import (
 func TestHeaderInsertCheckRetrieve(t *testing.T) {
 	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
 		expected := &flow.Header{
-			View:               1337,
-			Timestamp:          time.Now().UTC(),
-			ParentID:           flow.Identifier{0x11},
-			PayloadHash:        flow.Identifier{0x22},
-			ParentVoterIndices: []byte{0x44},
-			ParentVoterSigData: []byte{0x88},
-			ProposerID:         flow.Identifier{0x33},
-			ProposerSigData:    crypto.Signature{0x77},
+			HeaderBody: flow.HeaderBody{
+				View:               1337,
+				Timestamp:          uint64(time.Now().UnixMilli()),
+				ParentID:           flow.Identifier{0x11},
+				ParentVoterIndices: []byte{0x44},
+				ParentVoterSigData: []byte{0x88},
+				ProposerID:         flow.Identifier{0x33},
+			},
+			PayloadHash: flow.Identifier{0x22},
 		}
 		blockID := expected.ID()
 
-		err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			return operation.InsertHeader(rw.Writer(), expected.ID(), expected)
+		lockManager := storage.NewTestingLockManager()
+		lctx := lockManager.NewContext()
+		err := lctx.AcquireLock(storage.LockInsertBlock)
+		require.NoError(t, err)
+		defer lctx.Release()
+
+		err = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+			return operation.InsertHeader(lctx, rw, expected.ID(), expected)
 		})
 		require.NoError(t, err)
 
@@ -46,15 +53,15 @@ func TestHeaderIDIndexByCollectionID(t *testing.T) {
 	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
 
 		headerID := unittest.IdentifierFixture()
-		collectionID := unittest.IdentifierFixture()
+		collectionGuaranteeID := unittest.IdentifierFixture()
 
 		err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			return operation.IndexCollectionBlock(rw.Writer(), collectionID, headerID)
+			return operation.IndexBlockContainingCollectionGuarantee(rw.Writer(), collectionGuaranteeID, headerID)
 		})
 		require.NoError(t, err)
 
 		actualID := &flow.Identifier{}
-		err = operation.LookupCollectionBlock(db.Reader(), collectionID, actualID)
+		err = operation.LookupBlockContainingCollectionGuarantee(db.Reader(), collectionGuaranteeID, actualID)
 		require.NoError(t, err)
 		assert.Equal(t, headerID, *actualID)
 	})
@@ -66,16 +73,41 @@ func TestBlockHeightIndexLookup(t *testing.T) {
 		height := uint64(1337)
 		expected := flow.Identifier{0x01, 0x02, 0x03}
 
-		_, lctx := unittest.LockManagerWithContext(t, storage.LockFinalizeBlock)
+		lockManager := storage.NewTestingLockManager()
+		lctx := lockManager.NewContext()
+		err := lctx.AcquireLock(storage.LockFinalizeBlock)
+		require.NoError(t, err)
 		defer lctx.Release()
 
-		err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			return operation.IndexBlockHeight(lctx, rw, height, expected)
+		err = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+			return operation.IndexFinalizedBlockByHeight(lctx, rw, height, expected)
 		})
 		require.NoError(t, err)
 
 		var actual flow.Identifier
 		err = operation.LookupBlockHeight(db.Reader(), height, &actual)
+		require.NoError(t, err)
+
+		assert.Equal(t, expected, actual)
+	})
+}
+
+func TestBlockViewIndexLookup(t *testing.T) {
+	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
+
+		view := uint64(1337)
+		expected := flow.Identifier{0x01, 0x02, 0x03}
+
+		lockManager := storage.NewTestingLockManager()
+
+		unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
+			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+				return operation.IndexCertifiedBlockByView(lctx, rw, view, expected)
+			})
+		})
+
+		var actual flow.Identifier
+		err := operation.LookupCertifiedBlockByView(db.Reader(), view, &actual)
 		require.NoError(t, err)
 
 		assert.Equal(t, expected, actual)

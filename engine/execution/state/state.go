@@ -56,6 +56,10 @@ type ScriptExecutionState interface {
 	IsBlockExecuted(height uint64, blockID flow.Identifier) (bool, error)
 }
 
+// IsParentExecuted returns true if and only if the parent of the given block (header) is executed.
+// TODO: Check whether `header` is a root block is potentially flawed, because it only works for the genesis block.
+//
+//	Neither spork root blocks nor dynamically boostrapped Execution Nodes (with truncated history) are supported.
 func IsParentExecuted(state ReadOnlyExecutionState, header *flow.Header) (bool, error) {
 	// sanity check, caller should not pass a root block
 	if header.Height == 0 {
@@ -376,7 +380,7 @@ func (s *state) SaveExecutionResults(
 	if s.enableRegisterStore {
 		// save registers to register store
 		err = s.registerStore.SaveRegisters(
-			result.BlockExecutionResult.ExecutableBlock.Block.Header,
+			result.BlockExecutionResult.ExecutableBlock.Block.ToHeader(),
 			result.BlockExecutionResult.AllUpdatedRegisters(),
 		)
 
@@ -386,7 +390,7 @@ func (s *state) SaveExecutionResults(
 	}
 
 	//outside batch because it requires read access
-	err = s.UpdateLastExecutedBlock(childCtx, result.ExecutableBlock.ID())
+	err = s.UpdateLastExecutedBlock(childCtx, result.ExecutableBlock.BlockID())
 	if err != nil {
 		return fmt.Errorf("cannot update highest executed block: %w", err)
 	}
@@ -397,9 +401,14 @@ func (s *state) saveExecutionResults(
 	ctx context.Context,
 	result *execution.ComputationResult,
 ) (err error) {
-	blockID := result.ExecutableBlock.ID()
+	blockID := result.ExecutableBlock.BlockID()
 
-	err = s.chunkDataPacks.Store(result.AllChunkDataPacks())
+	chunks, err := result.AllChunkDataPacks()
+	if err != nil {
+		return fmt.Errorf("can not retrieve chunk data packs: %w", err)
+	}
+
+	err = s.chunkDataPacks.Store(chunks)
 	if err != nil {
 		return fmt.Errorf("can not store multiple chunk data pack: %w", err)
 	}
@@ -419,10 +428,9 @@ func (s *state) saveExecutionResults(
 		batch.AddCallback(func(err error) {
 			// Rollback if an error occurs during batch operations
 			if err != nil {
-				chunks := result.AllChunkDataPacks()
 				chunkIDs := make([]flow.Identifier, 0, len(chunks))
 				for _, chunk := range chunks {
-					chunkIDs = append(chunkIDs, chunk.ID())
+					chunkIDs = append(chunkIDs, chunk.ChunkID)
 				}
 				_ = s.chunkDataPacks.Remove(chunkIDs)
 			}
@@ -461,7 +469,7 @@ func (s *state) saveExecutionResults(
 		// the state commitment is the last data item to be stored, so that
 		// IsBlockExecuted can be implemented by checking whether state commitment exists
 		// in the database
-		err = s.commits.BatchStore(blockID, result.CurrentEndState(), batch)
+		err = s.commits.BatchStore(lctx, blockID, result.CurrentEndState(), batch)
 		if err != nil {
 			return fmt.Errorf("cannot store state commitment: %w", err)
 		}

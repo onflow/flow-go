@@ -55,6 +55,7 @@ type CollectionSyncer struct {
 	transactions storage.Transactions
 
 	lastFullBlockHeight *counters.PersistentStrictMonotonicCounter
+	lockManager         storage.LockManager
 }
 
 // NewCollectionSyncer creates a new CollectionSyncer responsible for requesting,
@@ -68,6 +69,7 @@ func NewCollectionSyncer(
 	collections storage.Collections,
 	transactions storage.Transactions,
 	lastFullBlockHeight *counters.PersistentStrictMonotonicCounter,
+	lockManager storage.LockManager,
 ) *CollectionSyncer {
 	collectionExecutedMetric.UpdateLastFullBlockHeight(lastFullBlockHeight.Value())
 
@@ -80,6 +82,7 @@ func NewCollectionSyncer(
 		transactions:             transactions,
 		lastFullBlockHeight:      lastFullBlockHeight,
 		collectionExecutedMetric: collectionExecutedMetric,
+		lockManager:              lockManager,
 	}
 }
 
@@ -307,13 +310,13 @@ func (s *CollectionSyncer) RequestCollectionsForBlock(height uint64, missingColl
 // requestCollections registers collection download requests in the requester engine,
 // optionally forcing immediate dispatch.
 func (s *CollectionSyncer) requestCollections(collections []*flow.CollectionGuarantee, immediately bool) {
-	for _, collection := range collections {
-		guarantors, err := protocol.FindGuarantors(s.state, collection)
+	for _, guarantee := range collections {
+		guarantors, err := protocol.FindGuarantors(s.state, guarantee)
 		if err != nil {
 			// failed to find guarantors for guarantees contained in a finalized block is fatal error
-			s.logger.Fatal().Err(err).Msgf("could not find guarantors for guarantee %v", collection.ID())
+			s.logger.Fatal().Err(err).Msgf("could not find guarantors for collection %v", guarantee.CollectionID)
 		}
-		s.requester.EntityByID(collection.ID(), filter.HasNodeID[flow.Identity](guarantors...))
+		s.requester.EntityByID(guarantee.CollectionID, filter.HasNodeID[flow.Identity](guarantors...))
 	}
 
 	if immediately {
@@ -390,7 +393,17 @@ func (s *CollectionSyncer) OnCollectionDownloaded(_ flow.Identifier, entity flow
 		return
 	}
 
-	err := indexer.IndexCollection(collection, s.collections, s.transactions, s.logger, s.collectionExecutedMetric)
+	// Create a lock context for indexing
+	lctx := s.lockManager.NewContext()
+	defer lctx.Release()
+	err := lctx.AcquireLock(storage.LockInsertCollection)
+	if err != nil {
+		// TODO(leo): should be using irrecoverable.Context
+		s.logger.Fatal().Err(err).Msg("could not acquire lock for collection indexing")
+		return
+	}
+
+	err = indexer.IndexCollection(lctx, collection, s.collections, s.logger, s.collectionExecutedMetric)
 	if err != nil {
 		s.logger.Error().Err(err).Msg("could not index collection after it has been downloaded")
 		return

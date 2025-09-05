@@ -20,7 +20,7 @@ func (c TransactionSequenceNumberChecker) CheckAndIncrementSequenceNumber(
 ) error {
 	// TODO(Janez): verification is part of inclusion fees, not execution fees.
 	var err error
-	txnState.RunWithAllLimitsDisabled(func() {
+	txnState.RunWithMeteringDisabled(func() {
 		err = c.checkAndIncrementSequenceNumber(tracer, proc, txnState)
 	})
 
@@ -56,7 +56,7 @@ func (c TransactionSequenceNumberChecker) checkAndIncrementSequenceNumber(
 
 	var accountKey flow.AccountPublicKey
 
-	accountKey, err = accounts.GetPublicKey(proposalKey.Address, proposalKey.KeyIndex)
+	accountKey, err = accounts.GetAccountPublicKey(proposalKey.Address, proposalKey.KeyIndex)
 	if err != nil {
 		return errors.NewInvalidProposalSignatureError(proposalKey, err)
 	}
@@ -76,7 +76,7 @@ func (c TransactionSequenceNumberChecker) checkAndIncrementSequenceNumber(
 
 	accountKey.SeqNumber++
 
-	_, err = accounts.SetPublicKey(proposalKey.Address, proposalKey.KeyIndex, accountKey)
+	_, err = accounts.SetAccountPublicKey(proposalKey.Address, proposalKey.KeyIndex, accountKey)
 	if err != nil {
 		restartError := txnState.RestartNestedTransaction(nestedTxnId)
 		if restartError != nil {

@@ -132,6 +132,36 @@ func (_m *Headers) ByParentID(parentID flow.Identifier) ([]*flow.Header, error) 
 	return r0, r1
 }
 
+// ByView provides a mock function with given fields: view
+func (_m *Headers) ByView(view uint64) (*flow.Header, error) {
+	ret := _m.Called(view)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ByView")
+	}
+
+	var r0 *flow.Header
+	var r1 error
+	if rf, ok := ret.Get(0).(func(uint64) (*flow.Header, error)); ok {
+		return rf(view)
+	}
+	if rf, ok := ret.Get(0).(func(uint64) *flow.Header); ok {
+		r0 = rf(view)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*flow.Header)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(uint64) error); ok {
+		r1 = rf(view)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // Exists provides a mock function with given fields: blockID
 func (_m *Headers) Exists(blockID flow.Identifier) (bool, error) {
 	ret := _m.Called(blockID)
@@ -149,6 +179,36 @@ func (_m *Headers) Exists(blockID flow.Identifier) (bool, error) {
 		r0 = rf(blockID)
 	} else {
 		r0 = ret.Get(0).(bool)
+	}
+
+	if rf, ok := ret.Get(1).(func(flow.Identifier) error); ok {
+		r1 = rf(blockID)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// ProposalByBlockID provides a mock function with given fields: blockID
+func (_m *Headers) ProposalByBlockID(blockID flow.Identifier) (*flow.ProposalHeader, error) {
+	ret := _m.Called(blockID)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ProposalByBlockID")
+	}
+
+	var r0 *flow.ProposalHeader
+	var r1 error
+	if rf, ok := ret.Get(0).(func(flow.Identifier) (*flow.ProposalHeader, error)); ok {
+		return rf(blockID)
+	}
+	if rf, ok := ret.Get(0).(func(flow.Identifier) *flow.ProposalHeader); ok {
+		r0 = rf(blockID)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*flow.ProposalHeader)
+		}
 	}
 
 	if rf, ok := ret.Get(1).(func(flow.Identifier) error); ok {

@@ -4,7 +4,6 @@ import (
 	"github.com/jordanschalm/lockctx"
 
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/storage/badger/transaction"
 )
 
 // QuorumCertificates represents storage for Quorum Certificates.
@@ -13,10 +12,6 @@ import (
 // In the example below, `QC_1` is indexed by `Block_1.ID()`
 // Block_1 <- Block_2(QC_1)
 type QuorumCertificates interface {
-	// StoreTx stores a Quorum Certificate as part of database transaction QC is indexed by QC.BlockID.
-	// * storage.ErrAlreadyExists if any QC for blockID is already stored
-	StoreTx(qc *flow.QuorumCertificate) func(*transaction.Tx) error
-
 	// BatchStore stores a Quorum Certificate as part of database batch update. QC is indexed by QC.BlockID.
 	//
 	// Note: For the same block, different QCs can easily be constructed by selecting different sub-sets of the received votes

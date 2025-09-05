@@ -5,6 +5,7 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/jordanschalm/lockctx"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/module/metrics"
@@ -15,22 +16,22 @@ import (
 )
 
 func TestMyExecutionReceiptsStorage(t *testing.T) {
-	withStore := func(t *testing.T, f func(storage.MyExecutionReceipts, storage.ExecutionResults, storage.ExecutionReceipts, storage.DB)) {
+	withStore := func(t *testing.T, f func(storage.MyExecutionReceipts, storage.ExecutionResults, storage.ExecutionReceipts, storage.DB, lockctx.Manager)) {
 		dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
+			lockManager := storage.NewTestingLockManager()
 			metrics := metrics.NewNoopCollector()
 			results := store.NewExecutionResults(metrics, db)
 			receipts := store.NewExecutionReceipts(metrics, db, results, 100)
 			myReceipts := store.NewMyExecutionReceipts(metrics, db, receipts)
 
-			f(myReceipts, results, receipts, db)
+			f(myReceipts, results, receipts, db, lockManager)
 		})
 	}
 
 	t.Run("myReceipts store and retrieve from different storage layers", func(t *testing.T) {
-		withStore(t, func(myReceipts storage.MyExecutionReceipts, results storage.ExecutionResults, receipts storage.ExecutionReceipts, db storage.DB) {
-			lockManager := storage.NewTestingLockManager()
+		withStore(t, func(myReceipts storage.MyExecutionReceipts, results storage.ExecutionResults, receipts storage.ExecutionReceipts, db storage.DB, lockManager lockctx.Manager) {
 			block := unittest.BlockFixture()
-			receipt1 := unittest.ReceiptForBlockFixture(&block)
+			receipt1 := unittest.ReceiptForBlockFixture(block)
 
 			// STEP 1: Store receipt
 			lctx := lockManager.NewContext()
@@ -60,10 +61,9 @@ func TestMyExecutionReceiptsStorage(t *testing.T) {
 	})
 
 	t.Run("myReceipts store identical receipt for the same block", func(t *testing.T) {
-		withStore(t, func(myReceipts storage.MyExecutionReceipts, _ storage.ExecutionResults, _ storage.ExecutionReceipts, db storage.DB) {
-			lockManager := storage.NewTestingLockManager()
+		withStore(t, func(myReceipts storage.MyExecutionReceipts, _ storage.ExecutionResults, _ storage.ExecutionReceipts, db storage.DB, lockManager lockctx.Manager) {
 			block := unittest.BlockFixture()
-			receipt1 := unittest.ReceiptForBlockFixture(&block)
+			receipt1 := unittest.ReceiptForBlockFixture(block)
 
 			lctx := lockManager.NewContext()
 			require.NoError(t, lctx.AcquireLock(storage.LockInsertOwnReceipt))
@@ -84,15 +84,14 @@ func TestMyExecutionReceiptsStorage(t *testing.T) {
 	})
 
 	t.Run("store different receipt for same block should fail", func(t *testing.T) {
-		withStore(t, func(myReceipts storage.MyExecutionReceipts, results storage.ExecutionResults, receipts storage.ExecutionReceipts, db storage.DB) {
-			lockManager := storage.NewTestingLockManager()
+		withStore(t, func(myReceipts storage.MyExecutionReceipts, results storage.ExecutionResults, receipts storage.ExecutionReceipts, db storage.DB, lockManager lockctx.Manager) {
 			block := unittest.BlockFixture()
 
 			executor1 := unittest.IdentifierFixture()
 			executor2 := unittest.IdentifierFixture()
 
-			receipt1 := unittest.ReceiptForBlockExecutorFixture(&block, executor1)
-			receipt2 := unittest.ReceiptForBlockExecutorFixture(&block, executor2)
+			receipt1 := unittest.ReceiptForBlockExecutorFixture(block, executor1)
+			receipt2 := unittest.ReceiptForBlockExecutorFixture(block, executor2)
 
 			lctx := lockManager.NewContext()
 			require.NoError(t, lctx.AcquireLock(storage.LockInsertOwnReceipt))
@@ -114,15 +113,14 @@ func TestMyExecutionReceiptsStorage(t *testing.T) {
 	})
 
 	t.Run("concurrent store different receipt for same block should fail", func(t *testing.T) {
-		withStore(t, func(myReceipts storage.MyExecutionReceipts, results storage.ExecutionResults, receipts storage.ExecutionReceipts, db storage.DB) {
-			lockManager := storage.NewTestingLockManager()
+		withStore(t, func(myReceipts storage.MyExecutionReceipts, results storage.ExecutionResults, receipts storage.ExecutionReceipts, db storage.DB, lockManager lockctx.Manager) {
 			block := unittest.BlockFixture()
 
 			executor1 := unittest.IdentifierFixture()
 			executor2 := unittest.IdentifierFixture()
 
-			receipt1 := unittest.ReceiptForBlockExecutorFixture(&block, executor1)
-			receipt2 := unittest.ReceiptForBlockExecutorFixture(&block, executor2)
+			receipt1 := unittest.ReceiptForBlockExecutorFixture(block, executor1)
+			receipt2 := unittest.ReceiptForBlockExecutorFixture(block, executor2)
 
 			var startSignal sync.WaitGroup // goroutines attempting store operations will wait for this signal to start concurrently
 			startSignal.Add(1)             // expecting one signal from the main thread to start both goroutines
@@ -173,9 +171,7 @@ func TestMyExecutionReceiptsStorage(t *testing.T) {
 	})
 
 	t.Run("concurrent store of 10 different receipts for different blocks should succeed", func(t *testing.T) {
-		withStore(t, func(myReceipts storage.MyExecutionReceipts, results storage.ExecutionResults, receipts storage.ExecutionReceipts, db storage.DB) {
-			lockManager := storage.NewTestingLockManager()
-
+		withStore(t, func(myReceipts storage.MyExecutionReceipts, results storage.ExecutionResults, receipts storage.ExecutionReceipts, db storage.DB, lockManager lockctx.Manager) {
 			var startSignal sync.WaitGroup // goroutines attempting store operations will wait for this signal to start concurrently
 			startSignal.Add(1)             // expecting one signal from the main thread to start both goroutines
 			var doneSinal sync.WaitGroup   // the main thread will wait on this for goroutines attempting store operations to finish
@@ -187,10 +183,10 @@ func TestMyExecutionReceiptsStorage(t *testing.T) {
 				go func(i int) {
 					block := unittest.BlockFixture() // Each iteration gets a new block
 					executor := unittest.IdentifierFixture()
-					receipt := unittest.ReceiptForBlockExecutorFixture(&block, executor)
-					lctx := lockManager.NewContext()
+					receipt := unittest.ReceiptForBlockExecutorFixture(block, executor)
 
 					startSignal.Wait()
+					lctx := lockManager.NewContext()
 					require.NoError(t, lctx.AcquireLock(storage.LockInsertOwnReceipt))
 					err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 						return myReceipts.BatchStoreMyReceipt(lctx, receipt, rw)
@@ -213,11 +209,10 @@ func TestMyExecutionReceiptsStorage(t *testing.T) {
 	})
 
 	t.Run("store and remove", func(t *testing.T) {
-		withStore(t, func(myReceipts storage.MyExecutionReceipts, results storage.ExecutionResults, receipts storage.ExecutionReceipts, db storage.DB) {
+		withStore(t, func(myReceipts storage.MyExecutionReceipts, results storage.ExecutionResults, receipts storage.ExecutionReceipts, db storage.DB, lockManager lockctx.Manager) {
 			block := unittest.BlockFixture()
-			receipt1 := unittest.ReceiptForBlockFixture(&block)
+			receipt1 := unittest.ReceiptForBlockFixture(block)
 
-			lockManager := storage.NewTestingLockManager()
 			lctx := lockManager.NewContext()
 			defer lctx.Release()
 			require.NoError(t, lctx.AcquireLock(storage.LockInsertOwnReceipt))
@@ -253,16 +248,16 @@ func TestMyExecutionReceiptsStorage(t *testing.T) {
 
 func TestMyExecutionReceiptsStorageMultipleStoreInSameBatch(t *testing.T) {
 	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
+		lockManager := storage.NewTestingLockManager()
 		metrics := metrics.NewNoopCollector()
 		results := store.NewExecutionResults(metrics, db)
 		receipts := store.NewExecutionReceipts(metrics, db, results, 100)
 		myReceipts := store.NewMyExecutionReceipts(metrics, db, receipts)
 
 		block := unittest.BlockFixture()
-		receipt1 := unittest.ReceiptForBlockFixture(&block)
-		receipt2 := unittest.ReceiptForBlockFixture(&block)
+		receipt1 := unittest.ReceiptForBlockFixture(block)
+		receipt2 := unittest.ReceiptForBlockFixture(block)
 
-		lockManager := storage.NewTestingLockManager()
 		lctx := lockManager.NewContext()
 		defer lctx.Release()
 		require.NoError(t, lctx.AcquireLock(storage.LockInsertOwnReceipt))

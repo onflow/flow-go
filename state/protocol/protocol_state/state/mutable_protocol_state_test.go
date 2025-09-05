@@ -10,6 +10,7 @@ import (
 	"golang.org/x/exp/slices"
 
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/state/protocol"
 	psmock "github.com/onflow/flow-go/state/protocol/mock"
 	"github.com/onflow/flow-go/state/protocol/protocol_state"
@@ -552,7 +553,14 @@ func (s *StateMutatorSuite) Test_EncodeFailed() {
 	// the expected mock methods should be called, which is asserted by the testify framework
 	blockID := s.candidate.ID()
 	err = deferredDBOps.Execute(nil, blockID, rw)
-	require.Contains(s.T(), err.Error(), "exception")
+
+	// We expect the business logic to wrap the unexpected `exception` from above into an irrecoverable error.
+	// Therefore, we should _not_ be able to unwrap the returned error to match the original `exception`.
+	// Furthermore, the business logic should _not_ erroneously interpret the error as an invalid service event error.
+	irrecErr := irrecoverable.NewExceptionf("")
+	require.ErrorAs(s.T(), err, &irrecErr)
+	require.NotErrorIs(s.T(), err, exception)
+	require.False(s.T(), protocol.IsInvalidServiceEventError(err))
 
 	s.protocolKVStoreDB.AssertExpectations(s.T())
 }

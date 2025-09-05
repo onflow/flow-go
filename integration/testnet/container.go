@@ -384,6 +384,7 @@ func (c *Container) Connect() error {
 }
 
 func (c *Container) OpenState() (*state.State, error) {
+	lockManager := storage.NewTestingLockManager()
 	badgerdb, err := c.DB()
 	if err != nil {
 		return nil, err
@@ -396,7 +397,7 @@ func (c *Container) OpenState() (*state.State, error) {
 	seals := store.NewSeals(metrics, db)
 	results := store.NewExecutionResults(metrics, db)
 	receipts := store.NewExecutionReceipts(metrics, db, results, store.DefaultCacheSize)
-	guarantees := store.NewGuarantees(metrics, db, store.DefaultCacheSize)
+	guarantees := store.NewGuarantees(metrics, db, store.DefaultCacheSize, store.DefaultCacheSize)
 	payloads := store.NewPayloads(db, index, guarantees, seals, receipts, results)
 	blocks := store.NewBlocks(db, headers, payloads)
 	qcs := store.NewQuorumCertificates(metrics, db, store.DefaultCacheSize)
@@ -411,7 +412,7 @@ func (c *Container) OpenState() (*state.State, error) {
 	return state.OpenState(
 		metrics,
 		db,
-		storage.NewTestingLockManager(),
+		lockManager,
 		headers,
 		seals,
 		results,
@@ -477,7 +478,7 @@ func (c *Container) TestnetClient() (*Client, error) {
 		return nil, fmt.Errorf("container does not implement flow.access.AccessAPI")
 	}
 
-	chain := c.net.Root().Header.ChainID.Chain()
+	chain := c.net.Root().ChainID.Chain()
 	return NewClient(c.Addr(GRPCPort), chain)
 }
 

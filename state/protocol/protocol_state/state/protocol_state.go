@@ -336,7 +336,6 @@ func (s *MutableProtocolState) build(
 		if err != nil {
 			return flow.ZeroID, nil, fmt.Errorf("unexpected exception from sub-state machine while building its output state: %w", err)
 		}
-
 		deferredDBOps.Chain(dbOps)
 	}
 	resultingStateID := evolvingState.ID()

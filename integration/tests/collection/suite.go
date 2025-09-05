@@ -19,9 +19,9 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/factory"
 	"github.com/onflow/flow-go/model/flow/filter"
-	"github.com/onflow/flow-go/model/messages"
 	clusterstate "github.com/onflow/flow-go/state/cluster"
 	clusterstateimpl "github.com/onflow/flow-go/state/cluster/badger"
+	"github.com/onflow/flow-go/storage/operation/badgerimpl"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -102,7 +102,7 @@ func (suite *CollectorSuite) SetupTest(name string, nNodes, nClusters uint) {
 
 	// create an account to use for sending transactions
 	var err error
-	suite.acct.addr, suite.acct.key, suite.acct.signer, err = lib.GetAccount(suite.net.Root().Header.ChainID.Chain())
+	suite.acct.addr, suite.acct.key, suite.acct.signer, err = lib.GetAccount(suite.net.Root().ChainID.Chain())
 	require.NoError(suite.T(), err)
 	suite.serviceAccountIdx = 2
 
@@ -179,7 +179,7 @@ func (suite *CollectorSuite) TxForCluster(target flow.IdentitySkeletonList) *sdk
 
 	// hash-grind the script until the transaction will be routed to target cluster
 	for {
-		serviceAccountAddr, err := suite.net.Root().Header.ChainID.Chain().AddressAtIndex(suite.serviceAccountIdx)
+		serviceAccountAddr, err := suite.net.Root().ChainID.Chain().AddressAtIndex(suite.serviceAccountIdx)
 		suite.Require().NoError(err)
 		suite.serviceAccountIdx++
 		tx.SetScript(append(tx.Script, '/', '/'))
@@ -211,9 +211,10 @@ func (suite *CollectorSuite) AwaitProposals(n uint) []cluster.Block {
 		suite.T().Logf("ghost recv: %T", msg)
 
 		switch val := msg.(type) {
-		case *messages.ClusterBlockProposal:
-			block := val.Block.ToInternal()
-			blocks = append(blocks, *block)
+		case *cluster.UntrustedProposal:
+			internalClusterProposal, err := cluster.NewProposal(*val)
+			require.NoError(suite.T(), err)
+			blocks = append(blocks, internalClusterProposal.Block)
 			if len(blocks) == int(n) {
 				return blocks
 			}
@@ -260,11 +261,12 @@ func (suite *CollectorSuite) AwaitTransactionsIncluded(txIDs ...flow.Identifier)
 		require.Nil(suite.T(), err, "could not read next message")
 
 		switch val := msg.(type) {
-		case *messages.ClusterBlockProposal:
-			block := val.Block.ToInternal()
-			header := block.Header
+		case *cluster.UntrustedProposal:
+			internalClusterProposal, err := cluster.NewProposal(*val)
+			require.NoError(suite.T(), err)
+			block := internalClusterProposal.Block
 			collection := block.Payload.Collection
-			suite.T().Logf("got collection from %v height=%d col_id=%x size=%d", originID, header.Height, collection.ID(), collection.Len())
+			suite.T().Logf("got collection from %v height=%d col_id=%x size=%d", originID, block.Height, collection.ID(), collection.Len())
 			if guarantees[collection.ID()] {
 				for _, txID := range collection.Light().Transactions {
 					delete(lookup, txID)
@@ -342,7 +344,8 @@ func (suite *CollectorSuite) ClusterStateFor(id flow.Identifier) *clusterstateim
 
 	setup, ok := suite.net.Result().ServiceEvents[0].Event.(*flow.EpochSetup)
 	suite.Require().True(ok, "could not get root seal setup")
-	rootBlock := clusterstate.CanonicalRootBlock(setup.Counter, myCluster)
+	rootBlock, err := clusterstate.CanonicalRootBlock(setup.Counter, myCluster)
+	suite.Require().NoError(err)
 	node := suite.net.ContainerByID(id)
 
 	db, err := node.DB()
@@ -351,7 +354,7 @@ func (suite *CollectorSuite) ClusterStateFor(id flow.Identifier) *clusterstateim
 	rootQC := unittest.QuorumCertificateFixture(unittest.QCWithRootBlockID(rootBlock.ID()))
 	clusterStateRoot, err := clusterstateimpl.NewStateRoot(rootBlock, rootQC, setup.Counter)
 	suite.NoError(err)
-	clusterState, err := clusterstateimpl.OpenState(db, nil, nil, nil, clusterStateRoot.ClusterID(), clusterStateRoot.EpochCounter())
+	clusterState, err := clusterstateimpl.OpenState(badgerimpl.ToDB(db), nil, nil, nil, clusterStateRoot.ClusterID(), clusterStateRoot.EpochCounter())
 	require.NoError(suite.T(), err, "could not get cluster state")
 
 	return clusterState

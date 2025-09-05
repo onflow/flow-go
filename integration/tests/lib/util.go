@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"fmt"
+	"strings"
 	"testing"
 	"time"
 
@@ -53,11 +54,80 @@ var (
 	}
 )
 
+// TestFlowCallbackHandlerContract creates a test contract DSL for testing FlowCallbackScheduler
+func TestFlowCallbackHandlerContract(callbackScheduler sdk.Address, flowToken sdk.Address, fungibleToken sdk.Address) dsl.Contract {
+	return dsl.Contract{
+		Name: "TestFlowCallbackHandler",
+		Imports: []dsl.Import{
+			{
+				Names:   []string{"FlowCallbackScheduler"},
+				Address: callbackScheduler,
+			},
+			{
+				Names:   []string{"FlowToken"},
+				Address: flowToken,
+			},
+			{
+				Names:   []string{"FungibleToken"},
+				Address: fungibleToken,
+			},
+		},
+		Members: []dsl.CadenceCode{
+			dsl.Code(`
+				access(all) var scheduledCallbacks: {UInt64: FlowCallbackScheduler.ScheduledCallback}
+				access(all) var executedCallbacks: [UInt64]
+
+				access(all) let HandlerStoragePath: StoragePath
+				access(all) let HandlerPublicPath: PublicPath
+				
+				access(all) resource Handler: FlowCallbackScheduler.CallbackHandler {
+					
+					access(FlowCallbackScheduler.Execute) 
+					fun executeCallback(id: UInt64, data: AnyStruct?) {
+						TestFlowCallbackHandler.executedCallbacks.append(id)
+					}
+				}
+
+				access(all) fun createHandler(): @Handler {
+					return <- create Handler()
+				}
+
+				access(all) fun addScheduledCallback(callback: FlowCallbackScheduler.ScheduledCallback) {
+					self.scheduledCallbacks[callback.id] = callback
+				}
+
+				access(all) fun cancelCallback(id: UInt64): @FlowToken.Vault {
+					let callback = self.scheduledCallbacks[id]
+						?? panic("Invalid ID: \(id) callback not found")
+					self.scheduledCallbacks[id] = nil
+					return <-FlowCallbackScheduler.cancel(callback: callback)
+				}
+
+				access(all) fun getExecutedCallbacks(): [UInt64] {
+					return self.executedCallbacks
+				}
+
+				access(all) init() {
+					self.scheduledCallbacks = {}
+					self.executedCallbacks = []
+
+					self.HandlerStoragePath = /storage/testCallbackHandler
+					self.HandlerPublicPath = /public/testCallbackHandler
+				}
+			`),
+		},
+	}
+}
+
 // CreateCounterTx is a transaction script for creating an instance of the counter in the account storage of the
 // authorizing account NOTE: the counter contract must be deployed first
 func CreateCounterTx(counterAddress sdk.Address) dsl.Transaction {
 	return dsl.Transaction{
-		Import: dsl.Import{Address: counterAddress},
+		Imports: dsl.Imports{
+			dsl.Import{
+				Address: counterAddress,
+			},
+		},
 		Content: dsl.Prepare{
 			Content: dsl.Code(fmt.Sprintf(
 				`
@@ -104,7 +174,11 @@ func ReadCounterScript(contractAddress sdk.Address, accountAddress sdk.Address) 
 // contract must be deployed first
 func CreateCounterPanicTx(chain flow.Chain) dsl.Transaction {
 	return dsl.Transaction{
-		Import: dsl.Import{Address: sdk.Address(chain.ServiceAddress())},
+		Imports: dsl.Imports{
+			dsl.Import{
+				Address: sdk.Address(chain.ServiceAddress()),
+			},
+		},
 		Content: dsl.Prepare{
 			Content: dsl.Code(`
 				var maybeCounter <- signer.storage.load<@Testing.Counter>(from: /storage/counter)
@@ -244,10 +318,10 @@ func LogStatus(t *testing.T, ctx context.Context, log zerolog.Logger, client *te
 	require.NoError(t, err)
 	counter := epoch.Counter()
 
-	log.Info().Uint64("final_height", finalized.Header.Height).
-		Uint64("final_view", finalized.Header.View).
-		Uint64("sealed_height", sealed.Header.Height).
-		Uint64("sealed_view", sealed.Header.View).
+	log.Info().Uint64("final_height", finalized.Height).
+		Uint64("final_view", finalized.View).
+		Uint64("sealed_height", sealed.Height).
+		Uint64("sealed_view", sealed.View).
 		Str("cur_epoch_phase", phase.String()).
 		Uint64("cur_epoch_counter", counter).
 		Msg("test run status")
@@ -268,4 +342,206 @@ func LogStatusPeriodically(t *testing.T, parent context.Context, log zerolog.Log
 		LogStatus(t, ctx, log, client)
 		cancel()
 	}
+}
+
+// ScheduleCallbackAtTimestamp sends a test transaction to schedule a callback on FlowCallbackScheduler
+// at a given timestamp and returns the scheduled callback ID.
+func ScheduleCallbackAtTimestamp(
+	timestamp int64,
+	client *testnet.Client,
+	flowCallbackScheduler sdk.Address,
+	flowToken sdk.Address,
+	fungibleToken sdk.Address,
+) (uint64, error) {
+	header, err := client.GetLatestFinalizedBlockHeader(context.Background())
+	if err != nil {
+		return 0, fmt.Errorf("could not get latest block ID: %w", err)
+	}
+
+	serviceAccount, err := client.GetAccountAtBlockHeight(context.Background(), client.SDKServiceAddress(), header.Height)
+	if err != nil {
+		return 0, fmt.Errorf("could not get account: %w", err)
+	}
+
+	script := []byte(fmt.Sprintf(`
+		import FlowCallbackScheduler from 0x%s
+		import TestFlowCallbackHandler from 0x%s
+		import FlowToken from 0x%s
+		import FungibleToken from 0x%s
+
+		transaction(timestamp: UFix64) {
+
+			prepare(account: auth(BorrowValue, SaveValue, IssueStorageCapabilityController, PublishCapability, GetStorageCapabilityController) &Account) {
+        		if !account.storage.check<@TestFlowCallbackHandler.Handler>(from: TestFlowCallbackHandler.HandlerStoragePath) {
+            		let handler <- TestFlowCallbackHandler.createHandler()
+				
+					account.storage.save(<-handler, to: TestFlowCallbackHandler.HandlerStoragePath)
+            		account.capabilities.storage.issue<auth(FlowCallbackScheduler.Execute) &{FlowCallbackScheduler.CallbackHandler}>(TestFlowCallbackHandler.HandlerStoragePath)
+				}
+
+				let callbackCap = account.capabilities.storage
+					.getControllers(forPath: TestFlowCallbackHandler.HandlerStoragePath)[0]
+					.capability as! Capability<auth(FlowCallbackScheduler.Execute) &{FlowCallbackScheduler.CallbackHandler}>
+				
+				let vault = account.storage.borrow<auth(FungibleToken.Withdraw) &FlowToken.Vault>(from: /storage/flowTokenVault)
+					?? panic("Could not borrow FlowToken vault")
+				
+				let testData = "test data"
+				let feeAmount = 1.0
+				let effort = UInt64(1000)
+				let priority = FlowCallbackScheduler.Priority.High
+
+				let fees <- vault.withdraw(amount: feeAmount) as! @FlowToken.Vault
+				
+				let scheduledCallback = FlowCallbackScheduler.schedule(
+					callback: callbackCap,
+					data: testData,
+					timestamp: timestamp,
+					priority: priority,
+					executionEffort: effort,
+					fees: <-fees
+				)
+
+				TestFlowCallbackHandler.addScheduledCallback(callback: scheduledCallback)
+			}
+		} 
+	`, serviceAccount.Address.Hex(), flowCallbackScheduler.Hex(), flowToken.Hex(), fungibleToken.Hex()))
+
+	timeArg, err := cadence.NewUFix64(fmt.Sprintf("%d.0", timestamp))
+	if err != nil {
+		return 0, fmt.Errorf("could not create time argument: %w", err)
+	}
+
+	tx := sdk.NewTransaction().
+		SetScript(script).
+		SetReferenceBlockID(header.ID).
+		SetProposalKey(serviceAccount.Address, serviceAccount.Keys[0].Index, serviceAccount.Keys[0].SequenceNumber).
+		SetPayer(serviceAccount.Address).
+		AddAuthorizer(serviceAccount.Address)
+
+	err = tx.AddArgument(timeArg)
+	if err != nil {
+		return 0, fmt.Errorf("could not add argument to transaction: %w", err)
+	}
+
+	return sendCallbackTx(client, tx)
+}
+
+// CancelCallbackByID sends a test transaction for canceling a callback on FlowCallbackScheduler by ID.
+func CancelCallbackByID(
+	callbackID uint64,
+	client *testnet.Client,
+	flowCallbackScheduler sdk.Address,
+	flowToken sdk.Address,
+	fungibleToken sdk.Address,
+) (uint64, error) {
+
+	header, err := client.GetLatestFinalizedBlockHeader(context.Background())
+	if err != nil {
+		return 0, fmt.Errorf("could not get latest block ID: %w", err)
+	}
+
+	serviceAccount, err := client.GetAccountAtBlockHeight(context.Background(), client.SDKServiceAddress(), header.Height)
+	if err != nil {
+		return 0, fmt.Errorf("could not get account: %w", err)
+	}
+
+	cancelTx := fmt.Sprintf(`
+		import FlowCallbackScheduler from 0x%s
+		import TestFlowCallbackHandler from 0x%s
+		import FlowToken from 0x%s
+		import FungibleToken from 0x%s
+
+		transaction(id: UInt64) {
+
+			prepare(account: auth(BorrowValue, SaveValue, IssueStorageCapabilityController, PublishCapability, GetStorageCapabilityController) &Account) {
+
+				let vault = account.storage.borrow<auth(FungibleToken.Withdraw) &FlowToken.Vault>(from: /storage/flowTokenVault)
+					?? panic("Could not borrow FlowToken vault")
+
+				vault.deposit(from: <-TestFlowCallbackHandler.cancelCallback(id: id))
+			}
+		} 
+	`, serviceAccount.Address.Hex(), flowCallbackScheduler.Hex(), flowToken.Hex(), fungibleToken.Hex())
+
+	tx := sdk.NewTransaction().
+		SetScript([]byte(cancelTx)).
+		SetReferenceBlockID(header.ID).
+		SetProposalKey(serviceAccount.Address, serviceAccount.Keys[0].Index, serviceAccount.Keys[0].SequenceNumber).
+		SetPayer(serviceAccount.Address).
+		AddAuthorizer(serviceAccount.Address)
+
+	err = tx.AddArgument(cadence.UInt64(callbackID))
+	if err != nil {
+		return 0, fmt.Errorf("could not add argument to transaction: %w", err)
+	}
+
+	return sendCallbackTx(client, tx)
+}
+
+// ExtractCallbackIDFromEvents extracts the callback ID from the events of a transaction result.
+func ExtractCallbackIDFromEvents(result *sdk.TransactionResult) uint64 {
+	for _, event := range result.Events {
+		if strings.Contains(string(event.Type), "FlowCallbackScheduler.Scheduled") ||
+			strings.Contains(string(event.Type), "FlowCallbackScheduler.Canceled") ||
+			strings.Contains(string(event.Type), "FlowCallbackScheduler.Executed") ||
+			strings.Contains(string(event.Type), "FlowCallbackScheduler.PendingExecution") {
+
+			if id := event.Value.SearchFieldByName("id"); id != nil {
+				return uint64(id.(cadence.UInt64))
+			}
+		}
+	}
+
+	return 0
+}
+
+// DeployScheduledCallbackTestContract deploys the test contract for scheduled callbacks.
+func DeployScheduledCallbackTestContract(
+	client *testnet.Client,
+	callbackScheduler sdk.Address,
+	flowToken sdk.Address,
+	fungibleToken sdk.Address,
+	refID sdk.Identifier,
+) error {
+	testContract := TestFlowCallbackHandlerContract(callbackScheduler, flowToken, fungibleToken)
+	tx, err := client.DeployContract(context.Background(), refID, testContract)
+	if err != nil {
+		return fmt.Errorf("could not deploy test contract: %w", err)
+	}
+
+	res, err := client.WaitForExecuted(context.Background(), tx.ID())
+	if err != nil {
+		return fmt.Errorf("could not wait for deploy transaction to be sealed: %w", err)
+	}
+
+	if res.Error != nil {
+		return fmt.Errorf("deploy transaction should not have error: %w", res.Error)
+	}
+
+	return nil
+}
+
+func sendCallbackTx(client *testnet.Client, tx *sdk.Transaction) (uint64, error) {
+	err := client.SignAndSendTransaction(context.Background(), tx)
+	if err != nil {
+		return 0, fmt.Errorf("could not send schedule transaction: %w", err)
+	}
+
+	// Wait for the transaction to be executed
+	executedResult, err := client.WaitForExecuted(context.Background(), tx.ID())
+	if err != nil {
+		return 0, fmt.Errorf("could not wait for schedule transaction to be executed: %w", err)
+	}
+
+	if executedResult.Error != nil {
+		return 0, fmt.Errorf("schedule transaction should not have error: %w", executedResult.Error)
+	}
+
+	callbackID := ExtractCallbackIDFromEvents(executedResult)
+	if callbackID == 0 {
+		return 0, fmt.Errorf("callback ID should not be 0")
+	}
+
+	return callbackID, nil
 }

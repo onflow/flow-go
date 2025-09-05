@@ -16,6 +16,7 @@ import (
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/convert"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	"github.com/onflow/flow-go/module/mempool/stdmap"
 	"github.com/onflow/flow-go/module/metrics"
@@ -75,7 +76,7 @@ func (i *indexCoreTest) useDefaultBlockByHeight() *indexCoreTest {
 		On("BlockIDByHeight", mocks.AnythingOfType("uint64")).
 		Return(func(height uint64) (flow.Identifier, error) {
 			for _, b := range i.blocks {
-				if b.Header.Height == height {
+				if b.Height == height {
 					return b.ID(), nil
 				}
 			}
@@ -86,8 +87,8 @@ func (i *indexCoreTest) useDefaultBlockByHeight() *indexCoreTest {
 		On("ByHeight", mocks.AnythingOfType("uint64")).
 		Return(func(height uint64) (*flow.Header, error) {
 			for _, b := range i.blocks {
-				if b.Header.Height == height {
-					return b.Header, nil
+				if b.Height == height {
+					return b.ToHeader(), nil
 				}
 			}
 			return nil, fmt.Errorf("not found")
@@ -109,12 +110,12 @@ func (i *indexCoreTest) useDefaultHeights() *indexCoreTest {
 	i.registers.
 		On("FirstHeight").
 		Return(func() uint64 {
-			return i.blocks[0].Header.Height
+			return i.blocks[0].Height
 		})
 	i.registers.
 		On("LatestHeight").
 		Return(func() uint64 {
-			return i.blocks[len(i.blocks)-1].Header.Height
+			return i.blocks[len(i.blocks)-1].Height
 		})
 	return i
 }
@@ -159,7 +160,7 @@ func (i *indexCoreTest) setGetRegisters(f func(t *testing.T, ID flow.RegisterID,
 
 func (i *indexCoreTest) useDefaultStorageMocks() *indexCoreTest {
 
-	i.collections.On("StoreLightAndIndexByTransaction", mock.AnythingOfType("*flow.LightCollection")).Return(nil).Maybe()
+	i.collections.On("StoreAndIndexByTransaction", mock.Anything, mock.AnythingOfType("*flow.Collection")).Return(&flow.LightCollection{}, nil).Maybe()
 	i.transactions.On("Store", mock.AnythingOfType("*flow.TransactionBody")).Return(nil).Maybe()
 
 	return i
@@ -180,6 +181,7 @@ func (i *indexCoreTest) useDefaultTransactionResults() *indexCoreTest {
 }
 
 func (i *indexCoreTest) initIndexer() *indexCoreTest {
+	lockManager := storage.NewTestingLockManager()
 	db, dbDir := unittest.TempBadgerDB(i.t)
 	i.t.Cleanup(func() {
 		require.NoError(i.t, db.Close())
@@ -188,14 +190,10 @@ func (i *indexCoreTest) initIndexer() *indexCoreTest {
 
 	i.useDefaultHeights()
 
-	collectionsToMarkFinalized, err := stdmap.NewTimes(100)
-	require.NoError(i.t, err)
-	collectionsToMarkExecuted, err := stdmap.NewTimes(100)
-	require.NoError(i.t, err)
-	blocksToMarkExecuted, err := stdmap.NewTimes(100)
-	require.NoError(i.t, err)
-	blockTransactions, err := stdmap.NewIdentifierMap(100)
-	require.NoError(i.t, err)
+	collectionsToMarkFinalized := stdmap.NewTimes(100)
+	collectionsToMarkExecuted := stdmap.NewTimes(100)
+	blocksToMarkExecuted := stdmap.NewTimes(100)
+	blockTransactions := stdmap.NewIdentifierMap(100)
 
 	log := zerolog.New(os.Stdout)
 	blocks := storagemock.NewBlocks(i.t)
@@ -228,6 +226,7 @@ func (i *indexCoreTest) initIndexer() *indexCoreTest {
 		flow.Testnet.Chain(),
 		derivedChainData,
 		collectionExecutedMetric,
+		lockManager,
 	)
 	require.NoError(i.t, err)
 	i.indexer = indexer
@@ -270,7 +269,7 @@ func TestExecutionState_IndexBlockData(t *testing.T) {
 			useDefaultTransactionResults().
 			// make sure update registers match in length and are same as block data ledger payloads
 			setStoreRegisters(func(t *testing.T, entries flow.RegisterEntries, height uint64) error {
-				assert.Equal(t, height, block.Header.Height)
+				assert.Equal(t, height, block.Height)
 				assert.Len(t, trie.Payloads, entries.Len())
 
 				// make sure all the registers from the execution data have been stored as well the value matches
@@ -376,7 +375,7 @@ func TestExecutionState_IndexBlockData(t *testing.T) {
 			}).
 			// make sure an empty set of register entries was stored
 			setStoreRegisters(func(t *testing.T, entries flow.RegisterEntries, height uint64) error {
-				assert.Equal(t, height, block.Header.Height)
+				assert.Equal(t, height, block.Height)
 				assert.Equal(t, 0, entries.Len())
 				return nil
 			}).
@@ -424,7 +423,7 @@ func TestExecutionState_IndexBlockData(t *testing.T) {
 			}).
 			// make sure an empty set of register entries was stored
 			setStoreRegisters(func(t *testing.T, entries flow.RegisterEntries, height uint64) error {
-				assert.Equal(t, height, block.Header.Height)
+				assert.Equal(t, height, block.Height)
 				assert.Equal(t, 0, entries.Len())
 				return nil
 			}).
@@ -461,7 +460,7 @@ func TestExecutionState_IndexBlockData(t *testing.T) {
 			}).
 			// make sure an empty set of register entries was stored
 			setStoreRegisters(func(t *testing.T, entries flow.RegisterEntries, height uint64) error {
-				assert.Equal(t, height, block.Header.Height)
+				assert.Equal(t, height, block.Height)
 				assert.Equal(t, 0, entries.Len())
 				return nil
 			}).
@@ -522,7 +521,7 @@ func TestExecutionState_IndexBlockData(t *testing.T) {
 			}).
 			// make sure update registers match in length and are same as block data ledger payloads
 			setStoreRegisters(func(t *testing.T, entries flow.RegisterEntries, actualHeight uint64) error {
-				assert.Equal(t, actualHeight, block.Header.Height)
+				assert.Equal(t, actualHeight, block.Height)
 				assert.Equal(t, entries.Len(), len(expectedPayloads))
 
 				// make sure all the registers from the execution data have been stored as well the value matches
@@ -539,10 +538,10 @@ func TestExecutionState_IndexBlockData(t *testing.T) {
 	t.Run("Invalid Heights", func(t *testing.T) {
 		last := blocks[len(blocks)-1]
 		ed := &execution_data.BlockExecutionData{
-			BlockID: last.Header.ID(),
+			BlockID: last.ID(),
 		}
 		execData := execution_data.NewBlockExecutionDataEntity(last.ID(), ed)
-		latestHeight := blocks[len(blocks)-3].Header.Height
+		latestHeight := blocks[len(blocks)-3].Height
 
 		err := newIndexCoreTest(t, blocks, execData).
 			// return a height one smaller than the latest block in storage
@@ -551,7 +550,7 @@ func TestExecutionState_IndexBlockData(t *testing.T) {
 			}).
 			runIndexBlockData()
 
-		assert.EqualError(t, err, fmt.Sprintf("must index block data with the next height %d, but got %d", latestHeight+1, last.Header.Height))
+		assert.EqualError(t, err, fmt.Sprintf("must index block data with the next height %d, but got %d", latestHeight+1, last.Height))
 	})
 
 	// this test makes sure that if a block we try to index is not found in block storage
@@ -559,9 +558,9 @@ func TestExecutionState_IndexBlockData(t *testing.T) {
 	t.Run("Unknown block ID", func(t *testing.T) {
 		unknownBlock := unittest.BlockFixture()
 		ed := &execution_data.BlockExecutionData{
-			BlockID: unknownBlock.Header.ID(),
+			BlockID: unknownBlock.ID(),
 		}
-		execData := execution_data.NewBlockExecutionDataEntity(unknownBlock.Header.ID(), ed)
+		execData := execution_data.NewBlockExecutionDataEntity(unknownBlock.ID(), ed)
 
 		err := newIndexCoreTest(t, blocks, execData).runIndexBlockData()
 
@@ -573,7 +572,7 @@ func TestExecutionState_IndexBlockData(t *testing.T) {
 func TestExecutionState_RegisterValues(t *testing.T) {
 	t.Run("Get value for single register", func(t *testing.T) {
 		blocks := unittest.BlockchainFixture(5)
-		height := blocks[1].Header.Height
+		height := blocks[1].Height
 		id := flow.RegisterID{
 			Owner: "1",
 			Key:   "2",
@@ -640,10 +639,11 @@ func TestIndexerIntegration_StoreAndGet(t *testing.T) {
 
 	// this test makes sure index values for a single register are correctly updated and always last value is returned
 	t.Run("Single Index Value Changes", func(t *testing.T) {
+		lockManager := storage.NewTestingLockManager()
 		pebbleStorage.RunWithRegistersStorageAtInitialHeights(t, 0, 0, func(registers *pebbleStorage.Registers) {
 			index, err := New(
 				logger,
-				metrics,
+				module.ExecutionStateIndexerMetrics(metrics),
 				badgerimpl.ToDB(db),
 				registers,
 				nil,
@@ -654,6 +654,7 @@ func TestIndexerIntegration_StoreAndGet(t *testing.T) {
 				flow.Testnet.Chain(),
 				derivedChainData,
 				nil,
+				lockManager,
 			)
 			require.NoError(t, err)
 
@@ -674,10 +675,11 @@ func TestIndexerIntegration_StoreAndGet(t *testing.T) {
 	// this test makes sure if a register is not found the value returned is nil and without an error in order for this to be
 	// up to the specification script executor requires
 	t.Run("Missing Register", func(t *testing.T) {
+		lockManager := storage.NewTestingLockManager()
 		pebbleStorage.RunWithRegistersStorageAtInitialHeights(t, 0, 0, func(registers *pebbleStorage.Registers) {
 			index, err := New(
 				logger,
-				metrics,
+				module.ExecutionStateIndexerMetrics(metrics),
 				badgerimpl.ToDB(db),
 				registers,
 				nil,
@@ -688,6 +690,7 @@ func TestIndexerIntegration_StoreAndGet(t *testing.T) {
 				flow.Testnet.Chain(),
 				derivedChainData,
 				nil,
+				lockManager,
 			)
 			require.NoError(t, err)
 
@@ -701,10 +704,11 @@ func TestIndexerIntegration_StoreAndGet(t *testing.T) {
 	// the correct highest height indexed value is returned.
 	// e.g. we index A{h(1) -> X}, A{h(2) -> Y}, when we request h(4) we get value Y
 	t.Run("Single Index Value At Later Heights", func(t *testing.T) {
+		lockManager := storage.NewTestingLockManager()
 		pebbleStorage.RunWithRegistersStorageAtInitialHeights(t, 0, 0, func(registers *pebbleStorage.Registers) {
 			index, err := New(
 				logger,
-				metrics,
+				module.ExecutionStateIndexerMetrics(metrics),
 				badgerimpl.ToDB(db),
 				registers,
 				nil,
@@ -715,6 +719,7 @@ func TestIndexerIntegration_StoreAndGet(t *testing.T) {
 				flow.Testnet.Chain(),
 				derivedChainData,
 				nil,
+				lockManager,
 			)
 			require.NoError(t, err)
 
@@ -745,10 +750,11 @@ func TestIndexerIntegration_StoreAndGet(t *testing.T) {
 
 	// this test makes sure we correctly handle weird payloads
 	t.Run("Empty and Nil Payloads", func(t *testing.T) {
+		lockManager := storage.NewTestingLockManager()
 		pebbleStorage.RunWithRegistersStorageAtInitialHeights(t, 0, 0, func(registers *pebbleStorage.Registers) {
 			index, err := New(
 				logger,
-				metrics,
+				module.ExecutionStateIndexerMetrics(metrics),
 				badgerimpl.ToDB(db),
 				registers,
 				nil,
@@ -759,6 +765,7 @@ func TestIndexerIntegration_StoreAndGet(t *testing.T) {
 				flow.Testnet.Chain(),
 				derivedChainData,
 				nil,
+				lockManager,
 			)
 			require.NoError(t, err)
 

@@ -12,12 +12,11 @@ import (
 func MakeBlock(options ...func(*model.Block)) *model.Block {
 	view := rand.Uint64()
 	block := model.Block{
-		View:        view,
-		BlockID:     unittest.IdentifierFixture(),
-		PayloadHash: unittest.IdentifierFixture(),
-		ProposerID:  unittest.IdentifierFixture(),
-		Timestamp:   time.Now().UTC(),
-		QC:          MakeQC(WithQCView(view - 1)),
+		View:       view,
+		BlockID:    unittest.IdentifierFixture(),
+		ProposerID: unittest.IdentifierFixture(),
+		Timestamp:  uint64(time.Now().UnixMilli()),
+		QC:         MakeQC(WithQCView(view - 1)),
 	}
 	for _, option := range options {
 		option(&block)
@@ -102,28 +101,30 @@ func WithLastViewTC(lastViewTC *flow.TimeoutCertificate) func(*model.Proposal) {
 	}
 }
 
-// SignedProposalToFlow turns a block proposal into a flow header.
+// SignedProposalToFlow turns a HotStuff block proposal into a flow block proposal.
 //
 // CAUTION: This function is only suitable for TESTING purposes ONLY.
-// In the conversion from `flow.Header` to HoStuff's `model.Block` we loose information
+// In the conversion from `flow.Header` to HotStuff's `model.Block` we lose information
 // (e.g. `ChainID` and `Height` are not included in `model.Block`) and hence the conversion
 // is *not reversible*. This is on purpose, because we wanted to only expose data to
 // HotStuff that HotStuff really needs.
-func SignedProposalToFlow(proposal *model.SignedProposal) *flow.Header {
-
+func SignedProposalToFlow(proposal *model.SignedProposal) *flow.ProposalHeader {
 	block := proposal.Block
 	header := &flow.Header{
-		ParentID:           block.QC.BlockID,
-		PayloadHash:        block.PayloadHash,
-		Timestamp:          block.Timestamp,
-		View:               block.View,
-		ParentView:         block.QC.View,
-		ParentVoterIndices: block.QC.SignerIndices,
-		ParentVoterSigData: block.QC.SigData,
-		ProposerID:         block.ProposerID,
-		ProposerSigData:    proposal.SigData,
-		LastViewTC:         proposal.LastViewTC,
+		HeaderBody: flow.HeaderBody{
+			ParentID:           block.QC.BlockID,
+			Timestamp:          block.Timestamp,
+			View:               block.View,
+			ParentView:         block.QC.View,
+			ParentVoterIndices: block.QC.SignerIndices,
+			ParentVoterSigData: block.QC.SigData,
+			ProposerID:         block.ProposerID,
+			LastViewTC:         proposal.LastViewTC,
+		},
 	}
 
-	return header
+	return &flow.ProposalHeader{
+		Header:          header,
+		ProposerSigData: proposal.SigData,
+	}
 }

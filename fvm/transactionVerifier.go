@@ -173,7 +173,7 @@ func (v *TransactionVerifier) CheckAuthorization(
 ) error {
 	// TODO(Janez): verification is part of inclusion fees, not execution fees.
 	var err error
-	txnState.RunWithAllLimitsDisabled(func() {
+	txnState.RunWithMeteringDisabled(func() {
 		err = v.verifyTransaction(tracer, proc, txnState, keyWeightThreshold)
 	})
 	if err != nil {
@@ -259,14 +259,14 @@ func (v *TransactionVerifier) verifyTransaction(
 // getAccountKeys gets the signatures' account keys and populate the account
 // keys into the signature continuation structs.
 func (v *TransactionVerifier) getAccountKeys(
-	txnState storage.TransactionPreparer,
+	_ storage.TransactionPreparer,
 	accounts environment.Accounts,
 	signatures []*signatureContinuation,
 	proposalKey flow.ProposalKey,
 ) error {
 	foundProposalSignature := false
 	for _, signature := range signatures {
-		accountKey, err := accounts.GetPublicKey(
+		accountKey, err := accounts.GetAccountPublicKey(
 			signature.Address,
 			signature.KeyIndex)
 		if err != nil {

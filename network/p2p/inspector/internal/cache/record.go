@@ -17,24 +17,10 @@ type ClusterPrefixedMessagesReceivedRecord struct {
 	lastUpdated time.Time
 }
 
-func NewClusterPrefixedMessagesReceivedRecord(nodeID flow.Identifier) ClusterPrefixedMessagesReceivedRecord {
-	return ClusterPrefixedMessagesReceivedRecord{
+func NewClusterPrefixedMessagesReceivedRecord(nodeID flow.Identifier) *ClusterPrefixedMessagesReceivedRecord {
+	return &ClusterPrefixedMessagesReceivedRecord{
 		NodeID:      nodeID,
 		Gauge:       0.0,
 		lastUpdated: time.Now(),
 	}
-}
-
-var _ flow.Entity = (*ClusterPrefixedMessagesReceivedRecord)(nil)
-
-// ID returns the node ID of the sender, which is used as the unique identifier of the entity for maintenance and
-// deduplication purposes in the cache.
-func (c ClusterPrefixedMessagesReceivedRecord) ID() flow.Identifier {
-	return c.NodeID
-}
-
-// Checksum returns the node ID of the sender, it does not have any purpose in the cache.
-// It is implemented to satisfy the flow.Entity interface.
-func (c ClusterPrefixedMessagesReceivedRecord) Checksum() flow.Identifier {
-	return c.NodeID
 }

@@ -54,12 +54,17 @@ func (p *Payloads) storeTx(lctx lockctx.Proof, rw storage.ReaderBatchWriter, blo
 				return err
 			}
 		}
-		fullReceipts = append(fullReceipts, flow.ExecutionReceiptFromMeta(*meta, *result))
+		executionReceipt, err := flow.ExecutionReceiptFromStub(*meta, *result)
+		if err != nil {
+			return fmt.Errorf("could not create execution receipt from stub: %w", err)
+		}
+
+		fullReceipts = append(fullReceipts, executionReceipt)
 	}
 
 	// make sure all payload guarantees are stored
 	for _, guarantee := range payload.Guarantees {
-		err := p.guarantees.storeTx(rw, guarantee)
+		err := p.guarantees.storeTx(lctx, rw, guarantee)
 		if err != nil {
 			return fmt.Errorf("could not store guarantee: %w", err)
 		}
@@ -98,8 +103,8 @@ func (p *Payloads) retrieveTx(blockID flow.Identifier) (*flow.Payload, error) {
 	}
 
 	// retrieve guarantees
-	guarantees := make([]*flow.CollectionGuarantee, 0, len(idx.CollectionIDs))
-	for _, collID := range idx.CollectionIDs {
+	guarantees := make([]*flow.CollectionGuarantee, 0, len(idx.GuaranteeIDs))
+	for _, collID := range idx.GuaranteeIDs {
 		guarantee, err := p.guarantees.retrieveTx(collID)
 		if err != nil {
 			return nil, fmt.Errorf("could not retrieve guarantee (%x): %w", collID, err)
@@ -118,13 +123,13 @@ func (p *Payloads) retrieveTx(blockID flow.Identifier) (*flow.Payload, error) {
 	}
 
 	// retrieve receipts
-	receipts := make([]*flow.ExecutionReceiptMeta, 0, len(idx.ReceiptIDs))
+	receipts := make([]*flow.ExecutionReceiptStub, 0, len(idx.ReceiptIDs))
 	for _, recID := range idx.ReceiptIDs {
 		receipt, err := p.receipts.byID(recID)
 		if err != nil {
 			return nil, fmt.Errorf("could not retrieve receipt %x: %w", recID, err)
 		}
-		receipts = append(receipts, receipt.Meta())
+		receipts = append(receipts, receipt.Stub())
 	}
 
 	// retrieve results
@@ -136,12 +141,17 @@ func (p *Payloads) retrieveTx(blockID flow.Identifier) (*flow.Payload, error) {
 		}
 		results = append(results, result)
 	}
-	payload := &flow.Payload{
-		Seals:           seals,
-		Guarantees:      guarantees,
-		Receipts:        receipts,
-		Results:         results,
-		ProtocolStateID: idx.ProtocolStateID,
+	payload, err := flow.NewPayload(
+		flow.UntrustedPayload{
+			Seals:           seals,
+			Guarantees:      guarantees,
+			Receipts:        receipts,
+			Results:         results,
+			ProtocolStateID: idx.ProtocolStateID,
+		},
+	)
+	if err != nil {
+		return nil, fmt.Errorf("could not build the payload: %w", err)
 	}
 
 	return payload, nil

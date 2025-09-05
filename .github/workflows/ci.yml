@@ -19,7 +19,7 @@ on:
       - master
 
 env:
-  GO_VERSION: "1.23"
+  GO_VERSION: "1.25"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
@@ -295,10 +295,6 @@ jobs:
     runs-on: buildjet-16vcpu-ubuntu-2204
     env:
       CADENCE_DEPLOY_KEY: ${{ secrets.CADENCE_DEPLOY_KEY }}
-    # Set the environment based on the author association of the pull request.
-    # This is used to determine whether the build should be run in an internal or external environment.
-    # If the author is a member or collaborator, use the internal environment; otherwise, use the external environment that will require approval
-    environment: ${{ (github.event_name == 'merge_group' || (github.event.pull_request && (github.event.pull_request.author_association == 'MEMBER' || github.event.pull_request.author_association == 'COLLABORATOR'))) && 'internal-ci' || 'external-ci' }}
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4

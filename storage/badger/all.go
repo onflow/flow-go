@@ -12,7 +12,7 @@ import (
 func InitAll(metrics module.CacheMetrics, db *badger.DB) *storage.All {
 	sdb := badgerimpl.ToDB(db)
 	headers := store.NewHeaders(metrics, sdb)
-	guarantees := store.NewGuarantees(metrics, sdb, DefaultCacheSize)
+	guarantees := store.NewGuarantees(metrics, sdb, DefaultCacheSize, DefaultCacheSize)
 	seals := store.NewSeals(metrics, sdb)
 	index := store.NewIndex(metrics, sdb)
 	results := store.NewExecutionResults(metrics, sdb)

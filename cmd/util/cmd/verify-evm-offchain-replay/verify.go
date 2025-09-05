@@ -6,7 +6,6 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/dgraph-io/badger/v2"
 	badgerds "github.com/ipfs/go-ds-badger2"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
@@ -18,6 +17,7 @@ import (
 	"github.com/onflow/flow-go/module/blobs"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	"github.com/onflow/flow-go/storage"
+	"github.com/onflow/flow-go/storage/store"
 )
 
 // Verify verifies the offchain replay of EVM blocks from the given height range
@@ -139,18 +139,21 @@ func loadState(height uint64, gobDir string) (*testutils.TestValueStore, error) 
 }
 
 func initStorages(dataDir string, executionDataDir string) (
-	*badger.DB,
-	*storage.All,
+	storage.DB,
+	*store.All,
 	execution_data.ExecutionDataGetter,
 	io.Closer,
 	error,
 ) {
-	db := common.InitStorage(dataDir)
+	db, err := common.InitStorage(dataDir)
+	if err != nil {
+		return nil, nil, nil, nil, fmt.Errorf("could not initialize storage: %w", err)
+	}
 
 	storages := common.InitStorages(db)
 
 	datastoreDir := filepath.Join(executionDataDir, "blobstore")
-	err := os.MkdirAll(datastoreDir, 0700)
+	err = os.MkdirAll(datastoreDir, 0700)
 	if err != nil {
 		return nil, nil, nil, nil, err
 	}

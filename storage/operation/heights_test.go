@@ -2,7 +2,6 @@ package operation_test
 
 import (
 	"math/rand"
-	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -11,16 +10,18 @@ import (
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/operation"
 	"github.com/onflow/flow-go/storage/operation/dbtest"
-	"github.com/onflow/flow-go/utils/unittest"
 )
 
 func TestFinalizedInsertUpdateRetrieve(t *testing.T) {
 	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
-		_, lctx := unittest.LockManagerWithContext(t, storage.LockFinalizeBlock)
+		lockManager := storage.NewTestingLockManager()
+		lctx := lockManager.NewContext()
+		err := lctx.AcquireLock(storage.LockFinalizeBlock)
+		require.NoError(t, err)
 		defer lctx.Release()
 
 		height := uint64(1337)
-		err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+		err = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 			return operation.UpsertFinalizedHeight(lctx, rw.Writer(), height)
 		})
 		require.NoError(t, err)
@@ -46,11 +47,14 @@ func TestFinalizedInsertUpdateRetrieve(t *testing.T) {
 
 func TestSealedInsertUpdateRetrieve(t *testing.T) {
 	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
-		_, lctx := unittest.LockManagerWithContext(t, storage.LockFinalizeBlock)
+		lockManager := storage.NewTestingLockManager()
+		lctx := lockManager.NewContext()
+		err := lctx.AcquireLock(storage.LockFinalizeBlock)
+		require.NoError(t, err)
 		defer lctx.Release()
 		height := uint64(1337)
 
-		err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+		err = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 			return operation.UpsertSealedHeight(lctx, rw.Writer(), height)
 		})
 		require.NoError(t, err)
@@ -76,13 +80,17 @@ func TestSealedInsertUpdateRetrieve(t *testing.T) {
 
 func TestEpochFirstBlockIndex_InsertRetrieve(t *testing.T) {
 	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
-		_, lctx := unittest.LockManagerWithContext(t, storage.LockFinalizeBlock)
+		lockManager := storage.NewTestingLockManager()
+		lctx := lockManager.NewContext()
+		err := lctx.AcquireLock(storage.LockFinalizeBlock)
+		require.NoError(t, err)
+		defer lctx.Release()
 		height := rand.Uint64()
 		epoch := rand.Uint64()
 
 		// retrieve when empty errors
 		var retrieved uint64
-		err := operation.RetrieveEpochFirstHeight(db.Reader(), epoch, &retrieved)
+		err = operation.RetrieveEpochFirstHeight(db.Reader(), epoch, &retrieved)
 		require.ErrorIs(t, err, storage.ErrNotFound)
 
 		// can insert
@@ -105,62 +113,5 @@ func TestEpochFirstBlockIndex_InsertRetrieve(t *testing.T) {
 			return operation.InsertEpochFirstHeight(lctx, rw, epoch, height)
 		})
 		require.ErrorIs(t, err, storage.ErrAlreadyExists)
-	})
-}
-
-func TestLastCompleteBlockHeightInsertUpdateRetrieve(t *testing.T) {
-	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
-		height := uint64(1337)
-
-		err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			return operation.UpsertLastCompleteBlockHeight(rw.Writer(), height)
-		})
-		require.NoError(t, err)
-
-		var retrieved uint64
-		err = operation.RetrieveLastCompleteBlockHeight(db.Reader(), &retrieved)
-		require.NoError(t, err)
-
-		assert.Equal(t, retrieved, height)
-
-		height = 9999
-		err = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			return operation.UpsertLastCompleteBlockHeight(rw.Writer(), height)
-		})
-		require.NoError(t, err)
-
-		err = operation.RetrieveLastCompleteBlockHeight(db.Reader(), &retrieved)
-		require.NoError(t, err)
-
-		assert.Equal(t, retrieved, height)
-	})
-}
-
-func TestLastCompleteBlockHeightInsertIfNotExists(t *testing.T) {
-	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
-		height1 := uint64(1337)
-
-		inserting := &sync.Mutex{}
-		err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			return operation.InsertLastCompleteBlockHeightIfNotExists(inserting, rw, height1)
-		})
-		require.NoError(t, err)
-
-		var retrieved uint64
-		err = operation.RetrieveLastCompleteBlockHeight(db.Reader(), &retrieved)
-		require.NoError(t, err)
-
-		assert.Equal(t, retrieved, height1)
-
-		height2 := uint64(9999)
-		err = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			return operation.InsertLastCompleteBlockHeightIfNotExists(inserting, rw, height2)
-		})
-		require.NoError(t, err)
-
-		err = operation.RetrieveLastCompleteBlockHeight(db.Reader(), &retrieved)
-		require.NoError(t, err)
-
-		assert.Equal(t, retrieved, height1)
 	})
 }

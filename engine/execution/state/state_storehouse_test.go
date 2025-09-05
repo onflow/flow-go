@@ -10,8 +10,6 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	"github.com/onflow/crypto"
-
 	"github.com/onflow/flow-go/engine/execution"
 	"github.com/onflow/flow-go/engine/execution/state"
 	"github.com/onflow/flow-go/engine/execution/storehouse"
@@ -29,9 +27,8 @@ import (
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/storage"
-	badgerstorage "github.com/onflow/flow-go/storage/badger"
-	"github.com/onflow/flow-go/storage/badger/operation"
 	storagemock "github.com/onflow/flow-go/storage/mock"
+	"github.com/onflow/flow-go/storage/operation"
 	"github.com/onflow/flow-go/storage/operation/badgerimpl"
 	"github.com/onflow/flow-go/storage/pebble"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -39,6 +36,7 @@ import (
 
 func prepareStorehouseTest(f func(t *testing.T, es state.ExecutionState, l *ledger.Ledger, headers *storagemock.Headers, commits *storagemock.Commits, finalized *testutil.MockFinalizedReader)) func(*testing.T) {
 	return func(t *testing.T) {
+		lockManager := storage.NewTestingLockManager()
 		unittest.RunWithBadgerDB(t, func(badgerDB *badger.DB) {
 			metricsCollector := &metrics.NoopCollector{}
 			diskWal := &fixtures.NoopWAL{}
@@ -52,7 +50,7 @@ func prepareStorehouseTest(f func(t *testing.T, es state.ExecutionState, l *ledg
 			}()
 
 			stateCommitments := storagemock.NewCommits(t)
-			stateCommitments.On("BatchStore", mock.Anything, mock.Anything, mock.Anything).Return(nil)
+			stateCommitments.On("BatchStore", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
 			headers := storagemock.NewHeaders(t)
 			blocks := storagemock.NewBlocks(t)
 			events := storagemock.NewEvents(t)
@@ -67,7 +65,6 @@ func prepareStorehouseTest(f func(t *testing.T, es state.ExecutionState, l *ledg
 			results.On("BatchIndex", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 			myReceipts := storagemock.NewMyExecutionReceipts(t)
 			myReceipts.On("BatchStoreMyReceipt", mock.Anything, mock.Anything, mock.Anything).Return(nil)
-			lockManager := storage.NewTestingLockManager()
 
 			withRegisterStore(t, func(t *testing.T,
 				rs *storehouse.RegisterStore,
@@ -80,13 +77,18 @@ func prepareStorehouseTest(f func(t *testing.T, es state.ExecutionState, l *ledg
 
 				rootID, err := finalized.FinalizedBlockIDAtHeight(10)
 				require.NoError(t, err)
-				require.NoError(t,
-					badgerDB.Update(operation.InsertExecutedBlock(rootID)),
-				)
 
-				metrics := metrics.NewNoopCollector()
-				headersDB := badgerstorage.NewHeaders(metrics, badgerDB)
-				require.NoError(t, headersDB.Store(finalizedHeaders[10]))
+				db := badgerimpl.ToDB(badgerDB)
+				require.NoError(t, db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+					return operation.UpdateExecutedBlock(rw.Writer(), rootID)
+				}))
+
+				lctx := lockManager.NewContext()
+				require.NoError(t, lctx.AcquireLock(storage.LockInsertBlock))
+				require.NoError(t, badgerimpl.ToDB(badgerDB).WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+					return operation.InsertHeader(lctx, rw, finalizedHeaders[10].ID(), finalizedHeaders[10])
+				}))
+				lctx.Release()
 
 				getLatestFinalized := func() (uint64, error) {
 					return rootHeight, nil
@@ -134,7 +136,7 @@ func TestExecutionStateWithStorehouse(t *testing.T) {
 
 		// block 11 is the block to be executed
 		block11 := finalized.BlockAtHeight(11)
-		header11 := block11.Header
+		header11 := block11.ToHeader()
 		sc10 := flow.StateCommitment(l.InitialState())
 
 		reg1 := unittest.MakeOwnerReg("fruit", "apple")
@@ -224,7 +226,7 @@ func makeComputationResult(
 	computationResult.AppendCollectionAttestationResult(
 		*completeBlock.StartState,
 		commit,
-		nil,
+		[]byte{'p'},
 		unittest.IdentifierFixture(),
 		ceds[0],
 	)
@@ -237,22 +239,29 @@ func makeComputationResult(
 	executionDataID, err := execution_data.CalculateID(context.Background(), bed, execution_data.DefaultSerializer)
 	require.NoError(t, err)
 
-	executionResult := flow.NewExecutionResult(
-		unittest.IdentifierFixture(),
-		completeBlock.ID(),
-		computationResult.AllChunks(),
-		flow.ServiceEventList{},
-		executionDataID)
+	chunks, err := computationResult.AllChunks()
+	require.NoError(t, err)
+
+	executionResult, err := flow.NewExecutionResult(flow.UntrustedExecutionResult{
+		PreviousResultID: unittest.IdentifierFixture(),
+		BlockID:          completeBlock.BlockID(),
+		Chunks:           chunks,
+		ServiceEvents:    flow.ServiceEventList{},
+		ExecutionDataID:  executionDataID,
+	})
+	require.NoError(t, err)
 
 	computationResult.BlockAttestationResult.BlockExecutionResult.ExecutionDataRoot = &flow.BlockExecutionDataRoot{
-		BlockID:               completeBlock.ID(),
+		BlockID:               completeBlock.BlockID(),
 		ChunkExecutionDataIDs: []cid.Cid{flow.IdToCid(unittest.IdentifierFixture())},
 	}
 
 	computationResult.ExecutionReceipt = &flow.ExecutionReceipt{
-		ExecutionResult:   *executionResult,
-		Spocks:            make([]crypto.Signature, numberOfChunks),
-		ExecutorSignature: crypto.Signature{},
+		UnsignedExecutionReceipt: flow.UnsignedExecutionReceipt{
+			ExecutionResult: *executionResult,
+			Spocks:          unittest.SignaturesFixture(numberOfChunks),
+		},
+		ExecutorSignature: unittest.SignatureFixture(),
 	}
 	return computationResult
 }

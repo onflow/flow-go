@@ -14,7 +14,7 @@ import (
 	"github.com/onflow/flow-go/model/verification"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/storage"
-	"github.com/onflow/flow-go/storage/badger/operation"
+	"github.com/onflow/flow-go/storage/operation"
 	"github.com/onflow/flow-go/storage/operation/badgerimpl"
 	"github.com/onflow/flow-go/storage/operation/pebbleimpl"
 	"github.com/onflow/flow-go/storage/store"
@@ -25,6 +25,7 @@ import (
 func TestLoopPruneExecutionDataFromRootToLatestSealed(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(bdb *badger.DB) {
 		unittest.RunWithPebbleDB(t, func(pdb *pebble.DB) {
+			lockManager := storage.NewTestingLockManager()
 			// create dependencies
 			ps := unittestMocks.NewProtocolState()
 			blocks, rootResult, rootSeal := unittest.ChainFixture(0)
@@ -48,33 +49,41 @@ func TestLoopPruneExecutionDataFromRootToLatestSealed(t *testing.T) {
 			// indexed by height
 			chunks := make([]*verification.VerifiableChunkData, lastFinalizedHeight+2)
 			parentID := genesis.ID()
-			manager, lctx := unittest.LockManagerWithContext(t, storage.LockInsertBlock)
+			lctx := lockManager.NewContext()
+			require.NoError(t, lctx.AcquireLock(storage.LockInsertBlock))
 			require.NoError(t, db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-				return blockstore.BatchStore(lctx, rw, genesis)
+				// By convention, root block has no proposer signature - implementation has to handle this edge case
+				return blockstore.BatchStore(lctx, rw, &flow.Proposal{Block: *genesis, ProposerSigData: nil})
 			}))
 			lctx.Release()
 
 			for i := 1; i <= lastFinalizedHeight; i++ {
-				chunk, block := unittest.VerifiableChunkDataFixture(0, func(header *flow.Header) {
-					header.Height = uint64(i)
-					header.ParentID = parentID
+				chunk, block := unittest.VerifiableChunkDataFixture(0, func(headerBody *flow.HeaderBody) {
+					headerBody.Height = uint64(i)
+					headerBody.ParentID = parentID
 				})
 				chunks[i] = chunk // index by height
-				lctx := manager.NewContext()
+				lctx := lockManager.NewContext()
 				require.NoError(t, lctx.AcquireLock(storage.LockInsertBlock))
 				require.NoError(t, db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-					return blockstore.BatchStore(lctx, rw, block)
+					return blockstore.BatchStore(lctx, rw, unittest.ProposalFromBlock(block))
 				}))
 				lctx.Release()
-				require.NoError(t, bdb.Update(operation.IndexBlockHeight(chunk.Header.Height, chunk.Header.ID())))
+				lctx = lockManager.NewContext()
+				require.NoError(t, lctx.AcquireLock(storage.LockFinalizeBlock))
+				require.NoError(t, db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+					return operation.IndexFinalizedBlockByHeight(lctx, rw, chunk.Header.Height, chunk.Header.ID())
+				}))
+				lctx.Release()
 				require.NoError(t, results.Store(chunk.Result))
 				require.NoError(t, results.Index(chunk.Result.BlockID, chunk.Result.ID()))
 				require.NoError(t, chunkDataPacks.Store([]*flow.ChunkDataPack{chunk.ChunkDataPack}))
-				require.NoError(t, collections.Store(chunk.ChunkDataPack.Collection))
+				_, storeErr := collections.Store(chunk.ChunkDataPack.Collection)
+				require.NoError(t, storeErr)
 				// verify that chunk data pack fixture can be found by the result
 				for _, c := range chunk.Result.Chunks {
 					chunkID := c.ID()
-					require.Equal(t, chunk.ChunkDataPack.ID(), chunkID)
+					require.Equal(t, chunk.ChunkDataPack.ChunkID, chunkID)
 					_, err := chunkDataPacks.ByChunkID(chunkID)
 					require.NoError(t, err)
 				}
@@ -88,8 +97,11 @@ func TestLoopPruneExecutionDataFromRootToLatestSealed(t *testing.T) {
 				parentID = block.ID()
 			}
 
-			// last seale and executed is the last sealed
-			require.NoError(t, bdb.Update(operation.InsertExecutedBlock(chunks[lastFinalizedHeight].Header.ID())))
+			// update the index "latest executed block (max height)" to latest sealed block
+			require.NoError(t, db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+				return operation.UpdateExecutedBlock(rw.Writer(), chunks[lastFinalizedHeight].Header.ID())
+			}))
+
 			lastSealed := chunks[lastSealedHeight].Header
 			require.NoError(t, ps.MakeSeal(lastSealed.ID()))
 
@@ -119,7 +131,7 @@ func TestLoopPruneExecutionDataFromRootToLatestSealed(t *testing.T) {
 			lastPrunedHeight := lastSealedHeight - int(cfg.Threshold) // 90
 			for i := 1; i <= lastPrunedHeight; i++ {
 				expected := chunks[i]
-				_, err := chunkDataPacks.ByChunkID(expected.ChunkDataPack.ID())
+				_, err := chunkDataPacks.ByChunkID(expected.ChunkDataPack.ChunkID)
 				require.Error(t, err, fmt.Errorf("chunk data pack at height %v should be pruned, but not", i))
 				require.ErrorIs(t, err, storage.ErrNotFound)
 			}
@@ -127,7 +139,7 @@ func TestLoopPruneExecutionDataFromRootToLatestSealed(t *testing.T) {
 			// verify the chunk data packs within the threshold are not pruned
 			for i := lastPrunedHeight + 1; i <= lastFinalizedHeight; i++ {
 				expected := chunks[i]
-				actual, err := chunkDataPacks.ByChunkID(expected.ChunkDataPack.ID())
+				actual, err := chunkDataPacks.ByChunkID(expected.ChunkDataPack.ChunkID)
 				require.NoError(t, err)
 				require.Equal(t, expected.ChunkDataPack, actual)
 			}
