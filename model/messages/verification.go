@@ -16,30 +16,36 @@ type ApprovalRequest struct {
 
 // ToInternal converts the untrusted ApprovalRequest into its trusted internal
 // representation.
-//
-// This stub returns the receiver unchanged. A proper implementation
-// must perform validation checks and return a constructed internal
-// object.
 func (a *ApprovalRequest) ToInternal() (any, error) {
-	// TODO(malleability, #7717) implement with validation checks
-	return a, nil
+	if a.ResultID == flow.ZeroID {
+		return nil, fmt.Errorf("ResultID of approval request must not be zero")
+	}
+
+	return &flow.ApprovalRequest{
+		Nonce:      a.Nonce,
+		ResultID:   a.ResultID,
+		ChunkIndex: a.ChunkIndex,
+	}, nil
 }
 
 // ApprovalResponse contains a response to an approval request.
 type ApprovalResponse struct {
 	Nonce    uint64
-	Approval flow.ResultApproval
+	Approval flow.UntrustedResultApproval
 }
 
 // ToInternal converts the untrusted ApprovalResponse into its trusted internal
 // representation.
-//
-// This stub returns the receiver unchanged. A proper implementation
-// must perform validation checks and return a constructed internal
-// object.
 func (a *ApprovalResponse) ToInternal() (any, error) {
-	// TODO(malleability, #7718) implement with validation checks
-	return a, nil
+	approval, err := flow.NewResultApproval(a.Approval)
+	if err != nil {
+		return nil, fmt.Errorf("invalid result approval: %w", err)
+	}
+
+	return &flow.ApprovalResponse{
+		Nonce:    a.Nonce,
+		Approval: *approval,
+	}, nil
 }
 
 // ResultApproval is a message representation of a ResultApproval, which includes an approval for a chunk, verified by a verification n
