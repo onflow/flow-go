@@ -34,7 +34,6 @@ func TestGuaranteeStoreRetrieve(t *testing.T) {
 
 		// make block with a collection guarantee:
 		guarantee1 := unittest.CollectionGuaranteeFixture()
-
 		block := unittest.BlockWithGuaranteesFixture([]*flow.CollectionGuarantee{guarantee1})
 		proposal := unittest.ProposalFromBlock(block)
 
@@ -127,7 +126,7 @@ func TestStoreDuplicateGuarantee(t *testing.T) {
 	})
 }
 
-// Storing a different guarantee for the same collection should return an error
+// Storing a different guarantee for the same collection should return [storage.ErrDataMismatch]
 func TestStoreConflictingGuarantee(t *testing.T) {
 	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
 		lockManager := storage.NewTestingLockManager()
@@ -145,7 +144,7 @@ func TestStoreConflictingGuarantee(t *testing.T) {
 			})
 		})
 
-		// a differing guarantee for the same collection is potentially byzantine and should return an error
+		// a differing guarantee for the same collection is potentially byzantine and should return [storage.ErrDataMismatch]
 		conflicting := *expected
 		conflicting.SignerIndices = []byte{99}
 		block2 := unittest.BlockWithGuaranteesFixture([]*flow.CollectionGuarantee{&conflicting})
