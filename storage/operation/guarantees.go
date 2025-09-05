@@ -11,7 +11,12 @@ import (
 )
 
 // InsertGuarantee inserts a collection guarantee by ID.
-// Error returns:
+//
+// CAUTION: The caller must ensure guaranteeID is a collision-resistant hash of the provided
+// guarantee! This method silently overrides existing data, which is safe only if for the same
+// key, we always write the same value.
+//
+// Expected errors during normal operations:
 //   - generic error in case of unexpected failure from the database layer or encoding failure.
 func InsertGuarantee(w storage.Writer, guaranteeID flow.Identifier, guarantee *flow.CollectionGuarantee) error {
 	return UpsertByKey(w, MakePrefix(codeGuarantee, guaranteeID), guarantee)
@@ -29,8 +34,8 @@ func InsertGuarantee(w storage.Writer, guaranteeID flow.Identifier, guarantee *f
 //     serves as a reminder that the CALLER is responsible to ensure that the DEDUPLICATION CHECK is done elsewhere
 //     ATOMICALLY with this write operation.
 //
-// Error returns:
-//   - [storage.ErrAlreadyExists] if the key already exists in the database.
+// Expected errors during normal operations:
+//   - [storage.ErrDataMismatch] if a different [flow.CollectionGuarantee] has already been indexed for the given collection ID.
 //   - All other errors have to be treated as unexpected failures from the database layer.
 func IndexGuarantee(lctx lockctx.Proof, rw storage.ReaderBatchWriter, collectionID flow.Identifier, guaranteeID flow.Identifier) error {
 	if !lctx.HoldsLock(storage.LockInsertBlock) {
@@ -45,10 +50,8 @@ func IndexGuarantee(lctx lockctx.Proof, rw storage.ReaderBatchWriter, collection
 			return fmt.Errorf("new guarantee %x did not match already stored guarantee %x, for collection %x: %w",
 				guaranteeID, storedGuaranteeID, collectionID, storage.ErrDataMismatch)
 		}
-
 		return nil
 	}
-
 	if !errors.Is(err, storage.ErrNotFound) {
 		return fmt.Errorf("failed to retrieve existing guarantee for collection %x: %w", collectionID, err)
 	}
@@ -74,7 +77,20 @@ func LookupGuarantee(r storage.Reader, collectionID flow.Identifier, guaranteeID
 	return RetrieveByKey(r, MakePrefix(codeGuaranteeByCollectionID, collectionID), guaranteeID)
 }
 
-// IndexPayloadGuarantees indexes a collection guarantees by block ID.
+// IndexPayloadGuarantees indexes the list of collection guarantees that were included in the specified block,
+// keyed by the block ID. It produces a mapping from block ID to the list of collection guarantees contained in
+// the block's payload. The collection guarantees are represented by their respective IDs.
+//
+// CAUTION:
+//   - The caller must acquire the [storage.LockInsertBlock] and hold it until the database write has been committed.
+//   - OVERWRITES existing data (potential for data corruption):
+//     This method silently overrides existing data without any sanity checks whether data for the same key already exits.
+//     Note that the Flow protocol mandates that for a previously persisted key, the data is never changed to a different
+//     value. Changing data could cause the node to publish inconsistent data and to be slashed, or the protocol to be
+//     compromised as a whole. This method does not contain any safeguards to prevent such data corruption. The lock proof
+//     serves as a reminder that the CALLER is responsible to ensure that the DEDUPLICATION CHECK is done elsewhere
+//     ATOMICALLY with this write operation.
+//
 // Error returns:
 //   - [storage.ErrAlreadyExists] if the key already exists in the database.
 //   - All other errors have to be treated as unexpected failures from the database layer.
@@ -83,6 +99,7 @@ func IndexPayloadGuarantees(lctx lockctx.Proof, w storage.Writer, blockID flow.I
 		return fmt.Errorf("cannot index guarantee for blockID %v without holding lock %s",
 			blockID, storage.LockInsertBlock)
 	}
+
 	return UpsertByKey(w, MakePrefix(codePayloadGuarantees, blockID), guarIDs)
 }
 
