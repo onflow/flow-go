@@ -3,6 +3,7 @@ package migrations
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/onflow/flow-go/cmd/util/ledger/reporters"
@@ -62,6 +63,15 @@ func (m *AccountUsageMigration) InitMigration(
 	_ int,
 ) error {
 	m.log = log.With().Str("component", "AccountUsageMigration").Logger()
+
+	csvReportHeader := []string{
+		"address",
+		"old_storage_used",
+		"new_storage_used",
+	}
+
+	m.rw.Write(csvReportHeader)
+
 	return nil
 }
 
@@ -173,16 +183,17 @@ func (m *AccountUsageMigration) MigrateAccount(
 			return fmt.Errorf("could not update account status register: %w", err)
 		}
 
-		m.rw.Write(accountUsageMigrationReportData{
-			AccountAddress: address.Hex(),
-			OldStorageUsed: currentUsed,
-			NewStorageUsed: actualUsed,
+		m.rw.Write([]string{
+			address.Hex(),
+			strconv.FormatUint(currentUsed, 10),
+			strconv.FormatUint(actualUsed, 10),
 		})
 	}
 
 	return nil
 }
 
+// nolint:unused
 type accountUsageMigrationReportData struct {
 	AccountAddress string
 	OldStorageUsed uint64
