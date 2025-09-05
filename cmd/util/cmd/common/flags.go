@@ -19,7 +19,7 @@ type DBFlags struct {
 
 const DefaultBadgerDir = "/var/flow/data/protocol"
 const DefaultPebbleDir = "/var/flow/data/protocol-pebble"
-const DefaultDB = "badger" // "badger|pebble"
+const DefaultDB = "pebble" // "badger|pebble"
 
 // InitWithDBFlags initializes the command with the database flags
 // and sets the default values for the flags

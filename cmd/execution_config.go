@@ -133,7 +133,7 @@ func (exeConf *ExecutionConfig) SetupFlags(flags *pflag.FlagSet) {
 	flags.UintVar(&exeConf.transactionExecutionMetricsBufferSize, "tx-execution-metrics-buffer-size", 200, "buffer size for transaction execution metrics. The buffer size is the number of blocks that are kept in memory by the metrics provider engine")
 	flags.StringVar(&exeConf.executionDataDBMode,
 		"execution-data-db",
-		execution_data.ExecutionDataDBModeBadger.String(),
+		execution_data.ExecutionDataDBModePebble.String(),
 		"[experimental] the DB type for execution datastore. One of [badger, pebble]")
 
 	flags.BoolVar(&exeConf.onflowOnlyLNs, "temp-onflow-only-lns", false, "do not use unless required. forces node to only request collections from onflow collection nodes")
