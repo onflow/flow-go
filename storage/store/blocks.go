@@ -203,7 +203,7 @@ func (b *Blocks) ByCollectionID(collID flow.Identifier) (*flow.Block, error) {
 	return b.ByID(blockID)
 }
 
-// IndexBlockContainingCollectionGuarantee populates an index `guaranteeID->blockID` for each guarantee
+// IndexBlockContainingCollectionGuarantees populates an index `guaranteeID->blockID` for each guarantee
 // which appears in the block.
 // CAUTION: a collection can be included in multiple *unfinalized* blocks. However, the implementation
 // assumes a one-to-one map from collection ID to a *single* block ID. This holds for FINALIZED BLOCKS ONLY
@@ -213,7 +213,7 @@ func (b *Blocks) ByCollectionID(collID flow.Identifier) (*flow.Block, error) {
 //
 // Error returns:
 //   - generic error in case of unexpected failure from the database layer or encoding failure.
-func (b *Blocks) IndexBlockContainingCollectionGuarantee(blockID flow.Identifier, guaranteeIDs []flow.Identifier) error {
+func (b *Blocks) IndexBlockContainingCollectionGuarantees(blockID flow.Identifier, guaranteeIDs []flow.Identifier) error {
 	return b.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 		for _, guaranteeID := range guaranteeIDs {
 			err := operation.IndexBlockContainingCollectionGuarantee(rw.Writer(), guaranteeID, blockID)

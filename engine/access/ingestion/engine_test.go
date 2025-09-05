@@ -293,7 +293,7 @@ func (s *Suite) TestOnFinalizedBlockSingle() {
 	}
 
 	// expect that the block storage is indexed with each of the collection guarantee
-	s.blocks.On("IndexBlockForCollectionGuarantees", block.ID(), []flow.Identifier(flow.GetIDs(block.Payload.Guarantees))).Return(nil).Once()
+	s.blocks.On("IndexBlockContainingCollectionGuarantees", block.ID(), []flow.Identifier(flow.GetIDs(block.Payload.Guarantees))).Return(nil).Once()
 	for _, seal := range block.Payload.Seals {
 		s.results.On("Index", seal.BlockID, seal.ResultID).Return(nil).Once()
 	}
@@ -366,7 +366,7 @@ func (s *Suite) TestOnFinalizedBlockSeveralBlocksAhead() {
 
 	// expected all new blocks after last block processed
 	for _, block := range blocks {
-		s.blocks.On("IndexBlockForCollectionGuarantees", block.ID(), []flow.Identifier(flow.GetIDs(block.Payload.Guarantees))).Return(nil).Once()
+		s.blocks.On("IndexBlockContainingCollectionGuarantees", block.ID(), []flow.Identifier(flow.GetIDs(block.Payload.Guarantees))).Return(nil).Once()
 
 		for _, cg := range block.Payload.Guarantees {
 			s.request.On("EntityByID", cg.CollectionID, mock.Anything).Return().Run(func(args mock.Arguments) {
@@ -391,7 +391,7 @@ func (s *Suite) TestOnFinalizedBlockSeveralBlocksAhead() {
 	}
 
 	s.headers.AssertExpectations(s.T())
-	s.blocks.AssertNumberOfCalls(s.T(), "IndexBlockForCollectionGuarantees", newBlocksCount)
+	s.blocks.AssertNumberOfCalls(s.T(), "IndexBlockContainingCollectionGuarantees", newBlocksCount)
 	s.request.AssertNumberOfCalls(s.T(), "EntityByID", expectedEntityByIDCalls)
 	s.results.AssertNumberOfCalls(s.T(), "Index", expectedIndexCalls)
 }

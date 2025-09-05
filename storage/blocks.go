@@ -82,7 +82,7 @@ type Blocks interface {
 	//     to decode an existing database value
 	ByCollectionID(collID flow.Identifier) (*flow.Block, error)
 
-	// IndexBlockContainingCollectionGuarantee populates an index `guaranteeID->blockID` for each guarantee
+	// IndexBlockContainingCollectionGuarantees populates an index `guaranteeID->blockID` for each guarantee
 	// which appears in the block.
 	// CAUTION: a collection can be included in multiple *unfinalized* blocks. However, the implementation
 	// assumes a one-to-one map from collection ID to a *single* block ID. This holds for FINALIZED BLOCKS ONLY
@@ -92,5 +92,5 @@ type Blocks interface {
 	//
 	// Error returns:
 	//   - generic error in case of unexpected failure from the database layer or encoding failure.
-	IndexBlockContainingCollectionGuarantee(blockID flow.Identifier, collIDs []flow.Identifier) error
+	IndexBlockContainingCollectionGuarantees(blockID flow.Identifier, collIDs []flow.Identifier) error
 }
