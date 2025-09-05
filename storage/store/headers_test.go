@@ -3,6 +3,8 @@ package store_test
 import (
 	"testing"
 
+	"github.com/jordanschalm/lockctx"
+
 	"github.com/onflow/flow-go/storage/operation"
 	"github.com/onflow/flow-go/storage/operation/dbtest"
 	"github.com/onflow/flow-go/storage/store"
@@ -22,7 +24,8 @@ func TestHeaderStoreRetrieve(t *testing.T) {
 		headers := all.Headers
 		blocks := all.Blocks
 
-		block := unittest.BlockFixture()
+		proposal := unittest.ProposalFixture()
+		block := proposal.Block
 
 		lctx := lockManager.NewContext()
 		err := lctx.AcquireLock(storage.LockInsertBlock)
@@ -31,7 +34,7 @@ func TestHeaderStoreRetrieve(t *testing.T) {
 
 		// store block which will also store header
 		err = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			return blocks.BatchStore(lctx, rw, &block)
+			return blocks.BatchStore(lctx, rw, proposal)
 		})
 		require.NoError(t, err)
 
@@ -39,15 +42,47 @@ func TestHeaderStoreRetrieve(t *testing.T) {
 		require.NoError(t, lctx2.AcquireLock(storage.LockFinalizeBlock))
 		// index the header
 		err = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			return operation.IndexFinalizedBlockByHeight(lctx2, rw, block.Header.Height, block.ID())
+			return operation.IndexFinalizedBlockByHeight(lctx2, rw, block.Height, block.ID())
 		})
 		lctx2.Release()
 		require.NoError(t, err)
 
 		// retrieve header by height
-		actual, err := headers.ByHeight(block.Header.Height)
+		actual, err := headers.ByHeight(block.Height)
 		require.NoError(t, err)
-		require.Equal(t, block.Header, actual)
+		require.Equal(t, block.ToHeader(), actual)
+	})
+}
+
+func TestHeaderIndexByViewAndRetrieve(t *testing.T) {
+	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
+		lockManager := storage.NewTestingLockManager()
+		metrics := metrics.NewNoopCollector()
+		all := store.InitAll(metrics, db)
+		headers := all.Headers
+		blocks := all.Blocks
+
+		proposal := unittest.ProposalFixture()
+		block := proposal.Block
+
+		// store block which will also store header
+		unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
+			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+				return blocks.BatchStore(lctx, rw, proposal)
+			})
+		})
+
+		unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
+			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+				// index the header
+				return operation.IndexCertifiedBlockByView(lctx, rw, block.View, block.ID())
+			})
+		})
+
+		// retrieve header by view
+		actual, err := headers.ByView(block.View)
+		require.NoError(t, err)
+		require.Equal(t, block.ToHeader(), actual)
 	})
 }
 

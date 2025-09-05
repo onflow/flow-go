@@ -5,36 +5,24 @@ import (
 	"github.com/onflow/flow-go/storage"
 )
 
-// InsertSporkID inserts the spork ID for the present spork.
-// This values is inserted exactly once when bootstrapping the state and
-// should always be present for a properly bootstrapped node.
+// IndexSporkRootBlock indexes the spork root block ID for the present spork.
+// A Node's state is strictly tied to a specific spork, and should never change during
+// the lifetime of the node. This values is inserted exactly once when bootstrapping the
+// state and should always be present for a properly bootstrapped node.
 // CAUTION: OVERWRITES existing data (potential for data corruption).
+// TODO: error if key already exists!
 //
 // No errors are expected during normal operation.
-func InsertSporkID(w storage.Writer, sporkID flow.Identifier) error {
-	return UpsertByKey(w, MakePrefix(codeSporkID), sporkID)
+func IndexSporkRootBlock(w storage.Writer, blockID flow.Identifier) error {
+	return UpsertByKey(w, MakePrefix(codeSporkRootBlockID), blockID)
 }
 
-// RetrieveSporkID retrieves the spork ID for the present spork.
-// This values should always be present for a properly bootstrapped node.
+// RetrieveSporkRootBlockID retrieves the spork root block's ID for the present spork, which this node is
+// participating in. A Node's state is strictly tied to a specific spork, and should never change during
+// the lifetime of the node.
+// This values is inserted exactly once when bootstrapping the state and should always be present for a
+// properly bootstrapped node.
 // No errors are expected during normal operation.
-func RetrieveSporkID(r storage.Reader, sporkID *flow.Identifier) error {
-	return RetrieveByKey(r, MakePrefix(codeSporkID), sporkID)
-}
-
-// InsertSporkRootBlockHeight inserts the spork root block height for the present spork.
-// This values is inserted exactly once when bootstrapping the state and
-// should always be present for a properly bootstrapped node.
-// CAUTION: OVERWRITES existing data (potential for data corruption).
-//
-// No errors are expected during normal operation.
-func InsertSporkRootBlockHeight(w storage.Writer, height uint64) error {
-	return UpsertByKey(w, MakePrefix(codeSporkRootBlockHeight), height)
-}
-
-// RetrieveSporkRootBlockHeight retrieves the spork root block height for the present spork.
-// This values should always be present for a properly bootstrapped node.
-// No errors are expected during normal operation.
-func RetrieveSporkRootBlockHeight(r storage.Reader, height *uint64) error {
-	return RetrieveByKey(r, MakePrefix(codeSporkRootBlockHeight), height)
+func RetrieveSporkRootBlockID(r storage.Reader, blockID *flow.Identifier) error {
+	return RetrieveByKey(r, MakePrefix(codeSporkRootBlockID), blockID)
 }

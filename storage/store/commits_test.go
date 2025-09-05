@@ -62,9 +62,9 @@ func TestCommitStoreAndRemove(t *testing.T) {
 		// Create and store a commit
 		blockID := unittest.IdentifierFixture()
 		expected := unittest.StateCommitmentFixture()
-		lctx := lockManager.NewContext()
-		defer lctx.Release()
 		err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+			lctx := lockManager.NewContext()
+			defer lctx.Release()
 			require.NoError(t, lctx.AcquireLock(storage.LockInsertOwnReceipt))
 			return store.BatchStore(lctx, blockID, expected, rw)
 		})

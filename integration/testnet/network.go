@@ -671,6 +671,7 @@ func PrepareFlowNetwork(t *testing.T, networkConf NetworkConfig, chainID flow.Ch
 }
 
 func (net *FlowNetwork) addConsensusFollower(t *testing.T, rootProtocolSnapshotPath string, followerConf ConsensusFollowerConfig, _ []ContainerConfig) {
+	lockManager := storage.NewTestingLockManager()
 	tmpdir := makeTempSubDir(t, net.baseTempdir, "flow-consensus-follower")
 
 	// create a directory for the follower database
@@ -697,7 +698,6 @@ func (net *FlowNetwork) addConsensusFollower(t *testing.T, rootProtocolSnapshotP
 		WithValueLogMaxEntries(100000) // Default is 1000000
 	badgerDB, err := badgerstorage.InitPublic(dbOpts)
 	require.NoError(t, err)
-	lockManager := storage.NewTestingLockManager()
 
 	bindAddr := gonet.JoinHostPort("localhost", testingdock.RandomPort(t))
 	opts := append(

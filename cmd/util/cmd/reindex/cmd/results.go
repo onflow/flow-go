@@ -23,9 +23,9 @@ var resultsCmd = &cobra.Command{
 		}
 		defer db.Close()
 		storages := common.InitStorages(db)
-		state, err := common.OpenProtocolState(lockManager, db, storages)
+		state, err := common.InitProtocolState(lockManager, db, storages)
 		if err != nil {
-			log.Fatal().Err(err).Msg("could not open protocol state")
+			log.Fatal().Err(err).Msg("could not init protocol state")
 		}
 
 		results := storages.Results

@@ -579,10 +579,3 @@ func (bc *BaseChainSuite) AddSubgraphFixtureToMempools(subgraph subgraphFixture)
 	bc.PersistedResults[subgraph.Result.ID()] = subgraph.Result
 	bc.Assigner.On("Assign", subgraph.IncorporatedResult.Result, subgraph.IncorporatedResult.IncorporatedBlockID).Return(subgraph.Assignment, nil).Maybe()
 }
-
-// MockProtocolStateVersion mocks the given protocol state version on the snapshot.
-func MockProtocolStateVersion(snapshot *protocol.Snapshot, version uint64) {
-	kvstore := &protocol.KVStoreReader{}
-	kvstore.On("GetProtocolStateVersion").Return(version)
-	snapshot.On("ProtocolState").Return(kvstore, nil)
-}

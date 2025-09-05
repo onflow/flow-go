@@ -39,7 +39,7 @@ type Collections interface {
 	// transactions.
 	// This is used by execution node storing collections.
 	// No errors are expected during normal operation.
-	Store(collection *flow.Collection) (flow.LightCollection, error)
+	Store(collection *flow.Collection) (*flow.LightCollection, error)
 
 	// Remove removes the collection and all constituent transactions.
 	// No errors are expected during normal operation.
@@ -56,7 +56,7 @@ type Collections interface {
 	// TODO: eventually we need to handle Byzantine clusters
 	//
 	// No errors are expected during normal operation.
-	StoreAndIndexByTransaction(lctx lockctx.Proof, collection *flow.Collection) (flow.LightCollection, error)
+	StoreAndIndexByTransaction(lctx lockctx.Proof, collection *flow.Collection) (*flow.LightCollection, error)
 
 	// BatchStoreAndIndexByTransaction stores the collection and indexes it by transaction within a batch.
 	//
@@ -68,5 +68,5 @@ type Collections interface {
 	// TODO: eventually we need to handle Byzantine clusters
 	//
 	// This is used by access node storing collections for finalized blocks
-	BatchStoreAndIndexByTransaction(lctx lockctx.Proof, collection *flow.Collection, batch ReaderBatchWriter) (flow.LightCollection, error)
+	BatchStoreAndIndexByTransaction(lctx lockctx.Proof, collection *flow.Collection, batch ReaderBatchWriter) (*flow.LightCollection, error)
 }

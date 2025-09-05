@@ -25,7 +25,7 @@ import (
 // We return [storage.ErrAlreadyExists] if the block has already been persisted before, i.e. we only
 // insert a block once. This error allows the caller to detect duplicate inserts.
 // No other errors are expected during normal operation.
-func InsertClusterBlock(lctx lockctx.Proof, rw storage.ReaderBatchWriter, block *cluster.Block) error {
+func InsertClusterBlock(lctx lockctx.Proof, rw storage.ReaderBatchWriter, proposal *cluster.Proposal) error {
 	// We need to enforce that each cluster block is inserted and indexed exactly once (no overwriting allowed):
 	//   1. We check that the lock [storage.LockInsertOrFinalizeClusterBlock] for cluster block insertion is held.
 	//   2. When calling `operation.InsertHeader`, we append the storage operations for inserting the header to the
@@ -45,21 +45,27 @@ func InsertClusterBlock(lctx lockctx.Proof, rw storage.ReaderBatchWriter, block 
 
 	// Here the key `blockID` is derived from the `block` via a collision-resistant hash function.
 	// Hence, two different blocks having the same key is practically impossible.
-	blockID := block.ID()
+	blockID := proposal.Block.ID()
 	// 2. Store the block header; errors with [storage.ErrAlreadyExists] if some entry for `blockID` already exists
-	err := operation.InsertHeader(lctx, rw, blockID, block.Header)
+	err := operation.InsertHeader(lctx, rw, blockID, proposal.Block.ToHeader())
 	if err != nil {
 		return fmt.Errorf("could not insert cluster block header: %w", err)
 	}
 
 	// insert the block payload; without further overwrite checks (see above for explanation)
-	err = InsertClusterPayload(lctx, rw, blockID, block.Payload)
+	err = operation.InsertProposalSignature(rw.Writer(), blockID, &proposal.ProposerSigData)
+	if err != nil {
+		return fmt.Errorf("could not insert proposer signature: %w", err)
+	}
+
+	// insert the block payload
+	err = InsertClusterPayload(lctx, rw, blockID, &proposal.Block.Payload)
 	if err != nil {
 		return fmt.Errorf("could not insert cluster block payload: %w", err)
 	}
 
 	// index the child block for recovery; without further overwrite checks (see above for explanation)
-	err = IndexNewClusterBlock(lctx, rw, blockID, block.Header.ParentID)
+	err = IndexNewClusterBlock(lctx, rw, blockID, proposal.Block.ParentID)
 	if err != nil {
 		return fmt.Errorf("could not index new cluster block block: %w", err)
 	}
@@ -83,10 +89,17 @@ func RetrieveClusterBlock(r storage.Reader, blockID flow.Identifier, block *clus
 	}
 
 	// overwrite block
-	*block = cluster.Block{
-		Header:  &header,
-		Payload: &payload,
+	newBlock, err := cluster.NewBlock(
+		cluster.UntrustedBlock{
+			HeaderBody: header.HeaderBody,
+			Payload:    payload,
+		},
+	)
+	if err != nil {
+		return fmt.Errorf("could not build cluster block: %w", err)
 	}
+	*block = *newBlock
+
 	return nil
 }
 
@@ -149,7 +162,7 @@ func FinalizeClusterBlock(lctx lockctx.Proof, rw storage.ReaderBatchWriter, bloc
 	}
 
 	// index the block by its height
-	err = operation.IndexClusterBlockHeight(lctx, writer, clusterID, header.Height, header.ID())
+	err = operation.IndexClusterBlockHeight(lctx, writer, clusterID, header.Height, blockID)
 	if err != nil {
 		return fmt.Errorf("could not index cluster block height: %w", err)
 	}
@@ -194,7 +207,7 @@ func InsertClusterPayload(lctx lockctx.Proof, rw storage.ReaderBatchWriter, bloc
 	// Here, we persist a reduced representation of the collection, only listing the constituent transactions by their hashes.
 	light := payload.Collection.Light()
 	writer := rw.Writer()
-	err = operation.UpsertCollection(writer, &light) // collection is keyed by content hash, hence no overwrite protection is needed
+	err = operation.UpsertCollection(writer, light) // collection is keyed by content hash, hence no overwrite protection is needed
 	if err != nil {
 		return fmt.Errorf("could not insert payload collection: %w", err)
 	}
@@ -254,7 +267,20 @@ func RetrieveClusterPayload(r storage.Reader, blockID flow.Identifier, payload *
 		colTransactions = append(colTransactions, &nextTx)
 	}
 
-	*payload = cluster.PayloadFromTransactions(refID, colTransactions...)
+	collection, err := flow.NewCollection(flow.UntrustedCollection{Transactions: colTransactions})
+	if err != nil {
+		return fmt.Errorf("could not build the collection from the transactions: %w", err)
+	}
+	newPayload, err := cluster.NewPayload(
+		cluster.UntrustedPayload{
+			ReferenceBlockID: refID,
+			Collection:       *collection,
+		},
+	)
+	if err != nil {
+		return fmt.Errorf("could not build the payload: %w", err)
+	}
+	*payload = *newPayload
 
 	return nil
 }

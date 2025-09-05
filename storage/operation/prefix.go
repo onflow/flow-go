@@ -19,10 +19,11 @@ const (
 	codeLivenessData = 11 // liveness data for hotstuff state
 
 	// codes for fields associated with the root state
-	codeSporkID              = 13
-	_                        = 14 // DEPRECATED: 14 was used for ProtocolVersion before the versioned Protocol State
-	_                        = 15 // DEPRECATED: 15 was used to save the finalization safety threshold
-	codeSporkRootBlockHeight = 16
+	_                    = 13 // DEPRECATED: 13 was used for root spork ID
+	_                    = 14 // DEPRECATED: 14 was used for ProtocolVersion before the versioned Protocol State
+	_                    = 15 // DEPRECATED: 15 was used to save the finalization safety threshold
+	_                    = 16 // DEPRECATED: 16 was used for root spork height
+	codeSporkRootBlockID = 17 // the root spork block ID
 
 	// code for heights with special meaning
 	codeFinalizedHeight         = 20 // latest finalized block height
@@ -46,7 +47,7 @@ const (
 	codeChunk                = 38
 	codeExecutionReceiptMeta = 39 // NOTE: prior to Mainnet25, this erroneously had the same value as codeExecutionResult (36)
 
-	// codes for indexing single identifier by identifier/integer
+	// codes for indexing multiple identifiers by identifier -- to be continued with 80+
 	codeHeightToBlock               = 40 // index mapping height to block ID
 	codeBlockIDToLatestSealID       = 41 // index mapping a block its last payload seal
 	codeClusterBlockToRefBlock      = 42 // index cluster block ID to reference block ID
@@ -90,6 +91,10 @@ const (
 	codeJobConsumerProcessed = 70
 	codeJobQueue             = 71
 	codeJobQueuePointer      = 72
+
+	// codes for indexing multiple identifiers by identifier -- continued from 40-49
+	codeBlockIDToProposalSignature = 80 // index of proposer signatures by block ID
+	codeGuaranteeByCollectionID    = 81 // index of collection guarantee by collection ID
 
 	// legacy codes (should be cleaned up)
 	codeChunkDataPack                      = 100

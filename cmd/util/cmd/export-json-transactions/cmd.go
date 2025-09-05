@@ -74,9 +74,9 @@ func ExportTransactions(lockManager lockctx.Manager, dataDir string, outputDir s
 	storages := common.InitStorages(db)
 	defer db.Close()
 
-	state, err := common.OpenProtocolState(lockManager, db, storages)
+	state, err := common.InitProtocolState(lockManager, db, storages)
 	if err != nil {
-		return fmt.Errorf("could not open protocol state: %w", err)
+		return fmt.Errorf("could not init protocol state: %w", err)
 	}
 
 	// create finder

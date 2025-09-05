@@ -74,8 +74,8 @@ func LookupCollectionPayload(r storage.Reader, clusterBlockID flow.Identifier, t
 // CAUTION: this is for recovery purposes only, and should not be used during normal operations!
 // It returns nil if the collection does not exist.
 // No errors are expected during normal operation.
-func RemoveCollectionPayloadIndices(w storage.Writer, blockID flow.Identifier) error {
-	return RemoveByKey(w, MakePrefix(codeIndexCollection, blockID))
+func RemoveCollectionPayloadIndices(w storage.Writer, collID flow.Identifier) error {
+	return RemoveByKey(w, MakePrefix(codeIndexCollection, collID))
 }
 
 // IndexCollectionByTransaction indexes the given collection ID, keyed by the transaction ID.

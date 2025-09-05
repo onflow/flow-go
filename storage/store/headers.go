@@ -15,16 +15,19 @@ import (
 
 // Headers implements a simple read-only header storage around a DB.
 type Headers struct {
-	db          storage.DB
+	db storage.DB
+	// cache is essentially an in-memory map from `Block.ID()` -> `Header`
 	cache       *Cache[flow.Identifier, *flow.Header]
 	heightCache *Cache[uint64, flow.Identifier]
 	viewCache   *Cache[uint64, flow.Identifier]
+	sigs        *proposalSignatures
 }
 
 var _ storage.Headers = (*Headers)(nil)
 
+// NewHeaders creates a Headers instance, which stores block headers.
+// It supports storing, caching and retrieving by block ID and the additionally indexed by header height.
 func NewHeaders(collector module.CacheMetrics, db storage.DB) *Headers {
-
 	storeWithLock := func(lctx lockctx.Proof, rw storage.ReaderBatchWriter, blockID flow.Identifier, header *flow.Header) error {
 		return operation.InsertHeader(lctx, rw, blockID, header)
 	}
@@ -61,13 +64,26 @@ func NewHeaders(collector module.CacheMetrics, db storage.DB) *Headers {
 		viewCache: newCache(collector, metrics.ResourceCertifiedView,
 			withLimit[uint64, flow.Identifier](4*flow.DefaultTransactionExpiry),
 			withRetrieve(retrieveView)),
+
+		sigs: newProposalSignatures(collector, db),
 	}
 
 	return h
 }
 
-func (h *Headers) storeTx(lctx lockctx.Proof, rw storage.ReaderBatchWriter, header *flow.Header) error {
-	return h.cache.PutWithLockTx(lctx, rw, header.ID(), header)
+func (h *Headers) storeTx(
+	lctx lockctx.Proof,
+	rw storage.ReaderBatchWriter,
+	blockID flow.Identifier,
+	header *flow.Header,
+	proposalSig []byte,
+) error {
+	err := h.cache.PutWithLockTx(lctx, rw, blockID, header)
+	if err != nil {
+		return err
+	}
+
+	return h.sigs.storeTx(rw, blockID, proposalSig)
 }
 
 func (h *Headers) retrieveTx(blockID flow.Identifier) (*flow.Header, error) {
@@ -78,7 +94,19 @@ func (h *Headers) retrieveTx(blockID flow.Identifier) (*flow.Header, error) {
 	return val, nil
 }
 
-// results in `storage.ErrNotFound` for unknown height
+func (h *Headers) retrieveProposalTx(blockID flow.Identifier) (*flow.ProposalHeader, error) {
+	header, err := h.cache.Get(h.db.Reader(), blockID)
+	if err != nil {
+		return nil, fmt.Errorf("could not retrieve header: %w", err)
+	}
+	sig, err := h.sigs.retrieveTx(blockID)
+	if err != nil {
+		return nil, fmt.Errorf("could not retrieve proposer signature for id %x: %w", blockID, err)
+	}
+	return &flow.ProposalHeader{Header: header, ProposerSigData: sig}, nil
+}
+
+// results in [storage.ErrNotFound] for unknown height
 func (h *Headers) retrieveIdByHeightTx(height uint64) (flow.Identifier, error) {
 	blockID, err := h.heightCache.Get(h.db.Reader(), height)
 	if err != nil {
@@ -87,10 +115,24 @@ func (h *Headers) retrieveIdByHeightTx(height uint64) (flow.Identifier, error) {
 	return blockID, nil
 }
 
+// ByBlockID returns the header with the given ID. It is available for finalized blocks and those pending finalization.
+// Error returns:
+//   - [storage.ErrNotFound] if no block header with the given ID exists
 func (h *Headers) ByBlockID(blockID flow.Identifier) (*flow.Header, error) {
 	return h.retrieveTx(blockID)
 }
 
+// ProposalByBlockID returns the header with the given ID, along with the corresponding proposer signature.
+// It is available for finalized blocks and those pending finalization.
+// Error returns:
+//   - [storage.ErrNotFound] if no block header or proposer signature with the given blockID exists
+func (h *Headers) ProposalByBlockID(blockID flow.Identifier) (*flow.ProposalHeader, error) {
+	return h.retrieveProposalTx(blockID)
+}
+
+// ByHeight returns the block with the given number. It is only available for finalized blocks.
+// Error returns:
+//   - [storage.ErrNotFound] if no finalized block is known at the given height
 func (h *Headers) ByHeight(height uint64) (*flow.Header, error) {
 	blockID, err := h.retrieveIdByHeightTx(height)
 	if err != nil {
@@ -99,14 +141,13 @@ func (h *Headers) ByHeight(height uint64) (*flow.Header, error) {
 	return h.retrieveTx(blockID)
 }
 
-// ByView returns block header for the given view. It is only available for certified blocks.
-// Certified blocks are the blocks that have received a QC. Hotstuff guarantees that for each view,
+// ByView returns the block with the given view. It is only available for certified blocks.
+// Certified blocks are the blocks that have received QC. Hotstuff guarantees that for each view,
 // at most one block is certified. Hence, the return value of `ByView` is guaranteed to be unique
 // even for non-finalized blocks.
-// Expected errors during normal operations:
-//   - `storage.ErrNotFound` if no certified block is known at given view.
 //
-// NOTE: this method is not available until next spork (mainnet27) or a migration that builds the index.
+// Expected errors during normal operations:
+//   - [storage.ErrNotFound] if no certified block is known at given view.
 func (h *Headers) ByView(view uint64) (*flow.Header, error) {
 	blockID, err := h.viewCache.Get(h.db.Reader(), view)
 	if err != nil {
@@ -132,7 +173,7 @@ func (h *Headers) Exists(blockID flow.Identifier) (bool, error) {
 
 // BlockIDByHeight returns the block ID that is finalized at the given height. It is an optimized
 // version of `ByHeight` that skips retrieving the block. Expected errors during normal operations:
-//   - `storage.ErrNotFound` if no finalized block is known at given height.
+//   - [storage.ErrNotFound] if no finalized block is known at given height
 func (h *Headers) BlockIDByHeight(height uint64) (flow.Identifier, error) {
 	blockID, err := h.retrieveIdByHeightTx(height)
 	if err != nil {
@@ -141,6 +182,10 @@ func (h *Headers) BlockIDByHeight(height uint64) (flow.Identifier, error) {
 	return blockID, nil
 }
 
+// ByParentID finds all children for the given parent block. The returned headers
+// might be unfinalized; if there is more than one, at least one of them has to
+// be unfinalized.
+// CAUTION: this method is not backed by a cache and therefore comparatively slow!
 func (h *Headers) ByParentID(parentID flow.Identifier) ([]*flow.Header, error) {
 	var blockIDs flow.IdentifierList
 	err := procedure.LookupBlockChildren(h.db.Reader(), parentID, &blockIDs)
@@ -160,7 +205,7 @@ func (h *Headers) ByParentID(parentID flow.Identifier) ([]*flow.Header, error) {
 
 // BlockIDByView returns the block ID that is certified at the given view. It is an optimized
 // version of `ByView` that skips retrieving the block. Expected errors during normal operations:
-//   - `storage.ErrNotFound` if no certified block is known at given view.
+//   - `[storage.ErrNotFound] if no certified block is known at given view.
 //
 // NOTE: this method is not available until next spork (mainnet27) or a migration that builds the index.
 func (h *Headers) BlockIDByView(view uint64) (flow.Identifier, error) {

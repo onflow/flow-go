@@ -10,18 +10,31 @@ import (
 	"github.com/onflow/flow-go/storage/operation"
 )
 
+// InsertIndex persists the given index keyed by the block ID
+//
+// CAUTION:
+//   - The caller must acquire the [storage.LockInsertBlock] and hold it until the database write has been committed.
+//   - OVERWRITES existing data (potential for data corruption):
+//     This method silently overrides existing data without any sanity checks whether data for the same key already exits.
+//     Note that the Flow protocol mandates that for a previously persisted key, the data is never changed to a different
+//     value. Changing data could cause the node to publish inconsistent data and to be slashed, or the protocol to be
+//     compromised as a whole. This method does not contain any safeguards to prevent such data corruption. The lock proof
+//     serves as a reminder that the CALLER is responsible to ensure that the DEDUPLICATION CHECK is done elsewhere
+//     ATOMICALLY with this write operation.
+//
+// No errors expected during normal operations.
 func InsertIndex(lctx lockctx.Proof, rw storage.ReaderBatchWriter, blockID flow.Identifier, index *flow.Index) error {
 	if !lctx.HoldsLock(storage.LockInsertBlock) {
 		return fmt.Errorf("missing required lock: %s", storage.LockInsertBlock)
 	}
 
-	// The following database operations are all indexing data by block ID,
-	// they don't need to check if the data is already stored, because the same check has been done
-	// when storing the block header, which is in the same batch update and holding the same lock.
-	// if there is no header stored for the block ID, it means no index data for the same block ID
+	// The following database operations are all indexing data by block ID. If used correctly,
+	// we don't need to check here if the data is already stored, because the same check should have
+	// been done when storing the block header, which is in the same batch update and holding the same lock.
+	// If there is no header stored for the block ID, it means no index data for the same block ID
 	// was stored either, as long as the same lock is held, the data is guaranteed to be consistent.
 	w := rw.Writer()
-	err := operation.IndexPayloadGuarantees(lctx, w, blockID, index.CollectionIDs)
+	err := operation.IndexPayloadGuarantees(lctx, w, blockID, index.GuaranteeIDs)
 	if err != nil {
 		return fmt.Errorf("could not store guarantee index: %w", err)
 	}
@@ -45,8 +58,8 @@ func InsertIndex(lctx lockctx.Proof, rw storage.ReaderBatchWriter, blockID flow.
 }
 
 func RetrieveIndex(r storage.Reader, blockID flow.Identifier, index *flow.Index) error {
-	var collIDs []flow.Identifier
-	err := operation.LookupPayloadGuarantees(r, blockID, &collIDs)
+	var guaranteeIDs []flow.Identifier
+	err := operation.LookupPayloadGuarantees(r, blockID, &guaranteeIDs)
 	if err != nil {
 		return fmt.Errorf("could not retrieve guarantee index: %w", err)
 	}
@@ -72,7 +85,7 @@ func RetrieveIndex(r storage.Reader, blockID flow.Identifier, index *flow.Index)
 	}
 
 	*index = flow.Index{
-		CollectionIDs:   collIDs,
+		GuaranteeIDs:    guaranteeIDs,
 		SealIDs:         sealIDs,
 		ReceiptIDs:      receiptIDs,
 		ResultIDs:       resultsIDs,
