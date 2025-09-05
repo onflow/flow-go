@@ -108,3 +108,9 @@ func (state DKGState) String() string {
 //   - [2] https://www.notion.so/flowfoundation/DKG-contract-success-threshold-86c6bf2b92034855b3c185d7616eb6f1?pvs=4
 //   - [3] https://www.notion.so/flowfoundation/Architecture-for-Concurrent-Vote-Processing-41704666bc414a03869b70ba1043605f?pvs=4
 type DKGIndexMap map[Identifier]int
+
+// DKGMessage is the type of message exchanged between DKG nodes.
+type DKGMessage struct {
+	Data          []byte
+	DKGInstanceID string
+}
