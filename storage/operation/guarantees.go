@@ -68,7 +68,7 @@ func RetrieveGuarantee(r storage.Reader, collID flow.Identifier, guarantee *flow
 
 // LookupGuarantee finds collection guarantee ID by collection ID.
 // Error returns:
-//   - storage.ErrNotFound if the key does not exist in the database
+//   - [storage.ErrNotFound] if the key does not exist in the database
 //   - All other errors have to be treated as unexpected failures from the database layer.
 func LookupGuarantee(r storage.Reader, collectionID flow.Identifier, guaranteeID *flow.Identifier) error {
 	return RetrieveByKey(r, MakePrefix(codeGuaranteeByCollectionID, collectionID), guaranteeID)
