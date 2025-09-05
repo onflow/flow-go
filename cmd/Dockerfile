@@ -52,13 +52,15 @@ RUN --mount=type=cache,sharing=locked,target=/go/pkg/mod \
     # We explicitly use ";" rather than && as we want to safely pass if it is unavailable
     eval `ssh-agent -s` && printf "%s\n" "$(cat /run/secrets/cadence_deploy_key)" | ssh-add - ; \
     CGO_ENABLED=1 GOOS=linux GOARCH=${GOARCH} CC="${CC}" CGO_CFLAGS="${CGO_FLAG}" go build --tags "${TAGS}" -ldflags "-extldflags -static \
-    -X 'github.com/onflow/flow-go/cmd/build.commit=${COMMIT}' -X  'github.com/onflow/flow-go/cmd/build.semver=${VERSION}'" \
+    -X 'github.com/onflow/flow-go/cmd/build.commit=${COMMIT}' -X  'github.com/onflow/flow-go/cmd/build.semver=${VERSION}'" -gcflags=all=-d=checkptr=1 \
     -o ./app ${TARGET}
 
 RUN chmod a+x /app/app
 
 ## (4) Add the statically linked production binary to a distroless image
 FROM gcr.io/distroless/base-debian11 as production
+
+ENV GODEBUG=checkptr=1
 
 COPY --from=build-production /app/app /bin/app
 
