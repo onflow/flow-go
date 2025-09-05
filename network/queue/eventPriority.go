@@ -66,11 +66,11 @@ func getPriorityByType(message interface{}) Priority {
 		return HighPriority
 
 	// collections, guarantees & transactions
-	case *flow.CollectionGuarantee:
+	case *messages.CollectionGuarantee:
 		return HighPriority
-	case *flow.TransactionBody:
+	case *messages.TransactionBody:
 		return HighPriority
-	case *flow.Transaction:
+	case *messages.Transaction:
 		return HighPriority
 
 	// core messages for execution & verification

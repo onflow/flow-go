@@ -243,7 +243,7 @@ func initializeMessageAuthConfigsMap() {
 	authorizationConfigs[TransactionBody] = MsgAuthConfig{
 		Name: TransactionBody,
 		Type: func() interface{} {
-			return new(flow.TransactionBody)
+			return new(messages.TransactionBody)
 		},
 		Config: map[channels.Channel]ChannelAuthConfig{
 			channels.PushTransactions: {
@@ -437,7 +437,7 @@ func GetMessageAuthConfig(v interface{}) (MsgAuthConfig, error) {
 	// collections, guarantees & transactions
 	case *messages.CollectionGuarantee:
 		return authorizationConfigs[CollectionGuarantee], nil
-	case *flow.TransactionBody:
+	case *messages.TransactionBody:
 		return authorizationConfigs[TransactionBody], nil
 
 	// core messages for execution & verification

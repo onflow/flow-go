@@ -11,6 +11,7 @@ import (
 
 	"github.com/onflow/flow-go/integration/testnet"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -59,7 +60,7 @@ func TestGhostNodeExample_Send(t *testing.T) {
 	assert.NoError(t, err)
 
 	// generate a test transaction
-	tx := unittest.TransactionBodyFixture()
+	tx := (messages.TransactionBody)(unittest.TransactionBodyFixture())
 
 	// send the transaction as an event to a real collection node
 	err = ghostClient.Send(ctx, channels.PushTransactions, &tx, realCollNode.Identifier)

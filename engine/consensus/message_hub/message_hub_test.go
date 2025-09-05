@@ -183,7 +183,7 @@ func (s *MessageHubSuite) TestProcessValidIncomingMessages() {
 	})
 	s.Run("to-vote-aggregator", func() {
 		expectedVote := unittest.VoteFixture(unittest.WithVoteSignerID(originID))
-		msg := &messages.BlockVote{
+		msg := &flow.BlockVote{
 			View:    expectedVote.View,
 			BlockID: expectedVote.BlockID,
 			SigData: expectedVote.SigData,
