@@ -38,7 +38,7 @@ type signatureContinuation struct {
 	signatureEntry
 
 	// accountKey is set by getAccountKeys().
-	accountKey flow.AccountPublicKey
+	accountKey flow.RuntimeAccountPublicKey
 
 	// invokedVerify and verifyErr are set by verifyAccountSignatures().  Note
 	// that	verifyAccountSignatures() is always called after getAccountKeys()
@@ -266,7 +266,7 @@ func (v *TransactionVerifier) getAccountKeys(
 ) error {
 	foundProposalSignature := false
 	for _, signature := range signatures {
-		accountKey, err := accounts.GetAccountPublicKey(
+		accountKey, err := accounts.GetRuntimeAccountPublicKey(
 			signature.Address,
 			signature.KeyIndex)
 		if err != nil {

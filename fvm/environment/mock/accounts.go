@@ -415,6 +415,34 @@ func (_m *Accounts) GetContractNames(address flow.Address) ([]string, error) {
 	return r0, r1
 }
 
+// GetRuntimeAccountPublicKey provides a mock function with given fields: address, keyIndex
+func (_m *Accounts) GetRuntimeAccountPublicKey(address flow.Address, keyIndex uint32) (flow.RuntimeAccountPublicKey, error) {
+	ret := _m.Called(address, keyIndex)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetRuntimeAccountPublicKey")
+	}
+
+	var r0 flow.RuntimeAccountPublicKey
+	var r1 error
+	if rf, ok := ret.Get(0).(func(flow.Address, uint32) (flow.RuntimeAccountPublicKey, error)); ok {
+		return rf(address, keyIndex)
+	}
+	if rf, ok := ret.Get(0).(func(flow.Address, uint32) flow.RuntimeAccountPublicKey); ok {
+		r0 = rf(address, keyIndex)
+	} else {
+		r0 = ret.Get(0).(flow.RuntimeAccountPublicKey)
+	}
+
+	if rf, ok := ret.Get(1).(func(flow.Address, uint32) error); ok {
+		r1 = rf(address, keyIndex)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // GetStorageUsed provides a mock function with given fields: address
 func (_m *Accounts) GetStorageUsed(address flow.Address) (uint64, error) {
 	ret := _m.Called(address)
