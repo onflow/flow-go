@@ -1004,7 +1004,7 @@ func ResultApprovalFixture(opts ...func(*flow.ResultApproval)) *flow.ResultAppro
 			Attestation:          attestation,
 			ApproverID:           IdentifierFixture(),
 			AttestationSignature: SignatureFixture(),
-			Spock:                nil,
+			Spock:                SignatureFixture(),
 		},
 		VerifierSignature: SignatureFixture(),
 	}
