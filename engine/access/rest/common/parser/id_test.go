@@ -34,7 +34,7 @@ func TestID_ValidParse(t *testing.T) {
 }
 
 func TestIDs_ValidParse(t *testing.T) {
-	var testIDs []flow.Identifier = unittest.IdentifierListFixture(3)
+	testIDs := unittest.IdentifierListFixture(3)
 
 	rawIDs := make([]string, 0)
 	for _, id := range testIDs {
@@ -47,7 +47,7 @@ func TestIDs_ValidParse(t *testing.T) {
 
 	// duplication of ids
 	id := unittest.IdentifierFixture()
-	duplicatedIDs := []flow.Identifier{id, id, id}
+	duplicatedIDs := flow.IdentifierList{id, id, id}
 	rawIDs = make([]string, 0)
 	for _, id := range duplicatedIDs {
 		rawIDs = append(rawIDs, id.String())
