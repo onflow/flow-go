@@ -86,7 +86,9 @@ func (s *Suite) SetupSuite() {
 		testnet.WithID(s.verID),
 		testnet.WithLogLevel(zerolog.WarnLevel),
 		// only verification and execution nodes run with preferred unicast protocols
-		testnet.WithAdditionalFlag(fmt.Sprintf("--preferred-unicast-protocols=%s", s.PreferredUnicasts)))
+		testnet.WithAdditionalFlag(fmt.Sprintf("--preferred-unicast-protocols=%s", s.PreferredUnicasts)),
+		testnet.WithAdditionalFlag("--scheduled-callbacks-enabled=true"),
+	)
 	s.nodeConfigs = append(s.nodeConfigs, verConfig)
 
 	// generates two execution nodes
@@ -95,7 +97,9 @@ func (s *Suite) SetupSuite() {
 		testnet.WithID(s.exe1ID),
 		testnet.WithLogLevel(zerolog.InfoLevel),
 		// only verification and execution nodes run with preferred unicast protocols
-		testnet.WithAdditionalFlag(fmt.Sprintf("--preferred-unicast-protocols=%s", s.PreferredUnicasts)))
+		testnet.WithAdditionalFlag(fmt.Sprintf("--preferred-unicast-protocols=%s", s.PreferredUnicasts)),
+		testnet.WithAdditionalFlag("--scheduled-callbacks-enabled=true"),
+	)
 	s.nodeConfigs = append(s.nodeConfigs, exe1Config)
 
 	s.exe2ID = unittest.IdentifierFixture()
@@ -103,7 +107,9 @@ func (s *Suite) SetupSuite() {
 		testnet.WithID(s.exe2ID),
 		testnet.WithLogLevel(zerolog.InfoLevel),
 		// only verification and execution nodes run with preferred unicast protocols
-		testnet.WithAdditionalFlag(fmt.Sprintf("--preferred-unicast-protocols=%s", s.PreferredUnicasts)))
+		testnet.WithAdditionalFlag(fmt.Sprintf("--preferred-unicast-protocols=%s", s.PreferredUnicasts)),
+		testnet.WithAdditionalFlag("--scheduled-callbacks-enabled=true"),
+	)
 	s.nodeConfigs = append(s.nodeConfigs, exe2Config)
 
 	// generates two collection node
@@ -125,7 +131,8 @@ func (s *Suite) SetupSuite() {
 	ghostConfig := testnet.NewNodeConfig(flow.RoleExecution,
 		testnet.WithID(s.ghostID),
 		testnet.AsGhost(),
-		testnet.WithLogLevel(zerolog.FatalLevel))
+		testnet.WithLogLevel(zerolog.FatalLevel),
+	)
 	s.nodeConfigs = append(s.nodeConfigs, ghostConfig)
 
 	// generates, initializes, and starts the Flow network
