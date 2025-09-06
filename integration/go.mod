@@ -9,7 +9,6 @@ require (
 	github.com/cockroachdb/pebble/v2 v2.0.6
 	github.com/coreos/go-semver v0.3.0
 	github.com/dapperlabs/testingdock v0.4.5-0.20231020233342-a2853fe18724
-	github.com/dgraph-io/badger/v2 v2.2007.4
 	github.com/docker/docker v24.0.6+incompatible
 	github.com/docker/go-connections v0.4.0
 	github.com/ethereum/go-ethereum v1.16.2
@@ -112,6 +111,7 @@ require (
 	github.com/davidlazar/go-crypto v0.0.0-20200604182044-b73af7476f6c // indirect
 	github.com/deckarep/golang-set/v2 v2.6.0 // indirect
 	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.3.0 // indirect
+	github.com/dgraph-io/badger/v2 v2.2007.4 // indirect
 	github.com/dgraph-io/ristretto v0.1.0 // indirect
 	github.com/dgryski/go-farm v0.0.0-20200201041132-a6ae2369ad13 // indirect
 	github.com/distribution/reference v0.5.0 // indirect
