@@ -84,7 +84,6 @@ func TestMakeFinalValidChain(t *testing.T) {
 			return operation.IndexFinalizedBlockByHeight(lctx, rw, final.Height, final.ID())
 		})
 		require.NoError(t, err)
-		lctx.Release()
 
 		// insert the finalized block header into the DB
 		insertLctx := lockManager.NewContext()
@@ -165,7 +164,6 @@ func TestMakeFinalInvalidHeight(t *testing.T) {
 			return operation.IndexFinalizedBlockByHeight(lctx, rw, final.Height, final.ID())
 		})
 		require.NoError(t, err)
-		lctx.Release()
 
 		// insert the finalized block header into the DB
 		insertLctx := lockManager.NewContext()
@@ -240,7 +238,6 @@ func TestMakeFinalDuplicate(t *testing.T) {
 			return operation.IndexFinalizedBlockByHeight(lctx, rw, final.Height, final.ID())
 		})
 		require.NoError(t, err)
-		lctx.Release()
 
 		// insert the finalized block header into the DB
 		insertLctx := lockManager.NewContext()
