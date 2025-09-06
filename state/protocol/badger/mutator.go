@@ -126,7 +126,7 @@ func NewFullConsensusState(
 }
 
 // ExtendCertified extends the protocol state of a CONSENSUS FOLLOWER. While it checks
-// the validity of the header; it does _not_ check the validity of the payload.
+// the validity of the header, it does _not_ check the validity of the payload.
 // Instead, the consensus follower relies on the consensus participants to validate the
 // full payload. Payload validity must be proven by a valid quorum certificate
 // (field `CertifiedBlock.CertifyingQC`). The certifying QC must match candidate block:
@@ -198,11 +198,14 @@ func (m *FollowerState) ExtendCertified(ctx context.Context, certified *flow.Cer
 		return operation.IndexLatestSealAtBlock(lctx, rw.Writer(), blockID, latestSeal.ID())
 	})
 
-	// evolve protocol state and verify consistency with commitment included in
+	// Evolve protocol state and verify its consistency with the commitment included in the candidate block.
 	deferredProtocolStatePersist, err := m.evolveProtocolState(ctx, candidate)
 	if err != nil {
 		return fmt.Errorf("evolving protocol state failed: %w", err)
 	}
+	// Note that each staked node must locally replicate and persist the evolution of the protocol state (atm essentially
+	// a key-value store holding protocol parameters). This is necessary because the node needs the full protocol state
+	// for its operation, but only the protocol state's hash is included in the block.
 	deferredBlockPersist.Chain(deferredProtocolStatePersist)
 
 	// Final step: for atomicity we acquire lock and then execute the deferred operations
@@ -275,14 +278,15 @@ func (m *ParticipantState) Extend(ctx context.Context, candidateProposal *flow.P
 		return fmt.Errorf("header not compliant with chain state: %w", err)
 	}
 
-	// The following function rejects the input block with an [state.OutdatedExtensionError] if and only if
-	// the block is orphaned or already finalized. If the block was to be finalized already, it would have been
-	// detected as already processed by the check above. This holds, because the mutator is the only component
-	// that extends the chain state with new blocks. Hence, `candidate` being orphaned is the only possible case
-	// to receive an [state.OutdatedExtensionError] here.
-	// CAUTION: it is not clear whether this argument still holds for concurrent block ingestion (hypothetical future scenario).
+	// Next, we traverse the candidate's ancestry to determine whether it is on an orphaned fork.
+	// CAUTION: this must be done AFTER headerExtend, as it verifies that the parent is known.
 	err = m.checkOutdatedExtension(candidate.HeaderBody)
 	if err != nil {
+		// The following function rejects the input block with an [state.OutdatedExtensionError] if and only if
+		// the block is orphaned or already finalized. Though, finalized blocks are detected as already processed by
+		// the check above. Hence, `candidate` being orphaned is the only possible case to receive an
+		// [state.OutdatedExtensionError] here.
+		// CAUTION: it is not clear whether this argument still holds for concurrent block ingestion (hypothetical future scenario).
 		if state.IsOutdatedExtensionError(err) {
 			return fmt.Errorf("candidate block is an outdated extension: %w", err)
 		}
@@ -348,14 +352,19 @@ func (m *ParticipantState) Extend(ctx context.Context, candidateProposal *flow.P
 //  2. candidate's block time conforms to protocol rules
 //  3. If a `certifyingQC` is given (can be nil), we sanity-check that it certifies the candidate block
 //
-// If all checks pass, this method queues the following operations to persist the candidate block and
-// schedules `BlockProcessable` notification to be emitted in order of increasing height:
+// If all checks pass, this method queues the following operations (to persist the candidate block
+// and schedules `BlockProcessable` notification) to be emitted in order of increasing height:
 //
-//	4a. store QC embedded into the candidate block and emit `BlockProcessable` notification for the parent
+//	4a. if and only if the candidate block's parent has not been certified yet:
+//	    - persist QC embedded into the candidate block
+//	    - add the parent to the index of certified blocks (index: view → parent block's ID)
+//	    - queue a `BlockProcessable` notification for the parent
 //	4b. store candidate block and populate corresponding indices:
 //	    - store candidate block's proposer signature along with the block (needed to re-create an authenticated proposal)
-//	    - index it as a child of its parent (needed for recovery to traverse unfinalized blocks)
-//	4c. if we are given a certifyingQC, store it and queue a `BlockProcessable` notification for the candidate block
+//	    - index candidate as a child of its parent (needed for recovery to traverse unfinalized blocks)
+//	4c. if and only if we are given a `certifyingQC`, store it and
+//	    - add candidate to the index of certified blocks (index: view → candidate block's ID)
+//	    - queue a `BlockProcessable` notification for the candidate block
 //
 // If `headerExtend` is called by `ParticipantState.Extend` (full consensus participant) then `certifyingQC` will be nil,
 // but the block payload will be validated and proposer signature will be present. If `headerExtend` is called by
@@ -371,32 +380,32 @@ func (m *FollowerState) headerExtend(ctx context.Context, candidate *flow.Propos
 	span, _ := m.tracer.StartSpanFromContext(ctx, trace.ProtoStateMutatorExtendCheckHeader)
 	defer span.End()
 	blockID := candidate.Block.ID()
-	headerBody := candidate.Block.HeaderBody
+	header := candidate.Block.HeaderBody
 
 	// STEP 1: check whether the candidate (i) connects to the known block tree and
 	// (ii) has the same chain ID as its parent and a height incremented by 1.
-	parent, err := m.headers.ByBlockID(headerBody.ParentID) // (i) connects to the known block tree
+	parent, err := m.headers.ByBlockID(header.ParentID) // (i) connects to the known block tree
 	if err != nil {
-		// The only sentinel error that can happen here is `storage.ErrNotFound`. However, by convention the
+		// The only sentinel error that can happen here is [storage.ErrNotFound]. However, by convention the
 		// protocol state must be extended in a parent-first order. This block's parent being unknown breaks
 		// with this API contract and results in an exception.
-		return nil, irrecoverable.NewExceptionf("could not retrieve the candidate's parent block %v: %w", headerBody.ParentID, err)
+		return nil, irrecoverable.NewExceptionf("could not retrieve the candidate's parent block %v: %w", header.ParentID, err)
 	}
-	if headerBody.ChainID != parent.ChainID {
+	if header.ChainID != parent.ChainID {
 		return nil, state.NewInvalidExtensionErrorf("candidate built for invalid chain (candidate: %s, parent: %s)",
-			headerBody.ChainID, parent.ChainID)
+			header.ChainID, parent.ChainID)
 	}
-	if headerBody.ParentView != parent.View {
+	if header.ParentView != parent.View {
 		return nil, state.NewInvalidExtensionErrorf("candidate build with inconsistent parent view (candidate: %d, parent %d)",
-			headerBody.ParentView, parent.View)
+			header.ParentView, parent.View)
 	}
-	if headerBody.Height != parent.Height+1 {
+	if header.Height != parent.Height+1 {
 		return nil, state.NewInvalidExtensionErrorf("candidate built with invalid height (candidate: %d, parent: %d)",
-			headerBody.Height, parent.Height)
+			header.Height, parent.Height)
 	}
 
 	// STEP 2: check validity of block timestamp using parent's timestamp
-	err = m.blockTimer.Validate(parent.Timestamp, headerBody.Timestamp)
+	err = m.blockTimer.Validate(parent.Timestamp, header.Timestamp)
 	if err != nil {
 		if protocol.IsInvalidBlockTimestampError(err) {
 			return nil, state.NewInvalidExtensionErrorf("candidate contains invalid timestamp: %w", err)
@@ -406,8 +415,8 @@ func (m *FollowerState) headerExtend(ctx context.Context, candidate *flow.Propos
 
 	// STEP 3: if a certifying QC is given (can be nil), sanity-check that it actually certifies the candidate block
 	if certifyingQC != nil {
-		if certifyingQC.View != headerBody.View {
-			return nil, fmt.Errorf("qc doesn't certify candidate block, expect %d view, got %d", headerBody.View, certifyingQC.View)
+		if certifyingQC.View != header.View {
+			return nil, fmt.Errorf("qc doesn't certify candidate block, expect %d view, got %d", header.View, certifyingQC.View)
 		}
 		if certifyingQC.BlockID != blockID {
 			return nil, fmt.Errorf("qc doesn't certify candidate block, expect %x blockID, got %x", blockID, certifyingQC.BlockID)
@@ -447,7 +456,7 @@ func (m *FollowerState) headerExtend(ctx context.Context, candidate *flow.Propos
 		if err != nil {
 			return fmt.Errorf("could not store candidate block: %w", err)
 		}
-		err = procedure.IndexNewBlock(lctx, rw, blockID, headerBody.ParentID)
+		err = procedure.IndexNewBlock(lctx, rw, blockID, header.ParentID)
 		if err != nil {
 			return fmt.Errorf("could not index new block: %w", err)
 		}
@@ -460,9 +469,9 @@ func (m *FollowerState) headerExtend(ctx context.Context, candidate *flow.Propos
 			}
 
 			// add candidate to index of certified blocks:
-			err := operation.IndexCertifiedBlockByView(lctx, rw, headerBody.View, blockID)
+			err := operation.IndexCertifiedBlockByView(lctx, rw, header.View, blockID)
 			if err != nil {
-				return fmt.Errorf("could not index certified block by view %v: %w", headerBody.View, err)
+				return fmt.Errorf("could not index certified block by view %v: %w", header.View, err)
 			}
 
 			storage.OnCommitSucceed(rw, func() { // queue a BlockProcessable event for candidate block, since it is certified
@@ -496,33 +505,33 @@ func (m *FollowerState) checkBlockAlreadyProcessed(blockID flow.Identifier) (boo
 // the sentinel [state.OutdatedExtensionError] is returned. Per convention, the ancestor blocks
 // for any ingested block must be known (otherwise, we return an exception).
 //
-// APPROACH:
-// Starting with `block`s parent, we walk the fork backwards in order of decreasing height. Eventually,
+// APPROACH: (for brevity, we denote the input block as `B`)
+// Starting with B's parent, we walk the fork backwards in order of decreasing height. Eventually,
 // we will reach a finalized block (this is always true, because a node starts with the genesis block
 // or a root block that is known to be finalized and only accepts blocks that descend from this block).
 // Let H denote the *latest* finalized height (in the implementation below called `finalizedHeight`).
 //
 // For `block.Height` > H, there are two cases:
 //
-//  1. When walking the fork backward, we reach the *latest* finalized block. Hence, `block`
+//  1. When walking the fork backward, we reach the *latest* finalized block. Hence, B
 //     descends from the latest finalized block, i.e. it is not orphaned (yet).
 //
 //  2. We encounter a block at height H that is different from the latest finalized block.
 //     Therefore, our fork contains a block at height H that conflicts with the latest
-//     finalized block. Hence, `block` is orphaned.
+//     finalized block. Hence, B is orphaned.
 //     Example:
-//     ░    A (Finalized) ← B (Finalized) ← C (Finalized) ← D ← E ← F
-//     ░                   ↖ G              ↖ H              ↖ I
-//     Block G is outdated, because its ancestry does not include C (latest finalized).
-//     Block H and I are not outdated, because they do have C as an ancestor.
+//     ░    K (Finalized) ← L (Finalized) ← M (Finalized) ← P ← Q …
+//     ░                     ↖ W             ↖ X             ↖ Y …
+//     Block W is outdated, because its ancestry does not include the latest finalized block M.
+//     Block X and Y,P,Q… are not outdated, because they do have M as an ancestor.
 //
 // For `block.Height` ≤ H:
-//   - We emphasize that the traversal starts with `block`'s *parent*. Hence, the first block we
+//   - We emphasize that the traversal starts with B's *parent*. Hence, the first block we
 //     visit when traversing the fork is at height `block.Height - 1` < H. Also in this case, our
 //     traversal reaches height H or below, _without_ encountering the latest finalized block.
 //
-// In summary, in the context of this function, we define a `block` to be OUTDATED if and only if
-// `block` is orphaned or already finalized.
+// In summary, in the context of this function, we define a block B to be OUTDATED if and only if
+// B is orphaned or already finalized.
 //
 // Expected errors during normal operations:
 //   - [state.OutdatedExtensionError] if the candidate block is orphaned or finalized
@@ -564,14 +573,11 @@ func (m *ParticipantState) guaranteeExtend(ctx context.Context, candidate *flow.
 	span, _ := m.tracer.StartSpanFromContext(ctx, trace.ProtoStateMutatorExtendCheckGuarantees)
 	defer span.End()
 
-	headerBody := candidate.HeaderBody
-	payload := candidate.Payload
-
 	// we only look as far back for duplicates as the transaction expiry limit;
 	// if a guarantee was included before that, we will disqualify it on the
 	// basis of the reference block anyway
-	limit := headerBody.Height - flow.DefaultTransactionExpiry
-	if limit > headerBody.Height { // overflow check
+	limit := candidate.Height - flow.DefaultTransactionExpiry
+	if limit > candidate.Height { // overflow check
 		limit = 0
 	}
 	sporkRootBlockHeight := m.sporkRootBlock.Height
@@ -580,12 +586,12 @@ func (m *ParticipantState) guaranteeExtend(ctx context.Context, candidate *flow.
 	}
 
 	// build a list of all previously used guarantees on this part of the chain
-	ancestorID := headerBody.ParentID
+	ancestorID := candidate.ParentID
 	lookup := make(map[flow.Identifier]struct{})
 	for {
 		ancestor, err := m.headers.ByBlockID(ancestorID)
 		if err != nil {
-			return fmt.Errorf("could not retrieve ancestor headerBody (%x): %w", ancestorID, err)
+			return fmt.Errorf("could not retrieve ancestor header (%x): %w", ancestorID, err)
 		}
 		index, err := m.index.ByBlockID(ancestorID)
 		if err != nil {
@@ -601,7 +607,7 @@ func (m *ParticipantState) guaranteeExtend(ctx context.Context, candidate *flow.
 	}
 
 	// check each guarantee included in the payload for duplication and expiry
-	for _, guarantee := range payload.Guarantees {
+	for _, guarantee := range candidate.Payload.Guarantees {
 
 		// if the guarantee was already included before, error
 		_, duplicated := lookup[guarantee.ID()]
