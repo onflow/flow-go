@@ -260,7 +260,7 @@ func (c *Container) ExecutionDataDB() (*badger.DB, error) {
 }
 
 func (c *Container) DBPath() string {
-	return filepath.Join(c.datadir, DefaultFlowDBDir)
+	return filepath.Join(c.datadir, DefaultFlowPebbleDBDir)
 }
 
 func (c *Container) ExecutionDataDBPath() string {
