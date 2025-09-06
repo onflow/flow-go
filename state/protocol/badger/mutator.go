@@ -16,7 +16,7 @@ import (
 	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/state"
 	"github.com/onflow/flow-go/state/protocol"
-	protocol_state "github.com/onflow/flow-go/state/protocol/protocol_state/state"
+	protocolStateImpl "github.com/onflow/flow-go/state/protocol/protocol_state/state"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/deferred"
 	"github.com/onflow/flow-go/storage/operation"
@@ -77,7 +77,7 @@ func NewFollowerState(
 		logger:     logger,
 		consumer:   consumer,
 		blockTimer: blockTimer,
-		protocolState: protocol_state.NewMutableProtocolState(
+		protocolState: protocolStateImpl.NewMutableProtocolState(
 			logger,
 			state.epochProtocolStateEntriesDB,
 			state.protocolKVStoreSnapshotsDB,
@@ -182,7 +182,7 @@ func (m *FollowerState) ExtendCertified(ctx context.Context, certified *flow.Cer
 	}
 
 	// check if the block header is a valid extension of parent block
-	deferredBlockPersist, err := m.headerExtend(ctx, candidate, certifyingQC)
+	deferredBlockPersist, err := m.headerExtend(ctx, certified.Proposal, certifyingQC)
 	if err != nil {
 		// since we have a QC for this block, it cannot be an invalid extension
 		return fmt.Errorf("unexpected invalid block (id=%x) with certifying qc (id=%x): %s",
@@ -503,16 +503,16 @@ func (m *FollowerState) checkBlockAlreadyProcessed(blockID flow.Identifier) (boo
 // Let H denote the *latest* finalized height (in the implementation below called `finalizedHeight`).
 //
 // For `block.Height` > H, there are two cases:
+//
 //  1. When walking the fork backward, we reach the *latest* finalized block. Hence, `block`
 //     descends from the latest finalized block, i.e. it is not orphaned (yet).
+//
 //  2. We encounter a block at height H that is different from the latest finalized block.
 //     Therefore, our fork contains a block at height H that conflicts with the latest
 //     finalized block. Hence, `block` is orphaned.
 //     Example:
-//
-//        A (Finalized) ← B (Finalized) ← C (Finalized) ← D ← E ← F
-//                         ↖ G             ↖ H              ↖ I
-//
+//     ░    A (Finalized) ← B (Finalized) ← C (Finalized) ← D ← E ← F
+//     ░                   ↖ G              ↖ H              ↖ I
 //     Block G is outdated, because its ancestry does not include C (latest finalized).
 //     Block H and I are not outdated, because they do have C as an ancestor.
 //
@@ -742,7 +742,7 @@ func (m *FollowerState) evolveProtocolState(ctx context.Context, candidate *flow
 	// the candidate block's view and Service Events from execution results sealed in the candidate block.
 	updatedStateID, deferredBlockPersist, err := m.protocolState.EvolveState(candidate.ParentID, candidate.View, candidate.Payload.Seals)
 	if err != nil {
-		return fmt.Errorf("evolving protocol state failed: %w", err)
+		return nil, fmt.Errorf("evolving protocol state failed: %w", err)
 	}
 
 	// verify Protocol State commitment in the candidate block matches the locally-constructed value
