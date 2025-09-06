@@ -7,8 +7,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/cockroachdb/pebble/v2"
-	"github.com/dgraph-io/badger/v2"
 	"github.com/jordanschalm/lockctx"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/mock"
@@ -28,7 +26,7 @@ import (
 	bstorage "github.com/onflow/flow-go/storage/badger"
 	storagemock "github.com/onflow/flow-go/storage/mock"
 	"github.com/onflow/flow-go/storage/operation"
-	"github.com/onflow/flow-go/storage/operation/badgerimpl"
+	"github.com/onflow/flow-go/storage/operation/pebbleimpl"
 	pebbleStorage "github.com/onflow/flow-go/storage/pebble"
 	"github.com/onflow/flow-go/storage/store"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -41,8 +39,8 @@ type PipelineFunctionalSuite struct {
 	txResultErrMsgsRequester      *txerrmsgsmock.Requester
 	txResultErrMsgsRequestTimeout time.Duration
 	tmpDir                        string
-	bdb                           *badger.DB
-	pdb                           *pebble.DB
+	registerTmpDir                string
+	registerDB                    storage.DB
 	db                            storage.DB
 	lockManager                   lockctx.Manager
 	persistentRegisters           *pebbleStorage.Registers
@@ -80,8 +78,8 @@ func (p *PipelineFunctionalSuite) SetupTest() {
 	p.tmpDir = unittest.TempDir(t)
 	p.logger = zerolog.Nop()
 	p.metrics = metrics.NewNoopCollector()
-	p.bdb = unittest.BadgerDB(t, p.tmpDir)
-	p.db = badgerimpl.ToDB(p.bdb)
+	pdb := unittest.PebbleDB(t, p.tmpDir)
+	p.db = pebbleimpl.ToDB(pdb)
 
 	rootBlock := unittest.BlockHeaderFixture()
 	sealedBlock := unittest.BlockWithParentFixture(rootBlock)
@@ -89,8 +87,11 @@ func (p *PipelineFunctionalSuite) SetupTest() {
 
 	// Create real storages
 	var err error
-	p.pdb = pebbleStorage.NewBootstrappedRegistersWithPathForTest(t, p.tmpDir, rootBlock.Height, sealedBlock.Height)
-	p.persistentRegisters, err = pebbleStorage.NewRegisters(p.pdb, pebbleStorage.PruningDisabled)
+	// Use a separate directory for the register database to avoid lock conflicts
+	p.registerTmpDir = unittest.TempDir(t)
+	registerDB := pebbleStorage.NewBootstrappedRegistersWithPathForTest(t, p.registerTmpDir, rootBlock.Height, sealedBlock.Height)
+	p.registerDB = pebbleimpl.ToDB(registerDB)
+	p.persistentRegisters, err = pebbleStorage.NewRegisters(registerDB, pebbleStorage.PruningDisabled)
 	p.Require().NoError(err)
 
 	p.persistentEvents = store.NewEvents(p.metrics, p.db)
@@ -168,9 +169,10 @@ func (p *PipelineFunctionalSuite) SetupTest() {
 // It closes database connections and removes temporary directories
 // to ensure a clean state for subsequent tests.
 func (p *PipelineFunctionalSuite) TearDownTest() {
-	p.Require().NoError(p.pdb.Close())
-	p.Require().NoError(p.bdb.Close())
+	p.Require().NoError(p.db.Close())
+	p.Require().NoError(p.registerDB.Close())
 	p.Require().NoError(os.RemoveAll(p.tmpDir))
+	p.Require().NoError(os.RemoveAll(p.registerTmpDir))
 }
 
 // TestPipelineCompletesSuccessfully verifies the successful completion of the pipeline.

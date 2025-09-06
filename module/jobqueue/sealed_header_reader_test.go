@@ -3,7 +3,7 @@ package jobqueue_test
 import (
 	"testing"
 
-	"github.com/dgraph-io/badger/v2"
+	"github.com/cockroachdb/pebble/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -55,7 +55,7 @@ func RunWithReader(
 	withBlockReader func(*jobqueue.SealedBlockHeaderReader, []*flow.Block),
 ) {
 	require.Equal(t, blockCount%2, 0, "block count for this test should be even")
-	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+	unittest.RunWithPebbleDB(t, func(pdb *pebble.DB) {
 
 		blocks := make([]*flow.Block, blockCount)
 		blocksByHeight := make(map[uint64]*flow.Block, blockCount)

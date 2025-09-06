@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dgraph-io/badger/v2"
+	"github.com/cockroachdb/pebble/v2"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
@@ -18,7 +18,7 @@ import (
 	"github.com/onflow/flow-go/module/jobqueue"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/trace"
-	"github.com/onflow/flow-go/storage/operation/badgerimpl"
+	"github.com/onflow/flow-go/storage/operation/pebbleimpl"
 	"github.com/onflow/flow-go/storage/store"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -119,10 +119,10 @@ func withConsumer(
 	withBlockConsumer func(*blockconsumer.BlockConsumer, []*flow.Block),
 ) {
 
-	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+	unittest.RunWithPebbleDB(t, func(pdb *pebble.DB) {
 		maxProcessing := uint64(workerCount)
 
-		processedHeight := store.NewConsumerProgress(badgerimpl.ToDB(db), module.ConsumeProgressVerificationBlockHeight)
+		processedHeight := store.NewConsumerProgress(pebbleimpl.ToDB(pdb), module.ConsumeProgressVerificationBlockHeight)
 		collector := &metrics.NoopCollector{}
 		tracer := trace.NewNoopTracer()
 		log := unittest.Logger()
