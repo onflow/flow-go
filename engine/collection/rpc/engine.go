@@ -5,7 +5,6 @@ package rpc
 import (
 	"context"
 	"fmt"
-	"net"
 
 	grpc_prometheus "github.com/grpc-ecosystem/go-grpc-prometheus"
 	"github.com/onflow/flow/protobuf/go/flow/access"
@@ -21,6 +20,7 @@ import (
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/grpcserver"
 )
 
@@ -41,99 +41,44 @@ type Config struct {
 // Engine implements a gRPC server with a simplified version of the Observation
 // API to enable receiving transactions into the system.
 type Engine struct {
-	unit    *engine.Unit
+	component.Component
+	server  *grpcserver.GrpcServer
+	handler *handler
 	log     zerolog.Logger
-	handler *handler     // the gRPC service implementation
-	server  *grpc.Server // the gRPC server
-	config  Config
 }
 
 // New returns a new ingress server.
 func New(
+	log zerolog.Logger,
+	server *grpcserver.GrpcServer,
 	config Config,
 	backend Backend,
-	log zerolog.Logger,
 	chainID flow.ChainID,
-	apiRatelimits map[string]int, // the api rate limit (max calls per second) for each of the gRPC API e.g. Ping->100, ExecuteScriptAtBlockID->300
-	apiBurstLimits map[string]int, // the api burst limit (max calls at the same time) for each of the gRPC API e.g. Ping->50, ExecuteScriptAtBlockID->10
 ) *Engine {
-	// create a GRPC server to serve GRPC clients
-	grpcOpts := []grpc.ServerOption{
-		grpc.MaxRecvMsgSize(int(config.MaxMsgSize)),
-		grpc.MaxSendMsgSize(int(config.MaxMsgSize)),
-	}
+	log = log.With().Str("engine", "collection_rpc").Logger()
 
-	var interceptors []grpc.UnaryServerInterceptor // ordered list of interceptors
-	// if rpc metrics is enabled, add the grpc metrics interceptor as a server option
-	if config.RpcMetricsEnabled {
-		interceptors = append(interceptors, grpc_prometheus.UnaryServerInterceptor)
-	}
-
-	if len(apiRatelimits) > 0 {
-		// create a rate limit interceptor
-		rateLimitInterceptor := grpcserver.NewRateLimiterInterceptor(log, apiRatelimits, apiBurstLimits).UnaryServerInterceptor
-		// append the rate limit interceptor to the list of interceptors
-		interceptors = append(interceptors, rateLimitInterceptor)
-	}
-
-	// create a chained unary interceptor
-	chainedInterceptors := grpc.ChainUnaryInterceptor(interceptors...)
-	grpcOpts = append(grpcOpts, chainedInterceptors)
-
-	server := grpc.NewServer(grpcOpts...)
-
-	e := &Engine{
-		unit: engine.NewUnit(),
-		log:  log.With().Str("engine", "collection_rpc").Logger(),
-		handler: &handler{
-			UnimplementedAccessAPIServer: access.UnimplementedAccessAPIServer{},
-			backend:                      backend,
-			chainID:                      chainID,
-		},
-		server: server,
-		config: config,
+	handler := &handler{
+		UnimplementedAccessAPIServer: access.UnimplementedAccessAPIServer{},
+		backend:                      backend,
+		chainID:                      chainID,
 	}
 
 	if config.RpcMetricsEnabled {
 		grpc_prometheus.EnableHandlingTimeHistogram()
-		grpc_prometheus.Register(server)
+		server.RegisterService(func(s *grpc.Server) {
+			grpc_prometheus.Register(s)
+		})
 	}
 
-	access.RegisterAccessAPIServer(e.server, e.handler)
+	server.RegisterService(func(s *grpc.Server) {
+		access.RegisterAccessAPIServer(s, handler)
+	})
 
-	return e
-}
-
-// Ready returns a ready channel that is closed once the module has fully
-// started. The ingress module is ready when the gRPC server has successfully
-// started.
-func (e *Engine) Ready() <-chan struct{} {
-	e.unit.Launch(e.serve)
-	return e.unit.Ready()
-}
-
-// Done returns a done channel that is closed once the module has fully stopped.
-// It sends a signal to stop the gRPC server, then closes the channel.
-func (e *Engine) Done() <-chan struct{} {
-	return e.unit.Done(e.server.GracefulStop)
-}
-
-// serve starts the gRPC server .
-//
-// When this function returns, the server is considered ready.
-func (e *Engine) serve() {
-
-	e.log.Info().Msgf("starting server on address %s", e.config.ListenAddr)
-
-	l, err := net.Listen("tcp", e.config.ListenAddr)
-	if err != nil {
-		e.log.Fatal().Err(err).Msg("failed to start server")
-		return
-	}
-
-	err = e.server.Serve(l)
-	if err != nil {
-		e.log.Error().Err(err).Msg("fatal error in server")
+	return &Engine{
+		Component: server,
+		server:    server,
+		handler:   handler,
+		log:       log,
 	}
 }
 
