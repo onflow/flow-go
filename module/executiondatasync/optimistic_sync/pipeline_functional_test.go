@@ -39,6 +39,7 @@ type PipelineFunctionalSuite struct {
 	txResultErrMsgsRequester      *txerrmsgsmock.Requester
 	txResultErrMsgsRequestTimeout time.Duration
 	tmpDir                        string
+	registerTmpDir                string
 	registerDB                    storage.DB
 	db                            storage.DB
 	lockManager                   lockctx.Manager
@@ -86,7 +87,9 @@ func (p *PipelineFunctionalSuite) SetupTest() {
 
 	// Create real storages
 	var err error
-	registerDB := pebbleStorage.NewBootstrappedRegistersWithPathForTest(t, p.tmpDir, rootBlock.Height, sealedBlock.Height)
+	// Use a separate directory for the register database to avoid lock conflicts
+	p.registerTmpDir = unittest.TempDir(t)
+	registerDB := pebbleStorage.NewBootstrappedRegistersWithPathForTest(t, p.registerTmpDir, rootBlock.Height, sealedBlock.Height)
 	p.registerDB = pebbleimpl.ToDB(registerDB)
 	p.persistentRegisters, err = pebbleStorage.NewRegisters(registerDB, pebbleStorage.PruningDisabled)
 	p.Require().NoError(err)
@@ -169,6 +172,7 @@ func (p *PipelineFunctionalSuite) TearDownTest() {
 	p.Require().NoError(p.db.Close())
 	p.Require().NoError(p.registerDB.Close())
 	p.Require().NoError(os.RemoveAll(p.tmpDir))
+	p.Require().NoError(os.RemoveAll(p.registerTmpDir))
 }
 
 // TestPipelineCompletesSuccessfully verifies the successful completion of the pipeline.
