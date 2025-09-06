@@ -392,12 +392,10 @@ func main() {
 			rawMempool := stdmap.NewIncorporatedResultSeals(sealLimit)
 			multipleReceiptsFilterMempool := consensusMempools.NewIncorporatedResultSeals(rawMempool, node.Storage.Receipts)
 
-			dbStore := node.ProtocolDB
-
 			seals, err = consensusMempools.NewExecStateForkSuppressor(
 				multipleReceiptsFilterMempool,
 				consensusMempools.LogForkAndCrash(node.Logger),
-				dbStore,
+				node.ProtocolDB,
 				node.Logger,
 			)
 			if err != nil {

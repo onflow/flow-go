@@ -43,9 +43,9 @@ import (
 // Each worker submits batchesPerWorker*blocksPerBatch blocks
 // In total we will submit workers*batchesPerWorker*blocksPerBatch
 func TestFollowerHappyPath(t *testing.T) {
-	lockManager := storage.NewTestingLockManager()
 	allIdentities := unittest.CompleteIdentitySet()
 	rootSnapshot := unittest.RootSnapshotFixture(allIdentities)
+	lockManager := storage.NewTestingLockManager()
 	unittest.RunWithPebbleDB(t, func(pdb *pebble.DB) {
 		metrics := metrics.NewNoopCollector()
 		tracer := trace.NewNoopTracer()

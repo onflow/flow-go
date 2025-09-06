@@ -64,8 +64,7 @@ func (suite *MutatorSuite) SetupTest() {
 	suite.dbdir = unittest.TempDir(suite.T())
 	pdb := unittest.PebbleDB(suite.T(), suite.dbdir)
 	suite.db = pebbleimpl.ToDB(pdb)
-	lockManager := storage.NewTestingLockManager()
-	suite.lockManager = lockManager
+	suite.lockManager = storage.NewTestingLockManager()
 
 	metrics := metrics.NewNoopCollector()
 	tracer := trace.NewNoopTracer()
@@ -103,7 +102,7 @@ func (suite *MutatorSuite) SetupTest() {
 	state, err := pbadger.Bootstrap(
 		metrics,
 		suite.db,
-		lockManager,
+		suite.lockManager,
 		all.Headers,
 		all.Seals,
 		all.Results,

@@ -18,9 +18,9 @@ import (
 	"github.com/onflow/flow-go/follower/database"
 	"github.com/onflow/flow-go/state/protocol/datastore"
 	"github.com/onflow/flow-go/state/protocol/protocol_state"
+	"github.com/onflow/flow-go/storage/operation/pebbleimpl"
 
 	"github.com/dapperlabs/testingdock"
-	badgerv2 "github.com/dgraph-io/badger/v2"
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	dockercontainer "github.com/docker/docker/api/types/container"
@@ -56,7 +56,6 @@ import (
 	"github.com/onflow/flow-go/state/protocol/inmem"
 	"github.com/onflow/flow-go/state/protocol/protocol_state/kvstore"
 	"github.com/onflow/flow-go/storage"
-	badgerstorage "github.com/onflow/flow-go/storage/badger"
 	"github.com/onflow/flow-go/utils/io"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -671,11 +670,9 @@ func PrepareFlowNetwork(t *testing.T, networkConf NetworkConfig, chainID flow.Ch
 }
 
 func (net *FlowNetwork) addConsensusFollower(t *testing.T, rootProtocolSnapshotPath string, followerConf ConsensusFollowerConfig, _ []ContainerConfig) {
-	lockManager := storage.NewTestingLockManager()
 	tmpdir := makeTempSubDir(t, net.baseTempdir, "flow-consensus-follower")
 
 	// create a directory for the follower database
-	dataDir := makeDir(t, tmpdir, DefaultFlowDBDir)
 	pebbleDir := makeDir(t, tmpdir, DefaultFlowPebbleDBDir)
 
 	pebbleDB, _, err := database.InitPebbleDB(net.log, pebbleDir)
@@ -691,22 +688,13 @@ func (net *FlowNetwork) addConsensusFollower(t *testing.T, rootProtocolSnapshotP
 	require.NoError(t, err)
 
 	// consensus follower
-	dbOpts := badgerv2.
-		DefaultOptions(dataDir).
-		WithKeepL0InMemory(true).
-		WithValueLogFileSize(128 << 23).
-		WithValueLogMaxEntries(100000) // Default is 1000000
-	badgerDB, err := badgerstorage.InitPublic(dbOpts)
-	require.NoError(t, err)
+	lockManager := storage.NewTestingLockManager()
 
 	bindAddr := gonet.JoinHostPort("localhost", testingdock.RandomPort(t))
+	protocolDB := pebbleimpl.ToDB(pebbleDB)
 	opts := append(
 		followerConf.Opts,
-		consensus_follower.WithDB(badgerDB),
-		// this is required, otherwise consensus follower will create a pebble db at the default
-		// path /data/protocol-pebble, which is outside of the tmpdir, and will run into permission
-		// denied error.
-		consensus_follower.WithPebbleDB(pebbleDB),
+		consensus_follower.WithProtocolDB(protocolDB),
 		consensus_follower.WithBootstrapDir(followerBootstrapDir),
 		// each consenesus follower will have a different lock manager singleton
 		consensus_follower.WithLockManager(lockManager),

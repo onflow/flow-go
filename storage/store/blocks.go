@@ -149,6 +149,18 @@ func (b *Blocks) ByView(view uint64) (*flow.Block, error) {
 	return b.ByID(blockID)
 }
 
+// ProposalByView returns the block proposal with the given view. It is only available for certified blocks.
+//
+// Expected errors during normal operations:
+//   - `storage.ErrNotFound` if no certified block is known at given view.
+func (b *Blocks) ProposalByView(view uint64) (*flow.Proposal, error) {
+	blockID, err := b.headers.BlockIDByView(view)
+	if err != nil {
+		return nil, err
+	}
+	return b.retrieveProposal(blockID)
+}
+
 // ByHeight returns the block at the given height. It is only available
 // for finalized blocks.
 //

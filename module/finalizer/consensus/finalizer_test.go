@@ -84,9 +84,9 @@ func TestMakeFinalValidChain(t *testing.T) {
 			return operation.IndexFinalizedBlockByHeight(lctx, rw, final.Height, final.ID())
 		})
 		require.NoError(t, err)
+		lctx.Release()
 
 		// insert the finalized block header into the DB
-
 		insertLctx := lockManager.NewContext()
 		require.NoError(t, insertLctx.AcquireLock(storage.LockInsertBlock))
 		err = dbImpl.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
@@ -145,14 +145,14 @@ func TestMakeFinalInvalidHeight(t *testing.T) {
 	var list []flow.Identifier
 
 	unittest.RunWithPebbleDB(t, func(pdb *pebble.DB) {
+		dbImpl := pebbleimpl.ToDB(pdb)
+
 		// set up lock context
 		lockManager := storage.NewTestingLockManager()
 		lctx := lockManager.NewContext()
 		err := lctx.AcquireLock(storage.LockFinalizeBlock)
 		require.NoError(t, err)
 		defer lctx.Release()
-
-		dbImpl := pebbleimpl.ToDB(pdb)
 
 		// insert the latest finalized height
 		err = dbImpl.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
@@ -165,6 +165,7 @@ func TestMakeFinalInvalidHeight(t *testing.T) {
 			return operation.IndexFinalizedBlockByHeight(lctx, rw, final.Height, final.ID())
 		})
 		require.NoError(t, err)
+		lctx.Release()
 
 		// insert the finalized block header into the DB
 		insertLctx := lockManager.NewContext()
@@ -221,12 +222,12 @@ func TestMakeFinalDuplicate(t *testing.T) {
 	unittest.RunWithPebbleDB(t, func(pdb *pebble.DB) {
 		// set up lock context
 		lockManager := storage.NewTestingLockManager()
+		dbImpl := pebbleimpl.ToDB(pdb)
+
 		lctx := lockManager.NewContext()
 		err := lctx.AcquireLock(storage.LockFinalizeBlock)
 		require.NoError(t, err)
 		defer lctx.Release()
-
-		dbImpl := pebbleimpl.ToDB(pdb)
 
 		// insert the latest finalized height
 		err = dbImpl.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
@@ -239,6 +240,7 @@ func TestMakeFinalDuplicate(t *testing.T) {
 			return operation.IndexFinalizedBlockByHeight(lctx, rw, final.Height, final.ID())
 		})
 		require.NoError(t, err)
+		lctx.Release()
 
 		// insert the finalized block header into the DB
 		insertLctx := lockManager.NewContext()

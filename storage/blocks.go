@@ -63,11 +63,16 @@ type Blocks interface {
 	// Certified blocks are the blocks that have received a QC. Hotstuff guarantees that for each view,
 	// at most one block is certified. Hence, the return value of `ByView` is guaranteed to be unique
 	// even for non-finalized blocks.
+	//
 	// Expected errors during normal operations:
 	//   - `storage.ErrNotFound` if no certified block is known at given view.
+	ByView(view uint64) (*flow.Block, error)
+
+	// ProposalByView returns the block proposal with the given view. It is only available for certified blocks.
 	//
-	// TODO: this method is not available until next spork (mainnet27) or a migration that builds the index.
-	// ByView(view uint64) (*flow.Header, error)
+	// Expected errors during normal operations:
+	//   - `storage.ErrNotFound` if no certified block is known at given view.
+	ProposalByView(view uint64) (*flow.Proposal, error)
 
 	// ByCollectionID returns the block for the given [flow.CollectionGuarantee] ID.
 	// This method is only available for collections included in finalized blocks.
