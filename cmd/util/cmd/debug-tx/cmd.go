@@ -14,15 +14,18 @@ import (
 	"github.com/onflow/flow/protobuf/go/flow/executiondata"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
+	"go.opentelemetry.io/otel/exporters/stdout/stdouttrace"
 	"golang.org/x/exp/slices"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 
 	sdk "github.com/onflow/flow-go-sdk"
 
+	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/grpcclient"
+	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/utils/debug"
 )
 
@@ -40,6 +43,7 @@ var (
 	flagCollectionID        string
 	flagBlockID             string
 	flagUseVM               bool
+	flagTracePath           string
 )
 
 var Cmd = &cobra.Command{
@@ -77,6 +81,8 @@ func init() {
 	Cmd.Flags().StringVar(&flagBlockID, "block-id", "", "block ID")
 
 	Cmd.Flags().BoolVar(&flagUseVM, "use-vm", false, "use the VM for transaction execution (default: false)")
+
+  Cmd.Flags().StringVar(&flagTracePath, "trace", "", "enable tracing to given path")
 }
 
 func run(_ *cobra.Command, args []string) {
@@ -263,7 +269,56 @@ func runBlockID(
 
 	blockSnapshot := newBlockSnapshot(remoteSnapshot)
 
-	debugger := debug.NewRemoteDebugger(chain, log.Logger, flagUseVM, flagUseVM)
+  var fvmOptions []fvm.Option
+
+	if flagTracePath != "" {
+
+		var traceFile *os.File
+		if flagTracePath == "-" {
+			traceFile = os.Stdout
+		} else {
+			traceFile, err = os.Create(flagTracePath)
+			if err != nil {
+				log.Fatal().Err(err).Msg("failed to create trace file")
+			}
+			defer traceFile.Close()
+		}
+
+		exporter, err := stdouttrace.New(
+			stdouttrace.WithWriter(traceFile),
+		)
+		if err != nil {
+			log.Fatal().Err(err).Msg("failed to create trace exporter")
+		}
+
+		tracer, err := trace.NewTracerWithExporter(
+			log.Logger,
+			"debug-tx",
+			flagChain,
+			trace.SensitivityCaptureAll,
+			exporter,
+		)
+		if err != nil {
+			log.Fatal().Err(err).Msg("failed to create tracer")
+		}
+
+		span, _ := tracer.StartTransactionSpan(context.TODO(), txID, "")
+		defer span.End()
+
+		fvmOptions = append(
+			fvmOptions,
+			fvm.WithTracer(tracer),
+			fvm.WithSpan(span),
+		)
+	}
+
+	debugger := debug.NewRemoteDebugger(
+		chain,
+		log.Logger,
+    flagUseVM,
+    flagUseVM,
+		fvmOptions...,
+	)
 
 	for _, blockTx := range txsResult {
 		blockTxID := flow.Identifier(blockTx.ID())

@@ -23,18 +23,25 @@ func NewRemoteDebugger(
 	logger zerolog.Logger,
 	vmTransactionExecutionEnabled bool,
 	vmScriptExecutionEnabled bool,
+	options ...fvm.Option,
 ) *RemoteDebugger {
 	vm := fvm.NewVirtualMachine()
 
 	// no signature processor here
 	// TODO Maybe we add fee-deduction step as well
+
 	ctx := fvm.NewContext(
-		fvm.WithLogger(logger),
-		fvm.WithChain(chain),
-		fvm.WithAuthorizationChecksEnabled(false),
-		fvm.WithEVMEnabled(true),
-		fvm.WithVMTransactionExecutionEnabled(vmTransactionExecutionEnabled),
-		fvm.WithVMScriptExecutionEnabled(vmScriptExecutionEnabled),
+		append(
+			[]fvm.Option{
+				fvm.WithLogger(logger),
+				fvm.WithChain(chain),
+				fvm.WithAuthorizationChecksEnabled(false),
+				fvm.WithEVMEnabled(true),
+				fvm.WithVMTransactionExecutionEnabled(vmTransactionExecutionEnabled),
+				fvm.WithVMScriptExecutionEnabled(vmScriptExecutionEnabled),
+			},
+			options...,
+		)...,
 	)
 
 	return &RemoteDebugger{

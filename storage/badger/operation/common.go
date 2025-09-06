@@ -13,37 +13,6 @@ import (
 	"github.com/onflow/flow-go/storage"
 )
 
-// batchWrite will encode the given entity using msgpack and will upsert the resulting
-// binary data in the badger wrote batch under the provided key - if the value already exists
-// in the database it will be overridden.
-// No errors are expected during normal operation.
-func batchWrite(key []byte, entity interface{}) func(writeBatch *badger.WriteBatch) error {
-	return func(writeBatch *badger.WriteBatch) error {
-
-		// update the maximum key size if the inserted key is bigger
-		if uint32(len(key)) > max {
-			max = uint32(len(key))
-			err := SetMax(writeBatch)
-			if err != nil {
-				return fmt.Errorf("could not update max tracker: %w", err)
-			}
-		}
-
-		// serialize the entity data
-		val, err := msgpack.Marshal(entity)
-		if err != nil {
-			return irrecoverable.NewExceptionf("could not encode entity: %w", err)
-		}
-
-		// persist the entity data into the DB
-		err = writeBatch.Set(key, val)
-		if err != nil {
-			return irrecoverable.NewExceptionf("could not store data: %w", err)
-		}
-		return nil
-	}
-}
-
 // insert will encode the given entity using msgpack and will insert the resulting
 // binary data in the badger DB under the provided key. It will error if the
 // key already exists.
@@ -175,19 +144,6 @@ func remove(key []byte) func(*badger.Txn) error {
 	}
 }
 
-// batchRemove removes entry under a given key in a write-batch.
-// if key doesn't exist, does nothing.
-// No errors are expected during normal operation.
-func batchRemove(key []byte) func(writeBatch *badger.WriteBatch) error {
-	return func(writeBatch *badger.WriteBatch) error {
-		err := writeBatch.Delete(key)
-		if err != nil {
-			return irrecoverable.NewExceptionf("could not batch delete data: %w", err)
-		}
-		return nil
-	}
-}
-
 // removeByPrefix removes all the entities if the prefix of the key matches the given prefix.
 // if no key matches, this is a no-op
 // No errors are expected during normal operation.
@@ -306,14 +262,6 @@ func lookup(entityIDs *[]flow.Identifier) func() (checkFunc, createFunc, handleF
 		}
 		return check, create, handle
 	}
-}
-
-// withPrefetchValuesFalse configures a Badger iteration to NOT preemptively load
-// the values when iterating over keys (ie. key-only iteration). Key-only iteration
-// is several order of magnitudes faster than regular iteration, because it involves
-// access to the LSM-tree only, which is usually resident entirely in RAM.
-func withPrefetchValuesFalse(options *badger.IteratorOptions) {
-	options.PrefetchValues = false
 }
 
 // iterate iterates over a range of keys defined by a start and end key. The

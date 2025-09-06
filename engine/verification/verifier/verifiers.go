@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/jordanschalm/lockctx"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 
@@ -31,6 +32,7 @@ import (
 // pruned.
 // Note, it returns nil if certain block is not executed, in this case warning will be logged
 func VerifyLastKHeight(
+	lockManager lockctx.Manager,
 	k uint64,
 	chainID flow.ChainID,
 	protocolDataDir string,
@@ -38,6 +40,7 @@ func VerifyLastKHeight(
 	nWorker uint,
 	stopOnMismatch bool,
 	transactionFeesDisabled bool,
+	scheduledCallbacksEnabled bool,
 	vmScriptExecutionEnabled bool,
 	vmTransactionExecutionEnabled bool,
 ) (err error) {
@@ -46,6 +49,7 @@ func VerifyLastKHeight(
 		protocolDataDir,
 		chunkDataPackDir,
 		transactionFeesDisabled,
+		scheduledCallbacksEnabled,
 		vmScriptExecutionEnabled,
 		vmTransactionExecutionEnabled,
 	)
@@ -95,6 +99,7 @@ func VerifyLastKHeight(
 // VerifyRange verifies all chunks in the results of the blocks in the given range.
 // Note, it returns nil if certain block is not executed, in this case warning will be logged
 func VerifyRange(
+	lockManager lockctx.Manager,
 	from, to uint64,
 	chainID flow.ChainID,
 	protocolDataDir string,
@@ -102,6 +107,7 @@ func VerifyRange(
 	nWorker uint,
 	stopOnMismatch bool,
 	transactionFeesDisabled bool,
+  scheduledCallbacksEnabled bool,
 	vmScriptExecutionEnabled bool,
 	vmTransactionExecutionEnabled bool,
 ) (err error) {
@@ -110,6 +116,7 @@ func VerifyRange(
 		protocolDataDir,
 		chunkDataPackDir,
 		transactionFeesDisabled,
+		scheduledCallbacksEnabled,
 		vmScriptExecutionEnabled,
 		vmTransactionExecutionEnabled,
 	)
@@ -236,26 +243,31 @@ func verifyConcurrently(
 }
 
 func initStorages(
+	lockManager lockctx.Manager,
 	chainID flow.ChainID,
 	dataDir string,
 	chunkDataPackDir string,
 	transactionFeesDisabled bool,
+	scheduledCallbacksEnabled bool,
 	vmScriptExecutionEnabled bool,
 	vmTransactionExecutionEnabled bool,
 ) (
 	func() error,
-	*storage.All,
+	*store.All,
 	storage.ChunkDataPacks,
 	protocol.State,
 	module.ChunkVerifier,
 	error,
 ) {
-	db := common.InitStorage(dataDir)
+	db, err := common.InitStorage(dataDir)
+	if err != nil {
+		return nil, nil, nil, nil, nil, fmt.Errorf("could not init storage database: %w", err)
+	}
 
 	storages := common.InitStorages(db)
-	state, err := common.InitProtocolState(db, storages)
+	state, err := common.OpenProtocolState(lockManager, db, storages)
 	if err != nil {
-		return nil, nil, nil, nil, nil, fmt.Errorf("could not init protocol state: %w", err)
+		return nil, nil, nil, nil, nil, fmt.Errorf("could not open protocol state: %w", err)
 	}
 
 	// require the chunk data pack data must exist before returning the storage module
@@ -272,9 +284,11 @@ func initStorages(
 		chainID,
 		storages.Headers,
 		transactionFeesDisabled,
+		scheduledCallbacksEnabled,
 		vmScriptExecutionEnabled,
 		vmTransactionExecutionEnabled,
 	)
+
 	closer := func() error {
 		var dbErr, chunkDataPackDBErr error
 
@@ -352,6 +366,7 @@ func makeVerifier(
 	chainID flow.ChainID,
 	headers storage.Headers,
 	transactionFeesDisabled bool,
+	scheduledCallbacksEnabled bool,
 	vmScriptExecutionEnabled bool,
 	vmTransactionExecutionEnabled bool,
 ) module.ChunkVerifier {
@@ -375,7 +390,7 @@ func makeVerifier(
 		computation.DefaultFVMOptions(
 			chainID,
 			false,
-			true,
+			scheduledCallbacksEnabled,
 		)...,
 	)
 	vmCtx := fvm.NewContext(fvmOptions...)
