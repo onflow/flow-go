@@ -398,7 +398,7 @@ func (t *Transactions) GetTransactionResult(
 		}
 
 		if err != nil {
-			irrecoverable.Throw(ctx, err)
+			irrecoverable.Throw(ctx, fmt.Errorf("failed to derive transaction status: %w", err))
 			return nil, err
 		}
 

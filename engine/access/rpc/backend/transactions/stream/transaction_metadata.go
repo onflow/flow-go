@@ -144,7 +144,7 @@ func (t *TransactionMetadata) refreshStatus(ctx context.Context) error {
 
 		t.txResult.Status, err = t.txStatusDeriver.DeriveUnknownTransactionStatus(t.txReferenceBlockID)
 		if err != nil {
-			irrecoverable.Throw(ctx, err)
+			irrecoverable.Throw(ctx, fmt.Errorf("failed to derive unknown transaction status: %w", err))
 			return err
 		}
 		return nil
@@ -154,7 +154,7 @@ func (t *TransactionMetadata) refreshStatus(ctx context.Context) error {
 	// Recheck the status to ensure it's accurate.
 	t.txResult.Status, err = t.txStatusDeriver.DeriveFinalizedTransactionStatus(t.blockWithTx.Height, t.txResult.IsExecuted())
 	if err != nil {
-		irrecoverable.Throw(ctx, fmt.Errorf("failed to derive transaction status: %w", err))
+		irrecoverable.Throw(ctx, fmt.Errorf("failed to derive finalized transaction status: %w", err))
 		return err
 	}
 	return nil
