@@ -10,7 +10,6 @@ import (
 
 	"github.com/onflow/flow-go/engine/access/rpc/backend/transactions/status"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/state"
 	"github.com/onflow/flow-go/storage"
 )
 
@@ -138,14 +137,11 @@ func (r *RetrierImpl) retryTxsAtHeight(heightToRetry uint64) error {
 		if block == nil {
 			status, err = r.txStatusDeriver.DeriveUnknownTransactionStatus(tx.ReferenceBlockID)
 		} else {
-			status, err = r.txStatusDeriver.DeriveTransactionStatus(block.Height, false)
+			status, err = r.txStatusDeriver.DeriveFinalizedTransactionStatus(block.Height, false)
 		}
 
 		if err != nil {
-			if !errors.Is(err, state.ErrUnknownSnapshotReference) {
-				return err
-			}
-			continue
+			return err
 		}
 		if status == flow.TransactionStatusPending {
 			err = r.txSender.SendRawTransaction(context.Background(), tx)

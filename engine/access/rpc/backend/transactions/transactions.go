@@ -29,7 +29,6 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/irrecoverable"
-	"github.com/onflow/flow-go/state"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
 )
@@ -395,14 +394,12 @@ func (t *Transactions) GetTransactionResult(
 		if block == nil {
 			txStatus, err = t.txStatusDeriver.DeriveUnknownTransactionStatus(tx.ReferenceBlockID)
 		} else {
-			txStatus, err = t.txStatusDeriver.DeriveTransactionStatus(blockHeight, false)
+			txStatus, err = t.txStatusDeriver.DeriveFinalizedTransactionStatus(blockHeight, false)
 		}
 
 		if err != nil {
-			if !errors.Is(err, state.ErrUnknownSnapshotReference) {
-				irrecoverable.Throw(ctx, err)
-			}
-			return nil, rpc.ConvertStorageError(err)
+			irrecoverable.Throw(ctx, err)
+			return nil, err
 		}
 
 		txResult = &accessmodel.TransactionResult{
