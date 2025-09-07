@@ -1594,10 +1594,11 @@ func TransactionBodyFixture(opts ...func(*flow.TransactionBody)) flow.Transactio
 	return tb
 }
 
-func TransactionBodyListFixture(n int) []flow.TransactionBody {
-	l := make([]flow.TransactionBody, n)
+func TransactionBodyListFixture(n int) []*flow.TransactionBody {
+	l := make([]*flow.TransactionBody, n)
 	for i := 0; i < n; i++ {
-		l[i] = TransactionBodyFixture()
+		tx := TransactionBodyFixture()
+		l[i] = &tx
 	}
 
 	return l

@@ -18,7 +18,6 @@ import (
 	accessmodel "github.com/onflow/flow-go/model/access"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/irrecoverable"
-	"github.com/onflow/flow-go/state"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
 )
@@ -103,12 +102,10 @@ func (t *LocalTransactionProvider) TransactionResult(
 		txStatusCode = 1 // statusCode of 1 indicates an error and 0 indicates no error, the same as on EN
 	}
 
-	txStatus, err := t.txStatusDeriver.DeriveTransactionStatus(block.Height, true)
+	txStatus, err := t.txStatusDeriver.DeriveFinalizedTransactionStatus(block.Height, true)
 	if err != nil {
-		if !errors.Is(err, state.ErrUnknownSnapshotReference) {
-			irrecoverable.Throw(ctx, err)
-		}
-		return nil, rpc.ConvertStorageError(err)
+		irrecoverable.Throw(ctx, err)
+		return nil, err
 	}
 
 	events, err := t.eventsIndex.ByBlockIDTransactionID(blockID, block.Height, transactionID)
@@ -171,12 +168,10 @@ func (t *LocalTransactionProvider) TransactionResultByIndex(
 		txStatusCode = 1 // statusCode of 1 indicates an error and 0 indicates no error, the same as on EN
 	}
 
-	txStatus, err := t.txStatusDeriver.DeriveTransactionStatus(block.Height, true)
+	txStatus, err := t.txStatusDeriver.DeriveFinalizedTransactionStatus(block.Height, true)
 	if err != nil {
-		if !errors.Is(err, state.ErrUnknownSnapshotReference) {
-			irrecoverable.Throw(ctx, err)
-		}
-		return nil, rpc.ConvertStorageError(err)
+		irrecoverable.Throw(ctx, err)
+		return nil, err
 	}
 
 	events, err := t.eventsIndex.ByBlockIDTransactionIndex(blockID, block.Height, index)
@@ -261,12 +256,10 @@ func (t *LocalTransactionProvider) TransactionResultsByBlockID(
 			txStatusCode = 1
 		}
 
-		txStatus, err := t.txStatusDeriver.DeriveTransactionStatus(block.Height, true)
+		txStatus, err := t.txStatusDeriver.DeriveFinalizedTransactionStatus(block.Height, true)
 		if err != nil {
-			if !errors.Is(err, state.ErrUnknownSnapshotReference) {
-				irrecoverable.Throw(ctx, err)
-			}
-			return nil, rpc.ConvertStorageError(err)
+			irrecoverable.Throw(ctx, err)
+			return nil, err
 		}
 
 		events, err := t.eventsIndex.ByBlockIDTransactionID(blockID, block.Height, txResult.TransactionID)
