@@ -3,6 +3,7 @@ package provider
 import (
 	"context"
 	"errors"
+	"fmt"
 
 	"github.com/onflow/flow/protobuf/go/flow/entities"
 	execproto "github.com/onflow/flow/protobuf/go/flow/execution"
@@ -99,7 +100,7 @@ func (e *ENTransactionProvider) TransactionResult(
 	// tx body is irrelevant to status if it's in an executed block
 	txStatus, err := e.txStatusDeriver.DeriveFinalizedTransactionStatus(block.Height, true)
 	if err != nil {
-		irrecoverable.Throw(ctx, err)
+		irrecoverable.Throw(ctx, fmt.Errorf("failed to derive transaction status: %w", err))
 		return nil, err
 	}
 
@@ -151,7 +152,7 @@ func (e *ENTransactionProvider) TransactionResultByIndex(
 	// tx body is irrelevant to status if it's in an executed block
 	txStatus, err := e.txStatusDeriver.DeriveFinalizedTransactionStatus(block.Height, true)
 	if err != nil {
-		irrecoverable.Throw(ctx, err)
+		irrecoverable.Throw(ctx, fmt.Errorf("failed to derive transaction status: %w", err))
 		return nil, err
 	}
 
@@ -220,7 +221,7 @@ func (e *ENTransactionProvider) TransactionResultsByBlockID(
 			// tx body is irrelevant to status if it's in an executed block
 			txStatus, err := e.txStatusDeriver.DeriveFinalizedTransactionStatus(block.Height, true)
 			if err != nil {
-				irrecoverable.Throw(ctx, err)
+				irrecoverable.Throw(ctx, fmt.Errorf("failed to derive transaction status: %w", err))
 				return nil, err
 			}
 			events, err := convert.MessagesToEventsWithEncodingConversion(txResult.GetEvents(), resp.GetEventEncodingVersion(), requiredEventEncodingVersion)
@@ -267,7 +268,7 @@ func (e *ENTransactionProvider) TransactionResultsByBlockID(
 		systemTxResult := resp.TransactionResults[len(resp.TransactionResults)-1]
 		systemTxStatus, err := e.txStatusDeriver.DeriveFinalizedTransactionStatus(block.Height, true)
 		if err != nil {
-			irrecoverable.Throw(ctx, err)
+			irrecoverable.Throw(ctx, fmt.Errorf("failed to derive transaction status: %w", err))
 			return nil, err
 		}
 

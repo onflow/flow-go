@@ -102,7 +102,7 @@ func (t *LocalTransactionProvider) TransactionResult(
 
 	txStatus, err := t.txStatusDeriver.DeriveFinalizedTransactionStatus(block.Height, true)
 	if err != nil {
-		irrecoverable.Throw(ctx, err)
+		irrecoverable.Throw(ctx, fmt.Errorf("failed to derive transaction status: %w", err))
 		return nil, err
 	}
 
@@ -166,7 +166,7 @@ func (t *LocalTransactionProvider) TransactionResultByIndex(
 
 	txStatus, err := t.txStatusDeriver.DeriveFinalizedTransactionStatus(block.Height, true)
 	if err != nil {
-		irrecoverable.Throw(ctx, err)
+		irrecoverable.Throw(ctx, fmt.Errorf("failed to derive transaction status: %w", err))
 		return nil, err
 	}
 
@@ -252,7 +252,7 @@ func (t *LocalTransactionProvider) TransactionResultsByBlockID(
 
 		txStatus, err := t.txStatusDeriver.DeriveFinalizedTransactionStatus(block.Height, true)
 		if err != nil {
-			irrecoverable.Throw(ctx, err)
+			irrecoverable.Throw(ctx, fmt.Errorf("failed to derive transaction status: %w", err))
 			return nil, err
 		}
 
