@@ -1,6 +1,10 @@
 package operation
 
-import "github.com/onflow/flow-go/storage"
+import (
+	"github.com/hashicorp/go-multierror"
+
+	"github.com/onflow/flow-go/storage"
+)
 
 type multiDBStore struct {
 	rwStore storage.DB // primary read and write store
@@ -31,4 +35,17 @@ func (b *multiDBStore) WithReaderBatchWriter(fn func(storage.ReaderBatchWriter) 
 
 func (b *multiDBStore) NewBatch() storage.Batch {
 	return b.rwStore.NewBatch()
+}
+
+func (b *multiDBStore) Close() error {
+	var result *multierror.Error
+
+	if err := b.rwStore.Close(); err != nil {
+		result = multierror.Append(result, err)
+	}
+	if err := b.r.Close(); err != nil {
+		result = multierror.Append(result, err)
+	}
+
+	return result.ErrorOrNil()
 }

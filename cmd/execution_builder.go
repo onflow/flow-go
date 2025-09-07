@@ -94,7 +94,6 @@ import (
 	storageerr "github.com/onflow/flow-go/storage"
 	storage "github.com/onflow/flow-go/storage/badger"
 	"github.com/onflow/flow-go/storage/operation"
-	"github.com/onflow/flow-go/storage/operation/badgerimpl"
 	"github.com/onflow/flow-go/storage/operation/pebbleimpl"
 	storagepebble "github.com/onflow/flow-go/storage/pebble"
 	"github.com/onflow/flow-go/storage/store"
@@ -572,11 +571,13 @@ func (exeNode *ExecutionNode) LoadProviderEngine(
 		node.FvmOptions...,
 	)
 
-	opts = append(opts, computation.DefaultFVMOptions(
-		node.RootChainID,
-		exeNode.exeConf.computationConfig.CadenceTracing,
-		exeNode.exeConf.computationConfig.ExtensiveTracing,
-		exeNode.exeConf.scheduleCallbacksEnabled)...)
+	opts = append(opts,
+		computation.DefaultFVMOptions(
+			node.RootChainID,
+			exeNode.exeConf.computationConfig.ExtensiveTracing,
+			exeNode.exeConf.scheduleCallbacksEnabled,
+		)...,
+	)
 
 	vmCtx := fvm.NewContext(opts...)
 
@@ -743,7 +744,7 @@ func (exeNode *ExecutionNode) LoadExecutionState(
 	error,
 ) {
 
-	chunkDataPackDB, err := storagepebble.OpenDefaultPebbleDB(
+	chunkDataPackDB, err := storagepebble.SafeOpen(
 		node.Logger.With().Str("pebbledb", "cdp").Logger(),
 		exeNode.exeConf.chunkDataPackDir,
 	)
@@ -789,6 +790,7 @@ func (exeNode *ExecutionNode) LoadExecutionState(
 		node.Tracer,
 		exeNode.registerStore,
 		exeNode.exeConf.enableStorehouse,
+		node.StorageLockMgr,
 	)
 
 	height, _, err := exeNode.executionState.GetLastExecutedBlockID(context.Background())
@@ -1191,7 +1193,7 @@ func (exeNode *ExecutionNode) LoadFollowerCore(
 ) {
 	// create a finalizer that handles updating the protocol
 	// state when the follower detects newly finalized blocks
-	final := finalizer.NewFinalizer(node.DB, node.Storage.Headers, exeNode.followerState, node.Tracer)
+	final := finalizer.NewFinalizer(node.ProtocolDB.Reader(), node.Storage.Headers, exeNode.followerState, node.Tracer)
 
 	finalized, pending, err := recovery.FindLatest(node.State, node.Storage.Headers)
 	if err != nil {
@@ -1381,7 +1383,7 @@ func (exeNode *ExecutionNode) LoadBootstrapper(node *NodeConfig) error {
 	// in order to support switching from badger to pebble in the middle of the spork,
 	// we will check if the execution database has been bootstrapped by reading the state from badger db.
 	// and if not, bootstrap both badger and pebble db.
-	commit, bootstrapped, err := bootstrapper.IsBootstrapped(badgerimpl.ToDB(node.DB))
+	commit, bootstrapped, err := bootstrapper.IsBootstrapped(node.ProtocolDB)
 	if err != nil {
 		return fmt.Errorf("could not query database to know whether database has been bootstrapped: %w", err)
 	}
@@ -1408,12 +1410,7 @@ func (exeNode *ExecutionNode) LoadBootstrapper(node *NodeConfig) error {
 			return fmt.Errorf("could not load bootstrap state from checkpoint file: %w", err)
 		}
 
-		err = bootstrapper.BootstrapExecutionDatabase(badgerimpl.ToDB(node.DB), node.RootSeal)
-		if err != nil {
-			return fmt.Errorf("could not bootstrap execution database: %w", err)
-		}
-
-		err = bootstrapper.BootstrapExecutionDatabase(pebbleimpl.ToDB(node.PebbleDB), node.RootSeal)
+		err = bootstrapper.BootstrapExecutionDatabase(node.StorageLockMgr, node.ProtocolDB, node.RootSeal)
 		if err != nil {
 			return fmt.Errorf("could not bootstrap execution database: %w", err)
 		}
