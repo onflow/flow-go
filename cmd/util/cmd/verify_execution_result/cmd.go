@@ -59,9 +59,9 @@ func init() {
 
 	Cmd.Flags().BoolVar(&flagStopOnMismatch, "stop_on_mismatch", false, "stop verification on first mismatch")
 
-  Cmd.Flags().BoolVar(&flagTransactionFeesDisabled, "fees_disabled", false, "disable transaction fees")
+	Cmd.Flags().BoolVar(&flagTransactionFeesDisabled, "fees_disabled", false, "disable transaction fees")
 
-  Cmd.Flags().BoolVar(&flagScheduledCallbacksEnabled, "scheduled_callbacks_enabled", false, "enable scheduled callbacks")
+	Cmd.Flags().BoolVar(&flagScheduledCallbacksEnabled, "scheduled_callbacks_enabled", false, "enable scheduled callbacks")
 
 	Cmd.Flags().BoolVar(
 		&flagVMScriptExecutionEnabled,
@@ -105,7 +105,7 @@ func run(*cobra.Command, []string) {
 
 		lg.Info().Msgf("verifying range from %d to %d", from, to)
 
-    err = verifier.VerifyRange(
+		err = verifier.VerifyRange(
 			from,
 			to,
 			chainID,
@@ -114,7 +114,7 @@ func run(*cobra.Command, []string) {
 			flagWorkerCount,
 			flagStopOnMismatch,
 			flagTransactionFeesDisabled,
-      flagScheduledCallbacksEnabled,
+			flagScheduledCallbacksEnabled,
 			flagVMScriptExecutionEnabled,
 			flagVMTransactionExecutionEnabled,
 		)
@@ -133,7 +133,7 @@ func run(*cobra.Command, []string) {
 			flagWorkerCount,
 			flagStopOnMismatch,
 			flagTransactionFeesDisabled,
-      flagScheduledCallbacksEnabled,
+			flagScheduledCallbacksEnabled,
 			flagVMScriptExecutionEnabled,
 			flagVMTransactionExecutionEnabled,
 		)

@@ -45,6 +45,7 @@ func VerifyLastKHeight(
 	vmTransactionExecutionEnabled bool,
 ) (err error) {
 	closer, storages, chunkDataPacks, state, verifier, err := initStorages(
+		lockManager,
 		chainID,
 		protocolDataDir,
 		chunkDataPackDir,
@@ -107,11 +108,12 @@ func VerifyRange(
 	nWorker uint,
 	stopOnMismatch bool,
 	transactionFeesDisabled bool,
-  scheduledCallbacksEnabled bool,
+	scheduledCallbacksEnabled bool,
 	vmScriptExecutionEnabled bool,
 	vmTransactionExecutionEnabled bool,
 ) (err error) {
 	closer, storages, chunkDataPacks, state, verifier, err := initStorages(
+		lockManager,
 		chainID,
 		protocolDataDir,
 		chunkDataPackDir,

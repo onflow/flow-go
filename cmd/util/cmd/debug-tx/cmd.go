@@ -82,7 +82,7 @@ func init() {
 
 	Cmd.Flags().BoolVar(&flagUseVM, "use-vm", false, "use the VM for transaction execution (default: false)")
 
-  Cmd.Flags().StringVar(&flagTracePath, "trace", "", "enable tracing to given path")
+	Cmd.Flags().StringVar(&flagTracePath, "trace", "", "enable tracing to given path")
 }
 
 func run(_ *cobra.Command, args []string) {
@@ -269,7 +269,7 @@ func runBlockID(
 
 	blockSnapshot := newBlockSnapshot(remoteSnapshot)
 
-  var fvmOptions []fvm.Option
+	var fvmOptions []fvm.Option
 
 	if flagTracePath != "" {
 
@@ -315,8 +315,8 @@ func runBlockID(
 	debugger := debug.NewRemoteDebugger(
 		chain,
 		log.Logger,
-    flagUseVM,
-    flagUseVM,
+		flagUseVM,
+		flagUseVM,
 		fvmOptions...,
 	)
 
