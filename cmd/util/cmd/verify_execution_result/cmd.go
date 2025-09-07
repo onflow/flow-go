@@ -22,6 +22,7 @@ var (
 	flagWorkerCount                   uint // number of workers to verify the blocks concurrently
 	flagStopOnMismatch                bool
 	flagTransactionFeesDisabled       bool
+	flagScheduledCallbacksEnabled     bool
 	flagVMScriptExecutionEnabled      bool
 	flagVMTransactionExecutionEnabled bool
 )
@@ -106,6 +107,7 @@ func run(*cobra.Command, []string) {
 		lg.Info().Msgf("verifying range from %d to %d", from, to)
 
 		err = verifier.VerifyRange(
+			lockManager,
 			from,
 			to,
 			chainID,
@@ -126,6 +128,7 @@ func run(*cobra.Command, []string) {
 	} else {
 		lg.Info().Msgf("verifying last %d sealed blocks", flagLastK)
 		err := verifier.VerifyLastKHeight(
+			lockManager,
 			flagLastK,
 			chainID,
 			flagDatadir,
