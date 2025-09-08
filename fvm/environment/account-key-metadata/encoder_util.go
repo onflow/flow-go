@@ -25,6 +25,9 @@ func parseWeightAndRevokedStatusFromKeyMetadataBytes(b []byte) (
 	return parseNextLengthPrefixedData(b)
 }
 
+// parseStoredKeyMappingFromKeyMetadataBytes parses b and returns:
+// start index for mapping, raw mapping bytes, trailing bytes, and error (if any).
+// NOTE: b is expected to start with encoded start index for mapping.
 func parseStoredKeyMappingFromKeyMetadataBytes(b []byte) (
 	startIndexForMapping uint32,
 	mappingBytes []byte,
@@ -50,6 +53,9 @@ func parseStoredKeyMappingFromKeyMetadataBytes(b []byte) (
 	return
 }
 
+// parseDigestsFromKeyMetadataBytes parses b and returns:
+// start index for digests, raw digest bytes, trailing bytes, and error (if any).
+// NOTE: b is expected to start with encoded start index for digests.
 func parseDigestsFromKeyMetadataBytes(b []byte) (
 	startIndexForDigests uint32,
 	digestBytes []byte,
