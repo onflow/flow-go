@@ -52,15 +52,15 @@ func (c *ClusterBlockVote) ToInternal() (any, error) {
 // timing out in given round. Contains a sequential number for deduplication purposes.
 type ClusterTimeoutObject TimeoutObject
 
-// ToInternal converts the untrusted ClusterTimeoutObject into its trusted internal
-// representation.
+// ToInternal returns the internal type representation for ClusterTimeoutObject.
 //
-// This stub returns the receiver unchanged. A proper implementation
-// must perform validation checks and return a constructed internal
-// object.
+// All errors indicate that the decode target contains a structurally invalid representation of the internal model.TimeoutObject.
 func (c *ClusterTimeoutObject) ToInternal() (any, error) {
-	// TODO(malleability, #7704) implement with validation checks
-	return c, nil
+	internal, err := (*TimeoutObject)(c).ToInternal()
+	if err != nil {
+		return nil, fmt.Errorf("could not convert %T to internal type: %w", c, err)
+	}
+	return internal, nil
 }
 
 // CollectionGuarantee is a message representation of an CollectionGuarantee, which is used
