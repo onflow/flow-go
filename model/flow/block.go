@@ -304,6 +304,10 @@ type BlockVote struct {
 	SigData []byte
 }
 
+// NewBlockVote constructs a new block vote.It checks the consistency
+// requirements and errors otherwise:
+//
+//	BlockID == ZeroID and len(Block.SigData) == 0
 func NewBlockVote(blockID Identifier, view uint64, sigData []byte) (*BlockVote, error) {
 
 	if blockID == ZeroID {

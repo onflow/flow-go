@@ -371,6 +371,7 @@ func (e *Engine) propagateTransaction(log zerolog.Logger, tx *flow.TransactionBo
 	msg, err := messages.InternalToMessage(tx)
 	if err != nil {
 		e.log.Error().Err(err).Msg("failed to convert event to message")
+		return
 	}
 
 	err = e.conduit.Multicast(msg, e.config.PropagationRedundancy+1, txCluster.NodeIDs()...)
