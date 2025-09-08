@@ -210,6 +210,15 @@ func runBlockID(
 		header.Height,
 	)
 
+	log.Info().Msg("Fetching system transaction ...")
+
+	systemTx, err := flowClient.GetSystemTransaction(context.Background(), sdk.Identifier(blockID))
+	if err != nil {
+		log.Fatal().Err(err).Msg("Failed to fetch system transaction")
+	}
+
+	log.Info().Msgf("Fetched system transaction: %s", systemTx.ID())
+
 	remoteSnapshot, err := remoteClient.StorageSnapshot(blockHeight, blockID)
 	if err != nil {
 		log.Fatal().Err(err).Msg("failed to create storage snapshot")
@@ -268,9 +277,11 @@ func runBlockID(
 		fvmOptions...,
 	)
 
-	for i, blockTx := range blockTransactions {
-		if i == len(blockTransactions)-1 {
-			log.Info().Msg("Skipping last transaction of the block (system transaction)")
+	for _, blockTx := range blockTransactions {
+
+		// TODO: add support for executing system transactions
+		if blockTx.ID() == systemTx.ID() {
+			log.Info().Msg("Skipping system transaction")
 			continue
 		}
 
