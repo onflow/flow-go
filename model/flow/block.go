@@ -295,3 +295,32 @@ func NewBlockDigest(
 		Timestamp: timestamp,
 	}
 }
+
+// BlockVote is part of the consensus protocol and represents a consensus node
+// voting on the proposal of the leader of a given round.
+type BlockVote struct {
+	BlockID Identifier
+	View    uint64
+	SigData []byte
+}
+
+// NewBlockVote constructs a new block vote.It checks the consistency
+// requirements and errors otherwise:
+//
+//	BlockID == ZeroID and len(Block.SigData) == 0
+func NewBlockVote(blockID Identifier, view uint64, sigData []byte) (*BlockVote, error) {
+
+	if blockID == ZeroID {
+		return nil, fmt.Errorf("BlockID must not be empty")
+	}
+
+	if len(sigData) == 0 {
+		return nil, fmt.Errorf("SigData must not be empty")
+	}
+
+	return &BlockVote{
+		BlockID: blockID,
+		View:    view,
+		SigData: sigData,
+	}, nil
+}
