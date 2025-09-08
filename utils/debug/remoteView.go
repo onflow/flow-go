@@ -166,3 +166,32 @@ func (snapshot *ExecutionDataStorageSnapshot) Get(
 
 	return value, nil
 }
+
+// CachingStorageSnapshot is a storage snapshot that caches register values
+// in memory to avoid repeated calls to the backing snapshot.
+type CachingStorageSnapshot struct {
+	cache   *InMemoryRegisterCache
+	backing snapshot.StorageSnapshot
+}
+
+var _ snapshot.StorageSnapshot = (*CachingStorageSnapshot)(nil)
+
+func NewCachingStorageSnapshot(backing snapshot.StorageSnapshot) *CachingStorageSnapshot {
+	return &CachingStorageSnapshot{
+		cache:   NewInMemoryRegisterCache(),
+		backing: backing,
+	}
+}
+
+func (s *CachingStorageSnapshot) Get(id flow.RegisterID) (flow.RegisterValue, error) {
+	data, found := s.cache.Get(id.Key, id.Owner)
+	if found {
+		return data, nil
+	}
+
+	return s.backing.Get(id)
+}
+
+func (s *CachingStorageSnapshot) Set(id flow.RegisterID, value flow.RegisterValue) {
+	s.cache.Set(id.Key, id.Owner, value)
+}
