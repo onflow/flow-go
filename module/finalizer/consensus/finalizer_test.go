@@ -161,7 +161,7 @@ func TestMakeFinalInvalidHeight(t *testing.T) {
 		// another block at the same height is rejected. Hence, we should not be holding the lock anymore.
 		lctx.Release()
 
-		// insert the finalized block header into the DB
+		// Insert the latest finalized height and map the finalized height to the finalized block ID.
 		insertLctx := lockManager.NewContext()
 		require.NoError(t, insertLctx.AcquireLock(storage.LockInsertBlock))
 		err = dbImpl.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
@@ -214,26 +214,21 @@ func TestMakeFinalDuplicate(t *testing.T) {
 	var list []flow.Identifier
 
 	unittest.RunWithPebbleDB(t, func(pdb *pebble.DB) {
-		// set up lock context
 		lockManager := storage.NewTestingLockManager()
 		dbImpl := pebbleimpl.ToDB(pdb)
 
-		lctx := lockManager.NewContext()
-		err := lctx.AcquireLock(storage.LockFinalizeBlock)
-		require.NoError(t, err)
-		defer lctx.Release()
-
 		// insert the latest finalized height
-		err = dbImpl.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+		lctx := lockManager.NewContext()
+		require.NoError(t, lctx.AcquireLock(storage.LockFinalizeBlock))
+		err := dbImpl.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 			return operation.UpsertFinalizedHeight(lctx, rw.Writer(), final.Height)
-		})
-		require.NoError(t, err)
-
-		// map the finalized height to the finalized block ID
-		err = dbImpl.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 			return operation.IndexFinalizedBlockByHeight(lctx, rw, final.Height, final.ID())
 		})
-		require.NoError(t, err)
+		// NOTE: must release lock here - do not deferr! Reason:
+		// The business logic we are testing here should not be expected to do anything regarding finalization when
+		// somebody else is still holding the lock `LockFinalizeBlock`. However, we want to verify that finalizing
+		// the same block again is a no-op. Hence, we should not be holding the lock anymore.
+		lctx.Release()
 
 		// insert the finalized block header into the DB
 		insertLctx := lockManager.NewContext()
