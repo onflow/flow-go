@@ -22,6 +22,7 @@ import (
 	"github.com/onflow/flow-go/engine/verification/verifier"
 	"github.com/onflow/flow-go/insecure"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/irrecoverable"
@@ -282,7 +283,7 @@ func (n *Network) processAttackerEgressMessage(msg *insecure.Message) error {
 		Str("flow_protocol_event_type", fmt.Sprintf("%T", event)).Logger()
 
 	switch e := event.(type) {
-	case *flow.ExecutionReceipt:
+	case *messages.ExecutionReceipt:
 		if len(e.ExecutorSignature) == 0 {
 			// empty signature field on execution receipt means attack orchestrator is dictating a result to
 			// CCF, and the receipt fields must be filled out locally.
@@ -293,7 +294,7 @@ func (n *Network) processAttackerEgressMessage(msg *insecure.Message) error {
 					Msg("could not generate receipt for attack orchestrator's dictated result")
 				return fmt.Errorf("could not generate execution receipt for attack orchestrator's result: %w", err)
 			}
-			event = receipt // swaps event with the receipt.
+			event = (*messages.ExecutionReceipt)(receipt) // swaps event with the receipt.
 		}
 
 	case *flow.ResultApproval:
