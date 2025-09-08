@@ -408,7 +408,7 @@ func (o *Orchestrator) replyWithAttestation(chunkDataPackRequestEvent *insecure.
 			TargetIds:       consensusIds,
 
 			// wrapping attestation in a result approval for sake of encoding and decoding.
-			FlowProtocolEvent: &flow.ResultApproval{Body: flow.ResultApprovalBody{Attestation: *attestation}},
+			FlowProtocolEvent: &messages.ResultApproval{Body: flow.ResultApprovalBody{Attestation: *attestation}},
 		})
 		if err != nil {
 			return false, fmt.Errorf("could not send attestation for corrupted chunk: %w", err)

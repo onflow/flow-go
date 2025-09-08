@@ -295,7 +295,7 @@ func TestRespondingWithCorruptedAttestation(t *testing.T) {
 
 			// output of orchestrator for a corrupted chunk request from a corrupted verification node
 			// should be a result approval containing a dictated attestation.
-			approval, ok := event.FlowProtocolEvent.(*flow.ResultApproval)
+			approval, ok := event.FlowProtocolEvent.(*messages.ResultApproval)
 			require.True(t, ok)
 			attestation := approval.Body.Attestation
 
@@ -717,9 +717,9 @@ func TestWintermute_ResultApproval(t *testing.T) {
 		Protocol:        insecure.Protocol_MULTICAST,
 		TargetNum:       3,
 		TargetIds:       unittest.IdentifierListFixture(10),
-		FlowProtocolEvent: unittest.ResultApprovalFixture(
+		FlowProtocolEvent: (*messages.ResultApproval)(unittest.ResultApprovalFixture(
 			unittest.WithExecutionResultID(originalResult.ID()),
-			unittest.WithChunk(0)),
+			unittest.WithChunk(0))),
 	}
 
 	// mocks orchestrator network
