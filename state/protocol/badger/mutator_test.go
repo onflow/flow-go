@@ -567,11 +567,9 @@ func TestExtendMissingParent(t *testing.T) {
 		require.False(t, st.IsInvalidExtensionError(err), err)
 		require.False(t, st.IsOutdatedExtensionError(err), err)
 
-		storagedb := db
-
 		// verify seal that was contained in candidate block is not indexed
 		var sealID flow.Identifier
-		err = operation.LookupLatestSealAtBlock(storagedb.Reader(), extend.ID(), &sealID)
+		err = operation.LookupLatestSealAtBlock(db.Reader(), extend.ID(), &sealID)
 		require.Error(t, err)
 		require.ErrorIs(t, err, storage.ErrNotFound)
 	})
@@ -691,11 +689,9 @@ func TestExtendBlockNotConnected(t *testing.T) {
 		err = state.Extend(context.Background(), unittest.ProposalFromBlock(extend))
 		require.Error(t, err)
 
-		storagedb := db
-
 		// verify seal not indexed
 		var sealID flow.Identifier
-		err = operation.LookupLatestSealAtBlock(storagedb.Reader(), extend.ID(), &sealID)
+		err = operation.LookupLatestSealAtBlock(db.Reader(), extend.ID(), &sealID)
 		require.Error(t, err)
 		require.ErrorIs(t, err, storage.ErrNotFound)
 	})
@@ -2947,11 +2943,9 @@ func TestHeaderExtendMissingParent(t *testing.T) {
 		require.Error(t, err)
 		require.False(t, st.IsInvalidExtensionError(err), err)
 
-		storagedb := db
-
 		// verify seal not indexed
 		var sealID flow.Identifier
-		err = operation.LookupLatestSealAtBlock(storagedb.Reader(), extend.ID(), &sealID)
+		err = operation.LookupLatestSealAtBlock(db.Reader(), extend.ID(), &sealID)
 		require.Error(t, err)
 		require.ErrorIs(t, err, storage.ErrNotFound)
 	})
@@ -2982,11 +2976,9 @@ func TestHeaderExtendHeightTooSmall(t *testing.T) {
 		err = state.ExtendCertified(context.Background(), unittest.NewCertifiedBlock(block2))
 		require.False(t, st.IsInvalidExtensionError(err))
 
-		storagedb := db
-
 		// verify seal not indexed
 		var sealID flow.Identifier
-		err = operation.LookupLatestSealAtBlock(storagedb.Reader(), block2.ID(), &sealID)
+		err = operation.LookupLatestSealAtBlock(db.Reader(), block2.ID(), &sealID)
 		require.ErrorIs(t, err, storage.ErrNotFound)
 	})
 }
@@ -3126,11 +3118,9 @@ func TestParticipantHeaderExtendBlockNotConnected(t *testing.T) {
 		err = state.Extend(context.Background(), unittest.ProposalFromBlock(block2))
 		require.True(t, st.IsOutdatedExtensionError(err), err)
 
-		storagedb := db
-
 		// verify seal not indexed
 		var sealID flow.Identifier
-		err = operation.LookupLatestSealAtBlock(storagedb.Reader(), block2.ID(), &sealID)
+		err = operation.LookupLatestSealAtBlock(db.Reader(), block2.ID(), &sealID)
 		require.ErrorIs(t, err, storage.ErrNotFound)
 	})
 }
