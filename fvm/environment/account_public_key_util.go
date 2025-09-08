@@ -14,60 +14,6 @@ const (
 	MaxPublicKeyCountInBatch = 20 // 20 public key payload is ~1420 bytes
 )
 
-type StoredPublicKeyNotFoundError struct {
-	address  flow.Address
-	keyIndex uint32
-}
-
-func NewStoredPublicKeyNotFoundError(address flow.Address, keyIndex uint32) *StoredPublicKeyNotFoundError {
-	return &StoredPublicKeyNotFoundError{
-		address:  address,
-		keyIndex: keyIndex,
-	}
-}
-
-func (e *StoredPublicKeyNotFoundError) Error() string {
-	return fmt.Sprintf("stored public key not found for address %s and stored key index %d",
-		e.address,
-		e.keyIndex)
-}
-
-type BatchPublicKeyPayloadMalformedError struct {
-	address    flow.Address
-	batchIndex uint32
-}
-
-func NewBatchPublicKeyMalformedError(address flow.Address, batchIndex uint32) *BatchPublicKeyPayloadMalformedError {
-	return &BatchPublicKeyPayloadMalformedError{
-		address:    address,
-		batchIndex: batchIndex,
-	}
-}
-
-func (e *BatchPublicKeyPayloadMalformedError) Error() string {
-	return fmt.Sprintf("batch public key malformed for address %s and batch index %d",
-		e.address,
-		e.batchIndex)
-}
-
-type BatchPublicKeyPayloadNotFoundError struct {
-	address    flow.Address
-	batchIndex uint32
-}
-
-func NewBatchPublicKeyPayloadNotFoundError(address flow.Address, batchIndex uint32) *BatchPublicKeyPayloadNotFoundError {
-	return &BatchPublicKeyPayloadNotFoundError{
-		address:    address,
-		batchIndex: batchIndex,
-	}
-}
-
-func (e *BatchPublicKeyPayloadNotFoundError) Error() string {
-	return fmt.Sprintf("batch public key payload not found for address %s and batch index %d",
-		e.address,
-		e.batchIndex)
-}
-
 // Account Public Key 0
 
 func getAccountPublicKey0(
@@ -298,7 +244,7 @@ func getRawStoredPublicKey(
 	}
 
 	if len(b) == 0 {
-		return nil, NewStoredPublicKeyNotFoundError(address, storedKeyIndex)
+		return nil, errors.NewBatchPublicKeyNotFoundError("failed to get stored public key", address, batchIndex)
 	}
 
 	for off, i := 0, uint32(0); off < len(b); i++ {
@@ -306,7 +252,10 @@ func getRawStoredPublicKey(
 		off++
 
 		if off+size > len(b) {
-			return nil, NewBatchPublicKeyMalformedError(address, batchIndex)
+			return nil, errors.NewBatchPublicKeyDecodingError(
+				fmt.Sprintf("%s register is too short", batchRegisterKey),
+				address,
+				batchIndex)
 		}
 
 		if i == keyIndexInBatch {
@@ -317,7 +266,10 @@ func getRawStoredPublicKey(
 		off += size
 	}
 
-	return nil, NewStoredPublicKeyNotFoundError(address, storedKeyIndex)
+	return nil, errors.NewStoredPublicKeyNotFoundError(
+		fmt.Sprintf("%s register doesn't have key at index %d", batchRegisterKey, keyIndexInBatch),
+		address,
+		storedKeyIndex)
 }
 
 func appendStoredKey(
@@ -327,7 +279,7 @@ func appendStoredKey(
 	encodedPublicKey []byte,
 ) error {
 	if storedKeyIndex == 0 {
-		return fmt.Errorf("failed to append stored key 0 to batch public key: stored key 0 should be stored in its own payload")
+		return errors.NewStoredPublicKeyUnexpectedIndexError("failed to append stored key 0 to batch public key", address, storedKeyIndex)
 	}
 
 	encodedBatchedPublicKey, err := encodeBatchedPublicKey(encodedPublicKey)
@@ -363,7 +315,7 @@ func appendStoredKey(
 		return err
 	}
 	if len(existingBatchKeyPayload) == 0 {
-		return NewBatchPublicKeyPayloadNotFoundError(address, batchNum)
+		return errors.NewBatchPublicKeyNotFoundError("failed to append stored public key", address, batchNum)
 	}
 
 	// Append new key to existing batch public key register

@@ -31,9 +31,14 @@ const (
 	// Deprecated: No longer used.
 	FailureCodeMetaTransactionFailure FailureCode = 2100
 
-	FailureKeyMetadataDecodingFailure           FailureCode = 2200
-	FailureKeyMetadataNotFoundFailure           FailureCode = 2201
-	FailureKeyMetadataUnexpectedKeyIndexFailure FailureCode = 2202
+	// Account key
+	FailureCodeKeyMetadataDecodingFailure            FailureCode = 2200
+	FailureCodeKeyMetadataNotFoundFailure            FailureCode = 2201
+	FailureCodeKeyMetadataUnexpectedKeyIndexFailure  FailureCode = 2202
+	FailureCodeStoredPublicKeyNotFoundFailure        FailureCode = 2203
+	FailureCodeStoredPublicKeyUnexpectedIndexFailure FailureCode = 2204
+	FailureCodeBatchPublicKeyDecodingFailure         FailureCode = 2205
+	FailureCodeBatchPublicKeyNotFoundFailure         FailureCode = 2206
 )
 
 const (
