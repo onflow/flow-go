@@ -990,6 +990,12 @@ func (a *StatefulAccounts) accountPublicKeyIndexInRange(
 	return nil
 }
 
+// setAccountStatusAfterAccountStatusSizeChange adjusts and sets
+// account storage used after the account status register size is changed.
+// This function is needed because updateRegisterSizeChange() filters out
+// account status register to prevent recursion when computing storage used,
+// so we need to explicitly update the account storage used when the
+// account status register size is changed.
 func (a *StatefulAccounts) setAccountStatusAfterAccountStatusSizeChange(
 	address flow.Address,
 	status *AccountStatus,
