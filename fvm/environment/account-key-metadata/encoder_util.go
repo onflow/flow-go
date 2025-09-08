@@ -2,7 +2,8 @@ package accountkeymetadata
 
 import (
 	"encoding/binary"
-	"fmt"
+
+	"github.com/onflow/flow-go/fvm/errors"
 )
 
 const (
@@ -17,7 +18,7 @@ func parseWeightAndRevokedStatusFromKeyMetadataBytes(b []byte) (
 	err error,
 ) {
 	if len(b) == 0 {
-		err = NewKeyMetadataMalfromedError("key metadata is empty")
+		err = errors.NewKeyMetadataEmptyError("failed to parse weight and revoked status")
 		return
 	}
 
@@ -31,7 +32,11 @@ func parseStoredKeyMappingFromKeyMetadataBytes(b []byte) (
 	err error,
 ) {
 	if len(b) < storedKeyIndexSize {
-		err = NewKeyMetadataMalfromedError(fmt.Sprintf("failed to parse start index for mapping: expect %d bytes, got %d bytes", storedKeyIndexSize, len(b)))
+		err = errors.NewKeyMetadataTooShortError(
+			"failed to parse start key index for mappings",
+			storedKeyIndexSize,
+			len(b),
+		)
 		return
 	}
 
@@ -52,7 +57,11 @@ func parseDigestsFromKeyMetadataBytes(b []byte) (
 	err error,
 ) {
 	if len(b) < storedKeyIndexSize {
-		err = NewKeyMetadataMalfromedError(fmt.Sprintf("failed to parse start index for digests: expect %d bytes, got %d bytes", storedKeyIndexSize, len(b)))
+		err = errors.NewKeyMetadataTooShortError(
+			"failed to parse start key index for digests",
+			storedKeyIndexSize,
+			len(b),
+		)
 		return
 	}
 
@@ -68,7 +77,12 @@ func parseDigestsFromKeyMetadataBytes(b []byte) (
 
 func parseNextLengthPrefixedData(b []byte) (next []byte, rest []byte, err error) {
 	if len(b) < lengthPrefixSize {
-		return nil, nil, NewKeyMetadataMalfromedError(fmt.Sprintf("expect length prefix (4 bytes), got %d bytes", len(b)))
+		return nil, nil,
+			errors.NewKeyMetadataTooShortError(
+				"failed to parse prefixed data",
+				lengthPrefixSize,
+				len(b),
+			)
 	}
 
 	length := binary.BigEndian.Uint32(b[:lengthPrefixSize])
@@ -76,7 +90,12 @@ func parseNextLengthPrefixedData(b []byte) (next []byte, rest []byte, err error)
 	// NOTE: here, int is always int64 (never int32) because this software can cannot run on 32-bit platforms,
 	// so it is safe to cast length (uint32) to int (which is int64 on 64-bit platforms).
 	if len(b) < lengthPrefixSize+int(length) {
-		return nil, nil, NewKeyMetadataMalfromedError(fmt.Sprintf("expect %d bytes for next data, got %d bytes", lengthPrefixSize+length, len(b)))
+		return nil, nil,
+			errors.NewKeyMetadataTooShortError(
+				"failed to parse length prefixed data",
+				lengthPrefixSize+int(length),
+				len(b),
+			)
 	}
 
 	b = b[lengthPrefixSize:]

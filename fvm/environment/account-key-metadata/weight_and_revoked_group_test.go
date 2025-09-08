@@ -4,6 +4,8 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+
+	"github.com/onflow/flow-go/fvm/errors"
 )
 
 type weightAndRevokedStatus struct {
@@ -14,24 +16,21 @@ type weightAndRevokedStatus struct {
 func TestAppendAndGetWeightAndRevokedStatus(t *testing.T) {
 	t.Run("get from empty data", func(t *testing.T) {
 		_, _, err := getWeightAndRevokedStatus(nil, 0)
-		var notFoundErr *KeyMetadataNotFoundError
-		require.ErrorAs(t, err, &notFoundErr)
+		require.True(t, errors.IsKeyMetadataNotFoundError(err))
 	})
 
 	t.Run("get from truncated data", func(t *testing.T) {
 		b := []byte{1}
 
 		_, _, err := getWeightAndRevokedStatus(b, 1)
-		var malformedErr *KeyMetadataMalfromedError
-		require.ErrorAs(t, err, &malformedErr)
+		require.True(t, errors.IsKeyMetadataDecodingError(err))
 	})
 
 	t.Run("append to truncated data", func(t *testing.T) {
 		b := []byte{1}
 
 		_, err := appendWeightAndRevokedStatus(b, false, 1)
-		var malformedErr *KeyMetadataMalfromedError
-		require.ErrorAs(t, err, &malformedErr)
+		require.True(t, errors.IsKeyMetadataDecodingError(err))
 	})
 
 	// Some of the test cases are from migration test TestAccountPublicKeyWeightsAndRevokedStatusSerizliation
@@ -115,8 +114,7 @@ func TestAppendAndGetWeightAndRevokedStatus(t *testing.T) {
 			}
 
 			_, _, err = getWeightAndRevokedStatus(b, uint32(len(tc.status)))
-			var notFoundErr *KeyMetadataNotFoundError
-			require.ErrorAs(t, err, &notFoundErr)
+			require.True(t, errors.IsKeyMetadataNotFoundError(err))
 		})
 	}
 

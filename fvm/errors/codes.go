@@ -30,6 +30,10 @@ const (
 	FailureCodeExecutionVersionProvider                FailureCode = 2011
 	// Deprecated: No longer used.
 	FailureCodeMetaTransactionFailure FailureCode = 2100
+
+	FailureKeyMetadataDecodingFailure           FailureCode = 2200
+	FailureKeyMetadataNotFoundFailure           FailureCode = 2201
+	FailureKeyMetadataUnexpectedKeyIndexFailure FailureCode = 2202
 )
 
 const (

@@ -2,7 +2,8 @@ package accountkeymetadata
 
 import (
 	"encoding/binary"
-	"fmt"
+
+	"github.com/onflow/flow-go/fvm/errors"
 )
 
 // Account Public Key Index to Stored Public Key Index Mappings
@@ -39,7 +40,12 @@ const (
 // Received b is expected to only contain encoded mappings.
 func getStoredKeyIndexFromMappings(b []byte, keyIndex uint32) (uint32, error) {
 	if len(b)%mappingGroupSize != 0 {
-		return 0, NewKeyMetadataMalfromedError(fmt.Sprintf("failed to get stored key index: existing metadata is %d bytes, expect multiples of %d", len(b), mappingGroupSize))
+		return 0,
+			errors.NewKeyMetadataUnexpectedLengthError(
+				"failed to get stored key index from mapping",
+				mappingGroupSize,
+				len(b),
+			)
 	}
 
 	for off := 0; off < len(b); off += mappingGroupSize {
@@ -58,7 +64,7 @@ func getStoredKeyIndexFromMappings(b []byte, keyIndex uint32) (uint32, error) {
 		keyIndex -= uint32(runLength)
 	}
 
-	return 0, NewKeyMetadataNotFoundError("failed to query stored key index", keyIndex)
+	return 0, errors.NewKeyMetadataNotFoundError("failed to query stored key index from mapping", keyIndex)
 }
 
 func appendStoredKeyIndexToMappings(b []byte, storedKeyIndex uint32) (_ []byte, _ error) {
@@ -67,7 +73,12 @@ func appendStoredKeyIndexToMappings(b []byte, storedKeyIndex uint32) (_ []byte, 
 	}
 
 	if len(b)%mappingGroupSize != 0 {
-		return nil, NewKeyMetadataMalfromedError(fmt.Sprintf("failed to append stored key mapping: existing metadata is %d bytes, expect multiples of %d", len(b), mappingGroupSize))
+		return nil,
+			errors.NewKeyMetadataUnexpectedLengthError(
+				"failed to append stored key mapping",
+				mappingGroupSize,
+				len(b),
+			)
 	}
 
 	// Merge to last group

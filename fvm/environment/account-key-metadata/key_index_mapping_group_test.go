@@ -4,29 +4,28 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+
+	"github.com/onflow/flow-go/fvm/errors"
 )
 
 func TestAppendAndGetStoredKeyIndexFromMapping(t *testing.T) {
 	t.Run("get from empty data", func(t *testing.T) {
 		_, err := getStoredKeyIndexFromMappings(nil, 0)
-		var notFoundErr *KeyMetadataNotFoundError
-		require.ErrorAs(t, err, &notFoundErr)
+		require.True(t, errors.IsKeyMetadataNotFoundError(err))
 	})
 
 	t.Run("get from truncated data", func(t *testing.T) {
 		b := []byte{1}
 
 		_, err := getStoredKeyIndexFromMappings(b, 1)
-		var malformedErr *KeyMetadataMalfromedError
-		require.ErrorAs(t, err, &malformedErr)
+		require.True(t, errors.IsKeyMetadataDecodingError(err))
 	})
 
 	t.Run("append to truncated data", func(t *testing.T) {
 		b := []byte{1}
 
 		_, err := appendStoredKeyIndexToMappings(b, 1)
-		var malformedErr *KeyMetadataMalfromedError
-		require.ErrorAs(t, err, &malformedErr)
+		require.True(t, errors.IsKeyMetadataDecodingError(err))
 	})
 
 	testcases := []struct {

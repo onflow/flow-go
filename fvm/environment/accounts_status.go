@@ -323,7 +323,7 @@ func (a *AccountStatus) AppendAccountPublicKeyMetadata(
 		// NOTE: new key index must be 1 when key metadata is empty.
 
 		if keyIndex != 1 {
-			return 0, false, accountkeymetadata.NewKeyMetadataMalfromedError(fmt.Sprintf("public key metadata cannot be empty at index %d", keyIndex))
+			return 0, false, errors.NewKeyMetadataEmptyError(fmt.Sprintf("key metadata cannot be empty when appending new key metadata at index %d", keyIndex))
 		}
 
 		// To avoid storage overhead for most accounts, account key 0 digest is computed and stored when account key 1 is added.
