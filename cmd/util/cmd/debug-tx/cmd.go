@@ -2,6 +2,7 @@ package debug_tx
 
 import (
 	"context"
+	"io"
 	"os"
 
 	sdk "github.com/onflow/flow-go-sdk"
@@ -94,6 +95,22 @@ func run(_ *cobra.Command, args []string) {
 	}
 	defer remoteClient.Close()
 
+	var traceFile *os.File
+	if flagTracePath == "-" {
+		traceFile = os.Stdout
+	} else if flagTracePath != "" {
+		traceFile, err = os.Create(flagTracePath)
+		if err != nil {
+			log.Fatal().Err(err).Msg("failed to create trace file")
+		}
+		defer traceFile.Close()
+	}
+
+	var resultWriter io.Writer
+	if flagShowResult {
+		resultWriter = os.Stdout
+	}
+
 	if flagBlockID != "" {
 
 		if len(args) != 0 {
@@ -112,7 +129,7 @@ func run(_ *cobra.Command, args []string) {
 			log.Fatal().Err(err).Str("ID", flagBlockID).Msg("failed to fetch block by ID")
 		}
 
-		runBlockID(
+		RunBlockID(
 			remoteClient,
 			blockID,
 			block.Height,
@@ -120,6 +137,9 @@ func run(_ *cobra.Command, args []string) {
 			flowClient,
 			chain,
 			flagUseVM,
+			traceFile,
+			flagComputeLimit,
+			resultWriter,
 		)
 
 	} else {
@@ -131,23 +151,29 @@ func run(_ *cobra.Command, args []string) {
 				log.Fatal().Err(err).Str("ID", rawTxID).Msg("failed to parse transaction ID")
 			}
 
-			runTransactionID(
+			RunTransactionID(
 				remoteClient,
 				txID,
 				flowClient,
 				chain,
 				flagUseVM,
+				traceFile,
+				flagComputeLimit,
+				resultWriter,
 			)
 		}
 	}
 }
 
-func runTransactionID(
+func RunTransactionID(
 	remoteClient debug.RemoteClient,
 	txID flow.Identifier,
 	flowClient *client.Client,
 	chain flow.Chain,
 	useVM bool,
+	traceFile *os.File,
+	computeLimit uint64,
+	resultWriter io.Writer,
 ) {
 	log.Info().Msgf("Fetching transaction result for %s ...", txID)
 
@@ -166,7 +192,7 @@ func runTransactionID(
 		blockHeight,
 	)
 
-	runBlockID(
+	RunBlockID(
 		remoteClient,
 		blockID,
 		blockHeight,
@@ -174,10 +200,13 @@ func runTransactionID(
 		flowClient,
 		chain,
 		useVM,
+		traceFile,
+		computeLimit,
+		resultWriter,
 	)
 }
 
-func runBlockID(
+func RunBlockID(
 	remoteClient debug.RemoteClient,
 	blockID flow.Identifier,
 	blockHeight uint64,
@@ -185,6 +214,9 @@ func runBlockID(
 	flowClient *client.Client,
 	chain flow.Chain,
 	useVM bool,
+	traceFile *os.File,
+	computeLimit uint64,
+	resultWriter io.Writer,
 ) {
 	log.Info().Msgf("Fetching transactions of block %s ...", blockID)
 
@@ -228,18 +260,7 @@ func runBlockID(
 
 	var fvmOptions []fvm.Option
 
-	if flagTracePath != "" {
-
-		var traceFile *os.File
-		if flagTracePath == "-" {
-			traceFile = os.Stdout
-		} else {
-			traceFile, err = os.Create(flagTracePath)
-			if err != nil {
-				log.Fatal().Err(err).Msg("failed to create trace file")
-			}
-			defer traceFile.Close()
-		}
+	if traceFile != nil {
 
 		exporter, err := stdouttrace.New(
 			stdouttrace.WithWriter(traceFile),
@@ -251,7 +272,7 @@ func runBlockID(
 		tracer, err := trace.NewTracerWithExporter(
 			log.Logger,
 			"debug-tx",
-			flagChain,
+			string(chain.ChainID()),
 			trace.SensitivityCaptureAll,
 			exporter,
 		)
@@ -289,17 +310,18 @@ func runBlockID(
 
 		isDebuggedTx := blockTxID == txID
 
-		result := runTransaction(
+		result := RunTransaction(
 			debugger,
 			blockTxID,
 			flowClient,
 			blockSnapshot,
 			header,
 			isDebuggedTx,
+			computeLimit,
 		)
 
-		if flagShowResult && (isDebuggedTx || txID == flow.ZeroID) {
-			debug.WriteResult(os.Stdout, blockTxID, result)
+		if resultWriter != nil && (isDebuggedTx || txID == flow.ZeroID) {
+			debug.WriteResult(resultWriter, blockTxID, result)
 		}
 
 		if isDebuggedTx {
@@ -308,13 +330,14 @@ func runBlockID(
 	}
 }
 
-func runTransaction(
+func RunTransaction(
 	debugger *debug.RemoteDebugger,
 	txID flow.Identifier,
 	flowClient *client.Client,
 	snapshot *debug.CachingStorageSnapshot,
 	header *flow.Header,
 	isDebuggedTx bool,
+	computeLimit uint64,
 ) debug.Result {
 	var prefix string
 	if !isDebuggedTx {
@@ -330,7 +353,12 @@ func runTransaction(
 
 	log.Info().Msgf("Fetched %stransaction: %s", prefix, tx.ID())
 
-	result, err := debugger.RunSDKTransaction(tx, snapshot, header, flagComputeLimit)
+	result, err := debugger.RunSDKTransaction(
+		tx,
+		snapshot,
+		header,
+		computeLimit,
+	)
 	if err != nil {
 		log.Fatal().Err(err).Msg("Transaction execution failed")
 	}
