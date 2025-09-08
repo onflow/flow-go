@@ -328,6 +328,8 @@ func (m *KeyMetadataAppender) storedKeyCount() uint32 {
 	return m.startIndexForDigests + uint32(len(m.digestBytes)/digestSize)
 }
 
+// findDuplicateDigest returns true and stored key index with duplicate digest
+// if the given digest has a match in stored digests in key metadata section.
 func (m *KeyMetadataAppender) findDuplicateDigest(digest uint64) (found bool, duplicateStoredKeyIndex uint32) {
 	if len(m.digestBytes) == 0 {
 		return false, 0

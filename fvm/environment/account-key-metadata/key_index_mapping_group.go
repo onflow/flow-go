@@ -134,7 +134,8 @@ func (g *MappingGroup) TryMerge(storedKeyIndex uint32) bool {
 	}
 
 	if g.runLength == 1 && g.storedKeyIndex+1 == storedKeyIndex {
-		// Make last group a consecutive group and merge into it
+		// Convert the last group from a regular group to a consecutive group,
+		// and merge the given storedKeyIndex into it.
 		g.consecutiveGroup = true
 		g.runLength++
 		return true

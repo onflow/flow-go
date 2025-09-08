@@ -15,8 +15,8 @@ import (
 // If a hash collision happens with given digest, this function returns
 // SentinelFastDigest64 digest and duplicate key not found.
 // Specifically, a duplicate key is found when these conditions are met:
-// - given digest isn't the predefined sentinel digest (0),
-// - given digest matches one of the stored digests in key metadata, and
+// - computed digest isn't the predefined sentinel digest (0),
+// - computed digest matches one of the stored digests in key metadata, and
 // - given encodedKey also matches the stored key with the same digest.
 func FindDuplicateKey(
 	keyMetadata *KeyMetadataAppender,
@@ -42,27 +42,31 @@ func FindDuplicateKey(
 		return SentinelFastDigest64, false, 0, nil
 	}
 
-	// Find duplicate digest
+	// Find duplicate stored digest by comparing computed digest against stored digests in key metadata section.
 	found, duplicateStoredKeyIndex = keyMetadata.findDuplicateDigest(digest)
 
+	// If no duplicate digest is found, we return duplicate not found.
 	if !found {
 		return digest, false, 0, nil
 	}
 
-	// Get encoded key with duplicate digest
+	// A duplicate digest is found, so we need to compare the stored key to
+	// the given encodedKey.
+
+	// Get encoded key with duplicate digest.
 	encodedKeyWithDuplicateDigest, err := getStoredKey(duplicateStoredKeyIndex)
 	if err != nil {
 		return digest, false, 0, err
 	}
 
-	// Confirm keys are duplicate
+	// Compare the given encodedKey with stored key.
 	if bytes.Equal(encodedKeyWithDuplicateDigest, encodedKey) {
 		return digest, true, duplicateStoredKeyIndex, nil
 	}
 
-	// Found hash collision (same digest with different encoded keys).
+	// Found hash collision. The given encodedKey and the stored key are different but
+	// they both produce the same 64-bit fast hash digest.
 	// Return SentinelFastDigest64, duplicate key not found, and no error.
-	// TODO: maybe log hash collision
 	return SentinelFastDigest64, false, 0, nil
 }
 

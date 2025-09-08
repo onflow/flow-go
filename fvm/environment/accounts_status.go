@@ -366,6 +366,20 @@ func (a *AccountStatus) AppendAccountPublicKeyMetadata(
 		return 0, false, err
 	}
 
+	// Whether new public key is a duplicate or not, we store these items in key metadata section:
+	// - new account public key's revoked status and weight
+	// - new public key's digest (we only store last N digests and N=2 by default to balance tradeoffs)
+	// If new public key is a duplicate, we also store mapping of account key index to stored key index.
+	//
+	// As a non-duplicate key example, if public key at index 1 is unique, we store:
+	// - new key's weight and revoked status, and
+	// - new key's digest
+	//
+	// As a duplicate key example, if public key at index 1 is duplicate of public key at index 0, we store:
+	// - new key's weight and revoked status,
+	// - mapping indicating public key at index 1 is the same as public key at index 0.
+	// - new key's digest
+
 	// Handle duplicate key.
 	if isDuplicateKey {
 		err = keyMetadata.AppendDuplicateKeyMetadata(keyIndex, duplicateStoredKeyIndex, revoked, weight)
