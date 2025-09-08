@@ -240,8 +240,12 @@ func (c *Container) Name() string {
 }
 
 // DB returns the node's database.
-func (c *Container) DB() (*pebble.DB, error) {
-	return storagepebble.SafeOpen(unittest.Logger(), c.DBPath())
+func (c *Container) DB() (storage.DB, error) {
+	pdb, err := storagepebble.SafeOpen(unittest.Logger(), c.DBPath())
+	if err != nil {
+		return nil, err
+	}
+	return pebbleimpl.ToDB(pdb), nil
 }
 
 // DB returns the node's execution data database.
@@ -375,12 +379,10 @@ func (c *Container) Connect() error {
 
 func (c *Container) OpenState() (*state.State, error) {
 	lockManager := storage.NewTestingLockManager()
-	pdb, err := c.DB()
+	db, err := c.DB()
 	if err != nil {
 		return nil, err
 	}
-	db := pebbleimpl.ToDB(pdb)
-
 	metrics := metrics.NewNoopCollector()
 	index := store.NewIndex(metrics, db)
 	headers := store.NewHeaders(metrics, db)
