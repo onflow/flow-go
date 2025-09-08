@@ -319,7 +319,11 @@ func (a *AccountStatus) AppendAccountPublicKeyMetadata(
 	var keyMetadata *accountkeymetadata.KeyMetadataAppender
 
 	if len(a.keyMetadataBytes) == 0 {
-		// NOTE: new key index must be 1 when key metadata is empty.
+		// New key index must be 1 when key metadata is empty because
+		// key metadata at key index 0 is stored with public key at
+		// key index 0 in a separate register (apk_0).
+		// Most accounts only have 1 account public key and we
+		// special case for that as an optimization.
 
 		if keyIndex != 1 {
 			return 0, false, errors.NewKeyMetadataEmptyError(fmt.Sprintf("key metadata cannot be empty when appending new key metadata at index %d", keyIndex))
