@@ -151,7 +151,10 @@ func TestMakeFinalInvalidHeight(t *testing.T) {
 		lctx := lockManager.NewContext()
 		require.NoError(t, lctx.AcquireLock(storage.LockFinalizeBlock))
 		err := dbImpl.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			return operation.IndexFinalizedBlockByHeight(lctx, rw, final.Height, final.ID())
+			err := operation.IndexFinalizedBlockByHeight(lctx, rw, final.Height, final.ID())
+			if err != nil {
+				return err
+			}
 			return operation.UpsertFinalizedHeight(lctx, rw.Writer(), final.Height)
 		})
 		require.NoError(t, err)
@@ -221,9 +224,14 @@ func TestMakeFinalDuplicate(t *testing.T) {
 		lctx := lockManager.NewContext()
 		require.NoError(t, lctx.AcquireLock(storage.LockFinalizeBlock))
 		err := dbImpl.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			return operation.UpsertFinalizedHeight(lctx, rw.Writer(), final.Height)
+			err := operation.UpsertFinalizedHeight(lctx, rw.Writer(), final.Height)
+			if err != nil {
+				return err
+			}
+
 			return operation.IndexFinalizedBlockByHeight(lctx, rw, final.Height, final.ID())
 		})
+		require.NoError(t, err)
 		// NOTE: must release lock here - do not deferr! Reason:
 		// The business logic we are testing here should not be expected to do anything regarding finalization when
 		// somebody else is still holding the lock `LockFinalizeBlock`. However, we want to verify that finalizing
