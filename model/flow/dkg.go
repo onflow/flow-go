@@ -111,6 +111,9 @@ type DKGIndexMap map[Identifier]int
 
 // DKGMessage is the type of message exchanged between DKG nodes.
 type DKGMessage struct {
+	// Data holds the DKG message data, as provided by the DKG crypto layer.
+	// The contents are opaque to the DKG engine layer.
 	Data          []byte
+	// DKGInstanceID is a unique identifier for the DKG instance this message is part of.
 	DKGInstanceID string
 }
