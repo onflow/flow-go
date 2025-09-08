@@ -96,19 +96,6 @@ func ParseTwoDBDirs(flags DBFlags) (TwoDBDirs, error) {
 	}, nil
 }
 
-func InitBadgerStorage(flags DBFlags) (*badger.DB, error) {
-	datadir, err := ParseOneDBUsedDir(flags)
-	if err != nil {
-		return nil, fmt.Errorf("could not parse db dir: %w", err)
-	}
-
-	if datadir.UseDB != UsedDBBadger {
-		return nil, fmt.Errorf("only badger db is supported, got: %s", datadir.UseDB)
-	}
-
-	return InitBadgerDBStorage(datadir.DBDir), nil
-}
-
 func InitStorage(datadir string) (storage.DB, error) {
 	ok, err := IsBadgerFolder(datadir)
 	if err != nil {
@@ -226,23 +213,4 @@ func InitBadgerAndPebble(dirs TwoDBDirs) (bdb *badger.DB, pdb *pebble.DB, err er
 	bdb = InitBadgerDBStorage(dirs.BadgerDir)
 
 	return bdb, pdb, nil
-}
-
-// WithBadgerAndPebble runs the given function with the badger and pebble storages
-// it ensures that the storages are closed after the function is done
-func WithBadgerAndPebble(flags DBFlags, f func(*badger.DB, *pebble.DB) error) error {
-	dirs, err := ParseTwoDBDirs(flags)
-	if err != nil {
-		return err
-	}
-
-	bdb, pdb, err := InitBadgerAndPebble(dirs)
-	if err != nil {
-		return err
-	}
-
-	defer bdb.Close()
-	defer pdb.Close()
-
-	return f(bdb, pdb)
 }
