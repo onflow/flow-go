@@ -246,13 +246,7 @@ func (h *MessageHub) sendOwnTimeout(timeout *model.TimeoutObject) error {
 	}
 
 	// create the timeout message
-	msg := &messages.TimeoutObject{
-		View:        timeout.View,
-		NewestQC:    timeout.NewestQC,
-		LastViewTC:  timeout.LastViewTC,
-		SigData:     timeout.SigData,
-		TimeoutTick: timeout.TimeoutTick,
-	}
+	msg := (*messages.TimeoutObject)(timeout)
 	err = h.con.Publish(msg, recipients.NodeIDs()...)
 	if err != nil {
 		if !errors.Is(err, network.EmptyTargetList) {
@@ -483,7 +477,7 @@ func (h *MessageHub) Process(channel channels.Channel, originID flow.Identifier,
 			OriginID: originID,
 			Message:  msg,
 		})
-	case *messages.BlockVote:
+	case *flow.BlockVote:
 		vote, err := model.NewVote(model.UntrustedVote{
 			View:     msg.View,
 			BlockID:  msg.BlockID,
@@ -501,32 +495,8 @@ func (h *MessageHub) Process(channel channels.Channel, originID flow.Identifier,
 		}
 
 		h.forwardToOwnVoteAggregator(vote)
-	case *messages.TimeoutObject:
-		t, err := model.NewTimeoutObject(
-			model.UntrustedTimeoutObject{
-				View:        msg.View,
-				NewestQC:    msg.NewestQC,
-				LastViewTC:  msg.LastViewTC,
-				SignerID:    originID,
-				SigData:     msg.SigData,
-				TimeoutTick: msg.TimeoutTick,
-			},
-		)
-		if err != nil {
-			// TODO(BFT, #7620): Replace this log statement with a call to the protocol violation consumer.
-			h.log.Warn().
-				Hex("origin_id", originID[:]).
-				Uint64("view", msg.View).
-				Uint64("newest_qc_view", msg.NewestQC.View).
-				Hex("newest_qc_block_id", logging.ID(msg.NewestQC.BlockID)).
-				Uint64("last_view_tc_view", msg.LastViewTC.View).
-				Uint64("last_view_tc_newest_qc_view", msg.LastViewTC.NewestQC.View).
-				Hex("last_view_tc_newest_qc_block_id", logging.ID(msg.LastViewTC.NewestQC.BlockID)).
-				Uint64("timeout_tick", msg.TimeoutTick).
-				Err(err).Msgf("received invalid timeout object message")
-			return nil
-		}
-		h.forwardToOwnTimeoutAggregator(t)
+	case *model.TimeoutObject:
+		h.forwardToOwnTimeoutAggregator(msg)
 	default:
 		h.log.Warn().
 			Bool(logging.KeySuspicious, true).

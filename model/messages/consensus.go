@@ -3,6 +3,7 @@ package messages
 import (
 	"fmt"
 
+	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -22,40 +23,29 @@ func (p *Proposal) ToInternal() (any, error) {
 
 // BlockVote is part of the consensus protocol and represents a consensus node
 // voting on the proposal of the leader of a given round.
-type BlockVote struct {
-	BlockID flow.Identifier
-	View    uint64
-	SigData []byte
-}
+type BlockVote flow.BlockVote
 
 // ToInternal converts the untrusted BlockVote into its trusted internal
 // representation.
-//
-// This stub returns the receiver unchanged. A proper implementation
-// must perform validation checks and return a constructed internal
-// object.
 func (b *BlockVote) ToInternal() (any, error) {
-	// TODO(malleability, #7702) implement with validation checks
-	return b, nil
+	internal, err := flow.NewBlockVote(b.BlockID, b.View, b.SigData)
+	if err != nil {
+		return nil, fmt.Errorf("could not construct cluster block vote: %w", err)
+	}
+	return internal, nil
 }
 
 // TimeoutObject is part of the consensus protocol and represents a consensus node
 // timing out in given round. Contains a sequential number for deduplication purposes.
-type TimeoutObject struct {
-	TimeoutTick uint64
-	View        uint64
-	NewestQC    *flow.QuorumCertificate
-	LastViewTC  *flow.TimeoutCertificate
-	SigData     []byte
-}
+type TimeoutObject model.UntrustedTimeoutObject
 
-// ToInternal converts the untrusted TimeoutObject into its trusted internal
-// representation.
+// ToInternal returns the internal type representation for TimeoutObject.
 //
-// This stub returns the receiver unchanged. A proper implementation
-// must perform validation checks and return a constructed internal
-// object.
+// All errors indicate that the decode target contains a structurally invalid representation of the internal model.TimeoutObject.
 func (t *TimeoutObject) ToInternal() (any, error) {
-	// TODO(malleability, #7700) implement with validation checks
-	return t, nil
+	internal, err := model.NewTimeoutObject(model.UntrustedTimeoutObject(*t))
+	if err != nil {
+		return nil, fmt.Errorf("could not convert %T to internal type: %w", t, err)
+	}
+	return internal, nil
 }

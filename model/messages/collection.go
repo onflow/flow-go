@@ -36,32 +36,31 @@ type CollectionResponse struct {
 
 // ClusterBlockVote is a vote for a proposed block in collection node cluster
 // consensus; effectively a vote for a particular collection.
-type ClusterBlockVote BlockVote
+type ClusterBlockVote flow.BlockVote
 
 // ToInternal converts the untrusted ClusterBlockVote into its trusted internal
 // representation.
-//
-// This stub returns the receiver unchanged. A proper implementation
-// must perform validation checks and return a constructed internal
-// object.
 func (c *ClusterBlockVote) ToInternal() (any, error) {
-	// TODO(malleability, #7702) implement with validation checks
-	return c, nil
+	internal, err := flow.NewBlockVote(c.BlockID, c.View, c.SigData)
+	if err != nil {
+		return nil, fmt.Errorf("could not construct cluster block vote: %w", err)
+	}
+	return internal, nil
 }
 
 // ClusterTimeoutObject is part of the collection cluster protocol and represents a collection node
 // timing out in given round. Contains a sequential number for deduplication purposes.
 type ClusterTimeoutObject TimeoutObject
 
-// ToInternal converts the untrusted ClusterTimeoutObject into its trusted internal
-// representation.
+// ToInternal returns the internal type representation for ClusterTimeoutObject.
 //
-// This stub returns the receiver unchanged. A proper implementation
-// must perform validation checks and return a constructed internal
-// object.
+// All errors indicate that the decode target contains a structurally invalid representation of the internal model.TimeoutObject.
 func (c *ClusterTimeoutObject) ToInternal() (any, error) {
-	// TODO(malleability, #7704) implement with validation checks
-	return c, nil
+	internal, err := (*TimeoutObject)(c).ToInternal()
+	if err != nil {
+		return nil, fmt.Errorf("could not convert %T to internal type: %w", c, err)
+	}
+	return internal, nil
 }
 
 // CollectionGuarantee is a message representation of an CollectionGuarantee, which is used
@@ -75,6 +74,32 @@ func (c *CollectionGuarantee) ToInternal() (any, error) {
 	internal, err := flow.NewCollectionGuarantee(flow.UntrustedCollectionGuarantee(*c))
 	if err != nil {
 		return nil, fmt.Errorf("could not construct guarantee: %w", err)
+	}
+	return internal, nil
+}
+
+// TransactionBody is a message representation of a TransactionBody, which includes the main contents of a transaction
+type TransactionBody flow.UntrustedTransactionBody
+
+// ToInternal converts the untrusted TransactionBody into its trusted internal
+// representation.
+func (tb *TransactionBody) ToInternal() (any, error) {
+	internal, err := flow.NewTransactionBody(flow.UntrustedTransactionBody(*tb))
+	if err != nil {
+		return nil, fmt.Errorf("could not construct transaction body: %w", err)
+	}
+	return internal, nil
+}
+
+// Transaction is a message representation of a Transaction, which is the smallest unit of task
+type Transaction flow.UntrustedTransaction
+
+// ToInternal converts the untrusted Transaction into its trusted internal
+// representation.
+func (t *Transaction) ToInternal() (any, error) {
+	internal, err := flow.NewTransaction(flow.UntrustedTransaction(*t))
+	if err != nil {
+		return nil, fmt.Errorf("could not construct transaction : %w", err)
 	}
 	return internal, nil
 }

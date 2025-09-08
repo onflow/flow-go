@@ -183,7 +183,7 @@ func (s *MessageHubSuite) TestProcessValidIncomingMessages() {
 	})
 	s.Run("to-vote-aggregator", func() {
 		expectedVote := unittest.VoteFixture(unittest.WithVoteSignerID(originID))
-		msg := &messages.BlockVote{
+		msg := &flow.BlockVote{
 			View:    expectedVote.View,
 			BlockID: expectedVote.BlockID,
 			SigData: expectedVote.SigData,
@@ -193,15 +193,9 @@ func (s *MessageHubSuite) TestProcessValidIncomingMessages() {
 		require.NoError(s.T(), err)
 	})
 	s.Run("to-timeout-aggregator", func() {
-		expectedTimeout := helper.TimeoutObjectFixture(helper.WithTimeoutObjectSignerID(originID))
-		msg := &messages.TimeoutObject{
-			View:       expectedTimeout.View,
-			NewestQC:   expectedTimeout.NewestQC,
-			LastViewTC: expectedTimeout.LastViewTC,
-			SigData:    expectedTimeout.SigData,
-		}
-		s.timeoutAggregator.On("AddTimeout", expectedTimeout)
-		err := s.hub.Process(channel, originID, msg)
+		timeout := helper.TimeoutObjectFixture(helper.WithTimeoutObjectSignerID(originID))
+		s.timeoutAggregator.On("AddTimeout", timeout)
+		err := s.hub.Process(channel, originID, timeout)
 		require.NoError(s.T(), err)
 	})
 	s.Run("unsupported-msg-type", func() {
@@ -228,21 +222,6 @@ func (s *MessageHubSuite) TestProcessInvalidIncomingMessages() {
 
 		// AddVote should NOT be called for invalid Vote
 		s.voteAggregator.AssertNotCalled(s.T(), "AddVote", mock.Anything)
-	})
-	s.Run("to-timeout-aggregator", func() {
-		expectedTimeout := helper.TimeoutObjectFixture(helper.WithTimeoutObjectSignerID(originID))
-		msg := &messages.TimeoutObject{
-			View:       expectedTimeout.View,
-			NewestQC:   expectedTimeout.NewestQC,
-			LastViewTC: expectedTimeout.LastViewTC,
-			SigData:    nil, // invalid value
-		}
-
-		err := s.hub.Process(channel, originID, msg)
-		require.NoError(s.T(), err)
-
-		// AddTimeout should NOT be called for invalid TimeoutObject
-		s.timeoutAggregator.AssertNotCalled(s.T(), "AddTimeout", mock.Anything)
 	})
 	s.Run("unsupported-msg-type", func() {
 		err := s.hub.Process(channel, originID, struct{}{})
@@ -336,12 +315,7 @@ func (s *MessageHubSuite) TestProcessMultipleMessagesHappyPath() {
 		wg.Add(1)
 		// prepare timeout fixture
 		timeout := helper.TimeoutObjectFixture()
-		expectedBroadcastMsg := &messages.TimeoutObject{
-			View:       timeout.View,
-			NewestQC:   timeout.NewestQC,
-			LastViewTC: timeout.LastViewTC,
-			SigData:    timeout.SigData,
-		}
+		expectedBroadcastMsg := (*messages.TimeoutObject)(timeout)
 		s.con.On("Publish", expectedBroadcastMsg, s.participants[1].NodeID, s.participants[2].NodeID).
 			Run(func(_ mock.Arguments) { wg.Done() }).
 			Return(nil)

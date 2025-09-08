@@ -196,7 +196,7 @@ func (s *MessageHubSuite) TestProcessValidIncomingMessages() {
 	})
 	s.Run("to-vote-aggregator", func() {
 		expectedVote := unittest.VoteFixture(unittest.WithVoteSignerID(originID))
-		msg := &messages.ClusterBlockVote{
+		msg := &flow.BlockVote{
 			View:    expectedVote.View,
 			BlockID: expectedVote.BlockID,
 			SigData: expectedVote.SigData,
@@ -207,14 +207,8 @@ func (s *MessageHubSuite) TestProcessValidIncomingMessages() {
 	})
 	s.Run("to-timeout-aggregator", func() {
 		expectedTimeout := helper.TimeoutObjectFixture(helper.WithTimeoutObjectSignerID(originID))
-		msg := &messages.ClusterTimeoutObject{
-			View:       expectedTimeout.View,
-			NewestQC:   expectedTimeout.NewestQC,
-			LastViewTC: expectedTimeout.LastViewTC,
-			SigData:    expectedTimeout.SigData,
-		}
 		s.timeoutAggregator.On("AddTimeout", expectedTimeout)
-		err := s.hub.Process(channel, originID, msg)
+		err := s.hub.Process(channel, originID, expectedTimeout)
 		require.NoError(s.T(), err)
 	})
 	s.Run("unsupported-msg-type", func() {
@@ -241,20 +235,6 @@ func (s *MessageHubSuite) TestProcessInvalidIncomingMessages() {
 
 		// AddVote should NOT be called for invalid Vote
 		s.voteAggregator.AssertNotCalled(s.T(), "AddVote", mock.Anything)
-	})
-	s.Run("to-timeout-aggregator", func() {
-		expectedTimeout := helper.TimeoutObjectFixture(helper.WithTimeoutObjectSignerID(originID))
-		msg := &messages.ClusterTimeoutObject{
-			View:       expectedTimeout.View,
-			NewestQC:   expectedTimeout.NewestQC,
-			LastViewTC: expectedTimeout.LastViewTC,
-			SigData:    nil, // invalid value
-		}
-		err := s.hub.Process(channel, originID, msg)
-		require.NoError(s.T(), err)
-
-		// AddTimeout should NOT be called for invalid TimeoutObject
-		s.timeoutAggregator.AssertNotCalled(s.T(), "AddTimeout", mock.Anything)
 	})
 }
 
@@ -351,12 +331,7 @@ func (s *MessageHubSuite) TestProcessMultipleMessagesHappyPath() {
 		wg.Add(1)
 		// prepare timeout fixture
 		timeout := helper.TimeoutObjectFixture()
-		expectedBroadcastMsg := &messages.ClusterTimeoutObject{
-			View:       timeout.View,
-			NewestQC:   timeout.NewestQC,
-			LastViewTC: timeout.LastViewTC,
-			SigData:    timeout.SigData,
-		}
+		expectedBroadcastMsg := (*messages.ClusterTimeoutObject)(timeout)
 		s.con.On("Publish", expectedBroadcastMsg, s.cluster[1].NodeID, s.cluster[2].NodeID).
 			Run(func(_ mock.Arguments) { wg.Done() }).
 			Return(nil)
