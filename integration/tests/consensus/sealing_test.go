@@ -316,7 +316,7 @@ ReceiptLoop:
 		Attestation:          atst,
 		ApproverID:           ss.verID,
 		AttestationSignature: atstSign,
-		Spock:                crypto.Signature{},
+		Spock:                unittest.SignatureFixture(),
 	}
 
 	// generates a signature over result approval body
