@@ -238,7 +238,7 @@ func (e *Engine) setupMessageHandler(getSealingConfigs module.SealingConfigsGett
 		e.inboundEventsNotifier,
 		engine.Pattern{
 			Match: func(msg *engine.Message) bool {
-				_, ok := msg.Payload.(*messages.ResultApproval)
+				_, ok := msg.Payload.(*flow.ResultApproval)
 				if ok {
 					e.engineMetrics.MessageReceived(metrics.EngineSealing, metrics.MessageResultApproval)
 				}
