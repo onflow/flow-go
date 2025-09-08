@@ -3,7 +3,6 @@ package environment
 import (
 	"encoding/binary"
 	"encoding/hex"
-	goerrors "errors"
 	"fmt"
 
 	"github.com/onflow/atree"
@@ -362,7 +361,7 @@ func (a *AccountStatus) AppendAccountPublicKeyMetadata(
 		}
 	}()
 
-	digest, isDuplicateKey, duplicateStoredKeyIndex, err := isKeyDuplicate(keyMetadata, encodedKey, getKeyDigest, getStoredKey)
+	digest, isDuplicateKey, duplicateStoredKeyIndex, err := accountkeymetadata.FindDuplicateKey(keyMetadata, encodedKey, getKeyDigest, getStoredKey)
 	if err != nil {
 		return 0, false, err
 	}
@@ -384,39 +383,4 @@ func (a *AccountStatus) AppendAccountPublicKeyMetadata(
 	}
 
 	return storedKeyIndex, true, nil
-}
-
-func isKeyDuplicate(
-	keyMetadata *accountkeymetadata.KeyMetadataAppender,
-	encodedKey []byte,
-	getKeyDigest func([]byte) uint64,
-	getStoredKey func(uint32) ([]byte, error),
-) (
-	digest uint64,
-	isDuplicateKey bool,
-	duplicateStoredKeyIndex uint32,
-	err error,
-) {
-	// To balance tradeoffs, it is OK to have detection rate less than 100%, for the
-	// same reasons compression programs/libraries don't use max compression by default.
-
-	// We use a fast non-cryptographic hash algorithm for efficiency, so
-	// we need to handle hash collisions (same digest from different hash inputs).
-	// When a hash collision is detected, sentinel digest (0) is stored in place
-	// of new key digest, and subsequent digest comparison excludes stored sentinel digest.
-	// This means keys with the sentinel digest will not be deduplicated and that is OK.
-
-	digest = getKeyDigest(encodedKey)
-
-	isDuplicateKey, duplicateStoredKeyIndex, err = accountkeymetadata.FindDuplicateKey(keyMetadata, encodedKey, digest, getStoredKey)
-	if err != nil {
-		var collisionErr *accountkeymetadata.CollisionError
-		if goerrors.As(err, &collisionErr) {
-			// Return sentinel digest on collision.
-			return accountkeymetadata.SentinelFastDigest64, false, 0, nil
-		}
-		return 0, false, 0, err
-	}
-
-	return digest, isDuplicateKey, duplicateStoredKeyIndex, nil
 }

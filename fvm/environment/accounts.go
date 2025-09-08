@@ -12,6 +12,7 @@ import (
 	"github.com/onflow/crypto"
 	"github.com/onflow/crypto/hash"
 
+	accountkeymetadata "github.com/onflow/flow-go/fvm/environment/account-key-metadata"
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/storage/state"
 	"github.com/onflow/flow-go/model/flow"
@@ -535,7 +536,7 @@ func (a *StatefulAccounts) appendKeyMetadataToAccountStatusRegister(
 		weight,
 		encodedKey,
 		func(b []byte) uint64 {
-			return getPublicKeyDigest(address, b)
+			return accountkeymetadata.GetPublicKeyDigest(address, b)
 		},
 		func(storedKeyIndex uint32) ([]byte, error) {
 			return getRawStoredPublicKey(a, address, storedKeyIndex)

@@ -1,12 +1,9 @@
 package environment
 
 import (
-	"encoding/binary"
 	"fmt"
 	"math"
 	"slices"
-
-	"github.com/fxamacker/circlehash"
 
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/model/flow"
@@ -390,11 +387,4 @@ func encodeBatchedPublicKey(encodedPublicKey []byte) ([]byte, error) {
 	copy(buf[1:], encodedPublicKey)
 
 	return buf, nil
-}
-
-// Utils
-
-func getPublicKeyDigest(owner flow.Address, encodedPublicKey []byte) uint64 {
-	seed := binary.BigEndian.Uint64(owner[:])
-	return circlehash.Hash64(encodedPublicKey, seed)
 }

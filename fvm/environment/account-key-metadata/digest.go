@@ -1,11 +1,19 @@
 package accountkeymetadata
 
-import "bytes"
+import (
+	"bytes"
+	"encoding/binary"
+
+	"github.com/fxamacker/circlehash"
+
+	"github.com/onflow/flow-go/model/flow"
+)
 
 // FindDuplicateKey returns true with duplicate key index if duplicate key
 // of the given key is found.  However, detection rate is intentionally
 // not 100% in order to limit the number of digests we store on chain.
-// If a hash collision happens with given digest, CollisionError is returned.
+// If a hash collision happens with given digest, this function returns
+// SentinelFastDigest64 digest and duplicate key not found.
 // Specifically, a duplicate key is found when these conditions are met:
 // - given digest isn't the predefined sentinel digest (0),
 // - given digest matches one of the stored digests in key metadata, and
@@ -13,9 +21,9 @@ import "bytes"
 func FindDuplicateKey(
 	keyMetadata *KeyMetadataAppender,
 	encodedKey []byte,
-	digest uint64,
+	getKeyDigest func([]byte) uint64,
 	getStoredKey func(uint32) ([]byte, error),
-) (found bool, duplicateStoredKeyIndex uint32, _ error) {
+) (digest uint64, found bool, duplicateStoredKeyIndex uint32, _ error) {
 
 	// To balance tradeoffs, it is OK to have detection rate less than 100%, for the
 	// same reasons compression programs/libraries don't use max compression by default.
@@ -26,32 +34,41 @@ func FindDuplicateKey(
 	// of new key digest, and subsequent digest comparison excludes stored sentinel digest.
 	// This means keys with the sentinel digest will not be deduplicated and that is OK.
 
+	digest = getKeyDigest(encodedKey)
+
 	if digest == SentinelFastDigest64 {
 		// The new key digest matches the sentinel digest by coincidence or attack.
 		// Return early so the key will be stored without using deduplication.
-		return false, 0, nil
+		return SentinelFastDigest64, false, 0, nil
 	}
 
 	// Find duplicate digest
 	found, duplicateStoredKeyIndex = keyMetadata.findDuplicateDigest(digest)
 
 	if !found {
-		return false, 0, nil
+		return digest, false, 0, nil
 	}
 
 	// Get encoded key with duplicate digest
 	encodedKeyWithDuplicateDigest, err := getStoredKey(duplicateStoredKeyIndex)
 	if err != nil {
-		return false, 0, err
+		return digest, false, 0, err
 	}
 
 	// Confirm keys are duplicate
 	if bytes.Equal(encodedKeyWithDuplicateDigest, encodedKey) {
-		return true, duplicateStoredKeyIndex, nil
+		return digest, true, duplicateStoredKeyIndex, nil
 	}
 
-	// Found a collision
-	return false, 0, NewCollisionError(encodedKeyWithDuplicateDigest, encodedKey, digest)
+	// Found hash collision (same digest with different encoded keys).
+	// Return SentinelFastDigest64, duplicate key not found, and no error.
+	// TODO: maybe log hash collision
+	return SentinelFastDigest64, false, 0, nil
+}
+
+func GetPublicKeyDigest(owner flow.Address, encodedPublicKey []byte) uint64 {
+	seed := binary.BigEndian.Uint64(owner[:])
+	return circlehash.Hash64(encodedPublicKey, seed)
 }
 
 // SentinelFastDigest64 is the sentinel digest used for 64-bit fast hash collision handling.  SentinelFastDigest64
