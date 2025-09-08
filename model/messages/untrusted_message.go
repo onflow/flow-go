@@ -40,6 +40,14 @@ func InternalToMessage(event interface{}) (UntrustedMessage, error) {
 		return (*Proposal)(internal), nil
 	case *cluster.Proposal:
 		return (*ClusterProposal)(internal), nil
+	case *flow.EntityRequest:
+		return (*EntityRequest)(internal), nil
+	case *flow.EntityResponse:
+		return (*EntityResponse)(internal), nil
+	case *flow.TransactionBody:
+		return (*TransactionBody)(internal), nil
+	case *flow.Transaction:
+		return (*Transaction)(internal), nil
 	case *flow.CollectionGuarantee:
 		return (*CollectionGuarantee)(internal), nil
 	case *flow.SyncRequest:
@@ -57,10 +65,6 @@ func InternalToMessage(event interface{}) (UntrustedMessage, error) {
 		}, nil
 	case *flow.RangeRequest:
 		return (*RangeRequest)(internal), nil
-	case *flow.EntityRequest:
-		return (*EntityRequest)(internal), nil
-	case *flow.EntityResponse:
-		return (*EntityResponse)(internal), nil
 	case *flow.ExecutionReceipt:
 		return (*ExecutionReceipt)(internal), nil
 	case UntrustedMessage:
