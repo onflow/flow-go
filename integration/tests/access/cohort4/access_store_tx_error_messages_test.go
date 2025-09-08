@@ -20,7 +20,6 @@ import (
 	"github.com/onflow/flow-go/integration/tests/lib"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
-	"github.com/onflow/flow-go/storage/operation/pebbleimpl"
 	"github.com/onflow/flow-go/storage/store"
 )
 
@@ -219,7 +218,7 @@ func (s *AccessStoreTxErrorMessagesSuite) fetchTxErrorMessages(txResults []*sdk.
 	require.NoError(s.T(), err, "could not open db")
 
 	metrics := metrics.NewNoopCollector()
-	anTxErrorMessages := store.NewTransactionResultErrorMessages(metrics, pebbleimpl.ToDB(anDB), store.DefaultCacheSize)
+	anTxErrorMessages := store.NewTransactionResultErrorMessages(metrics, anDB, store.DefaultCacheSize)
 
 	txResultErrorMessages := make([]*flow.TransactionResultErrorMessage, len(txResults))
 	for i, txResult := range txResults {
