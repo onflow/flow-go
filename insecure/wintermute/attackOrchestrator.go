@@ -350,7 +350,7 @@ func (o *Orchestrator) handleChunkDataPackResponseEvent(chunkDataPackReplyEvent 
 func (o *Orchestrator) handleResultApprovalEvent(resultApprovalEvent *insecure.EgressEvent) error {
 	// non-nil state means a result has been corrupted, hence checking whether the approval
 	// belongs to the chunks of the original (non-corrupted) result.
-	approval := resultApprovalEvent.FlowProtocolEvent.(*flow.ResultApproval)
+	approval := resultApprovalEvent.FlowProtocolEvent.(*messages.ResultApproval)
 	lg := o.logger.With().
 		Hex("result_id", logging.ID(approval.Body.ExecutionResultID)).
 		Uint64("chunk_index", approval.Body.ChunkIndex).
