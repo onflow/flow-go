@@ -65,7 +65,10 @@ func (s *AccessStoreTxErrorMessagesSuite) SetupTest() {
 	storeTxAccess := testnet.NewNodeConfig(
 		flow.RoleAccess,
 		testnet.WithLogLevel(zerolog.InfoLevel),
-		testnet.WithAdditionalFlagf("--store-tx-result-error-messages=true"),
+		testnet.WithAdditionalFlagf("--execution-data-dir=%s", testnet.DefaultExecutionDataServiceDir),
+		testnet.WithAdditionalFlagf("--execution-state-dir=%s", testnet.DefaultExecutionStateDir),
+		testnet.WithAdditionalFlag("--execution-data-indexing-enabled=true"),
+		testnet.WithAdditionalFlag("--store-tx-result-error-messages=true"),
 		testnet.WithMetricsServer(),
 	)
 
@@ -110,11 +113,12 @@ func (s *AccessStoreTxErrorMessagesSuite) TestAccessStoreTxErrorMessages() {
 	// Create and send a transaction that will result in an error.
 	txResult := s.createAndSendTxWithTxError()
 
-	// Wait until execution receipts are handled, transaction error messages are stored.
-	s.Eventually(func() bool {
-		value, err := s.getMaxReceiptHeight(s.accessContainerName)
-		return err == nil && value > txResult.BlockHeight
-	}, 60*time.Second, 1*time.Second)
+	// wait until the block containing the transaction is indexed
+	client, err := s.net.ContainerByName(s.accessContainerName).TestnetClient()
+	s.Require().NoError(err)
+
+	err = client.WaitForIndexed(s.ctx, txResult.BlockHeight, 60*time.Second)
+	s.Require().NoError(err)
 
 	// Stop the network containers before checking the results.
 	s.net.StopContainers()
@@ -194,23 +198,6 @@ func (s *AccessStoreTxErrorMessagesSuite) createAndSendTxWithTxError() *sdk.Tran
 	s.Require().NoError(err)
 
 	return accountCreationTxRes
-}
-
-// getMaxReceiptHeight retrieves the maximum receipt height for a given container by
-// querying the metrics endpoint. This is used to confirm that the transaction receipts
-// have been processed.
-func (s *AccessStoreTxErrorMessagesSuite) getMaxReceiptHeight(containerName string) (uint64, error) {
-	node := s.net.ContainerByName(containerName)
-	metricsURL := fmt.Sprintf("http://0.0.0.0:%s/metrics", node.Port(testnet.MetricsPort))
-	values := s.net.GetMetricFromContainer(s.T(), containerName, metricsURL, maxReceiptHeightMetric)
-
-	// If no values are found in the metrics, return an error.
-	if len(values) == 0 {
-		return 0, fmt.Errorf("no values found")
-	}
-
-	// Return the first value found as the max receipt height.
-	return uint64(values[0].GetGauge().GetValue()), nil
 }
 
 // fetchTxErrorMessage retrieves the stored transaction error message for a given transaction result.

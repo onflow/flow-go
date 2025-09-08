@@ -19,6 +19,7 @@ import (
 	client "github.com/onflow/flow-go-sdk/access/grpc"
 	sdkcrypto "github.com/onflow/flow-go-sdk/crypto"
 	"github.com/onflow/flow-go-sdk/templates"
+	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
 
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/fvm/crypto"
@@ -306,6 +307,36 @@ func (c *Client) WaitForSealed(ctx context.Context, id sdk.Identifier) (*sdk.Tra
 // WaitForExecuted waits for the transaction to be executed, then returns the result.
 func (c *Client) WaitForExecuted(ctx context.Context, id sdk.Identifier) (*sdk.TransactionResult, error) {
 	return c.waitForStatus(ctx, id, sdk.TransactionStatusExecuted)
+}
+
+// WaitForExecuted waits for the transaction to be executed, then returns the result.
+func (c *Client) WaitForIndexed(ctx context.Context, height uint64, maxDuration time.Duration) error {
+	timeout := time.After(maxDuration)
+	ticker := time.NewTicker(100 * time.Millisecond)
+	defer ticker.Stop()
+
+	rpcClient := c.client.RPCClient()
+
+	indexedHeight := uint64(0)
+	for {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-timeout:
+			return fmt.Errorf("timed out waiting for indexed height %d (current: %d)", height, indexedHeight)
+		case <-ticker.C:
+		}
+
+		resp, err := rpcClient.GetLatestBlockHeader(ctx, &accessproto.GetLatestBlockHeaderRequest{})
+		if err != nil {
+			return err
+		}
+
+		indexedHeight = resp.GetMetadata().HighestIndexedHeight
+		if indexedHeight >= height {
+			return nil
+		}
+	}
 }
 
 // waitForStatus waits for the transaction to be in a certain status, then returns the result.
