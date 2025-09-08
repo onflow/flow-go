@@ -67,6 +67,8 @@ func InternalToMessage(event interface{}) (UntrustedMessage, error) {
 		return (*RangeRequest)(internal), nil
 	case *flow.ExecutionReceipt:
 		return (*ExecutionReceipt)(internal), nil
+	case *flow.ResultApproval:
+		return (*ResultApproval)(internal), nil
 	case UntrustedMessage:
 		// Already a valid UntrustedMessage
 		// TODO(immutable M2): expand when ToInternal changes for other M2 types

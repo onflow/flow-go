@@ -56,7 +56,7 @@ type ResultApproval flow.UntrustedResultApproval
 func (a *ResultApproval) ToInternal() (any, error) {
 	internal, err := flow.NewResultApproval(flow.UntrustedResultApproval(*a))
 	if err != nil {
-		return nil, fmt.Errorf("could not construct result approval: %w", err)
+		return nil, fmt.Errorf("could not convert %T to internal type: %w", a, err)
 	}
 	return internal, nil
 }

@@ -74,15 +74,10 @@ func (o *orchestrator) trackEgressEvents(event *insecure.EgressEvent) error {
 	case *messages.ResultApproval:
 		internalResultApproval, err := e.ToInternal()
 		if err != nil {
-			return err
+			o.Logger.Err(err).Msgf("failed to convert event %T to internal", e)
+			return nil
 		}
-
-		resultApproval, ok := internalResultApproval.(flow.ResultApproval)
-		if !ok {
-			return fmt.Errorf("expected flow.ResultApproval, got %T", internalResultApproval)
-		}
-
-		o.egressEventTracker[typeResultApproval] = append(o.egressEventTracker[typeResultApproval], resultApproval.ID())
+		o.egressEventTracker[typeResultApproval] = append(o.egressEventTracker[typeResultApproval], internalResultApproval.(*flow.ResultApproval).ID())
 	}
 	return nil
 }
