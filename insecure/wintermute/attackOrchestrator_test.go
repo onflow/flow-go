@@ -643,7 +643,7 @@ func TestPassingThrough_ResultApproval(t *testing.T) {
 		Protocol:          insecure.Protocol_MULTICAST,
 		TargetNum:         3,
 		TargetIds:         unittest.IdentifierListFixture(10),
-		FlowProtocolEvent: approval,
+		FlowProtocolEvent: (*messages.ResultApproval)(approval),
 	}
 
 	approvalPassThrough := &sync.WaitGroup{}
@@ -659,7 +659,7 @@ func TestPassingThrough_ResultApproval(t *testing.T) {
 			require.True(t, ok)
 
 			// passed through event must be a result approval
-			_, ok = event.FlowProtocolEvent.(*flow.ResultApproval)
+			_, ok = event.FlowProtocolEvent.(*messages.ResultApproval)
 			require.True(t, ok)
 
 			// response must be a pass through
