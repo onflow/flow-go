@@ -3,7 +3,6 @@ package codec
 import (
 	"fmt"
 
-	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/libp2p/message"
 	"github.com/onflow/flow-go/model/messages"
 )
