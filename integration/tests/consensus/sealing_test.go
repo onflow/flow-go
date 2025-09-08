@@ -324,7 +324,7 @@ ReceiptLoop:
 	bodySign, err := ss.verSK.Sign(bodyID[:], verUtils.NewResultApprovalHasher())
 	require.NoError(ss.T(), err)
 
-	approval := flow.ResultApproval{
+	approval := messages.ResultApproval{
 		Body:              body,
 		VerifierSignature: bodySign,
 	}
@@ -342,8 +342,13 @@ ApprovalLoop:
 		}
 		break ApprovalLoop
 	}
+	internal, err := approval.ToInternal()
+	require.NoError(ss.T(), err)
 
-	ss.T().Logf("result approval submitted (approval: %x, result: %x)\n", approval.ID(), approval.Body.ExecutionResultID)
+	internalApproval, ok := internal.(*flow.ResultApproval)
+	require.True(ss.T(), ok)
+
+	ss.T().Logf("result approval submitted (approval: %x, result: %x)\n", internalApproval.ID(), approval.Body.ExecutionResultID)
 
 	// we try to find a block with the guarantee included and three confirmations
 	found := false
