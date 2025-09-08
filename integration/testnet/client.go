@@ -309,7 +309,7 @@ func (c *Client) WaitForExecuted(ctx context.Context, id sdk.Identifier) (*sdk.T
 	return c.waitForStatus(ctx, id, sdk.TransactionStatusExecuted)
 }
 
-// WaitForExecuted waits up to maxDuration for the provided height to be indexed.
+// WaitForIndexed waits up to maxDuration for the provided height to be indexed.
 // Returns an error if the height is not indexed within the timeout or if the API returns an error.
 func (c *Client) WaitForIndexed(ctx context.Context, height uint64, maxDuration time.Duration) error {
 	timeout := time.After(maxDuration)
