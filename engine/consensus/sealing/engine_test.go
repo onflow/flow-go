@@ -13,7 +13,6 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	mockconsensus "github.com/onflow/flow-go/engine/consensus/mock"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
 	mockmodule "github.com/onflow/flow-go/module/mock"
@@ -163,7 +162,7 @@ func (s *SealingEngineSuite) TestMultipleProcessingItems() {
 
 	numApprovalsPerReceipt := 1
 	approvals := make([]*flow.ResultApproval, 0, len(receipts)*numApprovalsPerReceipt)
-	responseApprovals := make([]*messages.ApprovalResponse, 0)
+	responseApprovals := make([]*flow.ApprovalResponse, 0)
 	approverID := unittest.IdentifierFixture()
 	for _, receipt := range receipts {
 		for j := 0; j < numApprovalsPerReceipt; j++ {
@@ -172,9 +171,9 @@ func (s *SealingEngineSuite) TestMultipleProcessingItems() {
 				unittest.WithApproverID(approverID),
 			)
 
-			responseApproval := &messages.ApprovalResponse{
+			responseApproval := &flow.ApprovalResponse{
 				Nonce:    0,
-				Approval: flow.UntrustedResultApproval(*approval),
+				Approval: *approval,
 			}
 
 			responseApprovals = append(responseApprovals, responseApproval)
@@ -199,12 +198,8 @@ func (s *SealingEngineSuite) TestMultipleProcessingItems() {
 		for _, resp := range responseApprovals {
 			// convert wire → trusted *before* calling Process,
 			// so the queue only ever holds *flow.ResultApproval.
-			v, err := resp.ToInternal()
-			s.Require().IsType(&flow.ApprovalResponse{}, v, "response should be approval")
-			s.Require().NoError(err, "ToInternal failed for ApprovalResponse")
 
-			ar := v.(*flow.ApprovalResponse)
-			err = s.engine.Process(channels.ReceiveApprovals, approverID, &ar.Approval)
+			err := s.engine.Process(channels.ReceiveApprovals, approverID, resp)
 			s.Require().NoError(err, "should process approval (converted from wire)")
 		}
 	}()
