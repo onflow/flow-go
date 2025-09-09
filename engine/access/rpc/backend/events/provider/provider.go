@@ -6,6 +6,7 @@ import (
 
 	"github.com/onflow/flow/protobuf/go/flow/entities"
 
+	"github.com/onflow/flow-go/model/access"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/executiondatasync/optimistic_sync"
 )
@@ -16,8 +17,8 @@ type EventProvider interface {
 		blocks []BlockMetadata,
 		eventType flow.EventType,
 		encodingVersion entities.EventEncodingVersion,
-		criteria optimistic_sync.Criteria,
-	) (Response, entities.ExecutorMetadata, error)
+		executionResultInfo *optimistic_sync.ExecutionResultInfo,
+	) (Response, access.ExecutorMetadata, error)
 }
 
 // BlockMetadata is used to capture information about requested blocks to avoid repeated blockID

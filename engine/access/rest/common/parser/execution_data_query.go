@@ -3,38 +3,47 @@ package parser
 import (
 	"fmt"
 	"strconv"
+
+	"github.com/onflow/flow-go/engine/access/rest/http/models"
+	"github.com/onflow/flow-go/model/flow"
 )
 
 func NewExecutionDataQuery(
 	agreeingExecutorCount string,
 	requiredExecutorIds []string,
 	includeExecutorMetadata string,
-) (uint64, [][]byte, bool, error) {
-	//TODO: all of the passed args can be empty. Do we handle such a case?
-
-	// 1. Parse agreeingExecutorCount -> uint64
-	count, err := strconv.ParseUint(agreeingExecutorCount, 10, 64)
-	if err != nil || count == 0 {
-		return 0, nil, false, fmt.Errorf("invalid agreeingExecutorCount: %w", err)
+) (*models.ExecutionStateQuery, error) {
+	var executorCount uint64
+	var err error
+	if len(agreeingExecutorCount) > 0 {
+		executorCount, err = strconv.ParseUint(agreeingExecutorCount, 10, 64)
+		// executorCount can't be set to 0 explicitly
+		if err != nil || executorCount == 0 {
+			return nil, fmt.Errorf("invalid agreeingExecutorCount: %w", err)
+		}
 	}
 
-	// 2. Parse requiredExecutorIds -> []flow.Identifier
-	ids, err := NewIDs(requiredExecutorIds)
-	if err != nil {
-		return 0, nil, false, fmt.Errorf("invalid requiredExecutorIds: %w", err)
+	var ids IDs
+	var executorIDs []flow.Identifier
+	if len(requiredExecutorIds) > 0 {
+		ids, err = NewIDs(requiredExecutorIds)
+		if err != nil {
+			return nil, fmt.Errorf("invalid requiredExecutorIds: %w", err)
+		}
+		executorIDs = ids.Flow()
 	}
 
-	// 3. Parse includeExecutorMetadata -> bool
-	include, err := strconv.ParseBool(includeExecutorMetadata)
-	if err != nil {
-		return 0, nil, false, fmt.Errorf("invalid includeExecutorMetadata: %w", err)
+	var includeMetadata bool
+	if len(includeExecutorMetadata) > 0 {
+		includeMetadata, err = strconv.ParseBool(includeExecutorMetadata)
+		if err != nil {
+			return nil, fmt.Errorf("invalid includeExecutorMetadata: %w", err)
+		}
 	}
 
-	// cast every flow.Identifier to []byte
-	byteIDs := make([][]byte, len(ids.Flow()))
-	for i, id := range ids.Flow() {
-		byteIDs[i] = []byte(id.String())
-	}
-
-	return count, byteIDs, include, nil
+	return &models.ExecutionStateQuery{
+		AgreeingExecutorsCount:  executorCount,
+		RequiredExecutorIds:     executorIDs,
+		IncludeExecutorMetadata: includeMetadata,
+	}, nil
 }

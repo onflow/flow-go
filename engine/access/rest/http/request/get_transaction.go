@@ -3,10 +3,9 @@ package request
 import (
 	"fmt"
 
-	"github.com/onflow/flow/protobuf/go/flow/entities"
-
 	"github.com/onflow/flow-go/engine/access/rest/common"
 	"github.com/onflow/flow-go/engine/access/rest/common/parser"
+	"github.com/onflow/flow-go/engine/access/rest/http/models"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -66,7 +65,7 @@ func (g *GetTransaction) Build(r *common.Request) error {
 type GetTransactionResult struct {
 	GetByIDRequest
 	TransactionOptionals
-	ExecutionState entities.ExecutionStateQuery
+	ExecutionState models.ExecutionStateQuery
 }
 
 // NewGetTransactionResult extracts necessary variables from the provided request
@@ -98,7 +97,7 @@ func parseGetTransactionResult(
 		return GetTransactionResult{}, fmt.Errorf("invalid ID request: %w", err)
 	}
 
-	agreeingExecutorsCount, agreeingExecutorsIds, includeExecutorMetadata, err := parser.NewExecutionDataQuery(
+	executionStateQuery, err := parser.NewExecutionDataQuery(
 		rawAgreeingExecutorsCount,
 		rawAgreeingExecutorsIds,
 		rawIncludeExecutorMetadata,
@@ -110,10 +109,6 @@ func parseGetTransactionResult(
 	return GetTransactionResult{
 		GetByIDRequest:       byID,
 		TransactionOptionals: txOpts,
-		ExecutionState: entities.ExecutionStateQuery{
-			AgreeingExecutorsCount:  agreeingExecutorsCount,
-			RequiredExecutorIds:     agreeingExecutorsIds,
-			IncludeExecutorMetadata: includeExecutorMetadata,
-		},
+		ExecutionState:       *executionStateQuery,
 	}, nil
 }

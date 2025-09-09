@@ -8,6 +8,7 @@ import (
 	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/engine/access/rest/common"
 	commonmodels "github.com/onflow/flow-go/engine/access/rest/common/models"
+	"github.com/onflow/flow-go/engine/access/rest/http/models"
 	"github.com/onflow/flow-go/engine/access/rest/http/request"
 	"github.com/onflow/flow-go/module/executiondatasync/optimistic_sync"
 )
@@ -23,21 +24,19 @@ func GetEvents(r *common.Request, backend access.API, _ commonmodels.LinkGenerat
 	}
 
 	// if the request has block IDs provided then return events for block IDs
-	var blocksEvents commonmodels.BlocksEvents
 	if len(req.BlockIDs) > 0 {
-		events, _, err := backend.GetEventsForBlockIDs(
+		events, metadata, err := backend.GetEventsForBlockIDs(
 			r.Context(),
 			req.Type,
 			req.BlockIDs,
 			entitiesproto.EventEncodingVersion_JSON_CDC_V0,
-			optimistic_sync.NewCriteria(&req.ExecutionState),
+			NewCriteria(req.ExecutionState),
 		)
 		if err != nil {
 			return nil, err
 		}
 
-		blocksEvents.Build(events)
-		return blocksEvents, nil
+		return commonmodels.NewBlockEventsList(events, &metadata, req.ExecutionState.IncludeExecutorMetadata), nil
 	}
 
 	// if end height is provided with special values then load the height
@@ -55,18 +54,24 @@ func GetEvents(r *common.Request, backend access.API, _ commonmodels.LinkGenerat
 	}
 
 	// if request provided block height range then return events for that range
-	events, _, err := backend.GetEventsForHeightRange(
+	events, metadata, err := backend.GetEventsForHeightRange(
 		r.Context(),
 		req.Type,
 		req.StartHeight,
 		req.EndHeight,
 		entitiesproto.EventEncodingVersion_JSON_CDC_V0,
-		optimistic_sync.NewCriteria(&req.ExecutionState),
+		NewCriteria(req.ExecutionState),
 	)
 	if err != nil {
 		return nil, err
 	}
 
-	blocksEvents.Build(events)
-	return blocksEvents, nil
+	return commonmodels.NewBlockEventsList(events, &metadata, req.ExecutionState.IncludeExecutorMetadata), nil
+}
+
+func NewCriteria(query models.ExecutionStateQuery) optimistic_sync.Criteria {
+	return optimistic_sync.Criteria{
+		AgreeingExecutorsCount: uint(query.AgreeingExecutorsCount),
+		RequiredExecutors:      query.RequiredExecutorIds,
+	}
 }

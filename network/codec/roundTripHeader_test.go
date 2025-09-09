@@ -4,8 +4,9 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
-	"github.com/onflow/flow-go/model/messages"
+	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -22,23 +23,26 @@ import (
 // next developer who wants to add a new serialization format :-)
 func roundTripHeaderViaCodec(t *testing.T, codec network.Codec) {
 	block := unittest.BlockFixture()
-	message := messages.NewBlockProposal(&block)
-	encoded, err := codec.Encode(message)
+	proposal := unittest.ProposalFromBlock(block)
+	message := flow.UntrustedProposal(*proposal)
+	encoded, err := codec.Encode(&message)
 	assert.NoError(t, err)
 	decodedInterface, err := codec.Decode(encoded)
 	assert.NoError(t, err)
-	decoded := decodedInterface.(*messages.BlockProposal)
-	decodedBlock := decoded.Block.ToInternal()
+	decoded := decodedInterface.(*flow.UntrustedProposal)
+	proposalTrusted, err := flow.NewProposal(*decoded)
+	require.NoError(t, err)
+	decodedBlock := proposalTrusted.Block
 	// compare LastViewTC separately, because it is a pointer field
-	if decodedBlock.Header.LastViewTC == nil {
-		assert.Equal(t, block.Header.LastViewTC, decodedBlock.Header.LastViewTC)
+	if decodedBlock.LastViewTC == nil {
+		assert.Equal(t, block.LastViewTC, decodedBlock.LastViewTC)
 	} else {
-		assert.Equal(t, *block.Header.LastViewTC, *decodedBlock.Header.LastViewTC)
+		assert.Equal(t, *block.LastViewTC, *decodedBlock.LastViewTC)
 	}
 	// compare the rest of the header
 	// manually set LastViewTC fields to be equal to pass the Header pointer comparison
-	decodedBlock.Header.LastViewTC = block.Header.LastViewTC
-	assert.Equal(t, *block.Header, *decodedBlock.Header)
+	decodedBlock.LastViewTC = block.LastViewTC
+	assert.Equal(t, *block.ToHeader(), *decodedBlock.ToHeader())
 }
 
 func TestRoundTripHeaderViaCBOR(t *testing.T) {

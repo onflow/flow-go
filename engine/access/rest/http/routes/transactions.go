@@ -32,8 +32,7 @@ func GetTransactionByID(r *common.Request, backend access.API, link commonmodels
 			req.BlockID,
 			req.CollectionID,
 			entitiesproto.EventEncodingVersion_JSON_CDC_V0,
-			//TODO: This needs to be added to protobuf with https://github.com/onflow/flow-go/issues/7647
-			optimistic_sync.NewCriteria(nil),
+			optimistic_sync.Criteria{},
 		)
 		if err != nil {
 			return nil, err
@@ -59,7 +58,7 @@ func GetTransactionResultByID(r *common.Request, backend access.API, link common
 		req.BlockID,
 		req.CollectionID,
 		entitiesproto.EventEncodingVersion_JSON_CDC_V0,
-		optimistic_sync.NewCriteria(&req.ExecutionState),
+		NewCriteria(req.ExecutionState),
 	)
 	if err != nil {
 		return nil, err

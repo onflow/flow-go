@@ -85,7 +85,7 @@ func (b *backendBlockDetails) GetBlockByID(
 		return nil, flow.BlockStatusUnknown, access.NewDataNotFoundError("block", err)
 	}
 
-	status, err := b.getBlockStatus(block.Header)
+	status, err := b.getBlockStatus(block.ToHeader())
 	if err != nil {
 		return nil, flow.BlockStatusUnknown, access.RequireNoError(ctx, err)
 	}
@@ -113,9 +113,10 @@ func (b *backendBlockDetails) GetBlockByHeight(
 		return nil, flow.BlockStatusUnknown, access.NewDataNotFoundError("block", err)
 	}
 
-	status, err := b.getBlockStatus(block.Header)
+	status, err := b.getBlockStatus(block.ToHeader())
 	if err != nil {
 		return nil, flow.BlockStatusUnknown, access.RequireNoError(ctx, err)
 	}
+
 	return block, status, nil
 }

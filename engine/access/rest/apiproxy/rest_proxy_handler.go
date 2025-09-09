@@ -201,8 +201,12 @@ func (r *RestProxyHandler) GetTransactionResult(
 		return nil, entities.ExecutorMetadata{}, err
 	}
 
-	return convert.MessageToTransactionResult(transactionResultResponse),
-		*transactionResultResponse.Metadata.GetExecutorMetadata(), nil
+	transactionResult, err := convert.MessageToTransactionResult(transactionResultResponse)
+	if err != nil {
+		return nil, entities.ExecutorMetadata{}, err
+	}
+
+	return transactionResult, *transactionResultResponse.Metadata.GetExecutorMetadata(), nil
 }
 
 // GetAccountAtBlockHeight returns account by account address and block height.
@@ -384,10 +388,10 @@ func (r *RestProxyHandler) GetEventsForHeightRange(
 	startHeight, endHeight uint64,
 	requiredEventEncodingVersion entities.EventEncodingVersion,
 	criteria optimistic_sync.Criteria,
-) ([]flow.BlockEvents, entities.ExecutorMetadata, error) {
+) ([]flow.BlockEvents, accessmodel.ExecutorMetadata, error) {
 	upstream, closer, err := r.FaultTolerantClient()
 	if err != nil {
-		return nil, entities.ExecutorMetadata{}, err
+		return nil, accessmodel.ExecutorMetadata{}, err
 	}
 	defer closer.Close()
 
@@ -399,17 +403,22 @@ func (r *RestProxyHandler) GetEventsForHeightRange(
 		ExecutionStateQuery: &entities.ExecutionStateQuery{
 			AgreeingExecutorsCount:  uint64(criteria.AgreeingExecutorsCount),
 			RequiredExecutorIds:     convert.IdentifiersToMessages(criteria.RequiredExecutors),
-			IncludeExecutorMetadata: false, //TODO: what should I do with this field?
+			IncludeExecutorMetadata: true,
 		},
 	}
 	eventsResponse, err := upstream.GetEventsForHeightRange(ctx, getEventsForHeightRangeRequest)
+	if err != nil {
+		return nil, accessmodel.ExecutorMetadata{}, err
+	}
 	r.log("upstream", "GetEventsForHeightRange", err)
 
+	metadata, err := convert.MessageToExecutorMetadata(eventsResponse.Metadata.ExecutorMetadata)
 	if err != nil {
-		return nil, entities.ExecutorMetadata{}, err
+		return nil, accessmodel.ExecutorMetadata{}, err
 	}
 
-	return convert.MessagesToBlockEvents(eventsResponse.Results), entities.ExecutorMetadata{}, nil
+	res, err := convert.MessagesToBlockEvents(eventsResponse.Results)
+	return res, *metadata, err
 }
 
 // GetEventsForBlockIDs returns events by their name in the specified block IDs.
@@ -419,10 +428,10 @@ func (r *RestProxyHandler) GetEventsForBlockIDs(
 	blockIDs []flow.Identifier,
 	requiredEventEncodingVersion entities.EventEncodingVersion,
 	criteria optimistic_sync.Criteria,
-) ([]flow.BlockEvents, entities.ExecutorMetadata, error) {
+) ([]flow.BlockEvents, accessmodel.ExecutorMetadata, error) {
 	upstream, closer, err := r.FaultTolerantClient()
 	if err != nil {
-		return nil, entities.ExecutorMetadata{}, err
+		return nil, accessmodel.ExecutorMetadata{}, err
 	}
 	defer closer.Close()
 
@@ -435,17 +444,23 @@ func (r *RestProxyHandler) GetEventsForBlockIDs(
 		ExecutionStateQuery: &entities.ExecutionStateQuery{
 			AgreeingExecutorsCount:  uint64(criteria.AgreeingExecutorsCount),
 			RequiredExecutorIds:     convert.IdentifiersToMessages(criteria.RequiredExecutors),
-			IncludeExecutorMetadata: false, //TODO: what should I do with this field?
+			IncludeExecutorMetadata: true,
 		},
 	}
 	eventsResponse, err := upstream.GetEventsForBlockIDs(ctx, getEventsForBlockIDsRequest)
 	r.log("upstream", "GetEventsForBlockIDs", err)
 
 	if err != nil {
-		return nil, entities.ExecutorMetadata{}, err
+		return nil, accessmodel.ExecutorMetadata{}, err
 	}
 
-	return convert.MessagesToBlockEvents(eventsResponse.Results), entities.ExecutorMetadata{}, nil
+	metadata, err := convert.MessageToExecutorMetadata(eventsResponse.Metadata.ExecutorMetadata)
+	if err != nil {
+		return nil, accessmodel.ExecutorMetadata{}, err
+	}
+
+	res, err := convert.MessagesToBlockEvents(eventsResponse.Results)
+	return res, *metadata, err
 }
 
 // convertError converts a serialized access error formatted as a grpc error returned from the upstream AN,

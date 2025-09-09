@@ -166,7 +166,7 @@ func (t *LocalTransactionProvider) TransactionResultByIndex(
 
 	txResult, err := txResultsReader.ByBlockIDTransactionIndex(blockID, index)
 	if err != nil {
-		return nil, executionResultInfo, rpc.ConvertIndexError(err, block.Header.Height,
+		return nil, executionResultInfo, rpc.ConvertIndexError(err, block.Height,
 			"failed to get transaction result")
 	}
 
@@ -192,7 +192,7 @@ func (t *LocalTransactionProvider) TransactionResultByIndex(
 		txStatusCode = 1 // statusCode of 1 indicates an error and 0 indicates no error, the same as on EN
 	}
 
-	txStatus, err := t.txStatusDeriver.DeriveTransactionStatus(block.Header.Height, true)
+	txStatus, err := t.txStatusDeriver.DeriveTransactionStatus(block.Height, true)
 	if err != nil {
 		if !errors.Is(err, state.ErrUnknownSnapshotReference) {
 			irrecoverable.Throw(ctx, err)
@@ -203,7 +203,7 @@ func (t *LocalTransactionProvider) TransactionResultByIndex(
 	eventsReader := snapshot.Events()
 	events, err := eventsReader.ByBlockIDTransactionIndex(blockID, index)
 	if err != nil {
-		return nil, executionResultInfo, rpc.ConvertIndexError(err, block.Header.Height, "failed to get events")
+		return nil, executionResultInfo, rpc.ConvertIndexError(err, block.Height, "failed to get events")
 	}
 
 	// events are encoded in CCF format in storage. convert to JSON-CDC if requested
@@ -227,7 +227,7 @@ func (t *LocalTransactionProvider) TransactionResultByIndex(
 		Events:        events,
 		ErrorMessage:  txErrorMessageStr,
 		BlockID:       blockID,
-		BlockHeight:   block.Header.Height,
+		BlockHeight:   block.Height,
 		CollectionID:  collectionID,
 	}, executionResultInfo, nil
 }
@@ -256,7 +256,7 @@ func (t *LocalTransactionProvider) TransactionResultsByBlockID(
 
 	txResults, err := txResultsReader.ByBlockID(blockID)
 	if err != nil {
-		return nil, executionResultInfo, rpc.ConvertIndexError(err, block.Header.Height,
+		return nil, executionResultInfo, rpc.ConvertIndexError(err, block.Height,
 			"failed to get transaction result")
 	}
 
@@ -302,7 +302,7 @@ func (t *LocalTransactionProvider) TransactionResultsByBlockID(
 			txStatusCode = 1 // statusCode of 1 indicates an error and 0 indicates no error, the same as on EN
 		}
 
-		txStatus, err := t.txStatusDeriver.DeriveTransactionStatus(block.Header.Height, true)
+		txStatus, err := t.txStatusDeriver.DeriveTransactionStatus(block.Height, true)
 		if err != nil {
 			if !errors.Is(err, state.ErrUnknownSnapshotReference) {
 				irrecoverable.Throw(ctx, err)
@@ -312,7 +312,7 @@ func (t *LocalTransactionProvider) TransactionResultsByBlockID(
 
 		events, err := eventsReader.ByBlockIDTransactionID(blockID, txResult.TransactionID)
 		if err != nil {
-			return nil, executionResultInfo, rpc.ConvertIndexError(err, block.Header.Height, "failed to get events")
+			return nil, executionResultInfo, rpc.ConvertIndexError(err, block.Height, "failed to get events")
 		}
 
 		// events are encoded in CCF format in storage. convert to JSON-CDC if requested
@@ -338,7 +338,7 @@ func (t *LocalTransactionProvider) TransactionResultsByBlockID(
 			BlockID:       blockID,
 			TransactionID: txID,
 			CollectionID:  collectionID,
-			BlockHeight:   block.Header.Height,
+			BlockHeight:   block.Height,
 		})
 	}
 
@@ -353,15 +353,14 @@ func (t *LocalTransactionProvider) lookupCollectionIDInBlock(
 	collectionsReader storage.CollectionsReader,
 ) (flow.Identifier, error) {
 	for _, guarantee := range block.Payload.Guarantees {
-		collectionID := guarantee.ID()
-		collection, err := collectionsReader.LightByID(collectionID)
+		collection, err := t.collections.LightByID(guarantee.CollectionID)
 		if err != nil {
-			return flow.ZeroID, fmt.Errorf("failed to get collection %s in indexed block: %w", collectionID, err)
+			return flow.ZeroID, fmt.Errorf("failed to get collection %s in indexed block: %w", guarantee.CollectionID, err)
 		}
 
 		for _, collectionTxID := range collection.Transactions {
 			if collectionTxID == txID {
-				return collectionID, nil
+				return guarantee.CollectionID, nil
 			}
 		}
 	}
@@ -373,14 +372,13 @@ func (t *LocalTransactionProvider) lookupCollectionIDInBlock(
 func (t *LocalTransactionProvider) buildTxIDToCollectionIDMapping(block *flow.Block, collectionsReader storage.CollectionsReader) (map[flow.Identifier]flow.Identifier, error) {
 	txToCollectionID := make(map[flow.Identifier]flow.Identifier)
 	for _, guarantee := range block.Payload.Guarantees {
-		collectionID := guarantee.ID()
-		collection, err := collectionsReader.LightByID(collectionID)
+		collection, err := t.collections.LightByID(guarantee.CollectionID)
 		if err != nil {
 			// if the tx result is in storage, the collection must be too.
-			return nil, fmt.Errorf("failed to get collection %s in indexed block: %w", collectionID, err)
+			return nil, fmt.Errorf("failed to get collection %s in indexed block: %w", guarantee.CollectionID, err)
 		}
 		for _, txID := range collection.Transactions {
-			txToCollectionID[txID] = collectionID
+			txToCollectionID[txID] = guarantee.CollectionID
 		}
 	}
 	txToCollectionID[t.systemTxID] = flow.ZeroID

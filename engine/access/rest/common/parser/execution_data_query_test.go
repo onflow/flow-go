@@ -3,8 +3,11 @@ package parser
 import (
 	"testing"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/onflow/flow-go/engine/access/rest/http/models"
+	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -16,6 +19,7 @@ func TestNewExecutionDataQuery(t *testing.T) {
 		agreeingExecutorCount string
 		requiredExecutorIds   []string
 		includeExecutorMeta   string
+		expected              *models.ExecutionStateQuery
 		wantErr               bool
 	}{
 		{
@@ -23,7 +27,44 @@ func TestNewExecutionDataQuery(t *testing.T) {
 			agreeingExecutorCount: "5",
 			requiredExecutorIds:   validIDs.Strings(),
 			includeExecutorMeta:   "true",
-			wantErr:               false,
+			expected: &models.ExecutionStateQuery{
+				AgreeingExecutorsCount:  5,
+				RequiredExecutorIds:     validIDs,
+				IncludeExecutorMetadata: true,
+			},
+		},
+		{
+			name:                  "valid empty input",
+			agreeingExecutorCount: "",
+			requiredExecutorIds:   []string{},
+			includeExecutorMeta:   "",
+			expected: &models.ExecutionStateQuery{
+				AgreeingExecutorsCount:  0,
+				RequiredExecutorIds:     nil,
+				IncludeExecutorMetadata: false,
+			},
+		},
+		{
+			name:                  "duplicate requiredExecutorIds",
+			agreeingExecutorCount: "5",
+			requiredExecutorIds:   []string{validIDs[0].String(), validIDs[0].String()},
+			includeExecutorMeta:   "false",
+			expected: &models.ExecutionStateQuery{
+				AgreeingExecutorsCount:  5,
+				RequiredExecutorIds:     []flow.Identifier{validIDs[0]},
+				IncludeExecutorMetadata: false,
+			},
+		},
+		{
+			name:                  "empty requiredExecutorIds allowed",
+			agreeingExecutorCount: "5",
+			requiredExecutorIds:   []string{},
+			includeExecutorMeta:   "false",
+			expected: &models.ExecutionStateQuery{
+				AgreeingExecutorsCount:  5,
+				RequiredExecutorIds:     nil,
+				IncludeExecutorMetadata: false,
+			},
 		},
 		{
 			name:                  "invalid agreeingExecutorCount (not a number)",
@@ -60,25 +101,11 @@ func TestNewExecutionDataQuery(t *testing.T) {
 			includeExecutorMeta:   "notabool",
 			wantErr:               true,
 		},
-		{
-			name:                  "duplicate requiredExecutorIds",
-			agreeingExecutorCount: "5",
-			requiredExecutorIds:   []string{validIDs[0].String(), validIDs[0].String()},
-			includeExecutorMeta:   "false",
-			wantErr:               false,
-		},
-		{
-			name:                  "empty requiredExecutorIds allowed",
-			agreeingExecutorCount: "5",
-			requiredExecutorIds:   []string{},
-			includeExecutorMeta:   "false",
-			wantErr:               false,
-		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			count, ids, include, err := NewExecutionDataQuery(
+			query, err := NewExecutionDataQuery(
 				tt.agreeingExecutorCount,
 				tt.requiredExecutorIds,
 				tt.includeExecutorMeta,
@@ -90,10 +117,7 @@ func TestNewExecutionDataQuery(t *testing.T) {
 			}
 
 			require.NoError(t, err)
-			require.GreaterOrEqual(t, count, uint64(0))
-			require.NotNil(t, ids)
-			require.IsType(t, [][]byte{}, ids)
-			require.IsType(t, true, include)
+			assert.Equal(t, tt.expected, query)
 		})
 	}
 }

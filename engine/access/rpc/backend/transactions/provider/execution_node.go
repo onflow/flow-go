@@ -150,7 +150,7 @@ func (e *ENTransactionProvider) TransactionResultByIndex(
 	}
 
 	// tx body is irrelevant to status if it's in an executed block
-	txStatus, err := e.txStatusDeriver.DeriveTransactionStatus(block.Header.Height, true)
+	txStatus, err := e.txStatusDeriver.DeriveTransactionStatus(block.Height, true)
 	if err != nil {
 		if !errors.Is(err, state.ErrUnknownSnapshotReference) {
 			irrecoverable.Throw(ctx, err)
@@ -171,7 +171,7 @@ func (e *ENTransactionProvider) TransactionResultByIndex(
 		Events:       events,
 		ErrorMessage: resp.GetErrorMessage(),
 		BlockID:      blockID,
-		BlockHeight:  block.Header.Height,
+		BlockHeight:  block.Height,
 	}, executionResultInfo, nil
 }
 
@@ -220,7 +220,7 @@ func (e *ENTransactionProvider) TransactionResultsByBlockID(
 			txResult := resp.TransactionResults[i]
 
 			// tx body is irrelevant to status if it's in an executed block
-			txStatus, err := e.txStatusDeriver.DeriveTransactionStatus(block.Header.Height, true)
+			txStatus, err := e.txStatusDeriver.DeriveTransactionStatus(block.Height, true)
 			if err != nil {
 				if !errors.Is(err, state.ErrUnknownSnapshotReference) {
 					irrecoverable.Throw(ctx, err)
@@ -241,7 +241,7 @@ func (e *ENTransactionProvider) TransactionResultsByBlockID(
 				BlockID:       blockID,
 				TransactionID: txID,
 				CollectionID:  guarantee.CollectionID,
-				BlockHeight:   block.Header.Height,
+				BlockHeight:   block.Height,
 			})
 
 			i++
@@ -254,7 +254,7 @@ func (e *ENTransactionProvider) TransactionResultsByBlockID(
 	sporkRootBlockHeight := e.state.Params().SporkRootBlockHeight()
 
 	// root block has no system transaction result
-	if block.Header.Height > sporkRootBlockHeight {
+	if block.Height > sporkRootBlockHeight {
 		// system chunk transaction
 
 		// resp.TransactionResultsByBlockID includes the system tx result, so there should be exactly one
@@ -270,7 +270,7 @@ func (e *ENTransactionProvider) TransactionResultsByBlockID(
 		}
 
 		systemTxResult := resp.TransactionResults[len(resp.TransactionResults)-1]
-		systemTxStatus, err := e.txStatusDeriver.DeriveTransactionStatus(block.Header.Height, true)
+		systemTxStatus, err := e.txStatusDeriver.DeriveTransactionStatus(block.Height, true)
 		if err != nil {
 			if !errors.Is(err, state.ErrUnknownSnapshotReference) {
 				irrecoverable.Throw(ctx, err)
@@ -291,7 +291,7 @@ func (e *ENTransactionProvider) TransactionResultsByBlockID(
 			ErrorMessage:  systemTxResult.GetErrorMessage(),
 			BlockID:       blockID,
 			TransactionID: e.systemTxID,
-			BlockHeight:   block.Header.Height,
+			BlockHeight:   block.Height,
 		})
 	}
 	return results, executionResultInfo, nil

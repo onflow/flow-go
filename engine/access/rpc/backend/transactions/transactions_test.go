@@ -28,6 +28,7 @@ import (
 
 	"github.com/onflow/flow-go/access/validator"
 	validatormock "github.com/onflow/flow-go/access/validator/mock"
+	"github.com/onflow/flow-go/engine/access/index"
 	accessmock "github.com/onflow/flow-go/engine/access/mock"
 	"github.com/onflow/flow-go/engine/access/rpc/backend/node_communicator"
 	"github.com/onflow/flow-go/engine/access/rpc/backend/transactions/provider"
@@ -43,6 +44,7 @@ import (
 	"github.com/onflow/flow-go/module/counters"
 	execmock "github.com/onflow/flow-go/module/execution/mock"
 	"github.com/onflow/flow-go/module/metrics"
+	syncmock "github.com/onflow/flow-go/module/state_synchronization/mock"
 	"github.com/onflow/flow-go/state/protocol"
 	bprotocol "github.com/onflow/flow-go/state/protocol/badger"
 	protocolmock "github.com/onflow/flow-go/state/protocol/mock"
@@ -52,7 +54,6 @@ import (
 	"github.com/onflow/flow-go/storage/operation/badgerimpl"
 	"github.com/onflow/flow-go/storage/store"
 	"github.com/onflow/flow-go/utils/unittest"
-	"github.com/onflow/flow-go/utils/unittest/generator"
 	"github.com/onflow/flow-go/utils/unittest/mocks"
 )
 
@@ -233,7 +234,7 @@ func (suite *Suite) TestGetTransactionResult_UnknownTx() {
 	tbody := unittest.TransactionBodyFixture()
 	tx := unittest.TransactionFixture()
 	tx.TransactionBody = tbody
-	coll := flow.CollectionFromTransactions([]*flow.Transaction{&tx})
+	coll := unittest.CollectionFromTransactions([]*flow.Transaction{&tx})
 
 	suite.transactions.
 		On("ByID", tx.ID()).
@@ -265,7 +266,7 @@ func (suite *Suite) TestGetTransactionResult_TxLookupFailure() {
 	tbody := unittest.TransactionBodyFixture()
 	tx := unittest.TransactionFixture()
 	tx.TransactionBody = tbody
-	coll := flow.CollectionFromTransactions([]*flow.Transaction{&tx})
+	coll := unittest.CollectionFromTransactions([]*flow.Transaction{&tx})
 
 	expectedErr := fmt.Errorf("some other error")
 	suite.transactions.
@@ -293,7 +294,7 @@ func (suite *Suite) TestGetTransactionResult_HistoricNodes_Success() {
 	tbody := unittest.TransactionBodyFixture()
 	tx := unittest.TransactionFixture()
 	tx.TransactionBody = tbody
-	coll := flow.CollectionFromTransactions([]*flow.Transaction{&tx})
+	coll := unittest.CollectionFromTransactions([]*flow.Transaction{&tx})
 
 	suite.transactions.
 		On("ByID", tx.ID()).
@@ -359,7 +360,7 @@ func (suite *Suite) TestGetTransactionResult_HistoricNodes_FromCache() {
 	txBackend, err := NewTransactionsBackend(params)
 	require.NoError(suite.T(), err)
 
-	coll := flow.CollectionFromTransactions([]*flow.Transaction{&tx})
+	coll := unittest.CollectionFromTransactions([]*flow.Transaction{&tx})
 	resp, _, err := txBackend.GetTransactionResult(
 		context.Background(),
 		tx.ID(),
@@ -409,7 +410,7 @@ func (suite *Suite) TestGetTransactionResultUnknownFromCache() {
 	txBackend, err := NewTransactionsBackend(params)
 	require.NoError(suite.T(), err)
 
-	coll := flow.CollectionFromTransactions([]*flow.Transaction{&tx})
+	coll := unittest.CollectionFromTransactions([]*flow.Transaction{&tx})
 	resp, _, err := txBackend.GetTransactionResult(
 		context.Background(),
 		tx.ID(),
@@ -476,7 +477,9 @@ func (suite *Suite) TestGetSystemTransactionResult_HappyPath() {
 
 		block := unittest.BlockWithParentFixture(lastBlock)
 		blockID := block.ID()
-		stateSnapshotForKnownBlock := unittest.StateSnapshotForKnownBlock(block.Header, identities.Lookup())
+
+		stateSnapshotForKnownBlock := unittest.StateSnapshotForKnownBlock(block.ToHeader(), identities.Lookup())
+
 		suite.state.
 			On("AtBlockID", blockID).
 			Return(stateSnapshotForKnownBlock, nil).
@@ -495,7 +498,7 @@ func (suite *Suite) TestGetSystemTransactionResult_HappyPath() {
 
 		// Generating events with event generator
 		exeNodeEventEncodingVersion := entities.EventEncodingVersion_CCF_V0
-		events := generator.GetEventsWithEncoding(1, exeNodeEventEncodingVersion)
+		events := unittest.EventGenerator.GetEventsWithEncoding(1, exeNodeEventEncodingVersion)
 		eventMessages := convert.EventsToMessages(events)
 
 		exeEventResp := &execproto.GetTransactionResultsResponse{
@@ -582,7 +585,7 @@ func (suite *Suite) TestGetSystemTransactionResultFromStorage() {
 
 	suite.blocks.
 		On("ByID", blockId).
-		Return(&block, nil).
+		Return(block, nil).
 		Once()
 
 	lightTxShouldFail := false
@@ -602,7 +605,16 @@ func (suite *Suite) TestGetSystemTransactionResultFromStorage() {
 
 	// Set up the state and snapshot mocks
 	suite.state.On("Sealed").Return(suite.snapshot, nil)
-	suite.snapshot.On("Head").Return(block.Header, nil)
+	suite.snapshot.On("Head").Return(block.ToHeader(), nil)
+
+	// create a mock index reporter
+	reporter := syncmock.NewIndexReporter(suite.T())
+	reporter.On("LowestIndexedHeight").Return(block.Height, nil)
+	reporter.On("HighestIndexedHeight").Return(block.Height+10, nil)
+
+	indexReporter := index.NewReporter()
+	err = indexReporter.Initialize(reporter)
+	suite.Require().NoError(err)
 
 	// Set up the backend parameters and the backend instance
 	params := suite.defaultTransactionsParamsWithExecutionResultProviderMocks()
@@ -633,7 +645,7 @@ func (suite *Suite) TestGetSystemTransactionResultFromStorage() {
 	suite.Require().NoError(err)
 	response, _, err := txBackend.GetSystemTransactionResult(context.Background(), blockId,
 		entities.EventEncodingVersion_JSON_CDC_V0, optimistic_sync.Criteria{})
-	suite.assertTransactionResultResponse(err, response, block, txId, lightTxShouldFail, eventsForTx)
+	suite.assertTransactionResultResponse(err, response, *block, txId, lightTxShouldFail, eventsForTx)
 }
 
 // TestGetSystemTransactionResult_BlockNotFound tests GetSystemTransactionResult function when block was not found.
@@ -665,10 +677,10 @@ func (suite *Suite) TestGetSystemTransactionResult_FailedEncodingConversion() {
 	block := unittest.BlockFixture()
 	blockID := block.ID()
 
-	_, fixedENIDs := suite.setupReceipts(&block)
+	_, fixedENIDs := suite.setupReceipts(block)
 	suite.fixedExecutionNodeIDs = fixedENIDs.NodeIDs()
 
-	suite.snapshot.On("Head").Return(block.Header, nil)
+	suite.snapshot.On("Head").Return(block.ToHeader(), nil)
 	suite.snapshot.On("Identities", mock.Anything).Return(fixedENIDs, nil)
 	suite.state.On("Sealed").Return(suite.snapshot, nil)
 	suite.state.On("Final").Return(suite.snapshot, nil)
@@ -676,7 +688,7 @@ func (suite *Suite) TestGetSystemTransactionResult_FailedEncodingConversion() {
 	// block storage returns the corresponding block
 	suite.blocks.
 		On("ByID", blockID).
-		Return(&block, nil).
+		Return(block, nil).
 		Once()
 
 	// create empty events
@@ -724,17 +736,18 @@ func (suite *Suite) TestGetSystemTransactionResult_FailedEncodingConversion() {
 // instead of requesting it from the Execution Node.
 func (suite *Suite) TestGetTransactionResult_FromStorage() {
 	// Create fixtures for block, transaction, and collection
-	block := unittest.BlockFixture()
 	transaction := unittest.TransactionFixture()
-	col := flow.CollectionFromTransactions([]*flow.Transaction{&transaction})
-	guarantee := col.Guarantee()
-	block.SetPayload(unittest.PayloadFixture(unittest.WithGuarantees(&guarantee)))
+	col := unittest.CollectionFromTransactions([]*flow.Transaction{&transaction})
+	guarantee := &flow.CollectionGuarantee{CollectionID: col.ID()}
+	block := unittest.BlockFixture(
+		unittest.Block.WithPayload(unittest.PayloadFixture(unittest.WithGuarantees(guarantee))),
+	)
 	txId := transaction.ID()
 	blockId := block.ID()
 
 	suite.blocks.
 		On("ByID", blockId).
-		Return(&block, nil)
+		Return(block, nil)
 
 	suite.lightTxResults.On("ByBlockIDTransactionID", blockId, txId).
 		Return(&flow.LightTransactionResult{
@@ -749,19 +762,17 @@ func (suite *Suite) TestGetTransactionResult_FromStorage() {
 
 	// Set up the light collection and mock the behavior of the collections object
 	lightCol := col.Light()
-	suite.collections.On("LightByID", col.ID()).Return(&lightCol, nil)
+	suite.collections.On("LightByID", col.ID()).Return(lightCol, nil)
 
 	// Set up the events storage mock
 	totalEvents := 5
-	eventsForTx := unittest.EventsFixture(totalEvents, flow.EventAccountCreated)
+	eventsForTx := unittest.EventsFixture(totalEvents)
 	eventMessages := make([]*entities.Event, totalEvents)
 	for j, event := range eventsForTx {
 		eventMessages[j] = convert.EventToMessage(event)
 	}
 	// expect a call to lookup events by block ID and transaction ID
 	suite.events.On("ByBlockIDTransactionID", blockId, txId).Return(eventsForTx, nil)
-	suite.state.On("Sealed").Return(suite.snapshot, nil)
-	suite.snapshot.On("Head").Return(block.Header, nil)
 
 	suite.txResultErrorMessages.On("ByBlockIDTransactionID", mock.Anything, mock.Anything).Return(
 		&flow.TransactionResultErrorMessage{
@@ -770,6 +781,15 @@ func (suite *Suite) TestGetTransactionResult_FromStorage() {
 			Index:         0,
 			ExecutorID:    unittest.IdentifierFixture(),
 		}, nil)
+
+	// Set up the state and snapshot mocks
+	_, fixedENIDs := suite.setupReceipts(block)
+	suite.fixedExecutionNodeIDs = fixedENIDs.NodeIDs()
+
+	suite.state.On("Final").Return(suite.snapshot, nil)
+	suite.state.On("Sealed").Return(suite.snapshot, nil)
+	suite.snapshot.On("Identities", mock.Anything).Return(fixedENIDs, nil)
+	suite.snapshot.On("Head").Return(block.ToHeader(), nil)
 
 	params := suite.defaultTransactionsParamsWithExecutionResultProviderMocks()
 	// Set up optimistic sync mocks to provide snapshot-backed readers
@@ -800,7 +820,7 @@ func (suite *Suite) TestGetTransactionResult_FromStorage() {
 
 	response, _, err := txBackend.GetTransactionResult(context.Background(), txId, blockId, flow.ZeroID,
 		entities.EventEncodingVersion_JSON_CDC_V0, optimistic_sync.Criteria{})
-	suite.assertTransactionResultResponse(err, response, block, txId, true, eventsForTx)
+	suite.assertTransactionResultResponse(err, response, *block, txId, true, eventsForTx)
 
 	suite.blocks.AssertExpectations(suite.T())
 	suite.events.AssertExpectations(suite.T())
@@ -811,23 +831,24 @@ func (suite *Suite) TestGetTransactionResult_FromStorage() {
 // and returns it from storage instead of requesting from the Execution Node.
 func (suite *Suite) TestTransactionByIndexFromStorage() {
 	// Create fixtures for block, transaction, and collection
-	block := unittest.BlockFixture()
 	transaction := unittest.TransactionFixture()
-	col := flow.CollectionFromTransactions([]*flow.Transaction{&transaction})
-	guarantee := col.Guarantee()
-	block.SetPayload(unittest.PayloadFixture(unittest.WithGuarantees(&guarantee)))
+	col := unittest.CollectionFromTransactions([]*flow.Transaction{&transaction})
+	guarantee := &flow.CollectionGuarantee{CollectionID: col.ID()}
+	block := unittest.BlockFixture(
+		unittest.Block.WithPayload(unittest.PayloadFixture(unittest.WithGuarantees(guarantee))),
+	)
 	blockId := block.ID()
 	txId := transaction.ID()
 	txIndex := rand.Uint32()
 
 	// Set up the light collection and mock the behavior of the collections object
 	lightCol := col.Light()
-	suite.collections.On("LightByID", col.ID()).Return(&lightCol, nil)
+	suite.collections.On("LightByID", col.ID()).Return(lightCol, nil)
 
 	// Mock the behavior of the blocks and lightTxResults objects
 	suite.blocks.
 		On("ByID", blockId).
-		Return(&block, nil)
+		Return(block, nil)
 
 	suite.lightTxResults.On("ByBlockIDTransactionIndex", blockId, txIndex).
 		Return(&flow.LightTransactionResult{
@@ -838,7 +859,7 @@ func (suite *Suite) TestTransactionByIndexFromStorage() {
 
 	// Set up the events storage mock
 	totalEvents := 5
-	eventsForTx := unittest.EventsFixture(totalEvents, flow.EventAccountCreated)
+	eventsForTx := unittest.EventsFixture(totalEvents)
 	eventMessages := make([]*entities.Event, totalEvents)
 	for j, event := range eventsForTx {
 		eventMessages[j] = convert.EventToMessage(event)
@@ -849,7 +870,7 @@ func (suite *Suite) TestTransactionByIndexFromStorage() {
 
 	// Set up the state and snapshot mocks
 	suite.state.On("Sealed").Return(suite.snapshot, nil)
-	suite.snapshot.On("Head").Return(block.Header, nil)
+	suite.snapshot.On("Head").Return(block.ToHeader(), nil)
 	suite.txResultErrorMessages.On("ByBlockIDTransactionIndex", mock.Anything, mock.Anything).Return(
 		&flow.TransactionResultErrorMessage{
 			TransactionID: txId,
@@ -888,27 +909,28 @@ func (suite *Suite) TestTransactionByIndexFromStorage() {
 
 	response, _, err := txBackend.GetTransactionResultByIndex(context.Background(), blockId, txIndex,
 		entities.EventEncodingVersion_JSON_CDC_V0, optimistic_sync.Criteria{})
-	suite.assertTransactionResultResponse(err, response, block, txId, true, eventsForTx)
+	suite.assertTransactionResultResponse(err, response, *block, txId, true, eventsForTx)
 }
 
 // TestTransactionResultsByBlockIDFromStorage tests the retrieval of transaction results ([]flow.TransactionResult)
 // by block ID from storage instead of requesting from the Execution Node.
 func (suite *Suite) TestTransactionResultsByBlockIDFromStorage() {
 	// Create fixtures for the block and collection
-	block := unittest.BlockFixture()
 	col := unittest.CollectionFixture(2)
-	guarantee := col.Guarantee()
-	block.SetPayload(unittest.PayloadFixture(unittest.WithGuarantees(&guarantee)))
+	guarantee := &flow.CollectionGuarantee{CollectionID: col.ID()}
+	block := unittest.BlockFixture(
+		unittest.Block.WithPayload(unittest.PayloadFixture(unittest.WithGuarantees(guarantee))),
+	)
 	blockId := block.ID()
 
 	// Mock the behavior of the blocks, collections and light transaction results objects
 	suite.blocks.
 		On("ByID", blockId).
-		Return(&block, nil)
+		Return(block, nil)
 	lightCol := col.Light()
 	suite.collections.
 		On("LightByID", mock.Anything).
-		Return(&lightCol, nil).
+		Return(lightCol, nil).
 		Once()
 
 	lightTxResults := make([]flow.LightTransactionResult, len(lightCol.Transactions))
@@ -935,7 +957,7 @@ func (suite *Suite) TestTransactionResultsByBlockIDFromStorage() {
 
 	// Set up the events storage mock
 	totalEvents := 5
-	eventsForTx := unittest.EventsFixture(totalEvents, flow.EventAccountCreated)
+	eventsForTx := unittest.EventsFixture(totalEvents)
 	eventMessages := make([]*entities.Event, totalEvents)
 	for j, event := range eventsForTx {
 		eventMessages[j] = convert.EventToMessage(event)
@@ -956,7 +978,7 @@ func (suite *Suite) TestTransactionResultsByBlockIDFromStorage() {
 
 	// Set up the state and snapshot mocks
 	suite.state.On("Sealed").Return(suite.snapshot, nil)
-	suite.snapshot.On("Head").Return(block.Header, nil)
+	suite.snapshot.On("Head").Return(block.ToHeader(), nil)
 
 	params := suite.defaultTransactionsParamsWithExecutionResultProviderMocks()
 	// Set up optimistic sync mocks to provide snapshot-backed readers
@@ -993,26 +1015,25 @@ func (suite *Suite) TestTransactionResultsByBlockIDFromStorage() {
 	// Assertions for each transaction result in the response
 	for i, responseResult := range response {
 		lightTx := lightTxResults[i]
-		suite.assertTransactionResultResponse(err, responseResult, block, lightTx.TransactionID, lightTx.Failed, eventsForTx)
+		suite.assertTransactionResultResponse(err, responseResult, *block, lightTx.TransactionID, lightTx.Failed, eventsForTx)
 	}
 }
 
 // TestTransactionRetry tests that the retry mechanism will send retries at specific times
 func (suite *Suite) TestTransactionRetry() {
-	collection := unittest.CollectionFixture(1)
-	transactionBody := collection.Transactions[0]
-	block := unittest.BlockFixture()
-	// Height needs to be at least DefaultTransactionExpiry before we start doing retries
-	block.Header.Height = flow.DefaultTransactionExpiry + 1
-	transactionBody.SetReferenceBlockID(block.ID())
+	block := unittest.BlockFixture(
+		// Height needs to be at least DefaultTransactionExpiry before we start doing retries
+		unittest.Block.WithHeight(flow.DefaultTransactionExpiry + 1),
+	)
+	transactionBody := unittest.TransactionBodyFixture(unittest.WithReferenceBlock(block.ID()))
 	headBlock := unittest.BlockFixture()
-	headBlock.Header.Height = block.Header.Height - 1 // head is behind the current block
+	headBlock.Height = block.Height - 1 // head is behind the current block
 	suite.state.On("Final").Return(suite.snapshot, nil)
 	suite.headers.On("BlockIDByHeight", mock.AnythingOfType("uint64")).Return(headBlock.ID(), nil).Once()
 
-	suite.snapshot.On("Head").Return(headBlock.Header, nil)
+	suite.snapshot.On("Head").Return(headBlock.ToHeader(), nil)
 	snapshotAtBlock := protocolmock.NewSnapshot(suite.T())
-	snapshotAtBlock.On("Head").Return(block.Header, nil)
+	snapshotAtBlock.On("Head").Return(block.ToHeader(), nil)
 	suite.state.On("AtBlockID", block.ID()).Return(snapshotAtBlock, nil)
 
 	// collection storage returns a not found error
@@ -1033,24 +1054,24 @@ func (suite *Suite) TestTransactionRetry() {
 		txBackend,
 		txBackend.txStatusDeriver,
 	)
-	retry.RegisterTransaction(block.Header.Height, transactionBody)
+	retry.RegisterTransaction(block.Height, &transactionBody)
 
 	client.On("SendTransaction", mock.Anything, mock.Anything).Return(&access.SendTransactionResponse{}, nil)
 
 	// Don't retry on every height
-	err = retry.Retry(block.Header.Height + 1)
+	err = retry.Retry(block.Height + 1)
 	suite.Require().NoError(err)
 
 	client.AssertNotCalled(suite.T(), "SendTransaction", mock.Anything, mock.Anything)
 
 	// Retry every `retryFrequency`
-	err = retry.Retry(block.Header.Height + retrier.RetryFrequency)
+	err = retry.Retry(block.Height + retrier.RetryFrequency)
 	suite.Require().NoError(err)
 
 	client.AssertNumberOfCalls(suite.T(), "SendTransaction", 1)
 
 	// do not retry if expired
-	err = retry.Retry(block.Header.Height + retrier.RetryFrequency + flow.DefaultTransactionExpiry)
+	err = retry.Retry(block.Height + retrier.RetryFrequency + flow.DefaultTransactionExpiry)
 	suite.Require().NoError(err)
 
 	// Should've still only been called once
@@ -1068,13 +1089,13 @@ func (suite *Suite) TestSuccessfulTransactionsDontRetry() {
 	blockID := block.ID()
 
 	// setup chain state
-	_, fixedENIDs := suite.setupReceipts(&block)
+	_, fixedENIDs := suite.setupReceipts(block)
 	suite.fixedExecutionNodeIDs = fixedENIDs.NodeIDs()
 
 	suite.state.On("Final").Return(suite.snapshot, nil)
 	suite.transactions.On("ByID", transactionBody.ID()).Return(transactionBody, nil)
-	suite.collections.On("LightByTransactionID", transactionBody.ID()).Return(&light, nil)
-	suite.blocks.On("ByCollectionID", collection.ID()).Return(&block, nil)
+	suite.collections.On("LightByTransactionID", transactionBody.ID()).Return(light, nil)
+	suite.blocks.On("ByCollectionID", collection.ID()).Return(block, nil)
 	suite.snapshot.On("Identities", mock.Anything).Return(fixedENIDs, nil)
 
 	exeEventReq := execproto.GetTransactionResultRequest{
@@ -1107,7 +1128,7 @@ func (suite *Suite) TestSuccessfulTransactionsDontRetry() {
 		txBackend,
 		txBackend.txStatusDeriver,
 	)
-	retry.RegisterTransaction(block.Header.Height, transactionBody)
+	retry.RegisterTransaction(block.Height, transactionBody)
 
 	// first call - when block under test is greater height than the sealed head, but execution node does not know about Tx
 	result, _, err := txBackend.GetTransactionResult(
@@ -1125,19 +1146,19 @@ func (suite *Suite) TestSuccessfulTransactionsDontRetry() {
 	suite.Assert().Equal(flow.TransactionStatusFinalized, result.Status)
 
 	// Don't retry when block is finalized
-	err = retry.Retry(block.Header.Height + 1)
+	err = retry.Retry(block.Height + 1)
 	suite.Require().NoError(err)
 
 	client.AssertNotCalled(suite.T(), "SendTransaction", mock.Anything, mock.Anything)
 
 	// Don't retry when block is finalized
-	err = retry.Retry(block.Header.Height + retrier.RetryFrequency)
+	err = retry.Retry(block.Height + retrier.RetryFrequency)
 	suite.Require().NoError(err)
 
 	client.AssertNotCalled(suite.T(), "SendTransaction", mock.Anything, mock.Anything)
 
 	// Don't retry when block is finalized
-	err = retry.Retry(block.Header.Height + retrier.RetryFrequency + flow.DefaultTransactionExpiry)
+	err = retry.Retry(block.Height + retrier.RetryFrequency + flow.DefaultTransactionExpiry)
 	suite.Require().NoError(err)
 
 	// Should've still should not be called
@@ -1170,7 +1191,7 @@ func (suite *Suite) assertTransactionResultResponse(
 ) {
 	suite.Require().NoError(err)
 	suite.Assert().Equal(block.ID(), response.BlockID)
-	suite.Assert().Equal(block.Header.Height, response.BlockHeight)
+	suite.Assert().Equal(block.Height, response.BlockHeight)
 	suite.Assert().Equal(txId, response.TransactionID)
 	if txId == suite.systemTx.ID() {
 		suite.Assert().Equal(flow.ZeroID, response.CollectionID)

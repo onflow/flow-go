@@ -362,7 +362,7 @@ func (t *Transactions) GetTransactionResult(
 	// access node may not have the block if it hasn't yet been finalized, hence block can be nil at this point
 	if block != nil {
 		var executionResultInfo *optimistic_sync.ExecutionResultInfo
-		txResult, executionResultInfo, err = t.lookupTransactionResult(ctx, txID, block.Header,
+		txResult, executionResultInfo, err = t.lookupTransactionResult(ctx, txID, block.ToHeader(),
 			requiredEventEncodingVersion, criteria)
 		if err != nil {
 			return nil, executorMetadata, rpc.ConvertError(err, "failed to retrieve result", codes.Internal)
@@ -389,7 +389,7 @@ func (t *Transactions) GetTransactionResult(
 		}
 
 		blockID = block.ID()
-		blockHeight = block.Header.Height
+		blockHeight = block.Height
 	}
 
 	// If there is still no transaction result, provide one based on available information.
@@ -432,7 +432,7 @@ func (t *Transactions) lookupCollectionIDInBlock(
 	txID flow.Identifier,
 ) (flow.Identifier, error) {
 	for _, guarantee := range block.Payload.Guarantees {
-		collectionID := guarantee.ID()
+		collectionID := guarantee.CollectionID
 		collection, err := t.collections.LightByID(collectionID)
 		if err != nil {
 			return flow.ZeroID, fmt.Errorf("failed to get collection %s in indexed block: %w", collectionID, err)
@@ -534,7 +534,7 @@ func (t *Transactions) GetSystemTransactionResult(
 		return nil, entities.ExecutorMetadata{}, rpc.ConvertStorageError(err)
 	}
 
-	results, executionResultInfo, err := t.lookupTransactionResult(ctx, t.systemTxID, block.Header,
+	results, executionResultInfo, err := t.lookupTransactionResult(ctx, t.systemTxID, block.ToHeader(),
 		requiredEventEncodingVersion, criteria)
 
 	return results, convertExecutionResultInfoToMetadata(executionResultInfo), err
@@ -631,7 +631,12 @@ func (t *Transactions) getHistoricalTransactionResult(
 				result.Status = entities.TransactionStatus_EXPIRED
 			}
 
-			return convert.MessageToTransactionResult(result), nil
+			txResult, err := convert.MessageToTransactionResult(result)
+			if err != nil {
+				return nil, status.Errorf(codes.Internal, "could not convert transaction result: %v", err)
+			}
+
+			return txResult, nil
 		}
 		// Otherwise, if not found, just continue
 		if status.Code(err) == codes.NotFound {
@@ -661,7 +666,7 @@ func convertExecutionResultInfoToMetadata(executionResultInfo *optimistic_sync.E
 	execResultID := executionResultInfo.ExecutionResult.ID()
 	return entities.ExecutorMetadata{
 		ExecutionResultId: execResultID[:],
-		ExecutorId:        convert.IdentifiersToMessages(executionResultInfo.ExecutionNodes.NodeIDs()),
+		ExecutorIds:       convert.IdentifiersToMessages(executionResultInfo.ExecutionNodes.NodeIDs()),
 	}
 }
 

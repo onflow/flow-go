@@ -245,13 +245,15 @@ func (suite *RestAPITestSuite) TestGetBlock() {
 	testBlocks := make([]*flow.Block, parser.MaxIDsLength)
 	for i := range testBlockIDs {
 		collections := unittest.CollectionListFixture(1)
-		block := unittest.BlockWithGuaranteesFixture(
-			unittest.CollectionGuaranteesWithCollectionIDFixture(collections),
+		block := unittest.BlockFixture(
+			unittest.Block.WithHeight(uint64(i+1)), // avoiding edge case of height = 0 (genesis block)
+			unittest.Block.WithPayload(
+				unittest.PayloadFixture(unittest.WithGuarantees(unittest.CollectionGuaranteesWithCollectionIDFixture(collections)...)),
+			),
 		)
-		block.Header.Height = uint64(i)
 		suite.blocks.On("ByID", block.ID()).Return(block, nil)
-		suite.blocks.On("ByHeight", block.Header.Height).Return(block, nil)
-		suite.headers.On("BlockIDByHeight", block.Header.Height).Return(block.ID(), nil)
+		suite.blocks.On("ByHeight", block.Height).Return(block, nil)
+		suite.headers.On("BlockIDByHeight", block.Height).Return(block.ID(), nil)
 		testBlocks[i] = block
 		testBlockIDs[i] = block.ID().String()
 
@@ -259,8 +261,8 @@ func (suite *RestAPITestSuite) TestGetBlock() {
 		suite.executionResults.On("ByBlockID", block.ID()).Return(execResult, nil)
 	}
 
-	suite.sealedBlock = testBlocks[len(testBlocks)-1].Header
-	suite.finalizedBlock = testBlocks[len(testBlocks)-2].Header
+	suite.sealedBlock = testBlocks[len(testBlocks)-1].ToHeader()
+	suite.finalizedBlock = testBlocks[len(testBlocks)-2].ToHeader()
 
 	client := suite.restAPIClient()
 
@@ -304,9 +306,9 @@ func (suite *RestAPITestSuite) TestGetBlock() {
 		ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 		defer cancel()
 
-		startHeight := testBlocks[0].Header.Height
+		startHeight := testBlocks[0].Height
 		blkCnt := len(testBlocks)
-		endHeight := testBlocks[blkCnt-1].Header.Height
+		endHeight := testBlocks[blkCnt-1].Height
 
 		actualBlocks, resp, err := client.BlocksApi.BlocksGet(ctx, optionsForBlockByStartEndHeight(startHeight, endHeight))
 		require.NoError(suite.T(), err)
@@ -314,7 +316,7 @@ func (suite *RestAPITestSuite) TestGetBlock() {
 		assert.Len(suite.T(), actualBlocks, blkCnt)
 		for i := 0; i < blkCnt; i++ {
 			assert.Equal(suite.T(), testBlocks[i].ID().String(), actualBlocks[i].Header.Id)
-			assert.Equal(suite.T(), fmt.Sprintf("%d", testBlocks[i].Header.Height), actualBlocks[i].Header.Height)
+			assert.Equal(suite.T(), fmt.Sprintf("%d", testBlocks[i].Height), actualBlocks[i].Header.Height)
 		}
 	})
 
@@ -326,7 +328,7 @@ func (suite *RestAPITestSuite) TestGetBlock() {
 		lastIndex := len(testBlocks)
 		var reqHeights = make([]uint64, len(testBlocks))
 		for i := 0; i < lastIndex; i++ {
-			reqHeights[i] = testBlocks[i].Header.Height
+			reqHeights[i] = testBlocks[i].Height
 		}
 
 		actualBlocks, resp, err := client.BlocksApi.BlocksGet(ctx, optionsForBlockByHeights(reqHeights))
@@ -335,7 +337,7 @@ func (suite *RestAPITestSuite) TestGetBlock() {
 		assert.Len(suite.T(), actualBlocks, lastIndex)
 		for i := 0; i < lastIndex; i++ {
 			assert.Equal(suite.T(), testBlocks[i].ID().String(), actualBlocks[i].Header.Id)
-			assert.Equal(suite.T(), fmt.Sprintf("%d", testBlocks[i].Header.Height), actualBlocks[i].Header.Height)
+			assert.Equal(suite.T(), fmt.Sprintf("%d", testBlocks[i].Height), actualBlocks[i].Header.Height)
 		}
 	})
 
@@ -423,7 +425,7 @@ func (suite *RestAPITestSuite) TestGetBlock() {
 		ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 		defer cancel()
 
-		invalidHeight := uint64(len(testBlocks))
+		invalidHeight := uint64(len(testBlocks) * 2)
 		var reqHeights = []uint64{invalidHeight}
 		suite.blocks.On("ByHeight", invalidHeight).Return(nil, storage.ErrNotFound).Once()
 

@@ -140,7 +140,7 @@ func run(*cobra.Command, []string) {
 		registersByAccount.AccountCount(),
 	)
 
-	options := computation.DefaultFVMOptions(chainID, false, false)
+	options := computation.DefaultFVMOptions(chainID, false, false, false)
 	options = append(
 		options,
 		fvm.WithContractDeploymentRestricted(false),
@@ -453,8 +453,8 @@ func (a *api) GetEventsForHeightRange(
 	_, _ uint64,
 	_ entities.EventEncodingVersion,
 	_ optimistic_sync.Criteria,
-) ([]flow.BlockEvents, entities.ExecutorMetadata, error) {
-	return nil, entities.ExecutorMetadata{}, errors.New("unimplemented")
+) ([]flow.BlockEvents, accessmodel.ExecutorMetadata, error) {
+	return nil, accessmodel.ExecutorMetadata{}, errors.New("unimplemented")
 }
 
 func (a *api) GetEventsForBlockIDs(
@@ -463,8 +463,8 @@ func (a *api) GetEventsForBlockIDs(
 	_ []flow.Identifier,
 	_ entities.EventEncodingVersion,
 	_ optimistic_sync.Criteria,
-) ([]flow.BlockEvents, entities.ExecutorMetadata, error) {
-	return nil, entities.ExecutorMetadata{}, errors.New("unimplemented")
+) ([]flow.BlockEvents, accessmodel.ExecutorMetadata, error) {
+	return nil, accessmodel.ExecutorMetadata{}, errors.New("unimplemented")
 }
 
 func (*api) GetLatestProtocolStateSnapshot(_ context.Context) ([]byte, error) {

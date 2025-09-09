@@ -34,7 +34,6 @@ import (
 	"github.com/onflow/flow-go/storage"
 	storagemock "github.com/onflow/flow-go/storage/mock"
 	"github.com/onflow/flow-go/utils/unittest"
-	"github.com/onflow/flow-go/utils/unittest/generator"
 	"github.com/onflow/flow-go/utils/unittest/mocks"
 )
 
@@ -106,15 +105,19 @@ func (s *EventsSuite) SetupTest() {
 		if i == 0 {
 			header = unittest.BlockHeaderFixture()
 		} else {
-			header = unittest.BlockHeaderWithParentFixture(s.blocks[i-1].Header)
+			header = unittest.BlockHeaderWithParentFixture(s.blocks[i-1].ToHeader())
 		}
 
 		payload := unittest.PayloadFixture()
 		header.PayloadHash = payload.Hash()
-		block := &flow.Block{
-			Header:  header,
-			Payload: &payload,
-		}
+		block, err := flow.NewBlock(
+			flow.UntrustedBlock{
+				HeaderBody: header.HeaderBody,
+				Payload:    payload,
+			},
+		)
+		require.NoError(s.T(), err)
+
 		// the last block is sealed
 		if i == blockCount-1 {
 			s.sealedHead = header
@@ -126,7 +129,7 @@ func (s *EventsSuite) SetupTest() {
 		s.T().Logf("block %d: %s", header.Height, block.ID())
 	}
 
-	s.blockEvents = generator.GetEventsWithEncoding(10, entities.EventEncodingVersion_CCF_V0)
+	s.blockEvents = unittest.EventGenerator.GetEventsWithEncoding(10, entities.EventEncodingVersion_CCF_V0)
 	targetEvent = string(s.blockEvents[0].Type)
 
 	// events returned from the db are sorted by txID, txIndex, then eventIndex.
@@ -149,7 +152,7 @@ func (s *EventsSuite) SetupTest() {
 
 	s.headers.On("BlockIDByHeight", mock.Anything).Return(func(height uint64) (flow.Identifier, error) {
 		for _, block := range s.blocks {
-			if height == block.Header.Height {
+			if height == block.Height {
 				return block.ID(), nil
 			}
 		}
@@ -159,7 +162,7 @@ func (s *EventsSuite) SetupTest() {
 	s.headers.On("ByBlockID", mock.Anything).Return(func(blockID flow.Identifier) (*flow.Header, error) {
 		for _, block := range s.blocks {
 			if blockID == block.ID() {
-				return block.Header, nil
+				return block.ToHeader(), nil
 			}
 		}
 		return nil, storage.ErrNotFound
@@ -186,7 +189,7 @@ func (s *EventsSuite) SetupTest() {
 		Return(s.resultForestSnapshot, nil).
 		Maybe() // it is called only for local query mode
 
-	s.criteria = optimistic_sync.NewCriteria(nil)
+	s.criteria = optimistic_sync.Criteria{}
 
 	s.testCases = make([]testCase, 0)
 
@@ -212,7 +215,7 @@ func (s *EventsSuite) SetupTest() {
 func (s *EventsSuite) TestGetEvents_HappyPaths() {
 	ctx := context.Background()
 
-	startHeight := s.blocks[0].Header.Height
+	startHeight := s.blocks[0].Height
 	endHeight := s.sealedHead.Height
 
 	s.state.On("Sealed").Return(s.snapshot)
@@ -223,7 +226,14 @@ func (s *EventsSuite) TestGetEvents_HappyPaths() {
 		endHeight := startHeight + 20 // should still return 5 responses
 		encoding := entities.EventEncodingVersion_CCF_V0
 
-		response, _, err := backend.GetEventsForHeightRange(ctx, targetEvent, startHeight, endHeight, encoding, s.criteria)
+		response, _, err := backend.GetEventsForHeightRange(
+			ctx,
+			targetEvent,
+			startHeight,
+			endHeight,
+			encoding,
+			s.criteria,
+		)
 		s.Require().NoError(err)
 
 		s.assertResponse(response, encoding)
@@ -236,7 +246,13 @@ func (s *EventsSuite) TestGetEvents_HappyPaths() {
 			}
 
 			backend := s.defaultBackend(tt.queryMode)
-			response, _, err := backend.GetEventsForBlockIDs(ctx, targetEvent, s.blockIDs, tt.encoding, s.criteria)
+			response, _, err := backend.GetEventsForBlockIDs(
+				ctx,
+				targetEvent,
+				s.blockIDs,
+				tt.encoding,
+				s.criteria,
+			)
 			s.Require().NoError(err)
 			s.assertResponse(response, tt.encoding)
 
@@ -253,7 +269,13 @@ func (s *EventsSuite) TestGetEvents_HappyPaths() {
 			backend := s.defaultBackend(tt.queryMode)
 			s.setupENSuccessResponse(targetEvent, s.blocks)
 
-			response, _, err := backend.GetEventsForBlockIDs(ctx, targetEvent, s.blockIDs, tt.encoding, s.criteria)
+			response, _, err := backend.GetEventsForBlockIDs(
+				ctx,
+				targetEvent,
+				s.blockIDs,
+				tt.encoding,
+				s.criteria,
+			)
 			s.Require().NoError(err)
 			s.assertResponse(response, tt.encoding)
 
@@ -271,7 +293,13 @@ func (s *EventsSuite) TestGetEvents_HappyPaths() {
 			// make sure that execution nodes are called
 
 			backend := s.defaultBackend(tt.queryMode)
-			response, _, err := backend.GetEventsForBlockIDs(ctx, targetEvent, s.blockIDs, tt.encoding, s.criteria)
+			response, _, err := backend.GetEventsForBlockIDs(
+				ctx,
+				targetEvent,
+				s.blockIDs,
+				tt.encoding,
+				s.criteria,
+			)
 			s.Require().NoError(err)
 			s.assertResponse(response, tt.encoding)
 
@@ -285,7 +313,7 @@ func (s *EventsSuite) TestGetEvents_HappyPaths() {
 func (s *EventsSuite) TestGetEventsForHeightRange_HandlesErrors() {
 	ctx := context.Background()
 
-	startHeight := s.blocks[0].Header.Height
+	startHeight := s.blocks[0].Height
 	endHeight := s.sealedHead.Height
 	encoding := entities.EventEncodingVersion_CCF_V0
 
@@ -293,7 +321,14 @@ func (s *EventsSuite) TestGetEventsForHeightRange_HandlesErrors() {
 		backend := s.defaultBackend(query_mode.IndexQueryModeExecutionNodesOnly)
 		endHeight := startHeight - 1
 
-		response, _, err := backend.GetEventsForHeightRange(ctx, targetEvent, startHeight, endHeight, encoding, s.criteria)
+		response, _, err := backend.GetEventsForHeightRange(
+			ctx,
+			targetEvent,
+			startHeight,
+			endHeight,
+			encoding,
+			s.criteria,
+		)
 		s.Assert().Equal(codes.InvalidArgument, status.Code(err))
 		s.Assert().Nil(response)
 	})
@@ -302,7 +337,14 @@ func (s *EventsSuite) TestGetEventsForHeightRange_HandlesErrors() {
 		backend := s.defaultBackend(query_mode.IndexQueryModeExecutionNodesOnly)
 		endHeight := startHeight + DefaultMaxHeightRange
 
-		response, _, err := backend.GetEventsForHeightRange(ctx, targetEvent, startHeight, endHeight, encoding, s.criteria)
+		response, _, err := backend.GetEventsForHeightRange(
+			ctx,
+			targetEvent,
+			startHeight,
+			endHeight,
+			encoding,
+			s.criteria,
+		)
 		s.Assert().Equal(codes.InvalidArgument, status.Code(err))
 		s.Assert().Nil(response)
 	})
@@ -316,7 +358,14 @@ func (s *EventsSuite) TestGetEventsForHeightRange_HandlesErrors() {
 			irrecoverable.NewMockSignalerContextExpectError(s.T(), ctx, signCtxErr))
 
 		backend := s.defaultBackend(query_mode.IndexQueryModeExecutionNodesOnly)
-		response, _, err := backend.GetEventsForHeightRange(signalerCtx, targetEvent, startHeight, endHeight, encoding, s.criteria)
+		response, _, err := backend.GetEventsForHeightRange(
+			signalerCtx,
+			targetEvent,
+			startHeight,
+			endHeight,
+			encoding,
+			s.criteria,
+		)
 		// these will never be returned in production
 		s.Assert().Equal(codes.Unknown, status.Code(err))
 		s.Assert().Nil(response)
@@ -330,7 +379,14 @@ func (s *EventsSuite) TestGetEventsForHeightRange_HandlesErrors() {
 		endHeight := startHeight + 1
 
 		backend := s.defaultBackend(query_mode.IndexQueryModeExecutionNodesOnly)
-		response, _, err := backend.GetEventsForHeightRange(ctx, targetEvent, startHeight, endHeight, encoding, s.criteria)
+		response, _, err := backend.GetEventsForHeightRange(
+			ctx,
+			targetEvent,
+			startHeight,
+			endHeight,
+			encoding,
+			s.criteria,
+		)
 		s.Assert().Equal(codes.OutOfRange, status.Code(err))
 		s.Assert().Nil(response)
 	})
@@ -338,14 +394,21 @@ func (s *EventsSuite) TestGetEventsForHeightRange_HandlesErrors() {
 	s.state.On("Params").Return(s.params)
 
 	s.Run("returns error for startHeight < spork root height", func() {
-		sporkRootHeight := s.blocks[0].Header.Height - 10
+		sporkRootHeight := s.blocks[0].Height - 10
 		startHeight := sporkRootHeight - 1
 
 		s.params.On("SporkRootBlockHeight").Return(sporkRootHeight).Once()
 		s.params.On("SealedRoot").Return(s.rootHeader, nil).Once()
 
 		backend := s.defaultBackend(query_mode.IndexQueryModeExecutionNodesOnly)
-		response, _, err := backend.GetEventsForHeightRange(ctx, targetEvent, startHeight, endHeight, encoding, s.criteria)
+		response, _, err := backend.GetEventsForHeightRange(
+			ctx,
+			targetEvent,
+			startHeight,
+			endHeight,
+			encoding,
+			s.criteria,
+		)
 		s.Assert().Equal(codes.NotFound, status.Code(err))
 		s.Assert().ErrorContains(err, "Try to use a historic node")
 		s.Assert().Nil(response)
@@ -354,14 +417,21 @@ func (s *EventsSuite) TestGetEventsForHeightRange_HandlesErrors() {
 	s.Run("returns error for startHeight < node root height", func() {
 		backend := s.defaultBackend(query_mode.IndexQueryModeExecutionNodesOnly)
 
-		sporkRootHeight := s.blocks[0].Header.Height - 10
-		nodeRootHeader := unittest.BlockHeaderWithHeight(s.blocks[0].Header.Height)
+		sporkRootHeight := s.blocks[0].Height - 10
+		nodeRootHeader := unittest.BlockHeaderWithHeight(s.blocks[0].Height)
 		startHeight := nodeRootHeader.Height - 5
 
 		s.params.On("SporkRootBlockHeight").Return(sporkRootHeight).Once()
 		s.params.On("SealedRoot").Return(nodeRootHeader, nil).Once()
 
-		response, _, err := backend.GetEventsForHeightRange(ctx, targetEvent, startHeight, endHeight, encoding, s.criteria)
+		response, _, err := backend.GetEventsForHeightRange(
+			ctx,
+			targetEvent,
+			startHeight,
+			endHeight,
+			encoding,
+			s.criteria,
+		)
 		s.Assert().Equal(codes.NotFound, status.Code(err))
 		s.Assert().ErrorContains(err, "Try to use a different Access node")
 		s.Assert().Nil(response)
@@ -376,7 +446,13 @@ func (s *EventsSuite) TestGetEventsForBlockIDs_HandlesErrors() {
 		backend := s.defaultBackend(query_mode.IndexQueryModeExecutionNodesOnly)
 		backend.maxHeightRange = 3
 
-		response, _, err := backend.GetEventsForBlockIDs(ctx, targetEvent, s.blockIDs, encoding, s.criteria)
+		response, _, err := backend.GetEventsForBlockIDs(
+			ctx,
+			targetEvent,
+			s.blockIDs,
+			encoding,
+			s.criteria,
+		)
 		s.Assert().Equal(codes.InvalidArgument, status.Code(err))
 		s.Assert().Nil(response)
 	})
@@ -393,10 +469,16 @@ func (s *EventsSuite) TestGetEventsForBlockIDs_HandlesErrors() {
 				continue
 			}
 
-			headers.On("ByBlockID", blockID).Return(s.blocks[i].Header, nil)
+			headers.On("ByBlockID", blockID).Return(s.blocks[i].ToHeader(), nil)
 		}
 
-		response, _, err := backend.GetEventsForBlockIDs(ctx, targetEvent, s.blockIDs, encoding, s.criteria)
+		response, _, err := backend.GetEventsForBlockIDs(
+			ctx,
+			targetEvent,
+			s.blockIDs,
+			encoding,
+			s.criteria,
+		)
 		s.Assert().Equal(codes.NotFound, status.Code(err))
 		s.Assert().Nil(response)
 	})
@@ -405,8 +487,8 @@ func (s *EventsSuite) TestGetEventsForBlockIDs_HandlesErrors() {
 func (s *EventsSuite) assertResponse(response []flow.BlockEvents, encoding entities.EventEncodingVersion) {
 	s.Assert().Len(response, len(s.blocks))
 	for i, block := range s.blocks {
-		s.Assert().Equal(block.Header.Height, response[i].BlockHeight)
-		s.Assert().Equal(block.Header.ID(), response[i].BlockID)
+		s.Assert().Equal(block.Height, response[i].BlockHeight)
+		s.Assert().Equal(block.ID(), response[i].BlockID)
 		s.Assert().Len(response[i].Events, 1)
 
 		s.assertEncoding(&response[i].Events[0], encoding)
@@ -452,27 +534,11 @@ func (s *EventsSuite) defaultBackend(mode query_mode.IndexQueryMode) *Events {
 	return e
 }
 
-// setupExecutionNodes sets up the mocks required to test against an EN backend
-func (s *EventsSuite) setupExecutionNodes(block *flow.Block) {
-	s.params.On("FinalizedRoot").Return(s.rootHeader, nil)
-	s.state.On("Params").Return(s.params)
-	s.state.On("Final").Return(s.snapshot)
-	s.snapshot.On("Identities", mock.Anything).Return(s.executionNodes, nil)
-
-	// this line causes a S1021 lint error because receipts is explicitly declared. this is required
-	// to ensure the mock library handles the response type correctly
-	var receipts flow.ExecutionReceiptList //nolint:gosimple
-	receipts = unittest.ReceiptsForBlockFixture(block, s.executionNodes.NodeIDs())
-	s.receipts.On("ByBlockID", block.ID()).Return(receipts, nil)
-
+// setupENSuccessResponse configures the execution node client to return a successful response
+func (s *EventsSuite) setupENSuccessResponse(eventType string, blocks []*flow.Block) {
 	s.connectionFactory.
 		On("GetExecutionAPIClient", mock.Anything).
 		Return(s.execClient, &mocks.MockCloser{}, nil)
-}
-
-// setupENSuccessResponse configures the execution node client to return a successful response
-func (s *EventsSuite) setupENSuccessResponse(eventType string, blocks []*flow.Block) {
-	s.setupExecutionNodes(blocks[len(blocks)-1])
 
 	ids := make([][]byte, len(blocks))
 	results := make([]*execproto.GetEventsForBlockIDsResponse_Result, len(blocks))
@@ -489,7 +555,7 @@ func (s *EventsSuite) setupENSuccessResponse(eventType string, blocks []*flow.Bl
 		ids[i] = id[:]
 		results[i] = &execproto.GetEventsForBlockIDsResponse_Result{
 			BlockId:     id[:],
-			BlockHeight: block.Header.Height,
+			BlockHeight: block.Height,
 			Events:      events,
 		}
 	}

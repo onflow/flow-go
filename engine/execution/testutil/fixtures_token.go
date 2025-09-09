@@ -10,9 +10,9 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-func CreateTokenTransferTransaction(chain flow.Chain, amount int, to flow.Address, signer flow.Address) *flow.TransactionBody {
+func CreateTokenTransferTransaction(chain flow.Chain, amount int, to flow.Address, signer flow.Address) *flow.TransactionBodyBuilder {
 	sc := systemcontracts.SystemContractsForChain(chain.ChainID())
-	return flow.NewTransactionBody().
+	return flow.NewTransactionBodyBuilder().
 		SetScript([]byte(fmt.Sprintf(`
 		import FungibleToken from 0x%s
 		import FlowToken from 0x%s
