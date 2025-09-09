@@ -203,11 +203,20 @@ func (e *ENTransactionProvider) TransactionResultsByBlockID(
 		return nil, rpc.ConvertError(err, "failed to retrieve result from execution node", codes.Internal)
 	}
 
+	txStatus, err := e.txStatusDeriver.DeriveTransactionStatus(block.Height, true)
+	if err != nil {
+		if !errors.Is(err, state.ErrUnknownSnapshotReference) {
+			irrecoverable.Throw(ctx, err)
+		}
+		return nil, rpc.ConvertStorageError(err)
+	}
+
 	userTxResults, err := e.userTransactionResults(
 		ctx,
 		executionResponse,
 		block,
 		blockID,
+		txStatus,
 		requiredEventEncodingVersion,
 	)
 	if err != nil {
@@ -224,6 +233,7 @@ func (e *ENTransactionProvider) TransactionResultsByBlockID(
 		len(userTxResults),
 		block,
 		blockID,
+		txStatus,
 		executionResponse,
 		requiredEventEncodingVersion,
 	)
@@ -243,6 +253,7 @@ func (e *ENTransactionProvider) userTransactionResults(
 	resp *execproto.GetTransactionResultsResponse,
 	block *flow.Block,
 	blockID flow.Identifier,
+	txStatus flow.TransactionStatus,
 	requiredEventEncodingVersion entities.EventEncodingVersion,
 ) ([]*accessmodel.TransactionResult, error) {
 
@@ -266,14 +277,6 @@ func (e *ENTransactionProvider) userTransactionResults(
 			}
 			txResult := resp.TransactionResults[i]
 
-			// tx body is irrelevant to status if it's in an executed block
-			txStatus, err := e.txStatusDeriver.DeriveTransactionStatus(block.Height, true)
-			if err != nil {
-				if !errors.Is(err, state.ErrUnknownSnapshotReference) {
-					irrecoverable.Throw(ctx, err)
-				}
-				return nil, rpc.ConvertStorageError(err)
-			}
 			events, err := convert.MessagesToEventsWithEncodingConversion(txResult.GetEvents(), resp.GetEventEncodingVersion(), requiredEventEncodingVersion)
 			if err != nil {
 				return nil, status.Errorf(codes.Internal,
@@ -309,6 +312,7 @@ func (e *ENTransactionProvider) systemTransactionResults(
 	userTxCount int,
 	block *flow.Block,
 	blockID flow.Identifier,
+	txStatus flow.TransactionStatus,
 	resp *execproto.GetTransactionResultsResponse,
 	requiredEventEncodingVersion entities.EventEncodingVersion,
 ) ([]*accessmodel.TransactionResult, error) {
@@ -333,14 +337,6 @@ func (e *ENTransactionProvider) systemTransactionResults(
 	events := make([]flow.Event, 0, systemTxCount)
 
 	for i, systemTxResult := range systemTxResults {
-		systemTxStatus, err := e.txStatusDeriver.DeriveTransactionStatus(block.Height, true)
-		if err != nil {
-			if !errors.Is(err, state.ErrUnknownSnapshotReference) {
-				irrecoverable.Throw(ctx, err)
-			}
-			return nil, rpc.ConvertStorageError(err)
-		}
-
 		txEvents, err := convert.MessagesToEventsWithEncodingConversion(systemTxResult.GetEvents(), resp.GetEventEncodingVersion(), requiredEventEncodingVersion)
 		if err != nil {
 			return nil, rpc.ConvertError(err, "failed to convert events from system tx result", codes.Internal)
@@ -348,7 +344,7 @@ func (e *ENTransactionProvider) systemTransactionResults(
 		events = append(events, txEvents...)
 
 		results = append(results, &accessmodel.TransactionResult{
-			Status:        systemTxStatus,
+			Status:        txStatus,
 			StatusCode:    uint(systemTxResult.GetStatusCode()),
 			Events:        events,
 			ErrorMessage:  systemTxResult.GetErrorMessage(),
