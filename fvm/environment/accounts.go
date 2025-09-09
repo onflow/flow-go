@@ -12,6 +12,7 @@ import (
 	"github.com/onflow/crypto"
 	"github.com/onflow/crypto/hash"
 
+	accountkeymetadata "github.com/onflow/flow-go/fvm/environment/account-key-metadata"
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/storage/state"
 	"github.com/onflow/flow-go/model/flow"
@@ -571,6 +572,14 @@ func (a *StatefulAccounts) appendPublicKey(
 		}
 	}
 
+	// Store sequence number if needed.
+	if publicKey.SeqNumber > 0 {
+		err = createAccountPublicKeySequenceNumber(a, address, keyIndex, publicKey.SeqNumber)
+		if err != nil {
+			return err
+		}
+	}
+
 	return nil
 }
 
@@ -590,7 +599,7 @@ func (a *StatefulAccounts) appendKeyMetadataToAccountStatusRegister(
 		weight,
 		encodedKey,
 		func(b []byte) uint64 {
-			return getPublicKeyDigest(address, b)
+			return accountkeymetadata.GetPublicKeyDigest(address, b)
 		},
 		func(storedKeyIndex uint32) ([]byte, error) {
 			return getRawStoredPublicKey(a, address, storedKeyIndex)
@@ -833,15 +842,16 @@ func (a *StatefulAccounts) updateRegisterSizeChange(
 }
 
 func RegisterSize(id flow.RegisterID, value flow.RegisterValue) int {
+	// NOTE: RegisterSize() needs to be in sync with encodedKeyLength() in ledger/trie_encoder.go.
 	if len(value) == 0 {
 		// registers with empty value won't (or don't) exist when stored
 		return 0
 	}
-	size := 0
-	// additional 2 is for len prefixes when encoding is happening
-	// we might get rid of these 2s in the future
-	size += 2 + len(id.Owner)
-	size += 2 + len(id.Key)
+	size := 2 // number of key parts (2 bytes)
+	// Size for each key part:
+	// length prefix (4 bytes) + encoded key part type (2 bytes) + key part value
+	size += 4 + 2 + len(id.Owner)
+	size += 4 + 2 + len(id.Key)
 	size += len(value)
 	return size
 }
@@ -1043,6 +1053,12 @@ func (a *StatefulAccounts) accountPublicKeyIndexInRange(
 	return nil
 }
 
+// setAccountStatusAfterAccountStatusSizeChange adjusts and sets
+// account storage used after the account status register size is changed.
+// This function is needed because updateRegisterSizeChange() filters out
+// account status register to prevent recursion when computing storage used,
+// so we need to explicitly update the account storage used when the
+// account status register size is changed.
 func (a *StatefulAccounts) setAccountStatusAfterAccountStatusSizeChange(
 	address flow.Address,
 	status *AccountStatus,

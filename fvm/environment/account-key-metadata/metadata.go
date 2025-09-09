@@ -5,6 +5,8 @@ import (
 	"encoding/binary"
 	"fmt"
 	"slices"
+
+	"github.com/onflow/flow-go/fvm/errors"
 )
 
 // GetRevokedStatus returns revoked status for account public key at the key index.
@@ -12,7 +14,7 @@ func GetRevokedStatus(b []byte, keyIndex uint32) (bool, error) {
 	// Key metadata only stores weight and revoked status for keys at index > 0.
 
 	if keyIndex == 0 {
-		return false, NewUnexpectedKeyIndexError(0)
+		return false, errors.NewKeyMetadataUnexpectedKeyIndexError("failed to query revoked status", 0)
 	}
 
 	weightAndRevokedStatusBytes, _, err := parseWeightAndRevokedStatusFromKeyMetadataBytes(b)
@@ -34,7 +36,7 @@ func GetKeyMetadata(b []byte, keyIndex uint32, deduplicated bool) (
 	// Key metadata only stores weight and revoked status for keys at index > 0.
 
 	if keyIndex == 0 {
-		err = NewUnexpectedKeyIndexError(0)
+		err = errors.NewKeyMetadataUnexpectedKeyIndexError("failed to query key metadata", 0)
 		return
 	}
 
@@ -81,11 +83,10 @@ func SetRevokedStatus(b []byte, keyIndex uint32) ([]byte, error) {
 	// Key metadata only stores weight and revoked status for keys at index > 0.
 
 	if keyIndex == 0 {
-		return nil, NewUnexpectedKeyIndexError(0)
+		return nil, errors.NewKeyMetadataUnexpectedKeyIndexError("failed to set revoked status", 0)
 	}
 
 	weightAndRevokedStatusBytes, rest, err := parseWeightAndRevokedStatusFromKeyMetadataBytes(b)
-
 	if err != nil {
 		return nil, err
 	}
@@ -169,7 +170,11 @@ func NewKeyMetadataAppenderFromBytes(b []byte, deduplicated bool, maxStoredDiges
 	keyMetadata.digestBytes = slices.Clone(digestBytes)
 
 	if len(b) != 0 {
-		return nil, NewKeyMetadataMalfromedError(fmt.Sprintf("found %d extra bytes", len(b)))
+		return nil,
+			errors.NewKeyMetadataTrailingDataError(
+				"failed to parse key metadata",
+				len(b),
+			)
 	}
 
 	return &keyMetadata, nil
@@ -323,7 +328,9 @@ func (m *KeyMetadataAppender) storedKeyCount() uint32 {
 	return m.startIndexForDigests + uint32(len(m.digestBytes)/digestSize)
 }
 
-func (m *KeyMetadataAppender) FindDuplicateDigest(digest uint64) (found bool, duplicateStoredKeyIndex uint32) {
+// findDuplicateDigest returns true and stored key index with duplicate digest
+// if the given digest has a match in stored digests in key metadata section.
+func (m *KeyMetadataAppender) findDuplicateDigest(digest uint64) (found bool, duplicateStoredKeyIndex uint32) {
 	if len(m.digestBytes) == 0 {
 		return false, 0
 	}

@@ -3,7 +3,6 @@ package environment
 import (
 	"encoding/binary"
 	"encoding/hex"
-	goerrors "errors"
 	"fmt"
 
 	"github.com/onflow/atree"
@@ -51,7 +50,6 @@ const (
 	addressIdCounterStartIndex       = accountPublicKeyCountsStartIndex + accountPublicKeyCountsSize
 
 	versionMask           = 0xf0
-	flagMask              = 0x0f
 	deduplicationFlagMask = 0x01
 
 	accountStatusV4DefaultVersionAndFlag = 0x40
@@ -321,10 +319,14 @@ func (a *AccountStatus) AppendAccountPublicKeyMetadata(
 	var keyMetadata *accountkeymetadata.KeyMetadataAppender
 
 	if len(a.keyMetadataBytes) == 0 {
-		// NOTE: new key index must be 1 when key metadata is empty.
+		// New key index must be 1 when key metadata is empty because
+		// key metadata at key index 0 is stored with public key at
+		// key index 0 in a separate register (apk_0).
+		// Most accounts only have 1 account public key and we
+		// special case for that as an optimization.
 
 		if keyIndex != 1 {
-			return 0, false, accountkeymetadata.NewKeyMetadataMalfromedError(fmt.Sprintf("public key metadata cannot be empty at index %d", keyIndex))
+			return 0, false, errors.NewKeyMetadataEmptyError(fmt.Sprintf("key metadata cannot be empty when appending new key metadata at index %d", keyIndex))
 		}
 
 		// To avoid storage overhead for most accounts, account key 0 digest is computed and stored when account key 1 is added.
@@ -363,10 +365,24 @@ func (a *AccountStatus) AppendAccountPublicKeyMetadata(
 		}
 	}()
 
-	digest, isDuplicateKey, duplicateStoredKeyIndex, err := isKeyDuplicate(keyMetadata, encodedKey, getKeyDigest, getStoredKey)
+	digest, isDuplicateKey, duplicateStoredKeyIndex, err := accountkeymetadata.FindDuplicateKey(keyMetadata, encodedKey, getKeyDigest, getStoredKey)
 	if err != nil {
 		return 0, false, err
 	}
+
+	// Whether new public key is a duplicate or not, we store these items in key metadata section:
+	// - new account public key's revoked status and weight
+	// - new public key's digest (we only store last N digests and N=2 by default to balance tradeoffs)
+	// If new public key is a duplicate, we also store mapping of account key index to stored key index.
+	//
+	// As a non-duplicate key example, if public key at index 1 is unique, we store:
+	// - new key's weight and revoked status, and
+	// - new key's digest
+	//
+	// As a duplicate key example, if public key at index 1 is duplicate of public key at index 0, we store:
+	// - new key's weight and revoked status,
+	// - mapping indicating public key at index 1 is the same as public key at index 0.
+	// - new key's digest
 
 	// Handle duplicate key.
 	if isDuplicateKey {
@@ -385,39 +401,4 @@ func (a *AccountStatus) AppendAccountPublicKeyMetadata(
 	}
 
 	return storedKeyIndex, true, nil
-}
-
-func isKeyDuplicate(
-	keyMetadata *accountkeymetadata.KeyMetadataAppender,
-	encodedKey []byte,
-	getKeyDigest func([]byte) uint64,
-	getStoredKey func(uint32) ([]byte, error),
-) (
-	digest uint64,
-	isDuplicateKey bool,
-	duplicateStoredKeyIndex uint32,
-	err error,
-) {
-	// To balance tradeoffs, it is OK to have detection rate less than 100%, for the
-	// same reasons compression programs/libraries don't use max compression by default.
-
-	// We use a fast non-cryptographic hash algorithm for efficiency, so
-	// we need to handle hash collisions (same digest from different hash inputs).
-	// When a hash collision is detected, sentinel digest (0) is stored in place
-	// of new key digest, and subsequent digest comparison excludes stored sentinel digest.
-	// This means keys with the sentinel digest will not be deduplicated and that is OK.
-
-	digest = getKeyDigest(encodedKey)
-
-	isDuplicateKey, duplicateStoredKeyIndex, err = accountkeymetadata.FindDuplicateKey(keyMetadata, encodedKey, digest, getStoredKey)
-	if err != nil {
-		var collisionErr *accountkeymetadata.CollisionError
-		if goerrors.As(err, &collisionErr) {
-			// Return sentinel digest on collision.
-			return accountkeymetadata.SentinelFastDigest64, false, 0, nil
-		}
-		return 0, false, 0, err
-	}
-
-	return digest, isDuplicateKey, duplicateStoredKeyIndex, nil
 }

@@ -2,9 +2,10 @@ package accountkeymetadata
 
 import (
 	"encoding/binary"
-	"fmt"
 	"math"
 	"slices"
+
+	"github.com/onflow/flow-go/fvm/errors"
 )
 
 // Account public key weight and revoked status is encoded using RLE:
@@ -28,7 +29,12 @@ const (
 // Received b is expected to only contain encoded weight and revoked status.
 func getWeightAndRevokedStatus(b []byte, index uint32) (bool, uint16, error) {
 	if len(b)%weightAndRevokedStatusGroupSize != 0 {
-		return false, 0, NewKeyMetadataMalfromedError(fmt.Sprintf("failed to get weight and revoked status: existing metadata is %d bytes, expect multiples of %d", len(b), weightAndRevokedStatusGroupSize))
+		return false, 0,
+			errors.NewKeyMetadataUnexpectedLengthError(
+				"failed to get weight and revoked status",
+				weightAndRevokedStatusGroupSize,
+				len(b),
+			)
 	}
 
 	for off := 0; off < len(b); off += weightAndRevokedStatusGroupSize {
@@ -42,20 +48,25 @@ func getWeightAndRevokedStatus(b []byte, index uint32) (bool, uint16, error) {
 		index -= uint32(runLength)
 	}
 
-	return false, 0, NewKeyMetadataNotFoundError("failed to query weight and revoked status", index)
+	return false, 0, errors.NewKeyMetadataNotFoundError("failed to query weight and revoked status", index)
 }
 
 // appendWeightAndRevokedStatus appends given weight and revoked status to the given data.
 // New weight and revoked status can be appended in a new run-length group, or included in
 // last group by incrementing last group's run-length.
 // NOTE: this function can modify the given data.
-func appendWeightAndRevokedStatus(b []byte, revoked bool, weight uint16) (_ []byte, _ error) {
+func appendWeightAndRevokedStatus(b []byte, revoked bool, weight uint16) ([]byte, error) {
 	if len(b) == 0 {
 		return encodeWeightAndRevokedStatusGroup(1, revoked, weight), nil
 	}
 
 	if len(b)%weightAndRevokedStatusGroupSize != 0 {
-		return nil, NewKeyMetadataMalfromedError(fmt.Sprintf("failed to append weight and revoked status: existing metadata is %d bytes, expect multiples of %d", len(b), weightAndRevokedStatusGroupSize))
+		return nil,
+			errors.NewKeyMetadataUnexpectedLengthError(
+				"failed to append weight and revoked status",
+				weightAndRevokedStatusGroupSize,
+				len(b),
+			)
 	}
 
 	// Merge to last groupo
@@ -75,7 +86,12 @@ func appendWeightAndRevokedStatus(b []byte, revoked bool, weight uint16) (_ []by
 // NOTE: this function can modify the given data.
 func setRevokedStatus(b []byte, index uint32) ([]byte, error) {
 	if len(b)%weightAndRevokedStatusGroupSize != 0 {
-		return nil, NewKeyMetadataMalfromedError(fmt.Sprintf("failed to set revoked status: existing metadata is %d bytes, expect multiples of %d", len(b), weightAndRevokedStatusGroupSize))
+		return nil,
+			errors.NewKeyMetadataUnexpectedLengthError(
+				"failed to set revoked status",
+				weightAndRevokedStatusGroupSize,
+				len(b),
+			)
 	}
 
 	foundGroup := false
@@ -83,6 +99,8 @@ func setRevokedStatus(b []byte, index uint32) ([]byte, error) {
 	for ; curOff < len(b); curOff += weightAndRevokedStatusGroupSize {
 		runLength := parseRunLength(b, curOff)
 
+		// When this loop exits, index is guaranteed to be less than math.MaxUint16 (65535)
+		// because runlength is uint16.
 		if index < uint32(runLength) {
 			foundGroup = true
 			break
@@ -92,7 +110,7 @@ func setRevokedStatus(b []byte, index uint32) ([]byte, error) {
 	}
 
 	if !foundGroup {
-		return nil, NewKeyMetadataNotFoundError("failed to set revoked status", index)
+		return nil, errors.NewKeyMetadataNotFoundError("failed to set revoked status", index)
 	}
 
 	curGroup := parseWeightAndRevokedStatusGroup(b, curOff)

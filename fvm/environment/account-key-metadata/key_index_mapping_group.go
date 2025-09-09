@@ -2,7 +2,8 @@ package accountkeymetadata
 
 import (
 	"encoding/binary"
-	"fmt"
+
+	"github.com/onflow/flow-go/fvm/errors"
 )
 
 // Account Public Key Index to Stored Public Key Index Mappings
@@ -39,7 +40,12 @@ const (
 // Received b is expected to only contain encoded mappings.
 func getStoredKeyIndexFromMappings(b []byte, keyIndex uint32) (uint32, error) {
 	if len(b)%mappingGroupSize != 0 {
-		return 0, NewKeyMetadataMalfromedError(fmt.Sprintf("failed to get stored key index: existing metadata is %d bytes, expect multiples of %d", len(b), mappingGroupSize))
+		return 0,
+			errors.NewKeyMetadataUnexpectedLengthError(
+				"failed to get stored key index from mapping",
+				mappingGroupSize,
+				len(b),
+			)
 	}
 
 	for off := 0; off < len(b); off += mappingGroupSize {
@@ -58,16 +64,23 @@ func getStoredKeyIndexFromMappings(b []byte, keyIndex uint32) (uint32, error) {
 		keyIndex -= uint32(runLength)
 	}
 
-	return 0, NewKeyMetadataNotFoundError("failed to query stored key index", keyIndex)
+	return 0, errors.NewKeyMetadataNotFoundError("failed to query stored key index from mapping", keyIndex)
 }
 
+// appendStoredKeyIndexToMappings appends the given storedKeyIndex to the given encoded mappings (b).
+// NOTE: b can be modified by this function.
 func appendStoredKeyIndexToMappings(b []byte, storedKeyIndex uint32) (_ []byte, _ error) {
 	if len(b) == 0 {
 		return encodeKeyIndexToStoredKeyIndexMapping(false, 1, storedKeyIndex), nil
 	}
 
 	if len(b)%mappingGroupSize != 0 {
-		return nil, NewKeyMetadataMalfromedError(fmt.Sprintf("failed to append stored key mapping: existing metadata is %d bytes, expect multiples of %d", len(b), mappingGroupSize))
+		return nil,
+			errors.NewKeyMetadataUnexpectedLengthError(
+				"failed to append stored key mapping",
+				mappingGroupSize,
+				len(b),
+			)
 	}
 
 	// Merge to last group
@@ -75,6 +88,8 @@ func appendStoredKeyIndexToMappings(b []byte, storedKeyIndex uint32) (_ []byte, 
 	lastGroup := parseMappingGroup(b, lastGroupOff)
 
 	if lastGroup.TryMerge(storedKeyIndex) {
+		// Overwrite the last group in the given b since the
+		// given storedKeyIndex is merged into the last group.
 		b = append(b[:lastGroupOff], lastGroup.Encode()...)
 		return b, nil
 	}
@@ -100,6 +115,15 @@ func NewMappingGroup(runLength uint16, storedKeyIndex uint32, consecutive bool) 
 	}
 }
 
+// TryMerge returns true if the given storedKeyIndex is merged into g.
+// The given storedKeyIndex is merged into regular group g if
+// g's runLength is less than maxRunLengthInMappingGroup and
+// either g's storedKeyIndex is the same as the given storedKeyIndex or
+// g's runLength is 1 and g's storedKeyIndex + 1 is the same as the
+// given storedKeyIndex.
+// The given storedKeyIndex is merged into consecutive group g if
+// g's runLength is less than maxRunLengthInMappingGroup and
+// g's storedKeyIndex + g's runLength the same as the given storedKeyIndex.
 func (g *MappingGroup) TryMerge(storedKeyIndex uint32) bool {
 	if g.runLength == maxRunLengthInMappingGroup {
 		// Can't be merged because run length limit is reached.
@@ -123,7 +147,8 @@ func (g *MappingGroup) TryMerge(storedKeyIndex uint32) bool {
 	}
 
 	if g.runLength == 1 && g.storedKeyIndex+1 == storedKeyIndex {
-		// Make last group a consecutive group and merge into it
+		// Convert the last group from a regular group to a consecutive group,
+		// and merge the given storedKeyIndex into it.
 		g.consecutiveGroup = true
 		g.runLength++
 		return true
