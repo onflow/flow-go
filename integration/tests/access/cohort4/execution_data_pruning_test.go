@@ -19,7 +19,6 @@ import (
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/storage"
-	"github.com/onflow/flow-go/storage/operation/badgerimpl"
 	"github.com/onflow/flow-go/storage/store"
 	"github.com/onflow/flow-go/utils/unittest"
 
@@ -162,9 +161,8 @@ func (s *ExecutionDataPruningSuite) TestHappyPath() {
 	anEds := s.nodeExecutionDataStore(accessNode)
 
 	// setup storage objects needed to get the execution data id
-	anDB, err := accessNode.DB()
+	db, err := accessNode.DB()
 	require.NoError(s.T(), err, "could not open db")
-	db := badgerimpl.ToDB(anDB)
 	anHeaders := store.NewHeaders(metrics, db)
 	anResults := store.NewExecutionResults(metrics, db)
 
@@ -175,7 +173,7 @@ func (s *ExecutionDataPruningSuite) TestHappyPath() {
 	onDB, err := observerNode.DB()
 	require.NoError(s.T(), err, "could not open db")
 
-	onResults := store.NewExecutionResults(metrics, badgerimpl.ToDB(onDB))
+	onResults := store.NewExecutionResults(metrics, onDB)
 
 	s.checkResults(anHeaders, anResults, onResults, anEds, onEds)
 }
