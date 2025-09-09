@@ -261,8 +261,9 @@ func (bs *BuilderSuite) SetupTest() {
 		require.NoError(bs.T(), operation.InsertInstanceParams(
 			rw,
 			operation.EncodableInstanceParams{
-				FinalizedRootID: unittest.IdentifierFixture(),
-				SealedRootID:    unittest.IdentifierFixture(),
+				FinalizedRootID:  unittest.IdentifierFixture(),
+				SealedRootID:     unittest.IdentifierFixture(),
+				SporkRootBlockID: unittest.IdentifierFixture(),
 			}))
 		require.NoError(bs.T(), operation.UpsertFinalizedHeight(lctx, rw.Writer(), final.Height))
 		require.NoError(bs.T(), operation.IndexFinalizedBlockByHeight(lctx, rw, final.Height, bs.finalID))
