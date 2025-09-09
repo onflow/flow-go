@@ -118,6 +118,10 @@ func compareBlock(
 
 	blockTransactions, systemTxID, header := debug_tx.FetchBlockInfo(blockID, flowClient)
 
+	log.Info().Msgf("Running all transactions in block %s (height %d) ...", blockID, header.Height)
+
+	log.Info().Msg("Running with interpreter ...")
+
 	interResults := debug_tx.RunBlock(
 		remoteClient,
 		header,
@@ -129,6 +133,8 @@ func compareBlock(
 		traceFile,
 		flagComputeLimit,
 	)
+
+	log.Info().Msg("Running with VM ...")
 
 	vmResults := debug_tx.RunBlock(
 		remoteClient,
@@ -161,6 +167,8 @@ func compareResults(
 ) {
 	log := log.With().Str("tx", txID.String()).Logger()
 
+	var mismatch bool
+
 	// Compare errors
 
 	interErr := interResult.Output.Err
@@ -168,8 +176,10 @@ func compareResults(
 
 	if interErr == nil && vmErr != nil {
 		log.Error().Msgf("VM failed but interpreter succeeded")
+		mismatch = true
 	} else if interErr != nil && vmErr == nil {
 		log.Error().Msgf("Interpreter failed but VM succeeded")
+		mismatch = true
 	}
 
 	// Compare events
@@ -178,9 +188,13 @@ func compareResults(
 	vmEventCount := len(vmResult.Output.Events)
 	if interEventCount != vmEventCount {
 		log.Error().Msgf("Number of events differ: interpreter %d vs VM %d", interEventCount, vmEventCount)
+		mismatch = true
 	}
 
 	eventDiff := pretty.Diff(interResult.Output.Events, vmResult.Output.Events)
+	if len(eventDiff) != 0 {
+		mismatch = true
+	}
 	for _, diff := range eventDiff {
 		log.Error().Msgf("Event diff: %s", diff)
 	}
@@ -195,9 +209,13 @@ func compareResults(
 			interLogCount,
 			vmLogCount,
 		)
+		mismatch = true
 	}
 
 	logDiff := pretty.Diff(interResult.Output.Logs, vmResult.Output.Logs)
+	if len(logDiff) != 0 {
+		mismatch = true
+	}
 	for _, diff := range logDiff {
 		log.Error().Msgf("Log diff: %s", diff)
 	}
@@ -215,9 +233,13 @@ func compareResults(
 			len(interReadRegisters),
 			len(vmReadRegisters),
 		)
+		mismatch = true
 	}
 
 	readRegisterDiff := pretty.Diff(interReadRegisters, vmReadRegisters)
+	if len(readRegisterDiff) != 0 {
+		mismatch = true
+	}
 	for _, diff := range readRegisterDiff {
 		log.Error().Msgf("Read register diff: %s", diff)
 	}
@@ -235,10 +257,20 @@ func compareResults(
 			len(interUpdatedRegisters),
 			len(vmUpdatedRegisters),
 		)
+		mismatch = true
 	}
 
 	updatedRegisterDiff := pretty.Diff(interUpdatedRegisters, vmUpdatedRegisters)
+	if len(updatedRegisterDiff) != 0 {
+		mismatch = true
+	}
 	for _, diff := range updatedRegisterDiff {
 		log.Error().Msgf("Updated register diff: %s", diff)
+	}
+
+	if mismatch {
+		log.Info().Msg("Differences found between interpreter and VM")
+	} else {
+		log.Info().Msg("No differences found between interpreter and VM")
 	}
 }
