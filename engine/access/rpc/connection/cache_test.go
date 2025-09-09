@@ -36,7 +36,7 @@ func TestCachedClientShutdown(t *testing.T) {
 		assert.True(t, client.CloseRequested())
 
 		require.Eventually(t, func() bool {
-			return client.Closed()
+			return client.CloseCompleted()
 		}, 100*time.Millisecond, 10*time.Millisecond, "client timed out closing connection")
 	})
 
@@ -61,7 +61,7 @@ func TestCachedClientShutdown(t *testing.T) {
 		assert.True(t, client.CloseRequested())
 
 		require.Eventually(t, func() bool {
-			return doneCalled.Load() && client.Closed()
+			return doneCalled.Load() && client.CloseCompleted()
 		}, 100*time.Millisecond, 10*time.Millisecond, "client timed out closing connection")
 	})
 
@@ -79,7 +79,7 @@ func TestCachedClientShutdown(t *testing.T) {
 		assert.True(t, client.CloseRequested())
 
 		require.Never(t, func() bool {
-			return client.Closed()
+			return client.CloseCompleted()
 		}, 500*time.Millisecond, 10*time.Millisecond, "request completed after client closed")
 	})
 

@@ -22,7 +22,7 @@ type CachedClient struct {
 
 	cache          *Cache
 	closeRequested bool
-	closed         bool
+	closeCompleted bool
 
 	wg sync.WaitGroup
 	mu sync.RWMutex
@@ -47,11 +47,11 @@ func (cc *CachedClient) CloseRequested() bool {
 	return cc.closeRequested
 }
 
-// Closed returns true if the CachedClient completed closing its connection.
-func (cc *CachedClient) Closed() bool {
+// CloseCompleted returns true if the CachedClient completed closing its connection.
+func (cc *CachedClient) CloseCompleted() bool {
 	cc.mu.RLock()
 	defer cc.mu.RUnlock()
-	return cc.closed
+	return cc.closeCompleted
 }
 
 // TryAddRequest attempts to add a request to the CachedClient.
@@ -92,7 +92,7 @@ func (cc *CachedClient) Close() {
 		cc.mu.Lock()
 		defer cc.mu.Unlock()
 
-		cc.closed = true
+		cc.closeCompleted = true
 	}()
 }
 
