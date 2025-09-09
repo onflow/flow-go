@@ -84,10 +84,10 @@ func (c *ExecutionResultContainer) AddReceipts(receipts ...*flow.ExecutionReceip
 	defer c.mu.Unlock()
 
 	receiptsAdded := uint(0)
-	for i := range receipts {
-		added, err := c.addReceipt(receipts[i])
+	for _, receipt := range receipts {
+		added, err := c.addReceipt(receipt)
 		if err != nil {
-			return receiptsAdded, fmt.Errorf("failed to add receipt (%x) to equivalence class: %w", receipts[i].ID(), err)
+			return receiptsAdded, fmt.Errorf("failed to add receipt (%x) to equivalence class: %w", receipt.ID(), err)
 		}
 		receiptsAdded += added
 	}

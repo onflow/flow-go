@@ -1,6 +1,6 @@
 package ingestion2
 
-// BlockStatus represents the state of a block in the forest.
+// BlockStatus represents the status of a block in the forest.
 type BlockStatus uint64
 
 const (
@@ -12,7 +12,7 @@ const (
 	BlockStatusSealed
 )
 
-// String returns the string representation of the block state
+// String returns the string representation of the block status
 func (bs BlockStatus) String() string {
 	switch bs {
 	case BlockStatusCertified:
