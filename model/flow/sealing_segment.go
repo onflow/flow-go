@@ -55,10 +55,11 @@ type SealingSegment struct {
 	// the lowest one, are contained in the blocks of the sealing segment.
 	LatestSeals map[Identifier]Identifier
 
-	// FirstSeal contains the latest seal as of the first block in the segment.
-	// Per convention, this field holds a seal that was included _prior_ to the
-	// first block of the sealing segment. If the first block in the segment
-	// contains a seal, then this field is `nil`.
+	// FirstSeal contains the latest seal in the fork as of the first block in the
+	// segment, i.e. `Blocks[0]`. Per convention, this field is `nil` if and only if
+	// the first block in the segment contains a seal. In other words, `FirstSeal`
+	// holding a non-nil value indicates that `Blocks[0]` did not seal any blocks,
+	// i.e. the latest sealed block as of `Blocks[0]` is carried over from an ancestor.
 	// This information is needed for the `Commit` method of protocol snapshot
 	// to return the sealed state, when the first block contains no seal.
 	FirstSeal *Seal

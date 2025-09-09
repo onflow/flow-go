@@ -6,6 +6,8 @@ import (
 	"github.com/onflow/flow-go/fvm/evm/types"
 )
 
+const CADENCE_ARCH_PRECOMPILE_NAME = "CADENCE_ARCH"
+
 var (
 	FlowBlockHeightFuncSig = ComputeFunctionSelector("flowBlockHeight", nil)
 

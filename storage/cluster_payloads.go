@@ -9,9 +9,6 @@ import (
 // node cluster consensus.
 type ClusterPayloads interface {
 
-	// Store stores and indexes the given cluster payload.
-	Store(blockID flow.Identifier, payload *cluster.Payload) error
-
 	// ByBlockID returns the cluster payload for the given block ID.
 	ByBlockID(blockID flow.Identifier) (*cluster.Payload, error)
 }

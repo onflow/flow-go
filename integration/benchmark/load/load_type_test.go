@@ -210,17 +210,19 @@ func (t *testTransactionSender) Send(tx *sdk.Transaction) (sdk.TransactionResult
 		txBodyBuilder.AddArgument(arg)
 	}
 	for _, sig := range tx.PayloadSignatures {
-		txBodyBuilder.AddPayloadSignature(
+		txBodyBuilder.AddPayloadSignatureWithExtensionData(
 			flow.BytesToAddress(sig.Address.Bytes()),
 			sig.KeyIndex,
 			sig.Signature,
+			sig.ExtensionData,
 		)
 	}
 	for _, sig := range tx.EnvelopeSignatures {
-		txBodyBuilder.AddEnvelopeSignature(
+		txBodyBuilder.AddEnvelopeSignatureWithExtensionData(
 			flow.BytesToAddress(sig.Address.Bytes()),
 			sig.KeyIndex,
 			sig.Signature,
+			sig.ExtensionData,
 		)
 	}
 
