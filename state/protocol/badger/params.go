@@ -4,7 +4,6 @@ import (
 	"fmt"
 
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/operation"
@@ -29,6 +28,8 @@ type InstanceParams struct {
 	sealedRoot *flow.Header
 	// rootSeal is the seal for block `sealedRoot` - the newest incorporated seal with respect to `finalizedRoot`.
 	rootSeal *flow.Seal
+	// sporkRoot is the root block for the present spork.
+	sporkRootBlock *flow.Block
 }
 
 var _ protocol.InstanceParams = (*InstanceParams)(nil)
@@ -38,7 +39,7 @@ var _ protocol.InstanceParams = (*InstanceParams)(nil)
 // emphasizing that it only reads and never writes.
 // This information is immutable and may be cached.
 // No errors are expected during normal operation.
-func ReadInstanceParams(r storage.Reader, headers storage.Headers, seals storage.Seals) (*InstanceParams, error) {
+func ReadInstanceParams(r storage.Reader, headers storage.Headers, seals storage.Seals, blocks storage.Blocks) (*InstanceParams, error) {
 	params := &InstanceParams{}
 
 	var enc operation.EncodableInstanceParams
@@ -63,6 +64,11 @@ func ReadInstanceParams(r storage.Reader, headers storage.Headers, seals storage
 		return nil, fmt.Errorf("could not retrieve root seal: %w", err)
 	}
 
+	params.sporkRootBlock, err = blocks.ByID(enc.SporkRootBlockID)
+	if err != nil {
+		return nil, fmt.Errorf("could not retrieve spork root block: %w", err)
+	}
+
 	return params, nil
 }
 
@@ -83,24 +89,4 @@ func (p *InstanceParams) SealedRoot() *flow.Header {
 // `SealedRoot` block that was used to bootstrap this state. It may differ from node to node.
 func (p *InstanceParams) Seal() *flow.Seal {
 	return p.rootSeal
-}
-
-// ReadSporkRootBlock reads the spork root block from the database.
-// No errors are expected during normal operation.
-func ReadSporkRootBlock(
-	db storage.DB,
-	blocks storage.Blocks,
-) (*flow.Block, error) {
-	var sporkRootBlockID flow.Identifier
-	err := operation.RetrieveSporkRootBlockID(db.Reader(), &sporkRootBlockID)
-	if err != nil {
-		return nil, irrecoverable.NewExceptionf("could not get spork root block ID: %w", err)
-	}
-
-	sporkRootBlock, err := blocks.ByID(sporkRootBlockID)
-	if err != nil {
-		return nil, irrecoverable.NewExceptionf("could not retrieve spork root block: %w", err)
-	}
-
-	return sporkRootBlock, nil
 }

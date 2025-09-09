@@ -258,7 +258,7 @@ func (bs *BuilderSuite) SetupTest() {
 	db := badgerimpl.ToDB(bs.db)
 	require.NoError(bs.T(), db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 		require.NoError(bs.T(), operation.InsertInstanceParams(
-			rw.Writer(),
+			rw,
 			operation.EncodableInstanceParams{
 				FinalizedRootID: unittest.IdentifierFixture(),
 				SealedRootID:    unittest.IdentifierFixture(),
