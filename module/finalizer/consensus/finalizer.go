@@ -4,38 +4,36 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/dgraph-io/badger/v2"
-
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
-	"github.com/onflow/flow-go/storage/badger/operation"
+	"github.com/onflow/flow-go/storage/operation"
 )
 
 // Finalizer is a simple wrapper around our temporary state to clean up after a
 // block has been fully finalized to the persistent protocol state.
 type Finalizer struct {
-	db      *badger.DB
-	headers storage.Headers
-	state   protocol.FollowerState
-	cleanup CleanupFunc
-	tracer  module.Tracer
+	dbReader storage.Reader
+	headers  storage.Headers
+	state    protocol.FollowerState
+	cleanup  CleanupFunc
+	tracer   module.Tracer
 }
 
 // NewFinalizer creates a new finalizer for the temporary state.
-func NewFinalizer(db *badger.DB,
+func NewFinalizer(dbReader storage.Reader,
 	headers storage.Headers,
 	state protocol.FollowerState,
 	tracer module.Tracer,
 	options ...func(*Finalizer)) *Finalizer {
 	f := &Finalizer{
-		db:      db,
-		state:   state,
-		headers: headers,
-		cleanup: CleanupNothing(),
-		tracer:  tracer,
+		dbReader: dbReader,
+		state:    state,
+		headers:  headers,
+		cleanup:  CleanupNothing(),
+		tracer:   tracer,
 	}
 	for _, option := range options {
 		option(f)
@@ -62,7 +60,7 @@ func (f *Finalizer) MakeFinal(blockID flow.Identifier) error {
 	// that height, it's an invalid operation. Otherwise, it is a no-op.
 
 	var finalized uint64
-	err := f.db.View(operation.RetrieveFinalizedHeight(&finalized))
+	err := operation.RetrieveFinalizedHeight(f.dbReader, &finalized)
 	if err != nil {
 		return fmt.Errorf("could not retrieve finalized height: %w", err)
 	}
@@ -89,7 +87,7 @@ func (f *Finalizer) MakeFinal(blockID flow.Identifier) error {
 	// back to the last finalized block, this is also an invalid call.
 
 	var finalID flow.Identifier
-	err = f.db.View(operation.LookupBlockHeight(finalized, &finalID))
+	err = operation.LookupBlockHeight(f.dbReader, finalized, &finalID)
 	if err != nil {
 		return fmt.Errorf("could not retrieve finalized header: %w", err)
 	}
