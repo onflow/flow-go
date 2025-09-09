@@ -408,7 +408,7 @@ func (h *Handler) GetSystemTransaction(
 	} else {
 		txID, err = convert.TransactionID(id)
 		if err != nil {
-			return nil, status.Errorf(codes.InvalidArgument, "invalid transaction id: %v", err)
+			return nil, status.Errorf(codes.InvalidArgument, "invalid transaction id: %x %v", id, err)
 		}
 	}
 
