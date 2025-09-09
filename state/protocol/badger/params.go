@@ -17,10 +17,11 @@ type Params struct {
 
 var _ protocol.Params = (*Params)(nil)
 
-// InstanceParams implements the interface protocol.InstanceParams. All functions
-// are served on demand directly from the database, _without_ any caching.
+// InstanceParams implements the interface [protocol.InstanceParams]. All values
+// are cached after construction and do not incur database reads. The values are
+// constant throughout the lifetime of a node; therefore, non-atomic reads of the
+// fields via accessor methods are acceptable.
 type InstanceParams struct {
-	db storage.DB
 	// finalizedRoot marks the cutoff of the history this node knows about. It is the block at the tip
 	// of the root snapshot used to bootstrap this node - all newer blocks are synced from the network.
 	finalizedRoot *flow.Header
@@ -33,20 +34,19 @@ type InstanceParams struct {
 var _ protocol.InstanceParams = (*InstanceParams)(nil)
 
 // ReadInstanceParams reads the instance parameters from the database and returns them as in-memory representation.
+// It serves as a constructor for InstanceParams and only requires a read-only database handle,
+// emphasizing that it only reads and never writes.
 // No errors are expected during normal operation.
-func ReadInstanceParams(db storage.DB, headers storage.Headers, seals storage.Seals) (*InstanceParams, error) {
-	params := &InstanceParams{
-		db: db,
-	}
+func ReadInstanceParams(r storage.Reader, headers storage.Headers, seals storage.Seals) (*InstanceParams, error) {
+	params := &InstanceParams{}
 
-	// in next section we will read data from the database and cache them,
-	// as they are immutable for the runtime of the node.
+	// The values below are written during bootstrapping and immutable for the lifetime of the node. All
+	// following parameters are uniquely defined by the values initially read.
 	var (
 		finalizedRootHeight uint64
 		sealedRootHeight    uint64
 	)
 
-	r := db.Reader()
 	// root height
 	err := operation.RetrieveRootHeight(r, &finalizedRootHeight)
 	if err != nil {
