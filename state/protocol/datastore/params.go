@@ -31,52 +31,33 @@ type InstanceParams struct {
 var _ protocol.InstanceParams = (*InstanceParams)(nil)
 
 // ReadInstanceParams reads the instance parameters from the database and returns them as in-memory representation.
+// It serves as a constructor for InstanceParams and only requires a read-only database handle,
+// emphasizing that it only reads and never writes.
+// This information is immutable and may be cached.
 // No errors are expected during normal operation.
 func ReadInstanceParams(r storage.Reader, headers storage.Headers, seals storage.Seals) (*InstanceParams, error) {
 	params := &InstanceParams{}
 
 	// The values below are written during bootstrapping and immutable for the lifetime of the node. All
 	// following parameters are uniquely defined by the values initially read. No atomicity is required.
-	var (
-		finalizedRootHeight uint64 // height of the highest finalized block contained in the root snapshot
-		sealedRootHeight    uint64 // height of the highest sealed block contained in the root snapshot
-	)
-
-	// root height
-	err := operation.RetrieveRootHeight(r, &finalizedRootHeight)
+	var enc operation.EncodableInstanceParams
+	err := operation.RetrieveInstanceParams(r, &enc)
 	if err != nil {
-		return nil, fmt.Errorf("could not read root block to populate cache: %w", err)
-	}
-	// sealed root height
-	err = operation.RetrieveSealedRootHeight(r, &sealedRootHeight)
-	if err != nil {
-		return nil, fmt.Errorf("could not read sealed root block to populate cache: %w", err)
+		return nil, fmt.Errorf("could not read instance params to populate cache: %w", err)
 	}
 
-	// look up 'finalized root block'
-	var finalizedRootID flow.Identifier
-	err = operation.LookupBlockHeight(r, finalizedRootHeight, &finalizedRootID)
-	if err != nil {
-		return nil, fmt.Errorf("could not look up finalized root height: %w", err)
-	}
-	params.finalizedRoot, err = headers.ByBlockID(finalizedRootID)
+	params.finalizedRoot, err = headers.ByBlockID(enc.FinalizedRootID)
 	if err != nil {
 		return nil, fmt.Errorf("could not retrieve finalized root header: %w", err)
 	}
 
-	// look up the sealed block as of the 'finalized root block'
-	var sealedRootID flow.Identifier
-	err = operation.LookupBlockHeight(r, sealedRootHeight, &sealedRootID)
-	if err != nil {
-		return nil, fmt.Errorf("could not look up sealed root height: %w", err)
-	}
-	params.sealedRoot, err = headers.ByBlockID(sealedRootID)
+	params.sealedRoot, err = headers.ByBlockID(enc.SealedRootID)
 	if err != nil {
 		return nil, fmt.Errorf("could not retrieve sealed root header: %w", err)
 	}
 
 	// retrieve the root seal
-	params.rootSeal, err = seals.HighestInFork(finalizedRootID)
+	params.rootSeal, err = seals.HighestInFork(enc.FinalizedRootID)
 	if err != nil {
 		return nil, fmt.Errorf("could not retrieve root seal: %w", err)
 	}
@@ -101,28 +82,4 @@ func (p *InstanceParams) SealedRoot() *flow.Header {
 // `SealedRoot` block that was used to bootstrap this state. It may differ from node to node.
 func (p *InstanceParams) Seal() *flow.Seal {
 	return p.rootSeal
-}
-
-// ReadFinalizedRoot retrieves the root block's header from the database.
-// This information is immutable for the runtime of the software and may be cached.
-func ReadFinalizedRoot(r storage.Reader) (*flow.Header, error) {
-	// The values below are written during bootstrapping and immutable for the lifetime of the node. All
-	// following parameters are uniquely defined by the values initially read. No atomicity is required.
-	var finalizedRootHeight uint64
-	var rootID flow.Identifier
-	err := operation.RetrieveRootHeight(r, &finalizedRootHeight)
-	if err != nil {
-		return nil, fmt.Errorf("could not retrieve finalized root height: %w", err)
-	}
-	err = operation.LookupBlockHeight(r, finalizedRootHeight, &rootID) // look up root block ID
-	if err != nil {
-		return nil, fmt.Errorf("could not retrieve root header's ID by height: %w", err)
-	}
-
-	var rootHeader flow.Header
-	err = operation.RetrieveHeader(r, rootID, &rootHeader) // retrieve root header
-	if err != nil {
-		return nil, fmt.Errorf("could not retrieve root header: %w", err)
-	}
-	return &rootHeader, nil
 }

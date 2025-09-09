@@ -557,16 +557,16 @@ func bootstrapStatePointers(lctx lockctx.Proof, rw storage.ReaderBatchWriter, ro
 		return fmt.Errorf("could not insert quorum certificate for the latest finalized block: %w", err)
 	}
 
+	enc := operation.EncodableInstanceParams{
+		FinalizedRootID: lastFinalized.ID(),
+		SealedRootID:    lastSealed.ID(),
+	}
+	err = operation.InsertInstanceParams(w, enc)
+	if err != nil {
+		return fmt.Errorf("could not store instance params: %w", err)
+	}
+
 	// insert height pointers
-	err = operation.InsertRootHeight(w, lastFinalized.Height)
-	if err != nil {
-		return fmt.Errorf("could not insert finalized root height: %w", err)
-	}
-	// the sealed root height is the lastSealed block in sealing segment
-	err = operation.InsertSealedRootHeight(w, lastSealed.Height)
-	if err != nil {
-		return fmt.Errorf("could not insert sealed root height: %w", err)
-	}
 	err = operation.UpsertFinalizedHeight(lctx, w, lastFinalized.Height)
 	if err != nil {
 		return fmt.Errorf("could not insert finalized height: %w", err)

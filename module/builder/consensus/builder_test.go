@@ -257,7 +257,12 @@ func (bs *BuilderSuite) SetupTest() {
 	// insert finalized height and root height
 	db := badgerimpl.ToDB(bs.db)
 	require.NoError(bs.T(), db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-		require.NoError(bs.T(), operation.InsertRootHeight(rw.Writer(), 13))
+		require.NoError(bs.T(), operation.InsertInstanceParams(
+			rw.Writer(),
+			operation.EncodableInstanceParams{
+				FinalizedRootID: unittest.IdentifierFixture(),
+				SealedRootID:    unittest.IdentifierFixture(),
+			}))
 		require.NoError(bs.T(), operation.UpsertFinalizedHeight(lctx, rw.Writer(), final.Height))
 		require.NoError(bs.T(), operation.IndexFinalizedBlockByHeight(lctx, rw, final.Height, bs.finalID))
 		require.NoError(bs.T(), operation.UpsertSealedHeight(lctx, rw.Writer(), first.Height))

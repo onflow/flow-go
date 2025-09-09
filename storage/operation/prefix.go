@@ -30,10 +30,11 @@ const (
 	codeSealedHeight            = 21 // latest sealed block height
 	codeClusterHeight           = 22 // latest finalized height on cluster
 	codeExecutedBlock           = 23 // latest executed block with max height
-	codeFinalizedRootHeight     = 24 // the height of the highest finalized block contained in the root snapshot
+	codeFinalizedRootHeight     = 24 // DEPRECATED: 24 was used for the height of the highest finalized block contained in the root snapshot
 	codeLastCompleteBlockHeight = 25 // the height of the last block for which all collections were received
 	codeEpochFirstHeight        = 26 // the height of the first block in a given epoch
-	codeSealedRootHeight        = 27 // the height of the highest sealed block contained in the root snapshot
+	codeSealedRootHeight        = 27 // DEPRECATED: 27 was used for the height of the highest sealed block contained in the root snapshot
+	codeInstanceParams          = 28 // instance parameters which are constant throughout the lifetime of a node(finalized root, sealed root, root seal)
 
 	// codes for single entity storage
 	codeHeader               = 30
