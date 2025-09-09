@@ -25,14 +25,14 @@ func WriteResult(w io.Writer, id flow.Identifier, result Result) {
 
 	_, _ = fmt.Fprintf(w, "# Read registers:\n")
 	readRegisterIDs := result.Snapshot.ReadRegisterIDs()
-	sortRegisterIDs(readRegisterIDs)
+	SortRegisterIDs(readRegisterIDs)
 	for _, readRegisterID := range readRegisterIDs {
 		_, _ = fmt.Fprintf(w, "%s\n", readRegisterID)
 	}
 
 	_, _ = fmt.Fprintf(w, "# Updated registers:\n")
 	updatedRegisters := result.Snapshot.UpdatedRegisters()
-	sortRegisterEntries(updatedRegisters)
+	SortRegisterEntries(updatedRegisters)
 	for _, updatedRegister := range updatedRegisters {
 		_, _ = fmt.Fprintf(
 			w,

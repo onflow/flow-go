@@ -2,7 +2,6 @@ package debug_tx
 
 import (
 	"context"
-	"io"
 	"os"
 
 	sdk "github.com/onflow/flow-go-sdk"
@@ -106,11 +105,6 @@ func run(_ *cobra.Command, args []string) {
 		defer traceFile.Close()
 	}
 
-	var resultWriter io.Writer
-	if flagShowResult {
-		resultWriter = os.Stdout
-	}
-
 	if flagBlockID != "" {
 
 		if len(args) != 0 {
@@ -128,7 +122,7 @@ func run(_ *cobra.Command, args []string) {
 
 		log.Info().Msgf("Running all transactions in block %s (height %d) ...", blockID, header.Height)
 
-		RunBlock(
+		results := RunBlock(
 			remoteClient,
 			header,
 			blockTransactions,
@@ -138,8 +132,22 @@ func run(_ *cobra.Command, args []string) {
 			flagUseVM,
 			traceFile,
 			flagComputeLimit,
-			resultWriter,
 		)
+
+		if flagShowResult {
+			for i, blockTx := range blockTransactions {
+				// Skip system transaction
+				if blockTx.ID() == systemTxID {
+					continue
+				}
+
+				debug.WriteResult(
+					os.Stdout,
+					flow.Identifier(blockTx.ID()),
+					results[i],
+				)
+			}
+		}
 
 	} else {
 		// No block ID provided, proceed with transaction IDs from args
@@ -150,7 +158,7 @@ func run(_ *cobra.Command, args []string) {
 				log.Fatal().Err(err).Str("ID", rawTxID).Msg("failed to parse transaction ID")
 			}
 
-			RunSingleTransaction(
+			result := RunSingleTransaction(
 				remoteClient,
 				txID,
 				flowClient,
@@ -158,8 +166,14 @@ func run(_ *cobra.Command, args []string) {
 				flagUseVM,
 				traceFile,
 				flagComputeLimit,
-				resultWriter,
 			)
+			if flagShowResult {
+				debug.WriteResult(
+					os.Stdout,
+					txID,
+					result,
+				)
+			}
 		}
 	}
 }
@@ -172,8 +186,7 @@ func RunSingleTransaction(
 	useVM bool,
 	traceFile *os.File,
 	computeLimit uint64,
-	resultWriter io.Writer,
-) {
+) debug.Result {
 	log.Info().Msgf("Fetching transaction result for %s ...", txID)
 
 	txResult, err := flowClient.GetTransactionResult(context.Background(), sdk.Identifier(txID))
@@ -193,7 +206,7 @@ func RunSingleTransaction(
 
 	blockTransactions, systemTxID, header := FetchBlockInfo(blockID, flowClient)
 
-	RunBlock(
+	results := RunBlock(
 		remoteClient,
 		header,
 		blockTransactions,
@@ -203,8 +216,17 @@ func RunSingleTransaction(
 		useVM,
 		traceFile,
 		computeLimit,
-		resultWriter,
 	)
+
+	for i, blockTx := range blockTransactions {
+		if flow.Identifier(blockTx.ID()) == txID {
+			return results[i]
+		}
+	}
+
+	log.Fatal().Msg("transaction not found in block transactions")
+
+	return debug.Result{}
 }
 
 func FetchBlockInfo(
@@ -264,7 +286,8 @@ func RunBlock(
 	useVM bool,
 	traceFile *os.File,
 	computeLimit uint64,
-	resultWriter io.Writer,
+) (
+	results []debug.Result,
 ) {
 	remoteSnapshot, err := remoteClient.StorageSnapshot(blockHeader.Height, blockHeader.ID())
 	if err != nil {
@@ -331,17 +354,15 @@ func RunBlock(
 			computeLimit,
 		)
 
-		isDebuggedTx := blockTxID == debuggedTxID
-		isWholeBlockDebugged := debuggedTxID == flow.ZeroID
+		results = append(results, result)
 
-		if resultWriter != nil && (isDebuggedTx || isWholeBlockDebugged) {
-			debug.WriteResult(resultWriter, blockTxID, result)
-		}
-
-		if isDebuggedTx {
+		// Ignore remaining transactions if a specific transaction is being debugged
+		if blockTxID == debuggedTxID {
 			break
 		}
 	}
+
+	return
 }
 
 func RunTransaction(
@@ -364,9 +385,8 @@ func RunTransaction(
 		log.Fatal().Err(err).Msg("Transaction execution failed")
 	}
 
-	if result.Output.Err != nil {
-		log.Err(result.Output.Err).Msg("Transaction failed")
-	} else {
+	// TransactionInvoker already logs error
+	if result.Output.Err == nil {
 		log.Info().Msg("Transaction succeeded")
 	}
 
