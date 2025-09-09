@@ -124,17 +124,16 @@ func run(_ *cobra.Command, args []string) {
 			log.Fatal().Err(err).Str("ID", flagBlockID).Msg("failed to parse block ID")
 		}
 
-		block, err := flowClient.GetBlockByID(context.Background(), sdk.Identifier(blockID))
-		if err != nil {
-			log.Fatal().Err(err).Str("ID", flagBlockID).Msg("failed to fetch block by ID")
-		}
+		blockTransactions, systemTxID, header := FetchBlockInfo(blockID, flowClient)
 
-		RunBlockID(
+		log.Info().Msgf("Running all transactions in block %s (height %d) ...", blockID, header.Height)
+
+		RunBlock(
 			remoteClient,
-			blockID,
-			block.Height,
+			header,
+			blockTransactions,
 			flow.ZeroID,
-			flowClient,
+			systemTxID,
 			chain,
 			flagUseVM,
 			traceFile,
@@ -151,7 +150,7 @@ func run(_ *cobra.Command, args []string) {
 				log.Fatal().Err(err).Str("ID", rawTxID).Msg("failed to parse transaction ID")
 			}
 
-			RunTransactionID(
+			RunSingleTransaction(
 				remoteClient,
 				txID,
 				flowClient,
@@ -165,7 +164,7 @@ func run(_ *cobra.Command, args []string) {
 	}
 }
 
-func RunTransactionID(
+func RunSingleTransaction(
 	remoteClient debug.RemoteClient,
 	txID flow.Identifier,
 	flowClient *client.Client,
@@ -192,12 +191,14 @@ func RunTransactionID(
 		blockHeight,
 	)
 
-	RunBlockID(
+	blockTransactions, systemTxID, header := FetchBlockInfo(blockID, flowClient)
+
+	RunBlock(
 		remoteClient,
-		blockID,
-		blockHeight,
+		header,
+		blockTransactions,
 		txID,
-		flowClient,
+		systemTxID,
 		chain,
 		useVM,
 		traceFile,
@@ -206,21 +207,19 @@ func RunTransactionID(
 	)
 }
 
-func RunBlockID(
-	remoteClient debug.RemoteClient,
+func FetchBlockInfo(
 	blockID flow.Identifier,
-	blockHeight uint64,
-	txID flow.Identifier,
 	flowClient *client.Client,
-	chain flow.Chain,
-	useVM bool,
-	traceFile *os.File,
-	computeLimit uint64,
-	resultWriter io.Writer,
+) (
+	blockTransactions []*sdk.Transaction,
+	systemTxID sdk.Identifier,
+	header *flow.Header,
 ) {
+	var err error
+
 	log.Info().Msgf("Fetching transactions of block %s ...", blockID)
 
-	blockTransactions, err := flowClient.GetTransactionsByBlockID(context.Background(), sdk.Identifier(blockID))
+	blockTransactions, err = flowClient.GetTransactionsByBlockID(context.Background(), sdk.Identifier(blockID))
 	if err != nil {
 		log.Fatal().Err(err).Msg("failed to fetch transactions of block")
 	}
@@ -231,7 +230,7 @@ func RunBlockID(
 
 	log.Info().Msg("Fetching block header ...")
 
-	header, err := debug.GetAccessAPIBlockHeader(context.Background(), flowClient.RPCClient(), blockID)
+	header, err = debug.GetAccessAPIBlockHeader(context.Background(), flowClient.RPCClient(), blockID)
 	if err != nil {
 		log.Fatal().Err(err).Msg("failed to fetch block header")
 	}
@@ -249,9 +248,25 @@ func RunBlockID(
 		log.Fatal().Err(err).Msg("Failed to fetch system transaction")
 	}
 
-	log.Info().Msgf("Fetched system transaction: %s", systemTx.ID())
+	systemTxID = systemTx.ID()
+	log.Info().Msgf("Fetched system transaction: %s", systemTxID)
 
-	remoteSnapshot, err := remoteClient.StorageSnapshot(blockHeight, blockID)
+	return
+}
+
+func RunBlock(
+	remoteClient debug.RemoteClient,
+	blockHeader *flow.Header,
+	blockTransactions []*sdk.Transaction,
+	debuggedTxID flow.Identifier,
+	systemTxID sdk.Identifier,
+	chain flow.Chain,
+	useVM bool,
+	traceFile *os.File,
+	computeLimit uint64,
+	resultWriter io.Writer,
+) {
+	remoteSnapshot, err := remoteClient.StorageSnapshot(blockHeader.Height, blockHeader.ID())
 	if err != nil {
 		log.Fatal().Err(err).Msg("failed to create storage snapshot")
 	}
@@ -280,7 +295,7 @@ func RunBlockID(
 			log.Fatal().Err(err).Msg("failed to create tracer")
 		}
 
-		span, _ := tracer.StartTransactionSpan(context.TODO(), txID, "")
+		span, _ := tracer.StartTransactionSpan(context.TODO(), debuggedTxID, "")
 		defer span.End()
 
 		fvmOptions = append(
@@ -301,26 +316,25 @@ func RunBlockID(
 	for _, blockTx := range blockTransactions {
 
 		// TODO: add support for executing system transactions
-		if blockTx.ID() == systemTx.ID() {
+		if blockTx.ID() == systemTxID {
 			log.Info().Msg("Skipping system transaction")
 			continue
 		}
 
 		blockTxID := flow.Identifier(blockTx.ID())
 
-		isDebuggedTx := blockTxID == txID
-
 		result := RunTransaction(
 			debugger,
-			blockTxID,
-			flowClient,
+			blockTx,
 			blockSnapshot,
-			header,
-			isDebuggedTx,
+			blockHeader,
 			computeLimit,
 		)
 
-		if resultWriter != nil && (isDebuggedTx || txID == flow.ZeroID) {
+		isDebuggedTx := blockTxID == debuggedTxID
+		isWholeBlockDebugged := debuggedTxID == flow.ZeroID
+
+		if resultWriter != nil && (isDebuggedTx || isWholeBlockDebugged) {
 			debug.WriteResult(resultWriter, blockTxID, result)
 		}
 
@@ -332,26 +346,13 @@ func RunBlockID(
 
 func RunTransaction(
 	debugger *debug.RemoteDebugger,
-	txID flow.Identifier,
-	flowClient *client.Client,
+	tx *sdk.Transaction,
 	snapshot *debug.CachingStorageSnapshot,
 	header *flow.Header,
-	isDebuggedTx bool,
 	computeLimit uint64,
 ) debug.Result {
-	var prefix string
-	if !isDebuggedTx {
-		prefix = "(prerequisite) "
-	}
 
-	log.Info().Msgf("Fetching %stransaction %s ...", prefix, txID)
-
-	tx, err := flowClient.GetTransaction(context.Background(), sdk.Identifier(txID))
-	if err != nil {
-		log.Fatal().Err(err).Msg("Failed to fetch transaction")
-	}
-
-	log.Info().Msgf("Fetched %stransaction: %s", prefix, tx.ID())
+	log.Info().Msgf("Running transaction %s ...", tx.ID())
 
 	result, err := debugger.RunSDKTransaction(
 		tx,
