@@ -25,9 +25,9 @@ const (
 	weightMask  = 0x7fff
 )
 
-// getWeightAndRevokedStatus returns weight and revoked status of the given index from encoded data.
+// getWeightAndRevokedStatus returns weight and revoked status of the given keyIndex from encoded data.
 // Received b is expected to only contain encoded weight and revoked status.
-func getWeightAndRevokedStatus(b []byte, index uint32) (bool, uint16, error) {
+func getWeightAndRevokedStatus(b []byte, keyIndex uint32) (bool, uint16, error) {
 	if len(b)%weightAndRevokedStatusGroupSize != 0 {
 		return false, 0,
 			errors.NewKeyMetadataUnexpectedLengthError(
@@ -37,18 +37,20 @@ func getWeightAndRevokedStatus(b []byte, index uint32) (bool, uint16, error) {
 			)
 	}
 
+	remainingKeyIndex := keyIndex
+
 	for off := 0; off < len(b); off += weightAndRevokedStatusGroupSize {
 		runLength := parseRunLength(b, off)
 
-		if index < uint32(runLength) {
+		if remainingKeyIndex < uint32(runLength) {
 			revoked, weight := parseWeightAndRevokedStatus(b, off+runLengthSize)
 			return revoked, weight, nil
 		}
 
-		index -= uint32(runLength)
+		remainingKeyIndex -= uint32(runLength)
 	}
 
-	return false, 0, errors.NewKeyMetadataNotFoundError("failed to query weight and revoked status", index)
+	return false, 0, errors.NewKeyMetadataNotFoundError("failed to query weight and revoked status", keyIndex)
 }
 
 // appendWeightAndRevokedStatus appends given weight and revoked status to the given data.

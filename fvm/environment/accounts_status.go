@@ -317,6 +317,40 @@ func (a *AccountStatus) AppendAccountPublicKeyMetadata(
 	}
 
 	var keyMetadata *accountkeymetadata.KeyMetadataAppender
+	keyMetadata, storedKeyIndex, saveKey, err = a.appendAccountPublicKeyMetadata(keyIndex, revoked, weight, encodedKey, getKeyDigest, getStoredKey)
+	if err != nil {
+		return 0, false, err
+	}
+
+	// Serialize key metadata and set account duplication flag if needed.
+	var deduplicated bool
+	a.keyMetadataBytes, deduplicated = keyMetadata.ToBytes()
+	if deduplicated {
+		a.setAccountKeyDeduplicationFlag()
+	}
+
+	a.SetAccountPublicKeyCount(accountPublicKeyCount + 1)
+
+	return storedKeyIndex, saveKey, nil
+}
+
+// appendAccountPublicKeyMetadata is the main implementation of AppendAccountPublicKeyMetadata()
+// and it should only be called by that function.
+func (a *AccountStatus) appendAccountPublicKeyMetadata(
+	keyIndex uint32,
+	revoked bool,
+	weight uint16,
+	encodedKey []byte,
+	getKeyDigest func([]byte) uint64,
+	getStoredKey func(uint32) ([]byte, error),
+) (
+	_ *accountkeymetadata.KeyMetadataAppender,
+	storedKeyIndex uint32,
+	saveKey bool,
+	err error,
+) {
+
+	var keyMetadata *accountkeymetadata.KeyMetadataAppender
 
 	if len(a.keyMetadataBytes) == 0 {
 		// New key index must be 1 when key metadata is empty because
@@ -326,7 +360,7 @@ func (a *AccountStatus) AppendAccountPublicKeyMetadata(
 		// special case for that as an optimization.
 
 		if keyIndex != 1 {
-			return 0, false, errors.NewKeyMetadataEmptyError(fmt.Sprintf("key metadata cannot be empty when appending new key metadata at index %d", keyIndex))
+			return nil, 0, false, errors.NewKeyMetadataEmptyError(fmt.Sprintf("key metadata cannot be empty when appending new key metadata at index %d", keyIndex))
 		}
 
 		// To avoid storage overhead for most accounts, account key 0 digest is computed and stored when account key 1 is added.
@@ -336,7 +370,7 @@ func (a *AccountStatus) AppendAccountPublicKeyMetadata(
 		var key0 []byte
 		key0, err = getStoredKey(0)
 		if err != nil {
-			return 0, false, err
+			return nil, 0, false, err
 		}
 
 		// Get public key 0 digest.
@@ -348,26 +382,13 @@ func (a *AccountStatus) AppendAccountPublicKeyMetadata(
 		// Create KeyMetadataAppender with stored key metadata bytes.
 		keyMetadata, err = accountkeymetadata.NewKeyMetadataAppenderFromBytes(a.keyMetadataBytes, a.IsAccountKeyDeduplicated(), maxStoredDigests)
 		if err != nil {
-			return 0, false, err
+			return nil, 0, false, err
 		}
 	}
 
-	defer func() {
-		if err == nil {
-			// Serialize key metadata and set account duplication flag if needed.
-			var deduplicated bool
-			a.keyMetadataBytes, deduplicated = keyMetadata.ToBytes()
-			if deduplicated {
-				a.setAccountKeyDeduplicationFlag()
-			}
-
-			a.SetAccountPublicKeyCount(accountPublicKeyCount + 1)
-		}
-	}()
-
 	digest, isDuplicateKey, duplicateStoredKeyIndex, err := accountkeymetadata.FindDuplicateKey(keyMetadata, encodedKey, getKeyDigest, getStoredKey)
 	if err != nil {
-		return 0, false, err
+		return nil, 0, false, err
 	}
 
 	// Whether new public key is a duplicate or not, we store these items in key metadata section:
@@ -388,17 +409,17 @@ func (a *AccountStatus) AppendAccountPublicKeyMetadata(
 	if isDuplicateKey {
 		err = keyMetadata.AppendDuplicateKeyMetadata(keyIndex, duplicateStoredKeyIndex, revoked, weight)
 		if err != nil {
-			return 0, false, err
+			return nil, 0, false, err
 		}
 
-		return duplicateStoredKeyIndex, false, nil
+		return keyMetadata, duplicateStoredKeyIndex, false, nil
 	}
 
 	// Handle non-duplicate key.
 	storedKeyIndex, err = keyMetadata.AppendUniqueKeyMetadata(revoked, weight, digest)
 	if err != nil {
-		return 0, false, err
+		return nil, 0, false, err
 	}
 
-	return storedKeyIndex, true, nil
+	return keyMetadata, storedKeyIndex, true, nil
 }

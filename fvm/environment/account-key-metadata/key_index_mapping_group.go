@@ -39,6 +39,8 @@ const (
 // getStoredKeyIndexFromMappings returns stored key index of the given key index from encoded data.
 // Received b is expected to only contain encoded mappings.
 func getStoredKeyIndexFromMappings(b []byte, keyIndex uint32) (uint32, error) {
+	remainingKeyIndex := keyIndex
+
 	if len(b)%mappingGroupSize != 0 {
 		return 0,
 			errors.NewKeyMetadataUnexpectedLengthError(
@@ -51,17 +53,17 @@ func getStoredKeyIndexFromMappings(b []byte, keyIndex uint32) (uint32, error) {
 	for off := 0; off < len(b); off += mappingGroupSize {
 		isConsecutiveGroup, runLength := parseMappingRunLength(b, off)
 
-		if keyIndex < uint32(runLength) {
-			storedKeyIndex := binary.BigEndian.Uint32(b[off+runLengthSize : off+mappingGroupSize])
+		if remainingKeyIndex < uint32(runLength) {
+			storedKeyIndex := parseMappingStoredKeyIndex(b, off+runLengthSize)
 
 			if isConsecutiveGroup {
-				return storedKeyIndex + keyIndex, nil
+				return storedKeyIndex + remainingKeyIndex, nil
 			}
 
 			return storedKeyIndex, nil
 		}
 
-		keyIndex -= uint32(runLength)
+		remainingKeyIndex -= uint32(runLength)
 	}
 
 	return 0, errors.NewKeyMetadataNotFoundError("failed to query stored key index from mapping", keyIndex)
@@ -207,4 +209,9 @@ func parseMappingRunLength(b []byte, off int) (isConsecutiveGroup bool, runLengt
 	isConsecutiveGroup = runLength&consecutiveGroupFlagMask > 0
 	runLength &= lengthMask
 	return
+}
+
+func parseMappingStoredKeyIndex(b []byte, off int) uint32 {
+	_ = b[off+3] // bounds check
+	return binary.BigEndian.Uint32(b[off : off+storedKeyIndexSize])
 }
