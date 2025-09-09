@@ -364,7 +364,6 @@ func TestBootstrapNonRoot(t *testing.T) {
 			block3View := block2.View + 1
 			block3 := unittest.BlockFixture(
 				unittest.Block.WithParent(block2.ID(), block2.View, block2.Height),
-				unittest.Block.WithView(block3View),
 				unittest.Block.WithPayload(
 					flow.Payload{
 						Seals:           seals,
@@ -505,7 +504,6 @@ func TestBootstrapNonRoot(t *testing.T) {
 			block3View := block2.View + 1
 			block3 := unittest.BlockFixture(
 				unittest.Block.WithParent(block2.ID(), block2.View, block2.Height),
-				unittest.Block.WithView(block3View),
 				unittest.Block.WithPayload(
 					flow.Payload{
 						Seals:           seals,
