@@ -394,7 +394,7 @@ func (e *ENTransactionProvider) systemTransactionIDs(
 	}
 
 	if len(systemTxIDs) != len(systemTxResults) {
-		return nil, status.Errorf(codes.Internal, "mismatch: expected %d, got %d", len(systemTxResults), len(systemTxIDs))
+		return nil, status.Errorf(codes.Internal, "system transaction count mismatch: expected %d, got %d", len(systemTxResults), len(systemTxIDs))
 	}
 
 	return systemTxIDs, nil
