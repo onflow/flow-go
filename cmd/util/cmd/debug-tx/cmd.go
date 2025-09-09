@@ -296,6 +296,47 @@ func RunBlock(
 
 	blockSnapshot := debug.NewCachingStorageSnapshot(remoteSnapshot)
 
+	for _, blockTx := range blockTransactions {
+
+		// TODO: add support for executing system transactions
+		if blockTx.ID() == systemTxID {
+			log.Info().Msg("Skipping system transaction")
+			continue
+		}
+
+		blockTxID := flow.Identifier(blockTx.ID())
+
+		result := RunTransaction(
+			blockTx,
+			blockSnapshot,
+			blockHeader,
+			chain,
+			useVM,
+			traceFile,
+			computeLimit,
+		)
+
+		results = append(results, result)
+
+		// Ignore remaining transactions if a specific transaction is being debugged
+		if blockTxID == debuggedTxID {
+			break
+		}
+	}
+
+	return
+}
+
+func RunTransaction(
+	tx *sdk.Transaction,
+	snapshot *debug.CachingStorageSnapshot,
+	header *flow.Header,
+	chain flow.Chain,
+	useVM bool,
+	traceFile *os.File,
+	computeLimit uint64,
+) debug.Result {
+
 	var fvmOptions []fvm.Option
 
 	if traceFile != nil {
@@ -318,7 +359,7 @@ func RunBlock(
 			log.Fatal().Err(err).Msg("failed to create tracer")
 		}
 
-		span, _ := tracer.StartTransactionSpan(context.TODO(), debuggedTxID, "")
+		span, _ := tracer.StartTransactionSpan(context.TODO(), flow.Identifier(tx.ID()), "")
 		defer span.End()
 
 		fvmOptions = append(
@@ -335,43 +376,6 @@ func RunBlock(
 		useVM,
 		fvmOptions...,
 	)
-
-	for _, blockTx := range blockTransactions {
-
-		// TODO: add support for executing system transactions
-		if blockTx.ID() == systemTxID {
-			log.Info().Msg("Skipping system transaction")
-			continue
-		}
-
-		blockTxID := flow.Identifier(blockTx.ID())
-
-		result := RunTransaction(
-			debugger,
-			blockTx,
-			blockSnapshot,
-			blockHeader,
-			computeLimit,
-		)
-
-		results = append(results, result)
-
-		// Ignore remaining transactions if a specific transaction is being debugged
-		if blockTxID == debuggedTxID {
-			break
-		}
-	}
-
-	return
-}
-
-func RunTransaction(
-	debugger *debug.RemoteDebugger,
-	tx *sdk.Transaction,
-	snapshot *debug.CachingStorageSnapshot,
-	header *flow.Header,
-	computeLimit uint64,
-) debug.Result {
 
 	log.Info().Msgf("Running transaction %s ...", tx.ID())
 
