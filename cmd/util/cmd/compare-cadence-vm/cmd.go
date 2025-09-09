@@ -1,12 +1,14 @@
 package compare_cadence_vm
 
 import (
+	"encoding/hex"
 	"os"
 
 	"github.com/kr/pretty"
 	client "github.com/onflow/flow-go-sdk/access/grpc"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
+	"golang.org/x/exp/slices"
 
 	debug_tx "github.com/onflow/flow-go/cmd/util/cmd/debug-tx"
 	"github.com/onflow/flow-go/model/flow"
@@ -240,15 +242,6 @@ func compareResults(
 	vmReadRegisters := vmResult.Snapshot.ReadRegisterIDs()
 	debug.SortRegisterIDs(vmReadRegisters)
 
-	if len(interReadRegisters) != len(vmReadRegisters) {
-		log.Error().Msgf(
-			"Number of read registers differ: interpreter %d vs VM %d",
-			len(interReadRegisters),
-			len(vmReadRegisters),
-		)
-		mismatch = true
-	}
-
 	readRegisterDiff := pretty.Diff(interReadRegisters, vmReadRegisters)
 	if len(readRegisterDiff) != 0 {
 		mismatch = true
@@ -273,16 +266,36 @@ func compareResults(
 		mismatch = true
 	}
 
-	updatedRegisterDiff := pretty.Diff(interUpdatedRegisters, vmUpdatedRegisters)
-	if len(updatedRegisterDiff) != 0 {
-		mismatch = true
-	}
-	for _, diff := range updatedRegisterDiff {
-		log.Error().Msgf("Updated register diff: %s", diff)
+	for i, interEntry := range interUpdatedRegisters {
+		if i >= len(vmUpdatedRegisters) {
+			break
+		}
+		vmEntry := vmUpdatedRegisters[i]
+
+		if interEntry.Key != vmEntry.Key {
+			log.Error().Msgf(
+				"Updated register key mismatch at index %d: interpreter %s vs VM %s",
+				i,
+				interEntry.Key,
+				vmEntry.Key,
+			)
+			mismatch = true
+			continue
+		}
+
+		if !slices.Equal(interEntry.Value, vmEntry.Value) {
+			log.Error().Msgf(
+				"Updated register value mismatch for register %s: interpreter %s vs VM %s",
+				interEntry.Key,
+				hex.EncodeToString(interEntry.Value),
+				hex.EncodeToString(vmEntry.Value),
+			)
+			mismatch = true
+		}
 	}
 
 	if mismatch {
-		log.Info().Msg("Differences found between interpreter and VM")
+		log.Error().Msg("Differences found between interpreter and VM")
 	} else {
 		log.Info().Msg("No differences found between interpreter and VM")
 	}
