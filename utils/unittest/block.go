@@ -20,10 +20,14 @@ func BlockFixture(opts ...func(*flow.Block)) *flow.Block {
 	return block
 }
 
+// WithParent is an option for the [unittest.Block] factory. It updates the fields `ParentID`, `ParentView`,
+// to match the parent's values. Furthermore, it sets the `View` and `Height` of the block to be one greater
+// than the parent's values. This emulates the happy path and hence is a sensible default.
 func (f *blockFactory) WithParent(parentID flow.Identifier, parentView uint64, parentHeight uint64) func(*flow.Block) {
 	return func(block *flow.Block) {
 		block.ParentID = parentID
 		block.ParentView = parentView
+		block.View = parentView + 1
 		block.Height = parentHeight + 1
 	}
 }

@@ -194,8 +194,15 @@ func (s *EngineSuite) TestProcessBatchOfDisconnectedBlocks() {
 // FollowerCore.
 // After submitting new finalized block, we check if new batches are filtered based on new finalized view.
 func (s *EngineSuite) TestProcessFinalizedBlock() {
-	newFinalizedBlock := unittest.BlockHeaderWithParentFixture(s.finalized)
+	// Block that is 5 views ahead of the current finalized block. The gap is important, because we want to
+	// verify the Engine's behavior when ingesting a valid block with _lower_ view than the new finalized view.
+	newFinalizedBlock := unittest.HeaderFixture(
+		unittest.Header.WithParent(s.finalized.ID(), s.finalized.View, s.finalized.Height),
+		unittest.Header.WithView(s.finalized.View+5),
+	)
 
+	// when submitting the finalization notification for the new finalized block, we expect the engine to
+	// relay this to the Compliance Core within 500ms
 	done := make(chan struct{})
 	s.core.On("OnFinalizedBlock", newFinalizedBlock).Run(func(_ mock.Arguments) {
 		close(done)
@@ -205,15 +212,16 @@ func (s *EngineSuite) TestProcessFinalizedBlock() {
 	s.engine.OnFinalizedBlock(model.BlockFromFlow(newFinalizedBlock))
 	unittest.RequireCloseBefore(s.T(), done, time.Millisecond*500, "expect to close before timeout")
 
-	// check if batch gets filtered out since it's lower than finalized view
-	done = make(chan struct{})
-	block := unittest.BlockWithParentFixture(s.finalized)
-	block.View = newFinalizedBlock.View - 1 // use block view lower than new latest finalized view
-
-	proposal := unittest.ProposalFromBlock(block)
+	// batch of synced blocks, whose latest block has a view lower than our latest finalized view
+	orphaned := unittest.ProposalFromBlock(unittest.BlockFixture(
+		unittest.Block.WithParent(s.finalized.ID(), s.finalized.View, s.finalized.Height),
+		unittest.Block.WithView(newFinalizedBlock.View-1),
+	))
+	orphanedBatch := []*flow.Proposal{orphaned}
 
 	// use metrics mock to track that we have indeed processed the message, and the batch was filtered out since it was
 	// lower than finalized height
+	done = make(chan struct{})
 	metricsMock := module.NewEngineMetrics(s.T())
 	metricsMock.On("MessageReceived", mock.Anything, metrics.MessageSyncedBlocks).Return().Once()
 	metricsMock.On("MessageHandled", mock.Anything, metrics.MessageSyncedBlocks).Run(func(_ mock.Arguments) {
@@ -223,7 +231,7 @@ func (s *EngineSuite) TestProcessFinalizedBlock() {
 
 	s.engine.OnSyncedBlocks(flow.Slashable[[]*flow.Proposal]{
 		OriginID: unittest.IdentifierFixture(),
-		Message:  []*flow.Proposal{proposal},
+		Message:  orphanedBatch,
 	})
 	unittest.RequireCloseBefore(s.T(), done, time.Millisecond*500, "expect to close before timeout")
 	// check if message wasn't buffered in internal channel

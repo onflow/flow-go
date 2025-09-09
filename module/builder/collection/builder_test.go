@@ -423,17 +423,17 @@ func (suite *BuilderSuite) TestBuildOn_WithOrphanedReferenceBlock() {
 	protocolStateID := protocolState.ID()
 
 	// create a block extending genesis which will be orphaned
-	orphan := unittest.BlockWithParentAndPayload(
-		genesis,
-		unittest.PayloadFixture(unittest.WithProtocolStateID(protocolStateID)),
-	)
+	orphan := unittest.BlockFixture(
+		unittest.Block.WithParent(genesis.ID(), genesis.View, genesis.Height),
+		unittest.Block.WithView(genesis.View+1),
+		unittest.Block.WithPayload(unittest.PayloadFixture(unittest.WithProtocolStateID(protocolStateID))))
 	err = suite.protoState.ExtendCertified(context.Background(), unittest.NewCertifiedBlock(orphan))
 	suite.Require().NoError(err)
 	// create and finalize a block on top of genesis, orphaning `orphan`
-	block1 := unittest.BlockWithParentAndPayload(
-		genesis,
-		unittest.PayloadFixture(unittest.WithProtocolStateID(protocolStateID)),
-	)
+	block1 := unittest.BlockFixture(
+		unittest.Block.WithParent(genesis.ID(), genesis.View, genesis.Height),
+		unittest.Block.WithView(genesis.View+2),
+		unittest.Block.WithPayload(unittest.PayloadFixture(unittest.WithProtocolStateID(protocolStateID))))
 	err = suite.protoState.ExtendCertified(context.Background(), unittest.NewCertifiedBlock(block1))
 	suite.Require().NoError(err)
 	err = suite.protoState.Finalize(context.Background(), block1.ID())
