@@ -21,7 +21,7 @@ func NewMetadata(metadata *access.ExecutorMetadata) *Metadata {
 func NewExecutorMetadata(metadata *access.ExecutorMetadata) *ExecutorMetadata {
 	// metadata can be empty
 	if metadata == nil {
-		return &ExecutorMetadata{} //TODO why don't i return nil here?
+		return nil
 	}
 
 	// we don't want to allocate memory for an object if it is empty

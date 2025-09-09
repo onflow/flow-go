@@ -31,7 +31,7 @@ func NewBlockEvents(
 	metadata *access.ExecutorMetadata,
 	shouldIncludeMetadata bool,
 ) *BlockEvents {
-	var meta *Metadata = nil
+	var meta *Metadata
 	if shouldIncludeMetadata {
 		meta = NewMetadata(metadata)
 	}
