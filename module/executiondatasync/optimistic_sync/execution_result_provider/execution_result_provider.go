@@ -30,7 +30,7 @@ type ExecutionResultProvider struct {
 	baseCriteria optimistic_sync.Criteria
 }
 
-var _ optimistic_sync.ExecutionResultProvider = (*ExecutionResultProvider)(nil)
+var _ optimistic_sync.ExecutionResultInfoProvider = (*ExecutionResultProvider)(nil)
 
 // NewExecutionResultProvider creates and returns a new instance of
 // ExecutionResultProvider.

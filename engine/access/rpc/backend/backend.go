@@ -119,7 +119,7 @@ type Params struct {
 	ExecNodeIdentitiesProvider *commonrpc.ExecutionNodeIdentitiesProvider
 	TxErrorMessageProvider     error_messages.Provider
 
-	ExecutionResultProvider optimistic_sync.ExecutionResultProvider
+	ExecutionResultProvider optimistic_sync.ExecutionResultInfoProvider
 	ExecutionStateCache     optimistic_sync.ExecutionStateCache
 	OperatorCriteria        optimistic_sync.Criteria
 }

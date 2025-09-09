@@ -37,7 +37,7 @@ type Events struct {
 	maxHeightRange     uint
 	provider           provider.EventProvider
 	queryMode          query_mode.IndexQueryMode
-	execResultProvider optimistic_sync.ExecutionResultProvider
+	execResultProvider optimistic_sync.ExecutionResultInfoProvider
 	operatorCriteria   optimistic_sync.Criteria
 }
 
@@ -53,7 +53,7 @@ func NewEventsBackend(
 	nodeCommunicator node_communicator.Communicator,
 	queryMode query_mode.IndexQueryMode,
 	execNodeIdentitiesProvider *rpc.ExecutionNodeIdentitiesProvider,
-	executionResultProvider optimistic_sync.ExecutionResultProvider,
+	executionResultProvider optimistic_sync.ExecutionResultInfoProvider,
 	executionStateCache optimistic_sync.ExecutionStateCache,
 	operatorCriteria optimistic_sync.Criteria,
 ) (*Events, error) {

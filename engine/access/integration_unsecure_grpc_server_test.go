@@ -204,7 +204,7 @@ func (suite *SameGRPCPortTestSuite) SetupTest() {
 		ScriptExecutionMode:  query_mode.IndexQueryModeExecutionNodesOnly,
 		TxResultQueryMode:    query_mode.IndexQueryModeExecutionNodesOnly,
 		// TODO: set this once data result forest merged in
-		//ExecutionResultProvider:
+		//ExecutionResultInfoProvider:
 		//ExecutionStateCache:
 		OperatorCriteria: optimistic_sync.DefaultCriteria,
 	})

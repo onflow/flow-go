@@ -2096,7 +2096,7 @@ func (suite *Suite) defaultBackendParams() Params {
 			suite.fixedExecutionNodeIDs,
 		),
 		// TODO: set this once data result forest merged in
-		//ExecutionResultProvider:
+		//ExecutionResultInfoProvider:
 		//ExecutionStateCache:
 		OperatorCriteria: optimistic_sync.DefaultCriteria,
 	}

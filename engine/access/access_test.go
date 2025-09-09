@@ -181,7 +181,7 @@ func (suite *Suite) RunTest(
 			ScriptExecutionMode:  query_mode.IndexQueryModeExecutionNodesOnly,
 			TxResultQueryMode:    query_mode.IndexQueryModeExecutionNodesOnly,
 			// TODO: set this once data result forest merged in
-			//ExecutionResultProvider:
+			//ExecutionResultInfoProvider:
 			//ExecutionStateCache:
 			OperatorCriteria: optimistic_sync.DefaultCriteria,
 		})
@@ -362,7 +362,7 @@ func (suite *Suite) TestSendTransactionToRandomCollectionNode() {
 			ScriptExecutionMode:  query_mode.IndexQueryModeExecutionNodesOnly,
 			TxResultQueryMode:    query_mode.IndexQueryModeExecutionNodesOnly,
 			// TODO: set this once data result forest merged in
-			//ExecutionResultProvider:
+			//ExecutionResultInfoProvider:
 			//ExecutionStateCache:
 			OperatorCriteria: optimistic_sync.DefaultCriteria,
 		})
@@ -699,7 +699,7 @@ func (suite *Suite) TestGetSealedTransaction() {
 			ScriptExecutionMode:        query_mode.IndexQueryModeExecutionNodesOnly,
 			ExecNodeIdentitiesProvider: execNodeIdentitiesProvider,
 			// TODO: set this once data result forest merged in
-			//ExecutionResultProvider:
+			//ExecutionResultInfoProvider:
 			//ExecutionStateCache:
 			OperatorCriteria: optimistic_sync.DefaultCriteria,
 		})
@@ -898,7 +898,7 @@ func (suite *Suite) TestGetTransactionResult() {
 			ScriptExecutionMode:        query_mode.IndexQueryModeExecutionNodesOnly,
 			ExecNodeIdentitiesProvider: execNodeIdentitiesProvider,
 			// TODO: set this once data result forest merged in
-			//ExecutionResultProvider:
+			//ExecutionResultInfoProvider:
 			//ExecutionStateCache:
 			OperatorCriteria: optimistic_sync.DefaultCriteria,
 		})
@@ -1148,7 +1148,7 @@ func (suite *Suite) TestExecuteScript() {
 			TxResultQueryMode:          query_mode.IndexQueryModeExecutionNodesOnly,
 			ExecNodeIdentitiesProvider: execNodeIdentitiesProvider,
 			// TODO: set this once data result forest merged in
-			//ExecutionResultProvider:
+			//ExecutionResultInfoProvider:
 			//ExecutionStateCache:
 			OperatorCriteria: optimistic_sync.DefaultCriteria,
 		})
