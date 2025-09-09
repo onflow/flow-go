@@ -590,14 +590,11 @@ func TestExtendHeightTooSmall(t *testing.T) {
 	emptyPayload := unittest.PayloadFixture(unittest.WithProtocolStateID(rootProtocolStateID))
 	blockB := unittest.BlockFixture( // creates child with increased height and view (protocol compliant)
 		unittest.Block.WithParent(head.ID(), head.View, head.Height),
-		unittest.Block.WithHeight(head.Height+1),
-		unittest.Block.WithView(head.View+1),
 		unittest.Block.WithPayload(emptyPayload))
 
 	blockC := unittest.BlockFixture( // creates child with height identical to parent (protocol violation) but increased view (protocol compliant)
 		unittest.Block.WithParent(blockB.ID(), blockB.View, blockB.Height),
 		unittest.Block.WithHeight(blockB.Height),
-		unittest.Block.WithView(blockB.View+1),
 		unittest.Block.WithPayload(emptyPayload))
 
 	util.RunWithFullProtocolState(t, rootSnapshot, func(db storage.DB, chainState *protocol.ParticipantState) {
@@ -1026,7 +1023,6 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 		block3View := block2.View + 1
 		block3 := unittest.BlockFixture(
 			unittest.Block.WithParent(block2.ID(), block2.View, block2.Height),
-			unittest.Block.WithView(block3View),
 			unittest.Block.WithPayload(
 				flow.Payload{
 					Seals:           seals,
@@ -1107,7 +1103,6 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 		block6View := block5.View + 1
 		block6 := unittest.BlockFixture(
 			unittest.Block.WithParent(block5.ID(), block5.View, block5.Height),
-			unittest.Block.WithView(block6View),
 			unittest.Block.WithPayload(
 				flow.Payload{
 					Seals:           seals,
@@ -2099,7 +2094,6 @@ func TestEpochFallbackMode(t *testing.T) {
 			block3View := block2.View + 1
 			block3 := unittest.BlockFixture(
 				unittest.Block.WithParent(block2.ID(), block2.View, block2.Height),
-				unittest.Block.WithView(block3View),
 				unittest.Block.WithPayload(
 					flow.Payload{
 						Seals:           seals,
@@ -2192,7 +2186,6 @@ func TestRecoveryFromEpochFallbackMode(t *testing.T) {
 			block1View := head.View + 1
 			block1 := unittest.BlockFixture(
 				unittest.Block.WithParent(head.ID(), head.View, head.Height),
-				unittest.Block.WithView(block1View),
 				unittest.Block.WithPayload(
 					flow.Payload{
 						ProtocolStateID: expectedStateIdCalculator(head.ID(), block1View, nil),
@@ -2291,7 +2284,6 @@ func TestRecoveryFromEpochFallbackMode(t *testing.T) {
 			block1View := head.View + 1
 			block1 := unittest.BlockFixture(
 				unittest.Block.WithParent(head.ID(), head.View, head.Height),
-				unittest.Block.WithView(block1View),
 				unittest.Block.WithPayload(
 					flow.Payload{
 						ProtocolStateID: expectedStateIdCalculator(head.ID(), block1View, nil),
@@ -2436,7 +2428,6 @@ func TestRecoveryFromEpochFallbackMode(t *testing.T) {
 			block1View := head.View + 1
 			block1 := unittest.BlockFixture(
 				unittest.Block.WithParent(head.ID(), head.View, head.Height),
-				unittest.Block.WithView(block1View),
 				unittest.Block.WithPayload(
 					flow.Payload{
 						ProtocolStateID: expectedStateIdCalculator(head.ID(), block1View, nil),
