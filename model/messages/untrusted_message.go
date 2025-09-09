@@ -2,6 +2,7 @@ package messages
 
 import (
 	"fmt"
+	libp2pmessage "github.com/onflow/flow-go/model/libp2p/message"
 
 	"github.com/onflow/flow-go/model/cluster"
 	"github.com/onflow/flow-go/model/flow"
@@ -69,10 +70,12 @@ func InternalToMessage(event interface{}) (UntrustedMessage, error) {
 		return (*ExecutionReceipt)(internal), nil
 	case *flow.ResultApproval:
 		return (*ResultApproval)(internal), nil
-	case UntrustedMessage:
-		// Already a valid UntrustedMessage
-		// TODO(immutable M2): expand when ToInternal changes for other M2 types
-		return internal, nil
+	case *flow.TestMessage:
+		return (*libp2pmessage.TestMessage)(internal), nil
+	//case UntrustedMessage:
+	//	// Already a valid UntrustedMessage
+	//	// TODO(immutable M2): expand when ToInternal changes for other M2 types
+	//	return internal, nil
 	default:
 		return nil, fmt.Errorf("cannot convert unsupported type %T", event)
 	}
