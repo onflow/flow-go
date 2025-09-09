@@ -22,6 +22,7 @@ var (
 	flagUseExecutionDataAPI bool
 	flagBlockID             string
 	flagTracePath           string
+	flagBlockCount          int
 )
 
 var Cmd = &cobra.Command{
@@ -53,6 +54,8 @@ func init() {
 	_ = Cmd.MarkFlagRequired("block-id")
 
 	Cmd.Flags().StringVar(&flagTracePath, "trace", "", "enable tracing to given path")
+
+	Cmd.Flags().IntVar(&flagBlockCount, "block-count", 1, "number of blocks to process (default: 1)")
 }
 
 func run(_ *cobra.Command, args []string) {
@@ -99,13 +102,21 @@ func run(_ *cobra.Command, args []string) {
 		log.Fatal().Err(err).Str("ID", flagBlockID).Msg("failed to parse block ID")
 	}
 
-	compareBlock(
-		blockID,
-		remoteClient,
-		flowClient,
-		chain,
-		traceFile,
-	)
+	var header *flow.Header
+
+	for i := 0; i < flagBlockCount; i++ {
+		if header != nil {
+			blockID = header.ParentID
+		}
+
+		header = compareBlock(
+			blockID,
+			remoteClient,
+			flowClient,
+			chain,
+			traceFile,
+		)
+	}
 }
 
 func compareBlock(
@@ -114,7 +125,7 @@ func compareBlock(
 	flowClient *client.Client,
 	chain flow.Chain,
 	traceFile *os.File,
-) {
+) *flow.Header {
 
 	blockTransactions, systemTxID, header := debug_tx.FetchBlockInfo(blockID, flowClient)
 
@@ -158,6 +169,8 @@ func compareBlock(
 			vmResult,
 		)
 	}
+
+	return header
 }
 
 func compareResults(
