@@ -167,10 +167,7 @@ func (e *Events) GetEventsForHeightRange(
 	// must be from the execution fork terminating at this result. this guarantees the response
 	// contains a consistent view of the state.
 	lastBlockID := blockHeaders[len(blockHeaders)-1].ID
-	execResultInfo, err := e.execResultProvider.ExecutionResultInfo(
-		lastBlockID,
-		criteria,
-	)
+	execResultInfo, err := e.execResultProvider.ExecutionResultInfo(lastBlockID, criteria)
 	if err != nil {
 		return nil, accessmodel.ExecutorMetadata{}, fmt.Errorf("failed to get execution result for last block: %w", err)
 	}

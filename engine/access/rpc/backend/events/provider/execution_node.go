@@ -67,23 +67,14 @@ func (e *ENEventProvider) Events(
 		BlockIds: convert.IdentifiersToMessages(blockIDs),
 	}
 
-	var resp *execproto.GetEventsForBlockIDsResponse
-	var successfulNode *flow.IdentitySkeleton
-	resp, successfulNode, err := e.getEventsFromAnyExeNode(ctx, execResultInfo.ExecutionNodes, req)
+	resp, _, err := e.getEventsFromAnyExeNode(ctx, execResultInfo.ExecutionNodes, req)
 	if err != nil {
 		return Response{}, access.ExecutorMetadata{},
 			rpc.ConvertError(err, "failed to get execution nodes for events query", codes.Internal)
 	}
 
-	lastBlockID := blocks[len(blocks)-1].ID
-	e.log.Trace().
-		Str("execution_node_id", successfulNode.String()).
-		Str("execution_result_id", execResultInfo.ExecutionResult.ID().String()).
-		Str("last_block_id", lastBlockID.String()).
-		Msg("successfully got events")
-
 	metadata := access.ExecutorMetadata{
-		ExecutionResultID: successfulNode.NodeID,
+		ExecutionResultID: execResultInfo.ExecutionResult.ID(),
 		ExecutorIDs:       execResultInfo.ExecutionNodes.NodeIDs(),
 	}
 

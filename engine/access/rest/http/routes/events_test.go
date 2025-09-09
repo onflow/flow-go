@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
-	"strconv"
 	"strings"
 	"testing"
 
@@ -415,23 +414,10 @@ func buildRequest(
 		q.Add(router.EndHeightQueryParam, end)
 	}
 
-	if agreeingExecutorsCount != "" {
-		count, err := strconv.Atoi(agreeingExecutorsCount)
-		require.NoError(t, err)
-		require.Greater(t, count, 0, "agreeingExecutorsCount must be greater than 0")
-		q.Add(router.AgreeingExecutorsCountQueryParam, agreeingExecutorsCount)
-	}
-
-	if len(requiredExecutors) > 0 {
-		q.Add(router.RequiredExecutorIdsQueryParam, strings.Join(requiredExecutors, ","))
-	}
-
-	if includeExecutorMetadata != "" {
-		includeMetadata, err := strconv.ParseBool(includeExecutorMetadata)
-		require.NoError(t, err)
-		if includeMetadata {
-			q.Add(router.IncludeExecutorMetadataQueryParam, fmt.Sprint(includeExecutorMetadata))
-		}
+	q.Add(router.AgreeingExecutorsCountQueryParam, agreeingExecutorsCount)
+	q.Add(router.RequiredExecutorIdsQueryParam, strings.Join(requiredExecutors, ","))
+	if len(includeExecutorMetadata) > 0 {
+		q.Add(router.IncludeExecutorMetadataQueryParam, fmt.Sprint(includeExecutorMetadata))
 	}
 
 	q.Add(routes.EventTypeQuery, eventType)
