@@ -41,7 +41,7 @@ func NewExecutionNodeRemoteClient(address string) (*ExecutionNodeRemoteClient, e
 
 func (c *ExecutionNodeRemoteClient) StorageSnapshot(_ uint64, blockID flow.Identifier) (snapshot.StorageSnapshot, error) {
 	executionClient := execution.NewExecutionAPIClient(c.conn)
-	return NewExecutionNodeStorageSnapshot(executionClient, nil, blockID)
+	return NewExecutionNodeStorageSnapshot(executionClient, blockID)
 }
 
 func (c *ExecutionNodeRemoteClient) Close() error {
@@ -75,7 +75,7 @@ func (c *ExecutionDataRemoteClient) StorageSnapshot(blockHeight uint64, _ flow.I
 
 	// The execution data API provides the *resulting* data,
 	// so fetch the data for the parent block for the *initial* data.
-	return NewExecutionDataStorageSnapshot(executionDataClient, nil, blockHeight-1)
+	return NewExecutionDataStorageSnapshot(executionDataClient, blockHeight-1)
 }
 
 func (c *ExecutionDataRemoteClient) Close() error {

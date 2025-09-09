@@ -117,12 +117,14 @@ func run(*cobra.Command, []string) {
 		log.Fatal().Err(err).Msg("failed to create storage snapshot")
 	}
 
+	blockSnapshot := debug.NewCachingStorageSnapshot(remoteSnapshot)
+
 	debugger := debug.NewRemoteDebugger(chain, log.Logger, flagUseVM, flagUseVM)
 
 	// TODO: add support for arguments
 	var arguments [][]byte
 
-	result, err := debugger.RunScript(code, arguments, remoteSnapshot, blockHeader)
+	result, err := debugger.RunScript(code, arguments, blockSnapshot, blockHeader)
 	if err != nil {
 		log.Fatal().Err(err).Msg("failed to run script")
 	}

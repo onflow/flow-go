@@ -21,7 +21,6 @@ type StorageSnapshot interface {
 // to an execution node to read the registers.
 type ExecutionNodeStorageSnapshot struct {
 	Client  execution.ExecutionAPIClient
-	Cache   RegisterCache
 	BlockID flow.Identifier
 }
 
@@ -29,40 +28,27 @@ var _ StorageSnapshot = &ExecutionNodeStorageSnapshot{}
 
 func NewExecutionNodeStorageSnapshot(
 	client execution.ExecutionAPIClient,
-	cache RegisterCache,
 	blockID flow.Identifier,
 ) (
 	*ExecutionNodeStorageSnapshot,
 	error,
 ) {
-	if cache == nil {
-		cache = NewInMemoryRegisterCache()
-	}
-
 	return &ExecutionNodeStorageSnapshot{
 		Client:  client,
-		Cache:   cache,
 		BlockID: blockID,
 	}, nil
 }
 
 func (snapshot *ExecutionNodeStorageSnapshot) Close() error {
-	return snapshot.Cache.Persist()
+	return nil
 }
 
 func (snapshot *ExecutionNodeStorageSnapshot) Get(
 	id flow.RegisterID,
 ) (
-	flow.RegisterValue,
-	error,
+	value flow.RegisterValue,
+	err error,
 ) {
-	// first, check the cache
-	value, found := snapshot.Cache.Get(id.Owner, id.Key)
-	if found {
-		return value, nil
-	}
-
-	// if the register is not cached, fetch it from the execution node
 	req := &execution.GetRegisterAtBlockIDRequest{
 		BlockId:       snapshot.BlockID[:],
 		RegisterOwner: []byte(id.Owner),
@@ -84,9 +70,6 @@ func (snapshot *ExecutionNodeStorageSnapshot) Get(
 		value = resp.Value
 	}
 
-	// append register to the cache
-	snapshot.Cache.Set(id.Owner, id.Key, value)
-
 	return value, nil
 }
 
@@ -94,7 +77,6 @@ func (snapshot *ExecutionNodeStorageSnapshot) Get(
 // to an access node to read the registers (via its execution data API).
 type ExecutionDataStorageSnapshot struct {
 	Client      executiondata.ExecutionDataAPIClient
-	Cache       RegisterCache
 	BlockHeight uint64
 }
 
@@ -102,40 +84,27 @@ var _ StorageSnapshot = &ExecutionDataStorageSnapshot{}
 
 func NewExecutionDataStorageSnapshot(
 	client executiondata.ExecutionDataAPIClient,
-	cache RegisterCache,
 	blockHeight uint64,
 ) (
 	*ExecutionDataStorageSnapshot,
 	error,
 ) {
-	if cache == nil {
-		cache = NewInMemoryRegisterCache()
-	}
-
 	return &ExecutionDataStorageSnapshot{
 		Client:      client,
-		Cache:       cache,
 		BlockHeight: blockHeight,
 	}, nil
 }
 
 func (snapshot *ExecutionDataStorageSnapshot) Close() error {
-	return snapshot.Cache.Persist()
+	return nil
 }
 
 func (snapshot *ExecutionDataStorageSnapshot) Get(
 	id flow.RegisterID,
 ) (
-	flow.RegisterValue,
-	error,
+	value flow.RegisterValue,
+	err error,
 ) {
-	// first, check the cache
-	value, found := snapshot.Cache.Get(id.Owner, id.Key)
-	if found {
-		return value, nil
-	}
-
-	// if the register is not cached, fetch it from the execution data API
 	req := &executiondata.GetRegisterValuesRequest{
 		BlockHeight: snapshot.BlockHeight,
 		RegisterIds: []*entities.RegisterID{
@@ -160,9 +129,6 @@ func (snapshot *ExecutionDataStorageSnapshot) Get(
 	} else {
 		value = resp.Values[0]
 	}
-
-	// append register to the cache
-	snapshot.Cache.Set(id.Owner, id.Key, value)
 
 	return value, nil
 }
@@ -189,7 +155,14 @@ func (s *CachingStorageSnapshot) Get(id flow.RegisterID) (flow.RegisterValue, er
 		return data, nil
 	}
 
-	return s.backing.Get(id)
+	value, err := s.backing.Get(id)
+	if err != nil {
+		return nil, err
+	}
+
+	s.cache.Set(id.Key, id.Owner, value)
+
+	return value, nil
 }
 
 func (s *CachingStorageSnapshot) Set(id flow.RegisterID, value flow.RegisterValue) {
