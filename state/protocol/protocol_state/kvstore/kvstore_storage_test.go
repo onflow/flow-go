@@ -5,6 +5,7 @@ import (
 	"math"
 	"testing"
 
+	"github.com/jordanschalm/lockctx"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/model/flow"
@@ -37,18 +38,17 @@ func TestProtocolKVStore_StoreTx(t *testing.T) {
 		}
 		kvState.On("VersionedEncode").Return(expectedVersion, encData, nil).Once()
 
-		lctx := lockManager.NewContext()
-		defer lctx.Release()
-		require.NoError(t, lctx.AcquireLock(storage.LockInsertBlock))
-		rw := storagemock.NewReaderBatchWriter(t)
-		llStorage.On("BatchStore", lctx, rw, kvStateID, versionedSnapshot).Return(nil).Once()
+		unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
+			rw := storagemock.NewReaderBatchWriter(t)
+			llStorage.On("BatchStore", lctx, rw, kvStateID, versionedSnapshot).Return(nil).Once()
 
-		// TODO: potentially update - we might be bringing back a functor here, because we acquire a lock  as explained in slack thread https://flow-foundation.slack.com/archives/C071612SJJE/p1754600182033289?thread_ts=1752912083.194619&cid=C071612SJJE
-		// Calling `BatchStore` should return the output of the wrapped low-level storage, which is a deferred database
-		// update. Conceptually, it is possible that `ProtocolKVStore` wraps the deferred database operation in faulty
-		// code, such that it cannot be executed. Therefore, we execute the top-level deferred database update below
-		// and verify that the deferred database operation returned by the lower-level is actually reached.
-		require.NoError(t, store.BatchStore(lctx, rw, kvStateID, kvState))
+			// TODO: potentially update - we might be bringing back a functor here, because we acquire a lock  as explained in slack thread https://flow-foundation.slack.com/archives/C071612SJJE/p1754600182033289?thread_ts=1752912083.194619&cid=C071612SJJE
+			// Calling `BatchStore` should return the output of the wrapped low-level storage, which is a deferred database
+			// update. Conceptually, it is possible that `ProtocolKVStore` wraps the deferred database operation in faulty
+			// code, such that it cannot be executed. Therefore, we execute the top-level deferred database update below
+			// and verify that the deferred database operation returned by the lower-level is actually reached.
+			return store.BatchStore(lctx, rw, kvStateID, kvState)
+		})
 	})
 
 	// On the unhappy path, i.e. when the encoding of input `kvState` failed, `ProtocolKVStore` should produce
@@ -59,12 +59,12 @@ func TestProtocolKVStore_StoreTx(t *testing.T) {
 
 		kvState.On("VersionedEncode").Return(uint64(0), nil, encodingError).Once()
 
-		lctx := lockManager.NewContext()
-		defer lctx.Release()
-		require.NoError(t, lctx.AcquireLock(storage.LockInsertBlock))
-		rw := storagemock.NewReaderBatchWriter(t)
-		err := store.BatchStore(lctx, rw, kvStateID, kvState)
-		require.ErrorIs(t, err, encodingError)
+		unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
+			rw := storagemock.NewReaderBatchWriter(t)
+			err := store.BatchStore(lctx, rw, kvStateID, kvState)
+			require.ErrorIs(t, err, encodingError)
+			return nil
+		})
 	})
 }
 
@@ -80,33 +80,32 @@ func TestProtocolKVStore_IndexTx(t *testing.T) {
 	// should be called to persist the version-encoded snapshot.
 	t.Run("happy path", func(t *testing.T) {
 		lockManager := storage.NewTestingLockManager()
-		lctx := lockManager.NewContext()
-		defer lctx.Release()
-		require.NoError(t, lctx.AcquireLock(storage.LockInsertBlock))
-		rw := storagemock.NewReaderBatchWriter(t)
-		llStorage.On("BatchIndex", lctx, rw, blockID, stateID).Return(nil).Once()
+		unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
+			rw := storagemock.NewReaderBatchWriter(t)
+			llStorage.On("BatchIndex", lctx, rw, blockID, stateID).Return(nil).Once()
 
-		// TODO: potentially update - we might be bringing back a functor here, because we acquire a lock  as explained in slack thread https://flow-foundation.slack.com/archives/C071612SJJE/p1754600182033289?thread_ts=1752912083.194619&cid=C071612SJJE
-		// Calling `BatchIndex` should return the output of the wrapped low-level storage, which is a deferred database
-		// update. Conceptually, it is possible that `ProtocolKVStore` wraps the deferred database operation in faulty
-		// code, such that it cannot be executed. Therefore, we execute the top-level deferred database update below
-		// and verify that the deferred database operation returned by the lower-level is actually reached.
-		require.NoError(t, store.BatchIndex(lctx, rw, blockID, stateID))
+			// TODO: potentially update - we might be bringing back a functor here, because we acquire a lock  as explained in slack thread https://flow-foundation.slack.com/archives/C071612SJJE/p1754600182033289?thread_ts=1752912083.194619&cid=C071612SJJE
+			// Calling `BatchIndex` should return the output of the wrapped low-level storage, which is a deferred database
+			// update. Conceptually, it is possible that `ProtocolKVStore` wraps the deferred database operation in faulty
+			// code, such that it cannot be executed. Therefore, we execute the top-level deferred database update below
+			// and verify that the deferred database operation returned by the lower-level is actually reached.
+			return store.BatchIndex(lctx, rw, blockID, stateID)
+		})
 	})
 
 	// On the unhappy path, the deferred database update from the lower level just errors upon execution.
 	// This error should be escalated.
 	t.Run("unhappy path", func(t *testing.T) {
 		lockManager := storage.NewTestingLockManager()
-		lctx := lockManager.NewContext()
-		defer lctx.Release()
-		require.NoError(t, lctx.AcquireLock(storage.LockInsertBlock))
-		indexingError := errors.New("indexing error")
-		rw := storagemock.NewReaderBatchWriter(t)
-		llStorage.On("BatchIndex", lctx, rw, blockID, stateID).Return(indexingError).Once()
+		unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
+			indexingError := errors.New("indexing error")
+			rw := storagemock.NewReaderBatchWriter(t)
+			llStorage.On("BatchIndex", lctx, rw, blockID, stateID).Return(indexingError).Once()
 
-		err := store.BatchIndex(lctx, rw, blockID, stateID)
-		require.ErrorIs(t, err, indexingError)
+			err := store.BatchIndex(lctx, rw, blockID, stateID)
+			require.ErrorIs(t, err, indexingError)
+			return nil
+		})
 	})
 }
 

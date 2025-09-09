@@ -5,6 +5,7 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/jordanschalm/lockctx"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/model/flow"
@@ -26,11 +27,11 @@ func TestApprovalStoreAndRetrieve(t *testing.T) {
 		// creating the operation -- only for executing the storage write further below
 		approval := unittest.ResultApprovalFixture()
 		storing := store.StoreMyApproval(approval)
-		lctx := lockManager.NewContext()
-		require.NoError(t, lctx.AcquireLock(storage.LockIndexResultApproval))
-		err := storing(lctx)
-		require.NoError(t, err)
-		defer lctx.Release() // While still holding the lock, verify that reads are not blocked by acquired locks
+		unittest.WithLock(t, lockManager, storage.LockIndexResultApproval, func(lctx lockctx.Context) error {
+			err := storing(lctx)
+			require.NoError(t, err)
+			return nil
+		}) // While still holding the lock, verify that reads are not blocked by acquired locks
 
 		// retrieve entire approval by its ID
 		byID, err := store.ByID(approval.ID())
@@ -55,17 +56,17 @@ func TestApprovalStoreTwice(t *testing.T) {
 		// creating the operation -- only for executing the storage write further below
 		approval := unittest.ResultApprovalFixture()
 		storing := store.StoreMyApproval(approval)
-		lctx := lockManager.NewContext()
-		require.NoError(t, lctx.AcquireLock(storage.LockIndexResultApproval))
-		err := storing(lctx)
-		require.NoError(t, err)
-		lctx.Release()
+		unittest.WithLock(t, lockManager, storage.LockIndexResultApproval, func(lctx lockctx.Context) error {
+			err := storing(lctx)
+			require.NoError(t, err)
+			return nil
+		})
 
-		lctx2 := lockManager.NewContext()
-		require.NoError(t, lctx2.AcquireLock(storage.LockIndexResultApproval))
-		err = storing(lctx2) // repeated storage of same approval should be no-op
-		require.NoError(t, err)
-		lctx2.Release()
+		unittest.WithLock(t, lockManager, storage.LockIndexResultApproval, func(lctx lockctx.Context) error {
+			err := storing(lctx) // repeated storage of same approval should be no-op
+			require.NoError(t, err)
+			return nil
+		})
 	})
 }
 
@@ -78,21 +79,21 @@ func TestApprovalStoreTwoDifferentApprovalsShouldFail(t *testing.T) {
 		approval1, approval2 := twoApprovalsForTheSameResult(t)
 
 		storing := store.StoreMyApproval(approval1)
-		lctx := lockManager.NewContext()
-		require.NoError(t, lctx.AcquireLock(storage.LockIndexResultApproval))
-		err := storing(lctx)
-		lctx.Release()
-		require.NoError(t, err)
+		unittest.WithLock(t, lockManager, storage.LockIndexResultApproval, func(lctx lockctx.Context) error {
+			err := storing(lctx)
+			require.NoError(t, err)
+			return nil
+		})
 
 		// we can store a different approval, but we can't index a different
 		// approval for the same chunk.
 		storing2 := store.StoreMyApproval(approval2)
-		lctx2 := lockManager.NewContext()
-		require.NoError(t, lctx2.AcquireLock(storage.LockIndexResultApproval))
-		err = storing2(lctx2)
-		lctx2.Release()
-		require.Error(t, err)
-		require.ErrorIs(t, err, storage.ErrDataMismatch)
+		unittest.WithLock(t, lockManager, storage.LockIndexResultApproval, func(lctx lockctx.Context) error {
+			err := storing2(lctx)
+			require.Error(t, err)
+			require.ErrorIs(t, err, storage.ErrDataMismatch)
+			return nil
+		})
 	})
 }
 
@@ -116,24 +117,24 @@ func TestApprovalStoreTwoDifferentApprovalsConcurrently(t *testing.T) {
 		// First goroutine stores and indexes the first approval.
 		go func() {
 			storing := store.StoreMyApproval(approval1)
-			lctx := lockManager.NewContext()
 
 			startSignal.Wait()
-			require.NoError(t, lctx.AcquireLock(storage.LockIndexResultApproval))
-			firstIndexErr = storing(lctx)
-			lctx.Release()
+			unittest.WithLock(t, lockManager, storage.LockIndexResultApproval, func(lctx lockctx.Context) error {
+				firstIndexErr = storing(lctx)
+				return nil
+			})
 			doneSinal.Done()
 		}()
 
 		// Second goroutine stores and tries to index the second approval for the same chunk.
 		go func() {
 			storing := store.StoreMyApproval(approval2)
-			lctx := lockManager.NewContext()
 
 			startSignal.Wait()
-			require.NoError(t, lctx.AcquireLock(storage.LockIndexResultApproval))
-			secondIndexErr = storing(lctx)
-			lctx.Release()
+			unittest.WithLock(t, lockManager, storage.LockIndexResultApproval, func(lctx lockctx.Context) error {
+				secondIndexErr = storing(lctx)
+				return nil
+			})
 			doneSinal.Done()
 		}()
 

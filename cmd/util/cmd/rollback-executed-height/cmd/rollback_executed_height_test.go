@@ -86,13 +86,11 @@ func TestReExecuteBlock(t *testing.T) {
 		computationResult := testutil.ComputationResultFixture(t)
 		header := computationResult.Block.ToHeader()
 
-		lctx2 := lockManager.NewContext()
-		require.NoError(t, lctx2.AcquireLock(storage.LockInsertBlock))
-		err = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			return blocks.BatchStore(lctx2, rw, unittest.ProposalFromBlock(computationResult.Block))
+		unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
+			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+				return blocks.BatchStore(lctx, rw, unittest.ProposalFromBlock(computationResult.Block))
+			})
 		})
-		lctx2.Release()
-		require.NoError(t, err)
 
 		// save execution results
 		err = es.SaveExecutionResults(context.Background(), computationResult)

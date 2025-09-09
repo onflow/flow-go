@@ -14,3 +14,10 @@ func WithLock(t *testing.T, manager lockctx.Manager, lockID string, fn func(lctx
 	defer lctx.Release()
 	require.NoError(t, fn(lctx))
 }
+
+func WithLockBench(b *testing.B, manager lockctx.Manager, lockID string, fn func(lctx lockctx.Context) error) {
+	lctx := manager.NewContext()
+	require.NoError(b, lctx.AcquireLock(lockID))
+	defer lctx.Release()
+	require.NoError(b, fn(lctx))
+}

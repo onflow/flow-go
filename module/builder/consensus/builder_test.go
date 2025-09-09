@@ -6,6 +6,7 @@ import (
 	"os"
 	"testing"
 
+	"github.com/jordanschalm/lockctx"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -251,20 +252,19 @@ func (bs *BuilderSuite) SetupTest() {
 	bs.dir = dir
 
 	lockManager := storage.NewTestingLockManager()
-	lctx := lockManager.NewContext()
-	require.NoError(bs.T(), lctx.AcquireLock(storage.LockFinalizeBlock))
-	defer lctx.Release()
 
 	// insert finalized height and root height
 	db := bs.db
-	require.NoError(bs.T(), db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-		require.NoError(bs.T(), operation.InsertRootHeight(rw.Writer(), 13))
-		require.NoError(bs.T(), operation.UpsertFinalizedHeight(lctx, rw.Writer(), final.Height))
-		require.NoError(bs.T(), operation.IndexFinalizedBlockByHeight(lctx, rw, final.Height, bs.finalID))
-		require.NoError(bs.T(), operation.UpsertSealedHeight(lctx, rw.Writer(), first.Height))
-		require.NoError(bs.T(), operation.IndexFinalizedBlockByHeight(lctx, rw, first.Height, first.ID()))
-		return nil
-	}))
+	unittest.WithLock(bs.T(), lockManager, storage.LockFinalizeBlock, func(lctx lockctx.Context) error {
+		return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+			require.NoError(bs.T(), operation.InsertRootHeight(rw.Writer(), 13))
+			require.NoError(bs.T(), operation.UpsertFinalizedHeight(lctx, rw.Writer(), final.Height))
+			require.NoError(bs.T(), operation.IndexFinalizedBlockByHeight(lctx, rw, final.Height, bs.finalID))
+			require.NoError(bs.T(), operation.UpsertSealedHeight(lctx, rw.Writer(), first.Height))
+			require.NoError(bs.T(), operation.IndexFinalizedBlockByHeight(lctx, rw, first.Height, first.ID()))
+			return nil
+		})
+	})
 
 	bs.sentinel = 1337
 	bs.setter = func(h *flow.HeaderBodyBuilder) error {

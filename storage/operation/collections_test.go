@@ -3,6 +3,7 @@ package operation_test
 import (
 	"testing"
 
+	"github.com/jordanschalm/lockctx"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -60,14 +61,14 @@ func TestCollections(t *testing.T) {
 			expected := unittest.CollectionFixture(1).Light()
 			blockID := unittest.IdentifierFixture()
 
-			lctx := lockManager.NewContext()
-			require.NoError(t, lctx.AcquireLock(storage.LockInsertOrFinalizeClusterBlock))
-			defer lctx.Release()
-			_ = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-				err := operation.UpsertCollection(rw.Writer(), expected)
-				assert.NoError(t, err)
-				err = operation.IndexCollectionPayload(lctx, rw.Writer(), blockID, expected.Transactions)
-				assert.NoError(t, err)
+			unittest.WithLock(t, lockManager, storage.LockInsertOrFinalizeClusterBlock, func(lctx lockctx.Context) error {
+				_ = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+					err := operation.UpsertCollection(rw.Writer(), expected)
+					assert.NoError(t, err)
+					err = operation.IndexCollectionPayload(lctx, rw.Writer(), blockID, expected.Transactions)
+					assert.NoError(t, err)
+					return nil
+				})
 				return nil
 			})
 
@@ -82,12 +83,12 @@ func TestCollections(t *testing.T) {
 			transactionID := unittest.IdentifierFixture()
 			actual := flow.Identifier{}
 
-			lctx := lockManager.NewContext()
-			require.NoError(t, lctx.AcquireLock(storage.LockInsertCollection))
-			defer lctx.Release()
-			_ = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-				err := operation.IndexCollectionByTransaction(lctx, rw.Writer(), transactionID, expected)
-				assert.NoError(t, err)
+			unittest.WithLock(t, lockManager, storage.LockInsertCollection, func(lctx lockctx.Context) error {
+				_ = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+					err := operation.IndexCollectionByTransaction(lctx, rw.Writer(), transactionID, expected)
+					assert.NoError(t, err)
+					return nil
+				})
 				return nil
 			})
 

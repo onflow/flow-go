@@ -33,13 +33,13 @@ func TestClusterHeights(t *testing.T) {
 		})
 
 		t.Run("insert/retrieve", func(t *testing.T) {
-			lctx := lockManager.NewContext()
-			require.NoError(t, lctx.AcquireLock(storage.LockInsertOrFinalizeClusterBlock))
-			err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-				return operation.IndexClusterBlockHeight(lctx, rw.Writer(), clusterID, height, expected)
+			unittest.WithLock(t, lockManager, storage.LockInsertOrFinalizeClusterBlock, func(lctx lockctx.Context) error {
+				err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+					return operation.IndexClusterBlockHeight(lctx, rw.Writer(), clusterID, height, expected)
+				})
+				assert.NoError(t, err)
+				return nil
 			})
-			lctx.Release()
-			assert.NoError(t, err)
 
 			var actual flow.Identifier
 			err = operation.LookupClusterBlockHeight(db.Reader(), clusterID, height, &actual)
@@ -60,13 +60,13 @@ func TestClusterHeights(t *testing.T) {
 				err = operation.LookupClusterBlockHeight(db.Reader(), clusterIDs[i], height, &actual)
 				assert.ErrorIs(t, err, storage.ErrNotFound)
 
-				lctx := lockManager.NewContext()
-				require.NoError(t, lctx.AcquireLock(storage.LockInsertOrFinalizeClusterBlock))
-				err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-					return operation.IndexClusterBlockHeight(lctx, rw.Writer(), clusterIDs[i], height, clusterBlockIDs[i])
+				unittest.WithLock(t, lockManager, storage.LockInsertOrFinalizeClusterBlock, func(lctx lockctx.Context) error {
+					err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+						return operation.IndexClusterBlockHeight(lctx, rw.Writer(), clusterIDs[i], height, clusterBlockIDs[i])
+					})
+					assert.NoError(t, err)
+					return nil
 				})
-				lctx.Release() // Release lock immediately after operation
-				assert.NoError(t, err)
 			}
 			for i := 0; i < len(clusterBlockIDs); i++ {
 				err = operation.LookupClusterBlockHeight(db.Reader(), clusterIDs[i], height, &actual)
@@ -143,9 +143,9 @@ func Test_RetrieveClusterFinalizedHeight(t *testing.T) {
 }
 
 func TestClusterBlockByReferenceHeight(t *testing.T) {
-	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
-		lockManager := storage.NewTestingLockManager()
-		t.Run("should be able to index cluster block by reference height", func(t *testing.T) {
+	t.Run("should be able to index cluster block by reference height", func(t *testing.T) {
+		dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
+			lockManager := storage.NewTestingLockManager()
 			id := unittest.IdentifierFixture()
 			height := rand.Uint64()
 			unittest.WithLock(t, lockManager, storage.LockInsertOrFinalizeClusterBlock, func(lctx lockctx.Context) error {
@@ -163,68 +163,67 @@ func TestClusterBlockByReferenceHeight(t *testing.T) {
 		})
 	})
 
-	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
-		lockManager := storage.NewTestingLockManager()
-		t.Run("should be able to index multiple cluster blocks at same reference height", func(t *testing.T) {
+	t.Run("should be able to index multiple cluster blocks at same reference height", func(t *testing.T) {
+		dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
+			lockManager := storage.NewTestingLockManager()
 			ids := unittest.IdentifierListFixture(10)
 			height := rand.Uint64()
-			lctx := lockManager.NewContext()
-			require.NoError(t, lctx.AcquireLock(storage.LockInsertOrFinalizeClusterBlock))
-			defer lctx.Release()
-			for _, id := range ids {
-				err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-					return operation.IndexClusterBlockByReferenceHeight(lctx, rw.Writer(), height, id)
-				})
-				assert.NoError(t, err)
-			}
+			unittest.WithLock(t, lockManager, storage.LockInsertOrFinalizeClusterBlock, func(lctx lockctx.Context) error {
+				for _, id := range ids {
+					err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+						return operation.IndexClusterBlockByReferenceHeight(lctx, rw.Writer(), height, id)
+					})
+					assert.NoError(t, err)
+				}
 
-			var retrieved []flow.Identifier
-			err := operation.LookupClusterBlocksByReferenceHeightRange(lctx, db.Reader(), height, height, &retrieved)
-			assert.NoError(t, err)
-			assert.Len(t, retrieved, len(ids))
-			assert.ElementsMatch(t, ids, retrieved)
+				var retrieved []flow.Identifier
+				err := operation.LookupClusterBlocksByReferenceHeightRange(lctx, db.Reader(), height, height, &retrieved)
+				assert.NoError(t, err)
+				assert.Len(t, retrieved, len(ids))
+				assert.ElementsMatch(t, ids, retrieved)
+				return nil
+			})
 		})
 	})
 
-	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
-		lockManager := storage.NewTestingLockManager()
-		t.Run("should be able to lookup cluster blocks across height range", func(t *testing.T) {
+	t.Run("should be able to lookup cluster blocks across height range", func(t *testing.T) {
+		dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
+			lockManager := storage.NewTestingLockManager()
 			ids := unittest.IdentifierListFixture(100)
 			nextHeight := rand.Uint64()
 			// keep track of height range
 			minHeight, maxHeight := nextHeight, nextHeight
 			// keep track of which ids are indexed at each nextHeight
 			lookup := make(map[uint64][]flow.Identifier)
-			lctx := lockManager.NewContext()
-			require.NoError(t, lctx.AcquireLock(storage.LockInsertOrFinalizeClusterBlock))
-			defer lctx.Release()
+			unittest.WithLock(t, lockManager, storage.LockInsertOrFinalizeClusterBlock, func(lctx lockctx.Context) error {
+				for i := 0; i < len(ids); i++ {
+					// randomly adjust the nextHeight, increasing on average
+					r := rand.Intn(100)
+					if r < 20 {
+						nextHeight -= 1 // 20% probability
+					} else if r < 40 {
+						// 20% probability: nextHeight stays the same
+					} else if r < 80 {
+						nextHeight += 1 // 40% probability
+					} else {
+						nextHeight += 2 // 20% probability
+					}
 
-			for i := 0; i < len(ids); i++ {
-				// randomly adjust the nextHeight, increasing on average
-				r := rand.Intn(100)
-				if r < 20 {
-					nextHeight -= 1 // 20% probability
-				} else if r < 40 {
-					// 20% probability: nextHeight stays the same
-				} else if r < 80 {
-					nextHeight += 1 // 40% probability
-				} else {
-					nextHeight += 2 // 20% probability
-				}
+					lookup[nextHeight] = append(lookup[nextHeight], ids[i])
+					if nextHeight < minHeight {
+						minHeight = nextHeight
+					}
+					if nextHeight > maxHeight {
+						maxHeight = nextHeight
+					}
 
-				lookup[nextHeight] = append(lookup[nextHeight], ids[i])
-				if nextHeight < minHeight {
-					minHeight = nextHeight
+					err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+						return operation.IndexClusterBlockByReferenceHeight(lctx, rw.Writer(), nextHeight, ids[i])
+					})
+					assert.NoError(t, err)
 				}
-				if nextHeight > maxHeight {
-					maxHeight = nextHeight
-				}
-
-				err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-					return operation.IndexClusterBlockByReferenceHeight(lctx, rw.Writer(), nextHeight, ids[i])
-				})
-				assert.NoError(t, err)
-			}
+				return nil
+			})
 
 			// determine which ids we expect to be retrieved for a given height range
 			idsInHeightRange := func(min, max uint64) []flow.Identifier {
@@ -243,86 +242,111 @@ func TestClusterBlockByReferenceHeight(t *testing.T) {
 			// [{ means the left endpoint of both ranges are the same
 			// {-[ means the left endpoint of the queried range is strictly less than the indexed range
 			t.Run("{-}--[-]", func(t *testing.T) {
-				var retrieved []flow.Identifier
-				err := operation.LookupClusterBlocksByReferenceHeightRange(lctx, db.Reader(), minHeight-100, minHeight-1, &retrieved)
-				assert.NoError(t, err)
-				assert.Len(t, retrieved, 0)
+				unittest.WithLock(t, lockManager, storage.LockInsertOrFinalizeClusterBlock, func(lctx lockctx.Context) error {
+					var retrieved []flow.Identifier
+					err := operation.LookupClusterBlocksByReferenceHeightRange(lctx, db.Reader(), minHeight-100, minHeight-1, &retrieved)
+					assert.NoError(t, err)
+					assert.Len(t, retrieved, 0)
+					return nil
+				})
 			})
-			t.Run("{-[--}-]", func(t *testing.T) {
-				var retrieved []flow.Identifier
-				min := minHeight - 100
-				max := minHeight + (maxHeight-minHeight)/2
-				err := operation.LookupClusterBlocksByReferenceHeightRange(lctx, db.Reader(), min, max, &retrieved)
-				assert.NoError(t, err)
 
-				expected := idsInHeightRange(min, max)
-				assert.NotEmpty(t, expected, "test assumption broken")
-				assert.Len(t, retrieved, len(expected))
-				assert.ElementsMatch(t, expected, retrieved)
+			t.Run("{-[--}-]", func(t *testing.T) {
+				unittest.WithLock(t, lockManager, storage.LockInsertOrFinalizeClusterBlock, func(lctx lockctx.Context) error {
+					var retrieved []flow.Identifier
+					min := minHeight - 100
+					max := minHeight + (maxHeight-minHeight)/2
+					err := operation.LookupClusterBlocksByReferenceHeightRange(lctx, db.Reader(), min, max, &retrieved)
+					assert.NoError(t, err)
+
+					expected := idsInHeightRange(min, max)
+					assert.NotEmpty(t, expected, "test assumption broken")
+					assert.Len(t, retrieved, len(expected))
+					assert.ElementsMatch(t, expected, retrieved)
+					return nil
+				})
 			})
 			t.Run("{[--}--]", func(t *testing.T) {
-				var retrieved []flow.Identifier
-				min := minHeight
-				max := minHeight + (maxHeight-minHeight)/2
-				err := operation.LookupClusterBlocksByReferenceHeightRange(lctx, db.Reader(), min, max, &retrieved)
-				assert.NoError(t, err)
+				unittest.WithLock(t, lockManager, storage.LockInsertOrFinalizeClusterBlock, func(lctx lockctx.Context) error {
+					var retrieved []flow.Identifier
+					min := minHeight
+					max := minHeight + (maxHeight-minHeight)/2
+					err := operation.LookupClusterBlocksByReferenceHeightRange(lctx, db.Reader(), min, max, &retrieved)
+					assert.NoError(t, err)
 
-				expected := idsInHeightRange(min, max)
-				assert.NotEmpty(t, expected, "test assumption broken")
-				assert.Len(t, retrieved, len(expected))
-				assert.ElementsMatch(t, expected, retrieved)
+					expected := idsInHeightRange(min, max)
+					assert.NotEmpty(t, expected, "test assumption broken")
+					assert.Len(t, retrieved, len(expected))
+					assert.ElementsMatch(t, expected, retrieved)
+					return nil
+				})
 			})
 			t.Run("[-{--}-]", func(t *testing.T) {
-				var retrieved []flow.Identifier
-				min := minHeight + 1
-				max := maxHeight - 1
-				err := operation.LookupClusterBlocksByReferenceHeightRange(lctx, db.Reader(), min, max, &retrieved)
-				assert.NoError(t, err)
+				unittest.WithLock(t, lockManager, storage.LockInsertOrFinalizeClusterBlock, func(lctx lockctx.Context) error {
+					var retrieved []flow.Identifier
+					min := minHeight + 1
+					max := maxHeight - 1
+					err := operation.LookupClusterBlocksByReferenceHeightRange(lctx, db.Reader(), min, max, &retrieved)
+					assert.NoError(t, err)
 
-				expected := idsInHeightRange(min, max)
-				assert.NotEmpty(t, expected, "test assumption broken")
-				assert.Len(t, retrieved, len(expected))
-				assert.ElementsMatch(t, expected, retrieved)
+					expected := idsInHeightRange(min, max)
+					assert.NotEmpty(t, expected, "test assumption broken")
+					assert.Len(t, retrieved, len(expected))
+					assert.ElementsMatch(t, expected, retrieved)
+					return nil
+				})
 			})
 			t.Run("[{----}]", func(t *testing.T) {
-				var retrieved []flow.Identifier
-				err := operation.LookupClusterBlocksByReferenceHeightRange(lctx, db.Reader(), minHeight, maxHeight, &retrieved)
-				assert.NoError(t, err)
+				unittest.WithLock(t, lockManager, storage.LockInsertOrFinalizeClusterBlock, func(lctx lockctx.Context) error {
+					var retrieved []flow.Identifier
+					err := operation.LookupClusterBlocksByReferenceHeightRange(lctx, db.Reader(), minHeight, maxHeight, &retrieved)
+					assert.NoError(t, err)
 
-				expected := idsInHeightRange(minHeight, maxHeight)
-				assert.NotEmpty(t, expected, "test assumption broken")
-				assert.Len(t, retrieved, len(expected))
-				assert.ElementsMatch(t, expected, retrieved)
+					expected := idsInHeightRange(minHeight, maxHeight)
+					assert.NotEmpty(t, expected, "test assumption broken")
+					assert.Len(t, retrieved, len(expected))
+					assert.ElementsMatch(t, expected, retrieved)
+					return nil
+				})
 			})
 			t.Run("[--{--}]", func(t *testing.T) {
-				var retrieved []flow.Identifier
-				min := minHeight + (maxHeight-minHeight)/2
-				max := maxHeight
-				err := operation.LookupClusterBlocksByReferenceHeightRange(lctx, db.Reader(), min, max, &retrieved)
-				assert.NoError(t, err)
+				unittest.WithLock(t, lockManager, storage.LockInsertOrFinalizeClusterBlock, func(lctx lockctx.Context) error {
+					var retrieved []flow.Identifier
+					min := minHeight + (maxHeight-minHeight)/2
+					max := maxHeight
+					err := operation.LookupClusterBlocksByReferenceHeightRange(lctx, db.Reader(), min, max, &retrieved)
+					assert.NoError(t, err)
 
-				expected := idsInHeightRange(min, max)
-				assert.NotEmpty(t, expected, "test assumption broken")
-				assert.Len(t, retrieved, len(expected))
-				assert.ElementsMatch(t, expected, retrieved)
+					expected := idsInHeightRange(min, max)
+					assert.NotEmpty(t, expected, "test assumption broken")
+					assert.Len(t, retrieved, len(expected))
+					assert.ElementsMatch(t, expected, retrieved)
+					return nil
+				})
 			})
 			t.Run("[-{--]-}", func(t *testing.T) {
-				var retrieved []flow.Identifier
-				min := minHeight + (maxHeight-minHeight)/2
-				max := maxHeight + 100
-				err := operation.LookupClusterBlocksByReferenceHeightRange(lctx, db.Reader(), min, max, &retrieved)
-				assert.NoError(t, err)
+				unittest.WithLock(t, lockManager, storage.LockInsertOrFinalizeClusterBlock, func(lctx lockctx.Context) error {
+					var retrieved []flow.Identifier
+					min := minHeight + (maxHeight-minHeight)/2
+					max := maxHeight + 100
+					err := operation.LookupClusterBlocksByReferenceHeightRange(lctx, db.Reader(), min, max, &retrieved)
+					assert.NoError(t, err)
 
-				expected := idsInHeightRange(min, max)
-				assert.NotEmpty(t, expected, "test assumption broken")
-				assert.Len(t, retrieved, len(expected))
-				assert.ElementsMatch(t, expected, retrieved)
+					expected := idsInHeightRange(min, max)
+					assert.NotEmpty(t, expected, "test assumption broken")
+					assert.Len(t, retrieved, len(expected))
+					assert.ElementsMatch(t, expected, retrieved)
+					return nil
+				})
 			})
 			t.Run("[-]--{-}", func(t *testing.T) {
-				var retrieved []flow.Identifier
-				err := operation.LookupClusterBlocksByReferenceHeightRange(lctx, db.Reader(), maxHeight+1, maxHeight+100, &retrieved)
-				assert.NoError(t, err)
-				assert.Len(t, retrieved, 0)
+				unittest.WithLock(t, lockManager, storage.LockInsertOrFinalizeClusterBlock, func(lctx lockctx.Context) error {
+					var retrieved []flow.Identifier
+					err := operation.LookupClusterBlocksByReferenceHeightRange(lctx, db.Reader(), maxHeight+1, maxHeight+100, &retrieved)
+					assert.NoError(t, err)
+					assert.Len(t, retrieved, 0)
+					return nil
+				})
 			})
 		})
 	})
@@ -346,23 +370,19 @@ func benchmarkLookupClusterBlocksByReferenceHeightRange(b *testing.B, n int) {
 	lockManager := storage.NewTestingLockManager()
 	dbtest.BenchWithStorages(b, func(b *testing.B, r storage.Reader, wr dbtest.WithWriter) {
 		for i := 0; i < n; i++ {
-			lctx := lockManager.NewContext()
-			require.NoError(b, lctx.AcquireLock(storage.LockInsertOrFinalizeClusterBlock))
-			err := wr(func(w storage.Writer) error {
-				return operation.IndexClusterBlockByReferenceHeight(lctx, w, rand.Uint64()%1000, unittest.IdentifierFixture())
+			unittest.WithLockBench(b, lockManager, storage.LockInsertOrFinalizeClusterBlock, func(lctx lockctx.Context) error {
+				return wr(func(w storage.Writer) error {
+					return operation.IndexClusterBlockByReferenceHeight(lctx, w, rand.Uint64()%1000, unittest.IdentifierFixture())
+				})
 			})
-			require.NoError(b, err)
-			lctx.Release()
 		}
 
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
 			var blockIDs []flow.Identifier
-			lctx := lockManager.NewContext()
-			require.NoError(b, lctx.AcquireLock(storage.LockInsertOrFinalizeClusterBlock))
-			err := operation.LookupClusterBlocksByReferenceHeightRange(lctx, r, 0, 1000, &blockIDs)
-			require.NoError(b, err)
-			lctx.Release()
+			unittest.WithLockBench(b, lockManager, storage.LockInsertOrFinalizeClusterBlock, func(lctx lockctx.Context) error {
+				return operation.LookupClusterBlocksByReferenceHeightRange(lctx, r, 0, 1000, &blockIDs)
+			})
 		}
 	})
 }

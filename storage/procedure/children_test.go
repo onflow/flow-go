@@ -3,6 +3,7 @@ package procedure_test
 import (
 	"testing"
 
+	"github.com/jordanschalm/lockctx"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/model/flow"
@@ -16,22 +17,18 @@ import (
 func TestIndexAndLookupChild(t *testing.T) {
 	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
 		lockManager := storage.NewTestingLockManager()
-		lctx := lockManager.NewContext()
-		err := lctx.AcquireLock(storage.LockInsertBlock)
-		require.NoError(t, err)
-		defer lctx.Release()
-
 		parentID := unittest.IdentifierFixture()
 		childID := unittest.IdentifierFixture()
 
-		err = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			return procedure.IndexNewBlock(lctx, rw, childID, parentID)
+		unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
+			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+				return procedure.IndexNewBlock(lctx, rw, childID, parentID)
+			})
 		})
-		require.NoError(t, err)
 
 		// retrieve child
 		var retrievedIDs flow.IdentifierList
-		err = procedure.LookupBlockChildren(db.Reader(), parentID, &retrievedIDs)
+		err := procedure.LookupBlockChildren(db.Reader(), parentID, &retrievedIDs)
 		require.NoError(t, err)
 
 		// retrieved child should be the stored child
@@ -45,29 +42,26 @@ func TestIndexAndLookupChild(t *testing.T) {
 func TestIndexTwiceAndRetrieve(t *testing.T) {
 	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
 		lockManager := storage.NewTestingLockManager()
-		lctx := lockManager.NewContext()
-		err := lctx.AcquireLock(storage.LockInsertBlock)
-		require.NoError(t, err)
-		defer lctx.Release()
-
 		parentID := unittest.IdentifierFixture()
 		child1ID := unittest.IdentifierFixture()
 		child2ID := unittest.IdentifierFixture()
 
 		// index the first child
-		err = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			return procedure.IndexNewBlock(lctx, rw, child1ID, parentID)
+		unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
+			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+				return procedure.IndexNewBlock(lctx, rw, child1ID, parentID)
+			})
 		})
-		require.NoError(t, err)
 
 		// index the second child
-		err = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			return procedure.IndexNewBlock(lctx, rw, child2ID, parentID)
+		unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
+			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+				return procedure.IndexNewBlock(lctx, rw, child2ID, parentID)
+			})
 		})
-		require.NoError(t, err)
 
 		var retrievedIDs flow.IdentifierList
-		err = procedure.LookupBlockChildren(db.Reader(), parentID, &retrievedIDs)
+		err := procedure.LookupBlockChildren(db.Reader(), parentID, &retrievedIDs)
 		require.NoError(t, err)
 
 		require.Equal(t, flow.IdentifierList{child1ID, child2ID}, retrievedIDs)
@@ -78,21 +72,19 @@ func TestIndexTwiceAndRetrieve(t *testing.T) {
 func TestIndexZeroParent(t *testing.T) {
 	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
 		lockManager := storage.NewTestingLockManager()
-		lctx := lockManager.NewContext()
-		err := lctx.AcquireLock(storage.LockInsertBlock)
-		require.NoError(t, err)
-		defer lctx.Release()
-
 		childID := unittest.IdentifierFixture()
 
-		err = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			return procedure.IndexNewBlock(lctx, rw, childID, flow.ZeroID)
+		unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
+			err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+				return procedure.IndexNewBlock(lctx, rw, childID, flow.ZeroID)
+			})
+			require.NoError(t, err)
+			return nil
 		})
-		require.NoError(t, err)
 
 		// zero id should have no children
 		var retrievedIDs flow.IdentifierList
-		err = procedure.LookupBlockChildren(db.Reader(), flow.ZeroID, &retrievedIDs)
+		err := procedure.LookupBlockChildren(db.Reader(), flow.ZeroID, &retrievedIDs)
 		require.ErrorIs(t, err, storage.ErrNotFound)
 	})
 }
@@ -101,35 +93,33 @@ func TestIndexZeroParent(t *testing.T) {
 func TestDirectChildren(t *testing.T) {
 	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
 		lockManager := storage.NewTestingLockManager()
-		lctx := lockManager.NewContext()
-		err := lctx.AcquireLock(storage.LockInsertBlock)
-		require.NoError(t, err)
-		defer lctx.Release()
-
 		b1 := unittest.IdentifierFixture()
 		b2 := unittest.IdentifierFixture()
 		b3 := unittest.IdentifierFixture()
 		b4 := unittest.IdentifierFixture()
 
-		err = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			return procedure.IndexNewBlock(lctx, rw, b2, b1)
+		unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
+			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+				return procedure.IndexNewBlock(lctx, rw, b2, b1)
+			})
 		})
-		require.NoError(t, err)
 
-		err = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			return procedure.IndexNewBlock(lctx, rw, b3, b2)
+		unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
+			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+				return procedure.IndexNewBlock(lctx, rw, b3, b2)
+			})
 		})
-		require.NoError(t, err)
 
-		err = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			return procedure.IndexNewBlock(lctx, rw, b4, b3)
+		unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
+			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+				return procedure.IndexNewBlock(lctx, rw, b4, b3)
+			})
 		})
-		require.NoError(t, err)
 
 		// check the children of the first block
 		var retrievedIDs flow.IdentifierList
 
-		err = procedure.LookupBlockChildren(db.Reader(), b1, &retrievedIDs)
+		err := procedure.LookupBlockChildren(db.Reader(), b1, &retrievedIDs)
 		require.NoError(t, err)
 		require.Equal(t, flow.IdentifierList{b2}, retrievedIDs)
 

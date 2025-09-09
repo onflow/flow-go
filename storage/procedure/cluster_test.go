@@ -19,17 +19,15 @@ func TestInsertRetrieveClusterBlock(t *testing.T) {
 		block := unittest.ClusterBlockFixture()
 
 		lockManager := storage.NewTestingLockManager()
-		lctx := lockManager.NewContext()
-		err := lctx.AcquireLock(storage.LockInsertOrFinalizeClusterBlock)
-		require.NoError(t, err)
-		defer lctx.Release()
-
-		require.NoError(t, db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			return InsertClusterBlock(lctx, rw, unittest.ClusterProposalFromBlock(block))
-		}))
+		unittest.WithLock(t, lockManager, storage.LockInsertOrFinalizeClusterBlock, func(lctx lockctx.Context) error {
+			require.NoError(t, db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+				return InsertClusterBlock(lctx, rw, unittest.ClusterProposalFromBlock(block))
+			}))
+			return nil
+		})
 
 		var retrieved cluster.Block
-		err = RetrieveClusterBlock(db.Reader(), block.ID(), &retrieved)
+		err := RetrieveClusterBlock(db.Reader(), block.ID(), &retrieved)
 		require.NoError(t, err)
 
 		require.Equal(t, *block, retrieved)
@@ -44,28 +42,28 @@ func TestFinalizeClusterBlock(t *testing.T) {
 		)
 
 		lockManager := storage.NewTestingLockManager()
-		lctx := lockManager.NewContext()
-		defer lctx.Release()
-		require.NoError(t, lctx.AcquireLock(storage.LockInsertOrFinalizeClusterBlock))
-		require.NoError(t, db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			return InsertClusterBlock(lctx, rw, unittest.ClusterProposalFromBlock(parent))
-		}))
+		unittest.WithLock(t, lockManager, storage.LockInsertOrFinalizeClusterBlock, func(lctx lockctx.Context) error {
+			require.NoError(t, db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+				return InsertClusterBlock(lctx, rw, unittest.ClusterProposalFromBlock(parent))
+			}))
 
-		// index parent as latest finalized block (manually writing respective indexes like in bootstrapping to skip transitive consistency checks)
-		require.NoError(t, db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			return operation.IndexClusterBlockHeight(lctx, rw.Writer(), block.ChainID, parent.Height, parent.ID())
-		}))
-		require.NoError(t, db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			return operation.UpsertClusterFinalizedHeight(lctx, rw.Writer(), block.ChainID, parent.Height)
-		}))
+			// index parent as latest finalized block (manually writing respective indexes like in bootstrapping to skip transitive consistency checks)
+			require.NoError(t, db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+				return operation.IndexClusterBlockHeight(lctx, rw.Writer(), block.ChainID, parent.Height, parent.ID())
+			}))
+			require.NoError(t, db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+				return operation.UpsertClusterFinalizedHeight(lctx, rw.Writer(), block.ChainID, parent.Height)
+			}))
 
-		// Insert new block and verify `FinalizeClusterBlock` procedure accepts it
-		require.NoError(t, db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			return InsertClusterBlock(lctx, rw, unittest.ClusterProposalFromBlock(block))
-		}))
-		require.NoError(t, db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			return FinalizeClusterBlock(lctx, rw, block.ID())
-		}))
+			// Insert new block and verify `FinalizeClusterBlock` procedure accepts it
+			require.NoError(t, db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+				return InsertClusterBlock(lctx, rw, unittest.ClusterProposalFromBlock(block))
+			}))
+			require.NoError(t, db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+				return FinalizeClusterBlock(lctx, rw, block.ID())
+			}))
+			return nil
+		})
 
 		// verify that the new block as been properly indexed as the latest finalized
 		var latestFinalizedHeight uint64
@@ -84,44 +82,50 @@ func TestFinalizeClusterBlock(t *testing.T) {
 // TestDisconnectedFinalizedBlock verifies that finalization logic rejects finalizing a block whose parent is not the latest finalized block.
 func TestDisconnectedFinalizedBlock(t *testing.T) {
 	lockManager := storage.NewTestingLockManager()
-	lctx := lockManager.NewContext()
-	require.NoError(t, lctx.AcquireLock(storage.LockInsertOrFinalizeClusterBlock))
-	defer lctx.Release()
 
 	t.Run("finalizing C should fail because B is not yet finalized", func(t *testing.T) {
 		dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
-			_, _, blockC, _ := constructState(t, db, lctx)
-			err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-				return FinalizeClusterBlock(lctx, rw, blockC.ID())
+			unittest.WithLock(t, lockManager, storage.LockInsertOrFinalizeClusterBlock, func(lctx lockctx.Context) error {
+				_, _, blockC, _ := constructState(t, db, lctx)
+				err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+					return FinalizeClusterBlock(lctx, rw, blockC.ID())
+				})
+				require.Error(t, err)
+				require.NotErrorIs(t, err, storage.ErrAlreadyExists)
+				return nil
 			})
-			require.Error(t, err)
-			require.NotErrorIs(t, err, storage.ErrAlreadyExists)
 		})
 	})
 
 	t.Run("finalizing B and then C should succeed", func(t *testing.T) {
 		dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
-			_, blockB, blockC, _ := constructState(t, db, lctx)
-			require.NoError(t, db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-				return FinalizeClusterBlock(lctx, rw, blockB.ID())
-			}))
-			require.NoError(t, db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-				return FinalizeClusterBlock(lctx, rw, blockC.ID())
-			}))
+			unittest.WithLock(t, lockManager, storage.LockInsertOrFinalizeClusterBlock, func(lctx lockctx.Context) error {
+				_, blockB, blockC, _ := constructState(t, db, lctx)
+				require.NoError(t, db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+					return FinalizeClusterBlock(lctx, rw, blockB.ID())
+				}))
+				require.NoError(t, db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+					return FinalizeClusterBlock(lctx, rw, blockC.ID())
+				}))
+				return nil
+			})
 		})
 	})
 
 	t.Run("finalizing B and then D should fail, because B is not the parent of D", func(t *testing.T) {
 		dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
-			_, blockB, _, blockD := constructState(t, db, lctx)
-			require.NoError(t, db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-				return FinalizeClusterBlock(lctx, rw, blockB.ID())
-			}))
-			err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-				return FinalizeClusterBlock(lctx, rw, blockD.ID())
+			unittest.WithLock(t, lockManager, storage.LockInsertOrFinalizeClusterBlock, func(lctx lockctx.Context) error {
+				_, blockB, _, blockD := constructState(t, db, lctx)
+				require.NoError(t, db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+					return FinalizeClusterBlock(lctx, rw, blockB.ID())
+				}))
+				err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+					return FinalizeClusterBlock(lctx, rw, blockD.ID())
+				})
+				require.Error(t, err)
+				require.NotErrorIs(t, err, storage.ErrAlreadyExists)
+				return nil
 			})
-			require.Error(t, err)
-			require.NotErrorIs(t, err, storage.ErrAlreadyExists)
 		})
 	})
 

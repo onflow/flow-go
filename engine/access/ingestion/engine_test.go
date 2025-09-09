@@ -409,13 +409,11 @@ func (s *Suite) TestOnCollection() {
 	s.collections.On("StoreAndIndexByTransaction", mock.Anything, &collection).Return(light, nil).Once()
 
 	// Create a lock context for indexing
-	lctx := s.lockManager.NewContext()
-	err := lctx.AcquireLock(storage.LockInsertCollection)
-	require.NoError(s.T(), err)
-	defer lctx.Release()
-
-	err = indexer.IndexCollection(lctx, &collection, s.collections, s.log, s.collectionExecutedMetric)
-	require.NoError(s.T(), err)
+	unittest.WithLock(s.T(), s.lockManager, storage.LockInsertCollection, func(lctx lockctx.Context) error {
+		err := indexer.IndexCollection(lctx, &collection, s.collections, s.log, s.collectionExecutedMetric)
+		require.NoError(s.T(), err)
+		return nil
+	})
 
 	// check that the collection was stored and indexed
 	s.collections.AssertExpectations(s.T())
@@ -485,13 +483,11 @@ func (s *Suite) TestOnCollectionDuplicate() {
 	s.collections.On("StoreAndIndexByTransaction", mock.Anything, &collection).Return(light, storage.ErrAlreadyExists).Once()
 
 	// Create a lock context for indexing
-	lctx := s.lockManager.NewContext()
-	err := lctx.AcquireLock(storage.LockInsertCollection)
-	require.NoError(s.T(), err)
-	defer lctx.Release()
-
-	err = indexer.IndexCollection(lctx, &collection, s.collections, s.log, s.collectionExecutedMetric)
-	require.ErrorIs(s.T(), err, storage.ErrAlreadyExists)
+	unittest.WithLock(s.T(), s.lockManager, storage.LockInsertCollection, func(lctx lockctx.Context) error {
+		err := indexer.IndexCollection(lctx, &collection, s.collections, s.log, s.collectionExecutedMetric)
+		require.ErrorIs(s.T(), err, storage.ErrAlreadyExists)
+		return nil
+	})
 
 	// check that the collection was stored and indexed
 	s.collections.AssertExpectations(s.T())
