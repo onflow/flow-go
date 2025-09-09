@@ -2,10 +2,10 @@ package messages
 
 import (
 	"fmt"
-	libp2pmessage "github.com/onflow/flow-go/model/libp2p/message"
 
 	"github.com/onflow/flow-go/model/cluster"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/libp2p/message"
 )
 
 // UntrustedMessage represents the set of allowed decode target types for messages received over the network.
@@ -71,7 +71,7 @@ func InternalToMessage(event interface{}) (UntrustedMessage, error) {
 	case *flow.ResultApproval:
 		return (*ResultApproval)(internal), nil
 	case *flow.TestMessage:
-		return (*libp2pmessage.TestMessage)(internal), nil
+		return (*message.TestMessage)(internal), nil
 	//case UntrustedMessage:
 	//	// Already a valid UntrustedMessage
 	//	// TODO(immutable M2): expand when ToInternal changes for other M2 types
