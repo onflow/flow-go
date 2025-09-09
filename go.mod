@@ -15,7 +15,7 @@ require (
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc
 	github.com/dgraph-io/badger/v2 v2.2007.4
 	github.com/ef-ds/deque v1.0.4
-	github.com/ethereum/go-ethereum v1.16.2
+	github.com/ethereum/go-ethereum v1.16.3
 	github.com/fxamacker/cbor/v2 v2.8.1-0.20250402194037-6f932b086829
 	github.com/gammazero/workerpool v1.1.3
 	github.com/gogo/protobuf v1.3.2
@@ -112,6 +112,7 @@ require (
 	github.com/onflow/wal v1.0.2
 	github.com/slok/go-http-metrics v0.12.0
 	github.com/sony/gobreaker v0.5.0
+	go.opentelemetry.io/otel/exporters/stdout/stdouttrace v1.21.0
 	golang.org/x/xerrors v0.0.0-20240903120638-7835f813f4da
 	google.golang.org/genproto/googleapis/api v0.0.0-20250528174236-200df99c418a
 	google.golang.org/genproto/googleapis/bytestream v0.0.0-20250603155806-513f23925822

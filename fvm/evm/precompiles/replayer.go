@@ -75,3 +75,7 @@ func (p *ReplayerPrecompiledContract) HasReplayedAll() bool {
 	return len(p.expectedCalls.RequiredGasCalls) == p.requiredGasIndex &&
 		len(p.expectedCalls.RunCalls) == p.runIndex
 }
+
+func (p *ReplayerPrecompiledContract) Name() string {
+	return CADENCE_ARCH_PRECOMPILE_NAME
+}

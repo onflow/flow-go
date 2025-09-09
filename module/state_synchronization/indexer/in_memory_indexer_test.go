@@ -3,6 +3,7 @@ package indexer
 import (
 	"testing"
 
+	"github.com/jordanschalm/lockctx"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -11,15 +12,17 @@ import (
 	"github.com/onflow/flow-go/ledger/common/convert"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
+	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/store/inmemory/unsynchronized"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
 func TestNewInMemoryIndexer(t *testing.T) {
+	lockManager := storage.NewTestingLockManager()
 	header := unittest.BlockHeaderFixture()
 	block := unittest.BlockWithParentFixture(header)
 	exeResult := unittest.ExecutionResultFixture(unittest.WithBlock(block))
-	indexer := createInMemoryIndexer(exeResult, header)
+	indexer, _ := createInMemoryIndexer(lockManager, exeResult, header)
 
 	assert.NotNil(t, indexer)
 	assert.Equal(t, header.Height, indexer.registers.LatestHeight())
@@ -27,11 +30,12 @@ func TestNewInMemoryIndexer(t *testing.T) {
 
 func TestInMemoryIndexer_IndexBlockData(t *testing.T) {
 	t.Run("Index Single Chunk and Single Register", func(t *testing.T) {
+		lockManager := storage.NewTestingLockManager()
 		header := unittest.BlockHeaderFixture()
 		block := unittest.BlockWithParentFixture(header)
 		blockID := block.ID()
 		exeResult := unittest.ExecutionResultFixture(unittest.WithBlock(block))
-		indexer := createInMemoryIndexer(exeResult, header)
+		indexer, _ := createInMemoryIndexer(lockManager, exeResult, header)
 
 		trie := TrieUpdateRandomLedgerPayloadsFixture(t)
 		require.NotEmpty(t, trie.Payloads)
@@ -69,11 +73,12 @@ func TestInMemoryIndexer_IndexBlockData(t *testing.T) {
 	})
 
 	t.Run("Index Multiple Chunks and Merge Same Register Updates", func(t *testing.T) {
+		lockManager := storage.NewTestingLockManager()
 		header := unittest.BlockHeaderFixture()
 		block := unittest.BlockWithParentFixture(header)
 		blockID := block.ID()
 		exeResult := unittest.ExecutionResultFixture(unittest.WithBlock(block))
-		indexer := createInMemoryIndexer(exeResult, header)
+		indexer, _ := createInMemoryIndexer(lockManager, exeResult, header)
 
 		tries := []*ledger.TrieUpdate{TrieUpdateRandomLedgerPayloadsFixture(t), TrieUpdateRandomLedgerPayloadsFixture(t)}
 		// Make sure we have two register updates that are updating the same value
@@ -113,11 +118,12 @@ func TestInMemoryIndexer_IndexBlockData(t *testing.T) {
 	})
 
 	t.Run("Index Events", func(t *testing.T) {
+		lockManager := storage.NewTestingLockManager()
 		header := unittest.BlockHeaderFixture()
 		block := unittest.BlockWithParentFixture(header)
 		blockID := block.ID()
 		exeResult := unittest.ExecutionResultFixture(unittest.WithBlock(block))
-		indexer := createInMemoryIndexer(exeResult, header)
+		indexer, _ := createInMemoryIndexer(lockManager, exeResult, header)
 
 		expectedEvents := unittest.EventsFixture(20)
 		collection := unittest.CollectionFixture(0)
@@ -148,11 +154,12 @@ func TestInMemoryIndexer_IndexBlockData(t *testing.T) {
 	})
 
 	t.Run("Index Tx Results", func(t *testing.T) {
+		lockManager := storage.NewTestingLockManager()
 		header := unittest.BlockHeaderFixture()
 		block := unittest.BlockWithParentFixture(header)
 		blockID := block.ID()
 		exeResult := unittest.ExecutionResultFixture(unittest.WithBlock(block))
-		indexer := createInMemoryIndexer(exeResult, header)
+		indexer, _ := createInMemoryIndexer(lockManager, exeResult, header)
 
 		expectedResults := unittest.LightTransactionResultsFixture(20)
 		collection := unittest.CollectionFixture(0)
@@ -184,11 +191,12 @@ func TestInMemoryIndexer_IndexBlockData(t *testing.T) {
 	})
 
 	t.Run("Index Collections", func(t *testing.T) {
+		lockManager := storage.NewTestingLockManager()
 		header := unittest.BlockHeaderFixture()
 		block := unittest.BlockWithParentFixture(header)
 		blockID := block.ID()
 		exeResult := unittest.ExecutionResultFixture(unittest.WithBlock(block))
-		indexer := createInMemoryIndexer(exeResult, header)
+		indexer, transactions := createInMemoryIndexer(lockManager, exeResult, header)
 
 		// Create collections and store them directly first
 		expectedCollections := unittest.CollectionListFixture(2)
@@ -220,19 +228,24 @@ func TestInMemoryIndexer_IndexBlockData(t *testing.T) {
 
 			// Verify transactions were indexed
 			for _, tx := range expectedCollection.Transactions {
-				storedTx, err := indexer.transactions.ByID(tx.ID())
+				storedTx, err := transactions.ByID(tx.ID())
 				require.NoError(t, err)
 				assert.Equal(t, tx.ID(), storedTx.ID())
+
+				storedLightTx, err := indexer.collections.LightByTransactionID(tx.ID())
+				require.NoError(t, err)
+				assert.Equal(t, expectedCollection.Light().ID(), storedLightTx.ID())
 			}
 		}
 	})
 
 	t.Run("Index AllTheThings", func(t *testing.T) {
+		lockManager := storage.NewTestingLockManager()
 		header := unittest.BlockHeaderFixture()
 		block := unittest.BlockWithParentFixture(header)
 		blockID := block.ID()
 		exeResult := unittest.ExecutionResultFixture(unittest.WithBlock(block))
-		indexer := createInMemoryIndexer(exeResult, header)
+		indexer, _ := createInMemoryIndexer(lockManager, exeResult, header)
 
 		expectedEvents := unittest.EventsFixture(20)
 		expectedResults := unittest.LightTransactionResultsFixture(20)
@@ -305,10 +318,11 @@ func TestInMemoryIndexer_IndexBlockData(t *testing.T) {
 	})
 
 	t.Run("Index Transaction Error Messages", func(t *testing.T) {
+		lockManager := storage.NewTestingLockManager()
 		header := unittest.BlockHeaderFixture()
 		block := unittest.BlockWithParentFixture(header)
 		exeResult := unittest.ExecutionResultFixture(unittest.WithBlock(block))
-		indexer := createInMemoryIndexer(exeResult, header)
+		indexer, _ := createInMemoryIndexer(lockManager, exeResult, header)
 
 		txResultErrMsgsData := make([]flow.TransactionResultErrorMessage, 2)
 		for i := 0; i < 2; i++ {
@@ -331,14 +345,17 @@ func TestInMemoryIndexer_IndexBlockData(t *testing.T) {
 
 // Helper functions
 
-func createInMemoryIndexer(executionResult *flow.ExecutionResult, header *flow.Header) *InMemoryIndexer {
+func createInMemoryIndexer(lockManager lockctx.Manager, executionResult *flow.ExecutionResult, header *flow.Header) (*InMemoryIndexer, *unsynchronized.Transactions) {
+	transactions := unsynchronized.NewTransactions()
 	return NewInMemoryIndexer(zerolog.Nop(),
 		unsynchronized.NewRegisters(header.Height),
 		unsynchronized.NewEvents(),
-		unsynchronized.NewCollections(),
-		unsynchronized.NewTransactions(),
+		unsynchronized.NewCollections(transactions),
 		unsynchronized.NewLightTransactionResults(),
 		unsynchronized.NewTransactionResultErrorMessages(),
 		executionResult,
-		header)
+		header,
+		lockManager,
+	), transactions
+
 }
