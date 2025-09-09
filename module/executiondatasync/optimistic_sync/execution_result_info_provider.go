@@ -54,5 +54,5 @@ type ExecutionResultInfoProvider interface {
 	//
 	// Expected errors during normal operations:
 	//   - backend.InsufficientExecutionReceipts - found insufficient receipts for given block ID.
-	ExecutionResult(blockID flow.Identifier, criteria Criteria) (*ExecutionResultInfo, error)
+	ExecutionResultInfo(blockID flow.Identifier, criteria Criteria) (*ExecutionResultInfo, error)
 }

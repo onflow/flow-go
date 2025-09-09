@@ -167,7 +167,7 @@ func (e *Events) GetEventsForHeightRange(
 	// must be from the execution fork terminating at this result. this guarantees the response
 	// contains a consistent view of the state.
 	lastBlockID := blockHeaders[len(blockHeaders)-1].ID
-	execResultInfo, err := e.execResultProvider.ExecutionResult(
+	execResultInfo, err := e.execResultProvider.ExecutionResultInfo(
 		lastBlockID,
 		criteria,
 	)
@@ -229,7 +229,7 @@ func (e *Events) GetEventsForBlockIDs(
 	// get the result for the block with the highest height. all data queried for this set of blocks
 	// must be from the execution fork terminating at this result. this guarantees the response
 	// contains a consistent view of the state.
-	execResultInfo, err := e.execResultProvider.ExecutionResult(
+	execResultInfo, err := e.execResultProvider.ExecutionResultInfo(
 		newestBlockHeader.ID(),
 		criteria,
 	)

@@ -1983,7 +1983,7 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 			VersionControl:             builder.VersionControl,
 			ExecNodeIdentitiesProvider: execNodeIdentitiesProvider,
 			// TODO: set this once data result forest merged in
-			//ExecutionResultProvider:
+			//ExecutionResultInfoProvider:
 			//ExecutionStateCache:
 			OperatorCriteria: optimistic_sync.DefaultCriteria,
 		}

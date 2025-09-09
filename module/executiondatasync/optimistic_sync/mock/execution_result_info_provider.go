@@ -15,7 +15,7 @@ type ExecutionResultInfoProvider struct {
 }
 
 // ExecutionResult provides a mock function with given fields: blockID, criteria
-func (_m *ExecutionResultInfoProvider) ExecutionResult(blockID flow.Identifier, criteria optimistic_sync.Criteria) (*optimistic_sync.ExecutionResultInfo, error) {
+func (_m *ExecutionResultInfoProvider) ExecutionResultInfo(blockID flow.Identifier, criteria optimistic_sync.Criteria) (*optimistic_sync.ExecutionResultInfo, error) {
 	ret := _m.Called(blockID, criteria)
 
 	if len(ret) == 0 {

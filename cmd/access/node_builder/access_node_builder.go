@@ -2060,7 +2060,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				ExecNodeIdentitiesProvider: notNil(builder.ExecNodeIdentitiesProvider),
 				TxErrorMessageProvider:     notNil(builder.txResultErrorMessageProvider),
 				// TODO: set this once data result forest merged in
-				//ExecutionResultProvider:
+				//ExecutionResultInfoProvider:
 				//ExecutionStateCache:
 				OperatorCriteria: optimistic_sync.DefaultCriteria,
 			})
