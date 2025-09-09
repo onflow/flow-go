@@ -8,7 +8,6 @@ import (
 	"os"
 	"testing"
 
-	"github.com/dgraph-io/badger/v2"
 	"github.com/jordanschalm/lockctx"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
@@ -30,7 +29,7 @@ import (
 	protocolutil "github.com/onflow/flow-go/state/protocol/util"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/operation"
-	"github.com/onflow/flow-go/storage/operation/badgerimpl"
+	"github.com/onflow/flow-go/storage/operation/pebbleimpl"
 	"github.com/onflow/flow-go/storage/procedure"
 	"github.com/onflow/flow-go/storage/store"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -39,7 +38,6 @@ import (
 type MutatorSuite struct {
 	suite.Suite
 	db          storage.DB
-	badgerdb    *badger.DB
 	dbdir       string
 	lockManager lockctx.Manager
 
@@ -64,8 +62,8 @@ func (suite *MutatorSuite) SetupTest() {
 	suite.chainID = suite.genesis.ChainID
 
 	suite.dbdir = unittest.TempDir(suite.T())
-	suite.badgerdb = unittest.BadgerDB(suite.T(), suite.dbdir)
-	suite.db = badgerimpl.ToDB(suite.badgerdb)
+	pdb := unittest.PebbleDB(suite.T(), suite.dbdir)
+	suite.db = pebbleimpl.ToDB(pdb)
 	suite.lockManager = storage.NewTestingLockManager()
 
 	metrics := metrics.NewNoopCollector()
@@ -144,7 +142,7 @@ func (suite *MutatorSuite) SetupTest() {
 
 // runs after each test finishes
 func (suite *MutatorSuite) TearDownTest() {
-	err := suite.badgerdb.Close()
+	err := suite.db.Close()
 	suite.Assert().Nil(err)
 	err = os.RemoveAll(suite.dbdir)
 	suite.Assert().Nil(err)
