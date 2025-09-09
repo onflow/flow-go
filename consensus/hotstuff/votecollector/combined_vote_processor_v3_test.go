@@ -1045,3 +1045,116 @@ func TestCombinedVoteProcessorV3_BuildVerifyQC(t *testing.T) {
 
 	require.True(t, qcCreated)
 }
+
+// TestCombinedVoteProcessorV3_BuildVerifyQC tests a complete path from creating votes to collecting votes and then
+// building & verifying QC.
+// We start with leader proposing a block, then new leader collects votes and builds a QC.
+// Need to verify that QC that was produced is valid and can be embedded in new proposal.
+func TestCombinedVoteProcessorV3_DoubleVoting(t *testing.T) {
+	epochCounter := uint64(3)
+	epochLookup := &modulemock.EpochLookup{}
+	proposerView := uint64(20)
+	epochLookup.On("EpochForView", proposerView).Return(epochCounter, nil)
+
+	dkgData, err := bootstrapDKG.RandomBeaconKG(4, unittest.RandomBytes(32))
+	require.NoError(t, err)
+
+	// signers hold objects that are created with private key and can sign votes and proposals
+	signers := make(map[flow.Identifier]*verification.CombinedSignerV3)
+
+	// prepare consensus committee:
+	// * 3 signers that have the staking key but have failed DKG and don't have Random Beacon key
+	// * 8 signers that have the staking key and have the Random Beacon key
+	// * 1 signer that was ejected from the committee but still took part in DKG.
+	// Total consensus committee is 11.
+	// Total random beacon committee is 9.
+	// This way both random beacon committee and consensus committee have nodes that are not part of the other committee
+	// therefore forming a symmetric difference.
+	allIdentities := unittest.IdentityListFixture(4).Sort(flow.Canonical[flow.Identity])
+	require.Equal(t, len(dkgData.PubKeyShares), len(allIdentities),
+		"require the most general case: consensus and random beacon committees form a symmetric difference")
+	dkgParticipants := make(map[flow.Identifier]flow.DKGParticipant)
+	for index, identity := range allIdentities {
+		dkgParticipants[identity.NodeID] = flow.DKGParticipant{
+			Index:    uint(index),
+			KeyShare: dkgData.PubKeyShares[index],
+		}
+	}
+
+	for _, identity := range allIdentities {
+		stakingPriv := unittest.StakingPrivKeyFixture()
+		identity.StakingPubKey = stakingPriv.PublicKey()
+
+		participantData := dkgParticipants[identity.NodeID]
+
+		dkgKey := encodable.RandomBeaconPrivKey{
+			PrivateKey: dkgData.PrivKeyShares[participantData.Index],
+		}
+
+		keys := &storagemock.SafeBeaconKeys{}
+		// there is Random Beacon key for this epoch
+		keys.On("RetrieveMyBeaconPrivateKey", epochCounter).Return(dkgKey, true, nil)
+
+		beaconSignerStore := hsig.NewEpochAwareRandomBeaconKeyStore(epochLookup, keys)
+
+		me, err := local.New(identity.IdentitySkeleton, stakingPriv)
+		require.NoError(t, err)
+
+		signers[identity.NodeID] = verification.NewCombinedSignerV3(me, beaconSignerStore)
+	}
+
+	leader := allIdentities[0]
+	block := helper.MakeBlock(helper.WithBlockView(proposerView), helper.WithBlockProposer(leader.NodeID))
+
+	committee, err := committees.NewStaticCommittee(allIdentities, flow.ZeroID, dkgParticipants, dkgData.PubGroupKey)
+	require.NoError(t, err)
+
+	votes := make([]*model.Vote, 0, len(allIdentities))
+
+	// first staking signer will be leader collecting votes for proposal
+	// prepare votes for every member of committee except leader
+	for _, signer := range allIdentities.Filter(filter.Not(filter.HasNodeID[flow.Identity](leader.NodeID))) {
+		vote, err := signers[signer.NodeID].CreateVote(block)
+		require.NoError(t, err)
+		votes = append(votes, vote)
+	}
+
+	// create and sign proposal
+	leaderVote, err := signers[leader.NodeID].CreateVote(block)
+	require.NoError(t, err)
+	proposal := helper.MakeSignedProposal(helper.WithProposal(helper.MakeProposal(helper.WithBlock(block))), helper.WithSigData(leaderVote.SigData))
+
+	qcCreated := false
+	onQCCreated := func(qc *flow.QuorumCertificate) {
+		packer := hsig.NewConsensusSigDataPacker(committee)
+
+		// create verifier that will do crypto checks of created QC
+		verifier := verification.NewCombinedVerifierV3(committee, packer)
+		// create validator which will do compliance and crypto checked of created QC
+		validator := hotstuffvalidator.New(committee, verifier)
+		// check if QC is valid against parent
+		err := validator.ValidateQC(qc)
+		require.NoError(t, err)
+
+		qcCreated = true
+	}
+
+	baseFactory := &combinedVoteProcessorFactoryBaseV3{
+		committee:   committee,
+		onQCCreated: onQCCreated,
+		packer:      hsig.NewConsensusSigDataPacker(committee),
+	}
+	voteProcessorFactory := &VoteProcessorFactory{
+		baseFactory: baseFactory.Create,
+	}
+	voteProcessor, err := voteProcessorFactory.Create(unittest.Logger(), proposal)
+	require.NoError(t, err)
+
+	// process votes by new leader, this will result in producing new QC
+	for _, vote := range votes {
+		err := voteProcessor.Process(vote)
+		require.NoError(t, err)
+	}
+
+	require.True(t, qcCreated)
+}
