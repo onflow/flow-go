@@ -87,6 +87,7 @@ func TestAccounts_Create(t *testing.T) {
 
 	t.Run("account with 1 key", func(t *testing.T) {
 		key0 := newAccountPublicKey(t, 1000)
+		key0.SeqNumber = 1
 
 		txnState := testutils.NewSimpleTransaction(nil)
 		accounts := environment.NewAccounts(txnState)
@@ -138,129 +139,178 @@ func TestAccounts_Create(t *testing.T) {
 		require.Equal(t, expectedStorageUsed, decodedAccountStatus.StorageUsed())
 	})
 
-	t.Run("account with 2 unique key", func(t *testing.T) {
-		key0 := newAccountPublicKey(t, 1000)
-		key1 := newAccountPublicKey(t, 1000)
+	t.Run("account with 2 unique keys", func(t *testing.T) {
+		for _, hasSequenceNumber := range []bool{true, false} {
+			key0 := newAccountPublicKey(t, 1000)
+			key0.SeqNumber = 1
 
-		txnState := testutils.NewSimpleTransaction(nil)
-		accounts := environment.NewAccounts(txnState)
+			key1 := newAccountPublicKey(t, 1000)
+			if hasSequenceNumber {
+				key1.SeqNumber = 2
+			} else {
+				key1.SeqNumber = 0
+			}
 
-		address := flow.HexToAddress("01")
+			txnState := testutils.NewSimpleTransaction(nil)
+			accounts := environment.NewAccounts(txnState)
 
-		err := accounts.Create([]flow.AccountPublicKey{key0, key1}, address)
-		require.NoError(t, err)
+			address := flow.HexToAddress("01")
 
-		snapshot, err := txnState.FinalizeMainTransaction()
-		require.NoError(t, err)
+			err := accounts.Create([]flow.AccountPublicKey{key0, key1}, address)
+			require.NoError(t, err)
 
-		// New registers
-		expectedNewRegisterIDs := []flow.RegisterID{
-			flow.AccountStatusRegisterID(address),
-			flow.AccountPublicKey0RegisterID(address),
-			flow.AccountBatchPublicKeyRegisterID(address, 0),
+			snapshot, err := txnState.FinalizeMainTransaction()
+			require.NoError(t, err)
+
+			// New registers
+			expectedNewRegisterIDs := []flow.RegisterID{
+				flow.AccountStatusRegisterID(address),
+				flow.AccountPublicKey0RegisterID(address),
+				flow.AccountBatchPublicKeyRegisterID(address, 0),
+			}
+			if hasSequenceNumber {
+				expectedNewRegisterIDs = append(
+					expectedNewRegisterIDs,
+					flow.AccountPublicKeySequenceNumberRegisterID(address, 1),
+				)
+			}
+			registerIDs := snapshot.AllRegisterIDs()
+			require.Equal(t, len(expectedNewRegisterIDs), len(registerIDs))
+			require.ElementsMatch(t, expectedNewRegisterIDs, registerIDs)
+
+			// Test account status
+			accountStatusValue, exists := snapshot.WriteSet[flow.AccountStatusRegisterID(address)]
+			require.True(t, exists)
+			require.NotEmpty(t, accountStatusValue)
+
+			decodedAccountStatus, err := environment.AccountStatusFromBytes(accountStatusValue)
+			require.NoError(t, err)
+			require.Equal(t, uint8(4), decodedAccountStatus.Version())
+			require.Equal(t, uint32(2), decodedAccountStatus.AccountPublicKeyCount())
+
+			// Test account public key 0
+			key0Value, exists := snapshot.WriteSet[flow.AccountPublicKey0RegisterID(address)]
+			require.True(t, exists)
+			require.NotEmpty(t, key0Value)
+
+			decodedKey0, err := flow.DecodeAccountPublicKey(key0Value, 0)
+			require.NoError(t, err)
+			require.Equal(t, key0, decodedKey0)
+
+			// Test account public key 1
+			key1Value, exists := snapshot.WriteSet[flow.AccountBatchPublicKeyRegisterID(address, 0)]
+			require.True(t, exists)
+			require.NotEmpty(t, key1Value)
+
+			if hasSequenceNumber {
+				// Test sequence number 1
+				seqNum1Value, exists := snapshot.WriteSet[flow.AccountPublicKeySequenceNumberRegisterID(address, 1)]
+				require.True(t, exists)
+				decodedSeqNum1, err := flow.DecodeSequenceNumber(seqNum1Value)
+				require.NoError(t, err)
+				require.Equal(t, key1.SeqNumber, decodedSeqNum1)
+			}
+
+			// Test storage used
+			var expectedStorageUsed uint64
+			// Include account status register in storage used
+			expectedStorageUsed += uint64(environment.RegisterSize(
+				flow.AccountStatusRegisterID(address),
+				accountStatusValue))
+			// Include apk_0 register in storage used
+			expectedStorageUsed += uint64(environment.RegisterSize(
+				flow.AccountPublicKey0RegisterID(address),
+				key0Value))
+			// Include pk_b0 register in storage used
+			expectedStorageUsed += uint64(environment.RegisterSize(
+				flow.AccountBatchPublicKeyRegisterID(address, 1),
+				key1Value))
+			// Include predefined sequence number 1 register in storage used
+			expectedStorageUsed += environment.PredefinedSequenceNumberPayloadSize(address, 1)
+			require.Equal(t, expectedStorageUsed, decodedAccountStatus.StorageUsed())
 		}
-		registerIDs := snapshot.AllRegisterIDs()
-		require.Equal(t, len(expectedNewRegisterIDs), len(registerIDs))
-		require.ElementsMatch(t, expectedNewRegisterIDs, registerIDs)
-
-		// Test account status
-		accountStatusValue, exists := snapshot.WriteSet[flow.AccountStatusRegisterID(address)]
-		require.True(t, exists)
-		require.NotEmpty(t, accountStatusValue)
-
-		decodedAccountStatus, err := environment.AccountStatusFromBytes(accountStatusValue)
-		require.NoError(t, err)
-		require.Equal(t, uint8(4), decodedAccountStatus.Version())
-		require.Equal(t, uint32(2), decodedAccountStatus.AccountPublicKeyCount())
-
-		// Test account public key 0
-		key0Value, exists := snapshot.WriteSet[flow.AccountPublicKey0RegisterID(address)]
-		require.True(t, exists)
-		require.NotEmpty(t, key0Value)
-
-		decodedKey0, err := flow.DecodeAccountPublicKey(key0Value, 0)
-		require.NoError(t, err)
-		require.Equal(t, key0, decodedKey0)
-
-		// Test account public key 1
-		key1Value, exists := snapshot.WriteSet[flow.AccountBatchPublicKeyRegisterID(address, 0)]
-		require.True(t, exists)
-		require.NotEmpty(t, key1Value)
-
-		// Test storage used
-		var expectedStorageUsed uint64
-		// Include account status register in storage used
-		expectedStorageUsed += uint64(environment.RegisterSize(
-			flow.AccountStatusRegisterID(address),
-			accountStatusValue))
-		// Include apk_0 register in storage used
-		expectedStorageUsed += uint64(environment.RegisterSize(
-			flow.AccountPublicKey0RegisterID(address),
-			key0Value))
-		// Include pk_b0 register in storage used
-		expectedStorageUsed += uint64(environment.RegisterSize(
-			flow.AccountBatchPublicKeyRegisterID(address, 1),
-			key1Value))
-		// Include predefined sequence number 1 register in storage used
-		expectedStorageUsed += environment.PredefinedSequenceNumberPayloadSize(address, 1)
-		require.Equal(t, expectedStorageUsed, decodedAccountStatus.StorageUsed())
 	})
 
 	t.Run("account with 2 duplicate key", func(t *testing.T) {
-		key0 := newAccountPublicKey(t, 1000)
+		for _, hasSequenceNumber := range []bool{true, false} {
+			key0 := newAccountPublicKey(t, 1000)
+			key0.SeqNumber = 1
 
-		txnState := testutils.NewSimpleTransaction(nil)
-		accounts := environment.NewAccounts(txnState)
+			key1 := key0
+			if hasSequenceNumber {
+				key1.SeqNumber = 2
+			} else {
+				key1.SeqNumber = 0
+			}
 
-		address := flow.HexToAddress("01")
+			txnState := testutils.NewSimpleTransaction(nil)
+			accounts := environment.NewAccounts(txnState)
 
-		err := accounts.Create([]flow.AccountPublicKey{key0, key0}, address)
-		require.NoError(t, err)
+			address := flow.HexToAddress("01")
 
-		snapshot, err := txnState.FinalizeMainTransaction()
-		require.NoError(t, err)
+			err := accounts.Create([]flow.AccountPublicKey{key0, key1}, address)
+			require.NoError(t, err)
 
-		// New registers
-		expectedNewRegisterIDs := []flow.RegisterID{
-			flow.AccountStatusRegisterID(address),
-			flow.AccountPublicKey0RegisterID(address),
+			snapshot, err := txnState.FinalizeMainTransaction()
+			require.NoError(t, err)
+
+			// New registers
+			expectedNewRegisterIDs := []flow.RegisterID{
+				flow.AccountStatusRegisterID(address),
+				flow.AccountPublicKey0RegisterID(address),
+			}
+			if hasSequenceNumber {
+				expectedNewRegisterIDs = append(
+					expectedNewRegisterIDs,
+					flow.AccountPublicKeySequenceNumberRegisterID(address, 1),
+				)
+			}
+			registerIDs := snapshot.AllRegisterIDs()
+			require.Equal(t, len(expectedNewRegisterIDs), len(registerIDs))
+			require.ElementsMatch(t, expectedNewRegisterIDs, registerIDs)
+
+			// Test account status
+			accountStatusValue, exists := snapshot.WriteSet[flow.AccountStatusRegisterID(address)]
+			require.True(t, exists)
+			require.NotEmpty(t, accountStatusValue)
+
+			decodedAccountStatus, err := environment.AccountStatusFromBytes(accountStatusValue)
+			require.NoError(t, err)
+			require.Equal(t, uint8(4), decodedAccountStatus.Version())
+			require.Equal(t, uint32(2), decodedAccountStatus.AccountPublicKeyCount())
+
+			// Test account public key 0
+			key0Value, exists := snapshot.WriteSet[flow.AccountPublicKey0RegisterID(address)]
+			require.True(t, exists)
+			require.NotEmpty(t, key0Value)
+
+			decodedKey0, err := flow.DecodeAccountPublicKey(key0Value, 0)
+			require.NoError(t, err)
+			require.Equal(t, key0, decodedKey0)
+
+			if hasSequenceNumber {
+				// Test sequence number 1
+				seqNum1Value, exists := snapshot.WriteSet[flow.AccountPublicKeySequenceNumberRegisterID(address, 1)]
+				require.True(t, exists)
+				decodedSeqNum1, err := flow.DecodeSequenceNumber(seqNum1Value)
+				require.NoError(t, err)
+				require.Equal(t, key1.SeqNumber, decodedSeqNum1)
+			}
+
+			// Test storage used
+			var expectedStorageUsed uint64
+			// Include account status register in storage used
+			expectedStorageUsed += uint64(environment.RegisterSize(
+				flow.AccountStatusRegisterID(address),
+				accountStatusValue))
+			// Include apk_0 register in storage used
+			expectedStorageUsed += uint64(environment.RegisterSize(
+				flow.AccountPublicKey0RegisterID(address),
+				key0Value))
+			// Include predefined sequence number 1 register in storage used
+			expectedStorageUsed += environment.PredefinedSequenceNumberPayloadSize(address, 1)
+			require.Equal(t, expectedStorageUsed, decodedAccountStatus.StorageUsed())
 		}
-		registerIDs := snapshot.AllRegisterIDs()
-		require.Equal(t, len(expectedNewRegisterIDs), len(registerIDs))
-		require.ElementsMatch(t, expectedNewRegisterIDs, registerIDs)
-
-		// Test account status
-		accountStatusValue, exists := snapshot.WriteSet[flow.AccountStatusRegisterID(address)]
-		require.True(t, exists)
-		require.NotEmpty(t, accountStatusValue)
-
-		decodedAccountStatus, err := environment.AccountStatusFromBytes(accountStatusValue)
-		require.NoError(t, err)
-		require.Equal(t, uint8(4), decodedAccountStatus.Version())
-		require.Equal(t, uint32(2), decodedAccountStatus.AccountPublicKeyCount())
-
-		// Test account public key 0
-		key0Value, exists := snapshot.WriteSet[flow.AccountPublicKey0RegisterID(address)]
-		require.True(t, exists)
-		require.NotEmpty(t, key0Value)
-
-		decodedKey0, err := flow.DecodeAccountPublicKey(key0Value, 0)
-		require.NoError(t, err)
-		require.Equal(t, key0, decodedKey0)
-
-		// Test storage used
-		var expectedStorageUsed uint64
-		// Include account status register in storage used
-		expectedStorageUsed += uint64(environment.RegisterSize(
-			flow.AccountStatusRegisterID(address),
-			accountStatusValue))
-		// Include apk_0 register in storage used
-		expectedStorageUsed += uint64(environment.RegisterSize(
-			flow.AccountPublicKey0RegisterID(address),
-			key0Value))
-		// Include predefined sequence number 1 register in storage used
-		expectedStorageUsed += environment.PredefinedSequenceNumberPayloadSize(address, 1)
-		require.Equal(t, expectedStorageUsed, decodedAccountStatus.StorageUsed())
 	})
 }
 
@@ -749,165 +799,200 @@ func TestAccounts_AppendAndGetAccountPublicKey(t *testing.T) {
 		require.Equal(t, expectedStorageUsed, storageUsed)
 	})
 
-	t.Run("account with 2 unique key", func(t *testing.T) {
-		key0 := newAccountPublicKey(t, 1000)
-		key1 := newAccountPublicKey(t, 1000)
+	t.Run("account with 2 unique keys", func(t *testing.T) {
+		for _, hasSequenceNumber := range []bool{true, false} {
+			key0 := newAccountPublicKey(t, 1000)
+			key0.SeqNumber = 1
 
-		txnState := testutils.NewSimpleTransaction(nil)
-		accounts := environment.NewAccounts(txnState)
+			key1 := newAccountPublicKey(t, 1000)
+			if hasSequenceNumber {
+				key1.SeqNumber = 2
+			} else {
+				key1.SeqNumber = 0
+			}
 
-		address := flow.HexToAddress("01")
+			txnState := testutils.NewSimpleTransaction(nil)
+			accounts := environment.NewAccounts(txnState)
 
-		err := accounts.Create(nil, address)
-		require.NoError(t, err)
+			address := flow.HexToAddress("01")
 
-		err = accounts.AppendAccountPublicKey(address, key0)
-		require.NoError(t, err)
+			err := accounts.Create(nil, address)
+			require.NoError(t, err)
 
-		err = accounts.AppendAccountPublicKey(address, key1)
-		require.NoError(t, err)
+			err = accounts.AppendAccountPublicKey(address, key0)
+			require.NoError(t, err)
 
-		keyCount, err := accounts.GetAccountPublicKeyCount(address)
-		require.NoError(t, err)
-		require.Equal(t, uint32(2), keyCount)
+			err = accounts.AppendAccountPublicKey(address, key1)
+			require.NoError(t, err)
 
-		storageUsed, err := accounts.GetStorageUsed(address)
-		require.NoError(t, err)
+			keyCount, err := accounts.GetAccountPublicKeyCount(address)
+			require.NoError(t, err)
+			require.Equal(t, uint32(2), keyCount)
 
-		retrievedKey0, err := accounts.GetAccountPublicKey(address, 0)
-		require.NoError(t, err)
-		require.Equal(t, key0, retrievedKey0)
+			storageUsed, err := accounts.GetStorageUsed(address)
+			require.NoError(t, err)
 
-		retrievedKey1, err := accounts.GetAccountPublicKey(address, 1)
-		require.NoError(t, err)
-		key1.Index = 1
-		require.Equal(t, key1, retrievedKey1)
+			retrievedKey0, err := accounts.GetAccountPublicKey(address, 0)
+			require.NoError(t, err)
+			require.Equal(t, key0, retrievedKey0)
 
-		snapshot, err := txnState.FinalizeMainTransaction()
-		require.NoError(t, err)
+			retrievedKey1, err := accounts.GetAccountPublicKey(address, 1)
+			require.NoError(t, err)
+			key1.Index = 1
+			require.Equal(t, key1, retrievedKey1)
 
-		// New registers
-		expectedNewRegisterIDs := []flow.RegisterID{
-			flow.AccountStatusRegisterID(address),
-			flow.AccountPublicKey0RegisterID(address),
-			flow.AccountBatchPublicKeyRegisterID(address, 0),
+			snapshot, err := txnState.FinalizeMainTransaction()
+			require.NoError(t, err)
+
+			// New registers
+			expectedNewRegisterIDs := []flow.RegisterID{
+				flow.AccountStatusRegisterID(address),
+				flow.AccountPublicKey0RegisterID(address),
+				flow.AccountBatchPublicKeyRegisterID(address, 0),
+			}
+			if hasSequenceNumber {
+				expectedNewRegisterIDs = append(
+					expectedNewRegisterIDs,
+					flow.AccountPublicKeySequenceNumberRegisterID(address, 1),
+				)
+			}
+			registerIDs := slices.Collect(maps.Keys(snapshot.WriteSet))
+			require.Equal(t, len(expectedNewRegisterIDs), len(registerIDs))
+			require.ElementsMatch(t, expectedNewRegisterIDs, registerIDs)
+
+			// Test account status
+			accountStatusValue, exists := snapshot.WriteSet[flow.AccountStatusRegisterID(address)]
+			require.True(t, exists)
+			require.NotEmpty(t, accountStatusValue)
+
+			// Test account public key 0
+			key0Value, exists := snapshot.WriteSet[flow.AccountPublicKey0RegisterID(address)]
+			require.True(t, exists)
+			require.NotEmpty(t, key0Value)
+
+			// Test account public key 1
+			key1Value, exists := snapshot.WriteSet[flow.AccountBatchPublicKeyRegisterID(address, 0)]
+			require.True(t, exists)
+			require.NotEmpty(t, key1Value)
+
+			// Test storage used
+			var expectedStorageUsed uint64
+			// Include account status register in storage used
+			expectedStorageUsed += uint64(environment.RegisterSize(
+				flow.AccountStatusRegisterID(address),
+				accountStatusValue))
+			// Include apk_0 register in storage used
+			expectedStorageUsed += uint64(environment.RegisterSize(
+				flow.AccountPublicKey0RegisterID(address),
+				key0Value))
+			// Include pk_b0 register in storage used
+			expectedStorageUsed += uint64(environment.RegisterSize(
+				flow.AccountBatchPublicKeyRegisterID(address, 1),
+				key1Value))
+			// Include predefined sequence number 1 register in storage used
+			expectedStorageUsed += environment.PredefinedSequenceNumberPayloadSize(address, 1)
+			require.Equal(t, expectedStorageUsed, storageUsed)
 		}
-		registerIDs := slices.Collect(maps.Keys(snapshot.WriteSet))
-		require.Equal(t, len(expectedNewRegisterIDs), len(registerIDs))
-		require.ElementsMatch(t, expectedNewRegisterIDs, registerIDs)
-
-		// Test account status
-		accountStatusValue, exists := snapshot.WriteSet[flow.AccountStatusRegisterID(address)]
-		require.True(t, exists)
-		require.NotEmpty(t, accountStatusValue)
-
-		// Test account public key 0
-		key0Value, exists := snapshot.WriteSet[flow.AccountPublicKey0RegisterID(address)]
-		require.True(t, exists)
-		require.NotEmpty(t, key0Value)
-
-		// Test account public key 1
-		key1Value, exists := snapshot.WriteSet[flow.AccountBatchPublicKeyRegisterID(address, 0)]
-		require.True(t, exists)
-		require.NotEmpty(t, key1Value)
-
-		// Test storage used
-		var expectedStorageUsed uint64
-		// Include account status register in storage used
-		expectedStorageUsed += uint64(environment.RegisterSize(
-			flow.AccountStatusRegisterID(address),
-			accountStatusValue))
-		// Include apk_0 register in storage used
-		expectedStorageUsed += uint64(environment.RegisterSize(
-			flow.AccountPublicKey0RegisterID(address),
-			key0Value))
-		// Include pk_b0 register in storage used
-		expectedStorageUsed += uint64(environment.RegisterSize(
-			flow.AccountBatchPublicKeyRegisterID(address, 1),
-			key1Value))
-		// Include predefined sequence number 1 register in storage used
-		expectedStorageUsed += environment.PredefinedSequenceNumberPayloadSize(address, 1)
-		require.Equal(t, expectedStorageUsed, storageUsed)
 	})
 
-	t.Run("account with 2 duplicate key", func(t *testing.T) {
-		key0 := newAccountPublicKey(t, 1000)
-		key1 := key0
-		key1.Weight = 1
+	t.Run("account with 2 duplicate keys", func(t *testing.T) {
+		for _, hasSequenceNumber := range []bool{true, false} {
+			key0 := newAccountPublicKey(t, 1000)
+			key0.SeqNumber = 1
 
-		txnState := testutils.NewSimpleTransaction(nil)
-		accounts := environment.NewAccounts(txnState)
+			key1 := key0
+			key1.Weight = 1
+			if hasSequenceNumber {
+				key1.SeqNumber = 2
+			} else {
+				key1.SeqNumber = 0
+			}
 
-		address := flow.HexToAddress("01")
+			txnState := testutils.NewSimpleTransaction(nil)
+			accounts := environment.NewAccounts(txnState)
 
-		err := accounts.Create(nil, address)
-		require.NoError(t, err)
+			address := flow.HexToAddress("01")
 
-		err = accounts.AppendAccountPublicKey(address, key0)
-		require.NoError(t, err)
+			err := accounts.Create(nil, address)
+			require.NoError(t, err)
 
-		err = accounts.AppendAccountPublicKey(address, key1)
-		require.NoError(t, err)
+			err = accounts.AppendAccountPublicKey(address, key0)
+			require.NoError(t, err)
 
-		keyCount, err := accounts.GetAccountPublicKeyCount(address)
-		require.NoError(t, err)
-		require.Equal(t, uint32(2), keyCount)
+			err = accounts.AppendAccountPublicKey(address, key1)
+			require.NoError(t, err)
 
-		storageUsed, err := accounts.GetStorageUsed(address)
-		require.NoError(t, err)
+			keyCount, err := accounts.GetAccountPublicKeyCount(address)
+			require.NoError(t, err)
+			require.Equal(t, uint32(2), keyCount)
 
-		retrievedKey0, err := accounts.GetAccountPublicKey(address, 0)
-		require.NoError(t, err)
-		require.Equal(t, key0, retrievedKey0)
+			storageUsed, err := accounts.GetStorageUsed(address)
+			require.NoError(t, err)
 
-		retrievedKey1, err := accounts.GetAccountPublicKey(address, 1)
-		require.NoError(t, err)
-		key1.Index = 1
-		require.Equal(t, key1, retrievedKey1)
+			retrievedKey0, err := accounts.GetAccountPublicKey(address, 0)
+			require.NoError(t, err)
+			require.Equal(t, key0, retrievedKey0)
 
-		snapshot, err := txnState.FinalizeMainTransaction()
-		require.NoError(t, err)
+			retrievedKey1, err := accounts.GetAccountPublicKey(address, 1)
+			require.NoError(t, err)
+			key1.Index = 1
+			require.Equal(t, key1, retrievedKey1)
 
-		// New registers
-		expectedNewRegisterIDs := []flow.RegisterID{
-			flow.AccountStatusRegisterID(address),
-			flow.AccountPublicKey0RegisterID(address),
+			snapshot, err := txnState.FinalizeMainTransaction()
+			require.NoError(t, err)
+
+			// New registers
+			expectedNewRegisterIDs := []flow.RegisterID{
+				flow.AccountStatusRegisterID(address),
+				flow.AccountPublicKey0RegisterID(address),
+			}
+			if hasSequenceNumber {
+				expectedNewRegisterIDs = append(
+					expectedNewRegisterIDs,
+					flow.AccountPublicKeySequenceNumberRegisterID(address, 1),
+				)
+			}
+			registerIDs := slices.Collect(maps.Keys(snapshot.WriteSet))
+			require.Equal(t, len(expectedNewRegisterIDs), len(registerIDs))
+			require.ElementsMatch(t, expectedNewRegisterIDs, registerIDs)
+
+			// Test account status
+			accountStatusValue, exists := snapshot.WriteSet[flow.AccountStatusRegisterID(address)]
+			require.True(t, exists)
+			require.NotEmpty(t, accountStatusValue)
+
+			// Test account public key 0
+			key0Value, exists := snapshot.WriteSet[flow.AccountPublicKey0RegisterID(address)]
+			require.True(t, exists)
+			require.NotEmpty(t, key0Value)
+
+			// Test storage used
+			var expectedStorageUsed uint64
+			// Include account status register in storage used
+			expectedStorageUsed += uint64(environment.RegisterSize(
+				flow.AccountStatusRegisterID(address),
+				accountStatusValue))
+			// Include apk_0 register in storage used
+			expectedStorageUsed += uint64(environment.RegisterSize(
+				flow.AccountPublicKey0RegisterID(address),
+				key0Value))
+			// Include predefined sequence number 1 register in storage used
+			expectedStorageUsed += environment.PredefinedSequenceNumberPayloadSize(address, 1)
+			require.Equal(t, expectedStorageUsed, storageUsed)
 		}
-		registerIDs := slices.Collect(maps.Keys(snapshot.WriteSet))
-		require.Equal(t, len(expectedNewRegisterIDs), len(registerIDs))
-		require.ElementsMatch(t, expectedNewRegisterIDs, registerIDs)
-
-		// Test account status
-		accountStatusValue, exists := snapshot.WriteSet[flow.AccountStatusRegisterID(address)]
-		require.True(t, exists)
-		require.NotEmpty(t, accountStatusValue)
-
-		// Test account public key 0
-		key0Value, exists := snapshot.WriteSet[flow.AccountPublicKey0RegisterID(address)]
-		require.True(t, exists)
-		require.NotEmpty(t, key0Value)
-
-		// Test storage used
-		var expectedStorageUsed uint64
-		// Include account status register in storage used
-		expectedStorageUsed += uint64(environment.RegisterSize(
-			flow.AccountStatusRegisterID(address),
-			accountStatusValue))
-		// Include apk_0 register in storage used
-		expectedStorageUsed += uint64(environment.RegisterSize(
-			flow.AccountPublicKey0RegisterID(address),
-			key0Value))
-		// Include predefined sequence number 1 register in storage used
-		expectedStorageUsed += environment.PredefinedSequenceNumberPayloadSize(address, 1)
-		require.Equal(t, expectedStorageUsed, storageUsed)
 	})
 
-	t.Run("account with 3 duplicate key", func(t *testing.T) {
+	t.Run("account with 3 duplicate key with mixed sequence number", func(t *testing.T) {
 		key0 := newAccountPublicKey(t, 1000)
+		key0.SeqNumber = 1
+
 		key1 := key0
 		key1.Weight = 1
+		key1.SeqNumber = 0
+
 		key2 := key1
 		key2.Weight = 1000
+		key2.SeqNumber = 3
 
 		txnState := testutils.NewSimpleTransaction(nil)
 		accounts := environment.NewAccounts(txnState)
@@ -954,6 +1039,7 @@ func TestAccounts_AppendAndGetAccountPublicKey(t *testing.T) {
 		expectedNewRegisterIDs := []flow.RegisterID{
 			flow.AccountStatusRegisterID(address),
 			flow.AccountPublicKey0RegisterID(address),
+			flow.AccountPublicKeySequenceNumberRegisterID(address, 2),
 		}
 		registerIDs := slices.Collect(maps.Keys(snapshot.WriteSet))
 		require.Equal(t, len(expectedNewRegisterIDs), len(registerIDs))

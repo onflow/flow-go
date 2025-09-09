@@ -166,6 +166,19 @@ func incrementAccountPublicKeySequenceNumber(
 
 	seqNum++
 
+	return createAccountPublicKeySequenceNumber(a, address, keyIndex, seqNum)
+}
+
+func createAccountPublicKeySequenceNumber(
+	a Accounts,
+	address flow.Address,
+	keyIndex uint32,
+	seqNum uint64,
+) error {
+	if keyIndex == 0 {
+		return errors.NewKeyMetadataUnexpectedKeyIndexError("failed to create sequence number register", keyIndex)
+	}
+
 	encodedSeqNum, err := flow.EncodeSequenceNumber(seqNum)
 	if err != nil {
 		return err

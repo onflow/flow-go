@@ -517,6 +517,14 @@ func (a *StatefulAccounts) appendPublicKey(
 		}
 	}
 
+	// Store sequence number if needed.
+	if publicKey.SeqNumber > 0 {
+		err = createAccountPublicKeySequenceNumber(a, address, keyIndex, publicKey.SeqNumber)
+		if err != nil {
+			return err
+		}
+	}
+
 	return nil
 }
 
