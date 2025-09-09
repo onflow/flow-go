@@ -258,8 +258,8 @@ func FetchBlockInfo(
 	}
 
 	log.Info().Msgf(
-		"Fetched block header: %s (height %d)",
-		header.ID(),
+		"Fetched block header: %s is at height %d",
+		blockID,
 		header.Height,
 	)
 

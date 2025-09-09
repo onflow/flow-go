@@ -247,7 +247,7 @@ func compareResults(
 		mismatch = true
 	}
 	for _, diff := range readRegisterDiff {
-		log.Error().Msgf("Read register diff: %s", diff)
+		log.Error().Msgf("Read register diff (interpreter vs VM): %s", diff)
 	}
 
 	// Compare updated registers
