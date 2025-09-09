@@ -6,7 +6,7 @@ import (
 	"os"
 	"path/filepath"
 
-		pebbleds "github.com/ipfs/go-ds-pebble"
+	pebbleds "github.com/ipfs/go-ds-pebble"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 
