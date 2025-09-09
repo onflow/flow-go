@@ -8,7 +8,6 @@ import (
 	lru "github.com/hashicorp/golang-lru/v2"
 	"github.com/onflow/crypto"
 	"github.com/rs/zerolog"
-	"go.uber.org/atomic"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/connectivity"
 
@@ -22,9 +21,11 @@ type CachedClient struct {
 	timeout time.Duration
 
 	cache          *Cache
-	closeRequested *atomic.Bool
-	wg             sync.WaitGroup
-	mu             sync.RWMutex
+	closeRequested bool
+	closed         bool
+
+	wg sync.WaitGroup
+	mu sync.RWMutex
 }
 
 // ClientConn returns the underlying gRPC client connection.
@@ -41,48 +42,77 @@ func (cc *CachedClient) Address() string {
 
 // CloseRequested returns true if the CachedClient has been marked for closure.
 func (cc *CachedClient) CloseRequested() bool {
-	return cc.closeRequested.Load()
+	cc.mu.RLock()
+	defer cc.mu.RUnlock()
+	return cc.closeRequested
 }
 
-// AddRequest increments the in-flight request counter for the CachedClient.
-// It returns a function that should be called when the request completes to decrement the counter
-func (cc *CachedClient) AddRequest() func() {
+// Closed returns true if the CachedClient completed closing its connection.
+func (cc *CachedClient) Closed() bool {
+	cc.mu.RLock()
+	defer cc.mu.RUnlock()
+	return cc.closed
+}
+
+// TryAddRequest attempts to add a request to the CachedClient.
+// If the client is marked for closure, the request is not added and false is returned.
+// Otherwise, it increments the in-flight request counter for the CachedClient and returns a function
+// that MUST be called when the request completes to decrement the counter.
+// Failure to call the callback will prevent the client from closing and will result in a goroutine leak!
+func (cc *CachedClient) TryAddRequest() (func(), bool) {
+	cc.mu.Lock()
+	defer cc.mu.Unlock()
+
+	if cc.closeRequested {
+		return func() {}, false
+	}
+
 	cc.wg.Add(1)
-	return cc.wg.Done
+	return cc.wg.Done, true
 }
 
-// Invalidate removes the CachedClient from the cache and closes the connection.
-func (cc *CachedClient) Invalidate() {
-	cc.cache.invalidate(cc.address)
-
-	// Close the connection asynchronously to avoid blocking requests
-	go cc.Close()
-}
-
-// Close closes the CachedClient connection. It marks the connection for closure and waits asynchronously for ongoing
+// Close closes the CachedClient connection.
+// It marks the client for closure preventing new requests, then waits asynchronously for outstanding
 // requests to complete before closing the connection.
+// Returns immediately after marking the client for closure.
 func (cc *CachedClient) Close() {
-	// Mark the connection for closure
-	if !cc.closeRequested.CompareAndSwap(false, true) {
+	conn, ok := cc.initiateClose()
+	if !ok {
 		return
 	}
 
-	// Obtain the lock to ensure that any connection attempts have completed
-	cc.mu.RLock()
-	conn := cc.conn
-	cc.mu.RUnlock()
+	go func() {
+		// If there are ongoing requests, wait for them to complete asynchronously
+		// this avoids tearing down the connection while requests are in-flight resulting in errors
+		cc.wg.Wait()
+
+		// Close the connection
+		conn.Close()
+
+		cc.mu.Lock()
+		defer cc.mu.Unlock()
+
+		cc.closed = true
+	}()
+}
+
+// initiateClose marks the client for closure and returns the connection if it is available.
+// Returns false if the client is already marked for closure or if the connection is not available.
+func (cc *CachedClient) initiateClose() (*grpc.ClientConn, bool) {
+	cc.mu.Lock()
+	defer cc.mu.Unlock()
+
+	if cc.closeRequested {
+		return nil, false
+	}
+	cc.closeRequested = true
 
 	// If the initial connection attempt failed, conn will be nil
-	if conn == nil {
-		return
+	if cc.conn == nil {
+		return nil, false
 	}
 
-	// If there are ongoing requests, wait for them to complete asynchronously
-	// this avoids tearing down the connection while requests are in-flight resulting in errors
-	cc.wg.Wait()
-
-	// Close the connection
-	conn.Close()
+	return cc.conn, true
 }
 
 // Cache represents a cache of CachedClient instances with a given maximum size.
@@ -101,7 +131,7 @@ func NewCache(
 	maxSize int,
 ) (*Cache, error) {
 	cache, err := lru.NewWithEvict(maxSize, func(_ string, client *CachedClient) {
-		go client.Close() // close is blocking, so run in a goroutine
+		client.Close()
 
 		log.Debug().Str("grpc_conn_evicted", client.address).Msg("closing grpc connection evicted from pool")
 		metrics.ConnectionFromPoolEvicted()
@@ -128,19 +158,19 @@ func (c *Cache) GetConnected(
 	connectFn func(string, time.Duration, crypto.PublicKey, *CachedClient) (*grpc.ClientConn, error),
 ) (*CachedClient, error) {
 	client := &CachedClient{
-		address:        address,
-		timeout:        timeout,
-		closeRequested: atomic.NewBool(false),
-		cache:          c,
+		address: address,
+		timeout: timeout,
+		cache:   c,
 	}
 
-	// Note: PeekOrAdd does not "visit" the existing entry, so we need to call Get explicitly
-	// to mark the entry as "visited" and update the LRU order. Unfortunately, the lru library
-	// doesn't have a GetOrAdd method, so this is the simplest way to achieve atomic get-or-add
-	val, existed, _ := c.cache.PeekOrAdd(address, client)
+	existingClient, existed, _ := c.cache.PeekOrAdd(address, client)
 	if existed {
-		client = val
+		// Note: PeekOrAdd does not "visit" the existing entry, so we need to call Get explicitly
+		// to mark the entry as "visited" and update the LRU order. Unfortunately, the lru library
+		// doesn't have a GetOrAdd method, so this is the simplest way to achieve a semi-atomic
+		// get-or-add operation.
 		_, _ = c.cache.Get(address)
+		client = existingClient
 		c.metrics.ConnectionFromPoolReused()
 	} else {
 		c.metrics.ConnectionAddedToPool()
@@ -159,23 +189,22 @@ func (c *Cache) GetConnected(
 	if err != nil {
 		return nil, err
 	}
+	client.conn = conn
 
 	c.metrics.NewConnectionEstablished()
 	c.metrics.TotalConnectionsInPool(uint(c.Len()), uint(c.MaxSize()))
 
-	client.conn = conn
 	return client, nil
 }
 
 // invalidate removes the CachedClient entry from the cache with the given address, and shuts
 // down the connection.
-func (c *Cache) invalidate(address string) {
-	if !c.cache.Remove(address) {
-		return
+func (c *Cache) Invalidate(client *CachedClient) {
+	if c.cache.Remove(client.Address()) {
+		c.logger.Debug().Str("cached_client_invalidated", client.Address()).Msg("invalidating cached client")
+		c.metrics.ConnectionFromPoolInvalidated()
 	}
-
-	c.logger.Debug().Str("cached_client_invalidated", address).Msg("invalidating cached client")
-	c.metrics.ConnectionFromPoolInvalidated()
+	client.Close()
 }
 
 // Len returns the number of CachedClient entries in the cache.

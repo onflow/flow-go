@@ -137,9 +137,9 @@ func (m *Manager) createConnection(
 		connInterceptors = append(connInterceptors, createRequestWatcherInterceptor(cachedClient))
 	}
 
+	// If the circuit breaker interceptor is enabled, it should always be called first before passing control to
+	// subsequent interceptors.
 	if m.circuitBreakerConfig.Enabled {
-		// If the circuit breaker interceptor is enabled, it should always be called first before passing control to
-		// subsequent interceptors.
 		connInterceptors = append(connInterceptors, m.createCircuitBreakerInterceptor())
 	}
 
@@ -187,16 +187,14 @@ func createRequestWatcherInterceptor(cachedClient *CachedClient) grpc.UnaryClien
 		invoker grpc.UnaryInvoker,
 		opts ...grpc.CallOption,
 	) error {
-		// Prevent new requests from being sent if the connection is marked for closure.
-		if cachedClient.CloseRequested() {
+		// Increment the request counter to track ongoing requests, then decrement the request counter before returning.
+		done, ok := cachedClient.TryAddRequest()
+		if !ok {
+			// Connection is marked for closure, abort the request
 			return status.Errorf(codes.Unavailable, "the connection to %s was closed", cachedClient.Address())
 		}
-
-		// Increment the request counter to track ongoing requests, then decrement the request counter before returning.
-		done := cachedClient.AddRequest()
 		defer done()
 
-		// Invoke the actual RPC method.
 		return invoker(ctx, method, req, reply, cc, opts...)
 	}
 
@@ -248,7 +246,7 @@ func (m *Manager) createClientInvalidationInterceptor(cachedClient *CachedClient
 	) error {
 		err := invoker(ctx, method, req, reply, cc, opts...)
 		if status.Code(err) == codes.Unavailable {
-			cachedClient.Invalidate()
+			m.cache.Invalidate(cachedClient)
 		}
 
 		return err
