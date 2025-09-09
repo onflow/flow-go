@@ -6,7 +6,7 @@ import (
 	"os"
 	"path/filepath"
 
-	badgerds "github.com/ipfs/go-ds-badger2"
+		pebbleds "github.com/ipfs/go-ds-pebble"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 
@@ -157,8 +157,7 @@ func initStorages(dataDir string, executionDataDir string) (
 	if err != nil {
 		return nil, nil, nil, nil, err
 	}
-	dsOpts := &badgerds.DefaultOptions
-	ds, err := badgerds.NewDatastore(datastoreDir, dsOpts)
+	ds, err := pebbleds.NewDatastore(datastoreDir, nil)
 	if err != nil {
 		return nil, nil, nil, nil, err
 	}
