@@ -236,7 +236,7 @@ func (e *ENTransactionProvider) TransactionResultsByBlockID(
 
 // userTransactionResults constructs the user transaction results from the execution node response.
 //
-// It does so by itterating through all user collections (without system collection) in the block
+// It does so by iterating through all user collections (without system collection) in the block
 // and constructing the transaction results.
 func (e *ENTransactionProvider) userTransactionResults(
 	ctx context.Context,
