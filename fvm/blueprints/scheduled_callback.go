@@ -32,7 +32,7 @@ func SystemCollection(chain flow.Chain, processEvents flow.EventsList) (*flow.Co
 		return nil, fmt.Errorf("failed to construct system chunk transaction: %w", err)
 	}
 
-	transactions := make([]*flow.TransactionBody, 0, len(processEvents)+len(executes)+1) // +1 system tx
+	transactions := make([]*flow.TransactionBody, 0, len(executes)+2) // +2 process and system tx
 	transactions = append(transactions, process)
 	transactions = append(transactions, executes...)
 	transactions = append(transactions, systemTx)
