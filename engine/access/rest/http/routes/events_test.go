@@ -47,7 +47,7 @@ func TestGetEvents(t *testing.T) {
 	})
 
 	testVectors := []testVector{
-		// valid
+		//valid
 		{
 			description: "Get events for a single block by ID",
 			request: buildRequest(
@@ -61,7 +61,7 @@ func TestGetEvents(t *testing.T) {
 				"true",
 			),
 			expectedStatus:   http.StatusOK,
-			expectedResponse: testBlockEventResponse(t, []flow.BlockEvents{events[0]}),
+			expectedResponse: buildExpectedResponse(t, []flow.BlockEvents{events[0]}),
 		},
 		{
 			description: "Get events by all block IDs",
@@ -76,7 +76,7 @@ func TestGetEvents(t *testing.T) {
 				"true",
 			),
 			expectedStatus:   http.StatusOK,
-			expectedResponse: testBlockEventResponse(t, events),
+			expectedResponse: buildExpectedResponse(t, events),
 		},
 		{
 			description: "Get events for height range",
@@ -91,7 +91,7 @@ func TestGetEvents(t *testing.T) {
 				"true",
 			),
 			expectedStatus:   http.StatusOK,
-			expectedResponse: testBlockEventResponse(t, events),
+			expectedResponse: buildExpectedResponse(t, events),
 		},
 		{
 			description: "Get events range ending at sealed block",
@@ -106,7 +106,7 @@ func TestGetEvents(t *testing.T) {
 				"true",
 			),
 			expectedStatus:   http.StatusOK,
-			expectedResponse: testBlockEventResponse(t, events),
+			expectedResponse: buildExpectedResponse(t, events),
 		},
 		{
 			description: "Get events range ending after last block",
@@ -121,7 +121,7 @@ func TestGetEvents(t *testing.T) {
 				"true",
 			),
 			expectedStatus:   http.StatusOK,
-			expectedResponse: testBlockEventResponse(t, truncatedEvents),
+			expectedResponse: buildExpectedResponse(t, truncatedEvents),
 		},
 		// invalid
 		{
@@ -275,17 +275,23 @@ func buildRequest(
 		q.Add(router.EndHeightQueryParam, end)
 	}
 
-	count, err := strconv.Atoi(agreeingExecutorsCount)
-	require.NoError(t, err)
-	require.Greater(t, count, 0, "agreeingExecutorsCount must be greater than 0")
-	q.Add(router.AgreeingExecutorsCountQueryParam, agreeingExecutorsCount)
+	if agreeingExecutorsCount != "" {
+		count, err := strconv.Atoi(agreeingExecutorsCount)
+		require.NoError(t, err)
+		require.Greater(t, count, 0, "agreeingExecutorsCount must be greater than 0")
+		q.Add(router.AgreeingExecutorsCountQueryParam, agreeingExecutorsCount)
+	}
 
-	q.Add(router.RequiredExecutorIdsQueryParam, strings.Join(requiredExecutors, ","))
+	if len(requiredExecutors) > 0 {
+		q.Add(router.RequiredExecutorIdsQueryParam, strings.Join(requiredExecutors, ","))
+	}
 
-	includeMetadata, err := strconv.ParseBool(includeExecutorMetadata)
-	require.NoError(t, err)
-	if includeMetadata {
-		q.Add(router.IncludeExecutorMetadataQueryParam, fmt.Sprint(includeExecutorMetadata))
+	if includeExecutorMetadata != "" {
+		includeMetadata, err := strconv.ParseBool(includeExecutorMetadata)
+		require.NoError(t, err)
+		if includeMetadata {
+			q.Add(router.IncludeExecutorMetadataQueryParam, fmt.Sprint(includeExecutorMetadata))
+		}
 	}
 
 	q.Add(routes.EventTypeQuery, eventType)
@@ -296,6 +302,45 @@ func buildRequest(
 	require.NoError(t, err)
 
 	return req
+}
+
+func TestGetEvents_ParseEmptyExecutionState(t *testing.T) {
+	startHeight := 0
+	endHeight := 5
+	expectedBlockEvents := make([]flow.BlockEvents, endHeight)
+
+	for i := 0; i < len(expectedBlockEvents); i++ {
+		header := unittest.BlockHeaderFixture(unittest.WithHeaderHeight(uint64(i)))
+		expectedBlockEvents[i] = unittest.BlockEventsFixture(header, 2)
+	}
+
+	backend := mock.NewAPI(t)
+	backend.
+		On(
+			"GetEventsForHeightRange",
+			mocks.Anything,
+			mocks.Anything,
+			uint64(startHeight),
+			uint64(endHeight),
+			entities.EventEncodingVersion_JSON_CDC_V0,
+			mocks.Anything,
+		).
+		Return(expectedBlockEvents, access.ExecutorMetadata{}, nil).
+		Once()
+
+	request := buildRequest(
+		t,
+		"A.179b6b1cb6755e31.Foo.Bar",
+		"0",
+		fmt.Sprint(endHeight),
+		[]string{},
+		"",
+		[]string{},
+		"",
+	)
+
+	expectedResponseBody := buildExpectedResponse(t, expectedBlockEvents)
+	router.AssertResponse(t, request, http.StatusOK, expectedResponseBody, backend)
 }
 
 func generateEventsMocks(backend *mock.API, n int) []flow.BlockEvents {
@@ -383,19 +428,30 @@ func generateEventsMocks(backend *mock.API, n int) []flow.BlockEvents {
 		Return(nil, access.ExecutorMetadata{}, status.Error(codes.NotFound, "not found"))
 
 	backend.Mock.
+		On(
+			"GetEventsForHeightRange",
+			mocks.Anything,
+			mocks.Anything,
+			mocks.Anything,
+			mocks.Anything,
+			mocks.Anything,
+			mocks.Anything,
+		).
+		Return(events[0:3], access.ExecutorMetadata{}, nil)
+
+	backend.Mock.
 		On("GetLatestBlockHeader", mocks.Anything, true).
 		Return(latestBlock, flow.BlockStatusSealed, nil)
 
 	return events
 }
 
-func testBlockEventResponse(t *testing.T, events []flow.BlockEvents) string {
-	// TODO: why don't we reuse types from rest/common/models package here?
-
+func buildExpectedResponse(t *testing.T, events []flow.BlockEvents) string {
 	// TODO(illia): We need to refactor this test to support include/exclude metadata field
 	// We should pass in includeMetadata boolean value here and fix it in TestGetEvents.
-	// Currently, if one exclude metadata field, we still include it in the response object.
+	// Currently, if we exclude metadata field, we still include it in the response object.
 
+	// TODO: why don't we reuse types from rest/common/models package here?
 	type eventResponse struct {
 		Type             flow.EventType  `json:"type"`
 		TransactionID    flow.Identifier `json:"transaction_id"`
