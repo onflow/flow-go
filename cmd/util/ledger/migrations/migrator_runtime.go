@@ -175,7 +175,14 @@ func NewInterpreterMigrationRuntime(
 		return nil, fmt.Errorf("failed to create runtime interface: %w", err)
 	}
 
-	evmStdlib.SetupEnvironment(env, nil, evm.ContractAccountAddress(chainID))
+	evmStdlib.SetupEnvironment(
+		env,
+		// Not necessary for type checking
+		nil,
+		// Not necessary for type checking
+		evmStdlib.InternalEVMFunctions{},
+		evm.ContractAccountAddress(chainID),
+	)
 
 	env.Configure(
 		runtimeInterface,
