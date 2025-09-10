@@ -27,8 +27,7 @@ func (suite *Suite) TestHistoricalTransactionResult() {
 		Return(nil, status.Errorf(codes.NotFound, "not found on main node"))
 
 	accessEventReq := accessproto.GetTransactionRequest{
-		Id:                  txID[:],
-		ExecutionStateQuery: &entities.ExecutionStateQuery{},
+		Id: txID[:],
 	}
 
 	accessEventResp := accessproto.TransactionResultResponse{

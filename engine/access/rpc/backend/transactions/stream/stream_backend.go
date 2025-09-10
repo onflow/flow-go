@@ -19,6 +19,7 @@ import (
 	"github.com/onflow/flow-go/engine/access/subscription/tracker"
 	accessmodel "github.com/onflow/flow-go/model/access"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/executiondatasync/optimistic_sync"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
@@ -45,8 +46,9 @@ type TransactionStream struct {
 	collections  storage.Collections
 	transactions storage.Transactions
 
-	txProvider      *txprovider.FailoverTransactionProvider
-	txStatusDeriver *txstatus.TxStatusDeriver
+	txProvider         *txprovider.FailoverTransactionProvider
+	txStatusDeriver    *txstatus.TxStatusDeriver
+	execResultProvider optimistic_sync.ExecutionResultProvider
 }
 
 var _ access.TransactionStreamAPI = (*TransactionStream)(nil)
@@ -62,6 +64,7 @@ func NewTransactionStreamBackend(
 	transactions storage.Transactions,
 	txProvider *txprovider.FailoverTransactionProvider,
 	txStatusDeriver *txstatus.TxStatusDeriver,
+	execResultProvider optimistic_sync.ExecutionResultProvider,
 ) *TransactionStream {
 	return &TransactionStream{
 		log:                 log,
@@ -74,6 +77,7 @@ func NewTransactionStreamBackend(
 		transactions:        transactions,
 		txProvider:          txProvider,
 		txStatusDeriver:     txStatusDeriver,
+		execResultProvider:  execResultProvider,
 	}
 }
 
@@ -166,6 +170,7 @@ func (t *TransactionStream) createSubscription(
 		requiredEventEncodingVersion,
 		t.txProvider,
 		t.txStatusDeriver,
+		t.execResultProvider,
 	)
 
 	return t.subscriptionHandler.Subscribe(ctx, startHeight, t.getTransactionStatusResponse(txInfo, startHeight))

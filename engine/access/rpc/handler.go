@@ -351,6 +351,7 @@ func (h *Handler) GetTransactionResult(
 	}
 
 	eventEncodingVersion := req.GetEventEncodingVersion()
+	query := req.GetExecutionStateQuery()
 
 	result, executorMetadata, err := h.api.GetTransactionResult(
 		ctx,
@@ -358,14 +359,14 @@ func (h *Handler) GetTransactionResult(
 		blockId,
 		collectionId,
 		eventEncodingVersion,
-		NewCriteria(req.GetExecutionStateQuery()),
+		NewCriteria(query),
 	)
 	if err != nil {
 		return nil, err
 	}
 
-	if query := req.GetExecutionStateQuery(); query != nil && query.GetIncludeExecutorMetadata() {
-		metadata.ExecutorMetadata = &executorMetadata
+	if query != nil && query.GetIncludeExecutorMetadata() {
+		metadata.ExecutorMetadata = convert.ExecutorMetadataToMessage(&executorMetadata)
 	}
 	message := convert.TransactionResultToMessage(result)
 	message.Metadata = metadata
@@ -388,18 +389,20 @@ func (h *Handler) GetTransactionResultsByBlockID(
 	}
 
 	eventEncodingVersion := req.GetEventEncodingVersion()
+	query := req.GetExecutionStateQuery()
+
 	results, executorMetadata, err := h.api.GetTransactionResultsByBlockID(
 		ctx,
 		id,
 		eventEncodingVersion,
-		NewCriteria(req.GetExecutionStateQuery()),
+		NewCriteria(query),
 	)
 	if err != nil {
 		return nil, err
 	}
 
-	if query := req.GetExecutionStateQuery(); query != nil && query.GetIncludeExecutorMetadata() {
-		metadata.ExecutorMetadata = &executorMetadata
+	if query != nil && query.GetIncludeExecutorMetadata() {
+		metadata.ExecutorMetadata = convert.ExecutorMetadataToMessage(&executorMetadata)
 	}
 	message := convert.TransactionResultsToMessage(results)
 	message.Metadata = metadata
@@ -446,18 +449,21 @@ func (h *Handler) GetSystemTransactionResult(
 		return nil, status.Errorf(codes.InvalidArgument, "invalid block id: %v", err)
 	}
 
+	eventEncodingVersion := req.GetEventEncodingVersion()
+	query := req.GetExecutionStateQuery()
+
 	result, executorMetadata, err := h.api.GetSystemTransactionResult(
 		ctx,
 		id,
-		req.GetEventEncodingVersion(),
-		NewCriteria(req.GetExecutionStateQuery()),
+		eventEncodingVersion,
+		NewCriteria(query),
 	)
 	if err != nil {
 		return nil, err
 	}
 
-	if query := req.GetExecutionStateQuery(); query != nil && query.GetIncludeExecutorMetadata() {
-		metadata.ExecutorMetadata = &executorMetadata
+	if query != nil && query.GetIncludeExecutorMetadata() {
+		metadata.ExecutorMetadata = convert.ExecutorMetadataToMessage(&executorMetadata)
 	}
 	message := convert.TransactionResultToMessage(result)
 	message.Metadata = metadata
@@ -507,20 +513,21 @@ func (h *Handler) GetTransactionResultByIndex(
 	}
 
 	eventEncodingVersion := req.GetEventEncodingVersion()
+	query := req.GetExecutionStateQuery()
 
 	result, executorMetadata, err := h.api.GetTransactionResultByIndex(
 		ctx,
 		blockID,
 		req.GetIndex(),
 		eventEncodingVersion,
-		NewCriteria(req.GetExecutionStateQuery()),
+		NewCriteria(query),
 	)
 	if err != nil {
 		return nil, err
 	}
 
-	if query := req.GetExecutionStateQuery(); query != nil && query.GetIncludeExecutorMetadata() {
-		metadata.ExecutorMetadata = &executorMetadata
+	if query != nil && query.GetIncludeExecutorMetadata() {
+		metadata.ExecutorMetadata = convert.ExecutorMetadataToMessage(&executorMetadata)
 	}
 	message := convert.TransactionResultToMessage(result)
 	message.Metadata = metadata
@@ -929,6 +936,7 @@ func (h *Handler) GetEventsForHeightRange(
 	endHeight := req.GetEndHeight()
 
 	eventEncodingVersion := req.GetEventEncodingVersion()
+	query := req.GetExecutionStateQuery()
 
 	results, executorMetadata, err := h.api.GetEventsForHeightRange(
 		ctx,
@@ -936,17 +944,14 @@ func (h *Handler) GetEventsForHeightRange(
 		startHeight,
 		endHeight,
 		eventEncodingVersion,
-		NewCriteria(req.GetExecutionStateQuery()),
+		NewCriteria(query),
 	)
 	if err != nil {
 		return nil, err
 	}
 
-	if query := req.GetExecutionStateQuery(); query != nil && query.GetIncludeExecutorMetadata() {
-		metadata.ExecutorMetadata, err = convert.ExecutorMetadataToMessage(&executorMetadata)
-		if err != nil {
-			return nil, err
-		}
+	if query != nil && query.GetIncludeExecutorMetadata() {
+		metadata.ExecutorMetadata = convert.ExecutorMetadataToMessage(&executorMetadata)
 	}
 
 	resultEvents, err := convert.BlockEventsToMessages(results)
@@ -981,23 +986,21 @@ func (h *Handler) GetEventsForBlockIDs(
 	}
 
 	eventEncodingVersion := req.GetEventEncodingVersion()
+	query := req.GetExecutionStateQuery()
 
 	results, executorMetadata, err := h.api.GetEventsForBlockIDs(
 		ctx,
 		eventType,
 		blockIDs,
 		eventEncodingVersion,
-		NewCriteria(req.GetExecutionStateQuery()),
+		NewCriteria(query),
 	)
 	if err != nil {
 		return nil, err
 	}
 
-	if query := req.GetExecutionStateQuery(); query != nil && query.GetIncludeExecutorMetadata() {
-		metadata.ExecutorMetadata, err = convert.ExecutorMetadataToMessage(&executorMetadata)
-		if err != nil {
-			return nil, err
-		}
+	if query != nil && query.GetIncludeExecutorMetadata() {
+		metadata.ExecutorMetadata = convert.ExecutorMetadataToMessage(&executorMetadata)
 	}
 
 	resultEvents, err := convert.BlockEventsToMessages(results)

@@ -21,38 +21,36 @@ type TransactionProvider struct {
 	mock.Mock
 }
 
-// TransactionResult provides a mock function with given fields: ctx, header, txID, encodingVersion, criteria
-func (_m *TransactionProvider) TransactionResult(ctx context.Context, header *flow.Header, txID flow.Identifier, encodingVersion entities.EventEncodingVersion, criteria optimistic_sync.Criteria) (*access.TransactionResult, *optimistic_sync.ExecutionResultInfo, error) {
-	ret := _m.Called(ctx, header, txID, encodingVersion, criteria)
+// TransactionResult provides a mock function with given fields: ctx, header, txID, encodingVersion, executionResultInfo
+func (_m *TransactionProvider) TransactionResult(ctx context.Context, header *flow.Header, txID flow.Identifier, encodingVersion entities.EventEncodingVersion, executionResultInfo *optimistic_sync.ExecutionResultInfo) (*access.TransactionResult, access.ExecutorMetadata, error) {
+	ret := _m.Called(ctx, header, txID, encodingVersion, executionResultInfo)
 
 	if len(ret) == 0 {
 		panic("no return value specified for TransactionResult")
 	}
 
 	var r0 *access.TransactionResult
-	var r1 *optimistic_sync.ExecutionResultInfo
+	var r1 access.ExecutorMetadata
 	var r2 error
-	if rf, ok := ret.Get(0).(func(context.Context, *flow.Header, flow.Identifier, entities.EventEncodingVersion, optimistic_sync.Criteria) (*access.TransactionResult, *optimistic_sync.ExecutionResultInfo, error)); ok {
-		return rf(ctx, header, txID, encodingVersion, criteria)
+	if rf, ok := ret.Get(0).(func(context.Context, *flow.Header, flow.Identifier, entities.EventEncodingVersion, *optimistic_sync.ExecutionResultInfo) (*access.TransactionResult, access.ExecutorMetadata, error)); ok {
+		return rf(ctx, header, txID, encodingVersion, executionResultInfo)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, *flow.Header, flow.Identifier, entities.EventEncodingVersion, optimistic_sync.Criteria) *access.TransactionResult); ok {
-		r0 = rf(ctx, header, txID, encodingVersion, criteria)
+	if rf, ok := ret.Get(0).(func(context.Context, *flow.Header, flow.Identifier, entities.EventEncodingVersion, *optimistic_sync.ExecutionResultInfo) *access.TransactionResult); ok {
+		r0 = rf(ctx, header, txID, encodingVersion, executionResultInfo)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*access.TransactionResult)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, *flow.Header, flow.Identifier, entities.EventEncodingVersion, optimistic_sync.Criteria) *optimistic_sync.ExecutionResultInfo); ok {
-		r1 = rf(ctx, header, txID, encodingVersion, criteria)
+	if rf, ok := ret.Get(1).(func(context.Context, *flow.Header, flow.Identifier, entities.EventEncodingVersion, *optimistic_sync.ExecutionResultInfo) access.ExecutorMetadata); ok {
+		r1 = rf(ctx, header, txID, encodingVersion, executionResultInfo)
 	} else {
-		if ret.Get(1) != nil {
-			r1 = ret.Get(1).(*optimistic_sync.ExecutionResultInfo)
-		}
+		r1 = ret.Get(1).(access.ExecutorMetadata)
 	}
 
-	if rf, ok := ret.Get(2).(func(context.Context, *flow.Header, flow.Identifier, entities.EventEncodingVersion, optimistic_sync.Criteria) error); ok {
-		r2 = rf(ctx, header, txID, encodingVersion, criteria)
+	if rf, ok := ret.Get(2).(func(context.Context, *flow.Header, flow.Identifier, entities.EventEncodingVersion, *optimistic_sync.ExecutionResultInfo) error); ok {
+		r2 = rf(ctx, header, txID, encodingVersion, executionResultInfo)
 	} else {
 		r2 = ret.Error(2)
 	}
@@ -60,38 +58,36 @@ func (_m *TransactionProvider) TransactionResult(ctx context.Context, header *fl
 	return r0, r1, r2
 }
 
-// TransactionResultByIndex provides a mock function with given fields: ctx, block, index, encodingVersion, criteria
-func (_m *TransactionProvider) TransactionResultByIndex(ctx context.Context, block *flow.GenericBlock[flow.Payload], index uint32, encodingVersion entities.EventEncodingVersion, criteria optimistic_sync.Criteria) (*access.TransactionResult, *optimistic_sync.ExecutionResultInfo, error) {
-	ret := _m.Called(ctx, block, index, encodingVersion, criteria)
+// TransactionResultByIndex provides a mock function with given fields: ctx, block, index, encodingVersion, executionResultInfo
+func (_m *TransactionProvider) TransactionResultByIndex(ctx context.Context, block *flow.GenericBlock[flow.Payload], index uint32, encodingVersion entities.EventEncodingVersion, executionResultInfo *optimistic_sync.ExecutionResultInfo) (*access.TransactionResult, access.ExecutorMetadata, error) {
+	ret := _m.Called(ctx, block, index, encodingVersion, executionResultInfo)
 
 	if len(ret) == 0 {
 		panic("no return value specified for TransactionResultByIndex")
 	}
 
 	var r0 *access.TransactionResult
-	var r1 *optimistic_sync.ExecutionResultInfo
+	var r1 access.ExecutorMetadata
 	var r2 error
-	if rf, ok := ret.Get(0).(func(context.Context, *flow.GenericBlock[flow.Payload], uint32, entities.EventEncodingVersion, optimistic_sync.Criteria) (*access.TransactionResult, *optimistic_sync.ExecutionResultInfo, error)); ok {
-		return rf(ctx, block, index, encodingVersion, criteria)
+	if rf, ok := ret.Get(0).(func(context.Context, *flow.GenericBlock[flow.Payload], uint32, entities.EventEncodingVersion, *optimistic_sync.ExecutionResultInfo) (*access.TransactionResult, access.ExecutorMetadata, error)); ok {
+		return rf(ctx, block, index, encodingVersion, executionResultInfo)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, *flow.GenericBlock[flow.Payload], uint32, entities.EventEncodingVersion, optimistic_sync.Criteria) *access.TransactionResult); ok {
-		r0 = rf(ctx, block, index, encodingVersion, criteria)
+	if rf, ok := ret.Get(0).(func(context.Context, *flow.GenericBlock[flow.Payload], uint32, entities.EventEncodingVersion, *optimistic_sync.ExecutionResultInfo) *access.TransactionResult); ok {
+		r0 = rf(ctx, block, index, encodingVersion, executionResultInfo)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*access.TransactionResult)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, *flow.GenericBlock[flow.Payload], uint32, entities.EventEncodingVersion, optimistic_sync.Criteria) *optimistic_sync.ExecutionResultInfo); ok {
-		r1 = rf(ctx, block, index, encodingVersion, criteria)
+	if rf, ok := ret.Get(1).(func(context.Context, *flow.GenericBlock[flow.Payload], uint32, entities.EventEncodingVersion, *optimistic_sync.ExecutionResultInfo) access.ExecutorMetadata); ok {
+		r1 = rf(ctx, block, index, encodingVersion, executionResultInfo)
 	} else {
-		if ret.Get(1) != nil {
-			r1 = ret.Get(1).(*optimistic_sync.ExecutionResultInfo)
-		}
+		r1 = ret.Get(1).(access.ExecutorMetadata)
 	}
 
-	if rf, ok := ret.Get(2).(func(context.Context, *flow.GenericBlock[flow.Payload], uint32, entities.EventEncodingVersion, optimistic_sync.Criteria) error); ok {
-		r2 = rf(ctx, block, index, encodingVersion, criteria)
+	if rf, ok := ret.Get(2).(func(context.Context, *flow.GenericBlock[flow.Payload], uint32, entities.EventEncodingVersion, *optimistic_sync.ExecutionResultInfo) error); ok {
+		r2 = rf(ctx, block, index, encodingVersion, executionResultInfo)
 	} else {
 		r2 = ret.Error(2)
 	}
@@ -99,38 +95,36 @@ func (_m *TransactionProvider) TransactionResultByIndex(ctx context.Context, blo
 	return r0, r1, r2
 }
 
-// TransactionResultsByBlockID provides a mock function with given fields: ctx, block, encodingVersion, criteria
-func (_m *TransactionProvider) TransactionResultsByBlockID(ctx context.Context, block *flow.GenericBlock[flow.Payload], encodingVersion entities.EventEncodingVersion, criteria optimistic_sync.Criteria) ([]*access.TransactionResult, *optimistic_sync.ExecutionResultInfo, error) {
-	ret := _m.Called(ctx, block, encodingVersion, criteria)
+// TransactionResultsByBlockID provides a mock function with given fields: ctx, block, encodingVersion, executionResultInfo
+func (_m *TransactionProvider) TransactionResultsByBlockID(ctx context.Context, block *flow.GenericBlock[flow.Payload], encodingVersion entities.EventEncodingVersion, executionResultInfo *optimistic_sync.ExecutionResultInfo) ([]*access.TransactionResult, access.ExecutorMetadata, error) {
+	ret := _m.Called(ctx, block, encodingVersion, executionResultInfo)
 
 	if len(ret) == 0 {
 		panic("no return value specified for TransactionResultsByBlockID")
 	}
 
 	var r0 []*access.TransactionResult
-	var r1 *optimistic_sync.ExecutionResultInfo
+	var r1 access.ExecutorMetadata
 	var r2 error
-	if rf, ok := ret.Get(0).(func(context.Context, *flow.GenericBlock[flow.Payload], entities.EventEncodingVersion, optimistic_sync.Criteria) ([]*access.TransactionResult, *optimistic_sync.ExecutionResultInfo, error)); ok {
-		return rf(ctx, block, encodingVersion, criteria)
+	if rf, ok := ret.Get(0).(func(context.Context, *flow.GenericBlock[flow.Payload], entities.EventEncodingVersion, *optimistic_sync.ExecutionResultInfo) ([]*access.TransactionResult, access.ExecutorMetadata, error)); ok {
+		return rf(ctx, block, encodingVersion, executionResultInfo)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, *flow.GenericBlock[flow.Payload], entities.EventEncodingVersion, optimistic_sync.Criteria) []*access.TransactionResult); ok {
-		r0 = rf(ctx, block, encodingVersion, criteria)
+	if rf, ok := ret.Get(0).(func(context.Context, *flow.GenericBlock[flow.Payload], entities.EventEncodingVersion, *optimistic_sync.ExecutionResultInfo) []*access.TransactionResult); ok {
+		r0 = rf(ctx, block, encodingVersion, executionResultInfo)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]*access.TransactionResult)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, *flow.GenericBlock[flow.Payload], entities.EventEncodingVersion, optimistic_sync.Criteria) *optimistic_sync.ExecutionResultInfo); ok {
-		r1 = rf(ctx, block, encodingVersion, criteria)
+	if rf, ok := ret.Get(1).(func(context.Context, *flow.GenericBlock[flow.Payload], entities.EventEncodingVersion, *optimistic_sync.ExecutionResultInfo) access.ExecutorMetadata); ok {
+		r1 = rf(ctx, block, encodingVersion, executionResultInfo)
 	} else {
-		if ret.Get(1) != nil {
-			r1 = ret.Get(1).(*optimistic_sync.ExecutionResultInfo)
-		}
+		r1 = ret.Get(1).(access.ExecutorMetadata)
 	}
 
-	if rf, ok := ret.Get(2).(func(context.Context, *flow.GenericBlock[flow.Payload], entities.EventEncodingVersion, optimistic_sync.Criteria) error); ok {
-		r2 = rf(ctx, block, encodingVersion, criteria)
+	if rf, ok := ret.Get(2).(func(context.Context, *flow.GenericBlock[flow.Payload], entities.EventEncodingVersion, *optimistic_sync.ExecutionResultInfo) error); ok {
+		r2 = rf(ctx, block, encodingVersion, executionResultInfo)
 	} else {
 		r2 = ret.Error(2)
 	}

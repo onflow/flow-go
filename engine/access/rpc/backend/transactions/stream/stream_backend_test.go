@@ -121,7 +121,7 @@ func TestTransactionStatusSuite(t *testing.T) {
 
 // SetupTest initializes the test dependencies, configurations, and mock objects for TransactionStreamSuite tests.
 func (s *TransactionStreamSuite) SetupTest() {
-	s.log = zerolog.New(zerolog.NewConsoleWriter())
+	s.log = unittest.Logger()
 	s.state = protocol.NewState(s.T())
 	s.sealedSnapshot = protocol.NewSnapshot(s.T())
 	s.finalSnapshot = protocol.NewSnapshot(s.T())
@@ -335,6 +335,7 @@ func (s *TransactionStreamSuite) initializeBackend() {
 		s.transactions,
 		txProvider,
 		txStatusDeriver,
+		s.executionResultProvider,
 	)
 }
 

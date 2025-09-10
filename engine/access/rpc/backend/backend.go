@@ -260,6 +260,9 @@ func New(params Params) (*Backend, error) {
 		TxResultCache:               txResCache,
 		TxValidator:                 txValidator,
 		TxStatusDeriver:             txStatusDeriver,
+		ExecutionStateCache:         params.ExecutionStateCache,
+		ExecResultProvider:          params.ExecutionResultProvider,
+		OperatorCriteria:            params.OperatorCriteria,
 	}
 
 	switch params.TxResultQueryMode {
@@ -289,6 +292,7 @@ func New(params Params) (*Backend, error) {
 		params.Transactions,
 		failoverTxProvider,
 		txStatusDeriver,
+		params.ExecutionResultProvider,
 	)
 
 	b := &Backend{

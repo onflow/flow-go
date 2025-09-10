@@ -70,8 +70,8 @@ func NewExecutionResultProvider(
 // ExecutionResult retrieves execution results and associated execution nodes for a given block ID
 // based on the provided criteria.
 //
-// Expected errors during normal operations:
-//   - backend.InsufficientExecutionReceipts - found insufficient receipts for given block ID.
+// Expected error returns during normal operations:
+//   - [common.InsufficientExecutionReceipts] - found insufficient receipts for given block ID.
 func (e *ExecutionResultProvider) ExecutionResult(blockID flow.Identifier, criteria optimistic_sync.Criteria) (*optimistic_sync.ExecutionResultInfo, error) {
 	executorIdentities, err := e.state.Final().Identities(filter.HasRole[flow.Identity](flow.RoleExecution))
 	if err != nil {
@@ -81,10 +81,7 @@ func (e *ExecutionResultProvider) ExecutionResult(blockID flow.Identifier, crite
 	// if the block ID is the root block, then use the root ExecutionResult and skip the receipt
 	// check since there will not be any.
 	if e.rootBlockID == blockID {
-		subsetENs, err := e.executionNodes.SelectExecutionNodes(executorIdentities, criteria.RequiredExecutors)
-		if err != nil {
-			return nil, fmt.Errorf("failed to choose execution nodes for root block ID %v: %w", e.rootBlockID, err)
-		}
+		subsetENs := e.executionNodes.SelectExecutionNodes(executorIdentities, criteria.RequiredExecutors)
 
 		return &optimistic_sync.ExecutionResultInfo{
 			ExecutionResult: e.rootBlockResult,
@@ -98,10 +95,7 @@ func (e *ExecutionResultProvider) ExecutionResult(blockID flow.Identifier, crite
 	}
 
 	executors := executorIdentities.Filter(filter.HasNodeID[flow.Identity](executorIDs...))
-	subsetENs, err := e.executionNodes.SelectExecutionNodes(executors, criteria.RequiredExecutors)
-	if err != nil {
-		return nil, fmt.Errorf("failed to choose execution nodes for block ID %v: %w", blockID, err)
-	}
+	subsetENs := e.executionNodes.SelectExecutionNodes(executors, criteria.RequiredExecutors)
 
 	if len(subsetENs) == 0 {
 		// this is unexpected, and probably indicates there is a bug.
@@ -112,7 +106,7 @@ func (e *ExecutionResultProvider) ExecutionResult(blockID flow.Identifier, crite
 		// None of these are possible since there must be at least one AgreeingExecutorsCount. If the
 		// criteria is met, then there must be at least one acceptable executor. If this is not true,
 		// then the criteria check must fail.
-		return nil, fmt.Errorf("no execution nodes found for result %v (blockID: %v): %w", result.ID(), blockID, err)
+		return nil, fmt.Errorf("no execution nodes found for result %v (blockID: %v)", result.ID(), blockID)
 	}
 
 	return &optimistic_sync.ExecutionResultInfo{
@@ -125,8 +119,8 @@ func (e *ExecutionResultProvider) ExecutionResult(blockID flow.Identifier, crite
 // The result must match the provided criteria and have at least one acceptable executor. If multiple
 // results are found, then the result with the most executors is returned.
 //
-// Expected errors during normal operations:
-//   - backend.InsufficientExecutionReceipts - found insufficient receipts for given block ID.
+// Expected error returns during normal operations:
+//   - [common.InsufficientExecutionReceipts] - found insufficient receipts for given block ID.
 func (e *ExecutionResultProvider) findResultAndExecutors(
 	blockID flow.Identifier,
 	criteria optimistic_sync.Criteria,

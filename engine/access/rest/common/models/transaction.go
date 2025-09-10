@@ -1,8 +1,6 @@
 package models
 
 import (
-	entitiesproto "github.com/onflow/flow/protobuf/go/flow/entities"
-
 	"github.com/onflow/flow-go/engine/access/rest/util"
 	accessmodel "github.com/onflow/flow-go/model/access"
 	"github.com/onflow/flow-go/model/flow"
@@ -110,20 +108,6 @@ func (t *TransactionResult) Build(txr *accessmodel.TransactionResult, txID flow.
 
 	self, _ := SelfLink(txID, link.TransactionResultLink)
 	t.Links = self
-}
-
-func NewMetaData(executorMetadata entitiesproto.ExecutorMetadata) *Metadata {
-	executorIDs := make([]string, len(executorMetadata.ExecutionResultId))
-	for i, b := range executorMetadata.ExecutionResultId {
-		executorIDs[i] = string(b)
-	}
-
-	return &Metadata{
-		ExecutorMetadata: &ExecutorMetadata{
-			ExecutorIds:       executorIDs,
-			ExecutionResultId: string(executorMetadata.ExecutionResultId),
-		},
-	}
 }
 
 func (t *TransactionStatus) Build(status flow.TransactionStatus) {

@@ -11,10 +11,6 @@ import (
 
 	"github.com/coreos/go-semver/semver"
 	"github.com/dgraph-io/badger/v2"
-	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
-	"github.com/onflow/flow/protobuf/go/flow/entities"
-	entitiesproto "github.com/onflow/flow/protobuf/go/flow/entities"
-	execproto "github.com/onflow/flow/protobuf/go/flow/execution"
 	"github.com/rs/zerolog"
 	"github.com/sony/gobreaker"
 	"github.com/stretchr/testify/mock"
@@ -22,6 +18,10 @@ import (
 	"github.com/stretchr/testify/suite"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+
+	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
+	entitiesproto "github.com/onflow/flow/protobuf/go/flow/entities"
+	execproto "github.com/onflow/flow/protobuf/go/flow/execution"
 
 	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/cmd/build"
@@ -42,6 +42,7 @@ import (
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/counters"
 	"github.com/onflow/flow-go/module/executiondatasync/optimistic_sync"
+	optimisticsyncmock "github.com/onflow/flow-go/module/executiondatasync/optimistic_sync/mock"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
 	realstate "github.com/onflow/flow-go/state"
@@ -99,6 +100,10 @@ type Suite struct {
 
 	fixedExecutionNodeIDs     flow.IdentifierList
 	preferredExecutionNodeIDs flow.IdentifierList
+
+	execResultProvider  *optimisticsyncmock.ExecutionResultProvider
+	executionStateCache *optimisticsyncmock.ExecutionStateCache
+	operatorCriteria    optimistic_sync.Criteria
 }
 
 func TestHandler(t *testing.T) {
@@ -106,7 +111,7 @@ func TestHandler(t *testing.T) {
 }
 
 func (suite *Suite) SetupTest() {
-	suite.log = zerolog.New(zerolog.NewConsoleWriter())
+	suite.log = unittest.Logger()
 	suite.state = new(protocol.State)
 	suite.snapshot = new(protocol.Snapshot)
 	header := unittest.BlockHeaderFixture()
@@ -143,6 +148,10 @@ func (suite *Suite) SetupTest() {
 	require.NoError(suite.T(), err)
 	suite.lastFullBlockHeight, err = counters.NewPersistentStrictMonotonicCounter(progress)
 	suite.Require().NoError(err)
+
+	suite.execResultProvider = optimisticsyncmock.NewExecutionResultProvider(suite.T())
+	suite.executionStateCache = optimisticsyncmock.NewExecutionStateCache(suite.T())
+	suite.operatorCriteria = optimistic_sync.DefaultCriteria
 }
 
 // TearDownTest cleans up the db
@@ -954,8 +963,6 @@ func (suite *Suite) TestGetTransactionResultByIndex() {
 		Return(block, nil)
 
 	_, fixedENIDs := suite.setupReceipts(block)
-	suite.state.On("Final").Return(suite.snapshot, nil).Maybe()
-	suite.snapshot.On("Identities", mock.Anything).Return(fixedENIDs, nil)
 
 	exeEventReq := &execproto.GetTransactionByIndexRequest{
 		BlockId: blockId[:],
@@ -974,6 +981,13 @@ func (suite *Suite) TestGetTransactionResultByIndex() {
 
 	backend, err := New(params)
 	suite.Require().NoError(err)
+
+	suite.execResultProvider.
+		On("ExecutionResult", block.ID(), mock.Anything).
+		Return(&optimistic_sync.ExecutionResultInfo{
+			ExecutionResult: unittest.ExecutionResultFixture(),
+			ExecutionNodes:  fixedENIDs.ToSkeleton(),
+		}, nil)
 
 	suite.execClient.
 		On("GetTransactionResultByIndex", mock.Anything, exeEventReq).
@@ -1022,8 +1036,6 @@ func (suite *Suite) TestGetTransactionResultsByBlockID() {
 		Return(block, nil)
 
 	_, fixedENIDs := suite.setupReceipts(block)
-	suite.state.On("Final").Return(suite.snapshot, nil).Maybe()
-	suite.snapshot.On("Identities", mock.Anything).Return(fixedENIDs, nil)
 
 	exeEventReq := &execproto.GetTransactionsByBlockIDRequest{
 		BlockId: blockId[:],
@@ -1045,6 +1057,13 @@ func (suite *Suite) TestGetTransactionResultsByBlockID() {
 	suite.execClient.
 		On("GetTransactionResultsByBlockID", mock.Anything, exeEventReq).
 		Return(exeEventResp, nil)
+
+	suite.execResultProvider.
+		On("ExecutionResult", block.ID(), mock.Anything).
+		Return(&optimistic_sync.ExecutionResultInfo{
+			ExecutionResult: unittest.ExecutionResultFixture(),
+			ExecutionNodes:  fixedENIDs.ToSkeleton(),
+		}, nil)
 
 	suite.Run("GetTransactionResultsByBlockID - happy path", func() {
 		suite.snapshot.On("Head").Return(block.ToHeader(), nil).Once()
@@ -1120,7 +1139,6 @@ func (suite *Suite) TestTransactionStatusTransition() {
 	blockID := block.ID()
 	_, fixedENIDs := suite.setupReceipts(block)
 	suite.state.On("Final").Return(suite.snapshot, nil).Maybe()
-	suite.snapshot.On("Identities", mock.Anything).Return(fixedENIDs, nil)
 
 	exeEventReq := &execproto.GetTransactionResultRequest{
 		BlockId:       blockID[:],
@@ -1145,6 +1163,20 @@ func (suite *Suite) TestTransactionStatusTransition() {
 		On("GetTransactionResult", ctx, exeEventReq).
 		Return(exeEventResp, status.Errorf(codes.NotFound, "not found")).
 		Times(len(fixedENIDs)) // should call each EN once
+
+	suite.execResultProvider.
+		On("ExecutionResult", block.ID(), mock.Anything).
+		Return(&optimistic_sync.ExecutionResultInfo{
+			ExecutionResult: unittest.ExecutionResultFixture(),
+			ExecutionNodes:  fixedENIDs.ToSkeleton(),
+		}, nil)
+
+	execStateSnapshot := optimisticsyncmock.NewSnapshot(suite.T())
+	execStateSnapshot.On("Collections").Return(suite.collections)
+
+	suite.executionStateCache.
+		On("Snapshot", mock.Anything).
+		Return(execStateSnapshot, nil)
 
 	// first call - when block under test is greater height than the sealed head, but execution node does not know about Tx
 	result, _, err := backend.GetTransactionResult(ctx, txID, flow.ZeroID, flow.ZeroID,
@@ -1203,9 +1235,6 @@ func (suite *Suite) TestTransactionStatusTransition() {
 // TestTransactionExpiredStatusTransition tests that the status
 // of transaction changes from Pending to Expired when enough Blocks pass
 func (suite *Suite) TestTransactionExpiredStatusTransition() {
-	suite.state.On("Sealed").Return(suite.snapshot, nil).Maybe()
-	suite.state.On("Final").Return(suite.snapshot, nil).Maybe()
-
 	ctx := rpcContext(suite.T(), context.Background())
 
 	collection := unittest.CollectionFixture(1)
@@ -1227,6 +1256,8 @@ func (suite *Suite) TestTransactionExpiredStatusTransition() {
 		Return(func() *flow.Header {
 			return headBlock.ToHeader()
 		}, nil)
+
+	suite.state.On("Final").Return(suite.snapshot, nil).Maybe()
 
 	snapshotAtBlock := new(protocol.Snapshot)
 	snapshotAtBlock.On("Head").Return(block.ToHeader(), nil)
@@ -1351,8 +1382,6 @@ func (suite *Suite) TestTransactionPendingToFinalizedStatusTransition() {
 	_, enIDs := suite.setupReceipts(block)
 	suite.state.On("Final").Return(suite.snapshot, nil).Maybe()
 
-	suite.snapshot.On("Identities", mock.Anything).Return(enIDs, nil)
-
 	suite.state.
 		On("AtBlockID", refBlockID).
 		Return(snapshotAtBlock, nil)
@@ -1406,6 +1435,20 @@ func (suite *Suite) TestTransactionPendingToFinalizedStatusTransition() {
 		On("GetTransactionResult", ctx, exeEventReq).
 		Return(exeEventResp, status.Errorf(codes.NotFound, "not found")).
 		Times(len(enIDs)) // should call each EN once
+
+	suite.execResultProvider.
+		On("ExecutionResult", block.ID(), mock.Anything).
+		Return(&optimistic_sync.ExecutionResultInfo{
+			ExecutionResult: unittest.ExecutionResultFixture(),
+			ExecutionNodes:  enIDs.ToSkeleton(),
+		}, nil)
+
+	execState := optimisticsyncmock.NewSnapshot(suite.T())
+	execState.On("Collections").Return(suite.collections)
+
+	suite.executionStateCache.
+		On("Snapshot", mock.Anything).
+		Return(execState, nil)
 
 	// create a mock connection factory
 	connFactory := suite.setupConnectionFactory()
@@ -1853,6 +1896,19 @@ func (suite *Suite) TestGetTransactionResultEventEncodingVersion() {
 	// the connection factory should be used to get the execution node client
 	params.ConnFactory = suite.setupConnectionFactory()
 
+	suite.execResultProvider.
+		On("ExecutionResult", block.ID(), mock.Anything).
+		Return(&optimistic_sync.ExecutionResultInfo{
+			ExecutionResult: unittest.ExecutionResultFixture(),
+			ExecutionNodes:  fixedENIDs.ToSkeleton(),
+		}, nil)
+
+	execStateSnapshot := optimisticsyncmock.NewSnapshot(suite.T())
+	execStateSnapshot.On("Collections").Return(suite.collections)
+	suite.executionStateCache.
+		On("Snapshot", mock.Anything).
+		Return(execStateSnapshot, nil)
+
 	backend, err := New(params)
 	suite.Require().NoError(err)
 
@@ -1891,16 +1947,12 @@ func (suite *Suite) TestGetTransactionResultEventEncodingVersion() {
 	}
 }
 
-// TestGetTransactionResultEventEncodingVersion tests the GetTransactionResult function with different event encoding versions.
+// TestGetTransactionResultByIndexAndBlockIdEventEncodingVersion tests the GetTransactionResult function with different event encoding versions.
 func (suite *Suite) TestGetTransactionResultByIndexAndBlockIdEventEncodingVersion() {
-	suite.state.On("Sealed").Return(suite.snapshot, nil).Maybe()
-
 	ctx := rpcContext(suite.T(), context.Background())
 	block := unittest.BlockFixture()
 	blockId := block.ID()
 	index := uint32(0)
-
-	suite.snapshot.On("Head").Return(block.ToHeader(), nil)
 
 	// block storage returns the corresponding block
 	suite.blocks.
@@ -1908,14 +1960,19 @@ func (suite *Suite) TestGetTransactionResultByIndexAndBlockIdEventEncodingVersio
 		Return(block, nil)
 
 	_, fixedENIDs := suite.setupReceipts(block)
-	suite.state.On("Final").Return(suite.snapshot, nil).Maybe()
-	suite.snapshot.On("Identities", mock.Anything).Return(fixedENIDs, nil)
 
 	suite.fixedExecutionNodeIDs = fixedENIDs.NodeIDs()
 
 	params := suite.defaultBackendParams()
 	// the connection factory should be used to get the execution node client
 	params.ConnFactory = suite.setupConnectionFactory()
+
+	suite.execResultProvider.
+		On("ExecutionResult", block.ID(), mock.Anything).
+		Return(&optimistic_sync.ExecutionResultInfo{
+			ExecutionResult: unittest.ExecutionResultFixture(),
+			ExecutionNodes:  fixedENIDs.ToSkeleton(),
+		}, nil)
 
 	backend, err := New(params)
 	suite.Require().NoError(err)
@@ -1938,6 +1995,9 @@ func (suite *Suite) TestGetTransactionResultByIndexAndBlockIdEventEncodingVersio
 				}).
 				Return(exeEventResp, nil).
 				Once()
+
+			suite.state.On("Sealed").Return(suite.snapshot, nil).Once()
+			suite.snapshot.On("Head").Return(block.ToHeader(), nil).Once()
 
 			result, _, err := backend.GetTransactionResultByIndex(ctx, blockId, index, version, optimistic_sync.Criteria{})
 			suite.Require().NoError(err)
@@ -1970,6 +2030,9 @@ func (suite *Suite) TestGetTransactionResultByIndexAndBlockIdEventEncodingVersio
 				}).
 				Return(exeEventResp, nil).
 				Once()
+
+			suite.state.On("Sealed").Return(suite.snapshot, nil).Once()
+			suite.snapshot.On("Head").Return(block.ToHeader(), nil).Once()
 
 			results, _, err := backend.GetTransactionResultsByBlockID(ctx, blockId, version, optimistic_sync.Criteria{})
 			suite.Require().NoError(err)
@@ -2022,6 +2085,13 @@ func (suite *Suite) TestNodeCommunicator() {
 	// the connection factory should be used to get the execution node client
 	params.ConnFactory = suite.setupConnectionFactory()
 
+	suite.execResultProvider.
+		On("ExecutionResult", block.ID(), mock.Anything).
+		Return(&optimistic_sync.ExecutionResultInfo{
+			ExecutionResult: unittest.ExecutionResultFixture(),
+			ExecutionNodes:  fixedENIDs.ToSkeleton(),
+		}, nil)
+
 	backend, err := New(params)
 	suite.Require().NoError(err)
 
@@ -2071,7 +2141,7 @@ func (suite *Suite) setupConnectionFactory() connection.ConnectionFactory {
 }
 
 func generateEncodedEvents(t *testing.T, n int) ([]flow.Event, []flow.Event) {
-	ccfEvents := unittest.EventGenerator.GetEventsWithEncoding(n, entities.EventEncodingVersion_CCF_V0)
+	ccfEvents := unittest.EventGenerator.GetEventsWithEncoding(n, entitiesproto.EventEncodingVersion_CCF_V0)
 	jsonEvents := make([]flow.Event, n)
 	for i, e := range ccfEvents {
 		jsonEvent, err := convert.CcfEventToJsonEvent(e)
@@ -2111,9 +2181,9 @@ func (suite *Suite) defaultBackendParams() Params {
 			suite.fixedExecutionNodeIDs,
 		),
 		// TODO: set this once data result forest merged in
-		//ExecutionResultProvider:
-		//ExecutionStateCache:
-		OperatorCriteria: optimistic_sync.DefaultCriteria,
+		ExecutionResultProvider: suite.execResultProvider,
+		ExecutionStateCache:     suite.executionStateCache,
+		OperatorCriteria:        optimistic_sync.DefaultCriteria,
 	}
 }
 

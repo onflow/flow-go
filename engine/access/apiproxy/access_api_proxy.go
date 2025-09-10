@@ -30,6 +30,8 @@ type FlowAccessAPIRouter struct {
 	useIndex bool
 }
 
+var _ access.AccessAPIServer = (*FlowAccessAPIRouter)(nil)
+
 type Params struct {
 	Log      zerolog.Logger
 	Metrics  *metrics.ObserverCollector
