@@ -3,7 +3,6 @@ package compare_cadence_vm
 import (
 	"context"
 	"encoding/hex"
-	"fmt"
 	"strings"
 
 	"github.com/kr/pretty"
@@ -151,15 +150,25 @@ func compareBlock(
 
 	log.Info().Msg("Running with interpreter ...")
 
-	var interSpans []*spans
+	interBlockSnapshot := debug_tx.NewBlockSnapshot(remoteClient, header)
+
+	var (
+		interSpans       []*spans
+		interTxSnapshots []*debug.CapturingStorageSnapshot
+	)
 	interResults := debug_tx.RunBlock(
-		remoteClient,
+		interBlockSnapshot,
 		header,
 		blockTransactions,
 		flow.ZeroID,
 		systemTxID,
 		chain,
 		false,
+		func(_ flow.Identifier, snapshot debug.UpdatableStorageSnapshot) debug.UpdatableStorageSnapshot {
+			txSnapshot := debug.NewCapturingStorageSnapshot(snapshot)
+			interTxSnapshots = append(interTxSnapshots, txSnapshot)
+			return txSnapshot
+		},
 		func(_ flow.Identifier) otelTrace.SpanExporter {
 			spans := &spans{}
 			interSpans = append(interSpans, spans)
@@ -170,15 +179,25 @@ func compareBlock(
 
 	log.Info().Msg("Running with VM ...")
 
-	var vmSpans []*spans
+	vmBlockSnapshot := debug_tx.NewBlockSnapshot(remoteClient, header)
+
+	var (
+		vmSpans       []*spans
+		vmTxSnapshots []*debug.CapturingStorageSnapshot
+	)
 	vmResults := debug_tx.RunBlock(
-		remoteClient,
+		vmBlockSnapshot,
 		header,
 		blockTransactions,
 		flow.ZeroID,
 		systemTxID,
 		chain,
 		true,
+		func(_ flow.Identifier, snapshot debug.UpdatableStorageSnapshot) debug.UpdatableStorageSnapshot {
+			txSnapshot := debug.NewCapturingStorageSnapshot(snapshot)
+			vmTxSnapshots = append(vmTxSnapshots, txSnapshot)
+			return txSnapshot
+		},
 		func(_ flow.Identifier) otelTrace.SpanExporter {
 			spans := &spans{}
 			vmSpans = append(vmSpans, spans)
@@ -199,10 +218,17 @@ func compareBlock(
 			vmResult,
 		)
 
-		compareSpans(
+		// TODO: not yet equal
+		//compareSpans(
+		//	txID,
+		//	interSpans[i].spans,
+		//	vmSpans[i].spans,
+		//)
+
+		compareReadsAndWrites(
 			txID,
-			interSpans[i].spans,
-			vmSpans[i].spans,
+			interTxSnapshots[i],
+			vmTxSnapshots[i],
 		)
 	}
 
@@ -336,13 +362,94 @@ func compareResults(
 }
 
 func compareSpans(
-	id flow.Identifier,
+	txID flow.Identifier,
 	interSpans []otelTrace.ReadOnlySpan,
 	vmSpans []otelTrace.ReadOnlySpan,
 ) {
+	log := log.With().Str("tx", txID.String()).Logger()
+
 	diffs := pretty.Diff(interSpans, vmSpans)
 	for _, diff := range diffs {
-		log.Error().Str("tx", id.String()).Msgf("Span diff: %s", diff)
+		log.Error().Msgf("Span diff: %s", diff)
+	}
+}
+
+func compareReadsAndWrites(
+	txID flow.Identifier,
+	interSnapshot *debug.CapturingStorageSnapshot,
+	vmSnapshot *debug.CapturingStorageSnapshot,
+) {
+	log := log.With().Str("tx", txID.String()).Logger()
+
+	// Compare reads
+
+	if len(interSnapshot.Reads) != len(vmSnapshot.Reads) {
+		log.Error().Msgf(
+			"Number of read registers differ: interpreter %d vs VM %d",
+			len(interSnapshot.Reads),
+			len(vmSnapshot.Reads),
+		)
 	}
 
+	for index, interRead := range interSnapshot.Reads {
+		if index >= len(vmSnapshot.Reads) {
+			break
+		}
+		vmRead := vmSnapshot.Reads[index]
+
+		if interRead.RegisterID != vmRead.RegisterID {
+			log.Error().Msgf(
+				"Read register ID mismatch at index %d: interpreter %s vs VM %s",
+				index,
+				interRead.RegisterID,
+				vmRead.RegisterID,
+			)
+			continue
+		}
+
+		if !slices.Equal(interRead.RegisterValue, vmRead.RegisterValue) {
+			log.Error().Msgf(
+				"Read register value mismatch for register %s: interpreter %s vs VM %s",
+				interRead.RegisterID,
+				hex.EncodeToString(interRead.RegisterValue),
+				hex.EncodeToString(vmRead.RegisterValue),
+			)
+		}
+	}
+
+	// Compare writes
+
+	if len(interSnapshot.Writes) != len(vmSnapshot.Writes) {
+		log.Error().Msgf(
+			"Number of written registers differ: interpreter %d vs VM %d",
+			len(interSnapshot.Writes),
+			len(vmSnapshot.Writes),
+		)
+	}
+
+	for index, interWrite := range interSnapshot.Writes {
+		if index >= len(vmSnapshot.Writes) {
+			break
+		}
+		vmWrite := vmSnapshot.Writes[index]
+
+		if interWrite.RegisterID != vmWrite.RegisterID {
+			log.Error().Msgf(
+				"Written register ID mismatch at index %d: interpreter %s vs VM %s",
+				index,
+				interWrite.RegisterID,
+				vmWrite.RegisterID,
+			)
+			continue
+		}
+
+		if !slices.Equal(interWrite.RegisterValue, vmWrite.RegisterValue) {
+			log.Error().Msgf(
+				"Written register value mismatch for register %s: interpreter %s vs VM %s",
+				interWrite.RegisterID,
+				hex.EncodeToString(interWrite.RegisterValue),
+				hex.EncodeToString(vmWrite.RegisterValue),
+			)
+		}
+	}
 }

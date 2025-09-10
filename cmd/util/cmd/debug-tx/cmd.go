@@ -141,14 +141,17 @@ func run(_ *cobra.Command, args []string) {
 			}
 		}
 
+		blockSnapshot := NewBlockSnapshot(remoteClient, header)
+
 		results := RunBlock(
-			remoteClient,
+			blockSnapshot,
 			header,
 			blockTransactions,
 			flow.ZeroID,
 			systemTxID,
 			chain,
 			flagUseVM,
+			nil,
 			newSpanExporter,
 			flagComputeLimit,
 		)
@@ -235,14 +238,17 @@ func RunSingleTransaction(
 		}
 	}
 
+	blockSnapshot := NewBlockSnapshot(remoteClient, header)
+
 	results := RunBlock(
-		remoteClient,
+		blockSnapshot,
 		header,
 		blockTransactions,
 		txID,
 		systemTxID,
 		chain,
 		useVM,
+		nil,
 		newSpanExporter,
 		computeLimit,
 	)
@@ -256,6 +262,19 @@ func RunSingleTransaction(
 	log.Fatal().Msg("transaction not found in block transactions")
 
 	return debug.Result{}
+}
+
+func NewBlockSnapshot(
+	remoteClient debug.RemoteClient,
+	blockHeader *flow.Header,
+) *debug.CachingStorageSnapshot {
+
+	remoteSnapshot, err := remoteClient.StorageSnapshot(blockHeader.Height, blockHeader.ID())
+	if err != nil {
+		log.Fatal().Err(err).Msg("failed to create storage snapshot")
+	}
+
+	return debug.NewCachingStorageSnapshot(remoteSnapshot)
 }
 
 func FetchBlockInfo(
@@ -306,25 +325,19 @@ func FetchBlockInfo(
 }
 
 func RunBlock(
-	remoteClient debug.RemoteClient,
+	blockSnapshot debug.UpdatableStorageSnapshot,
 	blockHeader *flow.Header,
 	blockTransactions []*sdk.Transaction,
 	debuggedTxID flow.Identifier,
 	systemTxID sdk.Identifier,
 	chain flow.Chain,
 	useVM bool,
+	wrapTxSnapshot func(blockTxID flow.Identifier, snapshot debug.UpdatableStorageSnapshot) debug.UpdatableStorageSnapshot,
 	newSpanExporter func(blockTxID flow.Identifier) otelTrace.SpanExporter,
 	computeLimit uint64,
 ) (
 	results []debug.Result,
 ) {
-	remoteSnapshot, err := remoteClient.StorageSnapshot(blockHeader.Height, blockHeader.ID())
-	if err != nil {
-		log.Fatal().Err(err).Msg("failed to create storage snapshot")
-	}
-
-	blockSnapshot := debug.NewCachingStorageSnapshot(remoteSnapshot)
-
 	for _, blockTx := range blockTransactions {
 
 		// TODO: add support for executing system transactions
@@ -340,15 +353,28 @@ func RunBlock(
 			spanExporter = newSpanExporter(blockTxID)
 		}
 
+		txSnapshot := blockSnapshot
+		if wrapTxSnapshot != nil {
+			txSnapshot = wrapTxSnapshot(blockTxID, blockSnapshot)
+		}
+
 		result := RunTransaction(
 			blockTx,
-			blockSnapshot,
+			txSnapshot,
 			blockHeader,
 			chain,
 			useVM,
 			spanExporter,
 			computeLimit,
 		)
+
+		updatedRegisters := result.Snapshot.UpdatedRegisters()
+		for _, updatedRegister := range updatedRegisters {
+			txSnapshot.Set(
+				updatedRegister.Key,
+				updatedRegister.Value,
+			)
+		}
 
 		results = append(results, result)
 
@@ -363,7 +389,7 @@ func RunBlock(
 
 func RunTransaction(
 	tx *sdk.Transaction,
-	snapshot *debug.CachingStorageSnapshot,
+	snapshot debug.StorageSnapshot,
 	header *flow.Header,
 	chain flow.Chain,
 	useVM bool,

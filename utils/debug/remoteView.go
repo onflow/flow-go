@@ -133,16 +133,21 @@ func (snapshot *ExecutionDataStorageSnapshot) Get(
 	return value, nil
 }
 
+type UpdatableStorageSnapshot interface {
+	StorageSnapshot
+	Set(id flow.RegisterID, value flow.RegisterValue)
+}
+
 // CachingStorageSnapshot is a storage snapshot that caches register values
 // in memory to avoid repeated calls to the backing snapshot.
 type CachingStorageSnapshot struct {
 	cache   *InMemoryRegisterCache
-	backing snapshot.StorageSnapshot
+	backing StorageSnapshot
 }
 
-var _ snapshot.StorageSnapshot = (*CachingStorageSnapshot)(nil)
+var _ StorageSnapshot = &CachingStorageSnapshot{}
 
-func NewCachingStorageSnapshot(backing snapshot.StorageSnapshot) *CachingStorageSnapshot {
+func NewCachingStorageSnapshot(backing StorageSnapshot) *CachingStorageSnapshot {
 	return &CachingStorageSnapshot{
 		cache:   NewInMemoryRegisterCache(),
 		backing: backing,
@@ -167,4 +172,61 @@ func (s *CachingStorageSnapshot) Get(id flow.RegisterID) (flow.RegisterValue, er
 
 func (s *CachingStorageSnapshot) Set(id flow.RegisterID, value flow.RegisterValue) {
 	s.cache.Set(id.Key, id.Owner, value)
+}
+
+type CapturingStorageSnapshot struct {
+	backing StorageSnapshot
+	Reads   []struct {
+		flow.RegisterID
+		flow.RegisterValue
+	}
+	Writes []struct {
+		flow.RegisterID
+		flow.RegisterValue
+	}
+}
+
+var _ UpdatableStorageSnapshot = &CapturingStorageSnapshot{}
+
+func NewCapturingStorageSnapshot(backing StorageSnapshot) *CapturingStorageSnapshot {
+	return &CapturingStorageSnapshot{
+		backing: backing,
+	}
+}
+
+func (s *CapturingStorageSnapshot) Get(id flow.RegisterID) (flow.RegisterValue, error) {
+	value, err := s.backing.Get(id)
+	if err != nil {
+		return nil, err
+	}
+
+	s.Reads = append(
+		s.Reads,
+		struct {
+			flow.RegisterID
+			flow.RegisterValue
+		}{
+			RegisterID:    id,
+			RegisterValue: value,
+		},
+	)
+
+	return value, nil
+}
+
+func (s *CapturingStorageSnapshot) Set(id flow.RegisterID, value flow.RegisterValue) {
+	s.Writes = append(
+		s.Writes,
+		struct {
+			flow.RegisterID
+			flow.RegisterValue
+		}{
+			RegisterID:    id,
+			RegisterValue: value,
+		},
+	)
+
+	if updatableBacking, ok := s.backing.(UpdatableStorageSnapshot); ok {
+		updatableBacking.Set(id, value)
+	}
 }

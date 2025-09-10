@@ -84,7 +84,7 @@ func (d *RemoteDebugger) RunTransaction(
 
 func (d *RemoteDebugger) RunSDKTransaction(
 	tx *sdk.Transaction,
-	snapshot *CachingStorageSnapshot,
+	snapshot StorageSnapshot,
 	header *flow.Header,
 	computeLimit uint64,
 ) (
