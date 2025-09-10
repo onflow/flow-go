@@ -27,6 +27,7 @@ type Accounts interface {
 	Get(address flow.Address) (*flow.Account, error)
 	GetAccountPublicKeyCount(address flow.Address) (uint32, error)
 	AppendAccountPublicKey(address flow.Address, key flow.AccountPublicKey) error
+	GetRuntimeAccountPublicKey(address flow.Address, keyIndex uint32) (flow.RuntimeAccountPublicKey, error)
 	GetAccountPublicKey(address flow.Address, keyIndex uint32) (flow.AccountPublicKey, error)
 	GetAccountPublicKeys(address flow.Address) ([]flow.AccountPublicKey, error)
 	RevokeAccountPublicKey(address flow.Address, keyIndex uint32) error
@@ -277,6 +278,60 @@ func (a *StatefulAccounts) GetAccountPublicKey(
 		SignAlgo:  storedKey.SignAlgo,
 		HashAlgo:  storedKey.HashAlgo,
 		SeqNumber: sequenceNumber,
+		Weight:    int(weight),
+		Revoked:   revoked,
+	}, nil
+}
+
+func (a *StatefulAccounts) GetRuntimeAccountPublicKey(
+	address flow.Address,
+	keyIndex uint32,
+) (
+	flow.RuntimeAccountPublicKey,
+	error,
+) {
+	err := a.accountPublicKeyIndexInRange(address, keyIndex)
+	if err != nil {
+		return flow.RuntimeAccountPublicKey{}, err
+	}
+
+	if keyIndex == 0 {
+		key, err := getAccountPublicKey0(a, address)
+		if err != nil {
+			return flow.RuntimeAccountPublicKey{}, fmt.Errorf("failed to get account public key at index %d for %s: %w", keyIndex, address, err)
+		}
+		return flow.RuntimeAccountPublicKey{
+			Index:     keyIndex,
+			PublicKey: key.PublicKey,
+			SignAlgo:  key.SignAlgo,
+			HashAlgo:  key.HashAlgo,
+			Weight:    key.Weight,
+			Revoked:   key.Revoked,
+		}, nil
+	}
+
+	status, err := a.getAccountStatus(address)
+	if err != nil {
+		return flow.RuntimeAccountPublicKey{}, err
+	}
+
+	// Get account public key metadata.
+	weight, revoked, storedKeyIndex, err := status.AccountPublicKeyMetadata(keyIndex)
+	if err != nil {
+		return flow.RuntimeAccountPublicKey{}, fmt.Errorf("failed to get account public key at index %d for %s: %w", keyIndex, address, err)
+	}
+
+	// Get stored public key.
+	storedKey, err := getStoredPublicKey(a, address, storedKeyIndex)
+	if err != nil {
+		return flow.RuntimeAccountPublicKey{}, fmt.Errorf("failed to get account public key at index %d for %s: %w", keyIndex, address, err)
+	}
+
+	return flow.RuntimeAccountPublicKey{
+		Index:     keyIndex,
+		PublicKey: storedKey.PublicKey,
+		SignAlgo:  storedKey.SignAlgo,
+		HashAlgo:  storedKey.HashAlgo,
 		Weight:    int(weight),
 		Revoked:   revoked,
 	}, nil

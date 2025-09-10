@@ -130,6 +130,17 @@ func (f FakePublicKey) toAccountPublicKey() flow.AccountPublicKey {
 	}
 }
 
+func (f FakePublicKey) toRuntimeAccountPublicKey() flow.RuntimeAccountPublicKey {
+	return flow.RuntimeAccountPublicKey{
+		Index:     1,
+		PublicKey: f,
+		SignAlgo:  crypto.ECDSASecp256k1,
+		HashAlgo:  hash.SHA3_256,
+		Weight:    1000,
+		Revoked:   false,
+	}
+}
+
 func (f FakePublicKey) Encode() []byte {
 	return f.data
 }
@@ -162,6 +173,12 @@ func (f FakeAccounts) GetAccountPublicKey(address flow.Address, keyIndex uint32)
 		return flow.AccountPublicKey{}, errors.NewAccountPublicKeyNotFoundError(address, keyIndex)
 	}
 	return FakePublicKey{}.toAccountPublicKey(), nil
+}
+func (f FakeAccounts) GetRuntimeAccountPublicKey(address flow.Address, keyIndex uint32) (flow.RuntimeAccountPublicKey, error) {
+	if keyIndex >= f.keyCount {
+		return flow.RuntimeAccountPublicKey{}, errors.NewAccountPublicKeyNotFoundError(address, keyIndex)
+	}
+	return FakePublicKey{}.toRuntimeAccountPublicKey(), nil
 }
 func (f FakeAccounts) GetAccountPublicKeys(address flow.Address) ([]flow.AccountPublicKey, error) {
 	return make([]flow.AccountPublicKey, f.keyCount), nil
