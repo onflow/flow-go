@@ -9,6 +9,7 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 	"go.opentelemetry.io/otel/exporters/stdout/stdouttrace"
+	otelTrace "go.opentelemetry.io/otel/sdk/trace"
 
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/model/flow"
@@ -105,6 +106,17 @@ func run(_ *cobra.Command, args []string) {
 		defer traceFile.Close()
 	}
 
+	var spanExporter otelTrace.SpanExporter
+	if traceFile != nil {
+		spanExporter, err = stdouttrace.New(
+			stdouttrace.WithWriter(traceFile),
+			stdouttrace.WithoutTimestamps(),
+		)
+		if err != nil {
+			log.Fatal().Err(err).Msg("failed to create trace exporter")
+		}
+	}
+
 	if flagBlockID != "" {
 
 		if len(args) != 0 {
@@ -122,6 +134,13 @@ func run(_ *cobra.Command, args []string) {
 
 		log.Info().Msgf("Running all transactions in block %s (height %d) ...", blockID, header.Height)
 
+		var newSpanExporter func(flow.Identifier) otelTrace.SpanExporter
+		if spanExporter != nil {
+			newSpanExporter = func(_ flow.Identifier) otelTrace.SpanExporter {
+				return spanExporter
+			}
+		}
+
 		results := RunBlock(
 			remoteClient,
 			header,
@@ -130,7 +149,7 @@ func run(_ *cobra.Command, args []string) {
 			systemTxID,
 			chain,
 			flagUseVM,
-			traceFile,
+			newSpanExporter,
 			flagComputeLimit,
 		)
 
@@ -164,7 +183,7 @@ func run(_ *cobra.Command, args []string) {
 				flowClient,
 				chain,
 				flagUseVM,
-				traceFile,
+				spanExporter,
 				flagComputeLimit,
 			)
 			if flagShowResult {
@@ -184,7 +203,7 @@ func RunSingleTransaction(
 	flowClient *client.Client,
 	chain flow.Chain,
 	useVM bool,
-	traceFile *os.File,
+	spanExporter otelTrace.SpanExporter,
 	computeLimit uint64,
 ) debug.Result {
 	log.Info().Msgf("Fetching transaction result for %s ...", txID)
@@ -206,6 +225,16 @@ func RunSingleTransaction(
 
 	blockTransactions, systemTxID, header := FetchBlockInfo(blockID, flowClient)
 
+	var newSpanExporter func(blockTxID flow.Identifier) otelTrace.SpanExporter
+	if spanExporter != nil {
+		newSpanExporter = func(blockTxID flow.Identifier) otelTrace.SpanExporter {
+			if blockTxID == txID {
+				return spanExporter
+			}
+			return nil
+		}
+	}
+
 	results := RunBlock(
 		remoteClient,
 		header,
@@ -214,7 +243,7 @@ func RunSingleTransaction(
 		systemTxID,
 		chain,
 		useVM,
-		traceFile,
+		newSpanExporter,
 		computeLimit,
 	)
 
@@ -284,7 +313,7 @@ func RunBlock(
 	systemTxID sdk.Identifier,
 	chain flow.Chain,
 	useVM bool,
-	traceFile *os.File,
+	newSpanExporter func(blockTxID flow.Identifier) otelTrace.SpanExporter,
 	computeLimit uint64,
 ) (
 	results []debug.Result,
@@ -306,13 +335,18 @@ func RunBlock(
 
 		blockTxID := flow.Identifier(blockTx.ID())
 
+		var spanExporter otelTrace.SpanExporter
+		if newSpanExporter != nil {
+			spanExporter = newSpanExporter(blockTxID)
+		}
+
 		result := RunTransaction(
 			blockTx,
 			blockSnapshot,
 			blockHeader,
 			chain,
 			useVM,
-			traceFile,
+			spanExporter,
 			computeLimit,
 		)
 
@@ -333,27 +367,22 @@ func RunTransaction(
 	header *flow.Header,
 	chain flow.Chain,
 	useVM bool,
-	traceFile *os.File,
+	spanExporter otelTrace.SpanExporter,
 	computeLimit uint64,
 ) debug.Result {
 
 	var fvmOptions []fvm.Option
 
-	if traceFile != nil {
+	if spanExporter != nil {
 
-		exporter, err := stdouttrace.New(
-			stdouttrace.WithWriter(traceFile),
-		)
-		if err != nil {
-			log.Fatal().Err(err).Msg("failed to create trace exporter")
-		}
-
+		const sync = true
 		tracer, err := trace.NewTracerWithExporter(
 			log.Logger,
 			"debug-tx",
 			string(chain.ChainID()),
 			trace.SensitivityCaptureAll,
-			exporter,
+			spanExporter,
+			sync,
 		)
 		if err != nil {
 			log.Fatal().Err(err).Msg("failed to create tracer")

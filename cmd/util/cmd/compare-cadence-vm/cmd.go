@@ -1,18 +1,22 @@
 package compare_cadence_vm
 
 import (
+	"context"
 	"encoding/hex"
-	"os"
+	"fmt"
+	"strings"
 
 	"github.com/kr/pretty"
 	client "github.com/onflow/flow-go-sdk/access/grpc"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
+	otelTrace "go.opentelemetry.io/otel/sdk/trace"
 	"golang.org/x/exp/slices"
 
 	debug_tx "github.com/onflow/flow-go/cmd/util/cmd/debug-tx"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/grpcclient"
+	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/utils/debug"
 )
 
@@ -23,7 +27,6 @@ var (
 	flagComputeLimit        uint64
 	flagUseExecutionDataAPI bool
 	flagBlockID             string
-	flagTracePath           string
 	flagBlockCount          int
 )
 
@@ -54,8 +57,6 @@ func init() {
 
 	Cmd.Flags().StringVar(&flagBlockID, "block-id", "", "block ID")
 	_ = Cmd.MarkFlagRequired("block-id")
-
-	Cmd.Flags().StringVar(&flagTracePath, "trace", "", "enable tracing to given path")
 
 	Cmd.Flags().IntVar(&flagBlockCount, "block-count", 1, "number of blocks to process (default: 1)")
 }
@@ -88,17 +89,6 @@ func run(_ *cobra.Command, args []string) {
 	}
 	defer remoteClient.Close()
 
-	var traceFile *os.File
-	if flagTracePath == "-" {
-		traceFile = os.Stdout
-	} else if flagTracePath != "" {
-		traceFile, err = os.Create(flagTracePath)
-		if err != nil {
-			log.Fatal().Err(err).Msg("failed to create trace file")
-		}
-		defer traceFile.Close()
-	}
-
 	blockID, err := flow.HexStringToIdentifier(flagBlockID)
 	if err != nil {
 		log.Fatal().Err(err).Str("ID", flagBlockID).Msg("failed to parse block ID")
@@ -116,9 +106,36 @@ func run(_ *cobra.Command, args []string) {
 			remoteClient,
 			flowClient,
 			chain,
-			traceFile,
 		)
 	}
+}
+
+type spans struct {
+	spans []otelTrace.ReadOnlySpan
+}
+
+var _ otelTrace.SpanExporter = &spans{}
+
+var interestingSpanNamePrefixes = []trace.SpanName{
+	trace.FVMCadenceTrace,
+	trace.FVMEnvAllocateSlabIndex,
+}
+
+func (s *spans) ExportSpans(_ context.Context, spans []otelTrace.ReadOnlySpan) error {
+	for _, span := range spans {
+		name := span.Name()
+		for _, prefix := range interestingSpanNamePrefixes {
+			if strings.HasPrefix(name, string(prefix)) {
+				s.spans = append(s.spans, span)
+				break
+			}
+		}
+	}
+	return nil
+}
+
+func (s *spans) Shutdown(_ context.Context) error {
+	return nil
 }
 
 func compareBlock(
@@ -126,7 +143,6 @@ func compareBlock(
 	remoteClient debug.RemoteClient,
 	flowClient *client.Client,
 	chain flow.Chain,
-	traceFile *os.File,
 ) *flow.Header {
 
 	blockTransactions, systemTxID, header := debug_tx.FetchBlockInfo(blockID, flowClient)
@@ -135,6 +151,7 @@ func compareBlock(
 
 	log.Info().Msg("Running with interpreter ...")
 
+	var interSpans []*spans
 	interResults := debug_tx.RunBlock(
 		remoteClient,
 		header,
@@ -143,12 +160,17 @@ func compareBlock(
 		systemTxID,
 		chain,
 		false,
-		traceFile,
+		func(_ flow.Identifier) otelTrace.SpanExporter {
+			spans := &spans{}
+			interSpans = append(interSpans, spans)
+			return spans
+		},
 		flagComputeLimit,
 	)
 
 	log.Info().Msg("Running with VM ...")
 
+	var vmSpans []*spans
 	vmResults := debug_tx.RunBlock(
 		remoteClient,
 		header,
@@ -157,7 +179,11 @@ func compareBlock(
 		systemTxID,
 		chain,
 		true,
-		traceFile,
+		func(_ flow.Identifier) otelTrace.SpanExporter {
+			spans := &spans{}
+			vmSpans = append(vmSpans, spans)
+			return spans
+		},
 		flagComputeLimit,
 	)
 
@@ -165,10 +191,18 @@ func compareBlock(
 		vmResult := vmResults[i]
 		transaction := blockTransactions[i]
 
+		txID := flow.Identifier(transaction.ID())
+
 		compareResults(
-			flow.Identifier(transaction.ID()),
+			txID,
 			interResult,
 			vmResult,
+		)
+
+		compareSpans(
+			txID,
+			interSpans[i].spans,
+			vmSpans[i].spans,
 		)
 	}
 
@@ -206,11 +240,11 @@ func compareResults(
 		mismatch = true
 	}
 
-	eventDiff := pretty.Diff(interResult.Output.Events, vmResult.Output.Events)
-	if len(eventDiff) != 0 {
+	eventsDiffs := pretty.Diff(interResult.Output.Events, vmResult.Output.Events)
+	if len(eventsDiffs) != 0 {
 		mismatch = true
 	}
-	for _, diff := range eventDiff {
+	for _, diff := range eventsDiffs {
 		log.Error().Msgf("Event diff: %s", diff)
 	}
 
@@ -227,11 +261,11 @@ func compareResults(
 		mismatch = true
 	}
 
-	logDiff := pretty.Diff(interResult.Output.Logs, vmResult.Output.Logs)
-	if len(logDiff) != 0 {
+	logsDiffs := pretty.Diff(interResult.Output.Logs, vmResult.Output.Logs)
+	if len(logsDiffs) != 0 {
 		mismatch = true
 	}
-	for _, diff := range logDiff {
+	for _, diff := range logsDiffs {
 		log.Error().Msgf("Log diff: %s", diff)
 	}
 
@@ -299,4 +333,16 @@ func compareResults(
 	} else {
 		log.Info().Msg("No differences found between interpreter and VM")
 	}
+}
+
+func compareSpans(
+	id flow.Identifier,
+	interSpans []otelTrace.ReadOnlySpan,
+	vmSpans []otelTrace.ReadOnlySpan,
+) {
+	diffs := pretty.Diff(interSpans, vmSpans)
+	for _, diff := range diffs {
+		log.Error().Str("tx", id.String()).Msgf("Span diff: %s", diff)
+	}
+
 }
