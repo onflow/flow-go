@@ -11,7 +11,6 @@ import (
 	"github.com/onflow/flow-go/storage"
 	storagebadger "github.com/onflow/flow-go/storage/badger"
 	"github.com/onflow/flow-go/storage/badger/operation"
-	"github.com/onflow/flow-go/storage/operation/badgerimpl"
 	"github.com/onflow/flow-go/storage/operation/pebbleimpl"
 	pebblestorage "github.com/onflow/flow-go/storage/pebble"
 	"github.com/onflow/flow-go/storage/store"
@@ -97,27 +96,13 @@ func ParseTwoDBDirs(flags DBFlags) (TwoDBDirs, error) {
 	}, nil
 }
 
-func InitBadgerStorage(flags DBFlags) (*badger.DB, error) {
-	datadir, err := ParseOneDBUsedDir(flags)
-	if err != nil {
-		return nil, fmt.Errorf("could not parse db dir: %w", err)
-	}
-
-	if datadir.UseDB != UsedDBBadger {
-		return nil, fmt.Errorf("only badger db is supported, got: %s", datadir.UseDB)
-	}
-
-	return InitBadgerDBStorage(datadir.DBDir), nil
-}
-
 func InitStorage(datadir string) (storage.DB, error) {
 	ok, err := IsBadgerFolder(datadir)
 	if err != nil {
 		return nil, err
 	}
 	if ok {
-		log.Info().Msgf("using badger db at %s", datadir)
-		return badgerimpl.ToDB(InitBadgerDBStorage(datadir)), nil
+		return nil, fmt.Errorf("badger db is no longer supported for protocol data, datadir: %v", datadir)
 	}
 
 	ok, err = IsPebbleFolder(datadir)
@@ -190,25 +175,6 @@ func InitBadgerStorages(db *badger.DB) *storage.All {
 	return storagebadger.InitAll(metrics, db)
 }
 
-func InitExecutionStorages(bdb *badger.DB) *storage.Execution {
-	metrics := &metrics.NoopCollector{}
-
-	db := badgerimpl.ToDB(bdb)
-
-	results := store.NewExecutionResults(metrics, db)
-	receipts := store.NewExecutionReceipts(metrics, db, results, storagebadger.DefaultCacheSize)
-	commits := store.NewCommits(metrics, db)
-	transactionResults := store.NewTransactionResults(metrics, db, storagebadger.DefaultCacheSize)
-	events := store.NewEvents(metrics, db)
-	return &storage.Execution{
-		Results:            results,
-		Receipts:           receipts,
-		Commits:            commits,
-		TransactionResults: transactionResults,
-		Events:             events,
-	}
-}
-
 // WithStorage runs the given function with the storage depending on the flags.
 func WithStorage(flags DBFlags, f func(storage.DB) error) error {
 	usedDir, err := ParseOneDBUsedDir(flags)
@@ -230,10 +196,7 @@ func WithStorage(flags DBFlags, f func(storage.DB) error) error {
 	}
 
 	if usedDir.UseDB == UsedDBBadger {
-		db := InitBadgerDBStorage(usedDir.DBDir)
-		defer db.Close()
-
-		return f(badgerimpl.ToDB(db))
+		return fmt.Errorf("badger db is no longer supported for protocol data, please use pebble db")
 	}
 
 	return fmt.Errorf("unexpected error")
@@ -250,23 +213,4 @@ func InitBadgerAndPebble(dirs TwoDBDirs) (bdb *badger.DB, pdb *pebble.DB, err er
 	bdb = InitBadgerDBStorage(dirs.BadgerDir)
 
 	return bdb, pdb, nil
-}
-
-// WithBadgerAndPebble runs the given function with the badger and pebble storages
-// it ensures that the storages are closed after the function is done
-func WithBadgerAndPebble(flags DBFlags, f func(*badger.DB, *pebble.DB) error) error {
-	dirs, err := ParseTwoDBDirs(flags)
-	if err != nil {
-		return err
-	}
-
-	bdb, pdb, err := InitBadgerAndPebble(dirs)
-	if err != nil {
-		return err
-	}
-
-	defer bdb.Close()
-	defer pdb.Close()
-
-	return f(bdb, pdb)
 }

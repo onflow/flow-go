@@ -96,7 +96,6 @@ func SealBlock(t *testing.T, st protocol.ParticipantState, mutableProtocolState 
 
 	block3 := BlockFixture(
 		Block.WithParent(block2.ID(), block2.View, block2.Height),
-		Block.WithView(block3View),
 		Block.WithPayload(
 			flow.Payload{
 				Seals:           seals,

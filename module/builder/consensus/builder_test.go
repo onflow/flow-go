@@ -6,7 +6,6 @@ import (
 	"os"
 	"testing"
 
-	"github.com/dgraph-io/badger/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -24,7 +23,7 @@ import (
 	"github.com/onflow/flow-go/storage"
 	storagemock "github.com/onflow/flow-go/storage/mock"
 	"github.com/onflow/flow-go/storage/operation"
-	"github.com/onflow/flow-go/storage/operation/badgerimpl"
+	"github.com/onflow/flow-go/storage/operation/pebbleimpl"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -66,7 +65,7 @@ type BuilderSuite struct {
 
 	// real dependencies
 	dir      string
-	db       *badger.DB
+	db       storage.DB
 	sentinel uint64
 	setter   func(*flow.HeaderBodyBuilder) error
 	sign     func(*flow.Header) ([]byte, error)
@@ -247,15 +246,17 @@ func (bs *BuilderSuite) SetupTest() {
 	bs.parentID = parent.ID()
 
 	// set up temporary database for tests
-	bs.db, bs.dir = unittest.TempBadgerDB(bs.T())
-	lockManager := storage.NewTestingLockManager()
+	pdb, dir := unittest.TempPebbleDB(bs.T())
+	bs.db = pebbleimpl.ToDB(pdb)
+	bs.dir = dir
 
+	lockManager := storage.NewTestingLockManager()
 	lctx := lockManager.NewContext()
 	require.NoError(bs.T(), lctx.AcquireLock(storage.LockFinalizeBlock))
 	defer lctx.Release()
 
 	// insert finalized height and root height
-	db := badgerimpl.ToDB(bs.db)
+	db := bs.db
 	require.NoError(bs.T(), db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 		require.NoError(bs.T(), operation.InsertRootHeight(rw.Writer(), 13))
 		require.NoError(bs.T(), operation.UpsertFinalizedHeight(lctx, rw.Writer(), final.Height))

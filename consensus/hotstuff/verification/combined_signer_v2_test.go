@@ -35,7 +35,6 @@ func TestCombinedSignWithBeaconKey(t *testing.T) {
 	proposerIdentity := identities[0]
 	fblock := unittest.BlockFixture(
 		unittest.Block.WithParent(unittest.IdentifierFixture(), proposerView-1, 0),
-		unittest.Block.WithView(proposerView),
 		unittest.Block.WithProposerID(proposerIdentity.NodeID),
 		unittest.Block.WithLastViewTC(nil),
 	)
@@ -145,7 +144,6 @@ func TestCombinedSignWithNoBeaconKey(t *testing.T) {
 
 	fblock := unittest.BlockFixture(
 		unittest.Block.WithParent(unittest.IdentifierFixture(), proposerView-1, 0),
-		unittest.Block.WithView(proposerView),
 		unittest.Block.WithLastViewTC(nil),
 	)
 	proposal := model.ProposalFromFlow(fblock.ToHeader())

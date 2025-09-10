@@ -58,6 +58,12 @@ func (bs *BlockTimeControllerSuite) EpochDurationSeconds() uint64 {
 	return 60 * 60
 }
 
+// Helper function to allow an initial tick before checking the condition.
+func (bs *BlockTimeControllerSuite) EventuallyWithDelay(t require.TestingT, condition func() bool, waitFor time.Duration, tick time.Duration) {
+	time.Sleep(tick) // initial delay
+	require.Eventually(t, condition, waitFor, tick)
+}
+
 // SetupTest initializes mocks and default values.
 func (bs *BlockTimeControllerSuite) SetupTest() {
 	bs.config = DefaultConfig()
@@ -245,9 +251,9 @@ func (bs *BlockTimeControllerSuite) TestOnEpochExtended() {
 	bs.ctl.EpochExtended(bs.epochCounter, header, extension)
 
 	// Check component state after the epochEvents channel is empty, indicating the event has been processed.
-	require.Eventually(bs.T(), func() bool {
+	bs.EventuallyWithDelay(bs.T(), func() bool {
 		return len(bs.ctl.epochEvents) == 0
-	}, time.Second, time.Millisecond)
+	}, time.Second, 10*time.Millisecond)
 
 	currentEpoch, err := bs.snapshot.Epochs().Current()
 	require.NoError(bs.T(), err)
@@ -381,9 +387,10 @@ func (bs *BlockTimeControllerSuite) TestEnableDisable() {
 	// send another block
 	block = model.BlockFromFlow(unittest.BlockHeaderFixture(unittest.HeaderWithView(bs.initialView + 2)))
 	bs.ctl.OnBlockIncorporated(block)
-	require.Eventually(bs.T(), func() bool {
+
+	bs.EventuallyWithDelay(bs.T(), func() bool {
 		return bs.ctl.getProposalTiming().ObservationView() > bs.initialView
-	}, time.Second, time.Millisecond)
+	}, time.Second, 10*time.Millisecond)
 
 	thirdControllerState := captureControllerStateDigest(bs.ctl)
 	thirdProposalDelay := bs.ctl.getProposalTiming()

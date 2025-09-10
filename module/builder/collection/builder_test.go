@@ -8,7 +8,6 @@ import (
 	"os"
 	"testing"
 
-	"github.com/dgraph-io/badger/v2"
 	"github.com/jordanschalm/lockctx"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
@@ -34,7 +33,7 @@ import (
 	"github.com/onflow/flow-go/state/protocol/util"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/operation"
-	"github.com/onflow/flow-go/storage/operation/badgerimpl"
+	"github.com/onflow/flow-go/storage/operation/pebbleimpl"
 	"github.com/onflow/flow-go/storage/procedure"
 	"github.com/onflow/flow-go/storage/store"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -57,7 +56,6 @@ var setter = func(h *flow.HeaderBodyBuilder) error {
 type BuilderSuite struct {
 	suite.Suite
 	db          storage.DB
-	badgerDB    *badger.DB
 	dbdir       string
 	lockManager lockctx.Manager
 
@@ -91,8 +89,8 @@ func (suite *BuilderSuite) SetupTest() {
 	suite.pool = herocache.NewTransactions(1000, unittest.Logger(), metrics.NewNoopCollector())
 
 	suite.dbdir = unittest.TempDir(suite.T())
-	suite.badgerDB = unittest.BadgerDB(suite.T(), suite.dbdir)
-	suite.db = badgerimpl.ToDB(suite.badgerDB)
+	pdb := unittest.PebbleDB(suite.T(), suite.dbdir)
+	suite.db = pebbleimpl.ToDB(pdb)
 
 	metrics := metrics.NewNoopCollector()
 	tracer := trace.NewNoopTracer()
@@ -197,7 +195,7 @@ func (suite *BuilderSuite) SetupTest() {
 
 // runs after each test finishes
 func (suite *BuilderSuite) TearDownTest() {
-	err := suite.badgerDB.Close()
+	err := suite.db.Close()
 	suite.Assert().NoError(err)
 	err = os.RemoveAll(suite.dbdir)
 	suite.Assert().NoError(err)
@@ -1485,10 +1483,10 @@ func benchmarkBuildOn(b *testing.B, size int) {
 		suite.pool = herocache.NewTransactions(1000, unittest.Logger(), metrics.NewNoopCollector())
 
 		suite.dbdir = unittest.TempDir(b)
-		suite.badgerDB = unittest.BadgerDB(b, suite.dbdir)
-		suite.db = badgerimpl.ToDB(suite.badgerDB)
+		pdb := unittest.PebbleDB(suite.T(), suite.dbdir)
+		suite.db = pebbleimpl.ToDB(pdb)
 		defer func() {
-			err = suite.badgerDB.Close()
+			err = suite.db.Close()
 			assert.NoError(b, err)
 			err = os.RemoveAll(suite.dbdir)
 			assert.NoError(b, err)

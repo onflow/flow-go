@@ -793,7 +793,7 @@ func OpenState(
 			SporkRootBlockView:   sporkRootBlock.View,
 		},
 	)
-	instanceParams, err := ReadInstanceParams(db, headers, seals)
+	instanceParams, err := ReadInstanceParams(db.Reader(), headers, seals)
 	if err != nil {
 		return nil, fmt.Errorf("could not read instance params: %w", err)
 	}

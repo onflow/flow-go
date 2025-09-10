@@ -73,3 +73,7 @@ func (p *precompile) Run(input []byte) (output []byte, err error) {
 	}
 	return callable.Run(data)
 }
+
+func (p *precompile) Name() string {
+	return CADENCE_ARCH_PRECOMPILE_NAME
+}

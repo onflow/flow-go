@@ -38,10 +38,3 @@ func InitBadgerAndPebble() (bdb *badger.DB, pdb *pebble.DB, err error) {
 	}
 	return common.InitBadgerAndPebble(dbDirs)
 }
-
-// WithBadgerAndPebble runs the given function with the badger and pebble storages
-// it ensures that the storages are closed after the function is done
-func WithBadgerAndPebble(f func(*badger.DB, *pebble.DB) error) error {
-	flagDBs := common.ReadDBFlags()
-	return common.WithBadgerAndPebble(flagDBs, f)
-}

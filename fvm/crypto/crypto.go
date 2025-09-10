@@ -9,7 +9,6 @@ import (
 	"github.com/onflow/crypto/hash"
 
 	"github.com/onflow/flow-go/fvm/errors"
-	"github.com/onflow/flow-go/model/flow"
 	msig "github.com/onflow/flow-go/module/signature"
 )
 
@@ -118,14 +117,14 @@ func ValidatePublicKey(signAlgo runtime.SignatureAlgorithm, pk []byte) error {
 	return nil
 }
 
-// VerifySignatureFromRuntime performs signature verification using raw values provided
+// VerifySignatureFromRuntime performs signature verification using values provided
 // by the Cadence runtime.
 //
 // The signature/hash function combinations accepted are:
 //   - ECDSA (on both curves P-256 and secp256k1) with any of SHA2-256/SHA3-256/Keccak256.
 //   - BLS (on BLS12-381 curve) with the specific KMAC128 for BLS.
 //
-// The tag is applied to the message depending on the hash function used.
+// The tag is applied to the message within the implementation depending on the hash function used.
 //
 // The function errors:
 //   - NewValueErrorf for any user error
@@ -199,13 +198,14 @@ func VerifySignatureFromRuntime(
 	return valid, nil
 }
 
-// VerifySignatureFromRuntime performs signature verification using raw values provided
-// by the Cadence runtime.
+// VerifySignatureFromTransaction performs signature verification using values provided
+// by the Transaction Verifier.
 //
 // The signature/hash function combinations accepted are:
 //   - ECDSA (on both curves P-256 and secp256k1) with any of SHA2-256/SHA3-256.
 //
-// The tag is applied to the message as a constant length prefix.
+// No tagging is applied to the input `message` in the implementation.Any tagging/prefixing should be applied to the message prior
+// to calling the function.
 //
 // The function errors:
 //   - NewValueErrorf for any user error
@@ -219,22 +219,23 @@ func VerifySignatureFromTransaction(
 
 	// check ECDSA compatibilites
 	if pk.Algorithm() != crypto.ECDSAP256 && pk.Algorithm() != crypto.ECDSASecp256k1 {
-		// TODO: check if we should panic
-		// This case only happens in production if there is a bug
+		// should not happen
 		return false, errors.NewUnknownFailure(fmt.Errorf(
 			pk.Algorithm().String(), "is not supported in transactions"))
 	}
 	// hashing compatibility
 	if hashAlgo != hash.SHA2_256 && hashAlgo != hash.SHA3_256 {
-		// TODO: check if we should panic
-		// This case only happens in production if there is a bug
+		// should not happen
 		return false, errors.NewUnknownFailure(fmt.Errorf(
 			hashAlgo.String(), "is not supported in transactions"))
 	}
 
-	hasher, err := NewPrefixedHashing(hashAlgo, flow.TransactionTagString)
+	// No prefix logic is implemented here, any prefixing should be applied directly to the `message` input
+	hasher, err := NewHashing(hashAlgo)
 	if err != nil {
-		return false, errors.NewValueErrorf(err.Error(), "transaction verification failed")
+		// should not happen
+		return false, errors.NewUnknownFailure(fmt.Errorf(
+			hashAlgo.String(), "is not supported in transactions"))
 	}
 
 	valid, err := pk.Verify(signature, message, hasher)

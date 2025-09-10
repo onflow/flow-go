@@ -6,7 +6,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/dgraph-io/badger/v2"
+	"github.com/cockroachdb/pebble/v2"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/atomic"
 
@@ -15,7 +15,7 @@ import (
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/metrics"
 	storage "github.com/onflow/flow-go/storage"
-	"github.com/onflow/flow-go/storage/operation/badgerimpl"
+	"github.com/onflow/flow-go/storage/operation/pebbleimpl"
 	"github.com/onflow/flow-go/storage/store"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -143,9 +143,9 @@ func WithConsumer(
 	process func(module.ProcessingNotifier, *chunks.Locator),
 	withConsumer func(*chunkconsumer.ChunkConsumer, storage.ChunksQueue),
 ) {
-	unittest.RunWithBadgerDB(t, func(badgerdb *badger.DB) {
+	unittest.RunWithPebbleDB(t, func(pebbleDB *pebble.DB) {
 		maxProcessing := uint64(3)
-		db := badgerimpl.ToDB(badgerdb)
+		db := pebbleimpl.ToDB(pebbleDB)
 
 		collector := &metrics.NoopCollector{}
 		processedIndex := store.NewConsumerProgress(db, module.ConsumeProgressVerificationChunkIndex)

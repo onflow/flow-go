@@ -283,7 +283,6 @@ func createBlock(b *testing.B, parentBlock *flow.Block, accs *testAccounts, colN
 
 	block := unittest.BlockFixture(
 		unittest.Block.WithParent(parentBlock.ID(), parentBlock.View, parentBlock.Height),
-		unittest.Block.WithView(parentBlock.View+1),
 		unittest.Block.WithPayload(
 			unittest.PayloadFixture(unittest.WithGuarantees(guarantees...)),
 		),

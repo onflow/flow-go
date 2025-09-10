@@ -532,7 +532,6 @@ func createTestBlockAndRun(
 
 	block := unittest.BlockFixture(
 		unittest.Block.WithParent(parentBlock.ID(), parentBlock.View, parentBlock.Height),
-		unittest.Block.WithView(parentBlock.View+1),
 		unittest.Block.WithPayload(
 			unittest.PayloadFixture(unittest.WithGuarantees(guarantee)),
 		),

@@ -25,6 +25,7 @@ func (f *blockFactory) WithParent(parentID flow.Identifier, parentView uint64, p
 		block.ParentID = parentID
 		block.ParentView = parentView
 		block.Height = parentHeight + 1
+		block.View = parentView + 1
 	}
 }
 

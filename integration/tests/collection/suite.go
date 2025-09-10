@@ -21,7 +21,6 @@ import (
 	"github.com/onflow/flow-go/model/flow/filter"
 	clusterstate "github.com/onflow/flow-go/state/cluster"
 	clusterstateimpl "github.com/onflow/flow-go/state/cluster/badger"
-	"github.com/onflow/flow-go/storage/operation/badgerimpl"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -354,7 +353,7 @@ func (suite *CollectorSuite) ClusterStateFor(id flow.Identifier) *clusterstateim
 	rootQC := unittest.QuorumCertificateFixture(unittest.QCWithRootBlockID(rootBlock.ID()))
 	clusterStateRoot, err := clusterstateimpl.NewStateRoot(rootBlock, rootQC, setup.Counter)
 	suite.NoError(err)
-	clusterState, err := clusterstateimpl.OpenState(badgerimpl.ToDB(db), nil, nil, nil, clusterStateRoot.ClusterID(), clusterStateRoot.EpochCounter())
+	clusterState, err := clusterstateimpl.OpenState(db, nil, nil, nil, clusterStateRoot.ClusterID(), clusterStateRoot.EpochCounter())
 	require.NoError(suite.T(), err, "could not get cluster state")
 
 	return clusterState
