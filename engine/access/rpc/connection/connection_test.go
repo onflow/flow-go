@@ -493,10 +493,10 @@ func TestConnectionPoolStale(t *testing.T) {
 	assert.Equal(t, connectionCache.Len(), 1)
 	assert.NoError(t, err)
 	// close connection to simulate something "going wrong" with our stored connection
-	cachedClient, _ := connectionCache.cache.Get(proxyConnectionFactory.targetAddress)
+	cachedClient, ok := connectionCache.cache.Get(proxyConnectionFactory.targetAddress)
+	require.True(t, ok)
 
-	cachedClient.Invalidate()
-	cachedClient.Close()
+	connectionCache.Invalidate(cachedClient)
 
 	ctx := context.Background()
 	// make the call to the collection node (should fail, connection closed)
@@ -670,8 +670,8 @@ func TestEvictingCacheClients(t *testing.T) {
 	require.NoError(t, err)
 
 	// create a non-blocking cache
-	connectionCache.cache, err = lru.NewWithEvict[string, *CachedClient](cacheSize, func(_ string, client *CachedClient) {
-		go client.Close()
+	connectionCache.cache, err = lru.NewWithEvict(cacheSize, func(_ string, client *CachedClient) {
+		client.Close()
 	})
 	require.NoError(t, err)
 
@@ -711,11 +711,11 @@ func TestEvictingCacheClients(t *testing.T) {
 		<-startPing // wait until Ping is called
 
 		// Invalidate the access API client
-		cachedClient.Invalidate()
+		connectionCache.Invalidate(cachedClient)
 
 		// Invalidate marks the connection for closure asynchronously, so give it some time to run
 		require.Eventually(t, func() bool {
-			return cachedClient.closeRequested.Load()
+			return cachedClient.CloseRequested()
 		}, 100*time.Millisecond, 10*time.Millisecond, "client timed out closing connection")
 
 		// Call a gRPC method on the client, requests should be blocked since the connection is invalidated
