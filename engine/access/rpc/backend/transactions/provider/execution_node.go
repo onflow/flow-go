@@ -103,7 +103,7 @@ func (e *ENTransactionProvider) TransactionResult(
 		return nil, metadata, err
 	}
 
-	txStatus, err := e.txStatusDeriver.DeriveTransactionStatus(block.Height, true)
+	txStatus, err := e.txStatusDeriver.DeriveFinalizedTransactionStatus(block.Height, true)
 	if err != nil {
 		return nil, metadata, fmt.Errorf("failed to derive transaction status: %w", err)
 	}
@@ -153,7 +153,7 @@ func (e *ENTransactionProvider) TransactionResultByIndex(
 		return nil, metadata, status.Errorf(codes.Internal, "failed to retrieve result from execution node: %v", err)
 	}
 
-	txStatus, err := e.txStatusDeriver.DeriveTransactionStatus(block.Height, true)
+	txStatus, err := e.txStatusDeriver.DeriveFinalizedTransactionStatus(block.Height, true)
 	if err != nil {
 		return nil, metadata, fmt.Errorf("failed to derive transaction status: %w", err)
 	}
@@ -201,10 +201,9 @@ func (e *ENTransactionProvider) TransactionResultsByBlockID(
 		return nil, metadata, rpc.ConvertError(err, "failed to retrieve result from execution node", codes.Internal)
 	}
 
-	txStatus, err := e.txStatusDeriver.DeriveTransactionStatus(block.Height, true)
+	txStatus, err := e.txStatusDeriver.DeriveFinalizedTransactionStatus(block.Height, true)
 	if err != nil {
-		irrecoverable.Throw(ctx, fmt.Errorf("failed to derive transaction status: %w", err))
-		return nil, metadata, err
+		return nil, metadata, fmt.Errorf("failed to derive transaction status: %w", err)
 	}
 
 	results := make([]*accessmodel.TransactionResult, 0, len(resp.TransactionResults))
@@ -263,6 +262,14 @@ func (e *ENTransactionProvider) TransactionResultsByBlockID(
 		}
 
 		systemTxResult := resp.TransactionResults[len(resp.TransactionResults)-1]
+<<<<<<< HEAD
+=======
+		systemTxStatus, err := e.txStatusDeriver.DeriveFinalizedTransactionStatus(block.Height, true)
+		if err != nil {
+			irrecoverable.Throw(ctx, fmt.Errorf("failed to derive transaction status: %w", err))
+			return nil, err
+		}
+>>>>>>> illia-malachyn/7652-fork-aware-events-endpoint
 
 		events, err := convert.MessagesToEventsWithEncodingConversion(systemTxResult.GetEvents(), resp.GetEventEncodingVersion(), requiredEventEncodingVersion)
 		if err != nil {
