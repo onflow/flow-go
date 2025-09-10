@@ -365,7 +365,7 @@ func (h *Handler) GetTransactionResult(
 		return nil, err
 	}
 
-	if query != nil && query.GetIncludeExecutorMetadata() {
+	if query.GetIncludeExecutorMetadata() {
 		metadata.ExecutorMetadata = convert.ExecutorMetadataToMessage(&executorMetadata)
 	}
 	message := convert.TransactionResultToMessage(result)
@@ -401,7 +401,7 @@ func (h *Handler) GetTransactionResultsByBlockID(
 		return nil, err
 	}
 
-	if query != nil && query.GetIncludeExecutorMetadata() {
+	if query.GetIncludeExecutorMetadata() {
 		metadata.ExecutorMetadata = convert.ExecutorMetadataToMessage(&executorMetadata)
 	}
 	message := convert.TransactionResultsToMessage(results)
@@ -462,7 +462,7 @@ func (h *Handler) GetSystemTransactionResult(
 		return nil, err
 	}
 
-	if query != nil && query.GetIncludeExecutorMetadata() {
+	if query.GetIncludeExecutorMetadata() {
 		metadata.ExecutorMetadata = convert.ExecutorMetadataToMessage(&executorMetadata)
 	}
 	message := convert.TransactionResultToMessage(result)
@@ -526,7 +526,7 @@ func (h *Handler) GetTransactionResultByIndex(
 		return nil, err
 	}
 
-	if query != nil && query.GetIncludeExecutorMetadata() {
+	if query.GetIncludeExecutorMetadata() {
 		metadata.ExecutorMetadata = convert.ExecutorMetadataToMessage(&executorMetadata)
 	}
 	message := convert.TransactionResultToMessage(result)
@@ -950,7 +950,7 @@ func (h *Handler) GetEventsForHeightRange(
 		return nil, err
 	}
 
-	if query != nil && query.GetIncludeExecutorMetadata() {
+	if query.GetIncludeExecutorMetadata() {
 		metadata.ExecutorMetadata = convert.ExecutorMetadataToMessage(&executorMetadata)
 	}
 
@@ -999,7 +999,7 @@ func (h *Handler) GetEventsForBlockIDs(
 		return nil, err
 	}
 
-	if query != nil && query.GetIncludeExecutorMetadata() {
+	if query.GetIncludeExecutorMetadata() {
 		metadata.ExecutorMetadata = convert.ExecutorMetadataToMessage(&executorMetadata)
 	}
 
