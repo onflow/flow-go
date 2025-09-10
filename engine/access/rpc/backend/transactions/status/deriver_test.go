@@ -14,6 +14,7 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
+// TestDeriveUnknownTransactionStatus tests each scenario when deriving the status of transaction whose block is not known.
 func TestDeriveUnknownTransactionStatus(t *testing.T) {
 	rootHeader := unittest.BlockHeaderFixture(unittest.WithHeaderHeight(flow.DefaultTransactionExpiry + 1))
 	blocks := unittest.ChainBlockFixtureWithRoot(rootHeader, 10)
@@ -99,7 +100,8 @@ func TestDeriveUnknownTransactionStatus(t *testing.T) {
 	})
 }
 
-func TestDeriveTransactionStatus(t *testing.T) {
+// TestDeriveFinalizedTransactionStatus tests each scenario when deriving the status of transaction in a finalized block.
+func TestDeriveFinalizedTransactionStatus(t *testing.T) {
 	rootHeader := unittest.BlockHeaderFixture(unittest.WithHeaderHeight(flow.DefaultTransactionExpiry + 1))
 	blocks := unittest.ChainBlockFixtureWithRoot(rootHeader, 10)
 
@@ -144,6 +146,7 @@ func TestDeriveTransactionStatus(t *testing.T) {
 	})
 }
 
+// TestIsExpired tests the isExpired function.
 func TestIsExpired(t *testing.T) {
 	tests := []struct {
 		name              string
