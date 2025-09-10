@@ -39,34 +39,47 @@ var _ protocol.InstanceParams = (*InstanceParams)(nil)
 // emphasizing that it only reads and never writes.
 // This information is immutable and may be cached.
 // No errors are expected during normal operation.
-func ReadInstanceParams(r storage.Reader, headers storage.Headers, seals storage.Seals, blocks storage.Blocks) (*InstanceParams, error) {
+func ReadInstanceParams(
+	r storage.Reader,
+	headers storage.Headers,
+	seals storage.Seals,
+	blocks storage.Blocks,
+) (*InstanceParams, error) {
 	params := &InstanceParams{}
-
-	var enc operation.EncodableInstanceParams
-	err := operation.RetrieveInstanceParams(r, &enc)
+	var versioned operation.VersionedInstanceParams
+	err := operation.RetrieveInstanceParams(r, &versioned)
 	if err != nil {
 		return nil, fmt.Errorf("could not read instance params to populate cache: %w", err)
 	}
 
-	params.finalizedRoot, err = headers.ByBlockID(enc.FinalizedRootID)
-	if err != nil {
-		return nil, fmt.Errorf("could not retrieve finalized root header: %w", err)
-	}
+	switch versioned.Version {
+	case 0:
+		enc, ok := versioned.InstanceParams.(operation.InstanceParamsV0)
+		if !ok {
+			return nil, fmt.Errorf("invalid instance params %T for version %d", versioned.InstanceParams, versioned.Version)
+		}
+		params.finalizedRoot, err = headers.ByBlockID(enc.FinalizedRootID)
+		if err != nil {
+			return nil, fmt.Errorf("could not retrieve finalized root header: %w", err)
+		}
 
-	params.sealedRoot, err = headers.ByBlockID(enc.SealedRootID)
-	if err != nil {
-		return nil, fmt.Errorf("could not retrieve sealed root header: %w", err)
-	}
+		params.sealedRoot, err = headers.ByBlockID(enc.SealedRootID)
+		if err != nil {
+			return nil, fmt.Errorf("could not retrieve sealed root header: %w", err)
+		}
 
-	// retrieve the root seal
-	params.rootSeal, err = seals.HighestInFork(enc.FinalizedRootID)
-	if err != nil {
-		return nil, fmt.Errorf("could not retrieve root seal: %w", err)
-	}
+		// retrieve the root seal
+		params.rootSeal, err = seals.HighestInFork(enc.FinalizedRootID)
+		if err != nil {
+			return nil, fmt.Errorf("could not retrieve root seal: %w", err)
+		}
 
-	params.sporkRootBlock, err = blocks.ByID(enc.SporkRootBlockID)
-	if err != nil {
-		return nil, fmt.Errorf("could not retrieve spork root block: %w", err)
+		params.sporkRootBlock, err = blocks.ByID(enc.SporkRootBlockID)
+		if err != nil {
+			return nil, fmt.Errorf("could not retrieve spork root block: %w", err)
+		}
+	default:
+		return nil, fmt.Errorf("unsupported instance params version: %d", versioned.Version)
 	}
 
 	return params, nil

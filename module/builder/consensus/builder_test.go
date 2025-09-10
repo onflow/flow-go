@@ -258,13 +258,14 @@ func (bs *BuilderSuite) SetupTest() {
 	// insert finalized height and root height
 	db := bs.db
 	require.NoError(bs.T(), db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-		require.NoError(bs.T(), operation.InsertInstanceParams(
-			rw,
-			operation.EncodableInstanceParams{
-				FinalizedRootID:  unittest.IdentifierFixture(),
-				SealedRootID:     unittest.IdentifierFixture(),
-				SporkRootBlockID: unittest.IdentifierFixture(),
-			}))
+		enc, err := operation.NewVersionedInstanceParams(
+			operation.DefaultInstanceParamsVersion,
+			unittest.IdentifierFixture(),
+			unittest.IdentifierFixture(),
+			unittest.IdentifierFixture(),
+		)
+		require.NoError(bs.T(), err)
+		require.NoError(bs.T(), operation.InsertInstanceParams(rw, *enc))
 		require.NoError(bs.T(), operation.UpsertFinalizedHeight(lctx, rw.Writer(), final.Height))
 		require.NoError(bs.T(), operation.IndexFinalizedBlockByHeight(lctx, rw, final.Height, bs.finalID))
 		require.NoError(bs.T(), operation.UpsertSealedHeight(lctx, rw.Writer(), first.Height))

@@ -3,13 +3,78 @@ package operation
 import (
 	"fmt"
 
+	"github.com/vmihailenco/msgpack/v4"
+
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/storage"
 )
 
-// EncodableInstanceParams is the consolidated, serializable form of protocol instance
+const DefaultInstanceParamsVersion = 0
+
+// VersionedInstanceParams wraps serialized instance params with a version tag.
+// This allows evolving the schema while keeping backward compatibility.
+type VersionedInstanceParams struct {
+	Version        uint64
+	InstanceParams interface{}
+}
+
+// NewVersionedInstanceParams constructs an instance params for a particular version for bootstrapping.
+// Caller must provide a supported version number, otherwise an exception is returned.
+func NewVersionedInstanceParams(
+	version uint64,
+	finalizedRootID flow.Identifier,
+	sealedRootID flow.Identifier,
+	sporkRootBlockID flow.Identifier,
+) (*VersionedInstanceParams, error) {
+	versionedInstanceParams := &VersionedInstanceParams{
+		Version: version,
+	}
+	switch version {
+	case 0:
+		versionedInstanceParams.InstanceParams = InstanceParamsV0{
+			FinalizedRootID:  finalizedRootID,
+			SealedRootID:     sealedRootID,
+			SporkRootBlockID: sporkRootBlockID,
+		}
+	default:
+		return nil, fmt.Errorf("unsupported instance params version: %d", version)
+	}
+
+	return versionedInstanceParams, nil
+}
+
+func (v *VersionedInstanceParams) UnmarshalMsgpack(b []byte) error {
+	// slias type to prevent recursion
+	type decodable VersionedInstanceParams
+	var d decodable
+	if err := msgpack.Unmarshal(b, &d); err != nil {
+		return fmt.Errorf("could not decode VersionedInstanceParams: %w", err)
+	}
+
+	v.Version = d.Version
+	instanceBytes, err := msgpack.Marshal(d.InstanceParams)
+	if err != nil {
+		return fmt.Errorf("could not re-marshal InstanceParams: %w", err)
+	}
+
+	// decode InstanceParams based on version
+	switch d.Version {
+	case 0:
+		var p InstanceParamsV0
+		if err := msgpack.Unmarshal(instanceBytes, &p); err != nil {
+			return fmt.Errorf("could not decode to InstanceParamsV0: %w", err)
+		}
+		v.InstanceParams = p
+	default:
+		return fmt.Errorf("unsupported instance params version: %d", d.Version)
+	}
+
+	return nil
+}
+
+// InstanceParamsV0 is the consolidated, serializable form of protocol instance
 // parameters that are constant throughout the lifetime of a node.
-type EncodableInstanceParams struct {
+type InstanceParamsV0 struct {
 	// FinalizedRootID is the ID of the finalized root block.
 	FinalizedRootID flow.Identifier
 	// SealedRootID is the ID of the sealed root block.
@@ -27,7 +92,7 @@ type EncodableInstanceParams struct {
 // Expected errors during normal operations:
 //   - [storage.ErrAlreadyExists] if instance params have already been stored.
 //   - Generic error for unexpected database or encoding failures.
-func InsertInstanceParams(rw storage.ReaderBatchWriter, params EncodableInstanceParams) error {
+func InsertInstanceParams(rw storage.ReaderBatchWriter, params VersionedInstanceParams) error {
 	key := MakePrefix(codeInstanceParams)
 	exist, err := KeyExists(rw.GlobalReader(), key)
 	if err != nil {
@@ -44,6 +109,6 @@ func InsertInstanceParams(rw storage.ReaderBatchWriter, params EncodableInstance
 // Expected errors during normal operations:
 //   - [storage.ErrNotFound] if the key does not exist (not bootstrapped).
 //   - Generic error for unexpected database or decoding failures.
-func RetrieveInstanceParams(r storage.Reader, params *EncodableInstanceParams) error {
+func RetrieveInstanceParams(r storage.Reader, params *VersionedInstanceParams) error {
 	return RetrieveByKey(r, MakePrefix(codeInstanceParams), params)
 }

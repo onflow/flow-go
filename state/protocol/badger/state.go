@@ -523,12 +523,17 @@ func bootstrapStatePointers(lctx lockctx.Proof, rw storage.ReaderBatchWriter, ro
 	lastFinalized := segment.Finalized() // the lastFinalized block in sealing segment is the latest known finalized block
 	lastSealed := segment.Sealed()       // the lastSealed block in sealing segment is the latest known sealed block
 
-	enc := operation.EncodableInstanceParams{
-		FinalizedRootID:  lastFinalized.ID(),
-		SealedRootID:     lastSealed.ID(),
-		SporkRootBlockID: root.Params().SporkID(),
+	enc, err := operation.NewVersionedInstanceParams(
+		operation.DefaultInstanceParamsVersion,
+		lastFinalized.ID(),
+		lastSealed.ID(),
+		root.Params().SporkID(),
+	)
+	if err != nil {
+		return fmt.Errorf("could not create versioned instance params: %w", err)
 	}
-	err = operation.InsertInstanceParams(rw, enc)
+
+	err = operation.InsertInstanceParams(rw, *enc)
 	if err != nil {
 		return fmt.Errorf("could not store instance params: %w", err)
 	}
