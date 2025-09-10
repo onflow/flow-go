@@ -213,7 +213,7 @@ func (suite *Suite) TestInvalidTransaction() {
 
 			err := suite.engine.ProcessTransaction(&tx)
 			suite.Assert().Error(err)
-			suite.Assert().True(errors.As(err, &validator.InvalidSignatureError{}))
+			suite.Assert().True(errors.As(err, &validator.InvalidRawSignatureError{}))
 		})
 
 		suite.Run("invalid format of a payload signature", func() {
@@ -224,7 +224,7 @@ func (suite *Suite) TestInvalidTransaction() {
 
 			err := suite.engine.ProcessTransaction(&tx)
 			suite.Assert().Error(err)
-			suite.Assert().True(errors.As(err, &validator.InvalidSignatureError{}))
+			suite.Assert().True(errors.As(err, &validator.InvalidRawSignatureError{}))
 		})
 
 		suite.Run("duplicated signature (envelope only)", func() {

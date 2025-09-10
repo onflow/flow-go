@@ -16,7 +16,6 @@ import (
 	"github.com/ipfs/boxo/bitswap"
 	"github.com/ipfs/go-cid"
 	"github.com/ipfs/go-datastore"
-	badgerds "github.com/ipfs/go-ds-badger2"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/onflow/crypto"
 	"github.com/rs/zerolog"
@@ -1129,10 +1128,7 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 					return fmt.Errorf("could not create PebbleDatastoreManager for execution data: %w", err)
 				}
 			} else {
-				builder.ExecutionDatastoreManager, err = edstorage.NewBadgerDatastoreManager(datastoreDir, &badgerds.DefaultOptions)
-				if err != nil {
-					return fmt.Errorf("could not create BadgerDatastoreManager for execution data: %w", err)
-				}
+				return fmt.Errorf("datastore with badger has been deprecated, please use pebble instead")
 			}
 			ds = builder.ExecutionDatastoreManager.Datastore()
 

@@ -991,13 +991,6 @@ func diff[T comparable](old, new []T) (onlyOld, onlyNew, shared []T) {
 	return
 }
 
-func min(a, b int) int {
-	if a <= b {
-		return a
-	}
-	return b
-}
-
 func newReadonlyStorage(regs registers.Registers) *runtime.Storage {
 	ledger := &registers.ReadOnlyLedger{Registers: regs}
 	config := runtime.StorageConfig{}

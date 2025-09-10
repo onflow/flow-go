@@ -77,14 +77,24 @@ func (e DuplicatedSignatureError) Error() string {
 	return fmt.Sprintf("duplicated signature for key (address: %s, index: %d)", e.Address.String(), e.KeyIndex)
 }
 
-// InvalidSignatureError indicates that a transaction contains a signature
+// InvalidRawSignatureError indicates that a transaction contains a cryptographic raw signature
 // with a wrong format.
-type InvalidSignatureError struct {
+type InvalidRawSignatureError struct {
 	Signature flow.TransactionSignature
 }
 
-func (e InvalidSignatureError) Error() string {
-	return fmt.Sprintf("invalid signature: %s", e.Signature)
+func (e InvalidRawSignatureError) Error() string {
+	return fmt.Sprintf("the cryptographic signature within the transaction signature has an invalid format: %s", e.Signature)
+}
+
+// InvalidAuthenticationSchemeFormatError indicates that a transaction contains a signature
+// with a wrong format.
+type InvalidAuthenticationSchemeFormatError struct {
+	Signature flow.TransactionSignature
+}
+
+func (e InvalidAuthenticationSchemeFormatError) Error() string {
+	return fmt.Sprintf("the transaction signature has invalid extension data: %s", e.Signature)
 }
 
 // InvalidTxByteSizeError indicates that a transaction byte size exceeds the maximum.
