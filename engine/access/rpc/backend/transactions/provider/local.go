@@ -98,8 +98,7 @@ func (t *LocalTransactionProvider) TransactionResult(
 
 		if len(txErrorMessageStr) == 0 {
 			// this means that the error message stored in the db is inconsistent with the tx result.
-			return nil, metadata,
-				fmt.Errorf("transaction failed but error message is empty")
+			return nil, metadata, fmt.Errorf("transaction failed but error message is empty")
 		}
 
 		txStatusCode = 1 // statusCode of 1 indicates an error and 0 indicates no error, the same as on EN
@@ -177,16 +176,15 @@ func (t *LocalTransactionProvider) TransactionResultByIndex(
 			// it's possible that the error lookup request failed during the indexing process.
 			// use a placeholder error message in this case to ensure graceful degradation.
 			txErrorMessageStr = error_messages.DefaultFailedErrorMessage
+		} else {
+			txErrorMessageStr = txErrorMessage.ErrorMessage
 		}
 
 		if len(txErrorMessage.ErrorMessage) == 0 {
 			// this means that the error message stored in the db is inconsistent with the tx result.
-			return nil, metadata,
-				fmt.Errorf("transaction failed but error message is empty (txID: %s, blockID: %s)",
-					txResult.TransactionID, blockID)
+			return nil, metadata, fmt.Errorf("transaction failed but error message is empty")
 		}
 
-		txErrorMessageStr = txErrorMessage.ErrorMessage
 		txStatusCode = 1 // statusCode of 1 indicates an error and 0 indicates no error, the same as on EN
 	}
 
