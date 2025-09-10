@@ -11,15 +11,15 @@ import (
 
 const DefaultInstanceParamsVersion = 0
 
-// VersionedInstanceParams wraps serialized instance params with a version tag.
-// This allows evolving the schema while keeping backward compatibility.
+// VersionedInstanceParams wraps instance params with a version tag.
 type VersionedInstanceParams struct {
 	Version        uint64
 	InstanceParams interface{}
 }
 
 // NewVersionedInstanceParams constructs an instance params for a particular version for bootstrapping.
-// Caller must provide a supported version number, otherwise an exception is returned.
+//
+// No errors are expected during normal operation.
 func NewVersionedInstanceParams(
 	version uint64,
 	finalizedRootID flow.Identifier,
@@ -44,7 +44,7 @@ func NewVersionedInstanceParams(
 }
 
 func (v *VersionedInstanceParams) UnmarshalMsgpack(b []byte) error {
-	// slias type to prevent recursion
+	// alias type to prevent recursion
 	type decodable VersionedInstanceParams
 	var d decodable
 	if err := msgpack.Unmarshal(b, &d); err != nil {
