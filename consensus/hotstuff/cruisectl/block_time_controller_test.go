@@ -62,7 +62,6 @@ func (bs *BlockTimeControllerSuite) EpochDurationSeconds() uint64 {
 func (bs *BlockTimeControllerSuite) EventuallyWithDelay(t require.TestingT, condition func() bool, waitFor time.Duration, tick time.Duration) {
 	time.Sleep(tick) // initial delay
 	require.Eventually(t, condition, waitFor, tick)
-	return
 }
 
 // SetupTest initializes mocks and default values.
