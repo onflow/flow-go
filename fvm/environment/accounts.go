@@ -33,6 +33,11 @@ type Accounts interface {
 	RevokeAccountPublicKey(address flow.Address, keyIndex uint32) error
 	GetAccountPublicKeyRevokedStatus(address flow.Address, keyIndex uint32) (bool, error)
 	GetAccountPublicKeySequenceNumber(address flow.Address, keyIndex uint32) (uint64, error)
+	// IncrementAccountPublicKeySequenceNumber increments the sequence number for the account's public key
+	// at the given key index.  This update does not affect the account status, enabling concurrent execution
+	// of transactions that do not modify any data related to account status.
+	// Note: No additional storage is consumed, as the storage for the sequence number register
+	// was allocated when account public key was initially added to the account.
 	IncrementAccountPublicKeySequenceNumber(address flow.Address, keyIndex uint32) error
 	GetContractNames(address flow.Address) ([]string, error)
 	GetContract(contractName string, address flow.Address) ([]byte, error)
@@ -175,6 +180,15 @@ func (a *StatefulAccounts) Create(
 		return errors.NewAccountAlreadyExistsError(newAddress)
 	}
 
+	publicKeyCount := uint32(len(publicKeys))
+
+	if publicKeyCount >= MaxPublicKeyCount {
+		return errors.NewAccountPublicKeyLimitError(
+			newAddress,
+			publicKeyCount,
+			MaxPublicKeyCount)
+	}
+
 	accountStatus := NewAccountStatus()
 	storageUsedByTheStatusItself := uint64(RegisterSize(
 		flow.AccountStatusRegisterID(newAddress),
@@ -185,15 +199,6 @@ func (a *StatefulAccounts) Create(
 		storageUsedByTheStatusItself)
 	if err != nil {
 		return fmt.Errorf("failed to create a new account: %w", err)
-	}
-
-	publicKeyCount := uint32(len(publicKeys))
-
-	if publicKeyCount >= MaxPublicKeyCount {
-		return errors.NewAccountPublicKeyLimitError(
-			newAddress,
-			publicKeyCount,
-			MaxPublicKeyCount)
 	}
 
 	for i, publicKey := range publicKeys {
@@ -485,10 +490,11 @@ func (a *StatefulAccounts) AppendAccountPublicKey(
 		return err
 	}
 
+	newCount := count + 1
 	if count >= MaxPublicKeyCount {
 		return errors.NewAccountPublicKeyLimitError(
 			address,
-			count+1,
+			newCount,
 			MaxPublicKeyCount)
 	}
 
