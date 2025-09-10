@@ -23,6 +23,7 @@ type ExecutionNodesSelector struct {
 }
 
 // NewExecutionNodes creates a new ExecutionNodesSelector with the provided configuration.
+// If both preferred and required ENs are set, preferred MUST be a subset of required.
 func NewExecutionNodes(
 	preferredENIdentifiers flow.IdentifierList,
 	requiredENIdentifiers flow.IdentifierList,
@@ -49,12 +50,10 @@ func NewExecutionNodes(
 //
 //  4. If neither preferred nor required nodes are defined, then all execution nodes matching the
 //     executor IDs are returned.
-//
-// No errors are expected during normal operations
 func (en *ExecutionNodesSelector) SelectExecutionNodes(
 	executors flow.IdentityList,
 	userRequiredExecutors flow.IdentifierList,
-) (flow.IdentitySkeletonList, error) {
+) flow.IdentitySkeletonList {
 	var chosenIDs flow.IdentityList
 
 	// first, check if the user's criteria included any required executors.
@@ -62,7 +61,7 @@ func (en *ExecutionNodesSelector) SelectExecutionNodes(
 	// at least one match.
 	if len(userRequiredExecutors) > 0 {
 		chosenIDs = executors.Filter(filter.HasNodeID[flow.Identity](userRequiredExecutors...))
-		return chosenIDs.ToSkeleton(), nil
+		return chosenIDs.ToSkeleton()
 	}
 
 	// if required ENs are set, only select executors from the required ENs list
@@ -70,7 +69,7 @@ func (en *ExecutionNodesSelector) SelectExecutionNodes(
 	// `en.requiredENIdentifiers` are applied, so this should always return at least one match.
 	if len(en.requiredENIdentifiers) > 0 {
 		chosenIDs = en.selectFromRequiredENIDs(executors)
-		return chosenIDs.ToSkeleton(), nil
+		return chosenIDs.ToSkeleton()
 	}
 
 	// if only preferred ENs are set, then select any preferred ENs that have executed the result,
@@ -78,13 +77,13 @@ func (en *ExecutionNodesSelector) SelectExecutionNodes(
 	if len(en.preferredENIdentifiers) > 0 {
 		chosenIDs = executors.Filter(filter.HasNodeID[flow.Identity](en.preferredENIdentifiers...))
 		if len(chosenIDs) >= en.maxNodesCnt {
-			return chosenIDs.ToSkeleton(), nil
+			return chosenIDs.ToSkeleton()
 		}
 	}
 
 	// finally, add any remaining required executors
 	chosenIDs = en.mergeExecutionNodes(chosenIDs, executors)
-	return chosenIDs.ToSkeleton(), nil
+	return chosenIDs.ToSkeleton()
 }
 
 // selectFromRequiredENIDs finds the subset the provided executors that match the required ENs.

@@ -223,11 +223,10 @@ func New(params Params) (*Backend, error) {
 		params.State,
 		params.Collections,
 		params.Blocks,
-		params.EventsIndex,
-		params.TxResultsIndex,
-		params.TxErrorMessageProvider,
 		systemTxID,
 		txStatusDeriver,
+		params.ExecutionResultProvider,
+		params.ExecutionStateCache,
 	)
 	execNodeTxProvider := provider.NewENTransactionProvider(
 		params.Log,
@@ -235,7 +234,7 @@ func New(params Params) (*Backend, error) {
 		params.Collections,
 		params.ConnFactory,
 		params.Communicator,
-		params.ExecNodeIdentitiesProvider,
+		params.ExecutionResultProvider,
 		txStatusDeriver,
 		systemTxID,
 		systemTx,
@@ -258,12 +257,12 @@ func New(params Params) (*Backend, error) {
 		Blocks:                      params.Blocks,
 		Collections:                 params.Collections,
 		Transactions:                params.Transactions,
-		TxErrorMessageProvider:      params.TxErrorMessageProvider,
 		TxResultCache:               txResCache,
 		TxValidator:                 txValidator,
 		TxStatusDeriver:             txStatusDeriver,
-		EventsIndex:                 params.EventsIndex,
-		TxResultsIndex:              params.TxResultsIndex,
+		ExecutionStateCache:         params.ExecutionStateCache,
+		ExecResultProvider:          params.ExecutionResultProvider,
+		OperatorCriteria:            params.OperatorCriteria,
 	}
 
 	switch params.TxResultQueryMode {
@@ -293,6 +292,7 @@ func New(params Params) (*Backend, error) {
 		params.Transactions,
 		failoverTxProvider,
 		txStatusDeriver,
+		params.ExecutionResultProvider,
 	)
 
 	b := &Backend{

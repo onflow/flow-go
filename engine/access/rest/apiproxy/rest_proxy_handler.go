@@ -173,11 +173,12 @@ func (r *RestProxyHandler) GetTransactionResult(
 	blockID flow.Identifier,
 	collectionID flow.Identifier,
 	requiredEventEncodingVersion entities.EventEncodingVersion,
-) (*accessmodel.TransactionResult, error) {
+	criteria optimistic_sync.Criteria,
+) (*accessmodel.TransactionResult, accessmodel.ExecutorMetadata, error) {
 	upstream, closer, err := r.FaultTolerantClient()
 	if err != nil {
 
-		return nil, err
+		return nil, accessmodel.ExecutorMetadata{}, err
 	}
 	defer closer.Close()
 
@@ -186,16 +187,28 @@ func (r *RestProxyHandler) GetTransactionResult(
 		BlockId:              blockID[:],
 		CollectionId:         collectionID[:],
 		EventEncodingVersion: requiredEventEncodingVersion,
+		ExecutionStateQuery: &entities.ExecutionStateQuery{
+			AgreeingExecutorsCount:  uint64(criteria.AgreeingExecutorsCount),
+			RequiredExecutorIds:     convert.IdentifiersToMessages(criteria.RequiredExecutors),
+			IncludeExecutorMetadata: true,
+		},
 	}
 
 	transactionResultResponse, err := upstream.GetTransactionResult(ctx, getTransactionResultRequest)
 	r.log("upstream", "GetTransactionResult", err)
 
 	if err != nil {
-		return nil, err
+		return nil, accessmodel.ExecutorMetadata{}, err
 	}
 
-	return convert.MessageToTransactionResult(transactionResultResponse)
+	transactionResult, err := convert.MessageToTransactionResult(transactionResultResponse)
+	if err != nil {
+		return nil, accessmodel.ExecutorMetadata{}, err
+	}
+
+	metadata := convert.MessageToExecutorMetadata(transactionResultResponse.Metadata.GetExecutorMetadata())
+
+	return transactionResult, *metadata, nil
 }
 
 // GetAccountAtBlockHeight returns account by account address and block height.
@@ -401,10 +414,7 @@ func (r *RestProxyHandler) GetEventsForHeightRange(
 	}
 	r.log("upstream", "GetEventsForHeightRange", err)
 
-	metadata, err := convert.MessageToExecutorMetadata(eventsResponse.Metadata.ExecutionStateQuery)
-	if err != nil {
-		return nil, accessmodel.ExecutorMetadata{}, err
-	}
+	metadata := convert.MessageToExecutorMetadata(eventsResponse.Metadata.ExecutorMetadata)
 
 	res, err := convert.MessagesToBlockEvents(eventsResponse.Results)
 	return res, *metadata, err
@@ -443,10 +453,7 @@ func (r *RestProxyHandler) GetEventsForBlockIDs(
 		return nil, accessmodel.ExecutorMetadata{}, err
 	}
 
-	metadata, err := convert.MessageToExecutorMetadata(eventsResponse.Metadata.ExecutionStateQuery)
-	if err != nil {
-		return nil, accessmodel.ExecutorMetadata{}, err
-	}
+	metadata := convert.MessageToExecutorMetadata(eventsResponse.Metadata.ExecutorMetadata)
 
 	res, err := convert.MessagesToBlockEvents(eventsResponse.Results)
 	return res, *metadata, err

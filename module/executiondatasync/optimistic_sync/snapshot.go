@@ -1,6 +1,7 @@
 package optimistic_sync
 
 import (
+	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/storage"
 )
 
@@ -23,4 +24,7 @@ type Snapshot interface {
 
 	// Registers returns a reader for querying register data.
 	Registers() storage.RegisterIndexReader
+
+	// BlockStatus returns the block status for the block associated with the snapshot.
+	BlockStatus() flow.BlockStatus
 }

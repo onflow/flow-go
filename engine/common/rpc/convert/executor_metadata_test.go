@@ -19,11 +19,10 @@ func TestMessageToExecutorMetadata_Populated(t *testing.T) {
 
 	msg := &entities.ExecutorMetadata{
 		ExecutionResultId: erID[:],
-		ExecutorId:        [][]byte{exec1[:], exec2[:]},
+		ExecutorIds:       [][]byte{exec1[:], exec2[:]},
 	}
 
-	actual, err := convert.MessageToExecutorMetadata(msg)
-	require.NoError(t, err)
+	actual := convert.MessageToExecutorMetadata(msg)
 	require.NotNil(t, actual)
 	require.Equal(t, erID, actual.ExecutionResultID)
 	require.Len(t, actual.ExecutorIDs, 2)
@@ -32,14 +31,12 @@ func TestMessageToExecutorMetadata_Populated(t *testing.T) {
 }
 
 func TestMessageToExecutorMetadata_Nil(t *testing.T) {
-	actual, err := convert.MessageToExecutorMetadata(nil)
-	require.ErrorIs(t, err, convert.ErrEmptyMessage)
+	actual := convert.MessageToExecutorMetadata(nil)
 	require.Nil(t, actual)
 }
 
 func TestMessageToExecutorMetadata_Empty(t *testing.T) {
-	actual, err := convert.MessageToExecutorMetadata(&entities.ExecutorMetadata{})
-	require.NoError(t, err)
+	actual := convert.MessageToExecutorMetadata(&entities.ExecutorMetadata{})
 	require.NotNil(t, actual)
 	require.Equal(t, flow.ZeroID, actual.ExecutionResultID)
 	require.Empty(t, actual.ExecutorIDs)
@@ -55,25 +52,22 @@ func TestExecutorMetadataToMessage_Populated(t *testing.T) {
 		ExecutorIDs:       []flow.Identifier{exec1, exec2},
 	}
 
-	msg, err := convert.ExecutorMetadataToMessage(in)
-	require.NoError(t, err)
+	msg := convert.ExecutorMetadataToMessage(in)
 	require.NotNil(t, msg)
 	require.Equal(t, erID[:], msg.ExecutionResultId)
-	require.Len(t, msg.ExecutorId, 2)
-	require.Equal(t, exec1[:], msg.ExecutorId[0])
-	require.Equal(t, exec2[:], msg.ExecutorId[1])
+	require.Len(t, msg.ExecutorIds, 2)
+	require.Equal(t, exec1[:], msg.ExecutorIds[0])
+	require.Equal(t, exec2[:], msg.ExecutorIds[1])
 }
 
 func TestExecutorMetadataToMessage_Empty(t *testing.T) {
-	msg, err := convert.ExecutorMetadataToMessage(&access.ExecutorMetadata{})
-	require.NoError(t, err)
+	msg := convert.ExecutorMetadataToMessage(&access.ExecutorMetadata{})
 	require.NotNil(t, msg)
 	require.Equal(t, flow.ZeroID[:], msg.ExecutionResultId)
-	require.Empty(t, msg.ExecutorId)
+	require.Empty(t, msg.ExecutorIds)
 }
 
 func TestExecutorMetadataToMessage_Nil(t *testing.T) {
-	msg, err := convert.ExecutorMetadataToMessage(nil)
-	require.ErrorIs(t, err, convert.ErrEmptyMessage)
+	msg := convert.ExecutorMetadataToMessage(nil)
 	require.Nil(t, msg)
 }
