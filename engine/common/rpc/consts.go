@@ -25,6 +25,7 @@ const (
 
 	// DefaultCollectionMaxRequestSize is the default maximum request message size for the collection node.
 	// This is set to 4 MiB, which is larger than the default max service account transaction size (3 MiB).
+	// The service account size is controled by MaxCollectionByteSize used by the transaction validator.
 	DefaultCollectionMaxRequestSize = 4 << (10 * 2) // 4 MiB
 
 	// DefaultCollectionMaxResponseSize is the default maximum response message size for the collection node.
