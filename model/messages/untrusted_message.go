@@ -72,10 +72,6 @@ func InternalToMessage(event interface{}) (UntrustedMessage, error) {
 		return (*ResultApproval)(internal), nil
 	case *flow.TestMessage:
 		return (*message.TestMessage)(internal), nil
-	//case UntrustedMessage:
-	//	// Already a valid UntrustedMessage
-	//	// TODO(immutable M2): expand when ToInternal changes for other M2 types
-	//	return internal, nil
 	default:
 		return nil, fmt.Errorf("cannot convert unsupported type %T", event)
 	}
