@@ -19,7 +19,7 @@ func (c TransactionSequenceNumberChecker) CheckAndIncrementSequenceNumber(
 ) error {
 	// TODO(Janez): verification is part of inclusion fees, not execution fees.
 	var err error
-	txnState.RunWithAllLimitsDisabled(func() {
+	txnState.RunWithMeteringDisabled(func() {
 		err = c.checkAndIncrementSequenceNumber(tracer, proc, txnState)
 	})
 

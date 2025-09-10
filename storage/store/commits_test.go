@@ -18,6 +18,7 @@ import (
 // TestCommitsStoreAndRetrieve tests that a commit can be store1d, retrieved and attempted to be stored again without an error
 func TestCommitsStoreAndRetrieve(t *testing.T) {
 	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
+		lockManager := storage.NewTestingLockManager()
 		metrics := metrics.NewNoopCollector()
 		store1 := store.NewCommits(metrics, db)
 
@@ -25,11 +26,16 @@ func TestCommitsStoreAndRetrieve(t *testing.T) {
 		_, err := store1.ByBlockID(unittest.IdentifierFixture())
 		assert.ErrorIs(t, err, storage.ErrNotFound)
 
-		// store1 a commit in db
+		// store a commit in db
 		blockID := unittest.IdentifierFixture()
 		expected := unittest.StateCommitmentFixture()
-		err = store1.Store(blockID, expected)
+		lctx := lockManager.NewContext()
+		require.NoError(t, lctx.AcquireLock(storage.LockInsertOwnReceipt))
+		err = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+			return store1.BatchStore(lctx, blockID, expected, rw)
+		})
 		require.NoError(t, err)
+		lctx.Release()
 
 		// retrieve the commit by ID
 		actual, err := store1.ByBlockID(blockID)
@@ -37,20 +43,31 @@ func TestCommitsStoreAndRetrieve(t *testing.T) {
 		assert.Equal(t, expected, actual)
 
 		// re-insert the commit - should be idempotent
-		err = store1.Store(blockID, expected)
+		lctx = lockManager.NewContext()
+		require.NoError(t, lctx.AcquireLock(storage.LockInsertOwnReceipt))
+		err = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+			return store1.BatchStore(lctx, blockID, expected, rw)
+		})
 		require.NoError(t, err)
+		lctx.Release()
 	})
 }
 
 func TestCommitStoreAndRemove(t *testing.T) {
 	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
+		lockManager := storage.NewTestingLockManager()
 		metrics := metrics.NewNoopCollector()
 		store := store.NewCommits(metrics, db)
 
 		// Create and store a commit
 		blockID := unittest.IdentifierFixture()
 		expected := unittest.StateCommitmentFixture()
-		err := store.Store(blockID, expected)
+		lctx := lockManager.NewContext()
+		defer lctx.Release()
+		err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+			require.NoError(t, lctx.AcquireLock(storage.LockInsertOwnReceipt))
+			return store.BatchStore(lctx, blockID, expected, rw)
+		})
 		require.NoError(t, err)
 
 		// Ensure it exists

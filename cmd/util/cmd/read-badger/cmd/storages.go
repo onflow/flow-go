@@ -17,8 +17,8 @@ func InitStorages() (*storage.All, *badger.DB) {
 		log.Fatal().Err(err).Msg("could not parse db flag")
 	}
 
-	db := common.InitStorage(usedDir.DBDir)
-	storages := common.InitStorages(db)
+	db := common.InitBadgerDBStorage(usedDir.DBDir)
+	storages := common.InitBadgerStorages(db)
 	return storages, db
 }
 
@@ -37,11 +37,4 @@ func InitBadgerAndPebble() (bdb *badger.DB, pdb *pebble.DB, err error) {
 		return nil, nil, err
 	}
 	return common.InitBadgerAndPebble(dbDirs)
-}
-
-// WithBadgerAndPebble runs the given function with the badger and pebble storages
-// it ensures that the storages are closed after the function is done
-func WithBadgerAndPebble(f func(*badger.DB, *pebble.DB) error) error {
-	flagDBs := common.ReadDBFlags()
-	return common.WithBadgerAndPebble(flagDBs, f)
 }

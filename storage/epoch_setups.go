@@ -2,13 +2,13 @@ package storage
 
 import (
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/storage/badger/transaction"
 )
 
 type EpochSetups interface {
 
-	// StoreTx allows us to store a new epoch setup in a DB transaction while going through the cache.
-	StoreTx(*flow.EpochSetup) func(*transaction.Tx) error
+	// BatchStore allows us to store a new epoch setup in a DB batch update while going through the cache.
+	// No errors are expected during normal operation.
+	BatchStore(rw ReaderBatchWriter, setup *flow.EpochSetup) error
 
 	// ByID will return the EpochSetup event by its ID.
 	// Error returns:
