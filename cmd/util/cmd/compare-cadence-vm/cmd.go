@@ -29,7 +29,7 @@ var (
 	flagChain               string
 	flagComputeLimit        uint64
 	flagUseExecutionDataAPI bool
-	flagBlockID             string
+	flagBlockIDs            string
 	flagBlockCount          int
 	flagWriteTraces         bool
 	flagParallel            int
@@ -60,10 +60,10 @@ func init() {
 
 	Cmd.Flags().BoolVar(&flagUseExecutionDataAPI, "use-execution-data-api", true, "use the execution data API (default: true)")
 
-	Cmd.Flags().StringVar(&flagBlockID, "block-id", "", "block ID")
+	Cmd.Flags().StringVar(&flagBlockIDs, "block-ids", "", "block IDs, comma-separated. if --block-count > 1 is used, provide a single block ID")
 	_ = Cmd.MarkFlagRequired("block-id")
 
-	Cmd.Flags().IntVar(&flagBlockCount, "block-count", 1, "number of blocks to process (default: 1)")
+	Cmd.Flags().IntVar(&flagBlockCount, "block-count", 1, "number of blocks to process (default: 1). if > 1, provide a single block ID with --block-ids")
 
 	Cmd.Flags().BoolVar(&flagWriteTraces, "write-traces", false, "write traces for mismatched transactions")
 
@@ -99,7 +99,7 @@ func run(_ *cobra.Command, args []string) {
 	defer remoteClient.Close()
 
 	var blockIDs []flow.Identifier
-	for _, rawBlockID := range strings.Split(flagBlockID, ",") {
+	for _, rawBlockID := range strings.Split(flagBlockIDs, ",") {
 		blockID, err := flow.HexStringToIdentifier(rawBlockID)
 		if err != nil {
 			log.Fatal().Err(err).Str("ID", rawBlockID).Msg("failed to parse block ID")
