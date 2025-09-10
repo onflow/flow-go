@@ -77,7 +77,7 @@ func (t *LocalTransactionProvider) TransactionResult(
 
 	txResult, err := snapshot.LightTransactionResults().ByBlockIDTransactionID(blockID, transactionID)
 	if err != nil {
-		// this method does not return an error for empty of missing data, so any error here is an exception
+		// this method does not return an error for empty or missing data, so any error here is an exception
 		return nil, metadata, fmt.Errorf("failed to get transaction results: %w", err)
 	}
 
@@ -162,7 +162,7 @@ func (t *LocalTransactionProvider) TransactionResultByIndex(
 
 	txResult, err := snapshot.LightTransactionResults().ByBlockIDTransactionIndex(blockID, index)
 	if err != nil {
-		// this method does not return an error for empty of missing data, so any error here is an exception
+		// this method does not return an error for empty or missing data, so any error here is an exception
 		return nil, metadata, fmt.Errorf("failed to get transaction results: %w", err)
 	}
 
@@ -253,7 +253,7 @@ func (t *LocalTransactionProvider) TransactionResultsByBlockID(
 
 	txResults, err := snapshot.LightTransactionResults().ByBlockID(blockID)
 	if err != nil {
-		// this method does not return an error for empty of missing data, so any error here is an exception
+		// this method does not return an error for empty or missing data, so any error here is an exception
 		return nil, metadata, fmt.Errorf("failed to get transaction results: %w", err)
 	}
 
@@ -309,7 +309,7 @@ func (t *LocalTransactionProvider) TransactionResultsByBlockID(
 
 		events, err := eventsReader.ByBlockIDTransactionID(blockID, txResult.TransactionID)
 		if err != nil {
-			// this method does not return an error for empty of missing data, so any error here is an exception
+			// this method does not return an error for empty or missing data, so any error here is an exception
 			return nil, metadata, fmt.Errorf("failed to get events (txID: %s): %w", txID, err)
 		}
 
