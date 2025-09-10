@@ -365,6 +365,10 @@ func (rf *ResultsForest) AddSealedResult(result *flow.ExecutionResult) error {
 // Expected error returns during normal operations:
 //   - [ErrMaxViewDeltaExceeded]: if the result's block view is more than maxViewDelta views ahead of the last sealed view
 func (rf *ResultsForest) AddReceipt(receipt *flow.ExecutionReceipt, blockStatus BlockStatus) (bool, error) {
+	if !blockStatus.IsValid() {
+		return false, fmt.Errorf("invalid block status: %s", blockStatus)
+	}
+
 	resultID := receipt.ExecutionResult.ID()
 
 	container, err := rf.getOrCreateContainer(&receipt.ExecutionResult, blockStatus)
@@ -647,11 +651,11 @@ func (rf *ResultsForest) OnBlockFinalized(finalized *flow.Block) error {
 	// 2. For each of the results' children, mark the result as finalized if its executed block
 	//    matches the finalized block, otherwise, abandon the fork.
 	for container := range rf.iterateView(finalized.ParentView) {
-		for child := range rf.iterateChildren(container.ResultID()) {
-			if child.BlockView() == finalized.View {
-				container.SetBlockStatus(BlockStatusFinalized)
+		for sibling := range rf.iterateChildren(container.ResultID()) {
+			if sibling.BlockView() == finalized.View {
+				sibling.SetBlockStatus(BlockStatusFinalized)
 			} else {
-				rf.abandonFork(child)
+				rf.abandonFork(sibling)
 			}
 		}
 	}

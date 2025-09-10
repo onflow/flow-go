@@ -25,3 +25,13 @@ func (bs BlockStatus) String() string {
 		return "unknown"
 	}
 }
+
+// IsValid returns true if the block status is a valid value.
+func (bs BlockStatus) IsValid() bool {
+	switch bs {
+	case BlockStatusCertified, BlockStatusFinalized, BlockStatusSealed:
+		return true
+	default:
+		return false
+	}
+}
