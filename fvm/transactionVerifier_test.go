@@ -1,6 +1,7 @@
 package fvm_test
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -149,6 +150,7 @@ func TestTransactionVerification(t *testing.T) {
 	})
 
 	t.Run("invalid payload signature", func(t *testing.T) {
+
 		sig1 := flow.TransactionSignature{
 			Address:     address1,
 			SignerIndex: 0,
@@ -231,5 +233,69 @@ func TestTransactionVerification(t *testing.T) {
 
 		// TODO: update to InvalidEnvelopeSignatureError once FVM verifier is updated.
 		require.True(t, errors.IsInvalidPayloadSignatureError(err))
+	})
+
+	// test that Transaction Signature verification uses the correct domain tag for verification
+	// i.e the message verification reconstruction logic uses the right tag (check signatureContinuation.verify() )
+	t.Run("tag combinations", func(t *testing.T) {
+		cases := []struct {
+			signTag  string
+			validity bool
+		}{
+			{
+				signTag:  string(flow.TransactionDomainTag[:]), // only valid tag
+				validity: true,
+			},
+			{
+				signTag:  "", // invalid tag
+				validity: false,
+			}, {
+				signTag:  "random_tag", // invalid tag
+				validity: false,
+			},
+		}
+
+		sig := flow.TransactionSignature{
+			Address:     address1,
+			SignerIndex: 0,
+			KeyIndex:    0,
+		}
+
+		tx := &flow.TransactionBody{
+			ProposalKey: flow.ProposalKey{
+				Address:        address1,
+				KeyIndex:       0,
+				SequenceNumber: 0,
+			},
+			Payer:              address1,
+			EnvelopeSignatures: []flow.TransactionSignature{sig},
+		}
+
+		for _, c := range cases {
+			t.Run(fmt.Sprintf("sign tag: %v", c.signTag), func(t *testing.T) {
+
+				// generate an envelope signature using the test tag
+				hasher, err := crypto.NewPrefixedHashing(privKey1.HashAlgo, c.signTag)
+				require.NoError(t, err)
+				sig, err := privKey1.PrivateKey.Sign(tx.EnvelopeMessage(), hasher)
+				require.NoError(t, err)
+
+				// set the signature into the transaction
+				tx.EnvelopeSignatures[0].Signature = sig
+
+				ctx := fvm.NewContext(
+					fvm.WithAuthorizationChecksEnabled(true),
+					fvm.WithAccountKeyWeightThreshold(1000),
+					fvm.WithSequenceNumberCheckAndIncrementEnabled(false),
+					fvm.WithTransactionBodyExecutionEnabled(false))
+				err = run(tx, ctx, txnState)
+				if c.validity {
+					require.NoError(t, err)
+				} else {
+					require.Error(t, err)
+					require.True(t, errors.IsInvalidEnvelopeSignatureError(err))
+				}
+			})
+		}
 	})
 }

@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/dgraph-io/badger/v2"
+	"github.com/cockroachdb/pebble/v2"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 
@@ -19,14 +19,14 @@ import (
 	"github.com/onflow/flow-go/module/trace"
 	storageerr "github.com/onflow/flow-go/storage"
 	storage "github.com/onflow/flow-go/storage/mock"
-	"github.com/onflow/flow-go/storage/operation/badgerimpl"
+	"github.com/onflow/flow-go/storage/operation/pebbleimpl"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
 func prepareTest(f func(t *testing.T, es state.ExecutionState, l *ledger.Ledger, headers *storage.Headers, commits *storage.Commits)) func(*testing.T) {
 	return func(t *testing.T) {
 		lockManager := storageerr.NewTestingLockManager()
-		unittest.RunWithBadgerDB(t, func(badgerDB *badger.DB) {
+		unittest.RunWithPebbleDB(t, func(pebbleDB *pebble.DB) {
 			metricsCollector := &metrics.NoopCollector{}
 			diskWal := &fixtures.NoopWAL{}
 			ls, err := ledger.NewLedger(diskWal, 100, metricsCollector, zerolog.Nop(), ledger.DefaultPathFinderVersion)
@@ -52,7 +52,7 @@ func prepareTest(f func(t *testing.T, es state.ExecutionState, l *ledger.Ledger,
 				return 0, nil
 			}
 
-			db := badgerimpl.ToDB(badgerDB)
+			db := pebbleimpl.ToDB(pebbleDB)
 			es := state.NewExecutionState(
 				ls, stateCommitments, blocks, headers, chunkDataPacks, results, myReceipts, events, serviceEvents, txResults, db, getLatestFinalized, trace.NewNoopTracer(),
 				nil,
