@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/cockroachdb/pebble/v2"
 	"github.com/coreos/go-semver/semver"
 	"github.com/ipfs/boxo/blockstore"
 	"github.com/ipfs/go-datastore"
@@ -106,7 +107,7 @@ import (
 	"github.com/onflow/flow-go/state/protocol/util"
 	"github.com/onflow/flow-go/storage"
 	storagebadger "github.com/onflow/flow-go/storage/badger"
-	"github.com/onflow/flow-go/storage/operation/badgerimpl"
+	"github.com/onflow/flow-go/storage/operation/pebbleimpl"
 	storagepebble "github.com/onflow/flow-go/storage/pebble"
 	"github.com/onflow/flow-go/storage/store"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -208,7 +209,7 @@ func GenericNodeWithStateFixture(t testing.TB,
 		Blocks:             stateFixture.Storage.Blocks,
 		QuorumCertificates: stateFixture.Storage.QuorumCertificates,
 		Results:            stateFixture.Storage.Results,
-		Setups:             stateFixture.Storage.Setups,
+		Setups:             stateFixture.Storage.EpochSetups,
 		EpochCommits:       stateFixture.Storage.EpochCommits,
 		EpochProtocolState: stateFixture.Storage.EpochProtocolStateEntries,
 		ProtocolKVStore:    stateFixture.Storage.ProtocolKVStore,
@@ -234,22 +235,23 @@ func CompleteStateFixture(
 	dataDir := unittest.TempDir(t)
 	publicDBDir := filepath.Join(dataDir, "protocol")
 	secretsDBDir := filepath.Join(dataDir, "secrets")
-	db := unittest.TypedBadgerDB(t, publicDBDir, storagebadger.InitPublic)
+	pdb := unittest.TypedPebbleDB(t, publicDBDir, pebble.Open)
+	db := pebbleimpl.ToDB(pdb)
 	lockManager := storage.NewTestingLockManager()
-	s := storagebadger.InitAll(metric, db)
+	s := store.InitAll(metric, db)
 	secretsDB := unittest.TypedBadgerDB(t, secretsDBDir, storagebadger.InitSecret)
 	consumer := events.NewDistributor()
 
 	state, err := badgerstate.Bootstrap(
 		metric,
-		badgerimpl.ToDB(db),
+		db,
 		lockManager,
 		s.Headers,
 		s.Seals,
 		s.Results,
 		s.Blocks,
 		s.QuorumCertificates,
-		s.Setups,
+		s.EpochSetups,
 		s.EpochCommits,
 		s.EpochProtocolStateEntries,
 		s.ProtocolKVStore,
@@ -295,7 +297,7 @@ func CollectionNode(t *testing.T, hub *stub.Hub, identity bootstrap.NodeInfo, ro
 			return herocache.NewTransactions(1000, node.Log, metrics.NewNoopCollector())
 		})
 
-	db := badgerimpl.ToDB(node.PublicDB)
+	db := node.PublicDB
 	transactions := store.NewTransactions(node.Metrics, db)
 	collections := store.NewCollections(db, transactions)
 	clusterPayloads := store.NewClusterPayloads(node.Metrics, db)
@@ -439,7 +441,7 @@ func ConsensusNode(t *testing.T, hub *stub.Hub, identity bootstrap.NodeInfo, ide
 
 	node := GenericNodeFromParticipants(t, hub, identity, identities, chainID)
 
-	db := badgerimpl.ToDB(node.PublicDB)
+	db := node.PublicDB
 	resultsDB := store.NewExecutionResults(node.Metrics, db)
 	receiptsDB := store.NewExecutionReceipts(node.Metrics, db, resultsDB, storagebadger.DefaultCacheSize)
 
@@ -540,7 +542,7 @@ type CheckerMock struct {
 func ExecutionNode(t *testing.T, hub *stub.Hub, identity bootstrap.NodeInfo, identities []*flow.Identity, syncThreshold int, chainID flow.ChainID) testmock.ExecutionNode {
 	node := GenericNodeFromParticipants(t, hub, identity, identities, chainID)
 
-	db := badgerimpl.ToDB(node.PublicDB)
+	db := node.PublicDB
 	transactionsStorage := store.NewTransactions(node.Metrics, db)
 	collectionsStorage := store.NewCollections(db, transactionsStorage)
 	eventsStorage := store.NewEvents(node.Metrics, db)
@@ -837,7 +839,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity bootstrap.NodeInfo, ide
 		ExecutionEngine:     computationEngine,
 		RequestEngine:       requestEngine,
 		ReceiptsEngine:      pusherEngine,
-		BadgerDB:            node.PublicDB,
+		ProtocolDB:          node.PublicDB,
 		VM:                  computationEngine.VM(),
 		ExecutionState:      execState,
 		Ledger:              ls,
@@ -932,7 +934,7 @@ func createFollowerCore(
 	rootHead *flow.Header,
 	rootQC *flow.QuorumCertificate,
 ) (module.HotStuffFollower, *confinalizer.Finalizer) {
-	finalizer := confinalizer.NewFinalizer(badgerimpl.ToDB(node.PublicDB).Reader(), node.Headers, followerState, trace.NewNoopTracer())
+	finalizer := confinalizer.NewFinalizer(node.PublicDB.Reader(), node.Headers, followerState, trace.NewNoopTracer())
 
 	pending := make([]*flow.ProposalHeader, 0)
 
@@ -1004,18 +1006,18 @@ func VerificationNode(t testing.TB,
 	}
 
 	if node.Results == nil {
-		db := badgerimpl.ToDB(node.PublicDB)
+		db := node.PublicDB
 		results := store.NewExecutionResults(node.Metrics, db)
 		node.Results = results
 		node.Receipts = store.NewExecutionReceipts(node.Metrics, db, results, storagebadger.DefaultCacheSize)
 	}
 
 	if node.ProcessedChunkIndex == nil {
-		node.ProcessedChunkIndex = store.NewConsumerProgress(badgerimpl.ToDB(node.PublicDB), module.ConsumeProgressVerificationChunkIndex)
+		node.ProcessedChunkIndex = store.NewConsumerProgress(node.PublicDB, module.ConsumeProgressVerificationChunkIndex)
 	}
 
 	if node.ChunksQueue == nil {
-		cq := store.NewChunkQueue(node.Metrics, badgerimpl.ToDB(node.PublicDB))
+		cq := store.NewChunkQueue(node.Metrics, node.PublicDB)
 		ok, err := cq.Init(chunkconsumer.DefaultJobIndex)
 		require.NoError(t, err)
 		require.True(t, ok)
@@ -1023,7 +1025,7 @@ func VerificationNode(t testing.TB,
 	}
 
 	if node.ProcessedBlockHeight == nil {
-		node.ProcessedBlockHeight = store.NewConsumerProgress(badgerimpl.ToDB(node.PublicDB), module.ConsumeProgressVerificationBlockHeight)
+		node.ProcessedBlockHeight = store.NewConsumerProgress(node.PublicDB, module.ConsumeProgressVerificationBlockHeight)
 	}
 	if node.VerifierEngine == nil {
 		vm := fvm.NewVirtualMachine()
@@ -1038,7 +1040,7 @@ func VerificationNode(t testing.TB,
 
 		chunkVerifier := chunks.NewChunkVerifier(vm, vmCtx, node.Log)
 
-		approvalStorage := store.NewResultApprovals(node.Metrics, badgerimpl.ToDB(node.PublicDB), node.LockManager)
+		approvalStorage := store.NewResultApprovals(node.Metrics, node.PublicDB, node.LockManager)
 
 		node.VerifierEngine, err = verifier.New(node.Log,
 			collector,
