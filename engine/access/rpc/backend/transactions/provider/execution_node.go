@@ -246,7 +246,7 @@ func (e *ENTransactionProvider) TransactionResultsByBlockID(
 
 // userTransactionResults constructs the user transaction results from the execution node response.
 //
-// It does so by itterating through all user collections (without system collection) in the block
+// It does so by iterating through all user collections (without system collection) in the block
 // and constructing the transaction results.
 func (e *ENTransactionProvider) userTransactionResults(
 	ctx context.Context,
@@ -303,7 +303,7 @@ func (e *ENTransactionProvider) userTransactionResults(
 
 // systemTransactionResults constructs the system transaction results from the execution node response.
 //
-// It does so by itterating through all system transactions in the block and constructing the transaction results.
+// It does so by iterating through all system transactions in the block and constructing the transaction results.
 // System transactions are transactions that follow the user transactions from the execution node response.
 // We should always return transaction result for system chunk transaction, but if scheduled callbacks are enabled
 // we also return results for the process and execute callbacks transactions.

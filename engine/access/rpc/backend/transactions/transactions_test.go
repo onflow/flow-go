@@ -8,7 +8,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/dgraph-io/badger/v2"
+	"github.com/cockroachdb/pebble/v2"
 	lru "github.com/hashicorp/golang-lru/v2"
 	"github.com/onflow/cadence"
 	cadenceCommon "github.com/onflow/cadence/common"
@@ -52,7 +52,7 @@ import (
 	"github.com/onflow/flow-go/state/protocol/util"
 	"github.com/onflow/flow-go/storage"
 	storagemock "github.com/onflow/flow-go/storage/mock"
-	"github.com/onflow/flow-go/storage/operation/badgerimpl"
+	"github.com/onflow/flow-go/storage/operation/pebbleimpl"
 	"github.com/onflow/flow-go/storage/store"
 	"github.com/onflow/flow-go/utils/unittest"
 	"github.com/onflow/flow-go/utils/unittest/mocks"
@@ -78,7 +78,7 @@ type Suite struct {
 	txResultErrorMessages *storagemock.TransactionResultErrorMessages
 	txResultCache         *lru.Cache[flow.Identifier, *accessmodel.TransactionResult]
 
-	db                  *badger.DB
+	db                  *pebble.DB
 	dbDir               string
 	lastFullBlockHeight *counters.PersistentStrictMonotonicCounter
 
@@ -147,8 +147,8 @@ func (suite *Suite) SetupTest() {
 	suite.systemTx, err = blueprints.SystemChunkTransaction(flow.Testnet.Chain())
 	suite.Require().NoError(err)
 
-	suite.db, suite.dbDir = unittest.TempBadgerDB(suite.T())
-	progress, err := store.NewConsumerProgress(badgerimpl.ToDB(suite.db), module.ConsumeProgressLastFullBlockHeight).Initialize(0)
+	suite.db, suite.dbDir = unittest.TempPebbleDB(suite.T())
+	progress, err := store.NewConsumerProgress(pebbleimpl.ToDB(suite.db), module.ConsumeProgressLastFullBlockHeight).Initialize(0)
 	require.NoError(suite.T(), err)
 	suite.lastFullBlockHeight, err = counters.NewPersistentStrictMonotonicCounter(progress)
 	suite.Require().NoError(err)
@@ -552,7 +552,7 @@ func (suite *Suite) TestGetSystemTransactionResult_HappyPath() {
 	util.RunWithFullProtocolStateAndMutator(
 		suite.T(),
 		rootSnapshot,
-		func(db *badger.DB, state *bprotocol.ParticipantState, mutableState protocol.MutableProtocolState) {
+		func(db storage.DB, state *bprotocol.ParticipantState, mutableState protocol.MutableProtocolState) {
 			epochBuilder := unittest.NewEpochBuilder(suite.T(), mutableState, state)
 
 			epochBuilder.
