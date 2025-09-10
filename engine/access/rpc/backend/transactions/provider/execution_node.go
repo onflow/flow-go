@@ -334,14 +334,11 @@ func (e *ENTransactionProvider) systemTransactionResults(
 		return nil, rpc.ConvertError(err, "failed to determine system transaction IDs", codes.Internal)
 	}
 
-	events := make([]flow.Event, 0, systemTxCount)
-
 	for i, systemTxResult := range systemTxResults {
-		txEvents, err := convert.MessagesToEventsWithEncodingConversion(systemTxResult.GetEvents(), resp.GetEventEncodingVersion(), requiredEventEncodingVersion)
+		events, err := convert.MessagesToEventsWithEncodingConversion(systemTxResult.GetEvents(), resp.GetEventEncodingVersion(), requiredEventEncodingVersion)
 		if err != nil {
 			return nil, rpc.ConvertError(err, "failed to convert events from system tx result", codes.Internal)
 		}
-		events = append(events, txEvents...)
 
 		results = append(results, &accessmodel.TransactionResult{
 			Status:        txStatus,
