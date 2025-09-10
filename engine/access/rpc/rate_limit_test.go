@@ -147,14 +147,18 @@ func (suite *RateLimitTestSuite) SetupTest() {
 		false,
 		apiRateLimt,
 		apiBurstLimt,
-		grpcserver.WithTransportCredentials(config.TransportCredentials)).Build()
+		grpcserver.WithTransportCredentials(config.TransportCredentials),
+		grpcserver.WithLoggingInterceptor(),
+	).Build()
 
 	suite.unsecureGrpcServer = grpcserver.NewGrpcServerBuilder(suite.log,
 		config.UnsecureGRPCListenAddr,
 		grpcutils.DefaultMaxMsgSize,
 		false,
 		apiRateLimt,
-		apiBurstLimt).Build()
+		apiBurstLimt,
+		grpcserver.WithLoggingInterceptor(),
+	).Build()
 
 	block := unittest.BlockHeaderFixture()
 	suite.snapshot.On("Head").Return(block, nil)

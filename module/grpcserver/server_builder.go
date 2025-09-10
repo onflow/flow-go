@@ -26,6 +26,13 @@ func WithStreamInterceptor() Option {
 	}
 }
 
+// WithLoggingInterceptor enables the logging interceptor.
+func WithLoggingInterceptor() Option {
+	return func(c *GrpcServerBuilder) {
+		c.loggingInterceptorEnable = true
+	}
+}
+
 // GrpcServerBuilder created for separating the creation and starting GrpcServer,
 // cause services need to be registered before the server starts.
 type GrpcServerBuilder struct {
@@ -36,6 +43,7 @@ type GrpcServerBuilder struct {
 
 	transportCredentials         credentials.TransportCredentials // the GRPC credentials
 	stateStreamInterceptorEnable bool
+	loggingInterceptorEnable     bool
 }
 
 // NewGrpcServerBuilder creates a new builder for configuring and initializing a gRPC server.
@@ -98,8 +106,10 @@ func NewGrpcServerBuilder(log zerolog.Logger,
 		unaryInterceptors = append(unaryInterceptors, NewRateLimiterInterceptor(log, apiRateLimits, apiBurstLimits).UnaryServerInterceptor)
 	}
 
-	// Note: make sure logging interceptor is innermost wrapper to capture all messages
-	unaryInterceptors = append(unaryInterceptors, LoggingInterceptor(log))
+	if grpcServerBuilder.loggingInterceptorEnable {
+		// Note: make sure logging interceptor is innermost wrapper to capture all messages
+		unaryInterceptors = append(unaryInterceptors, LoggingInterceptor(log))
+	}
 
 	grpcOpts = append(grpcOpts, grpc.ChainUnaryInterceptor(unaryInterceptors...))
 	if len(streamInterceptors) > 0 {
