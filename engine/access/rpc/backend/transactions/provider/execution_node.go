@@ -3,6 +3,7 @@ package provider
 import (
 	"context"
 	"errors"
+	"fmt"
 
 	"github.com/onflow/flow/protobuf/go/flow/entities"
 	execproto "github.com/onflow/flow/protobuf/go/flow/execution"
@@ -19,9 +20,16 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/executiondatasync/optimistic_sync"
 	"github.com/onflow/flow-go/module/irrecoverable"
-	"github.com/onflow/flow-go/state"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
+)
+
+var (
+	// errTooManyResults is returned when the execution node included more results in its response than there are tx in the block
+	errTooManyResults = errors.New("number of transaction results returned by execution node is more than the number of transactions in the block")
+
+	// errTooFewResults is returned when the execution node included fewer results in its response than there are tx in the block
+	errTooFewResults = errors.New("number of transaction results returned by execution node is less than the number of transactions in the block")
 )
 
 type ENTransactionProvider struct {
@@ -53,7 +61,6 @@ func NewENTransactionProvider(
 	systemTxID flow.Identifier,
 	systemTx *flow.TransactionBody,
 ) *ENTransactionProvider {
-
 	return &ENTransactionProvider{
 		log:                     log.With().Str("transaction_provider", "execution_node").Logger(),
 		state:                   state,
@@ -67,6 +74,12 @@ func NewENTransactionProvider(
 	}
 }
 
+// TransactionResult retrieves a transaction result from execution nodes by block ID and transaction ID.
+//
+// Expected error returns during normal operation:
+//   - [codes.NotFound] when transaction result is not found
+//   - [codes.Internal] when data returned by execution node is invalid or inconsistent
+//   - [status.Error] when the request to execution node failed
 func (e *ENTransactionProvider) TransactionResult(
 	ctx context.Context,
 	block *flow.Header,
@@ -75,7 +88,6 @@ func (e *ENTransactionProvider) TransactionResult(
 	executionResultInfo *optimistic_sync.ExecutionResultInfo,
 ) (*accessmodel.TransactionResult, accessmodel.ExecutorMetadata, error) {
 	blockID := block.ID()
-	// create an execution API request for events at blockID and transactionID
 	req := &execproto.GetTransactionResultRequest{
 		BlockId:       blockID[:],
 		TransactionId: transactionID[:],
@@ -91,18 +103,14 @@ func (e *ENTransactionProvider) TransactionResult(
 		return nil, metadata, err
 	}
 
-	// tx body is irrelevant to status if it's in an executed block
 	txStatus, err := e.txStatusDeriver.DeriveTransactionStatus(block.Height, true)
 	if err != nil {
-		if !errors.Is(err, state.ErrUnknownSnapshotReference) {
-			irrecoverable.Throw(ctx, err)
-		}
-		return nil, metadata, rpc.ConvertStorageError(err)
+		return nil, metadata, fmt.Errorf("failed to derive transaction status: %w", err)
 	}
 
 	events, err := convert.MessagesToEventsWithEncodingConversion(resp.GetEvents(), resp.GetEventEncodingVersion(), requiredEventEncodingVersion)
 	if err != nil {
-		return nil, metadata, rpc.ConvertError(err, "failed to convert events to message", codes.Internal)
+		return nil, metadata, status.Errorf(codes.Internal, "failed to convert events to message: %v", err)
 	}
 
 	return &accessmodel.TransactionResult{
@@ -116,6 +124,12 @@ func (e *ENTransactionProvider) TransactionResult(
 	}, metadata, nil
 }
 
+// TransactionResultByIndex retrieves a transaction result from execution nodes by block ID and index.
+//
+// Expected error returns during normal operation:
+//   - [codes.NotFound] when transaction result is not found
+//   - [codes.Internal] when data returned by execution node is invalid or inconsistent
+//   - [status.Error] when the request to execution node failed
 func (e *ENTransactionProvider) TransactionResultByIndex(
 	ctx context.Context,
 	block *flow.Block,
@@ -124,7 +138,6 @@ func (e *ENTransactionProvider) TransactionResultByIndex(
 	executionResultInfo *optimistic_sync.ExecutionResultInfo,
 ) (*accessmodel.TransactionResult, accessmodel.ExecutorMetadata, error) {
 	blockID := block.ID()
-	// create request and forward to EN
 	req := &execproto.GetTransactionByIndexRequest{
 		BlockId: blockID[:],
 		Index:   index,
@@ -137,17 +150,12 @@ func (e *ENTransactionProvider) TransactionResultByIndex(
 
 	resp, err := e.getTransactionResultByIndexFromAnyExeNode(ctx, executionResultInfo.ExecutionNodes, req)
 	if err != nil {
-		return nil, metadata, rpc.ConvertError(err, "failed to retrieve result from execution node",
-			codes.Internal)
+		return nil, metadata, status.Errorf(codes.Internal, "failed to retrieve result from execution node: %v", err)
 	}
 
-	// tx body is irrelevant to status if it's in an executed block
 	txStatus, err := e.txStatusDeriver.DeriveTransactionStatus(block.Height, true)
 	if err != nil {
-		if !errors.Is(err, state.ErrUnknownSnapshotReference) {
-			irrecoverable.Throw(ctx, err)
-		}
-		return nil, metadata, rpc.ConvertStorageError(err)
+		return nil, metadata, fmt.Errorf("failed to derive transaction status: %w", err)
 	}
 
 	events, err := convert.MessagesToEventsWithEncodingConversion(resp.GetEvents(), resp.GetEventEncodingVersion(), encodingVersion)
@@ -156,7 +164,6 @@ func (e *ENTransactionProvider) TransactionResultByIndex(
 			blockID, err)
 	}
 
-	// convert to response, cache and return
 	return &accessmodel.TransactionResult{
 		Status:       txStatus,
 		StatusCode:   uint(resp.GetStatusCode()),
@@ -167,6 +174,12 @@ func (e *ENTransactionProvider) TransactionResultByIndex(
 	}, metadata, nil
 }
 
+// TransactionResultsByBlockID retrieves a transaction result from execution nodes by block ID.
+//
+// Expected error returns during normal operation:
+//   - [codes.NotFound] when transaction results or collection from block are not found
+//   - [codes.Internal] when data returned by execution node is invalid or inconsistent
+//   - [status.Error] when the request to execution node failed
 func (e *ENTransactionProvider) TransactionResultsByBlockID(
 	ctx context.Context,
 	block *flow.Block,
@@ -188,13 +201,14 @@ func (e *ENTransactionProvider) TransactionResultsByBlockID(
 		return nil, metadata, rpc.ConvertError(err, "failed to retrieve result from execution node", codes.Internal)
 	}
 
+	txStatus, err := e.txStatusDeriver.DeriveTransactionStatus(block.Height, true)
+	if err != nil {
+		irrecoverable.Throw(ctx, fmt.Errorf("failed to derive transaction status: %w", err))
+		return nil, metadata, err
+	}
+
 	results := make([]*accessmodel.TransactionResult, 0, len(resp.TransactionResults))
 	i := 0
-	errInsufficientResults := status.Errorf(
-		codes.Internal,
-		"number of transaction results returned by execution node is less than the number of transactions in the block",
-	)
-
 	for _, guarantee := range block.Payload.Guarantees {
 		collection, err := e.collections.LightByID(guarantee.CollectionID)
 		if err != nil {
@@ -204,22 +218,13 @@ func (e *ENTransactionProvider) TransactionResultsByBlockID(
 		for _, txID := range collection.Transactions {
 			// bounds check. this means the EN returned fewer transaction results than the transactions  in the block
 			if i >= len(resp.TransactionResults) {
-				return nil, metadata, errInsufficientResults
+				return nil, metadata, status.Errorf(codes.Internal, errTooFewResults.Error())
 			}
 			txResult := resp.TransactionResults[i]
 
-			// tx body is irrelevant to status if it's in an executed block
-			txStatus, err := e.txStatusDeriver.DeriveTransactionStatus(block.Height, true)
-			if err != nil {
-				if !errors.Is(err, state.ErrUnknownSnapshotReference) {
-					irrecoverable.Throw(ctx, err)
-				}
-				return nil, metadata, rpc.ConvertStorageError(err)
-			}
 			events, err := convert.MessagesToEventsWithEncodingConversion(txResult.GetEvents(), resp.GetEventEncodingVersion(), requiredEventEncodingVersion)
 			if err != nil {
-				return nil, metadata, status.Errorf(codes.Internal,
-					"failed to convert events to message in txID %x: %v", txID, err)
+				return nil, metadata, status.Errorf(codes.Internal, "failed to convert events to message in txID %x: %v", txID, err)
 			}
 
 			results = append(results, &accessmodel.TransactionResult{
@@ -250,31 +255,22 @@ func (e *ENTransactionProvider) TransactionResultsByBlockID(
 		// more result than txCount
 		if txCount != len(resp.TransactionResults)-1 {
 			if txCount >= len(resp.TransactionResults) {
-				return nil, metadata, errInsufficientResults
+				return nil, metadata, status.Errorf(codes.Internal, errTooFewResults.Error())
 			}
 			// otherwise there are extra results
 			// TODO(bft): slashable offense
-			return nil, metadata, status.Errorf(codes.Internal,
-				"number of transaction results returned by execution node is more than the number of transactions  in the block")
+			return nil, metadata, status.Errorf(codes.Internal, errTooManyResults.Error())
 		}
 
 		systemTxResult := resp.TransactionResults[len(resp.TransactionResults)-1]
-		systemTxStatus, err := e.txStatusDeriver.DeriveTransactionStatus(block.Height, true)
-		if err != nil {
-			if !errors.Is(err, state.ErrUnknownSnapshotReference) {
-				irrecoverable.Throw(ctx, err)
-			}
-			return nil, metadata, rpc.ConvertStorageError(err)
-		}
 
 		events, err := convert.MessagesToEventsWithEncodingConversion(systemTxResult.GetEvents(), resp.GetEventEncodingVersion(), requiredEventEncodingVersion)
 		if err != nil {
-			return nil, metadata, rpc.ConvertError(err, "failed to convert events from system tx result",
-				codes.Internal)
+			return nil, metadata, status.Errorf(codes.Internal, "failed to convert events from system tx result: %v", err)
 		}
 
 		results = append(results, &accessmodel.TransactionResult{
-			Status:        systemTxStatus,
+			Status:        txStatus,
 			StatusCode:    uint(systemTxResult.GetStatusCode()),
 			Events:        events,
 			ErrorMessage:  systemTxResult.GetErrorMessage(),
@@ -286,6 +282,11 @@ func (e *ENTransactionProvider) TransactionResultsByBlockID(
 	return results, metadata, nil
 }
 
+// tryGetTransactionResultFromAnyExeNode retrieves a transaction result from execution nodes by block ID and transaction ID.
+//
+// Expected errors during normal operation:
+//   - [codes.Unavailable] when the connection to the execution node fails.
+//   - [status.Error] when the GRPC call failed.
 func (e *ENTransactionProvider) getTransactionResultFromAnyExeNode(
 	ctx context.Context,
 	execNodes flow.IdentitySkeletonList,
@@ -321,6 +322,11 @@ func (e *ENTransactionProvider) getTransactionResultFromAnyExeNode(
 	return resp, errToReturn
 }
 
+// tryGetTransactionResultsByBlockID retrieves a transaction result from execution nodes by block ID.
+//
+// Expected errors during normal operation:
+//   - [codes.Unavailable] when the connection to the execution node fails.
+//   - [status.Error] when the GRPC call failed.
 func (e *ENTransactionProvider) getTransactionResultsByBlockIDFromAnyExeNode(
 	ctx context.Context,
 	execNodes flow.IdentitySkeletonList,
@@ -361,6 +367,11 @@ func (e *ENTransactionProvider) getTransactionResultsByBlockIDFromAnyExeNode(
 	return resp, errToReturn
 }
 
+// tryGetTransactionResultByIndex retrieves a transaction result from execution nodes by block ID and index.
+//
+// Expected errors during normal operation:
+//   - [codes.Unavailable] when the connection to the execution node fails.
+//   - [status.Error] when the GRPC call failed.
 func (e *ENTransactionProvider) getTransactionResultByIndexFromAnyExeNode(
 	ctx context.Context,
 	execNodes flow.IdentitySkeletonList,
@@ -399,6 +410,11 @@ func (e *ENTransactionProvider) getTransactionResultByIndexFromAnyExeNode(
 	return resp, errToReturn
 }
 
+// tryGetTransactionResult retrieves a transaction result from execution nodes by block ID and transaction ID.
+//
+// Expected errors during normal operation:
+//   - [codes.Unavailable] when the connection to the execution node fails.
+//   - [status.Error] when the GRPC call failed.
 func (e *ENTransactionProvider) tryGetTransactionResult(
 	ctx context.Context,
 	execNode *flow.IdentitySkeleton,
@@ -406,7 +422,7 @@ func (e *ENTransactionProvider) tryGetTransactionResult(
 ) (*execproto.GetTransactionResultResponse, error) {
 	execRPCClient, closer, err := e.connFactory.GetExecutionAPIClient(execNode.Address)
 	if err != nil {
-		return nil, err
+		return nil, status.Errorf(codes.Unavailable, "failed to connect to execution node: %v", err)
 	}
 	defer closer.Close()
 
@@ -418,6 +434,11 @@ func (e *ENTransactionProvider) tryGetTransactionResult(
 	return resp, nil
 }
 
+// tryGetTransactionResultsByBlockID retrieves a transaction result from execution nodes by block ID.
+//
+// Expected errors during normal operation:
+//   - [codes.Unavailable] when the connection to the execution node fails.
+//   - [status.Error] when the GRPC call failed.
 func (e *ENTransactionProvider) tryGetTransactionResultsByBlockID(
 	ctx context.Context,
 	execNode *flow.IdentitySkeleton,
@@ -425,7 +446,7 @@ func (e *ENTransactionProvider) tryGetTransactionResultsByBlockID(
 ) (*execproto.GetTransactionResultsResponse, error) {
 	execRPCClient, closer, err := e.connFactory.GetExecutionAPIClient(execNode.Address)
 	if err != nil {
-		return nil, err
+		return nil, status.Errorf(codes.Unavailable, "failed to connect to execution node: %v", err)
 	}
 	defer closer.Close()
 
@@ -437,6 +458,11 @@ func (e *ENTransactionProvider) tryGetTransactionResultsByBlockID(
 	return resp, nil
 }
 
+// tryGetTransactionResultByIndex retrieves a transaction result from execution nodes by block ID and index.
+//
+// Expected errors during normal operation:
+//   - [codes.Unavailable] when the connection to the execution node fails.
+//   - [status.Error] when the GRPC call failed.
 func (e *ENTransactionProvider) tryGetTransactionResultByIndex(
 	ctx context.Context,
 	execNode *flow.IdentitySkeleton,
@@ -444,7 +470,7 @@ func (e *ENTransactionProvider) tryGetTransactionResultByIndex(
 ) (*execproto.GetTransactionResultResponse, error) {
 	execRPCClient, closer, err := e.connFactory.GetExecutionAPIClient(execNode.Address)
 	if err != nil {
-		return nil, err
+		return nil, status.Errorf(codes.Unavailable, "failed to connect to execution node: %v", err)
 	}
 	defer closer.Close()
 

@@ -32,7 +32,7 @@ func GetTransactionByID(r *common.Request, backend access.API, link commonmodels
 			req.BlockID,
 			req.CollectionID,
 			entitiesproto.EventEncodingVersion_JSON_CDC_V0,
-			optimistic_sync.Criteria{},
+			optimistic_sync.Criteria{}, // TODO: add support for passing criteria in the request
 		)
 		if err != nil {
 			return nil, err
@@ -51,7 +51,6 @@ func GetTransactionResultByID(r *common.Request, backend access.API, link common
 		return nil, common.NewBadRequestError(err)
 	}
 
-	// TODO:
 	txr, executorMetadata, err := backend.GetTransactionResult(
 		r.Context(),
 		req.ID,

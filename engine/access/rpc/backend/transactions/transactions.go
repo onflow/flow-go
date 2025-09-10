@@ -390,7 +390,10 @@ func (t *Transactions) GetTransactionResult(
 
 		txResult, executorMetadata, err = t.lookupTransactionResult(ctx, txID, block.ToHeader(), requiredEventEncodingVersion, execResultInfo)
 		if err != nil {
-			return nil, executorMetadata, rpc.ConvertError(err, "failed to retrieve result", codes.Internal)
+			if _, ok := status.FromError(err); ok {
+				return nil, executorMetadata, rpc.ConvertError(err, "failed to retrieve result", codes.Internal)
+			}
+			return nil, executorMetadata, access.RequireNoError(ctx, fmt.Errorf("failed to retrieve result: %w", err))
 		}
 
 		// an additional check to ensure the correctness of the collection ID.
@@ -523,7 +526,19 @@ func (t *Transactions) GetTransactionResultsByBlockID(
 		return nil, accessmodel.ExecutorMetadata{}, fmt.Errorf("failed to get execution result for last block: %w", err)
 	}
 
-	return t.txProvider.TransactionResultsByBlockID(ctx, block, requiredEventEncodingVersion, execResultInfo)
+	results, executorMetadata, err := t.txProvider.TransactionResultsByBlockID(ctx, block, requiredEventEncodingVersion, execResultInfo)
+	if err != nil {
+		if _, ok := status.FromError(err); ok {
+			return nil, executorMetadata, rpc.ConvertError(err, "failed to retrieve result", codes.Internal)
+		}
+		if errors.Is(err, storage.ErrNotFound) {
+			return nil, executorMetadata, status.Errorf(codes.NotFound, "could not find execution result for block %s: %v", blockID, err)
+		}
+
+		return nil, executorMetadata, access.RequireNoError(ctx, fmt.Errorf("failed to retrieve result: %w", err))
+	}
+
+	return results, executorMetadata, nil
 }
 
 // GetTransactionResultByIndex returns transactions Results for an index in a block that is executed,
@@ -546,7 +561,18 @@ func (t *Transactions) GetTransactionResultByIndex(
 		return nil, accessmodel.ExecutorMetadata{}, fmt.Errorf("failed to get execution result for last block: %w", err)
 	}
 
-	return t.txProvider.TransactionResultByIndex(ctx, block, index, requiredEventEncodingVersion, execResultInfo)
+	txResult, executorMetadata, err := t.txProvider.TransactionResultByIndex(ctx, block, index, requiredEventEncodingVersion, execResultInfo)
+	if err != nil {
+		if errors.Is(err, storage.ErrNotFound) {
+			return nil, executorMetadata, status.Errorf(codes.NotFound, "could not find execution result for block %s: %v", blockID, err)
+		}
+		if _, ok := status.FromError(err); ok {
+			return nil, executorMetadata, rpc.ConvertError(err, "failed to retrieve result", codes.Internal)
+		}
+		return nil, executorMetadata, access.RequireNoError(ctx, fmt.Errorf("failed to retrieve result: %w", err))
+	}
+
+	return txResult, executorMetadata, nil
 }
 
 // GetSystemTransaction returns system transaction
@@ -572,7 +598,15 @@ func (t *Transactions) GetSystemTransactionResult(
 		return nil, accessmodel.ExecutorMetadata{}, fmt.Errorf("failed to get execution result for last block: %w", err)
 	}
 
-	return t.lookupTransactionResult(ctx, t.systemTxID, block.ToHeader(), requiredEventEncodingVersion, execResultInfo)
+	result, executorMetadata, err := t.lookupTransactionResult(ctx, t.systemTxID, block.ToHeader(), requiredEventEncodingVersion, execResultInfo)
+	if err != nil {
+		if _, ok := status.FromError(err); ok {
+			return nil, executorMetadata, rpc.ConvertError(err, "failed to retrieve system result", codes.Internal)
+		}
+		return nil, executorMetadata, access.RequireNoError(ctx, fmt.Errorf("failed to retrieve system result: %w", err))
+	}
+
+	return result, executorMetadata, nil
 }
 
 // lookupBlock returns a block based on the transaction ID.
@@ -601,12 +635,11 @@ func (t *Transactions) lookupTransactionResult(
 ) (*accessmodel.TransactionResult, accessmodel.ExecutorMetadata, error) {
 	txResult, executorMetadata, err := t.txProvider.TransactionResult(ctx, header, txID, requiredEventEncodingVersion, execResultInfo)
 	if err != nil {
-		// if either the storage or execution node reported no results or there were not enough execution results
-		if status.Code(err) == codes.NotFound {
-			// No result yet, indicate that it has not been executed
+		// if either the storage or execution node reported no results or there were not enough execution results,
+		// indicate that it has not been executed
+		if errors.Is(err, storage.ErrNotFound) || status.Code(err) == codes.NotFound {
 			return nil, executorMetadata, nil
 		}
-		// Other Error trying to retrieve the result, return with err
 		return nil, executorMetadata, err
 	}
 

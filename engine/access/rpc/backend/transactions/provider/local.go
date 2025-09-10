@@ -5,10 +5,7 @@ import (
 	"errors"
 	"fmt"
 
-	"google.golang.org/grpc/status"
-
 	"github.com/onflow/flow/protobuf/go/flow/entities"
-	"google.golang.org/grpc/codes"
 
 	"github.com/onflow/flow-go/engine/access/rpc/backend/transactions/error_messages"
 	txstatus "github.com/onflow/flow-go/engine/access/rpc/backend/transactions/status"
@@ -17,7 +14,6 @@ import (
 	accessmodel "github.com/onflow/flow-go/model/access"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/executiondatasync/optimistic_sync"
-	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
 )
@@ -57,14 +53,11 @@ func NewLocalTransactionProvider(
 }
 
 // TransactionResult retrieves a transaction result from storage by block ID and transaction ID.
-// Expected errors during normal operation:
-//   - [storage.ErrNotFound] when the tx result is not found in the snapshot.
-//   - codes.NotFound when result cannot be provided by storage due to the absence of data.
-//   - codes.Internal if event payload conversion failed.
-//   - indexer.ErrIndexNotInitialized when txResultsIndex not initialized
-//   - storage.ErrHeightNotIndexed when data is unavailable
+//
+// Expected error returns during normal operation:
+//   - [storage.ErrNotFound] when no snapshot is found for the execution result
 func (t *LocalTransactionProvider) TransactionResult(
-	ctx context.Context,
+	_ context.Context,
 	block *flow.Header,
 	transactionID flow.Identifier,
 	encodingVersion entities.EventEncodingVersion,
@@ -77,14 +70,15 @@ func (t *LocalTransactionProvider) TransactionResult(
 		ExecutorIDs:       executionResultInfo.ExecutionNodes.NodeIDs(),
 	}
 
-	snapshot, err := t.executionStateCache.Snapshot(executionResultInfo.ExecutionResult.ID())
+	snapshot, err := t.executionStateCache.Snapshot(metadata.ExecutionResultID)
 	if err != nil {
-		return nil, metadata, err
+		return nil, metadata, fmt.Errorf("failed to get snapshot for execution result %s: %w", metadata.ExecutionResultID, err)
 	}
 
 	txResult, err := snapshot.LightTransactionResults().ByBlockIDTransactionID(blockID, transactionID)
 	if err != nil {
-		return nil, metadata, fmt.Errorf("could not find transaction result: %w", err)
+		// this method does not return an error for empty of missing data, so any error here is an exception
+		return nil, metadata, fmt.Errorf("failed to get transaction results: %w", err)
 	}
 
 	var txErrorMessageStr string
@@ -93,37 +87,40 @@ func (t *LocalTransactionProvider) TransactionResult(
 		txErrorMessage, err := snapshot.TransactionResultErrorMessages().ByBlockIDTransactionID(blockID, transactionID)
 		if err != nil {
 			if !errors.Is(err, storage.ErrNotFound) {
-				return nil, metadata, err
+				return nil, metadata, fmt.Errorf("failed to get transaction error message: %w", err)
 			}
 			// it's possible that the error lookup request failed during the indexing process.
 			// use a placeholder error message in this case to ensure graceful degradation.
 			txErrorMessageStr = error_messages.DefaultFailedErrorMessage
+		} else {
+			txErrorMessageStr = txErrorMessage.ErrorMessage
 		}
 
-		if len(txErrorMessage.ErrorMessage) == 0 {
+		if len(txErrorMessageStr) == 0 {
 			// this means that the error message stored in the db is inconsistent with the tx result.
 			return nil, metadata,
-				fmt.Errorf("transaction failed but error message is empty (txID: %s, blockID: %s)",
-					transactionID, blockID)
+				fmt.Errorf("transaction failed but error message is empty")
 		}
 
-		txErrorMessageStr = txErrorMessage.ErrorMessage
 		txStatusCode = 1 // statusCode of 1 indicates an error and 0 indicates no error, the same as on EN
 	}
 
 	events, err := snapshot.Events().ByBlockIDTransactionID(blockID, transactionID)
 	if err != nil {
 		// this method will return an empty slice when no data is found, so any error is irrecoverable.
-		return nil, metadata,
-			fmt.Errorf("could not find events (blockID: %s, transactionID: %s): %w",
-				blockID, transactionID, err)
+		return nil, metadata, fmt.Errorf("could not find events: %w", err)
 	}
 
 	// events are encoded in CCF format in storage. convert to JSON-CDC if requested
 	if encodingVersion == entities.EventEncodingVersion_JSON_CDC_V0 {
 		events, err = convert.CcfEventsToJsonEvents(events)
 		if err != nil {
-			return nil, metadata, rpc.ConvertError(err, "failed to convert event payload", codes.Internal)
+			// if conversion fails, one of these cases must be true:
+			// 1. the data added to the block is invalid
+			// 2. the data in storage is corrupted
+			// 3. there is a software bug or configuration mismatch
+			// all cases point to either inconsistent state or a software bug, and continuing is not safe.
+			return nil, metadata, fmt.Errorf("failed to convert event payloads: %w", err)
 		}
 	}
 
@@ -141,13 +138,11 @@ func (t *LocalTransactionProvider) TransactionResult(
 }
 
 // TransactionResultByIndex retrieves a transaction result by index from storage.
-// Expected errors during normal operation:
-//   - codes.NotFound if result cannot be provided by storage due to the absence of data.
-//   - codes.Internal when event payload conversion failed.
-//   - indexer.ErrIndexNotInitialized when txResultsIndex not initialized
-//   - storage.ErrHeightNotIndexed when data is unavailable
+//
+// Expected error returns during normal operation:
+//   - [storage.ErrNotFound] when no snapshot is found for the execution result
 func (t *LocalTransactionProvider) TransactionResultByIndex(
-	ctx context.Context,
+	_ context.Context,
 	block *flow.Block,
 	index uint32,
 	requiredEventEncodingVersion entities.EventEncodingVersion,
@@ -160,15 +155,15 @@ func (t *LocalTransactionProvider) TransactionResultByIndex(
 		ExecutorIDs:       executionResultInfo.ExecutionNodes.NodeIDs(),
 	}
 
-	snapshot, err := t.executionStateCache.Snapshot(executionResultInfo.ExecutionResult.ID())
+	snapshot, err := t.executionStateCache.Snapshot(metadata.ExecutionResultID)
 	if err != nil {
-		return nil, metadata, err
+		return nil, metadata, fmt.Errorf("failed to get snapshot for execution result %s: %w", metadata.ExecutionResultID, err)
 	}
 
 	txResult, err := snapshot.LightTransactionResults().ByBlockIDTransactionIndex(blockID, index)
 	if err != nil {
-		return nil, metadata, rpc.ConvertIndexError(err, block.Height,
-			"failed to get transaction result")
+		// this method does not return an error for empty of missing data, so any error here is an exception
+		return nil, metadata, fmt.Errorf("failed to get transaction results: %w", err)
 	}
 
 	var txErrorMessageStr string
@@ -177,7 +172,7 @@ func (t *LocalTransactionProvider) TransactionResultByIndex(
 		txErrorMessage, err := snapshot.TransactionResultErrorMessages().ByBlockIDTransactionIndex(blockID, index)
 		if err != nil {
 			if !errors.Is(err, storage.ErrNotFound) {
-				return nil, metadata, err
+				return nil, metadata, fmt.Errorf("failed to get transaction error message: %w", err)
 			}
 			// it's possible that the error lookup request failed during the indexing process.
 			// use a placeholder error message in this case to ensure graceful degradation.
@@ -204,7 +199,12 @@ func (t *LocalTransactionProvider) TransactionResultByIndex(
 	if requiredEventEncodingVersion == entities.EventEncodingVersion_JSON_CDC_V0 {
 		events, err = convert.CcfEventsToJsonEvents(events)
 		if err != nil {
-			return nil, metadata, rpc.ConvertError(err, "failed to convert event payload", codes.Internal)
+			// if conversion fails, one of these cases must be true:
+			// 1. the data added to the block is invalid
+			// 2. the data in storage is corrupted
+			// 3. there is a software bug or configuration mismatch
+			// all cases point to either inconsistent state or a software bug, and continuing is not safe.
+			return nil, metadata, fmt.Errorf("failed to convert event payloads: %w", err)
 		}
 	}
 
@@ -230,13 +230,11 @@ func (t *LocalTransactionProvider) TransactionResultByIndex(
 }
 
 // TransactionResultsByBlockID retrieves transaction results by block ID from storage
-// Expected errors during normal operation:
-//   - codes.NotFound if result cannot be provided by storage due to the absence of data.
-//   - codes.Internal when event payload conversion failed.
-//   - indexer.ErrIndexNotInitialized when txResultsIndex not initialized
-//   - storage.ErrHeightNotIndexed when data is unavailable
+//
+// Expected error returns during normal operation:
+//   - [storage.ErrNotFound] when no snapshot is found for the execution result
 func (t *LocalTransactionProvider) TransactionResultsByBlockID(
-	ctx context.Context,
+	_ context.Context,
 	block *flow.Block,
 	requiredEventEncodingVersion entities.EventEncodingVersion,
 	executionResultInfo *optimistic_sync.ExecutionResultInfo,
@@ -248,20 +246,23 @@ func (t *LocalTransactionProvider) TransactionResultsByBlockID(
 		ExecutorIDs:       executionResultInfo.ExecutionNodes.NodeIDs(),
 	}
 
-	snapshot, err := t.executionStateCache.Snapshot(executionResultInfo.ExecutionResult.ID())
+	snapshot, err := t.executionStateCache.Snapshot(metadata.ExecutionResultID)
 	if err != nil {
-		return nil, metadata, err
+		return nil, metadata, fmt.Errorf("failed to get snapshot for execution result %s: %w", metadata.ExecutionResultID, err)
 	}
 
 	txResults, err := snapshot.LightTransactionResults().ByBlockID(blockID)
 	if err != nil {
-		return nil, metadata, rpc.ConvertIndexError(err, block.Height,
-			"failed to get transaction result")
+		// this method does not return an error for empty of missing data, so any error here is an exception
+		return nil, metadata, fmt.Errorf("failed to get transaction results: %w", err)
 	}
 
 	txErrorMessageList, err := snapshot.TransactionResultErrorMessages().ByBlockID(blockID)
-	if err != nil && !errors.Is(err, storage.ErrNotFound) {
-		return nil, metadata, err
+	if err != nil {
+		if !errors.Is(err, storage.ErrNotFound) {
+			return nil, metadata, fmt.Errorf("failed to get transaction error messages: %w", err)
+		}
+		// if no data was found, continue. we will add a placeholder error message.
 	}
 
 	txErrorMessages := make(map[flow.Identifier]string, len(txErrorMessageList))
@@ -279,9 +280,7 @@ func (t *LocalTransactionProvider) TransactionResultsByBlockID(
 		// lookups are gated on the indexer signaling it has finished processing all data for the
 		// block, all data must be available in storage, otherwise there is an inconsistency in the
 		// state.
-		err = fmt.Errorf("inconsistent index state: %w", err)
-		irrecoverable.Throw(ctx, err)
-		return nil, metadata, err
+		return nil, metadata, fmt.Errorf("unexpected missing collection: %w", err)
 	}
 
 	txStatus := t.txStatusDeriver.DeriveExecutedTransactionStatus(snapshot.BlockStatus())
@@ -302,9 +301,7 @@ func (t *LocalTransactionProvider) TransactionResultsByBlockID(
 
 			if len(txErrorMessageStr) == 0 {
 				// this means that the error message stored in the db is inconsistent with the tx result.
-				return nil, metadata,
-					fmt.Errorf("transaction failed but error message is empty (txID: %s, blockID: %s)",
-						txID, blockID)
+				return nil, metadata, fmt.Errorf("transaction failed but error message is empty (txID: %s)", txID)
 			}
 
 			txStatusCode = 1 // statusCode of 1 indicates an error and 0 indicates no error, the same as on EN
@@ -312,22 +309,28 @@ func (t *LocalTransactionProvider) TransactionResultsByBlockID(
 
 		events, err := eventsReader.ByBlockIDTransactionID(blockID, txResult.TransactionID)
 		if err != nil {
-			return nil, metadata, rpc.ConvertIndexError(err, block.Height, "failed to get events")
+			// this method does not return an error for empty of missing data, so any error here is an exception
+			return nil, metadata, fmt.Errorf("failed to get events (txID: %s): %w", txID, err)
 		}
 
 		// events are encoded in CCF format in storage. convert to JSON-CDC if requested
 		if requiredEventEncodingVersion == entities.EventEncodingVersion_JSON_CDC_V0 {
 			events, err = convert.CcfEventsToJsonEvents(events)
 			if err != nil {
-				return nil, metadata,
-					rpc.ConvertError(err, "failed to convert event payload", codes.Internal)
+				// if conversion fails, one of these cases must be true:
+				// 1. the data added to the block is invalid
+				// 2. the data in storage is corrupted
+				// 3. there is a software bug or configuration mismatch
+				// all cases point to either inconsistent state or a software bug, and continuing is not safe.
+				return nil, metadata, fmt.Errorf("failed to convert event payloads (txID: %s): %w", txID, err)
 			}
 		}
 
 		collectionID, ok := txToCollectionID[txID]
 		if !ok {
-			return nil, metadata,
-				status.Errorf(codes.Internal, "transaction %s not found in block %s", txID, blockID)
+			// since all collections for the block are available and indexed, any missing mapping
+			// indicates there is a bug or inconsistent state.
+			return nil, metadata, fmt.Errorf("transaction %s not found in block", txID)
 		}
 
 		results = append(results, &accessmodel.TransactionResult{
