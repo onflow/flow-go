@@ -170,10 +170,10 @@ func (exeConf *ExecutionConfig) ValidateFlags() error {
 			}
 		}
 	}
-	if exeConf.rpcConf.MaxRequestMsgSize <= 0 {
+	if exeConf.rpcConf.MaxRequestMsgSize == 0 {
 		return errors.New("rpc-max-request-message-size must be greater than 0")
 	}
-	if exeConf.rpcConf.MaxResponseMsgSize <= 0 {
+	if exeConf.rpcConf.MaxResponseMsgSize == 0 {
 		return errors.New("rpc-max-response-message-size must be greater than 0")
 	}
 	return nil
