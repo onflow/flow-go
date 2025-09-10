@@ -528,13 +528,12 @@ func (t *Transactions) GetTransactionResultsByBlockID(
 
 	results, executorMetadata, err := t.txProvider.TransactionResultsByBlockID(ctx, block, requiredEventEncodingVersion, execResultInfo)
 	if err != nil {
-		if _, ok := status.FromError(err); ok {
-			return nil, executorMetadata, rpc.ConvertError(err, "failed to retrieve result", codes.Internal)
-		}
 		if errors.Is(err, storage.ErrNotFound) {
 			return nil, executorMetadata, status.Errorf(codes.NotFound, "could not find execution result for block %s: %v", blockID, err)
 		}
-
+		if _, ok := status.FromError(err); ok {
+			return nil, executorMetadata, rpc.ConvertError(err, "failed to retrieve result", codes.Internal)
+		}
 		return nil, executorMetadata, access.RequireNoError(ctx, fmt.Errorf("failed to retrieve result: %w", err))
 	}
 
