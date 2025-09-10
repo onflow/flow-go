@@ -106,15 +106,3 @@ func MakeSingletonLockManager() lockctx.Manager {
 func NewTestingLockManager() lockctx.Manager {
 	return lockctx.NewManager(Locks(), makeLockPolicy())
 }
-
-// WithLock is a helper function that creates a new lock context, acquires the specified lock,
-// It help to reduce boilerplate code when using locks.
-// also prevent mistakes like forgetting to release the lock, releasing multiple times, etc.
-func WithLock(manager lockctx.Manager, lockID string, fn func(lctx lockctx.Context) error) error {
-	lctx := manager.NewContext()
-	if err := lctx.AcquireLock(lockID); err != nil {
-		return err
-	}
-	defer lctx.Release()
-	return fn(lctx)
-}
