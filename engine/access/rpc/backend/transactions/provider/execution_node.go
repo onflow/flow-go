@@ -19,7 +19,6 @@ import (
 	accessmodel "github.com/onflow/flow-go/model/access"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/executiondatasync/optimistic_sync"
-	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
 )
@@ -262,14 +261,6 @@ func (e *ENTransactionProvider) TransactionResultsByBlockID(
 		}
 
 		systemTxResult := resp.TransactionResults[len(resp.TransactionResults)-1]
-<<<<<<< HEAD
-=======
-		systemTxStatus, err := e.txStatusDeriver.DeriveFinalizedTransactionStatus(block.Height, true)
-		if err != nil {
-			irrecoverable.Throw(ctx, fmt.Errorf("failed to derive transaction status: %w", err))
-			return nil, err
-		}
->>>>>>> illia-malachyn/7652-fork-aware-events-endpoint
 
 		events, err := convert.MessagesToEventsWithEncodingConversion(systemTxResult.GetEvents(), resp.GetEventEncodingVersion(), requiredEventEncodingVersion)
 		if err != nil {
