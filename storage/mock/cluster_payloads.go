@@ -44,24 +44,6 @@ func (_m *ClusterPayloads) ByBlockID(blockID flow.Identifier) (*cluster.Payload,
 	return r0, r1
 }
 
-// Store provides a mock function with given fields: blockID, payload
-func (_m *ClusterPayloads) Store(blockID flow.Identifier, payload *cluster.Payload) error {
-	ret := _m.Called(blockID, payload)
-
-	if len(ret) == 0 {
-		panic("no return value specified for Store")
-	}
-
-	var r0 error
-	if rf, ok := ret.Get(0).(func(flow.Identifier, *cluster.Payload) error); ok {
-		r0 = rf(blockID, payload)
-	} else {
-		r0 = ret.Error(0)
-	}
-
-	return r0
-}
-
 // NewClusterPayloads creates a new instance of ClusterPayloads. It also registers a testing interface on the mock and a cleanup function to assert the mocks expectations.
 // The first argument is typically a *testing.T value.
 func NewClusterPayloads(t interface {

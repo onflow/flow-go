@@ -54,7 +54,7 @@ type ExecutionStateSyncSuite struct {
 }
 
 func (s *ExecutionStateSyncSuite) SetupTest() {
-	s.setup(execution_data.ExecutionDataDBModeBadger)
+	s.setup(execution_data.ExecutionDataDBModePebble)
 }
 
 func (s *ExecutionStateSyncSuite) setup(executionDataDBMode execution_data.ExecutionDataDBMode) {

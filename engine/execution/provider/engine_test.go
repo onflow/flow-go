@@ -54,8 +54,8 @@ func TestProviderEngine_onChunkDataRequest(t *testing.T) {
 		require.NoError(t, e.Process(channels.RequestChunks, originIdentity.NodeID, req))
 
 		require.Eventually(t, func() bool {
-			_, ok := requestQueue.Get() // ensuring all requests have been picked up from the queue.
-			return !ok
+			empty := requestQueue.Size() == 0 // ensuring all requests have been picked up from the queue.
+			return empty
 		}, 1*time.Second, 10*time.Millisecond)
 
 		cancel()
@@ -103,8 +103,8 @@ func TestProviderEngine_onChunkDataRequest(t *testing.T) {
 		require.NoError(t, e.Process(channels.RequestChunks, originIdentity.NodeID, req))
 
 		require.Eventually(t, func() bool {
-			_, ok := requestQueue.Get() // ensuring all requests have been picked up from the queue.
-			return !ok
+			empty := requestQueue.Size() == 0 // ensuring all requests have been picked up from the queue.
+			return empty
 		}, 1*time.Second, 10*time.Millisecond)
 
 		cancel()

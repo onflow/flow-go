@@ -5,23 +5,19 @@ import "github.com/onflow/flow-go/model/flow"
 // NewKeyMetadataEmptyError creates a new CodedFailure. It is returned
 // when key metadata cannot be parsed because it is unexpectedly empty.
 func NewKeyMetadataEmptyError(msgPrefix string) CodedFailure {
-	if len(msgPrefix) > 0 {
-		msgPrefix += ": "
-	}
-	return NewCodedFailure(
+	return NewCodedFailuref(
 		FailureCodeKeyMetadataDecodingFailure,
-		msgPrefix+"key metadata is empty")
+		msgPrefix,
+		"key metadata is empty")
 }
 
 // NewKeyMetadataTooShortError creates a new CodedFailure. It is returned
 // when key metadata cannot be parsed because it is truncated.
 func NewKeyMetadataTooShortError(msgPrefix string, expectedLength, actualLength int) CodedFailure {
-	if len(msgPrefix) > 0 {
-		msgPrefix += ": "
-	}
-	return NewCodedFailure(
+	return NewCodedFailuref(
 		FailureCodeKeyMetadataDecodingFailure,
-		msgPrefix+"key metadata is too short: expect %d bytes, got %d bytes",
+		msgPrefix,
+		"key metadata is too short: expect %d bytes, got %d bytes",
 		expectedLength,
 		actualLength,
 	)
@@ -30,12 +26,10 @@ func NewKeyMetadataTooShortError(msgPrefix string, expectedLength, actualLength 
 // NewKeyMetadataUnexpectedLengthError creates a new CodedFailure. It is returned
 // when key metadata cannot be parsed because its length is unexpected.
 func NewKeyMetadataUnexpectedLengthError(msgPrefix string, groupLength, actualLength int) CodedFailure {
-	if len(msgPrefix) > 0 {
-		msgPrefix += ": "
-	}
-	return NewCodedFailure(
+	return NewCodedFailuref(
 		FailureCodeKeyMetadataDecodingFailure,
-		msgPrefix+"key metadata length is unexpected: expect multiples of %d, got %d bytes",
+		msgPrefix,
+		"key metadata length is unexpected: expect multiples of %d, got %d bytes",
 		groupLength,
 		actualLength,
 	)
@@ -44,12 +38,10 @@ func NewKeyMetadataUnexpectedLengthError(msgPrefix string, groupLength, actualLe
 // NewKeyMetadataTrailingDataError creates a new CodedFailure. It is returned
 // when key metadata cannot be parsed because it has trailing data after expected content.
 func NewKeyMetadataTrailingDataError(msgPrefix string, trailingDataLength int) CodedFailure {
-	if len(msgPrefix) > 0 {
-		msgPrefix += ": "
-	}
-	return NewCodedFailure(
+	return NewCodedFailuref(
 		FailureCodeKeyMetadataDecodingFailure,
-		msgPrefix+"key metadata has trailing data: expect no trailing data, got %d bytes",
+		msgPrefix,
+		"key metadata has trailing data: expect no trailing data, got %d bytes",
 		trailingDataLength,
 	)
 }
@@ -57,12 +49,10 @@ func NewKeyMetadataTrailingDataError(msgPrefix string, trailingDataLength int) C
 // NewKeyMetadataNotFoundError creates a new CodedFailure. It is returned
 // when key metadata cannot be found for the given stored key index.
 func NewKeyMetadataNotFoundError(msgPrefix string, storedKeyIndex uint32) CodedFailure {
-	if len(msgPrefix) > 0 {
-		msgPrefix += ": "
-	}
-	return NewCodedFailure(
+	return NewCodedFailuref(
 		FailureCodeKeyMetadataNotFoundFailure,
-		msgPrefix+"key metadata not found at stored key index %d",
+		msgPrefix,
+		"key metadata not found at stored key index %d",
 		storedKeyIndex,
 	)
 }
@@ -70,12 +60,10 @@ func NewKeyMetadataNotFoundError(msgPrefix string, storedKeyIndex uint32) CodedF
 // NewKeyMetadataUnexpectedKeyIndexError creates a new CodedFailure. It is returned
 // when key metadata cannot be found for unexpected stored key index.
 func NewKeyMetadataUnexpectedKeyIndexError(msgPrefix string, storedKeyIndex uint32) CodedFailure {
-	if len(msgPrefix) > 0 {
-		msgPrefix += ": "
-	}
-	return NewCodedFailure(
+	return NewCodedFailuref(
 		FailureCodeKeyMetadataUnexpectedKeyIndexFailure,
-		msgPrefix+"unexpected key index %d",
+		msgPrefix,
+		"unexpected key index %d",
 		storedKeyIndex,
 	)
 }
@@ -83,12 +71,10 @@ func NewKeyMetadataUnexpectedKeyIndexError(msgPrefix string, storedKeyIndex uint
 // NewBatchPublicKeyDecodingError creates a new CodedFailure. It is returned
 // when batch public key payload cannot be decoded.
 func NewBatchPublicKeyDecodingError(msgPrefix string, address flow.Address, batchIndex uint32) CodedFailure {
-	if len(msgPrefix) > 0 {
-		msgPrefix += ": "
-	}
-	return NewCodedFailure(
+	return NewCodedFailuref(
 		FailureCodeBatchPublicKeyDecodingFailure,
-		msgPrefix+"batch public key payload is malformed at batch index %d for address %s",
+		msgPrefix,
+		"batch public key payload is malformed at batch index %d for address %s",
 		batchIndex,
 		address,
 	)
@@ -97,12 +83,10 @@ func NewBatchPublicKeyDecodingError(msgPrefix string, address flow.Address, batc
 // NewStoredPublicKeyNotFoundError creates a new CodedFailure. It is returned
 // when stored public key cannot be found for the given stored key index.
 func NewStoredPublicKeyNotFoundError(msgPrefix string, address flow.Address, storedKeyIndex uint32) CodedFailure {
-	if len(msgPrefix) > 0 {
-		msgPrefix += ": "
-	}
-	return NewCodedFailure(
+	return NewCodedFailuref(
 		FailureCodeStoredPublicKeyNotFoundFailure,
-		msgPrefix+"stored public key not found at stored key index %d for address %s",
+		msgPrefix,
+		"stored public key not found at stored key index %d for address %s",
 		storedKeyIndex,
 		address,
 	)
@@ -111,12 +95,10 @@ func NewStoredPublicKeyNotFoundError(msgPrefix string, address flow.Address, sto
 // NewStoredPublicKeyUnexpectedIndexError creates a new CodedFailure. It is returned
 // when stored public key cannot be found for unexpected stored key index.
 func NewStoredPublicKeyUnexpectedIndexError(msgPrefix string, address flow.Address, storedKeyIndex uint32) CodedFailure {
-	if len(msgPrefix) > 0 {
-		msgPrefix += ": "
-	}
-	return NewCodedFailure(
+	return NewCodedFailuref(
 		FailureCodeStoredPublicKeyUnexpectedIndexFailure,
-		msgPrefix+"unexpected stored key index %d for address %s",
+		msgPrefix,
+		"unexpected stored key index %d for address %s",
 		storedKeyIndex,
 		address,
 	)
@@ -125,12 +107,10 @@ func NewStoredPublicKeyUnexpectedIndexError(msgPrefix string, address flow.Addre
 // NewBatchPublicKeyNotFoundError creates a new CodedFailure. It is returned
 // when batch public key payload cannot be found for the given batch ndex.
 func NewBatchPublicKeyNotFoundError(msgPrefix string, address flow.Address, batchIndex uint32) CodedFailure {
-	if len(msgPrefix) > 0 {
-		msgPrefix += ": "
-	}
-	return NewCodedFailure(
+	return NewCodedFailuref(
 		FailureCodeBatchPublicKeyNotFoundFailure,
-		msgPrefix+"batch public key payload not found for address %s and batch index %d",
+		msgPrefix,
+		"batch public key payload not found for address %s and batch index %d",
 		address,
 		batchIndex,
 	)
