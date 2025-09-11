@@ -176,7 +176,7 @@ func (s *EventsSuite) SetupTest() {
 
 	s.executionResultProvider = osyncmock.NewExecutionResultProvider(s.T())
 	s.executionResultProvider.
-		On("ExecutionResult", mock.Anything, mock.Anything).
+		On("ExecutionResultInfo", mock.Anything, mock.Anything).
 		Return(&optimistic_sync.ExecutionResultInfo{
 			ExecutionResult: s.executionResult,
 			ExecutionNodes:  s.executionNodes.ToSkeleton(),

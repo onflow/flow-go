@@ -37,7 +37,7 @@ type Events struct {
 	maxHeightRange     uint
 	provider           provider.EventProvider
 	queryMode          query_mode.IndexQueryMode
-	execResultProvider optimistic_sync.ExecutionResultProvider
+	execResultProvider optimistic_sync.ExecutionResultInfoProvider
 	operatorCriteria   optimistic_sync.Criteria
 }
 
@@ -53,7 +53,7 @@ func NewEventsBackend(
 	nodeCommunicator node_communicator.Communicator,
 	queryMode query_mode.IndexQueryMode,
 	execNodeIdentitiesProvider *rpc.ExecutionNodeIdentitiesProvider,
-	executionResultProvider optimistic_sync.ExecutionResultProvider,
+	executionResultProvider optimistic_sync.ExecutionResultInfoProvider,
 	executionStateCache optimistic_sync.ExecutionStateCache,
 	operatorCriteria optimistic_sync.Criteria,
 ) (*Events, error) {
@@ -167,7 +167,7 @@ func (e *Events) GetEventsForHeightRange(
 	// must be from the execution fork terminating at this result. this guarantees the response
 	// contains a consistent view of the state.
 	lastBlockID := blockHeaders[len(blockHeaders)-1].ID
-	execResultInfo, err := e.execResultProvider.ExecutionResult(lastBlockID, criteria)
+	execResultInfo, err := e.execResultProvider.ExecutionResultInfo(lastBlockID, criteria)
 	if err != nil {
 		return nil, accessmodel.ExecutorMetadata{}, fmt.Errorf("failed to get execution result for last block: %w", err)
 	}
@@ -226,7 +226,7 @@ func (e *Events) GetEventsForBlockIDs(
 	// get the result for the block with the highest height. all data queried for this set of blocks
 	// must be from the execution fork terminating at this result. this guarantees the response
 	// contains a consistent view of the state.
-	execResultInfo, err := e.execResultProvider.ExecutionResult(
+	execResultInfo, err := e.execResultProvider.ExecutionResultInfo(
 		newestBlockHeader.ID(),
 		criteria,
 	)

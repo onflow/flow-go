@@ -895,22 +895,23 @@ func (h *Handler) GetEventsForHeightRange(
 
 	eventEncodingVersion := req.GetEventEncodingVersion()
 
+	query := req.GetExecutionStateQuery()
 	results, executorMetadata, err := h.api.GetEventsForHeightRange(
 		ctx,
 		eventType,
 		startHeight,
 		endHeight,
 		eventEncodingVersion,
-		NewCriteria(req.GetExecutionStateQuery()),
+		NewCriteria(query),
 	)
 	if err != nil {
 		return nil, err
 	}
 
-	if query := req.GetExecutionStateQuery(); query != nil && query.GetIncludeExecutorMetadata() {
-		metadata.ExecutionStateQuery, err = convert.ExecutorMetadataToMessage(&executorMetadata)
-		if err != nil {
-			return nil, err
+	if query != nil && query.GetIncludeExecutorMetadata() {
+		if !executorMetadata.IsEmpty() {
+			meta := convert.ExecutorMetadataToMessage(executorMetadata)
+			metadata.ExecutionStateQuery = &meta
 		}
 	}
 
@@ -959,9 +960,9 @@ func (h *Handler) GetEventsForBlockIDs(
 	}
 
 	if query := req.GetExecutionStateQuery(); query != nil && query.GetIncludeExecutorMetadata() {
-		metadata.ExecutionStateQuery, err = convert.ExecutorMetadataToMessage(&executorMetadata)
-		if err != nil {
-			return nil, err
+		if !executorMetadata.IsEmpty() {
+			meta := convert.ExecutorMetadataToMessage(executorMetadata)
+			metadata.ExecutionStateQuery = &meta
 		}
 	}
 

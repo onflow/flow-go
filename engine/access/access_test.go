@@ -37,6 +37,7 @@ import (
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/counters"
 	"github.com/onflow/flow-go/module/executiondatasync/optimistic_sync"
+	osyncmock "github.com/onflow/flow-go/module/executiondatasync/optimistic_sync/mock"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/mempool/stdmap"
 	"github.com/onflow/flow-go/module/metrics"
@@ -49,6 +50,7 @@ import (
 	"github.com/onflow/flow-go/storage"
 	bstorage "github.com/onflow/flow-go/storage/badger"
 	"github.com/onflow/flow-go/storage/badger/operation"
+	storagemock "github.com/onflow/flow-go/storage/mock"
 	"github.com/onflow/flow-go/storage/operation/badgerimpl"
 	"github.com/onflow/flow-go/storage/store"
 	"github.com/onflow/flow-go/storage/util"
@@ -84,6 +86,12 @@ type Suite struct {
 	backend              *backend.Backend
 	sporkID              flow.Identifier
 	protocolStateVersion uint64
+
+	events                  *storagemock.Events
+	executionResultProvider *osyncmock.ExecutionResultProvider
+	executionStateCache     *osyncmock.ExecutionStateCache
+	resultForestSnapshot    *osyncmock.Snapshot
+	criteria                optimistic_sync.Criteria
 }
 
 // TestAccess tests scenarios which exercise multiple API calls using both the RPC handler and the ingest engine
@@ -152,6 +160,28 @@ func (suite *Suite) SetupTest() {
 	suite.chainID = flow.Testnet
 	suite.metrics = metrics.NewNoopCollector()
 	suite.finalizedHeaderCache = mocks.NewFinalizedHeaderCache(suite.T(), suite.state)
+
+	suite.events = storagemock.NewEvents(suite.T())
+
+	execResultInfoProvider := osyncmock.NewExecutionResultInfoProvider(suite.T())
+	execResultInfoProvider.
+		On("ExecutionResultInfo", mock.Anything, mock.Anything).
+		Return(&optimistic_sync.ExecutionResultInfo{
+			ExecutionResult: unittest.ExecutionResultFixture(),
+			ExecutionNodes:  unittest.IdentityListFixture(2).ToSkeleton(),
+		}, nil).
+		Maybe()
+
+	suite.resultForestSnapshot = osyncmock.NewSnapshot(suite.T())
+	suite.resultForestSnapshot.On("Events").
+		Return(suite.events, nil).
+		Maybe()
+
+	execStateCache := osyncmock.NewExecutionStateCache(suite.T())
+	execStateCache.
+		On("Snapshot", mock.Anything).
+		Return(suite.resultForestSnapshot, nil).
+		Maybe()
 }
 
 func (suite *Suite) RunTest(
@@ -181,7 +211,7 @@ func (suite *Suite) RunTest(
 			ScriptExecutionMode:  query_mode.IndexQueryModeExecutionNodesOnly,
 			TxResultQueryMode:    query_mode.IndexQueryModeExecutionNodesOnly,
 			// TODO: set this once data result forest merged in
-			//ExecutionResultProvider:
+			//ExecutionResultInfoProvider:
 			//ExecutionStateCache:
 			OperatorCriteria: optimistic_sync.DefaultCriteria,
 		})
@@ -349,22 +379,21 @@ func (suite *Suite) TestSendTransactionToRandomCollectionNode() {
 		connFactory.On("GetAccessAPIClient", collNode2.Address, nil).Return(col2ApiClient, &mocks.MockCloser{}, nil)
 
 		bnd, err := backend.New(backend.Params{State: suite.state,
-			Collections:          collections,
-			Transactions:         transactions,
-			ChainID:              suite.chainID,
-			AccessMetrics:        metrics,
-			ConnFactory:          connFactory,
-			MaxHeightRange:       events.DefaultMaxHeightRange,
-			Log:                  suite.log,
-			SnapshotHistoryLimit: backend.DefaultSnapshotHistoryLimit,
-			Communicator:         node_communicator.NewNodeCommunicator(false),
-			EventQueryMode:       query_mode.IndexQueryModeExecutionNodesOnly,
-			ScriptExecutionMode:  query_mode.IndexQueryModeExecutionNodesOnly,
-			TxResultQueryMode:    query_mode.IndexQueryModeExecutionNodesOnly,
-			// TODO: set this once data result forest merged in
-			//ExecutionResultProvider:
-			//ExecutionStateCache:
-			OperatorCriteria: optimistic_sync.DefaultCriteria,
+			Collections:                 collections,
+			Transactions:                transactions,
+			ChainID:                     suite.chainID,
+			AccessMetrics:               metrics,
+			ConnFactory:                 connFactory,
+			MaxHeightRange:              events.DefaultMaxHeightRange,
+			Log:                         suite.log,
+			SnapshotHistoryLimit:        backend.DefaultSnapshotHistoryLimit,
+			Communicator:                node_communicator.NewNodeCommunicator(false),
+			EventQueryMode:              query_mode.IndexQueryModeExecutionNodesOnly,
+			ScriptExecutionMode:         query_mode.IndexQueryModeExecutionNodesOnly,
+			TxResultQueryMode:           query_mode.IndexQueryModeExecutionNodesOnly,
+			ExecutionResultInfoProvider: suite.executionResultProvider,
+			ExecutionStateCache:         suite.executionStateCache,
+			OperatorCriteria:            optimistic_sync.DefaultCriteria,
 		})
 		require.NoError(suite.T(), err)
 
@@ -699,7 +728,7 @@ func (suite *Suite) TestGetSealedTransaction() {
 			ScriptExecutionMode:        query_mode.IndexQueryModeExecutionNodesOnly,
 			ExecNodeIdentitiesProvider: execNodeIdentitiesProvider,
 			// TODO: set this once data result forest merged in
-			//ExecutionResultProvider:
+			//ExecutionResultInfoProvider:
 			//ExecutionStateCache:
 			OperatorCriteria: optimistic_sync.DefaultCriteria,
 		})
@@ -898,7 +927,7 @@ func (suite *Suite) TestGetTransactionResult() {
 			ScriptExecutionMode:        query_mode.IndexQueryModeExecutionNodesOnly,
 			ExecNodeIdentitiesProvider: execNodeIdentitiesProvider,
 			// TODO: set this once data result forest merged in
-			//ExecutionResultProvider:
+			//ExecutionResultInfoProvider:
 			//ExecutionStateCache:
 			OperatorCriteria: optimistic_sync.DefaultCriteria,
 		})
@@ -1148,7 +1177,7 @@ func (suite *Suite) TestExecuteScript() {
 			TxResultQueryMode:          query_mode.IndexQueryModeExecutionNodesOnly,
 			ExecNodeIdentitiesProvider: execNodeIdentitiesProvider,
 			// TODO: set this once data result forest merged in
-			//ExecutionResultProvider:
+			//ExecutionResultInfoProvider:
 			//ExecutionStateCache:
 			OperatorCriteria: optimistic_sync.DefaultCriteria,
 		})

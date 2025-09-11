@@ -1,4 +1,4 @@
-package execution_result_provider
+package er_info_provider
 
 import (
 	"fmt"
@@ -22,7 +22,7 @@ type ExecutionResultProvider struct {
 	executionReceipts storage.ExecutionReceipts
 	state             protocol.State
 
-	executionNodes *ExecutionNodesSelector
+	executionNodes *ExecutionNodeSelector
 
 	rootBlockID     flow.Identifier
 	rootBlockResult *flow.ExecutionResult
@@ -30,7 +30,7 @@ type ExecutionResultProvider struct {
 	baseCriteria optimistic_sync.Criteria
 }
 
-var _ optimistic_sync.ExecutionResultProvider = (*ExecutionResultProvider)(nil)
+var _ optimistic_sync.ExecutionResultInfoProvider = (*ExecutionResultProvider)(nil)
 
 // NewExecutionResultProvider creates and returns a new instance of
 // ExecutionResultProvider.
@@ -41,7 +41,7 @@ func NewExecutionResultProvider(
 	state protocol.State,
 	headers storage.Headers,
 	executionReceipts storage.ExecutionReceipts,
-	executionNodes *ExecutionNodesSelector,
+	executionNodes *ExecutionNodeSelector,
 	operatorCriteria optimistic_sync.Criteria,
 ) (*ExecutionResultProvider, error) {
 	// Root block ID and result should not change and could be cached.
@@ -72,7 +72,7 @@ func NewExecutionResultProvider(
 //
 // Expected errors during normal operations:
 //   - backend.InsufficientExecutionReceipts - found insufficient receipts for given block ID.
-func (e *ExecutionResultProvider) ExecutionResult(blockID flow.Identifier, criteria optimistic_sync.Criteria) (*optimistic_sync.ExecutionResultInfo, error) {
+func (e *ExecutionResultProvider) ExecutionResultInfo(blockID flow.Identifier, criteria optimistic_sync.Criteria) (*optimistic_sync.ExecutionResultInfo, error) {
 	executorIdentities, err := e.state.Final().Identities(filter.HasRole[flow.Identity](flow.RoleExecution))
 	if err != nil {
 		return nil, fmt.Errorf("failed to retrieve execution IDs for root block: %w", err)
