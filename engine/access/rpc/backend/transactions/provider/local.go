@@ -38,6 +38,7 @@ type LocalTransactionProvider struct {
 	systemTxID                flow.Identifier
 	txStatusDeriver           *txstatus.TxStatusDeriver
 	scheduledCallbacksEnabled bool
+	chainID                   flow.ChainID
 }
 
 var _ TransactionProvider = (*LocalTransactionProvider)(nil)
@@ -52,6 +53,7 @@ func NewLocalTransactionProvider(
 	systemTxID flow.Identifier,
 	txStatusDeriver *txstatus.TxStatusDeriver,
 	scheduledCallbacksEnabled bool,
+	chainID flow.ChainID,
 ) *LocalTransactionProvider {
 	return &LocalTransactionProvider{
 		state:                     state,
@@ -63,6 +65,7 @@ func NewLocalTransactionProvider(
 		systemTxID:                systemTxID,
 		txStatusDeriver:           txStatusDeriver,
 		scheduledCallbacksEnabled: scheduledCallbacksEnabled,
+		chainID:                   chainID,
 	}
 }
 
@@ -238,10 +241,8 @@ func (t *LocalTransactionProvider) TransactionsByBlockID(
 		transactions = append(transactions, collection.Transactions...)
 	}
 
-	chainID := t.state.Params().ChainID().Chain()
-
 	if !t.scheduledCallbacksEnabled {
-		systemTx, err := blueprints.SystemChunkTransaction(chainID)
+		systemTx, err := blueprints.SystemChunkTransaction(t.chainID.Chain())
 		if err != nil {
 			return nil, fmt.Errorf("failed to construct system chunk transaction: %w", err)
 		}
@@ -254,7 +255,7 @@ func (t *LocalTransactionProvider) TransactionsByBlockID(
 		return nil, rpc.ConvertStorageError(err)
 	}
 
-	sysCollection, err := blueprints.SystemCollection(chainID, events)
+	sysCollection, err := blueprints.SystemCollection(t.chainID.Chain(), events)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "could not construct system collection: %v", err)
 	}
