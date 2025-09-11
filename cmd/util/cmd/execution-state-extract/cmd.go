@@ -130,7 +130,7 @@ func init() {
 	Cmd.Flags().StringVar(&flagCPUProfile, "cpu-profile", "",
 		"enable CPU profiling")
 
-	Cmd.Flags().BoolVar(&flagValidate, "validate", false,
+	Cmd.Flags().BoolVar(&flagValidate, "validate-public-key-migration", false,
 		"validate migrated account public keys")
 }
 
