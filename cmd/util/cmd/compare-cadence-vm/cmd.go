@@ -3,6 +3,7 @@ package compare_cadence_vm
 import (
 	"context"
 	"encoding/hex"
+	"fmt"
 	"strings"
 
 	"github.com/kr/pretty"
@@ -212,34 +213,46 @@ func compareBlock(
 
 		txID := flow.Identifier(transaction.ID())
 
-		compareResults(
+		if !compareResults(
 			txID,
 			interResult,
 			vmResult,
-		)
+		) {
+			compareReadsAndWrites(
+				txID,
+				interTxSnapshots[i],
+				vmTxSnapshots[i],
+			)
 
-		// TODO: not yet equal
-		//compareSpans(
-		//	txID,
-		//	interSpans[i].spans,
-		//	vmSpans[i].spans,
-		//)
+			log.Info().Str("tx", txID.String()).Msg("Interpreter spans:")
 
-		compareReadsAndWrites(
-			txID,
-			interTxSnapshots[i],
-			vmTxSnapshots[i],
-		)
+			for _, span := range interSpans[i].spans {
+				printSpan(span)
+			}
+
+			log.Info().Str("tx", txID.String()).Msg("VM spans:")
+
+			for _, span := range vmSpans[i].spans {
+				printSpan(span)
+			}
+		}
 	}
 
 	return header
 }
 
-func compareResults(
-	txID flow.Identifier,
-	interResult debug.Result,
-	vmResult debug.Result,
-) {
+func printSpan(span otelTrace.ReadOnlySpan) {
+	fmt.Printf("- %s: ", span.Name())
+	for i, attr := range span.Attributes() {
+		if i > 0 {
+			fmt.Print(", ")
+		}
+		fmt.Printf("%s=%v", attr.Key, attr.Value.AsInterface())
+	}
+	fmt.Println()
+}
+
+func compareResults(txID flow.Identifier, interResult debug.Result, vmResult debug.Result) bool {
 	log := log.With().Str("tx", txID.String()).Logger()
 
 	var mismatch bool
@@ -359,19 +372,8 @@ func compareResults(
 	} else {
 		log.Info().Msg("No differences found between interpreter and VM")
 	}
-}
 
-func compareSpans(
-	txID flow.Identifier,
-	interSpans []otelTrace.ReadOnlySpan,
-	vmSpans []otelTrace.ReadOnlySpan,
-) {
-	log := log.With().Str("tx", txID.String()).Logger()
-
-	diffs := pretty.Diff(interSpans, vmSpans)
-	for _, diff := range diffs {
-		log.Error().Msgf("Span diff: %s", diff)
-	}
+	return !mismatch
 }
 
 func compareReadsAndWrites(
