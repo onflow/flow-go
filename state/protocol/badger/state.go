@@ -120,6 +120,10 @@ func Bootstrap(
 	if err != nil {
 		return nil, err
 	}
+	err = lctx.AcquireLock(storage.LockBootstrapping)
+	if err != nil {
+		return nil, err
+	}
 
 	config := defaultBootstrapConfig()
 	for _, opt := range options {
@@ -523,8 +527,8 @@ func bootstrapStatePointers(lctx lockctx.Proof, rw storage.ReaderBatchWriter, ro
 	lastFinalized := segment.Finalized() // the lastFinalized block in sealing segment is the latest known finalized block
 	lastSealed := segment.Sealed()       // the lastSealed block in sealing segment is the latest known sealed block
 
-	enc, err := operation.NewVersionedInstanceParams(
-		operation.DefaultInstanceParamsVersion,
+	enc, err := datastore.NewVersionedInstanceParams(
+		datastore.DefaultInstanceParamsVersion,
 		lastFinalized.ID(),
 		lastSealed.ID(),
 		root.Params().SporkID(),
@@ -774,11 +778,11 @@ func OpenState(
 	if !isBootstrapped {
 		return nil, fmt.Errorf("expected database to contain bootstrapped state")
 	}
-	instanceParams, err := ReadInstanceParams(db.Reader(), headers, seals, blocks)
+	instanceParams, err := datastore.ReadInstanceParams(db.Reader(), headers, seals, blocks)
 	if err != nil {
 		return nil, fmt.Errorf("could not read instance params: %w", err)
 	}
-	sporkRootBlock := instanceParams.sporkRootBlock
+	sporkRootBlock := instanceParams.SporkRootBlock()
 
 	globalParams := inmem.NewParams(
 		inmem.EncodableParams{

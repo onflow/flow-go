@@ -19,6 +19,7 @@ import (
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/trace"
 	realproto "github.com/onflow/flow-go/state/protocol"
+	"github.com/onflow/flow-go/state/protocol/datastore"
 	protocol "github.com/onflow/flow-go/state/protocol/mock"
 	"github.com/onflow/flow-go/storage"
 	storagemock "github.com/onflow/flow-go/storage/mock"
@@ -253,13 +254,14 @@ func (bs *BuilderSuite) SetupTest() {
 	lockManager := storage.NewTestingLockManager()
 	lctx := lockManager.NewContext()
 	require.NoError(bs.T(), lctx.AcquireLock(storage.LockFinalizeBlock))
+	require.NoError(bs.T(), lctx.AcquireLock(storage.LockBootstrapping))
 	defer lctx.Release()
 
 	// insert finalized height and root height
 	db := bs.db
 	require.NoError(bs.T(), db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-		enc, err := operation.NewVersionedInstanceParams(
-			operation.DefaultInstanceParamsVersion,
+		enc, err := datastore.NewVersionedInstanceParams(
+			datastore.DefaultInstanceParamsVersion,
 			unittest.IdentifierFixture(),
 			unittest.IdentifierFixture(),
 			unittest.IdentifierFixture(),

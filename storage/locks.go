@@ -37,6 +37,7 @@ func Locks() []string {
 		LockInsertOrFinalizeClusterBlock,
 		LockInsertOwnReceipt,
 		LockInsertCollection,
+		LockBootstrapping,
 	}
 }
 
@@ -59,6 +60,7 @@ type LockManager = lockctx.Manager
 func makeLockPolicy() lockctx.Policy {
 	return lockctx.NewDAGPolicyBuilder().
 		Add(LockInsertBlock, LockFinalizeBlock).
+		Add(LockFinalizeBlock, LockBootstrapping).
 		Build()
 }
 
@@ -70,10 +72,10 @@ var makeLockManagerOnce sync.Once
 // The Lock Manager is a core component enforcing atomicity of various storage operations across different
 // components. Therefore, the lock manager is a singleton instance, as the storage layer's atomicity and
 // consistency depends on the same set of locks being used everywhere.
-// By convention, the lock mananger singleton is injected into the node's components during their
+// By convention, the lock manager singleton is injected into the node's components during their
 // initialization, following the same dependency-injection pattern as other components that are conceptually
 // singletons (e.g. the storage layer abstractions). Thereby, we explicitly codify in the constructor that a
-// component uses the lock mananger. We think it is helpful to emphasize that the component at times
+// component uses the lock manager. We think it is helpful to emphasize that the component at times
 // will acquire _exclusive access_ to all key-value pairs in the database whose keys start with some specific
 // prefixes (see `storage/badger/operation/prefix.go` for an exhaustive list of prefixes).
 // In comparison, the alternative pattern (which we do not use) of retrieving a singleton instance via a
