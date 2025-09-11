@@ -1088,21 +1088,6 @@ func (suite *Suite) TestGetTransactionsByBlockID() {
 
 	// Test with Local Provider
 	suite.Run("LocalProvider", func() {
-
-		params := protocolmock.NewParams(suite.T())
-		params.On("ChainID").Return(suite.chainID)
-		params.On("FinalizedRoot").Return(unittest.BlockHeaderFixture(), nil).Maybe()
-		params.On("SporkID").Return(unittest.IdentifierFixture(), nil).Maybe()
-		params.On("SporkRootBlockHeight").Return(uint64(0), nil).Maybe()
-		params.On("SealedRoot").Return(unittest.BlockHeaderFixture(), nil).Maybe()
-
-		// Setup state to use our params
-		suite.state.On("Params").Return(params).Times(2) // Called twice in the flow
-
-		// Setup the state and snapshot mocks
-		suite.state.On("Sealed").Return(suite.snapshot, nil).Once()
-		suite.snapshot.On("Head").Return(block.ToHeader(), nil).Once()
-
 		// Mock the blocks storage
 		suite.blocks.
 			On("ByID", blockID).
@@ -1121,33 +1106,26 @@ func (suite *Suite) TestGetTransactionsByBlockID() {
 			Return(pendingExecutionEvents, nil).
 			Once()
 
-		// Create a mock index reporter
-		reporter := syncmock.NewIndexReporter(suite.T())
-		reporter.On("LowestIndexedHeight").Return(block.Height, nil)
-		reporter.On("HighestIndexedHeight").Return(block.Height+10, nil)
-
-		indexReporter := index.NewReporter()
-		err := indexReporter.Initialize(reporter)
-		suite.Require().NoError(err)
+		suite.reporter.On("LowestIndexedHeight").Return(block.Height, nil)
+		suite.reporter.On("HighestIndexedHeight").Return(block.Height+10, nil)
 
 		// Set up the backend parameters with local transaction provider
-		backendParams := suite.defaultTransactionsParams()
-		backendParams.EventsIndex = index.NewEventsIndex(indexReporter, suite.events)
-		backendParams.TxResultsIndex = index.NewTransactionResultsIndex(indexReporter, suite.lightTxResults)
-		backendParams.TxProvider = provider.NewLocalTransactionProvider(
-			backendParams.State,
-			backendParams.Collections,
-			backendParams.Blocks,
-			backendParams.EventsIndex,
-			backendParams.TxResultsIndex,
-			backendParams.TxErrorMessageProvider,
-			backendParams.SystemTxID,
-			backendParams.TxStatusDeriver,
-			backendParams.ScheduledCallbacksEnabled,
-			suite.chainID,
+		params := suite.defaultTransactionsParams()
+
+		params.TxProvider = provider.NewLocalTransactionProvider(
+			params.State,
+			params.Collections,
+			params.Blocks,
+			params.EventsIndex,
+			params.TxResultsIndex,
+			params.TxErrorMessageProvider,
+			params.SystemTxID,
+			params.TxStatusDeriver,
+			params.ScheduledCallbacksEnabled,
+			params.ChainID,
 		)
 
-		txBackend, err := NewTransactionsBackend(backendParams)
+		txBackend, err := NewTransactionsBackend(params)
 		suite.Require().NoError(err)
 
 		// Call GetTransactionsByBlockID
@@ -1171,6 +1149,14 @@ func (suite *Suite) TestGetTransactionsByBlockID() {
 
 	// Test with Execution Node Provider
 	suite.Run("ExecutionNodeProvider", func() {
+		// Set up the state and snapshot mocks first
+		_, fixedENIDs := suite.setupReceipts(block)
+		suite.fixedExecutionNodeIDs = fixedENIDs.NodeIDs()
+		suite.state.On("Final").Return(suite.snapshot, nil).Maybe()
+		suite.state.On("Sealed").Return(suite.snapshot, nil).Maybe()
+		suite.snapshot.On("Identities", mock.Anything).Return(fixedENIDs, nil).Maybe()
+		suite.snapshot.On("Head").Return(block.ToHeader(), nil).Maybe()
+
 		// Mock the blocks storage
 		suite.blocks.
 			On("ByID", blockID).
@@ -1183,10 +1169,11 @@ func (suite *Suite) TestGetTransactionsByBlockID() {
 			Return(&col, nil).
 			Once()
 
-		// Convert events to protobuf messages
-		eventMessages := make([]*entities.Event, len(pendingExecutionEvents))
+		// For ExecutionNodeProvider test, use empty events (no scheduled callbacks)
+		// This tests the case where there are no pending callbacks, resulting in just process + system chunk txs
+		pendingExecutionEventsMessages := make([]*entities.Event, len(pendingExecutionEvents))
 		for i, event := range pendingExecutionEvents {
-			eventMessages[i] = convert.EventToMessage(event)
+			pendingExecutionEventsMessages[i] = convert.EventToMessage(event)
 		}
 
 		// Set up execution node response for GetEventsForBlockIDs
@@ -1198,24 +1185,16 @@ func (suite *Suite) TestGetTransactionsByBlockID() {
 				{
 					BlockId:     blockID[:],
 					BlockHeight: block.Height,
-					Events:      eventMessages,
+					Events:      pendingExecutionEventsMessages,
 				},
 			},
-			EventEncodingVersion: entities.EventEncodingVersion_CCF_V0,
+			EventEncodingVersion: entities.EventEncodingVersion_JSON_CDC_V0,
 		}
 
 		suite.executionAPIClient.
 			On("GetEventsForBlockIDs", mock.Anything, exeEventReq).
 			Return(exeEventResp, nil).
 			Once()
-
-		// Set up the state and snapshot mocks
-		_, fixedENIDs := suite.setupReceipts(block)
-		suite.fixedExecutionNodeIDs = fixedENIDs.NodeIDs()
-		suite.state.On("Final").Return(suite.snapshot, nil)
-		suite.state.On("Sealed").Return(suite.snapshot, nil)
-		suite.snapshot.On("Identities", mock.Anything).Return(fixedENIDs, nil)
-		suite.snapshot.On("Head").Return(block.ToHeader(), nil)
 
 		suite.connectionFactory.
 			On("GetExecutionAPIClient", mock.Anything).
@@ -1233,8 +1212,8 @@ func (suite *Suite) TestGetTransactionsByBlockID() {
 			params.NodeProvider,
 			params.TxStatusDeriver,
 			params.SystemTxID,
-			suite.chainID,
-			true, // scheduledCallbacksEnabled
+			params.ChainID,
+			params.ScheduledCallbacksEnabled,
 		)
 
 		txBackend, err := NewTransactionsBackend(params)
@@ -1244,17 +1223,22 @@ func (suite *Suite) TestGetTransactionsByBlockID() {
 		transactions, err := txBackend.GetTransactionsByBlockID(context.Background(), blockID)
 		suite.Require().NoError(err)
 
+		// For empty events, we expect: user transactions + process tx + system chunk tx (no execute callback txs)
+		expectedSystemCollectionEmpty, err := blueprints.SystemCollection(suite.chainID.Chain(), pendingExecutionEvents)
+		suite.Require().NoError(err)
+		expectedTotalCountEmpty := len(col.Transactions) + len(expectedSystemCollectionEmpty.Transactions)
+
 		// Verify transaction count
-		suite.Assert().Equal(expectedTotalCount, len(transactions))
+		suite.Assert().Equal(expectedTotalCountEmpty, len(transactions))
 
 		// Verify user transactions
 		for i, tx := range col.Transactions {
 			suite.Assert().Equal(tx.ID(), transactions[i].ID())
 		}
 
-		// Verify system transactions
-		for i, expectedTx := range expectedSystemCollection.Transactions {
-			actualTx := transactions[expectedUserTxCount+i]
+		// Verify system transactions (process + system chunk only, no execute callbacks)
+		for i, expectedTx := range expectedSystemCollectionEmpty.Transactions {
+			actualTx := transactions[len(col.Transactions)+i]
 			suite.Assert().Equal(expectedTx.ID(), actualTx.ID())
 		}
 	})
@@ -1394,8 +1378,8 @@ func (suite *Suite) TestTransactionResultsByBlockIDFromExecutionNode() {
 		params.NodeProvider,
 		params.TxStatusDeriver,
 		params.SystemTxID,
-		suite.chainID,
-		true,
+		params.ChainID,
+		params.ScheduledCallbacksEnabled,
 	)
 	txBackend, err := NewTransactionsBackend(params)
 	suite.Require().NoError(err)
@@ -1645,10 +1629,14 @@ func (suite *Suite) createPendingExecutionEvents(numCallbacks int) []flow.Event 
 				{Identifier: "id", Type: cadence.UInt64Type},
 				{Identifier: "priority", Type: cadence.UInt8Type},
 				{Identifier: "executionEffort", Type: cadence.UInt64Type},
+				{Identifier: "fees", Type: cadence.UFix64Type},
 				{Identifier: "callbackOwner", Type: cadence.AddressType},
 			},
 			nil,
 		)
+
+		fees, err := cadence.NewUFix64("0.0")
+		suite.Require().NoError(err)
 
 		// Create the Cadence event with proper values
 		event := cadence.NewEvent(
@@ -1656,7 +1644,8 @@ func (suite *Suite) createPendingExecutionEvents(numCallbacks int) []flow.Event 
 				cadence.NewUInt64(uint64(i + 1)),           // id: unique callback ID
 				cadence.NewUInt8(1),                        // priority
 				cadence.NewUInt64(uint64((i+1)*100 + 100)), // executionEffort (200, 300, etc.)
-				cadence.NewAddress([8]byte{}),              // callbackOwner
+				fees,                          // fees: 0.0
+				cadence.NewAddress([8]byte{}), // callbackOwner
 			},
 		).WithType(eventType)
 
