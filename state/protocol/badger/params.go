@@ -37,7 +37,7 @@ var _ protocol.InstanceParams = (*InstanceParams)(nil)
 // ReadInstanceParams reads the instance parameters from the database and returns them as in-memory representation.
 // It serves as a constructor for InstanceParams and only requires a read-only database handle,
 // emphasizing that it only reads and never writes.
-// This information is immutable and may be cached.
+// This information is immutable for the lifetime of a node and may be cached.
 // No errors are expected during normal operation.
 func ReadInstanceParams(
 	r storage.Reader,
