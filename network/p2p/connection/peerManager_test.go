@@ -243,7 +243,7 @@ func (suite *PeerManagerTestSuite) TestConcurrentOnDemandPeerUpdate() {
 
 	// assert that the first update started
 	assert.Eventually(suite.T(), func() bool {
-		return peerUpdater.AssertNumberOfCalls(suite.T(), "UpdatePeers", 1)
+		return len(peerUpdater.Calls) > 0 && peerUpdater.AssertNumberOfCalls(suite.T(), "UpdatePeers", 1)
 	}, 3*time.Second, 100*time.Millisecond)
 
 	// makes 10 concurrent request for peer update
@@ -255,6 +255,6 @@ func (suite *PeerManagerTestSuite) TestConcurrentOnDemandPeerUpdate() {
 
 	// assert that only two calls to UpdatePeers were made (one by the periodic update and one by the on-demand update)
 	assert.Eventually(suite.T(), func() bool {
-		return peerUpdater.AssertNumberOfCalls(suite.T(), "UpdatePeers", 2)
+		return len(peerUpdater.Calls) > 1 && peerUpdater.AssertNumberOfCalls(suite.T(), "UpdatePeers", 2)
 	}, 10*time.Second, 100*time.Millisecond)
 }
