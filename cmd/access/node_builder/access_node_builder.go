@@ -80,7 +80,7 @@ import (
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	execdatacache "github.com/onflow/flow-go/module/executiondatasync/execution_data/cache"
 	"github.com/onflow/flow-go/module/executiondatasync/optimistic_sync"
-	"github.com/onflow/flow-go/module/executiondatasync/optimistic_sync/er_info_provider"
+	"github.com/onflow/flow-go/module/executiondatasync/optimistic_sync/execution_result_info_provider"
 	"github.com/onflow/flow-go/module/executiondatasync/optimistic_sync/execution_state_cache"
 	"github.com/onflow/flow-go/module/executiondatasync/pruner"
 	edstorage "github.com/onflow/flow-go/module/executiondatasync/storage"
