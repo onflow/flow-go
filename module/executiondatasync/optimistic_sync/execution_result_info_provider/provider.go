@@ -1,4 +1,4 @@
-package er_info_provider
+package execution_result_info_provider
 
 import (
 	"fmt"

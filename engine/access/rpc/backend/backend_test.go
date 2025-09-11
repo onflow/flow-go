@@ -42,6 +42,7 @@ import (
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/counters"
 	"github.com/onflow/flow-go/module/executiondatasync/optimistic_sync"
+	osyncmock "github.com/onflow/flow-go/module/executiondatasync/optimistic_sync/mock"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
 	realstate "github.com/onflow/flow-go/state"
@@ -99,6 +100,10 @@ type Suite struct {
 
 	fixedExecutionNodeIDs     flow.IdentifierList
 	preferredExecutionNodeIDs flow.IdentifierList
+
+	executionResultInfoProvider *osyncmock.ExecutionResultInfoProvider
+	executionStateCache         *osyncmock.ExecutionStateCache
+	executionDataSnapshot       *osyncmock.Snapshot
 }
 
 func TestHandler(t *testing.T) {
@@ -143,6 +148,26 @@ func (suite *Suite) SetupTest() {
 	require.NoError(suite.T(), err)
 	suite.lastFullBlockHeight, err = counters.NewPersistentStrictMonotonicCounter(progress)
 	suite.Require().NoError(err)
+
+	suite.executionResultInfoProvider = osyncmock.NewExecutionResultInfoProvider(suite.T())
+	suite.executionResultInfoProvider.
+		On("ExecutionResultInfo", mock.Anything, mock.Anything).
+		Return(&optimistic_sync.ExecutionResultInfo{
+			ExecutionResult: unittest.ExecutionResultFixture(),
+			ExecutionNodes:  unittest.IdentityListFixture(2).ToSkeleton(),
+		}, nil).
+		Maybe()
+
+	suite.executionDataSnapshot = osyncmock.NewSnapshot(suite.T())
+	suite.executionDataSnapshot.On("Events").
+		Return(suite.events, nil).
+		Maybe()
+
+	suite.executionStateCache = osyncmock.NewExecutionStateCache(suite.T())
+	suite.executionStateCache.
+		On("Snapshot", mock.Anything).
+		Return(suite.executionDataSnapshot, nil).
+		Maybe()
 }
 
 // TearDownTest cleans up the db
@@ -2095,10 +2120,9 @@ func (suite *Suite) defaultBackendParams() Params {
 			suite.preferredExecutionNodeIDs,
 			suite.fixedExecutionNodeIDs,
 		),
-		// TODO: set this once data result forest merged in
-		//ExecutionResultInfoProvider:
-		//ExecutionStateCache:
-		OperatorCriteria: optimistic_sync.DefaultCriteria,
+		ExecutionResultInfoProvider: suite.executionResultInfoProvider,
+		ExecutionStateCache:         suite.executionStateCache,
+		OperatorCriteria:            optimistic_sync.DefaultCriteria,
 	}
 }
 

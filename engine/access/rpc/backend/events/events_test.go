@@ -70,7 +70,7 @@ type EventsSuite struct {
 
 	executionResultProvider *osyncmock.ExecutionResultProvider
 	executionStateCache     *osyncmock.ExecutionStateCache
-	resultForestSnapshot    *osyncmock.Snapshot
+	executionDataSnapshot   *osyncmock.Snapshot
 	criteria                optimistic_sync.Criteria
 
 	testCases []testCase
@@ -168,8 +168,8 @@ func (s *EventsSuite) SetupTest() {
 		return nil, storage.ErrNotFound
 	}).Maybe()
 
-	s.resultForestSnapshot = osyncmock.NewSnapshot(s.T())
-	s.resultForestSnapshot.
+	s.executionDataSnapshot = osyncmock.NewSnapshot(s.T())
+	s.executionDataSnapshot.
 		On("Events").
 		Return(s.events, nil).
 		Maybe()
@@ -186,7 +186,7 @@ func (s *EventsSuite) SetupTest() {
 	s.executionStateCache = osyncmock.NewExecutionStateCache(s.T())
 	s.executionStateCache.
 		On("Snapshot", mock.Anything).
-		Return(s.resultForestSnapshot, nil).
+		Return(s.executionDataSnapshot, nil).
 		Maybe() // it is called only for local query mode
 
 	s.criteria = optimistic_sync.Criteria{}

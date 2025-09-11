@@ -8,7 +8,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-func NewExecutionDataQuery(
+func NewExecutionStateQuery(
 	agreeingExecutorCount string,
 	requiredExecutorIds []string,
 	includeExecutorMetadata string,
@@ -43,7 +43,7 @@ func NewExecutionDataQuery(
 
 	return &models.ExecutionStateQuery{
 		AgreeingExecutorsCount:  executorCount,
-		RequiredExecutorIds:     executorIDs,
+		RequiredExecutorIDs:     executorIDs,
 		IncludeExecutorMetadata: includeMetadata,
 	}, nil
 }

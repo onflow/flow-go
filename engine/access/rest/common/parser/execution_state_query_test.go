@@ -29,7 +29,7 @@ func TestNewExecutionDataQuery(t *testing.T) {
 			includeExecutorMeta:   "true",
 			expected: &models.ExecutionStateQuery{
 				AgreeingExecutorsCount:  5,
-				RequiredExecutorIds:     validIDs,
+				RequiredExecutorIDs:     validIDs,
 				IncludeExecutorMetadata: true,
 			},
 		},
@@ -40,7 +40,7 @@ func TestNewExecutionDataQuery(t *testing.T) {
 			includeExecutorMeta:   "",
 			expected: &models.ExecutionStateQuery{
 				AgreeingExecutorsCount:  0,
-				RequiredExecutorIds:     nil,
+				RequiredExecutorIDs:     nil,
 				IncludeExecutorMetadata: false,
 			},
 		},
@@ -51,7 +51,7 @@ func TestNewExecutionDataQuery(t *testing.T) {
 			includeExecutorMeta:   "false",
 			expected: &models.ExecutionStateQuery{
 				AgreeingExecutorsCount:  5,
-				RequiredExecutorIds:     []flow.Identifier{validIDs[0]},
+				RequiredExecutorIDs:     []flow.Identifier{validIDs[0]},
 				IncludeExecutorMetadata: false,
 			},
 		},
@@ -62,7 +62,7 @@ func TestNewExecutionDataQuery(t *testing.T) {
 			includeExecutorMeta:   "false",
 			expected: &models.ExecutionStateQuery{
 				AgreeingExecutorsCount:  5,
-				RequiredExecutorIds:     nil,
+				RequiredExecutorIDs:     nil,
 				IncludeExecutorMetadata: false,
 			},
 		},
@@ -105,7 +105,7 @@ func TestNewExecutionDataQuery(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			query, err := NewExecutionDataQuery(
+			query, err := NewExecutionStateQuery(
 				tt.agreeingExecutorCount,
 				tt.requiredExecutorIds,
 				tt.includeExecutorMeta,

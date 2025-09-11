@@ -28,6 +28,7 @@ import (
 	statestreambackend "github.com/onflow/flow-go/engine/access/state_stream/backend"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/executiondatasync/optimistic_sync"
+	osyncmock "github.com/onflow/flow-go/module/executiondatasync/optimistic_sync/mock"
 	"github.com/onflow/flow-go/module/grpcserver"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
@@ -62,6 +63,7 @@ type RateLimitTestSuite struct {
 	collections  *storagemock.Collections
 	transactions *storagemock.Transactions
 	receipts     *storagemock.ExecutionReceipts
+	events       *storagemock.Events
 
 	// test rate limit
 	rateLimit  int
@@ -73,6 +75,10 @@ type RateLimitTestSuite struct {
 	// grpc servers
 	secureGrpcServer   *grpcserver.GrpcServer
 	unsecureGrpcServer *grpcserver.GrpcServer
+
+	executionResultInfoProvider *osyncmock.ExecutionResultInfoProvider
+	executionStateCache         *osyncmock.ExecutionStateCache
+	executionDataSnapshot       *osyncmock.Snapshot
 }
 
 func (suite *RateLimitTestSuite) SetupTest() {
@@ -97,6 +103,7 @@ func (suite *RateLimitTestSuite) SetupTest() {
 	suite.transactions = new(storagemock.Transactions)
 	suite.collections = new(storagemock.Collections)
 	suite.receipts = new(storagemock.ExecutionReceipts)
+	suite.events = new(storagemock.Events)
 
 	suite.collClient = new(accessmock.AccessAPIClient)
 	suite.execClient = new(accessmock.ExecutionAPIClient)
@@ -160,26 +167,45 @@ func (suite *RateLimitTestSuite) SetupTest() {
 	block := unittest.BlockHeaderFixture()
 	suite.snapshot.On("Head").Return(block, nil)
 
+	suite.executionResultInfoProvider = osyncmock.NewExecutionResultInfoProvider(suite.T())
+	suite.executionResultInfoProvider.
+		On("ExecutionResultInfo", mock.Anything, mock.Anything).
+		Return(&optimistic_sync.ExecutionResultInfo{
+			ExecutionResult: unittest.ExecutionResultFixture(),
+			ExecutionNodes:  unittest.IdentityListFixture(2).ToSkeleton(),
+		}, nil).
+		Maybe()
+
+	suite.executionDataSnapshot = osyncmock.NewSnapshot(suite.T())
+	suite.executionDataSnapshot.On("Events").
+		Return(suite.events, nil).
+		Maybe()
+
+	suite.executionStateCache = osyncmock.NewExecutionStateCache(suite.T())
+	suite.executionStateCache.
+		On("Snapshot", mock.Anything).
+		Return(suite.executionDataSnapshot, nil).
+		Maybe()
+
 	bnd, err := backend.New(backend.Params{
-		State:                suite.state,
-		CollectionRPC:        suite.collClient,
-		Blocks:               suite.blocks,
-		Headers:              suite.headers,
-		Collections:          suite.collections,
-		Transactions:         suite.transactions,
-		ChainID:              suite.chainID,
-		AccessMetrics:        suite.metrics,
-		MaxHeightRange:       0,
-		Log:                  suite.log,
-		SnapshotHistoryLimit: 0,
-		Communicator:         node_communicator.NewNodeCommunicator(false),
-		EventQueryMode:       query_mode.IndexQueryModeExecutionNodesOnly,
-		ScriptExecutionMode:  query_mode.IndexQueryModeExecutionNodesOnly,
-		TxResultQueryMode:    query_mode.IndexQueryModeExecutionNodesOnly,
-		// TODO: set this once data result forest merged in
-		//ExecutionResultInfoProvider:
-		//ExecutionStateCache:
-		OperatorCriteria: optimistic_sync.DefaultCriteria,
+		State:                       suite.state,
+		CollectionRPC:               suite.collClient,
+		Blocks:                      suite.blocks,
+		Headers:                     suite.headers,
+		Collections:                 suite.collections,
+		Transactions:                suite.transactions,
+		ChainID:                     suite.chainID,
+		AccessMetrics:               suite.metrics,
+		MaxHeightRange:              0,
+		Log:                         suite.log,
+		SnapshotHistoryLimit:        0,
+		Communicator:                node_communicator.NewNodeCommunicator(false),
+		EventQueryMode:              query_mode.IndexQueryModeExecutionNodesOnly,
+		ScriptExecutionMode:         query_mode.IndexQueryModeExecutionNodesOnly,
+		TxResultQueryMode:           query_mode.IndexQueryModeExecutionNodesOnly,
+		ExecutionResultInfoProvider: suite.executionResultInfoProvider,
+		ExecutionStateCache:         suite.executionStateCache,
+		OperatorCriteria:            optimistic_sync.DefaultCriteria,
 	})
 	suite.Require().NoError(err)
 

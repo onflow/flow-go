@@ -87,11 +87,10 @@ type Suite struct {
 	sporkID              flow.Identifier
 	protocolStateVersion uint64
 
-	events                  *storagemock.Events
-	executionResultProvider *osyncmock.ExecutionResultProvider
-	executionStateCache     *osyncmock.ExecutionStateCache
-	resultForestSnapshot    *osyncmock.Snapshot
-	criteria                optimistic_sync.Criteria
+	events                      *storagemock.Events
+	executionResultInfoProvider *osyncmock.ExecutionResultInfoProvider
+	executionStateCache         *osyncmock.ExecutionStateCache
+	executionDataSnapshot       *osyncmock.Snapshot
 }
 
 // TestAccess tests scenarios which exercise multiple API calls using both the RPC handler and the ingest engine
@@ -163,8 +162,8 @@ func (suite *Suite) SetupTest() {
 
 	suite.events = storagemock.NewEvents(suite.T())
 
-	execResultInfoProvider := osyncmock.NewExecutionResultInfoProvider(suite.T())
-	execResultInfoProvider.
+	suite.executionResultInfoProvider = osyncmock.NewExecutionResultInfoProvider(suite.T())
+	suite.executionResultInfoProvider.
 		On("ExecutionResultInfo", mock.Anything, mock.Anything).
 		Return(&optimistic_sync.ExecutionResultInfo{
 			ExecutionResult: unittest.ExecutionResultFixture(),
@@ -172,15 +171,15 @@ func (suite *Suite) SetupTest() {
 		}, nil).
 		Maybe()
 
-	suite.resultForestSnapshot = osyncmock.NewSnapshot(suite.T())
-	suite.resultForestSnapshot.On("Events").
+	suite.executionDataSnapshot = osyncmock.NewSnapshot(suite.T())
+	suite.executionDataSnapshot.On("Events").
 		Return(suite.events, nil).
 		Maybe()
 
-	execStateCache := osyncmock.NewExecutionStateCache(suite.T())
-	execStateCache.
+	suite.executionStateCache = osyncmock.NewExecutionStateCache(suite.T())
+	suite.executionStateCache.
 		On("Snapshot", mock.Anything).
-		Return(suite.resultForestSnapshot, nil).
+		Return(suite.executionDataSnapshot, nil).
 		Maybe()
 }
 
@@ -193,27 +192,26 @@ func (suite *Suite) RunTest(
 
 		var err error
 		suite.backend, err = backend.New(backend.Params{
-			State:                suite.state,
-			CollectionRPC:        suite.collClient,
-			Blocks:               all.Blocks,
-			Headers:              all.Headers,
-			Collections:          all.Collections,
-			Transactions:         all.Transactions,
-			ExecutionResults:     en.Results,
-			ExecutionReceipts:    en.Receipts,
-			ChainID:              suite.chainID,
-			AccessMetrics:        suite.metrics,
-			MaxHeightRange:       events.DefaultMaxHeightRange,
-			Log:                  suite.log,
-			SnapshotHistoryLimit: backend.DefaultSnapshotHistoryLimit,
-			Communicator:         node_communicator.NewNodeCommunicator(false),
-			EventQueryMode:       query_mode.IndexQueryModeExecutionNodesOnly,
-			ScriptExecutionMode:  query_mode.IndexQueryModeExecutionNodesOnly,
-			TxResultQueryMode:    query_mode.IndexQueryModeExecutionNodesOnly,
-			// TODO: set this once data result forest merged in
-			//ExecutionResultInfoProvider:
-			//ExecutionStateCache:
-			OperatorCriteria: optimistic_sync.DefaultCriteria,
+			State:                       suite.state,
+			CollectionRPC:               suite.collClient,
+			Blocks:                      all.Blocks,
+			Headers:                     all.Headers,
+			Collections:                 all.Collections,
+			Transactions:                all.Transactions,
+			ExecutionResults:            en.Results,
+			ExecutionReceipts:           en.Receipts,
+			ChainID:                     suite.chainID,
+			AccessMetrics:               suite.metrics,
+			MaxHeightRange:              events.DefaultMaxHeightRange,
+			Log:                         suite.log,
+			SnapshotHistoryLimit:        backend.DefaultSnapshotHistoryLimit,
+			Communicator:                node_communicator.NewNodeCommunicator(false),
+			EventQueryMode:              query_mode.IndexQueryModeExecutionNodesOnly,
+			ScriptExecutionMode:         query_mode.IndexQueryModeExecutionNodesOnly,
+			TxResultQueryMode:           query_mode.IndexQueryModeExecutionNodesOnly,
+			ExecutionResultInfoProvider: suite.executionResultInfoProvider,
+			ExecutionStateCache:         suite.executionStateCache,
+			OperatorCriteria:            optimistic_sync.DefaultCriteria,
 		})
 		require.NoError(suite.T(), err)
 
@@ -391,7 +389,7 @@ func (suite *Suite) TestSendTransactionToRandomCollectionNode() {
 			EventQueryMode:              query_mode.IndexQueryModeExecutionNodesOnly,
 			ScriptExecutionMode:         query_mode.IndexQueryModeExecutionNodesOnly,
 			TxResultQueryMode:           query_mode.IndexQueryModeExecutionNodesOnly,
-			ExecutionResultInfoProvider: suite.executionResultProvider,
+			ExecutionResultInfoProvider: suite.executionResultInfoProvider,
 			ExecutionStateCache:         suite.executionStateCache,
 			OperatorCriteria:            optimistic_sync.DefaultCriteria,
 		})
@@ -708,29 +706,28 @@ func (suite *Suite) TestGetSealedTransaction() {
 		)
 
 		bnd, err := backend.New(backend.Params{
-			State:                      suite.state,
-			CollectionRPC:              suite.collClient,
-			Blocks:                     all.Blocks,
-			Headers:                    all.Headers,
-			Collections:                collections,
-			Transactions:               transactions,
-			ExecutionReceipts:          en.Receipts,
-			ExecutionResults:           en.Results,
-			ChainID:                    suite.chainID,
-			AccessMetrics:              suite.metrics,
-			ConnFactory:                connFactory,
-			MaxHeightRange:             events.DefaultMaxHeightRange,
-			Log:                        suite.log,
-			SnapshotHistoryLimit:       backend.DefaultSnapshotHistoryLimit,
-			Communicator:               node_communicator.NewNodeCommunicator(false),
-			TxResultQueryMode:          query_mode.IndexQueryModeExecutionNodesOnly,
-			EventQueryMode:             query_mode.IndexQueryModeExecutionNodesOnly,
-			ScriptExecutionMode:        query_mode.IndexQueryModeExecutionNodesOnly,
-			ExecNodeIdentitiesProvider: execNodeIdentitiesProvider,
-			// TODO: set this once data result forest merged in
-			//ExecutionResultInfoProvider:
-			//ExecutionStateCache:
-			OperatorCriteria: optimistic_sync.DefaultCriteria,
+			State:                       suite.state,
+			CollectionRPC:               suite.collClient,
+			Blocks:                      all.Blocks,
+			Headers:                     all.Headers,
+			Collections:                 collections,
+			Transactions:                transactions,
+			ExecutionReceipts:           en.Receipts,
+			ExecutionResults:            en.Results,
+			ChainID:                     suite.chainID,
+			AccessMetrics:               suite.metrics,
+			ConnFactory:                 connFactory,
+			MaxHeightRange:              events.DefaultMaxHeightRange,
+			Log:                         suite.log,
+			SnapshotHistoryLimit:        backend.DefaultSnapshotHistoryLimit,
+			Communicator:                node_communicator.NewNodeCommunicator(false),
+			TxResultQueryMode:           query_mode.IndexQueryModeExecutionNodesOnly,
+			EventQueryMode:              query_mode.IndexQueryModeExecutionNodesOnly,
+			ScriptExecutionMode:         query_mode.IndexQueryModeExecutionNodesOnly,
+			ExecNodeIdentitiesProvider:  execNodeIdentitiesProvider,
+			ExecutionResultInfoProvider: suite.executionResultInfoProvider,
+			ExecutionStateCache:         suite.executionStateCache,
+			OperatorCriteria:            optimistic_sync.DefaultCriteria,
 		})
 		require.NoError(suite.T(), err)
 
@@ -908,28 +905,27 @@ func (suite *Suite) TestGetTransactionResult() {
 		)
 
 		bnd, err := backend.New(backend.Params{State: suite.state,
-			CollectionRPC:              suite.collClient,
-			Blocks:                     all.Blocks,
-			Headers:                    all.Headers,
-			Collections:                collections,
-			Transactions:               transactions,
-			ExecutionReceipts:          en.Receipts,
-			ExecutionResults:           en.Results,
-			ChainID:                    suite.chainID,
-			AccessMetrics:              suite.metrics,
-			ConnFactory:                connFactory,
-			MaxHeightRange:             events.DefaultMaxHeightRange,
-			Log:                        suite.log,
-			SnapshotHistoryLimit:       backend.DefaultSnapshotHistoryLimit,
-			Communicator:               node_communicator.NewNodeCommunicator(false),
-			TxResultQueryMode:          query_mode.IndexQueryModeExecutionNodesOnly,
-			EventQueryMode:             query_mode.IndexQueryModeExecutionNodesOnly,
-			ScriptExecutionMode:        query_mode.IndexQueryModeExecutionNodesOnly,
-			ExecNodeIdentitiesProvider: execNodeIdentitiesProvider,
-			// TODO: set this once data result forest merged in
-			//ExecutionResultInfoProvider:
-			//ExecutionStateCache:
-			OperatorCriteria: optimistic_sync.DefaultCriteria,
+			CollectionRPC:               suite.collClient,
+			Blocks:                      all.Blocks,
+			Headers:                     all.Headers,
+			Collections:                 collections,
+			Transactions:                transactions,
+			ExecutionReceipts:           en.Receipts,
+			ExecutionResults:            en.Results,
+			ChainID:                     suite.chainID,
+			AccessMetrics:               suite.metrics,
+			ConnFactory:                 connFactory,
+			MaxHeightRange:              events.DefaultMaxHeightRange,
+			Log:                         suite.log,
+			SnapshotHistoryLimit:        backend.DefaultSnapshotHistoryLimit,
+			Communicator:                node_communicator.NewNodeCommunicator(false),
+			TxResultQueryMode:           query_mode.IndexQueryModeExecutionNodesOnly,
+			EventQueryMode:              query_mode.IndexQueryModeExecutionNodesOnly,
+			ScriptExecutionMode:         query_mode.IndexQueryModeExecutionNodesOnly,
+			ExecNodeIdentitiesProvider:  execNodeIdentitiesProvider,
+			ExecutionResultInfoProvider: suite.executionResultInfoProvider,
+			ExecutionStateCache:         suite.executionStateCache,
+			OperatorCriteria:            optimistic_sync.DefaultCriteria,
 		})
 		require.NoError(suite.T(), err)
 
@@ -1157,29 +1153,28 @@ func (suite *Suite) TestExecuteScript() {
 
 		var err error
 		suite.backend, err = backend.New(backend.Params{
-			State:                      suite.state,
-			CollectionRPC:              suite.collClient,
-			Blocks:                     all.Blocks,
-			Headers:                    all.Headers,
-			Collections:                all.Collections,
-			Transactions:               all.Transactions,
-			ExecutionReceipts:          en.Receipts,
-			ExecutionResults:           en.Results,
-			ChainID:                    suite.chainID,
-			AccessMetrics:              suite.metrics,
-			ConnFactory:                connFactory,
-			MaxHeightRange:             events.DefaultMaxHeightRange,
-			Log:                        suite.log,
-			SnapshotHistoryLimit:       backend.DefaultSnapshotHistoryLimit,
-			Communicator:               node_communicator.NewNodeCommunicator(false),
-			EventQueryMode:             query_mode.IndexQueryModeExecutionNodesOnly,
-			ScriptExecutionMode:        query_mode.IndexQueryModeExecutionNodesOnly,
-			TxResultQueryMode:          query_mode.IndexQueryModeExecutionNodesOnly,
-			ExecNodeIdentitiesProvider: execNodeIdentitiesProvider,
-			// TODO: set this once data result forest merged in
-			//ExecutionResultInfoProvider:
-			//ExecutionStateCache:
-			OperatorCriteria: optimistic_sync.DefaultCriteria,
+			State:                       suite.state,
+			CollectionRPC:               suite.collClient,
+			Blocks:                      all.Blocks,
+			Headers:                     all.Headers,
+			Collections:                 all.Collections,
+			Transactions:                all.Transactions,
+			ExecutionReceipts:           en.Receipts,
+			ExecutionResults:            en.Results,
+			ChainID:                     suite.chainID,
+			AccessMetrics:               suite.metrics,
+			ConnFactory:                 connFactory,
+			MaxHeightRange:              events.DefaultMaxHeightRange,
+			Log:                         suite.log,
+			SnapshotHistoryLimit:        backend.DefaultSnapshotHistoryLimit,
+			Communicator:                node_communicator.NewNodeCommunicator(false),
+			EventQueryMode:              query_mode.IndexQueryModeExecutionNodesOnly,
+			ScriptExecutionMode:         query_mode.IndexQueryModeExecutionNodesOnly,
+			TxResultQueryMode:           query_mode.IndexQueryModeExecutionNodesOnly,
+			ExecNodeIdentitiesProvider:  execNodeIdentitiesProvider,
+			ExecutionResultInfoProvider: suite.executionResultInfoProvider,
+			ExecutionStateCache:         suite.executionStateCache,
+			OperatorCriteria:            optimistic_sync.DefaultCriteria,
 		})
 		require.NoError(suite.T(), err)
 

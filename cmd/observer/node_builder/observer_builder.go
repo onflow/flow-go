@@ -1954,12 +1954,12 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 			fixedENIdentifiers,
 		)
 
-		execNodeSelector := er_info_provider.NewExecutionNodeSelector(
+		execNodeSelector := execution_result_info_provider.NewExecutionNodeSelector(
 			preferredENIdentifiers,
 			fixedENIdentifiers,
 		)
 
-		execResultInfoProvider, err := er_info_provider.NewExecutionResultProvider(
+		execResultInfoProvider, err := execution_result_info_provider.NewExecutionResultProvider(
 			node.Logger,
 			node.State,
 			node.Storage.Headers,
