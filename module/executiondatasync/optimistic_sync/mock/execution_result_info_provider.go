@@ -14,12 +14,12 @@ type ExecutionResultInfoProvider struct {
 	mock.Mock
 }
 
-// ExecutionResult provides a mock function with given fields: blockID, criteria
+// ExecutionResultInfo provides a mock function with given fields: blockID, criteria
 func (_m *ExecutionResultInfoProvider) ExecutionResultInfo(blockID flow.Identifier, criteria optimistic_sync.Criteria) (*optimistic_sync.ExecutionResultInfo, error) {
 	ret := _m.Called(blockID, criteria)
 
 	if len(ret) == 0 {
-		panic("no return value specified for ExecutionResult")
+		panic("no return value specified for ExecutionResultInfo")
 	}
 
 	var r0 *optimistic_sync.ExecutionResultInfo
