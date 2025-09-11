@@ -31,9 +31,9 @@ import (
 
 	"github.com/onflow/flow-go/admin"
 	pb "github.com/onflow/flow-go/admin/admin"
+	commonrpc "github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/integration/client"
 	"github.com/onflow/flow-go/module/irrecoverable"
-	"github.com/onflow/flow-go/utils/grpcutils"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -80,7 +80,7 @@ func (suite *CommandRunnerSuite) SetupCommandRunner(opts ...admin.CommandRunnerO
 	signalerCtx := irrecoverable.NewMockSignalerContext(suite.T(), ctx)
 
 	suite.grpcAddressSock = fmt.Sprintf("%s/%s-flow-node-admin.sock", os.TempDir(), unittest.GenerateRandomStringWithLen(16))
-	opts = append(opts, admin.WithGRPCAddress(suite.grpcAddressSock), admin.WithMaxMsgSize(grpcutils.DefaultMaxMsgSize))
+	opts = append(opts, admin.WithGRPCAddress(suite.grpcAddressSock), admin.WithMaxMsgSize(commonrpc.DefaultMaxResponseMsgSize))
 
 	logger := zerolog.New(zerolog.NewConsoleWriter())
 	suite.runner = suite.bootstrapper.Bootstrap(logger, suite.httpAddress, opts...)
