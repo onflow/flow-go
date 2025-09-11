@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/fxamacker/circlehash"
+	"github.com/onflow/cadence/common"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 
@@ -230,6 +231,9 @@ func TestMigration(t *testing.T) {
 		require.Equal(t, len(encodedAccountStatusV3), len(encodedAccountStatusV4))
 		require.Equal(t, byte(0x40), encodedAccountStatusV4[0])
 		require.Equal(t, encodedAccountStatusV3[1:], encodedAccountStatusV4[1:])
+
+		err = validateAccountPublicKeyV4(common.Address(owner), accountRegisters)
+		require.NoError(t, err)
 	})
 
 	t.Run("1 account public key without sequence number", func(t *testing.T) {
@@ -271,6 +275,9 @@ func TestMigration(t *testing.T) {
 		encodedAccountPublicKey0, err := accountRegisters.Get(string(owner[:]), flow.AccountPublicKey0RegisterKey)
 		require.NoError(t, err)
 		require.Equal(t, encodedPk1, encodedAccountPublicKey0)
+
+		err = validateAccountPublicKeyV4(common.Address(owner), accountRegisters)
+		require.NoError(t, err)
 	})
 
 	t.Run("1 account public key with sequence number", func(t *testing.T) {
@@ -313,6 +320,9 @@ func TestMigration(t *testing.T) {
 		encodedAccountPublicKey0, err := accountRegisters.Get(string(owner[:]), flow.AccountPublicKey0RegisterKey)
 		require.NoError(t, err)
 		require.Equal(t, encodedPk1, encodedAccountPublicKey0)
+
+		err = validateAccountPublicKeyV4(common.Address(owner), accountRegisters)
+		require.NoError(t, err)
 	})
 
 	t.Run("2 unique account public key without sequence number", func(t *testing.T) {
@@ -388,6 +398,9 @@ func TestMigration(t *testing.T) {
 		encodedPks, err := decodeBatchPublicKey(encodedBatchPublicKey0)
 		require.NoError(t, err)
 		require.ElementsMatch(t, [][]byte{{}, encodedSpk2}, encodedPks)
+
+		err = validateAccountPublicKeyV4(common.Address(owner), accountRegisters)
+		require.NoError(t, err)
 	})
 
 	t.Run("2 unique account public key with sequence number", func(t *testing.T) {
@@ -474,6 +487,9 @@ func TestMigration(t *testing.T) {
 		seqNum, err := flow.DecodeSequenceNumber(encodedSequenceNumber)
 		require.NoError(t, err)
 		require.Equal(t, uint64(2), seqNum)
+
+		err = validateAccountPublicKeyV4(common.Address(owner), accountRegisters)
+		require.NoError(t, err)
 	})
 
 	t.Run("2 account public key (1 unique key) without sequence number", func(t *testing.T) {
@@ -531,6 +547,9 @@ func TestMigration(t *testing.T) {
 		encodedAccountPublicKey0, err := accountRegisters.Get(string(owner[:]), flow.AccountPublicKey0RegisterKey)
 		require.NoError(t, err)
 		require.Equal(t, encodedPk1, encodedAccountPublicKey0)
+
+		err = validateAccountPublicKeyV4(common.Address(owner), accountRegisters)
+		require.NoError(t, err)
 	})
 
 	t.Run("2 account public key (1 unique key) with sequence number", func(t *testing.T) {
@@ -598,6 +617,9 @@ func TestMigration(t *testing.T) {
 		seqNum, err := flow.DecodeSequenceNumber(encodedSequenceNumber)
 		require.NoError(t, err)
 		require.Equal(t, uint64(1), seqNum)
+
+		err = validateAccountPublicKeyV4(common.Address(owner), accountRegisters)
+		require.NoError(t, err)
 	})
 }
 
