@@ -1,4 +1,4 @@
-package execution_result_provider
+package er_info_provider
 
 import (
 	"fmt"
@@ -22,7 +22,7 @@ type ExecutionResultProvider struct {
 	executionReceipts storage.ExecutionReceipts
 	state             protocol.State
 
-	executionNodes *ExecutionNodesSelector
+	executionNodes *ExecutionNodeSelector
 
 	rootBlockID     flow.Identifier
 	rootBlockResult *flow.ExecutionResult
@@ -41,7 +41,7 @@ func NewExecutionResultProvider(
 	state protocol.State,
 	headers storage.Headers,
 	executionReceipts storage.ExecutionReceipts,
-	executionNodes *ExecutionNodesSelector,
+	executionNodes *ExecutionNodeSelector,
 	operatorCriteria optimistic_sync.Criteria,
 ) (*ExecutionResultProvider, error) {
 	// Root block ID and result should not change and could be cached.

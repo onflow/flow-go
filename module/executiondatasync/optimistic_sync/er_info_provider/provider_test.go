@@ -1,4 +1,4 @@
-package execution_result_provider
+package er_info_provider
 
 import (
 	"testing"
@@ -64,7 +64,7 @@ func (suite *ExecutionResultQueryProviderSuite) createProvider(preferredExecutor
 		suite.state,
 		suite.headers,
 		suite.receipts,
-		NewExecutionNodes(preferredExecutors, operatorCriteria.RequiredExecutors),
+		NewExecutionNodeSelector(preferredExecutors, operatorCriteria.RequiredExecutors),
 		operatorCriteria,
 	)
 	suite.Require().NoError(err)

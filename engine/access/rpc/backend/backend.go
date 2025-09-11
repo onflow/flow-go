@@ -119,9 +119,9 @@ type Params struct {
 	ExecNodeIdentitiesProvider *commonrpc.ExecutionNodeIdentitiesProvider
 	TxErrorMessageProvider     error_messages.Provider
 
-	ExecutionResultProvider optimistic_sync.ExecutionResultInfoProvider
-	ExecutionStateCache     optimistic_sync.ExecutionStateCache
-	OperatorCriteria        optimistic_sync.Criteria
+	ExecutionResultInfoProvider optimistic_sync.ExecutionResultInfoProvider
+	ExecutionStateCache         optimistic_sync.ExecutionStateCache
+	OperatorCriteria            optimistic_sync.Criteria
 }
 
 var _ access.API = (*Backend)(nil)
@@ -172,7 +172,7 @@ func New(params Params) (*Backend, error) {
 		params.Communicator,
 		params.EventQueryMode,
 		params.ExecNodeIdentitiesProvider,
-		params.ExecutionResultProvider,
+		params.ExecutionResultInfoProvider,
 		params.ExecutionStateCache,
 		params.OperatorCriteria,
 	)

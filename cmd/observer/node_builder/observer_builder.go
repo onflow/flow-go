@@ -75,6 +75,8 @@ import (
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	execdatacache "github.com/onflow/flow-go/module/executiondatasync/execution_data/cache"
 	"github.com/onflow/flow-go/module/executiondatasync/optimistic_sync"
+	"github.com/onflow/flow-go/module/executiondatasync/optimistic_sync/er_info_provider"
+	"github.com/onflow/flow-go/module/executiondatasync/optimistic_sync/execution_state_cache"
 	"github.com/onflow/flow-go/module/executiondatasync/pruner"
 	edstorage "github.com/onflow/flow-go/module/executiondatasync/storage"
 	"github.com/onflow/flow-go/module/executiondatasync/tracker"
@@ -1952,6 +1954,25 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 			fixedENIdentifiers,
 		)
 
+		execNodeSelector := er_info_provider.NewExecutionNodeSelector(
+			preferredENIdentifiers,
+			fixedENIdentifiers,
+		)
+
+		execResultInfoProvider, err := er_info_provider.NewExecutionResultProvider(
+			node.Logger,
+			node.State,
+			node.Storage.Headers,
+			node.Storage.Receipts,
+			execNodeSelector,
+			optimistic_sync.DefaultCriteria,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create execution result provider: %w", err)
+		}
+
+		execStateCache := execution_state_cache.NewExecutionStateCache()
+
 		backendParams := backend.Params{
 			State:                node.State,
 			Blocks:               node.Storage.Blocks,
@@ -1979,13 +2000,12 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 				builder.stateStreamConf.ResponseLimit,
 				builder.stateStreamConf.ClientSendBufferSize,
 			),
-			IndexReporter:              indexReporter,
-			VersionControl:             builder.VersionControl,
-			ExecNodeIdentitiesProvider: execNodeIdentitiesProvider,
-			// TODO: set this once data result forest merged in
-			//ExecutionResultInfoProvider:
-			//ExecutionStateCache:
-			OperatorCriteria: optimistic_sync.DefaultCriteria,
+			IndexReporter:               indexReporter,
+			VersionControl:              builder.VersionControl,
+			ExecNodeIdentitiesProvider:  execNodeIdentitiesProvider,
+			ExecutionResultInfoProvider: execResultInfoProvider,
+			ExecutionStateCache:         execStateCache,
+			OperatorCriteria:            optimistic_sync.DefaultCriteria,
 		}
 
 		if builder.localServiceAPIEnabled {
