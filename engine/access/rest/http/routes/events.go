@@ -10,7 +10,6 @@ import (
 	commonmodels "github.com/onflow/flow-go/engine/access/rest/common/models"
 	"github.com/onflow/flow-go/engine/access/rest/http/models"
 	"github.com/onflow/flow-go/engine/access/rest/http/request"
-	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/executiondatasync/optimistic_sync"
 )
 
@@ -71,13 +70,8 @@ func GetEvents(r *common.Request, backend access.API, _ commonmodels.LinkGenerat
 }
 
 func NewCriteria(query models.ExecutionStateQuery) optimistic_sync.Criteria {
-	var executors flow.IdentifierList
-	for _, byteID := range query.RequiredExecutorIds {
-		executors = append(executors, flow.Identifier(byteID))
-	}
-
 	return optimistic_sync.Criteria{
 		AgreeingExecutorsCount: uint(query.AgreeingExecutorsCount),
-		RequiredExecutors:      executors,
+		RequiredExecutors:      query.RequiredExecutorIds,
 	}
 }

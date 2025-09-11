@@ -106,7 +106,7 @@ func parseGetEvents(
 		}
 	}
 
-	agreeingExecutorsCount, agreeingExecutorsIds, includeExecutorMetadata, err := parser.NewExecutionDataQuery(
+	executionStateQuery, err := parser.NewExecutionDataQuery(
 		rawAgreeingExecutorsCount,
 		rawAgreeingExecutorsIds,
 		rawIncludeExecutorMetadata,
@@ -116,14 +116,10 @@ func parseGetEvents(
 	}
 
 	return GetEvents{
-		StartHeight: startHeight.Flow(),
-		EndHeight:   endHeight.Flow(),
-		Type:        eventType.Flow(),
-		BlockIDs:    blockIDs.Flow(),
-		ExecutionState: models.ExecutionStateQuery{
-			AgreeingExecutorsCount:  agreeingExecutorsCount,
-			RequiredExecutorIds:     agreeingExecutorsIds,
-			IncludeExecutorMetadata: includeExecutorMetadata,
-		},
+		StartHeight:    startHeight.Flow(),
+		EndHeight:      endHeight.Flow(),
+		Type:           eventType.Flow(),
+		BlockIDs:       blockIDs.Flow(),
+		ExecutionState: *executionStateQuery,
 	}, nil
 }
