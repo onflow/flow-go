@@ -2,7 +2,9 @@ package provider
 
 import (
 	"context"
+	"encoding/hex"
 	"errors"
+	"fmt"
 
 	"github.com/onflow/flow/protobuf/go/flow/entities"
 	execproto "github.com/onflow/flow/protobuf/go/flow/execution"
@@ -37,8 +39,9 @@ type ENTransactionProvider struct {
 
 	txStatusDeriver *txstatus.TxStatusDeriver
 
-	systemTxID flow.Identifier
-	chainID    flow.ChainID
+	systemTxID                flow.Identifier
+	chainID                   flow.ChainID
+	scheduledCallbacksEnabled bool
 }
 
 var _ TransactionProvider = (*ENTransactionProvider)(nil)
@@ -53,18 +56,20 @@ func NewENTransactionProvider(
 	txStatusDeriver *txstatus.TxStatusDeriver,
 	systemTxID flow.Identifier,
 	chainID flow.ChainID,
+	scheduledCallbacksEnabled bool,
 ) *ENTransactionProvider {
 
 	return &ENTransactionProvider{
-		log:              log.With().Str("transaction_provider", "execution_node").Logger(),
-		state:            state,
-		collections:      collections,
-		connFactory:      connFactory,
-		nodeCommunicator: nodeCommunicator,
-		nodeProvider:     execNodeIdentitiesProvider,
-		txStatusDeriver:  txStatusDeriver,
-		systemTxID:       systemTxID,
-		chainID:          chainID,
+		log:                       log.With().Str("transaction_provider", "execution_node").Logger(),
+		state:                     state,
+		collections:               collections,
+		connFactory:               connFactory,
+		nodeCommunicator:          nodeCommunicator,
+		nodeProvider:              execNodeIdentitiesProvider,
+		txStatusDeriver:           txStatusDeriver,
+		systemTxID:                systemTxID,
+		chainID:                   chainID,
+		scheduledCallbacksEnabled: scheduledCallbacksEnabled,
 	}
 }
 
@@ -121,6 +126,73 @@ func (e *ENTransactionProvider) TransactionResult(
 		BlockID:       blockID,
 		BlockHeight:   block.Height,
 	}, nil
+}
+
+func (e *ENTransactionProvider) TransactionsByBlockID(
+	ctx context.Context,
+	block *flow.Block,
+) ([]*flow.TransactionBody, error) {
+	var transactions []*flow.TransactionBody
+	blockID := block.ID()
+	req := &execproto.GetEventsForBlockIDsRequest{
+		BlockIds: [][]byte{blockID[:]},
+	}
+
+	// user transactions
+	for _, guarantee := range block.Payload.Guarantees {
+		collection, err := e.collections.ByID(guarantee.CollectionID)
+		if err != nil {
+			return nil, rpc.ConvertStorageError(err)
+		}
+
+		transactions = append(transactions, collection.Transactions...)
+	}
+
+	// system transactions
+	if !e.scheduledCallbacksEnabled {
+		systemTx, err := blueprints.SystemChunkTransaction(e.chainID.Chain())
+		if err != nil {
+			return nil, fmt.Errorf("failed to construct system chunk transaction: %w", err)
+		}
+
+		return append(transactions, systemTx), nil
+	}
+
+	execNodes, err := e.nodeProvider.ExecutionNodesForBlockID(
+		ctx,
+		blockID,
+	)
+	if err != nil {
+		if common.IsInsufficientExecutionReceipts(err) {
+			return nil, status.Error(codes.NotFound, err.Error())
+		}
+		return nil, rpc.ConvertError(err, "failed to retrieve result from any execution node", codes.Internal)
+	}
+
+	resp, err := e.getBlockEventsByBlockIDsFromAnyExeNode(ctx, execNodes, req)
+	if err != nil {
+		return nil, rpc.ConvertError(err, "failed to retrieve result from any execution node", codes.Internal)
+	}
+
+	var events flow.EventsList
+	for _, result := range resp.GetResults() {
+		resultEvents, err := convert.MessagesToEventsWithEncodingConversion(
+			result.GetEvents(),
+			resp.GetEventEncodingVersion(),
+			entities.EventEncodingVersion_JSON_CDC_V0,
+		)
+		if err != nil {
+			return nil, rpc.ConvertError(err, "failed to convert events", codes.Internal)
+		}
+		events = append(events, resultEvents...)
+	}
+
+	sysCollection, err := blueprints.SystemCollection(e.chainID.Chain(), events)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "could not construct system collection: %v", err)
+	}
+
+	return append(transactions, sysCollection.Transactions...), nil
 }
 
 func (e *ENTransactionProvider) TransactionResultByIndex(
@@ -506,6 +578,47 @@ func (e *ENTransactionProvider) getTransactionResultByIndexFromAnyExeNode(
 	return resp, errToReturn
 }
 
+func (e *ENTransactionProvider) getBlockEventsByBlockIDsFromAnyExeNode(
+	ctx context.Context,
+	execNodes flow.IdentitySkeletonList,
+	req *execproto.GetEventsForBlockIDsRequest,
+) (*execproto.GetEventsForBlockIDsResponse, error) {
+	var errToReturn error
+	defer func() {
+		if errToReturn != nil {
+			e.log.Info().Err(errToReturn).Msg("failed to get block events from execution nodes")
+		}
+	}()
+
+	if len(execNodes) == 0 {
+		return nil, errors.New("zero execution nodes provided")
+	}
+
+	var resp *execproto.GetEventsForBlockIDsResponse
+	errToReturn = e.nodeCommunicator.CallAvailableNode(
+		execNodes,
+		func(node *flow.IdentitySkeleton) error {
+			var err error
+			resp, err = e.tryGetBlockEventsByBlockIDs(ctx, node, req)
+			if err == nil {
+				var ids []string
+				for _, id := range req.GetBlockIds() {
+					ids = append(ids, hex.EncodeToString(id))
+				}
+				e.log.Debug().
+					Str("execution_node", node.String()).
+					Strs("block_ids", ids).
+					Msg("Successfully got block events from any node")
+				return nil
+			}
+			return err
+		},
+		nil,
+	)
+
+	return resp, errToReturn
+}
+
 func (e *ENTransactionProvider) tryGetTransactionResult(
 	ctx context.Context,
 	execNode *flow.IdentitySkeleton,
@@ -556,6 +669,25 @@ func (e *ENTransactionProvider) tryGetTransactionResultByIndex(
 	defer closer.Close()
 
 	resp, err := execRPCClient.GetTransactionResultByIndex(ctx, req)
+	if err != nil {
+		return nil, err
+	}
+
+	return resp, nil
+}
+
+func (e *ENTransactionProvider) tryGetBlockEventsByBlockIDs(
+	ctx context.Context,
+	execNode *flow.IdentitySkeleton,
+	req *execproto.GetEventsForBlockIDsRequest,
+) (*execproto.GetEventsForBlockIDsResponse, error) {
+	execRPCClient, closer, err := e.connFactory.GetExecutionAPIClient(execNode.Address)
+	if err != nil {
+		return nil, err
+	}
+	defer closer.Close()
+
+	resp, err := execRPCClient.GetEventsForBlockIDs(ctx, req)
 	if err != nil {
 		return nil, err
 	}
