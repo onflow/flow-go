@@ -24,7 +24,7 @@ func TestTransactions(t *testing.T) {
 		require.NoError(t, err)
 
 		// verify can be retrieved
-		var actual flow.Transaction
+		var actual flow.ExecutedTransaction
 		err = operation.RetrieveTransaction(db.Reader(), expected.ID(), &actual.TransactionBody)
 		require.NoError(t, err)
 		assert.Equal(t, expected, actual)

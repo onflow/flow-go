@@ -139,18 +139,6 @@ func (tb TransactionBody) ID() Identifier {
 	return MakeID(tb)
 }
 
-// Transaction is the smallest unit of task.
-//
-//structwrite:immutable - mutations allowed only within the constructor
-type Transaction struct {
-	TransactionBody
-	Status           TransactionStatus
-	Events           []Event
-	ComputationSpent uint64
-	StartState       StateCommitment
-	EndState         StateCommitment
-}
-
 // MissingFields checks if a transaction is missing any required fields and returns those that are missing.
 func (tb *TransactionBody) MissingFields() []string {
 	// Required fields are Script, ReferenceBlockID, Payer
@@ -221,7 +209,20 @@ func (tb *TransactionBody) envelopeCanonicalForm() interface{} {
 	}
 }
 
-func (tx *Transaction) String() string {
+// ExecutedTransaction represents the result of executing a transaction.
+// In Flow, a transaction is the smallest unit of task, which either atomically succeeds or fails.
+//
+//structwrite:immutable - mutations allowed only within the constructor
+type ExecutedTransaction struct {
+	TransactionBody
+	Status           TransactionStatus
+	Events           []Event
+	ComputationSpent uint64
+	StartState       StateCommitment
+	EndState         StateCommitment
+}
+
+func (tx *ExecutedTransaction) String() string {
 	return fmt.Sprintf("Transaction %v submitted by %v (block %v)",
 		tx.ID(), tx.Payer.Hex(), tx.ReferenceBlockID)
 }

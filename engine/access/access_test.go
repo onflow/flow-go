@@ -200,7 +200,7 @@ func (suite *Suite) TestSendAndGetTransaction() {
 	suite.RunTest(func(handler *rpc.Handler, _ storage.DB, _ *store.All) {
 		referenceBlock := unittest.BlockHeaderFixture()
 		transaction := unittest.TransactionFixture(
-			func(t *flow.Transaction) {
+			func(t *flow.ExecutedTransaction) {
 				t.ReferenceBlockID = referenceBlock.ID()
 			})
 
@@ -256,7 +256,7 @@ func (suite *Suite) TestSendExpiredTransaction() {
 		referenceBlock := suite.finalizedBlock
 
 		transaction := unittest.TransactionFixture(
-			func(t *flow.Transaction) {
+			func(t *flow.ExecutedTransaction) {
 				t.ReferenceBlockID = referenceBlock.ID()
 			})
 		// create latest block that is past the expiry window
@@ -295,7 +295,7 @@ func (suite *Suite) TestSendTransactionToRandomCollectionNode() {
 		// create a transaction
 		referenceBlock := unittest.BlockHeaderFixture()
 		transaction := unittest.TransactionFixture(
-			func(t *flow.Transaction) {
+			func(t *flow.ExecutedTransaction) {
 				t.ReferenceBlockID = referenceBlock.ID()
 			})
 

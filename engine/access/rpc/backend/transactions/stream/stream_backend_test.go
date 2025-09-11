@@ -424,8 +424,8 @@ func (s *TransactionStreamSuite) initializeHappyCaseMockInstructions() {
 }
 
 // createSendTransaction generate sent transaction with ref block of the current finalized block
-func (s *TransactionStreamSuite) createSendTransaction() flow.Transaction {
-	transaction := unittest.TransactionFixture(func(t *flow.Transaction) {
+func (s *TransactionStreamSuite) createSendTransaction() flow.ExecutedTransaction {
+	transaction := unittest.TransactionFixture(func(t *flow.ExecutedTransaction) {
 		t.ReferenceBlockID = s.finalizedBlock.ID()
 	})
 	s.transactions.On("ByID", mock.AnythingOfType("flow.Identifier")).Return(&transaction.TransactionBody, nil).Maybe()
@@ -463,8 +463,8 @@ func (s *TransactionStreamSuite) mockTransactionResult(transactionID *flow.Ident
 		)
 }
 
-func (s *TransactionStreamSuite) addBlockWithTransaction(transaction *flow.Transaction) {
-	col := unittest.CollectionFromTransactions([]*flow.Transaction{transaction})
+func (s *TransactionStreamSuite) addBlockWithTransaction(transaction *flow.ExecutedTransaction) {
+	col := unittest.CollectionFromTransactions([]*flow.ExecutedTransaction{transaction})
 	colID := col.ID()
 	guarantee := flow.CollectionGuarantee{CollectionID: colID}
 	light := col.Light()
@@ -762,7 +762,7 @@ func (s *TransactionStreamSuite) TestSubscribeTransactionStatusFailedSubscriptio
 
 	// Generate sent transaction with ref block of the current finalized block
 	transaction := unittest.TransactionFixture(
-		func(t *flow.Transaction) {
+		func(t *flow.ExecutedTransaction) {
 			t.ReferenceBlockID = s.finalizedBlock.ID()
 		})
 	txId := transaction.ID()

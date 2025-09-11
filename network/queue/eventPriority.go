@@ -71,7 +71,7 @@ func getPriorityByType(message interface{}) Priority {
 		return HighPriority
 	case *flow.TransactionBody:
 		return HighPriority
-	case *flow.Transaction:
+	case *flow.ExecutedTransaction:
 		return HighPriority
 
 	// core messages for execution & verification

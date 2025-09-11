@@ -430,7 +430,7 @@ func TestCreateTransaction(t *testing.T) {
 	})
 }
 
-func transactionResultFixture(tx flow.Transaction) *accessmodel.TransactionResult {
+func transactionResultFixture(tx flow.ExecutedTransaction) *accessmodel.TransactionResult {
 	cid := unittest.IdentifierFixture()
 	return &accessmodel.TransactionResult{
 		Status:     flow.TransactionStatusSealed,

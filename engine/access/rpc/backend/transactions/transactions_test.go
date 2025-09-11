@@ -228,7 +228,7 @@ func (suite *Suite) TestGetTransactionResult_UnknownTx() {
 	tbody := unittest.TransactionBodyFixture()
 	tx := unittest.TransactionFixture()
 	tx.TransactionBody = tbody
-	coll := unittest.CollectionFromTransactions([]*flow.Transaction{&tx})
+	coll := unittest.CollectionFromTransactions([]*flow.ExecutedTransaction{&tx})
 
 	suite.transactions.
 		On("ByID", tx.ID()).
@@ -259,7 +259,7 @@ func (suite *Suite) TestGetTransactionResult_TxLookupFailure() {
 	tbody := unittest.TransactionBodyFixture()
 	tx := unittest.TransactionFixture()
 	tx.TransactionBody = tbody
-	coll := unittest.CollectionFromTransactions([]*flow.Transaction{&tx})
+	coll := unittest.CollectionFromTransactions([]*flow.ExecutedTransaction{&tx})
 
 	expectedErr := fmt.Errorf("some other error")
 	suite.transactions.
@@ -286,7 +286,7 @@ func (suite *Suite) TestGetTransactionResult_HistoricNodes_Success() {
 	tbody := unittest.TransactionBodyFixture()
 	tx := unittest.TransactionFixture()
 	tx.TransactionBody = tbody
-	coll := unittest.CollectionFromTransactions([]*flow.Transaction{&tx})
+	coll := unittest.CollectionFromTransactions([]*flow.ExecutedTransaction{&tx})
 
 	suite.transactions.
 		On("ByID", tx.ID()).
@@ -351,7 +351,7 @@ func (suite *Suite) TestGetTransactionResult_HistoricNodes_FromCache() {
 	txBackend, err := NewTransactionsBackend(params)
 	require.NoError(suite.T(), err)
 
-	coll := unittest.CollectionFromTransactions([]*flow.Transaction{&tx})
+	coll := unittest.CollectionFromTransactions([]*flow.ExecutedTransaction{&tx})
 	resp, err := txBackend.GetTransactionResult(
 		context.Background(),
 		tx.ID(),
@@ -399,7 +399,7 @@ func (suite *Suite) TestGetTransactionResultUnknownFromCache() {
 	txBackend, err := NewTransactionsBackend(params)
 	require.NoError(suite.T(), err)
 
-	coll := unittest.CollectionFromTransactions([]*flow.Transaction{&tx})
+	coll := unittest.CollectionFromTransactions([]*flow.ExecutedTransaction{&tx})
 	resp, err := txBackend.GetTransactionResult(
 		context.Background(),
 		tx.ID(),
@@ -707,7 +707,7 @@ func (suite *Suite) TestGetSystemTransactionResult_FailedEncodingConversion() {
 func (suite *Suite) TestGetTransactionResult_FromStorage() {
 	// Create fixtures for block, transaction, and collection
 	transaction := unittest.TransactionFixture()
-	col := unittest.CollectionFromTransactions([]*flow.Transaction{&transaction})
+	col := unittest.CollectionFromTransactions([]*flow.ExecutedTransaction{&transaction})
 	guarantee := &flow.CollectionGuarantee{CollectionID: col.ID()}
 	block := unittest.BlockFixture(
 		unittest.Block.WithPayload(unittest.PayloadFixture(unittest.WithGuarantees(guarantee))),
@@ -814,7 +814,7 @@ func (suite *Suite) TestGetTransactionResult_FromStorage() {
 func (suite *Suite) TestTransactionByIndexFromStorage() {
 	// Create fixtures for block, transaction, and collection
 	transaction := unittest.TransactionFixture()
-	col := unittest.CollectionFromTransactions([]*flow.Transaction{&transaction})
+	col := unittest.CollectionFromTransactions([]*flow.ExecutedTransaction{&transaction})
 	guarantee := &flow.CollectionGuarantee{CollectionID: col.ID()}
 	block := unittest.BlockFixture(
 		unittest.Block.WithPayload(unittest.PayloadFixture(unittest.WithGuarantees(guarantee))),

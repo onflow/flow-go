@@ -105,7 +105,7 @@ func MessageCodeFromInterface(v interface{}) (MessageCode, string, error) {
 		return CodeCollectionGuarantee, s, nil
 	case *flow.TransactionBody:
 		return CodeTransactionBody, s, nil
-	case *flow.Transaction:
+	case *flow.ExecutedTransaction:
 		return CodeTransaction, s, nil
 
 	// core messages for execution & verification
@@ -189,7 +189,7 @@ func InterfaceFromMessageCode(code MessageCode) (interface{}, string, error) {
 		var transactionBody flow.TransactionBody
 		return &transactionBody, what(&transactionBody), nil
 	case CodeTransaction:
-		var transaction flow.Transaction
+		var transaction flow.ExecutedTransaction
 		return &transaction, what(&transaction), nil
 
 	// core messages for execution & verification

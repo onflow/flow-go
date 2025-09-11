@@ -1569,8 +1569,8 @@ func RandomSourcesFixture(n int) [][]byte {
 	return sigs
 }
 
-func TransactionFixture(n ...func(t *flow.Transaction)) flow.Transaction {
-	tx := flow.Transaction{TransactionBody: TransactionBodyFixture()}
+func TransactionFixture(n ...func(t *flow.ExecutedTransaction)) flow.ExecutedTransaction {
+	tx := flow.ExecutedTransaction{TransactionBody: TransactionBodyFixture()}
 	if len(n) > 0 {
 		n[0](&tx)
 	}
