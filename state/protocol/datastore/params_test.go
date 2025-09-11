@@ -1,6 +1,8 @@
 package datastore
 
 import (
+	"testing"
+
 	"github.com/stretchr/testify/require"
 	"github.com/vmihailenco/msgpack/v4"
 
@@ -19,11 +21,11 @@ func TestNewVersionedInstanceParams(t *testing.T) {
 	sporkRootID := unittest.IdentifierFixture()
 
 	t.Run("valid version 0", func(t *testing.T) {
-		versioned, err := datastore.NewVersionedInstanceParams(0, finalizedRootID, sealedRootID, sporkRootID)
+		versioned, err := NewVersionedInstanceParams(0, finalizedRootID, sealedRootID, sporkRootID)
 		require.NoError(t, err)
 		require.Equal(t, uint64(0), versioned.Version)
 
-		var v0 datastore.InstanceParamsV0
+		var v0 InstanceParamsV0
 		err = msgpack.Unmarshal(versioned.Data, &v0)
 		require.NoError(t, err)
 
@@ -33,7 +35,7 @@ func TestNewVersionedInstanceParams(t *testing.T) {
 	})
 
 	t.Run("unsupported version", func(t *testing.T) {
-		versioned, err := datastore.NewVersionedInstanceParams(99, finalizedRootID, sealedRootID, sporkRootID)
+		versioned, err := NewVersionedInstanceParams(99, finalizedRootID, sealedRootID, sporkRootID)
 		require.Nil(t, versioned)
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "unsupported instance params version")
