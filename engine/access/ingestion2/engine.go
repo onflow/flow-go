@@ -53,6 +53,7 @@ func New(
 	receipts storage.ExecutionReceipts,
 	collectionExecutedMetric module.CollectionExecutedMetric,
 ) (*Engine, error) {
+	// test
 	executionReceiptsRawQueue, err := fifoqueue.NewFifoQueue(defaultQueueCapacity)
 	if err != nil {
 		return nil, fmt.Errorf("could not create execution receipts queue: %w", err)
