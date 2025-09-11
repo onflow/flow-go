@@ -188,7 +188,7 @@ func loadPayloads() (payloads1, payloads2 []*ledger.Payload) {
 				err = fmt.Errorf("failed to load v3 payload file: %w", err)
 			}
 		} else {
-			log.Info().Msg("Reading v3 trie")
+			log.Info().Msgf("Reading v3 trie with state commitement %s", flagStateCommitmentV3)
 
 			stateCommitment := util.ParseStateCommitment(flagStateCommitmentV3)
 			payloads1, err = util.ReadTrieForPayloads(flagStateV3, stateCommitment)
@@ -208,7 +208,7 @@ func loadPayloads() (payloads1, payloads2 []*ledger.Payload) {
 				err = fmt.Errorf("failed to load v4 payload file: %w", err)
 			}
 		} else {
-			log.Info().Msg("Reading v4 trie")
+			log.Info().Msgf("Reading v4 trie with state commitment %s", flagStateCommitmentV4)
 
 			stateCommitment := util.ParseStateCommitment(flagStateCommitmentV4)
 			payloads2, err = util.ReadTrieForPayloads(flagStateV4, stateCommitment)
@@ -240,7 +240,7 @@ func payloadsToRegisters(payloads1, payloads2 []*ledger.Payload) (registers1, re
 
 		registers1, err = registers.NewByAccountFromPayloads(payloads1)
 		if err != nil {
-			err = fmt.Errorf("failed to create registers from v3 payloads: %w", err)
+			return fmt.Errorf("failed to create registers from v3 payloads: %w", err)
 		}
 
 		log.Info().Msgf(
@@ -257,7 +257,7 @@ func payloadsToRegisters(payloads1, payloads2 []*ledger.Payload) (registers1, re
 
 		registers2, err = registers.NewByAccountFromPayloads(payloads2)
 		if err != nil {
-			err = fmt.Errorf("failed to create registers from v4 payloads: %w", err)
+			return fmt.Errorf("failed to create registers from v4 payloads: %w", err)
 		}
 
 		log.Info().Msgf(
@@ -286,7 +286,7 @@ func diff(
 	rw reporters.ReportWriter,
 	nWorkers int,
 ) error {
-	log.Info().Msgf("Diffing %d accounts", registersV3.AccountCount())
+	log.Info().Msgf("Diffing accounts: v3 count %d, v4 count %d", registersV3.AccountCount(), registersV4.AccountCount())
 
 	if registersV3.AccountCount() < nWorkers {
 		nWorkers = registersV3.AccountCount()
@@ -336,6 +336,9 @@ func diff(
 		})
 
 		if foundAccountCountInRegistersV4 < registersV4.AccountCount() {
+
+			log.Warn().Msgf("finding missing accounts that exist in v4, but are missing in v3, count: %v", registersV4.AccountCount()-foundAccountCountInRegistersV4)
+
 			_ = registersV4.ForEachAccount(func(accountRegistersV4 *registers.AccountRegisters) error {
 				owner := accountRegistersV4.Owner()
 				if !registersV3.HasAccountOwner(owner) {
@@ -427,6 +430,9 @@ func diff(
 		})
 
 		if foundAccountCountInRegistersV4 < registersV4.AccountCount() {
+
+			log.Warn().Msgf("finding missing accounts that exist in v4, but are missing in v3, count: %v", registersV4.AccountCount()-foundAccountCountInRegistersV4)
+
 			_ = registersV4.ForEachAccount(func(accountRegistersV4 *registers.AccountRegisters) (err error) {
 				owner := accountRegistersV4.Owner()
 				if !registersV3.HasAccountOwner(owner) {
