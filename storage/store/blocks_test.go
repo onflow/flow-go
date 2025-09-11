@@ -24,11 +24,9 @@ func TestBlockStoreAndRetrieve(t *testing.T) {
 		prop := unittest.ProposalFromBlock(block)
 
 		unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
-			err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 				return blocks.BatchStore(lctx, rw, prop)
 			})
-			require.NoError(t, err)
-			return nil
 		})
 
 		retrieved, err := blocks.ByID(block.ID())

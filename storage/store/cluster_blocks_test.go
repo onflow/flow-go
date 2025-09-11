@@ -39,20 +39,16 @@ func TestClusterBlocks(t *testing.T) {
 		for _, block := range blocks {
 			// InsertClusterBlock only needs LockInsertOrFinalizeClusterBlock
 			unittest.WithLock(t, lockManager, storage.LockInsertOrFinalizeClusterBlock, func(lctx2 lockctx.Context) error {
-				err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+				return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 					return procedure.InsertClusterBlock(lctx2, rw, unittest.ClusterProposalFromBlock(block))
 				})
-				require.NoError(t, err)
-				return nil
 			})
 
 			// FinalizeClusterBlock only needs LockInsertOrFinalizeClusterBlock
 			unittest.WithLock(t, lockManager, storage.LockInsertOrFinalizeClusterBlock, func(lctx2 lockctx.Context) error {
-				err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+				return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 					return procedure.FinalizeClusterBlock(lctx2, rw, block.ID())
 				})
-				require.NoError(t, err)
-				return nil
 			})
 		}
 

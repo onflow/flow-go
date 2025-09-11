@@ -29,20 +29,16 @@ func TestHeaderStoreRetrieve(t *testing.T) {
 
 		// store block which will also store header
 		unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
-			err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 				return blocks.BatchStore(lctx, rw, proposal)
 			})
-			require.NoError(t, err)
-			return nil
 		})
 
 		// index the header
 		unittest.WithLock(t, lockManager, storage.LockFinalizeBlock, func(lctx2 lockctx.Context) error {
-			err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 				return operation.IndexFinalizedBlockByHeight(lctx2, rw, block.Height, block.ID())
 			})
-			require.NoError(t, err)
-			return nil
 		})
 
 		// retrieve header by height

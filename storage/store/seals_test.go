@@ -65,11 +65,9 @@ func TestSealIndexAndRetrieve(t *testing.T) {
 
 		// index the seal ID for the heighest sealed block in this fork
 		unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
-			err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 				return operation.IndexLatestSealAtBlock(lctx, rw.Writer(), blockID, expectedSeal.ID())
 			})
-			require.NoError(t, err)
-			return nil
 		})
 
 		// retrieve latest seal

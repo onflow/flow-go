@@ -430,9 +430,7 @@ func (s *Suite) TestOnCollection() {
 
 	// Create a lock context for indexing
 	unittest.WithLock(s.T(), s.lockManager, storage.LockInsertCollection, func(lctx lockctx.Context) error {
-		err := indexer.IndexCollection(lctx, &collection, s.collections, s.log, s.collectionExecutedMetric)
-		require.NoError(s.T(), err)
-		return nil
+		return indexer.IndexCollection(lctx, &collection, s.collections, s.log, s.collectionExecutedMetric)
 	})
 
 	// check that the collection was stored and indexed

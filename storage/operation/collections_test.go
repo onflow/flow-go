@@ -62,14 +62,11 @@ func TestCollections(t *testing.T) {
 			blockID := unittest.IdentifierFixture()
 
 			unittest.WithLock(t, lockManager, storage.LockInsertOrFinalizeClusterBlock, func(lctx lockctx.Context) error {
-				_ = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+				return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 					err := operation.UpsertCollection(rw.Writer(), expected)
 					assert.NoError(t, err)
-					err = operation.IndexCollectionPayload(lctx, rw.Writer(), blockID, expected.Transactions)
-					assert.NoError(t, err)
-					return nil
+					return operation.IndexCollectionPayload(lctx, rw.Writer(), blockID, expected.Transactions)
 				})
-				return nil
 			})
 
 			actual := new(flow.LightCollection)
@@ -84,12 +81,9 @@ func TestCollections(t *testing.T) {
 			actual := flow.Identifier{}
 
 			unittest.WithLock(t, lockManager, storage.LockInsertCollection, func(lctx lockctx.Context) error {
-				_ = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-					err := operation.IndexCollectionByTransaction(lctx, rw.Writer(), transactionID, expected)
-					assert.NoError(t, err)
-					return nil
+				return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+					return operation.IndexCollectionByTransaction(lctx, rw.Writer(), transactionID, expected)
 				})
-				return nil
 			})
 
 			err := operation.LookupCollectionByTransaction(db.Reader(), transactionID, &actual)

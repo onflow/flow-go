@@ -994,9 +994,7 @@ func (suite *Suite) TestGetTransactionResult() {
 			// Indexer IndexCollection receives the requested collection and all the execution receipts
 			// Create a lock context for indexing
 			unittest.WithLock(suite.T(), suite.lockManager, storage.LockInsertCollection, func(indexLctx lockctx.Context) error {
-				err := indexer.IndexCollection(indexLctx, collection, collections, suite.log, module.CollectionExecutedMetric(collectionExecutedMetric))
-				require.NoError(suite.T(), err)
-				return nil
+				return indexer.IndexCollection(indexLctx, collection, collections, suite.log, module.CollectionExecutedMetric(collectionExecutedMetric))
 			})
 
 			for _, r := range executionReceipts {

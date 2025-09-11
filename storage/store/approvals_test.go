@@ -28,10 +28,8 @@ func TestApprovalStoreAndRetrieve(t *testing.T) {
 		approval := unittest.ResultApprovalFixture()
 		storing := store.StoreMyApproval(approval)
 		unittest.WithLock(t, lockManager, storage.LockIndexResultApproval, func(lctx lockctx.Context) error {
-			err := storing(lctx)
-			require.NoError(t, err)
-			return nil
-		}) // While still holding the lock, verify that reads are not blocked by acquired locks
+			return storing(lctx)
+		})
 
 		// retrieve entire approval by its ID
 		byID, err := store.ByID(approval.ID())
@@ -57,15 +55,11 @@ func TestApprovalStoreTwice(t *testing.T) {
 		approval := unittest.ResultApprovalFixture()
 		storing := store.StoreMyApproval(approval)
 		unittest.WithLock(t, lockManager, storage.LockIndexResultApproval, func(lctx lockctx.Context) error {
-			err := storing(lctx)
-			require.NoError(t, err)
-			return nil
+			return storing(lctx)
 		})
 
 		unittest.WithLock(t, lockManager, storage.LockIndexResultApproval, func(lctx lockctx.Context) error {
-			err := storing(lctx) // repeated storage of same approval should be no-op
-			require.NoError(t, err)
-			return nil
+			return storing(lctx) // repeated storage of same approval should be no-op
 		})
 	})
 }
