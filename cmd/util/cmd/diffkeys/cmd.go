@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
 
 	"github.com/onflow/cadence/common"
 	"github.com/rs/zerolog/log"
@@ -181,11 +182,17 @@ func loadPayloads() (payloads1, payloads2 []*ledger.Payload) {
 	group.Go(func() (err error) {
 		if flagPayloadsV3 != "" {
 			_, payloads1, err = util.ReadPayloadFile(log.Logger, flagPayloadsV3)
+			if err != nil {
+				err = fmt.Errorf("failed to load v3 payload file: %w", err)
+			}
 		} else {
 			log.Info().Msg("Reading v3 trie")
 
 			stateCommitment := util.ParseStateCommitment(flagStateCommitmentV3)
 			payloads1, err = util.ReadTrieForPayloads(flagStateV3, stateCommitment)
+			if err != nil {
+				err = fmt.Errorf("failed to load v3 trie: %w", err)
+			}
 		}
 		return
 	})
@@ -193,11 +200,17 @@ func loadPayloads() (payloads1, payloads2 []*ledger.Payload) {
 	group.Go(func() (err error) {
 		if flagPayloadsV4 != "" {
 			_, payloads2, err = util.ReadPayloadFile(log.Logger, flagPayloadsV4)
+			if err != nil {
+				err = fmt.Errorf("failed to load v4 payload file: %w", err)
+			}
 		} else {
 			log.Info().Msg("Reading v4 trie")
 
 			stateCommitment := util.ParseStateCommitment(flagStateCommitmentV4)
 			payloads2, err = util.ReadTrieForPayloads(flagStateV4, stateCommitment)
+			if err != nil {
+				err = fmt.Errorf("failed to load v4 trie: %w", err)
+			}
 		}
 		return
 	})
@@ -222,6 +235,9 @@ func payloadsToRegisters(payloads1, payloads2 []*ledger.Payload) (registers1, re
 		log.Info().Msgf("Creating registers from v3 payloads (%d)", len(payloads1))
 
 		registers1, err = registers.NewByAccountFromPayloads(payloads1)
+		if err != nil {
+			err = fmt.Errorf("failed to create registers from v3 payloads: %w", err)
+		}
 
 		log.Info().Msgf(
 			"Created %d registers from payloads (%d accounts)",
@@ -236,6 +252,9 @@ func payloadsToRegisters(payloads1, payloads2 []*ledger.Payload) (registers1, re
 		log.Info().Msgf("Creating registers from v4 payloads (%d)", len(payloads2))
 
 		registers2, err = registers.NewByAccountFromPayloads(payloads2)
+		if err != nil {
+			err = fmt.Errorf("failed to create registers from v4 payloads: %w", err)
+		}
 
 		log.Info().Msgf(
 			"Created %d registers from payloads (%d accounts)",
