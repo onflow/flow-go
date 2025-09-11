@@ -94,8 +94,9 @@ type Suite struct {
 
 	errorMessageProvider error_messages.Provider
 
-	chainID  flow.ChainID
-	systemTx *flow.TransactionBody
+	chainID                   flow.ChainID
+	systemTx                  *flow.TransactionBody
+	scheduledCallbacksEnabled bool
 
 	fixedExecutionNodeIDs     flow.IdentifierList
 	preferredExecutionNodeIDs flow.IdentifierList
@@ -146,6 +147,7 @@ func (suite *Suite) SetupTest() {
 
 	suite.systemTx, err = blueprints.SystemChunkTransaction(flow.Testnet.Chain())
 	suite.Require().NoError(err)
+	suite.scheduledCallbacksEnabled = true
 
 	suite.db, suite.dbDir = unittest.TempPebbleDB(suite.T())
 	progress, err := store.NewConsumerProgress(pebbleimpl.ToDB(suite.db), module.ConsumeProgressLastFullBlockHeight).Initialize(0)
@@ -198,6 +200,7 @@ func (suite *Suite) defaultTransactionsParams() Params {
 		txStatusDeriver,
 		suite.systemTx.ID(),
 		suite.chainID,
+		suite.scheduledCallbacksEnabled,
 	)
 
 	return Params{
@@ -223,6 +226,7 @@ func (suite *Suite) defaultTransactionsParams() Params {
 		TxStatusDeriver:             txStatusDeriver,
 		EventsIndex:                 suite.eventsIndex,
 		TxResultsIndex:              suite.txResultsIndex,
+		ScheduledCallbacksEnabled:   true,
 	}
 }
 
@@ -627,6 +631,8 @@ func (suite *Suite) TestGetSystemTransactionResultFromStorage() {
 		params.TxErrorMessageProvider,
 		params.SystemTxID,
 		params.TxStatusDeriver,
+		params.ScheduledCallbacksEnabled,
+		params.ChainID,
 	)
 
 	txBackend, err := NewTransactionsBackend(params)
@@ -813,6 +819,8 @@ func (suite *Suite) TestGetTransactionResult_FromStorage() {
 		params.TxErrorMessageProvider,
 		params.SystemTxID,
 		params.TxStatusDeriver,
+		params.ScheduledCallbacksEnabled,
+		params.ChainID,
 	)
 
 	txBackend, err := NewTransactionsBackend(params)
@@ -904,6 +912,8 @@ func (suite *Suite) TestTransactionByIndexFromStorage() {
 		params.TxErrorMessageProvider,
 		params.SystemTxID,
 		params.TxStatusDeriver,
+		params.ScheduledCallbacksEnabled,
+		params.ChainID,
 	)
 
 	txBackend, err := NewTransactionsBackend(params)
@@ -1019,6 +1029,8 @@ func (suite *Suite) TestTransactionResultsByBlockIDFromStorage() {
 		params.TxErrorMessageProvider,
 		params.SystemTxID,
 		params.TxStatusDeriver,
+		params.ScheduledCallbacksEnabled,
+		params.ChainID,
 	)
 	txBackend, err := NewTransactionsBackend(params)
 	suite.Require().NoError(err)
@@ -1053,9 +1065,202 @@ func (suite *Suite) TestTransactionResultsByBlockIDFromStorage() {
 	}
 }
 
-// TestTransactionResultsByBlockIDFromExecutionNode_ScheduledCallbacks tests the retrieval of transaction results
-// for system collection with scheduled callbacks by block ID from execution node.
-func (suite *Suite) TestTransactionResultsByBlockIDFromExecutionNode_ScheduledCallbacks() {
+func (suite *Suite) TestGetTransactionsByBlockID() {
+	// Create fixtures
+	col := unittest.CollectionFixture(3)
+	guarantee := &flow.CollectionGuarantee{CollectionID: col.ID()}
+	block := unittest.BlockFixture(
+		unittest.Block.WithPayload(unittest.PayloadFixture(unittest.WithGuarantees(guarantee))),
+	)
+	blockID := block.ID()
+
+	// Create PendingExecution events for scheduled callbacks
+	pendingExecutionEvents := suite.createPendingExecutionEvents(2) // 2 callbacks
+
+	// Reconstruct expected system collection to get the actual transaction IDs
+	expectedSystemCollection, err := blueprints.SystemCollection(suite.chainID.Chain(), pendingExecutionEvents)
+	suite.Require().NoError(err)
+
+	// Expected transaction counts
+	expectedUserTxCount := len(col.Transactions)
+	expectedSystemTxCount := len(expectedSystemCollection.Transactions)
+	expectedTotalCount := expectedUserTxCount + expectedSystemTxCount
+
+	// Test with Local Provider
+	suite.Run("LocalProvider", func() {
+
+		params := protocolmock.NewParams(suite.T())
+		params.On("ChainID").Return(suite.chainID)
+		params.On("FinalizedRoot").Return(unittest.BlockHeaderFixture(), nil).Maybe()
+		params.On("SporkID").Return(unittest.IdentifierFixture(), nil).Maybe()
+		params.On("SporkRootBlockHeight").Return(uint64(0), nil).Maybe()
+		params.On("SealedRoot").Return(unittest.BlockHeaderFixture(), nil).Maybe()
+
+		// Setup state to use our params
+		suite.state.On("Params").Return(params).Times(2) // Called twice in the flow
+
+		// Setup the state and snapshot mocks
+		suite.state.On("Sealed").Return(suite.snapshot, nil).Once()
+		suite.snapshot.On("Head").Return(block.ToHeader(), nil).Once()
+
+		// Mock the blocks storage
+		suite.blocks.
+			On("ByID", blockID).
+			Return(block, nil).
+			Once()
+
+		// Mock the collections storage
+		suite.collections.
+			On("ByID", col.ID()).
+			Return(&col, nil).
+			Once()
+
+		// Mock the events storage to return PendingExecution events
+		suite.events.
+			On("ByBlockID", blockID).
+			Return(pendingExecutionEvents, nil).
+			Once()
+
+		// Create a mock index reporter
+		reporter := syncmock.NewIndexReporter(suite.T())
+		reporter.On("LowestIndexedHeight").Return(block.Height, nil)
+		reporter.On("HighestIndexedHeight").Return(block.Height+10, nil)
+
+		indexReporter := index.NewReporter()
+		err := indexReporter.Initialize(reporter)
+		suite.Require().NoError(err)
+
+		// Set up the backend parameters with local transaction provider
+		backendParams := suite.defaultTransactionsParams()
+		backendParams.EventsIndex = index.NewEventsIndex(indexReporter, suite.events)
+		backendParams.TxResultsIndex = index.NewTransactionResultsIndex(indexReporter, suite.lightTxResults)
+		backendParams.TxProvider = provider.NewLocalTransactionProvider(
+			backendParams.State,
+			backendParams.Collections,
+			backendParams.Blocks,
+			backendParams.EventsIndex,
+			backendParams.TxResultsIndex,
+			backendParams.TxErrorMessageProvider,
+			backendParams.SystemTxID,
+			backendParams.TxStatusDeriver,
+			backendParams.ScheduledCallbacksEnabled,
+			suite.chainID,
+		)
+
+		txBackend, err := NewTransactionsBackend(backendParams)
+		suite.Require().NoError(err)
+
+		// Call GetTransactionsByBlockID
+		transactions, err := txBackend.GetTransactionsByBlockID(context.Background(), blockID)
+		suite.Require().NoError(err)
+
+		// Verify transaction count
+		suite.Require().Equal(expectedTotalCount, len(transactions), "expected %d transactions but got %d", expectedTotalCount, len(transactions))
+
+		// Verify user transactions
+		for i, tx := range col.Transactions {
+			suite.Assert().Equal(tx.ID(), transactions[i].ID(), "user transaction %d mismatch", i)
+		}
+
+		// Verify system transactions
+		for i, expectedTx := range expectedSystemCollection.Transactions {
+			actualTx := transactions[expectedUserTxCount+i]
+			suite.Assert().Equal(expectedTx.ID(), actualTx.ID(), "system transaction %d mismatch", i)
+		}
+	})
+
+	// Test with Execution Node Provider
+	suite.Run("ExecutionNodeProvider", func() {
+		// Mock the blocks storage
+		suite.blocks.
+			On("ByID", blockID).
+			Return(block, nil).
+			Once()
+
+		// Mock the collections storage
+		suite.collections.
+			On("ByID", col.ID()).
+			Return(&col, nil).
+			Once()
+
+		// Convert events to protobuf messages
+		eventMessages := make([]*entities.Event, len(pendingExecutionEvents))
+		for i, event := range pendingExecutionEvents {
+			eventMessages[i] = convert.EventToMessage(event)
+		}
+
+		// Set up execution node response for GetEventsForBlockIDs
+		exeEventReq := &execproto.GetEventsForBlockIDsRequest{
+			BlockIds: [][]byte{blockID[:]},
+		}
+		exeEventResp := &execproto.GetEventsForBlockIDsResponse{
+			Results: []*execproto.GetEventsForBlockIDsResponse_Result{
+				{
+					BlockId:     blockID[:],
+					BlockHeight: block.Height,
+					Events:      eventMessages,
+				},
+			},
+			EventEncodingVersion: entities.EventEncodingVersion_CCF_V0,
+		}
+
+		suite.executionAPIClient.
+			On("GetEventsForBlockIDs", mock.Anything, exeEventReq).
+			Return(exeEventResp, nil).
+			Once()
+
+		// Set up the state and snapshot mocks
+		_, fixedENIDs := suite.setupReceipts(block)
+		suite.fixedExecutionNodeIDs = fixedENIDs.NodeIDs()
+		suite.state.On("Final").Return(suite.snapshot, nil)
+		suite.state.On("Sealed").Return(suite.snapshot, nil)
+		suite.snapshot.On("Identities", mock.Anything).Return(fixedENIDs, nil)
+		suite.snapshot.On("Head").Return(block.ToHeader(), nil)
+
+		suite.connectionFactory.
+			On("GetExecutionAPIClient", mock.Anything).
+			Return(suite.executionAPIClient, &mocks.MockCloser{}, nil).
+			Once()
+
+		// Set up the backend parameters with EN transaction provider
+		params := suite.defaultTransactionsParams()
+		params.TxProvider = provider.NewENTransactionProvider(
+			params.Log,
+			params.State,
+			params.Collections,
+			params.ConnFactory,
+			params.NodeCommunicator,
+			params.NodeProvider,
+			params.TxStatusDeriver,
+			params.SystemTxID,
+			suite.chainID,
+			true, // scheduledCallbacksEnabled
+		)
+
+		txBackend, err := NewTransactionsBackend(params)
+		suite.Require().NoError(err)
+
+		// Call GetTransactionsByBlockID
+		transactions, err := txBackend.GetTransactionsByBlockID(context.Background(), blockID)
+		suite.Require().NoError(err)
+
+		// Verify transaction count
+		suite.Assert().Equal(expectedTotalCount, len(transactions))
+
+		// Verify user transactions
+		for i, tx := range col.Transactions {
+			suite.Assert().Equal(tx.ID(), transactions[i].ID())
+		}
+
+		// Verify system transactions
+		for i, expectedTx := range expectedSystemCollection.Transactions {
+			actualTx := transactions[expectedUserTxCount+i]
+			suite.Assert().Equal(expectedTx.ID(), actualTx.ID())
+		}
+	})
+}
+
+func (suite *Suite) TestTransactionResultsByBlockIDFromExecutionNode() {
 	// Create fixtures for the block and collection
 	col := unittest.CollectionFixture(2)
 	guarantee := &flow.CollectionGuarantee{CollectionID: col.ID()}
@@ -1190,6 +1395,7 @@ func (suite *Suite) TestTransactionResultsByBlockIDFromExecutionNode_ScheduledCa
 		params.TxStatusDeriver,
 		params.SystemTxID,
 		suite.chainID,
+		true,
 	)
 	txBackend, err := NewTransactionsBackend(params)
 	suite.Require().NoError(err)
