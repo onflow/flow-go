@@ -7,10 +7,10 @@ import (
 	"testing"
 
 	"github.com/fxamacker/circlehash"
+	"github.com/onflow/cadence/common"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 
-	"github.com/onflow/cadence/common"
 	"github.com/onflow/flow-go/cmd/util/ledger/util/registers"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
