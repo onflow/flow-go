@@ -496,10 +496,15 @@ func (t *Transactions) GetTransactionResultByIndex(
 
 // GetSystemTransaction returns system transaction
 func (t *Transactions) GetSystemTransaction(
-	_ context.Context,
+	ctx context.Context,
 	txID flow.Identifier,
 	blockID flow.Identifier,
 ) (*flow.TransactionBody, error) {
+	block, err := t.blocks.ByID(blockID)
+	if err != nil {
+		return nil, rpc.ConvertStorageError(err)
+	}
+
 	if txID == flow.ZeroID {
 		// TODO: add metric for usage and deprecate the optional txID parameter
 		txID = t.systemTxID
@@ -517,23 +522,7 @@ func (t *Transactions) GetSystemTransaction(
 		return nil, fmt.Errorf("transaction %s not found in block %s", txID, blockID)
 	}
 
-	events, err := t.events.ByBlockID(blockID)
-	if err != nil {
-		return nil, rpc.ConvertStorageError(err)
-	}
-
-	sysCollection, err := blueprints.SystemCollection(t.chainID.Chain(), events)
-	if err != nil {
-		return nil, status.Errorf(codes.Internal, "could not construct system collection: %v", err)
-	}
-
-	for _, tx := range sysCollection.Transactions {
-		if tx.ID() == txID {
-			return tx, nil
-		}
-	}
-
-	return nil, status.Errorf(codes.NotFound, "system transaction not found")
+	return t.txProvider.SystemTransaction(ctx, block, txID)
 }
 
 // GetSystemTransactionResult returns system transaction result
@@ -554,13 +543,7 @@ func (t *Transactions) GetSystemTransactionResult(
 		return nil, rpc.ConvertStorageError(err)
 	}
 
-	// make sure the system transaction exists
-	_, err = t.GetSystemTransaction(ctx, txID, blockID)
-	if err != nil {
-		return nil, err
-	}
-
-	return t.lookupTransactionResult(ctx, txID, block.ToHeader(), requiredEventEncodingVersion)
+	return t.txProvider.SystemTransactionResult(ctx, block, txID, requiredEventEncodingVersion)
 }
 
 // Error returns:
