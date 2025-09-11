@@ -31,4 +31,9 @@ type TransactionProvider interface {
 		block *flow.Block,
 		encodingVersion entities.EventEncodingVersion,
 	) ([]*accessmodel.TransactionResult, error)
+
+	TransactionsByBlockID(
+		ctx context.Context,
+		block *flow.Block,
+	) ([]*flow.TransactionBody, error)
 }

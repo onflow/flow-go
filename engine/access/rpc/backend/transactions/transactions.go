@@ -283,46 +283,16 @@ func (t *Transactions) GetTransaction(ctx context.Context, txID flow.Identifier)
 }
 
 func (t *Transactions) GetTransactionsByBlockID(
-	_ context.Context,
+	ctx context.Context,
 	blockID flow.Identifier,
 ) ([]*flow.TransactionBody, error) {
-	var transactions []*flow.TransactionBody
-
 	// TODO: consider using storage.Index.ByBlockID, the index contains collection id and seals ID
 	block, err := t.blocks.ByID(blockID)
 	if err != nil {
 		return nil, rpc.ConvertStorageError(err)
 	}
 
-	for _, guarantee := range block.Payload.Guarantees {
-		collection, err := t.collections.ByID(guarantee.CollectionID)
-		if err != nil {
-			return nil, rpc.ConvertStorageError(err)
-		}
-
-		transactions = append(transactions, collection.Transactions...)
-	}
-
-	events, err := t.events.ByBlockID(blockID)
-	if err != nil {
-		return nil, rpc.ConvertStorageError(err)
-	}
-
-	if !t.scheduledCallbacksEnabled {
-		systemTx, err := blueprints.SystemChunkTransaction(t.chainID.Chain())
-		if err != nil {
-			return nil, fmt.Errorf("failed to construct system chunk transaction: %w", err)
-		}
-
-		return append(transactions, systemTx), nil
-	}
-
-	sysCollection, err := blueprints.SystemCollection(t.chainID.Chain(), events)
-	if err != nil {
-		return nil, status.Errorf(codes.Internal, "could not construct system collection: %v", err)
-	}
-
-	return append(transactions, sysCollection.Transactions...), nil
+	return t.txProvider.TransactionsByBlockID(ctx, block)
 }
 
 func (t *Transactions) GetTransactionResult(
@@ -525,15 +495,14 @@ func (t *Transactions) GetTransactionResultByIndex(
 }
 
 // GetSystemTransaction returns system transaction
-func (t *Transactions) GetSystemTransaction(_ context.Context, txID flow.Identifier, blockID flow.Identifier) (*flow.TransactionBody, error) {
+func (t *Transactions) GetSystemTransaction(
+	_ context.Context,
+	txID flow.Identifier,
+	blockID flow.Identifier,
+) (*flow.TransactionBody, error) {
 	if txID == flow.ZeroID {
 		// TODO: add metric for usage and deprecate the optional txID parameter
 		txID = t.systemTxID
-	}
-
-	events, err := t.events.ByBlockID(blockID)
-	if err != nil {
-		return nil, rpc.ConvertStorageError(err)
 	}
 
 	if !t.scheduledCallbacksEnabled {
@@ -546,6 +515,11 @@ func (t *Transactions) GetSystemTransaction(_ context.Context, txID flow.Identif
 			return systemTx, nil
 		}
 		return nil, fmt.Errorf("transaction %s not found in block %s", txID, blockID)
+	}
+
+	events, err := t.events.ByBlockID(blockID)
+	if err != nil {
+		return nil, rpc.ConvertStorageError(err)
 	}
 
 	sysCollection, err := blueprints.SystemCollection(t.chainID.Chain(), events)
@@ -563,7 +537,12 @@ func (t *Transactions) GetSystemTransaction(_ context.Context, txID flow.Identif
 }
 
 // GetSystemTransactionResult returns system transaction result
-func (t *Transactions) GetSystemTransactionResult(ctx context.Context, txID flow.Identifier, blockID flow.Identifier, requiredEventEncodingVersion entities.EventEncodingVersion) (*accessmodel.TransactionResult, error) {
+func (t *Transactions) GetSystemTransactionResult(
+	ctx context.Context,
+	txID flow.Identifier,
+	blockID flow.Identifier,
+	requiredEventEncodingVersion entities.EventEncodingVersion,
+) (*accessmodel.TransactionResult, error) {
 	if txID == flow.ZeroID {
 		// todo add metric for usage and deprecate the optional txID parameter
 		txID = t.systemTxID
