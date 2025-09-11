@@ -155,7 +155,7 @@ func (t *LocalTransactionProvider) TransactionResultByIndex(
 	ctx context.Context,
 	block *flow.Block,
 	index uint32,
-	requiredEventEncodingVersion entities.EventEncodingVersion,
+	eventEncoding entities.EventEncodingVersion,
 ) (*accessmodel.TransactionResult, error) {
 	blockID := block.ID()
 	txResult, err := t.txResultsIndex.ByBlockIDTransactionIndex(blockID, block.Height, index)
@@ -192,7 +192,7 @@ func (t *LocalTransactionProvider) TransactionResultByIndex(
 	}
 
 	// events are encoded in CCF format in storage. convert to JSON-CDC if requested
-	if requiredEventEncodingVersion == entities.EventEncodingVersion_JSON_CDC_V0 {
+	if eventEncoding == entities.EventEncodingVersion_JSON_CDC_V0 {
 		events, err = convert.CcfEventsToJsonEvents(events)
 		if err != nil {
 			return nil, rpc.ConvertError(err, "failed to convert event payload", codes.Internal)
@@ -355,6 +355,40 @@ func (t *LocalTransactionProvider) TransactionResultsByBlockID(
 	}
 
 	return results, nil
+}
+
+// SystemTransaction rebuilds the system transaction from storage
+func (t *LocalTransactionProvider) SystemTransaction(
+	ctx context.Context,
+	block *flow.Block,
+	txID flow.Identifier,
+) (*flow.TransactionBody, error) {
+	events, err := t.eventsIndex.ByBlockID(block.ID(), block.Height)
+	if err != nil {
+		return nil, rpc.ConvertStorageError(err)
+	}
+
+	sysCollection, err := blueprints.SystemCollection(t.chainID.Chain(), events)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "could not construct system collection: %v", err)
+	}
+
+	for _, tx := range sysCollection.Transactions {
+		if tx.ID() == txID {
+			return tx, nil
+		}
+	}
+
+	return nil, status.Errorf(codes.NotFound, "system transaction not found")
+}
+
+func (t *LocalTransactionProvider) SystemTransactionResult(
+	ctx context.Context,
+	block *flow.Block,
+	txID flow.Identifier,
+	requiredEventEncodingVersion entities.EventEncodingVersion,
+) (*accessmodel.TransactionResult, error) {
+	return t.TransactionResult(ctx, block.ToHeader(), txID, requiredEventEncodingVersion)
 }
 
 // lookupCollectionIDInBlock returns the collection ID based on the transaction ID.
