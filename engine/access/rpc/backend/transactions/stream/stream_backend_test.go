@@ -245,6 +245,7 @@ func (s *TransactionStreamSuite) initializeBackend() {
 		errorMessageProvider,
 		s.systemTx.ID(),
 		txStatusDeriver,
+		true, // scheduledCallbacksEnabled
 	)
 
 	execNodeTxProvider := provider.NewENTransactionProvider(
@@ -257,6 +258,7 @@ func (s *TransactionStreamSuite) initializeBackend() {
 		txStatusDeriver,
 		s.systemTx.ID(),
 		s.chainID,
+		true, // scheduledCallbacksEnabled
 	)
 
 	txProvider := provider.NewFailoverTransactionProvider(localTxProvider, execNodeTxProvider)

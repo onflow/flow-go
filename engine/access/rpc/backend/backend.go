@@ -223,6 +223,7 @@ func New(params Params) (*Backend, error) {
 		params.TxErrorMessageProvider,
 		systemTxID,
 		txStatusDeriver,
+		params.ScheduledCallbacksEnabled,
 	)
 	execNodeTxProvider := provider.NewENTransactionProvider(
 		params.Log,
@@ -234,6 +235,7 @@ func New(params Params) (*Backend, error) {
 		txStatusDeriver,
 		systemTxID,
 		params.ChainID,
+		params.ScheduledCallbacksEnabled,
 	)
 	failoverTxProvider := provider.NewFailoverTransactionProvider(localTxProvider, execNodeTxProvider)
 

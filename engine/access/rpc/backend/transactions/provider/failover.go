@@ -66,3 +66,16 @@ func (f *FailoverTransactionProvider) TransactionResultsByBlockID(
 	execNodeResults, execNodeErr := f.execNodeProvider.TransactionResultsByBlockID(ctx, block, encodingVersion)
 	return execNodeResults, execNodeErr
 }
+
+func (f *FailoverTransactionProvider) TransactionsByBlockID(
+	ctx context.Context,
+	block *flow.Block,
+) ([]*flow.TransactionBody, error) {
+	localResults, localErr := f.localProvider.TransactionsByBlockID(ctx, block)
+	if localErr == nil {
+		return localResults, nil
+	}
+
+	execNodeResults, execNodeErr := f.execNodeProvider.TransactionsByBlockID(ctx, block)
+	return execNodeResults, execNodeErr
+}
