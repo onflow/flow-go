@@ -11,15 +11,16 @@ import (
 	"github.com/onflow/flow/protobuf/go/flow/execution"
 	"github.com/rs/zerolog"
 
+	commonrpc "github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/module"
 )
 
 // ConnectionFactory is an interface for creating access and execution API clients.
 type ConnectionFactory interface {
-	// GetAccessAPIClient gets an access API client for the specified address using the default CollectionGRPCPort, networkPubKey is optional,
+	// GetCollectionAPIClient gets an access API client for the specified address using the default CollectionGRPCPort, networkPubKey is optional,
 	// and it is used for secure gRPC connection. Can be nil for an unsecured connection.
 	// The returned io.Closer should close the connection after the call if no error occurred during client creation.
-	GetAccessAPIClient(address string, networkPubKey crypto.PublicKey) (access.AccessAPIClient, io.Closer, error)
+	GetCollectionAPIClient(address string, networkPubKey crypto.PublicKey) (access.AccessAPIClient, io.Closer, error)
 	// GetAccessAPIClientWithPort gets an access API client for the specified address with port, networkPubKey is optional,
 	// and it is used for secure gRPC connection. Can be nil for an unsecured connection.
 	// The returned io.Closer should close the connection after the call if no error occurred during client creation.
@@ -35,47 +36,79 @@ type ProxyConnectionFactory struct {
 	targetAddress string
 }
 
-// GetAccessAPIClient gets an access API client for a target address using the default CollectionGRPCPort.
+// GetCollectionAPIClient gets an access API client for a target address using the default CollectionGRPCPort.
 // The networkPubKey is the public key used for a secure gRPC connection. It can be nil for an unsecured connection.
 // The returned io.Closer should close the connection after the call if no error occurred during client creation.
-func (p *ProxyConnectionFactory) GetAccessAPIClient(address string, networkPubKey crypto.PublicKey) (access.AccessAPIClient, io.Closer, error) {
-	return p.ConnectionFactory.GetAccessAPIClient(p.targetAddress, networkPubKey)
+func (p *ProxyConnectionFactory) GetCollectionAPIClient(_ string, networkPubKey crypto.PublicKey) (access.AccessAPIClient, io.Closer, error) {
+	return p.ConnectionFactory.GetCollectionAPIClient(p.targetAddress, networkPubKey)
 }
 
 // GetExecutionAPIClient gets an execution API client for a target address using the default ExecutionGRPCPort.
 // The returned io.Closer should close the connection after the call if no error occurred during client creation.
-func (p *ProxyConnectionFactory) GetExecutionAPIClient(address string) (execution.ExecutionAPIClient, io.Closer, error) {
+func (p *ProxyConnectionFactory) GetExecutionAPIClient(_ string) (execution.ExecutionAPIClient, io.Closer, error) {
 	return p.ConnectionFactory.GetExecutionAPIClient(p.targetAddress)
 }
 
 var _ ConnectionFactory = (*ConnectionFactoryImpl)(nil)
 
 type ConnectionFactoryImpl struct {
-	CollectionGRPCPort        uint
-	ExecutionGRPCPort         uint
-	CollectionNodeGRPCTimeout time.Duration
-	ExecutionNodeGRPCTimeout  time.Duration
-	AccessMetrics             module.AccessMetrics
-	Log                       zerolog.Logger
-	Manager                   Manager
+	AccessMetrics module.AccessMetrics
+	Log           zerolog.Logger
+	Manager       Manager
+
+	AccessConfig     Config
+	ExecutionConfig  Config
+	CollectionConfig Config
 }
 
-// GetAccessAPIClient gets an access API client for the specified address using the default CollectionGRPCPort.
+type Config struct {
+	GRPCPort           uint
+	Timeout            time.Duration
+	MaxRequestMsgSize  uint
+	MaxResponseMsgSize uint
+}
+
+// DefaultExecutionConfig returns the default execution client config.
+func DefaultAccessConfig() Config {
+	return Config{
+		GRPCPort:           9000,
+		Timeout:            3 * time.Second,
+		MaxRequestMsgSize:  commonrpc.DefaultAccessMaxRequestSize,
+		MaxResponseMsgSize: commonrpc.DefaultAccessMaxResponseSize,
+	}
+}
+
+// DefaultCollectionConfig returns the default collection client config.
+func DefaultCollectionConfig() Config {
+	return Config{
+		GRPCPort:           9000,
+		Timeout:            3 * time.Second,
+		MaxRequestMsgSize:  commonrpc.DefaultCollectionMaxRequestSize,
+		MaxResponseMsgSize: commonrpc.DefaultCollectionMaxResponseSize,
+	}
+}
+
+// DefaultExecutionConfig returns the default execution client config.
+func DefaultExecutionConfig() Config {
+	return Config{
+		GRPCPort:           9000,
+		Timeout:            3 * time.Second,
+		MaxRequestMsgSize:  commonrpc.DefaultExecutionMaxRequestSize,
+		MaxResponseMsgSize: commonrpc.DefaultExecutionMaxResponseSize,
+	}
+}
+
+// GetCollectionAPIClient gets an access API client for the specified collection node address using
+// the default CollectionConfig.
 // The networkPubKey is the public key used for secure gRPC connection. Can be nil for an unsecured connection.
 // The returned io.Closer should close the connection after the call if no error occurred during client creation.
-func (cf *ConnectionFactoryImpl) GetAccessAPIClient(address string, networkPubKey crypto.PublicKey) (access.AccessAPIClient, io.Closer, error) {
-	address, err := getGRPCAddress(address, cf.CollectionGRPCPort)
+func (cf *ConnectionFactoryImpl) GetCollectionAPIClient(address string, networkPubKey crypto.PublicKey) (access.AccessAPIClient, io.Closer, error) {
+	address, err := getGRPCAddress(address, cf.CollectionConfig.GRPCPort)
 	if err != nil {
 		return nil, nil, err
 	}
-	return cf.GetAccessAPIClientWithPort(address, networkPubKey)
-}
 
-// GetAccessAPIClientWithPort gets an access API client for the specified address with port.
-// The networkPubKey is the public key used for secure gRPC connection. Can be nil for an unsecured connection.
-// The returned io.Closer should close the connection after the call if no error occurred during client creation.
-func (cf *ConnectionFactoryImpl) GetAccessAPIClientWithPort(address string, networkPubKey crypto.PublicKey) (access.AccessAPIClient, io.Closer, error) {
-	conn, closer, err := cf.Manager.GetConnection(address, cf.CollectionNodeGRPCTimeout, networkPubKey)
+	conn, closer, err := cf.Manager.GetConnection(address, cf.CollectionConfig, networkPubKey)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -83,15 +116,27 @@ func (cf *ConnectionFactoryImpl) GetAccessAPIClientWithPort(address string, netw
 	return access.NewAccessAPIClient(conn), closer, nil
 }
 
-// GetExecutionAPIClient gets an execution API client for the specified address using the default ExecutionGRPCPort.
+// GetAccessAPIClientWithPort gets an access API client for the specified address with port.
+// The networkPubKey is the public key used for secure gRPC connection. Can be nil for an unsecured connection.
 // The returned io.Closer should close the connection after the call if no error occurred during client creation.
-func (cf *ConnectionFactoryImpl) GetExecutionAPIClient(address string) (execution.ExecutionAPIClient, io.Closer, error) {
-	grpcAddress, err := getGRPCAddress(address, cf.ExecutionGRPCPort)
+func (cf *ConnectionFactoryImpl) GetAccessAPIClientWithPort(address string, networkPubKey crypto.PublicKey) (access.AccessAPIClient, io.Closer, error) {
+	conn, closer, err := cf.Manager.GetConnection(address, cf.AccessConfig, networkPubKey)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	conn, closer, err := cf.Manager.GetConnection(grpcAddress, cf.ExecutionNodeGRPCTimeout, nil)
+	return access.NewAccessAPIClient(conn), closer, nil
+}
+
+// GetExecutionAPIClient gets an execution API client for the specified address using the ExecutionConfig.
+// The returned io.Closer should close the connection after the call if no error occurred during client creation.
+func (cf *ConnectionFactoryImpl) GetExecutionAPIClient(address string) (execution.ExecutionAPIClient, io.Closer, error) {
+	grpcAddress, err := getGRPCAddress(address, cf.ExecutionConfig.GRPCPort)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	conn, closer, err := cf.Manager.GetConnection(grpcAddress, cf.ExecutionConfig, nil)
 	if err != nil {
 		return nil, nil, err
 	}

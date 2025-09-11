@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	badgerds "github.com/ipfs/go-ds-badger2"
+	pebbleds "github.com/ipfs/go-ds-pebble"
 	sdk "github.com/onflow/flow-go-sdk"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
@@ -269,7 +269,7 @@ func (s *ExecutionDataPruningSuite) checkResults(
 }
 
 func (s *ExecutionDataPruningSuite) nodeExecutionDataStore(node *testnet.Container) execution_data.ExecutionDataStore {
-	ds, err := badgerds.NewDatastore(filepath.Join(node.ExecutionDataDBPath(), "blobstore"), &badgerds.DefaultOptions)
+	ds, err := pebbleds.NewDatastore(filepath.Join(node.ExecutionDataDBPath(), "blobstore"), nil)
 	require.NoError(s.T(), err, "could not get execution datastore")
 
 	return execution_data.NewExecutionDataStore(blobs.NewBlobstore(ds), execution_data.DefaultSerializer)
