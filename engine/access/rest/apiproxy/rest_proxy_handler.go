@@ -401,7 +401,7 @@ func (r *RestProxyHandler) GetEventsForHeightRange(
 	}
 	r.log("upstream", "GetEventsForHeightRange", err)
 
-	metadata, err := convert.MessageToExecutorMetadata(eventsResponse.Metadata.ExecutionStateQuery)
+	metadata := convert.MessageToExecutorMetadata(eventsResponse.Metadata.ExecutionStateQuery)
 	if err != nil {
 		return nil, accessmodel.ExecutorMetadata{}, err
 	}
@@ -443,7 +443,7 @@ func (r *RestProxyHandler) GetEventsForBlockIDs(
 		return nil, accessmodel.ExecutorMetadata{}, err
 	}
 
-	metadata, err := convert.MessageToExecutorMetadata(eventsResponse.Metadata.ExecutionStateQuery)
+	metadata := convert.MessageToExecutorMetadata(eventsResponse.Metadata.ExecutionStateQuery)
 	if err != nil {
 		return nil, accessmodel.ExecutorMetadata{}, err
 	}

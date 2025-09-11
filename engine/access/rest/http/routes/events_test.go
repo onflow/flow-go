@@ -431,7 +431,7 @@ func buildRequest(
 }
 
 func buildExpectedResponse(t *testing.T, events []flow.BlockEvents, includeMetadata bool) string {
-	list := models.NewBlockEventsList(events, &access.ExecutorMetadata{}, includeMetadata)
+	list := models.NewBlockEventsList(events, access.ExecutorMetadata{}, includeMetadata)
 	data, err := json.Marshal(list)
 	require.NoError(t, err)
 

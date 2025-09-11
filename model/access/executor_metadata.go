@@ -6,5 +6,5 @@ import (
 
 type ExecutorMetadata struct {
 	ExecutionResultID flow.Identifier
-	ExecutorIDs       []flow.Identifier
+	ExecutorIDs       flow.IdentifierList
 }
