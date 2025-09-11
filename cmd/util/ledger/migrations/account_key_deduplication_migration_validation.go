@@ -1,7 +1,6 @@
 package migrations
 
 import (
-	"encoding/binary"
 	"fmt"
 	"maps"
 	"slices"
@@ -25,8 +24,12 @@ func validateAccountPublicKeyV4(
 		return err
 	}
 
+	if storedKeyCount > accountPublicKeyCount {
+		return fmt.Errorf("number of stored keys shouldn't be greater than number of account keys, got %d stored keys, and %d account keys", storedKeyCount, accountPublicKeyCount)
+	}
+
 	if deduplicated && accountPublicKeyCount == storedKeyCount {
-		return fmt.Errorf("stored key count is the same as account key count when account is deduplicated: %d keys", accountPublicKeyCount)
+		return fmt.Errorf("number of deduplicated stored keys shouldn't equal number of account keys, got %d stored keys, and %d account keys", storedKeyCount, accountPublicKeyCount)
 	}
 
 	// Find relevant registers
@@ -290,199 +293,4 @@ func validateKeyMetadata(
 	}
 
 	return nil
-}
-
-// Decode util functions used for testing and migration validation
-
-func decodeAccountPublicKeyWeightAndRevokedStatusGroups(b []byte) ([]accountPublicKeyWeightAndRevokedStatus, error) {
-	if len(b)%weightAndRevokedStatusGroupSize != 0 {
-		return nil, fmt.Errorf("failed to decode weight and revoked status: expect multiple of %d bytes, got %d", weightAndRevokedStatusGroupSize, len(b))
-	}
-
-	statuses := make([]accountPublicKeyWeightAndRevokedStatus, 0, len(b)/weightAndRevokedStatusGroupSize)
-
-	for i := 0; i < len(b); i += weightAndRevokedStatusGroupSize {
-		runLength := uint32(binary.BigEndian.Uint16(b[i:]))
-		weightAndRevoked := binary.BigEndian.Uint16(b[i+2 : i+4])
-
-		status := accountPublicKeyWeightAndRevokedStatus{
-			weight:  weightAndRevoked & weightMask,
-			revoked: (weightAndRevoked & revokedMask) > 0,
-		}
-
-		for range runLength {
-			statuses = append(statuses, status)
-		}
-	}
-
-	return statuses, nil
-}
-
-func decodeAccountPublicKeyMapping(b []byte) ([]uint32, error) {
-	if len(b)%mappingGroupSize != 0 {
-		return nil, fmt.Errorf("failed to decode mappings: expect multiple of %d bytes, got %d", mappingGroupSize, len(b))
-	}
-
-	mapping := make([]uint32, 0, len(b)/mappingGroupSize)
-
-	for i := 0; i < len(b); i += mappingGroupSize {
-		runLength := binary.BigEndian.Uint16(b[i:])
-		storedKeyIndex := binary.BigEndian.Uint32(b[i+runLengthSize:])
-
-		if highBit := (runLength & consecutiveGroupFlagMask) >> 15; highBit == 1 {
-			runLength &= lengthMask
-
-			for i := range runLength {
-				mapping = append(mapping, storedKeyIndex+uint32(i))
-			}
-		} else {
-			for range runLength {
-				mapping = append(mapping, storedKeyIndex)
-			}
-		}
-	}
-
-	return mapping, nil
-}
-
-func decodeDigestList(b []byte) ([]uint64, error) {
-	if len(b)%digestSize != 0 {
-		return nil, fmt.Errorf("failed to decode digest list: expect multiple of %d byte, got %d", digestSize, len(b))
-	}
-
-	storedDigestCount := len(b) / digestSize
-
-	digests := make([]uint64, 0, storedDigestCount)
-
-	for i := 0; i < len(b); i += digestSize {
-		digests = append(digests, binary.BigEndian.Uint64(b[i:]))
-	}
-
-	return digests, nil
-}
-
-func decodeBatchPublicKey(b []byte) ([][]byte, error) {
-	if len(b) == 0 {
-		return nil, nil
-	}
-
-	encodedPublicKeys := make([][]byte, 0, maxPublicKeyCountInBatch)
-
-	off := 0
-	for off < len(b) {
-		size := int(b[off])
-		off++
-
-		if off+size > len(b) {
-			return nil, fmt.Errorf("failed to decode batch public key: off %d + size %d out of bounds %d: %x", off, size, len(b), b)
-		}
-
-		encodedPublicKey := b[off : off+size]
-		off += size
-
-		encodedPublicKeys = append(encodedPublicKeys, encodedPublicKey)
-	}
-
-	if off != len(b) {
-		return nil, fmt.Errorf("failed to decode batch public key: trailing data (%d bytes): %x", len(b)-off, b)
-	}
-
-	return encodedPublicKeys, nil
-}
-
-func decodeAccountStatusKeyMetadata(b []byte, deduplicated bool) (
-	weightAndRevokedStatus []accountPublicKeyWeightAndRevokedStatus,
-	startKeyIndexForMapping uint32,
-	accountPublicKeyMappings []uint32,
-	startKeyIndexForDigests uint32,
-	digests []uint64,
-	err error,
-) {
-	// Decode weight and revoked list
-
-	var weightAndRevokedGroupsData []byte
-	weightAndRevokedGroupsData, b, err = parseNextLengthPrefixedData(b)
-	if err != nil {
-		err = fmt.Errorf("failed to decode AccountStatusV4: %w", err)
-		return
-	}
-
-	weightAndRevokedStatus, err = decodeAccountPublicKeyWeightAndRevokedStatusGroups(weightAndRevokedGroupsData)
-	if err != nil {
-		err = fmt.Errorf("failed to decode weight and revoked status list: %w", err)
-		return
-	}
-
-	// Decode account public key mapping if deduplication is on
-
-	if deduplicated {
-		if len(b) < 4 {
-			err = fmt.Errorf("failed to decode AccountStatusV4: expect 4 bytes of start key index for mapping, got %d bytes", len(b))
-			return
-		}
-
-		startKeyIndexForMapping = binary.BigEndian.Uint32(b)
-
-		b = b[4:]
-
-		var mappingData []byte
-		mappingData, b, err = parseNextLengthPrefixedData(b)
-		if err != nil {
-			err = fmt.Errorf("failed to decode AccountStatusV4: %w", err)
-			return
-		}
-
-		accountPublicKeyMappings, err = decodeAccountPublicKeyMapping(mappingData)
-		if err != nil {
-			err = fmt.Errorf("failed to decode account public key mappings: %w", err)
-			return
-		}
-	}
-
-	// Decode digests list
-
-	if len(b) < 4 {
-		err = fmt.Errorf("failed to decode AccountStatusV4: expect 4 bytes of start stored key index for digests, got %d bytes", len(b))
-		return
-	}
-
-	startKeyIndexForDigests = binary.BigEndian.Uint32(b)
-	b = b[4:]
-
-	var digestsData []byte
-	digestsData, b, err = parseNextLengthPrefixedData(b)
-	if err != nil {
-		err = fmt.Errorf("failed to decode AccountStatusV4: %w", err)
-		return
-	}
-
-	digests, err = decodeDigestList(digestsData)
-	if err != nil {
-		err = fmt.Errorf("failed to decode digests: %w", err)
-		return
-	}
-
-	// Check trailing data
-
-	if len(b) != 0 {
-		err = fmt.Errorf("failed to decode AccountStatusV4: got %d extra bytes", len(b))
-		return
-	}
-
-	return
-}
-
-func parseNextLengthPrefixedData(b []byte) (next []byte, rest []byte, err error) {
-	if len(b) < lengthPrefixSize {
-		return nil, nil, fmt.Errorf("failed to decode data: expect at least 4 bytes, got %d bytes", len(b))
-	}
-
-	length := binary.BigEndian.Uint32(b[:lengthPrefixSize])
-
-	if len(b) < lengthPrefixSize+int(length) {
-		return nil, nil, fmt.Errorf("failed to decode data: expect at least %d bytes, got %d bytes", lengthPrefixSize+int(length), len(b))
-	}
-
-	b = b[lengthPrefixSize:]
-	return b[:length], b[length:], nil
 }
