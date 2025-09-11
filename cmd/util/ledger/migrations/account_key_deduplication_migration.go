@@ -57,6 +57,7 @@ import (
 //   * adds account public key to unique key mappings if any key is deduplicated
 
 const (
+	legacyAccountPublicKeyRegisterKeyPrefix  = "public_key_"
 	legacyAccountPublicKeyRegisterKeyPattern = "public_key_%d"
 	legacyAccountPublicKey0RegisterKey       = "public_key_0"
 )
@@ -77,9 +78,11 @@ type AccountPublicKeyDeduplicationMigration struct {
 	chainID                 flow.ChainID
 	outputDir               string
 	reporter                reporters.ReportWriter
+	validationReporter      reporters.ReportWriter
 	migrationResult         migrationResult
 	accountMigrationResults []accountMigrationResult
 	resultLock              sync.Mutex
+	validate                bool
 }
 
 var _ AccountBasedMigration = (*AccountPublicKeyDeduplicationMigration)(nil)
@@ -87,16 +90,21 @@ var _ AccountBasedMigration = (*AccountPublicKeyDeduplicationMigration)(nil)
 func NewAccountPublicKeyDeduplicationMigration(
 	chainID flow.ChainID,
 	outputDir string,
+	validate bool,
 	rwf reporters.ReportWriterFactory,
 ) *AccountPublicKeyDeduplicationMigration {
 
-	// TODO: maybe migrate accounts with > 10,000 keys first.
-
-	return &AccountPublicKeyDeduplicationMigration{
+	m := &AccountPublicKeyDeduplicationMigration{
 		chainID:   chainID,
 		reporter:  rwf.ReportWriter("account-public-key-deduplication-migration_summary"),
 		outputDir: outputDir,
 	}
+
+	if validate {
+		m.validationReporter = rwf.ReportWriter("account-public-key-deduplication-validation")
+	}
+
+	return m
 }
 
 func (m *AccountPublicKeyDeduplicationMigration) InitMigration(
@@ -120,6 +128,16 @@ func (m *AccountPublicKeyDeduplicationMigration) MigrateAccount(
 	deduplicated, err := migrateAndDeduplicateAccountPublicKeys(m.log, accountRegisters)
 	if err != nil {
 		return fmt.Errorf("failed to migrate and deduplicate account public keys for account %x: %w", accountRegisters.Owner(), err)
+	}
+
+	if m.validate {
+		err := validateAccountPublicKeyV4(address, accountRegisters)
+		if err != nil {
+			m.validationReporter.Write(validationError{
+				Address: address.Hex(),
+				Msg:     err.Error(),
+			})
+		}
 	}
 
 	afterCount := accountRegisters.Count()
@@ -428,4 +446,9 @@ func generatePublicKeyDigests(
 	}
 
 	return digests
+}
+
+type validationError struct {
+	Address string
+	Msg     string
 }
