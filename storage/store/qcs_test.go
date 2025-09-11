@@ -23,11 +23,9 @@ func TestQuorumCertificates_StoreTx(t *testing.T) {
 		qc := unittest.QuorumCertificateFixture()
 
 		unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
-			err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 				return store.BatchStore(lctx, rw, qc)
 			})
-			require.NoError(t, err)
-			return nil
 		})
 
 		actual, err := store.ByBlockID(qc.BlockID)
@@ -48,11 +46,9 @@ func TestQuorumCertificates_LockEnforced(t *testing.T) {
 
 		// acquire wrong lock and attempt to store QC: should error
 		unittest.WithLock(t, lockManager, storage.LockFinalizeBlock, func(lctx lockctx.Context) error { // INCORRECT LOCK
-			err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 				return store.BatchStore(lctx, rw, qc)
 			})
-			require.Error(t, err)
-			return nil
 		})
 
 		// qc should not be stored, so ByBlockID should return `storage.ErrNotFound`
@@ -75,11 +71,9 @@ func TestQuorumCertificates_StoreTx_OtherQC(t *testing.T) {
 		})
 
 		unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
-			err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 				return s.BatchStore(lctx, rw, qc)
 			})
-			require.NoError(t, err)
-			return nil
 		})
 
 		unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {

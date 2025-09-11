@@ -29,11 +29,9 @@ func TestPayloadStoreRetrieve(t *testing.T) {
 		blockID := block.ID()
 
 		unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
-			err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 				return blocks.BatchStore(lctx, rw, proposal)
 			})
-			require.NoError(t, err)
-			return nil
 		})
 
 		// fetch payload

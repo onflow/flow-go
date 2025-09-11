@@ -37,7 +37,7 @@ func TestKeyValueStoreStorage(t *testing.T) {
 			})
 			require.NoError(t, err)
 			return nil
-		}) // While still holding the lock, retrieve values; this verifies that reads are not blocked by acquired locks
+		})
 
 		// fetch protocol state by its own ID
 		actual, err := store.ByID(stateID)

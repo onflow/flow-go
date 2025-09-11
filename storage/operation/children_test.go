@@ -35,11 +35,9 @@ func TestBlockChildrenIndexUpdateLookup(t *testing.T) {
 
 		altIDs := unittest.IdentifierListFixture(4)
 		unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
-			err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 				return operation.UpsertBlockChildren(lctx, rw.Writer(), blockID, altIDs)
 			})
-			require.NoError(t, err)
-			return nil
 		})
 
 		err = operation.RetrieveBlockChildren(db.Reader(), blockID, &retrievedIDs)

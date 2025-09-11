@@ -152,10 +152,6 @@ func TestMakeFinalInvalidHeight(t *testing.T) {
 				return operation.UpsertFinalizedHeight(lctx, rw.Writer(), final.Height)
 			})
 		})
-		// NOTE: lock is automatically released here by unittest.WithLock. Reason:
-		// The business logic we are testing here should not be expected to do anything regarding finalization when
-		// somebody else is still holding the lock `LockFinalizeBlock`. However, we want to verify that finalizing
-		// another block at the same height is rejected. Hence, we should not be holding the lock anymore.
 
 		// Insert the latest finalized height and map the finalized height to the finalized block ID.
 		unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(insertLctx lockctx.Context) error {
@@ -220,10 +216,6 @@ func TestMakeFinalDuplicate(t *testing.T) {
 				return operation.IndexFinalizedBlockByHeight(lctx, rw, final.Height, final.ID())
 			})
 		})
-		// NOTE: lock is automatically released here by unittest.WithLock. Reason:
-		// The business logic we are testing here should not be expected to do anything regarding finalization when
-		// somebody else is still holding the lock `LockFinalizeBlock`. However, we want to verify that finalizing
-		// the same block again is a no-op. Hence, we should not be holding the lock anymore.
 
 		// insert the finalized block header into the DB
 		unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(insertLctx lockctx.Context) error {
