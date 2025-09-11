@@ -295,7 +295,7 @@ func TestRespondingWithCorruptedAttestation(t *testing.T) {
 
 			// output of orchestrator for a corrupted chunk request from a corrupted verification node
 			// should be a result approval containing a dictated attestation.
-			approval, ok := event.FlowProtocolEvent.(*flow.ResultApproval)
+			approval, ok := event.FlowProtocolEvent.(*messages.ResultApproval)
 			require.True(t, ok)
 			attestation := approval.Body.Attestation
 
@@ -643,7 +643,7 @@ func TestPassingThrough_ResultApproval(t *testing.T) {
 		Protocol:          insecure.Protocol_MULTICAST,
 		TargetNum:         3,
 		TargetIds:         unittest.IdentifierListFixture(10),
-		FlowProtocolEvent: approval,
+		FlowProtocolEvent: (*messages.ResultApproval)(approval),
 	}
 
 	approvalPassThrough := &sync.WaitGroup{}
@@ -659,7 +659,7 @@ func TestPassingThrough_ResultApproval(t *testing.T) {
 			require.True(t, ok)
 
 			// passed through event must be a result approval
-			_, ok = event.FlowProtocolEvent.(*flow.ResultApproval)
+			_, ok = event.FlowProtocolEvent.(*messages.ResultApproval)
 			require.True(t, ok)
 
 			// response must be a pass through
@@ -717,9 +717,9 @@ func TestWintermute_ResultApproval(t *testing.T) {
 		Protocol:        insecure.Protocol_MULTICAST,
 		TargetNum:       3,
 		TargetIds:       unittest.IdentifierListFixture(10),
-		FlowProtocolEvent: unittest.ResultApprovalFixture(
+		FlowProtocolEvent: (*messages.ResultApproval)(unittest.ResultApprovalFixture(
 			unittest.WithExecutionResultID(originalResult.ID()),
-			unittest.WithChunk(0)),
+			unittest.WithChunk(0))),
 	}
 
 	// mocks orchestrator network

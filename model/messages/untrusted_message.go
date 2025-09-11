@@ -5,6 +5,7 @@ import (
 
 	"github.com/onflow/flow-go/model/cluster"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/libp2p/message"
 )
 
 // UntrustedMessage represents the set of allowed decode target types for messages received over the network.
@@ -67,10 +68,10 @@ func InternalToMessage(event interface{}) (UntrustedMessage, error) {
 		return (*RangeRequest)(internal), nil
 	case *flow.ExecutionReceipt:
 		return (*ExecutionReceipt)(internal), nil
-	case UntrustedMessage:
-		// Already a valid UntrustedMessage
-		// TODO(immutable M2): expand when ToInternal changes for other M2 types
-		return internal, nil
+	case *flow.ResultApproval:
+		return (*ResultApproval)(internal), nil
+	case *flow.TestMessage:
+		return (*message.TestMessage)(internal), nil
 	default:
 		return nil, fmt.Errorf("cannot convert unsupported type %T", event)
 	}

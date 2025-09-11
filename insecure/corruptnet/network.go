@@ -297,7 +297,7 @@ func (n *Network) processAttackerEgressMessage(msg *insecure.Message) error {
 			event = (*messages.ExecutionReceipt)(receipt) // swaps event with the receipt.
 		}
 
-	case *flow.ResultApproval:
+	case *messages.ResultApproval:
 		if len(e.VerifierSignature) == 0 {
 			// empty signature field on result approval means attack orchestrator is dictating an attestation to
 			// CCF, and the approval fields must be filled out locally.
@@ -310,7 +310,7 @@ func (n *Network) processAttackerEgressMessage(msg *insecure.Message) error {
 					Msg("could not generate result approval for attack orchestrator's dictated attestation")
 				return fmt.Errorf("could not generate result approval for attack orchestrator's attestation: %w", err)
 			}
-			event = approval // swaps event with the receipt.
+			event = (*messages.ResultApproval)(approval) // swaps event with the receipt.
 		}
 	}
 

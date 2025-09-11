@@ -71,8 +71,13 @@ func (o *orchestrator) trackEgressEvents(event *insecure.EgressEvent) error {
 		o.egressEventTracker[typeChunkDataRequest] = append(o.egressEventTracker[typeChunkDataRequest], e.ChunkID)
 	case *messages.ChunkDataResponse:
 		o.egressEventTracker[typeChunkDataResponse] = append(o.egressEventTracker[typeChunkDataResponse], e.ChunkDataPack.ChunkID)
-	case *flow.ResultApproval:
-		o.egressEventTracker[typeResultApproval] = append(o.egressEventTracker[typeResultApproval], e.ID())
+	case *messages.ResultApproval:
+		internalResultApproval, err := e.ToInternal()
+		if err != nil {
+			o.Logger.Err(err).Msgf("failed to convert event %T to internal", e)
+			return nil
+		}
+		o.egressEventTracker[typeResultApproval] = append(o.egressEventTracker[typeResultApproval], internalResultApproval.(*flow.ResultApproval).ID())
 	}
 	return nil
 }

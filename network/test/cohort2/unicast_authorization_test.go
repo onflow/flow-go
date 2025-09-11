@@ -361,7 +361,7 @@ func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_PublicChannel()
 	u.setupNetworks(slashingViolationsConsumer)
 	u.startNetworksAndLibp2pNodes()
 
-	msg := &libp2pmessage.TestMessage{
+	msg := &flow.TestMessage{
 		Text: string("hello"),
 	}
 

@@ -47,3 +47,16 @@ func (a *ApprovalResponse) ToInternal() (any, error) {
 		Approval: *approval,
 	}, nil
 }
+
+// ResultApproval is a message representation of a ResultApproval, which includes an approval for a chunk, verified by a verification n
+type ResultApproval flow.UntrustedResultApproval
+
+// ToInternal converts the untrusted ResultApproval into its trusted internal
+// representation.
+func (a *ResultApproval) ToInternal() (any, error) {
+	internal, err := flow.NewResultApproval(flow.UntrustedResultApproval(*a))
+	if err != nil {
+		return nil, fmt.Errorf("could not convert %T to internal type: %w", a, err)
+	}
+	return internal, nil
+}

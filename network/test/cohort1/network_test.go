@@ -232,8 +232,10 @@ func (suite *NetworkTestSuite) TestUpdateNodeAddresses() {
 	senderID := suite.ids[0].NodeID
 	senderMessageProcessor := mocknetwork.NewMessageProcessor(suite.T())
 	receiverMessageProcessor := mocknetwork.NewMessageProcessor(suite.T())
+	internal, err := message.ToInternal()
+	require.NoError(suite.T(), err)
 	receiverMessageProcessor.
-		On("Process", channels.TestNetworkChannel, senderID, message).
+		On("Process", channels.TestNetworkChannel, senderID, internal).
 		Return(nil).
 		Maybe() // we may not actually process this message depending on how fast runs
 
@@ -614,7 +616,7 @@ func (suite *NetworkTestSuite) TestPing() {
 			require.True(suite.T(), ok)
 			require.Equal(suite.T(), suite.ids[senderNodeIndex].NodeID, msgOriginID) // sender id
 
-			msgPayload, ok := args[2].(*libp2pmessage.TestMessage)
+			msgPayload, ok := args[2].(*flow.TestMessage)
 			require.True(suite.T(), ok)
 			require.Equal(suite.T(), expectedPayload, msgPayload.Text) // payload
 		}).Return(nil).Once()
@@ -681,7 +683,7 @@ func (suite *NetworkTestSuite) MultiPing(count int) {
 			require.True(suite.T(), ok)
 			require.Equal(suite.T(), suite.ids[senderNodeIndex].NodeID, msgOriginID) // sender id
 
-			msgPayload, ok := args[2].(*libp2pmessage.TestMessage)
+			msgPayload, ok := args[2].(*flow.TestMessage)
 			require.True(suite.T(), ok)
 			// payload
 			require.True(suite.T(), regex.MatchString(msgPayload.Text))
@@ -753,7 +755,7 @@ func (suite *NetworkTestSuite) TestEcho() {
 			require.True(suite.T(), ok)
 			require.Equal(suite.T(), suite.ids[first].NodeID, msgOriginID) // sender id
 
-			msgPayload, ok := args[2].(*libp2pmessage.TestMessage)
+			msgPayload, ok := args[2].(*flow.TestMessage)
 			require.True(suite.T(), ok)
 			require.Equal(suite.T(), expectedSendMsg, msgPayload.Text) // payload
 
@@ -777,7 +779,7 @@ func (suite *NetworkTestSuite) TestEcho() {
 			require.True(suite.T(), ok)
 			require.Equal(suite.T(), suite.ids[last].NodeID, msgOriginID) // sender id
 
-			msgPayload, ok := args[2].(*libp2pmessage.TestMessage)
+			msgPayload, ok := args[2].(*flow.TestMessage)
 			require.True(suite.T(), ok)
 			require.Equal(suite.T(), expectedReplyMsg, msgPayload.Text) // payload
 		}).Return(nil)
@@ -908,7 +910,7 @@ func (suite *NetworkTestSuite) TestUnsubscribe() {
 			require.True(suite.T(), ok)
 			require.Equal(suite.T(), suite.ids[senderIndex].NodeID, msgOriginID) // sender id
 
-			msgPayload, ok := args[2].(*libp2pmessage.TestMessage)
+			msgPayload, ok := args[2].(*flow.TestMessage)
 			require.True(suite.T(), ok)
 			require.True(suite.T(), msgPayload.Text == "hello1") // payload, we only expect hello 1 that was sent before unsubscribe.
 			msgRcvd <- struct{}{}

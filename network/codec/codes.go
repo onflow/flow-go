@@ -3,7 +3,6 @@ package codec
 import (
 	"fmt"
 
-	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/libp2p/message"
 	"github.com/onflow/flow-go/model/messages"
 )
@@ -110,7 +109,7 @@ func MessageCodeFromInterface(v interface{}) (MessageCode, string, error) {
 	// core messages for execution & verification
 	case *messages.ExecutionReceipt:
 		return CodeExecutionReceipt, s, nil
-	case *flow.ResultApproval:
+	case *messages.ResultApproval:
 		return CodeResultApproval, s, nil
 
 	// data exchange for execution of blocks
@@ -182,21 +181,17 @@ func InterfaceFromMessageCode(code MessageCode) (messages.UntrustedMessage, stri
 
 	// collections, guarantees & transactions
 	case CodeCollectionGuarantee:
-		var guarantee messages.CollectionGuarantee
-		return &guarantee, what(&guarantee), nil
+		return &messages.CollectionGuarantee{}, what(&messages.CollectionGuarantee{}), nil
 	case CodeTransactionBody:
-		var transactionBody messages.TransactionBody
-		return &transactionBody, what(&transactionBody), nil
+		return &messages.TransactionBody{}, what(&messages.TransactionBody{}), nil
 	case CodeTransaction:
-		var transaction messages.Transaction
-		return &transaction, what(&transaction), nil
+		return &messages.Transaction{}, what(&messages.Transaction{}), nil
 
 	// core messages for execution & verification
 	case CodeExecutionReceipt:
 		return &messages.ExecutionReceipt{}, what(&messages.ExecutionReceipt{}), nil
 	case CodeResultApproval:
-		var approval flow.ResultApproval
-		return &approval, what(&approval), nil
+		return &messages.ResultApproval{}, what(&messages.ResultApproval{}), nil
 
 	// data exchange for execution of blocks
 	case CodeChunkDataRequest:
