@@ -449,6 +449,8 @@ func (suite *Suite) TestGetSystemTransaction_HappyPath() {
 
 	block := unittest.BlockFixture()
 
+	suite.blocks.On("ByID", block.ID()).Return(block, nil).Once()
+
 	// Mock the events.ByBlockID call - return empty events list (no scheduled callbacks)
 	suite.events.On("ByBlockID", block.ID()).Return([]flow.Event{}, nil).Once()
 
@@ -487,8 +489,8 @@ func (suite *Suite) TestGetSystemTransactionResult_HappyPath() {
 			Return(block, nil).
 			Once()
 
-		// Mock the events.ByBlockID call for GetSystemTransaction - return empty events list (no scheduled callbacks)
-		suite.events.On("ByBlockID", blockID).Return([]flow.Event{}, nil).Once()
+		// Mock the events.ByBlockID call - return empty events list (no scheduled callbacks)
+		suite.events.On("ByBlockID", blockID).Return([]flow.Event{}, nil)
 
 		receipt1 := unittest.ReceiptForBlockFixture(block)
 		suite.receipts.
@@ -602,8 +604,9 @@ func (suite *Suite) TestGetSystemTransactionResultFromStorage() {
 	// expect a call to lookup events by block ID and transaction ID
 	suite.events.On("ByBlockIDTransactionID", blockId, txId).Return(eventsForTx, nil)
 
-	// Mock the events.ByBlockID call for GetSystemTransaction - return empty events list (no scheduled callbacks)
-	suite.events.On("ByBlockID", blockId).Return([]flow.Event{}, nil).Once()
+	// Mock the events.ByBlockID call - return empty events list (no scheduled callbacks)
+	// This is called by SystemTransaction method to reconstruct the system collection
+	suite.events.On("ByBlockID", blockId).Return([]flow.Event{}, nil)
 
 	// Set up the state and snapshot mocks
 	suite.state.On("Sealed").Return(suite.snapshot, nil)
@@ -684,8 +687,8 @@ func (suite *Suite) TestGetSystemTransactionResult_FailedEncodingConversion() {
 		Return(block, nil).
 		Once()
 
-	// Mock the events.ByBlockID call for GetSystemTransaction - return empty events list (no scheduled callbacks)
-	suite.events.On("ByBlockID", blockID).Return([]flow.Event{}, nil).Once()
+	// Mock the events.ByBlockID call - return empty events list (no scheduled callbacks)
+	suite.events.On("ByBlockID", blockID).Return([]flow.Event{}, nil)
 
 	// create empty events
 	eventsPerBlock := 10
