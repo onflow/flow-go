@@ -182,7 +182,7 @@ func loadPayloads() (payloads1, payloads2 []*ledger.Payload) {
 		if flagPayloadsV3 != "" {
 			_, payloads1, err = util.ReadPayloadFile(log.Logger, flagPayloadsV3)
 		} else {
-			log.Info().Msg("Reading first trie")
+			log.Info().Msg("Reading v3 trie")
 
 			stateCommitment := util.ParseStateCommitment(flagStateCommitmentV3)
 			payloads1, err = util.ReadTrieForPayloads(flagStateV3, stateCommitment)
@@ -194,7 +194,7 @@ func loadPayloads() (payloads1, payloads2 []*ledger.Payload) {
 		if flagPayloadsV4 != "" {
 			_, payloads2, err = util.ReadPayloadFile(log.Logger, flagPayloadsV4)
 		} else {
-			log.Info().Msg("Reading second trie")
+			log.Info().Msg("Reading v4 trie")
 
 			stateCommitment := util.ParseStateCommitment(flagStateCommitmentV4)
 			payloads2, err = util.ReadTrieForPayloads(flagStateV4, stateCommitment)
@@ -219,7 +219,7 @@ func payloadsToRegisters(payloads1, payloads2 []*ledger.Payload) (registers1, re
 	var group errgroup.Group
 
 	group.Go(func() (err error) {
-		log.Info().Msgf("Creating registers from first payloads (%d)", len(payloads1))
+		log.Info().Msgf("Creating registers from v3 payloads (%d)", len(payloads1))
 
 		registers1, err = registers.NewByAccountFromPayloads(payloads1)
 
@@ -233,7 +233,7 @@ func payloadsToRegisters(payloads1, payloads2 []*ledger.Payload) (registers1, re
 	})
 
 	group.Go(func() (err error) {
-		log.Info().Msgf("Creating registers from second payloads (%d)", len(payloads2))
+		log.Info().Msgf("Creating registers from v4 payloads (%d)", len(payloads2))
 
 		registers2, err = registers.NewByAccountFromPayloads(payloads2)
 

@@ -98,7 +98,7 @@ func (akd *AccountKeyDiffReporter) DiffKeys(
 			accountKeyDiffError{
 				Address: akd.address.Hex(),
 				Kind:    accountKeyDiffErrorKindString[accountKeyCountErrorKind],
-				Msg:     fmt.Sprintf("failed to get account public key count v3: %s", err),
+				Msg:     fmt.Sprintf("failed to get account public key count v4: %s", err),
 			})
 		return
 	}
