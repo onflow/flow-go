@@ -270,29 +270,20 @@ func TestSystemCollection(t *testing.T) {
 	chain := flow.Mainnet.Chain()
 
 	tests := []struct {
-		name                string
-		events              []flow.Event
-		expectedTxCount     int
-		expectProcessTx     bool
-		expectSystemChunkTx bool
-		expectError         bool
-		errorMessage        string
+		name            string
+		events          []flow.Event
+		expectedTxCount int
+		errorMessage    string
 	}{
 		{
-			name:                "no events",
-			events:              []flow.Event{},
-			expectedTxCount:     2, // process + system chunk
-			expectProcessTx:     true,
-			expectSystemChunkTx: true,
-			expectError:         false,
+			name:            "no events",
+			events:          []flow.Event{},
+			expectedTxCount: 2, // process + system chunk
 		},
 		{
-			name:                "single valid callback event",
-			events:              []flow.Event{createValidCallbackEvent(t, 1, 100)},
-			expectedTxCount:     3, // process + execute + system chunk
-			expectProcessTx:     true,
-			expectSystemChunkTx: true,
-			expectError:         false,
+			name:            "single valid callback event",
+			events:          []flow.Event{createValidCallbackEvent(t, 1, 100)},
+			expectedTxCount: 3, // process + execute + system chunk
 		},
 		{
 			name: "multiple valid callback events",
@@ -301,10 +292,7 @@ func TestSystemCollection(t *testing.T) {
 				createValidCallbackEvent(t, 2, 200),
 				createValidCallbackEvent(t, 3, 300),
 			},
-			expectedTxCount:     5, // process + 3 executes + system chunk
-			expectProcessTx:     true,
-			expectSystemChunkTx: true,
-			expectError:         false,
+			expectedTxCount: 5, // process + 3 executes + system chunk
 		},
 		{
 			name: "mixed events - valid callbacks and invalid types",
@@ -314,23 +302,16 @@ func TestSystemCollection(t *testing.T) {
 				createValidCallbackEvent(t, 2, 200),
 				createInvalidPayloadEvent(),
 			},
-			expectedTxCount:     4, // process + 2 executes + system chunk
-			expectProcessTx:     true,
-			expectSystemChunkTx: true,
-			expectError:         false,
+			expectedTxCount: 4, // process + 2 executes + system chunk
 		},
 		{
-			name:                "only invalid event types",
-			events:              []flow.Event{createInvalidTypeEvent(), createInvalidPayloadEvent()},
-			expectedTxCount:     2, // process + system chunk
-			expectProcessTx:     true,
-			expectSystemChunkTx: true,
-			expectError:         false,
+			name:            "only invalid event types",
+			events:          []flow.Event{createInvalidTypeEvent(), createInvalidPayloadEvent()},
+			expectedTxCount: 2, // process + system chunk
 		},
 		{
 			name:         "invalid CCF payload in callback event",
 			events:       []flow.Event{createPendingExecutionEventWithPayload([]byte{0xFF, 0xAB, 0xCD})},
-			expectError:  true,
 			errorMessage: "failed to construct execute callbacks transactions",
 		},
 	}
@@ -339,7 +320,7 @@ func TestSystemCollection(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			collection, err := blueprints.SystemCollection(chain, tt.events)
 
-			if tt.expectError {
+			if tt.errorMessage != "" {
 				assert.Error(t, err)
 				assert.Contains(t, err.Error(), tt.errorMessage)
 				assert.Nil(t, collection)
@@ -354,22 +335,18 @@ func TestSystemCollection(t *testing.T) {
 
 			if tt.expectedTxCount > 0 {
 				// First transaction should always be the process transaction
-				if tt.expectProcessTx {
-					processTx := transactions[0]
-					assert.NotNil(t, processTx)
-					assert.NotEmpty(t, processTx.Script)
-					assert.Equal(t, uint64(flow.DefaultMaxTransactionGasLimit), processTx.GasLimit)
-					assert.Equal(t, []flow.Address{chain.ServiceAddress()}, processTx.Authorizers)
-					assert.Empty(t, processTx.Arguments)
-				}
+				processTx := transactions[0]
+				assert.NotNil(t, processTx)
+				assert.NotEmpty(t, processTx.Script)
+				assert.Equal(t, uint64(flow.DefaultMaxTransactionGasLimit), processTx.GasLimit)
+				assert.Equal(t, []flow.Address{chain.ServiceAddress()}, processTx.Authorizers)
+				assert.Empty(t, processTx.Arguments)
 
 				// Last transaction should always be the system chunk transaction
-				if tt.expectSystemChunkTx {
-					systemChunkTx := transactions[len(transactions)-1]
-					assert.NotNil(t, systemChunkTx)
-					assert.NotEmpty(t, systemChunkTx.Script)
-					assert.Equal(t, []flow.Address{chain.ServiceAddress()}, systemChunkTx.Authorizers)
-				}
+				systemChunkTx := transactions[len(transactions)-1]
+				assert.NotNil(t, systemChunkTx)
+				assert.NotEmpty(t, systemChunkTx.Script)
+				assert.Equal(t, []flow.Address{chain.ServiceAddress()}, systemChunkTx.Authorizers)
 
 				// Middle transactions should be execute callback transactions
 				executeCount := tt.expectedTxCount - 2 // subtract process and system chunk
