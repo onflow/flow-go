@@ -24,6 +24,8 @@ const (
 	LockInsertOwnReceipt = "lock_insert_own_receipt"
 	// LockInsertCollection protects the insertion of collections.
 	LockInsertCollection = "lock_insert_collection"
+	// LockBootstrapping protects the data during bootstrapping.
+	LockBootstrapping = "lock_bootstrapping"
 )
 
 // Locks returns a list of all named locks used by the storage layer.

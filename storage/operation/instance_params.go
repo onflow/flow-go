@@ -3,6 +3,7 @@ package operation
 import (
 	"fmt"
 
+	"github.com/jordanschalm/lockctx"
 	"github.com/vmihailenco/msgpack/v4"
 
 	"github.com/onflow/flow-go/model/flow"
@@ -92,7 +93,10 @@ type InstanceParamsV0 struct {
 // Expected errors during normal operations:
 //   - [storage.ErrAlreadyExists] if instance params have already been stored.
 //   - Generic error for unexpected database or encoding failures.
-func InsertInstanceParams(rw storage.ReaderBatchWriter, params VersionedInstanceParams) error {
+func InsertInstanceParams(lctx lockctx.Proof, rw storage.ReaderBatchWriter, params VersionedInstanceParams) error {
+	if !lctx.HoldsLock(storage.LockBootstrapping) {
+		return fmt.Errorf("missing required lock: %s", storage.LockBootstrapping)
+	}
 	key := MakePrefix(codeInstanceParams)
 	exist, err := KeyExists(rw.GlobalReader(), key)
 	if err != nil {

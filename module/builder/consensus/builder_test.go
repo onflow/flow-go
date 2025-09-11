@@ -265,7 +265,7 @@ func (bs *BuilderSuite) SetupTest() {
 			unittest.IdentifierFixture(),
 		)
 		require.NoError(bs.T(), err)
-		require.NoError(bs.T(), operation.InsertInstanceParams(rw, *enc))
+		require.NoError(bs.T(), operation.InsertInstanceParams(lctx, rw, *enc))
 		require.NoError(bs.T(), operation.UpsertFinalizedHeight(lctx, rw.Writer(), final.Height))
 		require.NoError(bs.T(), operation.IndexFinalizedBlockByHeight(lctx, rw, final.Height, bs.finalID))
 		require.NoError(bs.T(), operation.UpsertSealedHeight(lctx, rw.Writer(), first.Height))

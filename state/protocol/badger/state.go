@@ -533,7 +533,7 @@ func bootstrapStatePointers(lctx lockctx.Proof, rw storage.ReaderBatchWriter, ro
 		return fmt.Errorf("could not create versioned instance params: %w", err)
 	}
 
-	err = operation.InsertInstanceParams(rw, *enc)
+	err = operation.InsertInstanceParams(lctx, rw, *enc)
 	if err != nil {
 		return fmt.Errorf("could not store instance params: %w", err)
 	}

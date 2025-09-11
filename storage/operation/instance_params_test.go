@@ -25,8 +25,13 @@ func TestInstanceParams_InsertRetrieve(t *testing.T) {
 		)
 		require.NoError(t, err)
 
+		lockManager := storage.NewTestingLockManager()
+		lctx := lockManager.NewContext()
+		require.NoError(t, lctx.AcquireLock(storage.LockBootstrapping))
+		defer lctx.Release()
+
 		err = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			return operation.InsertInstanceParams(rw, *enc)
+			return operation.InsertInstanceParams(lctx, rw, *enc)
 		})
 		require.NoError(t, err)
 
