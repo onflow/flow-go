@@ -16,7 +16,6 @@ import (
 	"github.com/ipfs/boxo/bitswap"
 	"github.com/ipfs/go-cid"
 	"github.com/ipfs/go-datastore"
-	badgerds "github.com/ipfs/go-ds-badger2"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/onflow/crypto"
 	"github.com/rs/zerolog"
@@ -157,7 +156,6 @@ type ObserverServiceConfig struct {
 	logTxTimeToSealed                    bool
 	executionDataSyncEnabled             bool
 	executionDataIndexingEnabled         bool
-	executionDataDBMode                  string
 	executionDataPrunerHeightRangeTarget uint64
 	executionDataPrunerThreshold         uint64
 	executionDataPruningInterval         time.Duration
@@ -236,7 +234,6 @@ func DefaultObserverServiceConfig() *ObserverServiceConfig {
 		logTxTimeToSealed:                    false,
 		executionDataSyncEnabled:             false,
 		executionDataIndexingEnabled:         false,
-		executionDataDBMode:                  execution_data.ExecutionDataDBModePebble.String(),
 		executionDataPrunerHeightRangeTarget: 0,
 		executionDataPrunerThreshold:         pruner.DefaultThreshold,
 		executionDataPruningInterval:         pruner.DefaultPruningInterval,
@@ -699,10 +696,9 @@ func (builder *ObserverServiceBuilder) extraFlags() {
 		flags.BoolVar(&builder.localServiceAPIEnabled, "local-service-api-enabled", defaultConfig.localServiceAPIEnabled, "whether to use local indexed data for api queries")
 		flags.StringVar(&builder.registersDBPath, "execution-state-dir", defaultConfig.registersDBPath, "directory to use for execution-state database")
 		flags.StringVar(&builder.checkpointFile, "execution-state-checkpoint", defaultConfig.checkpointFile, "execution-state checkpoint file")
-		flags.StringVar(&builder.executionDataDBMode,
-			"execution-data-db",
-			defaultConfig.executionDataDBMode,
-			"[experimental] the DB type for execution datastore. One of [badger, pebble]")
+
+		var builderExecutionDataDBMode string
+		flags.StringVar(&builderExecutionDataDBMode, "execution-data-db", "pebble", "[deprecated] the DB type for execution datastore.")
 
 		// Execution data pruner
 		flags.Uint64Var(&builder.executionDataPrunerHeightRangeTarget,
@@ -1097,7 +1093,6 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 	var execDataDistributor *edrequester.ExecutionDataDistributor
 	var execDataCacheBackend *herocache.BlockExecutionData
 	var executionDataStoreCache *execdatacache.ExecutionDataCache
-	var executionDataDBMode execution_data.ExecutionDataDBMode
 
 	// setup dependency chain to ensure indexer starts after the requester
 	requesterDependable := module.NewProxiedReadyDoneAware()
@@ -1116,23 +1111,11 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 				return err
 			}
 
-			executionDataDBMode, err = execution_data.ParseExecutionDataDBMode(builder.executionDataDBMode)
+			builder.ExecutionDatastoreManager, err = edstorage.NewPebbleDatastoreManager(
+				node.Logger.With().Str("pebbledb", "endata").Logger(),
+				datastoreDir, nil)
 			if err != nil {
-				return fmt.Errorf("could not parse execution data DB mode: %w", err)
-			}
-
-			if executionDataDBMode == execution_data.ExecutionDataDBModePebble {
-				builder.ExecutionDatastoreManager, err = edstorage.NewPebbleDatastoreManager(
-					node.Logger.With().Str("pebbledb", "endata").Logger(),
-					datastoreDir, nil)
-				if err != nil {
-					return fmt.Errorf("could not create PebbleDatastoreManager for execution data: %w", err)
-				}
-			} else {
-				builder.ExecutionDatastoreManager, err = edstorage.NewBadgerDatastoreManager(datastoreDir, &badgerds.DefaultOptions)
-				if err != nil {
-					return fmt.Errorf("could not create BadgerDatastoreManager for execution data: %w", err)
-				}
+				return fmt.Errorf("could not create PebbleDatastoreManager for execution data: %w", err)
 			}
 			ds = builder.ExecutionDatastoreManager.Datastore()
 
