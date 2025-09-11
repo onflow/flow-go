@@ -370,7 +370,7 @@ func benchmarkLookupClusterBlocksByReferenceHeightRange(b *testing.B, n int) {
 	lockManager := storage.NewTestingLockManager()
 	dbtest.BenchWithStorages(b, func(b *testing.B, r storage.Reader, wr dbtest.WithWriter) {
 		for i := 0; i < n; i++ {
-			unittest.WithLockBench(b, lockManager, storage.LockInsertOrFinalizeClusterBlock, func(lctx lockctx.Context) error {
+			unittest.WithLock(b, lockManager, storage.LockInsertOrFinalizeClusterBlock, func(lctx lockctx.Context) error {
 				return wr(func(w storage.Writer) error {
 					return operation.IndexClusterBlockByReferenceHeight(lctx, w, rand.Uint64()%1000, unittest.IdentifierFixture())
 				})
@@ -380,7 +380,7 @@ func benchmarkLookupClusterBlocksByReferenceHeightRange(b *testing.B, n int) {
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
 			var blockIDs []flow.Identifier
-			unittest.WithLockBench(b, lockManager, storage.LockInsertOrFinalizeClusterBlock, func(lctx lockctx.Context) error {
+			unittest.WithLock(b, lockManager, storage.LockInsertOrFinalizeClusterBlock, func(lctx lockctx.Context) error {
 				return operation.LookupClusterBlocksByReferenceHeightRange(lctx, r, 0, 1000, &blockIDs)
 			})
 		}

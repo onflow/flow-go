@@ -1261,18 +1261,15 @@ func (suite *Suite) TestExecuteScript() {
 			require.NoError(suite.T(), err)
 		}
 
-		unittest.WithLock(suite.T(), suite.lockManager, storage.LockInsertBlock, func(fctx2 lockctx.Context) error {
-			unittest.WithLock(suite.T(), suite.lockManager, storage.LockFinalizeBlock, func(fctx2Final lockctx.Context) error {
-				return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-					err := all.Blocks.BatchStore(fctx2, rw, unittest.ProposalFromBlock(prevBlock))
-					if err != nil {
-						return err
-					}
+		unittest.WithLocks(suite.T(), suite.lockManager, []string{storage.LockInsertBlock, storage.LockFinalizeBlock}, func(ctx lockctx.Context) error {
+			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+				err := all.Blocks.BatchStore(ctx, rw, unittest.ProposalFromBlock(prevBlock))
+				if err != nil {
+					return err
+				}
 
-					return operation.IndexFinalizedBlockByHeight(fctx2Final, rw, prevBlock.Height, prevBlock.ID())
-				})
+				return operation.IndexFinalizedBlockByHeight(ctx, rw, prevBlock.Height, prevBlock.ID())
 			})
-			return nil
 		})
 
 		// create execution receipts for each of the execution node and the previous block

@@ -1532,7 +1532,7 @@ func benchmarkBuildOn(b *testing.B, size int) {
 		block := unittest.ClusterBlockFixture(
 			unittest.ClusterBlock.WithParent(final),
 		)
-		unittest.WithLockBench(b, suite.lockManager, storage.LockInsertOrFinalizeClusterBlock, func(lctx lockctx.Context) error {
+		unittest.WithLock(b, suite.lockManager, storage.LockInsertOrFinalizeClusterBlock, func(lctx lockctx.Context) error {
 			return suite.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 				return procedure.InsertClusterBlock(lctx, rw, unittest.ClusterProposalFromBlock(block))
 			})
@@ -1540,7 +1540,7 @@ func benchmarkBuildOn(b *testing.B, size int) {
 
 		// finalize the block 80% of the time, resulting in a fork-rate of 20%
 		if rand.Intn(100) < 80 {
-			unittest.WithLockBench(b, suite.lockManager, storage.LockInsertOrFinalizeClusterBlock, func(lctx lockctx.Context) error {
+			unittest.WithLock(b, suite.lockManager, storage.LockInsertOrFinalizeClusterBlock, func(lctx lockctx.Context) error {
 				return suite.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 					return procedure.FinalizeClusterBlock(lctx, rw, block.ID())
 				})

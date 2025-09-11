@@ -7,7 +7,9 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func WithLock(t *testing.T, manager lockctx.Manager, lockID string, fn func(lctx lockctx.Context) error) {
+// WithLock creates a lock context from the given manager, acquires the given lock, then executes the function `fn`.
+// The test will fail if we are unable to acquire the lock or if `fn` returns any non-nil error.
+func WithLock(t testing.TB, manager lockctx.Manager, lockID string, fn func(lctx lockctx.Context) error) {
 	t.Helper()
 	lctx := manager.NewContext()
 	require.NoError(t, lctx.AcquireLock(lockID))
@@ -15,9 +17,14 @@ func WithLock(t *testing.T, manager lockctx.Manager, lockID string, fn func(lctx
 	require.NoError(t, fn(lctx))
 }
 
-func WithLockBench(b *testing.B, manager lockctx.Manager, lockID string, fn func(lctx lockctx.Context) error) {
+// WithLocks creates a lock context from the given manager, acquires the given locks, then executes the function `fn`.
+// The test will fail if we are unable to acquire any of the locks or if `fn` returns any non-nil error.
+func WithLocks(t testing.TB, manager lockctx.Manager, lockIDs []string, fn func(lctx lockctx.Context) error) {
+	t.Helper()
 	lctx := manager.NewContext()
-	require.NoError(b, lctx.AcquireLock(lockID))
+	for _, lockID := range lockIDs {
+		require.NoError(t, lctx.AcquireLock(lockID))
+	}
 	defer lctx.Release()
-	require.NoError(b, fn(lctx))
+	require.NoError(t, fn(lctx))
 }
