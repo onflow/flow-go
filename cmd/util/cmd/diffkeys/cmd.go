@@ -34,7 +34,7 @@ var (
 
 var Cmd = &cobra.Command{
 	Use:   "diff-keys",
-	Short: "Compares keys in the given states",
+	Short: "Compare account public keys in the given state-v3 with state-v4 and output to JSONL file (empty file if no difference)",
 	Run:   run,
 }
 
@@ -181,6 +181,8 @@ func loadPayloads() (payloads1, payloads2 []*ledger.Payload) {
 
 	group.Go(func() (err error) {
 		if flagPayloadsV3 != "" {
+			log.Info().Msgf("Loading v3 payloads from file at %v", flagPayloadsV3)
+
 			_, payloads1, err = util.ReadPayloadFile(log.Logger, flagPayloadsV3)
 			if err != nil {
 				err = fmt.Errorf("failed to load v3 payload file: %w", err)
@@ -199,6 +201,8 @@ func loadPayloads() (payloads1, payloads2 []*ledger.Payload) {
 
 	group.Go(func() (err error) {
 		if flagPayloadsV4 != "" {
+			log.Info().Msgf("Loading v4 payloads from file at %v", flagPayloadsV4)
+
 			_, payloads2, err = util.ReadPayloadFile(log.Logger, flagPayloadsV4)
 			if err != nil {
 				err = fmt.Errorf("failed to load v4 payload file: %w", err)
@@ -444,11 +448,11 @@ func diff(
 		}
 	}
 
-	log.Info().Msgf("Finished diffing accounts, waiting for goroutines...")
-
 	if err := g.Wait(); err != nil {
 		return err
 	}
+
+	log.Info().Msgf("Finished diffing accounts")
 
 	return nil
 }
