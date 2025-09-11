@@ -1,17 +1,22 @@
 # Flow Go Fixtures Module
 
-A context-aware test fixture generation system for Flow Go that provides deterministic, reproducible test data with shared randomness across all generators. This module replaces the standalone fixture functions with a comprehensive suite of generator objects.
+A context-aware test fixture generation system for Flow Go that provides deterministic, reproducible
+test data with shared randomness across all generators. This module replaces the standalone fixture
+functions with a comprehensive suite of generator objects.
 
 ## Table of Contents
 
 1. [Overview](#overview)
-2. [Quick Start](#quick-start)
-3. [Core Concepts](#core-concepts)
-4. [Generator Suite](#generator-suite)
-5. [Available Generators](#available-generators)
-6. [Migration Guide](#migration-guide)
-7. [Testing](#testing)
-8. [Architecture](#architecture)
+2. [Reproducibility](#reproducibility)
+3. [Concurrency](#concurrency)
+4. [Module Structure](#module-structure)
+5. [Quick Start](#quick-start)
+6. [Core Concepts](#core-concepts)
+7. [Generator Suite](#generator-suite)
+8. [Available Generators](#available-generators)
+9. [Migration Guide](#migration-guide)
+10. [Testing](#testing)
+11. [Architecture](#architecture)
 
 ## Overview
 
@@ -22,6 +27,42 @@ The fixtures module replaces standalone fixture functions with a suite of contex
 - **Provide context awareness**: Generators can create related data that makes sense together
 - **Enable easy extension**: Simple to add new generator types
 - **Improve test reproducibility**: Consistent results across test runs
+
+## Reproducibility
+
+This suite is designed to allow producing complete data types with reproducible random data. This is
+critical for certain test scenarios like testing hash functions or data serializers. In most cases,
+deterministic data is not strictly require.
+
+However, it is very useful to be able to replay a failed test that used random data. Imagine the 
+scenario where a test failed in CI due to some corner case bug with data handling. Since the data
+was randomly generated, it's extrememly difficult to reverse engineer the inputs that caused the failure.
+With deterministic test fixtures, we could grab the random seed used by the test from the logs,
+then rerun the test locally with the exact same test data.
+
+This does require that some extra care is taken while designing the tests, especially any tests that
+use multiple goroutines, or any tests that run subtests with `Parallel()`. See [Concurrency](#concurrancy).
+
+## Concurrency
+
+The generator suite does support concurrent usage, but it is discouraged to ensure that tests remain
+reproducible. Any time that the main suite or any generator are used within different goroutines or
+parallel subtests, the specific order that fixtures are produced with vary depending on the go
+scheduler. The order a fixture is generated determines the random data provided by the PRNG, thus if
+fixtures are produced concurrently, their output will not be deterministic!
+
+### Best Pracice
+
+To support using concurrency within your tests AND get deterministic random fixtures, you need to
+follow these best practices:
+
+1. Always use a single `GeneratorSuite` per test. This ensures you can replay the test individually,
+and allows for tests to be run in parallel without losing support for deterministic fixtures.
+2. Always generate all fixture data before executing any concurrent logic.
+3. **Never** generate any fixtures outside of the test's main goroutine.
+
+It is fine to share a `GeneratorSuite` between subtests so long as they are **not** marked `Parallel()`.
+It is also fine to use a `GeneratorSuite` within a test suite since suite tests do not support parallelism.
 
 ## Module Structure
 
@@ -126,9 +167,6 @@ suite := fixtures.NewGeneratorSuite(t, fixtures.WithSeed(42))
 ### Core Methods
 
 ```go
-// Access the shared RNG
-rng := suite.RNG()
-
 // Access the random generator
 randomGen := suite.Random()
 

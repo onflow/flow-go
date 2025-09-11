@@ -44,11 +44,6 @@ func NewGeneratorSuite(t testing.TB, opts ...GeneratorSuiteOption) *GeneratorSui
 	}
 }
 
-// RNG returns the random number generator used by this suite.
-func (g *GeneratorSuite) RNG() *rand.Rand {
-	return g.rng
-}
-
 // Random returns a random generator for this suite.
 func (g *GeneratorSuite) Random() *RandomGenerator {
 	return &RandomGenerator{
