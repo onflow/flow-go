@@ -134,9 +134,6 @@ func (e *ENTransactionProvider) TransactionsByBlockID(
 ) ([]*flow.TransactionBody, error) {
 	var transactions []*flow.TransactionBody
 	blockID := block.ID()
-	req := &execproto.GetEventsForBlockIDsRequest{
-		BlockIds: [][]byte{blockID[:]},
-	}
 
 	// user transactions
 	for _, guarantee := range block.Payload.Guarantees {
@@ -158,33 +155,9 @@ func (e *ENTransactionProvider) TransactionsByBlockID(
 		return append(transactions, systemTx), nil
 	}
 
-	execNodes, err := e.nodeProvider.ExecutionNodesForBlockID(
-		ctx,
-		blockID,
-	)
+	events, err := e.getBlockEvents(ctx, blockID)
 	if err != nil {
-		if common.IsInsufficientExecutionReceipts(err) {
-			return nil, status.Error(codes.NotFound, err.Error())
-		}
-		return nil, rpc.ConvertError(err, "failed to retrieve result from any execution node", codes.Internal)
-	}
-
-	resp, err := e.getBlockEventsByBlockIDsFromAnyExeNode(ctx, execNodes, req)
-	if err != nil {
-		return nil, rpc.ConvertError(err, "failed to retrieve result from any execution node", codes.Internal)
-	}
-
-	var events flow.EventsList
-	for _, result := range resp.GetResults() {
-		resultEvents, err := convert.MessagesToEventsWithEncodingConversion(
-			result.GetEvents(),
-			resp.GetEventEncodingVersion(),
-			entities.EventEncodingVersion_JSON_CDC_V0,
-		)
-		if err != nil {
-			return nil, rpc.ConvertError(err, "failed to convert events", codes.Internal)
-		}
-		events = append(events, resultEvents...)
+		return nil, rpc.ConvertError(err, "failed to retrieve events from any execution node", codes.Internal)
 	}
 
 	sysCollection, err := blueprints.SystemCollection(e.chainID.Chain(), events)
@@ -314,6 +287,41 @@ func (e *ENTransactionProvider) TransactionResultsByBlockID(
 	}
 
 	return append(userTxResults, systemTxResults...), nil
+}
+
+func (e *ENTransactionProvider) SystemTransaction(
+	ctx context.Context,
+	block *flow.Block,
+	txID flow.Identifier,
+) (*flow.TransactionBody, error) {
+	blockID := block.ID()
+
+	events, err := e.getBlockEvents(ctx, blockID)
+	if err != nil {
+		return nil, rpc.ConvertError(err, "failed to retrieve events from any execution node", codes.Internal)
+	}
+
+	sysCollection, err := blueprints.SystemCollection(e.chainID.Chain(), events)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "could not construct system collection: %v", err)
+	}
+
+	for _, tx := range sysCollection.Transactions {
+		if tx.ID() == txID {
+			return tx, nil
+		}
+	}
+
+	return nil, status.Errorf(codes.NotFound, "system transaction not found")
+}
+
+func (e *ENTransactionProvider) SystemTransactionResult(
+	ctx context.Context,
+	block *flow.Block,
+	txID flow.Identifier,
+	requiredEventEncodingVersion entities.EventEncodingVersion,
+) (*accessmodel.TransactionResult, error) {
+	return e.TransactionResult(ctx, block.ToHeader(), txID, requiredEventEncodingVersion)
 }
 
 // userTransactionResults constructs the user transaction results from the execution node response.
@@ -463,6 +471,48 @@ func (e *ENTransactionProvider) systemTransactionIDs(
 	}
 
 	return systemTxIDs, nil
+}
+
+func (e *ENTransactionProvider) getBlockEvents(
+	ctx context.Context,
+	blockID flow.Identifier,
+) (flow.EventsList, error) {
+	execNodes, err := e.nodeProvider.ExecutionNodesForBlockID(
+		ctx,
+		blockID,
+	)
+	if err != nil {
+		if common.IsInsufficientExecutionReceipts(err) {
+			return nil, status.Error(codes.NotFound, err.Error())
+		}
+		return nil, rpc.ConvertError(err, "failed to retrieve result from any execution node", codes.Internal)
+	}
+
+	resp, err := e.getBlockEventsByBlockIDsFromAnyExeNode(
+		ctx,
+		execNodes,
+		&execproto.GetEventsForBlockIDsRequest{
+			BlockIds: [][]byte{blockID[:]},
+		},
+	)
+	if err != nil {
+		return nil, rpc.ConvertError(err, "failed to retrieve result from any execution node", codes.Internal)
+	}
+
+	var events flow.EventsList
+	for _, result := range resp.GetResults() {
+		resultEvents, err := convert.MessagesToEventsWithEncodingConversion(
+			result.GetEvents(),
+			resp.GetEventEncodingVersion(),
+			entities.EventEncodingVersion_JSON_CDC_V0,
+		)
+		if err != nil {
+			return nil, rpc.ConvertError(err, "failed to convert events", codes.Internal)
+		}
+		events = append(events, resultEvents...)
+	}
+
+	return events, nil
 }
 
 func (e *ENTransactionProvider) getTransactionResultFromAnyExeNode(
