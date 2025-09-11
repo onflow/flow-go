@@ -196,8 +196,6 @@ func (s *SealingEngineSuite) TestMultipleProcessingItems() {
 	go func() {
 		defer wg.Done()
 		for _, resp := range responseApprovals {
-			// convert wire → trusted *before* calling Process,
-			// so the queue only ever holds *flow.ResultApproval.
 
 			err := s.engine.Process(channels.ReceiveApprovals, approverID, resp)
 			s.Require().NoError(err, "should process approval (converted from wire)")
