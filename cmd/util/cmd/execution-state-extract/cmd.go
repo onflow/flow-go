@@ -45,6 +45,7 @@ var (
 	flagOutputPayloadByAddresses      string
 	flagCPUProfile                    string
 	flagZeroMigration                 bool
+	flagValidate                      bool
 )
 
 var Cmd = &cobra.Command{
@@ -128,6 +129,9 @@ func init() {
 
 	Cmd.Flags().StringVar(&flagCPUProfile, "cpu-profile", "",
 		"enable CPU profiling")
+
+	Cmd.Flags().BoolVar(&flagValidate, "validate", false,
+		"validate migrated account public keys")
 }
 
 func run(*cobra.Command, []string) {
@@ -379,6 +383,7 @@ func run(*cobra.Command, []string) {
 						migrations.NewAccountPublicKeyDeduplicationMigration(
 							chain.ChainID(),
 							flagOutputDir,
+							flagValidate,
 							reporters.NewReportFileWriterFactory(flagOutputDir, log.Logger),
 						),
 						migrations.NewAccountUsageMigration(
