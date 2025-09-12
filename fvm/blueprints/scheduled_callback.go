@@ -16,6 +16,37 @@ import (
 
 const callbackTransactionGasLimit = flow.DefaultMaxTransactionGasLimit
 
+func SystemCollection(chain flow.Chain, processEvents flow.EventsList) (*flow.Collection, error) {
+	process, err := ProcessCallbacksTransaction(chain)
+	if err != nil {
+		return nil, fmt.Errorf("failed to construct process callbacks transaction: %w", err)
+	}
+
+	executes, err := ExecuteCallbacksTransactions(chain, processEvents)
+	if err != nil {
+		return nil, fmt.Errorf("failed to construct execute callbacks transactions: %w", err)
+	}
+
+	systemTx, err := SystemChunkTransaction(chain)
+	if err != nil {
+		return nil, fmt.Errorf("failed to construct system chunk transaction: %w", err)
+	}
+
+	transactions := make([]*flow.TransactionBody, 0, len(executes)+2) // +2 process and system tx
+	transactions = append(transactions, process)
+	transactions = append(transactions, executes...)
+	transactions = append(transactions, systemTx)
+
+	collection, err := flow.NewCollection(flow.UntrustedCollection{
+		Transactions: transactions,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to construct system collection: %w", err)
+	}
+
+	return collection, nil
+}
+
 // ProcessCallbacksTransaction constructs a transaction for processing callbacks, for the given callback.
 // No errors are expected during normal operation.
 func ProcessCallbacksTransaction(chain flow.Chain) (*flow.TransactionBody, error) {

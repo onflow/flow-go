@@ -23,8 +23,8 @@ import (
 	txstatus "github.com/onflow/flow-go/engine/access/rpc/backend/transactions/status"
 	"github.com/onflow/flow-go/engine/access/rpc/connection"
 	"github.com/onflow/flow-go/engine/common/rpc"
-	commonrpc "github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
+	"github.com/onflow/flow-go/fvm/blueprints"
 	accessmodel "github.com/onflow/flow-go/model/access"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
@@ -45,7 +45,6 @@ type Transactions struct {
 	chainID flow.ChainID
 
 	systemTxID flow.Identifier
-	systemTx   *flow.TransactionBody
 
 	// RPC Clients & Network
 	collectionRPCClient         accessproto.AccessAPIClient // RPC client tied to a fixed collection node
@@ -58,12 +57,15 @@ type Transactions struct {
 	blocks       storage.Blocks
 	collections  storage.Collections
 	transactions storage.Transactions
+	events       storage.Events
 
 	txResultCache *lru.Cache[flow.Identifier, *accessmodel.TransactionResult]
 
 	txValidator     *validator.TransactionValidator
 	txProvider      provider.TransactionProvider
 	txStatusDeriver *txstatus.TxStatusDeriver
+
+	scheduledCallbacksEnabled bool
 }
 
 var _ access.TransactionsAPI = (*Transactions)(nil)
@@ -74,16 +76,16 @@ type Params struct {
 	State                       protocol.State
 	ChainID                     flow.ChainID
 	SystemTxID                  flow.Identifier
-	SystemTx                    *flow.TransactionBody
 	StaticCollectionRPCClient   accessproto.AccessAPIClient
 	HistoricalAccessNodeClients []accessproto.AccessAPIClient
 	NodeCommunicator            node_communicator.Communicator
 	ConnFactory                 connection.ConnectionFactory
 	EnableRetries               bool
-	NodeProvider                *commonrpc.ExecutionNodeIdentitiesProvider
+	NodeProvider                *rpc.ExecutionNodeIdentitiesProvider
 	Blocks                      storage.Blocks
 	Collections                 storage.Collections
 	Transactions                storage.Transactions
+	Events                      storage.Events
 	TxErrorMessageProvider      error_messages.Provider
 	TxResultCache               *lru.Cache[flow.Identifier, *accessmodel.TransactionResult]
 	TxProvider                  provider.TransactionProvider
@@ -91,6 +93,7 @@ type Params struct {
 	TxStatusDeriver             *txstatus.TxStatusDeriver
 	EventsIndex                 *index.EventsIndex
 	TxResultsIndex              *index.TransactionResultsIndex
+	ScheduledCallbacksEnabled   bool
 }
 
 func NewTransactionsBackend(params Params) (*Transactions, error) {
@@ -100,7 +103,6 @@ func NewTransactionsBackend(params Params) (*Transactions, error) {
 		state:                       params.State,
 		chainID:                     params.ChainID,
 		systemTxID:                  params.SystemTxID,
-		systemTx:                    params.SystemTx,
 		collectionRPCClient:         params.StaticCollectionRPCClient,
 		historicalAccessNodeClients: params.HistoricalAccessNodeClients,
 		nodeCommunicator:            params.NodeCommunicator,
@@ -108,10 +110,12 @@ func NewTransactionsBackend(params Params) (*Transactions, error) {
 		blocks:                      params.Blocks,
 		collections:                 params.Collections,
 		transactions:                params.Transactions,
+		events:                      params.Events,
 		txResultCache:               params.TxResultCache,
 		txValidator:                 params.TxValidator,
 		txProvider:                  params.TxProvider,
 		txStatusDeriver:             params.TxStatusDeriver,
+		scheduledCallbacksEnabled:   params.ScheduledCallbacksEnabled,
 	}
 
 	if params.EnableRetries {
@@ -279,29 +283,16 @@ func (t *Transactions) GetTransaction(ctx context.Context, txID flow.Identifier)
 }
 
 func (t *Transactions) GetTransactionsByBlockID(
-	_ context.Context,
+	ctx context.Context,
 	blockID flow.Identifier,
 ) ([]*flow.TransactionBody, error) {
-	var transactions []*flow.TransactionBody
-
 	// TODO: consider using storage.Index.ByBlockID, the index contains collection id and seals ID
 	block, err := t.blocks.ByID(blockID)
 	if err != nil {
 		return nil, rpc.ConvertStorageError(err)
 	}
 
-	for _, guarantee := range block.Payload.Guarantees {
-		collection, err := t.collections.ByID(guarantee.CollectionID)
-		if err != nil {
-			return nil, rpc.ConvertStorageError(err)
-		}
-
-		transactions = append(transactions, collection.Transactions...)
-	}
-
-	transactions = append(transactions, t.systemTx)
-
-	return transactions, nil
+	return t.txProvider.TransactionsByBlockID(ctx, block)
 }
 
 func (t *Transactions) GetTransactionResult(
@@ -504,18 +495,55 @@ func (t *Transactions) GetTransactionResultByIndex(
 }
 
 // GetSystemTransaction returns system transaction
-func (t *Transactions) GetSystemTransaction(_ context.Context, _ flow.Identifier) (*flow.TransactionBody, error) {
-	return t.systemTx, nil
-}
-
-// GetSystemTransactionResult returns system transaction result
-func (t *Transactions) GetSystemTransactionResult(ctx context.Context, blockID flow.Identifier, requiredEventEncodingVersion entities.EventEncodingVersion) (*accessmodel.TransactionResult, error) {
+func (t *Transactions) GetSystemTransaction(
+	ctx context.Context,
+	txID flow.Identifier,
+	blockID flow.Identifier,
+) (*flow.TransactionBody, error) {
 	block, err := t.blocks.ByID(blockID)
 	if err != nil {
 		return nil, rpc.ConvertStorageError(err)
 	}
 
-	return t.lookupTransactionResult(ctx, t.systemTxID, block.ToHeader(), requiredEventEncodingVersion)
+	if txID == flow.ZeroID {
+		// TODO: add metric for usage and deprecate the optional txID parameter
+		txID = t.systemTxID
+	}
+
+	if !t.scheduledCallbacksEnabled {
+		systemTx, err := blueprints.SystemChunkTransaction(t.chainID.Chain())
+		if err != nil {
+			return nil, status.Errorf(codes.Internal, "failed to construct system chunk transaction: %v", err)
+		}
+
+		if txID == systemTx.ID() {
+			return systemTx, nil
+		}
+		return nil, fmt.Errorf("transaction %s not found in block %s", txID, blockID)
+	}
+
+	return t.txProvider.SystemTransaction(ctx, block, txID)
+}
+
+// GetSystemTransactionResult returns system transaction result
+func (t *Transactions) GetSystemTransactionResult(
+	ctx context.Context,
+	txID flow.Identifier,
+	blockID flow.Identifier,
+	requiredEventEncodingVersion entities.EventEncodingVersion,
+) (*accessmodel.TransactionResult, error) {
+	if txID == flow.ZeroID {
+		// todo add metric for usage and deprecate the optional txID parameter
+		txID = t.systemTxID
+	}
+
+	// first check if the block exists
+	block, err := t.blocks.ByID(blockID)
+	if err != nil {
+		return nil, rpc.ConvertStorageError(err)
+	}
+
+	return t.txProvider.SystemTransactionResult(ctx, block, txID, requiredEventEncodingVersion)
 }
 
 // Error returns:
