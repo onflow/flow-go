@@ -74,7 +74,7 @@ func TestFlowCallbackHandlerContract(callbackScheduler sdk.Address, flowToken sd
 		},
 		Members: []dsl.CadenceCode{
 			dsl.Code(`
-				access(all) var scheduledCallbacks: {UInt64: FlowTransactionScheduler.ScheduledCallback}
+				access(all) var scheduledCallbacks: {UInt64: FlowTransactionScheduler.ScheduledTransaction}
 				access(all) var executedCallbacks: [UInt64]
 
 				access(all) let HandlerStoragePath: StoragePath
@@ -92,7 +92,7 @@ func TestFlowCallbackHandlerContract(callbackScheduler sdk.Address, flowToken sd
 					return <- create Handler()
 				}
 
-				access(all) fun addScheduledCallback(callback: FlowTransactionScheduler.ScheduledCallback) {
+				access(all) fun addScheduledCallback(callback: FlowTransactionScheduler.ScheduledTransaction) {
 					self.scheduledCallbacks[callback.id] = callback
 				}
 
