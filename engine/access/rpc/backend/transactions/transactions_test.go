@@ -95,11 +95,12 @@ type Suite struct {
 
 	errorMessageProvider error_messages.Provider
 
-	chainID                   flow.ChainID
-	systemTx                  *flow.TransactionBody
-	systemCollection          *flow.Collection
-	pendingExecutionEvents    []flow.Event
-	scheduledCallbacksEnabled bool
+	chainID                           flow.ChainID
+	systemTx                          *flow.TransactionBody
+	systemCollection                  *flow.Collection
+	pendingExecutionEvents            []flow.Event
+	processScheduledCallbackEventType flow.EventType
+	scheduledCallbacksEnabled         bool
 
 	fixedExecutionNodeIDs     flow.IdentifierList
 	preferredExecutionNodeIDs flow.IdentifierList
@@ -155,6 +156,7 @@ func (suite *Suite) SetupTest() {
 	suite.pendingExecutionEvents = suite.createPendingExecutionEvents(2) // 2 callbacks
 	suite.systemCollection, err = blueprints.SystemCollection(suite.chainID.Chain(), suite.pendingExecutionEvents)
 	suite.Require().NoError(err)
+	suite.processScheduledCallbackEventType = suite.pendingExecutionEvents[0].Type
 
 	suite.db, suite.dbDir = unittest.TempPebbleDB(suite.T())
 	progress, err := store.NewConsumerProgress(pebbleimpl.ToDB(suite.db), module.ConsumeProgressLastFullBlockHeight).Initialize(0)
@@ -1890,6 +1892,7 @@ func (suite *Suite) setupExecutionGetEventsRequest(blockID flow.Identifier, bloc
 	}
 
 	request := &execproto.GetEventsForBlockIDsRequest{
+		Type:     string(suite.processScheduledCallbackEventType),
 		BlockIds: [][]byte{blockID[:]},
 	}
 	expectedResponse := &execproto.GetEventsForBlockIDsResponse{
