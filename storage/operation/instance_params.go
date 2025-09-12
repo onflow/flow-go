@@ -39,7 +39,6 @@ func InsertInstanceParams(lctx lockctx.Proof, rw storage.ReaderBatchWriter, para
 //
 // Expected errors during normal operations:
 //   - [storage.ErrNotFound] if the key does not exist (not bootstrapped).
-//   - Generic error for unexpected database or decoding failures.
 func RetrieveInstanceParams(r storage.Reader, params *flow.VersionedInstanceParams) error {
 	return RetrieveByKey(r, MakePrefix(codeInstanceParams), params)
 }
