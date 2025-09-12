@@ -1971,7 +1971,7 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 			return nil, fmt.Errorf("failed to create execution result provider: %w", err)
 		}
 
-		execStateCache := execution_state_cache.NewExecutionStateCache()
+		execStateCache := execution_state.NewExecutionStateCacheMock()
 
 		backendParams := backend.Params{
 			State:                node.State,

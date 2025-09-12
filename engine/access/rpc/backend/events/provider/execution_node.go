@@ -67,7 +67,7 @@ func (e *ENEventProvider) Events(
 		BlockIds: convert.IdentifiersToMessages(blockIDs),
 	}
 
-	resp, _, err := e.getEventsFromAnyExeNode(ctx, execResultInfo.ExecutionNodes, req)
+	resp, node, err := e.getEventsFromAnyExeNode(ctx, execResultInfo.ExecutionNodes, req)
 	if err != nil {
 		return Response{}, access.ExecutorMetadata{},
 			rpc.ConvertError(err, "failed to get execution nodes for events query", codes.Internal)
@@ -75,8 +75,7 @@ func (e *ENEventProvider) Events(
 
 	metadata := access.ExecutorMetadata{
 		ExecutionResultID: execResultInfo.ExecutionResult.ID(),
-		//TODO(illia): return ordered exec nodes (use Peter's code)
-		ExecutorIDs: execResultInfo.ExecutionNodes.NodeIDs(),
+		ExecutorIDs:       orderedExecutors(node.NodeID, execResultInfo.ExecutionNodes.NodeIDs()),
 	}
 
 	// convert execution node api result to access node api result
@@ -197,4 +196,20 @@ func verifyAndConvertToAccessEvents(
 	}
 
 	return results, nil
+}
+
+// orderedExecutors creates an ordered list of executors for the same execution result
+// - respondingExecutor is the executor who returned execution result.
+// - executorList is a list of executors who also produced the same execution result.
+func orderedExecutors(respondingExecutor flow.Identifier, executorList flow.IdentifierList) flow.IdentifierList {
+	ordered := make(flow.IdentifierList, 0, len(executorList))
+	ordered = append(ordered, respondingExecutor)
+
+	for _, nodeID := range executorList {
+		if nodeID != respondingExecutor {
+			ordered = append(ordered, nodeID)
+		}
+	}
+
+	return ordered
 }

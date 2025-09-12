@@ -81,7 +81,8 @@ import (
 	execdatacache "github.com/onflow/flow-go/module/executiondatasync/execution_data/cache"
 	"github.com/onflow/flow-go/module/executiondatasync/optimistic_sync"
 	"github.com/onflow/flow-go/module/executiondatasync/optimistic_sync/execution_result_info_provider"
-	"github.com/onflow/flow-go/module/executiondatasync/optimistic_sync/execution_state_cache"
+	"github.com/onflow/flow-go/module/executiondatasync/optimistic_sync/execution_state"
+	osyncsnapshot "github.com/onflow/flow-go/module/executiondatasync/optimistic_sync/snapshot"
 	"github.com/onflow/flow-go/module/executiondatasync/pruner"
 	edstorage "github.com/onflow/flow-go/module/executiondatasync/storage"
 	"github.com/onflow/flow-go/module/executiondatasync/tracker"
@@ -2038,8 +2039,9 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				return nil, fmt.Errorf("failed to create execution result provider: %w", err)
 			}
 
-			// TODO(illia): use mock storage to return actual events DB
-			execStateCache := execution_state_cache.NewExecutionStateCache()
+			// TODO: use real objects instead of mocks once they're implemented
+			snapshot := osyncsnapshot.NewSnapshotMock(builder.events)
+			execStateCache := execution_state.NewExecutionStateCacheMock(snapshot)
 
 			builder.nodeBackend, err = backend.New(backend.Params{
 				State:                 node.State,
