@@ -302,6 +302,14 @@ func (t *LocalTransactionProvider) TransactionResultsByBlockID(
 		return nil, status.Errorf(codes.Internal, "failed to map tx to collection ID: %v", err)
 	}
 
+	txStatus, err := t.txStatusDeriver.DeriveTransactionStatus(block.Height, true)
+	if err != nil {
+		if !errors.Is(err, state.ErrUnknownSnapshotReference) {
+			irrecoverable.Throw(ctx, err)
+		}
+		return nil, rpc.ConvertStorageError(err)
+	}
+
 	for _, txResult := range txResults {
 		txID := txResult.TransactionID
 
@@ -313,14 +321,6 @@ func (t *LocalTransactionProvider) TransactionResultsByBlockID(
 				return nil, status.Errorf(codes.Internal, "transaction failed but error message is empty for tx ID: %s block ID: %s", txID, blockID)
 			}
 			txStatusCode = 1
-		}
-
-		txStatus, err := t.txStatusDeriver.DeriveTransactionStatus(block.Height, true)
-		if err != nil {
-			if !errors.Is(err, state.ErrUnknownSnapshotReference) {
-				irrecoverable.Throw(ctx, err)
-			}
-			return nil, rpc.ConvertStorageError(err)
 		}
 
 		events, err := t.eventsIndex.ByBlockIDTransactionID(blockID, block.Height, txResult.TransactionID)
@@ -337,8 +337,9 @@ func (t *LocalTransactionProvider) TransactionResultsByBlockID(
 		}
 
 		collectionID, ok := txToCollectionID[txID]
-		// for all the transactions that are not in the block user collections we assign the zeroID indicating system collection
 		if !ok {
+			// for all the transactions that are not in the block's user collections we assign the
+			// ZeroID indicating system collection.
 			collectionID = flow.ZeroID
 		}
 
@@ -402,6 +403,7 @@ func (t *LocalTransactionProvider) SystemTransactionResult(
 	txID flow.Identifier,
 	requiredEventEncodingVersion entities.EventEncodingVersion,
 ) (*accessmodel.TransactionResult, error) {
+	// make sure the request is for a system transaction
 	if txID != t.systemTxID {
 		if _, err := t.SystemTransaction(ctx, block, txID); err != nil {
 			return nil, status.Errorf(codes.NotFound, "system transaction not found")

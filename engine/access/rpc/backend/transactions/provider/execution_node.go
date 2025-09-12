@@ -270,9 +270,15 @@ func (e *ENTransactionProvider) TransactionResultsByBlockID(
 		return userTxResults, nil
 	}
 
+	// there must be at least one system transaction result
+	if len(userTxResults) >= len(executionResponse.TransactionResults) {
+		return nil, status.Errorf(codes.Internal, "no system transaction results")
+	}
+
+	remainingTxResults := executionResponse.TransactionResults[len(userTxResults):]
+
 	systemTxResults, err := e.systemTransactionResults(
-		ctx,
-		len(userTxResults),
+		remainingTxResults,
 		block,
 		blockID,
 		txStatus,
@@ -404,31 +410,14 @@ func (e *ENTransactionProvider) userTransactionResults(
 // We should always return transaction result for system chunk transaction, but if scheduled callbacks are enabled
 // we also return results for the process and execute callbacks transactions.
 func (e *ENTransactionProvider) systemTransactionResults(
-	ctx context.Context,
-	userTxCount int,
+	systemTxResults []*execproto.GetTransactionResultResponse,
 	block *flow.Block,
 	blockID flow.Identifier,
 	txStatus flow.TransactionStatus,
 	resp *execproto.GetTransactionResultsResponse,
 	requiredEventEncodingVersion entities.EventEncodingVersion,
 ) ([]*accessmodel.TransactionResult, error) {
-
-	// TransactionResults includes the system tx results plus the user transactions
-	if userTxCount >= len(resp.TransactionResults) {
-		// this is unexpected. there must always be at least one system transaction
-		return nil, status.Errorf(codes.Internal, "no system transaction results")
-	}
-	systemTxStartIndex := userTxCount
-	systemTxResults := resp.TransactionResults[systemTxStartIndex:]
-	systemTxCount := len(systemTxResults)
-	results := make([]*accessmodel.TransactionResult, 0, systemTxCount)
-
-	// EN response does not include the txID, so we need to reconstruct the system collection so we
-	// can add them into the results.
-	systemTxIDs, err := e.systemTransactionIDs(
-		systemTxResults,
-		resp.GetEventEncodingVersion(),
-	)
+	systemTxIDs, err := e.systemTransactionIDs(systemTxResults, resp.GetEventEncodingVersion())
 	if err != nil {
 		return nil, rpc.ConvertError(err, "failed to determine system transaction IDs", codes.Internal)
 	}
@@ -440,6 +429,7 @@ func (e *ENTransactionProvider) systemTransactionResults(
 		return nil, status.Errorf(codes.Internal, "system transaction count mismatch: expected %d, got %d", len(systemTxResults), len(systemTxIDs))
 	}
 
+	results := make([]*accessmodel.TransactionResult, 0, len(systemTxResults))
 	for i, systemTxResult := range systemTxResults {
 		events, err := convert.MessagesToEventsWithEncodingConversion(systemTxResult.GetEvents(), resp.GetEventEncodingVersion(), requiredEventEncodingVersion)
 		if err != nil {
@@ -453,6 +443,7 @@ func (e *ENTransactionProvider) systemTransactionResults(
 			ErrorMessage:  systemTxResult.GetErrorMessage(),
 			BlockID:       blockID,
 			TransactionID: systemTxIDs[i],
+			CollectionID:  flow.ZeroID,
 			BlockHeight:   block.Height,
 		})
 	}
@@ -467,13 +458,15 @@ func (e *ENTransactionProvider) systemTransactionIDs(
 ) ([]flow.Identifier, error) {
 	// TODO: implement system that allows this endpoint to dynamically determine if scheduled
 	// transactions were enabled for this block. See https://github.com/onflow/flow-go/issues/7873
-	if len(systemTxResults) > 1 {
+	if len(systemTxResults) == 1 {
 		return []flow.Identifier{e.systemTxID}, nil
 	}
 
 	// if scheduled callbacks are enabled, the first transaction will always be the "process" transaction
 	// get its events to reconstruct the system collection
 	processResult := systemTxResults[0]
+
+	// blueprints.SystemCollection requires events are CCF encoded
 	events, err := convert.MessagesToEventsWithEncodingConversion(
 		processResult.GetEvents(),
 		actualEventEncodingVersion,

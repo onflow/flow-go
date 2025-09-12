@@ -1004,7 +1004,8 @@ func (suite *Suite) TestGetTransactionResultsByBlockID() {
 	}
 
 	exeEventResp := &execproto.GetTransactionResultsResponse{
-		TransactionResults: []*execproto.GetTransactionResultResponse{{}},
+		TransactionResults:   []*execproto.GetTransactionResultResponse{{}},
+		EventEncodingVersion: entitiesproto.EventEncodingVersion_CCF_V0,
 	}
 
 	suite.fixedExecutionNodeIDs = fixedENIDs.NodeIDs()
@@ -1012,6 +1013,7 @@ func (suite *Suite) TestGetTransactionResultsByBlockID() {
 	params := suite.defaultBackendParams()
 	// the connection factory should be used to get the execution node client
 	params.ConnFactory = suite.setupConnectionFactory()
+	params.ScheduledCallbacksEnabled = true
 
 	backend, err := New(params)
 	suite.Require().NoError(err)
