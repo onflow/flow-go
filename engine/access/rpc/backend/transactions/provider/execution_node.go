@@ -2,7 +2,6 @@ package provider
 
 import (
 	"context"
-	"encoding/hex"
 	"errors"
 	"fmt"
 
@@ -22,7 +21,6 @@ import (
 	accessmodel "github.com/onflow/flow-go/model/access"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/irrecoverable"
-	"github.com/onflow/flow-go/state"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
 )
@@ -106,10 +104,8 @@ func (e *ENTransactionProvider) TransactionResult(
 	// tx body is irrelevant to status if it's in an executed block
 	txStatus, err := e.txStatusDeriver.DeriveTransactionStatus(block.Height, true)
 	if err != nil {
-		if !errors.Is(err, state.ErrUnknownSnapshotReference) {
-			irrecoverable.Throw(ctx, err)
-		}
-		return nil, rpc.ConvertStorageError(err)
+		irrecoverable.Throw(ctx, fmt.Errorf("failed to derive transaction status: %w", err))
+		return nil, err
 	}
 
 	events, err := convert.MessagesToEventsWithEncodingConversion(resp.GetEvents(), resp.GetEventEncodingVersion(), requiredEventEncodingVersion)
@@ -146,6 +142,8 @@ func (e *ENTransactionProvider) TransactionsByBlockID(
 	}
 
 	// system transactions
+	// TODO: implement system that allows this endpoint to dynamically determine if scheduled
+	// transactions were enabled for this block. See https://github.com/onflow/flow-go/issues/7873
 	if !e.scheduledCallbacksEnabled {
 		systemTx, err := blueprints.SystemChunkTransaction(e.chainID.Chain())
 		if err != nil {
@@ -200,10 +198,8 @@ func (e *ENTransactionProvider) TransactionResultByIndex(
 	// tx body is irrelevant to status if it's in an executed block
 	txStatus, err := e.txStatusDeriver.DeriveTransactionStatus(block.Height, true)
 	if err != nil {
-		if !errors.Is(err, state.ErrUnknownSnapshotReference) {
-			irrecoverable.Throw(ctx, err)
-		}
-		return nil, rpc.ConvertStorageError(err)
+		irrecoverable.Throw(ctx, fmt.Errorf("failed to derive transaction status: %w", err))
+		return nil, err
 	}
 
 	events, err := convert.MessagesToEventsWithEncodingConversion(resp.GetEvents(), resp.GetEventEncodingVersion(), encodingVersion)
@@ -250,10 +246,8 @@ func (e *ENTransactionProvider) TransactionResultsByBlockID(
 
 	txStatus, err := e.txStatusDeriver.DeriveTransactionStatus(block.Height, true)
 	if err != nil {
-		if !errors.Is(err, state.ErrUnknownSnapshotReference) {
-			irrecoverable.Throw(ctx, err)
-		}
-		return nil, rpc.ConvertStorageError(err)
+		irrecoverable.Throw(ctx, fmt.Errorf("failed to derive transaction status: %w", err))
+		return nil, err
 	}
 
 	userTxResults, err := e.userTransactionResults(
@@ -296,6 +290,18 @@ func (e *ENTransactionProvider) SystemTransaction(
 ) (*flow.TransactionBody, error) {
 	blockID := block.ID()
 
+	if txID == e.systemTxID || !e.scheduledCallbacksEnabled {
+		systemTx, err := blueprints.SystemChunkTransaction(e.chainID.Chain())
+		if err != nil {
+			return nil, status.Errorf(codes.Internal, "failed to construct system chunk transaction: %v", err)
+		}
+
+		if txID == systemTx.ID() {
+			return systemTx, nil
+		}
+		return nil, fmt.Errorf("transaction %s not found in block %s", txID, blockID)
+	}
+
 	events, err := e.getBlockEvents(ctx, blockID)
 	if err != nil {
 		return nil, rpc.ConvertError(err, "failed to retrieve events from any execution node", codes.Internal)
@@ -321,7 +327,14 @@ func (e *ENTransactionProvider) SystemTransactionResult(
 	txID flow.Identifier,
 	requiredEventEncodingVersion entities.EventEncodingVersion,
 ) (*accessmodel.TransactionResult, error) {
+	// make sure the request is for a system transaction
+	if txID != e.systemTxID {
+		if _, err := e.SystemTransaction(ctx, block, txID); err != nil {
+			return nil, status.Errorf(codes.NotFound, "system transaction not found")
+		}
+	}
 	return e.TransactionResult(ctx, block.ToHeader(), txID, requiredEventEncodingVersion)
+
 }
 
 // userTransactionResults constructs the user transaction results from the execution node response.
@@ -399,6 +412,7 @@ func (e *ENTransactionProvider) systemTransactionResults(
 
 	// TransactionResults includes the system tx results plus the user transactions
 	if userTxCount >= len(resp.TransactionResults) {
+		// this is unexpected. there must always be at least one system transaction
 		return nil, status.Errorf(codes.Internal, "no system transaction results")
 	}
 	systemTxStartIndex := userTxCount
@@ -446,7 +460,8 @@ func (e *ENTransactionProvider) systemTransactionIDs(
 		return []flow.Identifier{e.systemTxID}, nil
 	}
 
-	// Get events from the process scheduled callback transaction to reconstruct the system collection
+	// if scheduled callbacks are enabled, the first transaction will always be the "process" transaction
+	// get its events to reconstruct the system collection
 	processResult := systemTxResults[0]
 	events, err := convert.MessagesToEventsWithEncodingConversion(
 		processResult.GetEvents(),
@@ -504,7 +519,7 @@ func (e *ENTransactionProvider) getBlockEvents(
 		resultEvents, err := convert.MessagesToEventsWithEncodingConversion(
 			result.GetEvents(),
 			resp.GetEventEncodingVersion(),
-			entities.EventEncodingVersion_JSON_CDC_V0,
+			entities.EventEncodingVersion_CCF_V0,
 		)
 		if err != nil {
 			return nil, rpc.ConvertError(err, "failed to convert events", codes.Internal)
@@ -650,17 +665,6 @@ func (e *ENTransactionProvider) getBlockEventsByBlockIDsFromAnyExeNode(
 		func(node *flow.IdentitySkeleton) error {
 			var err error
 			resp, err = e.tryGetBlockEventsByBlockIDs(ctx, node, req)
-			if err == nil {
-				var ids []string
-				for _, id := range req.GetBlockIds() {
-					ids = append(ids, hex.EncodeToString(id))
-				}
-				e.log.Debug().
-					Str("execution_node", node.String()).
-					Strs("block_ids", ids).
-					Msg("Successfully got block events from any node")
-				return nil
-			}
 			return err
 		},
 		nil,

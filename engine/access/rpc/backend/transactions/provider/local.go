@@ -52,8 +52,8 @@ func NewLocalTransactionProvider(
 	txErrorMessages error_messages.Provider,
 	systemTxID flow.Identifier,
 	txStatusDeriver *txstatus.TxStatusDeriver,
-	scheduledCallbacksEnabled bool,
 	chainID flow.ChainID,
+	scheduledCallbacksEnabled bool,
 ) *LocalTransactionProvider {
 	return &LocalTransactionProvider{
 		state:                     state,
@@ -252,7 +252,7 @@ func (t *LocalTransactionProvider) TransactionsByBlockID(
 
 	events, err := t.eventsIndex.ByBlockID(blockID, block.Height)
 	if err != nil {
-		return nil, rpc.ConvertStorageError(err)
+		return nil, rpc.ConvertIndexError(err, block.Height, "failed to get events")
 	}
 
 	sysCollection, err := blueprints.SystemCollection(t.chainID.Chain(), events)
@@ -363,9 +363,23 @@ func (t *LocalTransactionProvider) SystemTransaction(
 	block *flow.Block,
 	txID flow.Identifier,
 ) (*flow.TransactionBody, error) {
-	events, err := t.eventsIndex.ByBlockID(block.ID(), block.Height)
+	blockID := block.ID()
+
+	if txID == t.systemTxID || !t.scheduledCallbacksEnabled {
+		systemTx, err := blueprints.SystemChunkTransaction(t.chainID.Chain())
+		if err != nil {
+			return nil, status.Errorf(codes.Internal, "failed to construct system chunk transaction: %v", err)
+		}
+
+		if txID == systemTx.ID() {
+			return systemTx, nil
+		}
+		return nil, fmt.Errorf("transaction %s not found in block %s", txID, blockID)
+	}
+
+	events, err := t.eventsIndex.ByBlockID(blockID, block.Height)
 	if err != nil {
-		return nil, rpc.ConvertStorageError(err)
+		return nil, rpc.ConvertIndexError(err, block.Height, "failed to get events")
 	}
 
 	sysCollection, err := blueprints.SystemCollection(t.chainID.Chain(), events)
@@ -388,6 +402,11 @@ func (t *LocalTransactionProvider) SystemTransactionResult(
 	txID flow.Identifier,
 	requiredEventEncodingVersion entities.EventEncodingVersion,
 ) (*accessmodel.TransactionResult, error) {
+	if txID != t.systemTxID {
+		if _, err := t.SystemTransaction(ctx, block, txID); err != nil {
+			return nil, status.Errorf(codes.NotFound, "system transaction not found")
+		}
+	}
 	return t.TransactionResult(ctx, block.ToHeader(), txID, requiredEventEncodingVersion)
 }
 

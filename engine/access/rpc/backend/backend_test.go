@@ -104,7 +104,7 @@ func TestHandler(t *testing.T) {
 }
 
 func (suite *Suite) SetupTest() {
-	suite.log = zerolog.New(zerolog.NewConsoleWriter())
+	suite.log = unittest.Logger()
 	suite.state = new(protocol.State)
 	suite.snapshot = new(protocol.Snapshot)
 	header := unittest.BlockHeaderFixture()
@@ -969,7 +969,7 @@ func (suite *Suite) TestGetTransactionResultByIndex() {
 		suite.snapshot.On("Head").Return(nil, err).Once()
 
 		// mock signaler context expect an error
-		signCtxErr := irrecoverable.NewExceptionf("failed to lookup sealed header: %w", err)
+		signCtxErr := fmt.Errorf("failed to derive transaction status: %w", irrecoverable.NewExceptionf("failed to lookup sealed header: %w", err))
 		signalerCtx := irrecoverable.WithSignalerContext(context.Background(),
 			irrecoverable.NewMockSignalerContextExpectError(suite.T(), context.Background(), signCtxErr))
 
@@ -1036,7 +1036,7 @@ func (suite *Suite) TestGetTransactionResultsByBlockID() {
 		suite.snapshot.On("Head").Return(nil, err).Once()
 
 		// mock signaler context expect an error
-		signCtxErr := irrecoverable.NewExceptionf("failed to lookup sealed header: %w", err)
+		signCtxErr := fmt.Errorf("failed to derive transaction status: %w", irrecoverable.NewExceptionf("failed to lookup sealed header: %w", err))
 		signalerCtx := irrecoverable.WithSignalerContext(context.Background(),
 			irrecoverable.NewMockSignalerContextExpectError(suite.T(), context.Background(), signCtxErr))
 

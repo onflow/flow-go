@@ -245,6 +245,7 @@ func (s *TransactionStreamSuite) initializeBackend() {
 		errorMessageProvider,
 		s.systemTx.ID(),
 		txStatusDeriver,
+		s.chainID,
 		true, // scheduledCallbacksEnabled
 	)
 

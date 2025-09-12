@@ -24,7 +24,6 @@ import (
 	"github.com/onflow/flow-go/engine/access/rpc/connection"
 	"github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
-	"github.com/onflow/flow-go/fvm/blueprints"
 	accessmodel "github.com/onflow/flow-go/model/access"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
@@ -506,20 +505,7 @@ func (t *Transactions) GetSystemTransaction(
 	}
 
 	if txID == flow.ZeroID {
-		// TODO: add metric for usage and deprecate the optional txID parameter
 		txID = t.systemTxID
-	}
-
-	if !t.scheduledCallbacksEnabled {
-		systemTx, err := blueprints.SystemChunkTransaction(t.chainID.Chain())
-		if err != nil {
-			return nil, status.Errorf(codes.Internal, "failed to construct system chunk transaction: %v", err)
-		}
-
-		if txID == systemTx.ID() {
-			return systemTx, nil
-		}
-		return nil, fmt.Errorf("transaction %s not found in block %s", txID, blockID)
 	}
 
 	return t.txProvider.SystemTransaction(ctx, block, txID)
@@ -532,15 +518,13 @@ func (t *Transactions) GetSystemTransactionResult(
 	blockID flow.Identifier,
 	requiredEventEncodingVersion entities.EventEncodingVersion,
 ) (*accessmodel.TransactionResult, error) {
-	if txID == flow.ZeroID {
-		// todo add metric for usage and deprecate the optional txID parameter
-		txID = t.systemTxID
-	}
-
-	// first check if the block exists
 	block, err := t.blocks.ByID(blockID)
 	if err != nil {
 		return nil, rpc.ConvertStorageError(err)
+	}
+
+	if txID == flow.ZeroID {
+		txID = t.systemTxID
 	}
 
 	return t.txProvider.SystemTransactionResult(ctx, block, txID, requiredEventEncodingVersion)
