@@ -163,10 +163,13 @@ func callbackArgsFromEvent(event flow.Event) ([]byte, uint64, error) {
 }
 
 func isPendingExecutionEvent(env templates.Environment, event flow.Event) bool {
+	processedEventType := PendingExecutionEventType(env)
+	return event.Type == processedEventType
+}
+
+func PendingExecutionEventType(env templates.Environment) flow.EventType {
 	const processedEventTypeTemplate = "A.%v.FlowCallbackScheduler.PendingExecution"
 
 	scheduledContractAddress := env.FlowCallbackSchedulerAddress
-	processedEventType := flow.EventType(fmt.Sprintf(processedEventTypeTemplate, scheduledContractAddress))
-
-	return event.Type == processedEventType
+	return flow.EventType(fmt.Sprintf(processedEventTypeTemplate, scheduledContractAddress))
 }
