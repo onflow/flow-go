@@ -22,6 +22,8 @@ const (
 	DefaultComputationLimit   = 100_000 // 100K
 	DefaultMemoryLimit        = math.MaxUint64
 	DefaultMaxInteractionSize = 20_000_000 // ~20MB
+
+	DefaultScheduledCallbacksEnabled = false
 )
 
 // A Context defines a set of execution parameters used by the virtual machine.
