@@ -19,11 +19,11 @@ const (
 	codeLivenessData = 11 // liveness data for hotstuff state
 
 	// codes for fields associated with the root state
-	_ = 13 // DEPRECATED: 13 was used for root spork ID
-	_ = 14 // DEPRECATED: 14 was used for ProtocolVersion before the versioned Protocol State
-	_ = 15 // DEPRECATED: 15 was used to save the finalization safety threshold
-	_ = 16 // DEPRECATED: 16 was used for root spork height
-	_ = 17 // DEPRECATED: 17 was used for the root spork block ID
+	codeInstanceParams = 13 // instance parameters which are constant throughout the lifetime of a node(finalized root, sealed root, spork root)
+	_                  = 14 // DEPRECATED: 14 was used for ProtocolVersion before the versioned Protocol State
+	_                  = 15 // DEPRECATED: 15 was used to save the finalization safety threshold
+	_                  = 16 // DEPRECATED: 16 was used for root spork height
+	_                  = 17 // DEPRECATED: 17 was used for the root spork block ID
 
 	// code for heights with special meaning
 	codeFinalizedHeight         = 20 // latest finalized block height
@@ -34,7 +34,6 @@ const (
 	codeLastCompleteBlockHeight = 25 // the height of the last block for which all collections were received
 	codeEpochFirstHeight        = 26 // the height of the first block in a given epoch
 	_                           = 27 // DEPRECATED: 27 was used for the height of the highest sealed block contained in the root snapshot
-	codeInstanceParams          = 28 // instance parameters which are constant throughout the lifetime of a node(finalized root, sealed root, spork root)
 
 	// codes for single entity storage
 	codeHeader               = 30
