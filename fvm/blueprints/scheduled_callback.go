@@ -51,7 +51,7 @@ func SystemCollection(chain flow.Chain, processEvents flow.EventsList) (*flow.Co
 // No errors are expected during normal operation.
 func ProcessCallbacksTransaction(chain flow.Chain) (*flow.TransactionBody, error) {
 	sc := systemcontracts.SystemContractsForChain(chain.ChainID())
-	script := templates.GenerateProcessCallbackScript(sc.AsTemplateEnv())
+	script := templates.GenerateProcessTransactionScript(sc.AsTemplateEnv())
 
 	return flow.NewTransactionBodyBuilder().
 		AddAuthorizer(sc.FlowServiceAccount.Address).
@@ -96,7 +96,7 @@ func executeCallbackTransaction(
 	id []byte,
 	effort uint64,
 ) (*flow.TransactionBody, error) {
-	script := templates.GenerateExecuteCallbackScript(env)
+	script := templates.GenerateExecuteTransactionScript(env)
 
 	return flow.NewTransactionBodyBuilder().
 		AddAuthorizer(sc.FlowServiceAccount.Address).
@@ -168,8 +168,8 @@ func isPendingExecutionEvent(env templates.Environment, event flow.Event) bool {
 }
 
 func PendingExecutionEventType(env templates.Environment) flow.EventType {
-	const processedEventTypeTemplate = "A.%v.FlowCallbackScheduler.PendingExecution"
+	const processedEventTypeTemplate = "A.%v.FlowTransactionScheduler.PendingExecution"
 
-	scheduledContractAddress := env.FlowCallbackSchedulerAddress
+	scheduledContractAddress := env.FlowTransactionSchedulerAddress
 	return flow.EventType(fmt.Sprintf(processedEventTypeTemplate, scheduledContractAddress))
 }

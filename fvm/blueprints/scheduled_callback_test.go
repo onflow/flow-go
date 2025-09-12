@@ -29,7 +29,7 @@ func TestProcessCallbacksTransaction(t *testing.T) {
 
 	assert.NotNil(t, tx)
 	assert.NotEmpty(t, tx.Script)
-	require.False(t, strings.Contains(string(tx.Script), `import "FlowCallbackScheduler"`), "should resolve callback scheduler import")
+	require.False(t, strings.Contains(string(tx.Script), `import "FlowTransactionScheduler"`), "should resolve callback scheduler import")
 	assert.Equal(t, uint64(flow.DefaultMaxTransactionGasLimit), tx.GasLimit)
 	assert.Equal(t, tx.Authorizers, []flow.Address{chain.ServiceAddress()})
 	assert.Empty(t, tx.Arguments)
@@ -172,7 +172,7 @@ func TestExecuteCallbackTransaction(t *testing.T) {
 	tx := txs[0]
 	assert.NotNil(t, tx)
 	assert.NotEmpty(t, tx.Script)
-	require.False(t, strings.Contains(string(tx.Script), `import "FlowCallbackScheduler"`), "should resolve callback scheduler import")
+	require.False(t, strings.Contains(string(tx.Script), `import "FlowTransactionScheduler"`), "should resolve callback scheduler import")
 	assert.Equal(t, uint64(effort), tx.GasLimit)
 	assert.Len(t, tx.Arguments, 1)
 
@@ -184,10 +184,10 @@ func TestExecuteCallbackTransaction(t *testing.T) {
 }
 
 func createValidCallbackEvent(t *testing.T, id uint64, effort uint64) flow.Event {
-	const processedEventTypeTemplate = "A.%v.FlowCallbackScheduler.PendingExecution"
+	const processedEventTypeTemplate = "A.%v.FlowTransactionScheduler.PendingExecution"
 	env := systemcontracts.SystemContractsForChain(flow.Mainnet.Chain().ChainID()).AsTemplateEnv()
-	eventTypeString := fmt.Sprintf(processedEventTypeTemplate, env.FlowCallbackSchedulerAddress)
-	loc, err := cadenceCommon.HexToAddress(env.FlowCallbackSchedulerAddress)
+	eventTypeString := fmt.Sprintf(processedEventTypeTemplate, env.FlowTransactionSchedulerAddress)
+	loc, err := cadenceCommon.HexToAddress(env.FlowTransactionSchedulerAddress)
 	require.NoError(t, err)
 	location := cadenceCommon.NewAddressLocation(nil, loc, "PendingExecution")
 
@@ -236,7 +236,7 @@ func createInvalidTypeEvent() flow.Event {
 
 func createInvalidPayloadEvent() flow.Event {
 	return flow.Event{
-		Type:             flow.EventType("A.0000000000000000.FlowCallbackScheduler.PendingExecution"),
+		Type:             flow.EventType("A.0000000000000000.FlowTransactionScheduler.PendingExecution"),
 		TransactionID:    unittest.IdentifierFixture(),
 		TransactionIndex: 0,
 		EventIndex:       0,
@@ -245,9 +245,9 @@ func createInvalidPayloadEvent() flow.Event {
 }
 
 func createPendingExecutionEventWithPayload(payload []byte) flow.Event {
-	const processedEventTypeTemplate = "A.%v.FlowCallbackScheduler.PendingExecution"
+	const processedEventTypeTemplate = "A.%v.FlowTransactionScheduler.PendingExecution"
 	env := systemcontracts.SystemContractsForChain(flow.Mainnet.Chain().ChainID()).AsTemplateEnv()
-	eventTypeString := fmt.Sprintf(processedEventTypeTemplate, env.FlowCallbackSchedulerAddress)
+	eventTypeString := fmt.Sprintf(processedEventTypeTemplate, env.FlowTransactionSchedulerAddress)
 
 	return flow.Event{
 		Type:             flow.EventType(eventTypeString),
@@ -370,10 +370,10 @@ func TestSystemCollection(t *testing.T) {
 }
 
 func createEventWithModifiedField(t *testing.T, fieldName string, newValue cadence.Value) flow.Event {
-	const processedEventTypeTemplate = "A.%v.FlowCallbackScheduler.PendingExecution"
+	const processedEventTypeTemplate = "A.%v.FlowTransactionScheduler.PendingExecution"
 	env := systemcontracts.SystemContractsForChain(flow.Mainnet.Chain().ChainID()).AsTemplateEnv()
-	eventTypeString := fmt.Sprintf(processedEventTypeTemplate, env.FlowCallbackSchedulerAddress)
-	loc, err := cadenceCommon.HexToAddress(env.FlowCallbackSchedulerAddress)
+	eventTypeString := fmt.Sprintf(processedEventTypeTemplate, env.FlowTransactionSchedulerAddress)
+	loc, err := cadenceCommon.HexToAddress(env.FlowTransactionSchedulerAddress)
 	require.NoError(t, err)
 	location := cadenceCommon.NewAddressLocation(nil, loc, "PendingExecution")
 

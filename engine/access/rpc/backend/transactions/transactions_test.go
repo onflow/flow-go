@@ -1831,11 +1831,11 @@ func (suite *Suite) createPendingExecutionEvents(numCallbacks int) []flow.Event 
 
 	for i := 0; i < numCallbacks; i++ {
 		// Create the PendingExecution event as it would be emitted by the process callback transaction
-		const processedEventTypeTemplate = "A.%v.FlowCallbackScheduler.PendingExecution"
-		eventTypeString := fmt.Sprintf(processedEventTypeTemplate, env.FlowCallbackSchedulerAddress)
+		const processedEventTypeTemplate = "A.%v.FlowTransactionScheduler.PendingExecution"
+		eventTypeString := fmt.Sprintf(processedEventTypeTemplate, env.FlowTransactionSchedulerAddress)
 
 		// Create Cadence event type
-		loc, err := cadenceCommon.HexToAddress(env.FlowCallbackSchedulerAddress)
+		loc, err := cadenceCommon.HexToAddress(env.FlowTransactionSchedulerAddress)
 		suite.Require().NoError(err)
 		location := cadenceCommon.NewAddressLocation(nil, loc, "PendingExecution")
 
