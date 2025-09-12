@@ -121,11 +121,20 @@ var interestingSpanNamePrefixes = []trace.SpanName{
 	trace.FVMEnvAllocateSlabIndex,
 }
 
+var uninterestingSpanNames = []trace.SpanName{
+	// Only reported by interpreter at the moment, makes diffing harder
+	"fvm.cadence.trace.import",
+}
+
 func (s *spans) ExportSpans(_ context.Context, spans []otelTrace.ReadOnlySpan) error {
 	for _, span := range spans {
 		name := span.Name()
 		for _, prefix := range interestingSpanNamePrefixes {
-			if strings.HasPrefix(name, string(prefix)) {
+
+			// Filter spans
+			if strings.HasPrefix(name, string(prefix)) &&
+				!slices.Contains(uninterestingSpanNames, trace.SpanName(name)) {
+
 				s.spans = append(s.spans, span)
 				break
 			}
