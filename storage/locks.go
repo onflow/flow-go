@@ -24,7 +24,7 @@ const (
 	LockInsertOwnReceipt = "lock_insert_own_receipt"
 	// LockInsertCollection protects the insertion of collections.
 	LockInsertCollection = "lock_insert_collection"
-	// LockBootstrapping protects the data during bootstrapping.
+	// LockBootstrapping protects data that is *exclusively* written during bootstrapping.
 	LockBootstrapping = "lock_bootstrapping"
 )
 

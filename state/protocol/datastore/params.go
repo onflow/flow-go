@@ -37,8 +37,7 @@ type InstanceParams struct {
 var _ protocol.InstanceParams = (*InstanceParams)(nil)
 
 // ReadInstanceParams reads the instance parameters from the database and returns them as in-memory representation.
-// It serves as a constructor for InstanceParams and only requires a read-only database handle,
-// emphasizing that it only reads and never writes.
+// It serves as a constructor for InstanceParams and only requires read-only access to the database (we never write).
 // This information is immutable for the lifetime of a node and may be cached.
 // No errors are expected during normal operation.
 func ReadInstanceParams(
@@ -125,7 +124,9 @@ type InstanceParamsV0 struct {
 	SporkRootBlockID flow.Identifier
 }
 
-// NewVersionedInstanceParams constructs an instance params for a particular version for bootstrapping.
+// NewVersionedInstanceParams constructs a versioned binary blob representing the `InstanceParams`.
+// Conceptually, the values in the `InstanceParams` are immutable during the lifetime of a node.
+// However, versioning allows extending `InstanceParams` with new fields in the future.
 //
 // No errors are expected during normal operation.
 func NewVersionedInstanceParams(

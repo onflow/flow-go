@@ -13,9 +13,10 @@ import (
 //
 // CAUTION:
 //   - This function is intended to be called exactly once during bootstrapping.
-//   - Overwrites are prevented by an explicit existence check; if data is already present, error is returned.
+//     Overwrites are prevented by an explicit existence check; if data is already present, error is returned.
+//   - To guarantee atomicity of existence-check plus database write, we require the caller to acquire
+//     the [storage.LockBootstrapping] lock and hold it until the database write has been committed.
 //
-// It requires the caller to acquire storage.LockBootstrapping lock.
 // Expected errors during normal operations:
 //   - [storage.ErrAlreadyExists] if instance params have already been stored.
 //   - Generic error for unexpected database or encoding failures.
