@@ -100,7 +100,7 @@ func TestFlowCallbackHandlerContract(callbackScheduler sdk.Address, flowToken sd
 					let callback = self.scheduledCallbacks[id]
 						?? panic("Invalid ID: \(id) callback not found")
 					self.scheduledCallbacks[id] = nil
-					return <-FlowTransactionScheduler.cancel(callback: callback)
+					return <-FlowTransactionScheduler.cancel(scheduledTx: callback)
 				}
 
 				access(all) fun getExecutedCallbacks(): [UInt64] {
