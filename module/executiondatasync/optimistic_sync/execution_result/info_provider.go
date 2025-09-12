@@ -80,7 +80,7 @@ func (e *Provider) ExecutionResultInfo(
 	if err != nil {
 		return nil, fmt.Errorf("failed to retrieve execution IDs for root block: %w", err)
 	}
-	
+
 	// if the block ID is the root block, then use the root ExecutionResult and skip the receipt
 	// check since there will not be any.
 	if e.rootBlockID == blockID {
