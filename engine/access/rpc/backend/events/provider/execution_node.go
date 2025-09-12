@@ -75,7 +75,8 @@ func (e *ENEventProvider) Events(
 
 	metadata := access.ExecutorMetadata{
 		ExecutionResultID: execResultInfo.ExecutionResult.ID(),
-		ExecutorIDs:       execResultInfo.ExecutionNodes.NodeIDs(),
+		//TODO(illia): return ordered exec nodes (use Peter's code)
+		ExecutorIDs: execResultInfo.ExecutionNodes.NodeIDs(),
 	}
 
 	// convert execution node api result to access node api result

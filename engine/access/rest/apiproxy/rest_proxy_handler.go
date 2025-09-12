@@ -377,7 +377,6 @@ func (r *RestProxyHandler) GetEventsForHeightRange(
 	startHeight, endHeight uint64,
 	requiredEventEncodingVersion entities.EventEncodingVersion,
 	criteria optimistic_sync.Criteria,
-	// TODO: should we return accessmodel.ExecutorMetadata or models.ExecutorMetadata ?
 ) ([]flow.BlockEvents, accessmodel.ExecutorMetadata, error) {
 	upstream, closer, err := r.FaultTolerantClient()
 	if err != nil {
@@ -415,7 +414,6 @@ func (r *RestProxyHandler) GetEventsForBlockIDs(
 	blockIDs []flow.Identifier,
 	requiredEventEncodingVersion entities.EventEncodingVersion,
 	criteria optimistic_sync.Criteria,
-	// TODO: should we return accessmodel.ExecutorMetadata or models.ExecutorMetadata ?
 ) ([]flow.BlockEvents, accessmodel.ExecutorMetadata, error) {
 	upstream, closer, err := r.FaultTolerantClient()
 	if err != nil {
@@ -510,8 +508,7 @@ func splitOnPrefix(original, prefix string) (string, bool) {
 func getExecutorMetadata(metadata *entities.Metadata) accessmodel.ExecutorMetadata {
 	if metadata != nil {
 		if executorMetadata := metadata.GetExecutionStateQuery(); executorMetadata != nil {
-			m := convert.MessageToExecutorMetadata(*executorMetadata)
-			return m
+			return *convert.MessageToExecutorMetadata(executorMetadata)
 		}
 	}
 

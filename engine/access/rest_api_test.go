@@ -72,7 +72,6 @@ type RestAPITestSuite struct {
 	transactions     *storagemock.Transactions
 	receipts         *storagemock.ExecutionReceipts
 	executionResults *storagemock.ExecutionResults
-	events           *storagemock.Events
 
 	ctx    irrecoverable.SignalerContext
 	cancel context.CancelFunc
@@ -83,7 +82,6 @@ type RestAPITestSuite struct {
 
 	executionResultInfoProvider *osyncmock.ExecutionResultInfoProvider
 	executionStateCache         *osyncmock.ExecutionStateCache
-	executionDataSnapshot       *osyncmock.Snapshot
 }
 
 func (suite *RestAPITestSuite) SetupTest() {
@@ -122,7 +120,6 @@ func (suite *RestAPITestSuite) SetupTest() {
 	suite.collections = new(storagemock.Collections)
 	suite.receipts = new(storagemock.ExecutionReceipts)
 	suite.executionResults = new(storagemock.ExecutionResults)
-	suite.events = new(storagemock.Events)
 
 	suite.collClient = new(accessmock.AccessAPIClient)
 	suite.execClient = new(accessmock.ExecutionAPIClient)
@@ -174,24 +171,7 @@ func (suite *RestAPITestSuite) SetupTest() {
 		nil).Build()
 
 	suite.executionResultInfoProvider = osyncmock.NewExecutionResultInfoProvider(suite.T())
-	suite.executionResultInfoProvider.
-		On("ExecutionResultInfo", mock.Anything, mock.Anything).
-		Return(&optimistic_sync.ExecutionResultInfo{
-			ExecutionResult: unittest.ExecutionResultFixture(),
-			ExecutionNodes:  unittest.IdentityListFixture(2).ToSkeleton(),
-		}, nil).
-		Maybe()
-
-	suite.executionDataSnapshot = osyncmock.NewSnapshot(suite.T())
-	suite.executionDataSnapshot.On("Events").
-		Return(suite.events, nil).
-		Maybe()
-
 	suite.executionStateCache = osyncmock.NewExecutionStateCache(suite.T())
-	suite.executionStateCache.
-		On("Snapshot", mock.Anything).
-		Return(suite.executionDataSnapshot, nil).
-		Maybe()
 
 	bnd, err := backend.New(backend.Params{
 		State:                       suite.state,

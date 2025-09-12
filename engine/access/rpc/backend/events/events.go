@@ -203,17 +203,20 @@ func (e *Events) GetEventsForBlockIDs(
 			status.Errorf(codes.InvalidArgument, "requested block range (%d) exceeded maximum (%d)", len(blockIDs), e.maxHeightRange)
 	}
 
+	var newestBlockHeader *flow.Header
+	newestView := uint64(0)
+
 	// find the block headers for all the block IDs
 	blockHeaders := make([]provider.BlockMetadata, 0, len(blockIDs))
-	var newestBlockHeader flow.Header
 	for _, blockID := range blockIDs {
 		header, err := e.headers.ByBlockID(blockID)
 		if err != nil {
 			return nil, accessmodel.ExecutorMetadata{},
 				rpc.ConvertStorageError(fmt.Errorf("failed to get block header for %s: %w", blockID, err))
 		}
-		if header.View > newestBlockHeader.View {
-			newestBlockHeader = *header
+		if header.View > newestView {
+			newestView = header.View
+			newestBlockHeader = header
 		}
 
 		blockHeaders = append(blockHeaders, provider.BlockMetadata{

@@ -50,7 +50,6 @@ import (
 	"github.com/onflow/flow-go/storage"
 	bstorage "github.com/onflow/flow-go/storage/badger"
 	"github.com/onflow/flow-go/storage/badger/operation"
-	storagemock "github.com/onflow/flow-go/storage/mock"
 	"github.com/onflow/flow-go/storage/operation/badgerimpl"
 	"github.com/onflow/flow-go/storage/store"
 	"github.com/onflow/flow-go/storage/util"
@@ -87,10 +86,8 @@ type Suite struct {
 	sporkID              flow.Identifier
 	protocolStateVersion uint64
 
-	events                      *storagemock.Events
 	executionResultInfoProvider *osyncmock.ExecutionResultInfoProvider
 	executionStateCache         *osyncmock.ExecutionStateCache
-	executionDataSnapshot       *osyncmock.Snapshot
 }
 
 // TestAccess tests scenarios which exercise multiple API calls using both the RPC handler and the ingest engine
@@ -160,27 +157,8 @@ func (suite *Suite) SetupTest() {
 	suite.metrics = metrics.NewNoopCollector()
 	suite.finalizedHeaderCache = mocks.NewFinalizedHeaderCache(suite.T(), suite.state)
 
-	suite.events = storagemock.NewEvents(suite.T())
-
 	suite.executionResultInfoProvider = osyncmock.NewExecutionResultInfoProvider(suite.T())
-	suite.executionResultInfoProvider.
-		On("ExecutionResultInfo", mock.Anything, mock.Anything).
-		Return(&optimistic_sync.ExecutionResultInfo{
-			ExecutionResult: unittest.ExecutionResultFixture(),
-			ExecutionNodes:  unittest.IdentityListFixture(2).ToSkeleton(),
-		}, nil).
-		Maybe()
-
-	suite.executionDataSnapshot = osyncmock.NewSnapshot(suite.T())
-	suite.executionDataSnapshot.On("Events").
-		Return(suite.events, nil).
-		Maybe()
-
 	suite.executionStateCache = osyncmock.NewExecutionStateCache(suite.T())
-	suite.executionStateCache.
-		On("Snapshot", mock.Anything).
-		Return(suite.executionDataSnapshot, nil).
-		Maybe()
 }
 
 func (suite *Suite) RunTest(

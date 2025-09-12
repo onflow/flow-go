@@ -908,11 +908,8 @@ func (h *Handler) GetEventsForHeightRange(
 		return nil, err
 	}
 
-	if query != nil && query.GetIncludeExecutorMetadata() {
-		if !executorMetadata.IsEmpty() {
-			meta := convert.ExecutorMetadataToMessage(executorMetadata)
-			metadata.ExecutionStateQuery = &meta
-		}
+	if query.GetIncludeExecutorMetadata() {
+		metadata.ExecutionStateQuery = convert.ExecutorMetadataToMessage(&executorMetadata)
 	}
 
 	resultEvents, err := convert.BlockEventsToMessages(results)
@@ -959,11 +956,8 @@ func (h *Handler) GetEventsForBlockIDs(
 		return nil, err
 	}
 
-	if query := req.GetExecutionStateQuery(); query != nil && query.GetIncludeExecutorMetadata() {
-		if !executorMetadata.IsEmpty() {
-			meta := convert.ExecutorMetadataToMessage(executorMetadata)
-			metadata.ExecutionStateQuery = &meta
-		}
+	if query := req.GetExecutionStateQuery(); query.GetIncludeExecutorMetadata() {
+		metadata.ExecutionStateQuery = convert.ExecutorMetadataToMessage(&executorMetadata)
 	}
 
 	resultEvents, err := convert.BlockEventsToMessages(results)

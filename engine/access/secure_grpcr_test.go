@@ -62,7 +62,6 @@ type SecureGRPCTestSuite struct {
 	collections  *storagemock.Collections
 	transactions *storagemock.Transactions
 	receipts     *storagemock.ExecutionReceipts
-	events       *storagemock.Events
 
 	ctx    irrecoverable.SignalerContext
 	cancel context.CancelFunc
@@ -73,7 +72,6 @@ type SecureGRPCTestSuite struct {
 
 	executionResultInfoProvider *osyncmock.ExecutionResultInfoProvider
 	executionStateCache         *osyncmock.ExecutionStateCache
-	executionDataSnapshot       *osyncmock.Snapshot
 }
 
 func (suite *SecureGRPCTestSuite) SetupTest() {
@@ -98,7 +96,6 @@ func (suite *SecureGRPCTestSuite) SetupTest() {
 	suite.transactions = new(storagemock.Transactions)
 	suite.collections = new(storagemock.Collections)
 	suite.receipts = new(storagemock.ExecutionReceipts)
-	suite.events = new(storagemock.Events)
 
 	suite.collClient = new(accessmock.AccessAPIClient)
 	suite.execClient = new(accessmock.ExecutionAPIClient)
@@ -152,24 +149,7 @@ func (suite *SecureGRPCTestSuite) SetupTest() {
 	suite.snapshot.On("Head").Return(block, nil)
 
 	suite.executionResultInfoProvider = osyncmock.NewExecutionResultInfoProvider(suite.T())
-	suite.executionResultInfoProvider.
-		On("ExecutionResultInfo", mock.Anything, mock.Anything).
-		Return(&optimistic_sync.ExecutionResultInfo{
-			ExecutionResult: unittest.ExecutionResultFixture(),
-			ExecutionNodes:  unittest.IdentityListFixture(2).ToSkeleton(),
-		}, nil).
-		Maybe()
-
-	suite.executionDataSnapshot = osyncmock.NewSnapshot(suite.T())
-	suite.executionDataSnapshot.On("Events").
-		Return(suite.events, nil).
-		Maybe()
-
 	suite.executionStateCache = osyncmock.NewExecutionStateCache(suite.T())
-	suite.executionStateCache.
-		On("Snapshot", mock.Anything).
-		Return(suite.executionDataSnapshot, nil).
-		Maybe()
 
 	bnd, err := backend.New(backend.Params{
 		State:                       suite.state,

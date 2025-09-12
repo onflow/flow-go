@@ -2038,6 +2038,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				return nil, fmt.Errorf("failed to create execution result provider: %w", err)
 			}
 
+			// TODO(illia): use mock storage to return actual events DB
 			execStateCache := execution_state_cache.NewExecutionStateCache()
 
 			builder.nodeBackend, err = backend.New(backend.Params{
