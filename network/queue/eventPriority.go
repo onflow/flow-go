@@ -58,7 +58,7 @@ func getPriorityByType(message interface{}) Priority {
 	case *messages.BlockResponse:
 		return HighPriority
 
-	// cluster consensus
+	// cluster consensus (effectively collections)
 	case *cluster.UntrustedProposal:
 		return HighPriority
 	case *messages.ClusterBlockVote:
@@ -66,12 +66,10 @@ func getPriorityByType(message interface{}) Priority {
 	case *messages.ClusterBlockResponse:
 		return HighPriority
 
-	// collections, guarantees & transactions
+	// collection guarantees & transactions
 	case *flow.CollectionGuarantee:
 		return HighPriority
 	case *flow.TransactionBody:
-		return HighPriority
-	case *flow.ExecutedTransaction:
 		return HighPriority
 
 	// core messages for execution & verification

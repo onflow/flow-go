@@ -209,24 +209,6 @@ func (tb *TransactionBody) envelopeCanonicalForm() interface{} {
 	}
 }
 
-// ExecutedTransaction represents the result of executing a transaction.
-// In Flow, a transaction is the smallest unit of task, which either atomically succeeds or fails.
-//
-//structwrite:immutable - mutations allowed only within the constructor
-type ExecutedTransaction struct {
-	TransactionBody
-	Status           TransactionStatus
-	Events           []Event
-	ComputationSpent uint64
-	StartState       StateCommitment
-	EndState         StateCommitment
-}
-
-func (tx *ExecutedTransaction) String() string {
-	return fmt.Sprintf("Transaction %v submitted by %v (block %v)",
-		tx.ID(), tx.Payer.Hex(), tx.ReferenceBlockID)
-}
-
 // TransactionStatus represents the status of a transaction.
 type TransactionStatus int
 

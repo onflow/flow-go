@@ -38,7 +38,7 @@ const (
 
 	// collections, guarantees & transactions
 	CodeCollectionGuarantee
-	CodeTransaction
+	_ // DEPRECATED as of Mainnet 27; previously used for essentially an executed transaction
 	CodeTransactionBody
 
 	// core messages for execution & verification
@@ -105,8 +105,6 @@ func MessageCodeFromInterface(v interface{}) (MessageCode, string, error) {
 		return CodeCollectionGuarantee, s, nil
 	case *flow.TransactionBody:
 		return CodeTransactionBody, s, nil
-	case *flow.ExecutedTransaction:
-		return CodeTransaction, s, nil
 
 	// core messages for execution & verification
 	case *flow.ExecutionReceipt:
@@ -181,16 +179,13 @@ func InterfaceFromMessageCode(code MessageCode) (interface{}, string, error) {
 	case CodeBlockResponse:
 		return &messages.BlockResponse{}, what(&messages.BlockResponse{}), nil
 
-	// collections, guarantees & transactions
+	// collection guarantees & transactions
 	case CodeCollectionGuarantee:
 		var guarantee flow.CollectionGuarantee
 		return &guarantee, what(&guarantee), nil
 	case CodeTransactionBody:
 		var transactionBody flow.TransactionBody
 		return &transactionBody, what(&transactionBody), nil
-	case CodeTransaction:
-		var transaction flow.ExecutedTransaction
-		return &transaction, what(&transaction), nil
 
 	// core messages for execution & verification
 	case CodeExecutionReceipt:
