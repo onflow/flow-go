@@ -127,6 +127,7 @@ func LogProgress(
 		current := currentIndex.Add(diff)
 		lastTime := lastDataTime.Swap(now)
 
+		// if the diff went over one or more increments, log the progress for each increment
 		fromTick := (current - diff - incrementsOverflow) / increment
 		toTick := (current - incrementsOverflow) / increment
 
@@ -137,6 +138,8 @@ func LogProgress(
 		}
 
 		for t := fromTick; t < toTick; t++ {
+			// (t+1) because we want to log the progress for the increment reached
+			// not the increment past
 			current := increment*(t+1) + incrementsOverflow
 			logProgress(current)
 		}
