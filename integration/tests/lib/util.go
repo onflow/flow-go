@@ -80,7 +80,7 @@ func TestFlowCallbackHandlerContract(callbackScheduler sdk.Address, flowToken sd
 				access(all) let HandlerStoragePath: StoragePath
 				access(all) let HandlerPublicPath: PublicPath
 				
-				access(all) resource Handler: FlowTransactionScheduler.CallbackHandler {
+				access(all) resource Handler: FlowTransactionScheduler.TransactionHandler {
 					
 					access(FlowTransactionScheduler.Execute) 
 					fun executeCallback(id: UInt64, data: AnyStruct?) {
@@ -161,8 +161,8 @@ func ReadCounterScript(contractAddress sdk.Address, accountAddress sdk.Address) 
 			`
 			  let account = getAccount(0x%s)
 			  let counter = account.capabilities.borrow<&Testing.Counter>(/public/counter)
-              return counter?.count ?? %d
-            `,
+			  return counter?.count ?? %d
+			`,
 			accountAddress.Hex(),
 			CounterDefaultValue,
 		),
@@ -372,16 +372,16 @@ func ScheduleCallbackAtTimestamp(
 		transaction(timestamp: UFix64) {
 
 			prepare(account: auth(BorrowValue, SaveValue, IssueStorageCapabilityController, PublishCapability, GetStorageCapabilityController) &Account) {
-        		if !account.storage.check<@TestFlowCallbackHandler.Handler>(from: TestFlowCallbackHandler.HandlerStoragePath) {
-            		let handler <- TestFlowCallbackHandler.createHandler()
+				if !account.storage.check<@TestFlowCallbackHandler.Handler>(from: TestFlowCallbackHandler.HandlerStoragePath) {
+					let handler <- TestFlowCallbackHandler.createHandler()
 				
 					account.storage.save(<-handler, to: TestFlowCallbackHandler.HandlerStoragePath)
-            		account.capabilities.storage.issue<auth(FlowTransactionScheduler.Execute) &{FlowTransactionScheduler.CallbackHandler}>(TestFlowCallbackHandler.HandlerStoragePath)
+					account.capabilities.storage.issue<auth(FlowTransactionScheduler.Execute) &{FlowTransactionScheduler.TransactionHandler}>(TestFlowCallbackHandler.HandlerStoragePath)
 				}
 
 				let callbackCap = account.capabilities.storage
 					.getControllers(forPath: TestFlowCallbackHandler.HandlerStoragePath)[0]
-					.capability as! Capability<auth(FlowTransactionScheduler.Execute) &{FlowTransactionScheduler.CallbackHandler}>
+					.capability as! Capability<auth(FlowTransactionScheduler.Execute) &{FlowTransactionScheduler.TransactionHandler}>
 				
 				let vault = account.storage.borrow<auth(FungibleToken.Withdraw) &FlowToken.Vault>(from: /storage/flowTokenVault)
 					?? panic("Could not borrow FlowToken vault")
