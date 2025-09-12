@@ -20,6 +20,7 @@ import (
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/trace"
 	realproto "github.com/onflow/flow-go/state/protocol"
+	"github.com/onflow/flow-go/state/protocol/datastore"
 	protocol "github.com/onflow/flow-go/state/protocol/mock"
 	"github.com/onflow/flow-go/storage"
 	storagemock "github.com/onflow/flow-go/storage/mock"
@@ -255,9 +256,16 @@ func (bs *BuilderSuite) SetupTest() {
 
 	// insert finalized height and root height
 	db := bs.db
-	unittest.WithLock(bs.T(), lockManager, storage.LockFinalizeBlock, func(lctx lockctx.Context) error {
+	unittest.WithLocks(bs.T(), lockManager, []string{storage.LockFinalizeBlock, storage.LockBootstrapping}, func(lctx lockctx.Context) error {
 		return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			require.NoError(bs.T(), operation.InsertRootHeight(rw.Writer(), 13))
+			enc, err := datastore.NewVersionedInstanceParams(
+				datastore.DefaultInstanceParamsVersion,
+				unittest.IdentifierFixture(),
+				unittest.IdentifierFixture(),
+				unittest.IdentifierFixture(),
+			)
+			require.NoError(bs.T(), err)
+			require.NoError(bs.T(), operation.InsertInstanceParams(lctx, rw, *enc))
 			require.NoError(bs.T(), operation.UpsertFinalizedHeight(lctx, rw.Writer(), final.Height))
 			require.NoError(bs.T(), operation.IndexFinalizedBlockByHeight(lctx, rw, final.Height, bs.finalID))
 			require.NoError(bs.T(), operation.UpsertSealedHeight(lctx, rw.Writer(), first.Height))

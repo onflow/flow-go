@@ -163,23 +163,24 @@ func (suite *Suite) RunTest(
 
 		var err error
 		suite.backend, err = backend.New(backend.Params{
-			State:                suite.state,
-			CollectionRPC:        suite.collClient,
-			Blocks:               all.Blocks,
-			Headers:              all.Headers,
-			Collections:          all.Collections,
-			Transactions:         all.Transactions,
-			ExecutionResults:     all.Results,
-			ExecutionReceipts:    all.Receipts,
-			ChainID:              suite.chainID,
-			AccessMetrics:        suite.metrics,
-			MaxHeightRange:       events.DefaultMaxHeightRange,
-			Log:                  suite.log,
-			SnapshotHistoryLimit: backend.DefaultSnapshotHistoryLimit,
-			Communicator:         node_communicator.NewNodeCommunicator(false),
-			EventQueryMode:       query_mode.IndexQueryModeExecutionNodesOnly,
-			ScriptExecutionMode:  query_mode.IndexQueryModeExecutionNodesOnly,
-			TxResultQueryMode:    query_mode.IndexQueryModeExecutionNodesOnly,
+			State:                    suite.state,
+			CollectionRPC:            suite.collClient,
+			Blocks:                   all.Blocks,
+			Headers:                  all.Headers,
+			Collections:              all.Collections,
+			Transactions:             all.Transactions,
+			ExecutionResults:         all.Results,
+			ExecutionReceipts:        all.Receipts,
+			ChainID:                  suite.chainID,
+			AccessMetrics:            suite.metrics,
+			MaxHeightRange:           events.DefaultMaxHeightRange,
+			Log:                      suite.log,
+			SnapshotHistoryLimit:     backend.DefaultSnapshotHistoryLimit,
+			Communicator:             node_communicator.NewNodeCommunicator(false),
+			EventQueryMode:           query_mode.IndexQueryModeExecutionNodesOnly,
+			ScriptExecutionMode:      query_mode.IndexQueryModeExecutionNodesOnly,
+			TxResultQueryMode:        query_mode.IndexQueryModeExecutionNodesOnly,
+			MaxScriptAndArgumentSize: commonrpc.DefaultAccessMaxRequestSize,
 		})
 		require.NoError(suite.T(), err)
 
@@ -342,22 +343,23 @@ func (suite *Suite) TestSendTransactionToRandomCollectionNode() {
 
 		// create a mock connection factory
 		connFactory := connectionmock.NewConnectionFactory(suite.T())
-		connFactory.On("GetAccessAPIClient", collNode1.Address, nil).Return(col1ApiClient, &mocks.MockCloser{}, nil)
-		connFactory.On("GetAccessAPIClient", collNode2.Address, nil).Return(col2ApiClient, &mocks.MockCloser{}, nil)
+		connFactory.On("GetCollectionAPIClient", collNode1.Address, nil).Return(col1ApiClient, &mocks.MockCloser{}, nil)
+		connFactory.On("GetCollectionAPIClient", collNode2.Address, nil).Return(col2ApiClient, &mocks.MockCloser{}, nil)
 
 		bnd, err := backend.New(backend.Params{State: suite.state,
-			Collections:          collections,
-			Transactions:         transactions,
-			ChainID:              suite.chainID,
-			AccessMetrics:        metrics,
-			ConnFactory:          connFactory,
-			MaxHeightRange:       events.DefaultMaxHeightRange,
-			Log:                  suite.log,
-			SnapshotHistoryLimit: backend.DefaultSnapshotHistoryLimit,
-			Communicator:         node_communicator.NewNodeCommunicator(false),
-			EventQueryMode:       query_mode.IndexQueryModeExecutionNodesOnly,
-			ScriptExecutionMode:  query_mode.IndexQueryModeExecutionNodesOnly,
-			TxResultQueryMode:    query_mode.IndexQueryModeExecutionNodesOnly,
+			Collections:              collections,
+			Transactions:             transactions,
+			ChainID:                  suite.chainID,
+			AccessMetrics:            metrics,
+			ConnFactory:              connFactory,
+			MaxHeightRange:           events.DefaultMaxHeightRange,
+			Log:                      suite.log,
+			SnapshotHistoryLimit:     backend.DefaultSnapshotHistoryLimit,
+			Communicator:             node_communicator.NewNodeCommunicator(false),
+			EventQueryMode:           query_mode.IndexQueryModeExecutionNodesOnly,
+			ScriptExecutionMode:      query_mode.IndexQueryModeExecutionNodesOnly,
+			TxResultQueryMode:        query_mode.IndexQueryModeExecutionNodesOnly,
+			MaxScriptAndArgumentSize: commonrpc.DefaultAccessMaxRequestSize,
 		})
 		require.NoError(suite.T(), err)
 
@@ -703,6 +705,7 @@ func (suite *Suite) TestGetSealedTransaction() {
 			EventQueryMode:             query_mode.IndexQueryModeExecutionNodesOnly,
 			ScriptExecutionMode:        query_mode.IndexQueryModeExecutionNodesOnly,
 			ExecNodeIdentitiesProvider: execNodeIdentitiesProvider,
+			MaxScriptAndArgumentSize:   commonrpc.DefaultAccessMaxRequestSize,
 		})
 		require.NoError(suite.T(), err)
 
@@ -897,7 +900,8 @@ func (suite *Suite) TestGetTransactionResult() {
 			nil,
 		)
 
-		bnd, err := backend.New(backend.Params{State: suite.state,
+		bnd, err := backend.New(backend.Params{
+			State:                      suite.state,
 			CollectionRPC:              suite.collClient,
 			Blocks:                     all.Blocks,
 			Headers:                    all.Headers,
@@ -916,6 +920,7 @@ func (suite *Suite) TestGetTransactionResult() {
 			EventQueryMode:             query_mode.IndexQueryModeExecutionNodesOnly,
 			ScriptExecutionMode:        query_mode.IndexQueryModeExecutionNodesOnly,
 			ExecNodeIdentitiesProvider: execNodeIdentitiesProvider,
+			MaxScriptAndArgumentSize:   commonrpc.DefaultAccessMaxRequestSize,
 		})
 		require.NoError(suite.T(), err)
 
@@ -1168,6 +1173,7 @@ func (suite *Suite) TestExecuteScript() {
 			ScriptExecutionMode:        query_mode.IndexQueryModeExecutionNodesOnly,
 			TxResultQueryMode:          query_mode.IndexQueryModeExecutionNodesOnly,
 			ExecNodeIdentitiesProvider: execNodeIdentitiesProvider,
+			MaxScriptAndArgumentSize:   commonrpc.DefaultAccessMaxRequestSize,
 		})
 		require.NoError(suite.T(), err)
 
