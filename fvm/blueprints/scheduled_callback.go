@@ -16,6 +16,8 @@ import (
 
 const callbackTransactionGasLimit = flow.DefaultMaxTransactionGasLimit
 
+// SystemCollection returns the re-created system collection after it has been already executed
+// using the events from the process callback transaction.
 func SystemCollection(chain flow.Chain, processEvents flow.EventsList) (*flow.Collection, error) {
 	process, err := ProcessCallbacksTransaction(chain)
 	if err != nil {
@@ -167,6 +169,8 @@ func isPendingExecutionEvent(env templates.Environment, event flow.Event) bool {
 	return event.Type == processedEventType
 }
 
+// PendingExecutionEventType returns the event type for FlowCallbackScheduler PendingExecution event
+// for the provided environment.
 func PendingExecutionEventType(env templates.Environment) flow.EventType {
 	const processedEventTypeTemplate = "A.%v.FlowCallbackScheduler.PendingExecution"
 

@@ -1327,7 +1327,7 @@ func (builder *FlowAccessNodeBuilder) extraFlags() {
 		flags.BoolVar(&builder.scheduledCallbacksEnabled,
 			"scheduled-callbacks-enabled",
 			defaultConfig.scheduledCallbacksEnabled,
-			"whether to include scheduled callback transactions in system collections. Default value is false")
+			"whether to include scheduled callback transactions in system collections.")
 		// ExecutionDataRequester config
 		flags.BoolVar(&builder.executionDataSyncEnabled,
 			"execution-data-sync-enabled",
