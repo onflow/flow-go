@@ -46,11 +46,16 @@ func TestQuorumCertificates_LockEnforced(t *testing.T) {
 
 		// acquire wrong lock and attempt to store QC: should error
 		unittest.WithLock(t, lockManager, storage.LockFinalizeBlock, func(lctx lockctx.Context) error { // INCORRECT LOCK
-			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-				err := store.BatchStore(lctx, rw, qc)
-				require.Error(t, err)
-				return nil
+			err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+				return store.BatchStore(lctx, rw, qc)
 			})
+
+			// handle the error outside of the db.WithReaderBatchWriter, otherwise batch writer would
+			// consider no error happened and would commit the batch, which would execute
+			// the callbacks to store the QC in the cache, and causing the following reads
+			// with ByBlockID to read from dirty data.
+			require.Error(t, err)
+			return nil
 		})
 
 		// qc should not be stored, so ByBlockID should return `storage.ErrNotFound`
