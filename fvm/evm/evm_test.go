@@ -3211,7 +3211,7 @@ func TestEVMFileSystemContract(t *testing.T) {
 				testContract *TestContract,
 				testAccount *EOATestAccount,
 			) {
-				state, output := runFileSystemContract(ctx, vm, snapshot, testContract, testAccount, 437)
+				state, output := runFileSystemContract(ctx, vm, snapshot, testContract, testAccount, 438)
 
 				require.NoError(t, output.Err)
 				require.NotEmpty(t, state.WriteSet)
@@ -3252,7 +3252,7 @@ func TestEVMFileSystemContract(t *testing.T) {
 				require.Equal(t, blockEventPayload.TotalGasUsed-feeTranferEventPayload.GasConsumed, txEventPayload.GasConsumed)
 				require.Empty(t, txEventPayload.ContractAddress)
 
-				require.Equal(t, 436, int(output.ComputationUsed))
+				require.Equal(t, 437, int(output.ComputationUsed))
 			},
 			fvm.WithExecutionEffortWeights(
 				environment.MainnetExecutionEffortWeights,
@@ -3288,7 +3288,7 @@ func TestEVMFileSystemContract(t *testing.T) {
 				require.Equal(t, uint64(0), blockEventPayload.TotalGasUsed)
 
 				// only a small amount of computation was used due to the EVM transaction never being executed
-				require.Equal(t, 7, int(output.ComputationUsed))
+				require.Equal(t, 8, int(output.ComputationUsed))
 			},
 			fvm.WithExecutionEffortWeights(
 				environment.MainnetExecutionEffortWeights,
