@@ -8,19 +8,20 @@ import (
 	"strings"
 	"testing"
 
-	gethCommon "github.com/onflow/go-ethereum/common"
-	gethTypes "github.com/onflow/go-ethereum/core/types"
-	gethVM "github.com/onflow/go-ethereum/core/vm"
-	gethParams "github.com/onflow/go-ethereum/params"
+	gethCommon "github.com/ethereum/go-ethereum/common"
+	gethTypes "github.com/ethereum/go-ethereum/core/types"
+	gethVM "github.com/ethereum/go-ethereum/core/vm"
+	gethParams "github.com/ethereum/go-ethereum/params"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/fvm/evm/emulator"
+	"github.com/onflow/flow-go/fvm/evm/precompiles"
 	"github.com/onflow/flow-go/fvm/evm/testutils"
 	"github.com/onflow/flow-go/fvm/evm/testutils/contracts"
 	"github.com/onflow/flow-go/fvm/evm/types"
 	"github.com/onflow/flow-go/model/flow"
 
-	_ "github.com/onflow/go-ethereum/eth/tracers/native" // imported so callTracers is registered in init
+	_ "github.com/ethereum/go-ethereum/eth/tracers/native" // imported so callTracers is registered in init
 )
 
 var blockNumber = big.NewInt(10)
@@ -1252,4 +1253,8 @@ func (mp *MockedPrecompiled) Run(input []byte) ([]byte, error) {
 		panic("Run not set for the mocked precompiled contract")
 	}
 	return mp.RunFunc(input)
+}
+
+func (mp *MockedPrecompiled) Name() string {
+	return precompiles.CADENCE_ARCH_PRECOMPILE_NAME
 }

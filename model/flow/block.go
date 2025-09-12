@@ -1,6 +1,7 @@
 package flow
 
 import (
+	"encoding/json"
 	"fmt"
 	"time"
 )
@@ -64,6 +65,19 @@ func (b *GenericBlock[T]) ToHeader() *Header {
 		panic(fmt.Errorf("could not build header from block: %w", err))
 	}
 	return header
+}
+
+// MarshalJSON implements JSON encoding logic for blocks.
+// We include a top-level ID field equal to the hash of the block, for visibility in automations.
+// The ID field is ignored when unmarshaling a JSON structure back into a block.
+func (b *GenericBlock[T]) MarshalJSON() ([]byte, error) {
+	return json.Marshal(struct {
+		GenericBlock[T]
+		ID Identifier
+	}{
+		GenericBlock: *b,
+		ID:           b.ID(),
+	})
 }
 
 // Block is the canonical instantiation of GenericBlock using flow.Payload as the payload type.

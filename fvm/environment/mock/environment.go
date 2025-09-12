@@ -909,26 +909,6 @@ func (_m *Environment) GetCurrentBlockHeight() (uint64, error) {
 	return r0, r1
 }
 
-// GetInterpreterSharedState provides a mock function with no fields
-func (_m *Environment) GetInterpreterSharedState() *interpreter.SharedState {
-	ret := _m.Called()
-
-	if len(ret) == 0 {
-		panic("no return value specified for GetInterpreterSharedState")
-	}
-
-	var r0 *interpreter.SharedState
-	if rf, ok := ret.Get(0).(func() *interpreter.SharedState); ok {
-		r0 = rf()
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*interpreter.SharedState)
-		}
-	}
-
-	return r0
-}
-
 // GetOrLoadProgram provides a mock function with given fields: location, load
 func (_m *Environment) GetOrLoadProgram(location common.Location, load func() (*cadenceruntime.Program, error)) (*cadenceruntime.Program, error) {
 	ret := _m.Called(location, load)
@@ -1121,34 +1101,6 @@ func (_m *Environment) ImplementationDebugLog(message string) error {
 	}
 
 	return r0
-}
-
-// InteractionUsed provides a mock function with no fields
-func (_m *Environment) InteractionUsed() (uint64, error) {
-	ret := _m.Called()
-
-	if len(ret) == 0 {
-		panic("no return value specified for InteractionUsed")
-	}
-
-	var r0 uint64
-	var r1 error
-	if rf, ok := ret.Get(0).(func() (uint64, error)); ok {
-		return rf()
-	}
-	if rf, ok := ret.Get(0).(func() uint64); ok {
-		r0 = rf()
-	} else {
-		r0 = ret.Get(0).(uint64)
-	}
-
-	if rf, ok := ret.Get(1).(func() error); ok {
-		r1 = rf()
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
 }
 
 // Invoke provides a mock function with given fields: spec, arguments
@@ -1431,9 +1383,9 @@ func (_m *Environment) ReadRandom(_a0 []byte) error {
 	return r0
 }
 
-// RecordTrace provides a mock function with given fields: operation, location, duration, attrs
-func (_m *Environment) RecordTrace(operation string, location common.Location, duration time.Duration, attrs []attribute.KeyValue) {
-	_m.Called(operation, location, duration, attrs)
+// RecordTrace provides a mock function with given fields: operation, duration, attrs
+func (_m *Environment) RecordTrace(operation string, duration time.Duration, attrs []attribute.KeyValue) {
+	_m.Called(operation, duration, attrs)
 }
 
 // RecoverProgram provides a mock function with given fields: program, location
@@ -1559,6 +1511,11 @@ func (_m *Environment) RevokeAccountKey(address common.Address, index uint32) (*
 	return r0, r1
 }
 
+// RunWithMeteringDisabled provides a mock function with given fields: f
+func (_m *Environment) RunWithMeteringDisabled(f func()) {
+	_m.Called(f)
+}
+
 // RuntimeSetNumberOfAccounts provides a mock function with given fields: count
 func (_m *Environment) RuntimeSetNumberOfAccounts(count uint64) {
 	_m.Called(count)
@@ -1607,11 +1564,6 @@ func (_m *Environment) ServiceEvents() flow.EventsList {
 	}
 
 	return r0
-}
-
-// SetInterpreterSharedState provides a mock function with given fields: state
-func (_m *Environment) SetInterpreterSharedState(state *interpreter.SharedState) {
-	_m.Called(state)
 }
 
 // SetNumberOfDeployedCOAs provides a mock function with given fields: count

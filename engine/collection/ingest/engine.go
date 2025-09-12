@@ -71,6 +71,7 @@ func New(
 			CheckScriptsParse:      config.CheckScriptsParse,
 			MaxTransactionByteSize: config.MaxTransactionByteSize,
 			MaxCollectionByteSize:  config.MaxCollectionByteSize,
+			CheckPayerBalanceMode:  validator.Disabled,
 		},
 		colMetrics,
 		limiter,

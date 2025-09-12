@@ -130,6 +130,17 @@ func (f FakePublicKey) toAccountPublicKey() flow.AccountPublicKey {
 	}
 }
 
+func (f FakePublicKey) toRuntimeAccountPublicKey() flow.RuntimeAccountPublicKey {
+	return flow.RuntimeAccountPublicKey{
+		Index:     1,
+		PublicKey: f,
+		SignAlgo:  crypto.ECDSASecp256k1,
+		HashAlgo:  hash.SHA3_256,
+		Weight:    1000,
+		Revoked:   false,
+	}
+}
+
 func (f FakePublicKey) Encode() []byte {
 	return f.data
 }
@@ -151,22 +162,46 @@ var _ environment.Accounts = &FakeAccounts{}
 
 func (f FakeAccounts) Exists(address flow.Address) (bool, error)       { return true, nil }
 func (f FakeAccounts) Get(address flow.Address) (*flow.Account, error) { return &flow.Account{}, nil }
-func (f FakeAccounts) GetPublicKeyCount(_ flow.Address) (uint32, error) {
+func (f FakeAccounts) GetAccountPublicKeyCount(_ flow.Address) (uint32, error) {
 	return f.keyCount, nil
 }
-func (f FakeAccounts) AppendPublicKey(_ flow.Address, _ flow.AccountPublicKey) error { return nil }
-func (f FakeAccounts) GetPublicKey(address flow.Address, keyIndex uint32) (flow.AccountPublicKey, error) {
+func (f FakeAccounts) AppendAccountPublicKey(_ flow.Address, _ flow.AccountPublicKey) error {
+	return nil
+}
+func (f FakeAccounts) GetAccountPublicKey(address flow.Address, keyIndex uint32) (flow.AccountPublicKey, error) {
 	if keyIndex >= f.keyCount {
 		return flow.AccountPublicKey{}, errors.NewAccountPublicKeyNotFoundError(address, keyIndex)
 	}
 	return FakePublicKey{}.toAccountPublicKey(), nil
 }
-
-func (f FakeAccounts) SetPublicKey(_ flow.Address, _ uint32, _ flow.AccountPublicKey) ([]byte, error) {
-	return nil, nil
+func (f FakeAccounts) GetRuntimeAccountPublicKey(address flow.Address, keyIndex uint32) (flow.RuntimeAccountPublicKey, error) {
+	if keyIndex >= f.keyCount {
+		return flow.RuntimeAccountPublicKey{}, errors.NewAccountPublicKeyNotFoundError(address, keyIndex)
+	}
+	return FakePublicKey{}.toRuntimeAccountPublicKey(), nil
 }
-func (f FakeAccounts) GetPublicKeys(address flow.Address) ([]flow.AccountPublicKey, error) {
+func (f FakeAccounts) GetAccountPublicKeys(address flow.Address) ([]flow.AccountPublicKey, error) {
 	return make([]flow.AccountPublicKey, f.keyCount), nil
+}
+func (f FakeAccounts) GetAccountPublicKeyRevokedStatus(address flow.Address, keyIndex uint32) (bool, error) {
+	if keyIndex >= f.keyCount {
+		return false, errors.NewAccountPublicKeyNotFoundError(address, keyIndex)
+	}
+	return FakePublicKey{}.toAccountPublicKey().Revoked, nil
+}
+func (f FakeAccounts) GetAccountPublicKeySequenceNumber(address flow.Address, keyIndex uint32) (uint64, error) {
+	if keyIndex >= f.keyCount {
+		return 0, errors.NewAccountPublicKeyNotFoundError(address, keyIndex)
+	}
+	return FakePublicKey{}.toAccountPublicKey().SeqNumber, nil
+}
+func (f FakeAccounts) IncrementAccountPublicKeySequenceNumber(flow.Address, uint32) error {
+	// no-op
+	return nil
+}
+func (f FakeAccounts) RevokeAccountPublicKey(flow.Address, uint32) error {
+	// no-op
+	return nil
 }
 func (f FakeAccounts) GetContractNames(_ flow.Address) ([]string, error)      { return nil, nil }
 func (f FakeAccounts) GetContract(_ string, _ flow.Address) ([]byte, error)   { return nil, nil }

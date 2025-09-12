@@ -19,7 +19,7 @@ type DBFlags struct {
 
 const DefaultBadgerDir = "/var/flow/data/protocol"
 const DefaultPebbleDir = "/var/flow/data/protocol-pebble"
-const DefaultDB = "badger" // "badger|pebble"
+const DefaultDB = "pebble" // "badger|pebble"
 
 // InitWithDBFlags initializes the command with the database flags
 // and sets the default values for the flags
@@ -31,7 +31,7 @@ func InitWithDBFlags(cmd *cobra.Command) {
 	cmd.PersistentFlags().StringVar(&flagPebbleDir, "pebble-dir", DefaultPebbleDir,
 		"directory to the pebble dababase")
 
-	cmd.PersistentFlags().StringVar(&flagUseDB, "use-db", DefaultDB, "the database type to use, --badger or --pebble")
+	cmd.PersistentFlags().StringVar(&flagUseDB, "use-db", DefaultDB, "the database type to use, badger or pebble")
 }
 
 // ReadDBFlags is to read the database flags

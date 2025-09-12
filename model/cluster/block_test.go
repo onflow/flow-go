@@ -1,9 +1,11 @@
 package cluster_test
 
 import (
+	"encoding/json"
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/model/cluster"
@@ -280,4 +282,17 @@ func TestNewRootProposal(t *testing.T) {
 		require.Nil(t, res)
 		require.Contains(t, err.Error(), "proposer signature must be empty")
 	})
+}
+
+// TestBlockEncodingJSON_IDField ensures that the explicit ID field added to the
+// block when encoded as JSON is present and accurate.
+func TestBlockEncodingJSON_IDField(t *testing.T) {
+	block := unittest.ClusterBlockFixture()
+	blockID := block.ID()
+	data, err := json.Marshal(block)
+	require.NoError(t, err)
+	var decodedIDField struct{ ID flow.Identifier }
+	err = json.Unmarshal(data, &decodedIDField)
+	require.NoError(t, err)
+	assert.Equal(t, blockID, decodedIDField.ID)
 }

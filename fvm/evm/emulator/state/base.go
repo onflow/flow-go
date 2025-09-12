@@ -3,12 +3,12 @@ package state
 import (
 	"fmt"
 
+	"github.com/ethereum/go-ethereum/common"
+	gethCommon "github.com/ethereum/go-ethereum/common"
+	gethTypes "github.com/ethereum/go-ethereum/core/types"
+	gethCrypto "github.com/ethereum/go-ethereum/crypto"
 	"github.com/holiman/uint256"
 	"github.com/onflow/atree"
-	"github.com/onflow/go-ethereum/common"
-	gethCommon "github.com/onflow/go-ethereum/common"
-	gethTypes "github.com/onflow/go-ethereum/core/types"
-	gethCrypto "github.com/onflow/go-ethereum/crypto"
 
 	"github.com/onflow/flow-go/fvm/evm/types"
 	"github.com/onflow/flow-go/model/flow"
