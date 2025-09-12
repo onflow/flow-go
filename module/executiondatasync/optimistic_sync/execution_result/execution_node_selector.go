@@ -1,4 +1,4 @@
-package execution_result_info_provider
+package execution_result
 
 import (
 	"github.com/onflow/flow-go/model/flow"

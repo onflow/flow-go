@@ -80,7 +80,7 @@ import (
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	execdatacache "github.com/onflow/flow-go/module/executiondatasync/execution_data/cache"
 	"github.com/onflow/flow-go/module/executiondatasync/optimistic_sync"
-	"github.com/onflow/flow-go/module/executiondatasync/optimistic_sync/execution_result_info_provider"
+	"github.com/onflow/flow-go/module/executiondatasync/optimistic_sync/execution_result"
 	"github.com/onflow/flow-go/module/executiondatasync/optimistic_sync/execution_state"
 	osyncsnapshot "github.com/onflow/flow-go/module/executiondatasync/optimistic_sync/snapshot"
 	"github.com/onflow/flow-go/module/executiondatasync/pruner"
@@ -2022,12 +2022,12 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				notNil(builder.ExecNodeIdentitiesProvider),
 			)
 
-			execNodeSelector := execution_result_info_provider.NewExecutionNodeSelector(
+			execNodeSelector := execution_result.NewExecutionNodeSelector(
 				preferredENIdentifiers,
 				fixedENIdentifiers,
 			)
 
-			execResultInfoProvider, err := execution_result_info_provider.NewExecutionResultProvider(
+			execResultInfoProvider, err := execution_result.NewExecutionResultInfoProvider(
 				node.Logger,
 				node.State,
 				node.Storage.Headers,
