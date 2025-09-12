@@ -21,6 +21,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/counters"
+	"github.com/onflow/flow-go/module/executiondatasync/optimistic_sync"
 	"github.com/onflow/flow-go/module/state_synchronization"
 	"github.com/onflow/flow-go/module/state_synchronization/indexer"
 )
@@ -894,15 +895,28 @@ func (h *Handler) GetEventsForHeightRange(
 
 	eventEncodingVersion := req.GetEventEncodingVersion()
 
-	results, err := h.api.GetEventsForHeightRange(ctx, eventType, startHeight, endHeight, eventEncodingVersion)
+	query := req.GetExecutionStateQuery()
+	results, executorMetadata, err := h.api.GetEventsForHeightRange(
+		ctx,
+		eventType,
+		startHeight,
+		endHeight,
+		eventEncodingVersion,
+		NewCriteria(query),
+	)
 	if err != nil {
 		return nil, err
+	}
+
+	if query.GetIncludeExecutorMetadata() {
+		metadata.ExecutionStateQuery = convert.ExecutorMetadataToMessage(&executorMetadata)
 	}
 
 	resultEvents, err := convert.BlockEventsToMessages(results)
 	if err != nil {
 		return nil, err
 	}
+
 	return &accessproto.EventsResponse{
 		Results:  resultEvents,
 		Metadata: metadata,
@@ -931,9 +945,19 @@ func (h *Handler) GetEventsForBlockIDs(
 
 	eventEncodingVersion := req.GetEventEncodingVersion()
 
-	results, err := h.api.GetEventsForBlockIDs(ctx, eventType, blockIDs, eventEncodingVersion)
+	results, executorMetadata, err := h.api.GetEventsForBlockIDs(
+		ctx,
+		eventType,
+		blockIDs,
+		eventEncodingVersion,
+		NewCriteria(req.GetExecutionStateQuery()),
+	)
 	if err != nil {
 		return nil, err
+	}
+
+	if query := req.GetExecutionStateQuery(); query.GetIncludeExecutorMetadata() {
+		metadata.ExecutionStateQuery = convert.ExecutorMetadataToMessage(&executorMetadata)
 	}
 
 	resultEvents, err := convert.BlockEventsToMessages(results)
@@ -1585,4 +1609,15 @@ func HandleRPCSubscription[T any](sub subscription.Subscription, handleResponse 
 	}
 
 	return nil
+}
+
+func NewCriteria(query *entities.ExecutionStateQuery) optimistic_sync.Criteria {
+	if query == nil {
+		return optimistic_sync.Criteria{}
+	}
+
+	return optimistic_sync.Criteria{
+		AgreeingExecutorsCount: uint(query.AgreeingExecutorsCount),
+		RequiredExecutors:      convert.MessagesToIdentifiers(query.RequiredExecutorIds),
+	}
 }

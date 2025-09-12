@@ -16,15 +16,13 @@ type TransactionOptionals struct {
 }
 
 func (t *TransactionOptionals) Parse(r *common.Request) error {
-	var blockId parser.ID
-	err := blockId.Parse(r.GetQueryParam(blockIDQueryParam))
+	blockId, err := parser.NewID(r.GetQueryParam(blockIDQueryParam))
 	if err != nil {
 		return err
 	}
 	t.BlockID = blockId.Flow()
 
-	var collectionId parser.ID
-	err = collectionId.Parse(r.GetQueryParam(collectionIDQueryParam))
+	collectionId, err := parser.NewID(r.GetQueryParam(collectionIDQueryParam))
 	if err != nil {
 		return err
 	}

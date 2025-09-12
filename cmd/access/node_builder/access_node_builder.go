@@ -79,6 +79,10 @@ import (
 	"github.com/onflow/flow-go/module/execution"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	execdatacache "github.com/onflow/flow-go/module/executiondatasync/execution_data/cache"
+	"github.com/onflow/flow-go/module/executiondatasync/optimistic_sync"
+	"github.com/onflow/flow-go/module/executiondatasync/optimistic_sync/execution_result"
+	"github.com/onflow/flow-go/module/executiondatasync/optimistic_sync/execution_state"
+	osyncsnapshot "github.com/onflow/flow-go/module/executiondatasync/optimistic_sync/snapshot"
 	"github.com/onflow/flow-go/module/executiondatasync/pruner"
 	edstorage "github.com/onflow/flow-go/module/executiondatasync/storage"
 	"github.com/onflow/flow-go/module/executiondatasync/tracker"
@@ -2018,6 +2022,27 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				notNil(builder.ExecNodeIdentitiesProvider),
 			)
 
+			execNodeSelector := execution_result.NewExecutionNodeSelector(
+				preferredENIdentifiers,
+				fixedENIdentifiers,
+			)
+
+			execResultInfoProvider, err := execution_result.NewExecutionResultInfoProvider(
+				node.Logger,
+				node.State,
+				node.Storage.Headers,
+				node.Storage.Receipts,
+				execNodeSelector,
+				optimistic_sync.DefaultCriteria,
+			)
+			if err != nil {
+				return nil, fmt.Errorf("failed to create execution result provider: %w", err)
+			}
+
+			// TODO: use real objects instead of mocks once they're implemented
+			snapshot := osyncsnapshot.NewSnapshotMock(builder.events)
+			execStateCache := execution_state.NewExecutionStateCacheMock(snapshot)
+
 			builder.nodeBackend, err = backend.New(backend.Params{
 				State:                 node.State,
 				CollectionRPC:         builder.CollectionRPC, // might be nil
@@ -2050,14 +2075,17 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 					builder.stateStreamConf.ResponseLimit,
 					builder.stateStreamConf.ClientSendBufferSize,
 				),
-				EventsIndex:                notNil(builder.EventsIndex),
-				TxResultQueryMode:          txResultQueryMode,
-				TxResultsIndex:             notNil(builder.TxResultsIndex),
-				LastFullBlockHeight:        lastFullBlockHeight,
-				IndexReporter:              indexReporter,
-				VersionControl:             notNil(builder.VersionControl),
-				ExecNodeIdentitiesProvider: notNil(builder.ExecNodeIdentitiesProvider),
-				TxErrorMessageProvider:     notNil(builder.txResultErrorMessageProvider),
+				EventsIndex:                 notNil(builder.EventsIndex),
+				TxResultQueryMode:           txResultQueryMode,
+				TxResultsIndex:              notNil(builder.TxResultsIndex),
+				LastFullBlockHeight:         lastFullBlockHeight,
+				IndexReporter:               indexReporter,
+				VersionControl:              notNil(builder.VersionControl),
+				ExecNodeIdentitiesProvider:  notNil(builder.ExecNodeIdentitiesProvider),
+				TxErrorMessageProvider:      notNil(builder.txResultErrorMessageProvider),
+				ExecutionResultInfoProvider: execResultInfoProvider,
+				ExecutionStateCache:         execStateCache,
+				OperatorCriteria:            optimistic_sync.DefaultCriteria,
 			})
 			if err != nil {
 				return nil, fmt.Errorf("could not initialize backend: %w", err)
