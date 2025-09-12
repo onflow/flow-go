@@ -47,7 +47,9 @@ func TestQuorumCertificates_LockEnforced(t *testing.T) {
 		// acquire wrong lock and attempt to store QC: should error
 		unittest.WithLock(t, lockManager, storage.LockFinalizeBlock, func(lctx lockctx.Context) error { // INCORRECT LOCK
 			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-				return store.BatchStore(lctx, rw, qc)
+				err := store.BatchStore(lctx, rw, qc)
+				require.Error(t, err)
+				return nil
 			})
 		})
 
