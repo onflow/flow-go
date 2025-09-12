@@ -2,235 +2,213 @@ package fixtures
 
 import (
 	"math/rand"
-	"testing"
 	"time"
+
+	"github.com/onflow/flow-go/model/flow"
 )
 
 // GeneratorSuite provides a context-aware generator system for creating test fixtures.
 // It manages a shared random number generator and provides access to specialized generators.
 type GeneratorSuite struct {
 	rng *rand.Rand
+
+	chainID flow.ChainID
 }
 
 // GeneratorSuiteOption defines an option for configuring a GeneratorSuite.
 type GeneratorSuiteOption func(*generatorSuiteConfig)
 
 type generatorSuiteConfig struct {
-	seed int64
+	seed    int64
+	chainID flow.ChainID
 }
 
-// WithSeed sets the seed for the generator suite.
+// WithSeed sets the random seed used for the random number generator used by all generators.
+// Specifying a seed makes the fixture data deterministic.
 func WithSeed(seed int64) GeneratorSuiteOption {
 	return func(config *generatorSuiteConfig) {
 		config.seed = seed
 	}
 }
 
+// WithChainID sets the chain ID that's used as the default for all generators.
+func WithChainID(chainID flow.ChainID) GeneratorSuiteOption {
+	return func(config *generatorSuiteConfig) {
+		config.chainID = chainID
+	}
+}
+
 // NewGeneratorSuite creates a new generator suite with optional configuration.
 // If no seed is specified, a random seed is generated.
-func NewGeneratorSuite(t testing.TB, opts ...GeneratorSuiteOption) *GeneratorSuite {
+// If no chain ID is specified, the default chain ID is [flow.Emulator].
+func NewGeneratorSuite(opts ...GeneratorSuiteOption) *GeneratorSuite {
 	config := &generatorSuiteConfig{
-		seed: time.Now().UnixNano(), // default random seed
+		chainID: flow.Emulator,
+		seed:    time.Now().UnixNano(), // default random seed
 	}
 
 	for _, opt := range opts {
 		opt(config)
 	}
 
-	t.Logf("generator suite seed: %d", config.seed)
-
 	return &GeneratorSuite{
-		rng: rand.New(rand.NewSource(config.seed)),
+		chainID: config.chainID,
+		rng:     rand.New(rand.NewSource(config.seed)),
 	}
 }
 
-// Random returns a random generator for this suite.
+// ChainID returns the default chain ID used by all generators.
+func (g *GeneratorSuite) ChainID() flow.ChainID {
+	return g.chainID
+}
+
+// Random returns the shared random generator.
 func (g *GeneratorSuite) Random() *RandomGenerator {
-	return &RandomGenerator{
-		Rand: g.rng,
-	}
+	return NewRandomGenerator(g.rng)
 }
 
-// BlockHeaders returns a block header generator for this suite.
+// BlockHeaders returns a generator for [flow.Header].
 func (g *GeneratorSuite) BlockHeaders() *BlockHeaderGenerator {
-	return &BlockHeaderGenerator{
-		randomGen:        g.Random(),
-		identifierGen:    g.Identifiers(),
-		signatureGen:     g.Signatures(),
-		signerIndicesGen: g.SignerIndices(),
-		quorumCertGen:    g.QuorumCertificates(),
-		timeGen:          g.Time(),
-	}
+	return NewBlockHeaderGenerator(
+		g.Random(),
+		g.Identifiers(),
+		g.Signatures(),
+		g.SignerIndices(),
+		g.QuorumCertificates(),
+		g.Time(),
+		g.chainID,
+	)
 }
 
-// Identifiers returns an identifier generator for this suite.
+// Identifiers returns a shared generator for [flow.Identifier].
 func (g *GeneratorSuite) Identifiers() *IdentifierGenerator {
-	return &IdentifierGenerator{
-		randomGen: g.Random(),
-	}
+	return NewIdentifierGenerator(g.Random())
 }
 
-// Signatures returns a signature generator for this suite.
+// Signatures returns a shared generator for [crypto.Signature].
 func (g *GeneratorSuite) Signatures() *SignatureGenerator {
-	return &SignatureGenerator{
-		randomGen: g.Random(),
-	}
+	return NewSignatureGenerator(g.Random())
 }
 
-// Addresses returns an address generator for this suite.
+// Addresses returns a shared generator for [flow.Address].
 func (g *GeneratorSuite) Addresses() *AddressGenerator {
-	return &AddressGenerator{
-		randomGen: g.Random(),
-	}
+	return NewAddressGenerator(g.Random(), g.chainID)
 }
 
-// SignerIndices returns a signer indices generator for this suite.
+// SignerIndices returns a generator for [flow.SignerIndices].
 func (g *GeneratorSuite) SignerIndices() *SignerIndicesGenerator {
-	return &SignerIndicesGenerator{}
+	return NewSignerIndicesGenerator(g.Random())
 }
 
-// QuorumCertificates returns a quorum certificate generator for this suite.
+// QuorumCertificates returns a generator for [flow.QuorumCertificate].
 func (g *GeneratorSuite) QuorumCertificates() *QuorumCertificateGenerator {
-	return &QuorumCertificateGenerator{
-		randomGen:        g.Random(),
-		identifierGen:    g.Identifiers(),
-		signerIndicesGen: g.SignerIndices(),
-		signatureGen:     g.Signatures(),
-	}
+	return NewQuorumCertificateGenerator(
+		g.Random(),
+		g.Identifiers(),
+		g.SignerIndices(),
+		g.Signatures(),
+	)
 }
 
-// ChunkExecutionDatas returns a chunk execution data generator for this suite.
-func (g *GeneratorSuite) ChunkExecutionDatas() *ChunkExecutionDataGenerator {
-	return &ChunkExecutionDataGenerator{
-		randomGen:                 g.Random(),
-		collectionGen:             g.Collections(),
-		lightTransactionResultGen: g.LightTransactionResults(),
-		eventGen:                  g.Events(),
-		trieUpdateGen:             g.TrieUpdates(),
-	}
-}
-
-// BlockExecutionDatas returns a block execution data generator for this suite.
-func (g *GeneratorSuite) BlockExecutionDatas() *BlockExecutionDataGenerator {
-	return &BlockExecutionDataGenerator{
-		identifierGen:         g.Identifiers(),
-		chunkExecutionDataGen: g.ChunkExecutionDatas(),
-	}
-}
-
-// BlockExecutionDataEntities returns a block execution data entity generator for this suite.
-func (g *GeneratorSuite) BlockExecutionDataEntities() *BlockExecutionDataEntityGenerator {
-	return &BlockExecutionDataEntityGenerator{
-		BlockExecutionDataGenerator: g.BlockExecutionDatas(),
-	}
-}
-
-// Transactions returns a transaction generator for this suite.
+// Transactions returns a generator for [flow.TransactionBody].
 func (g *GeneratorSuite) Transactions() *TransactionGenerator {
-	return &TransactionGenerator{
-		identifierGen:     g.Identifiers(),
-		proposalKeyGen:    g.ProposalKeys(),
-		addressGen:        g.Addresses(),
-		transactionSigGen: g.TransactionSignatures(),
-	}
+	return NewTransactionGenerator(
+		g.Identifiers(),
+		g.ProposalKeys(),
+		g.Addresses(),
+		g.TransactionSignatures(),
+	)
 }
 
-// FullTransactions returns a full transaction generator for this suite.
-func (g *GeneratorSuite) FullTransactions() *FullTransactionGenerator {
-	return &FullTransactionGenerator{
-		TransactionGenerator: g.Transactions(),
-	}
-}
-
-// Collections returns a collection generator for this suite.
+// Collections returns a generator for [flow.Collection].
 func (g *GeneratorSuite) Collections() *CollectionGenerator {
-	return &CollectionGenerator{
-		transactionGen: g.Transactions(),
-	}
+	return NewCollectionGenerator(g.Transactions())
 }
 
-// TrieUpdates returns a trie update generator for this suite.
-func (g *GeneratorSuite) TrieUpdates() *TrieUpdateGenerator {
-	return &TrieUpdateGenerator{
-		randomGen:        g.Random(),
-		ledgerPathGen:    g.LedgerPaths(),
-		ledgerPayloadGen: g.LedgerPayloads(),
-	}
-}
-
-// TransactionResults returns a transaction result generator for this suite.
+// TransactionResults returns a generator for [flow.TransactionResult].
 func (g *GeneratorSuite) TransactionResults() *TransactionResultGenerator {
-	return &TransactionResultGenerator{
-		randomGen:     g.Random(),
-		identifierGen: g.Identifiers(),
-	}
+	return NewTransactionResultGenerator(g.Random(), g.Identifiers())
 }
 
-// LightTransactionResults returns a light transaction result generator for this suite.
+// LightTransactionResults returns a generator for [flow.LightTransactionResult].
 func (g *GeneratorSuite) LightTransactionResults() *LightTransactionResultGenerator {
-	return &LightTransactionResultGenerator{
-		TransactionResultGenerator: g.TransactionResults(),
-	}
+	return NewLightTransactionResultGenerator(g.TransactionResults())
 }
 
-// TransactionSignatures returns a transaction signature generator for this suite.
+// TransactionSignatures returns a generator for [flow.TransactionSignature].
 func (g *GeneratorSuite) TransactionSignatures() *TransactionSignatureGenerator {
-	return &TransactionSignatureGenerator{
-		randomGen:  g.Random(),
-		addressGen: g.Addresses(),
-	}
+	return NewTransactionSignatureGenerator(g.Random(), g.Addresses())
 }
 
-// ProposalKeys returns a proposal key generator for this suite.
+// ProposalKeys returns a generator for [flow.ProposalKey].
 func (g *GeneratorSuite) ProposalKeys() *ProposalKeyGenerator {
-	return &ProposalKeyGenerator{
-		addressGen: g.Addresses(),
-	}
+	return NewProposalKeyGenerator(g.Addresses())
 }
 
-// Events returns an event generator for this suite.
+// Events returns a generator for [flow.Event].
 func (g *GeneratorSuite) Events() *EventGenerator {
-	return &EventGenerator{
-		randomGen:     g.Random(),
-		identifierGen: g.Identifiers(),
-		eventTypeGen:  g.EventTypes(),
-		addressGen:    g.Addresses(),
-	}
+	return NewEventGenerator(
+		g.Random(),
+		g.Identifiers(),
+		g.EventTypes(),
+		g.Addresses(),
+	)
 }
 
-// EventTypes returns an event type generator for this suite.
+// EventTypes returns a generator for [flow.EventType].
 func (g *GeneratorSuite) EventTypes() *EventTypeGenerator {
-	return &EventTypeGenerator{
-		randomGen:  g.Random(),
-		addressGen: g.Addresses(),
-	}
+	return NewEventTypeGenerator(g.Random(), g.Addresses())
 }
 
-// Time returns a time generator for this suite.
-func (g *GeneratorSuite) Time() *TimeGenerator {
-	return &TimeGenerator{
-		randomGen: g.Random(),
-	}
+// ChunkExecutionDatas returns a generator for [flow.ChunkExecutionData].
+func (g *GeneratorSuite) ChunkExecutionDatas() *ChunkExecutionDataGenerator {
+	return NewChunkExecutionDataGenerator(
+		g.Random(),
+		g.Collections(),
+		g.LightTransactionResults(),
+		g.Events(),
+		g.TrieUpdates(),
+	)
 }
 
-// LedgerPaths returns a ledger path generator for this suite.
+// BlockExecutionDatas returns a generator for [flow.BlockExecutionData].
+func (g *GeneratorSuite) BlockExecutionDatas() *BlockExecutionDataGenerator {
+	return NewBlockExecutionDataGenerator(
+		g.Identifiers(),
+		g.ChunkExecutionDatas(),
+	)
+}
+
+// BlockExecutionDataEntities returns a generator for [flow.BlockExecutionDataEntity].
+func (g *GeneratorSuite) BlockExecutionDataEntities() *BlockExecutionDataEntityGenerator {
+	return NewBlockExecutionDataEntityGenerator(g.BlockExecutionDatas())
+}
+
+// TrieUpdates returns a generator for [ledger.TrieUpdate].
+func (g *GeneratorSuite) TrieUpdates() *TrieUpdateGenerator {
+	return NewTrieUpdateGenerator(
+		g.Random(),
+		g.LedgerPaths(),
+		g.LedgerPayloads(),
+	)
+}
+
+// LedgerPaths returns a generator for [ledger.Path].
 func (g *GeneratorSuite) LedgerPaths() *LedgerPathGenerator {
-	return &LedgerPathGenerator{
-		randomGen: g.Random(),
-	}
+	return NewLedgerPathGenerator(g.Random())
 }
 
-// LedgerPayloads returns a ledger payload generator for this suite.
+// LedgerPayloads returns a generator for [ledger.Payload].
 func (g *GeneratorSuite) LedgerPayloads() *LedgerPayloadGenerator {
-	return &LedgerPayloadGenerator{
-		randomGen:      g.Random(),
-		ledgerValueGen: g.LedgerValues(),
-	}
+	return NewLedgerPayloadGenerator(g.Random(), g.LedgerValues())
 }
 
-// LedgerValues returns a ledger value generator for this suite.
+// LedgerValues returns a generator for [ledger.Value].
 func (g *GeneratorSuite) LedgerValues() *LedgerValueGenerator {
-	return &LedgerValueGenerator{
-		randomGen: g.Random(),
-	}
+	return NewLedgerValueGenerator(g.Random())
+}
+
+// Time returns a generator for [time.Time].
+func (g *GeneratorSuite) Time() *TimeGenerator {
+	return NewTimeGenerator(g.Random())
 }

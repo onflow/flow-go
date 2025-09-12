@@ -1,8 +1,6 @@
 package fixtures
 
 import (
-	"testing"
-
 	"github.com/onflow/flow-go/ledger"
 )
 
@@ -12,6 +10,16 @@ type LedgerPayloadGenerator struct {
 	ledgerValueGen *LedgerValueGenerator
 }
 
+func NewLedgerPayloadGenerator(
+	randomGen *RandomGenerator,
+	ledgerValueGen *LedgerValueGenerator,
+) *LedgerPayloadGenerator {
+	return &LedgerPayloadGenerator{
+		randomGen:      randomGen,
+		ledgerValueGen: ledgerValueGen,
+	}
+}
+
 // payloadConfig holds the configuration for payload generation.
 type payloadConfig struct {
 	minSize int
@@ -19,7 +27,7 @@ type payloadConfig struct {
 	value   ledger.Value
 }
 
-// WithSize returns an option to set the payload size range.
+// WithSize is an option that sets the payload size range.
 func (g *LedgerPayloadGenerator) WithSize(minSize, maxSize int) func(*payloadConfig) {
 	return func(config *payloadConfig) {
 		config.minSize = minSize
@@ -27,15 +35,15 @@ func (g *LedgerPayloadGenerator) WithSize(minSize, maxSize int) func(*payloadCon
 	}
 }
 
-// WithValue returns an option to set the value for the payload.
+// WithValue is an option that sets the value for the payload.
 func (g *LedgerPayloadGenerator) WithValue(value ledger.Value) func(*payloadConfig) {
 	return func(config *payloadConfig) {
 		config.value = value
 	}
 }
 
-// Fixture generates a single random ledger payload.
-func (g *LedgerPayloadGenerator) Fixture(t testing.TB, opts ...func(*payloadConfig)) *ledger.Payload {
+// Fixture generates a single random [ledger.Payload].
+func (g *LedgerPayloadGenerator) Fixture(opts ...func(*payloadConfig)) *ledger.Payload {
 	config := &payloadConfig{
 		minSize: 1,
 		maxSize: 8,
@@ -45,26 +53,28 @@ func (g *LedgerPayloadGenerator) Fixture(t testing.TB, opts ...func(*payloadConf
 		opt(config)
 	}
 
+	Assert(config.minSize <= config.maxSize, "minSize must be less than or equal to maxSize")
+
 	if config.value == nil {
-		config.value = g.ledgerValueGen.Fixture(t, g.ledgerValueGen.WithSize(config.minSize, config.maxSize))
+		config.value = g.ledgerValueGen.Fixture(g.ledgerValueGen.WithSize(config.minSize, config.maxSize))
 	}
 
-	return g.generatePayload(t, config.minSize, config.maxSize, config.value)
+	return g.generatePayload(config.minSize, config.maxSize, config.value)
 }
 
-// List generates a list of random ledger payloads.
-func (g *LedgerPayloadGenerator) List(t testing.TB, n int, opts ...func(*payloadConfig)) []*ledger.Payload {
+// List generates a list of random [ledger.Payload].
+func (g *LedgerPayloadGenerator) List(n int, opts ...func(*payloadConfig)) []*ledger.Payload {
 	res := make([]*ledger.Payload, n)
 	for i := range n {
-		res[i] = g.Fixture(t, opts...)
+		res[i] = g.Fixture(opts...)
 	}
 	return res
 }
 
-// generatePayload returns a random payload.
-func (g *LedgerPayloadGenerator) generatePayload(t testing.TB, minByteSize int, maxByteSize int, value ledger.Value) *ledger.Payload {
-	keyByteSize := minByteSize + g.randomGen.Intn(maxByteSize-minByteSize)
-	keydata := g.randomGen.RandomBytes(t, keyByteSize)
+// generatePayload returns a random [ledger.Payload].
+func (g *LedgerPayloadGenerator) generatePayload(minByteSize int, maxByteSize int, value ledger.Value) *ledger.Payload {
+	keyByteSize := g.randomGen.IntInRange(minByteSize, maxByteSize)
+	keydata := g.randomGen.RandomBytes(keyByteSize)
 	key := ledger.Key{KeyParts: []ledger.KeyPart{{Type: 0, Value: keydata}}}
 
 	return ledger.NewPayload(key, value)

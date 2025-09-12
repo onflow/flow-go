@@ -2,9 +2,6 @@ package fixtures
 
 import (
 	"bytes"
-	"testing"
-
-	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/model/flow"
@@ -20,119 +17,117 @@ type ChunkExecutionDataGenerator struct {
 	trieUpdateGen             *TrieUpdateGenerator
 }
 
-// chunkExecutionDataConfig holds the configuration for chunk execution data generation.
-type chunkExecutionDataConfig struct {
-	collection         *flow.Collection
-	events             flow.EventsList
-	trieUpdate         *ledger.TrieUpdate
-	transactionResults []flow.LightTransactionResult
-	minSize            int
-}
-
-// WithCollection returns an option to set the collection for the chunk execution data.
-func (g *ChunkExecutionDataGenerator) WithCollection(collection *flow.Collection) func(*chunkExecutionDataConfig) {
-	return func(config *chunkExecutionDataConfig) {
-		config.collection = collection
+func NewChunkExecutionDataGenerator(
+	randomGen *RandomGenerator,
+	collectionGen *CollectionGenerator,
+	lightTransactionResultGen *LightTransactionResultGenerator,
+	eventGen *EventGenerator,
+	trieUpdateGen *TrieUpdateGenerator,
+) *ChunkExecutionDataGenerator {
+	return &ChunkExecutionDataGenerator{
+		randomGen:                 randomGen,
+		collectionGen:             collectionGen,
+		lightTransactionResultGen: lightTransactionResultGen,
+		eventGen:                  eventGen,
+		trieUpdateGen:             trieUpdateGen,
 	}
 }
 
-// WithEvents returns an option to set the events for the chunk execution data.
-func (g *ChunkExecutionDataGenerator) WithEvents(events flow.EventsList) func(*chunkExecutionDataConfig) {
-	return func(config *chunkExecutionDataConfig) {
-		config.events = events
+// WithCollection is an option that sets the collection for the chunk execution data.
+func (g *ChunkExecutionDataGenerator) WithCollection(collection *flow.Collection) func(*execution_data.ChunkExecutionData) {
+	return func(ced *execution_data.ChunkExecutionData) {
+		ced.Collection = collection
 	}
 }
 
-// WithTrieUpdate returns an option to set the trie update for the chunk execution data.
-func (g *ChunkExecutionDataGenerator) WithTrieUpdate(trieUpdate *ledger.TrieUpdate) func(*chunkExecutionDataConfig) {
-	return func(config *chunkExecutionDataConfig) {
-		config.trieUpdate = trieUpdate
+// WithEvents is an option that sets the events for the chunk execution data.
+func (g *ChunkExecutionDataGenerator) WithEvents(events flow.EventsList) func(*execution_data.ChunkExecutionData) {
+	return func(ced *execution_data.ChunkExecutionData) {
+		ced.Events = events
 	}
 }
 
-// WithTransactionResults returns an option to set the transaction results for the chunk execution data.
-func (g *ChunkExecutionDataGenerator) WithTransactionResults(results []flow.LightTransactionResult) func(*chunkExecutionDataConfig) {
-	return func(config *chunkExecutionDataConfig) {
-		config.transactionResults = results
+// WithTrieUpdate is an option that sets the trie update for the chunk execution data.
+func (g *ChunkExecutionDataGenerator) WithTrieUpdate(trieUpdate *ledger.TrieUpdate) func(*execution_data.ChunkExecutionData) {
+	return func(ced *execution_data.ChunkExecutionData) {
+		ced.TrieUpdate = trieUpdate
 	}
 }
 
-// WithMinSize returns an option to set the minimum size for the chunk execution data.
-func (g *ChunkExecutionDataGenerator) WithMinSize(minSize int) func(*chunkExecutionDataConfig) {
-	return func(config *chunkExecutionDataConfig) {
-		config.minSize = minSize
+// WithTransactionResults is an option that sets the transaction results for the chunk execution data.
+func (g *ChunkExecutionDataGenerator) WithTransactionResults(results []flow.LightTransactionResult) func(*execution_data.ChunkExecutionData) {
+	return func(ced *execution_data.ChunkExecutionData) {
+		ced.TransactionResults = results
 	}
 }
 
-// Fixture generates chunk execution data with optional configuration.
-func (g *ChunkExecutionDataGenerator) Fixture(t testing.TB, opts ...func(*chunkExecutionDataConfig)) *execution_data.ChunkExecutionData {
-	config := &chunkExecutionDataConfig{
-		collection: g.collectionGen.Fixture(t, g.collectionGen.WithTxCount(5)),
-		trieUpdate: g.trieUpdateGen.Fixture(t),
+// WithMinSize is an option that sets the minimum size for the chunk execution data.
+func (g *ChunkExecutionDataGenerator) WithMinSize(minSize int) func(*execution_data.ChunkExecutionData) {
+	return func(ced *execution_data.ChunkExecutionData) {
+		if minSize > 0 && ced.TrieUpdate != nil {
+			g.ensureMinSize(ced, minSize)
+		}
+	}
+}
+
+// Fixture generates a [execution_data.ChunkExecutionData] with random data based on the provided options.
+func (g *ChunkExecutionDataGenerator) Fixture(opts ...func(*execution_data.ChunkExecutionData)) *execution_data.ChunkExecutionData {
+	ced := &execution_data.ChunkExecutionData{
+		Collection: g.collectionGen.Fixture(g.collectionGen.WithTxCount(5)),
+		TrieUpdate: g.trieUpdateGen.Fixture(),
 	}
 
 	for _, opt := range opts {
-		opt(config)
+		opt(ced)
 	}
 
-	if len(config.transactionResults) == 0 {
-		config.transactionResults = make([]flow.LightTransactionResult, len(config.collection.Transactions))
-		for i, tx := range config.collection.Transactions {
-			config.transactionResults[i] = g.lightTransactionResultGen.Fixture(t, g.lightTransactionResultGen.WithTransactionID(tx.ID()))
+	if len(ced.TransactionResults) == 0 {
+		ced.TransactionResults = make([]flow.LightTransactionResult, len(ced.Collection.Transactions))
+		for i, tx := range ced.Collection.Transactions {
+			ced.TransactionResults[i] = g.lightTransactionResultGen.Fixture(g.lightTransactionResultGen.WithTransactionID(tx.ID()))
 		}
 	}
 
-	if len(config.events) == 0 {
-		for txIndex, result := range config.transactionResults {
-			events := g.eventGen.List(t, 5,
+	if len(ced.Events) == 0 {
+		for txIndex, result := range ced.TransactionResults {
+			events := g.eventGen.List(5,
 				g.eventGen.WithTransactionID(result.TransactionID),
 				g.eventGen.WithTransactionIndex(uint32(txIndex)),
 			)
-			config.events = append(config.events, events...)
+			ced.Events = append(ced.Events, events...)
 		}
-		config.events = AdjustEventsMetadata(config.events)
-	}
-
-	ced := &execution_data.ChunkExecutionData{
-		Collection:         config.collection,
-		Events:             config.events,
-		TrieUpdate:         config.trieUpdate,
-		TransactionResults: config.transactionResults,
-	}
-
-	// Handle minimum size requirement
-	if config.minSize > 0 && ced.TrieUpdate != nil {
-		g.ensureMinSize(t, ced, config.minSize)
+		ced.Events = AdjustEventsMetadata(ced.Events)
 	}
 
 	return ced
 }
 
-// List generates a list of chunk execution data.
-func (g *ChunkExecutionDataGenerator) List(t testing.TB, n int, opts ...func(*chunkExecutionDataConfig)) []*execution_data.ChunkExecutionData {
+// List generates a list of [execution_data.ChunkExecutionData].
+func (g *ChunkExecutionDataGenerator) List(n int, opts ...func(*execution_data.ChunkExecutionData)) []*execution_data.ChunkExecutionData {
 	list := make([]*execution_data.ChunkExecutionData, n)
 	for i := range n {
-		list[i] = g.Fixture(t, opts...)
+		list[i] = g.Fixture(opts...)
 	}
 	return list
 }
 
 // Helper methods for generating random values
 
-func (g *ChunkExecutionDataGenerator) ensureMinSize(t testing.TB, ced *execution_data.ChunkExecutionData, minSize int) {
+func (g *ChunkExecutionDataGenerator) ensureMinSize(ced *execution_data.ChunkExecutionData, minSize int) {
 	size := 1
 	for {
 		buf := &bytes.Buffer{}
 		err := execution_data.DefaultSerializer.Serialize(buf, ced)
-		require.NoError(t, err)
+		NoError(err)
+
 		if buf.Len() >= minSize {
 			return
 		}
 
-		v := g.randomGen.RandomBytes(t, size)
-
 		k, err := ced.TrieUpdate.Payloads[0].Key()
-		require.NoError(t, err)
+		NoError(err)
+
+		v := g.randomGen.RandomBytes(size)
 
 		ced.TrieUpdate.Payloads[0] = ledger.NewPayload(k, v)
 		size *= 2

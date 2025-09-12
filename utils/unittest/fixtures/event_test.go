@@ -18,12 +18,12 @@ func TestAdjustEventsMetadata(t *testing.T) {
 	})
 
 	t.Run("single event", func(t *testing.T) {
-		suite := NewGeneratorSuite(t)
+		suite := NewGeneratorSuite()
 		eventGen := suite.Events()
 		identifierGen := suite.Identifiers()
 
-		txID := identifierGen.Fixture(t)
-		event := eventGen.Fixture(t,
+		txID := identifierGen.Fixture()
+		event := eventGen.Fixture(
 			eventGen.WithTransactionID(txID),
 			eventGen.WithEventIndex(999),
 			eventGen.WithTransactionIndex(999),
@@ -42,23 +42,23 @@ func TestAdjustEventsMetadata(t *testing.T) {
 	})
 
 	t.Run("multiple events from same transaction", func(t *testing.T) {
-		suite := NewGeneratorSuite(t)
+		suite := NewGeneratorSuite()
 		eventGen := suite.Events()
 		identifierGen := suite.Identifiers()
 
-		txID := identifierGen.Fixture(t)
+		txID := identifierGen.Fixture()
 		events := []flow.Event{
-			eventGen.Fixture(t,
+			eventGen.Fixture(
 				eventGen.WithTransactionID(txID),
 				eventGen.WithTransactionIndex(999),
 				eventGen.WithEventIndex(999),
 			),
-			eventGen.Fixture(t,
+			eventGen.Fixture(
 				eventGen.WithTransactionID(txID),
 				eventGen.WithTransactionIndex(888),
 				eventGen.WithEventIndex(888),
 			),
-			eventGen.Fixture(t,
+			eventGen.Fixture(
 				eventGen.WithTransactionID(txID),
 				eventGen.WithTransactionIndex(777),
 				eventGen.WithEventIndex(777),
@@ -76,14 +76,14 @@ func TestAdjustEventsMetadata(t *testing.T) {
 	})
 
 	t.Run("multiple events from different transactions", func(t *testing.T) {
-		suite := NewGeneratorSuite(t)
+		suite := NewGeneratorSuite()
 		eventGen := suite.Events()
 		identifierGen := suite.Identifiers()
 		randomGen := suite.Random()
 
-		txID0 := identifierGen.Fixture(t)
-		txID1 := identifierGen.Fixture(t)
-		txID2 := identifierGen.Fixture(t)
+		txID0 := identifierGen.Fixture()
+		txID1 := identifierGen.Fixture()
+		txID2 := identifierGen.Fixture()
 
 		type eventConfig struct {
 			transactionID    flow.Identifier
@@ -126,7 +126,7 @@ func TestAdjustEventsMetadata(t *testing.T) {
 
 		events := make([]flow.Event, len(expected))
 		for i, event := range expected {
-			events[i] = eventGen.Fixture(t,
+			events[i] = eventGen.Fixture(
 				eventGen.WithTransactionID(event.transactionID),
 				eventGen.WithTransactionIndex(randomGen.Uint32()),
 				eventGen.WithEventIndex(randomGen.Uint32()),

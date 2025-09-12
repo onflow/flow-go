@@ -171,13 +171,10 @@ suite := fixtures.NewGeneratorSuite(t, fixtures.WithSeed(42))
 randomGen := suite.Random()
 
 // Generate random bytes
-bytes := randomGen.RandomBytes(t, 32)
+bytes := randomGen.RandomBytes(32)
 
 // Generate random string
 str := randomGen.RandomString(16)
-
-// Generate random uint64 in range
-num := randomGen.Uint64InRange(1, 100)
 ```
 
 ### Available Generators
@@ -203,54 +200,83 @@ num := randomGen.Uint64InRange(1, 100)
 | Proposal Keys | `ProposalKeys()` | Generate proposal keys |
 | Events | `Events()` | Generate events with encoding support |
 | Event Types | `EventTypes()` | Generate event types |
-| Time | `Time()` | Generate time.Time values |
+| Time | `Time()` | Generate [time.Time] values |
 | Ledger Paths | `LedgerPaths()` | Generate ledger paths |
 | Ledger Payloads | `LedgerPayloads()` | Generate ledger payloads |
-| Ledger Values | `LedgerValues()` | Generate ledger values |
+| Time | `Time()` | Generate [time.Time] values |
 
 ## Available Generators
 
 ### Random Generator
 
-The RandomGenerator provides consistent random value generation for all other generators.
+The RandomGenerator provides consistent random value generation for all other generators. It exposes all methods from `*rand.Rand` and provides additional convenience methods for common use cases.
 
-**Methods:**
-- `RandomBytes(t testing.TB, n int)`: Generates n random bytes
+**Core Methods:**
+- `RandomBytes(n int)`: Generates n random bytes
 - `RandomString(length uint)`: Generates a random string of specified length
-- `Uint64InRange(min, max uint64)`: Generates a random uint64 in the specified range [min, max]
 - `Uint32()`: Generates a random uint32
 - `Uint64()`: Generates a random uint64
 - `Int31()`: Generates a random int32
 - `Int63()`: Generates a random int64
 - `Intn(n int)`: Generates a random int in the range [0, n)
 
+**Unsigned Integer Methods (n > 0 required):**
+- `Uintn(n uint)`: Generates a random uint strictly less than n
+- `Uint32n(n uint32)`: Generates a random uint32 strictly less than n
+- `Uint64n(n uint64)`: Generates a random uint64 strictly less than n
+
+**Range Methods (positive ranges only):**
+- `IntInRange(min, max int)`: Generates a random int in the inclusive range [min, max]
+- `Int32InRange(min, max int32)`: Generates a random int32 in the inclusive range [min, max]
+- `Int64InRange(min, max int64)`: Generates a random int64 in the inclusive range [min, max]
+- `UintInRange(min, max uint)`: Generates a random uint in the inclusive range [min, max]
+- `Uint32InRange(min, max uint32)`: Generates a random uint32 in the inclusive range [min, max]
+- `Uint64InRange(min, max uint64)`: Generates a random uint64 in the inclusive range [min, max]
+
+**Generic Functions:**
+- `InclusiveRange[T](g *RandomGenerator, min, max T)`: Generic function for generating random numbers in inclusive ranges
+- `RandomElement[T](g *RandomGenerator, slice []T)`: Selects a random element from a slice
+
+**Constraints:**
+- All `*n` methods require n > 0 (will panic if n = 0)
+- All range methods only support positive ranges (will panic with negative ranges)
+- The RandomGenerator exposes all methods from `*rand.Rand` for additional functionality
+
 ```go
 randomGen := suite.Random()
 
 // Generate random bytes
-bytes := randomGen.RandomBytes(t, 32)
+bytes := randomGen.RandomBytes(32)
 
 // Generate random string
 str := randomGen.RandomString(16)
 
-// Generate random number in range
-num := randomGen.Uint64InRange(1, 100)
+// Generate random unsigned integers less than n
+uintVal := randomGen.Uintn(100)
+uint32Val := randomGen.Uint32n(100)
+uint64Val := randomGen.Uint64n(100)
+
+// Generate random numbers in inclusive ranges (positive ranges only)
+intInRange := randomGen.IntInRange(1, 50)
+int32InRange := randomGen.Int32InRange(1, 25)
+int64InRange := randomGen.Int64InRange(1, 100)
+uintInRange := randomGen.UintInRange(10, 90)
+uint32InRange := randomGen.Uint32InRange(5, 95)
+uint64InRange := randomGen.Uint64InRange(1, 1000)
+
+// Use generic InclusiveRange function
+numInRange := InclusiveRange(randomGen, 1, 100)
+numInRangeWithType := InclusiveRange[uint32](randomGen, 1, 100)
+
+// Select random element from slice
+slice := []string{"apple", "banana", "cherry", "date"}
+randomElement := RandomElement(randomGen, slice)
 
 // randomGen also exposes all methods from *rand.Rand
-
-// Generate random uint32
 val := randomGen.Uint32()
-
-// Generate random uint64
 val64 := randomGen.Uint64()
-
-// Generate random int32
 int32Val := randomGen.Int31()
-
-// Generate random int64
 int64Val := randomGen.Int63()
-
-// Generate random int in range [0, n)
 intVal := randomGen.Intn(100)
 ```
 
@@ -297,7 +323,7 @@ child := headerGen.Fixture(t,
 
 // Header with parent and source of randomness
 parent := headerGen.Fixture(t)
-source := suite.RandomBytes(t, 32)
+source := suite.Random().RandomBytes(32)
 child := headerGen.Fixture(t,
     headerGen.WithParentAndSoR(parent, source),
 )

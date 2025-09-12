@@ -1,14 +1,20 @@
 package fixtures
 
 import (
-	"testing"
-
 	"github.com/onflow/flow-go/model/flow"
 )
 
 // ProposalKeyGenerator generates proposal keys with consistent randomness.
 type ProposalKeyGenerator struct {
 	addressGen *AddressGenerator
+}
+
+func NewProposalKeyGenerator(
+	addressGen *AddressGenerator,
+) *ProposalKeyGenerator {
+	return &ProposalKeyGenerator{
+		addressGen: addressGen,
+	}
 }
 
 // proposalKeyConfig holds the configuration for proposal key generation.
@@ -18,51 +24,47 @@ type proposalKeyConfig struct {
 	sequenceNumber uint64
 }
 
-// WithAddress returns an option to set the address for the proposal key.
-func (g *ProposalKeyGenerator) WithAddress(address flow.Address) func(*proposalKeyConfig) {
-	return func(config *proposalKeyConfig) {
-		config.address = address
+// WithAddress is an option that sets the address for the proposal key.
+func (g *ProposalKeyGenerator) WithAddress(address flow.Address) func(*flow.ProposalKey) {
+	return func(key *flow.ProposalKey) {
+		key.Address = address
 	}
 }
 
-// WithKeyIndex returns an option to set the key index for the proposal key.
-func (g *ProposalKeyGenerator) WithKeyIndex(keyIndex uint32) func(*proposalKeyConfig) {
-	return func(config *proposalKeyConfig) {
-		config.keyIndex = keyIndex
+// WithKeyIndex is an option that sets the key index for the proposal key.
+func (g *ProposalKeyGenerator) WithKeyIndex(keyIndex uint32) func(*flow.ProposalKey) {
+	return func(key *flow.ProposalKey) {
+		key.KeyIndex = keyIndex
 	}
 }
 
-// WithSequenceNumber returns an option to set the sequence number for the proposal key.
-func (g *ProposalKeyGenerator) WithSequenceNumber(sequenceNumber uint64) func(*proposalKeyConfig) {
-	return func(config *proposalKeyConfig) {
-		config.sequenceNumber = sequenceNumber
+// WithSequenceNumber is an option that sets the sequence number for the proposal key.
+func (g *ProposalKeyGenerator) WithSequenceNumber(sequenceNumber uint64) func(*flow.ProposalKey) {
+	return func(key *flow.ProposalKey) {
+		key.SequenceNumber = sequenceNumber
 	}
 }
 
-// Fixture generates a proposal key with optional configuration.
-func (g *ProposalKeyGenerator) Fixture(t testing.TB, opts ...func(*proposalKeyConfig)) flow.ProposalKey {
-	config := &proposalKeyConfig{
-		address:        g.addressGen.Fixture(t),
-		keyIndex:       1,
-		sequenceNumber: 0,
+// Fixture generates a [flow.ProposalKey] with random data based on the provided options.
+func (g *ProposalKeyGenerator) Fixture(opts ...func(*flow.ProposalKey)) flow.ProposalKey {
+	key := flow.ProposalKey{
+		Address:        g.addressGen.Fixture(),
+		KeyIndex:       1,
+		SequenceNumber: 0,
 	}
 
 	for _, opt := range opts {
-		opt(config)
+		opt(&key)
 	}
 
-	return flow.ProposalKey{
-		Address:        config.address,
-		KeyIndex:       config.keyIndex,
-		SequenceNumber: config.sequenceNumber,
-	}
+	return key
 }
 
-// List generates a list of proposal keys.
-func (g *ProposalKeyGenerator) List(t testing.TB, n int, opts ...func(*proposalKeyConfig)) []flow.ProposalKey {
+// List generates a list of [flow.ProposalKey].
+func (g *ProposalKeyGenerator) List(n int, opts ...func(*flow.ProposalKey)) []flow.ProposalKey {
 	list := make([]flow.ProposalKey, n)
 	for i := range n {
-		list[i] = g.Fixture(t, opts...)
+		list[i] = g.Fixture(opts...)
 	}
 	return list
 }

@@ -1,10 +1,6 @@
 package fixtures
 
 import (
-	"testing"
-
-	"github.com/stretchr/testify/require"
-
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -13,29 +9,37 @@ type IdentifierGenerator struct {
 	randomGen *RandomGenerator
 }
 
+func NewIdentifierGenerator(
+	randomGen *RandomGenerator,
+) *IdentifierGenerator {
+	return &IdentifierGenerator{
+		randomGen: randomGen,
+	}
+}
+
 // identifierConfig holds the configuration for identifier generation.
 type identifierConfig struct {
 	// Currently no special options needed, but maintaining pattern consistency
 }
 
-// Fixture generates a random identifier.
-func (g *IdentifierGenerator) Fixture(t testing.TB, opts ...func(*identifierConfig)) flow.Identifier {
+// Fixture generates a random [flow.Identifier].
+func (g *IdentifierGenerator) Fixture(opts ...func(*identifierConfig)) flow.Identifier {
 	config := &identifierConfig{}
 
 	for _, opt := range opts {
 		opt(config)
 	}
 
-	id, err := flow.ByteSliceToId(g.randomGen.RandomBytes(t, flow.IdentifierLen))
-	require.NoError(t, err)
+	id, err := flow.ByteSliceToId(g.randomGen.RandomBytes(flow.IdentifierLen))
+	NoError(err)
 	return id
 }
 
-// List generates a list of random identifiers.
-func (g *IdentifierGenerator) List(t testing.TB, n int, opts ...func(*identifierConfig)) flow.IdentifierList {
+// List generates a list of random [flow.Identifier].
+func (g *IdentifierGenerator) List(n int, opts ...func(*identifierConfig)) flow.IdentifierList {
 	list := make([]flow.Identifier, n)
 	for i := range n {
-		list[i] = g.Fixture(t, opts...)
+		list[i] = g.Fixture(opts...)
 	}
 	return list
 }

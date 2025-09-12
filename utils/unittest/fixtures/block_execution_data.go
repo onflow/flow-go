@@ -1,8 +1,6 @@
 package fixtures
 
 import (
-	"testing"
-
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 )
@@ -13,68 +11,77 @@ type BlockExecutionDataGenerator struct {
 	chunkExecutionDataGen *ChunkExecutionDataGenerator
 }
 
-// blockExecutionDataConfig holds the configuration for block execution data generation.
-type blockExecutionDataConfig struct {
-	blockID             flow.Identifier
-	chunkExecutionDatas []*execution_data.ChunkExecutionData
-}
-
-// WithBlockID returns an option to set the block ID for the block execution data.
-func (g *BlockExecutionDataGenerator) WithBlockID(blockID flow.Identifier) func(*blockExecutionDataConfig) {
-	return func(config *blockExecutionDataConfig) {
-		config.blockID = blockID
+func NewBlockExecutionDataGenerator(
+	identifierGen *IdentifierGenerator,
+	chunkExecutionDataGen *ChunkExecutionDataGenerator,
+) *BlockExecutionDataGenerator {
+	return &BlockExecutionDataGenerator{
+		identifierGen:         identifierGen,
+		chunkExecutionDataGen: chunkExecutionDataGen,
 	}
 }
 
-// WithChunkExecutionDatas returns an option to set the chunk execution datas for the block execution data.
-func (g *BlockExecutionDataGenerator) WithChunkExecutionDatas(chunks ...*execution_data.ChunkExecutionData) func(*blockExecutionDataConfig) {
-	return func(config *blockExecutionDataConfig) {
-		config.chunkExecutionDatas = chunks
+// WithBlockID is an option that sets the BlockID for the block execution data.
+func (g *BlockExecutionDataGenerator) WithBlockID(blockID flow.Identifier) func(*execution_data.BlockExecutionData) {
+	return func(blockExecutionData *execution_data.BlockExecutionData) {
+		blockExecutionData.BlockID = blockID
 	}
 }
 
-// Fixture generates block execution data with optional configuration.
-func (g *BlockExecutionDataGenerator) Fixture(t testing.TB, opts ...func(*blockExecutionDataConfig)) *execution_data.BlockExecutionData {
-	config := &blockExecutionDataConfig{
-		blockID:             g.identifierGen.Fixture(t),
-		chunkExecutionDatas: []*execution_data.ChunkExecutionData{},
+// WithChunkExecutionDatas is an option that sets the ChunkExecutionDatas for the block execution data.
+func (g *BlockExecutionDataGenerator) WithChunkExecutionDatas(chunks ...*execution_data.ChunkExecutionData) func(*execution_data.BlockExecutionData) {
+	return func(blockExecutionData *execution_data.BlockExecutionData) {
+		blockExecutionData.ChunkExecutionDatas = chunks
+	}
+}
+
+// Fixture generates a [execution_data.BlockExecutionData] with random data based on the provided options.
+func (g *BlockExecutionDataGenerator) Fixture(opts ...func(*execution_data.BlockExecutionData)) *execution_data.BlockExecutionData {
+	blockExecutionData := &execution_data.BlockExecutionData{
+		BlockID:             g.identifierGen.Fixture(),
+		ChunkExecutionDatas: []*execution_data.ChunkExecutionData{},
 	}
 
 	for _, opt := range opts {
-		opt(config)
+		opt(blockExecutionData)
 	}
 
-	return &execution_data.BlockExecutionData{
-		BlockID:             config.blockID,
-		ChunkExecutionDatas: config.chunkExecutionDatas,
-	}
+	return blockExecutionData
 }
 
-// List generates a list of block execution data.
-func (g *BlockExecutionDataGenerator) List(t testing.TB, n int, opts ...func(*blockExecutionDataConfig)) []*execution_data.BlockExecutionData {
+// List generates a list of [execution_data.BlockExecutionData].
+func (g *BlockExecutionDataGenerator) List(n int, opts ...func(*execution_data.BlockExecutionData)) []*execution_data.BlockExecutionData {
 	list := make([]*execution_data.BlockExecutionData, n)
 	for i := range n {
-		list[i] = g.Fixture(t, opts...)
+		list[i] = g.Fixture(opts...)
 	}
 	return list
 }
 
-// BlockExecutionDataEntityGenerator generates block execution data entities with consistent randomness.
+// BlockExecutionDataEntityGenerator generates [execution_data.BlockExecutionDataEntity] with consistent randomness.
 type BlockExecutionDataEntityGenerator struct {
 	*BlockExecutionDataGenerator
 }
 
-// Fixture generates a block execution data entity with optional configuration.
-func (g *BlockExecutionDataEntityGenerator) Fixture(t testing.TB, opts ...func(*blockExecutionDataConfig)) *execution_data.BlockExecutionDataEntity {
-	execData := g.BlockExecutionDataGenerator.Fixture(t, opts...)
-	return execution_data.NewBlockExecutionDataEntity(g.identifierGen.Fixture(t), execData)
+func NewBlockExecutionDataEntityGenerator(
+	blockExecutionDataGen *BlockExecutionDataGenerator,
+) *BlockExecutionDataEntityGenerator {
+	return &BlockExecutionDataEntityGenerator{
+		BlockExecutionDataGenerator: blockExecutionDataGen,
+	}
 }
 
-// List generates a list of block execution data entities.
-func (g *BlockExecutionDataEntityGenerator) List(t testing.TB, n int, opts ...func(*blockExecutionDataConfig)) []*execution_data.BlockExecutionDataEntity {
+// Fixture generates a [execution_data.BlockExecutionDataEntity] with random data based on the provided options.
+func (g *BlockExecutionDataEntityGenerator) Fixture(opts ...func(*execution_data.BlockExecutionData)) *execution_data.BlockExecutionDataEntity {
+	execData := g.BlockExecutionDataGenerator.Fixture(opts...)
+	return execution_data.NewBlockExecutionDataEntity(g.identifierGen.Fixture(), execData)
+}
+
+// List generates a list of [execution_data.BlockExecutionDataEntity].
+func (g *BlockExecutionDataEntityGenerator) List(n int, opts ...func(*execution_data.BlockExecutionData)) []*execution_data.BlockExecutionDataEntity {
 	list := make([]*execution_data.BlockExecutionDataEntity, n)
 	for i := range n {
-		list[i] = g.Fixture(t, opts...)
+		list[i] = g.Fixture(opts...)
 	}
 	return list
 }

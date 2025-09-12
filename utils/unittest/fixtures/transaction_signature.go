@@ -1,8 +1,6 @@
 package fixtures
 
 import (
-	"testing"
-
 	"github.com/onflow/crypto"
 
 	"github.com/onflow/flow-go/model/flow"
@@ -14,76 +12,73 @@ type TransactionSignatureGenerator struct {
 	addressGen *AddressGenerator
 }
 
-// transactionSignatureConfig holds the configuration for transaction signature generation.
-type transactionSignatureConfig struct {
-	address     flow.Address
-	signerIndex int
-	signature   crypto.Signature
-	keyIndex    uint32
-}
-
-// WithAddress returns an option to set the address for the transaction signature.
-func (g *TransactionSignatureGenerator) WithAddress(address flow.Address) func(*transactionSignatureConfig) {
-	return func(config *transactionSignatureConfig) {
-		config.address = address
+func NewTransactionSignatureGenerator(
+	randomGen *RandomGenerator,
+	addressGen *AddressGenerator,
+) *TransactionSignatureGenerator {
+	return &TransactionSignatureGenerator{
+		randomGen:  randomGen,
+		addressGen: addressGen,
 	}
 }
 
-// WithSignerIndex returns an option to set the signer index for the transaction signature.
-func (g *TransactionSignatureGenerator) WithSignerIndex(signerIndex int) func(*transactionSignatureConfig) {
-	return func(config *transactionSignatureConfig) {
-		config.signerIndex = signerIndex
+// WithAddress is an option that sets the address for the transaction signature.
+func (g *TransactionSignatureGenerator) WithAddress(address flow.Address) func(*flow.TransactionSignature) {
+	return func(signature *flow.TransactionSignature) {
+		signature.Address = address
 	}
 }
 
-// WithSignature returns an option to set the signature for the transaction signature.
-func (g *TransactionSignatureGenerator) WithSignature(signature crypto.Signature) func(*transactionSignatureConfig) {
-	return func(config *transactionSignatureConfig) {
-		config.signature = signature
+// WithSignerIndex is an option that sets the signer index for the transaction signature.
+func (g *TransactionSignatureGenerator) WithSignerIndex(signerIndex int) func(*flow.TransactionSignature) {
+	return func(signature *flow.TransactionSignature) {
+		signature.SignerIndex = signerIndex
 	}
 }
 
-// WithKeyIndex returns an option to set the key index for the transaction signature.
-func (g *TransactionSignatureGenerator) WithKeyIndex(keyIndex uint32) func(*transactionSignatureConfig) {
-	return func(config *transactionSignatureConfig) {
-		config.keyIndex = keyIndex
+// WithSignature is an option that sets the signature for the transaction signature.
+func (g *TransactionSignatureGenerator) WithSignature(signature crypto.Signature) func(*flow.TransactionSignature) {
+	return func(signature *flow.TransactionSignature) {
+		signature.Signature = signature.Signature
 	}
 }
 
-// Fixture generates a transaction signature with optional configuration.
-func (g *TransactionSignatureGenerator) Fixture(t testing.TB, opts ...func(*transactionSignatureConfig)) flow.TransactionSignature {
-	config := &transactionSignatureConfig{
-		address:     g.addressGen.Fixture(t),
-		signerIndex: 0,
-		signature:   g.generateValidSignature(t),
-		keyIndex:    1,
+// WithKeyIndex is an option that sets the key index for the transaction signature.
+func (g *TransactionSignatureGenerator) WithKeyIndex(keyIndex uint32) func(*flow.TransactionSignature) {
+	return func(signature *flow.TransactionSignature) {
+		signature.KeyIndex = keyIndex
+	}
+}
+
+// Fixture generates a [flow.TransactionSignature] with random data based on the provided options.
+func (g *TransactionSignatureGenerator) Fixture(opts ...func(*flow.TransactionSignature)) flow.TransactionSignature {
+	signature := flow.TransactionSignature{
+		Address:     g.addressGen.Fixture(),
+		SignerIndex: 0,
+		Signature:   g.generateValidSignature(),
+		KeyIndex:    1,
 	}
 
 	for _, opt := range opts {
-		opt(config)
+		opt(&signature)
 	}
 
-	return flow.TransactionSignature{
-		Address:     config.address,
-		SignerIndex: config.signerIndex,
-		Signature:   config.signature,
-		KeyIndex:    config.keyIndex,
-	}
+	return signature
 }
 
-// List generates a list of transaction signatures.
-func (g *TransactionSignatureGenerator) List(t testing.TB, n int, opts ...func(*transactionSignatureConfig)) []flow.TransactionSignature {
+// List generates a list of [flow.TransactionSignature].
+func (g *TransactionSignatureGenerator) List(n int, opts ...func(*flow.TransactionSignature)) []flow.TransactionSignature {
 	list := make([]flow.TransactionSignature, n)
 	for i := range n {
-		list[i] = g.Fixture(t, opts...)
+		list[i] = g.Fixture(opts...)
 	}
 	return list
 }
 
 // generateValidSignature generates a valid ECDSA signature for the given transaction.
-func (g *TransactionSignatureGenerator) generateValidSignature(t testing.TB) crypto.Signature {
+func (g *TransactionSignatureGenerator) generateValidSignature() crypto.Signature {
 	sigLen := crypto.SignatureLenECDSAP256
-	signature := g.randomGen.RandomBytes(t, sigLen)
+	signature := g.randomGen.RandomBytes(sigLen)
 
 	// Make sure the ECDSA signature passes the format check
 	signature[sigLen/2] = 0

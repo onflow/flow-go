@@ -1,8 +1,6 @@
 package fixtures
 
 import (
-	"testing"
-
 	"github.com/onflow/flow-go/ledger"
 )
 
@@ -11,13 +9,21 @@ type LedgerPathGenerator struct {
 	randomGen *RandomGenerator
 }
 
+func NewLedgerPathGenerator(
+	randomGen *RandomGenerator,
+) *LedgerPathGenerator {
+	return &LedgerPathGenerator{
+		randomGen: randomGen,
+	}
+}
+
 // ledgerPathConfig holds the configuration for ledger path generation.
 type ledgerPathConfig struct {
 	// Currently no special options needed, but maintaining pattern consistency
 }
 
-// Fixture generates a single random ledger path.
-func (g *LedgerPathGenerator) Fixture(t testing.TB, opts ...func(*ledgerPathConfig)) ledger.Path {
+// Fixture generates a single random [ledger.Path].
+func (g *LedgerPathGenerator) Fixture(opts ...func(*ledgerPathConfig)) ledger.Path {
 	config := &ledgerPathConfig{}
 
 	for _, opt := range opts {
@@ -25,18 +31,18 @@ func (g *LedgerPathGenerator) Fixture(t testing.TB, opts ...func(*ledgerPathConf
 	}
 
 	var path ledger.Path
-	pathData := g.randomGen.RandomBytes(t, ledger.PathLen)
+	pathData := g.randomGen.RandomBytes(ledger.PathLen)
 	copy(path[:], pathData)
 	return path
 }
 
-// List generates a list of random ledger paths.
-func (g *LedgerPathGenerator) List(t testing.TB, n int, opts ...func(*ledgerPathConfig)) []ledger.Path {
+// List generates a list of random [ledger.Path].
+func (g *LedgerPathGenerator) List(n int, opts ...func(*ledgerPathConfig)) []ledger.Path {
 	paths := make([]ledger.Path, 0, n)
 	alreadySelectPaths := make(map[ledger.Path]bool)
 	i := 0
 	for i < n {
-		path := g.Fixture(t, opts...)
+		path := g.Fixture(opts...)
 
 		// deduplicate
 		if _, found := alreadySelectPaths[path]; !found {

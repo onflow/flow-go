@@ -1,10 +1,6 @@
 package fixtures
 
 import (
-	"testing"
-
-	"github.com/stretchr/testify/require"
-
 	"github.com/onflow/flow-go/ledger"
 )
 
@@ -13,13 +9,21 @@ type LedgerValueGenerator struct {
 	randomGen *RandomGenerator
 }
 
+func NewLedgerValueGenerator(
+	randomGen *RandomGenerator,
+) *LedgerValueGenerator {
+	return &LedgerValueGenerator{
+		randomGen: randomGen,
+	}
+}
+
 // valueConfig holds the configuration for value generation.
 type valueConfig struct {
 	minSize int
 	maxSize int
 }
 
-// WithSize returns an option to set the value size range [minSize, maxSize).
+// WithSize is an option that sets the value size range [minSize, maxSize).
 func (g *LedgerValueGenerator) WithSize(minSize, maxSize int) func(*valueConfig) {
 	return func(config *valueConfig) {
 		config.minSize = minSize
@@ -27,8 +31,8 @@ func (g *LedgerValueGenerator) WithSize(minSize, maxSize int) func(*valueConfig)
 	}
 }
 
-// Fixture generates a single random ledger value.
-func (g *LedgerValueGenerator) Fixture(t testing.TB, opts ...func(*valueConfig)) ledger.Value {
+// Fixture generates a single random [ledger.Value].
+func (g *LedgerValueGenerator) Fixture(opts ...func(*valueConfig)) ledger.Value {
 	config := &valueConfig{
 		minSize: 1,
 		maxSize: 8,
@@ -38,25 +42,25 @@ func (g *LedgerValueGenerator) Fixture(t testing.TB, opts ...func(*valueConfig))
 		opt(config)
 	}
 
-	return g.generateValue(t, config.minSize, config.maxSize)
+	Assert(config.minSize <= config.maxSize, "minSize must be less than or equal to maxSize")
+
+	return g.generateValue(config.minSize, config.maxSize)
 }
 
-// List generates a list of random ledger values.
-func (g *LedgerValueGenerator) List(t testing.TB, n int, opts ...func(*valueConfig)) []ledger.Value {
+// List generates a list of random [ledger.Value].
+func (g *LedgerValueGenerator) List(n int, opts ...func(*valueConfig)) []ledger.Value {
 	values := make([]ledger.Value, n)
 	for i := range n {
-		values[i] = g.Fixture(t, opts...)
+		values[i] = g.Fixture(opts...)
 	}
 	return values
 }
 
-// generateValue returns a random value with variable size (minByteSize <= size < maxByteSize).
-func (g *LedgerValueGenerator) generateValue(t testing.TB, minByteSize, maxByteSize int) ledger.Value {
-	require.LessOrEqual(t, minByteSize, maxByteSize, "minByteSize must be less than or equal to maxByteSize")
-
-	var byteSize = maxByteSize
+// generateValue returns a random [ledger.Value] with variable size (minByteSize <= size < maxByteSize).
+func (g *LedgerValueGenerator) generateValue(minByteSize, maxByteSize int) ledger.Value {
+	byteSize := maxByteSize
 	if minByteSize < maxByteSize {
-		byteSize = minByteSize + g.randomGen.Intn(maxByteSize-minByteSize)
+		byteSize = g.randomGen.IntInRange(minByteSize, maxByteSize)
 	}
-	return g.randomGen.RandomBytes(t, byteSize)
+	return g.randomGen.RandomBytes(byteSize)
 }

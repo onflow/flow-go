@@ -1,8 +1,6 @@
 package fixtures
 
 import (
-	"testing"
-
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -11,48 +9,48 @@ type CollectionGenerator struct {
 	transactionGen *TransactionGenerator
 }
 
-// collectionConfig holds the configuration for collection generation.
-type collectionConfig struct {
-	count        int
-	transactions []*flow.TransactionBody
-}
-
-// WithTxCount returns an option to set the number of transactions in the collection.
-func (g *CollectionGenerator) WithTxCount(count int) func(*collectionConfig) {
-	return func(config *collectionConfig) {
-		config.count = count
+func NewCollectionGenerator(
+	transactionGen *TransactionGenerator,
+) *CollectionGenerator {
+	return &CollectionGenerator{
+		transactionGen: transactionGen,
 	}
 }
 
-// WithTransactions returns an option to set the transactions for the collection.
-func (g *CollectionGenerator) WithTransactions(transactions []*flow.TransactionBody) func(*collectionConfig) {
-	return func(config *collectionConfig) {
-		config.transactions = transactions
+// WithTxCount is an option that sets the number of transactions in the collection.
+func (g *CollectionGenerator) WithTxCount(count int) func(*flow.Collection) {
+	return func(collection *flow.Collection) {
+		collection.Transactions = g.transactionGen.List(count)
 	}
 }
 
-// Fixture generates a collection with optional configuration.
-func (g *CollectionGenerator) Fixture(t testing.TB, opts ...func(*collectionConfig)) *flow.Collection {
-	config := &collectionConfig{
-		count: 1,
+// WithTransactions is an option that sets the transactions for the collection.
+func (g *CollectionGenerator) WithTransactions(transactions []*flow.TransactionBody) func(*flow.Collection) {
+	return func(collection *flow.Collection) {
+		collection.Transactions = transactions
 	}
+}
+
+// Fixture generates a [flow.Collection] with random data based on the provided options.
+func (g *CollectionGenerator) Fixture(opts ...func(*flow.Collection)) *flow.Collection {
+	collection := &flow.Collection{}
 
 	for _, opt := range opts {
-		opt(config)
+		opt(collection)
 	}
 
-	if len(config.transactions) == 0 {
-		config.transactions = g.transactionGen.List(t, config.count)
+	if len(collection.Transactions) == 0 {
+		collection.Transactions = g.transactionGen.List(1)
 	}
 
-	return &flow.Collection{Transactions: config.transactions}
+	return collection
 }
 
-// List generates a list of collections.
-func (g *CollectionGenerator) List(t testing.TB, n int, opts ...func(*collectionConfig)) []*flow.Collection {
+// List generates a list of [flow.Collection].
+func (g *CollectionGenerator) List(n int, opts ...func(*flow.Collection)) []*flow.Collection {
 	list := make([]*flow.Collection, n)
 	for i := range n {
-		list[i] = g.Fixture(t, opts...)
+		list[i] = g.Fixture(opts...)
 	}
 	return list
 }

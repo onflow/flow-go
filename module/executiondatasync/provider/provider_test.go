@@ -38,7 +38,7 @@ const (
 
 var (
 	// canonicalExecutionDataID is the execution data ID of the canonical execution data.
-	canonicalExecutionDataID = flow.MustHexStringToIdentifier("5df41e9faa69f157c050af768d9535572dc8dfa8013543d148469e165728caf7")
+	canonicalExecutionDataID = flow.MustHexStringToIdentifier("d839f4f9001ef255f7dde8f1f32aa3f96e72bcb7499dc07a05c28efaf8139e2b")
 )
 
 func getDatastore() datastore.Batching {
@@ -69,13 +69,13 @@ func getProvider(blobService network.BlobService) provider.Provider {
 }
 
 func generateBlockExecutionData(t *testing.T, numChunks int, minSerializedSizePerChunk int) *execution_data.BlockExecutionData {
-	suite := fixtures.NewGeneratorSuite(t)
+	suite := fixtures.NewGeneratorSuite()
 
 	cedGen := suite.ChunkExecutionDatas()
-	chunkExecutionData := cedGen.List(t, numChunks, cedGen.WithMinSize(minSerializedSizePerChunk))
+	chunkExecutionData := cedGen.List(numChunks, cedGen.WithMinSize(minSerializedSizePerChunk))
 
 	bedGen := suite.BlockExecutionDatas()
-	return bedGen.Fixture(t, bedGen.WithChunkExecutionDatas(chunkExecutionData...))
+	return bedGen.Fixture(bedGen.WithChunkExecutionDatas(chunkExecutionData...))
 }
 
 func deepEqual(t *testing.T, expected, actual *execution_data.BlockExecutionData) {
@@ -309,7 +309,7 @@ func TestCalculateExecutionDataLifecycle(t *testing.T) {
 		protoMsg, err := convert.BlockExecutionDataToMessage(bed)
 		require.NoError(t, err)
 
-		executionData, err := convert.MessageToBlockExecutionData(protoMsg, flow.Testnet.Chain())
+		executionData, err := convert.MessageToBlockExecutionData(protoMsg, flow.Emulator.Chain())
 		require.NoError(t, err)
 
 		deepEqual(t, bed, executionData)
@@ -319,11 +319,11 @@ func TestCalculateExecutionDataLifecycle(t *testing.T) {
 // canonicalBlockExecutionData returns a block execution data fixture generated using a static random seed.
 // this ensures it produces the same data on every run, allowing for deterministic testing of output hashes.
 func canonicalBlockExecutionData(t *testing.T) (*execution_data.BlockExecutionData, *flow.BlockExecutionDataRoot) {
-	suite := fixtures.NewGeneratorSuite(t, fixtures.WithSeed(canonicalGeneratorSeed))
+	suite := fixtures.NewGeneratorSuite(fixtures.WithSeed(canonicalGeneratorSeed))
 
 	bedGen := suite.BlockExecutionDatas()
 	cedGen := suite.ChunkExecutionDatas()
-	executionData := bedGen.Fixture(t, bedGen.WithChunkExecutionDatas(cedGen.List(t, 4)...))
+	executionData := bedGen.Fixture(bedGen.WithChunkExecutionDatas(cedGen.List(4)...))
 
 	// use in-memory provider to generate the ExecutionDataRoot and ExecutionDataID
 	prov := getProvider(getBlobservice(t, getDatastore()))
