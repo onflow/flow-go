@@ -19,7 +19,6 @@ import (
 //
 // Expected errors during normal operations:
 //   - [storage.ErrAlreadyExists] if instance params have already been stored.
-//   - Generic error for unexpected database or encoding failures.
 func InsertInstanceParams(lctx lockctx.Proof, rw storage.ReaderBatchWriter, params flow.VersionedInstanceParams) error {
 	if !lctx.HoldsLock(storage.LockBootstrapping) {
 		return fmt.Errorf("missing required lock: %s", storage.LockBootstrapping)
