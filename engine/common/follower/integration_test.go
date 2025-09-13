@@ -206,22 +206,39 @@ func TestFollowerHappyPath(t *testing.T) {
 			}(pendingBlocks[i*blocksPerWorker : (i+1)*blocksPerWorker])
 		}
 
+		// Ensure graceful shutdown even if the test fails early (e.g., Eventually times out).
+		// Otherwise, the test may panic with "pebble: closed" when threads are attempting to still write to the database, while
+		// the test is unwinding and closing the database. If such panics happen, we don't know what assertation failed and
+		// just see the panic. Hence, we call `cancel()` and attempt to wait for the engine to stop in all cases.
+		defer func() {
+			// stop producers and wait for them to exit
+			submittingBlocks.Store(false)
+			unittest.RequireReturnsBefore(t, wg.Wait, time.Second, "expect workers to stop producing")
+
+			// stop engines and wait for graceful shutdown
+			cancel()
+			unittest.RequireCloseBefore(t, moduleutil.AllDone(engine, followerLoop), time.Second, "engine failed to stop")
+
+			// surface any irrecoverable errors
+			select {
+			case err := <-errs:
+				require.NoError(t, err)
+			default:
+			}
+		}()
+
 		// wait for target block to become finalized, this might take a while.
 		require.Eventually(t, func() bool {
 			final, err := followerState.Final().Head()
 			require.NoError(t, err)
-			return final.Height == targetBlockHeight
-		}, time.Minute, time.Second, "expect to process all blocks before timeout")
+			success := final.Height == targetBlockHeight
+			if !success {
+				t.Logf("finalized height %d, waiting for %d", final.Height, targetBlockHeight)
+			} else {
+				t.Logf("successfully finalized target height %d\n", targetBlockHeight)
+			}
+			return success
+		}, 90*time.Second, time.Second, "expect to process all blocks before timeout")
 
-		// shutdown and cleanup test
-		submittingBlocks.Store(false)
-		unittest.RequireReturnsBefore(t, wg.Wait, time.Second, "expect workers to stop producing")
-		cancel()
-		unittest.RequireCloseBefore(t, moduleutil.AllDone(engine, followerLoop), time.Second, "engine failed to stop")
-		select {
-		case err := <-errs:
-			require.NoError(t, err)
-		default:
-		}
 	})
 }

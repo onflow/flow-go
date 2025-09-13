@@ -201,6 +201,14 @@ func (c *ComplianceCore) processCoreSeqEvents(ctx irrecoverable.SignalerContext,
 
 	doneSignal := ctx.Done()
 	for {
+		// Check if shutdown was requested before attempting to process queued events.
+		// This helps to prioritize timely reaction in case of shutdown.
+		select {
+		case <-doneSignal:
+			return
+		default:
+		}
+
 		select {
 		case <-doneSignal:
 			return
