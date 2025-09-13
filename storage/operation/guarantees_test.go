@@ -20,18 +20,15 @@ func TestGuaranteeInsertRetrieve(t *testing.T) {
 		g := unittest.CollectionGuaranteeFixture()
 
 		lockManager := storage.NewTestingLockManager()
-		lctx := lockManager.NewContext()
-		err := lctx.AcquireLock(storage.LockInsertBlock)
-		require.NoError(t, err)
-		defer lctx.Release()
 
-		err = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			return operation.InsertGuarantee(rw.Writer(), g.ID(), g)
+		unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
+			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+				return operation.InsertGuarantee(rw.Writer(), g.ID(), g)
+			})
 		})
-		require.NoError(t, err)
 
 		var retrieved flow.CollectionGuarantee
-		err = operation.RetrieveGuarantee(db.Reader(), g.ID(), &retrieved)
+		err := operation.RetrieveGuarantee(db.Reader(), g.ID(), &retrieved)
 		require.NoError(t, err)
 
 		assert.Equal(t, g, &retrieved)
@@ -50,29 +47,28 @@ func TestIndexGuaranteedCollectionByBlockHashInsertRetrieve(t *testing.T) {
 		expected := flow.GetIDs(guarantees)
 
 		lockManager := storage.NewTestingLockManager()
-		lctx := lockManager.NewContext()
-		err := lctx.AcquireLock(storage.LockInsertBlock)
-		require.NoError(t, err)
-		defer lctx.Release()
 
-		err = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			for _, guarantee := range guarantees {
-				if err := operation.InsertGuarantee(rw.Writer(), guarantee.ID(), guarantee); err != nil {
+		unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
+			err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+				for _, guarantee := range guarantees {
+					if err := operation.InsertGuarantee(rw.Writer(), guarantee.ID(), guarantee); err != nil {
+						return err
+					}
+				}
+				if err := operation.IndexPayloadGuarantees(lctx, rw.Writer(), blockID, expected); err != nil {
 					return err
 				}
-			}
-			if err := operation.IndexPayloadGuarantees(lctx, rw.Writer(), blockID, expected); err != nil {
-				return err
-			}
+				return nil
+			})
+			require.NoError(t, err)
+
+			var actual []flow.Identifier
+			err = operation.LookupPayloadGuarantees(db.Reader(), blockID, &actual)
+			require.NoError(t, err)
+
+			assert.Equal(t, []flow.Identifier(expected), actual)
 			return nil
 		})
-		require.NoError(t, err)
-
-		var actual []flow.Identifier
-		err = operation.LookupPayloadGuarantees(db.Reader(), blockID, &actual)
-		require.NoError(t, err)
-
-		assert.Equal(t, []flow.Identifier(expected), actual)
 	})
 }
 
