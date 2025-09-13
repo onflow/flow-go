@@ -11,7 +11,6 @@ import (
 	"github.com/onflow/flow-go/engine/common/fifoqueue"
 	"github.com/onflow/flow-go/engine/consensus"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/irrecoverable"
@@ -256,7 +255,7 @@ func (e *Engine) setupMessageHandler(getSealingConfigs module.SealingConfigsGett
 		},
 		engine.Pattern{
 			Match: func(msg *engine.Message) bool {
-				_, ok := msg.Payload.(*messages.ApprovalResponse)
+				_, ok := msg.Payload.(*flow.ApprovalResponse)
 				if ok {
 					e.engineMetrics.MessageReceived(metrics.EngineSealing, metrics.MessageResultApproval)
 				}
@@ -268,7 +267,7 @@ func (e *Engine) setupMessageHandler(getSealingConfigs module.SealingConfigsGett
 					return nil, false
 				}
 
-				approval := msg.Payload.(*messages.ApprovalResponse).Approval
+				approval := msg.Payload.(*flow.ApprovalResponse).Approval
 				return &engine.Message{
 					OriginID: msg.OriginID,
 					Payload:  &approval,
@@ -329,7 +328,11 @@ func (e *Engine) processAvailableMessages(ctx irrecoverable.SignalerContext) err
 		if ok {
 			e.log.Debug().Msg("got new result approval")
 
-			err := e.onApproval(msg.OriginID, msg.Payload.(*flow.ResultApproval))
+			ra, ok := msg.Payload.(*flow.ResultApproval)
+			if !ok {
+				return irrecoverable.NewExceptionf("unexpected approval payload type %T; expected *flow.ResultApproval", msg.Payload)
+			}
+			err := e.onApproval(msg.OriginID, ra)
 			if err != nil {
 				return fmt.Errorf("could not process result approval: %w", err)
 			}

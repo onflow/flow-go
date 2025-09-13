@@ -525,7 +525,7 @@ func (suite *EchoEngineTestSuite) multiMessageAsync(echo bool, count int, send t
 			unittest.AssertReturnsBefore(suite.T(), func() {
 				// evaluates proper reception of event
 				// casts the received event at the receiver side
-				rcvEvent, ok := (<-receiver.event).(*message.TestMessage)
+				rcvEvent, ok := (<-receiver.event).(*flow.TestMessage)
 				// evaluates correctness of casting
 				require.True(suite.T(), ok)
 
@@ -563,7 +563,7 @@ func (suite *EchoEngineTestSuite) multiMessageAsync(echo bool, count int, send t
 				unittest.AssertReturnsBefore(suite.T(), func() {
 					// evaluates proper reception of event
 					// casts the received event at the receiver side
-					rcvEvent, ok := (<-sender.event).(*message.TestMessage)
+					rcvEvent, ok := (<-sender.event).(*flow.TestMessage)
 					// evaluates correctness of casting
 					require.True(suite.T(), ok)
 					// evaluates content of received echo message
@@ -593,7 +593,7 @@ func assertMessageReceived(t *testing.T, e *EchoEngine, m *message.TestMessage, 
 	unittest.AssertReturnsBefore(t, func() {
 		// evaluates proper reception of event
 		// casts the received event at the receiver side
-		rcvEvent, ok := (<-e.event).(*message.TestMessage)
+		rcvEvent, ok := (<-e.event).(*flow.TestMessage)
 		// evaluates correctness of casting
 		require.True(t, ok)
 		// evaluates content of received message

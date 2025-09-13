@@ -60,14 +60,24 @@ func NewDummyOrchestrator(t *testing.T, Logger zerolog.Logger) *orchestrator {
 // trackEgressEvent tracks egress events by event type, this func is used as a callback in the BaseOrchestrator OnEgressEvent callback list.
 func (o *orchestrator) trackEgressEvents(event *insecure.EgressEvent) error {
 	switch e := event.FlowProtocolEvent.(type) {
-	case *flow.ExecutionReceipt:
-		o.egressEventTracker[typeExecutionReceipt] = append(o.egressEventTracker[typeExecutionReceipt], e.ID())
+	case *messages.ExecutionReceipt:
+		internalEvent, err := e.ToInternal()
+		if err != nil {
+			o.Logger.Err(err).Msgf("failed to convert event %T to internal", e)
+			return nil
+		}
+		o.egressEventTracker[typeExecutionReceipt] = append(o.egressEventTracker[typeExecutionReceipt], internalEvent.(*flow.ExecutionReceipt).ID())
 	case *messages.ChunkDataRequest:
 		o.egressEventTracker[typeChunkDataRequest] = append(o.egressEventTracker[typeChunkDataRequest], e.ChunkID)
 	case *messages.ChunkDataResponse:
 		o.egressEventTracker[typeChunkDataResponse] = append(o.egressEventTracker[typeChunkDataResponse], e.ChunkDataPack.ChunkID)
-	case *flow.ResultApproval:
-		o.egressEventTracker[typeResultApproval] = append(o.egressEventTracker[typeResultApproval], e.ID())
+	case *messages.ResultApproval:
+		internalResultApproval, err := e.ToInternal()
+		if err != nil {
+			o.Logger.Err(err).Msgf("failed to convert event %T to internal", e)
+			return nil
+		}
+		o.egressEventTracker[typeResultApproval] = append(o.egressEventTracker[typeResultApproval], internalResultApproval.(*flow.ResultApproval).ID())
 	}
 	return nil
 }

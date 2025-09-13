@@ -151,6 +151,38 @@ type Transaction struct {
 	EndState         StateCommitment
 }
 
+// UntrustedTransaction is an untrusted input-only representation of a Transaction,
+// used for construction.
+//
+// This type exists to ensure that constructor functions are invoked explicitly
+// with named fields, which improves clarity and reduces the risk of incorrect field
+// ordering during construction.
+//
+// An instance of UntrustedTransaction should be validated and converted into
+// a trusted Transaction using NewTransaction constructor.
+type UntrustedTransaction Transaction
+
+// NewTransaction creates a new instance of Transaction.
+// Construction of Transaction is allowed only within the constructor.
+//
+// All errors indicate a valid Transaction cannot be constructed from the input.
+func NewTransaction(untrusted UntrustedTransaction) (*Transaction, error) {
+
+	trustedTxBody, err := NewTransactionBody(UntrustedTransactionBody(untrusted.TransactionBody))
+	if err != nil {
+		return nil, fmt.Errorf("invalid transaction body: %w", err)
+	}
+
+	return &Transaction{
+		TransactionBody:  *trustedTxBody,
+		Status:           untrusted.Status,
+		Events:           untrusted.Events,
+		ComputationSpent: untrusted.ComputationSpent,
+		StartState:       untrusted.StartState,
+		EndState:         untrusted.EndState,
+	}, nil
+}
+
 // MissingFields checks if a transaction is missing any required fields and returns those that are missing.
 func (tb *TransactionBody) MissingFields() []string {
 	// Required fields are Script, ReferenceBlockID, Payer

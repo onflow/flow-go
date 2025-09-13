@@ -23,7 +23,7 @@ test:
 .PHONY: lint
 lint: tidy
 	# revive -config revive.toml -exclude storage/ledger/trie ./...
-	golangci-lint run -v
+	../tools/custom-gcl run -v
 
 # this ensures there is no unused dependency being added by accident
 .PHONY: tidy

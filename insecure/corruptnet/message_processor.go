@@ -7,6 +7,7 @@ import (
 
 	"github.com/onflow/flow-go/insecure"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/messages"
 	flownet "github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/channels"
 )
@@ -37,7 +38,11 @@ func (m *MessageProcessor) Process(channel channels.Channel, originID flow.Ident
 		Str("origin_id", fmt.Sprintf("%v", originID)).
 		Str("flow_protocol_event", fmt.Sprintf("%T", event)).Logger()
 	lg.Debug().Msg("processing new incoming event")
-	attackerRegistered := m.ingressController.HandleIncomingEvent(event, channel, originID)
+	msg, err := messages.InternalToMessage(event)
+	if err != nil {
+		return fmt.Errorf("failed to convert event %T to message: %v", event, err)
+	}
+	attackerRegistered := m.ingressController.HandleIncomingEvent(msg, channel, originID)
 	if !attackerRegistered {
 		// No attack orchestrator registered yet, hence pass the ingress message back to the original processor.
 		err := m.originalProcessor.Process(channel, originID, event)

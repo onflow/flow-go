@@ -227,6 +227,19 @@ func (b *Proposal) ProposalHeader() *ProposalHeader {
 	return &ProposalHeader{Header: b.Block.ToHeader(), ProposerSigData: b.ProposerSigData}
 }
 
+// GenericBlockResponse is part of the synchronization protocol and represents the
+// reply to any active synchronization attempts. It is a generic container that
+// holds a list of structurally validated blocks of type T, which should
+// correspond to the synchronization request.
+type GenericBlockResponse[T any] struct {
+	Nonce  uint64
+	Blocks []T
+}
+
+// BlockResponse is a specialization of GenericBlockResponse for Proposal blocks.
+// It is used as the concrete response type for block synchronization requests.
+type BlockResponse GenericBlockResponse[Proposal]
+
 // CertifiedBlock holds a certified block, which is a block and a Quorum Certificate [QC] pointing
 // to the block. A QC is the aggregated form of votes from a supermajority of HotStuff and therefore
 // proves validity of the block. A certified block satisfies:
@@ -295,4 +308,33 @@ func NewBlockDigest(
 		Height:    height,
 		Timestamp: timestamp,
 	}
+}
+
+// BlockVote is part of the consensus protocol and represents a consensus node
+// voting on the proposal of the leader of a given round.
+type BlockVote struct {
+	BlockID Identifier
+	View    uint64
+	SigData []byte
+}
+
+// NewBlockVote constructs a new block vote.It checks the consistency
+// requirements and errors otherwise:
+//
+//	BlockID == ZeroID and len(Block.SigData) == 0
+func NewBlockVote(blockID Identifier, view uint64, sigData []byte) (*BlockVote, error) {
+
+	if blockID == ZeroID {
+		return nil, fmt.Errorf("BlockID must not be empty")
+	}
+
+	if len(sigData) == 0 {
+		return nil, fmt.Errorf("SigData must not be empty")
+	}
+
+	return &BlockVote{
+		BlockID: blockID,
+		View:    view,
+		SigData: sigData,
+	}, nil
 }

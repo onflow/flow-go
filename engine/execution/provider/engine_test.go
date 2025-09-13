@@ -40,7 +40,7 @@ func TestProviderEngine_onChunkDataRequest(t *testing.T) {
 
 		chunkID := unittest.IdentifierFixture()
 
-		req := &messages.ChunkDataRequest{
+		req := &flow.ChunkDataRequest{
 			ChunkID: chunkID,
 			Nonce:   rand.Uint64(),
 		}
@@ -89,7 +89,7 @@ func TestProviderEngine_onChunkDataRequest(t *testing.T) {
 
 		es.On("ChunkDataPackByChunkID", chunkID).Return(chunkDataPack, nil)
 
-		req := &messages.ChunkDataRequest{
+		req := &flow.ChunkDataRequest{
 			ChunkID: chunkID,
 			Nonce:   rand.Uint64(),
 		}
@@ -135,7 +135,8 @@ func TestProviderEngine_BroadcastExecutionReceipt(t *testing.T) {
 
 	// verify that above the sealed height will be broadcasted
 	receipt1 := unittest.ExecutionReceiptFixture()
-	receiptConduit.On("Publish", receipt1, receivers.NodeIDs()[0]).Return(nil)
+	receipt1Msg := (*messages.ExecutionReceipt)(receipt1)
+	receiptConduit.On("Publish", receipt1Msg, receivers.NodeIDs()[0]).Return(nil)
 
 	broadcasted, err := e.BroadcastExecutionReceipt(context.Background(), sealedHeight+1, receipt1)
 	require.NoError(t, err)

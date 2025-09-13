@@ -19,7 +19,6 @@ import (
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/storage"
-	"github.com/onflow/flow-go/utils/logging"
 )
 
 type EngineOption func(*ComplianceEngine)
@@ -226,22 +225,10 @@ func (e *ComplianceEngine) OnFinalizedBlock(block *model.Block) {
 // messages. These cases must be logged and routed to a dedicated violation reporting consumer.
 func (e *ComplianceEngine) Process(channel channels.Channel, originID flow.Identifier, message interface{}) error {
 	switch msg := message.(type) {
-	case *flow.UntrustedProposal:
-		proposal, err := flow.NewProposal(*msg)
-		if err != nil {
-			// TODO(BFT, #7620): Replace this log statement with a call to the protocol violation consumer.
-			e.log.Warn().
-				Hex("origin_id", originID[:]).
-				Hex("block_id", logging.ID(msg.Block.ID())).
-				Uint64("block_height", msg.Block.Height).
-				Uint64("block_view", msg.Block.View).
-				Err(err).Msgf("received invalid proposal message")
-			return nil
-		}
-
+	case *flow.Proposal:
 		e.OnBlockProposal(flow.Slashable[*flow.Proposal]{
 			OriginID: originID,
-			Message:  proposal,
+			Message:  msg,
 		})
 	default:
 		e.log.Warn().Msgf("%v delivered unsupported message %T through %v", originID, message, channel)

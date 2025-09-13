@@ -10,6 +10,7 @@ import (
 	"github.com/onflow/flow-go/engine"
 	ghost "github.com/onflow/flow-go/engine/ghost/protobuf"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/channels"
@@ -185,9 +186,12 @@ func (e *RPC) Process(channel channels.Channel, originID flow.Identifier, event 
 }
 
 func (e *RPC) process(originID flow.Identifier, event interface{}) error {
-
+	msg, err := messages.InternalToMessage(event)
+	if err != nil {
+		return fmt.Errorf("failed to convert event to message: %v", err)
+	}
 	// json encode the message into bytes
-	encodedMsg, err := e.codec.Encode(event)
+	encodedMsg, err := e.codec.Encode(msg)
 	if err != nil {
 		return fmt.Errorf("failed to encode message: %v", err)
 	}

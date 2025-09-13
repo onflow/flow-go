@@ -506,7 +506,7 @@ func extractSenderID(enginesNum int, events chan interface{}, expectedMsgTxt str
 		default:
 			continue
 		}
-		echo := event.(*message.TestMessage)
+		echo := event.(*flow.TestMessage)
 		msg := echo.Text
 		if len(msg) < expectedMsgSize {
 			return nil, fmt.Errorf("invalid message format")

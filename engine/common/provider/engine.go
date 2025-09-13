@@ -89,13 +89,13 @@ func New(
 			// Provider engine only expects EntityRequest.
 			// Other message types are discarded by Match.
 			Match: func(message *engine.Message) bool {
-				_, ok := message.Payload.(*messages.EntityRequest)
+				_, ok := message.Payload.(*flow.EntityRequest)
 				return ok
 			},
 			// Map is called on messages that are Match(ed) successfully, i.e.,
 			// EntityRequest.
 			Map: func(message *engine.Message) (*engine.Message, bool) {
-				request, ok := message.Payload.(*messages.EntityRequest)
+				request, ok := message.Payload.(*flow.EntityRequest)
 				if !ok {
 					// should never happen, unless there is a bug.
 					log.Warn().
@@ -305,7 +305,7 @@ func (e *Engine) processAvailableMessages(ctx irrecoverable.SignalerContext) {
 			return
 		}
 
-		requestEvent, ok := msg.Payload.(messages.EntityRequest)
+		requestEvent, ok := msg.Payload.(flow.EntityRequest)
 		if !ok {
 			// should never happen, as we only put EntityRequest in the queue,
 			// if it does happen, it means there is a bug in the queue implementation.

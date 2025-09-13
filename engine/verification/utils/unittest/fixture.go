@@ -77,7 +77,7 @@ func (c CompleteExecutionReceiptList) ChunkDataResponseOf(t *testing.T, chunkID 
 
 	// publishes the chunk data pack response to the network
 	res := &messages.ChunkDataResponse{
-		ChunkDataPack: *receiptData.ChunkDataPacks[chunkIndex],
+		ChunkDataPack: flow.UntrustedChunkDataPack(*receiptData.ChunkDataPacks[chunkIndex]),
 		Nonce:         rand.Uint64(),
 	}
 

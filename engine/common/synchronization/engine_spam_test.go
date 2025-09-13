@@ -12,7 +12,6 @@ import (
 
 	"github.com/onflow/flow-go/model/chainsync"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/network/channels"
@@ -41,7 +40,7 @@ func (ss *SyncSuite) TestLoad_Process_SyncRequest_HigherThanReceiver_OutsideTole
 		nonce, err := rand.Uint64()
 		require.NoError(ss.T(), err, "should generate nonce")
 
-		req := &messages.SyncRequest{
+		req := &flow.SyncRequest{
 			Nonce:  nonce,
 			Height: 0,
 		}
@@ -131,7 +130,7 @@ func (ss *SyncSuite) TestLoad_Process_SyncRequest_HigherThanReceiver_OutsideTole
 
 				// generate origin and request message
 				originID := unittest.IdentifierFixture()
-				req := &messages.SyncRequest{
+				req := &flow.SyncRequest{
 					Nonce:  nonce,
 					Height: 0,
 				}
@@ -248,7 +247,7 @@ func (ss *SyncSuite) TestLoad_Process_RangeRequest_SometimesReportSpam() {
 
 			// generate origin and request message
 			originID := unittest.IdentifierFixture()
-			req := &messages.RangeRequest{
+			req := &flow.RangeRequest{
 				Nonce:      nonce,
 				FromHeight: loadGroup.fromHeight,
 				ToHeight:   loadGroup.toHeight,
@@ -348,7 +347,7 @@ func (ss *SyncSuite) TestLoad_Process_BatchRequest_SometimesReportSpam() {
 
 			// generate origin and request message
 			originID := unittest.IdentifierFixture()
-			req := &messages.BatchRequest{
+			req := &flow.BatchRequest{
 				Nonce:    nonce,
 				BlockIDs: loadGroup.blockIDs,
 			}
