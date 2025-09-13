@@ -195,22 +195,12 @@ func TestFollowerHappyPath(t *testing.T) {
 		for i := 0; i < workers; i++ {
 			go func(blocks []*flow.Proposal) {
 				defer wg.Done()
-				//rng := rand.New(rand.NewSource(time.Now().UnixNano() + 5749*int64(i))) // addition of 5749*i guarantees different seeds for different workers, even when they are initialized by the CPU with sub-nanosecond time difference
 				for submittingBlocks.Load() {
 					for batch := 0; batch < batchesPerWorker; batch++ {
 						engine.OnSyncedBlocks(flow.Slashable[[]*flow.Proposal]{
 							OriginID: originID,
 							Message:  blocks[batch*blocksPerBatch : (batch+1)*blocksPerBatch],
 						})
-						// This is an attempt to fix test flakiness. Empirically, we observed that in rare occasions, a few workers were monopolizing the queue, consistently
-						// keeping the queue in an overflowed state, while some specific ranges of blocks were consistently dropped. In those situations, consensus did not
-						// receive the full ancestry and finalization could not progress to `targetBlockHeight`. Hence, the `require.Eventually` condition at the end would
-						// time out.
-						//
-						// We now attempt to work with a slightly more realistic data ingestion pattern, where data received over the network is not entirely uniform but
-						// has minor random delays between batches of data arriving: we sleep for n microsecond, where n is randomly chosen from the interval [0, 17].
-						//n := rng.Intn(118)
-						//time.Sleep(time.Microsecond * time.Duration(n))
 					}
 				}
 			}(pendingBlocks[i*blocksPerWorker : (i+1)*blocksPerWorker])
