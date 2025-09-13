@@ -15,8 +15,66 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
+// Event is the default options factory for [flow.Event] generation.
+var Event eventFactory
+
+type eventFactory struct{}
+
+type EventOption func(*EventGenerator, *eventConfig)
+
+// eventConfig holds the configuration for event generation.
+type eventConfig struct {
+	event    flow.Event
+	encoding entities.EventEncodingVersion
+}
+
+// WithEventType is an option that sets the event type for the event.
+func (f eventFactory) WithEventType(eventType flow.EventType) EventOption {
+	return func(g *EventGenerator, config *eventConfig) {
+		config.event.Type = eventType
+	}
+}
+
+// WithTransactionID is an option that sets the transaction ID for the event.
+func (f eventFactory) WithTransactionID(transactionID flow.Identifier) EventOption {
+	return func(g *EventGenerator, config *eventConfig) {
+		config.event.TransactionID = transactionID
+	}
+}
+
+// WithTransactionIndex is an option that sets the transaction index for the event.
+func (f eventFactory) WithTransactionIndex(transactionIndex uint32) EventOption {
+	return func(g *EventGenerator, config *eventConfig) {
+		config.event.TransactionIndex = transactionIndex
+	}
+}
+
+// WithEventIndex is an option that sets the event index for the event.
+func (f eventFactory) WithEventIndex(eventIndex uint32) EventOption {
+	return func(g *EventGenerator, config *eventConfig) {
+		config.event.EventIndex = eventIndex
+	}
+}
+
+// WithPayload is an option that sets the payload for the event.
+// Note: if payload is provided, it must already be in the desired encoding.
+func (f eventFactory) WithPayload(payload []byte) EventOption {
+	return func(g *EventGenerator, config *eventConfig) {
+		config.event.Payload = payload
+	}
+}
+
+// WithEncoding is an option that sets the encoding for the event payload.
+func (f eventFactory) WithEncoding(encoding entities.EventEncodingVersion) EventOption {
+	return func(g *EventGenerator, config *eventConfig) {
+		config.encoding = encoding
+	}
+}
+
 // EventGenerator generates events with consistent randomness.
 type EventGenerator struct {
+	eventFactory
+
 	randomGen     *RandomGenerator
 	identifierGen *IdentifierGenerator
 	eventTypeGen  *EventTypeGenerator
@@ -37,57 +95,8 @@ func NewEventGenerator(
 	}
 }
 
-// eventConfig holds the configuration for event generation.
-type eventConfig struct {
-	event    flow.Event
-	encoding entities.EventEncodingVersion
-}
-
-// WithEventType is an option that sets the event type for the event.
-func (g *EventGenerator) WithEventType(eventType flow.EventType) func(*eventConfig) {
-	return func(config *eventConfig) {
-		config.event.Type = eventType
-	}
-}
-
-// WithTransactionID is an option that sets the transaction ID for the event.
-func (g *EventGenerator) WithTransactionID(transactionID flow.Identifier) func(*eventConfig) {
-	return func(config *eventConfig) {
-		config.event.TransactionID = transactionID
-	}
-}
-
-// WithTransactionIndex is an option that sets the transaction index for the event.
-func (g *EventGenerator) WithTransactionIndex(transactionIndex uint32) func(*eventConfig) {
-	return func(config *eventConfig) {
-		config.event.TransactionIndex = transactionIndex
-	}
-}
-
-// WithEventIndex is an option that sets the event index for the event.
-func (g *EventGenerator) WithEventIndex(eventIndex uint32) func(*eventConfig) {
-	return func(config *eventConfig) {
-		config.event.EventIndex = eventIndex
-	}
-}
-
-// WithPayload is an option that sets the payload for the event.
-// Note: if payload is provided, it must already be in the desired encoding.
-func (g *EventGenerator) WithPayload(payload []byte) func(*eventConfig) {
-	return func(config *eventConfig) {
-		config.event.Payload = payload
-	}
-}
-
-// WithEncoding is an option that sets the encoding for the event payload.
-func (g *EventGenerator) WithEncoding(encoding entities.EventEncodingVersion) func(*eventConfig) {
-	return func(config *eventConfig) {
-		config.encoding = encoding
-	}
-}
-
 // Fixture generates a [flow.Event] with random data based on the provided options.
-func (g *EventGenerator) Fixture(opts ...func(*eventConfig)) flow.Event {
+func (g *EventGenerator) Fixture(opts ...EventOption) flow.Event {
 	config := &eventConfig{
 		event: flow.Event{
 			Type:             g.eventTypeGen.Fixture(),
@@ -100,7 +109,7 @@ func (g *EventGenerator) Fixture(opts ...func(*eventConfig)) flow.Event {
 	}
 
 	for _, opt := range opts {
-		opt(config)
+		opt(g, config)
 	}
 
 	// Generate payload if not provided
@@ -112,11 +121,14 @@ func (g *EventGenerator) Fixture(opts ...func(*eventConfig)) flow.Event {
 }
 
 // List generates a list of [flow.Event].
-func (g *EventGenerator) List(n int, opts ...func(*eventConfig)) []flow.Event {
+func (g *EventGenerator) List(n int, opts ...EventOption) []flow.Event {
 	list := make([]flow.Event, n)
 	for i := range n {
 		// For lists, we want sequential indices
-		list[i] = g.Fixture(append(opts, g.WithTransactionIndex(uint32(i)), g.WithEventIndex(uint32(i)))...)
+		list[i] = g.Fixture(append(opts,
+			Event.WithTransactionIndex(uint32(i)),
+			Event.WithEventIndex(uint32(i)),
+		)...)
 	}
 	// ensure event/transaction indexes are sequential
 	list = AdjustEventsMetadata(list)
@@ -124,13 +136,13 @@ func (g *EventGenerator) List(n int, opts ...func(*eventConfig)) []flow.Event {
 }
 
 // ForTransaction generates a list of [flow.Event] for a specific transaction.
-func (g *EventGenerator) ForTransaction(transactionID flow.Identifier, transactionIndex uint32, eventCount int, opts ...func(*eventConfig)) []flow.Event {
+func (g *EventGenerator) ForTransaction(transactionID flow.Identifier, transactionIndex uint32, eventCount int, opts ...EventOption) []flow.Event {
 	events := make([]flow.Event, eventCount)
 	for i := range eventCount {
 		eventOpts := append(opts,
-			g.WithTransactionID(transactionID),
-			g.WithTransactionIndex(transactionIndex),
-			g.WithEventIndex(uint32(i)),
+			Event.WithTransactionID(transactionID),
+			Event.WithTransactionIndex(transactionIndex),
+			Event.WithEventIndex(uint32(i)),
 		)
 		events[i] = g.Fixture(eventOpts...)
 	}
@@ -138,7 +150,7 @@ func (g *EventGenerator) ForTransaction(transactionID flow.Identifier, transacti
 }
 
 // ForTransactions generates a list of [flow.Event] for multiple transactions.
-func (g *EventGenerator) ForTransactions(transactionIDs []flow.Identifier, eventsPerTransaction int, opts ...func(*eventConfig)) []flow.Event {
+func (g *EventGenerator) ForTransactions(transactionIDs []flow.Identifier, eventsPerTransaction int, opts ...EventOption) []flow.Event {
 	var allEvents []flow.Event
 	for i, txID := range transactionIDs {
 		txEvents := g.ForTransaction(txID, uint32(i), eventsPerTransaction, opts...)

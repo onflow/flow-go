@@ -68,7 +68,7 @@ func getProvider(blobService network.BlobService) provider.Provider {
 	)
 }
 
-func generateBlockExecutionData(t *testing.T, numChunks int, minSerializedSizePerChunk int) *execution_data.BlockExecutionData {
+func generateBlockExecutionData(numChunks int, minSerializedSizePerChunk int) *execution_data.BlockExecutionData {
 	suite := fixtures.NewGeneratorSuite()
 
 	cedGen := suite.ChunkExecutionDatas()
@@ -99,7 +99,7 @@ func TestHappyPath(t *testing.T) {
 	store := getExecutionDataStore(ds)
 
 	test := func(numChunks int, minSerializedSizePerChunk int) {
-		expected := generateBlockExecutionData(t, numChunks, minSerializedSizePerChunk)
+		expected := generateBlockExecutionData(numChunks, minSerializedSizePerChunk)
 		executionDataID, executionDataRoot, err := provider.Provide(context.Background(), 0, expected)
 		require.NoError(t, err)
 
@@ -118,7 +118,7 @@ func TestHappyPath(t *testing.T) {
 func TestProvideContextCanceled(t *testing.T) {
 	t.Parallel()
 
-	bed := generateBlockExecutionData(t, 5, 5*execution_data.DefaultMaxBlobSize)
+	bed := generateBlockExecutionData(5, 5*execution_data.DefaultMaxBlobSize)
 
 	provider := getProvider(getBlobservice(t, getDatastore()))
 	_, _, err := provider.Provide(context.Background(), 0, bed)
@@ -143,7 +143,7 @@ func TestProvideContextCanceled(t *testing.T) {
 func TestGenerateExecutionDataRoot(t *testing.T) {
 	t.Parallel()
 
-	bed := generateBlockExecutionData(t, 5, 5*execution_data.DefaultMaxBlobSize)
+	bed := generateBlockExecutionData(5, 5*execution_data.DefaultMaxBlobSize)
 
 	testProvider := getProvider(getBlobservice(t, getDatastore()))
 	expectedExecutionDataID, expectedExecutionDataRoot, err := testProvider.Provide(context.Background(), 0, bed)

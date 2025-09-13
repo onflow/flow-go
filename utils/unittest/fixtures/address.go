@@ -1,13 +1,51 @@
 package fixtures
 
 import (
+	"math"
+
 	sdk "github.com/onflow/flow-go-sdk"
 
 	"github.com/onflow/flow-go/model/flow"
 )
 
-// AddressGenerator generates addresses with consistent randomness.
+// Address is the default options factory for [flow.Address] generation.
+var Address addressFactory
+
+type addressFactory struct{}
+
+type AddressOption func(*AddressGenerator, *addressConfig)
+
+// addressConfig holds the configuration for address generation.
+type addressConfig struct {
+	chainID flow.ChainID
+	index   uint64
+}
+
+// WithChainID is an option that generates an [flow.Address] for the specified chain.
+func (f addressFactory) WithChainID(chainID flow.ChainID) AddressOption {
+	return func(g *AddressGenerator, config *addressConfig) {
+		config.chainID = chainID
+	}
+}
+
+// ServiceAddress is an option that generates the service account [flow.Address] for the given chain.
+func (f addressFactory) ServiceAddress() AddressOption {
+	return func(g *AddressGenerator, config *addressConfig) {
+		config.index = 1
+	}
+}
+
+// WithIndex is an option that sets the index for the address.
+func (f addressFactory) WithIndex(index uint64) AddressOption {
+	return func(g *AddressGenerator, config *addressConfig) {
+		config.index = index
+	}
+}
+
+// AddressGenerator generates [flow.Address] with consistent randomness.
 type AddressGenerator struct {
+	addressFactory
+
 	randomGen *RandomGenerator
 
 	chainID flow.ChainID
@@ -23,36 +61,9 @@ func NewAddressGenerator(
 	}
 }
 
-// addressConfig holds the configuration for address generation.
-type addressConfig struct {
-	chainID flow.ChainID
-	index   uint64
-}
-
-// WithChainID is an option that generates an [flow.Address] for the specified chain.
-func (g *AddressGenerator) WithChainID(chainID flow.ChainID) func(*addressConfig) {
-	return func(config *addressConfig) {
-		config.chainID = chainID
-	}
-}
-
-// ServiceAddress is an option that generates the service account [flow.Address] for the given chain.
-func (g *AddressGenerator) ServiceAddress() func(*addressConfig) {
-	return func(config *addressConfig) {
-		config.index = 1
-	}
-}
-
-// WithIndex is an option that sets the index for the address.
-func (g *AddressGenerator) WithIndex(index uint64) func(*addressConfig) {
-	return func(config *addressConfig) {
-		config.index = index
-	}
-}
-
 // Fixture generates a random [flow.Address] with the provided options.
 // Defaults to the chain ID specified in the generator suite.
-func (g *AddressGenerator) Fixture(opts ...func(*addressConfig)) flow.Address {
+func (g *AddressGenerator) Fixture(opts ...AddressOption) flow.Address {
 	config := &addressConfig{
 		chainID: g.chainID,
 		// we use a 32-bit index - since the linear address generator uses 45 bits,
@@ -61,7 +72,7 @@ func (g *AddressGenerator) Fixture(opts ...func(*addressConfig)) flow.Address {
 	}
 
 	for _, opt := range opts {
-		opt(config)
+		opt(g, config)
 	}
 
 	addr, err := config.chainID.Chain().AddressAtIndex(config.index)
@@ -71,11 +82,13 @@ func (g *AddressGenerator) Fixture(opts ...func(*addressConfig)) flow.Address {
 }
 
 // List returns a list of [flow.Address] with the provided options.
-func (g *AddressGenerator) List(n int, opts ...func(*addressConfig)) []flow.Address {
+func (g *AddressGenerator) List(n int, opts ...AddressOption) []flow.Address {
 	addresses := make([]flow.Address, n)
 	for i := range uint64(n) {
 		// set the index explicitly to guarantee we do not have duplicates
-		opts = append(opts, g.WithIndex(g.randomGen.Uint64InRange(i, i+1000)))
+		// wrapping at maxUint32 to avoid errors if we go above 2^45
+		index := g.randomGen.Uint64InRange(i, i+1000) % math.MaxUint32
+		opts = append(opts, Address.WithIndex(index))
 		addresses[i] = g.Fixture(opts...)
 	}
 	return addresses

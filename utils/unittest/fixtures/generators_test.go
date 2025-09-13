@@ -4,11 +4,13 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/onflow/crypto"
-	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow/protobuf/go/flow/entities"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/onflow/crypto"
+	"github.com/onflow/flow/protobuf/go/flow/entities"
+
+	"github.com/onflow/flow-go/model/flow"
 )
 
 func TestGeneratorSuiteRandomSeed(t *testing.T) {
@@ -48,26 +50,26 @@ func TestGeneratorsDeterminism(t *testing.T) {
 				assert.Greater(t, header1.View, uint64(0))
 
 				// Test with specific height
-				header2 := suite.BlockHeaders().Fixture(suite.BlockHeaders().WithHeight(100))
+				header2 := suite.BlockHeaders().Fixture(Header.WithHeight(100))
 				assert.Equal(t, uint64(100), header2.Height)
 
 				// Test with parent details
 				parent := suite.BlockHeaders().Fixture()
-				child1 := suite.BlockHeaders().Fixture(suite.BlockHeaders().WithParent(parent.ID(), parent.View, parent.Height))
+				child1 := suite.BlockHeaders().Fixture(Header.WithParent(parent.ID(), parent.View, parent.Height))
 				assert.Equal(t, parent.Height+1, child1.Height)
 				assert.Equal(t, parent.ID(), child1.ParentID)
 				assert.Equal(t, parent.ChainID, child1.ChainID)
 				assert.Less(t, parent.View, child1.View)
 
 				// Test with parent header
-				child2 := suite.BlockHeaders().Fixture(suite.BlockHeaders().WithParentHeader(parent))
+				child2 := suite.BlockHeaders().Fixture(Header.WithParentHeader(parent))
 				assert.Equal(t, parent.Height+1, child2.Height)
 				assert.Equal(t, parent.ID(), child2.ParentID)
 				assert.Equal(t, parent.ChainID, child2.ChainID)
 				assert.Less(t, parent.View, child2.View)
 
 				// Test on specific chain
-				header3 := suite.BlockHeaders().Fixture(suite.BlockHeaders().WithChainID(flow.Testnet))
+				header3 := suite.BlockHeaders().Fixture(Header.WithChainID(flow.Testnet))
 				assert.Equal(t, flow.Testnet, header3.ChainID)
 			},
 		},
@@ -135,12 +137,12 @@ func TestGeneratorsDeterminism(t *testing.T) {
 			name: "SignerIndices",
 			fixture: func(a, b *GeneratorSuite) (any, any) {
 				// use a larger total to avoid accidental collisions
-				opts := []func(*signerIndicesConfig){a.SignerIndices().WithSignerCount(1000, 5)}
+				opts := []SignerIndicesOption{SignerIndices.WithSignerCount(1000, 5)}
 				return a.SignerIndices().Fixture(opts...), b.SignerIndices().Fixture(opts...)
 			},
 			list: func(a, b *GeneratorSuite, n int) (any, any) {
 				// use a larger total to avoid accidental collisions
-				opts := []func(*signerIndicesConfig){a.SignerIndices().WithSignerCount(1000, 5)}
+				opts := []SignerIndicesOption{SignerIndices.WithSignerCount(1000, 5)}
 				return a.SignerIndices().List(n, opts...), b.SignerIndices().List(n, opts...)
 			},
 			sanity: func(t *testing.T, suite *GeneratorSuite) {
@@ -160,7 +162,7 @@ func TestGeneratorsDeterminism(t *testing.T) {
 				qc := suite.QuorumCertificates().Fixture()
 				assert.NotEmpty(t, qc)
 
-				qc2 := suite.QuorumCertificates().Fixture(suite.QuorumCertificates().WithView(100))
+				qc2 := suite.QuorumCertificates().Fixture(QuorumCertificate.WithView(100))
 				assert.Equal(t, uint64(100), qc2.View)
 			},
 		},
@@ -228,7 +230,7 @@ func TestGeneratorsDeterminism(t *testing.T) {
 				col := suite.Collections().Fixture()
 				assert.NotEmpty(t, col)
 
-				col2 := suite.Collections().Fixture(suite.Collections().WithTxCount(10))
+				col2 := suite.Collections().Fixture(Collection.WithTxCount(10))
 				assert.Len(t, col2.Transactions, 10)
 			},
 		},
@@ -257,7 +259,7 @@ func TestGeneratorsDeterminism(t *testing.T) {
 				tr := suite.TransactionResults().Fixture()
 				assert.NotEmpty(t, tr)
 
-				tr2 := suite.TransactionResults().Fixture(suite.TransactionResults().WithErrorMessage("custom error"))
+				tr2 := suite.TransactionResults().Fixture(TransactionResult.WithErrorMessage("custom error"))
 				assert.Equal(t, "custom error", tr2.ErrorMessage)
 			},
 		},
@@ -273,7 +275,7 @@ func TestGeneratorsDeterminism(t *testing.T) {
 				ltr := suite.LightTransactionResults().Fixture()
 				assert.NotEmpty(t, ltr)
 
-				ltr2 := suite.LightTransactionResults().Fixture(suite.LightTransactionResults().WithFailed(true))
+				ltr2 := suite.LightTransactionResults().Fixture(LightTransactionResult.WithFailed(true))
 				assert.True(t, ltr2.Failed)
 			},
 		},
@@ -315,10 +317,10 @@ func TestGeneratorsDeterminism(t *testing.T) {
 				event := suite.Events().Fixture()
 				assert.NotEmpty(t, event)
 
-				eventWithCCF := suite.Events().Fixture(suite.Events().WithEncoding(entities.EventEncodingVersion_CCF_V0))
+				eventWithCCF := suite.Events().Fixture(Event.WithEncoding(entities.EventEncodingVersion_CCF_V0))
 				assert.NotEmpty(t, eventWithCCF.Payload)
 
-				eventWithJSON := suite.Events().Fixture(suite.Events().WithEncoding(entities.EventEncodingVersion_JSON_CDC_V0))
+				eventWithJSON := suite.Events().Fixture(Event.WithEncoding(entities.EventEncodingVersion_JSON_CDC_V0))
 				assert.NotEmpty(t, eventWithJSON.Payload)
 
 				// Test events for transaction
@@ -344,14 +346,14 @@ func TestGeneratorsDeterminism(t *testing.T) {
 				eventType1 := suite.EventTypes().Fixture()
 				assert.NotEmpty(t, eventType1)
 
-				eventType2 := suite.EventTypes().Fixture(suite.EventTypes().WithEventName("CustomEvent"))
+				eventType2 := suite.EventTypes().Fixture(EventType.WithEventName("CustomEvent"))
 				assert.Contains(t, string(eventType2), "CustomEvent")
 
-				eventType3 := suite.EventTypes().Fixture(suite.EventTypes().WithContractName("CustomContract"))
+				eventType3 := suite.EventTypes().Fixture(EventType.WithContractName("CustomContract"))
 				assert.Contains(t, string(eventType3), "CustomContract")
 
 				addr := suite.Addresses().Fixture()
-				eventType4 := suite.EventTypes().Fixture(suite.EventTypes().WithAddress(addr))
+				eventType4 := suite.EventTypes().Fixture(EventType.WithAddress(addr))
 				assert.Contains(t, string(eventType4), addr.String())
 			},
 		},

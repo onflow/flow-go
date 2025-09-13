@@ -8,8 +8,56 @@ const (
 	defaultOffset = int64(10 * 365 * 24 * time.Hour) // 10 years
 )
 
+// Time is the default options factory for [time.Time] generation.
+var Time timeFactory
+
+type timeFactory struct{}
+
+type TimeOption func(*TimeGenerator, *timeConfig)
+
+// timeConfig holds the configuration for time generation.
+type timeConfig struct {
+	baseTime time.Time
+	offset   time.Duration
+	timezone *time.Location
+}
+
+// WithBaseTime is an option that sets the time produced by the generator.
+// This will be the exact time. If you want to include a random jitter, use the
+// WithOffsetRandom option in combination with this option.
+func (f timeFactory) WithBaseTime(baseTime time.Time) TimeOption {
+	return func(g *TimeGenerator, config *timeConfig) {
+		config.baseTime = baseTime
+		config.offset = 0
+	}
+}
+
+// WithTimezone is an option that sets the timezone for time generation.
+func (f timeFactory) WithTimezone(tz *time.Location) TimeOption {
+	return func(g *TimeGenerator, config *timeConfig) {
+		config.timezone = tz
+	}
+}
+
+// WithOffset is an option that sets the offset from the base time.
+// This sets the exact offset of the base time.
+func (f timeFactory) WithOffset(offset time.Duration) TimeOption {
+	return func(g *TimeGenerator, config *timeConfig) {
+		config.offset = offset
+	}
+}
+
+// WithOffsetRandom is an option that sets a random offset from the base time in the range [0, max).
+func (f timeFactory) WithOffsetRandom(max time.Duration) TimeOption {
+	return func(g *TimeGenerator, config *timeConfig) {
+		config.offset = time.Duration(g.randomGen.Intn(int(max)))
+	}
+}
+
 // TimeGenerator generates [time.Time] values with consistent randomness.
 type TimeGenerator struct {
+	timeFactory
+
 	randomGen *RandomGenerator
 }
 
@@ -21,54 +69,20 @@ func NewTimeGenerator(
 	}
 }
 
-// timeConfig holds the configuration for time generation.
-type timeConfig struct {
-	baseTime time.Time
-	offset   time.Duration
-	timezone *time.Location
-}
-
-// WithBaseTime is an option that sets the base time for generation.
-func (g *TimeGenerator) WithBaseTime(baseTime time.Time) func(*timeConfig) {
-	return func(config *timeConfig) {
-		config.baseTime = baseTime
-	}
-}
-
-// WithTimezone is an option that sets the timezone for time generation.
-func (g *TimeGenerator) WithTimezone(tz *time.Location) func(*timeConfig) {
-	return func(config *timeConfig) {
-		config.timezone = tz
-	}
-}
-
-// WithOffset is an option that sets the offset from the base time.
-func (g *TimeGenerator) WithOffset(offset time.Duration) func(*timeConfig) {
-	return func(config *timeConfig) {
-		config.offset = offset
-	}
-}
-
-// WithOffsetRandom is an option that sets a random offset from the base time in the range [0, max).
-func (g *TimeGenerator) WithOffsetRandom(max time.Duration) func(*timeConfig) {
-	return func(config *timeConfig) {
-		offset := time.Duration(g.randomGen.Intn(int(max)))
-		config.offset = offset
-	}
-}
-
 // Fixture generates a [time.Time] value.
 // Uses default base time of 2020-07-14T16:00:00Z and timezone of UTC.
 // The default offset is within 10 years of 2020-07-14T16:00:00Z.
-func (g *TimeGenerator) Fixture(opts ...func(*timeConfig)) time.Time {
+func (g *TimeGenerator) Fixture(opts ...TimeOption) time.Time {
+	defaultBaseTime := time.Date(2020, 7, 14, 16, 0, 0, 0, time.UTC) // 2020-07-14T16:00:00Z
+	defaultOffset := time.Duration(g.randomGen.Int63n(defaultOffset))
 	config := &timeConfig{
-		baseTime: time.Date(2020, 7, 14, 16, 0, 0, 0, time.UTC), // 2020-07-14T16:00:00Z
-		offset:   time.Duration(g.randomGen.Int63n(defaultOffset)),
+		baseTime: defaultBaseTime,
+		offset:   defaultOffset,
 		timezone: time.UTC,
 	}
 
 	for _, opt := range opts {
-		opt(config)
+		opt(g, config)
 	}
 
 	// Apply timezone if specified
@@ -82,7 +96,7 @@ func (g *TimeGenerator) Fixture(opts ...func(*timeConfig)) time.Time {
 // List generates a list of [time.Time] values.
 // Uses default base time of 2020-07-14T16:00:00Z and timezone of UTC.
 // The default offset is within 10 years of 2020-07-14T16:00:00Z.
-func (g *TimeGenerator) List(n int, opts ...func(*timeConfig)) []time.Time {
+func (g *TimeGenerator) List(n int, opts ...TimeOption) []time.Time {
 	times := make([]time.Time, n)
 	for i := range n {
 		times[i] = g.Fixture(opts...)

@@ -4,8 +4,41 @@ import (
 	"github.com/onflow/flow-go/ledger/common/bitutils"
 )
 
+// SignerIndices is the default options factory for SignerIndices generation.
+var SignerIndices signerIndicesFactory
+
+type signerIndicesFactory struct{}
+
+type SignerIndicesOption func(*SignerIndicesGenerator, *signerIndicesConfig)
+
+// signerIndicesConfig holds the configuration for signer indices generation.
+type signerIndicesConfig struct {
+	authorizedSigners   int
+	contributingSigners int
+	indices             []int
+}
+
+// WithSignerCount is an option that sets the total number of indices and the number of signers.
+func (f signerIndicesFactory) WithSignerCount(authorizedSigners, contributingSigners int) SignerIndicesOption {
+	return func(g *SignerIndicesGenerator, config *signerIndicesConfig) {
+		config.authorizedSigners = authorizedSigners
+		config.contributingSigners = contributingSigners
+	}
+}
+
+// WithIndices is an option that sets the total number of indices and specific indices for signers.
+// Note: passing an empty slice is valid and will be treated as all indices are not set.
+func (f signerIndicesFactory) WithIndices(authorizedSigners int, indices []int) SignerIndicesOption {
+	return func(g *SignerIndicesGenerator, config *signerIndicesConfig) {
+		config.authorizedSigners = authorizedSigners
+		config.indices = indices
+	}
+}
+
 // SignerIndicesGenerator generates signer indices with consistent randomness.
 type SignerIndicesGenerator struct {
+	signerIndicesFactory
+
 	randomGen *RandomGenerator
 }
 
@@ -15,68 +48,46 @@ func NewSignerIndicesGenerator(randomGen *RandomGenerator) *SignerIndicesGenerat
 	}
 }
 
-// signerIndicesConfig holds the configuration for signer indices generation.
-type signerIndicesConfig struct {
-	total   int
-	signers int
-	indices []int
-}
-
-// WithSignerCount is an option that sets the total number of indices and the number of signers.
-func (g *SignerIndicesGenerator) WithSignerCount(total, signers int) func(*signerIndicesConfig) {
-	return func(config *signerIndicesConfig) {
-		config.total = total
-		config.signers = signers
-	}
-}
-
-// WithIndices is an option that sets the total number of indices and specific indices for signers.
-// Note: passing an empty slice is valid and will be treated as all indices are not set.
-func (g *SignerIndicesGenerator) WithIndices(total int, indices []int) func(*signerIndicesConfig) {
-	return func(config *signerIndicesConfig) {
-		config.total = total
-		config.indices = indices
-	}
-}
-
 // Fixture generates signer indices with random data based on the provided options.
 // Uses default 10-bit vector size and count of 3 signers.
-func (g *SignerIndicesGenerator) Fixture(opts ...func(*signerIndicesConfig)) []byte {
+func (g *SignerIndicesGenerator) Fixture(opts ...SignerIndicesOption) []byte {
 	config := &signerIndicesConfig{
-		total:   10,
-		signers: 3,
+		authorizedSigners:   10,
+		contributingSigners: 3,
 	}
 
 	for _, opt := range opts {
-		opt(config)
+		opt(g, config)
 	}
 
-	Assert(config.total > 0, "total must be greater than 0")
-	Assert(config.signers <= config.total, "signers must be less than or equal to total")
+	Assert(config.authorizedSigners > 0, "authorizedSigners must be greater than 0")
+	Assert(config.contributingSigners >= 0, "contributingSigners must be greater than or equal to 0")
+	Assert(config.contributingSigners <= config.authorizedSigners, "contributingSigners must be less than or equal to authorizedSigners")
 
-	indices := bitutils.MakeBitVector(config.total)
+	indices := bitutils.MakeBitVector(config.authorizedSigners)
 
 	if config.indices != nil {
 		for _, i := range config.indices {
-			Assert(i >= 0 && i < config.total, "index must be within the total number of indices")
+			Assert(i >= 0 && i < config.authorizedSigners, "index must be within the total number of indices")
 			bitutils.SetBit(indices, i)
 		}
 		return indices
 	}
 
 	// special case to avoid looping when all indices are set
-	if config.signers == config.total {
-		for i := range config.total {
+	if config.contributingSigners == config.authorizedSigners {
+		for i := range config.authorizedSigners {
 			bitutils.SetBit(indices, i)
 		}
 		return indices
 	}
 
-	// choose `signers` random indices from the total
+	// choose `contributingSigners` random indices from the total
 	count := 0
-	for count < config.signers {
-		index := g.randomGen.Intn(config.total)
-		// make sure we get the correct number of unique indices
+	for count < config.contributingSigners {
+		index := g.randomGen.Intn(config.authorizedSigners)
+
+		// only count unset bits to ensure that we set the correct number of unique indices
 		if bitutils.ReadBit(indices, index) == 0 {
 			bitutils.SetBit(indices, index)
 			count++
@@ -88,7 +99,7 @@ func (g *SignerIndicesGenerator) Fixture(opts ...func(*signerIndicesConfig)) []b
 
 // List generates a list of signer indices.
 // Uses default 10-bit vector size and count of 3 signers.
-func (g *SignerIndicesGenerator) List(n int, opts ...func(*signerIndicesConfig)) [][]byte {
+func (g *SignerIndicesGenerator) List(n int, opts ...SignerIndicesOption) [][]byte {
 	list := make([][]byte, n)
 	for i := range n {
 		list[i] = g.Fixture(opts...)

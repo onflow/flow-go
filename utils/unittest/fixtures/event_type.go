@@ -20,8 +20,17 @@ var (
 	sampleEventNames    = []string{"TestEvent", "MyEvent", "SampleEvent", "DemoEvent", "Created", "Updated", "Deleted"}
 )
 
+// EventType is the default options factory for [flow.EventType] generation.
+var EventType eventTypeFactory
+
+type eventTypeFactory struct{}
+
+type EventTypeOption func(*EventTypeGenerator, *eventTypeConfig)
+
 // EventTypeGenerator generates event types with consistent randomness.
 type EventTypeGenerator struct {
+	eventTypeFactory
+
 	randomGen  *RandomGenerator
 	addressGen *AddressGenerator
 }
@@ -44,28 +53,28 @@ type eventTypeConfig struct {
 }
 
 // WithAddress is an option that sets the address for the event type.
-func (g *EventTypeGenerator) WithAddress(address flow.Address) func(*eventTypeConfig) {
-	return func(config *eventTypeConfig) {
+func (f eventTypeFactory) WithAddress(address flow.Address) EventTypeOption {
+	return func(g *EventTypeGenerator, config *eventTypeConfig) {
 		config.address = address
 	}
 }
 
 // WithContractName is an option that sets the contract name for the event type.
-func (g *EventTypeGenerator) WithContractName(contractName string) func(*eventTypeConfig) {
-	return func(config *eventTypeConfig) {
+func (f eventTypeFactory) WithContractName(contractName string) EventTypeOption {
+	return func(g *EventTypeGenerator, config *eventTypeConfig) {
 		config.contractName = contractName
 	}
 }
 
 // WithEventName is an option that sets the event name for the event type.
-func (g *EventTypeGenerator) WithEventName(eventName string) func(*eventTypeConfig) {
-	return func(config *eventTypeConfig) {
+func (f eventTypeFactory) WithEventName(eventName string) EventTypeOption {
+	return func(g *EventTypeGenerator, config *eventTypeConfig) {
 		config.eventName = eventName
 	}
 }
 
 // Fixture generates a [flow.EventType] with random data based on the provided options.
-func (g *EventTypeGenerator) Fixture(opts ...func(*eventTypeConfig)) flow.EventType {
+func (g *EventTypeGenerator) Fixture(opts ...EventTypeOption) flow.EventType {
 	config := &eventTypeConfig{
 		address:      g.addressGen.Fixture(),
 		contractName: g.generateContractName(),
@@ -73,7 +82,7 @@ func (g *EventTypeGenerator) Fixture(opts ...func(*eventTypeConfig)) flow.EventT
 	}
 
 	for _, opt := range opts {
-		opt(config)
+		opt(g, config)
 	}
 
 	if config.contractName == protocolEventName {
@@ -84,7 +93,7 @@ func (g *EventTypeGenerator) Fixture(opts ...func(*eventTypeConfig)) flow.EventT
 }
 
 // List generates a list of [flow.EventType].
-func (g *EventTypeGenerator) List(n int, opts ...func(*eventTypeConfig)) []flow.EventType {
+func (g *EventTypeGenerator) List(n int, opts ...EventTypeOption) []flow.EventType {
 	types := make([]flow.EventType, n)
 	for i := range n {
 		types[i] = g.Fixture(opts...)

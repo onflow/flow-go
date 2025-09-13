@@ -106,24 +106,24 @@ import (
 suite := fixtures.NewGeneratorSuite(t)
 
 // Create suite with specific seed for deterministic reproducible results
-suite := fixtures.NewGeneratorSuite(t, fixtures.WithSeed(12345))
+suite := fixtures.NewGeneratorSuite(fixtures.WithSeed(12345))
 ```
 
 ### Basic Usage Examples
 
 ```go
 // Generate a block header
-header := suite.BlockHeaders().Fixture(t)
+header := suite.BlockHeaders().Fixture()
 
 // Generate an identifier
-id := suite.Identifiers().Fixture(t)
+id := suite.Identifiers().Fixture()
 
 // Generate a collection with 3 transactions
-collection := suite.Collections().Fixture(t, 3)
+collection := suite.Collections().Fixture(3)
 
 // Generate events for a transaction
-txID := suite.Identifiers().Fixture(t)
-events := suite.Events().ForTransaction(t, txID, 0, 3)
+txID := suite.Identifiers().Fixture()
+events := suite.Events().ForTransaction(txID, 0, 3)
 ```
 
 ## Core Concepts
@@ -135,21 +135,34 @@ The `GeneratorSuite` is the central object that:
 - Ensures consistent randomness across all generators
 
 ### Options Pattern
-Most generators use an options pattern for configuration:
+Most generators use an options pattern for configuration. This is an example using the default
+`Header` options factory:
+```go
+// Example: Configure a block header
+header := suite.BlockHeaders().Fixture(
+    Header.WithHeight(100),
+    Header.WithView(200),
+)
+```
+
+Alternatively, you can use the generator itself as the factory:
 ```go
 // Example: Configure a block header
 headerGen := suite.BlockHeaders()
-header := headerGen.Fixture(t,
+header := headerGen.Fixture(
     headerGen.WithHeight(100),
     headerGen.WithView(200),
 )
 ```
 
+Using typed options allows us to namepace the options by type, avoiding name conflicts for similar
+options.
+
 ### Error Handling
 All generators that can produce an error require a `testing.TB` parameter and use `require.NoError` internally to assert no errors are encountered:
 ```go
 // No error handling needed - failures will fail the test
-result := suite.TransactionResults().Fixture(t)
+result := suite.TransactionResults().Fixture()
 ```
 
 ## Generator Suite
@@ -161,7 +174,7 @@ result := suite.TransactionResults().Fixture(t)
 suite := fixtures.NewGeneratorSuite(t)
 
 // WithSeed(seed int64): Set specific seed for deterministic results
-suite := fixtures.NewGeneratorSuite(t, fixtures.WithSeed(42))
+suite := fixtures.NewGeneratorSuite(fixtures.WithSeed(42))
 ```
 
 ### Core Methods
@@ -298,33 +311,33 @@ Generates block headers with proper field relationships and chain-specific defau
 headerGen := suite.BlockHeaders()
 
 // Basic header
-header := headerGen.Fixture(t)
+header := headerGen.Fixture()
 
 // Header with specific height
-header := headerGen.Fixture(t,
+header := headerGen.Fixture(
     headerGen.WithHeight(100),
 )
 
 // Header with specific view
-header := headerGen.Fixture(t,
+header := headerGen.Fixture(
     headerGen.WithView(200),
 )
 
 // Header for specific chain
-header := headerGen.Fixture(t,
+header := headerGen.Fixture(
     headerGen.WithChainID(flow.Testnet),
 )
 
 // Header with parent
-parent := headerGen.Fixture(t)
-child := headerGen.Fixture(t,
+parent := headerGen.Fixture()
+child := headerGen.Fixture(
     headerGen.WithParent(parent),
 )
 
 // Header with parent and source of randomness
-parent := headerGen.Fixture(t)
+parent := headerGen.Fixture()
 source := suite.Random().RandomBytes(32)
-child := headerGen.Fixture(t,
+child := headerGen.Fixture(
     headerGen.WithParentAndSoR(parent, source),
 )
 ```
@@ -336,10 +349,10 @@ child := headerGen.Fixture(t,
 idGen := suite.Identifiers()
 
 // Single identifier
-id := idGen.Fixture(t)
+id := idGen.Fixture()
 
 // List of identifiers
-ids := idGen.List(t, 5)
+ids := idGen.List(5)
 ```
 
 #### Signature Generator
@@ -347,10 +360,10 @@ ids := idGen.List(t, 5)
 sigGen := suite.Signatures()
 
 // Single signature
-sig := sigGen.Fixture(t)
+sig := sigGen.Fixture()
 
 // List of signatures
-sigs := sigGen.List(t, 3)
+sigs := sigGen.List(3)
 ```
 
 #### Address Generator
@@ -358,16 +371,16 @@ sigs := sigGen.List(t, 3)
 addrGen := suite.Addresses()
 
 // Default random address on default chain (Testnet)
-addr := addrGen.Fixture(t)
+addr := addrGen.Fixture()
 
 // Address for specific chain
-addr := addrGen.Fixture(t, addrGen.WithChainID(flow.Testnet))
+addr := addrGen.Fixture(addrGen.WithChainID(flow.Testnet))
 
 // Service account address
-addr := addrGen.Fixture(t, addrGen.ServiceAddress())
+addr := addrGen.Fixture(addrGen.ServiceAddress())
 
 // Invalid address
-invalidAddr := CorruptAddress(t, addrGen.Fixture(t), flow.Testnet)
+invalidAddr := CorruptAddress(addrGen.Fixture(), flow.Testnet)
 ```
 
 #### Signer Indices Generator
@@ -375,13 +388,13 @@ invalidAddr := CorruptAddress(t, addrGen.Fixture(t), flow.Testnet)
 indicesGen := suite.SignerIndices()
 
 // Generate indices with total validators and signer count
-indices := indicesGen.Fixture(t, indicesGen.WithSignerCount(10, 4))
+indices := indicesGen.Fixture(indicesGen.WithSignerCount(10, 4))
 
 // Generate indices at specific positions
-indices := indicesGen.Fixture(t, indicesGen.WithIndices([]int{0, 2, 4}))
+indices := indicesGen.Fixture(indicesGen.WithIndices([]int{0, 2, 4}))
 
 // Generate list of indices
-indicesList := indicesGen.List(t, 3, indicesGen.WithSignerCount(10, 2))
+indicesList := indicesGen.List(3, indicesGen.WithSignerCount(10, 2))
 ```
 
 ### Consensus Generators
@@ -391,32 +404,32 @@ indicesList := indicesGen.List(t, 3, indicesGen.WithSignerCount(10, 2))
 qcGen := suite.QuorumCertificates()
 
 // Basic quorum certificate
-qc := qcGen.Fixture(t)
+qc := qcGen.Fixture()
 
 // With specific view and block ID
-qc := qcGen.Fixture(t,
+qc := qcGen.Fixture(
     qcGen.WithView(100),
     qcGen.WithBlockID(blockID),
 )
 
 // With root block ID (sets view to 0)
-qc := qcGen.Fixture(t,
+qc := qcGen.Fixture(
     qcGen.WithRootBlockID(blockID),
 )
 
 // Certifies specific block
-qc := qcGen.Fixture(t,
+qc := qcGen.Fixture(
     qcGen.CertifiesBlock(header),
 )
 
 // With signer indices and source
-qc := qcGen.Fixture(t,
+qc := qcGen.Fixture(
     qcGen.WithSignerIndices(signerIndices),
     qcGen.WithRandomnessSource(source),
 )
 
 // List of certificates
-qcList := qcGen.List(t, 3)
+qcList := qcGen.List(3)
 ```
 
 ### Execution Data Generators
@@ -426,15 +439,15 @@ qcList := qcGen.List(t, 3)
 cedGen := suite.ChunkExecutionDatas()
 
 // Basic chunk execution data
-ced := cedGen.Fixture(t)
+ced := cedGen.Fixture()
 
 // With minimum size
-ced := cedGen.Fixture(t,
+ced := cedGen.Fixture(
     cedGen.WithMinSize(100),
 )
 
 // List of chunk execution data
-cedList := cedGen.List(t, 3)
+cedList := cedGen.List(3)
 ```
 
 #### Block Execution Data Generator
@@ -442,21 +455,21 @@ cedList := cedGen.List(t, 3)
 bedGen := suite.BlockExecutionDatas()
 
 // Basic block execution data
-bed := bedGen.Fixture(t)
+bed := bedGen.Fixture()
 
 // With specific block ID
-bed := bedGen.Fixture(t,
+bed := bedGen.Fixture(
     bedGen.WithBlockID(blockID),
 )
 
 // With specific chunk execution datas
-chunks := suite.ChunkExecutionDatas().List(t, 3)
-bed := bedGen.Fixture(t,
+chunks := suite.ChunkExecutionDatas().List(3)
+bed := bedGen.Fixture(
     bedGen.WithChunkExecutionDatas(chunks...),
 )
 
 // List of block execution data
-bedList := bedGen.List(t, 2)
+bedList := bedGen.List(2)
 ```
 
 #### Block Execution Data Entity Generator
@@ -464,15 +477,15 @@ bedList := bedGen.List(t, 2)
 bedEntityGen := suite.BlockExecutionDataEntities()
 
 // Basic block execution data entity
-entity := bedEntityGen.Fixture(t)
+entity := bedEntityGen.Fixture()
 
 // With specific block ID
-entity := bedEntityGen.Fixture(t,
+entity := bedEntityGen.Fixture(
     bedEntityGen.WithBlockID(blockID),
 )
 
 // List of entities
-entityList := bedEntityGen.List(t, 2)
+entityList := bedEntityGen.List(2)
 ```
 
 ### Transaction Generators
@@ -482,15 +495,15 @@ entityList := bedEntityGen.List(t, 2)
 txGen := suite.Transactions()
 
 // Basic transaction body
-tx := txGen.Fixture(t)
+tx := txGen.Fixture()
 
 // With custom gas limit
-tx := txGen.Fixture(t,
+tx := txGen.Fixture(
     txGen.WithGasLimit(100),
 )
 
 // List of transactions
-txList := txGen.List(t, 3)
+txList := txGen.List(3)
 ```
 
 #### Full Transaction Generator
@@ -498,10 +511,10 @@ txList := txGen.List(t, 3)
 fullTxGen := suite.FullTransactions()
 
 // Complete transaction (with TransactionBody embedded)
-tx := fullTxGen.Fixture(t)
+tx := fullTxGen.Fixture()
 
 // List of complete transactions
-txList := fullTxGen.List(t, 2)
+txList := fullTxGen.List(2)
 ```
 
 #### Collection Generator
@@ -509,17 +522,17 @@ txList := fullTxGen.List(t, 2)
 colGen := suite.Collections()
 
 // Collection with 1 transaction (default)
-col := colGen.Fixture(t)
+col := colGen.Fixture()
 
 // Collection with specific transaction count
-col := colGen.Fixture(t, colGen.WithTxCount(3))
+col := colGen.Fixture(colGen.WithTxCount(3))
 
 // Collection with specific transactions
-transactions := suite.Transactions().List(t, 2)
-col := colGen.Fixture(t, colGen.WithTransactions(transactions))
+transactions := suite.Transactions().List(2)
+col := colGen.Fixture(colGen.WithTransactions(transactions))
 
 // List of collections each with 3 transactions
-colList := colGen.List(t, 2, colGen.WithTxCount(3))
+colList := colGen.List(2, colGen.WithTxCount(3))
 ```
 
 ### Ledger Generators
@@ -529,15 +542,15 @@ colList := colGen.List(t, 2, colGen.WithTxCount(3))
 trieGen := suite.TrieUpdates()
 
 // Basic trie update
-trie := trieGen.Fixture(t)
+trie := trieGen.Fixture()
 
 // With specific number of paths
-trie := trieGen.Fixture(t,
+trie := trieGen.Fixture(
     trieGen.WithNumPaths(5),
 )
 
 // List of trie updates
-trieList := trieGen.List(t, 2)
+trieList := trieGen.List(2)
 ```
 
 ### Transaction Result Generators
@@ -547,15 +560,15 @@ trieList := trieGen.List(t, 2)
 trGen := suite.TransactionResults()
 
 // Basic transaction result
-tr := trGen.Fixture(t)
+tr := trGen.Fixture()
 
 // With custom error message
-tr := trGen.Fixture(t,
+tr := trGen.Fixture(
     trGen.WithErrorMessage("custom error"),
 )
 
 // List of results
-trList := trGen.List(t, 2)
+trList := trGen.List(2)
 ```
 
 #### Light Transaction Result Generator
@@ -563,15 +576,15 @@ trList := trGen.List(t, 2)
 ltrGen := suite.LightTransactionResults()
 
 // Basic light transaction result
-ltr := ltrGen.Fixture(t)
+ltr := ltrGen.Fixture()
 
 // With failed status
-ltr := ltrGen.Fixture(t,
+ltr := ltrGen.Fixture(
     ltrGen.WithFailed(true),
 )
 
 // List of light results
-ltrList := ltrGen.List(t, 2)
+ltrList := ltrGen.List(2)
 ```
 
 ### Transaction Component Generators
@@ -581,15 +594,15 @@ ltrList := ltrGen.List(t, 2)
 tsGen := suite.TransactionSignatures()
 
 // Basic transaction signature
-ts := tsGen.Fixture(t)
+ts := tsGen.Fixture()
 
 // With custom signer index
-ts := tsGen.Fixture(t,
+ts := tsGen.Fixture(
     tsGen.WithSignerIndex(5),
 )
 
 // List of signatures
-tsList := tsGen.List(t, 2)
+tsList := tsGen.List(2)
 ```
 
 #### Proposal Key Generator
@@ -597,15 +610,15 @@ tsList := tsGen.List(t, 2)
 pkGen := suite.ProposalKeys()
 
 // Basic proposal key
-pk := pkGen.Fixture(t)
+pk := pkGen.Fixture()
 
 // With custom sequence number
-pk := pkGen.Fixture(t,
+pk := pkGen.Fixture(
     pkGen.WithSequenceNumber(100),
 )
 
 // List of proposal keys
-pkList := pkGen.List(t, 2)
+pkList := pkGen.List(2)
 ```
 
 ### Event Generators
@@ -615,21 +628,21 @@ pkList := pkGen.List(t, 2)
 eventTypeGen := suite.EventTypes()
 
 // Basic event type
-eventType := eventTypeGen.Fixture(t)
+eventType := eventTypeGen.Fixture()
 
 // With custom event name
-eventType := eventTypeGen.Fixture(t,
+eventType := eventTypeGen.Fixture(
     eventTypeGen.WithEventName("CustomEvent"),
 )
 
 // With custom contract name
-eventType := eventTypeGen.Fixture(t,
+eventType := eventTypeGen.Fixture(
     eventTypeGen.WithContractName("CustomContract"),
 )
 
 // With specific address
-address := suite.Addresses().Fixture(t)
-eventType := eventTypeGen.Fixture(t,
+address := suite.Addresses().Fixture()
+eventType := eventTypeGen.Fixture(
     eventTypeGen.WithAddress(address),
 )
 ```
@@ -639,29 +652,29 @@ eventType := eventTypeGen.Fixture(t,
 eventGen := suite.Events()
 
 // Basic event with default CCF encoding
-event := eventGen.Fixture(t)
+event := eventGen.Fixture()
 
 // With specific encoding
-eventWithCCF := eventGen.Fixture(t,
+eventWithCCF := eventGen.Fixture(
     eventGen.WithEncoding(entities.EventEncodingVersion_CCF_V0),
 )
-eventWithJSON := eventGen.Fixture(t,
+eventWithJSON := eventGen.Fixture(
     eventGen.WithEncoding(entities.EventEncodingVersion_JSON_CDC_V0),
 )
 
 // With custom type and encoding
-event := eventGen.Fixture(t,
+event := eventGen.Fixture(
     eventGen.WithEventType("A.0x1.Test.Event"),
     eventGen.WithEncoding(entities.EventEncodingVersion_JSON_CDC_V0),
 )
 
 // Events for specific transaction
-txID := suite.Identifiers().Fixture(t)
-txEvents := eventGen.ForTransaction(t, txID, 0, 3)
+txID := suite.Identifiers().Fixture()
+txEvents := eventGen.ForTransaction(txID, 0, 3)
 
 // Events for multiple transactions
-txIDs := suite.Identifiers().List(t, 2)
-allEvents := eventGen.ForTransactions(t, txIDs, 2)
+txIDs := suite.Identifiers().List(2)
+allEvents := eventGen.ForTransactions(txIDs, 2)
 ```
 
 ### Time Generator
@@ -681,27 +694,27 @@ Generates `time.Time` values with various options for time-based testing scenari
 timeGen := suite.Time()
 
 // Basic time fixture
-time1 := timeGen.Fixture(t)
+time1 := timeGen.Fixture()
 
 // Time with specific base time
 now := time.Now()
-time2 := timeGen.Fixture(t, timeGen.WithBaseTime(now))
+time2 := timeGen.Fixture(timeGen.WithBaseTime(now))
 
 // Time with specific base time
 baseTime := time.Date(2023, 1, 1, 12, 0, 0, 0, time.UTC)
-time3 := timeGen.Fixture(t, timeGen.WithBaseTime(baseTime))
+time3 := timeGen.Fixture(timeGen.WithBaseTime(baseTime))
 
 // Time with specific offset
-time4 := timeGen.Fixture(t, timeGen.WithOffset(time.Hour))
+time4 := timeGen.Fixture(timeGen.WithOffset(time.Hour))
 
 // Time with random offset
-time5 := timeGen.Fixture(t, timeGen.WithOffsetRandom(24*time.Hour))
+time5 := timeGen.Fixture(timeGen.WithOffsetRandom(24*time.Hour))
 
 // Time in a specific timezone
-time6 := timeGen.Fixture(t, timeGen.WithTimezone(time.FixedZone("EST", -5*3600)))
+time6 := timeGen.Fixture(timeGen.WithTimezone(time.FixedZone("EST", -5*3600)))
 
 // Time with multiple options
-time7 := timeGen.Fixture(t,
+time7 := timeGen.Fixture(
 	timeGen.WithBaseTime(baseTime),
 	timeGen.WithOffset(time.Hour),
 	timeGen.WithTimezone(time.FixedZone("EST", -5*3600)),
@@ -723,10 +736,10 @@ Generates ledger paths with consistent randomness and deduplication.
 pathGen := suite.LedgerPaths()
 
 // Basic path fixture
-path1 := pathGen.Fixture(t)
+path1 := pathGen.Fixture()
 
 // List of paths
-paths := pathGen.List(t, 3)
+paths := pathGen.List(3)
 ```
 
 ### Ledger Payload Generator
@@ -745,17 +758,17 @@ Generates ledger payloads with consistent randomness and configurable sizes.
 payloadGen := suite.LedgerPayloads()
 
 // Basic payload fixture
-payload1 := payloadGen.Fixture(t)
+payload1 := payloadGen.Fixture()
 
 // Payload with specific size
-payload2 := payloadGen.Fixture(t, payloadGen.WithSize(4, 16))
+payload2 := payloadGen.Fixture(payloadGen.WithSize(4, 16))
 
 // Payload with specific value
-value := suite.LedgerValues().Fixture(t)
-payload3 := payloadGen.Fixture(t, payloadGen.WithValue(value))
+value := suite.LedgerValues().Fixture()
+payload3 := payloadGen.Fixture(payloadGen.WithValue(value))
 
 // List of payloads
-payloads := payloadGen.List(t, 3)
+payloads := payloadGen.List(3)
 ```
 
 ### Ledger Value Generator
@@ -773,16 +786,16 @@ Generates ledger values with consistent randomness and configurable sizes.
 valueGen := suite.LedgerValues()
 
 // Basic value fixture
-value1 := valueGen.Fixture(t)
+value1 := valueGen.Fixture()
 
 // Value with specific size
-value2 := valueGen.Fixture(t, valueGen.WithSize(4, 16))
+value2 := valueGen.Fixture(valueGen.WithSize(4, 16))
 
 // List of values
-values := valueGen.List(t, 3)
+values := valueGen.List(3)
 
 // List of values with specific size
-largeValues := valueGen.List(t, 2, valueGen.WithSize(8, 32))
+largeValues := valueGen.List(2, valueGen.WithSize(8, 32))
 ```
 
 ## Migration Guide
@@ -810,9 +823,9 @@ suite := fixtures.NewGeneratorSuite(t) // or fixtures.WithSeed(12345)
 
 // Use suite generators
 headerGen := suite.BlockHeaders()
-header := headerGen.Fixture(t)
-header := headerGen.Fixture(t, headerGen.WithChainID(flow.Testnet))
-header := headerGen.Fixture(t, headerGen.WithParent(parent))
+header := headerGen.Fixture()
+header := headerGen.Fixture(headerGen.WithChainID(flow.Testnet))
+header := headerGen.Fixture(headerGen.WithParent(parent))
 ```
 
 ### Benefits of Migration

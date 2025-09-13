@@ -6,8 +6,45 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
+// TransactionSignature is the default options factory for [flow.TransactionSignature] generation.
+var TransactionSignature transactionSignatureFactory
+
+type transactionSignatureFactory struct{}
+
+type TransactionSignatureOption func(*TransactionSignatureGenerator, *flow.TransactionSignature)
+
+// WithAddress is an option that sets the address for the transaction signature.
+func (f transactionSignatureFactory) WithAddress(address flow.Address) TransactionSignatureOption {
+	return func(g *TransactionSignatureGenerator, signature *flow.TransactionSignature) {
+		signature.Address = address
+	}
+}
+
+// WithSignerIndex is an option that sets the signer index for the transaction signature.
+func (f transactionSignatureFactory) WithSignerIndex(signerIndex int) TransactionSignatureOption {
+	return func(g *TransactionSignatureGenerator, signature *flow.TransactionSignature) {
+		signature.SignerIndex = signerIndex
+	}
+}
+
+// WithSignature is an option that sets the signature for the transaction signature.
+func (f transactionSignatureFactory) WithSignature(signature crypto.Signature) TransactionSignatureOption {
+	return func(g *TransactionSignatureGenerator, signature *flow.TransactionSignature) {
+		signature.Signature = signature.Signature
+	}
+}
+
+// WithKeyIndex is an option that sets the key index for the transaction signature.
+func (f transactionSignatureFactory) WithKeyIndex(keyIndex uint32) TransactionSignatureOption {
+	return func(g *TransactionSignatureGenerator, signature *flow.TransactionSignature) {
+		signature.KeyIndex = keyIndex
+	}
+}
+
 // TransactionSignatureGenerator generates transaction signatures with consistent randomness.
 type TransactionSignatureGenerator struct {
+	transactionSignatureFactory
+
 	randomGen  *RandomGenerator
 	addressGen *AddressGenerator
 }
@@ -22,36 +59,8 @@ func NewTransactionSignatureGenerator(
 	}
 }
 
-// WithAddress is an option that sets the address for the transaction signature.
-func (g *TransactionSignatureGenerator) WithAddress(address flow.Address) func(*flow.TransactionSignature) {
-	return func(signature *flow.TransactionSignature) {
-		signature.Address = address
-	}
-}
-
-// WithSignerIndex is an option that sets the signer index for the transaction signature.
-func (g *TransactionSignatureGenerator) WithSignerIndex(signerIndex int) func(*flow.TransactionSignature) {
-	return func(signature *flow.TransactionSignature) {
-		signature.SignerIndex = signerIndex
-	}
-}
-
-// WithSignature is an option that sets the signature for the transaction signature.
-func (g *TransactionSignatureGenerator) WithSignature(signature crypto.Signature) func(*flow.TransactionSignature) {
-	return func(signature *flow.TransactionSignature) {
-		signature.Signature = signature.Signature
-	}
-}
-
-// WithKeyIndex is an option that sets the key index for the transaction signature.
-func (g *TransactionSignatureGenerator) WithKeyIndex(keyIndex uint32) func(*flow.TransactionSignature) {
-	return func(signature *flow.TransactionSignature) {
-		signature.KeyIndex = keyIndex
-	}
-}
-
 // Fixture generates a [flow.TransactionSignature] with random data based on the provided options.
-func (g *TransactionSignatureGenerator) Fixture(opts ...func(*flow.TransactionSignature)) flow.TransactionSignature {
+func (g *TransactionSignatureGenerator) Fixture(opts ...TransactionSignatureOption) flow.TransactionSignature {
 	signature := flow.TransactionSignature{
 		Address:     g.addressGen.Fixture(),
 		SignerIndex: 0,
@@ -60,14 +69,14 @@ func (g *TransactionSignatureGenerator) Fixture(opts ...func(*flow.TransactionSi
 	}
 
 	for _, opt := range opts {
-		opt(&signature)
+		opt(g, &signature)
 	}
 
 	return signature
 }
 
 // List generates a list of [flow.TransactionSignature].
-func (g *TransactionSignatureGenerator) List(n int, opts ...func(*flow.TransactionSignature)) []flow.TransactionSignature {
+func (g *TransactionSignatureGenerator) List(n int, opts ...TransactionSignatureOption) []flow.TransactionSignature {
 	list := make([]flow.TransactionSignature, n)
 	for i := range n {
 		list[i] = g.Fixture(opts...)

@@ -4,8 +4,22 @@ import (
 	"github.com/onflow/flow-go/ledger"
 )
 
+// LedgerPath is the default options factory for [ledger.Path] generation.
+var LedgerPath ledgerPathFactory
+
+type ledgerPathFactory struct{}
+
+type LedgerPathOption func(*LedgerPathGenerator, *ledgerPathConfig)
+
+// ledgerPathConfig holds the configuration for ledger path generation.
+type ledgerPathConfig struct {
+	// Currently no special options needed, but maintaining pattern consistency
+}
+
 // LedgerPathGenerator generates ledger paths with consistent randomness.
 type LedgerPathGenerator struct {
+	ledgerPathFactory
+
 	randomGen *RandomGenerator
 }
 
@@ -17,17 +31,12 @@ func NewLedgerPathGenerator(
 	}
 }
 
-// ledgerPathConfig holds the configuration for ledger path generation.
-type ledgerPathConfig struct {
-	// Currently no special options needed, but maintaining pattern consistency
-}
-
 // Fixture generates a single random [ledger.Path].
-func (g *LedgerPathGenerator) Fixture(opts ...func(*ledgerPathConfig)) ledger.Path {
+func (g *LedgerPathGenerator) Fixture(opts ...LedgerPathOption) ledger.Path {
 	config := &ledgerPathConfig{}
 
 	for _, opt := range opts {
-		opt(config)
+		opt(g, config)
 	}
 
 	var path ledger.Path
@@ -37,7 +46,7 @@ func (g *LedgerPathGenerator) Fixture(opts ...func(*ledgerPathConfig)) ledger.Pa
 }
 
 // List generates a list of random [ledger.Path].
-func (g *LedgerPathGenerator) List(n int, opts ...func(*ledgerPathConfig)) []ledger.Path {
+func (g *LedgerPathGenerator) List(n int, opts ...LedgerPathOption) []ledger.Path {
 	paths := make([]ledger.Path, 0, n)
 	alreadySelectPaths := make(map[ledger.Path]bool)
 	i := 0

@@ -24,9 +24,9 @@ func TestAdjustEventsMetadata(t *testing.T) {
 
 		txID := identifierGen.Fixture()
 		event := eventGen.Fixture(
-			eventGen.WithTransactionID(txID),
-			eventGen.WithEventIndex(999),
-			eventGen.WithTransactionIndex(999),
+			Event.WithTransactionID(txID),
+			Event.WithEventIndex(999),
+			Event.WithTransactionIndex(999),
 		)
 
 		result := AdjustEventsMetadata([]flow.Event{event})
@@ -49,19 +49,19 @@ func TestAdjustEventsMetadata(t *testing.T) {
 		txID := identifierGen.Fixture()
 		events := []flow.Event{
 			eventGen.Fixture(
-				eventGen.WithTransactionID(txID),
-				eventGen.WithTransactionIndex(999),
-				eventGen.WithEventIndex(999),
+				Event.WithTransactionID(txID),
+				Event.WithTransactionIndex(999),
+				Event.WithEventIndex(999),
 			),
 			eventGen.Fixture(
-				eventGen.WithTransactionID(txID),
-				eventGen.WithTransactionIndex(888),
-				eventGen.WithEventIndex(888),
+				Event.WithTransactionID(txID),
+				Event.WithTransactionIndex(888),
+				Event.WithEventIndex(888),
 			),
 			eventGen.Fixture(
-				eventGen.WithTransactionID(txID),
-				eventGen.WithTransactionIndex(777),
-				eventGen.WithEventIndex(777),
+				Event.WithTransactionID(txID),
+				Event.WithTransactionIndex(777),
+				Event.WithEventIndex(777),
 			),
 		}
 
@@ -127,9 +127,9 @@ func TestAdjustEventsMetadata(t *testing.T) {
 		events := make([]flow.Event, len(expected))
 		for i, event := range expected {
 			events[i] = eventGen.Fixture(
-				eventGen.WithTransactionID(event.transactionID),
-				eventGen.WithTransactionIndex(randomGen.Uint32()),
-				eventGen.WithEventIndex(randomGen.Uint32()),
+				Event.WithTransactionID(event.transactionID),
+				Event.WithTransactionIndex(randomGen.Uint32()),
+				Event.WithEventIndex(randomGen.Uint32()),
 			)
 		}
 

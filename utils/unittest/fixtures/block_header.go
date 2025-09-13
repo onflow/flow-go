@@ -6,8 +6,113 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
+// Header is the default options factory for [flow.Header] generation.
+var Header blockHeaderFactory
+
+type blockHeaderFactory struct{}
+
+type BlockHeaderOption func(*BlockHeaderGenerator, *flow.Header)
+
+// WithHeight is an option that sets the height of the block header.
+func (f blockHeaderFactory) WithHeight(height uint64) BlockHeaderOption {
+	return func(g *BlockHeaderGenerator, header *flow.Header) {
+		header.Height = height
+	}
+}
+
+// WithView is an option that sets the view of the block header.
+func (f blockHeaderFactory) WithView(view uint64) BlockHeaderOption {
+	return func(g *BlockHeaderGenerator, header *flow.Header) {
+		header.View = view
+	}
+}
+
+// WithChainID is an option that sets the chain ID of the block header.
+func (f blockHeaderFactory) WithChainID(chainID flow.ChainID) BlockHeaderOption {
+	return func(g *BlockHeaderGenerator, header *flow.Header) {
+		header.ChainID = chainID
+	}
+}
+
+// WithParent is an option that sets the ParentID, ParentView, and Height of the block header based
+// on the provided fields. Height is set to parent's Height + 1.
+func (f blockHeaderFactory) WithParent(parentID flow.Identifier, parentView uint64, parentHeight uint64) BlockHeaderOption {
+	return func(g *BlockHeaderGenerator, header *flow.Header) {
+		header.ParentID = parentID
+		header.ParentView = parentView
+		header.Height = parentHeight + 1
+	}
+}
+
+// WithParentView is an option that sets the ParentView of the block header.
+func (f blockHeaderFactory) WithParentView(view uint64) BlockHeaderOption {
+	return func(g *BlockHeaderGenerator, header *flow.Header) {
+		header.ParentView = view
+	}
+}
+
+// WithParentHeader is an option that sets the the following fields of the block header based on the
+// provided parent header:
+// - View
+// - Height
+// - ChainID
+// - Timestamp
+// - ParentID
+// - ParentView
+//
+// If you want a specific value for any of these fields, you should add the appropriate option
+// after this option.
+func (f blockHeaderFactory) WithParentHeader(parent *flow.Header) BlockHeaderOption {
+	return func(g *BlockHeaderGenerator, header *flow.Header) {
+		header.View = parent.View + 1
+		header.Height = parent.Height + 1
+		header.ChainID = parent.ChainID
+		header.Timestamp = g.randomGen.Uint64InRange(parent.Timestamp+1, parent.Timestamp+1000)
+		header.ParentID = parent.ID()
+		header.ParentView = parent.View
+	}
+}
+
+// WithProposerID is an option that sets the ProposerID of the block header.
+func (f blockHeaderFactory) WithProposerID(proposerID flow.Identifier) BlockHeaderOption {
+	return func(g *BlockHeaderGenerator, header *flow.Header) {
+		header.ProposerID = proposerID
+	}
+}
+
+// WithLastViewTC is an option that sets the LastViewTC of the block header.
+func (f blockHeaderFactory) WithLastViewTC(lastViewTC *flow.TimeoutCertificate) BlockHeaderOption {
+	return func(g *BlockHeaderGenerator, header *flow.Header) {
+		header.LastViewTC = lastViewTC
+	}
+}
+
+// WithPayloadHash is an option that sets the PayloadHash of the block header.
+func (f blockHeaderFactory) WithPayloadHash(hash flow.Identifier) BlockHeaderOption {
+	return func(g *BlockHeaderGenerator, header *flow.Header) {
+		header.PayloadHash = hash
+	}
+}
+
+// WithTimestamp is an option that sets the Timestamp of the block header.
+func (f blockHeaderFactory) WithTimestamp(timestamp uint64) BlockHeaderOption {
+	return func(g *BlockHeaderGenerator, header *flow.Header) {
+		header.Timestamp = timestamp
+	}
+}
+
+// WithSourceOfRandomness is an option that sets the ParentVoterSigData of the block header based on
+// the provided source of randomness.
+func (f blockHeaderFactory) WithSourceOfRandomness(source []byte) BlockHeaderOption {
+	return func(g *BlockHeaderGenerator, header *flow.Header) {
+		header.ParentVoterSigData = g.quorumCertGen.QCSigDataWithSoR(source)
+	}
+}
+
 // BlockHeaderGenerator generates block headers with consistent randomness.
 type BlockHeaderGenerator struct {
+	blockHeaderFactory
+
 	randomGen        *RandomGenerator
 	identifierGen    *IdentifierGenerator
 	signatureGen     *SignatureGenerator
@@ -38,104 +143,8 @@ func NewBlockHeaderGenerator(
 	}
 }
 
-// WithHeight is an option that sets the height of the block header.
-func (g *BlockHeaderGenerator) WithHeight(height uint64) func(*flow.Header) {
-	return func(header *flow.Header) {
-		header.Height = height
-	}
-}
-
-// WithView is an option that sets the view of the block header.
-func (g *BlockHeaderGenerator) WithView(view uint64) func(*flow.Header) {
-	return func(header *flow.Header) {
-		header.View = view
-	}
-}
-
-// WithChainID is an option that sets the chain ID of the block header.
-func (g *BlockHeaderGenerator) WithChainID(chainID flow.ChainID) func(*flow.Header) {
-	return func(header *flow.Header) {
-		header.ChainID = chainID
-	}
-}
-
-// WithParent is an option that sets the ParentID, ParentView, and Height of the block header based
-// on the provided fields. Height is set to parent's Height + 1.
-func (g *BlockHeaderGenerator) WithParent(parentID flow.Identifier, parentView uint64, parentHeight uint64) func(*flow.Header) {
-	return func(header *flow.Header) {
-		header.ParentID = parentID
-		header.ParentView = parentView
-		header.Height = parentHeight + 1
-	}
-}
-
-// WithParentView is an option that sets the ParentView of the block header.
-func (g *BlockHeaderGenerator) WithParentView(view uint64) func(*flow.Header) {
-	return func(header *flow.Header) {
-		header.ParentView = view
-	}
-}
-
-// WithParentHeader is an option that sets the the following fields of the block header based on the
-// provided parent header:
-// - View
-// - Height
-// - ChainID
-// - Timestamp
-// - ParentID
-// - ParentView
-//
-// If you want a specific value for any of these fields, you should add the appropriate option
-// after this option.
-func (g *BlockHeaderGenerator) WithParentHeader(parent *flow.Header) func(*flow.Header) {
-	return func(header *flow.Header) {
-		header.View = header.ParentView + 1
-		header.Height = parent.Height + 1
-		header.ChainID = parent.ChainID
-		header.Timestamp = g.randomGen.Uint64InRange(parent.Timestamp+1, parent.Timestamp+1000)
-		header.ParentID = parent.ID()
-		header.ParentView = parent.View
-	}
-}
-
-// WithProposerID is an option that sets the ProposerID of the block header.
-func (g *BlockHeaderGenerator) WithProposerID(proposerID flow.Identifier) func(*flow.Header) {
-	return func(header *flow.Header) {
-		header.ProposerID = proposerID
-	}
-}
-
-// WithLastViewTC is an option that sets the LastViewTC of the block header.
-func (g *BlockHeaderGenerator) WithLastViewTC(lastViewTC *flow.TimeoutCertificate) func(*flow.Header) {
-	return func(header *flow.Header) {
-		header.LastViewTC = lastViewTC
-	}
-}
-
-// WithPayloadHash is an option that sets the PayloadHash of the block header.
-func (g *BlockHeaderGenerator) WithPayloadHash(hash flow.Identifier) func(*flow.Header) {
-	return func(header *flow.Header) {
-		header.PayloadHash = hash
-	}
-}
-
-// WithTimestamp is an option that sets the Timestamp of the block header.
-func (g *BlockHeaderGenerator) WithTimestamp(timestamp uint64) func(*flow.Header) {
-	return func(header *flow.Header) {
-		header.Timestamp = timestamp
-	}
-}
-
-// WithSourceOfRandomness is an option that sets the ParentVoterSigData of the block header based on
-// the provided source of randomness.
-func (g *BlockHeaderGenerator) WithSourceOfRandomness(source []byte) func(*flow.Header) {
-	return func(header *flow.Header) {
-		header.ParentVoterSigData = g.quorumCertGen.QCSigDataWithSoR(source)
-	}
-}
-
 // Fixture generates a [flow.Header] with random data based on the provided options.
-func (g *BlockHeaderGenerator) Fixture(opts ...func(*flow.Header)) *flow.Header {
+func (g *BlockHeaderGenerator) Fixture(opts ...BlockHeaderOption) *flow.Header {
 	height := g.randomGen.Uint64InRange(1, math.MaxUint32) // avoiding edge case of height = 0 (genesis block)
 	view := g.randomGen.Uint64InRange(height, height+1000)
 
@@ -156,11 +165,11 @@ func (g *BlockHeaderGenerator) Fixture(opts ...func(*flow.Header)) *flow.Header 
 	}
 
 	for _, opt := range opts {
-		opt(header)
+		opt(g, header)
 	}
 
 	if header.View != header.ParentView+1 && header.LastViewTC == nil {
-		newestQC := g.quorumCertGen.Fixture(g.quorumCertGen.WithView(header.ParentView))
+		newestQC := g.quorumCertGen.Fixture(QuorumCertificate.WithView(header.ParentView))
 		header.LastViewTC = &flow.TimeoutCertificate{
 			View:          view - 1,
 			NewestQCViews: []uint64{newestQC.View},
@@ -207,7 +216,7 @@ func (g *BlockHeaderGenerator) Fixture(opts ...func(*flow.Header)) *flow.Header 
 // Genesis instantiates a genesis block header. This block has view and height equal to zero. However,
 // conceptually spork root blocks are functionally equivalent to genesis blocks. We have decided that
 // in the long term, the protocol must support spork root blocks with height _and_ view larger than zero.
-func (g *BlockHeaderGenerator) Genesis(opts ...func(*flow.Header)) *flow.Header {
+func (g *BlockHeaderGenerator) Genesis(opts ...BlockHeaderOption) *flow.Header {
 	header := &flow.Header{
 		HeaderBody: flow.HeaderBody{
 			ChainID: flow.Emulator,
@@ -215,7 +224,7 @@ func (g *BlockHeaderGenerator) Genesis(opts ...func(*flow.Header)) *flow.Header 
 	}
 
 	for _, opt := range opts {
-		opt(header)
+		opt(g, header)
 	}
 
 	return &flow.Header{
@@ -231,12 +240,12 @@ func (g *BlockHeaderGenerator) Genesis(opts ...func(*flow.Header)) *flow.Header 
 
 // List generates a chain of block headers. The first block is generated with the given options,
 // and the subsequent blocks are generated using the previous block as the parent.
-func (g *BlockHeaderGenerator) List(n int, opts ...func(*flow.Header)) []*flow.Header {
+func (g *BlockHeaderGenerator) List(n int, opts ...BlockHeaderOption) []*flow.Header {
 	headers := make([]*flow.Header, 0, n)
 	headers = append(headers, g.Fixture(opts...))
 
 	for i := 1; i < n; i++ {
-		headers = append(headers, g.Fixture(g.WithParentHeader(headers[i-1])))
+		headers = append(headers, g.Fixture(Header.WithParentHeader(headers[i-1])))
 	}
 	return headers
 }

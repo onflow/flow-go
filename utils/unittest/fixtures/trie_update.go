@@ -5,8 +5,61 @@ import (
 	"github.com/onflow/flow-go/ledger/common/testutils"
 )
 
+// TrieUpdate is the default options factory for [ledger.TrieUpdate] generation.
+var TrieUpdate trieUpdateFactory
+
+type trieUpdateFactory struct{}
+
+type TrieUpdateOption func(*TrieUpdateGenerator, *trieUpdateConfig)
+
+// trieUpdateConfig holds the configuration for trie update generation.
+type trieUpdateConfig struct {
+	trieUpdate *ledger.TrieUpdate
+	numPaths   int
+	minSize    int
+	maxSize    int
+}
+
+// WithRootHash is an option that sets the root hash for the trie update.
+func (f trieUpdateFactory) WithRootHash(rootHash ledger.RootHash) TrieUpdateOption {
+	return func(g *TrieUpdateGenerator, config *trieUpdateConfig) {
+		config.trieUpdate.RootHash = rootHash
+	}
+}
+
+// WithPaths is an option that sets the paths for the trie update.
+func (f trieUpdateFactory) WithPaths(paths []ledger.Path) TrieUpdateOption {
+	return func(g *TrieUpdateGenerator, config *trieUpdateConfig) {
+		config.trieUpdate.Paths = paths
+	}
+}
+
+// WithPayloads is an option that sets the payloads for the trie update.
+func (f trieUpdateFactory) WithPayloads(payloads []*ledger.Payload) TrieUpdateOption {
+	return func(g *TrieUpdateGenerator, config *trieUpdateConfig) {
+		config.trieUpdate.Payloads = payloads
+	}
+}
+
+// WithNumPaths is an option that sets the number of paths for the trie update.
+func (f trieUpdateFactory) WithNumPaths(numPaths int) TrieUpdateOption {
+	return func(g *TrieUpdateGenerator, config *trieUpdateConfig) {
+		config.numPaths = numPaths
+	}
+}
+
+// WithPayloadSize is an option that sets the payload size range for the trie update.
+func (f trieUpdateFactory) WithPayloadSize(minSize, maxSize int) TrieUpdateOption {
+	return func(g *TrieUpdateGenerator, config *trieUpdateConfig) {
+		config.minSize = minSize
+		config.maxSize = maxSize
+	}
+}
+
 // TrieUpdateGenerator generates trie updates with consistent randomness.
 type TrieUpdateGenerator struct {
+	trieUpdateFactory
+
 	randomGen        *RandomGenerator
 	ledgerPathGen    *LedgerPathGenerator
 	ledgerPayloadGen *LedgerPayloadGenerator
@@ -24,52 +77,8 @@ func NewTrieUpdateGenerator(
 	}
 }
 
-// trieUpdateConfig holds the configuration for trie update generation.
-type trieUpdateConfig struct {
-	trieUpdate *ledger.TrieUpdate
-	numPaths   int
-	minSize    int
-	maxSize    int
-}
-
-// WithRootHash is an option that sets the root hash for the trie update.
-func (g *TrieUpdateGenerator) WithRootHash(rootHash ledger.RootHash) func(*trieUpdateConfig) {
-	return func(config *trieUpdateConfig) {
-		config.trieUpdate.RootHash = rootHash
-	}
-}
-
-// WithPaths is an option that sets the paths for the trie update.
-func (g *TrieUpdateGenerator) WithPaths(paths []ledger.Path) func(*trieUpdateConfig) {
-	return func(config *trieUpdateConfig) {
-		config.trieUpdate.Paths = paths
-	}
-}
-
-// WithPayloads is an option that sets the payloads for the trie update.
-func (g *TrieUpdateGenerator) WithPayloads(payloads []*ledger.Payload) func(*trieUpdateConfig) {
-	return func(config *trieUpdateConfig) {
-		config.trieUpdate.Payloads = payloads
-	}
-}
-
-// WithNumPaths is an option that sets the number of paths for the trie update.
-func (g *TrieUpdateGenerator) WithNumPaths(numPaths int) func(*trieUpdateConfig) {
-	return func(config *trieUpdateConfig) {
-		config.numPaths = numPaths
-	}
-}
-
-// WithPayloadSize is an option that sets the payload size range for the trie update.
-func (g *TrieUpdateGenerator) WithPayloadSize(minSize, maxSize int) func(*trieUpdateConfig) {
-	return func(config *trieUpdateConfig) {
-		config.minSize = minSize
-		config.maxSize = maxSize
-	}
-}
-
 // Fixture generates a [ledger.TrieUpdate] with random data based on the provided options.
-func (g *TrieUpdateGenerator) Fixture(opts ...func(*trieUpdateConfig)) *ledger.TrieUpdate {
+func (g *TrieUpdateGenerator) Fixture(opts ...TrieUpdateOption) *ledger.TrieUpdate {
 	config := &trieUpdateConfig{
 		trieUpdate: &ledger.TrieUpdate{
 			RootHash: testutils.RootHashFixture(),
@@ -82,7 +91,7 @@ func (g *TrieUpdateGenerator) Fixture(opts ...func(*trieUpdateConfig)) *ledger.T
 	}
 
 	for _, opt := range opts {
-		opt(config)
+		opt(g, config)
 	}
 
 	// Generate paths and payloads if not provided
@@ -90,14 +99,14 @@ func (g *TrieUpdateGenerator) Fixture(opts ...func(*trieUpdateConfig)) *ledger.T
 		config.trieUpdate.Paths = g.ledgerPathGen.List(config.numPaths)
 	}
 	if config.trieUpdate.Payloads == nil {
-		config.trieUpdate.Payloads = g.ledgerPayloadGen.List(config.numPaths, g.ledgerPayloadGen.WithSize(config.minSize, config.maxSize))
+		config.trieUpdate.Payloads = g.ledgerPayloadGen.List(config.numPaths, LedgerPayload.WithSize(config.minSize, config.maxSize))
 	}
 
 	return config.trieUpdate
 }
 
 // List generates a list of [ledger.TrieUpdate].
-func (g *TrieUpdateGenerator) List(n int, opts ...func(*trieUpdateConfig)) []*ledger.TrieUpdate {
+func (g *TrieUpdateGenerator) List(n int, opts ...TrieUpdateOption) []*ledger.TrieUpdate {
 	list := make([]*ledger.TrieUpdate, n)
 	for i := range n {
 		list[i] = g.Fixture(opts...)

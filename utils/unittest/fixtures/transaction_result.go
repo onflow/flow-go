@@ -4,8 +4,38 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
+// TransactionResult is the default options factory for [flow.TransactionResult] generation.
+var TransactionResult transactionResultFactory
+
+type transactionResultFactory struct{}
+
+type TransactionResultOption func(*TransactionResultGenerator, *flow.TransactionResult)
+
+// WithTransactionID is an option that sets the transaction ID for the transaction result.
+func (f transactionResultFactory) WithTransactionID(transactionID flow.Identifier) TransactionResultOption {
+	return func(g *TransactionResultGenerator, result *flow.TransactionResult) {
+		result.TransactionID = transactionID
+	}
+}
+
+// WithErrorMessage is an option that sets the error message for the transaction result.
+func (f transactionResultFactory) WithErrorMessage(errorMessage string) TransactionResultOption {
+	return func(g *TransactionResultGenerator, result *flow.TransactionResult) {
+		result.ErrorMessage = errorMessage
+	}
+}
+
+// WithComputationUsed is an option that sets the computation used for the transaction result.
+func (f transactionResultFactory) WithComputationUsed(computationUsed uint64) TransactionResultOption {
+	return func(g *TransactionResultGenerator, result *flow.TransactionResult) {
+		result.ComputationUsed = computationUsed
+	}
+}
+
 // TransactionResultGenerator generates transaction results with consistent randomness.
 type TransactionResultGenerator struct {
+	transactionResultFactory
+
 	randomGen     *RandomGenerator
 	identifierGen *IdentifierGenerator
 }
@@ -20,29 +50,8 @@ func NewTransactionResultGenerator(
 	}
 }
 
-// WithTransactionID is an option that sets the transaction ID for the transaction result.
-func (g *TransactionResultGenerator) WithTransactionID(transactionID flow.Identifier) func(*flow.TransactionResult) {
-	return func(result *flow.TransactionResult) {
-		result.TransactionID = transactionID
-	}
-}
-
-// WithErrorMessage is an option that sets the error message for the transaction result.
-func (g *TransactionResultGenerator) WithErrorMessage(errorMessage string) func(*flow.TransactionResult) {
-	return func(result *flow.TransactionResult) {
-		result.ErrorMessage = errorMessage
-	}
-}
-
-// WithComputationUsed is an option that sets the computation used for the transaction result.
-func (g *TransactionResultGenerator) WithComputationUsed(computationUsed uint64) func(*flow.TransactionResult) {
-	return func(result *flow.TransactionResult) {
-		result.ComputationUsed = computationUsed
-	}
-}
-
 // Fixture generates a [flow.TransactionResult] with random data based on the provided options.
-func (g *TransactionResultGenerator) Fixture(opts ...func(*flow.TransactionResult)) flow.TransactionResult {
+func (g *TransactionResultGenerator) Fixture(opts ...TransactionResultOption) flow.TransactionResult {
 	result := flow.TransactionResult{
 		TransactionID:   g.identifierGen.Fixture(),
 		ComputationUsed: g.randomGen.Uint64InRange(1, 9999),
@@ -50,19 +59,46 @@ func (g *TransactionResultGenerator) Fixture(opts ...func(*flow.TransactionResul
 	}
 
 	for _, opt := range opts {
-		opt(&result)
+		opt(g, &result)
 	}
 
 	return result
 }
 
 // List generates a list of [flow.TransactionResult].
-func (g *TransactionResultGenerator) List(n int, opts ...func(*flow.TransactionResult)) []flow.TransactionResult {
+func (g *TransactionResultGenerator) List(n int, opts ...TransactionResultOption) []flow.TransactionResult {
 	list := make([]flow.TransactionResult, n)
 	for i := range n {
 		list[i] = g.Fixture(opts...)
 	}
 	return list
+}
+
+var LightTransactionResult lightTransactionResultFactory
+
+type lightTransactionResultFactory struct{}
+
+type LightTransactionResultOption func(*LightTransactionResultGenerator, *flow.LightTransactionResult)
+
+// WithTransactionID is an option that sets the transaction ID for the transaction result.
+func (f lightTransactionResultFactory) WithTransactionID(transactionID flow.Identifier) LightTransactionResultOption {
+	return func(g *LightTransactionResultGenerator, result *flow.LightTransactionResult) {
+		result.TransactionID = transactionID
+	}
+}
+
+// WithFailed is an option that sets the failed status for the transaction result.
+func (f lightTransactionResultFactory) WithFailed(failed bool) LightTransactionResultOption {
+	return func(g *LightTransactionResultGenerator, result *flow.LightTransactionResult) {
+		result.Failed = failed
+	}
+}
+
+// WithComputationUsed is an option that sets the computation used for the transaction result.
+func (f lightTransactionResultFactory) WithComputationUsed(computationUsed uint64) LightTransactionResultOption {
+	return func(g *LightTransactionResultGenerator, result *flow.LightTransactionResult) {
+		result.ComputationUsed = computationUsed
+	}
 }
 
 // LightTransactionResultGenerator generates light transaction results with consistent randomness.
@@ -78,29 +114,8 @@ func NewLightTransactionResultGenerator(
 	}
 }
 
-// WithTransactionID is an option that sets the transaction ID for the transaction result.
-func (g *LightTransactionResultGenerator) WithTransactionID(transactionID flow.Identifier) func(*flow.LightTransactionResult) {
-	return func(result *flow.LightTransactionResult) {
-		result.TransactionID = transactionID
-	}
-}
-
-// WithFailed is an option that sets the failed status for the transaction result.
-func (g *LightTransactionResultGenerator) WithFailed(failed bool) func(*flow.LightTransactionResult) {
-	return func(result *flow.LightTransactionResult) {
-		result.Failed = failed
-	}
-}
-
-// WithComputationUsed is an option that sets the computation used for the transaction result.
-func (g *LightTransactionResultGenerator) WithComputationUsed(computationUsed uint64) func(*flow.LightTransactionResult) {
-	return func(result *flow.LightTransactionResult) {
-		result.ComputationUsed = computationUsed
-	}
-}
-
 // Fixture generates a [flow.LightTransactionResult] with random data based on the provided options.
-func (g *LightTransactionResultGenerator) Fixture(opts ...func(*flow.LightTransactionResult)) flow.LightTransactionResult {
+func (g *LightTransactionResultGenerator) Fixture(opts ...LightTransactionResultOption) flow.LightTransactionResult {
 	result := flow.LightTransactionResult{
 		TransactionID:   g.identifierGen.Fixture(),
 		ComputationUsed: g.randomGen.Uint64InRange(1, 9999),
@@ -108,14 +123,14 @@ func (g *LightTransactionResultGenerator) Fixture(opts ...func(*flow.LightTransa
 	}
 
 	for _, opt := range opts {
-		opt(&result)
+		opt(g, &result)
 	}
 
 	return result
 }
 
 // List generates a list of [flow.LightTransactionResult].
-func (g *LightTransactionResultGenerator) List(n int, opts ...func(*flow.LightTransactionResult)) []flow.LightTransactionResult {
+func (g *LightTransactionResultGenerator) List(n int, opts ...LightTransactionResultOption) []flow.LightTransactionResult {
 	list := make([]flow.LightTransactionResult, n)
 	for i := range n {
 		list[i] = g.Fixture(opts...)
