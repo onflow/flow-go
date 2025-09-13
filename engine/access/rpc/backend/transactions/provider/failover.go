@@ -66,3 +66,45 @@ func (f *FailoverTransactionProvider) TransactionResultsByBlockID(
 	execNodeResults, execNodeErr := f.execNodeProvider.TransactionResultsByBlockID(ctx, block, encodingVersion)
 	return execNodeResults, execNodeErr
 }
+
+func (f *FailoverTransactionProvider) TransactionsByBlockID(
+	ctx context.Context,
+	block *flow.Block,
+) ([]*flow.TransactionBody, error) {
+	localResults, localErr := f.localProvider.TransactionsByBlockID(ctx, block)
+	if localErr == nil {
+		return localResults, nil
+	}
+
+	execNodeResults, execNodeErr := f.execNodeProvider.TransactionsByBlockID(ctx, block)
+	return execNodeResults, execNodeErr
+}
+
+func (f *FailoverTransactionProvider) SystemTransaction(
+	ctx context.Context,
+	block *flow.Block,
+	txID flow.Identifier,
+) (*flow.TransactionBody, error) {
+	localResult, localErr := f.localProvider.SystemTransaction(ctx, block, txID)
+	if localErr == nil {
+		return localResult, nil
+	}
+
+	execNodeResult, execNodeErr := f.execNodeProvider.SystemTransaction(ctx, block, txID)
+	return execNodeResult, execNodeErr
+}
+
+func (f *FailoverTransactionProvider) SystemTransactionResult(
+	ctx context.Context,
+	block *flow.Block,
+	txID flow.Identifier,
+	requiredEventEncodingVersion entities.EventEncodingVersion,
+) (*accessmodel.TransactionResult, error) {
+	localResult, localErr := f.localProvider.SystemTransactionResult(ctx, block, txID, requiredEventEncodingVersion)
+	if localErr == nil {
+		return localResult, nil
+	}
+
+	execNodeResult, execNodeErr := f.execNodeProvider.SystemTransactionResult(ctx, block, txID, requiredEventEncodingVersion)
+	return execNodeResult, execNodeErr
+}
