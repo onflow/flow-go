@@ -239,9 +239,11 @@ func TestClientConnection(t *testing.T) {
 		// subsequent calls return the existing connection and do not call the connectFn
 		conn, err = client.clientConnection(cfg, networkPubKey, neverConnectClientFn(t))
 		assert.ErrorIs(t, err, expectedErr)
+		assert.Nil(t, conn)
 
 		conn, err = client.clientConnection(cfg, networkPubKey, neverConnectClientFn(t))
 		assert.ErrorIs(t, err, expectedErr)
+		assert.Nil(t, conn)
 	})
 
 	// test making multiple concurrent calls to clientConnection results in exactly one call to

@@ -8,11 +8,12 @@ import (
 	"time"
 
 	"github.com/onflow/crypto"
-	"github.com/onflow/flow-go/module/metrics"
-	"github.com/onflow/flow-go/utils/unittest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/atomic"
+
+	"github.com/onflow/flow-go/module/metrics"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 const clientAddress = "test-address"
@@ -141,7 +142,7 @@ func TestGetConnection(t *testing.T) {
 
 		// wait for all goroutines to block on the started channel, then release them
 		for range attemptCount {
-			_ = <-started
+			<-started
 		}
 		close(block)
 
