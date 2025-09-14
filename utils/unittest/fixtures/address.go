@@ -1,12 +1,13 @@
 package fixtures
 
 import (
-	"math"
-
 	sdk "github.com/onflow/flow-go-sdk"
 
 	"github.com/onflow/flow-go/model/flow"
 )
+
+// maxIndex is the maximum index for the linear code address generator.
+const maxIndex = 1<<45 - 1
 
 // Address is the default options factory for [flow.Address] generation.
 var Address addressFactory
@@ -66,14 +67,14 @@ func NewAddressGenerator(
 func (g *AddressGenerator) Fixture(opts ...AddressOption) flow.Address {
 	config := &addressConfig{
 		chainID: g.chainID,
-		// we use a 32-bit index - since the linear address generator uses 45 bits,
-		// this won't error
-		index: uint64(g.randomGen.Uint32()),
+		index:   g.randomGen.Uint64InRange(1, maxIndex),
 	}
 
 	for _, opt := range opts {
 		opt(g, config)
 	}
+
+	Assertf(config.index <= maxIndex, "index must be less than %d, got %d", maxIndex, config.index)
 
 	addr, err := config.chainID.Chain().AddressAtIndex(config.index)
 	NoError(err)
@@ -86,8 +87,8 @@ func (g *AddressGenerator) List(n int, opts ...AddressOption) []flow.Address {
 	addresses := make([]flow.Address, n)
 	for i := range uint64(n) {
 		// set the index explicitly to guarantee we do not have duplicates
-		// wrapping at maxUint32 to avoid errors if we go above 2^45
-		index := g.randomGen.Uint64InRange(i, i+1000) % math.MaxUint32
+		// wrapping at maxIndex to avoid errors if we go above maxIndex.
+		index := g.randomGen.Uint64InRange(i, i+1000) % maxIndex
 		opts = append(opts, Address.WithIndex(index))
 		addresses[i] = g.Fixture(opts...)
 	}
@@ -104,6 +105,8 @@ func ToSDKAddress(addr flow.Address) sdk.Address {
 // CorruptAddress corrupts the first byte of the address and checks that the address is invalid.
 func CorruptAddress(addr flow.Address, chainID flow.ChainID) flow.Address {
 	addr[0] ^= 1
-	Assert(!chainID.Chain().IsValid(addr), "invalid address fixture generated valid address")
+	// this should only fail if the provided address was already not valid for the chain. explicitly
+	// check so the returned address is guaranteed to be invalid.
+	Assert(!chainID.Chain().IsValid(addr), "corrupted address is valid!")
 	return addr
 }

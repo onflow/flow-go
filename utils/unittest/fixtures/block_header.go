@@ -13,29 +13,29 @@ type blockHeaderFactory struct{}
 
 type BlockHeaderOption func(*BlockHeaderGenerator, *flow.Header)
 
-// WithHeight is an option that sets the height of the block header.
+// WithHeight is an option that sets the `Height` of the block header.
 func (f blockHeaderFactory) WithHeight(height uint64) BlockHeaderOption {
 	return func(g *BlockHeaderGenerator, header *flow.Header) {
 		header.Height = height
 	}
 }
 
-// WithView is an option that sets the view of the block header.
+// WithView is an option that sets the `View` of the block header.
 func (f blockHeaderFactory) WithView(view uint64) BlockHeaderOption {
 	return func(g *BlockHeaderGenerator, header *flow.Header) {
 		header.View = view
 	}
 }
 
-// WithChainID is an option that sets the chain ID of the block header.
+// WithChainID is an option that sets the `ChainID` of the block header.
 func (f blockHeaderFactory) WithChainID(chainID flow.ChainID) BlockHeaderOption {
 	return func(g *BlockHeaderGenerator, header *flow.Header) {
 		header.ChainID = chainID
 	}
 }
 
-// WithParent is an option that sets the ParentID, ParentView, and Height of the block header based
-// on the provided fields. Height is set to parent's Height + 1.
+// WithParent is an option that sets the `ParentID`, `ParentView`, and `Height` of the block header based
+// on the provided fields. `Height` is set to parent's `Height` + 1.
 func (f blockHeaderFactory) WithParent(parentID flow.Identifier, parentView uint64, parentHeight uint64) BlockHeaderOption {
 	return func(g *BlockHeaderGenerator, header *flow.Header) {
 		header.ParentID = parentID
@@ -44,7 +44,7 @@ func (f blockHeaderFactory) WithParent(parentID flow.Identifier, parentView uint
 	}
 }
 
-// WithParentView is an option that sets the ParentView of the block header.
+// WithParentView is an option that sets the `ParentView` of the block header.
 func (f blockHeaderFactory) WithParentView(view uint64) BlockHeaderOption {
 	return func(g *BlockHeaderGenerator, header *flow.Header) {
 		header.ParentView = view
@@ -53,12 +53,12 @@ func (f blockHeaderFactory) WithParentView(view uint64) BlockHeaderOption {
 
 // WithParentHeader is an option that sets the the following fields of the block header based on the
 // provided parent header:
-// - View
-// - Height
-// - ChainID
-// - Timestamp
-// - ParentID
-// - ParentView
+// - `View`
+// - `Height`
+// - `ChainID`
+// - `Timestamp`
+// - `ParentID`
+// - `ParentView`
 //
 // If you want a specific value for any of these fields, you should add the appropriate option
 // after this option.
@@ -73,35 +73,35 @@ func (f blockHeaderFactory) WithParentHeader(parent *flow.Header) BlockHeaderOpt
 	}
 }
 
-// WithProposerID is an option that sets the ProposerID of the block header.
+// WithProposerID is an option that sets the `ProposerID` of the block header.
 func (f blockHeaderFactory) WithProposerID(proposerID flow.Identifier) BlockHeaderOption {
 	return func(g *BlockHeaderGenerator, header *flow.Header) {
 		header.ProposerID = proposerID
 	}
 }
 
-// WithLastViewTC is an option that sets the LastViewTC of the block header.
+// WithLastViewTC is an option that sets the `LastViewTC` of the block header.
 func (f blockHeaderFactory) WithLastViewTC(lastViewTC *flow.TimeoutCertificate) BlockHeaderOption {
 	return func(g *BlockHeaderGenerator, header *flow.Header) {
 		header.LastViewTC = lastViewTC
 	}
 }
 
-// WithPayloadHash is an option that sets the PayloadHash of the block header.
+// WithPayloadHash is an option that sets the `PayloadHash` of the block header.
 func (f blockHeaderFactory) WithPayloadHash(hash flow.Identifier) BlockHeaderOption {
 	return func(g *BlockHeaderGenerator, header *flow.Header) {
 		header.PayloadHash = hash
 	}
 }
 
-// WithTimestamp is an option that sets the Timestamp of the block header.
+// WithTimestamp is an option that sets the `Timestamp` of the block header.
 func (f blockHeaderFactory) WithTimestamp(timestamp uint64) BlockHeaderOption {
 	return func(g *BlockHeaderGenerator, header *flow.Header) {
 		header.Timestamp = timestamp
 	}
 }
 
-// WithSourceOfRandomness is an option that sets the ParentVoterSigData of the block header based on
+// WithSourceOfRandomness is an option that sets the `ParentVoterSigData` of the block header based on
 // the provided source of randomness.
 func (f blockHeaderFactory) WithSourceOfRandomness(source []byte) BlockHeaderOption {
 	return func(g *BlockHeaderGenerator, header *flow.Header) {
