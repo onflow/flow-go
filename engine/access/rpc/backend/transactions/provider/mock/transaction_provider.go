@@ -19,6 +19,66 @@ type TransactionProvider struct {
 	mock.Mock
 }
 
+// SystemTransaction provides a mock function with given fields: ctx, block, txID
+func (_m *TransactionProvider) SystemTransaction(ctx context.Context, block *flow.GenericBlock[flow.Payload], txID flow.Identifier) (*flow.TransactionBody, error) {
+	ret := _m.Called(ctx, block, txID)
+
+	if len(ret) == 0 {
+		panic("no return value specified for SystemTransaction")
+	}
+
+	var r0 *flow.TransactionBody
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, *flow.GenericBlock[flow.Payload], flow.Identifier) (*flow.TransactionBody, error)); ok {
+		return rf(ctx, block, txID)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, *flow.GenericBlock[flow.Payload], flow.Identifier) *flow.TransactionBody); ok {
+		r0 = rf(ctx, block, txID)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*flow.TransactionBody)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, *flow.GenericBlock[flow.Payload], flow.Identifier) error); ok {
+		r1 = rf(ctx, block, txID)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// SystemTransactionResult provides a mock function with given fields: ctx, block, txID, requiredEventEncodingVersion
+func (_m *TransactionProvider) SystemTransactionResult(ctx context.Context, block *flow.GenericBlock[flow.Payload], txID flow.Identifier, requiredEventEncodingVersion entities.EventEncodingVersion) (*access.TransactionResult, error) {
+	ret := _m.Called(ctx, block, txID, requiredEventEncodingVersion)
+
+	if len(ret) == 0 {
+		panic("no return value specified for SystemTransactionResult")
+	}
+
+	var r0 *access.TransactionResult
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, *flow.GenericBlock[flow.Payload], flow.Identifier, entities.EventEncodingVersion) (*access.TransactionResult, error)); ok {
+		return rf(ctx, block, txID, requiredEventEncodingVersion)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, *flow.GenericBlock[flow.Payload], flow.Identifier, entities.EventEncodingVersion) *access.TransactionResult); ok {
+		r0 = rf(ctx, block, txID, requiredEventEncodingVersion)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*access.TransactionResult)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, *flow.GenericBlock[flow.Payload], flow.Identifier, entities.EventEncodingVersion) error); ok {
+		r1 = rf(ctx, block, txID, requiredEventEncodingVersion)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // TransactionResult provides a mock function with given fields: ctx, header, txID, encodingVersion
 func (_m *TransactionProvider) TransactionResult(ctx context.Context, header *flow.Header, txID flow.Identifier, encodingVersion entities.EventEncodingVersion) (*access.TransactionResult, error) {
 	ret := _m.Called(ctx, header, txID, encodingVersion)
@@ -102,6 +162,36 @@ func (_m *TransactionProvider) TransactionResultsByBlockID(ctx context.Context, 
 
 	if rf, ok := ret.Get(1).(func(context.Context, *flow.GenericBlock[flow.Payload], entities.EventEncodingVersion) error); ok {
 		r1 = rf(ctx, block, encodingVersion)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// TransactionsByBlockID provides a mock function with given fields: ctx, block
+func (_m *TransactionProvider) TransactionsByBlockID(ctx context.Context, block *flow.GenericBlock[flow.Payload]) ([]*flow.TransactionBody, error) {
+	ret := _m.Called(ctx, block)
+
+	if len(ret) == 0 {
+		panic("no return value specified for TransactionsByBlockID")
+	}
+
+	var r0 []*flow.TransactionBody
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, *flow.GenericBlock[flow.Payload]) ([]*flow.TransactionBody, error)); ok {
+		return rf(ctx, block)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, *flow.GenericBlock[flow.Payload]) []*flow.TransactionBody); ok {
+		r0 = rf(ctx, block)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]*flow.TransactionBody)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, *flow.GenericBlock[flow.Payload]) error); ok {
+		r1 = rf(ctx, block)
 	} else {
 		r1 = ret.Error(1)
 	}

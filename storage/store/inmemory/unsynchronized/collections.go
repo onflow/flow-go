@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/jordanschalm/lockctx"
+
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/storage"
 )
@@ -17,15 +19,18 @@ type Collections struct {
 	collections                    map[flow.Identifier]*flow.Collection
 	lightCollections               map[flow.Identifier]*flow.LightCollection
 	transactionIDToLightCollection map[flow.Identifier]*flow.LightCollection
+
+	transactions *Transactions // Reference to Transactions to store txs when storing collections
 }
 
 var _ storage.Collections = (*Collections)(nil)
 
-func NewCollections() *Collections {
+func NewCollections(transactions *Transactions) *Collections {
 	return &Collections{
 		collections:                    make(map[flow.Identifier]*flow.Collection),
 		lightCollections:               make(map[flow.Identifier]*flow.LightCollection),
 		transactionIDToLightCollection: make(map[flow.Identifier]*flow.LightCollection),
+		transactions:                   transactions,
 	}
 }
 
@@ -79,38 +84,45 @@ func (c *Collections) LightByTransactionID(txID flow.Identifier) (*flow.LightCol
 
 // Store inserts the collection keyed by ID and all constituent transactions.
 // No errors are expected during normal operation.
-func (c *Collections) Store(collection *flow.Collection) error {
+func (c *Collections) Store(collection *flow.Collection) (*flow.LightCollection, error) {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
 	c.collections[collection.ID()] = collection
-	return nil
+	light := collection.Light()
+	return light, nil
 }
 
-// StoreLightAndIndexByTransaction inserts the light collection (only
+// StoreAndIndexByTransaction inserts the light collection (only
 // transaction IDs) and adds a transaction id index for each of the
 // transactions within the collection (transaction_id->collection_id).
 //
-// NOTE: Currently it is possible in rare circumstances for two collections
-// to be guaranteed which both contain the same transaction (see https://github.com/dapperlabs/flow-go/issues/3556).
-// The second of these will revert upon reaching the execution node, so
-// this doesn't impact the execution state, but it can result in the Access
-// node processing two collections which both contain the same transaction (see https://github.com/dapperlabs/flow-go/issues/5337).
-// To handle this, we skip indexing the affected transaction when inserting
-// the transaction_id->collection_id index when an index for the transaction
-// already exists.
+// CAUTION: current approach is NOT BFT and needs to be revised in the future.
+// Honest clusters ensure a transaction can only belong to one collection. However, in rare
+// cases, the collector clusters can exceed byzantine thresholds -- making it possible to
+// produce multiple finalized collections (aka guaranteed collections) containing the same
+// transaction repeatedly.
+// TODO: eventually we need to handle Byzantine clusters
 //
 // No errors are expected during normal operation.
-func (c *Collections) StoreLightAndIndexByTransaction(collection *flow.LightCollection) error {
+func (c *Collections) StoreAndIndexByTransaction(_ lockctx.Proof, collection *flow.Collection) (*flow.LightCollection, error) {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
-	c.lightCollections[collection.ID()] = collection
-	for _, txID := range collection.Transactions {
-		c.transactionIDToLightCollection[txID] = collection
+	c.collections[collection.ID()] = collection
+	light := collection.Light()
+	c.lightCollections[light.ID()] = light
+	for _, txID := range light.Transactions {
+		c.transactionIDToLightCollection[txID] = light
 	}
 
-	return nil
+	for _, tx := range collection.Transactions {
+		if err := c.transactions.Store(tx); err != nil {
+			return nil, fmt.Errorf("could not index transaction: %w", err)
+		}
+	}
+
+	return light, nil
 }
 
 // Remove removes the collection and all constituent transactions.
@@ -154,8 +166,16 @@ func (c *Collections) LightCollections() []flow.LightCollection {
 	return out
 }
 
-// BatchStoreLightAndIndexByTransaction stores a light collection and indexes it by transaction ID within a batch operation.
+// BatchStoreAndIndexByTransaction stores a light collection and indexes it by transaction ID within a batch operation.
+//
+// CAUTION: current approach is NOT BFT and needs to be revised in the future.
+// Honest clusters ensure a transaction can only belong to one collection. However, in rare
+// cases, the collector clusters can exceed byzantine thresholds -- making it possible to
+// produce multiple finalized collections (aka guaranteed collections) containing the same
+// transaction repeatedly.
+// TODO: eventually we need to handle Byzantine clusters
+//
 // This method is not implemented and will always return an error.
-func (c *Collections) BatchStoreLightAndIndexByTransaction(_ *flow.LightCollection, _ storage.ReaderBatchWriter) error {
-	return fmt.Errorf("not implemented")
+func (c *Collections) BatchStoreAndIndexByTransaction(_ lockctx.Proof, _ *flow.Collection, _ storage.ReaderBatchWriter) (*flow.LightCollection, error) {
+	return nil, fmt.Errorf("not implemented")
 }

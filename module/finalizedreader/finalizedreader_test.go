@@ -4,49 +4,69 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/dgraph-io/badger/v2"
+	"github.com/jordanschalm/lockctx"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/storage"
-	"github.com/onflow/flow-go/storage/badger/operation"
+	"github.com/onflow/flow-go/storage/operation"
+	"github.com/onflow/flow-go/storage/operation/dbtest"
+	"github.com/onflow/flow-go/storage/store"
 	"github.com/onflow/flow-go/utils/unittest"
-
-	badgerstorage "github.com/onflow/flow-go/storage/badger"
 )
 
 func TestFinalizedReader(t *testing.T) {
-	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
+		lockManager := storage.NewTestingLockManager()
 		// prepare the storage.Headers instance
 		metrics := metrics.NewNoopCollector()
-		headers := badgerstorage.NewHeaders(metrics, db)
-		block := unittest.BlockFixture()
+		all := store.InitAll(metrics, db)
+		blocks := all.Blocks
+		headers := all.Headers
+		proposal := unittest.ProposalFixture()
+		block := proposal.Block
 
-		// store header
-		err := headers.Store(unittest.ProposalHeaderFromHeader(block.ToHeader()))
-		require.NoError(t, err)
+		// store `block`
+		unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
+			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+				return blocks.BatchStore(lctx, rw, proposal)
+			})
+		})
 
-		// index the header
-		err = db.Update(operation.IndexBlockHeight(block.Height, block.ID()))
-		require.NoError(t, err)
+		// index `block` as finalized
+		unittest.WithLock(t, lockManager, storage.LockFinalizeBlock, func(lctx lockctx.Context) error {
+			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+				return operation.IndexFinalizedBlockByHeight(lctx, rw, block.Height, block.ID())
+			})
+		})
 
-		// verify is able to reader the finalized block ID
+		// verify that `FinalizedReader` reads values from database that are not yet cached, eg. right after initialization
 		reader := NewFinalizedReader(headers, block.Height)
 		finalized, err := reader.FinalizedBlockIDAtHeight(block.Height)
 		require.NoError(t, err)
 		require.Equal(t, block.ID(), finalized)
 
-		// verify is able to return storage.NotFound when the height is not finalized
+		// verify that `FinalizedReader` returns storage.NotFound when the height is not finalized
 		_, err = reader.FinalizedBlockIDAtHeight(block.Height + 1)
 		require.Error(t, err)
 		require.True(t, errors.Is(err, storage.ErrNotFound), err)
 
-		// finalize one more block
+		// store and finalize one more block
 		block2 := unittest.BlockWithParentFixture(block.ToHeader())
-		require.NoError(t, headers.Store(unittest.ProposalHeaderFromHeader(block2.ToHeader())))
-		err = db.Update(operation.IndexBlockHeight(block2.Height, block2.ID()))
-		require.NoError(t, err)
+		unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
+			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+				return blocks.BatchStore(lctx, rw, unittest.ProposalFromBlock(block2))
+			})
+		})
+		unittest.WithLock(t, lockManager, storage.LockFinalizeBlock, func(lctx lockctx.Context) error {
+			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+				return operation.IndexFinalizedBlockByHeight(lctx, rw, block2.Height, block2.ID())
+			})
+		})
+
+		// We declare `block2` as via the `FinalizedReader`
 		reader.BlockFinalized(block2.ToHeader())
+		require.Equal(t, block.ID(), finalized)
 
 		// should be able to retrieve the block
 		finalized, err = reader.FinalizedBlockIDAtHeight(block2.Height)
