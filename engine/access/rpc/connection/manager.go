@@ -38,7 +38,6 @@ type Manager struct {
 	logger               zerolog.Logger
 	metrics              module.AccessMetrics
 	cache                *Cache
-	maxMsgSize           uint
 	circuitBreakerConfig CircuitBreakerConfig
 	compressorName       string
 }
@@ -62,7 +61,6 @@ func NewManager(
 	logger zerolog.Logger,
 	metrics module.AccessMetrics,
 	cache *Cache,
-	maxMsgSize uint,
 	circuitBreakerConfig CircuitBreakerConfig,
 	compressorName string,
 ) Manager {
@@ -70,7 +68,6 @@ func NewManager(
 		cache:                cache,
 		logger:               logger,
 		metrics:              metrics,
-		maxMsgSize:           maxMsgSize,
 		circuitBreakerConfig: circuitBreakerConfig,
 		compressorName:       compressorName,
 	}
@@ -82,11 +79,11 @@ func NewManager(
 // The networkPubKey is the public key used for creating secure gRPC connection. Can be nil for an unsecured connection.
 func (m *Manager) GetConnection(
 	grpcAddress string,
-	timeout time.Duration,
+	cfg Config,
 	networkPubKey crypto.PublicKey,
 ) (grpc.ClientConnInterface, io.Closer, error) {
 	if m.cache != nil {
-		conn, err := m.cache.GetConnection(grpcAddress, timeout, networkPubKey, m.createConnection)
+		conn, err := m.cache.GetConnection(grpcAddress, cfg, networkPubKey, m.createConnection)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -94,7 +91,7 @@ func (m *Manager) GetConnection(
 		return conn, &noopCloser{}, nil
 	}
 
-	conn, err := m.createConnection(grpcAddress, timeout, networkPubKey, nil)
+	conn, err := m.createConnection(grpcAddress, cfg, networkPubKey, nil)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -109,10 +106,11 @@ func (m *Manager) GetConnection(
 // it means that it used for creating secure gRPC connection. If it is nil, it means unsecure gRPC connection is being created.
 func (m *Manager) createConnection(
 	address string,
-	timeout time.Duration,
+	cfg Config,
 	networkPubKey crypto.PublicKey,
 	client *cachedClient,
 ) (grpcClientConn, error) {
+	timeout := cfg.Timeout
 	if timeout == 0 {
 		timeout = DefaultClientTimeout
 	}
@@ -149,7 +147,10 @@ func (m *Manager) createConnection(
 	// https://pkg.go.dev/google.golang.org/grpc#WithKeepaliveParams
 	// https://grpc.io/blog/grpc-on-http2/#keeping-connections-alive
 	var opts []grpc.DialOption
-	opts = append(opts, grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(int(m.maxMsgSize))))
+	opts = append(opts, grpc.WithDefaultCallOptions(
+		grpc.MaxCallSendMsgSize(int(cfg.MaxRequestMsgSize)),
+		grpc.MaxCallRecvMsgSize(int(cfg.MaxResponseMsgSize)),
+	))
 	opts = append(opts, grpc.WithKeepaliveParams(keepaliveParams))
 	opts = append(opts, grpc.WithChainUnaryInterceptor(connInterceptors...))
 

@@ -1621,7 +1621,7 @@ func TransactionDSLFixture(chain flow.Chain) dsl.Transaction {
 		Imports: dsl.Imports{
 			dsl.Import{
 				Address: sdk.Address(chain.ServiceAddress()),
-				Names:   []string{"FlowCallbackScheduler"},
+				Names:   []string{"FlowTransactionScheduler"},
 			},
 		},
 		Content: dsl.Prepare{

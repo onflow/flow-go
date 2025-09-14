@@ -13,20 +13,21 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/atomic"
-	"google.golang.org/grpc"
 )
 
-// Tests:
-// onEvict()
-// - closes the connection when the client is evicted from the cache
+const clientAddress = "test-address"
+
+func clientConf(t *testing.T) (string, Config, crypto.PublicKey) {
+	return clientAddress,
+		Config{Timeout: 10 * time.Second},
+		generateRandomPublicKey(t)
+}
 
 func TestGetConnection(t *testing.T) {
 	logger := unittest.Logger()
 	metrics := metrics.NewNoopCollector()
 
-	clientAddress := "test-address"
-	clientTimeout := 10 * time.Second
-	networkPubKey := generateRandomPublicKey(t)
+	clientAddress, cfg, networkPubKey := clientConf(t)
 
 	mockConn := newMockGrpcConn()
 
@@ -36,57 +37,48 @@ func TestGetConnection(t *testing.T) {
 		cache, err := NewCache(logger, metrics, 100)
 		require.NoError(t, err)
 
-		connectFn := assertConnectFn(t, clientAddress, clientTimeout, networkPubKey, mockConn, nil)
+		connectFn := assertConnectFn(t, clientAddress, cfg, networkPubKey, mockConn, nil)
 
 		// first call creates a new connection
-		conn, err := cache.GetConnection(clientAddress, clientTimeout, networkPubKey, connectFn)
+		conn, err := cache.GetConnection(clientAddress, cfg, networkPubKey, connectFn)
 		require.NoError(t, err)
 		assert.Same(t, mockConn, conn)
 
 		// subsequent calls reuse the existing connection
-		conn, err = cache.GetConnection(clientAddress, clientTimeout, networkPubKey, neverConnectClientFn(t))
+		conn, err = cache.GetConnection(clientAddress, cfg, networkPubKey, neverConnectClientFn(t))
 		require.NoError(t, err)
 		assert.Same(t, mockConn, conn)
 
-		conn, err = cache.GetConnection(clientAddress, clientTimeout, networkPubKey, neverConnectClientFn(t))
+		conn, err = cache.GetConnection(clientAddress, cfg, networkPubKey, neverConnectClientFn(t))
 		require.NoError(t, err)
 		assert.Same(t, mockConn, conn)
 	})
 
 	// tests that concurrent calls block and all receive the same connection.
 	t.Run("concurrent calls block and all receive the same connection", func(t *testing.T) {
-		cache, err := NewCache(logger, metrics, 100)
-		require.NoError(t, err)
-
-		callCount := atomic.NewInt32(0)
-		connectFn := func(string, time.Duration, crypto.PublicKey, *cachedClient) (grpcClientConn, error) {
-			if callCount.CompareAndSwap(0, 1) {
-				return mockConn, nil
-			}
-			return nil, errors.New("test error: only one connection should be established")
-		}
-
 		synctest.Test(t, func(t *testing.T) {
+			cache, err := NewCache(logger, metrics, 100)
+			require.NoError(t, err)
+
+			callCount := atomic.NewInt32(0)
+			connectFn := countedConnectClientFn(callCount, mockConn, nil)
+
 			attemptCount := 50
-			conns := make(chan grpc.ClientConnInterface, attemptCount)
 			started := make(chan struct{})
 			for range attemptCount {
 				go func() {
 					<-started
-					conn, err := cache.GetConnection(clientAddress, clientTimeout, networkPubKey, connectFn)
+					conn, err := cache.GetConnection(clientAddress, cfg, networkPubKey, connectFn)
 					require.NoError(t, err)
-					conns <- conn
+					assert.Same(t, mockConn, conn)
 				}()
 			}
 			synctest.Wait() // wait until all goroutines are blocked on the started channel
 			close(started)
 
 			synctest.Wait() // wait until all goroutines have finished
-			close(conns)
-			for conn := range conns {
-				assert.Same(t, mockConn, conn)
-			}
 			assert.Equal(t, 1, cache.Len())
+			assert.Equal(t, int32(1), callCount.Load())
 		})
 	})
 
@@ -97,11 +89,10 @@ func TestGetConnection(t *testing.T) {
 		require.NoError(t, err)
 
 		expectedErr := errors.New("test error: conn failed to connect")
-
-		connectFn := assertConnectFn(t, clientAddress, clientTimeout, networkPubKey, nil, expectedErr)
+		connectFn := assertConnectFn(t, clientAddress, cfg, networkPubKey, nil, expectedErr)
 
 		// first call creates a new connection
-		conn, err := cache.GetConnection(clientAddress, clientTimeout, networkPubKey, connectFn)
+		conn, err := cache.GetConnection(clientAddress, cfg, networkPubKey, connectFn)
 		require.ErrorIs(t, err, expectedErr)
 		assert.Nil(t, conn)
 		assert.Equal(t, 0, cache.Len())
@@ -125,7 +116,7 @@ func TestGetConnection(t *testing.T) {
 
 		callCount := atomic.NewInt32(0)
 		finishConnection := make(chan struct{})
-		connectFn := func(string, time.Duration, crypto.PublicKey, *cachedClient) (grpcClientConn, error) {
+		connectFn := func(string, Config, crypto.PublicKey, *cachedClient) (grpcClientConn, error) {
 			if callCount.CompareAndSwap(0, 1) {
 				<-finishConnection
 				return nil, expectedErr
@@ -142,7 +133,7 @@ func TestGetConnection(t *testing.T) {
 			wg.Go(func() {
 				started <- struct{}{}
 				<-block
-				conn, err := cache.GetConnection(clientAddress, clientTimeout, networkPubKey, connectFn)
+				conn, err := cache.GetConnection(clientAddress, cfg, networkPubKey, connectFn)
 				require.ErrorIs(t, err, expectedErr)
 				require.Nil(t, conn)
 			})
@@ -173,21 +164,19 @@ func TestInvalidate(t *testing.T) {
 	logger := unittest.Logger()
 	metrics := metrics.NewNoopCollector()
 
-	clientAddress := "test-address"
-	clientTimeout := 10 * time.Second
-	networkPubKey := generateRandomPublicKey(t)
+	clientAddress, cfg, networkPubKey := clientConf(t)
 
 	// tests that Invalidate() removes the client from the cache and closes its connection.
 	t.Run("removes the client from the cache and closes the connection", func(t *testing.T) {
 		synctest.Test(t, func(t *testing.T) {
 			mockConn := newMockGrpcConn()
-			connectFn := assertConnectFn(t, clientAddress, clientTimeout, networkPubKey, mockConn, nil)
+			connectFn := assertConnectFn(t, clientAddress, cfg, networkPubKey, mockConn, nil)
 
 			cache, err := NewCache(logger, metrics, 100)
 			require.NoError(t, err)
 
 			// add the client to the cache
-			conn, err := cache.GetConnection(clientAddress, clientTimeout, networkPubKey, connectFn)
+			conn, err := cache.GetConnection(clientAddress, cfg, networkPubKey, connectFn)
 			require.NoError(t, err)
 			assert.Same(t, mockConn, conn)
 			assert.Equal(t, 1, cache.Len())
@@ -232,13 +221,13 @@ func TestInvalidate(t *testing.T) {
 	t.Run("concurrent calls behave as expected", func(t *testing.T) {
 		synctest.Test(t, func(t *testing.T) {
 			mockConn := newMockGrpcConn()
-			connectFn := assertConnectFn(t, clientAddress, clientTimeout, networkPubKey, mockConn, nil)
+			connectFn := assertConnectFn(t, clientAddress, cfg, networkPubKey, mockConn, nil)
 
 			cache, err := NewCache(logger, metrics, 100)
 			require.NoError(t, err)
 
 			// add the client to the cache
-			conn, err := cache.GetConnection(clientAddress, clientTimeout, networkPubKey, connectFn)
+			conn, err := cache.GetConnection(clientAddress, cfg, networkPubKey, connectFn)
 			require.NoError(t, err)
 			assert.Same(t, mockConn, conn)
 			assert.Equal(t, 1, cache.Len())
@@ -266,21 +255,20 @@ func TestEvict(t *testing.T) {
 
 	clientAddress1 := "test-address-1"
 	clientAddress2 := "test-address-2"
-	clientTimeout := 10 * time.Second
-	networkPubKey := generateRandomPublicKey(t)
+	_, cfg, networkPubKey := clientConf(t)
 
 	synctest.Test(t, func(t *testing.T) {
 		mockConn1 := newMockGrpcConn()
 		mockConn2 := newMockGrpcConn()
-		connectFn1 := assertConnectFn(t, clientAddress1, clientTimeout, networkPubKey, mockConn1, nil)
-		connectFn2 := assertConnectFn(t, clientAddress2, clientTimeout, networkPubKey, mockConn2, nil)
+		connectFn1 := assertConnectFn(t, clientAddress1, cfg, networkPubKey, mockConn1, nil)
+		connectFn2 := assertConnectFn(t, clientAddress2, cfg, networkPubKey, mockConn2, nil)
 
 		cache, err := NewCache(logger, metrics, 1)
 		require.NoError(t, err)
 		assert.Equal(t, 0, cache.Len())
 
 		// add the first client to the cache
-		conn1, err := cache.GetConnection(clientAddress1, clientTimeout, networkPubKey, connectFn1)
+		conn1, err := cache.GetConnection(clientAddress1, cfg, networkPubKey, connectFn1)
 		require.NoError(t, err)
 		assert.Same(t, mockConn1, conn1)
 		assert.Equal(t, 1, cache.Len())
@@ -291,7 +279,7 @@ func TestEvict(t *testing.T) {
 		require.Same(t, client1.conn, conn1)
 
 		// add the second client to the cache
-		conn2, err := cache.GetConnection(clientAddress2, clientTimeout, networkPubKey, connectFn2)
+		conn2, err := cache.GetConnection(clientAddress2, cfg, networkPubKey, connectFn2)
 		require.NoError(t, err)
 		assert.Same(t, mockConn2, conn2)
 		assert.Equal(t, 1, cache.Len())
@@ -318,14 +306,14 @@ func TestEvict(t *testing.T) {
 func assertConnectFn(
 	t *testing.T,
 	expectedAddress string,
-	expectedTimeout time.Duration,
+	expectedCfg Config,
 	expectedNetworkPubKey crypto.PublicKey,
 	rawConn grpcClientConn,
 	err error,
 ) ConnectClientFn {
-	return func(address string, timeout time.Duration, networkPubKey crypto.PublicKey, client *cachedClient) (grpcClientConn, error) {
+	return func(address string, cfg Config, networkPubKey crypto.PublicKey, client *cachedClient) (grpcClientConn, error) {
 		assert.Equal(t, expectedAddress, address)
-		assert.Equal(t, expectedTimeout, timeout)
+		assert.Equal(t, expectedCfg, cfg)
 		if expectedNetworkPubKey != nil {
 			assert.Same(t, expectedNetworkPubKey, networkPubKey)
 		} else {

@@ -84,11 +84,11 @@ func (c *Cache) onEvict(_ string, client *cachedClient) {
 // with an external node.
 func (c *Cache) GetConnection(
 	address string,
-	timeout time.Duration,
+	cfg Config,
 	networkPubKey crypto.PublicKey,
 	connectFn ConnectClientFn,
 ) (grpc.ClientConnInterface, error) {
-	client, added := c.getOrAdd(address, timeout)
+	client, added := c.getOrAdd(address, cfg.Timeout)
 
 	if added {
 		c.metrics.ConnectionAddedToPool()
@@ -96,7 +96,7 @@ func (c *Cache) GetConnection(
 		c.metrics.ConnectionFromPoolReused()
 	}
 
-	conn, err := client.clientConnection(connectFn, networkPubKey)
+	conn, err := client.clientConnection(cfg, networkPubKey, connectFn)
 	if err != nil {
 		_ = c.remove(address)
 		return nil, err
@@ -139,6 +139,7 @@ func (c *Cache) Invalidate(client *cachedClient) {
 	client.Close()
 }
 
+// remove removes the client entry from the cache.
 func (c *Cache) remove(address string) bool {
 	c.mu.Lock()
 	defer c.mu.Unlock()

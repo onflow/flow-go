@@ -17,7 +17,7 @@ var ErrClientMarkedForClosure = errors.New("client is marked for closure")
 // ConnectClientFn is callback function that creates a new gRPC client connection.
 type ConnectClientFn func(
 	address string,
-	timeout time.Duration,
+	cfg Config,
 	networkPubKey crypto.PublicKey,
 	client *cachedClient,
 ) (grpcClientConn, error)
@@ -167,8 +167,9 @@ func (cc *cachedClient) initiateClose() (grpcClientConn, bool) {
 // No assertions are made about the errors returned by connectFn since only the caller has sufficient
 // context to determine if they are exceptions or benign.
 func (cc *cachedClient) clientConnection(
-	connectFn ConnectClientFn,
+	cfg Config,
 	networkPubKey crypto.PublicKey,
+	connectFn ConnectClientFn,
 ) (grpc.ClientConnInterface, error) {
 	// during normal operation, the common case is that client connections are already setup and can
 	// be reused. use a read lock here to optimize for this case.
@@ -206,7 +207,7 @@ func (cc *cachedClient) clientConnection(
 	}
 
 	// otherwise, this is the first goroutine to create the connection.
-	conn, err := connectFn(cc.address, cc.timeout, networkPubKey, cc)
+	conn, err := connectFn(cc.address, cfg, networkPubKey, cc)
 	if err != nil {
 		cc.connectErr = err
 		return nil, err

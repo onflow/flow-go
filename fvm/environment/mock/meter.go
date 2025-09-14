@@ -163,6 +163,11 @@ func (_m *Meter) MeterMemory(usage common.MemoryUsage) error {
 	return r0
 }
 
+// RunWithMeteringDisabled provides a mock function with given fields: f
+func (_m *Meter) RunWithMeteringDisabled(f func()) {
+	_m.Called(f)
+}
+
 // TotalEmittedEventBytes provides a mock function with no fields
 func (_m *Meter) TotalEmittedEventBytes() uint64 {
 	ret := _m.Called()

@@ -22,7 +22,7 @@ func TestRun(t *testing.T) {
 	// test the happy path where the callback is executed successfully.
 	t.Run("callback is executed", func(t *testing.T) {
 		client := &cachedClient{
-			address: "test-address",
+			address: clientAddress,
 		}
 
 		cb := newSuccessCallbackMock()
@@ -35,7 +35,7 @@ func TestRun(t *testing.T) {
 	// test the case where the callback returns an error.
 	t.Run("callback returns error", func(t *testing.T) {
 		client := &cachedClient{
-			address: "test-address",
+			address: clientAddress,
 		}
 		expectedErr := errors.New("callback error")
 
@@ -49,7 +49,7 @@ func TestRun(t *testing.T) {
 	// test the case where the client is already marked for closure, and the callback is not executed.
 	t.Run("returns ErrClientMarkedForClosure when marked for closure", func(t *testing.T) {
 		client := &cachedClient{
-			address:        "test-address",
+			address:        clientAddress,
 			closeRequested: true,
 		}
 
@@ -63,7 +63,7 @@ func TestRun(t *testing.T) {
 	// test that concurrent calls to Run to not interfere with each other
 	t.Run("handles concurrent calls", func(t *testing.T) {
 		client := &cachedClient{
-			address: "test-address",
+			address: clientAddress,
 		}
 
 		var wg sync.WaitGroup
@@ -85,7 +85,7 @@ func TestClose(t *testing.T) {
 	t.Run("initiates shutdown", func(t *testing.T) {
 		mockConn := newMockGrpcConn()
 		client := &cachedClient{
-			address: "test-address",
+			address: clientAddress,
 			conn:    mockConn,
 		}
 
@@ -101,7 +101,7 @@ func TestClose(t *testing.T) {
 	t.Run("handles concurrent calls", func(t *testing.T) {
 		mockConn := newMockGrpcConn()
 		client := &cachedClient{
-			address: "test-address",
+			address: clientAddress,
 			conn:    mockConn,
 		}
 
@@ -135,7 +135,7 @@ func TestClose(t *testing.T) {
 		synctest.Test(t, func(t *testing.T) {
 			mockConn := newMockGrpcConn()
 			client := &cachedClient{
-				address: "test-address",
+				address: clientAddress,
 				conn:    mockConn,
 			}
 
@@ -180,31 +180,30 @@ func TestClose(t *testing.T) {
 }
 
 func TestClientConnection(t *testing.T) {
-	// Note: using a nil network key for most tests since we generally don't use one.
+	clientAddress, cfg, networkPubKey := clientConf(t)
 
 	// test that clientConnection calls connectFn on the first request, and returns the existing
 	// connection on subsequent requests.
 	t.Run("creates new connection once", func(t *testing.T) {
 		client := &cachedClient{
-			address: "test-address",
-			timeout: 10 * time.Second,
+			address: clientAddress,
+			timeout: cfg.Timeout,
 		}
 
 		rawConn := &grpc.ClientConn{}
-		var networkPubKey crypto.PublicKey
 
 		// first call creates the connection
-		conn, err := client.clientConnection(assertConnectClientFn(t, client, networkPubKey, rawConn, nil), networkPubKey)
+		conn, err := client.clientConnection(cfg, networkPubKey, assertConnectClientFn(t, client, cfg, networkPubKey, rawConn, nil))
 		assert.NoError(t, err)
 		assert.Same(t, rawConn, conn)
 		assert.Same(t, rawConn, client.conn)
 
 		// subsequent calls return the existing connection and do not call the connectFn
-		conn, err = client.clientConnection(neverConnectClientFn(t), networkPubKey)
+		conn, err = client.clientConnection(cfg, networkPubKey, neverConnectClientFn(t))
 		assert.NoError(t, err)
 		assert.Same(t, rawConn, conn)
 
-		conn, err = client.clientConnection(neverConnectClientFn(t), networkPubKey)
+		conn, err = client.clientConnection(cfg, networkPubKey, neverConnectClientFn(t))
 		assert.NoError(t, err)
 		assert.Same(t, rawConn, conn)
 	})
@@ -213,11 +212,11 @@ func TestClientConnection(t *testing.T) {
 	// marked for closure.
 	t.Run("returns ErrClientMarkedForClosure when client is marked for closure", func(t *testing.T) {
 		client := &cachedClient{
-			address:        "test-address",
+			address:        clientAddress,
 			closeRequested: true,
 		}
 
-		conn, err := client.clientConnection(neverConnectClientFn(t), nil)
+		conn, err := client.clientConnection(cfg, networkPubKey, neverConnectClientFn(t))
 		assert.ErrorIs(t, err, ErrClientMarkedForClosure)
 		assert.Nil(t, conn)
 	})
@@ -226,22 +225,22 @@ func TestClientConnection(t *testing.T) {
 	// error is returned on subsequent calls.
 	t.Run("returns error from first attempt", func(t *testing.T) {
 		client := &cachedClient{
-			address: "test-address",
-			timeout: 10 * time.Second,
+			address: clientAddress,
+			timeout: cfg.Timeout,
 		}
 
 		expectedErr := errors.New("connectFn error")
 
 		// first call fails to create the connection
-		conn, err := client.clientConnection(assertConnectClientFn(t, client, nil, nil, expectedErr), nil)
+		conn, err := client.clientConnection(cfg, networkPubKey, assertConnectClientFn(t, client, cfg, networkPubKey, nil, expectedErr))
 		assert.ErrorIs(t, err, expectedErr)
 		assert.Nil(t, conn)
 
 		// subsequent calls return the existing connection and do not call the connectFn
-		conn, err = client.clientConnection(neverConnectClientFn(t), nil)
+		conn, err = client.clientConnection(cfg, networkPubKey, neverConnectClientFn(t))
 		assert.ErrorIs(t, err, expectedErr)
 
-		conn, err = client.clientConnection(neverConnectClientFn(t), nil)
+		conn, err = client.clientConnection(cfg, networkPubKey, neverConnectClientFn(t))
 		assert.ErrorIs(t, err, expectedErr)
 	})
 
@@ -251,8 +250,8 @@ func TestClientConnection(t *testing.T) {
 		for range 1000 {
 			synctest.Test(t, func(t *testing.T) {
 				client := &cachedClient{
-					address: "test-address",
-					timeout: 10 * time.Second,
+					address: clientAddress,
+					timeout: cfg.Timeout,
 				}
 
 				callCount := atomic.NewInt32(0)
@@ -263,7 +262,7 @@ func TestClientConnection(t *testing.T) {
 
 				for range connectAttempts {
 					go func() {
-						conn, err := client.clientConnection(countedConnectClientFn(t, callCount, rawConn, nil), nil)
+						conn, err := client.clientConnection(cfg, networkPubKey, countedConnectClientFn(callCount, rawConn, nil))
 						assert.NoError(t, err)
 						conns <- conn
 					}()
@@ -287,6 +286,8 @@ func TestClientConnection(t *testing.T) {
 
 // TestClientActions tests various scenarios of concurrent calls to clientConnection, Run, and Close.
 func TestClientActions(t *testing.T) {
+	clientAddress, cfg, networkPubKey := clientConf(t)
+
 	// tests the happy path where the connection is created, the callback is executed, and the
 	// connection is closed in sequence.
 	t.Run("serialized connect-run-close", func(t *testing.T) {
@@ -294,10 +295,10 @@ func TestClientActions(t *testing.T) {
 			cb := newSuccessCallbackMock()
 			mockConn := newMockGrpcConn()
 			client := &cachedClient{
-				address: "test-address",
+				address: clientAddress,
 			}
 
-			_, err := client.clientConnection(assertConnectClientFn(t, client, nil, mockConn, nil), nil)
+			_, err := client.clientConnection(cfg, networkPubKey, assertConnectClientFn(t, client, cfg, networkPubKey, mockConn, nil))
 			require.NoError(t, err)
 
 			err = client.Run(cb.Execute)
@@ -318,11 +319,11 @@ func TestClientActions(t *testing.T) {
 	t.Run("close during connect", func(t *testing.T) {
 		mockConn := newMockGrpcConn()
 		client := &cachedClient{
-			address: "test-address",
+			address: clientAddress,
 		}
 
 		synctest.Test(t, func(t *testing.T) {
-			_, err := client.clientConnection(func(string, time.Duration, crypto.PublicKey, *cachedClient) (grpcClientConn, error) {
+			_, err := client.clientConnection(cfg, networkPubKey, func(string, Config, crypto.PublicKey, *cachedClient) (grpcClientConn, error) {
 				// run Close() within a goroutine since it requires the lock, otherwise this test
 				// will deadlock
 				started := make(chan struct{})
@@ -333,7 +334,7 @@ func TestClientActions(t *testing.T) {
 				<-started // wait until goroutine is running
 
 				return mockConn, nil
-			}, nil)
+			})
 			require.NoError(t, err)
 
 			// wait until gorountine started by Close() returns
@@ -346,7 +347,7 @@ func TestClientActions(t *testing.T) {
 	t.Run("close during run", func(t *testing.T) {
 		mockConn := newMockGrpcConn()
 		client := &cachedClient{
-			address: "test-address",
+			address: clientAddress,
 			conn:    mockConn,
 		}
 
@@ -380,7 +381,7 @@ func TestClientActions(t *testing.T) {
 	t.Run("concurrent close eventually closes", func(t *testing.T) {
 		mockConn := newMockGrpcConn()
 		client := &cachedClient{
-			address: "test-address",
+			address: clientAddress,
 		}
 
 		for range 1000 {
@@ -398,9 +399,9 @@ func TestClientActions(t *testing.T) {
 				functions := []func(){
 					func() {
 						<-started
-						_, err := client.clientConnection(func(string, time.Duration, crypto.PublicKey, *cachedClient) (grpcClientConn, error) {
+						_, err := client.clientConnection(cfg, networkPubKey, func(string, Config, crypto.PublicKey, *cachedClient) (grpcClientConn, error) {
 							return mockConn, nil
-						}, nil)
+						})
 						if err != nil {
 							require.ErrorIs(t, err, ErrClientMarkedForClosure)
 						}
@@ -508,10 +509,10 @@ func (m *mockGrpcConn) isClosed() bool {
 
 // assertConnectClientFn returns a ConnectClientFn that asserts the correct parameters are passed to
 // the connectFn.
-func assertConnectClientFn(t *testing.T, expectedClient *cachedClient, expectedNetworkPubKey crypto.PublicKey, rawConn grpcClientConn, err error) ConnectClientFn {
-	return func(address string, timeout time.Duration, networkPubKey crypto.PublicKey, client *cachedClient) (grpcClientConn, error) {
+func assertConnectClientFn(t *testing.T, expectedClient *cachedClient, expectedCfg Config, expectedNetworkPubKey crypto.PublicKey, rawConn grpcClientConn, err error) ConnectClientFn {
+	return func(address string, cfg Config, networkPubKey crypto.PublicKey, client *cachedClient) (grpcClientConn, error) {
 		assert.Equal(t, expectedClient.address, address)
-		assert.Equal(t, expectedClient.timeout, timeout)
+		assert.Equal(t, expectedCfg, cfg)
 		assert.Same(t, expectedClient, client)
 		if expectedNetworkPubKey != nil {
 			assert.Same(t, expectedNetworkPubKey, networkPubKey)
@@ -525,15 +526,15 @@ func assertConnectClientFn(t *testing.T, expectedClient *cachedClient, expectedN
 
 // neverConnectClientFn returns a ConnectClientFn that fails the test if connectFn is called.
 func neverConnectClientFn(t *testing.T) ConnectClientFn {
-	return func(string, time.Duration, crypto.PublicKey, *cachedClient) (grpcClientConn, error) {
+	return func(string, Config, crypto.PublicKey, *cachedClient) (grpcClientConn, error) {
 		t.Errorf("connectFn should never be called")
 		return nil, fmt.Errorf("should never be called")
 	}
 }
 
 // countedConnectClientFn returns a ConnectClientFn that increments the call counter when called.
-func countedConnectClientFn(t *testing.T, callCount *atomic.Int32, rawConn grpcClientConn, err error) ConnectClientFn {
-	return func(string, time.Duration, crypto.PublicKey, *cachedClient) (grpcClientConn, error) {
+func countedConnectClientFn(callCount *atomic.Int32, rawConn grpcClientConn, err error) ConnectClientFn {
+	return func(string, Config, crypto.PublicKey, *cachedClient) (grpcClientConn, error) {
 		callCount.Inc()
 		return rawConn, err
 	}

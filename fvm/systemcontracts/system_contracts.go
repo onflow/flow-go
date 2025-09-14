@@ -32,7 +32,7 @@ const (
 	ContractNameServiceAccount             = "FlowServiceAccount"
 	ContractNameFlowFees                   = "FlowFees"
 	ContractNameStorageFees                = "FlowStorageFees"
-	ContractNameFlowCallbackScheduler      = "FlowCallbackScheduler"
+	ContractNameFlowCallbackScheduler      = "FlowTransactionScheduler"
 	ContractNameNodeVersionBeacon          = "NodeVersionBeacon"
 	ContractNameRandomBeaconHistory        = "RandomBeaconHistory"
 	ContractNameFungibleToken              = "FungibleToken"
@@ -210,7 +210,7 @@ func (c SystemContracts) AsTemplateEnv() templates.Environment {
 
 		FlowFeesAddress:                   c.FlowFees.Address.Hex(),
 		FlowTokenAddress:                  c.FlowToken.Address.Hex(),
-		FlowCallbackSchedulerAddress:      c.FlowCallbackScheduler.Address.Hex(),
+		FlowTransactionSchedulerAddress:   c.FlowCallbackScheduler.Address.Hex(),
 		FungibleTokenAddress:              c.FungibleToken.Address.Hex(),
 		FungibleTokenSwitchboardAddress:   c.FungibleTokenSwitchboard.Address.Hex(),
 		FungibleTokenMetadataViewsAddress: c.FungibleTokenMetadataViews.Address.Hex(),
