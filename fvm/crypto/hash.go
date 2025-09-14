@@ -42,8 +42,22 @@ var hasherCreators = map[hash.HashingAlgorithm](func() hash.Hasher){
 	hash.Keccak_256: hash.NewKeccak_256,
 }
 
+// NewHashing returns a new hasher from the supported hash algorithms, witout any prefixing logic.
+// The output is equivalent to calling `NewPrefixedHashing` with an empty tag "".
+//
+// Supported algorithms are SHA2-256, SHA2-384, SHA3-256, SHA3-384 and Keccak256.
+func NewHashing(algo hash.HashingAlgorithm) (hash.Hasher, error) {
+	hasherCreator, hasCreator := hasherCreators[algo]
+	if !hasCreator {
+		return nil, errors.New("hashing algorithm is not supported")
+	}
+
+	return hasherCreator(), nil
+}
+
 // NewPrefixedHashing returns a new hasher that prefixes the tag for all
 // hash computations (only when tag is not empty).
+// If tag is empty "", output is a simple hasher without tagging logic.
 //
 // Supported algorithms are SHA2-256, SHA2-384, SHA3-256, SHA3-384 and Keccak256.
 func NewPrefixedHashing(algo hash.HashingAlgorithm, tag string) (hash.Hasher, error) {

@@ -136,7 +136,11 @@ func bootstrapVM(t *testing.T, chain flow.Chain) (*fvm.VirtualMachine, fvm.Conte
 		block1.ToHeader(),
 	).Return(block1.ToHeader(), nil)
 
-	opts := computation.DefaultFVMOptions(chain.ChainID(), false, false, false)
+	opts := computation.DefaultFVMOptions(
+		chain.ChainID(),
+		false,
+		false,
+	)
 	opts = append(opts,
 		fvm.WithTransactionFeesEnabled(true),
 		fvm.WithAccountStorageLimit(true),
@@ -206,17 +210,19 @@ func (t *testTransactionSender) Send(tx *sdk.Transaction) (sdk.TransactionResult
 		txBodyBuilder.AddArgument(arg)
 	}
 	for _, sig := range tx.PayloadSignatures {
-		txBodyBuilder.AddPayloadSignature(
+		txBodyBuilder.AddPayloadSignatureWithExtensionData(
 			flow.BytesToAddress(sig.Address.Bytes()),
 			sig.KeyIndex,
 			sig.Signature,
+			sig.ExtensionData,
 		)
 	}
 	for _, sig := range tx.EnvelopeSignatures {
-		txBodyBuilder.AddEnvelopeSignature(
+		txBodyBuilder.AddEnvelopeSignatureWithExtensionData(
 			flow.BytesToAddress(sig.Address.Bytes()),
 			sig.KeyIndex,
 			sig.Signature,
+			sig.ExtensionData,
 		)
 	}
 

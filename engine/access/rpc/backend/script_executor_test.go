@@ -20,6 +20,7 @@ import (
 	"github.com/onflow/flow-go/fvm/storage/derived"
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/execution"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
@@ -96,6 +97,7 @@ func (s *ScriptExecutorSuite) bootstrap() {
 // SetupTest sets up the test environment for each test in the suite.
 // This includes initializing various components and mock objects needed for the tests.
 func (s *ScriptExecutorSuite) SetupTest() {
+	lockManager := storage.NewTestingLockManager()
 	s.log = unittest.Logger()
 	s.chain = flow.Emulator.Chain()
 
@@ -129,7 +131,7 @@ func (s *ScriptExecutorSuite) SetupTest() {
 
 	indexerCore, err := indexer.New(
 		s.log,
-		metrics.NewNoopCollector(),
+		module.ExecutionStateIndexerMetrics(metrics.NewNoopCollector()),
 		nil,
 		s.registerIndex,
 		s.headers,
@@ -139,7 +141,8 @@ func (s *ScriptExecutorSuite) SetupTest() {
 		nil,
 		s.chain,
 		derivedChainData,
-		nil,
+		module.CollectionExecutedMetric(metrics.NewNoopCollector()),
+		lockManager,
 	)
 	s.Require().NoError(err)
 
