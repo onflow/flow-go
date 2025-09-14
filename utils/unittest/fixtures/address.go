@@ -47,18 +47,18 @@ func (f addressFactory) WithIndex(index uint64) AddressOption {
 type AddressGenerator struct {
 	addressFactory
 
-	randomGen *RandomGenerator
+	random *RandomGenerator
 
 	chainID flow.ChainID
 }
 
 func NewAddressGenerator(
-	randomGen *RandomGenerator,
+	random *RandomGenerator,
 	chainID flow.ChainID,
 ) *AddressGenerator {
 	return &AddressGenerator{
-		randomGen: randomGen,
-		chainID:   chainID,
+		random:  random,
+		chainID: chainID,
 	}
 }
 
@@ -67,7 +67,7 @@ func NewAddressGenerator(
 func (g *AddressGenerator) Fixture(opts ...AddressOption) flow.Address {
 	config := &addressConfig{
 		chainID: g.chainID,
-		index:   g.randomGen.Uint64InRange(1, maxIndex),
+		index:   g.random.Uint64InRange(1, maxIndex),
 	}
 
 	for _, opt := range opts {
@@ -88,7 +88,7 @@ func (g *AddressGenerator) List(n int, opts ...AddressOption) []flow.Address {
 	for i := range uint64(n) {
 		// set the index explicitly to guarantee we do not have duplicates
 		// wrapping at maxIndex to avoid errors if we go above maxIndex.
-		index := g.randomGen.Uint64InRange(i, i+1000) % maxIndex
+		index := g.random.Uint64InRange(i, i+1000) % maxIndex
 		opts = append(opts, Address.WithIndex(index))
 		addresses[i] = g.Fixture(opts...)
 	}

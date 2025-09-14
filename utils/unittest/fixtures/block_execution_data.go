@@ -30,16 +30,16 @@ func (f blockExecutionDataFactory) WithChunkExecutionDatas(chunks ...*execution_
 type BlockExecutionDataGenerator struct {
 	blockExecutionDataFactory
 
-	identifierGen         *IdentifierGenerator
+	identifiers           *IdentifierGenerator
 	chunkExecutionDataGen *ChunkExecutionDataGenerator
 }
 
 func NewBlockExecutionDataGenerator(
-	identifierGen *IdentifierGenerator,
+	identifiers *IdentifierGenerator,
 	chunkExecutionDataGen *ChunkExecutionDataGenerator,
 ) *BlockExecutionDataGenerator {
 	return &BlockExecutionDataGenerator{
-		identifierGen:         identifierGen,
+		identifiers:           identifiers,
 		chunkExecutionDataGen: chunkExecutionDataGen,
 	}
 }
@@ -47,7 +47,7 @@ func NewBlockExecutionDataGenerator(
 // Fixture generates a [execution_data.BlockExecutionData] with random data based on the provided options.
 func (g *BlockExecutionDataGenerator) Fixture(opts ...BlockExecutionDataOption) *execution_data.BlockExecutionData {
 	blockExecutionData := &execution_data.BlockExecutionData{
-		BlockID:             g.identifierGen.Fixture(),
+		BlockID:             g.identifiers.Fixture(),
 		ChunkExecutionDatas: []*execution_data.ChunkExecutionData{},
 	}
 
@@ -83,7 +83,7 @@ func NewBlockExecutionDataEntityGenerator(
 // Fixture generates a [execution_data.BlockExecutionDataEntity] with random data based on the provided options.
 func (g *BlockExecutionDataEntityGenerator) Fixture(opts ...BlockExecutionDataOption) *execution_data.BlockExecutionDataEntity {
 	execData := g.BlockExecutionDataGenerator.Fixture(opts...)
-	return execution_data.NewBlockExecutionDataEntity(g.identifierGen.Fixture(), execData)
+	return execution_data.NewBlockExecutionDataEntity(g.identifiers.Fixture(), execData)
 }
 
 // List generates a list of [execution_data.BlockExecutionDataEntity].

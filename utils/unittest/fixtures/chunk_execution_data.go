@@ -56,34 +56,34 @@ func (f chunkExecutionDataFactory) WithMinSize(minSize int) ChunkExecutionDataOp
 type ChunkExecutionDataGenerator struct {
 	chunkExecutionDataFactory
 
-	randomGen                 *RandomGenerator
-	collectionGen             *CollectionGenerator
+	random                    *RandomGenerator
+	collections               *CollectionGenerator
 	lightTransactionResultGen *LightTransactionResultGenerator
-	eventGen                  *EventGenerator
-	trieUpdateGen             *TrieUpdateGenerator
+	events                    *EventGenerator
+	trieUpdates               *TrieUpdateGenerator
 }
 
 func NewChunkExecutionDataGenerator(
-	randomGen *RandomGenerator,
-	collectionGen *CollectionGenerator,
+	random *RandomGenerator,
+	collections *CollectionGenerator,
 	lightTransactionResultGen *LightTransactionResultGenerator,
-	eventGen *EventGenerator,
-	trieUpdateGen *TrieUpdateGenerator,
+	events *EventGenerator,
+	trieUpdates *TrieUpdateGenerator,
 ) *ChunkExecutionDataGenerator {
 	return &ChunkExecutionDataGenerator{
-		randomGen:                 randomGen,
-		collectionGen:             collectionGen,
+		random:                    random,
+		collections:               collections,
 		lightTransactionResultGen: lightTransactionResultGen,
-		eventGen:                  eventGen,
-		trieUpdateGen:             trieUpdateGen,
+		events:                    events,
+		trieUpdates:               trieUpdates,
 	}
 }
 
 // Fixture generates a [execution_data.ChunkExecutionData] with random data based on the provided options.
 func (g *ChunkExecutionDataGenerator) Fixture(opts ...ChunkExecutionDataOption) *execution_data.ChunkExecutionData {
 	ced := &execution_data.ChunkExecutionData{
-		Collection: g.collectionGen.Fixture(Collection.WithTxCount(5)),
-		TrieUpdate: g.trieUpdateGen.Fixture(),
+		Collection: g.collections.Fixture(Collection.WithTxCount(5)),
+		TrieUpdate: g.trieUpdates.Fixture(),
 	}
 
 	for _, opt := range opts {
@@ -99,7 +99,7 @@ func (g *ChunkExecutionDataGenerator) Fixture(opts ...ChunkExecutionDataOption) 
 
 	if len(ced.Events) == 0 {
 		for txIndex, result := range ced.TransactionResults {
-			events := g.eventGen.List(5,
+			events := g.events.List(5,
 				Event.WithTransactionID(result.TransactionID),
 				Event.WithTransactionIndex(uint32(txIndex)),
 			)
@@ -136,7 +136,7 @@ func (g *ChunkExecutionDataGenerator) ensureMinSize(ced *execution_data.ChunkExe
 		k, err := ced.TrieUpdate.Payloads[0].Key()
 		NoError(err)
 
-		v := g.randomGen.RandomBytes(size)
+		v := g.random.RandomBytes(size)
 
 		ced.TrieUpdate.Payloads[0] = ledger.NewPayload(k, v)
 		size *= 2

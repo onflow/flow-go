@@ -75,23 +75,23 @@ func (f eventFactory) WithEncoding(encoding entities.EventEncodingVersion) Event
 type EventGenerator struct {
 	eventFactory
 
-	randomGen     *RandomGenerator
-	identifierGen *IdentifierGenerator
-	eventTypeGen  *EventTypeGenerator
-	addressGen    *AddressGenerator
+	random      *RandomGenerator
+	identifiers *IdentifierGenerator
+	eventTypes  *EventTypeGenerator
+	addresses   *AddressGenerator
 }
 
 func NewEventGenerator(
-	randomGen *RandomGenerator,
-	identifierGen *IdentifierGenerator,
-	eventTypeGen *EventTypeGenerator,
-	addressGen *AddressGenerator,
+	random *RandomGenerator,
+	identifiers *IdentifierGenerator,
+	eventTypes *EventTypeGenerator,
+	addresses *AddressGenerator,
 ) *EventGenerator {
 	return &EventGenerator{
-		randomGen:     randomGen,
-		identifierGen: identifierGen,
-		eventTypeGen:  eventTypeGen,
-		addressGen:    addressGen,
+		random:      random,
+		identifiers: identifiers,
+		eventTypes:  eventTypes,
+		addresses:   addresses,
 	}
 }
 
@@ -99,8 +99,8 @@ func NewEventGenerator(
 func (g *EventGenerator) Fixture(opts ...EventOption) flow.Event {
 	config := &eventConfig{
 		event: flow.Event{
-			Type:             g.eventTypeGen.Fixture(),
-			TransactionID:    g.identifierGen.Fixture(),
+			Type:             g.eventTypes.Fixture(),
+			TransactionID:    g.identifiers.Fixture(),
 			TransactionIndex: 0,
 			EventIndex:       0,
 			Payload:          nil, // Will be generated based on encoding
@@ -178,7 +178,7 @@ func (g *EventGenerator) generateEncodedPayload(eventType flow.EventType, encodi
 
 	default:
 		// Fallback to random bytes for unknown encoding
-		return g.randomGen.RandomBytes(10)
+		return g.random.RandomBytes(10)
 	}
 }
 
@@ -217,7 +217,7 @@ func (g *EventGenerator) generateCadenceEvent(eventType flow.EventType) cadence.
 
 // generateGenericEventData generates generic event data for a cadence event.
 func (g *EventGenerator) generateGenericEventData() (fields []cadence.Field, values []cadence.Value) {
-	testString, err := cadence.NewString(g.randomGen.RandomString(10))
+	testString, err := cadence.NewString(g.random.RandomString(10))
 	NoError(err)
 
 	fields = []cadence.Field{
@@ -231,7 +231,7 @@ func (g *EventGenerator) generateGenericEventData() (fields []cadence.Field, val
 		},
 	}
 	values = []cadence.Value{
-		cadence.NewInt(g.randomGen.IntInRange(1, 100)),
+		cadence.NewInt(g.random.IntInRange(1, 100)),
 		testString,
 	}
 
@@ -242,7 +242,7 @@ func (g *EventGenerator) generateGenericEventData() (fields []cadence.Field, val
 func (g *EventGenerator) generateProtocolEventData(eventName string) ([]cadence.Field, []cadence.Value) {
 	switch eventName {
 	case "AccountCreated":
-		address, err := common.BytesToAddress(g.addressGen.Fixture().Bytes())
+		address, err := common.BytesToAddress(g.addresses.Fixture().Bytes())
 		NoError(err)
 
 		fields := []cadence.Field{
@@ -258,13 +258,13 @@ func (g *EventGenerator) generateProtocolEventData(eventName string) ([]cadence.
 		return fields, values
 
 	case "AccountContractAdded":
-		address, err := common.BytesToAddress(g.addressGen.Fixture().Bytes())
+		address, err := common.BytesToAddress(g.addresses.Fixture().Bytes())
 		NoError(err)
 
 		contractName, err := cadence.NewString("EventContract")
 		NoError(err)
 
-		codeHash := unittest.BytesToCdcUInt8(g.randomGen.RandomBytes(32))
+		codeHash := unittest.BytesToCdcUInt8(g.random.RandomBytes(32))
 
 		fields := []cadence.Field{
 			{

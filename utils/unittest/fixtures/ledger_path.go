@@ -20,14 +20,14 @@ type ledgerPathConfig struct {
 type LedgerPathGenerator struct {
 	ledgerPathFactory
 
-	randomGen *RandomGenerator
+	random *RandomGenerator
 }
 
 func NewLedgerPathGenerator(
-	randomGen *RandomGenerator,
+	random *RandomGenerator,
 ) *LedgerPathGenerator {
 	return &LedgerPathGenerator{
-		randomGen: randomGen,
+		random: random,
 	}
 }
 
@@ -40,7 +40,7 @@ func (g *LedgerPathGenerator) Fixture(opts ...LedgerPathOption) ledger.Path {
 	}
 
 	var path ledger.Path
-	pathData := g.randomGen.RandomBytes(ledger.PathLen)
+	pathData := g.random.RandomBytes(ledger.PathLen)
 	copy(path[:], pathData)
 	return path
 }

@@ -59,43 +59,52 @@ func (g *RandomGenerator) Uintn(n uint) uint {
 }
 
 // Uint64InRange generates a random uint64 in the inclusive range [min, max].
-// Min and max MUST not be equal or the method will panic.
+// `max` must be strictly greater than `min` or the method will panic.
 func (g *RandomGenerator) Uint64InRange(min, max uint64) uint64 {
 	return InclusiveRange(g, min, max)
 }
 
 // Uint32InRange generates a random uint32 in the inclusive range [min, max].
-// Min and max MUST not be equal or the method will panic.
+// `max` must be strictly greater than `min` or the method will panic.
 func (g *RandomGenerator) Uint32InRange(min, max uint32) uint32 {
 	return InclusiveRange(g, min, max)
 }
 
 // UintInRange generates a random uint in the inclusive range [min, max].
-// Min and max MUST not be equal or the method will panic.
+// `max` must be strictly greater than `min` or the method will panic.
 func (g *RandomGenerator) UintInRange(min, max uint) uint {
 	return InclusiveRange(g, min, max)
 }
 
 // Int64InRange generates a random int64 in the inclusive range [min, max].
-// Min and max MUST be positive numbers. This method uses Intn, which panics for n <= 0.
+// Min and max MUST be positive numbers and `max` must be strictly greater than `min` or the method
+// will panic.
 func (g *RandomGenerator) Int64InRange(min, max int64) int64 {
 	return InclusiveRange(g, min, max)
 }
 
 // Int32InRange generates a random int32 in the inclusive range [min, max].
-// Min and max MUST be positive numbers. This method uses Intn, which panics for n <= 0.
+// Min and max MUST be positive numbers and `max` must be strictly greater than `min` or the method
+// will panic.
 func (g *RandomGenerator) Int32InRange(min, max int32) int32 {
 	return InclusiveRange(g, min, max)
 }
 
 // IntInRange generates a random int in the inclusive range [min, max].
-// Min and max MUST be positive numbers. This method uses Intn, which panics for n <= 0.
+// Min and max MUST be positive numbers and `max` must be strictly greater than `min` or the method
+// will panic.
 func (g *RandomGenerator) IntInRange(min, max int) int {
 	return InclusiveRange(g, min, max)
 }
 
+// Bool generates a random bool.
+func (g *RandomGenerator) Bool() bool {
+	return g.Intn(2) == 0
+}
+
 // InclusiveRange generates a random number of type T in the inclusive range [min, max].
-// Min and max MUST be positive numbers. This method uses Intn, which panics for n <= 0.
+// Min and max MUST be positive numbers and `max` must be strictly greater than `min` or the method
+// will panic.
 func InclusiveRange[T ~uint64 | ~uint32 | ~uint | ~int64 | ~int32 | ~int](g *RandomGenerator, min, max T) T {
 	return min + T(g.Intn(int(max)+1-int(min)))
 }

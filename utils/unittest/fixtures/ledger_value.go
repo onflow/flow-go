@@ -29,14 +29,14 @@ func (f ledgerValueFactory) WithSize(minSize, maxSize int) LedgerValueOption {
 type LedgerValueGenerator struct {
 	ledgerValueFactory
 
-	randomGen *RandomGenerator
+	random *RandomGenerator
 }
 
 func NewLedgerValueGenerator(
-	randomGen *RandomGenerator,
+	random *RandomGenerator,
 ) *LedgerValueGenerator {
 	return &LedgerValueGenerator{
-		randomGen: randomGen,
+		random: random,
 	}
 }
 
@@ -69,7 +69,7 @@ func (g *LedgerValueGenerator) List(n int, opts ...LedgerValueOption) []ledger.V
 func (g *LedgerValueGenerator) generateValue(minByteSize, maxByteSize int) ledger.Value {
 	byteSize := maxByteSize
 	if minByteSize < maxByteSize {
-		byteSize = g.randomGen.IntInRange(minByteSize, maxByteSize)
+		byteSize = g.random.IntInRange(minByteSize, maxByteSize)
 	}
-	return g.randomGen.RandomBytes(byteSize)
+	return g.random.RandomBytes(byteSize)
 }

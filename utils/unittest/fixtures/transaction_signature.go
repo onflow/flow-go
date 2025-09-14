@@ -45,24 +45,24 @@ func (f transactionSignatureFactory) WithKeyIndex(keyIndex uint32) TransactionSi
 type TransactionSignatureGenerator struct {
 	transactionSignatureFactory
 
-	randomGen  *RandomGenerator
-	addressGen *AddressGenerator
+	random    *RandomGenerator
+	addresses *AddressGenerator
 }
 
 func NewTransactionSignatureGenerator(
-	randomGen *RandomGenerator,
-	addressGen *AddressGenerator,
+	random *RandomGenerator,
+	addresses *AddressGenerator,
 ) *TransactionSignatureGenerator {
 	return &TransactionSignatureGenerator{
-		randomGen:  randomGen,
-		addressGen: addressGen,
+		random:    random,
+		addresses: addresses,
 	}
 }
 
 // Fixture generates a [flow.TransactionSignature] with random data based on the provided options.
 func (g *TransactionSignatureGenerator) Fixture(opts ...TransactionSignatureOption) flow.TransactionSignature {
 	signature := flow.TransactionSignature{
-		Address:     g.addressGen.Fixture(),
+		Address:     g.addresses.Fixture(),
 		SignerIndex: 0,
 		Signature:   g.generateValidSignature(),
 		KeyIndex:    1,
@@ -87,7 +87,7 @@ func (g *TransactionSignatureGenerator) List(n int, opts ...TransactionSignature
 // generateValidSignature generates a valid ECDSA signature for the given transaction.
 func (g *TransactionSignatureGenerator) generateValidSignature() crypto.Signature {
 	sigLen := crypto.SignatureLenECDSAP256
-	signature := g.randomGen.RandomBytes(sigLen)
+	signature := g.random.RandomBytes(sigLen)
 
 	// Make sure the ECDSA signature passes the format check
 	signature[sigLen/2] = 0

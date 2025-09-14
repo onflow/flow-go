@@ -61,32 +61,32 @@ func (f quorumCertificateFactory) WithRandomnessSource(source []byte) QuorumCert
 type QuorumCertificateGenerator struct {
 	quorumCertificateFactory
 
-	randomGen        *RandomGenerator
-	identifierGen    *IdentifierGenerator
-	signerIndicesGen *SignerIndicesGenerator
-	signatureGen     *SignatureGenerator
+	random        *RandomGenerator
+	identifiers   *IdentifierGenerator
+	signerIndices *SignerIndicesGenerator
+	signatures    *SignatureGenerator
 }
 
 func NewQuorumCertificateGenerator(
-	randomGen *RandomGenerator,
-	identifierGen *IdentifierGenerator,
-	signerIndicesGen *SignerIndicesGenerator,
-	signatureGen *SignatureGenerator,
+	random *RandomGenerator,
+	identifiers *IdentifierGenerator,
+	signerIndices *SignerIndicesGenerator,
+	signatures *SignatureGenerator,
 ) *QuorumCertificateGenerator {
 	return &QuorumCertificateGenerator{
-		randomGen:        randomGen,
-		identifierGen:    identifierGen,
-		signerIndicesGen: signerIndicesGen,
-		signatureGen:     signatureGen,
+		random:        random,
+		identifiers:   identifiers,
+		signerIndices: signerIndices,
+		signatures:    signatures,
 	}
 }
 
 // Fixture generates a [flow.QuorumCertificate] with random data based on the provided options.
 func (g *QuorumCertificateGenerator) Fixture(opts ...QuorumCertificateOption) *flow.QuorumCertificate {
 	qc := &flow.QuorumCertificate{
-		View:          uint64(g.randomGen.Uint32()),
-		BlockID:       g.identifierGen.Fixture(),
-		SignerIndices: g.signerIndicesGen.Fixture(SignerIndices.WithSignerCount(10, 3)),
+		View:          uint64(g.random.Uint32()),
+		BlockID:       g.identifiers.Fixture(),
+		SignerIndices: g.signerIndices.Fixture(SignerIndices.WithSignerCount(10, 3)),
 		SigData:       g.QCSigDataWithSoR(nil),
 	}
 
@@ -118,18 +118,101 @@ func (g *QuorumCertificateGenerator) QCSigDataWithSoR(source []byte) []byte {
 
 // qcRawSignatureData generates a raw signature data for a [flow.QuorumCertificate].
 func (g *QuorumCertificateGenerator) qcRawSignatureData(source []byte) hotstuff.SignatureData {
-	sigType := g.randomGen.RandomBytes(5)
+	sigType := g.random.RandomBytes(5)
 	for i := range sigType {
 		sigType[i] = sigType[i] % 2
 	}
 	sigData := hotstuff.SignatureData{
 		SigType:                      sigType,
-		AggregatedStakingSig:         g.signatureGen.Fixture(),
-		AggregatedRandomBeaconSig:    g.signatureGen.Fixture(),
+		AggregatedStakingSig:         g.signatures.Fixture(),
+		AggregatedRandomBeaconSig:    g.signatures.Fixture(),
 		ReconstructedRandomBeaconSig: source,
 	}
 	if len(sigData.ReconstructedRandomBeaconSig) == 0 {
-		sigData.ReconstructedRandomBeaconSig = g.signatureGen.Fixture()
+		sigData.ReconstructedRandomBeaconSig = g.signatures.Fixture()
 	}
 	return sigData
+}
+
+// QuorumCertificateWithSignerIDs is the default options factory for
+// [flow.QuorumCertificateWithSignerIDs] generation.
+var QuorumCertificateWithSignerIDs quorumCertificateWithSignerIDsFactory
+
+type quorumCertificateWithSignerIDsFactory struct{}
+
+type QuorumCertificateWithSignerIDsOption func(*QuorumCertificateWithSignerIDsGenerator, *flow.QuorumCertificateWithSignerIDs)
+
+// WithView is an option that sets the `View` of the quorum certificate with signer IDs.
+func (f quorumCertificateWithSignerIDsFactory) WithView(view uint64) QuorumCertificateWithSignerIDsOption {
+	return func(g *QuorumCertificateWithSignerIDsGenerator, qc *flow.QuorumCertificateWithSignerIDs) {
+		qc.View = view
+	}
+}
+
+// WithSignerIDs is an option that sets the `SignerIDs` of the quorum certificate with signer IDs.
+func (f quorumCertificateWithSignerIDsFactory) WithSignerIDs(signerIDs flow.IdentifierList) QuorumCertificateWithSignerIDsOption {
+	return func(g *QuorumCertificateWithSignerIDsGenerator, qc *flow.QuorumCertificateWithSignerIDs) {
+		qc.SignerIDs = signerIDs
+	}
+}
+
+// WithBlockID is an option that sets the `BlockID` of the quorum certificate with signer IDs.
+func (f quorumCertificateWithSignerIDsFactory) WithBlockID(blockID flow.Identifier) QuorumCertificateWithSignerIDsOption {
+	return func(g *QuorumCertificateWithSignerIDsGenerator, qc *flow.QuorumCertificateWithSignerIDs) {
+		qc.BlockID = blockID
+	}
+}
+
+// WithSigData is an option that sets the `SigData` of the quorum certificate with signer IDs.
+func (f quorumCertificateWithSignerIDsFactory) WithSigData(sigData []byte) QuorumCertificateWithSignerIDsOption {
+	return func(g *QuorumCertificateWithSignerIDsGenerator, qc *flow.QuorumCertificateWithSignerIDs) {
+		qc.SigData = sigData
+	}
+}
+
+// QuorumCertificateWithSignerIDsGenerator generates [flow.QuorumCertificateWithSignerIDs] with
+// consistent randomness.
+type QuorumCertificateWithSignerIDsGenerator struct {
+	quorumCertificateWithSignerIDsFactory
+
+	random      *RandomGenerator
+	identifiers *IdentifierGenerator
+	qcGen       *QuorumCertificateGenerator
+}
+
+func NewQuorumCertificateWithSignerIDsGenerator(
+	random *RandomGenerator,
+	identifiers *IdentifierGenerator,
+	qcGen *QuorumCertificateGenerator,
+) *QuorumCertificateWithSignerIDsGenerator {
+	return &QuorumCertificateWithSignerIDsGenerator{
+		random:      random,
+		identifiers: identifiers,
+		qcGen:       qcGen,
+	}
+}
+
+// Fixture generates a [flow.QuorumCertificateWithSignerIDs] with random data based on the provided options.
+func (g *QuorumCertificateWithSignerIDsGenerator) Fixture(opts ...QuorumCertificateWithSignerIDsOption) *flow.QuorumCertificateWithSignerIDs {
+	qc := &flow.QuorumCertificateWithSignerIDs{
+		View:      uint64(g.random.Uint32()),
+		BlockID:   g.identifiers.Fixture(),
+		SignerIDs: g.identifiers.List(10),
+		SigData:   g.qcGen.QCSigDataWithSoR(nil),
+	}
+
+	for _, opt := range opts {
+		opt(g, qc)
+	}
+
+	return qc
+}
+
+// List generates a list of [flow.QuorumCertificateWithSignerIDs].
+func (g *QuorumCertificateWithSignerIDsGenerator) List(n int, opts ...QuorumCertificateWithSignerIDsOption) []*flow.QuorumCertificateWithSignerIDs {
+	list := make([]*flow.QuorumCertificateWithSignerIDs, n)
+	for i := range n {
+		list[i] = g.Fixture(opts...)
+	}
+	return list
 }

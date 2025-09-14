@@ -10,6 +10,7 @@ import (
 	"github.com/onflow/crypto"
 	"github.com/onflow/flow/protobuf/go/flow/entities"
 
+	"github.com/onflow/flow-go/ledger/common/hash"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -19,8 +20,8 @@ func TestGeneratorSuiteRandomSeed(t *testing.T) {
 	suite2 := NewGeneratorSuite()
 
 	// generated values should be different
-	header := suite1.BlockHeaders().Fixture()
-	header2 := suite2.BlockHeaders().Fixture()
+	header := suite1.Headers().Fixture()
+	header2 := suite2.Headers().Fixture()
 	assert.NotEqual(t, header, header2)
 }
 
@@ -36,40 +37,40 @@ func TestGeneratorsDeterminism(t *testing.T) {
 		{
 			name: "BlockHeaders",
 			fixture: func(a, b *GeneratorSuite) (any, any) {
-				return a.BlockHeaders().Fixture(), b.BlockHeaders().Fixture()
+				return a.Headers().Fixture(), b.Headers().Fixture()
 			},
 			list: func(a, b *GeneratorSuite, n int) (any, any) {
-				return a.BlockHeaders().List(n), b.BlockHeaders().List(n)
+				return a.Headers().List(n), b.Headers().List(n)
 			},
 			sanity: func(t *testing.T, suite *GeneratorSuite) {
 				// Test basic block header generation
-				header1 := suite.BlockHeaders().Fixture()
+				header1 := suite.Headers().Fixture()
 				require.NotNil(t, header1)
 				assert.Equal(t, flow.Emulator, header1.ChainID)
 				assert.Greater(t, header1.Height, uint64(0))
 				assert.Greater(t, header1.View, uint64(0))
 
 				// Test with specific height
-				header2 := suite.BlockHeaders().Fixture(Header.WithHeight(100))
+				header2 := suite.Headers().Fixture(Header.WithHeight(100))
 				assert.Equal(t, uint64(100), header2.Height)
 
 				// Test with parent details
-				parent := suite.BlockHeaders().Fixture()
-				child1 := suite.BlockHeaders().Fixture(Header.WithParent(parent.ID(), parent.View, parent.Height))
+				parent := suite.Headers().Fixture()
+				child1 := suite.Headers().Fixture(Header.WithParent(parent.ID(), parent.View, parent.Height))
 				assert.Equal(t, parent.Height+1, child1.Height)
 				assert.Equal(t, parent.ID(), child1.ParentID)
 				assert.Equal(t, parent.ChainID, child1.ChainID)
 				assert.Less(t, parent.View, child1.View)
 
 				// Test with parent header
-				child2 := suite.BlockHeaders().Fixture(Header.WithParentHeader(parent))
+				child2 := suite.Headers().Fixture(Header.WithParentHeader(parent))
 				assert.Equal(t, parent.Height+1, child2.Height)
 				assert.Equal(t, parent.ID(), child2.ParentID)
 				assert.Equal(t, parent.ChainID, child2.ChainID)
 				assert.Less(t, parent.View, child2.View)
 
 				// Test on specific chain
-				header3 := suite.BlockHeaders().Fixture(Header.WithChainID(flow.Testnet))
+				header3 := suite.Headers().Fixture(Header.WithChainID(flow.Testnet))
 				assert.Equal(t, flow.Testnet, header3.ChainID)
 			},
 		},
@@ -394,6 +395,267 @@ func TestGeneratorsDeterminism(t *testing.T) {
 			sanity: func(t *testing.T, suite *GeneratorSuite) {
 				lv := suite.LedgerValues().Fixture()
 				assert.NotEmpty(t, lv)
+			},
+		},
+		{
+			name: "Identities",
+			fixture: func(a, b *GeneratorSuite) (any, any) {
+				return a.Identities().Fixture(), b.Identities().Fixture()
+			},
+			list: func(a, b *GeneratorSuite, n int) (any, any) {
+				return a.Identities().List(n), b.Identities().List(n)
+			},
+			sanity: func(t *testing.T, suite *GeneratorSuite) {
+				identity := suite.Identities().Fixture()
+				assert.NotEmpty(t, identity.NodeID)
+				assert.NotEmpty(t, identity.Address)
+				assert.NotNil(t, identity.StakingPubKey)
+				assert.NotNil(t, identity.NetworkPubKey)
+
+				// Test with specific role
+				consensus := suite.Identities().Fixture(Identity.WithRole(flow.RoleConsensus))
+				assert.Equal(t, flow.RoleConsensus, consensus.Role)
+
+				// Test with all roles
+				identities := suite.Identities().List(10, Identity.WithAllRoles())
+				rolesSeen := make(map[flow.Role]bool)
+				for _, id := range identities {
+					rolesSeen[id.Role] = true
+				}
+				assert.Equal(t, len(rolesSeen), len(flow.Roles())) // Should see multiple roles
+			},
+		},
+		{
+			name: "StateCommitments",
+			fixture: func(a, b *GeneratorSuite) (any, any) {
+				return a.StateCommitments().Fixture(), b.StateCommitments().Fixture()
+			},
+			list: func(a, b *GeneratorSuite, n int) (any, any) {
+				return a.StateCommitments().List(n), b.StateCommitments().List(n)
+			},
+			sanity: func(t *testing.T, suite *GeneratorSuite) {
+				sc := suite.StateCommitments().Fixture()
+				assert.Len(t, sc, 32)
+				assert.NotEqual(t, flow.DummyStateCommitment, sc)
+
+				// Test empty state
+				empty := suite.StateCommitments().Fixture(StateCommitment.WithEmptyState())
+				assert.Equal(t, flow.EmptyStateCommitment, empty)
+
+				// Test special state
+				hash, err := hash.ToHash(suite.Random().RandomBytes(32))
+				require.NoError(t, err)
+				actual := suite.StateCommitments().Fixture(StateCommitment.WithHash(hash))
+				assert.Equal(t, flow.StateCommitment(hash), actual)
+			},
+		},
+		{
+			name: "AggregatedSignatures",
+			fixture: func(a, b *GeneratorSuite) (any, any) {
+				return a.AggregatedSignatures().Fixture(), b.AggregatedSignatures().Fixture()
+			},
+			list: func(a, b *GeneratorSuite, n int) (any, any) {
+				return a.AggregatedSignatures().List(n), b.AggregatedSignatures().List(n)
+			},
+			sanity: func(t *testing.T, suite *GeneratorSuite) {
+				as := suite.AggregatedSignatures().Fixture()
+				assert.NotEmpty(t, as.VerifierSignatures)
+				assert.NotEmpty(t, as.SignerIDs)
+			},
+		},
+		{
+			name: "TimeoutCertificates",
+			fixture: func(a, b *GeneratorSuite) (any, any) {
+				return a.TimeoutCertificates().Fixture(), b.TimeoutCertificates().Fixture()
+			},
+			list: func(a, b *GeneratorSuite, n int) (any, any) {
+				return a.TimeoutCertificates().List(n), b.TimeoutCertificates().List(n)
+			},
+			sanity: func(t *testing.T, suite *GeneratorSuite) {
+				tc := suite.TimeoutCertificates().Fixture()
+				assert.Greater(t, tc.View, uint64(0))
+				assert.NotEmpty(t, tc.NewestQCViews)
+				assert.NotEmpty(t, tc.SignerIndices)
+			},
+		},
+		{
+			name: "ExecutionResults",
+			fixture: func(a, b *GeneratorSuite) (any, any) {
+				return a.ExecutionResults().Fixture(), b.ExecutionResults().Fixture()
+			},
+			list: func(a, b *GeneratorSuite, n int) (any, any) {
+				return a.ExecutionResults().List(n), b.ExecutionResults().List(n)
+			},
+			sanity: func(t *testing.T, suite *GeneratorSuite) {
+				er := suite.ExecutionResults().Fixture()
+				assert.NotEmpty(t, er.PreviousResultID)
+				assert.NotEmpty(t, er.BlockID)
+				assert.NotEmpty(t, er.Chunks)
+			},
+		},
+		{
+			name: "ExecutionReceipts",
+			fixture: func(a, b *GeneratorSuite) (any, any) {
+				return a.ExecutionReceipts().Fixture(), b.ExecutionReceipts().Fixture()
+			},
+			list: func(a, b *GeneratorSuite, n int) (any, any) {
+				return a.ExecutionReceipts().List(n), b.ExecutionReceipts().List(n)
+			},
+			sanity: func(t *testing.T, suite *GeneratorSuite) {
+				er := suite.ExecutionReceipts().Fixture()
+				assert.NotEmpty(t, er.ExecutorID)
+				assert.NotNil(t, er.ExecutionResult)
+				assert.NotEmpty(t, er.Spocks)
+				assert.NotEmpty(t, er.ExecutorSignature)
+			},
+		},
+		{
+			name: "Chunks",
+			fixture: func(a, b *GeneratorSuite) (any, any) {
+				return a.Chunks().Fixture(), b.Chunks().Fixture()
+			},
+			list: func(a, b *GeneratorSuite, n int) (any, any) {
+				return a.Chunks().List(n), b.Chunks().List(n)
+			},
+			sanity: func(t *testing.T, suite *GeneratorSuite) {
+				chunk := suite.Chunks().Fixture()
+				assert.NotEmpty(t, chunk.CollectionIndex)
+				assert.NotEmpty(t, chunk.StartState)
+				assert.NotEmpty(t, chunk.EventCollection)
+				assert.NotEmpty(t, chunk.BlockID)
+			},
+		},
+		{
+			name: "ServiceEvents",
+			fixture: func(a, b *GeneratorSuite) (any, any) {
+				return a.ServiceEvents().Fixture(), b.ServiceEvents().Fixture()
+			},
+			list: func(a, b *GeneratorSuite, n int) (any, any) {
+				return a.ServiceEvents().List(n), b.ServiceEvents().List(n)
+			},
+			sanity: func(t *testing.T, suite *GeneratorSuite) {
+				se := suite.ServiceEvents().Fixture()
+				assert.NotEmpty(t, se.Type)
+				assert.NotNil(t, se.Event)
+
+				// Test with specific type
+				setup := suite.ServiceEvents().Fixture(ServiceEvent.WithType(flow.ServiceEventSetup))
+				assert.Equal(t, flow.ServiceEventSetup, setup.Type)
+				assert.IsType(t, &flow.EpochSetup{}, setup.Event)
+			},
+		},
+		{
+			name: "VersionBeacons",
+			fixture: func(a, b *GeneratorSuite) (any, any) {
+				return a.VersionBeacons().Fixture(), b.VersionBeacons().Fixture()
+			},
+			list: func(a, b *GeneratorSuite, n int) (any, any) {
+				return a.VersionBeacons().List(n), b.VersionBeacons().List(n)
+			},
+			sanity: func(t *testing.T, suite *GeneratorSuite) {
+				vb := suite.VersionBeacons().Fixture()
+				assert.NotEmpty(t, vb.VersionBoundaries)
+			},
+		},
+		{
+			name: "ProtocolStateVersionUpgrades",
+			fixture: func(a, b *GeneratorSuite) (any, any) {
+				return a.ProtocolStateVersionUpgrades().Fixture(), b.ProtocolStateVersionUpgrades().Fixture()
+			},
+			list: func(a, b *GeneratorSuite, n int) (any, any) {
+				return a.ProtocolStateVersionUpgrades().List(n), b.ProtocolStateVersionUpgrades().List(n)
+			},
+			sanity: func(t *testing.T, suite *GeneratorSuite) {
+				psvu := suite.ProtocolStateVersionUpgrades().Fixture()
+				assert.Greater(t, psvu.NewProtocolStateVersion, uint64(0))
+			},
+		},
+		{
+			name: "SetEpochExtensionViewCounts",
+			fixture: func(a, b *GeneratorSuite) (any, any) {
+				return a.SetEpochExtensionViewCounts().Fixture(), b.SetEpochExtensionViewCounts().Fixture()
+			},
+			list: func(a, b *GeneratorSuite, n int) (any, any) {
+				return a.SetEpochExtensionViewCounts().List(n), b.SetEpochExtensionViewCounts().List(n)
+			},
+			sanity: func(t *testing.T, suite *GeneratorSuite) {
+				seevc := suite.SetEpochExtensionViewCounts().Fixture()
+				assert.Greater(t, seevc.Value, uint64(0))
+			},
+		},
+		{
+			name: "EjectNodes",
+			fixture: func(a, b *GeneratorSuite) (any, any) {
+				return a.EjectNodes().Fixture(), b.EjectNodes().Fixture()
+			},
+			list: func(a, b *GeneratorSuite, n int) (any, any) {
+				return a.EjectNodes().List(n), b.EjectNodes().List(n)
+			},
+			sanity: func(t *testing.T, suite *GeneratorSuite) {
+				en := suite.EjectNodes().Fixture()
+				assert.NotEmpty(t, en.NodeID)
+			},
+		},
+		{
+			name: "EpochSetups",
+			fixture: func(a, b *GeneratorSuite) (any, any) {
+				return a.EpochSetups().Fixture(), b.EpochSetups().Fixture()
+			},
+			list: func(a, b *GeneratorSuite, n int) (any, any) {
+				return a.EpochSetups().List(n), b.EpochSetups().List(n)
+			},
+			sanity: func(t *testing.T, suite *GeneratorSuite) {
+				es := suite.EpochSetups().Fixture()
+				assert.Greater(t, es.Counter, uint64(0))
+				assert.NotEmpty(t, es.Participants)
+				assert.NotEmpty(t, es.Assignments)
+				assert.Greater(t, es.FinalView, es.FirstView)
+			},
+		},
+		{
+			name: "EpochCommits",
+			fixture: func(a, b *GeneratorSuite) (any, any) {
+				return a.EpochCommits().Fixture(), b.EpochCommits().Fixture()
+			},
+			list: func(a, b *GeneratorSuite, n int) (any, any) {
+				return a.EpochCommits().List(n), b.EpochCommits().List(n)
+			},
+			sanity: func(t *testing.T, suite *GeneratorSuite) {
+				ec := suite.EpochCommits().Fixture()
+				assert.Greater(t, ec.Counter, uint64(0))
+				assert.NotEmpty(t, ec.ClusterQCs)
+				assert.NotNil(t, ec.DKGGroupKey)
+				assert.NotEmpty(t, ec.DKGParticipantKeys)
+			},
+		},
+		{
+			name: "EpochRecovers",
+			fixture: func(a, b *GeneratorSuite) (any, any) {
+				return a.EpochRecovers().Fixture(), b.EpochRecovers().Fixture()
+			},
+			list: func(a, b *GeneratorSuite, n int) (any, any) {
+				return a.EpochRecovers().List(n), b.EpochRecovers().List(n)
+			},
+			sanity: func(t *testing.T, suite *GeneratorSuite) {
+				er := suite.EpochRecovers().Fixture()
+				assert.Equal(t, er.EpochSetup.Counter, er.EpochCommit.Counter)
+				assert.NotEmpty(t, er.EpochSetup.Participants)
+				assert.NotEmpty(t, er.EpochCommit.ClusterQCs)
+			},
+		},
+		{
+			name: "QuorumCertificatesWithSignerIDs",
+			fixture: func(a, b *GeneratorSuite) (any, any) {
+				return a.QuorumCertificatesWithSignerIDs().Fixture(), b.QuorumCertificatesWithSignerIDs().Fixture()
+			},
+			list: func(a, b *GeneratorSuite, n int) (any, any) {
+				return a.QuorumCertificatesWithSignerIDs().List(n), b.QuorumCertificatesWithSignerIDs().List(n)
+			},
+			sanity: func(t *testing.T, suite *GeneratorSuite) {
+				qc := suite.QuorumCertificatesWithSignerIDs().Fixture()
+				assert.Greater(t, qc.View, uint64(0))
+				assert.NotEmpty(t, qc.BlockID)
+				assert.NotEmpty(t, qc.SignerIDs)
 			},
 		},
 	}

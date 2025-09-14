@@ -20,9 +20,9 @@ func TestAdjustEventsMetadata(t *testing.T) {
 	t.Run("single event", func(t *testing.T) {
 		suite := NewGeneratorSuite()
 		eventGen := suite.Events()
-		identifierGen := suite.Identifiers()
+		identifier := suite.Identifiers()
 
-		txID := identifierGen.Fixture()
+		txID := identifier.Fixture()
 		event := eventGen.Fixture(
 			Event.WithTransactionID(txID),
 			Event.WithEventIndex(999),
@@ -44,9 +44,9 @@ func TestAdjustEventsMetadata(t *testing.T) {
 	t.Run("multiple events from same transaction", func(t *testing.T) {
 		suite := NewGeneratorSuite()
 		eventGen := suite.Events()
-		identifierGen := suite.Identifiers()
+		identifier := suite.Identifiers()
 
-		txID := identifierGen.Fixture()
+		txID := identifier.Fixture()
 		events := []flow.Event{
 			eventGen.Fixture(
 				Event.WithTransactionID(txID),
@@ -78,12 +78,12 @@ func TestAdjustEventsMetadata(t *testing.T) {
 	t.Run("multiple events from different transactions", func(t *testing.T) {
 		suite := NewGeneratorSuite()
 		eventGen := suite.Events()
-		identifierGen := suite.Identifiers()
-		randomGen := suite.Random()
+		identifier := suite.Identifiers()
+		random := suite.Random()
 
-		txID0 := identifierGen.Fixture()
-		txID1 := identifierGen.Fixture()
-		txID2 := identifierGen.Fixture()
+		txID0 := identifier.Fixture()
+		txID1 := identifier.Fixture()
+		txID2 := identifier.Fixture()
 
 		type eventConfig struct {
 			transactionID    flow.Identifier
@@ -128,8 +128,8 @@ func TestAdjustEventsMetadata(t *testing.T) {
 		for i, event := range expected {
 			events[i] = eventGen.Fixture(
 				Event.WithTransactionID(event.transactionID),
-				Event.WithTransactionIndex(randomGen.Uint32()),
-				Event.WithEventIndex(randomGen.Uint32()),
+				Event.WithTransactionIndex(random.Uint32()),
+				Event.WithEventIndex(random.Uint32()),
 			)
 		}
 

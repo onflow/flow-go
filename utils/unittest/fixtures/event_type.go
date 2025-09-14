@@ -31,17 +31,17 @@ type EventTypeOption func(*EventTypeGenerator, *eventTypeConfig)
 type EventTypeGenerator struct {
 	eventTypeFactory
 
-	randomGen  *RandomGenerator
-	addressGen *AddressGenerator
+	random    *RandomGenerator
+	addresses *AddressGenerator
 }
 
 func NewEventTypeGenerator(
-	randomGen *RandomGenerator,
-	addressGen *AddressGenerator,
+	random *RandomGenerator,
+	addresses *AddressGenerator,
 ) *EventTypeGenerator {
 	return &EventTypeGenerator{
-		randomGen:  randomGen,
-		addressGen: addressGen,
+		random:    random,
+		addresses: addresses,
 	}
 }
 
@@ -76,7 +76,7 @@ func (f eventTypeFactory) WithEventName(eventName string) EventTypeOption {
 // Fixture generates a [flow.EventType] with random data based on the provided options.
 func (g *EventTypeGenerator) Fixture(opts ...EventTypeOption) flow.EventType {
 	config := &eventTypeConfig{
-		address:      g.addressGen.Fixture(),
+		address:      g.addresses.Fixture(),
 		contractName: g.generateContractName(),
 		eventName:    g.generateEventName(),
 	}
@@ -103,12 +103,12 @@ func (g *EventTypeGenerator) List(n int, opts ...EventTypeOption) []flow.EventTy
 
 // generateContractName generates a random contract name.
 func (g *EventTypeGenerator) generateContractName() string {
-	return RandomElement(g.randomGen, sampleContractNames)
+	return RandomElement(g.random, sampleContractNames)
 }
 
 // generateEventName generates a random event name.
 func (g *EventTypeGenerator) generateEventName() string {
-	return RandomElement(g.randomGen, sampleEventNames)
+	return RandomElement(g.random, sampleEventNames)
 }
 
 // ToCadenceEventType converts a flow.EventType to a cadence.EventType.

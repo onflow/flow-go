@@ -39,12 +39,12 @@ func (f signerIndicesFactory) WithIndices(authorizedSigners int, indices []int) 
 type SignerIndicesGenerator struct {
 	signerIndicesFactory
 
-	randomGen *RandomGenerator
+	random *RandomGenerator
 }
 
-func NewSignerIndicesGenerator(randomGen *RandomGenerator) *SignerIndicesGenerator {
+func NewSignerIndicesGenerator(random *RandomGenerator) *SignerIndicesGenerator {
 	return &SignerIndicesGenerator{
-		randomGen: randomGen,
+		random: random,
 	}
 }
 
@@ -85,7 +85,7 @@ func (g *SignerIndicesGenerator) Fixture(opts ...SignerIndicesOption) []byte {
 	// choose `contributingSigners` random indices from the total
 	count := 0
 	for count < config.contributingSigners {
-		index := g.randomGen.Intn(config.authorizedSigners)
+		index := g.random.Intn(config.authorizedSigners)
 
 		// only count unset bits to ensure that we set the correct number of unique indices
 		if bitutils.ReadBit(indices, index) == 0 {

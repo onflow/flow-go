@@ -67,8 +67,8 @@ func (g *GeneratorSuite) Random() *RandomGenerator {
 	return NewRandomGenerator(g.rng)
 }
 
-// BlockHeaders returns a generator for [flow.Header].
-func (g *GeneratorSuite) BlockHeaders() *BlockHeaderGenerator {
+// Headers returns a generator for [flow.Header].
+func (g *GeneratorSuite) Headers() *HeaderGenerator {
 	return NewBlockHeaderGenerator(
 		g.Random(),
 		g.Identifiers(),
@@ -77,6 +77,58 @@ func (g *GeneratorSuite) BlockHeaders() *BlockHeaderGenerator {
 		g.QuorumCertificates(),
 		g.Time(),
 		g.chainID,
+	)
+}
+
+// Blocks returns a generator for [flow.Block].
+func (g *GeneratorSuite) Blocks() *BlockGenerator {
+	return NewBlockGenerator(
+		g.Identifiers(),
+		g.Headers(),
+		g.Payloads(),
+		g.chainID,
+	)
+}
+
+// Payloads returns a generator for [flow.Payload].
+func (g *GeneratorSuite) Payloads() *PayloadGenerator {
+	return NewPayloadGenerator(
+		g.Random(),
+		g.Identifiers(),
+		g.CollectionGuarantees(),
+		g.Seals(),
+		g.ExecutionReceiptStubs(),
+		g.ExecutionResults(),
+	)
+}
+
+// Seals returns a generator for [flow.Seal].
+func (g *GeneratorSuite) Seals() *SealGenerator {
+	return NewSealGenerator(
+		g.Random(),
+		g.Identifiers(),
+		g.StateCommitments(),
+		g.AggregatedSignatures(),
+	)
+}
+
+// CollectionGuarantees returns a generator for [flow.CollectionGuarantee].
+func (g *GeneratorSuite) CollectionGuarantees() *CollectionGuaranteeGenerator {
+	return NewCollectionGuaranteeGenerator(
+		g.Random(),
+		g.Identifiers(),
+		g.Signatures(),
+		g.SignerIndices(),
+		g.chainID,
+	)
+}
+
+// ExecutionReceiptStubs returns a generator for [flow.ExecutionReceiptStub].
+func (g *GeneratorSuite) ExecutionReceiptStubs() *ExecutionReceiptStubGenerator {
+	return NewExecutionReceiptStubGenerator(
+		g.Random(),
+		g.Identifiers(),
+		g.Signatures(),
 	)
 }
 
@@ -107,6 +159,15 @@ func (g *GeneratorSuite) QuorumCertificates() *QuorumCertificateGenerator {
 		g.Identifiers(),
 		g.SignerIndices(),
 		g.Signatures(),
+	)
+}
+
+// QuorumCertificatesWithSignerIDs returns a generator for [flow.QuorumCertificateWithSignerIDs].
+func (g *GeneratorSuite) QuorumCertificatesWithSignerIDs() *QuorumCertificateWithSignerIDsGenerator {
+	return NewQuorumCertificateWithSignerIDsGenerator(
+		g.Random(),
+		g.Identifiers(),
+		g.QuorumCertificates(),
 	)
 }
 
@@ -211,4 +272,115 @@ func (g *GeneratorSuite) LedgerValues() *LedgerValueGenerator {
 // Time returns a generator for [time.Time].
 func (g *GeneratorSuite) Time() *TimeGenerator {
 	return NewTimeGenerator(g.Random())
+}
+
+func (g *GeneratorSuite) Identities() *IdentityGenerator {
+	return NewIdentityGenerator(g.Random(), g.Crypto(), g.Identifiers(), g.Addresses())
+}
+
+func (g *GeneratorSuite) Crypto() *CryptoGenerator {
+	return NewCryptoGenerator(g.Random())
+}
+
+// StateCommitments returns a generator for [flow.StateCommitment].
+func (g *GeneratorSuite) StateCommitments() *StateCommitmentGenerator {
+	return NewStateCommitmentGenerator(g.Random())
+}
+
+// AggregatedSignatures returns a generator for [flow.AggregatedSignature].
+func (g *GeneratorSuite) AggregatedSignatures() *AggregatedSignatureGenerator {
+	return NewAggregatedSignatureGenerator(g.Random(), g.Identifiers(), g.Signatures())
+}
+
+// TimeoutCertificates returns a generator for [flow.TimeoutCertificate].
+func (g *GeneratorSuite) TimeoutCertificates() *TimeoutCertificateGenerator {
+	return NewTimeoutCertificateGenerator(g.Random(), g.QuorumCertificates(), g.Signatures(), g.SignerIndices())
+}
+
+// ExecutionResults returns a generator for [flow.ExecutionResult].
+func (g *GeneratorSuite) ExecutionResults() *ExecutionResultGenerator {
+	return NewExecutionResultGenerator(
+		g.Random(),
+		g.Identifiers(),
+		g.Chunks(),
+		g.ServiceEvents(),
+		g.StateCommitments(),
+	)
+}
+
+// ExecutionReceipts returns a generator for [flow.ExecutionReceipt].
+func (g *GeneratorSuite) ExecutionReceipts() *ExecutionReceiptGenerator {
+	return NewExecutionReceiptGenerator(
+		g.Random(),
+		g.Identifiers(),
+		g.ExecutionResults(),
+		g.Signatures(),
+	)
+}
+
+// Chunks returns a generator for [flow.Chunk].
+func (g *GeneratorSuite) Chunks() *ChunkGenerator {
+	return NewChunkGenerator(
+		g.Random(),
+		g.Identifiers(),
+		g.StateCommitments(),
+	)
+}
+
+// ServiceEvents returns a generator for [flow.ServiceEvent].
+func (g *GeneratorSuite) ServiceEvents() *ServiceEventGenerator {
+	return NewServiceEventGenerator(
+		g.Random(),
+		g.EpochSetups(),
+		g.EpochCommits(),
+		g.EpochRecovers(),
+		g.VersionBeacons(),
+		g.ProtocolStateVersionUpgrades(),
+		g.SetEpochExtensionViewCounts(),
+		g.EjectNodes(),
+	)
+}
+
+// VersionBeacons returns a generator for [flow.VersionBeacon].
+func (g *GeneratorSuite) VersionBeacons() *VersionBeaconGenerator {
+	return NewVersionBeaconGenerator(g.Random())
+}
+
+// ProtocolStateVersionUpgrades returns a generator for [flow.ProtocolStateVersionUpgrade].
+func (g *GeneratorSuite) ProtocolStateVersionUpgrades() *ProtocolStateVersionUpgradeGenerator {
+	return NewProtocolStateVersionUpgradeGenerator(g.Random())
+}
+
+// SetEpochExtensionViewCounts returns a generator for [flow.SetEpochExtensionViewCount].
+func (g *GeneratorSuite) SetEpochExtensionViewCounts() *SetEpochExtensionViewCountGenerator {
+	return NewSetEpochExtensionViewCountGenerator(g.Random())
+}
+
+// EjectNodes returns a generator for [flow.EjectNode].
+func (g *GeneratorSuite) EjectNodes() *EjectNodeGenerator {
+	return NewEjectNodeGenerator(g.Identifiers())
+}
+
+// EpochSetups returns a generator for [flow.EpochSetup].
+func (g *GeneratorSuite) EpochSetups() *EpochSetupGenerator {
+	return NewEpochSetupGenerator(g.Random(), g.Time(), g.Identities())
+}
+
+// EpochCommits returns a generator for [flow.EpochCommit].
+func (g *GeneratorSuite) EpochCommits() *EpochCommitGenerator {
+	return NewEpochCommitGenerator(
+		g.Random(),
+		g.Crypto(),
+		g.Identifiers(),
+		g.QuorumCertificatesWithSignerIDs(),
+	)
+}
+
+// EpochRecovers returns a generator for [flow.EpochRecover].
+func (g *GeneratorSuite) EpochRecovers() *EpochRecoverGenerator {
+	return NewEpochRecoverGenerator(
+		g.Random(),
+		g.EpochSetups(),
+		g.EpochCommits(),
+	)
 }

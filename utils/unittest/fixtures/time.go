@@ -50,7 +50,7 @@ func (f timeFactory) WithOffset(offset time.Duration) TimeOption {
 // WithOffsetRandom is an option that sets a random offset from the base time in the range [0, max).
 func (f timeFactory) WithOffsetRandom(max time.Duration) TimeOption {
 	return func(g *TimeGenerator, config *timeConfig) {
-		config.offset = time.Duration(g.randomGen.Intn(int(max)))
+		config.offset = time.Duration(g.random.Intn(int(max)))
 	}
 }
 
@@ -58,14 +58,14 @@ func (f timeFactory) WithOffsetRandom(max time.Duration) TimeOption {
 type TimeGenerator struct {
 	timeFactory
 
-	randomGen *RandomGenerator
+	random *RandomGenerator
 }
 
 func NewTimeGenerator(
-	randomGen *RandomGenerator,
+	random *RandomGenerator,
 ) *TimeGenerator {
 	return &TimeGenerator{
-		randomGen: randomGen,
+		random: random,
 	}
 }
 
@@ -74,7 +74,7 @@ func NewTimeGenerator(
 // The default offset is within 10 years of 2020-07-14T16:00:00Z.
 func (g *TimeGenerator) Fixture(opts ...TimeOption) time.Time {
 	defaultBaseTime := time.Date(2020, 7, 14, 16, 0, 0, 0, time.UTC) // 2020-07-14T16:00:00Z
-	defaultOffset := time.Duration(g.randomGen.Int63n(defaultOffset))
+	defaultOffset := time.Duration(g.random.Int63n(defaultOffset))
 	config := &timeConfig{
 		baseTime: defaultBaseTime,
 		offset:   defaultOffset,

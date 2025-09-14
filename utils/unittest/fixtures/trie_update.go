@@ -60,20 +60,20 @@ func (f trieUpdateFactory) WithPayloadSize(minSize, maxSize int) TrieUpdateOptio
 type TrieUpdateGenerator struct {
 	trieUpdateFactory
 
-	randomGen        *RandomGenerator
-	ledgerPathGen    *LedgerPathGenerator
-	ledgerPayloadGen *LedgerPayloadGenerator
+	random         *RandomGenerator
+	ledgerPaths    *LedgerPathGenerator
+	ledgerPayloads *LedgerPayloadGenerator
 }
 
 func NewTrieUpdateGenerator(
-	randomGen *RandomGenerator,
-	ledgerPathGen *LedgerPathGenerator,
-	ledgerPayloadGen *LedgerPayloadGenerator,
+	random *RandomGenerator,
+	ledgerPaths *LedgerPathGenerator,
+	ledgerPayloads *LedgerPayloadGenerator,
 ) *TrieUpdateGenerator {
 	return &TrieUpdateGenerator{
-		randomGen:        randomGen,
-		ledgerPathGen:    ledgerPathGen,
-		ledgerPayloadGen: ledgerPayloadGen,
+		random:         random,
+		ledgerPaths:    ledgerPaths,
+		ledgerPayloads: ledgerPayloads,
 	}
 }
 
@@ -96,10 +96,10 @@ func (g *TrieUpdateGenerator) Fixture(opts ...TrieUpdateOption) *ledger.TrieUpda
 
 	// Generate paths and payloads if not provided
 	if config.trieUpdate.Paths == nil {
-		config.trieUpdate.Paths = g.ledgerPathGen.List(config.numPaths)
+		config.trieUpdate.Paths = g.ledgerPaths.List(config.numPaths)
 	}
 	if config.trieUpdate.Payloads == nil {
-		config.trieUpdate.Payloads = g.ledgerPayloadGen.List(config.numPaths, LedgerPayload.WithSize(config.minSize, config.maxSize))
+		config.trieUpdate.Payloads = g.ledgerPayloads.List(config.numPaths, LedgerPayload.WithSize(config.minSize, config.maxSize))
 	}
 
 	return config.trieUpdate

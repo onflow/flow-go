@@ -36,21 +36,21 @@ func (f proposalKeyFactory) WithSequenceNumber(sequenceNumber uint64) ProposalKe
 type ProposalKeyGenerator struct {
 	proposalKeyFactory
 
-	addressGen *AddressGenerator
+	addresses *AddressGenerator
 }
 
 func NewProposalKeyGenerator(
-	addressGen *AddressGenerator,
+	addresses *AddressGenerator,
 ) *ProposalKeyGenerator {
 	return &ProposalKeyGenerator{
-		addressGen: addressGen,
+		addresses: addresses,
 	}
 }
 
 // Fixture generates a [flow.ProposalKey] with random data based on the provided options.
 func (g *ProposalKeyGenerator) Fixture(opts ...ProposalKeyOption) flow.ProposalKey {
 	key := flow.ProposalKey{
-		Address:        g.addressGen.Fixture(),
+		Address:        g.addresses.Fixture(),
 		KeyIndex:       1,
 		SequenceNumber: 0,
 	}

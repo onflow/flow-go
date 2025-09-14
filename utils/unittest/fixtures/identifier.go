@@ -20,14 +20,14 @@ type identifierConfig struct {
 type IdentifierGenerator struct {
 	identifierFactory
 
-	randomGen *RandomGenerator
+	random *RandomGenerator
 }
 
 func NewIdentifierGenerator(
-	randomGen *RandomGenerator,
+	random *RandomGenerator,
 ) *IdentifierGenerator {
 	return &IdentifierGenerator{
-		randomGen: randomGen,
+		random: random,
 	}
 }
 
@@ -39,7 +39,7 @@ func (g *IdentifierGenerator) Fixture(opts ...IdentifierOption) flow.Identifier 
 		opt(g, config)
 	}
 
-	id, err := flow.ByteSliceToId(g.randomGen.RandomBytes(flow.IdentifierLen))
+	id, err := flow.ByteSliceToId(g.random.RandomBytes(flow.IdentifierLen))
 	NoError(err)
 	return id
 }

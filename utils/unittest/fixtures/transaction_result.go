@@ -36,25 +36,25 @@ func (f transactionResultFactory) WithComputationUsed(computationUsed uint64) Tr
 type TransactionResultGenerator struct {
 	transactionResultFactory
 
-	randomGen     *RandomGenerator
-	identifierGen *IdentifierGenerator
+	random      *RandomGenerator
+	identifiers *IdentifierGenerator
 }
 
 func NewTransactionResultGenerator(
-	randomGen *RandomGenerator,
-	identifierGen *IdentifierGenerator,
+	random *RandomGenerator,
+	identifiers *IdentifierGenerator,
 ) *TransactionResultGenerator {
 	return &TransactionResultGenerator{
-		randomGen:     randomGen,
-		identifierGen: identifierGen,
+		random:      random,
+		identifiers: identifiers,
 	}
 }
 
 // Fixture generates a [flow.TransactionResult] with random data based on the provided options.
 func (g *TransactionResultGenerator) Fixture(opts ...TransactionResultOption) flow.TransactionResult {
 	result := flow.TransactionResult{
-		TransactionID:   g.identifierGen.Fixture(),
-		ComputationUsed: g.randomGen.Uint64InRange(1, 9999),
+		TransactionID:   g.identifiers.Fixture(),
+		ComputationUsed: g.random.Uint64InRange(1, 9999),
 		ErrorMessage:    "",
 	}
 
@@ -117,8 +117,8 @@ func NewLightTransactionResultGenerator(
 // Fixture generates a [flow.LightTransactionResult] with random data based on the provided options.
 func (g *LightTransactionResultGenerator) Fixture(opts ...LightTransactionResultOption) flow.LightTransactionResult {
 	result := flow.LightTransactionResult{
-		TransactionID:   g.identifierGen.Fixture(),
-		ComputationUsed: g.randomGen.Uint64InRange(1, 9999),
+		TransactionID:   g.identifiers.Fixture(),
+		ComputationUsed: g.random.Uint64InRange(1, 9999),
 		Failed:          false,
 	}
 

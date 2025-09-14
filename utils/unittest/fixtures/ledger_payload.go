@@ -37,17 +37,17 @@ func (f ledgerPayloadFactory) WithValue(value ledger.Value) LedgerPayloadOption 
 type LedgerPayloadGenerator struct {
 	ledgerPayloadFactory
 
-	randomGen      *RandomGenerator
-	ledgerValueGen *LedgerValueGenerator
+	random       *RandomGenerator
+	ledgerValues *LedgerValueGenerator
 }
 
 func NewLedgerPayloadGenerator(
-	randomGen *RandomGenerator,
-	ledgerValueGen *LedgerValueGenerator,
+	random *RandomGenerator,
+	ledgerValues *LedgerValueGenerator,
 ) *LedgerPayloadGenerator {
 	return &LedgerPayloadGenerator{
-		randomGen:      randomGen,
-		ledgerValueGen: ledgerValueGen,
+		random:       random,
+		ledgerValues: ledgerValues,
 	}
 }
 
@@ -65,7 +65,7 @@ func (g *LedgerPayloadGenerator) Fixture(opts ...LedgerPayloadOption) *ledger.Pa
 	Assert(config.minSize <= config.maxSize, "minSize must be less than or equal to maxSize")
 
 	if config.value == nil {
-		config.value = g.ledgerValueGen.Fixture(LedgerValue.WithSize(config.minSize, config.maxSize))
+		config.value = g.ledgerValues.Fixture(LedgerValue.WithSize(config.minSize, config.maxSize))
 	}
 
 	return g.generatePayload(config.minSize, config.maxSize, config.value)
@@ -82,8 +82,8 @@ func (g *LedgerPayloadGenerator) List(n int, opts ...LedgerPayloadOption) []*led
 
 // generatePayload returns a random [ledger.Payload].
 func (g *LedgerPayloadGenerator) generatePayload(minByteSize int, maxByteSize int, value ledger.Value) *ledger.Payload {
-	keyByteSize := g.randomGen.IntInRange(minByteSize, maxByteSize)
-	keydata := g.randomGen.RandomBytes(keyByteSize)
+	keyByteSize := g.random.IntInRange(minByteSize, maxByteSize)
+	keydata := g.random.RandomBytes(keyByteSize)
 	key := ledger.Key{KeyParts: []ledger.KeyPart{{Type: 0, Value: keydata}}}
 
 	return ledger.NewPayload(key, value)

@@ -14,7 +14,7 @@ type CollectionOption func(*CollectionGenerator, *flow.Collection)
 // WithTxCount is an option that sets the number of transactions in the collection.
 func (f collectionFactory) WithTxCount(count int) CollectionOption {
 	return func(g *CollectionGenerator, collection *flow.Collection) {
-		collection.Transactions = g.transactionGen.List(count)
+		collection.Transactions = g.transactions.List(count)
 	}
 }
 
@@ -29,14 +29,14 @@ func (f collectionFactory) WithTransactions(transactions []*flow.TransactionBody
 type CollectionGenerator struct {
 	collectionFactory
 
-	transactionGen *TransactionGenerator
+	transactions *TransactionGenerator
 }
 
 func NewCollectionGenerator(
-	transactionGen *TransactionGenerator,
+	transactions *TransactionGenerator,
 ) *CollectionGenerator {
 	return &CollectionGenerator{
-		transactionGen: transactionGen,
+		transactions: transactions,
 	}
 }
 
@@ -49,7 +49,7 @@ func (g *CollectionGenerator) Fixture(opts ...CollectionOption) *flow.Collection
 	}
 
 	if len(collection.Transactions) == 0 {
-		collection.Transactions = g.transactionGen.List(1)
+		collection.Transactions = g.transactions.List(1)
 	}
 
 	return collection

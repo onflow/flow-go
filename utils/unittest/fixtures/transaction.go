@@ -64,35 +64,35 @@ func (f transactionFactory) WithEnvelopeSignatures(signatures []flow.Transaction
 type TransactionGenerator struct {
 	transactionFactory
 
-	identifierGen     *IdentifierGenerator
-	proposalKeyGen    *ProposalKeyGenerator
-	addressGen        *AddressGenerator
-	transactionSigGen *TransactionSignatureGenerator
+	identifiers     *IdentifierGenerator
+	proposalKeys    *ProposalKeyGenerator
+	addresses       *AddressGenerator
+	transactionSigs *TransactionSignatureGenerator
 }
 
 func NewTransactionGenerator(
-	identifierGen *IdentifierGenerator,
-	proposalKeyGen *ProposalKeyGenerator,
-	addressGen *AddressGenerator,
-	transactionSigGen *TransactionSignatureGenerator,
+	identifiers *IdentifierGenerator,
+	proposalKeys *ProposalKeyGenerator,
+	addresses *AddressGenerator,
+	transactionSigs *TransactionSignatureGenerator,
 ) *TransactionGenerator {
 	return &TransactionGenerator{
-		identifierGen:     identifierGen,
-		proposalKeyGen:    proposalKeyGen,
-		addressGen:        addressGen,
-		transactionSigGen: transactionSigGen,
+		identifiers:     identifiers,
+		proposalKeys:    proposalKeys,
+		addresses:       addresses,
+		transactionSigs: transactionSigs,
 	}
 }
 
 // Fixture generates a [flow.TransactionBody] with random data based on the provided options.
 func (g *TransactionGenerator) Fixture(opts ...TransactionOption) *flow.TransactionBody {
 	tx := &flow.TransactionBody{
-		ReferenceBlockID: g.identifierGen.Fixture(),
+		ReferenceBlockID: g.identifiers.Fixture(),
 		Script:           []byte("access(all) fun main() {}"),
 		GasLimit:         10,
-		ProposalKey:      g.proposalKeyGen.Fixture(),
-		Payer:            g.addressGen.Fixture(),
-		Authorizers:      []flow.Address{g.addressGen.Fixture()},
+		ProposalKey:      g.proposalKeys.Fixture(),
+		Payer:            g.addresses.Fixture(),
+		Authorizers:      []flow.Address{g.addresses.Fixture()},
 	}
 
 	for _, opt := range opts {
@@ -105,7 +105,7 @@ func (g *TransactionGenerator) Fixture(opts ...TransactionOption) *flow.Transact
 		// if the signature does not match the proposer, the signer index resolved during
 		// deserialization will be incorrect.
 		tx.EnvelopeSignatures = []flow.TransactionSignature{
-			g.transactionSigGen.Fixture(
+			g.transactionSigs.Fixture(
 				TransactionSignature.WithAddress(tx.ProposalKey.Address),
 				TransactionSignature.WithSignerIndex(0), // proposer should be index 0
 			),

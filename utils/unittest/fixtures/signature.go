@@ -15,14 +15,14 @@ type SignatureOption func(*SignatureGenerator, *signatureConfig)
 type SignatureGenerator struct {
 	signatureFactory
 
-	randomGen *RandomGenerator
+	random *RandomGenerator
 }
 
 func NewSignatureGenerator(
-	randomGen *RandomGenerator,
+	random *RandomGenerator,
 ) *SignatureGenerator {
 	return &SignatureGenerator{
-		randomGen: randomGen,
+		random: random,
 	}
 }
 
@@ -39,7 +39,7 @@ func (g *SignatureGenerator) Fixture(opts ...SignatureOption) crypto.Signature {
 		opt(g, config)
 	}
 
-	return g.randomGen.RandomBytes(crypto.SignatureLenBLSBLS12381)
+	return g.random.RandomBytes(crypto.SignatureLenBLSBLS12381)
 }
 
 // List generates a list of random [crypto.Signature].
