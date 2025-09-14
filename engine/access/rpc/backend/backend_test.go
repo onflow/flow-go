@@ -880,7 +880,7 @@ func (suite *Suite) TestGetLatestSealedBlockHeader() {
 		signalerCtx := rpcContextExpectError(suite.T(), context.Background(), signCtxErr)
 
 		actualHeader, actualStatus, err := backend.GetLatestBlockHeader(signalerCtx, true)
-		suite.Require().Equal(err.Error(), irrecoverable.NewExceptionf(signCtxErr.Error()) // can't use ErrorIs because NewExceptionf does not allow unwrapping
+		suite.Require().Equal(err.Error(), irrecoverable.NewException(signCtxErr).Error()) // can't use ErrorIs because NewExceptionf does not allow unwrapping
 		suite.Require().Nil(actualHeader)
 		suite.Require().Equal(flow.BlockStatusUnknown, actualStatus)
 	})
