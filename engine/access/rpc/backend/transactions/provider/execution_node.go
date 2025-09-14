@@ -248,7 +248,7 @@ func (e *ENTransactionProvider) TransactionResultsByBlockID(
 		return nil, rpc.ConvertError(err, "failed to retrieve result from execution node", codes.Internal)
 	}
 
-	txStatus, err := e.txStatusDeriver.DeriveTransactionStatus(block.Height, true)
+	txStatus, err := e.txStatusDeriver.DeriveFinalizedTransactionStatus(block.Height, true)
 	if err != nil {
 		irrecoverable.Throw(ctx, fmt.Errorf("failed to derive transaction status: %w", err))
 		return nil, err
