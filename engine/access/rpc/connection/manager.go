@@ -192,7 +192,7 @@ func createRequestWatcherInterceptor(client *cachedClient) grpc.UnaryClientInter
 		err := client.Run(func() error {
 			return invoker(ctx, method, req, reply, cc, opts...)
 		})
-		if errors.Is(err, ErrClientMarkedForClosure) {
+		if errors.Is(err, ErrClientShuttingDown) {
 			return status.Errorf(codes.Unavailable, "the connection to %s was closed", client.Address())
 		}
 		return err

@@ -13,6 +13,14 @@ import (
 	"github.com/onflow/flow-go/module"
 )
 
+// ConnectClientFn is callback function that creates a new gRPC client connection.
+type ConnectClientFn func(
+	address string,
+	cfg Config,
+	networkPubKey crypto.PublicKey,
+	client *cachedClient,
+) (grpcClientConn, error)
+
 // <component_spec>
 //
 // Cache provides access to a pool of cached gRPC client connections as part of the client connection
@@ -40,7 +48,7 @@ type Cache struct {
 	cache   *simplelru.LRU[string, *cachedClient]
 	maxSize uint
 
-	// mu protects access to the cache.
+	// mu protects access to `cache`
 	mu sync.RWMutex
 }
 
@@ -62,8 +70,8 @@ func NewCache(
 	if err != nil {
 		return nil, fmt.Errorf("could not initialize connection pool cache: %w", err)
 	}
-
 	c.cache = cache
+
 	return c, nil
 }
 
@@ -98,6 +106,10 @@ func (c *Cache) GetConnection(
 
 	conn, err := client.clientConnection(cfg, networkPubKey, connectFn)
 	if err != nil {
+		// remove the failed client from the cache to ensure a fresh connection is created on the
+		// next attempt. the client guarantees that only a single connection attempt is made per
+		// client object, so all goroutines with a reference to this client will fail with an error.
+		// therefore, it's safe to discard the client after the first error.
 		_ = c.remove(address)
 		return nil, err
 	}

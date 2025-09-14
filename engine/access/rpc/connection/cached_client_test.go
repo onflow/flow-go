@@ -46,8 +46,49 @@ func TestRun(t *testing.T) {
 		assert.Equal(t, 1, cb.Calls())
 	})
 
-	// test the case where the client is already marked for closure, and the callback is not executed.
-	t.Run("returns ErrClientMarkedForClosure when marked for closure", func(t *testing.T) {
+	// test the case where the callback panics to ensure that the wait group is decremented avoiding
+	// a leak if the caller recovers from the panic.
+	t.Run("callback panics", func(t *testing.T) {
+		synctest.Test(t, func(t *testing.T) {
+			mockConn := newMockGrpcConn()
+			client := &cachedClient{
+				address: clientAddress,
+				conn:    mockConn,
+			}
+
+			expectedErr := errors.New("callback error")
+
+			cb := newCallbackMock(func() error {
+				panic(expectedErr)
+			})
+
+			// recover from the panic then call Close(). It should close the connection without
+			// blocking since there are no outstanding requests.
+			defer func() {
+				r := recover()
+
+				if r != nil {
+					client.Close()
+
+					assert.True(t, client.isCloseRequested())
+					assert.Equal(t, 1, cb.Calls())
+
+					// wait for the Close() goroutine to finish
+					synctest.Wait()
+
+					assert.True(t, mockConn.isClosed())
+				} else {
+					t.Errorf("unexpected panic: %v", r)
+				}
+			}()
+
+			// callback panics, so we don't expect a return
+			_ = client.Run(cb.Execute)
+		})
+	})
+
+	// test the case where the client is already shutting down, and the callback is not executed.
+	t.Run("returns ErrClientShuttingDown when shutting down", func(t *testing.T) {
 		client := &cachedClient{
 			address:        clientAddress,
 			closeRequested: true,
@@ -56,7 +97,7 @@ func TestRun(t *testing.T) {
 		cb := newSuccessCallbackMock()
 		err := client.Run(cb.Execute)
 
-		assert.ErrorIs(t, err, ErrClientMarkedForClosure)
+		assert.ErrorIs(t, err, ErrClientShuttingDown)
 		assert.Equal(t, 0, cb.Calls())
 	})
 
@@ -208,16 +249,16 @@ func TestClientConnection(t *testing.T) {
 		assert.Same(t, rawConn, conn)
 	})
 
-	// test that clientConnection returns ErrClientMarkedForClosure when the client is already
-	// marked for closure.
-	t.Run("returns ErrClientMarkedForClosure when client is marked for closure", func(t *testing.T) {
+	// test that clientConnection returns ErrClientShuttingDown when the client is already
+	// shutting down.
+	t.Run("returns ErrClientShuttingDown when client is shutting down", func(t *testing.T) {
 		client := &cachedClient{
 			address:        clientAddress,
 			closeRequested: true,
 		}
 
 		conn, err := client.clientConnection(cfg, networkPubKey, neverConnectClientFn(t))
-		assert.ErrorIs(t, err, ErrClientMarkedForClosure)
+		assert.ErrorIs(t, err, ErrClientShuttingDown)
 		assert.Nil(t, conn)
 	})
 
@@ -405,14 +446,14 @@ func TestClientActions(t *testing.T) {
 							return mockConn, nil
 						})
 						if err != nil {
-							require.ErrorIs(t, err, ErrClientMarkedForClosure)
+							require.ErrorIs(t, err, ErrClientShuttingDown)
 						}
 					},
 					func() {
 						<-started
 						err := client.Run(cb.Execute)
 						if err != nil {
-							require.ErrorIs(t, err, ErrClientMarkedForClosure)
+							require.ErrorIs(t, err, ErrClientShuttingDown)
 						}
 					},
 					func() {
