@@ -86,10 +86,6 @@ func (g *AddressGenerator) Fixture(opts ...AddressOption) flow.Address {
 func (g *AddressGenerator) List(n int, opts ...AddressOption) []flow.Address {
 	addresses := make([]flow.Address, n)
 	for i := range uint64(n) {
-		// set the index explicitly to guarantee we do not have duplicates
-		// wrapping at maxIndex to avoid errors if we go above maxIndex.
-		index := g.random.Uint64InRange(i, i+1000) % maxIndex
-		opts = append(opts, Address.WithIndex(index))
 		addresses[i] = g.Fixture(opts...)
 	}
 	return addresses
