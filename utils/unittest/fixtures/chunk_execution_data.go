@@ -56,26 +56,26 @@ func (f chunkExecutionDataFactory) WithMinSize(minSize int) ChunkExecutionDataOp
 type ChunkExecutionDataGenerator struct {
 	chunkExecutionDataFactory
 
-	random                    *RandomGenerator
-	collections               *CollectionGenerator
-	lightTransactionResultGen *LightTransactionResultGenerator
-	events                    *EventGenerator
-	trieUpdates               *TrieUpdateGenerator
+	random         *RandomGenerator
+	collections    *CollectionGenerator
+	lightTxResults *LightTransactionResultGenerator
+	events         *EventGenerator
+	trieUpdates    *TrieUpdateGenerator
 }
 
 func NewChunkExecutionDataGenerator(
 	random *RandomGenerator,
 	collections *CollectionGenerator,
-	lightTransactionResultGen *LightTransactionResultGenerator,
+	lightTxResults *LightTransactionResultGenerator,
 	events *EventGenerator,
 	trieUpdates *TrieUpdateGenerator,
 ) *ChunkExecutionDataGenerator {
 	return &ChunkExecutionDataGenerator{
-		random:                    random,
-		collections:               collections,
-		lightTransactionResultGen: lightTransactionResultGen,
-		events:                    events,
-		trieUpdates:               trieUpdates,
+		random:         random,
+		collections:    collections,
+		lightTxResults: lightTxResults,
+		events:         events,
+		trieUpdates:    trieUpdates,
 	}
 }
 
@@ -93,7 +93,7 @@ func (g *ChunkExecutionDataGenerator) Fixture(opts ...ChunkExecutionDataOption) 
 	if len(ced.TransactionResults) == 0 {
 		ced.TransactionResults = make([]flow.LightTransactionResult, len(ced.Collection.Transactions))
 		for i, tx := range ced.Collection.Transactions {
-			ced.TransactionResults[i] = g.lightTransactionResultGen.Fixture(LightTransactionResult.WithTransactionID(tx.ID()))
+			ced.TransactionResults[i] = g.lightTxResults.Fixture(LightTransactionResult.WithTransactionID(tx.ID()))
 		}
 	}
 

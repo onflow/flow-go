@@ -177,18 +177,18 @@ type QuorumCertificateWithSignerIDsGenerator struct {
 
 	random      *RandomGenerator
 	identifiers *IdentifierGenerator
-	qcGen       *QuorumCertificateGenerator
+	quorumCerts *QuorumCertificateGenerator
 }
 
 func NewQuorumCertificateWithSignerIDsGenerator(
 	random *RandomGenerator,
 	identifiers *IdentifierGenerator,
-	qcGen *QuorumCertificateGenerator,
+	quorumCerts *QuorumCertificateGenerator,
 ) *QuorumCertificateWithSignerIDsGenerator {
 	return &QuorumCertificateWithSignerIDsGenerator{
 		random:      random,
 		identifiers: identifiers,
-		qcGen:       qcGen,
+		quorumCerts: quorumCerts,
 	}
 }
 
@@ -198,7 +198,7 @@ func (g *QuorumCertificateWithSignerIDsGenerator) Fixture(opts ...QuorumCertific
 		View:      uint64(g.random.Uint32()),
 		BlockID:   g.identifiers.Fixture(),
 		SignerIDs: g.identifiers.List(10),
-		SigData:   g.qcGen.QCSigDataWithSoR(nil),
+		SigData:   g.quorumCerts.QCSigDataWithSoR(nil),
 	}
 
 	for _, opt := range opts {

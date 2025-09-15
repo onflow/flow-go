@@ -30,17 +30,17 @@ func (f blockExecutionDataFactory) WithChunkExecutionDatas(chunks ...*execution_
 type BlockExecutionDataGenerator struct {
 	blockExecutionDataFactory
 
-	identifiers           *IdentifierGenerator
-	chunkExecutionDataGen *ChunkExecutionDataGenerator
+	identifiers         *IdentifierGenerator
+	chunkExecutionDatas *ChunkExecutionDataGenerator
 }
 
 func NewBlockExecutionDataGenerator(
 	identifiers *IdentifierGenerator,
-	chunkExecutionDataGen *ChunkExecutionDataGenerator,
+	chunkExecutionDatas *ChunkExecutionDataGenerator,
 ) *BlockExecutionDataGenerator {
 	return &BlockExecutionDataGenerator{
-		identifiers:           identifiers,
-		chunkExecutionDataGen: chunkExecutionDataGen,
+		identifiers:         identifiers,
+		chunkExecutionDatas: chunkExecutionDatas,
 	}
 }
 
@@ -73,10 +73,10 @@ type BlockExecutionDataEntityGenerator struct {
 }
 
 func NewBlockExecutionDataEntityGenerator(
-	blockExecutionDataGen *BlockExecutionDataGenerator,
+	blockExecutionDatas *BlockExecutionDataGenerator,
 ) *BlockExecutionDataEntityGenerator {
 	return &BlockExecutionDataEntityGenerator{
-		BlockExecutionDataGenerator: blockExecutionDataGen,
+		BlockExecutionDataGenerator: blockExecutionDatas,
 	}
 }
 

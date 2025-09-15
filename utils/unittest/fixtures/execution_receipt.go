@@ -45,24 +45,24 @@ func (f executionReceiptFactory) WithExecutorSignature(executorSignature crypto.
 type ExecutionReceiptGenerator struct {
 	executionReceiptFactory
 
-	random             *RandomGenerator
-	identifiers        *IdentifierGenerator
-	executionResultGen *ExecutionResultGenerator
-	signatures         *SignatureGenerator
+	random           *RandomGenerator
+	identifiers      *IdentifierGenerator
+	executionResults *ExecutionResultGenerator
+	signatures       *SignatureGenerator
 }
 
 // NewExecutionReceiptGenerator creates a new ExecutionReceiptGenerator.
 func NewExecutionReceiptGenerator(
 	random *RandomGenerator,
 	identifiers *IdentifierGenerator,
-	executionResultGen *ExecutionResultGenerator,
+	executionResults *ExecutionResultGenerator,
 	signatures *SignatureGenerator,
 ) *ExecutionReceiptGenerator {
 	return &ExecutionReceiptGenerator{
-		random:             random,
-		identifiers:        identifiers,
-		executionResultGen: executionResultGen,
-		signatures:         signatures,
+		random:           random,
+		identifiers:      identifiers,
+		executionResults: executionResults,
+		signatures:       signatures,
 	}
 }
 
@@ -71,7 +71,7 @@ func (g *ExecutionReceiptGenerator) Fixture(opts ...ExecutionReceiptOption) *flo
 	receipt := &flow.ExecutionReceipt{
 		UnsignedExecutionReceipt: flow.UnsignedExecutionReceipt{
 			ExecutorID:      g.identifiers.Fixture(),
-			ExecutionResult: *g.executionResultGen.Fixture(),
+			ExecutionResult: *g.executionResults.Fixture(),
 			Spocks:          g.signatures.List(g.random.IntInRange(1, 5)),
 		},
 		ExecutorSignature: g.signatures.Fixture(),

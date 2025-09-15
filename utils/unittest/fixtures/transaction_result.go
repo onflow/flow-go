@@ -107,10 +107,10 @@ type LightTransactionResultGenerator struct {
 }
 
 func NewLightTransactionResultGenerator(
-	transactionResultGen *TransactionResultGenerator,
+	txResults *TransactionResultGenerator,
 ) *LightTransactionResultGenerator {
 	return &LightTransactionResultGenerator{
-		TransactionResultGenerator: transactionResultGen,
+		TransactionResultGenerator: txResults,
 	}
 }
 
