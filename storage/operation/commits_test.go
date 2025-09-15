@@ -19,11 +19,12 @@ func TestStateCommitments(t *testing.T) {
 		expected := unittest.StateCommitmentFixture()
 		id := unittest.IdentifierFixture()
 
-		unittest.WithLock(t, lockManager, storage.LockInsertOwnReceipt, func(lctx lockctx.Context) error {
+		err := unittest.WithLock(t, lockManager, storage.LockInsertOwnReceipt, func(lctx lockctx.Context) error {
 			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 				return operation.IndexStateCommitment(lctx, rw, id, expected)
 			})
 		})
+		require.NoError(t, err)
 
 		var actual flow.StateCommitment
 		err := operation.LookupStateCommitment(db.Reader(), id, &actual)

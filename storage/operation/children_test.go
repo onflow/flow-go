@@ -21,24 +21,26 @@ func TestBlockChildrenIndexUpdateLookup(t *testing.T) {
 		childrenIDs := unittest.IdentifierListFixture(8)
 		var retrievedIDs flow.IdentifierList
 
-		unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
+		err := unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
 			err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 				return operation.UpsertBlockChildren(lctx, rw.Writer(), blockID, childrenIDs)
 			})
 			require.NoError(t, err)
 			return nil
 		})
+		require.NoError(t, err)
 
-		err := operation.RetrieveBlockChildren(db.Reader(), blockID, &retrievedIDs)
+		err = operation.RetrieveBlockChildren(db.Reader(), blockID, &retrievedIDs)
 		require.NoError(t, err)
 		assert.Equal(t, childrenIDs, retrievedIDs)
 
 		altIDs := unittest.IdentifierListFixture(4)
-		unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
+		err = unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
 			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 				return operation.UpsertBlockChildren(lctx, rw.Writer(), blockID, altIDs)
 			})
 		})
+		require.NoError(t, err)
 
 		err = operation.RetrieveBlockChildren(db.Reader(), blockID, &retrievedIDs)
 		require.NoError(t, err)

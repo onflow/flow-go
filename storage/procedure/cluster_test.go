@@ -19,12 +19,13 @@ func TestInsertRetrieveClusterBlock(t *testing.T) {
 		block := unittest.ClusterBlockFixture()
 
 		lockManager := storage.NewTestingLockManager()
-		unittest.WithLock(t, lockManager, storage.LockInsertOrFinalizeClusterBlock, func(lctx lockctx.Context) error {
+		err := unittest.WithLock(t, lockManager, storage.LockInsertOrFinalizeClusterBlock, func(lctx lockctx.Context) error {
 			require.NoError(t, db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 				return InsertClusterBlock(lctx, rw, unittest.ClusterProposalFromBlock(block))
 			}))
 			return nil
 		})
+		require.NoError(t, err)
 
 		var retrieved cluster.Block
 		err := RetrieveClusterBlock(db.Reader(), block.ID(), &retrieved)
@@ -42,7 +43,7 @@ func TestFinalizeClusterBlock(t *testing.T) {
 		)
 
 		lockManager := storage.NewTestingLockManager()
-		unittest.WithLock(t, lockManager, storage.LockInsertOrFinalizeClusterBlock, func(lctx lockctx.Context) error {
+		err := unittest.WithLock(t, lockManager, storage.LockInsertOrFinalizeClusterBlock, func(lctx lockctx.Context) error {
 			require.NoError(t, db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 				return InsertClusterBlock(lctx, rw, unittest.ClusterProposalFromBlock(parent))
 			}))
@@ -64,6 +65,7 @@ func TestFinalizeClusterBlock(t *testing.T) {
 			}))
 			return nil
 		})
+		require.NoError(t, err)
 
 		// verify that the new block as been properly indexed as the latest finalized
 		var latestFinalizedHeight uint64
@@ -85,7 +87,7 @@ func TestDisconnectedFinalizedBlock(t *testing.T) {
 
 	t.Run("finalizing C should fail because B is not yet finalized", func(t *testing.T) {
 		dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
-			unittest.WithLock(t, lockManager, storage.LockInsertOrFinalizeClusterBlock, func(lctx lockctx.Context) error {
+			err := unittest.WithLock(t, lockManager, storage.LockInsertOrFinalizeClusterBlock, func(lctx lockctx.Context) error {
 				_, _, blockC, _ := constructState(t, db, lctx)
 				err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 					return FinalizeClusterBlock(lctx, rw, blockC.ID())
@@ -94,6 +96,7 @@ func TestDisconnectedFinalizedBlock(t *testing.T) {
 				require.NotErrorIs(t, err, storage.ErrAlreadyExists)
 				return nil
 			})
+			require.NoError(t, err)
 		})
 	})
 
