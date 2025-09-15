@@ -19,24 +19,26 @@ func TestFinalizedInsertUpdateRetrieve(t *testing.T) {
 		lockManager := storage.NewTestingLockManager()
 
 		height := uint64(1337)
-		unittest.WithLock(t, lockManager, storage.LockFinalizeBlock, func(lctx lockctx.Context) error {
+		err := unittest.WithLock(t, lockManager, storage.LockFinalizeBlock, func(lctx lockctx.Context) error {
 			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 				return operation.UpsertFinalizedHeight(lctx, rw.Writer(), height)
 			})
 		})
+		require.NoError(t, err)
 
 		var retrieved uint64
-		err := operation.RetrieveFinalizedHeight(db.Reader(), &retrieved)
+		err = operation.RetrieveFinalizedHeight(db.Reader(), &retrieved)
 		require.NoError(t, err)
 
 		assert.Equal(t, retrieved, height)
 
 		height = 9999
-		unittest.WithLock(t, lockManager, storage.LockFinalizeBlock, func(lctx lockctx.Context) error {
+		err = unittest.WithLock(t, lockManager, storage.LockFinalizeBlock, func(lctx lockctx.Context) error {
 			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 				return operation.UpsertFinalizedHeight(lctx, rw.Writer(), height)
 			})
 		})
+		require.NoError(t, err)
 
 		err = operation.RetrieveFinalizedHeight(db.Reader(), &retrieved)
 		require.NoError(t, err)
@@ -50,24 +52,26 @@ func TestSealedInsertUpdateRetrieve(t *testing.T) {
 		lockManager := storage.NewTestingLockManager()
 
 		height := uint64(1337)
-		unittest.WithLock(t, lockManager, storage.LockFinalizeBlock, func(lctx lockctx.Context) error {
+		err := unittest.WithLock(t, lockManager, storage.LockFinalizeBlock, func(lctx lockctx.Context) error {
 			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 				return operation.UpsertSealedHeight(lctx, rw.Writer(), height)
 			})
 		})
+		require.NoError(t, err)
 
 		var retrieved uint64
-		err := operation.RetrieveSealedHeight(db.Reader(), &retrieved)
+		err = operation.RetrieveSealedHeight(db.Reader(), &retrieved)
 		require.NoError(t, err)
 
 		assert.Equal(t, retrieved, height)
 
 		height = 9999
-		unittest.WithLock(t, lockManager, storage.LockFinalizeBlock, func(lctx lockctx.Context) error {
+		err = unittest.WithLock(t, lockManager, storage.LockFinalizeBlock, func(lctx lockctx.Context) error {
 			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 				return operation.UpsertSealedHeight(lctx, rw.Writer(), height)
 			})
 		})
+		require.NoError(t, err)
 
 		err = operation.RetrieveSealedHeight(db.Reader(), &retrieved)
 		require.NoError(t, err)
@@ -88,12 +92,13 @@ func TestEpochFirstBlockIndex_InsertRetrieve(t *testing.T) {
 		err := operation.RetrieveEpochFirstHeight(db.Reader(), epoch, &retrieved)
 		require.ErrorIs(t, err, storage.ErrNotFound)
 
-		unittest.WithLock(t, lockManager, storage.LockFinalizeBlock, func(lctx lockctx.Context) error {
+		err = unittest.WithLock(t, lockManager, storage.LockFinalizeBlock, func(lctx lockctx.Context) error {
 			// can insert
 			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 				return operation.InsertEpochFirstHeight(lctx, rw, epoch, height)
 			})
 		})
+		require.NoError(t, err)
 
 		// can retrieve
 		err = operation.RetrieveEpochFirstHeight(db.Reader(), epoch, &retrieved)
@@ -104,13 +109,12 @@ func TestEpochFirstBlockIndex_InsertRetrieve(t *testing.T) {
 		err = operation.RetrieveEpochFirstHeight(db.Reader(), epoch+1, &retrieved)
 		require.ErrorIs(t, err, storage.ErrNotFound)
 
-		unittest.WithLock(t, lockManager, storage.LockFinalizeBlock, func(lctx lockctx.Context) error {
+		err = unittest.WithLock(t, lockManager, storage.LockFinalizeBlock, func(lctx lockctx.Context) error {
 			// insert existent key errors
-			err = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 				return operation.InsertEpochFirstHeight(lctx, rw, epoch, height)
 			})
-			require.ErrorIs(t, err, storage.ErrAlreadyExists)
-			return nil
 		})
+		require.ErrorIs(t, err, storage.ErrAlreadyExists)
 	})
 }

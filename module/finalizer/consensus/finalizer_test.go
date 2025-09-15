@@ -146,7 +146,7 @@ func TestMakeFinalInvalidHeight(t *testing.T) {
 		lockManager := storage.NewTestingLockManager()
 
 		// Insert the latest finalized height and map the finalized height to the finalized block ID.
-		unittest.WithLock(t, lockManager, storage.LockFinalizeBlock, func(lctx lockctx.Context) error {
+		err := unittest.WithLock(t, lockManager, storage.LockFinalizeBlock, func(lctx lockctx.Context) error {
 			return dbImpl.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 				err := operation.IndexFinalizedBlockByHeight(lctx, rw, final.Height, final.ID())
 				if err != nil {
@@ -155,20 +155,23 @@ func TestMakeFinalInvalidHeight(t *testing.T) {
 				return operation.UpsertFinalizedHeight(lctx, rw.Writer(), final.Height)
 			})
 		})
+		require.NoError(t, err)
 
 		// Insert the latest finalized height and map the finalized height to the finalized block ID.
-		unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(insertLctx lockctx.Context) error {
+		err = unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(insertLctx lockctx.Context) error {
 			return dbImpl.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 				return operation.InsertHeader(insertLctx, rw, final.ID(), final)
 			})
 		})
+		require.NoError(t, err)
 
 		// insert all of the pending header into DB
-		unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(insertLctx lockctx.Context) error {
+		err = unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(insertLctx lockctx.Context) error {
 			return dbImpl.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 				return operation.InsertHeader(insertLctx, rw, pending.ID(), pending)
 			})
 		})
+		require.NoError(t, err)
 
 		// initialize the finalizer with the dependencies and make the call
 		metrics := metrics.NewNoopCollector()
@@ -179,7 +182,7 @@ func TestMakeFinalInvalidHeight(t *testing.T) {
 			tracer:   trace.NewNoopTracer(),
 			cleanup:  LogCleanup(&list),
 		}
-		err := fin.MakeFinal(pending.ID())
+		err = fin.MakeFinal(pending.ID())
 		require.Error(t, err)
 	})
 
@@ -209,7 +212,7 @@ func TestMakeFinalDuplicate(t *testing.T) {
 		dbImpl := pebbleimpl.ToDB(pdb)
 
 		// insert the latest finalized height
-		unittest.WithLock(t, lockManager, storage.LockFinalizeBlock, func(lctx lockctx.Context) error {
+		err := unittest.WithLock(t, lockManager, storage.LockFinalizeBlock, func(lctx lockctx.Context) error {
 			return dbImpl.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 				err := operation.UpsertFinalizedHeight(lctx, rw.Writer(), final.Height)
 				if err != nil {
@@ -219,13 +222,15 @@ func TestMakeFinalDuplicate(t *testing.T) {
 				return operation.IndexFinalizedBlockByHeight(lctx, rw, final.Height, final.ID())
 			})
 		})
+		require.NoError(t, err)
 
 		// insert the finalized block header into the DB
-		unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(insertLctx lockctx.Context) error {
+		err = unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(insertLctx lockctx.Context) error {
 			return dbImpl.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 				return operation.InsertHeader(insertLctx, rw, final.ID(), final)
 			})
 		})
+		require.NoError(t, err)
 
 		// initialize the finalizer with the dependencies and make the call
 		metrics := metrics.NewNoopCollector()
@@ -236,7 +241,7 @@ func TestMakeFinalDuplicate(t *testing.T) {
 			tracer:   trace.NewNoopTracer(),
 			cleanup:  LogCleanup(&list),
 		}
-		err := fin.MakeFinal(final.ID())
+		err = fin.MakeFinal(final.ID())
 		require.NoError(t, err)
 	})
 

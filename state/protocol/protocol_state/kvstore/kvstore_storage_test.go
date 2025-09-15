@@ -62,11 +62,9 @@ func TestProtocolKVStore_StoreTx(t *testing.T) {
 
 		err := unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
 			rw := storagemock.NewReaderBatchWriter(t)
-			err := store.BatchStore(lctx, rw, kvStateID, kvState)
-			require.ErrorIs(t, err, encodingError)
-			return nil
+			return store.BatchStore(lctx, rw, kvStateID, kvState)
 		})
-		require.NoError(t, err)
+		require.ErrorIs(t, err, encodingError)
 	})
 }
 

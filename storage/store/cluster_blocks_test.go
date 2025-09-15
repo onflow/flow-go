@@ -28,11 +28,9 @@ func TestClusterBlocks(t *testing.T) {
 			})
 			require.NoError(t, err)
 
-			err = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 				return operation.UpsertClusterFinalizedHeight(lctx, rw.Writer(), parent.ChainID, parent.Height)
 			})
-			require.NoError(t, err)
-			return nil
 		})
 		require.NoError(t, err)
 

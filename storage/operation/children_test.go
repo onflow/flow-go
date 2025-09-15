@@ -22,11 +22,9 @@ func TestBlockChildrenIndexUpdateLookup(t *testing.T) {
 		var retrievedIDs flow.IdentifierList
 
 		err := unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
-			err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 				return operation.UpsertBlockChildren(lctx, rw.Writer(), blockID, childrenIDs)
 			})
-			require.NoError(t, err)
-			return nil
 		})
 		require.NoError(t, err)
 

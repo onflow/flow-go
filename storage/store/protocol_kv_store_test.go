@@ -30,13 +30,11 @@ func TestKeyValueStoreStorage(t *testing.T) {
 
 		// store protocol state and auxiliary info
 		err := unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
-			err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 				err := store.BatchStore(lctx, rw, stateID, expected)
 				require.NoError(t, err)
 				return store.BatchIndex(lctx, rw, blockID, stateID)
 			})
-			require.NoError(t, err)
-			return nil
 		})
 		require.NoError(t, err)
 
@@ -91,13 +89,11 @@ func TestProtocolKVStore_StoreTx(t *testing.T) {
 		}
 
 		err = unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
-			err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 				return store.BatchStore(lctx, rw, stateID, dataDifferent)
 			})
-			require.ErrorIs(t, err, storage.ErrDataMismatch)
-			return nil
 		})
-		require.NoError(t, err)
+		require.ErrorIs(t, err, storage.ErrDataMismatch)
 
 		// Attempt to store different version with the same stateID
 		versionDifferent := &flow.PSKeyValueStoreData{
@@ -106,13 +102,11 @@ func TestProtocolKVStore_StoreTx(t *testing.T) {
 		}
 
 		err = unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
-			err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 				return store.BatchStore(lctx, rw, stateID, versionDifferent)
 			})
-			require.ErrorIs(t, err, storage.ErrDataMismatch)
-			return nil
 		})
-		require.NoError(t, err)
+		require.ErrorIs(t, err, storage.ErrDataMismatch)
 	})
 }
 

@@ -142,13 +142,11 @@ func TestBlockIndexByViewAndRetrieve(t *testing.T) {
 
 		// Test that indexing the same view again returns ErrAlreadyExists
 		err = unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
-			err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 				return operation.IndexCertifiedBlockByView(lctx, rw, block.View, block.ID())
 			})
-			require.ErrorIs(t, err, storage.ErrAlreadyExists)
-			return nil
 		})
-		require.NoError(t, err)
+		require.ErrorIs(t, err, storage.ErrAlreadyExists)
 
 		// Test that retrieving by non-existent view returns ErrNotFound
 		_, err = blocks.ByView(block.View + 1000)

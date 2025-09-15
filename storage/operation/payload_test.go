@@ -42,7 +42,7 @@ func TestSealIndexAndLookup(t *testing.T) {
 
 		lockManager := storage.NewTestingLockManager()
 
-		unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
+		err := unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
 			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 				for _, seal := range seals {
 					if err := operation.InsertSeal(rw.Writer(), seal.ID(), seal); err != nil {
@@ -55,9 +55,10 @@ func TestSealIndexAndLookup(t *testing.T) {
 				return nil
 			})
 		})
+		require.NoError(t, err)
 
 		var actual []flow.Identifier
-		err := operation.LookupPayloadSeals(db.Reader(), blockID, &actual)
+		err = operation.LookupPayloadSeals(db.Reader(), blockID, &actual)
 		require.NoError(t, err)
 
 		assert.Equal(t, expected, actual)

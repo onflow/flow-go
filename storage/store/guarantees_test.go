@@ -57,13 +57,11 @@ func TestGuaranteeStoreRetrieve(t *testing.T) {
 		// Repeated storage of the same block should return [storage.ErrAlreadyExists].
 		// Yet, the guarantee can still be retrieved.
 		err = unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx2 lockctx.Context) error {
-			err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 				return blocks.BatchStore(lctx2, rw, proposal)
 			})
-			require.ErrorIs(t, err, storage.ErrAlreadyExists)
-			return nil
 		})
-		require.NoError(t, err)
+		require.ErrorIs(t, err, storage.ErrAlreadyExists)
 		actual, err = guarantees.ByCollectionID(guarantee1.CollectionID)
 		require.NoError(t, err)
 		require.Equal(t, guarantee1, actual)
@@ -73,10 +71,9 @@ func TestGuaranteeStoreRetrieve(t *testing.T) {
 		block2 := unittest.BlockWithGuaranteesFixture([]*flow.CollectionGuarantee{guarantee2, guarantee1})
 		proposal2 := unittest.ProposalFromBlock(block2)
 		err = unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx3 lockctx.Context) error {
-			require.NoError(t, db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 				return blocks.BatchStore(lctx3, rw, proposal2)
-			}))
-			return nil
+			})
 		})
 		require.NoError(t, err)
 		// retrieving guarantee 1 (contained in both blocks) still works
@@ -104,10 +101,9 @@ func TestStoreDuplicateGuarantee(t *testing.T) {
 
 		// store guarantee
 		err := unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
-			require.NoError(t, db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 				return blocks.BatchStore(lctx, rw, proposal)
-			}))
-			return nil
+			})
 		})
 		require.NoError(t, err)
 
@@ -115,10 +111,9 @@ func TestStoreDuplicateGuarantee(t *testing.T) {
 		block2 := unittest.BlockWithGuaranteesFixture([]*flow.CollectionGuarantee{expected})
 		proposal2 := unittest.ProposalFromBlock(block2)
 		err = unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx2 lockctx.Context) error {
-			require.NoError(t, db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 				return blocks.BatchStore(lctx2, rw, proposal2)
-			}))
-			return nil
+			})
 		})
 		require.NoError(t, err)
 
@@ -156,14 +151,11 @@ func TestStoreConflictingGuarantee(t *testing.T) {
 		block2 := unittest.BlockWithGuaranteesFixture([]*flow.CollectionGuarantee{&conflicting})
 		proposal2 := unittest.ProposalFromBlock(block2)
 		err = unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
-			err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 				return blocks.BatchStore(lctx, rw, proposal2)
 			})
-
-			require.ErrorIs(t, err, storage.ErrDataMismatch)
-			return nil
 		})
-		require.NoError(t, err)
+		require.ErrorIs(t, err, storage.ErrDataMismatch)
 
 		actual, err := store1.ByID(expected.ID())
 		require.NoError(t, err)

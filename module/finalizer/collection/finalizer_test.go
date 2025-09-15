@@ -40,21 +40,23 @@ func TestFinalizer(t *testing.T) {
 		state, err := cluster.Bootstrap(db, lockManager, stateRoot)
 		require.NoError(t, err)
 
-		unittest.WithLock(t, lockManager, storage.LockInsertOrFinalizeClusterBlock, func(lctx lockctx.Context) error {
+		err = unittest.WithLock(t, lockManager, storage.LockInsertOrFinalizeClusterBlock, func(lctx lockctx.Context) error {
 			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 				return operation.InsertHeader(lctx, rw, refBlock.ID(), refBlock.ToHeader())
 			})
 		})
+		require.NoError(t, err)
 		return state
 	}
 
 	// a helper function to insert a block
 	insert := func(db storage.DB, lockManager lockctx.Manager, block *model.Block) {
-		unittest.WithLock(t, lockManager, storage.LockInsertOrFinalizeClusterBlock, func(lctx lockctx.Context) error {
+		err := unittest.WithLock(t, lockManager, storage.LockInsertOrFinalizeClusterBlock, func(lctx lockctx.Context) error {
 			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 				return procedure.InsertClusterBlock(lctx, rw, unittest.ClusterProposalFromBlock(block))
 			})
 		})
+		require.NoError(t, err)
 	}
 
 	// Run each test with its own fresh database
@@ -441,8 +443,9 @@ func TestFinalizer(t *testing.T) {
 // finalization.
 func assertClusterBlocksIndexedByReferenceHeight(t *testing.T, lockManager lockctx.Manager, db storage.DB, refHeight uint64, clusterBlockIDs ...flow.Identifier) {
 	var ids []flow.Identifier
-	unittest.WithLock(t, lockManager, storage.LockInsertOrFinalizeClusterBlock, func(lctx lockctx.Context) error {
+	err := unittest.WithLock(t, lockManager, storage.LockInsertOrFinalizeClusterBlock, func(lctx lockctx.Context) error {
 		return operation.LookupClusterBlocksByReferenceHeightRange(lctx, db.Reader(), refHeight, refHeight, &ids)
 	})
+	require.NoError(t, err)
 	assert.ElementsMatch(t, clusterBlockIDs, ids)
 }
