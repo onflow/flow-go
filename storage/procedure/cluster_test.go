@@ -28,7 +28,7 @@ func TestInsertRetrieveClusterBlock(t *testing.T) {
 		require.NoError(t, err)
 
 		var retrieved cluster.Block
-		err := RetrieveClusterBlock(db.Reader(), block.ID(), &retrieved)
+		err = RetrieveClusterBlock(db.Reader(), block.ID(), &retrieved)
 		require.NoError(t, err)
 
 		require.Equal(t, *block, retrieved)
@@ -69,7 +69,6 @@ func TestFinalizeClusterBlock(t *testing.T) {
 
 		// verify that the new block as been properly indexed as the latest finalized
 		var latestFinalizedHeight uint64
-		var err error
 		err = operation.RetrieveClusterFinalizedHeight(db.Reader(), block.ChainID, &latestFinalizedHeight)
 		require.NoError(t, err)
 		require.Equal(t, block.Height, latestFinalizedHeight)

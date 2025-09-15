@@ -84,11 +84,12 @@ func prepareStorehouseTest(f func(t *testing.T, es state.ExecutionState, l *ledg
 					return operation.UpdateExecutedBlock(rw.Writer(), rootID)
 				}))
 
-				unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
+				err = unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
 					return pebbleimpl.ToDB(pebbleDB).WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 						return operation.InsertHeader(lctx, rw, finalizedHeaders[10].ID(), finalizedHeaders[10])
 					})
 				})
+				require.NoError(t, err)
 
 				getLatestFinalized := func() (uint64, error) {
 					return rootHeight, nil

@@ -27,7 +27,7 @@ func TestStateCommitments(t *testing.T) {
 		require.NoError(t, err)
 
 		var actual flow.StateCommitment
-		err := operation.LookupStateCommitment(db.Reader(), id, &actual)
+		err = operation.LookupStateCommitment(db.Reader(), id, &actual)
 		require.Nil(t, err)
 		require.Equal(t, expected, actual)
 	})

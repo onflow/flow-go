@@ -447,7 +447,6 @@ func (bs *BuilderSuite) SetupTest() {
 	bs.stateMutator.On("EvolveState", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(unittest.IdentifierFixture(), nil).Maybe()
 
 	// initialize the builder
-	var err error
 	bs.build, err = NewBuilder(
 		noopMetrics,
 		bs.state,

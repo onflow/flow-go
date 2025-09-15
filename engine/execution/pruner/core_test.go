@@ -86,7 +86,7 @@ func TestLoopPruneExecutionDataFromRootToLatestSealed(t *testing.T) {
 				require.NoError(t, err)
 			}
 			// verify the result can be found by block
-			_, err := results.ByBlockID(chunk.Header.ID())
+			_, err = results.ByBlockID(chunk.Header.ID())
 			require.NoError(t, err)
 
 			// Finalize block

@@ -112,7 +112,7 @@ func TestMakeFinalValidChain(t *testing.T) {
 			tracer:   trace.NewNoopTracer(),
 			cleanup:  LogCleanup(&list),
 		}
-		err := fin.MakeFinal(lastID)
+		err = fin.MakeFinal(lastID)
 		require.NoError(t, err)
 	})
 

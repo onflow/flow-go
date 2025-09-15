@@ -71,7 +71,7 @@ func TestCollections(t *testing.T) {
 			require.NoError(t, err)
 
 			actual := new(flow.LightCollection)
-			err := operation.LookupCollectionPayload(db.Reader(), blockID, &actual.Transactions)
+			err = operation.LookupCollectionPayload(db.Reader(), blockID, &actual.Transactions)
 			assert.NoError(t, err)
 			assert.Equal(t, expected, actual)
 		})
@@ -88,7 +88,7 @@ func TestCollections(t *testing.T) {
 			})
 			require.NoError(t, err)
 
-			err := operation.LookupCollectionByTransaction(db.Reader(), transactionID, &actual)
+			err = operation.LookupCollectionByTransaction(db.Reader(), transactionID, &actual)
 			assert.NoError(t, err)
 
 			assert.Equal(t, expected, actual)
