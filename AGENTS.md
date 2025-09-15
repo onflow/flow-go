@@ -2,6 +2,12 @@
 
 This file provides guidance to AI Agents when working with code in this repository.
 
+## Agents Docs
+
+- Coding Conventions: @docs/agents/CodingConventions.md
+- Agents Directive: @docs/agents/OperationalDoctrine.md
+- GoDocs: @docs/agents/GoDocs.md
+
 ## Behavior Guidance
 
 ### Git branches names

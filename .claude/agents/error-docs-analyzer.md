@@ -50,7 +50,6 @@ IMPORTANT: do not add or modify other sections of the godocs including concurren
         - The error is actually returned by the function (not just handled)
         - The error is correctly classified as benign in this specific context
         - Wrapped errors properly document the original sentinel error type
-        - The catch-all statement about other errors is included
 
 4. **Documentation Format Compliance**: Ensure all error documentation matches the Required Format from the godocs policy
 

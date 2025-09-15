@@ -5,11 +5,13 @@
 - Add godocs comments for all types, variables, constants, functions, and interfaces.
 - Begin with the name of the entity.
 - Use complete sentences.
-- Do not exceed 100 character line length
+- Wrap lines that exceed 100 characters.
 - **ALL** methods that return an error **MUST** document expected error conditions!
 - When updating existing code, if godocs exist, keep the existing content and improve formating/expand with additional details to conform with these rules.
 - If any details are unclear, **DO NOT make something up**. Add a TODO to fill in the missing details or ask the user for clarification.
 - Include an empty comment line with no trailing spaces between each section.
+- Wrap types mentioned within comments within brackets (e.g. `[ErrNotFound] if no block header with the given ID exists`)
+- Wrap variable or method names within ticks (e.g. ```Update the `View` field```)
 
 ## Method Rules
 Structure
@@ -18,11 +20,7 @@ Structure
 //
 // [Additional context - optional]
 //
-// [Parameters - optional]
-//
-// [Returns - optional]
-//
-// [Concurrency safety - optional]
+// [Concurrency safety - REQUIRED if not concurrency safe]
 //
 // [Expected errors - REQUIRED]
 ```
@@ -33,39 +31,30 @@ Example
 //
 // Additional important details about the method.
 //
-// Parameters: (only if additional interpretation of values is needed beyond the method / function signature)
-//   - parameter1: description of non-obvious aspects
-//   - parameter2: description of non-obvious aspects
-//
-// Returns: (only if additional interpretation of return values is needed beyond the method / function signature)
-//   - return1: description of non-obvious aspects
-//   - return2: description of non-obvious aspects
-//
-// CAUTION: not concurrency safe! (if applicable, documentation is obligatory)
+// NOT CONCURRENCY SAFE!
 //
 // Expected error returns during normal operations:
-//   - ErrType1: when and why this error occurs
-//   - ErrType2: when and why this error occurs
-//   - All other errors are potential indicators of bugs or corrupted internal state (continuation impossible)
+//   - [ErrType1]: when and why this error occurs
+//   - [ErrType2]: when and why this error occurs
 ```
 
 ### Method Description
-- First line must be a complete sentence describing what the method does
-- Use present tense
-- Start with the method name
-- End with a period
+- First line must be a complete sentence describing what the method does.
+- Use present tense.
+- Start with the method name.
+- End with a period.
 - Prefer a concise description that naturally incorporates the meaning of parameters
 - Example:
   ```go
   // ByBlockID returns the header with the given ID. It is available for finalized and ambiguous blocks.
   //
   // Expected error returns during normal operations:
-  //  - ErrNotFound if no block header with the given ID exists
-  //  - All other errors are potential indicators of bugs or corrupted internal state (continuation impossible)
+  //  - [ErrNotFound] if no block header with the given ID exists
   ByBlockID(blockID flow.Identifier) (*flow.Header, error)
   ```
 
 ### Parameters
+- Document parameters as part of the main description block.
 - Only document parameters separately when they have non-obvious aspects:
   - Complex constraints or requirements
   - Special relationships with other parameters
@@ -73,13 +62,12 @@ Example
   - Example:
     ```go
     // ValidateTransaction validates the transaction against the current state.
-    //
-    // Parameters:
-    //   - script: must be valid BPL-encoded script with max size of 64KB
-    //   - accounts: must contain at least one account with signing capability
+    // `script` must be valid BPL-encoded script with max size of 64KB
+    // `accounts` must contain at least one account with signing capability
     ```
 
 ### Returns
+- Document parameters as part of the main description block.
 - Only document return values if there is **additional information** necessary to interpret the function's or method's return values, which is not apparent from the method signature's return values
 - When documenting non-error returns, be concise and focus only on non-obvious aspects:
   Example 1 - No return docs needed (self-explanatory):
@@ -95,7 +83,6 @@ Example
   Example 3 - Complex return value needs explanation:
   ```go
   // GetBlockStatus returns the block's current status.
-  //
   // Returns:
   //   - status: PENDING if still processing, FINALIZED if complete, INVALID if failed validation
   ```
@@ -110,15 +97,14 @@ Expected errors are benign sentinel errors returned by the function.
 Exceptions are unexpected errors returned by the function. These include all errors that are not benign within the context of the method.
 
 IMPORTANT: For high-assurance software systems such as Flow, anything _outside_ of the paths explicitly specified as safe must be treated as critical failures. 
-* Hence, we tend to not explicitly specify this over and over again for the sake of brevity. Applying this rule entails that we only document sentinel errors. 
-* It is implicit that _any_ function or method that has an error return might return an exception, unless explicitly stated otherwise. 
+- Hence, we tend to not explicitly specify this over and over again for the sake of brevity. Applying this rule entails that we only document sentinel errors.
+- It is implicit that _any_ function or method that has an error return might return an exception, unless explicitly stated otherwise.
 
 - Error classification is context-dependent - the same error type can be benign in one context but an exception in another
 - **ALL** methods that return an error **MUST** document exhaustively all expected benign errors that can be returned (if any)
 - ONLY include expected errors documentation if the function returns an error.
 - ONLY document benign errors that are expected during normal operations
 - Exceptions (unexpected errors) are NOT individually documented in the error section.
-- If sentinel errors are expected, include the catch-all statement about exceptions as the last item: `All other errors are potential indicators of bugs or corrupted internal state (continuation impossible)`
 - If no errors are expected (all return errors are exceptions), use the catch-all statement: `No error returns are expected during normal operations.`
 - NEVER document individual exceptions.
 - Error documentation should be the last part of a method's documentation
@@ -136,7 +122,6 @@ Common mistakes to avoid:
 - DO NOT document generic fmt.Errorf errors unless they wrap a sentinel error
 - DO NOT document exceptions (unexpected errors that may indicate bugs)
 - DO NOT document exceptional errors. Instead, it is implicitly understood that any function or method with an error return might throw exceptions. We categorically exclude repetitive statements about exceptions, because they bloat the documentation.
-- DO NOT omit the catch-all statement about other errors
 - DO NOT document implementation details that might change
 
 #### Required Format
@@ -146,14 +131,12 @@ Error documentation must follow one of these 2 formats:
 For methods with expected benign errors:
 ```go
 // Expected error returns during normal operations:
-//   - ErrTypeName: when and why this error occurs (for sentinel errors)
-//   - ErrWrapped: when wrapped via fmt.Errorf, document the original sentinel error
-//   - All other errors are potential indicators of bugs or corrupted internal state (continuation impossible)
+//   - [ErrTypeName]: when and why this error occurs (for sentinel errors)
 ```
 
 For methods where all errors are exceptions:
 ```go
-// No errors are expected during normal operations.
+// No error returns are expected during normal operations.
 ```
 
 #### Examples
@@ -163,8 +146,7 @@ Example 1: Method with sentinel errors
 // GetBlock returns the block with the given ID.
 //
 // Expected error returns during normal operations:
-//   - ErrNotFound: when the block doesn't exist
-//   - All other errors are potential indicators of bugs or corrupted internal state (continuation impossible)
+//   - [ErrNotFound]: when the block doesn't exist
 ```
 
 Example 2: Method wrapping a sentinel error
@@ -172,15 +154,14 @@ Example 2: Method wrapping a sentinel error
 // ValidateTransaction validates the transaction against the current state.
 //
 // Expected error returns during normal operations:
-//   - ErrInvalidSignature: when the transaction signature is invalid (wrapped)
-//   - All other errors are potential indicators of bugs or corrupted internal state (continuation impossible)
+//   - [ErrInvalidSignature]: when the transaction signature is invalid (wrapped)
 ```
 
 Example 3: Method with only exceptional errors
 ```go
 // ProcessFinalizedBlock processes a block that is known to be finalized.
 //
-// No errors are expected during normal operations.
+// No error returns are expected during normal operations.
 ```
 
 Example 4: Method with context-dependent error handling
@@ -188,15 +169,13 @@ Example 4: Method with context-dependent error handling
 // ByBlockID returns the block with the given ID.
 //
 // Expected error returns during normal operations:
-//   - ErrNotFound: when requesting non-finalized blocks that don't exist
-//   - All other errors are potential indicators of bugs or corrupted internal state (continuation impossible)
-// Note: ErrNotFound is NOT expected when requesting finalized blocks
+//   - [ErrNotFound]: when requesting non-finalized blocks that don't exist
+// Note: [ErrNotFound] is NOT expected when requesting finalized blocks
 ```
 
 ### Concurrency Safety
 - By default, we assume methods and functions to be concurrency safe.
 - Every struct and interface must explicitly state whether it is safe for concurrent access.
-- If not thread-safe, explain why
 - For methods or functions that are not concurrency safe (deviating from the default), it **MUST** be explicitly documented by including the following call-out:
   ```go
   // NOT CONCURRENCY SAFE!
@@ -219,13 +198,13 @@ Example 4: Method with context-dependent error handling
   // NewTypeName creates a new instance of TypeName.
   //
   // Parameters:
-  //   - param1: description of param1
+  //   - `param1`: description of `param1`
   //
   // Returns:
-  //   - *TypeName: the newly created instance
+  //   - [*TypeName]: the newly created instance
   //   - error: any error that occurred during creation
   //
-  // No errors are expected during normal operations.
+  // No error returns are expected during normal operations.
   ```
 
 ### Private Methods
@@ -244,9 +223,8 @@ Example 4: Method with context-dependent error handling
 // Safe for concurrent access.
 //
 // Expected error returns during normal operations:
-//   - ErrInvalidReceipt: when the receipt is malformed
-//   - ErrDuplicateReceipt: when the receipt already exists
-//   - All other errors are potential indicators of bugs or corrupted internal state (continuation impossible)
+//   - [ErrInvalidReceipt]: when the receipt is malformed
+//   - [ErrDuplicateReceipt]: when the receipt already exists
 ```
 
 ### Getter Method Example
@@ -262,8 +240,7 @@ Example 4: Method with context-dependent error handling
 // NewExecutionResultContainer creates a new instance of ExecutionResultContainer with the given result and pipeline.
 //
 // Expected Errors:
-//   - ErrInvalidBlock: when the block ID doesn't match the result's block ID
-//   - All other errors are potential indicators of bugs or corrupted internal state (continuation impossible)
+//   - [ErrInvalidBlock]: when the block ID doesn't match the result's block ID
 ```
 
 ## Interface Documentation
@@ -293,9 +270,8 @@ Example 4: Method with context-dependent error handling
   // The method must be idempotent and handle byzantine inputs gracefully.
   //
   // Expected Errors:
-  //   - ErrInvalidTransaction: when the transaction is malformed
-  //   - ErrExecutionFailed: when the transaction execution fails
-  //   - All other errors are potential indicators of bugs or corrupted internal state (continuation impossible)
+  //   - [ErrInvalidTransaction]: when the transaction is malformed
+  //   - [ErrExecutionFailed]: when the transaction execution fails
   Execute(tx *Transaction) (*Result, error)
   ```
 
