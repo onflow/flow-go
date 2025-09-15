@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -34,6 +35,7 @@ import (
 	"github.com/onflow/flow-go/engine/collection/rpc"
 	followereng "github.com/onflow/flow-go/engine/common/follower"
 	"github.com/onflow/flow-go/engine/common/provider"
+	commonrpc "github.com/onflow/flow-go/engine/common/rpc"
 	consync "github.com/onflow/flow-go/engine/common/synchronization"
 	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/model/bootstrap"
@@ -57,8 +59,7 @@ import (
 	badgerState "github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/state/protocol/blocktimer"
 	"github.com/onflow/flow-go/state/protocol/events/gadgets"
-	"github.com/onflow/flow-go/storage/badger"
-	"github.com/onflow/flow-go/utils/grpcutils"
+	"github.com/onflow/flow-go/storage/store"
 )
 
 func main() {
@@ -121,8 +122,12 @@ func main() {
 			"maximum number of transactions in the memory pool")
 		flags.StringVarP(&rpcConf.ListenAddr, "ingress-addr", "i", "localhost:9000",
 			"the address the ingress server listens on")
-		flags.UintVar(&rpcConf.MaxMsgSize, "rpc-max-message-size", grpcutils.DefaultMaxMsgSize,
-			"the maximum message size in bytes for messages sent or received over grpc")
+		flags.UintVar(&rpcConf.DeprecatedMaxMsgSize, "rpc-max-message-size", 0,
+			"[deprecated] the maximum message size in bytes for messages sent or received over grpc")
+		flags.UintVar(&rpcConf.MaxRequestMsgSize, "rpc-max-request-message-size", commonrpc.DefaultCollectionMaxRequestSize,
+			"the maximum request message size in bytes for request messages received over grpc by the server")
+		flags.UintVar(&rpcConf.MaxResponseMsgSize, "rpc-max-response-message-size", commonrpc.DefaultCollectionMaxResponseSize,
+			"the maximum message size in bytes for response messages sent over grpc by the server")
 		flags.BoolVar(&rpcConf.RpcMetricsEnabled, "rpc-metrics-enabled", false,
 			"whether to enable the rpc metrics")
 		flags.Uint64Var(&ingestConf.MaxGasLimit, "ingest-max-gas-limit", flow.DefaultMaxTransactionGasLimit,
@@ -198,6 +203,12 @@ func main() {
 		if deprecatedFlagBlockRateDelay > 0 {
 			nodeBuilder.Logger.Warn().Msg("A deprecated flag was specified (--block-rate-delay). This flag is deprecated as of v0.30 (Jun 2023), has no effect, and will eventually be removed.")
 		}
+		if rpcConf.MaxRequestMsgSize <= 0 {
+			return errors.New("rpc-max-request-message-size must be greater than 0")
+		}
+		if rpcConf.MaxResponseMsgSize <= 0 {
+			return errors.New("rpc-max-response-message-size must be greater than 0")
+		}
 		return nil
 	})
 
@@ -223,12 +234,9 @@ func main() {
 			return collectionCommands.NewTxRateLimitCommand(addressRateLimiter)
 		}).
 		AdminCommand("read-range-cluster-blocks", func(conf *cmd.NodeConfig) commands.AdminCommand {
-			clusterPayloads := badger.NewClusterPayloads(&metrics.NoopCollector{}, conf.DB)
-			headers, ok := conf.Storage.Headers.(*badger.Headers)
-			if !ok {
-				panic("fail to initialize admin tool, conf.Storage.Headers can not be casted as badger headers")
-			}
-			return storageCommands.NewReadRangeClusterBlocksCommand(conf.DB, headers, clusterPayloads)
+			clusterPayloads := store.NewClusterPayloads(&metrics.NoopCollector{}, conf.ProtocolDB)
+			headers := store.NewHeaders(&metrics.NoopCollector{}, conf.ProtocolDB)
+			return storageCommands.NewReadRangeClusterBlocksCommand(conf.ProtocolDB, headers, clusterPayloads)
 		}).
 		Module("follower distributor", func(node *cmd.NodeConfig) error {
 			followerDistributor = pubsub.NewFollowerDistributor()
@@ -370,7 +378,7 @@ func main() {
 		Component("follower core", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			// create a finalizer for updating the protocol
 			// state when the follower detects newly finalized blocks
-			finalizer := confinalizer.NewFinalizer(node.DB, node.Storage.Headers, followerState, node.Tracer)
+			finalizer := confinalizer.NewFinalizer(node.ProtocolDB.Reader(), node.Storage.Headers, followerState, node.Tracer)
 			finalized, pending, err := recovery.FindLatest(node.State, node.Storage.Headers)
 			if err != nil {
 				return nil, fmt.Errorf("could not find latest finalized block and pending blocks to recover consensus follower: %w", err)
@@ -479,6 +487,13 @@ func main() {
 			return ing, err
 		}).
 		Component("transaction ingress rpc server", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+			// maintain backwards compatibility with the deprecated flag
+			if rpcConf.DeprecatedMaxMsgSize != 0 {
+				node.Logger.Warn().Msg("A deprecated flag was specified (--rpc-max-message-size). Use --rpc-max-request-message-size and --rpc-max-response-message-size instead. This flag will be removed in a future release.")
+				rpcConf.MaxRequestMsgSize = rpcConf.DeprecatedMaxMsgSize
+				rpcConf.MaxResponseMsgSize = rpcConf.DeprecatedMaxMsgSize
+			}
+
 			server := rpc.New(
 				rpcConf,
 				ing,
@@ -531,7 +546,7 @@ func main() {
 		// Epoch manager encapsulates and manages epoch-dependent engines as we
 		// transition between epochs
 		Component("epoch manager", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-			clusterStateFactory, err := factories.NewClusterStateFactory(node.DB, node.Metrics.Cache, node.Tracer)
+			clusterStateFactory, err := factories.NewClusterStateFactory(node.ProtocolDB, node.StorageLockMgr, node.Metrics.Cache, node.Tracer)
 			if err != nil {
 				return nil, err
 			}
@@ -551,8 +566,9 @@ func main() {
 			}
 
 			builderFactory, err := factories.NewBuilderFactory(
-				node.DB,
+				node.ProtocolDB,
 				node.State,
+				node.StorageLockMgr,
 				node.Storage.Headers,
 				node.Tracer,
 				colMetrics,

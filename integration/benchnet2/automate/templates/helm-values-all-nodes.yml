@@ -98,7 +98,6 @@ execution:
         - --loglevel=INFO
         - --admin-addr=0.0.0.0:9002
         - --rpc-addr=0.0.0.0:9000
-        - --cadence-tracing=false
         - --extensive-tracing=false
         - --enable-storehouse=false
       env:{{template "env" .}}

@@ -5,7 +5,7 @@ import (
 	"os"
 
 	"github.com/ipfs/go-datastore"
-	badger "github.com/ipfs/go-ds-badger2"
+	pebbleds "github.com/ipfs/go-ds-pebble"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -32,10 +32,10 @@ func Execute() {
 }
 
 func initBlobstore() (blobs.Blobstore, datastore.Batching) {
-	ds, err := badger.NewDatastore(flagBlobstoreDir, &badger.DefaultOptions)
+	ds, err := pebbleds.NewDatastore(flagBlobstoreDir, nil)
 
 	if err != nil {
-		log.Fatal().Err(err).Msg("could not init badger datastore")
+		log.Fatal().Err(err).Msg("could not init pebble datastore")
 	}
 
 	blobstore := blobs.NewBlobstore(ds)

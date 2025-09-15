@@ -4,7 +4,7 @@ import (
 	"math/rand"
 	"testing"
 
-	"github.com/dgraph-io/badger/v2"
+	"github.com/cockroachdb/pebble/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -13,9 +13,10 @@ import (
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/trace"
 	mockprot "github.com/onflow/flow-go/state/protocol/mock"
-	storage "github.com/onflow/flow-go/storage/badger"
-	"github.com/onflow/flow-go/storage/badger/operation"
-	mockstor "github.com/onflow/flow-go/storage/mock"
+	"github.com/onflow/flow-go/storage"
+	"github.com/onflow/flow-go/storage/operation"
+	"github.com/onflow/flow-go/storage/operation/pebbleimpl"
+	"github.com/onflow/flow-go/storage/store"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -24,18 +25,6 @@ func LogCleanup(list *[]flow.Identifier) func(flow.Identifier) error {
 		*list = append(*list, blockID)
 		return nil
 	}
-}
-
-func TestNewFinalizer(t *testing.T) {
-	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
-		headers := &mockstor.Headers{}
-		state := &mockprot.FollowerState{}
-		tracer := trace.NewNoopTracer()
-		fin := NewFinalizer(db, headers, state, tracer)
-		assert.Equal(t, fin.db, db)
-		assert.Equal(t, fin.headers, headers)
-		assert.Equal(t, fin.state, state)
-	})
 }
 
 // TestMakeFinalValidChain checks whether calling `MakeFinal` with the ID of a valid
@@ -74,34 +63,56 @@ func TestMakeFinalValidChain(t *testing.T) {
 	// this will hold the IDs of blocks clean up
 	var list []flow.Identifier
 
-	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+	unittest.RunWithPebbleDB(t, func(pdb *pebble.DB) {
+		// set up lock context
+		lockManager := storage.NewTestingLockManager()
+		lctx := lockManager.NewContext()
+		err := lctx.AcquireLock(storage.LockFinalizeBlock)
+		require.NoError(t, err)
+		defer lctx.Release()
+
+		dbImpl := pebbleimpl.ToDB(pdb)
 
 		// insert the latest finalized height
-		err := db.Update(operation.InsertFinalizedHeight(final.Height))
+		err = dbImpl.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+			return operation.UpsertFinalizedHeight(lctx, rw.Writer(), final.Height)
+		})
 		require.NoError(t, err)
 
 		// map the finalized height to the finalized block ID
-		err = db.Update(operation.IndexBlockHeight(final.Height, final.ID()))
+		err = dbImpl.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+			return operation.IndexFinalizedBlockByHeight(lctx, rw, final.Height, final.ID())
+		})
 		require.NoError(t, err)
 
 		// insert the finalized block header into the DB
-		err = db.Update(operation.InsertHeader(final.ID(), final))
+		insertLctx := lockManager.NewContext()
+		require.NoError(t, insertLctx.AcquireLock(storage.LockInsertBlock))
+		err = dbImpl.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+			return operation.InsertHeader(insertLctx, rw, final.ID(), final)
+		})
 		require.NoError(t, err)
+		insertLctx.Release()
 
 		// insert all of the pending blocks into the DB
 		for _, header := range pending {
-			err = db.Update(operation.InsertHeader(header.ID(), header))
+			insertLctx2 := lockManager.NewContext()
+			require.NoError(t, insertLctx2.AcquireLock(storage.LockInsertBlock))
+			err = dbImpl.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+				return operation.InsertHeader(insertLctx2, rw, header.ID(), header)
+			})
 			require.NoError(t, err)
+			insertLctx2.Release()
 		}
 
 		// initialize the finalizer with the dependencies and make the call
 		metrics := metrics.NewNoopCollector()
 		fin := Finalizer{
-			db:      db,
-			headers: storage.NewHeaders(metrics, db),
-			state:   state,
-			tracer:  trace.NewNoopTracer(),
-			cleanup: LogCleanup(&list),
+			dbReader: pebbleimpl.ToDB(pdb).Reader(),
+			headers:  store.NewHeaders(metrics, pebbleimpl.ToDB(pdb)),
+			state:    state,
+			tracer:   trace.NewNoopTracer(),
+			cleanup:  LogCleanup(&list),
 		}
 		err = fin.MakeFinal(lastID)
 		require.NoError(t, err)
@@ -132,32 +143,53 @@ func TestMakeFinalInvalidHeight(t *testing.T) {
 	// this will hold the IDs of blocks clean up
 	var list []flow.Identifier
 
-	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+	unittest.RunWithPebbleDB(t, func(pdb *pebble.DB) {
+		dbImpl := pebbleimpl.ToDB(pdb)
+		lockManager := storage.NewTestingLockManager()
 
-		// insert the latest finalized height
-		err := db.Update(operation.InsertFinalizedHeight(final.Height))
+		// Insert the latest finalized height and map the finalized height to the finalized block ID.
+		lctx := lockManager.NewContext()
+		require.NoError(t, lctx.AcquireLock(storage.LockFinalizeBlock))
+		err := dbImpl.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+			err := operation.IndexFinalizedBlockByHeight(lctx, rw, final.Height, final.ID())
+			if err != nil {
+				return err
+			}
+			return operation.UpsertFinalizedHeight(lctx, rw.Writer(), final.Height)
+		})
 		require.NoError(t, err)
+		// NOTE: must release lock here - do not deferr! Reason:
+		// The business logic we are testing here should not be expected to do anything regarding finalization when
+		// somebody else is still holding the lock `LockFinalizeBlock`. However, we want to verify that finalizing
+		// another block at the same height is rejected. Hence, we should not be holding the lock anymore.
+		lctx.Release()
 
-		// map the finalized height to the finalized block ID
-		err = db.Update(operation.IndexBlockHeight(final.Height, final.ID()))
+		// Insert the latest finalized height and map the finalized height to the finalized block ID.
+		insertLctx := lockManager.NewContext()
+		require.NoError(t, insertLctx.AcquireLock(storage.LockInsertBlock))
+		err = dbImpl.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+			return operation.InsertHeader(insertLctx, rw, final.ID(), final)
+		})
 		require.NoError(t, err)
-
-		// insert the finalized block header into the DB
-		err = db.Update(operation.InsertHeader(final.ID(), final))
-		require.NoError(t, err)
+		insertLctx.Release()
 
 		// insert all of the pending header into DB
-		err = db.Update(operation.InsertHeader(pending.ID(), pending))
+		insertLctx = lockManager.NewContext()
+		require.NoError(t, insertLctx.AcquireLock(storage.LockInsertBlock))
+		err = dbImpl.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+			return operation.InsertHeader(insertLctx, rw, pending.ID(), pending)
+		})
 		require.NoError(t, err)
+		insertLctx.Release()
 
 		// initialize the finalizer with the dependencies and make the call
 		metrics := metrics.NewNoopCollector()
 		fin := Finalizer{
-			db:      db,
-			headers: storage.NewHeaders(metrics, db),
-			state:   state,
-			tracer:  trace.NewNoopTracer(),
-			cleanup: LogCleanup(&list),
+			dbReader: pebbleimpl.ToDB(pdb).Reader(),
+			headers:  store.NewHeaders(metrics, pebbleimpl.ToDB(pdb)),
+			state:    state,
+			tracer:   trace.NewNoopTracer(),
+			cleanup:  LogCleanup(&list),
 		}
 		err = fin.MakeFinal(pending.ID())
 		require.Error(t, err)
@@ -184,28 +216,45 @@ func TestMakeFinalDuplicate(t *testing.T) {
 	// this will hold the IDs of blocks clean up
 	var list []flow.Identifier
 
-	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+	unittest.RunWithPebbleDB(t, func(pdb *pebble.DB) {
+		lockManager := storage.NewTestingLockManager()
+		dbImpl := pebbleimpl.ToDB(pdb)
 
 		// insert the latest finalized height
-		err := db.Update(operation.InsertFinalizedHeight(final.Height))
-		require.NoError(t, err)
+		lctx := lockManager.NewContext()
+		require.NoError(t, lctx.AcquireLock(storage.LockFinalizeBlock))
+		err := dbImpl.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+			err := operation.UpsertFinalizedHeight(lctx, rw.Writer(), final.Height)
+			if err != nil {
+				return err
+			}
 
-		// map the finalized height to the finalized block ID
-		err = db.Update(operation.IndexBlockHeight(final.Height, final.ID()))
+			return operation.IndexFinalizedBlockByHeight(lctx, rw, final.Height, final.ID())
+		})
 		require.NoError(t, err)
+		// NOTE: must release lock here - do not deferr! Reason:
+		// The business logic we are testing here should not be expected to do anything regarding finalization when
+		// somebody else is still holding the lock `LockFinalizeBlock`. However, we want to verify that finalizing
+		// the same block again is a no-op. Hence, we should not be holding the lock anymore.
+		lctx.Release()
 
 		// insert the finalized block header into the DB
-		err = db.Update(operation.InsertHeader(final.ID(), final))
+		insertLctx := lockManager.NewContext()
+		require.NoError(t, insertLctx.AcquireLock(storage.LockInsertBlock))
+		err = dbImpl.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+			return operation.InsertHeader(insertLctx, rw, final.ID(), final)
+		})
 		require.NoError(t, err)
+		insertLctx.Release()
 
 		// initialize the finalizer with the dependencies and make the call
 		metrics := metrics.NewNoopCollector()
 		fin := Finalizer{
-			db:      db,
-			headers: storage.NewHeaders(metrics, db),
-			state:   state,
-			tracer:  trace.NewNoopTracer(),
-			cleanup: LogCleanup(&list),
+			dbReader: pebbleimpl.ToDB(pdb).Reader(),
+			headers:  store.NewHeaders(metrics, pebbleimpl.ToDB(pdb)),
+			state:    state,
+			tracer:   trace.NewNoopTracer(),
+			cleanup:  LogCleanup(&list),
 		}
 		err = fin.MakeFinal(final.ID())
 		require.NoError(t, err)

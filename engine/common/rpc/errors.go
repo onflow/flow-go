@@ -13,6 +13,9 @@ import (
 	"github.com/onflow/flow-go/storage"
 )
 
+// ErrScriptTooLarge is returned when a script and/or arguments exceed the max size allowed by the server
+var ErrScriptTooLarge = errors.New("script and/or arguments are too large")
+
 // ErrorToStatus converts an Access API error into a grpc status error.
 // The input may either be a status.Error already, or an access sentinel error.
 // All generic errors are classified as `codes.Unknown`
