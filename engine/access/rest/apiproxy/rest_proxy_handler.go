@@ -389,9 +389,10 @@ func (r *RestProxyHandler) ExecuteScriptAtBlockHeight(
 	defer closer.Close()
 
 	executeScriptAtBlockHeightRequest := &accessproto.ExecuteScriptAtBlockHeightRequest{
-		BlockHeight: blockHeight,
-		Script:      script,
-		Arguments:   arguments,
+		BlockHeight:         blockHeight,
+		Script:              script,
+		Arguments:           arguments,
+		ExecutionStateQuery: executionStateQuery(criteria),
 	}
 	executeScriptAtBlockHeightResponse, err := upstream.ExecuteScriptAtBlockHeight(
 		ctx,
@@ -423,9 +424,10 @@ func (r *RestProxyHandler) ExecuteScriptAtBlockID(
 	defer closer.Close()
 
 	executeScriptAtBlockIDRequest := &accessproto.ExecuteScriptAtBlockIDRequest{
-		BlockId:   blockID[:],
-		Script:    script,
-		Arguments: arguments,
+		BlockId:             blockID[:],
+		Script:              script,
+		Arguments:           arguments,
+		ExecutionStateQuery: executionStateQuery(criteria),
 	}
 	executeScriptAtBlockIDResponse, err := upstream.ExecuteScriptAtBlockID(
 		ctx,
@@ -461,11 +463,7 @@ func (r *RestProxyHandler) GetEventsForHeightRange(
 		StartHeight:          startHeight,
 		EndHeight:            endHeight,
 		EventEncodingVersion: requiredEventEncodingVersion,
-		ExecutionStateQuery: &entities.ExecutionStateQuery{
-			AgreeingExecutorsCount:  uint64(criteria.AgreeingExecutorsCount),
-			RequiredExecutorIds:     convert.IdentifiersToMessages(criteria.RequiredExecutors),
-			IncludeExecutorMetadata: true,
-		},
+		ExecutionStateQuery:  executionStateQuery(criteria),
 	}
 	eventsResponse, err := upstream.GetEventsForHeightRange(ctx, getEventsForHeightRangeRequest)
 	if err != nil {
@@ -499,11 +497,7 @@ func (r *RestProxyHandler) GetEventsForBlockIDs(
 		Type:                 eventType,
 		BlockIds:             blockIds,
 		EventEncodingVersion: requiredEventEncodingVersion,
-		ExecutionStateQuery: &entities.ExecutionStateQuery{
-			AgreeingExecutorsCount:  uint64(criteria.AgreeingExecutorsCount),
-			RequiredExecutorIds:     convert.IdentifiersToMessages(criteria.RequiredExecutors),
-			IncludeExecutorMetadata: true,
-		},
+		ExecutionStateQuery:  executionStateQuery(criteria),
 	}
 	eventsResponse, err := upstream.GetEventsForBlockIDs(ctx, getEventsForBlockIDsRequest)
 	r.log("upstream", "GetEventsForBlockIDs", err)
@@ -589,4 +583,13 @@ func getExecutorMetadata(metadata *entities.Metadata) accessmodel.ExecutorMetada
 
 	return accessmodel.ExecutorMetadata{}
 
+}
+
+// TODO(Uliana): add godoc
+func executionStateQuery(criteria optimistic_sync.Criteria) *entities.ExecutionStateQuery {
+	return &entities.ExecutionStateQuery{
+		AgreeingExecutorsCount:  uint64(criteria.AgreeingExecutorsCount),
+		RequiredExecutorIds:     convert.IdentifiersToMessages(criteria.RequiredExecutors),
+		IncludeExecutorMetadata: true,
+	}
 }
