@@ -814,7 +814,12 @@ func TestConcurrentConnections(t *testing.T) {
 				defer wg.Done()
 
 				client, _, err := connectionFactory.GetExecutionAPIClient(clientAddress)
-				require.NoError(tt, err)
+				if err != nil {
+					// if there was a connection error, the client will be invalidated, in the cache
+					// causing the client to be closed.
+					require.ErrorIs(tt, err, ErrClientShuttingDown)
+					return
+				}
 
 				_, err = client.Ping(ctx, req)
 

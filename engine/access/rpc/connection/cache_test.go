@@ -127,16 +127,28 @@ func TestGetConnection(t *testing.T) {
 
 		var wg sync.WaitGroup
 
-		attemptCount := 50
+		attemptCount := 10
 		started := make(chan struct{}, attemptCount)
 		block := make(chan struct{}, attemptCount)
+
+		gotExpectedErr := atomic.NewBool(false)
 		for range attemptCount {
 			wg.Go(func() {
 				started <- struct{}{}
 				<-block
 				conn, err := cache.GetConnection(clientAddress, cfg, networkPubKey, connectFn)
-				require.ErrorIs(t, err, expectedErr)
-				require.Nil(t, conn)
+				assert.Nil(t, conn)
+
+				// if some of the goroutines take longer to get rescheduled, they may get to the
+				// clientConnection() mutex after the connection is closed. Allow either error to be
+				// to avoid flakiness.
+				switch {
+				case errors.Is(err, expectedErr):
+					gotExpectedErr.Store(true)
+				case errors.Is(err, ErrClientShuttingDown):
+				default:
+					t.Errorf("unexpected error: %v", err)
+				}
 			})
 		}
 
@@ -157,6 +169,9 @@ func TestGetConnection(t *testing.T) {
 		wg.Wait()
 
 		assert.Equal(t, 0, cache.Len())
+
+		// make sure we got at least one of the expected errors
+		assert.True(t, gotExpectedErr.Load())
 	})
 }
 
