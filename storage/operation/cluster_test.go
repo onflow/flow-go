@@ -186,7 +186,9 @@ func TestClusterBlockByReferenceHeight(t *testing.T) {
 			require.NoError(t, err)
 
 			var retrieved []flow.Identifier
-			err = operation.LookupClusterBlocksByReferenceHeightRange(lctx, db.Reader(), height, height, &retrieved)
+			err = unittest.WithLock(t, lockManager, storage.LockInsertOrFinalizeClusterBlock, func(lctx lockctx.Context) error {
+				return operation.LookupClusterBlocksByReferenceHeightRange(lctx, db.Reader(), height, height, &retrieved)
+			})
 			assert.NoError(t, err)
 			assert.Len(t, retrieved, len(ids))
 			assert.ElementsMatch(t, ids, retrieved)
