@@ -109,13 +109,17 @@ There are 2 categories of returned errors:
 Expected errors are benign sentinel errors returned by the function.
 Exceptions are unexpected errors returned by the function. These include all errors that are not benign within the context of the method.
 
+IMPORTANT: For high-assurance software systems such as Flow, anything _outside_ of the paths explicitly specified as safe must be treated as critical failures. 
+* Hence, we tend to not explicitly specify this over and over again for the sake of brevity. Applying this rule entails that we only document sentinel errors. 
+* It is implicit that _any_ function or method that has an error return might return an exception, unless explicitly stated otherwise. 
+
 - Error classification is context-dependent - the same error type can be benign in one context but an exception in another
 - **ALL** methods that return an error **MUST** document exhaustively all expected benign errors that can be returned (if any)
 - ONLY include expected errors documentation if the function returns an error.
 - ONLY document benign errors that are expected during normal operations
 - Exceptions (unexpected errors) are NOT individually documented in the error section.
 - If sentinel errors are expected, include the catch-all statement about exceptions as the last item: `All other errors are potential indicators of bugs or corrupted internal state (continuation impossible)`
-- If no errors are expected (all return errors are exceptions), use the catch-all statement: `No errors are expected during normal operations.`
+- If no errors are expected (all return errors are exceptions), use the catch-all statement: `No error returns are expected during normal operations.`
 - NEVER document individual exceptions.
 - Error documentation should be the last part of a method's documentation
 
@@ -131,7 +135,7 @@ Common mistakes to avoid:
 - DO NOT document errors that aren't returned
 - DO NOT document generic fmt.Errorf errors unless they wrap a sentinel error
 - DO NOT document exceptions (unexpected errors that may indicate bugs)
-- DO NOT mix benign and exceptional errors without clear distinction
+- DO NOT document exceptional errors. Instead, it is implicitly understood that any function or method with an error return might throw exceptions. We categorically exclude repetitive statements about exceptions, because they bloat the documentation.
 - DO NOT omit the catch-all statement about other errors
 - DO NOT document implementation details that might change
 
@@ -195,7 +199,7 @@ Example 4: Method with context-dependent error handling
 - If not thread-safe, explain why
 - For methods or functions that are not concurrency safe (deviating from the default), it **MUST** be explicitly documented by including the following call-out:
   ```go
-  // CAUTION: not concurrency safe!
+  // NOT CONCURRENCY SAFE!
   ```
 - If **ALL** methods of a struct or interface are thread-safe, only document this in the struct's or interface's godoc and mention that all methods are thread-safe. Do NOT include the line in each method:
   ```go
