@@ -52,7 +52,7 @@ When generating documentation for functions that read data, carefully differenti
 As an example for functions of type (i), consider `operation.RetrieveSeal`:
 ```golang
 // RetrieveSeal retrieves [flow.Seal] by its ID.
-// Expected errors during normal operations:
+// Expected error returns during normal operations:
 //   - [storage.ErrNotFound] if no seal with the specified `sealID` is known.
 func RetrieveSeal(r storage.Reader, sealID flow.Identifier, seal *flow.Seal) error
 ```
@@ -67,7 +67,7 @@ As an example for functions of type (ii), consider `operation.LookupPayloadSeals
 ```golang
 // LookupPayloadSeals retrieves the list of Seals that were included in the payload
 // of the specified block. For every known block, this index should be populated (at or above the root block).
-// Expected errors during normal operations:
+// Expected error returns during normal operations:
 //   - [storage.ErrNotFound] if `blockID` does not refer to a known block
 func LookupPayloadSeals(r storage.Reader, blockID flow.Identifier, sealIDs *[]flow.Identifier) error error
 ```
@@ -93,7 +93,7 @@ As an example for functions of type (i.a), consider `operation.UpsertCollection`
 // from the value (collection) via a collision-resistant hash function. Hence, unchecked overwrites pose no risk
 // of data corruption, because for the same key, we expect the same value.
 //
-// No other error returns are expected during normal operation.
+// No error returns are expected during normal operation.
 func UpsertCollection(w storage.Writer, collection *flow.LightCollection) error {
 	return UpsertByKey(w, MakePrefix(codeCollection, collection.ID()), collection)
 }
@@ -117,7 +117,7 @@ As an example for functions of type (i.b), consider `operation.InsertSeal`:
 // This method silently overrides existing data, which is safe only if for the same key, we
 // always write the same value.
 //
-// No other error returns are expected during normal operation.
+// No error returns are expected during normal operation.
 func InsertSeal(w storage.Writer, sealID flow.Identifier, seal *flow.Seal) error {
 	return UpsertByKey(w, MakePrefix(codeSeal, sealID), seal)
 }
@@ -182,7 +182,7 @@ As an example for functions of type (i.b), consider `operation.IndexPayloadSeals
 //     serves as a reminder that the CALLER is responsible to ensure that the DEDUPLICATION CHECK is done elsewhere
 //     ATOMICALLY with this write operation.
 //
-// No other error returns are expected during normal operation.
+// No error returns are expected during normal operation.
 func IndexPayloadSeals(lctx lockctx.Proof, w storage.Writer, blockID flow.Identifier, sealIDs []flow.Identifier) error {
 	if !lctx.HoldsLock(storage.LockInsertBlock) {
 		return fmt.Errorf("cannot index seal for blockID %v without holding lock %s",
