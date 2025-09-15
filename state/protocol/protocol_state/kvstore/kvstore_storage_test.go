@@ -38,7 +38,7 @@ func TestProtocolKVStore_StoreTx(t *testing.T) {
 		}
 		kvState.On("VersionedEncode").Return(expectedVersion, encData, nil).Once()
 
-		unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
+		err := unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
 			rw := storagemock.NewReaderBatchWriter(t)
 			llStorage.On("BatchStore", lctx, rw, kvStateID, versionedSnapshot).Return(nil).Once()
 
@@ -49,6 +49,7 @@ func TestProtocolKVStore_StoreTx(t *testing.T) {
 			// and verify that the deferred database operation returned by the lower-level is actually reached.
 			return store.BatchStore(lctx, rw, kvStateID, kvState)
 		})
+		require.NoError(t, err)
 	})
 
 	// On the unhappy path, i.e. when the encoding of input `kvState` failed, `ProtocolKVStore` should produce
@@ -59,12 +60,13 @@ func TestProtocolKVStore_StoreTx(t *testing.T) {
 
 		kvState.On("VersionedEncode").Return(uint64(0), nil, encodingError).Once()
 
-		unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
+		err := unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
 			rw := storagemock.NewReaderBatchWriter(t)
 			err := store.BatchStore(lctx, rw, kvStateID, kvState)
 			require.ErrorIs(t, err, encodingError)
 			return nil
 		})
+		require.NoError(t, err)
 	})
 }
 
@@ -80,7 +82,7 @@ func TestProtocolKVStore_IndexTx(t *testing.T) {
 	// should be called to persist the version-encoded snapshot.
 	t.Run("happy path", func(t *testing.T) {
 		lockManager := storage.NewTestingLockManager()
-		unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
+		err := unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
 			rw := storagemock.NewReaderBatchWriter(t)
 			llStorage.On("BatchIndex", lctx, rw, blockID, stateID).Return(nil).Once()
 
@@ -91,13 +93,14 @@ func TestProtocolKVStore_IndexTx(t *testing.T) {
 			// and verify that the deferred database operation returned by the lower-level is actually reached.
 			return store.BatchIndex(lctx, rw, blockID, stateID)
 		})
+		require.NoError(t, err)
 	})
 
 	// On the unhappy path, the deferred database update from the lower level just errors upon execution.
 	// This error should be escalated.
 	t.Run("unhappy path", func(t *testing.T) {
 		lockManager := storage.NewTestingLockManager()
-		unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
+		err := unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
 			indexingError := errors.New("indexing error")
 			rw := storagemock.NewReaderBatchWriter(t)
 			llStorage.On("BatchIndex", lctx, rw, blockID, stateID).Return(indexingError).Once()
@@ -106,6 +109,7 @@ func TestProtocolKVStore_IndexTx(t *testing.T) {
 			require.ErrorIs(t, err, indexingError)
 			return nil
 		})
+		require.NoError(t, err)
 	})
 }
 

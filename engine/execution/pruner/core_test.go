@@ -47,12 +47,13 @@ func TestLoopPruneExecutionDataFromRootToLatestSealed(t *testing.T) {
 		// indexed by height
 		chunks := make([]*verification.VerifiableChunkData, lastFinalizedHeight+2)
 		parentID := genesis.ID()
-		unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
+		err := unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
 			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 				// By convention, root block has no proposer signature - implementation has to handle this edge case
 				return blockstore.BatchStore(lctx, rw, &flow.Proposal{Block: *genesis, ProposerSigData: nil})
 			})
 		})
+		require.NoError(t, err)
 
 		for i := 1; i <= lastFinalizedHeight; i++ {
 			chunk, block := unittest.VerifiableChunkDataFixture(0, func(headerBody *flow.HeaderBody) {
@@ -60,16 +61,18 @@ func TestLoopPruneExecutionDataFromRootToLatestSealed(t *testing.T) {
 				headerBody.ParentID = parentID
 			})
 			chunks[i] = chunk // index by height
-			unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
+			err := unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
 				return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 					return blockstore.BatchStore(lctx, rw, unittest.ProposalFromBlock(block))
 				})
 			})
-			unittest.WithLock(t, lockManager, storage.LockFinalizeBlock, func(lctx lockctx.Context) error {
+			require.NoError(t, err)
+			err = unittest.WithLock(t, lockManager, storage.LockFinalizeBlock, func(lctx lockctx.Context) error {
 				return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 					return operation.IndexFinalizedBlockByHeight(lctx, rw, chunk.Header.Height, chunk.Header.ID())
 				})
 			})
+			require.NoError(t, err)
 			require.NoError(t, results.Store(chunk.Result))
 			require.NoError(t, results.Index(chunk.Result.BlockID, chunk.Result.ID()))
 			require.NoError(t, chunkDataPacks.Store([]*flow.ChunkDataPack{chunk.ChunkDataPack}))

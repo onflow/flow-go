@@ -69,7 +69,7 @@ func TestMakeFinalValidChain(t *testing.T) {
 		lockManager := storage.NewTestingLockManager()
 		dbImpl := pebbleimpl.ToDB(pdb)
 
-		unittest.WithLock(t, lockManager, storage.LockFinalizeBlock, func(lctx lockctx.Context) error {
+		err := unittest.WithLock(t, lockManager, storage.LockFinalizeBlock, func(lctx lockctx.Context) error {
 			// insert the latest finalized height
 			err := dbImpl.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 				return operation.UpsertFinalizedHeight(lctx, rw.Writer(), final.Height)
@@ -83,21 +83,24 @@ func TestMakeFinalValidChain(t *testing.T) {
 			require.NoError(t, err)
 			return nil
 		})
+		require.NoError(t, err)
 
 		// insert the finalized block header into the DB
-		unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
+		err = unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
 			return dbImpl.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 				return operation.InsertHeader(lctx, rw, final.ID(), final)
 			})
 		})
+		require.NoError(t, err)
 
 		// insert all of the pending blocks into the DB
 		for _, header := range pending {
-			unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
+			err := unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
 				return dbImpl.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 					return operation.InsertHeader(lctx, rw, header.ID(), header)
 				})
 			})
+			require.NoError(t, err)
 		}
 
 		// initialize the finalizer with the dependencies and make the call

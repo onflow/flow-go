@@ -202,7 +202,7 @@ func (suite *MutatorSuite) FinalizeBlock(block model.Block) {
 	err := operation.RetrieveHeader(suite.db.Reader(), block.Payload.ReferenceBlockID, &refBlock)
 	suite.Require().Nil(err)
 
-	unittest.WithLock(suite.T(), suite.lockManager, storage.LockInsertOrFinalizeClusterBlock, func(lctx lockctx.Context) error {
+	err = unittest.WithLock(suite.T(), suite.lockManager, storage.LockInsertOrFinalizeClusterBlock, func(lctx lockctx.Context) error {
 		return suite.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 			err := procedure.FinalizeClusterBlock(lctx, rw, block.ID())
 			if err != nil {

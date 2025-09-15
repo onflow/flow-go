@@ -256,7 +256,7 @@ func (bs *BuilderSuite) SetupTest() {
 
 	// insert finalized height and root height
 	db := bs.db
-	unittest.WithLocks(bs.T(), lockManager, []string{storage.LockFinalizeBlock, storage.LockBootstrapping}, func(lctx lockctx.Context) error {
+	err := unittest.WithLocks(bs.T(), lockManager, []string{storage.LockFinalizeBlock, storage.LockBootstrapping}, func(lctx lockctx.Context) error {
 		return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 			enc, err := datastore.NewVersionedInstanceParams(
 				datastore.DefaultInstanceParamsVersion,
@@ -273,6 +273,7 @@ func (bs *BuilderSuite) SetupTest() {
 			return nil
 		})
 	})
+	require.NoError(bs.T(), err)
 
 	bs.sentinel = 1337
 	bs.setter = func(h *flow.HeaderBodyBuilder) error {
