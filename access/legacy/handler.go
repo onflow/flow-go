@@ -28,7 +28,10 @@ func NewHandler(api access.API, chain flow.Chain) *Handler {
 }
 
 // Ping the Access API server for a response.
-func (h *Handler) Ping(context.Context, *accessproto.PingRequest) (*accessproto.PingResponse, error) {
+func (h *Handler) Ping(
+	context.Context,
+	*accessproto.PingRequest,
+) (*accessproto.PingResponse, error) {
 	return &accessproto.PingResponse{}, nil
 }
 
@@ -264,7 +267,12 @@ func (h *Handler) ExecuteScriptAtLatestBlock(
 	script := req.GetScript()
 	arguments := req.GetArguments()
 
-	value, err := h.api.ExecuteScriptAtLatestBlock(ctx, script, arguments)
+	value, _, err := h.api.ExecuteScriptAtLatestBlock(
+		ctx,
+		script,
+		arguments,
+		optimistic_sync.Criteria{},
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -283,7 +291,13 @@ func (h *Handler) ExecuteScriptAtBlockHeight(
 	arguments := req.GetArguments()
 	blockHeight := req.GetBlockHeight()
 
-	value, err := h.api.ExecuteScriptAtBlockHeight(ctx, blockHeight, script, arguments)
+	value, _, err := h.api.ExecuteScriptAtBlockHeight(
+		ctx,
+		blockHeight,
+		script,
+		arguments,
+		optimistic_sync.Criteria{},
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -302,7 +316,13 @@ func (h *Handler) ExecuteScriptAtBlockID(
 	arguments := req.GetArguments()
 	blockID := convert.MessageToIdentifier(req.GetBlockId())
 
-	value, err := h.api.ExecuteScriptAtBlockID(ctx, blockID, script, arguments)
+	value, _, err := h.api.ExecuteScriptAtBlockID(
+		ctx,
+		blockID,
+		script,
+		arguments,
+		optimistic_sync.Criteria{},
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -321,7 +341,14 @@ func (h *Handler) GetEventsForHeightRange(
 	startHeight := req.GetStartHeight()
 	endHeight := req.GetEndHeight()
 
-	results, _, err := h.api.GetEventsForHeightRange(ctx, eventType, startHeight, endHeight, entities.EventEncodingVersion_JSON_CDC_V0, optimistic_sync.Criteria{})
+	results, _, err := h.api.GetEventsForHeightRange(
+		ctx,
+		eventType,
+		startHeight,
+		endHeight,
+		entities.EventEncodingVersion_JSON_CDC_V0,
+		optimistic_sync.Criteria{},
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -339,7 +366,13 @@ func (h *Handler) GetEventsForBlockIDs(
 	eventType := req.GetType()
 	blockIDs := convert.MessagesToIdentifiers(req.GetBlockIds())
 
-	results, _, err := h.api.GetEventsForBlockIDs(ctx, eventType, blockIDs, entities.EventEncodingVersion_JSON_CDC_V0, optimistic_sync.Criteria{})
+	results, _, err := h.api.GetEventsForBlockIDs(
+		ctx,
+		eventType,
+		blockIDs,
+		entities.EventEncodingVersion_JSON_CDC_V0,
+		optimistic_sync.Criteria{},
+	)
 	if err != nil {
 		return nil, err
 	}
