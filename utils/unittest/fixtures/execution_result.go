@@ -108,14 +108,17 @@ func NewExecutionResultGenerator(
 // Fixture generates a [flow.ExecutionResult] with random data based on the provided options.
 func (g *ExecutionResultGenerator) Fixture(opts ...ExecutionResultOption) *flow.ExecutionResult {
 	blockID := g.identifiers.Fixture()
-	chunkCount := g.random.IntInRange(1, 4)
+	chunks := g.chunks.List(g.random.IntInRange(1, 4), Chunk.WithBlockID(blockID))
+	serviceEventCount := 0
+	for _, chunk := range chunks {
+		serviceEventCount += int(chunk.ServiceEventCount)
+	}
 	result := &flow.ExecutionResult{
 		PreviousResultID: g.identifiers.Fixture(),
 		BlockID:          blockID,
-		Chunks:           g.chunks.List(chunkCount, Chunk.WithBlockID(blockID)),
-		// TODO: split the service events amoung the chunks
-		ServiceEvents:   g.serviceEvents.List(g.random.IntInRange(0, 5)),
-		ExecutionDataID: g.identifiers.Fixture(),
+		Chunks:           chunks,
+		ServiceEvents:    g.serviceEvents.List(serviceEventCount),
+		ExecutionDataID:  g.identifiers.Fixture(),
 	}
 
 	for _, opt := range opts {

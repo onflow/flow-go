@@ -103,7 +103,7 @@ func (g *ChunkGenerator) Fixture(opts ...ChunkOption) *flow.Chunk {
 			CollectionIndex:      g.random.Uintn(10), // TODO: should CollectionIndex == Index?
 			StartState:           g.stateCommitments.Fixture(),
 			EventCollection:      g.identifiers.Fixture(),
-			ServiceEventCount:    uint16(g.random.Uintn(100)),
+			ServiceEventCount:    g.random.Uint16n(10),
 			BlockID:              g.identifiers.Fixture(),
 			TotalComputationUsed: g.random.Uint64InRange(1, 9999),
 			NumberOfTransactions: g.random.Uint64InRange(1, 100),
