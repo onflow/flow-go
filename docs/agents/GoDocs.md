@@ -83,8 +83,7 @@ Example
   Example 3 - Complex return value needs explanation:
   ```go
   // GetBlockStatus returns the block's current status.
-  // Returns:
-  //   - status: PENDING if still processing, FINALIZED if complete, INVALID if failed validation
+  // Returns `PENDING` if still processing, `FINALIZED` if complete, or `INVALID` if failed validation.
   ```
 - Expected errors documentation is mandatory (see section `Error Documentation` below)
 
@@ -185,28 +184,6 @@ Example 4: Method with context-dependent error handling
   // Safe for concurrent access
   ```
 
-### Special Cases
-- For getters/setters, use simplified format:
-  ```go
-  // GetterName returns the value of the field.
-  //
-  // Returns:
-  //   - value: description of the returned value
-  ```
-- For constructors, use:
-  ```go
-  // NewTypeName creates a new instance of TypeName.
-  //
-  // Parameters:
-  //   - `param1`: description of `param1`
-  //
-  // Returns:
-  //   - [*TypeName]: the newly created instance
-  //   - error: any error that occurred during creation
-  //
-  // No error returns are expected during normal operations.
-  ```
-
 ### Private Methods
 - Private methods should still be documented
 - Can use more technical language
@@ -229,15 +206,16 @@ Example 4: Method with context-dependent error handling
 
 ### Getter Method Example
 ```go
-// Pipeline returns the pipeline associated with this execution result container.
+// pipeline returns the pipeline associated with this execution result container.
 // Returns nil if no pipeline is set.
 //
-// Safe for concurrent access
+// NOT CONCURRENCY SAFE! Caller must hold the lock.
 ```
 
 ### Constructor Example
 ```go
-// NewExecutionResultContainer creates a new instance of ExecutionResultContainer with the given result and pipeline.
+// NewExecutionResultContainer creates a new instance of ExecutionResultContainer with the given
+// result and pipeline.
 //
 // Expected Errors:
 //   - [ErrInvalidBlock]: when the block ID doesn't match the result's block ID
