@@ -92,8 +92,8 @@ func TestEpochFirstBlockIndex_InsertRetrieve(t *testing.T) {
 		err := operation.RetrieveEpochFirstHeight(db.Reader(), epoch, &retrieved)
 		require.ErrorIs(t, err, storage.ErrNotFound)
 
+		// can insert
 		err = unittest.WithLock(t, lockManager, storage.LockFinalizeBlock, func(lctx lockctx.Context) error {
-			// can insert
 			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 				return operation.InsertEpochFirstHeight(lctx, rw, epoch, height)
 			})

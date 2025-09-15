@@ -176,17 +176,20 @@ func TestClusterBlockByReferenceHeight(t *testing.T) {
 					err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 						return operation.IndexClusterBlockByReferenceHeight(lctx, rw.Writer(), height, id)
 					})
-					assert.NoError(t, err)
+					if err != nil {
+						return err
+					}
 				}
 
-				var retrieved []flow.Identifier
-				err := operation.LookupClusterBlocksByReferenceHeightRange(lctx, db.Reader(), height, height, &retrieved)
-				assert.NoError(t, err)
-				assert.Len(t, retrieved, len(ids))
-				assert.ElementsMatch(t, ids, retrieved)
 				return nil
 			})
 			require.NoError(t, err)
+
+			var retrieved []flow.Identifier
+			err = operation.LookupClusterBlocksByReferenceHeightRange(lctx, db.Reader(), height, height, &retrieved)
+			assert.NoError(t, err)
+			assert.Len(t, retrieved, len(ids))
+			assert.ElementsMatch(t, ids, retrieved)
 		})
 	})
 

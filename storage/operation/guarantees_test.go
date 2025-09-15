@@ -50,27 +50,21 @@ func TestIndexGuaranteedCollectionByBlockHashInsertRetrieve(t *testing.T) {
 		lockManager := storage.NewTestingLockManager()
 
 		err := unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
-			err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 				for _, guarantee := range guarantees {
 					if err := operation.InsertGuarantee(rw.Writer(), guarantee.ID(), guarantee); err != nil {
 						return err
 					}
 				}
-				if err := operation.IndexPayloadGuarantees(lctx, rw.Writer(), blockID, expected); err != nil {
-					return err
-				}
-				return nil
+				return operation.IndexPayloadGuarantees(lctx, rw.Writer(), blockID, expected)
 			})
-			require.NoError(t, err)
-
-			var actual []flow.Identifier
-			err = operation.LookupPayloadGuarantees(db.Reader(), blockID, &actual)
-			require.NoError(t, err)
-
-			assert.Equal(t, []flow.Identifier(expected), actual)
-			return nil
 		})
 		require.NoError(t, err)
+		var actual []flow.Identifier
+		err = operation.LookupPayloadGuarantees(db.Reader(), blockID, &actual)
+		require.NoError(t, err)
+
+		assert.Equal(t, []flow.Identifier(expected), actual)
 	})
 }
 
@@ -102,10 +96,7 @@ func TestIndexGuaranteedCollectionByBlockHashMultipleBlocks(t *testing.T) {
 						return err
 					}
 				}
-				if err := operation.IndexPayloadGuarantees(lctx, rw.Writer(), blockID1, ids1); err != nil {
-					return err
-				}
-				return nil
+				return operation.IndexPayloadGuarantees(lctx, rw.Writer(), blockID1, ids1)
 			})
 		})
 		require.NoError(t, err)
@@ -118,10 +109,7 @@ func TestIndexGuaranteedCollectionByBlockHashMultipleBlocks(t *testing.T) {
 						return err
 					}
 				}
-				if err := operation.IndexPayloadGuarantees(lctx, rw.Writer(), blockID2, ids2); err != nil {
-					return err
-				}
-				return nil
+				return operation.IndexPayloadGuarantees(lctx, rw.Writer(), blockID2, ids2)
 			})
 		})
 		require.NoError(t, err)

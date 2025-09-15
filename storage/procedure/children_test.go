@@ -78,11 +78,9 @@ func TestIndexZeroParent(t *testing.T) {
 		childID := unittest.IdentifierFixture()
 
 		err := unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
-			err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 				return procedure.IndexNewBlock(lctx, rw, childID, flow.ZeroID)
 			})
-			require.NoError(t, err)
-			return nil
 		})
 		require.NoError(t, err)
 

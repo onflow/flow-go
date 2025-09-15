@@ -157,7 +157,7 @@ func TestMakeFinalInvalidHeight(t *testing.T) {
 		})
 		require.NoError(t, err)
 
-		// Insert the latest finalized height and map the finalized height to the finalized block ID.
+		// insert the finalized block header into the DB
 		err = unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(insertLctx lockctx.Context) error {
 			return dbImpl.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 				return operation.InsertHeader(insertLctx, rw, final.ID(), final)
@@ -165,7 +165,7 @@ func TestMakeFinalInvalidHeight(t *testing.T) {
 		})
 		require.NoError(t, err)
 
-		// insert all of the pending header into DB
+		// insert pending header into DB, which has the same height as the finalized header
 		err = unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(insertLctx lockctx.Context) error {
 			return dbImpl.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 				return operation.InsertHeader(insertLctx, rw, pending.ID(), pending)
