@@ -216,6 +216,8 @@ func compareBlock(
 		flagComputeLimit,
 	)
 
+	var mismatch bool
+
 	for i, interResult := range interResults {
 		vmResult := vmResults[i]
 		transaction := blockTransactions[i]
@@ -227,6 +229,8 @@ func compareBlock(
 			interResult,
 			vmResult,
 		) {
+			mismatch = true
+
 			compareReadsAndWrites(
 				txID,
 				interTxSnapshots[i],
@@ -245,6 +249,12 @@ func compareBlock(
 				printSpan(span)
 			}
 		}
+	}
+
+	if mismatch {
+		log.Info().Msgf("Block %s (height %d) matched!", blockID, header.Height)
+	} else {
+		log.Error().Msgf("Block %s (height %d) did not match!", blockID, header.Height)
 	}
 
 	return header
