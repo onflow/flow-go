@@ -9,7 +9,6 @@ import (
 	"github.com/ipfs/go-cid"
 	"github.com/ipfs/go-datastore"
 	dssync "github.com/ipfs/go-datastore/sync"
-	badgerds "github.com/ipfs/go-ds-badger2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -38,7 +37,7 @@ const (
 
 var (
 	// canonicalExecutionDataID is the execution data ID of the canonical execution data.
-	canonicalExecutionDataID = flow.MustHexStringToIdentifier("843b992db0f6feb9fa439d5515ec6796f367c8f8fb318515fa98ebfc9491b632")
+	canonicalExecutionDataID = flow.MustHexStringToIdentifier("637cf35656b86a647eca490d9370632a276137712ecfec65846ba8ec90bec627")
 )
 
 func getDatastore() datastore.Batching {
@@ -244,21 +243,7 @@ func TestCalculateExecutionDataLifecycle(t *testing.T) {
 	bed, bedRoot := canonicalBlockExecutionData(t)
 
 	unittest.RunWithTempDir(t, func(dbDir string) {
-		badgerDir := filepath.Join(dbDir, "badger")
 		pebbleDir := filepath.Join(dbDir, "pebble")
-
-		t.Run("badger provider generates correct ID", func(t *testing.T) {
-			dsManager, err := edstorage.NewBadgerDatastoreManager(badgerDir, &badgerds.DefaultOptions)
-			require.NoError(t, err)
-			defer dsManager.Close()
-
-			provider := getProvider(getBlobservice(t, dsManager.Datastore()))
-			executionDataID, executionDataRoot, err := provider.Provide(ctx, 0, bed)
-			require.NoError(t, err)
-
-			assert.Equal(t, canonicalExecutionDataID, executionDataID)
-			assert.Equal(t, bedRoot, executionDataRoot)
-		})
 
 		t.Run("pebble provider generates correct ID", func(t *testing.T) {
 			dsManager, err := edstorage.NewPebbleDatastoreManager(unittest.Logger(), pebbleDir, nil)
@@ -271,21 +256,6 @@ func TestCalculateExecutionDataLifecycle(t *testing.T) {
 
 			assert.Equal(t, canonicalExecutionDataID, executionDataID)
 			assert.Equal(t, bedRoot, executionDataRoot)
-		})
-
-		t.Run("badger provider retrieves correct execution data", func(t *testing.T) {
-			dsManager, err := edstorage.NewBadgerDatastoreManager(badgerDir, &badgerds.DefaultOptions)
-			require.NoError(t, err)
-			defer dsManager.Close()
-
-			bs := blobs.NewBlobstore(dsManager.Datastore())
-			bs.HashOnRead(true) // ensure data read from db matches expected hash
-			executionDataStore := execution_data.NewExecutionDataStore(bs, execution_data.DefaultSerializer)
-
-			executionData, err := executionDataStore.Get(ctx, canonicalExecutionDataID)
-			require.NoError(t, err)
-
-			deepEqual(t, bed, executionData)
 		})
 
 		t.Run("pebble provider retrieves correct execution data", func(t *testing.T) {
