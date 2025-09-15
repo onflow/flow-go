@@ -5,8 +5,6 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/cockroachdb/pebble/v2"
-	"github.com/dgraph-io/badger/v2"
 	"github.com/jordanschalm/lockctx"
 	"github.com/onflow/crypto"
 	"github.com/rs/zerolog"
@@ -20,6 +18,7 @@ import (
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/util"
+	"github.com/onflow/flow-go/storage"
 )
 
 // ConsensusFollower is a standalone module run by third parties which provides
@@ -38,8 +37,7 @@ type Config struct {
 	networkPrivKey   crypto.PrivateKey   // the network private key of this node
 	bootstrapNodes   []BootstrapNodeInfo // the bootstrap nodes to use
 	bindAddr         string              // address to bind on
-	badgerDB         *badger.DB          // badger instance
-	pebbleDB         *pebble.DB          // pebble instance
+	protocolDB       storage.DB          // badger instance
 	bootstrapDir     string              // path to the bootstrap directory
 	logLevel         string              // log level
 	exposeMetrics    bool                // whether to expose metrics
@@ -53,15 +51,9 @@ type Config struct {
 type Option func(c *Config)
 
 // currently used by rosetta
-func WithDB(db *badger.DB) Option {
+func WithProtocolDB(db storage.DB) Option {
 	return func(cf *Config) {
-		cf.badgerDB = db
-	}
-}
-
-func WithPebbleDB(db *pebble.DB) Option {
-	return func(cf *Config) {
-		cf.pebbleDB = db
+		cf.protocolDB = db
 	}
 }
 
@@ -145,11 +137,8 @@ func getBaseOptions(config *Config) []cmd.Option {
 	if config.bindAddr != "" {
 		options = append(options, cmd.WithBindAddress(config.bindAddr))
 	}
-	if config.badgerDB != nil {
-		options = append(options, cmd.WithBadgerDB(config.badgerDB))
-	}
-	if config.pebbleDB != nil {
-		options = append(options, cmd.WithPebbleDB(config.pebbleDB))
+	if config.protocolDB != nil {
+		options = append(options, cmd.WithProtocolDB(config.protocolDB))
 	}
 	if config.logLevel != "" {
 		options = append(options, cmd.WithLogLevel(config.logLevel))
@@ -196,8 +185,7 @@ func NewConsensusFollower(
 		networkPrivKey: networkPrivKey,
 		bootstrapNodes: bootstapIdentities,
 		bindAddr:       bindAddr,
-		badgerDB:       nil,
-		pebbleDB:       nil,
+		protocolDB:     nil,
 		logLevel:       "info",
 		exposeMetrics:  false,
 		lockManager:    nil, // default to nil, can be set optionally with WithLockManager in tests

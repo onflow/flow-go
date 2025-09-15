@@ -2,7 +2,6 @@ package storage
 
 import (
 	"io"
-	"sync"
 )
 
 // Iterator is an interface for iterating over key-value pairs in a storage backend.
@@ -62,6 +61,7 @@ type IteratorOption struct {
 	BadgerIterateKeyOnly bool // default false
 }
 
+// TODO: convert into a var
 func DefaultIteratorOptions() IteratorOption {
 	return IteratorOption{
 		// only needed for badger. ignored by pebble
@@ -143,14 +143,6 @@ type ReaderBatchWriter interface {
 	// - The writer cannot be used concurrently for writing.
 	Writer() Writer
 
-	// Lock tries to acquire the lock for the batch.
-	// if the lock is already acquired by this same batch from other pending db operations,
-	// then it will not be blocked and can continue updating the batch, which prevents a re-entrant deadlock.
-	// Note the ReaderBatchWriter is not concurrent-safe, so the caller must ensure that
-	// the batch is not used concurrently by multiple goroutines.
-	// CAUTION: The caller must ensure that no other references exist for the input lock.
-	Lock(*sync.Mutex)
-
 	// AddCallback adds a callback to execute after the batch has been flush
 	// regardless the batch update is succeeded or failed.
 	// The error parameter is the error returned by the batch update.
@@ -170,6 +162,10 @@ type DB interface {
 
 	// NewBatch create a new batch for writing.
 	NewBatch() Batch
+
+	// Close closes the database and releases all resources.
+	// No errors are expected during normal operation.
+	Close() error
 }
 
 // Batch is an interface for a batch of writes to a storage backend.
@@ -199,6 +195,12 @@ func OnlyWriter(fn func(Writer) error) func(ReaderBatchWriter) error {
 }
 
 // OnCommitSucceed adds a callback to execute after the batch has been successfully committed.
+//
+// Context on why we don't add this method to the ReaderBatchWriter:
+// Because the implementation of the ReaderBatchWriter interface would have to provide an implementation
+// for AddSuccessCallback, which can be derived for free from the AddCallback method.
+// It's better avoid using AddCallback directly and use OnCommitSucceed instead,
+// because you might write `if err != nil` by mistake, which is a golang idiom for error handling
 func OnCommitSucceed(b ReaderBatchWriter, onSuccessFn func()) {
 	b.AddCallback(func(err error) {
 		if err == nil {

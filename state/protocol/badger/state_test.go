@@ -6,7 +6,6 @@ import (
 	"os"
 	"testing"
 
-	"github.com/dgraph-io/badger/v2"
 	"github.com/stretchr/testify/assert"
 	testmock "github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -19,8 +18,9 @@ import (
 	"github.com/onflow/flow-go/state/protocol/inmem"
 	"github.com/onflow/flow-go/state/protocol/util"
 	protoutil "github.com/onflow/flow-go/state/protocol/util"
-	bstorage "github.com/onflow/flow-go/storage/badger"
-	storagebadger "github.com/onflow/flow-go/storage/badger"
+	"github.com/onflow/flow-go/storage"
+	"github.com/onflow/flow-go/storage/operation/pebbleimpl"
+	"github.com/onflow/flow-go/storage/store"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -34,7 +34,8 @@ func TestBootstrapAndOpen(t *testing.T) {
 		block.ParentID = unittest.IdentifierFixture()
 	})
 
-	protoutil.RunWithBootstrapState(t, rootSnapshot, func(db *badger.DB, _ *bprotocol.State) {
+	protoutil.RunWithBootstrapState(t, rootSnapshot, func(db storage.DB, _ *bprotocol.State) {
+		lockManager := storage.NewTestingLockManager()
 		// expect the final view metric to be set to current epoch's final view
 		epoch, err := rootSnapshot.Epochs().Current()
 		require.NoError(t, err)
@@ -46,24 +47,27 @@ func TestBootstrapAndOpen(t *testing.T) {
 		complianceMetrics.On("CurrentEpochCounter", counter).Once()
 		complianceMetrics.On("CurrentEpochPhase", phase).Once()
 		complianceMetrics.On("CurrentEpochFinalView", epoch.FinalView()).Once()
+		complianceMetrics.On("BlockFinalized", testmock.Anything).Once()
 		complianceMetrics.On("FinalizedHeight", testmock.Anything).Once()
+		complianceMetrics.On("BlockSealed", testmock.Anything).Once()
 		complianceMetrics.On("SealedHeight", testmock.Anything).Once()
 
 		complianceMetrics.On("CurrentDKGPhaseViews",
 			epoch.DKGPhase1FinalView(), epoch.DKGPhase2FinalView(), epoch.DKGPhase3FinalView()).Once()
 
 		noopMetrics := new(metrics.NoopCollector)
-		all := storagebadger.InitAll(noopMetrics, db)
+		all := store.InitAll(noopMetrics, db)
 		// protocol state has been bootstrapped, now open a protocol state with the database
 		state, err := bprotocol.OpenState(
 			complianceMetrics,
 			db,
+			lockManager,
 			all.Headers,
 			all.Seals,
 			all.Results,
 			all.Blocks,
 			all.QuorumCertificates,
-			all.Setups,
+			all.EpochSetups,
 			all.EpochCommits,
 			all.EpochProtocolStateEntries,
 			all.ProtocolKVStore,
@@ -107,7 +111,8 @@ func TestBootstrapAndOpen_EpochCommitted(t *testing.T) {
 		}
 	})
 
-	protoutil.RunWithBootstrapState(t, committedPhaseSnapshot, func(db *badger.DB, _ *bprotocol.State) {
+	protoutil.RunWithBootstrapState(t, committedPhaseSnapshot, func(db storage.DB, _ *bprotocol.State) {
+		lockManager := storage.NewTestingLockManager()
 
 		complianceMetrics := new(mock.ComplianceMetrics)
 
@@ -121,25 +126,27 @@ func TestBootstrapAndOpen_EpochCommitted(t *testing.T) {
 		phase, err := committedPhaseSnapshot.EpochPhase()
 		require.NoError(t, err)
 		complianceMetrics.On("CurrentEpochPhase", phase).Once()
-
 		complianceMetrics.On("CurrentEpochFinalView", currentEpoch.FinalView()).Once()
+		complianceMetrics.On("CurrentDKGPhaseViews", currentEpoch.DKGPhase1FinalView(), currentEpoch.DKGPhase2FinalView(), currentEpoch.DKGPhase3FinalView()).Once()
 
-		complianceMetrics.On("CurrentDKGPhaseViews",
-			currentEpoch.DKGPhase1FinalView(), currentEpoch.DKGPhase2FinalView(), currentEpoch.DKGPhase3FinalView()).Once()
+		// expect finalized and sealed to be set to the latest block
 		complianceMetrics.On("FinalizedHeight", testmock.Anything).Once()
+		complianceMetrics.On("BlockFinalized", testmock.Anything).Once()
 		complianceMetrics.On("SealedHeight", testmock.Anything).Once()
+		complianceMetrics.On("BlockSealed", testmock.Anything).Once()
 
 		noopMetrics := new(metrics.NoopCollector)
-		all := storagebadger.InitAll(noopMetrics, db)
+		all := store.InitAll(noopMetrics, db)
 		state, err := bprotocol.OpenState(
 			complianceMetrics,
 			db,
+			lockManager,
 			all.Headers,
 			all.Seals,
 			all.Results,
 			all.Blocks,
 			all.QuorumCertificates,
-			all.Setups,
+			all.EpochSetups,
 			all.EpochCommits,
 			all.EpochProtocolStateEntries,
 			all.ProtocolKVStore,
@@ -172,7 +179,7 @@ func TestBootstrap_EpochHeightBoundaries(t *testing.T) {
 	// For the spork root snapshot, only the first height of the root epoch should be indexed.
 	// [x]
 	t.Run("spork root snapshot", func(t *testing.T) {
-		util.RunWithFollowerProtocolState(t, rootSnapshot, func(db *badger.DB, state *bprotocol.FollowerState) {
+		util.RunWithFollowerProtocolState(t, rootSnapshot, func(db storage.DB, state *bprotocol.FollowerState) {
 			currentEpoch, err := state.Final().Epochs().Current()
 			require.NoError(t, err)
 			// first height of started current epoch should be known
@@ -357,7 +364,6 @@ func TestBootstrapNonRoot(t *testing.T) {
 			block3View := block2.View + 1
 			block3 := unittest.BlockFixture(
 				unittest.Block.WithParent(block2.ID(), block2.View, block2.Height),
-				unittest.Block.WithView(block3View),
 				unittest.Block.WithPayload(
 					flow.Payload{
 						Seals:           seals,
@@ -498,7 +504,6 @@ func TestBootstrapNonRoot(t *testing.T) {
 			block3View := block2.View + 1
 			block3 := unittest.BlockFixture(
 				unittest.Block.WithParent(block2.ID(), block2.View, block2.Height),
-				unittest.Block.WithView(block3View),
 				unittest.Block.WithPayload(
 					flow.Payload{
 						Seals:           seals,
@@ -825,14 +830,14 @@ func TestBootstrap_InvalidSporkBlockView(t *testing.T) {
 	segment, err := rootSnapshot.SealingSegment()
 	require.NoError(t, err)
 
-	currentView := segment.Finalized().View + 1       // according to creating LivenessData
-	encodable.Params.SporkRootBlockView = currentView // update spork root block view
+	// invalid configuration, where the latest finalized block's view is lower than the spork root block's view:
+	encodable.Params.SporkRootBlockView = segment.Finalized().View + 1
 
 	rootSnapshot = inmem.SnapshotFromEncodable(encodable)
 
 	bootstrap(t, rootSnapshot, func(state *bprotocol.State, err error) {
 		require.Error(t, err)
-		require.Contains(t, err.Error(), fmt.Sprintf("PaceMaker cannot start in view %d which is less or equal than spork root view %d", currentView, rootSnapshot.Params().SporkRootBlockView()))
+		require.Contains(t, err.Error(), fmt.Sprintf("sealing segment is invalid, because the latest finalized block's view %d is lower than the spork root block's view %d", segment.Finalized().View, rootSnapshot.Params().SporkRootBlockView()))
 	})
 }
 
@@ -842,18 +847,21 @@ func bootstrap(t *testing.T, rootSnapshot protocol.Snapshot, f func(*bprotocol.S
 	metrics := metrics.NewNoopCollector()
 	dir := unittest.TempDir(t)
 	defer os.RemoveAll(dir)
-	db := unittest.BadgerDB(t, dir)
+	pdb := unittest.PebbleDB(t, dir)
+	db := pebbleimpl.ToDB(pdb)
+	lockManager := storage.NewTestingLockManager()
 	defer db.Close()
-	all := bstorage.InitAll(metrics, db)
+	all := store.InitAll(metrics, db)
 	state, err := bprotocol.Bootstrap(
 		metrics,
 		db,
+		lockManager,
 		all.Headers,
 		all.Seals,
 		all.Results,
 		all.Blocks,
 		all.QuorumCertificates,
-		all.Setups,
+		all.EpochSetups,
 		all.EpochCommits,
 		all.EpochProtocolStateEntries,
 		all.ProtocolKVStore,
@@ -871,7 +879,7 @@ func bootstrap(t *testing.T, rootSnapshot protocol.Snapshot, f func(*bprotocol.S
 // from non-root states.
 func snapshotAfter(t *testing.T, rootSnapshot protocol.Snapshot, f func(*bprotocol.FollowerState, protocol.MutableProtocolState) protocol.Snapshot) protocol.Snapshot {
 	var after protocol.Snapshot
-	protoutil.RunWithFullProtocolStateAndMutator(t, rootSnapshot, func(_ *badger.DB, state *bprotocol.ParticipantState, mutableState protocol.MutableProtocolState) {
+	protoutil.RunWithFullProtocolStateAndMutator(t, rootSnapshot, func(_ storage.DB, state *bprotocol.ParticipantState, mutableState protocol.MutableProtocolState) {
 		snap := f(state.FollowerState, mutableState)
 		var err error
 		after, err = inmem.FromSnapshot(snap)
@@ -933,7 +941,7 @@ func assertSealingSegmentBlocksQueryableAfterBootstrap(t *testing.T, snapshot pr
 
 // BenchmarkFinal benchmarks retrieving the latest finalized block from storage.
 func BenchmarkFinal(b *testing.B) {
-	util.RunWithBootstrapState(b, unittest.RootSnapshotFixture(unittest.CompleteIdentitySet()), func(db *badger.DB, state *bprotocol.State) {
+	util.RunWithBootstrapState(b, unittest.RootSnapshotFixture(unittest.CompleteIdentitySet()), func(db storage.DB, state *bprotocol.State) {
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
 			header, err := state.Final().Head()
@@ -945,7 +953,7 @@ func BenchmarkFinal(b *testing.B) {
 
 // BenchmarkFinal benchmarks retrieving the block by height from storage.
 func BenchmarkByHeight(b *testing.B) {
-	util.RunWithBootstrapState(b, unittest.RootSnapshotFixture(unittest.CompleteIdentitySet()), func(db *badger.DB, state *bprotocol.State) {
+	util.RunWithBootstrapState(b, unittest.RootSnapshotFixture(unittest.CompleteIdentitySet()), func(db storage.DB, state *bprotocol.State) {
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
 			header, err := state.AtHeight(0).Head()
