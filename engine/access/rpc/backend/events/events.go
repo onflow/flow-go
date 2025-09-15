@@ -235,7 +235,6 @@ func (e *Events) GetEventsForBlockIDs(
 	}
 
 	var newestBlockHeader *flow.Header
-	newestView := uint64(0)
 
 	// find the block headers for all the block IDs
 	blockHeaders := make([]provider.BlockMetadata, 0, len(blockIDs))
@@ -246,8 +245,7 @@ func (e *Events) GetEventsForBlockIDs(
 				rpc.ConvertStorageError(fmt.Errorf("failed to get block header for %s: %w", blockID, err))
 		}
 
-		if header.View > newestView {
-			newestView = header.View
+		if newestBlockHeader == nil || header.View > newestBlockHeader.View {
 			newestBlockHeader = header
 		}
 
