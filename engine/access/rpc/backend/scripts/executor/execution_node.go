@@ -63,7 +63,7 @@ func (e *ENScriptExecutor) Execute(ctx context.Context, request *Request) ([]byt
 	var result []byte
 	var executionTime time.Time
 	var execDuration time.Duration
-	errToReturn := e.nodeCommunicator.CallAvailableNode(
+	_, errToReturn := e.nodeCommunicator.CallAvailableNode(
 		executors,
 		func(node *flow.IdentitySkeleton) error {
 			execStartTime := time.Now()

@@ -1,6 +1,13 @@
 package optimistic_sync
 
-import "github.com/onflow/flow-go/model/flow"
+import (
+	"errors"
+
+	"github.com/onflow/flow-go/model/flow"
+)
+
+// ErrSnapshotNotFound indicates that the execution result is not found or not ready for querying.
+var ErrSnapshotNotFound = errors.New("execution result not found for block")
 
 // ExecutionStateCache provides access to execution state snapshots for querying data at specific ExecutionResults.
 type ExecutionStateCache interface {
@@ -10,6 +17,6 @@ type ExecutionStateCache interface {
 	// The result may be sealed or unsealed. Only data for finalized blocks is available.
 	//
 	// Expected error returns during normal operation:
-	//   - storage.ErrNotFound - result is not found or not ready for querying.
+	//   - ErrSnapshotNotFound - result is not found or not ready for querying.
 	Snapshot(executionResultID flow.Identifier) (Snapshot, error)
 }

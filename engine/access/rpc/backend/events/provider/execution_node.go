@@ -114,8 +114,7 @@ func (e *ENEventProvider) getEventsFromAnyExeNode(
 	req *execproto.GetEventsForBlockIDsRequest,
 ) (*execproto.GetEventsForBlockIDsResponse, *flow.IdentitySkeleton, error) {
 	var resp *execproto.GetEventsForBlockIDsResponse
-	var execNode *flow.IdentitySkeleton
-	errToReturn := e.nodeCommunicator.CallAvailableNode(
+	execNode, errToReturn := e.nodeCommunicator.CallAvailableNode(
 		execNodes,
 		func(node *flow.IdentitySkeleton) error {
 			var err error
@@ -133,7 +132,6 @@ func (e *ENEventProvider) getEventsFromAnyExeNode(
 			if err == nil {
 				// return if any execution node replied successfully
 				logger.Debug().Msg("Successfully got events")
-				execNode = node
 				return nil
 			}
 

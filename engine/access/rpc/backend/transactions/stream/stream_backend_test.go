@@ -237,12 +237,7 @@ func (s *TransactionStreamSuite) initializeBackend() {
 	s.executionStateCache = optimisticsyncmock.NewExecutionStateCache(s.T())
 
 	localTxProvider := provider.NewLocalTransactionProvider(
-		s.state,
-		s.collections,
-		s.blocks,
-		s.systemTx.ID(),
 		txStatusDeriver,
-		s.executionResultProvider,
 		s.executionStateCache,
 	)
 
