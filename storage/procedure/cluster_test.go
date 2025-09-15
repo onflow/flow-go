@@ -20,10 +20,9 @@ func TestInsertRetrieveClusterBlock(t *testing.T) {
 
 		lockManager := storage.NewTestingLockManager()
 		err := unittest.WithLock(t, lockManager, storage.LockInsertOrFinalizeClusterBlock, func(lctx lockctx.Context) error {
-			require.NoError(t, db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 				return InsertClusterBlock(lctx, rw, unittest.ClusterProposalFromBlock(block))
-			}))
-			return nil
+			})
 		})
 		require.NoError(t, err)
 
@@ -60,10 +59,9 @@ func TestFinalizeClusterBlock(t *testing.T) {
 			require.NoError(t, db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 				return InsertClusterBlock(lctx, rw, unittest.ClusterProposalFromBlock(block))
 			}))
-			require.NoError(t, db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 				return FinalizeClusterBlock(lctx, rw, block.ID())
-			}))
-			return nil
+			})
 		})
 		require.NoError(t, err)
 
@@ -104,10 +102,9 @@ func TestDisconnectedFinalizedBlock(t *testing.T) {
 				require.NoError(t, db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 					return FinalizeClusterBlock(lctx, rw, blockB.ID())
 				}))
-				require.NoError(t, db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+				return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 					return FinalizeClusterBlock(lctx, rw, blockC.ID())
-				}))
-				return nil
+				})
 			})
 			require.NoError(t, err)
 		})
