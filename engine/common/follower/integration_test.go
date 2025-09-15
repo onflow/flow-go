@@ -143,10 +143,12 @@ func TestFollowerHappyPath(t *testing.T) {
 		// don't forget to subscribe for finalization notifications
 		consensusConsumer.AddOnBlockFinalizedConsumer(engine.OnFinalizedBlock)
 
+		// Create an [irrecoverable.SignalerContext] to consume any irrecoverable errors that might be thrown by
+		// hotstuff or follower engine. This mock will fail the test when `SignalerContext.Throw` is called.
+		mockCtx, cancel := irrecoverable.NewMockSignalerContextWithCancel(t, context.Background())
 		// start hotstuff logic and follower engine
-		ctx, cancel, errs := irrecoverable.WithSignallerAndCancel(context.Background())
-		followerLoop.Start(ctx)
-		engine.Start(ctx)
+		followerLoop.Start(mockCtx)
+		engine.Start(mockCtx)
 		unittest.RequireCloseBefore(t, moduleutil.AllReady(engine, followerLoop), time.Second, "engine failed to start")
 
 		// prepare chain of blocks, we will use a continuous chain assuming it was generated on happy path.
@@ -218,13 +220,7 @@ func TestFollowerHappyPath(t *testing.T) {
 			// stop engines and wait for graceful shutdown
 			cancel()
 			unittest.RequireCloseBefore(t, moduleutil.AllDone(engine, followerLoop), time.Second, "engine failed to stop")
-
-			// surface any irrecoverable errors
-			select {
-			case err := <-errs:
-				require.NoError(t, err)
-			default:
-			}
+			// Note: in case any error occur, the `mockCtx` will fail the test, due to the unexpected call of `Throw` on the mock.
 		}()
 
 		// wait for target block to become finalized, this might take a while.
