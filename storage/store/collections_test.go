@@ -28,12 +28,13 @@ func TestCollections(t *testing.T) {
 		expected := unittest.CollectionFixture(3)
 
 		// Create a lock manager and context for testing
-		unittest.WithLock(t, lockManager, storage.LockInsertCollection, func(lctx lockctx.Context) error {
+		err := unittest.WithLock(t, lockManager, storage.LockInsertCollection, func(lctx lockctx.Context) error {
 			// store the collection and the transaction index
 			_, err := collections.StoreAndIndexByTransaction(lctx, &expected)
 			require.NoError(t, err)
 			return nil
 		})
+		require.NoError(t, err)
 
 		// retrieve the light collection by collection id
 		actual, err := collections.LightByID(expected.ID())
@@ -92,7 +93,7 @@ func TestCollections_IndexDuplicateTx(t *testing.T) {
 		col2.Transactions = append(col2.Transactions, dupTx)
 
 		// Create a lock manager and context for testing
-		unittest.WithLock(t, lockManager, storage.LockInsertCollection, func(lctx lockctx.Context) error {
+		err := unittest.WithLock(t, lockManager, storage.LockInsertCollection, func(lctx lockctx.Context) error {
 			// insert col1
 			_, err := collections.StoreAndIndexByTransaction(lctx, &col1)
 			require.NoError(t, err)
@@ -103,6 +104,7 @@ func TestCollections_IndexDuplicateTx(t *testing.T) {
 
 			return nil
 		})
+		require.NoError(t, err)
 
 		// should be able to retrieve col2 by ID
 		gotLightByCol2ID, err := collections.LightByID(col2.ID())
@@ -151,11 +153,12 @@ func TestCollections_ConcurrentIndexByTx(t *testing.T) {
 			for i := 0; i < numCollections; i++ {
 				col := unittest.CollectionFixture(1)
 				col.Transactions[0] = sharedTx // Ensure it shares the same transaction
-				unittest.WithLock(t, lockManager, storage.LockInsertCollection, func(lctx lockctx.Context) error {
+				err := unittest.WithLock(t, lockManager, storage.LockInsertCollection, func(lctx lockctx.Context) error {
 					_, err := collections.StoreAndIndexByTransaction(lctx, &col)
 					errChan <- err
 					return nil
 				})
+				require.NoError(t, err)
 			}
 		}()
 
@@ -166,11 +169,12 @@ func TestCollections_ConcurrentIndexByTx(t *testing.T) {
 			for i := 0; i < numCollections; i++ {
 				col := unittest.CollectionFixture(1)
 				col.Transactions[0] = sharedTx // Ensure it shares the same transaction
-				unittest.WithLock(t, lockManager, storage.LockInsertCollection, func(lctx lockctx.Context) error {
+				err := unittest.WithLock(t, lockManager, storage.LockInsertCollection, func(lctx lockctx.Context) error {
 					_, err := collections.StoreAndIndexByTransaction(lctx, &col)
 					errChan <- err
 					return nil
 				})
+				require.NoError(t, err)
 			}
 		}()
 

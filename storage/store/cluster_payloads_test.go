@@ -25,11 +25,12 @@ func TestStoreRetrieveClusterPayload(t *testing.T) {
 
 		// store payload
 		manager := storage.NewTestingLockManager()
-		unittest.WithLock(t, manager, storage.LockInsertOrFinalizeClusterBlock, func(lctx lockctx.Context) error {
+		err := unittest.WithLock(t, manager, storage.LockInsertOrFinalizeClusterBlock, func(lctx lockctx.Context) error {
 			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 				return procedure.InsertClusterPayload(lctx, rw, blockID, expected)
 			})
 		})
+		require.NoError(t, err)
 
 		// fetch payload
 		payload, err := payloads.ByBlockID(blockID)

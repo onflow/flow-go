@@ -28,18 +28,20 @@ func TestHeaderStoreRetrieve(t *testing.T) {
 		block := proposal.Block
 
 		// store block which will also store header
-		unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
+		err := unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
 			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 				return blocks.BatchStore(lctx, rw, proposal)
 			})
 		})
+		require.NoError(t, err)
 
 		// index the header
-		unittest.WithLock(t, lockManager, storage.LockFinalizeBlock, func(lctx2 lockctx.Context) error {
+		err = unittest.WithLock(t, lockManager, storage.LockFinalizeBlock, func(lctx2 lockctx.Context) error {
 			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 				return operation.IndexFinalizedBlockByHeight(lctx2, rw, block.Height, block.ID())
 			})
 		})
+		require.NoError(t, err)
 
 		// retrieve header by height
 		actual, err := headers.ByHeight(block.Height)
@@ -60,18 +62,20 @@ func TestHeaderIndexByViewAndRetrieve(t *testing.T) {
 		block := proposal.Block
 
 		// store block which will also store header
-		unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
+		err := unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
 			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 				return blocks.BatchStore(lctx, rw, proposal)
 			})
 		})
+		require.NoError(t, err)
 
-		unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
+		err = unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
 			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 				// index the header
 				return operation.IndexCertifiedBlockByView(lctx, rw, block.View, block.ID())
 			})
 		})
+		require.NoError(t, err)
 
 		// retrieve header by view
 		actual, err := headers.ByView(block.View)

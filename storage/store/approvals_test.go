@@ -27,9 +27,10 @@ func TestApprovalStoreAndRetrieve(t *testing.T) {
 		// creating the operation -- only for executing the storage write further below
 		approval := unittest.ResultApprovalFixture()
 		storing := store.StoreMyApproval(approval)
-		unittest.WithLock(t, lockManager, storage.LockIndexResultApproval, func(lctx lockctx.Context) error {
+		err := unittest.WithLock(t, lockManager, storage.LockIndexResultApproval, func(lctx lockctx.Context) error {
 			return storing(lctx)
 		})
+		require.NoError(t, err)
 
 		// retrieve entire approval by its ID
 		byID, err := store.ByID(approval.ID())
@@ -54,13 +55,15 @@ func TestApprovalStoreTwice(t *testing.T) {
 		// creating the operation -- only for executing the storage write further below
 		approval := unittest.ResultApprovalFixture()
 		storing := store.StoreMyApproval(approval)
-		unittest.WithLock(t, lockManager, storage.LockIndexResultApproval, func(lctx lockctx.Context) error {
+		err := unittest.WithLock(t, lockManager, storage.LockIndexResultApproval, func(lctx lockctx.Context) error {
 			return storing(lctx)
 		})
+		require.NoError(t, err)
 
-		unittest.WithLock(t, lockManager, storage.LockIndexResultApproval, func(lctx lockctx.Context) error {
+		err = unittest.WithLock(t, lockManager, storage.LockIndexResultApproval, func(lctx lockctx.Context) error {
 			return storing(lctx) // repeated storage of same approval should be no-op
 		})
+		require.NoError(t, err)
 	})
 }
 
@@ -73,21 +76,18 @@ func TestApprovalStoreTwoDifferentApprovalsShouldFail(t *testing.T) {
 		approval1, approval2 := twoApprovalsForTheSameResult(t)
 
 		storing := store.StoreMyApproval(approval1)
-		unittest.WithLock(t, lockManager, storage.LockIndexResultApproval, func(lctx lockctx.Context) error {
-			err := storing(lctx)
-			require.NoError(t, err)
-			return nil
+		err := unittest.WithLock(t, lockManager, storage.LockIndexResultApproval, func(lctx lockctx.Context) error {
+			return storing(lctx)
 		})
+		require.NoError(t, err)
 
 		// we can store a different approval, but we can't index a different
 		// approval for the same chunk.
 		storing2 := store.StoreMyApproval(approval2)
-		unittest.WithLock(t, lockManager, storage.LockIndexResultApproval, func(lctx lockctx.Context) error {
-			err := storing2(lctx)
-			require.Error(t, err)
-			require.ErrorIs(t, err, storage.ErrDataMismatch)
-			return nil
+		err = unittest.WithLock(t, lockManager, storage.LockIndexResultApproval, func(lctx lockctx.Context) error {
+			return storing2(lctx)
 		})
+		require.ErrorIs(t, err, storage.ErrDataMismatch)
 	})
 }
 
@@ -113,10 +113,11 @@ func TestApprovalStoreTwoDifferentApprovalsConcurrently(t *testing.T) {
 			storing := store.StoreMyApproval(approval1)
 
 			startSignal.Wait()
-			unittest.WithLock(t, lockManager, storage.LockIndexResultApproval, func(lctx lockctx.Context) error {
+			err := unittest.WithLock(t, lockManager, storage.LockIndexResultApproval, func(lctx lockctx.Context) error {
 				firstIndexErr = storing(lctx)
 				return nil
 			})
+			require.NoError(t, err)
 			doneSinal.Done()
 		}()
 
@@ -125,10 +126,11 @@ func TestApprovalStoreTwoDifferentApprovalsConcurrently(t *testing.T) {
 			storing := store.StoreMyApproval(approval2)
 
 			startSignal.Wait()
-			unittest.WithLock(t, lockManager, storage.LockIndexResultApproval, func(lctx lockctx.Context) error {
+			err := unittest.WithLock(t, lockManager, storage.LockIndexResultApproval, func(lctx lockctx.Context) error {
 				secondIndexErr = storing(lctx)
 				return nil
 			})
+			require.NoError(t, err)
 			doneSinal.Done()
 		}()
 

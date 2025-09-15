@@ -22,7 +22,7 @@ func TestClusterBlocks(t *testing.T) {
 		parent, blocks := chain[0], chain[1:]
 
 		// add parent and mark its height as the latest finalized block
-		unittest.WithLock(t, lockManager, storage.LockInsertOrFinalizeClusterBlock, func(lctx lockctx.Context) error {
+		err := unittest.WithLock(t, lockManager, storage.LockInsertOrFinalizeClusterBlock, func(lctx lockctx.Context) error {
 			err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 				return operation.IndexClusterBlockHeight(lctx, rw.Writer(), parent.ChainID, parent.Height, parent.ID())
 			})
@@ -34,22 +34,25 @@ func TestClusterBlocks(t *testing.T) {
 			require.NoError(t, err)
 			return nil
 		})
+		require.NoError(t, err)
 
 		// store chain of descending blocks
 		for _, block := range blocks {
 			// InsertClusterBlock only needs LockInsertOrFinalizeClusterBlock
-			unittest.WithLock(t, lockManager, storage.LockInsertOrFinalizeClusterBlock, func(lctx2 lockctx.Context) error {
+			err := unittest.WithLock(t, lockManager, storage.LockInsertOrFinalizeClusterBlock, func(lctx2 lockctx.Context) error {
 				return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 					return procedure.InsertClusterBlock(lctx2, rw, unittest.ClusterProposalFromBlock(block))
 				})
 			})
+			require.NoError(t, err)
 
 			// FinalizeClusterBlock only needs LockInsertOrFinalizeClusterBlock
-			unittest.WithLock(t, lockManager, storage.LockInsertOrFinalizeClusterBlock, func(lctx2 lockctx.Context) error {
+			err = unittest.WithLock(t, lockManager, storage.LockInsertOrFinalizeClusterBlock, func(lctx2 lockctx.Context) error {
 				return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 					return procedure.FinalizeClusterBlock(lctx2, rw, block.ID())
 				})
 			})
+			require.NoError(t, err)
 		}
 
 		clusterBlocks := NewClusterBlocks(
