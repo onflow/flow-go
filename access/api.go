@@ -14,15 +14,39 @@ import (
 type AccountsAPI interface {
 	GetAccount(ctx context.Context, address flow.Address) (*flow.Account, error)
 	GetAccountAtLatestBlock(ctx context.Context, address flow.Address) (*flow.Account, error)
-	GetAccountAtBlockHeight(ctx context.Context, address flow.Address, height uint64) (*flow.Account, error)
+	GetAccountAtBlockHeight(
+		ctx context.Context,
+		address flow.Address,
+		height uint64,
+	) (*flow.Account, error)
 
 	GetAccountBalanceAtLatestBlock(ctx context.Context, address flow.Address) (uint64, error)
-	GetAccountBalanceAtBlockHeight(ctx context.Context, address flow.Address, height uint64) (uint64, error)
+	GetAccountBalanceAtBlockHeight(
+		ctx context.Context,
+		address flow.Address,
+		height uint64,
+	) (uint64, error)
 
-	GetAccountKeyAtLatestBlock(ctx context.Context, address flow.Address, keyIndex uint32) (*flow.AccountPublicKey, error)
-	GetAccountKeyAtBlockHeight(ctx context.Context, address flow.Address, keyIndex uint32, height uint64) (*flow.AccountPublicKey, error)
-	GetAccountKeysAtLatestBlock(ctx context.Context, address flow.Address) ([]flow.AccountPublicKey, error)
-	GetAccountKeysAtBlockHeight(ctx context.Context, address flow.Address, height uint64) ([]flow.AccountPublicKey, error)
+	GetAccountKeyAtLatestBlock(
+		ctx context.Context,
+		address flow.Address,
+		keyIndex uint32,
+	) (*flow.AccountPublicKey, error)
+	GetAccountKeyAtBlockHeight(
+		ctx context.Context,
+		address flow.Address,
+		keyIndex uint32,
+		height uint64,
+	) (*flow.AccountPublicKey, error)
+	GetAccountKeysAtLatestBlock(
+		ctx context.Context,
+		address flow.Address,
+	) ([]flow.AccountPublicKey, error)
+	GetAccountKeysAtBlockHeight(
+		ctx context.Context,
+		address flow.Address,
+		height uint64,
+	) ([]flow.AccountPublicKey, error)
 }
 
 type EventsAPI interface {
@@ -45,9 +69,66 @@ type EventsAPI interface {
 }
 
 type ScriptsAPI interface {
-	ExecuteScriptAtLatestBlock(ctx context.Context, script []byte, arguments [][]byte) ([]byte, error)
-	ExecuteScriptAtBlockHeight(ctx context.Context, blockHeight uint64, script []byte, arguments [][]byte) ([]byte, error)
-	ExecuteScriptAtBlockID(ctx context.Context, blockID flow.Identifier, script []byte, arguments [][]byte) ([]byte, error)
+	ExecuteScriptAtLatestBlock(
+		ctx context.Context,
+		script []byte,
+		arguments [][]byte,
+		criteria optimistic_sync.Criteria,
+	) ([]byte, accessmodel.ExecutorMetadata, error)
+	ExecuteScriptAtBlockHeight(
+		ctx context.Context,
+		blockHeight uint64,
+		script []byte,
+		arguments [][]byte,
+		criteria optimistic_sync.Criteria,
+	) ([]byte, accessmodel.ExecutorMetadata, error)
+	ExecuteScriptAtBlockID(
+		ctx context.Context,
+		blockID flow.Identifier,
+		script []byte,
+		arguments [][]byte,
+		criteria optimistic_sync.Criteria,
+	) ([]byte, accessmodel.ExecutorMetadata, error)
+}
+
+type TransactionsAPI interface {
+	SendTransaction(ctx context.Context, tx *flow.TransactionBody) error
+
+	GetTransaction(ctx context.Context, id flow.Identifier) (*flow.TransactionBody, error)
+	GetTransactionsByBlockID(
+		ctx context.Context,
+		blockID flow.Identifier,
+	) ([]*flow.TransactionBody, error)
+
+	GetTransactionResult(
+		ctx context.Context,
+		txID flow.Identifier,
+		blockID flow.Identifier,
+		collectionID flow.Identifier,
+		encodingVersion entities.EventEncodingVersion,
+	) (*accessmodel.TransactionResult, error)
+	GetTransactionResultByIndex(
+		ctx context.Context,
+		blockID flow.Identifier,
+		index uint32,
+		encodingVersion entities.EventEncodingVersion,
+	) (*accessmodel.TransactionResult, error)
+	GetTransactionResultsByBlockID(
+		ctx context.Context,
+		blockID flow.Identifier,
+		encodingVersion entities.EventEncodingVersion,
+	) ([]*accessmodel.TransactionResult, error)
+
+	GetSystemTransaction(
+		ctx context.Context,
+		blockID flow.Identifier,
+	) (*flow.TransactionBody, error)
+	GetSystemTransactionResult(
+		ctx context.Context,
+		blockID flow.Identifier,
+		encodingVersion entities.EventEncodingVersion,
+		criteria optimistic_sync.Criteria,
+	) (*accessmodel.TransactionResult, accessmodel.ExecutorMetadata, error)
 }
 
 type TransactionsAPI interface {
