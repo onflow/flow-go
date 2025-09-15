@@ -47,14 +47,14 @@ func (f transactionFactory) WithPayer(payer flow.Address) TransactionOption {
 }
 
 // WithAuthorizers is an option that sets the authorizers for the transaction.
-func (f transactionFactory) WithAuthorizers(authorizers []flow.Address) TransactionOption {
+func (f transactionFactory) WithAuthorizers(authorizers ...flow.Address) TransactionOption {
 	return func(g *TransactionGenerator, tx *flow.TransactionBody) {
 		tx.Authorizers = authorizers
 	}
 }
 
 // WithEnvelopeSignatures is an option that sets the envelope signatures for the transaction.
-func (f transactionFactory) WithEnvelopeSignatures(signatures []flow.TransactionSignature) TransactionOption {
+func (f transactionFactory) WithEnvelopeSignatures(signatures ...flow.TransactionSignature) TransactionOption {
 	return func(g *TransactionGenerator, tx *flow.TransactionBody) {
 		tx.EnvelopeSignatures = signatures
 	}

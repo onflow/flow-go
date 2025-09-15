@@ -33,7 +33,7 @@ func (f sealFactory) WithFinalState(finalState flow.StateCommitment) SealOption 
 }
 
 // WithAggregatedApprovalSigs is an option that sets the `AggregatedApprovalSigs` of the seal.
-func (f sealFactory) WithAggregatedApprovalSigs(sigs []flow.AggregatedSignature) SealOption {
+func (f sealFactory) WithAggregatedApprovalSigs(sigs ...flow.AggregatedSignature) SealOption {
 	return func(g *SealGenerator, seal *flow.Seal) {
 		seal.AggregatedApprovalSigs = sigs
 	}

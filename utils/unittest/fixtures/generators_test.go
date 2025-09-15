@@ -658,6 +658,176 @@ func TestGeneratorsDeterminism(t *testing.T) {
 				assert.NotEmpty(t, qc.SignerIDs)
 			},
 		},
+		{
+			name: "Blocks",
+			fixture: func(a, b *GeneratorSuite) (any, any) {
+				return a.Blocks().Fixture(), b.Blocks().Fixture()
+			},
+			list: func(a, b *GeneratorSuite, n int) (any, any) {
+				return a.Blocks().List(n), b.Blocks().List(n)
+			},
+			sanity: func(t *testing.T, suite *GeneratorSuite) {
+				block := suite.Blocks().Fixture()
+				assert.NotNil(t, block)
+				assert.NotNil(t, block.Payload)
+				assert.Equal(t, flow.Emulator, block.ChainID)
+				assert.Greater(t, block.Height, uint64(0))
+				assert.Greater(t, block.View, uint64(0))
+
+				// Test with specific height
+				block2 := suite.Blocks().Fixture(Block.WithHeight(100))
+				assert.Equal(t, uint64(100), block2.Height)
+
+				// Test with specific view
+				block3 := suite.Blocks().Fixture(Block.WithView(200))
+				assert.Equal(t, uint64(200), block3.View)
+
+				// Test with specific chain ID
+				block4 := suite.Blocks().Fixture(Block.WithChainID(flow.Testnet))
+				assert.Equal(t, flow.Testnet, block4.ChainID)
+			},
+		},
+		{
+			name: "Payloads",
+			fixture: func(a, b *GeneratorSuite) (any, any) {
+				return a.Payloads().Fixture(), b.Payloads().Fixture()
+			},
+			list: func(a, b *GeneratorSuite, n int) (any, any) {
+				return a.Payloads().List(n), b.Payloads().List(n)
+			},
+			sanity: func(t *testing.T, suite *GeneratorSuite) {
+				payload := suite.Payloads().Fixture()
+				assert.NotNil(t, payload)
+
+				// Test with specific seals
+				seal := suite.Seals().Fixture()
+				payload2 := suite.Payloads().Fixture(Payload.WithSeals(seal))
+				assert.Len(t, payload2.Seals, 1)
+				assert.Equal(t, seal, payload2.Seals[0])
+
+				// Test with specific guarantees
+				guarantee := suite.Guarantees().Fixture()
+				payload3 := suite.Payloads().Fixture(Payload.WithGuarantees(guarantee))
+				assert.Len(t, payload3.Guarantees, 1)
+				assert.Equal(t, guarantee, payload3.Guarantees[0])
+			},
+		},
+		{
+			name: "Seals",
+			fixture: func(a, b *GeneratorSuite) (any, any) {
+				return a.Seals().Fixture(), b.Seals().Fixture()
+			},
+			list: func(a, b *GeneratorSuite, n int) (any, any) {
+				return a.Seals().List(n), b.Seals().List(n)
+			},
+			sanity: func(t *testing.T, suite *GeneratorSuite) {
+				seal := suite.Seals().Fixture()
+				assert.NotNil(t, seal)
+				assert.NotEmpty(t, seal.BlockID)
+				assert.NotEmpty(t, seal.ResultID)
+				assert.NotEmpty(t, seal.FinalState)
+
+				// Test with specific block ID
+				blockID := suite.Identifiers().Fixture()
+				seal2 := suite.Seals().Fixture(Seal.WithBlockID(blockID))
+				assert.Equal(t, blockID, seal2.BlockID)
+
+				// Test with specific result ID
+				resultID := suite.Identifiers().Fixture()
+				seal3 := suite.Seals().Fixture(Seal.WithResultID(resultID))
+				assert.Equal(t, resultID, seal3.ResultID)
+
+				// Test with specific final state
+				finalState := suite.StateCommitments().Fixture()
+				seal4 := suite.Seals().Fixture(Seal.WithFinalState(finalState))
+				assert.Equal(t, finalState, seal4.FinalState)
+			},
+		},
+		{
+			name: "CollectionGuarantees",
+			fixture: func(a, b *GeneratorSuite) (any, any) {
+				return a.Guarantees().Fixture(), b.Guarantees().Fixture()
+			},
+			list: func(a, b *GeneratorSuite, n int) (any, any) {
+				return a.Guarantees().List(n), b.Guarantees().List(n)
+			},
+			sanity: func(t *testing.T, suite *GeneratorSuite) {
+				guarantee := suite.Guarantees().Fixture()
+				assert.NotNil(t, guarantee)
+				assert.NotEmpty(t, guarantee.CollectionID)
+				assert.NotEmpty(t, guarantee.ReferenceBlockID)
+				assert.NotEmpty(t, guarantee.SignerIndices)
+				assert.NotEmpty(t, guarantee.Signature)
+
+				// Test with specific collection ID
+				collectionID := suite.Identifiers().Fixture()
+				guarantee2 := suite.Guarantees().Fixture(Guarantee.WithCollectionID(collectionID))
+				assert.Equal(t, collectionID, guarantee2.CollectionID)
+
+				// Test with specific reference block ID
+				refBlockID := suite.Identifiers().Fixture()
+				guarantee3 := suite.Guarantees().Fixture(Guarantee.WithReferenceBlockID(refBlockID))
+				assert.Equal(t, refBlockID, guarantee3.ReferenceBlockID)
+			},
+		},
+		{
+			name: "ExecutionReceiptStubs",
+			fixture: func(a, b *GeneratorSuite) (any, any) {
+				return a.ExecutionReceiptStubs().Fixture(), b.ExecutionReceiptStubs().Fixture()
+			},
+			list: func(a, b *GeneratorSuite, n int) (any, any) {
+				return a.ExecutionReceiptStubs().List(n), b.ExecutionReceiptStubs().List(n)
+			},
+			sanity: func(t *testing.T, suite *GeneratorSuite) {
+				stub := suite.ExecutionReceiptStubs().Fixture()
+				assert.NotNil(t, stub)
+				assert.NotEmpty(t, stub.ExecutorID)
+				assert.NotEmpty(t, stub.ResultID)
+				assert.NotEmpty(t, stub.Spocks)
+				assert.NotEmpty(t, stub.ExecutorSignature)
+
+				// Test with specific executor ID
+				executorID := suite.Identifiers().Fixture()
+				stub2 := suite.ExecutionReceiptStubs().Fixture(ExecutionReceiptStub.WithExecutorID(executorID))
+				assert.Equal(t, executorID, stub2.ExecutorID)
+
+				// Test with specific result ID
+				resultID := suite.Identifiers().Fixture()
+				stub3 := suite.ExecutionReceiptStubs().Fixture(ExecutionReceiptStub.WithResultID(resultID))
+				assert.Equal(t, resultID, stub3.ResultID)
+			},
+		},
+		{
+			name: "Crypto",
+			fixture: func(a, b *GeneratorSuite) (any, any) {
+				return a.Crypto().PrivateKey(crypto.BLSBLS12381), b.Crypto().PrivateKey(crypto.BLSBLS12381)
+			},
+			list: func(a, b *GeneratorSuite, n int) (any, any) {
+				keys1 := make([]crypto.PrivateKey, n)
+				keys2 := make([]crypto.PrivateKey, n)
+				for i := range n {
+					keys1[i] = a.Crypto().PrivateKey(crypto.BLSBLS12381)
+					keys2[i] = b.Crypto().PrivateKey(crypto.BLSBLS12381)
+				}
+				return keys1, keys2
+			},
+			sanity: func(t *testing.T, suite *GeneratorSuite) {
+				// Test BLS key generation
+				blsKey := suite.Crypto().PrivateKey(crypto.BLSBLS12381)
+				assert.NotNil(t, blsKey)
+				assert.Equal(t, crypto.BLSBLS12381, blsKey.Algorithm())
+
+				// Test ECDSA key generation
+				ecdsaKey := suite.Crypto().PrivateKey(crypto.ECDSAP256)
+				assert.NotNil(t, ecdsaKey)
+				assert.Equal(t, crypto.ECDSAP256, ecdsaKey.Algorithm())
+
+				// Test with custom seed
+				seed := suite.Random().RandomBytes(crypto.KeyGenSeedMinLen)
+				seededKey := suite.Crypto().PrivateKey(crypto.BLSBLS12381, PrivateKey.WithSeed(seed))
+				assert.NotNil(t, seededKey)
+			},
+		},
 	}
 
 	suite1 := NewGeneratorSuite(WithSeed(42))

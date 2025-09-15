@@ -28,14 +28,14 @@ func (f trieUpdateFactory) WithRootHash(rootHash ledger.RootHash) TrieUpdateOpti
 }
 
 // WithPaths is an option that sets the paths for the trie update.
-func (f trieUpdateFactory) WithPaths(paths []ledger.Path) TrieUpdateOption {
+func (f trieUpdateFactory) WithPaths(paths ...ledger.Path) TrieUpdateOption {
 	return func(g *TrieUpdateGenerator, config *trieUpdateConfig) {
 		config.trieUpdate.Paths = paths
 	}
 }
 
 // WithPayloads is an option that sets the payloads for the trie update.
-func (f trieUpdateFactory) WithPayloads(payloads []*ledger.Payload) TrieUpdateOption {
+func (f trieUpdateFactory) WithPayloads(payloads ...*ledger.Payload) TrieUpdateOption {
 	return func(g *TrieUpdateGenerator, config *trieUpdateConfig) {
 		config.trieUpdate.Payloads = payloads
 	}
@@ -101,6 +101,8 @@ func (g *TrieUpdateGenerator) Fixture(opts ...TrieUpdateOption) *ledger.TrieUpda
 	if config.trieUpdate.Payloads == nil {
 		config.trieUpdate.Payloads = g.ledgerPayloads.List(config.numPaths, LedgerPayload.WithSize(config.minSize, config.maxSize))
 	}
+
+	Assertf(len(config.trieUpdate.Paths) == len(config.trieUpdate.Payloads), "paths and payloads must have the same length")
 
 	return config.trieUpdate
 }

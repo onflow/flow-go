@@ -7,43 +7,57 @@ var Block blockFactory
 
 type blockFactory struct{}
 
-type BlockOption func(*BlockGenerator, *flow.Block)
+type BlockOption func(*BlockGenerator, *blockConfig)
+
+type blockConfig struct {
+	headerOpts []HeaderOption
+
+	headerBody *flow.HeaderBody
+	payload    *flow.Payload
+}
 
 // WithHeight is an option that sets the `Height` of the block's header.
 func (f blockFactory) WithHeight(height uint64) BlockOption {
-	return func(g *BlockGenerator, header *flow.Block) {
-		header.Height = height
+	return func(g *BlockGenerator, config *blockConfig) {
+		config.headerOpts = append(config.headerOpts, Header.WithHeight(height))
+
 	}
 }
 
 // WithView is an option that sets the `View` of the block's header.
 func (f blockFactory) WithView(view uint64) BlockOption {
-	return func(g *BlockGenerator, header *flow.Block) {
-		header.View = view
+	return func(g *BlockGenerator, config *blockConfig) {
+		config.headerOpts = append(config.headerOpts,
+			Header.WithView(view),
+		)
 	}
 }
 
 // WithChainID is an option that sets the `ChainID` of the block's header.
 func (f blockFactory) WithChainID(chainID flow.ChainID) BlockOption {
-	return func(g *BlockGenerator, header *flow.Block) {
-		header.ChainID = chainID
+	return func(g *BlockGenerator, config *blockConfig) {
+		config.headerOpts = append(config.headerOpts,
+			Header.WithChainID(chainID),
+		)
 	}
 }
 
 // WithParent is an option that sets the `ParentID`, `ParentView`, and `Height` of the block's header based
 // on the provided fields. `Height` is set to parent's `Height` + 1.
 func (f blockFactory) WithParent(parentID flow.Identifier, parentView uint64, parentHeight uint64) BlockOption {
-	return func(g *BlockGenerator, block *flow.Block) {
-		block.ParentID = parentID
-		block.ParentView = parentView
-		block.Height = parentHeight + 1
+	return func(g *BlockGenerator, config *blockConfig) {
+		config.headerOpts = append(config.headerOpts,
+			Header.WithParent(parentID, parentView, parentHeight),
+		)
 	}
 }
 
 // WithParentView is an option that sets the `ParentView` of the block's header.
 func (f blockFactory) WithParentView(view uint64) BlockOption {
-	return func(g *BlockGenerator, block *flow.Block) {
-		block.ParentView = view
+	return func(g *BlockGenerator, config *blockConfig) {
+		config.headerOpts = append(config.headerOpts,
+			Header.WithParentView(view),
+		)
 	}
 }
 
@@ -59,62 +73,69 @@ func (f blockFactory) WithParentView(view uint64) BlockOption {
 // If you want a specific value for any of these fields, you should add the appropriate option
 // after this option.
 func (f blockFactory) WithParentHeader(parent *flow.Header) BlockOption {
-	return func(g *BlockGenerator, block *flow.Block) {
-		block.View = parent.View + 1
-		block.Height = parent.Height + 1
-		block.ChainID = parent.ChainID
-		block.Timestamp = g.random.Uint64InRange(parent.Timestamp+1, parent.Timestamp+1000)
-		block.ParentID = parent.ID()
-		block.ParentView = parent.View
+	return func(g *BlockGenerator, config *blockConfig) {
+		config.headerOpts = append(config.headerOpts,
+			Header.WithParentHeader(parent),
+		)
 	}
 }
 
 // WithProposerID is an option that sets the `ProposerID` of the block's header.
 func (f blockFactory) WithProposerID(proposerID flow.Identifier) BlockOption {
-	return func(g *BlockGenerator, block *flow.Block) {
-		block.ProposerID = proposerID
+	return func(g *BlockGenerator, config *blockConfig) {
+		config.headerOpts = append(config.headerOpts,
+			Header.WithProposerID(proposerID),
+		)
 	}
 }
 
 // WithLastViewTC is an option that sets the `LastViewTC` of the block's header.
 func (f blockFactory) WithLastViewTC(lastViewTC *flow.TimeoutCertificate) BlockOption {
-	return func(g *BlockGenerator, block *flow.Block) {
-		block.LastViewTC = lastViewTC
+	return func(g *BlockGenerator, config *blockConfig) {
+		config.headerOpts = append(config.headerOpts,
+			Header.WithLastViewTC(lastViewTC),
+		)
 	}
 }
 
 // WithTimestamp is an option that sets the `Timestamp` of the block's header.
 func (f blockFactory) WithTimestamp(timestamp uint64) BlockOption {
-	return func(g *BlockGenerator, block *flow.Block) {
-		block.Timestamp = timestamp
+	return func(g *BlockGenerator, config *blockConfig) {
+		config.headerOpts = append(config.headerOpts,
+			Header.WithTimestamp(timestamp),
+		)
 	}
 }
 
 // WithParentVoterIndices is an option that sets the `ParentVoterIndices` of the block's header.
 func (f blockFactory) WithParentVoterIndices(indices []byte) BlockOption {
-	return func(g *BlockGenerator, block *flow.Block) {
-		block.ParentVoterIndices = indices
+	return func(g *BlockGenerator, config *blockConfig) {
+		config.headerOpts = append(config.headerOpts,
+			Header.WithParentVoterIndices(indices),
+		)
 	}
 }
 
 // WithParentVoterSigData is an option that sets the `ParentVoterSigData` of the block's header.
 func (f blockFactory) WithParentVoterSigData(data []byte) BlockOption {
-	return func(g *BlockGenerator, block *flow.Block) {
-		block.ParentVoterSigData = data
+	return func(g *BlockGenerator, config *blockConfig) {
+		config.headerOpts = append(config.headerOpts,
+			Header.WithParentVoterSigData(data),
+		)
 	}
 }
 
 // WithHeaderBody is an option that sets the `HeaderBody` of the block.
-func (f blockFactory) WithHeaderBody(headerBody flow.HeaderBody) BlockOption {
-	return func(g *BlockGenerator, block *flow.Block) {
-		block.HeaderBody = headerBody
+func (f blockFactory) WithHeaderBody(headerBody *flow.HeaderBody) BlockOption {
+	return func(g *BlockGenerator, config *blockConfig) {
+		config.headerBody = headerBody
 	}
 }
 
 // WithPayload is an option that sets the `Payload` of the block.
-func (f blockFactory) WithPayload(payload flow.Payload) BlockOption {
-	return func(g *BlockGenerator, block *flow.Block) {
-		block.Payload = payload
+func (f blockFactory) WithPayload(payload *flow.Payload) BlockOption {
+	return func(g *BlockGenerator, config *blockConfig) {
+		config.payload = payload
 	}
 }
 
@@ -146,19 +167,26 @@ func NewBlockGenerator(
 
 // Fixture generates a [flow.Block] with random data based on the provided options.
 func (g *BlockGenerator) Fixture(opts ...BlockOption) *flow.Block {
-	header := g.headers.Fixture(Header.WithChainID(g.chainID))
-	payload := g.payloads.Fixture()
-
-	block := &flow.Block{
-		HeaderBody: header.HeaderBody,
-		Payload:    *payload,
+	config := &blockConfig{
+		headerOpts: []HeaderOption{Header.WithChainID(g.chainID)},
 	}
 
 	for _, opt := range opts {
-		opt(g, block)
+		opt(g, config)
 	}
 
-	return block
+	if config.headerBody == nil {
+		header := g.headers.Fixture(config.headerOpts...)
+		config.headerBody = &header.HeaderBody
+	}
+	if config.payload == nil {
+		config.payload = g.payloads.Fixture()
+	}
+
+	return &flow.Block{
+		HeaderBody: *config.headerBody,
+		Payload:    *config.payload,
+	}
 }
 
 // List generates a chain of [flow.Block] objects. The first block is generated with the given options,
@@ -169,8 +197,17 @@ func (g *BlockGenerator) List(n int, opts ...BlockOption) []*flow.Block {
 	blocks = append(blocks, g.Fixture(opts...))
 
 	for i := 1; i < n; i++ {
+		// give a 50% chance that the view is not ParentView + 1
+		view := blocks[i-1].View + 1
+		if g.random.Bool() {
+			view += g.random.Uint64InRange(1, 10)
+		}
+
 		parent := blocks[i-1].ToHeader()
-		blocks = append(blocks, g.Fixture(Block.WithParentHeader(parent)))
+		blocks = append(blocks, g.Fixture(
+			Block.WithParentHeader(parent),
+			Block.WithView(view),
+		))
 	}
 	return blocks
 }
@@ -180,11 +217,9 @@ func (g *BlockGenerator) List(n int, opts ...BlockOption) []*flow.Block {
 // in the long term, the protocol must support spork root blocks with height _and_ view larger than zero.
 // The only options that are used are the chainID and the protocol state ID.
 func (g *BlockGenerator) Genesis(opts ...BlockOption) *flow.Block {
-	config := &flow.Block{
-		HeaderBody: flow.HeaderBody{
-			ChainID: g.chainID,
-		},
-		Payload: flow.Payload{
+	config := &blockConfig{
+		headerOpts: []HeaderOption{Header.WithChainID(g.chainID)},
+		payload: &flow.Payload{
 			ProtocolStateID: g.identifiers.Fixture(),
 		},
 	}
@@ -194,12 +229,16 @@ func (g *BlockGenerator) Genesis(opts ...BlockOption) *flow.Block {
 		opt(g, config)
 	}
 
-	header := g.headers.Genesis(Header.WithChainID(config.ChainID))
+	header := g.headers.Genesis(config.headerOpts...)
+	if config.payload == nil {
+		config.payload = &flow.Payload{
+			ProtocolStateID: g.identifiers.Fixture(),
+		}
+	}
+
 	block, err := flow.NewRootBlock(flow.UntrustedBlock{
 		HeaderBody: header.HeaderBody,
-		Payload: flow.Payload{
-			ProtocolStateID: config.Payload.ProtocolStateID,
-		},
+		Payload:    *config.payload,
 	})
 	NoError(err)
 

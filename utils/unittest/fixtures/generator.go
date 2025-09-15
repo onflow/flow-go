@@ -95,7 +95,7 @@ func (g *GeneratorSuite) Payloads() *PayloadGenerator {
 	return NewPayloadGenerator(
 		g.Random(),
 		g.Identifiers(),
-		g.CollectionGuarantees(),
+		g.Guarantees(),
 		g.Seals(),
 		g.ExecutionReceiptStubs(),
 		g.ExecutionResults(),
@@ -112,8 +112,8 @@ func (g *GeneratorSuite) Seals() *SealGenerator {
 	)
 }
 
-// CollectionGuarantees returns a generator for [flow.CollectionGuarantee].
-func (g *GeneratorSuite) CollectionGuarantees() *CollectionGuaranteeGenerator {
+// Guarantees returns a generator for [flow.CollectionGuarantee].
+func (g *GeneratorSuite) Guarantees() *CollectionGuaranteeGenerator {
 	return NewCollectionGuaranteeGenerator(
 		g.Random(),
 		g.Identifiers(),
@@ -235,6 +235,7 @@ func (g *GeneratorSuite) ChunkExecutionDatas() *ChunkExecutionDataGenerator {
 // BlockExecutionDatas returns a generator for [flow.BlockExecutionData].
 func (g *GeneratorSuite) BlockExecutionDatas() *BlockExecutionDataGenerator {
 	return NewBlockExecutionDataGenerator(
+		g.Random(),
 		g.Identifiers(),
 		g.ChunkExecutionDatas(),
 	)

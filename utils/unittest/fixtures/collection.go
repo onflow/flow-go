@@ -19,7 +19,7 @@ func (f collectionFactory) WithTxCount(count int) CollectionOption {
 }
 
 // WithTransactions is an option that sets the transactions for the collection.
-func (f collectionFactory) WithTransactions(transactions []*flow.TransactionBody) CollectionOption {
+func (f collectionFactory) WithTransactions(transactions ...*flow.TransactionBody) CollectionOption {
 	return func(g *CollectionGenerator, collection *flow.Collection) {
 		collection.Transactions = transactions
 	}

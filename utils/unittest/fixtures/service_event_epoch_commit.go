@@ -22,7 +22,7 @@ func (f epochCommitFactory) WithCounter(counter uint64) EpochCommitOption {
 }
 
 // WithClusterQCs is an option that sets the `ClusterQCs` of the epoch commit.
-func (f epochCommitFactory) WithClusterQCs(qcs []flow.ClusterQCVoteData) EpochCommitOption {
+func (f epochCommitFactory) WithClusterQCs(qcs ...flow.ClusterQCVoteData) EpochCommitOption {
 	return func(g *EpochCommitGenerator, commit *flow.EpochCommit) {
 		commit.ClusterQCs = qcs
 	}

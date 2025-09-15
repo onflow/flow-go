@@ -37,7 +37,7 @@ func (f chunkExecutionDataFactory) WithTrieUpdate(trieUpdate *ledger.TrieUpdate)
 }
 
 // WithTransactionResults is an option that sets the transaction results for the chunk execution data.
-func (f chunkExecutionDataFactory) WithTransactionResults(results []flow.LightTransactionResult) ChunkExecutionDataOption {
+func (f chunkExecutionDataFactory) WithTransactionResults(results ...flow.LightTransactionResult) ChunkExecutionDataOption {
 	return func(g *ChunkExecutionDataGenerator, ced *execution_data.ChunkExecutionData) {
 		ced.TransactionResults = results
 	}

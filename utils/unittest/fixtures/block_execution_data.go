@@ -30,15 +30,18 @@ func (f blockExecutionDataFactory) WithChunkExecutionDatas(chunks ...*execution_
 type BlockExecutionDataGenerator struct {
 	blockExecutionDataFactory
 
+	random              *RandomGenerator
 	identifiers         *IdentifierGenerator
 	chunkExecutionDatas *ChunkExecutionDataGenerator
 }
 
 func NewBlockExecutionDataGenerator(
+	random *RandomGenerator,
 	identifiers *IdentifierGenerator,
 	chunkExecutionDatas *ChunkExecutionDataGenerator,
 ) *BlockExecutionDataGenerator {
 	return &BlockExecutionDataGenerator{
+		random:              random,
 		identifiers:         identifiers,
 		chunkExecutionDatas: chunkExecutionDatas,
 	}
@@ -47,12 +50,15 @@ func NewBlockExecutionDataGenerator(
 // Fixture generates a [execution_data.BlockExecutionData] with random data based on the provided options.
 func (g *BlockExecutionDataGenerator) Fixture(opts ...BlockExecutionDataOption) *execution_data.BlockExecutionData {
 	blockExecutionData := &execution_data.BlockExecutionData{
-		BlockID:             g.identifiers.Fixture(),
-		ChunkExecutionDatas: []*execution_data.ChunkExecutionData{},
+		BlockID: g.identifiers.Fixture(),
 	}
 
 	for _, opt := range opts {
 		opt(g, blockExecutionData)
+	}
+
+	if len(blockExecutionData.ChunkExecutionDatas) == 0 {
+		blockExecutionData.ChunkExecutionDatas = g.chunkExecutionDatas.List(g.random.IntInRange(1, 4))
 	}
 
 	return blockExecutionData

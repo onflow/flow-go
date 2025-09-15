@@ -28,7 +28,7 @@ func (f executionReceiptFactory) WithExecutionResult(result flow.ExecutionResult
 }
 
 // WithSpocks is an option that sets the `Spocks` of the execution receipt.
-func (f executionReceiptFactory) WithSpocks(spocks []crypto.Signature) ExecutionReceiptOption {
+func (f executionReceiptFactory) WithSpocks(spocks ...crypto.Signature) ExecutionReceiptOption {
 	return func(g *ExecutionReceiptGenerator, receipt *flow.ExecutionReceipt) {
 		receipt.Spocks = spocks
 	}
@@ -115,7 +115,7 @@ func (f executionReceiptStubFactory) WithResultID(resultID flow.Identifier) Exec
 }
 
 // WithSpocks is an option that sets the `Spocks` of the execution receipt stub.
-func (f executionReceiptStubFactory) WithSpocks(spocks []crypto.Signature) ExecutionReceiptStubOption {
+func (f executionReceiptStubFactory) WithSpocks(spocks ...crypto.Signature) ExecutionReceiptStubOption {
 	return func(g *ExecutionReceiptStubGenerator, stub *flow.ExecutionReceiptStub) {
 		stub.Spocks = spocks
 	}

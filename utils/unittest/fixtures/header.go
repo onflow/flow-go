@@ -101,6 +101,20 @@ func (f headerFactory) WithTimestamp(timestamp uint64) HeaderOption {
 	}
 }
 
+// WithParentVoterIndices is an option that sets the `ParentVoterIndices` of the block header.
+func (f headerFactory) WithParentVoterIndices(indices []byte) HeaderOption {
+	return func(g *HeaderGenerator, header *flow.Header) {
+		header.ParentVoterIndices = indices
+	}
+}
+
+// WithParentVoterSigData is an option that sets the `ParentVoterSigData` of the block header.
+func (f headerFactory) WithParentVoterSigData(data []byte) HeaderOption {
+	return func(g *HeaderGenerator, header *flow.Header) {
+		header.ParentVoterSigData = data
+	}
+}
+
 // WithSourceOfRandomness is an option that sets the `ParentVoterSigData` of the block header based on
 // the provided source of randomness.
 func (f headerFactory) WithSourceOfRandomness(source []byte) HeaderOption {
@@ -250,7 +264,16 @@ func (g *HeaderGenerator) List(n int, opts ...HeaderOption) []*flow.Header {
 	headers = append(headers, g.Fixture(opts...))
 
 	for i := 1; i < n; i++ {
-		headers = append(headers, g.Fixture(Header.WithParentHeader(headers[i-1])))
+		// give a 50% chance that the view is not ParentView + 1
+		view := headers[i-1].View + 1
+		if g.random.Bool() {
+			view += g.random.Uint64InRange(1, 10)
+		}
+
+		headers = append(headers, g.Fixture(
+			Header.WithParentHeader(headers[i-1]),
+			Header.WithView(view),
+		))
 	}
 	return headers
 }

@@ -14,7 +14,7 @@ type aggregatedSignatureFactory struct{}
 type AggregatedSignatureOption func(*AggregatedSignatureGenerator, *flow.AggregatedSignature)
 
 // WithVerifierSignatures is an option that sets the `VerifierSignatures` of the aggregated signature.
-func (f aggregatedSignatureFactory) WithVerifierSignatures(sigs []crypto.Signature) AggregatedSignatureOption {
+func (f aggregatedSignatureFactory) WithVerifierSignatures(sigs ...crypto.Signature) AggregatedSignatureOption {
 	return func(g *AggregatedSignatureGenerator, aggSig *flow.AggregatedSignature) {
 		aggSig.VerifierSignatures = sigs
 	}
