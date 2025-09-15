@@ -104,7 +104,7 @@ func TestHandler(t *testing.T) {
 }
 
 func (suite *Suite) SetupTest() {
-	suite.log = zerolog.New(zerolog.NewConsoleWriter())
+	suite.log = unittest.Logger()
 	suite.state = new(protocol.State)
 	suite.snapshot = new(protocol.Snapshot)
 	header := unittest.BlockHeaderFixture()
@@ -969,7 +969,7 @@ func (suite *Suite) TestGetTransactionResultByIndex() {
 		suite.snapshot.On("Head").Return(nil, err).Once()
 
 		// mock signaler context expect an error
-		signCtxErr := irrecoverable.NewExceptionf("failed to lookup sealed header: %w", err)
+		signCtxErr := fmt.Errorf("failed to derive transaction status: %w", irrecoverable.NewExceptionf("failed to lookup sealed header: %w", err))
 		signalerCtx := irrecoverable.WithSignalerContext(context.Background(),
 			irrecoverable.NewMockSignalerContextExpectError(suite.T(), context.Background(), signCtxErr))
 
@@ -1004,7 +1004,8 @@ func (suite *Suite) TestGetTransactionResultsByBlockID() {
 	}
 
 	exeEventResp := &execproto.GetTransactionResultsResponse{
-		TransactionResults: []*execproto.GetTransactionResultResponse{{}},
+		TransactionResults:   []*execproto.GetTransactionResultResponse{{}},
+		EventEncodingVersion: entitiesproto.EventEncodingVersion_CCF_V0,
 	}
 
 	suite.fixedExecutionNodeIDs = fixedENIDs.NodeIDs()
@@ -1012,6 +1013,7 @@ func (suite *Suite) TestGetTransactionResultsByBlockID() {
 	params := suite.defaultBackendParams()
 	// the connection factory should be used to get the execution node client
 	params.ConnFactory = suite.setupConnectionFactory()
+	params.ScheduledCallbacksEnabled = true
 
 	backend, err := New(params)
 	suite.Require().NoError(err)
@@ -1036,7 +1038,7 @@ func (suite *Suite) TestGetTransactionResultsByBlockID() {
 		suite.snapshot.On("Head").Return(nil, err).Once()
 
 		// mock signaler context expect an error
-		signCtxErr := irrecoverable.NewExceptionf("failed to lookup sealed header: %w", err)
+		signCtxErr := fmt.Errorf("failed to derive transaction status: %w", irrecoverable.NewExceptionf("failed to lookup sealed header: %w", err))
 		signalerCtx := irrecoverable.WithSignalerContext(context.Background(),
 			irrecoverable.NewMockSignalerContextExpectError(suite.T(), context.Background(), signCtxErr))
 
