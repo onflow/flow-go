@@ -1273,7 +1273,7 @@ func (builder *FlowAccessNodeBuilder) extraFlags() {
 		flags.StringVar(&builder.rpcConf.CompressorName,
 			"grpc-compressor",
 			defaultConfig.rpcConf.CompressorName,
-			"name of grpc compressor that will be used for requests to other nodes. One of (gzip, snappy, deflate)")
+			"name of grpc compressor that will be used for requests to other nodes. One of (gzip, snappy, deflate, zstd)")
 		flags.BoolVar(&builder.logTxTimeToFinalized, "log-tx-time-to-finalized", defaultConfig.logTxTimeToFinalized, "log transaction time to finalized")
 		flags.BoolVar(&builder.logTxTimeToExecuted, "log-tx-time-to-executed", defaultConfig.logTxTimeToExecuted, "log transaction time to executed")
 		flags.BoolVar(&builder.logTxTimeToFinalizedExecuted,

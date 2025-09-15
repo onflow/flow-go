@@ -3,10 +3,10 @@
 package deflate
 
 import (
-	"compress/flate"
 	"io"
 	"sync"
 
+	"github.com/klauspost/compress/flate"
 	"google.golang.org/grpc/encoding"
 )
 
