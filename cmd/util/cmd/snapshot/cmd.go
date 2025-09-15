@@ -10,6 +10,7 @@ import (
 
 	"github.com/onflow/flow-go/cmd/util/cmd/common"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
+	"github.com/onflow/flow-go/storage"
 )
 
 var (
@@ -43,14 +44,18 @@ func init() {
 }
 
 func run(*cobra.Command, []string) {
+	lockManager := storage.MakeSingletonLockManager()
 
-	db := common.InitStorage(flagDatadir)
+	db, err := common.InitStorage(flagDatadir)
+	if err != nil {
+		log.Fatal().Err(err).Msg("could not init storage")
+	}
 	defer db.Close()
 
 	storages := common.InitStorages(db)
-	state, err := common.InitProtocolState(db, storages)
+	state, err := common.OpenProtocolState(lockManager, db, storages)
 	if err != nil {
-		log.Fatal().Err(err).Msg("could not init protocol state")
+		log.Fatal().Err(err).Msg("could not open protocol state")
 	}
 
 	log := log.With().Uint64("block_height", flagHeight).Logger()

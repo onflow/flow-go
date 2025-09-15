@@ -3,7 +3,7 @@ package factories
 import (
 	"fmt"
 
-	"github.com/dgraph-io/badger/v2"
+	"github.com/jordanschalm/lockctx"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/engine/collection"
@@ -17,8 +17,9 @@ import (
 )
 
 type BuilderFactory struct {
-	db               *badger.DB
+	db               storage.DB
 	protoState       protocol.State
+	lockManager      lockctx.Manager
 	mainChainHeaders storage.Headers
 	trace            module.Tracer
 	opts             []builder.Opt
@@ -29,8 +30,9 @@ type BuilderFactory struct {
 }
 
 func NewBuilderFactory(
-	db *badger.DB,
+	db storage.DB,
 	protoState protocol.State,
+	lockManager lockctx.Manager,
 	mainChainHeaders storage.Headers,
 	trace module.Tracer,
 	metrics module.CollectionMetrics,
@@ -43,6 +45,7 @@ func NewBuilderFactory(
 	factory := &BuilderFactory{
 		db:               db,
 		protoState:       protoState,
+		lockManager:      lockManager,
 		mainChainHeaders: mainChainHeaders,
 		trace:            trace,
 		metrics:          metrics,
@@ -65,6 +68,7 @@ func (f *BuilderFactory) Create(
 	build, err := builder.NewBuilder(
 		f.db,
 		f.trace,
+		f.lockManager,
 		f.metrics,
 		f.protoState,
 		clusterState,
@@ -83,6 +87,7 @@ func (f *BuilderFactory) Create(
 
 	final := finalizer.NewFinalizer(
 		f.db,
+		f.lockManager,
 		pool,
 		f.pusher,
 		f.metrics,

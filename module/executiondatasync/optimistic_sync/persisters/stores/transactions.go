@@ -3,6 +3,8 @@ package stores
 import (
 	"fmt"
 
+	"github.com/jordanschalm/lockctx"
+
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/store/inmemory/unsynchronized"
 )
@@ -27,7 +29,7 @@ func NewTransactionsStore(
 
 // Persist adds transactions to the batch.
 // No errors are expected during normal operations
-func (t *TransactionsStore) Persist(batch storage.ReaderBatchWriter) error {
+func (t *TransactionsStore) Persist(lctx lockctx.Proof, batch storage.ReaderBatchWriter) error {
 	for _, transaction := range t.inMemoryTransactions.Data() {
 		if err := t.persistedTransactions.BatchStore(&transaction, batch); err != nil {
 			return fmt.Errorf("could not add transactions to batch: %w", err)
