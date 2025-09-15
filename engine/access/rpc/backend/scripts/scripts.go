@@ -8,6 +8,8 @@ import (
 
 	lru "github.com/hashicorp/golang-lru/v2"
 	"github.com/rs/zerolog"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 
 	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/engine/access/rpc/backend/common"
@@ -25,9 +27,10 @@ import (
 )
 
 type Scripts struct {
-	headers  storage.Headers
-	state    protocol.State
-	executor executor.ScriptExecutor
+	headers                  storage.Headers
+	state                    protocol.State
+	executor                 executor.ScriptExecutor
+	maxScriptAndArgumentSize uint
 }
 
 var _ access.ScriptsAPI = (*Scripts)(nil)
@@ -43,6 +46,7 @@ func NewScriptsBackend(
 	scriptExecMode query_mode.IndexQueryMode,
 	nodeProvider *commonrpc.ExecutionNodeIdentitiesProvider,
 	loggedScripts *lru.Cache[[md5.Size]byte, time.Time],
+	maxScriptAndArgumentSize uint,
 ) (*Scripts, error) {
 	var exec executor.ScriptExecutor
 	cache := executor.NewLoggedScriptCache(log, loggedScripts)
@@ -69,9 +73,10 @@ func NewScriptsBackend(
 	}
 
 	return &Scripts{
-		headers:  headers,
-		state:    state,
-		executor: exec,
+		headers:                  headers,
+		state:                    state,
+		executor:                 exec,
+		maxScriptAndArgumentSize: maxScriptAndArgumentSize,
 	}, nil
 }
 
@@ -81,6 +86,10 @@ func (b *Scripts) ExecuteScriptAtLatestBlock(
 	script []byte,
 	arguments [][]byte,
 ) ([]byte, error) {
+	if !commonrpc.CheckScriptSize(script, arguments, b.maxScriptAndArgumentSize) {
+		return nil, status.Error(codes.InvalidArgument, commonrpc.ErrScriptTooLarge.Error())
+	}
+
 	latestHeader, err := b.state.Sealed().Head()
 	if err != nil {
 		// the latest sealed header MUST be available
@@ -100,6 +109,10 @@ func (b *Scripts) ExecuteScriptAtBlockID(
 	script []byte,
 	arguments [][]byte,
 ) ([]byte, error) {
+	if !commonrpc.CheckScriptSize(script, arguments, b.maxScriptAndArgumentSize) {
+		return nil, status.Error(codes.InvalidArgument, commonrpc.ErrScriptTooLarge.Error())
+	}
+
 	header, err := b.headers.ByBlockID(blockID)
 	if err != nil {
 		return nil, commonrpc.ConvertStorageError(err)
@@ -116,6 +129,10 @@ func (b *Scripts) ExecuteScriptAtBlockHeight(
 	script []byte,
 	arguments [][]byte,
 ) ([]byte, error) {
+	if !commonrpc.CheckScriptSize(script, arguments, b.maxScriptAndArgumentSize) {
+		return nil, status.Error(codes.InvalidArgument, commonrpc.ErrScriptTooLarge.Error())
+	}
+
 	header, err := b.headers.ByHeight(blockHeight)
 	if err != nil {
 		return nil, commonrpc.ConvertStorageError(common.ResolveHeightError(b.state.Params(), blockHeight, err))

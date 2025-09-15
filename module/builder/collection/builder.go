@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/dgraph-io/badger/v2"
+	"github.com/jordanschalm/lockctx"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/model/cluster"
@@ -19,8 +19,8 @@ import (
 	"github.com/onflow/flow-go/state/fork"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
-	"github.com/onflow/flow-go/storage/badger/operation"
-	"github.com/onflow/flow-go/storage/badger/procedure"
+	"github.com/onflow/flow-go/storage/operation"
+	"github.com/onflow/flow-go/storage/procedure"
 	"github.com/onflow/flow-go/utils/logging"
 )
 
@@ -31,7 +31,8 @@ import (
 // HotStuff event loop is the only consumer of this interface and is single
 // threaded, this is OK.
 type Builder struct {
-	db                         *badger.DB
+	db                         storage.DB
+	lockManager                lockctx.Manager
 	mainHeaders                storage.Headers
 	metrics                    module.CollectionMetrics
 	clusterHeaders             storage.Headers
@@ -50,8 +51,9 @@ type Builder struct {
 }
 
 func NewBuilder(
-	db *badger.DB,
+	db storage.DB,
 	tracer module.Tracer,
+	lockManager lockctx.Manager,
 	metrics module.CollectionMetrics,
 	protoState protocol.State,
 	clusterState clusterstate.State,
@@ -67,6 +69,7 @@ func NewBuilder(
 	b := Builder{
 		db:                         db,
 		tracer:                     tracer,
+		lockManager:                lockManager,
 		metrics:                    metrics,
 		protoState:                 protoState,
 		clusterState:               clusterState,
@@ -169,11 +172,18 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.HeaderBody
 		return nil, fmt.Errorf("could not populate un-finalized ancestry lookout (parent_id=%x): %w", parentID, err)
 	}
 
+	lctx := b.lockManager.NewContext()
+	defer lctx.Release()
+	err = lctx.AcquireLock(storage.LockInsertOrFinalizeClusterBlock)
+	if err != nil {
+		return nil, err
+	}
+
 	// STEP 1b: create a lookup of all transactions previously included in
 	// the finalized collections. Any transactions already included in finalized
 	// collections can be removed from the mempool.
 	span, _ = b.tracer.StartSpanFromContext(ctx, trace.COLBuildOnFinalizedLookup)
-	err = b.populateFinalizedAncestryLookup(buildCtx)
+	err = b.populateFinalizedAncestryLookup(lctx, buildCtx)
 	span.End()
 	if err != nil {
 		return nil, fmt.Errorf("could not populate finalized ancestry lookup: %w", err)
@@ -219,7 +229,10 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.HeaderBody
 
 	// STEP 4: insert the cluster block to the database.
 	span, _ = b.tracer.StartSpanFromContext(ctx, trace.COLBuildOnDBInsert)
-	err = operation.RetryOnConflict(b.db.Update, procedure.InsertClusterBlock(blockProposal))
+
+	err = b.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+		return procedure.InsertClusterBlock(lctx, rw, blockProposal)
+	})
 	span.End()
 	if err != nil {
 		return nil, fmt.Errorf("could not insert built block: %w", err)
@@ -278,37 +291,34 @@ func (b *Builder) getBlockBuildContext(parentID flow.Identifier) (*blockBuildCon
 		return ctx, nil
 	}
 
-	// otherwise, attempt to read them from storage
-	err = b.db.View(func(btx *badger.Txn) error {
-		var refEpochFinalHeight uint64
-		var refEpochFinalID flow.Identifier
+	r := b.db.Reader()
 
-		err = operation.RetrieveEpochLastHeight(b.clusterEpoch, &refEpochFinalHeight)(btx)
-		if err != nil {
-			if errors.Is(err, storage.ErrNotFound) {
-				return nil
-			}
-			return fmt.Errorf("unexpected failure to retrieve final height of operating epoch: %w", err)
-		}
-		err = operation.LookupBlockHeight(refEpochFinalHeight, &refEpochFinalID)(btx)
-		if err != nil {
-			// if we are able to retrieve the epoch's final height, the block must be finalized
-			// therefore failing to look up its height here is an unexpected error
-			return irrecoverable.NewExceptionf("could not retrieve ID of finalized final block of operating epoch: %w", err)
-		}
+	var refEpochFinalHeight uint64
+	var refEpochFinalID flow.Identifier
 
-		// cache the values
-		b.epochFinalHeight = &refEpochFinalHeight
-		b.epochFinalID = &refEpochFinalID
-		// store the values in the build context
-		ctx.refEpochFinalID = b.epochFinalID
-		ctx.refEpochFinalHeight = b.epochFinalHeight
-
-		return nil
-	})
+	err = operation.RetrieveEpochLastHeight(r, b.clusterEpoch, &refEpochFinalHeight)
 	if err != nil {
-		return nil, fmt.Errorf("could not get block build context: %w", err)
+		if errors.Is(err, storage.ErrNotFound) {
+			return ctx, nil
+		}
+		return nil, fmt.Errorf("unexpected failure to retrieve final height of operating epoch: %w", err)
 	}
+
+	// this does not require a lock, as block ID of an height does not change
+	err = operation.LookupBlockHeight(r, refEpochFinalHeight, &refEpochFinalID)
+	if err != nil {
+		// if we are able to retrieve the epoch's final height, the block must be finalized
+		// therefore failing to look up its height here is an unexpected error
+		return nil, irrecoverable.NewExceptionf("could not retrieve ID of finalized final block of operating epoch: %w", err)
+	}
+
+	// cache the values
+	b.epochFinalHeight = &refEpochFinalHeight
+	b.epochFinalID = &refEpochFinalID
+	// store the values in the build context
+	ctx.refEpochFinalID = b.epochFinalID
+	ctx.refEpochFinalHeight = b.epochFinalHeight
+
 	return ctx, nil
 }
 
@@ -341,7 +351,7 @@ func (b *Builder) populateUnfinalizedAncestryLookup(ctx *blockBuildContext) erro
 // The traversal is structured so that we check every collection whose reference
 // block height translates to a possible constituent transaction which could also
 // appear in the collection we are building.
-func (b *Builder) populateFinalizedAncestryLookup(ctx *blockBuildContext) error {
+func (b *Builder) populateFinalizedAncestryLookup(lctx lockctx.Proof, ctx *blockBuildContext) error {
 	minRefHeight := ctx.lowestPossibleReferenceBlockHeight()
 	maxRefHeight := ctx.highestPossibleReferenceBlockHeight()
 	lookup := ctx.lookup
@@ -369,7 +379,7 @@ func (b *Builder) populateFinalizedAncestryLookup(ctx *blockBuildContext) error 
 	// the finalized cluster blocks which could possibly contain any conflicting transactions
 	var clusterBlockIDs []flow.Identifier
 	start, end := findRefHeightSearchRangeForConflictingClusterBlocks(minRefHeight, maxRefHeight)
-	err := b.db.View(operation.LookupClusterBlocksByReferenceHeightRange(start, end, &clusterBlockIDs))
+	err := operation.LookupClusterBlocksByReferenceHeightRange(lctx, b.db.Reader(), start, end, &clusterBlockIDs)
 	if err != nil {
 		return fmt.Errorf("could not lookup finalized cluster blocks by reference height range [%d,%d]: %w", start, end, err)
 	}

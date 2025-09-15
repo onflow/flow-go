@@ -461,7 +461,7 @@ func (s *ChunkVerifierTestSuite) TestSystemChunkWithScheduledCallbackReturningEv
 
 	// create the event returned for processed callback
 	processedEventName := fmt.Sprintf(
-		"A.%s.FlowCallbackScheduler.PendingExecution",
+		"A.%s.FlowTransactionScheduler.PendingExecution",
 		systemContracts.FlowCallbackScheduler.Address,
 	)
 	callbackEventPayload, err := ccf.Encode(cadence.NewEvent(

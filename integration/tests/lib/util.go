@@ -54,13 +54,13 @@ var (
 	}
 )
 
-// TestFlowCallbackHandlerContract creates a test contract DSL for testing FlowCallbackScheduler
+// TestFlowCallbackHandlerContract creates a test contract DSL for testing FlowTransactionScheduler
 func TestFlowCallbackHandlerContract(callbackScheduler sdk.Address, flowToken sdk.Address, fungibleToken sdk.Address) dsl.Contract {
 	return dsl.Contract{
 		Name: "TestFlowCallbackHandler",
 		Imports: []dsl.Import{
 			{
-				Names:   []string{"FlowCallbackScheduler"},
+				Names:   []string{"FlowTransactionScheduler"},
 				Address: callbackScheduler,
 			},
 			{
@@ -74,16 +74,16 @@ func TestFlowCallbackHandlerContract(callbackScheduler sdk.Address, flowToken sd
 		},
 		Members: []dsl.CadenceCode{
 			dsl.Code(`
-				access(all) var scheduledCallbacks: {UInt64: FlowCallbackScheduler.ScheduledCallback}
+				access(all) var scheduledCallbacks: @{UInt64: FlowTransactionScheduler.ScheduledTransaction}
 				access(all) var executedCallbacks: [UInt64]
 
 				access(all) let HandlerStoragePath: StoragePath
 				access(all) let HandlerPublicPath: PublicPath
 				
-				access(all) resource Handler: FlowCallbackScheduler.CallbackHandler {
+				access(all) resource Handler: FlowTransactionScheduler.TransactionHandler {
 					
-					access(FlowCallbackScheduler.Execute) 
-					fun executeCallback(id: UInt64, data: AnyStruct?) {
+					access(FlowTransactionScheduler.Execute) 
+					fun executeTransaction(id: UInt64, data: AnyStruct?) {
 						TestFlowCallbackHandler.executedCallbacks.append(id)
 					}
 				}
@@ -92,15 +92,14 @@ func TestFlowCallbackHandlerContract(callbackScheduler sdk.Address, flowToken sd
 					return <- create Handler()
 				}
 
-				access(all) fun addScheduledCallback(callback: FlowCallbackScheduler.ScheduledCallback) {
-					self.scheduledCallbacks[callback.id] = callback
+				access(all) fun addScheduledCallback(callback: @FlowTransactionScheduler.ScheduledTransaction) {
+					self.scheduledCallbacks[callback.id] <-! callback
 				}
 
 				access(all) fun cancelCallback(id: UInt64): @FlowToken.Vault {
-					let callback = self.scheduledCallbacks[id]
+					let callback <- self.scheduledCallbacks.remove(key: id)
 						?? panic("Invalid ID: \(id) callback not found")
-					self.scheduledCallbacks[id] = nil
-					return <-FlowCallbackScheduler.cancel(callback: callback)
+					return <-FlowTransactionScheduler.cancel(scheduledTx: <-callback)
 				}
 
 				access(all) fun getExecutedCallbacks(): [UInt64] {
@@ -108,7 +107,7 @@ func TestFlowCallbackHandlerContract(callbackScheduler sdk.Address, flowToken sd
 				}
 
 				access(all) init() {
-					self.scheduledCallbacks = {}
+					self.scheduledCallbacks <- {}
 					self.executedCallbacks = []
 
 					self.HandlerStoragePath = /storage/testCallbackHandler
@@ -161,8 +160,8 @@ func ReadCounterScript(contractAddress sdk.Address, accountAddress sdk.Address) 
 			`
 			  let account = getAccount(0x%s)
 			  let counter = account.capabilities.borrow<&Testing.Counter>(/public/counter)
-              return counter?.count ?? %d
-            `,
+			  return counter?.count ?? %d
+			`,
 			accountAddress.Hex(),
 			CounterDefaultValue,
 		),
@@ -344,7 +343,7 @@ func LogStatusPeriodically(t *testing.T, parent context.Context, log zerolog.Log
 	}
 }
 
-// ScheduleCallbackAtTimestamp sends a test transaction to schedule a callback on FlowCallbackScheduler
+// ScheduleCallbackAtTimestamp sends a test transaction to schedule a callback on FlowTransactionScheduler
 // at a given timestamp and returns the scheduled callback ID.
 func ScheduleCallbackAtTimestamp(
 	timestamp int64,
@@ -364,7 +363,7 @@ func ScheduleCallbackAtTimestamp(
 	}
 
 	script := []byte(fmt.Sprintf(`
-		import FlowCallbackScheduler from 0x%s
+		import FlowTransactionScheduler from 0x%s
 		import TestFlowCallbackHandler from 0x%s
 		import FlowToken from 0x%s
 		import FungibleToken from 0x%s
@@ -372,16 +371,16 @@ func ScheduleCallbackAtTimestamp(
 		transaction(timestamp: UFix64) {
 
 			prepare(account: auth(BorrowValue, SaveValue, IssueStorageCapabilityController, PublishCapability, GetStorageCapabilityController) &Account) {
-        		if !account.storage.check<@TestFlowCallbackHandler.Handler>(from: TestFlowCallbackHandler.HandlerStoragePath) {
-            		let handler <- TestFlowCallbackHandler.createHandler()
+				if !account.storage.check<@TestFlowCallbackHandler.Handler>(from: TestFlowCallbackHandler.HandlerStoragePath) {
+					let handler <- TestFlowCallbackHandler.createHandler()
 				
 					account.storage.save(<-handler, to: TestFlowCallbackHandler.HandlerStoragePath)
-            		account.capabilities.storage.issue<auth(FlowCallbackScheduler.Execute) &{FlowCallbackScheduler.CallbackHandler}>(TestFlowCallbackHandler.HandlerStoragePath)
+					account.capabilities.storage.issue<auth(FlowTransactionScheduler.Execute) &{FlowTransactionScheduler.TransactionHandler}>(TestFlowCallbackHandler.HandlerStoragePath)
 				}
 
 				let callbackCap = account.capabilities.storage
 					.getControllers(forPath: TestFlowCallbackHandler.HandlerStoragePath)[0]
-					.capability as! Capability<auth(FlowCallbackScheduler.Execute) &{FlowCallbackScheduler.CallbackHandler}>
+					.capability as! Capability<auth(FlowTransactionScheduler.Execute) &{FlowTransactionScheduler.TransactionHandler}>
 				
 				let vault = account.storage.borrow<auth(FungibleToken.Withdraw) &FlowToken.Vault>(from: /storage/flowTokenVault)
 					?? panic("Could not borrow FlowToken vault")
@@ -389,12 +388,12 @@ func ScheduleCallbackAtTimestamp(
 				let testData = "test data"
 				let feeAmount = 1.0
 				let effort = UInt64(1000)
-				let priority = FlowCallbackScheduler.Priority.High
+				let priority = FlowTransactionScheduler.Priority.High
 
 				let fees <- vault.withdraw(amount: feeAmount) as! @FlowToken.Vault
 				
-				let scheduledCallback = FlowCallbackScheduler.schedule(
-					callback: callbackCap,
+				let scheduledCallback <- FlowTransactionScheduler.schedule(
+					handlerCap: callbackCap,
 					data: testData,
 					timestamp: timestamp,
 					priority: priority,
@@ -402,7 +401,7 @@ func ScheduleCallbackAtTimestamp(
 					fees: <-fees
 				)
 
-				TestFlowCallbackHandler.addScheduledCallback(callback: scheduledCallback)
+				TestFlowCallbackHandler.addScheduledCallback(callback: <-scheduledCallback)
 			}
 		} 
 	`, serviceAccount.Address.Hex(), flowCallbackScheduler.Hex(), flowToken.Hex(), fungibleToken.Hex()))
@@ -447,7 +446,7 @@ func CancelCallbackByID(
 	}
 
 	cancelTx := fmt.Sprintf(`
-		import FlowCallbackScheduler from 0x%s
+		import FlowTransactionScheduler from 0x%s
 		import TestFlowCallbackHandler from 0x%s
 		import FlowToken from 0x%s
 		import FungibleToken from 0x%s
@@ -482,10 +481,10 @@ func CancelCallbackByID(
 // ExtractCallbackIDFromEvents extracts the callback ID from the events of a transaction result.
 func ExtractCallbackIDFromEvents(result *sdk.TransactionResult) uint64 {
 	for _, event := range result.Events {
-		if strings.Contains(string(event.Type), "FlowCallbackScheduler.Scheduled") ||
-			strings.Contains(string(event.Type), "FlowCallbackScheduler.Canceled") ||
-			strings.Contains(string(event.Type), "FlowCallbackScheduler.Executed") ||
-			strings.Contains(string(event.Type), "FlowCallbackScheduler.PendingExecution") {
+		if strings.Contains(string(event.Type), "FlowTransactionScheduler.Scheduled") ||
+			strings.Contains(string(event.Type), "FlowTransactionScheduler.Canceled") ||
+			strings.Contains(string(event.Type), "FlowTransactionScheduler.Executed") ||
+			strings.Contains(string(event.Type), "FlowTransactionScheduler.PendingExecution") {
 
 			if id := event.Value.SearchFieldByName("id"); id != nil {
 				return uint64(id.(cadence.UInt64))

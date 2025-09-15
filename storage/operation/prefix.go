@@ -11,28 +11,29 @@ import (
 const (
 
 	// codes for special database markers
-	// codeMax    = 1 // deprecated
-	codeDBType = 2 // specifies a database type
+	_ = 1 // DEPRECATED: previously used for badger to denote the max length of the storage codes in units of bytes
+	_ = 2 // DEPRECATED: previously used to differentiate the protocol database from the secrets database; now the former is pebble and the latter is badger
 
 	// codes for views with special meaning
 	codeSafetyData   = 10 // safety data for hotstuff state
 	codeLivenessData = 11 // liveness data for hotstuff state
 
 	// codes for fields associated with the root state
-	codeSporkID              = 13
-	_                        = 14 // DEPRECATED: 14 was used for ProtocolVersion before the versioned Protocol State
-	_                        = 15 // DEPRECATED: 15 was used to save the finalization safety threshold
-	codeSporkRootBlockHeight = 16
+	codeInstanceParams = 13 // instance parameters which are constant throughout the lifetime of a node(finalized root, sealed root, spork root)
+	_                  = 14 // DEPRECATED: 14 was used for ProtocolVersion before the versioned Protocol State
+	_                  = 15 // DEPRECATED: 15 was used to save the finalization safety threshold
+	_                  = 16 // DEPRECATED: 16 was used for root spork height
+	_                  = 17 // DEPRECATED: 17 was used for the root spork block ID
 
 	// code for heights with special meaning
 	codeFinalizedHeight         = 20 // latest finalized block height
 	codeSealedHeight            = 21 // latest sealed block height
 	codeClusterHeight           = 22 // latest finalized height on cluster
 	codeExecutedBlock           = 23 // latest executed block with max height
-	codeFinalizedRootHeight     = 24 // the height of the highest finalized block contained in the root snapshot
+	_                           = 24 // DEPRECATED: 24 was used for the height of the highest finalized block contained in the root snapshot
 	codeLastCompleteBlockHeight = 25 // the height of the last block for which all collections were received
 	codeEpochFirstHeight        = 26 // the height of the first block in a given epoch
-	codeSealedRootHeight        = 27 // the height of the highest sealed block contained in the root snapshot
+	_                           = 27 // DEPRECATED: 27 was used for the height of the highest sealed block contained in the root snapshot
 
 	// codes for single entity storage
 	codeHeader               = 30
@@ -46,7 +47,7 @@ const (
 	codeChunk                = 38
 	codeExecutionReceiptMeta = 39 // NOTE: prior to Mainnet25, this erroneously had the same value as codeExecutionResult (36)
 
-	// codes for indexing single identifier by identifier/integer
+	// codes for indexing multiple identifiers by identifier -- to be continued with 80+
 	codeHeightToBlock               = 40 // index mapping height to block ID
 	codeBlockIDToLatestSealID       = 41 // index mapping a block its last payload seal
 	codeClusterBlockToRefBlock      = 42 // index cluster block ID to reference block ID
@@ -55,6 +56,7 @@ const (
 	codeBlockIDToQuorumCertificate  = 45 // index of quorum certificates by block ID
 	codeEpochProtocolStateByBlockID = 46 // index of epoch protocol state entry by block ID
 	codeProtocolKVStoreByBlockID    = 47 // index of protocol KV store entry by block ID
+	codeCertifiedBlockByView        = 48 // index mapping view to ID of certified block (guaranteed by HotStuff that there is at most one per view)
 
 	// codes for indexing multiple identifiers by identifier
 	codeBlockChildren          = 50 // index mapping block ID to children blocks
@@ -72,9 +74,10 @@ const (
 	// codes related to protocol level information
 	codeEpochSetup         = 61 // EpochSetup service event, keyed by ID
 	codeEpochCommit        = 62 // EpochCommit service event, keyed by ID
-	codeBeaconPrivateKey   = 63 // BeaconPrivateKey, keyed by epoch counter
-	codeDKGStarted         = 64 // flag that the DKG for an epoch has been started
-	codeDKGEnded           = 65 // flag that the DKG for an epoch has ended (stores end state)
+	_                      = 63 // USED BY SECRETS DATABASE: BeaconPrivateKey, keyed by epoch counter
+	_                      = 64 // DEPRECATED: flag that the DKG for an epoch has been started
+	_                      = 65 // DEPRECATED: flag that the DKG for an epoch has ended (stores end state)
+	_                      = 66 // USED BY SECRETS DATABASE: current state of Recoverable Random Beacon State Machine for given epoch
 	codeVersionBeacon      = 67 // flag for storing version beacons
 	codeEpochProtocolState = 68
 	codeProtocolKVStore    = 69
@@ -88,6 +91,10 @@ const (
 	codeJobConsumerProcessed = 70
 	codeJobQueue             = 71
 	codeJobQueuePointer      = 72
+
+	// codes for indexing multiple identifiers by identifier -- continued from 40-49
+	codeBlockIDToProposalSignature = 80 // index of proposer signatures by block ID
+	codeGuaranteeByCollectionID    = 81 // index of collection guarantee by collection ID
 
 	// legacy codes (should be cleaned up)
 	codeChunkDataPack                      = 100
