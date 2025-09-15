@@ -13,7 +13,7 @@ type SignatureOption func(*SignatureGenerator, *signatureConfig)
 
 // SignatureGenerator generates signatures with consistent randomness.
 type SignatureGenerator struct {
-	signatureFactory
+	signatureFactory //nolint:unused
 
 	random *RandomGenerator
 }

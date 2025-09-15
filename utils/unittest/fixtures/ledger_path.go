@@ -18,7 +18,7 @@ type ledgerPathConfig struct {
 
 // LedgerPathGenerator generates ledger paths with consistent randomness.
 type LedgerPathGenerator struct {
-	ledgerPathFactory
+	ledgerPathFactory //nolint:unused
 
 	random *RandomGenerator
 }

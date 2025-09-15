@@ -2,6 +2,7 @@ package fixtures
 
 import (
 	"github.com/onflow/crypto"
+
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/state/cluster"
 )

@@ -28,9 +28,9 @@ func (f transactionSignatureFactory) WithSignerIndex(signerIndex int) Transactio
 }
 
 // WithSignature is an option that sets the signature for the transaction signature.
-func (f transactionSignatureFactory) WithSignature(signature crypto.Signature) TransactionSignatureOption {
+func (f transactionSignatureFactory) WithSignature(sig crypto.Signature) TransactionSignatureOption {
 	return func(g *TransactionSignatureGenerator, signature *flow.TransactionSignature) {
-		signature.Signature = signature.Signature
+		signature.Signature = sig
 	}
 }
 

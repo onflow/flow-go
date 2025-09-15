@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/coreos/go-semver/semver"
+
 	"github.com/onflow/flow-go/model/flow"
 )
 

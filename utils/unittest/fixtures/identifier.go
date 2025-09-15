@@ -18,7 +18,7 @@ type identifierConfig struct {
 
 // IdentifierGenerator generates identifiers with consistent randomness.
 type IdentifierGenerator struct {
-	identifierFactory
+	identifierFactory //nolint:unused
 
 	random *RandomGenerator
 }
