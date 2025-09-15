@@ -98,14 +98,12 @@ func TestMyExecutionReceiptsStorage(t *testing.T) {
 			require.NoError(t, err)
 
 			err = unittest.WithLock(t, lockManager, storage.LockInsertOwnReceipt, func(lctx lockctx.Context) error {
-				err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+				return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 					return myReceipts.BatchStoreMyReceipt(lctx, receipt2, rw)
 				})
-				require.Error(t, err)
-				require.Contains(t, err.Error(), "different receipt")
-				return nil
 			})
-			require.NoError(t, err)
+			require.Error(t, err)
+			require.ErrorIs(t, err, storage.ErrDataMismatch)
 		})
 	})
 
@@ -128,26 +126,22 @@ func TestMyExecutionReceiptsStorage(t *testing.T) {
 			go func() {
 				startSignal.Wait()
 				err := unittest.WithLock(t, lockManager, storage.LockInsertOwnReceipt, func(lctx lockctx.Context) error {
-					err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+					return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 						return myReceipts.BatchStoreMyReceipt(lctx, receipt1, rw)
 					})
-					errChan <- err
-					return nil
 				})
-				require.NoError(t, err)
+				errChan <- err
 				doneSinal.Done()
 			}()
 
 			go func() {
 				startSignal.Wait()
 				err := unittest.WithLock(t, lockManager, storage.LockInsertOwnReceipt, func(lctx lockctx.Context) error {
-					err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+					return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 						return myReceipts.BatchStoreMyReceipt(lctx, receipt2, rw)
 					})
-					errChan <- err
-					return nil
 				})
-				require.NoError(t, err)
+				errChan <- err
 				doneSinal.Done()
 			}()
 
@@ -184,12 +178,11 @@ func TestMyExecutionReceiptsStorage(t *testing.T) {
 
 					startSignal.Wait()
 					err := unittest.WithLock(t, lockManager, storage.LockInsertOwnReceipt, func(lctx lockctx.Context) error {
-						err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+						return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 							return myReceipts.BatchStoreMyReceipt(lctx, receipt, rw)
 						})
-						errChan <- err
-						return nil
 					})
+					errChan <- err
 					require.NoError(t, err)
 					doneSinal.Done()
 				}(i)

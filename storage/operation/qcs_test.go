@@ -19,15 +19,16 @@ func TestInsertQuorumCertificate(t *testing.T) {
 		expected := unittest.QuorumCertificateFixture()
 		lockManager := storage.NewTestingLockManager()
 
-		unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
+		err := unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
 			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 				return operation.InsertQuorumCertificate(lctx, rw, expected)
 			})
 		})
+		require.NoError(t, err)
 
 		// While still holding the lock, get value; this verifies that reads are not blocked by acquired locks
 		var actual flow.QuorumCertificate
-		err := operation.RetrieveQuorumCertificate(db.Reader(), expected.BlockID, &actual)
+		err = operation.RetrieveQuorumCertificate(db.Reader(), expected.BlockID, &actual)
 		require.NoError(t, err)
 		assert.Equal(t, expected, &actual)
 
@@ -36,14 +37,13 @@ func TestInsertQuorumCertificate(t *testing.T) {
 		different.BlockID = expected.BlockID
 
 		// verify that overwriting the prior QC fails with `storage.ErrAlreadyExists`
-		unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
-			err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+		err = unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
+			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 				return operation.InsertQuorumCertificate(lctx, rw, different)
 			})
-			require.Error(t, err)
-			require.ErrorIs(t, err, storage.ErrAlreadyExists)
-			return nil
 		})
+		require.Error(t, err)
+		require.ErrorIs(t, err, storage.ErrAlreadyExists)
 
 		// verify that the original QC is still there
 		err = operation.RetrieveQuorumCertificate(db.Reader(), expected.BlockID, &actual)

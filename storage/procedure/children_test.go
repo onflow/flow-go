@@ -20,15 +20,16 @@ func TestIndexAndLookupChild(t *testing.T) {
 		parentID := unittest.IdentifierFixture()
 		childID := unittest.IdentifierFixture()
 
-		unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
+		err := unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
 			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 				return procedure.IndexNewBlock(lctx, rw, childID, parentID)
 			})
 		})
+		require.NoError(t, err)
 
 		// retrieve child
 		var retrievedIDs flow.IdentifierList
-		err := procedure.LookupBlockChildren(db.Reader(), parentID, &retrievedIDs)
+		err = procedure.LookupBlockChildren(db.Reader(), parentID, &retrievedIDs)
 		require.NoError(t, err)
 
 		// retrieved child should be the stored child
@@ -47,21 +48,23 @@ func TestIndexTwiceAndRetrieve(t *testing.T) {
 		child2ID := unittest.IdentifierFixture()
 
 		// index the first child
-		unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
+		err := unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
 			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 				return procedure.IndexNewBlock(lctx, rw, child1ID, parentID)
 			})
 		})
+		require.NoError(t, err)
 
 		// index the second child
-		unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
+		err = unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
 			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 				return procedure.IndexNewBlock(lctx, rw, child2ID, parentID)
 			})
 		})
+		require.NoError(t, err)
 
 		var retrievedIDs flow.IdentifierList
-		err := procedure.LookupBlockChildren(db.Reader(), parentID, &retrievedIDs)
+		err = procedure.LookupBlockChildren(db.Reader(), parentID, &retrievedIDs)
 		require.NoError(t, err)
 
 		require.Equal(t, flow.IdentifierList{child1ID, child2ID}, retrievedIDs)
@@ -74,17 +77,18 @@ func TestIndexZeroParent(t *testing.T) {
 		lockManager := storage.NewTestingLockManager()
 		childID := unittest.IdentifierFixture()
 
-		unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
+		err := unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
 			err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 				return procedure.IndexNewBlock(lctx, rw, childID, flow.ZeroID)
 			})
 			require.NoError(t, err)
 			return nil
 		})
+		require.NoError(t, err)
 
 		// zero id should have no children
 		var retrievedIDs flow.IdentifierList
-		err := procedure.LookupBlockChildren(db.Reader(), flow.ZeroID, &retrievedIDs)
+		err = procedure.LookupBlockChildren(db.Reader(), flow.ZeroID, &retrievedIDs)
 		require.ErrorIs(t, err, storage.ErrNotFound)
 	})
 }
@@ -98,28 +102,31 @@ func TestDirectChildren(t *testing.T) {
 		b3 := unittest.IdentifierFixture()
 		b4 := unittest.IdentifierFixture()
 
-		unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
+		err := unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
 			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 				return procedure.IndexNewBlock(lctx, rw, b2, b1)
 			})
 		})
+		require.NoError(t, err)
 
-		unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
+		err = unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
 			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 				return procedure.IndexNewBlock(lctx, rw, b3, b2)
 			})
 		})
+		require.NoError(t, err)
 
-		unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
+		err = unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
 			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 				return procedure.IndexNewBlock(lctx, rw, b4, b3)
 			})
 		})
+		require.NoError(t, err)
 
 		// check the children of the first block
 		var retrievedIDs flow.IdentifierList
 
-		err := procedure.LookupBlockChildren(db.Reader(), b1, &retrievedIDs)
+		err = procedure.LookupBlockChildren(db.Reader(), b1, &retrievedIDs)
 		require.NoError(t, err)
 		require.Equal(t, flow.IdentifierList{b2}, retrievedIDs)
 

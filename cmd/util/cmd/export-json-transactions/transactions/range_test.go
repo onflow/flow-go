@@ -73,7 +73,7 @@ func TestFindBlockTransactions(t *testing.T) {
 		// store into database
 		p1 := unittest.ProposalFromBlock(b1)
 		p2 := unittest.ProposalFromBlock(b2)
-		unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
+		err := unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
 			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 				err := storages.Blocks.BatchStore(lctx, rw, p1)
 				if err != nil {
@@ -83,8 +83,9 @@ func TestFindBlockTransactions(t *testing.T) {
 				return storages.Blocks.BatchStore(lctx, rw, p2)
 			})
 		})
+		require.NoError(t, err)
 
-		_, err := collections.Store(&col1.Collection)
+		_, err = collections.Store(&col1.Collection)
 		require.NoError(t, err)
 		_, err = collections.Store(&col2.Collection)
 		require.NoError(t, err)

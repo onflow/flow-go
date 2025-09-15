@@ -88,20 +88,18 @@ func TestDisconnectedFinalizedBlock(t *testing.T) {
 		dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
 			err := unittest.WithLock(t, lockManager, storage.LockInsertOrFinalizeClusterBlock, func(lctx lockctx.Context) error {
 				_, _, blockC, _ := constructState(t, db, lctx)
-				err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+				return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 					return FinalizeClusterBlock(lctx, rw, blockC.ID())
 				})
-				require.Error(t, err)
-				require.NotErrorIs(t, err, storage.ErrAlreadyExists)
-				return nil
 			})
-			require.NoError(t, err)
+			require.Error(t, err)
+			require.NotErrorIs(t, err, storage.ErrAlreadyExists)
 		})
 	})
 
 	t.Run("finalizing B and then C should succeed", func(t *testing.T) {
 		dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
-			unittest.WithLock(t, lockManager, storage.LockInsertOrFinalizeClusterBlock, func(lctx lockctx.Context) error {
+			err := unittest.WithLock(t, lockManager, storage.LockInsertOrFinalizeClusterBlock, func(lctx lockctx.Context) error {
 				_, blockB, blockC, _ := constructState(t, db, lctx)
 				require.NoError(t, db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 					return FinalizeClusterBlock(lctx, rw, blockB.ID())
@@ -111,23 +109,24 @@ func TestDisconnectedFinalizedBlock(t *testing.T) {
 				}))
 				return nil
 			})
+			require.NoError(t, err)
 		})
 	})
 
 	t.Run("finalizing B and then D should fail, because B is not the parent of D", func(t *testing.T) {
 		dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
-			unittest.WithLock(t, lockManager, storage.LockInsertOrFinalizeClusterBlock, func(lctx lockctx.Context) error {
+			err := unittest.WithLock(t, lockManager, storage.LockInsertOrFinalizeClusterBlock, func(lctx lockctx.Context) error {
 				_, blockB, _, blockD := constructState(t, db, lctx)
 				require.NoError(t, db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 					return FinalizeClusterBlock(lctx, rw, blockB.ID())
 				}))
-				err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+				return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 					return FinalizeClusterBlock(lctx, rw, blockD.ID())
 				})
-				require.Error(t, err)
-				require.NotErrorIs(t, err, storage.ErrAlreadyExists)
-				return nil
+
 			})
+			require.Error(t, err)
+			require.NotErrorIs(t, err, storage.ErrAlreadyExists)
 		})
 	})
 

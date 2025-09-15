@@ -10,6 +10,7 @@ import (
 	"github.com/jordanschalm/lockctx"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
 	txerrmsgsmock "github.com/onflow/flow-go/engine/access/ingestion/tx_error_messages/mock"
@@ -106,30 +107,34 @@ func (p *PipelineFunctionalSuite) SetupTest() {
 	// store and index the root header
 	p.headers = store.NewHeaders(p.metrics, p.db)
 
-	unittest.WithLock(t, p.lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
+	err = unittest.WithLock(t, p.lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
 		return p.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 			return operation.InsertHeader(lctx, rw, rootBlock.ID(), rootBlock)
 		})
 	})
+	require.NoError(t, err)
 
-	unittest.WithLock(t, p.lockManager, storage.LockFinalizeBlock, func(lctx lockctx.Context) error {
+	err = unittest.WithLock(t, p.lockManager, storage.LockFinalizeBlock, func(lctx lockctx.Context) error {
 		return p.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 			return operation.IndexFinalizedBlockByHeight(lctx, rw, rootBlock.Height, rootBlock.ID())
 		})
 	})
+	require.NoError(t, err)
 
 	// store and index the latest sealed block header
-	unittest.WithLock(t, p.lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
+	err = unittest.WithLock(t, p.lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
 		return p.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 			return operation.InsertHeader(lctx, rw, sealedBlock.ID(), sealedBlock.ToHeader())
 		})
 	})
+	require.NoError(t, err)
 
-	unittest.WithLock(t, p.lockManager, storage.LockFinalizeBlock, func(lctx lockctx.Context) error {
+	err = unittest.WithLock(t, p.lockManager, storage.LockFinalizeBlock, func(lctx lockctx.Context) error {
 		return p.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 			return operation.IndexFinalizedBlockByHeight(lctx, rw, sealedBlock.Height, sealedBlock.ID())
 		})
 	})
+	require.NoError(t, err)
 
 	// Store and index sealed block execution result
 	err = p.results.Store(sealedExecutionResult)

@@ -21,14 +21,15 @@ func TestGuaranteeInsertRetrieve(t *testing.T) {
 
 		lockManager := storage.NewTestingLockManager()
 
-		unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
+		err := unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
 			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 				return operation.InsertGuarantee(rw.Writer(), g.ID(), g)
 			})
 		})
+		require.NoError(t, err)
 
 		var retrieved flow.CollectionGuarantee
-		err := operation.RetrieveGuarantee(db.Reader(), g.ID(), &retrieved)
+		err = operation.RetrieveGuarantee(db.Reader(), g.ID(), &retrieved)
 		require.NoError(t, err)
 
 		assert.Equal(t, g, &retrieved)
@@ -48,7 +49,7 @@ func TestIndexGuaranteedCollectionByBlockHashInsertRetrieve(t *testing.T) {
 
 		lockManager := storage.NewTestingLockManager()
 
-		unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
+		err := unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
 			err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 				for _, guarantee := range guarantees {
 					if err := operation.InsertGuarantee(rw.Writer(), guarantee.ID(), guarantee); err != nil {
@@ -69,6 +70,7 @@ func TestIndexGuaranteedCollectionByBlockHashInsertRetrieve(t *testing.T) {
 			assert.Equal(t, []flow.Identifier(expected), actual)
 			return nil
 		})
+		require.NoError(t, err)
 	})
 }
 
@@ -93,7 +95,7 @@ func TestIndexGuaranteedCollectionByBlockHashMultipleBlocks(t *testing.T) {
 		ids2 := flow.GetIDs(set2)
 
 		// insert block 1
-		unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
+		err := unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
 			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 				for _, guarantee := range set1 {
 					if err := operation.InsertGuarantee(rw.Writer(), guarantee.ID(), guarantee); err != nil {
@@ -106,9 +108,10 @@ func TestIndexGuaranteedCollectionByBlockHashMultipleBlocks(t *testing.T) {
 				return nil
 			})
 		})
+		require.NoError(t, err)
 
 		// insert block 2
-		unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
+		err = unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
 			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 				for _, guarantee := range set2 {
 					if err := operation.InsertGuarantee(rw.Writer(), guarantee.ID(), guarantee); err != nil {
@@ -121,6 +124,7 @@ func TestIndexGuaranteedCollectionByBlockHashMultipleBlocks(t *testing.T) {
 				return nil
 			})
 		})
+		require.NoError(t, err)
 
 		t.Run("should retrieve collections for block", func(t *testing.T) {
 			var actual1 []flow.Identifier
@@ -146,25 +150,25 @@ func TestIndexGuaranteeDataMismatch(t *testing.T) {
 		lockManager := storage.NewTestingLockManager()
 
 		// First, index a guarantee for the collection
-		unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
+		err := unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
 			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 				return operation.IndexGuarantee(lctx, rw, collectionID, guaranteeID1)
 			})
 		})
+		require.NoError(t, err)
 
 		// Now try to index a different guarantee ID for the same collection
 		// This should return storage.ErrDataMismatch
-		unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
+		err = unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
 			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-				err := operation.IndexGuarantee(lctx, rw, collectionID, guaranteeID2)
-				require.ErrorIs(t, err, storage.ErrDataMismatch)
-				return nil // Always return nil to satisfy WithLock, we'll check the error outside
+				return operation.IndexGuarantee(lctx, rw, collectionID, guaranteeID2)
 			})
 		})
+		require.ErrorIs(t, err, storage.ErrDataMismatch)
 
 		// Verify that the original guarantee ID is still stored
 		var retrievedGuaranteeID flow.Identifier
-		err := operation.LookupGuarantee(db.Reader(), collectionID, &retrievedGuaranteeID)
+		err = operation.LookupGuarantee(db.Reader(), collectionID, &retrievedGuaranteeID)
 		require.NoError(t, err)
 		assert.Equal(t, guaranteeID1, retrievedGuaranteeID)
 	})

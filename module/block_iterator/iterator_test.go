@@ -28,11 +28,12 @@ func TestIterateHeight(t *testing.T) {
 
 		// index height
 		for _, b := range bs {
-			unittest.WithLock(t, lockManager, storage.LockFinalizeBlock, func(lctx lockctx.Context) error {
+			err := unittest.WithLock(t, lockManager, storage.LockFinalizeBlock, func(lctx lockctx.Context) error {
 				return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 					return operation.IndexFinalizedBlockByHeight(lctx, rw, b.Height, b.ID())
 				})
 			})
+			require.NoError(t, err)
 		}
 
 		progress := &saveNextHeight{}

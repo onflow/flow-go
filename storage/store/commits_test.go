@@ -31,11 +31,9 @@ func TestCommitsStoreAndRetrieve(t *testing.T) {
 		blockID := unittest.IdentifierFixture()
 		expected := unittest.StateCommitmentFixture()
 		err = unittest.WithLock(t, lockManager, storage.LockInsertOwnReceipt, func(lctx lockctx.Context) error {
-			err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 				return store1.BatchStore(lctx, blockID, expected, rw)
 			})
-			require.NoError(t, err)
-			return nil
 		})
 		require.NoError(t, err)
 
@@ -46,11 +44,9 @@ func TestCommitsStoreAndRetrieve(t *testing.T) {
 
 		// re-insert the commit - should be idempotent
 		err = unittest.WithLock(t, lockManager, storage.LockInsertOwnReceipt, func(lctx lockctx.Context) error {
-			err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 				return store1.BatchStore(lctx, blockID, expected, rw)
 			})
-			require.NoError(t, err)
-			return nil
 		})
 		require.NoError(t, err)
 	})
@@ -66,11 +62,9 @@ func TestCommitStoreAndRemove(t *testing.T) {
 		blockID := unittest.IdentifierFixture()
 		expected := unittest.StateCommitmentFixture()
 		err := unittest.WithLock(t, lockManager, storage.LockInsertOwnReceipt, func(lctx lockctx.Context) error {
-			err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 				return store.BatchStore(lctx, blockID, expected, rw)
 			})
-			require.NoError(t, err)
-			return nil
 		})
 		require.NoError(t, err)
 

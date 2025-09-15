@@ -31,8 +31,7 @@ func TestCollections(t *testing.T) {
 		err := unittest.WithLock(t, lockManager, storage.LockInsertCollection, func(lctx lockctx.Context) error {
 			// store the collection and the transaction index
 			_, err := collections.StoreAndIndexByTransaction(lctx, &expected)
-			require.NoError(t, err)
-			return nil
+			return err
 		})
 		require.NoError(t, err)
 
@@ -100,9 +99,7 @@ func TestCollections_IndexDuplicateTx(t *testing.T) {
 
 			// insert col2
 			_, err = collections.StoreAndIndexByTransaction(lctx, &col2)
-			require.NoError(t, err)
-
-			return nil
+			return err
 		})
 		require.NoError(t, err)
 
@@ -155,10 +152,9 @@ func TestCollections_ConcurrentIndexByTx(t *testing.T) {
 				col.Transactions[0] = sharedTx // Ensure it shares the same transaction
 				err := unittest.WithLock(t, lockManager, storage.LockInsertCollection, func(lctx lockctx.Context) error {
 					_, err := collections.StoreAndIndexByTransaction(lctx, &col)
-					errChan <- err
-					return nil
+					return err
 				})
-				require.NoError(t, err)
+				errChan <- err
 			}
 		}()
 
@@ -171,10 +167,9 @@ func TestCollections_ConcurrentIndexByTx(t *testing.T) {
 				col.Transactions[0] = sharedTx // Ensure it shares the same transaction
 				err := unittest.WithLock(t, lockManager, storage.LockInsertCollection, func(lctx lockctx.Context) error {
 					_, err := collections.StoreAndIndexByTransaction(lctx, &col)
-					errChan <- err
-					return nil
+					return err
 				})
-				require.NoError(t, err)
+				errChan <- err
 			}
 		}()
 

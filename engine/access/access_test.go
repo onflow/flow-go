@@ -411,7 +411,7 @@ func (suite *Suite) TestGetBlockByIDAndHeight() {
 		)
 		proposal2 := unittest.ProposalFromBlock(block2)
 
-		unittest.WithLock(suite.T(), suite.lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
+		err := unittest.WithLock(suite.T(), suite.lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
 			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 				if err := all.Blocks.BatchStore(lctx, rw, proposal1); err != nil {
 					return err
@@ -422,13 +422,15 @@ func (suite *Suite) TestGetBlockByIDAndHeight() {
 				return nil
 			})
 		})
+		require.NoError(suite.T(), err)
 
-		unittest.WithLock(suite.T(), suite.lockManager, storage.LockFinalizeBlock, func(fctx lockctx.Context) error {
+		err = unittest.WithLock(suite.T(), suite.lockManager, storage.LockFinalizeBlock, func(fctx lockctx.Context) error {
 			// the follower logic should update height index on the block storage when a block is finalized
 			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 				return operation.IndexFinalizedBlockByHeight(fctx, rw, block2.Height, block2.ID())
 			})
 		})
+		require.NoError(suite.T(), err)
 
 		assertHeaderResp := func(
 			resp *accessproto.BlockHeaderResponse,
@@ -759,17 +761,19 @@ func (suite *Suite) TestGetSealedTransaction() {
 		require.NoError(suite.T(), err)
 
 		// 1. Assume that follower engine updated the block storage and the protocol state. The block is reported as sealed
-		unittest.WithLock(suite.T(), suite.lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
+		err = unittest.WithLock(suite.T(), suite.lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
 			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 				return all.Blocks.BatchStore(lctx, rw, proposal)
 			})
 		})
+		require.NoError(suite.T(), err)
 
-		unittest.WithLock(suite.T(), suite.lockManager, storage.LockFinalizeBlock, func(fctx lockctx.Context) error {
+		err = unittest.WithLock(suite.T(), suite.lockManager, storage.LockFinalizeBlock, func(fctx lockctx.Context) error {
 			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 				return operation.IndexFinalizedBlockByHeight(fctx, rw, block.Height, block.ID())
 			})
 		})
+		require.NoError(suite.T(), err)
 
 		suite.sealedBlock = block.ToHeader()
 
@@ -791,11 +795,10 @@ func (suite *Suite) TestGetSealedTransaction() {
 		suite.request.On("EntityByID", collection.ID(), mock.Anything).Return()
 		// 4. Indexer IndexCollection receives the requested collection and all the execution receipts
 		// Create a lock context for indexing
-		unittest.WithLock(suite.T(), suite.lockManager, storage.LockInsertCollection, func(indexLctx lockctx.Context) error {
-			err := indexer.IndexCollection(indexLctx, collection, collections, suite.log, module.CollectionExecutedMetric(collectionExecutedMetric))
-			require.NoError(suite.T(), err)
-			return nil
+		err = unittest.WithLock(suite.T(), suite.lockManager, storage.LockInsertCollection, func(indexLctx lockctx.Context) error {
+			return indexer.IndexCollection(indexLctx, collection, collections, suite.log, module.CollectionExecutedMetric(collectionExecutedMetric))
 		})
+		require.NoError(suite.T(), err)
 
 		for _, r := range executionReceipts {
 			err = ingestEng.Process(channels.ReceiveReceipts, enNodeIDs[0], r)
@@ -843,17 +846,19 @@ func (suite *Suite) TestGetTransactionResult() {
 		// specifically for this test we will consider that sealed block is far behind finalized, so we get EXECUTED status
 		suite.sealedSnapshot.On("Head").Return(sealedBlock, nil)
 
-		unittest.WithLock(suite.T(), suite.lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
+		err := unittest.WithLock(suite.T(), suite.lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
 			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 				return all.Blocks.BatchStore(lctx, rw, proposal)
 			})
 		})
+		require.NoError(suite.T(), err)
 
-		unittest.WithLock(suite.T(), suite.lockManager, storage.LockInsertBlock, func(lctx2 lockctx.Context) error {
+		err = unittest.WithLock(suite.T(), suite.lockManager, storage.LockInsertBlock, func(lctx2 lockctx.Context) error {
 			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 				return all.Blocks.BatchStore(lctx2, rw, proposalNegative)
 			})
 		})
+		require.NoError(suite.T(), err)
 
 		suite.state.On("AtBlockID", blockId).Return(suite.sealedSnapshot)
 
@@ -885,7 +890,7 @@ func (suite *Suite) TestGetTransactionResult() {
 		metrics := metrics.NewNoopCollector()
 		transactions := store.NewTransactions(metrics, db)
 		collections := store.NewCollections(db, transactions)
-		_, err := collections.Store(collectionNegative)
+		_, err = collections.Store(collectionNegative)
 		require.NoError(suite.T(), err)
 		collectionsToMarkFinalized := stdmap.NewTimes(100)
 		collectionsToMarkExecuted := stdmap.NewTimes(100)
@@ -998,20 +1003,22 @@ func (suite *Suite) TestGetTransactionResult() {
 
 			// Indexer IndexCollection receives the requested collection and all the execution receipts
 			// Create a lock context for indexing
-			unittest.WithLock(suite.T(), suite.lockManager, storage.LockInsertCollection, func(indexLctx lockctx.Context) error {
+			err = unittest.WithLock(suite.T(), suite.lockManager, storage.LockInsertCollection, func(indexLctx lockctx.Context) error {
 				return indexer.IndexCollection(indexLctx, collection, collections, suite.log, module.CollectionExecutedMetric(collectionExecutedMetric))
 			})
+			require.NoError(suite.T(), err)
 
 			for _, r := range executionReceipts {
 				err = ingestEng.Process(channels.ReceiveReceipts, enNodeIDs[0], r)
 				require.NoError(suite.T(), err)
 			}
 		}
-		unittest.WithLock(suite.T(), suite.lockManager, storage.LockFinalizeBlock, func(fctx2 lockctx.Context) error {
+		err = unittest.WithLock(suite.T(), suite.lockManager, storage.LockFinalizeBlock, func(fctx2 lockctx.Context) error {
 			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 				return operation.IndexFinalizedBlockByHeight(fctx2, rw, block.Height, block.ID())
 			})
 		})
+		require.NoError(suite.T(), err)
 		finalSnapshot.On("Head").Return(block.ToHeader(), nil)
 
 		processExecutionReceipts(&block, collection, enNodeIDs, originID, ingestEng)
@@ -1243,13 +1250,14 @@ func (suite *Suite) TestExecuteScript() {
 
 		// create a block and a seal pointing to that block
 		lastBlock := unittest.BlockWithParentFixture(prevBlock.ToHeader())
-		unittest.WithLock(suite.T(), suite.lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
+		err = unittest.WithLock(suite.T(), suite.lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
 			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 				return all.Blocks.BatchStore(lctx, rw, unittest.ProposalFromBlock(lastBlock))
 			})
 		})
+		require.NoError(suite.T(), err)
 
-		unittest.WithLock(suite.T(), suite.lockManager, storage.LockFinalizeBlock, func(fctx lockctx.Context) error {
+		err = unittest.WithLock(suite.T(), suite.lockManager, storage.LockFinalizeBlock, func(fctx lockctx.Context) error {
 			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 				return operation.IndexFinalizedBlockByHeight(fctx, rw, lastBlock.Height, lastBlock.ID())
 			})
@@ -1396,12 +1404,13 @@ func (suite *Suite) TestLastFinalizedBlockHeightResult() {
 		proposal := unittest.ProposalFromBlock(block)
 		newFinalizedBlock := unittest.BlockWithParentFixture(block.ToHeader())
 
-		unittest.WithLock(suite.T(), suite.lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
+		err := unittest.WithLock(suite.T(), suite.lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
 			// store new block
 			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 				return all.Blocks.BatchStore(lctx, rw, proposal)
 			})
 		})
+		require.NoError(suite.T(), err)
 
 		assertFinalizedBlockHeader := func(resp *accessproto.BlockHeaderResponse, err error) {
 			require.NoError(suite.T(), err)

@@ -202,15 +202,16 @@ func (suite *BuilderSuite) TearDownTest() {
 }
 
 func (suite *BuilderSuite) InsertBlock(block *model.Block) {
-	unittest.WithLock(suite.T(), suite.lockManager, storage.LockInsertOrFinalizeClusterBlock, func(lctx lockctx.Context) error {
+	err := unittest.WithLock(suite.T(), suite.lockManager, storage.LockInsertOrFinalizeClusterBlock, func(lctx lockctx.Context) error {
 		return suite.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 			return procedure.InsertClusterBlock(lctx, rw, unittest.ClusterProposalFromBlock(block))
 		})
 	})
+	suite.Require().NoError(err)
 }
 
 func (suite *BuilderSuite) FinalizeBlock(block model.Block) {
-	unittest.WithLock(suite.T(), suite.lockManager, storage.LockInsertOrFinalizeClusterBlock, func(lctx lockctx.Context) error {
+	err := unittest.WithLock(suite.T(), suite.lockManager, storage.LockInsertOrFinalizeClusterBlock, func(lctx lockctx.Context) error {
 		return suite.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 			var refBlock flow.Header
 			err := operation.RetrieveHeader(rw.GlobalReader(), block.Payload.ReferenceBlockID, &refBlock)
@@ -224,6 +225,7 @@ func (suite *BuilderSuite) FinalizeBlock(block model.Block) {
 			return operation.IndexClusterBlockByReferenceHeight(lctx, rw.Writer(), refBlock.Height, block.ID())
 		})
 	})
+	suite.Require().NoError(err)
 }
 
 // Payload returns a payload containing the given transactions, with a valid
@@ -1532,19 +1534,21 @@ func benchmarkBuildOn(b *testing.B, size int) {
 		block := unittest.ClusterBlockFixture(
 			unittest.ClusterBlock.WithParent(final),
 		)
-		unittest.WithLock(b, suite.lockManager, storage.LockInsertOrFinalizeClusterBlock, func(lctx lockctx.Context) error {
+		err := unittest.WithLock(b, suite.lockManager, storage.LockInsertOrFinalizeClusterBlock, func(lctx lockctx.Context) error {
 			return suite.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 				return procedure.InsertClusterBlock(lctx, rw, unittest.ClusterProposalFromBlock(block))
 			})
 		})
+		require.NoError(b, err)
 
 		// finalize the block 80% of the time, resulting in a fork-rate of 20%
 		if rand.Intn(100) < 80 {
-			unittest.WithLock(b, suite.lockManager, storage.LockInsertOrFinalizeClusterBlock, func(lctx lockctx.Context) error {
+			err = unittest.WithLock(b, suite.lockManager, storage.LockInsertOrFinalizeClusterBlock, func(lctx lockctx.Context) error {
 				return suite.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 					return procedure.FinalizeClusterBlock(lctx, rw, block.ID())
 				})
 			})
+			require.NoError(b, err)
 			final = block
 		}
 	}
