@@ -10,7 +10,6 @@ import (
 
 	"github.com/onflow/flow-go/engine/access/rpc/backend/transactions/status"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/state"
 	"github.com/onflow/flow-go/storage"
 )
 
@@ -117,8 +116,8 @@ func (r *RetrierImpl) prune(height uint64) {
 // It looks up transactions at the specified height and retries sending
 // raw transactions for those that are still pending. It also cleans up
 // transactions that are no longer pending or have an unknown status.
-// Error returns:
-//   - errors are unexpected and potentially symptoms of internal implementation bugs or state corruption (fatal).
+//
+// No errors expected during normal operations.
 func (r *RetrierImpl) retryTxsAtHeight(heightToRetry uint64) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -138,15 +137,12 @@ func (r *RetrierImpl) retryTxsAtHeight(heightToRetry uint64) error {
 		if block == nil {
 			status, err = r.txStatusDeriver.DeriveUnknownTransactionStatus(tx.ReferenceBlockID)
 		} else {
-			status, err = r.txStatusDeriver.DeriveTransactionStatus(block.Header.Height, false)
+			status, err = r.txStatusDeriver.DeriveFinalizedTransactionStatus(block.Height, false)
+		}
+		if err != nil {
+			return fmt.Errorf("failed to derive transaction status: %w", err)
 		}
 
-		if err != nil {
-			if !errors.Is(err, state.ErrUnknownSnapshotReference) {
-				return err
-			}
-			continue
-		}
 		if status == flow.TransactionStatusPending {
 			err = r.txSender.SendRawTransaction(context.Background(), tx)
 			if err != nil {

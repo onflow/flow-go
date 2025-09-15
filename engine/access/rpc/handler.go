@@ -895,20 +895,21 @@ func (h *Handler) GetEventsForHeightRange(
 
 	eventEncodingVersion := req.GetEventEncodingVersion()
 
+	query := req.GetExecutionStateQuery()
 	results, executorMetadata, err := h.api.GetEventsForHeightRange(
 		ctx,
 		eventType,
 		startHeight,
 		endHeight,
 		eventEncodingVersion,
-		optimistic_sync.NewCriteria(req.GetExecutionStateQuery()),
+		NewCriteria(query),
 	)
 	if err != nil {
 		return nil, err
 	}
 
-	if query := req.GetExecutionStateQuery(); query != nil && query.GetIncludeExecutorMetadata() {
-		metadata.ExecutionStateQuery = convert.ExecutorMetadataToMessage(executorMetadata)
+	if query.GetIncludeExecutorMetadata() {
+		metadata.ExecutionStateQuery = convert.ExecutorMetadataToMessage(&executorMetadata)
 	}
 
 	resultEvents, err := convert.BlockEventsToMessages(results)
@@ -949,14 +950,14 @@ func (h *Handler) GetEventsForBlockIDs(
 		eventType,
 		blockIDs,
 		eventEncodingVersion,
-		optimistic_sync.NewCriteria(req.GetExecutionStateQuery()),
+		NewCriteria(req.GetExecutionStateQuery()),
 	)
 	if err != nil {
 		return nil, err
 	}
 
-	if query := req.GetExecutionStateQuery(); query != nil && query.GetIncludeExecutorMetadata() {
-		metadata.ExecutionStateQuery = convert.ExecutorMetadataToMessage(executorMetadata)
+	if query := req.GetExecutionStateQuery(); query.GetIncludeExecutorMetadata() {
+		metadata.ExecutionStateQuery = convert.ExecutorMetadataToMessage(&executorMetadata)
 	}
 
 	resultEvents, err := convert.BlockEventsToMessages(results)
@@ -1392,7 +1393,7 @@ func (h *Handler) SubscribeBlockDigestsFromLatest(request *accessproto.Subscribe
 func (h *Handler) handleBlockDigestsResponse(send sendSubscribeBlockDigestsResponseFunc) func(*flow.BlockDigest) error {
 	return func(blockDigest *flow.BlockDigest) error {
 		err := send(&accessproto.SubscribeBlockDigestsResponse{
-			BlockId:        convert.IdentifierToMessage(blockDigest.ID()),
+			BlockId:        convert.IdentifierToMessage(blockDigest.BlockID),
 			BlockHeight:    blockDigest.Height,
 			BlockTimestamp: timestamppb.New(blockDigest.Timestamp),
 		})
@@ -1481,7 +1482,7 @@ func (h *Handler) blockResponse(block *flow.Block, fullResponse bool, status flo
 		return nil, err
 	}
 
-	signerIDs, err := h.signerIndicesDecoder.DecodeSignerIDs(block.Header)
+	signerIDs, err := h.signerIndicesDecoder.DecodeSignerIDs(block.ToHeader())
 	if err != nil {
 		return nil, err // the block was retrieved from local storage - so no errors are expected
 	}
@@ -1608,4 +1609,15 @@ func HandleRPCSubscription[T any](sub subscription.Subscription, handleResponse 
 	}
 
 	return nil
+}
+
+func NewCriteria(query *entities.ExecutionStateQuery) optimistic_sync.Criteria {
+	if query == nil {
+		return optimistic_sync.Criteria{}
+	}
+
+	return optimistic_sync.Criteria{
+		AgreeingExecutorsCount: uint(query.AgreeingExecutorsCount),
+		RequiredExecutors:      convert.MessagesToIdentifiers(query.RequiredExecutorIds),
+	}
 }

@@ -30,6 +30,7 @@ import (
 	statestreambackend "github.com/onflow/flow-go/engine/access/state_stream/backend"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/executiondatasync/optimistic_sync"
+	osyncmock "github.com/onflow/flow-go/module/executiondatasync/optimistic_sync/mock"
 	"github.com/onflow/flow-go/module/grpcserver"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
@@ -68,6 +69,9 @@ type IrrecoverableStateTestSuite struct {
 	// grpc servers
 	secureGrpcServer   *grpcserver.GrpcServer
 	unsecureGrpcServer *grpcserver.GrpcServer
+
+	executionResultInfoProvider *osyncmock.ExecutionResultInfoProvider
+	executionStateCache         *osyncmock.ExecutionStateCache
 }
 
 func (suite *IrrecoverableStateTestSuite) SetupTest() {
@@ -141,27 +145,29 @@ func (suite *IrrecoverableStateTestSuite) SetupTest() {
 	blockHeader := unittest.BlockHeaderFixture()
 	suite.snapshot.On("Head").Return(blockHeader, nil).Once()
 
+	suite.executionResultInfoProvider = osyncmock.NewExecutionResultInfoProvider(suite.T())
+	suite.executionStateCache = osyncmock.NewExecutionStateCache(suite.T())
+
 	bnd, err := backend.New(backend.Params{
-		State:                suite.state,
-		CollectionRPC:        suite.collClient,
-		Blocks:               suite.blocks,
-		Headers:              suite.headers,
-		Collections:          suite.collections,
-		Transactions:         suite.transactions,
-		ChainID:              suite.chainID,
-		AccessMetrics:        suite.metrics,
-		MaxHeightRange:       0,
-		Log:                  suite.log,
-		SnapshotHistoryLimit: 0,
-		Communicator:         node_communicator.NewNodeCommunicator(false),
-		BlockTracker:         nil,
-		EventQueryMode:       query_mode.IndexQueryModeExecutionNodesOnly,
-		ScriptExecutionMode:  query_mode.IndexQueryModeExecutionNodesOnly,
-		TxResultQueryMode:    query_mode.IndexQueryModeExecutionNodesOnly,
-		// TODO: set this once data result forest merged in
-		//ExecutionResultProvider:
-		//ExecutionStateCache:
-		OperatorCriteria: optimistic_sync.DefaultCriteria,
+		State:                       suite.state,
+		CollectionRPC:               suite.collClient,
+		Blocks:                      suite.blocks,
+		Headers:                     suite.headers,
+		Collections:                 suite.collections,
+		Transactions:                suite.transactions,
+		ChainID:                     suite.chainID,
+		AccessMetrics:               suite.metrics,
+		MaxHeightRange:              0,
+		Log:                         suite.log,
+		SnapshotHistoryLimit:        0,
+		Communicator:                node_communicator.NewNodeCommunicator(false),
+		BlockTracker:                nil,
+		EventQueryMode:              query_mode.IndexQueryModeExecutionNodesOnly,
+		ScriptExecutionMode:         query_mode.IndexQueryModeExecutionNodesOnly,
+		TxResultQueryMode:           query_mode.IndexQueryModeExecutionNodesOnly,
+		ExecutionResultInfoProvider: suite.executionResultInfoProvider,
+		ExecutionStateCache:         suite.executionStateCache,
+		OperatorCriteria:            optimistic_sync.DefaultCriteria,
 	})
 	suite.Require().NoError(err)
 
@@ -221,11 +227,13 @@ func (suite *IrrecoverableStateTestSuite) TestGRPCInconsistentNodeState() {
 // TestRestInconsistentNodeState tests the behavior when the REST API encounters an inconsistent node state.
 func (suite *IrrecoverableStateTestSuite) TestRestInconsistentNodeState() {
 	collections := unittest.CollectionListFixture(1)
-	blockHeader := unittest.BlockWithGuaranteesFixture(
-		unittest.CollectionGuaranteesWithCollectionIDFixture(collections),
+	block := unittest.BlockFixture(
+		unittest.Block.WithPayload(
+			unittest.PayloadFixture(unittest.WithGuarantees(unittest.CollectionGuaranteesWithCollectionIDFixture(collections)...)),
+		),
 	)
-	suite.blocks.On("ByID", blockHeader.ID()).Return(blockHeader, nil)
-	suite.headers.On("BlockIDByHeight", blockHeader.Header.Height).Return(blockHeader.ID(), nil)
+	suite.blocks.On("ByID", block.ID()).Return(block, nil)
+	suite.headers.On("BlockIDByHeight", block.Height).Return(block.ID(), nil)
 
 	err := fmt.Errorf("inconsistent node state")
 	suite.snapshot.On("Head").Return(nil, err)
@@ -239,7 +247,7 @@ func (suite *IrrecoverableStateTestSuite) TestRestInconsistentNodeState() {
 	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
 	defer cancel()
 
-	actual, _, err := client.BlocksApi.BlocksIdGet(ctx, []string{blockHeader.ID().String()}, optionsForBlocksIdGetOpts())
+	actual, _, err := client.BlocksApi.BlocksIdGet(ctx, []string{block.ID().String()}, optionsForBlocksIdGetOpts())
 	suite.Require().Error(err)
 	suite.Require().Nil(actual)
 }

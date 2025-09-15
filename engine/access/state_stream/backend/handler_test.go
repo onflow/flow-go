@@ -29,7 +29,6 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/utils/unittest"
-	"github.com/onflow/flow-go/utils/unittest/generator"
 )
 
 func TestHeartbeatResponseSuite(t *testing.T) {
@@ -80,7 +79,7 @@ func (s *HandlerTestSuite) TestHeartbeatResponse() {
 	}
 
 	// notify backend block is available
-	s.highestBlockHeader = s.blocks[len(s.blocks)-1].Header
+	s.highestBlockHeader = s.blocks[len(s.blocks)-1].ToHeader()
 
 	s.Run("All events filter", func() {
 		// create empty event filter
@@ -102,13 +101,13 @@ func (s *HandlerTestSuite) TestHeartbeatResponse() {
 			// consume execution data from subscription
 			unittest.RequireReturnsBefore(s.T(), func() {
 				resp, ok := <-reader.received
-				require.True(s.T(), ok, "channel closed while waiting for exec data for block %d %v", b.Header.Height, b.ID())
+				require.True(s.T(), ok, "channel closed while waiting for exec data for block %d %v", b.Height, b.ID())
 
 				blockID, err := convert.BlockID(resp.BlockId)
 				require.NoError(s.T(), err)
-				require.Equal(s.T(), b.Header.ID(), blockID)
-				require.Equal(s.T(), b.Header.Height, resp.BlockHeight)
-			}, time.Second, fmt.Sprintf("timed out waiting for exec data for block %d %v", b.Header.Height, b.ID()))
+				require.Equal(s.T(), b.ID(), blockID)
+				require.Equal(s.T(), b.Height, resp.BlockHeight)
+			}, time.Second, fmt.Sprintf("timed out waiting for exec data for block %d %v", b.Height, b.ID()))
 		}
 	})
 
@@ -137,13 +136,13 @@ func (s *HandlerTestSuite) TestHeartbeatResponse() {
 			// consume execution data from subscription
 			unittest.RequireReturnsBefore(s.T(), func() {
 				resp, ok := <-reader.received
-				require.True(s.T(), ok, "channel closed while waiting for exec data for block %d %v", b.Header.Height, b.ID())
+				require.True(s.T(), ok, "channel closed while waiting for exec data for block %d %v", b.Height, b.ID())
 
 				blockID, err := convert.BlockID(resp.BlockId)
 				require.NoError(s.T(), err)
-				require.Equal(s.T(), b.Header.ID(), blockID)
-				require.Equal(s.T(), b.Header.Height, resp.BlockHeight)
-			}, time.Second, fmt.Sprintf("timed out waiting for exec data for block %d %v", b.Header.Height, b.ID()))
+				require.Equal(s.T(), b.ID(), blockID)
+				require.Equal(s.T(), b.Height, resp.BlockHeight)
+			}, time.Second, fmt.Sprintf("timed out waiting for exec data for block %d %v", b.Height, b.ID()))
 		}
 	})
 
@@ -182,14 +181,14 @@ func (s *HandlerTestSuite) TestHeartbeatResponse() {
 			// consume execution data from subscription
 			unittest.RequireReturnsBefore(s.T(), func() {
 				resp, ok := <-reader.received
-				require.True(s.T(), ok, "channel closed while waiting for exec data for block %d %v", b.Header.Height, b.ID())
+				require.True(s.T(), ok, "channel closed while waiting for exec data for block %d %v", b.Height, b.ID())
 
 				blockID, err := convert.BlockID(resp.BlockId)
 				require.NoError(s.T(), err)
-				require.Equal(s.T(), b.Header.Height, resp.BlockHeight)
-				require.Equal(s.T(), b.Header.ID(), blockID)
+				require.Equal(s.T(), b.Height, resp.BlockHeight)
+				require.Equal(s.T(), b.ID(), blockID)
 				require.Empty(s.T(), resp.Events)
-			}, time.Second, fmt.Sprintf("timed out waiting for exec data for block %d %v", b.Header.Height, b.ID()))
+			}, time.Second, fmt.Sprintf("timed out waiting for exec data for block %d %v", b.Height, b.ID()))
 		}
 	})
 }
@@ -450,7 +449,8 @@ func TestEventStream(t *testing.T) {
 		}
 
 		for _, resp := range responses {
-			convertedEvents := convert.MessagesToEvents(resp.GetEvents())
+			convertedEvents, err := convert.MessagesToEvents(resp.GetEvents())
+			require.NoError(t, err)
 
 			assert.Equal(t, blockHeight, resp.GetBlockHeight())
 			assert.Equal(t, blockID, convert.MessageToIdentifier(resp.GetBlockId()))
@@ -603,7 +603,7 @@ func TestGetRegisterValues(t *testing.T) {
 }
 
 func generateEvents(t *testing.T, n int) ([]flow.Event, []flow.Event) {
-	ccfEvents := generator.GetEventsWithEncoding(n, entities.EventEncodingVersion_CCF_V0)
+	ccfEvents := unittest.EventGenerator.GetEventsWithEncoding(n, entities.EventEncodingVersion_CCF_V0)
 	jsonEvents := make([]flow.Event, len(ccfEvents))
 	for i, e := range ccfEvents {
 		jsonEvent, err := convert.CcfEventToJsonEvent(e)

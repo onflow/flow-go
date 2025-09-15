@@ -155,7 +155,6 @@ generate-fvm-env-wrappers:
 .PHONY: generate-mocks
 generate-mocks: install-mock-generators
 	mockery --name '(Connector|PingInfoProvider)' --dir=network/p2p --case=underscore --output="./network/mocknetwork" --outpkg="mocknetwork"
-	CGO_CFLAGS=$(CRYPTO_FLAG) mockgen -destination=storage/mocks/storage.go -package=mocks github.com/onflow/flow-go/storage Blocks,Headers,Payloads,Collections,Commits,Events,ServiceEvents,TransactionResults
 	CGO_CFLAGS=$(CRYPTO_FLAG) mockgen -destination=network/mocknetwork/mock_network.go -package=mocknetwork github.com/onflow/flow-go/network EngineRegistry
 	mockery --name=ExecutionDataStore --dir=module/executiondatasync/execution_data --case=underscore --output="./module/executiondatasync/execution_data/mock" --outpkg="mock"
 	mockery --name=Downloader --dir=module/executiondatasync/execution_data --case=underscore --output="./module/executiondatasync/execution_data/mock" --outpkg="mock"
@@ -224,7 +223,7 @@ generate-mocks: install-mock-generators
 	mockery --name 'ScriptExecutor' --dir=module/execution --case=underscore --output="module/execution/mock" --outpkg="mock"
 	mockery --name 'StorageSnapshot' --dir=fvm/storage/snapshot --case=underscore --output="fvm/storage/snapshot/mock" --outpkg="mock"
 	mockery --name 'Core' --dir=module/executiondatasync/optimistic_sync --case=underscore --output="module/executiondatasync/optimistic_sync/mock" --outpkg="mock"
-	mockery --name 'ExecutionResultProvider' --dir=module/executiondatasync/optimistic_sync --case=underscore --output="module/executiondatasync/optimistic_sync/mock" --outpkg="mock"
+	mockery --name 'ExecutionResultInfoProvider' --dir=module/executiondatasync/optimistic_sync --case=underscore --output="module/executiondatasync/optimistic_sync/mock" --outpkg="mock"
 	mockery --name 'ExecutionStateCache' --dir=module/executiondatasync/optimistic_sync --case=underscore --output="module/executiondatasync/optimistic_sync/mock" --outpkg="mock"
 	mockery --name 'Snapshot' --dir=module/executiondatasync/optimistic_sync --case=underscore --output="module/executiondatasync/optimistic_sync/mock" --outpkg="mock"
 	mockery --name 'Requester' --dir=engine/access/ingestion/tx_error_messages --case=underscore --output="engine/access/ingestion/tx_error_messages/mock" --outpkg="mock"
@@ -254,12 +253,12 @@ tools/custom-gcl: tools/structwrite .custom-gcl.yml
 .PHONY: lint
 lint: tidy tools/custom-gcl
 	# revive -config revive.toml -exclude storage/ledger/trie ./...
-	./tools/custom-gcl run -v ./...
+	./tools/custom-gcl run -v $(or $(LINT_PATH),./...)
 
 .PHONY: fix-lint
 fix-lint:
 	# revive -config revive.toml -exclude storage/ledger/trie ./...
-	./tools/custom-gcl run -v --fix ./...
+	./tools/custom-gcl run -v --fix $(or $(LINT_PATH),./...)
 
 # Runs unit tests with different list of packages as passed by CI so they run in parallel
 .PHONY: ci

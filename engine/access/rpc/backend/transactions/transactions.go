@@ -29,7 +29,6 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/irrecoverable"
-	"github.com/onflow/flow-go/state"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
 )
@@ -361,7 +360,7 @@ func (t *Transactions) GetTransactionResult(
 	var txResult *accessmodel.TransactionResult
 	// access node may not have the block if it hasn't yet been finalized, hence block can be nil at this point
 	if block != nil {
-		txResult, err = t.lookupTransactionResult(ctx, txID, block.Header, requiredEventEncodingVersion)
+		txResult, err = t.lookupTransactionResult(ctx, txID, block.ToHeader(), requiredEventEncodingVersion)
 		if err != nil {
 			return nil, rpc.ConvertError(err, "failed to retrieve result", codes.Internal)
 		}
@@ -385,7 +384,7 @@ func (t *Transactions) GetTransactionResult(
 		}
 
 		blockID = block.ID()
-		blockHeight = block.Header.Height
+		blockHeight = block.Height
 	}
 
 	// If there is still no transaction result, provide one based on available information.
@@ -395,14 +394,12 @@ func (t *Transactions) GetTransactionResult(
 		if block == nil {
 			txStatus, err = t.txStatusDeriver.DeriveUnknownTransactionStatus(tx.ReferenceBlockID)
 		} else {
-			txStatus, err = t.txStatusDeriver.DeriveTransactionStatus(blockHeight, false)
+			txStatus, err = t.txStatusDeriver.DeriveFinalizedTransactionStatus(blockHeight, false)
 		}
 
 		if err != nil {
-			if !errors.Is(err, state.ErrUnknownSnapshotReference) {
-				irrecoverable.Throw(ctx, err)
-			}
-			return nil, rpc.ConvertStorageError(err)
+			irrecoverable.Throw(ctx, fmt.Errorf("failed to derive transaction status: %w", err))
+			return nil, err
 		}
 
 		txResult = &accessmodel.TransactionResult{
@@ -428,7 +425,7 @@ func (t *Transactions) lookupCollectionIDInBlock(
 	txID flow.Identifier,
 ) (flow.Identifier, error) {
 	for _, guarantee := range block.Payload.Guarantees {
-		collectionID := guarantee.ID()
+		collectionID := guarantee.CollectionID
 		collection, err := t.collections.LightByID(collectionID)
 		if err != nil {
 			return flow.ZeroID, fmt.Errorf("failed to get collection %s in indexed block: %w", collectionID, err)
@@ -515,7 +512,7 @@ func (t *Transactions) GetSystemTransactionResult(ctx context.Context, blockID f
 		return nil, rpc.ConvertStorageError(err)
 	}
 
-	return t.lookupTransactionResult(ctx, t.systemTxID, block.Header, requiredEventEncodingVersion)
+	return t.lookupTransactionResult(ctx, t.systemTxID, block.ToHeader(), requiredEventEncodingVersion)
 }
 
 // Error returns:
@@ -600,7 +597,12 @@ func (t *Transactions) getHistoricalTransactionResult(
 				result.Status = entities.TransactionStatus_EXPIRED
 			}
 
-			return convert.MessageToTransactionResult(result), nil
+			txResult, err := convert.MessageToTransactionResult(result)
+			if err != nil {
+				return nil, status.Errorf(codes.Internal, "could not convert transaction result: %v", err)
+			}
+
+			return txResult, nil
 		}
 		// Otherwise, if not found, just continue
 		if status.Code(err) == codes.NotFound {

@@ -2,6 +2,7 @@ package models
 
 import (
 	"github.com/onflow/flow-go/engine/access/rest/util"
+	"github.com/onflow/flow-go/model/access"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -27,12 +28,13 @@ func NewEvents(events []flow.Event) Events {
 
 func NewBlockEvents(
 	events flow.BlockEvents,
-	metadata *flow.ExecutorMetadata,
+	metadata access.ExecutorMetadata,
 	shouldIncludeMetadata bool,
 ) *BlockEvents {
 	var meta *Metadata
 	if shouldIncludeMetadata {
-		meta = NewMetadata(metadata)
+		m := NewMetadata(metadata)
+		meta = &m
 	}
 
 	return &BlockEvents{
@@ -41,7 +43,6 @@ func NewBlockEvents(
 		BlockTimestamp: events.BlockTimestamp,
 		Events:         NewEvents(events.Events),
 		Metadata:       meta,
-		Links:          nil,
 	}
 }
 
@@ -49,12 +50,12 @@ type BlockEventsList []BlockEvents
 
 func NewBlockEventsList(
 	blocksEvents []flow.BlockEvents,
-	metadata *flow.ExecutorMetadata,
+	metadata access.ExecutorMetadata,
 	shouldIncludeMetadata bool,
 ) BlockEventsList {
-	converted := make([]BlockEvents, len(blocksEvents))
-	for i, evs := range blocksEvents {
-		converted[i] = *NewBlockEvents(evs, metadata, shouldIncludeMetadata)
+	var converted BlockEventsList
+	for _, evs := range blocksEvents {
+		converted = append(converted, *NewBlockEvents(evs, metadata, shouldIncludeMetadata))
 	}
 	return converted
 }

@@ -6,20 +6,20 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-// InsertExecutionReceiptMeta inserts an execution receipt meta by ID.
-func InsertExecutionReceiptMeta(receiptID flow.Identifier, meta *flow.ExecutionReceiptMeta) func(*badger.Txn) error {
-	return insert(makePrefix(codeExecutionReceiptMeta, receiptID), meta)
+// InsertExecutionReceiptStub inserts an execution receipt stub by ID.
+func InsertExecutionReceiptStub(receiptID flow.Identifier, stub *flow.ExecutionReceiptStub) func(*badger.Txn) error {
+	return insert(makePrefix(codeExecutionReceiptStub, receiptID), stub)
 }
 
-// BatchInsertExecutionReceiptMeta inserts an execution receipt meta by ID.
+// BatchInsertExecutionReceiptStub inserts an execution receipt stub by ID.
 // TODO: rename to BatchUpdate
-func BatchInsertExecutionReceiptMeta(receiptID flow.Identifier, meta *flow.ExecutionReceiptMeta) func(batch *badger.WriteBatch) error {
-	return batchWrite(makePrefix(codeExecutionReceiptMeta, receiptID), meta)
+func BatchInsertExecutionReceiptStub(receiptID flow.Identifier, stub *flow.ExecutionReceiptStub) func(batch *badger.WriteBatch) error {
+	return batchWrite(makePrefix(codeExecutionReceiptStub, receiptID), stub)
 }
 
-// RetrieveExecutionReceiptMeta retrieves a execution receipt meta by ID.
-func RetrieveExecutionReceiptMeta(receiptID flow.Identifier, meta *flow.ExecutionReceiptMeta) func(*badger.Txn) error {
-	return retrieve(makePrefix(codeExecutionReceiptMeta, receiptID), meta)
+// RetrieveExecutionReceiptStub retrieves a execution receipt stub by ID.
+func RetrieveExecutionReceiptStub(receiptID flow.Identifier, stub *flow.ExecutionReceiptStub) func(*badger.Txn) error {
+	return retrieve(makePrefix(codeExecutionReceiptStub, receiptID), stub)
 }
 
 // IndexOwnExecutionReceipt inserts an execution receipt ID keyed by block ID

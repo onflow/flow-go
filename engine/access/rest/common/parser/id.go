@@ -45,7 +45,6 @@ func NewIDs(raw []string) (IDs, error) {
 	ids := make(IDs, 0)
 	uniqueIDs := make(map[string]bool)
 	for _, r := range raw {
-		var id ID
 		id, err := NewID(r)
 		if err != nil {
 			return nil, err
@@ -60,7 +59,7 @@ func NewIDs(raw []string) (IDs, error) {
 	return ids, nil
 }
 
-func (i IDs) Flow() []flow.Identifier {
+func (i IDs) Flow() flow.IdentifierList {
 	ids := make([]flow.Identifier, len(i))
 	for j, id := range i {
 		ids[j] = id.Flow()

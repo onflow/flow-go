@@ -195,7 +195,7 @@ func (r *RestProxyHandler) GetTransactionResult(
 		return nil, err
 	}
 
-	return convert.MessageToTransactionResult(transactionResultResponse), nil
+	return convert.MessageToTransactionResult(transactionResultResponse)
 }
 
 // GetAccountAtBlockHeight returns account by account address and block height.
@@ -377,10 +377,10 @@ func (r *RestProxyHandler) GetEventsForHeightRange(
 	startHeight, endHeight uint64,
 	requiredEventEncodingVersion entities.EventEncodingVersion,
 	criteria optimistic_sync.Criteria,
-) ([]flow.BlockEvents, flow.ExecutorMetadata, error) {
+) ([]flow.BlockEvents, accessmodel.ExecutorMetadata, error) {
 	upstream, closer, err := r.FaultTolerantClient()
 	if err != nil {
-		return nil, flow.ExecutorMetadata{}, err
+		return nil, accessmodel.ExecutorMetadata{}, err
 	}
 	defer closer.Close()
 
@@ -396,13 +396,15 @@ func (r *RestProxyHandler) GetEventsForHeightRange(
 		},
 	}
 	eventsResponse, err := upstream.GetEventsForHeightRange(ctx, getEventsForHeightRangeRequest)
+	if err != nil {
+		return nil, accessmodel.ExecutorMetadata{}, err
+	}
 	r.log("upstream", "GetEventsForHeightRange", err)
 
-	if err != nil {
-		return nil, flow.ExecutorMetadata{}, err
-	}
+	metadata := getExecutorMetadata(eventsResponse.GetMetadata())
+	res, err := convert.MessagesToBlockEvents(eventsResponse.Results)
 
-	return convert.MessagesToBlockEvents(eventsResponse.Results), flow.ExecutorMetadata{}, nil
+	return res, metadata, err
 }
 
 // GetEventsForBlockIDs returns events by their name in the specified block IDs.
@@ -412,10 +414,10 @@ func (r *RestProxyHandler) GetEventsForBlockIDs(
 	blockIDs []flow.Identifier,
 	requiredEventEncodingVersion entities.EventEncodingVersion,
 	criteria optimistic_sync.Criteria,
-) ([]flow.BlockEvents, flow.ExecutorMetadata, error) {
+) ([]flow.BlockEvents, accessmodel.ExecutorMetadata, error) {
 	upstream, closer, err := r.FaultTolerantClient()
 	if err != nil {
-		return nil, flow.ExecutorMetadata{}, err
+		return nil, accessmodel.ExecutorMetadata{}, err
 	}
 	defer closer.Close()
 
@@ -435,10 +437,13 @@ func (r *RestProxyHandler) GetEventsForBlockIDs(
 	r.log("upstream", "GetEventsForBlockIDs", err)
 
 	if err != nil {
-		return nil, flow.ExecutorMetadata{}, err
+		return nil, accessmodel.ExecutorMetadata{}, err
 	}
 
-	return convert.MessagesToBlockEvents(eventsResponse.Results), flow.ExecutorMetadata{}, nil
+	metadata := getExecutorMetadata(eventsResponse.GetMetadata())
+	res, err := convert.MessagesToBlockEvents(eventsResponse.Results)
+
+	return res, metadata, err
 }
 
 // convertError converts a serialized access error formatted as a grpc error returned from the upstream AN,
@@ -498,4 +503,15 @@ func splitOnPrefix(original, prefix string) (string, bool) {
 		return parts[1], true
 	}
 	return "", false
+}
+
+func getExecutorMetadata(metadata *entities.Metadata) accessmodel.ExecutorMetadata {
+	if metadata != nil {
+		if executorMetadata := metadata.GetExecutionStateQuery(); executorMetadata != nil {
+			return *convert.MessageToExecutorMetadata(executorMetadata)
+		}
+	}
+
+	return accessmodel.ExecutorMetadata{}
+
 }

@@ -7,7 +7,6 @@ import (
 	"net/url"
 	"strings"
 	"testing"
-	"time"
 
 	mocks "github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -18,7 +17,7 @@ import (
 	"github.com/onflow/flow-go/engine/access/rest/common/models"
 	"github.com/onflow/flow-go/engine/access/rest/http/routes"
 	"github.com/onflow/flow-go/engine/access/rest/router"
-	"github.com/onflow/flow-go/engine/access/rest/util"
+	"github.com/onflow/flow-go/model/access"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
 
@@ -47,81 +46,197 @@ func TestGetEvents(t *testing.T) {
 	testVectors := []testVector{
 		// valid
 		{
-			description:      "Get events for a single block by ID",
-			request:          getEventReq(t, "A.179b6b1cb6755e31.Foo.Bar", "", "", []string{events[0].BlockID.String()}),
+			description: "Get events for a single block by ID",
+			request: buildRequest(
+				t,
+				"A.179b6b1cb6755e31.Foo.Bar",
+				"",
+				"",
+				[]string{events[0].BlockID.String()},
+				"2",
+				[]string{},
+				"true",
+			),
 			expectedStatus:   http.StatusOK,
-			expectedResponse: testBlockEventResponse(t, []flow.BlockEvents{events[0]}),
+			expectedResponse: buildExpectedResponse(t, []flow.BlockEvents{events[0]}, true),
 		},
 		{
-			description:      "Get events by all block IDs",
-			request:          getEventReq(t, "A.179b6b1cb6755e31.Foo.Bar", "", "", allBlockIDs),
+			description: "Get events by all block IDs",
+			request: buildRequest(
+				t,
+				"A.179b6b1cb6755e31.Foo.Bar",
+				"",
+				"",
+				allBlockIDs,
+				"2",
+				[]string{},
+				"true",
+			),
 			expectedStatus:   http.StatusOK,
-			expectedResponse: testBlockEventResponse(t, events),
+			expectedResponse: buildExpectedResponse(t, events, true),
 		},
 		{
-			description:      "Get events for height range",
-			request:          getEventReq(t, "A.179b6b1cb6755e31.Foo.Bar", startHeight, endHeight, nil),
+			description: "Get events for height range",
+			request: buildRequest(
+				t,
+				"A.179b6b1cb6755e31.Foo.Bar",
+				startHeight,
+				endHeight,
+				nil,
+				"2",
+				[]string{},
+				"true",
+			),
 			expectedStatus:   http.StatusOK,
-			expectedResponse: testBlockEventResponse(t, events),
+			expectedResponse: buildExpectedResponse(t, events, true),
 		},
 		{
-			description:      "Get events range ending at sealed block",
-			request:          getEventReq(t, "A.179b6b1cb6755e31.Foo.Bar", "0", "sealed", nil),
+			description: "Get events range ending at sealed block",
+			request: buildRequest(
+				t,
+				"A.179b6b1cb6755e31.Foo.Bar",
+				"0",
+				"sealed",
+				nil,
+				"2",
+				[]string{},
+				"true",
+			),
 			expectedStatus:   http.StatusOK,
-			expectedResponse: testBlockEventResponse(t, events),
+			expectedResponse: buildExpectedResponse(t, events, true),
 		},
 		{
-			description:      "Get events range ending after last block",
-			request:          getEventReq(t, "A.179b6b1cb6755e31.Foo.Bar", "0", fmt.Sprint(events[len(events)-1].BlockHeight+5), nil),
+			description: "Get events range ending after last block",
+			request: buildRequest(
+				t,
+				"A.179b6b1cb6755e31.Foo.Bar",
+				"0",
+				fmt.Sprint(events[len(events)-1].BlockHeight+5),
+				nil,
+				"2",
+				[]string{},
+				"true",
+			),
 			expectedStatus:   http.StatusOK,
-			expectedResponse: testBlockEventResponse(t, truncatedEvents),
+			expectedResponse: buildExpectedResponse(t, truncatedEvents, true),
 		},
 		// invalid
 		{
-			description:      "Get invalid - missing all fields",
-			request:          getEventReq(t, "", "", "", nil),
+			description: "Get invalid - missing all fields",
+			request: buildRequest(
+				t,
+				"",
+				"",
+				"",
+				nil,
+				"2",
+				[]string{},
+				"true",
+			),
 			expectedStatus:   http.StatusBadRequest,
 			expectedResponse: `{"code":400,"message":"must provide either block IDs or start and end height range"}`,
 		},
 		{
-			description:      "Get invalid - missing query event type",
-			request:          getEventReq(t, "", "", "", []string{events[0].BlockID.String()}),
+			description: "Get invalid - missing query event type",
+			request: buildRequest(
+				t,
+				"",
+				"",
+				"",
+				[]string{events[0].BlockID.String()},
+				"2",
+				[]string{},
+				"true",
+			),
 			expectedStatus:   http.StatusBadRequest,
 			expectedResponse: `{"code":400,"message":"event type must be provided"}`,
 		},
 		{
-			description:      "Get invalid - missing end height",
-			request:          getEventReq(t, "A.179b6b1cb6755e31.Foo.Bar", "100", "", nil),
+			description: "Get invalid - missing end height",
+			request: buildRequest(
+				t,
+				"A.179b6b1cb6755e31.Foo.Bar",
+				"100",
+				"", nil,
+				"2",
+				[]string{},
+				"true",
+			),
 			expectedStatus:   http.StatusBadRequest,
 			expectedResponse: `{"code":400,"message":"must provide either block IDs or start and end height range"}`,
 		},
 		{
-			description:      "Get invalid - start height bigger than end height",
-			request:          getEventReq(t, "A.179b6b1cb6755e31.Foo.Bar", "100", "50", nil),
+			description: "Get invalid - start height bigger than end height",
+			request: buildRequest(
+				t,
+				"A.179b6b1cb6755e31.Foo.Bar",
+				"100",
+				"50",
+				nil,
+				"2",
+				[]string{},
+				"true",
+			),
 			expectedStatus:   http.StatusBadRequest,
 			expectedResponse: `{"code":400,"message":"start height must be less than or equal to end height"}`,
 		},
 		{
-			description:      "Get invalid - too big interval",
-			request:          getEventReq(t, "A.179b6b1cb6755e31.Foo.Bar", "0", "5000", nil),
+			description: "Get invalid - too big interval",
+			request: buildRequest(
+				t,
+				"A.179b6b1cb6755e31.Foo.Bar",
+				"0",
+				"5000",
+				nil,
+				"2",
+				[]string{},
+				"true",
+			),
 			expectedStatus:   http.StatusBadRequest,
 			expectedResponse: `{"code":400,"message":"height range 5000 exceeds maximum allowed of 250"}`,
 		},
 		{
-			description:      "Get invalid - can not provide all params",
-			request:          getEventReq(t, "A.179b6b1cb6755e31.Foo.Bar", "100", "120", []string{"10e782612a014b5c9c7d17994d7e67157064f3dd42fa92cd080bfb0fe22c3f71"}),
+			description: "Get invalid - can not provide all params",
+			request: buildRequest(
+				t,
+				"A.179b6b1cb6755e31.Foo.Bar",
+				"100",
+				"120",
+				[]string{"10e782612a014b5c9c7d17994d7e67157064f3dd42fa92cd080bfb0fe22c3f71"},
+				"2",
+				[]string{},
+				"true",
+			),
 			expectedStatus:   http.StatusBadRequest,
 			expectedResponse: `{"code":400,"message":"can only provide either block IDs or start and end height range"}`,
 		},
 		{
-			description:      "Get invalid - invalid height format",
-			request:          getEventReq(t, "A.179b6b1cb6755e31.Foo.Bar", "foo", "120", nil),
+			description: "Get invalid - invalid height format",
+			request: buildRequest(
+				t,
+				"A.179b6b1cb6755e31.Foo.Bar",
+				"foo",
+				"120",
+				nil,
+				"2",
+				[]string{},
+				"true",
+			),
 			expectedStatus:   http.StatusBadRequest,
 			expectedResponse: `{"code":400,"message":"invalid start height: invalid height format"}`,
 		},
 		{
-			description:      "Get invalid - latest block smaller than start",
-			request:          getEventReq(t, "A.179b6b1cb6755e31.Foo.Bar", "100000", "sealed", nil),
+			description: "Get invalid - latest block smaller than start",
+			request: buildRequest(
+				t,
+				"A.179b6b1cb6755e31.Foo.Bar",
+				"100000",
+				"sealed",
+				nil,
+				"2",
+				[]string{},
+				"true",
+			),
 			expectedStatus:   http.StatusBadRequest,
 			expectedResponse: `{"code":400,"message":"current retrieved end height value is lower than start height"}`,
 		},
@@ -135,37 +250,43 @@ func TestGetEvents(t *testing.T) {
 
 }
 
-func getEventReq(
-	t *testing.T,
-	eventType string,
-	start string,
-	end string,
-	blockIDs []string,
-) *http.Request {
-	u, _ := url.Parse("/v1/events")
-	q := u.Query()
+func TestGetEvents_ParseEmptyExecutionState(t *testing.T) {
+	startHeight := 0
+	endHeight := 5
+	expectedBlockEvents := make([]flow.BlockEvents, endHeight)
 
-	if len(blockIDs) > 0 {
-		q.Add(routes.BlockQueryParam, strings.Join(blockIDs, ","))
+	for i := 0; i < len(expectedBlockEvents); i++ {
+		header := unittest.BlockHeaderFixture(unittest.WithHeaderHeight(uint64(i)))
+		expectedBlockEvents[i] = unittest.BlockEventsFixture(header, 2)
 	}
 
-	if start != "" && end != "" {
-		q.Add(router.StartHeightQueryParam, start)
-		q.Add(router.EndHeightQueryParam, end)
-	}
+	backend := mock.NewAPI(t)
+	backend.
+		On(
+			"GetEventsForHeightRange",
+			mocks.Anything,
+			mocks.Anything,
+			uint64(startHeight),
+			uint64(endHeight),
+			entities.EventEncodingVersion_JSON_CDC_V0,
+			mocks.Anything,
+		).
+		Return(expectedBlockEvents, access.ExecutorMetadata{}, nil).
+		Once()
 
-	q.Add(router.AgreeingExecutorsCountQueryParam, "2")
-	q.Add(router.RequiredExecutorsIdsQueryParam, "")
-	q.Add(router.IncludeExecutorMetadataQueryParam, "true")
+	request := buildRequest(
+		t,
+		"A.179b6b1cb6755e31.Foo.Bar",
+		"0",
+		fmt.Sprint(endHeight),
+		[]string{},
+		"",
+		[]string{},
+		"",
+	)
 
-	q.Add(routes.EventTypeQuery, eventType)
-
-	u.RawQuery = q.Encode()
-
-	req, err := http.NewRequest("GET", u.String(), nil)
-	require.NoError(t, err)
-
-	return req
+	expectedResponseBody := buildExpectedResponse(t, expectedBlockEvents, false)
+	router.AssertOKResponse(t, request, expectedResponseBody, backend)
 }
 
 func generateEventsMocks(backend *mock.API, n int) []flow.BlockEvents {
@@ -188,7 +309,7 @@ func generateEventsMocks(backend *mock.API, n int) []flow.BlockEvents {
 				entities.EventEncodingVersion_JSON_CDC_V0,
 				mocks.Anything,
 			).
-			Return([]flow.BlockEvents{events[i]}, flow.ExecutorMetadata{}, nil)
+			Return([]flow.BlockEvents{events[i]}, access.ExecutorMetadata{}, nil)
 
 		lastHeader = header
 	}
@@ -202,7 +323,7 @@ func generateEventsMocks(backend *mock.API, n int) []flow.BlockEvents {
 			entities.EventEncodingVersion_JSON_CDC_V0,
 			mocks.Anything,
 		).
-		Return(events, flow.ExecutorMetadata{}, nil)
+		Return(events, access.ExecutorMetadata{}, nil)
 
 	// range from first to last block
 	backend.Mock.On(
@@ -212,7 +333,8 @@ func generateEventsMocks(backend *mock.API, n int) []flow.BlockEvents {
 		events[0].BlockHeight,
 		events[len(events)-1].BlockHeight,
 		entities.EventEncodingVersion_JSON_CDC_V0,
-	).Return(events, nil)
+		mocks.Anything,
+	).Return(events, access.ExecutorMetadata{}, nil)
 
 	// range from first to last block + 5
 	backend.Mock.On(
@@ -222,7 +344,8 @@ func generateEventsMocks(backend *mock.API, n int) []flow.BlockEvents {
 		events[0].BlockHeight,
 		events[len(events)-1].BlockHeight+5,
 		entities.EventEncodingVersion_JSON_CDC_V0,
-	).Return(append(events[:len(events)-1], unittest.BlockEventsFixture(lastHeader, 0)), nil)
+		mocks.Anything,
+	).Return(append(events[:len(events)-1], unittest.BlockEventsFixture(lastHeader, 0)), access.ExecutorMetadata{}, nil)
 
 	latestBlock := unittest.BlockHeaderFixture()
 	latestBlock.Height = uint64(n - 1)
@@ -237,11 +360,31 @@ func generateEventsMocks(backend *mock.API, n int) []flow.BlockEvents {
 			entities.EventEncodingVersion_JSON_CDC_V0,
 			mocks.Anything,
 		).
-		Return(nil, flow.ExecutorMetadata{}, status.Error(codes.NotFound, "not found"))
+		Return(nil, access.ExecutorMetadata{}, status.Error(codes.NotFound, "not found"))
 
 	backend.Mock.
-		On("GetEventsForHeightRange", mocks.Anything, mocks.Anything).
-		Return(nil, status.Error(codes.NotFound, "not found"))
+		On(
+			"GetEventsForHeightRange",
+			mocks.Anything,
+			mocks.Anything,
+			mocks.Anything,
+			mocks.Anything,
+			mocks.Anything,
+			mocks.Anything,
+		).
+		Return(nil, access.ExecutorMetadata{}, status.Error(codes.NotFound, "not found"))
+
+	backend.Mock.
+		On(
+			"GetEventsForHeightRange",
+			mocks.Anything,
+			mocks.Anything,
+			mocks.Anything,
+			mocks.Anything,
+			mocks.Anything,
+			mocks.Anything,
+		).
+		Return(events[0:3], access.ExecutorMetadata{}, nil)
 
 	backend.Mock.
 		On("GetLatestBlockHeader", mocks.Anything, true).
@@ -250,54 +393,47 @@ func generateEventsMocks(backend *mock.API, n int) []flow.BlockEvents {
 	return events
 }
 
-func testBlockEventResponse(t *testing.T, events []flow.BlockEvents) string {
-	type eventResponse struct {
-		Type             flow.EventType  `json:"type"`
-		TransactionID    flow.Identifier `json:"transaction_id"`
-		TransactionIndex string          `json:"transaction_index"`
-		EventIndex       string          `json:"event_index"`
-		Payload          string          `json:"payload"`
+func buildRequest(
+	t *testing.T,
+	eventType string,
+	start string,
+	end string,
+	blockIDs []string,
+	agreeingExecutorsCount string,
+	requiredExecutors []string,
+	includeExecutorMetadata string,
+) *http.Request {
+	u, _ := url.Parse("/v1/events")
+	q := u.Query()
+
+	if len(blockIDs) > 0 {
+		q.Add(routes.BlockQueryParam, strings.Join(blockIDs, ","))
 	}
 
-	type blockEventsResponse struct {
-		BlockID        flow.Identifier `json:"block_id"`
-		BlockHeight    string          `json:"block_height"`
-		BlockTimestamp string          `json:"block_timestamp"`
-		Events         []eventResponse `json:"events,omitempty"`
-		//TOOD: should add Metadata: ExecutorMetadata{ ... }
-		models.Metadata `json:",inline"`
+	if start != "" && end != "" {
+		q.Add(router.StartHeightQueryParam, start)
+		q.Add(router.EndHeightQueryParam, end)
 	}
 
-	res := make([]blockEventsResponse, len(events))
-
-	for i, e := range events {
-		events := make([]eventResponse, len(e.Events))
-
-		for i, ev := range e.Events {
-			events[i] = eventResponse{
-				Type:             ev.Type,
-				TransactionID:    ev.TransactionID,
-				TransactionIndex: fmt.Sprint(ev.TransactionIndex),
-				EventIndex:       fmt.Sprint(ev.EventIndex),
-				Payload:          util.ToBase64(ev.Payload),
-			}
-		}
-
-		res[i] = blockEventsResponse{
-			BlockID:        e.BlockID,
-			BlockHeight:    fmt.Sprint(e.BlockHeight),
-			BlockTimestamp: e.BlockTimestamp.Format(time.RFC3339Nano),
-			Events:         events,
-			Metadata: models.Metadata{
-				ExecutorMetadata: &models.ExecutorMetadata{
-					ExecutionResultId: "",
-					ExecutorIds:       nil,
-				},
-			},
-		}
+	q.Add(router.AgreeingExecutorsCountQueryParam, agreeingExecutorsCount)
+	q.Add(router.RequiredExecutorIdsQueryParam, strings.Join(requiredExecutors, ","))
+	if len(includeExecutorMetadata) > 0 {
+		q.Add(router.IncludeExecutorMetadataQueryParam, fmt.Sprint(includeExecutorMetadata))
 	}
 
-	data, err := json.Marshal(res)
+	q.Add(routes.EventTypeQuery, eventType)
+
+	u.RawQuery = q.Encode()
+
+	req, err := http.NewRequest("GET", u.String(), nil)
+	require.NoError(t, err)
+
+	return req
+}
+
+func buildExpectedResponse(t *testing.T, events []flow.BlockEvents, includeMetadata bool) string {
+	list := models.NewBlockEventsList(events, access.ExecutorMetadata{}, includeMetadata)
+	data, err := json.Marshal(list)
 	require.NoError(t, err)
 
 	return string(data)

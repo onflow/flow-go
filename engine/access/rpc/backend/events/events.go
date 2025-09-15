@@ -3,6 +3,7 @@ package events
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/rs/zerolog"
 	"google.golang.org/grpc/codes"
@@ -17,6 +18,7 @@ import (
 	"github.com/onflow/flow-go/engine/access/rpc/backend/query_mode"
 	"github.com/onflow/flow-go/engine/access/rpc/connection"
 	"github.com/onflow/flow-go/engine/common/rpc"
+	accessmodel "github.com/onflow/flow-go/model/access"
 	"github.com/onflow/flow-go/model/events"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/executiondatasync/optimistic_sync"
@@ -35,7 +37,7 @@ type Events struct {
 	maxHeightRange     uint
 	provider           provider.EventProvider
 	queryMode          query_mode.IndexQueryMode
-	execResultProvider optimistic_sync.ExecutionResultProvider
+	execResultProvider optimistic_sync.ExecutionResultInfoProvider
 	operatorCriteria   optimistic_sync.Criteria
 }
 
@@ -51,7 +53,7 @@ func NewEventsBackend(
 	nodeCommunicator node_communicator.Communicator,
 	queryMode query_mode.IndexQueryMode,
 	execNodeIdentitiesProvider *rpc.ExecutionNodeIdentitiesProvider,
-	executionResultProvider optimistic_sync.ExecutionResultProvider,
+	executionResultProvider optimistic_sync.ExecutionResultInfoProvider,
 	executionStateCache optimistic_sync.ExecutionStateCache,
 	operatorCriteria optimistic_sync.Criteria,
 ) (*Events, error) {
@@ -62,11 +64,21 @@ func NewEventsBackend(
 		eventProvider = provider.NewLocalEventProvider(executionStateCache)
 
 	case query_mode.IndexQueryModeExecutionNodesOnly:
-		eventProvider = provider.NewENEventProvider(log, execNodeIdentitiesProvider, connFactory, nodeCommunicator)
+		eventProvider = provider.NewENEventProvider(
+			log,
+			execNodeIdentitiesProvider,
+			connFactory,
+			nodeCommunicator,
+		)
 
 	case query_mode.IndexQueryModeFailover:
 		local := provider.NewLocalEventProvider(executionStateCache)
-		execNode := provider.NewENEventProvider(log, execNodeIdentitiesProvider, connFactory, nodeCommunicator)
+		execNode := provider.NewENEventProvider(
+			log,
+			execNodeIdentitiesProvider,
+			connFactory,
+			nodeCommunicator,
+		)
 		eventProvider = provider.NewFailoverEventProvider(log, local, execNode)
 
 	default:
@@ -93,21 +105,26 @@ func (e *Events) GetEventsForHeightRange(
 	startHeight, endHeight uint64,
 	requiredEventEncodingVersion entities.EventEncodingVersion,
 	criteria optimistic_sync.Criteria,
-) ([]flow.BlockEvents, flow.ExecutorMetadata, error) {
+) ([]flow.BlockEvents, accessmodel.ExecutorMetadata, error) {
 	if _, err := events.ValidateEvent(flow.EventType(eventType), e.chain); err != nil {
-		return nil, flow.ExecutorMetadata{},
+		return nil, accessmodel.ExecutorMetadata{},
 			status.Errorf(codes.InvalidArgument, "invalid event type: %v", err)
 	}
 
 	if endHeight < startHeight {
-		return nil, flow.ExecutorMetadata{},
+		return nil, accessmodel.ExecutorMetadata{},
 			status.Error(codes.InvalidArgument, "start height must not be larger than end height")
 	}
 
 	rangeSize := endHeight - startHeight + 1 // range is inclusive on both ends
 	if rangeSize > uint64(e.maxHeightRange) {
-		return nil, flow.ExecutorMetadata{},
-			status.Errorf(codes.InvalidArgument, "requested block range (%d) exceeded maximum (%d)", rangeSize, e.maxHeightRange)
+		return nil, accessmodel.ExecutorMetadata{},
+			status.Errorf(
+				codes.InvalidArgument,
+				"requested block range (%d) exceeded maximum (%d)",
+				rangeSize,
+				e.maxHeightRange,
+			)
 	}
 
 	// get the latest sealed block header
@@ -116,16 +133,21 @@ func (e *Events) GetEventsForHeightRange(
 		// sealed block must be in the store, so throw an exception for any error
 		err := irrecoverable.NewExceptionf("failed to lookup sealed header: %w", err)
 		irrecoverable.Throw(ctx, err)
-		return nil, flow.ExecutorMetadata{}, err
+		return nil, accessmodel.ExecutorMetadata{}, err
 	}
 
-	// start height should not be beyond the last sealed height
+	// a start height should not be beyond the last sealed height
 	if startHeight > sealed.Height {
-		return nil, flow.ExecutorMetadata{},
-			status.Errorf(codes.OutOfRange, "start height %d is greater than the last sealed block height %d", startHeight, sealed.Height)
+		return nil, accessmodel.ExecutorMetadata{},
+			status.Errorf(
+				codes.OutOfRange,
+				"start height %d is greater than the last sealed block height %d",
+				startHeight,
+				sealed.Height,
+			)
 	}
 
-	// limit max height to last sealed block in the chain
+	// limit max height to the last sealed block in the chain
 	//
 	// Note: this causes unintuitive behavior for clients making requests through a proxy that
 	// fronts multiple nodes. With that setup, clients may receive responses for a smaller range
@@ -143,32 +165,36 @@ func (e *Events) GetEventsForHeightRange(
 	blockHeaders := make([]provider.BlockMetadata, 0, endHeight-startHeight+1)
 
 	for i := startHeight; i <= endHeight; i++ {
-		// this looks inefficient, but is actually what's done under the covers by `headers.ByHeight`
+		// this looks inefficient, but it's actually what's done under the covers by `headers.ByHeight`
 		// and avoids calculating header.ID() for each block.
 		blockID, err := e.headers.BlockIDByHeight(i)
 		if err != nil {
-			return nil, flow.ExecutorMetadata{}, rpc.ConvertStorageError(common.ResolveHeightError(e.state.Params(), i, err))
+			return nil, accessmodel.ExecutorMetadata{},
+				rpc.ConvertStorageError(common.ResolveHeightError(e.state.Params(), i, err))
 		}
 		header, err := e.headers.ByBlockID(blockID)
 		if err != nil {
-			return nil, flow.ExecutorMetadata{}, rpc.ConvertStorageError(fmt.Errorf("failed to get block header for %d: %w", i, err))
+			return nil, accessmodel.ExecutorMetadata{},
+				rpc.ConvertStorageError(fmt.Errorf("failed to get block header for %d: %w", i, err))
 		}
 
-		blockHeaders = append(blockHeaders, provider.BlockMetadata{
-			ID:        blockID,
-			Height:    header.Height,
-			Timestamp: header.Timestamp,
-		})
+		blockHeaders = append(
+			blockHeaders, provider.BlockMetadata{
+				ID:        blockID,
+				Height:    header.Height,
+				Timestamp: time.UnixMilli(int64(header.Timestamp)).UTC(),
+			},
+		)
 	}
 
-	// TODO: can block headers len be equal to 0?
+	// get the result for the block with the highest height. all data queried for this set of blocks
+	// must be from the execution fork terminating at this result. this guarantees the response
+	// contains a consistent view of the state.
 	lastBlockID := blockHeaders[len(blockHeaders)-1].ID
-	execResultInfo, err := e.execResultProvider.ExecutionResult(
-		lastBlockID,
-		criteria,
-	)
+	execResultInfo, err := e.execResultProvider.ExecutionResultInfo(lastBlockID, criteria)
 	if err != nil {
-		return nil, flow.ExecutorMetadata{}, fmt.Errorf("failed to get execution result for last block: %w", err)
+		return nil, accessmodel.ExecutorMetadata{},
+			fmt.Errorf("failed to get execution result for last block: %w", err)
 	}
 
 	resp, metadata, err := e.provider.Events(
@@ -192,40 +218,56 @@ func (e *Events) GetEventsForBlockIDs(
 	blockIDs []flow.Identifier,
 	requiredEventEncodingVersion entities.EventEncodingVersion,
 	criteria optimistic_sync.Criteria,
-) ([]flow.BlockEvents, flow.ExecutorMetadata, error) {
+) ([]flow.BlockEvents, accessmodel.ExecutorMetadata, error) {
+	if len(blockIDs) == 0 {
+		return nil, accessmodel.ExecutorMetadata{},
+			status.Error(codes.InvalidArgument, "block IDs must not be empty")
+	}
+
 	if _, err := events.ValidateEvent(flow.EventType(eventType), e.chain); err != nil {
-		return nil, flow.ExecutorMetadata{}, status.Errorf(codes.InvalidArgument, "invalid event type: %v", err)
+		return nil, accessmodel.ExecutorMetadata{},
+			status.Errorf(codes.InvalidArgument, "invalid event type: %v", err)
 	}
 
 	if uint(len(blockIDs)) > e.maxHeightRange {
-		return nil, flow.ExecutorMetadata{},
+		return nil, accessmodel.ExecutorMetadata{},
 			status.Errorf(codes.InvalidArgument, "requested block range (%d) exceeded maximum (%d)", len(blockIDs), e.maxHeightRange)
 	}
+
+	var newestBlockHeader *flow.Header
 
 	// find the block headers for all the block IDs
 	blockHeaders := make([]provider.BlockMetadata, 0, len(blockIDs))
 	for _, blockID := range blockIDs {
 		header, err := e.headers.ByBlockID(blockID)
 		if err != nil {
-			return nil, flow.ExecutorMetadata{},
+			return nil, accessmodel.ExecutorMetadata{},
 				rpc.ConvertStorageError(fmt.Errorf("failed to get block header for %s: %w", blockID, err))
 		}
 
-		blockHeaders = append(blockHeaders, provider.BlockMetadata{
-			ID:        blockID,
-			Height:    header.Height,
-			Timestamp: header.Timestamp,
-		})
+		if newestBlockHeader == nil || header.View > newestBlockHeader.View {
+			newestBlockHeader = header
+		}
+
+		blockHeaders = append(
+			blockHeaders, provider.BlockMetadata{
+				ID:        blockID,
+				Height:    header.Height,
+				Timestamp: time.UnixMilli(int64(header.Timestamp)).UTC(),
+			},
+		)
 	}
 
-	// TODO: can block headers len be equal to 0?
-	lastBlockID := blockHeaders[len(blockHeaders)-1].ID
-	execResultInfo, err := e.execResultProvider.ExecutionResult(
-		lastBlockID,
+	// get the result for the block with the highest height. all data queried for this set of blocks
+	// must be from the execution fork terminating at this result. this guarantees the response
+	// contains a consistent view of the state.
+	execResultInfo, err := e.execResultProvider.ExecutionResultInfo(
+		newestBlockHeader.ID(),
 		criteria,
 	)
 	if err != nil {
-		return nil, flow.ExecutorMetadata{}, fmt.Errorf("failed to get execution result for last block: %w", err)
+		return nil, accessmodel.ExecutorMetadata{},
+			fmt.Errorf("failed to get execution result for block %v: %w", newestBlockHeader.ID(), err)
 	}
 
 	resp, metadata, err := e.provider.Events(

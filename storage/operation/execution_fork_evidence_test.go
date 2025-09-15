@@ -38,7 +38,7 @@ func Test_ExecutionForkEvidenceOperations(t *testing.T) {
 				conflictingSeals[i] = unittest.IncorporatedResultSeal.Fixture(
 					unittest.IncorporatedResultSeal.WithResult(
 						unittest.ExecutionResultFixture(
-							unittest.WithBlock(&block))))
+							unittest.WithBlock(block))))
 			}
 
 			err = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {

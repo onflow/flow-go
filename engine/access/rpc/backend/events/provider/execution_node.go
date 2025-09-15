@@ -18,6 +18,7 @@ import (
 	"github.com/onflow/flow-go/engine/access/rpc/connection"
 	"github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
+	"github.com/onflow/flow-go/model/access"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/executiondatasync/optimistic_sync"
 )
@@ -51,9 +52,9 @@ func (e *ENEventProvider) Events(
 	eventType flow.EventType,
 	encodingVersion entities.EventEncodingVersion,
 	execResultInfo *optimistic_sync.ExecutionResultInfo,
-) (Response, flow.ExecutorMetadata, error) {
+) (Response, access.ExecutorMetadata, error) {
 	if len(blocks) == 0 {
-		return Response{}, flow.ExecutorMetadata{}, nil
+		return Response{}, access.ExecutorMetadata{}, nil
 	}
 
 	blockIDs := make([]flow.Identifier, len(blocks))
@@ -66,24 +67,15 @@ func (e *ENEventProvider) Events(
 		BlockIds: convert.IdentifiersToMessages(blockIDs),
 	}
 
-	var resp *execproto.GetEventsForBlockIDsResponse
-	var successfulNode *flow.IdentitySkeleton
-	resp, successfulNode, err := e.getEventsFromAnyExeNode(ctx, execResultInfo.ExecutionNodes, req)
+	resp, node, err := e.getEventsFromAnyExeNode(ctx, execResultInfo.ExecutionNodes, req)
 	if err != nil {
-		return Response{}, flow.ExecutorMetadata{},
+		return Response{}, access.ExecutorMetadata{},
 			rpc.ConvertError(err, "failed to get execution nodes for events query", codes.Internal)
 	}
 
-	lastBlockID := blocks[len(blocks)-1].ID
-	e.log.Trace().
-		Str("execution_node_id", successfulNode.String()).
-		Str("execution_result_id", execResultInfo.ExecutionResult.ID().String()).
-		Str("last_block_id", lastBlockID.String()).
-		Msg("successfully got events")
-
-	metadata := flow.ExecutorMetadata{
-		ExecutionResultID: successfulNode.NodeID,
-		ExecutorIDs:       execResultInfo.ExecutionNodes.NodeIDs(),
+	metadata := access.ExecutorMetadata{
+		ExecutionResultID: execResultInfo.ExecutionResult.ID(),
+		ExecutorIDs:       orderedExecutors(node.NodeID, execResultInfo.ExecutionNodes.NodeIDs()),
 	}
 
 	// convert execution node api result to access node api result
@@ -94,7 +86,7 @@ func (e *ENEventProvider) Events(
 		encodingVersion,
 	)
 	if err != nil {
-		return Response{}, flow.ExecutorMetadata{},
+		return Response{}, access.ExecutorMetadata{},
 			status.Errorf(codes.Internal, "failed to verify retrieved events from execution node: %v", err)
 	}
 
@@ -204,4 +196,20 @@ func verifyAndConvertToAccessEvents(
 	}
 
 	return results, nil
+}
+
+// orderedExecutors creates an ordered list of executors for the same execution result
+// - respondingExecutor is the executor who returned execution result.
+// - executorList is a list of executors who also produced the same execution result.
+func orderedExecutors(respondingExecutor flow.Identifier, executorList flow.IdentifierList) flow.IdentifierList {
+	ordered := make(flow.IdentifierList, 0, len(executorList))
+	ordered = append(ordered, respondingExecutor)
+
+	for _, nodeID := range executorList {
+		if nodeID != respondingExecutor {
+			ordered = append(ordered, nodeID)
+		}
+	}
+
+	return ordered
 }

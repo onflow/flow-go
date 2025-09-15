@@ -52,13 +52,19 @@ func MessageToExecutionResult(m *entities.ExecutionResult) (
 	if err != nil {
 		return nil, err
 	}
-	return &flow.ExecutionResult{
+
+	executionResult, err := flow.NewExecutionResult(flow.UntrustedExecutionResult{
 		PreviousResultID: MessageToIdentifier(m.PreviousResultId),
 		BlockID:          MessageToIdentifier(m.BlockId),
 		Chunks:           parsedChunks,
 		ServiceEvents:    parsedServiceEvents,
 		ExecutionDataID:  MessageToIdentifier(m.ExecutionDataId),
-	}, nil
+	})
+	if err != nil {
+		return nil, fmt.Errorf("could not build execution result: %w", err)
+	}
+
+	return executionResult, nil
 }
 
 // ExecutionResultsToMessages converts a slice of execution results to a slice of protobuf messages
@@ -94,7 +100,7 @@ func MessagesToExecutionResults(m []*entities.ExecutionResult) (
 }
 
 // ExecutionResultMetaListToMessages converts an execution result meta list to a slice of protobuf messages
-func ExecutionResultMetaListToMessages(e flow.ExecutionReceiptMetaList) []*entities.ExecutionReceiptMeta {
+func ExecutionResultMetaListToMessages(e flow.ExecutionReceiptStubList) []*entities.ExecutionReceiptMeta {
 	messageList := make([]*entities.ExecutionReceiptMeta, len(e))
 	for i, execMeta := range e {
 		messageList[i] = &entities.ExecutionReceiptMeta{
@@ -107,18 +113,34 @@ func ExecutionResultMetaListToMessages(e flow.ExecutionReceiptMetaList) []*entit
 	return messageList
 }
 
-// MessagesToExecutionResultMetaList converts a slice of protobuf messages to an execution result meta list
-func MessagesToExecutionResultMetaList(m []*entities.ExecutionReceiptMeta) flow.ExecutionReceiptMetaList {
-	execMetaList := make([]*flow.ExecutionReceiptMeta, len(m))
+// MessagesToExecutionResultMetaList converts a slice of protobuf messages to an execution result meta list.
+// All errors indicate the input cannot be converted to a valid [flow.ExecutionReceiptStubList].
+func MessagesToExecutionResultMetaList(m []*entities.ExecutionReceiptMeta) (flow.ExecutionReceiptStubList, error) {
+	execMetaList := make([]*flow.ExecutionReceiptStub, len(m))
 	for i, message := range m {
-		execMetaList[i] = &flow.ExecutionReceiptMeta{
-			ExecutorID:        MessageToIdentifier(message.ExecutorId),
-			ResultID:          MessageToIdentifier(message.ResultId),
-			Spocks:            MessagesToSignatures(message.Spocks),
-			ExecutorSignature: MessageToSignature(message.ExecutorSignature),
+		unsignedExecutionReceiptStub, err := flow.NewUnsignedExecutionReceiptStub(
+			flow.UntrustedUnsignedExecutionReceiptStub{
+				ExecutorID: MessageToIdentifier(message.ExecutorId),
+				ResultID:   MessageToIdentifier(message.ResultId),
+				Spocks:     MessagesToSignatures(message.Spocks),
+			},
+		)
+		if err != nil {
+			return nil, fmt.Errorf("could not construct unsigned execution receipt stub at index: %d: %w", i, err)
+		}
+
+		execMetaList[i], err = flow.NewExecutionReceiptStub(
+			flow.UntrustedExecutionReceiptStub{
+				UnsignedExecutionReceiptStub: *unsignedExecutionReceiptStub,
+				ExecutorSignature:            MessageToSignature(message.ExecutorSignature),
+			},
+		)
+		if err != nil {
+			return nil, fmt.Errorf("could not construct execution receipt stub at index: %d: %w", i, err)
 		}
 	}
-	return execMetaList[:]
+
+	return execMetaList[:], nil
 }
 
 // ChunkToMessage converts a chunk to a protobuf message
@@ -146,20 +168,25 @@ func MessageToChunk(m *entities.Chunk) (*flow.Chunk, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse Message end state to Chunk: %w", err)
 	}
-	chunkBody := flow.ChunkBody{
-		CollectionIndex:      uint(m.CollectionIndex),
-		StartState:           startState,
-		EventCollection:      MessageToIdentifier(m.EventCollection),
-		BlockID:              MessageToIdentifier(m.BlockId),
-		TotalComputationUsed: m.TotalComputationUsed,
-		NumberOfTransactions: uint64(m.NumberOfTransactions),
-		ServiceEventCount:    uint16(m.ServiceEventCount),
+
+	chunk, err := flow.NewChunk(flow.UntrustedChunk{
+		ChunkBody: flow.ChunkBody{
+			CollectionIndex:      uint(m.CollectionIndex),
+			StartState:           startState,
+			EventCollection:      MessageToIdentifier(m.EventCollection),
+			ServiceEventCount:    uint16(m.ServiceEventCount),
+			BlockID:              MessageToIdentifier(m.BlockId),
+			TotalComputationUsed: m.TotalComputationUsed,
+			NumberOfTransactions: uint64(m.NumberOfTransactions),
+		},
+		Index:    m.Index,
+		EndState: endState,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("could not build chunk: %w", err)
 	}
-	return &flow.Chunk{
-		ChunkBody: chunkBody,
-		Index:     m.Index,
-		EndState:  endState,
-	}, nil
+
+	return chunk, nil
 }
 
 // MessagesToChunkList converts a slice of protobuf messages to a chunk list

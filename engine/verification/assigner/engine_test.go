@@ -90,18 +90,22 @@ func SetupTest(options ...func(suite *AssignerEngineTestSuite)) *AssignerEngineT
 func createContainerBlock(options ...func(result *flow.ExecutionResult, assignments *chunks.AssignmentBuilder)) (*flow.Block, *chunks.Assignment) {
 	result, assignment := vertestutils.CreateExecutionResult(unittest.IdentifierFixture(), options...)
 	receipt := &flow.ExecutionReceipt{
-		ExecutorID:      unittest.IdentifierFixture(),
-		ExecutionResult: *result,
+		UnsignedExecutionReceipt: flow.UnsignedExecutionReceipt{
+			ExecutorID:      unittest.IdentifierFixture(),
+			ExecutionResult: *result,
+		},
+		ExecutorSignature: unittest.SignatureFixture(),
 	}
 	// container block
-	header := unittest.BlockHeaderFixture()
-	block := &flow.Block{
-		Header: header,
-		Payload: &flow.Payload{
-			Receipts: []*flow.ExecutionReceiptMeta{receipt.Meta()},
-			Results:  []*flow.ExecutionResult{&receipt.ExecutionResult},
-		},
-	}
+	block := unittest.BlockFixture(
+		unittest.Block.WithPayload(
+			flow.Payload{
+				Receipts: []*flow.ExecutionReceiptStub{receipt.Stub()},
+				Results:  []*flow.ExecutionResult{&receipt.ExecutionResult},
+			},
+		),
+	)
+
 	return block, assignment
 }
 
@@ -182,7 +186,7 @@ func newBlockHappyPath(t *testing.T) {
 	s.metrics.On("OnAssignedChunkProcessedAtAssigner").Return().Once()
 
 	// sends containerBlock containing receipt to assigner engine
-	s.metrics.On("OnFinalizedBlockArrivedAtAssigner", containerBlock.Header.Height).Return().Once()
+	s.metrics.On("OnFinalizedBlockArrivedAtAssigner", containerBlock.Height).Return().Once()
 	s.metrics.On("OnExecutionResultReceivedAtAssignerEngine").Return().Once()
 	e.ProcessFinalizedBlock(containerBlock)
 
@@ -222,7 +226,7 @@ func newBlockVerifierNotAuthorized(t *testing.T) {
 		s.notifier.On("Notify", containerBlock.ID()).Return().Once()
 
 		// sends block containing receipt to assigner engine
-		s.metrics.On("OnFinalizedBlockArrivedAtAssigner", containerBlock.Header.Height).Return().Once()
+		s.metrics.On("OnFinalizedBlockArrivedAtAssigner", containerBlock.Height).Return().Once()
 		s.metrics.On("OnExecutionResultReceivedAtAssignerEngine").Return().Once()
 		e.ProcessFinalizedBlock(containerBlock)
 
@@ -285,7 +289,7 @@ func newBlockNoChunk(t *testing.T) {
 	s.notifier.On("Notify", containerBlock.ID()).Return().Once()
 
 	// sends block containing receipt to assigner engine
-	s.metrics.On("OnFinalizedBlockArrivedAtAssigner", containerBlock.Header.Height).Return().Once()
+	s.metrics.On("OnFinalizedBlockArrivedAtAssigner", containerBlock.Height).Return().Once()
 	s.metrics.On("OnExecutionResultReceivedAtAssignerEngine").Return().Once()
 	e.ProcessFinalizedBlock(containerBlock)
 
@@ -330,7 +334,7 @@ func newBlockNoAssignedChunk(t *testing.T) {
 	s.notifier.On("Notify", containerBlock.ID()).Return().Once()
 
 	// sends block containing receipt to assigner engine
-	s.metrics.On("OnFinalizedBlockArrivedAtAssigner", containerBlock.Header.Height).Return().Once()
+	s.metrics.On("OnFinalizedBlockArrivedAtAssigner", containerBlock.Height).Return().Once()
 	s.metrics.On("OnExecutionResultReceivedAtAssignerEngine").Return().Once()
 	e.ProcessFinalizedBlock(containerBlock)
 
@@ -382,7 +386,7 @@ func newBlockMultipleAssignment(t *testing.T) {
 	s.notifier.On("Notify", containerBlock.ID()).Return().Once()
 
 	// sends containerBlock containing receipt to assigner engine
-	s.metrics.On("OnFinalizedBlockArrivedAtAssigner", containerBlock.Header.Height).Return().Once()
+	s.metrics.On("OnFinalizedBlockArrivedAtAssigner", containerBlock.Height).Return().Once()
 	s.metrics.On("OnExecutionResultReceivedAtAssignerEngine").Return().Once()
 	e.ProcessFinalizedBlock(containerBlock)
 
@@ -423,7 +427,7 @@ func chunkQueueUnhappyPathDuplicate(t *testing.T) {
 	s.notifier.On("Notify", containerBlock.ID()).Return().Once()
 
 	// sends block containing receipt to assigner engine
-	s.metrics.On("OnFinalizedBlockArrivedAtAssigner", containerBlock.Header.Height).Return().Once()
+	s.metrics.On("OnFinalizedBlockArrivedAtAssigner", containerBlock.Height).Return().Once()
 	s.metrics.On("OnExecutionResultReceivedAtAssignerEngine").Return().Once()
 	e.ProcessFinalizedBlock(containerBlock)
 

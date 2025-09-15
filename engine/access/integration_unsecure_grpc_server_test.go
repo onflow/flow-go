@@ -36,6 +36,7 @@ import (
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data/cache"
 	"github.com/onflow/flow-go/module/executiondatasync/optimistic_sync"
+	osyncmock "github.com/onflow/flow-go/module/executiondatasync/optimistic_sync/mock"
 	"github.com/onflow/flow-go/module/grpcserver"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/mempool/herocache"
@@ -93,6 +94,9 @@ type SameGRPCPortTestSuite struct {
 	execDataHeroCache *herocache.BlockExecutionData
 
 	blockMap map[uint64]*flow.Block
+
+	executionResultInfoProvider *osyncmock.ExecutionResultInfoProvider
+	executionStateCache         *osyncmock.ExecutionStateCache
 }
 
 func (suite *SameGRPCPortTestSuite) SetupTest() {
@@ -150,17 +154,16 @@ func (suite *SameGRPCPortTestSuite) SetupTest() {
 	suite.blockMap = make(map[uint64]*flow.Block, blockCount)
 	// generate blockCount consecutive blocks with associated seal, result and execution data
 	rootBlock := unittest.BlockFixture()
-	parent := rootBlock.Header
-	suite.blockMap[rootBlock.Header.Height] = &rootBlock
+	parent := rootBlock.ToHeader()
+	suite.blockMap[rootBlock.Height] = rootBlock
 
 	for i := 0; i < blockCount; i++ {
 		block := unittest.BlockWithParentFixture(parent)
-		suite.blockMap[block.Header.Height] = block
+		suite.blockMap[block.Height] = block
 	}
 
 	params.On("SporkID").Return(unittest.IdentifierFixture(), nil)
-	params.On("SporkRootBlockHeight").Return(rootBlock.Header.Height, nil)
-	params.On("SealedRoot").Return(rootBlock.Header, nil)
+	params.On("SporkRootBlockHeight").Return(rootBlock.Height, nil)
 
 	// generate a server certificate that will be served by the GRPC server
 	networkingKey := unittest.NetworkingPrivKeyFixture()
@@ -188,26 +191,28 @@ func (suite *SameGRPCPortTestSuite) SetupTest() {
 	block := unittest.BlockHeaderFixture()
 	suite.snapshot.On("Head").Return(block, nil)
 
+	suite.executionResultInfoProvider = osyncmock.NewExecutionResultInfoProvider(suite.T())
+	suite.executionStateCache = osyncmock.NewExecutionStateCache(suite.T())
+
 	bnd, err := backend.New(backend.Params{
-		State:                suite.state,
-		CollectionRPC:        suite.collClient,
-		Blocks:               suite.blocks,
-		Headers:              suite.headers,
-		Collections:          suite.collections,
-		Transactions:         suite.transactions,
-		ChainID:              suite.chainID,
-		AccessMetrics:        suite.metrics,
-		MaxHeightRange:       0,
-		Log:                  suite.log,
-		SnapshotHistoryLimit: 0,
-		Communicator:         node_communicator.NewNodeCommunicator(false),
-		EventQueryMode:       query_mode.IndexQueryModeExecutionNodesOnly,
-		ScriptExecutionMode:  query_mode.IndexQueryModeExecutionNodesOnly,
-		TxResultQueryMode:    query_mode.IndexQueryModeExecutionNodesOnly,
-		// TODO: set this once data result forest merged in
-		//ExecutionResultProvider:
-		//ExecutionStateCache:
-		OperatorCriteria: optimistic_sync.DefaultCriteria,
+		State:                       suite.state,
+		CollectionRPC:               suite.collClient,
+		Blocks:                      suite.blocks,
+		Headers:                     suite.headers,
+		Collections:                 suite.collections,
+		Transactions:                suite.transactions,
+		ChainID:                     suite.chainID,
+		AccessMetrics:               suite.metrics,
+		MaxHeightRange:              0,
+		Log:                         suite.log,
+		SnapshotHistoryLimit:        0,
+		Communicator:                node_communicator.NewNodeCommunicator(false),
+		EventQueryMode:              query_mode.IndexQueryModeExecutionNodesOnly,
+		ScriptExecutionMode:         query_mode.IndexQueryModeExecutionNodesOnly,
+		TxResultQueryMode:           query_mode.IndexQueryModeExecutionNodesOnly,
+		ExecutionResultInfoProvider: suite.executionResultInfoProvider,
+		ExecutionStateCache:         suite.executionStateCache,
+		OperatorCriteria:            optimistic_sync.DefaultCriteria,
 	})
 	require.NoError(suite.T(), err)
 
@@ -237,7 +242,7 @@ func (suite *SameGRPCPortTestSuite) SetupTest() {
 	suite.headers.On("BlockIDByHeight", mock.AnythingOfType("uint64")).Return(
 		func(height uint64) flow.Identifier {
 			if block, ok := suite.blockMap[height]; ok {
-				return block.Header.ID()
+				return block.ID()
 			}
 			return flow.ZeroID
 		},
@@ -267,10 +272,10 @@ func (suite *SameGRPCPortTestSuite) SetupTest() {
 	suite.executionDataTracker = tracker.NewExecutionDataTracker(
 		suite.log,
 		suite.state,
-		rootBlock.Header.Height,
+		rootBlock.Height,
 		suite.headers,
 		nil,
-		rootBlock.Header.Height,
+		rootBlock.Height,
 		eventIndexer,
 		false,
 	)

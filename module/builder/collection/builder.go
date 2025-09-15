@@ -31,17 +31,19 @@ import (
 // HotStuff event loop is the only consumer of this interface and is single
 // threaded, this is OK.
 type Builder struct {
-	db             *badger.DB
-	mainHeaders    storage.Headers
-	clusterHeaders storage.Headers
-	protoState     protocol.State
-	clusterState   clusterstate.State
-	payloads       storage.ClusterPayloads
-	transactions   mempool.Transactions
-	tracer         module.Tracer
-	config         Config
-	log            zerolog.Logger
-	clusterEpoch   uint64 // the operating epoch for this cluster
+	db                         *badger.DB
+	mainHeaders                storage.Headers
+	metrics                    module.CollectionMetrics
+	clusterHeaders             storage.Headers
+	protoState                 protocol.State
+	clusterState               clusterstate.State
+	payloads                   storage.ClusterPayloads
+	transactions               mempool.Transactions
+	tracer                     module.Tracer
+	config                     Config
+	bySealingRateLimiterConfig module.ReadonlySealingLagRateLimiterConfig
+	log                        zerolog.Logger
+	clusterEpoch               uint64 // the operating epoch for this cluster
 	// cache of values about the operating epoch which never change
 	epochFinalHeight *uint64          // last height of this cluster's operating epoch (nil if epoch not ended)
 	epochFinalID     *flow.Identifier // ID of last block in this cluster's operating epoch (nil if epoch not ended)
@@ -50,6 +52,7 @@ type Builder struct {
 func NewBuilder(
 	db *badger.DB,
 	tracer module.Tracer,
+	metrics module.CollectionMetrics,
 	protoState protocol.State,
 	clusterState clusterstate.State,
 	mainHeaders storage.Headers,
@@ -58,20 +61,23 @@ func NewBuilder(
 	transactions mempool.Transactions,
 	log zerolog.Logger,
 	epochCounter uint64,
+	bySealingRateLimiterConfig module.ReadonlySealingLagRateLimiterConfig,
 	opts ...Opt,
 ) (*Builder, error) {
 	b := Builder{
-		db:             db,
-		tracer:         tracer,
-		protoState:     protoState,
-		clusterState:   clusterState,
-		mainHeaders:    mainHeaders,
-		clusterHeaders: clusterHeaders,
-		payloads:       payloads,
-		transactions:   transactions,
-		config:         DefaultConfig(),
-		log:            log.With().Str("component", "cluster_builder").Logger(),
-		clusterEpoch:   epochCounter,
+		db:                         db,
+		tracer:                     tracer,
+		metrics:                    metrics,
+		protoState:                 protoState,
+		clusterState:               clusterState,
+		mainHeaders:                mainHeaders,
+		clusterHeaders:             clusterHeaders,
+		payloads:                   payloads,
+		transactions:               transactions,
+		config:                     DefaultConfig(),
+		bySealingRateLimiterConfig: bySealingRateLimiterConfig,
+		log:                        log.With().Str("component", "cluster_builder").Logger(),
+		clusterEpoch:               epochCounter,
 	}
 
 	for _, apply := range opts {
@@ -99,7 +105,7 @@ func NewBuilder(
 // However, it will pass through all errors returned by `setter` and `sign`.
 // Callers must be aware of possible error returns from the `setter` and `sign` arguments they provide,
 // and handle them accordingly when handling errors returned from BuildOn.
-func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) error, sign func(*flow.Header) error) (*flow.Header, error) {
+func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.HeaderBodyBuilder) error, sign func(*flow.Header) ([]byte, error)) (*flow.ProposalHeader, error) {
 	parentSpan, ctx := b.tracer.StartSpanFromContext(context.Background(), trace.COLBuildOn)
 	defer parentSpan.End()
 
@@ -185,26 +191,41 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 	// STEP 3: we have a set of transactions that are valid to include on this fork.
 	// Now we create the header for the cluster block.
 	span, _ = b.tracer.StartSpanFromContext(ctx, trace.COLBuildOnCreateHeader)
-	header, err := b.buildHeader(buildCtx, payload, setter, sign)
+	proposal, err := b.buildHeader(buildCtx, payload, setter, sign)
 	span.End()
 	if err != nil {
 		return nil, fmt.Errorf("could not build header: %w", err)
 	}
 
-	proposal := cluster.Block{
-		Header:  header,
-		Payload: payload,
+	block, err := cluster.NewBlock(
+		cluster.UntrustedBlock{
+			HeaderBody: proposal.Header.HeaderBody,
+			Payload:    *payload,
+		},
+	)
+	if err != nil {
+		return nil, fmt.Errorf("could not build cluster block: %w", err)
+	}
+
+	blockProposal, err := cluster.NewProposal(
+		cluster.UntrustedProposal{
+			Block:           *block,
+			ProposerSigData: proposal.ProposerSigData,
+		},
+	)
+	if err != nil {
+		return nil, fmt.Errorf("could not build cluster proposal: %w", err)
 	}
 
 	// STEP 4: insert the cluster block to the database.
 	span, _ = b.tracer.StartSpanFromContext(ctx, trace.COLBuildOnDBInsert)
-	err = operation.RetryOnConflict(b.db.Update, procedure.InsertClusterBlock(&proposal))
+	err = operation.RetryOnConflict(b.db.Update, procedure.InsertClusterBlock(blockProposal))
 	span.End()
 	if err != nil {
 		return nil, fmt.Errorf("could not insert built block: %w", err)
 	}
 
-	return proposal.Header, nil
+	return proposal, nil
 }
 
 // getBlockBuildContext retrieves the required contextual information from the database
@@ -215,13 +236,25 @@ func (b *Builder) getBlockBuildContext(parentID flow.Identifier) (*blockBuildCon
 	ctx.config = b.config
 	ctx.parentID = parentID
 	ctx.lookup = newTransactionLookup()
-
 	var err error
+	ctx.config.MaxCollectionSize, err = GetMaxCollectionSizeForSealingLag(
+		b.protoState,
+		b.bySealingRateLimiterConfig.MinSealingLag(),
+		b.bySealingRateLimiterConfig.MaxSealingLag(),
+		b.bySealingRateLimiterConfig.HalvingInterval(),
+		b.bySealingRateLimiterConfig.MinCollectionSize(),
+		b.config.MaxCollectionSize,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("could not create by sealing lag rate limiter: %w", err)
+	}
+	b.metrics.CollectionMaxSize(ctx.config.MaxCollectionSize)
+
 	ctx.parent, err = b.clusterHeaders.ByBlockID(parentID)
 	if err != nil {
 		return nil, fmt.Errorf("could not get parent: %w", err)
 	}
-	ctx.limiter = newRateLimiter(b.config, ctx.parent.Height+1)
+	ctx.limiter = newRateLimiter(ctx.config, ctx.parent.Height+1)
 
 	// retrieve the finalized boundary ON THE CLUSTER CHAIN
 	ctx.clusterChainFinalizedBlock, err = b.clusterState.Final().Head()
@@ -365,6 +398,7 @@ func (b *Builder) populateFinalizedAncestryLookup(ctx *blockBuildContext) error 
 func (b *Builder) buildPayload(buildCtx *blockBuildContext) (*cluster.Payload, error) {
 	lookup := buildCtx.lookup
 	limiter := buildCtx.limiter
+	config := buildCtx.config
 	maxRefHeight := buildCtx.highestPossibleReferenceBlockHeight()
 	// keep track of the actual smallest reference height of all included transactions
 	minRefHeight := maxRefHeight
@@ -373,36 +407,50 @@ func (b *Builder) buildPayload(buildCtx *blockBuildContext) (*cluster.Payload, e
 	var transactions []*flow.TransactionBody
 	var totalByteSize uint64
 	var totalGas uint64
-	for _, tx := range b.transactions.All() {
+
+	// ATTENTION: this is a temporary measure to ensure that we give some prioritization to the service account
+	// transactions. This is experimental approach to increase likelihood of service account transactions being included in the collection.
+	var priorityTransactions []*flow.TransactionBody
+	for payer := range config.PriorityPayers {
+		priorityTransactions = append(priorityTransactions, b.transactions.ByPayer(payer)...)
+	}
+	// txDedup is a map to deduplicate transactions by their ID, since we are merging service account transactions
+	// and all transactions from the mempool, we need to ensure that we don't include the same transaction twice.
+	txDedup := make(map[flow.Identifier]struct{}, config.MaxCollectionSize)
+	for _, tx := range append(priorityTransactions, b.transactions.Values()...) {
 
 		// if we have reached maximum number of transactions, stop
-		if uint(len(transactions)) >= b.config.MaxCollectionSize {
+		if uint(len(transactions)) >= config.MaxCollectionSize {
 			break
+		}
+		txID := tx.ID()
+		if _, exists := txDedup[txID]; exists {
+			continue
 		}
 
 		txByteSize := uint64(tx.ByteSize())
 		// ignore transactions with tx byte size bigger that the max amount per collection
 		// this case shouldn't happen ever since we keep a limit on tx byte size but in case
 		// we keep this condition
-		if txByteSize > b.config.MaxCollectionByteSize {
+		if txByteSize > config.MaxCollectionByteSize {
 			continue
 		}
 
 		// because the max byte size per tx is way smaller than the max collection byte size, we can stop here and not continue.
 		// to make it more effective in the future we can continue adding smaller ones
-		if totalByteSize+txByteSize > b.config.MaxCollectionByteSize {
+		if totalByteSize+txByteSize > config.MaxCollectionByteSize {
 			break
 		}
 
 		// ignore transactions with max gas bigger that the max total gas per collection
 		// this case shouldn't happen ever but in case we keep this condition
-		if tx.GasLimit > b.config.MaxCollectionTotalGas {
+		if tx.GasLimit > config.MaxCollectionTotalGas {
 			continue
 		}
 
 		// cause the max gas limit per tx is way smaller than the total max gas per collection, we can stop here and not continue.
 		// to make it more effective in the future we can continue adding smaller ones
-		if totalGas+tx.GasLimit > b.config.MaxCollectionTotalGas {
+		if totalGas+tx.GasLimit > config.MaxCollectionTotalGas {
 			break
 		}
 
@@ -420,7 +468,6 @@ func (b *Builder) buildPayload(buildCtx *blockBuildContext) (*cluster.Payload, e
 			continue
 		}
 
-		txID := tx.ID()
 		// make sure the reference block is finalized and not orphaned
 		blockIDFinalizedAtRefHeight, err := b.mainHeaders.BlockIDByHeight(refHeader.Height)
 		if err != nil {
@@ -453,18 +500,18 @@ func (b *Builder) buildPayload(buildCtx *blockBuildContext) (*cluster.Payload, e
 
 		// enforce rate limiting rules
 		if limiter.shouldRateLimit(tx) {
-			if b.config.DryRunRateLimit {
+			if config.DryRunRateLimit {
 				// log that this transaction would have been rate-limited, but we will still include it in the collection
 				b.log.Info().
 					Hex("tx_id", logging.ID(txID)).
 					Str("payer_addr", tx.Payer.String()).
-					Float64("rate_limit", b.config.MaxPayerTransactionRate).
+					Float64("rate_limit", config.MaxPayerTransactionRate).
 					Msg("dry-run: observed transaction that would have been rate limited")
 			} else {
 				b.log.Debug().
 					Hex("tx_id", logging.ID(txID)).
 					Str("payer_addr", tx.Payer.String()).
-					Float64("rate_limit", b.config.MaxPayerTransactionRate).
+					Float64("rate_limit", config.MaxPayerTransactionRate).
 					Msg("transaction is rate-limited")
 				continue
 			}
@@ -480,13 +527,27 @@ func (b *Builder) buildPayload(buildCtx *blockBuildContext) (*cluster.Payload, e
 		limiter.transactionIncluded(tx)
 
 		transactions = append(transactions, tx)
+		txDedup[txID] = struct{}{}
 		totalByteSize += txByteSize
 		totalGas += tx.GasLimit
 	}
 
 	// build the payload from the transactions
-	payload := cluster.PayloadFromTransactions(minRefID, transactions...)
-	return &payload, nil
+	collection, err := flow.NewCollection(flow.UntrustedCollection{Transactions: transactions})
+	if err != nil {
+		return nil, fmt.Errorf("could not build the collection from the transactions: %w", err)
+	}
+
+	payload, err := cluster.NewPayload(
+		cluster.UntrustedPayload{
+			ReferenceBlockID: minRefID,
+			Collection:       *collection,
+		},
+	)
+	if err != nil {
+		return nil, fmt.Errorf("could not build a payload: %w", err)
+	}
+	return payload, nil
 }
 
 // buildHeader constructs the header for the cluster block being built.
@@ -495,31 +556,41 @@ func (b *Builder) buildPayload(buildCtx *blockBuildContext) (*cluster.Payload, e
 func (b *Builder) buildHeader(
 	ctx *blockBuildContext,
 	payload *cluster.Payload,
-	setter func(header *flow.Header) error,
-	sign func(*flow.Header) error,
-) (*flow.Header, error) {
-
-	header := &flow.Header{
-		ChainID:     ctx.parent.ChainID,
-		ParentID:    ctx.parentID,
-		Height:      ctx.parent.Height + 1,
-		PayloadHash: payload.Hash(),
-		Timestamp:   time.Now().UTC(),
-
-		// NOTE: we rely on the HotStuff-provided setter to set the other
-		// fields, which are related to signatures and HotStuff internals
-	}
+	setter func(header *flow.HeaderBodyBuilder) error,
+	sign func(header *flow.Header) ([]byte, error),
+) (*flow.ProposalHeader, error) {
+	// NOTE: we rely on the HotStuff-provided setter to set the other
+	// fields, which are related to signatures and HotStuff internals
+	headerBodyBuilder := flow.NewHeaderBodyBuilder().
+		WithChainID(ctx.parent.ChainID).
+		WithParentID(ctx.parentID).
+		WithHeight(ctx.parent.Height + 1).
+		WithTimestamp(uint64(time.Now().UnixMilli()))
 
 	// set fields specific to the consensus algorithm
-	err := setter(header)
+	err := setter(headerBodyBuilder)
 	if err != nil {
 		return nil, fmt.Errorf("could not set fields to header: %w", err)
 	}
-	err = sign(header)
+	headerBody, err := headerBodyBuilder.Build()
+	if err != nil {
+		return nil, irrecoverable.NewExceptionf("unexpected error when building header body: %w", err)
+	}
+	header, err := flow.NewHeader(flow.UntrustedHeader{
+		HeaderBody:  *headerBody,
+		PayloadHash: payload.Hash(),
+	})
+	if err != nil {
+		return nil, fmt.Errorf("could not build header: %w", err)
+	}
+	sig, err := sign(header)
 	if err != nil {
 		return nil, fmt.Errorf("could not sign proposal: %w", err)
 	}
-	return header, nil
+	return &flow.ProposalHeader{
+		Header:          header,
+		ProposerSigData: sig,
+	}, nil
 }
 
 // findRefHeightSearchRangeForConflictingClusterBlocks computes the range of reference

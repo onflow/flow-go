@@ -107,7 +107,7 @@ func New(
 	}
 
 	chainID := vmCtx.Chain.ChainID()
-	options := DefaultFVMOptions(chainID, params.CadenceTracing, params.ExtensiveTracing)
+	options := DefaultFVMOptions(chainID, params.CadenceTracing, params.ExtensiveTracing, vmCtx.ScheduleCallbacksEnabled)
 	vmCtx = fvm.NewContextFromParent(vmCtx, options...)
 
 	blockComputer, err := computer.NewBlockComputer(
@@ -170,7 +170,7 @@ func (e *Manager) ComputeBlock(
 		Msg("received complete block")
 
 	derivedBlockData := e.derivedChainData.GetOrCreateDerivedBlockData(
-		block.ID(),
+		block.BlockID(),
 		block.ParentID())
 
 	result, err := e.blockComputer.ExecuteBlock(
@@ -224,7 +224,7 @@ func (e *Manager) QueryExecutor() query.Executor {
 	return e.queryExecutor
 }
 
-func DefaultFVMOptions(chainID flow.ChainID, cadenceTracing bool, extensiveTracing bool) []fvm.Option {
+func DefaultFVMOptions(chainID flow.ChainID, cadenceTracing bool, extensiveTracing bool, scheduleCallbacksEnabled bool) []fvm.Option {
 	options := []fvm.Option{
 		fvm.WithChain(chainID.Chain()),
 		fvm.WithReusableCadenceRuntimePool(
@@ -235,6 +235,7 @@ func DefaultFVMOptions(chainID flow.ChainID, cadenceTracing bool, extensiveTraci
 				},
 			)),
 		fvm.WithEVMEnabled(true),
+		fvm.WithScheduleCallbacksEnabled(scheduleCallbacksEnabled),
 	}
 
 	if extensiveTracing {

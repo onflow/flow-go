@@ -39,7 +39,7 @@ const (
 	ContractsQueryParams              = "contracts"
 	HeartbeatIntervalQueryParam       = "heartbeat_interval"
 	AgreeingExecutorsCountQueryParam  = "agreeing_executors_count"
-	RequiredExecutorsIdsQueryParam    = "required_executors_ids"
+	RequiredExecutorIdsQueryParam     = "required_executor_ids"
 	IncludeExecutorMetadataQueryParam = "include_executor_metadata"
 )
 

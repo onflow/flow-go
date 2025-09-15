@@ -80,6 +80,9 @@ import (
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	execdatacache "github.com/onflow/flow-go/module/executiondatasync/execution_data/cache"
 	"github.com/onflow/flow-go/module/executiondatasync/optimistic_sync"
+	"github.com/onflow/flow-go/module/executiondatasync/optimistic_sync/execution_result"
+	"github.com/onflow/flow-go/module/executiondatasync/optimistic_sync/execution_state"
+	osyncsnapshot "github.com/onflow/flow-go/module/executiondatasync/optimistic_sync/snapshot"
 	"github.com/onflow/flow-go/module/executiondatasync/pruner"
 	edstorage "github.com/onflow/flow-go/module/executiondatasync/storage"
 	"github.com/onflow/flow-go/module/executiondatasync/tracker"
@@ -324,7 +327,7 @@ type FlowAccessNodeBuilder struct {
 	PingMetrics                  module.PingMetrics
 	Committee                    hotstuff.DynamicCommittee
 	Finalized                    *flow.Header // latest finalized block that the node knows of at startup time
-	Pending                      []*flow.Header
+	Pending                      []*flow.ProposalHeader
 	FollowerCore                 module.HotStuffFollower
 	Validator                    hotstuff.Validator
 	ExecutionDataDownloader      execution_data.Downloader
@@ -460,7 +463,7 @@ func (builder *FlowAccessNodeBuilder) buildFollowerCore() *FlowAccessNodeBuilder
 			node.Storage.Headers,
 			final,
 			builder.FollowerDistributor,
-			node.FinalizedRootBlock.Header,
+			node.FinalizedRootBlock.ToHeader(),
 			node.RootQC,
 			builder.Finalized,
 			builder.Pending,
@@ -711,10 +714,10 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 		Component("execution data requester", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			// Validation of the start block height needs to be done after loading state
 			if builder.executionDataStartHeight > 0 {
-				if builder.executionDataStartHeight <= builder.FinalizedRootBlock.Header.Height {
+				if builder.executionDataStartHeight <= builder.FinalizedRootBlock.Height {
 					return nil, fmt.Errorf(
 						"execution data start block height (%d) must be greater than the root block height (%d)",
-						builder.executionDataStartHeight, builder.FinalizedRootBlock.Header.Height)
+						builder.executionDataStartHeight, builder.FinalizedRootBlock.Height)
 				}
 
 				latestSeal, err := builder.State.Sealed().Head()
@@ -736,7 +739,7 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 				// requester expects the initial last processed height, which is the first height - 1
 				builder.executionDataConfig.InitialBlockHeight = builder.executionDataStartHeight - 1
 			} else {
-				builder.executionDataConfig.InitialBlockHeight = builder.SealedRootBlock.Header.Height
+				builder.executionDataConfig.InitialBlockHeight = builder.SealedRootBlock.Height
 			}
 
 			execDataDistributor = edrequester.NewExecutionDataDistributor()
@@ -898,7 +901,7 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 						return nil, fmt.Errorf("could not verify checkpoint file: %w", err)
 					}
 
-					checkpointHeight := builder.SealedRootBlock.Header.Height
+					checkpointHeight := builder.SealedRootBlock.Height
 
 					if builder.SealedRootBlock.ID() != builder.RootSeal.BlockID {
 						return nil, fmt.Errorf("mismatching sealed root block and root seal: %v != %v",
@@ -1716,30 +1719,13 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 			return nil
 		}).
 		Module("transaction timing mempools", func(node *cmd.NodeConfig) error {
-			var err error
-			builder.TransactionTimings, err = stdmap.NewTransactionTimings(1500 * 300) // assume 1500 TPS * 300 seconds
-			if err != nil {
-				return err
-			}
+			builder.TransactionTimings = stdmap.NewTransactionTimings(1500 * 300) // assume 1500 TPS * 300 seconds
+			builder.CollectionsToMarkFinalized = stdmap.NewTimes(50 * 300)        // assume 50 collection nodes * 300 seconds
+			builder.CollectionsToMarkExecuted = stdmap.NewTimes(50 * 300)         // assume 50 collection nodes * 300 seconds
+			builder.BlockTransactions = stdmap.NewIdentifierMap(10000)
+			builder.BlocksToMarkExecuted = stdmap.NewTimes(1 * 300) // assume 1 block per second * 300 seconds
 
-			builder.CollectionsToMarkFinalized, err = stdmap.NewTimes(50 * 300) // assume 50 collection nodes * 300 seconds
-			if err != nil {
-				return err
-			}
-
-			builder.CollectionsToMarkExecuted, err = stdmap.NewTimes(50 * 300) // assume 50 collection nodes * 300 seconds
-			if err != nil {
-				return err
-			}
-
-			builder.BlockTransactions, err = stdmap.NewIdentifierMap(10000)
-			if err != nil {
-				return err
-			}
-
-			builder.BlocksToMarkExecuted, err = stdmap.NewTimes(1 * 300) // assume 1 block per second * 300 seconds
-
-			return err
+			return nil
 		}).
 		Module("transaction metrics", func(node *cmd.NodeConfig) error {
 			builder.TransactionMetrics = metrics.NewTransactionCollector(
@@ -1906,7 +1892,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				builder.Logger,
 				node.Storage.VersionBeacons,
 				nodeVersion,
-				builder.SealedRootBlock.Header.Height,
+				builder.SealedRootBlock.Height,
 				builder.LastFinalizedHeader.Height,
 			)
 			if err != nil {
@@ -1986,7 +1972,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 			// handles block-related operations.
 			blockTracker, err := subscriptiontracker.NewBlockTracker(
 				node.State,
-				builder.FinalizedRootBlock.Header.Height,
+				builder.FinalizedRootBlock.Height,
 				node.Storage.Headers,
 				broadcaster,
 			)
@@ -2038,6 +2024,27 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				notNil(builder.ExecNodeIdentitiesProvider),
 			)
 
+			execNodeSelector := execution_result.NewExecutionNodeSelector(
+				preferredENIdentifiers,
+				fixedENIdentifiers,
+			)
+
+			execResultInfoProvider, err := execution_result.NewExecutionResultInfoProvider(
+				node.Logger,
+				node.State,
+				node.Storage.Headers,
+				node.Storage.Receipts,
+				execNodeSelector,
+				optimistic_sync.DefaultCriteria,
+			)
+			if err != nil {
+				return nil, fmt.Errorf("failed to create execution result provider: %w", err)
+			}
+
+			// TODO: use real objects instead of mocks once they're implemented
+			snapshot := osyncsnapshot.NewSnapshotMock(builder.events)
+			execStateCache := execution_state.NewExecutionStateCacheMock(snapshot)
+
 			builder.nodeBackend, err = backend.New(backend.Params{
 				State:                 node.State,
 				CollectionRPC:         builder.CollectionRPC, // might be nil
@@ -2070,18 +2077,17 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 					builder.stateStreamConf.ResponseLimit,
 					builder.stateStreamConf.ClientSendBufferSize,
 				),
-				EventsIndex:                notNil(builder.EventsIndex),
-				TxResultQueryMode:          txResultQueryMode,
-				TxResultsIndex:             notNil(builder.TxResultsIndex),
-				LastFullBlockHeight:        lastFullBlockHeight,
-				IndexReporter:              indexReporter,
-				VersionControl:             notNil(builder.VersionControl),
-				ExecNodeIdentitiesProvider: notNil(builder.ExecNodeIdentitiesProvider),
-				TxErrorMessageProvider:     notNil(builder.txResultErrorMessageProvider),
-				// TODO: set this once data result forest merged in
-				//ExecutionResultProvider:
-				//ExecutionStateCache:
-				OperatorCriteria: optimistic_sync.DefaultCriteria,
+				EventsIndex:                 notNil(builder.EventsIndex),
+				TxResultQueryMode:           txResultQueryMode,
+				TxResultsIndex:              notNil(builder.TxResultsIndex),
+				LastFullBlockHeight:         lastFullBlockHeight,
+				IndexReporter:               indexReporter,
+				VersionControl:              notNil(builder.VersionControl),
+				ExecNodeIdentitiesProvider:  notNil(builder.ExecNodeIdentitiesProvider),
+				TxErrorMessageProvider:      notNil(builder.txResultErrorMessageProvider),
+				ExecutionResultInfoProvider: execResultInfoProvider,
+				ExecutionStateCache:         execStateCache,
+				OperatorCriteria:            optimistic_sync.DefaultCriteria,
 			})
 			if err != nil {
 				return nil, fmt.Errorf("could not initialize backend: %w", err)
@@ -2129,7 +2135,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				node.State,
 				channels.RequestCollections,
 				filter.HasRole[flow.Identity](flow.RoleCollection),
-				func() flow.Entity { return &flow.Collection{} },
+				func() flow.Entity { return new(flow.Collection) },
 			)
 			if err != nil {
 				return nil, fmt.Errorf("could not create requester engine: %w", err)
