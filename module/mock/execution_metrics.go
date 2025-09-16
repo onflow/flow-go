@@ -56,6 +56,11 @@ func (_m *ExecutionMetrics) ExecutionBlockExecutionEffortVectorComponent(_a0 str
 	_m.Called(_a0, _a1)
 }
 
+// ExecutionCallbacksExecuted provides a mock function with given fields: callbackCount, processGasUsed, executeGasLimits
+func (_m *ExecutionMetrics) ExecutionCallbacksExecuted(callbackCount int, processGasUsed uint64, executeGasLimits uint64) {
+	_m.Called(callbackCount, processGasUsed, executeGasLimits)
+}
+
 // ExecutionCheckpointSize provides a mock function with given fields: bytes
 func (_m *ExecutionMetrics) ExecutionCheckpointSize(bytes uint64) {
 	_m.Called(bytes)
@@ -104,11 +109,6 @@ func (_m *ExecutionMetrics) ExecutionLastFinalizedExecutedBlockHeight(height uin
 // ExecutionScriptExecuted provides a mock function with given fields: dur, compUsed, memoryUsed, memoryEstimate
 func (_m *ExecutionMetrics) ExecutionScriptExecuted(dur time.Duration, compUsed uint64, memoryUsed uint64, memoryEstimate uint64) {
 	_m.Called(dur, compUsed, memoryUsed, memoryEstimate)
-}
-
-// ExecutionCallbacksExecuted provides a mock function with given fields: callbackCount, processGasUsed, executeGasLimits
-func (_m *ExecutionMetrics) ExecutionCallbacksExecuted(callbackCount int, processGasUsed uint64, executeGasLimits uint64) {
-	_m.Called(callbackCount, processGasUsed, executeGasLimits)
 }
 
 // ExecutionStorageStateCommitment provides a mock function with given fields: bytes
