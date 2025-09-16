@@ -94,7 +94,6 @@ import (
 	storageerr "github.com/onflow/flow-go/storage"
 	storage "github.com/onflow/flow-go/storage/badger"
 	"github.com/onflow/flow-go/storage/operation"
-	"github.com/onflow/flow-go/storage/operation/badgerimpl"
 	"github.com/onflow/flow-go/storage/operation/pebbleimpl"
 	storagepebble "github.com/onflow/flow-go/storage/pebble"
 	"github.com/onflow/flow-go/storage/store"
@@ -1358,6 +1357,12 @@ func (exeNode *ExecutionNode) LoadGrpcServer(
 	module.ReadyDoneAware,
 	error,
 ) {
+	// maintain backwards compatibility with the deprecated flag
+	if exeNode.exeConf.rpcConf.DeprecatedMaxMsgSize != 0 {
+		node.Logger.Warn().Msg("A deprecated flag was specified (--rpc-max-message-size). Use --rpc-max-request-message-size and --rpc-max-response-message-size instead. This flag will be removed in a future release.")
+		exeNode.exeConf.rpcConf.MaxRequestMsgSize = exeNode.exeConf.rpcConf.DeprecatedMaxMsgSize
+		exeNode.exeConf.rpcConf.MaxResponseMsgSize = exeNode.exeConf.rpcConf.DeprecatedMaxMsgSize
+	}
 	return rpc.New(
 		node.Logger,
 		exeNode.exeConf.rpcConf,
@@ -1411,12 +1416,7 @@ func (exeNode *ExecutionNode) LoadBootstrapper(node *NodeConfig) error {
 			return fmt.Errorf("could not load bootstrap state from checkpoint file: %w", err)
 		}
 
-		err = bootstrapper.BootstrapExecutionDatabase(node.StorageLockMgr, badgerimpl.ToDB(node.DB), node.RootSeal)
-		if err != nil {
-			return fmt.Errorf("could not bootstrap execution database: %w", err)
-		}
-
-		err = bootstrapper.BootstrapExecutionDatabase(node.StorageLockMgr, pebbleimpl.ToDB(node.PebbleDB), node.RootSeal)
+		err = bootstrapper.BootstrapExecutionDatabase(node.StorageLockMgr, node.ProtocolDB, node.RootSeal)
 		if err != nil {
 			return fmt.Errorf("could not bootstrap execution database: %w", err)
 		}

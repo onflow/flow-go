@@ -49,14 +49,14 @@ func TestProxyAccessAPI(t *testing.T) {
 	// create the factory
 	connectionFactory := new(ConnectionFactoryImpl)
 	// set the collection grpc port
-	connectionFactory.CollectionGRPCPort = cn.port
+	connectionFactory.CollectionConfig = DefaultCollectionConfig()
+	connectionFactory.CollectionConfig.GRPCPort = cn.port
 	// set metrics reporting
 	connectionFactory.AccessMetrics = metrics
 	connectionFactory.Manager = NewManager(
 		logger,
 		connectionFactory.AccessMetrics,
 		nil,
-		0,
 		CircuitBreakerConfig{},
 		grpcutils.NoCompressor,
 	)
@@ -67,7 +67,7 @@ func TestProxyAccessAPI(t *testing.T) {
 	}
 
 	// get a collection API client
-	client, conn, err := proxyConnectionFactory.GetAccessAPIClient("foo", nil)
+	client, conn, err := proxyConnectionFactory.GetCollectionAPIClient("foo", nil)
 	defer conn.Close()
 	assert.NoError(t, err)
 
@@ -98,7 +98,8 @@ func TestProxyExecutionAPI(t *testing.T) {
 	// create the factory
 	connectionFactory := new(ConnectionFactoryImpl)
 	// set the execution grpc port
-	connectionFactory.ExecutionGRPCPort = en.port
+	connectionFactory.ExecutionConfig = DefaultExecutionConfig()
+	connectionFactory.ExecutionConfig.GRPCPort = en.port
 
 	// set metrics reporting
 	connectionFactory.AccessMetrics = metrics
@@ -106,7 +107,6 @@ func TestProxyExecutionAPI(t *testing.T) {
 		logger,
 		connectionFactory.AccessMetrics,
 		nil,
-		0,
 		CircuitBreakerConfig{},
 		grpcutils.NoCompressor,
 	)
@@ -147,7 +147,8 @@ func TestProxyAccessAPIConnectionReuse(t *testing.T) {
 	// create the factory
 	connectionFactory := new(ConnectionFactoryImpl)
 	// set the collection grpc port
-	connectionFactory.CollectionGRPCPort = cn.port
+	connectionFactory.CollectionConfig = DefaultCollectionConfig()
+	connectionFactory.CollectionConfig.GRPCPort = cn.port
 
 	// set the connection pool cache size
 	cacheSize := 1
@@ -160,7 +161,6 @@ func TestProxyAccessAPIConnectionReuse(t *testing.T) {
 		logger,
 		connectionFactory.AccessMetrics,
 		connectionCache,
-		0,
 		CircuitBreakerConfig{},
 		grpcutils.NoCompressor,
 	)
@@ -171,7 +171,7 @@ func TestProxyAccessAPIConnectionReuse(t *testing.T) {
 	}
 
 	// get a collection API client
-	_, closer, err := proxyConnectionFactory.GetAccessAPIClient("foo", nil)
+	_, closer, err := proxyConnectionFactory.GetCollectionAPIClient("foo", nil)
 	assert.Equal(t, connectionCache.Len(), 1)
 	assert.NoError(t, err)
 	assert.Nil(t, closer.Close())
@@ -209,7 +209,8 @@ func TestProxyExecutionAPIConnectionReuse(t *testing.T) {
 	// create the factory
 	connectionFactory := new(ConnectionFactoryImpl)
 	// set the execution grpc port
-	connectionFactory.ExecutionGRPCPort = en.port
+	connectionFactory.ExecutionConfig = DefaultExecutionConfig()
+	connectionFactory.ExecutionConfig.GRPCPort = en.port
 
 	// set the connection pool cache size
 	cacheSize := 5
@@ -222,7 +223,6 @@ func TestProxyExecutionAPIConnectionReuse(t *testing.T) {
 		logger,
 		connectionFactory.AccessMetrics,
 		connectionCache,
-		0,
 		CircuitBreakerConfig{},
 		grpcutils.NoCompressor,
 	)
@@ -275,10 +275,10 @@ func TestExecutionNodeClientTimeout(t *testing.T) {
 
 	// create the factory
 	connectionFactory := new(ConnectionFactoryImpl)
-	// set the execution grpc port
-	connectionFactory.ExecutionGRPCPort = en.port
-	// set the execution grpc client timeout
-	connectionFactory.ExecutionNodeGRPCTimeout = timeout
+	// set the execution config
+	connectionFactory.ExecutionConfig = DefaultExecutionConfig()
+	connectionFactory.ExecutionConfig.GRPCPort = en.port
+	connectionFactory.ExecutionConfig.Timeout = timeout
 
 	// set the connection pool cache size
 	cacheSize := 5
@@ -291,7 +291,6 @@ func TestExecutionNodeClientTimeout(t *testing.T) {
 		logger,
 		connectionFactory.AccessMetrics,
 		connectionCache,
-		0,
 		CircuitBreakerConfig{},
 		grpcutils.NoCompressor,
 	)
@@ -332,10 +331,10 @@ func TestCollectionNodeClientTimeout(t *testing.T) {
 
 	// create the factory
 	connectionFactory := new(ConnectionFactoryImpl)
-	// set the collection grpc port
-	connectionFactory.CollectionGRPCPort = cn.port
-	// set the collection grpc client timeout
-	connectionFactory.CollectionNodeGRPCTimeout = timeout
+	// set the collection grpc config
+	connectionFactory.CollectionConfig = DefaultCollectionConfig()
+	connectionFactory.CollectionConfig.GRPCPort = cn.port
+	connectionFactory.CollectionConfig.Timeout = timeout
 
 	// set the connection pool cache size
 	cacheSize := 5
@@ -348,13 +347,12 @@ func TestCollectionNodeClientTimeout(t *testing.T) {
 		logger,
 		connectionFactory.AccessMetrics,
 		connectionCache,
-		0,
 		CircuitBreakerConfig{},
 		grpcutils.NoCompressor,
 	)
 
 	// create the collection API client
-	client, _, err := connectionFactory.GetAccessAPIClient(cn.listener.Addr().String(), nil)
+	client, _, err := connectionFactory.GetCollectionAPIClient(cn.listener.Addr().String(), nil)
 	assert.NoError(t, err)
 
 	ctx := context.Background()
@@ -382,7 +380,8 @@ func TestConnectionPoolFull(t *testing.T) {
 	// create the factory
 	connectionFactory := new(ConnectionFactoryImpl)
 	// set the collection grpc port
-	connectionFactory.CollectionGRPCPort = cn1.port
+	connectionFactory.CollectionConfig = DefaultCollectionConfig()
+	connectionFactory.CollectionConfig.GRPCPort = cn1.port
 
 	// set the connection pool cache size
 	cacheSize := 2
@@ -395,7 +394,6 @@ func TestConnectionPoolFull(t *testing.T) {
 		logger,
 		connectionFactory.AccessMetrics,
 		connectionCache,
-		0,
 		CircuitBreakerConfig{},
 		grpcutils.NoCompressor,
 	)
@@ -406,22 +404,22 @@ func TestConnectionPoolFull(t *testing.T) {
 
 	// get a collection API client
 	// Create and add first client to cache
-	_, _, err = connectionFactory.GetAccessAPIClient(cn1Address, nil)
+	_, _, err = connectionFactory.GetCollectionAPIClient(cn1Address, nil)
 	assert.Equal(t, connectionCache.Len(), 1)
 	assert.NoError(t, err)
 
 	// Create and add second client to cache
-	_, _, err = connectionFactory.GetAccessAPIClient(cn2Address, nil)
+	_, _, err = connectionFactory.GetCollectionAPIClient(cn2Address, nil)
 	assert.Equal(t, connectionCache.Len(), 2)
 	assert.NoError(t, err)
 
 	// Get the first client from cache.
-	_, _, err = connectionFactory.GetAccessAPIClient(cn1Address, nil)
+	_, _, err = connectionFactory.GetCollectionAPIClient(cn1Address, nil)
 	assert.Equal(t, connectionCache.Len(), 2)
 	assert.NoError(t, err)
 
 	// Create and add third client to cache, second client will be removed from cache
-	_, _, err = connectionFactory.GetAccessAPIClient(cn3Address, nil)
+	_, _, err = connectionFactory.GetCollectionAPIClient(cn3Address, nil)
 	assert.Equal(t, connectionCache.Len(), 2)
 	assert.NoError(t, err)
 
@@ -429,15 +427,15 @@ func TestConnectionPoolFull(t *testing.T) {
 
 	hostnameOrIP, _, err = net.SplitHostPort(cn1Address)
 	require.NoError(t, err)
-	grpcAddress1 := fmt.Sprintf("%s:%d", hostnameOrIP, connectionFactory.CollectionGRPCPort)
+	grpcAddress1 := fmt.Sprintf("%s:%d", hostnameOrIP, connectionFactory.CollectionConfig.GRPCPort)
 
 	hostnameOrIP, _, err = net.SplitHostPort(cn2Address)
 	require.NoError(t, err)
-	grpcAddress2 := fmt.Sprintf("%s:%d", hostnameOrIP, connectionFactory.CollectionGRPCPort)
+	grpcAddress2 := fmt.Sprintf("%s:%d", hostnameOrIP, connectionFactory.CollectionConfig.GRPCPort)
 
 	hostnameOrIP, _, err = net.SplitHostPort(cn3Address)
 	require.NoError(t, err)
-	grpcAddress3 := fmt.Sprintf("%s:%d", hostnameOrIP, connectionFactory.CollectionGRPCPort)
+	grpcAddress3 := fmt.Sprintf("%s:%d", hostnameOrIP, connectionFactory.CollectionConfig.GRPCPort)
 
 	assert.True(t, connectionCache.cache.Contains(grpcAddress1))
 	assert.False(t, connectionCache.cache.Contains(grpcAddress2))
@@ -465,7 +463,8 @@ func TestConnectionPoolStale(t *testing.T) {
 	// create the factory
 	connectionFactory := new(ConnectionFactoryImpl)
 	// set the collection grpc port
-	connectionFactory.CollectionGRPCPort = cn.port
+	connectionFactory.CollectionConfig = DefaultCollectionConfig()
+	connectionFactory.CollectionConfig.GRPCPort = cn.port
 
 	// set the connection pool cache size
 	cacheSize := 5
@@ -478,7 +477,6 @@ func TestConnectionPoolStale(t *testing.T) {
 		logger,
 		connectionFactory.AccessMetrics,
 		connectionCache,
-		0,
 		CircuitBreakerConfig{},
 		grpcutils.NoCompressor,
 	)
@@ -489,7 +487,7 @@ func TestConnectionPoolStale(t *testing.T) {
 	}
 
 	// get a collection API client
-	client, _, err := proxyConnectionFactory.GetAccessAPIClient("foo", nil)
+	client, _, err := proxyConnectionFactory.GetCollectionAPIClient("foo", nil)
 	assert.Equal(t, connectionCache.Len(), 1)
 	assert.NoError(t, err)
 	// close connection to simulate something "going wrong" with our stored connection
@@ -504,7 +502,7 @@ func TestConnectionPoolStale(t *testing.T) {
 	assert.Error(t, err)
 
 	// re-access, should replace stale connection in cache with new one
-	_, _, _ = proxyConnectionFactory.GetAccessAPIClient("foo", nil)
+	_, _, _ = proxyConnectionFactory.GetCollectionAPIClient("foo", nil)
 	assert.Equal(t, connectionCache.Len(), 1)
 
 	var conn *grpc.ClientConn
@@ -560,10 +558,10 @@ func TestExecutionNodeClientClosedGracefully(t *testing.T) {
 
 		// create the factory
 		connectionFactory := new(ConnectionFactoryImpl)
-		// set the execution grpc port
-		connectionFactory.ExecutionGRPCPort = en.port
-		// set the execution grpc client timeout
-		connectionFactory.ExecutionNodeGRPCTimeout = time.Second
+		// set the execution grpc config
+		connectionFactory.ExecutionConfig = DefaultExecutionConfig()
+		connectionFactory.ExecutionConfig.GRPCPort = en.port
+		connectionFactory.ExecutionConfig.Timeout = time.Second
 
 		// set the connection pool cache size
 		cacheSize := 1
@@ -576,7 +574,6 @@ func TestExecutionNodeClientClosedGracefully(t *testing.T) {
 			logger,
 			connectionFactory.AccessMetrics,
 			connectionCache,
-			0,
 			CircuitBreakerConfig{},
 			grpcutils.NoCompressor,
 		)
@@ -659,10 +656,10 @@ func TestEvictingCacheClients(t *testing.T) {
 
 	// Create the connection factory
 	connectionFactory := new(ConnectionFactoryImpl)
-	// Set the gRPC port
-	connectionFactory.CollectionGRPCPort = cn.port
-	// Set the gRPC client timeout
-	connectionFactory.CollectionNodeGRPCTimeout = 5 * time.Second
+	// Set the gRPC config
+	connectionFactory.CollectionConfig = DefaultCollectionConfig()
+	connectionFactory.CollectionConfig.GRPCPort = cn.port
+	connectionFactory.CollectionConfig.Timeout = 5 * time.Second
 	// Set the connection pool cache size
 	cacheSize := 1
 
@@ -681,14 +678,13 @@ func TestEvictingCacheClients(t *testing.T) {
 		logger,
 		connectionFactory.AccessMetrics,
 		connectionCache,
-		0,
 		CircuitBreakerConfig{},
 		grpcutils.NoCompressor,
 	)
 
 	clientAddress := cn.listener.Addr().String()
-	// Create the execution API client
-	client, _, err := connectionFactory.GetAccessAPIClient(clientAddress, nil)
+	// Create the collection API client
+	client, _, err := connectionFactory.GetCollectionAPIClient(clientAddress, nil)
 	require.NoError(t, err)
 
 	ctx := context.Background()
@@ -797,15 +793,17 @@ func TestConcurrentConnections(t *testing.T) {
 		connectionCache, err := NewCache(logger, metrics, 1)
 		require.NoError(tt, err)
 
+		enConfig := DefaultExecutionConfig()
+		enConfig.GRPCPort = en.port
+		enConfig.Timeout = time.Second
+
 		connectionFactory := &ConnectionFactoryImpl{
-			ExecutionGRPCPort:        en.port,
-			ExecutionNodeGRPCTimeout: time.Second,
-			AccessMetrics:            metrics,
+			ExecutionConfig: enConfig,
+			AccessMetrics:   metrics,
 			Manager: NewManager(
 				logger,
 				metrics,
 				connectionCache,
-				0,
 				CircuitBreakerConfig{},
 				grpcutils.NoCompressor,
 			),
@@ -870,11 +868,10 @@ func TestCircuitBreakerExecutionNode(t *testing.T) {
 	// Create the connection factory.
 	connectionFactory := new(ConnectionFactoryImpl)
 
-	// Set the execution gRPC port.
-	connectionFactory.ExecutionGRPCPort = en.port
-
-	// Set the execution gRPC client requestTimeout.
-	connectionFactory.ExecutionNodeGRPCTimeout = requestTimeout
+	// Set the execution gRPC config
+	connectionFactory.ExecutionConfig = DefaultExecutionConfig()
+	connectionFactory.ExecutionConfig.GRPCPort = en.port
+	connectionFactory.ExecutionConfig.Timeout = requestTimeout
 
 	// Set the connection pool cache size.
 	cacheSize := 1
@@ -885,7 +882,6 @@ func TestCircuitBreakerExecutionNode(t *testing.T) {
 		logger,
 		connectionFactory.AccessMetrics,
 		connectionCache,
-		0,
 		CircuitBreakerConfig{
 			Enabled:        true,
 			MaxFailures:    1,
@@ -987,11 +983,10 @@ func TestCircuitBreakerCollectionNode(t *testing.T) {
 	// Create the connection factory.
 	connectionFactory := new(ConnectionFactoryImpl)
 
-	// Set the collection gRPC port.
-	connectionFactory.CollectionGRPCPort = cn.port
-
-	// Set the collection gRPC client requestTimeout.
-	connectionFactory.CollectionNodeGRPCTimeout = requestTimeout
+	// Set the collection gRPC config
+	connectionFactory.CollectionConfig = DefaultCollectionConfig()
+	connectionFactory.CollectionConfig.GRPCPort = cn.port
+	connectionFactory.CollectionConfig.Timeout = requestTimeout
 
 	// Set the connection pool cache size.
 	cacheSize := 1
@@ -1002,7 +997,6 @@ func TestCircuitBreakerCollectionNode(t *testing.T) {
 		logger,
 		connectionFactory.AccessMetrics,
 		connectionCache,
-		0,
 		CircuitBreakerConfig{
 			Enabled:        true,
 			MaxFailures:    1,
@@ -1016,7 +1010,7 @@ func TestCircuitBreakerCollectionNode(t *testing.T) {
 	connectionFactory.AccessMetrics = metrics
 
 	// Create the collection API client.
-	client, _, err := connectionFactory.GetAccessAPIClient(cn.listener.Addr().String(), nil)
+	client, _, err := connectionFactory.GetCollectionAPIClient(cn.listener.Addr().String(), nil)
 	assert.NoError(t, err)
 
 	req := &access.PingRequest{}

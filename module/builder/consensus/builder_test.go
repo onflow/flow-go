@@ -6,7 +6,6 @@ import (
 	"os"
 	"testing"
 
-	"github.com/dgraph-io/badger/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -20,11 +19,12 @@ import (
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/trace"
 	realproto "github.com/onflow/flow-go/state/protocol"
+	"github.com/onflow/flow-go/state/protocol/datastore"
 	protocol "github.com/onflow/flow-go/state/protocol/mock"
 	"github.com/onflow/flow-go/storage"
 	storagemock "github.com/onflow/flow-go/storage/mock"
 	"github.com/onflow/flow-go/storage/operation"
-	"github.com/onflow/flow-go/storage/operation/badgerimpl"
+	"github.com/onflow/flow-go/storage/operation/pebbleimpl"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -66,7 +66,7 @@ type BuilderSuite struct {
 
 	// real dependencies
 	dir      string
-	db       *badger.DB
+	db       storage.DB
 	sentinel uint64
 	setter   func(*flow.HeaderBodyBuilder) error
 	sign     func(*flow.Header) ([]byte, error)
@@ -247,17 +247,27 @@ func (bs *BuilderSuite) SetupTest() {
 	bs.parentID = parent.ID()
 
 	// set up temporary database for tests
-	bs.db, bs.dir = unittest.TempBadgerDB(bs.T())
-	lockManager := storage.NewTestingLockManager()
+	pdb, dir := unittest.TempPebbleDB(bs.T())
+	bs.db = pebbleimpl.ToDB(pdb)
+	bs.dir = dir
 
+	lockManager := storage.NewTestingLockManager()
 	lctx := lockManager.NewContext()
 	require.NoError(bs.T(), lctx.AcquireLock(storage.LockFinalizeBlock))
+	require.NoError(bs.T(), lctx.AcquireLock(storage.LockBootstrapping))
 	defer lctx.Release()
 
 	// insert finalized height and root height
-	db := badgerimpl.ToDB(bs.db)
+	db := bs.db
 	require.NoError(bs.T(), db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-		require.NoError(bs.T(), operation.InsertRootHeight(rw.Writer(), 13))
+		enc, err := datastore.NewVersionedInstanceParams(
+			datastore.DefaultInstanceParamsVersion,
+			unittest.IdentifierFixture(),
+			unittest.IdentifierFixture(),
+			unittest.IdentifierFixture(),
+		)
+		require.NoError(bs.T(), err)
+		require.NoError(bs.T(), operation.InsertInstanceParams(lctx, rw, *enc))
 		require.NoError(bs.T(), operation.UpsertFinalizedHeight(lctx, rw.Writer(), final.Height))
 		require.NoError(bs.T(), operation.IndexFinalizedBlockByHeight(lctx, rw, final.Height, bs.finalID))
 		require.NoError(bs.T(), operation.UpsertSealedHeight(lctx, rw.Writer(), first.Height))

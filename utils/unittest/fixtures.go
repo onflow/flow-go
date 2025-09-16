@@ -121,10 +121,11 @@ func InvalidFormatSignature() flow.TransactionSignature {
 func TransactionSignatureFixture() flow.TransactionSignature {
 	sigLen := crypto.SignatureLenECDSAP256
 	s := flow.TransactionSignature{
-		Address:     AddressFixture(),
-		SignerIndex: 0,
-		Signature:   SeedFixture(sigLen),
-		KeyIndex:    1,
+		Address:       AddressFixture(),
+		SignerIndex:   0,
+		Signature:     SeedFixture(sigLen),
+		KeyIndex:      1,
+		ExtensionData: []byte{},
 	}
 	// make sure the ECDSA signature passes the format check
 	s.Signature[sigLen/2] = 0
@@ -1620,7 +1621,7 @@ func TransactionDSLFixture(chain flow.Chain) dsl.Transaction {
 		Imports: dsl.Imports{
 			dsl.Import{
 				Address: sdk.Address(chain.ServiceAddress()),
-				Names:   []string{"FlowCallbackScheduler"},
+				Names:   []string{"FlowTransactionScheduler"},
 			},
 		},
 		Content: dsl.Prepare{
