@@ -834,10 +834,20 @@ func (h *Handler) ExecuteScriptAtLatestBlock(
 
 	script := req.GetScript()
 	arguments := req.GetArguments()
+	executionState := req.GetExecutionStateQuery()
 
-	value, err := h.api.ExecuteScriptAtLatestBlock(ctx, script, arguments)
+	value, executorMetadata, err := h.api.ExecuteScriptAtLatestBlock(
+		ctx,
+		script,
+		arguments,
+		NewCriteria(executionState),
+	)
 	if err != nil {
 		return nil, err
+	}
+
+	if executionState.GetIncludeExecutorMetadata() {
+		metadata.ExecutionStateQuery = convert.ExecutorMetadataToMessage(&executorMetadata)
 	}
 
 	return &accessproto.ExecuteScriptResponse{
@@ -859,10 +869,21 @@ func (h *Handler) ExecuteScriptAtBlockHeight(
 	script := req.GetScript()
 	arguments := req.GetArguments()
 	blockHeight := req.GetBlockHeight()
+	executionState := req.GetExecutionStateQuery()
 
-	value, err := h.api.ExecuteScriptAtBlockHeight(ctx, blockHeight, script, arguments)
+	value, executorMetadata, err := h.api.ExecuteScriptAtBlockHeight(
+		ctx,
+		blockHeight,
+		script,
+		arguments,
+		NewCriteria(executionState),
+	)
 	if err != nil {
 		return nil, err
+	}
+
+	if executionState.GetIncludeExecutorMetadata() {
+		metadata.ExecutionStateQuery = convert.ExecutorMetadataToMessage(&executorMetadata)
 	}
 
 	return &accessproto.ExecuteScriptResponse{
@@ -883,10 +904,21 @@ func (h *Handler) ExecuteScriptAtBlockID(
 	script := req.GetScript()
 	arguments := req.GetArguments()
 	blockID := convert.MessageToIdentifier(req.GetBlockId())
+	executionState := req.GetExecutionStateQuery()
 
-	value, err := h.api.ExecuteScriptAtBlockID(ctx, blockID, script, arguments)
+	value, executorMetadata, err := h.api.ExecuteScriptAtBlockID(
+		ctx,
+		blockID,
+		script,
+		arguments,
+		NewCriteria(executionState),
+	)
 	if err != nil {
 		return nil, err
+	}
+
+	if executionState.GetIncludeExecutorMetadata() {
+		metadata.ExecutionStateQuery = convert.ExecutorMetadataToMessage(&executorMetadata)
 	}
 
 	return &accessproto.ExecuteScriptResponse{
