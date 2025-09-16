@@ -19,6 +19,7 @@ import (
 	"github.com/onflow/flow-go/engine/access/rest/router"
 	"github.com/onflow/flow-go/model/access"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/executiondatasync/optimistic_sync"
 	"github.com/onflow/flow-go/utils/unittest"
 
 	"github.com/onflow/flow/protobuf/go/flow/entities"
@@ -260,23 +261,24 @@ func TestGetEvents_ParseEmptyExecutionState(t *testing.T) {
 		expectedBlockEvents[i] = unittest.BlockEventsFixture(header, 2)
 	}
 
+	eventType := "A.179b6b1cb6755e31.Foo.Bar"
 	backend := mock.NewAPI(t)
 	backend.
 		On(
 			"GetEventsForHeightRange",
 			mocks.Anything,
-			mocks.Anything,
+			eventType,
 			uint64(startHeight),
 			uint64(endHeight),
 			entities.EventEncodingVersion_JSON_CDC_V0,
-			mocks.Anything,
+			optimistic_sync.Criteria{},
 		).
 		Return(expectedBlockEvents, access.ExecutorMetadata{}, nil).
 		Once()
 
 	request := buildRequest(
 		t,
-		"A.179b6b1cb6755e31.Foo.Bar",
+		eventType,
 		"0",
 		fmt.Sprint(endHeight),
 		[]string{},
@@ -309,7 +311,8 @@ func generateEventsMocks(backend *mock.API, n int) []flow.BlockEvents {
 				entities.EventEncodingVersion_JSON_CDC_V0,
 				mocks.Anything,
 			).
-			Return([]flow.BlockEvents{events[i]}, access.ExecutorMetadata{}, nil)
+			Return([]flow.BlockEvents{events[i]}, access.ExecutorMetadata{}, nil).
+			Once()
 
 		lastHeader = header
 	}
@@ -322,7 +325,8 @@ func generateEventsMocks(backend *mock.API, n int) []flow.BlockEvents {
 			entities.EventEncodingVersion_JSON_CDC_V0,
 			mocks.Anything,
 		).
-		Return(events, access.ExecutorMetadata{}, nil)
+		Return(events, access.ExecutorMetadata{}, nil).
+		Once()
 
 	// range from first to last block
 	backend.Mock.On(
@@ -333,7 +337,9 @@ func generateEventsMocks(backend *mock.API, n int) []flow.BlockEvents {
 		events[len(events)-1].BlockHeight,
 		entities.EventEncodingVersion_JSON_CDC_V0,
 		mocks.Anything,
-	).Return(events, access.ExecutorMetadata{}, nil)
+	).
+		Return(events, access.ExecutorMetadata{}, nil).
+		Once()
 
 	// range from first to last block + 5
 	backend.Mock.On(
@@ -344,7 +350,9 @@ func generateEventsMocks(backend *mock.API, n int) []flow.BlockEvents {
 		events[len(events)-1].BlockHeight+5,
 		entities.EventEncodingVersion_JSON_CDC_V0,
 		mocks.Anything,
-	).Return(append(events[:len(events)-1], unittest.BlockEventsFixture(lastHeader, 0)), access.ExecutorMetadata{}, nil)
+	).
+		Return(append(events[:len(events)-1], unittest.BlockEventsFixture(lastHeader, 0)), access.ExecutorMetadata{}, nil).
+		Once()
 
 	latestBlock := unittest.BlockHeaderFixture()
 	latestBlock.Height = uint64(n - 1)
@@ -359,7 +367,8 @@ func generateEventsMocks(backend *mock.API, n int) []flow.BlockEvents {
 			entities.EventEncodingVersion_JSON_CDC_V0,
 			mocks.Anything,
 		).
-		Return(nil, access.ExecutorMetadata{}, status.Error(codes.NotFound, "not found"))
+		Return(nil, access.ExecutorMetadata{}, status.Error(codes.NotFound, "not found")).
+		Once()
 
 	backend.Mock.
 		On(
@@ -371,7 +380,8 @@ func generateEventsMocks(backend *mock.API, n int) []flow.BlockEvents {
 			mocks.Anything,
 			mocks.Anything,
 		).
-		Return(nil, access.ExecutorMetadata{}, status.Error(codes.NotFound, "not found"))
+		Return(nil, access.ExecutorMetadata{}, status.Error(codes.NotFound, "not found")).
+		Once()
 
 	backend.Mock.
 		On(
@@ -383,7 +393,8 @@ func generateEventsMocks(backend *mock.API, n int) []flow.BlockEvents {
 			mocks.Anything,
 			mocks.Anything,
 		).
-		Return(events[0:3], access.ExecutorMetadata{}, nil)
+		Return(events[0:3], access.ExecutorMetadata{}, nil).
+		Once()
 
 	backend.Mock.
 		On("GetLatestBlockHeader", mocks.Anything, true).
