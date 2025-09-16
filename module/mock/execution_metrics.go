@@ -106,6 +106,11 @@ func (_m *ExecutionMetrics) ExecutionScriptExecuted(dur time.Duration, compUsed 
 	_m.Called(dur, compUsed, memoryUsed, memoryEstimate)
 }
 
+// ExecutionCallbacksExecuted provides a mock function with given fields: callbackCount, processGasUsed, executeGasLimits
+func (_m *ExecutionMetrics) ExecutionCallbacksExecuted(callbackCount int, processGasUsed uint64, executeGasLimits uint64) {
+	_m.Called(callbackCount, processGasUsed, executeGasLimits)
+}
+
 // ExecutionStorageStateCommitment provides a mock function with given fields: bytes
 func (_m *ExecutionMetrics) ExecutionStorageStateCommitment(bytes int64) {
 	_m.Called(bytes)

@@ -650,6 +650,21 @@ func (e *blockComputer) executeProcessCallback(
 		return nil, 0, err
 	}
 
+	if len(callbackTxs) > 0 {
+		// calculate total gas limits for execute callback transactions
+		var totalExecuteGasLimits uint64
+		for _, tx := range callbackTxs {
+			totalExecuteGasLimits += tx.GasLimit
+		}
+
+		// report metrics for callbacks executed
+		e.metrics.ExecutionCallbacksExecuted(
+			len(callbackTxs),
+			txn.Output().ComputationUsed,
+			totalExecuteGasLimits,
+		)
+	}
+
 	return callbackTxs, txnIndex, nil
 }
 

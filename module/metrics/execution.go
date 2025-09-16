@@ -98,6 +98,9 @@ type ExecutionCollector struct {
 	evmTransactionGasUsed                   prometheus.Histogram
 	evmBlockTxCount                         prometheus.Histogram
 	evmBlockGasUsed                         prometheus.Histogram
+	callbacksExecutedCount                  prometheus.Histogram
+	callbacksProcessGasUsed                 prometheus.Histogram
+	callbacksExecuteGasLimits               prometheus.Histogram
 }
 
 func NewExecutionCollector(tracer module.Tracer) *ExecutionCollector {
@@ -793,6 +796,30 @@ func NewExecutionCollector(tracer module.Tracer) *ExecutionCollector {
 			Name:      "evm_block_total_supply",
 			Help:      "the total amount of flow deposited to EVM (in FLOW)",
 		}),
+
+		callbacksExecutedCount: promauto.NewHistogram(prometheus.HistogramOpts{
+			Namespace: namespaceExecution,
+			Subsystem: subsystemRuntime,
+			Name:      "callbacks_executed_count",
+			Help:      "the number of callbacks executed",
+			Buckets:   prometheus.ExponentialBuckets(1, 2, 8),
+		}),
+
+		callbacksProcessGasUsed: promauto.NewHistogram(prometheus.HistogramOpts{
+			Namespace: namespaceExecution,
+			Subsystem: subsystemRuntime,
+			Name:      "callbacks_process_gas_used",
+			Help:      "the gas used by the process callback transaction",
+			Buckets:   prometheus.ExponentialBuckets(10_000, 2, 12),
+		}),
+
+		callbacksExecuteGasLimits: promauto.NewHistogram(prometheus.HistogramOpts{
+			Namespace: namespaceExecution,
+			Subsystem: subsystemRuntime,
+			Name:      "callbacks_execute_gas_limits",
+			Help:      "the total gas limits for execute callback transactions",
+			Buckets:   prometheus.ExponentialBuckets(10_000, 2, 12),
+		}),
 	}
 
 	return ec
@@ -881,6 +908,13 @@ func (ec *ExecutionCollector) ExecutionScriptExecuted(dur time.Duration, compUse
 	ec.scriptMemoryUsage.Observe(float64(memoryUsed))
 	ec.scriptMemoryEstimate.Observe(float64(memoryEstimated))
 	ec.scriptMemoryDifference.Observe(float64(memoryEstimated) - float64(memoryUsed))
+}
+
+// ExecutionCallbacksExecuted reports callback execution metrics
+func (ec *ExecutionCollector) ExecutionCallbacksExecuted(callbackCount int, processGasUsed, executeGasLimits uint64) {
+	ec.callbacksExecutedCount.Observe(float64(callbackCount))
+	ec.callbacksProcessGasUsed.Observe(float64(processGasUsed))
+	ec.callbacksExecuteGasLimits.Observe(float64(executeGasLimits))
 }
 
 // ExecutionStateStorageDiskTotal reports the total storage size of the execution state on disk in bytes
