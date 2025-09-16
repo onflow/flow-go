@@ -252,9 +252,9 @@ func compareBlock(
 	}
 
 	if mismatch {
-		log.Info().Msgf("Block %s (height %d) matched!", blockID, header.Height)
-	} else {
 		log.Error().Msgf("Block %s (height %d) did not match!", blockID, header.Height)
+	} else {
+		log.Info().Msgf("Block %s (height %d) matched!", blockID, header.Height)
 	}
 
 	return header
