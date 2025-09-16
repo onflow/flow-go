@@ -88,7 +88,7 @@ func validateWebAuthNExtensionData(extensionData []byte, payload []byte) (bool, 
 	}
 
 	// base64url decode the challenge, as that's the encoding used client side according to https://www.w3.org/TR/webauthn-3/#dictionary-client-data
-	clientDataChallenge, err := base64.URLEncoding.DecodeString(clientData.Challenge)
+	clientDataChallenge, err := base64.RawURLEncoding.DecodeString(clientData.Challenge)
 	if err != nil {
 		return false, nil
 	}
