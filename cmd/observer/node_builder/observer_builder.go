@@ -2392,7 +2392,14 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 			}
 
 			// TODO: use real objects instead of mocks once they're implemented
-			snapshot := osyncsnapshot.NewSnapshotMock(builder.events)
+			snapshot := osyncsnapshot.NewSnapshotMock(
+				builder.events,
+				nil,
+				nil,
+				builder.lightTransactionResults,
+				nil,
+				nil,
+			)
 			execStateCache := execution_state.NewExecutionStateCacheMock(snapshot)
 
 			backendParams := backend.Params{

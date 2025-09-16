@@ -505,7 +505,7 @@ func splitOnPrefix(original, prefix string) (string, bool) {
 }
 
 func getExecutorMetadata(metadata *entities.Metadata) accessmodel.ExecutorMetadata {
-	if executorMetadata := metadata.GetExecutionStateQuery(); executorMetadata != nil {
+	if executorMetadata := metadata.GetExecutorMetadata(); executorMetadata != nil {
 		return *convert.MessageToExecutorMetadata(executorMetadata)
 	}
 

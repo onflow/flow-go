@@ -13,7 +13,7 @@ func ExecutorMetadataToMessage(metadata *access.ExecutorMetadata) *entities.Exec
 
 	return &entities.ExecutorMetadata{
 		ExecutionResultId: IdentifierToMessage(metadata.ExecutionResultID),
-		ExecutorId:        IdentifiersToMessages(metadata.ExecutorIDs),
+		ExecutorIds:       IdentifiersToMessages(metadata.ExecutorIDs),
 	}
 }
 
@@ -23,7 +23,7 @@ func MessageToExecutorMetadata(metadata *entities.ExecutorMetadata) *access.Exec
 	}
 
 	return &access.ExecutorMetadata{
-		ExecutionResultID: MessageToIdentifier(metadata.ExecutionResultId),
-		ExecutorIDs:       MessagesToIdentifiers(metadata.ExecutorId),
+		ExecutionResultID: MessageToIdentifier(metadata.GetExecutionResultId()),
+		ExecutorIDs:       MessagesToIdentifiers(metadata.GetExecutorIds()),
 	}
 }
