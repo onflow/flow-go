@@ -356,8 +356,9 @@ func (r *RestProxyHandler) ExecuteScriptAtLatestBlock(
 	defer closer.Close()
 
 	executeScriptAtLatestBlockRequest := &accessproto.ExecuteScriptAtLatestBlockRequest{
-		Script:    script,
-		Arguments: arguments,
+		Script:              script,
+		Arguments:           arguments,
+		ExecutionStateQuery: executionStateQuery(criteria),
 	}
 	executeScriptAtLatestBlockResponse, err := upstream.ExecuteScriptAtLatestBlock(
 		ctx,
@@ -519,10 +520,7 @@ func convertError(ctx context.Context, err error, typeName string) error {
 	// this is a bit fragile since we're decoding error strings. it's only needed until we add support for execution data on the public network
 	switch status.Code(err) {
 	case codes.NotFound:
-		if sourceErrStr, ok := splitOnPrefix(
-			err.Error(),
-			fmt.Sprintf("data not found for %s: ", typeName),
-		); ok {
+		if sourceErrStr, ok := splitOnPrefix(err.Error(), fmt.Sprintf("data not found for %s: ", typeName)); ok {
 			return access.NewDataNotFoundError(typeName, errors.New(sourceErrStr))
 		}
 	case codes.Internal:
