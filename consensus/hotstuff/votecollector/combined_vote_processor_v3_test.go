@@ -2,6 +2,7 @@ package votecollector
 
 import (
 	"errors"
+	"github.com/onflow/flow-go/module"
 	"math/rand"
 	"slices"
 	"sync"
@@ -1051,16 +1052,10 @@ func TestCombinedVoteProcessorV3_BuildVerifyQC(t *testing.T) {
 // We start with leader proposing a block, then new leader collects votes and builds a QC.
 // Need to verify that QC that was produced is valid and can be embedded in new proposal.
 func TestCombinedVoteProcessorV3_DoubleVoting(t *testing.T) {
-	epochCounter := uint64(3)
-	epochLookup := &modulemock.EpochLookup{}
 	proposerView := uint64(20)
-	epochLookup.On("EpochForView", proposerView).Return(epochCounter, nil)
 
 	dkgData, err := bootstrapDKG.RandomBeaconKG(4, unittest.RandomBytes(32))
 	require.NoError(t, err)
-
-	// signers hold objects that are created with private key and can sign votes and proposals
-	signers := make(map[flow.Identifier]*verification.CombinedSignerV3)
 
 	// prepare consensus committee:
 	// * 3 signers that have the staking key but have failed DKG and don't have Random Beacon key
@@ -1081,63 +1076,44 @@ func TestCombinedVoteProcessorV3_DoubleVoting(t *testing.T) {
 		}
 	}
 
-	for _, identity := range allIdentities {
-		stakingPriv := unittest.StakingPrivKeyFixture()
-		identity.StakingPubKey = stakingPriv.PublicKey()
+	leader := allIdentities[0]
 
-		participantData := dkgParticipants[identity.NodeID]
+	stakingPriv := unittest.StakingPrivKeyFixture()
+	leader.StakingPubKey = stakingPriv.PublicKey()
 
-		dkgKey := encodable.RandomBeaconPrivKey{
-			PrivateKey: dkgData.PrivKeyShares[participantData.Index],
-		}
+	participantData := dkgParticipants[leader.NodeID]
 
-		keys := &storagemock.SafeBeaconKeys{}
-		// there is Random Beacon key for this epoch
-		keys.On("RetrieveMyBeaconPrivateKey", epochCounter).Return(dkgKey, true, nil)
-
-		beaconSignerStore := hsig.NewEpochAwareRandomBeaconKeyStore(epochLookup, keys)
-
-		me, err := local.New(identity.IdentitySkeleton, stakingPriv)
-		require.NoError(t, err)
-
-		signers[identity.NodeID] = verification.NewCombinedSignerV3(me, beaconSignerStore)
+	dkgKey := encodable.RandomBeaconPrivKey{
+		PrivateKey: dkgData.PrivKeyShares[participantData.Index],
 	}
 
-	leader := allIdentities[0]
-	block := helper.MakeBlock(helper.WithBlockView(proposerView), helper.WithBlockProposer(leader.NodeID))
-
-	committee, err := committees.NewStaticCommittee(allIdentities, flow.ZeroID, dkgParticipants, dkgData.PubGroupKey)
+	me, err := local.New(leader.IdentitySkeleton, stakingPriv)
 	require.NoError(t, err)
 
-	votes := make([]*model.Vote, 0, len(allIdentities))
+	beaconSignerStore := modulemock.NewRandomBeaconKeyStore(t)
+	beaconSignerStore.On("ByView", proposerView).Return(dkgKey, nil)
+	rbSigner := verification.NewCombinedSignerV3(me, beaconSignerStore)
 
-	// first staking signer will be leader collecting votes for proposal
-	// prepare votes for every member of committee except leader
-	for _, signer := range allIdentities.Filter(filter.Not(filter.HasNodeID[flow.Identity](leader.NodeID))) {
-		vote, err := signers[signer.NodeID].CreateVote(block)
-		require.NoError(t, err)
-		votes = append(votes, vote)
-	}
+	stakingSignerStore := modulemock.NewRandomBeaconKeyStore(t)
+	stakingSignerStore.On("ByView", proposerView).Return(nil, module.ErrNoBeaconKeyForEpoch)
+	stakingSigner := verification.NewCombinedSignerV3(me, stakingSignerStore)
+
+	block := helper.MakeBlock(helper.WithBlockView(proposerView), helper.WithBlockProposer(leader.NodeID))
 
 	// create and sign proposal
-	leaderVote, err := signers[leader.NodeID].CreateVote(block)
+	leaderVote, err := rbSigner.CreateVote(block)
 	require.NoError(t, err)
 	proposal := helper.MakeSignedProposal(helper.WithProposal(helper.MakeProposal(helper.WithBlock(block))), helper.WithSigData(leaderVote.SigData))
 
-	qcCreated := false
+	leaderDoubleVote, err := stakingSigner.CreateVote(block)
+	require.NoError(t, err)
+
 	onQCCreated := func(qc *flow.QuorumCertificate) {
-		packer := hsig.NewConsensusSigDataPacker(committee)
-
-		// create verifier that will do crypto checks of created QC
-		verifier := verification.NewCombinedVerifierV3(committee, packer)
-		// create validator which will do compliance and crypto checked of created QC
-		validator := hotstuffvalidator.New(committee, verifier)
-		// check if QC is valid against parent
-		err := validator.ValidateQC(qc)
-		require.NoError(t, err)
-
-		qcCreated = true
+		require.Fail(t, "qc is not expected to be created in this test scenario")
 	}
+
+	committee, err := committees.NewStaticCommittee(allIdentities, flow.ZeroID, dkgParticipants, dkgData.PubGroupKey)
+	require.NoError(t, err)
 
 	baseFactory := &combinedVoteProcessorFactoryBaseV3{
 		committee:   committee,
@@ -1150,11 +1126,8 @@ func TestCombinedVoteProcessorV3_DoubleVoting(t *testing.T) {
 	voteProcessor, err := voteProcessorFactory.Create(unittest.Logger(), proposal)
 	require.NoError(t, err)
 
-	// process votes by new leader, this will result in producing new QC
-	for _, vote := range votes {
-		err := voteProcessor.Process(vote)
-		require.NoError(t, err)
-	}
-
-	require.True(t, qcCreated)
+	// process the double vote, this has to result in an error.
+	err = voteProcessor.Process(leaderDoubleVote)
+	require.Error(t, err)
+	require.True(t, model.IsDuplicatedSignerError(err))
 }
