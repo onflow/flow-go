@@ -21,8 +21,8 @@ var DefaultCriteria = Criteria{
 
 // OverrideWith overrides the original criteria with the incoming criteria, returning a new Criteria object.
 // Fields from `override` criteria take precedence when set.
-func (c *Criteria) OverrideWith(override Criteria) Criteria {
-	newCriteria := *c
+func (c Criteria) OverrideWith(override Criteria) Criteria {
+	newCriteria := c
 
 	if override.AgreeingExecutorsCount > 0 {
 		newCriteria.AgreeingExecutorsCount = override.AgreeingExecutorsCount

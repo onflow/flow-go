@@ -185,15 +185,6 @@ func (s *Suite) TearDownTest() {
 	s.Require().NoError(err)
 }
 
-func (s *Suite) defaultTransactionsParamsWithExecutionResultProviderMocks() Params {
-	executionResult := unittest.ExecutionResultFixture(unittest.WithExecutionResultBlockID(s.rootBlockHeader.ID()))
-	s.snapshot.On("SealedResult").Return(executionResult, nil, nil).Once()
-	s.state.On("AtBlockID", mock.AnythingOfType("flow.Identifier")).Return(s.snapshot).Once()
-	s.headers.On("BlockIDByHeight", mock.AnythingOfType("uint64")).Return(s.rootBlockHeader.ID(), nil).Once()
-
-	return s.defaultTransactionsParams()
-}
-
 func (s *Suite) defaultTransactionsParams() Params {
 	nodeProvider := rpc.NewExecutionNodeIdentitiesProvider(
 		s.log,
@@ -269,7 +260,7 @@ func (s *Suite) TestGetTransactionResult_UnknownTx() {
 		On("ByID", tx.ID()).
 		Return(nil, storage.ErrNotFound)
 
-	params := s.defaultTransactionsParamsWithExecutionResultProviderMocks()
+	params := s.defaultTransactionsParams()
 	txBackend, err := NewTransactionsBackend(params)
 	require.NoError(s.T(), err)
 	res, _, err := txBackend.GetTransactionResult(
@@ -302,7 +293,7 @@ func (s *Suite) TestGetTransactionResult_TxLookupFailure() {
 		On("ByID", tx.ID()).
 		Return(nil, expectedErr)
 
-	params := s.defaultTransactionsParamsWithExecutionResultProviderMocks()
+	params := s.defaultTransactionsParams()
 	txBackend, err := NewTransactionsBackend(params)
 	require.NoError(s.T(), err)
 
@@ -342,7 +333,7 @@ func (s *Suite) TestGetTransactionResult_HistoricNodes_Success() {
 		Return(&transactionResultResponse, nil).
 		Once()
 
-	params := s.defaultTransactionsParamsWithExecutionResultProviderMocks()
+	params := s.defaultTransactionsParams()
 	params.HistoricalAccessNodeClients = []access.AccessAPIClient{s.historicalAccessAPIClient}
 	txBackend, err := NewTransactionsBackend(params)
 	require.NoError(s.T(), err)
@@ -384,7 +375,7 @@ func (s *Suite) TestGetTransactionResult_HistoricNodes_FromCache() {
 		Return(&transactionResultResponse, nil).
 		Once()
 
-	params := s.defaultTransactionsParamsWithExecutionResultProviderMocks()
+	params := s.defaultTransactionsParams()
 	params.HistoricalAccessNodeClients = []access.AccessAPIClient{s.historicalAccessAPIClient}
 	txBackend, err := NewTransactionsBackend(params)
 	require.NoError(s.T(), err)
@@ -434,7 +425,7 @@ func (s *Suite) TestGetTransactionResultUnknownFromCache() {
 		Return(nil, status.Errorf(codes.NotFound, "no known transaction with ID %s", tx.ID())).
 		Once()
 
-	params := s.defaultTransactionsParamsWithExecutionResultProviderMocks()
+	params := s.defaultTransactionsParams()
 	params.HistoricalAccessNodeClients = []access.AccessAPIClient{s.historicalAccessAPIClient}
 	txBackend, err := NewTransactionsBackend(params)
 	require.NoError(s.T(), err)
@@ -506,6 +497,13 @@ func (s *Suite) TestGetSystemTransaction_ExecutionNode_HappyPath() {
 
 	s.params.On("FinalizedRoot").Unset()
 
+	s.execResultProvider.
+		On("ExecutionResultInfo", block.ID(), mock.AnythingOfType("optimistic_sync.Criteria")).
+		Return(&optimistic_sync.ExecutionResultInfo{
+			ExecutionResult: &s.receiptsList[0].ExecutionResult,
+			ExecutionNodes:  s.identities.ToSkeleton(),
+		}, nil)
+
 	s.Run("scheduled callbacks DISABLED - ZeroID", func() {
 		s.blocks.On("ByID", blockID).Return(block, nil).Once()
 
@@ -579,11 +577,6 @@ func (s *Suite) TestGetSystemTransaction_ExecutionNode_HappyPath() {
 	s.Run("scheduled callbacks ENABLED - system collection TX", func() {
 		s.blocks.On("ByID", blockID).Return(block, nil).Once()
 
-		// get execution node identities
-		s.params.On("FinalizedRoot").Return(block.ToHeader(), nil)
-		s.state.On("Final").Return(s.snapshot, nil).Twice()
-		s.snapshot.On("Identities", mock.Anything).Return(unittest.IdentityListFixture(1), nil).Twice()
-
 		s.setupExecutionGetEventsRequest(blockID, block.Height, s.pendingExecutionEvents)
 
 		params.TxProvider = enabledProvider
@@ -603,10 +596,6 @@ func (s *Suite) TestGetSystemTransaction_ExecutionNode_HappyPath() {
 
 		params.TxProvider = enabledProvider
 
-		s.params.On("FinalizedRoot").Return(block.ToHeader(), nil)
-		s.state.On("Final").Return(s.snapshot, nil).Twice()
-		s.snapshot.On("Identities", mock.Anything).Return(unittest.IdentityListFixture(1), nil).Twice()
-
 		s.setupExecutionGetEventsRequest(blockID, block.Height, s.pendingExecutionEvents)
 
 		txBackend, err := NewTransactionsBackend(params)
@@ -623,6 +612,9 @@ func (s *Suite) TestGetSystemTransaction_ExecutionNode_HappyPath() {
 func (s *Suite) TestGetSystemTransaction_Local_HappyPath() {
 	block := unittest.BlockFixture()
 	blockID := block.ID()
+
+	executionResult := s.receiptsList[0].ExecutionResult
+	executionResultID := executionResult.ID()
 
 	params := s.defaultTransactionsParams()
 	enabledProvider := provider.NewLocalTransactionProvider(
@@ -646,6 +638,14 @@ func (s *Suite) TestGetSystemTransaction_Local_HappyPath() {
 
 	s.params.On("FinalizedRoot").Unset()
 
+	// this is called for all tests
+	s.execResultProvider.
+		On("ExecutionResultInfo", block.ID(), mock.AnythingOfType("optimistic_sync.Criteria")).
+		Return(&optimistic_sync.ExecutionResultInfo{
+			ExecutionResult: &executionResult,
+			ExecutionNodes:  s.identities.ToSkeleton(),
+		}, nil)
+
 	s.Run("scheduled callbacks DISABLED - ZeroID", func() {
 		s.blocks.On("ByID", blockID).Return(block, nil).Once()
 
@@ -719,29 +719,43 @@ func (s *Suite) TestGetSystemTransaction_Local_HappyPath() {
 	})
 
 	s.Run("scheduled callbacks ENABLED - system collection TX", func() {
-		s.blocks.On("ByID", blockID).Return(block, nil).Once()
+		systemTx := s.systemCollection.Transactions[2]
+		systemTxID := systemTx.ID()
+		params.TxProvider = enabledProvider
 
+		s.blocks.On("ByID", blockID).Return(block, nil).Once()
 		s.events.On("ByBlockID", blockID).Return(s.pendingExecutionEvents, nil).Once()
 
-		params.TxProvider = enabledProvider
+		snapshot := optimisticsyncmock.NewSnapshot(s.T())
+		snapshot.On("Events").Return(s.events)
+
+		s.executionStateCache.
+			On("Snapshot", executionResultID).
+			Return(snapshot, nil).
+			Once()
 
 		txBackend, err := NewTransactionsBackend(params)
 		s.Require().NoError(err)
 
-		systemTx := s.systemCollection.Transactions[2]
-		res, err := txBackend.GetSystemTransaction(context.Background(), systemTx.ID(), blockID)
+		res, err := txBackend.GetSystemTransaction(context.Background(), systemTxID, blockID)
 
 		s.Require().NoError(err)
-
 		s.Require().Equal(systemTx, res)
 	})
 
 	s.Run("scheduled callbacks ENABLED - non-system txID fails", func() {
-		s.blocks.On("ByID", blockID).Return(block, nil).Once()
-
 		params.TxProvider = enabledProvider
 
+		s.blocks.On("ByID", blockID).Return(block, nil).Once()
 		s.events.On("ByBlockID", blockID).Return(s.pendingExecutionEvents, nil).Once()
+
+		snapshot := optimisticsyncmock.NewSnapshot(s.T())
+		snapshot.On("Events").Return(s.events)
+
+		s.executionStateCache.
+			On("Snapshot", executionResultID).
+			Return(snapshot, nil).
+			Once()
 
 		txBackend, err := NewTransactionsBackend(params)
 		s.Require().NoError(err)
@@ -771,18 +785,11 @@ func (s *Suite) TestGetSystemTransactionResult_ExecutionNode_HappyPath() {
 
 		stateSnapshotForKnownBlock := unittest.StateSnapshotForKnownBlock(block.ToHeader(), identities.Lookup())
 
-		s.state.
-			On("AtBlockID", blockID).
-			Return(stateSnapshotForKnownBlock, nil).
-			Once()
-
 		// block storage returns the corresponding block
 		s.blocks.
 			On("ByID", blockID).
 			Return(block, nil).
 			Once()
-
-		s.headers.On("BlockIDByHeight", mock.AnythingOfType("uint64")).Return(blockID, nil)
 
 		stateSnapshotForKnownBlock.On("SealedResult").Return(&s.receiptsList[0].ExecutionResult, nil, nil)
 
@@ -817,7 +824,7 @@ func (s *Suite) TestGetSystemTransactionResult_ExecutionNode_HappyPath() {
 		s.Require().NoError(err)
 
 		s.execResultProvider.
-			On("ExecutionResult", block.ID(), mock.AnythingOfType("optimistic_sync.Criteria")).
+			On("ExecutionResultInfo", block.ID(), mock.AnythingOfType("optimistic_sync.Criteria")).
 			Return(&optimistic_sync.ExecutionResultInfo{
 				ExecutionResult: &s.receiptsList[0].ExecutionResult,
 				ExecutionNodes:  s.identities.ToSkeleton(),
@@ -905,7 +912,7 @@ func (s *Suite) TestGetSystemTransactionResult_Local_HappyPath() {
 	s.events.On("ByBlockIDTransactionID", blockId, txId).Return(eventsForTx, nil)
 
 	// Set up the backend parameters and the backend instance
-	params := s.defaultTransactionsParamsWithExecutionResultProviderMocks()
+	params := s.defaultTransactionsParams()
 
 	// Set up optimistic sync mocks to provide snapshot-backed readers
 	snapshot := optimisticsyncmock.NewSnapshot(s.T())
@@ -914,7 +921,7 @@ func (s *Suite) TestGetSystemTransactionResult_Local_HappyPath() {
 	// ExecutionResultQuery can return any result with an ID; only ID is used to fetch snapshot
 	fakeRes := &flow.ExecutionResult{PreviousResultID: unittest.IdentifierFixture()}
 	s.execResultProvider.
-		On("ExecutionResult", blockId, reqCriteria).
+		On("ExecutionResultInfo", blockId, reqCriteria).
 		Return(&optimistic_sync.ExecutionResultInfo{ExecutionResult: fakeRes}, nil)
 	s.executionStateCache.
 		On("Snapshot", fakeRes.ID()).
@@ -936,7 +943,13 @@ func (s *Suite) TestGetSystemTransactionResult_Local_HappyPath() {
 
 	txBackend, err := NewTransactionsBackend(params)
 	s.Require().NoError(err)
-	response, metadata, err := txBackend.GetSystemTransactionResult(context.Background(), flow.ZeroID, blockId, entities.EventEncodingVersion_JSON_CDC_V0, optimistic_sync.Criteria{})
+	response, metadata, err := txBackend.GetSystemTransactionResult(
+		context.Background(),
+		flow.ZeroID,
+		blockId,
+		entities.EventEncodingVersion_JSON_CDC_V0,
+		reqCriteria,
+	)
 
 	_ = metadata // TODO: validate metadata
 
@@ -951,7 +964,7 @@ func (s *Suite) TestGetSystemTransactionResult_BlockNotFound() {
 		Return(nil, storage.ErrNotFound).
 		Once()
 
-	params := s.defaultTransactionsParamsWithExecutionResultProviderMocks()
+	params := s.defaultTransactionsParams()
 	txBackend, err := NewTransactionsBackend(params)
 	s.Require().NoError(err)
 	res, _, err := txBackend.GetSystemTransactionResult(
@@ -1006,12 +1019,12 @@ func (s *Suite) TestGetSystemTransactionResult_FailedEncodingConversion() {
 		Return(s.executionAPIClient, &mocks.MockCloser{}, nil).
 		Once()
 
-	params := s.defaultTransactionsParamsWithExecutionResultProviderMocks()
+	params := s.defaultTransactionsParams()
 	txBackend, err := NewTransactionsBackend(params)
 	s.Require().NoError(err)
 
 	s.execResultProvider.
-		On("ExecutionResult", block.ID(), mock.AnythingOfType("optimistic_sync.Criteria")).
+		On("ExecutionResultInfo", block.ID(), mock.AnythingOfType("optimistic_sync.Criteria")).
 		Return(&optimistic_sync.ExecutionResultInfo{
 			ExecutionResult: &s.receiptsList[0].ExecutionResult,
 			ExecutionNodes:  s.identities.ToSkeleton(),
@@ -1081,7 +1094,7 @@ func (s *Suite) TestGetTransactionResult_FromStorage() {
 			ExecutorID:    unittest.IdentifierFixture(),
 		}, nil)
 
-	params := s.defaultTransactionsParamsWithExecutionResultProviderMocks()
+	params := s.defaultTransactionsParams()
 
 	// Set up optimistic sync mocks to provide snapshot-backed readers
 	snapshot := optimisticsyncmock.NewSnapshot(s.T())
@@ -1094,7 +1107,7 @@ func (s *Suite) TestGetTransactionResult_FromStorage() {
 	// ExecutionResultQuery can return any result with an ID; only ID is used to fetch snapshot
 	fakeRes := &flow.ExecutionResult{PreviousResultID: unittest.IdentifierFixture()}
 	s.execResultProvider.
-		On("ExecutionResult", block.ID(), mock.AnythingOfType("optimistic_sync.Criteria")).
+		On("ExecutionResultInfo", block.ID(), mock.AnythingOfType("optimistic_sync.Criteria")).
 		Return(&optimistic_sync.ExecutionResultInfo{
 			ExecutionResult: fakeRes,
 			ExecutionNodes:  s.identities.ToSkeleton(),
@@ -1173,7 +1186,7 @@ func (s *Suite) TestTransactionByIndexFromStorage() {
 			ExecutorID:    unittest.IdentifierFixture(),
 		}, nil)
 
-	params := s.defaultTransactionsParamsWithExecutionResultProviderMocks()
+	params := s.defaultTransactionsParams()
 
 	// Set up optimistic sync mocks to provide snapshot-backed readers
 	snapshot := optimisticsyncmock.NewSnapshot(s.T())
@@ -1182,7 +1195,7 @@ func (s *Suite) TestTransactionByIndexFromStorage() {
 	// ExecutionResultQuery can return any result with an ID; only ID is used to fetch snapshot
 	fakeRes := &flow.ExecutionResult{PreviousResultID: unittest.IdentifierFixture()}
 	s.execResultProvider.
-		On("ExecutionResult", block.ID(), mock.AnythingOfType("optimistic_sync.Criteria")).
+		On("ExecutionResultInfo", block.ID(), mock.AnythingOfType("optimistic_sync.Criteria")).
 		Return(&optimistic_sync.ExecutionResultInfo{ExecutionResult: fakeRes}, nil)
 	s.executionStateCache.On("Snapshot", mock.Anything).Return(snapshot, nil)
 
@@ -1278,7 +1291,7 @@ func (s *Suite) TestTransactionResultsByBlockIDFromStorage() {
 
 	// Set up the state and snapshot mocks
 
-	params := s.defaultTransactionsParamsWithExecutionResultProviderMocks()
+	params := s.defaultTransactionsParams()
 
 	// Set up optimistic sync mocks to provide snapshot-backed readers
 	snapshot := optimisticsyncmock.NewSnapshot(s.T())
@@ -1287,7 +1300,7 @@ func (s *Suite) TestTransactionResultsByBlockIDFromStorage() {
 	// ExecutionResultQuery can return any result with an ID; only ID is used to fetch snapshot
 	fakeRes := &flow.ExecutionResult{PreviousResultID: unittest.IdentifierFixture()}
 	s.execResultProvider.
-		On("ExecutionResult", block.ID(), mock.AnythingOfType("optimistic_sync.Criteria")).
+		On("ExecutionResultInfo", block.ID(), mock.AnythingOfType("optimistic_sync.Criteria")).
 		Return(&optimistic_sync.ExecutionResultInfo{ExecutionResult: fakeRes}, nil)
 	s.executionStateCache.On("Snapshot", mock.Anything).Return(snapshot, nil)
 
@@ -1341,25 +1354,30 @@ func (s *Suite) TestGetTransactionsByBlockID() {
 	expectedSystemTxCount := len(expectedSystemCollection.Transactions)
 	expectedTotalCount := expectedUserTxCount + expectedSystemTxCount
 
+	executionResult := s.receiptsList[0].ExecutionResult
+	executionResultID := executionResult.ID()
+
+	s.execResultProvider.
+		On("ExecutionResultInfo", block.ID(), mock.AnythingOfType("optimistic_sync.Criteria")).
+		Return(&optimistic_sync.ExecutionResultInfo{
+			ExecutionResult: &executionResult,
+			ExecutionNodes:  s.identities.ToSkeleton(),
+		}, nil)
+
 	// Test with Local Provider
 	s.Run("LocalProvider", func() {
-		// Mock the blocks storage
-		s.blocks.
-			On("ByID", blockID).
-			Return(block, nil).
+		snapshot := optimisticsyncmock.NewSnapshot(s.T())
+		snapshot.On("Events").Return(s.events)
+		snapshot.On("Collections").Return(s.collections)
+
+		s.executionStateCache.
+			On("Snapshot", executionResultID).
+			Return(snapshot, nil).
 			Once()
 
-		// Mock the collections storage
-		s.collections.
-			On("ByID", col.ID()).
-			Return(&col, nil).
-			Once()
-
-		// Mock the events storage to return PendingExecution events
-		s.events.
-			On("ByBlockID", blockID).
-			Return(pendingExecutionEvents, nil).
-			Once()
+		s.blocks.On("ByID", blockID).Return(block, nil).Once()
+		s.collections.On("ByID", col.ID()).Return(&col, nil).Once()
+		s.events.On("ByBlockID", blockID).Return(pendingExecutionEvents, nil).Once()
 
 		// Set up the backend parameters with local transaction provider
 		params := s.defaultTransactionsParams()
@@ -1398,25 +1416,8 @@ func (s *Suite) TestGetTransactionsByBlockID() {
 
 	// Test with Execution Node Provider
 	s.Run("ExecutionNodeProvider", func() {
-		// Set up the state and snapshot mocks first
-		_, fixedENIDs := s.setupReceipts(block)
-		s.fixedExecutionNodeIDs = fixedENIDs.NodeIDs()
-		s.state.On("Final").Return(s.snapshot, nil).Maybe()
-		s.state.On("Sealed").Return(s.snapshot, nil).Maybe()
-		s.snapshot.On("Identities", mock.Anything).Return(fixedENIDs, nil).Maybe()
-		s.snapshot.On("Head").Return(block.ToHeader(), nil).Maybe()
-
-		// Mock the blocks storage
-		s.blocks.
-			On("ByID", blockID).
-			Return(block, nil).
-			Once()
-
-		// Mock the collections storage
-		s.collections.
-			On("ByID", col.ID()).
-			Return(&col, nil).
-			Once()
+		s.blocks.On("ByID", blockID).Return(block, nil).Once()
+		s.collections.On("ByID", col.ID()).Return(&col, nil).Once()
 
 		s.setupExecutionGetEventsRequest(blockID, block.Height, pendingExecutionEvents)
 
@@ -1472,14 +1473,9 @@ func (s *Suite) TestTransactionResultsByBlockIDFromExecutionNode() {
 	blockId := block.ID()
 
 	// Mock the behavior of the blocks, collections and light transaction results objects
-	s.blocks.
-		On("ByID", blockId).
-		Return(block, nil)
 	lightCol := col.Light()
-	s.collections.
-		On("LightByID", mock.Anything).
-		Return(lightCol, nil).
-		Once()
+	s.blocks.On("ByID", blockId).Return(block, nil)
+	s.collections.On("LightByID", mock.Anything).Return(lightCol, nil).Once()
 
 	// Execute callback transactions will be reconstructed from PendingExecution events
 	// We don't create them manually - they'll be generated by blueprints.SystemCollection
@@ -1551,18 +1547,23 @@ func (s *Suite) TestTransactionResultsByBlockIDFromExecutionNode() {
 		Return(exeGetTxResp, nil).
 		Once()
 
-	// Set up the state and snapshot mocks
-	_, fixedENIDs := s.setupReceipts(block)
-	s.fixedExecutionNodeIDs = fixedENIDs.NodeIDs()
-	s.state.On("Final").Return(s.snapshot, nil)
-	s.state.On("Sealed").Return(s.snapshot, nil)
-	s.snapshot.On("Identities", mock.Anything).Return(fixedENIDs, nil)
-	s.snapshot.On("Head").Return(block.ToHeader(), nil)
-
 	s.connectionFactory.
 		On("GetExecutionAPIClient", mock.Anything).
 		Return(s.executionAPIClient, &mocks.MockCloser{}, nil).
 		Once()
+
+	executionResult := s.receiptsList[0].ExecutionResult
+
+	s.execResultProvider.
+		On("ExecutionResultInfo", block.ID(), mock.AnythingOfType("optimistic_sync.Criteria")).
+		Return(&optimistic_sync.ExecutionResultInfo{
+			ExecutionResult: &executionResult,
+			ExecutionNodes:  s.identities.ToSkeleton(),
+		}, nil)
+
+	// used to derive transaction status
+	s.state.On("Sealed").Return(s.snapshot, nil)
+	s.snapshot.On("Head").Return(block.ToHeader(), nil)
 
 	params := s.defaultTransactionsParams()
 	params.TxProvider = provider.NewENTransactionProvider(
@@ -1620,12 +1621,6 @@ func (s *Suite) TestTransactionRetry() {
 		unittest.Block.WithHeight(flow.DefaultTransactionExpiry + 1),
 	)
 	transactionBody := unittest.TransactionBodyFixture(unittest.WithReferenceBlock(block.ID()))
-
-	// execution result provider bootstrap
-	s.headers.On("BlockIDByHeight", s.rootBlockHeader.Height).Return(s.rootBlockHeader.ID(), nil).Once()
-	snapshotAtRoot := protocolmock.NewSnapshot(s.T())
-	snapshotAtRoot.On("SealedResult").Return(unittest.ExecutionResultFixture(), nil, nil)
-	s.state.On("AtBlockID", s.rootBlockHeader.ID()).Return(snapshotAtRoot)
 
 	snapshotAtBlock := protocolmock.NewSnapshot(s.T())
 	s.state.On("Final").Return(snapshotAtBlock)
@@ -1698,7 +1693,7 @@ func (s *Suite) TestSuccessfulTransactionsDontRetry() {
 		Return(s.executionAPIClient, &mocks.MockCloser{}, nil).
 		Times(len(s.identities))
 
-	params := s.defaultTransactionsParamsWithExecutionResultProviderMocks()
+	params := s.defaultTransactionsParams()
 	client := accessmock.NewAccessAPIClient(s.T())
 	params.StaticCollectionRPCClient = client
 	txBackend, err := NewTransactionsBackend(params)
@@ -1717,7 +1712,7 @@ func (s *Suite) TestSuccessfulTransactionsDontRetry() {
 	snapshot.On("Collections").Return(s.collections)
 
 	s.execResultProvider.
-		On("ExecutionResult", block.ID(), mock.AnythingOfType("optimistic_sync.Criteria")).
+		On("ExecutionResultInfo", block.ID(), mock.AnythingOfType("optimistic_sync.Criteria")).
 		Return(&optimistic_sync.ExecutionResultInfo{
 			ExecutionResult: unittest.ExecutionResultFixture(),
 			ExecutionNodes:  s.identities.ToSkeleton(),
