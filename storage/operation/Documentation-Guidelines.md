@@ -131,43 +131,52 @@ Analyze the implementation! Here, the method itself receives the ID (i.e. the cr
 
 #### Type (ii.a) functions for writing data
 
-As an example for functions of type (i.b), consider `operation.InsertAndIndexResultApproval`:
+As an example for functions of type (ii.a), consider `operation.IndexStateCommitment`:
 
 ```golang
-// InsertAndIndexResultApproval atomically performs the following storage operations:
-//  1. Store ResultApproval by its ID (in this step, accidental overwrites with inconsistent values
-//     are prevented by using a collision-resistant hash to derive the key from the value)
-//  2. Index approval by the executed chunk, specifically the key pair (ExecutionResultID, chunk index).
-//     - first, we ensure that no _different_ approval has already been indexed for the same key pair
-//     - only if the prior check succeeds, we write the index to the database
+// IndexStateCommitment indexes a state commitment by the block ID whose execution results in that state.
+// The function ensures data integrity by first checking if a commitment already exists for the given block
+// and rejecting overwrites with different values. This function is idempotent, i.e. repeated calls with the
+// *initially* indexed value are no-ops.
 //
 // CAUTION:
-//   - In general, the Flow protocol requires multiple approvals for the same chunk from different
-//     verification nodes. In other words, there are multiple different approvals for the same chunk.
-//     Therefore, this index Executed Chunk ➜ ResultApproval ID is *only safe* to be used by
-//     Verification Nodes for tracking their own approvals (for the same ExecutionResult, a Verifier
-//     will always produce the same approval)
-//   - In order to make sure only one approval is indexed for the chunk, _all calls_ to
-//     `InsertAndIndexResultApproval` must be synchronized by the higher-logic. Currently, we have the
-//     lockctx.Proof to prove the higher logic is holding the lock inserting the approval after checking
-//     that the approval is not already indexed.
+//   - Confirming that no value is already stored and the subsequent write must be atomic to prevent data corruption.
+//     The caller must acquire the [storage.LockInsertOwnReceipt] and hold it until the database write has been committed.
 //
-// Expected error returns during normal operations
-//   - [storage.ErrDataMismatch] if a *different* approval for the same key pair (ExecutionResultID, chunk index) is already indexed
-func InsertAndIndexResultApproval(approval *flow.ResultApproval) func(lctx lockctx.Proof, rw storage.ReaderBatchWriter) error {
+// Expected error returns during normal operations:
+//   - [storage.ErrDataMismatch] if a *different* state commitment is already indexed for the same block ID
+func IndexStateCommitment(lctx lockctx.Proof, rw storage.ReaderBatchWriter, blockID flow.Identifier, commit flow.StateCommitment) error {
+	if !lctx.HoldsLock(storage.LockInsertOwnReceipt) {
+		return fmt.Errorf("cannot index state commitment without holding lock %s", storage.LockInsertOwnReceipt)
+	}
+
+	var existingCommit flow.StateCommitment
+	err := LookupStateCommitment(rw.GlobalReader(), blockID, &existingCommit) // on happy path, i.e. nothing stored yet, we expect `storage.ErrNotFound`
+	if err == nil {                                                           // Value for this key already exists! Need to check for data mismatch:
+		if existingCommit == commit {
+			return nil // The commit already exists, no need to index again
+		}
+		return fmt.Errorf("commit for block %v already exists with different value, (existing: %v, new: %v), %w", blockID, existingCommit, commit, storage.ErrDataMismatch)
+	} else if !errors.Is(err, storage.ErrNotFound) {
+		return fmt.Errorf("could not check existing state commitment: %w", err)
+	}
+
+	return UpsertByKey(rw.Writer(), MakePrefix(codeCommit, blockID), commit)
+}
 ```
 Analyze the implementation! Only functions that internally implement safeguards against overwriting a key-value pair with _different_ data for the same key are of type (ii.a)!
 
-* We document the struct type that is stored, here ResultApproval. If applicable, we also document additional key-value pairs that are persisted as part of this function (here "Index approval by the executed chunk"). Analyze the implementation.
-* With a "CAUTION" statement (here, second bullet point), we document that the function must first attempt to read the current value to avoid overwriting and corrupting existing data. This requires synchronization, and hence locking. We document which locks are required to be held by the caller.
-* The first bullet point explains further application-specific context which node is intended to use this index. You may skip this explanation for the structures you are documenting.
-* We state which errors are expected during normal operations (here storage.ErrDataMismatch) and the condition under which they occur. Analyze the implementation to make the correct statements!
+* We document the struct type that is stored, here `flow.StateCommitment`. If applicable, we also document additional key-value pairs that are persisted as part of this function (here, none). Analyze the implementation.
+* We concisely document by which means the implementation ensures data integrity. For functions of type (ii.a), we typically just attempt to read the value for the respective key. You may adapt the explanation from this example to reflect the specifics of the implementation. Note that the behaviour might be different if a value has previously been stored. Analyze the implementation.
+* With a "CAUTION" statement, we concisely document the requirement that the read for the data integrity check and the subsequent write must happen atomically. This requires synchronization, and hence locking. We document which locks are required to be held by the caller.
+* Analyze the implementation to decide whether additional cautionary statements are required to reduce the probability of accidental bugs.
+* We state which errors are expected during normal operations (here `storage.ErrDataMismatch`) and the condition under which they occur. Analyze the implementation to make the correct statements!
 
 
 
 #### Type (ii.b) functions for writing data
 
-As an example for functions of type (i.b), consider `operation.IndexPayloadSeals`:
+As an example for functions of type (ii.b), consider `operation.IndexPayloadSeals`:
 
 ```golang
 // IndexPayloadSeals indexes the given Seal IDs by the block ID.
