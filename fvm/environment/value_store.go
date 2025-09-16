@@ -2,10 +2,12 @@ package environment
 
 import (
 	"bytes"
+	"encoding/binary"
 	"fmt"
 
 	"github.com/onflow/atree"
 	"github.com/onflow/cadence/common"
+	"go.opentelemetry.io/otel/attribute"
 
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/storage/state"
@@ -217,12 +219,23 @@ func (store *valueStore) ValueExists(
 func (store *valueStore) AllocateSlabIndex(
 	owner []byte,
 ) (
-	atree.SlabIndex,
-	error,
+	slabIndex atree.SlabIndex,
+	err error,
 ) {
-	defer store.tracer.StartChildSpan(trace.FVMEnvAllocateSlabIndex).End()
+	address := flow.BytesToAddress(owner)
 
-	err := store.meter.MeterComputation(
+	span := store.tracer.StartChildSpan(trace.FVMEnvAllocateSlabIndex)
+	defer func() {
+		if span.Tracer != nil {
+			span.SetAttributes(
+				attribute.String("owner", address.String()),
+				attribute.String("index", fmt.Sprint(binary.BigEndian.Uint64(slabIndex[:]))),
+			)
+		}
+		span.End()
+	}()
+
+	err = store.meter.MeterComputation(
 		common.ComputationUsage{
 			Kind:      ComputationKindAllocateSlabIndex,
 			Intensity: 1,
@@ -231,14 +244,17 @@ func (store *valueStore) AllocateSlabIndex(
 	if err != nil {
 		return atree.SlabIndex{}, fmt.Errorf(
 			"allocate storage index failed: %w",
-			err)
+			err,
+		)
 	}
 
-	v, err := store.accounts.AllocateSlabIndex(flow.BytesToAddress(owner))
+	slabIndex, err = store.accounts.AllocateSlabIndex(address)
 	if err != nil {
 		return atree.SlabIndex{}, fmt.Errorf(
 			"storage address allocation failed: %w",
-			err)
+			err,
+		)
 	}
-	return v, nil
+
+	return slabIndex, nil
 }

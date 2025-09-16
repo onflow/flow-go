@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"encoding/binary"
 	"encoding/hex"
+	"flag"
 	"fmt"
 	"math"
 	"strings"
@@ -54,6 +55,18 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
+var testWithVMTransactionExecution = flag.Bool(
+	"testWithVMTransactionExecution",
+	false,
+	"Run transactions in tests using the Cadence compiler/VM",
+)
+
+var testWithVMScriptExecution = flag.Bool(
+	"testWithVMScriptExecution",
+	false,
+	"Run scripts in tests using the Cadence compiler/VM",
+)
+
 type vmTest struct {
 	bootstrapOptions []fvm.BootstrapProcedureOption
 	contextOptions   []fvm.Option
@@ -85,6 +98,8 @@ func (vmt vmTest) run(
 			// default chain is Testnet
 			fvm.WithChain(flow.Testnet.Chain()),
 			fvm.WithEntropyProvider(testutil.EntropyProviderFixture(nil)),
+			fvm.WithVMTransactionExecutionEnabled(*testWithVMTransactionExecution),
+			fvm.WithVMScriptExecutionEnabled(*testWithVMScriptExecution),
 		}
 
 		opts := append(baseOpts, vmt.contextOptions...)
@@ -975,7 +990,36 @@ func TestTransactionFeeDeduction(t *testing.T) {
 
 			snapshotTree = snapshotTree.Append(executionSnapshot)
 
-			require.Len(t, output.Events, 20)
+			eventTypes := make([]flow.EventType, 0, len(output.Events))
+			for _, e := range output.Events {
+				eventTypes = append(eventTypes, e.Type)
+			}
+
+			assert.Equal(t,
+				[]flow.EventType{
+					"A.7e60df042a9c0868.FlowToken.TokensWithdrawn",
+					"A.9a0766d93b6608b7.FungibleToken.Withdrawn",
+					"A.7e60df042a9c0868.FlowToken.TokensWithdrawn",
+					"A.9a0766d93b6608b7.FungibleToken.Withdrawn",
+					"A.7e60df042a9c0868.FlowToken.TokensDeposited",
+					"A.9a0766d93b6608b7.FungibleToken.Deposited",
+					"A.912d5440f7e3769e.FlowFees.TokensDeposited",
+					"flow.StorageCapabilityControllerIssued",
+					"flow.CapabilityPublished",
+					"flow.StorageCapabilityControllerIssued",
+					"flow.CapabilityPublished",
+					"A.7e60df042a9c0868.FlowToken.TokensDeposited",
+					"A.9a0766d93b6608b7.FungibleToken.Deposited",
+					"flow.AccountCreated",
+					"flow.AccountKeyAdded",
+					"A.7e60df042a9c0868.FlowToken.TokensWithdrawn",
+					"A.9a0766d93b6608b7.FungibleToken.Withdrawn",
+					"A.7e60df042a9c0868.FlowToken.TokensDeposited",
+					"A.9a0766d93b6608b7.FungibleToken.Deposited",
+					"A.912d5440f7e3769e.FlowFees.FeesDeducted",
+				},
+				eventTypes,
+			)
 			unittest.EnsureEventsIndexSeq(t, output.Events, chain.ChainID())
 
 			accountCreatedEvents := filterAccountCreatedEvents(output.Events)
@@ -1478,9 +1522,22 @@ func TestSettingExecutionWeights(t *testing.T) {
 			executionEffortNeededToCheckStorage := uint64(1)
 			maxExecutionEffort := uint64(997)
 			txBodyBuilder := flow.NewTransactionBodyBuilder().
-				SetScript([]byte(fmt.Sprintf(`
-				transaction() {prepare(signer: &Account){var i=0;  while i < %d {i = i +1 } } execute{}}
-			`, loops))).
+				SetScript([]byte(
+					fmt.Sprintf(`
+							transaction() {
+								prepare(signer: &Account) {
+									var i = 0
+									while i < %d {
+										i = i + 1
+									}
+								}
+
+								execute{}
+							}
+						`,
+						loops,
+					),
+				)).
 				SetProposalKey(chain.ServiceAddress(), 0, 0).
 				AddAuthorizer(chain.ServiceAddress()).
 				SetPayer(chain.ServiceAddress()).
@@ -1507,9 +1564,22 @@ func TestSettingExecutionWeights(t *testing.T) {
 			// increasing the number of loops should fail the transaction.
 			loops = loops + 1
 			txBodyBuilder = flow.NewTransactionBodyBuilder().
-				SetScript([]byte(fmt.Sprintf(`
-				transaction() {prepare(signer: &Account){var i=0;  while i < %d {i = i +1 } } execute{}}
-			`, loops))).
+				SetScript([]byte(
+					fmt.Sprintf(`
+							transaction() {
+								prepare(signer: &Account) {
+									var i = 0
+									while i < %d {
+										i = i + 1
+									}
+								}
+
+								execute{}
+							}
+						`,
+						loops,
+					),
+				)).
 				SetProposalKey(chain.ServiceAddress(), 0, 1).
 				AddAuthorizer(chain.ServiceAddress()).
 				SetPayer(chain.ServiceAddress()).
@@ -2300,7 +2370,11 @@ func TestScriptExecutionLimit(t *testing.T) {
 				require.True(t, errors.IsComputationLimitExceededError(output.Err))
 				require.ErrorContains(t, output.Err, "computation exceeds limit (10000)")
 				require.GreaterOrEqual(t, output.ComputationUsed, uint64(10000))
-				require.GreaterOrEqual(t, output.MemoryEstimate, uint64(548020260))
+				if *testWithVMScriptExecution {
+					require.GreaterOrEqual(t, output.MemoryEstimate, uint64(540012179))
+				} else {
+					require.GreaterOrEqual(t, output.MemoryEstimate, uint64(548020260))
+				}
 			},
 		),
 	)
@@ -2321,7 +2395,11 @@ func TestScriptExecutionLimit(t *testing.T) {
 				require.NoError(t, err)
 				require.NoError(t, output.Err)
 				require.GreaterOrEqual(t, output.ComputationUsed, uint64(17955))
-				require.GreaterOrEqual(t, output.MemoryEstimate, uint64(984017413))
+				if *testWithVMScriptExecution {
+					require.GreaterOrEqual(t, output.MemoryEstimate, uint64(969629012))
+				} else {
+					require.GreaterOrEqual(t, output.MemoryEstimate, uint64(984017413))
+				}
 			},
 		),
 	)
@@ -2500,6 +2578,11 @@ func TestAttachments(t *testing.T) {
 
 	newVMTest().
 		withBootstrapProcedureOptions().
+		withContextOptions(
+			// TODO: requires support for attachments in Cadence VM
+			fvm.WithVMTransactionExecutionEnabled(false),
+			fvm.WithVMScriptExecutionEnabled(false),
+		).
 		run(
 			func(
 				t *testing.T,
@@ -2836,7 +2919,8 @@ func TestEntropyCallOnlyOkIfAllowed(t *testing.T) {
 				_, output, err := vm.Run(
 					ctx,
 					fvm.Transaction(txBody, 0),
-					snapshotTree)
+					snapshotTree,
+				)
 				require.NoError(t, err)
 
 				if allowed {

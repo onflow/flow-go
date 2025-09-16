@@ -2,6 +2,7 @@ package bootstrap
 
 import (
 	"encoding/hex"
+	"flag"
 	"fmt"
 	"testing"
 
@@ -18,6 +19,18 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/utils/unittest"
+)
+
+var testWithVMTransactionExecution = flag.Bool(
+	"testWithVMTransactionExecution",
+	false,
+	"Run transactions in tests using the Cadence compiler/VM",
+)
+
+var testWithVMScriptExecution = flag.Bool(
+	"testWithVMScriptExecution",
+	false,
+	"Run scripts in tests using the Cadence compiler/VM",
 )
 
 func TestBootstrapLedger(t *testing.T) {
@@ -57,7 +70,7 @@ func TestBootstrapLedger(t *testing.T) {
 }
 
 func TestBootstrapLedger_ZeroTokenSupply(t *testing.T) {
-	expectedStateCommitmentBytes, _ := hex.DecodeString("d663a99bf30646bf3cd770bd19ce96c43f6da658a0928ea67a433beb106fae4f")
+	expectedStateCommitmentBytes, _ := hex.DecodeString("0c15cee4a90a5ab63ae6fffc90eb4803b0778c746b7fa5f326def118a84bc151")
 	expectedStateCommitment, err := flow.ToStateCommitment(expectedStateCommitmentBytes)
 	require.NoError(t, err)
 
@@ -104,7 +117,7 @@ func TestBootstrapLedger_ZeroTokenSupply(t *testing.T) {
 // - transaction fee deduction
 // This tests that the state commitment has not changed for the bookkeeping parts of the transaction.
 func TestBootstrapLedger_EmptyTransaction(t *testing.T) {
-	expectedStateCommitmentBytes, _ := hex.DecodeString("231e6e9c2cce27d0a9d2a47f5991ae934ee3eb3336534316c52719f511d46abb")
+	expectedStateCommitmentBytes, _ := hex.DecodeString("5c3b92cf25ba2a85821d6a81eaa36bc2dd029eba4e4ee4e835cb0531a2971d53")
 	expectedStateCommitment, err := flow.ToStateCommitment(expectedStateCommitmentBytes)
 	require.NoError(t, err)
 
@@ -144,6 +157,8 @@ func TestBootstrapLedger_EmptyTransaction(t *testing.T) {
 			fvm.WithAccountStorageLimit(true),
 			fvm.WithSequenceNumberCheckAndIncrementEnabled(false),
 			fvm.WithAuthorizationChecksEnabled(false),
+			fvm.WithVMTransactionExecutionEnabled(*testWithVMTransactionExecution),
+			fvm.WithVMScriptExecutionEnabled(*testWithVMScriptExecution),
 		)
 
 		sc := systemcontracts.SystemContractsForChain(chain.ChainID())
