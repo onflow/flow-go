@@ -10,6 +10,7 @@ import (
 	"github.com/onflow/flow-go/engine/access/subscription"
 	"github.com/onflow/flow-go/engine/access/subscription/tracker"
 	"github.com/onflow/flow-go/fvm/errors"
+	"github.com/onflow/flow-go/model/access"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/executiondatasync/optimistic_sync"
 	"github.com/onflow/flow-go/storage"
@@ -19,7 +20,7 @@ type AccountStatusesResponse struct {
 	BlockID          flow.Identifier
 	Height           uint64
 	AccountEvents    map[string]flow.EventsList
-	ExecutorMetadata flow.ExecutorMetadata
+	ExecutorMetadata access.ExecutorMetadata
 }
 
 // AccountStatusesBackend is a struct representing a backend implementation for subscribing to account statuses changes.

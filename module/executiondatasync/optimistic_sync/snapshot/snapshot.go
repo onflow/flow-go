@@ -6,14 +6,31 @@ import (
 )
 
 type Mock struct {
-	events storage.EventsReader
+	events                         storage.EventsReader
+	collections                    storage.CollectionsReader
+	transactions                   storage.TransactionsReader
+	lightTransactionResults        storage.LightTransactionResultsReader
+	transactionResultErrorMessages storage.TransactionResultErrorMessagesReader
+	registers                      storage.RegisterIndexReader
 }
 
 var _ optimistic_sync.Snapshot = (*Mock)(nil)
 
-func NewSnapshotMock(events storage.EventsReader) *Mock {
+func NewSnapshotMock(
+	events storage.EventsReader,
+	collections storage.CollectionsReader,
+	transactions storage.TransactionsReader,
+	lightTransactionResults storage.LightTransactionResultsReader,
+	transactionResultErrorMessages storage.TransactionResultErrorMessagesReader,
+	registers storage.RegisterIndexReader,
+) *Mock {
 	return &Mock{
-		events: events,
+		events:                         events,
+		collections:                    collections,
+		transactions:                   transactions,
+		lightTransactionResults:        lightTransactionResults,
+		transactionResultErrorMessages: transactionResultErrorMessages,
+		registers:                      registers,
 	}
 }
 
@@ -22,26 +39,21 @@ func (s *Mock) Events() storage.EventsReader {
 }
 
 func (s *Mock) Collections() storage.CollectionsReader {
-	//TODO implement me
-	panic("implement me")
+	return s.collections
 }
 
 func (s *Mock) Transactions() storage.TransactionsReader {
-	//TODO implement me
-	panic("implement me")
+	return s.transactions
 }
 
 func (s *Mock) LightTransactionResults() storage.LightTransactionResultsReader {
-	//TODO implement me
-	panic("implement me")
+	return s.lightTransactionResults
 }
 
 func (s *Mock) TransactionResultErrorMessages() storage.TransactionResultErrorMessagesReader {
-	//TODO implement me
-	panic("implement me")
+	return s.transactionResultErrorMessages
 }
 
 func (s *Mock) Registers() storage.RegisterIndexReader {
-	//TODO implement me
-	panic("implement me")
+	return s.registers
 }

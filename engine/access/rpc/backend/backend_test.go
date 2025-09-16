@@ -80,7 +80,6 @@ type Suite struct {
 	receipts           *storagemock.ExecutionReceipts
 	results            *storagemock.ExecutionResults
 	transactionResults *storagemock.LightTransactionResults
-	events             *storagemock.Events
 	txErrorMessages    *storagemock.TransactionResultErrorMessages
 
 	db                  *badger.DB
@@ -132,7 +131,6 @@ func (suite *Suite) SetupTest() {
 	suite.colClient = new(accessmock.AccessAPIClient)
 	suite.execClient = new(accessmock.ExecutionAPIClient)
 	suite.transactionResults = storagemock.NewLightTransactionResults(suite.T())
-	suite.events = storagemock.NewEvents(suite.T())
 	suite.chainID = flow.Testnet
 	suite.historicalAccessClient = new(accessmock.AccessAPIClient)
 	suite.connectionFactory = connectionmock.NewConnectionFactory(suite.T())
@@ -150,24 +148,8 @@ func (suite *Suite) SetupTest() {
 	suite.Require().NoError(err)
 
 	suite.executionResultInfoProvider = osyncmock.NewExecutionResultInfoProvider(suite.T())
-	suite.executionResultInfoProvider.
-		On("ExecutionResultInfo", mock.Anything, mock.Anything).
-		Return(&optimistic_sync.ExecutionResultInfo{
-			ExecutionResult: unittest.ExecutionResultFixture(),
-			ExecutionNodes:  unittest.IdentityListFixture(2).ToSkeleton(),
-		}, nil).
-		Maybe()
-
 	suite.executionDataSnapshot = osyncmock.NewSnapshot(suite.T())
-	suite.executionDataSnapshot.On("Events").
-		Return(suite.events, nil).
-		Maybe()
-
 	suite.executionStateCache = osyncmock.NewExecutionStateCache(suite.T())
-	suite.executionStateCache.
-		On("Snapshot", mock.Anything).
-		Return(suite.executionDataSnapshot, nil).
-		Maybe()
 }
 
 // TearDownTest cleans up the db

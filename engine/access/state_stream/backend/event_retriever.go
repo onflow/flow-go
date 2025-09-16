@@ -7,6 +7,7 @@ import (
 
 	"github.com/rs/zerolog"
 
+	"github.com/onflow/flow-go/model/access"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/executiondatasync/optimistic_sync"
 	"github.com/onflow/flow-go/storage"
@@ -19,7 +20,7 @@ type EventsResponse struct {
 	Height           uint64
 	Events           flow.EventsList
 	BlockTimestamp   time.Time
-	ExecutorMetadata flow.ExecutorMetadata
+	ExecutorMetadata access.ExecutorMetadata
 }
 
 // EventsProvider retrieves events by block height. It can be configured to retrieve events from
@@ -30,7 +31,7 @@ type EventsProvider struct {
 	getExecutionData GetExecutionDataFunc
 
 	fetchFromLocalCache bool
-	execResultProvider  optimistic_sync.ExecutionResultProvider
+	execResultProvider  optimistic_sync.ExecutionResultInfoProvider
 	execStateCache      optimistic_sync.ExecutionStateCache
 	operatorCriteria    optimistic_sync.Criteria
 }
@@ -75,7 +76,10 @@ func (b *EventsProvider) GetAllEventsResponse(
 // getEventsFromExecutionData returns the events for a given height extract from the execution data.
 // Expected errors:
 // - error: An error indicating issues with getting execution data for block
-func (b *EventsProvider) getEventsFromExecutionData(ctx context.Context, height uint64) (*EventsResponse, error) {
+func (b *EventsProvider) getEventsFromExecutionData(
+	ctx context.Context,
+	height uint64,
+) (*EventsResponse, error) {
 	executionData, err := b.getExecutionData(ctx, height)
 	if err != nil {
 		return nil, fmt.Errorf("could not get execution data for block %d: %w", height, err)
@@ -106,7 +110,7 @@ func (b *EventsProvider) getEventsFromStorage(
 		return nil, fmt.Errorf("could not get header for height %d: %w", height, err)
 	}
 
-	result, err := b.execResultProvider.ExecutionResult(
+	result, err := b.execResultProvider.ExecutionResultInfo(
 		blockID,
 		b.operatorCriteria.OverrideWith(criteria),
 	)
@@ -117,7 +121,11 @@ func (b *EventsProvider) getEventsFromStorage(
 	snapshot, err := b.execStateCache.Snapshot(result.ExecutionResult.ID())
 	if err != nil {
 		return &EventsResponse{},
-			fmt.Errorf("failed to get snapshot for execution result %s: %w", result.ExecutionResult.ID(), err)
+			fmt.Errorf(
+				"failed to get snapshot for execution result %s: %w",
+				result.ExecutionResult.ID(),
+				err,
+			)
 	}
 
 	events, err := snapshot.Events().ByBlockID(blockID)
@@ -125,7 +133,7 @@ func (b *EventsProvider) getEventsFromStorage(
 		return nil, fmt.Errorf("could not get events for block %d: %w", blockID, err)
 	}
 
-	metadata := flow.ExecutorMetadata{
+	metadata := access.ExecutorMetadata{
 		ExecutionResultID: result.ExecutionResult.ID(),
 		ExecutorIDs:       result.ExecutionNodes.NodeIDs(),
 	}

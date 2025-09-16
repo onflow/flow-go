@@ -6,6 +6,7 @@ import (
 
 	"github.com/onflow/flow-go/engine/access/rest/common"
 	"github.com/onflow/flow-go/engine/access/rest/websockets/models"
+	"github.com/onflow/flow-go/model/flow"
 )
 
 func ensureAllowedFields(fields map[string]interface{}, allowedFields map[string]struct{}) error {
@@ -37,7 +38,10 @@ func extractArrayOfStrings(args models.Arguments, name string, required bool) ([
 }
 
 // extractHeartbeatInterval extracts 'heartbeat_interval' argument which is always optional
-func extractHeartbeatInterval(args models.Arguments, defaultHeartbeatInterval uint64) (uint64, error) {
+func extractHeartbeatInterval(
+	args models.Arguments,
+	defaultHeartbeatInterval uint64,
+) (uint64, error) {
 	heartbeatIntervalRaw, exists := args["heartbeat_interval"]
 	if !exists {
 		return defaultHeartbeatInterval, nil
@@ -60,7 +64,7 @@ func extractExecutionStateQueryFields(
 	args models.Arguments,
 	name string,
 	required bool,
-) (agreeingExecutorsCount uint64, requiredExecutorIDs [][]byte, includeExecutorMetadata bool, err error) {
+) (agreeingExecutorsCount uint64, requiredExecutorIDs flow.IdentifierList, includeExecutorMetadata bool, err error) {
 	executionStateRaw, exists := args[name]
 	if !exists {
 		if required {
@@ -97,7 +101,11 @@ func extractExecutionStateQueryFields(
 				fmt.Errorf("'required_executor_ids' must be an array of strings: %w", err)
 		}
 
-		requiredExecutorIDs = stringsToBytes(converted)
+		requiredExecutorIDs, err = flow.IdentifierListFromHex(converted)
+		if err != nil {
+			return 0, nil, false,
+				fmt.Errorf("'required_executor_ids' must be an array of strings: %w", err)
+		}
 	}
 
 	includeExecutorMetadataRaw, exists := executionStateQuery["include_executor_metadata"]
@@ -112,13 +120,4 @@ func extractExecutionStateQueryFields(
 	}
 
 	return agreeingExecutorsCount, requiredExecutorIDs, includeExecutorMetadata, nil
-}
-
-func stringsToBytes(arr []string) [][]byte {
-	result := make([][]byte, len(arr))
-	for i, s := range arr {
-		result[i] = []byte(s)
-	}
-
-	return result
 }

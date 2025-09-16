@@ -1861,47 +1861,47 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 					return nil, fmt.Errorf("could not parse event query mode: %w", err)
 				}
 
-			// use the events index for events if enabled and the node is configured to use it for
-			// regular event queries
+				// use the events index for events if enabled and the node is configured to use it for
+				// regular event queries
 				fetchFromLocalStorage := builder.executionDataIndexingEnabled &&
-				eventQueryMode != query_mode.IndexQueryModeExecutionNodesOnly
+					eventQueryMode != query_mode.IndexQueryModeExecutionNodesOnly
 
-			executionDataTracker := subscriptiontracker.NewExecutionDataTracker(
-				builder.Logger,
-				node.State,
-				builder.executionDataConfig.InitialBlockHeight,
-				node.Storage.Headers,
-				broadcaster,
-				highestAvailableHeight,
-				builder.EventsIndex,
-				fetchFromLocalStorage,
-			)
-
-			builder.stateStreamBackend, err = statestreambackend.New(
-				node.Logger,
-				node.State,
-				node.Storage.Headers,
-				node.Storage.Seals,
-				node.Storage.Results,
-				builder.ExecutionDataStore,
-				executionDataStoreCache,
-				builder.RegistersAsyncStore,
-				fetchFromLocalStorage,
-				int(builder.stateStreamConf.RegisterIDsRequestLimit),
-				subscription.NewSubscriptionHandler(
+				executionDataTracker := subscriptiontracker.NewExecutionDataTracker(
 					builder.Logger,
+					node.State,
+					builder.executionDataConfig.InitialBlockHeight,
+					node.Storage.Headers,
 					broadcaster,
-					builder.stateStreamConf.ClientSendTimeout,
-					builder.stateStreamConf.ResponseLimit,
-					builder.stateStreamConf.ClientSendBufferSize,
-				),
-				executionDataTracker,
-				nil, //TODO: add later
-				nil,
-			)
-			if err != nil {
-				return nil, fmt.Errorf("could not create state stream backend: %w", err)
-			}
+					highestAvailableHeight,
+					builder.EventsIndex,
+					fetchFromLocalStorage,
+				)
+
+				builder.stateStreamBackend, err = statestreambackend.New(
+					node.Logger,
+					node.State,
+					node.Storage.Headers,
+					node.Storage.Seals,
+					node.Storage.Results,
+					builder.ExecutionDataStore,
+					executionDataStoreCache,
+					builder.RegistersAsyncStore,
+					fetchFromLocalStorage,
+					int(builder.stateStreamConf.RegisterIDsRequestLimit),
+					subscription.NewSubscriptionHandler(
+						builder.Logger,
+						broadcaster,
+						builder.stateStreamConf.ClientSendTimeout,
+						builder.stateStreamConf.ResponseLimit,
+						builder.stateStreamConf.ClientSendBufferSize,
+					),
+					executionDataTracker,
+					nil, //TODO: add later
+					nil,
+				)
+				if err != nil {
+					return nil, fmt.Errorf("could not create state stream backend: %w", err)
+				}
 
 				stateStreamEng, err := statestreambackend.NewEng(
 					node.Logger,
@@ -2386,7 +2386,14 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 			}
 
 			// TODO: use real objects instead of mocks once they're implemented
-			snapshot := osyncsnapshot.NewSnapshotMock(builder.events)
+			snapshot := osyncsnapshot.NewSnapshotMock(
+				builder.events,
+				nil,
+				nil,
+				builder.lightTransactionResults,
+				nil,
+				nil,
+			)
 			execStateCache := execution_state.NewExecutionStateCacheMock(snapshot)
 
 			backendParams := backend.Params{

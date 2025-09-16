@@ -4,9 +4,9 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/onflow/flow/protobuf/go/flow/entities"
 	"github.com/rs/zerolog"
 
+	httpmodels "github.com/onflow/flow-go/engine/access/rest/http/models"
 	"github.com/onflow/flow-go/engine/access/rest/http/request"
 	"github.com/onflow/flow-go/engine/access/rest/websockets/data_providers/models"
 	wsmodels "github.com/onflow/flow-go/engine/access/rest/websockets/models"
@@ -15,7 +15,6 @@ import (
 	"github.com/onflow/flow-go/engine/access/subscription"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/counters"
-	"github.com/onflow/flow-go/module/executiondatasync/optimistic_sync"
 )
 
 // accountStatusesArguments contains the arguments required for subscribing to account statuses
@@ -24,7 +23,7 @@ type accountStatusesArguments struct {
 	StartBlockHeight    uint64                           // Height of the block to start subscription from
 	Filter              state_stream.AccountStatusFilter // Filter applied to events for a given subscription
 	HeartbeatInterval   uint64                           // Maximum number of blocks message won't be sent
-	ExecutionStateQuery entities.ExecutionStateQuery
+	ExecutionStateQuery httpmodels.ExecutionStateQuery
 }
 
 type AccountStatusesDataProvider struct {
@@ -55,7 +54,12 @@ func NewAccountStatusesDataProvider(
 		return nil, fmt.Errorf("this access node does not support streaming account statuses")
 	}
 
-	args, err := parseAccountStatusesArguments(rawArguments, chain, eventFilterConfig, defaultHeartbeatInterval)
+	args, err := parseAccountStatusesArguments(
+		rawArguments,
+		chain,
+		eventFilterConfig,
+		defaultHeartbeatInterval,
+	)
 	if err != nil {
 		return nil, fmt.Errorf("invalid arguments for account statuses data provider: %w", err)
 	}
@@ -138,13 +142,23 @@ func (p *AccountStatusesDataProvider) createAndStartSubscription(
 	ctx context.Context,
 	args accountStatusesArguments,
 ) subscription.Subscription {
-	criteria := optimistic_sync.NewCriteria(&args.ExecutionStateQuery)
+	criteria := httpmodels.NewCriteria(args.ExecutionStateQuery)
 	if args.StartBlockID != flow.ZeroID {
-		return p.stateStreamApi.SubscribeAccountStatusesFromStartBlockID(ctx, args.StartBlockID, args.Filter, criteria)
+		return p.stateStreamApi.SubscribeAccountStatusesFromStartBlockID(
+			ctx,
+			args.StartBlockID,
+			args.Filter,
+			criteria,
+		)
 	}
 
 	if args.StartBlockHeight != request.EmptyHeight {
-		return p.stateStreamApi.SubscribeAccountStatusesFromStartHeight(ctx, args.StartBlockHeight, args.Filter, criteria)
+		return p.stateStreamApi.SubscribeAccountStatusesFromStartHeight(
+			ctx,
+			args.StartBlockHeight,
+			args.Filter,
+			criteria,
+		)
 	}
 
 	return p.stateStreamApi.SubscribeAccountStatusesFromLatestBlock(ctx, args.Filter, criteria)
@@ -222,7 +236,12 @@ func parseAccountStatusesArguments(
 	}
 
 	// Initialize the event filter with the parsed arguments
-	args.Filter, err = state_stream.NewAccountStatusFilter(eventFilterConfig, chain, eventTypes, accountAddresses)
+	args.Filter, err = state_stream.NewAccountStatusFilter(
+		eventFilterConfig,
+		chain,
+		eventTypes,
+		accountAddresses,
+	)
 	if err != nil {
 		return accountStatusesArguments{}, fmt.Errorf("failed to create event filter: %w", err)
 	}
@@ -231,11 +250,14 @@ func parseAccountStatusesArguments(
 	agreeingExecutorCount, requiredExecutorIDs, includeExecutorMetadata, err :=
 		extractExecutionStateQueryFields(arguments, "execution_state_query", false)
 	if err != nil {
-		return accountStatusesArguments{}, fmt.Errorf("error extracting execution_state_query fields: %w", err)
+		return accountStatusesArguments{}, fmt.Errorf(
+			"error extracting execution_state_query fields: %w",
+			err,
+		)
 	}
-	args.ExecutionStateQuery = entities.ExecutionStateQuery{
+	args.ExecutionStateQuery = httpmodels.ExecutionStateQuery{
 		AgreeingExecutorsCount:  agreeingExecutorCount,
-		RequiredExecutorIds:     requiredExecutorIDs,
+		RequiredExecutorIDs:     requiredExecutorIDs,
 		IncludeExecutorMetadata: includeExecutorMetadata,
 	}
 

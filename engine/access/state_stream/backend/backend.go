@@ -97,7 +97,7 @@ func New(
 	registerIDsRequestLimit int,
 	subscriptionHandler *subscription.SubscriptionHandler,
 	executionDataTracker tracker.ExecutionDataTracker,
-	executionResultProvider optimistic_sync.ExecutionResultProvider,
+	executionResultProvider optimistic_sync.ExecutionResultInfoProvider,
 	executionStateCache optimistic_sync.ExecutionStateCache,
 ) (*StateStreamBackend, error) {
 	logger := log.With().Str("module", "state_stream_api").Logger()
