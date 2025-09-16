@@ -397,12 +397,22 @@ func (h *Handler) GetSystemTransaction(
 		return nil, err
 	}
 
-	id, err := convert.BlockID(req.GetBlockId())
+	blockID, err := convert.BlockID(req.GetBlockId())
 	if err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, "invalid block id: %v", err)
 	}
 
-	tx, err := h.api.GetSystemTransaction(ctx, id)
+	var txID flow.Identifier
+	if id := req.GetId(); id == nil {
+		txID = flow.ZeroID
+	} else {
+		txID, err = convert.TransactionID(id)
+		if err != nil {
+			return nil, status.Errorf(codes.InvalidArgument, "invalid transaction id: %v", err)
+		}
+	}
+
+	tx, err := h.api.GetSystemTransaction(ctx, txID, blockID)
 	if err != nil {
 		return nil, err
 	}
@@ -422,12 +432,22 @@ func (h *Handler) GetSystemTransactionResult(
 		return nil, err
 	}
 
-	id, err := convert.BlockID(req.GetBlockId())
+	blockID, err := convert.BlockID(req.GetBlockId())
 	if err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, "invalid block id: %v", err)
 	}
 
-	result, err := h.api.GetSystemTransactionResult(ctx, id, req.GetEventEncodingVersion())
+	var txID flow.Identifier
+	if id := req.GetId(); id == nil {
+		txID = flow.ZeroID
+	} else {
+		txID, err = convert.TransactionID(id)
+		if err != nil {
+			return nil, status.Errorf(codes.InvalidArgument, "invalid transaction id: %v", err)
+		}
+	}
+
+	result, err := h.api.GetSystemTransactionResult(ctx, txID, blockID, req.GetEventEncodingVersion())
 	if err != nil {
 		return nil, err
 	}
