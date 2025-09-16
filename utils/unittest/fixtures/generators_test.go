@@ -800,7 +800,7 @@ func TestGeneratorsDeterminism(t *testing.T) {
 		{
 			name: "Crypto",
 			fixture: func(a, b *GeneratorSuite) (any, any) {
-				return a.Crypto().PrivateKey(crypto.BLSBLS12381), b.Crypto().PrivateKey(crypto.BLSBLS12381)
+				return a.Crypto().PrivateKey(crypto.ECDSAP256), b.Crypto().PrivateKey(crypto.ECDSAP256)
 			},
 			list: func(a, b *GeneratorSuite, n int) (any, any) {
 				keys1 := make([]crypto.PrivateKey, n)

@@ -152,12 +152,14 @@ type BlockGenerator struct {
 }
 
 func NewBlockGenerator(
+	random *RandomGenerator,
 	identifiers *IdentifierGenerator,
 	headers *HeaderGenerator,
 	payloads *PayloadGenerator,
 	chainID flow.ChainID,
 ) *BlockGenerator {
 	return &BlockGenerator{
+		random:      random,
 		identifiers: identifiers,
 		headers:     headers,
 		payloads:    payloads,

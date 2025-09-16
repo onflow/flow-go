@@ -83,6 +83,7 @@ func (g *GeneratorSuite) Headers() *HeaderGenerator {
 // Blocks returns a generator for [flow.Block].
 func (g *GeneratorSuite) Blocks() *BlockGenerator {
 	return NewBlockGenerator(
+		g.Random(),
 		g.Identifiers(),
 		g.Headers(),
 		g.Payloads(),
