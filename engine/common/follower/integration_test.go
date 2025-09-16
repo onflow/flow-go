@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dgraph-io/badger/v2"
+	"github.com/cockroachdb/pebble/v2"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/atomic"
@@ -27,7 +27,9 @@ import (
 	pbadger "github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/state/protocol/events"
 	"github.com/onflow/flow-go/state/protocol/util"
-	bstorage "github.com/onflow/flow-go/storage/badger"
+	"github.com/onflow/flow-go/storage"
+	"github.com/onflow/flow-go/storage/operation/pebbleimpl"
+	"github.com/onflow/flow-go/storage/store"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -43,23 +45,25 @@ import (
 func TestFollowerHappyPath(t *testing.T) {
 	allIdentities := unittest.CompleteIdentitySet()
 	rootSnapshot := unittest.RootSnapshotFixture(allIdentities)
-	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+	lockManager := storage.NewTestingLockManager()
+	unittest.RunWithPebbleDB(t, func(pdb *pebble.DB) {
 		metrics := metrics.NewNoopCollector()
 		tracer := trace.NewNoopTracer()
 		log := unittest.Logger()
 		consumer := events.NewNoop()
-		all := bstorage.InitAll(metrics, db)
+		all := store.InitAll(metrics, pebbleimpl.ToDB(pdb))
 
 		// bootstrap root snapshot
 		state, err := pbadger.Bootstrap(
 			metrics,
-			db,
+			pebbleimpl.ToDB(pdb),
+			lockManager,
 			all.Headers,
 			all.Seals,
 			all.Results,
 			all.Blocks,
 			all.QuorumCertificates,
-			all.Setups,
+			all.EpochSetups,
 			all.EpochCommits,
 			all.EpochProtocolStateEntries,
 			all.ProtocolKVStore,
@@ -80,7 +84,7 @@ func TestFollowerHappyPath(t *testing.T) {
 			mockTimer,
 		)
 		require.NoError(t, err)
-		finalizer := moduleconsensus.NewFinalizer(db, all.Headers, followerState, tracer)
+		finalizer := moduleconsensus.NewFinalizer(pebbleimpl.ToDB(pdb).Reader(), all.Headers, followerState, tracer)
 		rootHeader, err := rootSnapshot.Head()
 		require.NoError(t, err)
 		rootQC, err := rootSnapshot.QuorumCertificate()

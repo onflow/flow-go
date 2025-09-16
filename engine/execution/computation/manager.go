@@ -62,7 +62,6 @@ type ComputationManager interface {
 
 type ComputationConfig struct {
 	query.QueryConfig
-	CadenceTracing       bool
 	ExtensiveTracing     bool
 	DerivedDataCacheSize uint
 	MaxConcurrency       int
@@ -107,7 +106,7 @@ func New(
 	}
 
 	chainID := vmCtx.Chain.ChainID()
-	options := DefaultFVMOptions(chainID, params.CadenceTracing, params.ExtensiveTracing, vmCtx.ScheduleCallbacksEnabled)
+	options := DefaultFVMOptions(chainID, params.ExtensiveTracing, vmCtx.ScheduleCallbacksEnabled)
 	vmCtx = fvm.NewContextFromParent(vmCtx, options...)
 
 	blockComputer, err := computer.NewBlockComputer(
@@ -224,16 +223,15 @@ func (e *Manager) QueryExecutor() query.Executor {
 	return e.queryExecutor
 }
 
-func DefaultFVMOptions(chainID flow.ChainID, cadenceTracing bool, extensiveTracing bool, scheduleCallbacksEnabled bool) []fvm.Option {
+func DefaultFVMOptions(chainID flow.ChainID, extensiveTracing bool, scheduleCallbacksEnabled bool) []fvm.Option {
 	options := []fvm.Option{
 		fvm.WithChain(chainID.Chain()),
 		fvm.WithReusableCadenceRuntimePool(
 			reusableRuntime.NewReusableCadenceRuntimePool(
 				ReusableCadenceRuntimePoolSize,
-				runtime.Config{
-					TracingEnabled: cadenceTracing,
-				},
-			)),
+				runtime.Config{},
+			),
+		),
 		fvm.WithEVMEnabled(true),
 		fvm.WithScheduleCallbacksEnabled(scheduleCallbacksEnabled),
 	}

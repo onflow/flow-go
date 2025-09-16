@@ -4,7 +4,6 @@ import (
 	"context"
 	"time"
 
-	"github.com/cockroachdb/pebble/v2"
 	"github.com/dgraph-io/badger/v2"
 	"github.com/jordanschalm/lockctx"
 	madns "github.com/multiformats/go-multiaddr-dns"
@@ -15,6 +14,7 @@ import (
 
 	"github.com/onflow/flow-go/admin/commands"
 	"github.com/onflow/flow-go/config"
+	"github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
@@ -31,7 +31,6 @@ import (
 	"github.com/onflow/flow-go/storage"
 	bstorage "github.com/onflow/flow-go/storage/badger"
 	"github.com/onflow/flow-go/storage/dbops"
-	"github.com/onflow/flow-go/utils/grpcutils"
 )
 
 const NotSet = "not set"
@@ -158,8 +157,7 @@ type BaseConfig struct {
 	pebbleDir                   string
 	pebbleCheckpointsDir        string
 	DBOps                       string
-	badgerDB                    *badger.DB
-	pebbleDB                    *pebble.DB
+	protocolDB                  storage.DB
 	secretsdir                  string
 	secretsDBEnabled            bool
 	InsecureSecretsDB           bool
@@ -207,8 +205,6 @@ type NodeConfig struct {
 	ConfigManager     *updatable_configs.Manager
 	MetricsRegisterer prometheus.Registerer
 	Metrics           Metrics
-	DB                *badger.DB
-	PebbleDB          *pebble.DB
 	ProtocolDB        storage.DB
 	SecretsDB         *badger.DB
 	Storage           Storage
@@ -278,15 +274,14 @@ func DefaultBaseConfig() *BaseConfig {
 		AdminCert:        NotSet,
 		AdminKey:         NotSet,
 		AdminClientCAs:   NotSet,
-		AdminMaxMsgSize:  grpcutils.DefaultMaxMsgSize,
+		AdminMaxMsgSize:  rpc.DefaultMaxResponseMsgSize,
 		BindAddr:         NotSet,
 		ObserverMode:     false,
 		BootstrapDir:     "bootstrap",
 		datadir:          datadir,
 		pebbleDir:        pebbleDir,
-		DBOps:            string(dbops.BadgerBatch), // "badger-batch" (default) or "pebble-batch"
-		badgerDB:         nil,
-		pebbleDB:         nil,
+		DBOps:            string(dbops.PebbleBatch), // "pebble-batch" (default) or "badger-batch" (deprecated)
+		protocolDB:       nil,
 		secretsdir:       NotSet,
 		secretsDBEnabled: true,
 		level:            "info",

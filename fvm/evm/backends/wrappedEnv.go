@@ -55,6 +55,10 @@ func (we *WrappedEnvironment) AllocateSlabIndex(owner []byte) (atree.SlabIndex, 
 	return index, handleEnvironmentError(err)
 }
 
+func (we *WrappedEnvironment) RunWithMeteringDisabled(f func()) {
+	we.env.RunWithMeteringDisabled(f)
+}
+
 // MeterComputation updates the total computation used based on the kind and intensity of the operation.
 func (we *WrappedEnvironment) MeterComputation(usage common.ComputationUsage) error {
 	err := we.env.MeterComputation(usage)
@@ -99,12 +103,6 @@ func (we *WrappedEnvironment) MeterEmittedEvent(byteSize uint64) error {
 // TotalEmittedEventBytes returns the total byte size of events emitted so far.
 func (we *WrappedEnvironment) TotalEmittedEventBytes() uint64 {
 	return we.env.TotalEmittedEventBytes()
-}
-
-// InteractionUsed returns the total storage interaction used.
-func (we *WrappedEnvironment) InteractionUsed() (uint64, error) {
-	val, err := we.env.InteractionUsed()
-	return val, handleEnvironmentError(err)
 }
 
 // EmitEvent emits an event.

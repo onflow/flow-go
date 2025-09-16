@@ -14,39 +14,15 @@ import (
 type AccountsAPI interface {
 	GetAccount(ctx context.Context, address flow.Address) (*flow.Account, error)
 	GetAccountAtLatestBlock(ctx context.Context, address flow.Address) (*flow.Account, error)
-	GetAccountAtBlockHeight(
-		ctx context.Context,
-		address flow.Address,
-		height uint64,
-	) (*flow.Account, error)
+	GetAccountAtBlockHeight(ctx context.Context, address flow.Address, height uint64,) (*flow.Account, error)
 
 	GetAccountBalanceAtLatestBlock(ctx context.Context, address flow.Address) (uint64, error)
-	GetAccountBalanceAtBlockHeight(
-		ctx context.Context,
-		address flow.Address,
-		height uint64,
-	) (uint64, error)
+	GetAccountBalanceAtBlockHeight(ctx context.Context, address flow.Address, height uint64,) (uint64, error)
 
-	GetAccountKeyAtLatestBlock(
-		ctx context.Context,
-		address flow.Address,
-		keyIndex uint32,
-	) (*flow.AccountPublicKey, error)
-	GetAccountKeyAtBlockHeight(
-		ctx context.Context,
-		address flow.Address,
-		keyIndex uint32,
-		height uint64,
-	) (*flow.AccountPublicKey, error)
-	GetAccountKeysAtLatestBlock(
-		ctx context.Context,
-		address flow.Address,
-	) ([]flow.AccountPublicKey, error)
-	GetAccountKeysAtBlockHeight(
-		ctx context.Context,
-		address flow.Address,
-		height uint64,
-	) ([]flow.AccountPublicKey, error)
+	GetAccountKeyAtLatestBlock(ctx context.Context, address flow.Address, keyIndex uint32) (*flow.AccountPublicKey, error)
+	GetAccountKeyAtBlockHeight(ctx context.Context, address flow.Address, keyIndex uint32, height uint64,) (*flow.AccountPublicKey, error)
+	GetAccountKeysAtLatestBlock(ctx context.Context, address flow.Address) ([]flow.AccountPublicKey, error)
+	GetAccountKeysAtBlockHeight(ctx context.Context, address flow.Address, height uint64) ([]flow.AccountPublicKey, error)
 }
 
 type EventsAPI interface {
@@ -95,40 +71,14 @@ type TransactionsAPI interface {
 	SendTransaction(ctx context.Context, tx *flow.TransactionBody) error
 
 	GetTransaction(ctx context.Context, id flow.Identifier) (*flow.TransactionBody, error)
-	GetTransactionsByBlockID(
-		ctx context.Context,
-		blockID flow.Identifier,
-	) ([]*flow.TransactionBody, error)
+	GetTransactionsByBlockID(ctx context.Context, blockID flow.Identifier) ([]*flow.TransactionBody, error)
 
-	GetTransactionResult(
-		ctx context.Context,
-		txID flow.Identifier,
-		blockID flow.Identifier,
-		collectionID flow.Identifier,
-		encodingVersion entities.EventEncodingVersion,
-	) (*accessmodel.TransactionResult, error)
-	GetTransactionResultByIndex(
-		ctx context.Context,
-		blockID flow.Identifier,
-		index uint32,
-		encodingVersion entities.EventEncodingVersion,
-	) (*accessmodel.TransactionResult, error)
-	GetTransactionResultsByBlockID(
-		ctx context.Context,
-		blockID flow.Identifier,
-		encodingVersion entities.EventEncodingVersion,
-	) ([]*accessmodel.TransactionResult, error)
+	GetTransactionResult(ctx context.Context, txID flow.Identifier, blockID flow.Identifier, collectionID flow.Identifier, encodingVersion entities.EventEncodingVersion,) (*accessmodel.TransactionResult, error)
+	GetTransactionResultByIndex(ctx context.Context, blockID flow.Identifier, index uint32, encodingVersion entities.EventEncodingVersion,) (*accessmodel.TransactionResult, error)
+	GetTransactionResultsByBlockID(ctx context.Context, blockID flow.Identifier, encodingVersion entities.EventEncodingVersion,) ([]*accessmodel.TransactionResult, error)
 
-	GetSystemTransaction(
-		ctx context.Context,
-		blockID flow.Identifier,
-	) (*flow.TransactionBody, error)
-	GetSystemTransactionResult(
-		ctx context.Context,
-		blockID flow.Identifier,
-		encodingVersion entities.EventEncodingVersion,
-		criteria optimistic_sync.Criteria,
-	) (*accessmodel.TransactionResult, accessmodel.ExecutorMetadata, error)
+	GetSystemTransaction(ctx context.Context, txID flow.Identifier, blockID flow.Identifier) (*flow.TransactionBody, error)
+	GetSystemTransactionResult(ctx context.Context, txID flow.Identifier, blockID flow.Identifier, encodingVersion entities.EventEncodingVersion) (*accessmodel.TransactionResult, error)
 }
 
 type TransactionStreamAPI interface {
@@ -206,10 +156,7 @@ type API interface {
 	//
 	// Expected sentinel errors providing details to clients about failed requests:
 	//   - access.DataNotFoundError - No header with the given height was found
-	GetBlockHeaderByHeight(
-		ctx context.Context,
-		height uint64,
-	) (*flow.Header, flow.BlockStatus, error)
+	GetBlockHeaderByHeight(ctx context.Context, height uint64) (*flow.Header, flow.BlockStatus, error)
 
 	// GetBlockHeaderByID returns the block header with the given ID.
 	//
@@ -219,10 +166,7 @@ type API interface {
 	//
 	// Expected sentinel errors providing details to clients about failed requests:
 	//   - access.DataNotFoundError - No header with the given ID was found
-	GetBlockHeaderByID(
-		ctx context.Context,
-		id flow.Identifier,
-	) (*flow.Header, flow.BlockStatus, error)
+	GetBlockHeaderByID(ctx context.Context, id flow.Identifier) (*flow.Header, flow.BlockStatus, error)
 
 	// GetLatestBlock returns the latest block in the chain.
 	//
@@ -311,10 +255,7 @@ type API interface {
 	//
 	// Expected sentinel errors providing details to clients about failed requests:
 	//   - access.DataNotFoundError - No execution result with the given block ID was found
-	GetExecutionResultForBlockID(
-		ctx context.Context,
-		blockID flow.Identifier,
-	) (*flow.ExecutionResult, error)
+	GetExecutionResultForBlockID(ctx context.Context, blockID flow.Identifier) (*flow.ExecutionResult, error)
 
 	// GetExecutionResultByID gets an execution result by its ID.
 	//
@@ -334,11 +275,7 @@ type API interface {
 	// are returned. blockStatus must be BlockStatusSealed or BlockStatusFinalized.
 	//
 	// If invalid parameters are supplied, a failed subscription is returned.
-	SubscribeBlocksFromStartBlockID(
-		ctx context.Context,
-		startBlockID flow.Identifier,
-		blockStatus flow.BlockStatus,
-	) subscription.Subscription
+	SubscribeBlocksFromStartBlockID(ctx context.Context, startBlockID flow.Identifier, blockStatus flow.BlockStatus,) subscription.Subscription
 
 	// SubscribeBlocksFromStartHeight subscribes to the finalized or sealed blocks starting at the requested
 	// start block height, up until the latest available block. Once the latest is
@@ -349,11 +286,7 @@ type API interface {
 	// are returned. blockStatus must be BlockStatusSealed or BlockStatusFinalized.
 	//
 	// If invalid parameters are supplied, a failed subscription is returned.
-	SubscribeBlocksFromStartHeight(
-		ctx context.Context,
-		startHeight uint64,
-		blockStatus flow.BlockStatus,
-	) subscription.Subscription
+	SubscribeBlocksFromStartHeight(ctx context.Context, startHeight uint64, blockStatus flow.BlockStatus,) subscription.Subscription
 
 	// SubscribeBlocksFromLatest subscribes to the finalized or sealed blocks starting at the latest sealed block,
 	// up until the latest available block. Once the latest is
@@ -364,10 +297,7 @@ type API interface {
 	// are returned. blockStatus must be BlockStatusSealed or BlockStatusFinalized.
 	//
 	// If invalid parameters are supplied, a failed subscription is returned.
-	SubscribeBlocksFromLatest(
-		ctx context.Context,
-		blockStatus flow.BlockStatus,
-	) subscription.Subscription
+	SubscribeBlocksFromLatest(ctx context.Context, blockStatus flow.BlockStatus) subscription.Subscription
 
 	// SubscribeBlockHeadersFromStartBlockID streams finalized or sealed block headers starting at the requested
 	// start block id, up until the latest available block header. Once the latest is
@@ -378,11 +308,7 @@ type API interface {
 	// are returned. blockStatus must be BlockStatusSealed or BlockStatusFinalized.
 	//
 	// If invalid parameters are supplied, a failed subscription is returned.
-	SubscribeBlockHeadersFromStartBlockID(
-		ctx context.Context,
-		startBlockID flow.Identifier,
-		blockStatus flow.BlockStatus,
-	) subscription.Subscription
+	SubscribeBlockHeadersFromStartBlockID(ctx context.Context, startBlockID flow.Identifier, blockStatus flow.BlockStatus,) subscription.Subscription
 
 	// SubscribeBlockHeadersFromStartHeight streams finalized or sealed block headers starting at the requested
 	// start block height, up until the latest available block header. Once the latest is
@@ -393,11 +319,7 @@ type API interface {
 	// are returned. blockStatus must be BlockStatusSealed or BlockStatusFinalized.
 	//
 	// If invalid parameters are supplied, a failed subscription is returned.
-	SubscribeBlockHeadersFromStartHeight(
-		ctx context.Context,
-		startHeight uint64,
-		blockStatus flow.BlockStatus,
-	) subscription.Subscription
+	SubscribeBlockHeadersFromStartHeight(ctx context.Context, startHeight uint64, blockStatus flow.BlockStatus,) subscription.Subscription
 
 	// SubscribeBlockHeadersFromLatest streams finalized or sealed block headers starting at the latest sealed block,
 	// up until the latest available block header. Once the latest is
@@ -408,10 +330,7 @@ type API interface {
 	// are returned. blockStatus must be BlockStatusSealed or BlockStatusFinalized.
 	//
 	// If invalid parameters are supplied, a failed subscription is returned.
-	SubscribeBlockHeadersFromLatest(
-		ctx context.Context,
-		blockStatus flow.BlockStatus,
-	) subscription.Subscription
+	SubscribeBlockHeadersFromLatest(ctx context.Context, blockStatus flow.BlockStatus) subscription.Subscription
 
 	// SubscribeBlockDigestsFromStartBlockID streams finalized or sealed lightweight block starting at the requested
 	// start block id, up until the latest available block. Once the latest is
@@ -422,11 +341,7 @@ type API interface {
 	// are returned. blockStatus must be BlockStatusSealed or BlockStatusFinalized.
 	//
 	// If invalid parameters are supplied, a failed subscription is returned.
-	SubscribeBlockDigestsFromStartBlockID(
-		ctx context.Context,
-		startBlockID flow.Identifier,
-		blockStatus flow.BlockStatus,
-	) subscription.Subscription
+	SubscribeBlockDigestsFromStartBlockID(ctx context.Context, startBlockID flow.Identifier, blockStatus flow.BlockStatus,) subscription.Subscription
 
 	// SubscribeBlockDigestsFromStartHeight streams finalized or sealed lightweight block starting at the requested
 	// start block height, up until the latest available block. Once the latest is
@@ -437,11 +352,7 @@ type API interface {
 	// are returned. blockStatus must be BlockStatusSealed or BlockStatusFinalized.
 	//
 	// If invalid parameters are supplied, a failed subscription is returned.
-	SubscribeBlockDigestsFromStartHeight(
-		ctx context.Context,
-		startHeight uint64,
-		blockStatus flow.BlockStatus,
-	) subscription.Subscription
+	SubscribeBlockDigestsFromStartHeight(ctx context.Context, startHeight uint64, blockStatus flow.BlockStatus,) subscription.Subscription
 
 	// SubscribeBlockDigestsFromLatest streams finalized or sealed lightweight block starting at the latest sealed block,
 	// up until the latest available block. Once the latest is
@@ -452,8 +363,5 @@ type API interface {
 	// are returned. blockStatus must be BlockStatusSealed or BlockStatusFinalized.
 	//
 	// If invalid parameters are supplied, a failed subscription is returned.
-	SubscribeBlockDigestsFromLatest(
-		ctx context.Context,
-		blockStatus flow.BlockStatus,
-	) subscription.Subscription
+	SubscribeBlockDigestsFromLatest(ctx context.Context, blockStatus flow.BlockStatus) subscription.Subscription
 }
