@@ -64,7 +64,7 @@ func TestValidationInspector_InvalidTopicId_Detection(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
 
-	consumer := mockp2p.NewGossipSubInvalidControlMessageNotificationConsumer(t)
+	consumer := mockp2p.NewGossipSubInvCtrlMsgNotifConsumer(t)
 	consumer.On("OnInvalidControlMessageNotification", mockery.Anything).Run(func(args mockery.Arguments) {
 		count.Inc()
 		notification, ok := args[0].(*p2p.InvCtrlMsgNotif)
@@ -197,7 +197,7 @@ func TestValidationInspector_DuplicateTopicId_Detection(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
 
-	consumer := mockp2p.NewGossipSubInvalidControlMessageNotificationConsumer(t)
+	consumer := mockp2p.NewGossipSubInvCtrlMsgNotifConsumer(t)
 	consumer.On("OnInvalidControlMessageNotification", mockery.Anything).Run(func(args mockery.Arguments) {
 		count.Inc()
 		notification, ok := args[0].(*p2p.InvCtrlMsgNotif)
@@ -296,7 +296,7 @@ func TestValidationInspector_IHaveDuplicateMessageId_Detection(t *testing.T) {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
-	consumer := mockp2p.NewGossipSubInvalidControlMessageNotificationConsumer(t)
+	consumer := mockp2p.NewGossipSubInvCtrlMsgNotifConsumer(t)
 	consumer.On("OnInvalidControlMessageNotification", mockery.Anything).Run(func(args mockery.Arguments) {
 		count.Inc()
 		notification, ok := args[0].(*p2p.InvCtrlMsgNotif)
@@ -405,7 +405,7 @@ func TestValidationInspector_UnknownClusterId_Detection(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
 
-	consumer := mockp2p.NewGossipSubInvalidControlMessageNotificationConsumer(t)
+	consumer := mockp2p.NewGossipSubInvCtrlMsgNotifConsumer(t)
 	consumer.On("OnInvalidControlMessageNotification", mockery.Anything).Run(func(args mockery.Arguments) {
 		count.Inc()
 		notification, ok := args[0].(*p2p.InvCtrlMsgNotif)
@@ -503,7 +503,7 @@ func TestValidationInspector_ActiveClusterIdsNotSet_Graft_Detection(t *testing.T
 	ctx, cancel := context.WithCancel(context.Background())
 	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
 
-	consumer := mockp2p.NewGossipSubInvalidControlMessageNotificationConsumer(t)
+	consumer := mockp2p.NewGossipSubInvCtrlMsgNotifConsumer(t)
 	consumer.On("OnInvalidControlMessageNotification", mockery.Anything).Run(func(args mockery.Arguments) {
 		count.Inc()
 		notification, ok := args[0].(*p2p.InvCtrlMsgNotif)
@@ -584,7 +584,7 @@ func TestValidationInspector_ActiveClusterIdsNotSet_Prune_Detection(t *testing.T
 	ctx, cancel := context.WithCancel(context.Background())
 	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
 
-	consumer := mockp2p.NewGossipSubInvalidControlMessageNotificationConsumer(t)
+	consumer := mockp2p.NewGossipSubInvCtrlMsgNotifConsumer(t)
 	consumer.On("OnInvalidControlMessageNotification", mockery.Anything).Run(func(args mockery.Arguments) {
 		count.Inc()
 		notification, ok := args[0].(*p2p.InvCtrlMsgNotif)
@@ -665,7 +665,7 @@ func TestValidationInspector_UnstakedNode_Detection(t *testing.T) {
 	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
 
 	unstakedPeerID := unittest.PeerIdFixture(t)
-	consumer := mockp2p.NewGossipSubInvalidControlMessageNotificationConsumer(t)
+	consumer := mockp2p.NewGossipSubInvCtrlMsgNotifConsumer(t)
 	consumer.On("OnInvalidControlMessageNotification", mockery.Anything).Run(func(args mockery.Arguments) {
 		count.Inc()
 		notification, ok := args[0].(*p2p.InvCtrlMsgNotif)
@@ -757,7 +757,7 @@ func TestValidationInspector_InspectIWants_CacheMissThreshold(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
 
-	consumer := mockp2p.NewGossipSubInvalidControlMessageNotificationConsumer(t)
+	consumer := mockp2p.NewGossipSubInvCtrlMsgNotifConsumer(t)
 	consumer.On("OnInvalidControlMessageNotification", mockery.Anything).Run(func(args mockery.Arguments) {
 		notification, ok := args[0].(*p2p.InvCtrlMsgNotif)
 		require.True(t, ok)
@@ -882,7 +882,7 @@ func TestValidationInspector_InspectRpcPublishMessages(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
 
-	consumer := mockp2p.NewGossipSubInvalidControlMessageNotificationConsumer(t)
+	consumer := mockp2p.NewGossipSubInvCtrlMsgNotifConsumer(t)
 	consumer.On("OnInvalidControlMessageNotification", mockery.Anything).Run(func(args mockery.Arguments) {
 		notification, ok := args[0].(*p2p.InvCtrlMsgNotif)
 		require.True(t, ok)

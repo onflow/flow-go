@@ -28,7 +28,7 @@ func TestEngineClosingChannel(t *testing.T) {
 		func(
 			corruptedId flow.Identity, // identity of ccf
 			corruptNetwork *Network,
-			adapter *mocknetwork.Adapter, // mock adapter that ccf uses to communicate with authorized flow nodes.
+			adapter *mocknetwork.ConduitAdapter, // mock adapter that ccf uses to communicate with authorized flow nodes.
 			stream insecure.CorruptNetwork_ProcessAttackerMessageClient, // gRPC interface that orchestrator network uses to send messages to this ccf.
 		) {
 			channel := channels.TestNetworkChannel
@@ -58,7 +58,7 @@ func processAttackerMessage_EmptyEgressIngressMessage_Exit(t *testing.T) {
 		func(
 			corruptedId flow.Identity, // identity of ccf
 			corruptNetwork *Network,
-			adapter *mocknetwork.Adapter, // mock adapter that ccf uses to communicate with authorized flow nodes.
+			adapter *mocknetwork.ConduitAdapter, // mock adapter that ccf uses to communicate with authorized flow nodes.
 			stream insecure.CorruptNetwork_ProcessAttackerMessageClient, // gRPC interface that orchestrator network uses to send messages to this ccf.
 		) {
 			corruptedEventDispatchedOnFlowNetWg := sync.WaitGroup{}
@@ -99,7 +99,7 @@ func processAttackerMessage_NotEmptyEgressIngressMessage_Exit(t *testing.T) {
 		func(
 			corruptedId flow.Identity, // identity of ccf
 			corruptNetwork *Network,
-			adapter *mocknetwork.Adapter, // mock adapter that ccf uses to communicate with authorized flow nodes.
+			adapter *mocknetwork.ConduitAdapter, // mock adapter that ccf uses to communicate with authorized flow nodes.
 			stream insecure.CorruptNetwork_ProcessAttackerMessageClient, // gRPC interface that orchestrator network uses to send messages to this ccf.
 		) {
 			// creates a corrupted event that attacker is sending on the flow network through the
