@@ -48,7 +48,7 @@ require (
 	github.com/multiformats/go-multiaddr-dns v0.4.1
 	github.com/multiformats/go-multihash v0.2.3
 	github.com/onflow/atree v0.10.1
-	github.com/onflow/cadence v1.7.0
+	github.com/onflow/cadence v1.7.1-0.20250916000722-1d48c1a99704
 	github.com/onflow/crypto v0.25.3
 	github.com/onflow/flow v0.3.4
 	github.com/onflow/flow-core-contracts/lib/go/contracts v1.7.4-0.20250825173510-91e6f28b0224
@@ -235,7 +235,7 @@ require (
 	github.com/klauspost/compress v1.17.11 // indirect
 	github.com/klauspost/cpuid/v2 v2.2.9 // indirect
 	github.com/koron/go-ssdp v0.0.4 // indirect
-	github.com/kr/pretty v0.3.1 // indirect
+	github.com/kr/pretty v0.3.1
 	github.com/kr/text v0.2.0 // indirect
 	github.com/leodido/go-urn v1.4.0 // indirect
 	github.com/libp2p/go-buffer-pool v0.1.0 // indirect
