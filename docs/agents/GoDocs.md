@@ -312,5 +312,10 @@ Example 4: Method with context-dependent error handling
     ```
 
 3. **Type Methods**
-  - Document each method following the method documentation rules
-  - Include error documentation for methods that return errors
+   - Document each method following the method documentation rules
+   - Include error documentation for methods that return errors
+
+## Special Cases:
+We have low-level storage functions in the packages `storage/operation` and `storage/procedure` that have
+specialized documentation requirements. For all files in these packages, meticulously follow the instructions
+in `storage/operation/Documentation-Guidelines.md`

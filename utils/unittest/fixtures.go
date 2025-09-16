@@ -750,10 +750,9 @@ func CollectionListFixture(n int, options ...func(*flow.Collection)) []*flow.Col
 
 func CollectionFixture(n int, options ...func(*flow.Collection)) flow.Collection {
 	transactions := make([]*flow.TransactionBody, 0, n)
-
 	for i := 0; i < n; i++ {
 		tx := TransactionFixture()
-		transactions = append(transactions, &tx.TransactionBody)
+		transactions = append(transactions, &tx)
 	}
 
 	col := flow.Collection{Transactions: transactions}
@@ -1569,14 +1568,11 @@ func RandomSourcesFixture(n int) [][]byte {
 	return sigs
 }
 
-func TransactionFixture(n ...func(t *flow.Transaction)) flow.Transaction {
-	tx := flow.Transaction{TransactionBody: TransactionBodyFixture()}
-	if len(n) > 0 {
-		n[0](&tx)
-	}
-	return tx
+func TransactionFixture(opts ...func(*flow.TransactionBody)) flow.TransactionBody {
+	return TransactionBodyFixture(opts...)
 }
 
+// DEPRECATED: please use TransactionFixture instead
 func TransactionBodyFixture(opts ...func(*flow.TransactionBody)) flow.TransactionBody {
 	tb := flow.TransactionBody{
 		Script:             []byte("access(all) fun main() {}"),
