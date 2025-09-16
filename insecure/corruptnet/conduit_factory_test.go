@@ -10,7 +10,7 @@ import (
 
 	mockinsecure "github.com/onflow/flow-go/insecure/mock"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/network/mocknetwork"
+	mocknetwork "github.com/onflow/flow-go/network/mock"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 

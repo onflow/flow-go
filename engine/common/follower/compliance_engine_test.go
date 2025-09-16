@@ -19,7 +19,7 @@ import (
 	"github.com/onflow/flow-go/module/metrics"
 	module "github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/network/channels"
-	"github.com/onflow/flow-go/network/mocknetwork"
+	mocknetwork "github.com/onflow/flow-go/network/mock"
 	storage "github.com/onflow/flow-go/storage/mock"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -33,7 +33,7 @@ type EngineSuite struct {
 	suite.Suite
 
 	finalized *flow.Header
-	net       *mocknetwork.Network
+	net       *mocknetwork.EngineRegistry
 	con       *mocknetwork.Conduit
 	me        *module.Local
 	headers   *storage.Headers
@@ -47,7 +47,7 @@ type EngineSuite struct {
 
 func (s *EngineSuite) SetupTest() {
 
-	s.net = mocknetwork.NewNetwork(s.T())
+	s.net = mocknetwork.NewEngineRegistry(s.T())
 	s.con = mocknetwork.NewConduit(s.T())
 	s.me = module.NewLocal(s.T())
 	s.headers = storage.NewHeaders(s.T())
