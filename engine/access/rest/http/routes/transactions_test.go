@@ -80,7 +80,7 @@ func TestGetTransactions(t *testing.T) {
 
 		backend.Mock.
 			On("GetTransaction", mocks.Anything, tx.ID()).
-			Return(&tx.TransactionBody, nil)
+			Return(&tx, nil)
 
 		expected := fmt.Sprintf(`
 			{
@@ -121,12 +121,12 @@ func TestGetTransactions(t *testing.T) {
 	t.Run("Get by ID with results", func(t *testing.T) {
 		backend := &mock.API{}
 
-		tx := unittest.TransactionFixture()
+		tx := unittest.TransactionBodyFixture()
 		txr := transactionResultFixture(tx)
 
 		backend.Mock.
 			On("GetTransaction", mocks.Anything, tx.ID()).
-			Return(&tx.TransactionBody, nil)
+			Return(&tx, nil)
 
 		backend.Mock.
 			On("GetTransactionResult", mocks.Anything, tx.ID(), flow.ZeroID, flow.ZeroID, entities.EventEncodingVersion_JSON_CDC_V0).
@@ -430,7 +430,7 @@ func TestCreateTransaction(t *testing.T) {
 	})
 }
 
-func transactionResultFixture(tx flow.Transaction) *accessmodel.TransactionResult {
+func transactionResultFixture(tx flow.TransactionBody) *accessmodel.TransactionResult {
 	cid := unittest.IdentifierFixture()
 	return &accessmodel.TransactionResult{
 		Status:     flow.TransactionStatusSealed,

@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/ipfs/go-datastore"
-	badgerds "github.com/ipfs/go-ds-badger2"
 	pebbleds "github.com/ipfs/go-ds-pebble"
 	sdk "github.com/onflow/flow-go-sdk"
 	sdkclient "github.com/onflow/flow-go-sdk/access/grpc"
@@ -242,8 +241,6 @@ func (s *ExecutionStateSyncSuite) nodeExecutionDataStore(node *testnet.Container
 
 	if s.executionDataDBMode == execution_data.ExecutionDataDBModePebble {
 		ds, err = pebbleds.NewDatastore(dsPath, nil)
-	} else {
-		ds, err = badgerds.NewDatastore(dsPath, &badgerds.DefaultOptions)
 	}
 	require.NoError(s.T(), err, "could not get execution datastore")
 

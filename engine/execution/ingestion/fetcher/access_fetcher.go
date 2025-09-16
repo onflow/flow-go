@@ -15,6 +15,7 @@ import (
 	"github.com/onflow/flow/protobuf/go/flow/access"
 
 	"github.com/onflow/flow-go/engine/common/requester"
+	commonrpc "github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/engine/execution/ingestion"
 	"github.com/onflow/flow-go/model/flow"
@@ -63,7 +64,7 @@ func NewAccessCollectionFetcher(
 	collectionRPCConn, err := grpc.Dial(
 		accessAddress,
 		grpc.WithTransportCredentials(credentials.NewTLS(tlsConfig)),
-		grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(grpcutils.DefaultMaxMsgSize)),
+		grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(commonrpc.DefaultMaxResponseMsgSize)),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to collection rpc: %w", err)

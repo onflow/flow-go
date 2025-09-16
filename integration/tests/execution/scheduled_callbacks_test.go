@@ -189,10 +189,10 @@ func (s *ScheduledCallbacksSuite) getCallbackStatus(callbackID uint64) (int, boo
 	getStatusScript := dsl.Main{
 		Import: dsl.Import{
 			Address: s.AccessClient().SDKServiceAddress(),
-			Names:   []string{"FlowCallbackScheduler"},
+			Names:   []string{"FlowTransactionScheduler"},
 		},
-		ReturnType: "FlowCallbackScheduler.Status?",
-		Code:       fmt.Sprintf("return FlowCallbackScheduler.getStatus(id: %d)", callbackID),
+		ReturnType: "FlowTransactionScheduler.Status?",
+		Code:       fmt.Sprintf("return FlowTransactionScheduler.getStatus(id: %d)", callbackID),
 	}
 
 	latest, err := s.AccessClient().GetLatestFinalizedBlockHeader(context.Background())

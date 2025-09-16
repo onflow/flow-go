@@ -5,7 +5,6 @@ import (
 	"os"
 	"path/filepath"
 
-	badgerds "github.com/ipfs/go-ds-badger2"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
@@ -43,11 +42,7 @@ func CreateDatastoreManager(
 			return nil, fmt.Errorf("could not create PebbleDatastoreManager for execution data: %w", err)
 		}
 	} else {
-		logger.Info().Msgf("Using Badger datastore for execution data at %s", datastoreDir)
-		executionDatastoreManager, err = NewBadgerDatastoreManager(datastoreDir, &badgerds.DefaultOptions)
-		if err != nil {
-			return nil, fmt.Errorf("could not create BadgerDatastoreManager for execution data: %w", err)
-		}
+		return nil, fmt.Errorf("does not support badger data store for execution data")
 	}
 
 	return executionDatastoreManager, nil

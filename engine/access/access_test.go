@@ -163,23 +163,24 @@ func (suite *Suite) RunTest(
 
 		var err error
 		suite.backend, err = backend.New(backend.Params{
-			State:                suite.state,
-			CollectionRPC:        suite.collClient,
-			Blocks:               all.Blocks,
-			Headers:              all.Headers,
-			Collections:          all.Collections,
-			Transactions:         all.Transactions,
-			ExecutionResults:     all.Results,
-			ExecutionReceipts:    all.Receipts,
-			ChainID:              suite.chainID,
-			AccessMetrics:        suite.metrics,
-			MaxHeightRange:       events.DefaultMaxHeightRange,
-			Log:                  suite.log,
-			SnapshotHistoryLimit: backend.DefaultSnapshotHistoryLimit,
-			Communicator:         node_communicator.NewNodeCommunicator(false),
-			EventQueryMode:       query_mode.IndexQueryModeExecutionNodesOnly,
-			ScriptExecutionMode:  query_mode.IndexQueryModeExecutionNodesOnly,
-			TxResultQueryMode:    query_mode.IndexQueryModeExecutionNodesOnly,
+			State:                    suite.state,
+			CollectionRPC:            suite.collClient,
+			Blocks:                   all.Blocks,
+			Headers:                  all.Headers,
+			Collections:              all.Collections,
+			Transactions:             all.Transactions,
+			ExecutionResults:         all.Results,
+			ExecutionReceipts:        all.Receipts,
+			ChainID:                  suite.chainID,
+			AccessMetrics:            suite.metrics,
+			MaxHeightRange:           events.DefaultMaxHeightRange,
+			Log:                      suite.log,
+			SnapshotHistoryLimit:     backend.DefaultSnapshotHistoryLimit,
+			Communicator:             node_communicator.NewNodeCommunicator(false),
+			EventQueryMode:           query_mode.IndexQueryModeExecutionNodesOnly,
+			ScriptExecutionMode:      query_mode.IndexQueryModeExecutionNodesOnly,
+			TxResultQueryMode:        query_mode.IndexQueryModeExecutionNodesOnly,
+			MaxScriptAndArgumentSize: commonrpc.DefaultAccessMaxRequestSize,
 		})
 		require.NoError(suite.T(), err)
 
@@ -198,11 +199,7 @@ func (suite *Suite) RunTest(
 func (suite *Suite) TestSendAndGetTransaction() {
 	suite.RunTest(func(handler *rpc.Handler, _ storage.DB, _ *store.All) {
 		referenceBlock := unittest.BlockHeaderFixture()
-		transaction := unittest.TransactionFixture(
-			func(t *flow.Transaction) {
-				t.ReferenceBlockID = referenceBlock.ID()
-			})
-
+		transaction := unittest.TransactionBodyFixture(unittest.WithReferenceBlock(referenceBlock.ID()))
 		refSnapshot := new(protocol.Snapshot)
 
 		suite.state.
@@ -219,7 +216,7 @@ func (suite *Suite) TestSendAndGetTransaction() {
 			Return(referenceBlock, nil).
 			Once()
 
-		expected := convert.TransactionToMessage(transaction.TransactionBody)
+		expected := convert.TransactionToMessage(transaction)
 		sendReq := &accessproto.SendTransactionRequest{
 			Transaction: expected,
 		}
@@ -253,11 +250,8 @@ func (suite *Suite) TestSendAndGetTransaction() {
 func (suite *Suite) TestSendExpiredTransaction() {
 	suite.RunTest(func(handler *rpc.Handler, _ storage.DB, _ *store.All) {
 		referenceBlock := suite.finalizedBlock
+		transaction := unittest.TransactionBodyFixture(unittest.WithReferenceBlock(referenceBlock.ID()))
 
-		transaction := unittest.TransactionFixture(
-			func(t *flow.Transaction) {
-				t.ReferenceBlockID = referenceBlock.ID()
-			})
 		// create latest block that is past the expiry window
 		latestBlock := unittest.BlockHeaderFixture()
 		latestBlock.Height = referenceBlock.Height + flow.DefaultTransactionExpiry*2
@@ -277,7 +271,7 @@ func (suite *Suite) TestSendExpiredTransaction() {
 		suite.finalizedBlock = latestBlock
 
 		req := &accessproto.SendTransactionRequest{
-			Transaction: convert.TransactionToMessage(transaction.TransactionBody),
+			Transaction: convert.TransactionToMessage(transaction),
 		}
 
 		_, err := handler.SendTransaction(context.Background(), req)
@@ -293,10 +287,7 @@ func (suite *Suite) TestSendTransactionToRandomCollectionNode() {
 
 		// create a transaction
 		referenceBlock := unittest.BlockHeaderFixture()
-		transaction := unittest.TransactionFixture(
-			func(t *flow.Transaction) {
-				t.ReferenceBlockID = referenceBlock.ID()
-			})
+		transaction := unittest.TransactionBodyFixture(unittest.WithReferenceBlock(referenceBlock.ID()))
 
 		// setup the state and finalSnapshot mock expectations
 		suite.state.On("AtBlockID", referenceBlock.ID()).Return(suite.finalSnapshot, nil)
@@ -321,13 +312,13 @@ func (suite *Suite) TestSendTransactionToRandomCollectionNode() {
 
 		// create two transactions bound for each of the cluster
 		cluster1 := clusters[0]
-		cluster1tx := unittest.AlterTransactionForCluster(transaction.TransactionBody, clusters, cluster1, func(transaction *flow.TransactionBody) {})
+		cluster1tx := unittest.AlterTransactionForCluster(transaction, clusters, cluster1, func(transaction *flow.TransactionBody) {})
 		tx1 := convert.TransactionToMessage(cluster1tx)
 		sendReq1 := &accessproto.SendTransactionRequest{
 			Transaction: tx1,
 		}
 		cluster2 := clusters[1]
-		cluster2tx := unittest.AlterTransactionForCluster(transaction.TransactionBody, clusters, cluster2, func(transaction *flow.TransactionBody) {})
+		cluster2tx := unittest.AlterTransactionForCluster(transaction, clusters, cluster2, func(transaction *flow.TransactionBody) {})
 		tx2 := convert.TransactionToMessage(cluster2tx)
 		sendReq2 := &accessproto.SendTransactionRequest{
 			Transaction: tx2,
@@ -342,22 +333,23 @@ func (suite *Suite) TestSendTransactionToRandomCollectionNode() {
 
 		// create a mock connection factory
 		connFactory := connectionmock.NewConnectionFactory(suite.T())
-		connFactory.On("GetAccessAPIClient", collNode1.Address, nil).Return(col1ApiClient, &mocks.MockCloser{}, nil)
-		connFactory.On("GetAccessAPIClient", collNode2.Address, nil).Return(col2ApiClient, &mocks.MockCloser{}, nil)
+		connFactory.On("GetCollectionAPIClient", collNode1.Address, nil).Return(col1ApiClient, &mocks.MockCloser{}, nil)
+		connFactory.On("GetCollectionAPIClient", collNode2.Address, nil).Return(col2ApiClient, &mocks.MockCloser{}, nil)
 
 		bnd, err := backend.New(backend.Params{State: suite.state,
-			Collections:          collections,
-			Transactions:         transactions,
-			ChainID:              suite.chainID,
-			AccessMetrics:        metrics,
-			ConnFactory:          connFactory,
-			MaxHeightRange:       events.DefaultMaxHeightRange,
-			Log:                  suite.log,
-			SnapshotHistoryLimit: backend.DefaultSnapshotHistoryLimit,
-			Communicator:         node_communicator.NewNodeCommunicator(false),
-			EventQueryMode:       query_mode.IndexQueryModeExecutionNodesOnly,
-			ScriptExecutionMode:  query_mode.IndexQueryModeExecutionNodesOnly,
-			TxResultQueryMode:    query_mode.IndexQueryModeExecutionNodesOnly,
+			Collections:              collections,
+			Transactions:             transactions,
+			ChainID:                  suite.chainID,
+			AccessMetrics:            metrics,
+			ConnFactory:              connFactory,
+			MaxHeightRange:           events.DefaultMaxHeightRange,
+			Log:                      suite.log,
+			SnapshotHistoryLimit:     backend.DefaultSnapshotHistoryLimit,
+			Communicator:             node_communicator.NewNodeCommunicator(false),
+			EventQueryMode:           query_mode.IndexQueryModeExecutionNodesOnly,
+			ScriptExecutionMode:      query_mode.IndexQueryModeExecutionNodesOnly,
+			TxResultQueryMode:        query_mode.IndexQueryModeExecutionNodesOnly,
+			MaxScriptAndArgumentSize: commonrpc.DefaultAccessMaxRequestSize,
 		})
 		require.NoError(suite.T(), err)
 
@@ -705,6 +697,7 @@ func (suite *Suite) TestGetSealedTransaction() {
 			EventQueryMode:             query_mode.IndexQueryModeExecutionNodesOnly,
 			ScriptExecutionMode:        query_mode.IndexQueryModeExecutionNodesOnly,
 			ExecNodeIdentitiesProvider: execNodeIdentitiesProvider,
+			MaxScriptAndArgumentSize:   commonrpc.DefaultAccessMaxRequestSize,
 		})
 		require.NoError(suite.T(), err)
 
@@ -905,7 +898,8 @@ func (suite *Suite) TestGetTransactionResult() {
 			nil,
 		)
 
-		bnd, err := backend.New(backend.Params{State: suite.state,
+		bnd, err := backend.New(backend.Params{
+			State:                      suite.state,
 			CollectionRPC:              suite.collClient,
 			Blocks:                     all.Blocks,
 			Headers:                    all.Headers,
@@ -924,6 +918,7 @@ func (suite *Suite) TestGetTransactionResult() {
 			EventQueryMode:             query_mode.IndexQueryModeExecutionNodesOnly,
 			ScriptExecutionMode:        query_mode.IndexQueryModeExecutionNodesOnly,
 			ExecNodeIdentitiesProvider: execNodeIdentitiesProvider,
+			MaxScriptAndArgumentSize:   commonrpc.DefaultAccessMaxRequestSize,
 		})
 		require.NoError(suite.T(), err)
 
@@ -1181,6 +1176,7 @@ func (suite *Suite) TestExecuteScript() {
 			ScriptExecutionMode:        query_mode.IndexQueryModeExecutionNodesOnly,
 			TxResultQueryMode:          query_mode.IndexQueryModeExecutionNodesOnly,
 			ExecNodeIdentitiesProvider: execNodeIdentitiesProvider,
+			MaxScriptAndArgumentSize:   commonrpc.DefaultAccessMaxRequestSize,
 		})
 		require.NoError(suite.T(), err)
 

@@ -21,16 +21,16 @@ func TestTransactionStoreRetrieve(t *testing.T) {
 
 		// store a transaction in db
 		expected := unittest.TransactionFixture()
-		err := store.Store(&expected.TransactionBody)
+		err := store.Store(&expected)
 		require.NoError(t, err)
 
 		// retrieve the transaction by ID
 		actual, err := store.ByID(expected.ID())
 		require.NoError(t, err)
-		assert.Equal(t, &expected.TransactionBody, actual)
+		assert.Equal(t, &expected, actual)
 
 		// re-insert the transaction - should be idempotent
-		err = store.Store(&expected.TransactionBody)
+		err = store.Store(&expected)
 		require.NoError(t, err)
 	})
 }
@@ -53,13 +53,13 @@ func TestTransactionRemove(t *testing.T) {
 
 		// Create and store a transaction
 		expected := unittest.TransactionFixture()
-		err := store.Store(&expected.TransactionBody)
+		err := store.Store(&expected)
 		require.NoError(t, err)
 
 		// Ensure it exists
 		tx, err := store.ByID(expected.ID())
 		require.NoError(t, err)
-		assert.Equal(t, &expected.TransactionBody, tx)
+		assert.Equal(t, &expected, tx)
 
 		// Remove it
 		err = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {

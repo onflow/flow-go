@@ -5,12 +5,14 @@ import (
 	"fmt"
 	"math"
 	"sort"
+	"strings"
 
 	"github.com/fxamacker/cbor/v2"
 	"github.com/onflow/atree"
 	"github.com/onflow/crypto"
 	"github.com/onflow/crypto/hash"
 
+	accountkeymetadata "github.com/onflow/flow-go/fvm/environment/account-key-metadata"
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/storage/state"
 	"github.com/onflow/flow-go/model/flow"
@@ -25,9 +27,18 @@ type Accounts interface {
 	Get(address flow.Address) (*flow.Account, error)
 	GetAccountPublicKeyCount(address flow.Address) (uint32, error)
 	AppendAccountPublicKey(address flow.Address, key flow.AccountPublicKey) error
+	GetRuntimeAccountPublicKey(address flow.Address, keyIndex uint32) (flow.RuntimeAccountPublicKey, error)
 	GetAccountPublicKey(address flow.Address, keyIndex uint32) (flow.AccountPublicKey, error)
-	SetAccountPublicKey(address flow.Address, keyIndex uint32, publicKey flow.AccountPublicKey) ([]byte, error)
 	GetAccountPublicKeys(address flow.Address) ([]flow.AccountPublicKey, error)
+	RevokeAccountPublicKey(address flow.Address, keyIndex uint32) error
+	GetAccountPublicKeyRevokedStatus(address flow.Address, keyIndex uint32) (bool, error)
+	GetAccountPublicKeySequenceNumber(address flow.Address, keyIndex uint32) (uint64, error)
+	// IncrementAccountPublicKeySequenceNumber increments the sequence number for the account's public key
+	// at the given key index.  This update does not affect the account status, enabling concurrent execution
+	// of transactions that do not modify any data related to account status.
+	// Note: No additional storage is consumed, as the storage for the sequence number register
+	// was allocated when account public key was initially added to the account.
+	IncrementAccountPublicKeySequenceNumber(address flow.Address, keyIndex uint32) error
 	GetContractNames(address flow.Address) ([]string, error)
 	GetContract(contractName string, address flow.Address) ([]byte, error)
 	ContractExists(contractName string, address flow.Address) (bool, error)
@@ -169,6 +180,15 @@ func (a *StatefulAccounts) Create(
 		return errors.NewAccountAlreadyExistsError(newAddress)
 	}
 
+	publicKeyCount := uint32(len(publicKeys))
+
+	if publicKeyCount >= MaxPublicKeyCount {
+		return errors.NewAccountPublicKeyLimitError(
+			newAddress,
+			publicKeyCount,
+			MaxPublicKeyCount)
+	}
+
 	accountStatus := NewAccountStatus()
 	storageUsedByTheStatusItself := uint64(RegisterSize(
 		flow.AccountStatusRegisterID(newAddress),
@@ -181,7 +201,32 @@ func (a *StatefulAccounts) Create(
 		return fmt.Errorf("failed to create a new account: %w", err)
 	}
 
-	return a.SetAllAccountPublicKeys(newAddress, publicKeys)
+	for i, publicKey := range publicKeys {
+		err := a.appendPublicKey(newAddress, publicKey, uint32(i))
+		if err != nil {
+			return err
+		}
+	}
+
+	// NOTE: do not include pre-allocated sequence number register size in storage used for account public key 0.
+
+	if publicKeyCount <= 1 {
+		return nil
+	}
+
+	// Adjust storage used for pre-allocated sequence number registers, starting from account public key 1.
+	sequenceNumberPayloadSize := uint64(0)
+	for i := uint32(1); i < publicKeyCount; i++ {
+		sequenceNumberPayloadSize += PredefinedSequenceNumberPayloadSize(newAddress, i)
+	}
+
+	status, err := a.getAccountStatus(newAddress)
+	if err != nil {
+		return err
+	}
+
+	storageUsed := status.StorageUsed() + sequenceNumberPayloadSize
+	return a.setAccountStatusStorageUsed(newAddress, status, storageUsed)
 }
 
 func (a *StatefulAccounts) GetAccountPublicKey(
@@ -191,25 +236,188 @@ func (a *StatefulAccounts) GetAccountPublicKey(
 	flow.AccountPublicKey,
 	error,
 ) {
-	publicKey, err := a.GetValue(flow.PublicKeyRegisterID(address, keyIndex))
+	err := a.accountPublicKeyIndexInRange(address, keyIndex)
 	if err != nil {
 		return flow.AccountPublicKey{}, err
 	}
 
-	if len(publicKey) == 0 {
-		return flow.AccountPublicKey{}, errors.NewAccountPublicKeyNotFoundError(
-			address,
-			keyIndex)
+	if keyIndex == 0 {
+		key, err := getAccountPublicKey0(a, address)
+		if err != nil {
+			return flow.AccountPublicKey{}, fmt.Errorf("failed to get account public key at index %d for %s: %w", keyIndex, address, err)
+		}
+		return key, nil
 	}
 
-	decodedPublicKey, err := flow.DecodeAccountPublicKey(publicKey, keyIndex)
+	status, err := a.getAccountStatus(address)
 	if err != nil {
-		return flow.AccountPublicKey{}, fmt.Errorf(
-			"failed to decode public key: %w",
-			err)
+		return flow.AccountPublicKey{}, err
 	}
 
-	return decodedPublicKey, nil
+	// Get account public key metadata.
+	weight, revoked, storedKeyIndex, err := status.AccountPublicKeyMetadata(keyIndex)
+	if err != nil {
+		return flow.AccountPublicKey{}, fmt.Errorf("failed to get account public key at index %d for %s: %w", keyIndex, address, err)
+	}
+
+	// Get stored public key.
+	storedKey, err := getStoredPublicKey(a, address, storedKeyIndex)
+	if err != nil {
+		return flow.AccountPublicKey{}, fmt.Errorf("failed to get account public key at index %d for %s: %w", keyIndex, address, err)
+	}
+
+	// Get sequence number.
+	sequenceNumber, err := getAccountPublicKeySequenceNumber(a, address, keyIndex)
+	if err != nil {
+		return flow.AccountPublicKey{}, fmt.Errorf("failed to get account public key at index %d for %s: %w", keyIndex, address, err)
+	}
+
+	return flow.AccountPublicKey{
+		Index:     keyIndex,
+		PublicKey: storedKey.PublicKey,
+		SignAlgo:  storedKey.SignAlgo,
+		HashAlgo:  storedKey.HashAlgo,
+		SeqNumber: sequenceNumber,
+		Weight:    int(weight),
+		Revoked:   revoked,
+	}, nil
+}
+
+func (a *StatefulAccounts) GetRuntimeAccountPublicKey(
+	address flow.Address,
+	keyIndex uint32,
+) (
+	flow.RuntimeAccountPublicKey,
+	error,
+) {
+	err := a.accountPublicKeyIndexInRange(address, keyIndex)
+	if err != nil {
+		return flow.RuntimeAccountPublicKey{}, err
+	}
+
+	if keyIndex == 0 {
+		key, err := getAccountPublicKey0(a, address)
+		if err != nil {
+			return flow.RuntimeAccountPublicKey{}, fmt.Errorf("failed to get account public key at index %d for %s: %w", keyIndex, address, err)
+		}
+		return flow.RuntimeAccountPublicKey{
+			Index:     keyIndex,
+			PublicKey: key.PublicKey,
+			SignAlgo:  key.SignAlgo,
+			HashAlgo:  key.HashAlgo,
+			Weight:    key.Weight,
+			Revoked:   key.Revoked,
+		}, nil
+	}
+
+	status, err := a.getAccountStatus(address)
+	if err != nil {
+		return flow.RuntimeAccountPublicKey{}, err
+	}
+
+	// Get account public key metadata.
+	weight, revoked, storedKeyIndex, err := status.AccountPublicKeyMetadata(keyIndex)
+	if err != nil {
+		return flow.RuntimeAccountPublicKey{}, fmt.Errorf("failed to get account public key at index %d for %s: %w", keyIndex, address, err)
+	}
+
+	// Get stored public key.
+	storedKey, err := getStoredPublicKey(a, address, storedKeyIndex)
+	if err != nil {
+		return flow.RuntimeAccountPublicKey{}, fmt.Errorf("failed to get account public key at index %d for %s: %w", keyIndex, address, err)
+	}
+
+	return flow.RuntimeAccountPublicKey{
+		Index:     keyIndex,
+		PublicKey: storedKey.PublicKey,
+		SignAlgo:  storedKey.SignAlgo,
+		HashAlgo:  storedKey.HashAlgo,
+		Weight:    int(weight),
+		Revoked:   revoked,
+	}, nil
+}
+
+func (a *StatefulAccounts) GetAccountPublicKeyRevokedStatus(address flow.Address, keyIndex uint32) (bool, error) {
+	err := a.accountPublicKeyIndexInRange(address, keyIndex)
+	if err != nil {
+		return false, err
+	}
+
+	if keyIndex == 0 {
+		accountPublicKey, err := getAccountPublicKey0(a, address)
+		if err != nil {
+			return false, err
+		}
+		return accountPublicKey.Revoked, nil
+	}
+
+	status, err := a.getAccountStatus(address)
+	if err != nil {
+		return false, err
+	}
+
+	return status.AccountPublicKeyRevokedStatus(keyIndex)
+}
+
+func (a *StatefulAccounts) RevokeAccountPublicKey(
+	address flow.Address,
+	keyIndex uint32,
+) error {
+	err := a.accountPublicKeyIndexInRange(address, keyIndex)
+	if err != nil {
+		return err
+	}
+
+	if keyIndex == 0 {
+		return revokeAccountPublicKey0(a, address)
+	}
+
+	status, err := a.getAccountStatus(address)
+	if err != nil {
+		return err
+	}
+
+	err = status.RevokeAccountPublicKey(keyIndex)
+	if err != nil {
+		return fmt.Errorf("failed to revoke public key at index %d for %s: %w", keyIndex, address, err)
+	}
+
+	return a.setAccountStatusAfterAccountStatusSizeChange(address, status)
+}
+
+func (a *StatefulAccounts) GetAccountPublicKeySequenceNumber(address flow.Address, keyIndex uint32) (uint64, error) {
+	err := a.accountPublicKeyIndexInRange(address, keyIndex)
+	if err != nil {
+		return 0, err
+	}
+
+	if keyIndex == 0 {
+		accountPublicKey, err := getAccountPublicKey0(a, address)
+		if err != nil {
+			return 0, err
+		}
+		return accountPublicKey.SeqNumber, nil
+	}
+
+	return getAccountPublicKeySequenceNumber(a, address, keyIndex)
+}
+
+func (a *StatefulAccounts) IncrementAccountPublicKeySequenceNumber(address flow.Address, keyIndex uint32) error {
+	err := a.accountPublicKeyIndexInRange(address, keyIndex)
+	if err != nil {
+		return err
+	}
+
+	if keyIndex == 0 {
+		accountPublicKey, err := getAccountPublicKey0(a, address)
+		if err != nil {
+			return err
+		}
+		accountPublicKey.SeqNumber++
+		return setAccountPublicKey0(a, address, accountPublicKey)
+	}
+
+	return incrementAccountPublicKeySequenceNumber(a, address, keyIndex)
 }
 
 func (a *StatefulAccounts) GetAccountPublicKeyCount(
@@ -273,65 +481,51 @@ func (a *StatefulAccounts) GetAccountPublicKeys(
 	return publicKeys, nil
 }
 
-func (a *StatefulAccounts) SetAccountPublicKey(
-	address flow.Address,
-	keyIndex uint32,
-	publicKey flow.AccountPublicKey,
-) (encodedPublicKey []byte, err error) {
-	err = publicKey.Validate()
-	if err != nil {
-		encoded, _ := publicKey.MarshalJSON()
-		return nil, errors.NewValueErrorf(
-			string(encoded),
-			"invalid public key value: %w",
-			err)
-	}
-
-	encodedPublicKey, err = flow.EncodeAccountPublicKey(publicKey)
-	if err != nil {
-		encoded, _ := publicKey.MarshalJSON()
-		return nil, errors.NewValueErrorf(
-			string(encoded),
-			"invalid public key value: %w",
-			err)
-	}
-
-	err = a.SetValue(
-		flow.PublicKeyRegisterID(address, keyIndex),
-		encodedPublicKey)
-
-	return encodedPublicKey, err
-}
-
-func (a *StatefulAccounts) SetAllAccountPublicKeys(
-	address flow.Address,
-	publicKeys []flow.AccountPublicKey,
-) error {
-
-	count := uint32(len(publicKeys))
-
-	if count >= MaxPublicKeyCount {
-		return errors.NewAccountPublicKeyLimitError(
-			address,
-			count,
-			MaxPublicKeyCount)
-	}
-
-	for i, publicKey := range publicKeys {
-		_, err := a.SetAccountPublicKey(address, uint32(i), publicKey)
-		if err != nil {
-			return err
-		}
-	}
-
-	return a.setPublicKeyCount(address, count)
-}
-
 func (a *StatefulAccounts) AppendAccountPublicKey(
 	address flow.Address,
 	publicKey flow.AccountPublicKey,
 ) error {
+	count, err := a.GetAccountPublicKeyCount(address)
+	if err != nil {
+		return err
+	}
 
+	newCount := count + 1
+	if count >= MaxPublicKeyCount {
+		return errors.NewAccountPublicKeyLimitError(
+			address,
+			newCount,
+			MaxPublicKeyCount)
+	}
+
+	keyIndex := count
+
+	err = a.appendPublicKey(address, publicKey, keyIndex)
+	if err != nil {
+		return err
+	}
+
+	// Adjust storage used for pre-allocated sequence number for key at index > 0.
+	if keyIndex > 0 {
+		sequenceNumberPayloadSize := PredefinedSequenceNumberPayloadSize(address, keyIndex)
+
+		status, err := a.getAccountStatus(address)
+		if err != nil {
+			return err
+		}
+
+		storageUsed := status.StorageUsed() + sequenceNumberPayloadSize
+		return a.setAccountStatusStorageUsed(address, status, storageUsed)
+	}
+
+	return nil
+}
+
+func (a *StatefulAccounts) appendPublicKey(
+	address flow.Address,
+	publicKey flow.AccountPublicKey,
+	keyIndex uint32,
+) error {
 	if !IsValidAccountKeyHashAlgo(publicKey.HashAlgo) {
 		return errors.NewValueErrorf(
 			publicKey.HashAlgo.String(),
@@ -344,24 +538,89 @@ func (a *StatefulAccounts) AppendAccountPublicKey(
 			"signature algorithm type not found")
 	}
 
-	count, err := a.GetAccountPublicKeyCount(address)
+	if keyIndex == 0 {
+		// Create account public key register for account public key at key index 0
+		publicKey.Index = keyIndex
+		err := setAccountPublicKey0(a, address, publicKey)
+		if err != nil {
+			return err
+		}
+
+		return a.setPublicKeyCount(address, keyIndex+1)
+	}
+
+	storedKey := flow.StoredPublicKey{
+		PublicKey: publicKey.PublicKey,
+		SignAlgo:  publicKey.SignAlgo,
+		HashAlgo:  publicKey.HashAlgo,
+	}
+
+	encodedKey, err := flow.EncodeStoredPublicKey(storedKey)
 	if err != nil {
 		return err
 	}
 
-	if count >= MaxPublicKeyCount {
-		return errors.NewAccountPublicKeyLimitError(
-			address,
-			count+1,
-			MaxPublicKeyCount)
-	}
-
-	_, err = a.SetAccountPublicKey(address, count, publicKey)
+	storedKeyIndex, saveKey, err := a.appendKeyMetadataToAccountStatusRegister(
+		address,
+		publicKey.Revoked,
+		uint16(publicKey.Weight),
+		encodedKey,
+	)
 	if err != nil {
 		return err
 	}
 
-	return a.setPublicKeyCount(address, count+1)
+	// Store key if needed.
+	if saveKey {
+		err = appendStoredKey(a, address, storedKeyIndex, encodedKey)
+		if err != nil {
+			return err
+		}
+	}
+
+	// Store sequence number if needed.
+	if publicKey.SeqNumber > 0 {
+		err = createAccountPublicKeySequenceNumber(a, address, keyIndex, publicKey.SeqNumber)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (a *StatefulAccounts) appendKeyMetadataToAccountStatusRegister(
+	address flow.Address,
+	revoked bool,
+	weight uint16,
+	encodedKey []byte,
+) (storedKeyIndex uint32, saveKey bool, _ error) {
+	status, err := a.getAccountStatus(address)
+	if err != nil {
+		return 0, false, err
+	}
+
+	storedKeyIndex, saveKey, err = status.AppendAccountPublicKeyMetadata(
+		revoked,
+		weight,
+		encodedKey,
+		func(b []byte) uint64 {
+			return accountkeymetadata.GetPublicKeyDigest(address, b)
+		},
+		func(storedKeyIndex uint32) ([]byte, error) {
+			return getRawStoredPublicKey(a, address, storedKeyIndex)
+		},
+	)
+	if err != nil {
+		return 0, false, err
+	}
+
+	err = a.setAccountStatusAfterAccountStatusSizeChange(address, status)
+	if err != nil {
+		return 0, false, err
+	}
+
+	return storedKeyIndex, saveKey, nil
 }
 
 func IsValidAccountKeySignAlgo(algo crypto.SigningAlgorithm) bool {
@@ -546,6 +805,11 @@ func (a *StatefulAccounts) updateRegisterSizeChange(
 		// don't double check this to save time and prevent recursion
 		return nil
 	}
+	if strings.HasPrefix(id.Key, flow.SequenceNumberRegisterKeyPrefix) {
+		// Size of sequence number register is included when account public key is appended.
+		// Don't double count sequence number registers.
+		return nil
+	}
 	oldValue, err := a.GetValue(id)
 	if err != nil {
 		return err
@@ -584,15 +848,16 @@ func (a *StatefulAccounts) updateRegisterSizeChange(
 }
 
 func RegisterSize(id flow.RegisterID, value flow.RegisterValue) int {
+	// NOTE: RegisterSize() needs to be in sync with encodedKeyLength() in ledger/trie_encoder.go.
 	if len(value) == 0 {
 		// registers with empty value won't (or don't) exist when stored
 		return 0
 	}
-	size := 0
-	// additional 2 is for len prefixes when encoding is happening
-	// we might get rid of these 2s in the future
-	size += 2 + len(id.Owner)
-	size += 2 + len(id.Key)
+	size := 2 // number of key parts (2 bytes)
+	// Size for each key part:
+	// length prefix (4 bytes) + encoded key part type (2 bytes) + key part value
+	size += 4 + 2 + len(id.Owner)
+	size += 4 + 2 + len(id.Key)
 	size += len(value)
 	return size
 }
@@ -772,6 +1037,93 @@ func (a *StatefulAccounts) setAccountStatus(
 			err)
 	}
 	return nil
+}
+
+func (a *StatefulAccounts) accountPublicKeyIndexInRange(
+	address flow.Address,
+	keyIndex uint32,
+) error {
+	publicKeyCount, err := a.GetAccountPublicKeyCount(address)
+	if err != nil {
+		return errors.NewAccountPublicKeyNotFoundError(
+			address,
+			keyIndex)
+	}
+
+	if keyIndex >= publicKeyCount {
+		return errors.NewAccountPublicKeyNotFoundError(
+			address,
+			keyIndex)
+	}
+
+	return nil
+}
+
+// setAccountStatusAfterAccountStatusSizeChange adjusts and sets
+// account storage used after the account status register size is changed.
+// This function is needed because updateRegisterSizeChange() filters out
+// account status register to prevent recursion when computing storage used,
+// so we need to explicitly update the account storage used when the
+// account status register size is changed.
+func (a *StatefulAccounts) setAccountStatusAfterAccountStatusSizeChange(
+	address flow.Address,
+	status *AccountStatus,
+) error {
+	id := flow.AccountStatusRegisterID(address)
+
+	oldAccountStatusValue, err := a.GetValue(id)
+	if err != nil {
+		return err
+	}
+	oldAccountStatusSize := len(oldAccountStatusValue)
+
+	newAccountStatusValue := status.ToBytes()
+	newAccountStatusSize := len(newAccountStatusValue)
+
+	sizeChange := newAccountStatusSize - oldAccountStatusSize
+	if sizeChange == 0 {
+		// Account status register size has not changed.
+
+		// Set account status in underlying state
+		return a.txnState.Set(id, newAccountStatusValue)
+	}
+
+	oldAccountStatus, err := AccountStatusFromBytes(oldAccountStatusValue)
+	if err != nil {
+		return err
+	}
+	oldStorageUsed := oldAccountStatus.StorageUsed()
+
+	// Two paths to avoid casting uint to int
+	var newStorageUsed uint64
+	if sizeChange < 0 {
+		absChange := uint64(-sizeChange)
+		if absChange > uint64(oldAccountStatusSize) {
+			// should never happen
+			return fmt.Errorf("storage would be negative for %s", id)
+		}
+		newStorageUsed = oldStorageUsed - absChange
+	} else {
+		absChange := uint64(sizeChange)
+		newStorageUsed = oldStorageUsed + absChange
+	}
+
+	// Set updated storage used
+	status.SetStorageUsed(newStorageUsed)
+
+	// Set account status in underlying state
+	return a.txnState.Set(id, status.ToBytes())
+}
+
+// PredefinedSequenceNumberPayloadSize returns sequence number register size.
+func PredefinedSequenceNumberPayloadSize(address flow.Address, keyIndex uint32) uint64 {
+	// NOTE: We use 1 byte for register value size as predefined value size.
+	sequenceNumberValueUsedForStorageSizeComputation := []byte{0x01}
+	size := RegisterSize(
+		flow.AccountPublicKeySequenceNumberRegisterID(address, keyIndex),
+		sequenceNumberValueUsedForStorageSizeComputation,
+	)
+	return uint64(size)
 }
 
 // contractNames container for a list of contract names. Should always be

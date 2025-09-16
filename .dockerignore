@@ -1,3 +1,7 @@
+# Do not copy the user's project git directory into the container
+# it's not needed to build the project, and causes issues when working within git worktrees
+.git/
+
 integration/localnet/bootstrap/
 integration/localnet/profiler/
 integration/localnet/data/

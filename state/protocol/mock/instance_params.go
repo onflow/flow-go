@@ -72,6 +72,26 @@ func (_m *InstanceParams) SealedRoot() *flow.Header {
 	return r0
 }
 
+// SporkRootBlock provides a mock function with no fields
+func (_m *InstanceParams) SporkRootBlock() *flow.GenericBlock[flow.Payload] {
+	ret := _m.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for SporkRootBlock")
+	}
+
+	var r0 *flow.GenericBlock[flow.Payload]
+	if rf, ok := ret.Get(0).(func() *flow.GenericBlock[flow.Payload]); ok {
+		r0 = rf()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*flow.GenericBlock[flow.Payload])
+		}
+	}
+
+	return r0
+}
+
 // NewInstanceParams creates a new instance of InstanceParams. It also registers a testing interface on the mock and a cleanup function to assert the mocks expectations.
 // The first argument is typically a *testing.T value.
 func NewInstanceParams(t interface {

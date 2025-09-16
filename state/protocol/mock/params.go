@@ -110,6 +110,26 @@ func (_m *Params) SporkID() flow.Identifier {
 	return r0
 }
 
+// SporkRootBlock provides a mock function with no fields
+func (_m *Params) SporkRootBlock() *flow.GenericBlock[flow.Payload] {
+	ret := _m.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for SporkRootBlock")
+	}
+
+	var r0 *flow.GenericBlock[flow.Payload]
+	if rf, ok := ret.Get(0).(func() *flow.GenericBlock[flow.Payload]); ok {
+		r0 = rf()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*flow.GenericBlock[flow.Payload])
+		}
+	}
+
+	return r0
+}
+
 // SporkRootBlockHeight provides a mock function with no fields
 func (_m *Params) SporkRootBlockHeight() uint64 {
 	ret := _m.Called()

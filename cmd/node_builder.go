@@ -14,6 +14,7 @@ import (
 
 	"github.com/onflow/flow-go/admin/commands"
 	"github.com/onflow/flow-go/config"
+	"github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
@@ -30,7 +31,6 @@ import (
 	"github.com/onflow/flow-go/storage"
 	bstorage "github.com/onflow/flow-go/storage/badger"
 	"github.com/onflow/flow-go/storage/dbops"
-	"github.com/onflow/flow-go/utils/grpcutils"
 )
 
 const NotSet = "not set"
@@ -282,7 +282,7 @@ func DefaultBaseConfig() *BaseConfig {
 		AdminCert:        NotSet,
 		AdminKey:         NotSet,
 		AdminClientCAs:   NotSet,
-		AdminMaxMsgSize:  grpcutils.DefaultMaxMsgSize,
+		AdminMaxMsgSize:  rpc.DefaultMaxResponseMsgSize,
 		BindAddr:         NotSet,
 		ObserverMode:     false,
 		BootstrapDir:     "bootstrap",

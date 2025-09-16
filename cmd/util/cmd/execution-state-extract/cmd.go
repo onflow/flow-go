@@ -45,6 +45,7 @@ var (
 	flagOutputPayloadByAddresses      string
 	flagCPUProfile                    string
 	flagZeroMigration                 bool
+	flagValidate                      bool
 )
 
 var Cmd = &cobra.Command{
@@ -128,6 +129,9 @@ func init() {
 
 	Cmd.Flags().StringVar(&flagCPUProfile, "cpu-profile", "",
 		"enable CPU profiling")
+
+	Cmd.Flags().BoolVar(&flagValidate, "validate-public-key-migration", false,
+		"validate migrated account public keys")
 }
 
 func run(*cobra.Command, []string) {
@@ -359,12 +363,36 @@ func run(*cobra.Command, []string) {
 	if !flagNoMigration {
 		var migs []migrations.NamedMigration
 
-		switch flagMigration {
-		case "add-migrationmainnet-keys":
-			migs = append(migs, addMigrationMainnetKeysMigration(log.Logger, flagOutputDir, flagNWorker, chain.ChainID())...)
-		default:
-			log.Fatal().Msgf("unknown migration: %s", flagMigration)
+		if len(flagMigration) > 0 {
+			switch flagMigration {
+			case "add-migrationmainnet-keys":
+				migs = append(migs, addMigrationMainnetKeysMigration(log.Logger, flagOutputDir, flagNWorker, chain.ChainID())...)
+			default:
+				log.Fatal().Msgf("unknown migration: %s", flagMigration)
+			}
 		}
+
+		migs = append(
+			migs,
+			migrations.NamedMigration{
+				Name: "account-public-key-deduplication",
+				Migrate: migrations.NewAccountBasedMigration(
+					log.Logger,
+					flagNWorker,
+					[]migrations.AccountBasedMigration{
+						migrations.NewAccountPublicKeyDeduplicationMigration(
+							chain.ChainID(),
+							flagOutputDir,
+							flagValidate,
+							reporters.NewReportFileWriterFactory(flagOutputDir, log.Logger),
+						),
+						migrations.NewAccountUsageMigration(
+							reporters.NewReportFileWriterFactoryWithFormat(flagOutputDir, log.Logger, reporters.ReportFormatCSV),
+						),
+					},
+				),
+			},
+		)
 
 		migration := newMigration(log.Logger, migs, flagNWorker)
 

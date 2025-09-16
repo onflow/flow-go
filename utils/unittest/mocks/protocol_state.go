@@ -45,6 +45,10 @@ type Params struct {
 	state *ProtocolState
 }
 
+func (p *Params) SporkRootBlock() *flow.Block {
+	return p.state.root
+}
+
 func (p *Params) ChainID() flow.ChainID {
 	return p.state.root.ChainID
 }

@@ -43,9 +43,9 @@ func TestTransactionSequenceNumProcess(t *testing.T) {
 		require.NoError(t, err)
 
 		// get fetch the sequence number and it should be updated
-		key, err := accounts.GetAccountPublicKey(address, 0)
+		seqNumber, err := accounts.GetAccountPublicKeySequenceNumber(address, 0)
 		require.NoError(t, err)
-		require.Equal(t, key.SeqNumber, uint64(1))
+		require.Equal(t, seqNumber, uint64(1))
 	})
 	t.Run("invalid sequence number", func(t *testing.T) {
 		txnState := testutils.NewSimpleTransaction(nil)
@@ -77,9 +77,9 @@ func TestTransactionSequenceNumProcess(t *testing.T) {
 		require.True(t, errors.HasErrorCode(err, errors.ErrCodeInvalidProposalSeqNumberError))
 
 		// get fetch the sequence number and check it to be  unchanged
-		key, err := accounts.GetAccountPublicKey(address, 0)
+		seqNumber, err := accounts.GetAccountPublicKeySequenceNumber(address, 0)
 		require.NoError(t, err)
-		require.Equal(t, key.SeqNumber, uint64(0))
+		require.Equal(t, seqNumber, uint64(0))
 	})
 	t.Run("invalid address", func(t *testing.T) {
 		txnState := testutils.NewSimpleTransaction(nil)
@@ -110,8 +110,8 @@ func TestTransactionSequenceNumProcess(t *testing.T) {
 		require.Error(t, err)
 
 		// get fetch the sequence number and check it to be unchanged
-		key, err := accounts.GetAccountPublicKey(address, 0)
+		seqNumber, err := accounts.GetAccountPublicKeySequenceNumber(address, 0)
 		require.NoError(t, err)
-		require.Equal(t, key.SeqNumber, uint64(0))
+		require.Equal(t, seqNumber, uint64(0))
 	})
 }

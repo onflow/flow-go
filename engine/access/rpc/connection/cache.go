@@ -3,7 +3,6 @@ package connection
 import (
 	"fmt"
 	"sync"
-	"time"
 
 	lru "github.com/hashicorp/golang-lru/v2"
 	"github.com/onflow/crypto"
@@ -19,7 +18,7 @@ import (
 type CachedClient struct {
 	conn    *grpc.ClientConn
 	address string
-	timeout time.Duration
+	cfg     Config
 
 	cache          *Cache
 	closeRequested *atomic.Bool
@@ -123,13 +122,13 @@ func NewCache(
 // If the address is not in the cache, it creates a new entry and connects.
 func (c *Cache) GetConnected(
 	address string,
-	timeout time.Duration,
+	cfg Config,
 	networkPubKey crypto.PublicKey,
-	connectFn func(string, time.Duration, crypto.PublicKey, *CachedClient) (*grpc.ClientConn, error),
+	connectFn func(string, Config, crypto.PublicKey, *CachedClient) (*grpc.ClientConn, error),
 ) (*CachedClient, error) {
 	client := &CachedClient{
 		address:        address,
-		timeout:        timeout,
+		cfg:            cfg,
 		closeRequested: atomic.NewBool(false),
 		cache:          c,
 	}
@@ -155,7 +154,7 @@ func (c *Cache) GetConnected(
 	}
 
 	// if the connection is not setup yet or closed, create a new connection and cache it
-	conn, err := connectFn(client.address, client.timeout, networkPubKey, client)
+	conn, err := connectFn(client.address, client.cfg, networkPubKey, client)
 	if err != nil {
 		return nil, err
 	}

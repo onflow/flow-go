@@ -120,6 +120,10 @@ func Bootstrap(
 	if err != nil {
 		return nil, err
 	}
+	err = lctx.AcquireLock(storage.LockBootstrapping)
+	if err != nil {
+		return nil, err
+	}
 
 	config := defaultBootstrapConfig()
 	for _, opt := range options {
@@ -155,10 +159,6 @@ func Bootstrap(
 	// (The lowest block in sealing segment is the last sealed block, but we don't use that here.)
 	lastFinalized := segment.Finalized() // highest block in sealing segment; finalized by protocol convention
 
-	// The spork root block is always provided by a sealing segment separately. This is because the spork root block
-	// may or may not be part of [SealingSegment.Blocks] depending on how much history the sealing segment covers.
-	sporkRootBlock := segment.SporkRootBlock
-
 	// bootstrap the sealing segment
 	// creating sealed root block with the rootResult
 	// creating finalized root block with lastFinalized
@@ -168,12 +168,6 @@ func Bootstrap(
 	}
 
 	err = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-		// initialize spork params
-		err = bootstrapSporkInfo(lctx, rw, blocks, sporkRootBlock)
-		if err != nil {
-			return fmt.Errorf("could not bootstrap spork info: %w", err)
-		}
-
 		// bootstrap dynamic protocol state
 		err = bootstrapProtocolState(lctx, rw, segment, root.Params(), epochProtocolStateSnapshots, protocolKVStoreSnapshots, setups, commits, !config.SkipNetworkAddressValidation)
 		if err != nil {
@@ -287,6 +281,10 @@ func bootstrapProtocolState(
 //  4. For the highest seal (`rootSeal`), we index the sealed result ID in the database.
 //     This is necessary for the execution node to confirm that it is starting to execute from the
 //     correct state.
+//  5. persist the spork root block. This block is always provided separately in the sealing
+//     segment, as it may or may not be included in SealingSegment.Blocks depending on how much
+//     history is covered. The spork root block is persisted as a root proposal without proposer
+//     signature (by convention).
 func bootstrapSealingSegment(
 	lctx lockctx.Proof,
 	db storage.DB,
@@ -475,6 +473,36 @@ func bootstrapSealingSegment(
 		return err
 	}
 
+	// STEP 5: PERSIST spork root block
+	// The spork root block is always provided by a sealing segment separately. This is because the spork root block
+	// may or may not be part of [SealingSegment.Blocks] depending on how much history the sealing segment covers.
+	sporkRootBlock := segment.SporkRootBlock
+
+	// create the spork root proposal
+	proposal, err := flow.NewRootProposal(
+		flow.UntrustedProposal{
+			Block:           *sporkRootBlock,
+			ProposerSigData: nil, // by protocol convention, the spork root block (or genesis block) don't have a proposer signature
+		},
+	)
+	if err != nil {
+		return fmt.Errorf("could not create root proposal for spork root block: %w", err)
+	}
+
+	err = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+		err = blocks.BatchStore(lctx, rw, proposal)
+		if err != nil {
+			// the spork root block may or may not have already been persisted, depending
+			// on whether the root snapshot sealing segment contained it.
+			if errors.Is(err, storage.ErrAlreadyExists) {
+				return nil
+			}
+			return fmt.Errorf("could not store spork root block: %w", err)
+		}
+
+		return nil
+	})
+
 	return nil
 }
 
@@ -485,6 +513,7 @@ func bootstrapSealingSegment(
 //   - Sealed Root Block Height (block height sealed as of the Root Block)
 //   - Latest Finalized Height (initialized to height of Root Block)
 //   - Latest Sealed Block Height (initialized to block height sealed as of the Root Block)
+//   - Spork root block ID (spork root block in sealing segment)
 //   - initial entry in map:
 //     Finalized Block ID -> ID of latest seal in fork with this block as head
 func bootstrapStatePointers(lctx lockctx.Proof, rw storage.ReaderBatchWriter, root protocol.Snapshot) error {
@@ -497,6 +526,21 @@ func bootstrapStatePointers(lctx lockctx.Proof, rw storage.ReaderBatchWriter, ro
 	}
 	lastFinalized := segment.Finalized() // the lastFinalized block in sealing segment is the latest known finalized block
 	lastSealed := segment.Sealed()       // the lastSealed block in sealing segment is the latest known sealed block
+
+	enc, err := datastore.NewVersionedInstanceParams(
+		datastore.DefaultInstanceParamsVersion,
+		lastFinalized.ID(),
+		lastSealed.ID(),
+		root.Params().SporkID(),
+	)
+	if err != nil {
+		return fmt.Errorf("could not create versioned instance params: %w", err)
+	}
+
+	err = operation.InsertInstanceParams(lctx, rw, *enc)
+	if err != nil {
+		return fmt.Errorf("could not store instance params: %w", err)
+	}
 
 	// find the finalized seal that seals the lastSealed block, meaning seal.BlockID == lastSealed.ID()
 	seal, err := segment.FinalizedSeal()
@@ -558,15 +602,6 @@ func bootstrapStatePointers(lctx lockctx.Proof, rw storage.ReaderBatchWriter, ro
 	}
 
 	// insert height pointers
-	err = operation.InsertRootHeight(w, lastFinalized.Height)
-	if err != nil {
-		return fmt.Errorf("could not insert finalized root height: %w", err)
-	}
-	// the sealed root height is the lastSealed block in sealing segment
-	err = operation.InsertSealedRootHeight(w, lastSealed.Height)
-	if err != nil {
-		return fmt.Errorf("could not insert sealed root height: %w", err)
-	}
 	err = operation.UpsertFinalizedHeight(lctx, w, lastFinalized.Height)
 	if err != nil {
 		return fmt.Errorf("could not insert finalized height: %w", err)
@@ -683,44 +718,6 @@ func bootstrapEpochForProtocolStateEntry(
 	return nil
 }
 
-// bootstrapSporkInfo bootstraps the protocol state with information about the
-// spork which is used to disambiguate Flow networks.
-func bootstrapSporkInfo(
-	lctx lockctx.Proof,
-	rw storage.ReaderBatchWriter,
-	blocks storage.Blocks,
-	sporkRootBlock *flow.Block,
-) error {
-	// persist the ID of the spork root block
-	sporkRootBlockID := sporkRootBlock.ID()
-	err := operation.IndexSporkRootBlock(rw.Writer(), sporkRootBlockID)
-	if err != nil {
-		return fmt.Errorf("could not insert spork ID: %w", err)
-	}
-
-	// store the spork root block
-	proposal, err := flow.NewRootProposal(
-		flow.UntrustedProposal{
-			Block:           *sporkRootBlock,
-			ProposerSigData: nil, // by protocol convention, the spork root block (or genesis block) don't have a proposer signature
-		},
-	)
-	if err != nil {
-		return fmt.Errorf("could not create root proposal for spork root block: %w", err)
-	}
-
-	err = blocks.BatchStore(lctx, rw, proposal)
-	if err != nil {
-		// the spork root block may or may not have already been persisted, depending
-		// on whether the root snapshot sealing segment contained it.
-		if errors.Is(err, storage.ErrAlreadyExists) {
-			return nil
-		}
-		return fmt.Errorf("could not store spork root block: %w", err)
-	}
-	return nil
-}
-
 // indexEpochHeights populates the epoch height index from the root snapshot.
 // We index the FirstHeight for every epoch where the transition occurs within the sealing segment of the root snapshot,
 // or for the first epoch of a spork if the snapshot is a spork root snapshot (1 block sealing segment).
@@ -781,10 +778,12 @@ func OpenState(
 	if !isBootstrapped {
 		return nil, fmt.Errorf("expected database to contain bootstrapped state")
 	}
-	sporkRootBlock, err := ReadSporkRootBlock(db, blocks)
+	instanceParams, err := datastore.ReadInstanceParams(db.Reader(), headers, seals, blocks)
 	if err != nil {
-		return nil, fmt.Errorf("could not read spork root block: %w", err)
+		return nil, fmt.Errorf("could not read instance params: %w", err)
 	}
+	sporkRootBlock := instanceParams.SporkRootBlock()
+
 	globalParams := inmem.NewParams(
 		inmem.EncodableParams{
 			ChainID:              sporkRootBlock.ChainID,
@@ -793,10 +792,6 @@ func OpenState(
 			SporkRootBlockView:   sporkRootBlock.View,
 		},
 	)
-	instanceParams, err := ReadInstanceParams(db.Reader(), headers, seals)
-	if err != nil {
-		return nil, fmt.Errorf("could not read instance params: %w", err)
-	}
 	params := &datastore.Params{
 		GlobalParams:   globalParams,
 		InstanceParams: instanceParams,

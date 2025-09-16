@@ -9,22 +9,6 @@ import (
 	"github.com/onflow/flow-go/storage"
 )
 
-func InsertRootHeight(w storage.Writer, height uint64) error {
-	return UpsertByKey(w, MakePrefix(codeFinalizedRootHeight), height)
-}
-
-func RetrieveRootHeight(r storage.Reader, height *uint64) error {
-	return RetrieveByKey(r, MakePrefix(codeFinalizedRootHeight), height)
-}
-
-func InsertSealedRootHeight(w storage.Writer, height uint64) error {
-	return UpsertByKey(w, MakePrefix(codeSealedRootHeight), height)
-}
-
-func RetrieveSealedRootHeight(r storage.Reader, height *uint64) error {
-	return RetrieveByKey(r, MakePrefix(codeSealedRootHeight), height)
-}
-
 // UpsertFinalizedHeight upserts the finalized height index, overwriting the current value.
 // Updates to this index must strictly increase the finalized height.
 // To enforce this, the caller must check the current finalized height while holding [storage.LockFinalizeBlock].

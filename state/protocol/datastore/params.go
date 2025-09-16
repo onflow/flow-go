@@ -3,11 +3,15 @@ package datastore
 import (
 	"fmt"
 
+	"github.com/vmihailenco/msgpack/v4"
+
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/operation"
 )
+
+const DefaultInstanceParamsVersion = 0
 
 type Params struct {
 	protocol.GlobalParams
@@ -26,59 +30,60 @@ type InstanceParams struct {
 	sealedRoot *flow.Header
 	// rootSeal is the seal for block `sealedRoot` - the newest incorporated seal with respect to `finalizedRoot`.
 	rootSeal *flow.Seal
+	// sporkRoot is the root block for the present spork.
+	sporkRootBlock *flow.Block
 }
 
 var _ protocol.InstanceParams = (*InstanceParams)(nil)
 
 // ReadInstanceParams reads the instance parameters from the database and returns them as in-memory representation.
+// It serves as a constructor for InstanceParams and only requires read-only access to the database (we never write).
+// This information is immutable for the lifetime of a node and may be cached.
 // No errors are expected during normal operation.
-func ReadInstanceParams(r storage.Reader, headers storage.Headers, seals storage.Seals) (*InstanceParams, error) {
+func ReadInstanceParams(
+	r storage.Reader,
+	headers storage.Headers,
+	seals storage.Seals,
+	blocks storage.Blocks,
+) (*InstanceParams, error) {
 	params := &InstanceParams{}
 
 	// The values below are written during bootstrapping and immutable for the lifetime of the node. All
 	// following parameters are uniquely defined by the values initially read. No atomicity is required.
-	var (
-		finalizedRootHeight uint64 // height of the highest finalized block contained in the root snapshot
-		sealedRootHeight    uint64 // height of the highest sealed block contained in the root snapshot
-	)
-
-	// root height
-	err := operation.RetrieveRootHeight(r, &finalizedRootHeight)
+	var versioned flow.VersionedInstanceParams
+	err := operation.RetrieveInstanceParams(r, &versioned)
 	if err != nil {
-		return nil, fmt.Errorf("could not read root block to populate cache: %w", err)
-	}
-	// sealed root height
-	err = operation.RetrieveSealedRootHeight(r, &sealedRootHeight)
-	if err != nil {
-		return nil, fmt.Errorf("could not read sealed root block to populate cache: %w", err)
+		return nil, fmt.Errorf("could not read instance params to populate cache: %w", err)
 	}
 
-	// look up 'finalized root block'
-	var finalizedRootID flow.Identifier
-	err = operation.LookupBlockHeight(r, finalizedRootHeight, &finalizedRootID)
-	if err != nil {
-		return nil, fmt.Errorf("could not look up finalized root height: %w", err)
-	}
-	params.finalizedRoot, err = headers.ByBlockID(finalizedRootID)
-	if err != nil {
-		return nil, fmt.Errorf("could not retrieve finalized root header: %w", err)
-	}
+	switch versioned.Version {
+	case 0:
+		var v0 InstanceParamsV0
+		if err := msgpack.Unmarshal(versioned.Data, &v0); err != nil {
+			return nil, fmt.Errorf("could not decode to InstanceParamsV0: %w", err)
+		}
+		params.finalizedRoot, err = headers.ByBlockID(v0.FinalizedRootID)
+		if err != nil {
+			return nil, fmt.Errorf("could not retrieve finalized root header: %w", err)
+		}
 
-	// look up the sealed block as of the 'finalized root block'
-	var sealedRootID flow.Identifier
-	err = operation.LookupBlockHeight(r, sealedRootHeight, &sealedRootID)
-	if err != nil {
-		return nil, fmt.Errorf("could not look up sealed root height: %w", err)
-	}
-	params.sealedRoot, err = headers.ByBlockID(sealedRootID)
-	if err != nil {
-		return nil, fmt.Errorf("could not retrieve sealed root header: %w", err)
-	}
+		params.sealedRoot, err = headers.ByBlockID(v0.SealedRootID)
+		if err != nil {
+			return nil, fmt.Errorf("could not retrieve sealed root header: %w", err)
+		}
 
-	// retrieve the root seal
-	params.rootSeal, err = seals.HighestInFork(finalizedRootID)
-	if err != nil {
-		return nil, fmt.Errorf("could not retrieve root seal: %w", err)
+		// retrieve the root seal
+		params.rootSeal, err = seals.HighestInFork(v0.FinalizedRootID)
+		if err != nil {
+			return nil, fmt.Errorf("could not retrieve root seal: %w", err)
+		}
+
+		params.sporkRootBlock, err = blocks.ByID(v0.SporkRootBlockID)
+		if err != nil {
+			return nil, fmt.Errorf("could not retrieve spork root block: %w", err)
+		}
+	default:
+		return nil, fmt.Errorf("unsupported instance params version: %d", versioned.Version)
 	}
 
 	return params, nil
@@ -103,26 +108,53 @@ func (p *InstanceParams) Seal() *flow.Seal {
 	return p.rootSeal
 }
 
-// ReadFinalizedRoot retrieves the root block's header from the database.
-// This information is immutable for the runtime of the software and may be cached.
-func ReadFinalizedRoot(r storage.Reader) (*flow.Header, error) {
-	// The values below are written during bootstrapping and immutable for the lifetime of the node. All
-	// following parameters are uniquely defined by the values initially read. No atomicity is required.
-	var finalizedRootHeight uint64
-	var rootID flow.Identifier
-	err := operation.RetrieveRootHeight(r, &finalizedRootHeight)
-	if err != nil {
-		return nil, fmt.Errorf("could not retrieve finalized root height: %w", err)
+// SporkRootBlock returns the root block for the present spork.
+func (p *InstanceParams) SporkRootBlock() *flow.Block {
+	return p.sporkRootBlock
+}
+
+// InstanceParamsV0 is the consolidated, serializable form of protocol instance
+// parameters that are constant throughout the lifetime of a node.
+type InstanceParamsV0 struct {
+	// FinalizedRootID is the ID of the finalized root block.
+	FinalizedRootID flow.Identifier
+	// SealedRootID is the ID of the sealed root block.
+	SealedRootID flow.Identifier
+	// SporkRootBlockID is the root block's ID for the present spork this node participates in.
+	SporkRootBlockID flow.Identifier
+}
+
+// NewVersionedInstanceParams constructs a versioned binary blob representing the `InstanceParams`.
+// Conceptually, the values in the `InstanceParams` are immutable during the lifetime of a node.
+// However, versioning allows extending `InstanceParams` with new fields in the future.
+//
+// No errors are expected during normal operation.
+func NewVersionedInstanceParams(
+	version uint64,
+	finalizedRootID flow.Identifier,
+	sealedRootID flow.Identifier,
+	sporkRootBlockID flow.Identifier,
+) (*flow.VersionedInstanceParams, error) {
+	versionedInstanceParams := &flow.VersionedInstanceParams{
+		Version: version,
 	}
-	err = operation.LookupBlockHeight(r, finalizedRootHeight, &rootID) // look up root block ID
-	if err != nil {
-		return nil, fmt.Errorf("could not retrieve root header's ID by height: %w", err)
+	var data interface{}
+	switch version {
+	case 0:
+		data = InstanceParamsV0{
+			FinalizedRootID:  finalizedRootID,
+			SealedRootID:     sealedRootID,
+			SporkRootBlockID: sporkRootBlockID,
+		}
+	default:
+		return nil, fmt.Errorf("unsupported instance params version: %d", version)
 	}
 
-	var rootHeader flow.Header
-	err = operation.RetrieveHeader(r, rootID, &rootHeader) // retrieve root header
+	encodedData, err := msgpack.Marshal(data)
 	if err != nil {
-		return nil, fmt.Errorf("could not retrieve root header: %w", err)
+		return nil, fmt.Errorf("could not encode InstanceParams: %w", err)
 	}
-	return &rootHeader, nil
+	versionedInstanceParams.Data = encodedData
+
+	return versionedInstanceParams, nil
 }

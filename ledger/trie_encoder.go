@@ -210,6 +210,9 @@ func encodeAndAppendKey(buffer []byte, k *Key, version uint16) []byte {
 }
 
 func encodedKeyLength(k *Key, version uint16) int {
+	// NOTE: RegisterSize() in fvm/environment/accounts.go needs to be in sync with encodedKeyLength().
+	// Please update RegisterSize() when this function is updated.
+
 	// Key is encoded as: number of key parts (2 bytes) and for each key part,
 	// the key part size (4 bytes) + encoded key part (n bytes).
 	size := 2 + 4*len(k.KeyParts)

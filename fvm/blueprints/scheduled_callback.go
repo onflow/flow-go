@@ -16,11 +16,44 @@ import (
 
 const callbackTransactionGasLimit = flow.DefaultMaxTransactionGasLimit
 
+// SystemCollection returns the re-created system collection after it has been already executed
+// using the events from the process callback transaction.
+func SystemCollection(chain flow.Chain, processEvents flow.EventsList) (*flow.Collection, error) {
+	process, err := ProcessCallbacksTransaction(chain)
+	if err != nil {
+		return nil, fmt.Errorf("failed to construct process callbacks transaction: %w", err)
+	}
+
+	executes, err := ExecuteCallbacksTransactions(chain, processEvents)
+	if err != nil {
+		return nil, fmt.Errorf("failed to construct execute callbacks transactions: %w", err)
+	}
+
+	systemTx, err := SystemChunkTransaction(chain)
+	if err != nil {
+		return nil, fmt.Errorf("failed to construct system chunk transaction: %w", err)
+	}
+
+	transactions := make([]*flow.TransactionBody, 0, len(executes)+2) // +2 process and system tx
+	transactions = append(transactions, process)
+	transactions = append(transactions, executes...)
+	transactions = append(transactions, systemTx)
+
+	collection, err := flow.NewCollection(flow.UntrustedCollection{
+		Transactions: transactions,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to construct system collection: %w", err)
+	}
+
+	return collection, nil
+}
+
 // ProcessCallbacksTransaction constructs a transaction for processing callbacks, for the given callback.
 // No errors are expected during normal operation.
 func ProcessCallbacksTransaction(chain flow.Chain) (*flow.TransactionBody, error) {
 	sc := systemcontracts.SystemContractsForChain(chain.ChainID())
-	script := templates.GenerateProcessCallbackScript(sc.AsTemplateEnv())
+	script := templates.GenerateProcessTransactionScript(sc.AsTemplateEnv())
 
 	return flow.NewTransactionBodyBuilder().
 		AddAuthorizer(sc.FlowServiceAccount.Address).
@@ -65,7 +98,7 @@ func executeCallbackTransaction(
 	id []byte,
 	effort uint64,
 ) (*flow.TransactionBody, error) {
-	script := templates.GenerateExecuteCallbackScript(env)
+	script := templates.GenerateExecuteTransactionScript(env)
 
 	return flow.NewTransactionBodyBuilder().
 		AddAuthorizer(sc.FlowServiceAccount.Address).
@@ -132,10 +165,15 @@ func callbackArgsFromEvent(event flow.Event) ([]byte, uint64, error) {
 }
 
 func isPendingExecutionEvent(env templates.Environment, event flow.Event) bool {
-	const processedEventTypeTemplate = "A.%v.FlowCallbackScheduler.PendingExecution"
-
-	scheduledContractAddress := env.FlowCallbackSchedulerAddress
-	processedEventType := flow.EventType(fmt.Sprintf(processedEventTypeTemplate, scheduledContractAddress))
-
+	processedEventType := PendingExecutionEventType(env)
 	return event.Type == processedEventType
+}
+
+// PendingExecutionEventType returns the event type for FlowCallbackScheduler PendingExecution event
+// for the provided environment.
+func PendingExecutionEventType(env templates.Environment) flow.EventType {
+	const processedEventTypeTemplate = "A.%v.FlowTransactionScheduler.PendingExecution"
+
+	scheduledContractAddress := env.FlowTransactionSchedulerAddress
+	return flow.EventType(fmt.Sprintf(processedEventTypeTemplate, scheduledContractAddress))
 }
