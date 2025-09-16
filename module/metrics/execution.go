@@ -99,8 +99,9 @@ type ExecutionCollector struct {
 	evmBlockTxCount                         prometheus.Histogram
 	evmBlockGasUsed                         prometheus.Histogram
 	callbacksExecutedCount                  prometheus.Histogram
-	callbacksProcessGasUsed                 prometheus.Histogram
-	callbacksExecuteGasLimits               prometheus.Histogram
+	callbacksExecutedTotal                  prometheus.Counter
+	callbacksProcessComputationUsed         prometheus.Histogram
+	callbacksExecuteComputationLimits       prometheus.Histogram
 }
 
 func NewExecutionCollector(tracer module.Tracer) *ExecutionCollector {
@@ -805,19 +806,26 @@ func NewExecutionCollector(tracer module.Tracer) *ExecutionCollector {
 			Buckets:   prometheus.ExponentialBuckets(1, 2, 8),
 		}),
 
-		callbacksProcessGasUsed: promauto.NewHistogram(prometheus.HistogramOpts{
+		callbacksExecutedTotal: promauto.NewCounter(prometheus.CounterOpts{
 			Namespace: namespaceExecution,
 			Subsystem: subsystemRuntime,
-			Name:      "callbacks_process_gas_used",
-			Help:      "the gas used by the process callback transaction",
+			Name:      "callbacks_executed_total",
+			Help:      "the total number of callbacks executed",
+		}),
+
+		callbacksProcessComputationUsed: promauto.NewHistogram(prometheus.HistogramOpts{
+			Namespace: namespaceExecution,
+			Subsystem: subsystemRuntime,
+			Name:      "callbacks_process_computation_used",
+			Help:      "the computation used by the process callback transaction",
 			Buckets:   prometheus.ExponentialBuckets(10_000, 2, 12),
 		}),
 
-		callbacksExecuteGasLimits: promauto.NewHistogram(prometheus.HistogramOpts{
+		callbacksExecuteComputationLimits: promauto.NewHistogram(prometheus.HistogramOpts{
 			Namespace: namespaceExecution,
 			Subsystem: subsystemRuntime,
-			Name:      "callbacks_execute_gas_limits",
-			Help:      "the total gas limits for execute callback transactions",
+			Name:      "callbacks_execute_computation_limits",
+			Help:      "the total computation limits for execute callback transactions",
 			Buckets:   prometheus.ExponentialBuckets(10_000, 2, 12),
 		}),
 	}
@@ -911,10 +919,11 @@ func (ec *ExecutionCollector) ExecutionScriptExecuted(dur time.Duration, compUse
 }
 
 // ExecutionCallbacksExecuted reports callback execution metrics
-func (ec *ExecutionCollector) ExecutionCallbacksExecuted(callbackCount int, processGasUsed, executeGasLimits uint64) {
+func (ec *ExecutionCollector) ExecutionCallbacksExecuted(callbackCount int, processComputationUsed, executeComputationLimits uint64) {
 	ec.callbacksExecutedCount.Observe(float64(callbackCount))
-	ec.callbacksProcessGasUsed.Observe(float64(processGasUsed))
-	ec.callbacksExecuteGasLimits.Observe(float64(executeGasLimits))
+	ec.callbacksExecutedTotal.Add(float64(callbackCount))
+	ec.callbacksProcessComputationUsed.Observe(float64(processComputationUsed))
+	ec.callbacksExecuteComputationLimits.Observe(float64(executeComputationLimits))
 }
 
 // ExecutionStateStorageDiskTotal reports the total storage size of the execution state on disk in bytes
