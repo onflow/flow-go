@@ -3,71 +3,49 @@ package convert_test
 import (
 	"testing"
 
-	"github.com/onflow/flow/protobuf/go/flow/entities"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/model/access"
-	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-func TestMessageToExecutorMetadata_Populated(t *testing.T) {
-	erID := unittest.IdentifierFixture()
-	exec1 := unittest.IdentifierFixture()
-	exec2 := unittest.IdentifierFixture()
+func TestExecutorMetadata(t *testing.T) {
+	t.Parallel()
 
-	msg := &entities.ExecutorMetadata{
-		ExecutionResultId: erID[:],
-		ExecutorIds:       [][]byte{exec1[:], exec2[:]},
-	}
+	t.Run("convert executor metadata", func(t *testing.T) {
+		t.Parallel()
 
-	actual := convert.MessageToExecutorMetadata(msg)
-	require.NotNil(t, actual)
-	require.Equal(t, erID, actual.ExecutionResultID)
-	require.Len(t, actual.ExecutorIDs, 2)
-	require.Equal(t, exec1, actual.ExecutorIDs[0])
-	require.Equal(t, exec2, actual.ExecutorIDs[1])
-}
+		metadata := &access.ExecutorMetadata{
+			ExecutionResultID: unittest.IdentifierFixture(),
+			ExecutorIDs:       unittest.IdentifierListFixture(4),
+		}
 
-func TestMessageToExecutorMetadata_Nil(t *testing.T) {
-	actual := convert.MessageToExecutorMetadata(nil)
-	require.Nil(t, actual)
-}
+		msg := convert.ExecutorMetadataToMessage(metadata)
+		converted := convert.MessageToExecutorMetadata(msg)
 
-func TestMessageToExecutorMetadata_Empty(t *testing.T) {
-	actual := convert.MessageToExecutorMetadata(&entities.ExecutorMetadata{})
-	require.NotNil(t, actual)
-	require.Equal(t, flow.ZeroID, actual.ExecutionResultID)
-	require.Empty(t, actual.ExecutorIDs)
-}
+		require.Equal(t, metadata, converted)
+	})
 
-func TestExecutorMetadataToMessage_Populated(t *testing.T) {
-	erID := unittest.IdentifierFixture()
-	exec1 := unittest.IdentifierFixture()
-	exec2 := unittest.IdentifierFixture()
+	t.Run("convert nil executor metadata", func(t *testing.T) {
+		t.Parallel()
 
-	in := &access.ExecutorMetadata{
-		ExecutionResultID: erID,
-		ExecutorIDs:       []flow.Identifier{exec1, exec2},
-	}
+		msg := convert.ExecutorMetadataToMessage(nil)
+		converted := convert.MessageToExecutorMetadata(msg)
 
-	msg := convert.ExecutorMetadataToMessage(in)
-	require.NotNil(t, msg)
-	require.Equal(t, erID[:], msg.ExecutionResultId)
-	require.Len(t, msg.ExecutorIds, 2)
-	require.Equal(t, exec1[:], msg.ExecutorIds[0])
-	require.Equal(t, exec2[:], msg.ExecutorIds[1])
-}
+		require.Nil(t, converted)
+	})
 
-func TestExecutorMetadataToMessage_Empty(t *testing.T) {
-	msg := convert.ExecutorMetadataToMessage(&access.ExecutorMetadata{})
-	require.NotNil(t, msg)
-	require.Equal(t, flow.ZeroID[:], msg.ExecutionResultId)
-	require.Empty(t, msg.ExecutorIds)
-}
+	t.Run("convert empty executor metadata", func(t *testing.T) {
+		t.Parallel()
 
-func TestExecutorMetadataToMessage_Nil(t *testing.T) {
-	msg := convert.ExecutorMetadataToMessage(nil)
-	require.Nil(t, msg)
+		metadata := &access.ExecutorMetadata{}
+		msg := convert.ExecutorMetadataToMessage(metadata)
+		converted := convert.MessageToExecutorMetadata(msg)
+
+		// cannot do a direct comparison to metadata because the MessageToIdentifiers converter always
+		// returns a slice, even if the input is nil
+		require.NotNil(t, converted)
+		require.True(t, converted.IsEmpty())
+	})
 }

@@ -68,9 +68,9 @@ type EventsSuite struct {
 	blockIDs        []flow.Identifier
 	blockEvents     []flow.Event
 
-	executionResultProvider *osyncmock.ExecutionResultProvider
+	executionResultProvider *osyncmock.ExecutionResultInfoProvider
 	executionStateCache     *osyncmock.ExecutionStateCache
-	resultForestSnapshot    *osyncmock.Snapshot
+	executionDataSnapshot   *osyncmock.Snapshot
 	criteria                optimistic_sync.Criteria
 
 	testCases []testCase
@@ -168,15 +168,15 @@ func (s *EventsSuite) SetupTest() {
 		return nil, storage.ErrNotFound
 	}).Maybe()
 
-	s.resultForestSnapshot = osyncmock.NewSnapshot(s.T())
-	s.resultForestSnapshot.
+	s.executionDataSnapshot = osyncmock.NewSnapshot(s.T())
+	s.executionDataSnapshot.
 		On("Events").
 		Return(s.events, nil).
 		Maybe()
 
-	s.executionResultProvider = osyncmock.NewExecutionResultProvider(s.T())
+	s.executionResultProvider = osyncmock.NewExecutionResultInfoProvider(s.T())
 	s.executionResultProvider.
-		On("ExecutionResult", mock.Anything, mock.Anything).
+		On("ExecutionResultInfo", mock.Anything, mock.Anything).
 		Return(&optimistic_sync.ExecutionResultInfo{
 			ExecutionResult: s.executionResult,
 			ExecutionNodes:  s.executionNodes.ToSkeleton(),
@@ -186,7 +186,7 @@ func (s *EventsSuite) SetupTest() {
 	s.executionStateCache = osyncmock.NewExecutionStateCache(s.T())
 	s.executionStateCache.
 		On("Snapshot", mock.Anything).
-		Return(s.resultForestSnapshot, nil).
+		Return(s.executionDataSnapshot, nil).
 		Maybe() // it is called only for local query mode
 
 	s.criteria = optimistic_sync.Criteria{}

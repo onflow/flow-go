@@ -14,6 +14,7 @@ func (s *TransactionSignature) Parse(
 	rawAddress string,
 	rawKeyIndex string,
 	rawSignature string,
+	rawExtensionData string,
 	chain flow.Chain,
 ) error {
 	address, err := ParseAddress(rawAddress, chain)
@@ -32,10 +33,17 @@ func (s *TransactionSignature) Parse(
 		return fmt.Errorf("invalid signature: %w", err)
 	}
 
+	var extensionData ExtensionData
+	err = extensionData.Parse(rawExtensionData)
+	if err != nil {
+		return fmt.Errorf("invalid extension data: %w", err)
+	}
+
 	*s = TransactionSignature(flow.TransactionSignature{
-		Address:   address,
-		KeyIndex:  keyIndex,
-		Signature: signature,
+		Address:       address,
+		KeyIndex:      keyIndex,
+		Signature:     signature,
+		ExtensionData: extensionData,
 	})
 
 	return nil
@@ -51,7 +59,7 @@ func (t *TransactionSignatures) Parse(rawSigs []models.TransactionSignature, cha
 	signatures := make([]TransactionSignature, len(rawSigs))
 	for i, sig := range rawSigs {
 		var signature TransactionSignature
-		err := signature.Parse(sig.Address, sig.KeyIndex, sig.Signature, chain)
+		err := signature.Parse(sig.Address, sig.KeyIndex, sig.Signature, sig.ExtensionData, chain)
 		if err != nil {
 			return err
 		}
@@ -87,5 +95,22 @@ func (s *Signature) Parse(raw string) error {
 }
 
 func (s Signature) Flow() []byte {
+	return s
+}
+
+type ExtensionData []byte
+
+func (s *ExtensionData) Parse(raw string) error {
+	// Allow empty
+	extensionDataBytes, err := util.FromBase64(raw)
+	if err != nil {
+		return fmt.Errorf("invalid encoding")
+	}
+
+	*s = extensionDataBytes
+	return nil
+}
+
+func (s ExtensionData) Flow() []byte {
 	return s
 }

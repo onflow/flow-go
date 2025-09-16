@@ -67,7 +67,8 @@ func GetTransactionResultByID(r *common.Request, backend access.API, link common
 	response.Build(txr, req.ID, link)
 
 	if req.ExecutionState.IncludeExecutorMetadata {
-		response.Metadata = commonmodels.NewMetadata(&executorMetadata)
+		metadata := commonmodels.NewMetadata(executorMetadata)
+		response.Metadata = &metadata
 	}
 
 	return response, nil

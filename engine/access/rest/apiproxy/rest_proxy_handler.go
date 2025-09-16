@@ -414,10 +414,10 @@ func (r *RestProxyHandler) GetEventsForHeightRange(
 	}
 	r.log("upstream", "GetEventsForHeightRange", err)
 
-	metadata := convert.MessageToExecutorMetadata(eventsResponse.Metadata.ExecutorMetadata)
-
+	metadata := getExecutorMetadata(eventsResponse.GetMetadata())
 	res, err := convert.MessagesToBlockEvents(eventsResponse.Results)
-	return res, *metadata, err
+
+	return res, metadata, err
 }
 
 // GetEventsForBlockIDs returns events by their name in the specified block IDs.
@@ -453,10 +453,10 @@ func (r *RestProxyHandler) GetEventsForBlockIDs(
 		return nil, accessmodel.ExecutorMetadata{}, err
 	}
 
-	metadata := convert.MessageToExecutorMetadata(eventsResponse.Metadata.ExecutorMetadata)
-
+	metadata := getExecutorMetadata(eventsResponse.GetMetadata())
 	res, err := convert.MessagesToBlockEvents(eventsResponse.Results)
-	return res, *metadata, err
+
+	return res, metadata, err
 }
 
 // convertError converts a serialized access error formatted as a grpc error returned from the upstream AN,
@@ -516,4 +516,15 @@ func splitOnPrefix(original, prefix string) (string, bool) {
 		return parts[1], true
 	}
 	return "", false
+}
+
+func getExecutorMetadata(metadata *entities.Metadata) accessmodel.ExecutorMetadata {
+	if metadata != nil {
+		if executorMetadata := metadata.GetExecutorMetadata(); executorMetadata != nil {
+			return *convert.MessageToExecutorMetadata(executorMetadata)
+		}
+	}
+
+	return accessmodel.ExecutorMetadata{}
+
 }

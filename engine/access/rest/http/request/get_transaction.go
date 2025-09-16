@@ -97,7 +97,7 @@ func parseGetTransactionResult(
 		return GetTransactionResult{}, fmt.Errorf("invalid ID request: %w", err)
 	}
 
-	executionStateQuery, err := parser.NewExecutionDataQuery(
+	executionStateQuery, err := parser.NewExecutionStateQuery(
 		rawAgreeingExecutorsCount,
 		rawAgreeingExecutorsIds,
 		rawIncludeExecutorMetadata,

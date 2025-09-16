@@ -67,3 +67,45 @@ func (f *FailoverTransactionProvider) TransactionResultsByBlockID(
 
 	return f.execNodeProvider.TransactionResultsByBlockID(ctx, block, encodingVersion, executionResultInfo)
 }
+
+func (f *FailoverTransactionProvider) TransactionsByBlockID(
+	ctx context.Context,
+	block *flow.Block,
+	executionResultInfo *optimistic_sync.ExecutionResultInfo,
+) ([]*flow.TransactionBody, accessmodel.ExecutorMetadata, error) {
+	localResults, metadata, localErr := f.localProvider.TransactionsByBlockID(ctx, block, executionResultInfo)
+	if localErr == nil {
+		return localResults, metadata, nil
+	}
+
+	return f.execNodeProvider.TransactionsByBlockID(ctx, block, executionResultInfo)
+}
+
+func (f *FailoverTransactionProvider) SystemTransaction(
+	ctx context.Context,
+	block *flow.Block,
+	txID flow.Identifier,
+	executionResultInfo *optimistic_sync.ExecutionResultInfo,
+) (*flow.TransactionBody, accessmodel.ExecutorMetadata, error) {
+	localResult, metadata, localErr := f.localProvider.SystemTransaction(ctx, block, txID, executionResultInfo)
+	if localErr == nil {
+		return localResult, metadata, nil
+	}
+
+	return f.execNodeProvider.SystemTransaction(ctx, block, txID, executionResultInfo)
+}
+
+func (f *FailoverTransactionProvider) SystemTransactionResult(
+	ctx context.Context,
+	block *flow.Block,
+	txID flow.Identifier,
+	encodingVersion entities.EventEncodingVersion,
+	executionResultInfo *optimistic_sync.ExecutionResultInfo,
+) (*accessmodel.TransactionResult, accessmodel.ExecutorMetadata, error) {
+	localResult, metadata, localErr := f.localProvider.SystemTransactionResult(ctx, block, txID, encodingVersion, executionResultInfo)
+	if localErr == nil {
+		return localResult, metadata, nil
+	}
+
+	return f.execNodeProvider.SystemTransactionResult(ctx, block, txID, encodingVersion, executionResultInfo)
+}

@@ -184,7 +184,7 @@ func (e *Engine) processQueuedChunkDataPackRequestsShovelerWorker(ctx irrecovera
 		select {
 		case <-e.chdpRequestHandler.GetNotifier():
 			// there is at list a single chunk data pack request queued up.
-			e.processAvailableMesssages(ctx)
+			e.processAvailableMessages(ctx)
 		case <-ctx.Done():
 			// close the internal channel, the workers will drain the channel before exiting
 			close(e.chdpRequestChannel)
@@ -197,7 +197,7 @@ func (e *Engine) processQueuedChunkDataPackRequestsShovelerWorker(ctx irrecovera
 // processAvailableMesssages is a blocking method that reads all queued ChunkDataRequests till the queue gets empty.
 // Each ChunkDataRequest is processed by a single concurrent worker. However, there are limited number of such workers.
 // If there is no worker available for a request, the method blocks till one is available.
-func (e *Engine) processAvailableMesssages(ctx irrecoverable.SignalerContext) {
+func (e *Engine) processAvailableMessages(ctx irrecoverable.SignalerContext) {
 	for {
 		select {
 		case <-ctx.Done():
@@ -217,7 +217,6 @@ func (e *Engine) processAvailableMesssages(ctx irrecoverable.SignalerContext) {
 			// if it does happen, it means there is a bug in the queue implementation.
 			ctx.Throw(fmt.Errorf("invalid chunk id type in chunk data pack request queue: %T", msg.Payload))
 		}
-
 		request := &mempool.ChunkDataPackRequest{
 			RequesterId: msg.OriginID,
 			ChunkId:     chunkId,

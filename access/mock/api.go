@@ -932,9 +932,9 @@ func (_m *API) GetProtocolStateSnapshotByHeight(ctx context.Context, blockHeight
 	return r0, r1
 }
 
-// GetSystemTransaction provides a mock function with given fields: ctx, blockID
-func (_m *API) GetSystemTransaction(ctx context.Context, blockID flow.Identifier) (*flow.TransactionBody, error) {
-	ret := _m.Called(ctx, blockID)
+// GetSystemTransaction provides a mock function with given fields: ctx, txID, blockID
+func (_m *API) GetSystemTransaction(ctx context.Context, txID flow.Identifier, blockID flow.Identifier) (*flow.TransactionBody, error) {
+	ret := _m.Called(ctx, txID, blockID)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetSystemTransaction")
@@ -942,19 +942,19 @@ func (_m *API) GetSystemTransaction(ctx context.Context, blockID flow.Identifier
 
 	var r0 *flow.TransactionBody
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, flow.Identifier) (*flow.TransactionBody, error)); ok {
-		return rf(ctx, blockID)
+	if rf, ok := ret.Get(0).(func(context.Context, flow.Identifier, flow.Identifier) (*flow.TransactionBody, error)); ok {
+		return rf(ctx, txID, blockID)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, flow.Identifier) *flow.TransactionBody); ok {
-		r0 = rf(ctx, blockID)
+	if rf, ok := ret.Get(0).(func(context.Context, flow.Identifier, flow.Identifier) *flow.TransactionBody); ok {
+		r0 = rf(ctx, txID, blockID)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*flow.TransactionBody)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, flow.Identifier) error); ok {
-		r1 = rf(ctx, blockID)
+	if rf, ok := ret.Get(1).(func(context.Context, flow.Identifier, flow.Identifier) error); ok {
+		r1 = rf(ctx, txID, blockID)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -962,9 +962,9 @@ func (_m *API) GetSystemTransaction(ctx context.Context, blockID flow.Identifier
 	return r0, r1
 }
 
-// GetSystemTransactionResult provides a mock function with given fields: ctx, blockID, encodingVersion, criteria
-func (_m *API) GetSystemTransactionResult(ctx context.Context, blockID flow.Identifier, encodingVersion entities.EventEncodingVersion, criteria optimistic_sync.Criteria) (*modelaccess.TransactionResult, modelaccess.ExecutorMetadata, error) {
-	ret := _m.Called(ctx, blockID, encodingVersion, criteria)
+// GetSystemTransactionResult provides a mock function with given fields: ctx, txID, blockID, encodingVersion, criteria
+func (_m *API) GetSystemTransactionResult(ctx context.Context, txID flow.Identifier, blockID flow.Identifier, encodingVersion entities.EventEncodingVersion, criteria optimistic_sync.Criteria) (*modelaccess.TransactionResult, modelaccess.ExecutorMetadata, error) {
+	ret := _m.Called(ctx, txID, blockID, encodingVersion, criteria)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetSystemTransactionResult")
@@ -973,25 +973,25 @@ func (_m *API) GetSystemTransactionResult(ctx context.Context, blockID flow.Iden
 	var r0 *modelaccess.TransactionResult
 	var r1 modelaccess.ExecutorMetadata
 	var r2 error
-	if rf, ok := ret.Get(0).(func(context.Context, flow.Identifier, entities.EventEncodingVersion, optimistic_sync.Criteria) (*modelaccess.TransactionResult, modelaccess.ExecutorMetadata, error)); ok {
-		return rf(ctx, blockID, encodingVersion, criteria)
+	if rf, ok := ret.Get(0).(func(context.Context, flow.Identifier, flow.Identifier, entities.EventEncodingVersion, optimistic_sync.Criteria) (*modelaccess.TransactionResult, modelaccess.ExecutorMetadata, error)); ok {
+		return rf(ctx, txID, blockID, encodingVersion, criteria)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, flow.Identifier, entities.EventEncodingVersion, optimistic_sync.Criteria) *modelaccess.TransactionResult); ok {
-		r0 = rf(ctx, blockID, encodingVersion, criteria)
+	if rf, ok := ret.Get(0).(func(context.Context, flow.Identifier, flow.Identifier, entities.EventEncodingVersion, optimistic_sync.Criteria) *modelaccess.TransactionResult); ok {
+		r0 = rf(ctx, txID, blockID, encodingVersion, criteria)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*modelaccess.TransactionResult)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, flow.Identifier, entities.EventEncodingVersion, optimistic_sync.Criteria) modelaccess.ExecutorMetadata); ok {
-		r1 = rf(ctx, blockID, encodingVersion, criteria)
+	if rf, ok := ret.Get(1).(func(context.Context, flow.Identifier, flow.Identifier, entities.EventEncodingVersion, optimistic_sync.Criteria) modelaccess.ExecutorMetadata); ok {
+		r1 = rf(ctx, txID, blockID, encodingVersion, criteria)
 	} else {
 		r1 = ret.Get(1).(modelaccess.ExecutorMetadata)
 	}
 
-	if rf, ok := ret.Get(2).(func(context.Context, flow.Identifier, entities.EventEncodingVersion, optimistic_sync.Criteria) error); ok {
-		r2 = rf(ctx, blockID, encodingVersion, criteria)
+	if rf, ok := ret.Get(2).(func(context.Context, flow.Identifier, flow.Identifier, entities.EventEncodingVersion, optimistic_sync.Criteria) error); ok {
+		r2 = rf(ctx, txID, blockID, encodingVersion, criteria)
 	} else {
 		r2 = ret.Error(2)
 	}

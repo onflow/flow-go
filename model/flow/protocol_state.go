@@ -704,3 +704,18 @@ type PSKeyValueStoreData struct {
 	Version uint64
 	Data    []byte
 }
+
+func (d PSKeyValueStoreData) Equal(d2 *PSKeyValueStoreData) bool {
+	return d.Version == d2.Version &&
+		slices.Equal(d.Data, d2.Data)
+}
+
+// VersionedInstanceParams is a binary instance params blob with a version attached, specifying the format
+// of the marshaled data. In a nutshell, it serves as a binary of an InstanceParams.
+// The VersionedInstanceParams is a generic format that can be later decoded to
+// potentially different strongly typed structures based on version. When reading from the store,
+// callers must know how to deal with the binary representation.
+type VersionedInstanceParams struct {
+	Version uint64
+	Data    []byte
+}

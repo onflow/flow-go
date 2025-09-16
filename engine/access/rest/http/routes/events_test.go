@@ -5,10 +5,8 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
-	"strconv"
 	"strings"
 	"testing"
-	"time"
 
 	mocks "github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -19,7 +17,6 @@ import (
 	"github.com/onflow/flow-go/engine/access/rest/common/models"
 	"github.com/onflow/flow-go/engine/access/rest/http/routes"
 	"github.com/onflow/flow-go/engine/access/rest/router"
-	"github.com/onflow/flow-go/engine/access/rest/util"
 	"github.com/onflow/flow-go/model/access"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -61,7 +58,7 @@ func TestGetEvents(t *testing.T) {
 				"true",
 			),
 			expectedStatus:   http.StatusOK,
-			expectedResponse: buildExpectedResponse(t, []flow.BlockEvents{events[0]}),
+			expectedResponse: buildExpectedResponse(t, []flow.BlockEvents{events[0]}, true),
 		},
 		{
 			description: "Get events by all block IDs",
@@ -76,7 +73,7 @@ func TestGetEvents(t *testing.T) {
 				"true",
 			),
 			expectedStatus:   http.StatusOK,
-			expectedResponse: buildExpectedResponse(t, events),
+			expectedResponse: buildExpectedResponse(t, events, true),
 		},
 		{
 			description: "Get events for height range",
@@ -91,7 +88,7 @@ func TestGetEvents(t *testing.T) {
 				"true",
 			),
 			expectedStatus:   http.StatusOK,
-			expectedResponse: buildExpectedResponse(t, events),
+			expectedResponse: buildExpectedResponse(t, events, true),
 		},
 		{
 			description: "Get events range ending at sealed block",
@@ -106,7 +103,7 @@ func TestGetEvents(t *testing.T) {
 				"true",
 			),
 			expectedStatus:   http.StatusOK,
-			expectedResponse: buildExpectedResponse(t, events),
+			expectedResponse: buildExpectedResponse(t, events, true),
 		},
 		{
 			description: "Get events range ending after last block",
@@ -121,7 +118,7 @@ func TestGetEvents(t *testing.T) {
 				"true",
 			),
 			expectedStatus:   http.StatusOK,
-			expectedResponse: buildExpectedResponse(t, truncatedEvents),
+			expectedResponse: buildExpectedResponse(t, truncatedEvents, true),
 		},
 		// invalid
 		{
@@ -253,57 +250,6 @@ func TestGetEvents(t *testing.T) {
 
 }
 
-func buildRequest(
-	t *testing.T,
-	eventType string,
-	start string,
-	end string,
-	blockIDs []string,
-	agreeingExecutorsCount string,
-	requiredExecutors []string,
-	includeExecutorMetadata string,
-) *http.Request {
-	u, _ := url.Parse("/v1/events")
-	q := u.Query()
-
-	if len(blockIDs) > 0 {
-		q.Add(routes.BlockQueryParam, strings.Join(blockIDs, ","))
-	}
-
-	if start != "" && end != "" {
-		q.Add(router.StartHeightQueryParam, start)
-		q.Add(router.EndHeightQueryParam, end)
-	}
-
-	if agreeingExecutorsCount != "" {
-		count, err := strconv.Atoi(agreeingExecutorsCount)
-		require.NoError(t, err)
-		require.Greater(t, count, 0, "agreeingExecutorsCount must be greater than 0")
-		q.Add(router.AgreeingExecutorsCountQueryParam, agreeingExecutorsCount)
-	}
-
-	if len(requiredExecutors) > 0 {
-		q.Add(router.RequiredExecutorIdsQueryParam, strings.Join(requiredExecutors, ","))
-	}
-
-	if includeExecutorMetadata != "" {
-		includeMetadata, err := strconv.ParseBool(includeExecutorMetadata)
-		require.NoError(t, err)
-		if includeMetadata {
-			q.Add(router.IncludeExecutorMetadataQueryParam, fmt.Sprint(includeExecutorMetadata))
-		}
-	}
-
-	q.Add(routes.EventTypeQuery, eventType)
-
-	u.RawQuery = q.Encode()
-
-	req, err := http.NewRequest("GET", u.String(), nil)
-	require.NoError(t, err)
-
-	return req
-}
-
 func TestGetEvents_ParseEmptyExecutionState(t *testing.T) {
 	startHeight := 0
 	endHeight := 5
@@ -339,8 +285,8 @@ func TestGetEvents_ParseEmptyExecutionState(t *testing.T) {
 		"",
 	)
 
-	expectedResponseBody := buildExpectedResponse(t, expectedBlockEvents)
-	router.AssertResponse(t, request, http.StatusOK, expectedResponseBody, backend)
+	expectedResponseBody := buildExpectedResponse(t, expectedBlockEvents, false)
+	router.AssertOKResponse(t, request, expectedResponseBody, backend)
 }
 
 func generateEventsMocks(backend *mock.API, n int) []flow.BlockEvents {
@@ -446,52 +392,47 @@ func generateEventsMocks(backend *mock.API, n int) []flow.BlockEvents {
 	return events
 }
 
-func buildExpectedResponse(t *testing.T, events []flow.BlockEvents) string {
-	// TODO(illia): We need to refactor this test to support include/exclude metadata field
-	// We should pass in includeMetadata boolean value here and fix it in TestGetEvents.
-	// Currently, if we exclude metadata field, we still include it in the response object.
+func buildRequest(
+	t *testing.T,
+	eventType string,
+	start string,
+	end string,
+	blockIDs []string,
+	agreeingExecutorsCount string,
+	requiredExecutors []string,
+	includeExecutorMetadata string,
+) *http.Request {
+	u, _ := url.Parse("/v1/events")
+	q := u.Query()
 
-	// TODO: why don't we reuse types from rest/common/models package here?
-	type eventResponse struct {
-		Type             flow.EventType  `json:"type"`
-		TransactionID    flow.Identifier `json:"transaction_id"`
-		TransactionIndex string          `json:"transaction_index"`
-		EventIndex       string          `json:"event_index"`
-		Payload          string          `json:"payload"`
+	if len(blockIDs) > 0 {
+		q.Add(routes.BlockQueryParam, strings.Join(blockIDs, ","))
 	}
 
-	type blockEventsResponse struct {
-		BlockID        flow.Identifier  `json:"block_id"`
-		BlockHeight    string           `json:"block_height"`
-		BlockTimestamp string           `json:"block_timestamp"`
-		Events         []eventResponse  `json:"events,omitempty"`
-		Metadata       *models.Metadata `json:"metadata,omitempty"`
+	if start != "" && end != "" {
+		q.Add(router.StartHeightQueryParam, start)
+		q.Add(router.EndHeightQueryParam, end)
 	}
 
-	res := make([]blockEventsResponse, len(events))
-
-	for i, e := range events {
-		events := make([]eventResponse, len(e.Events))
-
-		for i, ev := range e.Events {
-			events[i] = eventResponse{
-				Type:             ev.Type,
-				TransactionID:    ev.TransactionID,
-				TransactionIndex: fmt.Sprint(ev.TransactionIndex),
-				EventIndex:       fmt.Sprint(ev.EventIndex),
-				Payload:          util.ToBase64(ev.Payload),
-			}
-		}
-
-		res[i] = blockEventsResponse{
-			BlockID:        e.BlockID,
-			BlockHeight:    fmt.Sprint(e.BlockHeight),
-			BlockTimestamp: e.BlockTimestamp.Format(time.RFC3339Nano),
-			Events:         events,
-		}
+	q.Add(router.AgreeingExecutorsCountQueryParam, agreeingExecutorsCount)
+	q.Add(router.RequiredExecutorIdsQueryParam, strings.Join(requiredExecutors, ","))
+	if len(includeExecutorMetadata) > 0 {
+		q.Add(router.IncludeExecutorMetadataQueryParam, fmt.Sprint(includeExecutorMetadata))
 	}
 
-	data, err := json.Marshal(res)
+	q.Add(routes.EventTypeQuery, eventType)
+
+	u.RawQuery = q.Encode()
+
+	req, err := http.NewRequest("GET", u.String(), nil)
+	require.NoError(t, err)
+
+	return req
+}
+
+func buildExpectedResponse(t *testing.T, events []flow.BlockEvents, includeMetadata bool) string {
+	list := models.NewBlockEventsList(events, access.ExecutorMetadata{}, includeMetadata)
+	data, err := json.Marshal(list)
 	require.NoError(t, err)
 
 	return string(data)

@@ -42,7 +42,6 @@ type Transactions struct {
 	chainID flow.ChainID
 
 	systemTxID flow.Identifier
-	systemTx   *flow.TransactionBody
 
 	// RPC Clients & Network
 	collectionRPCClient         accessproto.AccessAPIClient // RPC client tied to a fixed collection node
@@ -55,6 +54,7 @@ type Transactions struct {
 	blocks       storage.Blocks
 	collections  storage.Collections
 	transactions storage.Transactions
+	events       storage.Events
 
 	txResultCache *lru.Cache[flow.Identifier, *accessmodel.TransactionResult]
 
@@ -62,9 +62,10 @@ type Transactions struct {
 	txProvider      provider.TransactionProvider
 	txStatusDeriver *txstatus.TxStatusDeriver
 
-	executionStateCache optimistic_sync.ExecutionStateCache
-	execResultProvider  optimistic_sync.ExecutionResultProvider
-	operatorCriteria    optimistic_sync.Criteria
+	executionStateCache       optimistic_sync.ExecutionStateCache
+	execResultProvider        optimistic_sync.ExecutionResultInfoProvider
+	operatorCriteria          optimistic_sync.Criteria
+	scheduledCallbacksEnabled bool
 }
 
 var _ access.TransactionsAPI = (*Transactions)(nil)
@@ -75,7 +76,6 @@ type Params struct {
 	State                       protocol.State
 	ChainID                     flow.ChainID
 	SystemTxID                  flow.Identifier
-	SystemTx                    *flow.TransactionBody
 	StaticCollectionRPCClient   accessproto.AccessAPIClient
 	HistoricalAccessNodeClients []accessproto.AccessAPIClient
 	NodeCommunicator            node_communicator.Communicator
@@ -85,13 +85,15 @@ type Params struct {
 	Blocks                      storage.Blocks
 	Collections                 storage.Collections
 	Transactions                storage.Transactions
+	Events                      storage.Events
 	TxResultCache               *lru.Cache[flow.Identifier, *accessmodel.TransactionResult]
 	TxProvider                  provider.TransactionProvider
 	TxValidator                 *validator.TransactionValidator
 	TxStatusDeriver             *txstatus.TxStatusDeriver
 	ExecutionStateCache         optimistic_sync.ExecutionStateCache
-	ExecResultProvider          optimistic_sync.ExecutionResultProvider
+	ExecResultProvider          optimistic_sync.ExecutionResultInfoProvider
 	OperatorCriteria            optimistic_sync.Criteria
+	ScheduledCallbacksEnabled   bool
 }
 
 func NewTransactionsBackend(params Params) (*Transactions, error) {
@@ -101,7 +103,6 @@ func NewTransactionsBackend(params Params) (*Transactions, error) {
 		state:                       params.State,
 		chainID:                     params.ChainID,
 		systemTxID:                  params.SystemTxID,
-		systemTx:                    params.SystemTx,
 		collectionRPCClient:         params.StaticCollectionRPCClient,
 		historicalAccessNodeClients: params.HistoricalAccessNodeClients,
 		nodeCommunicator:            params.NodeCommunicator,
@@ -109,6 +110,7 @@ func NewTransactionsBackend(params Params) (*Transactions, error) {
 		blocks:                      params.Blocks,
 		collections:                 params.Collections,
 		transactions:                params.Transactions,
+		events:                      params.Events,
 		txResultCache:               params.TxResultCache,
 		txValidator:                 params.TxValidator,
 		txProvider:                  params.TxProvider,
@@ -116,6 +118,7 @@ func NewTransactionsBackend(params Params) (*Transactions, error) {
 		executionStateCache:         params.ExecutionStateCache,
 		execResultProvider:          params.ExecResultProvider,
 		operatorCriteria:            params.OperatorCriteria,
+		scheduledCallbacksEnabled:   params.ScheduledCallbacksEnabled,
 	}
 
 	if params.EnableRetries {
@@ -227,7 +230,7 @@ func (t *Transactions) sendTransactionToCollector(
 	tx *flow.TransactionBody,
 	collectionNodeAddr string,
 ) error {
-	collectionRPC, closer, err := t.connectionFactory.GetAccessAPIClient(collectionNodeAddr, nil)
+	collectionRPC, closer, err := t.connectionFactory.GetCollectionAPIClient(collectionNodeAddr, nil)
 	if err != nil {
 		return fmt.Errorf("failed to connect to collection node at %s: %w", collectionNodeAddr, err)
 	}
@@ -286,29 +289,25 @@ func (t *Transactions) GetTransaction(
 }
 
 func (t *Transactions) GetTransactionsByBlockID(
-	_ context.Context,
+	ctx context.Context,
 	blockID flow.Identifier,
 ) ([]*flow.TransactionBody, error) {
-	var transactions []*flow.TransactionBody
-
 	// TODO: consider using storage.Index.ByBlockID, the index contains collection id and seals ID
 	block, err := t.blocks.ByID(blockID)
 	if err != nil {
 		return nil, rpc.ConvertStorageError(err)
 	}
 
-	for _, guarantee := range block.Payload.Guarantees {
-		collection, err := t.collections.ByID(guarantee.CollectionID)
-		if err != nil {
-			return nil, rpc.ConvertStorageError(err)
-		}
-
-		transactions = append(transactions, collection.Transactions...)
+	// TODO: this method needs to accept userCriteria
+	criteria := t.operatorCriteria
+	execResultInfo, err := t.execResultProvider.ExecutionResultInfo(blockID, criteria)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get execution result for last block: %w", err)
 	}
 
-	transactions = append(transactions, t.systemTx)
-
-	return transactions, nil
+	// TODO: return executor metadata
+	transactions, _, err := t.txProvider.TransactionsByBlockID(ctx, block, execResultInfo)
+	return transactions, err
 }
 
 func (t *Transactions) GetTransactionResult(
@@ -382,7 +381,7 @@ func (t *Transactions) GetTransactionResult(
 		blockHeight = block.Height
 
 		criteria := t.operatorCriteria.OverrideWith(userCriteria)
-		execResultInfo, err := t.execResultProvider.ExecutionResult(blockID, criteria)
+		execResultInfo, err := t.execResultProvider.ExecutionResultInfo(blockID, criteria)
 		if err != nil {
 			return nil, executorMetadata, fmt.Errorf("failed to get execution result for last block: %w", err)
 		}
@@ -518,7 +517,7 @@ func (t *Transactions) GetTransactionResultsByBlockID(
 	}
 
 	criteria := t.operatorCriteria.OverrideWith(userCriteria)
-	execResultInfo, err := t.execResultProvider.ExecutionResult(blockID, criteria)
+	execResultInfo, err := t.execResultProvider.ExecutionResultInfo(blockID, criteria)
 	if err != nil {
 		return nil, accessmodel.ExecutorMetadata{}, fmt.Errorf("failed to get execution result for last block: %w", err)
 	}
@@ -552,7 +551,7 @@ func (t *Transactions) GetTransactionResultByIndex(
 	}
 
 	criteria := t.operatorCriteria.OverrideWith(userCriteria)
-	execResultInfo, err := t.execResultProvider.ExecutionResult(blockID, criteria)
+	execResultInfo, err := t.execResultProvider.ExecutionResultInfo(blockID, criteria)
 	if err != nil {
 		return nil, accessmodel.ExecutorMetadata{}, fmt.Errorf("failed to get execution result for last block: %w", err)
 	}
@@ -572,13 +571,36 @@ func (t *Transactions) GetTransactionResultByIndex(
 }
 
 // GetSystemTransaction returns system transaction
-func (t *Transactions) GetSystemTransaction(_ context.Context, _ flow.Identifier) (*flow.TransactionBody, error) {
-	return t.systemTx, nil
+func (t *Transactions) GetSystemTransaction(
+	ctx context.Context,
+	txID flow.Identifier,
+	blockID flow.Identifier,
+) (*flow.TransactionBody, error) {
+	block, err := t.blocks.ByID(blockID)
+	if err != nil {
+		return nil, rpc.ConvertStorageError(err)
+	}
+
+	if txID == flow.ZeroID {
+		txID = t.systemTxID
+	}
+
+	// TODO: this method needs to accept userCriteria
+	criteria := t.operatorCriteria
+	execResultInfo, err := t.execResultProvider.ExecutionResultInfo(blockID, criteria)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get execution result for last block: %w", err)
+	}
+
+	// TODO: return executor metadata
+	result, _, err := t.txProvider.SystemTransaction(ctx, block, txID, execResultInfo)
+	return result, err
 }
 
 // GetSystemTransactionResult returns system transaction result
 func (t *Transactions) GetSystemTransactionResult(
 	ctx context.Context,
+	txID flow.Identifier,
 	blockID flow.Identifier,
 	requiredEventEncodingVersion entities.EventEncodingVersion,
 	userCriteria optimistic_sync.Criteria,
@@ -588,21 +610,17 @@ func (t *Transactions) GetSystemTransactionResult(
 		return nil, accessmodel.ExecutorMetadata{}, rpc.ConvertStorageError(err)
 	}
 
+	if txID == flow.ZeroID {
+		txID = t.systemTxID
+	}
+
 	criteria := t.operatorCriteria.OverrideWith(userCriteria)
-	execResultInfo, err := t.execResultProvider.ExecutionResult(blockID, criteria)
+	execResultInfo, err := t.execResultProvider.ExecutionResultInfo(blockID, criteria)
 	if err != nil {
 		return nil, accessmodel.ExecutorMetadata{}, fmt.Errorf("failed to get execution result for last block: %w", err)
 	}
 
-	result, executorMetadata, err := t.lookupTransactionResult(ctx, t.systemTxID, block.ToHeader(), requiredEventEncodingVersion, execResultInfo)
-	if err != nil {
-		if _, ok := status.FromError(err); ok {
-			return nil, executorMetadata, rpc.ConvertError(err, "failed to retrieve system result", codes.Internal)
-		}
-		return nil, executorMetadata, access.RequireNoError(ctx, fmt.Errorf("failed to retrieve system result: %w", err))
-	}
-
-	return result, executorMetadata, nil
+	return t.txProvider.SystemTransactionResult(ctx, block, txID, requiredEventEncodingVersion, execResultInfo)
 }
 
 // lookupBlock returns a block based on the transaction ID.

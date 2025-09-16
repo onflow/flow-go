@@ -21,6 +21,7 @@ import (
 	debug_script "github.com/onflow/flow-go/cmd/util/cmd/debug-script"
 	debug_tx "github.com/onflow/flow-go/cmd/util/cmd/debug-tx"
 	diff_states "github.com/onflow/flow-go/cmd/util/cmd/diff-states"
+	"github.com/onflow/flow-go/cmd/util/cmd/diffkeys"
 	epochs "github.com/onflow/flow-go/cmd/util/cmd/epochs/cmd"
 	export "github.com/onflow/flow-go/cmd/util/cmd/exec-data-json-export"
 	edbs "github.com/onflow/flow-go/cmd/util/cmd/execution-data-blobstore/cmd"
@@ -136,6 +137,7 @@ func addCommands() {
 	rootCmd.AddCommand(verify_evm_offchain_replay.Cmd)
 	rootCmd.AddCommand(pebble_checkpoint.Cmd)
 	rootCmd.AddCommand(db_migration.Cmd)
+	rootCmd.AddCommand(diffkeys.Cmd)
 }
 
 func initConfig() {
