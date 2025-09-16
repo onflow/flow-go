@@ -1,6 +1,7 @@
 package compare_cadence_vm
 
 import (
+	"bytes"
 	"context"
 	"encoding/hex"
 	"fmt"
@@ -327,63 +328,18 @@ func compareResults(txID flow.Identifier, interResult debug.Result, vmResult deb
 		log.Error().Msgf("Log diff: %s", diff)
 	}
 
-	// Compare read registers
-	interReadRegisters := interResult.Snapshot.ReadRegisterIDs()
-	debug.SortRegisterIDs(interReadRegisters)
+	// Compare SPOCKs.
+	// Comparing the sets of read/updated register is not sufficient to determine if execution matched!
+	interSpock := interResult.Snapshot.SpockSecret
+	vmSpock := vmResult.Snapshot.SpockSecret
 
-	vmReadRegisters := vmResult.Snapshot.ReadRegisterIDs()
-	debug.SortRegisterIDs(vmReadRegisters)
-
-	readRegisterDiff := pretty.Diff(interReadRegisters, vmReadRegisters)
-	if len(readRegisterDiff) != 0 {
-		mismatch = true
-	}
-	for _, diff := range readRegisterDiff {
-		log.Error().Msgf("Read register diff (interpreter vs VM): %s", diff)
-	}
-
-	// Compare updated registers
-	interUpdatedRegisters := interResult.Snapshot.UpdatedRegisters()
-	debug.SortRegisterEntries(interUpdatedRegisters)
-
-	vmUpdatedRegisters := vmResult.Snapshot.UpdatedRegisters()
-	debug.SortRegisterEntries(vmUpdatedRegisters)
-
-	if len(interUpdatedRegisters) != len(vmUpdatedRegisters) {
+	if !bytes.Equal(interSpock, vmSpock) {
 		log.Error().Msgf(
-			"Number of updated registers differ: interpreter %d vs VM %d",
-			len(interUpdatedRegisters),
-			len(vmUpdatedRegisters),
+			"SPOCKs differ: interpreter %x vs VM %x",
+			interSpock,
+			vmSpock,
 		)
 		mismatch = true
-	}
-
-	for i, interEntry := range interUpdatedRegisters {
-		if i >= len(vmUpdatedRegisters) {
-			break
-		}
-		vmEntry := vmUpdatedRegisters[i]
-
-		if interEntry.Key != vmEntry.Key {
-			log.Error().Msgf(
-				"Updated register key mismatch at index %d: interpreter %s vs VM %s",
-				i,
-				interEntry.Key,
-				vmEntry.Key,
-			)
-			mismatch = true
-			continue
-		}
-
-		if !slices.Equal(interEntry.Value, vmEntry.Value) {
-			log.Error().Msgf(
-				"Updated register value mismatch for register %s: interpreter %s vs VM %s",
-				interEntry.Key,
-				hex.EncodeToString(interEntry.Value),
-				hex.EncodeToString(vmEntry.Value),
-			)
-			mismatch = true
-		}
 	}
 
 	if mismatch {
