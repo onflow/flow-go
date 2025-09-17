@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/kr/pretty"
+	sdk "github.com/onflow/flow-go-sdk"
 	client "github.com/onflow/flow-go-sdk/access/grpc"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
@@ -29,6 +30,7 @@ var (
 	flagUseExecutionDataAPI bool
 	flagBlockID             string
 	flagBlockCount          int
+	flagDebug               bool
 )
 
 var Cmd = &cobra.Command{
@@ -60,6 +62,8 @@ func init() {
 	_ = Cmd.MarkFlagRequired("block-id")
 
 	Cmd.Flags().IntVar(&flagBlockCount, "block-count", 1, "number of blocks to process (default: 1)")
+
+	Cmd.Flags().BoolVar(&flagDebug, "debug", false, "enable debug logging")
 }
 
 func run(_ *cobra.Command, args []string) {
@@ -95,20 +99,37 @@ func run(_ *cobra.Command, args []string) {
 		log.Fatal().Err(err).Str("ID", flagBlockID).Msg("failed to parse block ID")
 	}
 
-	var header *flow.Header
+	var (
+		header           *flow.Header
+		blocksMismatched int
+		blocksMatched    int
+		txMismatched     int
+		txMatched        int
+	)
 
 	for i := 0; i < flagBlockCount; i++ {
 		if header != nil {
 			blockID = header.ParentID
 		}
 
-		header = compareBlock(
+		var result blockResult
+		header, result = compareBlock(
 			blockID,
 			remoteClient,
 			flowClient,
 			chain,
 		)
+		txMismatched += result.mismatches
+		txMatched += result.matches
+		if result.mismatches > 0 {
+			blocksMismatched++
+		} else {
+			blocksMatched++
+		}
 	}
+
+	log.Info().Msgf("Compared %d blocks: %d matched, %d mismatched", blocksMatched+blocksMismatched, blocksMatched, blocksMismatched)
+	log.Info().Msgf("Compared %d transactions: %d matched, %d mismatched", txMatched+txMismatched, txMatched, txMismatched)
 }
 
 type spans struct {
@@ -148,14 +169,26 @@ func (s *spans) Shutdown(_ context.Context) error {
 	return nil
 }
 
+type blockResult struct {
+	mismatches int
+	matches    int
+}
+
 func compareBlock(
 	blockID flow.Identifier,
 	remoteClient debug.RemoteClient,
 	flowClient *client.Client,
 	chain flow.Chain,
-) *flow.Header {
+) (
+	header *flow.Header,
+	result blockResult,
+) {
 
-	blockTransactions, systemTxID, header := debug_tx.FetchBlockInfo(blockID, flowClient)
+	var (
+		blockTransactions []*sdk.Transaction
+		systemTxID        sdk.Identifier
+	)
+	blockTransactions, systemTxID, header = debug_tx.FetchBlockInfo(blockID, flowClient)
 
 	log.Info().Msgf("Running all transactions in block %s (height %d) ...", blockID, header.Height)
 
@@ -232,23 +265,29 @@ func compareBlock(
 		) {
 			mismatch = true
 
-			compareReadsAndWrites(
-				txID,
-				interTxSnapshots[i],
-				vmTxSnapshots[i],
-			)
+			result.mismatches++
 
-			log.Info().Str("tx", txID.String()).Msg("Interpreter spans:")
+			if flagDebug {
+				compareReadsAndWrites(
+					txID,
+					interTxSnapshots[i],
+					vmTxSnapshots[i],
+				)
 
-			for _, span := range interSpans[i].spans {
-				printSpan(span)
+				log.Info().Str("tx", txID.String()).Msg("Interpreter spans:")
+
+				for _, span := range interSpans[i].spans {
+					printSpan(span)
+				}
+
+				log.Info().Str("tx", txID.String()).Msg("VM spans:")
+
+				for _, span := range vmSpans[i].spans {
+					printSpan(span)
+				}
 			}
-
-			log.Info().Str("tx", txID.String()).Msg("VM spans:")
-
-			for _, span := range vmSpans[i].spans {
-				printSpan(span)
-			}
+		} else {
+			result.matches++
 		}
 	}
 
@@ -258,7 +297,7 @@ func compareBlock(
 		log.Info().Msgf("Block %s (height %d) matched!", blockID, header.Height)
 	}
 
-	return header
+	return header, result
 }
 
 func printSpan(span otelTrace.ReadOnlySpan) {
