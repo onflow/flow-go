@@ -2261,6 +2261,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 		}).
 		AdminCommand("backfill-tx-error-messages", func(config *cmd.NodeConfig) commands.AdminCommand {
 			return storageCommands.NewBackfillTxErrorMessagesCommand(
+				builder.Logger,
 				builder.State,
 				builder.TxResultErrorMessagesCore,
 			)
