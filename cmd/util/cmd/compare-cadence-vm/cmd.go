@@ -318,7 +318,7 @@ func compareResults(txID flow.Identifier, interResult debug.Result, vmResult deb
 
 	var mismatch bool
 
-	// Compare errors
+	// Compare errors (just presence/absence of error, not the error message itself)
 
 	interErr := interResult.Output.Err
 	vmErr := vmResult.Output.Err
@@ -369,18 +369,98 @@ func compareResults(txID flow.Identifier, interResult debug.Result, vmResult deb
 		log.Error().Msgf("Log diff: %s", diff)
 	}
 
+	// Compare set of read register IDs.
+	// The VM might perform fewer or more reads than the interpreter,
+	// and still produce the same end result.
+	// This is not considered a mismatch, but we warn about it.
+
+	interReadRegisterIDs := interResult.Snapshot.ReadRegisterIDs()
+	debug.SortRegisterIDs(interReadRegisterIDs)
+
+	vmReadRegisterIDs := vmResult.Snapshot.ReadRegisterIDs()
+	debug.SortRegisterIDs(vmReadRegisterIDs)
+
+	if len(vmReadRegisterIDs) != len(interReadRegisterIDs) {
+		log.Warn().Msgf(
+			"Number of read registers differ: interpreter %d vs VM %d",
+			len(interReadRegisterIDs),
+			len(vmReadRegisterIDs),
+		)
+	}
+
+	for i, interReadRegisterID := range interReadRegisterIDs {
+		if i >= len(vmReadRegisterIDs) {
+			break
+		}
+		vmReadRegisterID := vmReadRegisterIDs[i]
+
+		if interReadRegisterID != vmReadRegisterID {
+			log.Warn().Msgf(
+				"Read register ID mismatch at index %d: interpreter %s vs VM %s",
+				i,
+				interReadRegisterID,
+				vmReadRegisterID,
+			)
+		}
+	}
+
+	// Compare set of written register entries (IDs and values).
+
+	interWrittenRegisterEntries := interResult.Snapshot.UpdatedRegisters()
+	debug.SortRegisterEntries(interWrittenRegisterEntries)
+
+	vmWrittenRegisterEntries := vmResult.Snapshot.UpdatedRegisters()
+	debug.SortRegisterEntries(vmWrittenRegisterEntries)
+
+	if len(vmWrittenRegisterEntries) != len(interWrittenRegisterEntries) {
+		log.Error().Msgf(
+			"Number of written registers differ: interpreter %d vs VM %d",
+			len(interWrittenRegisterEntries),
+			len(vmWrittenRegisterEntries),
+		)
+		mismatch = true
+	}
+
+	for i, interWrittenRegisterEntry := range interWrittenRegisterEntries {
+		if i >= len(vmWrittenRegisterEntries) {
+			break
+		}
+		vmWrittenRegisterEntry := vmWrittenRegisterEntries[i]
+
+		if interWrittenRegisterEntry.Key != vmWrittenRegisterEntry.Key {
+			log.Error().Msgf(
+				"Written register ID mismatch at index %d: interpreter %s vs VM %s",
+				i,
+				interWrittenRegisterEntry.Key,
+				vmWrittenRegisterEntry.Key,
+			)
+			mismatch = true
+
+		} else if !bytes.Equal(interWrittenRegisterEntry.Value, vmWrittenRegisterEntry.Value) {
+			log.Error().Msgf(
+				"Written register value mismatch for register %s: interpreter %s vs VM %s",
+				interWrittenRegisterEntry.Key,
+				hex.EncodeToString(interWrittenRegisterEntry.Value),
+				hex.EncodeToString(vmWrittenRegisterEntry.Value),
+			)
+			mismatch = true
+		}
+	}
+
 	// Compare SPOCKs.
-	// Comparing the sets of read/updated register is not sufficient to determine if execution matched!
+	// The VM might perform fewer or more reads, or reads in a different order than the interpreter,
+	// and still produce the same end result.
+	// This is not considered a mismatch, but we warn about it.
+
 	interSpock := interResult.Snapshot.SpockSecret
 	vmSpock := vmResult.Snapshot.SpockSecret
 
 	if !bytes.Equal(interSpock, vmSpock) {
-		log.Error().Msgf(
+		log.Warn().Msgf(
 			"SPOCKs differ: interpreter %x vs VM %x",
 			interSpock,
 			vmSpock,
 		)
-		mismatch = true
 	}
 
 	if mismatch {
