@@ -161,13 +161,11 @@ func (b *StateStreamBackend) getExecutionData(ctx context.Context, height uint64
 	if height == b.sporkRootBlockHeight {
 		sporkRootBlockID, err := b.headers.BlockIDByHeight(b.sporkRootBlockHeight)
 		if err != nil {
-			if !errors.Is(err, storage.ErrNotFound) {
-				return nil, fmt.Errorf("could not get block ID for root block height %d: %w", b.sporkRootBlockHeight, err)
-			}
 			// the spork root block will not exist locally if the node was bootstrapped with a newer
-			// root block. In this case, just use a placeholder. This blockID is only used when serving
-			// data for the root block, which will never happen if it does not exist locally.
-			sporkRootBlockID = flow.ZeroID
+			// root block. However, the logic that calls this method should have already checked that
+			// the height is within the range of available data. Reaching this point means there is a
+			// bug in the logic or the node is in an inconsistent state.
+			return nil, fmt.Errorf("could not get block ID for root block height %d: %w", b.sporkRootBlockHeight, err)
 		}
 
 		return &execution_data.BlockExecutionDataEntity{
