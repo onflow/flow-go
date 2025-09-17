@@ -169,13 +169,11 @@ func (e *Events) GetEventsForHeightRange(
 				rpc.ConvertStorageError(fmt.Errorf("failed to get block header for %d: %w", i, err))
 		}
 
-		blockHeaders = append(
-			blockHeaders, provider.BlockMetadata{
-				ID:        blockID,
-				Height:    header.Height,
-				Timestamp: time.UnixMilli(int64(header.Timestamp)).UTC(),
-			},
-		)
+		blockHeaders = append(blockHeaders, provider.BlockMetadata{
+			ID:        blockID,
+			Height:    header.Height,
+			Timestamp: time.UnixMilli(int64(header.Timestamp)).UTC(),
+		})
 	}
 
 	// get the result for the block with the highest height. all data queried for this set of blocks
