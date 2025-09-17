@@ -1,6 +1,6 @@
 module github.com/onflow/flow-go
 
-go 1.23.7
+go 1.25.0
 
 require (
 	cloud.google.com/go/compute/metadata v0.8.0
@@ -15,7 +15,7 @@ require (
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc
 	github.com/dgraph-io/badger/v2 v2.2007.4
 	github.com/ef-ds/deque v1.0.4
-	github.com/ethereum/go-ethereum v1.16.2
+	github.com/ethereum/go-ethereum v1.16.3
 	github.com/fxamacker/cbor/v2 v2.8.1-0.20250402194037-6f932b086829
 	github.com/gammazero/workerpool v1.1.3
 	github.com/gogo/protobuf v1.3.2
@@ -49,9 +49,9 @@ require (
 	github.com/onflow/atree v0.10.1
 	github.com/onflow/cadence v1.7.0
 	github.com/onflow/crypto v0.25.3
-	github.com/onflow/flow v0.4.16
-	github.com/onflow/flow-core-contracts/lib/go/contracts v1.7.4-0.20250912190102-f09f1b77f361
-	github.com/onflow/flow-core-contracts/lib/go/templates v1.7.2-0.20250912190102-f09f1b77f361
+	github.com/onflow/flow v0.4.15
+	github.com/onflow/flow-core-contracts/lib/go/contracts v1.8.1
+	github.com/onflow/flow-core-contracts/lib/go/templates v1.8.1
 	github.com/onflow/flow-go-sdk v1.8.1
 	github.com/onflow/flow/protobuf/go/flow v0.4.16
 	github.com/pbnjay/memory v0.0.0-20210728143218-7b4eea64cf58
@@ -95,7 +95,6 @@ require (
 	github.com/coreos/go-semver v0.3.0
 	github.com/docker/go-units v0.5.0
 	github.com/dustin/go-humanize v1.0.1
-	github.com/fxamacker/circlehash v0.3.0
 	github.com/go-playground/validator/v10 v10.19.0
 	github.com/golang/snappy v0.0.5-0.20231225225746-43d5d4cd4e0e
 	github.com/gorilla/websocket v1.5.3
@@ -191,6 +190,7 @@ require (
 	github.com/flynn/noise v1.1.0 // indirect
 	github.com/francoispqt/gojay v1.2.13 // indirect
 	github.com/fsnotify/fsnotify v1.6.0 // indirect
+	github.com/fxamacker/circlehash v0.3.0
 	github.com/gabriel-vasile/mimetype v1.4.6 // indirect
 	github.com/gammazero/deque v1.0.0 // indirect
 	github.com/getsentry/sentry-go v0.27.0 // indirect
@@ -272,8 +272,8 @@ require (
 	github.com/onflow/fixed-point v0.1.1 // indirect
 	github.com/onflow/flow-ft/lib/go/contracts v1.0.1 // indirect
 	github.com/onflow/flow-ft/lib/go/templates v1.0.1 // indirect
-	github.com/onflow/flow-nft/lib/go/contracts v1.2.4 // indirect
-	github.com/onflow/flow-nft/lib/go/templates v1.2.1 // indirect
+	github.com/onflow/flow-nft/lib/go/contracts v1.3.0 // indirect
+	github.com/onflow/flow-nft/lib/go/templates v1.3.0 // indirect
 	github.com/onflow/sdks v0.6.0-preview.1 // indirect
 	github.com/onsi/ginkgo/v2 v2.22.0 // indirect
 	github.com/opencontainers/runtime-spec v1.2.0 // indirect

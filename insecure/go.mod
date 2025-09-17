@@ -1,6 +1,6 @@
 module github.com/onflow/flow-go/insecure
 
-go 1.23.7
+go 1.25.0
 
 require (
 	github.com/btcsuite/btcd/chaincfg/chainhash v1.0.2
@@ -93,7 +93,7 @@ require (
 	github.com/envoyproxy/go-control-plane/envoy v1.32.4 // indirect
 	github.com/envoyproxy/protoc-gen-validate v1.2.1 // indirect
 	github.com/ethereum/c-kzg-4844/v2 v2.1.0 // indirect
-	github.com/ethereum/go-ethereum v1.16.2 // indirect
+	github.com/ethereum/go-ethereum v1.16.3 // indirect
 	github.com/ethereum/go-verkle v0.2.2 // indirect
 	github.com/felixge/httpsnoop v1.0.4 // indirect
 	github.com/ferranbt/fastssz v0.1.4 // indirect
@@ -215,14 +215,14 @@ require (
 	github.com/onflow/atree v0.10.1 // indirect
 	github.com/onflow/cadence v1.7.0 // indirect
 	github.com/onflow/fixed-point v0.1.1 // indirect
-	github.com/onflow/flow-core-contracts/lib/go/contracts v1.7.4-0.20250912190102-f09f1b77f361 // indirect
-	github.com/onflow/flow-core-contracts/lib/go/templates v1.7.2-0.20250912190102-f09f1b77f361 // indirect
+	github.com/onflow/flow-core-contracts/lib/go/contracts v1.8.1 // indirect
+	github.com/onflow/flow-core-contracts/lib/go/templates v1.8.1 // indirect
 	github.com/onflow/flow-evm-bridge v0.1.0 // indirect
 	github.com/onflow/flow-ft/lib/go/contracts v1.0.1 // indirect
 	github.com/onflow/flow-ft/lib/go/templates v1.0.1 // indirect
 	github.com/onflow/flow-go-sdk v1.8.1 // indirect
-	github.com/onflow/flow-nft/lib/go/contracts v1.2.4 // indirect
-	github.com/onflow/flow-nft/lib/go/templates v1.2.1 // indirect
+	github.com/onflow/flow-nft/lib/go/contracts v1.3.0 // indirect
+	github.com/onflow/flow-nft/lib/go/templates v1.3.0 // indirect
 	github.com/onflow/flow/protobuf/go/flow v0.4.16 // indirect
 	github.com/onflow/go-ethereum v1.16.2 // indirect
 	github.com/onflow/nft-storefront/lib/go/contracts v1.0.0 // indirect
