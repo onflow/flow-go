@@ -141,11 +141,13 @@ var _ otelTrace.SpanExporter = &spans{}
 var interestingSpanNamePrefixes = []trace.SpanName{
 	trace.FVMCadenceTrace,
 	trace.FVMEnvAllocateSlabIndex,
+	trace.FVMEnvGetValue,
+	trace.FVMEnvSetValue,
 }
 
 var uninterestingSpanNames = []trace.SpanName{
 	// Only reported by interpreter at the moment, makes diffing harder
-	"fvm.cadence.trace.import",
+	trace.FVMCadenceTrace + ".import",
 }
 
 func (s *spans) ExportSpans(_ context.Context, spans []otelTrace.ReadOnlySpan) error {

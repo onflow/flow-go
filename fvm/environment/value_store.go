@@ -3,6 +3,7 @@ package environment
 import (
 	"bytes"
 	"encoding/binary"
+	"encoding/hex"
 	"fmt"
 
 	"github.com/onflow/atree"
@@ -125,7 +126,16 @@ func (store *valueStore) GetValue(
 	[]byte,
 	error,
 ) {
-	defer store.tracer.StartChildSpan(trace.FVMEnvGetValue).End()
+	span := store.tracer.StartChildSpan(trace.FVMEnvGetValue)
+	defer func() {
+		if span.Tracer != nil {
+			span.SetAttributes(
+				attribute.String("owner", hex.EncodeToString(owner)),
+				attribute.String("key", hex.EncodeToString(keyBytes)),
+			)
+		}
+		span.End()
+	}()
 
 	id := flow.CadenceRegisterID(owner, keyBytes)
 	if id.IsInternalState() {
@@ -154,7 +164,17 @@ func (store *valueStore) SetValue(
 	keyBytes []byte,
 	value []byte,
 ) error {
-	defer store.tracer.StartChildSpan(trace.FVMEnvSetValue).End()
+	span := store.tracer.StartChildSpan(trace.FVMEnvSetValue)
+	defer func() {
+		if span.Tracer != nil {
+			span.SetAttributes(
+				attribute.String("owner", hex.EncodeToString(owner)),
+				attribute.String("key", hex.EncodeToString(keyBytes)),
+				attribute.String("value", hex.EncodeToString(value)),
+			)
+		}
+		span.End()
+	}()
 
 	id := flow.CadenceRegisterID(owner, keyBytes)
 	if id.IsInternalState() {
