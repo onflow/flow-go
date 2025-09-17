@@ -139,50 +139,6 @@ func (tb TransactionBody) ID() Identifier {
 	return MakeID(tb)
 }
 
-// Transaction is the smallest unit of task.
-//
-//structwrite:immutable - mutations allowed only within the constructor
-type Transaction struct {
-	TransactionBody
-	Status           TransactionStatus
-	Events           []Event
-	ComputationSpent uint64
-	StartState       StateCommitment
-	EndState         StateCommitment
-}
-
-// UntrustedTransaction is an untrusted input-only representation of a Transaction,
-// used for construction.
-//
-// This type exists to ensure that constructor functions are invoked explicitly
-// with named fields, which improves clarity and reduces the risk of incorrect field
-// ordering during construction.
-//
-// An instance of UntrustedTransaction should be validated and converted into
-// a trusted Transaction using NewTransaction constructor.
-type UntrustedTransaction Transaction
-
-// NewTransaction creates a new instance of Transaction.
-// Construction of Transaction is allowed only within the constructor.
-//
-// All errors indicate a valid Transaction cannot be constructed from the input.
-func NewTransaction(untrusted UntrustedTransaction) (*Transaction, error) {
-
-	trustedTxBody, err := NewTransactionBody(UntrustedTransactionBody(untrusted.TransactionBody))
-	if err != nil {
-		return nil, fmt.Errorf("invalid transaction body: %w", err)
-	}
-
-	return &Transaction{
-		TransactionBody:  *trustedTxBody,
-		Status:           untrusted.Status,
-		Events:           untrusted.Events,
-		ComputationSpent: untrusted.ComputationSpent,
-		StartState:       untrusted.StartState,
-		EndState:         untrusted.EndState,
-	}, nil
-}
-
 // MissingFields checks if a transaction is missing any required fields and returns those that are missing.
 func (tb *TransactionBody) MissingFields() []string {
 	// Required fields are Script, ReferenceBlockID, Payer
@@ -251,11 +207,6 @@ func (tb *TransactionBody) envelopeCanonicalForm() interface{} {
 		tb.PayloadCanonicalForm(),
 		signaturesList(tb.PayloadSignatures).canonicalForm(),
 	}
-}
-
-func (tx *Transaction) String() string {
-	return fmt.Sprintf("Transaction %v submitted by %v (block %v)",
-		tx.ID(), tx.Payer.Hex(), tx.ReferenceBlockID)
 }
 
 // TransactionStatus represents the status of a transaction.

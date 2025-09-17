@@ -47,8 +47,6 @@ func InternalToMessage(event interface{}) (UntrustedMessage, error) {
 		return (*EntityResponse)(internal), nil
 	case *flow.TransactionBody:
 		return (*TransactionBody)(internal), nil
-	case *flow.Transaction:
-		return (*Transaction)(internal), nil
 	case *flow.CollectionGuarantee:
 		return (*CollectionGuarantee)(internal), nil
 	case *flow.SyncRequest:
