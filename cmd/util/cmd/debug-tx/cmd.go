@@ -31,6 +31,7 @@ var (
 	flagBlockID             string
 	flagUseVM               bool
 	flagTracePath           string
+	flagOnlyTraceCadence    bool
 )
 
 var Cmd = &cobra.Command{
@@ -65,6 +66,8 @@ func init() {
 	Cmd.Flags().BoolVar(&flagUseVM, "use-vm", false, "use the VM for transaction execution (default: false)")
 
 	Cmd.Flags().StringVar(&flagTracePath, "trace", "", "enable tracing to given path")
+
+	Cmd.Flags().BoolVar(&flagOnlyTraceCadence, "only-trace-cadence", false, "when tracing, only include spans related to Cadence execution (default: false)")
 }
 
 func run(_ *cobra.Command, args []string) {
@@ -108,12 +111,23 @@ func run(_ *cobra.Command, args []string) {
 
 	var spanExporter otelTrace.SpanExporter
 	if traceFile != nil {
-		spanExporter, err = stdouttrace.New(
-			stdouttrace.WithWriter(traceFile),
-			stdouttrace.WithoutTimestamps(),
-		)
-		if err != nil {
-			log.Fatal().Err(err).Msg("failed to create trace exporter")
+		if flagOnlyTraceCadence {
+			cadenceSpanExporter := &debug.InterestingCadenceSpanExporter{}
+			defer func() {
+				err = cadenceSpanExporter.WriteSpans(traceFile)
+				if err != nil {
+					log.Fatal().Err(err).Msg("failed to write spans")
+				}
+			}()
+			spanExporter = cadenceSpanExporter
+		} else {
+			spanExporter, err = stdouttrace.New(
+				stdouttrace.WithWriter(traceFile),
+				stdouttrace.WithoutTimestamps(),
+			)
+			if err != nil {
+				log.Fatal().Err(err).Msg("failed to create trace exporter")
+			}
 		}
 	}
 

@@ -2,10 +2,8 @@ package compare_cadence_vm
 
 import (
 	"bytes"
-	"context"
 	"encoding/hex"
-	"fmt"
-	"strings"
+	"os"
 
 	"github.com/kr/pretty"
 	sdk "github.com/onflow/flow-go-sdk"
@@ -18,7 +16,6 @@ import (
 	debug_tx "github.com/onflow/flow-go/cmd/util/cmd/debug-tx"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/grpcclient"
-	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/utils/debug"
 )
 
@@ -132,45 +129,6 @@ func run(_ *cobra.Command, args []string) {
 	log.Info().Msgf("Compared %d transactions: %d matched, %d mismatched", txMatched+txMismatched, txMatched, txMismatched)
 }
 
-type spans struct {
-	spans []otelTrace.ReadOnlySpan
-}
-
-var _ otelTrace.SpanExporter = &spans{}
-
-var interestingSpanNamePrefixes = []trace.SpanName{
-	trace.FVMCadenceTrace,
-	trace.FVMEnvAllocateSlabIndex,
-	trace.FVMEnvGetValue,
-	trace.FVMEnvSetValue,
-}
-
-var uninterestingSpanNames = []trace.SpanName{
-	// Only reported by interpreter at the moment, makes diffing harder
-	trace.FVMCadenceTrace + ".import",
-}
-
-func (s *spans) ExportSpans(_ context.Context, spans []otelTrace.ReadOnlySpan) error {
-	for _, span := range spans {
-		name := span.Name()
-		for _, prefix := range interestingSpanNamePrefixes {
-
-			// Filter spans
-			if strings.HasPrefix(name, string(prefix)) &&
-				!slices.Contains(uninterestingSpanNames, trace.SpanName(name)) {
-
-				s.spans = append(s.spans, span)
-				break
-			}
-		}
-	}
-	return nil
-}
-
-func (s *spans) Shutdown(_ context.Context) error {
-	return nil
-}
-
 type blockResult struct {
 	mismatches int
 	matches    int
@@ -199,8 +157,8 @@ func compareBlock(
 	interBlockSnapshot := debug_tx.NewBlockSnapshot(remoteClient, header)
 
 	var (
-		interSpans       []*spans
-		interTxSnapshots []*debug.CapturingStorageSnapshot
+		interSpanExporters []*debug.InterestingCadenceSpanExporter
+		interTxSnapshots   []*debug.CapturingStorageSnapshot
 	)
 	interResults := debug_tx.RunBlock(
 		interBlockSnapshot,
@@ -216,9 +174,9 @@ func compareBlock(
 			return txSnapshot
 		},
 		func(_ flow.Identifier) otelTrace.SpanExporter {
-			spans := &spans{}
-			interSpans = append(interSpans, spans)
-			return spans
+			exporter := &debug.InterestingCadenceSpanExporter{}
+			interSpanExporters = append(interSpanExporters, exporter)
+			return exporter
 		},
 		flagComputeLimit,
 	)
@@ -228,8 +186,8 @@ func compareBlock(
 	vmBlockSnapshot := debug_tx.NewBlockSnapshot(remoteClient, header)
 
 	var (
-		vmSpans       []*spans
-		vmTxSnapshots []*debug.CapturingStorageSnapshot
+		vmSpanExporters []*debug.InterestingCadenceSpanExporter
+		vmTxSnapshots   []*debug.CapturingStorageSnapshot
 	)
 	vmResults := debug_tx.RunBlock(
 		vmBlockSnapshot,
@@ -245,9 +203,9 @@ func compareBlock(
 			return txSnapshot
 		},
 		func(_ flow.Identifier) otelTrace.SpanExporter {
-			spans := &spans{}
-			vmSpans = append(vmSpans, spans)
-			return spans
+			exporter := &debug.InterestingCadenceSpanExporter{}
+			vmSpanExporters = append(vmSpanExporters, exporter)
+			return exporter
 		},
 		flagComputeLimit,
 	)
@@ -278,14 +236,18 @@ func compareBlock(
 
 				log.Info().Str("tx", txID.String()).Msg("Interpreter spans:")
 
-				for _, span := range interSpans[i].spans {
-					printSpan(span)
+				interSpanExporter := interSpanExporters[i]
+				err := interSpanExporter.WriteSpans(os.Stdout)
+				if err != nil {
+					log.Fatal().Err(err).Msg("failed to write interpreter spans")
 				}
 
 				log.Info().Str("tx", txID.String()).Msg("VM spans:")
 
-				for _, span := range vmSpans[i].spans {
-					printSpan(span)
+				vmSpanExporter := vmSpanExporters[i]
+				err = vmSpanExporter.WriteSpans(os.Stdout)
+				if err != nil {
+					log.Fatal().Err(err).Msg("failed to write VM spans")
 				}
 			}
 		} else {
@@ -300,17 +262,6 @@ func compareBlock(
 	}
 
 	return header, result
-}
-
-func printSpan(span otelTrace.ReadOnlySpan) {
-	fmt.Printf("- %s: ", span.Name())
-	for i, attr := range span.Attributes() {
-		if i > 0 {
-			fmt.Print(", ")
-		}
-		fmt.Printf("%s=%v", attr.Key, attr.Value.AsInterface())
-	}
-	fmt.Println()
 }
 
 func compareResults(txID flow.Identifier, interResult debug.Result, vmResult debug.Result) bool {
