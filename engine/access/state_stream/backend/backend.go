@@ -78,6 +78,7 @@ type StateStreamBackend struct {
 	execDataCache        *cache.ExecutionDataCache
 	registers            *execution.RegistersAsyncStore
 	registerRequestLimit int
+	sporkRootBlockHeight uint64
 }
 
 func New(
@@ -108,6 +109,7 @@ func New(
 		execDataCache:        execDataCache,
 		registers:            registers,
 		registerRequestLimit: registerIDsRequestLimit,
+		sporkRootBlockHeight: state.Params().SporkRootBlockHeight(),
 	}
 
 	b.ExecutionDataBackend = ExecutionDataBackend{
@@ -153,6 +155,26 @@ func (b *StateStreamBackend) getExecutionData(ctx context.Context, height uint64
 	// received. this ensures a consistent view is available to all streams.
 	if height > highestHeight {
 		return nil, fmt.Errorf("execution data for block %d is not available yet: %w", height, subscription.ErrBlockNotReady)
+	}
+
+	// the spork root block will never have execution data available. If requested, return an empty result.
+	if height == b.sporkRootBlockHeight {
+		sporkRootBlockID, err := b.headers.BlockIDByHeight(b.sporkRootBlockHeight)
+		if err != nil {
+			if !errors.Is(err, storage.ErrNotFound) {
+				return nil, fmt.Errorf("could not get block ID for root block height %d: %w", b.sporkRootBlockHeight, err)
+			}
+			// the spork root block will not exist locally if the node was bootstrapped with a newer
+			// root block. In this case, just use a placeholder. This blockID is only used when serving
+			// data for the root block, which will never happen if it does not exist locally.
+			sporkRootBlockID = flow.ZeroID
+		}
+
+		return &execution_data.BlockExecutionDataEntity{
+			BlockExecutionData: &execution_data.BlockExecutionData{
+				BlockID: sporkRootBlockID,
+			},
+		}, nil
 	}
 
 	execData, err := b.execDataCache.ByHeight(ctx, height)
