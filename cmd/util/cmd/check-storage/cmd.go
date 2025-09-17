@@ -13,6 +13,7 @@ import (
 	"github.com/onflow/cadence/common"
 	"github.com/onflow/cadence/runtime"
 
+	"github.com/onflow/flow-go/cmd/util/ledger/migrations"
 	"github.com/onflow/flow-go/cmd/util/ledger/reporters"
 	"github.com/onflow/flow-go/cmd/util/ledger/util"
 	"github.com/onflow/flow-go/cmd/util/ledger/util/registers"
@@ -109,7 +110,7 @@ func init() {
 	Cmd.Flags().BoolVar(
 		&flagHasAccountFormatV2,
 		"account-format-v2",
-		false,
+		true,
 		"State contains accounts in v2 format",
 	)
 }
@@ -397,7 +398,17 @@ func checkAccountStorageHealth(accountRegisters *registers.AccountRegisters, nWo
 		)
 	}
 
-	// TODO: check health of non-atree registers
+	err = migrations.ValidateAccountPublicKeyV4(address, accountRegisters)
+	if err != nil {
+		issues = append(
+			issues,
+			accountStorageIssue{
+				Address: address.Hex(),
+				Kind:    storageErrorKindString[accountKeyErrorKind],
+				Msg:     err.Error(),
+			},
+		)
+	}
 
 	return issues
 }
@@ -409,12 +420,14 @@ const (
 	cadenceAtreeStorageErrorKind
 	evmAtreeStorageErrorKind
 	storageFormatErrorKind
+	accountKeyErrorKind
 )
 
 var storageErrorKindString = map[storageErrorKind]string{
 	otherErrorKind:               "error_check_storage_failed",
 	cadenceAtreeStorageErrorKind: "error_cadence_atree_storage",
 	evmAtreeStorageErrorKind:     "error_evm_atree_storage",
+	accountKeyErrorKind:          "error_account_public_key",
 }
 
 type accountStorageIssue struct {
