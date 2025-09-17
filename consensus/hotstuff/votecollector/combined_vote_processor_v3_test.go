@@ -1081,10 +1081,9 @@ func TestCombinedVoteProcessorV3_DoubleVoting(t *testing.T) {
 	stakingPriv := unittest.StakingPrivKeyFixture()
 	leader.StakingPubKey = stakingPriv.PublicKey()
 
-	participantData := dkgParticipants[leader.NodeID]
-
+	leaderParticipantData := dkgParticipants[leader.NodeID]
 	dkgKey := encodable.RandomBeaconPrivKey{
-		PrivateKey: dkgData.PrivKeyShares[participantData.Index],
+		PrivateKey: dkgData.PrivKeyShares[leaderParticipantData.Index],
 	}
 
 	me, err := local.New(leader.IdentitySkeleton, stakingPriv)

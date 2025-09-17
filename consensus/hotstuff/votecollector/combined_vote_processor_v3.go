@@ -109,6 +109,7 @@ func (f *combinedVoteProcessorFactoryBaseV3) Create(log zerolog.Logger, block *m
 		rbRector:          rbRector,
 		onQCCreated:       f.onQCCreated,
 		packer:            f.packer,
+		votesCache:        NewVotesCache(block.View),
 		minRequiredWeight: minRequiredWeight,
 		done:              *atomic.NewBool(false),
 	}, nil
@@ -130,6 +131,7 @@ type CombinedVoteProcessorV3 struct {
 	rbRector          hotstuff.RandomBeaconReconstructor
 	onQCCreated       hotstuff.OnQCCreated
 	packer            hotstuff.Packer
+	votesCache        *VotesCache
 	minRequiredWeight uint64
 	done              atomic.Bool
 }
@@ -163,12 +165,6 @@ func (p *CombinedVoteProcessorV3) Status() hotstuff.VoteCollectorStatus {
 // every signerID. However, we have the edge case, where we still feed the proposers vote twice into the
 // `VerifyingVoteProcessor` (once as part of a cached vote, once as an individual vote). This can be exploited
 // by a byzantine proposer to be erroneously counted twice, which would lead to a safety fault.
-//
-//	 TODO (suggestion): I think it would be worth-while to include a second `votesCache` into the `CombinedVoteProcessorV3`.
-//			Thereby, `CombinedVoteProcessorV3` inherently guarantees correctness of the QCs it produces without relying on
-//			external conditions (making the code more modular, less interdependent and thereby easier to maintain). The
-//			runtime overhead is marginal: For `votesCache` to add 500 votes (concurrently with 20 threads) takes about
-//			0.25ms. This runtime overhead is neglectable and a good tradeoff for the gain in maintainability and code clarity.
 func (p *CombinedVoteProcessorV3) Process(vote *model.Vote) error {
 	err := EnsureVoteForBlock(vote, p.block)
 	if err != nil {
@@ -179,6 +175,33 @@ func (p *CombinedVoteProcessorV3) Process(vote *model.Vote) error {
 	if p.done.Load() {
 		return nil
 	}
+
+	// Add vote to a local cache to track repeated and double votes before processing them by specific aggregators.
+	// Since consensus committee member can provide vote in two forms: a staking signature and a random beacon signature
+	// this leads to a situation where we first vote gets processed by the StakingSigAggregator and second one by RBSigAggregator.
+	// While each of the aggregators tracks votes by signer ID, then cannot detect duplicated or repeated votes if they were provided
+	// only ones to each aggregator. It's impossible to deduplicate votes without relying on external components to do the job.
+	// To increase modularity and BFT resilience of this component we are introducing a votesCache which tracks repeated and
+	// double votes for a particular view. Using a votesCache inherently guarantees correctness of the QCs we produce without relying on
+	// external conditions.
+	//
+	// The way votesCache is used introduces some weak consistency between cache and aggregators, on happy path it's completely
+	// straightforward approach. Adding a vote to the votesCache acts like a trapdoor for competing threads, only single competing
+	// thread will pass through it and succeed in adding the vote to the aggregator.
+	// It gets more interesting when any of the operations fail after we add the vote to the cache. The way this logic is structured
+	// it results in the following rule: _only the very first vote that was added to the votesCache from the same signer will be processed by the component_.
+	// It means that if the vote was invalid by any reason from the point of view of the aggregator the second vote won't be processed at all
+	// even if it might be correct from the pointer of view of the aggregator.
+	// Since all honest replicas must provide valid votes at all times then this behavior of producing one invalid and one valid vote
+	// is accounted for byzantine behavior and affects the liveness threshold _f_ of the consensus algorithm.
+	// If this component receives _f+1_ invalid votes then we won't be able to produce a QC for this particular view.
+	if err := p.votesCache.AddVote(vote); err != nil {
+		if errors.Is(err, RepeatedVoteErr) {
+			return model.NewDuplicatedSignerErrorf("vote from %s has been already added", vote.SignerID)
+		}
+		return fmt.Errorf("could not add vote %v: %w", vote.ID(), err)
+	}
+
 	sigType, sig, err := msig.DecodeSingleSig(vote.SigData)
 	if err != nil {
 		if errors.Is(err, msig.ErrInvalidSignatureFormat) {
