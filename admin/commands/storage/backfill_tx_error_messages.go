@@ -201,13 +201,13 @@ func (b *BackfillTxErrorMessagesCommand) parseExecutionNodeIds(executionNodeIdsI
 	// input should be a json encoded string
 	executionNodeIdsStr, ok := executionNodeIdsIn.(string)
 	if !ok {
-		return nil, admin.NewInvalidAdminReqFormatError("'execution-node-ids' must be json")
+		return nil, admin.NewInvalidAdminReqParameterError("execution-node-ids", "must be json", executionNodeIdsIn)
 	}
 
 	var executionNodeIds []string
 	err := json.Unmarshal([]byte(executionNodeIdsStr), &executionNodeIds)
 	if err != nil {
-		return nil, admin.NewInvalidAdminReqFormatError("'execution-node-ids' not valid JSON", err)
+		return nil, admin.NewInvalidAdminReqParameterError("execution-node-ids", "must be a list of strings", executionNodeIdsIn)
 	}
 
 	if len(executionNodeIds) == 0 {
