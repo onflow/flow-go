@@ -2,6 +2,7 @@ package storage
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"testing"
@@ -156,6 +157,7 @@ func (suite *BackfillTxErrorMessagesSuite) SetupTest() {
 	)
 
 	suite.command = NewBackfillTxErrorMessagesCommand(
+		suite.log,
 		suite.state,
 		suite.txResultErrorMessagesCore,
 	)
@@ -377,12 +379,15 @@ func (suite *BackfillTxErrorMessagesSuite) TestHandleBackfillTxErrorMessages() {
 
 		suite.allENIDs = unittest.IdentityListFixture(3, unittest.WithRole(flow.RoleExecution))
 
-		executorID := suite.allENIDs[1].ID()
+		executorID := suite.allENIDs[1].NodeID
+		executorIDs, err := json.Marshal([]string{executorID.String()})
+		suite.Require().NoError(err)
+
 		req = &admin.CommandRequest{
 			Data: map[string]interface{}{
 				"start-height":       float64(startHeight), // raw json parses to float64
 				"end-height":         float64(endHeight),   // raw json parses to float64
-				"execution-node-ids": []string{executorID.String()},
+				"execution-node-ids": string(executorIDs),
 			},
 		}
 		suite.Require().NoError(suite.command.Validator(req))
@@ -405,7 +410,7 @@ func (suite *BackfillTxErrorMessagesSuite) TestHandleBackfillTxErrorMessages() {
 			suite.mockStoreTxErrorMessages(blockId, results, executorID)
 		}
 
-		_, err := suite.command.Handler(ctx, req)
+		_, err = suite.command.Handler(ctx, req)
 		suite.Require().NoError(err)
 		suite.assertAllExpectations()
 	})
@@ -425,6 +430,7 @@ func (suite *BackfillTxErrorMessagesSuite) TestHandleBackfillTxErrorMessagesErro
 	suite.Run("error when txErrorMessagesCore is nil", func() {
 		req := &admin.CommandRequest{Data: map[string]interface{}{}}
 		command := NewBackfillTxErrorMessagesCommand(
+			suite.log,
 			suite.state,
 			nil,
 		)
