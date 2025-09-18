@@ -325,11 +325,9 @@ func compareResults(txID flow.Identifier, interResult debug.Result, vmResult deb
 	// and still produce the same end result.
 	// This is not considered a mismatch, but we warn about it.
 
-	interReadRegisterIDs := interResult.Snapshot.ReadRegisterIDs()
-	debug.SortRegisterIDs(interReadRegisterIDs)
+	interReadRegisterIDs := interResult.Snapshot.ReadRegisterSet()
 
-	vmReadRegisterIDs := vmResult.Snapshot.ReadRegisterIDs()
-	debug.SortRegisterIDs(vmReadRegisterIDs)
+	vmReadRegisterIDs := vmResult.Snapshot.ReadRegisterSet()
 
 	if len(vmReadRegisterIDs) != len(interReadRegisterIDs) {
 		log.Warn().Msgf(
@@ -339,20 +337,28 @@ func compareResults(txID flow.Identifier, interResult debug.Result, vmResult deb
 		)
 	}
 
-	for i, interReadRegisterID := range interReadRegisterIDs {
-		if i >= len(vmReadRegisterIDs) {
-			break
+	var vmMissingReadRegisterIDs []flow.RegisterID
+	for id := range interReadRegisterIDs {
+		if _, ok := vmReadRegisterIDs[id]; !ok {
+			vmMissingReadRegisterIDs = append(vmMissingReadRegisterIDs, id)
 		}
-		vmReadRegisterID := vmReadRegisterIDs[i]
+	}
+	debug.SortRegisterIDs(vmMissingReadRegisterIDs)
 
-		if interReadRegisterID != vmReadRegisterID {
-			log.Warn().Msgf(
-				"Read register ID mismatch at index %d: interpreter %s vs VM %s",
-				i,
-				interReadRegisterID,
-				vmReadRegisterID,
-			)
+	if len(vmMissingReadRegisterIDs) > 0 {
+		log.Warn().Msgf("Interpreter read registers but VM did not: %s", vmMissingReadRegisterIDs)
+	}
+
+	var interMissingReadRegisterIDs []flow.RegisterID
+	for id := range vmReadRegisterIDs {
+		if _, ok := interReadRegisterIDs[id]; !ok {
+			interMissingReadRegisterIDs = append(interMissingReadRegisterIDs, id)
 		}
+	}
+	debug.SortRegisterIDs(interMissingReadRegisterIDs)
+
+	if len(interMissingReadRegisterIDs) > 0 {
+		log.Warn().Msgf("VM read registers but interpreter did not: %s", interMissingReadRegisterIDs)
 	}
 
 	// Compare set of written register entries (IDs and values).
