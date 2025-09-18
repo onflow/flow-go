@@ -9,10 +9,6 @@ var (
 	flagProtocolDBDir string
 )
 
-type DBFlags struct {
-	ProtocolDBDir string
-}
-
 const DefaultProtocolDBDir = "/var/flow/data/protocol"
 
 // InitWithDBFlags initializes the command with the database flags
@@ -27,12 +23,10 @@ func InitWithDBFlags(cmd *cobra.Command) {
 // Note `InitWithDBFlags` only defines the flags, it won't update the flags yet.
 // The flags is not updated until cobra.Command.Run is called, so use this function
 // only in the cobra.Command.Run function
-func ReadDBFlags() DBFlags {
+func ReadDBFlags() string {
 	log.Info().
 		Str("datadir", flagProtocolDBDir).
 		Msgf("read initialized protocol db flag")
 
-	return DBFlags{
-		ProtocolDBDir: flagProtocolDBDir,
-	}
+	return flagProtocolDBDir
 }

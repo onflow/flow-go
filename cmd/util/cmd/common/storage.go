@@ -58,19 +58,18 @@ func InitStorages(db storage.DB) *store.All {
 }
 
 // WithStorage runs the given function with the storage depending on the flags.
-func WithStorage(flags DBFlags, f func(storage.DB) error) error {
-	if flags.ProtocolDBDir == "" {
+func WithStorage(f func(storage.DB) error) error {
+	datadir := ReadDBFlags()
+	if datadir == "" {
 		return fmt.Errorf("--datadir is required")
 	}
 
-	dbDir := flags.ProtocolDBDir
-
-	log.Info().Msgf("using pebble db at %s", dbDir)
+	log.Info().Msgf("using pebble db at %s", datadir)
 
 	// Only pebble is supported now
-	db, err := pebblestorage.ShouldOpenDefaultPebbleDB(log.Logger, dbDir)
+	db, err := pebblestorage.ShouldOpenDefaultPebbleDB(log.Logger, datadir)
 	if err != nil {
-		return fmt.Errorf("can not open pebble db at %v: %w", dbDir, err)
+		return fmt.Errorf("can not open pebble db at %v: %w", datadir, err)
 	}
 
 	defer db.Close()
