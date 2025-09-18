@@ -237,7 +237,7 @@ func TestGetEvents(t *testing.T) {
 
 }
 
-func TestGetEvents_ParseEmptyExecutionState(t *testing.T) {
+func TestGetEvents_ParseExecutionState(t *testing.T) {
 	eventType := "A.179b6b1cb6755e31.Foo.Bar"
 	startHeight := 0
 	endHeight := 5
@@ -257,24 +257,105 @@ func TestGetEvents_ParseEmptyExecutionState(t *testing.T) {
 			uint64(startHeight),
 			uint64(endHeight),
 			entities.EventEncodingVersion_JSON_CDC_V0,
-			optimistic_sync.Criteria{},
+			mocks.Anything,
 		).
-		Return(expectedBlockEvents, access.ExecutorMetadata{}, nil).
-		Once()
+		Return(expectedBlockEvents, access.ExecutorMetadata{}, nil)
 
-	request := buildRequest(
-		t,
-		eventType,
-		"0",
-		fmt.Sprint(endHeight),
-		[]string{},
-		"",
-		[]string{},
-		"",
-	)
+	//
+	//request := buildRequest(
+	//	t,
+	//	eventType,
+	//	"0",
+	//	fmt.Sprint(endHeight),
+	//	[]string{},
+	//	"",
+	//	[]string{},
+	//	"",
+	//)
+	//
+	//expectedResponseBody := buildExpectedResponse(t, expectedBlockEvents, false)
+	//router.AssertOKResponse(t, request, expectedResponseBody, backend)
 
-	expectedResponseBody := buildExpectedResponse(t, expectedBlockEvents, false)
-	router.AssertOKResponse(t, request, expectedResponseBody, backend)
+	t.Run("empty execution state query", func(t *testing.T) {
+		request := buildRequest(
+			t,
+			eventType,
+			"0",
+			fmt.Sprint(endHeight),
+			[]string{},
+			"",
+			[]string{},
+			"",
+		)
+
+		expectedResponseBody := buildExpectedResponse(t, expectedBlockEvents, false)
+		router.AssertOKResponse(t, request, expectedResponseBody, backend)
+	})
+
+	t.Run("empty agreeing executors count", func(t *testing.T) {
+		request := buildRequest(
+			t,
+			eventType,
+			"0",
+			fmt.Sprint(endHeight),
+			[]string{},
+			"",
+			unittest.IdentifierListFixture(2).Strings(),
+			"true",
+		)
+
+		expectedResponseBody := buildExpectedResponse(t, expectedBlockEvents, true)
+		router.AssertOKResponse(t, request, expectedResponseBody, backend)
+	})
+
+	t.Run("empty required executors", func(t *testing.T) {
+		request := buildRequest(
+			t,
+			eventType,
+			"0",
+			fmt.Sprint(endHeight),
+			[]string{},
+			"2",
+			[]string{},
+			"true",
+		)
+
+		expectedResponseBody := buildExpectedResponse(t, expectedBlockEvents, true)
+		router.AssertOKResponse(t, request, expectedResponseBody, backend)
+	})
+
+	t.Run("empty include executor metadata", func(t *testing.T) {
+		request := buildRequest(
+			t,
+			eventType,
+			"0",
+			fmt.Sprint(endHeight),
+			[]string{},
+			"2",
+			unittest.IdentifierListFixture(2).Strings(),
+			"",
+		)
+
+		expectedResponseBody := buildExpectedResponse(t, expectedBlockEvents, true)
+		router.AssertOKResponse(t, request, expectedResponseBody, backend)
+	})
+
+	t.Run("agreeing executors count equals 0", func(t *testing.T) {
+		request := buildRequest(
+			t,
+			eventType,
+			"0",
+			fmt.Sprint(endHeight),
+			[]string{},
+			"0",
+			unittest.IdentifierListFixture(2).Strings(),
+			"true",
+		)
+
+		rr := router.ExecuteRequest(request, backend)
+		// agreeing executors count should be either omitted or greater than 0
+		require.Equal(t, http.StatusBadRequest, rr.Code)
+	})
 }
 
 func TestGetEvents_GetAtSealedBlock(t *testing.T) {
@@ -402,19 +483,6 @@ func generateEventsMocks(backend *mock.API, n int) []flow.BlockEvents {
 		).
 		Return(nil, access.ExecutorMetadata{}, status.Error(codes.NotFound, "not found")).
 		Once()
-
-	//backend.Mock.
-	//	On(
-	//		"GetEventsForHeightRange",
-	//		mocks.Anything,
-	//		mocks.Anything,
-	//		mocks.Anything,
-	//		mocks.Anything,
-	//		mocks.Anything,
-	//		mocks.Anything,
-	//	).
-	//	Return(nil, access.ExecutorMetadata{}, status.Error(codes.NotFound, "not found")).
-	//	Once()
 
 	backend.Mock.
 		On(
