@@ -16,27 +16,51 @@ func ExecuteScript(r *common.Request, backend access.API, _ commonmodels.LinkGen
 		return nil, common.NewBadRequestError(err)
 	}
 
-	var value []byte
-	var executorMetadata accessmodel.ExecutorMetadata
+	executionState := req.ExecutionState
+	includeExecutorMetadata := executionState.IncludeExecutorMetadata
+
+	// TODO(mainnet 27): remove this conditional: [TODO(Uliana): create issue]
+	// "legacyParams" is only to temporarily support current behaviour.
+	// In the next spork, we should update this to always return an ExecuteScriptResponse.
+	legacyParams := executionState.AgreeingExecutorsCount == 0 &&
+		len(executionState.RequiredExecutorIDs) == 0 &&
+		includeExecutorMetadata == false
+
+	buildResponse := func(value []byte, executorMetadata accessmodel.ExecutorMetadata) interface{} {
+		if legacyParams {
+			return value
+		}
+		return commonmodels.NewExecuteScriptResponse(value, executorMetadata, includeExecutorMetadata)
+	}
 
 	if req.BlockID != flow.ZeroID {
-		value, executorMetadata, err = backend.ExecuteScriptAtBlockID(
+		value, executorMetadata, err := backend.ExecuteScriptAtBlockID(
 			r.Context(),
 			req.BlockID,
 			req.Script.Source,
 			req.Script.Args,
 			NewCriteria(req.ExecutionState),
 		)
+		if err != nil {
+			return nil, err
+		}
+
+		return buildResponse(value, executorMetadata), nil
 	}
 
 	// default to sealed height
 	if req.BlockHeight == request.SealedHeight || req.BlockHeight == request.EmptyHeight {
-		value, executorMetadata, err = backend.ExecuteScriptAtLatestBlock(
+		value, executorMetadata, err := backend.ExecuteScriptAtLatestBlock(
 			r.Context(),
 			req.Script.Source,
 			req.Script.Args,
 			NewCriteria(req.ExecutionState),
 		)
+		if err != nil {
+			return nil, err
+		}
+
+		return buildResponse(value, executorMetadata), nil
 	}
 
 	if req.BlockHeight == request.FinalHeight {
@@ -47,13 +71,16 @@ func ExecuteScript(r *common.Request, backend access.API, _ commonmodels.LinkGen
 		req.BlockHeight = finalBlock.Height
 	}
 
-	value, executorMetadata, err = backend.ExecuteScriptAtBlockHeight(
+	value, executorMetadata, err := backend.ExecuteScriptAtBlockHeight(
 		r.Context(),
 		req.BlockHeight,
 		req.Script.Source,
 		req.Script.Args,
 		NewCriteria(req.ExecutionState),
 	)
+	if err != nil {
+		return nil, err
+	}
 
-	return commonmodels.NewExecuteScriptResponse(value, executorMetadata, req.ExecutionState.IncludeExecutorMetadata), nil
+	return buildResponse(value, executorMetadata), nil
 }
