@@ -171,15 +171,16 @@ func (e *Engine) processErrorMessagesForBlock(ctx context.Context, blockID flow.
 
 	attempt := 0
 	return retry.Do(ctx, backoff, func(context.Context) error {
+		err := e.txErrorMessagesCore.HandleTransactionResultErrorMessages(ctx, blockID)
+
 		if attempt > 0 {
 			e.log.Debug().
+				Err(err).
 				Str("block_id", blockID.String()).
 				Uint64("attempt", uint64(attempt)).
 				Msgf("retrying process transaction result error messages")
-
 		}
 		attempt++
-		err := e.txErrorMessagesCore.HandleTransactionResultErrorMessages(ctx, blockID)
 
 		return retry.RetryableError(err)
 	})
