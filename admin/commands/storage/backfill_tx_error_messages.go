@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/rs/zerolog"
+
 	"github.com/onflow/flow-go/admin"
 	"github.com/onflow/flow-go/admin/commands"
 	"github.com/onflow/flow-go/engine/access/ingestion/tx_error_messages"
@@ -25,16 +27,19 @@ type backfillTxErrorMessagesRequest struct {
 // BackfillTxErrorMessagesCommand executes a command to backfill
 // transaction error messages by fetching them from execution nodes.
 type BackfillTxErrorMessagesCommand struct {
+	log                 zerolog.Logger
 	state               protocol.State
 	txErrorMessagesCore *tx_error_messages.TxErrorMessagesCore
 }
 
 // NewBackfillTxErrorMessagesCommand creates a new instance of BackfillTxErrorMessagesCommand
 func NewBackfillTxErrorMessagesCommand(
+	log zerolog.Logger,
 	state protocol.State,
 	txErrorMessagesCore *tx_error_messages.TxErrorMessagesCore,
 ) commands.AdminCommand {
 	return &BackfillTxErrorMessagesCommand{
+		log:                 log.With().Str("command", "backfill-tx-error-messages").Logger(),
 		state:               state,
 		txErrorMessagesCore: txErrorMessagesCore,
 	}
@@ -147,6 +152,18 @@ func (b *BackfillTxErrorMessagesCommand) Handler(ctx context.Context, request *a
 
 	data := request.ValidatorData.(*backfillTxErrorMessagesRequest)
 
+	total := data.endHeight - data.startHeight + 1
+	progressTick := min(max(total/100, 1), 10_000) // 1% or at least every 10k blocks
+	progress := uint64(0)
+
+	lg := b.log.With().
+		Uint64("start-height", data.startHeight).
+		Uint64("end-height", data.endHeight).
+		Logger()
+
+	lg.Info().
+		Uint64("progress-tick", progressTick).
+		Msgf("starting to backfill")
 	for height := data.startHeight; height <= data.endHeight; height++ {
 		header, err := b.state.AtHeight(height).Head()
 		if err != nil {
@@ -158,7 +175,18 @@ func (b *BackfillTxErrorMessagesCommand) Handler(ctx context.Context, request *a
 		if err != nil {
 			return nil, fmt.Errorf("error encountered while processing transaction result error message for block: %d, %w", height, err)
 		}
+
+		progress++
+
+		// periodically log progress
+		if progress%progressTick == 0 {
+			b.log.Info().
+				Uint64("height", height).
+				Uint64("progress_%", progress*100/total).
+				Msgf("update")
+		}
 	}
+	lg.Info().Msgf("finished")
 
 	return nil, nil
 }
@@ -169,27 +197,36 @@ func (b *BackfillTxErrorMessagesCommand) Handler(ctx context.Context, request *a
 // Expected errors during normal operation:
 // - admin.InvalidAdminReqParameterError - if execution-node-ids is empty or has an invalid format.
 func (b *BackfillTxErrorMessagesCommand) parseExecutionNodeIds(executionNodeIdsIn interface{}, allIdentities flow.IdentityList) (flow.IdentitySkeletonList, error) {
-	var ids flow.IdentityList
-
+	idStrings := make([]string, 0)
 	switch executionNodeIds := executionNodeIdsIn.(type) {
 	case []string:
-		if len(executionNodeIds) == 0 {
-			return nil, admin.NewInvalidAdminReqParameterError("execution-node-ids", "must be a non empty list of strings", executionNodeIdsIn)
+		for _, id := range executionNodeIds {
+			idStrings = append(idStrings, id)
 		}
-		requestedENIdentifiers, err := flow.IdentifierListFromHex(executionNodeIds)
-		if err != nil {
-			return nil, admin.NewInvalidAdminReqParameterError("execution-node-ids", err.Error(), executionNodeIdsIn)
-		}
-
-		for _, enId := range requestedENIdentifiers {
-			id, exists := allIdentities.ByNodeID(enId)
-			if !exists {
-				return nil, admin.NewInvalidAdminReqParameterError("execution-node-ids", "could not find execution node by provided id", enId)
-			}
-			ids = append(ids, id)
+	case []any:
+		for _, id := range executionNodeIds {
+			idStrings = append(idStrings, id.(string))
 		}
 	default:
 		return nil, admin.NewInvalidAdminReqParameterError("execution-node-ids", "must be a list of strings", executionNodeIdsIn)
+	}
+
+	if len(idStrings) == 0 {
+		return nil, admin.NewInvalidAdminReqParameterError("execution-node-ids", "must be a non empty list of strings", executionNodeIdsIn)
+	}
+
+	requestedENIdentifiers, err := flow.IdentifierListFromHex(idStrings)
+	if err != nil {
+		return nil, admin.NewInvalidAdminReqParameterError("execution-node-ids", err.Error(), executionNodeIdsIn)
+	}
+
+	var ids flow.IdentityList
+	for _, enId := range requestedENIdentifiers {
+		id, exists := allIdentities.ByNodeID(enId)
+		if !exists {
+			return nil, admin.NewInvalidAdminReqParameterError("execution-node-ids", "could not find execution node by provided id", enId)
+		}
+		ids = append(ids, id)
 	}
 
 	return ids.ToSkeleton(), nil
