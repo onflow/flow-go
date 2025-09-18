@@ -1047,27 +1047,18 @@ func TestCombinedVoteProcessorV3_BuildVerifyQC(t *testing.T) {
 	require.True(t, qcCreated)
 }
 
-// TestCombinedVoteProcessorV3_BuildVerifyQC tests a complete path from creating votes to collecting votes and then
-// building & verifying QC.
-// We start with leader proposing a block, then new leader collects votes and builds a QC.
-// Need to verify that QC that was produced is valid and can be embedded in new proposal.
+// TestCombinedVoteProcessorV3_DoubleVoting tests that CombinedVoteProcessorV3 is able to
+// detect a situation where a consensus participant is sending two different votes, first vote is signed with the staking
+// key only and the other one is signed with the random beacon key.
+// CombinedVoteProcessorV3 has to detect that the vote from given participant has been already processed and return a respective error.
 func TestCombinedVoteProcessorV3_DoubleVoting(t *testing.T) {
 	proposerView := uint64(20)
 
 	dkgData, err := bootstrapDKG.RandomBeaconKG(4, unittest.RandomBytes(32))
 	require.NoError(t, err)
 
-	// prepare consensus committee:
-	// * 3 signers that have the staking key but have failed DKG and don't have Random Beacon key
-	// * 8 signers that have the staking key and have the Random Beacon key
-	// * 1 signer that was ejected from the committee but still took part in DKG.
-	// Total consensus committee is 11.
-	// Total random beacon committee is 9.
-	// This way both random beacon committee and consensus committee have nodes that are not part of the other committee
-	// therefore forming a symmetric difference.
-	allIdentities := unittest.IdentityListFixture(4).Sort(flow.Canonical[flow.Identity])
-	require.Equal(t, len(dkgData.PubKeyShares), len(allIdentities),
-		"require the most general case: consensus and random beacon committees form a symmetric difference")
+	// prepare a minimal consensus committee with all nodes participating in the RandomBeacon KG
+	allIdentities := unittest.IdentityListFixture(len(dkgData.PubKeyShares)).Sort(flow.Canonical[flow.Identity])
 	dkgParticipants := make(map[flow.Identifier]flow.DKGParticipant)
 	for index, identity := range allIdentities {
 		dkgParticipants[identity.NodeID] = flow.DKGParticipant{
