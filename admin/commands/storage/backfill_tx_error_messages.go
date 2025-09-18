@@ -2,7 +2,6 @@ package storage
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 
 	"github.com/rs/zerolog"
@@ -154,7 +153,7 @@ func (b *BackfillTxErrorMessagesCommand) Handler(ctx context.Context, request *a
 	data := request.ValidatorData.(*backfillTxErrorMessagesRequest)
 
 	total := data.endHeight - data.startHeight + 1
-	progressTick := min(max(total/100, 1), 25_000) // 1% or at least every 25k blocks
+	progressTick := min(max(total/100, 1), 1000) // 1% or at least every 1k blocks
 	progress := uint64(0)
 
 	lg := b.log.With().
@@ -162,7 +161,9 @@ func (b *BackfillTxErrorMessagesCommand) Handler(ctx context.Context, request *a
 		Uint64("end-height", data.endHeight).
 		Logger()
 
-	lg.Info().Msgf("starting to backfill")
+	lg.Info().
+		Uint64("progress-tick", progressTick).
+		Msgf("starting to backfill")
 	for height := data.startHeight; height <= data.endHeight; height++ {
 		header, err := b.state.AtHeight(height).Head()
 		if err != nil {
@@ -196,29 +197,30 @@ func (b *BackfillTxErrorMessagesCommand) Handler(ctx context.Context, request *a
 // Expected errors during normal operation:
 // - admin.InvalidAdminReqParameterError - if execution-node-ids is empty or has an invalid format.
 func (b *BackfillTxErrorMessagesCommand) parseExecutionNodeIds(executionNodeIdsIn interface{}, allIdentities flow.IdentityList) (flow.IdentitySkeletonList, error) {
-	var ids flow.IdentityList
-
-	// input should be a json encoded string
-	executionNodeIdsStr, ok := executionNodeIdsIn.(string)
-	if !ok {
-		return nil, admin.NewInvalidAdminReqParameterError("execution-node-ids", "must be json", executionNodeIdsIn)
-	}
-
-	var executionNodeIds []string
-	err := json.Unmarshal([]byte(executionNodeIdsStr), &executionNodeIds)
-	if err != nil {
+	idStrings := make([]string, 0)
+	switch executionNodeIds := executionNodeIdsIn.(type) {
+	case []string:
+		for _, id := range executionNodeIds {
+			idStrings = append(idStrings, id)
+		}
+	case []any:
+		for _, id := range executionNodeIds {
+			idStrings = append(idStrings, id.(string))
+		}
+	default:
 		return nil, admin.NewInvalidAdminReqParameterError("execution-node-ids", "must be a list of strings", executionNodeIdsIn)
 	}
 
-	if len(executionNodeIds) == 0 {
+	if len(idStrings) == 0 {
 		return nil, admin.NewInvalidAdminReqParameterError("execution-node-ids", "must be a non empty list of strings", executionNodeIdsIn)
 	}
 
-	requestedENIdentifiers, err := flow.IdentifierListFromHex(executionNodeIds)
+	requestedENIdentifiers, err := flow.IdentifierListFromHex(idStrings)
 	if err != nil {
 		return nil, admin.NewInvalidAdminReqParameterError("execution-node-ids", err.Error(), executionNodeIdsIn)
 	}
 
+	var ids flow.IdentityList
 	for _, enId := range requestedENIdentifiers {
 		id, exists := allIdentities.ByNodeID(enId)
 		if !exists {
