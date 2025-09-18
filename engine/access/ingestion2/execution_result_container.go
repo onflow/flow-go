@@ -41,7 +41,6 @@ var _ forest.Vertex = (*ExecutionResultContainer)(nil)
 func NewExecutionResultContainer(
 	result *flow.ExecutionResult,
 	header *flow.Header,
-	blockStatus BlockStatus,
 	pipeline optimistic_sync.Pipeline,
 ) (*ExecutionResultContainer, error) {
 	// sanity check: initial result must be for block
@@ -49,18 +48,14 @@ func NewExecutionResultContainer(
 		return nil, fmt.Errorf("initial result is for different block")
 	}
 
-	c := &ExecutionResultContainer{
+	return &ExecutionResultContainer{
 		receipts:    make(map[flow.Identifier]*flow.ExecutionReceiptStub),
 		result:      result,
 		resultID:    result.ID(),
 		blockHeader: header,
 		pipeline:    pipeline,
 		blockStatus: counters.NewMonotonicCounter(uint64(BlockStatusCertified)),
-	}
-
-	c.SetBlockStatus(blockStatus)
-
-	return c, nil
+	}, nil
 }
 
 // AddReceipt adds the given execution receipt to the container.
@@ -173,12 +168,20 @@ func (c *ExecutionResultContainer) BlockStatus() BlockStatus {
 }
 
 // SetBlockStatus sets the block status of the block executed by this result.
-func (c *ExecutionResultContainer) SetBlockStatus(blockStatus BlockStatus) {
+func (c *ExecutionResultContainer) SetBlockStatus(blockStatus BlockStatus) error {
 	if c.blockStatus.Set(uint64(blockStatus)) {
 		if blockStatus == BlockStatusSealed {
 			c.pipeline.SetSealed()
 		}
+		return nil
 	}
+
+	// The update failed, so it was either a no-op or an invalid transition.
+	if c.BlockStatus().IsValidTransition(blockStatus) {
+		return nil
+	}
+
+	return fmt.Errorf("invalid block status transition: %s -> %s", c.BlockStatus(), blockStatus)
 }
 
 // Methods implementing LevelledForest's Vertex interface

@@ -35,3 +35,18 @@ func (bs BlockStatus) IsValid() bool {
 		return false
 	}
 }
+
+// IsValidTransition returns true if the block status can be transitioned to the given status.
+func (bs BlockStatus) IsValidTransition(to BlockStatus) bool {
+	if to == bs {
+		return true
+	}
+	switch bs {
+	case BlockStatusCertified:
+		return to == BlockStatusFinalized || to == BlockStatusSealed
+	case BlockStatusFinalized:
+		return to == BlockStatusSealed
+	default:
+		return false
+	}
+}
