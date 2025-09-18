@@ -218,7 +218,44 @@ func (s *StateMachineTestSuite) TestProcessBlock_ProcessingOfCachedVotes() {
 	require.NoError(s.T(), err)
 
 	time.Sleep(100 * time.Millisecond)
+	processor.AssertExpectations(s.T())
+}
 
+// TestProcessBlock_ErrorHandlingOfCachedVotes tests that all sentinel errors and exceptions are correctly handled when processing
+// cached votes.
+func (s *StateMachineTestSuite) TestProcessBlock_ErrorHandlingOfCachedVotes() {
+	proposal := makeSignedProposalWithView(s.view)
+	block := proposal.Block
+	processor := s.prepareMockedProcessor(proposal)
+
+	// test equivocating votes, this is byzantine behavior and needs to be reported to the respective consumer
+	firstVote := unittest.VoteForBlockFixture(block)
+	doubleVote := unittest.VoteForBlockFixture(block, unittest.WithVoteSignerID(firstVote.SignerID))
+	s.notifier.On("OnVoteProcessed", doubleVote).Once()
+	processor.On("Process", doubleVote).Return(model.NewDoubleVoteErrorf(firstVote, doubleVote, "")).Once()
+	// expect delivery to the notifier
+	s.notifier.On("OnDoubleVotingDetected", firstVote, doubleVote).Once()
+	require.NoError(s.T(), s.collector.AddVote(doubleVote))
+
+	// test repeated vote, we ignore same vote and do nothing
+	repeatedVote := unittest.VoteForBlockFixture(block)
+	s.notifier.On("OnVoteProcessed", repeatedVote).Once()
+	processor.On("Process", repeatedVote).Return(model.NewDuplicatedSignerErrorf("")).Once()
+	require.NoError(s.T(), s.collector.AddVote(repeatedVote))
+
+	// test invalid vote,  this is byzantine behavior and needs to be reported to the respective consumer
+	invalidVote := unittest.VoteForBlockFixture(block)
+	s.notifier.On("OnVoteProcessed", invalidVote).Once()
+	invalidVoteErr := model.NewInvalidVoteErrorf(invalidVote, "")
+	processor.On("Process", invalidVote).Return(invalidVoteErr).Once()
+	// expect delivery to the notifier
+	s.notifier.On("OnInvalidVoteDetected", invalidVoteErr).Once()
+	require.NoError(s.T(), s.collector.AddVote(invalidVote))
+
+	err := s.collector.ProcessBlock(proposal)
+	require.NoError(s.T(), err)
+
+	time.Sleep(100 * time.Millisecond)
 	processor.AssertExpectations(s.T())
 }
 
