@@ -65,6 +65,7 @@ import (
 	"github.com/onflow/flow-go/engine/common/version"
 	"github.com/onflow/flow-go/engine/execution/computation"
 	"github.com/onflow/flow-go/engine/execution/computation/query"
+	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/storage/derived"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/complete/wal"
@@ -183,6 +184,7 @@ type AccessNodeConfig struct {
 	storeTxResultErrorMessages           bool
 	stopControlEnabled                   bool
 	registerDBPruneThreshold             uint64
+	scheduledCallbacksEnabled            bool
 }
 
 type PublicNetworkConfig struct {
@@ -292,6 +294,7 @@ func DefaultAccessNodeConfig() *AccessNodeConfig {
 		storeTxResultErrorMessages:           false,
 		stopControlEnabled:                   false,
 		registerDBPruneThreshold:             0,
+		scheduledCallbacksEnabled:            fvm.DefaultScheduledCallbacksEnabled,
 	}
 }
 
@@ -1321,6 +1324,10 @@ func (builder *FlowAccessNodeBuilder) extraFlags() {
 			"stop-control-enabled",
 			defaultConfig.stopControlEnabled,
 			"whether to enable the stop control feature. Default value is false")
+		flags.BoolVar(&builder.scheduledCallbacksEnabled,
+			"scheduled-callbacks-enabled",
+			defaultConfig.scheduledCallbacksEnabled,
+			"whether to include scheduled callback transactions in system collections.")
 		// ExecutionDataRequester config
 		flags.BoolVar(&builder.executionDataSyncEnabled,
 			"execution-data-sync-enabled",
@@ -2149,6 +2156,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				ExecNodeIdentitiesProvider: notNil(builder.ExecNodeIdentitiesProvider),
 				TxErrorMessageProvider:     notNil(builder.txResultErrorMessageProvider),
 				MaxScriptAndArgumentSize:   config.BackendConfig.AccessConfig.MaxRequestMsgSize,
+				ScheduledCallbacksEnabled:  builder.scheduledCallbacksEnabled,
 			})
 			if err != nil {
 				return nil, fmt.Errorf("could not initialize backend: %w", err)

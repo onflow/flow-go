@@ -73,10 +73,7 @@ func ClusterList(n uint, nodes flow.IdentitySkeletonList) flow.ClusterList {
 }
 
 // CollectionFromTransactions creates a new collection from the list of transactions.
-func CollectionFromTransactions(transactions []*flow.Transaction) flow.Collection {
-	coll := flow.Collection{Transactions: make([]*flow.TransactionBody, 0, len(transactions))}
-	for _, tx := range transactions {
-		coll.Transactions = append(coll.Transactions, &tx.TransactionBody)
-	}
-	return coll
+func CollectionFromTransactions(transactions ...*flow.TransactionBody) flow.Collection {
+	txs := append(([]*flow.TransactionBody)(nil), transactions...) // copy slice to avoid mutation
+	return flow.Collection{Transactions: txs}
 }

@@ -1375,7 +1375,7 @@ func Test_ScheduledCallback(t *testing.T) {
 	t.Run("process with 2 scheduled callbacks", func(t *testing.T) {
 		// create callback events that process callback will return
 		env := systemcontracts.SystemContractsForChain(chain.ChainID())
-		location := common.NewAddressLocation(nil, common.Address(env.FlowCallbackScheduler.Address), "FlowCallbackScheduler")
+		location := common.NewAddressLocation(nil, common.Address(env.FlowCallbackScheduler.Address), "FlowTransactionScheduler")
 
 		eventType := cadence.NewEventType(
 			location,
@@ -1528,6 +1528,16 @@ func testScheduledCallbackWithError(t *testing.T, chain flow.Chain, callbackEven
 		mock.Anything).
 		Return(nil).
 		Times(1)
+
+	// expect callback execution metrics if there are callbacks
+	if len(callbackEvents) > 0 {
+		exemetrics.On("ExecutionCallbacksExecuted",
+			mock.Anything,
+			mock.Anything,
+			mock.Anything).
+			Return(nil).
+			Times(1)
+	}
 
 	bservice := requesterunit.MockBlobService(blockstore.NewBlockstore(dssync.MutexWrap(datastore.NewMapDatastore())))
 	trackerStorage := mocktracker.NewMockStorage()
@@ -1697,7 +1707,7 @@ func (c *callbackTestExecutor) Output() fvm.ProcedureOutput {
 		return fvm.ProcedureOutput{}
 	}
 
-	const callbackSchedulerImport = `import "FlowCallbackScheduler"`
+	const callbackSchedulerImport = `import "FlowTransactionScheduler"`
 	txBody := txProc.Transaction
 	txID := fmt.Sprintf("tx_%d", txProc.TxIndex)
 
@@ -1706,7 +1716,7 @@ func (c *callbackTestExecutor) Output() fvm.ProcedureOutput {
 	case strings.Contains(string(txBody.Script), "scheduler.process"):
 		c.vm.executedTransactions[txID] = "process_callback"
 		env := systemcontracts.SystemContractsForChain(c.ctx.Chain.ChainID()).AsTemplateEnv()
-		eventTypeString := fmt.Sprintf("A.%v.FlowCallbackScheduler.PendingExecution", env.FlowCallbackSchedulerAddress)
+		eventTypeString := fmt.Sprintf("A.%v.FlowTransactionScheduler.PendingExecution", env.FlowTransactionSchedulerAddress)
 
 		// return events for each scheduled callback
 		events := make([]flow.Event, len(c.vm.eventPayloads))
@@ -1724,7 +1734,7 @@ func (c *callbackTestExecutor) Output() fvm.ProcedureOutput {
 			Events: events,
 		}
 	// scheduled callbacks execute transaction
-	case strings.Contains(string(txBody.Script), "scheduler.executeCallback"):
+	case strings.Contains(string(txBody.Script), "scheduler.executeTransaction"):
 		// extract the callback ID from the arguments
 		if len(txBody.Arguments) == 0 {
 			return fvm.ProcedureOutput{}
