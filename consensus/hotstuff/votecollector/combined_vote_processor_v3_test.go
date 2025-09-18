@@ -2,7 +2,6 @@ package votecollector
 
 import (
 	"errors"
-	"github.com/onflow/flow-go/module"
 	"math/rand"
 	"slices"
 	"sync"
@@ -27,6 +26,7 @@ import (
 	"github.com/onflow/flow-go/model/encodable"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
+	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/local"
 	modulemock "github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/module/signature"
