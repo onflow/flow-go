@@ -9,6 +9,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/onflow/flow-go/engine/verification/verifier"
+	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/storage"
 )
@@ -60,7 +61,7 @@ func init() {
 
 	Cmd.Flags().BoolVar(&flagtransactionFeesDisabled, "fees_disabled", false, "disable transaction fees")
 
-	Cmd.Flags().BoolVar(&flagScheduledCallbacksEnabled, "scheduled_callbacks_enabled", false, "enable scheduled callbacks")
+	Cmd.Flags().BoolVar(&flagScheduledCallbacksEnabled, "scheduled_callbacks_enabled", fvm.DefaultScheduledCallbacksEnabled, "enable scheduled callbacks")
 }
 
 func run(*cobra.Command, []string) {
