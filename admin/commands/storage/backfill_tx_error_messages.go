@@ -153,7 +153,7 @@ func (b *BackfillTxErrorMessagesCommand) Handler(ctx context.Context, request *a
 	data := request.ValidatorData.(*backfillTxErrorMessagesRequest)
 
 	total := data.endHeight - data.startHeight + 1
-	progressTick := min(max(total/100, 1), 1000) // 1% or at least every 1k blocks
+	progressTick := min(max(total/100, 1), 10_000) // 1% or at least every 10k blocks
 	progress := uint64(0)
 
 	lg := b.log.With().

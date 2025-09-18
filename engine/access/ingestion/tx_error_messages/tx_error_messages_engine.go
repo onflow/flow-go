@@ -23,7 +23,7 @@ import (
 const (
 	// processTxErrorMessagesWorkersCount defines the number of workers that
 	// concurrently process transaction error messages in the job queue.
-	processTxErrorMessagesWorkersCount = 3
+	processTxErrorMessagesWorkersCount = 5
 
 	// defaultRetryDelay specifies the initial delay for the exponential backoff
 	// when the process of fetching transaction error messages fails.
@@ -144,6 +144,11 @@ func (e *Engine) runTxResultErrorMessagesConsumer(ctx irrecoverable.SignalerCont
 	err := util.WaitClosed(ctx, e.txErrorMessagesConsumer.Ready())
 	if err == nil {
 		ready()
+
+		// In the case where this component is started for the first time after a spork, we need to
+		// manually trigger the first check since OnFinalizedBlock will never be called.
+		// If this is started on a live network, an eary check will be a no-op.
+		e.txErrorMessagesNotifier.Notify()
 	}
 
 	<-e.txErrorMessagesConsumer.Done()
