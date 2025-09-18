@@ -102,7 +102,6 @@ packages:
 
   # external libraries
   github.com/onflow/flow-go-sdk/access:
-    # TODO: remove integration/benchmark/mockiface
     config:
       dir: "integration/benchmark/mock"
     interfaces:
