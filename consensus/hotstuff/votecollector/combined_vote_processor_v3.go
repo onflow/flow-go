@@ -153,10 +153,13 @@ func (p *CombinedVoteProcessorV3) Status() hotstuff.VoteCollectorStatus {
 // Design of this function is event driven: as soon as we collect enough signatures to create a QC we will immediately do so
 // and submit it via callback for further processing.
 // Expected error returns during normal operations:
-// * VoteForIncompatibleBlockError - submitted vote for incompatible block
-// * VoteForIncompatibleViewError - submitted vote for incompatible view
-// * model.InvalidVoteError - submitted vote with invalid signature
-// * model.DuplicatedSignerError - vote from a signer whose vote was previously already processed
+//   - VoteForIncompatibleBlockError - submitted vote for incompatible block
+//   - VoteForIncompatibleViewError - submitted vote for incompatible view
+//   - model.InvalidVoteError - submitted vote with invalid signature
+//   - model.DuplicatedSignerError - vote from a signer whose vote was previously already processed
+//   - model.DoubleVoteError is returned if the voter is equivocating
+//     (i.e. voting in the same view for different blocks).
+//
 // All other errors should be treated as exceptions.
 //
 // CAUTION: implementation is NOT (yet) BFT
