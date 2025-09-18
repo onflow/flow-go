@@ -43,11 +43,10 @@ packages:
   github.com/onflow/flow-go/engine/collection/epochmgr:
   github.com/onflow/flow-go/engine/collection/rpc:
   github.com/onflow/flow-go/engine/common/follower:
-    config:
-      exported: true
     interfaces:
       complianceCore:
         config:
+          exported: true
           mockname:  "{{.InterfaceName | firstUpper}}"
   github.com/onflow/flow-go/engine/common/follower/cache:
   github.com/onflow/flow-go/engine/consensus:
