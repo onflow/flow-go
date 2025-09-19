@@ -197,32 +197,32 @@ func (b *BackfillTxErrorMessagesCommand) Handler(ctx context.Context, request *a
 // Expected errors during normal operation:
 // - admin.InvalidAdminReqParameterError - if execution-node-ids is empty or has an invalid format.
 func (b *BackfillTxErrorMessagesCommand) parseExecutionNodeIds(executionNodeIdsIn interface{}, allIdentities flow.IdentityList) (flow.IdentitySkeletonList, error) {
-	idStrings := make([]string, 0)
+	var ids flow.IdentityList
 	switch executionNodeIds := executionNodeIdsIn.(type) {
 	case []any:
-		for _, id := range executionNodeIds {
-			idStrings = append(idStrings, id.(string))
+		if len(executionNodeIds) == 0 {
+			return nil, admin.NewInvalidAdminReqParameterError("execution-node-ids", "must be a non empty list of strings", executionNodeIdsIn)
+		}
+
+		idStrings := make([]string, len(executionNodeIds))
+		for i, id := range executionNodeIds {
+			idStrings[i] = id.(string)
+		}
+
+		requestedENIdentifiers, err := flow.IdentifierListFromHex(idStrings)
+		if err != nil {
+			return nil, admin.NewInvalidAdminReqParameterError("execution-node-ids", err.Error(), executionNodeIdsIn)
+		}
+
+		for _, enId := range requestedENIdentifiers {
+			id, exists := allIdentities.ByNodeID(enId)
+			if !exists {
+				return nil, admin.NewInvalidAdminReqParameterError("execution-node-ids", "could not find execution node by provided id", enId)
+			}
+			ids = append(ids, id)
 		}
 	default:
 		return nil, admin.NewInvalidAdminReqParameterError("execution-node-ids", "must be a list of strings", executionNodeIdsIn)
-	}
-
-	if len(idStrings) == 0 {
-		return nil, admin.NewInvalidAdminReqParameterError("execution-node-ids", "must be a non empty list of strings", executionNodeIdsIn)
-	}
-
-	requestedENIdentifiers, err := flow.IdentifierListFromHex(idStrings)
-	if err != nil {
-		return nil, admin.NewInvalidAdminReqParameterError("execution-node-ids", err.Error(), executionNodeIdsIn)
-	}
-
-	var ids flow.IdentityList
-	for _, enId := range requestedENIdentifiers {
-		id, exists := allIdentities.ByNodeID(enId)
-		if !exists {
-			return nil, admin.NewInvalidAdminReqParameterError("execution-node-ids", "could not find execution node by provided id", enId)
-		}
-		ids = append(ids, id)
 	}
 
 	return ids.ToSkeleton(), nil
