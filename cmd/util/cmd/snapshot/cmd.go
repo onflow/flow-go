@@ -35,8 +35,7 @@ var Cmd = &cobra.Command{
 
 func init() {
 
-	Cmd.Flags().StringVar(&flagDatadir, "datadir", "",
-		"directory that stores the protocol state")
+	common.InitDataDirFlag(Cmd, &flagDatadir)
 	_ = Cmd.MarkFlagRequired("datadir")
 
 	Cmd.Flags().Uint64Var(&flagHeight, "height", 0, "the height of the snapshot to retrieve")

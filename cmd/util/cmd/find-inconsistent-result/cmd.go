@@ -29,7 +29,7 @@ var Cmd = &cobra.Command{
 }
 
 func init() {
-	Cmd.Flags().StringVarP(&flagDatadir, "datadir", "d", "/var/flow/data/protocol", "directory to the badger dababase")
+	common.InitDataDirFlag(Cmd, &flagDatadir)
 	_ = Cmd.MarkPersistentFlagRequired("datadir")
 
 	Cmd.Flags().Uint64Var(&flagEndHeight, "end-height", 0, "the last block height checks for result consistency")

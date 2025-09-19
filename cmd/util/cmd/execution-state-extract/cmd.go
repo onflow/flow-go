@@ -72,8 +72,7 @@ func init() {
 	Cmd.Flags().StringVar(&flagBlockHash, "block-hash", "",
 		"Block hash (hex-encoded, 64 characters)")
 
-	Cmd.Flags().StringVar(&flagDatadir, "datadir", "",
-		"directory that stores the protocol state")
+	common.InitDataDirFlag(Cmd, &flagDatadir)
 
 	Cmd.Flags().BoolVar(&flagNoMigration, "no-migration", false,
 		"don't migrate the state")

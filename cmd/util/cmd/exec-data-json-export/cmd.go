@@ -6,6 +6,7 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 
+	"github.com/onflow/flow-go/cmd/util/cmd/common"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -36,8 +37,7 @@ func init() {
 		"Block hash (hex-encoded, 64 characters)")
 	_ = Cmd.MarkFlagRequired("block-hash")
 
-	Cmd.Flags().StringVar(&flagDatadir, "datadir", "",
-		"directory that stores the protocol state")
+	common.InitDataDirFlag(Cmd, &flagDatadir)
 	_ = Cmd.MarkFlagRequired("datadir")
 
 	Cmd.Flags().StringVar(&flagStateCommitment, "state-commitment", "",

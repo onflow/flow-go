@@ -59,7 +59,7 @@ func InitStorages(db storage.DB) *store.All {
 
 // WithStorage runs the given function with the storage depending on the flags.
 func WithStorage(f func(storage.DB) error) error {
-	datadir := ReadDBFlags()
+	datadir := ReadDatadirFlag()
 	if datadir == "" {
 		return fmt.Errorf("--datadir is required")
 	}

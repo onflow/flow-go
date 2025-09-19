@@ -23,7 +23,7 @@ var flagStartHeight uint64
 var flagEndHeight uint64
 
 // example:
-// ./util export-json-transactions --output-dir ./ --datadir /var/fow/data/protocol/ --start-height 2 --end-height 242
+// ./util export-json-transactions --output-dir ./ --start-height 2 --end-height 242
 var Cmd = &cobra.Command{
 	Use:   "export-json-transactions",
 	Short: "exports transactions into a json file",
@@ -31,8 +31,7 @@ var Cmd = &cobra.Command{
 }
 
 func init() {
-	Cmd.Flags().StringVar(&flagDatadir, "datadir", "/var/flow/data/protocol",
-		"the protocol state")
+	common.InitDataDirFlag(Cmd, &flagDatadir)
 
 	Cmd.Flags().StringVar(&flagOutputDir, "output-dir", "",
 		"Directory to write transactions JSON to")
