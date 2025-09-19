@@ -19,7 +19,6 @@ import (
 	"github.com/onflow/flow-go/engine/access/rest/util"
 	"github.com/onflow/flow-go/model/access"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/module/executiondatasync/optimistic_sync"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -63,7 +62,7 @@ func TestScripts_HappyPath(t *testing.T) {
 	t.Run("block ID (legacyParams)", func(t *testing.T) {
 		backend := &mock.API{}
 		blockID := unittest.IdentifierFixture()
-		backend.On("ExecuteScriptAtBlockID", mocks.Anything, blockID, validCode, [][]byte{validArgs}, optimistic_sync.Criteria{}).
+		backend.On("ExecuteScriptAtBlockID", mocks.Anything, blockID, validCode, [][]byte{validArgs}, mocks.Anything).
 			Return([]byte("hello world"), access.ExecutorMetadata{}, nil).
 			Once()
 
@@ -84,7 +83,7 @@ func TestScripts_HappyPath(t *testing.T) {
 	t.Run("block height (legacyParams)", func(t *testing.T) {
 		backend := &mock.API{}
 		height := uint64(1337)
-		backend.On("ExecuteScriptAtBlockHeight", mocks.Anything, height, validCode, [][]byte{validArgs}, optimistic_sync.Criteria{}).
+		backend.On("ExecuteScriptAtBlockHeight", mocks.Anything, height, validCode, [][]byte{validArgs}, mocks.Anything).
 			Return([]byte("hello world"), access.ExecutorMetadata{}, nil).
 			Once()
 
@@ -104,7 +103,7 @@ func TestScripts_HappyPath(t *testing.T) {
 
 	t.Run("latest height (legacyParams)", func(t *testing.T) {
 		backend := &mock.API{}
-		backend.On("ExecuteScriptAtLatestBlock", mocks.Anything, validCode, [][]byte{validArgs}, optimistic_sync.Criteria{}).
+		backend.On("ExecuteScriptAtLatestBlock", mocks.Anything, validCode, [][]byte{validArgs}, mocks.Anything).
 			Return([]byte("hello world"), access.ExecutorMetadata{}, nil).
 			Once()
 
@@ -128,7 +127,7 @@ func TestScripts_HappyPath(t *testing.T) {
 		backend.On("GetLatestBlockHeader", mocks.Anything, false).
 			Return(finalBlock, flow.BlockStatusFinalized, nil).
 			Once()
-		backend.On("ExecuteScriptAtBlockHeight", mocks.Anything, finalBlock.Height, validCode, [][]byte{validArgs}, optimistic_sync.Criteria{}).
+		backend.On("ExecuteScriptAtBlockHeight", mocks.Anything, finalBlock.Height, validCode, [][]byte{validArgs}, mocks.Anything).
 			Return([]byte("hello world"), access.ExecutorMetadata{}, nil).
 			Once()
 
@@ -151,10 +150,10 @@ func TestScripts_HappyPath(t *testing.T) {
 		ExecutorIDs:       unittest.IdentifierListFixture(2),
 	}
 
-	t.Run("latest height (with executor metadata)", func(t *testing.T) {
+	t.Run("latest height (with metadata)", func(t *testing.T) {
 		backend := &mock.API{}
 
-		backend.On("ExecuteScriptAtLatestBlock", mocks.Anything, validCode, [][]byte{validArgs}, optimistic_sync.Criteria{}).
+		backend.On("ExecuteScriptAtLatestBlock", mocks.Anything, validCode, [][]byte{validArgs}, mocks.Anything).
 			Return([]byte("hello world"), *metadata, nil).
 			Once()
 
@@ -174,11 +173,11 @@ func TestScripts_HappyPath(t *testing.T) {
 		backend.AssertExpectations(t)
 	})
 
-	t.Run("block height (with executor metadata)", func(t *testing.T) {
+	t.Run("block height (with metadata)", func(t *testing.T) {
 		backend := &mock.API{}
 		height := uint64(1337)
 
-		backend.On("ExecuteScriptAtBlockHeight", mocks.Anything, height, validCode, [][]byte{validArgs}, optimistic_sync.Criteria{}).
+		backend.On("ExecuteScriptAtBlockHeight", mocks.Anything, height, validCode, [][]byte{validArgs}, mocks.Anything).
 			Return([]byte("hello world"), *metadata, nil).
 			Once()
 
@@ -198,11 +197,11 @@ func TestScripts_HappyPath(t *testing.T) {
 		backend.AssertExpectations(t)
 	})
 
-	t.Run("block ID (with executor metadata)", func(t *testing.T) {
+	t.Run("block ID (with metadata)", func(t *testing.T) {
 		backend := &mock.API{}
 
 		blockID := unittest.IdentifierFixture()
-		backend.On("ExecuteScriptAtBlockID", mocks.Anything, blockID, validCode, [][]byte{validArgs}, optimistic_sync.Criteria{}).
+		backend.On("ExecuteScriptAtBlockID", mocks.Anything, blockID, validCode, [][]byte{validArgs}, mocks.Anything).
 			Return([]byte("hello world"), *metadata, nil).
 			Once()
 
@@ -242,7 +241,7 @@ func TestScripts_Errors(t *testing.T) {
 			},
 		)
 
-		expectedResp := fmt.Sprintf(`{"code":400, "message":"invalid ID format"}`)
+		expectedResp := `{"code":400, "message":"invalid ID format"}`
 		router.AssertResponse(t, req, http.StatusBadRequest, expectedResp, backend)
 
 		backend.AssertExpectations(t)
@@ -259,11 +258,11 @@ func TestScripts_Errors(t *testing.T) {
 			},
 		)
 
-		backend.On("ExecuteScriptAtBlockID", mocks.Anything, blockID, validCode, [][]byte{validArgs}, optimistic_sync.Criteria{}).
+		backend.On("ExecuteScriptAtBlockID", mocks.Anything, blockID, validCode, [][]byte{validArgs}, mocks.Anything).
 			Return(nil, access.ExecutorMetadata{}, status.Error(codes.Internal, "internal server error")).
 			Once()
 
-		expectedResp := fmt.Sprintf(`{"code":400, "message":"Invalid Flow request: internal server error"}`)
+		expectedResp := `{"code":400, "message":"Invalid Flow request: internal server error"}`
 		router.AssertResponse(t, req, http.StatusBadRequest, expectedResp, backend)
 
 		backend.AssertExpectations(t)
@@ -279,11 +278,11 @@ func TestScripts_Errors(t *testing.T) {
 			},
 		)
 
-		backend.On("ExecuteScriptAtBlockHeight", mocks.Anything, uint64(1337), validCode, [][]byte{validArgs}, optimistic_sync.Criteria{}).
+		backend.On("ExecuteScriptAtBlockHeight", mocks.Anything, uint64(1337), validCode, [][]byte{validArgs}, mocks.Anything).
 			Return(nil, access.ExecutorMetadata{}, status.Error(codes.Internal, "internal server error")).
 			Once()
 
-		expectedResp := fmt.Sprintf(`{"code":400, "message":"Invalid Flow request: internal server error"}`)
+		expectedResp := `{"code":400, "message":"Invalid Flow request: internal server error"}`
 		router.AssertResponse(t, req, http.StatusBadRequest, expectedResp, backend)
 
 		backend.AssertExpectations(t)
@@ -298,11 +297,11 @@ func TestScripts_Errors(t *testing.T) {
 			},
 		)
 
-		backend.On("ExecuteScriptAtLatestBlock", mocks.Anything, validCode, [][]byte{validArgs}, optimistic_sync.Criteria{}).
+		backend.On("ExecuteScriptAtLatestBlock", mocks.Anything, validCode, [][]byte{validArgs}, mocks.Anything).
 			Return(nil, access.ExecutorMetadata{}, status.Error(codes.Internal, "internal server error")).
 			Once()
 
-		expectedResp := fmt.Sprintf(`{"code":400, "message":"Invalid Flow request: internal server error"}`)
+		expectedResp := `{"code":400, "message":"Invalid Flow request: internal server error"}`
 		router.AssertResponse(t, req, http.StatusBadRequest, expectedResp, backend)
 
 		backend.AssertExpectations(t)

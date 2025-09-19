@@ -24,7 +24,7 @@ func ExecuteScript(r *common.Request, backend access.API, _ commonmodels.LinkGen
 	// In the next spork, we should update this to always return an ExecuteScriptResponse.
 	legacyParams := executionState.AgreeingExecutorsCount == 0 &&
 		len(executionState.RequiredExecutorIDs) == 0 &&
-		includeExecutorMetadata == false
+		!includeExecutorMetadata
 
 	buildResponse := func(value []byte, executorMetadata accessmodel.ExecutorMetadata) interface{} {
 		if legacyParams {
