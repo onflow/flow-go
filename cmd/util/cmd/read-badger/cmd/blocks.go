@@ -27,7 +27,7 @@ var blocksCmd = &cobra.Command{
 	Use:   "blocks",
 	Short: "get a block by block ID or height",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		return WithStorage(func(db storage.DB) error {
+		return common.WithStorage(flagDatadir, func(db storage.DB) error {
 			cacheMetrics := &metrics.NoopCollector{}
 			headers := store.NewHeaders(cacheMetrics, db)
 			index := store.NewIndex(cacheMetrics, db)

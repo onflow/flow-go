@@ -31,7 +31,7 @@ var clusterBlocksCmd = &cobra.Command{
 	Use:   "cluster-blocks",
 	Short: "get cluster blocks",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		return WithStorage(func(db storage.DB) error {
+		return common.WithStorage(flagDatadir, func(db storage.DB) error {
 			metrics := metrics.NewNoopCollector()
 
 			headers := store.NewHeaders(metrics, db)
