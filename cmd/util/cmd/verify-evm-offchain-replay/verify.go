@@ -50,53 +50,53 @@ func Verify(
 		}
 		defer dsStore.Close()
 
-	var store *testutils.TestValueStore
+		var store *testutils.TestValueStore
 
-	// root block require the account status registers to be saved
-	isRoot := utils.IsEVMRootHeight(chainID, from)
-	if isRoot {
-		store = testutils.GetSimpleValueStore()
-	} else {
-		prev := from - 1
-		store, err = loadState(prev, evmStateGobDir)
-		if err != nil {
-			return fmt.Errorf("could not load EVM state from previous height %d: %w", prev, err)
-		}
-	}
-
-	// save state every N blocks
-	onHeightReplayed := func(height uint64) error {
-		log.Info().Msgf("replayed height %d", height)
-		if height%saveEveryNBlocks == 0 {
-			err := saveState(store, height, evmStateGobDir)
+		// root block require the account status registers to be saved
+		isRoot := utils.IsEVMRootHeight(chainID, from)
+		if isRoot {
+			store = testutils.GetSimpleValueStore()
+		} else {
+			prev := from - 1
+			store, err = loadState(prev, evmStateGobDir)
 			if err != nil {
-				return err
+				return fmt.Errorf("could not load EVM state from previous height %d: %w", prev, err)
 			}
 		}
-		return nil
-	}
 
-	// replay blocks
-	err = utils.OffchainReplayBackwardCompatibilityTest(
-		log,
-		chainID,
-		from,
-		to,
-		storages.Headers,
-		storages.Results,
-		executionDataStore,
-		store,
-		onHeightReplayed,
-	)
+		// save state every N blocks
+		onHeightReplayed := func(height uint64) error {
+			log.Info().Msgf("replayed height %d", height)
+			if height%saveEveryNBlocks == 0 {
+				err := saveState(store, height, evmStateGobDir)
+				if err != nil {
+					return err
+				}
+			}
+			return nil
+		}
 
-	if err != nil {
-		return err
-	}
+		// replay blocks
+		err = utils.OffchainReplayBackwardCompatibilityTest(
+			log,
+			chainID,
+			from,
+			to,
+			storages.Headers,
+			storages.Results,
+			executionDataStore,
+			store,
+			onHeightReplayed,
+		)
 
-	err = saveState(store, to, evmStateGobDir)
-	if err != nil {
-		return err
-	}
+		if err != nil {
+			return err
+		}
+
+		err = saveState(store, to, evmStateGobDir)
+		if err != nil {
+			return err
+		}
 
 		lg.Info().Msgf("successfully verified range from %d to %d", from, to)
 
@@ -147,13 +147,13 @@ func initStorages(db storage.DB, executionDataDir string) (
 	storages := common.InitStorages(db)
 
 	datastoreDir := filepath.Join(executionDataDir, "blobstore")
-	err = os.MkdirAll(datastoreDir, 0700)
+	err := os.MkdirAll(datastoreDir, 0700)
 	if err != nil {
-		return nil, nil, nil, nil, err
+		return nil, nil, nil, err
 	}
 	ds, err := pebbleds.NewDatastore(datastoreDir, nil)
 	if err != nil {
-		return nil, nil, nil, nil, err
+		return nil, nil, nil, err
 	}
 
 	executionDataBlobstore := blobs.NewBlobstore(ds)

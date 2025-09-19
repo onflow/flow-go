@@ -74,48 +74,48 @@ func ExportTransactions(lockManager lockctx.Manager, dataDir string, outputDir s
 			return fmt.Errorf("could not open protocol state: %w", err)
 		}
 
-	// create finder
-	finder := &transactions.Finder{
-		State:       state,
-		Payloads:    storages.Payloads,
-		Collections: storages.Collections,
-	}
+		// create finder
+		finder := &transactions.Finder{
+			State:       state,
+			Payloads:    storages.Payloads,
+			Collections: storages.Collections,
+		}
 
-	// create JSON file writer
-	outputFile := filepath.Join(outputDir, "transactions.json")
-	fi, err := os.Create(outputFile)
-	if err != nil {
-		return fmt.Errorf("could not create block output file %v, %w", outputFile, err)
-	}
-	defer fi.Close()
+		// create JSON file writer
+		outputFile := filepath.Join(outputDir, "transactions.json")
+		fi, err := os.Create(outputFile)
+		if err != nil {
+			return fmt.Errorf("could not create block output file %v, %w", outputFile, err)
+		}
+		defer fi.Close()
 
-	blockWriter := bufio.NewWriter(fi)
+		blockWriter := bufio.NewWriter(fi)
 
-	// build all blocks first before writing to disk
-	// TODO: if the height range is too high, consider streaming json writing for each block
-	blocks, err := finder.GetByHeightRange(startHeight, endHeight)
-	if err != nil {
-		return err
-	}
+		// build all blocks first before writing to disk
+		// TODO: if the height range is too high, consider streaming json writing for each block
+		blocks, err := finder.GetByHeightRange(startHeight, endHeight)
+		if err != nil {
+			return err
+		}
 
-	log.Info().Msgf("exporting transactions for %v blocks", endHeight-startHeight+1)
+		log.Info().Msgf("exporting transactions for %v blocks", endHeight-startHeight+1)
 
-	// converting all blocks into json
-	jsonData, err := json.Marshal(blocks)
-	if err != nil {
-		return fmt.Errorf("could not marshal JSON: %w", err)
-	}
+		// converting all blocks into json
+		jsonData, err := json.Marshal(blocks)
+		if err != nil {
+			return fmt.Errorf("could not marshal JSON: %w", err)
+		}
 
-	// writing to disk
-	err = writeJSONTo(blockWriter, jsonData)
-	if err != nil {
-		return fmt.Errorf("could not write json to %v: %w", outputDir, err)
-	}
+		// writing to disk
+		err = writeJSONTo(blockWriter, jsonData)
+		if err != nil {
+			return fmt.Errorf("could not write json to %v: %w", outputDir, err)
+		}
 
-	err = blockWriter.Flush()
-	if err != nil {
-		return fmt.Errorf("fail to flush block data: %w", err)
-	}
+		err = blockWriter.Flush()
+		if err != nil {
+			return fmt.Errorf("fail to flush block data: %w", err)
+		}
 
 		log.Info().Msgf("successfully exported transaction data to %v", outputFile)
 

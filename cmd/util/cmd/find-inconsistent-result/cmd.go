@@ -55,37 +55,37 @@ func findFirstMismatch(datadir string, startHeight, endHeight uint64, lockManage
 			return fmt.Errorf("could not create storages: %v", err)
 		}
 
-	c := &checker{
-		headers: headers,
-		results: results,
-		seals:   seals,
-		state:   state,
-	}
-
-	if startHeight == 0 {
-		startHeight = findRootBlockHeight(state)
-	}
-
-	if endHeight == 0 {
-		endHeight, err = latest.LatestSealedAndExecutedHeight(state, db)
-		if err != nil {
-			return fmt.Errorf("could not find last executed and sealed height: %v", err)
+		c := &checker{
+			headers: headers,
+			results: results,
+			seals:   seals,
+			state:   state,
 		}
-	}
 
-	fmt.Printf("finding mismatch result between heights %v and %v\n", startHeight, endHeight)
+		if startHeight == 0 {
+			startHeight = findRootBlockHeight(state)
+		}
 
-	mismatchHeight, err := c.FindFirstMismatchHeight(startHeight, endHeight)
-	if err != nil {
-		return fmt.Errorf("could not find first mismatch: %v", err)
-	}
+		if endHeight == 0 {
+			endHeight, err = latest.LatestSealedAndExecutedHeight(state, db)
+			if err != nil {
+				return fmt.Errorf("could not find last executed and sealed height: %v", err)
+			}
+		}
 
-	fmt.Printf("first mismatch found at block %v\n", mismatchHeight)
+		fmt.Printf("finding mismatch result between heights %v and %v\n", startHeight, endHeight)
 
-	blockID, err := findBlockIDByHeight(headers, mismatchHeight)
-	if err != nil {
-		return fmt.Errorf("could not find block id for height %v: %v", mismatchHeight, err)
-	}
+		mismatchHeight, err := c.FindFirstMismatchHeight(startHeight, endHeight)
+		if err != nil {
+			return fmt.Errorf("could not find first mismatch: %v", err)
+		}
+
+		fmt.Printf("first mismatch found at block %v\n", mismatchHeight)
+
+		blockID, err := findBlockIDByHeight(headers, mismatchHeight)
+		if err != nil {
+			return fmt.Errorf("could not find block id for height %v: %v", mismatchHeight, err)
+		}
 
 		fmt.Printf("mismatching block %v (id: %v)\n", mismatchHeight, blockID)
 

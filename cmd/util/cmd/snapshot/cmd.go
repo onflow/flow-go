@@ -31,7 +31,7 @@ var (
 var Cmd = &cobra.Command{
 	Use:   "snapshot",
 	Short: "Retrieves a protocol state snapshot from the database, which can be used to instantiate another node",
-	Run:   run,
+	RunE:  runE,
 }
 
 func init() {
@@ -43,36 +43,33 @@ func init() {
 	_ = Cmd.MarkFlagRequired("height")
 }
 
-func run(*cobra.Command, []string) {
+func runE(*cobra.Command, []string) error {
 	lockManager := storage.MakeSingletonLockManager()
 
-	err := common.WithStorage(flagDatadir, func(db storage.DB) error {
+	return common.WithStorage(flagDatadir, func(db storage.DB) error {
 		storages := common.InitStorages(db)
 		state, err := common.OpenProtocolState(lockManager, db, storages)
 		if err != nil {
 			return fmt.Errorf("could not open protocol state: %w", err)
 		}
 
-	log := log.With().Uint64("block_height", flagHeight).Logger()
+		log := log.With().Uint64("block_height", flagHeight).Logger()
 
-	snap := state.AtHeight(flagHeight)
-	encoded, err := convert.SnapshotToBytes(snap)
-	if err != nil {
-		log.Fatal().Err(err).Msg("failed to encode snapshot")
-	}
+		snap := state.AtHeight(flagHeight)
+		encoded, err := convert.SnapshotToBytes(snap)
+		if err != nil {
+			return fmt.Errorf("failed to encode snapshot: %w", err)
+		}
 
-	dir := filepath.Join(".", "root-protocol-state-snapshot.json")
+		dir := filepath.Join(".", "root-protocol-state-snapshot.json")
 
-	log.Info().Msgf("going to write snapshot to %s", dir)
-	err = os.WriteFile(dir, encoded, 0600)
-	if err != nil {
-		log.Fatal().Err(err).Msg("failed to write snapshot")
-	}
+		log.Info().Msgf("going to write snapshot to %s", dir)
+		err = os.WriteFile(dir, encoded, 0600)
+		if err != nil {
+			return fmt.Errorf("failed to write snapshot: %w", err)
+		}
 
 		log.Info().Msgf("successfully wrote snapshot to %s", dir)
 		return nil
 	})
-	if err != nil {
-		log.Fatal().Err(err).Msg("failed to process snapshot")
-	}
 }
