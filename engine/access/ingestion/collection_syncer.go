@@ -158,7 +158,7 @@ func (s *CollectionSyncer) requestMissingCollections() error {
 			Int("missing_collection_count", len(collections)).
 			Msg("re-requesting missing collections")
 
-		s.requestCollections(collections, false)
+		s.requestCollections(collections)
 	}
 
 	return nil
