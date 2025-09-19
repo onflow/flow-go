@@ -299,6 +299,7 @@ func (s *Suite) TestOnFinalizedBlockSingle() {
 			wg.Done()
 		}).Once()
 	}
+	s.request.On("Force").Return().Once()
 
 	// process the block through the finalized callback
 	eng.OnFinalizedBlock(&hotstuffBlock)
@@ -365,6 +366,7 @@ func (s *Suite) TestOnFinalizedBlockSeveralBlocksAhead() {
 				wg.Done()
 			}).Once()
 		}
+		s.request.On("Force").Return().Once()
 		for _, seal := range block.Payload.Seals {
 			s.results.On("Index", seal.BlockID, seal.ResultID).Return(nil).Once()
 		}
@@ -724,6 +726,7 @@ func (s *Suite) TestProcessBackgroundCalls() {
 				s.request.On("EntityByID", cg.CollectionID, mock.Anything).Return().Once()
 			}
 		}
+		s.request.On("Force").Return().Once()
 
 		err := eng.checkMissingCollections()
 		s.Require().NoError(err)
@@ -750,6 +753,7 @@ func (s *Suite) TestProcessBackgroundCalls() {
 				s.request.On("EntityByID", cg.CollectionID, mock.Anything).Return().Once()
 			}
 		}
+		s.request.On("Force").Return().Once()
 
 		err := eng.checkMissingCollections()
 		s.Require().NoError(err)
