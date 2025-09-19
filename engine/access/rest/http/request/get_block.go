@@ -123,8 +123,7 @@ func (g *GetBlockByIDs) Build(r *common.Request) error {
 }
 
 func (g *GetBlockByIDs) Parse(rawIds []string) error {
-	var ids parser.IDs
-	err := ids.Parse(rawIds)
+	ids, err := parser.NewIDs(rawIds)
 	if err != nil {
 		return err
 	}

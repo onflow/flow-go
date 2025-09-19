@@ -16,15 +16,12 @@ type EventResponse struct {
 
 // NewEventResponse creates EventResponse instance.
 func NewEventResponse(eventsResponse *backend.EventsResponse, index uint64) *EventResponse {
-	var events commonmodels.Events
-	events.Build(eventsResponse.Events)
-
 	return &EventResponse{
 		BlockEvents: commonmodels.BlockEvents{
 			BlockId:        eventsResponse.BlockID.String(),
 			BlockHeight:    strconv.FormatUint(eventsResponse.Height, 10),
 			BlockTimestamp: eventsResponse.BlockTimestamp,
-			Events:         events,
+			Events:         commonmodels.NewEvents(eventsResponse.Events),
 		},
 		MessageIndex: index,
 	}

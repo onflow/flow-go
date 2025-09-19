@@ -92,9 +92,6 @@ func (t *TransactionResult) Build(txr *accessmodel.TransactionResult, txID flow.
 	var execution TransactionExecution
 	execution.Build(txr)
 
-	var events Events
-	events.Build(txr.Events)
-
 	if txr.BlockID != flow.ZeroID { // don't send back 0 ID
 		t.BlockId = txr.BlockID.String()
 	}
@@ -108,7 +105,7 @@ func (t *TransactionResult) Build(txr *accessmodel.TransactionResult, txID flow.
 	t.StatusCode = int32(txr.StatusCode)
 	t.ErrorMessage = txr.ErrorMessage
 	t.ComputationUsed = util.FromUint(uint64(0)) // todo: define this
-	t.Events = events
+	t.Events = NewEvents(txr.Events)
 
 	self, _ := SelfLink(txID, link.TransactionResultLink)
 	t.Links = self

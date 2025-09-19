@@ -913,16 +913,28 @@ func (h *Handler) GetEventsForHeightRange(
 	endHeight := req.GetEndHeight()
 
 	eventEncodingVersion := req.GetEventEncodingVersion()
-
-	results, err := h.api.GetEventsForHeightRange(ctx, eventType, startHeight, endHeight, eventEncodingVersion)
+	query := req.GetExecutionStateQuery()
+	results, executorMetadata, err := h.api.GetEventsForHeightRange(
+		ctx,
+		eventType,
+		startHeight,
+		endHeight,
+		eventEncodingVersion,
+		convert.NewCriteria(query),
+	)
 	if err != nil {
 		return nil, err
+	}
+
+	if query.GetIncludeExecutorMetadata() {
+		metadata.ExecutorMetadata = convert.ExecutorMetadataToMessage(&executorMetadata)
 	}
 
 	resultEvents, err := convert.BlockEventsToMessages(results)
 	if err != nil {
 		return nil, err
 	}
+
 	return &accessproto.EventsResponse{
 		Results:  resultEvents,
 		Metadata: metadata,
@@ -950,10 +962,20 @@ func (h *Handler) GetEventsForBlockIDs(
 	}
 
 	eventEncodingVersion := req.GetEventEncodingVersion()
-
-	results, err := h.api.GetEventsForBlockIDs(ctx, eventType, blockIDs, eventEncodingVersion)
+	query := req.GetExecutionStateQuery()
+	results, executorMetadata, err := h.api.GetEventsForBlockIDs(
+		ctx,
+		eventType,
+		blockIDs,
+		eventEncodingVersion,
+		convert.NewCriteria(query),
+	)
 	if err != nil {
 		return nil, err
+	}
+
+	if query.GetIncludeExecutorMetadata() {
+		metadata.ExecutorMetadata = convert.ExecutorMetadataToMessage(&executorMetadata)
 	}
 
 	resultEvents, err := convert.BlockEventsToMessages(results)
