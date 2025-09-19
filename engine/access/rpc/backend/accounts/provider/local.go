@@ -20,7 +20,7 @@ import (
 type LocalAccountProvider struct {
 	log            zerolog.Logger
 	state          protocol.State
-	scriptExecutor execution.ScriptExecutor
+	scriptExecutor execution.IndexerScriptExecutor
 }
 
 var _ AccountProvider = (*LocalAccountProvider)(nil)
@@ -28,7 +28,7 @@ var _ AccountProvider = (*LocalAccountProvider)(nil)
 func NewLocalAccountProvider(
 	log zerolog.Logger,
 	state protocol.State,
-	scriptExecutor execution.ScriptExecutor,
+	scriptExecutor execution.IndexerScriptExecutor,
 ) *LocalAccountProvider {
 	return &LocalAccountProvider{
 		log:            log.With().Str("account_provider", "local").Logger(),

@@ -20,11 +20,9 @@ import (
 	"github.com/onflow/flow-go/fvm/storage/derived"
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/execution"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
-	"github.com/onflow/flow-go/module/state_synchronization/indexer"
 	syncmock "github.com/onflow/flow-go/module/state_synchronization/mock"
 	synctest "github.com/onflow/flow-go/module/state_synchronization/requester/unittest"
 	"github.com/onflow/flow-go/storage"
@@ -34,7 +32,7 @@ import (
 	"github.com/onflow/flow-go/utils/unittest/mocks"
 )
 
-// ScriptExecutorSuite is a test suite for testing the ScriptExecutor.
+// ScriptExecutorSuite is a test suite for testing the IndexerScriptExecutor.
 // It sets up the necessary components and dependencies for executing scripts.
 type ScriptExecutorSuite struct {
 	suite.Suite
@@ -97,7 +95,6 @@ func (s *ScriptExecutorSuite) bootstrap() {
 // SetupTest sets up the test environment for each test in the suite.
 // This includes initializing various components and mock objects needed for the tests.
 func (s *ScriptExecutorSuite) SetupTest() {
-	lockManager := storage.NewTestingLockManager()
 	s.log = unittest.Logger()
 	s.chain = flow.Emulator.Chain()
 
@@ -129,30 +126,12 @@ func (s *ScriptExecutorSuite) SetupTest() {
 	derivedChainData, err := derived.NewDerivedChainData(derived.DefaultDerivedDataCacheSize)
 	s.Require().NoError(err)
 
-	indexerCore, err := indexer.New(
-		s.log,
-		module.ExecutionStateIndexerMetrics(metrics.NewNoopCollector()),
-		nil,
-		s.registerIndex,
-		s.headers,
-		nil,
-		nil,
-		nil,
-		nil,
-		s.chain,
-		derivedChainData,
-		module.CollectionExecutedMetric(metrics.NewNoopCollector()),
-		lockManager,
-	)
-	s.Require().NoError(err)
-
 	s.scripts = execution.NewScripts(
 		s.log,
 		metrics.NewNoopCollector(),
 		s.chain.ChainID(),
 		protocolState,
 		s.headers,
-		indexerCore.RegisterValue,
 		query.NewDefaultConfig(),
 		derivedChainData,
 		true,
@@ -180,7 +159,7 @@ func (s *ScriptExecutorSuite) TestExecuteAtBlockHeight() {
 	// This test simulates the behavior when the version beacon is not set in the script executor,
 	// but it should still work by omitting the version control checks.
 	s.Run("test script execution without version control", func() {
-		scriptExec := NewScriptExecutor(s.log, uint64(0), math.MaxUint64)
+		scriptExec := NewIndexerScriptExecutor(s.log, s.registerIndex, uint64(0), math.MaxUint64)
 		s.reporter.On("HighestIndexedHeight").Return(s.height+1, nil).Once()
 
 		// Initialize the script executor without version control
@@ -233,7 +212,7 @@ func (s *ScriptExecutorSuite) TestExecuteAtBlockHeight() {
 		unittest.RequireComponentsReadyBefore(s.T(), 2*time.Second, s.versionControl)
 
 		// Initialize the script executor with version control
-		scriptExec := NewScriptExecutor(s.log, uint64(0), math.MaxUint64)
+		scriptExec := NewIndexerScriptExecutor(s.log, s.registerIndex, uint64(0), math.MaxUint64)
 		s.reporter.On("HighestIndexedHeight").Return(s.height+1, nil)
 
 		err = scriptExec.Initialize(s.indexReporter, s.scripts, s.versionControl)
@@ -285,7 +264,7 @@ func (s *ScriptExecutorSuite) TestExecuteAtBlockHeight() {
 		unittest.RequireComponentsReadyBefore(s.T(), 2*time.Second, s.versionControl)
 
 		// Initialize the script executor with version control
-		scriptExec := NewScriptExecutor(s.log, uint64(0), math.MaxUint64)
+		scriptExec := NewIndexerScriptExecutor(s.log, s.registerIndex, uint64(0), math.MaxUint64)
 		s.reporter.On("HighestIndexedHeight").Return(s.height+1, nil)
 
 		err = scriptExec.Initialize(s.indexReporter, s.scripts, s.versionControl)

@@ -193,7 +193,7 @@ func (suite *Suite) defaultTransactionsParams() Params {
 		suite.chainID.Chain(),
 		metrics.NewNoopCollector(),
 		validator.TransactionValidationOptions{},
-		execmock.NewScriptExecutor(suite.T()),
+		execmock.NewIndexerScriptExecutor(suite.T()),
 	)
 	suite.Require().NoError(err)
 

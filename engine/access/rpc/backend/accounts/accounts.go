@@ -36,7 +36,7 @@ func NewAccountsBackend(
 	connFactory connection.ConnectionFactory,
 	nodeCommunicator node_communicator.Communicator,
 	scriptExecMode query_mode.IndexQueryMode,
-	scriptExecutor execution.ScriptExecutor,
+	scriptExecutor execution.IndexerScriptExecutor,
 	execNodeIdentitiesProvider *commonrpc.ExecutionNodeIdentitiesProvider,
 ) (*Accounts, error) {
 	var accountProvider provider.AccountProvider

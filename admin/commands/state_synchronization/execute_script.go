@@ -19,10 +19,10 @@ type scriptData struct {
 }
 
 type ExecuteScriptCommand struct {
-	scriptExecutor execution.ScriptExecutor
+	scriptExecutor execution.IndexerScriptExecutor
 }
 
-func (e *ExecuteScriptCommand) Handler(ctx context.Context, req *admin.CommandRequest) (interface{}, error) {
+func (e *ExecuteScriptCommand) Handler(_ context.Context, req *admin.CommandRequest) (interface{}, error) {
 	d := req.ValidatorData.(*scriptData)
 
 	result, err := e.scriptExecutor.ExecuteAtBlockHeight(context.Background(), d.script, d.arguments, d.height)
@@ -91,7 +91,7 @@ func (e *ExecuteScriptCommand) Validator(req *admin.CommandRequest) error {
 	return nil
 }
 
-func NewExecuteScriptCommand(scripts execution.ScriptExecutor) commands.AdminCommand {
+func NewExecuteScriptCommand(scripts execution.IndexerScriptExecutor) commands.AdminCommand {
 	return &ExecuteScriptCommand{
 		scripts,
 	}

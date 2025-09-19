@@ -291,7 +291,7 @@ func (s *TransactionStreamSuite) initializeBackend() {
 			MaxTransactionByteSize: flow.DefaultMaxTransactionByteSize,
 			MaxCollectionByteSize:  flow.DefaultMaxCollectionByteSize,
 		},
-		execmock.NewScriptExecutor(s.T()),
+		execmock.NewIndexerScriptExecutor(s.T()),
 	)
 	s.Require().NoError(err)
 
@@ -657,7 +657,10 @@ func (s *TransactionStreamSuite) TestSubscribeTransactionStatusWithCurrentFinali
 	s.addBlockWithTransaction(&transaction)
 
 	sub := s.txStreamBackend.SubscribeTransactionStatuses(ctx, txId, entities.EventEncodingVersion_CCF_V0)
-	s.checkNewSubscriptionMessage(sub, txId, []flow.TransactionStatus{flow.TransactionStatusPending, flow.TransactionStatusFinalized})
+	s.checkNewSubscriptionMessage(sub, txId, []flow.TransactionStatus{
+		flow.TransactionStatusPending,
+		flow.TransactionStatusFinalized,
+	})
 
 	hasTransactionResultInStorage = true
 	s.addNewFinalizedBlock(s.finalizedBlock.ToHeader(), true)
