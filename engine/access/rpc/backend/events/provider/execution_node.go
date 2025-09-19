@@ -74,7 +74,7 @@ func (e *ENEventProvider) Events(
 	}
 
 	metadata := access.ExecutorMetadata{
-		ExecutionResultID: execResultInfo.ExecutionResult.ID(),
+		ExecutionResultID: execResultInfo.ExecutionResultID,
 		ExecutorIDs:       orderedExecutors(node.NodeID, execResultInfo.ExecutionNodes.NodeIDs()),
 	}
 

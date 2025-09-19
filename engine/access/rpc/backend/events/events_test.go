@@ -199,8 +199,8 @@ func (s *EventsSuite) TestGetEvents_HappyPaths() {
 	s.executionResultProvider.
 		On("ExecutionResultInfo", mock.Anything, mock.Anything).
 		Return(&optimistic_sync.ExecutionResultInfo{
-			ExecutionResult: s.executionResult,
-			ExecutionNodes:  s.executionNodes.ToSkeleton(),
+			ExecutionResultID: s.executionResult.ID(),
+			ExecutionNodes:    s.executionNodes.ToSkeleton(),
 		}, nil)
 
 	s.executionStateCache.

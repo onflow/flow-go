@@ -174,8 +174,8 @@ func (suite *RateLimitTestSuite) SetupTest() {
 	suite.executionResultInfoProvider.
 		On("ExecutionResultInfo", mock.Anything, mock.Anything).
 		Return(&optimistic_sync.ExecutionResultInfo{
-			ExecutionResult: unittest.ExecutionResultFixture(),
-			ExecutionNodes:  unittest.IdentityListFixture(2).ToSkeleton(),
+			ExecutionResultID: unittest.IdentifierFixture(),
+			ExecutionNodes:    unittest.IdentityListFixture(2).ToSkeleton(),
 		}, nil).
 		Maybe()
 

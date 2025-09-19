@@ -161,7 +161,7 @@ func (suite *ExecutionResultQueryProviderSuite) TestExecutionResultQuery() {
 			query, err := provider.ExecutionResultInfo(block.ID(), optimistic_sync.Criteria{})
 			suite.Require().NoError(err)
 
-			suite.Require().Equal(executionResult.ID(), query.ExecutionResult.ID())
+			suite.Require().Equal(executionResult.ID(), query.ExecutionResultID)
 			suite.Assert().ElementsMatch(requiredExecutors, query.ExecutionNodes.NodeIDs())
 		},
 	)
@@ -244,7 +244,7 @@ func (suite *ExecutionResultQueryProviderSuite) TestRootBlockHandling() {
 			)
 			suite.Require().NoError(err)
 
-			suite.Assert().Equal(suite.rootBlockResult, query.ExecutionResult)
+			suite.Assert().Equal(suite.rootBlockResult, query.ExecutionResultID)
 			suite.Assert().Len(query.ExecutionNodes.NodeIDs(), defaultMaxNodesCnt)
 			suite.Assert().Subset(allExecutionNodes.NodeIDs(), query.ExecutionNodes.NodeIDs())
 		},
@@ -263,7 +263,7 @@ func (suite *ExecutionResultQueryProviderSuite) TestRootBlockHandling() {
 			query, err := provider.ExecutionResultInfo(suite.rootBlock.ID(), criteria)
 			suite.Require().NoError(err)
 
-			suite.Assert().Equal(suite.rootBlockResult, query.ExecutionResult)
+			suite.Assert().Equal(suite.rootBlockResult, query.ExecutionResultID)
 			suite.Assert().ElementsMatch(query.ExecutionNodes.NodeIDs(), requiredExecutors)
 		},
 	)

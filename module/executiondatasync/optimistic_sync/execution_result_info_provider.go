@@ -39,7 +39,7 @@ func (c *Criteria) OverrideWith(override Criteria) Criteria {
 // It includes both the execution result and the execution nodes that produced it.
 type ExecutionResultInfo struct {
 	// ExecutionResult is the execution result for the queried block
-	ExecutionResult *flow.ExecutionResult
+	ExecutionResultID flow.Identifier
 	// ExecutionNodes is the list of execution node identities that produced the result
 	ExecutionNodes flow.IdentitySkeletonList
 }
