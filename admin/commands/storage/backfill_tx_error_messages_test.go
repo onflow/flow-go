@@ -2,7 +2,6 @@ package storage
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"os"
 	"testing"
@@ -11,7 +10,6 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
-	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
 	"github.com/onflow/flow-go/admin"
@@ -171,16 +169,6 @@ func (suite *BackfillTxErrorMessagesSuite) SetupTest() {
 	)
 }
 
-func encodeExecutionNodeIds(t *testing.T, nodeIDs ...flow.Identifier) string {
-	nodeIDsList := make([]string, len(nodeIDs))
-	for i, nodeID := range nodeIDs {
-		nodeIDsList[i] = nodeID.String()
-	}
-	ids, err := json.Marshal(nodeIDsList)
-	require.NoError(t, err)
-	return string(ids)
-}
-
 // TestValidateInvalidFormat validates that invalid input formats trigger appropriate error responses.
 // It tests several invalid cases such as:
 // - Invalid "start-height" and "end-height" fields where values are in an incorrect format or out of valid ranges.
@@ -250,7 +238,7 @@ func (suite *BackfillTxErrorMessagesSuite) TestValidateInvalidFormat() {
 			Data: map[string]interface{}{
 				"start-height":       float64(1),         // raw json parses to float64
 				"end-height":         float64(endHeight), // raw json parses to float64
-				"execution-node-ids": encodeExecutionNodeIds(suite.T(), suite.allENIDs[0].NodeID),
+				"execution-node-ids": []any{suite.allENIDs[0].NodeID.String()},
 			},
 		})
 		suite.Error(err)
@@ -285,19 +273,7 @@ func (suite *BackfillTxErrorMessagesSuite) TestValidateInvalidFormat() {
 		})
 		suite.Error(err)
 		suite.Equal(err, admin.NewInvalidAdminReqParameterError(
-			"execution-node-ids", "must be json", []int{1, 2, 3}))
-
-		// invalid type
-		encoded, err := json.Marshal([]int{1, 2, 3})
-		require.NoError(suite.T(), err)
-
-		err = suite.command.Validator(&admin.CommandRequest{
-			Data: map[string]interface{}{
-				"execution-node-ids": string(encoded),
-			},
-		})
-		suite.Error(err)
-		suite.ErrorContains(err, "must be a list of strings")
+			"execution-node-ids", "must be a list of strings", []int{1, 2, 3}))
 
 		// invalid type
 		err = suite.command.Validator(&admin.CommandRequest{
@@ -315,7 +291,7 @@ func (suite *BackfillTxErrorMessagesSuite) TestValidateInvalidFormat() {
 			Data: map[string]interface{}{
 				"start-height":       float64(1), // raw json parses to float64
 				"end-height":         float64(4), // raw json parses to float64
-				"execution-node-ids": encodeExecutionNodeIds(suite.T(), invalidENID),
+				"execution-node-ids": []any{invalidENID.String()},
 			},
 		})
 		suite.Error(err)
@@ -346,7 +322,7 @@ func (suite *BackfillTxErrorMessagesSuite) TestValidateValidFormat() {
 			Data: map[string]interface{}{
 				"start-height":       float64(1), // raw json parses to float64
 				"end-height":         float64(3), // raw json parses to float64
-				"execution-node-ids": encodeExecutionNodeIds(suite.T(), suite.allENIDs[0].NodeID),
+				"execution-node-ids": []any{suite.allENIDs[0].NodeID.String()},
 			},
 		})
 		suite.NoError(err)
@@ -414,7 +390,7 @@ func (suite *BackfillTxErrorMessagesSuite) TestHandleBackfillTxErrorMessages() {
 			Data: map[string]interface{}{
 				"start-height":       float64(startHeight), // raw json parses to float64
 				"end-height":         float64(endHeight),   // raw json parses to float64
-				"execution-node-ids": encodeExecutionNodeIds(suite.T(), executorID),
+				"execution-node-ids": []any{executorID.String()},
 			},
 		}
 		suite.Require().NoError(suite.command.Validator(req))
