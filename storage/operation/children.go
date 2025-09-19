@@ -10,6 +10,14 @@ import (
 	"github.com/onflow/flow-go/storage"
 )
 
+// IndexNewBlock indexes a new block and updates the parent-child relationship in the block children index.
+// This function creates an empty children index for the new block and adds the new block to the parent's children list.
+//
+// CAUTION:
+//   - The caller must acquire the [storage.LockInsertBlock] and hold it until the database write has been committed.
+//
+// Expected error returns during normal operations:
+//   - [storage.ErrAlreadyExists] if the blockID is already indexed as a child of the parent
 func IndexNewBlock(lctx lockctx.Proof, rw storage.ReaderBatchWriter, blockID flow.Identifier, parentID flow.Identifier) error {
 	if !lctx.HoldsLock(storage.LockInsertBlock) {
 		return fmt.Errorf("missing required lock: %s", storage.LockInsertBlock)
@@ -18,6 +26,13 @@ func IndexNewBlock(lctx lockctx.Proof, rw storage.ReaderBatchWriter, blockID flo
 	return insertNewBlock(rw, blockID, parentID)
 }
 
+// IndexNewRootBlock indexes a new root block by creating an empty children index for it.
+// This function is used for root blocks that have no parent and should not be added to any parent's children list.
+//
+// CAUTION:
+//   - The caller must acquire the [storage.LockInsertBlock] and hold it until the database write has been committed.
+//
+// No error returns are expected during normal operation.
 func IndexNewRootBlock(lctx lockctx.Proof, rw storage.ReaderBatchWriter, blockID flow.Identifier) error {
 	if !lctx.HoldsLock(storage.LockInsertBlock) {
 		return fmt.Errorf("missing required lock: %s", storage.LockInsertBlock)
@@ -26,6 +41,14 @@ func IndexNewRootBlock(lctx lockctx.Proof, rw storage.ReaderBatchWriter, blockID
 	return insertNewBlockWithNoChild(rw, blockID)
 }
 
+// IndexNewClusterBlock indexes a new cluster block and updates the parent-child relationship in the block children index.
+// This function creates an empty children index for the new cluster block and adds the new block to the parent's children list.
+//
+// CAUTION:
+//   - The caller must acquire the [storage.LockInsertOrFinalizeClusterBlock] and hold it until the database write has been committed.
+//
+// Expected error returns during normal operations:
+//   - [storage.ErrAlreadyExists] if the blockID is already indexed as a child of the parent
 func IndexNewClusterBlock(lctx lockctx.Proof, rw storage.ReaderBatchWriter, blockID flow.Identifier, parentID flow.Identifier) error {
 	if !lctx.HoldsLock(storage.LockInsertOrFinalizeClusterBlock) {
 		return fmt.Errorf("missing required lock: %s", storage.LockInsertOrFinalizeClusterBlock)
@@ -86,7 +109,7 @@ func insertNewBlockWithNoChild(rw storage.ReaderBatchWriter, blockID flow.Identi
 	err := RetrieveBlockChildren(rw.GlobalReader(), blockID, &nonExist)
 	if err == nil {
 		return fmt.Errorf("a new block supposed to have no children, but found %v: %w", nonExist,
-			storage.ErrDataMismatch)
+			storage.ErrAlreadyExists)
 	}
 
 	// verify err should be ErrNotFound, since new block has no children
