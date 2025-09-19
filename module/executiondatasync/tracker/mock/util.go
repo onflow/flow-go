@@ -1,4 +1,4 @@
-package mocktracker
+package mock
 
 import (
 	"github.com/ipfs/go-cid"

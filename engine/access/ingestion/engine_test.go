@@ -28,7 +28,7 @@ import (
 	"github.com/onflow/flow-go/module/signature"
 	"github.com/onflow/flow-go/module/state_synchronization/indexer"
 	"github.com/onflow/flow-go/network/channels"
-	"github.com/onflow/flow-go/network/mocknetwork"
+	mocknetwork "github.com/onflow/flow-go/network/mock"
 	protocol "github.com/onflow/flow-go/state/protocol/mock"
 	"github.com/onflow/flow-go/storage"
 	storagemock "github.com/onflow/flow-go/storage/mock"
@@ -49,7 +49,7 @@ type Suite struct {
 	}
 
 	me           *modulemock.Local
-	net          *mocknetwork.Network
+	net          *mocknetwork.EngineRegistry
 	request      *modulemock.Requester
 	obsIdentity  *flow.Identity
 	provider     *mocknetwork.Engine
@@ -118,7 +118,7 @@ func (s *Suite) SetupTest() {
 
 	s.me = modulemock.NewLocal(s.T())
 	s.me.On("NodeID").Return(s.obsIdentity.NodeID).Maybe()
-	s.net = mocknetwork.NewNetwork(s.T())
+	s.net = mocknetwork.NewEngineRegistry(s.T())
 	conduit := mocknetwork.NewConduit(s.T())
 	s.net.On("Register", channels.ReceiveReceipts, mock.Anything).
 		Return(conduit, nil).

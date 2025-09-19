@@ -13,8 +13,8 @@ import (
 	mockcommonmodels "github.com/onflow/flow-go/engine/access/rest/common/models/mock"
 	"github.com/onflow/flow-go/engine/access/rest/websockets/data_providers/models"
 	"github.com/onflow/flow-go/engine/access/state_stream"
-	ssmock "github.com/onflow/flow-go/engine/access/state_stream/mock"
 	"github.com/onflow/flow-go/engine/access/subscription"
+	submock "github.com/onflow/flow-go/engine/access/subscription/mock"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
 
@@ -84,7 +84,7 @@ func (s *TransactionStatusesProviderSuite) TestSendTransactionStatusesDataProvid
 		{
 			name:      "SubscribeTransactionStatusesFromStartBlockID happy path",
 			arguments: unittest.CreateSendTxHttpPayload(tx),
-			setupBackend: func(sub *ssmock.Subscription) {
+			setupBackend: func(sub *submock.Subscription) {
 				s.api.On(
 					"SendAndSubscribeTransactionStatuses",
 					mock.Anything,

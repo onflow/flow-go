@@ -18,6 +18,7 @@ import (
 	"github.com/onflow/flow-go/engine/access/state_stream/backend"
 	ssmock "github.com/onflow/flow-go/engine/access/state_stream/mock"
 	"github.com/onflow/flow-go/engine/access/subscription"
+	submock "github.com/onflow/flow-go/engine/access/subscription/mock"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -99,7 +100,7 @@ func (s *EventsProviderSuite) subscribeEventsDataProviderTestCases(backendRespon
 				"contracts":          []string{"A.0000000000000001.Contract1", "A.0000000000000001.Contract2"},
 				"heartbeat_interval": "3",
 			},
-			setupBackend: func(sub *ssmock.Subscription) {
+			setupBackend: func(sub *submock.Subscription) {
 				s.api.On(
 					"SubscribeEventsFromStartBlockID",
 					mock.Anything,
@@ -118,7 +119,7 @@ func (s *EventsProviderSuite) subscribeEventsDataProviderTestCases(backendRespon
 				"contracts":          []string{"A.0000000000000001.Contract1", "A.0000000000000001.Contract2"},
 				"heartbeat_interval": "3",
 			},
-			setupBackend: func(sub *ssmock.Subscription) {
+			setupBackend: func(sub *submock.Subscription) {
 				s.api.On(
 					"SubscribeEventsFromStartHeight",
 					mock.Anything,
@@ -136,7 +137,7 @@ func (s *EventsProviderSuite) subscribeEventsDataProviderTestCases(backendRespon
 				"contracts":          []string{"A.0000000000000001.Contract1", "A.0000000000000001.Contract2"},
 				"heartbeat_interval": "3",
 			},
-			setupBackend: func(sub *ssmock.Subscription) {
+			setupBackend: func(sub *submock.Subscription) {
 				s.api.On(
 					"SubscribeEventsFromLatest",
 					mock.Anything,
@@ -216,7 +217,7 @@ func (s *EventsProviderSuite) TestMessageIndexEventProviderResponse_HappyPath() 
 	eventChan := make(chan interface{})
 
 	// Create a mock subscription and mock the channel
-	sub := ssmock.NewSubscription(s.T())
+	sub := submock.NewSubscription(s.T())
 	sub.On("Channel").Return((<-chan interface{})(eventChan))
 	sub.On("Err").Return(nil).Once()
 

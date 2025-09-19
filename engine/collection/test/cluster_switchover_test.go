@@ -18,7 +18,7 @@ import (
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/util"
 	"github.com/onflow/flow-go/network/channels"
-	"github.com/onflow/flow-go/network/mocknetwork"
+	mocknetwork "github.com/onflow/flow-go/network/mock"
 	"github.com/onflow/flow-go/network/stub"
 	"github.com/onflow/flow-go/state/cluster"
 	bcluster "github.com/onflow/flow-go/state/cluster/badger"

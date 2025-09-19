@@ -19,7 +19,7 @@ import (
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module/metrics"
-	"github.com/onflow/flow-go/network/mocknetwork"
+	mocknetwork "github.com/onflow/flow-go/network/mock"
 	protocol "github.com/onflow/flow-go/state/protocol/mock"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -448,7 +448,7 @@ func TestOriginValidation(t *testing.T) {
 		EntityIDs: []flow.Identifier{wanted.ID()},
 	}
 
-	network := &mocknetwork.Network{}
+	network := &mocknetwork.EngineRegistry{}
 	network.On("Register", mock.Anything, mock.Anything).Return(nil, nil)
 
 	e, err := New(

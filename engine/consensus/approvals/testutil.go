@@ -12,7 +12,7 @@ import (
 	mempool "github.com/onflow/flow-go/module/mempool/mock"
 	module "github.com/onflow/flow-go/module/mock"
 	msig "github.com/onflow/flow-go/module/signature"
-	"github.com/onflow/flow-go/network/mocknetwork"
+	mocknetwork "github.com/onflow/flow-go/network/mock"
 	realproto "github.com/onflow/flow-go/state/protocol"
 	protocol "github.com/onflow/flow-go/state/protocol/mock"
 	realstorage "github.com/onflow/flow-go/storage"

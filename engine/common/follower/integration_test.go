@@ -23,7 +23,7 @@ import (
 	module "github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/module/trace"
 	moduleutil "github.com/onflow/flow-go/module/util"
-	"github.com/onflow/flow-go/network/mocknetwork"
+	mocknetwork "github.com/onflow/flow-go/network/mock"
 	pbadger "github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/state/protocol/events"
 	"github.com/onflow/flow-go/state/protocol/util"
@@ -124,7 +124,7 @@ func TestFollowerHappyPath(t *testing.T) {
 		nodeID := unittest.IdentifierFixture()
 		me.On("NodeID").Return(nodeID).Maybe()
 
-		net := mocknetwork.NewNetwork(t)
+		net := mocknetwork.NewEngineRegistry(t)
 		con := mocknetwork.NewConduit(t)
 		net.On("Register", mock.Anything, mock.Anything).Return(con, nil)
 

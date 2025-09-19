@@ -23,7 +23,8 @@ import (
 	"github.com/onflow/flow-go/engine/access/rest/router"
 	"github.com/onflow/flow-go/engine/access/state_stream"
 	"github.com/onflow/flow-go/engine/access/state_stream/backend"
-	mockstatestream "github.com/onflow/flow-go/engine/access/state_stream/mock"
+	ssmock "github.com/onflow/flow-go/engine/access/state_stream/mock"
+	submock "github.com/onflow/flow-go/engine/access/subscription/mock"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -163,8 +164,8 @@ func (s *SubscribeEventsSuite) TestSubscribeEvents() {
 
 	for _, test := range tests {
 		s.Run(test.name, func() {
-			stateStreamBackend := mockstatestream.NewAPI(s.T())
-			subscription := mockstatestream.NewSubscription(s.T())
+			stateStreamBackend := ssmock.NewAPI(s.T())
+			subscription := submock.NewSubscription(s.T())
 
 			filter, err := state_stream.NewEventFilter(
 				state_stream.DefaultEventFilterConfig,
@@ -255,7 +256,7 @@ func (s *SubscribeEventsSuite) TestSubscribeEvents() {
 
 func (s *SubscribeEventsSuite) TestSubscribeEventsHandlesErrors() {
 	s.Run("returns error for block id and height", func() {
-		stateStreamBackend := mockstatestream.NewAPI(s.T())
+		stateStreamBackend := ssmock.NewAPI(s.T())
 		req, err := getSubscribeEventsRequest(s.T(), s.blocks[0].ID(), s.blocks[0].Height, nil, nil, nil, 1, nil)
 		require.NoError(s.T(), err)
 		respRecorder := router.NewTestHijackResponseRecorder()
@@ -264,9 +265,9 @@ func (s *SubscribeEventsSuite) TestSubscribeEventsHandlesErrors() {
 	})
 
 	s.Run("returns error for invalid block id", func() {
-		stateStreamBackend := mockstatestream.NewAPI(s.T())
+		stateStreamBackend := ssmock.NewAPI(s.T())
 		invalidBlock := unittest.BlockFixture()
-		subscription := mockstatestream.NewSubscription(s.T())
+		subscription := submock.NewSubscription(s.T())
 
 		ch := make(chan interface{})
 		var chReadOnly <-chan interface{}
@@ -289,7 +290,7 @@ func (s *SubscribeEventsSuite) TestSubscribeEventsHandlesErrors() {
 	})
 
 	s.Run("returns error for invalid event filter", func() {
-		stateStreamBackend := mockstatestream.NewAPI(s.T())
+		stateStreamBackend := ssmock.NewAPI(s.T())
 		req, err := getSubscribeEventsRequest(s.T(), s.blocks[0].ID(), request.EmptyHeight, []string{"foo"}, nil, nil, 1, nil)
 		require.NoError(s.T(), err)
 		respRecorder := router.NewTestHijackResponseRecorder()
@@ -298,8 +299,8 @@ func (s *SubscribeEventsSuite) TestSubscribeEventsHandlesErrors() {
 	})
 
 	s.Run("returns error when channel closed", func() {
-		stateStreamBackend := mockstatestream.NewAPI(s.T())
-		subscription := mockstatestream.NewSubscription(s.T())
+		stateStreamBackend := ssmock.NewAPI(s.T())
+		subscription := submock.NewSubscription(s.T())
 
 		ch := make(chan interface{})
 		var chReadOnly <-chan interface{}

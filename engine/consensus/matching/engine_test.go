@@ -17,7 +17,7 @@ import (
 	"github.com/onflow/flow-go/module/metrics"
 	mockmodule "github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/network/channels"
-	"github.com/onflow/flow-go/network/mocknetwork"
+	mocknetwork "github.com/onflow/flow-go/network/mock"
 	mockprotocol "github.com/onflow/flow-go/state/protocol/mock"
 	mockstorage "github.com/onflow/flow-go/storage/mock"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -43,7 +43,7 @@ type MatchingEngineSuite struct {
 func (s *MatchingEngineSuite) SetupTest() {
 	metrics := metrics.NewNoopCollector()
 	me := &mockmodule.Local{}
-	net := &mocknetwork.Network{}
+	net := &mocknetwork.EngineRegistry{}
 	s.core = &mockconsensus.MatchingCore{}
 	s.index = &mockstorage.Index{}
 	s.receipts = &mockstorage.ExecutionReceipts{}

@@ -20,7 +20,7 @@ import (
 	"github.com/onflow/flow-go/module/metrics"
 	mockmodule "github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/network/channels"
-	"github.com/onflow/flow-go/network/mocknetwork"
+	mocknetwork "github.com/onflow/flow-go/network/mock"
 	protocol "github.com/onflow/flow-go/state/protocol/mock"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -68,7 +68,7 @@ func TestOnEntityRequestFull(t *testing.T) {
 	state := protocol.NewState(t)
 	state.On("Final").Return(final, nil)
 
-	net := mocknetwork.NewNetwork(t)
+	net := mocknetwork.NewEngineRegistry(t)
 	con := mocknetwork.NewConduit(t)
 	net.On("Register", mock.Anything, mock.Anything).Return(con, nil)
 	con.On("Unicast", mock.Anything, mock.Anything).Run(
@@ -162,7 +162,7 @@ func TestOnEntityRequestPartial(t *testing.T) {
 	state := protocol.NewState(t)
 	state.On("Final").Return(final, nil)
 
-	net := mocknetwork.NewNetwork(t)
+	net := mocknetwork.NewEngineRegistry(t)
 	con := mocknetwork.NewConduit(t)
 	net.On("Register", mock.Anything, mock.Anything).Return(con, nil)
 	con.On("Unicast", mock.Anything, mock.Anything).Run(
@@ -250,7 +250,7 @@ func TestOnEntityRequestDuplicates(t *testing.T) {
 	state := protocol.NewState(t)
 	state.On("Final").Return(final, nil)
 
-	net := mocknetwork.NewNetwork(t)
+	net := mocknetwork.NewEngineRegistry(t)
 	con := mocknetwork.NewConduit(t)
 	net.On("Register", mock.Anything, mock.Anything).Return(con, nil)
 	con.On("Unicast", mock.Anything, mock.Anything).Run(
@@ -335,7 +335,7 @@ func TestOnEntityRequestEmpty(t *testing.T) {
 	state := protocol.NewState(t)
 	state.On("Final").Return(final, nil)
 
-	net := mocknetwork.NewNetwork(t)
+	net := mocknetwork.NewEngineRegistry(t)
 	con := mocknetwork.NewConduit(t)
 	net.On("Register", mock.Anything, mock.Anything).Return(con, nil)
 	con.On("Unicast", mock.Anything, mock.Anything).Run(
@@ -420,7 +420,7 @@ func TestOnEntityRequestInvalidOrigin(t *testing.T) {
 	state := protocol.NewState(t)
 	state.On("Final").Return(final, nil)
 
-	net := mocknetwork.NewNetwork(t)
+	net := mocknetwork.NewEngineRegistry(t)
 	con := mocknetwork.NewConduit(t)
 	net.On("Register", mock.Anything, mock.Anything).Return(con, nil)
 	me := mockmodule.NewLocal(t)

@@ -17,7 +17,7 @@ import (
 	mockmodule "github.com/onflow/flow-go/module/mock"
 	netint "github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/channels"
-	"github.com/onflow/flow-go/network/mocknetwork"
+	mocknetwork "github.com/onflow/flow-go/network/mock"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -29,7 +29,7 @@ type IngestionSuite struct {
 	IngestionCoreSuite
 
 	con    *mocknetwork.Conduit
-	net    *mocknetwork.Network
+	net    *mocknetwork.EngineRegistry
 	cancel context.CancelFunc
 
 	ingest *Engine
@@ -41,7 +41,7 @@ func (s *IngestionSuite) SetupTest() {
 	s.con = &mocknetwork.Conduit{}
 
 	// set up network module mock
-	s.net = &mocknetwork.Network{}
+	s.net = &mocknetwork.EngineRegistry{}
 	s.net.On("Register", channels.ReceiveGuarantees, mock.Anything).Return(
 		func(channel channels.Channel, engine netint.MessageProcessor) netint.Conduit {
 			return s.con
