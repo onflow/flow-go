@@ -4,6 +4,7 @@ import (
 	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/engine/access/rest/common"
 	commonmodels "github.com/onflow/flow-go/engine/access/rest/common/models"
+	"github.com/onflow/flow-go/engine/access/rest/http/models"
 	"github.com/onflow/flow-go/engine/access/rest/http/request"
 	accessmodel "github.com/onflow/flow-go/model/access"
 	"github.com/onflow/flow-go/model/flow"
@@ -39,7 +40,7 @@ func ExecuteScript(r *common.Request, backend access.API, _ commonmodels.LinkGen
 			req.BlockID,
 			req.Script.Source,
 			req.Script.Args,
-			NewCriteria(req.ExecutionState),
+			models.NewCriteria(req.ExecutionState),
 		)
 		if err != nil {
 			return nil, err
@@ -54,7 +55,7 @@ func ExecuteScript(r *common.Request, backend access.API, _ commonmodels.LinkGen
 			r.Context(),
 			req.Script.Source,
 			req.Script.Args,
-			NewCriteria(req.ExecutionState),
+			models.NewCriteria(req.ExecutionState),
 		)
 		if err != nil {
 			return nil, err
@@ -76,7 +77,7 @@ func ExecuteScript(r *common.Request, backend access.API, _ commonmodels.LinkGen
 		req.BlockHeight,
 		req.Script.Source,
 		req.Script.Args,
-		NewCriteria(req.ExecutionState),
+		models.NewCriteria(req.ExecutionState),
 	)
 	if err != nil {
 		return nil, err

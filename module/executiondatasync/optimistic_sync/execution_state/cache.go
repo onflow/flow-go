@@ -17,7 +17,7 @@ func NewExecutionStateCacheMock(snapshot optimistic_sync.Snapshot) *CacheMock {
 	}
 }
 
-// Snapshot returns snapshot for the given execution result.
+// Snapshot returns a static snapshot that always queries the database.
 func (e *CacheMock) Snapshot(_ flow.Identifier) (optimistic_sync.Snapshot, error) {
 	return e.snapshot, nil
 }

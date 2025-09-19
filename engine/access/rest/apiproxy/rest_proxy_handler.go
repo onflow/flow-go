@@ -467,10 +467,10 @@ func (r *RestProxyHandler) GetEventsForHeightRange(
 		ExecutionStateQuery:  executionStateQuery(criteria),
 	}
 	eventsResponse, err := upstream.GetEventsForHeightRange(ctx, getEventsForHeightRangeRequest)
+	r.log("upstream", "GetEventsForHeightRange", err)
 	if err != nil {
 		return nil, accessmodel.ExecutorMetadata{}, err
 	}
-	r.log("upstream", "GetEventsForHeightRange", err)
 
 	metadata := getExecutorMetadata(eventsResponse.GetMetadata())
 	res, err := convert.MessagesToBlockEvents(eventsResponse.Results)
@@ -502,7 +502,6 @@ func (r *RestProxyHandler) GetEventsForBlockIDs(
 	}
 	eventsResponse, err := upstream.GetEventsForBlockIDs(ctx, getEventsForBlockIDsRequest)
 	r.log("upstream", "GetEventsForBlockIDs", err)
-
 	if err != nil {
 		return nil, accessmodel.ExecutorMetadata{}, err
 	}
@@ -573,14 +572,11 @@ func splitOnPrefix(original, prefix string) (string, bool) {
 }
 
 func getExecutorMetadata(metadata *entities.Metadata) accessmodel.ExecutorMetadata {
-	if metadata != nil {
-		if executorMetadata := metadata.GetExecutionStateQuery(); executorMetadata != nil {
-			return *convert.MessageToExecutorMetadata(executorMetadata)
-		}
+	if executorMetadata := metadata.GetExecutorMetadata(); executorMetadata != nil {
+		return *convert.MessageToExecutorMetadata(executorMetadata)
 	}
 
 	return accessmodel.ExecutorMetadata{}
-
 }
 
 // TODO(Uliana): add godoc

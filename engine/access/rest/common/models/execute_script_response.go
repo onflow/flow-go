@@ -13,7 +13,11 @@ func NewExecuteScriptResponse(
 	var meta *Metadata
 	if includeExecutorMetadata {
 		m := NewMetadata(executorMetadata)
-		meta = &m
+
+		// we don't want to include empty field in response body
+		if !m.IsEmpty() {
+			meta = m
+		}
 	}
 
 	return &ExecuteScriptResponse{

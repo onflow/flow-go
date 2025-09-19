@@ -944,6 +944,7 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 				if err != nil {
 					return nil, fmt.Errorf("could not create derived chain data: %w", err)
 				}
+
 				indexerCore, err := indexer.New(
 					builder.Logger,
 					metrics.NewExecutionStateIndexerCollector(),
@@ -2132,7 +2133,11 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 
 			// TODO: use real objects instead of mocks once they're implemented
 			snapshot := osyncsnapshot.NewSnapshotMock(
-				notNil(builder.events),
+				builder.events,
+				builder.collections,
+				builder.transactions,
+				builder.lightTransactionResults,
+				builder.transactionResultErrorMessages,
 				notNil(builder.Storage.RegisterIndex),
 			)
 			execStateCache := execution_state.NewExecutionStateCacheMock(snapshot)
