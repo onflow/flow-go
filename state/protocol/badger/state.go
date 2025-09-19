@@ -429,17 +429,18 @@ func bootstrapSealingSegment(
 				return fmt.Errorf("could not index block seal: %w", err)
 			}
 
-			// For all but the first block in the segment, index the parent->child relationship:
-			if i > 0 {
-				err = operation.UpsertBlockChildren(lctx, w, proposal.Block.ParentID, []flow.Identifier{blockID})
+			if i == 0 {
+				// when i == 0, it's the first block in the segment, which means its parent does not exist,
+				// therefore we don't index the parent->child relationship
+				err = operation.IndexNewRootBlock(lctx, rw, blockID)
 				if err != nil {
-					return fmt.Errorf("could not insert child index for block (id=%x): %w", blockID, err)
+					return fmt.Errorf("could not index root block (id=%x): %w", blockID, err)
 				}
-			}
-			if i == len(segment.Blocks)-1 { // in addition, for the highest block in the sealing segment, the set of known children is empty:
-				err = operation.UpsertBlockChildren(lctx, rw.Writer(), head.ID(), nil)
+			} else {
+				// For the rest blocks in the segment, index the parent->child relationship:
+				err = operation.IndexNewBlock(lctx, rw, blockID, proposal.Block.ParentID)
 				if err != nil {
-					return fmt.Errorf("could not insert child index for head block (id=%x): %w", head.ID(), err)
+					return fmt.Errorf("could not index new block (id=%x): %w", blockID, err)
 				}
 			}
 

@@ -65,7 +65,7 @@ func (s *Snapshot) head(head *flow.Header) error {
 
 func (s *Snapshot) pending(blockID flow.Identifier) ([]flow.Identifier, error) {
 	var pendingIDs flow.IdentifierList
-	err := procedure.LookupBlockChildren(s.state.db.Reader(), blockID, &pendingIDs)
+	err := operation.RetrieveBlockChildren(s.state.db.Reader(), blockID, &pendingIDs)
 	if err != nil {
 		return nil, fmt.Errorf("could not get pending children: %w", err)
 	}

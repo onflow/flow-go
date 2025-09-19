@@ -20,7 +20,6 @@ import (
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/deferred"
 	"github.com/onflow/flow-go/storage/operation"
-	"github.com/onflow/flow-go/storage/procedure"
 )
 
 // FollowerState implements a lighter version of a mutable protocol state.
@@ -443,7 +442,7 @@ func (m *FollowerState) headerExtend(ctx context.Context, candidate *flow.Propos
 		if err != nil {
 			return fmt.Errorf("could not store candidate block: %w", err)
 		}
-		err = procedure.IndexNewBlock(lctx, rw, blockID, headerBody.ParentID)
+		err = operation.IndexNewBlock(lctx, rw, blockID, headerBody.ParentID)
 		if err != nil {
 			return fmt.Errorf("could not index new block: %w", err)
 		}
