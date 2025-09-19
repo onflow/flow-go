@@ -66,7 +66,7 @@ func NewNetworkTransmissionErrorf(msg string, args ...interface{}) error {
 
 func NewNetworkTransmissionError(msg string) error {
 	return NetworkTransmissionError{
-		err: fmt.Errorf(msg),
+		err: errors.New(msg),
 	}
 }
 

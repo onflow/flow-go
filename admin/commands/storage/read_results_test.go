@@ -93,13 +93,13 @@ func (suite *ReadResultsSuite) SetupTest() {
 	suite.finalResult = finalResult
 	suite.sealedResult = sealedResult
 
-	suite.state.On("Final").Return(createSnapshot(final.Header))
-	suite.state.On("Sealed").Return(createSnapshot(sealed.Header))
+	suite.state.On("Final").Return(createSnapshot(suite.T(), final.Header))
+	suite.state.On("Sealed").Return(createSnapshot(suite.T(), sealed.Header))
 	suite.state.On("AtBlockID", mock.Anything).Return(
 		func(blockID flow.Identifier) protocol.Snapshot {
 			for _, block := range blocks {
 				if block.ID() == blockID {
-					return createSnapshot(block.Header)
+					return createSnapshot(suite.T(), block.Header)
 				}
 			}
 			return invalid.NewSnapshot(fmt.Errorf("invalid block ID: %v", blockID))
@@ -109,7 +109,7 @@ func (suite *ReadResultsSuite) SetupTest() {
 		func(height uint64) protocol.Snapshot {
 			if int(height) < len(blocks) {
 				block := blocks[height]
-				return createSnapshot(block.Header)
+				return createSnapshot(suite.T(), block.Header)
 			}
 			return invalid.NewSnapshot(fmt.Errorf("invalid height: %v", height))
 		},
