@@ -307,7 +307,7 @@ func (s *CollectionSyncer) RequestCollectionsForBlock(height uint64, missingColl
 	s.requestCollections(missingCollections)
 }
 
-// requestCollections registers collection download requests in the requester engine and 
+// requestCollections registers collection download requests in the requester engine and
 // causes the requester to immediately dispatch requests.
 func (s *CollectionSyncer) requestCollections(collections []*flow.CollectionGuarantee) {
 	for _, guarantee := range collections {
