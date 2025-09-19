@@ -12,6 +12,7 @@ import (
 	"github.com/onflow/flow-go/cmd/util/cmd/common"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
+	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/store"
 )
 
@@ -34,11 +35,7 @@ type blockSummary struct {
 func ExportBlocks(blockID flow.Identifier, dbPath string, outputPath string) (flow.StateCommitment, error) {
 
 	// traverse backward from the given block (parent block) and fetch by blockHash
-	db, err := common.InitStorage(dbPath)
-	if err != nil {
-		return flow.DummyStateCommitment, fmt.Errorf("could not initialize storage: %w", err)
-	}
-	defer db.Close()
+	return common.WithStorage(dbPath, func(db storage.DB) error {
 
 	cacheMetrics := &metrics.NoopCollector{}
 	headers := store.NewHeaders(cacheMetrics, db)
@@ -117,9 +114,10 @@ func ExportBlocks(blockID flow.Identifier, dbPath string, outputPath string) (fl
 		activeBlockID = header.ParentID
 	}
 
-	state, err := commits.ByBlockID(blockID)
-	if err != nil {
-		return flow.DummyStateCommitment, fmt.Errorf("could not find state commitment for this block: %w", err)
-	}
-	return state, nil
+		state, err := commits.ByBlockID(blockID)
+		if err != nil {
+			return flow.DummyStateCommitment, fmt.Errorf("could not find state commitment for this block: %w", err)
+		}
+		return state, nil
+	})
 }

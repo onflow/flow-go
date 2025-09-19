@@ -1,6 +1,7 @@
 package snapshot
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 
@@ -45,17 +46,12 @@ func init() {
 func run(*cobra.Command, []string) {
 	lockManager := storage.MakeSingletonLockManager()
 
-	db, err := common.InitStorage(flagDatadir)
-	if err != nil {
-		log.Fatal().Err(err).Msg("could not init storage")
-	}
-	defer db.Close()
-
-	storages := common.InitStorages(db)
-	state, err := common.OpenProtocolState(lockManager, db, storages)
-	if err != nil {
-		log.Fatal().Err(err).Msg("could not open protocol state")
-	}
+	err := common.WithStorage(flagDatadir, func(db storage.DB) error {
+		storages := common.InitStorages(db)
+		state, err := common.OpenProtocolState(lockManager, db, storages)
+		if err != nil {
+			return fmt.Errorf("could not open protocol state: %w", err)
+		}
 
 	log := log.With().Uint64("block_height", flagHeight).Logger()
 
@@ -73,5 +69,10 @@ func run(*cobra.Command, []string) {
 		log.Fatal().Err(err).Msg("failed to write snapshot")
 	}
 
-	log.Info().Msgf("successfully wrote snapshot to %s", dir)
+		log.Info().Msgf("successfully wrote snapshot to %s", dir)
+		return nil
+	})
+	if err != nil {
+		log.Fatal().Err(err).Msg("failed to process snapshot")
+	}
 }

@@ -23,6 +23,7 @@ import (
 	"github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
+	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/store"
 )
 
@@ -186,18 +187,18 @@ func run(*cobra.Command, []string) {
 
 		log.Info().Msgf("extracting state by block ID: %v", blockID)
 
-		db, err := common.InitStorage(flagDatadir)
+		err := common.WithStorage(flagDatadir, func(db storage.DB) error {
+			cache := &metrics.NoopCollector{}
+			commits := store.NewCommits(cache, db)
+
+			stateCommitment, err = commits.ByBlockID(blockID)
+			if err != nil {
+				return fmt.Errorf("cannot get state commitment for block %v: %w", blockID, err)
+			}
+			return nil
+		})
 		if err != nil {
 			log.Fatal().Err(err).Msgf("cannot initialize storage with datadir %s", flagDatadir)
-		}
-		defer db.Close()
-
-		cache := &metrics.NoopCollector{}
-		commits := store.NewCommits(cache, db)
-
-		stateCommitment, err = commits.ByBlockID(blockID)
-		if err != nil {
-			log.Fatal().Err(err).Msgf("cannot get state commitment for block %v", blockID)
 		}
 	}
 

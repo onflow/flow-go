@@ -59,15 +59,12 @@ func runE(*cobra.Command, []string) error {
 		return fmt.Errorf("height must be above 0: %v", flagHeight)
 	}
 
-	db, err := common.InitStorage(flagDatadir)
-	if err != nil {
-		return err
-	}
-	storages := common.InitStorages(db)
-	state, err := common.OpenProtocolState(lockManager, db, storages)
-	if err != nil {
-		return fmt.Errorf("could not open protocol states: %w", err)
-	}
+	return common.WithStorage(flagDatadir, func(db storage.DB) error {
+		storages := common.InitStorages(db)
+		state, err := common.OpenProtocolState(lockManager, db, storages)
+		if err != nil {
+			return fmt.Errorf("could not open protocol states: %w", err)
+		}
 
 	metrics := &metrics.NoopCollector{}
 
@@ -299,5 +296,6 @@ func removeForBlockID(
 		log.Warn().Msgf("result not found for block %v", blockID)
 	}
 
-	return nil
+		return nil
+	})
 }

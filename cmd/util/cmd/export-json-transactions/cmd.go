@@ -66,17 +66,13 @@ func writeJSONTo(writer io.Writer, jsonData []byte) error {
 func ExportTransactions(lockManager lockctx.Manager, dataDir string, outputDir string, startHeight uint64, endHeight uint64) error {
 
 	// init dependencies
-	db, err := common.InitStorage(flagDatadir)
-	if err != nil {
-		return fmt.Errorf("could not initialize storage: %w", err)
-	}
-	storages := common.InitStorages(db)
-	defer db.Close()
+	return common.WithStorage(flagDatadir, func(db storage.DB) error {
+		storages := common.InitStorages(db)
 
-	state, err := common.OpenProtocolState(lockManager, db, storages)
-	if err != nil {
-		return fmt.Errorf("could not open protocol state: %w", err)
-	}
+		state, err := common.OpenProtocolState(lockManager, db, storages)
+		if err != nil {
+			return fmt.Errorf("could not open protocol state: %w", err)
+		}
 
 	// create finder
 	finder := &transactions.Finder{
@@ -121,7 +117,8 @@ func ExportTransactions(lockManager lockctx.Manager, dataDir string, outputDir s
 		return fmt.Errorf("fail to flush block data: %w", err)
 	}
 
-	log.Info().Msgf("successfully exported transaction data to %v", outputFile)
+		log.Info().Msgf("successfully exported transaction data to %v", outputFile)
 
-	return nil
+		return nil
+	})
 }

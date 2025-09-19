@@ -1,6 +1,8 @@
 package cmd
 
 import (
+	"fmt"
+
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 
@@ -17,16 +19,12 @@ var resultsCmd = &cobra.Command{
 	Short: "reindex sealed result IDs by block ID",
 	Run: func(cmd *cobra.Command, args []string) {
 		lockManager := storage.MakeSingletonLockManager()
-		db, err := common.InitStorage(flagDatadir)
-		if err != nil {
-			log.Fatal().Err(err).Msg("could not initialize storage")
-		}
-		defer db.Close()
-		storages := common.InitStorages(db)
-		state, err := common.OpenProtocolState(lockManager, db, storages)
-		if err != nil {
-			log.Fatal().Err(err).Msg("could not open protocol state")
-		}
+		err := common.WithStorage(flagDatadir, func(db storage.DB) error {
+			storages := common.InitStorages(db)
+			state, err := common.OpenProtocolState(lockManager, db, storages)
+			if err != nil {
+				return fmt.Errorf("could not open protocol state: %w", err)
+			}
 
 		results := storages.Results
 		blocks := storages.Blocks
@@ -51,6 +49,11 @@ var resultsCmd = &cobra.Command{
 			}
 		}
 
-		log.Info().Uint64("start_height", root.Height).Uint64("end_height", final.Height).Msg("indexed execution results")
+			log.Info().Uint64("start_height", root.Height).Uint64("end_height", final.Height).Msg("indexed execution results")
+			return nil
+		})
+		if err != nil {
+			log.Fatal().Err(err).Msg("could not initialize storage")
+		}
 	},
 }

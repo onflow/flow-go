@@ -49,11 +49,11 @@ func run(*cobra.Command, []string) {
 
 func findFirstMismatch(datadir string, startHeight, endHeight uint64, lockManager lockctx.Manager) error {
 	fmt.Printf("initializing database\n")
-	headers, results, seals, state, db, err := createStorages(datadir, lockManager)
-	defer db.Close()
-	if err != nil {
-		return fmt.Errorf("could not create storages: %v", err)
-	}
+	return common.WithStorage(datadir, func(db storage.DB) error {
+		headers, results, seals, state, err := createStorages(db, lockManager)
+		if err != nil {
+			return fmt.Errorf("could not create storages: %v", err)
+		}
 
 	c := &checker{
 		headers: headers,
@@ -87,25 +87,21 @@ func findFirstMismatch(datadir string, startHeight, endHeight uint64, lockManage
 		return fmt.Errorf("could not find block id for height %v: %v", mismatchHeight, err)
 	}
 
-	fmt.Printf("mismatching block %v (id: %v)\n", mismatchHeight, blockID)
+		fmt.Printf("mismatching block %v (id: %v)\n", mismatchHeight, blockID)
 
-	return nil
+		return nil
+	})
 }
 
-func createStorages(dir string, lockManager lockctx.Manager) (
-	storage.Headers, storage.ExecutionResults, storage.Seals, protocol.State, storage.DB, error) {
-	db, err := common.InitStorage(dir)
-	if err != nil {
-		return nil, nil, nil, nil, nil, fmt.Errorf("could not initialize storage: %v", err)
-	}
-
+func createStorages(db storage.DB, lockManager lockctx.Manager) (
+	storage.Headers, storage.ExecutionResults, storage.Seals, protocol.State, error) {
 	storages := common.InitStorages(db)
 	state, err := common.OpenProtocolState(lockManager, db, storages)
 	if err != nil {
-		return nil, nil, nil, nil, db, fmt.Errorf("could not open protocol state: %v", err)
+		return nil, nil, nil, nil, fmt.Errorf("could not open protocol state: %v", err)
 	}
 
-	return storages.Headers, storages.Results, storages.Seals, state, db, err
+	return storages.Headers, storages.Results, storages.Seals, state, nil
 }
 
 type checker struct {
