@@ -13,6 +13,7 @@ import (
 
 	"github.com/onflow/flow-go/engine/access/rpc/connection"
 	"github.com/onflow/flow-go/engine/common/rpc"
+	commonrpc "github.com/onflow/flow-go/engine/common/rpc"
 	fvmerrors "github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
@@ -224,7 +225,7 @@ func (b *backendScripts) executeScriptOnAvailableExecutionNodes(
 	r *scriptExecutionRequest,
 ) ([]byte, time.Duration, error) {
 	// find few execution nodes which have executed the block earlier and provided an execution receipt for it
-	executors, err := executionNodesForBlockID(ctx, r.blockID, b.executionReceipts, b.state, b.log)
+	executors, err := commonrpc.ExecutionNodesForBlockID(ctx, r.blockID, b.executionReceipts, b.state, b.log, preferredENIdentifiers, fixedENIdentifiers)
 	if err != nil {
 		return nil, 0, status.Errorf(codes.Internal, "failed to find script executors at blockId %v: %v", r.blockID.String(), err)
 	}
