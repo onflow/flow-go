@@ -29,8 +29,8 @@ var Cmd = &cobra.Command{
 }
 
 func init() {
-	Cmd.Flags().StringVar(&flagBadgerDBdir, "datadir", "", "BadgerDB Dir to copy data from")
-	_ = Cmd.MarkFlagRequired("datadir")
+	Cmd.Flags().StringVar(&flagBadgerDBdir, "badgerdir", "", "BadgerDB Dir to copy data from")
+	_ = Cmd.MarkFlagRequired("badgerdir")
 
 	Cmd.Flags().StringVar(&flagPebbleDBdir, "pebbledir", "", "PebbleDB Dir to copy data to")
 	_ = Cmd.MarkFlagRequired("pebbledir")
