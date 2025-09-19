@@ -4,9 +4,10 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/onflow/flow-go/cmd/util/cmd/common"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+
+	"github.com/onflow/flow-go/cmd/util/cmd/common"
 )
 
 var (
