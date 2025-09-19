@@ -19,7 +19,7 @@ type scriptData struct {
 }
 
 type ExecuteScriptCommand struct {
-	scriptExecutor execution.IndexerScriptExecutor
+	scriptExecutor execution.ScriptExecutor
 }
 
 func (e *ExecuteScriptCommand) Handler(_ context.Context, req *admin.CommandRequest) (interface{}, error) {
@@ -91,7 +91,7 @@ func (e *ExecuteScriptCommand) Validator(req *admin.CommandRequest) error {
 	return nil
 }
 
-func NewExecuteScriptCommand(scripts execution.IndexerScriptExecutor) commands.AdminCommand {
+func NewExecuteScriptCommand(scripts execution.ScriptExecutor) commands.AdminCommand {
 	return &ExecuteScriptCommand{
 		scripts,
 	}

@@ -35,14 +35,15 @@ func TestScripts(t *testing.T) {
 
 type scriptTestSuite struct {
 	suite.Suite
-	scripts       *Scripts
-	registerIndex storage.RegisterIndex
-	vm            *fvm.VirtualMachine
-	vmCtx         fvm.Context
-	chain         flow.Chain
-	height        uint64
-	snapshot      snapshot.SnapshotTree
-	dbDir         string
+	scripts          *Scripts
+	registerIndex    storage.RegisterIndex
+	registerSnapshot storage.RegisterSnapshotReader
+	vm               *fvm.VirtualMachine
+	vmCtx            fvm.Context
+	chain            flow.Chain
+	height           uint64
+	snapshot         snapshot.SnapshotTree
+	dbDir            string
 }
 
 func (s *scriptTestSuite) TestScriptExecution() {
@@ -50,7 +51,7 @@ func (s *scriptTestSuite) TestScriptExecution() {
 		number := int64(42)
 		code := []byte(fmt.Sprintf("access(all) fun main(): Int { return %d; }", number))
 
-		result, err := s.scripts.ExecuteAtBlockHeight(context.Background(), code, nil, s.height, s.registerIndex)
+		result, err := s.scripts.ExecuteAtBlockHeight(context.Background(), code, nil, s.height, s.registerSnapshot)
 		s.Require().NoError(err)
 		val, err := jsoncdc.Decode(nil, result)
 		s.Require().NoError(err)
@@ -63,7 +64,7 @@ func (s *scriptTestSuite) TestScriptExecution() {
 			return getCurrentBlock().height
 		}`, s.height))
 
-		result, err := s.scripts.ExecuteAtBlockHeight(context.Background(), code, nil, s.height, s.registerIndex)
+		result, err := s.scripts.ExecuteAtBlockHeight(context.Background(), code, nil, s.height, s.registerSnapshot)
 		s.Require().NoError(err)
 		val, err := jsoncdc.Decode(nil, result)
 		s.Require().NoError(err)
@@ -72,10 +73,10 @@ func (s *scriptTestSuite) TestScriptExecution() {
 	})
 
 	s.Run("Handle not found Register", func() {
-		// use a non-existing address to trigger register get function
+		// use a non-existing address to trigger registerSnapshot get function
 		code := []byte("import Foo from 0x01; access(all) fun main() { }")
 
-		result, err := s.scripts.ExecuteAtBlockHeight(context.Background(), code, nil, s.height, s.registerIndex)
+		result, err := s.scripts.ExecuteAtBlockHeight(context.Background(), code, nil, s.height, s.registerSnapshot)
 		s.Assert().Error(err)
 		s.Assert().Nil(result)
 	})
@@ -91,7 +92,7 @@ func (s *scriptTestSuite) TestScriptExecution() {
 			code,
 			[][]byte{encoded},
 			s.height,
-			s.registerIndex,
+			s.registerSnapshot,
 		)
 		s.Require().NoError(err)
 		s.Assert().Equal(encoded, result)
@@ -101,7 +102,7 @@ func (s *scriptTestSuite) TestScriptExecution() {
 		code := []byte("access(all) fun main(foo: Int): Int { return foo }")
 		invalid := [][]byte{[]byte("i")}
 
-		result, err := s.scripts.ExecuteAtBlockHeight(context.Background(), code, invalid, s.height, s.registerIndex)
+		result, err := s.scripts.ExecuteAtBlockHeight(context.Background(), code, invalid, s.height, s.registerSnapshot)
 		s.Assert().Nil(result)
 		var coded errors.CodedError
 		s.Require().True(errors.As(err, &coded))
@@ -113,7 +114,7 @@ func (s *scriptTestSuite) TestScriptExecution() {
 func (s *scriptTestSuite) TestGetAccount() {
 	s.Run("Get Service Account", func() {
 		address := s.chain.ServiceAddress()
-		account, err := s.scripts.GetAccountAtBlockHeight(context.Background(), address, s.height, s.registerIndex)
+		account, err := s.scripts.GetAccountAtBlockHeight(context.Background(), address, s.height, s.registerSnapshot)
 		s.Require().NoError(err)
 		s.Assert().Equal(address, account.Address)
 		s.Assert().NotZero(account.Balance)
@@ -122,7 +123,7 @@ func (s *scriptTestSuite) TestGetAccount() {
 
 	s.Run("Get New Account", func() {
 		address := s.createAccount()
-		account, err := s.scripts.GetAccountAtBlockHeight(context.Background(), address, s.height, s.registerIndex)
+		account, err := s.scripts.GetAccountAtBlockHeight(context.Background(), address, s.height, s.registerSnapshot)
 		s.Require().NoError(err)
 		s.Require().Equal(address, account.Address)
 		s.Assert().Zero(account.Balance)
@@ -133,7 +134,7 @@ func (s *scriptTestSuite) TestGetAccountBalance() {
 	address := s.createAccount()
 	var transferAmount uint64 = 100000000
 	s.transferTokens(address, transferAmount)
-	balance, err := s.scripts.GetAccountBalance(context.Background(), address, s.height, s.registerIndex)
+	balance, err := s.scripts.GetAccountBalance(context.Background(), address, s.height, s.registerSnapshot)
 	s.Require().NoError(err)
 	s.Require().Equal(transferAmount, balance)
 }
@@ -142,7 +143,7 @@ func (s *scriptTestSuite) TestGetAccountKeys() {
 	address := s.createAccount()
 	publicKey := s.addAccountKey(address, accountKeyAPIVersionV2)
 
-	accountKeys, err := s.scripts.GetAccountKeys(context.Background(), address, s.height, s.registerIndex)
+	accountKeys, err := s.scripts.GetAccountKeys(context.Background(), address, s.height, s.registerSnapshot)
 	s.Require().NoError(err)
 	s.Assert().Equal(1, len(accountKeys))
 	s.Assert().Equal(publicKey.PublicKey, accountKeys[0].PublicKey)
@@ -173,6 +174,7 @@ func (s *scriptTestSuite) SetupTest() {
 	pebbleRegisters, err := pebbleStorage.NewRegisters(db, pebbleStorage.PruningDisabled)
 	s.Require().NoError(err)
 	s.registerIndex = pebbleRegisters
+	s.registerSnapshot = pebbleStorage.NewRegisterSnapshotReader(s.registerIndex)
 
 	derivedChainData, err := derived.NewDerivedChainData(derived.DefaultDerivedDataCacheSize)
 	s.Require().NoError(err)

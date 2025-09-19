@@ -87,7 +87,7 @@ var verifyPayerBalanceResultType = cadence.NewStructType(
 )
 
 func (s *TransactionValidatorSuite) TestTransactionValidator_ScriptExecutorInternalError() {
-	scriptExecutor := execmock.NewIndexerScriptExecutor(s.T())
+	scriptExecutor := execmock.NewScriptExecutor(s.T())
 	assert.NotNil(s.T(), scriptExecutor)
 
 	s.blocks.
@@ -110,7 +110,7 @@ func (s *TransactionValidatorSuite) TestTransactionValidator_ScriptExecutorInter
 }
 
 func (s *TransactionValidatorSuite) TestTransactionValidator_SufficientBalance() {
-	scriptExecutor := execmock.NewIndexerScriptExecutor(s.T())
+	scriptExecutor := execmock.NewScriptExecutor(s.T())
 
 	canExecuteTransaction := cadence.Bool(true)
 	requiredBalance := cadence.UFix64(1000)
@@ -141,7 +141,7 @@ func (s *TransactionValidatorSuite) TestTransactionValidator_SufficientBalance()
 }
 
 func (s *TransactionValidatorSuite) TestTransactionValidator_InsufficientBalance() {
-	scriptExecutor := execmock.NewIndexerScriptExecutor(s.T())
+	scriptExecutor := execmock.NewScriptExecutor(s.T())
 
 	canExecuteTransaction := cadence.Bool(false)
 	requiredBalance := cadence.UFix64(1000)
@@ -191,7 +191,7 @@ func (s *TransactionValidatorSuite) TestTransactionValidator_InsufficientBalance
 }
 
 func (s *TransactionValidatorSuite) TestTransactionValidator_SealedIndexedHeightThresholdLimit() {
-	scriptExecutor := execmock.NewIndexerScriptExecutor(s.T())
+	scriptExecutor := execmock.NewScriptExecutor(s.T())
 
 	// setting indexed height to be behind of sealed by bigger number than allowed(DefaultSealedIndexedHeightThreshold)
 	indexedHeight := s.header.Height - 40
@@ -211,7 +211,7 @@ func (s *TransactionValidatorSuite) TestTransactionValidator_SealedIndexedHeight
 }
 
 func (s *TransactionValidatorSuite) TestTransactionValidator_SignatureValidation() {
-	scriptExecutor := execmock.NewIndexerScriptExecutor(s.T())
+	scriptExecutor := execmock.NewScriptExecutor(s.T())
 
 	// setting indexed height to be behind of sealed by bigger number than allowed(DefaultSealedIndexedHeightThreshold)
 	indexedHeight := s.header.Height - 40

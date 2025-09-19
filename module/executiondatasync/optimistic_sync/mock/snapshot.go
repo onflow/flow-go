@@ -74,19 +74,19 @@ func (_m *Snapshot) LightTransactionResults() storage.LightTransactionResultsRea
 }
 
 // Registers provides a mock function with no fields
-func (_m *Snapshot) Registers() storage.RegisterIndexReader {
+func (_m *Snapshot) Registers() storage.RegisterSnapshotReader {
 	ret := _m.Called()
 
 	if len(ret) == 0 {
 		panic("no return value specified for Registers")
 	}
 
-	var r0 storage.RegisterIndexReader
-	if rf, ok := ret.Get(0).(func() storage.RegisterIndexReader); ok {
+	var r0 storage.RegisterSnapshotReader
+	if rf, ok := ret.Get(0).(func() storage.RegisterSnapshotReader); ok {
 		r0 = rf()
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(storage.RegisterIndexReader)
+			r0 = ret.Get(0).(storage.RegisterSnapshotReader)
 		}
 	}
 

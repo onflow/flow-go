@@ -338,7 +338,7 @@ type FlowAccessNodeBuilder struct {
 	ExecutionDataCache           *execdatacache.ExecutionDataCache
 	ExecutionIndexer             *indexer.Indexer
 	ExecutionIndexerCore         *indexer.IndexerCore
-	IndexerScriptExecutor        *backend.IndexerScriptExecutor
+	IndexerScriptExecutor        *backend.ScriptExecutor
 	RegistersAsyncStore          *execution.RegistersAsyncStore
 	Reporter                     *index.Reporter
 	EventsIndex                  *index.EventsIndex
@@ -986,6 +986,9 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 				// setup requester to notify indexer when new execution data is received
 				execDataDistributor.AddOnExecutionDataReceivedConsumer(builder.ExecutionIndexer.OnExecutionData)
 
+				//TODO(Uliana): refactoring: move creating scripts from execution data indexer component and remove Initialize for ScriptExecutor cause
+				// it does not depend on indexer anymore
+
 				// create script execution module, this depends on the indexer being initialized and the
 				// having the register storage bootstrapped
 				scripts := execution.NewScripts(
@@ -999,7 +1002,7 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 					builder.programCacheSize > 0,
 				)
 
-				err = builder.IndexerScriptExecutor.Initialize(builder.ExecutionIndexer, scripts, builder.VersionControl)
+				err = builder.IndexerScriptExecutor.Initialize(scripts, builder.VersionControl)
 				if err != nil {
 					return nil, err
 				}
@@ -1918,7 +1921,12 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 			return nil
 		}).
 		Module("backend script executor", func(node *cmd.NodeConfig) error {
-			builder.IndexerScriptExecutor = backend.NewIndexerScriptExecutor(builder.Logger, builder.Storage.RegisterIndex, builder.scriptExecMinBlock, builder.scriptExecMaxBlock)
+			builder.IndexerScriptExecutor = backend.NewScriptExecutor(
+				builder.Logger,
+				pstorage.NewRegisterSnapshotReader(builder.Storage.RegisterIndex),
+				builder.scriptExecMinBlock,
+				builder.scriptExecMaxBlock,
+			)
 			return nil
 		}).
 		Module("async register store", func(node *cmd.NodeConfig) error {
@@ -2138,7 +2146,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				builder.transactions,
 				builder.lightTransactionResults,
 				builder.transactionResultErrorMessages,
-				notNil(builder.Storage.RegisterIndex),
+				notNil(pstorage.NewRegisterSnapshotReader(builder.Storage.RegisterIndex)),
 			)
 			execStateCache := execution_state.NewExecutionStateCacheMock(snapshot)
 

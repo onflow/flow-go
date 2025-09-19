@@ -22,7 +22,7 @@ type LocalScriptExecutor struct {
 	log     zerolog.Logger
 	metrics module.BackendScriptsMetrics
 
-	scriptExecutor      execution.IndexerScriptExecutor
+	scriptExecutor      execution.ScriptExecutor
 	scriptCache         *LoggedScriptCache
 	executionStateCache optimistic_sync.ExecutionStateCache
 }
@@ -32,7 +32,7 @@ var _ ScriptExecutor = (*LocalScriptExecutor)(nil)
 func NewLocalScriptExecutor(
 	log zerolog.Logger,
 	metrics module.BackendScriptsMetrics,
-	executor execution.IndexerScriptExecutor,
+	executor execution.ScriptExecutor,
 	scriptCache *LoggedScriptCache,
 	executionStateCache optimistic_sync.ExecutionStateCache,
 ) *LocalScriptExecutor {

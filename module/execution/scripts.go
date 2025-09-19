@@ -2,7 +2,7 @@ package execution
 
 import (
 	"context"
-	"errors"
+	"fmt"
 
 	"github.com/rs/zerolog"
 
@@ -11,7 +11,6 @@ import (
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/storage/derived"
-	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/state/protocol"
@@ -73,11 +72,15 @@ func (s *Scripts) ExecuteAtBlockHeight(
 	script []byte,
 	arguments [][]byte,
 	height uint64,
-	register storage.RegisterIndexReader,
+	registerSnapshot storage.RegisterSnapshotReader,
 ) ([]byte, error) {
-	snap, header, err := s.snapshotWithBlock(register, height)
+	header, err := s.headers.ByHeight(height)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("could not get header for height %d: %w", height, err)
+	}
+	snap, err := registerSnapshot.StorageSnapshot(height)
+	if err != nil {
+		return nil, fmt.Errorf("could not get storage snapshot for height %d: %w", height, err)
 	}
 
 	value, compUsage, err := s.executor.ExecuteScript(ctx, script, arguments, header, snap)
@@ -90,10 +93,14 @@ func (s *Scripts) ExecuteAtBlockHeight(
 // Expected errors:
 // - Script execution related errors
 // - storage.ErrHeightNotIndexed if the data for the block height is not available
-func (s *Scripts) GetAccountAtBlockHeight(ctx context.Context, address flow.Address, height uint64, register storage.RegisterIndexReader) (*flow.Account, error) {
-	snap, header, err := s.snapshotWithBlock(register, height)
+func (s *Scripts) GetAccountAtBlockHeight(ctx context.Context, address flow.Address, height uint64, registerSnapshot storage.RegisterSnapshotReader) (*flow.Account, error) {
+	header, err := s.headers.ByHeight(height)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("could not get header for height %d: %w", height, err)
+	}
+	snap, err := registerSnapshot.StorageSnapshot(height)
+	if err != nil {
+		return nil, fmt.Errorf("could not get storage snapshot for height %d: %w", height, err)
 	}
 
 	return s.executor.GetAccount(ctx, address, header, snap)
@@ -103,10 +110,14 @@ func (s *Scripts) GetAccountAtBlockHeight(ctx context.Context, address flow.Addr
 // Expected errors:
 // - Script execution related errors
 // - storage.ErrHeightNotIndexed if the data for the block height is not available
-func (s *Scripts) GetAccountBalance(ctx context.Context, address flow.Address, height uint64, register storage.RegisterIndexReader) (uint64, error) {
-	snap, header, err := s.snapshotWithBlock(register, height)
+func (s *Scripts) GetAccountBalance(ctx context.Context, address flow.Address, height uint64, registerSnapshot storage.RegisterSnapshotReader) (uint64, error) {
+	header, err := s.headers.ByHeight(height)
 	if err != nil {
-		return 0, err
+		return 0, fmt.Errorf("could not get header for height %d: %w", height, err)
+	}
+	snap, err := registerSnapshot.StorageSnapshot(height)
+	if err != nil {
+		return 0, fmt.Errorf("could not get storage snapshot for height %d: %w", height, err)
 	}
 
 	return s.executor.GetAccountBalance(ctx, address, header, snap)
@@ -116,10 +127,14 @@ func (s *Scripts) GetAccountBalance(ctx context.Context, address flow.Address, h
 // Expected errors:
 // - Script execution related errors
 // - storage.ErrHeightNotIndexed if the data for the block height is not available
-func (s *Scripts) GetAccountAvailableBalance(ctx context.Context, address flow.Address, height uint64, register storage.RegisterIndexReader) (uint64, error) {
-	snap, header, err := s.snapshotWithBlock(register, height)
+func (s *Scripts) GetAccountAvailableBalance(ctx context.Context, address flow.Address, height uint64, registerSnapshot storage.RegisterSnapshotReader) (uint64, error) {
+	header, err := s.headers.ByHeight(height)
 	if err != nil {
-		return 0, err
+		return 0, fmt.Errorf("could not get header for height %d: %w", height, err)
+	}
+	snap, err := registerSnapshot.StorageSnapshot(height)
+	if err != nil {
+		return 0, fmt.Errorf("could not get storage snapshot for height %d: %w", height, err)
 	}
 
 	return s.executor.GetAccountAvailableBalance(ctx, address, header, snap)
@@ -129,10 +144,14 @@ func (s *Scripts) GetAccountAvailableBalance(ctx context.Context, address flow.A
 // Expected errors:
 // - Script execution related errors
 // - storage.ErrHeightNotIndexed if the data for the block height is not available
-func (s *Scripts) GetAccountKeys(ctx context.Context, address flow.Address, height uint64, register storage.RegisterIndexReader) ([]flow.AccountPublicKey, error) {
-	snap, header, err := s.snapshotWithBlock(register, height)
+func (s *Scripts) GetAccountKeys(ctx context.Context, address flow.Address, height uint64, registerSnapshot storage.RegisterSnapshotReader) ([]flow.AccountPublicKey, error) {
+	header, err := s.headers.ByHeight(height)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("could not get header for height %d: %w", height, err)
+	}
+	snap, err := registerSnapshot.StorageSnapshot(height)
+	if err != nil {
+		return nil, fmt.Errorf("could not get storage snapshot for height %d: %w", height, err)
 	}
 
 	return s.executor.GetAccountKeys(ctx, address, header, snap)
@@ -142,38 +161,15 @@ func (s *Scripts) GetAccountKeys(ctx context.Context, address flow.Address, heig
 // Expected errors:
 // - Script execution related errors
 // - storage.ErrHeightNotIndexed if the data for the block height is not available
-func (s *Scripts) GetAccountKey(ctx context.Context, address flow.Address, keyIndex uint32, height uint64, register storage.RegisterIndexReader) (*flow.AccountPublicKey, error) {
-	snap, header, err := s.snapshotWithBlock(register, height)
+func (s *Scripts) GetAccountKey(ctx context.Context, address flow.Address, keyIndex uint32, height uint64, registerSnapshot storage.RegisterSnapshotReader) (*flow.AccountPublicKey, error) {
+	header, err := s.headers.ByHeight(height)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("could not get header for height %d: %w", height, err)
+	}
+	snap, err := registerSnapshot.StorageSnapshot(height)
+	if err != nil {
+		return nil, fmt.Errorf("could not get storage snapshot for height %d: %w", height, err)
 	}
 
 	return s.executor.GetAccountKey(ctx, address, keyIndex, header, snap)
-}
-
-// snapshotWithBlock is a common function for executing scripts and get account functionality.
-// It creates a storage snapshot that is needed by the FVM to execute scripts.
-func (s *Scripts) snapshotWithBlock(register storage.RegisterIndexReader, height uint64) (snapshot.StorageSnapshot, *flow.Header, error) {
-	header, err := s.headers.ByHeight(height)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	storageSnapshot := snapshot.NewReadFuncStorageSnapshot(func(ID flow.RegisterID) (flow.RegisterValue, error) {
-		value, err := register.Get(ID, height)
-		if err != nil {
-			// only return an error if the error doesn't match the not found error, since we have
-			// to gracefully handle not found values and instead assign nil, that is because the script executor
-			// expects that behaviour
-			if errors.Is(err, storage.ErrNotFound) {
-				return nil, nil
-			}
-
-			return nil, err
-		}
-
-		return value, nil
-	})
-
-	return storageSnapshot, header, nil
 }

@@ -7,12 +7,12 @@ import (
 )
 
 // TODO(Uliana): add godoc
-type IndexerScriptExecutor interface {
+type ScriptExecutor interface {
 	// ExecuteAtBlockHeight executes provided script against the block height.
 	// A result value is returned encoded as byte array. An error will be returned if script
 	// doesn't successfully execute.
 	// Expected errors:
-	// - storage.ErrNotFound if block or register value at height was not found.
+	// - storage.ErrNotFound if block or registerSnapshot value at height was not found.
 	// - storage.ErrHeightNotIndexed if the data for the block height is not available
 	ExecuteAtBlockHeight(
 		ctx context.Context,
@@ -48,12 +48,12 @@ type IndexerScriptExecutor interface {
 }
 
 // TODO(Uliana): add godoc
-type ResultScriptExecutor interface {
+type ResultBasedScriptExecutor interface {
 	// ExecuteAtBlockHeight executes provided script against the block height.
 	// A result value is returned encoded as byte array. An error will be returned if script
 	// doesn't successfully execute.
 	// Expected errors:
-	// - storage.ErrNotFound if block or register value at height was not found.
+	// - storage.ErrNotFound if block or registerSnapshot value at height was not found.
 	// - storage.ErrHeightNotIndexed if the data for the block height is not available
 	ExecuteAtBlockHeight(
 		ctx context.Context,

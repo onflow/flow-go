@@ -103,7 +103,7 @@ type Params struct {
 	SnapshotHistoryLimit     int
 	Communicator             node_communicator.Communicator
 	TxResultCacheSize        uint
-	ScriptExecutor           execution.IndexerScriptExecutor
+	ScriptExecutor           execution.ScriptExecutor
 	ScriptExecutionMode      query_mode.IndexQueryMode
 	CheckPayerBalanceMode    validator.PayerBalanceMode
 	EventQueryMode           query_mode.IndexQueryMode

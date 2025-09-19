@@ -158,7 +158,7 @@ type TransactionValidator struct {
 	options                      TransactionValidationOptions
 	serviceAccountAddress        flow.Address
 	limiter                      ratelimit.RateLimiter
-	scriptExecutor               execution.IndexerScriptExecutor
+	scriptExecutor               execution.ScriptExecutor
 	verifyPayerBalanceScript     []byte
 	transactionValidationMetrics module.TransactionValidationMetrics
 
@@ -170,7 +170,7 @@ func NewTransactionValidator(
 	chain flow.Chain,
 	transactionValidationMetrics module.TransactionValidationMetrics,
 	options TransactionValidationOptions,
-	executor execution.IndexerScriptExecutor,
+	executor execution.ScriptExecutor,
 ) (*TransactionValidator, error) {
 	if options.CheckPayerBalanceMode != Disabled && executor == nil {
 		return nil, errors.New("transaction validator cannot use checkPayerBalance with nil executor")

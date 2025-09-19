@@ -291,7 +291,7 @@ func (s *TransactionStreamSuite) initializeBackend() {
 			MaxTransactionByteSize: flow.DefaultMaxTransactionByteSize,
 			MaxCollectionByteSize:  flow.DefaultMaxCollectionByteSize,
 		},
-		execmock.NewIndexerScriptExecutor(s.T()),
+		execmock.NewScriptExecutor(s.T()),
 	)
 	s.Require().NoError(err)
 

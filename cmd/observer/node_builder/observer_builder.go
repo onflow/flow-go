@@ -300,7 +300,7 @@ type ObserverServiceBuilder struct {
 	RegistersAsyncStore *execution.RegistersAsyncStore
 	Reporter            *index.Reporter
 	EventsIndex         *index.EventsIndex
-	ScriptExecutor      *backend.IndexerScriptExecutor
+	ScriptExecutor      *backend.ScriptExecutor
 
 	// storage
 	events                  storage.Events
@@ -1524,6 +1524,9 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 				return nil, err
 			}
 
+			//TODO(Uliana): refactoring: move creating scripts from execution data indexer component and remove Initialize for ScriptExecutor cause
+			// it does not depend on indexer anymore
+
 			// create script execution module, this depends on the indexer being initialized and the
 			// having the register storage bootstrapped
 			scripts := execution.NewScripts(
@@ -1537,7 +1540,7 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 				builder.programCacheSize > 0,
 			)
 
-			err = builder.ScriptExecutor.Initialize(builder.ExecutionIndexer, scripts, builder.VersionControl)
+			err = builder.ScriptExecutor.Initialize(scripts, builder.VersionControl)
 			if err != nil {
 				return nil, err
 			}
@@ -1855,7 +1858,10 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 		return nil
 	})
 	builder.Module("script executor", func(node *cmd.NodeConfig) error {
-		builder.ScriptExecutor = backend.NewIndexerScriptExecutor(builder.Logger, builder.Storage.RegisterIndex, builder.scriptExecMinBlock, builder.scriptExecMaxBlock)
+		builder.ScriptExecutor = backend.NewScriptExecutor(builder.Logger,
+			pstorage.NewRegisterSnapshotReader(builder.Storage.RegisterIndex),
+			builder.scriptExecMinBlock,
+			builder.scriptExecMaxBlock)
 		return nil
 	})
 
@@ -2021,7 +2027,7 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 			nil,
 			builder.lightTransactionResults,
 			nil,
-			builder.Storage.RegisterIndex,
+			pstorage.NewRegisterSnapshotReader(builder.Storage.RegisterIndex),
 		)
 		execStateCache := execution_state.NewExecutionStateCacheMock(snapshot)
 

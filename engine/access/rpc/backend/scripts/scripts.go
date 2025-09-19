@@ -48,7 +48,7 @@ func NewScriptsBackend(
 	state protocol.State,
 	connFactory connection.ConnectionFactory,
 	nodeCommunicator node_communicator.Communicator,
-	scriptExecutor execution.IndexerScriptExecutor,
+	scriptExecutor execution.ScriptExecutor,
 	scriptExecMode query_mode.IndexQueryMode,
 	nodeProvider *commonrpc.ExecutionNodeIdentitiesProvider,
 	loggedScripts *lru.Cache[[md5.Size]byte, time.Time],
