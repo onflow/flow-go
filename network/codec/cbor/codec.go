@@ -6,6 +6,7 @@ import (
 	"io"
 
 	cborcodec "github.com/onflow/flow-go/model/encoding/cbor"
+	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/codec"
 	_ "github.com/onflow/flow-go/utils/binstat"
@@ -88,7 +89,7 @@ func (c *Codec) Encode(v interface{}) ([]byte, error) {
 //   - codec.ErrInvalidEncoding if message encoding is invalid.
 //   - codec.ErrUnknownMsgCode if message code byte does not match any of the configured message codes.
 //   - codec.ErrMsgUnmarshal if the codec fails to unmarshal the data to the message type denoted by the message code.
-func (c *Codec) Decode(data []byte) (interface{}, error) {
+func (c *Codec) Decode(data []byte) (messages.UntrustedMessage, error) {
 
 	msgCode, err := codec.MessageCodeFromPayload(data)
 	if err != nil {
