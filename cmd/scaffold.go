@@ -291,9 +291,10 @@ type rejectPebbleDirValue struct{}
 
 func (rejectPebbleDirValue) String() string { return "" }
 func (rejectPebbleDirValue) Set(string) error {
-	return fmt.Errorf("the --pebble-dir flag is deprecated. Pebble migration is complete; " +
-		"protocol data is stored under --datadir. Remove both --datadir and --pebble-dir to use " +
-		"the default location: /var/flow/data/protocol")
+	return fmt.Errorf("the --pebble-dir flag is deprecated. Pebble migration is complete, so this flag is no longer needed. " +
+		"Protocol data is now stored in the directory specified by --datadir. " +
+		"We recommend removing both --datadir and --pebble-dir to use the default location: /var/flow/data/protocol\n" +
+		"See more detail: https://github.com/onflow/flow-go/issues/7921")
 }
 func (rejectPebbleDirValue) Type() string { return "string" }
 
