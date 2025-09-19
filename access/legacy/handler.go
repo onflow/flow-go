@@ -28,10 +28,7 @@ func NewHandler(api access.API, chain flow.Chain) *Handler {
 }
 
 // Ping the Access API server for a response.
-func (h *Handler) Ping(
-	context.Context,
-	*accessproto.PingRequest,
-) (*accessproto.PingResponse, error) {
+func (h *Handler) Ping(context.Context, *accessproto.PingRequest) (*accessproto.PingResponse, error) {
 	return &accessproto.PingResponse{}, nil
 }
 
@@ -267,12 +264,7 @@ func (h *Handler) ExecuteScriptAtLatestBlock(
 	script := req.GetScript()
 	arguments := req.GetArguments()
 
-	value, _, err := h.api.ExecuteScriptAtLatestBlock(
-		ctx,
-		script,
-		arguments,
-		optimistic_sync.Criteria{},
-	)
+	value, _, err := h.api.ExecuteScriptAtLatestBlock(ctx, script, arguments, optimistic_sync.Criteria{})
 	if err != nil {
 		return nil, err
 	}
@@ -291,13 +283,7 @@ func (h *Handler) ExecuteScriptAtBlockHeight(
 	arguments := req.GetArguments()
 	blockHeight := req.GetBlockHeight()
 
-	value, _, err := h.api.ExecuteScriptAtBlockHeight(
-		ctx,
-		blockHeight,
-		script,
-		arguments,
-		optimistic_sync.Criteria{},
-	)
+	value, _, err := h.api.ExecuteScriptAtBlockHeight(ctx, blockHeight, script, arguments, optimistic_sync.Criteria{})
 	if err != nil {
 		return nil, err
 	}
@@ -316,13 +302,7 @@ func (h *Handler) ExecuteScriptAtBlockID(
 	arguments := req.GetArguments()
 	blockID := convert.MessageToIdentifier(req.GetBlockId())
 
-	value, _, err := h.api.ExecuteScriptAtBlockID(
-		ctx,
-		blockID,
-		script,
-		arguments,
-		optimistic_sync.Criteria{},
-	)
+	value, _, err := h.api.ExecuteScriptAtBlockID(ctx, blockID, script, arguments, optimistic_sync.Criteria{})
 	if err != nil {
 		return nil, err
 	}
