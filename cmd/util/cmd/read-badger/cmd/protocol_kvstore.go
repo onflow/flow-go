@@ -29,7 +29,7 @@ var protocolStateKVStore = &cobra.Command{
 	Use:   "protocol-kvstore",
 	Short: "get protocol state kvstore by block ID",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		return common.WithStorage(func(db storage.DB) error {
+		return common.WithStorage(flagDatadir, func(db storage.DB) error {
 			storages := common.InitStorages(db)
 
 			log.Info().Msgf("got flag block id: %s", flagBlockID)

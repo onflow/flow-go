@@ -26,7 +26,7 @@ var chunkDataPackCmd = &cobra.Command{
 	Use:   "chunk-data-packs",
 	Short: "get chunk data pack by chunk ID",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		return common.WithStorage(func(db storage.DB) error {
+		return common.WithStorage(flagDatadir, func(db storage.DB) error {
 			log.Info().Msgf("got flag chunk id: %s", flagChunkID)
 			chunkID, err := flow.HexStringToIdentifier(flagChunkID)
 			if err != nil {

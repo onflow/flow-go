@@ -149,7 +149,7 @@ func (r *Reader) IsExecuted(blockID flow.Identifier) (bool, error) {
 
 func runE(*cobra.Command, []string) error {
 	lockManager := storage.MakeSingletonLockManager()
-	return common.WithStorage(func(db storage.DB) error {
+	return common.WithStorage(flagDatadir, func(db storage.DB) error {
 		storages := common.InitStorages(db)
 		state, err := common.OpenProtocolState(lockManager, db, storages)
 

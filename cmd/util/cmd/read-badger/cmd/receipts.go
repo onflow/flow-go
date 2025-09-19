@@ -26,7 +26,7 @@ var receiptsCmd = &cobra.Command{
 	Use:   "receipts",
 	Short: "get receipt by block or receipt ID",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		return common.WithStorage(func(db storage.DB) error {
+		return common.WithStorage(flagDatadir, func(db storage.DB) error {
 			results := store.NewExecutionResults(metrics.NewNoopCollector(), db)
 			receipts := store.NewExecutionReceipts(metrics.NewNoopCollector(), db, results, 1)
 

@@ -30,7 +30,7 @@ var eventsCmd = &cobra.Command{
 	Use:   "events",
 	Short: "Read events",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		return common.WithStorage(func(db storage.DB) error {
+		return common.WithStorage(flagDatadir, func(db storage.DB) error {
 			events := store.NewEvents(metrics.NewNoopCollector(), db)
 
 			if flagEventType != "" && flagTransactionID != "" {

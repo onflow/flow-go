@@ -24,7 +24,7 @@ var commitsCmd = &cobra.Command{
 	Use:   "commits",
 	Short: "get commit by block ID",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		return common.WithStorage(func(db storage.DB) error {
+		return common.WithStorage(flagDatadir, func(db storage.DB) error {
 
 			commits := store.NewCommits(metrics.NewNoopCollector(), db)
 

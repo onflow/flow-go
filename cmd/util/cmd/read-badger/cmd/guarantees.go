@@ -22,7 +22,7 @@ var guaranteesCmd = &cobra.Command{
 	Use:   "guarantees",
 	Short: "get guarantees by collection ID",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		return common.WithStorage(func(db storage.DB) error {
+		return common.WithStorage(flagDatadir, func(db storage.DB) error {
 			storages := common.InitStorages(db)
 
 			log.Info().Msgf("got flag collection id: %s", flagCollectionID)

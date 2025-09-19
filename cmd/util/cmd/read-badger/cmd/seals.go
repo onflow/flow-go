@@ -24,7 +24,7 @@ var sealsCmd = &cobra.Command{
 	Use:   "seals",
 	Short: "get seals by block or seal ID",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		return common.WithStorage(func(db storage.DB) error {
+		return common.WithStorage(flagDatadir, func(db storage.DB) error {
 			storages := common.InitStorages(db)
 
 			if flagSealID != "" && flagBlockID != "" {

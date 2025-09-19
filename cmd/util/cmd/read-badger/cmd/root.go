@@ -6,6 +6,12 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+
+	"github.com/onflow/flow-go/cmd/util/cmd/common"
+)
+
+var (
+	flagDatadir string
 )
 
 var rootCmd = &cobra.Command{
@@ -23,6 +29,8 @@ func Execute() {
 }
 
 func init() {
+	common.InitDataDirFlag(rootCmd, &flagDatadir)
+
 	cobra.OnInitialize(initConfig)
 }
 

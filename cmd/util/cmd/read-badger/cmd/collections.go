@@ -27,7 +27,7 @@ var collectionsCmd = &cobra.Command{
 	Use:   "collections",
 	Short: "get collection by collection or transaction ID",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		return common.WithStorage(func(db storage.DB) error {
+		return common.WithStorage(flagDatadir, func(db storage.DB) error {
 			storages := common.InitStorages(db)
 
 			if flagCollectionID != "" {

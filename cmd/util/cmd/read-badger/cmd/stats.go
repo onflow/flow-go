@@ -20,7 +20,7 @@ var statsCmd = &cobra.Command{
 	Use:   "stats",
 	Short: "get stats for the database, such as key count, total value size, min/max value size etc",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		return common.WithStorage(func(sdb storage.DB) error {
+		return common.WithStorage(flagDatadir, func(sdb storage.DB) error {
 
 			numWorkers := runtime.NumCPU()
 			if numWorkers > 256 {

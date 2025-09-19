@@ -11,7 +11,8 @@ import (
 )
 
 var (
-	flagChain string
+	flagChain   string
+	flagDatadir string
 )
 
 var rootCmd = &cobra.Command{
@@ -29,7 +30,7 @@ func Execute() {
 }
 
 func init() {
-	common.InitWithDBFlags(rootCmd)
+	common.InitDataDirFlag(rootCmd, &flagDatadir)
 
 	rootCmd.PersistentFlags().StringVar(&flagChain, "chain", "", "Chain name, e.g. flow-mainnet, flow-testnet")
 	_ = rootCmd.MarkPersistentFlagRequired("chain")

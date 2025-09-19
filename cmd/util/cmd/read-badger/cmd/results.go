@@ -26,7 +26,7 @@ var resultsCmd = &cobra.Command{
 	Use:   "results",
 	Short: "get result by block or result ID",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		return common.WithStorage(func(db storage.DB) error {
+		return common.WithStorage(flagDatadir, func(db storage.DB) error {
 			results := store.NewExecutionResults(metrics.NewNoopCollector(), db)
 			if flagBlockID != "" {
 				log.Info().Msgf("got flag block id: %s", flagBlockID)

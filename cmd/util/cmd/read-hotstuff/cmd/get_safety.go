@@ -21,7 +21,7 @@ func init() {
 }
 
 func runGetSafetyData(*cobra.Command, []string) {
-	err := common.WithStorage(func(db storage.DB) error {
+	err := common.WithStorage(flagDatadir, func(db storage.DB) error {
 
 		chainID := flow.ChainID(flagChain)
 		reader, err := persister.NewReader(db, chainID)
