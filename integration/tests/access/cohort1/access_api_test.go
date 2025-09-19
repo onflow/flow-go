@@ -319,7 +319,7 @@ func (s *AccessAPISuite) TestSendAndSubscribeTransactionStatuses() {
 	})
 	s.Require().NoError(err)
 
-	expectedCounter := uint64(1)
+	expectedCounter := uint64(0)
 	lastReportedTxStatus := entities.TransactionStatus_UNKNOWN
 	var txID sdk.Identifier
 

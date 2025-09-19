@@ -54,6 +54,7 @@ import (
 	statestreambackend "github.com/onflow/flow-go/engine/access/state_stream/backend"
 	"github.com/onflow/flow-go/engine/access/subscription"
 	"github.com/onflow/flow-go/engine/common/follower"
+	commonrpc "github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/engine/common/stop"
 	synceng "github.com/onflow/flow-go/engine/common/synchronization"
 	"github.com/onflow/flow-go/engine/common/version"
@@ -200,10 +201,11 @@ func DefaultObserverServiceConfig() *ObserverServiceConfig {
 				TxResultQueryMode:         backend.IndexQueryModeExecutionNodesOnly.String(), // default to ENs only for now
 			},
 			RestConfig: rest.Config{
-				ListenAddress: "",
-				WriteTimeout:  rest.DefaultWriteTimeout,
-				ReadTimeout:   rest.DefaultReadTimeout,
-				IdleTimeout:   rest.DefaultIdleTimeout,
+				ListenAddress:  "",
+				WriteTimeout:   rest.DefaultWriteTimeout,
+				ReadTimeout:    rest.DefaultReadTimeout,
+				IdleTimeout:    rest.DefaultIdleTimeout,
+				MaxRequestSize: routes.DefaultMaxRequestSize,
 			},
 			MaxMsgSize:     grpcutils.DefaultMaxMsgSize,
 			CompressorName: grpcutils.NoCompressor,
@@ -631,6 +633,10 @@ func (builder *ObserverServiceBuilder) extraFlags() {
 			defaultConfig.rpcConf.RestConfig.ReadTimeout,
 			"timeout to use when reading REST request headers")
 		flags.DurationVar(&builder.rpcConf.RestConfig.IdleTimeout, "rest-idle-timeout", defaultConfig.rpcConf.RestConfig.IdleTimeout, "idle timeout for REST connections")
+		flags.Int64Var(&builder.rpcConf.RestConfig.MaxRequestSize,
+			"rest-max-request-size",
+			defaultConfig.rpcConf.RestConfig.MaxRequestSize,
+			"the maximum request size in bytes for payload sent over REST server")
 		flags.UintVar(&builder.rpcConf.MaxMsgSize,
 			"rpc-max-message-size",
 			defaultConfig.rpcConf.MaxMsgSize,
@@ -863,6 +869,10 @@ func (builder *ObserverServiceBuilder) extraFlags() {
 			}
 		}
 
+		if builder.rpcConf.RestConfig.MaxRequestSize <= 0 {
+			return errors.New("rest-max-request-size must be greater than 0")
+		}
+
 		return nil
 	})
 }
@@ -941,7 +951,7 @@ func (builder *ObserverServiceBuilder) InitIDProviders() {
 
 					if flowID, err := builder.IDTranslator.GetFlowID(pid); err != nil {
 						// TODO: this is an instance of "log error and continue with best effort" anti-pattern
-						builder.Logger.Err(err).Str("peer", p2plogging.PeerId(pid)).Msg("failed to translate to Flow ID")
+						builder.Logger.Debug().Str("peer", p2plogging.PeerId(pid)).Msg("failed to translate to Flow ID")
 					} else {
 						result = append(result, flowID)
 					}
@@ -1951,25 +1961,41 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 			indexReporter = builder.Reporter
 		}
 
+		preferredENIdentifiers, err := commonrpc.IdentifierList(backendConfig.PreferredExecutionNodeIDs)
+		if err != nil {
+			return nil, fmt.Errorf("failed to convert node id string to Flow Identifier for preferred EN map: %w", err)
+		}
+
+		fixedENIdentifiers, err := commonrpc.IdentifierList(backendConfig.FixedExecutionNodeIDs)
+		if err != nil {
+			return nil, fmt.Errorf("failed to convert node id string to Flow Identifier for fixed EN map: %w", err)
+		}
+
+		execNodeIdentitiesProvider := commonrpc.NewExecutionNodeIdentitiesProvider(
+			node.Logger,
+			node.State,
+			node.Storage.Receipts,
+			preferredENIdentifiers,
+			fixedENIdentifiers,
+		)
+
 		backendParams := backend.Params{
-			State:                     node.State,
-			Blocks:                    node.Storage.Blocks,
-			Headers:                   node.Storage.Headers,
-			Collections:               node.Storage.Collections,
-			Transactions:              node.Storage.Transactions,
-			ExecutionReceipts:         node.Storage.Receipts,
-			ExecutionResults:          node.Storage.Results,
-			ChainID:                   node.RootChainID,
-			AccessMetrics:             accessMetrics,
-			ConnFactory:               connFactory,
-			RetryEnabled:              false,
-			MaxHeightRange:            backendConfig.MaxHeightRange,
-			PreferredExecutionNodeIDs: backendConfig.PreferredExecutionNodeIDs,
-			FixedExecutionNodeIDs:     backendConfig.FixedExecutionNodeIDs,
-			Log:                       node.Logger,
-			SnapshotHistoryLimit:      backend.DefaultSnapshotHistoryLimit,
-			Communicator:              backend.NewNodeCommunicator(backendConfig.CircuitBreakerConfig.Enabled),
-			BlockTracker:              blockTracker,
+			State:                node.State,
+			Blocks:               node.Storage.Blocks,
+			Headers:              node.Storage.Headers,
+			Collections:          node.Storage.Collections,
+			Transactions:         node.Storage.Transactions,
+			ExecutionReceipts:    node.Storage.Receipts,
+			ExecutionResults:     node.Storage.Results,
+			ChainID:              node.RootChainID,
+			AccessMetrics:        accessMetrics,
+			ConnFactory:          connFactory,
+			RetryEnabled:         false,
+			MaxHeightRange:       backendConfig.MaxHeightRange,
+			Log:                  node.Logger,
+			SnapshotHistoryLimit: backend.DefaultSnapshotHistoryLimit,
+			Communicator:         backend.NewNodeCommunicator(backendConfig.CircuitBreakerConfig.Enabled),
+			BlockTracker:         blockTracker,
 			SubscriptionHandler: subscription.NewSubscriptionHandler(
 				builder.Logger,
 				broadcaster,
@@ -1977,8 +2003,9 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 				builder.stateStreamConf.ResponseLimit,
 				builder.stateStreamConf.ClientSendBufferSize,
 			),
-			IndexReporter:  indexReporter,
-			VersionControl: builder.VersionControl,
+			IndexReporter:              indexReporter,
+			VersionControl:             builder.VersionControl,
+			ExecNodeIdentitiesProvider: execNodeIdentitiesProvider,
 		}
 
 		if builder.localServiceAPIEnabled {
