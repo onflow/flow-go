@@ -61,6 +61,16 @@ func TestIndexAndLookupChild(t *testing.T) {
 				require.NoError(t, operation.RetrieveBlockChildren(db.Reader(), childID, &retrievedIDs))
 				// verify new block has no child
 				require.Equal(t, flow.IdentifierList(nil), retrievedIDs)
+
+				// verify indexing again would hit storage.ErrAlreadyExists error
+				unittest.WithLock(t, lockManager, opPair.lockType, func(lctx lockctx.Context) error {
+					err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+						return opPair.indexFunc(lctx, rw, childID, parentID)
+					})
+					require.Error(t, err)
+					require.ErrorIs(t, err, storage.ErrAlreadyExists)
+					return nil
+				})
 			})
 		})
 	}
