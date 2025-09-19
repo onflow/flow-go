@@ -168,26 +168,8 @@ func (s *EventsSuite) SetupTest() {
 	}).Maybe()
 
 	s.executionDataSnapshot = osyncmock.NewSnapshot(s.T())
-	s.executionDataSnapshot.
-		On("Events").
-		Return(s.events, nil).
-		Maybe()
-
 	s.executionResultProvider = osyncmock.NewExecutionResultProvider(s.T())
-	s.executionResultProvider.
-		On("ExecutionResultInfo", mock.Anything, mock.Anything).
-		Return(&optimistic_sync.ExecutionResultInfo{
-			ExecutionResult: s.executionResult,
-			ExecutionNodes:  s.executionNodes.ToSkeleton(),
-		}, nil).
-		Maybe() // it is called only for local query mode
-
 	s.executionStateCache = osyncmock.NewExecutionStateCache(s.T())
-	s.executionStateCache.
-		On("Snapshot", mock.Anything).
-		Return(s.executionDataSnapshot, nil).
-		Maybe() // it is called only for local query mode
-
 	s.criteria = optimistic_sync.Criteria{}
 
 	s.testCases = make([]testCase, 0)
@@ -213,6 +195,21 @@ func (s *EventsSuite) SetupTest() {
 // across all queryModes and encodings
 func (s *EventsSuite) TestGetEvents_HappyPaths() {
 	ctx := context.Background()
+
+	s.executionResultProvider.
+		On("ExecutionResultInfo", mock.Anything, mock.Anything).
+		Return(&optimistic_sync.ExecutionResultInfo{
+			ExecutionResult: s.executionResult,
+			ExecutionNodes:  s.executionNodes.ToSkeleton(),
+		}, nil)
+
+	s.executionStateCache.
+		On("Snapshot", mock.Anything).
+		Return(s.executionDataSnapshot, nil)
+
+	s.executionDataSnapshot.
+		On("Events").
+		Return(s.events, nil)
 
 	startHeight := s.blocks[0].Height
 	endHeight := s.sealedHead.Height
