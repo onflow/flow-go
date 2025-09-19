@@ -6,14 +6,16 @@ import (
 )
 
 type Mock struct {
-	events storage.EventsReader
+	events    storage.EventsReader
+	registers storage.RegisterIndexReader
 }
 
 var _ optimistic_sync.Snapshot = (*Mock)(nil)
 
-func NewSnapshotMock(events storage.EventsReader) *Mock {
+func NewSnapshotMock(events storage.EventsReader, registers storage.RegisterIndexReader) *Mock {
 	return &Mock{
-		events: events,
+		events:    events,
+		registers: registers,
 	}
 }
 
@@ -42,6 +44,5 @@ func (s *Mock) TransactionResultErrorMessages() storage.TransactionResultErrorMe
 }
 
 func (s *Mock) Registers() storage.RegisterIndexReader {
-	//TODO implement me
-	panic("implement me")
+	return s.registers
 }

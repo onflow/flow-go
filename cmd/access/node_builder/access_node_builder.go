@@ -338,7 +338,7 @@ type FlowAccessNodeBuilder struct {
 	ExecutionDataCache           *execdatacache.ExecutionDataCache
 	ExecutionIndexer             *indexer.Indexer
 	ExecutionIndexerCore         *indexer.IndexerCore
-	ScriptExecutor               *backend.ScriptExecutor
+	IndexerScriptExecutor        *backend.IndexerScriptExecutor
 	RegistersAsyncStore          *execution.RegistersAsyncStore
 	Reporter                     *index.Reporter
 	EventsIndex                  *index.EventsIndex
@@ -589,6 +589,83 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 			collections := store.NewCollections(node.ProtocolDB, transactions)
 			builder.transactions = transactions
 			builder.collections = collections
+
+			return nil
+		}).
+		Module("registers storage", func(node *cmd.NodeConfig) error {
+			pdb, err := pstorage.OpenRegisterPebbleDB(
+				node.Logger.With().Str("pebbledb", "registers").Logger(),
+				builder.registersDBPath)
+			if err != nil {
+				return fmt.Errorf("could not open registers db: %w", err)
+			}
+			builder.ShutdownFunc(func() error {
+				return pdb.Close()
+			})
+
+			bootstrapped, err := pstorage.IsBootstrapped(pdb)
+			if err != nil {
+				return fmt.Errorf("could not check if registers db is bootstrapped: %w", err)
+			}
+
+			if !bootstrapped {
+				checkpointFile := builder.checkpointFile
+				if checkpointFile == cmd.NotSet {
+					checkpointFile = path.Join(builder.BootstrapDir, bootstrap.PathRootCheckpoint)
+				}
+
+				// currently, the checkpoint must be from the root block.
+				// read the root hash from the provided checkpoint and verify it matches the
+				// state commitment from the root snapshot.
+				err := wal.CheckpointHasRootHash(
+					node.Logger,
+					"", // checkpoint file already full path
+					checkpointFile,
+					ledger.RootHash(node.RootSeal.FinalState),
+				)
+				if err != nil {
+					return fmt.Errorf("could not verify checkpoint file: %w", err)
+				}
+
+				checkpointHeight := builder.SealedRootBlock.Height
+
+				if builder.SealedRootBlock.ID() != builder.RootSeal.BlockID {
+					return fmt.Errorf("mismatching sealed root block and root seal: %v != %v",
+						builder.SealedRootBlock.ID(), builder.RootSeal.BlockID)
+				}
+
+				rootHash := ledger.RootHash(builder.RootSeal.FinalState)
+				bootstrap, err := pstorage.NewRegisterBootstrap(pdb, checkpointFile, checkpointHeight, rootHash, builder.Logger)
+				if err != nil {
+					return fmt.Errorf("could not create registers bootstrap: %w", err)
+				}
+
+				// TODO: find a way to hook a context up to this to allow a graceful shutdown
+				workerCount := 10
+				err = bootstrap.IndexCheckpointFile(context.Background(), workerCount)
+				if err != nil {
+					return fmt.Errorf("could not load checkpoint file: %w", err)
+				}
+			}
+			registers, err := pstorage.NewRegisters(pdb, builder.registerDBPruneThreshold)
+			if err != nil {
+				return fmt.Errorf("could not create registers storage: %w", err)
+			}
+
+			if builder.registerCacheSize > 0 {
+				cacheType, err := pstorage.ParseCacheType(builder.registerCacheType)
+				if err != nil {
+					return fmt.Errorf("could not parse register cache type: %w", err)
+				}
+				cacheMetrics := metrics.NewCacheCollector(builder.RootChainID)
+				registersCache, err := pstorage.NewRegistersCache(registers, cacheType, builder.registerCacheSize, cacheMetrics)
+				if err != nil {
+					return fmt.Errorf("could not create registers cache: %w", err)
+				}
+				builder.Storage.RegisterIndex = registersCache
+			} else {
+				builder.Storage.RegisterIndex = registers
+			}
 
 			return nil
 		}).
@@ -847,7 +924,7 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 
 		builder.
 			AdminCommand("execute-script", func(config *cmd.NodeConfig) commands.AdminCommand {
-				return stateSyncCommands.NewExecuteScriptCommand(builder.ScriptExecutor)
+				return stateSyncCommands.NewExecuteScriptCommand(builder.IndexerScriptExecutor)
 			}).
 			Module("indexed block height consumer progress", func(node *cmd.NodeConfig) error {
 				// Note: progress is stored in the MAIN db since that is where indexed execution data is stored.
@@ -863,86 +940,10 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 				// other components from starting while bootstrapping the register db since it may
 				// take hours to complete.
 
-				pdb, err := pstorage.OpenRegisterPebbleDB(
-					node.Logger.With().Str("pebbledb", "registers").Logger(),
-					builder.registersDBPath)
-				if err != nil {
-					return nil, fmt.Errorf("could not open registers db: %w", err)
-				}
-				builder.ShutdownFunc(func() error {
-					return pdb.Close()
-				})
-
-				bootstrapped, err := pstorage.IsBootstrapped(pdb)
-				if err != nil {
-					return nil, fmt.Errorf("could not check if registers db is bootstrapped: %w", err)
-				}
-
-				if !bootstrapped {
-					checkpointFile := builder.checkpointFile
-					if checkpointFile == cmd.NotSet {
-						checkpointFile = path.Join(builder.BootstrapDir, bootstrap.PathRootCheckpoint)
-					}
-
-					// currently, the checkpoint must be from the root block.
-					// read the root hash from the provided checkpoint and verify it matches the
-					// state commitment from the root snapshot.
-					err := wal.CheckpointHasRootHash(
-						node.Logger,
-						"", // checkpoint file already full path
-						checkpointFile,
-						ledger.RootHash(node.RootSeal.FinalState),
-					)
-					if err != nil {
-						return nil, fmt.Errorf("could not verify checkpoint file: %w", err)
-					}
-
-					checkpointHeight := builder.SealedRootBlock.Height
-
-					if builder.SealedRootBlock.ID() != builder.RootSeal.BlockID {
-						return nil, fmt.Errorf("mismatching sealed root block and root seal: %v != %v",
-							builder.SealedRootBlock.ID(), builder.RootSeal.BlockID)
-					}
-
-					rootHash := ledger.RootHash(builder.RootSeal.FinalState)
-					bootstrap, err := pstorage.NewRegisterBootstrap(pdb, checkpointFile, checkpointHeight, rootHash, builder.Logger)
-					if err != nil {
-						return nil, fmt.Errorf("could not create registers bootstrap: %w", err)
-					}
-
-					// TODO: find a way to hook a context up to this to allow a graceful shutdown
-					workerCount := 10
-					err = bootstrap.IndexCheckpointFile(context.Background(), workerCount)
-					if err != nil {
-						return nil, fmt.Errorf("could not load checkpoint file: %w", err)
-					}
-				}
-
-				registers, err := pstorage.NewRegisters(pdb, builder.registerDBPruneThreshold)
-				if err != nil {
-					return nil, fmt.Errorf("could not create registers storage: %w", err)
-				}
-
-				if builder.registerCacheSize > 0 {
-					cacheType, err := pstorage.ParseCacheType(builder.registerCacheType)
-					if err != nil {
-						return nil, fmt.Errorf("could not parse register cache type: %w", err)
-					}
-					cacheMetrics := metrics.NewCacheCollector(builder.RootChainID)
-					registersCache, err := pstorage.NewRegistersCache(registers, cacheType, builder.registerCacheSize, cacheMetrics)
-					if err != nil {
-						return nil, fmt.Errorf("could not create registers cache: %w", err)
-					}
-					builder.Storage.RegisterIndex = registersCache
-				} else {
-					builder.Storage.RegisterIndex = registers
-				}
-
 				indexerDerivedChainData, queryDerivedChainData, err := builder.buildDerivedChainData()
 				if err != nil {
 					return nil, fmt.Errorf("could not create derived chain data: %w", err)
 				}
-
 				indexerCore, err := indexer.New(
 					builder.Logger,
 					metrics.NewExecutionStateIndexerCollector(),
@@ -966,8 +967,8 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 				// execution state worker uses a jobqueue to process new execution data and indexes it by using the indexer.
 				builder.ExecutionIndexer, err = indexer.NewIndexer(
 					builder.Logger,
-					registers.FirstHeight(),
-					registers,
+					builder.Storage.RegisterIndex.FirstHeight(), //TODO(Uliana):check why we need FirstHeight() as separate param here
+					builder.Storage.RegisterIndex,
 					indexerCore,
 					executionDataStoreCache,
 					builder.ExecutionDataRequester.HighestConsecutiveHeight,
@@ -992,13 +993,12 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 					builder.RootChainID,
 					computation.NewProtocolStateWrapper(builder.State),
 					builder.Storage.Headers,
-					builder.ExecutionIndexerCore.RegisterValue,
 					builder.scriptExecutorConfig,
 					queryDerivedChainData,
 					builder.programCacheSize > 0,
 				)
 
-				err = builder.ScriptExecutor.Initialize(builder.ExecutionIndexer, scripts, builder.VersionControl)
+				err = builder.IndexerScriptExecutor.Initialize(builder.ExecutionIndexer, scripts, builder.VersionControl)
 				if err != nil {
 					return nil, err
 				}
@@ -1008,7 +1008,7 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 					return nil, err
 				}
 
-				err = builder.RegistersAsyncStore.Initialize(registers)
+				err = builder.RegistersAsyncStore.Initialize(builder.Storage.RegisterIndex)
 				if err != nil {
 					return nil, err
 				}
@@ -1917,7 +1917,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 			return nil
 		}).
 		Module("backend script executor", func(node *cmd.NodeConfig) error {
-			builder.ScriptExecutor = backend.NewScriptExecutor(builder.Logger, builder.scriptExecMinBlock, builder.scriptExecMaxBlock)
+			builder.IndexerScriptExecutor = backend.NewIndexerScriptExecutor(builder.Logger, builder.Storage.RegisterIndex, builder.scriptExecMinBlock, builder.scriptExecMaxBlock)
 			return nil
 		}).
 		Module("async register store", func(node *cmd.NodeConfig) error {
@@ -2131,7 +2131,10 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 			}
 
 			// TODO: use real objects instead of mocks once they're implemented
-			snapshot := osyncsnapshot.NewSnapshotMock(builder.events)
+			snapshot := osyncsnapshot.NewSnapshotMock(
+				notNil(builder.events),
+				notNil(builder.Storage.RegisterIndex),
+			)
 			execStateCache := execution_state.NewExecutionStateCacheMock(snapshot)
 
 			builder.nodeBackend, err = backend.New(backend.Params{
@@ -2154,7 +2157,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				SnapshotHistoryLimit:  backend.DefaultSnapshotHistoryLimit,
 				Communicator:          nodeCommunicator,
 				TxResultCacheSize:     builder.TxResultCacheSize,
-				ScriptExecutor:        notNil(builder.ScriptExecutor),
+				ScriptExecutor:        notNil(builder.IndexerScriptExecutor),
 				ScriptExecutionMode:   scriptExecMode,
 				CheckPayerBalanceMode: checkPayerBalanceMode,
 				EventQueryMode:        eventQueryMode,

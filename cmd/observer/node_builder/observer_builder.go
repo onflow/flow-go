@@ -300,7 +300,7 @@ type ObserverServiceBuilder struct {
 	RegistersAsyncStore *execution.RegistersAsyncStore
 	Reporter            *index.Reporter
 	EventsIndex         *index.EventsIndex
-	ScriptExecutor      *backend.ScriptExecutor
+	ScriptExecutor      *backend.IndexerScriptExecutor
 
 	// storage
 	events                  storage.Events
@@ -1442,6 +1442,106 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 				return nil
 			},
 		).
+		Module("registers storage", func(node *cmd.NodeConfig) error {
+			pdb, err := pstorage.OpenRegisterPebbleDB(
+				node.Logger.With().Str("pebbledb", "registers").Logger(),
+				builder.registersDBPath,
+			)
+			if err != nil {
+				return fmt.Errorf("could not open registers db: %w", err)
+			}
+			builder.ShutdownFunc(
+				func() error {
+					return pdb.Close()
+				},
+			)
+
+			bootstrapped, err := pstorage.IsBootstrapped(pdb)
+			if err != nil {
+				return fmt.Errorf(
+					"could not check if registers db is bootstrapped: %w",
+					err,
+				)
+			}
+
+			if !bootstrapped {
+				checkpointFile := builder.checkpointFile
+				if checkpointFile == cmd.NotSet {
+					checkpointFile = path.Join(
+						builder.BootstrapDir,
+						bootstrap.PathRootCheckpoint,
+					)
+				}
+
+				// currently, the checkpoint must be from the root block.
+				// read the root hash from the provided checkpoint and verify it matches the
+				// state commitment from the root snapshot.
+				err := wal.CheckpointHasRootHash(
+					node.Logger,
+					"", // checkpoint file already full path
+					checkpointFile,
+					ledger.RootHash(node.RootSeal.FinalState),
+				)
+				if err != nil {
+					return fmt.Errorf("could not verify checkpoint file: %w", err)
+				}
+
+				checkpointHeight := builder.SealedRootBlock.Height
+
+				if builder.SealedRootBlock.ID() != builder.RootSeal.BlockID {
+					return fmt.Errorf(
+						"mismatching sealed root block and root seal: %v != %v",
+						builder.SealedRootBlock.ID(), builder.RootSeal.BlockID,
+					)
+				}
+
+				rootHash := ledger.RootHash(builder.RootSeal.FinalState)
+				bootstrap, err := pstorage.NewRegisterBootstrap(
+					pdb,
+					checkpointFile,
+					checkpointHeight,
+					rootHash,
+					builder.Logger,
+				)
+				if err != nil {
+					return fmt.Errorf("could not create registers bootstrap: %w", err)
+				}
+
+				// TODO: find a way to hook a context up to this to allow a graceful shutdown
+				workerCount := 10
+				err = bootstrap.IndexCheckpointFile(context.Background(), workerCount)
+				if err != nil {
+					return fmt.Errorf("could not load checkpoint file: %w", err)
+				}
+			}
+
+			registers, err := pstorage.NewRegisters(pdb, builder.registerDBPruneThreshold)
+			if err != nil {
+				return fmt.Errorf("could not create registers storage: %w", err)
+			}
+
+			if builder.registerCacheSize > 0 {
+				cacheType, err := pstorage.ParseCacheType(builder.registerCacheType)
+				if err != nil {
+					return fmt.Errorf("could not parse register cache type: %w", err)
+				}
+				cacheMetrics := metrics.NewCacheCollector(builder.RootChainID)
+				registersCache, err := pstorage.NewRegistersCache(
+					registers,
+					cacheType,
+					builder.registerCacheSize,
+					cacheMetrics,
+				)
+				if err != nil {
+					return fmt.Errorf("could not create registers cache: %w", err)
+				}
+				builder.Storage.RegisterIndex = registersCache
+			} else {
+				builder.Storage.RegisterIndex = registers
+			}
+
+			return nil
+		}).
 		Component(
 			"public execution data service",
 			func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
@@ -1647,103 +1747,6 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 				// other components from starting while bootstrapping the register db since it may
 				// take hours to complete.
 
-				pdb, err := pstorage.OpenRegisterPebbleDB(
-					node.Logger.With().Str("pebbledb", "registers").Logger(),
-					builder.registersDBPath,
-				)
-				if err != nil {
-					return nil, fmt.Errorf("could not open registers db: %w", err)
-				}
-				builder.ShutdownFunc(
-					func() error {
-						return pdb.Close()
-					},
-				)
-
-				bootstrapped, err := pstorage.IsBootstrapped(pdb)
-				if err != nil {
-					return nil, fmt.Errorf(
-						"could not check if registers db is bootstrapped: %w",
-						err,
-					)
-				}
-
-				if !bootstrapped {
-					checkpointFile := builder.checkpointFile
-					if checkpointFile == cmd.NotSet {
-						checkpointFile = path.Join(
-							builder.BootstrapDir,
-							bootstrap.PathRootCheckpoint,
-						)
-					}
-
-					// currently, the checkpoint must be from the root block.
-					// read the root hash from the provided checkpoint and verify it matches the
-					// state commitment from the root snapshot.
-					err := wal.CheckpointHasRootHash(
-						node.Logger,
-						"", // checkpoint file already full path
-						checkpointFile,
-						ledger.RootHash(node.RootSeal.FinalState),
-					)
-					if err != nil {
-						return nil, fmt.Errorf("could not verify checkpoint file: %w", err)
-					}
-
-					checkpointHeight := builder.SealedRootBlock.Height
-
-					if builder.SealedRootBlock.ID() != builder.RootSeal.BlockID {
-						return nil, fmt.Errorf(
-							"mismatching sealed root block and root seal: %v != %v",
-							builder.SealedRootBlock.ID(), builder.RootSeal.BlockID,
-						)
-					}
-
-					rootHash := ledger.RootHash(builder.RootSeal.FinalState)
-					bootstrap, err := pstorage.NewRegisterBootstrap(
-						pdb,
-						checkpointFile,
-						checkpointHeight,
-						rootHash,
-						builder.Logger,
-					)
-					if err != nil {
-						return nil, fmt.Errorf("could not create registers bootstrap: %w", err)
-					}
-
-					// TODO: find a way to hook a context up to this to allow a graceful shutdown
-					workerCount := 10
-					err = bootstrap.IndexCheckpointFile(context.Background(), workerCount)
-					if err != nil {
-						return nil, fmt.Errorf("could not load checkpoint file: %w", err)
-					}
-				}
-
-				registers, err := pstorage.NewRegisters(pdb, builder.registerDBPruneThreshold)
-				if err != nil {
-					return nil, fmt.Errorf("could not create registers storage: %w", err)
-				}
-
-				if builder.registerCacheSize > 0 {
-					cacheType, err := pstorage.ParseCacheType(builder.registerCacheType)
-					if err != nil {
-						return nil, fmt.Errorf("could not parse register cache type: %w", err)
-					}
-					cacheMetrics := metrics.NewCacheCollector(builder.RootChainID)
-					registersCache, err := pstorage.NewRegistersCache(
-						registers,
-						cacheType,
-						builder.registerCacheSize,
-						cacheMetrics,
-					)
-					if err != nil {
-						return nil, fmt.Errorf("could not create registers cache: %w", err)
-					}
-					builder.Storage.RegisterIndex = registersCache
-				} else {
-					builder.Storage.RegisterIndex = registers
-				}
-
 				indexerDerivedChainData, queryDerivedChainData, err := builder.buildDerivedChainData()
 				if err != nil {
 					return nil, fmt.Errorf("could not create derived chain data: %w", err)
@@ -1773,8 +1776,8 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 				// execution state worker uses a jobqueue to process new execution data and indexes it by using the indexer.
 				builder.ExecutionIndexer, err = indexer.NewIndexer(
 					builder.Logger,
-					registers.FirstHeight(),
-					registers,
+					builder.Storage.RegisterIndex.FirstHeight(),
+					builder.Storage.RegisterIndex,
 					indexerCore,
 					executionDataStoreCache,
 					builder.ExecutionDataRequester.HighestConsecutiveHeight,
@@ -1804,7 +1807,6 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 					builder.RootChainID,
 					computation.NewProtocolStateWrapper(builder.State),
 					builder.Storage.Headers,
-					builder.ExecutionIndexerCore.RegisterValue,
 					builder.scriptExecutorConfig,
 					queryDerivedChainData,
 					builder.programCacheSize > 0,
@@ -1819,7 +1821,7 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 					return nil, err
 				}
 
-				err = builder.RegistersAsyncStore.Initialize(registers)
+				err = builder.RegistersAsyncStore.Initialize(builder.Storage.RegisterIndex)
 				if err != nil {
 					return nil, err
 				}
@@ -2208,8 +2210,9 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 	)
 	builder.Module(
 		"script executor", func(node *cmd.NodeConfig) error {
-			builder.ScriptExecutor = backend.NewScriptExecutor(
+			builder.ScriptExecutor = backend.NewIndexerScriptExecutor(
 				builder.Logger,
+				builder.Storage.RegisterIndex,
 				builder.scriptExecMinBlock,
 				builder.scriptExecMaxBlock,
 			)
@@ -2392,7 +2395,7 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 			}
 
 			// TODO: use real objects instead of mocks once they're implemented
-			snapshot := osyncsnapshot.NewSnapshotMock(builder.events)
+			snapshot := osyncsnapshot.NewSnapshotMock(builder.events, builder.Storage.RegisterIndex)
 			execStateCache := execution_state.NewExecutionStateCacheMock(snapshot)
 
 			backendParams := backend.Params{
