@@ -103,7 +103,7 @@ type Params struct {
 	SnapshotHistoryLimit     int
 	Communicator             node_communicator.Communicator
 	TxResultCacheSize        uint
-	ScriptExecutor           execution.ScriptExecutor
+	ScriptExecutor           execution.IndexerScriptExecutor
 	ScriptExecutionMode      query_mode.IndexQueryMode
 	CheckPayerBalanceMode    validator.PayerBalanceMode
 	EventQueryMode           query_mode.IndexQueryMode
@@ -194,6 +194,8 @@ func New(params Params) (*Backend, error) {
 		params.ExecNodeIdentitiesProvider,
 		loggedScripts,
 		params.MaxScriptAndArgumentSize,
+		params.ExecutionResultInfoProvider,
+		params.ExecutionStateCache,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create scripts: %w", err)

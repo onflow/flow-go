@@ -18,19 +18,25 @@ import (
 	"github.com/onflow/flow-go/engine/access/rpc/backend/scripts/executor"
 	"github.com/onflow/flow-go/engine/access/rpc/connection"
 	commonrpc "github.com/onflow/flow-go/engine/common/rpc"
+	accessmodel "github.com/onflow/flow-go/model/access"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/execution"
+	"github.com/onflow/flow-go/module/executiondatasync/optimistic_sync"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
 )
 
+// TODO(Uliana): add godoc to whole file
 type Scripts struct {
 	headers                  storage.Headers
 	state                    protocol.State
 	executor                 executor.ScriptExecutor
 	maxScriptAndArgumentSize uint
+
+	executionResultProvider optimistic_sync.ExecutionResultInfoProvider
+	executionStateCache     optimistic_sync.ExecutionStateCache
 }
 
 var _ access.ScriptsAPI = (*Scripts)(nil)
@@ -42,25 +48,53 @@ func NewScriptsBackend(
 	state protocol.State,
 	connFactory connection.ConnectionFactory,
 	nodeCommunicator node_communicator.Communicator,
-	scriptExecutor execution.ScriptExecutor,
+	scriptExecutor execution.IndexerScriptExecutor,
 	scriptExecMode query_mode.IndexQueryMode,
 	nodeProvider *commonrpc.ExecutionNodeIdentitiesProvider,
 	loggedScripts *lru.Cache[[md5.Size]byte, time.Time],
 	maxScriptAndArgumentSize uint,
+	executionResultProvider optimistic_sync.ExecutionResultInfoProvider,
+	executionStateCache optimistic_sync.ExecutionStateCache,
 ) (*Scripts, error) {
 	var exec executor.ScriptExecutor
 	cache := executor.NewLoggedScriptCache(log, loggedScripts)
 
 	switch scriptExecMode {
 	case query_mode.IndexQueryModeLocalOnly:
-		exec = executor.NewLocalScriptExecutor(log, metrics, scriptExecutor, cache)
+		exec = executor.NewLocalScriptExecutor(
+			log,
+			metrics,
+			scriptExecutor,
+			cache,
+			executionStateCache,
+		)
 
 	case query_mode.IndexQueryModeExecutionNodesOnly:
-		exec = executor.NewENScriptExecutor(log, metrics, nodeProvider, nodeCommunicator, connFactory, cache)
+		exec = executor.NewENScriptExecutor(
+			log,
+			metrics,
+			nodeProvider,
+			nodeCommunicator,
+			connFactory,
+			cache,
+		)
 
 	case query_mode.IndexQueryModeFailover:
-		local := executor.NewLocalScriptExecutor(log, metrics, scriptExecutor, cache)
-		execNode := executor.NewENScriptExecutor(log, metrics, nodeProvider, nodeCommunicator, connFactory, cache)
+		local := executor.NewLocalScriptExecutor(
+			log,
+			metrics,
+			scriptExecutor,
+			cache,
+			executionStateCache,
+		)
+		execNode := executor.NewENScriptExecutor(
+			log,
+			metrics,
+			nodeProvider,
+			nodeCommunicator,
+			connFactory,
+			cache,
+		)
 		exec = executor.NewFailoverScriptExecutor(local, execNode)
 
 	default:
@@ -72,6 +106,8 @@ func NewScriptsBackend(
 		state:                    state,
 		executor:                 exec,
 		maxScriptAndArgumentSize: maxScriptAndArgumentSize,
+		executionStateCache:      executionStateCache,
+		executionResultProvider:  executionResultProvider,
 	}, nil
 }
 
@@ -80,9 +116,10 @@ func (b *Scripts) ExecuteScriptAtLatestBlock(
 	ctx context.Context,
 	script []byte,
 	arguments [][]byte,
-) ([]byte, error) {
+	criteria optimistic_sync.Criteria,
+) ([]byte, accessmodel.ExecutorMetadata, error) {
 	if !commonrpc.CheckScriptSize(script, arguments, b.maxScriptAndArgumentSize) {
-		return nil, status.Error(codes.InvalidArgument, commonrpc.ErrScriptTooLarge.Error())
+		return nil, accessmodel.ExecutorMetadata{}, status.Error(codes.InvalidArgument, commonrpc.ErrScriptTooLarge.Error())
 	}
 
 	latestHeader, err := b.state.Sealed().Head()
@@ -90,11 +127,29 @@ func (b *Scripts) ExecuteScriptAtLatestBlock(
 		// the latest sealed header MUST be available
 		err := irrecoverable.NewExceptionf("failed to lookup sealed header: %w", err)
 		irrecoverable.Throw(ctx, err)
-		return nil, err
+		return nil, accessmodel.ExecutorMetadata{}, err
 	}
 
-	res, _, err := b.executor.Execute(ctx, executor.NewScriptExecutionRequest(latestHeader.ID(), latestHeader.Height, script, arguments))
-	return res, err
+	executionResultInfo, err := b.executionResultProvider.ExecutionResultInfo(
+		latestHeader.ID(),
+		criteria,
+	)
+	if err != nil {
+		return nil, accessmodel.ExecutorMetadata{}, fmt.Errorf("failed to get execution result for block ID %s: %w", latestHeader.ID(), err)
+	}
+
+	executionResultID := executionResultInfo.ExecutionResult.ID()
+	//TODO(Uliana): add constructor for ExecutorMetadata
+	metadata := accessmodel.ExecutorMetadata{
+		ExecutionResultID: executionResultID,
+		ExecutorIDs:       executionResultInfo.ExecutionNodes.NodeIDs(),
+	}
+
+	res, _, err := b.executor.Execute(
+		ctx,
+		executor.NewScriptExecutionRequest(latestHeader.ID(), latestHeader.Height, script, arguments, executionResultID),
+	)
+	return res, metadata, err
 }
 
 // ExecuteScriptAtBlockID executes provided script at the provided block ID.
@@ -103,18 +158,33 @@ func (b *Scripts) ExecuteScriptAtBlockID(
 	blockID flow.Identifier,
 	script []byte,
 	arguments [][]byte,
-) ([]byte, error) {
+	criteria optimistic_sync.Criteria,
+) ([]byte, accessmodel.ExecutorMetadata, error) {
 	if !commonrpc.CheckScriptSize(script, arguments, b.maxScriptAndArgumentSize) {
-		return nil, status.Error(codes.InvalidArgument, commonrpc.ErrScriptTooLarge.Error())
+		return nil, accessmodel.ExecutorMetadata{}, status.Error(codes.InvalidArgument, commonrpc.ErrScriptTooLarge.Error())
 	}
 
 	header, err := b.headers.ByBlockID(blockID)
 	if err != nil {
-		return nil, commonrpc.ConvertStorageError(err)
+		return nil, accessmodel.ExecutorMetadata{}, commonrpc.ConvertStorageError(err)
 	}
 
-	res, _, err := b.executor.Execute(ctx, executor.NewScriptExecutionRequest(blockID, header.Height, script, arguments))
-	return res, err
+	executionResultInfo, err := b.executionResultProvider.ExecutionResultInfo(blockID, criteria)
+	if err != nil {
+		return nil, accessmodel.ExecutorMetadata{}, fmt.Errorf("failed to get execution result for block ID %s: %w", blockID.String(), err)
+	}
+
+	executionResultID := executionResultInfo.ExecutionResult.ID()
+	metadata := accessmodel.ExecutorMetadata{
+		ExecutionResultID: executionResultID,
+		ExecutorIDs:       executionResultInfo.ExecutionNodes.NodeIDs(),
+	}
+
+	res, _, err := b.executor.Execute(
+		ctx,
+		executor.NewScriptExecutionRequest(blockID, header.Height, script, arguments, executionResultID),
+	)
+	return res, metadata, err
 }
 
 // ExecuteScriptAtBlockHeight executes provided script at the provided block height.
@@ -123,16 +193,32 @@ func (b *Scripts) ExecuteScriptAtBlockHeight(
 	blockHeight uint64,
 	script []byte,
 	arguments [][]byte,
-) ([]byte, error) {
+	criteria optimistic_sync.Criteria,
+) ([]byte, accessmodel.ExecutorMetadata, error) {
 	if !commonrpc.CheckScriptSize(script, arguments, b.maxScriptAndArgumentSize) {
-		return nil, status.Error(codes.InvalidArgument, commonrpc.ErrScriptTooLarge.Error())
+		return nil, accessmodel.ExecutorMetadata{}, status.Error(codes.InvalidArgument, commonrpc.ErrScriptTooLarge.Error())
 	}
 
 	header, err := b.headers.ByHeight(blockHeight)
 	if err != nil {
-		return nil, commonrpc.ConvertStorageError(common.ResolveHeightError(b.state.Params(), blockHeight, err))
+		return nil, accessmodel.ExecutorMetadata{}, commonrpc.ConvertStorageError(common.ResolveHeightError(b.state.Params(), blockHeight, err))
 	}
 
-	res, _, err := b.executor.Execute(ctx, executor.NewScriptExecutionRequest(header.ID(), blockHeight, script, arguments))
-	return res, err
+	executionResultInfo, err := b.executionResultProvider.ExecutionResultInfo(header.ID(), criteria)
+	if err != nil {
+		return nil, accessmodel.ExecutorMetadata{},
+			fmt.Errorf("failed to get execution result for block ID %s: %w", header.ID(), err)
+	}
+
+	executionResultID := executionResultInfo.ExecutionResult.ID()
+	metadata := accessmodel.ExecutorMetadata{
+		ExecutionResultID: executionResultID,
+		ExecutorIDs:       executionResultInfo.ExecutionNodes.NodeIDs(),
+	}
+
+	res, _, err := b.executor.Execute(
+		ctx,
+		executor.NewScriptExecutionRequest(header.ID(), blockHeight, script, arguments, executionResultID),
+	)
+	return res, metadata, err
 }

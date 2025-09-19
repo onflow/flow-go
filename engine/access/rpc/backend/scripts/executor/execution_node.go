@@ -2,6 +2,7 @@ package executor
 
 import (
 	"context"
+	"crypto/md5" //nolint:gosec
 	"time"
 
 	execproto "github.com/onflow/flow/protobuf/go/flow/execution"
@@ -18,6 +19,7 @@ import (
 	"github.com/onflow/flow-go/module"
 )
 
+// TODO(Uliana): add godoc to whole file
 type ENScriptExecutor struct {
 	log     zerolog.Logger
 	metrics module.BackendScriptsMetrics //TODO: move this metrics to scriptCache struct?
@@ -53,12 +55,13 @@ func (e *ENScriptExecutor) Execute(ctx context.Context, request *Request) ([]byt
 	// find few execution nodes which have executed the block earlier and provided an execution receipt for it
 	executors, err := e.nodeProvider.ExecutionNodesForBlockID(ctx, request.blockID)
 	if err != nil {
-		return nil, 0, status.Errorf(
-			codes.Internal, "failed to find script executors at blockId %v: %v",
-			request.blockID.String(),
-			err,
-		)
+		return nil, 0, status.Errorf(codes.Internal, "failed to find script executors at blockId %v: %v", request.blockID.String(), err)
 	}
+
+	// encode to MD5 as low compute/memory lookup key
+	// CAUTION: cryptographically insecure md5 is used here, but only to de-duplicate logs.
+	// *DO NOT* use this hash for any protocol-related or cryptographic functions.
+	insecureScriptHash := md5.Sum(request.script) //nolint:gosec
 
 	var result []byte
 	var executionTime time.Time
@@ -77,14 +80,14 @@ func (e *ENScriptExecutor) Execute(ctx context.Context, request *Request) ([]byt
 				return err
 			}
 
-			e.scriptCache.LogExecutedScript(request.blockID, request.insecureScriptHash, executionTime, node.Address, request.script, execDuration)
+			e.scriptCache.LogExecutedScript(request.blockID, insecureScriptHash, executionTime, node.Address, request.script, execDuration)
 			e.metrics.ScriptExecuted(time.Since(execStartTime), len(request.script))
 
 			return nil
 		},
 		func(node *flow.IdentitySkeleton, err error) bool {
 			if status.Code(err) == codes.InvalidArgument {
-				e.scriptCache.LogFailedScript(request.blockID, request.insecureScriptHash, executionTime, node.Address, request.script)
+				e.scriptCache.LogFailedScript(request.blockID, insecureScriptHash, executionTime, node.Address, request.script)
 				return true
 			}
 			return false
@@ -110,16 +113,17 @@ func (e *ENScriptExecutor) tryExecuteScriptOnExecutionNode(
 ) ([]byte, error) {
 	execRPCClient, closer, err := e.connFactory.GetExecutionAPIClient(executorAddress)
 	if err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to create client for execution node %s: %v",
-			executorAddress, err)
+		return nil, status.Errorf(codes.Internal, "failed to create client for execution node %s: %v", executorAddress, err)
 	}
 	defer closer.Close()
 
-	execResp, err := execRPCClient.ExecuteScriptAtBlockID(ctx, &execproto.ExecuteScriptAtBlockIDRequest{
-		BlockId:   r.blockID[:],
-		Script:    r.script,
-		Arguments: r.arguments,
-	})
+	execResp, err := execRPCClient.ExecuteScriptAtBlockID(
+		ctx, &execproto.ExecuteScriptAtBlockIDRequest{
+			BlockId:   r.blockID[:],
+			Script:    r.script,
+			Arguments: r.arguments,
+		},
+	)
 	if err != nil {
 		return nil, status.Errorf(status.Code(err), "failed to execute the script on the execution node %s: %v", executorAddress, err)
 	}

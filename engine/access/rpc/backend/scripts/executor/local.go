@@ -2,6 +2,7 @@ package executor
 
 import (
 	"context"
+	"crypto/md5" //nolint:gosec
 	"time"
 
 	"github.com/rs/zerolog"
@@ -12,15 +13,18 @@ import (
 	fvmerrors "github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/execution"
+	"github.com/onflow/flow-go/module/executiondatasync/optimistic_sync"
 	"github.com/onflow/flow-go/utils/logging"
 )
 
+// TODO(Uliana): add godoc to whole file
 type LocalScriptExecutor struct {
 	log     zerolog.Logger
 	metrics module.BackendScriptsMetrics
 
-	scriptExecutor execution.ScriptExecutor
-	scriptCache    *LoggedScriptCache
+	scriptExecutor      execution.IndexerScriptExecutor
+	scriptCache         *LoggedScriptCache
+	executionStateCache optimistic_sync.ExecutionStateCache
 }
 
 var _ ScriptExecutor = (*LocalScriptExecutor)(nil)
@@ -28,30 +32,46 @@ var _ ScriptExecutor = (*LocalScriptExecutor)(nil)
 func NewLocalScriptExecutor(
 	log zerolog.Logger,
 	metrics module.BackendScriptsMetrics,
-	executor execution.ScriptExecutor,
+	executor execution.IndexerScriptExecutor,
 	scriptCache *LoggedScriptCache,
+	executionStateCache optimistic_sync.ExecutionStateCache,
 ) *LocalScriptExecutor {
 	return &LocalScriptExecutor{
-		log:            zerolog.New(log).With().Str("script_executor", "local").Logger(),
-		metrics:        metrics,
-		scriptCache:    scriptCache,
-		scriptExecutor: executor,
+		log:                 zerolog.New(log).With().Str("script_executor", "local").Logger(),
+		metrics:             metrics,
+		scriptCache:         scriptCache,
+		scriptExecutor:      executor,
+		executionStateCache: executionStateCache,
 	}
 }
 
-func (l *LocalScriptExecutor) Execute(ctx context.Context, r *Request) ([]byte, time.Duration, error) {
+func (l *LocalScriptExecutor) Execute(
+	ctx context.Context,
+	r *Request,
+) ([]byte, time.Duration, error) {
 	execStartTime := time.Now()
 
-	result, err := l.scriptExecutor.ExecuteAtBlockHeight(ctx, r.script, r.arguments, r.height)
+	result, err := l.scriptExecutor.ExecuteAtBlockHeight(
+		ctx,
+		r.script,
+		r.arguments,
+		r.height,
+		//r.executionResultID,
+	)
 
 	execEndTime := time.Now()
 	execDuration := execEndTime.Sub(execStartTime)
+
+	// encode to MD5 as low compute/memory lookup key
+	// CAUTION: cryptographically insecure md5 is used here, but only to de-duplicate logs.
+	// *DO NOT* use this hash for any protocol-related or cryptographic functions.
+	insecureScriptHash := md5.Sum(r.script) //nolint:gosec
 
 	log := l.log.With().
 		Str("script_executor_addr", "localhost").
 		Hex("block_id", logging.ID(r.blockID)).
 		Uint64("height", r.height).
-		Hex("script_hash", r.insecureScriptHash[:]).
+		Hex("script_hash", insecureScriptHash[:]).
 		Dur("execution_dur_ms", execDuration).
 		Logger()
 
@@ -60,7 +80,7 @@ func (l *LocalScriptExecutor) Execute(ctx context.Context, r *Request) ([]byte, 
 
 		switch status.Code(convertedErr) {
 		case codes.InvalidArgument, codes.Canceled, codes.DeadlineExceeded:
-			l.scriptCache.LogFailedScript(r.blockID, r.insecureScriptHash, execEndTime, "localhost", r.script)
+			l.scriptCache.LogFailedScript(r.blockID, insecureScriptHash, execEndTime, "localhost", r.script)
 
 		default:
 			log.Debug().Err(err).Msg("script execution failed")
@@ -70,7 +90,7 @@ func (l *LocalScriptExecutor) Execute(ctx context.Context, r *Request) ([]byte, 
 		return nil, execDuration, convertedErr
 	}
 
-	l.scriptCache.LogExecutedScript(r.blockID, r.insecureScriptHash, execEndTime, "localhost", r.script, execDuration)
+	l.scriptCache.LogExecutedScript(r.blockID, insecureScriptHash, execEndTime, "localhost", r.script, execDuration)
 	l.metrics.ScriptExecuted(execDuration, len(r.script))
 
 	return result, execDuration, nil
