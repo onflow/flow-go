@@ -261,21 +261,6 @@ func TestGetEvents_ParseExecutionState(t *testing.T) {
 		).
 		Return(expectedBlockEvents, access.ExecutorMetadata{}, nil)
 
-	//
-	//request := buildRequest(
-	//	t,
-	//	eventType,
-	//	"0",
-	//	fmt.Sprint(endHeight),
-	//	[]string{},
-	//	"",
-	//	[]string{},
-	//	"",
-	//)
-	//
-	//expectedResponseBody := buildExpectedResponse(t, expectedBlockEvents, false)
-	//router.AssertOKResponse(t, request, expectedResponseBody, backend)
-
 	t.Run("empty execution state query", func(t *testing.T) {
 		request := buildRequest(
 			t,
