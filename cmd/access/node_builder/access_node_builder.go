@@ -1941,6 +1941,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 			if err != nil {
 				return nil, fmt.Errorf("could not initialize backend: %w", err)
 			}
+			builder.nodeBackend = nodeBackend
 
 			// If execution data syncing and indexing is disabled, pass nil indexReporter
 			var indexReporter state_synchronization.IndexReporter
@@ -2052,6 +2053,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 		}).
 		AdminCommand("backfill-tx-error-messages", func(config *cmd.NodeConfig) commands.AdminCommand {
 			return storageCommands.NewBackfillTxErrorMessagesCommand(
+				builder.Logger,
 				builder.State,
 				builder.TxResultErrorMessagesCore,
 			)

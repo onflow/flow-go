@@ -152,6 +152,7 @@ func (suite *BackfillTxErrorMessagesSuite) SetupTest() {
 	)
 
 	suite.command = NewBackfillTxErrorMessagesCommand(
+		suite.log,
 		suite.state,
 		suite.txResultErrorMessagesCore,
 	)
@@ -441,6 +442,7 @@ func (suite *BackfillTxErrorMessagesSuite) TestHandleBackfillTxErrorMessagesErro
 	suite.Run("error when txErrorMessagesCore is nil", func() {
 		req := &admin.CommandRequest{Data: map[string]interface{}{}}
 		command := NewBackfillTxErrorMessagesCommand(
+			suite.log,
 			suite.state,
 			nil,
 		)
