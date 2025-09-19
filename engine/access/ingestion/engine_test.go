@@ -310,6 +310,9 @@ func (s *Suite) TestOnFinalizedBlockSingle() {
 		}).Once()
 	}
 
+	// force should be called once
+	s.request.On("Force").Return()
+
 	// process the block through the finalized callback
 	eng.OnFinalizedBlock(&hotstuffBlock)
 
@@ -375,6 +378,9 @@ func (s *Suite) TestOnFinalizedBlockSeveralBlocksAhead() {
 				wg.Done()
 			}).Once()
 		}
+		// force should be called once
+		s.request.On("Force").Return()
+
 		for _, seal := range block.Payload.Seals {
 			s.results.On("Index", seal.BlockID, seal.ResultID).Return(nil).Once()
 		}
@@ -717,6 +723,9 @@ func (s *Suite) TestProcessBackgroundCalls() {
 				s.request.On("EntityByID", cg.CollectionID, mock.Anything).Return().Once()
 			}
 		}
+
+		// force should be called once
+		s.request.On("Force").Return()
 
 		err := syncer.requestMissingCollections()
 		s.Require().NoError(err)
