@@ -38,7 +38,6 @@ func init() {
 	_ = Cmd.MarkFlagRequired("block-hash")
 
 	common.InitDataDirFlag(Cmd, &flagDatadir)
-	_ = Cmd.MarkFlagRequired("datadir")
 
 	Cmd.Flags().StringVar(&flagStateCommitment, "state-commitment", "",
 		"state commitment (hex-encoded, 64 characters)")

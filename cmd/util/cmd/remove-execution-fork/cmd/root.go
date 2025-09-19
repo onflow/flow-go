@@ -29,8 +29,7 @@ func Execute() {
 }
 
 func init() {
-	RootCmd.PersistentFlags().StringVarP(&flagDatadir, "datadir", "d", common.DefaultProtocolDBDir, "directory to the protocol dababase")
-	_ = RootCmd.MarkPersistentFlagRequired("datadir")
+	common.InitDataDirFlag(RootCmd, &flagDatadir)
 
 	cobra.OnInitialize(initConfig)
 }

@@ -30,7 +30,6 @@ var Cmd = &cobra.Command{
 
 func init() {
 	common.InitDataDirFlag(Cmd, &flagDatadir)
-	_ = Cmd.MarkPersistentFlagRequired("datadir")
 
 	Cmd.Flags().Uint64Var(&flagEndHeight, "end-height", 0, "the last block height checks for result consistency")
 	Cmd.Flags().Uint64Var(&flagStartHeight, "start-height", 0, "the first block height checks for result consistency")

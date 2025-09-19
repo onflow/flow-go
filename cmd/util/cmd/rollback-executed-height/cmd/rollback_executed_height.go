@@ -20,7 +20,7 @@ import (
 
 var (
 	flagHeight           uint64
-	flagDataDir          string
+	flagDatadir          string
 	flagChunkDataPackDir string
 )
 
@@ -37,9 +37,7 @@ func init() {
 		"the height of the block to update the highest executed height")
 	_ = Cmd.MarkFlagRequired("height")
 
-	Cmd.Flags().StringVar(&flagDataDir, "datadir", "",
-		"directory that stores the protocol state")
-	_ = Cmd.MarkFlagRequired("datadir")
+	common.InitDataDirFlag(Cmd, &flagDatadir)
 
 	Cmd.Flags().StringVar(&flagChunkDataPackDir, "chunk_data_pack_dir", "/var/flow/data/chunk_data_pack",
 		"directory that stores the protocol state")
@@ -50,7 +48,7 @@ func runE(*cobra.Command, []string) error {
 	lockManager := storage.MakeSingletonLockManager()
 
 	log.Info().
-		Str("datadir", flagDataDir).
+		Str("datadir", flagDatadir).
 		Str("chunk_data_pack_dir", flagChunkDataPackDir).
 		Uint64("height", flagHeight).
 		Msg("flags")
@@ -61,7 +59,7 @@ func runE(*cobra.Command, []string) error {
 		return fmt.Errorf("height must be above 0: %v", flagHeight)
 	}
 
-	db, err := common.InitStorage(flagDataDir)
+	db, err := common.InitStorage(flagDatadir)
 	if err != nil {
 		return err
 	}
