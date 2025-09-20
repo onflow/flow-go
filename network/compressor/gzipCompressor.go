@@ -1,9 +1,9 @@
 package compressor
 
 import (
-	"compress/gzip"
 	"io"
 
+	"github.com/klauspost/compress/gzip"
 	"github.com/onflow/flow-go/network"
 )
 

@@ -13,12 +13,13 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/insecure"
-	_ "google.golang.org/grpc/encoding/gzip" //required for gRPC compression
 	"google.golang.org/grpc/keepalive"
 	"google.golang.org/grpc/status"
 
 	_ "github.com/onflow/flow-go/engine/common/grpc/compressor/deflate" //required for gRPC compression
+	_ "github.com/onflow/flow-go/engine/common/grpc/compressor/gzip"    //required for gRPC compression
 	_ "github.com/onflow/flow-go/engine/common/grpc/compressor/snappy"  //required for gRPC compression
+	_ "github.com/onflow/flow-go/engine/common/grpc/compressor/zstd"    //required for gRPC compression
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/utils/grpcutils"
 )

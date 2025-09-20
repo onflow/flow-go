@@ -2,7 +2,6 @@ package exporter
 
 import (
 	"bufio"
-	"compress/gzip"
 	"encoding/hex"
 	"errors"
 	"fmt"
@@ -10,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/klauspost/compress/gzip"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
