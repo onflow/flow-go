@@ -3,7 +3,6 @@ package access
 import (
 	"context"
 	"fmt"
-	"io"
 	"os"
 	"testing"
 	"time"
@@ -184,22 +183,6 @@ func (suite *IrrecoverableStateTestSuite) SetupTest() {
 	assert.NoError(suite.T(), err)
 	suite.rpcEng, err = rpcEngBuilder.WithLegacy().Build()
 	assert.NoError(suite.T(), err)
-
-	err = fmt.Errorf("inconsistent node's state")
-	signCtxErr := irrecoverable.NewExceptionf("failed to lookup sealed header: %w", err)
-	ctx := irrecoverable.NewMockSignalerContextExpectError(suite.T(), context.Background(), signCtxErr)
-
-	suite.rpcEng.Start(ctx)
-
-	suite.secureGrpcServer.Start(ctx)
-	suite.unsecureGrpcServer.Start(ctx)
-
-	// wait for the servers to startup
-	unittest.AssertClosesBefore(suite.T(), suite.secureGrpcServer.Ready(), 2*time.Second)
-	unittest.AssertClosesBefore(suite.T(), suite.unsecureGrpcServer.Ready(), 2*time.Second)
-
-	// wait for the engine to startup
-	unittest.AssertClosesBefore(suite.T(), suite.rpcEng.Ready(), 2*time.Second)
 }
 
 func TestIrrecoverableState(t *testing.T) {
@@ -208,14 +191,16 @@ func TestIrrecoverableState(t *testing.T) {
 
 // TestGRPCInconsistentNodeState tests the behavior when gRPC encounters an inconsistent node state.
 func (suite *IrrecoverableStateTestSuite) TestGRPCInconsistentNodeState() {
-	err := fmt.Errorf("inconsistent node's state")
+	err := fmt.Errorf("inconsistent node state")
 	suite.snapshot.On("Head").Return(nil, err)
 
-	conn, err := grpc.Dial(
+	suite.startServers(suite.T(), irrecoverable.NewExceptionf("failed to lookup sealed header: %w", err))
+
+	conn, err := grpc.NewClient(
 		suite.unsecureGrpcServer.GRPCAddress().String(),
 		grpc.WithTransportCredentials(insecure.NewCredentials()))
 	assert.NoError(suite.T(), err)
-	defer io.Closer(conn).Close()
+	defer conn.Close()
 
 	client := accessproto.NewAccessAPIClient(conn)
 
@@ -242,8 +227,10 @@ func (suite *IrrecoverableStateTestSuite) TestRestInconsistentNodeState() {
 	suite.blocks.On("ByID", block.ID()).Return(block, nil)
 	suite.headers.On("BlockIDByHeight", block.Height).Return(block.ID(), nil)
 
-	err := fmt.Errorf("inconsistent node's state")
+	err := fmt.Errorf("inconsistent node state")
 	suite.snapshot.On("Head").Return(nil, err)
+
+	suite.startServers(suite.T(), fmt.Errorf("failed to lookup sealed header: %w", err))
 
 	config := restclient.NewConfiguration()
 	config.BasePath = fmt.Sprintf("http://%s/v1", suite.rpcEng.RestApiAddress().String())
@@ -263,4 +250,20 @@ func optionsForBlocksIdGetOpts() *restclient.BlocksApiBlocksIdGetOpts {
 		Expand:  optional.NewInterface([]string{router.ExpandableFieldPayload}),
 		Select_: optional.NewInterface([]string{"header.id"}),
 	}
+}
+
+func (suite *IrrecoverableStateTestSuite) startServers(t *testing.T, expectedError error) {
+	ctx := irrecoverable.NewMockSignalerContextExpectError(suite.T(), context.Background(), expectedError)
+
+	suite.rpcEng.Start(ctx)
+
+	suite.secureGrpcServer.Start(ctx)
+	suite.unsecureGrpcServer.Start(ctx)
+
+	// wait for the servers to startup
+	unittest.AssertClosesBefore(suite.T(), suite.secureGrpcServer.Ready(), 2*time.Second)
+	unittest.AssertClosesBefore(suite.T(), suite.unsecureGrpcServer.Ready(), 2*time.Second)
+
+	// wait for the engine to startup
+	unittest.AssertClosesBefore(suite.T(), suite.rpcEng.Ready(), 2*time.Second)
 }

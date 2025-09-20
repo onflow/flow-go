@@ -8,20 +8,22 @@ import (
 	"github.com/onflow/flow-go/storage"
 )
 
-// ResolveHeightError processes errors returned during height-based queries.
-// If the error is due to a block not being found, this function determines whether the queried
-// height falls outside the node's accessible range and provides context-sensitive error messages
-// based on spork and node root block heights.
+// ResolveHeightError wraps storage.ErrNotFound errors returned during height-based queries with
+// additional context about why the data was not found.
 //
-// Expected errors during normal operation:
-// - storage.ErrNotFound - Indicates that the queried block does not exist in the local database.
+// Specifically, this function determines whether the queried height falls outside the node's
+// accessible range and provides context-sensitive error messages based on spork and node root block
+// heights.
+//
+// Will return the original error, possibly wrapped with additional context.
+// CAUTION: this function might return irrecoverable errors or generic fatal from the lower protocol layers
 func ResolveHeightError(
 	stateParams protocol.Params,
 	height uint64,
-	genericErr error,
+	err error,
 ) error {
-	if !errors.Is(genericErr, storage.ErrNotFound) {
-		return genericErr
+	if !errors.Is(err, storage.ErrNotFound) {
+		return err
 	}
 
 	sporkRootBlockHeight := stateParams.SporkRootBlockHeight()
@@ -31,15 +33,17 @@ func ResolveHeightError(
 		return fmt.Errorf("block height %d is less than the spork root block height %d. Try to use a historic node: %w",
 			height,
 			sporkRootBlockHeight,
-			genericErr,
+			err,
 		)
-	} else if height < nodeRootBlockHeader {
+	}
+
+	if height < nodeRootBlockHeader {
 		return fmt.Errorf("block height %d is less than the node's root block height %d. Try to use a different Access node: %w",
 			height,
 			nodeRootBlockHeader,
-			genericErr,
+			err,
 		)
-	} else {
-		return genericErr
 	}
+
+	return err
 }
