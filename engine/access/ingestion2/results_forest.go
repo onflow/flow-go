@@ -128,6 +128,10 @@ var (
 //     might already have sealed further blocks, some of which might not have been ingested by the ResultsForest yet.
 //     This is another case, where the ResultsForest's local notion lags behind the protocol's global view, which
 //     is fine as long as the forest eventually receives the result and is told that it is sealed.
+//   - 𝓱 defines the upper bound of views that can be accepted by the ResultsForest. In a failure scenario,
+//     it is possible for a large number of views to be skipped by the protocol. To guarantee liveness, the
+//     forest must handle this case by allowing insertion of results whose view is greater than 𝓱,
+//     if and only if 𝓹 is the result's first degree ancestor.
 //   - The ResultsForest is an information-driven system and information is idempotent. Inputs are information about
 //     the protocol's global view rather than commands for the ResultsForest to do a certain thing. As illustration,
 //     consider a Alice walking up to a cliff. Telling Alice that "it is safe to walk up to 3m before the cliff"
@@ -496,7 +500,9 @@ func (rf *ResultsForest) getOrCreateContainer(result *flow.ExecutionResult, bloc
 	}
 
 	// check invariant: the result's block view must be less than or equal to the view horizon 𝓱
-	if executedBlock.View > rf.forest.LowestLevel+rf.maxViewDelta {
+	// handle the corner case where maxViewDelta views are skipped by allowing insertion if and only if
+	// the result's parent is the latest persisted sealed result.
+	if executedBlock.View > rf.forest.LowestLevel+rf.maxViewDelta && executedBlock.ParentView != rf.forest.LowestLevel {
 		rf.rejectedResults = true
 		return nil, ErrMaxViewDeltaExceeded
 	}
