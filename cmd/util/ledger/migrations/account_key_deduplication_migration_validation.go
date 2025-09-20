@@ -13,10 +13,14 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-func validateAccountPublicKeyV4(
+func ValidateAccountPublicKeyV4(
 	address common.Address,
 	accountRegisters *registers.AccountRegisters,
 ) error {
+	// Skip empty address because it doesn't have account status register.
+	if len(address) == 0 || address == common.ZeroAddress {
+		return nil
+	}
 
 	// Validate account status register
 	accountPublicKeyCount, storedKeyCount, deduplicated, err := validateAccountStatusV4Register(address, accountRegisters)
@@ -90,7 +94,7 @@ func validateAccountStatusV4Register(
 	deduplicated bool,
 	err error,
 ) {
-	owner := string(address[:])
+	owner := flow.AddressToRegisterOwner(flow.Address(address[:]))
 
 	encodedAccountStatus, err := accountRegisters.Get(owner, flow.AccountStatusKey)
 	if err != nil {

@@ -98,6 +98,7 @@ func NewAccountPublicKeyDeduplicationMigration(
 		chainID:   chainID,
 		reporter:  rwf.ReportWriter("account-public-key-deduplication-migration_summary"),
 		outputDir: outputDir,
+		validate:  validate,
 	}
 
 	if validate {
@@ -131,7 +132,7 @@ func (m *AccountPublicKeyDeduplicationMigration) MigrateAccount(
 	}
 
 	if m.validate {
-		err := validateAccountPublicKeyV4(address, accountRegisters)
+		err := ValidateAccountPublicKeyV4(address, accountRegisters)
 		if err != nil {
 			m.validationReporter.Write(validationError{
 				Address: address.Hex(),
