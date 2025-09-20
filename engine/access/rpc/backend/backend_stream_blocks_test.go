@@ -62,6 +62,7 @@ type testType struct {
 	highestBackfill int
 	startValue      interface{}
 	blockStatus     flow.BlockStatus
+	expectedBlocks  []*flow.Block
 }
 
 func TestBackendBlocksSuite(t *testing.T) {
@@ -70,7 +71,7 @@ func TestBackendBlocksSuite(t *testing.T) {
 
 // SetupTest initializes the test suite with required dependencies.
 func (s *BackendBlocksSuite) SetupTest() {
-	s.log = zerolog.New(zerolog.NewConsoleWriter())
+	s.log = unittest.Logger()
 	s.state = new(protocol.State)
 	s.snapshot = new(protocol.Snapshot)
 	header := unittest.BlockHeaderFixture()
@@ -98,6 +99,7 @@ func (s *BackendBlocksSuite) SetupTest() {
 	parent := s.rootBlock.ToHeader()
 	s.blockMap[s.rootBlock.Height] = s.rootBlock
 
+	s.T().Logf("Generating %d blocks, root block: %d %s", blockCount, s.rootBlock.Height, s.rootBlock.ID())
 	for i := 0; i < blockCount; i++ {
 		block := unittest.BlockWithParentFixture(parent)
 		// update for next iteration
@@ -105,6 +107,7 @@ func (s *BackendBlocksSuite) SetupTest() {
 
 		s.blocksArray = append(s.blocksArray, block)
 		s.blockMap[block.Height] = block
+		s.T().Logf("Adding block %d %s", block.Height, block.ID())
 	}
 
 	s.headers.On("ByBlockID", mock.AnythingOfType("flow.Identifier")).Return(
@@ -176,26 +179,33 @@ func (s *BackendBlocksSuite) backendParams() Params {
 // starting from a specified block ID. It is designed to test the subscription functionality when the subscription
 // starts from a custom block ID, either sealed or finalized.
 func (s *BackendBlocksSuite) subscribeFromStartBlockIdTestCases() []testType {
+	expectedFromRoot := []*flow.Block{s.rootBlock}
+	expectedFromRoot = append(expectedFromRoot, s.blocksArray...)
+
 	baseTests := []testType{
 		{
 			name:            "happy path - all new blocks",
 			highestBackfill: -1, // no backfill
 			startValue:      s.rootBlock.ID(),
+			expectedBlocks:  expectedFromRoot,
 		},
 		{
 			name:            "happy path - partial backfill",
 			highestBackfill: 2, // backfill the first 3 blocks
 			startValue:      s.blocksArray[0].ID(),
+			expectedBlocks:  s.blocksArray,
 		},
 		{
 			name:            "happy path - complete backfill",
 			highestBackfill: len(s.blocksArray) - 1, // backfill all blocks
 			startValue:      s.blocksArray[0].ID(),
+			expectedBlocks:  s.blocksArray,
 		},
 		{
 			name:            "happy path - start from root block by id",
 			highestBackfill: len(s.blocksArray) - 1, // backfill all blocks
 			startValue:      s.rootBlock.ID(),       // start from root block
+			expectedBlocks:  expectedFromRoot,
 		},
 	}
 
@@ -206,26 +216,33 @@ func (s *BackendBlocksSuite) subscribeFromStartBlockIdTestCases() []testType {
 // starting from a specified block height. It is designed to test the subscription functionality when the subscription
 // starts from a custom height, either sealed or finalized.
 func (s *BackendBlocksSuite) subscribeFromStartHeightTestCases() []testType {
+	expectedFromRoot := []*flow.Block{s.rootBlock}
+	expectedFromRoot = append(expectedFromRoot, s.blocksArray...)
+
 	baseTests := []testType{
 		{
 			name:            "happy path - all new blocks",
 			highestBackfill: -1, // no backfill
 			startValue:      s.rootBlock.Height,
+			expectedBlocks:  expectedFromRoot,
 		},
 		{
 			name:            "happy path - partial backfill",
 			highestBackfill: 2, // backfill the first 3 blocks
 			startValue:      s.blocksArray[0].Height,
+			expectedBlocks:  s.blocksArray,
 		},
 		{
 			name:            "happy path - complete backfill",
 			highestBackfill: len(s.blocksArray) - 1, // backfill all blocks
 			startValue:      s.blocksArray[0].Height,
+			expectedBlocks:  s.blocksArray,
 		},
 		{
 			name:            "happy path - start from root block by id",
 			highestBackfill: len(s.blocksArray) - 1, // backfill all blocks
 			startValue:      s.rootBlock.Height,     // start from root block
+			expectedBlocks:  expectedFromRoot,
 		},
 	}
 
@@ -236,18 +253,24 @@ func (s *BackendBlocksSuite) subscribeFromStartHeightTestCases() []testType {
 // starting from the latest sealed block. It is designed to test the subscription functionality when the subscription
 // starts from the latest available block, either sealed or finalized.
 func (s *BackendBlocksSuite) subscribeFromLatestTestCases() []testType {
+	expectedFromRoot := []*flow.Block{s.rootBlock}
+	expectedFromRoot = append(expectedFromRoot, s.blocksArray...)
+
 	baseTests := []testType{
 		{
 			name:            "happy path - all new blocks",
 			highestBackfill: -1, // no backfill
+			expectedBlocks:  expectedFromRoot,
 		},
 		{
 			name:            "happy path - partial backfill",
 			highestBackfill: 2, // backfill the first 3 blocks
+			expectedBlocks:  expectedFromRoot,
 		},
 		{
 			name:            "happy path - complete backfill",
 			highestBackfill: len(s.blocksArray) - 1, // backfill all blocks
+			expectedBlocks:  expectedFromRoot,
 		},
 	}
 
@@ -396,7 +419,7 @@ func (s *BackendBlocksSuite) subscribe(
 			sub := subscribeFn(subCtx, test.startValue, test.blockStatus)
 
 			// loop over all blocks
-			for i, b := range s.blocksArray {
+			for i, b := range test.expectedBlocks {
 				s.T().Logf("checking block %d %v %d", i, b.ID(), b.Height)
 
 				// simulate new block received.
@@ -440,7 +463,7 @@ func (s *BackendBlocksSuite) requireBlocks(v interface{}, expectedBlock *flow.Bl
 	actualBlock, ok := v.(*flow.Block)
 	require.True(s.T(), ok, "unexpected response type: %T", v)
 
-	s.Require().Equal(expectedBlock.Height, actualBlock.Height)
+	s.Require().Equalf(expectedBlock.Height, actualBlock.Height, "expected block height %d, got %d", expectedBlock.Height, actualBlock.Height)
 	s.Require().Equal(expectedBlock.ID(), actualBlock.ID())
 	s.Require().Equal(*expectedBlock, *actualBlock)
 }

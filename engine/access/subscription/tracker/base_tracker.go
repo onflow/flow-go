@@ -18,7 +18,6 @@ import (
 // BaseTracker is an interface for a tracker that provides base GetStartHeight method related to both blocks and execution data tracking.
 type BaseTracker interface {
 	// GetStartHeightFromBlockID returns the start height based on the provided starting block ID.
-	// If the start block is the root block, skip it and begin from the next block.
 	//
 	// Parameters:
 	// - startBlockID: The identifier of the starting block.
@@ -33,7 +32,6 @@ type BaseTracker interface {
 	GetStartHeightFromBlockID(flow.Identifier) (uint64, error)
 
 	// GetStartHeightFromHeight returns the start height based on the provided starting block height.
-	// If the start block is the root block, skip it and begin from the next block.
 	//
 	// Parameters:
 	// - startHeight: The height of the starting block.
@@ -48,7 +46,6 @@ type BaseTracker interface {
 	GetStartHeightFromHeight(uint64) (uint64, error)
 
 	// GetStartHeightFromLatest returns the start height based on the latest sealed block.
-	// If the start block is the root block, skip it and begin from the next block.
 	//
 	// Parameters:
 	// - ctx: Context for the operation.
@@ -88,7 +85,6 @@ func NewBaseTrackerImpl(
 }
 
 // GetStartHeightFromBlockID returns the start height based on the provided starting block ID.
-// If the start block is the root block, skip it and begin from the next block.
 //
 // Parameters:
 // - startBlockID: The identifier of the starting block.
@@ -107,11 +103,10 @@ func (b *BaseTrackerImpl) GetStartHeightFromBlockID(startBlockID flow.Identifier
 	}
 
 	// ensure that the resolved start height is available
-	return b.checkStartHeight(header.Height), nil
+	return header.Height, nil
 }
 
 // GetStartHeightFromHeight returns the start height based on the provided starting block height.
-// If the start block is the root block, skip it and begin from the next block.
 //
 // Parameters:
 // - startHeight: The height of the starting block.
@@ -134,11 +129,10 @@ func (b *BaseTrackerImpl) GetStartHeightFromHeight(startHeight uint64) (uint64, 
 	}
 
 	// ensure that the resolved start height is available
-	return b.checkStartHeight(header.Height), nil
+	return header.Height, nil
 }
 
 // GetStartHeightFromLatest returns the start height based on the latest sealed block.
-// If the start block is the root block, skip it and begin from the next block.
 //
 // Parameters:
 // - ctx: Context for the operation.
@@ -155,24 +149,5 @@ func (b *BaseTrackerImpl) GetStartHeightFromLatest(ctx context.Context) (uint64,
 		return 0, err
 	}
 
-	return b.checkStartHeight(header.Height), nil
-}
-
-// checkStartHeight validates the provided start height and adjusts it if necessary.
-// If the start block is the root block, skip it and begin from the next block.
-//
-// Parameters:
-// - height: The start height to be checked.
-//
-// Returns:
-// - uint64: The adjusted start height.
-//
-// No errors are expected during normal operation.
-func (b *BaseTrackerImpl) checkStartHeight(height uint64) uint64 {
-	// if the start block is the root block, skip it and begin from the next block.
-	if height == b.rootBlockHeight {
-		height = b.rootBlockHeight + 1
-	}
-
-	return height
+	return header.Height, nil
 }

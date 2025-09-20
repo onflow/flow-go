@@ -38,7 +38,6 @@ type ExecutionDataTracker interface {
 	// Only one of startBlockID and startHeight may be set. Otherwise, an InvalidArgument error is returned.
 	// If a block is provided and does not exist, a NotFound error is returned.
 	// If neither startBlockID nor startHeight is provided, the latest sealed block is used.
-	// If the start block is the root block, skip it and begin from the next block.
 	//
 	// Parameters:
 	// - ctx: Context for the operation.
@@ -117,7 +116,6 @@ func NewExecutionDataTracker(
 // Only one of startBlockID and startHeight may be set. Otherwise, an InvalidArgument error is returned.
 // If a block is provided and does not exist, a NotFound error is returned.
 // If neither startBlockID nor startHeight is provided, the latest sealed block is used.
-// If the start block is the root block, skip it and begin from the next block.
 //
 // Parameters:
 // - ctx: Context for the operation.
