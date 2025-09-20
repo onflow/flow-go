@@ -10,7 +10,6 @@ import (
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/operation"
-	"github.com/onflow/flow-go/storage/procedure"
 )
 
 // Headers implements a simple read-only header storage around a DB.
@@ -188,7 +187,7 @@ func (h *Headers) BlockIDByHeight(height uint64) (flow.Identifier, error) {
 // CAUTION: this method is not backed by a cache and therefore comparatively slow!
 func (h *Headers) ByParentID(parentID flow.Identifier) ([]*flow.Header, error) {
 	var blockIDs flow.IdentifierList
-	err := procedure.LookupBlockChildren(h.db.Reader(), parentID, &blockIDs)
+	err := operation.RetrieveBlockChildren(h.db.Reader(), parentID, &blockIDs)
 	if err != nil {
 		return nil, fmt.Errorf("could not look up children: %w", err)
 	}

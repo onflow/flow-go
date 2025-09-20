@@ -14,7 +14,6 @@ import (
 	"github.com/onflow/flow-go/state/protocol/protocol_state/kvstore"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/operation"
-	"github.com/onflow/flow-go/storage/procedure"
 )
 
 // Snapshot implements the protocol.Snapshot interface.
@@ -308,7 +307,7 @@ func (s *Snapshot) Descendants() ([]flow.Identifier, error) {
 
 func (s *Snapshot) lookupChildren(blockID flow.Identifier) ([]flow.Identifier, error) {
 	var children flow.IdentifierList
-	err := procedure.LookupBlockChildren(s.state.db.Reader(), blockID, &children)
+	err := operation.RetrieveBlockChildren(s.state.db.Reader(), blockID, &children)
 	if err != nil {
 		return nil, fmt.Errorf("could not get children of block %v: %w", blockID, err)
 	}

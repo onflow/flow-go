@@ -65,7 +65,7 @@ func InsertClusterBlock(lctx lockctx.Proof, rw storage.ReaderBatchWriter, propos
 	}
 
 	// index the child block for recovery; without further overwrite checks (see above for explanation)
-	err = IndexNewClusterBlock(lctx, rw, blockID, proposal.Block.ParentID)
+	err = operation.IndexNewClusterBlock(lctx, rw, blockID, proposal.Block.ParentID)
 	if err != nil {
 		return fmt.Errorf("could not index new cluster block block: %w", err)
 	}
