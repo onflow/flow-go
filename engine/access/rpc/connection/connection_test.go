@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	lru "github.com/hashicorp/golang-lru/v2"
+	"github.com/hashicorp/golang-lru/v2/simplelru"
 	"github.com/onflow/flow/protobuf/go/flow/access"
 	"github.com/onflow/flow/protobuf/go/flow/execution"
 	"github.com/sony/gobreaker"
@@ -151,8 +151,7 @@ func TestProxyAccessAPIConnectionReuse(t *testing.T) {
 	connectionFactory.CollectionConfig.GRPCPort = cn.port
 
 	// set the connection pool cache size
-	cacheSize := 1
-	connectionCache, err := NewCache(logger, metrics, cacheSize)
+	connectionCache, err := NewCache(logger, metrics, 1)
 	require.NoError(t, err)
 
 	// set metrics reporting
@@ -176,10 +175,10 @@ func TestProxyAccessAPIConnectionReuse(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Nil(t, closer.Close())
 
-	var conn *grpc.ClientConn
 	res, ok := connectionCache.cache.Get(proxyConnectionFactory.targetAddress)
 	assert.True(t, ok)
-	conn = res.ClientConn()
+	conn, err := res.clientConn()
+	assert.NoError(t, err)
 
 	// check if api client can be rebuilt with retrieved connection
 	accessAPIClient := access.NewAccessAPIClient(conn)
@@ -213,8 +212,7 @@ func TestProxyExecutionAPIConnectionReuse(t *testing.T) {
 	connectionFactory.ExecutionConfig.GRPCPort = en.port
 
 	// set the connection pool cache size
-	cacheSize := 5
-	connectionCache, err := NewCache(logger, metrics, cacheSize)
+	connectionCache, err := NewCache(logger, metrics, 5)
 	require.NoError(t, err)
 
 	// set metrics reporting
@@ -238,10 +236,10 @@ func TestProxyExecutionAPIConnectionReuse(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Nil(t, closer.Close())
 
-	var conn *grpc.ClientConn
 	res, ok := connectionCache.cache.Get(proxyConnectionFactory.targetAddress)
 	assert.True(t, ok)
-	conn = res.ClientConn()
+	conn, err := res.clientConn()
+	assert.NoError(t, err)
 
 	// check if api client can be rebuilt with retrieved connection
 	executionAPIClient := execution.NewExecutionAPIClient(conn)
@@ -281,8 +279,7 @@ func TestExecutionNodeClientTimeout(t *testing.T) {
 	connectionFactory.ExecutionConfig.Timeout = timeout
 
 	// set the connection pool cache size
-	cacheSize := 5
-	connectionCache, err := NewCache(logger, metrics, cacheSize)
+	connectionCache, err := NewCache(logger, metrics, 5)
 	require.NoError(t, err)
 
 	// set metrics reporting
@@ -337,8 +334,7 @@ func TestCollectionNodeClientTimeout(t *testing.T) {
 	connectionFactory.CollectionConfig.Timeout = timeout
 
 	// set the connection pool cache size
-	cacheSize := 5
-	connectionCache, err := NewCache(logger, metrics, cacheSize)
+	connectionCache, err := NewCache(logger, metrics, 5)
 	require.NoError(t, err)
 
 	// set metrics reporting
@@ -384,8 +380,7 @@ func TestConnectionPoolFull(t *testing.T) {
 	connectionFactory.CollectionConfig.GRPCPort = cn1.port
 
 	// set the connection pool cache size
-	cacheSize := 2
-	connectionCache, err := NewCache(logger, metrics, cacheSize)
+	connectionCache, err := NewCache(logger, metrics, 2)
 	require.NoError(t, err)
 
 	// set metrics reporting
@@ -467,8 +462,7 @@ func TestConnectionPoolStale(t *testing.T) {
 	connectionFactory.CollectionConfig.GRPCPort = cn.port
 
 	// set the connection pool cache size
-	cacheSize := 5
-	connectionCache, err := NewCache(logger, metrics, cacheSize)
+	connectionCache, err := NewCache(logger, metrics, 5)
 	require.NoError(t, err)
 
 	// set metrics reporting
@@ -493,8 +487,7 @@ func TestConnectionPoolStale(t *testing.T) {
 	// close connection to simulate something "going wrong" with our stored connection
 	cachedClient, _ := connectionCache.cache.Get(proxyConnectionFactory.targetAddress)
 
-	cachedClient.Invalidate()
-	cachedClient.Close()
+	connectionCache.Invalidate(cachedClient)
 
 	ctx := context.Background()
 	// make the call to the collection node (should fail, connection closed)
@@ -505,10 +498,10 @@ func TestConnectionPoolStale(t *testing.T) {
 	_, _, _ = proxyConnectionFactory.GetCollectionAPIClient("foo", nil)
 	assert.Equal(t, connectionCache.Len(), 1)
 
-	var conn *grpc.ClientConn
 	res, ok := connectionCache.cache.Get(proxyConnectionFactory.targetAddress)
 	assert.True(t, ok)
-	conn = res.ClientConn()
+	conn, err := res.clientConn()
+	assert.NoError(t, err)
 
 	// check if api client can be rebuilt with retrieved connection
 	accessAPIClient := access.NewAccessAPIClient(conn)
@@ -564,8 +557,7 @@ func TestExecutionNodeClientClosedGracefully(t *testing.T) {
 		connectionFactory.ExecutionConfig.Timeout = time.Second
 
 		// set the connection pool cache size
-		cacheSize := 1
-		connectionCache, err := NewCache(logger, metrics, cacheSize)
+		connectionCache, err := NewCache(logger, metrics, 1)
 		require.NoError(t, err)
 
 		// set metrics reporting
@@ -606,9 +598,6 @@ func TestExecutionNodeClientClosedGracefully(t *testing.T) {
 				}
 			}()
 		}
-
-		// Close connection
-		// connectionFactory.Manager.Remove(clientAddress)
 
 		waitGroup.Wait()
 
@@ -661,14 +650,14 @@ func TestEvictingCacheClients(t *testing.T) {
 	connectionFactory.CollectionConfig.GRPCPort = cn.port
 	connectionFactory.CollectionConfig.Timeout = 5 * time.Second
 	// Set the connection pool cache size
-	cacheSize := 1
+	cacheSize := uint(1)
 
 	connectionCache, err := NewCache(logger, metrics, cacheSize)
 	require.NoError(t, err)
 
 	// create a non-blocking cache
-	connectionCache.cache, err = lru.NewWithEvict[string, *CachedClient](cacheSize, func(_ string, client *CachedClient) {
-		go client.Close()
+	connectionCache.cache, err = simplelru.NewLRU[string, *cachedClient](int(cacheSize), func(_ string, client *cachedClient) {
+		client.Close()
 	})
 	require.NoError(t, err)
 
@@ -693,9 +682,12 @@ func TestEvictingCacheClients(t *testing.T) {
 	cachedClient, ok := connectionCache.cache.Get(clientAddress)
 	require.True(t, ok)
 
+	conn, err := cachedClient.clientConn()
+	require.NoError(t, err)
+
 	// wait until the client connection is ready
 	require.Eventually(t, func() bool {
-		return cachedClient.ClientConn().GetState() == connectivity.Ready
+		return conn.(*grpc.ClientConn).GetState() == connectivity.Ready
 	}, 100*time.Millisecond, 10*time.Millisecond, "client timed out before ready")
 
 	// Schedule the invalidation of the access API client while the Ping call is in progress
@@ -707,11 +699,11 @@ func TestEvictingCacheClients(t *testing.T) {
 		<-startPing // wait until Ping is called
 
 		// Invalidate the access API client
-		cachedClient.Invalidate()
+		connectionCache.Invalidate(cachedClient)
 
 		// Invalidate marks the connection for closure asynchronously, so give it some time to run
 		require.Eventually(t, func() bool {
-			return cachedClient.closeRequested.Load()
+			return cachedClient.isCloseRequested()
 		}, 100*time.Millisecond, 10*time.Millisecond, "client timed out closing connection")
 
 		// Call a gRPC method on the client, requests should be blocked since the connection is invalidated
@@ -728,10 +720,10 @@ func TestEvictingCacheClients(t *testing.T) {
 
 	// Wait for the client connection to change state from "Ready" to "Shutdown" as connection was closed.
 	require.Eventually(t, func() bool {
-		return cachedClient.ClientConn().WaitForStateChange(ctx, connectivity.Ready)
+		return conn.(*grpc.ClientConn).WaitForStateChange(ctx, connectivity.Ready)
 	}, 100*time.Millisecond, 10*time.Millisecond, "client timed out transitioning state")
 
-	assert.Equal(t, connectivity.Shutdown, cachedClient.ClientConn().GetState())
+	assert.Equal(t, connectivity.Shutdown, conn.(*grpc.ClientConn).GetState())
 	assert.Equal(t, 0, connectionCache.Len())
 
 	wg.Wait() // wait until the move test routine is done
@@ -822,7 +814,12 @@ func TestConcurrentConnections(t *testing.T) {
 				defer wg.Done()
 
 				client, _, err := connectionFactory.GetExecutionAPIClient(clientAddress)
-				require.NoError(tt, err)
+				if err != nil {
+					// if there was a connection error, the client will be invalidated, in the cache
+					// causing the client to be closed.
+					require.ErrorIs(tt, err, ErrClientShuttingDown)
+					return
+				}
 
 				_, err = client.Ping(ctx, req)
 
@@ -874,8 +871,7 @@ func TestCircuitBreakerExecutionNode(t *testing.T) {
 	connectionFactory.ExecutionConfig.Timeout = requestTimeout
 
 	// Set the connection pool cache size.
-	cacheSize := 1
-	connectionCache, err := NewCache(logger, metrics, cacheSize)
+	connectionCache, err := NewCache(logger, metrics, 1)
 	require.NoError(t, err)
 
 	connectionFactory.Manager = NewManager(
@@ -989,8 +985,7 @@ func TestCircuitBreakerCollectionNode(t *testing.T) {
 	connectionFactory.CollectionConfig.Timeout = requestTimeout
 
 	// Set the connection pool cache size.
-	cacheSize := 1
-	connectionCache, err := NewCache(logger, metrics, cacheSize)
+	connectionCache, err := NewCache(logger, metrics, 1)
 	require.NoError(t, err)
 
 	connectionFactory.Manager = NewManager(

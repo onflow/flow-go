@@ -3,186 +3,164 @@ package connection
 import (
 	"fmt"
 	"sync"
+	"time"
 
-	lru "github.com/hashicorp/golang-lru/v2"
+	"github.com/hashicorp/golang-lru/v2/simplelru"
 	"github.com/onflow/crypto"
 	"github.com/rs/zerolog"
-	"go.uber.org/atomic"
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/connectivity"
 
 	"github.com/onflow/flow-go/module"
 )
 
-// CachedClient represents a gRPC client connection that is cached for reuse.
-type CachedClient struct {
-	conn    *grpc.ClientConn
-	address string
-	cfg     Config
-
-	cache          *Cache
-	closeRequested *atomic.Bool
-	wg             sync.WaitGroup
-	mu             sync.RWMutex
-}
-
-// ClientConn returns the underlying gRPC client connection.
-func (cc *CachedClient) ClientConn() *grpc.ClientConn {
-	cc.mu.RLock()
-	defer cc.mu.RUnlock()
-	return cc.conn
-}
-
-// Address returns the address of the remote server.
-func (cc *CachedClient) Address() string {
-	return cc.address
-}
-
-// CloseRequested returns true if the CachedClient has been marked for closure.
-func (cc *CachedClient) CloseRequested() bool {
-	return cc.closeRequested.Load()
-}
-
-// AddRequest increments the in-flight request counter for the CachedClient.
-// It returns a function that should be called when the request completes to decrement the counter
-func (cc *CachedClient) AddRequest() func() {
-	cc.wg.Add(1)
-	return cc.wg.Done
-}
-
-// Invalidate removes the CachedClient from the cache and closes the connection.
-func (cc *CachedClient) Invalidate() {
-	cc.cache.invalidate(cc.address)
-
-	// Close the connection asynchronously to avoid blocking requests
-	go cc.Close()
-}
-
-// Close closes the CachedClient connection. It marks the connection for closure and waits asynchronously for ongoing
-// requests to complete before closing the connection.
-func (cc *CachedClient) Close() {
-	// Mark the connection for closure
-	if !cc.closeRequested.CompareAndSwap(false, true) {
-		return
-	}
-
-	// Obtain the lock to ensure that any connection attempts have completed
-	cc.mu.RLock()
-	conn := cc.conn
-	cc.mu.RUnlock()
-
-	// If the initial connection attempt failed, conn will be nil
-	if conn == nil {
-		return
-	}
-
-	// If there are ongoing requests, wait for them to complete asynchronously
-	// this avoids tearing down the connection while requests are in-flight resulting in errors
-	cc.wg.Wait()
-
-	// Close the connection
-	conn.Close()
-}
-
-// Cache represents a cache of CachedClient instances with a given maximum size.
-type Cache struct {
-	cache   *lru.Cache[string, *CachedClient]
-	maxSize int
-
-	logger  zerolog.Logger
-	metrics module.GRPCConnectionPoolMetrics
-}
-
-// NewCache creates a new Cache with the specified maximum size and the underlying LRU cache.
-func NewCache(
-	log zerolog.Logger,
-	metrics module.GRPCConnectionPoolMetrics,
-	maxSize int,
-) (*Cache, error) {
-	cache, err := lru.NewWithEvict(maxSize, func(_ string, client *CachedClient) {
-		go client.Close() // close is blocking, so run in a goroutine
-
-		log.Debug().Str("grpc_conn_evicted", client.address).Msg("closing grpc connection evicted from pool")
-		metrics.ConnectionFromPoolEvicted()
-	})
-
-	if err != nil {
-		return nil, fmt.Errorf("could not initialize connection pool cache: %w", err)
-	}
-
-	return &Cache{
-		cache:   cache,
-		maxSize: maxSize,
-		logger:  log,
-		metrics: metrics,
-	}, nil
-}
-
-// GetConnected returns a CachedClient for the given address that has an active connection.
-// If the address is not in the cache, it creates a new entry and connects.
-func (c *Cache) GetConnected(
+// ConnectClientFn is callback function that creates a new gRPC client connection.
+type ConnectClientFn func(
 	address string,
 	cfg Config,
 	networkPubKey crypto.PublicKey,
-	connectFn func(string, Config, crypto.PublicKey, *CachedClient) (*grpc.ClientConn, error),
-) (*CachedClient, error) {
-	client := &CachedClient{
-		address:        address,
-		cfg:            cfg,
-		closeRequested: atomic.NewBool(false),
-		cache:          c,
+	client *cachedClient,
+) (grpcClientConn, error)
+
+// <component_spec>
+//
+// Cache provides access to a pool of cached gRPC client connections as part of the client connection
+// pool. It has the following objectives:
+//   - Allow reuse of a single gRPC client connection per address, enabling efficient remote calls
+//     during Access API handling.
+//   - Provide synchronization for getting and creating gRPC client connections.
+//   - Allow invalidating entries when connections are determined to be unhealthy.
+//   - Ensure only healthy connections are cached, to avoid reusing known unhealthy connections.
+//
+// The following are required for safe operation:
+//   - Only a single connection exists per address.
+//   - Invalidated or evicted clients are closed and removed from the cache.
+//   - Clients with known failed connections are removed from the cache.
+//
+// </component_spec>
+type Cache struct {
+	logger  zerolog.Logger
+	metrics module.GRPCConnectionPoolMetrics
+
+	// cache is the underlying LRU cache used to store the client connections.
+	// we are using simplelru.LRU which does not provide synchronization. this allow us to implement
+	// the atomic GetOrAdd functionality that's missing from the standard lru.Cache implementation,
+	// which is required to guarantee that only a single connection exists per address.
+	cache   *simplelru.LRU[string, *cachedClient]
+	maxSize uint
+
+	// mu protects access to `cache`
+	mu sync.RWMutex
+}
+
+// NewCache creates a new Cache with the specified maximum size and the underlying LRU cache.
+//
+// No errors are expected during normal operation.
+func NewCache(
+	log zerolog.Logger,
+	metrics module.GRPCConnectionPoolMetrics,
+	maxSize uint,
+) (*Cache, error) {
+	c := &Cache{
+		logger:  log,
+		metrics: metrics,
+		maxSize: maxSize,
 	}
 
-	// Note: PeekOrAdd does not "visit" the existing entry, so we need to call Get explicitly
-	// to mark the entry as "visited" and update the LRU order. Unfortunately, the lru library
-	// doesn't have a GetOrAdd method, so this is the simplest way to achieve atomic get-or-add
-	val, existed, _ := c.cache.PeekOrAdd(address, client)
-	if existed {
-		client = val
-		_, _ = c.cache.Get(address)
-		c.metrics.ConnectionFromPoolReused()
-	} else {
-		c.metrics.ConnectionAddedToPool()
-	}
-
-	client.mu.Lock()
-	defer client.mu.Unlock()
-
-	// after getting the lock, check if the connection is still active
-	if client.conn != nil && client.conn.GetState() != connectivity.Shutdown {
-		return client, nil
-	}
-
-	// if the connection is not setup yet or closed, create a new connection and cache it
-	conn, err := connectFn(client.address, client.cfg, networkPubKey, client)
+	cache, err := simplelru.NewLRU(int(maxSize), c.onEvict)
 	if err != nil {
+		return nil, fmt.Errorf("could not initialize connection pool cache: %w", err)
+	}
+	c.cache = cache
+
+	return c, nil
+}
+
+// onEvict is called when a client is evicted from the cache.
+func (c *Cache) onEvict(_ string, client *cachedClient) {
+	client.Close()
+
+	c.metrics.ConnectionFromPoolEvicted()
+	c.logger.Debug().
+		Str("grpc_conn_evicted", client.address).
+		Msg("closing grpc connection evicted from pool")
+}
+
+// GetConnection returns a grpc connection for the given address.
+// If the address is not in the cache, it creates a new entry and establishes a connection.
+//
+// All returned errors are benign and side-effect free for the node. They indicate issues connecting
+// with an external node.
+func (c *Cache) GetConnection(
+	address string,
+	cfg Config,
+	networkPubKey crypto.PublicKey,
+	connectFn ConnectClientFn,
+) (grpc.ClientConnInterface, error) {
+	client, added := c.getOrAdd(address, cfg.Timeout)
+
+	if added {
+		c.metrics.ConnectionAddedToPool()
+	} else {
+		c.metrics.ConnectionFromPoolReused()
+	}
+
+	conn, err := client.clientConnection(cfg, networkPubKey, connectFn)
+	if err != nil {
+		// remove the failed client from the cache to ensure a fresh connection is created on the
+		// next attempt. the client guarantees that only a single connection attempt is made per
+		// client object, so all goroutines with a reference to this client will fail with an error.
+		// therefore, it's safe to discard the client after the first error.
+		_ = c.remove(address)
 		return nil, err
 	}
 
 	c.metrics.NewConnectionEstablished()
-	c.metrics.TotalConnectionsInPool(uint(c.Len()), uint(c.MaxSize()))
+	c.metrics.TotalConnectionsInPool(uint(c.Len()), c.maxSize)
 
-	client.conn = conn
-	return client, nil
+	return conn, nil
 }
 
-// invalidate removes the CachedClient entry from the cache with the given address, and shuts
-// down the connection.
-func (c *Cache) invalidate(address string) {
-	if !c.cache.Remove(address) {
-		return
+// getOrAdd atomically gets an existing client from the cache or adds a new one if one doesn't exist.
+// this ensures there is only a single client in the cache per address.
+// Returns true if a new client was added to the cache.
+func (c *Cache) getOrAdd(address string, timeout time.Duration) (*cachedClient, bool) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	if client, ok := c.cache.Get(address); ok {
+		return client, false
 	}
 
-	c.logger.Debug().Str("cached_client_invalidated", address).Msg("invalidating cached client")
-	c.metrics.ConnectionFromPoolInvalidated()
+	client := &cachedClient{
+		address: address,
+		timeout: timeout,
+	}
+
+	_ = c.cache.Add(address, client)
+
+	return client, true
 }
 
-// Len returns the number of CachedClient entries in the cache.
+// Invalidate removes the client entry from the cache and closes the connection.
+func (c *Cache) Invalidate(client *cachedClient) {
+	if c.remove(client.Address()) {
+		c.logger.Debug().Str("cached_client_invalidated", client.Address()).Msg("invalidating cached client")
+		c.metrics.ConnectionFromPoolInvalidated()
+	}
+
+	client.Close()
+}
+
+// remove removes the client entry from the cache.
+func (c *Cache) remove(address string) bool {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.cache.Remove(address)
+}
+
+// Len returns the number of entries in the cache.
 func (c *Cache) Len() int {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
 	return c.cache.Len()
-}
-
-// MaxSize returns the maximum size of the cache.
-func (c *Cache) MaxSize() int {
-	return c.maxSize
 }
