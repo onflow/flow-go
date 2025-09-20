@@ -476,7 +476,16 @@ func getRegisterType(key ledger.Key) string {
 		return "uuid generator state"
 	}
 	if strings.HasPrefix(kstr, "public_key_") {
-		return "public key"
+		return "legacy public key"
+	}
+	if kstr == "apk_0" {
+		return "account public key 0"
+	}
+	if strings.HasPrefix(kstr, flow.BatchPublicKeyRegisterKeyPrefix) {
+		return "batch public key"
+	}
+	if strings.HasPrefix(kstr, flow.SequenceNumberRegisterKeyPrefix) {
+		return "sequence number"
 	}
 	if strings.HasPrefix(kstr, flow.CodeKeyPrefix) {
 		return "contract content"
