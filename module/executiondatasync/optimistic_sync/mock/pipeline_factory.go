@@ -14,6 +14,26 @@ type PipelineFactory struct {
 	mock.Mock
 }
 
+// NewCompletedPipeline provides a mock function with given fields: result
+func (_m *PipelineFactory) NewCompletedPipeline(result *flow.ExecutionResult) optimistic_sync.Pipeline {
+	ret := _m.Called(result)
+
+	if len(ret) == 0 {
+		panic("no return value specified for NewCompletedPipeline")
+	}
+
+	var r0 optimistic_sync.Pipeline
+	if rf, ok := ret.Get(0).(func(*flow.ExecutionResult) optimistic_sync.Pipeline); ok {
+		r0 = rf(result)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(optimistic_sync.Pipeline)
+		}
+	}
+
+	return r0
+}
+
 // NewPipeline provides a mock function with given fields: result, isSealed
 func (_m *PipelineFactory) NewPipeline(result *flow.ExecutionResult, isSealed bool) optimistic_sync.Pipeline {
 	ret := _m.Called(result, isSealed)

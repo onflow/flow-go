@@ -269,32 +269,61 @@ type ResultsForest struct {
 	mu sync.RWMutex
 }
 
-// NewResultsForest creates a new instance of ResultsForest.
+// NewResultsForest creates a new instance of ResultsForest, and adds the latest persisted sealed
+// result to the forest.
+//
 // No errors are expected during normal operations.
 func NewResultsForest(
 	log zerolog.Logger,
 	headers storage.Headers,
+	results storage.ExecutionResults,
 	pipelineFactory optimistic_sync.PipelineFactory,
 	latestPersistedSealedResult storage.LatestPersistedSealedResultReader,
 	maxViewDelta uint64,
 ) (*ResultsForest, error) {
-	_, sealedHeight := latestPersistedSealedResult.Latest()
-	sealedHeader, err := headers.ByHeight(sealedHeight) // by protocol convention, this should always exist (initialized during bootstrapping)
+	sealedResultID, sealedHeight := latestPersistedSealedResult.Latest()
+
+	// by protocol convention, the latest persisted sealed result and its executed block should always
+	// exist. They are initialized to the root block and result during bootstrapping.
+	sealedResult, err := results.ByID(sealedResultID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get latest persisted sealed result (%s): %w", sealedResultID, err)
+	}
+
+	sealedHeader, err := headers.ByHeight(sealedHeight)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get block header for latest persisted sealed result (height: %d): %w", sealedHeight, err)
 	}
 
-	rf := &ResultsForest{
+	// insert the latest persisted sealed result into the forest.
+	pipeline := pipelineFactory.NewCompletedPipeline(sealedResult)
+	container, err := NewExecutionResultContainer(sealedResult, sealedHeader, pipeline)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create container for latest persisted sealed result (%s): %w", sealedResultID, err)
+	}
+
+	forest := forest.NewLevelledForest(sealedHeader.View)
+	err = forest.VerifyVertex(container)
+	if err != nil {
+		// this should never happen since this is the first container added to the forest.
+		return nil, fmt.Errorf("failed to verify container: %w", err)
+	}
+	forest.AddVertex(container)
+
+	if err := container.SetBlockStatus(BlockStatusSealed); err != nil {
+		return nil, fmt.Errorf("failed to set latest persisted sealed result block status to sealed (%s): %w", sealedResultID, err)
+	}
+
+	return &ResultsForest{
 		log:                         log.With().Str("component", "results_forest").Logger(),
-		forest:                      *forest.NewLevelledForest(sealedHeader.View),
+		forest:                      *forest,
 		headers:                     headers,
 		pipelineFactory:             pipelineFactory,
 		maxViewDelta:                maxViewDelta,
 		lastSealedView:              counters.NewMonotonicCounter(sealedHeader.View),
 		lastFinalizedView:           counters.NewMonotonicCounter(sealedHeader.View),
 		latestPersistedSealedResult: latestPersistedSealedResult,
-	}
-	return rf, nil
+	}, nil
 }
 
 // ResetLowestRejectedView returns the last sealed view processed by the forest, and resets the
@@ -393,7 +422,7 @@ func (rf *ResultsForest) AddReceipt(receipt *flow.ExecutionReceipt, blockStatus 
 
 	added, err := container.AddReceipt(receipt)
 	if err != nil {
-		return false, fmt.Errorf("failed to add receipt to its container: %w", err)
+		return false, fmt.Errorf("failed to add receipt to its container (%s): %w", resultID, err)
 	}
 
 	return added > 0, nil
@@ -507,29 +536,11 @@ func (rf *ResultsForest) getOrCreateContainer(result *flow.ExecutionResult, bloc
 		return nil, ErrMaxViewDeltaExceeded
 	}
 
-	if rf.forest.GetSize() == 0 {
-		// the first result added must be the latest persisted sealed result
-		// verify that it is the expected latest persisted sealed result, and bypass extended
-		// ancestory checks since there are no other results yet.
-		sealedResultID, _ := rf.latestPersistedSealedResult.Latest()
-		if resultID != sealedResultID {
-			return nil, fmt.Errorf("first sealed result does not match initial latest persisted sealed result. got: %s, expected: %s",
-				resultID, sealedResultID)
-		}
-		if executedBlock.View != rf.lastSealedView.Value() {
-			return nil, fmt.Errorf("first sealed view does not match initial last sealed view. got: %d, expected: %d",
-				rf.lastSealedView.Value(), container.BlockView())
-		}
-		if blockStatus != BlockStatusSealed {
-			return nil, fmt.Errorf("first result must be sealed. got: %s", blockStatus)
-		}
-	} else {
-		// check invariant: there must always be a direct ancestoral connection from the latest persisted
-		// sealed result to the latest sealed result. this is guaranteed by never accepting a sealed result
-		// whose parent does not exist in the forest or is not sealed.
-		if blockStatus == BlockStatusSealed && !rf.extendsSealedChain(container) {
-			return nil, fmt.Errorf("result (%s) does not extend latest sealed result (view: %d)", resultID, rf.lastSealedView.Value())
-		}
+	// check invariant: there must always be a direct ancestoral connection from the latest persisted
+	// sealed result to the latest sealed result. this is guaranteed by never accepting a sealed result
+	// whose parent does not exist in the forest or is not sealed.
+	if blockStatus == BlockStatusSealed && !rf.extendsSealedChain(container) {
+		return nil, fmt.Errorf("sealed result (%s) does not extend last sealed result (view: %d)", resultID, rf.lastSealedView.Value())
 	}
 
 	// verify and add to forest

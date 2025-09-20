@@ -185,7 +185,7 @@ func (p *PipelineFunctionalSuite) TestPipelineCompletesSuccessfully() {
 	p.execDataRequester.On("RequestExecutionData", mock.Anything).Return(p.expectedExecutionData, nil).Once()
 	p.txResultErrMsgsRequester.On("Request", mock.Anything).Return(p.expectedTxResultErrMsgs, nil).Once()
 
-	p.WithRunningPipeline(func(pipeline Pipeline, updateChan chan optimistic_sync.State, errChan chan error, cancel context.CancelFunc) {
+	p.WithRunningPipeline(func(pipeline optimistic_sync.Pipeline, updateChan chan optimistic_sync.State, errChan chan error, cancel context.CancelFunc) {
 		pipeline.OnParentStateUpdated(optimistic_sync.StateComplete)
 
 		waitForStateUpdates(p.T(), updateChan, optimistic_sync.StateProcessing, optimistic_sync.StateWaitingPersist)
@@ -230,7 +230,7 @@ func (p *PipelineFunctionalSuite) TestPipelineDownloadError() {
 		p.T().Run(test.name, func(t *testing.T) {
 			test.requesterInitialization(test.expectedErr)
 
-			p.WithRunningPipeline(func(pipeline Pipeline, updateChan chan optimistic_sync.State, errChan chan error, cancel context.CancelFunc) {
+			p.WithRunningPipeline(func(pipeline optimistic_sync.Pipeline, updateChan chan optimistic_sync.State, errChan chan error, cancel context.CancelFunc) {
 				pipeline.OnParentStateUpdated(optimistic_sync.StateComplete)
 
 				waitForError(p.T(), errChan, test.expectedErr)
@@ -260,7 +260,7 @@ func (p *PipelineFunctionalSuite) TestPipelineIndexingError() {
 		invalidBlockID.String(),
 	)
 
-	p.WithRunningPipeline(func(pipeline Pipeline, updateChan chan optimistic_sync.State, errChan chan error, cancel context.CancelFunc) {
+	p.WithRunningPipeline(func(pipeline optimistic_sync.Pipeline, updateChan chan optimistic_sync.State, errChan chan error, cancel context.CancelFunc) {
 		pipeline.OnParentStateUpdated(optimistic_sync.StateComplete)
 
 		waitForErrorWithCustomCheckers(p.T(), errChan, func(err error) {
@@ -284,7 +284,7 @@ func (p *PipelineFunctionalSuite) TestPipelinePersistingError() {
 	p.execDataRequester.On("RequestExecutionData", mock.Anything).Return(p.expectedExecutionData, nil).Once()
 	p.txResultErrMsgsRequester.On("Request", mock.Anything).Return(p.expectedTxResultErrMsgs, nil).Once()
 
-	p.WithRunningPipeline(func(pipeline Pipeline, updateChan chan optimistic_sync.State, errChan chan error, cancel context.CancelFunc) {
+	p.WithRunningPipeline(func(pipeline optimistic_sync.Pipeline, updateChan chan optimistic_sync.State, errChan chan error, cancel context.CancelFunc) {
 		pipeline.OnParentStateUpdated(optimistic_sync.StateComplete)
 
 		waitForStateUpdates(p.T(), updateChan, optimistic_sync.StateProcessing, optimistic_sync.StateWaitingPersist)
@@ -300,7 +300,7 @@ func (p *PipelineFunctionalSuite) TestPipelinePersistingError() {
 // request of execution data. It ensures that cancellation is handled properly when triggered
 // while execution data is being downloaded.
 func (p *PipelineFunctionalSuite) TestMainCtxCancellationDuringRequestingExecutionData() {
-	p.WithRunningPipeline(func(pipeline Pipeline, updateChan chan optimistic_sync.State, errChan chan error, cancel context.CancelFunc) {
+	p.WithRunningPipeline(func(pipeline optimistic_sync.Pipeline, updateChan chan optimistic_sync.State, errChan chan error, cancel context.CancelFunc) {
 		p.execDataRequester.On("RequestExecutionData", mock.Anything).Return(
 			func(ctx context.Context) (*execution_data.BlockExecutionData, error) {
 				// Wait for cancellation
@@ -328,7 +328,7 @@ func (p *PipelineFunctionalSuite) TestMainCtxCancellationDuringRequestingExecuti
 // is cancelled during this phase, the pipeline handles the cancellation gracefully
 // and transitions to the correct state.
 func (p *PipelineFunctionalSuite) TestMainCtxCancellationDuringRequestingTxResultErrMsgs() {
-	p.WithRunningPipeline(func(pipeline Pipeline, updateChan chan optimistic_sync.State, errChan chan error, cancel context.CancelFunc) {
+	p.WithRunningPipeline(func(pipeline optimistic_sync.Pipeline, updateChan chan optimistic_sync.State, errChan chan error, cancel context.CancelFunc) {
 		// This call marked as `Maybe()` because it may not be called depending on timing.
 		p.execDataRequester.On("RequestExecutionData", mock.Anything).Return((*execution_data.BlockExecutionData)(nil), nil).Maybe()
 
@@ -356,7 +356,7 @@ func (p *PipelineFunctionalSuite) TestMainCtxCancellationDuringWaitingPersist() 
 	p.execDataRequester.On("RequestExecutionData", mock.Anything).Return(p.expectedExecutionData, nil).Once()
 	p.txResultErrMsgsRequester.On("Request", mock.Anything).Return(p.expectedTxResultErrMsgs, nil).Once()
 
-	p.WithRunningPipeline(func(pipeline Pipeline, updateChan chan optimistic_sync.State, errChan chan error, cancel context.CancelFunc) {
+	p.WithRunningPipeline(func(pipeline optimistic_sync.Pipeline, updateChan chan optimistic_sync.State, errChan chan error, cancel context.CancelFunc) {
 		pipeline.OnParentStateUpdated(optimistic_sync.StateComplete)
 
 		waitForStateUpdates(p.T(), updateChan, optimistic_sync.StateProcessing, optimistic_sync.StateWaitingPersist)
@@ -376,12 +376,12 @@ func (p *PipelineFunctionalSuite) TestPipelineShutdownOnParentAbandon() {
 	tests := []struct {
 		name        string
 		config      PipelineConfig
-		customSetup func(pipeline Pipeline, updateChan chan optimistic_sync.State)
+		customSetup func(pipeline optimistic_sync.Pipeline, updateChan chan optimistic_sync.State)
 	}{
 		{
 			name: "from StatePending",
 			config: PipelineConfig{
-				beforePipelineRun: func(pipeline *PipelineImpl) {
+				beforePipelineRun: func(pipeline *Pipeline) {
 					pipeline.OnParentStateUpdated(optimistic_sync.StateAbandoned)
 				},
 				parentState: optimistic_sync.StateAbandoned,
@@ -389,7 +389,7 @@ func (p *PipelineFunctionalSuite) TestPipelineShutdownOnParentAbandon() {
 		},
 		{
 			name: "from optimistic_sync.StateProcessing",
-			customSetup: func(pipeline Pipeline, updateChan chan optimistic_sync.State) {
+			customSetup: func(pipeline optimistic_sync.Pipeline, updateChan chan optimistic_sync.State) {
 				waitForStateUpdates(p.T(), updateChan, optimistic_sync.StateProcessing)
 
 				pipeline.OnParentStateUpdated(optimistic_sync.StateAbandoned)
@@ -398,7 +398,7 @@ func (p *PipelineFunctionalSuite) TestPipelineShutdownOnParentAbandon() {
 		},
 		{
 			name: "from optimistic_sync.StateWaitingPersist",
-			customSetup: func(pipeline Pipeline, updateChan chan optimistic_sync.State) {
+			customSetup: func(pipeline optimistic_sync.Pipeline, updateChan chan optimistic_sync.State) {
 				waitForStateUpdates(p.T(), updateChan, optimistic_sync.StateProcessing, optimistic_sync.StateWaitingPersist)
 
 				pipeline.OnParentStateUpdated(optimistic_sync.StateAbandoned)
@@ -409,7 +409,7 @@ func (p *PipelineFunctionalSuite) TestPipelineShutdownOnParentAbandon() {
 
 	for _, test := range tests {
 		p.T().Run(test.name, func(t *testing.T) {
-			p.WithRunningPipeline(func(pipeline Pipeline, updateChan chan optimistic_sync.State, errChan chan error, cancel context.CancelFunc) {
+			p.WithRunningPipeline(func(pipeline optimistic_sync.Pipeline, updateChan chan optimistic_sync.State, errChan chan error, cancel context.CancelFunc) {
 				p.execDataRequester.On("RequestExecutionData", mock.Anything).Return(p.expectedExecutionData, nil).Maybe()
 				p.txResultErrMsgsRequester.On("Request", mock.Anything).Return(p.expectedTxResultErrMsgs, nil).Maybe()
 
@@ -428,7 +428,7 @@ func (p *PipelineFunctionalSuite) TestPipelineShutdownOnParentAbandon() {
 }
 
 type PipelineConfig struct {
-	beforePipelineRun func(pipeline *PipelineImpl)
+	beforePipelineRun func(pipeline *Pipeline)
 	parentState       optimistic_sync.State
 }
 
@@ -436,7 +436,7 @@ type PipelineConfig struct {
 // It manages the context and channels needed to run the pipeline and invokes the testFunc
 // with access to the pipeline, update channel, error channel, and cancel function.
 func (p *PipelineFunctionalSuite) WithRunningPipeline(
-	testFunc func(pipeline Pipeline, updateChan chan optimistic_sync.State, errChan chan error, cancel context.CancelFunc),
+	testFunc func(pipeline optimistic_sync.Pipeline, updateChan chan optimistic_sync.State, errChan chan error, cancel context.CancelFunc),
 	pipelineConfig PipelineConfig,
 ) {
 

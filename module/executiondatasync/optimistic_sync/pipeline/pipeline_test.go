@@ -125,12 +125,12 @@ func TestAbandoned(t *testing.T) {
 	// Test cases abandoning during different stages of processing
 	testCases := []struct {
 		name           string
-		setupMock      func(*PipelineImpl, *mockStateProvider, *osmock.Core)
+		setupMock      func(*Pipeline, *mockStateProvider, *osmock.Core)
 		expectedStates []optimistic_sync.State
 	}{
 		{
 			name: "Abandon during download",
-			setupMock: func(pipeline *PipelineImpl, parent *mockStateProvider, mockCore *osmock.Core) {
+			setupMock: func(pipeline *Pipeline, parent *mockStateProvider, mockCore *osmock.Core) {
 				mockCore.On("Download", mock.Anything).Run(func(args mock.Arguments) {
 					pipeline.Abandon()
 
@@ -144,7 +144,7 @@ func TestAbandoned(t *testing.T) {
 		},
 		{
 			name: "Parent abandoned during download",
-			setupMock: func(pipeline *PipelineImpl, parent *mockStateProvider, mockCore *osmock.Core) {
+			setupMock: func(pipeline *Pipeline, parent *mockStateProvider, mockCore *osmock.Core) {
 				mockCore.On("Download", mock.Anything).Run(func(args mock.Arguments) {
 					parent.UpdateState(optimistic_sync.StateAbandoned, pipeline)
 
@@ -159,7 +159,7 @@ func TestAbandoned(t *testing.T) {
 		{
 			name: "Abandon during index",
 			// Note: indexing will complete, and the pipeline will transition to waiting persist
-			setupMock: func(pipeline *PipelineImpl, parent *mockStateProvider, mockCore *osmock.Core) {
+			setupMock: func(pipeline *Pipeline, parent *mockStateProvider, mockCore *osmock.Core) {
 				mockCore.On("Download", mock.Anything).Return(nil)
 				mockCore.On("Index").Run(func(args mock.Arguments) {
 					pipeline.Abandon()
@@ -170,7 +170,7 @@ func TestAbandoned(t *testing.T) {
 		{
 			name: "Parent abandoned during index",
 			// Note: indexing will complete, and the pipeline will transition to waiting persist
-			setupMock: func(pipeline *PipelineImpl, parent *mockStateProvider, mockCore *osmock.Core) {
+			setupMock: func(pipeline *Pipeline, parent *mockStateProvider, mockCore *osmock.Core) {
 				mockCore.On("Download", mock.Anything).Return(nil)
 				mockCore.On("Index").Run(func(args mock.Arguments) {
 					parent.UpdateState(optimistic_sync.StateAbandoned, pipeline)
@@ -180,7 +180,7 @@ func TestAbandoned(t *testing.T) {
 		},
 		{
 			name: "Abandon during waiting to persist",
-			setupMock: func(pipeline *PipelineImpl, parent *mockStateProvider, mockCore *osmock.Core) {
+			setupMock: func(pipeline *Pipeline, parent *mockStateProvider, mockCore *osmock.Core) {
 				mockCore.On("Download", mock.Anything).Return(nil)
 				mockCore.On("Index").Run(func(args mock.Arguments) {
 					go func() {
@@ -193,7 +193,7 @@ func TestAbandoned(t *testing.T) {
 		},
 		{
 			name: "Parent abandoned during waiting to persist",
-			setupMock: func(pipeline *PipelineImpl, parent *mockStateProvider, mockCore *osmock.Core) {
+			setupMock: func(pipeline *Pipeline, parent *mockStateProvider, mockCore *osmock.Core) {
 				mockCore.On("Download", mock.Anything).Return(nil)
 				mockCore.On("Index").Run(func(args mock.Arguments) {
 					go func() {
@@ -237,11 +237,11 @@ func TestPipelineContextCancellation(t *testing.T) {
 	// Test cases for different stages of processing
 	testCases := []struct {
 		name      string
-		setupMock func(pipeline *PipelineImpl, parent *mockStateProvider, mockCore *osmock.Core) context.Context
+		setupMock func(pipeline *Pipeline, parent *mockStateProvider, mockCore *osmock.Core) context.Context
 	}{
 		{
 			name: "Cancel before download starts",
-			setupMock: func(pipeline *PipelineImpl, parent *mockStateProvider, mockCore *osmock.Core) context.Context {
+			setupMock: func(pipeline *Pipeline, parent *mockStateProvider, mockCore *osmock.Core) context.Context {
 				ctx, cancel := context.WithCancel(context.Background())
 				cancel()
 				// no Core methods called
@@ -250,7 +250,7 @@ func TestPipelineContextCancellation(t *testing.T) {
 		},
 		{
 			name: "Cancel during download",
-			setupMock: func(pipeline *PipelineImpl, parent *mockStateProvider, mockCore *osmock.Core) context.Context {
+			setupMock: func(pipeline *Pipeline, parent *mockStateProvider, mockCore *osmock.Core) context.Context {
 				ctx, cancel := context.WithCancel(context.Background())
 				mockCore.On("Download", mock.Anything).Run(func(args mock.Arguments) {
 					cancel()
@@ -264,7 +264,7 @@ func TestPipelineContextCancellation(t *testing.T) {
 		},
 		{
 			name: "Cancel between steps",
-			setupMock: func(pipeline *PipelineImpl, parent *mockStateProvider, mockCore *osmock.Core) context.Context {
+			setupMock: func(pipeline *Pipeline, parent *mockStateProvider, mockCore *osmock.Core) context.Context {
 				ctx, cancel := context.WithCancel(context.Background())
 
 				mockCore.On("Download", mock.Anything).Return(nil)
@@ -277,7 +277,7 @@ func TestPipelineContextCancellation(t *testing.T) {
 		},
 		{
 			name: "Cancel during abandon",
-			setupMock: func(pipeline *PipelineImpl, parent *mockStateProvider, mockCore *osmock.Core) context.Context {
+			setupMock: func(pipeline *Pipeline, parent *mockStateProvider, mockCore *osmock.Core) context.Context {
 				ctx, cancel := context.WithCancel(context.Background())
 
 				mockCore.On("Download", mock.Anything).Return(nil)
@@ -320,13 +320,13 @@ func TestPipelineErrorHandling(t *testing.T) {
 	// Test cases for different stages of processing
 	testCases := []struct {
 		name           string
-		setupMock      func(pipeline *PipelineImpl, parent *mockStateProvider, mockCore *osmock.Core, expectedErr error)
+		setupMock      func(pipeline *Pipeline, parent *mockStateProvider, mockCore *osmock.Core, expectedErr error)
 		expectedErr    error
 		expectedStates []optimistic_sync.State
 	}{
 		{
 			name: "Download Error",
-			setupMock: func(pipeline *PipelineImpl, _ *mockStateProvider, mockCore *osmock.Core, expectedErr error) {
+			setupMock: func(pipeline *Pipeline, _ *mockStateProvider, mockCore *osmock.Core, expectedErr error) {
 				mockCore.On("Download", mock.Anything).Return(expectedErr)
 			},
 			expectedErr:    errors.New("download error"),
@@ -334,7 +334,7 @@ func TestPipelineErrorHandling(t *testing.T) {
 		},
 		{
 			name: "Index Error",
-			setupMock: func(pipeline *PipelineImpl, _ *mockStateProvider, mockCore *osmock.Core, expectedErr error) {
+			setupMock: func(pipeline *Pipeline, _ *mockStateProvider, mockCore *osmock.Core, expectedErr error) {
 				mockCore.On("Download", mock.Anything).Return(nil)
 				mockCore.On("Index").Return(expectedErr)
 			},
@@ -343,7 +343,7 @@ func TestPipelineErrorHandling(t *testing.T) {
 		},
 		{
 			name: "Persist Error",
-			setupMock: func(pipeline *PipelineImpl, parent *mockStateProvider, mockCore *osmock.Core, expectedErr error) {
+			setupMock: func(pipeline *Pipeline, parent *mockStateProvider, mockCore *osmock.Core, expectedErr error) {
 				mockCore.On("Download", mock.Anything).Return(nil)
 				mockCore.On("Index").Run(func(args mock.Arguments) {
 					parent.UpdateState(optimistic_sync.StateComplete, pipeline)
@@ -356,7 +356,7 @@ func TestPipelineErrorHandling(t *testing.T) {
 		},
 		{
 			name: "Abandon Error",
-			setupMock: func(pipeline *PipelineImpl, _ *mockStateProvider, mockCore *osmock.Core, expectedErr error) {
+			setupMock: func(pipeline *Pipeline, _ *mockStateProvider, mockCore *osmock.Core, expectedErr error) {
 				pipeline.Abandon()
 				mockCore.On("Abandon").Return(expectedErr)
 			},

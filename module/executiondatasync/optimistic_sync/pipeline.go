@@ -14,7 +14,13 @@ var (
 
 // PipelineFactory is a factory object for creating new Pipeline instances.
 type PipelineFactory interface {
+	// NewPipeline creates a new pipeline for a given execution result with the given sealed status.
 	NewPipeline(result *flow.ExecutionResult, isSealed bool) Pipeline
+
+	// NewCompletedPipeline creates a new pipeline for a given execution result that has already
+	// completed processing. This should only be used for the latest persisted sealed result during
+	// bootstrapping.
+	NewCompletedPipeline(result *flow.ExecutionResult) Pipeline
 }
 
 // PipelineStateProvider is an interface that provides a pipeline's state.
@@ -40,7 +46,7 @@ type Pipeline interface {
 	PipelineStateProvider
 
 	// Run starts the pipeline processing and blocks until completion or context cancellation.
-	// CAUTION: not concurrency safe! Run must only be called once.
+	// NOT CONCURRENCY SAFE! Run must only be called once.
 	//
 	// Expected error returns during normal operations:
 	//   - context.Canceled: when the context is canceled
