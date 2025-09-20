@@ -26,6 +26,7 @@ import (
 	"github.com/onflow/flow-go/model/encodable"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
+	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/local"
 	modulemock "github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/module/signature"
@@ -1044,4 +1045,79 @@ func TestCombinedVoteProcessorV3_BuildVerifyQC(t *testing.T) {
 	}
 
 	require.True(t, qcCreated)
+}
+
+// TestCombinedVoteProcessorV3_DoubleVoting tests that CombinedVoteProcessorV3 is able to
+// detect a situation where a consensus participant is sending two different votes, first vote is signed with the staking
+// key only and the other one is signed with the random beacon key.
+// CombinedVoteProcessorV3 has to detect that the vote from given participant has been already processed and return a respective error.
+func TestCombinedVoteProcessorV3_DoubleVoting(t *testing.T) {
+	proposerView := uint64(20)
+
+	dkgData, err := bootstrapDKG.RandomBeaconKG(4, unittest.RandomBytes(32))
+	require.NoError(t, err)
+
+	// prepare a minimal consensus committee with all nodes participating in the RandomBeacon KG
+	allIdentities := unittest.IdentityListFixture(len(dkgData.PubKeyShares)).Sort(flow.Canonical[flow.Identity])
+	dkgParticipants := make(map[flow.Identifier]flow.DKGParticipant)
+	for index, identity := range allIdentities {
+		dkgParticipants[identity.NodeID] = flow.DKGParticipant{
+			Index:    uint(index),
+			KeyShare: dkgData.PubKeyShares[index],
+		}
+	}
+
+	leader := allIdentities[0]
+
+	stakingPriv := unittest.StakingPrivKeyFixture()
+	leader.StakingPubKey = stakingPriv.PublicKey()
+
+	leaderParticipantData := dkgParticipants[leader.NodeID]
+	dkgKey := encodable.RandomBeaconPrivKey{
+		PrivateKey: dkgData.PrivKeyShares[leaderParticipantData.Index],
+	}
+
+	me, err := local.New(leader.IdentitySkeleton, stakingPriv)
+	require.NoError(t, err)
+
+	beaconSignerStore := modulemock.NewRandomBeaconKeyStore(t)
+	beaconSignerStore.On("ByView", proposerView).Return(dkgKey, nil)
+	rbSigner := verification.NewCombinedSignerV3(me, beaconSignerStore)
+
+	stakingSignerStore := modulemock.NewRandomBeaconKeyStore(t)
+	stakingSignerStore.On("ByView", proposerView).Return(nil, module.ErrNoBeaconKeyForEpoch)
+	stakingSigner := verification.NewCombinedSignerV3(me, stakingSignerStore)
+
+	block := helper.MakeBlock(helper.WithBlockView(proposerView), helper.WithBlockProposer(leader.NodeID))
+
+	// create and sign proposal
+	leaderVote, err := rbSigner.CreateVote(block)
+	require.NoError(t, err)
+	proposal := helper.MakeSignedProposal(helper.WithProposal(helper.MakeProposal(helper.WithBlock(block))), helper.WithSigData(leaderVote.SigData))
+
+	leaderDoubleVote, err := stakingSigner.CreateVote(block)
+	require.NoError(t, err)
+
+	onQCCreated := func(qc *flow.QuorumCertificate) {
+		require.Fail(t, "qc is not expected to be created in this test scenario")
+	}
+
+	committee, err := committees.NewStaticCommittee(allIdentities, flow.ZeroID, dkgParticipants, dkgData.PubGroupKey)
+	require.NoError(t, err)
+
+	baseFactory := &combinedVoteProcessorFactoryBaseV3{
+		committee:   committee,
+		onQCCreated: onQCCreated,
+		packer:      hsig.NewConsensusSigDataPacker(committee),
+	}
+	voteProcessorFactory := &VoteProcessorFactory{
+		baseFactory: baseFactory.Create,
+	}
+	voteProcessor, err := voteProcessorFactory.Create(unittest.Logger(), proposal)
+	require.NoError(t, err)
+
+	// process the double vote, this has to result in an error.
+	err = voteProcessor.Process(leaderDoubleVote)
+	require.Error(t, err)
+	require.True(t, model.IsDuplicatedSignerError(err))
 }
