@@ -27,18 +27,20 @@ func TestFinalizedReader(t *testing.T) {
 		block := proposal.Block
 
 		// store `block`
-		unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
+		err := unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
 			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 				return blocks.BatchStore(lctx, rw, proposal)
 			})
 		})
+		require.NoError(t, err)
 
 		// index `block` as finalized
-		unittest.WithLock(t, lockManager, storage.LockFinalizeBlock, func(lctx lockctx.Context) error {
+		err = unittest.WithLock(t, lockManager, storage.LockFinalizeBlock, func(lctx lockctx.Context) error {
 			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 				return operation.IndexFinalizedBlockByHeight(lctx, rw, block.Height, block.ID())
 			})
 		})
+		require.NoError(t, err)
 
 		// verify that `FinalizedReader` reads values from database that are not yet cached, eg. right after initialization
 		reader := NewFinalizedReader(headers, block.Height)
@@ -53,16 +55,18 @@ func TestFinalizedReader(t *testing.T) {
 
 		// store and finalize one more block
 		block2 := unittest.BlockWithParentFixture(block.ToHeader())
-		unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
+		err = unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
 			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 				return blocks.BatchStore(lctx, rw, unittest.ProposalFromBlock(block2))
 			})
 		})
-		unittest.WithLock(t, lockManager, storage.LockFinalizeBlock, func(lctx lockctx.Context) error {
+		require.NoError(t, err)
+		err = unittest.WithLock(t, lockManager, storage.LockFinalizeBlock, func(lctx lockctx.Context) error {
 			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 				return operation.IndexFinalizedBlockByHeight(lctx, rw, block2.Height, block2.ID())
 			})
 		})
+		require.NoError(t, err)
 
 		// We declare `block2` as via the `FinalizedReader`
 		reader.BlockFinalized(block2.ToHeader())

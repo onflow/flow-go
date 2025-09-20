@@ -3,6 +3,7 @@ package operation_test
 import (
 	"testing"
 
+	"github.com/jordanschalm/lockctx"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -40,21 +41,19 @@ func TestSealIndexAndLookup(t *testing.T) {
 		expected := []flow.Identifier(flow.GetIDs(seals))
 
 		lockManager := storage.NewTestingLockManager()
-		lctx := lockManager.NewContext()
-		err := lctx.AcquireLock(storage.LockInsertBlock)
-		require.NoError(t, err)
-		defer lctx.Release()
 
-		err = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			for _, seal := range seals {
-				if err := operation.InsertSeal(rw.Writer(), seal.ID(), seal); err != nil {
+		err := unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
+			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+				for _, seal := range seals {
+					if err := operation.InsertSeal(rw.Writer(), seal.ID(), seal); err != nil {
+						return err
+					}
+				}
+				if err := operation.IndexPayloadSeals(lctx, rw.Writer(), blockID, expected); err != nil {
 					return err
 				}
-			}
-			if err := operation.IndexPayloadSeals(lctx, rw.Writer(), blockID, expected); err != nil {
-				return err
-			}
-			return nil
+				return nil
+			})
 		})
 		require.NoError(t, err)
 

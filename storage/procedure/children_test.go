@@ -3,6 +3,7 @@ package procedure_test
 import (
 	"testing"
 
+	"github.com/jordanschalm/lockctx"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/model/flow"
@@ -16,16 +17,13 @@ import (
 func TestIndexAndLookupChild(t *testing.T) {
 	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
 		lockManager := storage.NewTestingLockManager()
-		lctx := lockManager.NewContext()
-		err := lctx.AcquireLock(storage.LockInsertBlock)
-		require.NoError(t, err)
-		defer lctx.Release()
-
 		parentID := unittest.IdentifierFixture()
 		childID := unittest.IdentifierFixture()
 
-		err = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			return procedure.IndexNewBlock(lctx, rw, childID, parentID)
+		err := unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
+			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+				return procedure.IndexNewBlock(lctx, rw, childID, parentID)
+			})
 		})
 		require.NoError(t, err)
 
@@ -45,24 +43,23 @@ func TestIndexAndLookupChild(t *testing.T) {
 func TestIndexTwiceAndRetrieve(t *testing.T) {
 	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
 		lockManager := storage.NewTestingLockManager()
-		lctx := lockManager.NewContext()
-		err := lctx.AcquireLock(storage.LockInsertBlock)
-		require.NoError(t, err)
-		defer lctx.Release()
-
 		parentID := unittest.IdentifierFixture()
 		child1ID := unittest.IdentifierFixture()
 		child2ID := unittest.IdentifierFixture()
 
 		// index the first child
-		err = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			return procedure.IndexNewBlock(lctx, rw, child1ID, parentID)
+		err := unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
+			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+				return procedure.IndexNewBlock(lctx, rw, child1ID, parentID)
+			})
 		})
 		require.NoError(t, err)
 
 		// index the second child
-		err = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			return procedure.IndexNewBlock(lctx, rw, child2ID, parentID)
+		err = unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
+			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+				return procedure.IndexNewBlock(lctx, rw, child2ID, parentID)
+			})
 		})
 		require.NoError(t, err)
 
@@ -78,15 +75,12 @@ func TestIndexTwiceAndRetrieve(t *testing.T) {
 func TestIndexZeroParent(t *testing.T) {
 	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
 		lockManager := storage.NewTestingLockManager()
-		lctx := lockManager.NewContext()
-		err := lctx.AcquireLock(storage.LockInsertBlock)
-		require.NoError(t, err)
-		defer lctx.Release()
-
 		childID := unittest.IdentifierFixture()
 
-		err = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			return procedure.IndexNewBlock(lctx, rw, childID, flow.ZeroID)
+		err := unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
+			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+				return procedure.IndexNewBlock(lctx, rw, childID, flow.ZeroID)
+			})
 		})
 		require.NoError(t, err)
 
@@ -101,28 +95,29 @@ func TestIndexZeroParent(t *testing.T) {
 func TestDirectChildren(t *testing.T) {
 	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
 		lockManager := storage.NewTestingLockManager()
-		lctx := lockManager.NewContext()
-		err := lctx.AcquireLock(storage.LockInsertBlock)
-		require.NoError(t, err)
-		defer lctx.Release()
-
 		b1 := unittest.IdentifierFixture()
 		b2 := unittest.IdentifierFixture()
 		b3 := unittest.IdentifierFixture()
 		b4 := unittest.IdentifierFixture()
 
-		err = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			return procedure.IndexNewBlock(lctx, rw, b2, b1)
+		err := unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
+			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+				return procedure.IndexNewBlock(lctx, rw, b2, b1)
+			})
 		})
 		require.NoError(t, err)
 
-		err = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			return procedure.IndexNewBlock(lctx, rw, b3, b2)
+		err = unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
+			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+				return procedure.IndexNewBlock(lctx, rw, b3, b2)
+			})
 		})
 		require.NoError(t, err)
 
-		err = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			return procedure.IndexNewBlock(lctx, rw, b4, b3)
+		err = unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
+			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+				return procedure.IndexNewBlock(lctx, rw, b4, b3)
+			})
 		})
 		require.NoError(t, err)
 

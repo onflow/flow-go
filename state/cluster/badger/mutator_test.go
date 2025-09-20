@@ -202,15 +202,14 @@ func (suite *MutatorSuite) FinalizeBlock(block model.Block) {
 	err := operation.RetrieveHeader(suite.db.Reader(), block.Payload.ReferenceBlockID, &refBlock)
 	suite.Require().Nil(err)
 
-	lctx := suite.lockManager.NewContext()
-	defer lctx.Release()
-	require.NoError(suite.T(), lctx.AcquireLock(storage.LockInsertOrFinalizeClusterBlock))
-	err = suite.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-		err = procedure.FinalizeClusterBlock(lctx, rw, block.ID())
-		if err != nil {
-			return err
-		}
-		return operation.IndexClusterBlockByReferenceHeight(lctx, rw.Writer(), refBlock.Height, block.ID())
+	err = unittest.WithLock(suite.T(), suite.lockManager, storage.LockInsertOrFinalizeClusterBlock, func(lctx lockctx.Context) error {
+		return suite.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+			err := procedure.FinalizeClusterBlock(lctx, rw, block.ID())
+			if err != nil {
+				return err
+			}
+			return operation.IndexClusterBlockByReferenceHeight(lctx, rw.Writer(), refBlock.Height, block.ID())
+		})
 	})
 	suite.Assert().NoError(err)
 }

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/jordanschalm/lockctx"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/model/flow"
@@ -13,6 +14,7 @@ import (
 	"github.com/onflow/flow-go/storage/operation"
 	"github.com/onflow/flow-go/storage/operation/dbtest"
 	"github.com/onflow/flow-go/storage/store"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 func TestIterateHeight(t *testing.T) {
@@ -26,13 +28,12 @@ func TestIterateHeight(t *testing.T) {
 
 		// index height
 		for _, b := range bs {
-			lctx := lockManager.NewContext()
-			require.NoError(t, lctx.AcquireLock(storage.LockFinalizeBlock))
-			require.NoError(t, db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-				return operation.IndexFinalizedBlockByHeight(lctx, rw, b.Height, b.ID())
-			}))
-
-			lctx.Release()
+			err := unittest.WithLock(t, lockManager, storage.LockFinalizeBlock, func(lctx lockctx.Context) error {
+				return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+					return operation.IndexFinalizedBlockByHeight(lctx, rw, b.Height, b.ID())
+				})
+			})
+			require.NoError(t, err)
 		}
 
 		progress := &saveNextHeight{}
