@@ -2150,6 +2150,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				builder.TxResultErrorMessagesCore = tx_error_messages.NewTxErrorMessagesCore(
 					node.Logger,
 					notNil(builder.nodeBackend),
+					builder.lightTransactionResults,
 					builder.transactionResultErrorMessages,
 					notNil(builder.ExecNodeIdentitiesProvider),
 				)

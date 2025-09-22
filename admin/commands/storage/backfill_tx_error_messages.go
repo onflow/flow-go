@@ -11,6 +11,7 @@ import (
 	"github.com/onflow/flow-go/engine/access/ingestion/tx_error_messages"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
+	"github.com/onflow/flow-go/module/util"
 	"github.com/onflow/flow-go/state/protocol"
 )
 
@@ -153,17 +154,16 @@ func (b *BackfillTxErrorMessagesCommand) Handler(ctx context.Context, request *a
 	data := request.ValidatorData.(*backfillTxErrorMessagesRequest)
 
 	total := data.endHeight - data.startHeight + 1
-	progressTick := min(max(total/100, 1), 10_000) // 1% or at least every 10k blocks
-	progress := uint64(0)
+	progress := util.LogProgress(b.log,
+		util.DefaultLogProgressConfig("backfilling", int(total)),
+	)
 
-	lg := b.log.With().
-		Uint64("start-height", data.startHeight).
-		Uint64("end-height", data.endHeight).
-		Logger()
+	b.log.Info().
+		Uint64("start_height", data.startHeight).
+		Uint64("end_height", data.endHeight).
+		Uint64("blocks", total).
+		Msgf("starting backfill")
 
-	lg.Info().
-		Uint64("progress-tick", progressTick).
-		Msgf("starting to backfill")
 	for height := data.startHeight; height <= data.endHeight; height++ {
 		header, err := b.state.AtHeight(height).Head()
 		if err != nil {
@@ -176,17 +176,8 @@ func (b *BackfillTxErrorMessagesCommand) Handler(ctx context.Context, request *a
 			return nil, fmt.Errorf("error encountered while processing transaction result error message for block: %d, %w", height, err)
 		}
 
-		progress++
-
-		// periodically log progress
-		if progress%progressTick == 0 {
-			b.log.Info().
-				Uint64("height", height).
-				Uint64("progress_%", progress*100/total).
-				Msgf("update")
-		}
+		progress(1)
 	}
-	lg.Info().Msgf("finished")
 
 	return nil, nil
 }
@@ -197,36 +188,32 @@ func (b *BackfillTxErrorMessagesCommand) Handler(ctx context.Context, request *a
 // Expected errors during normal operation:
 // - admin.InvalidAdminReqParameterError - if execution-node-ids is empty or has an invalid format.
 func (b *BackfillTxErrorMessagesCommand) parseExecutionNodeIds(executionNodeIdsIn interface{}, allIdentities flow.IdentityList) (flow.IdentitySkeletonList, error) {
-	idStrings := make([]string, 0)
+	var ids flow.IdentityList
 	switch executionNodeIds := executionNodeIdsIn.(type) {
-	case []string:
-		for _, id := range executionNodeIds {
-			idStrings = append(idStrings, id)
-		}
 	case []any:
-		for _, id := range executionNodeIds {
-			idStrings = append(idStrings, id.(string))
+		if len(executionNodeIds) == 0 {
+			return nil, admin.NewInvalidAdminReqParameterError("execution-node-ids", "must be a non empty list of strings", executionNodeIdsIn)
+		}
+
+		idStrings := make([]string, len(executionNodeIds))
+		for i, id := range executionNodeIds {
+			idStrings[i] = id.(string)
+		}
+
+		requestedENIdentifiers, err := flow.IdentifierListFromHex(idStrings)
+		if err != nil {
+			return nil, admin.NewInvalidAdminReqParameterError("execution-node-ids", err.Error(), executionNodeIdsIn)
+		}
+
+		for _, enId := range requestedENIdentifiers {
+			id, exists := allIdentities.ByNodeID(enId)
+			if !exists {
+				return nil, admin.NewInvalidAdminReqParameterError("execution-node-ids", "could not find execution node by provided id", enId)
+			}
+			ids = append(ids, id)
 		}
 	default:
 		return nil, admin.NewInvalidAdminReqParameterError("execution-node-ids", "must be a list of strings", executionNodeIdsIn)
-	}
-
-	if len(idStrings) == 0 {
-		return nil, admin.NewInvalidAdminReqParameterError("execution-node-ids", "must be a non empty list of strings", executionNodeIdsIn)
-	}
-
-	requestedENIdentifiers, err := flow.IdentifierListFromHex(idStrings)
-	if err != nil {
-		return nil, admin.NewInvalidAdminReqParameterError("execution-node-ids", err.Error(), executionNodeIdsIn)
-	}
-
-	var ids flow.IdentityList
-	for _, enId := range requestedENIdentifiers {
-		id, exists := allIdentities.ByNodeID(enId)
-		if !exists {
-			return nil, admin.NewInvalidAdminReqParameterError("execution-node-ids", "could not find execution node by provided id", enId)
-		}
-		ids = append(ids, id)
 	}
 
 	return ids.ToSkeleton(), nil

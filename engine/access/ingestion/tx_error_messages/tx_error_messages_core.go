@@ -22,6 +22,7 @@ type TxErrorMessagesCore struct {
 	log zerolog.Logger // used to log relevant actions with context
 
 	backend                        *backend.Backend
+	results                        storage.LightTransactionResults
 	transactionResultErrorMessages storage.TransactionResultErrorMessages
 	execNodeIdentitiesProvider     *commonrpc.ExecutionNodeIdentitiesProvider
 }
@@ -30,12 +31,14 @@ type TxErrorMessagesCore struct {
 func NewTxErrorMessagesCore(
 	log zerolog.Logger,
 	backend *backend.Backend,
+	results storage.LightTransactionResults,
 	transactionResultErrorMessages storage.TransactionResultErrorMessages,
 	execNodeIdentitiesProvider *commonrpc.ExecutionNodeIdentitiesProvider,
 ) *TxErrorMessagesCore {
 	return &TxErrorMessagesCore{
 		log:                            log.With().Str("module", "tx_error_messages_core").Logger(),
 		backend:                        backend,
+		results:                        results,
 		transactionResultErrorMessages: transactionResultErrorMessages,
 		execNodeIdentitiesProvider:     execNodeIdentitiesProvider,
 	}
@@ -73,6 +76,22 @@ func (c *TxErrorMessagesCore) HandleTransactionResultErrorMessagesByENs(
 	}
 
 	if exists {
+		return nil
+	}
+
+	results, err := c.results.ByBlockID(blockID)
+	if err != nil {
+		return fmt.Errorf("could not get transaction results: %w", err)
+	}
+
+	hasErrors := false
+	for _, result := range results {
+		if result.Failed {
+			hasErrors = true
+			break
+		}
+	}
+	if !hasErrors {
 		return nil
 	}
 

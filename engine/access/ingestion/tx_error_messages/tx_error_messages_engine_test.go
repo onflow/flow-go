@@ -44,6 +44,7 @@ type TxErrorMessagesEngineSuite struct {
 	}
 	headers         *storage.Headers
 	receipts        *storage.ExecutionReceipts
+	results         *storage.LightTransactionResults
 	txErrorMessages *storage.TransactionResultErrorMessages
 
 	enNodeIDs   flow.IdentityList
@@ -85,6 +86,7 @@ func (s *TxErrorMessagesEngineSuite) SetupTest() {
 	s.connFactory = connectionmock.NewConnectionFactory(s.T())
 	s.headers = storage.NewHeaders(s.T())
 	s.receipts = storage.NewExecutionReceipts(s.T())
+	s.results = storage.NewLightTransactionResults(s.T())
 	s.txErrorMessages = storage.NewTransactionResultErrorMessages(s.T())
 
 	blockCount := 5
@@ -165,6 +167,7 @@ func (s *TxErrorMessagesEngineSuite) initEngine(ctx irrecoverable.SignalerContex
 	txResultErrorMessagesCore := NewTxErrorMessagesCore(
 		s.log,
 		backend,
+		s.results,
 		s.txErrorMessages,
 		execNodeIdentitiesProvider,
 	)
@@ -221,6 +224,9 @@ func (s *TxErrorMessagesEngineSuite) TestOnFinalizedBlockHandleTxErrorMessages()
 
 		// Create mock transaction results with a mix of failed and non-failed transactions.
 		resultsByBlockID := mockTransactionResultsByBlock(5)
+
+		s.results.On("ByBlockID", blockID).
+			Return(resultsByBlockID, nil).Once()
 
 		// Prepare a request to fetch transaction error messages by block ID from execution nodes.
 		exeEventReq := &execproto.GetTransactionErrorMessagesByBlockIDRequest{
