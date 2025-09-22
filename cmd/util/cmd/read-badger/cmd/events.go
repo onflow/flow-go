@@ -29,8 +29,8 @@ func init() {
 var eventsCmd = &cobra.Command{
 	Use:   "events",
 	Short: "Read events",
-	Run: func(cmd *cobra.Command, args []string) {
-		err := WithStorage(func(db storage.DB) error {
+	RunE: func(cmd *cobra.Command, args []string) error {
+		return common.WithStorage(flagDatadir, func(db storage.DB) error {
 			events := store.NewEvents(metrics.NewNoopCollector(), db)
 
 			if flagEventType != "" && flagTransactionID != "" {
@@ -98,9 +98,5 @@ var eventsCmd = &cobra.Command{
 
 			return nil
 		})
-
-		if err != nil {
-			log.Error().Err(err).Msg("could not get events")
-		}
 	},
 }
