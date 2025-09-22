@@ -695,10 +695,10 @@ func (rf *ResultsForest) OnBlockFinalized(finalized *flow.Block) error {
 	// 1. Iterate all results for the finalized block's parent
 	// 2. For each of the results' children, mark the result as finalized if its executed block
 	//    matches the finalized block, otherwise, abandon the fork.
-	for container := range rf.iterateView(finalized.ParentView) {
-		for sibling := range rf.iterateChildren(container.ResultID()) {
-			if sibling.BlockView() == finalized.View {
-				if err := sibling.SetBlockStatus(BlockStatusFinalized); err != nil {
+	for parent := range rf.iterateView(finalized.ParentView) {
+		for container := range rf.iterateChildren(parent.ResultID()) {
+			if container.BlockView() == finalized.View {
+				if err := container.SetBlockStatus(BlockStatusFinalized); err != nil {
 					return fmt.Errorf("failed to set block status to finalized: %w", err)
 				}
 				continue
@@ -706,12 +706,12 @@ func (rf *ResultsForest) OnBlockFinalized(finalized *flow.Block) error {
 
 			// sanity check: this result's block conflicts with the latest finalized block. it must
 			// not be marked as finalized or the forest is in an inconsistent state.
-			if sibling.BlockStatus() == BlockStatusFinalized {
+			if container.BlockStatus() == BlockStatusFinalized {
 				return fmt.Errorf("result (%s) was marked finalized, but its block's view (%d) is different from the latest finalized block (%d)",
-					sibling.ResultID(), sibling.BlockView(), finalized.View)
+					container.ResultID(), container.BlockView(), finalized.View)
 			}
 
-			rf.abandonFork(sibling)
+			rf.abandonFork(container)
 		}
 	}
 
@@ -760,9 +760,9 @@ func (rf *ResultsForest) OnBlockFinalized(finalized *flow.Block) error {
 // OnStateUpdated is called by pipeline state machines when their state changes, and propagates the
 // state update to all children of the result.
 //
-// WARNING: we are assuming a strict ordering of events of the type `OnStateUpdated` from different pipelines
-// across the forest. This is because `processCompleted` requires a strict ancestor first order of `StateComplete`
-// in order of sealing.
+// WARNING: we are assuming a strict ordering of events of the type `OnStateUpdated` from different
+// pipelines across the forest. This is because `processCompleted` requires a strict ancestor first
+// order of `StateComplete` in order of sealing.
 func (rf *ResultsForest) OnStateUpdated(resultID flow.Identifier, newState optimistic_sync.State) {
 	// abandoned status is propagated to all descendants synchronously, so no need to traverse again here.
 	if newState == optimistic_sync.StateAbandoned {
@@ -800,8 +800,8 @@ func (rf *ResultsForest) processCompleted(resultID flow.Identifier) error {
 
 	// next, ensure that this result matches the latest persisted sealed result, otherwise
 	// the forest is in an inconsistent state since persisting must be done sequentially
-	// Note: In practise this means that we are expecting a strict sequentiality of events `OnStateUpdated` when
-	// the next pipeline reaches `optimistic_sync.StateComplete`.
+	// Note: In practice this means that we are expecting a strict sequentiality of events
+	// `OnStateUpdated` when the next pipeline reaches `optimistic_sync.StateComplete`.
 	latestResultID, _ := rf.latestPersistedSealedResult.Latest()
 	if container.ResultID() != latestResultID {
 		return fmt.Errorf("completed result %s does not match latest persisted sealed result %s",
