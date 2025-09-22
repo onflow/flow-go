@@ -7,17 +7,13 @@ import (
 )
 
 // DKGMessage is the type of message exchanged between DKG nodes.
-type DKGMessage struct {
-	Data          []byte
-	DKGInstanceID string
-}
+type DKGMessage flow.DKGMessage
 
-// NewDKGMessage creates a new DKGMessage.
-func NewDKGMessage(data []byte, dkgInstanceID string) DKGMessage {
-	return DKGMessage{
-		Data:          data,
-		DKGInstanceID: dkgInstanceID,
-	}
+// ToInternal returns the internal type representation for DKGMessage.
+//
+// All errors indicate that the decode target contains a structurally invalid representation of the internal flow.DKGMessage.
+func (d *DKGMessage) ToInternal() (any, error) {
+	return (*flow.DKGMessage)(d), nil
 }
 
 // PrivDKGMessageIn is a wrapper around a DKGMessage containing the network ID
