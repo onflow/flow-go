@@ -31,16 +31,14 @@ func TestChunkDataPack(t *testing.T) {
 		})
 
 		t.Run("Save", func(t *testing.T) {
-			err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-				unittest.WithLock(t, lockManager, storage.LockInsertChunkDataPack, func(lctx lockctx.Context) error {
+			unittest.WithLock(t, lockManager, storage.LockInsertChunkDataPack, func(lctx lockctx.Context) error {
+				return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 					return operation.InsertChunkDataPack(lctx, rw, expected)
 				})
-				return nil
 			})
-			require.NoError(t, err)
 
 			var actual storage.StoredChunkDataPack
-			err = operation.RetrieveChunkDataPack(db.Reader(), expected.ChunkID, &actual)
+			err := operation.RetrieveChunkDataPack(db.Reader(), expected.ChunkID, &actual)
 			assert.NoError(t, err)
 
 			assert.Equal(t, *expected, actual)

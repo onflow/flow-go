@@ -23,8 +23,7 @@ func TestChunkDataPacks_Store(t *testing.T) {
 	WithChunkDataPacks(t, 100, func(t *testing.T, chunkDataPacks []*flow.ChunkDataPack, chunkDataPackStore *store.ChunkDataPacks, _ *pebble.DB, lockManager storage.LockManager) {
 		unittest.WithLock(t, lockManager, storage.LockInsertChunkDataPack, func(lctx lockctx.Context) error {
 			require.NoError(t, chunkDataPackStore.Store(lctx, chunkDataPacks))
-			require.NoError(t, chunkDataPackStore.Store(lctx, chunkDataPacks))
-			return nil
+			return chunkDataPackStore.Store(lctx, chunkDataPacks)
 		})
 	})
 }
@@ -51,8 +50,7 @@ func TestChunkDataPack_Remove(t *testing.T) {
 		}
 
 		unittest.WithLock(t, lockManager, storage.LockInsertChunkDataPack, func(lctx lockctx.Context) error {
-			require.NoError(t, chunkDataPackStore.Store(lctx, chunkDataPacks))
-			return nil
+			return chunkDataPackStore.Store(lctx, chunkDataPacks)
 		})
 		require.NoError(t, chunkDataPackStore.Remove(chunkIDs))
 
@@ -96,8 +94,7 @@ func TestChunkDataPacks_StoreTwice(t *testing.T) {
 				require.Equal(t, c, c2)
 			}
 
-			require.NoError(t, store1.Store(lctx, chunkDataPacks))
-			return nil
+			return store1.Store(lctx, chunkDataPacks)
 		})
 	})
 }

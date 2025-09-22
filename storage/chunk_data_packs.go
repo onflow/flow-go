@@ -4,6 +4,7 @@ import (
 	"bytes"
 
 	"github.com/jordanschalm/lockctx"
+
 	"github.com/onflow/flow-go/model/flow"
 )
 
