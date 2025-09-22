@@ -26,8 +26,12 @@ func IndexNewBlock(lctx lockctx.Proof, rw storage.ReaderBatchWriter, blockID flo
 	return insertNewBlock(rw, blockID, parentID)
 }
 
-// IndexNewRootBlock indexes a new root block by creating an empty children index for it.
-// This function is used for root blocks that have no parent and should not be added to any parent's children list.
+// IndexNewRootBlock indexes a new root block by creating an empty children index for it
+// WITHOUT adding the input block to any parent's child list.
+// This function is used:
+//   - for spork root blocks whose parent block is in a prior spork
+//   - for the sealed root block of a root snapshot, when a node uses Dynamic Bootstrapping.
+//     In this case the parent block is stored in the database for reference but excluded from indexing.
 //
 // CAUTION:
 //   - The caller must acquire the [storage.LockInsertBlock] and hold it until the database write has been committed.
