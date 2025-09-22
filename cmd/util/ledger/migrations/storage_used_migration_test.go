@@ -74,6 +74,10 @@ func TestAccountStatusMigration(t *testing.T) {
 	t.Run("status register v1", func(t *testing.T) {
 		t.Parallel()
 
+		accountPublicKeyCount := uint32(5)
+		statusPayloadAndSequenceNubmerSize := sizeOfTheStatusPayload +
+			predefinedSequenceNumberPayloadSizes(string(address[:]), 1, accountPublicKeyCount)
+
 		payloads := []*ledger.Payload{
 			ledger.NewPayload(
 				ledger.NewKey([]ledger.KeyPart{ownerKey, {Type: 2, Value: []byte(flow.AccountStatusKey)}}),
@@ -93,13 +97,17 @@ func TestAccountStatusMigration(t *testing.T) {
 		accountStatus, err := environment.AccountStatusFromBytes(migrated[0].Value())
 		require.NoError(t, err)
 
-		require.Equal(t, sizeOfTheStatusPayload, accountStatus.StorageUsed())
+		require.Equal(t, statusPayloadAndSequenceNubmerSize, accountStatus.StorageUsed())
 		require.Equal(t, atree.SlabIndex{0, 0, 0, 0, 0, 0, 0, 6}, accountStatus.SlabIndex())
-		require.Equal(t, uint32(5), accountStatus.AccountPublicKeyCount())
+		require.Equal(t, accountPublicKeyCount, accountStatus.AccountPublicKeyCount())
 		require.Equal(t, uint64(0), accountStatus.AccountIdCounter())
 	})
 	t.Run("status register v2", func(t *testing.T) {
 		t.Parallel()
+
+		accountPublicKeyCount := uint32(5)
+		statusPayloadAndSequenceNubmerSize := sizeOfTheStatusPayload +
+			predefinedSequenceNumberPayloadSizes(string(address[:]), 1, accountPublicKeyCount)
 
 		payloads := []*ledger.Payload{
 			ledger.NewPayload(
@@ -121,14 +129,18 @@ func TestAccountStatusMigration(t *testing.T) {
 		accountStatus, err := environment.AccountStatusFromBytes(migrated[0].Value())
 		require.NoError(t, err)
 
-		require.Equal(t, sizeOfTheStatusPayload, accountStatus.StorageUsed())
+		require.Equal(t, statusPayloadAndSequenceNubmerSize, accountStatus.StorageUsed())
 		require.Equal(t, atree.SlabIndex{0, 0, 0, 0, 0, 0, 0, 6}, accountStatus.SlabIndex())
-		require.Equal(t, uint32(5), accountStatus.AccountPublicKeyCount())
+		require.Equal(t, accountPublicKeyCount, accountStatus.AccountPublicKeyCount())
 		require.Equal(t, uint64(3), accountStatus.AccountIdCounter())
 	})
 
 	t.Run("status register v3", func(t *testing.T) {
 		t.Parallel()
+
+		accountPublicKeyCount := uint32(5)
+		statusPayloadAndSequenceNubmerSize := sizeOfTheStatusPayload +
+			predefinedSequenceNumberPayloadSizes(string(address[:]), 1, accountPublicKeyCount)
 
 		payloads := []*ledger.Payload{
 			ledger.NewPayload(
@@ -150,14 +162,18 @@ func TestAccountStatusMigration(t *testing.T) {
 		accountStatus, err := environment.AccountStatusFromBytes(migrated[0].Value())
 		require.NoError(t, err)
 
-		require.Equal(t, sizeOfTheStatusPayload, accountStatus.StorageUsed())
+		require.Equal(t, statusPayloadAndSequenceNubmerSize, accountStatus.StorageUsed())
 		require.Equal(t, atree.SlabIndex{0, 0, 0, 0, 0, 0, 0, 6}, accountStatus.SlabIndex())
-		require.Equal(t, uint32(5), accountStatus.AccountPublicKeyCount())
+		require.Equal(t, accountPublicKeyCount, accountStatus.AccountPublicKeyCount())
 		require.Equal(t, uint64(3), accountStatus.AccountIdCounter())
 	})
 
 	t.Run("data registers", func(t *testing.T) {
 		t.Parallel()
+
+		accountPublicKeyCount := uint32(5)
+		statusPayloadAndSequenceNubmerSize := sizeOfTheStatusPayload +
+			predefinedSequenceNumberPayloadSizes(string(address[:]), 1, accountPublicKeyCount)
 
 		payloads := []*ledger.Payload{
 			ledger.NewPayload(
@@ -200,9 +216,9 @@ func TestAccountStatusMigration(t *testing.T) {
 			make([]byte, 100),
 		))
 
-		require.Equal(t, sizeOfTheStatusPayload+dataRegisterSize, accountStatus.StorageUsed())
+		require.Equal(t, statusPayloadAndSequenceNubmerSize+dataRegisterSize, accountStatus.StorageUsed())
 		require.Equal(t, atree.SlabIndex{0, 0, 0, 0, 0, 0, 0, 6}, accountStatus.SlabIndex())
-		require.Equal(t, uint32(5), accountStatus.AccountPublicKeyCount())
+		require.Equal(t, accountPublicKeyCount, accountStatus.AccountPublicKeyCount())
 		require.Equal(t, uint64(3), accountStatus.AccountIdCounter())
 	})
 }

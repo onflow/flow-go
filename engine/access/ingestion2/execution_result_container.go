@@ -8,6 +8,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/counters"
 	"github.com/onflow/flow-go/module/executiondatasync/optimistic_sync"
+	"github.com/onflow/flow-go/module/forest"
 )
 
 // ErrIncompatibleReceipt is returned when an execution receipt is added to a container for a
@@ -30,6 +31,8 @@ type ExecutionResultContainer struct {
 	mu sync.RWMutex
 }
 
+var _ forest.Vertex = (*ExecutionResultContainer)(nil)
+
 // NewExecutionResultContainer creates a new instance of ExecutionResultContainer. Conceptually,
 // this is a set of execution receipts all committing to the *same* execution `result` for the
 // specified block.
@@ -38,7 +41,6 @@ type ExecutionResultContainer struct {
 func NewExecutionResultContainer(
 	result *flow.ExecutionResult,
 	header *flow.Header,
-	blockStatus BlockStatus,
 	pipeline optimistic_sync.Pipeline,
 ) (*ExecutionResultContainer, error) {
 	// sanity check: initial result must be for block
@@ -46,26 +48,21 @@ func NewExecutionResultContainer(
 		return nil, fmt.Errorf("initial result is for different block")
 	}
 
-	c := &ExecutionResultContainer{
+	return &ExecutionResultContainer{
 		receipts:    make(map[flow.Identifier]*flow.ExecutionReceiptStub),
 		result:      result,
 		resultID:    result.ID(),
 		blockHeader: header,
 		pipeline:    pipeline,
 		blockStatus: counters.NewMonotonicCounter(uint64(BlockStatusCertified)),
-	}
-
-	c.SetBlockStatus(blockStatus)
-
-	return c, nil
+	}, nil
 }
 
 // AddReceipt adds the given execution receipt to the container.
 // Returns the number of receipts added (0 if receipt already exists, 1 if added).
 //
-// Expected errors during normal operations:
-//   - ErrIncompatibleReceipt: if the receipt's execution result is different from the container's result ID
-//   - All other errors are potential indicators of bugs or corrupted internal state (continuation impossible)
+// Expected error returns during normal operations:
+//   - [ErrIncompatibleReceipt]: if the receipt's execution result is different from the container's result ID
 func (c *ExecutionResultContainer) AddReceipt(receipt *flow.ExecutionReceipt) (uint, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -76,18 +73,17 @@ func (c *ExecutionResultContainer) AddReceipt(receipt *flow.ExecutionReceipt) (u
 // AddReceipts adds execution receipts to the container.
 // Returns the total number of receipts added.
 //
-// Expected errors during normal operations:
-//   - ErrIncompatibleReceipt: if any of the receipts is for a result that is different from the container's result ID
-//   - All other errors are potential indicators of bugs or corrupted internal state (continuation impossible)
+// Expected error returns during normal operations:
+//   - [ErrIncompatibleReceipt]: if any of the receipts is for a result that is different from the container's result ID
 func (c *ExecutionResultContainer) AddReceipts(receipts ...*flow.ExecutionReceipt) (uint, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
 	receiptsAdded := uint(0)
-	for i := range receipts {
-		added, err := c.addReceipt(receipts[i])
+	for _, receipt := range receipts {
+		added, err := c.addReceipt(receipt)
 		if err != nil {
-			return receiptsAdded, fmt.Errorf("failed to add receipt (%x) to equivalence class: %w", receipts[i].ID(), err)
+			return receiptsAdded, fmt.Errorf("failed to add receipt (%x) to equivalence class: %w", receipt.ID(), err)
 		}
 		receiptsAdded += added
 	}
@@ -98,9 +94,8 @@ func (c *ExecutionResultContainer) AddReceipts(receipts ...*flow.ExecutionReceip
 // Returns the number of receipts added (0 if receipt already exists, 1 if added).
 // CAUTION: not concurrency safe! Caller must hold a lock.
 //
-// Expected errors during normal operations:
-//   - ErrIncompatibleReceipt: if the receipt's execution result is different from the container's result ID
-//   - All other errors are potential indicators of bugs or corrupted internal state (continuation impossible)
+// Expected error returns during normal operations:
+//   - [ErrIncompatibleReceipt]: if the receipt's execution result is different from the container's result ID
 func (c *ExecutionResultContainer) addReceipt(receipt *flow.ExecutionReceipt) (uint, error) {
 	resultID := receipt.ExecutionResult.ID()
 	if resultID != c.resultID {
@@ -173,12 +168,20 @@ func (c *ExecutionResultContainer) BlockStatus() BlockStatus {
 }
 
 // SetBlockStatus sets the block status of the block executed by this result.
-func (c *ExecutionResultContainer) SetBlockStatus(blockStatus BlockStatus) {
+func (c *ExecutionResultContainer) SetBlockStatus(blockStatus BlockStatus) error {
 	if c.blockStatus.Set(uint64(blockStatus)) {
 		if blockStatus == BlockStatusSealed {
 			c.pipeline.SetSealed()
 		}
+		return nil
 	}
+
+	// The update failed, so it was either a no-op or an invalid transition.
+	if c.BlockStatus().IsValidTransition(blockStatus) {
+		return nil
+	}
+
+	return fmt.Errorf("invalid block status transition: %s -> %s", c.BlockStatus(), blockStatus)
 }
 
 // Methods implementing LevelledForest's Vertex interface

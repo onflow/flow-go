@@ -1,6 +1,6 @@
 package ingestion2
 
-// BlockStatus represents the state of a block in the forest.
+// BlockStatus represents the status of a block in the forest.
 type BlockStatus uint64
 
 const (
@@ -12,7 +12,7 @@ const (
 	BlockStatusSealed
 )
 
-// String returns the string representation of the block state
+// String returns the string representation of the block status
 func (bs BlockStatus) String() string {
 	switch bs {
 	case BlockStatusCertified:
@@ -23,5 +23,30 @@ func (bs BlockStatus) String() string {
 		return "sealed"
 	default:
 		return "unknown"
+	}
+}
+
+// IsValid returns true if the block status is a valid value.
+func (bs BlockStatus) IsValid() bool {
+	switch bs {
+	case BlockStatusCertified, BlockStatusFinalized, BlockStatusSealed:
+		return true
+	default:
+		return false
+	}
+}
+
+// IsValidTransition returns true if the block status can be transitioned to the given status.
+func (bs BlockStatus) IsValidTransition(to BlockStatus) bool {
+	if to == bs {
+		return true
+	}
+	switch bs {
+	case BlockStatusCertified:
+		return to == BlockStatusFinalized || to == BlockStatusSealed
+	case BlockStatusFinalized:
+		return to == BlockStatusSealed
+	default:
+		return false
 	}
 }

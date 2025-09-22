@@ -6,6 +6,7 @@ import (
 	"golang.org/x/sync/errgroup"
 
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/channels"
 )
@@ -51,7 +52,11 @@ func (r *Relayer) Process(channel channels.Channel, originID flow.Identifier, ev
 	})
 
 	g.Go(func() error {
-		if err := r.destinationConduit.Publish(event, flow.ZeroID); err != nil {
+		msg, err := messages.InternalToMessage(event)
+		if err != nil {
+			return fmt.Errorf("failed to convert event to message: %v", err)
+		}
+		if err := r.destinationConduit.Publish(msg, flow.ZeroID); err != nil {
 			return fmt.Errorf("failed to relay message to network: %w", err)
 		}
 

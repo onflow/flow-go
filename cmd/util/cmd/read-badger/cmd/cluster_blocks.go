@@ -1,13 +1,16 @@
 package cmd
 
 import (
+	"fmt"
+
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 
 	"github.com/onflow/flow-go/cmd/util/cmd/common"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
-	"github.com/onflow/flow-go/storage/badger"
+	"github.com/onflow/flow-go/storage"
+	"github.com/onflow/flow-go/storage/store"
 )
 
 var flagChainName string
@@ -27,60 +30,52 @@ func init() {
 var clusterBlocksCmd = &cobra.Command{
 	Use:   "cluster-blocks",
 	Short: "get cluster blocks",
-	Run: func(cmd *cobra.Command, args []string) {
-		metrics := metrics.NewNoopCollector()
-		flagDBs := common.ReadDBFlags()
-		db, err := common.InitBadgerStorage(flagDBs)
-		if err != nil {
-			log.Fatal().Err(err).Msg("could not init badger db")
-		}
-		defer db.Close()
+	RunE: func(cmd *cobra.Command, args []string) error {
+		return common.WithStorage(flagDatadir, func(db storage.DB) error {
+			metrics := metrics.NewNoopCollector()
 
-		headers := badger.NewHeaders(metrics, db)
-		clusterPayloads := badger.NewClusterPayloads(metrics, db)
+			headers := store.NewHeaders(metrics, db)
+			clusterPayloads := store.NewClusterPayloads(metrics, db)
 
-		// get chain id
-		log.Info().Msgf("got flag chain name: %s", flagChainName)
-		chainID := flow.ChainID(flagChainName)
-		clusterBlocks := badger.NewClusterBlocks(db, chainID, headers, clusterPayloads)
+			// get chain id
+			log.Info().Msgf("got flag chain name: %s", flagChainName)
+			chainID := flow.ChainID(flagChainName)
+			clusterBlocks := store.NewClusterBlocks(db, chainID, headers, clusterPayloads)
 
-		if flagClusterBlockID != "" && flagHeight != 0 {
-			log.Error().Msg("provide either a --id or --height and not both")
-			return
-		}
-
-		if flagClusterBlockID != "" {
-			log.Info().Msgf("got flag cluster block id: %s", flagClusterBlockID)
-			clusterBlockID, err := flow.HexStringToIdentifier(flagClusterBlockID)
-			if err != nil {
-				log.Error().Err(err).Msg("malformed cluster block id")
-				return
+			if flagClusterBlockID != "" && flagHeight != 0 {
+				return fmt.Errorf("provide either a --id or --height and not both")
 			}
 
-			log.Info().Msgf("getting cluster block by id: %v", clusterBlockID)
-			clusterBlock, err := clusterBlocks.ProposalByID(clusterBlockID)
-			if err != nil {
-				log.Error().Err(err).Msgf("could not get cluster block with id: %v", clusterBlockID)
-				return
+			if flagClusterBlockID != "" {
+				log.Info().Msgf("got flag cluster block id: %s", flagClusterBlockID)
+				clusterBlockID, err := flow.HexStringToIdentifier(flagClusterBlockID)
+				if err != nil {
+					return fmt.Errorf("malformed cluster block id: %w", err)
+				}
+
+				log.Info().Msgf("getting cluster block by id: %v", clusterBlockID)
+				clusterBlock, err := clusterBlocks.ProposalByID(clusterBlockID)
+				if err != nil {
+					return fmt.Errorf("could not get cluster block with id: %v, %w", clusterBlockID, err)
+				}
+
+				common.PrettyPrint(clusterBlock)
+				return nil
 			}
 
-			common.PrettyPrint(clusterBlock)
-			return
-		}
+			if flagHeight > 0 {
+				log.Info().Msgf("getting cluster block by height: %v", flagHeight)
+				clusterBlock, err := clusterBlocks.ProposalByHeight(flagHeight)
+				if err != nil {
+					return fmt.Errorf("could not get cluster block with height: %v, %w", flagHeight, err)
+				}
 
-		if flagClusterBlockID != "" {
-			log.Info().Msgf("getting cluster block by height: %v", flagHeight)
-			clusterBlock, err := clusterBlocks.ProposalByHeight(flagHeight)
-			if err != nil {
-				log.Error().Err(err).Msgf("could not get cluster block with height: %v", flagHeight)
-				return
+				log.Info().Msgf("block id: %v", clusterBlock.Block.ID())
+				common.PrettyPrint(clusterBlock)
+				return nil
 			}
 
-			log.Info().Msgf("block id: %v", clusterBlock.Block.ID())
-			common.PrettyPrint(clusterBlock)
-			return
-		}
-
-		log.Error().Msg("provide either a --id or --height")
+			return fmt.Errorf("provide either a --id or --height")
+		})
 	},
 }

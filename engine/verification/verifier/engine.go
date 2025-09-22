@@ -142,7 +142,7 @@ func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 	switch resource := event.(type) {
 	case *verification.VerifiableChunkData:
 		err = e.verifiableChunkHandler(originID, resource)
-	case *messages.ApprovalRequest:
+	case *flow.ApprovalRequest:
 		err = e.approvalRequestHandler(originID, resource)
 	default:
 		return fmt.Errorf("invalid event type (%T)", event)
@@ -304,7 +304,7 @@ func (e *Engine) verify(ctx context.Context, originID flow.Identifier,
 	}
 
 	// broadcast result approval to the consensus nodes
-	err = e.pushConduit.Publish(approval, consensusNodes.NodeIDs()...)
+	err = e.pushConduit.Publish((*messages.ResultApproval)(approval), consensusNodes.NodeIDs()...)
 	if err != nil {
 		// TODO this error needs more advance handling after MVP
 		return fmt.Errorf("could not submit result approval: %w", err)
@@ -317,20 +317,23 @@ func (e *Engine) verify(ctx context.Context, originID flow.Identifier,
 }
 
 // storeApproval stores the result approval in the database.
+// Concurrency safe and guarantees that an approval for a result is never
+// overwritten by a different one (enforcing protocol rule that Verifier
+// must never publish two different approvals for the same chunk).
 // No errors are expected during normal operations.
-// concurrency safe and guarantees that an approval for a result
-// is never overwritten by a different one
 func (e *Engine) storeApproval(approval *flow.ResultApproval) error {
+	// create deferred operation for storing approval in the database
+	storing := e.approvals.StoreMyApproval(approval)
+
 	lctx := e.lockManager.NewContext()
 	defer lctx.Release()
 
-	err := lctx.AcquireLock(storage.LockMyResultApproval)
+	err := lctx.AcquireLock(storage.LockIndexResultApproval)
 	if err != nil {
 		return fmt.Errorf("fail to acquire lock to insert result approval: %w", err)
 	}
 
-	// store the approval in the database
-	err = e.approvals.StoreMyApproval(lctx, approval)
+	err = storing(lctx)
 	if err != nil {
 		return fmt.Errorf("could not store result approval: %w", err)
 	}
@@ -422,7 +425,7 @@ func (e *Engine) verifiableChunkHandler(originID flow.Identifier, ch *verificati
 	return nil
 }
 
-func (e *Engine) approvalRequestHandler(originID flow.Identifier, req *messages.ApprovalRequest) error {
+func (e *Engine) approvalRequestHandler(originID flow.Identifier, req *flow.ApprovalRequest) error {
 
 	log := e.log.With().
 		Hex("origin_id", logging.ID(originID)).
@@ -449,7 +452,7 @@ func (e *Engine) approvalRequestHandler(originID flow.Identifier, req *messages.
 
 	response := &messages.ApprovalResponse{
 		Nonce:    req.Nonce,
-		Approval: *approval,
+		Approval: flow.UntrustedResultApproval(*approval),
 	}
 
 	err = e.pullConduit.Unicast(response, originID)

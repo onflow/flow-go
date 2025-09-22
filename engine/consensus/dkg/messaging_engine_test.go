@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
+	"github.com/onflow/flow-go/model/flow"
 	msg "github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module/dkg"
 	"github.com/onflow/flow-go/module/irrecoverable"
@@ -68,10 +69,10 @@ func (ms *MessagingEngineSuite) TestForwardOutgoingMessages() {
 
 	// expected DKGMessage
 	destinationID := unittest.IdentifierFixture()
-	expectedMsg := msg.NewDKGMessage(
-		[]byte("hello"),
-		"dkg-123",
-	)
+	expectedMsg := msg.DKGMessage{
+		Data:          []byte("hello"),
+		DKGInstanceID: "dkg-123",
+	}
 
 	done := make(chan struct{})
 	ms.conduit.On("Unicast", &expectedMsg, destinationID).
@@ -95,8 +96,9 @@ func (ms *MessagingEngineSuite) TestForwardIncomingMessages() {
 	defer cancel()
 
 	originID := unittest.IdentifierFixture()
+	dkgMessage := flow.DKGMessage{Data: []byte("hello"), DKGInstanceID: "dkg-123"}
 	expectedMsg := msg.PrivDKGMessageIn{
-		DKGMessage: msg.NewDKGMessage([]byte("hello"), "dkg-123"),
+		DKGMessage: (msg.DKGMessage)(dkgMessage),
 		OriginID:   originID,
 	}
 
@@ -108,7 +110,7 @@ func (ms *MessagingEngineSuite) TestForwardIncomingMessages() {
 		close(done)
 	}()
 
-	err := ms.engine.Process(channels.DKGCommittee, originID, &expectedMsg.DKGMessage)
+	err := ms.engine.Process(channels.DKGCommittee, originID, &dkgMessage)
 	require.NoError(ms.T(), err)
 
 	unittest.RequireCloseBefore(ms.T(), done, time.Second, "message not received")

@@ -102,7 +102,7 @@ func receiptsWithSameResultFixture(
 
 			require.Equal(t, result.ID(), receipt.ExecutionResult.ID())
 
-			event := executionReceiptEvent(receipt, targetIds)
+			event := executionReceiptEvent((*messages.ExecutionReceipt)(receipt), targetIds)
 
 			_, ok := eventMap[receipt.ID()]
 			require.False(t, ok) // check for duplicate receipts.
@@ -117,7 +117,7 @@ func receiptsWithSameResultFixture(
 }
 
 // executionReceiptEvent creates the orchestrator network event of the corresponding execution receipt.
-func executionReceiptEvent(receipt *flow.ExecutionReceipt, targetIds flow.IdentifierList) *insecure.EgressEvent {
+func executionReceiptEvent(receipt *messages.ExecutionReceipt, targetIds flow.IdentifierList) *insecure.EgressEvent {
 	return &insecure.EgressEvent{
 		CorruptOriginId:   receipt.ExecutorID,
 		Channel:           channels.PushReceipts,
@@ -143,7 +143,7 @@ func chunkDataPackResponseForReceipts(receipts []*flow.ExecutionReceipt, verIds 
 			}
 
 			cdpRep := &messages.ChunkDataResponse{
-				ChunkDataPack: *unittest.ChunkDataPackFixture(chunkId),
+				ChunkDataPack: flow.UntrustedChunkDataPack(*unittest.ChunkDataPackFixture(chunkId)),
 			}
 			chunkIds = chunkIds.Union(flow.IdentifierList{chunkId})
 
@@ -207,14 +207,21 @@ func orchestratorOutputSanityCheck(
 
 	for _, outputEvent := range outputEvents {
 		switch event := outputEvent.FlowProtocolEvent.(type) {
-		case *flow.ExecutionReceipt:
+		case *messages.ExecutionReceipt:
 			if len(event.ExecutorSignature.Bytes()) != 0 {
 				// a receipt with a non-empty signature is a pass-through receipt.
 				// makes sure sender is a corrupted execution node.
 				ok := corrEnIds.Contains(outputEvent.CorruptOriginId)
 				require.True(t, ok)
+
+				internalEvent, err := event.ToInternal()
+				require.NoError(t, err)
+
+				receipt, ok := internalEvent.(*flow.ExecutionReceipt)
+				require.True(t, ok)
+
 				// uses union to avoid adding duplicate.
-				passThroughReceipts = passThroughReceipts.Union(flow.IdentifierList{event.ID()})
+				passThroughReceipts = passThroughReceipts.Union(flow.IdentifierList{receipt.ID()})
 			} else {
 				// a receipt with an empty signature contains a dictated result from wintermute orchestrator.
 				// the rest of receipt will be filled by the corrupted node
@@ -263,7 +270,7 @@ func receiptsWithDistinctResultFixture(
 	for i := 0; i < count; i++ {
 		for _, exeId := range exeIds {
 			receipt := unittest.ExecutionReceiptFixture(unittest.WithExecutorID(exeId))
-			event := executionReceiptEvent(receipt, targetIds)
+			event := executionReceiptEvent((*messages.ExecutionReceipt)(receipt), targetIds)
 
 			_, ok := eventMap[receipt.ID()]
 			require.False(t, ok) // checks for duplicate receipts.

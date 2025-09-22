@@ -174,7 +174,6 @@ generate-mocks: install-mock-generators
 	mockery --name '.*' --dir=module/component --case=underscore --output="./module/component/mock" --outpkg="component"
 	mockery --name '.*' --dir=network --case=underscore --output="./network/mocknetwork" --outpkg="mocknetwork"
 	mockery --name '.*' --dir=storage --case=underscore --output="./storage/mock" --outpkg="mock"
-	mockery --name 'DeferredDBUpdate' --dir=storage/badger/transaction --case=underscore --output="storage/mock" --outpkg="mock"
 	mockery --name '.*' --dir="state/protocol" --case=underscore --output="state/protocol/mock" --outpkg="mock"
 	mockery --name '.*' --dir="state/protocol/events" --case=underscore --output="./state/protocol/events/mock" --outpkg="mock"
 	mockery --name '.*' --dir="state/protocol/protocol_state" --case=underscore --output="state/protocol/protocol_state/mock" --outpkg="mock"
@@ -223,6 +222,8 @@ generate-mocks: install-mock-generators
 	mockery --name 'ScriptExecutor' --dir=module/execution --case=underscore --output="module/execution/mock" --outpkg="mock"
 	mockery --name 'StorageSnapshot' --dir=fvm/storage/snapshot --case=underscore --output="fvm/storage/snapshot/mock" --outpkg="mock"
 	mockery --name 'Core' --dir=module/executiondatasync/optimistic_sync --case=underscore --output="module/executiondatasync/optimistic_sync/mock" --outpkg="mock"
+	mockery --name 'Pipeline' --dir=module/executiondatasync/optimistic_sync --case=underscore --output="module/executiondatasync/optimistic_sync/mock" --outpkg="mock"
+	mockery --name 'PipelineFactory' --dir=module/executiondatasync/optimistic_sync --case=underscore --output="module/executiondatasync/optimistic_sync/mock" --outpkg="mock"
 	mockery --name 'Requester' --dir=engine/access/ingestion/tx_error_messages --case=underscore --output="engine/access/ingestion/tx_error_messages/mock" --outpkg="mock"
 	mockery --name 'ExecutionDataRequester' --dir=module/state_synchronization/requester --case=underscore --output="module/state_synchronization/requester/mock" --outpkg="mock"
 
@@ -239,7 +240,6 @@ tidy:
 	go mod tidy -v
 	cd integration; go mod tidy -v
 	cd crypto; go mod tidy -v
-	cd cmd/testclient; go mod tidy -v
 	cd insecure; go mod tidy -v
 	git diff --exit-code
 

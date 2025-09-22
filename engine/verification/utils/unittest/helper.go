@@ -23,7 +23,6 @@ import (
 	"github.com/onflow/flow-go/model/chunks"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
-	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/mock"
@@ -80,7 +79,7 @@ func SetupChunkDataPackProvider(t *testing.T,
 			// request should be dispatched by a verification node.
 			require.Contains(t, participants.Filter(filter.HasRole[flow.Identity](flow.RoleVerification)).NodeIDs(), originID)
 
-			req, ok := args[2].(*messages.ChunkDataRequest)
+			req, ok := args[2].(*flow.ChunkDataRequest)
 			require.True(t, ok)
 			require.Contains(t, assignedChunkIDs, req.ChunkID) // only assigned chunks should be requested.
 
@@ -657,7 +656,7 @@ func bootstrapSystem(
 			stateFixture.State.Params(),
 			stateFixture.Storage.Headers,
 			stateFixture.Storage.Results,
-			stateFixture.Storage.Setups,
+			stateFixture.Storage.EpochSetups,
 			stateFixture.Storage.EpochCommits,
 		)
 		epochBuilder := unittest.NewEpochBuilder(t, mutableProtocolState, stateFixture.State)

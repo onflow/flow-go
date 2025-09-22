@@ -97,7 +97,6 @@ execution:
         - --loglevel=INFO
         - --triedir=/trie
         - --rpc-addr=0.0.0.0:9000
-        - --cadence-tracing=false
         - --extensive-tracing=false
       env:{{template "env" .}}
       image: {{$val.docker_registry}}/execution:{{$val.docker_tag}}

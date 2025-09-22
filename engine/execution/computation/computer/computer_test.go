@@ -15,6 +15,7 @@ import (
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/common"
 	"github.com/onflow/cadence/encoding/ccf"
+	jsoncdc "github.com/onflow/cadence/encoding/json"
 	"github.com/onflow/cadence/interpreter"
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/sema"
@@ -1365,20 +1366,26 @@ func Test_ExecutingSystemCollection(t *testing.T) {
 }
 
 func Test_ScheduledCallback(t *testing.T) {
+	chain := flow.Testnet.Chain()
+
 	t.Run("process with no scheduled callback", func(t *testing.T) {
-		testScheduledCallback(t, []cadence.Event{}, 2) // process callback + system chunk
+		testScheduledCallback(t, chain, []cadence.Event{}, 2) // process callback + system chunk
 	})
 
 	t.Run("process with 2 scheduled callbacks", func(t *testing.T) {
 		// create callback events that process callback will return
-		location := common.NewAddressLocation(nil, common.Address(flow.HexToAddress("0x0000000000000000")), "CallbackScheduler")
+		env := systemcontracts.SystemContractsForChain(chain.ChainID())
+		location := common.NewAddressLocation(nil, common.Address(env.FlowCallbackScheduler.Address), "FlowTransactionScheduler")
 
 		eventType := cadence.NewEventType(
 			location,
-			"CallbackProcessed",
+			"PendingExecution",
 			[]cadence.Field{
-				{Identifier: "ID", Type: cadence.UInt64Type},
+				{Identifier: "id", Type: cadence.UInt64Type},
+				{Identifier: "priority", Type: cadence.UInt8Type},
 				{Identifier: "executionEffort", Type: cadence.UInt64Type},
+				{Identifier: "fees", Type: cadence.UFix64Type},
+				{Identifier: "callbackOwner", Type: cadence.AddressType},
 			},
 			nil,
 		)
@@ -1386,32 +1393,54 @@ func Test_ScheduledCallback(t *testing.T) {
 		callbackID1 := uint64(1)
 		callbackID2 := uint64(2)
 
+		fees, err := cadence.NewUFix64("0.0")
+		require.NoError(t, err)
+
 		callbackEvent1 := cadence.NewEvent(
 			[]cadence.Value{
 				cadence.NewUInt64(callbackID1),
+				cadence.NewUInt8(1),
 				cadence.NewUInt64(1000), // execution effort
+				fees,
+				cadence.NewAddress(env.FlowServiceAccount.Address),
 			},
 		).WithType(eventType)
 
 		callbackEvent2 := cadence.NewEvent(
 			[]cadence.Value{
 				cadence.NewUInt64(callbackID2),
+				cadence.NewUInt8(1),
 				cadence.NewUInt64(2000), // execution effort
+				fees,
+				cadence.NewAddress(env.FlowServiceAccount.Address),
 			},
 		).WithType(eventType)
 
-		testScheduledCallback(t, []cadence.Event{callbackEvent1, callbackEvent2}, 4) // process callback + 2 callbacks + system chunk
+		testScheduledCallback(t, chain, []cadence.Event{callbackEvent1, callbackEvent2}, 4) // process callback + 2 callbacks + system chunk
+	})
+
+	t.Run("process callback transaction execution error", func(t *testing.T) {
+		processCallbackError := fvmErrors.NewInvalidAddressErrorf(flow.EmptyAddress, "process callback execution failed")
+		testScheduledCallbackWithError(t, chain, []cadence.Event{}, 0, processCallbackError)
+	})
+
+	t.Run("process callback transaction output error", func(t *testing.T) {
+		processCallbackError := fvmErrors.NewInvalidAddressErrorf(flow.EmptyAddress, "process callback output error")
+		testScheduledCallbackWithError(t, chain, []cadence.Event{}, 0, processCallbackError)
 	})
 }
 
-func testScheduledCallback(t *testing.T, callbackEvents []cadence.Event, expectedTransactionCount int) {
-	rag := &RandomAddressGenerator{}
+func testScheduledCallback(t *testing.T, chain flow.Chain, callbackEvents []cadence.Event, expectedTransactionCount int) {
+	testScheduledCallbackWithError(t, chain, callbackEvents, expectedTransactionCount, nil)
+}
 
+func testScheduledCallbackWithError(t *testing.T, chain flow.Chain, callbackEvents []cadence.Event, expectedTransactionCount int, processCallbackError fvmErrors.CodedError) {
+	rag := &RandomAddressGenerator{}
 	executorID := unittest.IdentifierFixture()
 
 	execCtx := fvm.NewContext(
 		fvm.WithScheduleCallbacksEnabled(true), // Enable callbacks
-		fvm.WithChain(flow.Localnet.Chain()),
+		fvm.WithChain(chain),
 	)
 
 	// track which transactions were executed and their details
@@ -1432,7 +1461,7 @@ func testScheduledCallback(t *testing.T, callbackEvents []cadence.Event, expecte
 			require.NoError(t, err)
 			if cadenceEvent, ok := decodedEvent.(cadence.Event); ok {
 				// search for the ID field in the event
-				idField := cadence.SearchFieldByName(cadenceEvent, "ID")
+				idField := cadence.SearchFieldByName(cadenceEvent, "id")
 				if idValue, ok := idField.(cadence.UInt64); ok {
 					callbackIDs[i] = uint64(idValue)
 				}
@@ -1444,7 +1473,8 @@ func testScheduledCallback(t *testing.T, callbackEvents []cadence.Event, expecte
 	vm := &callbackTestVM{
 		testVM: testVM{
 			t:                    t,
-			eventsPerTransaction: 0, // we'll handle events manually
+			eventsPerTransaction: 0,                    // we'll handle events manually
+			err:                  processCallbackError, // inject error if provided
 		},
 		executedTransactions: executedTransactions,
 		executedMutex:        &executedTransactionsMutex,
@@ -1499,6 +1529,16 @@ func testScheduledCallback(t *testing.T, callbackEvents []cadence.Event, expecte
 		Return(nil).
 		Times(1)
 
+	// expect callback execution metrics if there are callbacks
+	if len(callbackEvents) > 0 {
+		exemetrics.On("ExecutionCallbacksExecuted",
+			mock.Anything,
+			mock.Anything,
+			mock.Anything).
+			Return(nil).
+			Times(1)
+	}
+
 	bservice := requesterunit.MockBlobService(blockstore.NewBlockstore(dssync.MutexWrap(datastore.NewMapDatastore())))
 	trackerStorage := mocktracker.NewMockStorage()
 
@@ -1534,6 +1574,14 @@ func testScheduledCallback(t *testing.T, callbackEvents []cadence.Event, expecte
 		block,
 		nil,
 		derived.NewEmptyDerivedBlockData(0))
+
+	// If we expect an error, verify it and return early
+	if processCallbackError != nil {
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "system process transaction")
+		return
+	}
+
 	require.NoError(t, err)
 
 	// verify execution results
@@ -1621,35 +1669,61 @@ type callbackTestExecutor struct {
 	vm *callbackTestVM
 }
 
+func (c *callbackTestExecutor) Execute() error {
+	// Return error if one was injected for process callback transaction
+	if c.vm.err != nil {
+		txProc, ok := c.proc.(*fvm.TransactionProcedure)
+		if ok {
+			script := string(txProc.Transaction.Script)
+			if strings.Contains(script, "scheduler.process") {
+				return c.vm.err
+			}
+		}
+	}
+
+	return c.testExecutor.Execute()
+}
+
 // we need to reimplement this Output since the events are consumed in the block computer
 // from the output of the procedure executor
-func (executor *callbackTestExecutor) Output() fvm.ProcedureOutput {
-	executor.vm.executedMutex.Lock()
-	defer executor.vm.executedMutex.Unlock()
+func (c *callbackTestExecutor) Output() fvm.ProcedureOutput {
+	// Return error if one was injected for process callback transaction
+	if c.vm.err != nil {
+		txProc, ok := c.proc.(*fvm.TransactionProcedure)
+		if ok {
+			script := string(txProc.Transaction.Script)
+			if strings.Contains(script, "scheduler.process") {
+				return fvm.ProcedureOutput{
+					Err: c.vm.err,
+				}
+			}
+		}
+	}
+	c.vm.executedMutex.Lock()
+	defer c.vm.executedMutex.Unlock()
 
-	txProc, ok := executor.proc.(*fvm.TransactionProcedure)
+	txProc, ok := c.proc.(*fvm.TransactionProcedure)
 	if !ok {
 		return fvm.ProcedureOutput{}
 	}
 
+	const callbackSchedulerImport = `import "FlowTransactionScheduler"`
 	txBody := txProc.Transaction
 	txID := fmt.Sprintf("tx_%d", txProc.TxIndex)
 
 	switch {
 	// scheduled callbacks process transaction
 	case strings.Contains(string(txBody.Script), "scheduler.process"):
-		executor.vm.executedTransactions[txID] = "process_callback"
-		env := systemcontracts.SystemContractsForChain(flow.Mainnet.Chain().ChainID()).AsTemplateEnv()
-		eventTypeString := fmt.Sprintf("A.%v.CallbackScheduler.CallbackProcessed", env.FlowCallbackSchedulerAddress)
+		c.vm.executedTransactions[txID] = "process_callback"
+		env := systemcontracts.SystemContractsForChain(c.ctx.Chain.ChainID()).AsTemplateEnv()
+		eventTypeString := fmt.Sprintf("A.%v.FlowTransactionScheduler.PendingExecution", env.FlowTransactionSchedulerAddress)
 
 		// return events for each scheduled callback
-		events := make([]flow.Event, len(executor.vm.eventPayloads))
-		for i, payload := range executor.vm.eventPayloads {
+		events := make([]flow.Event, len(c.vm.eventPayloads))
+		for i, payload := range c.vm.eventPayloads {
 			events[i] = flow.Event{
-				// TODO: we shouldn't hardcode this event types, refactor after the scheduler contract is done
-				Type:          flow.EventType(eventTypeString),
-				TransactionID: txProc.ID,
-
+				Type:             flow.EventType(eventTypeString),
+				TransactionID:    txProc.ID,
 				TransactionIndex: txProc.TxIndex,
 				EventIndex:       uint32(i),
 				Payload:          payload,
@@ -1660,19 +1734,19 @@ func (executor *callbackTestExecutor) Output() fvm.ProcedureOutput {
 			Events: events,
 		}
 	// scheduled callbacks execute transaction
-	case strings.Contains(string(txBody.Script), "scheduler.executeCallback"):
+	case strings.Contains(string(txBody.Script), "scheduler.executeTransaction"):
 		// extract the callback ID from the arguments
 		if len(txBody.Arguments) == 0 {
 			return fvm.ProcedureOutput{}
 		}
 
 		// decode the argument to check which callback it is
-		argValue, err := ccf.Decode(nil, txBody.Arguments[0])
+		argValue, err := jsoncdc.Decode(nil, txBody.Arguments[0])
 		if err == nil {
 			if idValue, ok := argValue.(cadence.UInt64); ok {
 				// find which callback this is
 				callbackIndex := -1
-				for i, callbackID := range executor.vm.callbackIDs {
+				for i, callbackID := range c.vm.callbackIDs {
 					if uint64(idValue) == callbackID {
 						callbackIndex = i
 						break
@@ -1680,9 +1754,9 @@ func (executor *callbackTestExecutor) Output() fvm.ProcedureOutput {
 				}
 
 				if callbackIndex >= 0 {
-					executor.vm.executedTransactions[txID] = fmt.Sprintf("callback%d", callbackIndex+1)
+					c.vm.executedTransactions[txID] = fmt.Sprintf("callback%d", callbackIndex+1)
 				} else {
-					executor.vm.executedTransactions[txID] = "unknown_callback"
+					c.vm.executedTransactions[txID] = "unknown_callback"
 				}
 			}
 		}
@@ -1690,7 +1764,7 @@ func (executor *callbackTestExecutor) Output() fvm.ProcedureOutput {
 		return fvm.ProcedureOutput{}
 	// system chunk transaction
 	default:
-		executor.vm.executedTransactions[txID] = "system_chunk"
+		c.vm.executedTransactions[txID] = "system_chunk"
 		return fvm.ProcedureOutput{}
 	}
 }
