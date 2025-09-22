@@ -464,7 +464,7 @@ func (e *Engine) processFinalizedBlock(block *flow.Block) error {
 	}
 
 	// queue requesting each of the collections from the collection node
-	e.requestCollectionsInFinalizedBlock(block.Payload.Guarantees)
+	e.requestCollectionsInFinalizedBlock(block.Payload.Guarantees, true)
 
 	e.collectionExecutedMetric.BlockFinalized(block)
 
@@ -540,7 +540,8 @@ func (e *Engine) requestMissingCollections(ctx context.Context) error {
 		}
 
 		// request the missing collections
-		e.requestCollectionsInFinalizedBlock(missingColls)
+		// Force() is run after all requests are added to the requester engine
+		e.requestCollectionsInFinalizedBlock(missingColls, false)
 
 		// add them to the missing collection id map to track later
 		for _, cg := range missingColls {
@@ -698,7 +699,7 @@ func (e *Engine) checkMissingCollections() error {
 			Int("missing_collection_blk_count", incompleteBlksCnt).
 			Int("missing_collection_count", len(allMissingColls)).
 			Msg("re-requesting missing collections")
-		e.requestCollectionsInFinalizedBlock(allMissingColls)
+		e.requestCollectionsInFinalizedBlock(allMissingColls, true)
 	}
 
 	return nil
@@ -738,7 +739,7 @@ func (e *Engine) haveCollection(collID flow.Identifier) (bool, error) {
 }
 
 // requestCollectionsInFinalizedBlock registers collection requests with the requester engine
-func (e *Engine) requestCollectionsInFinalizedBlock(missingColls []*flow.CollectionGuarantee) {
+func (e *Engine) requestCollectionsInFinalizedBlock(missingColls []*flow.CollectionGuarantee, force bool) {
 	for _, cg := range missingColls {
 		guarantors, err := protocol.FindGuarantors(e.state, cg)
 		if err != nil {
@@ -746,5 +747,9 @@ func (e *Engine) requestCollectionsInFinalizedBlock(missingColls []*flow.Collect
 			e.log.Fatal().Err(err).Msgf("could not find guarantors for guarantee %v", cg.ID())
 		}
 		e.request.EntityByID(cg.ID(), filter.HasNodeID[flow.Identity](guarantors...))
+	}
+
+	if force {
+		e.request.Force()
 	}
 }
