@@ -719,7 +719,6 @@ func (s *ResultsForestSuite) TestAddReceipt() {
 
 		// 3. add a sealed result which will be a sibling to the first conflicting result
 		// No results should be abandoned yet.
-		receipt = receiptGen.Fixture(receiptGen.WithExecutionResult(*s.results[0]))
 		sealedPipeline := s.createPipeline(s.results[0], true)
 		sealedPipeline.On("SetSealed").Return().Once()
 
