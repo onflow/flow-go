@@ -67,7 +67,7 @@ func Bootstrap(db storage.DB, lockManager lockctx.Manager, stateRoot *StateRoot)
 			return fmt.Errorf("failed to map genesis block height to block: %w", err)
 		}
 		// insert boundary
-		err = operation.UpsertClusterFinalizedHeight(lctx, rw.Writer(), chainID, genesis.Height)
+		err = operation.BootstrapClusterFinalizedHeight(lctx, rw, chainID, genesis.Height)
 		// insert started view for hotstuff
 		if err != nil {
 			return fmt.Errorf("could not insert genesis boundary: %w", err)

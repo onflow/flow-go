@@ -56,7 +56,7 @@ func TestFinalizeClusterBlock(t *testing.T) {
 			return operation.IndexClusterBlockHeight(lctx, rw, block.ChainID, parent.Height, parent.ID())
 		}))
 		require.NoError(t, db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			return operation.UpsertClusterFinalizedHeight(lctx, rw.Writer(), block.ChainID, parent.Height)
+			return operation.BootstrapClusterFinalizedHeight(lctx, rw, block.ChainID, parent.Height)
 		}))
 
 		// Insert new block and verify `FinalizeClusterBlock` procedure accepts it
@@ -149,7 +149,7 @@ func constructState(t *testing.T, db storage.DB, lctx lockctx.Proof) (blockA, bl
 		return operation.IndexClusterBlockHeight(lctx, rw, blockA.ChainID, blockA.Height, blockA.ID())
 	}))
 	require.NoError(t, db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-		return operation.UpsertClusterFinalizedHeight(lctx, rw.Writer(), blockA.ChainID, blockA.Height)
+		return operation.BootstrapClusterFinalizedHeight(lctx, rw, blockA.ChainID, blockA.Height)
 	}))
 
 	return blockA, blockB, blockC, blockD

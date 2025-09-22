@@ -83,7 +83,6 @@ func Test_RetrieveClusterFinalizedHeight(t *testing.T) {
 		lockManager := storage.NewTestingLockManager()
 		var (
 			clusterID flow.ChainID = "cluster"
-			expected  uint64       = 42
 			err       error
 		)
 
@@ -98,20 +97,26 @@ func Test_RetrieveClusterFinalizedHeight(t *testing.T) {
 
 			unittest.WithLock(t, lockManager, storage.LockInsertOrFinalizeClusterBlock, func(lctx lockctx.Context) error {
 				return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-					return operation.UpsertClusterFinalizedHeight(lctx, rw.Writer(), clusterID, 21)
+					return operation.BootstrapClusterFinalizedHeight(lctx, rw, clusterID, 20)
 				})
 			})
 
 			unittest.WithLock(t, lockManager, storage.LockInsertOrFinalizeClusterBlock, func(lctx lockctx.Context) error {
 				return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-					return operation.UpsertClusterFinalizedHeight(lctx, rw.Writer(), clusterID, expected)
+					return operation.UpdateClusterFinalizedHeight(lctx, rw, clusterID, 21)
+				})
+			})
+
+			unittest.WithLock(t, lockManager, storage.LockInsertOrFinalizeClusterBlock, func(lctx lockctx.Context) error {
+				return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+					return operation.UpdateClusterFinalizedHeight(lctx, rw, clusterID, 22)
 				})
 			})
 
 			var actual uint64
 			err = operation.RetrieveClusterFinalizedHeight(db.Reader(), clusterID, &actual)
 			assert.NoError(t, err)
-			assert.Equal(t, expected, actual)
+			assert.Equal(t, uint64(22), actual)
 		})
 
 		t.Run("multiple chain IDs", func(t *testing.T) {
@@ -129,7 +134,7 @@ func Test_RetrieveClusterFinalizedHeight(t *testing.T) {
 
 				unittest.WithLock(t, lockManager, storage.LockInsertOrFinalizeClusterBlock, func(lctx lockctx.Context) error {
 					return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-						return operation.UpsertClusterFinalizedHeight(lctx, rw.Writer(), clusterIDs[i], clusterFinalizedHeights[i])
+						return operation.BootstrapClusterFinalizedHeight(lctx, rw, clusterIDs[i], clusterFinalizedHeights[i])
 					})
 				})
 			}

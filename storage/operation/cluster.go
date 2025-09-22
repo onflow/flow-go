@@ -45,12 +45,45 @@ func LookupClusterBlockHeight(r storage.Reader, clusterID flow.ChainID, height u
 	return RetrieveByKey(r, MakePrefix(codeFinalizedCluster, clusterID, height), blockID)
 }
 
-// UpsertClusterFinalizedHeight updates (overwrites!) the latest finalized cluster block height for the given cluster.
-func UpsertClusterFinalizedHeight(lctx lockctx.Proof, w storage.Writer, clusterID flow.ChainID, number uint64) error {
+func BootstrapClusterFinalizedHeight(lctx lockctx.Proof, rw storage.ReaderBatchWriter, clusterID flow.ChainID, number uint64) error {
 	if !lctx.HoldsLock(storage.LockInsertOrFinalizeClusterBlock) {
 		return fmt.Errorf("missing lock: %v", storage.LockInsertOrFinalizeClusterBlock)
 	}
-	return UpsertByKey(w, MakePrefix(codeClusterHeight, clusterID), number)
+
+	key := MakePrefix(codeClusterHeight, clusterID)
+
+	var existing uint64
+	err := RetrieveByKey(rw.GlobalReader(), key, &existing)
+	if err == nil {
+		return fmt.Errorf("finalized height already initialized: %d", existing)
+	}
+
+	if !errors.Is(err, storage.ErrNotFound) {
+		return fmt.Errorf("failed to check existing finalized height: %w", err)
+	}
+
+	return UpsertByKey(rw.Writer(), key, number)
+}
+
+// UpdateClusterFinalizedHeight updates (overwrites!) the latest finalized cluster block height for the given cluster.
+func UpdateClusterFinalizedHeight(lctx lockctx.Proof, rw storage.ReaderBatchWriter, clusterID flow.ChainID, number uint64) error {
+	if !lctx.HoldsLock(storage.LockInsertOrFinalizeClusterBlock) {
+		return fmt.Errorf("missing lock: %v", storage.LockInsertOrFinalizeClusterBlock)
+	}
+
+	key := MakePrefix(codeClusterHeight, clusterID)
+
+	var existing uint64
+	err := RetrieveByKey(rw.GlobalReader(), key, &existing)
+	if err != nil {
+		return fmt.Errorf("failed to check existing finalized height: %w", err)
+	}
+
+	if existing+1 != number {
+		return fmt.Errorf("finalization isn't sequential: existing %d, new %d", existing, number)
+	}
+
+	return UpsertByKey(rw.Writer(), key, number)
 }
 
 // RetrieveClusterFinalizedHeight retrieves the latest finalized cluster block height of the given cluster.
