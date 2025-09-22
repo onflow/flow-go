@@ -26,25 +26,6 @@ func IndexNewBlock(lctx lockctx.Proof, rw storage.ReaderBatchWriter, blockID flo
 	return insertNewBlock(rw, blockID, parentID)
 }
 
-// IndexNewRootBlock indexes a new root block by creating an empty children index for it
-// WITHOUT adding the input block to any parent's child list.
-// This function is used:
-//   - for spork root blocks whose parent block is in a prior spork
-//   - for the sealed root block of a root snapshot, when a node uses Dynamic Bootstrapping.
-//     In this case the parent block is stored in the database for reference but excluded from indexing.
-//
-// CAUTION:
-//   - The caller must acquire the [storage.LockInsertBlock] and hold it until the database write has been committed.
-//
-// No error returns are expected during normal operation.
-func IndexNewRootBlock(lctx lockctx.Proof, rw storage.ReaderBatchWriter, blockID flow.Identifier) error {
-	if !lctx.HoldsLock(storage.LockInsertBlock) {
-		return fmt.Errorf("missing required lock: %s", storage.LockInsertBlock)
-	}
-
-	return insertNewBlockWithNoChild(rw, blockID)
-}
-
 // IndexNewClusterBlock indexes a new cluster block and updates the parent-child relationship in the block children index.
 // This function creates an empty children index for the new cluster block and adds the new block to the parent's children list.
 //
@@ -61,12 +42,20 @@ func IndexNewClusterBlock(lctx lockctx.Proof, rw storage.ReaderBatchWriter, bloc
 	return insertNewBlock(rw, blockID, parentID)
 }
 
+var errParentIsZero = errors.New("parent block is zero, no need to index it as a child of any block")
+
 func insertNewBlock(rw storage.ReaderBatchWriter, blockID flow.Identifier, parentID flow.Identifier) error {
-	// Step 1: index the child for the new block.
-	// the new block has no child, so adding an empty child index for it
-	err := insertNewBlockWithNoChild(rw, blockID)
-	if err != nil {
-		return fmt.Errorf("could not insert empty block children: %w", err)
+	// Step 1: make sure the new block has no children yet
+	var nonExist flow.IdentifierList
+	err := RetrieveBlockChildren(rw.GlobalReader(), blockID, &nonExist)
+	if err != nil && !errors.Is(err, storage.ErrNotFound) {
+		// verify err should be ErrNotFound, since new block has no children
+		return fmt.Errorf("could not check for existing children of new block: %w", err)
+	}
+
+	if len(nonExist) > 0 {
+		return fmt.Errorf("a new block supposed to have no children, but found %v: %w", nonExist,
+			storage.ErrAlreadyExists)
 	}
 
 	// Step 2: adding the second index for the parent block
@@ -106,34 +95,19 @@ func insertNewBlock(rw storage.ReaderBatchWriter, blockID flow.Identifier, paren
 	return nil
 }
 
-func insertNewBlockWithNoChild(rw storage.ReaderBatchWriter, blockID flow.Identifier) error {
-	// Step 1: index the child for the new block.
-	// the new block has no child, so adding an empty child index for it
-	var nonExist flow.IdentifierList
-	err := RetrieveBlockChildren(rw.GlobalReader(), blockID, &nonExist)
-	if err == nil {
-		return fmt.Errorf("a new block supposed to have no children, but found %v: %w", nonExist,
-			storage.ErrAlreadyExists)
-	}
-
-	// verify err should be ErrNotFound, since new block has no children
-	if !errors.Is(err, storage.ErrNotFound) {
-		return fmt.Errorf("could not check for existing children of new block: %w", err)
-	}
-
-	err = UpsertByKey(rw.Writer(), MakePrefix(codeBlockChildren, blockID), nil)
-	if err != nil {
-		return fmt.Errorf("could not insert empty block children: %w", err)
-	}
-
-	return nil
-}
-
 // RetrieveBlockChildren retrieves the list of child block IDs for the specified parent block.
-// For every known block (at or above the root block height), this index should be populated.
+// If the parent block has no children, the childrenIDs will be an empty list.
+// If the parent block does not exist in the index, the childrenIDs will be empty as well
 //
 // Expected errors during normal operations:
-//   - [storage.ErrNotFound] if `blockID` does not refer to a known block
 func RetrieveBlockChildren(r storage.Reader, blockID flow.Identifier, childrenIDs *flow.IdentifierList) error {
-	return RetrieveByKey(r, MakePrefix(codeBlockChildren, blockID), childrenIDs)
+	err := RetrieveByKey(r, MakePrefix(codeBlockChildren, blockID), childrenIDs)
+	if err != nil {
+		// If the block doesn't have a children index yet, it means it has no children
+		if errors.Is(err, storage.ErrNotFound) {
+			return nil
+		}
+		return err
+	}
+	return nil
 }

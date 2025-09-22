@@ -388,7 +388,7 @@ func bootstrapSealingSegment(
 
 	// PERSIST these blocks ONE-BY-ONE in order of increasing height, emulating the process during normal operations,
 	// so sanity checks from normal operations should continue to apply.
-	for i, proposal := range segment.Blocks {
+	for _, proposal := range segment.Blocks {
 		err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 			w := rw.Writer()
 			blockID := proposal.Block.ID()
@@ -429,19 +429,9 @@ func bootstrapSealingSegment(
 				return fmt.Errorf("could not index block seal: %w", err)
 			}
 
-			if i == 0 {
-				// when i == 0, it's the first block in the segment, which means its parent does not exist,
-				// therefore we don't index the parent->child relationship
-				err = operation.IndexNewRootBlock(lctx, rw, blockID)
-				if err != nil {
-					return fmt.Errorf("could not index root block (id=%x): %w", blockID, err)
-				}
-			} else {
-				// For the rest blocks in the segment, index the parent->child relationship:
-				err = operation.IndexNewBlock(lctx, rw, blockID, proposal.Block.ParentID)
-				if err != nil {
-					return fmt.Errorf("could not index new block (id=%x): %w", blockID, err)
-				}
+			err = operation.IndexNewBlock(lctx, rw, blockID, proposal.Block.ParentID)
+			if err != nil {
+				return fmt.Errorf("could not index block (id=%x): %w", blockID, err)
 			}
 
 			return nil
