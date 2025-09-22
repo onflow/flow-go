@@ -13,6 +13,7 @@ import (
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/common/fifoqueue"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/irrecoverable"
@@ -368,7 +369,13 @@ func (e *Engine) ingestTransaction(
 func (e *Engine) propagateTransaction(log zerolog.Logger, tx *flow.TransactionBody, txCluster flow.IdentitySkeletonList) {
 	log.Debug().Msg("propagating transaction to cluster")
 
-	err := e.conduit.Multicast(tx, e.config.PropagationRedundancy+1, txCluster.NodeIDs()...)
+	msg, err := messages.InternalToMessage(tx)
+	if err != nil {
+		e.log.Error().Err(err).Msg("failed to convert event to message")
+		return
+	}
+
+	err = e.conduit.Multicast(msg, e.config.PropagationRedundancy+1, txCluster.NodeIDs()...)
 	if err != nil && !errors.Is(err, network.EmptyTargetList) {
 		// if multicast to a target cluster with at least one node failed, log an error and exit
 		e.log.Error().Err(err).Msg("could not route transaction to cluster")

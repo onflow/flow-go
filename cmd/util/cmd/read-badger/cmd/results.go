@@ -25,8 +25,8 @@ func init() {
 var resultsCmd = &cobra.Command{
 	Use:   "results",
 	Short: "get result by block or result ID",
-	Run: func(cmd *cobra.Command, args []string) {
-		err := WithStorage(func(db storage.DB) error {
+	RunE: func(cmd *cobra.Command, args []string) error {
+		return common.WithStorage(flagDatadir, func(db storage.DB) error {
 			results := store.NewExecutionResults(metrics.NewNoopCollector(), db)
 			if flagBlockID != "" {
 				log.Info().Msgf("got flag block id: %s", flagBlockID)
@@ -68,10 +68,6 @@ var resultsCmd = &cobra.Command{
 
 			return fmt.Errorf("missing flags: --block-id or --result-id")
 		})
-
-		if err != nil {
-			log.Error().Err(err).Msg("could not get results")
-		}
 	},
 }
 

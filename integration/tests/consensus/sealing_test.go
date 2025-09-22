@@ -15,6 +15,7 @@ import (
 	verUtils "github.com/onflow/flow-go/engine/verification/utils"
 	"github.com/onflow/flow-go/integration/testnet"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -166,13 +167,11 @@ SearchLoop:
 		}
 
 		// we only care about block proposals at the moment
-		proposal, ok := msg.(*flow.UntrustedProposal)
+		proposal, ok := msg.(*flow.Proposal)
 		if !ok {
 			continue
 		}
-		proposalTrusted, err := flow.NewProposal(*proposal)
-		require.NoError(ss.T(), err)
-		block := proposalTrusted.Block
+		block := proposal.Block
 
 		// make sure we skip duplicates
 		proposalID := block.ID()
@@ -260,7 +259,7 @@ SearchLoop:
 	unsignedReceiptID := receiptBody.ID()
 	sig, err := ss.exeSK.Sign(unsignedReceiptID[:], exeUtils.NewExecutionReceiptHasher())
 	require.NoError(ss.T(), err)
-	receipt := flow.ExecutionReceipt{
+	receipt := messages.ExecutionReceipt{
 		UnsignedExecutionReceipt: receiptBody,
 		ExecutorSignature:        sig,
 	}
@@ -275,7 +274,7 @@ SearchLoop:
 	unsignedReceiptID2 := receiptBody2.ID()
 	sig2, err := ss.exe2SK.Sign(unsignedReceiptID2[:], exeUtils.NewExecutionReceiptHasher())
 	require.NoError(ss.T(), err)
-	receipt2 := flow.ExecutionReceipt{
+	receipt2 := messages.ExecutionReceipt{
 		UnsignedExecutionReceipt: receiptBody2,
 		ExecutorSignature:        sig2,
 	}
@@ -317,7 +316,7 @@ ReceiptLoop:
 		Attestation:          atst,
 		ApproverID:           ss.verID,
 		AttestationSignature: atstSign,
-		Spock:                nil,
+		Spock:                unittest.SignatureFixture(),
 	}
 
 	// generates a signature over result approval body
@@ -325,7 +324,7 @@ ReceiptLoop:
 	bodySign, err := ss.verSK.Sign(bodyID[:], verUtils.NewResultApprovalHasher())
 	require.NoError(ss.T(), err)
 
-	approval := flow.ResultApproval{
+	approval := messages.ResultApproval{
 		Body:              body,
 		VerifierSignature: bodySign,
 	}
@@ -343,8 +342,13 @@ ApprovalLoop:
 		}
 		break ApprovalLoop
 	}
+	internal, err := approval.ToInternal()
+	require.NoError(ss.T(), err)
 
-	ss.T().Logf("result approval submitted (approval: %x, result: %x)\n", approval.ID(), approval.Body.ExecutionResultID)
+	internalApproval, ok := internal.(*flow.ResultApproval)
+	require.True(ss.T(), ok)
+
+	ss.T().Logf("result approval submitted (approval: %x, result: %x)\n", internalApproval.ID(), approval.Body.ExecutionResultID)
 
 	// we try to find a block with the guarantee included and three confirmations
 	found := false
@@ -359,13 +363,11 @@ SealingLoop:
 		}
 
 		// we only care about block proposals at the moment
-		proposal, ok := msg.(*flow.UntrustedProposal)
+		proposal, ok := msg.(*flow.Proposal)
 		if !ok {
 			continue
 		}
-		proposalTrusted, err := flow.NewProposal(*proposal)
-		require.NoError(ss.T(), err)
-		block := proposalTrusted.Block
+		block := proposal.Block
 
 		// log the proposal details
 		proposalID := block.ID()

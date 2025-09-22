@@ -8,6 +8,7 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 
+	"github.com/onflow/flow-go/cmd/util/cmd/common"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -23,7 +24,7 @@ var (
 // usage example
 //
 //		./util verify-evm-offchain-replay --chain flow-testnet --from_to 211176670-211177000
-//	     --datadir /var/flow/data/protocol --execution_data_dir /var/flow/data/execution_data
+//	     --execution_data_dir /var/flow/data/execution_data
 var Cmd = &cobra.Command{
 	Use:   "verify-evm-offchain-replay",
 	Short: "verify evm offchain replay with execution data",
@@ -31,11 +32,10 @@ var Cmd = &cobra.Command{
 }
 
 func init() {
+	common.InitDataDirFlag(Cmd, &flagDatadir)
+
 	Cmd.Flags().StringVar(&flagChain, "chain", "", "Chain name")
 	_ = Cmd.MarkFlagRequired("chain")
-
-	Cmd.Flags().StringVar(&flagDatadir, "datadir", "/var/flow/data/protocol",
-		"directory that stores the protocol state")
 
 	Cmd.Flags().StringVar(&flagExecutionDataDir, "execution_data_dir", "/var/flow/data/execution_data",
 		"directory that stores the execution state")
