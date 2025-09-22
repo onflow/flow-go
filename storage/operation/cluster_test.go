@@ -36,7 +36,7 @@ func TestClusterHeights(t *testing.T) {
 			lctx := lockManager.NewContext()
 			require.NoError(t, lctx.AcquireLock(storage.LockInsertOrFinalizeClusterBlock))
 			err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-				return operation.IndexClusterBlockHeight(lctx, rw.Writer(), clusterID, height, expected)
+				return operation.IndexClusterBlockHeight(lctx, rw, clusterID, height, expected)
 			})
 			lctx.Release()
 			assert.NoError(t, err)
@@ -63,7 +63,7 @@ func TestClusterHeights(t *testing.T) {
 				lctx := lockManager.NewContext()
 				require.NoError(t, lctx.AcquireLock(storage.LockInsertOrFinalizeClusterBlock))
 				err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-					return operation.IndexClusterBlockHeight(lctx, rw.Writer(), clusterIDs[i], height, clusterBlockIDs[i])
+					return operation.IndexClusterBlockHeight(lctx, rw, clusterIDs[i], height, clusterBlockIDs[i])
 				})
 				lctx.Release() // Release lock immediately after operation
 				assert.NoError(t, err)

@@ -162,7 +162,7 @@ func FinalizeClusterBlock(lctx lockctx.Proof, rw storage.ReaderBatchWriter, bloc
 	}
 
 	// index the block by its height
-	err = operation.IndexClusterBlockHeight(lctx, writer, clusterID, header.Height, blockID)
+	err = operation.IndexClusterBlockHeight(lctx, rw, clusterID, header.Height, blockID)
 	if err != nil {
 		return fmt.Errorf("could not index cluster block height: %w", err)
 	}

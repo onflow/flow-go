@@ -1,6 +1,7 @@
 package operation
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/jordanschalm/lockctx"
@@ -15,12 +16,27 @@ import (
 // support storing multiple chains, for example during epoch switchover.
 
 // IndexClusterBlockHeight indexes a cluster block from the specified cluster by its height.
-func IndexClusterBlockHeight(lctx lockctx.Proof, w storage.Writer, clusterID flow.ChainID, height uint64, blockID flow.Identifier) error {
+func IndexClusterBlockHeight(lctx lockctx.Proof, rw storage.ReaderBatchWriter, clusterID flow.ChainID, height uint64, blockID flow.Identifier) error {
 	if !lctx.HoldsLock(storage.LockInsertOrFinalizeClusterBlock) {
 		return fmt.Errorf("missing lock: %v", storage.LockInsertOrFinalizeClusterBlock)
 	}
 
-	return UpsertByKey(w, MakePrefix(codeFinalizedCluster, clusterID, height), blockID)
+	key := MakePrefix(codeFinalizedCluster, clusterID, height)
+	var existing flow.Identifier
+	err := RetrieveByKey(rw.GlobalReader(), key, &existing)
+	if err == nil {
+		if existing != blockID {
+			return fmt.Errorf("cluster block height already indexed with different block ID: %s vs %s", existing, blockID)
+		}
+		// already indexed, nothing to do
+		return nil
+	}
+
+	if !errors.Is(err, storage.ErrNotFound) {
+		return fmt.Errorf("failed to check existing cluster block height index: %w", err)
+	}
+
+	return UpsertByKey(rw.Writer(), key, blockID)
 }
 
 // LookupClusterBlockHeight retrieves a block ID by height for the given cluster

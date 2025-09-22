@@ -62,7 +62,7 @@ func Bootstrap(db storage.DB, lockManager lockctx.Manager, stateRoot *StateRoot)
 			return fmt.Errorf("could not insert genesis block: %w", err)
 		}
 		// insert block height -> ID mapping
-		err = operation.IndexClusterBlockHeight(lctx, rw.Writer(), chainID, genesis.Height, genesis.ID())
+		err = operation.IndexClusterBlockHeight(lctx, rw, chainID, genesis.Height, genesis.ID())
 		if err != nil {
 			return fmt.Errorf("failed to map genesis block height to block: %w", err)
 		}
