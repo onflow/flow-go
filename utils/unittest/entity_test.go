@@ -350,7 +350,7 @@ type PartialHashStruct struct {
 	Signature crypto.Signature
 }
 
-func (e *PartialHashStruct) Hash() flow.Identifier {
+func (e *PartialHashStruct) PartialHash() flow.Identifier {
 	return flow.MakeID(struct {
 		Data []byte
 	}{
@@ -372,7 +372,7 @@ func TestMalleabilityChecker_PartialHash(t *testing.T) {
 	err := NewMalleabilityChecker().CheckEntity(model)
 	require.NoError(t, err)
 	// the default Hash check fails
-	err = NewMalleabilityChecker().Check(model, model.Hash)
+	err = NewMalleabilityChecker().Check(model, model.PartialHash)
 	require.Error(t, err)
 	require.ErrorContains(t, err, "Signature is malleable")
 	// the Hash check omitting the Signature field passes
