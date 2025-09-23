@@ -295,24 +295,30 @@ var (
 // LevelledForrest.
 type ResultsForest struct {
 	log             zerolog.Logger
-	forest          forest.LevelledForest
 	headers         storage.Headers
 	pipelineFactory optimistic_sync.PipelineFactory
 
-	// lastSealedView is the view of the last sealed result.
+	// forest maintains the underlying graph structure of execution results. It provides the
+	// following quantities from the specification:
+	//  forest.LowestLevel ≡ 𝓹.Level
+	forest forest.LevelledForest
+
+	// lastSealedView is 𝓼.Level, i.e. the view of the latest sealed result that the forest
+	// can make progress on without further input from the consensus follower.
 	lastSealedView counters.StrictMonotonicCounter
 
 	// lastFinalizedView is the view of the last finalized block processed by the forest.
 	lastFinalizedView counters.StrictMonotonicCounter
 
-	// latestPersistedSealedResult tracks metadata about the latest persisted sealed result.
-	// this represents the lowest sealed result within the forest.
+	// latestPersistedSealedResult tracks view and ID of the latest persisted sealed result.
+	// This information is solely from the perspective of the storage layer and does not allow for
+	// conclusions about the forest. Specifically, as the forest triggers persisting processed
+	// result data, this quantity can be ahead of the forest's internal result with the smallest view.
 	latestPersistedSealedResult storage.LatestPersistedSealedResultReader
 
 	// maxViewDelta specifies the number of views past its lowest view that the forest will accept.
-	// maxViewDelta is added to the lowest view to compute the view horizon.
-	// Results for views higher than view horizon are rejected. This ensures that the forest does
-	// not grow unbounded.
+	// The 𝙫𝙞𝙚𝙬 𝙝𝙤𝙧𝙞𝙯𝙤𝙣 𝓱 is computed as: 𝓱 = 𝓹.Level + maxViewDelta. Results for views higher than
+	// view horizon are rejected, ensuring that the forest does not grow unbounded.
 	maxViewDelta uint64
 
 	// rejectedResults is a boolean value that indicates whether the ResultsForest has rejected any
