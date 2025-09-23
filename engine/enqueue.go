@@ -48,6 +48,12 @@ func MatchType[T any](m *Message) bool {
 	return ok
 }
 
+// MessageHandler routes incoming network messages based on a static set of patterns.
+// It extends the network layer and shares its semantics: delivery is not guaranteed.
+//
+// Messages are placed into bounded stores. When a store is full, new messages are dropped
+// to avoid unbounded memory growth. Engines using [MessageHandler] can configure store sizes,
+// but must tolerate message loss, just as with the underlying network.
 type MessageHandler struct {
 	log      zerolog.Logger
 	notifier Notifier
@@ -85,6 +91,9 @@ func (e *MessageHandler) Process(originID flow.Identifier, payload interface{}) 
 
 			ok := pattern.Store.Put(msg)
 			if !ok {
+				// Failed to store the message means that the message store is full.
+				// To prevent memory exhaustion attacks we drop the message.
+				// Any component using the [MessageHandler] must tolerate message loss
 				e.log.Warn().
 					Str("msg_type", logging.Type(payload)).
 					Hex("origin_id", originID[:]).
