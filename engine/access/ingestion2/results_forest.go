@@ -434,6 +434,7 @@ func (rf *ResultsForest) ResetLowestRejectedView() (uint64, bool) {
 // has available capacity.
 //
 // Expected error returns during normal operations:
+//   - [ErrPrunedView]: if the result's block view is below the lowest view.
 //   - [ErrMaxViewDeltaExceeded]: if the result's block view is more than maxViewDelta views ahead of the last sealed view
 func (rf *ResultsForest) AddSealedResult(result *flow.ExecutionResult) error {
 	resultID := result.ID()
@@ -441,10 +442,6 @@ func (rf *ResultsForest) AddSealedResult(result *flow.ExecutionResult) error {
 	container, err := rf.getOrCreateContainer(result, BlockStatusSealed)
 	if err != nil {
 		return fmt.Errorf("failed to get container for result (%s): %w", resultID, err)
-	}
-	if container == nil {
-		// noop if the result's block view is lower than the lowest view.
-		return nil
 	}
 
 	rf.mu.Lock()
