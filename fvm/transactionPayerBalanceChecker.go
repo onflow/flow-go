@@ -73,7 +73,7 @@ func (_ TransactionPayerBalanceChecker) CheckPayerBalanceAndReturnMaxFees(
 
 	var resultValue cadence.Value
 	var err error
-	txnState.RunWithAllLimitsDisabled(func() {
+	txnState.RunWithMeteringDisabled(func() {
 		// Don't meter the payer balance check.
 		// It has a static cost, and its cost should be part of the inclusion fees, not part of execution fees.
 		resultValue, err = env.CheckPayerBalanceAndGetMaxTxFees(
