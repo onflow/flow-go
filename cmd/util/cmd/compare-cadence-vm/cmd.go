@@ -13,7 +13,6 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 	otelTrace "go.opentelemetry.io/otel/sdk/trace"
-	"golang.org/x/exp/slices"
 	"golang.org/x/sync/errgroup"
 
 	debug_tx "github.com/onflow/flow-go/cmd/util/cmd/debug-tx"
@@ -30,7 +29,7 @@ var (
 	flagUseExecutionDataAPI bool
 	flagBlockID             string
 	flagBlockCount          int
-	flagDebug               bool
+	flagPrintTraces         bool
 	flagParallel            int
 )
 
@@ -64,7 +63,7 @@ func init() {
 
 	Cmd.Flags().IntVar(&flagBlockCount, "block-count", 1, "number of blocks to process (default: 1)")
 
-	Cmd.Flags().BoolVar(&flagDebug, "debug", false, "enable debug logging")
+	Cmd.Flags().BoolVar(&flagPrintTraces, "print-traces", false, "print traces for mismatched transactions")
 
 	Cmd.Flags().IntVar(&flagParallel, "parallel", 1, "number of blocks to process in parallel (default: 1)")
 }
@@ -259,13 +258,7 @@ func compareBlock(
 
 			result.mismatches++
 
-			if flagDebug {
-				compareReadsAndWrites(
-					txID,
-					interTxSnapshots[i],
-					vmTxSnapshots[i],
-				)
-
+			if flagPrintTraces {
 				log.Info().Str("tx", txID.String()).Msg("Interpreter spans:")
 
 				interSpanExporter := interSpanExporters[i]
@@ -427,8 +420,8 @@ func compareResults(txID flow.Identifier, interResult debug.Result, vmResult deb
 
 		} else if !bytes.Equal(interWrittenRegisterEntry.Value, vmWrittenRegisterEntry.Value) {
 			log.Error().Msgf(
-				"Written register value mismatch for register %s: interpreter %s vs VM %s",
-				interWrittenRegisterEntry.Key,
+				"Written register value mismatch for register %s: interpreter %q vs VM %q",
+				key,
 				hex.EncodeToString(interWrittenRegisterEntry.Value),
 				hex.EncodeToString(vmWrittenRegisterEntry.Value),
 			)
@@ -459,84 +452,4 @@ func compareResults(txID flow.Identifier, interResult debug.Result, vmResult deb
 	}
 
 	return !mismatch
-}
-
-func compareReadsAndWrites(
-	txID flow.Identifier,
-	interSnapshot *debug.CapturingStorageSnapshot,
-	vmSnapshot *debug.CapturingStorageSnapshot,
-) {
-	log := log.With().Str("tx", txID.String()).Logger()
-
-	// Compare reads
-
-	if len(interSnapshot.Reads) != len(vmSnapshot.Reads) {
-		log.Error().Msgf(
-			"Number of read registers differ: interpreter %d vs VM %d",
-			len(interSnapshot.Reads),
-			len(vmSnapshot.Reads),
-		)
-	}
-
-	for index, interRead := range interSnapshot.Reads {
-		if index >= len(vmSnapshot.Reads) {
-			break
-		}
-		vmRead := vmSnapshot.Reads[index]
-
-		if interRead.RegisterID != vmRead.RegisterID {
-			log.Error().Msgf(
-				"Read register ID mismatch at index %d: interpreter %s vs VM %s",
-				index,
-				interRead.RegisterID,
-				vmRead.RegisterID,
-			)
-			continue
-		}
-
-		if !slices.Equal(interRead.RegisterValue, vmRead.RegisterValue) {
-			log.Error().Msgf(
-				"Read register value mismatch for register %s: interpreter %s vs VM %s",
-				interRead.RegisterID,
-				hex.EncodeToString(interRead.RegisterValue),
-				hex.EncodeToString(vmRead.RegisterValue),
-			)
-		}
-	}
-
-	// Compare writes
-
-	if len(interSnapshot.Writes) != len(vmSnapshot.Writes) {
-		log.Error().Msgf(
-			"Number of written registers differ: interpreter %d vs VM %d",
-			len(interSnapshot.Writes),
-			len(vmSnapshot.Writes),
-		)
-	}
-
-	for index, interWrite := range interSnapshot.Writes {
-		if index >= len(vmSnapshot.Writes) {
-			break
-		}
-		vmWrite := vmSnapshot.Writes[index]
-
-		if interWrite.RegisterID != vmWrite.RegisterID {
-			log.Error().Msgf(
-				"Written register ID mismatch at index %d: interpreter %s vs VM %s",
-				index,
-				interWrite.RegisterID,
-				vmWrite.RegisterID,
-			)
-			continue
-		}
-
-		if !slices.Equal(interWrite.RegisterValue, vmWrite.RegisterValue) {
-			log.Error().Msgf(
-				"Written register value mismatch for register %s: interpreter %s vs VM %s",
-				interWrite.RegisterID,
-				hex.EncodeToString(interWrite.RegisterValue),
-				hex.EncodeToString(vmWrite.RegisterValue),
-			)
-		}
-	}
 }
