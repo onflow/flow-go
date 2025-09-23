@@ -421,7 +421,7 @@ func (s *TransactionStreamSuite) initializeHappyCaseMockInstructions() {
 
 	fakeRes := &flow.ExecutionResult{PreviousResultID: unittest.IdentifierFixture()}
 	s.executionResultProvider.On("ExecutionResult", mock.Anything, mock.Anything).
-		Return(&optimistic_sync.ExecutionResultInfo{ExecutionResult: fakeRes}, nil)
+		Return(&optimistic_sync.ExecutionResultInfo{ExecutionResultID: fakeRes.ID()}, nil)
 	s.executionSnapshot.On("LightTransactionResults").Return(s.transactionResults)
 	s.executionSnapshot.On("Events").Return(s.events)
 	s.executionStateCache.On("Snapshot", mock.Anything).Return(s.executionSnapshot, nil)

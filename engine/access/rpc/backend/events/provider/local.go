@@ -44,19 +44,21 @@ func (l *LocalEventProvider) Events(
 	missingBlocks := make([]BlockMetadata, 0)
 	blockEvents := make([]flow.BlockEvents, 0)
 
-	snapshot, err := l.execStateCache.Snapshot(result.ExecutionResult.ID())
+	snapshot, err := l.execStateCache.Snapshot(result.ExecutionResultID)
 	if err != nil {
-		return Response{}, access.ExecutorMetadata{}, fmt.Errorf("failed to get snapshot for execution result %s: %w", result.ExecutionResult.ID(), err)
+		return Response{}, access.ExecutorMetadata{},
+			fmt.Errorf("failed to get snapshot for execution result %s: %w", result.ExecutionResultID, err)
 	}
 
 	metadata := access.ExecutorMetadata{
-		ExecutionResultID: result.ExecutionResult.ID(),
+		ExecutionResultID: result.ExecutionResultID,
 		ExecutorIDs:       result.ExecutionNodes.NodeIDs(),
 	}
 
 	for _, blockInfo := range blocks {
 		if ctx.Err() != nil {
-			return Response{}, access.ExecutorMetadata{}, rpc.ConvertError(ctx.Err(), "failed to get events from storage", codes.Canceled)
+			return Response{}, access.ExecutorMetadata{},
+				rpc.ConvertError(ctx.Err(), "failed to get events from storage", codes.Canceled)
 		}
 
 		events, err := snapshot.Events().ByBlockID(blockInfo.ID)
@@ -67,6 +69,7 @@ func (l *LocalEventProvider) Events(
 				missingBlocks = append(missingBlocks, blockInfo)
 				continue
 			}
+
 			err = fmt.Errorf("failed to get events for block %s: %w", blockInfo.ID, err)
 			return Response{}, metadata, rpc.ConvertError(err, "failed to get events from storage", codes.Internal)
 		}
@@ -84,6 +87,7 @@ func (l *LocalEventProvider) Events(
 					err = fmt.Errorf("failed to convert event payload for block %s: %w", blockInfo.ID, err)
 					return Response{}, metadata, rpc.ConvertError(err, "failed to convert event payload", codes.Internal)
 				}
+
 				filteredEvent, err := flow.NewEvent(
 					flow.UntrustedEvent{
 						Type:             event.Type,
@@ -96,6 +100,7 @@ func (l *LocalEventProvider) Events(
 				if err != nil {
 					return Response{}, metadata, rpc.ConvertError(err, "could not construct event", codes.Internal)
 				}
+
 				event = *filteredEvent
 			}
 

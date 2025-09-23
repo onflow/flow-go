@@ -87,19 +87,14 @@ func (e *Provider) ExecutionResultInfo(
 		subsetENs := e.executionNodes.SelectExecutionNodes(executorIdentities, criteria.RequiredExecutors)
 
 		return &optimistic_sync.ExecutionResultInfo{
-			ExecutionResult: e.rootBlockResult,
-			ExecutionNodes:  subsetENs,
+			ExecutionResultID: e.rootBlockResult.ID(),
+			ExecutionNodes:    subsetENs,
 		}, nil
 	}
 
-	result, executorIDs, err :=
-		e.findResultAndExecutors(blockID, criteria)
+	result, executorIDs, err := e.findResultAndExecutors(blockID, criteria)
 	if err != nil {
-		return nil, fmt.Errorf(
-			"failed to find result and executors for block ID %v: %w",
-			blockID,
-			err,
-		)
+		return nil, fmt.Errorf("failed to find result and executors for block ID %v: %w", blockID, err)
 	}
 
 	executors := executorIdentities.Filter(filter.HasNodeID[flow.Identity](executorIDs...))
@@ -118,8 +113,8 @@ func (e *Provider) ExecutionResultInfo(
 	}
 
 	return &optimistic_sync.ExecutionResultInfo{
-		ExecutionResult: result,
-		ExecutionNodes:  subsetENs,
+		ExecutionResultID: result.ID(),
+		ExecutionNodes:    subsetENs,
 	}, nil
 }
 
@@ -143,11 +138,7 @@ func (e *Provider) findResultAndExecutors(
 	// Note: this will return an empty slice with no error if no receipts are found.
 	allReceipts, err := e.executionReceipts.ByBlockID(blockID)
 	if err != nil {
-		return nil, nil, fmt.Errorf(
-			"failed to retreive execution receipts for block ID %v: %w",
-			blockID,
-			err,
-		)
+		return nil, nil, fmt.Errorf("failed to retreive execution receipts for block ID %v: %w", blockID, err)
 	}
 
 	// find all results that match the criteria and have at least one acceptable executor
@@ -155,12 +146,10 @@ func (e *Provider) findResultAndExecutors(
 	for _, executionReceiptList := range allReceipts.GroupByResultID() {
 		executorGroup := executionReceiptList.GroupByExecutorID()
 		if isExecutorGroupMeetingCriteria(executorGroup, criteria) {
-			results = append(
-				results, result{
-					result:   &executionReceiptList[0].ExecutionResult,
-					receipts: executionReceiptList,
-				},
-			)
+			results = append(results, result{
+				result:   &executionReceiptList[0].ExecutionResult,
+				receipts: executionReceiptList,
+			})
 		}
 	}
 
@@ -169,11 +158,9 @@ func (e *Provider) findResultAndExecutors(
 	}
 
 	// sort results by the number of execution nodes in descending order
-	sort.Slice(
-		results, func(i, j int) bool {
-			return len(results[i].receipts) > len(results[j].receipts)
-		},
-	)
+	sort.Slice(results, func(i, j int) bool {
+		return len(results[i].receipts) > len(results[j].receipts)
+	})
 
 	executorIDs := getExecutorIDs(results[0].receipts)
 	return results[0].result, executorIDs, nil

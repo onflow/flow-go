@@ -15,8 +15,8 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-// ExecutionResultQueryProviderSuite is a test suite for testing the Provider.
-type ExecutionResultQueryProviderSuite struct {
+// ExecutionResultInfoProviderSuite is a test suite for testing the Provider.
+type ExecutionResultInfoProviderSuite struct {
 	suite.Suite
 
 	state    *protocol.State
@@ -31,12 +31,12 @@ type ExecutionResultQueryProviderSuite struct {
 	rootBlockResult *flow.ExecutionResult
 }
 
-func TestExecutionResultQueryProvider(t *testing.T) {
-	suite.Run(t, new(ExecutionResultQueryProviderSuite))
+func TestExecutionResultInfoProvider(t *testing.T) {
+	suite.Run(t, new(ExecutionResultInfoProviderSuite))
 }
 
 // SetupTest initializes the test suite with mock state and receipts storage.
-func (suite *ExecutionResultQueryProviderSuite) SetupTest() {
+func (suite *ExecutionResultInfoProviderSuite) SetupTest() {
 	t := suite.T()
 	suite.log = zerolog.New(zerolog.NewConsoleWriter())
 	suite.state = protocol.NewState(t)
@@ -58,7 +58,7 @@ func (suite *ExecutionResultQueryProviderSuite) SetupTest() {
 	suite.state.On("AtBlockID", mock.Anything).Return(suite.snapshot).Maybe()
 }
 
-func (suite *ExecutionResultQueryProviderSuite) createProvider(
+func (suite *ExecutionResultInfoProviderSuite) createProvider(
 	preferredExecutors flow.IdentifierList,
 	operatorCriteria optimistic_sync.Criteria,
 ) *Provider {
@@ -76,7 +76,7 @@ func (suite *ExecutionResultQueryProviderSuite) createProvider(
 }
 
 // setupIdentitiesMock sets up the mock for identity-related calls.
-func (suite *ExecutionResultQueryProviderSuite) setupIdentitiesMock(allExecutionNodes flow.IdentityList) {
+func (suite *ExecutionResultInfoProviderSuite) setupIdentitiesMock(allExecutionNodes flow.IdentityList) {
 	suite.snapshot.On("Identities", mock.Anything).Return(
 		func(filter flow.IdentityFilter[flow.Identity]) flow.IdentityList {
 			return allExecutionNodes.Filter(filter)
@@ -86,7 +86,7 @@ func (suite *ExecutionResultQueryProviderSuite) setupIdentitiesMock(allExecution
 }
 
 // TestExecutionResultQuery tests the main ExecutionResult function with various scenarios.
-func (suite *ExecutionResultQueryProviderSuite) TestExecutionResultQuery() {
+func (suite *ExecutionResultInfoProviderSuite) TestExecutionResultQuery() {
 	totalReceipts := 5
 	block := unittest.BlockFixture()
 
@@ -161,7 +161,7 @@ func (suite *ExecutionResultQueryProviderSuite) TestExecutionResultQuery() {
 			query, err := provider.ExecutionResultInfo(block.ID(), optimistic_sync.Criteria{})
 			suite.Require().NoError(err)
 
-			suite.Require().Equal(executionResult.ID(), query.ExecutionResult.ID())
+			suite.Require().Equal(executionResult.ID(), query.ExecutionResultID)
 			suite.Assert().ElementsMatch(requiredExecutors, query.ExecutionNodes.NodeIDs())
 		},
 	)
@@ -230,7 +230,7 @@ func (suite *ExecutionResultQueryProviderSuite) TestExecutionResultQuery() {
 }
 
 // TestRootBlockHandling tests the special case handling for root blocks.
-func (suite *ExecutionResultQueryProviderSuite) TestRootBlockHandling() {
+func (suite *ExecutionResultInfoProviderSuite) TestRootBlockHandling() {
 	allExecutionNodes := unittest.IdentityListFixture(5, unittest.WithRole(flow.RoleExecution))
 	suite.setupIdentitiesMock(allExecutionNodes)
 
@@ -244,7 +244,7 @@ func (suite *ExecutionResultQueryProviderSuite) TestRootBlockHandling() {
 			)
 			suite.Require().NoError(err)
 
-			suite.Assert().Equal(suite.rootBlockResult, query.ExecutionResult)
+			suite.Assert().Equal(suite.rootBlockResult.ID(), query.ExecutionResultID)
 			suite.Assert().Len(query.ExecutionNodes.NodeIDs(), defaultMaxNodesCnt)
 			suite.Assert().Subset(allExecutionNodes.NodeIDs(), query.ExecutionNodes.NodeIDs())
 		},
@@ -263,14 +263,14 @@ func (suite *ExecutionResultQueryProviderSuite) TestRootBlockHandling() {
 			query, err := provider.ExecutionResultInfo(suite.rootBlock.ID(), criteria)
 			suite.Require().NoError(err)
 
-			suite.Assert().Equal(suite.rootBlockResult, query.ExecutionResult)
+			suite.Assert().Equal(suite.rootBlockResult.ID(), query.ExecutionResultID)
 			suite.Assert().ElementsMatch(query.ExecutionNodes.NodeIDs(), requiredExecutors)
 		},
 	)
 }
 
 // TestPreferredAndRequiredExecutionNodes tests the interaction with preferred and required execution nodes.
-func (suite *ExecutionResultQueryProviderSuite) TestPreferredAndRequiredExecutionNodes() {
+func (suite *ExecutionResultInfoProviderSuite) TestPreferredAndRequiredExecutionNodes() {
 	block := unittest.BlockFixture()
 	allExecutionNodes := unittest.IdentityListFixture(8, unittest.WithRole(flow.RoleExecution))
 	executionResult := unittest.ExecutionResultFixture()

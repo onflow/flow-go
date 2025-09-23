@@ -71,7 +71,7 @@ func (t *LocalTransactionProvider) TransactionResult(
 	blockID := block.ID()
 
 	metadata := accessmodel.ExecutorMetadata{
-		ExecutionResultID: executionResultInfo.ExecutionResult.ID(),
+		ExecutionResultID: executionResultInfo.ExecutionResultID,
 		ExecutorIDs:       executionResultInfo.ExecutionNodes.NodeIDs(),
 	}
 
@@ -155,7 +155,7 @@ func (t *LocalTransactionProvider) TransactionResultByIndex(
 	blockID := block.ID()
 
 	metadata := accessmodel.ExecutorMetadata{
-		ExecutionResultID: executionResultInfo.ExecutionResult.ID(),
+		ExecutionResultID: executionResultInfo.ExecutionResultID,
 		ExecutorIDs:       executionResultInfo.ExecutionNodes.NodeIDs(),
 	}
 
@@ -250,7 +250,7 @@ func (t *LocalTransactionProvider) TransactionsByBlockID(
 	blockID := block.ID()
 
 	metadata := accessmodel.ExecutorMetadata{
-		ExecutionResultID: executionResultInfo.ExecutionResult.ID(),
+		ExecutionResultID: executionResultInfo.ExecutionResultID,
 		ExecutorIDs:       executionResultInfo.ExecutionNodes.NodeIDs(),
 	}
 
@@ -305,7 +305,7 @@ func (t *LocalTransactionProvider) TransactionResultsByBlockID(
 	blockID := block.ID()
 
 	metadata := accessmodel.ExecutorMetadata{
-		ExecutionResultID: executionResultInfo.ExecutionResult.ID(),
+		ExecutionResultID: executionResultInfo.ExecutionResultID,
 		ExecutorIDs:       executionResultInfo.ExecutionNodes.NodeIDs(),
 	}
 
@@ -433,7 +433,7 @@ func (t *LocalTransactionProvider) SystemTransaction(
 	}
 
 	metadata := accessmodel.ExecutorMetadata{
-		ExecutionResultID: executionResultInfo.ExecutionResult.ID(),
+		ExecutionResultID: executionResultInfo.ExecutionResultID,
 		ExecutorIDs:       executionResultInfo.ExecutionNodes.NodeIDs(),
 	}
 

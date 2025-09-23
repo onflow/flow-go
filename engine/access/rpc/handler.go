@@ -21,7 +21,6 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/counters"
-	"github.com/onflow/flow-go/module/executiondatasync/optimistic_sync"
 	"github.com/onflow/flow-go/module/state_synchronization"
 	"github.com/onflow/flow-go/module/state_synchronization/indexer"
 )
@@ -359,7 +358,7 @@ func (h *Handler) GetTransactionResult(
 		blockId,
 		collectionId,
 		eventEncodingVersion,
-		NewCriteria(query),
+		convert.NewCriteria(query),
 	)
 	if err != nil {
 		return nil, err
@@ -395,7 +394,7 @@ func (h *Handler) GetTransactionResultsByBlockID(
 		ctx,
 		id,
 		eventEncodingVersion,
-		NewCriteria(query),
+		convert.NewCriteria(query),
 	)
 	if err != nil {
 		return nil, err
@@ -473,7 +472,7 @@ func (h *Handler) GetSystemTransactionResult(
 		txID,
 		blockID,
 		eventEncodingVersion,
-		NewCriteria(query),
+		convert.NewCriteria(query),
 	)
 	if err != nil {
 		return nil, err
@@ -537,7 +536,7 @@ func (h *Handler) GetTransactionResultByIndex(
 		blockID,
 		req.GetIndex(),
 		eventEncodingVersion,
-		NewCriteria(query),
+		convert.NewCriteria(query),
 	)
 	if err != nil {
 		return nil, err
@@ -961,7 +960,7 @@ func (h *Handler) GetEventsForHeightRange(
 		startHeight,
 		endHeight,
 		eventEncodingVersion,
-		NewCriteria(query),
+		convert.NewCriteria(query),
 	)
 	if err != nil {
 		return nil, err
@@ -1004,13 +1003,12 @@ func (h *Handler) GetEventsForBlockIDs(
 
 	eventEncodingVersion := req.GetEventEncodingVersion()
 	query := req.GetExecutionStateQuery()
-
 	results, executorMetadata, err := h.api.GetEventsForBlockIDs(
 		ctx,
 		eventType,
 		blockIDs,
 		eventEncodingVersion,
-		NewCriteria(query),
+		convert.NewCriteria(query),
 	)
 	if err != nil {
 		return nil, err
@@ -1669,15 +1667,4 @@ func HandleRPCSubscription[T any](sub subscription.Subscription, handleResponse 
 	}
 
 	return nil
-}
-
-func NewCriteria(query *entities.ExecutionStateQuery) optimistic_sync.Criteria {
-	if query == nil {
-		return optimistic_sync.Criteria{}
-	}
-
-	return optimistic_sync.Criteria{
-		AgreeingExecutorsCount: uint(query.AgreeingExecutorsCount),
-		RequiredExecutors:      convert.MessagesToIdentifiers(query.RequiredExecutorIds),
-	}
 }

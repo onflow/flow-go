@@ -74,7 +74,7 @@ func (e *ENEventProvider) Events(
 	}
 
 	metadata := access.ExecutorMetadata{
-		ExecutionResultID: execResultInfo.ExecutionResult.ID(),
+		ExecutionResultID: execResultInfo.ExecutionResultID,
 		ExecutorIDs:       orderedExecutors(node.NodeID, execResultInfo.ExecutionNodes.NodeIDs()),
 	}
 
@@ -200,7 +200,7 @@ func verifyAndConvertToAccessEvents(
 
 // orderedExecutors creates an ordered list of executors for the same execution result
 // - respondingExecutor is the executor who returned execution result.
-// - executorList is a list of executors who also produced the same execution result.
+// - executorList is the full list of executors who produced the same execution result.
 func orderedExecutors(respondingExecutor flow.Identifier, executorList flow.IdentifierList) flow.IdentifierList {
 	ordered := make(flow.IdentifierList, 0, len(executorList))
 	ordered = append(ordered, respondingExecutor)

@@ -500,8 +500,8 @@ func (s *Suite) TestGetSystemTransaction_ExecutionNode_HappyPath() {
 	s.execResultProvider.
 		On("ExecutionResultInfo", block.ID(), mock.AnythingOfType("optimistic_sync.Criteria")).
 		Return(&optimistic_sync.ExecutionResultInfo{
-			ExecutionResult: &s.receiptsList[0].ExecutionResult,
-			ExecutionNodes:  s.identities.ToSkeleton(),
+			ExecutionResultID: s.receiptsList[0].ExecutionResult.ID(),
+			ExecutionNodes:    s.identities.ToSkeleton(),
 		}, nil)
 
 	s.Run("scheduled callbacks DISABLED - ZeroID", func() {
@@ -642,8 +642,8 @@ func (s *Suite) TestGetSystemTransaction_Local_HappyPath() {
 	s.execResultProvider.
 		On("ExecutionResultInfo", block.ID(), mock.AnythingOfType("optimistic_sync.Criteria")).
 		Return(&optimistic_sync.ExecutionResultInfo{
-			ExecutionResult: &executionResult,
-			ExecutionNodes:  s.identities.ToSkeleton(),
+			ExecutionResultID: executionResultID,
+			ExecutionNodes:    s.identities.ToSkeleton(),
 		}, nil)
 
 	s.Run("scheduled callbacks DISABLED - ZeroID", func() {
@@ -826,8 +826,8 @@ func (s *Suite) TestGetSystemTransactionResult_ExecutionNode_HappyPath() {
 		s.execResultProvider.
 			On("ExecutionResultInfo", block.ID(), mock.AnythingOfType("optimistic_sync.Criteria")).
 			Return(&optimistic_sync.ExecutionResultInfo{
-				ExecutionResult: &s.receiptsList[0].ExecutionResult,
-				ExecutionNodes:  s.identities.ToSkeleton(),
+				ExecutionResultID: s.receiptsList[0].ExecutionResult.ID(),
+				ExecutionNodes:    s.identities.ToSkeleton(),
 			}, nil)
 
 		res, _, err := backend.GetSystemTransactionResult(
@@ -922,7 +922,7 @@ func (s *Suite) TestGetSystemTransactionResult_Local_HappyPath() {
 	fakeRes := &flow.ExecutionResult{PreviousResultID: unittest.IdentifierFixture()}
 	s.execResultProvider.
 		On("ExecutionResultInfo", blockId, reqCriteria).
-		Return(&optimistic_sync.ExecutionResultInfo{ExecutionResult: fakeRes}, nil)
+		Return(&optimistic_sync.ExecutionResultInfo{ExecutionResultID: fakeRes.ID()}, nil)
 	s.executionStateCache.
 		On("Snapshot", fakeRes.ID()).
 		Return(snapshot, nil)
@@ -1026,8 +1026,8 @@ func (s *Suite) TestGetSystemTransactionResult_FailedEncodingConversion() {
 	s.execResultProvider.
 		On("ExecutionResultInfo", block.ID(), mock.AnythingOfType("optimistic_sync.Criteria")).
 		Return(&optimistic_sync.ExecutionResultInfo{
-			ExecutionResult: &s.receiptsList[0].ExecutionResult,
-			ExecutionNodes:  s.identities.ToSkeleton(),
+			ExecutionResultID: s.receiptsList[0].ExecutionResult.ID(),
+			ExecutionNodes:    s.identities.ToSkeleton(),
 		}, nil)
 
 	res, _, err := txBackend.GetSystemTransactionResult(
@@ -1109,8 +1109,8 @@ func (s *Suite) TestGetTransactionResult_FromStorage() {
 	s.execResultProvider.
 		On("ExecutionResultInfo", block.ID(), mock.AnythingOfType("optimistic_sync.Criteria")).
 		Return(&optimistic_sync.ExecutionResultInfo{
-			ExecutionResult: fakeRes,
-			ExecutionNodes:  s.identities.ToSkeleton(),
+			ExecutionResultID: fakeRes.ID(),
+			ExecutionNodes:    s.identities.ToSkeleton(),
 		}, nil)
 	s.executionStateCache.On("Snapshot", mock.Anything).Return(snapshot, nil)
 
@@ -1196,7 +1196,7 @@ func (s *Suite) TestTransactionByIndexFromStorage() {
 	fakeRes := &flow.ExecutionResult{PreviousResultID: unittest.IdentifierFixture()}
 	s.execResultProvider.
 		On("ExecutionResultInfo", block.ID(), mock.AnythingOfType("optimistic_sync.Criteria")).
-		Return(&optimistic_sync.ExecutionResultInfo{ExecutionResult: fakeRes}, nil)
+		Return(&optimistic_sync.ExecutionResultInfo{ExecutionResultID: fakeRes.ID()}, nil)
 	s.executionStateCache.On("Snapshot", mock.Anything).Return(snapshot, nil)
 
 	// Snapshot readers delegate to our storage mocks
@@ -1301,7 +1301,7 @@ func (s *Suite) TestTransactionResultsByBlockIDFromStorage() {
 	fakeRes := &flow.ExecutionResult{PreviousResultID: unittest.IdentifierFixture()}
 	s.execResultProvider.
 		On("ExecutionResultInfo", block.ID(), mock.AnythingOfType("optimistic_sync.Criteria")).
-		Return(&optimistic_sync.ExecutionResultInfo{ExecutionResult: fakeRes}, nil)
+		Return(&optimistic_sync.ExecutionResultInfo{ExecutionResultID: fakeRes.ID()}, nil)
 	s.executionStateCache.On("Snapshot", mock.Anything).Return(snapshot, nil)
 
 	// Snapshot readers delegate to our storage mocks
@@ -1360,8 +1360,8 @@ func (s *Suite) TestGetTransactionsByBlockID() {
 	s.execResultProvider.
 		On("ExecutionResultInfo", block.ID(), mock.AnythingOfType("optimistic_sync.Criteria")).
 		Return(&optimistic_sync.ExecutionResultInfo{
-			ExecutionResult: &executionResult,
-			ExecutionNodes:  s.identities.ToSkeleton(),
+			ExecutionResultID: executionResultID,
+			ExecutionNodes:    s.identities.ToSkeleton(),
 		}, nil)
 
 	// Test with Local Provider
@@ -1557,8 +1557,8 @@ func (s *Suite) TestTransactionResultsByBlockIDFromExecutionNode() {
 	s.execResultProvider.
 		On("ExecutionResultInfo", block.ID(), mock.AnythingOfType("optimistic_sync.Criteria")).
 		Return(&optimistic_sync.ExecutionResultInfo{
-			ExecutionResult: &executionResult,
-			ExecutionNodes:  s.identities.ToSkeleton(),
+			ExecutionResultID: executionResult.ID(),
+			ExecutionNodes:    s.identities.ToSkeleton(),
 		}, nil)
 
 	// used to derive transaction status
@@ -1714,8 +1714,8 @@ func (s *Suite) TestSuccessfulTransactionsDontRetry() {
 	s.execResultProvider.
 		On("ExecutionResultInfo", block.ID(), mock.AnythingOfType("optimistic_sync.Criteria")).
 		Return(&optimistic_sync.ExecutionResultInfo{
-			ExecutionResult: unittest.ExecutionResultFixture(),
-			ExecutionNodes:  s.identities.ToSkeleton(),
+			ExecutionResultID: unittest.IdentifierFixture(),
+			ExecutionNodes:    s.identities.ToSkeleton(),
 		}, nil)
 	s.executionStateCache.
 		On("Snapshot", mock.Anything).

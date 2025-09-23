@@ -89,7 +89,7 @@ func (e *ENTransactionProvider) TransactionResult(
 	}
 
 	metadata := accessmodel.ExecutorMetadata{
-		ExecutionResultID: executionResultInfo.ExecutionResult.ID(),
+		ExecutionResultID: executionResultInfo.ExecutionResultID,
 		ExecutorIDs:       executionResultInfo.ExecutionNodes.NodeIDs(),
 	}
 
@@ -128,7 +128,7 @@ func (e *ENTransactionProvider) TransactionsByBlockID(
 	blockID := block.ID()
 
 	metadata := accessmodel.ExecutorMetadata{
-		ExecutionResultID: executionResultInfo.ExecutionResult.ID(),
+		ExecutionResultID: executionResultInfo.ExecutionResultID,
 		ExecutorIDs:       executionResultInfo.ExecutionNodes.NodeIDs(),
 	}
 
@@ -187,7 +187,7 @@ func (e *ENTransactionProvider) TransactionResultByIndex(
 	}
 
 	metadata := accessmodel.ExecutorMetadata{
-		ExecutionResultID: executionResultInfo.ExecutionResult.ID(),
+		ExecutionResultID: executionResultInfo.ExecutionResultID,
 		ExecutorIDs:       executionResultInfo.ExecutionNodes.NodeIDs(),
 	}
 
@@ -235,7 +235,7 @@ func (e *ENTransactionProvider) TransactionResultsByBlockID(
 	}
 
 	metadata := accessmodel.ExecutorMetadata{
-		ExecutionResultID: executionResultInfo.ExecutionResult.ID(),
+		ExecutionResultID: executionResultInfo.ExecutionResultID,
 		ExecutorIDs:       executionResultInfo.ExecutionNodes.NodeIDs(),
 	}
 
@@ -296,7 +296,7 @@ func (e *ENTransactionProvider) SystemTransaction(
 	blockID := block.ID()
 
 	metadata := accessmodel.ExecutorMetadata{
-		ExecutionResultID: executionResultInfo.ExecutionResult.ID(),
+		ExecutionResultID: executionResultInfo.ExecutionResultID,
 		ExecutorIDs:       executionResultInfo.ExecutionNodes.NodeIDs(),
 	}
 

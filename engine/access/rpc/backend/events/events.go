@@ -119,12 +119,8 @@ func (e *Events) GetEventsForHeightRange(
 	rangeSize := endHeight - startHeight + 1 // range is inclusive on both ends
 	if rangeSize > uint64(e.maxHeightRange) {
 		return nil, accessmodel.ExecutorMetadata{},
-			status.Errorf(
-				codes.InvalidArgument,
-				"requested block range (%d) exceeded maximum (%d)",
-				rangeSize,
-				e.maxHeightRange,
-			)
+			status.Errorf(codes.InvalidArgument, "requested block range (%d) exceeded maximum (%d)",
+				rangeSize, e.maxHeightRange)
 	}
 
 	// get the latest sealed block header
@@ -139,12 +135,7 @@ func (e *Events) GetEventsForHeightRange(
 	// a start height should not be beyond the last sealed height
 	if startHeight > sealed.Height {
 		return nil, accessmodel.ExecutorMetadata{},
-			status.Errorf(
-				codes.OutOfRange,
-				"start height %d is greater than the last sealed block height %d",
-				startHeight,
-				sealed.Height,
-			)
+			status.Errorf(codes.OutOfRange, "start height %d is greater than the last sealed block height %d", startHeight, sealed.Height)
 	}
 
 	// limit max height to the last sealed block in the chain
@@ -178,13 +169,11 @@ func (e *Events) GetEventsForHeightRange(
 				rpc.ConvertStorageError(fmt.Errorf("failed to get block header for %d: %w", i, err))
 		}
 
-		blockHeaders = append(
-			blockHeaders, provider.BlockMetadata{
-				ID:        blockID,
-				Height:    header.Height,
-				Timestamp: time.UnixMilli(int64(header.Timestamp)).UTC(),
-			},
-		)
+		blockHeaders = append(blockHeaders, provider.BlockMetadata{
+			ID:        blockID,
+			Height:    header.Height,
+			Timestamp: time.UnixMilli(int64(header.Timestamp)).UTC(),
+		})
 	}
 
 	// get the result for the block with the highest height. all data queried for this set of blocks
@@ -224,17 +213,19 @@ func (e *Events) GetEventsForBlockIDs(
 			status.Error(codes.InvalidArgument, "block IDs must not be empty")
 	}
 
+	if uint(len(blockIDs)) > e.maxHeightRange {
+		return nil, accessmodel.ExecutorMetadata{},
+			status.Errorf(codes.InvalidArgument, "requested block range (%d) exceeded maximum (%d)",
+				len(blockIDs), e.maxHeightRange)
+	}
+
 	if _, err := events.ValidateEvent(flow.EventType(eventType), e.chain); err != nil {
 		return nil, accessmodel.ExecutorMetadata{},
 			status.Errorf(codes.InvalidArgument, "invalid event type: %v", err)
 	}
 
-	if uint(len(blockIDs)) > e.maxHeightRange {
-		return nil, accessmodel.ExecutorMetadata{},
-			status.Errorf(codes.InvalidArgument, "requested block range (%d) exceeded maximum (%d)", len(blockIDs), e.maxHeightRange)
-	}
-
-	var newestBlockHeader *flow.Header
+	var newestView uint64
+	var newestBlockID flow.Identifier
 
 	// find the block headers for all the block IDs
 	blockHeaders := make([]provider.BlockMetadata, 0, len(blockIDs))
@@ -245,29 +236,28 @@ func (e *Events) GetEventsForBlockIDs(
 				rpc.ConvertStorageError(fmt.Errorf("failed to get block header for %s: %w", blockID, err))
 		}
 
-		if newestBlockHeader == nil || header.View > newestBlockHeader.View {
-			newestBlockHeader = header
+		if header.View >= newestView {
+			newestView = header.View
+			newestBlockID = blockID
 		}
 
-		blockHeaders = append(
-			blockHeaders, provider.BlockMetadata{
-				ID:        blockID,
-				Height:    header.Height,
-				Timestamp: time.UnixMilli(int64(header.Timestamp)).UTC(),
-			},
-		)
+		blockHeaders = append(blockHeaders, provider.BlockMetadata{
+			ID:        blockID,
+			Height:    header.Height,
+			Timestamp: time.UnixMilli(int64(header.Timestamp)).UTC(),
+		})
 	}
 
 	// get the result for the block with the highest height. all data queried for this set of blocks
 	// must be from the execution fork terminating at this result. this guarantees the response
 	// contains a consistent view of the state.
 	execResultInfo, err := e.execResultProvider.ExecutionResultInfo(
-		newestBlockHeader.ID(),
+		newestBlockID,
 		criteria,
 	)
 	if err != nil {
 		return nil, accessmodel.ExecutorMetadata{},
-			fmt.Errorf("failed to get execution result for block %v: %w", newestBlockHeader.ID(), err)
+			fmt.Errorf("failed to get execution result for block %v: %w", newestBlockID, err)
 	}
 
 	resp, metadata, err := e.provider.Events(

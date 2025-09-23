@@ -43,7 +43,6 @@ type BackendBlocksSuite struct {
 
 	blocks           *storagemock.Blocks
 	headers          *storagemock.Headers
-	events           *storagemock.Events
 	blockTracker     *trackermock.BlockTracker
 	blockTrackerReal tracker.BlockTracker
 
@@ -89,7 +88,6 @@ func (s *BackendBlocksSuite) SetupTest() {
 	s.state.On("Params").Return(params)
 
 	s.blocks = new(storagemock.Blocks)
-	s.events = new(storagemock.Events)
 	s.headers = new(storagemock.Headers)
 	s.chainID = flow.Testnet
 	s.connectionFactory = connectionmock.NewConnectionFactory(s.T())
@@ -155,24 +153,8 @@ func (s *BackendBlocksSuite) SetupTest() {
 	require.NoError(s.T(), err)
 
 	s.executionResultInfoProvider = osyncmock.NewExecutionResultInfoProvider(s.T())
-	s.executionResultInfoProvider.
-		On("ExecutionResultInfo", mock.Anything, mock.Anything).
-		Return(&optimistic_sync.ExecutionResultInfo{
-			ExecutionResult: unittest.ExecutionResultFixture(),
-			ExecutionNodes:  unittest.IdentityListFixture(2).ToSkeleton(),
-		}, nil).
-		Maybe()
-
 	s.executionDataSnapshot = osyncmock.NewSnapshot(s.T())
-	s.executionDataSnapshot.On("Events").
-		Return(s.events, nil).
-		Maybe()
-
 	s.executionStateCache = osyncmock.NewExecutionStateCache(s.T())
-	s.executionStateCache.
-		On("Snapshot", mock.Anything).
-		Return(s.executionDataSnapshot, nil).
-		Maybe()
 }
 
 // backendParams returns the Params configuration for the backend.

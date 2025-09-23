@@ -451,7 +451,7 @@ func (t *Transactions) lookupCollectionIDInBlock(
 	txID flow.Identifier,
 	execResultInfo *optimistic_sync.ExecutionResultInfo,
 ) (flow.Identifier, error) {
-	snapshot, err := t.executionStateCache.Snapshot(execResultInfo.ExecutionResult.ID())
+	snapshot, err := t.executionStateCache.Snapshot(execResultInfo.ExecutionResultID)
 	if err != nil {
 		return flow.ZeroID, err
 	}

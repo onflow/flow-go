@@ -19,6 +19,7 @@ import (
 	"github.com/onflow/flow-go/engine/access/rest/router"
 	"github.com/onflow/flow-go/model/access"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/executiondatasync/optimistic_sync"
 	"github.com/onflow/flow-go/utils/unittest"
 
 	"github.com/onflow/flow/protobuf/go/flow/entities"
@@ -82,21 +83,6 @@ func TestGetEvents(t *testing.T) {
 				"A.179b6b1cb6755e31.Foo.Bar",
 				startHeight,
 				endHeight,
-				nil,
-				"2",
-				[]string{},
-				"true",
-			),
-			expectedStatus:   http.StatusOK,
-			expectedResponse: buildExpectedResponse(t, events, true),
-		},
-		{
-			description: "Get events range ending at sealed block",
-			request: buildRequest(
-				t,
-				"A.179b6b1cb6755e31.Foo.Bar",
-				"0",
-				"sealed",
 				nil,
 				"2",
 				[]string{},
@@ -244,13 +230,15 @@ func TestGetEvents(t *testing.T) {
 
 	for _, test := range testVectors {
 		t.Run(test.description, func(t *testing.T) {
+			t.Log("request: ", test.request.URL.String())
 			router.AssertResponse(t, test.request, test.expectedStatus, test.expectedResponse, backend)
 		})
 	}
 
 }
 
-func TestGetEvents_ParseEmptyExecutionState(t *testing.T) {
+func TestGetEvents_ParseExecutionState(t *testing.T) {
+	eventType := "A.179b6b1cb6755e31.Foo.Bar"
 	startHeight := 0
 	endHeight := 5
 	expectedBlockEvents := make([]flow.BlockEvents, endHeight)
@@ -265,25 +253,136 @@ func TestGetEvents_ParseEmptyExecutionState(t *testing.T) {
 		On(
 			"GetEventsForHeightRange",
 			mocks.Anything,
-			mocks.Anything,
+			eventType,
 			uint64(startHeight),
 			uint64(endHeight),
 			entities.EventEncodingVersion_JSON_CDC_V0,
 			mocks.Anything,
+		).
+		Return(expectedBlockEvents, access.ExecutorMetadata{}, nil)
+
+	t.Run("empty execution state query", func(t *testing.T) {
+		request := buildRequest(
+			t,
+			eventType,
+			"0",
+			fmt.Sprint(endHeight),
+			[]string{},
+			"",
+			[]string{},
+			"",
+		)
+
+		expectedResponseBody := buildExpectedResponse(t, expectedBlockEvents, false)
+		router.AssertOKResponse(t, request, expectedResponseBody, backend)
+	})
+
+	t.Run("empty agreeing executors count", func(t *testing.T) {
+		request := buildRequest(
+			t,
+			eventType,
+			"0",
+			fmt.Sprint(endHeight),
+			[]string{},
+			"",
+			unittest.IdentifierListFixture(2).Strings(),
+			"true",
+		)
+
+		expectedResponseBody := buildExpectedResponse(t, expectedBlockEvents, true)
+		router.AssertOKResponse(t, request, expectedResponseBody, backend)
+	})
+
+	t.Run("empty required executors", func(t *testing.T) {
+		request := buildRequest(
+			t,
+			eventType,
+			"0",
+			fmt.Sprint(endHeight),
+			[]string{},
+			"2",
+			[]string{},
+			"true",
+		)
+
+		expectedResponseBody := buildExpectedResponse(t, expectedBlockEvents, true)
+		router.AssertOKResponse(t, request, expectedResponseBody, backend)
+	})
+
+	t.Run("empty include executor metadata", func(t *testing.T) {
+		request := buildRequest(
+			t,
+			eventType,
+			"0",
+			fmt.Sprint(endHeight),
+			[]string{},
+			"2",
+			unittest.IdentifierListFixture(2).Strings(),
+			"",
+		)
+
+		expectedResponseBody := buildExpectedResponse(t, expectedBlockEvents, true)
+		router.AssertOKResponse(t, request, expectedResponseBody, backend)
+	})
+
+	t.Run("agreeing executors count equals 0", func(t *testing.T) {
+		request := buildRequest(
+			t,
+			eventType,
+			"0",
+			fmt.Sprint(endHeight),
+			[]string{},
+			"0",
+			unittest.IdentifierListFixture(2).Strings(),
+			"true",
+		)
+
+		rr := router.ExecuteRequest(request, backend)
+		// agreeing executors count should be either omitted or greater than 0
+		require.Equal(t, http.StatusBadRequest, rr.Code)
+	})
+}
+
+func TestGetEvents_GetAtSealedBlock(t *testing.T) {
+	expectedBlockEvents := make([]flow.BlockEvents, 5)
+	for i := 0; i < len(expectedBlockEvents); i++ {
+		header := unittest.BlockHeaderFixture(unittest.WithHeaderHeight(uint64(i)))
+		expectedBlockEvents[i] = unittest.BlockEventsFixture(header, 2)
+	}
+
+	eventType := "A.179b6b1cb6755e31.Foo.Bar"
+	latestBlockHeader := unittest.BlockHeaderFixture()
+
+	backend := mock.NewAPI(t)
+	backend.Mock.
+		On("GetLatestBlockHeader", mocks.Anything, true).
+		Return(latestBlockHeader, flow.BlockStatusSealed, nil).
+		Once()
+
+	backend.
+		On(
+			"GetEventsForHeightRange",
+			mocks.Anything,
+			eventType,
+			uint64(0),
+			mocks.Anything,
+			entities.EventEncodingVersion_JSON_CDC_V0,
+			optimistic_sync.DefaultCriteria,
 		).
 		Return(expectedBlockEvents, access.ExecutorMetadata{}, nil).
 		Once()
 
 	request := buildRequest(
 		t,
-		"A.179b6b1cb6755e31.Foo.Bar",
+		eventType,
 		"0",
-		fmt.Sprint(endHeight),
+		"sealed",
 		[]string{},
-		"",
+		"2",
 		[]string{},
-		"",
+		"true",
 	)
+	t.Log("request: ", request.URL.String())
 
 	expectedResponseBody := buildExpectedResponse(t, expectedBlockEvents, false)
 	router.AssertOKResponse(t, request, expectedResponseBody, backend)
@@ -309,7 +408,8 @@ func generateEventsMocks(backend *mock.API, n int) []flow.BlockEvents {
 				entities.EventEncodingVersion_JSON_CDC_V0,
 				mocks.Anything,
 			).
-			Return([]flow.BlockEvents{events[i]}, access.ExecutorMetadata{}, nil)
+			Return([]flow.BlockEvents{events[i]}, access.ExecutorMetadata{}, nil).
+			Once()
 
 		lastHeader = header
 	}
@@ -322,29 +422,36 @@ func generateEventsMocks(backend *mock.API, n int) []flow.BlockEvents {
 			entities.EventEncodingVersion_JSON_CDC_V0,
 			mocks.Anything,
 		).
-		Return(events, access.ExecutorMetadata{}, nil)
+		Return(events, access.ExecutorMetadata{}, nil).
+		Once()
 
 	// range from first to last block
-	backend.Mock.On(
-		"GetEventsForHeightRange",
-		mocks.Anything,
-		mocks.Anything,
-		events[0].BlockHeight,
-		events[len(events)-1].BlockHeight,
-		entities.EventEncodingVersion_JSON_CDC_V0,
-		mocks.Anything,
-	).Return(events, access.ExecutorMetadata{}, nil)
+	backend.Mock.
+		On(
+			"GetEventsForHeightRange",
+			mocks.Anything,
+			mocks.Anything,
+			events[0].BlockHeight,
+			events[len(events)-1].BlockHeight,
+			entities.EventEncodingVersion_JSON_CDC_V0,
+			mocks.Anything,
+		).
+		Return(events, access.ExecutorMetadata{}, nil).
+		Once()
 
 	// range from first to last block + 5
-	backend.Mock.On(
-		"GetEventsForHeightRange",
-		mocks.Anything,
-		mocks.Anything,
-		events[0].BlockHeight,
-		events[len(events)-1].BlockHeight+5,
-		entities.EventEncodingVersion_JSON_CDC_V0,
-		mocks.Anything,
-	).Return(append(events[:len(events)-1], unittest.BlockEventsFixture(lastHeader, 0)), access.ExecutorMetadata{}, nil)
+	backend.Mock.
+		On(
+			"GetEventsForHeightRange",
+			mocks.Anything,
+			mocks.Anything,
+			events[0].BlockHeight,
+			events[len(events)-1].BlockHeight+5,
+			entities.EventEncodingVersion_JSON_CDC_V0,
+			mocks.Anything,
+		).
+		Return(append(events[:len(events)-1], unittest.BlockEventsFixture(lastHeader, 0)), access.ExecutorMetadata{}, nil).
+		Once()
 
 	latestBlock := unittest.BlockHeaderFixture()
 	latestBlock.Height = uint64(n - 1)
@@ -359,7 +466,8 @@ func generateEventsMocks(backend *mock.API, n int) []flow.BlockEvents {
 			entities.EventEncodingVersion_JSON_CDC_V0,
 			mocks.Anything,
 		).
-		Return(nil, access.ExecutorMetadata{}, status.Error(codes.NotFound, "not found"))
+		Return(nil, access.ExecutorMetadata{}, status.Error(codes.NotFound, "not found")).
+		Once()
 
 	backend.Mock.
 		On(
@@ -371,19 +479,8 @@ func generateEventsMocks(backend *mock.API, n int) []flow.BlockEvents {
 			mocks.Anything,
 			mocks.Anything,
 		).
-		Return(nil, access.ExecutorMetadata{}, status.Error(codes.NotFound, "not found"))
-
-	backend.Mock.
-		On(
-			"GetEventsForHeightRange",
-			mocks.Anything,
-			mocks.Anything,
-			mocks.Anything,
-			mocks.Anything,
-			mocks.Anything,
-			mocks.Anything,
-		).
-		Return(events[0:3], access.ExecutorMetadata{}, nil)
+		Return(events[0:3], access.ExecutorMetadata{}, nil).
+		Once()
 
 	backend.Mock.
 		On("GetLatestBlockHeader", mocks.Anything, true).
@@ -415,9 +512,13 @@ func buildRequest(
 	}
 
 	q.Add(router.AgreeingExecutorsCountQueryParam, agreeingExecutorsCount)
-	q.Add(router.RequiredExecutorIdsQueryParam, strings.Join(requiredExecutors, ","))
+
+	if len(requiredExecutors) > 0 {
+		q.Add(router.RequiredExecutorIdsQueryParam, strings.Join(requiredExecutors, ","))
+	}
+
 	if len(includeExecutorMetadata) > 0 {
-		q.Add(router.IncludeExecutorMetadataQueryParam, fmt.Sprint(includeExecutorMetadata))
+		q.Add(router.IncludeExecutorMetadataQueryParam, includeExecutorMetadata)
 	}
 
 	q.Add(routes.EventTypeQuery, eventType)

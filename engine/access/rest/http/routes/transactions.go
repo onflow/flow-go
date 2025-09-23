@@ -6,6 +6,7 @@ import (
 	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/engine/access/rest/common"
 	commonmodels "github.com/onflow/flow-go/engine/access/rest/common/models"
+	"github.com/onflow/flow-go/engine/access/rest/http/models"
 	"github.com/onflow/flow-go/engine/access/rest/http/request"
 	accessmodel "github.com/onflow/flow-go/model/access"
 	"github.com/onflow/flow-go/module/executiondatasync/optimistic_sync"
@@ -57,7 +58,7 @@ func GetTransactionResultByID(r *common.Request, backend access.API, link common
 		req.BlockID,
 		req.CollectionID,
 		entitiesproto.EventEncodingVersion_JSON_CDC_V0,
-		NewCriteria(req.ExecutionState),
+		models.NewCriteria(req.ExecutionState),
 	)
 	if err != nil {
 		return nil, err
@@ -67,8 +68,7 @@ func GetTransactionResultByID(r *common.Request, backend access.API, link common
 	response.Build(txr, req.ID, link)
 
 	if req.ExecutionState.IncludeExecutorMetadata {
-		metadata := commonmodels.NewMetadata(executorMetadata)
-		response.Metadata = &metadata
+		response.Metadata = commonmodels.NewMetadata(executorMetadata)
 	}
 
 	return response, nil
