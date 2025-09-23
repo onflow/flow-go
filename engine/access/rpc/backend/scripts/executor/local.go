@@ -3,6 +3,7 @@ package executor
 import (
 	"context"
 	"crypto/md5" //nolint:gosec
+	"fmt"
 	"time"
 
 	"github.com/rs/zerolog"
@@ -32,7 +33,7 @@ var _ ScriptExecutor = (*LocalScriptExecutor)(nil)
 func NewLocalScriptExecutor(
 	log zerolog.Logger,
 	metrics module.BackendScriptsMetrics,
-	executor execution.ScriptExecutor,
+	scriptExecutor execution.ScriptExecutor,
 	scriptCache *LoggedScriptCache,
 	executionStateCache optimistic_sync.ExecutionStateCache,
 ) *LocalScriptExecutor {
@@ -40,7 +41,7 @@ func NewLocalScriptExecutor(
 		log:                 zerolog.New(log).With().Str("script_executor", "local").Logger(),
 		metrics:             metrics,
 		scriptCache:         scriptCache,
-		scriptExecutor:      executor,
+		scriptExecutor:      scriptExecutor,
 		executionStateCache: executionStateCache,
 	}
 }
@@ -51,12 +52,17 @@ func (l *LocalScriptExecutor) Execute(
 ) ([]byte, time.Duration, error) {
 	execStartTime := time.Now()
 
+	snapshot, err := l.executionStateCache.Snapshot(r.executionResultID)
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to get snapshot for execution result %s: %w", r.executionResultID, err)
+	}
+
 	result, err := l.scriptExecutor.ExecuteAtBlockHeight(
 		ctx,
 		r.script,
 		r.arguments,
 		r.height,
-		//r.executionResultID,
+		snapshot.Registers(),
 	)
 
 	execEndTime := time.Now()
