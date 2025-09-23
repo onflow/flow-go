@@ -148,7 +148,7 @@ func TestIdentityList_Union(t *testing.T) {
 	})
 }
 
-// TestGenericIdentityList_Malleability verifies that the GenericIdentityList which implements the [flow.IDEntity]
+// TestGenericIdentityList_Malleability verifies that the GenericIdentityList which implements the [flow.Hashable]
 // interface is not malleable.
 func TestGenericIdentityList_Malleability(t *testing.T) {
 	t.Run("IdentityList", func(t *testing.T) {

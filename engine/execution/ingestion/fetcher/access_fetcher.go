@@ -79,7 +79,7 @@ func NewAccessCollectionFetcher(
 	// of the new ingestion engine for catching up, which loads less un-executed blocks
 	// during startup.
 	bufferSize := 100_000
-	noopHandler := func(flow.Identifier, flow.Entity) {}
+	noopHandler := func(flow.Identifier, flow.Hashable) {}
 	e := &AccessCollectionFetcher{
 		log:            lg,
 		handler:        noopHandler,

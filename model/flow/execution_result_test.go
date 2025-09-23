@@ -11,7 +11,7 @@ import (
 )
 
 // TestExecutionResultID_Malleability confirms that the ExecutionResult struct, which implements
-// the [flow.IDEntity] interface, is resistant to tampering.
+// the [flow.Hashable] interface, is resistant to tampering.
 func TestExecutionResultID_Malleability(t *testing.T) {
 	unittest.RequireEntityNonMalleable(t,
 		unittest.ExecutionResultFixture(),

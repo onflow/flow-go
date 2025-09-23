@@ -37,7 +37,7 @@ const (
 // related entities. It is important that the retrieve function return a
 // `storage.ErrNotFound` error if the entity does not exist locally; otherwise,
 // the logic will error and not send responses when failing to retrieve entities.
-type RetrieveFunc func(flow.Identifier) (flow.Entity, error)
+type RetrieveFunc func(flow.Identifier) (flow.Hashable, error)
 
 // Engine is a generic provider engine, handling the fulfillment of entity
 // requests on the flow network. It is the `reply` part of the request-reply
@@ -208,7 +208,7 @@ func (e *Engine) onEntityRequest(request *internal.EntityRequest) error {
 	}
 
 	// try to retrieve each entity and skip missing ones
-	entities := make([]flow.Entity, 0, len(request.EntityIds))
+	entities := make([]flow.Hashable, 0, len(request.EntityIds))
 	entityIDs := make([]flow.Identifier, 0, len(request.EntityIds))
 	seen := make(map[flow.Identifier]struct{})
 	for _, entityID := range request.EntityIds {

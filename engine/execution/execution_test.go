@@ -156,7 +156,7 @@ func TestExecutionFlow(t *testing.T) {
 			originID := args.Get(1).(flow.Identifier)
 			req := args.Get(2).(*flow.EntityRequest)
 
-			var entities []flow.Entity
+			var entities []flow.Hashable
 			for _, entityID := range req.EntityIDs {
 				coll, exists := collections[entityID]
 				require.True(t, exists)

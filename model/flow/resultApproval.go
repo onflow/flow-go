@@ -136,7 +136,7 @@ type ResultApproval struct {
 	VerifierSignature crypto.Signature
 }
 
-var _ Entity = (*ResultApproval)(nil)
+var _ Hashable = (*ResultApproval)(nil)
 
 // UntrustedResultApproval is an untrusted input-only representation of an ResultApproval,
 // used for construction.

@@ -284,8 +284,8 @@ func TestOnEntityResponseValid(t *testing.T) {
 		items:    make(map[flow.Identifier]*Item),
 		requests: make(map[uint64]*messages.EntityRequest),
 		selector: filter.HasNodeID[flow.Identity](targetID),
-		create:   func() flow.Entity { return &flow.Collection{} },
-		handle: func(flow.Identifier, flow.Entity) {
+		create:   func() flow.Hashable { return &flow.Collection{} },
+		handle: func(flow.Identifier, flow.Hashable) {
 			if called.Inc() >= 2 {
 				close(done)
 			}
@@ -371,8 +371,8 @@ func TestOnEntityIntegrityCheck(t *testing.T) {
 		items:    make(map[flow.Identifier]*Item),
 		requests: make(map[uint64]*messages.EntityRequest),
 		selector: filter.HasNodeID[flow.Identity](targetID),
-		create:   func() flow.Entity { return &flow.Collection{} },
-		handle:   func(flow.Identifier, flow.Entity) { close(called) },
+		create:   func() flow.Hashable { return &flow.Collection{} },
+		handle:   func(flow.Identifier, flow.Hashable) { close(called) },
 	}
 
 	request.items[iwanted.EntityID] = iwanted
@@ -459,13 +459,13 @@ func TestOriginValidation(t *testing.T) {
 		state,
 		"",
 		filter.HasNodeID[flow.Identity](targetID),
-		func() flow.Entity { return &flow.Collection{} },
+		func() flow.Hashable { return &flow.Collection{} },
 	)
 	assert.NoError(t, err)
 
 	called := make(chan struct{})
 
-	e.WithHandle(func(origin flow.Identifier, _ flow.Entity) {
+	e.WithHandle(func(origin flow.Identifier, _ flow.Hashable) {
 		// we expect wrong origin to propagate here with validation disabled
 		assert.Equal(t, wrongID, origin)
 		close(called)

@@ -462,7 +462,7 @@ func (s *CollectionSyncer) findLowestBlockHeightWithMissingCollections(
 
 // OnCollectionDownloaded indexes and persists a downloaded collection.
 // This function is a callback intended to be used by the requester engine.
-func (s *CollectionSyncer) OnCollectionDownloaded(id flow.Identifier, entity flow.Entity) {
+func (s *CollectionSyncer) OnCollectionDownloaded(id flow.Identifier, entity flow.Hashable) {
 	err := s.pendingCollectionsHandler.Process(id, entity)
 	if err != nil {
 		// this is an unexpected error condition. The only expected error returned from Process

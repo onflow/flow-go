@@ -9,8 +9,8 @@ import (
 // HashablePayload is a temporary interface used to generalize the payload type of GenericBlock.
 // It defines the minimal interface required for a payload to participate in block hashing.
 //
-// TODO(malleability, #7164): remove this interface after renaming IDEntity's method `ID` to `Hash`,
-// and replace all usages of HashablePayload with IDEntity.
+// TODO(malleability, #7164): remove this interface after renaming Hashable's method `ID` to `Hash`,
+// and replace all usages of HashablePayload with Hashable.
 type HashablePayload interface {
 	Hash() Identifier
 }

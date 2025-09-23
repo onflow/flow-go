@@ -150,7 +150,7 @@ func PublicKeyToID(pk crypto.PublicKey) (Identifier, error) {
 }
 
 // GetIDs gets the IDs for a slice of entities.
-func GetIDs[T Entity](entities []T) IdentifierList {
+func GetIDs[T Hashable](entities []T) IdentifierList {
 	ids := make([]Identifier, 0, len(entities))
 	for _, entity := range entities {
 		ids = append(ids, entity.ID())

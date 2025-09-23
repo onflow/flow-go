@@ -26,7 +26,7 @@ func TestChunkLocatorConvert(t *testing.T) {
 	require.ElementsMatch(t, originalList, convertedList)
 }
 
-// TestChunkLocatorMalleability verifies that the chunk locator which implements the [flow.IDEntity] interface is not malleable.
+// TestChunkLocatorMalleability verifies that the chunk locator which implements the [flow.Hashable] interface is not malleable.
 func TestChunkLocatorMalleability(t *testing.T) {
 	unittest.RequireEntityNonMalleable(t, unittest.ChunkLocatorFixture(unittest.IdentifierFixture(), rand.Uint64()))
 }

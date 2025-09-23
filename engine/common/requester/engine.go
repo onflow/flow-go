@@ -25,11 +25,11 @@ import (
 // HandleFunc is a function provided to the requester engine to handle an entity
 // once it has been retrieved from a provider. The function should be non-blocking
 // and errors should be handled internally within the function.
-type HandleFunc func(originID flow.Identifier, entity flow.Entity)
+type HandleFunc func(originID flow.Identifier, entity flow.Hashable)
 
-// CreateFunc is a function that creates a `flow.Entity` with an underlying type
+// CreateFunc is a function that creates a `flow.Hashable` with an underlying type
 // so that we can properly decode entities transmitted over the network.
-type CreateFunc func() flow.Entity
+type CreateFunc func() flow.Hashable
 
 // Engine is a generic requester engine, handling the requesting of entities
 // on the flow network. It is the `request` part of the request-reply

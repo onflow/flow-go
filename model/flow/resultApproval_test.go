@@ -298,14 +298,14 @@ func TestResultApprovalBodyNonMalleable(t *testing.T) {
 }
 
 // TestResultApprovalNonMalleable confirms that the ResultApproval struct, which implements
-// the [flow.IDEntity] interface, is resistant to tampering.
+// the [flow.Hashable] interface, is resistant to tampering.
 func TestResultApprovalNonMalleable(t *testing.T) {
 	ra := unittest.ResultApprovalFixture()
 	unittest.RequireEntityNonMalleable(t, ra)
 }
 
 // TestAttestationID_Malleability confirms that the Attestation struct, which implements
-// the [flow.IDEntity] interface, is resistant to tampering.
+// the [flow.Hashable] interface, is resistant to tampering.
 func TestAttestationID_Malleability(t *testing.T) {
 	unittest.RequireEntityNonMalleable(t, unittest.AttestationFixture())
 }

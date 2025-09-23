@@ -96,7 +96,7 @@ func NewMachine(
 	e.core = core
 
 	protocolEvents.AddConsumer(e)
-	collectionRequester.WithHandle(func(originID flow.Identifier, entity flow.Entity) {
+	collectionRequester.WithHandle(func(originID flow.Identifier, entity flow.Hashable) {
 		collection, ok := entity.(*flow.Collection)
 		if !ok {
 			e.log.Error().Msgf("invalid entity type (%T)", entity)

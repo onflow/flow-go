@@ -530,7 +530,7 @@ func TestStopAtHeight(t *testing.T) {
 	// expects processing notifier being invoked upon sealed chunk detected,
 	// which means the termination of processing a sealed chunk on fetcher engine
 	// side.
-	mockChunkConsumerNotifier(t, s.chunkConsumerNotifier, flow.GetIDs([]flow.Entity{locatorA, locatorB}))
+	mockChunkConsumerNotifier(t, s.chunkConsumerNotifier, flow.GetIDs([]flow.Hashable{locatorA, locatorB}))
 
 	s.pendingChunks.On("Add", mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
 		spew.Dump(args[1].(*verification.ChunkStatus).BlockHeight)

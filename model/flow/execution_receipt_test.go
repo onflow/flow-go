@@ -12,7 +12,7 @@ import (
 )
 
 // TestExecutionReceiptID_Malleability confirms that ExecutionReceipt and ExecutionReceiptStub, which implement
-// the [flow.IDEntity] interface, are resistant to tampering.
+// the [flow.Hashable] interface, are resistant to tampering.
 func TestExecutionReceiptID_Malleability(t *testing.T) {
 	receipt := unittest.ExecutionReceiptFixture(
 		unittest.WithResult(unittest.ExecutionResultFixture(unittest.WithServiceEvents(3))),

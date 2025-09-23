@@ -36,6 +36,6 @@ func (n NoopRequester) Query(key flow.Identifier, selector flow.IdentityFilter[f
 
 func (n NoopRequester) Force() {}
 
-func (n NoopRequester) WithHandle(func(flow.Identifier, flow.Entity)) Requester {
+func (n NoopRequester) WithHandle(func(flow.Identifier, flow.Hashable)) Requester {
 	return n
 }

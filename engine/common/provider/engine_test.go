@@ -31,7 +31,7 @@ func TestOnEntityRequestFull(t *testing.T) {
 	defer cancel()
 	ctx := irrecoverable.NewMockSignalerContext(t, cancelCtx)
 
-	entities := make(map[flow.Identifier]flow.Entity)
+	entities := make(map[flow.Identifier]flow.Hashable)
 
 	identities := unittest.IdentityListFixture(8)
 	selector := filter.HasNodeID[flow.Identity](identities.NodeIDs()...)
@@ -49,7 +49,7 @@ func TestOnEntityRequestFull(t *testing.T) {
 	entities[coll4.ID()] = coll4
 	entities[coll5.ID()] = coll5
 
-	retrieve := func(entityID flow.Identifier) (flow.Entity, error) {
+	retrieve := func(entityID flow.Identifier) (flow.Hashable, error) {
 		entity, ok := entities[entityID]
 		if !ok {
 			return nil, storage.ErrNotFound
@@ -78,13 +78,13 @@ func TestOnEntityRequestFull(t *testing.T) {
 			response := args.Get(0).(*messages.EntityResponse)
 			nodeID := args.Get(1).(flow.Identifier)
 			assert.Equal(t, nodeID, originID)
-			var entities []flow.Entity
+			var entities []flow.Hashable
 			for _, blob := range response.Blobs {
 				coll := &flow.Collection{}
 				_ = msgpack.Unmarshal(blob, &coll)
 				entities = append(entities, coll)
 			}
-			assert.ElementsMatch(t, entities, []flow.Entity{&coll1, &coll2, &coll3, &coll4, &coll5})
+			assert.ElementsMatch(t, entities, []flow.Hashable{&coll1, &coll2, &coll3, &coll4, &coll5})
 		},
 	).Return(nil)
 
@@ -125,7 +125,7 @@ func TestOnEntityRequestPartial(t *testing.T) {
 	defer cancel()
 	ctx := irrecoverable.NewMockSignalerContext(t, cancelCtx)
 
-	entities := make(map[flow.Identifier]flow.Entity)
+	entities := make(map[flow.Identifier]flow.Hashable)
 
 	identities := unittest.IdentityListFixture(8)
 	selector := filter.HasNodeID[flow.Identity](identities.NodeIDs()...)
@@ -143,7 +143,7 @@ func TestOnEntityRequestPartial(t *testing.T) {
 	// entities[coll4.ID()] = coll4
 	entities[coll5.ID()] = coll5
 
-	retrieve := func(entityID flow.Identifier) (flow.Entity, error) {
+	retrieve := func(entityID flow.Identifier) (flow.Hashable, error) {
 		entity, ok := entities[entityID]
 		if !ok {
 			return nil, storage.ErrNotFound
@@ -172,13 +172,13 @@ func TestOnEntityRequestPartial(t *testing.T) {
 			response := args.Get(0).(*messages.EntityResponse)
 			nodeID := args.Get(1).(flow.Identifier)
 			assert.Equal(t, nodeID, originID)
-			var entities []flow.Entity
+			var entities []flow.Hashable
 			for _, blob := range response.Blobs {
 				coll := &flow.Collection{}
 				_ = msgpack.Unmarshal(blob, &coll)
 				entities = append(entities, coll)
 			}
-			assert.ElementsMatch(t, entities, []flow.Entity{&coll1, &coll3, &coll5})
+			assert.ElementsMatch(t, entities, []flow.Hashable{&coll1, &coll3, &coll5})
 		},
 	).Return(nil)
 
@@ -217,7 +217,7 @@ func TestOnEntityRequestDuplicates(t *testing.T) {
 	defer cancel()
 	ctx := irrecoverable.NewMockSignalerContext(t, cancelCtx)
 
-	entities := make(map[flow.Identifier]flow.Entity)
+	entities := make(map[flow.Identifier]flow.Hashable)
 
 	identities := unittest.IdentityListFixture(8)
 	selector := filter.HasNodeID[flow.Identity](identities.NodeIDs()...)
@@ -231,7 +231,7 @@ func TestOnEntityRequestDuplicates(t *testing.T) {
 	entities[coll2.ID()] = coll2
 	entities[coll3.ID()] = coll3
 
-	retrieve := func(entityID flow.Identifier) (flow.Entity, error) {
+	retrieve := func(entityID flow.Identifier) (flow.Hashable, error) {
 		entity, ok := entities[entityID]
 		if !ok {
 			return nil, storage.ErrNotFound
@@ -260,13 +260,13 @@ func TestOnEntityRequestDuplicates(t *testing.T) {
 			response := args.Get(0).(*messages.EntityResponse)
 			nodeID := args.Get(1).(flow.Identifier)
 			assert.Equal(t, nodeID, originID)
-			var entities []flow.Entity
+			var entities []flow.Hashable
 			for _, blob := range response.Blobs {
 				coll := &flow.Collection{}
 				_ = msgpack.Unmarshal(blob, &coll)
 				entities = append(entities, coll)
 			}
-			assert.ElementsMatch(t, entities, []flow.Entity{&coll1, &coll2, &coll3})
+			assert.ElementsMatch(t, entities, []flow.Hashable{&coll1, &coll2, &coll3})
 		},
 	).Return(nil)
 
@@ -305,7 +305,7 @@ func TestOnEntityRequestEmpty(t *testing.T) {
 	defer cancel()
 	ctx := irrecoverable.NewMockSignalerContext(t, cancelCtx)
 
-	entities := make(map[flow.Identifier]flow.Entity)
+	entities := make(map[flow.Identifier]flow.Hashable)
 	identities := unittest.IdentityListFixture(8)
 	selector := filter.HasNodeID[flow.Identity](identities.NodeIDs()...)
 	originID := identities[0].NodeID
@@ -316,7 +316,7 @@ func TestOnEntityRequestEmpty(t *testing.T) {
 	coll4 := unittest.CollectionFixture(4)
 	coll5 := unittest.CollectionFixture(5)
 
-	retrieve := func(entityID flow.Identifier) (flow.Entity, error) {
+	retrieve := func(entityID flow.Identifier) (flow.Hashable, error) {
 		entity, ok := entities[entityID]
 		if !ok {
 			return nil, storage.ErrNotFound
@@ -383,7 +383,7 @@ func TestOnEntityRequestInvalidOrigin(t *testing.T) {
 	defer cancel()
 	ctx := irrecoverable.NewMockSignalerContext(t, cancelCtx)
 
-	entities := make(map[flow.Identifier]flow.Entity)
+	entities := make(map[flow.Identifier]flow.Hashable)
 	identities := unittest.IdentityListFixture(8)
 	selector := filter.HasNodeID[flow.Identity](identities.NodeIDs()...)
 	originID := unittest.IdentifierFixture()
@@ -400,7 +400,7 @@ func TestOnEntityRequestInvalidOrigin(t *testing.T) {
 	entities[coll4.ID()] = coll4
 	entities[coll5.ID()] = coll5
 
-	retrieve := func(entityID flow.Identifier) (flow.Entity, error) {
+	retrieve := func(entityID flow.Identifier) (flow.Hashable, error) {
 		entity, ok := entities[entityID]
 		if !ok {
 			return nil, storage.ErrNotFound
