@@ -130,7 +130,6 @@ func New(
 		fetchFromLocalCache: fetchFromLocalStorage,
 		execResultProvider:  executionResultProvider,
 		execStateCache:      executionStateCache,
-		operatorCriteria:    optimistic_sync.DefaultCriteria,
 	}
 
 	b.EventsBackend = EventsBackend{

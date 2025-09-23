@@ -296,8 +296,8 @@ func (suite *SameGRPCPortTestSuite) SetupTest() {
 		state_stream.DefaultRegisterIDsRequestLimit,
 		subscriptionHandler,
 		suite.executionDataTracker,
-		nil,
-		nil,
+		suite.executionResultInfoProvider,
+		suite.executionStateCache,
 	)
 	assert.NoError(suite.T(), err)
 

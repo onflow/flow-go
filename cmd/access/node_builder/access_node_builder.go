@@ -1065,6 +1065,45 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 				fetchFromLocalStorage,
 			)
 
+			cfg := builder.rpcConf.BackendConfig
+			preferredENIdentifiers, err := flow.IdentifierListFromHex(cfg.PreferredExecutionNodeIDs)
+			if err != nil {
+				return nil, fmt.Errorf("failed to convert node id string to Flow Identifier for preferred EN map: %w", err)
+			}
+
+			fixedENIdentifiers, err := flow.IdentifierListFromHex(cfg.FixedExecutionNodeIDs)
+			if err != nil {
+				return nil, fmt.Errorf("failed to convert node id string to Flow Identifier for fixed EN map: %w", err)
+			}
+
+			execNodeSelector := execution_result.NewExecutionNodeSelector(
+				preferredENIdentifiers,
+				fixedENIdentifiers,
+			)
+
+			execResultInfoProvider, err := execution_result.NewExecutionResultInfoProvider(
+				node.Logger,
+				node.State,
+				node.Storage.Headers,
+				node.Storage.Receipts,
+				execNodeSelector,
+				optimistic_sync.DefaultCriteria,
+			)
+			if err != nil {
+				return nil, fmt.Errorf("failed to create execution result provider: %w", err)
+			}
+
+			// TODO: use real objects instead of mocks once they're implemented
+			snapshot := osyncsnapshot.NewSnapshotMock(
+				builder.events,
+				builder.collections,
+				builder.transactions,
+				builder.lightTransactionResults,
+				builder.transactionResultErrorMessages,
+				nil,
+			)
+			execStateCache := execution_state.NewExecutionStateCacheMock(snapshot)
+
 			builder.stateStreamBackend, err = statestreambackend.New(
 				node.Logger,
 				node.State,
@@ -1084,8 +1123,8 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 					builder.stateStreamConf.ClientSendBufferSize,
 				),
 				executionDataTracker,
-				nil, //TODO: add later
-				nil, //TODO: add later
+				execResultInfoProvider,
+				execStateCache,
 			)
 			if err != nil {
 				return nil, fmt.Errorf("could not create state stream backend: %w", err)

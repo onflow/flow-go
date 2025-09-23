@@ -1574,6 +1574,45 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 				fetchFromLocalStorage,
 			)
 
+			cfg := builder.rpcConf.BackendConfig
+			preferredENIdentifiers, err := flow.IdentifierListFromHex(cfg.PreferredExecutionNodeIDs)
+			if err != nil {
+				return nil, fmt.Errorf("failed to convert node id string to Flow Identifier for preferred EN map: %w", err)
+			}
+
+			fixedENIdentifiers, err := flow.IdentifierListFromHex(cfg.FixedExecutionNodeIDs)
+			if err != nil {
+				return nil, fmt.Errorf("failed to convert node id string to Flow Identifier for fixed EN map: %w", err)
+			}
+
+			execNodeSelector := execution_result.NewExecutionNodeSelector(
+				preferredENIdentifiers,
+				fixedENIdentifiers,
+			)
+
+			execResultInfoProvider, err := execution_result.NewExecutionResultInfoProvider(
+				node.Logger,
+				node.State,
+				node.Storage.Headers,
+				node.Storage.Receipts,
+				execNodeSelector,
+				optimistic_sync.DefaultCriteria,
+			)
+			if err != nil {
+				return nil, fmt.Errorf("failed to create execution result provider: %w", err)
+			}
+
+			// TODO: use real objects instead of mocks once they're implemented
+			snapshot := osyncsnapshot.NewSnapshotMock(
+				builder.events,
+				nil,
+				nil,
+				builder.lightTransactionResults,
+				nil,
+				nil,
+			)
+			execStateCache := execution_state.NewExecutionStateCacheMock(snapshot)
+
 			builder.stateStreamBackend, err = statestreambackend.New(
 				node.Logger,
 				node.State,
@@ -1593,8 +1632,8 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 					builder.stateStreamConf.ClientSendBufferSize,
 				),
 				executionDataTracker,
-				nil, //TODO(illia): add later
-				nil,
+				execResultInfoProvider,
+				execStateCache,
 			)
 			if err != nil {
 				return nil, fmt.Errorf("could not create state stream backend: %w", err)
@@ -1966,6 +2005,7 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 			return nil, fmt.Errorf("could not parse transaction result query mode: %w", err)
 		}
 
+		// TODO: this code duplicated in a couple of places. Can it be refactored?
 		execNodeIdentitiesProvider := commonrpc.NewExecutionNodeIdentitiesProvider(
 			node.Logger,
 			node.State,

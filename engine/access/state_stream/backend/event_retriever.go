@@ -33,7 +33,6 @@ type EventsProvider struct {
 	fetchFromLocalCache bool
 	execResultProvider  optimistic_sync.ExecutionResultInfoProvider
 	execStateCache      optimistic_sync.ExecutionStateCache
-	operatorCriteria    optimistic_sync.Criteria
 }
 
 // GetAllEventsResponse returns a function that retrieves the event response for a given block height.
@@ -112,7 +111,7 @@ func (b *EventsProvider) getEventsFromStorage(
 
 	result, err := b.execResultProvider.ExecutionResultInfo(
 		blockID,
-		b.operatorCriteria.OverrideWith(criteria),
+		criteria,
 	)
 	if err != nil {
 		return &EventsResponse{}, fmt.Errorf("error fetching execution result: %w", err)
