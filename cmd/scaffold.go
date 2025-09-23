@@ -715,7 +715,10 @@ func (fnb *FlowNodeBuilder) EnqueueAdminServerInit() error {
 
 	// create the updatable config manager
 	fnb.RegisterDefaultAdminCommands()
-	fnb.Component("admin server", func(node *NodeConfig) (module.ReadyDoneAware, error) {
+
+	// run as DependableComponent with no dependencies to ensure it starts immediately after startup,
+	// allowing profiling and other admin operations before startup completes
+	fnb.DependableComponent("admin server", func(node *NodeConfig) (module.ReadyDoneAware, error) {
 		// set up all admin commands
 		for commandName, commandFunc := range fnb.adminCommands {
 			command := commandFunc(fnb.NodeConfig)
@@ -751,7 +754,7 @@ func (fnb *FlowNodeBuilder) EnqueueAdminServerInit() error {
 		runner := fnb.adminCommandBootstrapper.Bootstrap(fnb.Logger, fnb.AdminAddr, opts...)
 
 		return runner, nil
-	})
+	}, NewDependencyList())
 
 	return nil
 }
