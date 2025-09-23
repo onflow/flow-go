@@ -153,9 +153,7 @@ type ValidationStep struct {
 }
 
 // TransactionValidator implements transaction validation logic for Access and Collection Nodes.
-// NOTE: This validation logic is currently incomplete, because it does not fully cover validation which requires
-// up-to-date knowledge of the payer/authorizer account state (stored in the Execution State).
-// In particular, Collection/Access Nodes cannot reliably validate transaction signatures or payer balance.
+// NOTE: This validation logic is a simplified interim approach: Collection/Access Nodes cannot reliably validate transaction signatures or payer balance.
 // The long-term design for extending validation to cover these cases is described in the Sweet Onion Plan
 // (https://flowfoundation.notion.site/Sweet-Onion-Plan-eae4db664feb459598879b49ccf2aa85).
 type TransactionValidator struct {
