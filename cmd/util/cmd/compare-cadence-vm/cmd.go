@@ -2,8 +2,10 @@ package compare_cadence_vm
 
 import (
 	"bytes"
+	"context"
 	"encoding/hex"
 	"os"
+	"sync/atomic"
 
 	"github.com/kr/pretty"
 	sdk "github.com/onflow/flow-go-sdk"
@@ -12,6 +14,7 @@ import (
 	"github.com/spf13/cobra"
 	otelTrace "go.opentelemetry.io/otel/sdk/trace"
 	"golang.org/x/exp/slices"
+	"golang.org/x/sync/errgroup"
 
 	debug_tx "github.com/onflow/flow-go/cmd/util/cmd/debug-tx"
 	"github.com/onflow/flow-go/model/flow"
@@ -28,6 +31,7 @@ var (
 	flagBlockID             string
 	flagBlockCount          int
 	flagDebug               bool
+	flagParallel            int
 )
 
 var Cmd = &cobra.Command{
@@ -61,6 +65,8 @@ func init() {
 	Cmd.Flags().IntVar(&flagBlockCount, "block-count", 1, "number of blocks to process (default: 1)")
 
 	Cmd.Flags().BoolVar(&flagDebug, "debug", false, "enable debug logging")
+
+	Cmd.Flags().IntVar(&flagParallel, "parallel", 1, "number of blocks to process in parallel (default: 1)")
 }
 
 func run(_ *cobra.Command, args []string) {
@@ -96,33 +102,59 @@ func run(_ *cobra.Command, args []string) {
 		log.Fatal().Err(err).Str("ID", flagBlockID).Msg("failed to parse block ID")
 	}
 
-	var (
-		header           *flow.Header
-		blocksMismatched int
-		blocksMatched    int
-		txMismatched     int
-		txMatched        int
-	)
+	type block struct {
+		id     flow.Identifier
+		header *flow.Header
+	}
+
+	var blocks []block
 
 	for i := 0; i < flagBlockCount; i++ {
-		if header != nil {
-			blockID = header.ParentID
-		}
+		header := debug_tx.FetchBlockHeader(blockID, flowClient)
 
-		var result blockResult
-		header, result = compareBlock(
-			blockID,
-			remoteClient,
-			flowClient,
-			chain,
-		)
-		txMismatched += result.mismatches
-		txMatched += result.matches
-		if result.mismatches > 0 {
-			blocksMismatched++
-		} else {
-			blocksMatched++
-		}
+		blocks = append(blocks, block{
+			id:     blockID,
+			header: header,
+		})
+
+		blockID = header.ParentID
+	}
+
+	var (
+		blocksMismatched int64
+		blocksMatched    int64
+		txMismatched     int64
+		txMatched        int64
+	)
+
+	g, _ := errgroup.WithContext(context.Background())
+	g.SetLimit(flagParallel)
+
+	for _, block := range blocks {
+
+		g.Go(func() error {
+			result := compareBlock(
+				block.id,
+				block.header,
+				remoteClient,
+				flowClient,
+				chain,
+			)
+
+			atomic.AddInt64(&txMismatched, int64(result.mismatches))
+			atomic.AddInt64(&txMatched, int64(result.matches))
+			if result.mismatches > 0 {
+				atomic.AddInt64(&blocksMismatched, 1)
+			} else {
+				atomic.AddInt64(&blocksMatched, 1)
+			}
+
+			return nil
+		})
+	}
+
+	if err := g.Wait(); err != nil {
+		log.Fatal().Err(err).Msg("failed to compare blocks")
 	}
 
 	log.Info().Msgf("Compared %d blocks: %d matched, %d mismatched", blocksMatched+blocksMismatched, blocksMatched, blocksMismatched)
@@ -136,11 +168,11 @@ type blockResult struct {
 
 func compareBlock(
 	blockID flow.Identifier,
+	header *flow.Header,
 	remoteClient debug.RemoteClient,
 	flowClient *client.Client,
 	chain flow.Chain,
 ) (
-	header *flow.Header,
 	result blockResult,
 ) {
 
@@ -148,7 +180,7 @@ func compareBlock(
 		blockTransactions []*sdk.Transaction
 		systemTxID        sdk.Identifier
 	)
-	blockTransactions, systemTxID, header = debug_tx.FetchBlockInfo(blockID, flowClient)
+	blockTransactions, systemTxID = debug_tx.FetchBlockTransactions(blockID, flowClient)
 
 	log.Info().Msgf("Running all transactions in block %s (height %d) ...", blockID, header.Height)
 
@@ -261,7 +293,7 @@ func compareBlock(
 		log.Info().Msgf("Block %s (height %d) matched!", blockID, header.Height)
 	}
 
-	return header, result
+	return result
 }
 
 func compareResults(txID flow.Identifier, interResult debug.Result, vmResult debug.Result) bool {

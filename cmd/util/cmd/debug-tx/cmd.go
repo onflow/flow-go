@@ -144,7 +144,8 @@ func run(_ *cobra.Command, args []string) {
 			log.Fatal().Err(err).Str("ID", flagBlockID).Msg("failed to parse block ID")
 		}
 
-		blockTransactions, systemTxID, header := FetchBlockInfo(blockID, flowClient)
+		header := FetchBlockHeader(blockID, flowClient)
+		blockTransactions, systemTxID := FetchBlockTransactions(blockID, flowClient)
 
 		log.Info().Msgf("Running all transactions in block %s (height %d) ...", blockID, header.Height)
 
@@ -240,7 +241,9 @@ func RunSingleTransaction(
 		blockHeight,
 	)
 
-	blockTransactions, systemTxID, header := FetchBlockInfo(blockID, flowClient)
+	// Fetch block info
+	header := FetchBlockHeader(blockID, flowClient)
+	blockTransactions, systemTxID := FetchBlockTransactions(blockID, flowClient)
 
 	var newSpanExporter func(blockTxID flow.Identifier) otelTrace.SpanExporter
 	if spanExporter != nil {
@@ -291,13 +294,33 @@ func NewBlockSnapshot(
 	return debug.NewCachingStorageSnapshot(remoteSnapshot)
 }
 
-func FetchBlockInfo(
+func FetchBlockHeader(
+	blockID flow.Identifier,
+	flowClient *client.Client,
+) (header *flow.Header) {
+	log.Info().Msg("Fetching block header ...")
+
+	var err error
+	header, err = debug.GetAccessAPIBlockHeader(context.Background(), flowClient.RPCClient(), blockID)
+	if err != nil {
+		log.Fatal().Err(err).Msg("failed to fetch block header")
+	}
+
+	log.Info().Msgf(
+		"Fetched block header: %s is at height %d",
+		blockID,
+		header.Height,
+	)
+
+	return
+}
+
+func FetchBlockTransactions(
 	blockID flow.Identifier,
 	flowClient *client.Client,
 ) (
 	blockTransactions []*sdk.Transaction,
 	systemTxID sdk.Identifier,
-	header *flow.Header,
 ) {
 	var err error
 
@@ -311,19 +334,6 @@ func FetchBlockInfo(
 	for _, blockTx := range blockTransactions {
 		log.Info().Msgf("Block transaction: %s", blockTx.ID())
 	}
-
-	log.Info().Msg("Fetching block header ...")
-
-	header, err = debug.GetAccessAPIBlockHeader(context.Background(), flowClient.RPCClient(), blockID)
-	if err != nil {
-		log.Fatal().Err(err).Msg("failed to fetch block header")
-	}
-
-	log.Info().Msgf(
-		"Fetched block header: %s is at height %d",
-		blockID,
-		header.Height,
-	)
 
 	log.Info().Msg("Fetching system transaction ...")
 
