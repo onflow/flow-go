@@ -3,6 +3,7 @@ package operation_test
 import (
 	"testing"
 
+	"github.com/jordanschalm/lockctx"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -16,6 +17,7 @@ import (
 // TestInsertProtocolKVStore tests if basic badger operations on ProtocolKVStore work as expected.
 func TestInsertProtocolKVStore(t *testing.T) {
 	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
+		lockManager := storage.NewTestingLockManager()
 		expected := &flow.PSKeyValueStoreData{
 			Version: 2,
 			Data:    unittest.RandomBytes(32),
@@ -34,10 +36,11 @@ func TestInsertProtocolKVStore(t *testing.T) {
 		assert.Equal(t, expected, &actual)
 
 		blockID := unittest.IdentifierFixture()
-		err = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			return operation.IndexProtocolKVStore(rw.Writer(), blockID, kvStoreStateID)
+		unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
+			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+				return operation.IndexProtocolKVStore(lctx, rw, blockID, kvStoreStateID)
+			})
 		})
-		require.NoError(t, err)
 
 		var actualProtocolKVStoreID flow.Identifier
 		err = operation.LookupProtocolKVStore(db.Reader(), blockID, &actualProtocolKVStoreID)
