@@ -609,8 +609,12 @@ func (e *blockComputer) executeProcessCallback(
 	database *transactionCoordinator,
 	blockSpan otelTrace.Span,
 	txnIndex uint32,
-	callbackLogger zerolog.Logger,
+	systemLogger zerolog.Logger,
 ) ([]*flow.TransactionBody, uint32, error) {
+	callbackLogger := systemLogger.With().
+		Bool("scheduled_transaction", true).
+		Logger()
+
 	request := newTransactionRequest(
 		systemCollectionInfo,
 		systemCtx,
