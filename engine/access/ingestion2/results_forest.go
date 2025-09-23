@@ -68,7 +68,19 @@ var (
 //     (iii) No other result 𝒓 resists in the forest that satisfies (i) and (ii) but has a higher view than 𝓼.
 //     Note that this definition purposefully excludes results that have been sealed by the consensus nodes,
 //     but which the ResultsForest hasn't ingested yet or where some ancestor results are not yet available.
-//  3. 𝓱 is the ResultsForest's 𝙫𝙞𝙚𝙬 𝙝𝙤𝙧𝙞𝙯𝙤𝙣. No results with larger view exist in the forest.
+//  3. 𝓱 is the ResultsForest's 𝙫𝙞𝙚𝙬 𝙝𝙤𝙧𝙞𝙯𝙤𝙣. The result forest must store any results with views in the closed
+//     interval [𝓹.Level, 𝓱]. Results with views outside may be rejected. The following is a degree of freedom for
+//     the design:
+//     ○ Theoretically here is no bound on how many consensus views can pass _without_ new blocks being produced.
+//     Nevertheless, for practical considerations, we have already introduced the axiom that within every window of
+//     `FinalizationSafetyThreshold` views (for details see [protocol.GetFinalizationSafetyThreshold] ), at least one
+//     block must be finalized. `FinalizationSafetyThreshold` is chosen such that a violation of this axiom has vanshing
+//     probability. The axiom implies that two blocks with ancestral degree 1 (i.e. parent and child) cannot be more than
+//     `FinalizationSafetyThreshold` views apart. Hence, as long as 𝓱 - 𝓹.Level ≥ `FinalizationSafetyThreshold`, the
+//     child of 𝓹 always falls into the [𝓹.Level, 𝓱].
+//     ○ In case we choose `maxViewDelta` := 𝓱 - 𝓹.Level < `FinalizationSafetyThreshold`, we cannot guarantee that the
+//     child of 𝓹 will fall into the view range [𝓹.Level, 𝓱]. Therefore, we introduce that additional requirementthat the
+//     ResultsForest must always store the child of 𝓹.
 //  4. `rejectedResults` is a boolean value that indicates whether the ResultsForest has rejected any results.
 //     During instantiation, it is initialized to false. It is set to true if and only if the ResultsForest
 //     rejects a result with view > 𝓱. The ResultsForest allows external business logic to reset
@@ -150,14 +162,6 @@ var (
 //     might already have sealed further blocks, some of which might not have been ingested by the ResultsForest yet.
 //     This is another case, where the ResultsForest's local notion lags behind the protocol's global view, which
 //     is fine as long as the forest eventually receives the result and is told that it is sealed.
-//   - Note that we have specified 𝓱 as a hard cutoff, i.e. there is an upper bound on the number of views that the
-//     ResultsForest can accept results for. In contrast, theoretically here is no bound on how many consensus views
-//     can pass _without_ new blocks being produced. Nevertheless, for practical considerations, we have already
-//     introduced the axiom that within every window of `FinalizationSafetyThreshold` views, at least one block must
-//     be finalized (see [protocol.GetFinalizationSafetyThreshold] for details. `FinalizationSafetyThreshold` is chosen
-//     such that a violation of this axiom has vanshing probability. The axiom implies that two blocks with ancestral
-//     degree 1 (i.e. parent and child) cannot be more than `FinalizationSafetyThreshold` views apart. Hence, as long
-//     as 𝓱 - 𝓹.Level > `FinalizationSafetyThreshold`, the ResultsForest can always accept results for child of 𝓹.
 //   - The ResultsForest is an information-driven system and information is idempotent. Inputs are information about
 //     the protocol's global view rather than commands for the ResultsForest to do a certain thing. As illustration,
 //     consider a Alice walking up to a cliff. Telling Alice that "it is safe to walk up to 3m before the cliff"
@@ -209,10 +213,10 @@ var (
 //     (as long as no further rejection of inputs occurs).
 //   - In case the backfill process drives the forest into rejecting results again:
 //     Note that either the backfill process adds a new result to the forest that is a child of 𝓹 or such child already exists
-//     within the forest. The only case where such child does not exist is if 𝓹 = 𝓼. As the forest covers at least
-//     `FinalizationSafetyThreshold` views beyond 𝓹.Level, the child of 𝓹 must be within the forest's view window. Therefore, the
-//     backfill process will either add a sealed child of 𝓼 or such child will be added and sealed through the notifications from
-//     the consensus follower. In either case, the forest's 𝙡𝙖𝙩𝙚𝙨𝙩 𝘀𝗲𝗮𝗹𝗲𝗱 𝗿𝗲𝘀𝘂𝗹𝘁 𝓼 increases and the forest will therefore make progress.
+//     within the forest. The only case where such child does not exist in the forest is if 𝓹 = 𝓼. As specified in the requirements
+//     section, the forest will always accept and store 𝓹's chile. Therefore, the backfill process will either add a sealed child
+//     of 𝓼 or such child will be added and sealed through the notifications from the consensus follower. In either case, the
+//     forest's 𝙡𝙖𝙩𝙚𝙨𝙩 𝘀𝗲𝗮𝗹𝗲𝗱 𝗿𝗲𝘀𝘂𝗹𝘁 𝓼 increases and the forest will therefore make progress.
 //
 // In all cases, the ResultsForest makes progress and the forest's notion 𝙡𝙖𝙩𝙚𝙨𝙩 𝘀𝗲𝗮𝗹𝗲𝗱 𝗿𝗲𝘀𝘂𝗹𝘁 𝓼 also keeps progressing. Q.E.D.
 //
