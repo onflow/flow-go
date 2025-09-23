@@ -347,8 +347,9 @@ func (*api) GetSystemTransaction(
 	_ context.Context,
 	_ flow.Identifier,
 	_ flow.Identifier,
-) (*flow.TransactionBody, error) {
-	return nil, errors.New("unimplemented")
+	_ optimistic_sync.Criteria,
+) (*flow.TransactionBody, accessmodel.ExecutorMetadata, error) {
+	return nil, accessmodel.ExecutorMetadata{}, errors.New("unimplemented")
 }
 
 func (*api) GetSystemTransactionResult(

@@ -430,10 +430,15 @@ func (h *Handler) GetSystemTransaction(
 			return nil, status.Errorf(codes.InvalidArgument, "invalid transaction id: %v", err)
 		}
 	}
+	query := req.GetExecutionStateQuery()
 
-	tx, err := h.api.GetSystemTransaction(ctx, txID, blockID)
+	tx, executorMetadata, err := h.api.GetSystemTransaction(ctx, txID, blockID, convert.NewCriteria(query))
 	if err != nil {
 		return nil, err
+	}
+
+	if query.GetIncludeExecutorMetadata() {
+		metadata.ExecutorMetadata = convert.ExecutorMetadataToMessage(&executorMetadata)
 	}
 
 	return &accessproto.TransactionResponse{

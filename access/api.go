@@ -78,7 +78,12 @@ type TransactionsAPI interface {
 		criteria optimistic_sync.Criteria,
 	) ([]*accessmodel.TransactionResult, accessmodel.ExecutorMetadata, error)
 
-	GetSystemTransaction(ctx context.Context, txID flow.Identifier, blockID flow.Identifier) (*flow.TransactionBody, error)
+	GetSystemTransaction(
+		ctx context.Context,
+		txID flow.Identifier,
+		blockID flow.Identifier,
+		criteria optimistic_sync.Criteria,
+	) (*flow.TransactionBody, accessmodel.ExecutorMetadata, error)
 	GetSystemTransactionResult(
 		ctx context.Context,
 		txID flow.Identifier,

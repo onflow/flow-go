@@ -575,26 +575,24 @@ func (t *Transactions) GetSystemTransaction(
 	ctx context.Context,
 	txID flow.Identifier,
 	blockID flow.Identifier,
-) (*flow.TransactionBody, error) {
+	userCriteria optimistic_sync.Criteria,
+) (*flow.TransactionBody, accessmodel.ExecutorMetadata, error) {
 	block, err := t.blocks.ByID(blockID)
 	if err != nil {
-		return nil, rpc.ConvertStorageError(err)
+		return nil, accessmodel.ExecutorMetadata{}, rpc.ConvertStorageError(err)
 	}
 
 	if txID == flow.ZeroID {
 		txID = t.systemTxID
 	}
 
-	// TODO: this method needs to accept userCriteria
-	criteria := t.operatorCriteria
+	criteria := t.operatorCriteria.OverrideWith(userCriteria)
 	execResultInfo, err := t.execResultProvider.ExecutionResultInfo(blockID, criteria)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get execution result for last block: %w", err)
+		return nil, accessmodel.ExecutorMetadata{}, fmt.Errorf("failed to get execution result for last block: %w", err)
 	}
 
-	// TODO: return executor metadata
-	result, _, err := t.txProvider.SystemTransaction(ctx, block, txID, execResultInfo)
-	return result, err
+	return t.txProvider.SystemTransaction(ctx, block, txID, execResultInfo)
 }
 
 // GetSystemTransactionResult returns system transaction result

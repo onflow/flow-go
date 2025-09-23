@@ -512,7 +512,7 @@ func (s *Suite) TestGetSystemTransaction_ExecutionNode_HappyPath() {
 		txBackend, err := NewTransactionsBackend(params)
 		s.Require().NoError(err)
 
-		res, err := txBackend.GetSystemTransaction(context.Background(), flow.ZeroID, blockID)
+		res, _, err := txBackend.GetSystemTransaction(context.Background(), flow.ZeroID, blockID, optimistic_sync.Criteria{})
 		s.Require().NoError(err)
 
 		s.Require().Equal(s.systemTx, res)
@@ -526,7 +526,7 @@ func (s *Suite) TestGetSystemTransaction_ExecutionNode_HappyPath() {
 		txBackend, err := NewTransactionsBackend(params)
 		s.Require().NoError(err)
 
-		res, err := txBackend.GetSystemTransaction(context.Background(), s.systemTx.ID(), blockID)
+		res, _, err := txBackend.GetSystemTransaction(context.Background(), s.systemTx.ID(), blockID, optimistic_sync.Criteria{})
 		s.Require().NoError(err)
 
 		s.Require().Equal(s.systemTx, res)
@@ -540,7 +540,7 @@ func (s *Suite) TestGetSystemTransaction_ExecutionNode_HappyPath() {
 		txBackend, err := NewTransactionsBackend(params)
 		s.Require().NoError(err)
 
-		res, err := txBackend.GetSystemTransaction(context.Background(), unittest.IdentifierFixture(), blockID)
+		res, _, err := txBackend.GetSystemTransaction(context.Background(), unittest.IdentifierFixture(), blockID, optimistic_sync.Criteria{})
 
 		s.Require().Error(err)
 		s.Require().Nil(res)
@@ -554,7 +554,7 @@ func (s *Suite) TestGetSystemTransaction_ExecutionNode_HappyPath() {
 		txBackend, err := NewTransactionsBackend(params)
 		s.Require().NoError(err)
 
-		res, err := txBackend.GetSystemTransaction(context.Background(), flow.ZeroID, blockID)
+		res, _, err := txBackend.GetSystemTransaction(context.Background(), flow.ZeroID, blockID, optimistic_sync.Criteria{})
 		s.Require().NoError(err)
 
 		s.Require().Equal(s.systemTx, res)
@@ -568,7 +568,7 @@ func (s *Suite) TestGetSystemTransaction_ExecutionNode_HappyPath() {
 		txBackend, err := NewTransactionsBackend(params)
 		s.Require().NoError(err)
 
-		res, err := txBackend.GetSystemTransaction(context.Background(), s.systemTx.ID(), blockID)
+		res, _, err := txBackend.GetSystemTransaction(context.Background(), s.systemTx.ID(), blockID, optimistic_sync.Criteria{})
 		s.Require().NoError(err)
 
 		s.Require().Equal(s.systemTx, res)
@@ -585,7 +585,7 @@ func (s *Suite) TestGetSystemTransaction_ExecutionNode_HappyPath() {
 		s.Require().NoError(err)
 
 		systemTx := s.systemCollection.Transactions[2]
-		res, err := txBackend.GetSystemTransaction(context.Background(), systemTx.ID(), blockID)
+		res, _, err := txBackend.GetSystemTransaction(context.Background(), systemTx.ID(), blockID, optimistic_sync.Criteria{})
 		s.Require().NoError(err)
 
 		s.Require().Equal(systemTx, res)
@@ -601,7 +601,7 @@ func (s *Suite) TestGetSystemTransaction_ExecutionNode_HappyPath() {
 		txBackend, err := NewTransactionsBackend(params)
 		s.Require().NoError(err)
 
-		res, err := txBackend.GetSystemTransaction(context.Background(), unittest.IdentifierFixture(), blockID)
+		res, _, err := txBackend.GetSystemTransaction(context.Background(), unittest.IdentifierFixture(), blockID, optimistic_sync.Criteria{})
 
 		s.Require().Error(err)
 		s.Require().Nil(res)
@@ -654,7 +654,7 @@ func (s *Suite) TestGetSystemTransaction_Local_HappyPath() {
 		txBackend, err := NewTransactionsBackend(params)
 		s.Require().NoError(err)
 
-		res, err := txBackend.GetSystemTransaction(context.Background(), flow.ZeroID, blockID)
+		res, _, err := txBackend.GetSystemTransaction(context.Background(), flow.ZeroID, blockID, optimistic_sync.Criteria{})
 		s.Require().NoError(err)
 
 		s.Require().Equal(s.systemTx, res)
@@ -668,7 +668,7 @@ func (s *Suite) TestGetSystemTransaction_Local_HappyPath() {
 		txBackend, err := NewTransactionsBackend(params)
 		s.Require().NoError(err)
 
-		res, err := txBackend.GetSystemTransaction(context.Background(), s.systemTx.ID(), blockID)
+		res, _, err := txBackend.GetSystemTransaction(context.Background(), s.systemTx.ID(), blockID, optimistic_sync.Criteria{})
 		s.Require().NoError(err)
 
 		s.Require().Equal(s.systemTx, res)
@@ -682,7 +682,7 @@ func (s *Suite) TestGetSystemTransaction_Local_HappyPath() {
 		txBackend, err := NewTransactionsBackend(params)
 		s.Require().NoError(err)
 
-		res, err := txBackend.GetSystemTransaction(context.Background(), unittest.IdentifierFixture(), blockID)
+		res, _, err := txBackend.GetSystemTransaction(context.Background(), unittest.IdentifierFixture(), blockID, optimistic_sync.Criteria{})
 
 		s.Require().Error(err)
 		s.Require().Nil(res)
@@ -696,7 +696,7 @@ func (s *Suite) TestGetSystemTransaction_Local_HappyPath() {
 		txBackend, err := NewTransactionsBackend(params)
 		s.Require().NoError(err)
 
-		res, err := txBackend.GetSystemTransaction(context.Background(), flow.ZeroID, blockID)
+		res, _, err := txBackend.GetSystemTransaction(context.Background(), flow.ZeroID, blockID, optimistic_sync.Criteria{})
 
 		s.Require().NoError(err)
 
@@ -711,7 +711,7 @@ func (s *Suite) TestGetSystemTransaction_Local_HappyPath() {
 		txBackend, err := NewTransactionsBackend(params)
 		s.Require().NoError(err)
 
-		res, err := txBackend.GetSystemTransaction(context.Background(), s.systemTx.ID(), blockID)
+		res, _, err := txBackend.GetSystemTransaction(context.Background(), s.systemTx.ID(), blockID, optimistic_sync.Criteria{})
 
 		s.Require().NoError(err)
 
@@ -737,7 +737,7 @@ func (s *Suite) TestGetSystemTransaction_Local_HappyPath() {
 		txBackend, err := NewTransactionsBackend(params)
 		s.Require().NoError(err)
 
-		res, err := txBackend.GetSystemTransaction(context.Background(), systemTxID, blockID)
+		res, _, err := txBackend.GetSystemTransaction(context.Background(), systemTxID, blockID, optimistic_sync.Criteria{})
 
 		s.Require().NoError(err)
 		s.Require().Equal(systemTx, res)
@@ -760,7 +760,7 @@ func (s *Suite) TestGetSystemTransaction_Local_HappyPath() {
 		txBackend, err := NewTransactionsBackend(params)
 		s.Require().NoError(err)
 
-		res, err := txBackend.GetSystemTransaction(context.Background(), unittest.IdentifierFixture(), blockID)
+		res, _, err := txBackend.GetSystemTransaction(context.Background(), unittest.IdentifierFixture(), blockID, optimistic_sync.Criteria{})
 
 		s.Require().Error(err)
 		s.Require().Nil(res)
@@ -1754,21 +1754,6 @@ func (s *Suite) TestSuccessfulTransactionsDontRetry() {
 
 	// Should've still should not be called
 	client.AssertNotCalled(s.T(), "SendTransaction", mock.Anything, mock.Anything)
-}
-
-func (s *Suite) setupReceipts(block *flow.Block) ([]*flow.ExecutionReceipt, flow.IdentityList) {
-	receipt1 := unittest.ReceiptForBlockFixture(block)
-	receipt1.ExecutorID = s.identities[0].NodeID
-	receipt2 := unittest.ReceiptForBlockFixture(block)
-	receipt2.ExecutorID = s.identities[1].NodeID
-	receipt1.ExecutionResult = receipt2.ExecutionResult
-
-	receipts := flow.ExecutionReceiptList{receipt1, receipt2}
-	s.receipts.
-		On("ByBlockID", block.ID()).
-		Return(receipts, nil)
-
-	return receipts, s.identities
 }
 
 func (s *Suite) assertTransactionResultResponse(

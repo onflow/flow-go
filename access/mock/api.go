@@ -932,34 +932,41 @@ func (_m *API) GetProtocolStateSnapshotByHeight(ctx context.Context, blockHeight
 	return r0, r1
 }
 
-// GetSystemTransaction provides a mock function with given fields: ctx, txID, blockID
-func (_m *API) GetSystemTransaction(ctx context.Context, txID flow.Identifier, blockID flow.Identifier) (*flow.TransactionBody, error) {
-	ret := _m.Called(ctx, txID, blockID)
+// GetSystemTransaction provides a mock function with given fields: ctx, txID, blockID, criteria
+func (_m *API) GetSystemTransaction(ctx context.Context, txID flow.Identifier, blockID flow.Identifier, criteria optimistic_sync.Criteria) (*flow.TransactionBody, modelaccess.ExecutorMetadata, error) {
+	ret := _m.Called(ctx, txID, blockID, criteria)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetSystemTransaction")
 	}
 
 	var r0 *flow.TransactionBody
-	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, flow.Identifier, flow.Identifier) (*flow.TransactionBody, error)); ok {
-		return rf(ctx, txID, blockID)
+	var r1 modelaccess.ExecutorMetadata
+	var r2 error
+	if rf, ok := ret.Get(0).(func(context.Context, flow.Identifier, flow.Identifier, optimistic_sync.Criteria) (*flow.TransactionBody, modelaccess.ExecutorMetadata, error)); ok {
+		return rf(ctx, txID, blockID, criteria)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, flow.Identifier, flow.Identifier) *flow.TransactionBody); ok {
-		r0 = rf(ctx, txID, blockID)
+	if rf, ok := ret.Get(0).(func(context.Context, flow.Identifier, flow.Identifier, optimistic_sync.Criteria) *flow.TransactionBody); ok {
+		r0 = rf(ctx, txID, blockID, criteria)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*flow.TransactionBody)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, flow.Identifier, flow.Identifier) error); ok {
-		r1 = rf(ctx, txID, blockID)
+	if rf, ok := ret.Get(1).(func(context.Context, flow.Identifier, flow.Identifier, optimistic_sync.Criteria) modelaccess.ExecutorMetadata); ok {
+		r1 = rf(ctx, txID, blockID, criteria)
 	} else {
-		r1 = ret.Error(1)
+		r1 = ret.Get(1).(modelaccess.ExecutorMetadata)
 	}
 
-	return r0, r1
+	if rf, ok := ret.Get(2).(func(context.Context, flow.Identifier, flow.Identifier, optimistic_sync.Criteria) error); ok {
+		r2 = rf(ctx, txID, blockID, criteria)
+	} else {
+		r2 = ret.Error(2)
+	}
+
+	return r0, r1, r2
 }
 
 // GetSystemTransactionResult provides a mock function with given fields: ctx, txID, blockID, encodingVersion, criteria
