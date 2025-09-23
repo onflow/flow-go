@@ -42,8 +42,6 @@ func IndexNewClusterBlock(lctx lockctx.Proof, rw storage.ReaderBatchWriter, bloc
 	return insertNewBlock(rw, blockID, parentID)
 }
 
-var errParentIsZero = errors.New("parent block is zero, no need to index it as a child of any block")
-
 func insertNewBlock(rw storage.ReaderBatchWriter, blockID flow.Identifier, parentID flow.Identifier) error {
 	// Step 1: make sure the new block has no children yet
 	var nonExist flow.IdentifierList
