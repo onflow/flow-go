@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/hex"
+	"fmt"
 	"os"
 	"sync/atomic"
 
@@ -29,7 +30,7 @@ var (
 	flagUseExecutionDataAPI bool
 	flagBlockID             string
 	flagBlockCount          int
-	flagPrintTraces         bool
+	flagWriteTraces         bool
 	flagParallel            int
 )
 
@@ -63,7 +64,7 @@ func init() {
 
 	Cmd.Flags().IntVar(&flagBlockCount, "block-count", 1, "number of blocks to process (default: 1)")
 
-	Cmd.Flags().BoolVar(&flagPrintTraces, "print-traces", false, "print traces for mismatched transactions")
+	Cmd.Flags().BoolVar(&flagWriteTraces, "write-traces", false, "write traces for mismatched transactions")
 
 	Cmd.Flags().IntVar(&flagParallel, "parallel", 1, "number of blocks to process in parallel (default: 1)")
 }
@@ -258,22 +259,9 @@ func compareBlock(
 
 			result.mismatches++
 
-			if flagPrintTraces {
-				log.Info().Str("tx", txID.String()).Msg("Interpreter spans:")
-
-				interSpanExporter := interSpanExporters[i]
-				err := interSpanExporter.WriteSpans(os.Stdout)
-				if err != nil {
-					log.Fatal().Err(err).Msg("failed to write interpreter spans")
-				}
-
-				log.Info().Str("tx", txID.String()).Msg("VM spans:")
-
-				vmSpanExporter := vmSpanExporters[i]
-				err = vmSpanExporter.WriteSpans(os.Stdout)
-				if err != nil {
-					log.Fatal().Err(err).Msg("failed to write VM spans")
-				}
+			if flagWriteTraces {
+				writeTraces(txID, "inter", interSpanExporters[i])
+				writeTraces(txID, "vm", vmSpanExporters[i])
 			}
 		} else {
 			result.matches++
@@ -287,6 +275,20 @@ func compareBlock(
 	}
 
 	return result
+}
+
+func writeTraces(id flow.Identifier, kind string, exporter *debug.InterestingCadenceSpanExporter) {
+
+	f, err := os.Create(fmt.Sprintf("%s.%s.txt", id, kind))
+	if err != nil {
+		log.Fatal().Err(err).Msg("failed to create trace file")
+	}
+	defer f.Close()
+
+	err = exporter.WriteSpans(f)
+	if err != nil {
+		log.Fatal().Err(err).Msg("failed to write interpreter spans")
+	}
 }
 
 func compareResults(txID flow.Identifier, interResult debug.Result, vmResult debug.Result) bool {
@@ -421,7 +423,7 @@ func compareResults(txID flow.Identifier, interResult debug.Result, vmResult deb
 		} else if !bytes.Equal(interWrittenRegisterEntry.Value, vmWrittenRegisterEntry.Value) {
 			log.Error().Msgf(
 				"Written register value mismatch for register %s: interpreter %q vs VM %q",
-				key,
+				interWrittenRegisterEntry.Key,
 				hex.EncodeToString(interWrittenRegisterEntry.Value),
 				hex.EncodeToString(vmWrittenRegisterEntry.Value),
 			)
