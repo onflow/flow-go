@@ -104,7 +104,6 @@ var (
 // Any honest protocol execution should satisfy the invariant. Hence, the invariant being violated is a
 // symptom of a severe bug in the protocol implementation or a corrupted internal state. Either way, safe
 // continuation is not possible and the node should restart.
-//
 // Lastly, we require that the ResultsForest eventually progresses up to 𝓼, without relying on any input
 // events from the consensus follower (`AddReceipt`, `OnBlockFinalized`, `AddSealed`). This requirement can
 // be satisifed by the ResultsForest on its own, since it already has the chain of results between 𝓹 (latest
@@ -416,8 +415,9 @@ func (rf *ResultsForest) ResetLowestRejectedView() (uint64, bool) {
 // its status is set to sealed.
 //
 // IMPORTANT: The caller MUST provide sealed results in ancestor first order to allow the forest to
-// guarantee liveness. If a sealed result is provided whose parent is either missing or not sealed,
-// an error is returned.
+// guarantee liveness. Specifically, (i) the result's ancestry must be stored in the ResultsForest going
+// back to the forest's lowest sealed result _and_ (ii) the ResultsForest must know that those ancestors
+// are all sealed. Otherwise, an error is returned. 
 //
 // Execution results with a finalized seal are committed to the chain and considered final
 // irrespective of which Execution Nodes [ENs] produced them. Therefore, it is fine to not track
@@ -593,9 +593,9 @@ func (rf *ResultsForest) getOrCreateContainer(result *flow.ExecutionResult, bloc
 		return nil, ErrPrunedView
 	}
 
-	// check invariant: the result's block view must be less than or equal to the view horizon 𝓱
-	// handle the corner case where maxViewDelta views are skipped by allowing insertion if and only if
-	// the result's parent is the latest persisted sealed result.
+	// limit the view range of results stored in the forest to avoid unbounded memory consumption:
+	//  * we always accept direct children of the lowest sealed result 𝓹
+	//  * otherwise, we reject results whose view above 𝓱 = 𝓹.Level + maxViewDelta
 	if executedBlock.View > rf.forest.LowestLevel+rf.maxViewDelta && executedBlock.ParentView != rf.forest.LowestLevel {
 		rf.rejectedResults = true
 		return nil, ErrMaxViewDeltaExceeded
@@ -887,7 +887,7 @@ func (rf *ResultsForest) processCompleted(resultID flow.Identifier) error {
 // This requires that there is a direct path from the container's result to an abandoned result
 // within the forest, otherwise the function cannot determine if the fork is abandoned and returns false.
 //
-// A container is known to be on an abandoned fork if:
+// A container is known to be on an abandoned fork if *any* of the following conditions is true:
 //  1. its parent is abandoned
 //  2. one of its siblings is sealed
 //  3. its block conflicts with a finalized block
