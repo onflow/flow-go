@@ -21,6 +21,9 @@ type LocalAccountProvider struct {
 	log            zerolog.Logger
 	state          protocol.State
 	scriptExecutor execution.ScriptExecutor
+
+	// TODO(Data availability #7650): remove registers when fork-aware account endpoints will be implemented
+	registers storage.RegisterSnapshotReader
 }
 
 var _ AccountProvider = (*LocalAccountProvider)(nil)
@@ -29,11 +32,13 @@ func NewLocalAccountProvider(
 	log zerolog.Logger,
 	state protocol.State,
 	scriptExecutor execution.ScriptExecutor,
+	registers storage.RegisterSnapshotReader,
 ) *LocalAccountProvider {
 	return &LocalAccountProvider{
 		log:            log.With().Str("account_provider", "local").Logger(),
 		state:          state,
 		scriptExecutor: scriptExecutor,
+		registers:      registers,
 	}
 }
 
@@ -43,7 +48,7 @@ func (l *LocalAccountProvider) GetAccountAtBlock(
 	_ flow.Identifier,
 	height uint64,
 ) (*flow.Account, error) {
-	account, err := l.scriptExecutor.GetAccountAtBlockHeight(ctx, address, height)
+	account, err := l.scriptExecutor.GetAccountAtBlockHeight(ctx, address, height, l.registers)
 	if err != nil {
 		return nil, convertAccountError(common.ResolveHeightError(l.state.Params(), height, err), address, height)
 	}
@@ -56,7 +61,7 @@ func (l *LocalAccountProvider) GetAccountBalanceAtBlock(
 	blockID flow.Identifier,
 	height uint64,
 ) (uint64, error) {
-	accountBalance, err := l.scriptExecutor.GetAccountBalance(ctx, address, height)
+	accountBalance, err := l.scriptExecutor.GetAccountBalance(ctx, address, height, l.registers)
 	if err != nil {
 		l.log.Debug().Err(err).Msgf("failed to get account balance at blockID: %v", blockID)
 		return 0, err
@@ -72,7 +77,7 @@ func (l *LocalAccountProvider) GetAccountKeyAtBlock(
 	_ flow.Identifier,
 	height uint64,
 ) (*flow.AccountPublicKey, error) {
-	accountKey, err := l.scriptExecutor.GetAccountKey(ctx, address, keyIndex, height)
+	accountKey, err := l.scriptExecutor.GetAccountKey(ctx, address, keyIndex, height, l.registers)
 	if err != nil {
 		l.log.Debug().Err(err).Msgf("failed to get account key at height: %d", height)
 		return nil, err
@@ -87,7 +92,7 @@ func (l *LocalAccountProvider) GetAccountKeysAtBlock(
 	_ flow.Identifier,
 	height uint64,
 ) ([]flow.AccountPublicKey, error) {
-	accountKeys, err := l.scriptExecutor.GetAccountKeys(ctx, address, height)
+	accountKeys, err := l.scriptExecutor.GetAccountKeys(ctx, address, height, l.registers)
 	if err != nil {
 		l.log.Debug().Err(err).Msgf("failed to get account keys at height: %d", height)
 		return nil, err

@@ -24,6 +24,7 @@ import (
 	"github.com/onflow/flow-go/module/state_synchronization"
 	"github.com/onflow/flow-go/state"
 	"github.com/onflow/flow-go/state/protocol"
+	"github.com/onflow/flow-go/storage"
 )
 
 // DefaultSealedIndexedHeightThreshold is the default number of blocks between sealed and indexed height
@@ -161,6 +162,7 @@ type TransactionValidator struct {
 	scriptExecutor               execution.ScriptExecutor
 	verifyPayerBalanceScript     []byte
 	transactionValidationMetrics module.TransactionValidationMetrics
+	registers                    storage.RegisterSnapshotReader
 
 	validationSteps []ValidationStep
 }
@@ -171,6 +173,7 @@ func NewTransactionValidator(
 	transactionValidationMetrics module.TransactionValidationMetrics,
 	options TransactionValidationOptions,
 	executor execution.ScriptExecutor,
+	registers storage.RegisterSnapshotReader,
 ) (*TransactionValidator, error) {
 	if options.CheckPayerBalanceMode != Disabled && executor == nil {
 		return nil, errors.New("transaction validator cannot use checkPayerBalance with nil executor")
@@ -187,6 +190,7 @@ func NewTransactionValidator(
 		scriptExecutor:               executor,
 		verifyPayerBalanceScript:     templates.GenerateVerifyPayerBalanceForTxExecution(env),
 		transactionValidationMetrics: transactionValidationMetrics,
+		registers:                    registers,
 	}
 
 	txValidator.initValidationSteps()
@@ -503,7 +507,7 @@ func (v *TransactionValidator) checkSufficientBalanceToPayForTransaction(ctx con
 		return fmt.Errorf("failed to encode cadence args for script executor: %w", err)
 	}
 
-	result, err := v.scriptExecutor.ExecuteAtBlockHeight(ctx, v.verifyPayerBalanceScript, args, indexedHeight)
+	result, err := v.scriptExecutor.ExecuteAtBlockHeight(ctx, v.verifyPayerBalanceScript, args, indexedHeight, v.registers)
 	if err != nil {
 		return fmt.Errorf("script finished with error: %w", err)
 	}
