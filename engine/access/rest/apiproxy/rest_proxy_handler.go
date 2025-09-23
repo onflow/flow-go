@@ -93,10 +93,7 @@ func (r *RestProxyHandler) log(handler, rpc string, err error) {
 //
 // Expected sentinel errors providing details to clients about failed requests:
 //   - access.DataNotFoundError if the collection is not found.
-func (r *RestProxyHandler) GetCollectionByID(
-	ctx context.Context,
-	id flow.Identifier,
-) (*flow.LightCollection, error) {
+func (r *RestProxyHandler) GetCollectionByID(ctx context.Context, id flow.Identifier) (*flow.LightCollection, error) {
 	upstream, closer, err := r.FaultTolerantClient()
 	if err != nil {
 		return nil, access.NewServiceUnavailable(err)
@@ -118,12 +115,7 @@ func (r *RestProxyHandler) GetCollectionByID(
 	if err != nil {
 		// this is not fatal because the data is coming from the upstream AN, so a failure here
 		// does not imply inconsistent local state.
-		return nil, access.NewInternalError(
-			fmt.Errorf(
-				"failed to convert collection response: %w",
-				err,
-			),
-		)
+		return nil, access.NewInternalError(fmt.Errorf("failed to convert collection response: %w", err))
 	}
 
 	return collection, nil
@@ -149,10 +141,7 @@ func (r *RestProxyHandler) SendTransaction(ctx context.Context, tx *flow.Transac
 }
 
 // GetTransaction returns transaction by ID.
-func (r *RestProxyHandler) GetTransaction(
-	ctx context.Context,
-	id flow.Identifier,
-) (*flow.TransactionBody, error) {
+func (r *RestProxyHandler) GetTransaction(ctx context.Context, id flow.Identifier) (*flow.TransactionBody, error) {
 	upstream, closer, err := r.FaultTolerantClient()
 	if err != nil {
 		return nil, err
@@ -199,10 +188,7 @@ func (r *RestProxyHandler) GetTransactionResult(
 		EventEncodingVersion: requiredEventEncodingVersion,
 	}
 
-	transactionResultResponse, err := upstream.GetTransactionResult(
-		ctx,
-		getTransactionResultRequest,
-	)
+	transactionResultResponse, err := upstream.GetTransactionResult(ctx, getTransactionResultRequest)
 	r.log("upstream", "GetTransactionResult", err)
 
 	if err != nil {
@@ -213,11 +199,7 @@ func (r *RestProxyHandler) GetTransactionResult(
 }
 
 // GetAccountAtBlockHeight returns account by account address and block height.
-func (r *RestProxyHandler) GetAccountAtBlockHeight(
-	ctx context.Context,
-	address flow.Address,
-	height uint64,
-) (*flow.Account, error) {
+func (r *RestProxyHandler) GetAccountAtBlockHeight(ctx context.Context, address flow.Address, height uint64) (*flow.Account, error) {
 	upstream, closer, err := r.FaultTolerantClient()
 	if err != nil {
 		return nil, err
@@ -240,11 +222,7 @@ func (r *RestProxyHandler) GetAccountAtBlockHeight(
 }
 
 // GetAccountBalanceAtBlockHeight returns account balance by account address and block height.
-func (r *RestProxyHandler) GetAccountBalanceAtBlockHeight(
-	ctx context.Context,
-	address flow.Address,
-	height uint64,
-) (uint64, error) {
+func (r *RestProxyHandler) GetAccountBalanceAtBlockHeight(ctx context.Context, address flow.Address, height uint64) (uint64, error) {
 	upstream, closer, err := r.FaultTolerantClient()
 	if err != nil {
 		return 0, err
@@ -256,10 +234,7 @@ func (r *RestProxyHandler) GetAccountBalanceAtBlockHeight(
 		BlockHeight: height,
 	}
 
-	accountBalanceResponse, err := upstream.GetAccountBalanceAtBlockHeight(
-		ctx,
-		getAccountBalanceAtBlockHeightRequest,
-	)
+	accountBalanceResponse, err := upstream.GetAccountBalanceAtBlockHeight(ctx, getAccountBalanceAtBlockHeightRequest)
 	r.log("upstream", "GetAccountBalanceAtBlockHeight", err)
 
 	if err != nil {
@@ -271,11 +246,7 @@ func (r *RestProxyHandler) GetAccountBalanceAtBlockHeight(
 }
 
 // GetAccountKeys returns account keys by account address and block height.
-func (r *RestProxyHandler) GetAccountKeys(
-	ctx context.Context,
-	address flow.Address,
-	height uint64,
-) ([]flow.AccountPublicKey, error) {
+func (r *RestProxyHandler) GetAccountKeys(ctx context.Context, address flow.Address, height uint64) ([]flow.AccountPublicKey, error) {
 	upstream, closer, err := r.FaultTolerantClient()
 	if err != nil {
 		return nil, err
@@ -287,10 +258,7 @@ func (r *RestProxyHandler) GetAccountKeys(
 		BlockHeight: height,
 	}
 
-	accountKeyResponse, err := upstream.GetAccountKeysAtBlockHeight(
-		ctx,
-		getAccountKeysAtBlockHeightRequest,
-	)
+	accountKeyResponse, err := upstream.GetAccountKeysAtBlockHeight(ctx, getAccountKeysAtBlockHeightRequest)
 	r.log("upstream", "GetAccountKeysAtBlockHeight", err)
 
 	if err != nil {
@@ -311,12 +279,7 @@ func (r *RestProxyHandler) GetAccountKeys(
 }
 
 // GetAccountKeyByIndex returns account key by account address, key index and block height.
-func (r *RestProxyHandler) GetAccountKeyByIndex(
-	ctx context.Context,
-	address flow.Address,
-	keyIndex uint32,
-	height uint64,
-) (*flow.AccountPublicKey, error) {
+func (r *RestProxyHandler) GetAccountKeyByIndex(ctx context.Context, address flow.Address, keyIndex uint32, height uint64) (*flow.AccountPublicKey, error) {
 	upstream, closer, err := r.FaultTolerantClient()
 	if err != nil {
 		return nil, err
@@ -329,10 +292,7 @@ func (r *RestProxyHandler) GetAccountKeyByIndex(
 		BlockHeight: height,
 	}
 
-	accountKeyResponse, err := upstream.GetAccountKeyAtBlockHeight(
-		ctx,
-		getAccountKeyAtBlockHeightRequest,
-	)
+	accountKeyResponse, err := upstream.GetAccountKeyAtBlockHeight(ctx, getAccountKeyAtBlockHeightRequest)
 	r.log("upstream", "GetAccountKeyAtBlockHeight", err)
 
 	if err != nil {
@@ -343,12 +303,7 @@ func (r *RestProxyHandler) GetAccountKeyByIndex(
 }
 
 // ExecuteScriptAtLatestBlock executes script at latest block.
-func (r *RestProxyHandler) ExecuteScriptAtLatestBlock(
-	ctx context.Context,
-	script []byte,
-	arguments [][]byte,
-	criteria optimistic_sync.Criteria,
-) ([]byte, accessmodel.ExecutorMetadata, error) {
+func (r *RestProxyHandler) ExecuteScriptAtLatestBlock(ctx context.Context, script []byte, arguments [][]byte, criteria optimistic_sync.Criteria) ([]byte, accessmodel.ExecutorMetadata, error) {
 	upstream, closer, err := r.FaultTolerantClient()
 	if err != nil {
 		return nil, accessmodel.ExecutorMetadata{}, err
@@ -360,10 +315,7 @@ func (r *RestProxyHandler) ExecuteScriptAtLatestBlock(
 		Arguments:           arguments,
 		ExecutionStateQuery: executionStateQuery(criteria),
 	}
-	executeScriptAtLatestBlockResponse, err := upstream.ExecuteScriptAtLatestBlock(
-		ctx,
-		executeScriptAtLatestBlockRequest,
-	)
+	executeScriptAtLatestBlockResponse, err := upstream.ExecuteScriptAtLatestBlock(ctx, executeScriptAtLatestBlockRequest)
 	r.log("upstream", "ExecuteScriptAtLatestBlock", err)
 
 	if err != nil {
@@ -395,10 +347,7 @@ func (r *RestProxyHandler) ExecuteScriptAtBlockHeight(
 		Arguments:           arguments,
 		ExecutionStateQuery: executionStateQuery(criteria),
 	}
-	executeScriptAtBlockHeightResponse, err := upstream.ExecuteScriptAtBlockHeight(
-		ctx,
-		executeScriptAtBlockHeightRequest,
-	)
+	executeScriptAtBlockHeightResponse, err := upstream.ExecuteScriptAtBlockHeight(ctx, executeScriptAtBlockHeightRequest)
 	r.log("upstream", "ExecuteScriptAtBlockHeight", err)
 
 	if err != nil {
@@ -430,10 +379,7 @@ func (r *RestProxyHandler) ExecuteScriptAtBlockID(
 		Arguments:           arguments,
 		ExecutionStateQuery: executionStateQuery(criteria),
 	}
-	executeScriptAtBlockIDResponse, err := upstream.ExecuteScriptAtBlockID(
-		ctx,
-		executeScriptAtBlockIDRequest,
-	)
+	executeScriptAtBlockIDResponse, err := upstream.ExecuteScriptAtBlockID(ctx, executeScriptAtBlockIDRequest)
 	r.log("upstream", "ExecuteScriptAtBlockID", err)
 
 	if err != nil {
