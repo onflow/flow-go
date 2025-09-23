@@ -103,8 +103,11 @@ func insertNewBlock(rw storage.ReaderBatchWriter, blockID flow.Identifier, paren
 func RetrieveBlockChildren(r storage.Reader, blockID flow.Identifier, childrenIDs *flow.IdentifierList) error {
 	err := RetrieveByKey(r, MakePrefix(codeBlockChildren, blockID), childrenIDs)
 	if err != nil {
+		// when indexing new block, we don't create an index for the block if it has no children
+		// so we can't distinguish between a block that doesn't exist and a block that exists but has no children
 		// If the block doesn't have a children index yet, it means it has no children
 		if errors.Is(err, storage.ErrNotFound) {
+			*childrenIDs = flow.IdentifierList{} // empty (non-nil) list
 			return nil
 		}
 		return err

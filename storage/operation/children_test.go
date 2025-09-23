@@ -139,7 +139,8 @@ func TestIndexZeroParent(t *testing.T) {
 				// zero id should have no children
 				var retrievedIDs flow.IdentifierList
 				err := operation.RetrieveBlockChildren(db.Reader(), flow.ZeroID, &retrievedIDs)
-				require.ErrorIs(t, err, storage.ErrNotFound)
+				require.NoError(t, err)
+				require.Empty(t, retrievedIDs)
 			})
 		})
 	}
@@ -192,7 +193,8 @@ func TestDirectChildren(t *testing.T) {
 
 				err = operation.RetrieveBlockChildren(db.Reader(), b4, &retrievedIDs)
 				// verify b4 has no children index (not indexed yet)
-				require.ErrorIs(t, err, storage.ErrNotFound)
+				require.NoError(t, err)
+				require.Empty(t, retrievedIDs)
 			})
 		})
 	}
