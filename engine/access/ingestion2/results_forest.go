@@ -71,7 +71,7 @@ var (
 //  3. 𝓱 is the ResultsForest's 𝙫𝙞𝙚𝙬 𝙝𝙤𝙧𝙞𝙯𝙤𝙣. The result forest must store any results with views in the closed
 //     interval [𝓹.Level, 𝓱]. Results with views outside may be rejected. The following is a degree of freedom for
 //     the design:
-//     ○ Theoretically here is no bound on how many consensus views can pass _without_ new blocks being produced.
+//     ○ Theoretically there is no bound on how many consensus views can pass _without_ new blocks being produced.
 //     Nevertheless, for practical considerations, we have already introduced the axiom that within every window of
 //     `FinalizationSafetyThreshold` views (for details see [protocol.GetFinalizationSafetyThreshold] ), at least one
 //     block must be finalized. `FinalizationSafetyThreshold` is chosen such that a violation of this axiom has vanshing
@@ -79,7 +79,7 @@ var (
 //     `FinalizationSafetyThreshold` views apart. Hence, as long as 𝓱 - 𝓹.Level ≥ `FinalizationSafetyThreshold`, the
 //     child of 𝓹 always falls into the [𝓹.Level, 𝓱].
 //     ○ In case we choose `maxViewDelta` := 𝓱 - 𝓹.Level < `FinalizationSafetyThreshold`, we cannot guarantee that the
-//     child of 𝓹 will fall into the view range [𝓹.Level, 𝓱]. Therefore, we introduce that additional requirementthat the
+//     child of 𝓹 will fall into the view range [𝓹.Level, 𝓱]. Therefore, we introduce an additional requirement that the
 //     ResultsForest must always store the child of 𝓹.
 //  4. `rejectedResults` is a boolean value that indicates whether the ResultsForest has rejected any results.
 //     During instantiation, it is initialized to false. It is set to true if and only if the ResultsForest
@@ -206,15 +206,15 @@ var (
 //   - Per contract, if the forest rejected results, the backfill process will eventually kick in and deliver sealed results
 //     starting from 𝓼.Level up to the latest sealed result known to the consensus follower.
 //   - In case the backfill process finished without driving the forest into rejecting results again:
-//     Consider the next sealing "sealing" notification from the consensus follower (`OnFinalizedBlock` notification, where the
+//     Consider the next "sealing" notification from the consensus follower (`OnFinalizedBlock` notification, where the
 //     finalized block contains a seal). Since the backfill process only stopped at the latest sealed result known to the consensus
-//     follower, the new `OnFinalizedBlock` notification just received must seal the immeciate next child. Hence, the
+//     follower, the new `OnFinalizedBlock` notification just received must seal the immediate next child. Hence, the
 //     forest's 𝙡𝙖𝙩𝙚𝙨𝙩 𝘀𝗲𝗮𝗹𝗲𝗱 𝗿𝗲𝘀𝘂𝗹𝘁 𝓼 increases. Furthermore, the result forest's mode of operation is back in Scenario I, which is live
 //     (as long as no further rejection of inputs occurs).
 //   - In case the backfill process drives the forest into rejecting results again:
 //     Note that either the backfill process adds a new result to the forest that is a child of 𝓹 or such child already exists
 //     within the forest. The only case where such child does not exist in the forest is if 𝓹 = 𝓼. As specified in the requirements
-//     section, the forest will always accept and store 𝓹's chile. Therefore, the backfill process will either add a sealed child
+//     section, the forest will always accept and store 𝓹's child. Therefore, the backfill process will either add a sealed child
 //     of 𝓼 or such child will be added and sealed through the notifications from the consensus follower. In either case, the
 //     forest's 𝙡𝙖𝙩𝙚𝙨𝙩 𝘀𝗲𝗮𝗹𝗲𝗱 𝗿𝗲𝘀𝘂𝗹𝘁 𝓼 increases and the forest will therefore make progress.
 //
