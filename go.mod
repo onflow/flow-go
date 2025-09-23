@@ -353,6 +353,6 @@ require (
 )
 
 // Using custom fork until https://github.com/onflow/flow-go/issues/5338 is resolved
-replace github.com/ipfs/boxo => github.com/onflow/boxo v0.0.0-20240201202436-f2477b92f483
+replace github.com/ipfs/boxo => github.com/onflow/boxo v0.0.0-20250902204842-9e6676101077
 
 replace github.com/hashicorp/golang-lru/v2 => github.com/fxamacker/golang-lru/v2 v2.0.0-20250430153159-6f72f038a30f
