@@ -3,6 +3,7 @@ package operation_test
 import (
 	"testing"
 
+	"github.com/jordanschalm/lockctx"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -15,6 +16,7 @@ import (
 
 // TestInsertProtocolState tests if basic badger operations on EpochProtocolState work as expected.
 func TestInsertEpochProtocolState(t *testing.T) {
+	lockManager := storage.NewTestingLockManager()
 	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
 		expected := unittest.EpochStateFixture().MinEpochStateEntry
 
@@ -31,10 +33,11 @@ func TestInsertEpochProtocolState(t *testing.T) {
 		assert.Equal(t, expected, &actual)
 
 		blockID := unittest.IdentifierFixture()
-		err = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			return operation.IndexEpochProtocolState(rw.Writer(), blockID, epochProtocolStateEntryID)
+		unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
+			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+				return operation.IndexEpochProtocolState(lctx, rw.Writer(), blockID, epochProtocolStateEntryID)
+			})
 		})
-		require.NoError(t, err)
 
 		var actualProtocolStateID flow.Identifier
 		err = operation.LookupEpochProtocolState(db.Reader(), blockID, &actualProtocolStateID)

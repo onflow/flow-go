@@ -1,6 +1,8 @@
 package storage
 
 import (
+	"github.com/jordanschalm/lockctx"
+
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -25,7 +27,7 @@ type EpochProtocolStateEntries interface {
 	//     _after_ validating the QC.
 	//
 	// No errors are expected during normal operation.
-	BatchIndex(rw ReaderBatchWriter, blockID flow.Identifier, epochProtocolStateID flow.Identifier) error
+	BatchIndex(lctx lockctx.Proof, rw ReaderBatchWriter, blockID flow.Identifier, epochProtocolStateID flow.Identifier) error
 
 	// ByID returns the flow.RichEpochStateEntry by its ID.
 	// Expected errors during normal operations:

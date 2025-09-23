@@ -3,6 +3,8 @@ package store
 import (
 	"fmt"
 
+	"github.com/jordanschalm/lockctx"
+
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/irrecoverable"
@@ -81,8 +83,8 @@ func NewEpochProtocolStateEntries(collector module.CacheMetrics,
 		return result, nil
 	}
 
-	storeByBlockID := func(rw storage.ReaderBatchWriter, blockID flow.Identifier, epochProtocolStateEntryID flow.Identifier) error {
-		err := operation.IndexEpochProtocolState(rw.Writer(), blockID, epochProtocolStateEntryID)
+	storeByBlockID := func(lctx lockctx.Proof, rw storage.ReaderBatchWriter, blockID flow.Identifier, epochProtocolStateEntryID flow.Identifier) error {
+		err := operation.IndexEpochProtocolState(lctx, rw.Writer(), blockID, epochProtocolStateEntryID)
 		if err != nil {
 			return fmt.Errorf("could not index EpochProtocolState for block (%x): %w", blockID[:], err)
 		}
@@ -106,7 +108,7 @@ func NewEpochProtocolStateEntries(collector module.CacheMetrics,
 			withRetrieve(retrieveByEntryID)),
 		byBlockIdCache: newCache(collector, metrics.ResourceProtocolStateByBlockID,
 			withLimit[flow.Identifier, flow.Identifier](stateByBlockIDCacheSize),
-			withStore(storeByBlockID),
+			withStoreWithLock(storeByBlockID),
 			withRetrieve(retrieveByBlockID)),
 	}
 }
@@ -144,8 +146,8 @@ func (s *EpochProtocolStateEntries) BatchStore(
 //     _after_ validating the QC.
 //
 // No errors are expected during normal operation.
-func (s *EpochProtocolStateEntries) BatchIndex(rw storage.ReaderBatchWriter, blockID flow.Identifier, epochProtocolStateEntryID flow.Identifier) error {
-	return s.byBlockIdCache.PutTx(rw, blockID, epochProtocolStateEntryID)
+func (s *EpochProtocolStateEntries) BatchIndex(lctx lockctx.Proof, rw storage.ReaderBatchWriter, blockID flow.Identifier, epochProtocolStateEntryID flow.Identifier) error {
+	return s.byBlockIdCache.PutWithLockTx(lctx, rw, blockID, epochProtocolStateEntryID)
 }
 
 // ByID returns the epoch protocol state entry by its ID.

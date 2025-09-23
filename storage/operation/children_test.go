@@ -15,8 +15,8 @@ import (
 )
 
 func TestBlockChildrenIndexUpdateLookup(t *testing.T) {
+	lockManager := storage.NewTestingLockManager()
 	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
-		lockManager := storage.NewTestingLockManager()
 		blockID := unittest.IdentifierFixture()
 		childrenIDs := unittest.IdentifierListFixture(8)
 		var retrievedIDs flow.IdentifierList
