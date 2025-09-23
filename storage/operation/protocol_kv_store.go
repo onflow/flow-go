@@ -1,7 +1,12 @@
 package operation
 
 import (
+	"errors"
+	"fmt"
+
+	"github.com/jordanschalm/lockctx"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/storage"
 )
 
@@ -23,10 +28,32 @@ func RetrieveProtocolKVStore(r storage.Reader, protocolKVStoreID flow.Identifier
 
 // IndexProtocolKVStore indexes a protocol KV store by block ID.
 // Error returns:
-//   - storage.ErrAlreadyExists if the key already exists in the database.
+// - [storage.ErrDataMismatch] if a _different_ KV store for the given stateID has already been persisted
 //   - generic error in case of unexpected failure from the database layer
-func IndexProtocolKVStore(w storage.Writer, blockID flow.Identifier, protocolKVStoreID flow.Identifier) error {
-	return UpsertByKey(w, MakePrefix(codeProtocolKVStoreByBlockID, blockID), protocolKVStoreID)
+func IndexProtocolKVStore(lctx lockctx.Proof, rw storage.ReaderBatchWriter, blockID flow.Identifier, protocolKVStoreID flow.Identifier) error {
+	if !lctx.HoldsLock(storage.LockInsertBlock) {
+		return fmt.Errorf("missing required lock: %s", storage.LockInsertBlock)
+	}
+
+	key := MakePrefix(codeProtocolKVStoreByBlockID, blockID)
+	var existing flow.Identifier
+	err := RetrieveByKey(rw.GlobalReader(), key, &existing)
+	if err == nil {
+		// no-op if the *same* stateID is already indexed for the blockID
+		if existing == protocolKVStoreID {
+			return nil
+		}
+
+		return fmt.Errorf("kv-store snapshot with block id (%x) already exists and different (%v != %v): %w",
+			blockID[:],
+			existing, protocolKVStoreID,
+			storage.ErrDataMismatch)
+	}
+	if !errors.Is(err, storage.ErrNotFound) { // `storage.ErrNotFound` is expected, as this indicates that no receipt is indexed yet; anything else is an exception
+		return fmt.Errorf("could not check if kv-store snapshot with block id (%x) exists: %w", blockID[:], irrecoverable.NewException(err))
+	}
+
+	return UpsertByKey(rw.Writer(), key, protocolKVStoreID)
 }
 
 // LookupProtocolKVStore finds protocol KV store ID by block ID.

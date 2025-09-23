@@ -62,8 +62,8 @@ func NewProtocolKVStore(collector module.CacheMetrics,
 		return operation.InsertProtocolKVStore(rw.Writer(), stateID, data)
 	}
 
-	storeByBlockID := func(rw storage.ReaderBatchWriter, blockID flow.Identifier, stateID flow.Identifier) error {
-		err := operation.IndexProtocolKVStore(rw.Writer(), blockID, stateID)
+	storeByBlockID := func(lctx lockctx.Proof, rw storage.ReaderBatchWriter, blockID flow.Identifier, stateID flow.Identifier) error {
+		err := operation.IndexProtocolKVStore(lctx, rw, blockID, stateID)
 		if err != nil {
 			return fmt.Errorf("could not index protocol state for block (%x): %w", blockID[:], err)
 		}
@@ -87,7 +87,7 @@ func NewProtocolKVStore(collector module.CacheMetrics,
 			withRetrieve(retrieveByStateID)),
 		byBlockIdCache: newCache(collector, metrics.ResourceProtocolKVStoreByBlockID,
 			withLimit[flow.Identifier, flow.Identifier](kvStoreByBlockIDCacheSize),
-			withStore(storeByBlockID),
+			withStoreWithLock(storeByBlockID),
 			withRetrieve(retrieveByBlockID)),
 	}
 }
@@ -139,29 +139,7 @@ func (s *ProtocolKVStore) BatchStore(lctx lockctx.Proof, rw storage.ReaderBatchW
 // Expected errors during normal operations:
 // - [storage.ErrDataMismatch] if a _different_ KV store for the given stateID has already been persisted
 func (s *ProtocolKVStore) BatchIndex(lctx lockctx.Proof, rw storage.ReaderBatchWriter, blockID flow.Identifier, stateID flow.Identifier) error {
-	if !lctx.HoldsLock(storage.LockInsertBlock) {
-		return fmt.Errorf("missing required lock: %s", storage.LockInsertBlock)
-	}
-
-	existingStateID, err := s.byBlockIdCache.Get(s.db.Reader(), blockID)
-	if err == nil {
-		// no-op if the *same* stateID is already indexed for the blockID
-		if existingStateID == stateID {
-			return nil
-		}
-
-		return fmt.Errorf("kv-store snapshot with block id (%x) already exists and different (%v != %v): %w",
-			blockID[:],
-			stateID, existingStateID,
-			storage.ErrDataMismatch)
-	}
-	if !errors.Is(err, storage.ErrNotFound) { // `storage.ErrNotFound` is expected, as this indicates that no receipt is indexed yet; anything else is an exception
-		return fmt.Errorf("could not check if kv-store snapshot with block id (%x) exists: %w", blockID[:], irrecoverable.NewException(err))
-	}
-
-	return s.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-		return s.byBlockIdCache.PutTx(rw, blockID, stateID)
-	})
+	return s.byBlockIdCache.PutWithLockTx(lctx, rw, blockID, stateID)
 }
 
 // ByID retrieves the KV store snapshot with the given state ID.
