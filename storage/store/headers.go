@@ -16,7 +16,7 @@ import (
 // Headers implements a simple read-only header storage around a DB.
 type Headers struct {
 	db storage.DB
-	// cache is essentially an in-memory map from `Block.ID()` -> `Header`
+	// cache is essentially an in-memory map from `Block.Hash()` -> `Header`
 	cache       *Cache[flow.Identifier, *flow.Header]
 	heightCache *Cache[uint64, flow.Identifier]
 	viewCache   *Cache[uint64, flow.Identifier]

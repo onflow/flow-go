@@ -44,7 +44,7 @@ type EpochProtocolStateEntries struct {
 	// roughly 100 is a reasonable balance between performance and memory consumption.
 	cache *Cache[flow.Identifier, *flow.RichEpochStateEntry]
 
-	// byBlockIdCache is essentially an in-memory map from `Block.ID()` -> `MinEpochStateEntry.ID()`. The full
+	// byBlockIdCache is essentially an in-memory map from `Block.Hash()` -> `MinEpochStateEntry.ID()`. The full
 	// flow.RichEpochStateEntry can be retrieved from the `cache` above.
 	// We populate the `byBlockIdCache` on store, because a new entry is added for every block and we probably also
 	// query the Protocol state for every block. So argument (ii) from above does not apply here. Furthermore,

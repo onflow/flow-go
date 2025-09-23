@@ -28,7 +28,7 @@ import (
 // Instead, the FollowerState relies on the consensus nodes to run the full
 // payload check and uses quorum certificates to prove validity of block payloads.
 // Consequently, a block B should only be considered valid, if
-// there is a certifying QC for that block QC.View == Block.View && QC.BlockID == Block.ID().
+// there is a certifying QC for that block QC.View == Block.View && QC.BlockID == Block.Hash().
 //
 // The FollowerState allows non-consensus nodes to execute fork-aware queries
 // against the protocol state, while minimizing the amount of payload checks

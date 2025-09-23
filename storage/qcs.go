@@ -8,8 +8,8 @@ import (
 
 // QuorumCertificates represents storage for Quorum Certificates.
 // Quorum Certificates are distributed using blocks, where a block incorporates a QC for its parent.
-// When stored, QCs are indexed by the ID of the block they certify (not the block they are included within).
-// In the example below, `QC_1` is indexed by `Block_1.ID()`
+// When stored, QCs are indexed by the Hash of the block they certify (not the block they are included within).
+// In the example below, `QC_1` is indexed by `Block_1.Hash()`
 // Block_1 <- Block_2(QC_1)
 type QuorumCertificates interface {
 	// BatchStore stores a Quorum Certificate as part of database batch update. QC is indexed by QC.BlockID.

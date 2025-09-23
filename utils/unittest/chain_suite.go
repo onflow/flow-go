@@ -463,8 +463,8 @@ func ApprovalFor(result *flow.ExecutionResult, chunkIdx uint64, approverID flow.
 //	PreviousResult  ---> PreviousResult.BlockID
 //
 // Depending on validity of the subgraph:
-//   - valid:   PreviousResult.BlockID == ParentBlock.ID()
-//   - invalid: PreviousResult.BlockID != ParentBlock.ID()
+//   - valid:   PreviousResult.BlockID == ParentBlock.Hash()
+//   - invalid: PreviousResult.BlockID != ParentBlock.Hash()
 type subgraphFixture struct {
 	Block              *flow.Block
 	ParentBlock        *flow.Block

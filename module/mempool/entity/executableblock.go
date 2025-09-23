@@ -19,8 +19,8 @@ type CompleteCollection struct {
 //
 // It assumes that the attached Block is immutable, so take care in not modifying or changing the inner
 // *flow.Block, otherwise the struct will be in an inconsistent state. It requires the Block is immutable
-// because it lazy loads the Block.ID() into the private blockID field, on the first call to ExecutableBlock.BlockID()
-// All future calls to BlockID will not call Block.ID(), therefore if the Block changes, the blockID will not match the Block.
+// because it lazy loads the Block.Hash() into the private blockID field, on the first call to ExecutableBlock.BlockID()
+// All future calls to BlockID will not call Block.Hash(), therefore if the Block changes, the blockID will not match the Block.
 type ExecutableBlock struct {
 	blockID             flow.Identifier
 	Block               *flow.Block
@@ -35,7 +35,7 @@ func (c CompleteCollection) IsCompleted() bool {
 	return c.Collection != nil && len(c.Collection.Transactions) > 0
 }
 
-// BlockID lazy loads the Block.ID() into the private blockID field on the first call, and returns
+// BlockID lazy loads the Block.Hash() into the private blockID field on the first call, and returns
 // the id field in all future calls
 func (b *ExecutableBlock) BlockID() flow.Identifier {
 	if b.blockID == flow.ZeroID {
