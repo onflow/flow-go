@@ -300,7 +300,7 @@ type ObserverServiceBuilder struct {
 	RegistersAsyncStore *execution.RegistersAsyncStore
 	Reporter            *index.Reporter
 	EventsIndex         *index.EventsIndex
-	ScriptExecutor      *backend.ScriptExecutor
+	ScriptExecutor      *execution.Scripts
 
 	// storage
 	events                  storage.Events
@@ -1472,9 +1472,9 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 			// other components from starting while bootstrapping the register db since it may
 			// take hours to complete.
 
-			indexerDerivedChainData, queryDerivedChainData, err := builder.buildDerivedChainData()
+			indexerDerivedChainData, err := builder.buildIndexerDerivedChainData()
 			if err != nil {
-				return nil, fmt.Errorf("could not create derived chain data: %w", err)
+				return nil, fmt.Errorf("could not create indexer derived chain data: %w", err)
 			}
 
 			var collectionExecutedMetric module.CollectionExecutedMetric = metrics.NewNoopCollector()
@@ -1520,27 +1520,6 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 			execDataDistributor.AddOnExecutionDataReceivedConsumer(builder.ExecutionIndexer.OnExecutionData)
 
 			err = builder.Reporter.Initialize(builder.ExecutionIndexer)
-			if err != nil {
-				return nil, err
-			}
-
-			//TODO(Uliana): refactoring: move creating scripts from execution data indexer component and remove Initialize for ScriptExecutor cause
-			// it does not depend on indexer anymore
-
-			// create script execution module, this depends on the indexer being initialized and the
-			// having the register storage bootstrapped
-			scripts := execution.NewScripts(
-				builder.Logger,
-				metrics.NewExecutionCollector(builder.Tracer),
-				builder.RootChainID,
-				computation.NewProtocolStateWrapper(builder.State),
-				builder.Storage.Headers,
-				builder.scriptExecutorConfig,
-				queryDerivedChainData,
-				builder.programCacheSize > 0,
-			)
-
-			err = builder.ScriptExecutor.Initialize(scripts, builder.VersionControl)
 			if err != nil {
 				return nil, err
 			}
@@ -1649,11 +1628,9 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 	return builder
 }
 
-// buildDerivedChainData creates the derived chain data for the indexer and the query engine
-// If program caching is disabled, the function will return nil for the indexer cache, and a
-// derived chain data object for the query engine cache.
-func (builder *ObserverServiceBuilder) buildDerivedChainData() (
-	indexerCache *derived.DerivedChainData,
+// buildQueryDerivedChainData creates the derived chain data for the query engine.
+// If program caching is disabled, the function will return a derived chain data object for the query engine cache.
+func (builder *ObserverServiceBuilder) buildQueryDerivedChainData() (
 	queryCache *derived.DerivedChainData,
 	err error,
 ) {
@@ -1666,15 +1643,36 @@ func (builder *ObserverServiceBuilder) buildDerivedChainData() (
 
 	derivedChainData, err := derived.NewDerivedChainData(cacheSize)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
+	}
+
+	return derivedChainData, nil
+}
+
+// buildIndexerDerivedChainData creates the derived chain data for the indexer engine
+// If program caching is disabled, the function will return nil for the indexer cache.
+func (builder *ObserverServiceBuilder) buildIndexerDerivedChainData() (
+	indexerCache *derived.DerivedChainData,
+	err error,
+) {
+	cacheSize := builder.programCacheSize
+
+	// the underlying cache requires size > 0. no data will be written so 1 is fine.
+	if cacheSize == 0 {
+		cacheSize = 1
+	}
+
+	derivedChainData, err := derived.NewDerivedChainData(cacheSize)
+	if err != nil {
+		return nil, err
 	}
 
 	// writes are done by the indexer. using a nil value effectively disables writes to the cache.
 	if builder.programCacheSize == 0 {
-		return nil, derivedChainData, nil
+		return nil, nil
 	}
 
-	return derivedChainData, derivedChainData, nil
+	return derivedChainData, nil
 }
 
 // enqueuePublicNetworkInit enqueues the observer network component initialized for the observer
@@ -1858,10 +1856,24 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 		return nil
 	})
 	builder.Module("script executor", func(node *cmd.NodeConfig) error {
-		builder.ScriptExecutor = backend.NewScriptExecutor(builder.Logger,
-			pstorage.NewRegisterSnapshotReader(builder.Storage.RegisterIndex),
+		queryDerivedChainData, err := builder.buildQueryDerivedChainData()
+		if err != nil {
+			return fmt.Errorf("could not create query derived chain data: %w", err)
+		}
+
+		builder.ScriptExecutor = execution.NewScripts(
+			builder.Logger,
+			metrics.NewExecutionCollector(builder.Tracer),
+			builder.RootChainID,
+			computation.NewProtocolStateWrapper(builder.State),
+			builder.Storage.Headers,
+			builder.scriptExecutorConfig,
+			queryDerivedChainData,
+			builder.programCacheSize > 0,
 			builder.scriptExecMinBlock,
-			builder.scriptExecMaxBlock)
+			builder.scriptExecMaxBlock,
+			builder.VersionControl,
+		)
 		return nil
 	})
 
