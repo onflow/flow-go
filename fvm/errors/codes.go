@@ -30,6 +30,15 @@ const (
 	FailureCodeExecutionVersionProvider                FailureCode = 2011
 	// Deprecated: No longer used.
 	FailureCodeMetaTransactionFailure FailureCode = 2100
+
+	// Account key
+	FailureCodeKeyMetadataDecodingFailure            FailureCode = 2200
+	FailureCodeKeyMetadataNotFoundFailure            FailureCode = 2201
+	FailureCodeKeyMetadataUnexpectedKeyIndexFailure  FailureCode = 2202
+	FailureCodeStoredPublicKeyNotFoundFailure        FailureCode = 2203
+	FailureCodeStoredPublicKeyUnexpectedIndexFailure FailureCode = 2204
+	FailureCodeBatchPublicKeyDecodingFailure         FailureCode = 2205
+	FailureCodeBatchPublicKeyNotFoundFailure         FailureCode = 2206
 )
 
 const (

@@ -25,6 +25,7 @@ import (
 
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/engine"
+	"github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	exeEng "github.com/onflow/flow-go/engine/execution"
 	"github.com/onflow/flow-go/engine/execution/computation/metrics"
@@ -40,9 +41,14 @@ const DefaultMaxBlockRange = 300
 
 // Config defines the configurable options for the gRPC server.
 type Config struct {
-	ListenAddr        string
-	MaxMsgSize        uint // In bytes
-	RpcMetricsEnabled bool // enable GRPC metrics reporting
+	ListenAddr         string
+	MaxRequestMsgSize  uint // in bytes
+	MaxResponseMsgSize uint // in bytes
+	RpcMetricsEnabled  bool // enable GRPC metrics reporting
+
+	// holds value of deprecated MaxMsgSize flag for use during bootstrapping.
+	// will be removed in a future release.
+	DeprecatedMaxMsgSize uint // in bytes
 }
 
 // Engine implements a gRPC server with a simplified version of the Observation API.
@@ -73,8 +79,8 @@ func New(
 ) *Engine {
 	log = log.With().Str("engine", "rpc").Logger()
 	serverOptions := []grpc.ServerOption{
-		grpc.MaxRecvMsgSize(int(config.MaxMsgSize)),
-		grpc.MaxSendMsgSize(int(config.MaxMsgSize)),
+		grpc.MaxRecvMsgSize(int(config.MaxRequestMsgSize)),
+		grpc.MaxSendMsgSize(int(config.MaxResponseMsgSize)),
 	}
 
 	var interceptors []grpc.UnaryServerInterceptor // ordered list of interceptors
@@ -112,6 +118,7 @@ func New(
 			transactionMetrics:   transactionMetrics,
 			log:                  log,
 			maxBlockRange:        DefaultMaxBlockRange,
+			maxScriptSize:        config.MaxRequestMsgSize,
 		},
 		server: server,
 		config: config,
@@ -173,6 +180,7 @@ type handler struct {
 	commits              storage.CommitsReader
 	transactionMetrics   metrics.TransactionExecutionMetricsProvider
 	maxBlockRange        int
+	maxScriptSize        uint
 }
 
 var _ execution.ExecutionAPIServer = (*handler)(nil)
@@ -189,6 +197,12 @@ func (h *handler) ExecuteScriptAtBlockID(
 	ctx context.Context,
 	req *execution.ExecuteScriptAtBlockIDRequest,
 ) (*execution.ExecuteScriptAtBlockIDResponse, error) {
+	script := req.GetScript()
+	arguments := req.GetArguments()
+
+	if !rpc.CheckScriptSize(script, arguments, h.maxScriptSize) {
+		return nil, status.Error(codes.InvalidArgument, rpc.ErrScriptTooLarge.Error())
+	}
 
 	blockID, err := convert.BlockID(req.GetBlockId())
 	if err != nil {
@@ -203,7 +217,7 @@ func (h *handler) ExecuteScriptAtBlockID(
 		return nil, status.Errorf(codes.Internal, "state commitment for block ID %s could not be retrieved", blockID)
 	}
 
-	value, compUsage, err := h.engine.ExecuteScriptAtBlockID(ctx, req.GetScript(), req.GetArguments(), blockID)
+	value, compUsage, err := h.engine.ExecuteScriptAtBlockID(ctx, script, arguments, blockID)
 	if err != nil {
 		// todo check the error code instead
 		// return code 3 as this passes the litmus test in our context

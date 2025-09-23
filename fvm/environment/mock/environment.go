@@ -1511,6 +1511,11 @@ func (_m *Environment) RevokeAccountKey(address common.Address, index uint32) (*
 	return r0, r1
 }
 
+// RunWithMeteringDisabled provides a mock function with given fields: f
+func (_m *Environment) RunWithMeteringDisabled(f func()) {
+	_m.Called(f)
+}
+
 // RuntimeSetNumberOfAccounts provides a mock function with given fields: count
 func (_m *Environment) RuntimeSetNumberOfAccounts(count uint64) {
 	_m.Called(count)
