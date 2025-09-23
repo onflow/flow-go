@@ -6,15 +6,6 @@ import (
 	"time"
 )
 
-// HashablePayload is a temporary interface used to generalize the payload type of GenericBlock.
-// It defines the minimal interface required for a payload to participate in block hashing.
-//
-// TODO(malleability, #7164): remove this interface after renaming Hashable's method `ID` to `Hash`,
-// and replace all usages of HashablePayload with Hashable.
-type HashablePayload interface {
-	Hash() Identifier
-}
-
 // GenericBlock represents a generic Flow block structure parameterized by a payload type.
 // It includes both the block header metadata and the block payload.
 //
@@ -23,7 +14,7 @@ type HashablePayload interface {
 // using NewBlock to ensure validation of the block fields.
 //
 //structwrite:immutable - mutations allowed only within the constructor
-type GenericBlock[T HashablePayload] struct {
+type GenericBlock[T Hashable] struct {
 	// HeaderBody is a container encapsulating most of the header fields - *excluding* the payload hash
 	// and the proposer signature. Generally, the type [HeaderBody] should not be used on its own.
 	// CAUTION regarding security:
