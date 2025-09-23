@@ -505,6 +505,7 @@ func (e *blockComputer) executeSystemTransactions(
 		Uint64("height", block.Block.Height).
 		Bool("system_chunk", true).
 		Bool("system_transaction", true).
+		Bool("critical_error", true).
 		Int("num_collections", userCollectionCount).
 		Logger()
 
