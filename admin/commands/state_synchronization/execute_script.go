@@ -8,6 +8,7 @@ import (
 	"github.com/onflow/flow-go/admin"
 	"github.com/onflow/flow-go/admin/commands"
 	"github.com/onflow/flow-go/module/execution"
+	"github.com/onflow/flow-go/storage"
 )
 
 var _ commands.AdminCommand = (*ReadExecutionDataCommand)(nil)
@@ -20,12 +21,13 @@ type scriptData struct {
 
 type ExecuteScriptCommand struct {
 	scriptExecutor execution.ScriptExecutor
+	registers      storage.RegisterSnapshotReader
 }
 
 func (e *ExecuteScriptCommand) Handler(_ context.Context, req *admin.CommandRequest) (interface{}, error) {
 	d := req.ValidatorData.(*scriptData)
 
-	result, err := e.scriptExecutor.ExecuteAtBlockHeight(context.Background(), d.script, d.arguments, d.height)
+	result, err := e.scriptExecutor.ExecuteAtBlockHeight(context.Background(), d.script, d.arguments, d.height, e.registers)
 	if err != nil {
 		return nil, err
 	}
@@ -91,8 +93,9 @@ func (e *ExecuteScriptCommand) Validator(req *admin.CommandRequest) error {
 	return nil
 }
 
-func NewExecuteScriptCommand(scripts execution.ScriptExecutor) commands.AdminCommand {
+func NewExecuteScriptCommand(scripts execution.ScriptExecutor, registers storage.RegisterSnapshotReader) commands.AdminCommand {
 	return &ExecuteScriptCommand{
-		scripts,
+		scriptExecutor: scripts,
+		registers:      registers,
 	}
 }
