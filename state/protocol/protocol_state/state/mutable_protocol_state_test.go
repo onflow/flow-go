@@ -65,7 +65,7 @@ func (s *StateMutatorSuite) SetupTest() {
 	s.protocolKVStoreDB.On("ByBlockID", s.candidate.ParentID).Return(&s.parentState, nil)
 	s.parentState.On("GetProtocolStateVersion").Return(s.latestProtocolVersion)
 	s.parentState.On("GetVersionUpgrade").Return(nil) // no version upgrade by default
-	s.parentState.On("ID").Return(unittest.IdentifierFixture(), nil)
+	s.parentState.On("Hash").Return(unittest.IdentifierFixture(), nil)
 	s.parentState.On("Replicate", s.latestProtocolVersion).Return(&s.evolvingState, nil)
 
 	// state replicated from the parent state; by default exactly the same as the parent state
@@ -136,7 +136,7 @@ func (s *StateMutatorSuite) testEvolveState(seals []*flow.Seal, expectedResultin
 // prepares updates to the KV store, when building protocol state. Here, we focus on the path, where the *state remains invariant*.
 func (s *StateMutatorSuite) Test_HappyPath_StateInvariant() {
 	parentProtocolStateID := s.parentState.Hash()
-	s.evolvingState.On("ID").Return(parentProtocolStateID, nil)
+	s.evolvingState.On("Hash").Return(parentProtocolStateID, nil)
 
 	s.Run("nil seals slice, hence no service events", func() {
 		for i := range s.kvStateMachines {
@@ -196,7 +196,7 @@ func (s *StateMutatorSuite) Test_HappyPath_StateChange() {
 	s.Run("nil seals slice, hence no service events", func() {
 		expectedResultingStateID := unittest.IdentifierFixture()
 		modifyState := func(_ mock.Arguments) {
-			s.evolvingState.On("ID").Return(expectedResultingStateID, nil).Once()
+			s.evolvingState.On("Hash").Return(expectedResultingStateID, nil).Once()
 		}
 		s.kvStateMachines[0] = s.mockStateTransition().ServiceEventsMatch(emptySlice[flow.ServiceEvent]()).DuringEvolveState(modifyState).Mock()
 		s.kvStateMachines[1] = s.mockStateTransition().ServiceEventsMatch(emptySlice[flow.ServiceEvent]()).Mock()
@@ -207,7 +207,7 @@ func (s *StateMutatorSuite) Test_HappyPath_StateChange() {
 	s.Run("empty seals slice, hence no service events", func() {
 		expectedResultingStateID := unittest.IdentifierFixture()
 		modifyState := func(_ mock.Arguments) {
-			s.evolvingState.On("ID").Return(expectedResultingStateID, nil).Once()
+			s.evolvingState.On("Hash").Return(expectedResultingStateID, nil).Once()
 		}
 		s.kvStateMachines[0] = s.mockStateTransition().ServiceEventsMatch(emptySlice[flow.ServiceEvent]()).DuringEvolveState(modifyState).Mock()
 		s.kvStateMachines[1] = s.mockStateTransition().ServiceEventsMatch(emptySlice[flow.ServiceEvent]()).Mock()
@@ -224,7 +224,7 @@ func (s *StateMutatorSuite) Test_HappyPath_StateChange() {
 
 		expectedResultingStateID := unittest.IdentifierFixture()
 		modifyState := func(_ mock.Arguments) {
-			s.evolvingState.On("ID").Return(expectedResultingStateID, nil).Once()
+			s.evolvingState.On("Hash").Return(expectedResultingStateID, nil).Once()
 		}
 		s.kvStateMachines[0] = s.mockStateTransition().ServiceEventsMatch(emptySlice[flow.ServiceEvent]()).DuringEvolveState(modifyState).Mock()
 		s.kvStateMachines[1] = s.mockStateTransition().ServiceEventsMatch(emptySlice[flow.ServiceEvent]()).Mock()
@@ -244,7 +244,7 @@ func (s *StateMutatorSuite) Test_HappyPath_StateChange() {
 
 		expectedResultingStateID := unittest.IdentifierFixture()
 		modifyState := func(_ mock.Arguments) {
-			s.evolvingState.On("ID").Return(expectedResultingStateID, nil).Once()
+			s.evolvingState.On("Hash").Return(expectedResultingStateID, nil).Once()
 		}
 		s.kvStateMachines[0] = s.mockStateTransition().ExpectedServiceEvents(serviceEvents).DuringEvolveState(modifyState).Mock()
 		s.kvStateMachines[1] = s.mockStateTransition().ExpectedServiceEvents(serviceEvents).Mock()
@@ -267,14 +267,14 @@ func (s *StateMutatorSuite) Test_VersionUpgrade() {
 	s.Run("upgrade at future view", func() {
 		newVersion := s.latestProtocolVersion + 1
 		s.parentState = *protocol_statemock.NewKVStoreAPI(s.T())
-		s.parentState.On("ID").Return(parentStateID, nil)
+		s.parentState.On("Hash").Return(parentStateID, nil)
 		s.parentState.On("GetProtocolStateVersion").Return(s.latestProtocolVersion).Once()
 		s.parentState.On("GetVersionUpgrade").Return(&protocol.ViewBasedActivator[uint64]{
 			Data:           newVersion,
 			ActivationView: s.candidate.View + 1,
 		}).Once()
 		s.parentState.On("Replicate", s.latestProtocolVersion).Return(&s.evolvingState, nil)
-		s.evolvingState.On("ID").Return(parentStateID, nil).Once()
+		s.evolvingState.On("Hash").Return(parentStateID, nil).Once()
 
 		for i := range s.kvStateMachines {
 			s.kvStateMachines[i] = s.mockStateTransition().ServiceEventsMatch(emptySlice[flow.ServiceEvent]()).Mock()
@@ -288,14 +288,14 @@ func (s *StateMutatorSuite) Test_VersionUpgrade() {
 		newVersion := s.latestProtocolVersion + 1
 		newStateID := unittest.IdentifierFixture()
 		s.parentState = *protocol_statemock.NewKVStoreAPI(s.T())
-		s.parentState.On("ID").Return(parentStateID, nil)
+		s.parentState.On("Hash").Return(parentStateID, nil)
 		s.parentState.On("GetProtocolStateVersion").Return(s.latestProtocolVersion).Once()
 		s.parentState.On("GetVersionUpgrade").Return(&protocol.ViewBasedActivator[uint64]{
 			Data:           newVersion,
 			ActivationView: s.candidate.View,
 		}).Once()
 		s.parentState.On("Replicate", newVersion).Return(&s.evolvingState, nil)
-		s.evolvingState.On("ID").Return(newStateID, nil).Once()
+		s.evolvingState.On("Hash").Return(newStateID, nil).Once()
 
 		for i := range s.kvStateMachines {
 			s.kvStateMachines[i] = s.mockStateTransition().ServiceEventsMatch(emptySlice[flow.ServiceEvent]()).Mock()
@@ -311,14 +311,14 @@ func (s *StateMutatorSuite) Test_VersionUpgrade() {
 		newVersion := s.latestProtocolVersion + 1
 		newStateID := unittest.IdentifierFixture()
 		s.parentState = *protocol_statemock.NewKVStoreAPI(s.T())
-		s.parentState.On("ID").Return(parentStateID, nil)
+		s.parentState.On("Hash").Return(parentStateID, nil)
 		s.parentState.On("GetProtocolStateVersion").Return(s.latestProtocolVersion).Once()
 		s.parentState.On("GetVersionUpgrade").Return(&protocol.ViewBasedActivator[uint64]{
 			Data:           newVersion,
 			ActivationView: s.candidate.View - 1,
 		}).Once()
 		s.parentState.On("Replicate", newVersion).Return(&s.evolvingState, nil)
-		s.evolvingState.On("ID").Return(newStateID, nil).Once()
+		s.evolvingState.On("Hash").Return(newStateID, nil).Once()
 
 		for i := range s.kvStateMachines {
 			s.kvStateMachines[i] = s.mockStateTransition().ServiceEventsMatch(emptySlice[flow.ServiceEvent]()).Mock()
@@ -332,14 +332,14 @@ func (s *StateMutatorSuite) Test_VersionUpgrade() {
 	// of the same version.
 	s.Run("upgrade already done at earlier view", func() {
 		s.parentState = *protocol_statemock.NewKVStoreAPI(s.T())
-		s.parentState.On("ID").Return(parentStateID, nil)
+		s.parentState.On("Hash").Return(parentStateID, nil)
 		s.parentState.On("GetProtocolStateVersion").Return(s.latestProtocolVersion).Once()
 		s.parentState.On("GetVersionUpgrade").Return(&protocol.ViewBasedActivator[uint64]{
 			Data:           s.latestProtocolVersion,
 			ActivationView: s.candidate.View - 1,
 		}).Once()
 		s.parentState.On("Replicate", s.latestProtocolVersion).Return(&s.evolvingState, nil)
-		s.evolvingState.On("ID").Return(parentStateID, nil).Once()
+		s.evolvingState.On("Hash").Return(parentStateID, nil).Once()
 
 		for i := range s.kvStateMachines {
 			s.kvStateMachines[i] = s.mockStateTransition().ServiceEventsMatch(emptySlice[flow.ServiceEvent]()).Mock()
@@ -373,7 +373,7 @@ func (s *StateMutatorSuite) Test_SealsOrdered() {
 
 	s.Run("service events leave state invariant", func() {
 		parentProtocolStateID := s.parentState.Hash()
-		s.evolvingState.On("ID").Return(parentProtocolStateID, nil).Once()
+		s.evolvingState.On("Hash").Return(parentProtocolStateID, nil).Once()
 
 		s.kvStateMachines[0] = s.mockStateTransition().ExpectedServiceEvents(orderedServiceEvents).Mock()
 		s.kvStateMachines[1] = s.mockStateTransition().ExpectedServiceEvents(orderedServiceEvents).Mock()
@@ -384,7 +384,7 @@ func (s *StateMutatorSuite) Test_SealsOrdered() {
 	s.Run("service events change state", func() {
 		expectedResultingStateID := unittest.IdentifierFixture()
 		modifyState := func(_ mock.Arguments) {
-			s.evolvingState.On("ID").Return(expectedResultingStateID, nil).Once()
+			s.evolvingState.On("Hash").Return(expectedResultingStateID, nil).Once()
 		}
 		s.kvStateMachines[0] = s.mockStateTransition().ExpectedServiceEvents(orderedServiceEvents).DuringEvolveState(modifyState).Mock()
 		s.kvStateMachines[1] = s.mockStateTransition().ExpectedServiceEvents(orderedServiceEvents).Mock()
@@ -546,7 +546,7 @@ func (s *StateMutatorSuite) Test_EncodeFailed() {
 
 	expectedResultingStateID := unittest.IdentifierFixture()
 	modifyState := func(_ mock.Arguments) {
-		s.evolvingState.On("ID").Return(expectedResultingStateID, nil).Once()
+		s.evolvingState.On("Hash").Return(expectedResultingStateID, nil).Once()
 	}
 	s.kvStateMachines[0] = s.mockStateTransition().ServiceEventsMatch(emptySlice[flow.ServiceEvent]()).DuringEvolveState(modifyState).Mock()
 	s.kvStateMachines[1] = s.mockStateTransition().ServiceEventsMatch(emptySlice[flow.ServiceEvent]()).Mock()
