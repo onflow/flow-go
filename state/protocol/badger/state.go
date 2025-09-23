@@ -124,6 +124,14 @@ func Bootstrap(
 	if err != nil {
 		return nil, err
 	}
+	err = lctx.AcquireLock(storage.LockUpsertSafetyData)
+	if err != nil {
+		return nil, err
+	}
+	err = lctx.AcquireLock(storage.LockUpsertLivenessData)
+	if err != nil {
+		return nil, err
+	}
 
 	config := defaultBootstrapConfig()
 	for _, opt := range options {
@@ -588,11 +596,11 @@ func bootstrapStatePointers(lctx lockctx.Proof, rw storage.ReaderBatchWriter, ro
 
 	w := rw.Writer()
 	// persist safety and liveness data plus the QuorumCertificate for the latest finalized block for HotStuff/Jolteon consensus
-	err = operation.UpsertSafetyData(w, lastFinalized.ChainID, safetyData)
+	err = operation.UpsertSafetyData(lctx, w, lastFinalized.ChainID, safetyData)
 	if err != nil {
 		return fmt.Errorf("could not insert safety data: %w", err)
 	}
-	err = operation.UpsertLivenessData(w, lastFinalized.ChainID, livenessData)
+	err = operation.UpsertLivenessData(lctx, w, lastFinalized.ChainID, livenessData)
 	if err != nil {
 		return fmt.Errorf("could not insert liveness data: %w", err)
 	}

@@ -65,6 +65,11 @@ func makeLockPolicy() lockctx.Policy {
 	return lockctx.NewDAGPolicyBuilder().
 		Add(LockInsertBlock, LockFinalizeBlock).
 		Add(LockFinalizeBlock, LockBootstrapping).
+		Add(LockBootstrapping, LockUpsertSafetyData).
+		Add(LockBootstrapping, LockUpsertLivenessData).
+		Add(LockUpsertSafetyData, LockUpsertLivenessData).
+		Add(LockInsertOrFinalizeClusterBlock, LockUpsertSafetyData).
+		Add(LockInsertOrFinalizeClusterBlock, LockUpsertLivenessData).
 		Build()
 }
 

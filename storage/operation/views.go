@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/jordanschalm/lockctx"
+
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/storage"

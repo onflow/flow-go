@@ -3,6 +3,7 @@ package factories
 import (
 	"fmt"
 
+	"github.com/jordanschalm/lockctx"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/consensus"
@@ -33,6 +34,7 @@ type HotStuffFactory struct {
 	me             module.Local
 	db             storage.DB
 	protoState     protocol.State
+	lockManager    lockctx.Manager
 	engineMetrics  module.EngineMetrics
 	mempoolMetrics module.MempoolMetrics
 	createMetrics  HotStuffMetricsFunc
@@ -44,6 +46,7 @@ func NewHotStuffFactory(
 	me module.Local,
 	db storage.DB,
 	protoState protocol.State,
+	lockManager lockctx.Manager,
 	engineMetrics module.EngineMetrics,
 	mempoolMetrics module.MempoolMetrics,
 	createMetrics HotStuffMetricsFunc,
@@ -55,6 +58,7 @@ func NewHotStuffFactory(
 		me:             me,
 		db:             db,
 		protoState:     protoState,
+		lockManager:    lockManager,
 		engineMetrics:  engineMetrics,
 		mempoolMetrics: mempoolMetrics,
 		createMetrics:  createMetrics,
@@ -155,7 +159,7 @@ func (f *HotStuffFactory) CreateModules(
 		return nil, nil, err
 	}
 
-	persist, err := persister.New(f.db, cluster.ChainID())
+	persist, err := persister.New(f.db, cluster.ChainID(), f.lockManager)
 	if err != nil {
 		return nil, nil, err
 	}

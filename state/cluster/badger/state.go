@@ -32,6 +32,14 @@ func Bootstrap(db storage.DB, lockManager lockctx.Manager, stateRoot *StateRoot)
 	if err != nil {
 		return nil, fmt.Errorf("failed to acquire lock `storage.LockInsertOrFinalizeClusterBlock` for inserting cluster block: %w", err)
 	}
+	err = lctx.AcquireLock(storage.LockUpsertSafetyData)
+	if err != nil {
+		return nil, fmt.Errorf("failed to acquire lock for safety data: %w", err)
+	}
+	err = lctx.AcquireLock(storage.LockUpsertLivenessData)
+	if err != nil {
+		return nil, fmt.Errorf("failed to acquire lock for liveness data: %w", err)
+	}
 	isBootstrapped, err := IsBootstrapped(db, stateRoot.ClusterID())
 	if err != nil {
 		return nil, fmt.Errorf("failed to determine whether database contains bootstrapped state: %w", err)
@@ -83,12 +91,12 @@ func Bootstrap(db storage.DB, lockManager lockctx.Manager, stateRoot *StateRoot)
 			NewestQC:    rootQC,
 		}
 		// insert safety data
-		err = operation.UpsertSafetyData(rw.Writer(), chainID, safetyData)
+		err = operation.UpsertSafetyData(lctx, rw.Writer(), chainID, safetyData)
 		if err != nil {
 			return fmt.Errorf("could not insert safety data: %w", err)
 		}
 		// insert liveness data
-		err = operation.UpsertLivenessData(rw.Writer(), chainID, livenessData)
+		err = operation.UpsertLivenessData(lctx, rw.Writer(), chainID, livenessData)
 		if err != nil {
 			return fmt.Errorf("could not insert liveness data: %w", err)
 		}
