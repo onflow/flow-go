@@ -1,6 +1,9 @@
 package operation
 
 import (
+	"fmt"
+
+	"github.com/jordanschalm/lockctx"
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/storage"
@@ -9,10 +12,12 @@ import (
 // UpsertSafetyData inserts or updates the given safety data for this node.
 // Intended for consensus participants only (consensus and collector nodes).
 // Here, `chainID` specifies which consensus instance specifically the node participates in.
-// CAUTION: OVERWRITES existing data (potential for data corruption).
 //
 // No errors are expected during normal operation.
-func UpsertSafetyData(w storage.Writer, chainID flow.ChainID, safetyData *hotstuff.SafetyData) error {
+func UpsertSafetyData(lctx lockctx.Proof, w storage.Writer, chainID flow.ChainID, safetyData *hotstuff.SafetyData) error {
+	if !lctx.HoldsLock(storage.LockUpsertSafetyData) {
+		return fmt.Errorf("upsert safety data requires holding lock %q", storage.LockUpsertSafetyData)
+	}
 	return UpsertByKey(w, MakePrefix(codeSafetyData, chainID), safetyData)
 }
 
@@ -28,10 +33,12 @@ func RetrieveSafetyData(r storage.Reader, chainID flow.ChainID, safetyData *hots
 // UpsertLivenessData inserts or updates the given liveness data for this node.
 // Intended for consensus participants only (consensus and collector nodes).
 // Here, `chainID` specifies which consensus instance specifically the node participates in.
-// CAUTION: OVERWRITES existing data (potential for data corruption).
 //
 // No errors are expected during normal operation.
-func UpsertLivenessData(w storage.Writer, chainID flow.ChainID, livenessData *hotstuff.LivenessData) error {
+func UpsertLivenessData(lctx lockctx.Proof, w storage.Writer, chainID flow.ChainID, livenessData *hotstuff.LivenessData) error {
+	if !lctx.HoldsLock(storage.LockUpsertSafetyData) {
+		return fmt.Errorf("upsert liveness data requires holding lock %q", storage.LockUpsertLivenessData)
+	}
 	return UpsertByKey(w, MakePrefix(codeLivenessData, chainID), livenessData)
 }
 

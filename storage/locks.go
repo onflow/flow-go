@@ -19,6 +19,8 @@ const (
 	// The reason they are combined is because insertion process reads some data updated by finalization process,
 	// in order to prevent dirty reads, we need to acquire the lock for both operations.
 	LockInsertOrFinalizeClusterBlock = "lock_insert_or_finalize_cluster_block"
+	LockUpsertSafetyData             = "lock_upsert_safety_data"
+	LockUpsertLivenessData           = "lock_upsert_liveness_data"
 	// LockInsertOwnReceipt is intended for Execution Nodes to ensure that they never publish different receipts for the same block.
 	// Specifically, with this lock we prevent accidental overwrites of the index `executed block ID` ➜ `Receipt ID`.
 	LockInsertOwnReceipt = "lock_insert_own_receipt"
@@ -35,6 +37,8 @@ func Locks() []string {
 		LockFinalizeBlock,
 		LockIndexResultApproval,
 		LockInsertOrFinalizeClusterBlock,
+		LockUpsertSafetyData,
+		LockUpsertLivenessData,
 		LockInsertOwnReceipt,
 		LockInsertCollection,
 		LockBootstrapping,
