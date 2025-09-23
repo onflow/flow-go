@@ -6,7 +6,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-// SignatureCollector contains a set of of signatures from verifiers attesting
+// SignatureCollector contains a set of signatures from verifiers attesting
 // to the validity of an execution result chunk.
 // NOT concurrency safe.
 // TODO: this will be replaced with stateful BLS aggregation
