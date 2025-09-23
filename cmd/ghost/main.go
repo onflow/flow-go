@@ -6,11 +6,11 @@ import (
 	"github.com/spf13/pflag"
 
 	"github.com/onflow/flow-go/cmd"
+	"github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/engine/ghost/engine"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/validator"
-	"github.com/onflow/flow-go/utils/grpcutils"
 )
 
 func main() {
@@ -21,7 +21,7 @@ func main() {
 	nodeBuilder := cmd.FlowNode("ghost")
 	nodeBuilder.ExtraFlags(func(flags *pflag.FlagSet) {
 		flags.StringVarP(&rpcConf.ListenAddr, "rpc-addr", "r", "localhost:9000", "the address the GRPC server listens on")
-		flags.UintVar(&rpcConf.MaxMsgSize, "rpc-max-message-size", grpcutils.DefaultMaxMsgSize, "the maximum message size in bytes for messages sent or received over grpc")
+		flags.UintVar(&rpcConf.MaxMsgSize, "rpc-max-message-size", rpc.DefaultMaxResponseMsgSize, "the maximum message size in bytes for messages sent or received over grpc")
 	})
 
 	if err := nodeBuilder.Initialize(); err != nil {

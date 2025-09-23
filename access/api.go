@@ -29,7 +29,7 @@ type EventsAPI interface {
 	GetEventsForHeightRange(
 		ctx context.Context,
 		eventType string,
-		startHeight,
+		startHeight uint64,
 		endHeight uint64,
 		requiredEventEncodingVersion entities.EventEncodingVersion,
 		criteria optimistic_sync.Criteria,
@@ -60,8 +60,8 @@ type TransactionsAPI interface {
 	GetTransactionResultByIndex(ctx context.Context, blockID flow.Identifier, index uint32, encodingVersion entities.EventEncodingVersion) (*accessmodel.TransactionResult, error)
 	GetTransactionResultsByBlockID(ctx context.Context, blockID flow.Identifier, encodingVersion entities.EventEncodingVersion) ([]*accessmodel.TransactionResult, error)
 
-	GetSystemTransaction(ctx context.Context, blockID flow.Identifier) (*flow.TransactionBody, error)
-	GetSystemTransactionResult(ctx context.Context, blockID flow.Identifier, encodingVersion entities.EventEncodingVersion) (*accessmodel.TransactionResult, error)
+	GetSystemTransaction(ctx context.Context, txID flow.Identifier, blockID flow.Identifier) (*flow.TransactionBody, error)
+	GetSystemTransactionResult(ctx context.Context, txID flow.Identifier, blockID flow.Identifier, encodingVersion entities.EventEncodingVersion) (*accessmodel.TransactionResult, error)
 }
 
 type TransactionStreamAPI interface {

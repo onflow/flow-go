@@ -66,6 +66,13 @@ func GetFactoryTestContract(t testing.TB) *TestContract {
 	}
 }
 
+func GetFileSystemContract(t testing.TB) *TestContract {
+	return &TestContract{
+		ABI:      contracts.FileSystemContractABIJSON,
+		ByteCode: contracts.FileSystemContractBytes,
+	}
+}
+
 func RunWithDeployedContract(t testing.TB, tc *TestContract, led atree.Ledger, flowEVMRootAddress flow.Address, f func(*TestContract)) {
 	DeployContract(t, RandomAddress(t), tc, led, flowEVMRootAddress)
 	f(tc)

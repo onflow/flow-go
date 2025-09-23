@@ -31,8 +31,8 @@ type AccountStatusesProviderSuite struct {
 	log zerolog.Logger
 	api *ssmock.API
 
-	chain          flow.Chain
-	rootBlock      *flow.Block
+	chain     flow.Chain
+	rootBlock *flow.Block
 
 	factory *DataProviderFactoryImpl
 }

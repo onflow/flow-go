@@ -1103,34 +1103,6 @@ func (_m *Environment) ImplementationDebugLog(message string) error {
 	return r0
 }
 
-// InteractionUsed provides a mock function with no fields
-func (_m *Environment) InteractionUsed() (uint64, error) {
-	ret := _m.Called()
-
-	if len(ret) == 0 {
-		panic("no return value specified for InteractionUsed")
-	}
-
-	var r0 uint64
-	var r1 error
-	if rf, ok := ret.Get(0).(func() (uint64, error)); ok {
-		return rf()
-	}
-	if rf, ok := ret.Get(0).(func() uint64); ok {
-		r0 = rf()
-	} else {
-		r0 = ret.Get(0).(uint64)
-	}
-
-	if rf, ok := ret.Get(1).(func() error); ok {
-		r1 = rf()
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
 // Invoke provides a mock function with given fields: spec, arguments
 func (_m *Environment) Invoke(spec environment.ContractFunctionSpec, arguments []cadence.Value) (cadence.Value, error) {
 	ret := _m.Called(spec, arguments)
@@ -1537,6 +1509,11 @@ func (_m *Environment) RevokeAccountKey(address common.Address, index uint32) (*
 	}
 
 	return r0, r1
+}
+
+// RunWithMeteringDisabled provides a mock function with given fields: f
+func (_m *Environment) RunWithMeteringDisabled(f func()) {
+	_m.Called(f)
 }
 
 // RuntimeSetNumberOfAccounts provides a mock function with given fields: count

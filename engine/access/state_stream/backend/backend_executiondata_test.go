@@ -200,8 +200,8 @@ func (s *BackendExecutionDataSuite) SetupTestSuite(blockCount int) {
 		Return(func(blockID flow.Identifier, criteria optimistic_sync.Criteria) (*optimistic_sync.ExecutionResultInfo, error) {
 			ids := unittest.IdentityListFixture(2)
 			return &optimistic_sync.ExecutionResultInfo{
-				ExecutionResult: unittest.ExecutionResultFixture(),
-				ExecutionNodes:  ids.ToSkeleton(),
+				ExecutionResultID: unittest.IdentifierFixture(),
+				ExecutionNodes:    ids.ToSkeleton(),
 			}, nil
 		}, nil).
 		Maybe()

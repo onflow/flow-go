@@ -169,13 +169,11 @@ func (e *Events) GetEventsForHeightRange(
 				rpc.ConvertStorageError(fmt.Errorf("failed to get block header for %d: %w", i, err))
 		}
 
-		blockHeaders = append(
-			blockHeaders, provider.BlockMetadata{
-				ID:        blockID,
-				Height:    header.Height,
-				Timestamp: time.UnixMilli(int64(header.Timestamp)).UTC(),
-			},
-		)
+		blockHeaders = append(blockHeaders, provider.BlockMetadata{
+			ID:        blockID,
+			Height:    header.Height,
+			Timestamp: time.UnixMilli(int64(header.Timestamp)).UTC(),
+		})
 	}
 
 	// get the result for the block with the highest height. all data queried for this set of blocks
@@ -226,7 +224,8 @@ func (e *Events) GetEventsForBlockIDs(
 			status.Errorf(codes.InvalidArgument, "invalid event type: %v", err)
 	}
 
-	var newestBlockHeader *flow.Header
+	var newestView uint64
+	var newestBlockID flow.Identifier
 
 	// find the block headers for all the block IDs
 	blockHeaders := make([]provider.BlockMetadata, 0, len(blockIDs))
@@ -237,8 +236,9 @@ func (e *Events) GetEventsForBlockIDs(
 				rpc.ConvertStorageError(fmt.Errorf("failed to get block header for %s: %w", blockID, err))
 		}
 
-		if newestBlockHeader == nil || header.View > newestBlockHeader.View {
-			newestBlockHeader = header
+		if header.View >= newestView {
+			newestView = header.View
+			newestBlockID = blockID
 		}
 
 		blockHeaders = append(blockHeaders, provider.BlockMetadata{
@@ -252,12 +252,12 @@ func (e *Events) GetEventsForBlockIDs(
 	// must be from the execution fork terminating at this result. this guarantees the response
 	// contains a consistent view of the state.
 	execResultInfo, err := e.execResultProvider.ExecutionResultInfo(
-		newestBlockHeader.ID(),
+		newestBlockID,
 		criteria,
 	)
 	if err != nil {
 		return nil, accessmodel.ExecutorMetadata{},
-			fmt.Errorf("failed to get execution result for block %v: %w", newestBlockHeader.ID(), err)
+			fmt.Errorf("failed to get execution result for block %v: %w", newestBlockID, err)
 	}
 
 	resp, metadata, err := e.provider.Events(

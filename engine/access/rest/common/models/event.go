@@ -34,7 +34,11 @@ func NewBlockEvents(
 	var meta *Metadata
 	if shouldIncludeMetadata {
 		m := NewMetadata(metadata)
-		meta = &m
+
+		// we don't want to include empty field in response body
+		if !m.IsEmpty() {
+			meta = m
+		}
 	}
 
 	return &BlockEvents{

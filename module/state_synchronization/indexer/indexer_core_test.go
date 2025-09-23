@@ -16,13 +16,14 @@ import (
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/convert"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	"github.com/onflow/flow-go/module/mempool/stdmap"
 	"github.com/onflow/flow-go/module/metrics"
 	synctest "github.com/onflow/flow-go/module/state_synchronization/requester/unittest"
 	"github.com/onflow/flow-go/storage"
 	storagemock "github.com/onflow/flow-go/storage/mock"
-	"github.com/onflow/flow-go/storage/operation/badgerimpl"
+	"github.com/onflow/flow-go/storage/operation/pebbleimpl"
 	pebbleStorage "github.com/onflow/flow-go/storage/pebble"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -159,7 +160,7 @@ func (i *indexCoreTest) setGetRegisters(f func(t *testing.T, ID flow.RegisterID,
 
 func (i *indexCoreTest) useDefaultStorageMocks() *indexCoreTest {
 
-	i.collections.On("StoreLightAndIndexByTransaction", mock.AnythingOfType("*flow.LightCollection")).Return(nil).Maybe()
+	i.collections.On("StoreAndIndexByTransaction", mock.Anything, mock.AnythingOfType("*flow.Collection")).Return(&flow.LightCollection{}, nil).Maybe()
 	i.transactions.On("Store", mock.AnythingOfType("*flow.TransactionBody")).Return(nil).Maybe()
 
 	return i
@@ -180,7 +181,9 @@ func (i *indexCoreTest) useDefaultTransactionResults() *indexCoreTest {
 }
 
 func (i *indexCoreTest) initIndexer() *indexCoreTest {
-	db, dbDir := unittest.TempBadgerDB(i.t)
+	lockManager := storage.NewTestingLockManager()
+	pdb, dbDir := unittest.TempPebbleDB(i.t)
+	db := pebbleimpl.ToDB(pdb)
 	i.t.Cleanup(func() {
 		require.NoError(i.t, db.Close())
 		require.NoError(i.t, os.RemoveAll(dbDir))
@@ -214,7 +217,7 @@ func (i *indexCoreTest) initIndexer() *indexCoreTest {
 	indexer, err := New(
 		log,
 		metrics.NewNoopCollector(),
-		badgerimpl.ToDB(db),
+		db,
 		i.registers,
 		i.headers,
 		i.events,
@@ -224,6 +227,7 @@ func (i *indexCoreTest) initIndexer() *indexCoreTest {
 		flow.Testnet.Chain(),
 		derivedChainData,
 		collectionExecutedMetric,
+		lockManager,
 	)
 	require.NoError(i.t, err)
 	i.indexer = indexer
@@ -618,12 +622,13 @@ func trieRegistersPayloadComparer(t *testing.T, triePayloads []*ledger.Payload, 
 }
 
 func TestIndexerIntegration_StoreAndGet(t *testing.T) {
+	lockManager := storage.NewTestingLockManager()
 	regOwnerAddress := unittest.RandomAddressFixture()
 	regOwner := string(regOwnerAddress.Bytes())
 	regKey := "code"
 	registerID := flow.NewRegisterID(regOwnerAddress, regKey)
 
-	db, dbDir := unittest.TempBadgerDB(t)
+	pdb, dbDir := unittest.TempPebbleDB(t)
 	t.Cleanup(func() {
 		require.NoError(t, os.RemoveAll(dbDir))
 	})
@@ -639,8 +644,8 @@ func TestIndexerIntegration_StoreAndGet(t *testing.T) {
 		pebbleStorage.RunWithRegistersStorageAtInitialHeights(t, 0, 0, func(registers *pebbleStorage.Registers) {
 			index, err := New(
 				logger,
-				metrics,
-				badgerimpl.ToDB(db),
+				module.ExecutionStateIndexerMetrics(metrics),
+				pebbleimpl.ToDB(pdb),
 				registers,
 				nil,
 				nil,
@@ -650,6 +655,7 @@ func TestIndexerIntegration_StoreAndGet(t *testing.T) {
 				flow.Testnet.Chain(),
 				derivedChainData,
 				nil,
+				lockManager,
 			)
 			require.NoError(t, err)
 
@@ -673,8 +679,8 @@ func TestIndexerIntegration_StoreAndGet(t *testing.T) {
 		pebbleStorage.RunWithRegistersStorageAtInitialHeights(t, 0, 0, func(registers *pebbleStorage.Registers) {
 			index, err := New(
 				logger,
-				metrics,
-				badgerimpl.ToDB(db),
+				module.ExecutionStateIndexerMetrics(metrics),
+				pebbleimpl.ToDB(pdb),
 				registers,
 				nil,
 				nil,
@@ -684,6 +690,7 @@ func TestIndexerIntegration_StoreAndGet(t *testing.T) {
 				flow.Testnet.Chain(),
 				derivedChainData,
 				nil,
+				lockManager,
 			)
 			require.NoError(t, err)
 
@@ -693,15 +700,15 @@ func TestIndexerIntegration_StoreAndGet(t *testing.T) {
 		})
 	})
 
-	// this test makes sure that even if indexed values for a specific register are requested with higher height
+	// this test makes sure that even if indexed values for a single register are requested with higher height
 	// the correct highest height indexed value is returned.
 	// e.g. we index A{h(1) -> X}, A{h(2) -> Y}, when we request h(4) we get value Y
 	t.Run("Single Index Value At Later Heights", func(t *testing.T) {
 		pebbleStorage.RunWithRegistersStorageAtInitialHeights(t, 0, 0, func(registers *pebbleStorage.Registers) {
 			index, err := New(
 				logger,
-				metrics,
-				badgerimpl.ToDB(db),
+				module.ExecutionStateIndexerMetrics(metrics),
+				pebbleimpl.ToDB(pdb),
 				registers,
 				nil,
 				nil,
@@ -711,6 +718,7 @@ func TestIndexerIntegration_StoreAndGet(t *testing.T) {
 				flow.Testnet.Chain(),
 				derivedChainData,
 				nil,
+				lockManager,
 			)
 			require.NoError(t, err)
 
@@ -744,8 +752,8 @@ func TestIndexerIntegration_StoreAndGet(t *testing.T) {
 		pebbleStorage.RunWithRegistersStorageAtInitialHeights(t, 0, 0, func(registers *pebbleStorage.Registers) {
 			index, err := New(
 				logger,
-				metrics,
-				badgerimpl.ToDB(db),
+				module.ExecutionStateIndexerMetrics(metrics),
+				pebbleimpl.ToDB(pdb),
 				registers,
 				nil,
 				nil,
@@ -755,6 +763,7 @@ func TestIndexerIntegration_StoreAndGet(t *testing.T) {
 				flow.Testnet.Chain(),
 				derivedChainData,
 				nil,
+				lockManager,
 			)
 			require.NoError(t, err)
 

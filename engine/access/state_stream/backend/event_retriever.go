@@ -118,12 +118,12 @@ func (b *EventsProvider) getEventsFromStorage(
 		return &EventsResponse{}, fmt.Errorf("error fetching execution result: %w", err)
 	}
 
-	snapshot, err := b.execStateCache.Snapshot(result.ExecutionResult.ID())
+	snapshot, err := b.execStateCache.Snapshot(result.ExecutionResultID)
 	if err != nil {
 		return &EventsResponse{},
 			fmt.Errorf(
 				"failed to get snapshot for execution result %s: %w",
-				result.ExecutionResult.ID(),
+				result.ExecutionResultID,
 				err,
 			)
 	}
@@ -134,7 +134,7 @@ func (b *EventsProvider) getEventsFromStorage(
 	}
 
 	metadata := access.ExecutorMetadata{
-		ExecutionResultID: result.ExecutionResult.ID(),
+		ExecutionResultID: result.ExecutionResultID,
 		ExecutorIDs:       result.ExecutionNodes.NodeIDs(),
 	}
 
