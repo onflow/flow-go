@@ -172,7 +172,7 @@ func (il GenericIdentityList[T]) PublicStakingKeys() []crypto.PublicKey {
 
 // Hash generates a cryptographic commitment to the full IdentityList, including mutable fields.
 // CAUTION:
-//   - The outputs of `IdentityList.ID()` are order-sensitive.
+//   - The outputs of `IdentityList.Hash()` are order-sensitive.
 //     Therefore, the `IdentityList` must be in canonical order, unless explicitly specified
 //     otherwise by the protocol.
 func (il GenericIdentityList[T]) Hash() Identifier {

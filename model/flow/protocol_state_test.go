@@ -478,7 +478,7 @@ func TestNewEpochStateEntry(t *testing.T) {
 		require.Contains(t, err.Error(), expectedMsg)
 	})
 
-	// 4. Invalid: PreviousEpoch.CommitID doesn't match PreviousEpochCommit.ID()
+	// 4. Invalid: PreviousEpoch.CommitID doesn't match PreviousEpochCommit.Hash()
 	t.Run("invalid - previous commit ID mismatch", func(t *testing.T) {
 		stateEntryFixture := unittest.EpochStateFixture(unittest.WithNextEpochProtocolState(), func(entry *flow.RichEpochStateEntry) {
 			entry.PreviousEpoch.CommitID = flow.ZeroID // incorrect
@@ -544,7 +544,7 @@ func TestNewEpochStateEntry(t *testing.T) {
 		require.Contains(t, err.Error(), "no previous epoch but gotten non-nil EpochCommit event")
 	})
 
-	// 7. Invalid: CurrentEpoch.SetupID doesn't match CurrentEpochSetup.ID()
+	// 7. Invalid: CurrentEpoch.SetupID doesn't match CurrentEpochSetup.Hash()
 	t.Run("invalid - current setup ID mismatch", func(t *testing.T) {
 		stateEntryFixture := unittest.EpochStateFixture(unittest.WithNextEpochProtocolState(), func(entry *flow.RichEpochStateEntry) {
 			entry.CurrentEpoch.SetupID = unittest.IdentifierFixture() // incorrect
@@ -569,7 +569,7 @@ func TestNewEpochStateEntry(t *testing.T) {
 		require.Contains(t, err.Error(), expectedMsg)
 	})
 
-	// 8. Invalid: CurrentEpoch.CommitID doesn't match CurrentEpochCommit.ID()
+	// 8. Invalid: CurrentEpoch.CommitID doesn't match CurrentEpochCommit.Hash()
 	t.Run("invalid - current commit ID mismatch", func(t *testing.T) {
 		stateEntryFixture := unittest.EpochStateFixture(unittest.WithNextEpochProtocolState(), func(entry *flow.RichEpochStateEntry) {
 			entry.CurrentEpoch.CommitID = unittest.IdentifierFixture() // incorrect

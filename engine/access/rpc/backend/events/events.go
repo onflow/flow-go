@@ -134,7 +134,7 @@ func (e *Events) GetEventsForHeightRange(
 
 	for i := startHeight; i <= endHeight; i++ {
 		// this looks inefficient, but is actually what's done under the covers by `headers.ByHeight`
-		// and avoids calculating header.ID() for each block.
+		// and avoids calculating header.Hash() for each block.
 		blockID, err := e.headers.BlockIDByHeight(i)
 		if err != nil {
 			return nil, rpc.ConvertStorageError(common.ResolveHeightError(e.state.Params(), i, err))

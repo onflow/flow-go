@@ -138,9 +138,9 @@ func TestOnEntityRequestPartial(t *testing.T) {
 	coll5 := unittest.CollectionFixture(5)
 
 	entities[coll1.Hash()] = coll1
-	// entities[coll2.ID()] = coll2
+	// entities[coll2.Hash()] = coll2
 	entities[coll3.Hash()] = coll3
-	// entities[coll4.ID()] = coll4
+	// entities[coll4.Hash()] = coll4
 	entities[coll5.Hash()] = coll5
 
 	retrieve := func(entityID flow.Identifier) (flow.Hashable, error) {

@@ -26,7 +26,7 @@ var DefaultProtocolStateIndexCacheSize uint = 1000
 type EpochProtocolStateEntries struct {
 	db storage.DB
 
-	// cache is essentially an in-memory map from `MinEpochStateEntry.ID()` -> `RichEpochStateEntry`
+	// cache is essentially an in-memory map from `MinEpochStateEntry.Hash()` -> `RichEpochStateEntry`
 	// We do _not_ populate this cache which holds the RichEpochStateEntry's on store. This is because
 	//   (i) we don't have the RichEpochStateEntry on store readily available and
 	//  (ii) new RichEpochStateEntry are really rare throughout an epoch, so the total cost of populating
@@ -44,7 +44,7 @@ type EpochProtocolStateEntries struct {
 	// roughly 100 is a reasonable balance between performance and memory consumption.
 	cache *Cache[flow.Identifier, *flow.RichEpochStateEntry]
 
-	// byBlockIdCache is essentially an in-memory map from `Block.Hash()` -> `MinEpochStateEntry.ID()`. The full
+	// byBlockIdCache is essentially an in-memory map from `Block.Hash()` -> `MinEpochStateEntry.Hash()`. The full
 	// flow.RichEpochStateEntry can be retrieved from the `cache` above.
 	// We populate the `byBlockIdCache` on store, because a new entry is added for every block and we probably also
 	// query the Protocol state for every block. So argument (ii) from above does not apply here. Furthermore,

@@ -44,7 +44,7 @@ type GetDataByHeightFunc func(ctx context.Context, height uint64) (interface{}, 
 // Subscription represents a streaming request, and handles the communication between the grpc handler
 // and the backend implementation.
 type Subscription interface {
-	// Hash returns the unique identifier for this subscription used for logging
+	// ID returns the unique identifier for this subscription used for logging
 	ID() string
 
 	// Channel returns the channel from which subscription data can be read
@@ -56,7 +56,7 @@ type Subscription interface {
 
 // Streamable represents a subscription that can be streamed.
 type Streamable interface {
-	// Hash returns the subscription ID
+	// ID returns the subscription ID
 	// Note: this is not a cryptographic hash
 	ID() string
 	// Close is called when a subscription ends gracefully, and closes the subscription channel
@@ -97,7 +97,7 @@ func NewSubscription(bufferSize int) *SubscriptionImpl {
 	}
 }
 
-// Hash returns the subscription ID
+// ID returns the subscription ID
 // Note: this is not a cryptographic hash
 func (sub *SubscriptionImpl) ID() string {
 	return sub.id

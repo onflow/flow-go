@@ -277,10 +277,10 @@ type UntrustedEpochStateEntry EpochStateEntry
 func NewEpochStateEntry(untrusted UntrustedEpochStateEntry) (*EpochStateEntry, error) {
 	// If previous epoch is specified: ensure respective epoch service events are not nil and consistent with commitments in `MinEpochStateEntry.PreviousEpoch`
 	if untrusted.PreviousEpoch != nil {
-		if untrusted.PreviousEpoch.SetupID != untrusted.PreviousEpochSetup.Hash() { // calling ID() will panic is EpochSetup event is nil
+		if untrusted.PreviousEpoch.SetupID != untrusted.PreviousEpochSetup.Hash() { // calling Hash() will panic is EpochSetup event is nil
 			return nil, fmt.Errorf("supplied previous epoch's setup event (%x) does not match commitment (%x) in MinEpochStateEntry", untrusted.PreviousEpochSetup.Hash(), untrusted.PreviousEpoch.SetupID)
 		}
-		if untrusted.PreviousEpoch.CommitID != untrusted.PreviousEpochCommit.Hash() { // calling ID() will panic is EpochCommit event is nil
+		if untrusted.PreviousEpoch.CommitID != untrusted.PreviousEpochCommit.Hash() { // calling Hash() will panic is EpochCommit event is nil
 			return nil, fmt.Errorf("supplied previous epoch's commit event (%x) does not match commitment (%x) in MinEpochStateEntry", untrusted.PreviousEpochCommit.Hash(), untrusted.PreviousEpoch.CommitID)
 		}
 	} else {
@@ -293,10 +293,10 @@ func NewEpochStateEntry(untrusted UntrustedEpochStateEntry) (*EpochStateEntry, e
 	}
 
 	// For current epoch: ensure respective epoch service events are not nil and consistent with commitments in `MinEpochStateEntry.CurrentEpoch`
-	if untrusted.CurrentEpoch.SetupID != untrusted.CurrentEpochSetup.Hash() { // calling ID() will panic is EpochSetup event is nil
+	if untrusted.CurrentEpoch.SetupID != untrusted.CurrentEpochSetup.Hash() { // calling Hash() will panic is EpochSetup event is nil
 		return nil, fmt.Errorf("supplied current epoch's setup event (%x) does not match commitment (%x) in MinEpochStateEntry", untrusted.CurrentEpochSetup.Hash(), untrusted.CurrentEpoch.SetupID)
 	}
-	if untrusted.CurrentEpoch.CommitID != untrusted.CurrentEpochCommit.Hash() { // calling ID() will panic is EpochCommit event is nil
+	if untrusted.CurrentEpoch.CommitID != untrusted.CurrentEpochCommit.Hash() { // calling Hash() will panic is EpochCommit event is nil
 		return nil, fmt.Errorf("supplied current epoch's commit event (%x) does not match commitment (%x) in MinEpochStateEntry", untrusted.CurrentEpochCommit.Hash(), untrusted.CurrentEpoch.CommitID)
 	}
 

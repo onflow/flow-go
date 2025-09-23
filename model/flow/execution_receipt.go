@@ -108,7 +108,7 @@ func NewUnsignedExecutionReceipt(untrusted UntrustedUnsignedExecutionReceipt) (*
 
 // Hash returns a hash over the data of the execution receipt.
 // This is what is signed by the executor and verified by recipients.
-// Necessary to override ExecutionResult.ID().
+// Necessary to override ExecutionResult.Hash().
 func (erb UnsignedExecutionReceipt) Hash() Identifier {
 	return erb.Stub().Hash()
 }

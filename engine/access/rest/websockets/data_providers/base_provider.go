@@ -47,7 +47,7 @@ func newBaseDataProvider(
 	}
 }
 
-// Hash returns the subscription ID associated with current data provider
+// ID returns the subscription ID associated with current data provider
 func (b *baseDataProvider) ID() string {
 	return b.subscriptionID
 }

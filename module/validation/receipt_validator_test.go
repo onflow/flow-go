@@ -397,10 +397,10 @@ func (s *ReceiptValidationSuite) TestReceiptNoPreviousResult() {
 //	  v
 //	PreviousResult  ---> PreviousResult.BlockID
 //
-// with the validity requirement that PreviousResult.BlockID == ParentBlock.ID().
+// with the validity requirement that PreviousResult.BlockID == ParentBlock.Hash().
 //
 // In our test case, we assume that `ParentResult` and `Block` are known, but
-// ParentResult.BlockID ≠ ParentBlock.ID(). The compliance layer guarantees that new elements are added
+// ParentResult.BlockID ≠ ParentBlock.Hash(). The compliance layer guarantees that new elements are added
 // to the blockchain graph if and only if they are protocol compliant. In other words, we are testing
 // a byzantine receipt that references known and valid entities, but they do not form a valid subgraph.
 // For example, it could be a result for a block in a different fork or an ancestor further in the past.

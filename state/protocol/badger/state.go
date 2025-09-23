@@ -542,7 +542,7 @@ func bootstrapStatePointers(lctx lockctx.Proof, rw storage.ReaderBatchWriter, ro
 		return fmt.Errorf("could not store instance params: %w", err)
 	}
 
-	// find the finalized seal that seals the lastSealed block, meaning seal.BlockID == lastSealed.ID()
+	// find the finalized seal that seals the lastSealed block, meaning seal.BlockID == lastSealed.Hash()
 	seal, err := segment.FinalizedSeal()
 	if err != nil {
 		return fmt.Errorf("could not get finalized seal from sealing segment: %w", err)

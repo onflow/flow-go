@@ -131,7 +131,7 @@ func NewFullConsensusState(
 // full payload. Payload validity must be proven by a valid quorum certificate
 // (field `CertifiedBlock.CertifyingQC`). The certifying QC must match candidate block:
 //
-//	candidate.View == certifyingQC.View && candidate.ID() == certifyingQC.BlockID
+//	candidate.View == certifyingQC.View && candidate.Hash() == certifyingQC.BlockID
 //
 // CAUTION:
 //   - This function expects that `certified.CertifyingQC` has been validated. (otherwise, the state will be corrupted)

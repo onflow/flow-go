@@ -13,14 +13,14 @@ import (
 )
 
 // RequireEntityNonMalleable is RequireNonMalleable with the constraint that models implement [flow.Hashable]
-// and the content hash function is the ID() function.
+// and the content hash function is the Hash() function.
 // Non-malleability is a required property for any entity that implements the [flow.Hashable] interface.
 // This is especially important for entities that contain signatures and are transmitted over the network.
 // ID is used by the protocol to insure entity integrity when transmitted over the network. ID must therefore be a binding cryptographic commitment to an entity.
 // This function consumes the entity and modifies its fields randomly to ensure that the ID changes after each modification.
 // Generally speaking each type that implements [flow.Hashable] method should be tested with this function.
 func RequireEntityNonMalleable(t *testing.T, entity flow.Hashable, ops ...MalleabilityCheckerOpt) {
-	err := NewMalleabilityChecker(ops...).CheckEntity(entity)
+	err := NewMalleabilityChecker(ops...).CheckHashable(entity)
 	require.NoError(t, err)
 }
 
@@ -151,10 +151,10 @@ func NewMalleabilityChecker(ops ...MalleabilityCheckerOpt) *MalleabilityChecker 
 	return checker
 }
 
-// CheckEntity is Check with the constraint that models implement [flow.Hashable] and the content hash function is the ID() function.
+// CheckHashable is Check with the constraint that models implement [flow.Hashable] and the content hash function is the Hash() function.
 // It returns an error if the entity is malleable, otherwise it returns nil.
 // No errors are expected during normal operations.
-func (mc *MalleabilityChecker) CheckEntity(entity flow.Hashable) error {
+func (mc *MalleabilityChecker) CheckHashable(entity flow.Hashable) error {
 	if entity == nil {
 		return fmt.Errorf("entity is nil")
 	}
