@@ -20,6 +20,9 @@ var (
 	// more than maxViewDelta views ahead of the last sealed and persisted result. In the
 	// context of the ResultsForest, the view of a result is the view of the executed block.
 	ErrMaxViewDeltaExceeded = fmt.Errorf("result's block is outside view range currenlty covered by ResultForest")
+
+	// ErrPrunedView is returned when attempting to add a result whose view is below the lowest view.
+	ErrPrunedView = fmt.Errorf("result's block is below the lowest view")
 )
 
 // <component_spec>
@@ -301,6 +304,10 @@ func NewResultsForest(
 	if err != nil {
 		return nil, fmt.Errorf("failed to create container for latest persisted sealed result (%s): %w", sealedResultID, err)
 	}
+	err = container.SetBlockStatus(BlockStatusSealed)
+	if err != nil {
+		return nil, fmt.Errorf("failed to set latest persisted sealed result block status to sealed (%s): %w", sealedResultID, err)
+	}
 
 	forest := forest.NewLevelledForest(sealedHeader.View)
 	err = forest.VerifyVertex(container)
@@ -309,10 +316,6 @@ func NewResultsForest(
 		return nil, fmt.Errorf("failed to verify container: %w", err)
 	}
 	forest.AddVertex(container)
-
-	if err := container.SetBlockStatus(BlockStatusSealed); err != nil {
-		return nil, fmt.Errorf("failed to set latest persisted sealed result block status to sealed (%s): %w", sealedResultID, err)
-	}
 
 	return &ResultsForest{
 		log:                         log.With().Str("component", "results_forest").Logger(),
@@ -403,6 +406,7 @@ func (rf *ResultsForest) AddSealedResult(result *flow.ExecutionResult) error {
 // the forest has available capacity.
 //
 // Expected error returns during normal operations:
+//   - [ErrPrunedView]: if the result's block view is below the lowest view
 //   - [ErrMaxViewDeltaExceeded]: if the result's block view is more than maxViewDelta views ahead of the last sealed view
 func (rf *ResultsForest) AddReceipt(receipt *flow.ExecutionReceipt, blockStatus BlockStatus) (bool, error) {
 	if !blockStatus.IsValid() {
@@ -475,6 +479,7 @@ func (rf *ResultsForest) updateLastSealed(container *ExecutionResultContainer) {
 // NOT CONCURRENCY SAFE! Caller must hold a lock.
 //
 // Expected error returns during normal operations:
+//   - [ErrPrunedView]: if the result's block view is below the lowest view
 //   - [ErrMaxViewDeltaExceeded]: if the result's block view is more than maxViewDelta views ahead of the last sealed view
 func (rf *ResultsForest) getOrCreateContainer(result *flow.ExecutionResult, blockStatus BlockStatus) (*ExecutionResultContainer, error) {
 	// First, try to get existing container - this will acquire read-lock only
@@ -525,7 +530,7 @@ func (rf *ResultsForest) getOrCreateContainer(result *flow.ExecutionResult, bloc
 
 	// check invariant: the result's block view must be greater than 𝓹.View
 	if executedBlock.View < rf.forest.LowestLevel {
-		return nil, nil
+		return nil, ErrPrunedView
 	}
 
 	// check invariant: the result's block view must be less than or equal to the view horizon 𝓱

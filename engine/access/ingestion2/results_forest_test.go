@@ -269,7 +269,7 @@ func (s *ResultsForestSuite) TestAddSealedResult() {
 		_ = s.createPipeline(lowResult, true)
 
 		err := forest.AddSealedResult(lowResult)
-		s.Require().NoError(err)
+		s.ErrorIs(err, ingestion2.ErrPrunedView)
 
 		// only the latest persisted sealed result should be in the forest
 		s.Equal(uint(1), forest.Size())
@@ -649,7 +649,7 @@ func (s *ResultsForestSuite) TestAddReceipt() {
 		_ = s.createPipeline(result, false)
 
 		added, err := forest.AddReceipt(receipt, ingestion2.BlockStatusCertified)
-		s.Require().NoError(err)
+		s.ErrorIs(err, ingestion2.ErrPrunedView)
 		s.False(added)
 		s.Equal(uint(1), forest.Size())
 	})
