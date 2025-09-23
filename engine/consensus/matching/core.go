@@ -97,8 +97,8 @@ func (c *Core) ProcessReceipt(receipt *flow.ExecutionReceipt) error {
 	// mempool, and process it later when its parent result has been received and processed.
 	// Therefore, if a receipt is processed, we will check if it is the previous results of
 	// some pending receipts and process them one after another.
-	receiptID := receipt.ID()
-	resultID := receipt.ExecutionResult.ID()
+	receiptID := receipt.Hash()
+	resultID := receipt.ExecutionResult.Hash()
 
 	processed, err := c.processReceipt(receipt)
 	if err != nil {
@@ -113,7 +113,7 @@ func (c *Core) ProcessReceipt(receipt *flow.ExecutionReceipt) error {
 			Str("receipt", string(marshalled)).
 			Msg("internal error processing execution receipt")
 
-		return fmt.Errorf("internal error processing execution receipt %x: %w", receipt.ID(), err)
+		return fmt.Errorf("internal error processing execution receipt %x: %w", receipt.Hash(), err)
 	}
 
 	if !processed {
@@ -164,7 +164,7 @@ func (c *Core) processReceipt(receipt *flow.ExecutionReceipt) (bool, error) {
 
 	receiptSpan, _ := c.tracer.StartBlockSpan(context.Background(), receipt.ExecutionResult.BlockID, trace.CONMatchProcessReceipt)
 	receiptSpan.SetAttributes(
-		attribute.String("result_id", receipt.ExecutionResult.ID().String()),
+		attribute.String("result_id", receipt.ExecutionResult.Hash().String()),
 		attribute.String("executor", receipt.ExecutorID.String()),
 	)
 	defer receiptSpan.End()
@@ -235,7 +235,7 @@ func (c *Core) processReceipt(receipt *flow.ExecutionReceipt) (bool, error) {
 		}
 		if module.IsUnknownBlockError(err) { // This should never happen
 			// Above, we successfully retrieved the `executedBlock`. Hence, `UnknownBlockError` here means our state is corrupted!
-			return false, irrecoverable.NewExceptionf("internal state corruption detected when validating receipt %v for block %v: %w", receipt.ID(), receipt.BlockID, err)
+			return false, irrecoverable.NewExceptionf("internal state corruption detected when validating receipt %v for block %v: %w", receipt.Hash(), receipt.BlockID, err)
 		}
 		return false, fmt.Errorf("failed to validate execution receipt: %w", err)
 	}
@@ -258,7 +258,7 @@ func (c *Core) processReceipt(receipt *flow.ExecutionReceipt) (bool, error) {
 func (c *Core) storeReceipt(receipt *flow.ExecutionReceipt, head *flow.Header) (bool, error) {
 	added, err := c.receipts.AddReceipt(receipt, head)
 	if err != nil {
-		return false, fmt.Errorf("adding receipt (%x) to mempool failed: %w", receipt.ID(), err)
+		return false, fmt.Errorf("adding receipt (%x) to mempool failed: %w", receipt.Hash(), err)
 	}
 	if !added {
 		return false, nil
@@ -324,7 +324,7 @@ HEIGHT_LOOP:
 		if err != nil {
 			return 0, 0, fmt.Errorf("could not get header (height=%d): %w", height, err)
 		}
-		blockID := header.ID()
+		blockID := header.Hash()
 
 		receipts, err := c.receiptsDB.ByBlockID(blockID)
 		if err != nil && !errors.Is(err, storage.ErrNotFound) {
@@ -373,13 +373,13 @@ func (c *Core) OnBlockFinalization() error {
 	err = c.receipts.PruneUpToHeight(lastSealed.Height)
 	if err != nil {
 		return fmt.Errorf("failed to prune execution tree up to latest sealed and finalized block %v, height: %v: %w",
-			lastSealed.ID(), lastSealed.Height, err)
+			lastSealed.Hash(), lastSealed.Height, err)
 	}
 
 	err = c.pendingReceipts.PruneUpToHeight(lastSealed.Height)
 	if err != nil {
 		return fmt.Errorf("failed to prune pending receipts mempool up to latest sealed and finalized block %v, height: %v: %w",
-			lastSealed.ID(), lastSealed.Height, err)
+			lastSealed.Hash(), lastSealed.Height, err)
 	}
 
 	log := c.log.With().

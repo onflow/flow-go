@@ -68,7 +68,7 @@ func TestRegisterStoreGetRegisterFail(t *testing.T) {
 
 		// too high
 		block11 := headerByHeight[rootHeight+1]
-		_, err = rs.GetRegister(rootHeight+1, block11.ID(), unknownReg.Key)
+		_, err = rs.GetRegister(rootHeight+1, block11.Hash(), unknownReg.Key)
 		require.Error(t, err)
 		require.ErrorIs(t, err, storehouse.ErrNotExecuted)
 
@@ -80,7 +80,7 @@ func TestRegisterStoreGetRegisterFail(t *testing.T) {
 
 		// known block, unknown register
 		rootBlock := headerByHeight[rootHeight]
-		val, err := rs.GetRegister(rootHeight, rootBlock.ID(), unknownReg.Key)
+		val, err := rs.GetRegister(rootHeight, rootBlock.Hash(), unknownReg.Key)
 		require.NoError(t, err)
 		require.Nil(t, val)
 	})
@@ -132,7 +132,7 @@ func TestRegisterStoreSaveRegistersShouldOK(t *testing.T) {
 		n *notifier,
 	) {
 		// not executed
-		executed, err := rs.IsBlockExecuted(rootHeight+1, headerByHeight[rootHeight+1].ID())
+		executed, err := rs.IsBlockExecuted(rootHeight+1, headerByHeight[rootHeight+1].Hash())
 		require.NoError(t, err)
 		require.False(t, executed)
 
@@ -142,12 +142,12 @@ func TestRegisterStoreSaveRegistersShouldOK(t *testing.T) {
 		require.NoError(t, err)
 
 		// should get value
-		val, err := rs.GetRegister(rootHeight+1, headerByHeight[rootHeight+1].ID(), reg.Key)
+		val, err := rs.GetRegister(rootHeight+1, headerByHeight[rootHeight+1].Hash(), reg.Key)
 		require.NoError(t, err)
 		require.Equal(t, reg.Value, val)
 
 		// should become executed
-		executed, err = rs.IsBlockExecuted(rootHeight+1, headerByHeight[rootHeight+1].ID())
+		executed, err = rs.IsBlockExecuted(rootHeight+1, headerByHeight[rootHeight+1].Hash())
 		require.NoError(t, err)
 		require.True(t, executed)
 
@@ -156,12 +156,12 @@ func TestRegisterStoreSaveRegistersShouldOK(t *testing.T) {
 		require.NoError(t, err)
 
 		// should get same value
-		val, err = rs.GetRegister(rootHeight+1, headerByHeight[rootHeight+2].ID(), reg.Key)
+		val, err = rs.GetRegister(rootHeight+1, headerByHeight[rootHeight+2].Hash(), reg.Key)
 		require.NoError(t, err)
 		require.Equal(t, reg.Value, val)
 
 		// should become executed
-		executed, err = rs.IsBlockExecuted(rootHeight+1, headerByHeight[rootHeight+2].ID())
+		executed, err = rs.IsBlockExecuted(rootHeight+1, headerByHeight[rootHeight+2].Hash())
 		require.NoError(t, err)
 		require.True(t, executed)
 	})
@@ -199,19 +199,19 @@ func TestRegisterStoreIsBlockExecuted(t *testing.T) {
 
 		require.Equal(t, rootHeight+1, rs.LastFinalizedAndExecutedHeight())
 
-		executed, err := rs.IsBlockExecuted(rootHeight, headerByHeight[rootHeight].ID())
+		executed, err := rs.IsBlockExecuted(rootHeight, headerByHeight[rootHeight].Hash())
 		require.NoError(t, err)
 		require.True(t, executed)
 
-		executed, err = rs.IsBlockExecuted(rootHeight+1, headerByHeight[rootHeight+1].ID())
+		executed, err = rs.IsBlockExecuted(rootHeight+1, headerByHeight[rootHeight+1].Hash())
 		require.NoError(t, err)
 		require.True(t, executed)
 
-		executed, err = rs.IsBlockExecuted(rootHeight+2, headerByHeight[rootHeight+2].ID())
+		executed, err = rs.IsBlockExecuted(rootHeight+2, headerByHeight[rootHeight+2].Hash())
 		require.NoError(t, err)
 		require.True(t, executed)
 
-		executed, err = rs.IsBlockExecuted(rootHeight+3, headerByHeight[rootHeight+3].ID())
+		executed, err = rs.IsBlockExecuted(rootHeight+3, headerByHeight[rootHeight+3].Hash())
 		require.NoError(t, err)
 		require.False(t, executed)
 	})
@@ -251,22 +251,22 @@ func TestRegisterStoreReadingFromDisk(t *testing.T) {
 
 		require.Equal(t, rootHeight+2, n.height)
 
-		val, err := rs.GetRegister(rootHeight+1, headerByHeight[rootHeight+1].ID(), makeReg("Y", "2").Key)
+		val, err := rs.GetRegister(rootHeight+1, headerByHeight[rootHeight+1].Hash(), makeReg("Y", "2").Key)
 		require.NoError(t, err)
 		// value at block 11 is now stored in OnDiskRegisterStore, which is 2
 		require.Equal(t, makeReg("Y", "2").Value, val)
 
-		val, err = rs.GetRegister(rootHeight+2, headerByHeight[rootHeight+2].ID(), makeReg("X", "1").Key)
+		val, err = rs.GetRegister(rootHeight+2, headerByHeight[rootHeight+2].Hash(), makeReg("X", "1").Key)
 		require.NoError(t, err)
 		// value at block 12 is now stored in OnDiskRegisterStore, which is 1
 		require.Equal(t, makeReg("X", "1").Value, val)
 
-		val, err = rs.GetRegister(rootHeight+3, headerByHeight[rootHeight+3].ID(), makeReg("Y", "3").Key)
+		val, err = rs.GetRegister(rootHeight+3, headerByHeight[rootHeight+3].Hash(), makeReg("Y", "3").Key)
 		require.NoError(t, err)
 		// value at block 13 was stored in OnDiskRegisterStore at block 12, which is 3
 		require.Equal(t, makeReg("Y", "3").Value, val)
 
-		_, err = rs.GetRegister(rootHeight+4, headerByHeight[rootHeight+4].ID(), makeReg("Y", "3").Key)
+		_, err = rs.GetRegister(rootHeight+4, headerByHeight[rootHeight+4].Hash(), makeReg("Y", "3").Key)
 		require.Error(t, err)
 	})
 }
@@ -300,23 +300,23 @@ func TestRegisterStoreReadingFromInMemStore(t *testing.T) {
 		err = rs.SaveRegisters(block11Fork, flow.RegisterEntries{makeReg("X", "4")})
 		require.NoError(t, err)
 
-		val, err := rs.GetRegister(rootHeight+1, headerByHeight[rootHeight+1].ID(), makeReg("X", "1").Key)
+		val, err := rs.GetRegister(rootHeight+1, headerByHeight[rootHeight+1].Hash(), makeReg("X", "1").Key)
 		require.NoError(t, err)
 		require.Equal(t, makeReg("X", "1").Value, val)
 
-		val, err = rs.GetRegister(rootHeight+1, headerByHeight[rootHeight+1].ID(), makeReg("Y", "2").Key)
+		val, err = rs.GetRegister(rootHeight+1, headerByHeight[rootHeight+1].Hash(), makeReg("Y", "2").Key)
 		require.NoError(t, err)
 		require.Equal(t, makeReg("Y", "2").Value, val)
 
-		val, err = rs.GetRegister(rootHeight+2, headerByHeight[rootHeight+2].ID(), makeReg("X", "1").Key)
+		val, err = rs.GetRegister(rootHeight+2, headerByHeight[rootHeight+2].Hash(), makeReg("X", "1").Key)
 		require.NoError(t, err)
 		require.Equal(t, makeReg("X", "1").Value, val)
 
-		val, err = rs.GetRegister(rootHeight+2, headerByHeight[rootHeight+2].ID(), makeReg("Y", "3").Key)
+		val, err = rs.GetRegister(rootHeight+2, headerByHeight[rootHeight+2].Hash(), makeReg("Y", "3").Key)
 		require.NoError(t, err)
 		require.Equal(t, makeReg("Y", "3").Value, val)
 
-		val, err = rs.GetRegister(rootHeight+1, block11Fork.ID(), makeReg("X", "4").Key)
+		val, err = rs.GetRegister(rootHeight+1, block11Fork.Hash(), makeReg("X", "4").Key)
 		require.NoError(t, err)
 		require.Equal(t, makeReg("X", "4").Value, val)
 
@@ -324,7 +324,7 @@ func TestRegisterStoreReadingFromInMemStore(t *testing.T) {
 		require.NoError(t, finalized.MockFinal(rootHeight+1))
 		require.NoError(t, rs.OnBlockFinalized()) // notify 11 is finalized
 
-		val, err = rs.GetRegister(rootHeight+1, block11Fork.ID(), makeReg("X", "4").Key)
+		val, err = rs.GetRegister(rootHeight+1, block11Fork.Hash(), makeReg("X", "4").Key)
 		require.Error(t, err, fmt.Sprintf("%v", val))
 		// pruned conflicting forks are considered not executed
 		require.ErrorIs(t, err, storehouse.ErrNotExecuted)
@@ -356,7 +356,7 @@ func TestRegisterStoreReadRegisterAtPrunedHeight(t *testing.T) {
 		require.NoError(t, finalized.MockFinal(rootHeight+1))
 		require.NoError(t, rs.OnBlockFinalized()) // notify 11 is finalized
 
-		val, err := rs.GetRegister(rootHeight+1, headerByHeight[rootHeight+1].ID(), makeReg("X", "").Key)
+		val, err := rs.GetRegister(rootHeight+1, headerByHeight[rootHeight+1].Hash(), makeReg("X", "").Key)
 		require.NoError(t, err)
 		require.Equal(t, makeReg("X", "1").Value, val)
 
@@ -370,11 +370,11 @@ func TestRegisterStoreReadRegisterAtPrunedHeight(t *testing.T) {
 		err = rs.SaveRegisters(headerByHeight[rootHeight+2], flow.RegisterEntries{makeReg("X", "2")})
 		require.NoError(t, err)
 
-		val, err = rs.GetRegister(rootHeight+1, headerByHeight[rootHeight+1].ID(), makeReg("X", "").Key)
+		val, err = rs.GetRegister(rootHeight+1, headerByHeight[rootHeight+1].Hash(), makeReg("X", "").Key)
 		require.NoError(t, err)
 		require.Equal(t, makeReg("X", "1").Value, val)
 
-		val, err = rs.GetRegister(rootHeight+2, headerByHeight[rootHeight+2].ID(), makeReg("X", "").Key)
+		val, err = rs.GetRegister(rootHeight+2, headerByHeight[rootHeight+2].Hash(), makeReg("X", "").Key)
 		require.NoError(t, err)
 		require.Equal(t, makeReg("X", "2").Value, val)
 	})
@@ -398,7 +398,7 @@ func TestRegisterStoreExecuteFinalizedBlockOrFinalizeExecutedBlockShouldNotCallF
 		require.Equal(t, 1, finalized.FinalizedCalled()) // called by NewRegisterStore
 		// R <- 11 (X: 1)
 
-		val, err := rs.GetRegister(rootHeight, headerByHeight[rootHeight].ID(), makeReg("X", "").Key)
+		val, err := rs.GetRegister(rootHeight, headerByHeight[rootHeight].Hash(), makeReg("X", "").Key)
 		require.NoError(t, err)
 		require.Nil(t, val)
 		require.Equal(t, 1, finalized.FinalizedCalled()) // no FinalizedBlockIDAtHeight called
@@ -421,7 +421,7 @@ func TestRegisterStoreExecuteFinalizedBlockOrFinalizeExecutedBlockShouldNotCallF
 		require.NoError(t, rs.OnBlockFinalized())        // notify 12 is finalized
 		require.Equal(t, 5, finalized.FinalizedCalled()) // called by Checking whether height 12 and 13 are finalized
 
-		val, err = rs.GetRegister(rootHeight+1, headerByHeight[rootHeight+1].ID(), makeReg("X", "").Key)
+		val, err = rs.GetRegister(rootHeight+1, headerByHeight[rootHeight+1].Hash(), makeReg("X", "").Key)
 		require.NoError(t, err)
 		require.Equal(t, makeReg("X", "1").Value, val)
 		require.Equal(t, 5, finalized.FinalizedCalled()) // no FinalizedBlockIDAtHeight call

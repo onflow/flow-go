@@ -55,7 +55,7 @@ func NewCollectionExecutedMetricImpl(
 
 // CollectionFinalized tracks collections to mark finalized
 func (c *CollectionExecutedMetricImpl) CollectionFinalized(light *flow.LightCollection) {
-	lightID := light.ID()
+	lightID := light.Hash()
 	if ti, found := c.collectionsToMarkFinalized.Get(lightID); found {
 
 		block, err := c.blocks.ByCollectionID(lightID)
@@ -63,7 +63,7 @@ func (c *CollectionExecutedMetricImpl) CollectionFinalized(light *flow.LightColl
 			c.log.Warn().Err(err).Msg("could not find block by collection ID")
 			return
 		}
-		blockID := block.ID()
+		blockID := block.Hash()
 
 		for _, t := range light.Transactions {
 			c.accessMetrics.TransactionFinalized(t, ti)
@@ -76,11 +76,11 @@ func (c *CollectionExecutedMetricImpl) CollectionFinalized(light *flow.LightColl
 
 // CollectionExecuted tracks collections to mark executed
 func (c *CollectionExecutedMetricImpl) CollectionExecuted(light *flow.LightCollection) {
-	if ti, found := c.collectionsToMarkExecuted.Get(light.ID()); found {
+	if ti, found := c.collectionsToMarkExecuted.Get(light.Hash()); found {
 		for _, t := range light.Transactions {
 			c.accessMetrics.TransactionExecuted(t, ti)
 		}
-		c.collectionsToMarkExecuted.Remove(light.ID())
+		c.collectionsToMarkExecuted.Remove(light.Hash())
 	}
 }
 
@@ -88,7 +88,7 @@ func (c *CollectionExecutedMetricImpl) CollectionExecuted(light *flow.LightColle
 func (c *CollectionExecutedMetricImpl) BlockFinalized(block *flow.Block) {
 	// TODO: lookup actual finalization time by looking at the block finalizing `b`
 	now := time.Now().UTC()
-	blockID := block.ID()
+	blockID := block.Hash()
 
 	// mark all transactions as finalized
 	// TODO: sample to reduce performance overhead

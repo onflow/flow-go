@@ -70,7 +70,7 @@ func UniqueChannels(channels ChannelList) ChannelList {
 	for _, channel := range channels {
 		// non-cluster channel deduplicated based identifier of role list
 		if !IsClusterChannel(channel) {
-			id := channelRoleMap[channel].ID()
+			id := channelRoleMap[channel].Hash()
 			if _, ok := added[id]; ok {
 				// a channel with same RoleList already added, hence skips
 				continue

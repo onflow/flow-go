@@ -29,7 +29,7 @@ func TestInsertRetrieveClusterBlock(t *testing.T) {
 		}))
 
 		var retrieved cluster.Block
-		err = RetrieveClusterBlock(db.Reader(), block.ID(), &retrieved)
+		err = RetrieveClusterBlock(db.Reader(), block.Hash(), &retrieved)
 		require.NoError(t, err)
 
 		require.Equal(t, *block, retrieved)
@@ -53,7 +53,7 @@ func TestFinalizeClusterBlock(t *testing.T) {
 
 		// index parent as latest finalized block (manually writing respective indexes like in bootstrapping to skip transitive consistency checks)
 		require.NoError(t, db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			return operation.IndexClusterBlockHeight(lctx, rw.Writer(), block.ChainID, parent.Height, parent.ID())
+			return operation.IndexClusterBlockHeight(lctx, rw.Writer(), block.ChainID, parent.Height, parent.Hash())
 		}))
 		require.NoError(t, db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 			return operation.UpsertClusterFinalizedHeight(lctx, rw.Writer(), block.ChainID, parent.Height)
@@ -64,7 +64,7 @@ func TestFinalizeClusterBlock(t *testing.T) {
 			return InsertClusterBlock(lctx, rw, unittest.ClusterProposalFromBlock(block))
 		}))
 		require.NoError(t, db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			return FinalizeClusterBlock(lctx, rw, block.ID())
+			return FinalizeClusterBlock(lctx, rw, block.Hash())
 		}))
 
 		// verify that the new block as been properly indexed as the latest finalized
@@ -77,7 +77,7 @@ func TestFinalizeClusterBlock(t *testing.T) {
 		var headID flow.Identifier
 		err = operation.LookupClusterBlockHeight(db.Reader(), block.ChainID, latestFinalizedHeight, &headID)
 		require.NoError(t, err)
-		require.Equal(t, block.ID(), headID)
+		require.Equal(t, block.Hash(), headID)
 	})
 }
 
@@ -92,7 +92,7 @@ func TestDisconnectedFinalizedBlock(t *testing.T) {
 		dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
 			_, _, blockC, _ := constructState(t, db, lctx)
 			err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-				return FinalizeClusterBlock(lctx, rw, blockC.ID())
+				return FinalizeClusterBlock(lctx, rw, blockC.Hash())
 			})
 			require.Error(t, err)
 			require.NotErrorIs(t, err, storage.ErrAlreadyExists)
@@ -103,10 +103,10 @@ func TestDisconnectedFinalizedBlock(t *testing.T) {
 		dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
 			_, blockB, blockC, _ := constructState(t, db, lctx)
 			require.NoError(t, db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-				return FinalizeClusterBlock(lctx, rw, blockB.ID())
+				return FinalizeClusterBlock(lctx, rw, blockB.Hash())
 			}))
 			require.NoError(t, db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-				return FinalizeClusterBlock(lctx, rw, blockC.ID())
+				return FinalizeClusterBlock(lctx, rw, blockC.Hash())
 			}))
 		})
 	})
@@ -115,10 +115,10 @@ func TestDisconnectedFinalizedBlock(t *testing.T) {
 		dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
 			_, blockB, _, blockD := constructState(t, db, lctx)
 			require.NoError(t, db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-				return FinalizeClusterBlock(lctx, rw, blockB.ID())
+				return FinalizeClusterBlock(lctx, rw, blockB.Hash())
 			}))
 			err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-				return FinalizeClusterBlock(lctx, rw, blockD.ID())
+				return FinalizeClusterBlock(lctx, rw, blockD.Hash())
 			})
 			require.Error(t, err)
 			require.NotErrorIs(t, err, storage.ErrAlreadyExists)
@@ -146,7 +146,7 @@ func constructState(t *testing.T, db storage.DB, lctx lockctx.Proof) (blockA, bl
 
 	// index `blockA` as latest finalized block (manually writing respective indexes like in bootstrapping to skip transitive consistency checks)
 	require.NoError(t, db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-		return operation.IndexClusterBlockHeight(lctx, rw.Writer(), blockA.ChainID, blockA.Height, blockA.ID())
+		return operation.IndexClusterBlockHeight(lctx, rw.Writer(), blockA.ChainID, blockA.Height, blockA.Hash())
 	}))
 	require.NoError(t, db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 		return operation.UpsertClusterFinalizedHeight(lctx, rw.Writer(), blockA.ChainID, blockA.Height)

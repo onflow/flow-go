@@ -48,7 +48,7 @@ func (suite *BackendSuite) TestAdd() {
 	expected := suite.item()
 	suite.backend.add(expected.block)
 
-	actual, ok := suite.backend.byID(expected.block.Message.Block.ID())
+	actual, ok := suite.backend.byID(expected.block.Message.Block.Hash())
 	suite.Assert().True(ok)
 	suite.Assert().Equal(expected, actual)
 
@@ -72,7 +72,7 @@ func (suite *BackendSuite) TestChildIndexing() {
 	suite.Add(unrelated)
 
 	suite.Run("retrieve by parent ID", func() {
-		byParent, ok := suite.backend.byParentID(parent.block.Message.Block.ID())
+		byParent, ok := suite.backend.byParentID(parent.block.Message.Block.Hash())
 		suite.Assert().True(ok)
 		// should only include direct children
 		suite.Assert().Len(byParent, 2)
@@ -81,22 +81,22 @@ func (suite *BackendSuite) TestChildIndexing() {
 	})
 
 	suite.Run("drop for parent ID", func() {
-		suite.backend.dropForParent(parent.block.Message.Block.ID())
+		suite.backend.dropForParent(parent.block.Message.Block.Hash())
 
 		// should only drop direct children
-		_, exists := suite.backend.byID(child1.block.Message.Block.ID())
+		_, exists := suite.backend.byID(child1.block.Message.Block.Hash())
 		suite.Assert().False(exists)
-		_, exists = suite.backend.byID(child2.block.Message.Block.ID())
+		_, exists = suite.backend.byID(child2.block.Message.Block.Hash())
 		suite.Assert().False(exists)
 
 		// grandchildren should be unaffected
-		_, exists = suite.backend.byParentID(child1.block.Message.Block.ID())
+		_, exists = suite.backend.byParentID(child1.block.Message.Block.Hash())
 		suite.Assert().True(exists)
-		_, exists = suite.backend.byID(grandchild.block.Message.Block.ID())
+		_, exists = suite.backend.byID(grandchild.block.Message.Block.Hash())
 		suite.Assert().True(exists)
 
 		// nothing else should be affected
-		_, exists = suite.backend.byID(unrelated.block.Message.Block.ID())
+		_, exists = suite.backend.byID(unrelated.block.Message.Block.Hash())
 		suite.Assert().True(exists)
 	})
 }
@@ -132,7 +132,7 @@ func (suite *BackendSuite) TestPruneByView() {
 
 	for _, item := range items {
 		view := item.view
-		id := item.block.Message.Block.ID()
+		id := item.block.Message.Block.Hash()
 		parentID := item.parentID
 
 		// check that items below the prune view were removed

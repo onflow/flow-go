@@ -207,7 +207,7 @@ func (suite *Suite) defaultTransactionsParams() Params {
 		nodeCommunicator,
 		nodeProvider,
 		txStatusDeriver,
-		suite.systemTx.ID(),
+		suite.systemTx.Hash(),
 		suite.chainID,
 		suite.scheduledCallbacksEnabled,
 	)
@@ -217,7 +217,7 @@ func (suite *Suite) defaultTransactionsParams() Params {
 		Metrics:                     metrics.NewNoopCollector(),
 		State:                       suite.state,
 		ChainID:                     flow.Testnet,
-		SystemTxID:                  suite.systemTx.ID(),
+		SystemTxID:                  suite.systemTx.Hash(),
 		StaticCollectionRPCClient:   suite.historicalAccessAPIClient,
 		HistoricalAccessNodeClients: nil,
 		NodeCommunicator:            nodeCommunicator,
@@ -246,7 +246,7 @@ func (suite *Suite) TestGetTransactionResult_UnknownTx() {
 	coll := unittest.CollectionFromTransactions(&tx)
 
 	suite.transactions.
-		On("ByID", tx.ID()).
+		On("ByID", tx.Hash()).
 		Return(nil, storage.ErrNotFound)
 
 	params := suite.defaultTransactionsParams()
@@ -254,9 +254,9 @@ func (suite *Suite) TestGetTransactionResult_UnknownTx() {
 	require.NoError(suite.T(), err)
 	res, err := txBackend.GetTransactionResult(
 		context.Background(),
-		tx.ID(),
-		block.ID(),
-		coll.ID(),
+		tx.Hash(),
+		block.Hash(),
+		coll.Hash(),
 		entities.EventEncodingVersion_JSON_CDC_V0,
 	)
 	suite.Require().NoError(err)
@@ -276,7 +276,7 @@ func (suite *Suite) TestGetTransactionResult_TxLookupFailure() {
 
 	expectedErr := fmt.Errorf("some other error")
 	suite.transactions.
-		On("ByID", tx.ID()).
+		On("ByID", tx.Hash()).
 		Return(nil, expectedErr)
 
 	params := suite.defaultTransactionsParams()
@@ -285,9 +285,9 @@ func (suite *Suite) TestGetTransactionResult_TxLookupFailure() {
 
 	_, err = txBackend.GetTransactionResult(
 		context.Background(),
-		tx.ID(),
-		block.ID(),
-		coll.ID(),
+		tx.Hash(),
+		block.Hash(),
+		coll.Hash(),
 		entities.EventEncodingVersion_JSON_CDC_V0,
 	)
 	suite.Require().Equal(err, status.Errorf(codes.Internal, "failed to find: %v", expectedErr))
@@ -300,7 +300,7 @@ func (suite *Suite) TestGetTransactionResult_HistoricNodes_Success() {
 	coll := unittest.CollectionFromTransactions(&tx)
 
 	suite.transactions.
-		On("ByID", tx.ID()).
+		On("ByID", tx.Hash()).
 		Return(nil, storage.ErrNotFound)
 
 	transactionResultResponse := access.TransactionResultResponse{
@@ -310,7 +310,7 @@ func (suite *Suite) TestGetTransactionResult_HistoricNodes_Success() {
 
 	suite.historicalAccessAPIClient.
 		On("GetTransactionResult", mock.Anything, mock.MatchedBy(func(req *access.GetTransactionRequest) bool {
-			txID := tx.ID()
+			txID := tx.Hash()
 			return bytes.Equal(txID[:], req.Id)
 		})).
 		Return(&transactionResultResponse, nil).
@@ -323,9 +323,9 @@ func (suite *Suite) TestGetTransactionResult_HistoricNodes_Success() {
 
 	resp, err := txBackend.GetTransactionResult(
 		context.Background(),
-		tx.ID(),
-		block.ID(),
-		coll.ID(),
+		tx.Hash(),
+		block.Hash(),
+		coll.Hash(),
 		entities.EventEncodingVersion_JSON_CDC_V0,
 	)
 	suite.Require().NoError(err)
@@ -339,7 +339,7 @@ func (suite *Suite) TestGetTransactionResult_HistoricNodes_FromCache() {
 	tx := unittest.TransactionBodyFixture()
 
 	suite.transactions.
-		On("ByID", tx.ID()).
+		On("ByID", tx.Hash()).
 		Return(nil, storage.ErrNotFound)
 
 	transactionResultResponse := access.TransactionResultResponse{
@@ -349,7 +349,7 @@ func (suite *Suite) TestGetTransactionResult_HistoricNodes_FromCache() {
 
 	suite.historicalAccessAPIClient.
 		On("GetTransactionResult", mock.Anything, mock.MatchedBy(func(req *access.GetTransactionRequest) bool {
-			txID := tx.ID()
+			txID := tx.Hash()
 			return bytes.Equal(txID[:], req.Id)
 		})).
 		Return(&transactionResultResponse, nil).
@@ -363,9 +363,9 @@ func (suite *Suite) TestGetTransactionResult_HistoricNodes_FromCache() {
 	coll := unittest.CollectionFromTransactions(&tx)
 	resp, err := txBackend.GetTransactionResult(
 		context.Background(),
-		tx.ID(),
-		block.ID(),
-		coll.ID(),
+		tx.Hash(),
+		block.Hash(),
+		coll.Hash(),
 		entities.EventEncodingVersion_JSON_CDC_V0,
 	)
 	suite.Require().NoError(err)
@@ -374,9 +374,9 @@ func (suite *Suite) TestGetTransactionResult_HistoricNodes_FromCache() {
 
 	resp2, err := txBackend.GetTransactionResult(
 		context.Background(),
-		tx.ID(),
-		block.ID(),
-		coll.ID(),
+		tx.Hash(),
+		block.Hash(),
+		coll.Hash(),
 		entities.EventEncodingVersion_JSON_CDC_V0,
 	)
 	suite.Require().NoError(err)
@@ -390,15 +390,15 @@ func (suite *Suite) TestGetTransactionResultUnknownFromCache() {
 	tx := unittest.TransactionBodyFixture()
 
 	suite.transactions.
-		On("ByID", tx.ID()).
+		On("ByID", tx.Hash()).
 		Return(nil, storage.ErrNotFound)
 
 	suite.historicalAccessAPIClient.
 		On("GetTransactionResult", mock.Anything, mock.MatchedBy(func(req *access.GetTransactionRequest) bool {
-			txID := tx.ID()
+			txID := tx.Hash()
 			return bytes.Equal(txID[:], req.Id)
 		})).
-		Return(nil, status.Errorf(codes.NotFound, "no known transaction with ID %s", tx.ID())).
+		Return(nil, status.Errorf(codes.NotFound, "no known transaction with ID %s", tx.Hash())).
 		Once()
 
 	params := suite.defaultTransactionsParams()
@@ -409,9 +409,9 @@ func (suite *Suite) TestGetTransactionResultUnknownFromCache() {
 	coll := unittest.CollectionFromTransactions(&tx)
 	resp, err := txBackend.GetTransactionResult(
 		context.Background(),
-		tx.ID(),
-		block.ID(),
-		coll.ID(),
+		tx.Hash(),
+		block.Hash(),
+		coll.Hash(),
 		entities.EventEncodingVersion_JSON_CDC_V0,
 	)
 	suite.Require().NoError(err)
@@ -420,7 +420,7 @@ func (suite *Suite) TestGetTransactionResultUnknownFromCache() {
 
 	// ensure the unknown transaction is cached when not found anywhere
 	txStatus := flow.TransactionStatusUnknown
-	res, ok := txBackend.txResultCache.Get(tx.ID())
+	res, ok := txBackend.txResultCache.Get(tx.Hash())
 	suite.Require().True(ok)
 	suite.Require().Equal(res, &accessmodel.TransactionResult{
 		Status:     txStatus,
@@ -430,9 +430,9 @@ func (suite *Suite) TestGetTransactionResultUnknownFromCache() {
 	// ensure underlying GetTransactionResult() won't be called the second time
 	resp2, err := txBackend.GetTransactionResult(
 		context.Background(),
-		tx.ID(),
-		block.ID(),
-		coll.ID(),
+		tx.Hash(),
+		block.Hash(),
+		coll.Hash(),
 		entities.EventEncodingVersion_JSON_CDC_V0,
 	)
 	suite.Require().NoError(err)
@@ -443,7 +443,7 @@ func (suite *Suite) TestGetTransactionResultUnknownFromCache() {
 // TestGetSystemTransaction_HappyPath tests that GetSystemTransaction call returns system chunk transaction.
 func (suite *Suite) TestGetSystemTransaction_ExecutionNode_HappyPath() {
 	block := unittest.BlockFixture()
-	blockID := block.ID()
+	blockID := block.Hash()
 
 	params := suite.defaultTransactionsParams()
 	enabledProvider := provider.NewENTransactionProvider(
@@ -454,7 +454,7 @@ func (suite *Suite) TestGetSystemTransaction_ExecutionNode_HappyPath() {
 		params.NodeCommunicator,
 		params.NodeProvider,
 		params.TxStatusDeriver,
-		suite.systemTx.ID(),
+		suite.systemTx.Hash(),
 		suite.chainID,
 		true,
 	)
@@ -466,7 +466,7 @@ func (suite *Suite) TestGetSystemTransaction_ExecutionNode_HappyPath() {
 		params.NodeCommunicator,
 		params.NodeProvider,
 		params.TxStatusDeriver,
-		suite.systemTx.ID(),
+		suite.systemTx.Hash(),
 		suite.chainID,
 		false,
 	)
@@ -495,7 +495,7 @@ func (suite *Suite) TestGetSystemTransaction_ExecutionNode_HappyPath() {
 		txBackend, err := NewTransactionsBackend(params)
 		suite.Require().NoError(err)
 
-		res, err := txBackend.GetSystemTransaction(context.Background(), suite.systemTx.ID(), blockID)
+		res, err := txBackend.GetSystemTransaction(context.Background(), suite.systemTx.Hash(), blockID)
 		suite.Require().NoError(err)
 
 		suite.Require().Equal(suite.systemTx, res)
@@ -536,7 +536,7 @@ func (suite *Suite) TestGetSystemTransaction_ExecutionNode_HappyPath() {
 		txBackend, err := NewTransactionsBackend(params)
 		suite.Require().NoError(err)
 
-		res, err := txBackend.GetSystemTransaction(context.Background(), suite.systemTx.ID(), blockID)
+		res, err := txBackend.GetSystemTransaction(context.Background(), suite.systemTx.Hash(), blockID)
 		suite.Require().NoError(err)
 
 		suite.Require().Equal(suite.systemTx, res)
@@ -558,7 +558,7 @@ func (suite *Suite) TestGetSystemTransaction_ExecutionNode_HappyPath() {
 		suite.Require().NoError(err)
 
 		systemTx := suite.systemCollection.Transactions[2]
-		res, err := txBackend.GetSystemTransaction(context.Background(), systemTx.ID(), blockID)
+		res, err := txBackend.GetSystemTransaction(context.Background(), systemTx.Hash(), blockID)
 		suite.Require().NoError(err)
 
 		suite.Require().Equal(systemTx, res)
@@ -587,7 +587,7 @@ func (suite *Suite) TestGetSystemTransaction_ExecutionNode_HappyPath() {
 // TestGetSystemTransaction_HappyPath tests that GetSystemTransaction call returns system chunk transaction.
 func (suite *Suite) TestGetSystemTransaction_Local_HappyPath() {
 	block := unittest.BlockFixture()
-	blockID := block.ID()
+	blockID := block.Hash()
 
 	params := suite.defaultTransactionsParams()
 	enabledProvider := provider.NewLocalTransactionProvider(
@@ -597,7 +597,7 @@ func (suite *Suite) TestGetSystemTransaction_Local_HappyPath() {
 		params.EventsIndex,
 		params.TxResultsIndex,
 		params.TxErrorMessageProvider,
-		suite.systemTx.ID(),
+		suite.systemTx.Hash(),
 		params.TxStatusDeriver,
 		suite.chainID,
 		true,
@@ -609,7 +609,7 @@ func (suite *Suite) TestGetSystemTransaction_Local_HappyPath() {
 		params.EventsIndex,
 		params.TxResultsIndex,
 		params.TxErrorMessageProvider,
-		suite.systemTx.ID(),
+		suite.systemTx.Hash(),
 		params.TxStatusDeriver,
 		suite.chainID,
 		false,
@@ -639,7 +639,7 @@ func (suite *Suite) TestGetSystemTransaction_Local_HappyPath() {
 		txBackend, err := NewTransactionsBackend(params)
 		suite.Require().NoError(err)
 
-		res, err := txBackend.GetSystemTransaction(context.Background(), suite.systemTx.ID(), blockID)
+		res, err := txBackend.GetSystemTransaction(context.Background(), suite.systemTx.Hash(), blockID)
 		suite.Require().NoError(err)
 
 		suite.Require().Equal(suite.systemTx, res)
@@ -680,7 +680,7 @@ func (suite *Suite) TestGetSystemTransaction_Local_HappyPath() {
 		txBackend, err := NewTransactionsBackend(params)
 		suite.Require().NoError(err)
 
-		res, err := txBackend.GetSystemTransaction(context.Background(), suite.systemTx.ID(), blockID)
+		res, err := txBackend.GetSystemTransaction(context.Background(), suite.systemTx.Hash(), blockID)
 		suite.Require().NoError(err)
 
 		suite.Require().Equal(suite.systemTx, res)
@@ -699,7 +699,7 @@ func (suite *Suite) TestGetSystemTransaction_Local_HappyPath() {
 		suite.Require().NoError(err)
 
 		systemTx := suite.systemCollection.Transactions[2]
-		res, err := txBackend.GetSystemTransaction(context.Background(), systemTx.ID(), blockID)
+		res, err := txBackend.GetSystemTransaction(context.Background(), systemTx.Hash(), blockID)
 		suite.Require().NoError(err)
 
 		suite.Require().Equal(systemTx, res)
@@ -737,7 +737,7 @@ func (suite *Suite) TestGetSystemTransactionResult_ExecutionNode_HappyPath() {
 		suite.Require().NoError(err)
 
 		block := unittest.BlockWithParentFixture(lastBlock)
-		blockID := block.ID()
+		blockID := block.Hash()
 		suite.state.
 			On("AtBlockID", blockID).
 			Return(unittest.StateSnapshotForKnownBlock(block.ToHeader(), identities.Lookup()), nil).
@@ -751,7 +751,7 @@ func (suite *Suite) TestGetSystemTransactionResult_ExecutionNode_HappyPath() {
 
 		receipt1 := unittest.ReceiptForBlockFixture(block)
 		suite.receipts.
-			On("ByBlockID", block.ID()).
+			On("ByBlockID", block.Hash()).
 			Return(flow.ExecutionReceiptList{receipt1}, nil)
 
 		// Generating events with event generator
@@ -759,7 +759,7 @@ func (suite *Suite) TestGetSystemTransactionResult_ExecutionNode_HappyPath() {
 		events := unittest.EventGenerator.GetEventsWithEncoding(1, exeNodeEventEncodingVersion)
 		eventMessages := convert.EventsToMessages(events)
 
-		systemTxID := suite.systemTx.ID()
+		systemTxID := suite.systemTx.Hash()
 		expectedRequest := &execproto.GetTransactionResultRequest{
 			BlockId:       blockID[:],
 			TransactionId: systemTxID[:],
@@ -787,14 +787,14 @@ func (suite *Suite) TestGetSystemTransactionResult_ExecutionNode_HappyPath() {
 		res, err := backend.GetSystemTransactionResult(
 			context.Background(),
 			flow.ZeroID,
-			block.ID(),
+			block.Hash(),
 			entities.EventEncodingVersion_JSON_CDC_V0,
 		)
 		suite.Require().NoError(err)
 
 		// Expected system chunk transaction
 		suite.Require().Equal(flow.TransactionStatusExecuted, res.Status)
-		suite.Require().Equal(suite.systemTx.ID(), res.TransactionID)
+		suite.Require().Equal(suite.systemTx.Hash(), res.TransactionID)
 
 		// Check for successful decoding of event
 		_, err = jsoncdc.Decode(nil, res.Events[0].Payload)
@@ -837,8 +837,8 @@ func (suite *Suite) TestGetSystemTransactionResult_Local_HappyPath() {
 	sysTx, err := blueprints.SystemChunkTransaction(suite.chainID.Chain())
 	suite.Require().NoError(err)
 	suite.Require().NotNil(sysTx)
-	txId := suite.systemTx.ID()
-	blockId := block.ID()
+	txId := suite.systemTx.Hash()
+	blockId := block.Hash()
 
 	suite.blocks.
 		On("ByID", blockId).
@@ -900,7 +900,7 @@ func (suite *Suite) TestGetSystemTransactionResult_Local_HappyPath() {
 func (suite *Suite) TestGetSystemTransactionResult_BlockNotFound() {
 	block := unittest.BlockFixture()
 	suite.blocks.
-		On("ByID", block.ID()).
+		On("ByID", block.Hash()).
 		Return(nil, storage.ErrNotFound).
 		Once()
 
@@ -910,7 +910,7 @@ func (suite *Suite) TestGetSystemTransactionResult_BlockNotFound() {
 	res, err := txBackend.GetSystemTransactionResult(
 		context.Background(),
 		flow.ZeroID,
-		block.ID(),
+		block.Hash(),
 		entities.EventEncodingVersion_JSON_CDC_V0,
 	)
 
@@ -923,7 +923,7 @@ func (suite *Suite) TestGetSystemTransactionResult_BlockNotFound() {
 // event encoding versions.
 func (suite *Suite) TestGetSystemTransactionResult_FailedEncodingConversion() {
 	block := unittest.BlockFixture()
-	blockID := block.ID()
+	blockID := block.Hash()
 
 	_, fixedENIDs := suite.setupReceipts(block)
 	suite.fixedExecutionNodeIDs = fixedENIDs.NodeIDs()
@@ -943,7 +943,7 @@ func (suite *Suite) TestGetSystemTransactionResult_FailedEncodingConversion() {
 	eventsPerBlock := 10
 	eventMessages := make([]*entities.Event, eventsPerBlock)
 
-	systemTxID := suite.systemTx.ID()
+	systemTxID := suite.systemTx.Hash()
 	expectedRequest := &execproto.GetTransactionResultRequest{
 		BlockId:       blockID[:],
 		TransactionId: systemTxID[:],
@@ -970,7 +970,7 @@ func (suite *Suite) TestGetSystemTransactionResult_FailedEncodingConversion() {
 	res, err := txBackend.GetSystemTransactionResult(
 		context.Background(),
 		flow.ZeroID,
-		block.ID(),
+		block.Hash(),
 		entities.EventEncodingVersion_CCF_V0,
 	)
 
@@ -986,12 +986,12 @@ func (suite *Suite) TestGetTransactionResult_FromStorage() {
 	// Create fixtures for block, transaction, and collection
 	transaction := unittest.TransactionBodyFixture()
 	col := unittest.CollectionFromTransactions(&transaction)
-	guarantee := &flow.CollectionGuarantee{CollectionID: col.ID()}
+	guarantee := &flow.CollectionGuarantee{CollectionID: col.Hash()}
 	block := unittest.BlockFixture(
 		unittest.Block.WithPayload(unittest.PayloadFixture(unittest.WithGuarantees(guarantee))),
 	)
-	txId := transaction.ID()
-	blockId := block.ID()
+	txId := transaction.Hash()
+	blockId := block.Hash()
 
 	suite.blocks.
 		On("ByID", blockId).
@@ -1010,7 +1010,7 @@ func (suite *Suite) TestGetTransactionResult_FromStorage() {
 
 	// Set up the light collection and mock the behavior of the collections object
 	lightCol := col.Light()
-	suite.collections.On("LightByID", col.ID()).Return(lightCol, nil)
+	suite.collections.On("LightByID", col.Hash()).Return(lightCol, nil)
 
 	// Set up the events storage mock
 	totalEvents := 5
@@ -1095,17 +1095,17 @@ func (suite *Suite) TestTransactionByIndexFromStorage() {
 	// Create fixtures for block, transaction, and collection
 	transaction := unittest.TransactionBodyFixture()
 	col := unittest.CollectionFromTransactions(&transaction)
-	guarantee := &flow.CollectionGuarantee{CollectionID: col.ID()}
+	guarantee := &flow.CollectionGuarantee{CollectionID: col.Hash()}
 	block := unittest.BlockFixture(
 		unittest.Block.WithPayload(unittest.PayloadFixture(unittest.WithGuarantees(guarantee))),
 	)
-	blockId := block.ID()
-	txId := transaction.ID()
+	blockId := block.Hash()
+	txId := transaction.Hash()
 	txIndex := rand.Uint32()
 
 	// Set up the light collection and mock the behavior of the collections object
 	lightCol := col.Light()
-	suite.collections.On("LightByID", col.ID()).Return(lightCol, nil)
+	suite.collections.On("LightByID", col.Hash()).Return(lightCol, nil)
 
 	// Mock the behavior of the blocks and lightTxResults objects
 	suite.blocks.
@@ -1196,11 +1196,11 @@ func (suite *Suite) TestTransactionByIndexFromStorage() {
 func (suite *Suite) TestTransactionResultsByBlockIDFromStorage() {
 	// Create fixtures for the block and collection
 	col := unittest.CollectionFixture(2)
-	guarantee := &flow.CollectionGuarantee{CollectionID: col.ID()}
+	guarantee := &flow.CollectionGuarantee{CollectionID: col.Hash()}
 	block := unittest.BlockFixture(
 		unittest.Block.WithPayload(unittest.PayloadFixture(unittest.WithGuarantees(guarantee))),
 	)
-	blockId := block.ID()
+	blockId := block.Hash()
 
 	// Mock the behavior of the blocks, collections and light transaction results objects
 	suite.blocks.
@@ -1222,7 +1222,7 @@ func (suite *Suite) TestTransactionResultsByBlockIDFromStorage() {
 	}
 	// simulate the system tx
 	lightTxResults = append(lightTxResults, flow.LightTransactionResult{
-		TransactionID:   suite.systemTx.ID(),
+		TransactionID:   suite.systemTx.Hash(),
 		Failed:          false,
 		ComputationUsed: 10,
 	})
@@ -1320,11 +1320,11 @@ func (suite *Suite) TestTransactionResultsByBlockIDFromStorage() {
 func (suite *Suite) TestGetTransactionsByBlockID() {
 	// Create fixtures
 	col := unittest.CollectionFixture(3)
-	guarantee := &flow.CollectionGuarantee{CollectionID: col.ID()}
+	guarantee := &flow.CollectionGuarantee{CollectionID: col.Hash()}
 	block := unittest.BlockFixture(
 		unittest.Block.WithPayload(unittest.PayloadFixture(unittest.WithGuarantees(guarantee))),
 	)
-	blockID := block.ID()
+	blockID := block.Hash()
 
 	// Create PendingExecution events for scheduled callbacks
 	pendingExecutionEvents := suite.createPendingExecutionEvents(2) // 2 callbacks
@@ -1348,7 +1348,7 @@ func (suite *Suite) TestGetTransactionsByBlockID() {
 
 		// Mock the collections storage
 		suite.collections.
-			On("ByID", col.ID()).
+			On("ByID", col.Hash()).
 			Return(&col, nil).
 			Once()
 
@@ -1389,13 +1389,13 @@ func (suite *Suite) TestGetTransactionsByBlockID() {
 
 		// Verify user transactions
 		for i, tx := range col.Transactions {
-			suite.Assert().Equal(tx.ID(), transactions[i].ID(), "user transaction %d mismatch", i)
+			suite.Assert().Equal(tx.Hash(), transactions[i].Hash(), "user transaction %d mismatch", i)
 		}
 
 		// Verify system transactions
 		for i, expectedTx := range expectedSystemCollection.Transactions {
 			actualTx := transactions[expectedUserTxCount+i]
-			suite.Assert().Equal(expectedTx.ID(), actualTx.ID(), "system transaction %d mismatch", i)
+			suite.Assert().Equal(expectedTx.Hash(), actualTx.Hash(), "system transaction %d mismatch", i)
 		}
 	})
 
@@ -1417,7 +1417,7 @@ func (suite *Suite) TestGetTransactionsByBlockID() {
 
 		// Mock the collections storage
 		suite.collections.
-			On("ByID", col.ID()).
+			On("ByID", col.Hash()).
 			Return(&col, nil).
 			Once()
 
@@ -1455,13 +1455,13 @@ func (suite *Suite) TestGetTransactionsByBlockID() {
 
 		// Verify user transactions
 		for i, tx := range col.Transactions {
-			suite.Assert().Equal(tx.ID(), transactions[i].ID())
+			suite.Assert().Equal(tx.Hash(), transactions[i].Hash())
 		}
 
 		// Verify system transactions (process + system chunk only, no execute callbacks)
 		for i, expectedTx := range expectedSystemCollectionEmpty.Transactions {
 			actualTx := transactions[len(col.Transactions)+i]
-			suite.Assert().Equal(expectedTx.ID(), actualTx.ID())
+			suite.Assert().Equal(expectedTx.Hash(), actualTx.Hash())
 		}
 	})
 }
@@ -1469,11 +1469,11 @@ func (suite *Suite) TestGetTransactionsByBlockID() {
 func (suite *Suite) TestTransactionResultsByBlockIDFromExecutionNode() {
 	// Create fixtures for the block and collection
 	col := unittest.CollectionFixture(2)
-	guarantee := &flow.CollectionGuarantee{CollectionID: col.ID()}
+	guarantee := &flow.CollectionGuarantee{CollectionID: col.Hash()}
 	block := unittest.BlockFixture(
 		unittest.Block.WithPayload(unittest.PayloadFixture(unittest.WithGuarantees(guarantee))),
 	)
-	blockId := block.ID()
+	blockId := block.Hash()
 
 	// Mock the behavior of the blocks, collections and light transaction results objects
 	suite.blocks.
@@ -1514,7 +1514,7 @@ func (suite *Suite) TestTransactionResultsByBlockIDFromExecutionNode() {
 	// Extract the expected transaction IDs in order: process, execute callbacks, system chunk
 	expectedSystemTxIDs := make([]flow.Identifier, len(expectedSystemCollection.Transactions))
 	for i, tx := range expectedSystemCollection.Transactions {
-		expectedSystemTxIDs[i] = tx.ID()
+		expectedSystemTxIDs[i] = tx.Hash()
 	}
 
 	suite.Require().Equal(4, len(expectedSystemTxIDs), "should have 4 system transactions: process + 2 execute callbacks + system chunk")
@@ -1605,7 +1605,7 @@ func (suite *Suite) TestTransactionResultsByBlockIDFromExecutionNode() {
 	for i := 0; i < userTxCount; i++ {
 		suite.Assert().Equal(lightTxResults[i].TransactionID, response[i].TransactionID)
 		suite.Assert().Equal(block.Payload.Guarantees[0].CollectionID, response[i].CollectionID)
-		suite.Assert().Equal(block.ID(), response[i].BlockID)
+		suite.Assert().Equal(block.Hash(), response[i].BlockID)
 		suite.Assert().Equal(block.Height, response[i].BlockHeight)
 		suite.Assert().Equal(flow.TransactionStatusSealed, response[i].Status)
 	}
@@ -1617,7 +1617,7 @@ func (suite *Suite) TestTransactionResultsByBlockIDFromExecutionNode() {
 	for i := 0; i < systemTxCount; i++ {
 		systemTxIndex := userTxCount + i
 		suite.Assert().Equal(flow.ZeroID, response[systemTxIndex].CollectionID)
-		suite.Assert().Equal(block.ID(), response[systemTxIndex].BlockID)
+		suite.Assert().Equal(block.Hash(), response[systemTxIndex].BlockID)
 		suite.Assert().Equal(block.Height, response[systemTxIndex].BlockHeight)
 		suite.Assert().Equal(flow.TransactionStatusSealed, response[systemTxIndex].Status)
 		suite.Assert().Equal(expectedSystemTxIDs[i], response[userTxCount+i].TransactionID, "system transaction %d should match reconstructed ID", i)
@@ -1630,7 +1630,7 @@ func (suite *Suite) TestTransactionRetry() {
 		// Height needs to be at least DefaultTransactionExpiry before we start doing retries
 		unittest.Block.WithHeight(flow.DefaultTransactionExpiry + 1),
 	)
-	transactionBody := unittest.TransactionBodyFixture(unittest.WithReferenceBlock(block.ID()))
+	transactionBody := unittest.TransactionBodyFixture(unittest.WithReferenceBlock(block.Hash()))
 	headBlock := unittest.BlockFixture()
 	headBlock.Height = block.Height - 1 // head is behind the current block
 	suite.state.On("Final").Return(suite.snapshot, nil)
@@ -1638,11 +1638,11 @@ func (suite *Suite) TestTransactionRetry() {
 	suite.snapshot.On("Head").Return(headBlock.ToHeader(), nil)
 	snapshotAtBlock := protocolmock.NewSnapshot(suite.T())
 	snapshotAtBlock.On("Head").Return(block.ToHeader(), nil)
-	suite.state.On("AtBlockID", block.ID()).Return(snapshotAtBlock, nil)
+	suite.state.On("AtBlockID", block.Hash()).Return(snapshotAtBlock, nil)
 
 	// collection storage returns a not found error
 	suite.collections.
-		On("LightByTransactionID", transactionBody.ID()).
+		On("LightByTransactionID", transactionBody.Hash()).
 		Return(nil, storage.ErrNotFound)
 
 	client := accessmock.NewAccessAPIClient(suite.T())
@@ -1687,19 +1687,19 @@ func (suite *Suite) TestSuccessfulTransactionsDontRetry() {
 	collection := unittest.CollectionFixture(1)
 	light := collection.Light()
 	transactionBody := collection.Transactions[0]
-	txID := transactionBody.ID()
+	txID := transactionBody.Hash()
 
 	block := unittest.BlockFixture()
-	blockID := block.ID()
+	blockID := block.Hash()
 
 	// setup chain state
 	_, fixedENIDs := suite.setupReceipts(block)
 	suite.fixedExecutionNodeIDs = fixedENIDs.NodeIDs()
 
 	suite.state.On("Final").Return(suite.snapshot, nil)
-	suite.transactions.On("ByID", transactionBody.ID()).Return(transactionBody, nil)
-	suite.collections.On("LightByTransactionID", transactionBody.ID()).Return(light, nil)
-	suite.blocks.On("ByCollectionID", collection.ID()).Return(block, nil)
+	suite.transactions.On("ByID", transactionBody.Hash()).Return(transactionBody, nil)
+	suite.collections.On("LightByTransactionID", transactionBody.Hash()).Return(light, nil)
+	suite.blocks.On("ByCollectionID", collection.Hash()).Return(block, nil)
 	suite.snapshot.On("Identities", mock.Anything).Return(fixedENIDs, nil)
 
 	exeEventReq := execproto.GetTransactionResultRequest{
@@ -1778,7 +1778,7 @@ func (suite *Suite) setupReceipts(block *flow.Block) ([]*flow.ExecutionReceipt, 
 
 	receipts := flow.ExecutionReceiptList{receipt1, receipt2}
 	suite.receipts.
-		On("ByBlockID", block.ID()).
+		On("ByBlockID", block.Hash()).
 		Return(receipts, nil)
 
 	return receipts, ids
@@ -1793,10 +1793,10 @@ func (suite *Suite) assertTransactionResultResponse(
 	eventsForTx []flow.Event,
 ) {
 	suite.Require().NoError(err)
-	suite.Assert().Equal(block.ID(), response.BlockID)
+	suite.Assert().Equal(block.Hash(), response.BlockID)
 	suite.Assert().Equal(block.Height, response.BlockHeight)
 	suite.Assert().Equal(txId, response.TransactionID)
-	if txId == suite.systemTx.ID() {
+	if txId == suite.systemTx.Hash() {
 		suite.Assert().Equal(flow.ZeroID, response.CollectionID)
 	} else {
 		suite.Assert().Equal(block.Payload.Guarantees[0].CollectionID, response.CollectionID)

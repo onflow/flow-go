@@ -243,7 +243,7 @@ func TestProcessAttackerMessage_ResultApproval_Dictated(t *testing.T) {
 				require.Equal(t, corruptedId.NodeID, approval.Body.ApproverID)
 
 				// approval should have a valid attestation signature from corrupted node
-				id := approval.Body.Attestation.ID()
+				id := approval.Body.Attestation.Hash()
 				valid, err := corruptedId.StakingPubKey.Verify(approval.Body.AttestationSignature, id[:], corruptNetwork.approvalHasher)
 
 				require.NoError(t, err)
@@ -254,7 +254,7 @@ func TestProcessAttackerMessage_ResultApproval_Dictated(t *testing.T) {
 				require.NotEmpty(t, approval.Body.Spock)
 
 				// approval body should have a valid signature from corrupted node
-				bodyId := approval.Body.ID()
+				bodyId := approval.Body.Hash()
 				valid, err = corruptedId.StakingPubKey.Verify(approval.VerifierSignature, bodyId[:], corruptNetwork.approvalHasher)
 				require.NoError(t, err)
 				require.True(t, valid)
@@ -357,7 +357,7 @@ func TestProcessAttackerMessage_ExecutionReceipt_Dictated(t *testing.T) {
 				require.Equal(t, corruptedId.NodeID, receipt.ExecutorID)
 
 				// receipt should have a valid signature from corrupted node
-				unsignedReceiptID := receipt.UnsignedExecutionReceipt.ID()
+				unsignedReceiptID := receipt.UnsignedExecutionReceipt.Hash()
 				valid, err := corruptedId.StakingPubKey.Verify(receipt.ExecutorSignature, unsignedReceiptID[:], corruptNetwork.receiptHasher)
 				require.NoError(t, err)
 				require.True(t, valid)

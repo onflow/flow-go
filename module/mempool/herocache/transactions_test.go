@@ -21,12 +21,12 @@ func TestTransactionPool(t *testing.T) {
 	transactions := herocache.NewTransactions(1000, unittest.Logger(), metrics.NewNoopCollector())
 
 	t.Run("should be able to add first", func(t *testing.T) {
-		added := transactions.Add(tx1.ID(), &tx1)
+		added := transactions.Add(tx1.Hash(), &tx1)
 		assert.True(t, added)
 	})
 
 	t.Run("should be able to add second", func(t *testing.T) {
-		added := transactions.Add(tx2.ID(), &tx2)
+		added := transactions.Add(tx2.Hash(), &tx2)
 		assert.True(t, added)
 	})
 
@@ -36,13 +36,13 @@ func TestTransactionPool(t *testing.T) {
 	})
 
 	t.Run("should be able to get first", func(t *testing.T) {
-		actual, exists := transactions.Get(tx1.ID())
+		actual, exists := transactions.Get(tx1.Hash())
 		assert.True(t, exists)
 		assert.Equal(t, &tx1, actual)
 	})
 
 	t.Run("should be able to remove second", func(t *testing.T) {
-		ok := transactions.Remove(tx2.ID())
+		ok := transactions.Remove(tx2.Hash())
 		assert.True(t, ok)
 	})
 
@@ -71,7 +71,7 @@ func TestConcurrentWriteAndRead(t *testing.T) {
 	// storing all transactions
 	for i := 0; i < total; i++ {
 		go func(tx flow.TransactionBody) {
-			require.True(t, transactions.Add(tx.ID(), &tx))
+			require.True(t, transactions.Add(tx.Hash(), &tx))
 
 			wg.Done()
 		}(txs[i])
@@ -84,7 +84,7 @@ func TestConcurrentWriteAndRead(t *testing.T) {
 	// reading all transactions
 	for i := 0; i < total; i++ {
 		go func(tx flow.TransactionBody) {
-			actual, ok := transactions.Get(tx.ID())
+			actual, ok := transactions.Get(tx.Hash())
 			require.True(t, ok)
 			require.Equal(t, tx, *actual)
 
@@ -103,8 +103,8 @@ func TestValuesReturnsInOrder(t *testing.T) {
 
 	// storing all transactions
 	for i := 0; i < total; i++ {
-		require.True(t, transactions.Add(txs[i].ID(), &txs[i]))
-		tx, ok := transactions.Get(txs[i].ID())
+		require.True(t, transactions.Add(txs[i].Hash(), &txs[i]))
+		tx, ok := transactions.Get(txs[i].Hash())
 		require.True(t, ok)
 		require.Equal(t, txs[i], *tx)
 	}

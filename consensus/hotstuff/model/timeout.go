@@ -125,8 +125,8 @@ func NewTimeoutObject(untrusted UntrustedTimeoutObject) (*TimeoutObject, error) 
 	}, nil
 }
 
-// ID returns the TimeoutObject's identifier
-func (t *TimeoutObject) ID() flow.Identifier {
+// Hash returns the TimeoutObject's identifier
+func (t *TimeoutObject) Hash() flow.Identifier {
 	body := struct {
 		View         uint64
 		NewestQCID   flow.Identifier
@@ -135,8 +135,8 @@ func (t *TimeoutObject) ID() flow.Identifier {
 		SigData      crypto.Signature
 	}{
 		View:         t.View,
-		NewestQCID:   t.NewestQC.ID(),
-		LastViewTCID: t.LastViewTC.ID(),
+		NewestQCID:   t.NewestQC.Hash(),
+		LastViewTCID: t.LastViewTC.Hash(),
 		SignerID:     t.SignerID,
 		SigData:      t.SigData,
 	}

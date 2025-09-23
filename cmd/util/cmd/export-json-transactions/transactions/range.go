@@ -51,7 +51,7 @@ func (f *Finder) RunByHeightRange(startHeight uint64, endHeight uint64, run func
 		if err != nil {
 			return fmt.Errorf("could not find header by height %v: %w", height, err)
 		}
-		blockID := header.ID()
+		blockID := header.Hash()
 		cols, err := FindBlockTransactions(f.Payloads, f.Collections, blockID)
 		if err != nil {
 			return fmt.Errorf("could not find transactions for block %v at height %v:, err", blockID, height)
@@ -103,7 +103,7 @@ func FindBlockTransactions(
 		txs := make([]*Transaction, 0, len(col.Transactions))
 		for txIndex, tx := range col.Transactions {
 			txs = append(txs, &Transaction{
-				TxID:   tx.ID().String(),
+				TxID:   tx.Hash().String(),
 				Index:  txIndex,
 				Script: string(tx.Script),
 				Payer:  tx.Payer.String(),

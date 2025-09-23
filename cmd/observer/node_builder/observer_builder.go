@@ -1403,9 +1403,9 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 
 				checkpointHeight := builder.SealedRootBlock.Height
 
-				if builder.SealedRootBlock.ID() != builder.RootSeal.BlockID {
+				if builder.SealedRootBlock.Hash() != builder.RootSeal.BlockID {
 					return nil, fmt.Errorf("mismatching sealed root block and root seal: %v != %v",
-						builder.SealedRootBlock.ID(), builder.RootSeal.BlockID)
+						builder.SealedRootBlock.Hash(), builder.RootSeal.BlockID)
 				}
 
 				rootHash := ledger.RootHash(builder.RootSeal.FinalState)

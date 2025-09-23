@@ -54,7 +54,7 @@ func (t *Transactions) Store(flowTx *flow.TransactionBody) error {
 }
 
 func (t *Transactions) storeTx(rw storage.ReaderBatchWriter, flowTx *flow.TransactionBody) error {
-	return t.cache.PutTx(rw, flowTx.ID(), flowTx)
+	return t.cache.PutTx(rw, flowTx.Hash(), flowTx)
 }
 
 func (t *Transactions) ByID(txID flow.Identifier) (*flow.TransactionBody, error) {

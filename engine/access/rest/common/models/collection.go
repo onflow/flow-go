@@ -15,7 +15,7 @@ func (c *Collection) Build(
 	link LinkGenerator,
 	expand map[string]bool) error {
 
-	self, err := SelfLink(collection.ID(), link.CollectionLink)
+	self, err := SelfLink(collection.Hash(), link.CollectionLink)
 	if err != nil {
 		return err
 	}
@@ -34,7 +34,7 @@ func (c *Collection) Build(
 		}
 	}
 
-	c.Id = collection.ID().String()
+	c.Id = collection.Hash().String()
 	c.Transactions = transactions
 	c.Links = self
 	c.Expandable = &expandable

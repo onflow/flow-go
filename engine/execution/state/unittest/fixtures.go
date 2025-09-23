@@ -60,7 +60,7 @@ func ComputationResultForBlockFixture(
 		startState = endState
 	}
 	bed := unittest.BlockExecutionDataFixture(
-		unittest.WithBlockExecutionDataBlockID(completeBlock.Block.ID()),
+		unittest.WithBlockExecutionDataBlockID(completeBlock.Block.Hash()),
 		unittest.WithChunkExecutionDatas(ceds...),
 	)
 	executionDataID, err := execution_data.CalculateID(context.Background(), bed, execution_data.DefaultSerializer)

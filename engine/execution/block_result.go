@@ -210,12 +210,12 @@ func (ar *BlockAttestationResult) ChunkAt(index int) (*flow.Chunk, error) {
 	if execRes.executionSnapshot == nil {
 		// This should never happen
 		// In case it does, attach additional information to the error message
-		panic(fmt.Sprintf("execution snapshot is nil. Block ID: %s, EndState: %s", ar.Block.ID(), attestRes.endStateCommit))
+		panic(fmt.Sprintf("execution snapshot is nil. Block ID: %s, EndState: %s", ar.Block.Hash(), attestRes.endStateCommit))
 	}
 
 	chunk, err := flow.NewChunk(flow.UntrustedChunk{
 		ChunkBody: flow.ChunkBody{
-			BlockID:              ar.Block.ID(),
+			BlockID:              ar.Block.Hash(),
 			CollectionIndex:      uint(index),
 			StartState:           attestRes.startStateCommit,
 			EventCollection:      attestRes.eventCommit,
@@ -268,7 +268,7 @@ func (ar *BlockAttestationResult) ChunkDataPackAt(index int) (*flow.ChunkDataPac
 	}
 
 	chunkDataPack, err := flow.NewChunkDataPack(flow.UntrustedChunkDataPack{
-		ChunkID:           chunk.ID(), // TODO(ramtin): optimize this
+		ChunkID:           chunk.Hash(), // TODO(ramtin): optimize this
 		StartState:        attestRes.startStateCommit,
 		Proof:             attestRes.stateProof,
 		Collection:        collection,

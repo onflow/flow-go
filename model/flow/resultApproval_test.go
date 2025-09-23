@@ -288,7 +288,7 @@ func TestNewResultApproval(t *testing.T) {
 
 func TestResultApprovalEncode(t *testing.T) {
 	ra := unittest.ResultApprovalFixture()
-	id := ra.ID()
+	id := ra.Hash()
 	assert.NotEqual(t, flow.ZeroID, id)
 }
 

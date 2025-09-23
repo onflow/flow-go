@@ -39,7 +39,7 @@ func (c CompleteCollection) IsCompleted() bool {
 // the id field in all future calls
 func (b *ExecutableBlock) BlockID() flow.Identifier {
 	if b.blockID == flow.ZeroID {
-		b.blockID = b.Block.ID()
+		b.blockID = b.Block.Hash()
 	}
 	return b.blockID
 }

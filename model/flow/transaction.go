@@ -135,7 +135,7 @@ func (tb TransactionBody) InclusionEffort() uint64 {
 	return inclusionEffort
 }
 
-func (tb TransactionBody) ID() Identifier {
+func (tb TransactionBody) Hash() Identifier {
 	return MakeID(tb)
 }
 

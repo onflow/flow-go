@@ -191,14 +191,14 @@ func (a *PublicAssignmentTestSuite) TestDeterministicy() {
 	snapshot.On("Identities", mock.Anything).Return(nodes1, nil).Once()
 	a1, err := NewChunkAssigner(alpha, state)
 	require.NoError(a.T(), err)
-	p1, err := a1.Assign(result, head.ID())
+	p1, err := a1.Assign(result, head.Hash())
 	require.NoError(a.T(), err)
 
 	// chunk assignment of the second set
 	snapshot.On("Identities", mock.Anything).Return(nodes2, nil).Once()
 	a2, err := NewChunkAssigner(alpha, state)
 	require.NoError(a.T(), err)
-	p2, err := a2.Assign(result, head.ID())
+	p2, err := a2.Assign(result, head.Hash())
 	require.NoError(a.T(), err)
 
 	// list of nodes should get shuffled after public assignment
@@ -257,7 +257,7 @@ func (a *PublicAssignmentTestSuite) ChunkAssignmentScenario(chunkNum, verNum, al
 	snapshot.On("Identities", mock.Anything).Return(nodes, nil).Once()
 	a1, err := NewChunkAssigner(uint(alpha), state)
 	require.NoError(a.T(), err)
-	p1, err := a1.Assign(result, head.ID())
+	p1, err := a1.Assign(result, head.Hash())
 	require.NoError(a.T(), err)
 
 	// list of nodes should get shuffled after public assignment
@@ -291,12 +291,12 @@ func (a *PublicAssignmentTestSuite) TestCacheAssignment() {
 	// generate a new one if we want to have the same
 	// state
 	snapshot.On("Identities", mock.Anything).Return(nodes, nil).Once()
-	_, err = assigner.Assign(result, head.ID())
+	_, err = assigner.Assign(result, head.Hash())
 	require.NoError(a.T(), err)
 	require.Equal(a.T(), assigner.Size(), uint(1))
 
 	// repetitive assignment should not be cached
-	_, err = assigner.Assign(result, head.ID())
+	_, err = assigner.Assign(result, head.Hash())
 	require.NoError(a.T(), err)
 	require.Equal(a.T(), assigner.Size(), uint(1))
 
@@ -305,7 +305,7 @@ func (a *PublicAssignmentTestSuite) TestCacheAssignment() {
 	// which should be cached
 	otherResult := a.CreateResult(head, 20, a.T())
 
-	_, err = assigner.Assign(otherResult, head.ID())
+	_, err = assigner.Assign(otherResult, head.Hash())
 	require.NoError(a.T(), err)
 	require.Equal(a.T(), assigner.Size(), uint(2))
 }
@@ -340,7 +340,7 @@ func (a *PublicAssignmentTestSuite) CreateChunks(num int, t *testing.T) flow.Chu
 func (a *PublicAssignmentTestSuite) CreateResult(head *flow.Header, num int, t *testing.T) *flow.ExecutionResult {
 	list := a.CreateChunks(5, a.T())
 	result := &flow.ExecutionResult{
-		BlockID: head.ID(),
+		BlockID: head.Hash(),
 		Chunks:  list,
 	}
 

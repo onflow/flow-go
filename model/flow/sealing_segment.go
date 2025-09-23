@@ -132,9 +132,9 @@ func (segment *SealingSegment) FinalizedSeal() (*Seal, error) {
 	}
 
 	// sanity check
-	if seal.BlockID != segment.Sealed().ID() {
+	if seal.BlockID != segment.Sealed().Hash() {
 		return nil, fmt.Errorf("finalized seal should seal the lowest block %v, but actually is to seal %v",
-			segment.Sealed().ID(), seal.BlockID)
+			segment.Sealed().Hash(), seal.BlockID)
 	}
 	return seal, nil
 }
@@ -160,14 +160,14 @@ func (segment *SealingSegment) Validate() error {
 	results := segment.ExecutionResults.Lookup()
 
 	if segment.FirstSeal != nil {
-		seals[segment.FirstSeal.ID()] = segment.FirstSeal
+		seals[segment.FirstSeal.Hash()] = segment.FirstSeal
 	}
 	for _, proposal := range segment.Blocks {
 		for _, result := range proposal.Block.Payload.Results {
-			results[result.ID()] = result
+			results[result.Hash()] = result
 		}
 		for _, seal := range proposal.Block.Payload.Seals {
-			seals[seal.ID()] = seal
+			seals[seal.Hash()] = seal
 		}
 	}
 
@@ -294,7 +294,7 @@ func (builder *SealingSegmentBuilder) AddBlock(block *Proposal) error {
 	if !builder.isValidHeight(&block.Block) {
 		return NewInvalidSealingSegmentError("invalid block height (%d)", block.Block.Height)
 	}
-	blockID := block.Block.ID()
+	blockID := block.Block.Hash()
 
 	// for the first (lowest) block, if it contains no seal, store the latest
 	// seal incorporated prior to the first block
@@ -313,12 +313,12 @@ func (builder *SealingSegmentBuilder) AddBlock(block *Proposal) error {
 	if err != nil {
 		return fmt.Errorf("could not look up seal: %w", err)
 	}
-	builder.latestSeals[blockID] = latestSeal.ID()
+	builder.latestSeals[blockID] = latestSeal.Hash()
 
 	// cache included results and seals
 	// they could be referenced in a future block in the segment
 	for _, result := range block.Block.Payload.Results {
-		builder.includedResults[result.ID()] = struct{}{}
+		builder.includedResults[result.Hash()] = struct{}{}
 	}
 
 	// if the block commits to an unseen ProtocolStateID, add the corresponding data entry
@@ -380,7 +380,7 @@ func (builder *SealingSegmentBuilder) AddExtraBlock(block *Proposal) error {
 // AddExecutionResult adds result to executionResults
 func (builder *SealingSegmentBuilder) addExecutionResult(result *ExecutionResult) {
 	builder.results = append(builder.results, result)
-	builder.includedResults[result.ID()] = struct{}{}
+	builder.includedResults[result.Hash()] = struct{}{}
 }
 
 // SealingSegment completes building the sealing segment, validating the segment
@@ -489,11 +489,11 @@ func (builder *SealingSegmentBuilder) validateRootSegment() error {
 	if builder.firstSeal == nil {
 		return NewInvalidSealingSegmentError("firstSeal must not be nil for root segment")
 	}
-	if builder.results[0].BlockID != builder.lowest().ID() {
-		return NewInvalidSealingSegmentError("result (block_id=%x) is not for root block (id=%x)", builder.results[0].BlockID, builder.lowest().ID())
+	if builder.results[0].BlockID != builder.lowest().Hash() {
+		return NewInvalidSealingSegmentError("result (block_id=%x) is not for root block (id=%x)", builder.results[0].BlockID, builder.lowest().Hash())
 	}
-	if builder.results[0].ID() != builder.firstSeal.ResultID {
-		return NewInvalidSealingSegmentError("firstSeal (result_id=%x) is not for root result (id=%x)", builder.firstSeal.ResultID, builder.results[0].ID())
+	if builder.results[0].Hash() != builder.firstSeal.ResultID {
+		return NewInvalidSealingSegmentError("firstSeal (result_id=%x) is not for root result (id=%x)", builder.firstSeal.ResultID, builder.results[0].Hash())
 	}
 	if builder.results[0].BlockID != builder.firstSeal.BlockID {
 		return NewInvalidSealingSegmentError("root seal (block_id=%x) references different block than root result (block_id=%x)", builder.firstSeal.BlockID, builder.results[0].BlockID)
@@ -501,7 +501,7 @@ func (builder *SealingSegmentBuilder) validateRootSegment() error {
 	for _, block := range builder.blocks {
 		if len(block.Block.Payload.Seals) > 0 {
 			return NewInvalidSealingSegmentError("root segment cannot contain blocks with seals (minimality requirement) - block (height=%d,id=%x) has %d seals",
-				block.Block.Height, block.Block.ID(), len(block.Block.Payload.Seals))
+				block.Block.Height, block.Block.Hash(), len(block.Block.Payload.Seals))
 		}
 	}
 	return nil
@@ -534,7 +534,7 @@ func (builder *SealingSegmentBuilder) validateSegment() error {
 	// validate the latest seal is for the lowest block
 	_, err := findLatestSealForLowestBlock(builder.blocks, builder.latestSeals)
 	if err != nil {
-		return NewInvalidSealingSegmentError("sealing segment missing seal (lowest block id: %x) (highest block id: %x): %w", builder.lowest().ID(), builder.highest().ID(), err)
+		return NewInvalidSealingSegmentError("sealing segment missing seal (lowest block id: %x) (highest block id: %x): %w", builder.lowest().Hash(), builder.highest().Hash(), err)
 	}
 
 	return nil
@@ -596,8 +596,8 @@ func NewSealingSegmentBuilder(
 // The node logic requires a valid sealing segment to bootstrap.
 // No errors are expected during normal operations.
 func findLatestSealForLowestBlock(blocks []*Proposal, latestSeals map[Identifier]Identifier) (*Seal, error) {
-	lowestBlockID := blocks[0].Block.ID()
-	highestBlockID := blocks[len(blocks)-1].Block.ID()
+	lowestBlockID := blocks[0].Block.Hash()
+	highestBlockID := blocks[len(blocks)-1].Block.Hash()
 
 	// get the ID of the latest seal for highest block
 	latestSealID := latestSeals[highestBlockID]
@@ -608,7 +608,7 @@ func findLatestSealForLowestBlock(blocks []*Proposal, latestSeals map[Identifier
 		// look for latestSealID in the payload
 		for _, seal := range block.Payload.Seals {
 			// if we found the latest seal, confirm it seals lowest
-			if seal.ID() == latestSealID {
+			if seal.Hash() == latestSealID {
 				if seal.BlockID == lowestBlockID {
 					return seal, nil
 				}
@@ -622,7 +622,7 @@ func findLatestSealForLowestBlock(blocks []*Proposal, latestSeals map[Identifier
 		// otherwise, the sealing segment is invalid
 		if len(block.Payload.Seals) > 0 {
 			return nil, fmt.Errorf("invalid segment: segment's last block contain seal %v, but doesn't match latestSealID: %v",
-				block.Payload.Seals[0].ID(), latestSealID)
+				block.Payload.Seals[0].Hash(), latestSealID)
 		}
 	}
 

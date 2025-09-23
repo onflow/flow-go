@@ -158,7 +158,7 @@ func (mc *MalleabilityChecker) CheckEntity(entity flow.Hashable) error {
 	if entity == nil {
 		return fmt.Errorf("entity is nil")
 	}
-	return mc.Check(entity, entity.ID)
+	return mc.Check(entity, entity.Hash)
 }
 
 // Check is a method that performs the malleability check on the input model.

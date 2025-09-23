@@ -94,8 +94,8 @@ func TestExecutionFlow(t *testing.T) {
 	col2 := flow.Collection{Transactions: []*flow.TransactionBody{&tx3, &tx4}}
 
 	collections := map[flow.Identifier]*flow.Collection{
-		col1.ID(): &col1,
-		col2.ID(): &col2,
+		col1.Hash(): &col1,
+		col2.Hash(): &col2,
 	}
 
 	clusterChainID := cluster.CanonicalClusterID(1, flow.IdentityList{colID.Identity()}.NodeIDs())
@@ -111,16 +111,16 @@ func TestExecutionFlow(t *testing.T) {
 			Payload: flow.Payload{
 				Guarantees: []*flow.CollectionGuarantee{
 					{
-						CollectionID:     col1.ID(),
+						CollectionID:     col1.Hash(),
 						SignerIndices:    signerIndices,
 						ClusterChainID:   clusterChainID,
-						ReferenceBlockID: genesis.ID(),
+						ReferenceBlockID: genesis.Hash(),
 					},
 					{
-						CollectionID:     col2.ID(),
+						CollectionID:     col2.Hash(),
 						SignerIndices:    signerIndices,
 						ClusterChainID:   clusterChainID,
-						ReferenceBlockID: genesis.ID(),
+						ReferenceBlockID: genesis.Hash(),
 					},
 				},
 				ProtocolStateID: genesis.Payload.ProtocolStateID,
@@ -138,7 +138,7 @@ func TestExecutionFlow(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	log.Info().Msgf("child block ID: %v, indices: %x", child.ID(), child.ParentVoterIndices)
+	log.Info().Msgf("child block ID: %v, indices: %x", child.Hash(), child.ParentVoterIndices)
 
 	collectionNode := testutil.GenericNodeFromParticipants(t, hub, colID, identities, chainID)
 	defer collectionNode.Done()
@@ -194,7 +194,7 @@ func TestExecutionFlow(t *testing.T) {
 			defer lock.Unlock()
 			receipt, _ = args[2].(*flow.ExecutionReceipt)
 
-			assert.Equal(t, block.ID(), receipt.ExecutionResult.BlockID)
+			assert.Equal(t, block.Hash(), receipt.ExecutionResult.BlockID)
 		}).
 		Return(nil).
 		Once()
@@ -210,7 +210,7 @@ func TestExecutionFlow(t *testing.T) {
 
 			receipt, _ = args[2].(*flow.ExecutionReceipt)
 
-			assert.Equal(t, block.ID(), receipt.ExecutionResult.BlockID)
+			assert.Equal(t, block.Hash(), receipt.ExecutionResult.BlockID)
 			assert.Equal(t, len(collections), len(receipt.ExecutionResult.Chunks)-1) // don't count system chunk
 
 			for i, chunk := range receipt.ExecutionResult.Chunks {
@@ -248,7 +248,7 @@ func TestExecutionFlow(t *testing.T) {
 		exeNode.AssertHighestExecutedBlock(t, block.ToHeader())
 	}
 
-	myReceipt, err := exeNode.MyExecutionReceipts.MyReceipt(block.ID())
+	myReceipt, err := exeNode.MyExecutionReceipts.MyReceipt(block.Hash())
 	require.NoError(t, err)
 	require.NotNil(t, myReceipt)
 	require.Equal(t, exeNode.Me.NodeID(), myReceipt.ExecutorID)
@@ -292,10 +292,10 @@ func deployContractBlock(
 			Payload: flow.Payload{
 				Guarantees: []*flow.CollectionGuarantee{
 					{
-						CollectionID:     col.ID(),
+						CollectionID:     col.Hash(),
 						SignerIndices:    signerIndices,
 						ClusterChainID:   clusterChainID,
-						ReferenceBlockID: ref.ID(),
+						ReferenceBlockID: ref.Hash(),
 					},
 				},
 				ProtocolStateID: parent.Payload.ProtocolStateID,
@@ -334,7 +334,7 @@ func makePanicBlock(t *testing.T, conID *flow.Identity, colID *flow.Identity, ch
 			HeaderBody: block.HeaderBody,
 			Payload: flow.Payload{
 				Guarantees: []*flow.CollectionGuarantee{
-					{CollectionID: col.ID(), SignerIndices: signerIndices, ClusterChainID: clusterChainID, ReferenceBlockID: ref.ID()},
+					{CollectionID: col.Hash(), SignerIndices: signerIndices, ClusterChainID: clusterChainID, ReferenceBlockID: ref.Hash()},
 				},
 				ProtocolStateID: parent.Payload.ProtocolStateID,
 			},
@@ -367,7 +367,7 @@ func makeSuccessBlock(t *testing.T, conID *flow.Identity, colID *flow.Identity, 
 			HeaderBody: block.HeaderBody,
 			Payload: flow.Payload{
 				Guarantees: []*flow.CollectionGuarantee{
-					{CollectionID: col.ID(), SignerIndices: signerIndices, ClusterChainID: clusterChainID, ReferenceBlockID: ref.ID()},
+					{CollectionID: col.Hash(), SignerIndices: signerIndices, ClusterChainID: clusterChainID, ReferenceBlockID: ref.Hash()},
 				},
 				ProtocolStateID: parent.Payload.ProtocolStateID,
 			},
@@ -484,10 +484,10 @@ func TestFailedTxWillNotChangeStateCommitment(t *testing.T) {
 	exe1Node.AssertBlockIsExecuted(t, block1.ToHeader())
 	exe1Node.AssertBlockNotExecuted(t, block2.ToHeader())
 
-	scExe1Genesis, err := exe1Node.ExecutionState.StateCommitmentByBlockID(genesis.ID())
+	scExe1Genesis, err := exe1Node.ExecutionState.StateCommitmentByBlockID(genesis.Hash())
 	assert.NoError(t, err)
 
-	scExe1Block1, err := exe1Node.ExecutionState.StateCommitmentByBlockID(block1.ID())
+	scExe1Block1, err := exe1Node.ExecutionState.StateCommitmentByBlockID(block1.Hash())
 	assert.NoError(t, err)
 	assert.NotEqual(t, scExe1Genesis, scExe1Block1)
 
@@ -508,7 +508,7 @@ func TestFailedTxWillNotChangeStateCommitment(t *testing.T) {
 	exe1Node.AssertBlockIsExecuted(t, block3.ToHeader())
 
 	// verify state commitment of block 2 is the same as block 1, since tx failed on seq number verification
-	scExe1Block2, err := exe1Node.ExecutionState.StateCommitmentByBlockID(block2.ID())
+	scExe1Block2, err := exe1Node.ExecutionState.StateCommitmentByBlockID(block2.Hash())
 	assert.NoError(t, err)
 	// TODO this is no longer valid because the system chunk can change the state
 	// assert.Equal(t, scExe1Block1, scExe1Block2)
@@ -526,7 +526,7 @@ func mockCollectionEngineToReturnCollections(t *testing.T, collectionNode *testm
 	colMap := make(map[flow.Identifier][]byte)
 	for _, col := range cols {
 		blob, _ := msgpack.Marshal(col)
-		colMap[col.ID()] = blob
+		colMap[col.Hash()] = blob
 	}
 	collectionEngine.On("Process", mock.AnythingOfType("channels.Channel"), mock.Anything, mock.Anything).
 		Run(func(args mock.Arguments) {
@@ -622,7 +622,7 @@ func TestBroadcastToMultipleVerificationNodes(t *testing.T) {
 			var receipt *flow.ExecutionReceipt
 			receipt, _ = args[2].(*flow.ExecutionReceipt)
 
-			assert.Equal(t, block.ID(), receipt.ExecutionResult.BlockID)
+			assert.Equal(t, block.Hash(), receipt.ExecutionResult.BlockID)
 			for i, chunk := range receipt.ExecutionResult.Chunks {
 				assert.EqualValues(t, i, chunk.CollectionIndex)
 				assert.Greater(t, chunk.TotalComputationUsed, uint64(0))

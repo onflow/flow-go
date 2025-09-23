@@ -17,21 +17,21 @@ func TestLightTransactionResults_HappyPath(t *testing.T) {
 	txResults := unittest.LightTransactionResultsFixture(10)
 
 	// Store transaction results
-	err := ltx.Store(block.ID(), txResults)
+	err := ltx.Store(block.Hash(), txResults)
 	require.NoError(t, err)
 
 	// Retrieve by BlockID and TransactionID
-	retrievedTx, err := ltx.ByBlockIDTransactionID(block.ID(), txResults[0].TransactionID)
+	retrievedTx, err := ltx.ByBlockIDTransactionID(block.Hash(), txResults[0].TransactionID)
 	require.NoError(t, err)
 	assert.Equal(t, &txResults[0], retrievedTx)
 
 	// Retrieve by BlockID and Index
-	retrievedTxByIndex, err := ltx.ByBlockIDTransactionIndex(block.ID(), 0)
+	retrievedTxByIndex, err := ltx.ByBlockIDTransactionIndex(block.Hash(), 0)
 	require.NoError(t, err)
 	assert.Equal(t, &txResults[0], retrievedTxByIndex)
 
 	// Retrieve by BlockID
-	retrievedTxs, err := ltx.ByBlockID(block.ID())
+	retrievedTxs, err := ltx.ByBlockID(block.Hash())
 	require.NoError(t, err)
 	assert.Len(t, retrievedTxs, len(txResults))
 	assert.Equal(t, txResults, retrievedTxs)

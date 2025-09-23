@@ -290,11 +290,11 @@ func (s *Suite) TestOnFinalizedBlockSingle() {
 	s.finalizedBlock = block.ToHeader()
 
 	hotstuffBlock := hotmodel.Block{
-		BlockID: block.ID(),
+		BlockID: block.Hash(),
 	}
 
 	// expect that the block storage is indexed with each of the collection guarantee
-	s.blocks.On("IndexBlockContainingCollectionGuarantees", block.ID(), []flow.Identifier(flow.GetIDs(block.Payload.Guarantees))).Return(nil).Once()
+	s.blocks.On("IndexBlockContainingCollectionGuarantees", block.Hash(), []flow.Identifier(flow.GetIDs(block.Payload.Guarantees))).Return(nil).Once()
 	for _, seal := range block.Payload.Seals {
 		s.results.On("Index", seal.BlockID, seal.ResultID).Return(nil).Once()
 	}
@@ -361,7 +361,7 @@ func (s *Suite) TestOnFinalizedBlockSeveralBlocksAhead() {
 
 	// block several blocks newer than the last block processed
 	hotstuffBlock := hotmodel.Block{
-		BlockID: latestBlock.ID(),
+		BlockID: latestBlock.Hash(),
 	}
 
 	missingCollectionCountPerBlock := 4
@@ -370,7 +370,7 @@ func (s *Suite) TestOnFinalizedBlockSeveralBlocksAhead() {
 
 	// expected all new blocks after last block processed
 	for _, block := range blocks {
-		s.blocks.On("IndexBlockContainingCollectionGuarantees", block.ID(), []flow.Identifier(flow.GetIDs(block.Payload.Guarantees))).Return(nil).Once()
+		s.blocks.On("IndexBlockContainingCollectionGuarantees", block.Hash(), []flow.Identifier(flow.GetIDs(block.Payload.Guarantees))).Return(nil).Once()
 
 		for _, cg := range block.Payload.Guarantees {
 			s.request.On("EntityByID", cg.CollectionID, mock.Anything).Return().Run(func(args mock.Arguments) {
@@ -454,8 +454,8 @@ func (s *Suite) TestExecutionReceiptsAreIndexed() {
 	s.transactions.On("Store", mock.Anything).Return(nil).Run(
 		func(args mock.Arguments) {
 			tx := args.Get(0).(*flow.TransactionBody)
-			_, pending := needed[tx.ID()]
-			s.Assert().True(pending, "tx not pending (%x)", tx.ID())
+			_, pending := needed[tx.Hash()]
+			s.Assert().True(pending, "tx not pending (%x)", tx.Hash())
 		},
 	)
 	er1 := unittest.ExecutionReceiptFixture()
@@ -652,9 +652,9 @@ func (s *Suite) TestProcessBackgroundCalls() {
 		guarantees := make([]*flow.CollectionGuarantee, collPerBlk)
 		for j := 0; j < collPerBlk; j++ {
 			coll := unittest.CollectionFixture(2).Light()
-			collMap[coll.ID()] = coll
+			collMap[coll.Hash()] = coll
 			cg := unittest.CollectionGuaranteeFixture(func(cg *flow.CollectionGuarantee) {
-				cg.CollectionID = coll.ID()
+				cg.CollectionID = coll.Hash()
 				cg.ReferenceBlockID = refBlockID
 			})
 

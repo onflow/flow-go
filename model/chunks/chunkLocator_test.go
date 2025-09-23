@@ -18,7 +18,7 @@ func TestChunkLocatorConvert(t *testing.T) {
 
 	require.Equal(t, len(originalList), len(locatorMap))
 	for _, locator := range originalList {
-		_, ok := locatorMap[locator.ID()]
+		_, ok := locatorMap[locator.Hash()]
 		require.True(t, ok, "missing chunk locator in conversion from list to map")
 	}
 

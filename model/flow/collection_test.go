@@ -42,7 +42,7 @@ func TestNewCollection(t *testing.T) {
 			light := col.Light()
 			assert.Equal(t, light.Len(), col.Len())
 			for i := range light.Len() {
-				assert.Equal(t, col.Transactions[i].ID(), light.Transactions[i])
+				assert.Equal(t, col.Transactions[i].Hash(), light.Transactions[i])
 			}
 		})
 	})

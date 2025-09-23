@@ -27,13 +27,13 @@ func TestReadSealsByID(t *testing.T) {
 	seal := unittest.Seal.Fixture()
 	seals.On("ByID", mock.AnythingOfType("flow.Identifier")).Return(
 		func(sealID flow.Identifier) *flow.Seal {
-			if sealID == seal.ID() {
+			if sealID == seal.Hash() {
 				return seal
 			}
 			return nil
 		},
 		func(sealID flow.Identifier) error {
-			if sealID == seal.ID() {
+			if sealID == seal.Hash() {
 				return nil
 			}
 			return fmt.Errorf("seal %#v not found", sealID)
@@ -47,7 +47,7 @@ func TestReadSealsByID(t *testing.T) {
 
 	req := &admin.CommandRequest{
 		Data: map[string]interface{}{
-			"seal": seal.ID().String(),
+			"seal": seal.Hash().String(),
 		},
 	}
 	require.NoError(t, command.Validator(req))

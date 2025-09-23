@@ -148,7 +148,7 @@ func (t *Transactions) SendTransaction(ctx context.Context, tx *flow.Transaction
 		return rpc.ConvertError(err, "failed to send transaction to a collection node", codes.Internal)
 	}
 
-	t.metrics.TransactionReceived(tx.ID(), now)
+	t.metrics.TransactionReceived(tx.Hash(), now)
 
 	// store the transaction locally
 	err = t.transactions.Store(tx)
@@ -169,7 +169,7 @@ func (t *Transactions) trySendTransaction(ctx context.Context, tx *flow.Transact
 	}
 
 	// otherwise choose all collection nodes to try
-	collNodes, err := t.chooseCollectionNodes(tx.ID())
+	collNodes, err := t.chooseCollectionNodes(tx.Hash())
 	if err != nil {
 		return fmt.Errorf("failed to determine collection node for tx %x: %w", tx, err)
 	}
@@ -374,7 +374,7 @@ func (t *Transactions) GetTransactionResult(
 			return nil, status.Error(codes.InvalidArgument, "transaction not found in provided collection")
 		}
 
-		blockID = block.ID()
+		blockID = block.Hash()
 		blockHeight = block.Height
 	}
 
@@ -539,7 +539,7 @@ func (t *Transactions) lookupBlock(txID flow.Identifier) (*flow.Block, error) {
 		return nil, err
 	}
 
-	block, err := t.blocks.ByCollectionID(collection.ID())
+	block, err := t.blocks.ByCollectionID(collection.Hash())
 	if err != nil {
 		return nil, err
 	}

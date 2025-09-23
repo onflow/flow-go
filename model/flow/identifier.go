@@ -153,7 +153,7 @@ func PublicKeyToID(pk crypto.PublicKey) (Identifier, error) {
 func GetIDs[T Hashable](entities []T) IdentifierList {
 	ids := make([]Identifier, 0, len(entities))
 	for _, entity := range entities {
-		ids = append(ids, entity.ID())
+		ids = append(ids, entity.Hash())
 	}
 	return ids
 }

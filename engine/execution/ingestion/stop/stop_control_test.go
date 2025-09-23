@@ -47,7 +47,7 @@ func TestCannotSetNewValuesAfterStoppingCommenced(t *testing.T) {
 
 		// no stopping has started yet, block below stop height
 		header := unittest.BlockHeaderFixture(unittest.WithHeaderHeight(20))
-		require.True(t, sc.ShouldExecuteBlock(header.ID(), header.Height))
+		require.True(t, sc.ShouldExecuteBlock(header.Hash(), header.Height))
 
 		stop2 := StopParameters{StopBeforeHeight: 37}
 		err = sc.SetStopParameters(stop2)
@@ -55,7 +55,7 @@ func TestCannotSetNewValuesAfterStoppingCommenced(t *testing.T) {
 
 		// block at stop height, it should be skipped
 		header = unittest.BlockHeaderFixture(unittest.WithHeaderHeight(37))
-		require.False(t, sc.ShouldExecuteBlock(header.ID(), header.Height))
+		require.False(t, sc.ShouldExecuteBlock(header.Hash(), header.Height))
 
 		// cannot set new stop height after stopping has started
 		err = sc.SetStopParameters(StopParameters{StopBeforeHeight: 2137})
@@ -167,7 +167,7 @@ func (m *stopControlMockHeaders) BlockIDByHeight(height uint64) (flow.Identifier
 	if !ok {
 		return flow.ZeroID, fmt.Errorf("header not found")
 	}
-	return h.ID(), nil
+	return h.Hash(), nil
 }
 
 func TestAddStopForPastBlocks(t *testing.T) {
@@ -733,7 +733,7 @@ func Test_StopControlWorkers(t *testing.T) {
 
 		execState := mock.NewExecutionState(t)
 
-		execState.On("IsBlockExecuted", headerA.Height, headerA.ID()).Return(true, nil).Once()
+		execState.On("IsBlockExecuted", headerA.Height, headerA.Hash()).Return(true, nil).Once()
 
 		headers := &stopControlMockHeaders{
 			headers: map[uint64]*flow.Header{
@@ -804,7 +804,7 @@ func Test_StopControlWorkers(t *testing.T) {
 			Once()
 
 		execState := mock.NewExecutionState(t)
-		execState.On("IsBlockExecuted", headerB.Height, headerB.ID()).Return(true, nil).Once()
+		execState.On("IsBlockExecuted", headerB.Height, headerB.Hash()).Return(true, nil).Once()
 
 		headers := &stopControlMockHeaders{
 			headers: map[uint64]*flow.Header{

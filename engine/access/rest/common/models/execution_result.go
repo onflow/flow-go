@@ -9,7 +9,7 @@ func (e *ExecutionResult) Build(
 	exeResult *flow.ExecutionResult,
 	link LinkGenerator,
 ) error {
-	self, err := SelfLink(exeResult.ID(), link.ExecutionResultLink)
+	self, err := SelfLink(exeResult.Hash(), link.ExecutionResultLink)
 	if err != nil {
 		return err
 	}
@@ -21,7 +21,7 @@ func (e *ExecutionResult) Build(
 		}
 	}
 
-	e.Id = exeResult.ID().String()
+	e.Id = exeResult.Hash().String()
 	e.BlockId = exeResult.BlockID.String()
 	e.Events = events
 	e.Links = self

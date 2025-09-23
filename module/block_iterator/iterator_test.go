@@ -29,7 +29,7 @@ func TestIterateHeight(t *testing.T) {
 			lctx := lockManager.NewContext()
 			require.NoError(t, lctx.AcquireLock(storage.LockFinalizeBlock))
 			require.NoError(t, db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-				return operation.IndexFinalizedBlockByHeight(lctx, rw, b.Height, b.ID())
+				return operation.IndexFinalizedBlockByHeight(lctx, rw, b.Height, b.Hash())
 			}))
 
 			lctx.Release()
@@ -65,7 +65,7 @@ func TestIterateHeight(t *testing.T) {
 
 		// verify all blocks are visited in the same order
 		for i, b := range bs {
-			require.Equal(t, b.ID(), visited[i])
+			require.Equal(t, b.Hash(), visited[i])
 		}
 
 		require.Equal(t, len(bs), len(visited))

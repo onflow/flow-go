@@ -92,16 +92,16 @@ func (s *MatchingEngineSuite) TestOnFinalizedBlock() {
 func (s *MatchingEngineSuite) TestOnBlockIncorporated() {
 
 	incorporatedBlock := unittest.BlockHeaderFixture()
-	incorporatedBlockID := incorporatedBlock.ID()
+	incorporatedBlockID := incorporatedBlock.Hash()
 
 	payload := unittest.PayloadFixture(unittest.WithAllTheFixins)
 	index := &flow.Index{}
 	resultsByID := payload.Results.Lookup()
 	for _, receipt := range payload.Receipts {
-		index.ReceiptIDs = append(index.ReceiptIDs, receipt.ID())
+		index.ReceiptIDs = append(index.ReceiptIDs, receipt.Hash())
 		fullReceipt, err := flow.ExecutionReceiptFromStub(*receipt, *resultsByID[receipt.ResultID])
 		s.Require().NoError(err)
-		s.receipts.On("ByID", receipt.ID()).Return(fullReceipt, nil).Once()
+		s.receipts.On("ByID", receipt.Hash()).Return(fullReceipt, nil).Once()
 		s.core.On("ProcessReceipt", fullReceipt).Return(nil).Once()
 	}
 	s.index.On("ByBlockID", incorporatedBlockID).Return(index, nil)

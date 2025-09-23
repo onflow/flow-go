@@ -132,7 +132,7 @@ func TransactionResultToMessage(result accessmodel.TransactionResult) *accesspro
 }
 
 func BlockHeaderToMessage(h *flow.Header) (*entitiesproto.BlockHeader, error) {
-	id := h.ID()
+	id := h.Hash()
 
 	return &entitiesproto.BlockHeader{
 		Id:        id[:],
@@ -143,7 +143,7 @@ func BlockHeaderToMessage(h *flow.Header) (*entitiesproto.BlockHeader, error) {
 }
 
 func BlockToMessage(h *flow.Block) (*entitiesproto.Block, error) {
-	id := h.ID()
+	id := h.Hash()
 
 	cg := make([]*entitiesproto.CollectionGuarantee, len(h.Payload.Guarantees))
 	for i, g := range h.Payload.Guarantees {
@@ -190,7 +190,7 @@ func LightCollectionToMessage(c *flow.LightCollection) (*entitiesproto.Collectio
 		return nil, fmt.Errorf("invalid collection")
 	}
 
-	collectionID := c.ID()
+	collectionID := c.Hash()
 
 	return &entitiesproto.Collection{
 		Id:             collectionID[:],

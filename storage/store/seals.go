@@ -39,7 +39,7 @@ func NewSeals(collector module.CacheMetrics, db storage.DB) *Seals {
 }
 
 func (s *Seals) storeTx(rw storage.ReaderBatchWriter, seal *flow.Seal) error {
-	return s.cache.PutTx(rw, seal.ID(), seal)
+	return s.cache.PutTx(rw, seal.Hash(), seal)
 }
 
 func (s *Seals) retrieveTx(sealID flow.Identifier) (*flow.Seal, error) {

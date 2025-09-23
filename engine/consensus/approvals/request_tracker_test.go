@@ -39,11 +39,11 @@ func (s *RequestTrackerTestSuite) SetupTest() {
 // updated when blackout period has passed.
 func (s *RequestTrackerTestSuite) TestTryUpdate_CreateAndUpdate() {
 	executedBlock := unittest.BlockFixture()
-	s.headers.On("ByBlockID", executedBlock.ID()).Return(executedBlock.ToHeader(), nil)
+	s.headers.On("ByBlockID", executedBlock.Hash()).Return(executedBlock.ToHeader(), nil)
 	result := unittest.ExecutionResultFixture(unittest.WithBlock(executedBlock))
 	chunks := 5
 	for i := 0; i < chunks; i++ {
-		_, updated, err := s.tracker.TryUpdate(result, executedBlock.ID(), uint64(i))
+		_, updated, err := s.tracker.TryUpdate(result, executedBlock.Hash(), uint64(i))
 		require.NoError(s.T(), err)
 		require.False(s.T(), updated)
 	}
@@ -52,7 +52,7 @@ func (s *RequestTrackerTestSuite) TestTryUpdate_CreateAndUpdate() {
 	time.Sleep(time.Second * 3)
 
 	for i := 0; i < chunks; i++ {
-		item, updated, err := s.tracker.TryUpdate(result, executedBlock.ID(), uint64(i))
+		item, updated, err := s.tracker.TryUpdate(result, executedBlock.Hash(), uint64(i))
 		require.NoError(s.T(), err)
 		require.True(s.T(), updated)
 		require.Equal(s.T(), uint(1), item.Requests)
@@ -65,7 +65,7 @@ func (s *RequestTrackerTestSuite) TestTryUpdate_ConcurrentTracking() {
 	s.tracker.blackoutPeriodMin = 0
 
 	executedBlock := unittest.BlockFixture()
-	s.headers.On("ByBlockID", executedBlock.ID()).Return(executedBlock.ToHeader(), nil)
+	s.headers.On("ByBlockID", executedBlock.Hash()).Return(executedBlock.ToHeader(), nil)
 	result := unittest.ExecutionResultFixture(unittest.WithBlock(executedBlock))
 	chunks := 5
 	var wg sync.WaitGroup
@@ -73,7 +73,7 @@ func (s *RequestTrackerTestSuite) TestTryUpdate_ConcurrentTracking() {
 		wg.Add(1)
 		go func() {
 			for i := 0; i < chunks; i++ {
-				_, updated, err := s.tracker.TryUpdate(result, executedBlock.ID(), uint64(i))
+				_, updated, err := s.tracker.TryUpdate(result, executedBlock.Hash(), uint64(i))
 				require.NoError(s.T(), err)
 				require.True(s.T(), updated)
 			}
@@ -84,7 +84,7 @@ func (s *RequestTrackerTestSuite) TestTryUpdate_ConcurrentTracking() {
 	wg.Wait()
 
 	for i := 0; i < chunks; i++ {
-		tracker, ok := s.tracker.index[result.ID()][executedBlock.ID()][uint64(i)]
+		tracker, ok := s.tracker.index[result.Hash()][executedBlock.Hash()][uint64(i)]
 		require.True(s.T(), ok)
 		require.Equal(s.T(), uint(10), tracker.Requests)
 	}
@@ -94,9 +94,9 @@ func (s *RequestTrackerTestSuite) TestTryUpdate_ConcurrentTracking() {
 // results in error.
 func (s *RequestTrackerTestSuite) TestTryUpdate_UpdateForInvalidResult() {
 	executedBlock := unittest.BlockFixture()
-	s.headers.On("ByBlockID", executedBlock.ID()).Return(nil, storage.ErrNotFound)
+	s.headers.On("ByBlockID", executedBlock.Hash()).Return(nil, storage.ErrNotFound)
 	result := unittest.ExecutionResultFixture(unittest.WithBlock(executedBlock))
-	_, updated, err := s.tracker.TryUpdate(result, executedBlock.ID(), uint64(0))
+	_, updated, err := s.tracker.TryUpdate(result, executedBlock.Hash(), uint64(0))
 	require.Error(s.T(), err)
 	require.False(s.T(), updated)
 }
@@ -105,11 +105,11 @@ func (s *RequestTrackerTestSuite) TestTryUpdate_UpdateForInvalidResult() {
 // that are lower than our lowest height.
 func (s *RequestTrackerTestSuite) TestTryUpdate_UpdateForPrunedHeight() {
 	executedBlock := unittest.BlockFixture()
-	s.headers.On("ByBlockID", executedBlock.ID()).Return(executedBlock.ToHeader(), nil)
+	s.headers.On("ByBlockID", executedBlock.Hash()).Return(executedBlock.ToHeader(), nil)
 	err := s.tracker.PruneUpToHeight(executedBlock.Height + 1)
 	require.NoError(s.T(), err)
 	result := unittest.ExecutionResultFixture(unittest.WithBlock(executedBlock))
-	_, updated, err := s.tracker.TryUpdate(result, executedBlock.ID(), uint64(0))
+	_, updated, err := s.tracker.TryUpdate(result, executedBlock.Hash(), uint64(0))
 	require.Error(s.T(), err)
 	require.True(s.T(), mempool.IsBelowPrunedThresholdError(err))
 	require.False(s.T(), updated)
@@ -119,14 +119,14 @@ func (s *RequestTrackerTestSuite) TestTryUpdate_UpdateForPrunedHeight() {
 func (s *RequestTrackerTestSuite) TestPruneUpToHeight_Pruning() {
 	executedBlock := unittest.BlockFixture()
 	nextExecutedBlock := unittest.BlockWithParentFixture(executedBlock.ToHeader())
-	s.headers.On("ByBlockID", executedBlock.ID()).Return(executedBlock.ToHeader(), nil)
-	s.headers.On("ByBlockID", nextExecutedBlock.ID()).Return(nextExecutedBlock.ToHeader(), nil)
+	s.headers.On("ByBlockID", executedBlock.Hash()).Return(executedBlock.ToHeader(), nil)
+	s.headers.On("ByBlockID", nextExecutedBlock.Hash()).Return(nextExecutedBlock.ToHeader(), nil)
 
 	result := unittest.ExecutionResultFixture(unittest.WithBlock(executedBlock))
 	nextResult := unittest.ExecutionResultFixture(unittest.WithBlock(nextExecutedBlock))
 
 	for _, r := range []*flow.ExecutionResult{result, nextResult} {
-		_, updated, err := s.tracker.TryUpdate(r, executedBlock.ID(), uint64(0))
+		_, updated, err := s.tracker.TryUpdate(r, executedBlock.Hash(), uint64(0))
 		require.NoError(s.T(), err)
 		require.False(s.T(), updated)
 	}
@@ -134,9 +134,9 @@ func (s *RequestTrackerTestSuite) TestPruneUpToHeight_Pruning() {
 	err := s.tracker.PruneUpToHeight(nextExecutedBlock.Height)
 	require.NoError(s.T(), err)
 
-	_, ok := s.tracker.index[result.ID()]
+	_, ok := s.tracker.index[result.Hash()]
 	require.False(s.T(), ok)
-	_, ok = s.tracker.index[nextResult.ID()]
+	_, ok = s.tracker.index[nextResult.Hash()]
 	require.True(s.T(), ok)
 }
 

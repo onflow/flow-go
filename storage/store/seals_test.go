@@ -38,7 +38,7 @@ func TestSealStoreRetrieve(t *testing.T) {
 		require.NoError(t, err)
 
 		// retrieve seal
-		seal, err := s.ByID(expected.ID())
+		seal, err := s.ByID(expected.Hash())
 		require.NoError(t, err)
 		require.Equal(t, expected, seal)
 	})
@@ -69,7 +69,7 @@ func TestSealIndexAndRetrieve(t *testing.T) {
 
 		// index the seal ID for the heighest sealed block in this fork
 		err = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			return operation.IndexLatestSealAtBlock(lctx, rw.Writer(), blockID, expectedSeal.ID())
+			return operation.IndexLatestSealAtBlock(lctx, rw.Writer(), blockID, expectedSeal.Hash())
 		})
 		require.NoError(t, err)
 
@@ -97,7 +97,7 @@ func TestSealedBlockIndexAndRetrieve(t *testing.T) {
 
 		// index the seal ID for the highest sealed block in this fork
 		err = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			return operation.IndexFinalizedSealByBlockID(rw.Writer(), expectedSeal.BlockID, expectedSeal.ID())
+			return operation.IndexFinalizedSealByBlockID(rw.Writer(), expectedSeal.BlockID, expectedSeal.Hash())
 		})
 		require.NoError(t, err)
 

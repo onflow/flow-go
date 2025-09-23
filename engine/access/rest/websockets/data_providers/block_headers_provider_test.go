@@ -66,14 +66,14 @@ func (s *BlockHeadersProviderSuite) validBlockHeadersArgumentsTestCases() []test
 		{
 			name: "happy path with start_block_id argument",
 			arguments: wsmodels.Arguments{
-				"start_block_id": s.rootBlock.ID().String(),
+				"start_block_id": s.rootBlock.Hash().String(),
 				"block_status":   parser.Finalized,
 			},
 			setupBackend: func(sub *statestreamsmock.Subscription) {
 				s.api.On(
 					"SubscribeBlockHeadersFromStartBlockID",
 					mock.Anything,
-					s.rootBlock.ID(),
+					s.rootBlock.Hash(),
 					flow.BlockStatusFinalized,
 				).Return(sub).Once()
 			},

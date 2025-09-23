@@ -254,12 +254,12 @@ func (_m *KVStoreAPI) GetVersionUpgrade() *protocol.ViewBasedActivator[uint64] {
 	return r0
 }
 
-// ID provides a mock function with no fields
-func (_m *KVStoreAPI) ID() flow.Identifier {
+// Hash provides a mock function with no fields
+func (_m *KVStoreAPI) Hash() flow.Identifier {
 	ret := _m.Called()
 
 	if len(ret) == 0 {
-		panic("no return value specified for ID")
+		panic("no return value specified for Hash")
 	}
 
 	var r0 flow.Identifier

@@ -748,7 +748,7 @@ func (s *SealValidationSuite) TestExtendSeal_ResultIncorporatedOnDifferentFork()
 func (s *SealValidationSuite) validSealForResult(result *flow.ExecutionResult) *flow.Seal {
 	seal := unittest.Seal.Fixture(unittest.Seal.WithResult(result))
 
-	assignment := s.Assignments[result.ID()]
+	assignment := s.Assignments[result.Hash()]
 	for _, chunk := range result.Chunks {
 		aggregatedSigs := &seal.AggregatedApprovalSigs[chunk.Index]
 		assignedVerifiers, err := assignment.Verifiers(chunk.Index)
@@ -763,9 +763,9 @@ func (s *SealValidationSuite) validSealForResult(result *flow.ExecutionResult) *
 		for i, aggregatedSig := range aggregatedSigs.VerifierSignatures {
 			payload := flow.Attestation{
 				BlockID:           result.BlockID,
-				ExecutionResultID: result.ID(),
+				ExecutionResultID: result.Hash(),
 				ChunkIndex:        chunk.Index,
-			}.ID()
+			}.Hash()
 			// assuming all signatures are valid
 			s.Identities[aggregatedSigs.SignerIDs[i]].StakingPubKey = s.publicKey
 			s.publicKey.On("Verify",

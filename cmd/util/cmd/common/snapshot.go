@@ -99,7 +99,7 @@ func GetSnapshotAtEpochAndPhase(ctx context.Context, log zerolog.Logger, startup
 				Dur("time_waiting", time.Since(start)).
 				Uint64("current_epoch", currEpochCounter).
 				Str("current_epoch_phase", currEpochPhase.String()).
-				Hex("finalized_root_block_id", logging.ID(head.ID())).
+				Hex("finalized_root_block_id", logging.ID(head.Hash())).
 				Uint64("finalized_block_height", head.Height).
 				Msg("finished dynamic startup - reached desired epoch and phase")
 

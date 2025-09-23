@@ -137,7 +137,7 @@ func (ss *SyncSuite) TestOnRangeRequest() {
 			unittest.Block.WithHeight(height),
 		)
 		ss.heights[height] = unittest.ProposalFromBlock(block)
-		ss.blockIDs[block.ID()] = ss.heights[height]
+		ss.blockIDs[block.Hash()] = ss.heights[height]
 	}
 
 	// empty range should be a no-op
@@ -312,8 +312,8 @@ func (ss *SyncSuite) TestOnBatchRequest() {
 			unittest.Block.WithHeight(ss.head.Height - 1),
 		)
 		proposal := unittest.ProposalFromBlock(block)
-		req.BlockIDs = []flow.Identifier{block.ID()}
-		ss.blockIDs[block.ID()] = proposal
+		req.BlockIDs = []flow.Identifier{block.Hash()}
+		ss.blockIDs[block.Hash()] = proposal
 		ss.con.On("Unicast", mock.Anything, mock.Anything).Return(nil).Run(
 			func(args mock.Arguments) {
 				res := args.Get(0).(*messages.BlockResponse)
@@ -343,8 +343,8 @@ func (ss *SyncSuite) TestOnBatchRequest() {
 			b := unittest.BlockFixture(
 				unittest.Block.WithHeight(ss.head.Height - uint64(i)),
 			)
-			req.BlockIDs[i] = b.ID()
-			ss.blockIDs[b.ID()] = unittest.ProposalFromBlock(b)
+			req.BlockIDs[i] = b.Hash()
+			ss.blockIDs[b.Hash()] = unittest.ProposalFromBlock(b)
 		}
 		ss.con.On("Unicast", mock.Anything, mock.Anything).Return(nil).Run(
 			func(args mock.Arguments) {

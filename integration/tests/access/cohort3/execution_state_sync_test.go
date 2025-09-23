@@ -161,7 +161,7 @@ func (s *ExecutionStateSyncSuite) executionStateSyncTest() {
 	// get the first block height
 	currentFinalized := s.BlockState.HighestFinalizedHeight()
 	blockA := s.BlockState.WaitForHighestFinalizedProgress(s.T(), currentFinalized)
-	s.T().Logf("got block height %v ID %v", blockA.Height, blockA.ID())
+	s.T().Logf("got block height %v ID %v", blockA.Height, blockA.Hash())
 
 	// Loop through checkBlocks and verify the execution data was downloaded correctly
 	an := s.net.ContainerByName(testnet.PrimaryAN)

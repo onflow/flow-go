@@ -104,7 +104,7 @@ func (s *StateMutatorSuite) SetupTest() {
 func (s *StateMutatorSuite) testEvolveState(seals []*flow.Seal, expectedResultingStateID flow.Identifier, stateChangeExpected bool) {
 	// on the happy path, we _always_ require a deferred db update, which indexes the protocol state by the candidate block's ID
 	rw := storagemock.NewReaderBatchWriter(s.T())
-	s.protocolKVStoreDB.On("BatchIndex", mock.Anything, rw, s.candidate.ID(), expectedResultingStateID).Return(nil).Once()
+	s.protocolKVStoreDB.On("BatchIndex", mock.Anything, rw, s.candidate.Hash(), expectedResultingStateID).Return(nil).Once()
 
 	// expect calls to prepare a deferred update for indexing and storing the resulting state:
 	// as state has not changed, we expect the parent blocks protocol state ID
@@ -119,7 +119,7 @@ func (s *StateMutatorSuite) testEvolveState(seals []*flow.Seal, expectedResultin
 
 	// Provide the blockID and execute the resulting `DeferredDBUpdate`. Thereby,
 	// the expected mock methods should be called, which is asserted by the testify framework
-	blockID := s.candidate.ID()
+	blockID := s.candidate.Hash()
 	err = deferredDBOps.Execute(nil, blockID, rw)
 	require.NoError(s.T(), err)
 
@@ -135,7 +135,7 @@ func (s *StateMutatorSuite) testEvolveState(seals []*flow.Seal, expectedResultin
 // Test_HappyPath_StateInvariant tests that `MutableProtocolState.EvolveState` returns all updates from sub-state state machines and
 // prepares updates to the KV store, when building protocol state. Here, we focus on the path, where the *state remains invariant*.
 func (s *StateMutatorSuite) Test_HappyPath_StateInvariant() {
-	parentProtocolStateID := s.parentState.ID()
+	parentProtocolStateID := s.parentState.Hash()
 	s.evolvingState.On("ID").Return(parentProtocolStateID, nil)
 
 	s.Run("nil seals slice, hence no service events", func() {
@@ -157,7 +157,7 @@ func (s *StateMutatorSuite) Test_HappyPath_StateInvariant() {
 	s.Run("seals without service events", func() {
 		sealedBlock := unittest.BlockHeaderFixture(unittest.WithHeaderHeight(s.candidate.View - 10))
 		sealedResult := unittest.ExecutionResultFixture()
-		seal := unittest.Seal.Fixture(unittest.Seal.WithBlockID(sealedBlock.ID()))
+		seal := unittest.Seal.Fixture(unittest.Seal.WithBlockID(sealedBlock.Hash()))
 		s.headersDB.On("ByBlockID", seal.BlockID).Return(sealedBlock, nil)
 		s.resultsDB.On("ByID", seal.ResultID).Return(sealedResult, nil)
 
@@ -174,7 +174,7 @@ func (s *StateMutatorSuite) Test_HappyPath_StateInvariant() {
 		sealedResult := unittest.ExecutionResultFixture(func(result *flow.ExecutionResult) {
 			result.ServiceEvents = serviceEvents
 		})
-		seal := unittest.Seal.Fixture(unittest.Seal.WithBlockID(sealedBlock.ID()))
+		seal := unittest.Seal.Fixture(unittest.Seal.WithBlockID(sealedBlock.Hash()))
 		s.headersDB.On("ByBlockID", seal.BlockID).Return(sealedBlock, nil)
 		s.resultsDB.On("ByID", seal.ResultID).Return(sealedResult, nil)
 
@@ -218,7 +218,7 @@ func (s *StateMutatorSuite) Test_HappyPath_StateChange() {
 	s.Run("seals without service events", func() {
 		sealedBlock := unittest.BlockHeaderFixture(unittest.WithHeaderHeight(s.candidate.View - 10))
 		sealedResult := unittest.ExecutionResultFixture()
-		seal := unittest.Seal.Fixture(unittest.Seal.WithBlockID(sealedBlock.ID()))
+		seal := unittest.Seal.Fixture(unittest.Seal.WithBlockID(sealedBlock.Hash()))
 		s.headersDB.On("ByBlockID", seal.BlockID).Return(sealedBlock, nil)
 		s.resultsDB.On("ByID", seal.ResultID).Return(sealedResult, nil)
 
@@ -238,7 +238,7 @@ func (s *StateMutatorSuite) Test_HappyPath_StateChange() {
 		sealedResult := unittest.ExecutionResultFixture(func(result *flow.ExecutionResult) {
 			result.ServiceEvents = serviceEvents
 		})
-		seal := unittest.Seal.Fixture(unittest.Seal.WithBlockID(sealedBlock.ID()))
+		seal := unittest.Seal.Fixture(unittest.Seal.WithBlockID(sealedBlock.Hash()))
 		s.headersDB.On("ByBlockID", seal.BlockID).Return(sealedBlock, nil)
 		s.resultsDB.On("ByID", seal.ResultID).Return(sealedResult, nil)
 
@@ -359,20 +359,20 @@ func (s *StateMutatorSuite) Test_SealsOrdered() {
 		// create the seals in order of increasing block height:
 		sealedBlock := unittest.BlockHeaderFixture(unittest.WithHeaderHeight(s.candidate.View - 50 + uint64(i)))
 		sealedResult := unittest.ExecutionResultFixture(
-			unittest.WithExecutionResultBlockID(sealedBlock.ID()),
+			unittest.WithExecutionResultBlockID(sealedBlock.Hash()),
 			unittest.WithServiceEvents(i),
 		)
-		seal := unittest.Seal.Fixture(unittest.Seal.WithBlockID(sealedBlock.ID()), unittest.Seal.WithResult(sealedResult))
+		seal := unittest.Seal.Fixture(unittest.Seal.WithBlockID(sealedBlock.Hash()), unittest.Seal.WithResult(sealedResult))
 		orderedServiceEvents = append(orderedServiceEvents, sealedResult.ServiceEvents...)
 		seals = append(seals, seal)
 
-		s.headersDB.On("ByBlockID", sealedBlock.ID()).Return(sealedBlock, nil)
+		s.headersDB.On("ByBlockID", sealedBlock.Hash()).Return(sealedBlock, nil)
 		s.resultsDB.On("ByID", seal.ResultID).Return(sealedResult, nil)
 	}
 	slices.Reverse(seals) // revert order of seals, thereby they are listed in order of _decreasing_ block height
 
 	s.Run("service events leave state invariant", func() {
-		parentProtocolStateID := s.parentState.ID()
+		parentProtocolStateID := s.parentState.Hash()
 		s.evolvingState.On("ID").Return(parentProtocolStateID, nil).Once()
 
 		s.kvStateMachines[0] = s.mockStateTransition().ExpectedServiceEvents(orderedServiceEvents).Mock()
@@ -552,7 +552,7 @@ func (s *StateMutatorSuite) Test_EncodeFailed() {
 	s.kvStateMachines[1] = s.mockStateTransition().ServiceEventsMatch(emptySlice[flow.ServiceEvent]()).Mock()
 
 	rw := storagemock.NewReaderBatchWriter(s.T())
-	s.protocolKVStoreDB.On("BatchIndex", mock.Anything, mock.Anything, s.candidate.ID(), expectedResultingStateID).Return(nil).Once()
+	s.protocolKVStoreDB.On("BatchIndex", mock.Anything, mock.Anything, s.candidate.Hash(), expectedResultingStateID).Return(nil).Once()
 	s.protocolKVStoreDB.On("BatchStore", mock.Anything, mock.Anything, expectedResultingStateID, &s.evolvingState).Return(exception).Once()
 
 	deferredDBOps := deferred.NewDeferredBlockPersist()
@@ -561,7 +561,7 @@ func (s *StateMutatorSuite) Test_EncodeFailed() {
 
 	// Provide the blockID and execute the resulting `DeferredDBUpdate`. Thereby,
 	// the expected mock methods should be called, which is asserted by the testify framework
-	blockID := s.candidate.ID()
+	blockID := s.candidate.Hash()
 	err = deferredDBOps.Execute(nil, blockID, rw)
 
 	// We expect the business logic to wrap the unexpected `exception` from above into an irrecoverable error.

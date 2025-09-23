@@ -192,7 +192,7 @@ func (s *GrpcStateStreamSuite) TestHappyPath() {
 	for _, rpc := range s.testedRPCs() {
 		s.T().Run(rpc.name, func(t *testing.T) {
 			if rpc.name == "SubscribeEventsFromStartBlockID" {
-				startValue = convert.IdentifierToMessage(blockA.ID())
+				startValue = convert.IdentifierToMessage(blockA.Hash())
 			} else {
 				startValue = blockA.Height
 			}

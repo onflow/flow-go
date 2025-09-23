@@ -11,7 +11,7 @@ import (
 
 // PrettyPrintEntity pretty print a flow entity
 func PrettyPrintEntity(entity flow.Hashable) {
-	log.Info().Msgf("entity id: %v", entity.ID())
+	log.Info().Msgf("entity id: %v", entity.Hash())
 	PrettyPrint(entity)
 }
 

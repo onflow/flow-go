@@ -31,7 +31,7 @@ func chunkDataPackRequestForReceipts(
 	// stratifies result ids based on executor.
 	executorIds := make(map[flow.Identifier]flow.IdentifierList)
 	for _, receipt := range receipts {
-		resultId := receipt.ExecutionResult.ID()
+		resultId := receipt.ExecutionResult.Hash()
 		executorIds[resultId] = flow.IdentifierList{receipt.ExecutorID}.Union(executorIds[resultId])
 	}
 
@@ -40,7 +40,7 @@ func chunkDataPackRequestForReceipts(
 	for _, receipt := range receipts {
 		result := receipt.ExecutionResult
 		for _, chunk := range result.Chunks {
-			chunkId := chunk.ID()
+			chunkId := chunk.Hash()
 
 			if _, ok := cdpReqMap[chunkId]; ok {
 				// chunk data pack request already created
@@ -61,7 +61,7 @@ func chunkDataPackRequestForReceipts(
 					Channel:           channels.RequestChunks,
 					Protocol:          insecure.Protocol_PUBLISH,
 					TargetNum:         0,
-					TargetIds:         executorIds[result.ID()],
+					TargetIds:         executorIds[result.Hash()],
 					FlowProtocolEvent: cdpReq,
 				}
 
@@ -100,15 +100,15 @@ func receiptsWithSameResultFixture(
 				unittest.WithExecutorID(exeId),
 				unittest.WithResult(result))
 
-			require.Equal(t, result.ID(), receipt.ExecutionResult.ID())
+			require.Equal(t, result.Hash(), receipt.ExecutionResult.Hash())
 
 			event := executionReceiptEvent((*messages.ExecutionReceipt)(receipt), targetIds)
 
-			_, ok := eventMap[receipt.ID()]
+			_, ok := eventMap[receipt.Hash()]
 			require.False(t, ok) // check for duplicate receipts.
 
 			receipts = append(receipts, receipt)
-			eventMap[receipt.ID()] = event
+			eventMap[receipt.Hash()] = event
 		}
 	}
 
@@ -135,7 +135,7 @@ func chunkDataPackResponseForReceipts(receipts []*flow.ExecutionReceipt, verIds 
 	for _, receipt := range receipts {
 		result := receipt.ExecutionResult
 		for _, chunk := range result.Chunks {
-			chunkId := chunk.ID()
+			chunkId := chunk.Hash()
 
 			if chunkIds.Contains(chunkId) {
 				// chunk data pack request already created
@@ -221,11 +221,11 @@ func orchestratorOutputSanityCheck(
 				require.True(t, ok)
 
 				// uses union to avoid adding duplicate.
-				passThroughReceipts = passThroughReceipts.Union(flow.IdentifierList{receipt.ID()})
+				passThroughReceipts = passThroughReceipts.Union(flow.IdentifierList{receipt.Hash()})
 			} else {
 				// a receipt with an empty signature contains a dictated result from wintermute orchestrator.
 				// the rest of receipt will be filled by the corrupted node
-				resultId := event.ExecutionResult.ID()
+				resultId := event.ExecutionResult.Hash()
 				if dictatedResults[resultId] == nil {
 					dictatedResults[resultId] = flow.IdentifierList{}
 				}
@@ -272,11 +272,11 @@ func receiptsWithDistinctResultFixture(
 			receipt := unittest.ExecutionReceiptFixture(unittest.WithExecutorID(exeId))
 			event := executionReceiptEvent((*messages.ExecutionReceipt)(receipt), targetIds)
 
-			_, ok := eventMap[receipt.ID()]
+			_, ok := eventMap[receipt.Hash()]
 			require.False(t, ok) // checks for duplicate receipts.
 
 			receipts = append(receipts, receipt)
-			eventMap[receipt.ID()] = event
+			eventMap[receipt.Hash()] = event
 		}
 	}
 

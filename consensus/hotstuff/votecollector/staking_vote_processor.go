@@ -120,11 +120,11 @@ func (p *StakingVoteProcessor) Process(vote *model.Vote) error {
 	if err != nil {
 		if model.IsInvalidSignerError(err) {
 			return model.NewInvalidVoteErrorf(vote, "vote %x for view %d is not signed by an authorized consensus participant: %w",
-				vote.ID(), vote.View, err)
+				vote.Hash(), vote.View, err)
 		}
 		if errors.Is(err, model.ErrInvalidSignature) {
 			return model.NewInvalidVoteErrorf(vote, "vote %x for view %d has an invalid staking signature: %w",
-				vote.ID(), vote.View, err)
+				vote.Hash(), vote.View, err)
 		}
 		return fmt.Errorf("internal error checking signature validity: %w", err)
 	}
@@ -136,7 +136,7 @@ func (p *StakingVoteProcessor) Process(vote *model.Vote) error {
 	if err != nil {
 		// we don't expect any errors here during normal operation, as we previously checked
 		// for duplicated votes from the same signer and verified the signer+signature
-		return fmt.Errorf("unexpected exception adding signature from vote %x to staking aggregator: %w", vote.ID(), err)
+		return fmt.Errorf("unexpected exception adding signature from vote %x to staking aggregator: %w", vote.Hash(), err)
 	}
 
 	p.log.Debug().Msgf("processed vote, total weight=(%d), required=(%d)", totalWeight, p.minRequiredWeight)

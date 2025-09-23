@@ -290,7 +290,7 @@ func (n *Network) processAttackerEgressMessage(msg *insecure.Message) error {
 			receipt, err := n.generateExecutionReceipt(&e.ExecutionResult)
 			if err != nil {
 				lg.Err(err).
-					Hex("result_id", logging.ID(e.ExecutionResult.ID())).
+					Hex("result_id", logging.ID(e.ExecutionResult.Hash())).
 					Msg("could not generate receipt for attack orchestrator's dictated result")
 				return fmt.Errorf("could not generate execution receipt for attack orchestrator's result: %w", err)
 			}

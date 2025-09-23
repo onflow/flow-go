@@ -35,13 +35,13 @@ func CleanupMempools(
 		}
 
 		for _, guarantee := range payload.Guarantees {
-			_ = guarantees.Remove(guarantee.ID())
+			_ = guarantees.Remove(guarantee.Hash())
 		}
 
 		collector.MempoolEntries(metrics.ResourceGuarantee, guarantees.Size())
 
 		for _, seal := range payload.Seals {
-			_ = seals.Remove(seal.ID())
+			_ = seals.Remove(seal.Hash())
 		}
 
 		collector.MempoolEntries(metrics.ResourceSeal, seals.Size())

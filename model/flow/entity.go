@@ -7,15 +7,15 @@ package flow
 // of keeping a slice of entity object itself. This simplifies storage, signature and validation
 // of entities.
 type Hashable interface {
-	// ID returns a unique id for this entity using a hash of the immutable
+	// Hash returns a unique id for this entity using a hash of the immutable
 	// fields of the entity.
-	ID() Identifier
+	Hash() Identifier
 }
 
 func EntitiesToIDs[T Hashable](entities []T) []Identifier {
 	ids := make([]Identifier, 0, len(entities))
 	for _, entity := range entities {
-		ids = append(ids, entity.ID())
+		ids = append(ids, entity.Hash())
 	}
 	return ids
 }
@@ -31,7 +31,7 @@ func Deduplicate[T Hashable](entities []T) []T {
 	result := make([]T, 0, len(entities))
 
 	for _, entity := range entities {
-		id := entity.ID()
+		id := entity.Hash()
 		if _, ok := seen[id]; ok {
 			continue
 		}

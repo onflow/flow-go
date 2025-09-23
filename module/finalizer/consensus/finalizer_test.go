@@ -44,7 +44,7 @@ func TestMakeFinalValidChain(t *testing.T) {
 	for i := 0; i < total; i++ {
 		header := unittest.BlockHeaderFixture()
 		header.Height = parent.Height + 1
-		header.ParentID = parent.ID()
+		header.ParentID = parent.Hash()
 		pending = append(pending, header)
 		parent = header
 	}
@@ -56,8 +56,8 @@ func TestMakeFinalValidChain(t *testing.T) {
 	cutoff := total - 3
 	var lastID flow.Identifier
 	for i := 0; i < cutoff; i++ {
-		state.On("Finalize", mock.Anything, pending[i].ID()).Return(nil)
-		lastID = pending[i].ID()
+		state.On("Finalize", mock.Anything, pending[i].Hash()).Return(nil)
+		lastID = pending[i].Hash()
 	}
 
 	// this will hold the IDs of blocks clean up
@@ -81,7 +81,7 @@ func TestMakeFinalValidChain(t *testing.T) {
 
 		// map the finalized height to the finalized block ID
 		err = dbImpl.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			return operation.IndexFinalizedBlockByHeight(lctx, rw, final.Height, final.ID())
+			return operation.IndexFinalizedBlockByHeight(lctx, rw, final.Height, final.Hash())
 		})
 		require.NoError(t, err)
 
@@ -89,7 +89,7 @@ func TestMakeFinalValidChain(t *testing.T) {
 		insertLctx := lockManager.NewContext()
 		require.NoError(t, insertLctx.AcquireLock(storage.LockInsertBlock))
 		err = dbImpl.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			return operation.InsertHeader(insertLctx, rw, final.ID(), final)
+			return operation.InsertHeader(insertLctx, rw, final.Hash(), final)
 		})
 		require.NoError(t, err)
 		insertLctx.Release()
@@ -99,7 +99,7 @@ func TestMakeFinalValidChain(t *testing.T) {
 			insertLctx2 := lockManager.NewContext()
 			require.NoError(t, insertLctx2.AcquireLock(storage.LockInsertBlock))
 			err = dbImpl.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-				return operation.InsertHeader(insertLctx2, rw, header.ID(), header)
+				return operation.InsertHeader(insertLctx2, rw, header.Hash(), header)
 			})
 			require.NoError(t, err)
 			insertLctx2.Release()
@@ -151,7 +151,7 @@ func TestMakeFinalInvalidHeight(t *testing.T) {
 		lctx := lockManager.NewContext()
 		require.NoError(t, lctx.AcquireLock(storage.LockFinalizeBlock))
 		err := dbImpl.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			err := operation.IndexFinalizedBlockByHeight(lctx, rw, final.Height, final.ID())
+			err := operation.IndexFinalizedBlockByHeight(lctx, rw, final.Height, final.Hash())
 			if err != nil {
 				return err
 			}
@@ -168,7 +168,7 @@ func TestMakeFinalInvalidHeight(t *testing.T) {
 		insertLctx := lockManager.NewContext()
 		require.NoError(t, insertLctx.AcquireLock(storage.LockInsertBlock))
 		err = dbImpl.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			return operation.InsertHeader(insertLctx, rw, final.ID(), final)
+			return operation.InsertHeader(insertLctx, rw, final.Hash(), final)
 		})
 		require.NoError(t, err)
 		insertLctx.Release()
@@ -177,7 +177,7 @@ func TestMakeFinalInvalidHeight(t *testing.T) {
 		insertLctx = lockManager.NewContext()
 		require.NoError(t, insertLctx.AcquireLock(storage.LockInsertBlock))
 		err = dbImpl.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			return operation.InsertHeader(insertLctx, rw, pending.ID(), pending)
+			return operation.InsertHeader(insertLctx, rw, pending.Hash(), pending)
 		})
 		require.NoError(t, err)
 		insertLctx.Release()
@@ -191,7 +191,7 @@ func TestMakeFinalInvalidHeight(t *testing.T) {
 			tracer:   trace.NewNoopTracer(),
 			cleanup:  LogCleanup(&list),
 		}
-		err = fin.MakeFinal(pending.ID())
+		err = fin.MakeFinal(pending.Hash())
 		require.Error(t, err)
 	})
 
@@ -229,7 +229,7 @@ func TestMakeFinalDuplicate(t *testing.T) {
 				return err
 			}
 
-			return operation.IndexFinalizedBlockByHeight(lctx, rw, final.Height, final.ID())
+			return operation.IndexFinalizedBlockByHeight(lctx, rw, final.Height, final.Hash())
 		})
 		require.NoError(t, err)
 		// NOTE: must release lock here - do not deferr! Reason:
@@ -242,7 +242,7 @@ func TestMakeFinalDuplicate(t *testing.T) {
 		insertLctx := lockManager.NewContext()
 		require.NoError(t, insertLctx.AcquireLock(storage.LockInsertBlock))
 		err = dbImpl.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			return operation.InsertHeader(insertLctx, rw, final.ID(), final)
+			return operation.InsertHeader(insertLctx, rw, final.Hash(), final)
 		})
 		require.NoError(t, err)
 		insertLctx.Release()
@@ -256,7 +256,7 @@ func TestMakeFinalDuplicate(t *testing.T) {
 			tracer:   trace.NewNoopTracer(),
 			cleanup:  LogCleanup(&list),
 		}
-		err = fin.MakeFinal(final.ID())
+		err = fin.MakeFinal(final.Hash())
 		require.NoError(t, err)
 	})
 

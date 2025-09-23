@@ -73,7 +73,7 @@ func (e *Core) OnGuarantee(originID flow.Identifier, guarantee *flow.CollectionG
 		Logger()
 	log.Info().Msg("collection guarantee received")
 
-	guaranteeID := guarantee.ID()
+	guaranteeID := guarantee.Hash()
 
 	// skip collection guarantees that are already in our memory pool
 	exists := e.pool.Has(guaranteeID)

@@ -84,7 +84,7 @@ func (p *PersisterSuite) SetupTest() {
 			stores.NewCollectionsStore(p.inMemoryCollections, p.collections, lockManager),
 			stores.NewTransactionsStore(p.inMemoryTransactions, p.transactions),
 			stores.NewTxResultErrMsgStore(p.inMemoryTxResultErrMsg, p.txResultErrMsg, p.executionResult.BlockID),
-			stores.NewLatestSealedResultStore(p.latestPersistedSealedResult, p.executionResult.ID(), p.header.Height),
+			stores.NewLatestSealedResultStore(p.latestPersistedSealedResult, p.executionResult.Hash(), p.header.Height),
 		},
 	)
 }
@@ -142,7 +142,7 @@ func (p *PersisterSuite) TestPersister_PersistWithEmptyData() {
 	err = p.inMemoryTxResultErrMsg.Store(p.executionResult.BlockID, []flow.TransactionResultErrorMessage{})
 	p.Require().NoError(err)
 
-	p.latestPersistedSealedResult.On("BatchSet", p.executionResult.ID(), p.header.Height, mock.Anything).Return(nil).Once()
+	p.latestPersistedSealedResult.On("BatchSet", p.executionResult.Hash(), p.header.Height, mock.Anything).Return(nil).Once()
 
 	err = p.persister.Persist()
 	p.Require().NoError(err)
@@ -195,7 +195,7 @@ func (p *PersisterSuite) TestPersister_PersistWithData() {
 		storedTxResultErrMsgs = terrm
 	}).Return(nil)
 
-	p.latestPersistedSealedResult.On("BatchSet", p.executionResult.ID(), p.header.Height, mock.Anything).Return(nil).Once()
+	p.latestPersistedSealedResult.On("BatchSet", p.executionResult.Hash(), p.header.Height, mock.Anything).Return(nil).Once()
 
 	err := p.persister.Persist()
 	p.Require().NoError(err)
@@ -278,7 +278,7 @@ func (p *PersisterSuite) TestPersister_PersistErrorHandling() {
 				numberOfTransactions := len(p.inMemoryTransactions.Data())
 				p.transactions.On("BatchStore", mock.Anything, mock.Anything).Return(nil).Times(numberOfTransactions)
 				p.txResultErrMsg.On("BatchStore", p.executionResult.BlockID, mock.Anything, mock.Anything).Return(nil).Once()
-				p.latestPersistedSealedResult.On("BatchSet", p.executionResult.ID(), p.header.Height, mock.Anything).Return(assert.AnError).Once()
+				p.latestPersistedSealedResult.On("BatchSet", p.executionResult.Hash(), p.header.Height, mock.Anything).Return(assert.AnError).Once()
 			},
 			expectedError: "could not persist latest sealed result",
 		},

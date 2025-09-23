@@ -70,7 +70,7 @@ var clusterBlocksCmd = &cobra.Command{
 					return fmt.Errorf("could not get cluster block with height: %v, %w", flagHeight, err)
 				}
 
-				log.Info().Msgf("block id: %v", clusterBlock.Block.ID())
+				log.Info().Msgf("block id: %v", clusterBlock.Block.Hash())
 				common.PrettyPrint(clusterBlock)
 				return nil
 			}

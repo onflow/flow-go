@@ -313,7 +313,7 @@ func (e *executionDataRequester) processBlockJob(ctx irrecoverable.SignalerConte
 		ctx.Throw(fmt.Errorf("failed to convert job to block: %w", err))
 	}
 
-	err = e.processSealedHeight(ctx, header.ID(), header.Height)
+	err = e.processSealedHeight(ctx, header.Hash(), header.Height)
 	if err == nil {
 		jobComplete()
 		return

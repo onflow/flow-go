@@ -90,8 +90,8 @@ func ExportExecutedTransactions(blockID flow.Identifier, dbPath string, outputPa
 				return fmt.Errorf("could not fetch collection %w", err)
 			}
 			for j, tx := range col.Transactions {
-				txID := tx.ID()
-				colID := col.ID()
+				txID := tx.Hash()
+				colID := col.Hash()
 
 				args := make([]string, 0)
 				for _, a := range tx.Arguments {

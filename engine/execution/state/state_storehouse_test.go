@@ -86,7 +86,7 @@ func prepareStorehouseTest(f func(t *testing.T, es state.ExecutionState, l *ledg
 				lctx := lockManager.NewContext()
 				require.NoError(t, lctx.AcquireLock(storage.LockInsertBlock))
 				require.NoError(t, pebbleimpl.ToDB(pebbleDB).WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-					return operation.InsertHeader(lctx, rw, finalizedHeaders[10].ID(), finalizedHeaders[10])
+					return operation.InsertHeader(lctx, rw, finalizedHeaders[10].Hash(), finalizedHeaders[10])
 				}))
 				lctx.Release()
 
@@ -178,7 +178,7 @@ func TestExecutionStateWithStorehouse(t *testing.T) {
 		// save result and store registers
 		require.NoError(t, es.SaveExecutionResults(context.Background(), computationResult))
 
-		storageSnapshot := es.NewStorageSnapshot(sc2, header11.ID(), header11.Height)
+		storageSnapshot := es.NewStorageSnapshot(sc2, header11.Hash(), header11.Height)
 
 		// validate the storage snapshot has the registers
 		b1, err := storageSnapshot.Get(reg1.Key)
@@ -232,7 +232,7 @@ func makeComputationResult(
 	)
 
 	bed := unittest.BlockExecutionDataFixture(
-		unittest.WithBlockExecutionDataBlockID(completeBlock.Block.ID()),
+		unittest.WithBlockExecutionDataBlockID(completeBlock.Block.Hash()),
 		unittest.WithChunkExecutionDatas(ceds...),
 	)
 

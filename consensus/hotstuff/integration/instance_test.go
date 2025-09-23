@@ -166,7 +166,7 @@ func NewInstance(t *testing.T, options ...Option) *Instance {
 	}
 
 	// insert root block into headers register
-	in.headers[cfg.Root.ID()] = cfg.Root
+	in.headers[cfg.Root.Hash()] = cfg.Root
 
 	// program the hotstuff committee state
 	in.committee.On("IdentitiesByEpoch", mock.Anything).Return(
@@ -218,7 +218,7 @@ func NewInstance(t *testing.T, options ...Option) *Instance {
 				Header:          header,
 				ProposerSigData: sig,
 			}
-			in.headers[header.ID()] = header
+			in.headers[header.Hash()] = header
 			return proposal
 		},
 		func(parentID flow.Identifier, _ func(*flow.HeaderBodyBuilder) error, _ func(*flow.Header) ([]byte, error)) error {

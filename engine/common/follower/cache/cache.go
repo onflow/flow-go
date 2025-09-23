@@ -91,7 +91,7 @@ func NewCache(log zerolog.Logger, limit uint32, collector module.HeroCacheMetric
 // WARNING: Concurrency safety of this function is guaranteed by `c.lock`. This method is only called
 // by `herocache.Cache.Add` and we perform this call while `c.lock` is in locked state.
 func (c *Cache) handleEjectedBlock(proposal *flow.Proposal) {
-	blockID := proposal.Block.ID()
+	blockID := proposal.Block.Hash()
 
 	// remove block from the set of blocks for this view
 	blocksForView := c.byView[proposal.Block.View]
@@ -177,7 +177,7 @@ func (c *Cache) AddBlocks(batch []*flow.Proposal) (certifiedBatch []flow.Certifi
 	for i, proposal := range batch[:len(batch)-1] {
 		child := batch[i+1].Block
 		if !child.ContainsParentQC() {
-			return nil, fmt.Errorf("could not retrieve ParentQC from block (id=%x)", child.ID())
+			return nil, fmt.Errorf("could not retrieve ParentQC from block (id=%x)", child.Hash())
 		}
 		certifiedBlock, err := flow.NewCertifiedBlock(proposal, child.ParentQC())
 		if err != nil {
@@ -354,13 +354,13 @@ func (c *Cache) cache(blockID flow.Identifier, block *flow.Proposal) (equivocati
 // Pure function, hence concurrency safe.
 func enforceSequentialBlocks(batch []*flow.Proposal) ([]flow.Identifier, error) {
 	blockIDs := make([]flow.Identifier, 0, len(batch))
-	parentID := batch[0].Block.ID()
+	parentID := batch[0].Block.Hash()
 	blockIDs = append(blockIDs, parentID)
 	for _, b := range batch[1:] {
 		if b.Block.ParentID != parentID {
 			return nil, ErrDisconnectedBatch
 		}
-		parentID = b.Block.ID()
+		parentID = b.Block.Hash()
 		blockIDs = append(blockIDs, parentID)
 	}
 	return blockIDs, nil

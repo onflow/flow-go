@@ -50,7 +50,7 @@ func NewReceiptValidator(state protocol.State,
 // Expected errors during normal operations:
 //   - engine.InvalidInputError if the signature is invalid
 func (v *receiptValidator) verifySignature(receipt *flow.ExecutionReceiptStub, nodeIdentity *flow.Identity) error {
-	unsignedReceiptID := receipt.UnsignedExecutionReceiptStub.ID()
+	unsignedReceiptID := receipt.UnsignedExecutionReceiptStub.Hash()
 	valid, err := nodeIdentity.StakingPubKey.Verify(receipt.ExecutorSignature, unsignedReceiptID[:], v.signatureHasher)
 	if err != nil { // Verify(..) returns (false,nil) for invalid signature. Any error indicates unexpected internal failure.
 		return irrecoverable.NewExceptionf("failed to verify signature: %w", err)
@@ -162,11 +162,11 @@ func (v *receiptValidator) subgraphCheck(result *flow.ExecutionResult, prevResul
 func (v *receiptValidator) resultChainCheck(result *flow.ExecutionResult, prevResult *flow.ExecutionResult) error {
 	finalState, err := prevResult.FinalStateCommitment()
 	if err != nil {
-		return fmt.Errorf("missing final state commitment in parent result %v", prevResult.ID())
+		return fmt.Errorf("missing final state commitment in parent result %v", prevResult.Hash())
 	}
 	initialState, err := result.InitialStateCommit()
 	if err != nil {
-		return engine.NewInvalidInputErrorf("missing initial state commitment in execution result %v", result.ID())
+		return engine.NewInvalidInputErrorf("missing initial state commitment in execution result %v", result.Hash())
 	}
 	if initialState != finalState {
 		return engine.NewInvalidInputErrorf("execution results do not form chain: expecting init state %x, but got %x",
@@ -203,12 +203,12 @@ func (v *receiptValidator) Validate(receipt *flow.ExecutionReceipt) error {
 	// first validate result to avoid expensive signature check in `validateReceipt` in case result is invalid.
 	err = v.validateResult(&receipt.ExecutionResult, parentResult)
 	if err != nil {
-		return fmt.Errorf("could not validate single result %v at index: %w", receipt.ExecutionResult.ID(), err)
+		return fmt.Errorf("could not validate single result %v at index: %w", receipt.ExecutionResult.Hash(), err)
 	}
 
 	err = v.validateReceipt(receipt.Stub(), receipt.ExecutionResult.BlockID)
 	if err != nil {
-		return fmt.Errorf("could not validate receipt %v: %w", receipt.ID(), err)
+		return fmt.Errorf("could not validate receipt %v: %w", receipt.Hash(), err)
 	}
 
 	return nil
@@ -282,7 +282,7 @@ func (v *receiptValidator) ValidatePayload(candidate *flow.Block) error {
 	// Start from the lowest unsealed block and walk the chain upwards until we
 	// hit the candidate's parent. For each visited block track:
 	bookKeeper := func(block *flow.Header) error {
-		blockID := block.ID()
+		blockID := block.Hash()
 		// track encountered blocks
 		forkBlocks[blockID] = struct{}{}
 
@@ -326,7 +326,7 @@ func (v *receiptValidator) ValidatePayload(candidate *flow.Block) error {
 
 	// Validate all results that are incorporated into the payload. If one is malformed, the entire block is invalid.
 	for i, result := range payload.Results {
-		resultID := result.ID()
+		resultID := result.Hash()
 
 		// Every included result must be accompanied by a receipt with a corresponding `ResultID`, in the same block.
 		// If a result is included without a corresponding receipt, it cannot be attributed to any executor.
@@ -374,7 +374,7 @@ func (v *receiptValidator) ValidatePayload(candidate *flow.Block) error {
 	// It's very important that we fail the whole validation if one of the receipts is invalid.
 	delete(executionTree, lastSeal.ResultID)
 	for i, receipt := range payload.Receipts {
-		receiptID := receipt.ID()
+		receiptID := receipt.Hash()
 
 		// error if the result is not part of the execution tree with root latestSealedResult
 		result, isForLegitimateResult := executionTree[receipt.ResultID]
@@ -412,7 +412,7 @@ func (v *receiptValidator) ValidatePayload(candidate *flow.Block) error {
 func (v *receiptValidator) validateResult(result *flow.ExecutionResult, prevResult *flow.ExecutionResult) error {
 	err := v.verifyChunksFormat(result)
 	if err != nil {
-		return fmt.Errorf("invalid chunks format for result %v: %w", result.ID(), err)
+		return fmt.Errorf("invalid chunks format for result %v: %w", result.Hash(), err)
 	}
 
 	err = v.subgraphCheck(result, prevResult)

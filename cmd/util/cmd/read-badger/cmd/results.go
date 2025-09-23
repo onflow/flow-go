@@ -73,6 +73,6 @@ var resultsCmd = &cobra.Command{
 
 func printChunkID(result *flow.ExecutionResult) {
 	for i, chunk := range result.Chunks {
-		log.Info().Msgf("chunk index %d, id: %v", i, chunk.ID())
+		log.Info().Msgf("chunk index %d, id: %v", i, chunk.Hash())
 	}
 }

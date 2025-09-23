@@ -19,7 +19,7 @@ func (suite *Suite) TestHistoricalTransactionResult() {
 	collection := unittest.CollectionFixture(1)
 	transactionBody := collection.Transactions[0]
 
-	txID := transactionBody.ID()
+	txID := transactionBody.Hash()
 	// transaction storage returns the corresponding transaction
 	suite.transactions.
 		On("ByID", txID).
@@ -70,7 +70,7 @@ func (suite *Suite) TestHistoricalTransaction() {
 	collection := unittest.CollectionFixture(1)
 	transactionBody := collection.Transactions[0]
 
-	txID := transactionBody.ID()
+	txID := transactionBody.Hash()
 	// transaction storage returns the corresponding transaction
 	suite.transactions.
 		On("ByID", txID).

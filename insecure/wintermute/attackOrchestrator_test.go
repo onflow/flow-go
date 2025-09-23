@@ -48,7 +48,7 @@ func TestSingleExecutionReceipt(t *testing.T) {
 
 	// register mock network with orchestrator
 	wintermuteOrchestrator.Register(mockOrchestratorNetwork)
-	err = wintermuteOrchestrator.HandleEgressEvent(eventMap[receipts[0].ID()])
+	err = wintermuteOrchestrator.HandleEgressEvent(eventMap[receipts[0].Hash()])
 	require.NoError(t, err)
 
 	// waits till corrupted receipts dictated to all execution nodes.
@@ -301,9 +301,9 @@ func TestRespondingWithCorruptedAttestation(t *testing.T) {
 
 			// checking content of attestation
 			require.Equal(t, attestation.BlockID, wintermuteOrchestrator.state.corruptedResult.BlockID)
-			require.Equal(t, attestation.ExecutionResultID, wintermuteOrchestrator.state.corruptedResult.ID())
+			require.Equal(t, attestation.ExecutionResultID, wintermuteOrchestrator.state.corruptedResult.Hash())
 			chunk := wintermuteOrchestrator.state.corruptedResult.Chunks[attestation.ChunkIndex]
-			require.True(t, wintermuteOrchestrator.state.containsCorruptedChunkId(chunk.ID())) // attestation must be for a corrupted chunk
+			require.True(t, wintermuteOrchestrator.state.containsCorruptedChunkId(chunk.Hash())) // attestation must be for a corrupted chunk
 
 			corruptedAttestationWG.Done()
 		}).Return(nil)
@@ -632,8 +632,8 @@ func TestPassingThrough_ResultApproval(t *testing.T) {
 
 	// generates a test result approval that does not belong to original result.
 	approval := unittest.ResultApprovalFixture()
-	require.NotEqual(t, wintermuteOrchestrator.state.originalResult.ID(), approval.ID())
-	require.NotEqual(t, wintermuteOrchestrator.state.corruptedResult.ID(), approval.ID())
+	require.NotEqual(t, wintermuteOrchestrator.state.originalResult.Hash(), approval.Hash())
+	require.NotEqual(t, wintermuteOrchestrator.state.corruptedResult.Hash(), approval.Hash())
 
 	random, err := rand.Uintn(uint(len(corruptedIds)))
 	require.NoError(t, err)
@@ -718,7 +718,7 @@ func TestWintermute_ResultApproval(t *testing.T) {
 		TargetNum:       3,
 		TargetIds:       unittest.IdentifierListFixture(10),
 		FlowProtocolEvent: (*messages.ResultApproval)(unittest.ResultApprovalFixture(
-			unittest.WithExecutionResultID(originalResult.ID()),
+			unittest.WithExecutionResultID(originalResult.Hash()),
 			unittest.WithChunk(0))),
 	}
 

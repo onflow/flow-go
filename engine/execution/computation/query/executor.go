@@ -216,9 +216,9 @@ func (e *QueryExecutor) ExecuteScript(
 		fvm.NewContextFromParent(
 			e.vmCtx,
 			fvm.WithBlockHeader(blockHeader),
-			fvm.WithProtocolStateSnapshot(e.protocolStateSnapshot.AtBlockID(blockHeader.ID())),
+			fvm.WithProtocolStateSnapshot(e.protocolStateSnapshot.AtBlockID(blockHeader.Hash())),
 			fvm.WithDerivedBlockData(
-				e.derivedChainData.NewDerivedBlockDataForScript(blockHeader.ID()))),
+				e.derivedChainData.NewDerivedBlockDataForScript(blockHeader.Hash()))),
 		fvm.NewScriptWithContextAndArgs(script, requestCtx, arguments...),
 		snapshot)
 	if err != nil {
@@ -228,7 +228,7 @@ func (e *QueryExecutor) ExecuteScript(
 	if output.Err != nil {
 		return nil, 0, errors.NewCodedError(
 			output.Err.Code(),
-			"failed to execute script at block (%s): %s", blockHeader.ID(),
+			"failed to execute script at block (%s): %s", blockHeader.Hash(),
 			summarizeLog(output.Err.Error(), e.config.MaxErrorMessageSize),
 		)
 	}
@@ -274,7 +274,7 @@ func (e *QueryExecutor) GetAccount(
 		e.vmCtx,
 		fvm.WithBlockHeader(blockHeader),
 		fvm.WithDerivedBlockData(
-			e.derivedChainData.NewDerivedBlockDataForScript(blockHeader.ID())))
+			e.derivedChainData.NewDerivedBlockDataForScript(blockHeader.Hash())))
 
 	account, err := fvm.GetAccount(
 		blockCtx,
@@ -284,7 +284,7 @@ func (e *QueryExecutor) GetAccount(
 		return nil, fmt.Errorf(
 			"failed to get account (%s) at block (%s): %w",
 			address.String(),
-			blockHeader.ID(),
+			blockHeader.Hash(),
 			err)
 	}
 
@@ -303,7 +303,7 @@ func (e *QueryExecutor) GetAccountBalance(
 		e.vmCtx,
 		fvm.WithBlockHeader(blockHeader),
 		fvm.WithDerivedBlockData(
-			e.derivedChainData.NewDerivedBlockDataForScript(blockHeader.ID())))
+			e.derivedChainData.NewDerivedBlockDataForScript(blockHeader.Hash())))
 
 	accountBalance, err := fvm.GetAccountBalance(
 		blockCtx,
@@ -314,7 +314,7 @@ func (e *QueryExecutor) GetAccountBalance(
 		return 0, fmt.Errorf(
 			"failed to get account balance (%s) at block (%s): %w",
 			address.String(),
-			blockHeader.ID(),
+			blockHeader.Hash(),
 			err)
 	}
 
@@ -333,7 +333,7 @@ func (e *QueryExecutor) GetAccountAvailableBalance(
 		e.vmCtx,
 		fvm.WithBlockHeader(blockHeader),
 		fvm.WithDerivedBlockData(
-			e.derivedChainData.NewDerivedBlockDataForScript(blockHeader.ID())))
+			e.derivedChainData.NewDerivedBlockDataForScript(blockHeader.Hash())))
 
 	accountAvailableBalance, err := fvm.GetAccountAvailableBalance(
 		blockCtx,
@@ -344,7 +344,7 @@ func (e *QueryExecutor) GetAccountAvailableBalance(
 		return 0, fmt.Errorf(
 			"failed to get account available balance (%s) at block (%s): %w",
 			address.String(),
-			blockHeader.ID(),
+			blockHeader.Hash(),
 			err)
 	}
 
@@ -362,7 +362,7 @@ func (e *QueryExecutor) GetAccountKeys(
 		e.vmCtx,
 		fvm.WithBlockHeader(blockHeader),
 		fvm.WithDerivedBlockData(
-			e.derivedChainData.NewDerivedBlockDataForScript(blockHeader.ID())))
+			e.derivedChainData.NewDerivedBlockDataForScript(blockHeader.Hash())))
 
 	accountKeys, err := fvm.GetAccountKeys(blockCtx,
 		address,
@@ -371,7 +371,7 @@ func (e *QueryExecutor) GetAccountKeys(
 		return nil, fmt.Errorf(
 			"failed to get account keys (%s) at block (%s): %w",
 			address.String(),
-			blockHeader.ID(),
+			blockHeader.Hash(),
 			err)
 	}
 
@@ -390,7 +390,7 @@ func (e *QueryExecutor) GetAccountKey(
 		e.vmCtx,
 		fvm.WithBlockHeader(blockHeader),
 		fvm.WithDerivedBlockData(
-			e.derivedChainData.NewDerivedBlockDataForScript(blockHeader.ID())))
+			e.derivedChainData.NewDerivedBlockDataForScript(blockHeader.Hash())))
 
 	accountKey, err := fvm.GetAccountKey(blockCtx,
 		address,
@@ -400,7 +400,7 @@ func (e *QueryExecutor) GetAccountKey(
 		return nil, fmt.Errorf(
 			"failed to get account key (%s) at block (%s): %w",
 			address.String(),
-			blockHeader.ID(),
+			blockHeader.Hash(),
 			err)
 	}
 

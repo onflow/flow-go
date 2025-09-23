@@ -22,7 +22,7 @@ type BlockJob struct {
 
 // ID converts block id into job id, which guarantees uniqueness.
 func (j BlockJob) ID() module.JobID {
-	return JobID(j.Block.ID())
+	return JobID(j.Block.Hash())
 }
 
 // JobToBlock converts a block job into its corresponding block.
@@ -50,7 +50,7 @@ type BlockHeaderJob struct {
 
 // ID converts block id into job id, which guarantees uniqueness.
 func (j BlockHeaderJob) ID() module.JobID {
-	return JobID(j.Header.ID())
+	return JobID(j.Header.Hash())
 }
 
 // JobToBlockHeader converts a block job into its corresponding block header.

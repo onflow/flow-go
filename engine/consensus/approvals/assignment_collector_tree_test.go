@@ -45,10 +45,10 @@ func (s *AssignmentCollectorTreeSuite) SetupTest() {
 	s.BaseAssignmentCollectorTestSuite.SetupTest()
 
 	s.factoryMethod = func(result *flow.ExecutionResult) (approvals.AssignmentCollector, error) {
-		if wrapper, found := s.mockedCollectors[result.ID()]; found {
+		if wrapper, found := s.mockedCollectors[result.Hash()]; found {
 			return wrapper.collector, nil
 		}
-		return nil, fmt.Errorf("mocked collector %v not found: %w", result.ID(), factoryError)
+		return nil, fmt.Errorf("mocked collector %v not found: %w", result.Hash(), factoryError)
 	}
 
 	s.mockedCollectors = make(map[flow.Identifier]*mockedCollectorWrapper)
@@ -61,7 +61,7 @@ func (s *AssignmentCollectorTreeSuite) SetupTest() {
 // to create new collector when factory method will be called
 func (s *AssignmentCollectorTreeSuite) prepareMockedCollector(result *flow.ExecutionResult) *mockedCollectorWrapper {
 	collector := &mockAC.AssignmentCollector{}
-	collector.On("ResultID").Return(result.ID()).Maybe()
+	collector.On("ResultID").Return(result.Hash()).Maybe()
 	collector.On("Result").Return(result).Maybe()
 	collector.On("BlockID").Return(result.BlockID).Maybe()
 	collector.On("Block").Return(func() *flow.Header {
@@ -76,7 +76,7 @@ func (s *AssignmentCollectorTreeSuite) prepareMockedCollector(result *flow.Execu
 	collector.On("ProcessingStatus").Return(func() approvals.ProcessingStatus {
 		return wrapper.status
 	})
-	s.mockedCollectors[result.ID()] = wrapper
+	s.mockedCollectors[result.Hash()] = wrapper
 	return wrapper
 }
 
@@ -100,7 +100,7 @@ func (s *AssignmentCollectorTreeSuite) TestGetSize_ConcurrentAccess() {
 	result0 := unittest.ExecutionResultFixture()
 	receipts := unittest.ReceiptChainFor(chain, result0)
 	for _, block := range chain {
-		s.Blocks[block.ID()] = block.ToHeader()
+		s.Blocks[block.Hash()] = block.ToHeader()
 	}
 	for _, receipt := range receipts {
 		s.prepareMockedCollector(&receipt.ExecutionResult)
@@ -127,13 +127,13 @@ func (s *AssignmentCollectorTreeSuite) TestGetSize_ConcurrentAccess() {
 // TestGetCollector tests basic case where previously created collector can be retrieved
 func (s *AssignmentCollectorTreeSuite) TestGetCollector() {
 	result := unittest.ExecutionResultFixture(func(result *flow.ExecutionResult) {
-		result.BlockID = s.IncorporatedBlock.ID()
+		result.BlockID = s.IncorporatedBlock.Hash()
 	})
 	s.prepareMockedCollector(result)
 	expectedCollector, err := s.collectorTree.GetOrCreateCollector(result)
 	require.NoError(s.T(), err)
 	require.True(s.T(), expectedCollector.Created)
-	collector := s.collectorTree.GetCollector(result.ID())
+	collector := s.collectorTree.GetCollector(result.Hash())
 	require.Equal(s.T(), collector, expectedCollector.Collector)
 
 	// get collector for unknown result ID should return nil
@@ -147,7 +147,7 @@ func (s *AssignmentCollectorTreeSuite) TestGetCollectorsByInterval() {
 	chain := unittest.ChainFixtureFrom(10, s.ParentBlock)
 	receipts := unittest.ReceiptChainFor(chain, s.IncorporatedResult.Result)
 	for _, block := range chain {
-		s.Blocks[block.ID()] = block.ToHeader()
+		s.Blocks[block.Hash()] = block.ToHeader()
 	}
 
 	// Process all receipts except first one. This generates a chain of collectors but all of them will be
@@ -169,7 +169,7 @@ func (s *AssignmentCollectorTreeSuite) TestGetCollectorsByInterval() {
 	// of all added collectors from `CachingApprovals` to `VerifyingApprovals`. Therefore, we
 	// expect `GetCollectorsByInterval` to return all added collectors.
 	for _, receipt := range receipts {
-		mockedCollector := s.mockedCollectors[receipt.ExecutionResult.ID()]
+		mockedCollector := s.mockedCollectors[receipt.ExecutionResult.Hash()]
 		requireStateTransition(mockedCollector, approvals.CachingApprovals, approvals.VerifyingApprovals)
 	}
 	_, err := s.collectorTree.GetOrCreateCollector(&receipts[0].ExecutionResult)
@@ -179,7 +179,7 @@ func (s *AssignmentCollectorTreeSuite) TestGetCollectorsByInterval() {
 	require.Len(s.T(), collectors, len(receipts))
 
 	for _, receipt := range receipts {
-		mockedCollector := s.mockedCollectors[receipt.ExecutionResult.ID()]
+		mockedCollector := s.mockedCollectors[receipt.ExecutionResult.Hash()]
 		mockedCollector.collector.AssertExpectations(s.T())
 	}
 }
@@ -187,7 +187,7 @@ func (s *AssignmentCollectorTreeSuite) TestGetCollectorsByInterval() {
 // TestGetOrCreateCollector tests that getting collector creates one on first call and returns from cache on second one.
 func (s *AssignmentCollectorTreeSuite) TestGetOrCreateCollector_ReturnFromCache() {
 	result := unittest.ExecutionResultFixture(func(result *flow.ExecutionResult) {
-		result.BlockID = s.IncorporatedBlock.ID()
+		result.BlockID = s.IncorporatedBlock.Hash()
 	})
 	s.prepareMockedCollector(result)
 	lazyCollector, err := s.collectorTree.GetOrCreateCollector(result)
@@ -214,7 +214,7 @@ func (s *AssignmentCollectorTreeSuite) TestGetOrCreateCollector_FactoryError() {
 // In this specific case collector has to become verifying instead of caching.
 func (s *AssignmentCollectorTreeSuite) TestGetOrCreateCollector_CollectorParentIsSealed() {
 	result := s.IncorporatedResult.Result
-	requireStateTransition(s.mockedCollectors[result.ID()],
+	requireStateTransition(s.mockedCollectors[result.Hash()],
 		approvals.CachingApprovals, approvals.VerifyingApprovals)
 	lazyCollector, err := s.collectorTree.GetOrCreateCollector(result)
 	require.NoError(s.T(), err)
@@ -226,7 +226,7 @@ func (s *AssignmentCollectorTreeSuite) TestGetOrCreateCollector_CollectorParentI
 // Leveled forest doesn't accept vertexes lower than the lowest height.
 func (s *AssignmentCollectorTreeSuite) TestGetOrCreateCollector_AddingSealedCollector() {
 	block := unittest.BlockWithParentFixture(s.ParentBlock)
-	s.Blocks[block.ID()] = block.ToHeader()
+	s.Blocks[block.Hash()] = block.ToHeader()
 	result := unittest.ExecutionResultFixture(unittest.WithBlock(block))
 	s.prepareMockedCollector(result)
 
@@ -260,14 +260,14 @@ func (s *AssignmentCollectorTreeSuite) TestGetOrCreateCollector_AddingSealedColl
 // Test that when A becomes sealed {ER{B}, ER{C}} become processable
 // but {ER{E}, ER{F}} are unprocessable since E wasn't part of finalized fork.
 func (s *AssignmentCollectorTreeSuite) TestFinalizeForkAtLevel_ProcessableAfterSealedParent() {
-	s.IdentitiesCache[s.IncorporatedBlock.ID()] = s.AuthorizedVerifiers
+	s.IdentitiesCache[s.IncorporatedBlock.Hash()] = s.AuthorizedVerifiers
 	// two forks
 	forks := make([][]*flow.Block, 2)
 	results := make([][]*flow.IncorporatedResult, 2)
 
 	firstResult := unittest.ExecutionResultFixture(
 		unittest.WithPreviousResult(*s.IncorporatedResult.Result),
-		unittest.WithExecutionResultBlockID(s.IncorporatedBlock.ID()))
+		unittest.WithExecutionResultBlockID(s.IncorporatedBlock.Hash()))
 	s.prepareMockedCollector(firstResult)
 	for i := 0; i < len(forks); i++ {
 		fork := unittest.ChainFixtureFrom(3, s.IncorporatedBlock)
@@ -275,7 +275,7 @@ func (s *AssignmentCollectorTreeSuite) TestFinalizeForkAtLevel_ProcessableAfterS
 		prevResult := firstResult
 		// create execution results for all blocks except last one, since it won't be valid by definition
 		for _, block := range fork {
-			blockID := block.ID()
+			blockID := block.Hash()
 
 			// update caches
 			s.Blocks[blockID] = block.ToHeader()
@@ -310,8 +310,8 @@ func (s *AssignmentCollectorTreeSuite) TestFinalizeForkAtLevel_ProcessableAfterS
 	// at this point collectors for forks[0] should be processable and for forks[1] not
 	for forkIndex := range forks {
 		for resultIndex, result := range results[forkIndex] {
-			wrapper, found := s.mockedCollectors[result.Result.ID()]
-			fmt.Printf("forkIndex: %d, resultIndex: %d, id: %x, result: %v\n", forkIndex, resultIndex, result.Result.ID(), result.Result)
+			wrapper, found := s.mockedCollectors[result.Result.Hash()]
+			fmt.Printf("forkIndex: %d, resultIndex: %d, id: %x, result: %v\n", forkIndex, resultIndex, result.Result.Hash(), result.Result)
 			require.True(s.T(), found)
 
 			if forkIndex == 0 {
@@ -329,7 +329,7 @@ func (s *AssignmentCollectorTreeSuite) TestFinalizeForkAtLevel_ProcessableAfterS
 
 	for forkIndex := range forks {
 		for _, result := range results[forkIndex] {
-			s.mockedCollectors[result.Result.ID()].collector.AssertExpectations(s.T())
+			s.mockedCollectors[result.Result.Hash()].collector.AssertExpectations(s.T())
 		}
 	}
 }

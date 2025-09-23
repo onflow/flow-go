@@ -232,7 +232,7 @@ func (e *Engine) onTransaction(originID flow.Identifier, tx *flow.TransactionBod
 
 	defer e.engMetrics.MessageHandled(metrics.EngineCollectionIngest, metrics.MessageTransaction)
 
-	txID := tx.ID()
+	txID := tx.Hash()
 	log := e.log.With().
 		Hex("origin_id", originID[:]).
 		Hex("tx_id", txID[:]).
@@ -268,8 +268,8 @@ func (e *Engine) onTransaction(originID flow.Identifier, tx *flow.TransactionBod
 		return fmt.Errorf("could not get cluster responsible for tx: %x", txID)
 	}
 
-	localClusterFingerPrint := localCluster.ID()
-	txClusterFingerPrint := txCluster.ID()
+	localClusterFingerPrint := localCluster.Hash()
+	txClusterFingerPrint := txCluster.Hash()
 	log = log.With().
 		Hex("local_cluster", logging.ID(localClusterFingerPrint)).
 		Hex("tx_cluster", logging.ID(txClusterFingerPrint)).
@@ -357,7 +357,7 @@ func (e *Engine) ingestTransaction(
 
 	// if our cluster is responsible for the transaction, add it to our local mempool
 	if localClusterFingerprint == txClusterFingerprint {
-		_ = pool.Add(tx.ID(), tx)
+		_ = pool.Add(tx.Hash(), tx)
 		e.colMetrics.TransactionIngested(txID)
 	}
 

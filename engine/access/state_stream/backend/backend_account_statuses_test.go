@@ -102,7 +102,7 @@ func (s *BackendAccountStatusesSuite) SetupTest() {
 		}
 
 		execData := unittest.BlockExecutionDataFixture(
-			unittest.WithBlockExecutionDataBlockID(block.ID()),
+			unittest.WithBlockExecutionDataBlockID(block.Hash()),
 			unittest.WithChunkExecutionDatas(chunkDatas...),
 		)
 
@@ -110,13 +110,13 @@ func (s *BackendAccountStatusesSuite) SetupTest() {
 		assert.NoError(s.T(), err)
 
 		s.blocks = append(s.blocks, block)
-		s.execDataMap[block.ID()] = execution_data.NewBlockExecutionDataEntity(result.ExecutionDataID, execData)
-		s.blockEvents[block.ID()] = events
+		s.execDataMap[block.Hash()] = execution_data.NewBlockExecutionDataEntity(result.ExecutionDataID, execData)
+		s.blockEvents[block.Hash()] = events
 		s.blockMap[block.Height] = block
-		s.sealMap[block.ID()] = seal
+		s.sealMap[block.Hash()] = seal
 		s.resultMap[seal.ResultID] = result
 
-		s.T().Logf("adding exec data for block %d %d %v => %v", i, block.Height, block.ID(), result.ExecutionDataID)
+		s.T().Logf("adding exec data for block %d %d %v => %v", i, block.Height, block.Hash(), result.ExecutionDataID)
 	}
 
 	s.SetupTestMocks()
@@ -128,22 +128,22 @@ func (s *BackendAccountStatusesSuite) subscribeFromStartBlockIdTestCases() []tes
 		{
 			name:            "happy path - all new blocks",
 			highestBackfill: -1, // no backfill
-			startValue:      s.rootBlock.ID(),
+			startValue:      s.rootBlock.Hash(),
 		},
 		{
 			name:            "happy path - partial backfill",
 			highestBackfill: 2, // backfill the first 3 blocks
-			startValue:      s.blocks[0].ID(),
+			startValue:      s.blocks[0].Hash(),
 		},
 		{
 			name:            "happy path - complete backfill",
 			highestBackfill: len(s.blocks) - 1, // backfill all blocks
-			startValue:      s.blocks[0].ID(),
+			startValue:      s.blocks[0].Hash(),
 		},
 		{
 			name:            "happy path - start from root block by id",
-			highestBackfill: len(s.blocks) - 1, // backfill all blocks
-			startValue:      s.rootBlock.ID(),  // start from root block
+			highestBackfill: len(s.blocks) - 1,  // backfill all blocks
+			startValue:      s.rootBlock.Hash(), // start from root block
 		},
 	}
 
@@ -301,7 +301,7 @@ func (s *BackendAccountStatusesSuite) subscribeToAccountStatuses(
 
 			// Loop over all the blocks
 			for i, b := range s.blocks {
-				s.T().Logf("checking block %d %v", i, b.ID())
+				s.T().Logf("checking block %d %v", i, b.Hash())
 
 				// Simulate new exec data received.
 				// Exec data for all blocks with index <= highestBackfill were already received
@@ -312,7 +312,7 @@ func (s *BackendAccountStatusesSuite) subscribeToAccountStatuses(
 				}
 
 				expectedEvents := map[string]flow.EventsList{}
-				for _, event := range s.blockEvents[b.ID()] {
+				for _, event := range s.blockEvents[b.Hash()] {
 					if test.filters.Match(event) {
 						var address string
 						switch event.Type {
@@ -330,15 +330,15 @@ func (s *BackendAccountStatusesSuite) subscribeToAccountStatuses(
 				// Consume execution data from subscription
 				unittest.RequireReturnsBefore(s.T(), func() {
 					v, ok := <-sub.Channel()
-					require.True(s.T(), ok, "channel closed while waiting for exec data for block %d %v: err: %v", b.Height, b.ID(), sub.Err())
+					require.True(s.T(), ok, "channel closed while waiting for exec data for block %d %v: err: %v", b.Height, b.Hash(), sub.Err())
 
 					resp, ok := v.(*AccountStatusesResponse)
 					require.True(s.T(), ok, "unexpected response type: %T", v)
 
-					assert.Equal(s.T(), b.ID(), resp.BlockID)
+					assert.Equal(s.T(), b.Hash(), resp.BlockID)
 					assert.Equal(s.T(), b.Height, resp.Height)
 					assert.Equal(s.T(), expectedEvents, resp.AccountEvents)
-				}, 60*time.Second, fmt.Sprintf("timed out waiting for exec data for block %d %v", b.Height, b.ID()))
+				}, 60*time.Second, fmt.Sprintf("timed out waiting for exec data for block %d %v", b.Height, b.Hash()))
 			}
 
 			// Make sure there are no new messages waiting. The channel should be opened with nothing waiting

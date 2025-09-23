@@ -15,7 +15,7 @@ type ChunkJob struct {
 
 // ID converts chunk locator identifier into job id, which guarantees uniqueness.
 func (j ChunkJob) ID() module.JobID {
-	return locatorIDToJobID(j.ChunkLocator.ID())
+	return locatorIDToJobID(j.ChunkLocator.Hash())
 }
 
 func locatorIDToJobID(locatorID flow.Identifier) module.JobID {

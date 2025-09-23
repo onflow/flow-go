@@ -247,7 +247,7 @@ func (h *Headers) RollbackExecutedBlock(header *flow.Header) error {
 	}
 
 	return h.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-		err = operation.UpdateExecutedBlock(rw.Writer(), header.ID())
+		err = operation.UpdateExecutedBlock(rw.Writer(), header.Hash())
 		if err != nil {
 			return fmt.Errorf("cannot update highest executed block: %w", err)
 		}

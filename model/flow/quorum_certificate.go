@@ -65,8 +65,8 @@ func NewQuorumCertificate(untrusted UntrustedQuorumCertificate) (*QuorumCertific
 	}, nil
 }
 
-// ID returns the QuorumCertificate's identifier
-func (qc *QuorumCertificate) ID() Identifier {
+// Hash returns the QuorumCertificate's identifier
+func (qc *QuorumCertificate) Hash() Identifier {
 	if qc == nil {
 		return ZeroID
 	}

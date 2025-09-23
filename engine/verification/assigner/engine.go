@@ -75,7 +75,7 @@ func (e *Engine) resultChunkAssignment(ctx context.Context,
 	result *flow.ExecutionResult,
 	incorporatingBlock flow.Identifier,
 ) (flow.ChunkList, error) {
-	resultID := result.ID()
+	resultID := result.Hash()
 	log := e.log.With().
 		Hex("result_id", logging.ID(resultID)).
 		Hex("executed_block_id", logging.ID(result.BlockID)).
@@ -118,7 +118,7 @@ func (e *Engine) resultChunkAssignment(ctx context.Context,
 func (e *Engine) processChunk(chunk *flow.Chunk, resultID flow.Identifier, blockHeight uint64) (bool, error) {
 	lg := e.log.With().
 		Hex("result_id", logging.ID(resultID)).
-		Hex("chunk_id", logging.ID(chunk.ID())).
+		Hex("chunk_id", logging.ID(chunk.Hash())).
 		Uint64("chunk_index", chunk.Index).
 		Uint64("block_height", blockHeight).
 		Logger()
@@ -157,7 +157,7 @@ func (e *Engine) processChunk(chunk *flow.Chunk, resultID flow.Identifier, block
 // the assigned chunks are pushed to the chunks queue, which is the output stream of this engine.
 // Once the assigner engine is done handling all the receipts in the block, it notifies the block consumer.
 func (e *Engine) ProcessFinalizedBlock(block *flow.Block) {
-	blockID := block.ID()
+	blockID := block.Hash()
 
 	// We don't have any existing information and don't need cancellation, so use a background (empty) context
 	span, ctx := e.tracer.StartBlockSpan(context.Background(), blockID, trace.VERProcessFinalizedBlock)
@@ -171,10 +171,10 @@ func (e *Engine) ProcessFinalizedBlock(block *flow.Block) {
 func (e *Engine) processFinalizedBlock(ctx context.Context, block *flow.Block) {
 
 	if e.stopAtHeight > 0 && block.Height == e.stopAtHeight {
-		e.stopAtBlockID.Store(block.ID())
+		e.stopAtBlockID.Store(block.Hash())
 	}
 
-	blockID := block.ID()
+	blockID := block.Hash()
 	// we should always notify block consumer before returning.
 	defer e.blockConsumerNotifier.Notify(blockID)
 
@@ -192,12 +192,12 @@ func (e *Engine) processFinalizedBlock(ctx context.Context, block *flow.Block) {
 	// determine chunk assigment on each result and pushes the assigned chunks to the chunks queue.
 	receiptsGroupedByResultID := block.Payload.Receipts.GroupByResultID() // for logging purposes
 	for _, result := range block.Payload.Results {
-		resultID := result.ID()
+		resultID := result.Hash()
 
 		// log receipts committing to result
 		resultLog := lg.With().Hex("result_id", logging.ID(resultID)).Logger()
 		for _, receipt := range receiptsGroupedByResultID.GetGroup(resultID) {
-			resultLog = resultLog.With().Hex("receipts_for_result", logging.ID(receipt.ID())).Logger()
+			resultLog = resultLog.With().Hex("receipts_for_result", logging.ID(receipt.Hash())).Logger()
 		}
 		resultLog.Debug().Msg("determining chunk assignment for incorporated result")
 
@@ -212,7 +212,7 @@ func (e *Engine) processFinalizedBlock(ctx context.Context, block *flow.Block) {
 
 			if e.stopAtHeight > 0 && e.stopAtBlockID.Load() == chunk.BlockID {
 				resultLog.Fatal().
-					Hex("chunk_id", logging.ID(chunk.ID())).
+					Hex("chunk_id", logging.ID(chunk.Hash())).
 					Msgf("Chunk for block at finalized height %d received - stopping node", e.stopAtHeight)
 			}
 
@@ -220,7 +220,7 @@ func (e *Engine) processFinalizedBlock(ctx context.Context, block *flow.Block) {
 			if err != nil {
 				resultLog.Fatal().
 					Err(err).
-					Hex("chunk_id", logging.ID(chunk.ID())).
+					Hex("chunk_id", logging.ID(chunk.Hash())).
 					Uint64("chunk_index", chunk.Index).
 					Msg("could not process chunk")
 			}

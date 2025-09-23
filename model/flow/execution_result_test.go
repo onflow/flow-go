@@ -32,12 +32,12 @@ func TestExecutionResultGroupBy(t *testing.T) {
 	idA := unittest.IdentifierFixture()
 	idB := unittest.IdentifierFixture()
 	grouperFunc := func(er *flow.ExecutionResult) flow.Identifier {
-		switch er.ID() {
-		case er1.ID():
+		switch er.Hash() {
+		case er1.Hash():
 			return idA
-		case er2.ID():
+		case er2.Hash():
 			return idB
-		case er3.ID():
+		case er3.Hash():
 			return idA
 		default:
 			panic("unexpected ExecutionReceipt")

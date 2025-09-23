@@ -20,7 +20,7 @@ func TestCollections(t *testing.T) {
 
 		t.Run("Retrieve nonexistant", func(t *testing.T) {
 			var actual flow.LightCollection
-			err := operation.RetrieveCollection(db.Reader(), expected.ID(), &actual)
+			err := operation.RetrieveCollection(db.Reader(), expected.Hash(), &actual)
 			assert.Error(t, err)
 			assert.ErrorIs(t, err, storage.ErrNotFound)
 		})
@@ -32,7 +32,7 @@ func TestCollections(t *testing.T) {
 			require.NoError(t, err)
 
 			actual := new(flow.LightCollection)
-			err = operation.RetrieveCollection(db.Reader(), expected.ID(), actual)
+			err = operation.RetrieveCollection(db.Reader(), expected.Hash(), actual)
 			assert.NoError(t, err)
 
 			assert.Equal(t, expected, actual)
@@ -40,18 +40,18 @@ func TestCollections(t *testing.T) {
 
 		t.Run("Remove", func(t *testing.T) {
 			err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-				return operation.RemoveCollection(rw.Writer(), expected.ID())
+				return operation.RemoveCollection(rw.Writer(), expected.Hash())
 			})
 			require.NoError(t, err)
 
 			actual := new(flow.LightCollection)
-			err = operation.RetrieveCollection(db.Reader(), expected.ID(), actual)
+			err = operation.RetrieveCollection(db.Reader(), expected.Hash(), actual)
 			assert.Error(t, err)
 			assert.ErrorIs(t, err, storage.ErrNotFound)
 
 			// Remove again should not error
 			err = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-				return operation.RemoveCollection(rw.Writer(), expected.ID())
+				return operation.RemoveCollection(rw.Writer(), expected.Hash())
 			})
 			require.NoError(t, err)
 		})

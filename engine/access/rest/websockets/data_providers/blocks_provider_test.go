@@ -59,7 +59,7 @@ func (s *BlocksProviderSuite) SetupTest() {
 	for i := 0; i < blockCount; i++ {
 		transaction := unittest.TransactionBodyFixture()
 		col := unittest.CollectionFromTransactions(&transaction)
-		guarantee := &flow.CollectionGuarantee{CollectionID: col.ID()}
+		guarantee := &flow.CollectionGuarantee{CollectionID: col.Hash()}
 		block := unittest.BlockWithParentAndPayload(
 			parent,
 			unittest.PayloadFixture(unittest.WithGuarantees(guarantee)),
@@ -90,7 +90,7 @@ func (s *BlocksProviderSuite) TestBlocksDataProvider_HappyPath() {
 	s.linkGenerator.On("BlockLink", mock.AnythingOfType("flow.Identifier")).Return(
 		func(id flow.Identifier) (string, error) {
 			for _, block := range s.blocks {
-				if block.ID() == id {
+				if block.Hash() == id {
 					return fmt.Sprintf("/v1/blocks/%s", id), nil
 				}
 			}
@@ -121,14 +121,14 @@ func (s *BlocksProviderSuite) validBlockArgumentsTestCases() []testType {
 		{
 			name: "happy path with start_block_id argument",
 			arguments: wsmodels.Arguments{
-				"start_block_id": s.rootBlock.ID().String(),
+				"start_block_id": s.rootBlock.Hash().String(),
 				"block_status":   parser.Finalized,
 			},
 			setupBackend: func(sub *statestreamsmock.Subscription) {
 				s.api.On(
 					"SubscribeBlocksFromStartBlockID",
 					mock.Anything,
-					s.rootBlock.ID(),
+					s.rootBlock.Hash(),
 					flow.BlockStatusFinalized,
 				).Return(sub).Once()
 			},
@@ -235,7 +235,7 @@ func (s *BlocksProviderSuite) invalidArgumentsTestCases() []testErrType {
 		{
 			name: "missing 'block_status' argument",
 			arguments: wsmodels.Arguments{
-				"start_block_id": s.rootBlock.ID().String(),
+				"start_block_id": s.rootBlock.Hash().String(),
 			},
 			expectedErrorMsg: "missing 'block_status' field",
 		},
@@ -250,7 +250,7 @@ func (s *BlocksProviderSuite) invalidArgumentsTestCases() []testErrType {
 			name: "provide both 'start_block_id' and 'start_block_height' arguments",
 			arguments: wsmodels.Arguments{
 				"block_status":       parser.Finalized,
-				"start_block_id":     s.rootBlock.ID().String(),
+				"start_block_id":     s.rootBlock.Hash().String(),
 				"start_block_height": fmt.Sprintf("%d", s.rootBlock.Height),
 			},
 			expectedErrorMsg: "can only provide either 'start_block_id' or 'start_block_height'",
@@ -259,7 +259,7 @@ func (s *BlocksProviderSuite) invalidArgumentsTestCases() []testErrType {
 			name: "unexpected argument",
 			arguments: map[string]interface{}{
 				"block_status":        parser.Finalized,
-				"start_block_id":      unittest.BlockFixture().ID().String(),
+				"start_block_id":      unittest.BlockFixture().Hash().String(),
 				"unexpected_argument": "dummy",
 			},
 			expectedErrorMsg: "unexpected field: 'unexpected_argument'",

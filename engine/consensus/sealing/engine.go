@@ -359,9 +359,9 @@ func (e *Engine) finalizationProcessingLoop(ctx irrecoverable.SignalerContext, r
 			if err != nil {
 				ctx.Throw(fmt.Errorf("could not retrieve last finalized block: %w", err))
 			}
-			err = e.core.ProcessFinalizedBlock(finalized.ID())
+			err = e.core.ProcessFinalizedBlock(finalized.Hash())
 			if err != nil {
-				ctx.Throw(fmt.Errorf("could not process finalized block %v: %w", finalized.ID(), err))
+				ctx.Throw(fmt.Errorf("could not process finalized block %v: %w", finalized.Hash(), err))
 			}
 		}
 	}

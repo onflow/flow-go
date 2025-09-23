@@ -271,7 +271,7 @@ func createBlock(b *testing.B, parentBlock *flow.Block, accs *testAccounts, colN
 		}
 
 		collection := &flow.Collection{Transactions: transactions}
-		guarantee := &flow.CollectionGuarantee{CollectionID: collection.ID()}
+		guarantee := &flow.CollectionGuarantee{CollectionID: collection.Hash()}
 
 		collections[c] = collection
 		guarantees[c] = guarantee
@@ -282,7 +282,7 @@ func createBlock(b *testing.B, parentBlock *flow.Block, accs *testAccounts, colN
 	}
 
 	block := unittest.BlockFixture(
-		unittest.Block.WithParent(parentBlock.ID(), parentBlock.View, parentBlock.Height),
+		unittest.Block.WithParent(parentBlock.Hash(), parentBlock.View, parentBlock.Height),
 		unittest.Block.WithPayload(
 			unittest.PayloadFixture(unittest.WithGuarantees(guarantees...)),
 		),

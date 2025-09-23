@@ -122,7 +122,7 @@ func NewCoreImpl(
 ) *CoreImpl {
 	coreLogger := logger.With().
 		Str("component", "execution_data_core").
-		Str("execution_result_id", executionResult.ID().String()).
+		Str("execution_result_id", executionResult.Hash().String()).
 		Str("block_id", executionResult.BlockID.String()).
 		Uint64("height", header.Height).
 		Logger()
@@ -151,7 +151,7 @@ func NewCoreImpl(
 		stores.NewResultsStore(inmemResults, persistentResults, executionResult.BlockID),
 		stores.NewCollectionsStore(inmemCollections, persistentCollections, lockManager),
 		stores.NewTxResultErrMsgStore(inmemTxResultErrMsgs, persistentTxResultErrMsg, executionResult.BlockID),
-		stores.NewLatestSealedResultStore(latestPersistedSealedResult, executionResult.ID(), header.Height),
+		stores.NewLatestSealedResultStore(latestPersistedSealedResult, executionResult.Hash(), header.Height),
 	}
 
 	blockPersister := persisters.NewBlockPersister(

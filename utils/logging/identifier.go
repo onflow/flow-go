@@ -8,7 +8,7 @@ import (
 )
 
 func Entity(entity flow.Hashable) []byte {
-	id := entity.ID()
+	id := entity.Hash()
 	return id[:]
 }
 

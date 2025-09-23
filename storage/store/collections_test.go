@@ -37,39 +37,39 @@ func TestCollections(t *testing.T) {
 		require.NoError(t, err)
 
 		// retrieve the light collection by collection id
-		actual, err := collections.LightByID(expected.ID())
+		actual, err := collections.LightByID(expected.Hash())
 		require.NoError(t, err)
 
 		// check if the light collection was indeed persisted
 		expectedLight := expected.Light()
 		assert.Equal(t, expectedLight, actual)
 
-		expectedID := expected.ID()
+		expectedID := expected.Hash()
 
 		// retrieve the collection light id by each of its transaction id
 		for _, tx := range expected.Transactions {
-			collLight, err := collections.LightByTransactionID(tx.ID())
-			actualID := collLight.ID()
+			collLight, err := collections.LightByTransactionID(tx.Hash())
+			actualID := collLight.Hash()
 			// check that the collection id can indeed be retrieved by transaction id
 			require.NoError(t, err)
 			assert.Equal(t, expectedID, actualID)
 		}
 
 		// remove the collection
-		require.NoError(t, collections.Remove(expected.ID()))
+		require.NoError(t, collections.Remove(expected.Hash()))
 
 		// check that the collection was indeed removed
-		_, err = collections.LightByID(expected.ID())
+		_, err = collections.LightByID(expected.Hash())
 		assert.Error(t, err)
 		assert.True(t, errors.Is(err, storage.ErrNotFound))
 
 		// check that the collection was indeed removed from the transaction index
 		for _, tx := range expected.Transactions {
-			_, err = collections.LightByTransactionID(tx.ID())
+			_, err = collections.LightByTransactionID(tx.Hash())
 			assert.Error(t, err)
 			assert.ErrorIs(t, err, storage.ErrNotFound)
 
-			_, err = transactions.ByID(tx.ID())
+			_, err = transactions.ByID(tx.Hash())
 			assert.Error(t, err)
 			assert.ErrorIs(t, err, storage.ErrNotFound)
 		}
@@ -109,18 +109,18 @@ func TestCollections_IndexDuplicateTx(t *testing.T) {
 		require.NoError(t, err)
 
 		// should be able to retrieve col2 by ID
-		gotLightByCol2ID, err := collections.LightByID(col2.ID())
+		gotLightByCol2ID, err := collections.LightByID(col2.Hash())
 		require.NoError(t, err)
 		col2Light := col2.Light()
 		assert.Equal(t, col2Light, gotLightByCol2ID)
 
 		// should be able to retrieve col2 by the transaction which only appears in col2
-		_, err = collections.LightByTransactionID(col2Tx.ID())
+		_, err = collections.LightByTransactionID(col2Tx.Hash())
 		require.NoError(t, err)
 
 		// col1 should be indexed by the shared transaction ,
 		// since col1 is the first collection to be indexed by the shared transaction (dupTx)
-		gotLightByDupTxID, err := collections.LightByTransactionID(dupTx.ID())
+		gotLightByDupTxID, err := collections.LightByTransactionID(dupTx.Hash())
 		require.NoError(t, err)
 		col1Light := col1.Light()
 		assert.Equal(t, col1Light, gotLightByDupTxID)
@@ -187,8 +187,8 @@ func TestCollections_ConcurrentIndexByTx(t *testing.T) {
 		}
 
 		// Verify that one of the collections is indexed by the shared transaction
-		indexedCollection, err := collections.LightByTransactionID(sharedTx.ID())
+		indexedCollection, err := collections.LightByTransactionID(sharedTx.Hash())
 		require.NoError(t, err)
-		assert.True(t, indexedCollection.ID() == col1.ID() || indexedCollection.ID() == col2.ID(), "Expected one of the collections to be indexed")
+		assert.True(t, indexedCollection.Hash() == col1.Hash() || indexedCollection.Hash() == col2.Hash(), "Expected one of the collections to be indexed")
 	})
 }

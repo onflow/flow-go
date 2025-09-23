@@ -133,7 +133,7 @@ func (suite *ReactorEngineSuite_SetupPhase) SetupTest() {
 	suite.snapshot.On("Epochs").Return(suite.epochQuery)
 	suite.snapshot.On("Head").Return(suite.firstBlock, nil)
 	suite.state = new(protocol.State)
-	suite.state.On("AtBlockID", suite.firstBlock.ID()).Return(suite.snapshot)
+	suite.state.On("AtBlockID", suite.firstBlock.Hash()).Return(suite.snapshot)
 	suite.state.On("Final").Return(suite.snapshot)
 
 	// ensure that an attempt is made to insert the expected dkg private share
@@ -352,7 +352,7 @@ func (suite *ReactorEngineSuite_CommittedPhase) SetupTest() {
 	suite.snap.On("Head").Return(firstBlock, nil)
 
 	suite.state = new(protocol.State)
-	suite.state.On("AtBlockID", firstBlock.ID()).Return(suite.snap)
+	suite.state.On("AtBlockID", firstBlock.Hash()).Return(suite.snap)
 	suite.state.On("Final").Return(suite.snap)
 
 	// count number of warn-level logs
@@ -380,7 +380,7 @@ func (suite *ReactorEngineSuite_CommittedPhase) TestDKGSuccess() {
 
 	entry := unittest.EpochStateFixture(unittest.WithNextEpochProtocolState(), func(entry *flow.RichEpochStateEntry) {
 		entry.NextEpochCommit.Counter = suite.NextEpochCounter()
-		entry.NextEpoch.CommitID = entry.NextEpochCommit.ID()
+		entry.NextEpoch.CommitID = entry.NextEpochCommit.Hash()
 	})
 	epochProtocolState := protocol.NewEpochProtocolState(suite.T())
 	epochProtocolState.On("Entry").Return(entry)
@@ -449,7 +449,7 @@ func (suite *ReactorEngineSuite_CommittedPhase) TestStartupInCommittedPhase_DKGS
 
 	entry := unittest.EpochStateFixture(unittest.WithNextEpochProtocolState(), func(entry *flow.RichEpochStateEntry) {
 		entry.NextEpochCommit.Counter = suite.NextEpochCounter()
-		entry.NextEpoch.CommitID = entry.NextEpochCommit.ID()
+		entry.NextEpoch.CommitID = entry.NextEpochCommit.Hash()
 	})
 	epochProtocolState := protocol.NewEpochProtocolState(suite.T())
 	epochProtocolState.On("Entry").Return(entry)

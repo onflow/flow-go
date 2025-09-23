@@ -10,7 +10,7 @@ import (
 // CanonicalClusterID returns the canonical chain ID for the given cluster in
 // the given epoch.
 func CanonicalClusterID(epoch uint64, participants flow.IdentifierList) flow.ChainID {
-	return flow.ChainID(fmt.Sprintf("cluster-%d-%s", epoch, participants.ID()))
+	return flow.ChainID(fmt.Sprintf("cluster-%d-%s", epoch, participants.Hash()))
 }
 
 // CanonicalRootBlock returns the canonical root block for the given

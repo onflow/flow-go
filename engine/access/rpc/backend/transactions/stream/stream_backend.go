@@ -95,11 +95,11 @@ func (t *TransactionStream) SendAndSubscribeTransactionStatuses(
 	requiredEventEncodingVersion entities.EventEncodingVersion,
 ) subscription.Subscription {
 	if err := t.sendTransaction(ctx, tx); err != nil {
-		t.log.Debug().Err(err).Str("tx_id", tx.ID().String()).Msg("failed to send transaction")
+		t.log.Debug().Err(err).Str("tx_id", tx.Hash().String()).Msg("failed to send transaction")
 		return subscription.NewFailedSubscription(err, "failed to send transaction")
 	}
 
-	return t.createSubscription(ctx, tx.ID(), tx.ReferenceBlockID, tx.ReferenceBlockID, requiredEventEncodingVersion)
+	return t.createSubscription(ctx, tx.Hash(), tx.ReferenceBlockID, tx.ReferenceBlockID, requiredEventEncodingVersion)
 }
 
 // SubscribeTransactionStatuses subscribes to status updates for a given transaction ID.
@@ -124,7 +124,7 @@ func (t *TransactionStream) SubscribeTransactionStatuses(
 		return subscription.NewFailedSubscription(err, "failed to lookup sealed block")
 	}
 
-	return t.createSubscription(ctx, txID, header.ID(), flow.ZeroID, requiredEventEncodingVersion)
+	return t.createSubscription(ctx, txID, header.Hash(), flow.ZeroID, requiredEventEncodingVersion)
 }
 
 // createSubscription initializes a transaction subscription for monitoring status updates.

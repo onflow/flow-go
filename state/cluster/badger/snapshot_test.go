@@ -103,7 +103,7 @@ func (suite *SnapshotSuite) Payload(transactions ...*flow.TransactionBody) model
 	suite.Require().Nil(err)
 
 	// find the oldest reference block among the transactions
-	minRefID := final.ID() // use final by default
+	minRefID := final.Hash() // use final by default
 	minRefHeight := uint64(math.MaxUint64)
 	for _, tx := range transactions {
 		refBlock, err := suite.protoState.AtBlockID(tx.ReferenceBlockID).Head()
@@ -112,7 +112,7 @@ func (suite *SnapshotSuite) Payload(transactions ...*flow.TransactionBody) model
 		}
 		if refBlock.Height < minRefHeight {
 			minRefHeight = refBlock.Height
-			minRefID = refBlock.ID()
+			minRefID = refBlock.Hash()
 		}
 	}
 
@@ -192,7 +192,7 @@ func (suite *SnapshotSuite) TestNonexistentBlock() {
 func (suite *SnapshotSuite) TestAtBlockID() {
 	t := suite.T()
 
-	snapshot := suite.state.AtBlockID(suite.genesis.ID())
+	snapshot := suite.state.AtBlockID(suite.genesis.Hash())
 
 	// ensure collection is correct
 	coll, err := snapshot.Collection()
@@ -202,7 +202,7 @@ func (suite *SnapshotSuite) TestAtBlockID() {
 	// ensure head is correct
 	head, err := snapshot.Head()
 	assert.NoError(t, err)
-	assert.Equal(t, suite.genesis.ToHeader().ID(), head.ID())
+	assert.Equal(t, suite.genesis.ToHeader().Hash(), head.Hash())
 }
 
 func (suite *SnapshotSuite) TestEmptyCollection() {
@@ -212,7 +212,7 @@ func (suite *SnapshotSuite) TestEmptyCollection() {
 	proposal := suite.ProposalWithParentAndPayload(suite.genesis, *model.NewEmptyPayload(flow.ZeroID))
 	suite.InsertBlock(proposal)
 
-	snapshot := suite.state.AtBlockID(proposal.Block.ID())
+	snapshot := suite.state.AtBlockID(proposal.Block.Hash())
 
 	// ensure collection is correct
 	coll, err := snapshot.Collection()
@@ -243,7 +243,7 @@ func (suite *SnapshotSuite) TestFinalizedBlock() {
 	defer lctx.Release()
 	require.NoError(suite.T(), lctx.AcquireLock(storage.LockInsertOrFinalizeClusterBlock))
 	err = suite.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-		return procedure.FinalizeClusterBlock(lctx, rw, finalizedProposal1.Block.ID())
+		return procedure.FinalizeClusterBlock(lctx, rw, finalizedProposal1.Block.Hash())
 	})
 	assert.NoError(t, err)
 
@@ -258,7 +258,7 @@ func (suite *SnapshotSuite) TestFinalizedBlock() {
 	// ensure head is correct
 	head, err := snapshot.Head()
 	assert.NoError(t, err)
-	assert.Equal(t, finalizedProposal1.Block.ToHeader().ID(), head.ID())
+	assert.Equal(t, finalizedProposal1.Block.ToHeader().Hash(), head.Hash())
 }
 
 // test that no pending blocks are returned when there are none
@@ -282,7 +282,7 @@ func (suite *SnapshotSuite) TestPending_WithPendingBlocks() {
 	for i := 0; i < 10; i++ {
 		next := suite.ProposalWithParentAndPayload(parent, suite.Payload())
 		suite.InsertBlock(next)
-		pendings = append(pendings, next.Block.ID())
+		pendings = append(pendings, next.Block.Hash())
 	}
 
 	pending, err := suite.state.Final().Pending()
@@ -307,7 +307,7 @@ func (suite *SnapshotSuite) TestPending_Grandchildren() {
 	parents := make(map[flow.Identifier]struct{})
 	// initialize with the latest finalized block, which is the parent of the
 	// first level of children
-	parents[suite.genesis.ID()] = struct{}{}
+	parents[suite.genesis.Hash()] = struct{}{}
 
 	for _, blockID := range pending {
 		var header flow.Header

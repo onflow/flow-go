@@ -200,11 +200,11 @@ func (suite *Suite) RunTest(
 func (suite *Suite) TestSendAndGetTransaction() {
 	suite.RunTest(func(handler *rpc.Handler, _ storage.DB, _ *store.All) {
 		referenceBlock := unittest.BlockHeaderFixture()
-		transaction := unittest.TransactionBodyFixture(unittest.WithReferenceBlock(referenceBlock.ID()))
+		transaction := unittest.TransactionBodyFixture(unittest.WithReferenceBlock(referenceBlock.Hash()))
 		refSnapshot := new(protocol.Snapshot)
 
 		suite.state.
-			On("AtBlockID", referenceBlock.ID()).
+			On("AtBlockID", referenceBlock.Hash()).
 			Return(refSnapshot, nil)
 
 		refSnapshot.
@@ -233,7 +233,7 @@ func (suite *Suite) TestSendAndGetTransaction() {
 		suite.Require().NoError(err)
 		suite.Require().NotNil(resp)
 
-		id := transaction.ID()
+		id := transaction.Hash()
 		getReq := &accessproto.GetTransactionRequest{
 			Id: id[:],
 		}
@@ -251,7 +251,7 @@ func (suite *Suite) TestSendAndGetTransaction() {
 func (suite *Suite) TestSendExpiredTransaction() {
 	suite.RunTest(func(handler *rpc.Handler, _ storage.DB, _ *store.All) {
 		referenceBlock := suite.finalizedBlock
-		transaction := unittest.TransactionBodyFixture(unittest.WithReferenceBlock(referenceBlock.ID()))
+		transaction := unittest.TransactionBodyFixture(unittest.WithReferenceBlock(referenceBlock.Hash()))
 
 		// create latest block that is past the expiry window
 		latestBlock := unittest.BlockHeaderFixture()
@@ -260,7 +260,7 @@ func (suite *Suite) TestSendExpiredTransaction() {
 		refSnapshot := new(protocol.Snapshot)
 
 		suite.state.
-			On("AtBlockID", referenceBlock.ID()).
+			On("AtBlockID", referenceBlock.Hash()).
 			Return(refSnapshot, nil)
 
 		refSnapshot.
@@ -288,10 +288,10 @@ func (suite *Suite) TestSendTransactionToRandomCollectionNode() {
 
 		// create a transaction
 		referenceBlock := unittest.BlockHeaderFixture()
-		transaction := unittest.TransactionBodyFixture(unittest.WithReferenceBlock(referenceBlock.ID()))
+		transaction := unittest.TransactionBodyFixture(unittest.WithReferenceBlock(referenceBlock.Hash()))
 
 		// setup the state and finalSnapshot mock expectations
-		suite.state.On("AtBlockID", referenceBlock.ID()).Return(suite.finalSnapshot, nil)
+		suite.state.On("AtBlockID", referenceBlock.Hash()).Return(suite.finalSnapshot, nil)
 		suite.finalSnapshot.On("Head").Return(referenceBlock, nil)
 
 		// create storage
@@ -373,7 +373,7 @@ func (suite *Suite) TestSendTransactionToRandomCollectionNode() {
 
 		// additionally do a GetTransaction request for the two transactions
 		getTx := func(tx flow.TransactionBody) {
-			id := tx.ID()
+			id := tx.Hash()
 			getReq := &accessproto.GetTransactionRequest{
 				Id: id[:],
 			}
@@ -419,7 +419,7 @@ func (suite *Suite) TestGetBlockByIDAndHeight() {
 		require.NoError(suite.T(), fctx.AcquireLock(storage.LockFinalizeBlock))
 		// the follower logic should update height index on the block storage when a block is finalized
 		require.NoError(suite.T(), db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			return operation.IndexFinalizedBlockByHeight(fctx, rw, block2.Height, block2.ID())
+			return operation.IndexFinalizedBlockByHeight(fctx, rw, block2.Height, block2.Hash())
 		}))
 		fctx.Release()
 
@@ -452,7 +452,7 @@ func (suite *Suite) TestGetBlockByIDAndHeight() {
 			require.Equal(suite.T(), expectedMessage, actual)
 			expectedBlock, err := convert.MessageToBlock(resp.Block)
 			require.NoError(suite.T(), err)
-			require.Equal(suite.T(), expectedBlock.ID(), block.ID())
+			require.Equal(suite.T(), expectedBlock.Hash(), block.Hash())
 		}
 
 		assertLightBlockResp := func(
@@ -470,7 +470,7 @@ func (suite *Suite) TestGetBlockByIDAndHeight() {
 		suite.finalSnapshot.On("Head").Return(block1.ToHeader(), nil)
 		suite.Run("get header 1 by ID", func() {
 			// get header by ID
-			id := block1.ID()
+			id := block1.Hash()
 			req := &accessproto.GetBlockHeaderByIDRequest{
 				Id: id[:],
 			}
@@ -482,7 +482,7 @@ func (suite *Suite) TestGetBlockByIDAndHeight() {
 		})
 
 		suite.Run("get block 1 by ID", func() {
-			id := block1.ID()
+			id := block1.Hash()
 			// get block details by ID
 			req := &accessproto.GetBlockByIDRequest{
 				Id:                id[:],
@@ -495,7 +495,7 @@ func (suite *Suite) TestGetBlockByIDAndHeight() {
 		})
 
 		suite.Run("get block light 1 by ID", func() {
-			id := block1.ID()
+			id := block1.Hash()
 			// get block details by ID
 			req := &accessproto.GetBlockByIDRequest{
 				Id: id[:],
@@ -555,7 +555,7 @@ func (suite *Suite) TestGetExecutionResultByBlockID() {
 			unittest.WithServiceEvents(3))
 
 		require.NoError(suite.T(), all.Results.Store(er))
-		require.NoError(suite.T(), all.Results.Index(blockID, er.ID()))
+		require.NoError(suite.T(), all.Results.Index(blockID, er.Hash()))
 
 		assertResp := func(
 			resp *accessproto.ExecutionResultForBlockIDResponse,
@@ -593,7 +593,7 @@ func (suite *Suite) TestGetExecutionResultByBlockID() {
 			}
 			parsedExecResult, err := convert.MessageToExecutionResult(resp.ExecutionResult)
 			require.NoError(suite.T(), err)
-			assert.Equal(suite.T(), parsedExecResult.ID(), executionResult.ID())
+			assert.Equal(suite.T(), parsedExecResult.Hash(), executionResult.Hash())
 		}
 
 		suite.Run("nonexisting block", func() {
@@ -762,7 +762,7 @@ func (suite *Suite) TestGetSealedTransaction() {
 		fctx := suite.lockManager.NewContext()
 		require.NoError(suite.T(), fctx.AcquireLock(storage.LockFinalizeBlock))
 		require.NoError(suite.T(), db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			return operation.IndexFinalizedBlockByHeight(fctx, rw, block.Height, block.ID())
+			return operation.IndexFinalizedBlockByHeight(fctx, rw, block.Height, block.Hash())
 		}))
 		fctx.Release()
 
@@ -778,12 +778,12 @@ func (suite *Suite) TestGetSealedTransaction() {
 		// 2. Ingest engine was notified by the follower engine about a new block.
 		// Follower engine --> Ingest engine
 		mb := &model.Block{
-			BlockID: block.ID(),
+			BlockID: block.Hash(),
 		}
 		ingestEng.OnFinalizedBlock(mb)
 
 		// 3. Request engine is used to request missing collection
-		suite.request.On("EntityByID", collection.ID(), mock.Anything).Return()
+		suite.request.On("EntityByID", collection.Hash(), mock.Anything).Return()
 		// 4. Indexer IndexCollection receives the requested collection and all the execution receipts
 		// Create a lock context for indexing
 		indexLctx := suite.lockManager.NewContext()
@@ -801,7 +801,7 @@ func (suite *Suite) TestGetSealedTransaction() {
 
 		// 5. Client requests a transaction
 		tx := collection.Transactions[0]
-		txID := tx.ID()
+		txID := tx.Hash()
 		getReq := &accessproto.GetTransactionRequest{
 			Id: txID[:],
 		}
@@ -827,8 +827,8 @@ func (suite *Suite) TestGetTransactionResult() {
 		block := proposal.Block
 		proposalNegative, collectionNegative := suite.createChain()
 		blockNegative := proposalNegative.Block
-		blockId := block.ID()
-		blockNegativeId := blockNegative.ID()
+		blockId := block.Hash()
+		blockNegativeId := blockNegative.Hash()
 
 		finalSnapshot := new(protocol.Snapshot)
 		finalSnapshot.On("Head").Return(suite.finalizedBlock, nil)
@@ -991,7 +991,7 @@ func (suite *Suite) TestGetTransactionResult() {
 			// Ingest engine was notified by the follower engine about a new block.
 			// Follower engine --> Ingest engine
 			mb := &model.Block{
-				BlockID: block.ID(),
+				BlockID: block.Hash(),
 			}
 			ingestEng.OnFinalizedBlock(mb)
 
@@ -1013,7 +1013,7 @@ func (suite *Suite) TestGetTransactionResult() {
 		fctx2 := suite.lockManager.NewContext()
 		require.NoError(suite.T(), fctx2.AcquireLock(storage.LockFinalizeBlock))
 		require.NoError(suite.T(), db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			return operation.IndexFinalizedBlockByHeight(fctx2, rw, block.Height, block.ID())
+			return operation.IndexFinalizedBlockByHeight(fctx2, rw, block.Height, block.Hash())
 		}))
 		fctx2.Release()
 		finalSnapshot.On("Head").Return(block.ToHeader(), nil)
@@ -1021,10 +1021,10 @@ func (suite *Suite) TestGetTransactionResult() {
 		processExecutionReceipts(&block, collection, enNodeIDs, originID, ingestEng)
 		processExecutionReceipts(&blockNegative, collectionNegative, enNodeIDs, originID, ingestEng)
 
-		txId := collection.Transactions[0].ID()
-		collectionId := collection.ID()
-		txIdNegative := collectionNegative.Transactions[0].ID()
-		collectionIdNegative := collectionNegative.ID()
+		txId := collection.Transactions[0].Hash()
+		collectionId := collection.Hash()
+		txIdNegative := collectionNegative.Transactions[0].Hash()
+		collectionIdNegative := collectionNegative.Hash()
 
 		assertTransactionResult := func(
 			resp *accessproto.TransactionResultResponse,
@@ -1258,7 +1258,7 @@ func (suite *Suite) TestExecuteScript() {
 		fctx := suite.lockManager.NewContext()
 		require.NoError(suite.T(), fctx.AcquireLock(storage.LockFinalizeBlock))
 		require.NoError(suite.T(), db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			return operation.IndexFinalizedBlockByHeight(fctx, rw, lastBlock.Height, lastBlock.ID())
+			return operation.IndexFinalizedBlockByHeight(fctx, rw, lastBlock.Height, lastBlock.Hash())
 		}))
 		fctx.Release()
 		require.NoError(suite.T(), err)
@@ -1281,7 +1281,7 @@ func (suite *Suite) TestExecuteScript() {
 				return err
 			}
 
-			return operation.IndexFinalizedBlockByHeight(fctx2, rw, prevBlock.Height, prevBlock.ID())
+			return operation.IndexFinalizedBlockByHeight(fctx2, rw, prevBlock.Height, prevBlock.Hash())
 		}))
 		fctx2.Release()
 
@@ -1311,7 +1311,7 @@ func (suite *Suite) TestExecuteScript() {
 			suite.execClient.On("ExecuteScriptAtBlockID", ctx, &executionReq).Return(&executionResp, nil).Once()
 
 			finalizedHeader := suite.finalizedHeaderCache.Get()
-			finalizedHeaderId := finalizedHeader.ID()
+			finalizedHeaderId := finalizedHeader.Hash()
 			nodeId := suite.me.NodeID()
 
 			expectedResp := accessproto.ExecuteScriptResponse{
@@ -1333,10 +1333,10 @@ func (suite *Suite) TestExecuteScript() {
 
 		suite.Run("execute script at latest block", func() {
 			suite.state.
-				On("AtBlockID", lastBlock.ID()).
+				On("AtBlockID", lastBlock.Hash()).
 				Return(suite.sealedSnapshot, nil)
 
-			expectedResp := setupExecClientMock(lastBlock.ID())
+			expectedResp := setupExecClientMock(lastBlock.Hash())
 			req := accessproto.ExecuteScriptAtLatestBlockRequest{
 				Script: script,
 			}
@@ -1346,11 +1346,11 @@ func (suite *Suite) TestExecuteScript() {
 
 		suite.Run("execute script at block id", func() {
 			suite.state.
-				On("AtBlockID", prevBlock.ID()).
+				On("AtBlockID", prevBlock.Hash()).
 				Return(suite.sealedSnapshot, nil)
 
-			expectedResp := setupExecClientMock(prevBlock.ID())
-			id := prevBlock.ID()
+			expectedResp := setupExecClientMock(prevBlock.Hash())
+			id := prevBlock.Hash()
 			req := accessproto.ExecuteScriptAtBlockIDRequest{
 				BlockId: id[:],
 				Script:  script,
@@ -1361,10 +1361,10 @@ func (suite *Suite) TestExecuteScript() {
 
 		suite.Run("execute script at block height", func() {
 			suite.state.
-				On("AtBlockID", prevBlock.ID()).
+				On("AtBlockID", prevBlock.Hash()).
 				Return(suite.sealedSnapshot, nil)
 
-			expectedResp := setupExecClientMock(prevBlock.ID())
+			expectedResp := setupExecClientMock(prevBlock.Hash())
 			req := accessproto.ExecuteScriptAtBlockHeightRequest{
 				BlockHeight: prevBlock.Height,
 				Script:      script,
@@ -1418,7 +1418,7 @@ func (suite *Suite) TestLastFinalizedBlockHeightResult() {
 			require.NoError(suite.T(), err)
 			require.NotNil(suite.T(), resp)
 
-			finalizedHeaderId := suite.finalizedBlock.ID()
+			finalizedHeaderId := suite.finalizedBlock.Hash()
 			nodeId := suite.me.NodeID()
 
 			require.Equal(suite.T(), &entitiesproto.Metadata{
@@ -1428,7 +1428,7 @@ func (suite *Suite) TestLastFinalizedBlockHeightResult() {
 			}, resp.Metadata)
 		}
 
-		id := block.ID()
+		id := block.Hash()
 		req := &accessproto.GetBlockHeaderByIDRequest{
 			Id: id[:],
 		}
@@ -1453,7 +1453,7 @@ func (suite *Suite) createChain() (*flow.Proposal, *flow.Collection) {
 	indices, err := signature.EncodeSignersToIndices(clusterCommittee.NodeIDs(), clusterCommittee.NodeIDs())
 	require.NoError(suite.T(), err)
 	guarantee := &flow.CollectionGuarantee{
-		CollectionID:     collection.ID(),
+		CollectionID:     collection.Hash(),
 		Signature:        crypto.Signature([]byte("signature A")),
 		ReferenceBlockID: refBlockID,
 		SignerIndices:    indices,

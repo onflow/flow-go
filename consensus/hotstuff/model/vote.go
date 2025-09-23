@@ -52,7 +52,7 @@ func NewVote(untrusted UntrustedVote) (*Vote, error) {
 	}, nil
 }
 
-// ID returns the identifier for the vote.
-func (uv *Vote) ID() flow.Identifier {
+// Hash returns the identifier for the vote.
+func (uv *Vote) Hash() flow.Identifier {
 	return flow.MakeID(uv)
 }

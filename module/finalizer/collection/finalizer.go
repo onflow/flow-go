@@ -114,7 +114,7 @@ func (f *Finalizer) MakeFinal(blockID flow.Identifier) error {
 	// changes to the protocol state
 	for i := len(steps) - 1; i >= 0; i-- {
 		err := f.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			clusterBlockID := steps[i].ID()
+			clusterBlockID := steps[i].Hash()
 
 			// look up the transactions included in the payload
 			step := steps[i]
@@ -127,7 +127,7 @@ func (f *Finalizer) MakeFinal(blockID flow.Identifier) error {
 
 			// remove the transactions from the memory pool
 			for _, colTx := range payload.Collection.Transactions {
-				txID := colTx.ID()
+				txID := colTx.Hash()
 				// ignore result -- we don't care whether the transaction was in the pool
 				_ = f.transactions.Remove(txID)
 			}
@@ -181,7 +181,7 @@ func (f *Finalizer) MakeFinal(blockID flow.Identifier) error {
 			// TODO add real signatures here (https://github.com/onflow/flow-go-internal/issues/4569)
 			// TODO: after adding real signature here add check for signature in NewCollectionGuarantee
 			guarantee, err := flow.NewCollectionGuarantee(flow.UntrustedCollectionGuarantee{
-				CollectionID:     payload.Collection.ID(),
+				CollectionID:     payload.Collection.Hash(),
 				ReferenceBlockID: payload.ReferenceBlockID,
 				ClusterChainID:   header.ChainID,
 				SignerIndices:    step.ParentVoterIndices,
@@ -199,7 +199,7 @@ func (f *Finalizer) MakeFinal(blockID flow.Identifier) error {
 			return nil
 		})
 		if err != nil {
-			return fmt.Errorf("could not finalize cluster block (%x): %w", steps[i].ID(), err)
+			return fmt.Errorf("could not finalize cluster block (%x): %w", steps[i].Hash(), err)
 		}
 	}
 

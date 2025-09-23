@@ -58,7 +58,7 @@ type PeerManagement interface {
 	Publish(ctx context.Context, messageScope network.OutgoingMessageScope) error
 	// Host returns pointer to host object of node.
 	Host() host.Host
-	// ID returns the peer.ID of the node, which is the unique identifier of the node at the libp2p level.
+	// Hash returns the peer.ID of the node, which is the unique identifier of the node at the libp2p level.
 	// For other libp2p nodes, the current node is identified by this ID.
 	ID() peer.ID
 	// WithDefaultUnicastProtocol overrides the default handler of the unicast manager and registers all preferred protocols.

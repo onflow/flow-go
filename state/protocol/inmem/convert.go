@@ -105,7 +105,7 @@ func SnapshotFromBootstrapStateWithParams(
 
 	params := EncodableParams{
 		ChainID:              root.ChainID, // chain ID must match the root block
-		SporkID:              root.ID(),    // use root block ID as the unique spork identifier
+		SporkID:              root.Hash(),  // use root block ID as the unique spork identifier
 		SporkRootBlockHeight: root.Height,  // use root block height as the spork root block height
 		SporkRootBlockView:   root.View,    // use root block view as the spork root block view
 	}
@@ -114,14 +114,14 @@ func SnapshotFromBootstrapStateWithParams(
 	if err != nil {
 		return nil, fmt.Errorf("could not construct epoch protocol state: %w", err)
 	}
-	rootEpochStateID := rootMinEpochState.ID()
+	rootEpochStateID := rootMinEpochState.Hash()
 	rootKvStore, err := kvStoreFactory(rootEpochStateID)
 	if err != nil {
 		return nil, fmt.Errorf("could not construct root kvstore: %w", err)
 	}
-	if rootKvStore.ID() != root.Payload.ProtocolStateID {
+	if rootKvStore.Hash() != root.Payload.ProtocolStateID {
 		return nil, fmt.Errorf("incorrect protocol state ID in root block, expected (%x) but got (%x)",
-			root.Payload.ProtocolStateID, rootKvStore.ID())
+			root.Payload.ProtocolStateID, rootKvStore.Hash())
 	}
 	kvStoreVersion, kvStoreData, err := rootKvStore.VersionedEncode()
 	if err != nil {
@@ -171,9 +171,9 @@ func SnapshotFromBootstrapStateWithParams(
 				proposal,
 			},
 			ExecutionResults: flow.ExecutionResultList{result},
-			LatestSeals:      map[flow.Identifier]flow.Identifier{root.ID(): seal.ID()},
+			LatestSeals:      map[flow.Identifier]flow.Identifier{root.Hash(): seal.Hash()},
 			ProtocolStateEntries: map[flow.Identifier]*flow.ProtocolStateEntryWrapper{
-				rootKvStore.ID(): rootProtocolStateEntryWrapper,
+				rootKvStore.Hash(): rootProtocolStateEntryWrapper,
 			},
 			FirstSeal:      seal,
 			ExtraBlocks:    make([]*flow.Proposal, 0),
@@ -207,8 +207,8 @@ func EpochProtocolStateFromServiceEvents(setup *flow.EpochSetup, commit *flow.Ep
 	}
 	currentEpoch, err := flow.NewEpochStateContainer(
 		flow.UntrustedEpochStateContainer{
-			SetupID:          setup.ID(),
-			CommitID:         commit.ID(),
+			SetupID:          setup.Hash(),
+			CommitID:         commit.Hash(),
 			ActiveIdentities: identities,
 			EpochExtensions:  nil,
 		},

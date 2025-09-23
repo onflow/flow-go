@@ -142,7 +142,7 @@ func (e *Core) launchWorkerToExecuteBlocks(ctx irrecoverable.SignalerContext, re
 			if err != nil {
 				ctx.Throw(fmt.Errorf("execution ingestion engine failed to execute block %v (%v): %w",
 					executable.Block.Height,
-					executable.Block.ID(), err))
+					executable.Block.Hash(), err))
 			}
 		}
 	}
@@ -151,7 +151,7 @@ func (e *Core) launchWorkerToExecuteBlocks(ctx irrecoverable.SignalerContext, re
 func (e *Core) OnCollection(col *flow.Collection) {
 	err := e.onCollection(col)
 	if err != nil {
-		e.log.Fatal().Err(err).Msgf("error processing collection: %v", col.ID())
+		e.log.Fatal().Err(err).Msgf("error processing collection: %v", col.Hash())
 	}
 }
 
@@ -404,7 +404,7 @@ func nonSystemTransactionCount(result flow.ExecutionResult) uint64 {
 }
 
 func (e *Core) onCollection(col *flow.Collection) error {
-	colID := col.ID()
+	colID := col.Hash()
 	e.log.Info().
 		Hex("collection_id", colID[:]).
 		Msgf("handle collection")
@@ -413,7 +413,7 @@ func (e *Core) onCollection(col *flow.Collection) error {
 	// we only need to store it once.
 	err := storeCollectionIfMissing(e.collections, col)
 	if err != nil {
-		return fmt.Errorf("failed to store collection %v: %w", col.ID(), err)
+		return fmt.Errorf("failed to store collection %v: %w", col.Hash(), err)
 	}
 
 	return e.handleCollection(colID, col)
@@ -441,15 +441,15 @@ func (e *Core) handleCollection(colID flow.Identifier, col *flow.Collection) err
 }
 
 func storeCollectionIfMissing(collections storage.Collections, col *flow.Collection) error {
-	_, err := collections.ByID(col.ID())
+	_, err := collections.ByID(col.Hash())
 	if err != nil {
 		if !errors.Is(err, storage.ErrNotFound) {
-			return fmt.Errorf("failed to get collection %v: %w", col.ID(), err)
+			return fmt.Errorf("failed to get collection %v: %w", col.Hash(), err)
 		}
 
 		_, err = collections.Store(col)
 		if err != nil {
-			return fmt.Errorf("failed to store collection %v: %w", col.ID(), err)
+			return fmt.Errorf("failed to store collection %v: %w", col.Hash(), err)
 		}
 	}
 
@@ -469,7 +469,7 @@ func (e *Core) executeConcurrently(executables []*entity.ExecutableBlock) {
 }
 
 func (e *Core) execute(ctx context.Context, executable *entity.ExecutableBlock) error {
-	if !e.stopControl.ShouldExecuteBlock(executable.Block.ID(), executable.Block.Height) {
+	if !e.stopControl.ShouldExecuteBlock(executable.Block.Hash(), executable.Block.Height) {
 		return nil
 	}
 
@@ -484,12 +484,12 @@ func (e *Core) execute(ctx context.Context, executable *entity.ExecutableBlock) 
 
 	result, err := e.executor.ExecuteBlock(ctx, executable)
 	if err != nil {
-		return fmt.Errorf("failed to execute block %v: %w", executable.Block.ID(), err)
+		return fmt.Errorf("failed to execute block %v: %w", executable.Block.Hash(), err)
 	}
 
 	err = e.onBlockExecuted(ctx, executable, result, startedAt)
 	if err != nil {
-		return fmt.Errorf("failed to handle execution result of block %v: %w", executable.Block.ID(), err)
+		return fmt.Errorf("failed to handle execution result of block %v: %w", executable.Block.Hash(), err)
 	}
 
 	return nil

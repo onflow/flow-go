@@ -93,12 +93,12 @@ type BuilderSuite struct {
 }
 
 func (bs *BuilderSuite) storeBlock(block *flow.Block) {
-	bs.headers[block.ID()] = block.ToHeader()
-	bs.blocks[block.ID()] = block
-	bs.index[block.ID()] = block.Payload.Index()
-	bs.blockChildren[block.ParentID] = append(bs.blockChildren[block.ParentID], block.ID())
+	bs.headers[block.Hash()] = block.ToHeader()
+	bs.blocks[block.Hash()] = block
+	bs.index[block.Hash()] = block.Payload.Index()
+	bs.blockChildren[block.ParentID] = append(bs.blockChildren[block.ParentID], block.Hash())
 	for _, result := range block.Payload.Results {
-		bs.resultByID[result.ID()] = result
+		bs.resultByID[result.Hash()] = result
 	}
 }
 
@@ -114,7 +114,7 @@ func (bs *BuilderSuite) createAndRecordBlock(parentBlock *flow.Block, candidateS
 	// and add it to the payload. The corresponding IncorporatedResult will be used to
 	// seal the parentBlock, and to create an IncorporatedResultSeal for the seal mempool.
 	var incorporatedResultForPrevBlock *flow.IncorporatedResult
-	previousResult, found := bs.resultForBlock[parentBlock.ID()]
+	previousResult, found := bs.resultForBlock[parentBlock.Hash()]
 	if !found {
 		panic("missing execution result for parent")
 	}
@@ -124,7 +124,7 @@ func (bs *BuilderSuite) createAndRecordBlock(parentBlock *flow.Block, candidateS
 
 	incorporatedResultForPrevBlock = unittest.IncorporatedResult.Fixture(
 		unittest.IncorporatedResult.WithResult(previousResult),
-		unittest.IncorporatedResult.WithIncorporatedBlockID(block.ID()),
+		unittest.IncorporatedResult.WithIncorporatedBlockID(block.Hash()),
 	)
 
 	result := unittest.ExecutionResultFixture(
@@ -133,8 +133,8 @@ func (bs *BuilderSuite) createAndRecordBlock(parentBlock *flow.Block, candidateS
 	)
 
 	bs.resultForBlock[result.BlockID] = result
-	bs.resultByID[result.ID()] = result
-	bs.receiptsByID[receipt.ID()] = receipt
+	bs.resultByID[result.Hash()] = result
+	bs.receiptsByID[receipt.Hash()] = receipt
 	bs.receiptsByBlockID[receipt.ExecutionResult.BlockID] = append(bs.receiptsByBlockID[receipt.ExecutionResult.BlockID], receipt)
 
 	// record block in dbs
@@ -216,35 +216,35 @@ func (bs *BuilderSuite) SetupTest() {
 	// Construct the [first] block:
 	first := unittest.BlockFixture()
 	bs.storeBlock(first)
-	bs.firstID = first.ID()
+	bs.firstID = first.Hash()
 	firstResult := unittest.ExecutionResultFixture(unittest.WithBlock(first))
 	bs.lastSeal = unittest.Seal.Fixture(unittest.Seal.WithResult(firstResult))
 	bs.resultForBlock[firstResult.BlockID] = firstResult
-	bs.resultByID[firstResult.ID()] = firstResult
+	bs.resultByID[firstResult.Hash()] = firstResult
 
 	// Construct finalized blocks [F0] ... [F4]
 	previous := first
 	for n := 0; n < numFinalizedBlocks; n++ {
 		finalized := bs.createAndRecordBlock(previous, n > 0) // Do not construct candidate seal for [first], as it is already sealed
-		bs.finalizedBlockIDs = append(bs.finalizedBlockIDs, finalized.ID())
+		bs.finalizedBlockIDs = append(bs.finalizedBlockIDs, finalized.Hash())
 		previous = finalized
 	}
 
 	// Construct the last finalized block [final]
 	final := bs.createAndRecordBlock(previous, true)
-	bs.finalID = final.ID()
+	bs.finalID = final.Hash()
 
 	// Construct the pending (i.e. unfinalized) ancestors [A0], ..., [A3]
 	previous = final
 	for n := 0; n < numPendingBlocks; n++ {
 		pending := bs.createAndRecordBlock(previous, true)
-		bs.pendingBlockIDs = append(bs.pendingBlockIDs, pending.ID())
+		bs.pendingBlockIDs = append(bs.pendingBlockIDs, pending.Hash())
 		previous = pending
 	}
 
 	// Construct [parent] block; but do _not_ add candidate seal for its parent
 	parent := bs.createAndRecordBlock(previous, false)
-	bs.parentID = parent.ID()
+	bs.parentID = parent.Hash()
 
 	// set up temporary database for tests
 	pdb, dir := unittest.TempPebbleDB(bs.T())
@@ -271,7 +271,7 @@ func (bs *BuilderSuite) SetupTest() {
 		require.NoError(bs.T(), operation.UpsertFinalizedHeight(lctx, rw.Writer(), final.Height))
 		require.NoError(bs.T(), operation.IndexFinalizedBlockByHeight(lctx, rw, final.Height, bs.finalID))
 		require.NoError(bs.T(), operation.UpsertSealedHeight(lctx, rw.Writer(), first.Height))
-		require.NoError(bs.T(), operation.IndexFinalizedBlockByHeight(lctx, rw, first.Height, first.ID()))
+		require.NoError(bs.T(), operation.IndexFinalizedBlockByHeight(lctx, rw, first.Height, first.Hash()))
 		return nil
 	}))
 
@@ -536,7 +536,7 @@ func (bs *BuilderSuite) TestPayloadGuaranteeDuplicate() {
 	for _, guarantee := range duplicated {
 		blockID := forkBlocks[rand.Intn(len(forkBlocks))]
 		index := bs.index[blockID]
-		index.GuaranteeIDs = append(index.GuaranteeIDs, guarantee.ID())
+		index.GuaranteeIDs = append(index.GuaranteeIDs, guarantee.Hash())
 		bs.index[blockID] = index
 	}
 
@@ -570,8 +570,8 @@ func (bs *BuilderSuite) TestPayloadGuaranteeReferenceExpired() {
 	// create 4 expired guarantees
 	header := unittest.BlockHeaderFixture()
 	header.Height = bs.headers[bs.finalID].Height - 12
-	bs.headers[header.ID()] = header
-	expired := unittest.CollectionGuaranteesFixture(4, unittest.WithCollRef(header.ID()))
+	bs.headers[header.Hash()] = header
+	expired := unittest.CollectionGuaranteesFixture(4, unittest.WithCollRef(header.Hash()))
 
 	// add all guarantees to the pool
 	bs.pendingGuarantees = append(valid, expired...)
@@ -642,7 +642,7 @@ func (bs *BuilderSuite) TestPayloadSeals_OnlyFork() {
 	}
 
 	bs.pendingSeals = bs.irsMap
-	_, err := bs.build.BuildOn(forkHead.ID(), bs.setter, bs.sign)
+	_, err := bs.build.BuildOn(forkHead.Hash(), bs.setter, bs.sign)
 	bs.Require().NoError(err)
 
 	// expected seals: [F0] <- ... <- [final] <- [B0] <- ... <- [B5]
@@ -697,7 +697,7 @@ func (bs *BuilderSuite) TestPayloadSeals_EnforceGap() {
 	bchain := unittest.ChainFixtureFrom(2, b1.ToHeader()) // creates blocks b2, b3
 
 	// create block B4: includes result for block B1 in its payload
-	resultB1 := bs.resultForBlock[b1.ID()]
+	resultB1 := bs.resultForBlock[b1.Hash()]
 	receiptB1 := unittest.ExecutionReceiptFixture(unittest.WithResult(resultB1))
 	b4 := unittest.BlockWithParentAndPayload(
 		bchain[1].ToHeader(),
@@ -716,16 +716,16 @@ func (bs *BuilderSuite) TestPayloadSeals_EnforceGap() {
 
 	// mock for of candidate seal mempool:
 	bs.pendingSeals = make(map[flow.Identifier]*flow.IncorporatedResultSeal)
-	b1seal := storeSealForIncorporatedResult(resultB1, b4.ID(), bs.pendingSeals)
+	b1seal := storeSealForIncorporatedResult(resultB1, b4.Hash(), bs.pendingSeals)
 
 	// mock for seals storage layer:
 	bs.sealDB = &storagemock.Seals{}
 	bs.build.seals = bs.sealDB
 
 	bs.T().Run("Build on top of B4 and check that no seals are included", func(t *testing.T) {
-		bs.sealDB.On("HighestInFork", b4.ID()).Return(b0seal, nil)
+		bs.sealDB.On("HighestInFork", b4.Hash()).Return(b0seal, nil)
 
-		_, err := bs.build.BuildOn(b4.ID(), bs.setter, bs.sign)
+		_, err := bs.build.BuildOn(b4.Hash(), bs.setter, bs.sign)
 		require.NoError(t, err)
 		bs.recPool.AssertExpectations(t)
 		require.Empty(t, bs.assembled.Seals, "should not include any seals")
@@ -734,9 +734,9 @@ func (bs *BuilderSuite) TestPayloadSeals_EnforceGap() {
 	bs.T().Run("Build on top of B5 and check that seals for B1 is included", func(t *testing.T) {
 		b5 := unittest.BlockWithParentFixture(b4.ToHeader()) // creating block b5
 		bs.storeBlock(b5)
-		bs.sealDB.On("HighestInFork", b5.ID()).Return(b0seal, nil)
+		bs.sealDB.On("HighestInFork", b5.Hash()).Return(b0seal, nil)
 
-		_, err := bs.build.BuildOn(b5.ID(), bs.setter, bs.sign)
+		_, err := bs.build.BuildOn(b5.Hash(), bs.setter, bs.sign)
 		require.NoError(t, err)
 		bs.recPool.AssertExpectations(t)
 		require.Equal(t, 1, len(bs.assembled.Seals), "only seal for B1 expected")
@@ -894,25 +894,25 @@ func (bs *BuilderSuite) TestValidatePayloadSeals_ExecutionForks() {
 	bs.sealDB = &storagemock.Seals{}
 	bs.build.seals = bs.sealDB
 	bs.sealDB.On("HighestInFork", mock.Anything).Return(sealF, nil)
-	bs.resultByID[sealedResult.ID()] = &sealedResult
+	bs.resultByID[sealedResult.Hash()] = &sealedResult
 
 	bs.T().Run("verify that execution fork conflicting with sealed result is not sealed", func(t *testing.T) {
 		bs.pendingSeals = make(map[flow.Identifier]*flow.IncorporatedResultSeal)
-		storeSealForIncorporatedResult(&receiptChain2[1].ExecutionResult, blocks[2].ID(), bs.pendingSeals)
+		storeSealForIncorporatedResult(&receiptChain2[1].ExecutionResult, blocks[2].Hash(), bs.pendingSeals)
 
-		_, err := bs.build.BuildOn(blocks[4].ID(), bs.setter, bs.sign)
+		_, err := bs.build.BuildOn(blocks[4].Hash(), bs.setter, bs.sign)
 		require.NoError(t, err)
 		require.Empty(t, bs.assembled.Seals, "should not have included seal for conflicting execution fork")
 	})
 
 	bs.T().Run("verify that multiple execution forks are properly handled", func(t *testing.T) {
 		bs.pendingSeals = make(map[flow.Identifier]*flow.IncorporatedResultSeal)
-		sealResultA_1 := storeSealForIncorporatedResult(&receiptChain1[1].ExecutionResult, blocks[2].ID(), bs.pendingSeals)
-		sealResultB_1 := storeSealForIncorporatedResult(&receiptChain1[2].ExecutionResult, blocks[3].ID(), bs.pendingSeals)
-		storeSealForIncorporatedResult(&receiptChain2[1].ExecutionResult, blocks[2].ID(), bs.pendingSeals)
-		storeSealForIncorporatedResult(&receiptChain2[2].ExecutionResult, blocks[3].ID(), bs.pendingSeals)
+		sealResultA_1 := storeSealForIncorporatedResult(&receiptChain1[1].ExecutionResult, blocks[2].Hash(), bs.pendingSeals)
+		sealResultB_1 := storeSealForIncorporatedResult(&receiptChain1[2].ExecutionResult, blocks[3].Hash(), bs.pendingSeals)
+		storeSealForIncorporatedResult(&receiptChain2[1].ExecutionResult, blocks[2].Hash(), bs.pendingSeals)
+		storeSealForIncorporatedResult(&receiptChain2[2].ExecutionResult, blocks[3].Hash(), bs.pendingSeals)
 
-		_, err := bs.build.BuildOn(blocks[4].ID(), bs.setter, bs.sign)
+		_, err := bs.build.BuildOn(blocks[4].Hash(), bs.setter, bs.sign)
 		require.NoError(t, err)
 		require.ElementsMatch(t, []*flow.Seal{sealResultA_1.Seal, sealResultB_1.Seal}, bs.assembled.Seals, "valid fork should have been sealed")
 	})
@@ -938,7 +938,7 @@ func (bs *BuilderSuite) TestPayloadReceipts_TraverseExecutionTreeFromLastSealedR
 
 	// set last sealed blocks:
 	f2 := bs.blocks[bs.finalizedBlockIDs[2]]
-	f2eal := unittest.Seal.Fixture(unittest.Seal.WithResult(bs.resultForBlock[f2.ID()]))
+	f2eal := unittest.Seal.Fixture(unittest.Seal.WithResult(bs.resultForBlock[f2.Hash()]))
 	f4Seal := unittest.Seal.Fixture(unittest.Seal.WithResult(bs.resultForBlock[bs.finalID]))
 	bs.sealDB = &storagemock.Seals{}
 	bs.build.seals = bs.sealDB
@@ -949,16 +949,16 @@ func (bs *BuilderSuite) TestPayloadReceipts_TraverseExecutionTreeFromLastSealedR
 	bs.build.recPool = bs.recPool
 
 	// building on top of X0: latest finalized block in fork is [lastSeal]; expect search to start with sealed result
-	bs.sealDB.On("HighestInFork", x0.ID()).Return(bs.lastSeal, nil)
+	bs.sealDB.On("HighestInFork", x0.Hash()).Return(bs.lastSeal, nil)
 	bs.recPool.On("ReachableReceipts", bs.lastSeal.ResultID, mock.Anything, mock.Anything).Return([]*flow.ExecutionReceipt{}, nil).Once()
-	_, err := bs.build.BuildOn(x0.ID(), bs.setter, bs.sign)
+	_, err := bs.build.BuildOn(x0.Hash(), bs.setter, bs.sign)
 	bs.Require().NoError(err)
 	bs.recPool.AssertExpectations(bs.T())
 
 	// building on top of X1: latest finalized block in fork is [F4]; expect search to start with sealed result
-	bs.sealDB.On("HighestInFork", x1.ID()).Return(f4Seal, nil)
+	bs.sealDB.On("HighestInFork", x1.Hash()).Return(f4Seal, nil)
 	bs.recPool.On("ReachableReceipts", f4Seal.ResultID, mock.Anything, mock.Anything).Return([]*flow.ExecutionReceipt{}, nil).Once()
-	_, err = bs.build.BuildOn(x1.ID(), bs.setter, bs.sign)
+	_, err = bs.build.BuildOn(x1.Hash(), bs.setter, bs.sign)
 	bs.Require().NoError(err)
 	bs.recPool.AssertExpectations(bs.T())
 
@@ -1003,9 +1003,9 @@ func (bs *BuilderSuite) TestPayloadReceipts_IncludeOnlyReceiptsForCurrentFork() 
 	d4 := bs.createAndRecordBlock(c3, true)
 
 	// set last sealed blocks:
-	b1Seal := unittest.Seal.Fixture(unittest.Seal.WithResult(bs.resultForBlock[b1.ID()]))
+	b1Seal := unittest.Seal.Fixture(unittest.Seal.WithResult(bs.resultForBlock[b1.Hash()]))
 	bs.sealDB = &storagemock.Seals{}
-	bs.sealDB.On("HighestInFork", b5.ID()).Return(b1Seal, nil)
+	bs.sealDB.On("HighestInFork", b5.Hash()).Return(b1Seal, nil)
 	bs.build.seals = bs.sealDB
 
 	// setup mock to test the BlockFilter provided by Builder
@@ -1023,7 +1023,7 @@ func (bs *BuilderSuite) TestPayloadReceipts_IncludeOnlyReceiptsForCurrentFork() 
 		}).Return([]*flow.ExecutionReceipt{}, nil).Once()
 	bs.build.recPool = bs.recPool
 
-	_, err := bs.build.BuildOn(b5.ID(), bs.setter, bs.sign)
+	_, err := bs.build.BuildOn(b5.Hash(), bs.setter, bs.sign)
 	bs.Require().NoError(err)
 	bs.recPool.AssertExpectations(bs.T())
 }
@@ -1053,7 +1053,7 @@ func (bs *BuilderSuite) TestPayloadReceipts_SkipDuplicatedReceipts() {
 			}
 			// Verify that receipts for unsealed blocks, which are _not_ already incorporated are accepted:
 			for _, block := range bs.blocks {
-				if block.ID() != bs.firstID { // block with ID bs.firstID is already sealed
+				if block.Hash() != bs.firstID { // block with ID bs.firstID is already sealed
 					rcpt := unittest.ReceiptForBlockFixture(block)
 					assert.True(bs.T(), receiptFilter(rcpt))
 				}
@@ -1202,7 +1202,7 @@ func (bs *BuilderSuite) TestIntegration_PayloadReceiptNoParentResult() {
 	_, _ = bs.build.recPool.AddReceipt(receiptSABC[1], blockSABC[1].ToHeader())
 	_, _ = bs.build.recPool.AddReceipt(receiptSABC[3], blockSABC[3].ToHeader())
 
-	_, err := bs.build.BuildOn(blockSABC[3].ID(), bs.setter, bs.sign)
+	_, err := bs.build.BuildOn(blockSABC[3].Hash(), bs.setter, bs.sign)
 	bs.Require().NoError(err)
 	expectedReceipts := flow.ExecutionReceiptStubList{receiptSABC[1].Stub()}
 	expectedResults := flow.ExecutionResultList{&receiptSABC[1].ExecutionResult}
@@ -1270,7 +1270,7 @@ func (bs *BuilderSuite) TestIntegration_ExtendDifferentExecutionPathsOnSameFork(
 	_, _ = bs.build.recPool.AddReceipt(recB1, B.ToHeader())
 	_, _ = bs.build.recPool.AddReceipt(recB2, B.ToHeader())
 
-	_, err := bs.build.BuildOn(B.ID(), bs.setter, bs.sign)
+	_, err := bs.build.BuildOn(B.Hash(), bs.setter, bs.sign)
 	bs.Require().NoError(err)
 	expectedReceipts := flow.ExecutionReceiptStubList{recB1.Stub(), recB2.Stub()}
 	expectedResults := flow.ExecutionResultList{&recB1.ExecutionResult, &recB2.ExecutionResult}
@@ -1361,7 +1361,7 @@ func (bs *BuilderSuite) TestIntegration_ExtendDifferentExecutionPathsOnDifferent
 	_, err = bs.build.recPool.AddReceipt(recB2, B.ToHeader())
 	bs.Require().NoError(err)
 
-	_, err = bs.build.BuildOn(B.ID(), bs.setter, bs.sign)
+	_, err = bs.build.BuildOn(B.Hash(), bs.setter, bs.sign)
 	bs.Require().NoError(err)
 	expectedReceipts := []*flow.ExecutionReceiptStub{recA2.Stub(), recB1.Stub(), recB2.Stub()}
 	expectedResults := []*flow.ExecutionResult{&recA2.ExecutionResult, &recB1.ExecutionResult, &recB2.ExecutionResult}
@@ -1410,7 +1410,7 @@ func (bs *BuilderSuite) TestIntegration_DuplicateReceipts() {
 		}
 	}
 
-	_, err := bs.build.BuildOn(B.ID(), bs.setter, bs.sign)
+	_, err := bs.build.BuildOn(B.Hash(), bs.setter, bs.sign)
 	bs.Require().NoError(err)
 	expectedReceipts := []*flow.ExecutionReceiptStub{}
 	expectedResults := []*flow.ExecutionResult{}
@@ -1453,7 +1453,7 @@ func (bs *BuilderSuite) TestIntegration_ResultAlreadyIncorporated() {
 	_, err := bs.build.recPool.AddReceipt(recP_B, bs.blocks[recP_B.ExecutionResult.BlockID].ToHeader())
 	bs.NoError(err)
 
-	_, err = bs.build.BuildOn(A.ID(), bs.setter, bs.sign)
+	_, err = bs.build.BuildOn(A.Hash(), bs.setter, bs.sign)
 	bs.Require().NoError(err)
 	expectedReceipts := []*flow.ExecutionReceiptStub{recP_B.Stub()}
 	expectedResults := []*flow.ExecutionResult{}
@@ -1512,21 +1512,21 @@ func (bs *BuilderSuite) TestIntegration_RepopulateExecutionTreeAtStartup() {
 	// store execution results
 	for _, block := range []*flow.Block{A, B, C} {
 		// for current block create empty receipts list
-		bs.receiptsByBlockID[block.ID()] = flow.ExecutionReceiptList{}
+		bs.receiptsByBlockID[block.Hash()] = flow.ExecutionReceiptList{}
 
 		for _, result := range block.Payload.Results {
-			bs.resultByID[result.ID()] = result
+			bs.resultByID[result.Hash()] = result
 		}
 		for _, meta := range block.Payload.Receipts {
 			receipt, err := flow.ExecutionReceiptFromStub(*meta, *bs.resultByID[meta.ResultID])
 			bs.NoError(err)
-			bs.receiptsByID[meta.ID()] = receipt
+			bs.receiptsByID[meta.Hash()] = receipt
 			bs.receiptsByBlockID[receipt.ExecutionResult.BlockID] = append(bs.receiptsByBlockID[receipt.ExecutionResult.BlockID], receipt)
 		}
 	}
 
 	// mark A as finalized
-	bs.finalID = A.ID()
+	bs.finalID = A.Hash()
 
 	// set up no-op dependencies
 	noopMetrics := metrics.NewNoopCollector()
@@ -1570,7 +1570,7 @@ func (bs *BuilderSuite) TestIntegration_RepopulateExecutionTreeAtStartup() {
 	_, _ = bs.build.recPool.AddReceipt(recB2, B.ToHeader())
 	_, _ = bs.build.recPool.AddReceipt(recC, C.ToHeader())
 
-	_, err = bs.build.BuildOn(C.ID(), bs.setter, bs.sign)
+	_, err = bs.build.BuildOn(C.Hash(), bs.setter, bs.sign)
 	bs.Require().NoError(err)
 	expectedReceipts := flow.ExecutionReceiptStubList{recB1.Stub(), recB2.Stub(), recC.Stub()}
 	expectedResults := flow.ExecutionResultList{&recB1.ExecutionResult, &recB2.ExecutionResult, &recC.ExecutionResult}

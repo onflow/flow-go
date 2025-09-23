@@ -97,8 +97,8 @@ func TestNewRichProtocolStateEntry(t *testing.T) {
 		minStateEntry := &flow.MinEpochStateEntry{
 			PreviousEpoch: nil,
 			CurrentEpoch: flow.EpochStateContainer{
-				SetupID:          setup.ID(),
-				CommitID:         currentEpochCommit.ID(),
+				SetupID:          setup.Hash(),
+				CommitID:         currentEpochCommit.Hash(),
 				ActiveIdentities: identities,
 			},
 			EpochFallbackTriggered: false,
@@ -472,7 +472,7 @@ func TestNewEpochStateEntry(t *testing.T) {
 		require.Error(t, err)
 		expectedMsg := fmt.Sprintf(
 			"supplied previous epoch's setup event (%x) does not match commitment (%x) in MinEpochStateEntry",
-			stateEntryFixture.PreviousEpochSetup.ID(),
+			stateEntryFixture.PreviousEpochSetup.Hash(),
 			stateEntryFixture.MinEpochStateEntry.PreviousEpoch.SetupID,
 		)
 		require.Contains(t, err.Error(), expectedMsg)
@@ -497,7 +497,7 @@ func TestNewEpochStateEntry(t *testing.T) {
 		require.Error(t, err)
 		expectedMsg := fmt.Sprintf(
 			"supplied previous epoch's commit event (%x) does not match commitment (%x) in MinEpochStateEntry",
-			stateEntryFixture.PreviousEpochCommit.ID(),
+			stateEntryFixture.PreviousEpochCommit.Hash(),
 			stateEntryFixture.PreviousEpoch.CommitID,
 		)
 		require.Contains(t, err.Error(), expectedMsg)
@@ -563,7 +563,7 @@ func TestNewEpochStateEntry(t *testing.T) {
 		require.Error(t, err)
 		expectedMsg := fmt.Sprintf(
 			"supplied current epoch's setup event (%x) does not match commitment (%x) in MinEpochStateEntry",
-			stateEntryFixture.CurrentEpochSetup.ID(),
+			stateEntryFixture.CurrentEpochSetup.Hash(),
 			stateEntryFixture.CurrentEpoch.SetupID,
 		)
 		require.Contains(t, err.Error(), expectedMsg)
@@ -588,7 +588,7 @@ func TestNewEpochStateEntry(t *testing.T) {
 		require.Error(t, err)
 		expectedMsg := fmt.Sprintf(
 			"supplied current epoch's commit event (%x) does not match commitment (%x) in MinEpochStateEntry",
-			stateEntryFixture.CurrentEpochCommit.ID(),
+			stateEntryFixture.CurrentEpochCommit.Hash(),
 			stateEntryFixture.CurrentEpoch.CommitID,
 		)
 		require.Contains(t, err.Error(), expectedMsg)
@@ -655,7 +655,7 @@ func TestNewEpochStateEntry(t *testing.T) {
 		expectedMsg := fmt.Sprintf(
 			"supplied next epoch's setup event (%x) does not match commitment (%x) in MinEpochStateEntry",
 			stateEntryFixture.NextEpoch.SetupID,
-			stateEntryFixture.NextEpochSetup.ID(),
+			stateEntryFixture.NextEpochSetup.Hash(),
 		)
 		require.Contains(t, err.Error(), expectedMsg)
 	})
@@ -680,7 +680,7 @@ func TestNewEpochStateEntry(t *testing.T) {
 		expectedMsg := fmt.Sprintf(
 			"supplied next epoch's commit event (%x) does not match commitment (%x) in MinEpochStateEntry",
 			stateEntryFixture.NextEpoch.CommitID,
-			stateEntryFixture.NextEpochCommit.ID(),
+			stateEntryFixture.NextEpochCommit.Hash(),
 		)
 		require.Contains(t, err.Error(), expectedMsg)
 	})

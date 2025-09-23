@@ -128,7 +128,7 @@ func (ss *SyncSuite) TestRequestBlock() {
 
 	ss.core.blockIDs[queuedID] = ss.QueuedStatus()
 	ss.core.blockIDs[requestedID] = ss.RequestedStatus()
-	ss.core.blockIDs[received.ID()] = ss.RequestedStatus()
+	ss.core.blockIDs[received.Hash()] = ss.RequestedStatus()
 
 	// queued status should stay the same
 	ss.core.RequestBlock(queuedID, 0)
@@ -139,9 +139,9 @@ func (ss *SyncSuite) TestRequestBlock() {
 	assert.True(ss.T(), ss.core.blockIDs[requestedID].WasRequested())
 
 	// received status should be re-queued by ID
-	ss.core.RequestBlock(received.ID(), 0)
-	assert.True(ss.T(), ss.core.blockIDs[received.ID()].WasQueued())
-	assert.False(ss.T(), ss.core.blockIDs[received.ID()].WasReceived())
+	ss.core.RequestBlock(received.Hash(), 0)
+	assert.True(ss.T(), ss.core.blockIDs[received.Hash()].WasQueued())
+	assert.False(ss.T(), ss.core.blockIDs[received.Hash()].WasReceived())
 	assert.False(ss.T(), ss.core.heights[received.Height].WasQueued())
 }
 
@@ -151,33 +151,33 @@ func (ss *SyncSuite) TestHandleBlock() {
 	queuedByHeight := unittest.BlockHeaderFixture()
 	ss.core.heights[queuedByHeight.Height] = ss.QueuedStatus()
 	requestedByID := unittest.BlockHeaderFixture()
-	ss.core.blockIDs[requestedByID.ID()] = ss.RequestedStatus()
+	ss.core.blockIDs[requestedByID.Hash()] = ss.RequestedStatus()
 	received := unittest.BlockHeaderFixture()
 	ss.core.heights[received.Height] = ss.ReceivedStatus(received)
-	ss.core.blockIDs[received.ID()] = ss.ReceivedStatus(received)
+	ss.core.blockIDs[received.Hash()] = ss.ReceivedStatus(received)
 
 	// should ignore un-requested blocks
 	shouldProcess := ss.core.HandleBlock(unrequested)
 	ss.Assert().False(shouldProcess, "should not process un-requested block")
 	ss.Assert().NotContains(ss.core.heights, unrequested.Height)
-	ss.Assert().NotContains(ss.core.blockIDs, unrequested.ID())
+	ss.Assert().NotContains(ss.core.blockIDs, unrequested.Hash())
 
 	// should mark queued blocks as received, and process them
 	shouldProcess = ss.core.HandleBlock(queuedByHeight)
 	ss.Assert().True(shouldProcess, "should process queued block")
-	ss.Assert().True(ss.core.blockIDs[queuedByHeight.ID()].WasReceived(), "status should be reflected in block ID map")
+	ss.Assert().True(ss.core.blockIDs[queuedByHeight.Hash()].WasReceived(), "status should be reflected in block ID map")
 	ss.Assert().True(ss.core.heights[queuedByHeight.Height].WasReceived(), "status should be reflected in height map")
 
 	// should mark requested block as received, and process them
 	shouldProcess = ss.core.HandleBlock(requestedByID)
 	ss.Assert().True(shouldProcess, "should process requested block")
-	ss.Assert().True(ss.core.blockIDs[requestedByID.ID()].WasReceived(), "status should be reflected in block ID map")
+	ss.Assert().True(ss.core.blockIDs[requestedByID.Hash()].WasReceived(), "status should be reflected in block ID map")
 	ss.Assert().True(ss.core.heights[requestedByID.Height].WasReceived(), "status should be reflected in height map")
 
 	// should leave received blocks, and not process them
 	shouldProcess = ss.core.HandleBlock(received)
 	ss.Assert().False(shouldProcess, "should not process already received block")
-	ss.Assert().True(ss.core.blockIDs[received.ID()].WasReceived(), "status should remain reflected in block ID map")
+	ss.Assert().True(ss.core.blockIDs[received.Hash()].WasReceived(), "status should remain reflected in block ID map")
 	ss.Assert().True(ss.core.heights[received.Height].WasReceived(), "status should remain reflected in height map")
 }
 
@@ -421,7 +421,7 @@ func (ss *SyncSuite) TestPrune() {
 		block := unittest.BlockFixture(
 			unittest.Block.WithHeight(uint64(i + 1)),
 		)
-		ss.core.blockIDs[block.ID()] = ss.ReceivedStatus(block.ToHeader())
+		ss.core.blockIDs[block.Hash()] = ss.ReceivedStatus(block.ToHeader())
 		prunableBlockIDs = append(prunableBlockIDs, block)
 	}
 	// add some un-finalized, received blocks by block ID
@@ -429,7 +429,7 @@ func (ss *SyncSuite) TestPrune() {
 		block := unittest.BlockFixture(
 			unittest.Block.WithHeight(100 + uint64(i+1)),
 		)
-		ss.core.blockIDs[block.ID()] = ss.ReceivedStatus(block.ToHeader())
+		ss.core.blockIDs[block.Hash()] = ss.ReceivedStatus(block.ToHeader())
 		unprunable = append(unprunable, block)
 	}
 
@@ -444,7 +444,7 @@ func (ss *SyncSuite) TestPrune() {
 
 	// ensure the right things were pruned
 	for _, block := range prunableBlockIDs {
-		_, exists := ss.core.blockIDs[block.ID()]
+		_, exists := ss.core.blockIDs[block.Hash()]
 		assert.False(ss.T(), exists)
 	}
 	for _, block := range prunableHeights {
@@ -453,7 +453,7 @@ func (ss *SyncSuite) TestPrune() {
 	}
 	for _, block := range unprunable {
 		_, heightExists := ss.core.heights[block.Height]
-		_, blockIDExists := ss.core.blockIDs[block.ID()]
+		_, blockIDExists := ss.core.blockIDs[block.Hash()]
 		assert.True(ss.T(), heightExists || blockIDExists)
 	}
 }

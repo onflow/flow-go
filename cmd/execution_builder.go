@@ -891,8 +891,8 @@ func (exeNode *ExecutionNode) LoadRegisterStore(
 
 		rootSeal := node.State.Params().Seal()
 
-		if sealedRoot.ID() != rootSeal.BlockID {
-			return fmt.Errorf("mismatching root seal and sealed root: %v != %v", sealedRoot.ID(), rootSeal.BlockID)
+		if sealedRoot.Hash() != rootSeal.BlockID {
+			return fmt.Errorf("mismatching root seal and sealed root: %v != %v", sealedRoot.Hash(), rootSeal.BlockID)
 		}
 
 		checkpointHeight := sealedRoot.Height

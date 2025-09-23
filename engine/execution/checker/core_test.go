@@ -32,13 +32,13 @@ func mockFinalizedBlock(t *testing.T, state *protocol.State, finalized *flow.Hea
 func mockAtBlockID(t *testing.T, state *protocol.State, header *flow.Header) *protocol.Snapshot {
 	snapshot := protocol.NewSnapshot(t)
 	snapshot.On("Head").Return(header, nil)
-	state.On("AtBlockID", header.ID()).Return(snapshot)
+	state.On("AtBlockID", header.Hash()).Return(snapshot)
 	return snapshot
 }
 
 func mockSealedBlock(t *testing.T, state *protocol.State, finalized *protocol.Snapshot, sealed *flow.Header) (*flow.ExecutionResult, *flow.Seal) {
 	lastSealResult := unittest.ExecutionResultFixture(func(r *flow.ExecutionResult) {
-		r.BlockID = sealed.ID()
+		r.BlockID = sealed.Hash()
 	})
 	lastSeal := unittest.Seal.Fixture(unittest.Seal.WithResult(lastSealResult))
 	finalized.On("SealedResult").Return(lastSealResult, lastSeal, nil)
@@ -53,7 +53,7 @@ func mockFinalizedSealedBlock(t *testing.T, state *protocol.State, finalized *fl
 func mockSealedBlockAtHeight(t *testing.T, state *protocol.State, height uint64, lastSealed *flow.Header) (*flow.ExecutionResult, *flow.Seal) {
 	snapshotAtHeight := protocol.NewSnapshot(t)
 	lastSealedResultAtHeight := unittest.ExecutionResultFixture(func(r *flow.ExecutionResult) {
-		r.BlockID = lastSealed.ID()
+		r.BlockID = lastSealed.Hash()
 	})
 	lastSealAtHeight := unittest.Seal.Fixture(unittest.Seal.WithResult(lastSealedResultAtHeight))
 	snapshotAtHeight.On("SealedResult").Return(lastSealedResultAtHeight, lastSealAtHeight, nil)
@@ -64,11 +64,11 @@ func mockSealedBlockAtHeight(t *testing.T, state *protocol.State, height uint64,
 func mockExecutedBlock(t *testing.T, es *stateMock.ExecutionState, executed *flow.Header, result *flow.ExecutionResult) {
 	commit, err := result.FinalStateCommitment()
 	require.NoError(t, err)
-	es.On("StateCommitmentByBlockID", executed.ID()).Return(commit, nil)
+	es.On("StateCommitmentByBlockID", executed.Hash()).Return(commit, nil)
 }
 
 func mockUnexecutedBlock(t *testing.T, es *stateMock.ExecutionState, unexecuted *flow.Header) {
-	es.On("StateCommitmentByBlockID", unexecuted.ID()).Return(nil, storage.ErrNotFound)
+	es.On("StateCommitmentByBlockID", unexecuted.Hash()).Return(nil, storage.ErrNotFound)
 }
 
 func TestCheckPassIfLastSealedIsExecutedAndMatch(t *testing.T) {
@@ -118,7 +118,7 @@ func TestCheckPassIfLastSealedIsNotExecutedAndLastExecutedMatch(t *testing.T) {
 	mockUnexecutedBlock(t, es, lastSealed)
 
 	// mock the last sealed and is also executed
-	es.On("GetLastExecutedBlockID", mock.Anything).Return(lastExecuted.Height, lastExecuted.ID(), nil)
+	es.On("GetLastExecutedBlockID", mock.Anything).Return(lastExecuted.Height, lastExecuted.Hash(), nil)
 	lastSealedResultAtExecutedHeight, _ := mockSealedBlockAtHeight(t, state, lastExecuted.Height, lastSealedExecuted)
 	mockAtBlockID(t, state, lastSealedExecuted)
 
@@ -143,7 +143,7 @@ func TestCheckFailIfLastSealedIsNotExecutedAndLastExecutedMismatch(t *testing.T)
 	mockUnexecutedBlock(t, es, lastSealed)
 
 	// mock the last sealed and is also executed
-	es.On("GetLastExecutedBlockID", mock.Anything).Return(lastExecuted.Height, lastExecuted.ID(), nil)
+	es.On("GetLastExecutedBlockID", mock.Anything).Return(lastExecuted.Height, lastExecuted.Hash(), nil)
 	mockSealedBlockAtHeight(t, state, lastExecuted.Height, lastSealedExecuted)
 	mockAtBlockID(t, state, lastSealedExecuted)
 

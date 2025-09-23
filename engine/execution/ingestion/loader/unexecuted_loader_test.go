@@ -35,7 +35,7 @@ func newMockExecutionState(seal *flow.Seal, genesis *flow.Block) *mockExecutionS
 		commits: commits,
 	}
 	genesisHeader := genesis.ToHeader()
-	es.On("GetLastExecutedBlockID", mock.Anything).Return(genesisHeader.Height, genesisHeader.ID(), nil)
+	es.On("GetLastExecutedBlockID", mock.Anything).Return(genesisHeader.Height, genesisHeader.Hash(), nil)
 	return es
 }
 
@@ -71,13 +71,13 @@ func (es *mockExecutionState) ExecuteBlock(t *testing.T, block *flow.Block) {
 
 	es.Lock()
 	defer es.Unlock()
-	es.commits[block.ID()] = unittest.StateCommitmentFixture()
+	es.commits[block.Hash()] = unittest.StateCommitmentFixture()
 }
 
 func logChain(chain []*flow.Block) {
 	log := unittest.Logger()
 	for i, block := range chain {
-		log.Info().Msgf("block %v, height: %v, ID: %v", i, block.Height, block.ID())
+		log.Info().Msgf("block %v, height: %v, ID: %v", i, block.Height, block.Hash())
 	}
 }
 
@@ -94,7 +94,7 @@ func TestLoadingUnexecutedBlocks(t *testing.T) {
 
 		es := newMockExecutionState(seal, genesis)
 		headers := new(storage.Headers)
-		headers.On("ByBlockID", genesis.ID()).Return(genesis.ToHeader(), nil).Once()
+		headers.On("ByBlockID", genesis.Hash()).Return(genesis.ToHeader(), nil).Once()
 		log := unittest.Logger()
 		loader := loader.NewUnexecutedLoader(log, ps, headers, es)
 
@@ -123,18 +123,18 @@ func TestLoadingUnexecutedBlocks(t *testing.T) {
 
 		es := newMockExecutionState(seal, genesis)
 		headers := new(storage.Headers)
-		headers.On("ByBlockID", genesis.ID()).Return(genesis.ToHeader(), nil).Once()
-		headers.On("ByBlockID", blockA.ID()).Return(blockA.ToHeader(), nil).Once()
-		headers.On("ByBlockID", blockB.ID()).Return(blockB.ToHeader(), nil).Once()
-		headers.On("ByBlockID", blockC.ID()).Return(blockC.ToHeader(), nil).Once()
-		headers.On("ByBlockID", blockD.ID()).Return(blockD.ToHeader(), nil).Once()
+		headers.On("ByBlockID", genesis.Hash()).Return(genesis.ToHeader(), nil).Once()
+		headers.On("ByBlockID", blockA.Hash()).Return(blockA.ToHeader(), nil).Once()
+		headers.On("ByBlockID", blockB.Hash()).Return(blockB.ToHeader(), nil).Once()
+		headers.On("ByBlockID", blockC.Hash()).Return(blockC.ToHeader(), nil).Once()
+		headers.On("ByBlockID", blockD.Hash()).Return(blockD.ToHeader(), nil).Once()
 		log := unittest.Logger()
 		loader := loader.NewUnexecutedLoader(log, ps, headers, es)
 
 		unexecuted, err := loader.LoadUnexecuted(context.Background())
 		require.NoError(t, err)
 
-		unittest.IDsEqual(t, []flow.Identifier{blockA.ID(), blockB.ID(), blockC.ID(), blockD.ID()}, unexecuted)
+		unittest.IDsEqual(t, []flow.Identifier{blockA.Hash(), blockB.Hash(), blockC.Hash(), blockD.Hash()}, unexecuted)
 
 		headers.AssertExpectations(t)
 	})
@@ -156,11 +156,11 @@ func TestLoadingUnexecutedBlocks(t *testing.T) {
 
 		es := newMockExecutionState(seal, genesis)
 		headers := new(storage.Headers)
-		headers.On("ByBlockID", genesis.ID()).Return(genesis.ToHeader(), nil).Once()
-		headers.On("ByBlockID", blockA.ID()).Return(blockA.ToHeader(), nil).Once()
-		headers.On("ByBlockID", blockB.ID()).Return(blockB.ToHeader(), nil).Once()
-		headers.On("ByBlockID", blockC.ID()).Return(blockC.ToHeader(), nil).Once()
-		headers.On("ByBlockID", blockD.ID()).Return(blockD.ToHeader(), nil).Once()
+		headers.On("ByBlockID", genesis.Hash()).Return(genesis.ToHeader(), nil).Once()
+		headers.On("ByBlockID", blockA.Hash()).Return(blockA.ToHeader(), nil).Once()
+		headers.On("ByBlockID", blockB.Hash()).Return(blockB.ToHeader(), nil).Once()
+		headers.On("ByBlockID", blockC.Hash()).Return(blockC.ToHeader(), nil).Once()
+		headers.On("ByBlockID", blockD.Hash()).Return(blockD.ToHeader(), nil).Once()
 
 		log := unittest.Logger()
 		loader := loader.NewUnexecutedLoader(log, ps, headers, es)
@@ -171,7 +171,7 @@ func TestLoadingUnexecutedBlocks(t *testing.T) {
 		unexecuted, err := loader.LoadUnexecuted(context.Background())
 		require.NoError(t, err)
 
-		unittest.IDsEqual(t, []flow.Identifier{blockC.ID(), blockD.ID()}, unexecuted)
+		unittest.IDsEqual(t, []flow.Identifier{blockC.Hash(), blockD.Hash()}, unexecuted)
 
 		headers.AssertExpectations(t)
 	})
@@ -191,18 +191,18 @@ func TestLoadingUnexecutedBlocks(t *testing.T) {
 		require.NoError(t, ps.Extend(blockC))
 		require.NoError(t, ps.Extend(blockD))
 
-		require.NoError(t, ps.Finalize(blockC.ID()))
+		require.NoError(t, ps.Finalize(blockC.Hash()))
 
 		es := newMockExecutionState(seal, genesis)
 		headers := new(storage.Headers)
-		headers.On("ByBlockID", genesis.ID()).Return(genesis.ToHeader(), nil).Once()
-		headers.On("ByBlockID", blockD.ID()).Return(blockD.ToHeader(), nil).Once()
+		headers.On("ByBlockID", genesis.Hash()).Return(genesis.ToHeader(), nil).Once()
+		headers.On("ByBlockID", blockD.Hash()).Return(blockD.ToHeader(), nil).Once()
 
 		log := unittest.Logger()
 		loader := loader.NewUnexecutedLoader(log, ps, headers, es)
 
 		// block C is the only finalized block, index its header by its height
-		headers.On("BlockIDByHeight", blockC.Height).Return(blockC.ID(), nil).Once()
+		headers.On("BlockIDByHeight", blockC.Height).Return(blockC.Hash(), nil).Once()
 
 		es.ExecuteBlock(t, blockA)
 		es.ExecuteBlock(t, blockB)
@@ -211,7 +211,7 @@ func TestLoadingUnexecutedBlocks(t *testing.T) {
 		unexecuted, err := loader.LoadUnexecuted(context.Background())
 		require.NoError(t, err)
 
-		unittest.IDsEqual(t, []flow.Identifier{blockD.ID()}, unexecuted)
+		unittest.IDsEqual(t, []flow.Identifier{blockD.Hash()}, unexecuted)
 
 		headers.AssertExpectations(t)
 	})
@@ -231,17 +231,17 @@ func TestLoadingUnexecutedBlocks(t *testing.T) {
 		require.NoError(t, ps.Extend(blockC))
 		require.NoError(t, ps.Extend(blockD))
 
-		require.NoError(t, ps.Finalize(blockC.ID()))
+		require.NoError(t, ps.Finalize(blockC.Hash()))
 
 		es := newMockExecutionState(seal, genesis)
 		headers := new(storage.Headers)
-		headers.On("ByBlockID", genesis.ID()).Return(genesis.ToHeader(), nil).Once()
-		headers.On("ByBlockID", blockD.ID()).Return(blockD.ToHeader(), nil).Once()
+		headers.On("ByBlockID", genesis.Hash()).Return(genesis.ToHeader(), nil).Once()
+		headers.On("ByBlockID", blockD.Hash()).Return(blockD.ToHeader(), nil).Once()
 		log := unittest.Logger()
 		loader := loader.NewUnexecutedLoader(log, ps, headers, es)
 
 		// block C is finalized, index its header by its height
-		headers.On("BlockIDByHeight", blockC.Height).Return(blockC.ID(), nil).Once()
+		headers.On("BlockIDByHeight", blockC.Height).Return(blockC.Hash(), nil).Once()
 
 		es.ExecuteBlock(t, blockA)
 		es.ExecuteBlock(t, blockB)
@@ -250,7 +250,7 @@ func TestLoadingUnexecutedBlocks(t *testing.T) {
 		unexecuted, err := loader.LoadUnexecuted(context.Background())
 		require.NoError(t, err)
 
-		unittest.IDsEqual(t, []flow.Identifier{blockD.ID()}, unexecuted)
+		unittest.IDsEqual(t, []flow.Identifier{blockD.Hash()}, unexecuted)
 
 		headers.AssertExpectations(t)
 	})
@@ -269,20 +269,20 @@ func TestLoadingUnexecutedBlocks(t *testing.T) {
 		require.NoError(t, ps.Extend(blockB))
 		require.NoError(t, ps.Extend(blockC))
 		require.NoError(t, ps.Extend(blockD))
-		require.NoError(t, ps.Finalize(blockA.ID()))
+		require.NoError(t, ps.Finalize(blockA.Hash()))
 
 		es := newMockExecutionState(seal, genesis)
 		headers := new(storage.Headers)
-		headers.On("ByBlockID", genesis.ID()).Return(genesis.ToHeader(), nil).Once()
-		headers.On("ByBlockID", blockB.ID()).Return(blockB.ToHeader(), nil).Once()
-		headers.On("ByBlockID", blockC.ID()).Return(blockC.ToHeader(), nil).Once()
-		headers.On("ByBlockID", blockD.ID()).Return(blockD.ToHeader(), nil).Once()
+		headers.On("ByBlockID", genesis.Hash()).Return(genesis.ToHeader(), nil).Once()
+		headers.On("ByBlockID", blockB.Hash()).Return(blockB.ToHeader(), nil).Once()
+		headers.On("ByBlockID", blockC.Hash()).Return(blockC.ToHeader(), nil).Once()
+		headers.On("ByBlockID", blockD.Hash()).Return(blockD.ToHeader(), nil).Once()
 
 		log := unittest.Logger()
 		loader := loader.NewUnexecutedLoader(log, ps, headers, es)
 
 		// block A is finalized, index its header by its height
-		headers.On("BlockIDByHeight", blockA.Height).Return(blockA.ID(), nil).Once()
+		headers.On("BlockIDByHeight", blockA.Height).Return(blockA.Hash(), nil).Once()
 
 		es.ExecuteBlock(t, blockA)
 		es.ExecuteBlock(t, blockB)
@@ -335,23 +335,23 @@ func TestLoadingUnexecutedBlocks(t *testing.T) {
 		require.NoError(t, ps.Extend(blockG))
 		require.NoError(t, ps.Extend(blockH))
 
-		require.NoError(t, ps.Finalize(blockC.ID()))
+		require.NoError(t, ps.Finalize(blockC.Hash()))
 
 		es := newMockExecutionState(seal, genesis)
 		headers := new(storage.Headers)
-		headers.On("ByBlockID", genesis.ID()).Return(genesis.ToHeader(), nil).Once()
-		headers.On("ByBlockID", blockD.ID()).Return(blockD.ToHeader(), nil).Once()
-		headers.On("ByBlockID", blockE.ID()).Return(blockE.ToHeader(), nil).Once()
-		headers.On("ByBlockID", blockF.ID()).Return(blockF.ToHeader(), nil).Once()
-		headers.On("ByBlockID", blockG.ID()).Return(blockG.ToHeader(), nil).Once()
-		headers.On("ByBlockID", blockH.ID()).Return(blockH.ToHeader(), nil).Once()
-		headers.On("ByBlockID", blockI.ID()).Return(blockI.ToHeader(), nil).Once()
+		headers.On("ByBlockID", genesis.Hash()).Return(genesis.ToHeader(), nil).Once()
+		headers.On("ByBlockID", blockD.Hash()).Return(blockD.ToHeader(), nil).Once()
+		headers.On("ByBlockID", blockE.Hash()).Return(blockE.ToHeader(), nil).Once()
+		headers.On("ByBlockID", blockF.Hash()).Return(blockF.ToHeader(), nil).Once()
+		headers.On("ByBlockID", blockG.Hash()).Return(blockG.ToHeader(), nil).Once()
+		headers.On("ByBlockID", blockH.Hash()).Return(blockH.ToHeader(), nil).Once()
+		headers.On("ByBlockID", blockI.Hash()).Return(blockI.ToHeader(), nil).Once()
 
 		log := unittest.Logger()
 		loader := loader.NewUnexecutedLoader(log, ps, headers, es)
 
 		// block C is finalized, index its header by its height
-		headers.On("BlockIDByHeight", blockC.Height).Return(blockC.ID(), nil).Once()
+		headers.On("BlockIDByHeight", blockC.Height).Return(blockC.Hash(), nil).Once()
 
 		es.ExecuteBlock(t, blockA)
 		es.ExecuteBlock(t, blockB)
@@ -364,12 +364,12 @@ func TestLoadingUnexecutedBlocks(t *testing.T) {
 		require.NoError(t, err)
 
 		unittest.IDsEqual(t, []flow.Identifier{
-			blockI.ID(), // I is still pending, and unexecuted
-			blockE.ID(),
-			blockF.ID(),
+			blockI.Hash(), // I is still pending, and unexecuted
+			blockE.Hash(),
+			blockF.Hash(),
 			// note K is not a pending block, but a conflicting block, even if it's not executed,
 			// it won't included
-			blockH.ID()},
+			blockH.Hash()},
 			unexecuted)
 
 		headers.AssertExpectations(t)

@@ -47,16 +47,16 @@ func (b *BlockSignerDecoder) DecodeSignerIDs(header *flow.Header) (flow.Identifi
 			byBlockMembers, err := b.IdentitiesByBlock(header.ParentID)
 			if err != nil {
 				return nil, fmt.Errorf("could not retrieve identities for block %x with QC view %d for parent %x: %w",
-					header.ID(), header.ParentView, header.ParentID, err) // state.ErrUnknownSnapshotReference or exception
+					header.Hash(), header.ParentView, header.ParentID, err) // state.ErrUnknownSnapshotReference or exception
 			}
 			members = byBlockMembers.ToSkeleton()
 		} else {
-			return nil, fmt.Errorf("unexpected error retrieving identities for block %v: %w", header.ID(), err)
+			return nil, fmt.Errorf("unexpected error retrieving identities for block %v: %w", header.Hash(), err)
 		}
 	}
 	signerIDs, err := signature.DecodeSignerIndicesToIdentifiers(members.NodeIDs(), header.ParentVoterIndices)
 	if err != nil {
-		return nil, fmt.Errorf("could not decode signer indices for block %v: %w", header.ID(), err)
+		return nil, fmt.Errorf("could not decode signer indices for block %v: %w", header.Hash(), err)
 	}
 
 	return signerIDs, nil

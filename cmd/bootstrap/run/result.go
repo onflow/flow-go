@@ -15,7 +15,7 @@ func GenerateRootResult(
 ) (*flow.ExecutionResult, error) {
 	result, err := flow.NewRootExecutionResult(flow.UntrustedExecutionResult{
 		PreviousResultID: flow.ZeroID,
-		BlockID:          block.ID(),
+		BlockID:          block.Hash(),
 		Chunks:           chunks.ChunkListFromCommit(commit),
 		ServiceEvents:    []flow.ServiceEvent{epochSetup.ServiceEvent(), epochCommit.ServiceEvent()},
 		ExecutionDataID:  flow.ZeroID,

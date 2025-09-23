@@ -113,11 +113,11 @@ func NewCore(
 func (c *Core) OnBlockProposal(proposal flow.Slashable[*flow.Proposal]) error {
 	block := proposal.Message.Block
 	header := block.ToHeader()
-	blockID := block.ID()
+	blockID := block.Hash()
 	finalHeight := c.finalizedHeight.Value()
 	finalView := c.finalizedView.Value()
 
-	span, _ := c.tracer.StartBlockSpan(context.Background(), header.ID(), trace.CONCompOnBlockProposal)
+	span, _ := c.tracer.StartBlockSpan(context.Background(), header.Hash(), trace.CONCompOnBlockProposal)
 	span.SetAttributes(
 		attribute.Int64("view", int64(header.View)),
 		attribute.String("origin_id", proposal.OriginID.String()),
@@ -246,7 +246,7 @@ func (c *Core) OnBlockProposal(proposal flow.Slashable[*flow.Proposal]) error {
 func (c *Core) processBlockAndDescendants(proposal flow.Slashable[*flow.Proposal]) error {
 	block := proposal.Message.Block
 	header := block.ToHeader()
-	blockID := block.ID()
+	blockID := block.Hash()
 
 	log := c.log.With().
 		Str("block_id", blockID.String()).
@@ -320,7 +320,7 @@ func (c *Core) processBlockProposal(proposal *flow.Proposal) error {
 
 	block := proposal.Block
 	header := block.ToHeader()
-	blockID := block.ID()
+	blockID := block.Hash()
 
 	span, ctx := c.tracer.StartBlockSpan(context.Background(), blockID, trace.ConCompProcessBlockProposal)
 	span.SetAttributes(

@@ -23,7 +23,7 @@ func BlockToMessage(h *flow.Block, signerIDs flow.IdentifierList) (
 	*entities.Block,
 	error,
 ) {
-	id := h.ID()
+	id := h.Hash()
 	cg := CollectionGuaranteesToMessages(h.Payload.Guarantees)
 	seals := BlockSealsToMessages(h.Payload.Seals)
 
@@ -55,7 +55,7 @@ func BlockToMessage(h *flow.Block, signerIDs flow.IdentifierList) (
 
 // BlockToMessageLight converts a flow.Block to the light form of a protobuf Block message.
 func BlockToMessageLight(h *flow.Block) *entities.Block {
-	id := h.ID()
+	id := h.Hash()
 	cg := CollectionGuaranteesToMessages(h.Payload.Guarantees)
 
 	return &entities.Block{

@@ -116,7 +116,7 @@ func createNode(
 	snapshot.On("EpochPhase").Return(flow.EpochPhaseStaking, nil)
 	snapshot.On("Head").Return(firstBlock, nil)
 	state := new(protocolmock.ParticipantState)
-	state.On("AtBlockID", firstBlock.ID()).Return(snapshot)
+	state.On("AtBlockID", firstBlock.Hash()).Return(snapshot)
 	state.On("Final").Return(snapshot)
 	core.State = state
 

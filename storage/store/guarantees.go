@@ -77,7 +77,7 @@ func NewGuarantees(
 }
 
 func (g *Guarantees) storeTx(lctx lockctx.Proof, rw storage.ReaderBatchWriter, guarantee *flow.CollectionGuarantee) error {
-	guaranteeID := guarantee.ID()
+	guaranteeID := guarantee.Hash()
 	err := g.cache.PutTx(rw, guaranteeID, guarantee)
 	if err != nil {
 		return err

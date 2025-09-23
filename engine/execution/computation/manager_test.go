@@ -98,7 +98,7 @@ func TestComputeBlockWithStorage(t *testing.T) {
 	col := flow.Collection{Transactions: transactions}
 
 	guarantee := &flow.CollectionGuarantee{
-		CollectionID: col.ID(),
+		CollectionID: col.Hash(),
 		Signature:    nil,
 	}
 
@@ -798,7 +798,7 @@ func Test_EventEncodingFailsOnlyTxAndCarriesOn(t *testing.T) {
 	col := flow.Collection{Transactions: transactions}
 
 	guarantee := &flow.CollectionGuarantee{
-		CollectionID: col.ID(),
+		CollectionID: col.Hash(),
 		Signature:    nil,
 	}
 

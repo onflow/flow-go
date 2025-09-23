@@ -49,7 +49,7 @@ func (s *ReceiptValidationSuite) TestReceiptValid() {
 		unittest.WithResult(valSubgrph.Result))
 	s.AddSubgraphFixtureToMempools(valSubgrph)
 
-	unsignedReceiptID := receipt.UnsignedExecutionReceipt.ID()
+	unsignedReceiptID := receipt.UnsignedExecutionReceipt.Hash()
 	s.publicKey.On("Verify",
 		receipt.ExecutorSignature,
 		unsignedReceiptID[:],
@@ -462,7 +462,7 @@ func (s *ReceiptValidationSuite) TestMultiReceiptValidResultChain() {
 
 	// G <- A <- B <- C
 	blocks, result0, seal := unittest.ChainFixture(4)
-	s.SealsIndex[blocks[0].ID()] = seal
+	s.SealsIndex[blocks[0].Hash()] = seal
 
 	receipts := unittest.ReceiptChainFor(blocks, result0)
 	blockA, blockB, blockC := blocks[1], blocks[2], blocks[3]
@@ -482,7 +482,7 @@ func (s *ReceiptValidationSuite) TestMultiReceiptValidResultChain() {
 	for _, b := range blocks {
 		s.Extend(b)
 	}
-	s.PersistedResults[result0.ID()] = result0
+	s.PersistedResults[result0.Hash()] = result0
 
 	candidate := unittest.BlockWithParentAndPayload(
 		blockC.ToHeader(),
@@ -505,7 +505,7 @@ func (s *ReceiptValidationSuite) TestMultiReceiptValidResultChain() {
 func (s *ReceiptValidationSuite) TestMultiReceiptInvalidParent() {
 	// G <- A <- B <- C
 	blocks, result0, seal := unittest.ChainFixture(4)
-	s.SealsIndex[blocks[0].ID()] = seal
+	s.SealsIndex[blocks[0].Hash()] = seal
 
 	receipts := unittest.ReceiptChainFor(blocks, result0)
 	blockA, blockB, blockC := blocks[1], blocks[2], blocks[3]
@@ -526,7 +526,7 @@ func (s *ReceiptValidationSuite) TestMultiReceiptInvalidParent() {
 	for _, b := range blocks {
 		s.Extend(b)
 	}
-	s.PersistedResults[result0.ID()] = result0
+	s.PersistedResults[result0.Hash()] = result0
 
 	// receipt B is from an invalid node
 	// Note: for a receipt with a bad `ExecutorID`, we should never get to validating the signature,
@@ -960,9 +960,9 @@ func (s *ReceiptValidationSuite) TestValidateReceiptAfterBootstrap() {
 	// Genesis block
 	blocks, result0, seal := unittest.ChainFixture(0)
 	require.Equal(s.T(), len(blocks), 1, "expected only creation of genesis block")
-	s.SealsIndex[blocks[0].ID()] = seal
+	s.SealsIndex[blocks[0].Hash()] = seal
 	s.Extend(blocks[0])
-	s.PersistedResults[result0.ID()] = result0
+	s.PersistedResults[result0.Hash()] = result0
 
 	candidate := unittest.BlockWithParentFixture(blocks[0].ToHeader())
 	err := s.receiptValidator.ValidatePayload(candidate)
@@ -978,7 +978,7 @@ func (s *ReceiptValidationSuite) TestValidateReceiptResultWithoutReceipt() {
 
 	// G <- A <- B
 	blocks, result0, seal := unittest.ChainFixture(2)
-	s.SealsIndex[blocks[0].ID()] = seal
+	s.SealsIndex[blocks[0].Hash()] = seal
 
 	receipts := unittest.ReceiptChainFor(blocks, result0)
 	blockA, blockB := blocks[1], blocks[2]
@@ -997,7 +997,7 @@ func (s *ReceiptValidationSuite) TestValidateReceiptResultWithoutReceipt() {
 	for _, b := range blocks {
 		s.Extend(b)
 	}
-	s.PersistedResults[result0.ID()] = result0
+	s.PersistedResults[result0.Hash()] = result0
 
 	candidate := unittest.BlockWithParentAndPayload(
 		blockB.ToHeader(),
@@ -1026,7 +1026,7 @@ func (s *ReceiptValidationSuite) TestValidateReceiptResultHasEnoughReceipts() {
 
 	// G <- A <- B
 	blocks, result0, seal := unittest.ChainFixture(2)
-	s.SealsIndex[blocks[0].ID()] = seal
+	s.SealsIndex[blocks[0].Hash()] = seal
 
 	receipts := unittest.ReceiptChainFor(blocks, result0)
 	blockA, blockB := blocks[1], blocks[2]
@@ -1045,7 +1045,7 @@ func (s *ReceiptValidationSuite) TestValidateReceiptResultHasEnoughReceipts() {
 	for _, b := range blocks {
 		s.Extend(b)
 	}
-	s.PersistedResults[result0.ID()] = result0
+	s.PersistedResults[result0.Hash()] = result0
 
 	candidateReceipts := []*flow.ExecutionReceiptStub{receiptB.Stub()}
 	// add k-1 more receipts for the same execution result
@@ -1201,7 +1201,7 @@ func (s *ReceiptValidationSuite) TestException_ProtocolStateHead() {
 	snapshot := mock_protocol.NewSnapshot(s.T())
 	exception := errors.New("state.Head() exception")
 	snapshot.On("Head").Return(nil, exception)
-	s.State.On("AtBlockID", valSubgrph.Block.ID()).Return(snapshot)
+	s.State.On("AtBlockID", valSubgrph.Block.Hash()).Return(snapshot)
 
 	s.T().Run("Method Validate", func(t *testing.T) {
 		err := s.receiptValidator.Validate(receipt)
@@ -1239,7 +1239,7 @@ func (s *ReceiptValidationSuite) TestException_ProtocolStateIdentity() {
 	exception := errors.New("state.Identity() exception")
 	snapshot.On("Head").Return(valSubgrph.Block.ToHeader(), nil)
 	snapshot.On("Identity", mock.Anything).Return(nil, exception)
-	s.State.On("AtBlockID", valSubgrph.Block.ID()).Return(snapshot)
+	s.State.On("AtBlockID", valSubgrph.Block.Hash()).Return(snapshot)
 
 	s.T().Run("Method Validate", func(t *testing.T) {
 		err := s.receiptValidator.Validate(receipt)
@@ -1274,7 +1274,7 @@ func (s *ReceiptValidationSuite) TestException_IndexByBlockID() {
 	// receiptValidator.index yields exception on Identity retrieval
 	*s.IndexDB = *mock_storage.NewIndex(s.T()) // receiptValidator has pointer to this field, which we override with a new state mock
 	exception := errors.New("index.ByBlockID(..) exception")
-	s.IndexDB.On("ByBlockID", valSubgrph.Block.ID()).Return(nil, exception)
+	s.IndexDB.On("ByBlockID", valSubgrph.Block.Hash()).Return(nil, exception)
 
 	s.T().Run("Method Validate", func(t *testing.T) {
 		err := s.receiptValidator.Validate(receipt)

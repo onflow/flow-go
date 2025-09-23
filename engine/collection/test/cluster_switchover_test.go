@@ -105,8 +105,8 @@ func NewClusterSwitchoverTestCase(t *testing.T, conf ClusterSwitchoverTestConf) 
 
 	// create a root snapshot with the given number of initial clusters
 	root, result, seal := unittest.BootstrapFixtureWithSetupAndCommit(rootHeaderBody, setup, commit)
-	seal.ResultID = result.ID()
-	qc := unittest.QuorumCertificateFixture(unittest.QCWithRootBlockID(root.ID()))
+	seal.ResultID = result.Hash()
+	qc := unittest.QuorumCertificateFixture(unittest.QCWithRootBlockID(root.Hash()))
 
 	tc.root, err = unittest.SnapshotFromBootstrapState(root, result, seal, qc)
 	require.NoError(t, err)
@@ -279,7 +279,7 @@ func (tc *ClusterSwitchoverTestCase) Transaction(opts ...func(*flow.TransactionB
 		AddAuthorizer(tc.ServiceAddress()).
 		SetPayer(tc.ServiceAddress()).
 		SetScript(unittest.NoopTxScript()).
-		SetReferenceBlockID(tc.RootBlock().ID()).
+		SetReferenceBlockID(tc.RootBlock().Hash()).
 		Build()
 	require.NoError(tc.T(), err)
 
@@ -384,10 +384,10 @@ func (tc *ClusterSwitchoverTestCase) SubmitTransactionToCluster(
 	// get any block within the target epoch as the transaction's reference block
 	refBlock := tc.BlockInEpoch(epochCounter)
 	tx := tc.Transaction(func(tx *flow.TransactionBody) {
-		tx.ReferenceBlockID = refBlock.ID()
+		tx.ReferenceBlockID = refBlock.Hash()
 	})
 	clusterTx := unittest.AlterTransactionForCluster(*tx, clustering, clusterMembers, nil)
-	tc.ExpectTransaction(epochCounter, clusterIndex, clusterTx.ID())
+	tc.ExpectTransaction(epochCounter, clusterIndex, clusterTx.Hash())
 
 	// submit the transaction to any collector in this cluster
 	err := tc.Collector(clusterMembers[0].NodeID).IngestionEngine.ProcessTransaction(&clusterTx)

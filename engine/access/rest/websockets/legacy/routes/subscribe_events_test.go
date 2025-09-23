@@ -85,9 +85,9 @@ func (s *SubscribeEventsSuite) SetupTest() {
 			))
 		}
 
-		s.blockEvents[block.ID()] = events
+		s.blockEvents[block.Hash()] = events
 
-		s.T().Logf("adding exec data for block %d %d %v => %v", i, block.Height, block.ID(), result.ExecutionDataID)
+		s.T().Logf("adding exec data for block %d %d %v => %v", i, block.Height, block.Hash(), result.ExecutionDataID)
 	}
 }
 
@@ -122,7 +122,7 @@ func (s *SubscribeEventsSuite) TestSubscribeEvents() {
 		},
 		{
 			name:              "happy path - all events from startBlockID",
-			startBlockID:      s.blocks[0].ID(),
+			startBlockID:      s.blocks[0].Hash(),
 			startHeight:       request.EmptyHeight,
 			heartbeatInterval: 1,
 		},
@@ -180,7 +180,7 @@ func (s *SubscribeEventsSuite) TestSubscribeEvents() {
 
 			// construct expected event responses based on the provided test configuration
 			for i, block := range s.blocks {
-				blockID := block.ID()
+				blockID := block.Hash()
 				if startBlockFound || blockID == test.startBlockID {
 					startBlockFound = true
 					if test.startHeight == request.EmptyHeight || block.Height >= test.startHeight {
@@ -256,7 +256,7 @@ func (s *SubscribeEventsSuite) TestSubscribeEvents() {
 func (s *SubscribeEventsSuite) TestSubscribeEventsHandlesErrors() {
 	s.Run("returns error for block id and height", func() {
 		stateStreamBackend := mockstatestream.NewAPI(s.T())
-		req, err := getSubscribeEventsRequest(s.T(), s.blocks[0].ID(), s.blocks[0].Height, nil, nil, nil, 1, nil)
+		req, err := getSubscribeEventsRequest(s.T(), s.blocks[0].Hash(), s.blocks[0].Height, nil, nil, nil, 1, nil)
 		require.NoError(s.T(), err)
 		respRecorder := router.NewTestHijackResponseRecorder()
 		router.ExecuteLegacyWsRequest(req, stateStreamBackend, respRecorder, chainID.Chain())
@@ -278,10 +278,10 @@ func (s *SubscribeEventsSuite) TestSubscribeEventsHandlesErrors() {
 		subscription.Mock.On("Channel").Return(chReadOnly)
 		subscription.Mock.On("Err").Return(fmt.Errorf("subscription error"))
 		stateStreamBackend.Mock.
-			On("SubscribeEvents", mocks.Anything, invalidBlock.ID(), uint64(0), mocks.Anything).
+			On("SubscribeEvents", mocks.Anything, invalidBlock.Hash(), uint64(0), mocks.Anything).
 			Return(subscription)
 
-		req, err := getSubscribeEventsRequest(s.T(), invalidBlock.ID(), request.EmptyHeight, nil, nil, nil, 1, nil)
+		req, err := getSubscribeEventsRequest(s.T(), invalidBlock.Hash(), request.EmptyHeight, nil, nil, nil, 1, nil)
 		require.NoError(s.T(), err)
 		respRecorder := router.NewTestHijackResponseRecorder()
 		router.ExecuteLegacyWsRequest(req, stateStreamBackend, respRecorder, chainID.Chain())
@@ -290,7 +290,7 @@ func (s *SubscribeEventsSuite) TestSubscribeEventsHandlesErrors() {
 
 	s.Run("returns error for invalid event filter", func() {
 		stateStreamBackend := mockstatestream.NewAPI(s.T())
-		req, err := getSubscribeEventsRequest(s.T(), s.blocks[0].ID(), request.EmptyHeight, []string{"foo"}, nil, nil, 1, nil)
+		req, err := getSubscribeEventsRequest(s.T(), s.blocks[0].Hash(), request.EmptyHeight, []string{"foo"}, nil, nil, 1, nil)
 		require.NoError(s.T(), err)
 		respRecorder := router.NewTestHijackResponseRecorder()
 		router.ExecuteLegacyWsRequest(req, stateStreamBackend, respRecorder, chainID.Chain())
@@ -312,10 +312,10 @@ func (s *SubscribeEventsSuite) TestSubscribeEventsHandlesErrors() {
 		subscription.Mock.On("Channel").Return(chReadOnly)
 		subscription.Mock.On("Err").Return(nil)
 		stateStreamBackend.Mock.
-			On("SubscribeEvents", mocks.Anything, s.blocks[0].ID(), uint64(0), mocks.Anything).
+			On("SubscribeEvents", mocks.Anything, s.blocks[0].Hash(), uint64(0), mocks.Anything).
 			Return(subscription)
 
-		req, err := getSubscribeEventsRequest(s.T(), s.blocks[0].ID(), request.EmptyHeight, nil, nil, nil, 1, nil)
+		req, err := getSubscribeEventsRequest(s.T(), s.blocks[0].Hash(), request.EmptyHeight, nil, nil, nil, 1, nil)
 		require.NoError(s.T(), err)
 		respRecorder := router.NewTestHijackResponseRecorder()
 		router.ExecuteLegacyWsRequest(req, stateStreamBackend, respRecorder, chainID.Chain())

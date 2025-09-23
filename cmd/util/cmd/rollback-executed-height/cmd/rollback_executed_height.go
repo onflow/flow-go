@@ -176,7 +176,7 @@ func removeExecutionResultsFromHeight(
 			return fmt.Errorf("could not get header at height: %w", err)
 		}
 
-		blockID := head.ID()
+		blockID := head.Hash()
 
 		err = removeForBlockID(writeBatch, chunkBatch, commits, transactionResults, results, chunkDataPacks, myReceipts, events, serviceEvents, blockID)
 		if err != nil {
@@ -239,7 +239,7 @@ func removeForBlockID(
 	}
 
 	for _, chunk := range result.Chunks {
-		chunkID := chunk.ID()
+		chunkID := chunk.Hash()
 		// remove chunk data pack
 		err := chunks.BatchRemove(chunkID, chunkBatch)
 		if err != nil {

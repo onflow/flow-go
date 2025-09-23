@@ -28,12 +28,12 @@ func TestCachingAssignmentCollector(t *testing.T) {
 func (s *CachingAssignmentCollectorTestSuite) SetupTest() {
 	s.executedBlock = unittest.BlockHeaderFixture()
 	s.result = unittest.ExecutionResultFixture(func(result *flow.ExecutionResult) {
-		result.BlockID = s.executedBlock.ID()
+		result.BlockID = s.executedBlock.Hash()
 	})
 	s.collector = NewCachingAssignmentCollector(AssignmentCollectorBase{
 		executedBlock: s.executedBlock,
 		result:        s.result,
-		resultID:      s.result.ID(),
+		resultID:      s.result.Hash(),
 	})
 }
 
@@ -50,7 +50,7 @@ func (s *CachingAssignmentCollectorTestSuite) TestProcessApproval() {
 	err := s.collector.ProcessApproval(approval)
 	require.Error(s.T(), err)
 
-	approval = unittest.ResultApprovalFixture(unittest.WithExecutionResultID(s.result.ID()))
+	approval = unittest.ResultApprovalFixture(unittest.WithExecutionResultID(s.result.Hash()))
 	err = s.collector.ProcessApproval(approval)
 	require.Error(s.T(), err)
 	require.True(s.T(), engine.IsInvalidInputError(err))
@@ -58,8 +58,8 @@ func (s *CachingAssignmentCollectorTestSuite) TestProcessApproval() {
 	var expected []*flow.ResultApproval
 	for i := 0; i < 5; i++ {
 		approval := unittest.ResultApprovalFixture(
-			unittest.WithBlockID(s.executedBlock.ID()),
-			unittest.WithExecutionResultID(s.result.ID()),
+			unittest.WithBlockID(s.executedBlock.Hash()),
+			unittest.WithExecutionResultID(s.result.Hash()),
 			unittest.WithChunk(uint64(i)))
 		err := s.collector.ProcessApproval(approval)
 		require.NoError(s.T(), err)

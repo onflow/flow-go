@@ -40,7 +40,7 @@ func TestGetCollections(t *testing.T) {
 
 		for _, col := range inputs {
 			backend.Mock.
-				On("GetCollectionByID", mocks.Anything, col.ID()).
+				On("GetCollectionByID", mocks.Anything, col.Hash()).
 				Return(col, nil).
 				Once()
 
@@ -58,9 +58,9 @@ func TestGetCollections(t *testing.T) {
                "_expandable": {
                   "transactions": %s
                }
-			}`, col.ID(), col.ID(), transactionsStr)
+			}`, col.Hash(), col.Hash(), transactionsStr)
 
-			req := getCollectionReq(col.ID().String(), false)
+			req := getCollectionReq(col.Hash().String(), false)
 			router.AssertOKResponse(t, req, expected, backend)
 			mocks.AssertExpectationsForObjects(t, backend)
 		}
@@ -72,20 +72,20 @@ func TestGetCollections(t *testing.T) {
 		transactions := make([]flow.TransactionBody, len(col.Transactions))
 		for i := range col.Transactions {
 			transactions[i] = unittest.TransactionBodyFixture()
-			col.Transactions[i] = transactions[i].ID() // overwrite tx ids
+			col.Transactions[i] = transactions[i].Hash() // overwrite tx ids
 
 			backend.Mock.
-				On("GetTransaction", mocks.Anything, transactions[i].ID()).
+				On("GetTransaction", mocks.Anything, transactions[i].Hash()).
 				Return(&transactions[i], nil).
 				Once()
 		}
 
 		backend.Mock.
-			On("GetCollectionByID", mocks.Anything, col.ID()).
+			On("GetCollectionByID", mocks.Anything, col.Hash()).
 			Return(col, nil).
 			Once()
 
-		req := getCollectionReq(col.ID().String(), true)
+		req := getCollectionReq(col.Hash().String(), true)
 		rr := router.ExecuteRequest(req, backend)
 
 		assert.Equal(t, http.StatusOK, rr.Code)
@@ -98,7 +98,7 @@ func TestGetCollections(t *testing.T) {
 		resTx := res["transactions"].([]interface{})
 		for i, r := range resTx {
 			c := r.(map[string]interface{})
-			assert.Equal(t, transactions[i].ID().String(), c["id"])
+			assert.Equal(t, transactions[i].Hash().String(), c["id"])
 			assert.NotNil(t, c["envelope_signatures"])
 		}
 

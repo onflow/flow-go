@@ -30,11 +30,11 @@ func TestFindBlockTransactions(t *testing.T) {
 				flow.Payload{
 					Guarantees: []*flow.CollectionGuarantee{
 						&flow.CollectionGuarantee{
-							CollectionID:     col1.Collection.ID(),
+							CollectionID:     col1.Collection.Hash(),
 							ReferenceBlockID: col1.ReferenceBlockID,
 						},
 						&flow.CollectionGuarantee{
-							CollectionID:     col2.Collection.ID(),
+							CollectionID:     col2.Collection.Hash(),
 							ReferenceBlockID: col2.ReferenceBlockID,
 						},
 					},
@@ -49,7 +49,7 @@ func TestFindBlockTransactions(t *testing.T) {
 				flow.Payload{
 					Guarantees: []*flow.CollectionGuarantee{
 						&flow.CollectionGuarantee{
-							CollectionID:     col3.Collection.ID(),
+							CollectionID:     col3.Collection.Hash(),
 							ReferenceBlockID: col3.ReferenceBlockID,
 						},
 					},
@@ -113,7 +113,7 @@ func TestFindBlockTransactions(t *testing.T) {
 
 		require.Equal(t,
 			fetched[0].Collections[0].Transactions[0].TxID,
-			col1.Collection.Transactions[0].ID().String(),
+			col1.Collection.Transactions[0].Hash().String(),
 		)
 
 		// unhappy path: endHeight is lower than startHeight

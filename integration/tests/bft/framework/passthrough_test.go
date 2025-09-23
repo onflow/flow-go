@@ -39,7 +39,7 @@ func (p *PassThroughTestSuite) TestSealingAndVerificationPassThrough() {
 		p.exe1ID,
 		p.exe2ID,
 		p.verID,
-		p.Net.Root().ID())
+		p.Net.Root().Hash())
 
 	// identifier of chunks involved in the sealing and verification test.
 	chunkIds := flow.GetIDs(receipts[0].ExecutionResult.Chunks)

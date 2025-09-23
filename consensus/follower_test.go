@@ -104,7 +104,7 @@ func (s *HotStuffFollowerSuite) SetupTest() {
 	require.NoError(s.T(), err)
 	s.rootQC = &flow.QuorumCertificate{
 		View:          s.rootHeader.View,
-		BlockID:       s.rootHeader.ID(),
+		BlockID:       s.rootHeader.Hash(),
 		SignerIndices: signerIndices,
 	}
 
@@ -171,7 +171,7 @@ func (s *HotStuffFollowerSuite) TestOnBlockIncorporated() {
 	grandChild := s.mockConsensus.extendBlock(child.View+2, child)
 	certifiedChild := toCertifiedBlock(s.T(), child, grandChild.ParentQC())
 	blockIngested := make(chan struct{}) // close when child was ingested
-	s.notifier.On("OnBlockIncorporated", blockWithID(child.ID())).Run(func(_ mock.Arguments) {
+	s.notifier.On("OnBlockIncorporated", blockWithID(child.Hash())).Run(func(_ mock.Arguments) {
 		close(blockIngested)
 	}).Return().Once()
 
@@ -207,15 +207,15 @@ func (s *HotStuffFollowerSuite) TestFollowerFinalizedBlock() {
 
 	// adding b should not advance finality
 	bCertified := toCertifiedBlock(s.T(), b, c.ParentQC())
-	s.notifier.On("OnBlockIncorporated", blockWithID(b.ID())).Return().Once()
+	s.notifier.On("OnBlockIncorporated", blockWithID(b.Hash())).Return().Once()
 	s.follower.AddCertifiedBlock(bCertified)
 
 	// adding the certified child of b should advance finality to b
 	finalityAdvanced := make(chan struct{}) // close when finality has advanced to b
 	certifiedChild := toCertifiedBlock(s.T(), c, d.ParentQC())
 	s.notifier.On("OnBlockIncorporated", blockWithID(certifiedChild.BlockID())).Return().Once()
-	s.finalizer.On("MakeFinal", blockID(b.ID())).Return(nil).Once()
-	s.notifier.On("OnFinalizedBlock", blockWithID(b.ID())).Run(func(_ mock.Arguments) {
+	s.finalizer.On("MakeFinal", blockID(b.Hash())).Return(nil).Once()
+	s.notifier.On("OnFinalizedBlock", blockWithID(b.Hash())).Run(func(_ mock.Arguments) {
 		close(finalityAdvanced)
 	}).Return().Once()
 
@@ -275,7 +275,7 @@ func (s *HotStuffFollowerSuite) TestOutOfOrderBlocks() {
 	block20 := s.mockConsensus.extendBlock(rootView+20, block14)
 
 	for _, b := range []*flow.Header{block01, block03, block05, block07, block09, block11, block13, block14} {
-		s.notifier.On("OnBlockIncorporated", blockWithID(b.ID())).Return().Once()
+		s.notifier.On("OnBlockIncorporated", blockWithID(b.Hash())).Return().Once()
 	}
 
 	// now we feed the blocks in some wild view order into the Follower
@@ -290,14 +290,14 @@ func (s *HotStuffFollowerSuite) TestOutOfOrderBlocks() {
 
 	// Block 20 should now finalize the fork up to and including block13
 	finalityAdvanced := make(chan struct{}) // close when finality has advanced to b
-	s.notifier.On("OnFinalizedBlock", blockWithID(block01.ID())).Return().Once()
-	s.finalizer.On("MakeFinal", blockID(block01.ID())).Return(nil).Once()
-	s.notifier.On("OnFinalizedBlock", blockWithID(block05.ID())).Return().Once()
-	s.finalizer.On("MakeFinal", blockID(block05.ID())).Return(nil).Once()
-	s.notifier.On("OnFinalizedBlock", blockWithID(block09.ID())).Return().Once()
-	s.finalizer.On("MakeFinal", blockID(block09.ID())).Return(nil).Once()
-	s.notifier.On("OnFinalizedBlock", blockWithID(block13.ID())).Return().Once()
-	s.finalizer.On("MakeFinal", blockID(block13.ID())).Run(func(_ mock.Arguments) {
+	s.notifier.On("OnFinalizedBlock", blockWithID(block01.Hash())).Return().Once()
+	s.finalizer.On("MakeFinal", blockID(block01.Hash())).Return(nil).Once()
+	s.notifier.On("OnFinalizedBlock", blockWithID(block05.Hash())).Return().Once()
+	s.finalizer.On("MakeFinal", blockID(block05.Hash())).Return(nil).Once()
+	s.notifier.On("OnFinalizedBlock", blockWithID(block09.Hash())).Return().Once()
+	s.finalizer.On("MakeFinal", blockID(block09.Hash())).Return(nil).Once()
+	s.notifier.On("OnFinalizedBlock", blockWithID(block13.Hash())).Return().Once()
+	s.finalizer.On("MakeFinal", blockID(block13.Hash())).Run(func(_ mock.Arguments) {
 		close(finalityAdvanced)
 	}).Return(nil).Once()
 

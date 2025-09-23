@@ -71,11 +71,11 @@ func NewEvent(untrusted UntrustedEvent) (*Event, error) {
 
 // String returns the string representation of this event.
 func (e Event) String() string {
-	return fmt.Sprintf("%s: %s", e.Type, e.ID())
+	return fmt.Sprintf("%s: %s", e.Type, e.Hash())
 }
 
-// ID returns a canonical identifier that is guaranteed to be unique.
-func (e Event) ID() Identifier {
+// Hash returns a canonical identifier that is guaranteed to be unique.
+func (e Event) Hash() Identifier {
 	return MakeID(e)
 }
 

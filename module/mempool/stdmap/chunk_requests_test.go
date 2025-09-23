@@ -238,8 +238,8 @@ func TestAddingDuplicateChunkIDs(t *testing.T) {
 
 	locators, ok := requests.PopAll(thisReq.ChunkID)
 	require.True(t, ok)
-	require.NotNil(t, locators[thisReq.Locator.ID()])
-	require.NotNil(t, locators[otherReq.Locator.ID()])
+	require.NotNil(t, locators[thisReq.Locator.Hash()])
+	require.NotNil(t, locators[otherReq.Locator.Hash()])
 
 	// after poping all, mempool must be empty (since the requests for the only
 	// chunk id have been poped).

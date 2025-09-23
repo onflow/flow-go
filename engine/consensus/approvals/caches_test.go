@@ -32,8 +32,8 @@ func TestIncorporatedResultsCache_Get_Put_All(t *testing.T) {
 	for i := range results {
 		result := unittest.IncorporatedResult.Fixture()
 		results[i] = result
-		require.True(t, cache.Put(result.ID(), result))
-		require.Equal(t, result, cache.Get(result.ID()))
+		require.True(t, cache.Put(result.Hash(), result))
+		require.Equal(t, result, cache.Get(result.Hash()))
 	}
 	require.ElementsMatch(t, results, cache.All())
 	require.Equal(t, int(numElements), len(cache.All()))

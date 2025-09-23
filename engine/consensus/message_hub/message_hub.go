@@ -196,7 +196,7 @@ func (h *MessageHub) sendOwnMessages(ctx context.Context) error {
 			proposal := msg.(*flow.ProposalHeader)
 			err := h.sendOwnProposal(proposal)
 			if err != nil {
-				return fmt.Errorf("could not process queued block %v: %w", proposal.Header.ID(), err)
+				return fmt.Errorf("could not process queued block %v: %w", proposal.Header.Hash(), err)
 			}
 			continue
 		}
@@ -295,7 +295,7 @@ func (h *MessageHub) sendOwnProposal(proposal *flow.ProposalHeader) error {
 	}
 
 	// retrieve the payload for the block
-	payload, err := h.payloads.ByBlockID(header.ID())
+	payload, err := h.payloads.ByBlockID(header.Hash())
 	if err != nil {
 		return fmt.Errorf("could not retrieve payload for proposal: %w", err)
 	}
@@ -377,7 +377,7 @@ func (h *MessageHub) sendOwnProposal(proposal *flow.ProposalHeader) error {
 // network (non-consensus nodes).
 func (h *MessageHub) provideProposal(proposal *messages.Proposal, recipients flow.IdentityList) {
 	header := proposal.Block.ToHeader()
-	blockID := header.ID()
+	blockID := header.Hash()
 	log := h.log.With().
 		Uint64("block_view", header.View).
 		Hex("block_id", blockID[:]).
@@ -516,7 +516,7 @@ func (h *MessageHub) forwardToOwnVoteAggregator(vote *model.Vote) {
 		Uint64("block_view", vote.View).
 		Hex("block_id", vote.BlockID[:]).
 		Hex("voter", vote.SignerID[:]).
-		Str("vote_id", vote.ID().String()).
+		Str("vote_id", vote.Hash().String()).
 		Msg("block vote received, forwarding block vote to hotstuff vote aggregator")
 	h.voteAggregator.AddVote(vote)
 }

@@ -33,7 +33,7 @@ func TestApprovalStoreAndRetrieve(t *testing.T) {
 		defer lctx.Release() // While still holding the lock, verify that reads are not blocked by acquired locks
 
 		// retrieve entire approval by its ID
-		byID, err := store.ByID(approval.ID())
+		byID, err := store.ByID(approval.Hash())
 		require.NoError(t, err)
 		require.Equal(t, approval, byID)
 
@@ -158,6 +158,6 @@ func twoApprovalsForTheSameResult(t *testing.T) (*flow.ResultApproval, *flow.Res
 	approval2.Body.ChunkIndex = approval1.Body.ChunkIndex
 	approval2.Body.ExecutionResultID = approval1.Body.ExecutionResultID
 	// sanity check: make sure the two approvals are different
-	require.NotEqual(t, approval1.ID(), approval2.ID(), "expected two different approvals, but got the same ID")
+	require.NotEqual(t, approval1.Hash(), approval2.Hash(), "expected two different approvals, but got the same ID")
 	return approval1, approval2
 }

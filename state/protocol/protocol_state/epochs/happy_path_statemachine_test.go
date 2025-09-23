@@ -32,7 +32,7 @@ func (s *BaseStateMachineSuite) SetupTest() {
 	s.parentProtocolState = unittest.EpochStateFixture(func(entry *flow.RichEpochStateEntry) {
 		// have a fixed boundary for the current epoch
 		entry.CurrentEpochSetup.FinalView = 5_000
-		entry.CurrentEpoch.SetupID = entry.CurrentEpochSetup.ID()
+		entry.CurrentEpoch.SetupID = entry.CurrentEpochSetup.Hash()
 	})
 	s.parentBlock = unittest.BlockHeaderFixture(unittest.HeaderWithView(s.parentProtocolState.CurrentEpochSetup.FirstView + 1))
 	s.candidate = unittest.BlockHeaderWithParentFixture(s.parentBlock)
@@ -77,10 +77,10 @@ func (s *ProtocolStateMachineSuite) TestTransitionToNextEpoch() {
 	require.NoError(s.T(), err)
 	updatedState, stateID, hasChanges := s.stateMachine.Build()
 	require.True(s.T(), hasChanges)
-	require.NotEqual(s.T(), s.parentProtocolState.ID(), updatedState.ID())
-	require.Equal(s.T(), updatedState.ID(), stateID)
-	require.Equal(s.T(), s.parentProtocolState.ID(), s.stateMachine.ParentState().ID(), "should not modify parent protocol state")
-	require.Equal(s.T(), updatedState.CurrentEpoch.ID(), s.parentProtocolState.NextEpoch.ID(), "should transition into next epoch")
+	require.NotEqual(s.T(), s.parentProtocolState.Hash(), updatedState.Hash())
+	require.Equal(s.T(), updatedState.Hash(), stateID)
+	require.Equal(s.T(), s.parentProtocolState.Hash(), s.stateMachine.ParentState().Hash(), "should not modify parent protocol state")
+	require.Equal(s.T(), updatedState.CurrentEpoch.Hash(), s.parentProtocolState.NextEpoch.Hash(), "should transition into next epoch")
 	require.Nil(s.T(), updatedState.NextEpoch, "next epoch protocol state should be nil")
 }
 
@@ -121,11 +121,11 @@ func (s *ProtocolStateMachineSuite) TestTransitionToNextEpochNotAllowed() {
 // TestBuild tests if the HappyPathStateMachine returns correct protocol state.
 func (s *ProtocolStateMachineSuite) TestBuild() {
 	updatedState, stateID, hasChanges := s.stateMachine.Build()
-	require.Equal(s.T(), stateID, s.parentProtocolState.ID(), "should return same protocol state")
+	require.Equal(s.T(), stateID, s.parentProtocolState.Hash(), "should return same protocol state")
 	require.False(s.T(), hasChanges, "should not have changes")
 	require.NotSame(s.T(), updatedState, s.stateMachine.state, "should return a copy of protocol state")
-	require.Equal(s.T(), updatedState.ID(), stateID, "should return correct ID")
-	require.Equal(s.T(), s.parentProtocolState.ID(), s.stateMachine.ParentState().ID(), "should not modify parent protocol state")
+	require.Equal(s.T(), updatedState.Hash(), stateID, "should return correct ID")
+	require.Equal(s.T(), s.parentProtocolState.Hash(), s.stateMachine.ParentState().Hash(), "should not modify parent protocol state")
 
 	nodeIDforEjection := s.parentProtocolState.CurrentEpochIdentityTable[0].NodeID
 	serviceEvent := &flow.EjectNode{NodeID: nodeIDforEjection}
@@ -135,9 +135,9 @@ func (s *ProtocolStateMachineSuite) TestBuild() {
 	require.True(s.T(), wasEjected)
 	updatedState, stateID, hasChanges = s.stateMachine.Build()
 	require.True(s.T(), hasChanges, "should have changes")
-	require.NotEqual(s.T(), stateID, s.parentProtocolState.ID(), "protocol state was modified but still has same ID")
-	require.Equal(s.T(), updatedState.ID(), stateID, "should return correct ID")
-	require.Equal(s.T(), s.parentProtocolState.ID(), s.stateMachine.ParentState().ID(), "should not modify parent protocol state")
+	require.NotEqual(s.T(), stateID, s.parentProtocolState.Hash(), "protocol state was modified but still has same ID")
+	require.Equal(s.T(), updatedState.Hash(), stateID, "should return correct ID")
+	require.Equal(s.T(), s.parentProtocolState.Hash(), s.stateMachine.ParentState().Hash(), "should not modify parent protocol state")
 }
 
 // TestCreateStateMachineAfterEFMTriggered tests if creating state machine after observing invalid state transition
@@ -219,7 +219,7 @@ func (s *ProtocolStateMachineSuite) TestProcessEpochCommit() {
 		require.True(s.T(), protocol.IsInvalidServiceEventError(err))
 
 		newState, _, _ := s.stateMachine.Build()
-		require.Equal(s.T(), commit.ID(), newState.NextEpoch.CommitID, "next epoch should be committed since we have observed, a valid event")
+		require.Equal(s.T(), commit.Hash(), newState.NextEpoch.CommitID, "next epoch should be committed since we have observed, a valid event")
 	})
 	s.Run("happy path processing", func() {
 		s.stateMachine, err = NewHappyPathStateMachine(s.consumer, s.candidate.View, s.parentProtocolState.Copy())
@@ -237,9 +237,9 @@ func (s *ProtocolStateMachineSuite) TestProcessEpochCommit() {
 
 		updatedState, stateID, hasChanges := s.stateMachine.Build()
 		require.True(s.T(), hasChanges)
-		require.NotEqual(s.T(), s.parentProtocolState.ID(), updatedState.ID())
-		require.Equal(s.T(), updatedState.ID(), stateID)
-		require.Equal(s.T(), s.parentProtocolState.ID(), s.stateMachine.ParentState().ID(), "should not modify parent protocol state")
+		require.NotEqual(s.T(), s.parentProtocolState.Hash(), updatedState.Hash())
+		require.Equal(s.T(), updatedState.Hash(), stateID)
+		require.Equal(s.T(), s.parentProtocolState.Hash(), s.stateMachine.ParentState().Hash(), "should not modify parent protocol state")
 
 		parentState, err := flow.NewRichEpochStateEntry(updatedState)
 		require.NoError(s.T(), err)
@@ -256,11 +256,11 @@ func (s *ProtocolStateMachineSuite) TestProcessEpochCommit() {
 
 		newState, newStateID, newStateHasChanges := s.stateMachine.Build()
 		require.True(s.T(), newStateHasChanges)
-		require.Equal(s.T(), commit.ID(), newState.NextEpoch.CommitID, "next epoch should be committed")
-		require.Equal(s.T(), newState.ID(), newStateID)
-		require.NotEqual(s.T(), s.parentProtocolState.ID(), newState.ID())
-		require.NotEqual(s.T(), updatedState.ID(), newState.ID())
-		require.Equal(s.T(), parentState.ID(), s.stateMachine.ParentState().ID(),
+		require.Equal(s.T(), commit.Hash(), newState.NextEpoch.CommitID, "next epoch should be committed")
+		require.Equal(s.T(), newState.Hash(), newStateID)
+		require.NotEqual(s.T(), s.parentProtocolState.Hash(), newState.Hash())
+		require.NotEqual(s.T(), updatedState.Hash(), newState.Hash())
+		require.Equal(s.T(), parentState.Hash(), s.stateMachine.ParentState().Hash(),
 			"should not modify parent protocol state")
 	})
 }
@@ -277,8 +277,8 @@ func (s *ProtocolStateMachineSuite) TestNodeEjectionOfUnknownID() {
 
 	updatedState, updatedStateID, hasChanges := s.stateMachine.Build()
 	require.False(s.T(), hasChanges, "should not have changes")
-	require.Equal(s.T(), updatedState.ID(), s.parentProtocolState.ID())
-	require.Equal(s.T(), updatedState.ID(), updatedStateID)
+	require.Equal(s.T(), updatedState.Hash(), s.parentProtocolState.Hash())
+	require.Equal(s.T(), updatedState.Hash(), updatedStateID)
 }
 
 // TestNodeEjectionHappyPath verifies that `EjectNode` service events are correctly processed
@@ -303,9 +303,9 @@ func (s *ProtocolStateMachineSuite) TestNodeEjectionHappyPath() {
 	}
 	updatedState, updatedStateID, hasChanges := s.stateMachine.Build()
 	require.True(s.T(), hasChanges, "should have changes")
-	require.Equal(s.T(), updatedState.ID(), updatedStateID)
-	require.NotEqual(s.T(), s.parentProtocolState.ID(), updatedState.ID())
-	require.Equal(s.T(), s.parentProtocolState.ID(), s.stateMachine.ParentState().ID(),
+	require.Equal(s.T(), updatedState.Hash(), updatedStateID)
+	require.NotEqual(s.T(), s.parentProtocolState.Hash(), updatedState.Hash())
+	require.Equal(s.T(), s.parentProtocolState.Hash(), s.stateMachine.ParentState().Hash(),
 		"should not modify parent protocol state")
 
 	// assert that all changes made in the previous epoch are preserved
@@ -426,7 +426,7 @@ func (s *ProtocolStateMachineSuite) TestProcessEpochSetupHappyPath() {
 	require.Equal(s.T(), s.parentProtocolState.CurrentEpoch, updatedState.CurrentEpoch, "current epoch's EpochStateContainer should not change")
 	nextEpoch := updatedState.NextEpoch
 	require.NotNil(s.T(), nextEpoch, "should have next epoch protocol state")
-	require.Equal(s.T(), nextEpoch.SetupID, setup.ID(),
+	require.Equal(s.T(), nextEpoch.SetupID, setup.Hash(),
 		"should have correct setup ID for next protocol state")
 	require.Equal(s.T(), nextEpoch.CommitID, flow.ZeroID, "ID for EpochCommit event should still be nil")
 	require.Equal(s.T(), expectedNextEpochActiveIdentities, nextEpoch.ActiveIdentities,

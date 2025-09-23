@@ -13,7 +13,7 @@ import (
 
 type IntList []uint32
 
-func (l IntList) ID() flow.Identifier {
+func (l IntList) Hash() flow.Identifier {
 	return flow.MakeID(l)
 }
 
@@ -25,7 +25,7 @@ type StructWithNilFields struct {
 	QC         *flow.QuorumCertificate
 }
 
-func (e *StructWithNilFields) ID() flow.Identifier {
+func (e *StructWithNilFields) Hash() flow.Identifier {
 	type pair struct {
 		ID    flow.Identifier
 		Index uint32
@@ -44,7 +44,7 @@ func (e *StructWithNilFields) ID() flow.Identifier {
 	}{
 		Identities: e.Identities,
 		Index:      pairs,
-		QcID:       e.QC.ID(),
+		QcID:       e.QC.Hash(),
 	})
 }
 
@@ -53,7 +53,7 @@ type StructWithNotSettableFlowField struct {
 	field flow.IdentitySkeleton
 }
 
-func (e *StructWithNotSettableFlowField) ID() flow.Identifier {
+func (e *StructWithNotSettableFlowField) Hash() flow.Identifier {
 	return flow.MakeID(e)
 }
 
@@ -64,14 +64,14 @@ type MalleableEntityStruct struct {
 	Signature  crypto.Signature
 }
 
-// ID returns the hash of the entity in a way that does not cover all of its fields.
-func (e *MalleableEntityStruct) ID() flow.Identifier {
+// Hash returns the hash of the entity in a way that does not cover all of its fields.
+func (e *MalleableEntityStruct) Hash() flow.Identifier {
 	return flow.MakeID(struct {
 		Identities flow.IdentitySkeletonList
 		QcID       flow.Identifier
 	}{
 		Identities: e.Identities,
-		QcID:       e.QC.ID(),
+		QcID:       e.QC.Hash(),
 	})
 }
 
@@ -86,8 +86,8 @@ type StructWithOptionalField struct {
 	OptionalField *uint32
 }
 
-// ID returns the hash of the entity depending on the presence of the optional field.
-func (e *StructWithOptionalField) ID() flow.Identifier {
+// Hash returns the hash of the entity depending on the presence of the optional field.
+func (e *StructWithOptionalField) Hash() flow.Identifier {
 	if e.OptionalField == nil {
 		return flow.MakeID(struct {
 			Identifier    flow.Identifier
@@ -215,10 +215,10 @@ type StructWithPinning struct {
 	Evidence *EnterViewEvidence
 }
 
-// ID returns the hash of the entity depending on the value of the Version field.
+// Hash returns the hash of the entity depending on the value of the Version field.
 // Depending on the value of the Version field, the ID method includes or excludes the TC field in the hash calculation and requires it's nil or not in some cases.
 // This is a contrived example to demonstrate the pinning feature of the malleability checker.
-func (e *StructWithPinning) ID() flow.Identifier {
+func (e *StructWithPinning) Hash() flow.Identifier {
 	if e.Version == 1 {
 		if e.Evidence.TC != nil {
 			panic("TC should not be set for version 1")
@@ -228,7 +228,7 @@ func (e *StructWithPinning) ID() flow.Identifier {
 			QcID    flow.Identifier
 		}{
 			Version: e.Version,
-			QcID:    e.Evidence.QC.ID(),
+			QcID:    e.Evidence.QC.Hash(),
 		})
 	} else if e.Version == 2 {
 		if e.Evidence.QC == nil || e.Evidence.TC == nil {
@@ -240,8 +240,8 @@ func (e *StructWithPinning) ID() flow.Identifier {
 			TcID    flow.Identifier
 		}{
 			Version: e.Version,
-			QcID:    e.Evidence.QC.ID(),
-			TcID:    e.Evidence.TC.ID(),
+			QcID:    e.Evidence.QC.Hash(),
+			TcID:    e.Evidence.TC.Hash(),
 		})
 	} else {
 		panic("unsupported version")
@@ -289,7 +289,7 @@ type StructWithComplexType struct {
 	Evidences []*EnterViewEvidence
 }
 
-func (e *StructWithComplexType) ID() flow.Identifier {
+func (e *StructWithComplexType) Hash() flow.Identifier {
 	return flow.MakeID(e)
 }
 
@@ -341,7 +341,7 @@ func TestMalleabilityChecker_Generators(t *testing.T) {
 
 // PartialHashStruct represents a model which includes a signature field attesting to the rest of the model.
 // Hash returns a hash over PartialHashStruct excluding the Signature field, and the Signature would sign the Hash.
-// ID returns a hash over the entire PartialHashStruct.
+// Hash returns a hash over the entire PartialHashStruct.
 // PartialHashStruct is malleable with respect to the Hash method, but non-malleable with respect to the ID method.
 // Although the Hash method is malleable, we still want to be able to verify that it is non-malleable with respect
 // to all fields other than the Signature field.
@@ -358,7 +358,7 @@ func (e *PartialHashStruct) Hash() flow.Identifier {
 	})
 }
 
-func (e *PartialHashStruct) ID() flow.Identifier {
+func (e *PartialHashStruct) Hash() flow.Identifier {
 	return flow.MakeID(e)
 }
 

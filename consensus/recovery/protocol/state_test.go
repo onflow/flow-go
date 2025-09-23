@@ -23,7 +23,7 @@ func TestSaveBlockAsReplica(t *testing.T) {
 	rootSnapshot := unittest.RootSnapshotFixture(participants)
 	protocolState, err := rootSnapshot.ProtocolState()
 	require.NoError(t, err)
-	rootProtocolStateID := protocolState.ID()
+	rootProtocolStateID := protocolState.Hash()
 	b0, err := rootSnapshot.Head()
 	require.NoError(t, err)
 	util.RunWithFullProtocolState(t, rootSnapshot, func(db storage.DB, state *protocol.ParticipantState) {
@@ -49,7 +49,7 @@ func TestSaveBlockAsReplica(t *testing.T) {
 		headers := store.NewHeaders(metrics, db)
 		finalized, pending, err := recovery.FindLatest(state, headers)
 		require.NoError(t, err)
-		require.Equal(t, b0.ID(), finalized.ID(), "recover find latest returns inconsistent finalized block")
+		require.Equal(t, b0.Hash(), finalized.Hash(), "recover find latest returns inconsistent finalized block")
 
 		// b1,b2,b3 are unfinalized (pending) blocks
 		require.Equal(t, []*flow.ProposalHeader{b1p.ProposalHeader(), b2p.ProposalHeader(), b3p.ProposalHeader()}, pending)

@@ -198,7 +198,7 @@ func (suite *IngressSuite) TestTxIngressMultiCluster_CorrectCluster() {
 	// ensure the transaction IS NOT included in other cluster collections
 	for _, cluster := range clusters {
 		// skip the target cluster
-		if cluster.ID() == targetCluster.ID() {
+		if cluster.Hash() == targetCluster.Hash() {
 			continue
 		}
 
@@ -287,7 +287,7 @@ func (suite *IngressSuite) TestTxIngressMultiCluster_OtherCluster() {
 	// ensure the transaction IS NOT included in other cluster collections
 	for _, cluster := range clusters {
 		// skip the target cluster
-		if cluster.ID() == targetCluster.ID() {
+		if cluster.Hash() == targetCluster.Hash() {
 			continue
 		}
 

@@ -35,12 +35,12 @@ func TestIncorporatedResultGroupBy(t *testing.T) {
 	idA := unittest.IdentifierFixture()
 	idB := unittest.IdentifierFixture()
 	grouperFunc := func(ir *flow.IncorporatedResult) flow.Identifier {
-		switch ir.ID() {
-		case ir1.ID():
+		switch ir.Hash() {
+		case ir1.Hash():
 			return idA
-		case ir2.ID():
+		case ir2.Hash():
 			return idB
-		case ir3.ID():
+		case ir3.Hash():
 			return idA
 		default:
 			panic("unexpected IncorporatedResult")

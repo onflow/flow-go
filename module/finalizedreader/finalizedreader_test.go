@@ -36,7 +36,7 @@ func TestFinalizedReader(t *testing.T) {
 		// index `block` as finalized
 		unittest.WithLock(t, lockManager, storage.LockFinalizeBlock, func(lctx lockctx.Context) error {
 			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-				return operation.IndexFinalizedBlockByHeight(lctx, rw, block.Height, block.ID())
+				return operation.IndexFinalizedBlockByHeight(lctx, rw, block.Height, block.Hash())
 			})
 		})
 
@@ -44,7 +44,7 @@ func TestFinalizedReader(t *testing.T) {
 		reader := NewFinalizedReader(headers, block.Height)
 		finalized, err := reader.FinalizedBlockIDAtHeight(block.Height)
 		require.NoError(t, err)
-		require.Equal(t, block.ID(), finalized)
+		require.Equal(t, block.Hash(), finalized)
 
 		// verify that `FinalizedReader` returns storage.NotFound when the height is not finalized
 		_, err = reader.FinalizedBlockIDAtHeight(block.Height + 1)
@@ -60,18 +60,18 @@ func TestFinalizedReader(t *testing.T) {
 		})
 		unittest.WithLock(t, lockManager, storage.LockFinalizeBlock, func(lctx lockctx.Context) error {
 			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-				return operation.IndexFinalizedBlockByHeight(lctx, rw, block2.Height, block2.ID())
+				return operation.IndexFinalizedBlockByHeight(lctx, rw, block2.Height, block2.Hash())
 			})
 		})
 
 		// We declare `block2` as via the `FinalizedReader`
 		reader.BlockFinalized(block2.ToHeader())
-		require.Equal(t, block.ID(), finalized)
+		require.Equal(t, block.Hash(), finalized)
 
 		// should be able to retrieve the block
 		finalized, err = reader.FinalizedBlockIDAtHeight(block2.Height)
 		require.NoError(t, err)
-		require.Equal(t, block2.ID(), finalized)
+		require.Equal(t, block2.Hash(), finalized)
 
 		// should noop and no panic
 		reader.BlockProcessable(block.ToHeader(), block2.ParentQC())

@@ -56,7 +56,7 @@ func NewProtocolStateIDCache(
 		return nil, fmt.Errorf("failed to get latest state header: %w", err)
 	}
 
-	provider.update(head.ID())
+	provider.update(head.Hash())
 	eventDistributor.AddConsumer(provider)
 
 	return provider, nil
@@ -70,7 +70,7 @@ func NewProtocolStateIDCache(
 // and virtually latency free. However, we run data base queries and acquire locks here,
 // which is undesired.
 func (p *ProtocolStateIDCache) EpochTransition(newEpochCounter uint64, header *flow.Header) {
-	p.update(header.ID())
+	p.update(header.Hash())
 }
 
 // EpochSetupPhaseStarted is a callback function for notifying the `ProtocolStateIDCache`
@@ -81,7 +81,7 @@ func (p *ProtocolStateIDCache) EpochTransition(newEpochCounter uint64, header *f
 // and virtually latency free. However, we run data base queries and acquire locks here,
 // which is undesired.
 func (p *ProtocolStateIDCache) EpochSetupPhaseStarted(currentEpochCounter uint64, header *flow.Header) {
-	p.update(header.ID())
+	p.update(header.Hash())
 }
 
 // EpochCommittedPhaseStarted is a callback function for notifying the `ProtocolStateIDCache`
@@ -92,7 +92,7 @@ func (p *ProtocolStateIDCache) EpochSetupPhaseStarted(currentEpochCounter uint64
 // and virtually latency free. However, we run data base queries and acquire locks here,
 // which is undesired.
 func (p *ProtocolStateIDCache) EpochCommittedPhaseStarted(currentEpochCounter uint64, header *flow.Header) {
-	p.update(header.ID())
+	p.update(header.Hash())
 }
 
 // update updates the cached identities stored in this provider.

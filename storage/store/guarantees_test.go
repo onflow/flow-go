@@ -38,7 +38,7 @@ func TestGuaranteeStoreRetrieve(t *testing.T) {
 		proposal := unittest.ProposalFromBlock(block)
 
 		// attempt to retrieve (still) unknown guarantee
-		_, err := s.ByCollectionID(guarantee1.ID())
+		_, err := s.ByCollectionID(guarantee1.Hash())
 		require.ErrorIs(t, err, storage.ErrNotFound)
 
 		// store guarantee
@@ -117,7 +117,7 @@ func TestStoreDuplicateGuarantee(t *testing.T) {
 		}))
 		lctx2.Release()
 
-		actual, err := store1.ByID(expected.ID())
+		actual, err := store1.ByID(expected.Hash())
 		require.NoError(t, err)
 		require.Equal(t, expected, actual)
 		actual, err = store1.ByCollectionID(expected.CollectionID)
@@ -158,7 +158,7 @@ func TestStoreConflictingGuarantee(t *testing.T) {
 			return nil
 		})
 
-		actual, err := store1.ByID(expected.ID())
+		actual, err := store1.ByID(expected.Hash())
 		require.NoError(t, err)
 		require.Equal(t, expected, actual)
 		actual, err = store1.ByCollectionID(expected.CollectionID)

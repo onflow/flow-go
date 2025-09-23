@@ -23,7 +23,7 @@ func TestResultStoreAndRetrieve(t *testing.T) {
 		err := store1.Store(result)
 		require.NoError(t, err)
 
-		err = store1.Index(blockID, result.ID())
+		err = store1.Index(blockID, result.Hash())
 		require.NoError(t, err)
 
 		actual, err := store1.ByBlockID(blockID)
@@ -43,13 +43,13 @@ func TestResultStoreTwice(t *testing.T) {
 		err := store1.Store(result)
 		require.NoError(t, err)
 
-		err = store1.Index(blockID, result.ID())
+		err = store1.Index(blockID, result.Hash())
 		require.NoError(t, err)
 
 		err = store1.Store(result)
 		require.NoError(t, err)
 
-		err = store1.Index(blockID, result.ID())
+		err = store1.Index(blockID, result.Hash())
 		require.NoError(t, err)
 	})
 }
@@ -66,7 +66,7 @@ func TestResultBatchStoreTwice(t *testing.T) {
 			err := store1.BatchStore(result, batch)
 			require.NoError(t, err)
 
-			err = store1.BatchIndex(blockID, result.ID(), batch)
+			err = store1.BatchIndex(blockID, result.Hash(), batch)
 			require.NoError(t, err)
 			return nil
 		}))
@@ -75,7 +75,7 @@ func TestResultBatchStoreTwice(t *testing.T) {
 			err := store1.BatchStore(result, batch)
 			require.NoError(t, err)
 
-			err = store1.BatchIndex(blockID, result.ID(), batch)
+			err = store1.BatchIndex(blockID, result.Hash(), batch)
 			require.NoError(t, err)
 
 			return nil
@@ -94,7 +94,7 @@ func TestResultStoreTwoDifferentResultsShouldFail(t *testing.T) {
 		err := store1.Store(result1)
 		require.NoError(t, err)
 
-		err = store1.Index(blockID, result1.ID())
+		err = store1.Index(blockID, result1.Hash())
 		require.NoError(t, err)
 
 		// we can store1 a different result, but we can't index
@@ -103,7 +103,7 @@ func TestResultStoreTwoDifferentResultsShouldFail(t *testing.T) {
 		err = store1.Store(result2)
 		require.NoError(t, err)
 
-		err = store1.Index(blockID, result2.ID())
+		err = store1.Index(blockID, result2.Hash())
 		require.Error(t, err)
 		require.True(t, errors.Is(err, storage.ErrDataMismatch))
 	})
@@ -119,14 +119,14 @@ func TestResultStoreForceIndexOverridesMapping(t *testing.T) {
 		blockID := unittest.IdentifierFixture()
 		err := store1.Store(result1)
 		require.NoError(t, err)
-		err = store1.Index(blockID, result1.ID())
+		err = store1.Index(blockID, result1.Hash())
 		require.NoError(t, err)
 
 		err = store1.Store(result2)
 		require.NoError(t, err)
 
 		// force index
-		err = store1.ForceIndex(blockID, result2.ID())
+		err = store1.ForceIndex(blockID, result2.Hash())
 		require.NoError(t, err)
 
 		// retrieve index to make sure it points to second ER now

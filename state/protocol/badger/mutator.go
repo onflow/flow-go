@@ -167,7 +167,7 @@ func (m *FollowerState) ExtendCertified(ctx context.Context, certified *flow.Cer
 	defer span.End()
 
 	// check if candidate block has been already processed
-	blockID := candidate.ID()
+	blockID := candidate.Hash()
 	isDuplicate, err := m.checkBlockAlreadyProcessed(blockID)
 	if err != nil || isDuplicate {
 		return err
@@ -187,7 +187,7 @@ func (m *FollowerState) ExtendCertified(ctx context.Context, certified *flow.Cer
 	if err != nil {
 		// since we have a QC for this block, it cannot be an invalid extension
 		return fmt.Errorf("unexpected invalid block (id=%x) with certifying qc (id=%x): %s",
-			candidate.ID(), certifyingQC.ID(), err.Error())
+			candidate.Hash(), certifyingQC.Hash(), err.Error())
 	}
 
 	// find the last seal at the parent block
@@ -196,7 +196,7 @@ func (m *FollowerState) ExtendCertified(ctx context.Context, certified *flow.Cer
 		return fmt.Errorf("failed to determine the lastest sealed block in fork: %w", err)
 	}
 	deferredBlockPersist.AddNextOperation(func(lctx lockctx.Proof, blockID flow.Identifier, rw storage.ReaderBatchWriter) error {
-		return operation.IndexLatestSealAtBlock(lctx, rw.Writer(), blockID, latestSeal.ID())
+		return operation.IndexLatestSealAtBlock(lctx, rw.Writer(), blockID, latestSeal.Hash())
 	})
 
 	// TODO: we might not need the deferred db updates, because the candidate passed into
@@ -263,7 +263,7 @@ func (m *ParticipantState) Extend(ctx context.Context, candidateProposal *flow.P
 	candidate := &candidateProposal.Block
 
 	// check if candidate block has been already processed
-	blockID := candidate.ID()
+	blockID := candidate.Hash()
 	isDuplicate, err := m.checkBlockAlreadyProcessed(blockID)
 	if err != nil || isDuplicate {
 		return err
@@ -366,7 +366,7 @@ func (m *ParticipantState) Extend(ctx context.Context, candidateProposal *flow.P
 func (m *FollowerState) headerExtend(ctx context.Context, candidate *flow.Proposal, certifyingQC *flow.QuorumCertificate, deferredBlockPersist *deferred.DeferredBlockPersist) error {
 	span, _ := m.tracer.StartSpanFromContext(ctx, trace.ProtoStateMutatorExtendCheckHeader)
 	defer span.End()
-	blockID := candidate.Block.ID()
+	blockID := candidate.Block.Hash()
 	headerBody := candidate.Block.HeaderBody
 
 	// STEP 1: check whether the candidate (i) connects to the known block tree and
@@ -598,9 +598,9 @@ func (m *ParticipantState) guaranteeExtend(ctx context.Context, candidate *flow.
 	for _, guarantee := range payload.Guarantees {
 
 		// if the guarantee was already included before, error
-		_, duplicated := lookup[guarantee.ID()]
+		_, duplicated := lookup[guarantee.Hash()]
 		if duplicated {
-			return state.NewInvalidExtensionErrorf("payload includes duplicate guarantee (%x)", guarantee.ID())
+			return state.NewInvalidExtensionErrorf("payload includes duplicate guarantee (%x)", guarantee.Hash())
 		}
 
 		// get the reference block to check expiry
@@ -624,9 +624,9 @@ func (m *ParticipantState) guaranteeExtend(ctx context.Context, candidate *flow.
 			if signature.IsInvalidSignerIndicesError(err) ||
 				errors.Is(err, protocol.ErrNextEpochNotCommitted) ||
 				errors.Is(err, protocol.ErrClusterNotFound) {
-				return state.NewInvalidExtensionErrorf("guarantee %v contains invalid guarantors: %w", guarantee.ID(), err)
+				return state.NewInvalidExtensionErrorf("guarantee %v contains invalid guarantors: %w", guarantee.Hash(), err)
 			}
-			return fmt.Errorf("could not find guarantor for guarantee %v: %w", guarantee.ID(), err)
+			return fmt.Errorf("could not find guarantor for guarantee %v: %w", guarantee.Hash(), err)
 		}
 	}
 
@@ -647,7 +647,7 @@ func (m *ParticipantState) sealExtend(ctx context.Context, candidate *flow.Block
 	}
 
 	deferredBlockPersist.AddNextOperation(func(lctx lockctx.Proof, blockID flow.Identifier, rw storage.ReaderBatchWriter) error {
-		return operation.IndexLatestSealAtBlock(lctx, rw.Writer(), blockID, lastSeal.ID())
+		return operation.IndexLatestSealAtBlock(lctx, rw.Writer(), blockID, lastSeal.Hash())
 	})
 
 	return lastSeal, nil
@@ -675,7 +675,7 @@ func (m *ParticipantState) receiptExtend(ctx context.Context, candidate *flow.Bl
 		if module.IsUnknownBlockError(err) {
 			// By convention, the protocol state must be extended in a parent-first order. This block's parent
 			// being unknown breaks with this API contract and results in an exception.
-			return irrecoverable.NewExceptionf("internal state corruption detected when validating receipts in candidate block %v: %w", candidate.ID(), err)
+			return irrecoverable.NewExceptionf("internal state corruption detected when validating receipts in candidate block %v: %w", candidate.Hash(), err)
 		}
 		return fmt.Errorf("unexpected payload validation error %w", err)
 	}
@@ -859,7 +859,7 @@ func (m *FollowerState) Finalize(ctx context.Context, blockID flow.Identifier) e
 		// guarantees that only a single, continuous execution fork is sealed. Here, we index for
 		// each block ID the ID of its _finalized_ seal.
 		for _, seal := range block.Payload.Seals {
-			err = operation.IndexFinalizedSealByBlockID(rw.Writer(), seal.BlockID, seal.ID())
+			err = operation.IndexFinalizedSealByBlockID(rw.Writer(), seal.BlockID, seal.Hash())
 			if err != nil {
 				return fmt.Errorf("could not index the seal by the sealed block ID: %w", err)
 			}
@@ -1050,7 +1050,7 @@ func (m *FollowerState) versionBeaconOnBlockFinalized(
 			return nil, fmt.Errorf(
 				"could not retrieve result (id=%x) for seal (id=%x): %w",
 				seal.ResultID,
-				seal.ID(),
+				seal.Hash(),
 				err)
 		}
 		for _, event := range result.ServiceEvents {
@@ -1067,7 +1067,7 @@ func (m *FollowerState) versionBeaconOnBlockFinalized(
 			if err != nil {
 				m.logger.Warn().
 					Err(err).
-					Str("block_id", finalized.ID().String()).
+					Str("block_id", finalized.Hash().String()).
 					Interface("event", ev).
 					Msg("invalid VersionBeacon service event")
 				continue

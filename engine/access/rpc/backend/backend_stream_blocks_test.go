@@ -110,7 +110,7 @@ func (s *BackendBlocksSuite) SetupTest() {
 	s.headers.On("ByBlockID", mock.AnythingOfType("flow.Identifier")).Return(
 		func(blockID flow.Identifier) (*flow.Header, error) {
 			for _, block := range s.blockMap {
-				if block.ID() == blockID {
+				if block.Hash() == blockID {
 					return block.ToHeader(), nil
 				}
 			}
@@ -180,22 +180,22 @@ func (s *BackendBlocksSuite) subscribeFromStartBlockIdTestCases() []testType {
 		{
 			name:            "happy path - all new blocks",
 			highestBackfill: -1, // no backfill
-			startValue:      s.rootBlock.ID(),
+			startValue:      s.rootBlock.Hash(),
 		},
 		{
 			name:            "happy path - partial backfill",
 			highestBackfill: 2, // backfill the first 3 blocks
-			startValue:      s.blocksArray[0].ID(),
+			startValue:      s.blocksArray[0].Hash(),
 		},
 		{
 			name:            "happy path - complete backfill",
 			highestBackfill: len(s.blocksArray) - 1, // backfill all blocks
-			startValue:      s.blocksArray[0].ID(),
+			startValue:      s.blocksArray[0].Hash(),
 		},
 		{
 			name:            "happy path - start from root block by id",
 			highestBackfill: len(s.blocksArray) - 1, // backfill all blocks
-			startValue:      s.rootBlock.ID(),       // start from root block
+			startValue:      s.rootBlock.Hash(),     // start from root block
 		},
 	}
 
@@ -397,7 +397,7 @@ func (s *BackendBlocksSuite) subscribe(
 
 			// loop over all blocks
 			for i, b := range s.blocksArray {
-				s.T().Logf("checking block %d %v %d", i, b.ID(), b.Height)
+				s.T().Logf("checking block %d %v %d", i, b.Hash(), b.Height)
 
 				// simulate new block received.
 				// all blocks with index <= highestBackfill were already received
@@ -410,10 +410,10 @@ func (s *BackendBlocksSuite) subscribe(
 				// consume block from subscription
 				unittest.RequireReturnsBefore(s.T(), func() {
 					v, ok := <-sub.Channel()
-					require.True(s.T(), ok, "channel closed while waiting for exec data for block %x %v: err: %v", b.Height, b.ID(), sub.Err())
+					require.True(s.T(), ok, "channel closed while waiting for exec data for block %x %v: err: %v", b.Height, b.Hash(), sub.Err())
 
 					requireFn(v, b)
-				}, time.Second, fmt.Sprintf("timed out waiting for block %d %v", b.Height, b.ID()))
+				}, time.Second, fmt.Sprintf("timed out waiting for block %d %v", b.Height, b.Hash()))
 			}
 
 			// make sure there are no new messages waiting. the channel should be opened with nothing waiting
@@ -441,7 +441,7 @@ func (s *BackendBlocksSuite) requireBlocks(v interface{}, expectedBlock *flow.Bl
 	require.True(s.T(), ok, "unexpected response type: %T", v)
 
 	s.Require().Equal(expectedBlock.Height, actualBlock.Height)
-	s.Require().Equal(expectedBlock.ID(), actualBlock.ID())
+	s.Require().Equal(expectedBlock.Hash(), actualBlock.Hash())
 	s.Require().Equal(*expectedBlock, *actualBlock)
 }
 

@@ -326,14 +326,14 @@ func (e *ComplianceEngine) processQueuedBlocks(doneSignal <-chan struct{}) error
 		// extract sequences of connected blocks and schedule them for further processing
 		// we assume the sender has already ordered blocks into connected ranges if possible
 		latestFinalizedView := e.finalizedBlockTracker.NewestBlock().View
-		parentID := proposals[0].Block.ID()
+		parentID := proposals[0].Block.Hash()
 		indexOfLastConnected := 0
 		for i, block := range proposals {
 			if block.Block.ParentID != parentID {
 				e.submitConnectedBatch(log, latestFinalizedView, batch.OriginID, proposals[indexOfLastConnected:i])
 				indexOfLastConnected = i
 			}
-			parentID = block.Block.ID()
+			parentID = block.Block.Hash()
 		}
 		e.submitConnectedBatch(log, latestFinalizedView, batch.OriginID, proposals[indexOfLastConnected:])
 		e.engMetrics.MessageHandled(metrics.EngineFollower, metrics.MessageSyncedBlocks)

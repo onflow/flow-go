@@ -33,7 +33,7 @@ func TestCanIterate(t *testing.T) {
 	getBlockIDByHeight := func(height uint64) (flow.Identifier, error) {
 		for _, block := range blocks {
 			if block.Height == height {
-				return block.ID(), nil
+				return block.Hash(), nil
 			}
 		}
 		return flow.Identifier{}, fmt.Errorf("block not found at height %d", height)
@@ -74,7 +74,7 @@ func TestCanIterate(t *testing.T) {
 
 	// Verify all blocks were visited exactly once
 	for i, block := range blocks {
-		require.Equal(t, block.ID(), visitedBlocks[i], "Block %v was not visited", block.Height)
+		require.Equal(t, block.Hash(), visitedBlocks[i], "Block %v was not visited", block.Height)
 	}
 
 	// Verify no extra blocks were visited
@@ -120,7 +120,7 @@ func TestCanIterate(t *testing.T) {
 
 	// Verify all additional blocks were visited exactly once
 	for i, block := range additionalBlocks {
-		require.Equal(t, block.ID(), visitedBlocks[i], "Block %v was not visited", block.Height)
+		require.Equal(t, block.Hash(), visitedBlocks[i], "Block %v was not visited", block.Height)
 	}
 
 	// Verify no extra blocks were visited
@@ -151,7 +151,7 @@ func TestCanResume(t *testing.T) {
 	getBlockIDByHeight := func(height uint64) (flow.Identifier, error) {
 		for _, block := range blocks {
 			if block.Height == height {
-				return block.ID(), nil
+				return block.Hash(), nil
 			}
 		}
 		return flow.Identifier{}, fmt.Errorf("block not found at height %d", height)
@@ -230,7 +230,7 @@ func TestCanResume(t *testing.T) {
 
 	// verify all blocks are visited
 	for i, block := range blocks {
-		require.Equal(t, block.ID(), visitedBlocks[i], "Block %v was not visited", block.Height)
+		require.Equal(t, block.Hash(), visitedBlocks[i], "Block %v was not visited", block.Height)
 	}
 
 	// Verify no extra blocks were visited
@@ -251,7 +251,7 @@ func TestCanSkipViewsIfNotIndexed(t *testing.T) {
 	getBlockIDByView := func(view uint64) (blockID flow.Identifier, viewIndexed bool, exception error) {
 		for _, block := range blocks {
 			if block.View == view {
-				return block.ID(), true, nil
+				return block.Hash(), true, nil
 			}
 		}
 
@@ -293,9 +293,9 @@ func TestCanSkipViewsIfNotIndexed(t *testing.T) {
 
 	// Verify all blocks were visited exactly once
 	for _, block := range blocks {
-		_, ok := visitedBlocks[block.ID()]
+		_, ok := visitedBlocks[block.Hash()]
 		require.True(t, ok, "Block %v was not visited", block.View)
-		delete(visitedBlocks, block.ID())
+		delete(visitedBlocks, block.Hash())
 	}
 
 	// Verify no extra blocks were visited

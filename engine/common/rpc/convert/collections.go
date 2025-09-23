@@ -16,11 +16,11 @@ func CollectionToMessage(c *flow.Collection) (*entities.Collection, error) {
 
 	transactionsIDs := make([][]byte, len(c.Transactions))
 	for i, t := range c.Transactions {
-		id := t.ID()
+		id := t.Hash()
 		transactionsIDs[i] = id[:]
 	}
 
-	collectionID := c.ID()
+	collectionID := c.Hash()
 
 	ce := &entities.Collection{
 		Id:             collectionID[:],
@@ -36,7 +36,7 @@ func LightCollectionToMessage(c *flow.LightCollection) (*entities.Collection, er
 		return nil, fmt.Errorf("invalid collection")
 	}
 
-	collectionID := c.ID()
+	collectionID := c.Hash()
 
 	return &entities.Collection{
 		Id:             collectionID[:],

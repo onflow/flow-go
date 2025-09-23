@@ -90,7 +90,7 @@ func (tst *TestnetStateTracker) Track(t *testing.T, ctx context.Context, ghost *
 					sender,
 					block.Height,
 					block.View,
-					block.ID())
+					block.Hash())
 			case *flow.ResultApproval:
 				tst.ApprovalState.Add(sender, m)
 				t.Logf("%v result approval received from %s for execution result ID %x and chunk index %v\n",
@@ -109,7 +109,7 @@ func (tst *TestnetStateTracker) Track(t *testing.T, ctx context.Context, ghost *
 					m.ExecutionResult.BlockID,
 					m.ExecutorID,
 					finalState,
-					m.ExecutionResult.ID(),
+					m.ExecutionResult.Hash(),
 					len(m.ExecutionResult.Chunks))
 			case *flow.ChunkDataResponse:
 				// consuming this explicitly to avoid logging full msg which is usually very large because of proof

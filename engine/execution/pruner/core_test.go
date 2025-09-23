@@ -45,7 +45,7 @@ func TestLoopPruneExecutionDataFromRootToLatestSealed(t *testing.T) {
 		lastFinalizedHeight := lastSealedHeight + 2 // 2 finalized but unsealed
 		// indexed by height
 		chunks := make([]*verification.VerifiableChunkData, lastFinalizedHeight+2)
-		parentID := genesis.ID()
+		parentID := genesis.Hash()
 		lctxGenesis := lockManager.NewContext()
 		require.NoError(t, lctxGenesis.AcquireLock(storage.LockInsertBlock))
 		require.NoError(t, db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
@@ -69,38 +69,38 @@ func TestLoopPruneExecutionDataFromRootToLatestSealed(t *testing.T) {
 			lctxFinality := lockManager.NewContext()
 			require.NoError(t, lctxFinality.AcquireLock(storage.LockFinalizeBlock))
 			require.NoError(t, db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-				return operation.IndexFinalizedBlockByHeight(lctxFinality, rw, chunk.Header.Height, chunk.Header.ID())
+				return operation.IndexFinalizedBlockByHeight(lctxFinality, rw, chunk.Header.Height, chunk.Header.Hash())
 			}))
 			lctxFinality.Release()
 			require.NoError(t, results.Store(chunk.Result))
-			require.NoError(t, results.Index(chunk.Result.BlockID, chunk.Result.ID()))
+			require.NoError(t, results.Index(chunk.Result.BlockID, chunk.Result.Hash()))
 			require.NoError(t, chunkDataPacks.Store([]*flow.ChunkDataPack{chunk.ChunkDataPack}))
 			_, storeErr := collections.Store(chunk.ChunkDataPack.Collection)
 			require.NoError(t, storeErr)
 			// verify that chunk data pack fixture can be found by the result
 			for _, c := range chunk.Result.Chunks {
-				chunkID := c.ID()
+				chunkID := c.Hash()
 				require.Equal(t, chunk.ChunkDataPack.ChunkID, chunkID)
 				_, err := chunkDataPacks.ByChunkID(chunkID)
 				require.NoError(t, err)
 			}
 			// verify the result can be found by block
-			_, err := results.ByBlockID(chunk.Header.ID())
+			_, err := results.ByBlockID(chunk.Header.Hash())
 			require.NoError(t, err)
 
 			// Finalize block
 			require.NoError(t, ps.Extend(block))
-			require.NoError(t, ps.Finalize(block.ID()))
-			parentID = block.ID()
+			require.NoError(t, ps.Finalize(block.Hash()))
+			parentID = block.Hash()
 		}
 
 		// update the index "latest executed block (max height)" to latest sealed block
 		require.NoError(t, db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			return operation.UpdateExecutedBlock(rw.Writer(), chunks[lastFinalizedHeight].Header.ID())
+			return operation.UpdateExecutedBlock(rw.Writer(), chunks[lastFinalizedHeight].Header.Hash())
 		}))
 
 		lastSealed := chunks[lastSealedHeight].Header
-		require.NoError(t, ps.MakeSeal(lastSealed.ID()))
+		require.NoError(t, ps.MakeSeal(lastSealed.Hash()))
 
 		// create config
 		cfg := PruningConfig{

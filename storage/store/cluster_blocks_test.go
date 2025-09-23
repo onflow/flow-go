@@ -24,7 +24,7 @@ func TestClusterBlocks(t *testing.T) {
 		lctx := lockManager.NewContext()
 		require.NoError(t, lctx.AcquireLock(storage.LockInsertOrFinalizeClusterBlock))
 		err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			return operation.IndexClusterBlockHeight(lctx, rw.Writer(), parent.ChainID, parent.Height, parent.ID())
+			return operation.IndexClusterBlockHeight(lctx, rw.Writer(), parent.ChainID, parent.Height, parent.Hash())
 		})
 		require.NoError(t, err)
 
@@ -49,7 +49,7 @@ func TestClusterBlocks(t *testing.T) {
 			lctx2 = lockManager.NewContext()
 			require.NoError(t, lctx2.AcquireLock(storage.LockInsertOrFinalizeClusterBlock))
 			err = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-				return procedure.FinalizeClusterBlock(lctx2, rw, block.ID())
+				return procedure.FinalizeClusterBlock(lctx2, rw, block.Hash())
 			})
 			require.NoError(t, err)
 			lctx2.Release()
@@ -67,16 +67,16 @@ func TestClusterBlocks(t *testing.T) {
 			for _, block := range blocks {
 				retrievedBlock, err := clusterBlocks.ProposalByHeight(block.Height)
 				require.NoError(t, err)
-				require.Equal(t, block.ID(), retrievedBlock.Block.ID())
+				require.Equal(t, block.Hash(), retrievedBlock.Block.Hash())
 			}
 		})
 
 		t.Run("ByID", func(t *testing.T) {
 			// check if the block can be retrieved by ID
 			for _, block := range blocks {
-				retrievedBlock, err := clusterBlocks.ProposalByID(block.ID())
+				retrievedBlock, err := clusterBlocks.ProposalByID(block.Hash())
 				require.NoError(t, err)
-				require.Equal(t, block.ID(), retrievedBlock.Block.ID())
+				require.Equal(t, block.Hash(), retrievedBlock.Block.Hash())
 			}
 		})
 	})

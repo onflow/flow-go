@@ -25,7 +25,7 @@ func TestPayloadStoreRetrieve(t *testing.T) {
 		block := unittest.BlockWithParentAndPayload(unittest.BlockHeaderWithHeight(10), expected)
 		proposal := unittest.ProposalFromBlock(block)
 		require.Equal(t, expected, block.Payload)
-		blockID := block.ID()
+		blockID := block.Hash()
 
 		lctx := lockManager.NewContext()
 		err := lctx.AcquireLock(storage.LockInsertBlock)

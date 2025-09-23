@@ -69,13 +69,13 @@ func TestRoleList_ID(t *testing.T) {
 	// regardless of order of its elements
 	this := flow.RoleList{flow.RoleConsensus, flow.RoleVerification}
 	shuffled := flow.RoleList{flow.RoleVerification, flow.RoleConsensus}
-	thisID := this.ID()
-	shuffledID := shuffled.ID()
+	thisID := this.Hash()
+	shuffledID := shuffled.Hash()
 	assert.Equal(t, thisID, shuffledID)
 
 	// lists with distinct elements should have distinct identifiers
 	other := flow.RoleList{flow.RoleExecution, flow.RoleVerification}
-	otherID := other.ID()
+	otherID := other.Hash()
 	assert.NotEqual(t, thisID, otherID)
 }
 

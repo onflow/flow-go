@@ -95,8 +95,8 @@ func (cs *CommonSuite) SetupTest() {
 	cs.childrenDB = make(map[flow.Identifier][]flow.Slashable[*flow.Proposal])
 
 	// store the head header and payload
-	cs.headerDB[block.ID()] = block.ToHeader()
-	cs.payloadDB[block.ID()] = &block.Payload
+	cs.headerDB[block.Hash()] = block.ToHeader()
+	cs.payloadDB[block.Hash()] = &block.Payload
 
 	// set up local module mock
 	cs.me = &module.Local{}
@@ -110,7 +110,7 @@ func (cs *CommonSuite) SetupTest() {
 	cs.headers = &storage.Headers{}
 	cs.headers.On("Store", mock.Anything).Return(
 		func(header *flow.Header) error {
-			cs.headerDB[header.ID()] = header
+			cs.headerDB[header.Hash()] = header
 			return nil
 		},
 	)
@@ -138,7 +138,7 @@ func (cs *CommonSuite) SetupTest() {
 	cs.payloads = &storage.Payloads{}
 	cs.payloads.On("Store", mock.Anything, mock.Anything).Return(
 		func(header *flow.Header, payload *flow.Payload) error {
-			cs.payloadDB[header.ID()] = payload
+			cs.payloadDB[header.Hash()] = payload
 			return nil
 		},
 	)
@@ -311,8 +311,8 @@ func (cs *CoreSuite) TestOnBlockProposalValidAncestor() {
 	proposal := unittest.ProposalFromBlock(block)
 
 	// store the data for retrieval
-	cs.headerDB[parent.ID()] = parent.ToHeader()
-	cs.headerDB[ancestor.ID()] = ancestor.ToHeader()
+	cs.headerDB[parent.Hash()] = parent.ToHeader()
+	cs.headerDB[ancestor.Hash()] = ancestor.ToHeader()
 
 	hotstuffProposal := model.SignedProposalFromBlock(proposal)
 	cs.validator.On("ValidateProposal", hotstuffProposal).Return(nil)
@@ -369,8 +369,8 @@ func (cs *CoreSuite) TestOnBlockProposal_FailsHotStuffValidation() {
 	hotstuffProposal := model.SignedProposalFromBlock(proposal)
 
 	// store the data for retrieval
-	cs.headerDB[parent.ID()] = parent.ToHeader()
-	cs.headerDB[ancestor.ID()] = ancestor.ToHeader()
+	cs.headerDB[parent.Hash()] = parent.ToHeader()
+	cs.headerDB[ancestor.Hash()] = ancestor.ToHeader()
 
 	cs.Run("invalid block error", func() {
 		// the block fails HotStuff validation
@@ -451,8 +451,8 @@ func (cs *CoreSuite) TestOnBlockProposal_FailsProtocolStateValidation() {
 	hotstuffProposal := model.SignedProposalFromBlock(proposal)
 
 	// store the data for retrieval
-	cs.headerDB[parent.ID()] = parent.ToHeader()
-	cs.headerDB[ancestor.ID()] = ancestor.ToHeader()
+	cs.headerDB[parent.Hash()] = parent.ToHeader()
+	cs.headerDB[ancestor.Hash()] = ancestor.ToHeader()
 
 	// the block passes HotStuff validation
 	cs.validator.On("ValidateProposal", hotstuffProposal).Return(nil)
@@ -550,7 +550,7 @@ func (cs *CoreSuite) TestProcessBlockAndDescendants() {
 	pending3 := unittest.AsSlashable(proposal3)
 
 	// store the parent on disk
-	parentID := parent.ID()
+	parentID := parent.Hash()
 	cs.headerDB[parentID] = parent.ToHeader()
 
 	// store the pending children in the cache
@@ -573,7 +573,7 @@ func (cs *CoreSuite) TestProcessBlockAndDescendants() {
 	require.NoError(cs.T(), err, "should pass handling children")
 
 	// make sure we drop the cache after trying to process
-	cs.pending.AssertCalled(cs.T(), "DropForParent", parent.ID())
+	cs.pending.AssertCalled(cs.T(), "DropForParent", parent.Hash())
 }
 
 func (cs *CoreSuite) TestProposalBufferingOrder() {
@@ -597,7 +597,7 @@ func (cs *CoreSuite) TestProposalBufferingOrder() {
 	cs.core.pending = real.NewPendingBlocks()
 
 	// check that we request the ancestor block each time
-	cs.sync.On("RequestBlock", missingBlock.ID(), missingBlock.Height).Times(len(proposals))
+	cs.sync.On("RequestBlock", missingBlock.Hash(), missingBlock.Height).Times(len(proposals))
 
 	// process all the descendants
 	for _, proposal := range proposals {
@@ -619,10 +619,10 @@ func (cs *CoreSuite) TestProposalBufferingOrder() {
 
 	calls := 0                                   // track # of calls to SubmitProposal
 	unprocessed := map[flow.Identifier]struct{}{ // track un-processed proposals
-		missingProposal.Block.ID(): {},
-		proposals[0].Block.ID():    {},
-		proposals[1].Block.ID():    {},
-		proposals[2].Block.ID():    {},
+		missingProposal.Block.Hash(): {},
+		proposals[0].Block.Hash():    {},
+		proposals[1].Block.Hash():    {},
+		proposals[2].Block.Hash():    {},
 	}
 	cs.hotstuff.On("SubmitProposal", mock.Anything).Times(4).Run(
 		func(args mock.Arguments) {
@@ -630,7 +630,7 @@ func (cs *CoreSuite) TestProposalBufferingOrder() {
 			header := proposal.Block
 			if calls == 0 {
 				// first header processed must be the common parent
-				assert.Equal(cs.T(), missingProposal.Block.ID(), header.BlockID)
+				assert.Equal(cs.T(), missingProposal.Block.Hash(), header.BlockID)
 			}
 			// mark the proposal as processed
 			delete(unprocessed, header.BlockID)

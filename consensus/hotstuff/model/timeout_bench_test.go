@@ -28,8 +28,8 @@ func comparingUsingFieldsAndHashes(a, b *model.TimeoutObject) bool {
 	}
 	// both are not nil, so we can compare the fields
 	return a.View == b.View &&
-		a.NewestQC.ID() == b.NewestQC.ID() &&
-		a.LastViewTC.ID() == b.LastViewTC.ID() &&
+		a.NewestQC.Hash() == b.NewestQC.Hash() &&
+		a.LastViewTC.Hash() == b.LastViewTC.Hash() &&
 		a.SignerID == b.SignerID &&
 		bytes.Equal(a.SigData, b.SigData)
 }

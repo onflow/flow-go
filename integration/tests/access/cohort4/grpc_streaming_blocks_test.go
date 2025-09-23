@@ -150,7 +150,7 @@ func (s *GrpcBlocksStreamSuite) TestHappyPath() {
 	for _, rpc := range s.testedRPCs() {
 		s.T().Run(rpc.name, func(t *testing.T) {
 			if rpc.name == "SubscribeBlocksFromStartBlockID" {
-				startValue = convert.IdentifierToMessage(blockA.ID())
+				startValue = convert.IdentifierToMessage(blockA.Hash())
 			} else {
 				startValue = blockA.Height
 			}
@@ -235,7 +235,7 @@ func compareBlocksResponse(t *testing.T, responses map[uint64]map[string]*flow.B
 }
 
 func compareBlocks(t *testing.T, accessBlock *flow.Block, observerBlock *flow.Block) {
-	require.Equal(t, accessBlock.ID(), observerBlock.ID())
+	require.Equal(t, accessBlock.Hash(), observerBlock.Hash())
 	require.Equal(t, accessBlock.Height, observerBlock.Height)
 	require.Equal(t, accessBlock.Timestamp, observerBlock.Timestamp)
 	require.Equal(t, accessBlock.Payload.Hash(), observerBlock.Payload.Hash())

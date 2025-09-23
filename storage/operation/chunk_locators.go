@@ -7,7 +7,7 @@ import (
 )
 
 func InsertChunkLocator(w storage.Writer, locator *chunks.Locator) error {
-	return UpsertByKey(w, MakePrefix(codeChunk, locator.ID()), locator)
+	return UpsertByKey(w, MakePrefix(codeChunk, locator.Hash()), locator)
 }
 
 func RetrieveChunkLocator(r storage.Reader, locatorID flow.Identifier, locator *chunks.Locator) error {

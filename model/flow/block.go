@@ -36,9 +36,9 @@ type GenericBlock[T HashablePayload] struct {
 	Payload T
 }
 
-// ID returns a collision-resistant hash of the Block struct.
-func (b *GenericBlock[T]) ID() Identifier {
-	return b.ToHeader().ID()
+// Hash returns a collision-resistant hash of the Block struct.
+func (b *GenericBlock[T]) Hash() Identifier {
+	return b.ToHeader().Hash()
 }
 
 // ToHeader converts the block into a compact [flow.Header] representation,
@@ -76,7 +76,7 @@ func (b *GenericBlock[T]) MarshalJSON() ([]byte, error) {
 		ID Identifier
 	}{
 		GenericBlock: *b,
-		ID:           b.ID(),
+		ID:           b.Hash(),
 	})
 }
 
@@ -267,8 +267,8 @@ func NewCertifiedBlock(proposal *Proposal, qc *QuorumCertificate) (CertifiedBloc
 	if proposal.Block.View != qc.View {
 		return CertifiedBlock{}, fmt.Errorf("block's view (%d) should equal the qc's view (%d)", proposal.Block.View, qc.View)
 	}
-	if proposal.Block.ID() != qc.BlockID {
-		return CertifiedBlock{}, fmt.Errorf("block's ID (%v) should equal the block referenced by the qc (%d)", proposal.Block.ID(), qc.BlockID)
+	if proposal.Block.Hash() != qc.BlockID {
+		return CertifiedBlock{}, fmt.Errorf("block's ID (%v) should equal the block referenced by the qc (%d)", proposal.Block.Hash(), qc.BlockID)
 	}
 	return CertifiedBlock{Proposal: proposal, CertifyingQC: qc}, nil
 }

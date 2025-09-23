@@ -21,7 +21,7 @@ import (
 //
 // No errors are expected during normal operation.
 func UpsertCollection(w storage.Writer, collection *flow.LightCollection) error {
-	return UpsertByKey(w, MakePrefix(codeCollection, collection.ID()), collection)
+	return UpsertByKey(w, MakePrefix(codeCollection, collection.Hash()), collection)
 }
 
 // RetrieveCollection retrieves a [flow.LightCollection] by its ID.

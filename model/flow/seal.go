@@ -79,6 +79,7 @@ func NewSeal(untrusted UntrustedSeal) (*Seal, error) {
 	}, nil
 }
 
-func (s Seal) ID() Identifier {
+// Hash returns a unique identifier for the Seal.
+func (s Seal) Hash() Identifier {
 	return MakeID(s)
 }

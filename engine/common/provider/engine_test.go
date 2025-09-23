@@ -43,11 +43,11 @@ func TestOnEntityRequestFull(t *testing.T) {
 	coll4 := unittest.CollectionFixture(4)
 	coll5 := unittest.CollectionFixture(5)
 
-	entities[coll1.ID()] = coll1
-	entities[coll2.ID()] = coll2
-	entities[coll3.ID()] = coll3
-	entities[coll4.ID()] = coll4
-	entities[coll5.ID()] = coll5
+	entities[coll1.Hash()] = coll1
+	entities[coll2.Hash()] = coll2
+	entities[coll3.Hash()] = coll3
+	entities[coll4.Hash()] = coll4
+	entities[coll5.Hash()] = coll5
 
 	retrieve := func(entityID flow.Identifier) (flow.Hashable, error) {
 		entity, ok := entities[entityID]
@@ -107,7 +107,7 @@ func TestOnEntityRequestFull(t *testing.T) {
 
 	request := &flow.EntityRequest{
 		Nonce:     rand.Uint64(),
-		EntityIDs: []flow.Identifier{coll1.ID(), coll2.ID(), coll3.ID(), coll4.ID(), coll5.ID()},
+		EntityIDs: []flow.Identifier{coll1.Hash(), coll2.Hash(), coll3.Hash(), coll4.Hash(), coll5.Hash()},
 	}
 
 	e.Start(ctx)
@@ -137,11 +137,11 @@ func TestOnEntityRequestPartial(t *testing.T) {
 	coll4 := unittest.CollectionFixture(4)
 	coll5 := unittest.CollectionFixture(5)
 
-	entities[coll1.ID()] = coll1
+	entities[coll1.Hash()] = coll1
 	// entities[coll2.ID()] = coll2
-	entities[coll3.ID()] = coll3
+	entities[coll3.Hash()] = coll3
 	// entities[coll4.ID()] = coll4
-	entities[coll5.ID()] = coll5
+	entities[coll5.Hash()] = coll5
 
 	retrieve := func(entityID flow.Identifier) (flow.Hashable, error) {
 		entity, ok := entities[entityID]
@@ -201,7 +201,7 @@ func TestOnEntityRequestPartial(t *testing.T) {
 
 	request := &flow.EntityRequest{
 		Nonce:     rand.Uint64(),
-		EntityIDs: []flow.Identifier{coll1.ID(), coll2.ID(), coll3.ID(), coll4.ID(), coll5.ID()},
+		EntityIDs: []flow.Identifier{coll1.Hash(), coll2.Hash(), coll3.Hash(), coll4.Hash(), coll5.Hash()},
 	}
 
 	e.Start(ctx)
@@ -227,9 +227,9 @@ func TestOnEntityRequestDuplicates(t *testing.T) {
 	coll2 := unittest.CollectionFixture(2)
 	coll3 := unittest.CollectionFixture(3)
 
-	entities[coll1.ID()] = coll1
-	entities[coll2.ID()] = coll2
-	entities[coll3.ID()] = coll3
+	entities[coll1.Hash()] = coll1
+	entities[coll2.Hash()] = coll2
+	entities[coll3.Hash()] = coll3
 
 	retrieve := func(entityID flow.Identifier) (flow.Hashable, error) {
 		entity, ok := entities[entityID]
@@ -290,7 +290,7 @@ func TestOnEntityRequestDuplicates(t *testing.T) {
 	// create entity requests with some duplicate entity IDs
 	request := &flow.EntityRequest{
 		Nonce:     rand.Uint64(),
-		EntityIDs: []flow.Identifier{coll1.ID(), coll2.ID(), coll3.ID(), coll3.ID(), coll2.ID(), coll1.ID()},
+		EntityIDs: []flow.Identifier{coll1.Hash(), coll2.Hash(), coll3.Hash(), coll3.Hash(), coll2.Hash(), coll1.Hash()},
 	}
 
 	e.Start(ctx)
@@ -368,7 +368,7 @@ func TestOnEntityRequestEmpty(t *testing.T) {
 
 	request := &flow.EntityRequest{
 		Nonce:     rand.Uint64(),
-		EntityIDs: []flow.Identifier{coll1.ID(), coll2.ID(), coll3.ID(), coll4.ID(), coll5.ID()},
+		EntityIDs: []flow.Identifier{coll1.Hash(), coll2.Hash(), coll3.Hash(), coll4.Hash(), coll5.Hash()},
 	}
 
 	e.Start(ctx)
@@ -394,11 +394,11 @@ func TestOnEntityRequestInvalidOrigin(t *testing.T) {
 	coll4 := unittest.CollectionFixture(4)
 	coll5 := unittest.CollectionFixture(5)
 
-	entities[coll1.ID()] = coll1
-	entities[coll2.ID()] = coll2
-	entities[coll3.ID()] = coll3
-	entities[coll4.ID()] = coll4
-	entities[coll5.ID()] = coll5
+	entities[coll1.Hash()] = coll1
+	entities[coll2.Hash()] = coll2
+	entities[coll3.Hash()] = coll3
+	entities[coll4.Hash()] = coll4
+	entities[coll5.Hash()] = coll5
 
 	retrieve := func(entityID flow.Identifier) (flow.Hashable, error) {
 		entity, ok := entities[entityID]
@@ -442,7 +442,7 @@ func TestOnEntityRequestInvalidOrigin(t *testing.T) {
 
 	request := &flow.EntityRequest{
 		Nonce:     rand.Uint64(),
-		EntityIDs: []flow.Identifier{coll1.ID(), coll2.ID(), coll3.ID(), coll4.ID(), coll5.ID()},
+		EntityIDs: []flow.Identifier{coll1.Hash(), coll2.Hash(), coll3.Hash(), coll4.Hash(), coll5.Hash()},
 	}
 
 	e.Start(ctx)

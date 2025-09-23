@@ -241,7 +241,7 @@ func (e *Engine) onEntityRequest(request *internal.EntityRequest) error {
 	for _, entity := range entities {
 		blob, err := msgpack.Marshal(entity)
 		if err != nil {
-			return fmt.Errorf("could not encode entity (%x): %w", entity.ID(), err)
+			return fmt.Errorf("could not encode entity (%x): %w", entity.Hash(), err)
 		}
 		blobs = append(blobs, blob)
 	}

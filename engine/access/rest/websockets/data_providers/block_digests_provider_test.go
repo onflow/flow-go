@@ -41,7 +41,7 @@ func (s *BlockDigestsProviderSuite) TestBlockDigestsDataProvider_HappyPath() {
 		s.validBlockDigestsArgumentsTestCases(),
 		func(dataChan chan interface{}) {
 			for _, block := range s.blocks {
-				dataChan <- flow.NewBlockDigest(block.ID(), block.Height, time.UnixMilli(int64(block.Timestamp)).UTC())
+				dataChan <- flow.NewBlockDigest(block.Hash(), block.Height, time.UnixMilli(int64(block.Timestamp)).UTC())
 			}
 		},
 		s.requireBlockDigest,
@@ -53,7 +53,7 @@ func (s *BlockDigestsProviderSuite) TestBlockDigestsDataProvider_HappyPath() {
 func (s *BlockDigestsProviderSuite) validBlockDigestsArgumentsTestCases() []testType {
 	expectedResponses := make([]interface{}, len(s.blocks))
 	for i, b := range s.blocks {
-		blockDigest := flow.NewBlockDigest(b.ID(), b.Height, time.UnixMilli(int64(b.Timestamp)).UTC())
+		blockDigest := flow.NewBlockDigest(b.Hash(), b.Height, time.UnixMilli(int64(b.Timestamp)).UTC())
 		blockDigestPayload := models.NewBlockDigest(blockDigest)
 		expectedResponses[i] = &models.BaseDataProvidersResponse{
 			Topic:   BlockDigestsTopic,
@@ -65,14 +65,14 @@ func (s *BlockDigestsProviderSuite) validBlockDigestsArgumentsTestCases() []test
 		{
 			name: "happy path with start_block_id argument",
 			arguments: wsmodels.Arguments{
-				"start_block_id": s.rootBlock.ID().String(),
+				"start_block_id": s.rootBlock.Hash().String(),
 				"block_status":   parser.Finalized,
 			},
 			setupBackend: func(sub *statestreamsmock.Subscription) {
 				s.api.On(
 					"SubscribeBlockDigestsFromStartBlockID",
 					mock.Anything,
-					s.rootBlock.ID(),
+					s.rootBlock.Hash(),
 					flow.BlockStatusFinalized,
 				).Return(sub).Once()
 			},

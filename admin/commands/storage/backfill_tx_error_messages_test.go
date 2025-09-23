@@ -345,7 +345,7 @@ func (suite *BackfillTxErrorMessagesSuite) TestHandleBackfillTxErrorMessages() {
 		suite.connFactory.On("GetExecutionAPIClient", mock.Anything).Return(suite.execClient, &unittestMocks.MockCloser{}, nil)
 
 		for i := suite.nodeRootBlock.Height; i <= suite.blockHeadersMap[uint64(suite.blockCount)].Height; i++ {
-			blockId := suite.blockHeadersMap[i].ID()
+			blockId := suite.blockHeadersMap[i].Hash()
 
 			// Setup mock storing the transaction error message after retrieving the failed result.
 			suite.txErrorMessages.On("Exists", blockId).Return(false, nil).Once()
@@ -366,7 +366,7 @@ func (suite *BackfillTxErrorMessagesSuite) TestHandleBackfillTxErrorMessages() {
 
 	suite.Run("happy case, all default parameters, tx error messages exist in db", func() {
 		for i := suite.nodeRootBlock.Height; i <= suite.blockHeadersMap[uint64(suite.blockCount)].Height; i++ {
-			blockId := suite.blockHeadersMap[i].ID()
+			blockId := suite.blockHeadersMap[i].Hash()
 
 			// Setup mock storing the transaction error message after retrieving the failed result.
 			suite.txErrorMessages.On("Exists", blockId).Return(true, nil).Once()
@@ -398,7 +398,7 @@ func (suite *BackfillTxErrorMessagesSuite) TestHandleBackfillTxErrorMessages() {
 		suite.connFactory.On("GetExecutionAPIClient", mock.Anything).Return(suite.execClient, &unittestMocks.MockCloser{}, nil)
 
 		for i := startHeight; i <= endHeight; i++ {
-			blockId := suite.blockHeadersMap[uint64(i)].ID()
+			blockId := suite.blockHeadersMap[uint64(i)].Hash()
 
 			// Setup mock storing the transaction error message after retrieving the failed result.
 			suite.txErrorMessages.On("Exists", blockId).Return(false, nil).Once()

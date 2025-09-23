@@ -242,7 +242,7 @@ func (b *backendSubscribeBlocks) getBlockResponse(blockStatus flow.BlockStatus) 
 		}
 
 		b.log.Trace().
-			Hex("block_id", logging.ID(block.ID())).
+			Hex("block_id", logging.ID(block.Hash())).
 			Uint64("height", height).
 			Msgf("sending block info")
 
@@ -259,7 +259,7 @@ func (b *backendSubscribeBlocks) getBlockHeaderResponse(blockStatus flow.BlockSt
 		}
 
 		b.log.Trace().
-			Hex("block_id", logging.ID(header.ID())).
+			Hex("block_id", logging.ID(header.Hash())).
 			Uint64("height", height).
 			Msgf("sending block header info")
 
@@ -276,11 +276,11 @@ func (b *backendSubscribeBlocks) getBlockDigestResponse(blockStatus flow.BlockSt
 		}
 
 		b.log.Trace().
-			Hex("block_id", logging.ID(header.ID())).
+			Hex("block_id", logging.ID(header.Hash())).
 			Uint64("height", height).
 			Msgf("sending lightweight block info")
 
-		return flow.NewBlockDigest(header.ID(), header.Height, time.UnixMilli(int64(header.Timestamp)).UTC()), nil
+		return flow.NewBlockDigest(header.Hash(), header.Height, time.UnixMilli(int64(header.Timestamp)).UTC()), nil
 	}
 }
 

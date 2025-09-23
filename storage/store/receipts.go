@@ -21,7 +21,7 @@ type ExecutionReceipts struct {
 // supports storing and indexing receipts by receipt ID and block ID.
 func NewExecutionReceipts(collector module.CacheMetrics, db storage.DB, results storage.ExecutionResults, cacheSize uint) *ExecutionReceipts {
 	store := func(rw storage.ReaderBatchWriter, receiptTD flow.Identifier, receipt *flow.ExecutionReceipt) error {
-		receiptID := receipt.ID()
+		receiptID := receipt.Hash()
 
 		err := results.BatchStore(&receipt.ExecutionResult, rw)
 		if err != nil {
@@ -67,7 +67,7 @@ func NewExecutionReceipts(collector module.CacheMetrics, db storage.DB, results 
 
 // storeMyReceipt assembles the operations to store an arbitrary receipt.
 func (r *ExecutionReceipts) storeTx(rw storage.ReaderBatchWriter, receipt *flow.ExecutionReceipt) error {
-	return r.cache.PutTx(rw, receipt.ID(), receipt)
+	return r.cache.PutTx(rw, receipt.Hash(), receipt)
 }
 
 func (r *ExecutionReceipts) byID(receiptID flow.Identifier) (*flow.ExecutionReceipt, error) {

@@ -23,7 +23,7 @@ type ReceiptsOfSameResult struct {
 // NewReceiptsOfSameResult instantiates an empty Equivalence Class (without any receipts)
 func NewReceiptsOfSameResult(result *flow.ExecutionResult, block *flow.Header) (*ReceiptsOfSameResult, error) {
 	//sanity check: initial result should be for block
-	if block.ID() != result.BlockID {
+	if block.Hash() != result.BlockID {
 		return nil, fmt.Errorf("initial result is for different block")
 	}
 
@@ -32,7 +32,7 @@ func NewReceiptsOfSameResult(result *flow.ExecutionResult, block *flow.Header) (
 	rs := &ReceiptsOfSameResult{
 		receipts:    rcpts,
 		result:      result,
-		resultID:    result.ID(),
+		resultID:    result.Hash(),
 		blockHeader: block,
 	}
 	return rs, nil
@@ -44,11 +44,11 @@ func NewReceiptsOfSameResult(result *flow.ExecutionResult, block *flow.Header) (
 //     Possible values: 0 or 1
 //   - error in case of unforeseen problems
 func (rsr *ReceiptsOfSameResult) AddReceipt(receipt *flow.ExecutionReceipt) (uint, error) {
-	if receipt.ExecutionResult.ID() != rsr.resultID {
+	if receipt.ExecutionResult.Hash() != rsr.resultID {
 		return 0, errors.New("cannot add receipt for different result")
 	}
 
-	receiptID := receipt.ID()
+	receiptID := receipt.Hash()
 	if rsr.Has(receiptID) {
 		return 0, nil
 	}
@@ -65,7 +65,7 @@ func (rsr *ReceiptsOfSameResult) AddReceipts(receipts ...*flow.ExecutionReceipt)
 	for i := 0; i < len(receipts); i++ {
 		added, err := rsr.AddReceipt(receipts[i])
 		if err != nil {
-			return receiptsAdded, fmt.Errorf("failed to add receipt (%x) to equivalence class: %w", receipts[i].ID(), err)
+			return receiptsAdded, fmt.Errorf("failed to add receipt (%x) to equivalence class: %w", receipts[i].Hash(), err)
 		}
 		receiptsAdded += added
 	}

@@ -48,9 +48,9 @@ func NewExecutionReceipt(untrusted UntrustedExecutionReceipt) (*ExecutionReceipt
 	}, nil
 }
 
-// ID returns the canonical ID of the execution receipt.
-func (er *ExecutionReceipt) ID() Identifier {
-	return er.Stub().ID()
+// Hash returns the canonical ID of the execution receipt.
+func (er *ExecutionReceipt) Hash() Identifier {
+	return er.Stub().Hash()
 }
 
 // Stub returns a stub of the full ExecutionReceipt, where the ExecutionResult is replaced by its cryptographic hash.
@@ -106,11 +106,11 @@ func NewUnsignedExecutionReceipt(untrusted UntrustedUnsignedExecutionReceipt) (*
 	}, nil
 }
 
-// ID returns a hash over the data of the execution receipt.
+// Hash returns a hash over the data of the execution receipt.
 // This is what is signed by the executor and verified by recipients.
 // Necessary to override ExecutionResult.ID().
-func (erb UnsignedExecutionReceipt) ID() Identifier {
-	return erb.Stub().ID()
+func (erb UnsignedExecutionReceipt) Hash() Identifier {
+	return erb.Stub().Hash()
 }
 
 // Stub returns a stub of the UnsignedExecutionReceipt, where the ExecutionResult is replaced by its cryptographic hash.
@@ -119,7 +119,7 @@ func (erb UnsignedExecutionReceipt) Stub() *UnsignedExecutionReceiptStub {
 	//nolint:structwrite
 	return &UnsignedExecutionReceiptStub{
 		ExecutorID: erb.ExecutorID,
-		ResultID:   erb.ExecutionResult.ID(),
+		ResultID:   erb.ExecutionResult.Hash(),
 		Spocks:     erb.Spocks,
 	}
 }
@@ -165,9 +165,9 @@ func NewExecutionReceiptStub(untrusted UntrustedExecutionReceiptStub) (*Executio
 	}, nil
 }
 
-// ID returns the canonical ID of the execution receipt.
+// Hash returns the canonical ID of the execution receipt.
 // It is identical to the ID of the full receipt.
-func (er *ExecutionReceiptStub) ID() Identifier {
+func (er *ExecutionReceiptStub) Hash() Identifier {
 	return MakeID(er)
 }
 
@@ -178,7 +178,7 @@ func (er ExecutionReceiptStub) MarshalJSON() ([]byte, error) {
 		ID string
 	}{
 		Alias: Alias(er),
-		ID:    er.ID().String(),
+		ID:    er.Hash().String(),
 	})
 }
 
@@ -250,10 +250,10 @@ func NewUnsignedExecutionReceiptStub(untrusted UntrustedUnsignedExecutionReceipt
 	}, nil
 }
 
-// ID returns cryptographic hash of unsigned execution receipt.
+// Hash returns cryptographic hash of unsigned execution receipt.
 // This is what is signed by the executor and verified by recipients.
 // It is identical to the ID of the full UnsignedExecutionReceipt.
-func (erb UnsignedExecutionReceiptStub) ID() Identifier {
+func (erb UnsignedExecutionReceiptStub) Hash() Identifier {
 	return MakeID(erb)
 }
 
@@ -294,7 +294,7 @@ func (l ExecutionReceiptList) GroupByExecutorID() ExecutionReceiptGroupedList {
 // GroupByResultID partitions the ExecutionReceiptList by the receipts' Result IDs.
 // Within each group, the order and multiplicity of the receipts is preserved.
 func (l ExecutionReceiptList) GroupByResultID() ExecutionReceiptGroupedList {
-	grouper := func(receipt *ExecutionReceipt) Identifier { return receipt.ExecutionResult.ID() }
+	grouper := func(receipt *ExecutionReceipt) Identifier { return receipt.ExecutionResult.Hash() }
 	return l.GroupBy(grouper)
 }
 
@@ -384,7 +384,7 @@ func (g ExecutionReceiptStubGroupedList) NumberGroups() int {
 func (l ExecutionReceiptStubList) Lookup() map[Identifier]*ExecutionReceiptStub {
 	receiptsByID := make(map[Identifier]*ExecutionReceiptStub, len(l))
 	for _, receipt := range l {
-		receiptsByID[receipt.ID()] = receipt
+		receiptsByID[receipt.Hash()] = receipt
 	}
 	return receiptsByID
 }

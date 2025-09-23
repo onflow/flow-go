@@ -164,9 +164,9 @@ func (e *EpochExtension) EqualTo(other *EpochExtension) bool {
 		e.FinalView == other.FinalView
 }
 
-// ID returns an identifier for this EpochStateContainer by hashing internal fields.
+// Hash returns an identifier for this EpochStateContainer by hashing internal fields.
 // Per convention, the ID of a `nil` EpochStateContainer is `flow.ZeroID`.
-func (c *EpochStateContainer) ID() Identifier {
+func (c *EpochStateContainer) Hash() Identifier {
 	if c == nil {
 		return ZeroID
 	}
@@ -277,11 +277,11 @@ type UntrustedEpochStateEntry EpochStateEntry
 func NewEpochStateEntry(untrusted UntrustedEpochStateEntry) (*EpochStateEntry, error) {
 	// If previous epoch is specified: ensure respective epoch service events are not nil and consistent with commitments in `MinEpochStateEntry.PreviousEpoch`
 	if untrusted.PreviousEpoch != nil {
-		if untrusted.PreviousEpoch.SetupID != untrusted.PreviousEpochSetup.ID() { // calling ID() will panic is EpochSetup event is nil
-			return nil, fmt.Errorf("supplied previous epoch's setup event (%x) does not match commitment (%x) in MinEpochStateEntry", untrusted.PreviousEpochSetup.ID(), untrusted.PreviousEpoch.SetupID)
+		if untrusted.PreviousEpoch.SetupID != untrusted.PreviousEpochSetup.Hash() { // calling ID() will panic is EpochSetup event is nil
+			return nil, fmt.Errorf("supplied previous epoch's setup event (%x) does not match commitment (%x) in MinEpochStateEntry", untrusted.PreviousEpochSetup.Hash(), untrusted.PreviousEpoch.SetupID)
 		}
-		if untrusted.PreviousEpoch.CommitID != untrusted.PreviousEpochCommit.ID() { // calling ID() will panic is EpochCommit event is nil
-			return nil, fmt.Errorf("supplied previous epoch's commit event (%x) does not match commitment (%x) in MinEpochStateEntry", untrusted.PreviousEpochCommit.ID(), untrusted.PreviousEpoch.CommitID)
+		if untrusted.PreviousEpoch.CommitID != untrusted.PreviousEpochCommit.Hash() { // calling ID() will panic is EpochCommit event is nil
+			return nil, fmt.Errorf("supplied previous epoch's commit event (%x) does not match commitment (%x) in MinEpochStateEntry", untrusted.PreviousEpochCommit.Hash(), untrusted.PreviousEpoch.CommitID)
 		}
 	} else {
 		if untrusted.PreviousEpochSetup != nil {
@@ -293,11 +293,11 @@ func NewEpochStateEntry(untrusted UntrustedEpochStateEntry) (*EpochStateEntry, e
 	}
 
 	// For current epoch: ensure respective epoch service events are not nil and consistent with commitments in `MinEpochStateEntry.CurrentEpoch`
-	if untrusted.CurrentEpoch.SetupID != untrusted.CurrentEpochSetup.ID() { // calling ID() will panic is EpochSetup event is nil
-		return nil, fmt.Errorf("supplied current epoch's setup event (%x) does not match commitment (%x) in MinEpochStateEntry", untrusted.CurrentEpochSetup.ID(), untrusted.CurrentEpoch.SetupID)
+	if untrusted.CurrentEpoch.SetupID != untrusted.CurrentEpochSetup.Hash() { // calling ID() will panic is EpochSetup event is nil
+		return nil, fmt.Errorf("supplied current epoch's setup event (%x) does not match commitment (%x) in MinEpochStateEntry", untrusted.CurrentEpochSetup.Hash(), untrusted.CurrentEpoch.SetupID)
 	}
-	if untrusted.CurrentEpoch.CommitID != untrusted.CurrentEpochCommit.ID() { // calling ID() will panic is EpochCommit event is nil
-		return nil, fmt.Errorf("supplied current epoch's commit event (%x) does not match commitment (%x) in MinEpochStateEntry", untrusted.CurrentEpochCommit.ID(), untrusted.CurrentEpoch.CommitID)
+	if untrusted.CurrentEpoch.CommitID != untrusted.CurrentEpochCommit.Hash() { // calling ID() will panic is EpochCommit event is nil
+		return nil, fmt.Errorf("supplied current epoch's commit event (%x) does not match commitment (%x) in MinEpochStateEntry", untrusted.CurrentEpochCommit.Hash(), untrusted.CurrentEpoch.CommitID)
 	}
 
 	// If we are in staking phase (i.e. epochState.NextEpoch == nil):
@@ -317,12 +317,12 @@ func NewEpochStateEntry(untrusted UntrustedEpochStateEntry) (*EpochStateEntry, e
 		}
 	} else { // epochState.NextEpoch ≠ nil, i.e. we are in epoch setup or epoch commit phase
 		// ensure respective epoch service events are not nil and consistent with commitments in `MinEpochStateEntry.NextEpoch`
-		if nextEpoch.SetupID != untrusted.NextEpochSetup.ID() {
-			return nil, fmt.Errorf("supplied next epoch's setup event (%x) does not match commitment (%x) in MinEpochStateEntry", nextEpoch.SetupID, untrusted.NextEpochSetup.ID())
+		if nextEpoch.SetupID != untrusted.NextEpochSetup.Hash() {
+			return nil, fmt.Errorf("supplied next epoch's setup event (%x) does not match commitment (%x) in MinEpochStateEntry", nextEpoch.SetupID, untrusted.NextEpochSetup.Hash())
 		}
 		if nextEpoch.CommitID != ZeroID {
-			if nextEpoch.CommitID != untrusted.NextEpochCommit.ID() {
-				return nil, fmt.Errorf("supplied next epoch's commit event (%x) does not match commitment (%x) in MinEpochStateEntry", nextEpoch.CommitID, untrusted.NextEpochCommit.ID())
+			if nextEpoch.CommitID != untrusted.NextEpochCommit.Hash() {
+				return nil, fmt.Errorf("supplied next epoch's commit event (%x) does not match commitment (%x) in MinEpochStateEntry", nextEpoch.CommitID, untrusted.NextEpochCommit.Hash())
 			}
 		} else {
 			if untrusted.NextEpochCommit != nil {
@@ -434,8 +434,8 @@ func NewRichEpochStateEntry(epochState *EpochStateEntry) (*RichEpochStateEntry, 
 	}, nil
 }
 
-// ID returns hash of entry by hashing all fields.
-func (e *MinEpochStateEntry) ID() Identifier {
+// Hash returns hash of entry by hashing all fields.
+func (e *MinEpochStateEntry) Hash() Identifier {
 	if e == nil {
 		return ZeroID
 	}

@@ -42,7 +42,7 @@ func newBackend[T extractProposalHeader]() *backend[T] {
 // true otherwise.
 func (b *backend[T]) add(block flow.Slashable[T]) bool {
 	header := block.Message.ProposalHeader().Header
-	blockID := header.ID()
+	blockID := header.Hash()
 
 	b.mu.Lock()
 	defer b.mu.Unlock()

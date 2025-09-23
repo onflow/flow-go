@@ -35,7 +35,7 @@ func (r *ReadBlocksCommand) Handler(ctx context.Context, req *admin.CommandReque
 	if header, err := getBlockHeader(r.state, data.blocksRequest); err != nil {
 		return nil, fmt.Errorf("failed to get block header: %w", err)
 	} else {
-		blockID = header.ID()
+		blockID = header.Hash()
 	}
 
 	for i := uint64(0); i < data.numBlocksToQuery; i++ {

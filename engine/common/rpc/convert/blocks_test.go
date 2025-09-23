@@ -38,7 +38,7 @@ func TestConvertBlockLight(t *testing.T) {
 	msg := convert.BlockToMessageLight(block)
 
 	// required fields are set
-	blockID := block.ID()
+	blockID := block.Hash()
 	assert.Equal(t, 0, bytes.Compare(blockID[:], msg.Id))
 	assert.Equal(t, block.Height, msg.Height)
 	assert.Equal(t, 0, bytes.Compare(block.ParentID[:], msg.ParentId))

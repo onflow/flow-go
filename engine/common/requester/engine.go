@@ -530,7 +530,7 @@ func (e *Engine) onEntityResponse(originID flow.Identifier, res *flow.EntityResp
 		}
 
 		if item.checkIntegrity {
-			actualEntityID := entity.ID()
+			actualEntityID := entity.Hash()
 			// validate that we got correct entity, exactly what we were expecting
 			if entityID != actualEntityID {
 				lg.Error().

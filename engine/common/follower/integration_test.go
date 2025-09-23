@@ -91,7 +91,7 @@ func TestFollowerHappyPath(t *testing.T) {
 		require.NoError(t, err)
 		rootProtocolState, err := rootSnapshot.ProtocolState()
 		require.NoError(t, err)
-		rootProtocolStateID := rootProtocolState.ID()
+		rootProtocolStateID := rootProtocolState.Hash()
 
 		consensusConsumer := pubsub.NewFollowerDistributor()
 		// use real consensus modules
@@ -175,7 +175,7 @@ func TestFollowerHappyPath(t *testing.T) {
 
 			if i > 0 {
 				proposal.Block.ParentView = pendingBlocks[i-1].Block.View
-				proposal.Block.ParentID = pendingBlocks[i-1].Block.ID()
+				proposal.Block.ParentID = pendingBlocks[i-1].Block.Hash()
 			}
 		}
 

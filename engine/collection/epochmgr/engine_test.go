@@ -163,7 +163,7 @@ func (suite *Suite) SetupTest() {
 	suite.epochQuery = mocks.NewEpochQuery(suite.T(), suite.counter)
 
 	suite.state.On("Final").Return(suite.snap)
-	suite.state.On("AtBlockID", suite.header.ID()).Return(suite.snap).Maybe()
+	suite.state.On("AtBlockID", suite.header.Hash()).Return(suite.snap).Maybe()
 	suite.snap.On("Epochs").Return(suite.epochQuery)
 	suite.snap.On("Head").Return(
 		func() *flow.Header { return suite.header },
@@ -482,7 +482,7 @@ func (suite *Suite) TestRespondToPhaseChange() {
 		}).Once()
 
 	firstBlockOfEpochSetupPhase := unittest.BlockHeaderFixture()
-	suite.state.On("AtBlockID", firstBlockOfEpochSetupPhase.ID()).Return(suite.snap)
+	suite.state.On("AtBlockID", firstBlockOfEpochSetupPhase.Hash()).Return(suite.snap)
 	suite.StartEngine()
 
 	// after receiving the protocol event, we should submit our root QC vote
@@ -510,7 +510,7 @@ func (suite *Suite) TestRespondToEpochTransition() {
 	suite.StartEngine()
 
 	firstBlockOfEpoch := unittest.BlockHeaderFixture()
-	suite.state.On("AtBlockID", firstBlockOfEpoch.ID()).Return(suite.snap)
+	suite.state.On("AtBlockID", firstBlockOfEpoch.Hash()).Return(suite.snap)
 
 	// should set up callback for height at which previous epoch expires
 	var expiryCallback func()

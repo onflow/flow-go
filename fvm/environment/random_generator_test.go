@@ -39,7 +39,7 @@ func TestRandomGenerator(t *testing.T) {
 	// output space
 	t.Run("randomness test", func(t *testing.T) {
 		for i := 0; i < 10; i++ {
-			txId := unittest.TransactionFixture().ID()
+			txId := unittest.TransactionFixture().Hash()
 			urg := environment.NewRandomGenerator(
 				tracing.NewTracerSpan(),
 				randomSourceHistoryProvider,
@@ -63,7 +63,7 @@ func TestRandomGenerator(t *testing.T) {
 	// tests that has deterministic outputs.
 	t.Run("PRG-based Random", func(t *testing.T) {
 		for i := 0; i < 10; i++ {
-			txId := unittest.TransactionFixture().ID()
+			txId := unittest.TransactionFixture().Hash()
 			N := 100
 			r1 := getRandoms(txId[:], N)
 			r2 := getRandoms(txId[:], N)
@@ -74,7 +74,7 @@ func TestRandomGenerator(t *testing.T) {
 	t.Run("transaction specific randomness", func(t *testing.T) {
 		txns := [][]uint64{}
 		for i := 0; i < 10; i++ {
-			txId := unittest.TransactionFixture().ID()
+			txId := unittest.TransactionFixture().Hash()
 			N := 2
 			txns = append(txns, getRandoms(txId[:], N))
 		}

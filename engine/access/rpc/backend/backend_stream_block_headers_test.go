@@ -83,7 +83,7 @@ func (s *BackendBlockHeadersSuite) requireBlockHeaders(v interface{}, expectedBl
 	require.True(s.T(), ok, "unexpected response type: %T", v)
 
 	s.Require().Equal(expectedBlock.Height, actualHeader.Height)
-	s.Require().Equal(expectedBlock.ToHeader().ID(), actualHeader.ID())
+	s.Require().Equal(expectedBlock.ToHeader().Hash(), actualHeader.Hash())
 	s.Require().Equal(*expectedBlock.ToHeader(), *actualHeader)
 }
 

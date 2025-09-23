@@ -76,10 +76,10 @@ func TestGetTransactions(t *testing.T) {
 	t.Run("get by ID without results", func(t *testing.T) {
 		backend := &mock.API{}
 		tx := unittest.TransactionFixture()
-		req := getTransactionReq(tx.ID().String(), false, "", "")
+		req := getTransactionReq(tx.Hash().String(), false, "", "")
 
 		backend.Mock.
-			On("GetTransaction", mocks.Anything, tx.ID()).
+			On("GetTransaction", mocks.Anything, tx.Hash()).
 			Return(&tx, nil)
 
 		expected := fmt.Sprintf(`
@@ -113,7 +113,7 @@ func TestGetTransactions(t *testing.T) {
 					"result": "/v1/transaction_results/%s"
 				}
 			}`,
-			tx.ID(), tx.ReferenceBlockID, util.ToBase64(tx.EnvelopeSignatures[0].Signature), tx.ID(), tx.ID())
+			tx.Hash(), tx.ReferenceBlockID, util.ToBase64(tx.EnvelopeSignatures[0].Signature), tx.Hash(), tx.Hash())
 
 		router.AssertOKResponse(t, req, expected, backend)
 	})
@@ -125,14 +125,14 @@ func TestGetTransactions(t *testing.T) {
 		txr := transactionResultFixture(tx)
 
 		backend.Mock.
-			On("GetTransaction", mocks.Anything, tx.ID()).
+			On("GetTransaction", mocks.Anything, tx.Hash()).
 			Return(&tx, nil)
 
 		backend.Mock.
-			On("GetTransactionResult", mocks.Anything, tx.ID(), flow.ZeroID, flow.ZeroID, entities.EventEncodingVersion_JSON_CDC_V0).
+			On("GetTransactionResult", mocks.Anything, tx.Hash(), flow.ZeroID, flow.ZeroID, entities.EventEncodingVersion_JSON_CDC_V0).
 			Return(txr, nil)
 
-		req := getTransactionReq(tx.ID().String(), true, "", "")
+		req := getTransactionReq(tx.Hash().String(), true, "", "")
 
 		expected := fmt.Sprintf(`
 			{
@@ -184,7 +184,7 @@ func TestGetTransactions(t *testing.T) {
 				  "_self":"/v1/transactions/%s"
 			   }
 			}`,
-			tx.ID(), tx.ReferenceBlockID, util.ToBase64(tx.EnvelopeSignatures[0].Signature), tx.ReferenceBlockID, txr.CollectionID, tx.ID(), tx.ID(), tx.ID())
+			tx.Hash(), tx.ReferenceBlockID, util.ToBase64(tx.EnvelopeSignatures[0].Signature), tx.ReferenceBlockID, txr.CollectionID, tx.Hash(), tx.Hash(), tx.Hash())
 		router.AssertOKResponse(t, req, expected, backend)
 	})
 
@@ -200,10 +200,10 @@ func TestGetTransactions(t *testing.T) {
 		backend := &mock.API{}
 
 		tx := unittest.TransactionFixture()
-		req := getTransactionReq(tx.ID().String(), false, "", "")
+		req := getTransactionReq(tx.Hash().String(), false, "", "")
 
 		backend.Mock.
-			On("GetTransaction", mocks.Anything, tx.ID()).
+			On("GetTransaction", mocks.Anything, tx.Hash()).
 			Return(nil, status.Error(codes.NotFound, "transaction not found"))
 
 		expected := `{"code":404, "message":"Flow resource not found: transaction not found"}`
@@ -396,7 +396,7 @@ func TestCreateTransaction(t *testing.T) {
 				  "_self":"/v1/transactions/%s"
 			   }
 			}`,
-			tx.ID(), tx.ReferenceBlockID, util.ToBase64(tx.PayloadSignatures[0].Signature), util.ToBase64(tx.EnvelopeSignatures[0].Signature), tx.ID(), tx.ID())
+			tx.Hash(), tx.ReferenceBlockID, util.ToBase64(tx.PayloadSignatures[0].Signature), util.ToBase64(tx.EnvelopeSignatures[0].Signature), tx.Hash(), tx.Hash())
 		router.AssertOKResponse(t, req, expected, backend)
 	})
 
@@ -440,7 +440,7 @@ func transactionResultFixture(tx flow.TransactionBody) *accessmodel.TransactionR
 				unittest.Event.WithEventType(flow.EventAccountCreated),
 				unittest.Event.WithTransactionIndex(0),
 				unittest.Event.WithEventIndex(0),
-				unittest.Event.WithTransactionID(tx.ID()),
+				unittest.Event.WithTransactionID(tx.Hash()),
 				unittest.Event.WithPayload([]byte{}),
 			),
 		},

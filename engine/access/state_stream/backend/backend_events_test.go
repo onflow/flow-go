@@ -107,8 +107,8 @@ func (s *BackendEventsSuite) setupLocalStorage() {
 	// reproduce that here to ensure output order works as expected
 	blockEvents := make(map[flow.Identifier][]flow.Event)
 	for _, b := range s.blocks {
-		events := make([]flow.Event, len(s.blockEvents[b.ID()]))
-		for i, event := range s.blockEvents[b.ID()] {
+		events := make([]flow.Event, len(s.blockEvents[b.Hash()]))
+		for i, event := range s.blockEvents[b.Hash()] {
 			events[i] = event
 		}
 		sort.Slice(events, func(i, j int) bool {
@@ -121,7 +121,7 @@ func (s *BackendEventsSuite) setupLocalStorage() {
 			}
 			return cmp < 0
 		})
-		blockEvents[b.ID()] = events
+		blockEvents[b.Hash()] = events
 	}
 
 	s.events.On("ByBlockID", mock.AnythingOfType("flow.Identifier")).Return(
@@ -205,7 +205,7 @@ func (s *BackendEventsSuite) runTestSubscribeEvents() {
 		{
 			name:            "happy path - complete backfill",
 			highestBackfill: len(s.blocks) - 1, // backfill all blocks
-			startBlockID:    s.blocks[0].ID(),
+			startBlockID:    s.blocks[0].Hash(),
 			startHeight:     0,
 		},
 		{
@@ -216,8 +216,8 @@ func (s *BackendEventsSuite) runTestSubscribeEvents() {
 		},
 		{
 			name:            "happy path - start from root block by id",
-			highestBackfill: len(s.blocks) - 1, // backfill all blocks
-			startBlockID:    s.rootBlock.ID(),  // start from root block
+			highestBackfill: len(s.blocks) - 1,  // backfill all blocks
+			startBlockID:    s.rootBlock.Hash(), // start from root block
 			startHeight:     0,
 		},
 	}
@@ -235,22 +235,22 @@ func (s *BackendEventsSuite) runTestSubscribeEventsFromStartBlockID() {
 		{
 			name:            "happy path - all new blocks",
 			highestBackfill: -1, // no backfill
-			startBlockID:    s.rootBlock.ID(),
+			startBlockID:    s.rootBlock.Hash(),
 		},
 		{
 			name:            "happy path - partial backfill",
 			highestBackfill: 2, // backfill the first 3 blocks
-			startBlockID:    s.blocks[0].ID(),
+			startBlockID:    s.blocks[0].Hash(),
 		},
 		{
 			name:            "happy path - complete backfill",
 			highestBackfill: len(s.blocks) - 1, // backfill all blocks
-			startBlockID:    s.blocks[0].ID(),
+			startBlockID:    s.blocks[0].Hash(),
 		},
 		{
 			name:            "happy path - start from root block by id",
-			highestBackfill: len(s.blocks) - 1, // backfill all blocks
-			startBlockID:    s.rootBlock.ID(),  // start from root block
+			highestBackfill: len(s.blocks) - 1,  // backfill all blocks
+			startBlockID:    s.rootBlock.Hash(), // start from root block
 		},
 	}
 
@@ -391,7 +391,7 @@ func (s *BackendEventsSuite) subscribe(
 
 			// loop over all blocks
 			for i, b := range s.blocks {
-				s.T().Logf("checking block %d %v %d", i, b.ID(), b.Height)
+				s.T().Logf("checking block %d %v %d", i, b.Hash(), b.Height)
 
 				// simulate new block received.
 				// all blocks with index <= highestBackfill were already received
@@ -402,7 +402,7 @@ func (s *BackendEventsSuite) subscribe(
 				}
 
 				var expectedEvents flow.EventsList
-				for _, event := range s.blockEvents[b.ID()] {
+				for _, event := range s.blockEvents[b.Hash()] {
 					if test.filter.Match(event) {
 						expectedEvents = append(expectedEvents, event)
 					}
@@ -411,17 +411,17 @@ func (s *BackendEventsSuite) subscribe(
 				// consume events response from subscription
 				unittest.RequireReturnsBefore(s.T(), func() {
 					v, ok := <-sub.Channel()
-					require.True(s.T(), ok, "channel closed while waiting for exec data for block %x %v: err: %v", b.Height, b.ID(), sub.Err())
+					require.True(s.T(), ok, "channel closed while waiting for exec data for block %x %v: err: %v", b.Height, b.Hash(), sub.Err())
 
 					expected := &EventsResponse{
-						BlockID:        b.ID(),
+						BlockID:        b.Hash(),
 						Height:         b.Height,
 						Events:         expectedEvents,
 						BlockTimestamp: time.UnixMilli(int64(b.Timestamp)).UTC(),
 					}
 					requireFn(v, expected)
 
-				}, time.Second, fmt.Sprintf("timed out waiting for block %d %v", b.Height, b.ID()))
+				}, time.Second, fmt.Sprintf("timed out waiting for block %d %v", b.Height, b.Hash()))
 			}
 
 			// make sure there are no new messages waiting. the channel should be opened with nothing waiting
@@ -612,11 +612,11 @@ func (s *BackendExecutionDataSuite) TestSubscribeEventsFromStartBlockIDHandlesEr
 		subCtx, subCancel := context.WithCancel(ctx)
 		defer subCancel()
 
-		s.executionDataTracker.On("GetStartHeightFromBlockID", s.blocks[0].ID()).
+		s.executionDataTracker.On("GetStartHeightFromBlockID", s.blocks[0].Hash()).
 			Return(uint64(0), status.Errorf(codes.InvalidArgument, "start height %d is lower than lowest indexed height %d", s.blocks[0].Height, 0)).
 			Once()
 
-		sub := s.backend.SubscribeEventsFromStartBlockID(subCtx, s.blocks[0].ID(), state_stream.EventFilter{})
+		sub := s.backend.SubscribeEventsFromStartBlockID(subCtx, s.blocks[0].Hash(), state_stream.EventFilter{})
 		assert.Equal(s.T(), codes.InvalidArgument, status.Code(sub.Err()), "expected InvalidArgument, got %v: %v", status.Code(sub.Err()).String(), sub.Err())
 	})
 
@@ -624,11 +624,11 @@ func (s *BackendExecutionDataSuite) TestSubscribeEventsFromStartBlockIDHandlesEr
 		subCtx, subCancel := context.WithCancel(ctx)
 		defer subCancel()
 
-		s.executionDataTracker.On("GetStartHeightFromBlockID", s.blocks[len(s.blocks)-1].ID()).
+		s.executionDataTracker.On("GetStartHeightFromBlockID", s.blocks[len(s.blocks)-1].Hash()).
 			Return(uint64(0), status.Errorf(codes.InvalidArgument, "start height %d is higher than highest indexed height %d", s.blocks[len(s.blocks)-1].Height, s.blocks[0].Height)).
 			Once()
 
-		sub := s.backend.SubscribeEventsFromStartBlockID(subCtx, s.blocks[len(s.blocks)-1].ID(), state_stream.EventFilter{})
+		sub := s.backend.SubscribeEventsFromStartBlockID(subCtx, s.blocks[len(s.blocks)-1].Hash(), state_stream.EventFilter{})
 		assert.Equal(s.T(), codes.InvalidArgument, status.Code(sub.Err()), "expected InvalidArgument, got %v: %v", status.Code(sub.Err()).String(), sub.Err())
 	})
 }

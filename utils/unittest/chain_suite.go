@@ -105,10 +105,10 @@ func (bc *BaseChainSuite) SetupChain() {
 	bc.UnfinalizedBlock = *BlockWithParentFixture(bc.LatestFinalizedBlock.ToHeader())
 
 	bc.Blocks = make(map[flow.Identifier]*flow.Block)
-	bc.Blocks[bc.RootBlock.ID()] = bc.RootBlock
-	bc.Blocks[bc.LatestSealedBlock.ID()] = &bc.LatestSealedBlock
-	bc.Blocks[bc.LatestFinalizedBlock.ID()] = bc.LatestFinalizedBlock
-	bc.Blocks[bc.UnfinalizedBlock.ID()] = &bc.UnfinalizedBlock
+	bc.Blocks[bc.RootBlock.Hash()] = bc.RootBlock
+	bc.Blocks[bc.LatestSealedBlock.Hash()] = &bc.LatestSealedBlock
+	bc.Blocks[bc.LatestFinalizedBlock.Hash()] = bc.LatestFinalizedBlock
+	bc.Blocks[bc.UnfinalizedBlock.Hash()] = &bc.UnfinalizedBlock
 
 	// ~~~~~~~~~~~~~~~~~~~~~~~~ SETUP PROTOCOL STATE ~~~~~~~~~~~~~~~~~~~~~~~~ //
 	bc.State = &protocol.State{}
@@ -134,7 +134,7 @@ func (bc *BaseChainSuite) SetupChain() {
 	bc.FinalSnapshot.On("ProtocolState").Return(bc.KVStoreReader, nil)
 	bc.FinalSnapshot.On("SealedResult").Return(
 		func() *flow.ExecutionResult {
-			blockID := bc.LatestFinalizedBlock.ID()
+			blockID := bc.LatestFinalizedBlock.Hash()
 			seal, found := bc.SealsIndex[blockID]
 			if !found {
 				return nil
@@ -146,7 +146,7 @@ func (bc *BaseChainSuite) SetupChain() {
 			return result
 		},
 		func() *flow.Seal {
-			blockID := bc.LatestFinalizedBlock.ID()
+			blockID := bc.LatestFinalizedBlock.Hash()
 			seal, found := bc.SealsIndex[blockID]
 			if !found {
 				return nil
@@ -154,7 +154,7 @@ func (bc *BaseChainSuite) SetupChain() {
 			return seal
 		},
 		func() error {
-			blockID := bc.LatestFinalizedBlock.ID()
+			blockID := bc.LatestFinalizedBlock.Hash()
 			seal, found := bc.SealsIndex[blockID]
 			if !found {
 				return storerr.ErrNotFound
@@ -226,7 +226,7 @@ func (bc *BaseChainSuite) SetupChain() {
 	// ~~~~~~~~~~~~~~~~~~~~~~~ SETUP RESULTS STORAGE ~~~~~~~~~~~~~~~~~~~~~~~~ //
 	bc.PersistedResults = make(map[flow.Identifier]*flow.ExecutionResult)
 	bc.LatestExecutionResult = ExecutionResultFixture(WithBlock(&bc.LatestSealedBlock))
-	bc.PersistedResults[bc.LatestExecutionResult.ID()] = bc.LatestExecutionResult
+	bc.PersistedResults[bc.LatestExecutionResult.Hash()] = bc.LatestExecutionResult
 	bc.ResultsDB = &storage.ExecutionResults{}
 	bc.ResultsDB.On("ByID", mock.Anything).Return(
 		func(resultID flow.Identifier) *flow.ExecutionResult {
@@ -242,7 +242,7 @@ func (bc *BaseChainSuite) SetupChain() {
 	).Maybe()
 	bc.ResultsDB.On("Store", mock.Anything).Return(
 		func(result *flow.ExecutionResult) error {
-			_, found := bc.PersistedResults[result.ID()]
+			_, found := bc.PersistedResults[result.Hash()]
 			if found {
 				return storerr.ErrAlreadyExists
 			}
@@ -319,8 +319,8 @@ func (bc *BaseChainSuite) SetupChain() {
 	firtSeal := Seal.Fixture(Seal.WithBlock(bc.LatestSealedBlock.ToHeader()),
 		Seal.WithResult(bc.LatestExecutionResult))
 	for id, block := range bc.Blocks {
-		if id != bc.RootBlock.ID() {
-			bc.SealsIndex[block.ID()] = firtSeal
+		if id != bc.RootBlock.Hash() {
+			bc.SealsIndex[block.Hash()] = firtSeal
 		}
 	}
 
@@ -447,7 +447,7 @@ func StateSnapshotForKnownBlock(block *flow.Header, identities map[flow.Identifi
 func ApprovalFor(result *flow.ExecutionResult, chunkIdx uint64, approverID flow.Identifier) *flow.ResultApproval {
 	return ResultApprovalFixture(
 		WithBlockID(result.BlockID),
-		WithExecutionResultID(result.ID()),
+		WithExecutionResultID(result.Hash()),
 		WithApproverID(approverID),
 		WithChunk(chunkIdx),
 	)
@@ -534,10 +534,10 @@ func (bc *BaseChainSuite) ValidSubgraphFixture() subgraphFixture {
 }
 
 func (bc *BaseChainSuite) Extend(block *flow.Block) {
-	blockID := block.ID()
+	blockID := block.Hash()
 	bc.Blocks[blockID] = block
 	if seal, ok := bc.SealsIndex[block.ParentID]; ok {
-		bc.SealsIndex[block.ID()] = seal
+		bc.SealsIndex[block.Hash()] = seal
 	}
 
 	for _, result := range block.Payload.Results {
@@ -563,8 +563,8 @@ func (bc *BaseChainSuite) Extend(block *flow.Block) {
 		}
 		assignment := assignmentBuilder.Build()
 		bc.Assigner.On("Assign", incorporatedResult.Result, incorporatedResult.IncorporatedBlockID).Return(assignment, nil).Maybe()
-		bc.Assignments[incorporatedResult.Result.ID()] = assignment
-		bc.PersistedResults[result.ID()] = result
+		bc.Assignments[incorporatedResult.Result.Hash()] = assignment
+		bc.PersistedResults[result.Hash()] = result
 	}
 	for _, seal := range block.Payload.Seals {
 		bc.SealsIndex[blockID] = seal
@@ -573,9 +573,9 @@ func (bc *BaseChainSuite) Extend(block *flow.Block) {
 
 // AddSubgraphFixtureToMempools adds entities in subgraph to mempools and persistent storage mocks
 func (bc *BaseChainSuite) AddSubgraphFixtureToMempools(subgraph subgraphFixture) {
-	bc.Blocks[subgraph.ParentBlock.ID()] = subgraph.ParentBlock
-	bc.Blocks[subgraph.Block.ID()] = subgraph.Block
-	bc.PersistedResults[subgraph.PreviousResult.ID()] = subgraph.PreviousResult
-	bc.PersistedResults[subgraph.Result.ID()] = subgraph.Result
+	bc.Blocks[subgraph.ParentBlock.Hash()] = subgraph.ParentBlock
+	bc.Blocks[subgraph.Block.Hash()] = subgraph.Block
+	bc.PersistedResults[subgraph.PreviousResult.Hash()] = subgraph.PreviousResult
+	bc.PersistedResults[subgraph.Result.Hash()] = subgraph.Result
 	bc.Assigner.On("Assign", subgraph.IncorporatedResult.Result, subgraph.IncorporatedResult.IncorporatedBlockID).Return(subgraph.Assignment, nil).Maybe()
 }

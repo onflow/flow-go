@@ -46,15 +46,15 @@ func TestMyExecutionReceiptsStorage(t *testing.T) {
 			// MyExecutionReceipts delegates the storage of the receipt to the more generic storage.ExecutionReceipts and storage.ExecutionResults,
 			// which is also used by the consensus follower to store execution receipts & results that are incorporated into blocks.
 			// After storing my receipts, we check that the result and receipt can also be retrieved from the lower-level generic storage layers.
-			actual, err := myReceipts.MyReceipt(block.ID())
+			actual, err := myReceipts.MyReceipt(block.Hash())
 			require.NoError(t, err)
 			require.Equal(t, receipt1, actual)
 
-			actualReceipt, err := receipts.ByID(receipt1.ID()) // generic receipts storage
+			actualReceipt, err := receipts.ByID(receipt1.Hash()) // generic receipts storage
 			require.NoError(t, err)
 			require.Equal(t, receipt1, actualReceipt)
 
-			actualResult, err := results.ByID(receipt1.ExecutionResult.ID()) // generic results storage
+			actualResult, err := results.ByID(receipt1.ExecutionResult.Hash()) // generic results storage
 			require.NoError(t, err)
 			require.Equal(t, receipt1.ExecutionResult, *actualResult)
 		})
@@ -221,26 +221,26 @@ func TestMyExecutionReceiptsStorage(t *testing.T) {
 			})
 			require.NoError(t, err)
 
-			actual, err := myReceipts.MyReceipt(block.ID())
+			actual, err := myReceipts.MyReceipt(block.Hash())
 			require.NoError(t, err)
 
 			require.Equal(t, receipt1, actual)
 
 			// Check after storing my receipts, the result and receipt are stored
-			actualReceipt, err := receipts.ByID(receipt1.ID())
+			actualReceipt, err := receipts.ByID(receipt1.Hash())
 			require.NoError(t, err)
 			require.Equal(t, receipt1, actualReceipt)
 
-			actualResult, err := results.ByID(receipt1.ExecutionResult.ID())
+			actualResult, err := results.ByID(receipt1.ExecutionResult.Hash())
 			require.NoError(t, err)
 			require.Equal(t, receipt1.ExecutionResult, *actualResult)
 
 			err = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-				return myReceipts.BatchRemoveIndexByBlockID(block.ID(), rw)
+				return myReceipts.BatchRemoveIndexByBlockID(block.Hash(), rw)
 			})
 			require.NoError(t, err)
 
-			_, err = myReceipts.MyReceipt(block.ID())
+			_, err = myReceipts.MyReceipt(block.Hash())
 			require.True(t, errors.Is(err, storage.ErrNotFound))
 		})
 	})

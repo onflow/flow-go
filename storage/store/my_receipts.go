@@ -66,7 +66,7 @@ func (m *MyExecutionReceipts) myReceipt(blockID flow.Identifier) (*flow.Executio
 // If Badger unexpectedly fails to process the request, the error is wrapped in a generic error and returned.
 // If a different my receipt has been indexed for the same block, the error is wrapped in a generic error and returned.
 func (m *MyExecutionReceipts) BatchStoreMyReceipt(lctx lockctx.Proof, receipt *flow.ExecutionReceipt, rw storage.ReaderBatchWriter) error {
-	receiptID := receipt.ID()
+	receiptID := receipt.Hash()
 	blockID := receipt.ExecutionResult.BlockID
 
 	if lctx == nil || !lctx.HoldsLock(storage.LockInsertOwnReceipt) {

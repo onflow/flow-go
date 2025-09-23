@@ -427,7 +427,7 @@ func (e *EventHandler) proposeForNewViewIfPrimary() error {
 	log.Debug().
 		Uint64("block_view", flowProposal.Header.View).
 		Time("target_publication", targetPublicationTime).
-		Hex("block_id", logging.ID(flowProposal.Header.ID())).
+		Hex("block_id", logging.ID(flowProposal.Header.Hash())).
 		Uint64("parent_view", newestQC.View).
 		Hex("parent_id", newestQC.BlockID[:]).
 		Hex("signer", flowProposal.Header.ProposerID[:]).

@@ -1219,14 +1219,14 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string, chainID fl
 	if err != nil {
 		return nil, fmt.Errorf("could not construct epoch protocol state: %w", err)
 	}
-	rootProtocolState, err := networkConf.KVStoreFactory(minEpochStateEntry.ID())
+	rootProtocolState, err := networkConf.KVStoreFactory(minEpochStateEntry.Hash())
 	if err != nil {
 		return nil, err
 	}
 	root, err := flow.NewRootBlock(
 		flow.UntrustedBlock{
 			HeaderBody: *rootHeaderBody,
-			Payload:    unittest.PayloadFixture(unittest.WithProtocolStateID(rootProtocolState.ID())),
+			Payload:    unittest.PayloadFixture(unittest.WithProtocolStateID(rootProtocolState.Hash())),
 		},
 	)
 	if err != nil {

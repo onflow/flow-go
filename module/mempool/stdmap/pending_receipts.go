@@ -61,7 +61,7 @@ func removeReceipt(
 	entities mempool.BackData[flow.Identifier, *flow.ExecutionReceipt],
 	byPreviousResultID map[flow.Identifier]receiptsSet) {
 
-	receiptID := receipt.ID()
+	receiptID := receipt.Hash()
 	entities.Remove(receiptID)
 
 	index := indexByPreviousResultID(receipt)
@@ -76,7 +76,7 @@ func removeReceipt(
 func (r *PendingReceipts) Add(receipt *flow.ExecutionReceipt) bool {
 	added := false
 	err := r.Backend.Run(func(backData mempool.BackData[flow.Identifier, *flow.ExecutionReceipt]) error {
-		receiptID := receipt.ID()
+		receiptID := receipt.Hash()
 		_, exists := backData.Get(receiptID)
 		if exists {
 			// duplication

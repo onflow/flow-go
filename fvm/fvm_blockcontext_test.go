@@ -1542,7 +1542,7 @@ func TestBlockContext_GetBlockInfo(t *testing.T) {
 				"Block(height: %v, view: %v, id: 0x%x, timestamp: %.8f)",
 				block1.Height,
 				block1.View,
-				block1.ID(),
+				block1.Hash(),
 				float64(block1.Timestamp/1000), // Unix time in seconds
 			),
 			output.Logs[0],
@@ -1553,7 +1553,7 @@ func TestBlockContext_GetBlockInfo(t *testing.T) {
 				"Block(height: %v, view: %v, id: 0x%x, timestamp: %.8f)",
 				block2.Height,
 				block2.View,
-				block2.ID(),
+				block2.Hash(),
 				float64(block2.Timestamp/1000), // Unix time in seconds
 			),
 			output.Logs[1],
@@ -1584,7 +1584,7 @@ func TestBlockContext_GetBlockInfo(t *testing.T) {
 				"Block(height: %v, view: %v, id: 0x%x, timestamp: %.8f)",
 				block1.Height,
 				block1.View,
-				block1.ID(),
+				block1.Hash(),
 				float64(block1.Timestamp/1000), // Unix time in seconds
 			),
 			output.Logs[0],
@@ -1595,7 +1595,7 @@ func TestBlockContext_GetBlockInfo(t *testing.T) {
 				"Block(height: %v, view: %v, id: 0x%x, timestamp: %.8f)",
 				block2.Height,
 				block2.View,
-				block2.ID(),
+				block2.Hash(),
 				float64(block2.Timestamp/1000), // Unix time in seconds
 			),
 			output.Logs[1],

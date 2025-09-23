@@ -53,8 +53,8 @@ func NewApprovalCollector(
 	collector := ApprovalCollector{
 		log: log.With().
 			Str("component", "approval_collector").
-			Str("incorporated_block", incorporatedBlock.ID().String()).
-			Str("executed_block", executedBlock.ID().String()).
+			Str("incorporated_block", incorporatedBlock.Hash().String()).
+			Str("executed_block", executedBlock.Hash().String()).
 			Logger(),
 		incorporatedResult:   result,
 		incorporatedBlock:    incorporatedBlock,
@@ -74,12 +74,12 @@ func NewApprovalCollector(
 		for i := uint64(0); i < numberOfChunks; i++ {
 			_, err := collector.aggregatedSignatures.PutSignature(i, flow.AggregatedSignature{})
 			if err != nil {
-				return nil, fmt.Errorf("sealing result %x failed: %w", result.ID(), err)
+				return nil, fmt.Errorf("sealing result %x failed: %w", result.Hash(), err)
 			}
 		}
 		err := collector.SealResult()
 		if err != nil {
-			return nil, fmt.Errorf("sealing result %x failed: %w", result.ID(), err)
+			return nil, fmt.Errorf("sealing result %x failed: %w", result.Hash(), err)
 		}
 	}
 
@@ -117,7 +117,7 @@ func (c *ApprovalCollector) SealResult() error {
 	seal, err := flow.NewSeal(
 		flow.UntrustedSeal{
 			BlockID:                c.incorporatedResult.Result.BlockID,
-			ResultID:               c.incorporatedResult.Result.ID(),
+			ResultID:               c.incorporatedResult.Result.Hash(),
 			FinalState:             finalState,
 			AggregatedApprovalSigs: c.aggregatedSignatures.Collect(),
 		},

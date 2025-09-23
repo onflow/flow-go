@@ -154,7 +154,7 @@ func (p *CombinedVoteProcessorV2) Status() hotstuff.VoteCollectorStatus {
 func (p *CombinedVoteProcessorV2) Process(vote *model.Vote) error {
 	err := EnsureVoteForBlock(vote, p.block)
 	if err != nil {
-		return fmt.Errorf("received incompatible vote %v: %w", vote.ID(), err)
+		return fmt.Errorf("received incompatible vote %v: %w", vote.Hash(), err)
 	}
 
 	// Vote Processing state machine
@@ -166,7 +166,7 @@ func (p *CombinedVoteProcessorV2) Process(vote *model.Vote) error {
 		if errors.Is(err, msig.ErrInvalidSignatureFormat) {
 			return model.NewInvalidVoteErrorf(vote, "could not decode signature: %w", err)
 		}
-		return fmt.Errorf("unexpected error decoding vote %v: %w", vote.ID(), err)
+		return fmt.Errorf("unexpected error decoding vote %v: %w", vote.Hash(), err)
 	}
 
 	// Verify staking sig.
@@ -174,13 +174,13 @@ func (p *CombinedVoteProcessorV2) Process(vote *model.Vote) error {
 	if err != nil {
 		if model.IsInvalidSignerError(err) {
 			return model.NewInvalidVoteErrorf(vote, "vote %x for view %d is not from an authorized consensus participant: %w",
-				vote.ID(), vote.View, err)
+				vote.Hash(), vote.View, err)
 		}
 		if errors.Is(err, model.ErrInvalidSignature) {
 			return model.NewInvalidVoteErrorf(vote, "vote %x for view %d has an invalid staking signature: %w",
-				vote.ID(), vote.View, err)
+				vote.Hash(), vote.View, err)
 		}
-		return fmt.Errorf("internal error checking signature validity for vote %v: %w", vote.ID(), err)
+		return fmt.Errorf("internal error checking signature validity for vote %v: %w", vote.Hash(), err)
 	}
 
 	if p.done.Load() {
@@ -194,13 +194,13 @@ func (p *CombinedVoteProcessorV2) Process(vote *model.Vote) error {
 			// InvalidSignerError is possible in case we have consensus participants that are _not_ part of the random beacon committee.
 			if model.IsInvalidSignerError(err) {
 				return model.NewInvalidVoteErrorf(vote, "vote %x for view %d is not from an authorized random beacon participant: %w",
-					vote.ID(), vote.View, err)
+					vote.Hash(), vote.View, err)
 			}
 			if errors.Is(err, model.ErrInvalidSignature) {
 				return model.NewInvalidVoteErrorf(vote, "vote %x for view %d has an invalid random beacon signature: %w",
-					vote.ID(), vote.View, err)
+					vote.Hash(), vote.View, err)
 			}
-			return fmt.Errorf("internal error checking signature validity for vote %v: %w", vote.ID(), err)
+			return fmt.Errorf("internal error checking signature validity for vote %v: %w", vote.Hash(), err)
 		}
 	}
 
@@ -213,7 +213,7 @@ func (p *CombinedVoteProcessorV2) Process(vote *model.Vote) error {
 	if err != nil {
 		// we don't expect any errors here during normal operation, as we previously checked
 		// for duplicated votes from the same signer and verified the signer+signature
-		return fmt.Errorf("unexpected exception adding signature from vote %v to staking aggregator: %w", vote.ID(), err)
+		return fmt.Errorf("unexpected exception adding signature from vote %v to staking aggregator: %w", vote.Hash(), err)
 	}
 	// Add random beacon sig to threshold sig reconstructor
 	if randomBeaconSig != nil {
@@ -221,7 +221,7 @@ func (p *CombinedVoteProcessorV2) Process(vote *model.Vote) error {
 		if err != nil {
 			// we don't expect any errors here during normal operation, as we previously checked
 			// for duplicated votes from the same signer and verified the signer+signature
-			return fmt.Errorf("unexpected exception adding signature from vote %v to random beacon reconstructor: %w", vote.ID(), err)
+			return fmt.Errorf("unexpected exception adding signature from vote %v to random beacon reconstructor: %w", vote.Hash(), err)
 		}
 	}
 

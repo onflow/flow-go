@@ -66,7 +66,7 @@ func NewAssignmentCollectorBase(logger zerolog.Logger,
 		requestTracker:                       requestTracker,
 		requiredApprovalsForSealConstruction: requiredApprovalsForSealConstruction,
 		result:                               result,
-		resultID:                             result.ID(),
+		resultID:                             result.Hash(),
 		executedBlock:                        executedBlock,
 	}, nil
 }
@@ -82,6 +82,6 @@ func (cb *AssignmentCollectorBase) OnInvalidApproval(approval *flow.ResultApprov
 		Str("approver_id", approval.Body.ApproverID.String()).
 		Str("executed_block_id", approval.Body.BlockID.String()).
 		Str("result_id", approval.Body.ExecutionResultID.String()).
-		Str("approval_id", approval.ID().String()).
+		Str("approval_id", approval.Hash().String()).
 		Msg("received invalid approval")
 }

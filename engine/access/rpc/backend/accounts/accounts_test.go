@@ -83,7 +83,7 @@ func (s *AccountsSuite) TestGetAccountFromExecutionNode_HappyPath() {
 	ctx := context.Background()
 
 	s.setupExecutionNodes(s.block)
-	s.setupENSuccessResponse(s.block.ID())
+	s.setupENSuccessResponse(s.block.Hash())
 
 	scriptExecutor := execmock.NewScriptExecutor(s.T())
 	backend := s.defaultAccountsBackend(query_mode.IndexQueryModeExecutionNodesOnly, scriptExecutor)
@@ -110,7 +110,7 @@ func (s *AccountsSuite) TestGetAccountFromExecutionNode_Fails() {
 	errToReturn := status.Error(statusCode, "random error")
 
 	s.setupExecutionNodes(s.block)
-	s.setupENFailingResponse(s.block.ID(), errToReturn)
+	s.setupENFailingResponse(s.block.Hash(), errToReturn)
 
 	scriptExecutor := execmock.NewScriptExecutor(s.T())
 	backend := s.defaultAccountsBackend(query_mode.IndexQueryModeExecutionNodesOnly, scriptExecutor)
@@ -206,7 +206,7 @@ func (s *AccountsSuite) TestGetAccountFromFailover_HappyPath() {
 	ctx := context.Background()
 
 	s.setupExecutionNodes(s.block)
-	s.setupENSuccessResponse(s.block.ID())
+	s.setupENSuccessResponse(s.block.Hash())
 
 	scriptExecutor := execmock.NewScriptExecutor(s.T())
 	backend := s.defaultAccountsBackend(query_mode.IndexQueryModeFailover, scriptExecutor)
@@ -242,7 +242,7 @@ func (s *AccountsSuite) TestGetAccountFromFailover_ReturnsENErrors() {
 	errToReturn := status.Error(statusCode, "random error")
 
 	s.setupExecutionNodes(s.block)
-	s.setupENFailingResponse(s.block.ID(), errToReturn)
+	s.setupENFailingResponse(s.block.Hash(), errToReturn)
 
 	scriptExecutor := execmock.NewScriptExecutor(s.T())
 	scriptExecutor.On("GetAccountAtBlockHeight", mock.Anything, s.failingAddress, s.block.Height).
@@ -299,7 +299,7 @@ func (s *AccountsSuite) TestGetAccountBalanceFromStorage_HappyPath() {
 	})
 
 	s.Run("GetAccountBalanceAtBlockHeight - happy path", func() {
-		s.headers.On("BlockIDByHeight", s.block.Height).Return(s.block.ID(), nil).Once()
+		s.headers.On("BlockIDByHeight", s.block.Height).Return(s.block.Hash(), nil).Once()
 		s.testGetAccountBalanceAtBlockHeight(ctx, backend)
 	})
 }
@@ -309,7 +309,7 @@ func (s *AccountsSuite) TestGetAccountBalanceFromExecutionNode_HappyPath() {
 	ctx := context.Background()
 
 	s.setupExecutionNodes(s.block)
-	s.setupENSuccessResponse(s.block.ID())
+	s.setupENSuccessResponse(s.block.Hash())
 
 	scriptExecutor := execmock.NewScriptExecutor(s.T())
 	backend := s.defaultAccountsBackend(query_mode.IndexQueryModeExecutionNodesOnly, scriptExecutor)
@@ -319,7 +319,7 @@ func (s *AccountsSuite) TestGetAccountBalanceFromExecutionNode_HappyPath() {
 	})
 
 	s.Run("GetAccountBalanceAtBlockHeight - happy path", func() {
-		s.headers.On("BlockIDByHeight", s.block.Height).Return(s.block.ID(), nil).Once()
+		s.headers.On("BlockIDByHeight", s.block.Height).Return(s.block.Hash(), nil).Once()
 		s.testGetAccountBalanceAtBlockHeight(ctx, backend)
 	})
 }
@@ -330,7 +330,7 @@ func (s *AccountsSuite) TestGetAccountBalanceFromFailover_HappyPath() {
 	ctx := context.Background()
 
 	s.setupExecutionNodes(s.block)
-	s.setupENSuccessResponse(s.block.ID())
+	s.setupENSuccessResponse(s.block.Hash())
 
 	scriptExecutor := execmock.NewScriptExecutor(s.T())
 	backend := s.defaultAccountsBackend(query_mode.IndexQueryModeFailover, scriptExecutor)
@@ -344,7 +344,7 @@ func (s *AccountsSuite) TestGetAccountBalanceFromFailover_HappyPath() {
 		})
 
 		s.Run(fmt.Sprintf("GetAccountBalanceAtBlockHeight - happy path -recovers %v", errToReturn), func() {
-			s.headers.On("BlockIDByHeight", s.block.Height).Return(s.block.ID(), nil).Once()
+			s.headers.On("BlockIDByHeight", s.block.Height).Return(s.block.Hash(), nil).Once()
 			s.testGetAccountBalanceAtBlockHeight(ctx, backend)
 		})
 
@@ -367,7 +367,7 @@ func (s *AccountsSuite) TestGetAccountKeysFromStorage_HappyPath() {
 	})
 
 	s.Run("GetAccountKeysAtBlockHeight - happy path", func() {
-		s.headers.On("BlockIDByHeight", s.block.Height).Return(s.block.ID(), nil).Once()
+		s.headers.On("BlockIDByHeight", s.block.Height).Return(s.block.Hash(), nil).Once()
 
 		s.testGetAccountKeysAtBlockHeight(ctx, backend)
 
@@ -391,7 +391,7 @@ func (s *AccountsSuite) TestGetAccountKeyFromStorage_HappyPath() {
 	})
 
 	s.Run("GetAccountKeyAtBlockHeight - by key index - happy path", func() {
-		s.headers.On("BlockIDByHeight", s.block.Height).Return(s.block.ID(), nil).Once()
+		s.headers.On("BlockIDByHeight", s.block.Height).Return(s.block.Hash(), nil).Once()
 
 		s.testGetAccountKeyAtBlockHeight(ctx, backend, keyIndex)
 	})
@@ -402,7 +402,7 @@ func (s *AccountsSuite) TestGetAccountKeysFromExecutionNode_HappyPath() {
 	ctx := context.Background()
 
 	s.setupExecutionNodes(s.block)
-	s.setupENSuccessResponse(s.block.ID())
+	s.setupENSuccessResponse(s.block.Hash())
 
 	scriptExecutor := execmock.NewScriptExecutor(s.T())
 	backend := s.defaultAccountsBackend(query_mode.IndexQueryModeExecutionNodesOnly, scriptExecutor)
@@ -412,7 +412,7 @@ func (s *AccountsSuite) TestGetAccountKeysFromExecutionNode_HappyPath() {
 	})
 
 	s.Run("GetAccountKeysAtBlockHeight - all keys - happy path", func() {
-		s.headers.On("BlockIDByHeight", s.block.Height).Return(s.block.ID(), nil).Once()
+		s.headers.On("BlockIDByHeight", s.block.Height).Return(s.block.Hash(), nil).Once()
 
 		s.testGetAccountKeysAtBlockHeight(ctx, backend)
 	})
@@ -424,7 +424,7 @@ func (s *AccountsSuite) TestGetAccountKeyFromExecutionNode_HappyPath() {
 	ctx := context.Background()
 
 	s.setupExecutionNodes(s.block)
-	s.setupENSuccessResponse(s.block.ID())
+	s.setupENSuccessResponse(s.block.Hash())
 
 	scriptExecutor := execmock.NewScriptExecutor(s.T())
 	backend := s.defaultAccountsBackend(query_mode.IndexQueryModeExecutionNodesOnly, scriptExecutor)
@@ -436,7 +436,7 @@ func (s *AccountsSuite) TestGetAccountKeyFromExecutionNode_HappyPath() {
 	})
 
 	s.Run("GetAccountKeysAtLatestBlock - by key index - happy path", func() {
-		s.headers.On("BlockIDByHeight", s.block.Height).Return(s.block.ID(), nil).Once()
+		s.headers.On("BlockIDByHeight", s.block.Height).Return(s.block.Hash(), nil).Once()
 
 		s.testGetAccountKeyAtBlockHeight(ctx, backend, keyIndex)
 	})
@@ -448,7 +448,7 @@ func (s *AccountsSuite) TestGetAccountKeysFromFailover_HappyPath() {
 	ctx := context.Background()
 
 	s.setupExecutionNodes(s.block)
-	s.setupENSuccessResponse(s.block.ID())
+	s.setupENSuccessResponse(s.block.Hash())
 
 	scriptExecutor := execmock.NewScriptExecutor(s.T())
 	backend := s.defaultAccountsBackend(query_mode.IndexQueryModeFailover, scriptExecutor)
@@ -462,7 +462,7 @@ func (s *AccountsSuite) TestGetAccountKeysFromFailover_HappyPath() {
 		})
 
 		s.Run(fmt.Sprintf("GetAccountKeysAtBlockHeight - all keys - happy path - recovers %v", errToReturn), func() {
-			s.headers.On("BlockIDByHeight", s.block.Height).Return(s.block.ID(), nil).Once()
+			s.headers.On("BlockIDByHeight", s.block.Height).Return(s.block.Hash(), nil).Once()
 
 			s.testGetAccountKeysAtBlockHeight(ctx, backend)
 		})
@@ -475,7 +475,7 @@ func (s *AccountsSuite) TestGetAccountKeyFromFailover_HappyPath() {
 	ctx := context.Background()
 
 	s.setupExecutionNodes(s.block)
-	s.setupENSuccessResponse(s.block.ID())
+	s.setupENSuccessResponse(s.block.Hash())
 
 	scriptExecutor := execmock.NewScriptExecutor(s.T())
 	backend := s.defaultAccountsBackend(query_mode.IndexQueryModeFailover, scriptExecutor)
@@ -490,7 +490,7 @@ func (s *AccountsSuite) TestGetAccountKeyFromFailover_HappyPath() {
 		})
 
 		s.Run(fmt.Sprintf("GetAccountKeysAtBlockHeight - by key index - happy path - recovers %v", errToReturn), func() {
-			s.headers.On("BlockIDByHeight", s.block.Height).Return(s.block.ID(), nil).Once()
+			s.headers.On("BlockIDByHeight", s.block.Height).Return(s.block.Hash(), nil).Once()
 
 			s.testGetAccountKeyAtBlockHeight(ctx, backend, keyIndex)
 		})
@@ -531,7 +531,7 @@ func (s *AccountsSuite) testGetAccountAtLatestBlock(ctx context.Context, backend
 
 func (s *AccountsSuite) testGetAccountAtBlockHeight(ctx context.Context, backend *Accounts, statusCode codes.Code) {
 	height := s.block.Height
-	s.headers.On("BlockIDByHeight", height).Return(s.block.ID(), nil).Once()
+	s.headers.On("BlockIDByHeight", height).Return(s.block.Hash(), nil).Once()
 
 	if statusCode == codes.OK {
 		actual, err := backend.GetAccountAtBlockHeight(ctx, s.account.Address, height)
@@ -634,7 +634,7 @@ func (s *AccountsSuite) setupExecutionNodes(block *flow.Block) {
 	// to ensure the mock library handles the response type correctly
 	var receipts flow.ExecutionReceiptList //nolint:gosimple
 	receipts = unittest.ReceiptsForBlockFixture(block, s.executionNodes.NodeIDs())
-	s.receipts.On("ByBlockID", block.ID()).Return(receipts, nil)
+	s.receipts.On("ByBlockID", block.Hash()).Return(receipts, nil)
 
 	s.connectionFactory.On("GetExecutionAPIClient", mock.Anything).
 		Return(s.execClient, &mocks.MockCloser{}, nil)

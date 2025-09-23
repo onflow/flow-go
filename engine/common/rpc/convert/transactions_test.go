@@ -30,5 +30,5 @@ func TestConvertTransaction(t *testing.T) {
 	require.NoError(t, err)
 
 	assert.Equal(t, tx, converted)
-	assert.Equal(t, tx.ID(), converted.ID())
+	assert.Equal(t, tx.Hash(), converted.Hash())
 }

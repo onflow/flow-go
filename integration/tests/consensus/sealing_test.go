@@ -174,7 +174,7 @@ SearchLoop:
 		block := proposal.Block
 
 		// make sure we skip duplicates
-		proposalID := block.ID()
+		proposalID := block.Hash()
 		_, processed := confirmations[proposalID]
 		if processed {
 			continue
@@ -246,7 +246,7 @@ SearchLoop:
 		ExecutionDataID:  unittest.IdentifierFixture(), // our fake execution data ID
 	}
 
-	ss.T().Logf("execution result generated (result: %x)\n", result.ID())
+	ss.T().Logf("execution result generated (result: %x)\n", result.Hash())
 
 	// create the execution receipt for the only execution node
 	receiptBody := flow.UnsignedExecutionReceipt{
@@ -256,7 +256,7 @@ SearchLoop:
 	}
 
 	// create Full Execution Receipt by signing the previously-created receipt's body
-	unsignedReceiptID := receiptBody.ID()
+	unsignedReceiptID := receiptBody.Hash()
 	sig, err := ss.exeSK.Sign(unsignedReceiptID[:], exeUtils.NewExecutionReceiptHasher())
 	require.NoError(ss.T(), err)
 	receipt := messages.ExecutionReceipt{
@@ -271,7 +271,7 @@ SearchLoop:
 		Spocks:          ss.spocks, // our fake spocks
 	}
 
-	unsignedReceiptID2 := receiptBody2.ID()
+	unsignedReceiptID2 := receiptBody2.Hash()
 	sig2, err := ss.exe2SK.Sign(unsignedReceiptID2[:], exeUtils.NewExecutionReceiptHasher())
 	require.NoError(ss.T(), err)
 	receipt2 := messages.ExecutionReceipt{
@@ -296,18 +296,18 @@ ReceiptLoop:
 		break ReceiptLoop
 	}
 
-	ss.T().Logf("execution receipt submitted (receipt: %x, result: %x)\n", receipt.ID(), receipt.ExecutionResult.ID())
-	ss.T().Logf("execution receipt submitted (receipt2: %x, result: %x)\n", receipt2.ID(), receipt2.ExecutionResult.ID())
+	ss.T().Logf("execution receipt submitted (receipt: %x, result: %x)\n", receipt.Hash(), receipt.ExecutionResult.Hash())
+	ss.T().Logf("execution receipt submitted (receipt2: %x, result: %x)\n", receipt2.Hash(), receipt2.ExecutionResult.Hash())
 
 	// attestation
 	atst := flow.Attestation{
 		BlockID:           result.BlockID, // the block for the result
-		ExecutionResultID: result.ID(),    // the actual execution result
+		ExecutionResultID: result.Hash(),  // the actual execution result
 		ChunkIndex:        chunk.Index,    // the chunk of this approval
 	}
 
 	// generates a signature over the attestation part of approval
-	atstID := atst.ID()
+	atstID := atst.Hash()
 	atstSign, err := ss.verSK.Sign(atstID[:], verUtils.NewResultApprovalHasher())
 	require.NoError(ss.T(), err)
 
@@ -320,7 +320,7 @@ ReceiptLoop:
 	}
 
 	// generates a signature over result approval body
-	bodyID := body.ID()
+	bodyID := body.Hash()
 	bodySign, err := ss.verSK.Sign(bodyID[:], verUtils.NewResultApprovalHasher())
 	require.NoError(ss.T(), err)
 
@@ -348,7 +348,7 @@ ApprovalLoop:
 	internalApproval, ok := internal.(*flow.ResultApproval)
 	require.True(ss.T(), ok)
 
-	ss.T().Logf("result approval submitted (approval: %x, result: %x)\n", internalApproval.ID(), approval.Body.ExecutionResultID)
+	ss.T().Logf("result approval submitted (approval: %x, result: %x)\n", internalApproval.Hash(), approval.Body.ExecutionResultID)
 
 	// we try to find a block with the guarantee included and three confirmations
 	found := false
@@ -370,13 +370,13 @@ SealingLoop:
 		block := proposal.Block
 
 		// log the proposal details
-		proposalID := block.ID()
+		proposalID := block.Hash()
 		seals := block.Payload.Seals
 
 		// if the block seal is included, we add the block to those we
 		// monitor for confirmations
 		for _, seal := range seals {
-			if seal.ResultID == result.ID() {
+			if seal.ResultID == result.Hash() {
 				found = true
 				ss.T().Logf("%x: block seal included!\n", proposalID)
 				break SealingLoop

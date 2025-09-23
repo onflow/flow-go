@@ -277,7 +277,7 @@ func (c *ComplianceCore) processCertifiedBlocks(ctx context.Context, blocks Cert
 
 		b, err := model.NewCertifiedBlock(model.BlockFromFlow(certifiedBlock.Proposal.Block.ToHeader()), certifiedBlock.CertifyingQC)
 		if err != nil {
-			return fmt.Errorf("failed to convert certified block %v to HotStuff type: %w", certifiedBlock.Proposal.Block.ID(), err)
+			return fmt.Errorf("failed to convert certified block %v to HotStuff type: %w", certifiedBlock.Proposal.Block.Hash(), err)
 		}
 		c.follower.AddCertifiedBlock(&b) // submit the model to follower for async processing
 	}
@@ -303,7 +303,7 @@ func (c *ComplianceCore) processFinalizedBlock(ctx context.Context, finalized *f
 	// Therefore, from the perspective of the consensus follower, receiving a _non-empty_ `connectedBlocks` is a
 	// symptom of internal state corruption or a bug.
 	if len(connectedBlocks) > 0 {
-		return fmt.Errorf("finalizing block %v caused the PendingTree to connect additional blocks, which is a symptom of internal state corruption or a bug", finalized.ID())
+		return fmt.Errorf("finalizing block %v caused the PendingTree to connect additional blocks, which is a symptom of internal state corruption or a bug", finalized.Hash())
 	}
 	return nil
 }

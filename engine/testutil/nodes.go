@@ -618,7 +618,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity bootstrap.NodeInfo, ide
 	require.NoError(t, err)
 
 	require.Equal(t, fmt.Sprint(rootSeal.FinalState), fmt.Sprint(commit))
-	require.Equal(t, rootSeal.ResultID, rootResult.ID())
+	require.Equal(t, rootSeal.ResultID, rootResult.Hash())
 
 	err = bootstrapper.BootstrapExecutionDatabase(node.LockManager, db, rootSeal)
 	require.NoError(t, err)
@@ -864,7 +864,7 @@ func getRoot(t *testing.T, node *testmock.GenericNode) (*flow.Header, *flow.Quor
 
 	rootQC, err := flow.NewQuorumCertificate(flow.UntrustedQuorumCertificate{
 		View:          rootHead.View,
-		BlockID:       rootHead.ID(),
+		BlockID:       rootHead.Hash(),
 		SignerIndices: signerIndices,
 		SigData:       unittest.SignatureFixture(),
 	})

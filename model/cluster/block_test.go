@@ -288,7 +288,7 @@ func TestNewRootProposal(t *testing.T) {
 // block when encoded as JSON is present and accurate.
 func TestBlockEncodingJSON_IDField(t *testing.T) {
 	block := unittest.ClusterBlockFixture()
-	blockID := block.ID()
+	blockID := block.Hash()
 	data, err := json.Marshal(block)
 	require.NoError(t, err)
 	var decodedIDField struct{ ID flow.Identifier }

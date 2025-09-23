@@ -71,7 +71,7 @@ func NewBadgerRetryableUploaderWrapper(
 			return
 		}
 
-		blockID := computationResult.ExecutableBlock.Block.ID()
+		blockID := computationResult.ExecutableBlock.Block.Hash()
 		if err != nil {
 			log.Warn().Msgf("ComputationResults upload failed with BlockID %s", blockID.String())
 			return
@@ -113,7 +113,7 @@ func (b *BadgerRetryableUploaderWrapper) Upload(computationResult *execution.Com
 
 	// Before upload we store ComputationResult upload status to BadgerDB as false before upload is done.
 	// It will be marked as true when upload completes.
-	blockID := computationResult.ExecutableBlock.Block.ID()
+	blockID := computationResult.ExecutableBlock.Block.Hash()
 	if err := b.uploadStatusStore.Upsert(blockID, false /*not completed*/); err != nil {
 		log.Warn().Msgf("failed to store ComputationResult into local DB with BlockID %s", blockID)
 	}

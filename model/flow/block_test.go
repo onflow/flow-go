@@ -15,39 +15,39 @@ import (
 
 func TestGenesisEncodingJSON(t *testing.T) {
 	genesis := unittest.Block.Genesis(flow.Mainnet)
-	genesisID := genesis.ID()
+	genesisID := genesis.Hash()
 	data, err := json.Marshal(genesis)
 	require.NoError(t, err)
 	var decoded flow.Block
 	err = json.Unmarshal(data, &decoded)
 	require.NoError(t, err)
-	decodedID := decoded.ID()
+	decodedID := decoded.Hash()
 	assert.Equal(t, genesisID, decodedID)
 	assert.Equal(t, genesis, &decoded)
 }
 
 func TestGenesisDecodingMsgpack(t *testing.T) {
 	genesis := unittest.Block.Genesis(flow.Mainnet)
-	genesisID := genesis.ID()
+	genesisID := genesis.Hash()
 	data, err := msgpack.Marshal(genesis)
 	require.NoError(t, err)
 	var decoded flow.Block
 	err = msgpack.Unmarshal(data, &decoded)
 	require.NoError(t, err)
-	decodedID := decoded.ID()
+	decodedID := decoded.Hash()
 	assert.Equal(t, genesisID, decodedID)
 	assert.Equal(t, genesis, &decoded)
 }
 
 func TestBlockEncodingJSON(t *testing.T) {
 	block := unittest.BlockFixture()
-	blockID := block.ID()
+	blockID := block.Hash()
 	data, err := json.Marshal(block)
 	require.NoError(t, err)
 	var decoded flow.Block
 	err = json.Unmarshal(data, &decoded)
 	require.NoError(t, err)
-	decodedID := decoded.ID()
+	decodedID := decoded.Hash()
 	assert.Equal(t, blockID, decodedID)
 	assert.Equal(t, block, &decoded)
 }
@@ -56,7 +56,7 @@ func TestBlockEncodingJSON(t *testing.T) {
 // block when encoded as JSON is present and accurate.
 func TestBlockEncodingJSON_IDField(t *testing.T) {
 	block := unittest.BlockFixture()
-	blockID := block.ID()
+	blockID := block.Hash()
 	data, err := json.Marshal(block)
 	require.NoError(t, err)
 	var decodedIDField struct{ ID flow.Identifier }
@@ -67,13 +67,13 @@ func TestBlockEncodingJSON_IDField(t *testing.T) {
 
 func TestBlockEncodingMsgpack(t *testing.T) {
 	block := unittest.BlockFixture()
-	blockID := block.ID()
+	blockID := block.Hash()
 	data, err := msgpack.Marshal(block)
 	require.NoError(t, err)
 	var decoded flow.Block
 	err = msgpack.Unmarshal(data, &decoded)
 	require.NoError(t, err)
-	decodedID := decoded.ID()
+	decodedID := decoded.Hash()
 	assert.Equal(t, blockID, decodedID)
 	assert.Equal(t, block, &decoded)
 }

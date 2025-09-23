@@ -86,7 +86,7 @@ func (e *ExecutionNodeIdentitiesProvider) ExecutionNodesForBlockID(
 	// will not be present for the root block.
 	rootBlock := e.state.Params().FinalizedRoot()
 
-	if rootBlock.ID() == blockID {
+	if rootBlock.Hash() == blockID {
 		executorIdentities, err := e.state.Final().Identities(filter.HasRole[flow.Identity](flow.RoleExecution))
 		if err != nil {
 			return nil, fmt.Errorf("failed to retreive execution IDs for block ID %v: %w", blockID, err)
@@ -159,7 +159,7 @@ func (e *ExecutionNodeIdentitiesProvider) ExecutionNodesForResultID(
 	rootBlock := e.state.Params().FinalizedRoot()
 
 	// if block is a root block, don't look for execution receipts as there are none for root block.
-	if rootBlock.ID() == blockID {
+	if rootBlock.Hash() == blockID {
 		executorIdentities, err := e.state.Final().Identities(filter.HasRole[flow.Identity](flow.RoleExecution))
 		if err != nil {
 			return nil, fmt.Errorf("failed to retreive execution IDs for block ID %v: %w", blockID, err)

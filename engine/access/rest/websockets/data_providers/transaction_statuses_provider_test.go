@@ -126,7 +126,7 @@ func backendTransactionStatusesResponse(block *flow.Block) []*accessmodel.Transa
 		StatusCode:   10,
 		Events:       unittest.EventsFixture(1),
 		ErrorMessage: "",
-		BlockID:      block.ID(),
+		BlockID:      block.Hash(),
 		CollectionID: cid,
 		BlockHeight:  block.Height,
 	}
@@ -187,7 +187,7 @@ func (s *TransactionStatusesProviderSuite) TestMessageIndexTransactionStatusesPr
 
 	arguments :=
 		map[string]interface{}{
-			"tx_id": unittest.TransactionFixture().ID().String(),
+			"tx_id": unittest.TransactionFixture().Hash().String(),
 		}
 
 	// Create the TransactionStatusesDataProvider instance
@@ -306,7 +306,7 @@ func invalidTransactionStatusesArgumentsTestCases() []testErrType {
 			name: "unexpected argument",
 			arguments: map[string]interface{}{
 				"unexpected_argument": "dummy",
-				"tx_id":               unittest.TransactionFixture().ID().String(),
+				"tx_id":               unittest.TransactionFixture().Hash().String(),
 			},
 			expectedErrorMsg: "unexpected field: 'unexpected_argument'",
 		},
