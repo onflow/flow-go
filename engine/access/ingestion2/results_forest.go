@@ -84,6 +84,7 @@ var (
 //   - 𝓹.Level ≤ 𝓼.Level ≤ 𝓱
 //     with the additional constraint that 𝓹.Level < 𝓱 (required for liveness)
 //   - 𝓹, 𝓼, 𝓱, monotonically increase during the runtime of the ResultsForest
+//   - [optional, simplifying convention] there exists no result 𝒓 in the forest with 𝒓.Level < 𝓹.Level
 //
 // Any honest protocol execution should satisfy the invariant. Hence, the invariant being violated is a
 // symptom of a severe bug in the protocol implementation or a corrupted internal state. Either way, safe
