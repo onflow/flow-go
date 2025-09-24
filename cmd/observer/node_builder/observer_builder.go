@@ -305,6 +305,7 @@ type ObserverServiceBuilder struct {
 	// storage
 	events                  storage.Events
 	lightTransactionResults storage.LightTransactionResults
+	registers               storage.RegisterSnapshotReader
 
 	// available until after the network has started. Hence, a factory function that needs to be called just before
 	// creating the sync engine
@@ -1205,8 +1206,7 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 			)
 
 			return nil
-		},
-		).
+		}).
 		Module("registers storage", func(node *cmd.NodeConfig) error {
 			pdb, err := pstorage.OpenRegisterPebbleDB(
 				node.Logger.With().Str("pebbledb", "registers").Logger(),
@@ -1304,6 +1304,8 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 			} else {
 				builder.Storage.RegisterIndex = registers
 			}
+
+			builder.registers = pstorage.NewRegisterSnapshotReader(builder.Storage.RegisterIndex)
 
 			return nil
 		}).
@@ -2039,7 +2041,7 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 			nil,
 			builder.lightTransactionResults,
 			nil,
-			pstorage.NewRegisterSnapshotReader(builder.Storage.RegisterIndex),
+			builder.registers,
 		)
 		execStateCache := execution_state.NewExecutionStateCacheMock(snapshot)
 

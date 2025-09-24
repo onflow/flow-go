@@ -74,6 +74,7 @@ type TransactionStreamSuite struct {
 	transactionResults *storagemock.LightTransactionResults
 	events             *storagemock.Events
 	seals              *storagemock.Seals
+	registers          *storagemock.RegisterSnapshotReader
 
 	colClient              *access.AccessAPIClient
 	execClient             *access.ExecutionAPIClient
@@ -131,6 +132,7 @@ func (s *TransactionStreamSuite) SetupTest() {
 	s.receipts = storagemock.NewExecutionReceipts(s.T())
 	s.results = storagemock.NewExecutionResults(s.T())
 	s.seals = storagemock.NewSeals(s.T())
+	s.registers = storagemock.NewRegisterSnapshotReader(s.T())
 	s.colClient = access.NewAccessAPIClient(s.T())
 	s.archiveClient = access.NewAccessAPIClient(s.T())
 	s.execClient = access.NewExecutionAPIClient(s.T())
@@ -292,6 +294,7 @@ func (s *TransactionStreamSuite) initializeBackend() {
 			MaxCollectionByteSize:  flow.DefaultMaxCollectionByteSize,
 		},
 		execmock.NewScriptExecutor(s.T()),
+		s.registers,
 	)
 	s.Require().NoError(err)
 

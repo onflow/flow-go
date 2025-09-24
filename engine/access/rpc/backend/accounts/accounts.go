@@ -38,7 +38,7 @@ func NewAccountsBackend(
 	scriptExecMode query_mode.IndexQueryMode,
 	scriptExecutor execution.ScriptExecutor,
 	execNodeIdentitiesProvider *commonrpc.ExecutionNodeIdentitiesProvider,
-	registers storage.RegisterSnapshotReader, //TODO(Data availability #7650): remove registers when fork-aware account endpoints will be implemented
+	registers storage.RegisterSnapshotReader,
 ) (*Accounts, error) {
 	var accountProvider provider.AccountProvider
 
