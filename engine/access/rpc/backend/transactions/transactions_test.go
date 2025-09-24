@@ -1105,7 +1105,6 @@ func (s *Suite) TestGetTransactionResult_FromStorage() {
 	snapshot.On("Events").Return(s.events)
 	snapshot.On("LightTransactionResults").Return(s.lightTxResults)
 	snapshot.On("TransactionResultErrorMessages").Return(s.txResultErrorMessages)
-	snapshot.On("Collections").Return(s.collections)
 
 	// ExecutionResultQuery can return any result with an ID; only ID is used to fetch snapshot
 	fakeRes := &flow.ExecutionResult{PreviousResultID: unittest.IdentifierFixture()}
@@ -1206,7 +1205,6 @@ func (s *Suite) TestTransactionByIndexFromStorage() {
 	// Snapshot readers delegate to our storage mocks
 	snapshot.On("Events").Return(s.events)
 	snapshot.On("LightTransactionResults").Return(s.lightTxResults)
-	snapshot.On("Collections").Return(s.collections)
 	snapshot.On("TransactionResultErrorMessages").Return(s.txResultErrorMessages)
 	params.TxProvider = provider.NewLocalTransactionProvider(
 		params.State,
@@ -1312,7 +1310,6 @@ func (s *Suite) TestTransactionResultsByBlockIDFromStorage() {
 	// Snapshot readers delegate to our storage mocks
 	snapshot.On("Events").Return(s.events)
 	snapshot.On("LightTransactionResults").Return(s.lightTxResults)
-	snapshot.On("Collections").Return(s.collections)
 	snapshot.On("TransactionResultErrorMessages").Return(s.txResultErrorMessages)
 	params.TxProvider = provider.NewLocalTransactionProvider(
 		params.State,
@@ -1374,7 +1371,6 @@ func (s *Suite) TestGetTransactionsByBlockID() {
 	s.Run("LocalProvider", func() {
 		snapshot := optimisticsyncmock.NewSnapshot(s.T())
 		snapshot.On("Events").Return(s.events)
-		snapshot.On("Collections").Return(s.collections)
 
 		s.executionStateCache.
 			On("Snapshot", executionResultID).
@@ -1715,18 +1711,12 @@ func (s *Suite) TestSuccessfulTransactionsDontRetry() {
 	)
 	retry.RegisterTransaction(block.Height, transactionBody)
 
-	snapshot := optimisticsyncmock.NewSnapshot(s.T())
-	snapshot.On("Collections").Return(s.collections)
-
 	s.execResultProvider.
 		On("ExecutionResultInfo", block.ID(), mock.AnythingOfType("optimistic_sync.Criteria")).
 		Return(&optimistic_sync.ExecutionResultInfo{
 			ExecutionResultID: unittest.IdentifierFixture(),
 			ExecutionNodes:    s.identities.ToSkeleton(),
 		}, nil)
-	s.executionStateCache.
-		On("Snapshot", mock.Anything).
-		Return(snapshot, nil)
 
 	// first call - when block under test is greater height than the sealed head, but execution node does not know about Tx
 	result, _, err := txBackend.GetTransactionResult(

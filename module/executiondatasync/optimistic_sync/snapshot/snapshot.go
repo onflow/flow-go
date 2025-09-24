@@ -8,8 +8,6 @@ import (
 
 type Mock struct {
 	events                         storage.EventsReader
-	collections                    storage.CollectionsReader
-	transactions                   storage.TransactionsReader
 	lightTransactionResults        storage.LightTransactionResultsReader
 	transactionResultErrorMessages storage.TransactionResultErrorMessagesReader
 	registers                      storage.RegisterIndexReader
@@ -20,8 +18,6 @@ var _ optimistic_sync.Snapshot = (*Mock)(nil)
 
 func NewSnapshotMock(
 	events storage.EventsReader,
-	collections storage.CollectionsReader,
-	transactions storage.TransactionsReader,
 	lightTransactionResults storage.LightTransactionResultsReader,
 	transactionResultErrorMessages storage.TransactionResultErrorMessagesReader,
 	registers storage.RegisterIndexReader,
@@ -29,8 +25,6 @@ func NewSnapshotMock(
 ) *Mock {
 	return &Mock{
 		events:                         events,
-		collections:                    collections,
-		transactions:                   transactions,
 		lightTransactionResults:        lightTransactionResults,
 		transactionResultErrorMessages: transactionResultErrorMessages,
 		registers:                      registers,
@@ -40,14 +34,6 @@ func NewSnapshotMock(
 
 func (s *Mock) Events() storage.EventsReader {
 	return s.events
-}
-
-func (s *Mock) Collections() storage.CollectionsReader {
-	return s.collections
-}
-
-func (s *Mock) Transactions() storage.TransactionsReader {
-	return s.transactions
 }
 
 func (s *Mock) LightTransactionResults() storage.LightTransactionResultsReader {

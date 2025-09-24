@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 	"time"
 
 	lru "github.com/hashicorp/golang-lru/v2"
@@ -395,7 +396,7 @@ func (t *Transactions) GetTransactionResult(
 		}
 
 		// an additional check to ensure the correctness of the collection ID.
-		expectedCollectionID, err := t.lookupCollectionIDInBlock(block, txID, execResultInfo)
+		expectedCollectionID, err := t.lookupCollectionIDInBlock(block, txID)
 		if err != nil {
 			// if the collection has not been indexed yet, the lookup will return a not found error.
 			// if the request included a blockID or collectionID in its the search criteria, not found
@@ -449,25 +450,14 @@ func (t *Transactions) GetTransactionResult(
 func (t *Transactions) lookupCollectionIDInBlock(
 	block *flow.Block,
 	txID flow.Identifier,
-	execResultInfo *optimistic_sync.ExecutionResultInfo,
 ) (flow.Identifier, error) {
-	snapshot, err := t.executionStateCache.Snapshot(execResultInfo.ExecutionResultID)
-	if err != nil {
-		return flow.ZeroID, err
-	}
-
-	collectionsReader := snapshot.Collections()
-
 	for _, guarantee := range block.Payload.Guarantees {
-		collectionID := guarantee.CollectionID
-		collection, err := collectionsReader.LightByID(collectionID)
+		collection, err := t.collections.LightByID(guarantee.CollectionID)
 		if err != nil {
-			return flow.ZeroID, fmt.Errorf("failed to get collection %s in indexed block: %w", collectionID, err)
+			return flow.ZeroID, fmt.Errorf("failed to get collection %s in indexed block: %w", guarantee.CollectionID, err)
 		}
-		for _, collectionTxID := range collection.Transactions {
-			if collectionTxID == txID {
-				return collectionID, nil
-			}
+		if slices.Contains(collection.Transactions, txID) {
+			return guarantee.CollectionID, nil
 		}
 	}
 	return flow.ZeroID, ErrTransactionNotInBlock

@@ -65,12 +65,12 @@ func parseGetTransactionRequest(
 ) (GetTransaction, error) {
 	txOpts, err := NewTransactionOptionals(r)
 	if err != nil {
-		return GetTransaction{}, fmt.Errorf("invalid transaction optionals: %w", err)
+		return GetTransaction{}, err
 	}
 
 	var byID GetByIDRequest
 	if err := byID.Build(r); err != nil {
-		return GetTransaction{}, fmt.Errorf("invalid ID request: %w", err)
+		return GetTransaction{}, err
 	}
 
 	executionStateQuery, err := parser.NewExecutionStateQuery(
@@ -116,12 +116,12 @@ func parseGetTransactionResult(
 ) (GetTransactionResult, error) {
 	txOpts, err := NewTransactionOptionals(r)
 	if err != nil {
-		return GetTransactionResult{}, fmt.Errorf("invalid transaction optionals: %w", err)
+		return GetTransactionResult{}, err
 	}
 
 	var byID GetByIDRequest
 	if err := byID.Build(r); err != nil {
-		return GetTransactionResult{}, fmt.Errorf("invalid ID request: %w", err)
+		return GetTransactionResult{}, err
 	}
 
 	executionStateQuery, err := parser.NewExecutionStateQuery(

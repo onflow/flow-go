@@ -982,7 +982,7 @@ func (suite *Suite) TestGetTransactionResultByIndex() {
 	suite.Require().NoError(err)
 
 	suite.executionResultInfoProvider.
-		On("ExecutionResult", block.ID(), mock.Anything).
+		On("ExecutionResultInfo", block.ID(), mock.Anything).
 		Return(&optimistic_sync.ExecutionResultInfo{
 			ExecutionResultID: unittest.IdentifierFixture(),
 			ExecutionNodes:    fixedENIDs.ToSkeleton(),
@@ -1008,7 +1008,7 @@ func (suite *Suite) TestGetTransactionResultByIndex() {
 		suite.snapshot.On("Head").Return(nil, err).Once()
 
 		// mock signaler context expect an error
-		signCtxErr := fmt.Errorf("failed to derive transaction status: %w", irrecoverable.NewExceptionf("failed to lookup sealed header: %w", err))
+		signCtxErr := fmt.Errorf("failed to retrieve result: %w", fmt.Errorf("failed to derive transaction status: %w", irrecoverable.NewExceptionf("failed to lookup sealed header: %w", err)))
 		signalerCtx := rpcContextExpectError(suite.T(), context.Background(), signCtxErr)
 
 		actual, _, err := backend.GetTransactionResultByIndex(signalerCtx, blockId, index,
@@ -1060,7 +1060,7 @@ func (suite *Suite) TestGetTransactionResultsByBlockID() {
 		Return(exeEventResp, nil)
 
 	suite.executionResultInfoProvider.
-		On("ExecutionResult", block.ID(), mock.Anything).
+		On("ExecutionResultInfo", block.ID(), mock.Anything).
 		Return(&optimistic_sync.ExecutionResultInfo{
 			ExecutionResultID: unittest.IdentifierFixture(),
 			ExecutionNodes:    fixedENIDs.ToSkeleton(),
@@ -1083,7 +1083,7 @@ func (suite *Suite) TestGetTransactionResultsByBlockID() {
 		suite.snapshot.On("Head").Return(nil, err).Once()
 
 		// mock signaler context expect an error
-		signCtxErr := fmt.Errorf("failed to derive transaction status: %w", irrecoverable.NewExceptionf("failed to lookup sealed header: %w", err))
+		signCtxErr := fmt.Errorf("failed to retrieve result: %w", fmt.Errorf("failed to derive transaction status: %w", irrecoverable.NewExceptionf("failed to lookup sealed header: %w", err)))
 		signalerCtx := rpcContextExpectError(suite.T(), context.Background(), signCtxErr)
 
 		actual, _, err := backend.GetTransactionResultsByBlockID(signalerCtx, blockId,
@@ -1166,18 +1166,11 @@ func (suite *Suite) TestTransactionStatusTransition() {
 		Times(len(fixedENIDs)) // should call each EN once
 
 	suite.executionResultInfoProvider.
-		On("ExecutionResult", block.ID(), mock.Anything).
+		On("ExecutionResultInfo", block.ID(), mock.Anything).
 		Return(&optimistic_sync.ExecutionResultInfo{
 			ExecutionResultID: unittest.IdentifierFixture(),
 			ExecutionNodes:    fixedENIDs.ToSkeleton(),
 		}, nil)
-
-	execStateSnapshot := osyncmock.NewSnapshot(suite.T())
-	execStateSnapshot.On("Collections").Return(suite.collections)
-
-	suite.executionStateCache.
-		On("Snapshot", mock.Anything).
-		Return(execStateSnapshot, nil)
 
 	// first call - when block under test is greater height than the sealed head, but execution node does not know about Tx
 	result, _, err := backend.GetTransactionResult(ctx, txID, flow.ZeroID, flow.ZeroID,
@@ -1438,18 +1431,11 @@ func (suite *Suite) TestTransactionPendingToFinalizedStatusTransition() {
 		Times(len(enIDs)) // should call each EN once
 
 	suite.executionResultInfoProvider.
-		On("ExecutionResult", block.ID(), mock.Anything).
+		On("ExecutionResultInfo", block.ID(), mock.Anything).
 		Return(&optimistic_sync.ExecutionResultInfo{
 			ExecutionResultID: unittest.IdentifierFixture(),
 			ExecutionNodes:    enIDs.ToSkeleton(),
 		}, nil)
-
-	execState := osyncmock.NewSnapshot(suite.T())
-	execState.On("Collections").Return(suite.collections)
-
-	suite.executionStateCache.
-		On("Snapshot", mock.Anything).
-		Return(execState, nil)
 
 	// create a mock connection factory
 	connFactory := suite.setupConnectionFactory()
@@ -1898,17 +1884,11 @@ func (suite *Suite) TestGetTransactionResultEventEncodingVersion() {
 	params.ConnFactory = suite.setupConnectionFactory()
 
 	suite.executionResultInfoProvider.
-		On("ExecutionResult", block.ID(), mock.Anything).
+		On("ExecutionResultInfo", block.ID(), mock.Anything).
 		Return(&optimistic_sync.ExecutionResultInfo{
 			ExecutionResultID: unittest.IdentifierFixture(),
 			ExecutionNodes:    fixedENIDs.ToSkeleton(),
 		}, nil)
-
-	execStateSnapshot := osyncmock.NewSnapshot(suite.T())
-	execStateSnapshot.On("Collections").Return(suite.collections)
-	suite.executionStateCache.
-		On("Snapshot", mock.Anything).
-		Return(execStateSnapshot, nil)
 
 	backend, err := New(params)
 	suite.Require().NoError(err)
@@ -1969,7 +1949,7 @@ func (suite *Suite) TestGetTransactionResultByIndexAndBlockIdEventEncodingVersio
 	params.ConnFactory = suite.setupConnectionFactory()
 
 	suite.executionResultInfoProvider.
-		On("ExecutionResult", block.ID(), mock.Anything).
+		On("ExecutionResultInfo", block.ID(), mock.Anything).
 		Return(&optimistic_sync.ExecutionResultInfo{
 			ExecutionResultID: unittest.IdentifierFixture(),
 			ExecutionNodes:    fixedENIDs.ToSkeleton(),
@@ -2087,7 +2067,7 @@ func (suite *Suite) TestNodeCommunicator() {
 	params.ConnFactory = suite.setupConnectionFactory()
 
 	suite.executionResultInfoProvider.
-		On("ExecutionResult", block.ID(), mock.Anything).
+		On("ExecutionResultInfo", block.ID(), mock.Anything).
 		Return(&optimistic_sync.ExecutionResultInfo{
 			ExecutionResultID: unittest.IdentifierFixture(),
 			ExecutionNodes:    fixedENIDs.ToSkeleton(),

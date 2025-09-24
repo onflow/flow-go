@@ -260,10 +260,8 @@ func (t *LocalTransactionProvider) TransactionsByBlockID(
 			executionResultInfo.ExecutionResultID, err)
 	}
 
-	collectionsReader := snapshot.Collections()
-
 	for _, guarantee := range block.Payload.Guarantees {
-		collection, err := collectionsReader.ByID(guarantee.CollectionID)
+		collection, err := t.collections.ByID(guarantee.CollectionID)
 		if err != nil {
 			return nil, nil, rpc.ConvertStorageError(err)
 		}
