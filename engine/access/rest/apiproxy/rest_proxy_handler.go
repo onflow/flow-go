@@ -525,7 +525,10 @@ func getExecutorMetadata(metadata *entities.Metadata) accessmodel.ExecutorMetada
 	return accessmodel.ExecutorMetadata{}
 }
 
-// TODO(Uliana): add godoc
+// executionStateQuery constructs an ExecutionStateQuery protobuf message from
+// the provided optimistic sync Criteria.
+// The IncludeExecutorMetadata field is set to true, allowing metadata to be included
+// in the response if needed.
 func executionStateQuery(criteria optimistic_sync.Criteria) *entities.ExecutionStateQuery {
 	return &entities.ExecutionStateQuery{
 		AgreeingExecutorsCount:  uint64(criteria.AgreeingExecutorsCount),

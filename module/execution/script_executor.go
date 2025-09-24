@@ -7,7 +7,7 @@ import (
 	"github.com/onflow/flow-go/storage"
 )
 
-// TODO(Uliana): add godoc
+// ScriptExecutor is used to execute Cadence scripts and querying account data.
 type ScriptExecutor interface {
 	// ExecuteAtBlockHeight executes provided script against the block height.
 	// A result value is returned encoded as byte array. An error will be returned if script
