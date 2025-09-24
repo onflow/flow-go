@@ -441,7 +441,7 @@ func diff(
 		nWorkers = registers1.AccountCount()
 	}
 
-	logAccount := moduleUtil.LogProgress(
+	logAccount := moduleUtil.LogProgress[int](
 		log.Logger,
 		moduleUtil.DefaultLogProgressConfig(
 			"processing account group",

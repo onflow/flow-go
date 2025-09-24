@@ -19,7 +19,7 @@ func TestLogProgress40(t *testing.T) {
 	buf := bytes.NewBufferString("")
 	lg := zerolog.New(buf)
 	total := 40
-	logger := LogProgress(
+	logger := LogProgress[int](
 		lg,
 		DefaultLogProgressConfig(
 			"test",
@@ -55,7 +55,7 @@ func TestLogProgress40By3(t *testing.T) {
 	buf := bytes.NewBufferString("")
 	lg := zerolog.New(buf)
 	total := 40
-	logger := LogProgress(
+	logger := LogProgress[int](
 		lg,
 		DefaultLogProgressConfig(
 			"test",
@@ -92,7 +92,7 @@ func TestLogProgress43B(t *testing.T) {
 	buf := bytes.NewBufferString("")
 	lg := zerolog.New(buf)
 	total := 43
-	logger := LogProgress(
+	logger := LogProgress[int](
 		lg,
 		DefaultLogProgressConfig(
 			"test",
@@ -128,7 +128,7 @@ func TestLogProgress43By3(t *testing.T) {
 	buf := bytes.NewBufferString("")
 	lg := zerolog.New(buf)
 	total := 43
-	logger := LogProgress(
+	logger := LogProgress[int](
 		lg,
 		DefaultLogProgressConfig(
 			"test",
@@ -165,7 +165,7 @@ func TestLog100WhenOvershooting(t *testing.T) {
 	buf := bytes.NewBufferString("")
 	lg := zerolog.New(buf)
 	total := 100
-	logger := LogProgress(
+	logger := LogProgress[int](
 		lg,
 		DefaultLogProgressConfig(
 			"test",
@@ -195,7 +195,7 @@ func TestLogProgress1000(t *testing.T) {
 	for total := 11; total < 1000; total++ {
 		buf := bytes.NewBufferString("")
 		lg := zerolog.New(buf)
-		logger := LogProgress(
+		logger := LogProgress[int](
 			lg,
 			DefaultLogProgressConfig(
 				"test",
@@ -225,11 +225,11 @@ func TestLogProgressNoDataForAWhile(t *testing.T) {
 
 	buf := bytes.NewBufferString("")
 	lg := zerolog.New(buf)
-	logger := LogProgress(
+	logger := LogProgress[int](
 		lg,
 		LogProgressConfig{
 			Message:           "test",
-			Total:             total,
+			Total:             uint64(total),
 			Ticks:             11,
 			NoDataLogDuration: 1 * time.Millisecond,
 		},
@@ -264,7 +264,7 @@ func TestLogProgressMultipleGoroutines(t *testing.T) {
 
 	buf := bytes.NewBufferString("")
 	lg := zerolog.New(buf)
-	logger := LogProgress(
+	logger := LogProgress[int](
 		lg,
 		DefaultLogProgressConfig(
 			"test",
@@ -300,7 +300,7 @@ func TestLogProgressMultipleGoroutines(t *testing.T) {
 }
 
 func BenchmarkLogProgress(b *testing.B) {
-	l := LogProgress(zerolog.New(io.Discard), DefaultLogProgressConfig("test", b.N))
+	l := LogProgress[int](zerolog.New(io.Discard), DefaultLogProgressConfig("test", b.N))
 	for i := 0; i < b.N; i++ {
 		l(1)
 	}

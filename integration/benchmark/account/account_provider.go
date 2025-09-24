@@ -110,7 +110,7 @@ func (p *provider) init(
 	g, ctx := errgroup.WithContext(ctx)
 	g.SetLimit(creator.NumKeys())
 
-	progress := util.LogProgress(p.log,
+	progress := util.LogProgress[int](p.log,
 		util.DefaultLogProgressConfig(
 			"creating accounts",
 			p.numberOfAccounts,

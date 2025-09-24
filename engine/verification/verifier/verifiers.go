@@ -144,7 +144,7 @@ func verifyConcurrently(
 	var lowestErrHeight uint64 = ^uint64(0) // Initialize to max value of uint64
 	var mu sync.Mutex                       // To protect access to lowestErr and lowestErrHeight
 
-	lg := util.LogProgress(
+	lg := util.LogProgress[int](
 		log.Logger,
 		util.DefaultLogProgressConfig(
 			fmt.Sprintf("verifying heights progress for [%v:%v]", from, to),

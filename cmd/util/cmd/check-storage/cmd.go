@@ -221,7 +221,7 @@ func checkStorageHealth(
 
 	log.Info().Msgf("Checking storage health of %d accounts using %d workers ...", accountCount, nWorkers)
 
-	logAccount := moduleUtil.LogProgress(
+	logAccount := moduleUtil.LogProgress[int](
 		log.Logger,
 		moduleUtil.DefaultLogProgressConfig(
 			"processing account group",

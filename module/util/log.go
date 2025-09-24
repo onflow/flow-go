@@ -10,8 +10,8 @@ import (
 
 // LogProgressFunc is a function that can be called to add to the progress.
 // The function can be called concurrently. addProgress is the amount to add to the progress.
-// It is an int only for convenience purposes, negative values are ignored.
-type LogProgressFunc func(addProgress int)
+// It is any integer number type, but all negative values are ignored.
+type LogProgressFunc[T int | uint | int32 | uint32 | uint64 | int64] func(addProgress T)
 
 type LogProgressConfig struct {
 	// Message is part of the messages that will be logged.
@@ -19,26 +19,26 @@ type LogProgressConfig struct {
 	Message string
 	// Total is the total value of progress expected.
 	// When Total is added to LogProgressFunc the progress is considered to be 100%.
-	Total int
+	Total uint64
 	// NoDataLogDuration. If the last log line was more than this duration ago and a new data point is added, a new log line is logged.
 	// No line is logged if no data is received. The minimum resolution for NoDataLogDuration is 1 millisecond.
 	NoDataLogDuration time.Duration
 	// Ticks is the number of increments to log at. If Total is > 0 there will be at least 2 ticks. One at 0 and one at Total.
 	// If you want to log at every 10% set Ticks to 11 (one is at 0%).
 	// If the number of ticks is more than Total, it will be set to Total + 1.
-	Ticks int
+	Ticks uint64
 }
 
 // DefaultLogProgressConfig returns a LogProgressConfig with default values.
 // The default values will log every 10% and will log an additional line if new data is received
 // after no data has been received for 1 minute.
-func DefaultLogProgressConfig(
+func DefaultLogProgressConfig[T int | uint | int32 | uint32 | uint64 | int64](
 	message string,
-	total int,
+	total T,
 ) LogProgressConfig {
 	return LogProgressConfig{
 		Message:           message,
-		Total:             total,
+		Total:             uint64(total),
 		Ticks:             11,
 		NoDataLogDuration: 60 * time.Second,
 	}
@@ -51,10 +51,10 @@ type LogProgressOption func(config *LogProgressConfig)
 // updates.
 // The returned function can be called concurrently.
 // An eta is also logged, but it assumes that the progress is linear.
-func LogProgress(
+func LogProgress[T int | uint | int32 | uint32 | uint64 | int64](
 	log zerolog.Logger,
 	config LogProgressConfig,
-) LogProgressFunc {
+) LogProgressFunc[T] {
 
 	start := time.Now().UnixMilli()
 	var lastDataTime atomic.Int64
@@ -88,7 +88,7 @@ func LogProgress(
 			etaString = eta.Round(1 * time.Second).String()
 		}
 
-		if current < uint64(config.Total) {
+		if current < config.Total {
 			log.Info().Msgf("%s progress %d/%d (%.1f%%) elapsed: %s, eta %s", config.Message, current, config.Total, percentage, elapsedString, etaString)
 		} else {
 			log.Info().Msgf("%s progress %d/%d (%.1f%%) total time %s", config.Message, current, config.Total, percentage, elapsedString)
@@ -99,8 +99,8 @@ func LogProgress(
 	logProgress(0)
 
 	// sanitize inputs and calculate increment
-	total := uint64(config.Total)
-	ticksIncludingZero := uint64(config.Ticks)
+	total := config.Total
+	ticksIncludingZero := config.Ticks
 	if ticksIncludingZero < 2 {
 		ticksIncludingZero = 2
 	}
@@ -111,13 +111,13 @@ func LogProgress(
 		increment = 1
 	}
 
-	// increment doesnt necessarily divide config.Total
+	// increment doesn't necessarily divide config.Total
 	// Because we want 100% to mean 100% we need to deduct this overflow from the current value
 	// before checking if it is a multiple of the increment.
 	incrementsOverflow := total % increment
 	noLogDurationMillis := config.NoDataLogDuration.Milliseconds()
 
-	return func(add int) {
+	return func(add T) {
 		if add < 0 {
 			return
 		}
