@@ -321,6 +321,7 @@ jobs:
           username: ${{ vars.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
         if: ${{ (github.event_name == 'merge_group' || (github.event.pull_request && (github.event.pull_request.author_association == 'MEMBER' || github.event.pull_request.author_association == 'COLLABORATOR'))) }}
+        continue-on-error: true # authenticating with dockerhub is optional. continue even if this fails.
 
 
       - name: Docker build
