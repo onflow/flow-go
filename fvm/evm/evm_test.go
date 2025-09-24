@@ -3211,7 +3211,7 @@ func TestEVMFileSystemContract(t *testing.T) {
 				testContract *TestContract,
 				testAccount *EOATestAccount,
 			) {
-				state, output := runFileSystemContract(ctx, vm, snapshot, testContract, testAccount, 10000)
+				state, output := runFileSystemContract(ctx, vm, snapshot, testContract, testAccount, 10001)
 
 				require.NoError(t, output.Err)
 				require.NotEmpty(t, state.WriteSet)
