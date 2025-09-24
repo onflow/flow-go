@@ -47,6 +47,35 @@ func TestClusterHeights(t *testing.T) {
 			assert.Equal(t, expected, actual)
 		})
 
+		t.Run("data mismatch error", func(t *testing.T) {
+			// Use a different cluster ID and height to avoid conflicts with other tests
+			testClusterID := flow.ChainID("test-cluster")
+			testHeight := uint64(999)
+
+			// First index a block ID for the cluster and height
+			firstBlockID := unittest.IdentifierFixture()
+			unittest.WithLock(t, lockManager, storage.LockInsertOrFinalizeClusterBlock, func(lctx lockctx.Context) error {
+				return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+					return operation.IndexClusterBlockHeight(lctx, rw, testClusterID, testHeight, firstBlockID)
+				})
+			})
+
+			// Try to index a different block ID for the same cluster and height
+			differentBlockID := unittest.IdentifierFixture()
+			var err error
+			unittest.WithLock(t, lockManager, storage.LockInsertOrFinalizeClusterBlock, func(lctx lockctx.Context) error {
+				return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+					err = operation.IndexClusterBlockHeight(lctx, rw, testClusterID, testHeight, differentBlockID)
+					return nil // Don't return the error here, we want to check it outside
+				})
+			})
+
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), "cluster block height already indexed with different block ID")
+			assert.Contains(t, err.Error(), "data for key is different")
+			assert.ErrorIs(t, err, storage.ErrDataMismatch)
+		})
+
 		t.Run("multiple chain IDs", func(t *testing.T) {
 			// use different cluster ID but same block height
 			// - we first index *all* three blocks from different clusters for the same height
