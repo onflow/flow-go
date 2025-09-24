@@ -210,22 +210,18 @@ func TestChildrenWrongLockIsRejected(t *testing.T) {
 		parentID := unittest.IdentifierFixture()
 		childID := unittest.IdentifierFixture()
 
-		unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
-			err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+		err := unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
+			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 				return operation.IndexNewClusterBlock(lctx, rw, childID, parentID)
 			})
-
-			require.Error(t, err)
-			return nil
 		})
+		require.Error(t, err)
 
-		unittest.WithLock(t, lockManager, storage.LockInsertOrFinalizeClusterBlock, func(lctx lockctx.Context) error {
-			err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+		err = unittest.WithLock(t, lockManager, storage.LockInsertOrFinalizeClusterBlock, func(lctx lockctx.Context) error {
+			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 				return operation.IndexNewBlock(lctx, rw, childID, parentID)
 			})
-
-			require.Error(t, err)
-			return nil
 		})
+		require.Error(t, err)
 	})
 }
