@@ -264,7 +264,7 @@ func (s *TransactionStreamSuite) initializeBackend() {
 
 	txProvider := provider.NewFailoverTransactionProvider(localTxProvider, execNodeTxProvider)
 
-	subscriptionHandler := subscription.NewSubscriptionHandler(
+	subscriptionFactory := subscription.NewSubscriptionFactory(
 		s.log,
 		s.broadcaster,
 		subscription.DefaultSendTimeout,
@@ -333,7 +333,7 @@ func (s *TransactionStreamSuite) initializeBackend() {
 	s.txStreamBackend = NewTransactionStreamBackend(
 		s.log,
 		s.state,
-		subscriptionHandler,
+		subscriptionFactory,
 		s.blockTracker,
 		txBackend.SendTransaction,
 		s.blocks,

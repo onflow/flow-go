@@ -9,8 +9,8 @@ import (
 	"github.com/onflow/flow-go/engine"
 )
 
-// SubscriptionHandler represents common streaming data configuration for creating streaming subscription.
-type SubscriptionHandler struct {
+// Factory represents common streaming data configuration for creating streaming subscription.
+type Factory struct {
 	log zerolog.Logger
 
 	broadcaster *engine.Broadcaster
@@ -20,24 +20,24 @@ type SubscriptionHandler struct {
 	sendBufferSize int
 }
 
-// NewSubscriptionHandler creates a new SubscriptionHandler instance.
+// NewSubscriptionFactory creates a new Factory instance.
 //
 // Parameters:
 // - log: The logger to use for logging.
 // - broadcaster: The engine broadcaster for publishing notifications.
-// - sendTimeout: The duration after which a send operation will timeout.
+// - sendTimeout: The duration after which a send operation will time out.
 // - responseLimit: The maximum allowed response time for a single stream.
 // - sendBufferSize: The size of the response buffer for sending messages to the client.
 //
-// Returns a new SubscriptionHandler instance.
-func NewSubscriptionHandler(
+// Returns a new Factory instance.
+func NewSubscriptionFactory(
 	log zerolog.Logger,
 	broadcaster *engine.Broadcaster,
 	sendTimeout time.Duration,
 	responseLimit float64,
 	sendBufferSize uint,
-) *SubscriptionHandler {
-	return &SubscriptionHandler{
+) *Factory {
+	return &Factory{
 		log:            log,
 		broadcaster:    broadcaster,
 		sendTimeout:    sendTimeout,
@@ -46,13 +46,13 @@ func NewSubscriptionHandler(
 	}
 }
 
-// Subscribe creates and starts a new subscription.
+// CreateSubscription creates and starts a new subscription.
 //
 // Parameters:
 // - ctx: The context for the operation.
-// - startHeight: The height to start subscription from.
+// - startHeight: The height to start a subscription from.
 // - getData: The function to retrieve data by height.
-func (h *SubscriptionHandler) Subscribe(
+func (h *Factory) CreateSubscription(
 	ctx context.Context,
 	startHeight uint64,
 	getData GetDataByHeightFunc,

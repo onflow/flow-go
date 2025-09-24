@@ -1115,7 +1115,7 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 				builder.RegistersAsyncStore,
 				fetchFromLocalStorage,
 				int(builder.stateStreamConf.RegisterIDsRequestLimit),
-				subscription.NewSubscriptionHandler(
+				subscription.NewSubscriptionFactory(
 					builder.Logger,
 					broadcaster,
 					builder.stateStreamConf.ClientSendTimeout,
@@ -2207,7 +2207,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				CheckPayerBalanceMode: checkPayerBalanceMode,
 				EventQueryMode:        eventQueryMode,
 				BlockTracker:          blockTracker,
-				SubscriptionHandler: subscription.NewSubscriptionHandler(
+				SubscriptionFactory: subscription.NewSubscriptionFactory(
 					builder.Logger,
 					broadcaster,
 					builder.stateStreamConf.ClientSendTimeout,

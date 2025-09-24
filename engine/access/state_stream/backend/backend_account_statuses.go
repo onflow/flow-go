@@ -26,7 +26,7 @@ type AccountStatusesResponse struct {
 // AccountStatusesBackend is a struct representing a backend implementation for subscribing to account statuses changes.
 type AccountStatusesBackend struct {
 	log                 zerolog.Logger
-	subscriptionHandler *subscription.SubscriptionHandler
+	subscriptionFactory *subscription.Factory
 
 	executionDataTracker tracker.ExecutionDataTracker
 	eventsProvider       EventsProvider
@@ -41,7 +41,7 @@ func (b *AccountStatusesBackend) subscribe(
 	filter state_stream.AccountStatusFilter,
 	criteria optimistic_sync.Criteria,
 ) subscription.Subscription {
-	return b.subscriptionHandler.Subscribe(ctx, nextHeight, b.getAccountStatusResponseFactory(filter, criteria))
+	return b.subscriptionFactory.CreateSubscription(ctx, nextHeight, b.getAccountStatusResponseFactory(filter, criteria))
 }
 
 // SubscribeAccountStatusesFromStartBlockID subscribes to the streaming of account status changes starting from

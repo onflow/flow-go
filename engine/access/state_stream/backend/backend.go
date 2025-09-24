@@ -95,7 +95,7 @@ func New(
 	registers *execution.RegistersAsyncStore,
 	fetchFromLocalStorage bool,
 	registerIDsRequestLimit int,
-	subscriptionHandler *subscription.SubscriptionHandler,
+	subscriptionFactory *subscription.Factory,
 	executionDataTracker tracker.ExecutionDataTracker,
 	executionResultProvider optimistic_sync.ExecutionResultInfoProvider,
 	executionStateCache optimistic_sync.ExecutionStateCache,
@@ -118,7 +118,7 @@ func New(
 	b.ExecutionDataBackend = ExecutionDataBackend{
 		log:                  logger,
 		headers:              headers,
-		subscriptionHandler:  subscriptionHandler,
+		subscriptionFactory:  subscriptionFactory,
 		getExecutionData:     b.getExecutionData,
 		executionDataTracker: executionDataTracker,
 	}
@@ -134,14 +134,14 @@ func New(
 
 	b.EventsBackend = EventsBackend{
 		log:                  logger,
-		subscriptionHandler:  subscriptionHandler,
+		subscriptionFactory:  subscriptionFactory,
 		executionDataTracker: executionDataTracker,
 		eventsProvider:       eventsProvider,
 	}
 
 	b.AccountStatusesBackend = AccountStatusesBackend{
 		log:                  logger,
-		subscriptionHandler:  subscriptionHandler,
+		subscriptionFactory:  subscriptionFactory,
 		executionDataTracker: b.ExecutionDataTracker,
 		eventsProvider:       eventsProvider,
 	}

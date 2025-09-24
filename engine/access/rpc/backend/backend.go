@@ -108,7 +108,7 @@ type Params struct {
 	CheckPayerBalanceMode    validator.PayerBalanceMode
 	EventQueryMode           query_mode.IndexQueryMode
 	BlockTracker             tracker.BlockTracker
-	SubscriptionHandler      *subscription.SubscriptionHandler
+	SubscriptionFactory      *subscription.Factory
 	MaxScriptAndArgumentSize uint
 
 	EventsIndex                *index.EventsIndex
@@ -291,7 +291,7 @@ func New(params Params) (*Backend, error) {
 	txStreamBackend := txstream.NewTransactionStreamBackend(
 		params.Log,
 		params.State,
-		params.SubscriptionHandler,
+		params.SubscriptionFactory,
 		params.BlockTracker,
 		txBackend.SendTransaction,
 		params.Blocks,
@@ -335,7 +335,7 @@ func New(params Params) (*Backend, error) {
 			state:               params.State,
 			headers:             params.Headers,
 			blocks:              params.Blocks,
-			subscriptionHandler: params.SubscriptionHandler,
+			subscriptionFactory: params.SubscriptionFactory,
 			blockTracker:        params.BlockTracker,
 		},
 

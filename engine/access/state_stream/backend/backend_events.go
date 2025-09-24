@@ -18,7 +18,7 @@ import (
 type EventsBackend struct {
 	log zerolog.Logger
 
-	subscriptionHandler  *subscription.SubscriptionHandler
+	subscriptionFactory  *subscription.Factory
 	executionDataTracker tracker.ExecutionDataTracker
 	eventsProvider       EventsProvider
 }
@@ -59,7 +59,7 @@ func (b *EventsBackend) SubscribeEvents(
 		return subscription.NewFailedSubscription(err, "could not get start height")
 	}
 
-	return b.subscriptionHandler.Subscribe(ctx, nextHeight, b.getResponseFactory(filter, criteria))
+	return b.subscriptionFactory.CreateSubscription(ctx, nextHeight, b.getResponseFactory(filter, criteria))
 }
 
 // SubscribeEventsFromStartBlockID streams events starting at the specified block ID,
@@ -88,7 +88,7 @@ func (b *EventsBackend) SubscribeEventsFromStartBlockID(
 		return subscription.NewFailedSubscription(err, "could not get start height from block id")
 	}
 
-	return b.subscriptionHandler.Subscribe(ctx, nextHeight, b.getResponseFactory(filter, criteria))
+	return b.subscriptionFactory.CreateSubscription(ctx, nextHeight, b.getResponseFactory(filter, criteria))
 }
 
 // SubscribeEventsFromStartHeight streams events starting at the specified block height,
@@ -117,7 +117,7 @@ func (b *EventsBackend) SubscribeEventsFromStartHeight(
 		return subscription.NewFailedSubscription(err, "could not get start height from block height")
 	}
 
-	return b.subscriptionHandler.Subscribe(ctx, nextHeight, b.getResponseFactory(filter, criteria))
+	return b.subscriptionFactory.CreateSubscription(ctx, nextHeight, b.getResponseFactory(filter, criteria))
 }
 
 // SubscribeEventsFromLatest subscribes to events starting at the latest sealed block,
@@ -144,7 +144,7 @@ func (b *EventsBackend) SubscribeEventsFromLatest(
 		return subscription.NewFailedSubscription(err, "could not get start height from block height")
 	}
 
-	return b.subscriptionHandler.Subscribe(ctx, nextHeight, b.getResponseFactory(filter, criteria))
+	return b.subscriptionFactory.CreateSubscription(ctx, nextHeight, b.getResponseFactory(filter, criteria))
 }
 
 // getResponseFactory returns a function that retrieves the event response for a given height.

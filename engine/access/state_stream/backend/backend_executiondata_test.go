@@ -279,7 +279,7 @@ func (s *BackendExecutionDataSuite) SetupBackend(fetchFromLocalStorage bool) {
 		s.registersAsync,
 		fetchFromLocalStorage,
 		state_stream.DefaultRegisterIDsRequestLimit,
-		subscription.NewSubscriptionHandler(
+		subscription.NewSubscriptionFactory(
 			s.logger,
 			s.broadcaster,
 			subscription.DefaultSendTimeout,
