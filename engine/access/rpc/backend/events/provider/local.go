@@ -71,7 +71,8 @@ func (l *LocalEventProvider) Events(
 			}
 
 			err = fmt.Errorf("failed to get events for block %s: %w", blockInfo.ID, err)
-			return Response{}, metadata, rpc.ConvertError(err, "failed to get events from storage", codes.Internal)
+			return Response{}, access.ExecutorMetadata{},
+				rpc.ConvertError(err, "failed to get events from storage", codes.Internal)
 		}
 
 		filteredEvents := make([]flow.Event, 0)
@@ -85,7 +86,8 @@ func (l *LocalEventProvider) Events(
 				payload, err := convert.CcfPayloadToJsonPayload(event.Payload)
 				if err != nil {
 					err = fmt.Errorf("failed to convert event payload for block %s: %w", blockInfo.ID, err)
-					return Response{}, metadata, rpc.ConvertError(err, "failed to convert event payload", codes.Internal)
+					return Response{}, access.ExecutorMetadata{},
+						rpc.ConvertError(err, "failed to convert event payload", codes.Internal)
 				}
 
 				filteredEvent, err := flow.NewEvent(
@@ -98,7 +100,8 @@ func (l *LocalEventProvider) Events(
 					},
 				)
 				if err != nil {
-					return Response{}, metadata, rpc.ConvertError(err, "could not construct event", codes.Internal)
+					return Response{}, access.ExecutorMetadata{},
+						rpc.ConvertError(err, "could not construct event", codes.Internal)
 				}
 
 				event = *filteredEvent
