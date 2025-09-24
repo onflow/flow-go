@@ -3,6 +3,7 @@ package backend
 import (
 	"context"
 
+	"go.uber.org/atomic"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -20,7 +21,8 @@ import (
 )
 
 type Handler struct {
-	subscription.StreamingData
+	maxStreamCount    int32
+	activeStreamCount atomic.Int32
 
 	api   state_stream.API
 	chain flow.Chain
@@ -42,12 +44,12 @@ var _ executiondata.ExecutionDataAPIServer = (*Handler)(nil)
 
 func NewHandler(api state_stream.API, chain flow.Chain, config Config) *Handler {
 	h := &Handler{
-		StreamingData:            subscription.NewStreamingData(config.MaxGlobalStreams),
 		api:                      api,
 		chain:                    chain,
 		eventFilterConfig:        config.EventFilterConfig,
 		defaultHeartbeatInterval: config.HeartbeatInterval,
 		operatorCriteria:         config.OperatorCriteria,
+		maxStreamCount:           int32(config.MaxGlobalStreams),
 	}
 	return h
 }
@@ -103,11 +105,11 @@ func (h *Handler) SubscribeExecutionData(
 	stream executiondata.ExecutionDataAPI_SubscribeExecutionDataServer,
 ) error {
 	// check if the maximum number of streams is reached
-	if h.StreamCount.Load() >= h.MaxStreams {
+	if h.activeStreamCount.Load() >= h.maxStreamCount {
 		return status.Errorf(codes.ResourceExhausted, "maximum number of streams reached")
 	}
-	h.StreamCount.Add(1)
-	defer h.StreamCount.Add(-1)
+	h.activeStreamCount.Add(1)
+	defer h.activeStreamCount.Add(-1)
 
 	startBlockID := flow.ZeroID
 	if request.GetStartBlockId() != nil {
@@ -144,11 +146,11 @@ func (h *Handler) SubscribeExecutionDataFromStartBlockID(
 	stream executiondata.ExecutionDataAPI_SubscribeExecutionDataFromStartBlockIDServer,
 ) error {
 	// check if the maximum number of streams is reached
-	if h.StreamCount.Load() >= h.MaxStreams {
+	if h.activeStreamCount.Load() >= h.maxStreamCount {
 		return status.Errorf(codes.ResourceExhausted, "maximum number of streams reached")
 	}
-	h.StreamCount.Add(1)
-	defer h.StreamCount.Add(-1)
+	h.activeStreamCount.Add(1)
+	defer h.activeStreamCount.Add(-1)
 
 	startBlockID, err := convert.BlockID(request.GetStartBlockId())
 	if err != nil {
@@ -176,11 +178,11 @@ func (h *Handler) SubscribeExecutionDataFromStartBlockHeight(
 	stream executiondata.ExecutionDataAPI_SubscribeExecutionDataFromStartBlockHeightServer,
 ) error {
 	// check if the maximum number of streams is reached
-	if h.StreamCount.Load() >= h.MaxStreams {
+	if h.activeStreamCount.Load() >= h.maxStreamCount {
 		return status.Errorf(codes.ResourceExhausted, "maximum number of streams reached")
 	}
-	h.StreamCount.Add(1)
-	defer h.StreamCount.Add(-1)
+	h.activeStreamCount.Add(1)
+	defer h.activeStreamCount.Add(-1)
 
 	sub := h.api.SubscribeExecutionDataFromStartBlockHeight(
 		stream.Context(),
@@ -206,11 +208,11 @@ func (h *Handler) SubscribeExecutionDataFromLatest(
 	stream executiondata.ExecutionDataAPI_SubscribeExecutionDataFromLatestServer,
 ) error {
 	// check if the maximum number of streams is reached
-	if h.StreamCount.Load() >= h.MaxStreams {
+	if h.activeStreamCount.Load() >= h.maxStreamCount {
 		return status.Errorf(codes.ResourceExhausted, "maximum number of streams reached")
 	}
-	h.StreamCount.Add(1)
-	defer h.StreamCount.Add(-1)
+	h.activeStreamCount.Add(1)
+	defer h.activeStreamCount.Add(-1)
 
 	sub := h.api.SubscribeExecutionDataFromLatest(stream.Context())
 
@@ -242,11 +244,11 @@ func (h *Handler) SubscribeEvents(
 	stream executiondata.ExecutionDataAPI_SubscribeEventsServer,
 ) error {
 	// check if the maximum number of streams is reached
-	if h.StreamCount.Load() >= h.MaxStreams {
+	if h.activeStreamCount.Load() >= h.maxStreamCount {
 		return status.Errorf(codes.ResourceExhausted, "maximum number of streams reached")
 	}
-	h.StreamCount.Add(1)
-	defer h.StreamCount.Add(-1)
+	h.activeStreamCount.Add(1)
+	defer h.activeStreamCount.Add(-1)
 
 	startBlockID := flow.ZeroID
 	if request.GetStartBlockId() != nil {
@@ -301,11 +303,11 @@ func (h *Handler) SubscribeEventsFromStartBlockID(
 	stream executiondata.ExecutionDataAPI_SubscribeEventsFromStartBlockIDServer,
 ) error {
 	// check if the maximum number of streams is reached
-	if h.StreamCount.Load() >= h.MaxStreams {
+	if h.activeStreamCount.Load() >= h.maxStreamCount {
 		return status.Errorf(codes.ResourceExhausted, "maximum number of streams reached")
 	}
-	h.StreamCount.Add(1)
-	defer h.StreamCount.Add(-1)
+	h.activeStreamCount.Add(1)
+	defer h.activeStreamCount.Add(-1)
 
 	startBlockID, err := convert.BlockID(request.GetStartBlockId())
 	if err != nil {
@@ -355,11 +357,11 @@ func (h *Handler) SubscribeEventsFromStartHeight(
 	stream executiondata.ExecutionDataAPI_SubscribeEventsFromStartHeightServer,
 ) error {
 	// check if the maximum number of streams is reached
-	if h.StreamCount.Load() >= h.MaxStreams {
+	if h.activeStreamCount.Load() >= h.maxStreamCount {
 		return status.Errorf(codes.ResourceExhausted, "maximum number of streams reached")
 	}
-	h.StreamCount.Add(1)
-	defer h.StreamCount.Add(-1)
+	h.activeStreamCount.Add(1)
+	defer h.activeStreamCount.Add(-1)
 
 	filter, err := h.getEventFilter(request.GetFilter())
 	if err != nil {
@@ -403,11 +405,11 @@ func (h *Handler) SubscribeEventsFromLatest(
 	stream executiondata.ExecutionDataAPI_SubscribeEventsFromLatestServer,
 ) error {
 	// check if the maximum number of streams is reached
-	if h.StreamCount.Load() >= h.MaxStreams {
+	if h.activeStreamCount.Load() >= h.maxStreamCount {
 		return status.Errorf(codes.ResourceExhausted, "maximum number of streams reached")
 	}
-	h.StreamCount.Add(1)
-	defer h.StreamCount.Add(-1)
+	h.activeStreamCount.Add(1)
+	defer h.activeStreamCount.Add(-1)
 
 	filter, err := h.getEventFilter(request.GetFilter())
 	if err != nil {
@@ -684,12 +686,12 @@ func (h *Handler) SubscribeAccountStatusesFromStartBlockID(
 	stream executiondata.ExecutionDataAPI_SubscribeAccountStatusesFromStartBlockIDServer,
 ) error {
 	// check if the maximum number of streams is reached
-	if h.StreamCount.Load() >= h.MaxStreams {
+	if h.activeStreamCount.Load() >= h.maxStreamCount {
 		return status.Errorf(codes.ResourceExhausted, "maximum number of streams reached")
 	}
 
-	h.StreamCount.Add(1)
-	defer h.StreamCount.Add(-1)
+	h.activeStreamCount.Add(1)
+	defer h.activeStreamCount.Add(-1)
 
 	startBlockID, err := convert.BlockID(request.GetStartBlockId())
 	if err != nil {
@@ -740,12 +742,12 @@ func (h *Handler) SubscribeAccountStatusesFromStartHeight(
 	stream executiondata.ExecutionDataAPI_SubscribeAccountStatusesFromStartHeightServer,
 ) error {
 	// check if the maximum number of streams is reached
-	if h.StreamCount.Load() >= h.MaxStreams {
+	if h.activeStreamCount.Load() >= h.maxStreamCount {
 		return status.Errorf(codes.ResourceExhausted, "maximum number of streams reached")
 	}
 
-	h.StreamCount.Add(1)
-	defer h.StreamCount.Add(-1)
+	h.activeStreamCount.Add(1)
+	defer h.activeStreamCount.Add(-1)
 
 	statusFilter := request.GetFilter()
 	filter, err := state_stream.NewAccountStatusFilter(
@@ -791,12 +793,12 @@ func (h *Handler) SubscribeAccountStatusesFromLatestBlock(
 	stream executiondata.ExecutionDataAPI_SubscribeAccountStatusesFromLatestBlockServer,
 ) error {
 	// check if the maximum number of streams is reached
-	if h.StreamCount.Load() >= h.MaxStreams {
+	if h.activeStreamCount.Load() >= h.maxStreamCount {
 		return status.Errorf(codes.ResourceExhausted, "maximum number of streams reached")
 	}
 
-	h.StreamCount.Add(1)
-	defer h.StreamCount.Add(-1)
+	h.activeStreamCount.Add(1)
+	defer h.activeStreamCount.Add(-1)
 
 	statusFilter := request.GetFilter()
 	filter, err := state_stream.NewAccountStatusFilter(

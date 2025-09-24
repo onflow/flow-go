@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 
+	"go.uber.org/atomic"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -26,13 +27,14 @@ import (
 )
 
 type Handler struct {
-	subscription.StreamingData
 	api                  access.API
 	chain                flow.Chain
 	signerIndicesDecoder hotstuff.BlockSignerDecoder
 	finalizedHeaderCache module.FinalizedHeaderCache
 	me                   module.Local
 	indexReporter        state_synchronization.IndexReporter
+	activeStreamCount    atomic.Int32
+	maxStreamCount       int32
 }
 
 // HandlerOption is used to hand over optional constructor parameters
@@ -61,12 +63,12 @@ func NewHandler(
 	options ...HandlerOption,
 ) *Handler {
 	h := &Handler{
-		StreamingData:        subscription.NewStreamingData(maxStreams),
 		api:                  api,
 		chain:                chain,
 		finalizedHeaderCache: finalizedHeader,
 		me:                   me,
 		signerIndicesDecoder: &signature.NoopBlockSignerDecoder{},
+		maxStreamCount:       int32(maxStreams),
 	}
 	for _, opt := range options {
 		opt(h)
@@ -1099,11 +1101,11 @@ func (h *Handler) GetExecutionResultByID(ctx context.Context, req *accessproto.G
 // - codes.Internal - if stream encountered an error, if stream got unexpected response or could not convert block to message or could not send response.
 func (h *Handler) SubscribeBlocksFromStartBlockID(request *accessproto.SubscribeBlocksFromStartBlockIDRequest, stream accessproto.AccessAPI_SubscribeBlocksFromStartBlockIDServer) error {
 	// check if the maximum number of streams is reached
-	if h.StreamCount.Load() >= h.MaxStreams {
+	if h.activeStreamCount.Load() >= h.maxStreamCount {
 		return status.Errorf(codes.ResourceExhausted, "maximum number of streams reached")
 	}
-	h.StreamCount.Add(1)
-	defer h.StreamCount.Add(-1)
+	h.activeStreamCount.Add(1)
+	defer h.activeStreamCount.Add(-1)
 
 	startBlockID, blockStatus, err := h.getSubscriptionDataFromStartBlockID(request.GetStartBlockId(), request.GetBlockStatus())
 	if err != nil {
@@ -1125,11 +1127,11 @@ func (h *Handler) SubscribeBlocksFromStartBlockID(request *accessproto.Subscribe
 // - codes.Internal - if stream encountered an error, if stream got unexpected response or could not convert block to message or could not send response.
 func (h *Handler) SubscribeBlocksFromStartHeight(request *accessproto.SubscribeBlocksFromStartHeightRequest, stream accessproto.AccessAPI_SubscribeBlocksFromStartHeightServer) error {
 	// check if the maximum number of streams is reached
-	if h.StreamCount.Load() >= h.MaxStreams {
+	if h.activeStreamCount.Load() >= h.maxStreamCount {
 		return status.Errorf(codes.ResourceExhausted, "maximum number of streams reached")
 	}
-	h.StreamCount.Add(1)
-	defer h.StreamCount.Add(-1)
+	h.activeStreamCount.Add(1)
+	defer h.activeStreamCount.Add(-1)
 
 	blockStatus := convert.MessageToBlockStatus(request.GetBlockStatus())
 	err := checkBlockStatus(blockStatus)
@@ -1152,11 +1154,11 @@ func (h *Handler) SubscribeBlocksFromStartHeight(request *accessproto.SubscribeB
 // - codes.Internal - if stream encountered an error, if stream got unexpected response or could not convert block to message or could not send response.
 func (h *Handler) SubscribeBlocksFromLatest(request *accessproto.SubscribeBlocksFromLatestRequest, stream accessproto.AccessAPI_SubscribeBlocksFromLatestServer) error {
 	// check if the maximum number of streams is reached
-	if h.StreamCount.Load() >= h.MaxStreams {
+	if h.activeStreamCount.Load() >= h.maxStreamCount {
 		return status.Errorf(codes.ResourceExhausted, "maximum number of streams reached")
 	}
-	h.StreamCount.Add(1)
-	defer h.StreamCount.Add(-1)
+	h.activeStreamCount.Add(1)
+	defer h.activeStreamCount.Add(-1)
 
 	blockStatus := convert.MessageToBlockStatus(request.GetBlockStatus())
 	err := checkBlockStatus(blockStatus)
@@ -1212,11 +1214,11 @@ func (h *Handler) handleBlocksResponse(send sendSubscribeBlocksResponseFunc, ful
 // - codes.Internal - if stream encountered an error, if stream got unexpected response or could not convert block header to message or could not send response.
 func (h *Handler) SubscribeBlockHeadersFromStartBlockID(request *accessproto.SubscribeBlockHeadersFromStartBlockIDRequest, stream accessproto.AccessAPI_SubscribeBlockHeadersFromStartBlockIDServer) error {
 	// check if the maximum number of streams is reached
-	if h.StreamCount.Load() >= h.MaxStreams {
+	if h.activeStreamCount.Load() >= h.maxStreamCount {
 		return status.Errorf(codes.ResourceExhausted, "maximum number of streams reached")
 	}
-	h.StreamCount.Add(1)
-	defer h.StreamCount.Add(-1)
+	h.activeStreamCount.Add(1)
+	defer h.activeStreamCount.Add(-1)
 
 	startBlockID, blockStatus, err := h.getSubscriptionDataFromStartBlockID(request.GetStartBlockId(), request.GetBlockStatus())
 	if err != nil {
@@ -1238,11 +1240,11 @@ func (h *Handler) SubscribeBlockHeadersFromStartBlockID(request *accessproto.Sub
 // - codes.Internal - if stream encountered an error, if stream got unexpected response or could not convert block header to message or could not send response.
 func (h *Handler) SubscribeBlockHeadersFromStartHeight(request *accessproto.SubscribeBlockHeadersFromStartHeightRequest, stream accessproto.AccessAPI_SubscribeBlockHeadersFromStartHeightServer) error {
 	// check if the maximum number of streams is reached
-	if h.StreamCount.Load() >= h.MaxStreams {
+	if h.activeStreamCount.Load() >= h.maxStreamCount {
 		return status.Errorf(codes.ResourceExhausted, "maximum number of streams reached")
 	}
-	h.StreamCount.Add(1)
-	defer h.StreamCount.Add(-1)
+	h.activeStreamCount.Add(1)
+	defer h.activeStreamCount.Add(-1)
 
 	blockStatus := convert.MessageToBlockStatus(request.GetBlockStatus())
 	err := checkBlockStatus(blockStatus)
@@ -1265,11 +1267,11 @@ func (h *Handler) SubscribeBlockHeadersFromStartHeight(request *accessproto.Subs
 // - codes.Internal - if stream encountered an error, if stream got unexpected response or could not convert block header to message or could not send response.
 func (h *Handler) SubscribeBlockHeadersFromLatest(request *accessproto.SubscribeBlockHeadersFromLatestRequest, stream accessproto.AccessAPI_SubscribeBlockHeadersFromLatestServer) error {
 	// check if the maximum number of streams is reached
-	if h.StreamCount.Load() >= h.MaxStreams {
+	if h.activeStreamCount.Load() >= h.maxStreamCount {
 		return status.Errorf(codes.ResourceExhausted, "maximum number of streams reached")
 	}
-	h.StreamCount.Add(1)
-	defer h.StreamCount.Add(-1)
+	h.activeStreamCount.Add(1)
+	defer h.activeStreamCount.Add(-1)
 
 	blockStatus := convert.MessageToBlockStatus(request.GetBlockStatus())
 	err := checkBlockStatus(blockStatus)
@@ -1326,11 +1328,11 @@ func (h *Handler) handleBlockHeadersResponse(send sendSubscribeBlockHeadersRespo
 // - codes.Internal - if stream encountered an error, if stream got unexpected response or could not convert block to message or could not send response.
 func (h *Handler) SubscribeBlockDigestsFromStartBlockID(request *accessproto.SubscribeBlockDigestsFromStartBlockIDRequest, stream accessproto.AccessAPI_SubscribeBlockDigestsFromStartBlockIDServer) error {
 	// check if the maximum number of streams is reached
-	if h.StreamCount.Load() >= h.MaxStreams {
+	if h.activeStreamCount.Load() >= h.maxStreamCount {
 		return status.Errorf(codes.ResourceExhausted, "maximum number of streams reached")
 	}
-	h.StreamCount.Add(1)
-	defer h.StreamCount.Add(-1)
+	h.activeStreamCount.Add(1)
+	defer h.activeStreamCount.Add(-1)
 
 	startBlockID, blockStatus, err := h.getSubscriptionDataFromStartBlockID(request.GetStartBlockId(), request.GetBlockStatus())
 	if err != nil {
@@ -1352,11 +1354,11 @@ func (h *Handler) SubscribeBlockDigestsFromStartBlockID(request *accessproto.Sub
 // - codes.Internal - if stream encountered an error, if stream got unexpected response or could not convert block to message or could not send response.
 func (h *Handler) SubscribeBlockDigestsFromStartHeight(request *accessproto.SubscribeBlockDigestsFromStartHeightRequest, stream accessproto.AccessAPI_SubscribeBlockDigestsFromStartHeightServer) error {
 	// check if the maximum number of streams is reached
-	if h.StreamCount.Load() >= h.MaxStreams {
+	if h.activeStreamCount.Load() >= h.maxStreamCount {
 		return status.Errorf(codes.ResourceExhausted, "maximum number of streams reached")
 	}
-	h.StreamCount.Add(1)
-	defer h.StreamCount.Add(-1)
+	h.activeStreamCount.Add(1)
+	defer h.activeStreamCount.Add(-1)
 
 	blockStatus := convert.MessageToBlockStatus(request.GetBlockStatus())
 	err := checkBlockStatus(blockStatus)
@@ -1379,11 +1381,11 @@ func (h *Handler) SubscribeBlockDigestsFromStartHeight(request *accessproto.Subs
 // - codes.Internal - if stream encountered an error, if stream got unexpected response or could not convert block to message or could not send response.
 func (h *Handler) SubscribeBlockDigestsFromLatest(request *accessproto.SubscribeBlockDigestsFromLatestRequest, stream accessproto.AccessAPI_SubscribeBlockDigestsFromLatestServer) error {
 	// check if the maximum number of streams is reached
-	if h.StreamCount.Load() >= h.MaxStreams {
+	if h.activeStreamCount.Load() >= h.maxStreamCount {
 		return status.Errorf(codes.ResourceExhausted, "maximum number of streams reached")
 	}
-	h.StreamCount.Add(1)
-	defer h.StreamCount.Add(-1)
+	h.activeStreamCount.Add(1)
+	defer h.activeStreamCount.Add(-1)
 
 	blockStatus := convert.MessageToBlockStatus(request.GetBlockStatus())
 	err := checkBlockStatus(blockStatus)
@@ -1459,11 +1461,11 @@ func (h *Handler) SendAndSubscribeTransactionStatuses(
 	ctx := stream.Context()
 
 	// check if the maximum number of streams is reached
-	if h.StreamCount.Load() >= h.MaxStreams {
+	if h.activeStreamCount.Load() >= h.maxStreamCount {
 		return status.Errorf(codes.ResourceExhausted, "maximum number of streams reached")
 	}
-	h.StreamCount.Add(1)
-	defer h.StreamCount.Add(-1)
+	h.activeStreamCount.Add(1)
+	defer h.activeStreamCount.Add(-1)
 
 	tx, err := convert.MessageToTransaction(request.GetTransaction(), h.chain)
 	if err != nil {
