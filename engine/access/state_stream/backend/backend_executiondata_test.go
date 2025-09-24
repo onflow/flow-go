@@ -280,8 +280,8 @@ func (s *BackendExecutionDataSuite) SetupBackend(useEventsIndex bool) {
 		return s.executionDataTrackerReal.GetStartHeight(ctx, startBlockID, startHeight)
 	}, nil).Maybe()
 
-	s.executionDataTracker.On("GetHighestHeight").Return(func() (uint64, error) {
-		return s.highestBlockHeader.Height, nil
+	s.executionDataTracker.On("GetHighestHeight").Return(func() uint64 {
+		return s.highestBlockHeader.Height
 	}).Maybe()
 }
 
