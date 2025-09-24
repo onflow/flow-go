@@ -7,6 +7,7 @@ import (
 	"slices"
 	"testing"
 
+	"github.com/jordanschalm/lockctx"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/exp/rand"
@@ -21,6 +22,7 @@ import (
 )
 
 func TestBatchStoringTransactionResults(t *testing.T) {
+	lockManager := storage.NewTestingLockManager()
 	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
 		metrics := metrics.NewNoopCollector()
 		st, err := store.NewTransactionResults(metrics, db, 1000)
@@ -36,14 +38,11 @@ func TestBatchStoringTransactionResults(t *testing.T) {
 			}
 			txResults = append(txResults, expected)
 		}
-		writeBatch := db.NewBatch()
-		defer writeBatch.Close()
-
-		err = st.BatchStore(blockID, txResults, writeBatch)
-		require.NoError(t, err)
-
-		err = writeBatch.Commit()
-		require.NoError(t, err)
+		unittest.WithLock(t, lockManager, storage.LockInsertOwnReceipt, func(lctx lockctx.Context) error {
+			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+				return st.BatchStore(lctx, blockID, txResults, rw)
+			})
+		})
 
 		for _, txResult := range txResults {
 			actual, err := st.ByBlockIDTransactionID(blockID, txResult.TransactionID)

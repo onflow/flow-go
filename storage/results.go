@@ -22,12 +22,6 @@ type ExecutionResults interface {
 	// BatchStore stores an execution result in a given batch
 	BatchStore(result *flow.ExecutionResult, batch ReaderBatchWriter) error
 
-	// Index indexes an execution result by block ID.
-	Index(blockID flow.Identifier, resultID flow.Identifier) error
-
-	// ForceIndex indexes an execution result by block ID overwriting existing database entry
-	ForceIndex(blockID flow.Identifier, resultID flow.Identifier) error
-
 	// BatchIndex indexes an execution result by block ID in a given batch
 	BatchIndex(lctx lockctx.Proof, blockID flow.Identifier, resultID flow.Identifier, batch ReaderBatchWriter) error
 

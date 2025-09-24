@@ -63,7 +63,7 @@ func (r *ExecutionResults) byBlockID(blockID flow.Identifier) (*flow.ExecutionRe
 	return r.byID(resultID)
 }
 
-func (r *ExecutionResults) index(w storage.Writer, blockID, resultID flow.Identifier, force bool) error {
+func (r *ExecutionResults) index(lctx lockctx.Proof, w storage.Writer, blockID, resultID flow.Identifier, force bool) error {
 	if !force {
 		// when not forcing the index, check if the result is already indexed
 		exist, err := operation.ExistExecutionResult(r.db.Reader(), blockID)
@@ -91,7 +91,7 @@ func (r *ExecutionResults) index(w storage.Writer, blockID, resultID flow.Identi
 		// if the result is not indexed, we can index it
 	}
 
-	err := operation.IndexExecutionResult(w, blockID, resultID)
+	err := operation.IndexExecutionResult(lctx, w, blockID, resultID)
 	if err == nil {
 		return nil
 	}
@@ -115,32 +115,6 @@ func (r *ExecutionResults) BatchIndex(lctx lockctx.Proof, blockID flow.Identifie
 
 func (r *ExecutionResults) ByID(resultID flow.Identifier) (*flow.ExecutionResult, error) {
 	return r.byID(resultID)
-}
-
-// Index indexes an execution result by block ID.
-// Note: this method call is not concurrent safe, because it checks if the different result is already indexed
-// by the same blockID, and if it is, it returns an error.
-// The caller needs to ensure that there is no concurrent call to this method with the same blockID.
-func (r *ExecutionResults) Index(blockID flow.Identifier, resultID flow.Identifier) error {
-	err := r.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-		return r.index(rw.Writer(), blockID, resultID, false)
-	})
-
-	if err != nil {
-		return fmt.Errorf("could not index execution result: %w", err)
-	}
-	return nil
-}
-
-func (r *ExecutionResults) ForceIndex(blockID flow.Identifier, resultID flow.Identifier) error {
-	err := r.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-		return r.index(rw.Writer(), blockID, resultID, true)
-	})
-
-	if err != nil {
-		return fmt.Errorf("could not index execution result: %w", err)
-	}
-	return nil
 }
 
 func (r *ExecutionResults) ByBlockID(blockID flow.Identifier) (*flow.ExecutionResult, error) {

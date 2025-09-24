@@ -149,7 +149,7 @@ func (c *IndexerCore) IndexBlockData(data *execution_data.BlockExecutionDataEnti
 		}
 
 		err := c.protocolDB.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			err := c.events.BatchStore(data.BlockID, []flow.EventsList{events}, rw)
+			err := c.events.BatchStore(lctx, data.BlockID, []flow.EventsList{events}, rw)
 			if err != nil {
 				return fmt.Errorf("could not index events at height %d: %w", header.Height, err)
 			}
