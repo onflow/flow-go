@@ -44,7 +44,7 @@ import (
 	"github.com/onflow/flow-go/module/signature"
 	"github.com/onflow/flow-go/module/state_synchronization/indexer"
 	"github.com/onflow/flow-go/network/channels"
-	"github.com/onflow/flow-go/network/mocknetwork"
+	mocknetwork "github.com/onflow/flow-go/network/mock"
 	protocol "github.com/onflow/flow-go/state/protocol/mock"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/operation"
@@ -68,7 +68,7 @@ type Suite struct {
 	signerIndicesDecoder *hsmock.BlockSignerDecoder
 	signerIds            flow.IdentifierList
 	log                  zerolog.Logger
-	net                  *mocknetwork.Network
+	net                  *mocknetwork.EngineRegistry
 	request              *mockmodule.Requester
 	collClient           *accessmock.AccessAPIClient
 	execClient           *accessmock.ExecutionAPIClient
@@ -94,7 +94,7 @@ func TestAccess(t *testing.T) {
 func (suite *Suite) SetupTest() {
 	suite.lockManager = storage.NewTestingLockManager()
 	suite.log = zerolog.New(os.Stderr)
-	suite.net = new(mocknetwork.Network)
+	suite.net = new(mocknetwork.EngineRegistry)
 	suite.state = new(protocol.State)
 	suite.finalSnapshot = new(protocol.Snapshot)
 	suite.sealedSnapshot = new(protocol.Snapshot)

@@ -12,8 +12,9 @@ import (
 	"github.com/onflow/flow-go/engine/access/rest/common/parser"
 	wsmodels "github.com/onflow/flow-go/engine/access/rest/websockets/models"
 	"github.com/onflow/flow-go/engine/access/state_stream"
-	statestreammock "github.com/onflow/flow-go/engine/access/state_stream/mock"
+	ssmock "github.com/onflow/flow-go/engine/access/state_stream/mock"
 	"github.com/onflow/flow-go/engine/access/subscription"
+	submock "github.com/onflow/flow-go/engine/access/subscription/mock"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -26,7 +27,7 @@ type DataProviderFactorySuite struct {
 	ch  chan interface{}
 
 	accessApi      *accessmock.API
-	stateStreamApi *statestreammock.API
+	stateStreamApi *ssmock.API
 
 	factory *DataProviderFactoryImpl
 }
@@ -39,7 +40,7 @@ func TestDataProviderFactorySuite(t *testing.T) {
 // It initializes the factory with mock instances and validates that it is created successfully.
 func (s *DataProviderFactorySuite) SetupTest() {
 	log := unittest.Logger()
-	s.stateStreamApi = statestreammock.NewAPI(s.T())
+	s.stateStreamApi = ssmock.NewAPI(s.T())
 	s.accessApi = accessmock.NewAPI(s.T())
 
 	s.ctx = context.Background()
@@ -60,7 +61,7 @@ func (s *DataProviderFactorySuite) SetupTest() {
 // setupSubscription creates a mock subscription instance for testing purposes.
 // It configures the return value of the specified API call to the mock subscription.
 func (s *DataProviderFactorySuite) setupSubscription(apiCall *mock.Call) {
-	sub := statestreammock.NewSubscription(s.T())
+	sub := submock.NewSubscription(s.T())
 	apiCall.Return(sub).Once()
 }
 
