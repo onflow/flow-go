@@ -36,7 +36,7 @@ func TestClusterHeights(t *testing.T) {
 			lctx := lockManager.NewContext()
 			require.NoError(t, lctx.AcquireLock(storage.LockInsertOrFinalizeClusterBlock))
 			err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-				return operation.IndexClusterBlockHeight(lctx, rw.Writer(), clusterID, height, expected)
+				return operation.IndexClusterBlockHeight(lctx, rw, clusterID, height, expected)
 			})
 			lctx.Release()
 			assert.NoError(t, err)
@@ -45,6 +45,35 @@ func TestClusterHeights(t *testing.T) {
 			err = operation.LookupClusterBlockHeight(db.Reader(), clusterID, height, &actual)
 			assert.NoError(t, err)
 			assert.Equal(t, expected, actual)
+		})
+
+		t.Run("data mismatch error", func(t *testing.T) {
+			// Use a different cluster ID and height to avoid conflicts with other tests
+			testClusterID := flow.ChainID("test-cluster")
+			testHeight := uint64(999)
+
+			// First index a block ID for the cluster and height
+			firstBlockID := unittest.IdentifierFixture()
+			unittest.WithLock(t, lockManager, storage.LockInsertOrFinalizeClusterBlock, func(lctx lockctx.Context) error {
+				return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+					return operation.IndexClusterBlockHeight(lctx, rw, testClusterID, testHeight, firstBlockID)
+				})
+			})
+
+			// Try to index a different block ID for the same cluster and height
+			differentBlockID := unittest.IdentifierFixture()
+			var err error
+			unittest.WithLock(t, lockManager, storage.LockInsertOrFinalizeClusterBlock, func(lctx lockctx.Context) error {
+				return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+					err = operation.IndexClusterBlockHeight(lctx, rw, testClusterID, testHeight, differentBlockID)
+					return nil // Don't return the error here, we want to check it outside
+				})
+			})
+
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), "cluster block height already indexed with different block ID")
+			assert.Contains(t, err.Error(), "data for key is different")
+			assert.ErrorIs(t, err, storage.ErrDataMismatch)
 		})
 
 		t.Run("multiple chain IDs", func(t *testing.T) {
@@ -63,7 +92,7 @@ func TestClusterHeights(t *testing.T) {
 				lctx := lockManager.NewContext()
 				require.NoError(t, lctx.AcquireLock(storage.LockInsertOrFinalizeClusterBlock))
 				err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-					return operation.IndexClusterBlockHeight(lctx, rw.Writer(), clusterIDs[i], height, clusterBlockIDs[i])
+					return operation.IndexClusterBlockHeight(lctx, rw, clusterIDs[i], height, clusterBlockIDs[i])
 				})
 				lctx.Release() // Release lock immediately after operation
 				assert.NoError(t, err)
@@ -83,7 +112,6 @@ func Test_RetrieveClusterFinalizedHeight(t *testing.T) {
 		lockManager := storage.NewTestingLockManager()
 		var (
 			clusterID flow.ChainID = "cluster"
-			expected  uint64       = 42
 			err       error
 		)
 
@@ -98,20 +126,26 @@ func Test_RetrieveClusterFinalizedHeight(t *testing.T) {
 
 			unittest.WithLock(t, lockManager, storage.LockInsertOrFinalizeClusterBlock, func(lctx lockctx.Context) error {
 				return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-					return operation.UpsertClusterFinalizedHeight(lctx, rw.Writer(), clusterID, 21)
+					return operation.BootstrapClusterFinalizedHeight(lctx, rw, clusterID, 20)
 				})
 			})
 
 			unittest.WithLock(t, lockManager, storage.LockInsertOrFinalizeClusterBlock, func(lctx lockctx.Context) error {
 				return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-					return operation.UpsertClusterFinalizedHeight(lctx, rw.Writer(), clusterID, expected)
+					return operation.UpdateClusterFinalizedHeight(lctx, rw, clusterID, 21)
+				})
+			})
+
+			unittest.WithLock(t, lockManager, storage.LockInsertOrFinalizeClusterBlock, func(lctx lockctx.Context) error {
+				return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+					return operation.UpdateClusterFinalizedHeight(lctx, rw, clusterID, 22)
 				})
 			})
 
 			var actual uint64
 			err = operation.RetrieveClusterFinalizedHeight(db.Reader(), clusterID, &actual)
 			assert.NoError(t, err)
-			assert.Equal(t, expected, actual)
+			assert.Equal(t, uint64(22), actual)
 		})
 
 		t.Run("multiple chain IDs", func(t *testing.T) {
@@ -129,7 +163,7 @@ func Test_RetrieveClusterFinalizedHeight(t *testing.T) {
 
 				unittest.WithLock(t, lockManager, storage.LockInsertOrFinalizeClusterBlock, func(lctx lockctx.Context) error {
 					return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-						return operation.UpsertClusterFinalizedHeight(lctx, rw.Writer(), clusterIDs[i], clusterFinalizedHeights[i])
+						return operation.BootstrapClusterFinalizedHeight(lctx, rw, clusterIDs[i], clusterFinalizedHeights[i])
 					})
 				})
 			}

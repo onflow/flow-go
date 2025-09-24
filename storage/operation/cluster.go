@@ -1,6 +1,7 @@
 package operation
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/jordanschalm/lockctx"
@@ -14,13 +15,38 @@ import (
 // for regular consensus, these functions include the cluster ID in order to
 // support storing multiple chains, for example during epoch switchover.
 
-// IndexClusterBlockHeight indexes a cluster block from the specified cluster by its height.
-func IndexClusterBlockHeight(lctx lockctx.Proof, w storage.Writer, clusterID flow.ChainID, height uint64, blockID flow.Identifier) error {
+// IndexClusterBlockHeight indexes a cluster block ID by the cluster ID and block height.
+// The function ensures data integrity by first checking if a block ID already exists for the given
+// cluster and height, and rejecting overwrites with different values. This function is idempotent,
+// i.e. repeated calls with the *initially* indexed value are no-ops.
+//
+// CAUTION:
+//   - Confirming that no value is already stored and the subsequent write must be atomic to prevent data corruption.
+//     The caller must acquire the [storage.LockInsertOrFinalizeClusterBlock] and hold it until the database write has been committed.
+//
+// Expected error returns during normal operations:
+//   - [storage.ErrDataMismatch] if a *different* block ID is already indexed for the same cluster and height
+func IndexClusterBlockHeight(lctx lockctx.Proof, rw storage.ReaderBatchWriter, clusterID flow.ChainID, height uint64, blockID flow.Identifier) error {
 	if !lctx.HoldsLock(storage.LockInsertOrFinalizeClusterBlock) {
 		return fmt.Errorf("missing lock: %v", storage.LockInsertOrFinalizeClusterBlock)
 	}
 
-	return UpsertByKey(w, MakePrefix(codeFinalizedCluster, clusterID, height), blockID)
+	key := MakePrefix(codeFinalizedCluster, clusterID, height)
+	var existing flow.Identifier
+	err := RetrieveByKey(rw.GlobalReader(), key, &existing)
+	if err == nil {
+		if existing != blockID {
+			return fmt.Errorf("cluster block height already indexed with different block ID: %s vs %s: %w", existing, blockID, storage.ErrDataMismatch)
+		}
+		// already indexed, nothing to do
+		return nil
+	}
+
+	if !errors.Is(err, storage.ErrNotFound) {
+		return fmt.Errorf("failed to check existing cluster block height index: %w", err)
+	}
+
+	return UpsertByKey(rw.Writer(), key, blockID)
 }
 
 // LookupClusterBlockHeight retrieves a block ID by height for the given cluster
@@ -29,12 +55,45 @@ func LookupClusterBlockHeight(r storage.Reader, clusterID flow.ChainID, height u
 	return RetrieveByKey(r, MakePrefix(codeFinalizedCluster, clusterID, height), blockID)
 }
 
-// UpsertClusterFinalizedHeight updates (overwrites!) the latest finalized cluster block height for the given cluster.
-func UpsertClusterFinalizedHeight(lctx lockctx.Proof, w storage.Writer, clusterID flow.ChainID, number uint64) error {
+func BootstrapClusterFinalizedHeight(lctx lockctx.Proof, rw storage.ReaderBatchWriter, clusterID flow.ChainID, number uint64) error {
 	if !lctx.HoldsLock(storage.LockInsertOrFinalizeClusterBlock) {
 		return fmt.Errorf("missing lock: %v", storage.LockInsertOrFinalizeClusterBlock)
 	}
-	return UpsertByKey(w, MakePrefix(codeClusterHeight, clusterID), number)
+
+	key := MakePrefix(codeClusterHeight, clusterID)
+
+	var existing uint64
+	err := RetrieveByKey(rw.GlobalReader(), key, &existing)
+	if err == nil {
+		return fmt.Errorf("finalized height already initialized: %d", existing)
+	}
+
+	if !errors.Is(err, storage.ErrNotFound) {
+		return fmt.Errorf("failed to check existing finalized height: %w", err)
+	}
+
+	return UpsertByKey(rw.Writer(), key, number)
+}
+
+// UpdateClusterFinalizedHeight updates (overwrites!) the latest finalized cluster block height for the given cluster.
+func UpdateClusterFinalizedHeight(lctx lockctx.Proof, rw storage.ReaderBatchWriter, clusterID flow.ChainID, number uint64) error {
+	if !lctx.HoldsLock(storage.LockInsertOrFinalizeClusterBlock) {
+		return fmt.Errorf("missing lock: %v", storage.LockInsertOrFinalizeClusterBlock)
+	}
+
+	key := MakePrefix(codeClusterHeight, clusterID)
+
+	var existing uint64
+	err := RetrieveByKey(rw.GlobalReader(), key, &existing)
+	if err != nil {
+		return fmt.Errorf("failed to check existing finalized height: %w", err)
+	}
+
+	if existing+1 != number {
+		return fmt.Errorf("finalization isn't sequential: existing %d, new %d", existing, number)
+	}
+
+	return UpsertByKey(rw.Writer(), key, number)
 }
 
 // RetrieveClusterFinalizedHeight retrieves the latest finalized cluster block height of the given cluster.

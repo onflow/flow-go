@@ -131,7 +131,6 @@ func FinalizeClusterBlock(lctx lockctx.Proof, rw storage.ReaderBatchWriter, bloc
 	}
 
 	r := rw.GlobalReader()
-	writer := rw.Writer()
 	// retrieve the header to check the parent
 	var header flow.Header
 	err := operation.RetrieveHeader(r, blockID, &header)
@@ -162,13 +161,13 @@ func FinalizeClusterBlock(lctx lockctx.Proof, rw storage.ReaderBatchWriter, bloc
 	}
 
 	// index the block by its height
-	err = operation.IndexClusterBlockHeight(lctx, writer, clusterID, header.Height, blockID)
+	err = operation.IndexClusterBlockHeight(lctx, rw, clusterID, header.Height, blockID)
 	if err != nil {
 		return fmt.Errorf("could not index cluster block height: %w", err)
 	}
 
 	// update the finalized boundary
-	err = operation.UpsertClusterFinalizedHeight(lctx, writer, clusterID, header.Height)
+	err = operation.UpdateClusterFinalizedHeight(lctx, rw, clusterID, header.Height)
 	if err != nil {
 		return fmt.Errorf("could not update finalized boundary: %w", err)
 	}
