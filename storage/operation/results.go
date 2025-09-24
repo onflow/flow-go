@@ -1,6 +1,9 @@
 package operation
 
 import (
+	"fmt"
+
+	"github.com/jordanschalm/lockctx"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/storage"
 )
@@ -32,10 +35,11 @@ func RetrieveExecutionResult(r storage.Reader, resultID flow.Identifier, result 
 //     value. Changing data could cause the node to publish inconsistent data and to be slashed, or the protocol to be
 //     compromised as a whole. This method does not contain any safeguards to prevent such data corruption.
 //
-// TODO: USE LOCK, we want to protect this mapping from accidental overwrites (because the key is not derived from the value via a collision-resistant hash)
-//
 // No errors are expected during normal operation.
-func IndexExecutionResult(w storage.Writer, blockID flow.Identifier, resultID flow.Identifier) error {
+func IndexExecutionResult(lctx lockctx.Proof, w storage.Writer, blockID flow.Identifier, resultID flow.Identifier) error {
+	if !lctx.HoldsLock(storage.LockInsertOwnReceipt) {
+		return fmt.Errorf("IndexExecutionResult requires LockInsertOwnReceipt to be held")
+	}
 	return UpsertByKey(w, MakePrefix(codeIndexExecutionResultByBlock, blockID), resultID)
 }
 

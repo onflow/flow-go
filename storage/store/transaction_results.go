@@ -4,6 +4,7 @@ import (
 	"encoding/binary"
 	"fmt"
 
+	"github.com/jordanschalm/lockctx"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/metrics"
@@ -128,16 +129,16 @@ func NewTransactionResults(collector module.CacheMetrics, db storage.DB, transac
 }
 
 // BatchStore will store the transaction results for the given block ID in a batch
-func (tr *TransactionResults) BatchStore(blockID flow.Identifier, transactionResults []flow.TransactionResult, batch storage.ReaderBatchWriter) error {
+func (tr *TransactionResults) BatchStore(lctx lockctx.Proof, blockID flow.Identifier, transactionResults []flow.TransactionResult, batch storage.ReaderBatchWriter) error {
 	w := batch.Writer()
 
 	for i, result := range transactionResults {
-		err := operation.InsertTransactionResult(w, blockID, &result)
+		err := operation.InsertTransactionResult(lctx, w, blockID, &result)
 		if err != nil {
 			return fmt.Errorf("cannot batch insert tx result: %w", err)
 		}
 
-		err = operation.IndexTransactionResult(w, blockID, uint32(i), &result)
+		err = operation.IndexTransactionResult(lctx, w, blockID, uint32(i), &result)
 		if err != nil {
 			return fmt.Errorf("cannot batch index tx result: %w", err)
 		}

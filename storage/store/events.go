@@ -3,6 +3,7 @@ package store
 import (
 	"fmt"
 
+	"github.com/jordanschalm/lockctx"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/metrics"
@@ -40,7 +41,7 @@ func NewEvents(collector module.CacheMetrics, db storage.DB) *Events {
 // BatchStore stores events keyed by a blockID in provided batch
 // No errors are expected during normal operation, but it may return generic error
 // if badger fails to process request
-func (e *Events) BatchStore(blockID flow.Identifier, blockEvents []flow.EventsList, batch storage.ReaderBatchWriter) error {
+func (e *Events) BatchStore(lctx lockctx.Proof, blockID flow.Identifier, blockEvents []flow.EventsList, batch storage.ReaderBatchWriter) error {
 	writer := batch.Writer()
 
 	// pre-allocating and indexing slice is faster than appending
@@ -55,7 +56,7 @@ func (e *Events) BatchStore(blockID flow.Identifier, blockEvents []flow.EventsLi
 
 	for _, events := range blockEvents {
 		for _, event := range events {
-			err := operation.InsertEvent(writer, blockID, event)
+			err := operation.InsertEvent(lctx, writer, blockID, event)
 			if err != nil {
 				return fmt.Errorf("cannot batch insert event: %w", err)
 			}
@@ -72,9 +73,9 @@ func (e *Events) BatchStore(blockID flow.Identifier, blockEvents []flow.EventsLi
 }
 
 // Store will store events for the given block ID
-func (e *Events) Store(blockID flow.Identifier, blockEvents []flow.EventsList) error {
+func (e *Events) Store(lctx lockctx.Proof, blockID flow.Identifier, blockEvents []flow.EventsList) error {
 	return e.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-		return e.BatchStore(blockID, blockEvents, rw)
+		return e.BatchStore(lctx, blockID, blockEvents, rw)
 	})
 }
 
@@ -181,10 +182,10 @@ func NewServiceEvents(collector module.CacheMetrics, db storage.DB) *ServiceEven
 // BatchStore stores service events keyed by a blockID in provided batch
 // No errors are expected during normal operation, even if no entries are matched.
 // If Badger unexpectedly fails to process the request, the error is wrapped in a generic error and returned.
-func (e *ServiceEvents) BatchStore(blockID flow.Identifier, events []flow.Event, rw storage.ReaderBatchWriter) error {
+func (e *ServiceEvents) BatchStore(lctx lockctx.Proof, blockID flow.Identifier, events []flow.Event, rw storage.ReaderBatchWriter) error {
 	writer := rw.Writer()
 	for _, event := range events {
-		err := operation.InsertServiceEvent(writer, blockID, event)
+		err := operation.InsertServiceEvent(lctx, writer, blockID, event)
 		if err != nil {
 			return fmt.Errorf("cannot batch insert service event: %w", err)
 		}

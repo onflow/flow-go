@@ -436,17 +436,18 @@ func (s *state) saveExecutionResults(
 				}
 			})
 
-			err = s.events.BatchStore(blockID, []flow.EventsList{result.AllEvents()}, batch)
+			err = s.events.BatchStore(lctx, blockID, []flow.EventsList{result.AllEvents()}, batch)
 			if err != nil {
 				return fmt.Errorf("cannot store events: %w", err)
 			}
 
-			err = s.serviceEvents.BatchStore(blockID, result.AllServiceEvents(), batch)
+			err = s.serviceEvents.BatchStore(lctx, blockID, result.AllServiceEvents(), batch)
 			if err != nil {
 				return fmt.Errorf("cannot store service events: %w", err)
 			}
 
 			err = s.transactionResults.BatchStore(
+				lctx,
 				blockID,
 				result.AllTransactionResults(),
 				batch)
@@ -461,7 +462,7 @@ func (s *state) saveExecutionResults(
 				return fmt.Errorf("could not persist execution result: %w", err)
 			}
 
-			err = s.results.BatchIndex(blockID, executionResult.ID(), batch)
+			err = s.results.BatchIndex(lctx, blockID, executionResult.ID(), batch)
 			if err != nil {
 				return fmt.Errorf("cannot index execution result: %w", err)
 			}

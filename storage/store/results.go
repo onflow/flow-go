@@ -3,6 +3,7 @@ package store
 import (
 	"fmt"
 
+	"github.com/jordanschalm/lockctx"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/metrics"
@@ -108,8 +109,8 @@ func (r *ExecutionResults) BatchStore(result *flow.ExecutionResult, batch storag
 	return r.store(batch, result)
 }
 
-func (r *ExecutionResults) BatchIndex(blockID flow.Identifier, resultID flow.Identifier, batch storage.ReaderBatchWriter) error {
-	return operation.IndexExecutionResult(batch.Writer(), blockID, resultID)
+func (r *ExecutionResults) BatchIndex(lctx lockctx.Proof, blockID flow.Identifier, resultID flow.Identifier, batch storage.ReaderBatchWriter) error {
+	return operation.IndexExecutionResult(lctx, batch.Writer(), blockID, resultID)
 }
 
 func (r *ExecutionResults) ByID(resultID flow.Identifier) (*flow.ExecutionResult, error) {

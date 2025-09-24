@@ -3,15 +3,22 @@ package operation
 import (
 	"fmt"
 
+	"github.com/jordanschalm/lockctx"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/storage"
 )
 
-func InsertTransactionResult(w storage.Writer, blockID flow.Identifier, transactionResult *flow.TransactionResult) error {
+func InsertTransactionResult(lctx lockctx.Proof, w storage.Writer, blockID flow.Identifier, transactionResult *flow.TransactionResult) error {
+	if !lctx.HoldsLock(storage.LockInsertOwnReceipt) {
+		return fmt.Errorf("InsertTransactionResult requires LockInsertOwnReceipt to be held")
+	}
 	return UpsertByKey(w, MakePrefix(codeTransactionResult, blockID, transactionResult.TransactionID), transactionResult)
 }
 
-func IndexTransactionResult(w storage.Writer, blockID flow.Identifier, txIndex uint32, transactionResult *flow.TransactionResult) error {
+func IndexTransactionResult(lctx lockctx.Proof, w storage.Writer, blockID flow.Identifier, txIndex uint32, transactionResult *flow.TransactionResult) error {
+	if !lctx.HoldsLock(storage.LockInsertOwnReceipt) {
+		return fmt.Errorf("IndexTransactionResult requires LockInsertOwnReceipt to be held")
+	}
 	return UpsertByKey(w, MakePrefix(codeTransactionResultIndex, blockID, txIndex), transactionResult)
 }
 
