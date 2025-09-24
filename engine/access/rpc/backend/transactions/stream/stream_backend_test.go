@@ -346,7 +346,7 @@ func (s *TransactionStreamSuite) initializeBackend() {
 func blockByID(blockMap *concurrentmap.Map[uint64, *flow.Block]) func(flow.Identifier) (*flow.Block, error) {
 	return func(blockID flow.Identifier) (*flow.Block, error) {
 		var block *flow.Block
-		blockMap.ForEach(func(height uint64, b *flow.Block) error {
+		_ = blockMap.ForEach(func(height uint64, b *flow.Block) error {
 			if b.ID() == blockID {
 				block = b
 			}
