@@ -248,6 +248,8 @@ func (suite *RateLimitTestSuite) TearDownTest() {
 	unittest.AssertClosesBefore(suite.T(), suite.unsecureGrpcServer.Done(), 2*time.Second)
 }
 
+// TestRateLimit runs the RateLimitTestSuite to verify that Access API rate
+// limiting is enforced correctly for both steady-state requests and bursts.
 func TestRateLimit(t *testing.T) {
 	suite.Run(t, new(RateLimitTestSuite))
 }
