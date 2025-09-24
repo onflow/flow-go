@@ -20,7 +20,6 @@ import (
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/operation"
-	"github.com/onflow/flow-go/storage/procedure"
 	"github.com/onflow/flow-go/utils/logging"
 )
 
@@ -231,7 +230,7 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.HeaderBody
 	span, _ = b.tracer.StartSpanFromContext(ctx, trace.COLBuildOnDBInsert)
 
 	err = b.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-		return procedure.InsertClusterBlock(lctx, rw, blockProposal)
+		return operation.InsertClusterBlock(lctx, rw, blockProposal)
 	})
 	span.End()
 	if err != nil {

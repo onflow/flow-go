@@ -18,7 +18,6 @@ import (
 	"github.com/onflow/flow-go/state/fork"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/operation"
-	"github.com/onflow/flow-go/storage/procedure"
 )
 
 type MutableState struct {
@@ -62,7 +61,7 @@ func (m *MutableState) getExtendCtx(candidate *cluster.Block) (extendContext, er
 	r := m.State.db.Reader()
 	// get the latest finalized cluster block and latest finalized consensus height
 	ctx.finalizedClusterBlock = new(flow.Header)
-	err := procedure.RetrieveLatestFinalizedClusterHeader(r, candidate.ChainID, ctx.finalizedClusterBlock)
+	err := operation.RetrieveLatestFinalizedClusterHeader(r, candidate.ChainID, ctx.finalizedClusterBlock)
 	if err != nil {
 		return extendContext{}, fmt.Errorf("could not retrieve finalized cluster head: %w", err)
 	}
@@ -145,7 +144,7 @@ func (m *MutableState) Extend(proposal *cluster.Proposal) error {
 
 	span, _ = m.tracer.StartSpanFromContext(ctx, trace.COLClusterStateMutatorExtendDBInsert)
 	err = m.State.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-		return procedure.InsertClusterBlock(lctx, rw, proposal)
+		return operation.InsertClusterBlock(lctx, rw, proposal)
 	})
 	span.End()
 	if err != nil {
