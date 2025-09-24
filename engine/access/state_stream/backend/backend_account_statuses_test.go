@@ -529,7 +529,12 @@ func (s *BackendExecutionDataSuite) TestSubscribeAccountStatusesHandlesErrors() 
 	})
 }
 
-func (s *BackendAccountStatusesSuite) expectedAccountStatuses(blockID flow.Identifier, filter state_stream.AccountStatusFilter) map[string]flow.EventsList {
+// expectedAccountStatuses returns the account status events from the mock block events that match
+// the provided filter.
+func (s *BackendAccountStatusesSuite) expectedAccountStatuses(
+	blockID flow.Identifier,
+	filter state_stream.AccountStatusFilter,
+) map[string]flow.EventsList {
 	expectedEvents := map[string]flow.EventsList{}
 	for _, event := range s.blockEvents[blockID] {
 		if filter.Match(event) {
