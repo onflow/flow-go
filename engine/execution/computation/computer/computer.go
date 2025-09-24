@@ -313,11 +313,13 @@ func (e *blockComputer) queueSystemTransactions(
 	txnIndex uint32,
 	systemLogger zerolog.Logger,
 ) chan TransactionRequest {
-	systemLogger = systemLogger.With().
+	var logger zerolog.Logger
+
+	systemChunkTxLogger := systemLogger.With().
 		Uint32("num_txs", uint32(len(systemColection.CompleteCollection.Collection.Transactions))).
 		Logger()
 
-	logger := systemLogger.With().
+	scheduledTxLogger := systemChunkTxLogger.With().
 		Bool("scheduled_transaction", true).
 		Bool("critical_error", false).
 		Logger()
@@ -329,10 +331,11 @@ func (e *blockComputer) queueSystemTransactions(
 	for i, txBody := range allTxs {
 		systemChunkTx := i == len(allTxs)-1 // last tx in collection is system chunk
 		ctx := callbackCtx
+		logger = scheduledTxLogger
 
 		if systemChunkTx {
 			ctx = systemChunkCtx
-			logger = systemLogger
+			logger = systemChunkTxLogger
 		}
 
 		txQueue <- newTransactionRequest(
