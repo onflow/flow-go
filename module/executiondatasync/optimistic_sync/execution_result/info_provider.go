@@ -93,8 +93,8 @@ func (e *Provider) ExecutionResultInfo(
 		}
 
 		return &optimistic_sync.ExecutionResultInfo{
-			ExecutionResult: e.rootBlockResult,
-			ExecutionNodes:  subsetENs,
+			ExecutionResultID: e.rootBlockResult.ID(),
+			ExecutionNodes:    subsetENs,
 		}, nil
 	}
 
@@ -122,8 +122,8 @@ func (e *Provider) ExecutionResultInfo(
 	}
 
 	return &optimistic_sync.ExecutionResultInfo{
-		ExecutionResult: result,
-		ExecutionNodes:  subsetENs,
+		ExecutionResultID: result.ID(),
+		ExecutionNodes:    subsetENs,
 	}, nil
 }
 

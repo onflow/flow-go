@@ -29,7 +29,7 @@ type EventsAPI interface {
 	GetEventsForHeightRange(
 		ctx context.Context,
 		eventType string,
-		startHeight,
+		startHeight uint64,
 		endHeight uint64,
 		requiredEventEncodingVersion entities.EventEncodingVersion,
 		criteria optimistic_sync.Criteria,
