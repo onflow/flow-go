@@ -23,7 +23,7 @@ func IndexNewBlock(lctx lockctx.Proof, rw storage.ReaderBatchWriter, blockID flo
 		return fmt.Errorf("missing required lock: %s", storage.LockInsertBlock)
 	}
 
-	return insertNewBlock(rw, blockID, parentID)
+	return indexBlockByParent(rw, blockID, parentID)
 }
 
 // IndexNewClusterBlock indexes a new cluster block and updates the parent-child relationship in the block children index.
@@ -39,14 +39,14 @@ func IndexNewClusterBlock(lctx lockctx.Proof, rw storage.ReaderBatchWriter, bloc
 		return fmt.Errorf("missing required lock: %s", storage.LockInsertOrFinalizeClusterBlock)
 	}
 
-	return insertNewBlock(rw, blockID, parentID)
+	return indexBlockByParent(rw, blockID, parentID)
 }
 
-func insertNewBlock(rw storage.ReaderBatchWriter, blockID flow.Identifier, parentID flow.Identifier) error {
+func indexBlockByParent(rw storage.ReaderBatchWriter, blockID flow.Identifier, parentID flow.Identifier) error {
 	// Step 1: make sure the new block has no children yet
 	var nonExist flow.IdentifierList
 	err := RetrieveBlockChildren(rw.GlobalReader(), blockID, &nonExist)
-	if err != nil && !errors.Is(err, storage.ErrNotFound) {
+	if err != nil {
 		// verify err should be ErrNotFound, since new block has no children
 		return fmt.Errorf("could not check for existing children of new block: %w", err)
 	}
@@ -70,7 +70,7 @@ func insertNewBlock(rw storage.ReaderBatchWriter, blockID flow.Identifier, paren
 	// when parent block exists already, we will update the block children,
 	var childrenIDs flow.IdentifierList
 	err = RetrieveBlockChildren(rw.GlobalReader(), parentID, &childrenIDs)
-	if err != nil && !errors.Is(err, storage.ErrNotFound) {
+	if err != nil {
 		return fmt.Errorf("could not look up block children: %w", err)
 	}
 

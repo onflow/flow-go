@@ -10,7 +10,9 @@ import (
 	clustermodel "github.com/onflow/flow-go/model/cluster"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/state"
 	"github.com/onflow/flow-go/state/cluster"
+	"github.com/onflow/flow-go/state/cluster/invalid"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/operation"
 	"github.com/onflow/flow-go/storage/procedure"
@@ -162,6 +164,14 @@ func (s *State) Final() cluster.Snapshot {
 }
 
 func (s *State) AtBlockID(blockID flow.Identifier) cluster.Snapshot {
+	exists, err := operation.BlockExists(s.db.Reader(), blockID)
+	if err != nil {
+		return invalid.NewSnapshotf("could not check existence of reference block: %w", err)
+	}
+	if !exists {
+		return invalid.NewSnapshotf("unknown block %x: %w", blockID, state.ErrUnknownSnapshotReference)
+	}
+
 	snapshot := &Snapshot{
 		state:   s,
 		blockID: blockID,

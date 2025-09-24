@@ -297,6 +297,9 @@ func (s *Snapshot) SealingSegment() (*flow.SealingSegment, error) {
 	return segment, nil
 }
 
+// Note, the caller must have checked that the block of the snapshot does exist in the database.
+// This is currently true, because the Snapshot instance is only created by AtBlockID and AtHeight
+// method of State, which both check the existence of the block first.
 func (s *Snapshot) Descendants() ([]flow.Identifier, error) {
 	descendants, err := s.descendants(s.blockID)
 	if err != nil {

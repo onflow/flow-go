@@ -46,6 +46,10 @@ func (s *Snapshot) Head() (*flow.Header, error) {
 	return &head, err
 }
 
+// Pending returns all pending block IDs that descend from the snapshot's reference block.
+// Note, the caller must have checked that the block of the snapshot does exist in the database.
+// This is currently true, because the Snapshot instance is only created by AtBlockID and AtHeight
+// method of State, which both check the existence of the block first.
 func (s *Snapshot) Pending() ([]flow.Identifier, error) {
 	if s.err != nil {
 		return nil, s.err
