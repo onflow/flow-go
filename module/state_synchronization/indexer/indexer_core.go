@@ -148,13 +148,25 @@ func (c *IndexerCore) IndexBlockData(data *execution_data.BlockExecutionDataEnti
 			results = append(results, chunk.TransactionResults...)
 		}
 
-		err := c.protocolDB.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+		lctx := c.lockManager.NewContext()
+		defer lctx.Release()
+		err := lctx.AcquireLock(storage.LockInsertEvent)
+		if err != nil {
+			return fmt.Errorf("could not acquire LockInsertEvent for indexing block data: %w", err)
+		}
+
+		err = lctx.AcquireLock(storage.LockInsertLightTransactionResult)
+		if err != nil {
+			return fmt.Errorf("could not acquire LockInsertLightTransactionResult for indexing block data: %w", err)
+		}
+
+		err = c.protocolDB.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 			err := c.events.BatchStore(lctx, data.BlockID, []flow.EventsList{events}, rw)
 			if err != nil {
 				return fmt.Errorf("could not index events at height %d: %w", header.Height, err)
 			}
 
-			err = c.results.BatchStore(data.BlockID, results, rw)
+			err = c.results.BatchStore(lctx, data.BlockID, results, rw)
 			if err != nil {
 				return fmt.Errorf("could not index transaction results at height %d: %w", header.Height, err)
 			}

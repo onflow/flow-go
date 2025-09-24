@@ -16,7 +16,7 @@ func TestSummarizeKeysByFirstByteConcurrent(t *testing.T) {
 	lockManager := storage.NewTestingLockManager()
 	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
 
-		unittest.WithLock(t, lockManager, storage.LockInsertOwnReceipt, func(lctx lockctx.Context) error {
+		unittest.WithLock(t, lockManager, storage.LockInsertEvent, func(lctx lockctx.Context) error {
 			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 				// insert random events
 				b := unittest.IdentifierFixture()

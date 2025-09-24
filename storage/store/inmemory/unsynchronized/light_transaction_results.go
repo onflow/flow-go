@@ -113,10 +113,3 @@ func (l *LightTransactionResults) Data() []flow.LightTransactionResult {
 func (l *LightTransactionResults) BatchStore(flow.Identifier, []flow.LightTransactionResult, storage.ReaderBatchWriter) error {
 	return fmt.Errorf("not implemented")
 }
-
-// BatchStoreBadger inserts a batch of transaction result into a storage.
-// Deprecated: deprecated as a part of transition from Badger to Pebble. use BatchStore instead.
-// This method is not implemented and will always return an error.
-func (l *LightTransactionResults) BatchStoreBadger(flow.Identifier, []flow.LightTransactionResult, storage.BatchStorage) error {
-	return fmt.Errorf("not implemented")
-}

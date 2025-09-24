@@ -23,6 +23,8 @@ const (
 	// LockInsertEvent protects the insertion of events.
 	// This lock is reused by both EN storing its own receipt and AN indexing execution data
 	LockInsertEvent = "lock_insert_event"
+	// LockInsertLightTransactionResult protects the insertion of light transaction results.
+	LockInsertLightTransactionResult = "lock_insert_light_transaction_result"
 	// LockInsertOwnReceipt is intended for Execution Nodes to ensure that they never publish different receipts for the same block.
 	// Specifically, with this lock we prevent accidental overwrites of the index `executed block ID` ➜ `Receipt ID`.
 	LockInsertOwnReceipt = "lock_insert_own_receipt"

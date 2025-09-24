@@ -55,7 +55,7 @@ func TestRetrieveEventByBlockIDTxID(t *testing.T) {
 					)
 
 					// insert event into the db
-					unittest.WithLock(t, lockManager, storage.LockInsertOwnReceipt, func(lctx lockctx.Context) error {
+					unittest.WithLock(t, lockManager, storage.LockInsertEvent, func(lctx lockctx.Context) error {
 						return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 							return operation.InsertEvent(lctx, rw.Writer(), b, event)
 						})
