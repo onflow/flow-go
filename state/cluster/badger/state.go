@@ -163,6 +163,12 @@ func (s *State) Final() cluster.Snapshot {
 	return snapshot
 }
 
+// AtBlockID returns the snapshot of the persistent cluster at the given
+// block ID. It is available for any block that was introduced into the
+// the cluster state, and can thus represent an ambiguous state that was or
+// will never be finalized.
+// If the block is unknown, it returns an invalid snapshot, which returns
+// state.ErrUnknownSnapshotReference for all methods
 func (s *State) AtBlockID(blockID flow.Identifier) cluster.Snapshot {
 	exists, err := operation.BlockExists(s.db.Reader(), blockID)
 	if err != nil {
