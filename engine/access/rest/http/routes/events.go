@@ -4,6 +4,8 @@ import (
 	"fmt"
 
 	entitiesproto "github.com/onflow/flow/protobuf/go/flow/entities"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 
 	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/engine/access/rest/common"
@@ -36,6 +38,12 @@ func GetEvents(
 			models.NewCriteria(req.ExecutionState),
 		)
 		if err != nil {
+			if st, ok := status.FromError(err); ok {
+				if st.Code() == codes.InvalidArgument {
+					return nil, common.NewBadRequestError(err)
+				}
+			}
+
 			return nil, err
 		}
 
