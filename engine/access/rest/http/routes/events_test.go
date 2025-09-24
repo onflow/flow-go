@@ -17,7 +17,6 @@ import (
 	"github.com/onflow/flow-go/engine/access/rest/common/models"
 	"github.com/onflow/flow-go/engine/access/rest/http/routes"
 	"github.com/onflow/flow-go/engine/access/rest/router"
-	"github.com/onflow/flow-go/model/access"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/executiondatasync/optimistic_sync"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -259,7 +258,7 @@ func TestGetEvents_ParseExecutionState(t *testing.T) {
 			entities.EventEncodingVersion_JSON_CDC_V0,
 			mocks.Anything,
 		).
-		Return(expectedBlockEvents, access.ExecutorMetadata{}, nil)
+		Return(expectedBlockEvents, nil, nil)
 
 	t.Run("empty execution state query", func(t *testing.T) {
 		request := buildRequest(
@@ -369,7 +368,7 @@ func TestGetEvents_GetAtSealedBlock(t *testing.T) {
 			entities.EventEncodingVersion_JSON_CDC_V0,
 			optimistic_sync.DefaultCriteria,
 		).
-		Return(expectedBlockEvents, access.ExecutorMetadata{}, nil).
+		Return(expectedBlockEvents, nil, nil).
 		Once()
 
 	request := buildRequest(
@@ -408,7 +407,7 @@ func generateEventsMocks(backend *mock.API, n int) []flow.BlockEvents {
 				entities.EventEncodingVersion_JSON_CDC_V0,
 				mocks.Anything,
 			).
-			Return([]flow.BlockEvents{events[i]}, access.ExecutorMetadata{}, nil).
+			Return([]flow.BlockEvents{events[i]}, nil, nil).
 			Once()
 
 		lastHeader = header
@@ -422,7 +421,7 @@ func generateEventsMocks(backend *mock.API, n int) []flow.BlockEvents {
 			entities.EventEncodingVersion_JSON_CDC_V0,
 			mocks.Anything,
 		).
-		Return(events, access.ExecutorMetadata{}, nil).
+		Return(events, nil, nil).
 		Once()
 
 	// range from first to last block
@@ -436,7 +435,7 @@ func generateEventsMocks(backend *mock.API, n int) []flow.BlockEvents {
 			entities.EventEncodingVersion_JSON_CDC_V0,
 			mocks.Anything,
 		).
-		Return(events, access.ExecutorMetadata{}, nil).
+		Return(events, nil, nil).
 		Once()
 
 	// range from first to last block + 5
@@ -450,7 +449,7 @@ func generateEventsMocks(backend *mock.API, n int) []flow.BlockEvents {
 			entities.EventEncodingVersion_JSON_CDC_V0,
 			mocks.Anything,
 		).
-		Return(append(events[:len(events)-1], unittest.BlockEventsFixture(lastHeader, 0)), access.ExecutorMetadata{}, nil).
+		Return(append(events[:len(events)-1], unittest.BlockEventsFixture(lastHeader, 0)), nil, nil).
 		Once()
 
 	latestBlock := unittest.BlockHeaderFixture()
@@ -466,7 +465,7 @@ func generateEventsMocks(backend *mock.API, n int) []flow.BlockEvents {
 			entities.EventEncodingVersion_JSON_CDC_V0,
 			mocks.Anything,
 		).
-		Return(nil, access.ExecutorMetadata{}, status.Error(codes.NotFound, "not found")).
+		Return(nil, nil, status.Error(codes.NotFound, "not found")).
 		Once()
 
 	backend.Mock.
@@ -479,7 +478,7 @@ func generateEventsMocks(backend *mock.API, n int) []flow.BlockEvents {
 			mocks.Anything,
 			mocks.Anything,
 		).
-		Return(events[0:3], access.ExecutorMetadata{}, nil).
+		Return(events[0:3], nil, nil).
 		Once()
 
 	backend.Mock.
@@ -532,7 +531,7 @@ func buildRequest(
 }
 
 func buildExpectedResponse(t *testing.T, events []flow.BlockEvents, includeMetadata bool) string {
-	list := models.NewBlockEventsList(events, access.ExecutorMetadata{}, includeMetadata)
+	list := models.NewBlockEventsList(events, nil, includeMetadata)
 	data, err := json.Marshal(list)
 	require.NoError(t, err)
 
