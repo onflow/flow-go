@@ -19,7 +19,7 @@ type TransactionProvider interface {
 		txID flow.Identifier,
 		encodingVersion entities.EventEncodingVersion,
 		executionResultInfo *optimistic_sync.ExecutionResultInfo,
-	) (*accessmodel.TransactionResult, accessmodel.ExecutorMetadata, error)
+	) (*accessmodel.TransactionResult, *accessmodel.ExecutorMetadata, error)
 
 	TransactionResultByIndex(
 		ctx context.Context,
@@ -27,27 +27,27 @@ type TransactionProvider interface {
 		index uint32,
 		encodingVersion entities.EventEncodingVersion,
 		executionResultInfo *optimistic_sync.ExecutionResultInfo,
-	) (*accessmodel.TransactionResult, accessmodel.ExecutorMetadata, error)
+	) (*accessmodel.TransactionResult, *accessmodel.ExecutorMetadata, error)
 
 	TransactionResultsByBlockID(
 		ctx context.Context,
 		block *flow.Block,
 		encodingVersion entities.EventEncodingVersion,
 		executionResultInfo *optimistic_sync.ExecutionResultInfo,
-	) ([]*accessmodel.TransactionResult, accessmodel.ExecutorMetadata, error)
+	) ([]*accessmodel.TransactionResult, *accessmodel.ExecutorMetadata, error)
 
 	TransactionsByBlockID(
 		ctx context.Context,
 		block *flow.Block,
 		executionResultInfo *optimistic_sync.ExecutionResultInfo,
-	) ([]*flow.TransactionBody, accessmodel.ExecutorMetadata, error)
+	) ([]*flow.TransactionBody, *accessmodel.ExecutorMetadata, error)
 
 	SystemTransaction(
 		ctx context.Context,
 		block *flow.Block,
 		txID flow.Identifier,
 		executionResultInfo *optimistic_sync.ExecutionResultInfo,
-	) (*flow.TransactionBody, accessmodel.ExecutorMetadata, error)
+	) (*flow.TransactionBody, *accessmodel.ExecutorMetadata, error)
 
 	SystemTransactionResult(
 		ctx context.Context,
@@ -55,5 +55,5 @@ type TransactionProvider interface {
 		txID flow.Identifier,
 		encodingVersion entities.EventEncodingVersion,
 		executionResultInfo *optimistic_sync.ExecutionResultInfo,
-	) (*accessmodel.TransactionResult, accessmodel.ExecutorMetadata, error)
+	) (*accessmodel.TransactionResult, *accessmodel.ExecutorMetadata, error)
 }

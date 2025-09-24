@@ -239,6 +239,7 @@ func (s *TransactionStreamSuite) initializeBackend() {
 
 	localTxProvider := provider.NewLocalTransactionProvider(
 		s.state,
+		s.collections,
 		s.blocks,
 		s.systemTx.ID(),
 		txStatusDeriver,

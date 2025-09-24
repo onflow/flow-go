@@ -81,31 +81,31 @@ func (e *ENTransactionProvider) TransactionResult(
 	transactionID flow.Identifier,
 	encodingVersion entities.EventEncodingVersion,
 	executionResultInfo *optimistic_sync.ExecutionResultInfo,
-) (*accessmodel.TransactionResult, accessmodel.ExecutorMetadata, error) {
+) (*accessmodel.TransactionResult, *accessmodel.ExecutorMetadata, error) {
 	blockID := block.ID()
 	req := &execproto.GetTransactionResultRequest{
 		BlockId:       blockID[:],
 		TransactionId: transactionID[:],
 	}
 
-	metadata := accessmodel.ExecutorMetadata{
-		ExecutionResultID: executionResultInfo.ExecutionResultID,
-		ExecutorIDs:       executionResultInfo.ExecutionNodes.NodeIDs(),
-	}
-
 	resp, err := e.getTransactionResultFromAnyExeNode(ctx, executionResultInfo.ExecutionNodes, req)
 	if err != nil {
-		return nil, metadata, err
+		return nil, nil, err
 	}
 
 	txStatus, err := e.txStatusDeriver.DeriveFinalizedTransactionStatus(block.Height, true)
 	if err != nil {
-		return nil, metadata, fmt.Errorf("failed to derive transaction status: %w", err)
+		return nil, nil, fmt.Errorf("failed to derive transaction status: %w", err)
 	}
 
 	events, err := convert.MessagesToEventsWithEncodingConversion(resp.GetEvents(), resp.GetEventEncodingVersion(), encodingVersion)
 	if err != nil {
-		return nil, metadata, status.Errorf(codes.Internal, "failed to convert events to message: %v", err)
+		return nil, nil, status.Errorf(codes.Internal, "failed to convert events to message: %v", err)
+	}
+
+	metadata := &accessmodel.ExecutorMetadata{
+		ExecutionResultID: executionResultInfo.ExecutionResultID,
+		ExecutorIDs:       executionResultInfo.ExecutionNodes.NodeIDs(),
 	}
 
 	return &accessmodel.TransactionResult{
@@ -123,23 +123,23 @@ func (e *ENTransactionProvider) TransactionsByBlockID(
 	ctx context.Context,
 	block *flow.Block,
 	executionResultInfo *optimistic_sync.ExecutionResultInfo,
-) ([]*flow.TransactionBody, accessmodel.ExecutorMetadata, error) {
+) ([]*flow.TransactionBody, *accessmodel.ExecutorMetadata, error) {
 	var transactions []*flow.TransactionBody
 	blockID := block.ID()
-
-	metadata := accessmodel.ExecutorMetadata{
-		ExecutionResultID: executionResultInfo.ExecutionResultID,
-		ExecutorIDs:       executionResultInfo.ExecutionNodes.NodeIDs(),
-	}
 
 	// user transactions
 	for _, guarantee := range block.Payload.Guarantees {
 		collection, err := e.collections.ByID(guarantee.CollectionID)
 		if err != nil {
-			return nil, metadata, rpc.ConvertStorageError(err)
+			return nil, nil, rpc.ConvertStorageError(err)
 		}
 
 		transactions = append(transactions, collection.Transactions...)
+	}
+
+	metadata := &accessmodel.ExecutorMetadata{
+		ExecutionResultID: executionResultInfo.ExecutionResultID,
+		ExecutorIDs:       executionResultInfo.ExecutionNodes.NodeIDs(),
 	}
 
 	// system transactions
@@ -148,7 +148,7 @@ func (e *ENTransactionProvider) TransactionsByBlockID(
 	if !e.scheduledCallbacksEnabled {
 		systemTx, err := blueprints.SystemChunkTransaction(e.chainID.Chain())
 		if err != nil {
-			return nil, metadata, fmt.Errorf("failed to construct system chunk transaction: %w", err)
+			return nil, nil, fmt.Errorf("failed to construct system chunk transaction: %w", err)
 		}
 
 		return append(transactions, systemTx), metadata, nil
@@ -156,12 +156,12 @@ func (e *ENTransactionProvider) TransactionsByBlockID(
 
 	events, err := e.getBlockEvents(ctx, blockID, e.processScheduledCallbackEventType, executionResultInfo)
 	if err != nil {
-		return nil, metadata, rpc.ConvertError(err, "failed to retrieve events from any execution node", codes.Internal)
+		return nil, nil, rpc.ConvertError(err, "failed to retrieve events from any execution node", codes.Internal)
 	}
 
 	sysCollection, err := blueprints.SystemCollection(e.chainID.Chain(), events)
 	if err != nil {
-		return nil, metadata, status.Errorf(codes.Internal, "could not construct system collection: %v", err)
+		return nil, nil, status.Errorf(codes.Internal, "could not construct system collection: %v", err)
 	}
 
 	return append(transactions, sysCollection.Transactions...), metadata, nil
@@ -179,32 +179,31 @@ func (e *ENTransactionProvider) TransactionResultByIndex(
 	index uint32,
 	encodingVersion entities.EventEncodingVersion,
 	executionResultInfo *optimistic_sync.ExecutionResultInfo,
-) (*accessmodel.TransactionResult, accessmodel.ExecutorMetadata, error) {
+) (*accessmodel.TransactionResult, *accessmodel.ExecutorMetadata, error) {
 	blockID := block.ID()
 	req := &execproto.GetTransactionByIndexRequest{
 		BlockId: blockID[:],
 		Index:   index,
 	}
 
-	metadata := accessmodel.ExecutorMetadata{
-		ExecutionResultID: executionResultInfo.ExecutionResultID,
-		ExecutorIDs:       executionResultInfo.ExecutionNodes.NodeIDs(),
-	}
-
 	resp, err := e.getTransactionResultByIndexFromAnyExeNode(ctx, executionResultInfo.ExecutionNodes, req)
 	if err != nil {
-		return nil, metadata, status.Errorf(codes.Internal, "failed to retrieve result from execution node: %v", err)
+		return nil, nil, status.Errorf(codes.Internal, "failed to retrieve result from execution node: %v", err)
 	}
 
 	txStatus, err := e.txStatusDeriver.DeriveFinalizedTransactionStatus(block.Height, true)
 	if err != nil {
-		return nil, metadata, fmt.Errorf("failed to derive transaction status: %w", err)
+		return nil, nil, fmt.Errorf("failed to derive transaction status: %w", err)
 	}
 
 	events, err := convert.MessagesToEventsWithEncodingConversion(resp.GetEvents(), resp.GetEventEncodingVersion(), encodingVersion)
 	if err != nil {
-		return nil, metadata, status.Errorf(codes.Internal, "failed to convert events in blockID %x: %v",
-			blockID, err)
+		return nil, nil, status.Errorf(codes.Internal, "failed to convert events in blockID %x: %v", blockID, err)
+	}
+
+	metadata := &accessmodel.ExecutorMetadata{
+		ExecutionResultID: executionResultInfo.ExecutionResultID,
+		ExecutorIDs:       executionResultInfo.ExecutionNodes.NodeIDs(),
 	}
 
 	return &accessmodel.TransactionResult{
@@ -228,25 +227,20 @@ func (e *ENTransactionProvider) TransactionResultsByBlockID(
 	block *flow.Block,
 	encodingVersion entities.EventEncodingVersion,
 	executionResultInfo *optimistic_sync.ExecutionResultInfo,
-) ([]*accessmodel.TransactionResult, accessmodel.ExecutorMetadata, error) {
+) ([]*accessmodel.TransactionResult, *accessmodel.ExecutorMetadata, error) {
 	blockID := block.ID()
 	req := &execproto.GetTransactionsByBlockIDRequest{
 		BlockId: blockID[:],
 	}
 
-	metadata := accessmodel.ExecutorMetadata{
-		ExecutionResultID: executionResultInfo.ExecutionResultID,
-		ExecutorIDs:       executionResultInfo.ExecutionNodes.NodeIDs(),
-	}
-
 	executionResponse, err := e.getTransactionResultsByBlockIDFromAnyExeNode(ctx, executionResultInfo.ExecutionNodes, req)
 	if err != nil {
-		return nil, metadata, rpc.ConvertError(err, "failed to retrieve result from execution node", codes.Internal)
+		return nil, nil, rpc.ConvertError(err, "failed to retrieve result from execution node", codes.Internal)
 	}
 
 	txStatus, err := e.txStatusDeriver.DeriveFinalizedTransactionStatus(block.Height, true)
 	if err != nil {
-		return nil, metadata, fmt.Errorf("failed to derive transaction status: %w", err)
+		return nil, nil, fmt.Errorf("failed to derive transaction status: %w", err)
 	}
 
 	userTxResults, err := e.userTransactionResults(
@@ -257,17 +251,17 @@ func (e *ENTransactionProvider) TransactionResultsByBlockID(
 		encodingVersion,
 	)
 	if err != nil {
-		return nil, metadata, rpc.ConvertError(err, "failed to construct user transaction results", codes.Internal)
+		return nil, nil, rpc.ConvertError(err, "failed to construct user transaction results", codes.Internal)
 	}
 
 	// root block has no system transaction result
 	if block.Height == e.state.Params().SporkRootBlockHeight() {
-		return userTxResults, metadata, nil
+		return userTxResults, nil, nil
 	}
 
 	// there must be at least one system transaction result
 	if len(userTxResults) >= len(executionResponse.TransactionResults) {
-		return nil, metadata, status.Errorf(codes.Internal, "no system transaction results")
+		return nil, nil, status.Errorf(codes.Internal, "no system transaction results")
 	}
 
 	remainingTxResults := executionResponse.TransactionResults[len(userTxResults):]
@@ -281,7 +275,12 @@ func (e *ENTransactionProvider) TransactionResultsByBlockID(
 		encodingVersion,
 	)
 	if err != nil {
-		return nil, metadata, rpc.ConvertError(err, "failed to construct system transaction results", codes.Internal)
+		return nil, nil, rpc.ConvertError(err, "failed to construct system transaction results", codes.Internal)
+	}
+
+	metadata := &accessmodel.ExecutorMetadata{
+		ExecutionResultID: executionResultInfo.ExecutionResultID,
+		ExecutorIDs:       executionResultInfo.ExecutionNodes.NodeIDs(),
 	}
 
 	return append(userTxResults, systemTxResults...), metadata, nil
@@ -292,10 +291,10 @@ func (e *ENTransactionProvider) SystemTransaction(
 	block *flow.Block,
 	txID flow.Identifier,
 	executionResultInfo *optimistic_sync.ExecutionResultInfo,
-) (*flow.TransactionBody, accessmodel.ExecutorMetadata, error) {
+) (*flow.TransactionBody, *accessmodel.ExecutorMetadata, error) {
 	blockID := block.ID()
 
-	metadata := accessmodel.ExecutorMetadata{
+	metadata := &accessmodel.ExecutorMetadata{
 		ExecutionResultID: executionResultInfo.ExecutionResultID,
 		ExecutorIDs:       executionResultInfo.ExecutionNodes.NodeIDs(),
 	}
@@ -303,23 +302,23 @@ func (e *ENTransactionProvider) SystemTransaction(
 	if txID == e.systemTxID || !e.scheduledCallbacksEnabled {
 		systemTx, err := blueprints.SystemChunkTransaction(e.chainID.Chain())
 		if err != nil {
-			return nil, metadata, status.Errorf(codes.Internal, "failed to construct system chunk transaction: %v", err)
+			return nil, nil, status.Errorf(codes.Internal, "failed to construct system chunk transaction: %v", err)
 		}
 
 		if txID == systemTx.ID() {
 			return systemTx, metadata, nil
 		}
-		return nil, metadata, fmt.Errorf("transaction %s not found in block %s", txID, blockID)
+		return nil, nil, fmt.Errorf("transaction %s not found in block %s", txID, blockID)
 	}
 
 	events, err := e.getBlockEvents(ctx, blockID, e.processScheduledCallbackEventType, executionResultInfo)
 	if err != nil {
-		return nil, metadata, rpc.ConvertError(err, "failed to retrieve events from any execution node", codes.Internal)
+		return nil, nil, rpc.ConvertError(err, "failed to retrieve events from any execution node", codes.Internal)
 	}
 
 	sysCollection, err := blueprints.SystemCollection(e.chainID.Chain(), events)
 	if err != nil {
-		return nil, metadata, status.Errorf(codes.Internal, "could not construct system collection: %v", err)
+		return nil, nil, status.Errorf(codes.Internal, "could not construct system collection: %v", err)
 	}
 
 	for _, tx := range sysCollection.Transactions {
@@ -328,7 +327,7 @@ func (e *ENTransactionProvider) SystemTransaction(
 		}
 	}
 
-	return nil, metadata, status.Errorf(codes.NotFound, "system transaction not found")
+	return nil, nil, status.Errorf(codes.NotFound, "system transaction not found")
 }
 
 func (e *ENTransactionProvider) SystemTransactionResult(
@@ -337,7 +336,7 @@ func (e *ENTransactionProvider) SystemTransactionResult(
 	txID flow.Identifier,
 	encodingVersion entities.EventEncodingVersion,
 	executionResultInfo *optimistic_sync.ExecutionResultInfo,
-) (*accessmodel.TransactionResult, accessmodel.ExecutorMetadata, error) {
+) (*accessmodel.TransactionResult, *accessmodel.ExecutorMetadata, error) {
 	// make sure the request is for a system transaction
 	if txID != e.systemTxID {
 		if _, metadata, err := e.SystemTransaction(ctx, block, txID, executionResultInfo); err != nil {

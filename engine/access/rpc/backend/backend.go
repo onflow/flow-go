@@ -225,6 +225,7 @@ func New(params Params) (*Backend, error) {
 
 	localTxProvider := provider.NewLocalTransactionProvider(
 		params.State,
+		params.Collections,
 		params.Blocks,
 		systemTxID,
 		txStatusDeriver,

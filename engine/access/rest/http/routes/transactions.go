@@ -9,12 +9,11 @@ import (
 	"github.com/onflow/flow-go/engine/access/rest/http/models"
 	"github.com/onflow/flow-go/engine/access/rest/http/request"
 	accessmodel "github.com/onflow/flow-go/model/access"
-	"github.com/onflow/flow-go/module/executiondatasync/optimistic_sync"
 )
 
 // GetTransactionByID gets a transaction by requested ID.
 func GetTransactionByID(r *common.Request, backend access.API, link commonmodels.LinkGenerator) (interface{}, error) {
-	req, err := request.GetTransactionRequest(r)
+	req, err := request.NewGetTransactionRequest(r)
 	if err != nil {
 		return nil, common.NewBadRequestError(err)
 	}
@@ -33,7 +32,7 @@ func GetTransactionByID(r *common.Request, backend access.API, link commonmodels
 			req.BlockID,
 			req.CollectionID,
 			entitiesproto.EventEncodingVersion_JSON_CDC_V0,
-			optimistic_sync.Criteria{}, // TODO: add support for passing criteria in the request
+			models.NewCriteria(req.ExecutionState),
 		)
 		if err != nil {
 			return nil, err

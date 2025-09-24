@@ -18,48 +18,76 @@ type TransactionOptionals struct {
 	CollectionID flow.Identifier
 }
 
-func (t *TransactionOptionals) Parse(r *common.Request) error {
+// NewTransactionOptionals parses the request and returns a validated TransactionOptionals.
+//
+// All errors returned are benign and indicate invalid input data.
+func NewTransactionOptionals(r *common.Request) (TransactionOptionals, error) {
 	blockId, err := parser.NewID(r.GetQueryParam(blockIDQueryParam))
 	if err != nil {
-		return err
+		return TransactionOptionals{}, fmt.Errorf("invalid block ID: %w", err)
 	}
-	t.BlockID = blockId.Flow()
 
 	collectionId, err := parser.NewID(r.GetQueryParam(collectionIDQueryParam))
 	if err != nil {
-		return err
+		return TransactionOptionals{}, fmt.Errorf("invalid collection ID: %w", err)
 	}
-	t.CollectionID = collectionId.Flow()
 
-	return nil
+	return TransactionOptionals{
+		BlockID:      blockId.Flow(),
+		CollectionID: collectionId.Flow(),
+	}, nil
 }
 
 type GetTransaction struct {
 	GetByIDRequest
 	TransactionOptionals
-	ExpandsResult bool
+	ExpandsResult  bool
+	ExecutionState models.ExecutionStateQuery // TODO: add this to the openapi spec
 }
 
-// GetTransactionRequest extracts necessary variables from the provided request,
-// builds a GetTransaction instance, and validates it.
+// NewGetTransactionRequest parses the request and returns a validated request.GetTransaction.
 //
-// No errors are expected during normal operation.
-func GetTransactionRequest(r *common.Request) (GetTransaction, error) {
-	var req GetTransaction
-	err := req.Build(r)
-	return req, err
+// All errors returned are benign and indicate invalid input data.
+func NewGetTransactionRequest(r *common.Request) (GetTransaction, error) {
+	return parseGetTransactionRequest(
+		r,
+		r.GetQueryParam(agreeingExecutorCountQuery),
+		r.GetQueryParams(requiredExecutorIdsQuery),
+		r.GetQueryParam(includeExecutorMetadataQuery),
+	)
 }
 
-func (g *GetTransaction) Build(r *common.Request) error {
-	err := g.TransactionOptionals.Parse(r)
+func parseGetTransactionRequest(
+	r *common.Request,
+	rawAgreeingExecutorsCount string,
+	rawAgreeingExecutorsIds []string,
+	rawIncludeExecutorMetadata string,
+) (GetTransaction, error) {
+	txOpts, err := NewTransactionOptionals(r)
 	if err != nil {
-		return err
+		return GetTransaction{}, fmt.Errorf("invalid transaction optionals: %w", err)
 	}
 
-	err = g.GetByIDRequest.Build(r)
-	g.ExpandsResult = r.Expands(resultExpandable)
+	var byID GetByIDRequest
+	if err := byID.Build(r); err != nil {
+		return GetTransaction{}, fmt.Errorf("invalid ID request: %w", err)
+	}
 
-	return err
+	executionStateQuery, err := parser.NewExecutionStateQuery(
+		rawAgreeingExecutorsCount,
+		rawAgreeingExecutorsIds,
+		rawIncludeExecutorMetadata,
+	)
+	if err != nil {
+		return GetTransaction{}, err
+	}
+
+	return GetTransaction{
+		GetByIDRequest:       byID,
+		TransactionOptionals: txOpts,
+		ExpandsResult:        r.Expands(resultExpandable),
+		ExecutionState:       *executionStateQuery,
+	}, nil
 }
 
 type GetTransactionResult struct {
@@ -68,10 +96,9 @@ type GetTransactionResult struct {
 	ExecutionState models.ExecutionStateQuery
 }
 
-// NewGetTransactionResult extracts necessary variables from the provided request
-// and returns a validated GetTransactionResult.
+// NewGetTransactionResult parses the request and returns a validated request.GetTransactionResult.
 //
-// No errors are expected during normal operation.
+// All errors returned are benign and indicate invalid input data.
 func NewGetTransactionResult(r *common.Request) (GetTransactionResult, error) {
 	return parseGetTransactionResult(
 		r,
@@ -87,8 +114,8 @@ func parseGetTransactionResult(
 	rawAgreeingExecutorsIds []string,
 	rawIncludeExecutorMetadata string,
 ) (GetTransactionResult, error) {
-	var txOpts TransactionOptionals
-	if err := txOpts.Parse(r); err != nil {
+	txOpts, err := NewTransactionOptionals(r)
+	if err != nil {
 		return GetTransactionResult{}, fmt.Errorf("invalid transaction optionals: %w", err)
 	}
 

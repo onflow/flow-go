@@ -365,8 +365,9 @@ func (h *Handler) GetTransactionResult(
 	}
 
 	if query.GetIncludeExecutorMetadata() {
-		metadata.ExecutorMetadata = convert.ExecutorMetadataToMessage(&executorMetadata)
+		metadata.ExecutorMetadata = convert.ExecutorMetadataToMessage(executorMetadata)
 	}
+
 	message := convert.TransactionResultToMessage(result)
 	message.Metadata = metadata
 
@@ -401,8 +402,9 @@ func (h *Handler) GetTransactionResultsByBlockID(
 	}
 
 	if query.GetIncludeExecutorMetadata() {
-		metadata.ExecutorMetadata = convert.ExecutorMetadataToMessage(&executorMetadata)
+		metadata.ExecutorMetadata = convert.ExecutorMetadataToMessage(executorMetadata)
 	}
+
 	message := convert.TransactionResultsToMessage(results)
 	message.Metadata = metadata
 
@@ -438,7 +440,7 @@ func (h *Handler) GetSystemTransaction(
 	}
 
 	if query.GetIncludeExecutorMetadata() {
-		metadata.ExecutorMetadata = convert.ExecutorMetadataToMessage(&executorMetadata)
+		metadata.ExecutorMetadata = convert.ExecutorMetadataToMessage(executorMetadata)
 	}
 
 	return &accessproto.TransactionResponse{
@@ -484,8 +486,9 @@ func (h *Handler) GetSystemTransactionResult(
 	}
 
 	if query.GetIncludeExecutorMetadata() {
-		metadata.ExecutorMetadata = convert.ExecutorMetadataToMessage(&executorMetadata)
+		metadata.ExecutorMetadata = convert.ExecutorMetadataToMessage(executorMetadata)
 	}
+
 	message := convert.TransactionResultToMessage(result)
 	message.Metadata = metadata
 
@@ -548,8 +551,9 @@ func (h *Handler) GetTransactionResultByIndex(
 	}
 
 	if query.GetIncludeExecutorMetadata() {
-		metadata.ExecutorMetadata = convert.ExecutorMetadataToMessage(&executorMetadata)
+		metadata.ExecutorMetadata = convert.ExecutorMetadataToMessage(executorMetadata)
 	}
+
 	message := convert.TransactionResultToMessage(result)
 	message.Metadata = metadata
 
