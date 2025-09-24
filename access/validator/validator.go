@@ -154,7 +154,7 @@ type ValidationStep struct {
 }
 
 // TransactionValidator performs validation of transactions before they are processed.
-// It enforces correctness, safety, and economic checks by  running a series of validation steps
+// It enforces correctness, safety, and economic checks by running a series of validation steps
 // to ensure that transactions are well-formed, valid, and executable.
 type TransactionValidator struct {
 	blocks                       Blocks     // for looking up blocks to check transaction expiry
