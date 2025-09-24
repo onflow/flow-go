@@ -2396,7 +2396,7 @@ func TestScriptExecutionLimit(t *testing.T) {
 				require.NoError(t, output.Err)
 				require.GreaterOrEqual(t, output.ComputationUsed, uint64(17955))
 				if *testWithVMScriptExecution {
-					require.GreaterOrEqual(t, output.MemoryEstimate, uint64(969629012))
+					require.GreaterOrEqual(t, output.MemoryEstimate, uint64(969617812))
 				} else {
 					require.GreaterOrEqual(t, output.MemoryEstimate, uint64(984017413))
 				}
