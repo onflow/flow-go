@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"os"
+	"strings"
 	"sync/atomic"
 
 	"github.com/kr/pretty"
@@ -97,9 +98,14 @@ func run(_ *cobra.Command, args []string) {
 	}
 	defer remoteClient.Close()
 
-	blockID, err := flow.HexStringToIdentifier(flagBlockID)
-	if err != nil {
-		log.Fatal().Err(err).Str("ID", flagBlockID).Msg("failed to parse block ID")
+	var blockIDs []flow.Identifier
+	for _, rawBlockID := range strings.Split(flagBlockID, ",") {
+		blockID, err := flow.HexStringToIdentifier(rawBlockID)
+		if err != nil {
+			log.Fatal().Err(err).Str("ID", rawBlockID).Msg("failed to parse block ID")
+		}
+
+		blockIDs = append(blockIDs, blockID)
 	}
 
 	type block struct {
@@ -109,15 +115,31 @@ func run(_ *cobra.Command, args []string) {
 
 	var blocks []block
 
-	for i := 0; i < flagBlockCount; i++ {
-		header := debug_tx.FetchBlockHeader(blockID, flowClient)
+	if flagBlockCount != 1 {
+		if len(blockIDs) > 1 {
+			log.Fatal().Msg("either provide a single block ID and use --block-count, or provide multiple block IDs and do not use --block-count")
+		}
 
-		blocks = append(blocks, block{
-			id:     blockID,
-			header: header,
-		})
+		blockID := blockIDs[0]
+		for i := 0; i < flagBlockCount; i++ {
+			header := debug_tx.FetchBlockHeader(blockID, flowClient)
 
-		blockID = header.ParentID
+			blocks = append(blocks, block{
+				id:     blockID,
+				header: header,
+			})
+
+			blockID = header.ParentID
+		}
+	} else {
+		for _, blockID := range blockIDs {
+			header := debug_tx.FetchBlockHeader(blockID, flowClient)
+
+			blocks = append(blocks, block{
+				id:     blockID,
+				header: header,
+			})
+		}
 	}
 
 	var (
