@@ -33,7 +33,7 @@ type EventsAPI interface {
 		endHeight uint64,
 		requiredEventEncodingVersion entities.EventEncodingVersion,
 		criteria optimistic_sync.Criteria,
-	) ([]flow.BlockEvents, accessmodel.ExecutorMetadata, error)
+	) ([]flow.BlockEvents, *accessmodel.ExecutorMetadata, error)
 
 	GetEventsForBlockIDs(
 		ctx context.Context,
@@ -41,7 +41,7 @@ type EventsAPI interface {
 		blockIDs []flow.Identifier,
 		requiredEventEncodingVersion entities.EventEncodingVersion,
 		criteria optimistic_sync.Criteria,
-	) ([]flow.BlockEvents, accessmodel.ExecutorMetadata, error)
+	) ([]flow.BlockEvents, *accessmodel.ExecutorMetadata, error)
 }
 
 type ScriptsAPI interface {
