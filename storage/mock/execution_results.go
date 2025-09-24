@@ -3,7 +3,9 @@
 package mock
 
 import (
+	lockctx "github.com/jordanschalm/lockctx"
 	flow "github.com/onflow/flow-go/model/flow"
+
 	mock "github.com/stretchr/testify/mock"
 
 	storage "github.com/onflow/flow-go/storage"
@@ -14,17 +16,17 @@ type ExecutionResults struct {
 	mock.Mock
 }
 
-// BatchIndex provides a mock function with given fields: blockID, resultID, batch
-func (_m *ExecutionResults) BatchIndex(blockID flow.Identifier, resultID flow.Identifier, batch storage.ReaderBatchWriter) error {
-	ret := _m.Called(blockID, resultID, batch)
+// BatchIndex provides a mock function with given fields: lctx, blockID, resultID, batch
+func (_m *ExecutionResults) BatchIndex(lctx lockctx.Proof, blockID flow.Identifier, resultID flow.Identifier, batch storage.ReaderBatchWriter) error {
+	ret := _m.Called(lctx, blockID, resultID, batch)
 
 	if len(ret) == 0 {
 		panic("no return value specified for BatchIndex")
 	}
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(flow.Identifier, flow.Identifier, storage.ReaderBatchWriter) error); ok {
-		r0 = rf(blockID, resultID, batch)
+	if rf, ok := ret.Get(0).(func(lockctx.Proof, flow.Identifier, flow.Identifier, storage.ReaderBatchWriter) error); ok {
+		r0 = rf(lctx, blockID, resultID, batch)
 	} else {
 		r0 = ret.Error(0)
 	}
