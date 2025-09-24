@@ -417,7 +417,7 @@ func (rf *ResultsForest) ResetLowestRejectedView() (uint64, bool) {
 // IMPORTANT: The caller MUST provide sealed results in ancestor first order to allow the forest to
 // guarantee liveness. Specifically, (i) the result's ancestry must be stored in the ResultsForest going
 // back to the forest's lowest sealed result _and_ (ii) the ResultsForest must know that those ancestors
-// are all sealed. Otherwise, an error is returned. 
+// are all sealed. Otherwise, an error is returned.
 //
 // Execution results with a finalized seal are committed to the chain and considered final
 // irrespective of which Execution Nodes [ENs] produced them. Therefore, it is fine to not track
