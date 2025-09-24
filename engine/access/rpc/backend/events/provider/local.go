@@ -50,11 +50,6 @@ func (l *LocalEventProvider) Events(
 			fmt.Errorf("failed to get snapshot for execution result %s: %w", result.ExecutionResultID, err)
 	}
 
-	metadata := access.ExecutorMetadata{
-		ExecutionResultID: result.ExecutionResultID,
-		ExecutorIDs:       result.ExecutionNodes.NodeIDs(),
-	}
-
 	for _, blockInfo := range blocks {
 		if ctx.Err() != nil {
 			return Response{}, access.ExecutorMetadata{},
@@ -118,8 +113,15 @@ func (l *LocalEventProvider) Events(
 		})
 	}
 
-	return Response{
+	metadata := access.ExecutorMetadata{
+		ExecutionResultID: result.ExecutionResultID,
+		ExecutorIDs:       result.ExecutionNodes.NodeIDs(),
+	}
+
+	response := Response{
 		Events:        blockEvents,
 		MissingBlocks: missingBlocks,
-	}, metadata, nil
+	}
+
+	return response, metadata, nil
 }
