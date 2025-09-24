@@ -76,8 +76,6 @@ const (
 	DefaultFlowDataDir = "/data"
 	// DefaultFlowDBDir is the default directory for the node database.
 	DefaultFlowDBDir = "/data/protocol"
-	// DefaultFlowPebbleDBDir is the default directory for the pebble database.
-	DefaultFlowPebbleDBDir = "/data/protocol-pebble"
 	// DefaultFlowSecretsDBDir is the default directory for secrets database.
 	DefaultFlowSecretsDBDir = "/data/secrets"
 	// DefaultExecutionRootDir is the default directory for the execution node state database.
@@ -673,9 +671,9 @@ func (net *FlowNetwork) addConsensusFollower(t *testing.T, rootProtocolSnapshotP
 	tmpdir := makeTempSubDir(t, net.baseTempdir, "flow-consensus-follower")
 
 	// create a directory for the follower database
-	pebbleDir := makeDir(t, tmpdir, DefaultFlowPebbleDBDir)
+	dataDir := makeDir(t, tmpdir, DefaultFlowDBDir)
 
-	pebbleDB, _, err := database.InitPebbleDB(net.log, pebbleDir)
+	pebbleDB, _, err := database.InitPebbleDB(net.log, dataDir)
 	require.NoError(t, err)
 
 	// create a follower-specific directory for the bootstrap files

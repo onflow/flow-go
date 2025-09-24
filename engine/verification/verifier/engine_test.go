@@ -21,6 +21,7 @@ import (
 	"github.com/onflow/flow-go/engine/verification/verifier"
 	chmodel "github.com/onflow/flow-go/model/chunks"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/model/verification"
 	realModule "github.com/onflow/flow-go/module"
 	mockmodule "github.com/onflow/flow-go/module/mock"
@@ -153,7 +154,8 @@ func (suite *VerifierEngineTestSuite) TestVerifyHappyPath() {
 
 	for _, test := range tests {
 		suite.Run(test.name, func() {
-			var expectedApproval atomic.Pointer[flow.ResultApproval] // potentially accessed concurrently within engine
+
+			var expectedApproval atomic.Pointer[messages.ResultApproval]
 
 			suite.approvals.
 				On("StoreMyApproval", mock.Anything).
@@ -174,7 +176,7 @@ func (suite *VerifierEngineTestSuite) TestVerifyHappyPath() {
 						// spock should be non-nil
 						suite.Assert().NotNil(ra.Body.Spock)
 
-						expectedApproval.Store(ra)
+						expectedApproval.Store((*messages.ResultApproval)(ra))
 						return nil
 					}
 				}).
@@ -185,7 +187,7 @@ func (suite *VerifierEngineTestSuite) TestVerifyHappyPath() {
 				Return(nil).
 				Run(func(args testifymock.Arguments) {
 					// check that the approval matches the input execution result
-					ra, ok := args[0].(*flow.ResultApproval)
+					ra, ok := args[0].(*messages.ResultApproval)
 					suite.Require().True(ok)
 					suite.Assert().Equal(expectedApproval.Load(), ra)
 

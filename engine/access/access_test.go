@@ -137,6 +137,7 @@ func (suite *Suite) SetupTest() {
 
 	suite.request = new(mockmodule.Requester)
 	suite.request.On("EntityByID", mock.Anything, mock.Anything)
+	suite.request.On("Force").Return()
 
 	suite.me = new(mockmodule.Local)
 
