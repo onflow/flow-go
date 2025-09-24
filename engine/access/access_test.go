@@ -137,6 +137,7 @@ func (suite *Suite) SetupTest() {
 
 	suite.request = new(mockmodule.Requester)
 	suite.request.On("EntityByID", mock.Anything, mock.Anything)
+	suite.request.On("Force").Return()
 
 	suite.me = new(mockmodule.Local)
 
@@ -199,11 +200,7 @@ func (suite *Suite) RunTest(
 func (suite *Suite) TestSendAndGetTransaction() {
 	suite.RunTest(func(handler *rpc.Handler, _ storage.DB, _ *store.All) {
 		referenceBlock := unittest.BlockHeaderFixture()
-		transaction := unittest.TransactionFixture(
-			func(t *flow.Transaction) {
-				t.ReferenceBlockID = referenceBlock.ID()
-			})
-
+		transaction := unittest.TransactionBodyFixture(unittest.WithReferenceBlock(referenceBlock.ID()))
 		refSnapshot := new(protocol.Snapshot)
 
 		suite.state.
@@ -220,7 +217,7 @@ func (suite *Suite) TestSendAndGetTransaction() {
 			Return(referenceBlock, nil).
 			Once()
 
-		expected := convert.TransactionToMessage(transaction.TransactionBody)
+		expected := convert.TransactionToMessage(transaction)
 		sendReq := &accessproto.SendTransactionRequest{
 			Transaction: expected,
 		}
@@ -254,11 +251,8 @@ func (suite *Suite) TestSendAndGetTransaction() {
 func (suite *Suite) TestSendExpiredTransaction() {
 	suite.RunTest(func(handler *rpc.Handler, _ storage.DB, _ *store.All) {
 		referenceBlock := suite.finalizedBlock
+		transaction := unittest.TransactionBodyFixture(unittest.WithReferenceBlock(referenceBlock.ID()))
 
-		transaction := unittest.TransactionFixture(
-			func(t *flow.Transaction) {
-				t.ReferenceBlockID = referenceBlock.ID()
-			})
 		// create latest block that is past the expiry window
 		latestBlock := unittest.BlockHeaderFixture()
 		latestBlock.Height = referenceBlock.Height + flow.DefaultTransactionExpiry*2
@@ -278,7 +272,7 @@ func (suite *Suite) TestSendExpiredTransaction() {
 		suite.finalizedBlock = latestBlock
 
 		req := &accessproto.SendTransactionRequest{
-			Transaction: convert.TransactionToMessage(transaction.TransactionBody),
+			Transaction: convert.TransactionToMessage(transaction),
 		}
 
 		_, err := handler.SendTransaction(context.Background(), req)
@@ -294,10 +288,7 @@ func (suite *Suite) TestSendTransactionToRandomCollectionNode() {
 
 		// create a transaction
 		referenceBlock := unittest.BlockHeaderFixture()
-		transaction := unittest.TransactionFixture(
-			func(t *flow.Transaction) {
-				t.ReferenceBlockID = referenceBlock.ID()
-			})
+		transaction := unittest.TransactionBodyFixture(unittest.WithReferenceBlock(referenceBlock.ID()))
 
 		// setup the state and finalSnapshot mock expectations
 		suite.state.On("AtBlockID", referenceBlock.ID()).Return(suite.finalSnapshot, nil)
@@ -322,13 +313,13 @@ func (suite *Suite) TestSendTransactionToRandomCollectionNode() {
 
 		// create two transactions bound for each of the cluster
 		cluster1 := clusters[0]
-		cluster1tx := unittest.AlterTransactionForCluster(transaction.TransactionBody, clusters, cluster1, func(transaction *flow.TransactionBody) {})
+		cluster1tx := unittest.AlterTransactionForCluster(transaction, clusters, cluster1, func(transaction *flow.TransactionBody) {})
 		tx1 := convert.TransactionToMessage(cluster1tx)
 		sendReq1 := &accessproto.SendTransactionRequest{
 			Transaction: tx1,
 		}
 		cluster2 := clusters[1]
-		cluster2tx := unittest.AlterTransactionForCluster(transaction.TransactionBody, clusters, cluster2, func(transaction *flow.TransactionBody) {})
+		cluster2tx := unittest.AlterTransactionForCluster(transaction, clusters, cluster2, func(transaction *flow.TransactionBody) {})
 		tx2 := convert.TransactionToMessage(cluster2tx)
 		sendReq2 := &accessproto.SendTransactionRequest{
 			Transaction: tx2,
