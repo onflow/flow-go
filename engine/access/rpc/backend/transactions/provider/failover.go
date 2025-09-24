@@ -7,6 +7,7 @@ import (
 
 	accessmodel "github.com/onflow/flow-go/model/access"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/executiondatasync/optimistic_sync"
 )
 
 type FailoverTransactionProvider struct {
@@ -28,14 +29,14 @@ func (f *FailoverTransactionProvider) TransactionResult(
 	header *flow.Header,
 	txID flow.Identifier,
 	encodingVersion entities.EventEncodingVersion,
-) (*accessmodel.TransactionResult, error) {
-	localResult, localErr := f.localProvider.TransactionResult(ctx, header, txID, encodingVersion)
+	executionResultInfo *optimistic_sync.ExecutionResultInfo,
+) (*accessmodel.TransactionResult, *accessmodel.ExecutorMetadata, error) {
+	localResult, metadata, localErr := f.localProvider.TransactionResult(ctx, header, txID, encodingVersion, executionResultInfo)
 	if localErr == nil {
-		return localResult, nil
+		return localResult, metadata, nil
 	}
 
-	execNodeResult, execNodeErr := f.execNodeProvider.TransactionResult(ctx, header, txID, encodingVersion)
-	return execNodeResult, execNodeErr
+	return f.execNodeProvider.TransactionResult(ctx, header, txID, encodingVersion, executionResultInfo)
 }
 
 func (f *FailoverTransactionProvider) TransactionResultByIndex(
@@ -43,68 +44,68 @@ func (f *FailoverTransactionProvider) TransactionResultByIndex(
 	block *flow.Block,
 	index uint32,
 	encodingVersion entities.EventEncodingVersion,
-) (*accessmodel.TransactionResult, error) {
-	localResult, localErr := f.localProvider.TransactionResultByIndex(ctx, block, index, encodingVersion)
+	executionResultInfo *optimistic_sync.ExecutionResultInfo,
+) (*accessmodel.TransactionResult, *accessmodel.ExecutorMetadata, error) {
+	localResult, metadata, localErr := f.localProvider.TransactionResultByIndex(ctx, block, index, encodingVersion, executionResultInfo)
 	if localErr == nil {
-		return localResult, nil
+		return localResult, metadata, nil
 	}
 
-	execNodeResult, execNodeErr := f.execNodeProvider.TransactionResultByIndex(ctx, block, index, encodingVersion)
-	return execNodeResult, execNodeErr
+	return f.execNodeProvider.TransactionResultByIndex(ctx, block, index, encodingVersion, executionResultInfo)
 }
 
 func (f *FailoverTransactionProvider) TransactionResultsByBlockID(
 	ctx context.Context,
 	block *flow.Block,
 	encodingVersion entities.EventEncodingVersion,
-) ([]*accessmodel.TransactionResult, error) {
-	localResults, localErr := f.localProvider.TransactionResultsByBlockID(ctx, block, encodingVersion)
+	executionResultInfo *optimistic_sync.ExecutionResultInfo,
+) ([]*accessmodel.TransactionResult, *accessmodel.ExecutorMetadata, error) {
+	localResults, metadata, localErr := f.localProvider.TransactionResultsByBlockID(ctx, block, encodingVersion, executionResultInfo)
 	if localErr == nil {
-		return localResults, nil
+		return localResults, metadata, nil
 	}
 
-	execNodeResults, execNodeErr := f.execNodeProvider.TransactionResultsByBlockID(ctx, block, encodingVersion)
-	return execNodeResults, execNodeErr
+	return f.execNodeProvider.TransactionResultsByBlockID(ctx, block, encodingVersion, executionResultInfo)
 }
 
 func (f *FailoverTransactionProvider) TransactionsByBlockID(
 	ctx context.Context,
 	block *flow.Block,
-) ([]*flow.TransactionBody, error) {
-	localResults, localErr := f.localProvider.TransactionsByBlockID(ctx, block)
+	executionResultInfo *optimistic_sync.ExecutionResultInfo,
+) ([]*flow.TransactionBody, *accessmodel.ExecutorMetadata, error) {
+	localResults, metadata, localErr := f.localProvider.TransactionsByBlockID(ctx, block, executionResultInfo)
 	if localErr == nil {
-		return localResults, nil
+		return localResults, metadata, nil
 	}
 
-	execNodeResults, execNodeErr := f.execNodeProvider.TransactionsByBlockID(ctx, block)
-	return execNodeResults, execNodeErr
+	return f.execNodeProvider.TransactionsByBlockID(ctx, block, executionResultInfo)
 }
 
 func (f *FailoverTransactionProvider) SystemTransaction(
 	ctx context.Context,
 	block *flow.Block,
 	txID flow.Identifier,
-) (*flow.TransactionBody, error) {
-	localResult, localErr := f.localProvider.SystemTransaction(ctx, block, txID)
+	executionResultInfo *optimistic_sync.ExecutionResultInfo,
+) (*flow.TransactionBody, *accessmodel.ExecutorMetadata, error) {
+	localResult, metadata, localErr := f.localProvider.SystemTransaction(ctx, block, txID, executionResultInfo)
 	if localErr == nil {
-		return localResult, nil
+		return localResult, metadata, nil
 	}
 
-	execNodeResult, execNodeErr := f.execNodeProvider.SystemTransaction(ctx, block, txID)
-	return execNodeResult, execNodeErr
+	return f.execNodeProvider.SystemTransaction(ctx, block, txID, executionResultInfo)
 }
 
 func (f *FailoverTransactionProvider) SystemTransactionResult(
 	ctx context.Context,
 	block *flow.Block,
 	txID flow.Identifier,
-	requiredEventEncodingVersion entities.EventEncodingVersion,
-) (*accessmodel.TransactionResult, error) {
-	localResult, localErr := f.localProvider.SystemTransactionResult(ctx, block, txID, requiredEventEncodingVersion)
+	encodingVersion entities.EventEncodingVersion,
+	executionResultInfo *optimistic_sync.ExecutionResultInfo,
+) (*accessmodel.TransactionResult, *accessmodel.ExecutorMetadata, error) {
+	localResult, metadata, localErr := f.localProvider.SystemTransactionResult(ctx, block, txID, encodingVersion, executionResultInfo)
 	if localErr == nil {
-		return localResult, nil
+		return localResult, metadata, nil
 	}
 
-	execNodeResult, execNodeErr := f.execNodeProvider.SystemTransactionResult(ctx, block, txID, requiredEventEncodingVersion)
-	return execNodeResult, execNodeErr
+	return f.execNodeProvider.SystemTransactionResult(ctx, block, txID, encodingVersion, executionResultInfo)
 }

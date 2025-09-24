@@ -6,13 +6,14 @@ import (
 	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/engine/access/rest/common"
 	commonmodels "github.com/onflow/flow-go/engine/access/rest/common/models"
+	"github.com/onflow/flow-go/engine/access/rest/http/models"
 	"github.com/onflow/flow-go/engine/access/rest/http/request"
 	accessmodel "github.com/onflow/flow-go/model/access"
 )
 
 // GetTransactionByID gets a transaction by requested ID.
 func GetTransactionByID(r *common.Request, backend access.API, link commonmodels.LinkGenerator) (interface{}, error) {
-	req, err := request.GetTransactionRequest(r)
+	req, err := request.NewGetTransactionRequest(r)
 	if err != nil {
 		return nil, common.NewBadRequestError(err)
 	}
@@ -25,12 +26,13 @@ func GetTransactionByID(r *common.Request, backend access.API, link commonmodels
 	var txr *accessmodel.TransactionResult
 	// only lookup result if transaction result is to be expanded
 	if req.ExpandsResult {
-		txr, err = backend.GetTransactionResult(
+		txr, _, err = backend.GetTransactionResult(
 			r.Context(),
 			req.ID,
 			req.BlockID,
 			req.CollectionID,
 			entitiesproto.EventEncodingVersion_JSON_CDC_V0,
+			models.NewCriteria(req.ExecutionState),
 		)
 		if err != nil {
 			return nil, err
@@ -44,17 +46,18 @@ func GetTransactionByID(r *common.Request, backend access.API, link commonmodels
 
 // GetTransactionResultByID retrieves transaction result by the transaction ID.
 func GetTransactionResultByID(r *common.Request, backend access.API, link commonmodels.LinkGenerator) (interface{}, error) {
-	req, err := request.GetTransactionResultRequest(r)
+	req, err := request.NewGetTransactionResult(r)
 	if err != nil {
 		return nil, common.NewBadRequestError(err)
 	}
 
-	txr, err := backend.GetTransactionResult(
+	txr, executorMetadata, err := backend.GetTransactionResult(
 		r.Context(),
 		req.ID,
 		req.BlockID,
 		req.CollectionID,
 		entitiesproto.EventEncodingVersion_JSON_CDC_V0,
+		models.NewCriteria(req.ExecutionState),
 	)
 	if err != nil {
 		return nil, err
@@ -62,6 +65,11 @@ func GetTransactionResultByID(r *common.Request, backend access.API, link common
 
 	var response commonmodels.TransactionResult
 	response.Build(txr, req.ID, link)
+
+	if req.ExecutionState.IncludeExecutorMetadata {
+		response.Metadata = commonmodels.NewMetadata(executorMetadata)
+	}
+
 	return response, nil
 }
 

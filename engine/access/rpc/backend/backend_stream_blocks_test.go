@@ -76,7 +76,7 @@ func TestBackendBlocksSuite(t *testing.T) {
 
 // SetupTest initializes the test suite with required dependencies.
 func (s *BackendBlocksSuite) SetupTest() {
-	s.log = zerolog.New(zerolog.NewConsoleWriter())
+	s.log = unittest.Logger()
 	s.state = new(protocol.State)
 	s.snapshot = new(protocol.Snapshot)
 	header := unittest.BlockHeaderFixture()

@@ -2133,11 +2133,10 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 			// TODO: use real objects instead of mocks once they're implemented
 			snapshot := osyncsnapshot.NewSnapshotMock(
 				builder.events,
-				builder.collections,
-				builder.transactions,
 				builder.lightTransactionResults,
 				builder.transactionResultErrorMessages,
 				nil,
+				flow.BlockStatusSealed,
 			)
 			execStateCache := execution_state.NewExecutionStateCacheMock(snapshot)
 

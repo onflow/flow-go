@@ -23,6 +23,7 @@ import (
 	"github.com/onflow/flow-go/engine/access/rest/util"
 	accessmodel "github.com/onflow/flow-go/model/access"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/executiondatasync/optimistic_sync"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -74,12 +75,13 @@ func createTransactionReq(body interface{}) *http.Request {
 
 func TestGetTransactions(t *testing.T) {
 	t.Run("get by ID without results", func(t *testing.T) {
-		backend := &mock.API{}
+		backend := mock.NewAPI(t)
 		tx := unittest.TransactionFixture()
-		req := getTransactionReq(tx.ID().String(), false, "", "")
+		txID := tx.ID()
+		req := getTransactionReq(txID.String(), false, "", "")
 
-		backend.Mock.
-			On("GetTransaction", mocks.Anything, tx.ID()).
+		backend.
+			On("GetTransaction", mocks.Anything, txID).
 			Return(&tx.TransactionBody, nil)
 
 		expected := fmt.Sprintf(`
@@ -113,26 +115,27 @@ func TestGetTransactions(t *testing.T) {
 					"result": "/v1/transaction_results/%s"
 				}
 			}`,
-			tx.ID(), tx.ReferenceBlockID, util.ToBase64(tx.EnvelopeSignatures[0].Signature), tx.ID(), tx.ID())
+			txID, tx.ReferenceBlockID, util.ToBase64(tx.EnvelopeSignatures[0].Signature), txID, txID)
 
 		router.AssertOKResponse(t, req, expected, backend)
 	})
 
 	t.Run("Get by ID with results", func(t *testing.T) {
-		backend := &mock.API{}
+		backend := mock.NewAPI(t)
 
 		tx := unittest.TransactionFixture()
 		txr := transactionResultFixture(tx)
+		txID := tx.ID()
 
-		backend.Mock.
-			On("GetTransaction", mocks.Anything, tx.ID()).
+		backend.
+			On("GetTransaction", mocks.Anything, txID).
 			Return(&tx.TransactionBody, nil)
 
-		backend.Mock.
-			On("GetTransactionResult", mocks.Anything, tx.ID(), flow.ZeroID, flow.ZeroID, entities.EventEncodingVersion_JSON_CDC_V0).
-			Return(txr, nil)
+		backend.
+			On("GetTransactionResult", mocks.Anything, txID, flow.ZeroID, flow.ZeroID, entities.EventEncodingVersion_JSON_CDC_V0, optimistic_sync.Criteria{}).
+			Return(txr, nil, nil)
 
-		req := getTransactionReq(tx.ID().String(), true, "", "")
+		req := getTransactionReq(txID.String(), true, "", "")
 
 		expected := fmt.Sprintf(`
 			{
@@ -184,12 +187,12 @@ func TestGetTransactions(t *testing.T) {
 				  "_self":"/v1/transactions/%s"
 			   }
 			}`,
-			tx.ID(), tx.ReferenceBlockID, util.ToBase64(tx.EnvelopeSignatures[0].Signature), tx.ReferenceBlockID, txr.CollectionID, tx.ID(), tx.ID(), tx.ID())
+			txID, tx.ReferenceBlockID, util.ToBase64(tx.EnvelopeSignatures[0].Signature), tx.ReferenceBlockID, txr.CollectionID, txID, txID, txID)
 		router.AssertOKResponse(t, req, expected, backend)
 	})
 
 	t.Run("get by ID Invalid", func(t *testing.T) {
-		backend := &mock.API{}
+		backend := mock.NewAPI(t)
 
 		req := getTransactionReq("invalid", false, "", "")
 		expected := `{"code":400, "message":"invalid ID format"}`
@@ -197,13 +200,14 @@ func TestGetTransactions(t *testing.T) {
 	})
 
 	t.Run("get by ID non-existing", func(t *testing.T) {
-		backend := &mock.API{}
+		backend := mock.NewAPI(t)
 
 		tx := unittest.TransactionFixture()
-		req := getTransactionReq(tx.ID().String(), false, "", "")
+		txID := tx.ID()
+		req := getTransactionReq(txID.String(), false, "", "")
 
-		backend.Mock.
-			On("GetTransaction", mocks.Anything, tx.ID()).
+		backend.
+			On("GetTransaction", mocks.Anything, txID).
 			Return(nil, status.Error(codes.NotFound, "transaction not found"))
 
 		expected := `{"code":404, "message":"Flow resource not found: transaction not found"}`
@@ -254,69 +258,101 @@ func TestGetTransactionResult(t *testing.T) {
 		}`, bid.String(), cid.String(), id.String(), util.ToBase64(txr.Events[0].Payload), id.String())
 
 	t.Run("get by transaction ID", func(t *testing.T) {
-		backend := &mock.API{}
+		backend := mock.NewAPI(t)
 		req := getTransactionResultReq(id.String(), "", "")
 
-		backend.Mock.
-			On("GetTransactionResult", mocks.Anything, id, flow.ZeroID, flow.ZeroID, entities.EventEncodingVersion_JSON_CDC_V0).
-			Return(txr, nil)
+		backend.
+			On("GetTransactionResult", mocks.Anything, id, flow.ZeroID, flow.ZeroID, entities.EventEncodingVersion_JSON_CDC_V0, optimistic_sync.Criteria{}).
+			Return(txr, nil, nil)
 
 		router.AssertOKResponse(t, req, expected, backend)
 	})
 
 	t.Run("get by block ID", func(t *testing.T) {
-		backend := &mock.API{}
+		backend := mock.NewAPI(t)
 
 		req := getTransactionResultReq(id.String(), bid.String(), "")
 
-		backend.Mock.
-			On("GetTransactionResult", mocks.Anything, id, bid, flow.ZeroID, entities.EventEncodingVersion_JSON_CDC_V0).
-			Return(txr, nil)
+		backend.
+			On("GetTransactionResult", mocks.Anything, id, bid, flow.ZeroID, entities.EventEncodingVersion_JSON_CDC_V0, optimistic_sync.Criteria{}).
+			Return(txr, nil, nil)
 
 		router.AssertOKResponse(t, req, expected, backend)
 	})
 
 	t.Run("get by collection ID", func(t *testing.T) {
-		backend := &mock.API{}
+		backend := mock.NewAPI(t)
 		req := getTransactionResultReq(id.String(), "", cid.String())
 
-		backend.Mock.
-			On("GetTransactionResult", mocks.Anything, id, flow.ZeroID, cid, entities.EventEncodingVersion_JSON_CDC_V0).
-			Return(txr, nil)
+		backend.
+			On("GetTransactionResult", mocks.Anything, id, flow.ZeroID, cid, entities.EventEncodingVersion_JSON_CDC_V0, optimistic_sync.Criteria{}).
+			Return(txr, nil, nil)
 
 		router.AssertOKResponse(t, req, expected, backend)
 	})
 
 	t.Run("get execution statuses", func(t *testing.T) {
-		backend := &mock.API{}
+		backend := mock.NewAPI(t)
 
-		testVectors := map[*accessmodel.TransactionResult]string{{
-			Status:       flow.TransactionStatusExpired,
-			ErrorMessage: "",
-		}: string(models.FAILURE_RESULT), {
-			Status:       flow.TransactionStatusSealed,
-			ErrorMessage: "cadence runtime exception",
-		}: string(models.FAILURE_RESULT), {
-			Status:       flow.TransactionStatusFinalized,
-			ErrorMessage: "",
-		}: string(models.PENDING_RESULT), {
-			Status:       flow.TransactionStatusPending,
-			ErrorMessage: "",
-		}: string(models.PENDING_RESULT), {
-			Status:       flow.TransactionStatusExecuted,
-			ErrorMessage: "",
-		}: string(models.PENDING_RESULT), {
-			Status:       flow.TransactionStatusSealed,
-			ErrorMessage: "",
-		}: string(models.SUCCESS_RESULT)}
+		type testCase struct {
+			name     string
+			txResult *accessmodel.TransactionResult
+			expected string
+		}
 
-		for txResult, err := range testVectors {
-			txResult.BlockID = bid
-			txResult.CollectionID = cid
+		testCases := []testCase{
+			{
+				name: "expired",
+				txResult: &accessmodel.TransactionResult{
+					Status: flow.TransactionStatusExpired,
+				},
+				expected: string(models.FAILURE_RESULT),
+			},
+			{
+				name: "sealed",
+				txResult: &accessmodel.TransactionResult{
+					Status: flow.TransactionStatusSealed,
+				},
+				expected: string(models.SUCCESS_RESULT),
+			},
+			{
+				name: "finalized",
+				txResult: &accessmodel.TransactionResult{
+					Status: flow.TransactionStatusFinalized,
+				},
+				expected: string(models.PENDING_RESULT),
+			},
+			{
+				name: "pending",
+				txResult: &accessmodel.TransactionResult{
+					Status: flow.TransactionStatusPending,
+				},
+				expected: string(models.PENDING_RESULT),
+			},
+			{
+				name: "executed",
+				txResult: &accessmodel.TransactionResult{
+					Status: flow.TransactionStatusExecuted,
+				},
+				expected: string(models.PENDING_RESULT),
+			},
+			{
+				name: "error",
+				txResult: &accessmodel.TransactionResult{
+					Status:       flow.TransactionStatusSealed,
+					ErrorMessage: "cadence runtime exception",
+				},
+				expected: string(models.FAILURE_RESULT),
+			},
+		}
+
+		for _, tc := range testCases {
+			tc.txResult.BlockID = bid
+			tc.txResult.CollectionID = cid
 			req := getTransactionResultReq(id.String(), "", "")
-			backend.Mock.
-				On("GetTransactionResult", mocks.Anything, id, flow.ZeroID, flow.ZeroID, entities.EventEncodingVersion_JSON_CDC_V0).
-				Return(txResult, nil).
+			backend.
+				On("GetTransactionResult", mocks.Anything, id, flow.ZeroID, flow.ZeroID, entities.EventEncodingVersion_JSON_CDC_V0, optimistic_sync.Criteria{}).
+				Return(tc.txResult, nil, nil).
 				Once()
 
 			expectedResp := fmt.Sprintf(`{
@@ -331,13 +367,13 @@ func TestGetTransactionResult(t *testing.T) {
 				"_links": {
 					"_self": "/v1/transaction_results/%s"
 				}
-			}`, bid.String(), cid.String(), err, cases.Title(language.English).String(strings.ToLower(txResult.Status.String())), txResult.ErrorMessage, id.String())
+			}`, bid.String(), cid.String(), tc.expected, cases.Title(language.English).String(strings.ToLower(tc.txResult.Status.String())), tc.txResult.ErrorMessage, id.String())
 			router.AssertOKResponse(t, req, expectedResp, backend)
 		}
 	})
 
 	t.Run("get by ID Invalid", func(t *testing.T) {
-		backend := &mock.API{}
+		backend := mock.NewAPI(t)
 
 		req := getTransactionResultReq("invalid", "", "")
 
@@ -347,7 +383,7 @@ func TestGetTransactionResult(t *testing.T) {
 }
 
 func TestCreateTransaction(t *testing.T) {
-	backend := &mock.API{}
+	backend := mock.NewAPI(t)
 
 	t.Run("create", func(t *testing.T) {
 		tx := unittest.TransactionBodyFixture()
@@ -355,7 +391,7 @@ func TestCreateTransaction(t *testing.T) {
 		tx.Arguments = [][]uint8{}
 		req := createTransactionReq(unittest.CreateSendTxHttpPayload(tx))
 
-		backend.Mock.
+		backend.
 			On("SendTransaction", mocks.Anything, &tx).
 			Return(nil)
 

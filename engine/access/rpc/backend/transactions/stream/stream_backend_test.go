@@ -28,7 +28,6 @@ import (
 	access "github.com/onflow/flow-go/engine/access/mock"
 	"github.com/onflow/flow-go/engine/access/rpc/backend/node_communicator"
 	"github.com/onflow/flow-go/engine/access/rpc/backend/transactions"
-	"github.com/onflow/flow-go/engine/access/rpc/backend/transactions/error_messages"
 	"github.com/onflow/flow-go/engine/access/rpc/backend/transactions/provider"
 	txstatus "github.com/onflow/flow-go/engine/access/rpc/backend/transactions/status"
 	connectionmock "github.com/onflow/flow-go/engine/access/rpc/connection/mock"
@@ -42,6 +41,8 @@ import (
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/counters"
 	execmock "github.com/onflow/flow-go/module/execution/mock"
+	"github.com/onflow/flow-go/module/executiondatasync/optimistic_sync"
+	optimisticsyncmock "github.com/onflow/flow-go/module/executiondatasync/optimistic_sync/mock"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
 	syncmock "github.com/onflow/flow-go/module/state_synchronization/mock"
@@ -107,6 +108,10 @@ type TransactionStreamSuite struct {
 
 	fixedExecutionNodeIDs     flow.IdentifierList
 	preferredExecutionNodeIDs flow.IdentifierList
+
+	executionResultProvider *optimisticsyncmock.ExecutionResultInfoProvider
+	executionStateCache     *optimisticsyncmock.ExecutionStateCache
+	executionSnapshot       *optimisticsyncmock.Snapshot
 }
 
 func TestTransactionStatusSuite(t *testing.T) {
@@ -115,7 +120,7 @@ func TestTransactionStatusSuite(t *testing.T) {
 
 // SetupTest initializes the test dependencies, configurations, and mock objects for TransactionStreamSuite tests.
 func (s *TransactionStreamSuite) SetupTest() {
-	s.log = zerolog.New(zerolog.NewConsoleWriter())
+	s.log = unittest.Logger()
 	s.state = protocol.NewState(s.T())
 	s.sealedSnapshot = protocol.NewSnapshot(s.T())
 	s.finalSnapshot = protocol.NewSnapshot(s.T())
@@ -227,24 +232,18 @@ func (s *TransactionStreamSuite) initializeBackend() {
 		s.fixedExecutionNodeIDs,
 	)
 
-	errorMessageProvider := error_messages.NewTxErrorMessageProvider(
-		s.log,
-		nil,
-		s.txResultIndex,
-		s.connectionFactory,
-		nodeCommunicator,
-		execNodeProvider,
-	)
+	// Set up optimistic sync mocks to provide snapshot-backed readers
+	s.executionResultProvider = optimisticsyncmock.NewExecutionResultInfoProvider(s.T())
+	s.executionSnapshot = optimisticsyncmock.NewSnapshot(s.T())
+	s.executionStateCache = optimisticsyncmock.NewExecutionStateCache(s.T())
 
 	localTxProvider := provider.NewLocalTransactionProvider(
 		s.state,
 		s.collections,
 		s.blocks,
-		s.eventIndex,
-		s.txResultIndex,
-		errorMessageProvider,
 		s.systemTx.ID(),
 		txStatusDeriver,
+		s.executionStateCache,
 		s.chainID,
 		true, // scheduledCallbacksEnabled
 	)
@@ -255,7 +254,6 @@ func (s *TransactionStreamSuite) initializeBackend() {
 		s.collections,
 		s.connectionFactory,
 		nodeCommunicator,
-		execNodeProvider,
 		txStatusDeriver,
 		s.systemTx.ID(),
 		s.chainID,
@@ -319,13 +317,10 @@ func (s *TransactionStreamSuite) initializeBackend() {
 		Blocks:                      s.blocks,
 		Collections:                 s.collections,
 		Transactions:                s.transactions,
-		TxErrorMessageProvider:      errorMessageProvider,
 		TxResultCache:               txResCache,
 		TxProvider:                  txProvider,
 		TxValidator:                 txValidator,
 		TxStatusDeriver:             txStatusDeriver,
-		EventsIndex:                 s.eventIndex,
-		TxResultsIndex:              s.txResultIndex,
 	}
 	txBackend, err := transactions.NewTransactionsBackend(txParams)
 	s.Require().NoError(err)
@@ -341,6 +336,7 @@ func (s *TransactionStreamSuite) initializeBackend() {
 		s.transactions,
 		txProvider,
 		txStatusDeriver,
+		s.executionResultProvider,
 	)
 }
 
@@ -423,6 +419,13 @@ func (s *TransactionStreamSuite) initializeHappyCaseMockInstructions() {
 		mock.AnythingOfType("flow.Identifier"),
 		mock.AnythingOfType("flow.Identifier"),
 	).Return(eventsForTx, nil).Maybe()
+
+	fakeRes := &flow.ExecutionResult{PreviousResultID: unittest.IdentifierFixture()}
+	s.executionResultProvider.On("ExecutionResult", mock.Anything, mock.Anything).
+		Return(&optimistic_sync.ExecutionResultInfo{ExecutionResultID: fakeRes.ID()}, nil)
+	s.executionSnapshot.On("LightTransactionResults").Return(s.transactionResults)
+	s.executionSnapshot.On("Events").Return(s.events)
+	s.executionStateCache.On("Snapshot", mock.Anything).Return(s.executionSnapshot, nil)
 }
 
 // createSendTransaction generate sent transaction with ref block of the current finalized block
