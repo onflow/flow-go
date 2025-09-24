@@ -1,9 +1,11 @@
 package invalid
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/state"
 	"github.com/onflow/flow-go/state/cluster"
 )
 
@@ -19,10 +21,10 @@ type Snapshot struct {
 //     (height or block ID) does not resolve to a queriable block in the state.
 //   - generic error in case of unexpected critical internal corruption or bugs
 func NewSnapshot(err error) *Snapshot {
-	if err == nil {
-		return &Snapshot{err: fmt.Errorf("invalid snapshot: no error provided")}
+	if errors.Is(err, state.ErrUnknownSnapshotReference) {
+		return &Snapshot{err: err}
 	}
-	return &Snapshot{err: err}
+	return &Snapshot{fmt.Errorf("critical unexpected error querying snapshot: %w", err)}
 }
 
 var _ cluster.Snapshot = (*Snapshot)(nil)

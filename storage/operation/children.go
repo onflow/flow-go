@@ -47,7 +47,6 @@ func indexBlockByParent(rw storage.ReaderBatchWriter, blockID flow.Identifier, p
 	var nonExist flow.IdentifierList
 	err := RetrieveBlockChildren(rw.GlobalReader(), blockID, &nonExist)
 	if err != nil {
-		// verify err should be ErrNotFound, since new block has no children
 		return fmt.Errorf("could not check for existing children of new block: %w", err)
 	}
 
