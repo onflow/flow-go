@@ -234,7 +234,7 @@ func (s *ResultsForestSuite) TestAddSealedResult() {
 			err := forest.AddSealedResult(result)
 			s.Require().NoError(err)
 
-			s.assertContainer(forest, result.ID(), ingestion2.BlockStatusSealed)
+			s.assertContainer(forest, result.ID(), ingestion2.ResultSealed)
 		}
 
 		// all results plus the latest persisted sealed result should be in the forest
@@ -290,12 +290,12 @@ func (s *ResultsForestSuite) TestAddSealedResult() {
 		// add it to the forest as an unsealed result
 		conflictingPipeline := s.createPipeline(conflictingResult, false)
 
-		added, err := forest.AddReceipt(conflictingReceipt, ingestion2.BlockStatusCertified)
+		added, err := forest.AddReceipt(conflictingReceipt, ingestion2.ResultForCertifiedBlock)
 		s.Require().NoError(err)
 		s.True(added)
 
 		// the forest should now contain the new unsealed result
-		s.assertContainer(forest, conflictingResult.ID(), ingestion2.BlockStatusCertified)
+		s.assertContainer(forest, conflictingResult.ID(), ingestion2.ResultForCertifiedBlock)
 		s.Equal(uint(2), forest.Size())
 
 		// now, add the sealed result for the same block
@@ -309,8 +309,8 @@ func (s *ResultsForestSuite) TestAddSealedResult() {
 		s.Require().NoError(err)
 
 		// the forest should now contain the new sealed result, and the unsealed result should be abandoned
-		s.assertContainer(forest, s.results[0].ID(), ingestion2.BlockStatusSealed)
-		s.assertContainer(forest, conflictingResult.ID(), ingestion2.BlockStatusCertified)
+		s.assertContainer(forest, s.results[0].ID(), ingestion2.ResultSealed)
+		s.assertContainer(forest, conflictingResult.ID(), ingestion2.ResultForCertifiedBlock)
 		s.Equal(uint(3), forest.Size())
 	})
 
@@ -478,7 +478,7 @@ func (s *ResultsForestSuite) TestAddSealedResult_ConcurrentWithAddReceipt() {
 		for _, receipt := range conflictingReceipts {
 			go func() {
 				<-start
-				added, err := forest.AddReceipt(receipt, ingestion2.BlockStatusCertified)
+				added, err := forest.AddReceipt(receipt, ingestion2.ResultForCertifiedBlock)
 				s.Require().NoError(err)
 				s.True(added)
 			}()
@@ -503,7 +503,7 @@ func (s *ResultsForestSuite) TestAddSealedResult_ConcurrentWithAddReceipt() {
 	s.Equal(expectedSize, forest.Size())
 
 	for _, result := range sealedResults {
-		s.assertContainer(forest, result.ID(), ingestion2.BlockStatusSealed)
+		s.assertContainer(forest, result.ID(), ingestion2.ResultSealed)
 	}
 	for _, receipt := range conflictingReceipts {
 		resultID := receipt.ExecutionResult.ID()
@@ -512,7 +512,7 @@ func (s *ResultsForestSuite) TestAddSealedResult_ConcurrentWithAddReceipt() {
 		s.Equal(resultID, container.ResultID())
 		s.Equal(uint(1), container.Size())
 		s.True(container.Has(receipt.ID()))
-		s.Equal(ingestion2.BlockStatusCertified, container.BlockStatus())
+		s.Equal(ingestion2.ResultForCertifiedBlock, container.BlockStatus())
 
 		// this is mocked, but should be abandoned for all conflicting results
 		s.Equal(optimistic_sync.StateAbandoned, container.Pipeline().GetState())
@@ -534,11 +534,11 @@ func (s *ResultsForestSuite) TestAddReceipt() {
 		pipeline := s.createPipeline(result, true)
 		pipeline.On("SetSealed").Return().Once()
 
-		added, err := forest.AddReceipt(receipt, ingestion2.BlockStatusSealed)
+		added, err := forest.AddReceipt(receipt, ingestion2.ResultSealed)
 		s.Require().NoError(err)
 		s.True(added)
 
-		s.assertContainer(forest, result.ID(), ingestion2.BlockStatusSealed)
+		s.assertContainer(forest, result.ID(), ingestion2.ResultSealed)
 		s.Equal(uint(2), forest.Size())
 	})
 
@@ -550,11 +550,11 @@ func (s *ResultsForestSuite) TestAddReceipt() {
 
 		_ = s.createPipeline(result, false)
 
-		added, err := forest.AddReceipt(receipt, ingestion2.BlockStatusCertified)
+		added, err := forest.AddReceipt(receipt, ingestion2.ResultForCertifiedBlock)
 		s.Require().NoError(err)
 		s.True(added)
 
-		s.assertContainer(forest, result.ID(), ingestion2.BlockStatusCertified)
+		s.assertContainer(forest, result.ID(), ingestion2.ResultForCertifiedBlock)
 		s.Equal(uint(2), forest.Size())
 	})
 
@@ -568,16 +568,16 @@ func (s *ResultsForestSuite) TestAddReceipt() {
 		_ = s.createPipeline(result, false)
 
 		// add the first receipt
-		added, err := forest.AddReceipt(receipt1, ingestion2.BlockStatusCertified)
+		added, err := forest.AddReceipt(receipt1, ingestion2.ResultForCertifiedBlock)
 		s.Require().NoError(err)
 		s.True(added)
 
 		// result should be added to the forest
-		s.assertContainer(forest, result.ID(), ingestion2.BlockStatusCertified)
+		s.assertContainer(forest, result.ID(), ingestion2.ResultForCertifiedBlock)
 		s.Equal(uint(2), forest.Size())
 
 		// add the second receipt
-		added, err = forest.AddReceipt(receipt2, ingestion2.BlockStatusCertified)
+		added, err = forest.AddReceipt(receipt2, ingestion2.ResultForCertifiedBlock)
 		s.Require().NoError(err)
 		s.True(added)
 	})
@@ -594,11 +594,11 @@ func (s *ResultsForestSuite) TestAddReceipt() {
 
 		_ = s.createPipeline(result, false)
 
-		added, err := forest.AddReceipt(receipt, ingestion2.BlockStatusFinalized)
+		added, err := forest.AddReceipt(receipt, ingestion2.ResultForFinalizedBlock)
 		s.Require().NoError(err)
 		s.True(added)
 
-		s.assertContainer(forest, result.ID(), ingestion2.BlockStatusFinalized)
+		s.assertContainer(forest, result.ID(), ingestion2.ResultForFinalizedBlock)
 		s.Equal(uint(2), forest.Size())
 	})
 
@@ -610,11 +610,11 @@ func (s *ResultsForestSuite) TestAddReceipt() {
 
 		_ = s.createPipeline(result, false)
 
-		added, err := forest.AddReceipt(receipt, ingestion2.BlockStatusFinalized)
+		added, err := forest.AddReceipt(receipt, ingestion2.ResultForFinalizedBlock)
 		s.Require().NoError(err)
 		s.True(added)
 
-		s.assertContainer(forest, result.ID(), ingestion2.BlockStatusCertified)
+		s.assertContainer(forest, result.ID(), ingestion2.ResultForCertifiedBlock)
 		s.Equal(uint(2), forest.Size())
 	})
 
@@ -626,14 +626,14 @@ func (s *ResultsForestSuite) TestAddReceipt() {
 
 		_ = s.createPipeline(result, false)
 
-		added, err := forest.AddReceipt(receipt, ingestion2.BlockStatusCertified)
+		added, err := forest.AddReceipt(receipt, ingestion2.ResultForCertifiedBlock)
 		s.Require().NoError(err)
 		s.True(added)
 
-		s.assertContainer(forest, result.ID(), ingestion2.BlockStatusCertified)
+		s.assertContainer(forest, result.ID(), ingestion2.ResultForCertifiedBlock)
 		s.Equal(uint(2), forest.Size())
 
-		added, err = forest.AddReceipt(receipt, ingestion2.BlockStatusCertified)
+		added, err = forest.AddReceipt(receipt, ingestion2.ResultForCertifiedBlock)
 		s.Require().NoError(err)
 		s.False(added)
 		s.Equal(uint(2), forest.Size())
@@ -648,7 +648,7 @@ func (s *ResultsForestSuite) TestAddReceipt() {
 
 		_ = s.createPipeline(result, false)
 
-		added, err := forest.AddReceipt(receipt, ingestion2.BlockStatusCertified)
+		added, err := forest.AddReceipt(receipt, ingestion2.ResultForCertifiedBlock)
 		s.ErrorIs(err, ingestion2.ErrPrunedView)
 		s.False(added)
 		s.Equal(uint(1), forest.Size())
@@ -662,7 +662,7 @@ func (s *ResultsForestSuite) TestAddReceipt() {
 
 		abandonedPipeline := s.createPipeline(abandonedResult, false)
 
-		added, err := forest.AddReceipt(abandonedReceipt, ingestion2.BlockStatusCertified)
+		added, err := forest.AddReceipt(abandonedReceipt, ingestion2.ResultForCertifiedBlock)
 		s.Require().NoError(err)
 		s.True(added)
 
@@ -675,7 +675,7 @@ func (s *ResultsForestSuite) TestAddReceipt() {
 		// simulate the parent already being abandoned
 		abandonedPipeline.On("GetState").Return(optimistic_sync.StateAbandoned).Once()
 
-		added, err = forest.AddReceipt(receipt, ingestion2.BlockStatusCertified)
+		added, err = forest.AddReceipt(receipt, ingestion2.ResultForCertifiedBlock)
 		s.Require().NoError(err)
 		s.True(added)
 
@@ -701,7 +701,7 @@ func (s *ResultsForestSuite) TestAddReceipt() {
 		receipt := receiptGen.Fixture(receiptGen.WithExecutionResult(*conflictingFork[1]))
 		conflictingPipeline1 := s.createPipeline(conflictingFork[1], false)
 
-		added, err := forest.AddReceipt(receipt, ingestion2.BlockStatusCertified)
+		added, err := forest.AddReceipt(receipt, ingestion2.ResultForCertifiedBlock)
 		s.Require().NoError(err)
 		s.True(added)
 
@@ -713,7 +713,7 @@ func (s *ResultsForestSuite) TestAddReceipt() {
 		// no results should be abandoned yet.
 		conflictingPipeline1.On("GetState").Return(optimistic_sync.StatePending).Once()
 
-		added, err = forest.AddReceipt(receipt, ingestion2.BlockStatusCertified)
+		added, err = forest.AddReceipt(receipt, ingestion2.ResultForCertifiedBlock)
 		s.Require().NoError(err)
 		s.True(added)
 
@@ -733,7 +733,7 @@ func (s *ResultsForestSuite) TestAddReceipt() {
 		conflictingPipeline1.On("Abandon").Return().Once()
 		conflictingPipeline2.On("Abandon").Return().Once()
 
-		added, err = forest.AddReceipt(receipt, ingestion2.BlockStatusCertified)
+		added, err = forest.AddReceipt(receipt, ingestion2.ResultForCertifiedBlock)
 		s.Require().NoError(err)
 		s.True(added)
 		s.Equal(uint(5), forest.Size()) // last persisted, sealed result, + 3 conflicting results
@@ -747,7 +747,7 @@ func (s *ResultsForestSuite) TestAddReceipt() {
 
 		_ = s.createPipeline(result, true)
 
-		added, err := forest.AddReceipt(receipt, ingestion2.BlockStatusSealed)
+		added, err := forest.AddReceipt(receipt, ingestion2.ResultSealed)
 		s.ErrorContains(err, "does not extend last sealed result")
 		s.False(added)
 		s.Equal(uint(1), forest.Size())
@@ -762,7 +762,7 @@ func (s *ResultsForestSuite) TestAddReceipt() {
 
 		_ = s.createPipeline(result, false)
 
-		added, err := forest.AddReceipt(receipt, ingestion2.BlockStatusCertified)
+		added, err := forest.AddReceipt(receipt, ingestion2.ResultForCertifiedBlock)
 		s.ErrorIs(err, ingestion2.ErrMaxViewDeltaExceeded)
 		s.False(added)
 		s.Equal(uint(1), forest.Size())
@@ -774,7 +774,7 @@ func (s *ResultsForestSuite) TestAddReceipt() {
 		unknownResult := resultGen.Fixture()
 		receipt := receiptGen.Fixture(receiptGen.WithExecutionResult(*unknownResult))
 
-		added, err := forest.AddReceipt(receipt, ingestion2.BlockStatusCertified)
+		added, err := forest.AddReceipt(receipt, ingestion2.ResultForCertifiedBlock)
 		s.ErrorContains(err, "failed to get block header for result")
 		s.False(added)
 		s.Equal(uint(1), forest.Size())
@@ -802,7 +802,7 @@ func (s *ResultsForestSuite) TestAddReceipt() {
 		// next, add a result with the same parent, but different parent view
 		_ = s.createPipeline(incorrectResult, false)
 
-		added, err := forest.AddReceipt(incorrectReceipt, ingestion2.BlockStatusCertified)
+		added, err := forest.AddReceipt(incorrectReceipt, ingestion2.ResultForCertifiedBlock)
 		s.Error(err)
 		s.True(forestmodule.IsInvalidVertexError(err))
 		s.False(added)
@@ -849,9 +849,9 @@ func (s *ResultsForestSuite) TestAddReceipt_ConcurrentInserts() {
 	for i := range len(s.results) * receiptsPerResult {
 		wg.Go(func() {
 			index := i % len(s.results)
-			status := ingestion2.BlockStatusCertified
+			status := ingestion2.ResultForCertifiedBlock
 			if index < 2 {
-				status = ingestion2.BlockStatusFinalized
+				status = ingestion2.ResultForFinalizedBlock
 			}
 			receipt := receiptGen.Fixture(receiptGen.WithExecutionResult(*s.results[index]))
 			added, err := forest.AddReceipt(receipt, status)
@@ -868,9 +868,9 @@ func (s *ResultsForestSuite) TestAddReceipt_ConcurrentInserts() {
 		s.Equal(result.ID(), container.ResultID())
 		s.Equal(uint(receiptsPerResult), container.Size())
 		if i < 2 {
-			s.Equal(ingestion2.BlockStatusFinalized, container.BlockStatus())
+			s.Equal(ingestion2.ResultForFinalizedBlock, container.BlockStatus())
 		} else {
-			s.Equal(ingestion2.BlockStatusCertified, container.BlockStatus())
+			s.Equal(ingestion2.ResultForCertifiedBlock, container.BlockStatus())
 		}
 	}
 }
@@ -888,7 +888,7 @@ func (s *ResultsForestSuite) TestHasReceipt() {
 	s.False(has)
 
 	_ = s.createPipeline(result, false)
-	added, err := forest.AddReceipt(receipt, ingestion2.BlockStatusCertified)
+	added, err := forest.AddReceipt(receipt, ingestion2.ResultForCertifiedBlock)
 	s.Require().NoError(err)
 	s.True(added)
 
@@ -940,10 +940,10 @@ func (s *ResultsForestSuite) TestOnBlockFinalized() {
 		err := forest.OnBlockFinalized(s.blocks[1])
 		s.Require().NoError(err)
 
-		s.assertContainer(forest, mainResults[0].ID(), ingestion2.BlockStatusFinalized)
-		s.assertContainer(forest, mainResults[1].ID(), ingestion2.BlockStatusCertified)
-		s.assertContainer(forest, execFork[0].ID(), ingestion2.BlockStatusFinalized)
-		s.assertContainer(forest, execFork[1].ID(), ingestion2.BlockStatusCertified)
+		s.assertContainer(forest, mainResults[0].ID(), ingestion2.ResultForFinalizedBlock)
+		s.assertContainer(forest, mainResults[1].ID(), ingestion2.ResultForCertifiedBlock)
+		s.assertContainer(forest, execFork[0].ID(), ingestion2.ResultForFinalizedBlock)
+		s.assertContainer(forest, execFork[1].ID(), ingestion2.ResultForCertifiedBlock)
 	})
 
 	s.Run("returns an error if sibling with same view is marked sealed", func() {
@@ -957,7 +957,7 @@ func (s *ResultsForestSuite) TestOnBlockFinalized() {
 
 		container, found := forest.GetContainer(mainResults[0].ID())
 		s.True(found)
-		err := container.SetBlockStatus(ingestion2.BlockStatusSealed)
+		err := container.SetBlockStatus(ingestion2.ResultSealed)
 		s.Require().NoError(err)
 
 		err = forest.OnBlockFinalized(s.blocks[1])
@@ -971,7 +971,7 @@ func (s *ResultsForestSuite) TestOnBlockFinalized() {
 
 		container, found := forest.GetContainer(consensusFork1[0].ID())
 		s.True(found)
-		err := container.SetBlockStatus(ingestion2.BlockStatusFinalized)
+		err := container.SetBlockStatus(ingestion2.ResultForFinalizedBlock)
 		s.Require().NoError(err)
 
 		err = forest.OnBlockFinalized(s.blocks[1])
@@ -989,23 +989,23 @@ func (s *ResultsForestSuite) TestOnBlockFinalized() {
 		s.Require().NoError(err)
 
 		// Block 0: Finalized
-		s.assertContainer(forest, s.results[0].ID(), ingestion2.BlockStatusFinalized) // block 0
-		s.assertContainer(forest, s.results[1].ID(), ingestion2.BlockStatusCertified) // block 1
-		s.assertContainer(forest, s.results[2].ID(), ingestion2.BlockStatusCertified) // block 2
-		s.assertContainer(forest, s.results[3].ID(), ingestion2.BlockStatusCertified) // block 3
-		s.assertContainer(forest, execFork[0].ID(), ingestion2.BlockStatusCertified)  // block 1
-		s.assertContainer(forest, execFork[1].ID(), ingestion2.BlockStatusCertified)  // block 2
+		s.assertContainer(forest, s.results[0].ID(), ingestion2.ResultForFinalizedBlock) // block 0
+		s.assertContainer(forest, s.results[1].ID(), ingestion2.ResultForCertifiedBlock) // block 1
+		s.assertContainer(forest, s.results[2].ID(), ingestion2.ResultForCertifiedBlock) // block 2
+		s.assertContainer(forest, s.results[3].ID(), ingestion2.ResultForCertifiedBlock) // block 3
+		s.assertContainer(forest, execFork[0].ID(), ingestion2.ResultForCertifiedBlock)  // block 1
+		s.assertContainer(forest, execFork[1].ID(), ingestion2.ResultForCertifiedBlock)  // block 2
 
 		err = forest.OnBlockFinalized(s.blocks[1])
 		s.Require().NoError(err)
 
 		// Block 0 & 1: Finalized
-		s.assertContainer(forest, s.results[0].ID(), ingestion2.BlockStatusFinalized) // block 0
-		s.assertContainer(forest, s.results[1].ID(), ingestion2.BlockStatusFinalized) // block 1
-		s.assertContainer(forest, s.results[2].ID(), ingestion2.BlockStatusCertified) // block 2
-		s.assertContainer(forest, s.results[3].ID(), ingestion2.BlockStatusCertified) // block 3
-		s.assertContainer(forest, execFork[0].ID(), ingestion2.BlockStatusFinalized)  // block 1
-		s.assertContainer(forest, execFork[1].ID(), ingestion2.BlockStatusCertified)  // block 2
+		s.assertContainer(forest, s.results[0].ID(), ingestion2.ResultForFinalizedBlock) // block 0
+		s.assertContainer(forest, s.results[1].ID(), ingestion2.ResultForFinalizedBlock) // block 1
+		s.assertContainer(forest, s.results[2].ID(), ingestion2.ResultForCertifiedBlock) // block 2
+		s.assertContainer(forest, s.results[3].ID(), ingestion2.ResultForCertifiedBlock) // block 3
+		s.assertContainer(forest, execFork[0].ID(), ingestion2.ResultForFinalizedBlock)  // block 1
+		s.assertContainer(forest, execFork[1].ID(), ingestion2.ResultForCertifiedBlock)  // block 2
 
 		// block 2 contains a seal for the first main result
 		mainPipelines[0].On("SetSealed").Return().Once()
@@ -1015,12 +1015,12 @@ func (s *ResultsForestSuite) TestOnBlockFinalized() {
 
 		// Result 0: Sealed
 		// Block 1 & 2: Finalized
-		s.assertContainer(forest, s.results[0].ID(), ingestion2.BlockStatusSealed)    // block 0
-		s.assertContainer(forest, s.results[1].ID(), ingestion2.BlockStatusFinalized) // block 1
-		s.assertContainer(forest, s.results[2].ID(), ingestion2.BlockStatusFinalized) // block 2
-		s.assertContainer(forest, s.results[3].ID(), ingestion2.BlockStatusCertified) // block 3
-		s.assertContainer(forest, execFork[0].ID(), ingestion2.BlockStatusFinalized)  // block 1
-		s.assertContainer(forest, execFork[1].ID(), ingestion2.BlockStatusFinalized)  // block 2
+		s.assertContainer(forest, s.results[0].ID(), ingestion2.ResultSealed)            // block 0
+		s.assertContainer(forest, s.results[1].ID(), ingestion2.ResultForFinalizedBlock) // block 1
+		s.assertContainer(forest, s.results[2].ID(), ingestion2.ResultForFinalizedBlock) // block 2
+		s.assertContainer(forest, s.results[3].ID(), ingestion2.ResultForCertifiedBlock) // block 3
+		s.assertContainer(forest, execFork[0].ID(), ingestion2.ResultForFinalizedBlock)  // block 1
+		s.assertContainer(forest, execFork[1].ID(), ingestion2.ResultForFinalizedBlock)  // block 2
 
 		// block 3 contains a seal for the second main result
 		mainPipelines[1].On("SetSealed").Return().Once()
@@ -1036,10 +1036,10 @@ func (s *ResultsForestSuite) TestOnBlockFinalized() {
 
 		// Result 0 & 1: Sealed
 		// Block 2 & 3: Finalized
-		s.assertContainer(forest, s.results[0].ID(), ingestion2.BlockStatusSealed)    // block 0
-		s.assertContainer(forest, s.results[1].ID(), ingestion2.BlockStatusSealed)    // block 1
-		s.assertContainer(forest, s.results[2].ID(), ingestion2.BlockStatusFinalized) // block 2
-		s.assertContainer(forest, s.results[3].ID(), ingestion2.BlockStatusFinalized) // block 3
+		s.assertContainer(forest, s.results[0].ID(), ingestion2.ResultSealed)            // block 0
+		s.assertContainer(forest, s.results[1].ID(), ingestion2.ResultSealed)            // block 1
+		s.assertContainer(forest, s.results[2].ID(), ingestion2.ResultForFinalizedBlock) // block 2
+		s.assertContainer(forest, s.results[3].ID(), ingestion2.ResultForFinalizedBlock) // block 3
 	})
 }
 
@@ -1087,7 +1087,7 @@ func (s *ResultsForestSuite) TestOnBlockFinalized_CornerCases() {
 
 		// the forest will reject the result and set the rejectedResults flag
 		_ = s.createPipeline(rejectedResult, false)
-		added, err := forest.AddReceipt(rejectedReceipt, ingestion2.BlockStatusCertified)
+		added, err := forest.AddReceipt(rejectedReceipt, ingestion2.ResultForCertifiedBlock)
 		s.ErrorIs(err, ingestion2.ErrMaxViewDeltaExceeded)
 		s.False(added)
 
@@ -1096,8 +1096,8 @@ func (s *ResultsForestSuite) TestOnBlockFinalized_CornerCases() {
 		err = forest.OnBlockFinalized(finalizedBlockWithSkippedSeal)
 		s.NoError(err)
 
-		s.assertContainer(forest, s.results[0].ID(), ingestion2.BlockStatusCertified)
-		s.assertContainer(forest, s.results[1].ID(), ingestion2.BlockStatusCertified)
+		s.assertContainer(forest, s.results[0].ID(), ingestion2.ResultForCertifiedBlock)
+		s.assertContainer(forest, s.results[1].ID(), ingestion2.ResultForCertifiedBlock)
 	})
 
 	s.Run("sorts seals by view", func() {
@@ -1125,10 +1125,10 @@ func (s *ResultsForestSuite) TestOnBlockFinalized_CornerCases() {
 		err := forest.OnBlockFinalized(finalizedBlock)
 		s.Require().NoError(err)
 
-		s.assertContainer(forest, s.results[0].ID(), ingestion2.BlockStatusSealed)
-		s.assertContainer(forest, s.results[1].ID(), ingestion2.BlockStatusSealed)
-		s.assertContainer(forest, s.results[2].ID(), ingestion2.BlockStatusSealed)
-		s.assertContainer(forest, s.results[3].ID(), ingestion2.BlockStatusSealed)
+		s.assertContainer(forest, s.results[0].ID(), ingestion2.ResultSealed)
+		s.assertContainer(forest, s.results[1].ID(), ingestion2.ResultSealed)
+		s.assertContainer(forest, s.results[2].ID(), ingestion2.ResultSealed)
+		s.assertContainer(forest, s.results[3].ID(), ingestion2.ResultSealed)
 	})
 
 	s.Run("skips notification if finalized view was already processed", func() {
@@ -1149,9 +1149,9 @@ func (s *ResultsForestSuite) TestOnBlockFinalized_CornerCases() {
 		s.Require().NoError(err)
 
 		// the new block should not be marked finalized
-		s.assertContainer(forest, s.results[0].ID(), ingestion2.BlockStatusFinalized)
-		s.assertContainer(forest, s.results[1].ID(), ingestion2.BlockStatusCertified)
-		s.assertContainer(forest, execFork[0].ID(), ingestion2.BlockStatusCertified)
+		s.assertContainer(forest, s.results[0].ID(), ingestion2.ResultForFinalizedBlock)
+		s.assertContainer(forest, s.results[1].ID(), ingestion2.ResultForCertifiedBlock)
+		s.assertContainer(forest, execFork[0].ID(), ingestion2.ResultForCertifiedBlock)
 	})
 
 	s.Run("skips notification if finalized view is lower than or equal to last sealed view", func() {
@@ -1183,8 +1183,8 @@ func (s *ResultsForestSuite) TestOnBlockFinalized_CornerCases() {
 		s.Require().NoError(err)
 
 		// result[1] should NOT be marked as sealed
-		s.assertContainer(forest, s.results[0].ID(), ingestion2.BlockStatusSealed)
-		s.assertContainer(forest, s.results[1].ID(), ingestion2.BlockStatusCertified)
+		s.assertContainer(forest, s.results[0].ID(), ingestion2.ResultSealed)
+		s.assertContainer(forest, s.results[1].ID(), ingestion2.ResultForCertifiedBlock)
 	})
 }
 
@@ -1225,7 +1225,7 @@ func (s *ResultsForestSuite) TestOnStateUpdated() {
 		// called by isAbandonedFork when adding the child result
 		parentPipeline.On("GetState").Return(optimistic_sync.StatePending).Once()
 
-		added, err := forest.AddReceipt(receipt, ingestion2.BlockStatusCertified)
+		added, err := forest.AddReceipt(receipt, ingestion2.ResultForCertifiedBlock)
 		s.Require().NoError(err)
 		s.True(added)
 	}
@@ -1291,7 +1291,7 @@ func (s *ResultsForestSuite) TestOnStateUpdated_ConcurrentUpdates() {
 		pipeline.On("OnParentStateUpdated", mock.AnythingOfType("optimistic_sync.State")).Maybe()
 
 		receipt := receiptGen.Fixture(receiptGen.WithExecutionResult(*result))
-		added, err := forest.AddReceipt(receipt, ingestion2.BlockStatusCertified)
+		added, err := forest.AddReceipt(receipt, ingestion2.ResultForCertifiedBlock)
 		s.Require().NoError(err)
 		s.True(added)
 	}
@@ -1519,7 +1519,7 @@ func (s *ResultsForestSuite) chainWithSeals(
 	return blocks, results
 }
 
-// addToForest adds the set of results to the forest with BlockStatusCertified, and returns their pipelines
+// addToForest adds the set of results to the forest with ResultForCertifiedBlock, and returns their pipelines
 func (s *ResultsForestSuite) addToForest(forest *ingestion2.ResultsForest, results ...*flow.ExecutionResult) []*opsyncmock.Pipeline {
 	receiptGen := s.g.ExecutionReceipts()
 
@@ -1529,7 +1529,7 @@ func (s *ResultsForestSuite) addToForest(forest *ingestion2.ResultsForest, resul
 		pipelines[i].On("GetState").Return(optimistic_sync.StatePending).Maybe()
 
 		receipt := receiptGen.Fixture(receiptGen.WithExecutionResult(*result))
-		added, err := forest.AddReceipt(receipt, ingestion2.BlockStatusCertified)
+		added, err := forest.AddReceipt(receipt, ingestion2.ResultForCertifiedBlock)
 		s.Require().NoError(err)
 		s.True(added)
 	}

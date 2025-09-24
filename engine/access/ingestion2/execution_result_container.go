@@ -21,14 +21,18 @@ var ErrIncompatibleReceipt = errors.New("incompatible execution receipt")
 // same block. For optimized storage, we only store the result once. Mathematically, an
 // ExecutionResultContainer struct represents an Equivalence Class of Execution Receipts.
 type ExecutionResultContainer struct {
-	receipts    map[flow.Identifier]*flow.ExecutionReceiptStub // map from ExecutionReceipt.ID -> ExecutionReceiptStub
-	result      *flow.ExecutionResult
-	resultID    flow.Identifier // precomputed ID of result to avoid expensive hashing on each call
-	blockHeader *flow.Header    // header of the block which the result is for
+	// conceptually immutable values; can be read without concurrency protection:
+	result      *flow.ExecutionResult // execution result that all receipts in this container commit to
+	resultID    flow.Identifier       // precomputed ID of result to avoid expensive hashing on each call
+	blockHeader *flow.Header          // header of the block which the result is for
+
+	// inherently concurrency-safe values; can be read without concurrency protection:
 	pipeline    optimistic_sync.Pipeline
 	blockStatus counters.StrictMonotonicCounter
 
-	mu sync.RWMutex
+	// values requiring concurrency protection
+	mu       sync.RWMutex
+	receipts map[flow.Identifier]*flow.ExecutionReceiptStub // map from ExecutionReceipt.ID -> ExecutionReceiptStub
 }
 
 var _ forest.Vertex = (*ExecutionResultContainer)(nil)
@@ -54,7 +58,7 @@ func NewExecutionResultContainer(
 		resultID:    result.ID(),
 		blockHeader: header,
 		pipeline:    pipeline,
-		blockStatus: counters.NewMonotonicCounter(uint64(BlockStatusCertified)),
+		blockStatus: counters.NewMonotonicCounter(uint64(ResultForCertifiedBlock)),
 	}, nil
 }
 
@@ -170,7 +174,7 @@ func (c *ExecutionResultContainer) BlockStatus() BlockStatus {
 // SetBlockStatus sets the block status of the block executed by this result.
 func (c *ExecutionResultContainer) SetBlockStatus(blockStatus BlockStatus) error {
 	if c.blockStatus.Set(uint64(blockStatus)) {
-		if blockStatus == BlockStatusSealed {
+		if blockStatus == ResultSealed {
 			c.pipeline.SetSealed()
 		}
 		return nil
