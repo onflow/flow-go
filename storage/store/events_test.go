@@ -50,7 +50,7 @@ func TestEventStoreRetrieve(t *testing.T) {
 			{evt2_1},
 		}
 
-		unittest.WithLock(t, lockManager, storage.LockInsertOwnReceipt, func(lctx lockctx.Context) error {
+		unittest.WithLock(t, lockManager, storage.LockInsertEvent, func(lctx lockctx.Context) error {
 			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 				// store event
 				return events.BatchStore(lctx, blockID, expected, rw)
@@ -174,7 +174,7 @@ func TestEventStoreAndRemove(t *testing.T) {
 			{evt2_1},
 		}
 
-		unittest.WithLock(t, lockManager, storage.LockInsertOwnReceipt, func(lctx lockctx.Context) error {
+		unittest.WithLock(t, lockManager, storage.LockInsertEvent, func(lctx lockctx.Context) error {
 			return store.Store(lctx, blockID, expected)
 		})
 

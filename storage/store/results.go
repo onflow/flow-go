@@ -110,7 +110,7 @@ func (r *ExecutionResults) BatchStore(result *flow.ExecutionResult, batch storag
 }
 
 func (r *ExecutionResults) BatchIndex(lctx lockctx.Proof, blockID flow.Identifier, resultID flow.Identifier, batch storage.ReaderBatchWriter) error {
-	return operation.IndexExecutionResult(lctx, batch.Writer(), blockID, resultID)
+	return r.index(lctx, batch.Writer(), blockID, resultID, false)
 }
 
 func (r *ExecutionResults) ByID(resultID flow.Identifier) (*flow.ExecutionResult, error) {

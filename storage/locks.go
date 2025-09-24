@@ -46,6 +46,7 @@ func Locks() []string {
 		LockInsertEvent,
 		LockInsertOwnReceipt,
 		LockInsertCollection,
+		LockInsertLightTransactionResult,
 		LockBootstrapping,
 		LockInsertChunkDataPack,
 	}
