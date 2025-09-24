@@ -87,7 +87,7 @@ func MessageToBlock(m *entities.Block) (*flow.Block, error) {
 			},
 		)
 		if err != nil {
-			return nil, fmt.Errorf("failed to create root header: %w", err)
+			return nil, fmt.Errorf("failed to create root block: %w", err)
 		}
 		return block, nil
 	}
