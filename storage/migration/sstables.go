@@ -64,7 +64,7 @@ func CopyFromBadgerToPebbleSSTables(badgerDB *badger.DB, pebbleDB *pebble.DB, cf
 
 	kvChan := make(chan KVPairs, cfg.ReaderWorkerCount*2)
 
-	lg := util.LogProgress[int](
+	lg := util.LogProgress(
 		log.Logger,
 		util.DefaultLogProgressConfig("migration keys from badger to pebble", len(prefixes)),
 	)

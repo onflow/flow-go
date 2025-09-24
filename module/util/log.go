@@ -13,13 +13,13 @@ import (
 // It is any integer number type, but all negative values are ignored.
 type LogProgressFunc[T int | uint | int32 | uint32 | uint64 | int64] func(addProgress T)
 
-type LogProgressConfig struct {
+type LogProgressConfig[T int | uint | int32 | uint32 | uint64 | int64] struct {
 	// Message is part of the messages that will be logged.
 	// The full template is: `%s progress %d/%d (%.1f%%) total time %s`.
 	Message string
 	// Total is the total value of progress expected.
 	// When Total is added to LogProgressFunc the progress is considered to be 100%.
-	Total uint64
+	Total T
 	// NoDataLogDuration. If the last log line was more than this duration ago and a new data point is added, a new log line is logged.
 	// No line is logged if no data is received. The minimum resolution for NoDataLogDuration is 1 millisecond.
 	NoDataLogDuration time.Duration
@@ -35,16 +35,16 @@ type LogProgressConfig struct {
 func DefaultLogProgressConfig[T int | uint | int32 | uint32 | uint64 | int64](
 	message string,
 	total T,
-) LogProgressConfig {
-	return LogProgressConfig{
+) LogProgressConfig[T] {
+	return LogProgressConfig[T]{
 		Message:           message,
-		Total:             uint64(total),
+		Total:             total,
 		Ticks:             11,
 		NoDataLogDuration: 60 * time.Second,
 	}
 }
 
-type LogProgressOption func(config *LogProgressConfig)
+type LogProgressOption[T int | uint | int32 | uint32 | uint64 | int64] func(config *LogProgressConfig[T])
 
 // LogProgress takes a LogProgressConfig and return function such that when called adds the given
 // number to the progress and logs the progress in defined increments or there is a time gap between progress
@@ -53,7 +53,7 @@ type LogProgressOption func(config *LogProgressConfig)
 // An eta is also logged, but it assumes that the progress is linear.
 func LogProgress[T int | uint | int32 | uint32 | uint64 | int64](
 	log zerolog.Logger,
-	config LogProgressConfig,
+	config LogProgressConfig[T],
 ) LogProgressFunc[T] {
 
 	start := time.Now().UnixMilli()
@@ -67,6 +67,7 @@ func LogProgress[T int | uint | int32 | uint32 | uint64 | int64](
 	// usage anyway.
 	var mux sync.Mutex
 
+	total := uint64(config.Total)
 	logProgress := func(current uint64) {
 		mux.Lock()
 		defer mux.Unlock()
@@ -88,7 +89,7 @@ func LogProgress[T int | uint | int32 | uint32 | uint64 | int64](
 			etaString = eta.Round(1 * time.Second).String()
 		}
 
-		if current < config.Total {
+		if current < total {
 			log.Info().Msgf("%s progress %d/%d (%.1f%%) elapsed: %s, eta %s", config.Message, current, config.Total, percentage, elapsedString, etaString)
 		} else {
 			log.Info().Msgf("%s progress %d/%d (%.1f%%) total time %s", config.Message, current, config.Total, percentage, elapsedString)
@@ -99,7 +100,6 @@ func LogProgress[T int | uint | int32 | uint32 | uint64 | int64](
 	logProgress(0)
 
 	// sanitize inputs and calculate increment
-	total := config.Total
 	ticksIncludingZero := config.Ticks
 	if ticksIncludingZero < 2 {
 		ticksIncludingZero = 2

@@ -222,7 +222,7 @@ func validateAllKeys(badgerDB *badger.DB, pebbleDB *pebble.DB) error {
 
 	eg, ctx := errgroup.WithContext(ctx)
 
-	lg := util.LogProgress[int](
+	lg := util.LogProgress(
 		log.Logger,
 		util.DefaultLogProgressConfig("verifying progress", len(prefixes)),
 	)

@@ -70,7 +70,7 @@ func SummarizeKeysByFirstByteConcurrent(log zerolog.Logger, r storage.Reader, nW
 		}()
 	}
 
-	progress := util.LogProgress[int](log,
+	progress := util.LogProgress(log,
 		util.DefaultLogProgressConfig(
 			"Summarizing keys by first byte",
 			256,

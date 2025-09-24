@@ -272,7 +272,7 @@ func MigrateAccountsConcurrently(
 	})
 
 	// read job results
-	logAccount := moduleUtil.LogProgress[int](
+	logAccount := moduleUtil.LogProgress(
 		log,
 		moduleUtil.DefaultLogProgressConfig(
 			"processing account group",

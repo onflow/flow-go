@@ -171,7 +171,7 @@ func (l *EVMBatchTransferLoad) Setup(log zerolog.Logger, lc LoadContext) error {
 	g, ctx := errgroup.WithContext(context.Background())
 	g.SetLimit(lc.Proposer.NumKeys())
 
-	progress := util.LogProgress[int](l.log,
+	progress := util.LogProgress(l.log,
 		util.DefaultLogProgressConfig(
 			"creating and funding EOC accounts",
 			createEOA,
