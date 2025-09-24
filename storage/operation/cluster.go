@@ -15,7 +15,17 @@ import (
 // for regular consensus, these functions include the cluster ID in order to
 // support storing multiple chains, for example during epoch switchover.
 
-// IndexClusterBlockHeight indexes a cluster block from the specified cluster by its height.
+// IndexClusterBlockHeight indexes a cluster block ID by the cluster ID and block height.
+// The function ensures data integrity by first checking if a block ID already exists for the given
+// cluster and height, and rejecting overwrites with different values. This function is idempotent,
+// i.e. repeated calls with the *initially* indexed value are no-ops.
+//
+// CAUTION:
+//   - Confirming that no value is already stored and the subsequent write must be atomic to prevent data corruption.
+//     The caller must acquire the [storage.LockInsertOrFinalizeClusterBlock] and hold it until the database write has been committed.
+//
+// Expected error returns during normal operations:
+//   - [storage.ErrDataMismatch] if a *different* block ID is already indexed for the same cluster and height
 func IndexClusterBlockHeight(lctx lockctx.Proof, rw storage.ReaderBatchWriter, clusterID flow.ChainID, height uint64, blockID flow.Identifier) error {
 	if !lctx.HoldsLock(storage.LockInsertOrFinalizeClusterBlock) {
 		return fmt.Errorf("missing lock: %v", storage.LockInsertOrFinalizeClusterBlock)
@@ -26,7 +36,7 @@ func IndexClusterBlockHeight(lctx lockctx.Proof, rw storage.ReaderBatchWriter, c
 	err := RetrieveByKey(rw.GlobalReader(), key, &existing)
 	if err == nil {
 		if existing != blockID {
-			return fmt.Errorf("cluster block height already indexed with different block ID: %s vs %s", existing, blockID)
+			return fmt.Errorf("cluster block height already indexed with different block ID: %s vs %s: %w", existing, blockID, storage.ErrDataMismatch)
 		}
 		// already indexed, nothing to do
 		return nil
