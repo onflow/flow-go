@@ -12,7 +12,7 @@ import (
 	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/channels"
-	"github.com/onflow/flow-go/network/mocknetwork"
+	mocknetwork "github.com/onflow/flow-go/network/mock"
 )
 
 // TODO replace this type with `network/stub/hub.go`
@@ -70,7 +70,7 @@ type Network struct {
 	node     *Node
 	originID flow.Identifier
 	conduits map[channels.Channel]*Conduit
-	mocknetwork.Network
+	mocknetwork.EngineRegistry
 }
 
 var _ network.EngineRegistry = (*Network)(nil)

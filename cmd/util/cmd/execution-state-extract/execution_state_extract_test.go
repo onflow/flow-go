@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/jordanschalm/lockctx"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/atomic"
@@ -66,13 +67,13 @@ func TestExtractExecutionState(t *testing.T) {
 			blockID := unittest.IdentifierFixture()
 			stateCommitment := unittest.StateCommitmentFixture()
 
-			lctx := lockManager.NewContext()
-			require.NoError(t, lctx.AcquireLock(storage.LockInsertOwnReceipt))
-			require.NoError(t, storageDB.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-				// Store the state commitment for the block ID
-				return operation.IndexStateCommitment(lctx, rw, blockID, stateCommitment)
-			}))
-			lctx.Release()
+			err := unittest.WithLock(t, lockManager, storage.LockInsertOwnReceipt, func(lctx lockctx.Context) error {
+				return storageDB.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+					// Store the state commitment for the block ID
+					return operation.IndexStateCommitment(lctx, rw, blockID, stateCommitment)
+				})
+			})
+			require.NoError(t, err)
 
 			retrievedStateCommitment, err := commits.ByBlockID(blockID)
 			require.NoError(t, err)
@@ -138,12 +139,12 @@ func TestExtractExecutionState(t *testing.T) {
 				// generate random block and map it to state commitment
 				blockID := unittest.IdentifierFixture()
 
-				lctx := lockManager.NewContext()
-				require.NoError(t, lctx.AcquireLock(storage.LockInsertOwnReceipt))
-				require.NoError(t, storageDB.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-					return operation.IndexStateCommitment(lctx, rw, blockID, flow.StateCommitment(stateCommitment))
-				}))
-				lctx.Release()
+				err = unittest.WithLock(t, lockManager, storage.LockInsertOwnReceipt, func(lctx lockctx.Context) error {
+					return storageDB.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+						return operation.IndexStateCommitment(lctx, rw, blockID, flow.StateCommitment(stateCommitment))
+					})
+				})
+				require.NoError(t, err)
 
 				data := make(map[string]keyPair, len(keys))
 				for j, key := range keys {

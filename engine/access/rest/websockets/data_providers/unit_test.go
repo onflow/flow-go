@@ -11,7 +11,7 @@ import (
 
 	"github.com/onflow/flow-go/engine/access/rest/websockets/data_providers/models"
 	wsmodels "github.com/onflow/flow-go/engine/access/rest/websockets/models"
-	statestreamsmock "github.com/onflow/flow-go/engine/access/state_stream/mock"
+	submock "github.com/onflow/flow-go/engine/access/subscription/mock"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -19,7 +19,7 @@ import (
 type testType struct {
 	name              string
 	arguments         wsmodels.Arguments
-	setupBackend      func(sub *statestreamsmock.Subscription)
+	setupBackend      func(sub *submock.Subscription)
 	expectedResponses []interface{}
 }
 
@@ -58,7 +58,7 @@ func testHappyPath(
 			dataChan := make(chan interface{})
 
 			// Create a mock subscription and mock the channel
-			sub := statestreamsmock.NewSubscription(t)
+			sub := submock.NewSubscription(t)
 			sub.On("Channel").Return((<-chan interface{})(dataChan))
 			sub.On("Err").Return(nil)
 			test.setupBackend(sub)
