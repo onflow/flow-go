@@ -2554,10 +2554,10 @@ func TestCapabilityControllers(t *testing.T) {
 						transaction {
 						  prepare(signer: auth(Capabilities) &Account) {
 							let cap = signer.capabilities.storage.issue<&Int>(/storage/foo)
-							assert(cap.id == 6)
+							assert(cap.id == 7)
 
 							let cap2 = signer.capabilities.storage.issue<&String>(/storage/bar)
-							assert(cap2.id == 7)
+							assert(cap2.id == 8)
 						  }
 						}
 					`)).
@@ -2945,9 +2945,9 @@ func TestFlowCallbackScheduler(t *testing.T) {
 			require.NotNil(t, sc.FlowCallbackScheduler.Name)
 
 			script := fvm.Script([]byte(fmt.Sprintf(`
-				import FlowCallbackScheduler from %s
-				access(all) fun main(): FlowCallbackScheduler.Status? {
-					return FlowCallbackScheduler.getStatus(id: 1)
+				import FlowTransactionScheduler from %s
+				access(all) fun main(): FlowTransactionScheduler.Status? {
+					return FlowTransactionScheduler.getStatus(id: 1)
 				}
 			`, sc.FlowCallbackScheduler.Address.HexWithPrefix())))
 
@@ -2958,9 +2958,9 @@ func TestFlowCallbackScheduler(t *testing.T) {
 			require.Equal(t, output.Value, cadence.NewOptional(nil))
 
 			script = fvm.Script([]byte(fmt.Sprintf(`
-				import FlowCallbackScheduler from %s
+				import FlowTransactionScheduler from %s
 				access(all) fun main(): UInt64 {
-					return FlowCallbackScheduler.getSlotAvailableEffort(timestamp: 1.0, priority: FlowCallbackScheduler.Priority.High)
+					return FlowTransactionScheduler.getSlotAvailableEffort(timestamp: 1.0, priority: FlowTransactionScheduler.Priority.High)
 				}
 			`, sc.FlowCallbackScheduler.Address.HexWithPrefix())))
 

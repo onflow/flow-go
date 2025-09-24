@@ -49,7 +49,6 @@ const (
 	DefaultProfiler           = false
 	DefaultProfileUploader    = false
 	DefaultTracing            = true
-	DefaultCadenceTracing     = false
 	DefaultExtensiveTracing   = false
 	DefaultConsensusDelay     = 800 * time.Millisecond
 	DefaultCollectionDelay    = 950 * time.Millisecond
@@ -74,7 +73,6 @@ var (
 	profiler                    bool
 	profileUploader             bool
 	tracing                     bool
-	cadenceTracing              bool
 	extensiveTracing            bool
 	consensusDelay              time.Duration
 	collectionDelay             time.Duration
@@ -102,7 +100,6 @@ func init() {
 	flag.BoolVar(&profiler, "profiler", DefaultProfiler, "whether to enable the auto-profiler")
 	flag.BoolVar(&profileUploader, "profile-uploader", DefaultProfileUploader, "whether to upload profiles to the cloud")
 	flag.BoolVar(&tracing, "tracing", DefaultTracing, "whether to enable low-overhead tracing in flow")
-	flag.BoolVar(&cadenceTracing, "cadence-tracing", DefaultCadenceTracing, "whether to enable the tracing in cadance")
 	flag.BoolVar(&extensiveTracing, "extensive-tracing", DefaultExtensiveTracing, "enables high-overhead tracing in fvm")
 	flag.DurationVar(&consensusDelay, "consensus-delay", DefaultConsensusDelay, "delay on consensus node block proposals")
 	flag.DurationVar(&collectionDelay, "collection-delay", DefaultCollectionDelay, "delay on collection node block proposals")
@@ -401,6 +398,7 @@ func prepareVerificationService(container testnet.ContainerConfig, i int, n int)
 
 	service.Command = append(service.Command,
 		"--chunk-alpha=1",
+		"--scheduled-callbacks-enabled=true",
 	)
 
 	return service
@@ -434,12 +432,12 @@ func prepareExecutionService(container testnet.ContainerConfig, i int, n int) Se
 	service.Command = append(service.Command,
 		"--triedir=/trie",
 		fmt.Sprintf("--rpc-addr=%s:%s", container.ContainerName, testnet.GRPCPort),
-		fmt.Sprintf("--cadence-tracing=%t", cadenceTracing),
 		fmt.Sprintf("--extensive-tracing=%t", extensiveTracing),
 		"--execution-data-dir=/data/execution-data",
 		"--chunk-data-pack-dir=/data/chunk-data-pack",
 		"--pruning-config-threshold=20",
 		"--pruning-config-sleep-after-iteration=1m",
+		"--scheduled-callbacks-enabled=true",
 	)
 
 	service.Volumes = append(service.Volumes,
@@ -474,6 +472,7 @@ func prepareAccessService(container testnet.ContainerConfig, i int, n int) Servi
 		"--script-execution-mode=execution-nodes-only",
 		"--event-query-mode=execution-nodes-only",
 		"--tx-result-query-mode=execution-nodes-only",
+		"--scheduled-callbacks-enabled=true",
 	)
 
 	service.AddExposedPorts(

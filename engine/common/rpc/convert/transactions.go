@@ -25,9 +25,10 @@ func TransactionToMessage(tb flow.TransactionBody) *entities.Transaction {
 
 	for i, sig := range tb.PayloadSignatures {
 		payloadSigMessages[i] = &entities.Transaction_Signature{
-			Address:   sig.Address.Bytes(),
-			KeyId:     uint32(sig.KeyIndex),
-			Signature: sig.Signature,
+			Address:       sig.Address.Bytes(),
+			KeyId:         uint32(sig.KeyIndex),
+			Signature:     sig.Signature,
+			ExtensionData: sig.ExtensionData,
 		}
 	}
 
@@ -35,9 +36,10 @@ func TransactionToMessage(tb flow.TransactionBody) *entities.Transaction {
 
 	for i, sig := range tb.EnvelopeSignatures {
 		envelopeSigMessages[i] = &entities.Transaction_Signature{
-			Address:   sig.Address.Bytes(),
-			KeyId:     uint32(sig.KeyIndex),
-			Signature: sig.Signature,
+			Address:       sig.Address.Bytes(),
+			KeyId:         uint32(sig.KeyIndex),
+			Signature:     sig.Signature,
+			ExtensionData: sig.ExtensionData,
 		}
 	}
 
@@ -96,7 +98,7 @@ func MessageToTransaction(
 		if err != nil {
 			return t, err
 		}
-		tb.AddPayloadSignature(addr, sig.GetKeyId(), sig.GetSignature())
+		tb.AddPayloadSignatureWithExtensionData(addr, sig.GetKeyId(), sig.GetSignature(), sig.GetExtensionData())
 	}
 
 	for _, sig := range m.GetEnvelopeSignatures() {
@@ -104,7 +106,7 @@ func MessageToTransaction(
 		if err != nil {
 			return t, err
 		}
-		tb.AddEnvelopeSignature(addr, sig.GetKeyId(), sig.GetSignature())
+		tb.AddEnvelopeSignatureWithExtensionData(addr, sig.GetKeyId(), sig.GetSignature(), sig.GetExtensionData())
 	}
 
 	transactionBody, err := tb.SetScript(m.GetScript()).

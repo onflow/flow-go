@@ -19,7 +19,7 @@ on:
       - master
 
 env:
-  GO_VERSION: "1.23"
+  GO_VERSION: "1.25"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
@@ -239,7 +239,7 @@ jobs:
       timeout-minutes: 1
       continue-on-error: true
       with:
-        file: ./coverage.txt
+        files: ./coverage.txt
         flags: unittests
         name: codecov-umbrella
         token: ${{ secrets.CODECOV_TOKEN }}
@@ -285,7 +285,7 @@ jobs:
         timeout-minutes: 1
         continue-on-error: true
         with:
-          file: ./coverage.txt
+          files: ./coverage.txt
           flags: unittests
           name: codecov-umbrella
           token: ${{ secrets.CODECOV_TOKEN }}
@@ -389,7 +389,7 @@ jobs:
         timeout-minutes: 1
         continue-on-error: true
         with:
-          file: ./coverage.txt
+          files: ./coverage.txt
           flags: unittests
           name: codecov-umbrella
           token: ${{ secrets.CODECOV_TOKEN }}

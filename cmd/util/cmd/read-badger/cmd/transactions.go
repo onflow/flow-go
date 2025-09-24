@@ -1,11 +1,14 @@
 package cmd
 
 import (
+	"fmt"
+
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 
 	"github.com/onflow/flow-go/cmd/util/cmd/common"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/storage"
 )
 
 func init() {
@@ -18,24 +21,24 @@ func init() {
 var transactionsCmd = &cobra.Command{
 	Use:   "transactions",
 	Short: "get transaction by ID",
-	Run: func(cmd *cobra.Command, args []string) {
-		storages, db := InitStorages()
-		defer db.Close()
+	RunE: func(cmd *cobra.Command, args []string) error {
+		return common.WithStorage(flagDatadir, func(db storage.DB) error {
+			storages := common.InitStorages(db)
 
-		log.Info().Msgf("got flag transaction id: %s", flagTransactionID)
-		transactionID, err := flow.HexStringToIdentifier(flagTransactionID)
-		if err != nil {
-			log.Error().Err(err).Msg("malformed transaction id")
-			return
-		}
+			log.Info().Msgf("got flag transaction id: %s", flagTransactionID)
+			transactionID, err := flow.HexStringToIdentifier(flagTransactionID)
+			if err != nil {
+				return fmt.Errorf("malformed transaction id: %w", err)
+			}
 
-		log.Info().Msgf("getting transaction by id: %v", transactionID)
-		tx, err := storages.Transactions.ByID(transactionID)
-		if err != nil {
-			log.Error().Err(err).Msgf("could not get transaction with id: %v", transactionID)
-			return
-		}
+			log.Info().Msgf("getting transaction by id: %v", transactionID)
+			tx, err := storages.Transactions.ByID(transactionID)
+			if err != nil {
+				return fmt.Errorf("could not get transaction with id: %v: %w", transactionID, err)
+			}
 
-		common.PrettyPrintEntity(tx)
+			common.PrettyPrintEntity(tx)
+			return nil
+		})
 	},
 }

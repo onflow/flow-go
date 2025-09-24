@@ -454,14 +454,14 @@ func (e *Engine) process(originID flow.Identifier, message interface{}) error {
 	defer e.metrics.MessageHandled(e.channel.String(), metrics.MessageEntityResponse)
 
 	switch msg := message.(type) {
-	case *messages.EntityResponse:
+	case *flow.EntityResponse:
 		return e.onEntityResponse(originID, msg)
 	default:
 		return engine.NewInvalidInputErrorf("invalid message type (%T)", message)
 	}
 }
 
-func (e *Engine) onEntityResponse(originID flow.Identifier, res *messages.EntityResponse) error {
+func (e *Engine) onEntityResponse(originID flow.Identifier, res *flow.EntityResponse) error {
 	lg := e.log.With().Str("origin_id", originID.String()).Uint64("nonce", res.Nonce).Logger()
 
 	lg.Debug().Strs("entity_ids", flow.IdentifierList(res.EntityIDs).Strings()).Msg("entity response received")

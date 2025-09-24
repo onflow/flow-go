@@ -342,12 +342,14 @@ func (*api) GetTransactionResultsByBlockID(
 func (*api) GetSystemTransaction(
 	_ context.Context,
 	_ flow.Identifier,
+	_ flow.Identifier,
 ) (*flow.TransactionBody, error) {
 	return nil, errors.New("unimplemented")
 }
 
 func (*api) GetSystemTransactionResult(
 	_ context.Context,
+	_ flow.Identifier,
 	_ flow.Identifier,
 	_ entities.EventEncodingVersion,
 ) (*accessmodel.TransactionResult, error) {

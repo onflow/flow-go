@@ -7,6 +7,7 @@ import (
 	"github.com/onflow/cadence/encoding/ccf"
 	"github.com/rs/zerolog/log"
 
+	jsoncdc "github.com/onflow/cadence/encoding/json"
 	"github.com/onflow/flow-core-contracts/lib/go/templates"
 
 	"github.com/onflow/flow-go/fvm/systemcontracts"
@@ -15,13 +16,47 @@ import (
 
 const callbackTransactionGasLimit = flow.DefaultMaxTransactionGasLimit
 
+// SystemCollection returns the re-created system collection after it has been already executed
+// using the events from the process callback transaction.
+func SystemCollection(chain flow.Chain, processEvents flow.EventsList) (*flow.Collection, error) {
+	process, err := ProcessCallbacksTransaction(chain)
+	if err != nil {
+		return nil, fmt.Errorf("failed to construct process callbacks transaction: %w", err)
+	}
+
+	executes, err := ExecuteCallbacksTransactions(chain, processEvents)
+	if err != nil {
+		return nil, fmt.Errorf("failed to construct execute callbacks transactions: %w", err)
+	}
+
+	systemTx, err := SystemChunkTransaction(chain)
+	if err != nil {
+		return nil, fmt.Errorf("failed to construct system chunk transaction: %w", err)
+	}
+
+	transactions := make([]*flow.TransactionBody, 0, len(executes)+2) // +2 process and system tx
+	transactions = append(transactions, process)
+	transactions = append(transactions, executes...)
+	transactions = append(transactions, systemTx)
+
+	collection, err := flow.NewCollection(flow.UntrustedCollection{
+		Transactions: transactions,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to construct system collection: %w", err)
+	}
+
+	return collection, nil
+}
+
 // ProcessCallbacksTransaction constructs a transaction for processing callbacks, for the given callback.
 // No errors are expected during normal operation.
 func ProcessCallbacksTransaction(chain flow.Chain) (*flow.TransactionBody, error) {
 	sc := systemcontracts.SystemContractsForChain(chain.ChainID())
-	script := templates.GenerateProcessCallbackScript(sc.AsTemplateEnv())
+	script := templates.GenerateProcessTransactionScript(sc.AsTemplateEnv())
 
 	return flow.NewTransactionBodyBuilder().
+		AddAuthorizer(sc.FlowServiceAccount.Address).
 		SetScript(script).
 		SetComputeLimit(callbackTransactionGasLimit).Build()
 }
@@ -31,14 +66,23 @@ func ProcessCallbacksTransaction(chain flow.Chain) (*flow.TransactionBody, error
 func ExecuteCallbacksTransactions(chainID flow.Chain, processEvents flow.EventsList) ([]*flow.TransactionBody, error) {
 	txs := make([]*flow.TransactionBody, 0, len(processEvents))
 	env := systemcontracts.SystemContractsForChain(chainID.ChainID()).AsTemplateEnv()
+	sc := systemcontracts.SystemContractsForChain(chainID.ChainID())
 
 	for _, event := range processEvents {
-		id, effort, err := callbackArgsFromEvent(env, event)
+		// todo make sure to check event index to ensure order is indeed correct
+		// event.EventIndex
+
+		// skip any fee events or other events that are not pending execution events
+		if !isPendingExecutionEvent(env, event) {
+			continue
+		}
+
+		id, effort, err := callbackArgsFromEvent(event)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get callback args from event: %w", err)
 		}
 
-		tx, err := executeCallbackTransaction(env, id, effort)
+		tx, err := executeCallbackTransaction(sc, env, id, effort)
 		if err != nil {
 			return nil, fmt.Errorf("failed to construct execute callback transactions: %w", err)
 		}
@@ -48,10 +92,16 @@ func ExecuteCallbacksTransactions(chainID flow.Chain, processEvents flow.EventsL
 	return txs, nil
 }
 
-func executeCallbackTransaction(env templates.Environment, id []byte, effort uint64) (*flow.TransactionBody, error) {
-	script := templates.GenerateExecuteCallbackScript(env)
+func executeCallbackTransaction(
+	sc *systemcontracts.SystemContracts,
+	env templates.Environment,
+	id []byte,
+	effort uint64,
+) (*flow.TransactionBody, error) {
+	script := templates.GenerateExecuteTransactionScript(env)
 
 	return flow.NewTransactionBodyBuilder().
+		AddAuthorizer(sc.FlowServiceAccount.Address).
 		SetScript(script).
 		AddArgument(id).
 		SetComputeLimit(effort).
@@ -62,20 +112,12 @@ func executeCallbackTransaction(env templates.Environment, id []byte, effort uin
 //
 // The event for processed callback event is emitted by the process callback transaction from
 // callback scheduler contract and has the following signature:
-// event CallbackProcessed(ID: UInt64, executionEffort: UInt64)
-func callbackArgsFromEvent(env templates.Environment, event flow.Event) ([]byte, uint64, error) {
+// event PendingExecution(id: UInt64, priority: UInt8, executionEffort: UInt64, fees: UFix64, callbackOwner: Address)
+func callbackArgsFromEvent(event flow.Event) ([]byte, uint64, error) {
 	const (
-		processedCallbackIDFieldName     = "ID"
+		processedCallbackIDFieldName     = "id"
 		processedCallbackEffortFieldName = "executionEffort"
-		processedEventTypeTemplate       = "A.%v.CallbackScheduler.CallbackProcessed"
 	)
-
-	scheduledContractAddress := env.FlowCallbackSchedulerAddress
-	processedEventType := flow.EventType(fmt.Sprintf(processedEventTypeTemplate, scheduledContractAddress))
-
-	if event.Type != processedEventType {
-		return nil, 0, fmt.Errorf("wrong event type is passed")
-	}
 
 	eventData, err := ccf.Decode(nil, event.Payload)
 	if err != nil {
@@ -114,10 +156,24 @@ func callbackArgsFromEvent(env templates.Environment, event flow.Event) ([]byte,
 		effort = flow.DefaultMaxTransactionGasLimit
 	}
 
-	encodedID, err := ccf.Encode(id)
+	encID, err := jsoncdc.Encode(id)
 	if err != nil {
 		return nil, 0, fmt.Errorf("failed to encode id: %w", err)
 	}
 
-	return encodedID, effort, nil
+	return encID, uint64(effort), nil
+}
+
+func isPendingExecutionEvent(env templates.Environment, event flow.Event) bool {
+	processedEventType := PendingExecutionEventType(env)
+	return event.Type == processedEventType
+}
+
+// PendingExecutionEventType returns the event type for FlowCallbackScheduler PendingExecution event
+// for the provided environment.
+func PendingExecutionEventType(env templates.Environment) flow.EventType {
+	const processedEventTypeTemplate = "A.%v.FlowTransactionScheduler.PendingExecution"
+
+	scheduledContractAddress := env.FlowTransactionSchedulerAddress
+	return flow.EventType(fmt.Sprintf(processedEventTypeTemplate, scheduledContractAddress))
 }
