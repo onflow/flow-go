@@ -2,34 +2,24 @@ package models
 
 import (
 	"github.com/onflow/flow-go/model/access"
-	"github.com/onflow/flow-go/model/flow"
 )
 
-func NewMetadata(metadata access.ExecutorMetadata) *Metadata {
-	meta := NewExecutorMetadata(metadata)
+func NewMetadata(metadata *access.ExecutorMetadata) *Metadata {
+	if metadata == nil {
+		return nil
+	}
+
 	return &Metadata{
-		ExecutorMetadata: &meta,
+		ExecutorMetadata: NewExecutorMetadata(metadata),
 	}
 }
 
-func (m *Metadata) IsEmpty() bool {
-	if len(m.ExecutorMetadata.ExecutionResultId) != 0 {
-		return false
+func NewExecutorMetadata(metadata *access.ExecutorMetadata) *ExecutorMetadata {
+	if metadata == nil {
+		return nil
 	}
 
-	if len(m.ExecutorMetadata.ExecutorIds) != 0 {
-		return false
-	}
-
-	return true
-}
-
-func NewExecutorMetadata(metadata access.ExecutorMetadata) ExecutorMetadata {
-	if metadata.ExecutionResultID == flow.ZeroID {
-		return ExecutorMetadata{}
-	}
-
-	return ExecutorMetadata{
+	return &ExecutorMetadata{
 		ExecutionResultId: metadata.ExecutionResultID.String(),
 		ExecutorIds:       metadata.ExecutorIDs.Strings(),
 	}

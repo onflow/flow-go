@@ -52,9 +52,9 @@ func (e *ENEventProvider) Events(
 	eventType flow.EventType,
 	encodingVersion entities.EventEncodingVersion,
 	execResultInfo *optimistic_sync.ExecutionResultInfo,
-) (Response, access.ExecutorMetadata, error) {
+) (Response, *access.ExecutorMetadata, error) {
 	if len(blocks) == 0 {
-		return Response{}, access.ExecutorMetadata{}, nil
+		return Response{}, nil, nil
 	}
 
 	blockIDs := make([]flow.Identifier, len(blocks))
@@ -69,13 +69,8 @@ func (e *ENEventProvider) Events(
 
 	resp, node, err := e.getEventsFromAnyExeNode(ctx, execResultInfo.ExecutionNodes, req)
 	if err != nil {
-		return Response{}, access.ExecutorMetadata{},
+		return Response{}, nil,
 			rpc.ConvertError(err, "failed to get execution nodes for events query", codes.Internal)
-	}
-
-	metadata := access.ExecutorMetadata{
-		ExecutionResultID: execResultInfo.ExecutionResultID,
-		ExecutorIDs:       orderedExecutors(node.NodeID, execResultInfo.ExecutionNodes.NodeIDs()),
 	}
 
 	// convert execution node api result to access node api result
@@ -86,8 +81,13 @@ func (e *ENEventProvider) Events(
 		encodingVersion,
 	)
 	if err != nil {
-		return Response{}, access.ExecutorMetadata{},
+		return Response{}, nil,
 			status.Errorf(codes.Internal, "failed to verify retrieved events from execution node: %v", err)
+	}
+
+	metadata := &access.ExecutorMetadata{
+		ExecutionResultID: execResultInfo.ExecutionResultID,
+		ExecutorIDs:       orderedExecutors(node.NodeID, execResultInfo.ExecutionNodes.NodeIDs()),
 	}
 
 	return Response{
