@@ -30,7 +30,7 @@ type ExecutionDataBackend struct {
 
 	getExecutionData GetExecutionDataFunc
 
-	subscriptionHandler  *subscription.SubscriptionHandler
+	subscriptionFactory  *subscription.Factory
 	executionDataTracker tracker.ExecutionDataTracker
 }
 
@@ -76,7 +76,7 @@ func (b *ExecutionDataBackend) SubscribeExecutionData(ctx context.Context, start
 		return subscription.NewFailedSubscription(err, "could not get start block height")
 	}
 
-	return b.subscriptionHandler.Subscribe(ctx, nextHeight, b.getResponse)
+	return b.subscriptionFactory.CreateSubscription(ctx, nextHeight, b.getResponse)
 }
 
 // SubscribeExecutionDataFromStartBlockID streams execution data for all blocks starting at the specified block ID
@@ -94,7 +94,7 @@ func (b *ExecutionDataBackend) SubscribeExecutionDataFromStartBlockID(ctx contex
 		return subscription.NewFailedSubscription(err, "could not get start block height")
 	}
 
-	return b.subscriptionHandler.Subscribe(ctx, nextHeight, b.getResponse)
+	return b.subscriptionFactory.CreateSubscription(ctx, nextHeight, b.getResponse)
 }
 
 // SubscribeExecutionDataFromStartBlockHeight streams execution data for all blocks starting at the specified block height
@@ -112,7 +112,7 @@ func (b *ExecutionDataBackend) SubscribeExecutionDataFromStartBlockHeight(ctx co
 		return subscription.NewFailedSubscription(err, "could not get start block height")
 	}
 
-	return b.subscriptionHandler.Subscribe(ctx, nextHeight, b.getResponse)
+	return b.subscriptionFactory.CreateSubscription(ctx, nextHeight, b.getResponse)
 }
 
 // SubscribeExecutionDataFromLatest streams execution data starting at the latest block.
@@ -129,7 +129,7 @@ func (b *ExecutionDataBackend) SubscribeExecutionDataFromLatest(ctx context.Cont
 		return subscription.NewFailedSubscription(err, "could not get start block height")
 	}
 
-	return b.subscriptionHandler.Subscribe(ctx, nextHeight, b.getResponse)
+	return b.subscriptionFactory.CreateSubscription(ctx, nextHeight, b.getResponse)
 }
 
 func (b *ExecutionDataBackend) getResponse(ctx context.Context, height uint64) (interface{}, error) {

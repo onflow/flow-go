@@ -168,7 +168,7 @@ func (s *BackendBlocksSuite) backendParams() Params {
 		SnapshotHistoryLimit: DefaultSnapshotHistoryLimit,
 		AccessMetrics:        metrics.NewNoopCollector(),
 		Log:                  s.log,
-		SubscriptionHandler: subscription.NewSubscriptionHandler(
+		SubscriptionFactory: subscription.NewSubscriptionFactory(
 			s.log,
 			s.broadcaster,
 			subscription.DefaultSendTimeout,

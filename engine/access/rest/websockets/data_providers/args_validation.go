@@ -6,6 +6,7 @@ import (
 
 	"github.com/onflow/flow-go/engine/access/rest/common"
 	"github.com/onflow/flow-go/engine/access/rest/websockets/models"
+	"github.com/onflow/flow-go/model/flow"
 )
 
 func ensureAllowedFields(fields map[string]interface{}, allowedFields map[string]struct{}) error {
@@ -37,7 +38,10 @@ func extractArrayOfStrings(args models.Arguments, name string, required bool) ([
 }
 
 // extractHeartbeatInterval extracts 'heartbeat_interval' argument which is always optional
-func extractHeartbeatInterval(args models.Arguments, defaultHeartbeatInterval uint64) (uint64, error) {
+func extractHeartbeatInterval(
+	args models.Arguments,
+	defaultHeartbeatInterval uint64,
+) (uint64, error) {
 	heartbeatIntervalRaw, exists := args["heartbeat_interval"]
 	if !exists {
 		return defaultHeartbeatInterval, nil
@@ -54,4 +58,66 @@ func extractHeartbeatInterval(args models.Arguments, defaultHeartbeatInterval ui
 	}
 
 	return heartbeatInterval, nil
+}
+
+func extractExecutionStateQueryFields(
+	args models.Arguments,
+	name string,
+	required bool,
+) (agreeingExecutorsCount uint64, requiredExecutorIDs flow.IdentifierList, includeExecutorMetadata bool, err error) {
+	executionStateRaw, exists := args[name]
+	if !exists {
+		if required {
+			return 0, nil, false,
+				fmt.Errorf("missing 'execution_state_query' field")
+		}
+		return 0, nil, false, nil
+	}
+
+	executionStateQuery, ok := executionStateRaw.(map[string]interface{})
+	if !ok {
+		return 0, nil, false,
+			fmt.Errorf("'execution_state_query' must be a map")
+	}
+
+	agreeingExecutorsCountRaw, exists := executionStateQuery["agreeing_executors_count"]
+	if !exists {
+		agreeingExecutorsCount = 0
+	} else {
+		agreeingExecutorsCount, err = strconv.ParseUint(agreeingExecutorsCountRaw.(string), 10, 64)
+		if err != nil {
+			return 0, nil, false,
+				fmt.Errorf("'agreeing_executors_count' must be a number: %w", err)
+		}
+	}
+
+	requiredExecutorIDsRaw, exists := executionStateQuery["required_executor_ids"]
+	if !exists {
+		requiredExecutorIDs = nil
+	} else {
+		converted, err := common.ConvertInterfaceToArrayOfStrings(requiredExecutorIDsRaw)
+		if err != nil {
+			return 0, nil, false,
+				fmt.Errorf("'required_executor_ids' must be an array of strings: %w", err)
+		}
+
+		requiredExecutorIDs, err = flow.IdentifierListFromHex(converted)
+		if err != nil {
+			return 0, nil, false,
+				fmt.Errorf("'required_executor_ids' must be an array of strings: %w", err)
+		}
+	}
+
+	includeExecutorMetadataRaw, exists := executionStateQuery["include_executor_metadata"]
+	if !exists {
+		includeExecutorMetadata = false
+	} else {
+		includeExecutorMetadata, err = strconv.ParseBool(includeExecutorMetadataRaw.(string))
+		if err != nil {
+			return 0, nil, false,
+				fmt.Errorf("'include_executor_metadata' must be a boolean: %w", err)
+		}
+	}
+
+	return agreeingExecutorsCount, requiredExecutorIDs, includeExecutorMetadata, nil
 }

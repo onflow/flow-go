@@ -223,7 +223,7 @@ func (s *BackendEventsSuite) runTestSubscribeEvents() {
 	}
 
 	call := func(ctx context.Context, startBlockID flow.Identifier, startHeight uint64, filter state_stream.EventFilter) subscription.Subscription {
-		return s.backend.SubscribeEvents(ctx, startBlockID, startHeight, filter)
+		return s.backend.SubscribeEvents(ctx, startBlockID, startHeight, filter, s.criteria)
 	}
 
 	s.subscribe(call, s.requireEventsResponse, s.setupFilterForTestCases(tests))
@@ -262,7 +262,7 @@ func (s *BackendEventsSuite) runTestSubscribeEventsFromStartBlockID() {
 	}, nil)
 
 	call := func(ctx context.Context, startBlockID flow.Identifier, _ uint64, filter state_stream.EventFilter) subscription.Subscription {
-		return s.backend.SubscribeEventsFromStartBlockID(ctx, startBlockID, filter)
+		return s.backend.SubscribeEventsFromStartBlockID(ctx, startBlockID, filter, s.criteria)
 	}
 
 	s.subscribe(call, s.requireEventsResponse, s.setupFilterForTestCases(tests))
@@ -301,7 +301,7 @@ func (s *BackendEventsSuite) runTestSubscribeEventsFromStartHeight() {
 	}, nil)
 
 	call := func(ctx context.Context, _ flow.Identifier, startHeight uint64, filter state_stream.EventFilter) subscription.Subscription {
-		return s.backend.SubscribeEventsFromStartHeight(ctx, startHeight, filter)
+		return s.backend.SubscribeEventsFromStartHeight(ctx, startHeight, filter, s.criteria)
 	}
 
 	s.subscribe(call, s.requireEventsResponse, s.setupFilterForTestCases(tests))
@@ -332,7 +332,7 @@ func (s *BackendEventsSuite) runTestSubscribeEventsFromLatest() {
 	}, nil)
 
 	call := func(ctx context.Context, _ flow.Identifier, _ uint64, filter state_stream.EventFilter) subscription.Subscription {
-		return s.backend.SubscribeEventsFromLatest(ctx, filter)
+		return s.backend.SubscribeEventsFromLatest(ctx, filter, s.criteria)
 	}
 
 	s.subscribe(call, s.requireEventsResponse, s.setupFilterForTestCases(tests))
@@ -486,7 +486,13 @@ func (s *BackendExecutionDataSuite) TestSubscribeEventsHandlesErrors() {
 		subCtx, subCancel := context.WithCancel(ctx)
 		defer subCancel()
 
-		sub := s.backend.SubscribeEvents(subCtx, unittest.IdentifierFixture(), 1, state_stream.EventFilter{})
+		sub := s.backend.SubscribeEvents(
+			subCtx,
+			unittest.IdentifierFixture(),
+			1,
+			state_stream.EventFilter{},
+			s.criteria,
+		)
 		assert.Equal(s.T(), codes.InvalidArgument, status.Code(sub.Err()))
 	})
 
@@ -494,7 +500,13 @@ func (s *BackendExecutionDataSuite) TestSubscribeEventsHandlesErrors() {
 		subCtx, subCancel := context.WithCancel(ctx)
 		defer subCancel()
 
-		sub := s.backend.SubscribeEvents(subCtx, flow.ZeroID, s.rootBlock.Height-1, state_stream.EventFilter{})
+		sub := s.backend.SubscribeEvents(
+			subCtx,
+			flow.ZeroID,
+			s.rootBlock.Height-1,
+			state_stream.EventFilter{},
+			s.criteria,
+		)
 		assert.Equal(s.T(), codes.InvalidArgument, status.Code(sub.Err()), "expected InvalidArgument, got %v: %v", status.Code(sub.Err()).String(), sub.Err())
 	})
 
@@ -502,7 +514,13 @@ func (s *BackendExecutionDataSuite) TestSubscribeEventsHandlesErrors() {
 		subCtx, subCancel := context.WithCancel(ctx)
 		defer subCancel()
 
-		sub := s.backend.SubscribeEvents(subCtx, unittest.IdentifierFixture(), 0, state_stream.EventFilter{})
+		sub := s.backend.SubscribeEvents(
+			subCtx,
+			unittest.IdentifierFixture(),
+			0,
+			state_stream.EventFilter{},
+			s.criteria,
+		)
 		assert.Equal(s.T(), codes.NotFound, status.Code(sub.Err()), "expected NotFound, got %v: %v", status.Code(sub.Err()).String(), sub.Err())
 	})
 
@@ -513,7 +531,12 @@ func (s *BackendExecutionDataSuite) TestSubscribeEventsHandlesErrors() {
 		subCtx, subCancel := context.WithCancel(ctx)
 		defer subCancel()
 
-		sub := s.backend.SubscribeEvents(subCtx, flow.ZeroID, s.blocks[len(s.blocks)-1].Height+10, state_stream.EventFilter{})
+		sub := s.backend.SubscribeEvents(
+			subCtx,
+			flow.ZeroID,
+			s.blocks[len(s.blocks)-1].Height+10,
+			state_stream.EventFilter{}, s.criteria,
+		)
 		assert.Equal(s.T(), codes.NotFound, status.Code(sub.Err()), "expected NotFound, got %v: %v", status.Code(sub.Err()).String(), sub.Err())
 	})
 
@@ -529,7 +552,13 @@ func (s *BackendExecutionDataSuite) TestSubscribeEventsHandlesErrors() {
 			Once()
 
 		// Note: eventIndex.Initialize() is not called in this test
-		sub := s.backend.SubscribeEvents(subCtx, flow.ZeroID, 0, state_stream.EventFilter{})
+		sub := s.backend.SubscribeEvents(
+			subCtx,
+			flow.ZeroID,
+			0,
+			state_stream.EventFilter{},
+			s.criteria,
+		)
 		assert.Equal(s.T(), codes.FailedPrecondition, status.Code(sub.Err()), "expected FailedPrecondition, got %v: %v", status.Code(sub.Err()).String(), sub.Err())
 	})
 
@@ -541,7 +570,13 @@ func (s *BackendExecutionDataSuite) TestSubscribeEventsHandlesErrors() {
 			Return(uint64(0), status.Errorf(codes.InvalidArgument, "start height %d is lower than lowest indexed height %d", s.blocks[0].Height, 0)).
 			Once()
 
-		sub := s.backend.SubscribeEvents(subCtx, flow.ZeroID, s.blocks[0].Height, state_stream.EventFilter{})
+		sub := s.backend.SubscribeEvents(
+			subCtx,
+			flow.ZeroID,
+			s.blocks[0].Height,
+			state_stream.EventFilter{},
+			s.criteria,
+		)
 		assert.Equal(s.T(), codes.InvalidArgument, status.Code(sub.Err()), "expected InvalidArgument, got %v: %v", status.Code(sub.Err()).String(), sub.Err())
 	})
 
@@ -553,7 +588,12 @@ func (s *BackendExecutionDataSuite) TestSubscribeEventsHandlesErrors() {
 			Return(uint64(0), status.Errorf(codes.InvalidArgument, "start height %d is higher than highest indexed height %d", s.blocks[len(s.blocks)-1].Height, s.blocks[0].Height)).
 			Once()
 
-		sub := s.backend.SubscribeEvents(subCtx, flow.ZeroID, s.blocks[len(s.blocks)-1].Height, state_stream.EventFilter{})
+		sub := s.backend.SubscribeEvents(
+			subCtx,
+			flow.ZeroID,
+			s.blocks[len(s.blocks)-1].Height,
+			state_stream.EventFilter{}, s.criteria,
+		)
 		assert.Equal(s.T(), codes.InvalidArgument, status.Code(sub.Err()), "expected InvalidArgument, got %v: %v", status.Code(sub.Err()).String(), sub.Err())
 	})
 }
@@ -588,7 +628,12 @@ func (s *BackendExecutionDataSuite) TestSubscribeEventsFromStartBlockIDHandlesEr
 		subCtx, subCancel := context.WithCancel(ctx)
 		defer subCancel()
 
-		sub := s.backend.SubscribeEventsFromStartBlockID(subCtx, unittest.IdentifierFixture(), state_stream.EventFilter{})
+		sub := s.backend.SubscribeEventsFromStartBlockID(
+			subCtx,
+			unittest.IdentifierFixture(),
+			state_stream.EventFilter{},
+			s.criteria,
+		)
 		assert.Equal(s.T(), codes.NotFound, status.Code(sub.Err()), "expected NotFound, got %v: %v", status.Code(sub.Err()).String(), sub.Err())
 	})
 
@@ -604,7 +649,12 @@ func (s *BackendExecutionDataSuite) TestSubscribeEventsFromStartBlockIDHandlesEr
 			Once()
 
 		// Note: eventIndex.Initialize() is not called in this test
-		sub := s.backend.SubscribeEventsFromStartBlockID(subCtx, flow.ZeroID, state_stream.EventFilter{})
+		sub := s.backend.SubscribeEventsFromStartBlockID(
+			subCtx,
+			flow.ZeroID,
+			state_stream.EventFilter{},
+			s.criteria,
+		)
 		assert.Equal(s.T(), codes.FailedPrecondition, status.Code(sub.Err()), "expected FailedPrecondition, got %v: %v", status.Code(sub.Err()).String(), sub.Err())
 	})
 
@@ -616,7 +666,12 @@ func (s *BackendExecutionDataSuite) TestSubscribeEventsFromStartBlockIDHandlesEr
 			Return(uint64(0), status.Errorf(codes.InvalidArgument, "start height %d is lower than lowest indexed height %d", s.blocks[0].Height, 0)).
 			Once()
 
-		sub := s.backend.SubscribeEventsFromStartBlockID(subCtx, s.blocks[0].ID(), state_stream.EventFilter{})
+		sub := s.backend.SubscribeEventsFromStartBlockID(
+			subCtx,
+			s.blocks[0].ID(),
+			state_stream.EventFilter{},
+			s.criteria,
+		)
 		assert.Equal(s.T(), codes.InvalidArgument, status.Code(sub.Err()), "expected InvalidArgument, got %v: %v", status.Code(sub.Err()).String(), sub.Err())
 	})
 
@@ -628,7 +683,12 @@ func (s *BackendExecutionDataSuite) TestSubscribeEventsFromStartBlockIDHandlesEr
 			Return(uint64(0), status.Errorf(codes.InvalidArgument, "start height %d is higher than highest indexed height %d", s.blocks[len(s.blocks)-1].Height, s.blocks[0].Height)).
 			Once()
 
-		sub := s.backend.SubscribeEventsFromStartBlockID(subCtx, s.blocks[len(s.blocks)-1].ID(), state_stream.EventFilter{})
+		sub := s.backend.SubscribeEventsFromStartBlockID(
+			subCtx,
+			s.blocks[len(s.blocks)-1].ID(),
+			state_stream.EventFilter{},
+			s.criteria,
+		)
 		assert.Equal(s.T(), codes.InvalidArgument, status.Code(sub.Err()), "expected InvalidArgument, got %v: %v", status.Code(sub.Err()).String(), sub.Err())
 	})
 }
@@ -666,7 +726,12 @@ func (s *BackendExecutionDataSuite) TestSubscribeEventsFromStartHeightHandlesErr
 		subCtx, subCancel := context.WithCancel(ctx)
 		defer subCancel()
 
-		sub := s.backend.SubscribeEventsFromStartHeight(subCtx, s.rootBlock.Height-1, state_stream.EventFilter{})
+		sub := s.backend.SubscribeEventsFromStartHeight(
+			subCtx,
+			s.rootBlock.Height-1,
+			state_stream.EventFilter{},
+			s.criteria,
+		)
 		assert.Equal(s.T(), codes.InvalidArgument, status.Code(sub.Err()), "expected InvalidArgument, got %v: %v", status.Code(sub.Err()).String(), sub.Err())
 	})
 
@@ -677,7 +742,12 @@ func (s *BackendExecutionDataSuite) TestSubscribeEventsFromStartHeightHandlesErr
 		subCtx, subCancel := context.WithCancel(ctx)
 		defer subCancel()
 
-		sub := s.backend.SubscribeEventsFromStartHeight(subCtx, s.blocks[len(s.blocks)-1].Height+10, state_stream.EventFilter{})
+		sub := s.backend.SubscribeEventsFromStartHeight(
+			subCtx,
+			s.blocks[len(s.blocks)-1].Height+10,
+			state_stream.EventFilter{},
+			s.criteria,
+		)
 		assert.Equal(s.T(), codes.NotFound, status.Code(sub.Err()), "expected NotFound, got %v: %v", status.Code(sub.Err()).String(), sub.Err())
 	})
 
@@ -693,7 +763,12 @@ func (s *BackendExecutionDataSuite) TestSubscribeEventsFromStartHeightHandlesErr
 			Once()
 
 		// Note: eventIndex.Initialize() is not called in this test
-		sub := s.backend.SubscribeEventsFromStartHeight(subCtx, s.blocks[0].Height, state_stream.EventFilter{})
+		sub := s.backend.SubscribeEventsFromStartHeight(
+			subCtx,
+			s.blocks[0].Height,
+			state_stream.EventFilter{},
+			s.criteria,
+		)
 		assert.Equal(s.T(), codes.FailedPrecondition, status.Code(sub.Err()), "expected FailedPrecondition, got %v: %v", status.Code(sub.Err()).String(), sub.Err())
 	})
 
@@ -705,7 +780,12 @@ func (s *BackendExecutionDataSuite) TestSubscribeEventsFromStartHeightHandlesErr
 			Return(uint64(0), status.Errorf(codes.InvalidArgument, "start height %d is lower than lowest indexed height %d", s.blocks[0].Height, 0)).
 			Once()
 
-		sub := s.backend.SubscribeEventsFromStartHeight(subCtx, s.blocks[0].Height, state_stream.EventFilter{})
+		sub := s.backend.SubscribeEventsFromStartHeight(
+			subCtx,
+			s.blocks[0].Height,
+			state_stream.EventFilter{},
+			s.criteria,
+		)
 		assert.Equal(s.T(), codes.InvalidArgument, status.Code(sub.Err()), "expected InvalidArgument, got %v: %v", status.Code(sub.Err()).String(), sub.Err())
 	})
 
@@ -717,7 +797,12 @@ func (s *BackendExecutionDataSuite) TestSubscribeEventsFromStartHeightHandlesErr
 			Return(uint64(0), status.Errorf(codes.InvalidArgument, "start height %d is higher than highest indexed height %d", s.blocks[len(s.blocks)-1].Height, s.blocks[0].Height)).
 			Once()
 
-		sub := s.backend.SubscribeEventsFromStartHeight(subCtx, s.blocks[len(s.blocks)-1].Height, state_stream.EventFilter{})
+		sub := s.backend.SubscribeEventsFromStartHeight(
+			subCtx,
+			s.blocks[len(s.blocks)-1].Height,
+			state_stream.EventFilter{},
+			s.criteria,
+		)
 		assert.Equal(s.T(), codes.InvalidArgument, status.Code(sub.Err()), "expected InvalidArgument, got %v: %v", status.Code(sub.Err()).String(), sub.Err())
 	})
 }

@@ -37,7 +37,7 @@ type sendTransaction func(ctx context.Context, tx *flow.TransactionBody) error
 type TransactionStream struct {
 	log                 zerolog.Logger
 	state               protocol.State
-	subscriptionHandler *subscription.SubscriptionHandler
+	subscriptionFactory *subscription.Factory
 	blockTracker        tracker.BlockTracker
 	sendTransaction     sendTransaction
 
@@ -54,7 +54,7 @@ var _ access.TransactionStreamAPI = (*TransactionStream)(nil)
 func NewTransactionStreamBackend(
 	log zerolog.Logger,
 	state protocol.State,
-	subscriptionHandler *subscription.SubscriptionHandler,
+	subscriptionFactory *subscription.Factory,
 	blockTracker tracker.BlockTracker,
 	sendTransaction sendTransaction,
 	blocks storage.Blocks,
@@ -66,7 +66,7 @@ func NewTransactionStreamBackend(
 	return &TransactionStream{
 		log:                 log,
 		state:               state,
-		subscriptionHandler: subscriptionHandler,
+		subscriptionFactory: subscriptionFactory,
 		blockTracker:        blockTracker,
 		sendTransaction:     sendTransaction,
 		blocks:              blocks,
@@ -168,7 +168,7 @@ func (t *TransactionStream) createSubscription(
 		t.txStatusDeriver,
 	)
 
-	return t.subscriptionHandler.Subscribe(ctx, startHeight, t.getTransactionStatusResponse(txInfo, startHeight))
+	return t.subscriptionFactory.CreateSubscription(ctx, startHeight, t.getTransactionStatusResponse(txInfo, startHeight))
 }
 
 // getTransactionStatusResponse returns a callback function that produces transaction status

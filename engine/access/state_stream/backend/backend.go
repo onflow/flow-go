@@ -10,7 +10,6 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
-	"github.com/onflow/flow-go/engine/access/index"
 	"github.com/onflow/flow-go/engine/access/state_stream"
 	"github.com/onflow/flow-go/engine/access/subscription"
 	"github.com/onflow/flow-go/engine/access/subscription/tracker"
@@ -18,6 +17,7 @@ import (
 	"github.com/onflow/flow-go/module/execution"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data/cache"
+	"github.com/onflow/flow-go/module/executiondatasync/optimistic_sync"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
 )
@@ -58,6 +58,8 @@ type Config struct {
 
 	// HeartbeatInterval specifies the block interval at which heartbeat messages should be sent.
 	HeartbeatInterval uint64
+
+	OperatorCriteria optimistic_sync.Criteria
 }
 
 type GetExecutionDataFunc func(context.Context, uint64) (*execution_data.BlockExecutionDataEntity, error)
@@ -80,6 +82,8 @@ type StateStreamBackend struct {
 	registerRequestLimit int
 }
 
+var _ state_stream.API = (*StateStreamBackend)(nil)
+
 func New(
 	log zerolog.Logger,
 	state protocol.State,
@@ -89,11 +93,12 @@ func New(
 	execDataStore execution_data.ExecutionDataStore,
 	execDataCache *cache.ExecutionDataCache,
 	registers *execution.RegistersAsyncStore,
-	eventsIndex *index.EventsIndex,
-	useEventsIndex bool,
+	fetchFromLocalStorage bool,
 	registerIDsRequestLimit int,
-	subscriptionHandler *subscription.SubscriptionHandler,
+	subscriptionFactory *subscription.Factory,
 	executionDataTracker tracker.ExecutionDataTracker,
+	executionResultProvider optimistic_sync.ExecutionResultInfoProvider,
+	executionStateCache optimistic_sync.ExecutionStateCache,
 ) (*StateStreamBackend, error) {
 	logger := log.With().Str("module", "state_stream_api").Logger()
 
@@ -113,29 +118,30 @@ func New(
 	b.ExecutionDataBackend = ExecutionDataBackend{
 		log:                  logger,
 		headers:              headers,
-		subscriptionHandler:  subscriptionHandler,
+		subscriptionFactory:  subscriptionFactory,
 		getExecutionData:     b.getExecutionData,
 		executionDataTracker: executionDataTracker,
 	}
 
 	eventsProvider := EventsProvider{
-		log:              logger,
-		headers:          headers,
-		getExecutionData: b.getExecutionData,
-		useEventsIndex:   useEventsIndex,
-		eventsIndex:      eventsIndex,
+		log:                 logger,
+		headers:             headers,
+		getExecutionData:    b.getExecutionData,
+		fetchFromLocalCache: fetchFromLocalStorage,
+		execResultProvider:  executionResultProvider,
+		execStateCache:      executionStateCache,
 	}
 
 	b.EventsBackend = EventsBackend{
 		log:                  logger,
-		subscriptionHandler:  subscriptionHandler,
+		subscriptionFactory:  subscriptionFactory,
 		executionDataTracker: executionDataTracker,
 		eventsProvider:       eventsProvider,
 	}
 
 	b.AccountStatusesBackend = AccountStatusesBackend{
 		log:                  logger,
-		subscriptionHandler:  subscriptionHandler,
+		subscriptionFactory:  subscriptionFactory,
 		executionDataTracker: b.ExecutionDataTracker,
 		eventsProvider:       eventsProvider,
 	}

@@ -3,6 +3,7 @@ package backend
 import (
 	"context"
 
+	"go.uber.org/atomic"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -16,16 +17,19 @@ import (
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/counters"
+	"github.com/onflow/flow-go/module/executiondatasync/optimistic_sync"
 )
 
 type Handler struct {
-	subscription.StreamingData
+	maxStreamCount    int32
+	activeStreamCount atomic.Int32
 
 	api   state_stream.API
 	chain flow.Chain
 
 	eventFilterConfig        state_stream.EventFilterConfig
 	defaultHeartbeatInterval uint64
+	operatorCriteria         optimistic_sync.Criteria
 }
 
 // sendSubscribeEventsResponseFunc is a callback function used to send
@@ -40,16 +44,20 @@ var _ executiondata.ExecutionDataAPIServer = (*Handler)(nil)
 
 func NewHandler(api state_stream.API, chain flow.Chain, config Config) *Handler {
 	h := &Handler{
-		StreamingData:            subscription.NewStreamingData(config.MaxGlobalStreams),
 		api:                      api,
 		chain:                    chain,
 		eventFilterConfig:        config.EventFilterConfig,
 		defaultHeartbeatInterval: config.HeartbeatInterval,
+		operatorCriteria:         config.OperatorCriteria,
+		maxStreamCount:           int32(config.MaxGlobalStreams),
 	}
 	return h
 }
 
-func (h *Handler) GetExecutionDataByBlockID(ctx context.Context, request *executiondata.GetExecutionDataByBlockIDRequest) (*executiondata.GetExecutionDataByBlockIDResponse, error) {
+func (h *Handler) GetExecutionDataByBlockID(
+	ctx context.Context,
+	request *executiondata.GetExecutionDataByBlockIDRequest,
+) (*executiondata.GetExecutionDataByBlockIDResponse, error) {
 	blockID, err := convert.BlockID(request.GetBlockId())
 	if err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, "could not convert block ID: %v", err)
@@ -62,12 +70,21 @@ func (h *Handler) GetExecutionDataByBlockID(ctx context.Context, request *execut
 
 	message, err := convert.BlockExecutionDataToMessage(execData)
 	if err != nil {
-		return nil, status.Errorf(codes.Internal, "could not convert execution data to entity: %v", err)
+		return nil,
+			status.Errorf(codes.Internal, "could not convert execution data to entity: %v", err)
 	}
 
-	err = convert.BlockExecutionDataEventPayloadsToVersion(message, request.GetEventEncodingVersion())
+	err = convert.BlockExecutionDataEventPayloadsToVersion(
+		message,
+		request.GetEventEncodingVersion(),
+	)
 	if err != nil {
-		return nil, status.Errorf(codes.Internal, "could not convert execution data event payloads to JSON: %v", err)
+		return nil,
+			status.Errorf(
+				codes.Internal,
+				"could not convert execution data event payloads to JSON: %v",
+				err,
+			)
 	}
 
 	return &executiondata.GetExecutionDataByBlockIDResponse{BlockExecutionData: message}, nil
@@ -83,13 +100,16 @@ func (h *Handler) GetExecutionDataByBlockID(ctx context.Context, request *execut
 // - codes.InvalidArgument   - if request contains invalid startBlockID.
 // - codes.ResourceExhausted - if the maximum number of streams is reached.
 // - codes.Internal          - if stream got unexpected response or could not send response.
-func (h *Handler) SubscribeExecutionData(request *executiondata.SubscribeExecutionDataRequest, stream executiondata.ExecutionDataAPI_SubscribeExecutionDataServer) error {
+func (h *Handler) SubscribeExecutionData(
+	request *executiondata.SubscribeExecutionDataRequest,
+	stream executiondata.ExecutionDataAPI_SubscribeExecutionDataServer,
+) error {
 	// check if the maximum number of streams is reached
-	if h.StreamCount.Load() >= h.MaxStreams {
+	if h.activeStreamCount.Load() >= h.maxStreamCount {
 		return status.Errorf(codes.ResourceExhausted, "maximum number of streams reached")
 	}
-	h.StreamCount.Add(1)
-	defer h.StreamCount.Add(-1)
+	h.activeStreamCount.Add(1)
+	defer h.activeStreamCount.Add(-1)
 
 	startBlockID := flow.ZeroID
 	if request.GetStartBlockId() != nil {
@@ -100,9 +120,16 @@ func (h *Handler) SubscribeExecutionData(request *executiondata.SubscribeExecuti
 		startBlockID = blockID
 	}
 
-	sub := h.api.SubscribeExecutionData(stream.Context(), startBlockID, request.GetStartBlockHeight())
+	sub := h.api.SubscribeExecutionData(
+		stream.Context(),
+		startBlockID,
+		request.GetStartBlockHeight(),
+	)
 
-	return HandleRPCSubscription(sub, handleSubscribeExecutionData(stream.Send, request.GetEventEncodingVersion()))
+	return HandleRPCSubscription(
+		sub,
+		handleSubscribeExecutionData(stream.Send, request.GetEventEncodingVersion()),
+	)
 }
 
 // SubscribeExecutionDataFromStartBlockID handles subscription requests for
@@ -111,16 +138,19 @@ func (h *Handler) SubscribeExecutionData(request *executiondata.SubscribeExecuti
 // provided stream.
 //
 // Expected errors during normal operation:
-// - codes.InvalidArgument   - if request contains invalid startBlockID.
+// - codes.InvalidArgument - if the request contains invalid startBlockID.
 // - codes.ResourceExhausted - if the maximum number of streams is reached.
-// - codes.Internal          - if stream got unexpected response or could not send response.
-func (h *Handler) SubscribeExecutionDataFromStartBlockID(request *executiondata.SubscribeExecutionDataFromStartBlockIDRequest, stream executiondata.ExecutionDataAPI_SubscribeExecutionDataFromStartBlockIDServer) error {
+// - codes.Internal - if the stream got an unexpected response or could not send response.
+func (h *Handler) SubscribeExecutionDataFromStartBlockID(
+	request *executiondata.SubscribeExecutionDataFromStartBlockIDRequest,
+	stream executiondata.ExecutionDataAPI_SubscribeExecutionDataFromStartBlockIDServer,
+) error {
 	// check if the maximum number of streams is reached
-	if h.StreamCount.Load() >= h.MaxStreams {
+	if h.activeStreamCount.Load() >= h.maxStreamCount {
 		return status.Errorf(codes.ResourceExhausted, "maximum number of streams reached")
 	}
-	h.StreamCount.Add(1)
-	defer h.StreamCount.Add(-1)
+	h.activeStreamCount.Add(1)
+	defer h.activeStreamCount.Add(-1)
 
 	startBlockID, err := convert.BlockID(request.GetStartBlockId())
 	if err != nil {
@@ -129,7 +159,10 @@ func (h *Handler) SubscribeExecutionDataFromStartBlockID(request *executiondata.
 
 	sub := h.api.SubscribeExecutionDataFromStartBlockID(stream.Context(), startBlockID)
 
-	return HandleRPCSubscription(sub, handleSubscribeExecutionData(stream.Send, request.GetEventEncodingVersion()))
+	return HandleRPCSubscription(
+		sub,
+		handleSubscribeExecutionData(stream.Send, request.GetEventEncodingVersion()),
+	)
 }
 
 // SubscribeExecutionDataFromStartBlockHeight handles subscription requests for
@@ -139,18 +172,27 @@ func (h *Handler) SubscribeExecutionDataFromStartBlockID(request *executiondata.
 //
 // Expected errors during normal operation:
 // - codes.ResourceExhausted - if the maximum number of streams is reached.
-// - codes.Internal          - if stream got unexpected response or could not send response.
-func (h *Handler) SubscribeExecutionDataFromStartBlockHeight(request *executiondata.SubscribeExecutionDataFromStartBlockHeightRequest, stream executiondata.ExecutionDataAPI_SubscribeExecutionDataFromStartBlockHeightServer) error {
+// - codes.Internal - if the stream got an unexpected response or could not send a response.
+func (h *Handler) SubscribeExecutionDataFromStartBlockHeight(
+	request *executiondata.SubscribeExecutionDataFromStartBlockHeightRequest,
+	stream executiondata.ExecutionDataAPI_SubscribeExecutionDataFromStartBlockHeightServer,
+) error {
 	// check if the maximum number of streams is reached
-	if h.StreamCount.Load() >= h.MaxStreams {
+	if h.activeStreamCount.Load() >= h.maxStreamCount {
 		return status.Errorf(codes.ResourceExhausted, "maximum number of streams reached")
 	}
-	h.StreamCount.Add(1)
-	defer h.StreamCount.Add(-1)
+	h.activeStreamCount.Add(1)
+	defer h.activeStreamCount.Add(-1)
 
-	sub := h.api.SubscribeExecutionDataFromStartBlockHeight(stream.Context(), request.GetStartBlockHeight())
+	sub := h.api.SubscribeExecutionDataFromStartBlockHeight(
+		stream.Context(),
+		request.GetStartBlockHeight(),
+	)
 
-	return HandleRPCSubscription(sub, handleSubscribeExecutionData(stream.Send, request.GetEventEncodingVersion()))
+	return HandleRPCSubscription(
+		sub,
+		handleSubscribeExecutionData(stream.Send, request.GetEventEncodingVersion()),
+	)
 }
 
 // SubscribeExecutionDataFromLatest handles subscription requests for
@@ -160,18 +202,24 @@ func (h *Handler) SubscribeExecutionDataFromStartBlockHeight(request *executiond
 //
 // Expected errors during normal operation:
 // - codes.ResourceExhausted - if the maximum number of streams is reached.
-// - codes.Internal          - if stream got unexpected response or could not send response.
-func (h *Handler) SubscribeExecutionDataFromLatest(request *executiondata.SubscribeExecutionDataFromLatestRequest, stream executiondata.ExecutionDataAPI_SubscribeExecutionDataFromLatestServer) error {
+// - codes.Internal - if the stream got an unexpected response or could not send a response.
+func (h *Handler) SubscribeExecutionDataFromLatest(
+	request *executiondata.SubscribeExecutionDataFromLatestRequest,
+	stream executiondata.ExecutionDataAPI_SubscribeExecutionDataFromLatestServer,
+) error {
 	// check if the maximum number of streams is reached
-	if h.StreamCount.Load() >= h.MaxStreams {
+	if h.activeStreamCount.Load() >= h.maxStreamCount {
 		return status.Errorf(codes.ResourceExhausted, "maximum number of streams reached")
 	}
-	h.StreamCount.Add(1)
-	defer h.StreamCount.Add(-1)
+	h.activeStreamCount.Add(1)
+	defer h.activeStreamCount.Add(-1)
 
 	sub := h.api.SubscribeExecutionDataFromLatest(stream.Context())
 
-	return HandleRPCSubscription(sub, handleSubscribeExecutionData(stream.Send, request.GetEventEncodingVersion()))
+	return HandleRPCSubscription(
+		sub,
+		handleSubscribeExecutionData(stream.Send, request.GetEventEncodingVersion()),
+	)
 }
 
 // SubscribeEvents is deprecated and will be removed in a future version.
@@ -186,16 +234,21 @@ func (h *Handler) SubscribeExecutionDataFromLatest(request *executiondata.Subscr
 // information to determine which block to start from when reconnecting.
 //
 // Expected errors during normal operation:
-// - codes.InvalidArgument   - if provided both startBlockID and startHeight, if invalid startBlockID is provided, if invalid event filter is provided.
-// - codes.ResourceExhausted - if the maximum number of streams is reached.
-// - codes.Internal          - could not convert events to entity, if stream encountered an error, if stream got unexpected response or could not send response.
-func (h *Handler) SubscribeEvents(request *executiondata.SubscribeEventsRequest, stream executiondata.ExecutionDataAPI_SubscribeEventsServer) error {
+//   - codes.InvalidArgument - if provided both startBlockID and startHeight, if invalid startBlockID is provided,
+//     if invalid event filter is provided.
+//   - codes.ResourceExhausted - if the maximum number of streams is reached.
+//   - codes.Internal - could not convert events to entity, if stream encountered an error,
+//     if stream got unexpected response or could not send response.
+func (h *Handler) SubscribeEvents(
+	request *executiondata.SubscribeEventsRequest,
+	stream executiondata.ExecutionDataAPI_SubscribeEventsServer,
+) error {
 	// check if the maximum number of streams is reached
-	if h.StreamCount.Load() >= h.MaxStreams {
+	if h.activeStreamCount.Load() >= h.maxStreamCount {
 		return status.Errorf(codes.ResourceExhausted, "maximum number of streams reached")
 	}
-	h.StreamCount.Add(1)
-	defer h.StreamCount.Add(-1)
+	h.activeStreamCount.Add(1)
+	defer h.activeStreamCount.Add(-1)
 
 	startBlockID := flow.ZeroID
 	if request.GetStartBlockId() != nil {
@@ -211,9 +264,25 @@ func (h *Handler) SubscribeEvents(request *executiondata.SubscribeEventsRequest,
 		return err
 	}
 
-	sub := h.api.SubscribeEvents(stream.Context(), startBlockID, request.GetStartBlockHeight(), filter)
+	execStateQuery := request.GetExecutionStateQuery()
+	criteria := h.operatorCriteria.OverrideWith(convert.NewCriteria(execStateQuery))
 
-	return HandleRPCSubscription(sub, h.handleEventsResponse(stream.Send, request.HeartbeatInterval, request.GetEventEncodingVersion()))
+	sub := h.api.SubscribeEvents(
+		stream.Context(),
+		startBlockID,
+		request.GetStartBlockHeight(),
+		filter,
+		criteria,
+	)
+
+	handleFunc := h.createEventsResponseHandler(
+		stream.Send,
+		request.HeartbeatInterval,
+		request.GetEventEncodingVersion(),
+		GetIncludeExecutorMetadata(execStateQuery),
+	)
+
+	return HandleRPCSubscription(sub, handleFunc)
 }
 
 // SubscribeEventsFromStartBlockID handles subscription requests for events starting at the specified block ID.
@@ -227,14 +296,18 @@ func (h *Handler) SubscribeEvents(request *executiondata.SubscribeEventsRequest,
 // Expected errors during normal operation:
 // - codes.InvalidArgument   - if invalid startBlockID is provided, if invalid event filter is provided.
 // - codes.ResourceExhausted - if the maximum number of streams is reached.
-// - codes.Internal          - could not convert events to entity, if stream encountered an error, if stream got unexpected response or could not send response.
-func (h *Handler) SubscribeEventsFromStartBlockID(request *executiondata.SubscribeEventsFromStartBlockIDRequest, stream executiondata.ExecutionDataAPI_SubscribeEventsFromStartBlockIDServer) error {
+// - codes.Internal          - could not convert events to entity, if stream encountered an error,
+// if stream got unexpected response or could not send response.
+func (h *Handler) SubscribeEventsFromStartBlockID(
+	request *executiondata.SubscribeEventsFromStartBlockIDRequest,
+	stream executiondata.ExecutionDataAPI_SubscribeEventsFromStartBlockIDServer,
+) error {
 	// check if the maximum number of streams is reached
-	if h.StreamCount.Load() >= h.MaxStreams {
+	if h.activeStreamCount.Load() >= h.maxStreamCount {
 		return status.Errorf(codes.ResourceExhausted, "maximum number of streams reached")
 	}
-	h.StreamCount.Add(1)
-	defer h.StreamCount.Add(-1)
+	h.activeStreamCount.Add(1)
+	defer h.activeStreamCount.Add(-1)
 
 	startBlockID, err := convert.BlockID(request.GetStartBlockId())
 	if err != nil {
@@ -246,9 +319,24 @@ func (h *Handler) SubscribeEventsFromStartBlockID(request *executiondata.Subscri
 		return err
 	}
 
-	sub := h.api.SubscribeEventsFromStartBlockID(stream.Context(), startBlockID, filter)
+	execStateQuery := request.GetExecutionStateQuery()
+	criteria := h.operatorCriteria.OverrideWith(convert.NewCriteria(execStateQuery))
 
-	return HandleRPCSubscription(sub, h.handleEventsResponse(stream.Send, request.HeartbeatInterval, request.GetEventEncodingVersion()))
+	sub := h.api.SubscribeEventsFromStartBlockID(
+		stream.Context(),
+		startBlockID,
+		filter,
+		criteria,
+	)
+
+	handleFunc := h.createEventsResponseHandler(
+		stream.Send,
+		request.HeartbeatInterval,
+		request.GetEventEncodingVersion(),
+		GetIncludeExecutorMetadata(execStateQuery),
+	)
+
+	return HandleRPCSubscription(sub, handleFunc)
 }
 
 // SubscribeEventsFromStartHeight handles subscription requests for events starting at the specified block height.
@@ -262,23 +350,42 @@ func (h *Handler) SubscribeEventsFromStartBlockID(request *executiondata.Subscri
 // Expected errors during normal operation:
 // - codes.InvalidArgument   - if invalid event filter is provided.
 // - codes.ResourceExhausted - if the maximum number of streams is reached.
-// - codes.Internal          - could not convert events to entity, if stream encountered an error, if stream got unexpected response or could not send response.
-func (h *Handler) SubscribeEventsFromStartHeight(request *executiondata.SubscribeEventsFromStartHeightRequest, stream executiondata.ExecutionDataAPI_SubscribeEventsFromStartHeightServer) error {
+// - codes.Internal          - could not convert events to entity, if stream encountered an error,
+// if stream got unexpected response or could not send response.
+func (h *Handler) SubscribeEventsFromStartHeight(
+	request *executiondata.SubscribeEventsFromStartHeightRequest,
+	stream executiondata.ExecutionDataAPI_SubscribeEventsFromStartHeightServer,
+) error {
 	// check if the maximum number of streams is reached
-	if h.StreamCount.Load() >= h.MaxStreams {
+	if h.activeStreamCount.Load() >= h.maxStreamCount {
 		return status.Errorf(codes.ResourceExhausted, "maximum number of streams reached")
 	}
-	h.StreamCount.Add(1)
-	defer h.StreamCount.Add(-1)
+	h.activeStreamCount.Add(1)
+	defer h.activeStreamCount.Add(-1)
 
 	filter, err := h.getEventFilter(request.GetFilter())
 	if err != nil {
 		return err
 	}
 
-	sub := h.api.SubscribeEventsFromStartHeight(stream.Context(), request.GetStartBlockHeight(), filter)
+	execStateQuery := request.GetExecutionStateQuery()
+	criteria := h.operatorCriteria.OverrideWith(convert.NewCriteria(execStateQuery))
 
-	return HandleRPCSubscription(sub, h.handleEventsResponse(stream.Send, request.HeartbeatInterval, request.GetEventEncodingVersion()))
+	sub := h.api.SubscribeEventsFromStartHeight(
+		stream.Context(),
+		request.GetStartBlockHeight(),
+		filter,
+		criteria,
+	)
+
+	handleFunc := h.createEventsResponseHandler(
+		stream.Send,
+		request.HeartbeatInterval,
+		request.GetEventEncodingVersion(),
+		GetIncludeExecutorMetadata(execStateQuery),
+	)
+
+	return HandleRPCSubscription(sub, handleFunc)
 }
 
 // SubscribeEventsFromLatest handles subscription requests for events started from latest sealed block..
@@ -293,22 +400,39 @@ func (h *Handler) SubscribeEventsFromStartHeight(request *executiondata.Subscrib
 // - codes.InvalidArgument   - if invalid event filter is provided.
 // - codes.ResourceExhausted - if the maximum number of streams is reached.
 // - codes.Internal          - could not convert events to entity, if stream encountered an error, if stream got unexpected response or could not send response.
-func (h *Handler) SubscribeEventsFromLatest(request *executiondata.SubscribeEventsFromLatestRequest, stream executiondata.ExecutionDataAPI_SubscribeEventsFromLatestServer) error {
+func (h *Handler) SubscribeEventsFromLatest(
+	request *executiondata.SubscribeEventsFromLatestRequest,
+	stream executiondata.ExecutionDataAPI_SubscribeEventsFromLatestServer,
+) error {
 	// check if the maximum number of streams is reached
-	if h.StreamCount.Load() >= h.MaxStreams {
+	if h.activeStreamCount.Load() >= h.maxStreamCount {
 		return status.Errorf(codes.ResourceExhausted, "maximum number of streams reached")
 	}
-	h.StreamCount.Add(1)
-	defer h.StreamCount.Add(-1)
+	h.activeStreamCount.Add(1)
+	defer h.activeStreamCount.Add(-1)
 
 	filter, err := h.getEventFilter(request.GetFilter())
 	if err != nil {
 		return err
 	}
 
-	sub := h.api.SubscribeEventsFromLatest(stream.Context(), filter)
+	execStateQuery := request.GetExecutionStateQuery()
+	criteria := h.operatorCriteria.OverrideWith(convert.NewCriteria(execStateQuery))
 
-	return HandleRPCSubscription(sub, h.handleEventsResponse(stream.Send, request.HeartbeatInterval, request.GetEventEncodingVersion()))
+	sub := h.api.SubscribeEventsFromLatest(
+		stream.Context(),
+		filter,
+		criteria,
+	)
+
+	handleFunc := h.createEventsResponseHandler(
+		stream.Send,
+		request.HeartbeatInterval,
+		request.GetEventEncodingVersion(),
+		GetIncludeExecutorMetadata(execStateQuery),
+	)
+
+	return HandleRPCSubscription(sub, handleFunc)
 }
 
 // handleSubscribeExecutionData handles the subscription to execution data and sends it to the client via the provided stream.
@@ -321,7 +445,10 @@ func (h *Handler) SubscribeEventsFromLatest(request *executiondata.SubscribeEven
 //
 // Expected errors during normal operation:
 //   - codes.Internal - could not convert execution data to entity or could not convert execution data event payloads to JSON.
-func handleSubscribeExecutionData(send sendSubscribeExecutionDataResponseFunc, eventEncodingVersion entities.EventEncodingVersion) func(response *ExecutionDataResponse) error {
+func handleSubscribeExecutionData(
+	send sendSubscribeExecutionDataResponseFunc,
+	eventEncodingVersion entities.EventEncodingVersion,
+) func(response *ExecutionDataResponse) error {
 	return func(resp *ExecutionDataResponse) error {
 		execData, err := convert.BlockExecutionDataToMessage(resp.ExecutionData)
 		if err != nil {
@@ -343,7 +470,7 @@ func handleSubscribeExecutionData(send sendSubscribeExecutionDataResponseFunc, e
 	}
 }
 
-// handleEventsResponse handles the event subscription and sends subscribed events to the client via the provided stream.
+// createEventsResponseHandler handles the event subscription and sends subscribed events to the client via the provided stream.
 // This function is designed to be used as a callback for events updates in a subscription.
 // It takes a EventsResponse, processes it, and sends the corresponding response to the client using the provided send function.
 //
@@ -354,7 +481,12 @@ func handleSubscribeExecutionData(send sendSubscribeExecutionDataResponseFunc, e
 //
 // Expected errors during normal operation:
 //   - codes.Internal - could not convert events to entity or the stream could not send a response.
-func (h *Handler) handleEventsResponse(send sendSubscribeEventsResponseFunc, heartbeatInterval uint64, eventEncodingVersion entities.EventEncodingVersion) func(*EventsResponse) error {
+func (h *Handler) createEventsResponseHandler(
+	send sendSubscribeEventsResponseFunc,
+	heartbeatInterval uint64,
+	eventEncodingVersion entities.EventEncodingVersion,
+	includeExecutorMetadata bool,
+) func(*EventsResponse) error {
 	if heartbeatInterval == 0 {
 		heartbeatInterval = h.defaultHeartbeatInterval
 	}
@@ -376,23 +508,36 @@ func (h *Handler) handleEventsResponse(send sendSubscribeEventsResponseFunc, hea
 		// BlockExecutionData contains CCF encoded events, and the Access API returns JSON-CDC events.
 		// convert event payload formats.
 		// This is a temporary solution until the Access API supports specifying the encoding in the request
-		events, err := convert.EventsToMessagesWithEncodingConversion(resp.Events, entities.EventEncodingVersion_CCF_V0, eventEncodingVersion)
+		events, err := convert.EventsToMessagesWithEncodingConversion(
+			resp.Events,
+			entities.EventEncodingVersion_CCF_V0,
+			eventEncodingVersion,
+		)
 		if err != nil {
 			return status.Errorf(codes.Internal, "could not convert events to entity: %v", err)
 		}
 
 		index := messageIndex.Value()
 		if ok := messageIndex.Set(index + 1); !ok {
-			return status.Errorf(codes.Internal, "message index already incremented to %d", messageIndex.Value())
+			return status.Errorf(
+				codes.Internal,
+				"message index already incremented to %d",
+				messageIndex.Value(),
+			)
 		}
 
-		err = send(&executiondata.SubscribeEventsResponse{
+		response := &executiondata.SubscribeEventsResponse{
 			BlockHeight:    resp.Height,
 			BlockId:        convert.IdentifierToMessage(resp.BlockID),
 			Events:         events,
 			BlockTimestamp: timestamppb.New(resp.BlockTimestamp),
 			MessageIndex:   index,
-		})
+		}
+		if includeExecutorMetadata {
+			response.ExecutorMetadata = convert.ExecutorMetadataToMessage(&resp.ExecutorMetadata)
+		}
+
+		err = send(response)
 		if err != nil {
 			return rpc.ConvertError(err, "could not send response", codes.Internal)
 		}
@@ -430,7 +575,10 @@ func (h *Handler) getEventFilter(eventFilter *executiondata.EventFilter) (state_
 	return filter, nil
 }
 
-func (h *Handler) GetRegisterValues(_ context.Context, request *executiondata.GetRegisterValuesRequest) (*executiondata.GetRegisterValuesResponse, error) {
+func (h *Handler) GetRegisterValues(
+	_ context.Context,
+	request *executiondata.GetRegisterValuesRequest,
+) (*executiondata.GetRegisterValuesResponse, error) {
 	// Convert data
 	registerIDs, err := convert.MessagesToRegisterIDs(request.GetRegisterIds(), h.chain)
 	if err != nil {
@@ -453,15 +601,21 @@ func convertAccountsStatusesResultsToMessage(
 ) ([]*executiondata.SubscribeAccountStatusesResponse_Result, error) {
 	var results []*executiondata.SubscribeAccountStatusesResponse_Result
 	for address, events := range resp.AccountEvents {
-		convertedEvent, err := convert.EventsToMessagesWithEncodingConversion(events, entities.EventEncodingVersion_CCF_V0, eventVersion)
+		convertedEvent, err := convert.EventsToMessagesWithEncodingConversion(
+			events,
+			entities.EventEncodingVersion_CCF_V0,
+			eventVersion,
+		)
 		if err != nil {
 			return nil, status.Errorf(codes.Internal, "could not convert events to entity: %v", err)
 		}
 
-		results = append(results, &executiondata.SubscribeAccountStatusesResponse_Result{
-			Address: flow.HexToAddress(address).Bytes(),
-			Events:  convertedEvent,
-		})
+		results = append(
+			results, &executiondata.SubscribeAccountStatusesResponse_Result{
+				Address: flow.HexToAddress(address).Bytes(),
+				Events:  convertedEvent,
+			},
+		)
 	}
 	return results, nil
 }
@@ -469,11 +623,12 @@ func convertAccountsStatusesResultsToMessage(
 // sendSubscribeAccountStatusesResponseFunc defines the function signature for sending account status responses
 type sendSubscribeAccountStatusesResponseFunc func(*executiondata.SubscribeAccountStatusesResponse) error
 
-// handleAccountStatusesResponse handles account status responses by converting them to the message and sending them to the subscriber.
-func (h *Handler) handleAccountStatusesResponse(
+// createAccountStatusesHandler handles account status responses by converting them to the message and sending them to the subscriber.
+func (h *Handler) createAccountStatusesHandler(
 	heartbeatInterval uint64,
 	evenVersion entities.EventEncodingVersion,
 	send sendSubscribeAccountStatusesResponseFunc,
+	includeExecutorMetadata bool,
 ) func(resp *AccountStatusesResponse) error {
 	if heartbeatInterval == 0 {
 		heartbeatInterval = h.defaultHeartbeatInterval
@@ -503,12 +658,17 @@ func (h *Handler) handleAccountStatusesResponse(
 			return status.Errorf(codes.Internal, "message index already incremented to %d", messageIndex.Value())
 		}
 
-		err = send(&executiondata.SubscribeAccountStatusesResponse{
+		response := &executiondata.SubscribeAccountStatusesResponse{
 			BlockId:      convert.IdentifierToMessage(resp.BlockID),
 			BlockHeight:  resp.Height,
 			Results:      results,
 			MessageIndex: index,
-		})
+		}
+		if includeExecutorMetadata {
+			response.ExecutorMetadata = convert.ExecutorMetadataToMessage(&resp.ExecutorMetadata)
+		}
+
+		err = send(response)
 		if err != nil {
 			return rpc.ConvertError(err, "could not send response", codes.Internal)
 		}
@@ -526,12 +686,12 @@ func (h *Handler) SubscribeAccountStatusesFromStartBlockID(
 	stream executiondata.ExecutionDataAPI_SubscribeAccountStatusesFromStartBlockIDServer,
 ) error {
 	// check if the maximum number of streams is reached
-	if h.StreamCount.Load() >= h.MaxStreams {
+	if h.activeStreamCount.Load() >= h.maxStreamCount {
 		return status.Errorf(codes.ResourceExhausted, "maximum number of streams reached")
 	}
 
-	h.StreamCount.Add(1)
-	defer h.StreamCount.Add(-1)
+	h.activeStreamCount.Add(1)
+	defer h.activeStreamCount.Add(-1)
 
 	startBlockID, err := convert.BlockID(request.GetStartBlockId())
 	if err != nil {
@@ -539,14 +699,38 @@ func (h *Handler) SubscribeAccountStatusesFromStartBlockID(
 	}
 
 	statusFilter := request.GetFilter()
-	filter, err := state_stream.NewAccountStatusFilter(h.eventFilterConfig, h.chain, statusFilter.GetEventType(), statusFilter.GetAddress())
+	filter, err := state_stream.NewAccountStatusFilter(
+		h.eventFilterConfig,
+		h.chain,
+		statusFilter.GetEventType(),
+		statusFilter.GetAddress(),
+	)
 	if err != nil {
-		return status.Errorf(codes.InvalidArgument, "could not create account status filter: %v", err)
+		return status.Errorf(
+			codes.InvalidArgument,
+			"could not create account status filter: %v",
+			err,
+		)
 	}
 
-	sub := h.api.SubscribeAccountStatusesFromStartBlockID(stream.Context(), startBlockID, filter)
+	execStateQuery := request.GetExecutionStateQuery()
+	criteria := h.operatorCriteria.OverrideWith(convert.NewCriteria(execStateQuery))
 
-	return HandleRPCSubscription(sub, h.handleAccountStatusesResponse(request.HeartbeatInterval, request.GetEventEncodingVersion(), stream.Send))
+	sub := h.api.SubscribeAccountStatusesFromStartBlockID(
+		stream.Context(),
+		startBlockID,
+		filter,
+		criteria,
+	)
+
+	handleFunc := h.createAccountStatusesHandler(
+		request.HeartbeatInterval,
+		request.GetEventEncodingVersion(),
+		stream.Send,
+		GetIncludeExecutorMetadata(execStateQuery),
+	)
+
+	return HandleRPCSubscription(sub, handleFunc)
 }
 
 // SubscribeAccountStatusesFromStartHeight streams account statuses for all blocks starting at the requested
@@ -558,22 +742,46 @@ func (h *Handler) SubscribeAccountStatusesFromStartHeight(
 	stream executiondata.ExecutionDataAPI_SubscribeAccountStatusesFromStartHeightServer,
 ) error {
 	// check if the maximum number of streams is reached
-	if h.StreamCount.Load() >= h.MaxStreams {
+	if h.activeStreamCount.Load() >= h.maxStreamCount {
 		return status.Errorf(codes.ResourceExhausted, "maximum number of streams reached")
 	}
 
-	h.StreamCount.Add(1)
-	defer h.StreamCount.Add(-1)
+	h.activeStreamCount.Add(1)
+	defer h.activeStreamCount.Add(-1)
 
 	statusFilter := request.GetFilter()
-	filter, err := state_stream.NewAccountStatusFilter(h.eventFilterConfig, h.chain, statusFilter.GetEventType(), statusFilter.GetAddress())
+	filter, err := state_stream.NewAccountStatusFilter(
+		h.eventFilterConfig,
+		h.chain,
+		statusFilter.GetEventType(),
+		statusFilter.GetAddress(),
+	)
 	if err != nil {
-		return status.Errorf(codes.InvalidArgument, "could not create account status filter: %v", err)
+		return status.Errorf(
+			codes.InvalidArgument,
+			"could not create account status filter: %v",
+			err,
+		)
 	}
 
-	sub := h.api.SubscribeAccountStatusesFromStartHeight(stream.Context(), request.GetStartBlockHeight(), filter)
+	execStateQuery := request.GetExecutionStateQuery()
+	criteria := h.operatorCriteria.OverrideWith(convert.NewCriteria(execStateQuery))
 
-	return HandleRPCSubscription(sub, h.handleAccountStatusesResponse(request.HeartbeatInterval, request.GetEventEncodingVersion(), stream.Send))
+	sub := h.api.SubscribeAccountStatusesFromStartHeight(
+		stream.Context(),
+		request.GetStartBlockHeight(),
+		filter,
+		criteria,
+	)
+
+	handleFunc := h.createAccountStatusesHandler(
+		request.HeartbeatInterval,
+		request.GetEventEncodingVersion(),
+		stream.Send,
+		GetIncludeExecutorMetadata(execStateQuery),
+	)
+
+	return HandleRPCSubscription(sub, handleFunc)
 }
 
 // SubscribeAccountStatusesFromLatestBlock streams account statuses for all blocks starting
@@ -585,22 +793,45 @@ func (h *Handler) SubscribeAccountStatusesFromLatestBlock(
 	stream executiondata.ExecutionDataAPI_SubscribeAccountStatusesFromLatestBlockServer,
 ) error {
 	// check if the maximum number of streams is reached
-	if h.StreamCount.Load() >= h.MaxStreams {
+	if h.activeStreamCount.Load() >= h.maxStreamCount {
 		return status.Errorf(codes.ResourceExhausted, "maximum number of streams reached")
 	}
 
-	h.StreamCount.Add(1)
-	defer h.StreamCount.Add(-1)
+	h.activeStreamCount.Add(1)
+	defer h.activeStreamCount.Add(-1)
 
 	statusFilter := request.GetFilter()
-	filter, err := state_stream.NewAccountStatusFilter(h.eventFilterConfig, h.chain, statusFilter.GetEventType(), statusFilter.GetAddress())
+	filter, err := state_stream.NewAccountStatusFilter(
+		h.eventFilterConfig,
+		h.chain,
+		statusFilter.GetEventType(),
+		statusFilter.GetAddress(),
+	)
 	if err != nil {
-		return status.Errorf(codes.InvalidArgument, "could not create account status filter: %v", err)
+		return status.Errorf(
+			codes.InvalidArgument,
+			"could not create account status filter: %v",
+			err,
+		)
 	}
 
-	sub := h.api.SubscribeAccountStatusesFromLatestBlock(stream.Context(), filter)
+	execStateQuery := request.GetExecutionStateQuery()
+	criteria := h.operatorCriteria.OverrideWith(convert.NewCriteria(execStateQuery))
 
-	return HandleRPCSubscription(sub, h.handleAccountStatusesResponse(request.HeartbeatInterval, request.GetEventEncodingVersion(), stream.Send))
+	sub := h.api.SubscribeAccountStatusesFromLatestBlock(
+		stream.Context(),
+		filter,
+		criteria,
+	)
+
+	handleFunc := h.createAccountStatusesHandler(
+		request.HeartbeatInterval,
+		request.GetEventEncodingVersion(),
+		stream.Send,
+		GetIncludeExecutorMetadata(execStateQuery),
+	)
+
+	return HandleRPCSubscription(sub, handleFunc)
 }
 
 // HandleRPCSubscription is a generic handler for subscriptions to a specific type for rpc calls.
@@ -611,11 +842,22 @@ func (h *Handler) SubscribeAccountStatusesFromLatestBlock(
 //
 // Expected errors during normal operation:
 //   - codes.Internal: If the subscription encounters an error or gets an unexpected response.
-func HandleRPCSubscription[T any](sub subscription.Subscription, handleResponse func(resp T) error) error {
+func HandleRPCSubscription[T any](
+	sub subscription.Subscription,
+	handleResponse func(resp T) error,
+) error {
 	err := subscription.HandleSubscription(sub, handleResponse)
 	if err != nil {
 		return rpc.ConvertError(err, "handle subscription error", codes.Internal)
 	}
 
 	return nil
+}
+
+func GetIncludeExecutorMetadata(query *entities.ExecutionStateQuery) bool {
+	if query != nil {
+		return query.GetIncludeExecutorMetadata()
+	}
+
+	return false
 }

@@ -262,7 +262,7 @@ func (suite *SameGRPCPortTestSuite) SetupTest() {
 		ClientSendBufferSize: subscription.DefaultSendBufferSize,
 	}
 
-	subscriptionHandler := subscription.NewSubscriptionHandler(
+	subscriptionFactory := subscription.NewSubscriptionFactory(
 		suite.log,
 		suite.broadcaster,
 		subscription.DefaultSendTimeout,
@@ -292,11 +292,12 @@ func (suite *SameGRPCPortTestSuite) SetupTest() {
 		nil,
 		suite.execDataCache,
 		suite.registers,
-		eventIndexer,
 		false,
 		state_stream.DefaultRegisterIDsRequestLimit,
-		subscriptionHandler,
+		subscriptionFactory,
 		suite.executionDataTracker,
+		suite.executionResultInfoProvider,
+		suite.executionStateCache,
 	)
 	assert.NoError(suite.T(), err)
 
