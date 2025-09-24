@@ -20,7 +20,7 @@ func ExecuteScript(r *common.Request, backend access.API, _ commonmodels.LinkGen
 	executionState := req.ExecutionState
 	includeExecutorMetadata := executionState.IncludeExecutorMetadata
 
-	// TODO(mainnet 27): remove this conditional: [TODO(Uliana): create issue]
+	// TODO(mainnet #): remove this conditional: [TODO(Uliana): create issue]
 	// "legacyParams" is only to temporarily support current behaviour.
 	// In the next spork, we should update this to always return an ExecuteScriptResponse.
 	legacyParams := executionState.AgreeingExecutorsCount == 0 &&

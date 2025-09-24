@@ -56,7 +56,7 @@ type requestScriptParams struct {
 //  6. Execute at specific block height (with metadata, expect ExecuteScriptResponse).
 //  7. Execute at latest block height (with metadata, expect ExecuteScriptResponse).
 //
-// TODO(mainnet 27): delete legacy cases, update buildScriptResponse helper func and
+// TODO(mainnet #): delete legacy cases, update buildScriptResponse helper func and
 // update godoc once the new unified ExecuteScriptResponse behavior is enforced. [TODO(Uliana): create issue]
 func TestScripts_HappyPath(t *testing.T) {
 	t.Run("block ID (legacyParams)", func(t *testing.T) {
