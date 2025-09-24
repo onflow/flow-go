@@ -28,17 +28,12 @@ func NewEvents(events []flow.Event) Events {
 
 func NewBlockEvents(
 	events flow.BlockEvents,
-	metadata access.ExecutorMetadata,
+	metadata *access.ExecutorMetadata,
 	shouldIncludeMetadata bool,
 ) *BlockEvents {
 	var meta *Metadata
 	if shouldIncludeMetadata {
-		m := NewMetadata(metadata)
-
-		// we don't want to include empty field in response body
-		if !m.IsEmpty() {
-			meta = m
-		}
+		meta = NewMetadata(metadata)
 	}
 
 	return &BlockEvents{
@@ -54,7 +49,7 @@ type BlockEventsList []BlockEvents
 
 func NewBlockEventsList(
 	blocksEvents []flow.BlockEvents,
-	metadata access.ExecutorMetadata,
+	metadata *access.ExecutorMetadata,
 	shouldIncludeMetadata bool,
 ) BlockEventsList {
 	converted := make([]BlockEvents, len(blocksEvents))
