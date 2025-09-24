@@ -153,6 +153,9 @@ type ValidationStep struct {
 	failReason string
 }
 
+// TransactionValidator performs validation of transactions before they are processed.
+// It enforces correctness, safety, and economic checks by  running a series of validation steps
+// to ensure that transactions are well-formed, valid, and executable.
 type TransactionValidator struct {
 	blocks                       Blocks     // for looking up blocks to check transaction expiry
 	chain                        flow.Chain // for checking validity of addresses
@@ -167,6 +170,9 @@ type TransactionValidator struct {
 	validationSteps []ValidationStep
 }
 
+// NewTransactionValidator creates a TransactionValidator with the given TransactionValidationOptions.
+//
+// No errors are expected during normal operation.
 func NewTransactionValidator(
 	blocks Blocks,
 	chain flow.Chain,
@@ -198,6 +204,8 @@ func NewTransactionValidator(
 	return txValidator, nil
 }
 
+// NewTransactionValidatorWithLimiter creates a TransactionValidator with a
+// custom rate limiter.
 func NewTransactionValidatorWithLimiter(
 	blocks Blocks,
 	chain flow.Chain,
