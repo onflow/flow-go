@@ -26,18 +26,21 @@ import (
 )
 
 const (
-	ExpandableFieldPayload      = "payload"
-	ExpandableExecutionResult   = "execution_result"
-	SealedHeightQueryParam      = "sealed"
-	FinalHeightQueryParam       = "final"
-	StartHeightQueryParam       = "start_height"
-	EndHeightQueryParam         = "end_height"
-	HeightQueryParam            = "height"
-	StartBlockIdQueryParam      = "start_block_id"
-	EventTypesQueryParams       = "event_types"
-	AddressesQueryParams        = "addresses"
-	ContractsQueryParams        = "contracts"
-	HeartbeatIntervalQueryParam = "heartbeat_interval"
+	ExpandableFieldPayload            = "payload"
+	ExpandableExecutionResult         = "execution_result"
+	SealedHeightQueryParam            = "sealed"
+	FinalHeightQueryParam             = "final"
+	StartHeightQueryParam             = "start_height"
+	EndHeightQueryParam               = "end_height"
+	HeightQueryParam                  = "height"
+	StartBlockIdQueryParam            = "start_block_id"
+	EventTypesQueryParams             = "event_types"
+	AddressesQueryParams              = "addresses"
+	ContractsQueryParams              = "contracts"
+	HeartbeatIntervalQueryParam       = "heartbeat_interval"
+	AgreeingExecutorsCountQueryParam  = "agreeing_executors_count"
+	RequiredExecutorIdsQueryParam     = "required_executor_ids"
+	IncludeExecutorMetadataQueryParam = "include_executor_metadata"
 )
 
 // fakeNetConn implements a mocked ws connection that can be injected in testing logic.

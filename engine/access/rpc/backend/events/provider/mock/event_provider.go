@@ -5,10 +5,15 @@ package mock
 import (
 	context "context"
 
-	flow "github.com/onflow/flow-go/model/flow"
+	access "github.com/onflow/flow-go/model/access"
+
 	entities "github.com/onflow/flow/protobuf/go/flow/entities"
 
+	flow "github.com/onflow/flow-go/model/flow"
+
 	mock "github.com/stretchr/testify/mock"
+
+	optimistic_sync "github.com/onflow/flow-go/module/executiondatasync/optimistic_sync"
 
 	provider "github.com/onflow/flow-go/engine/access/rpc/backend/events/provider"
 )
@@ -18,32 +23,41 @@ type EventProvider struct {
 	mock.Mock
 }
 
-// Events provides a mock function with given fields: ctx, blocks, eventType, requiredEventEncodingVersion
-func (_m *EventProvider) Events(ctx context.Context, blocks []provider.BlockMetadata, eventType flow.EventType, requiredEventEncodingVersion entities.EventEncodingVersion) (provider.Response, error) {
-	ret := _m.Called(ctx, blocks, eventType, requiredEventEncodingVersion)
+// Events provides a mock function with given fields: ctx, blocks, eventType, encodingVersion, executionResultInfo
+func (_m *EventProvider) Events(ctx context.Context, blocks []provider.BlockMetadata, eventType flow.EventType, encodingVersion entities.EventEncodingVersion, executionResultInfo *optimistic_sync.ExecutionResultInfo) (provider.Response, *access.ExecutorMetadata, error) {
+	ret := _m.Called(ctx, blocks, eventType, encodingVersion, executionResultInfo)
 
 	if len(ret) == 0 {
 		panic("no return value specified for Events")
 	}
 
 	var r0 provider.Response
-	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, []provider.BlockMetadata, flow.EventType, entities.EventEncodingVersion) (provider.Response, error)); ok {
-		return rf(ctx, blocks, eventType, requiredEventEncodingVersion)
+	var r1 *access.ExecutorMetadata
+	var r2 error
+	if rf, ok := ret.Get(0).(func(context.Context, []provider.BlockMetadata, flow.EventType, entities.EventEncodingVersion, *optimistic_sync.ExecutionResultInfo) (provider.Response, *access.ExecutorMetadata, error)); ok {
+		return rf(ctx, blocks, eventType, encodingVersion, executionResultInfo)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, []provider.BlockMetadata, flow.EventType, entities.EventEncodingVersion) provider.Response); ok {
-		r0 = rf(ctx, blocks, eventType, requiredEventEncodingVersion)
+	if rf, ok := ret.Get(0).(func(context.Context, []provider.BlockMetadata, flow.EventType, entities.EventEncodingVersion, *optimistic_sync.ExecutionResultInfo) provider.Response); ok {
+		r0 = rf(ctx, blocks, eventType, encodingVersion, executionResultInfo)
 	} else {
 		r0 = ret.Get(0).(provider.Response)
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, []provider.BlockMetadata, flow.EventType, entities.EventEncodingVersion) error); ok {
-		r1 = rf(ctx, blocks, eventType, requiredEventEncodingVersion)
+	if rf, ok := ret.Get(1).(func(context.Context, []provider.BlockMetadata, flow.EventType, entities.EventEncodingVersion, *optimistic_sync.ExecutionResultInfo) *access.ExecutorMetadata); ok {
+		r1 = rf(ctx, blocks, eventType, encodingVersion, executionResultInfo)
 	} else {
-		r1 = ret.Error(1)
+		if ret.Get(1) != nil {
+			r1 = ret.Get(1).(*access.ExecutorMetadata)
+		}
 	}
 
-	return r0, r1
+	if rf, ok := ret.Get(2).(func(context.Context, []provider.BlockMetadata, flow.EventType, entities.EventEncodingVersion, *optimistic_sync.ExecutionResultInfo) error); ok {
+		r2 = rf(ctx, blocks, eventType, encodingVersion, executionResultInfo)
+	} else {
+		r2 = ret.Error(2)
+	}
+
+	return r0, r1, r2
 }
 
 // NewEventProvider creates a new instance of EventProvider. It also registers a testing interface on the mock and a cleanup function to assert the mocks expectations.
