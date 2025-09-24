@@ -199,7 +199,7 @@ func verifyAndConvertToAccessEvents(
 }
 
 // orderedExecutors creates an ordered list of executors for the same execution result
-// - respondingExecutor is the executor who returned execution result.
+// - respondingExecutor is the executor who returned an execution result.
 // - executorList is the full list of executors who produced the same execution result.
 func orderedExecutors(respondingExecutor flow.Identifier, executorList flow.IdentifierList) flow.IdentifierList {
 	ordered := make(flow.IdentifierList, 0, len(executorList))
