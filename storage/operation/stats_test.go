@@ -20,8 +20,11 @@ func TestSummarizeKeysByFirstByteConcurrent(t *testing.T) {
 			// insert random events
 			b := unittest.IdentifierFixture()
 			events := unittest.EventsFixture(30)
+			lctx := lockManager.NewContext()
+			require.NoError(t, lctx.AcquireLock(storage.LockInsertOwnReceipt))
+			defer lctx.Release()
 			for _, evt := range events {
-				err := operation.InsertEvent(rw.Writer(), b, evt)
+				err := operation.InsertEvent(lctx, rw.Writer(), b, evt)
 				if err != nil {
 					return err
 				}

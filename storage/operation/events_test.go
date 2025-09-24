@@ -19,6 +19,7 @@ import (
 // and block id and event type
 func TestRetrieveEventByBlockIDTxID(t *testing.T) {
 	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
+		lockManager := storage.NewTestingLockManager()
 
 		// create block ids, transaction ids and event types slices
 		blockIDs := []flow.Identifier{flow.HashToID([]byte{0x01}), flow.HashToID([]byte{0x02})}
@@ -53,9 +54,12 @@ func TestRetrieveEventByBlockIDTxID(t *testing.T) {
 					)
 
 					// insert event into the db
+					lctx := lockManager.NewContext()
+					require.NoError(t, lctx.AcquireLock(storage.LockInsertOwnReceipt))
 					err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-						return operation.InsertEvent(rw.Writer(), b, event)
+						return operation.InsertEvent(lctx, rw.Writer(), b, event)
 					})
+					lctx.Release()
 					require.Nil(t, err)
 
 					// update event arrays in the maps
