@@ -406,7 +406,11 @@ func (r *RestProxyHandler) GetEventsForHeightRange(
 		return nil, nil, err
 	}
 
-	metadata := convert.MessageToExecutorMetadata(eventsResponse.GetMetadata().GetExecutorMetadata())
+	var metadata *accessmodel.ExecutorMetadata
+	if rawMetadata := eventsResponse.GetMetadata(); rawMetadata != nil {
+		metadata = convert.MessageToExecutorMetadata(rawMetadata.GetExecutorMetadata())
+	}
+
 	return res, metadata, nil
 }
 
@@ -447,7 +451,11 @@ func (r *RestProxyHandler) GetEventsForBlockIDs(
 		return nil, nil, err
 	}
 
-	metadata := convert.MessageToExecutorMetadata(eventsResponse.GetMetadata().GetExecutorMetadata())
+	var metadata *accessmodel.ExecutorMetadata
+	if rawMetadata := eventsResponse.GetMetadata(); rawMetadata != nil {
+		metadata = convert.MessageToExecutorMetadata(rawMetadata.GetExecutorMetadata())
+	}
+
 	return res, metadata, nil
 }
 
