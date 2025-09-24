@@ -5,12 +5,12 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
+	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/access/subscription"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -31,13 +31,6 @@ func (s *BackendBlockDigestSuite) SetupTest() {
 
 // TestSubscribeBlockDigestsFromStartBlockID tests the SubscribeBlockDigestsFromStartBlockID method.
 func (s *BackendBlockDigestSuite) TestSubscribeBlockDigestsFromStartBlockID() {
-	s.blockTracker.On(
-		"GetStartHeightFromBlockID",
-		mock.AnythingOfType("flow.Identifier"),
-	).Return(func(startBlockID flow.Identifier) (uint64, error) {
-		return s.blockTrackerReal.GetStartHeightFromBlockID(startBlockID)
-	}, nil)
-
 	call := func(ctx context.Context, startValue interface{}, blockStatus flow.BlockStatus) subscription.Subscription {
 		return s.backend.SubscribeBlockDigestsFromStartBlockID(ctx, startValue.(flow.Identifier), blockStatus)
 	}
@@ -47,13 +40,6 @@ func (s *BackendBlockDigestSuite) TestSubscribeBlockDigestsFromStartBlockID() {
 
 // TestSubscribeBlockDigestsFromStartHeight tests the SubscribeBlockDigestsFromStartHeight method.
 func (s *BackendBlockDigestSuite) TestSubscribeBlockDigestsFromStartHeight() {
-	s.blockTracker.On(
-		"GetStartHeightFromHeight",
-		mock.AnythingOfType("uint64"),
-	).Return(func(startHeight uint64) (uint64, error) {
-		return s.blockTrackerReal.GetStartHeightFromHeight(startHeight)
-	}, nil)
-
 	call := func(ctx context.Context, startValue interface{}, blockStatus flow.BlockStatus) subscription.Subscription {
 		return s.backend.SubscribeBlockDigestsFromStartHeight(ctx, startValue.(uint64), blockStatus)
 	}
@@ -63,13 +49,6 @@ func (s *BackendBlockDigestSuite) TestSubscribeBlockDigestsFromStartHeight() {
 
 // TestSubscribeBlockDigestsFromLatest tests the SubscribeBlockDigestsFromLatest method.
 func (s *BackendBlockDigestSuite) TestSubscribeBlockDigestsFromLatest() {
-	s.blockTracker.On(
-		"GetStartHeightFromLatest",
-		mock.Anything,
-	).Return(func(ctx context.Context) (uint64, error) {
-		return s.blockTrackerReal.GetStartHeightFromLatest(ctx)
-	}, nil)
-
 	call := func(ctx context.Context, startValue interface{}, blockStatus flow.BlockStatus) subscription.Subscription {
 		return s.backend.SubscribeBlockDigestsFromLatest(ctx, blockStatus)
 	}
@@ -106,35 +85,22 @@ func (s *BackendBlockDigestSuite) TestSubscribeBlockDigestsHandlesErrors() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	// mock block tracker for GetStartHeightFromBlockID
-	s.blockTracker.On(
-		"GetStartHeightFromBlockID",
-		mock.AnythingOfType("flow.Identifier"),
-	).Return(func(startBlockID flow.Identifier) (uint64, error) {
-		return s.blockTrackerReal.GetStartHeightFromBlockID(startBlockID)
-	}, nil)
+	backend, err := New(s.backendParams(engine.NewBroadcaster()))
+	s.Require().NoError(err)
 
 	s.Run("returns error if unknown start block id is provided", func() {
 		subCtx, subCancel := context.WithCancel(ctx)
 		defer subCancel()
 
-		sub := s.backend.SubscribeBlockDigestsFromStartBlockID(subCtx, unittest.IdentifierFixture(), flow.BlockStatusFinalized)
+		sub := backend.SubscribeBlockDigestsFromStartBlockID(subCtx, unittest.IdentifierFixture(), flow.BlockStatusFinalized)
 		assert.Equal(s.T(), codes.NotFound, status.Code(sub.Err()), "expected %s, got %v: %v", codes.NotFound, status.Code(sub.Err()).String(), sub.Err())
 	})
-
-	// mock block tracker for GetStartHeightFromHeight
-	s.blockTracker.On(
-		"GetStartHeightFromHeight",
-		mock.AnythingOfType("uint64"),
-	).Return(func(startHeight uint64) (uint64, error) {
-		return s.blockTrackerReal.GetStartHeightFromHeight(startHeight)
-	}, nil)
 
 	s.Run("returns error for start height before root height", func() {
 		subCtx, subCancel := context.WithCancel(ctx)
 		defer subCancel()
 
-		sub := s.backend.SubscribeBlockDigestsFromStartHeight(subCtx, s.rootBlock.Height-1, flow.BlockStatusFinalized)
+		sub := backend.SubscribeBlockDigestsFromStartHeight(subCtx, s.rootBlock.Height-1, flow.BlockStatusFinalized)
 		assert.Equal(s.T(), codes.InvalidArgument, status.Code(sub.Err()), "expected %s, got %v: %v", codes.InvalidArgument, status.Code(sub.Err()).String(), sub.Err())
 	})
 
@@ -142,7 +108,7 @@ func (s *BackendBlockDigestSuite) TestSubscribeBlockDigestsHandlesErrors() {
 		subCtx, subCancel := context.WithCancel(ctx)
 		defer subCancel()
 
-		sub := s.backend.SubscribeBlockDigestsFromStartHeight(subCtx, s.blocksArray[len(s.blocksArray)-1].Height+10, flow.BlockStatusFinalized)
+		sub := backend.SubscribeBlockDigestsFromStartHeight(subCtx, s.blocksArray[len(s.blocksArray)-1].Height+10, flow.BlockStatusFinalized)
 		assert.Equal(s.T(), codes.NotFound, status.Code(sub.Err()), "expected %s, got %v: %v", codes.NotFound, status.Code(sub.Err()).String(), sub.Err())
 	})
 }
