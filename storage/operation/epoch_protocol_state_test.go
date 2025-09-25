@@ -33,11 +33,11 @@ func TestInsertEpochProtocolState(t *testing.T) {
 		assert.Equal(t, expected, &actual)
 
 		blockID := unittest.IdentifierFixture()
-		unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
+		require.NoError(t, unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
 			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 				return operation.IndexEpochProtocolState(lctx, rw.Writer(), blockID, epochProtocolStateEntryID)
 			})
-		})
+		}))
 
 		var actualProtocolStateID flow.Identifier
 		err = operation.LookupEpochProtocolState(db.Reader(), blockID, &actualProtocolStateID)

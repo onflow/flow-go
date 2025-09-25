@@ -30,7 +30,7 @@ func TestProtocolStateStorage(t *testing.T) {
 		blockID := unittest.IdentifierFixture()
 
 		// store protocol state and auxiliary info
-		unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
+		require.NoError(t, unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
 			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 				// store epoch events to be able to retrieve them later
 				err := setups.BatchStore(rw, expected.PreviousEpochSetup)
@@ -50,7 +50,7 @@ func TestProtocolStateStorage(t *testing.T) {
 				require.NoError(t, err)
 				return s.BatchIndex(lctx, rw, blockID, protocolStateID)
 			})
-		})
+		}))
 
 		// fetch protocol state
 		actual, err := s.ByID(protocolStateID)
@@ -162,7 +162,7 @@ func TestProtocolStateRootSnapshot(t *testing.T) {
 		blockID := unittest.IdentifierFixture()
 
 		// store protocol state and auxiliary info
-		unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
+		require.NoError(t, unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
 			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 				// store epoch events to be able to retrieve them later
 				err := setups.BatchStore(rw, expected.CurrentEpochSetup)
@@ -174,7 +174,7 @@ func TestProtocolStateRootSnapshot(t *testing.T) {
 				require.NoError(t, err)
 				return s.BatchIndex(lctx, rw, blockID, protocolStateID)
 			})
-		})
+		}))
 
 		// fetch protocol state
 		actual, err := s.ByID(protocolStateID)
