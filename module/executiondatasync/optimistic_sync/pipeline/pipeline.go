@@ -101,7 +101,6 @@ type Pipeline struct {
 func NewPipeline(
 	log zerolog.Logger,
 	executionResult *flow.ExecutionResult,
-	isSealed bool,
 	stateReceiver optimistic_sync.PipelineStateConsumer,
 ) *Pipeline {
 	log = log.With().
@@ -116,7 +115,7 @@ func NewPipeline(
 		worker:               newWorker(),
 		state:                atomic.NewInt32(int32(optimistic_sync.StatePending)),
 		parentStateCache:     atomic.NewInt32(int32(optimistic_sync.StatePending)),
-		isSealed:             atomic.NewBool(isSealed),
+		isSealed:             atomic.NewBool(false),
 		isAbandoned:          atomic.NewBool(false),
 		isIndexed:            atomic.NewBool(false),
 		stateChangedNotifier: engine.NewNotifier(),

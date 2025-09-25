@@ -14,8 +14,8 @@ var (
 
 // PipelineFactory is a factory object for creating new Pipeline instances.
 type PipelineFactory interface {
-	// NewPipeline creates a new pipeline for a given execution result with the given sealed status.
-	NewPipeline(result *flow.ExecutionResult, isSealed bool) Pipeline
+	// NewPipeline creates a new pipeline for a given execution result.
+	NewPipeline(result *flow.ExecutionResult) Pipeline
 
 	// NewCompletedPipeline creates a new pipeline for a given execution result that has already
 	// completed processing. This should only be used for the latest persisted sealed result during

@@ -6,7 +6,6 @@ import (
 	"sync"
 
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/module/counters"
 	"github.com/onflow/flow-go/module/executiondatasync/optimistic_sync"
 	"github.com/onflow/flow-go/module/forest"
 )
@@ -21,14 +20,18 @@ var ErrIncompatibleReceipt = errors.New("incompatible execution receipt")
 // same block. For optimized storage, we only store the result once. Mathematically, an
 // ExecutionResultContainer struct represents an Equivalence Class of Execution Receipts.
 type ExecutionResultContainer struct {
-	receipts    map[flow.Identifier]*flow.ExecutionReceiptStub // map from ExecutionReceipt.ID -> ExecutionReceiptStub
-	result      *flow.ExecutionResult
-	resultID    flow.Identifier // precomputed ID of result to avoid expensive hashing on each call
-	blockHeader *flow.Header    // header of the block which the result is for
-	pipeline    optimistic_sync.Pipeline
-	blockStatus counters.StrictMonotonicCounter
+	// conceptually immutable values; can be read without concurrency protection:
+	result      *flow.ExecutionResult // execution result that all receipts in this container commit to
+	resultID    flow.Identifier       // precomputed ID of result to avoid expensive hashing on each call
+	blockHeader *flow.Header          // header of the block which the result is for
 
-	mu sync.RWMutex
+	// inherently concurrency-safe values; can be read without concurrency protection:
+	pipeline     optimistic_sync.Pipeline
+	resultStatus ResultStatusTracker
+
+	// values requiring concurrency protection
+	mu       sync.RWMutex
+	receipts map[flow.Identifier]*flow.ExecutionReceiptStub // map from ExecutionReceipt.ID -> ExecutionReceiptStub
 }
 
 var _ forest.Vertex = (*ExecutionResultContainer)(nil)
@@ -37,7 +40,7 @@ var _ forest.Vertex = (*ExecutionResultContainer)(nil)
 // this is a set of execution receipts all committing to the *same* execution `result` for the
 // specified block.
 //
-// No errors are expected during normal operation.
+// No error returns are expected during normal operation.
 func NewExecutionResultContainer(
 	result *flow.ExecutionResult,
 	header *flow.Header,
@@ -49,12 +52,12 @@ func NewExecutionResultContainer(
 	}
 
 	return &ExecutionResultContainer{
-		receipts:    make(map[flow.Identifier]*flow.ExecutionReceiptStub),
-		result:      result,
-		resultID:    result.ID(),
-		blockHeader: header,
-		pipeline:    pipeline,
-		blockStatus: counters.NewMonotonicCounter(uint64(BlockStatusCertified)),
+		receipts:     make(map[flow.Identifier]*flow.ExecutionReceiptStub),
+		result:       result,
+		resultID:     result.ID(),
+		blockHeader:  header,
+		pipeline:     pipeline,
+		resultStatus: NewResultStatusTracker(ResultForCertifiedBlock),
 	}, nil
 }
 
@@ -162,26 +165,33 @@ func (c *ExecutionResultContainer) Pipeline() optimistic_sync.Pipeline {
 	return c.pipeline
 }
 
-// BlockStatus returns the block status of the block executed by this result.
-func (c *ExecutionResultContainer) BlockStatus() BlockStatus {
-	return BlockStatus(c.blockStatus.Value())
+// ResultStatus returns the status of this result.
+func (c *ExecutionResultContainer) ResultStatus() ResultStatus {
+	return c.resultStatus.Value()
 }
 
-// SetBlockStatus sets the block status of the block executed by this result.
-func (c *ExecutionResultContainer) SetBlockStatus(blockStatus BlockStatus) error {
-	if c.blockStatus.Set(uint64(blockStatus)) {
-		if blockStatus == BlockStatusSealed {
+// SetResultStatus sets the status of this result.
+//
+// No error returns expected during normal operations.
+func (c *ExecutionResultContainer) SetResultStatus(resultStatus ResultStatus) error {
+	if c.resultStatus.Set(resultStatus) {
+		if resultStatus == ResultSealed {
 			c.pipeline.SetSealed()
 		}
 		return nil
 	}
+	return fmt.Errorf("invalid result status transition: %s -> %s", c.resultStatus.Value(), resultStatus)
+}
 
-	// The update failed, so it was either a no-op or an invalid transition.
-	if c.BlockStatus().IsValidTransition(blockStatus) {
-		return nil
+// Abandon marks the result as orphaned and abandons the pipeline.
+//
+// No error returns expected during normal operations.
+func (c *ExecutionResultContainer) Abandon() error {
+	if err := c.SetResultStatus(ResultOrphaned); err != nil {
+		return fmt.Errorf("failed to abandon result: %w", err)
 	}
-
-	return fmt.Errorf("invalid block status transition: %s -> %s", c.BlockStatus(), blockStatus)
+	c.pipeline.Abandon()
+	return nil
 }
 
 // Methods implementing LevelledForest's Vertex interface
