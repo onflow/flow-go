@@ -153,6 +153,7 @@ func (p *CombinedVoteProcessorV3) Status() hotstuff.VoteCollectorStatus {
 // Design of this function is event driven: as soon as we collect enough signatures to create a QC we will immediately do so
 // and submit it via callback for further processing.
 // Expected error returns during normal operations:
+//   - [VoteForIncompatibleBlockError] - submitted vote for incompatible block
 //   - [VoteForIncompatibleViewError] - submitted vote for incompatible view
 //   - [model.InvalidVoteError] - submitted vote with invalid signature
 //   - [model.DuplicatedSignerError] - vote from a signer whose vote was previously already processed
@@ -192,6 +193,14 @@ func (p *CombinedVoteProcessorV3) Process(vote *model.Vote) error {
 			return model.NewDuplicatedSignerErrorf("vote from %s has been already added", vote.SignerID)
 		}
 		return fmt.Errorf("could not add vote %v: %w", vote.ID(), err)
+	}
+
+	// in order to catch all cases of vote equivocation we are first adding the vote to the cache and only after
+	// we ensure that indeed the vote is for designated vote processor, otherwise we won't be able to track equivocation
+	// cases where replica voted for two different block IDs in the same view.
+	err := EnsureVoteForBlock(vote, p.block)
+	if err != nil {
+		return fmt.Errorf("received incompatible vote %v: %w", vote.ID(), err)
 	}
 
 	// Vote Processing state machine

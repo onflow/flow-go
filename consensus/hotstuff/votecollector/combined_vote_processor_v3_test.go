@@ -98,6 +98,7 @@ func (s *CombinedVoteProcessorV3TestSuite) SetupTest() {
 		onQCCreated:       s.onQCCreated,
 		packer:            s.packer,
 		minRequiredWeight: s.minRequiredWeight,
+		votesCache:        NewVotesCache(s.proposal.Block.View),
 		done:              *atomic.NewBool(false),
 	}
 }
@@ -228,19 +229,23 @@ func (s *CombinedVoteProcessorV3TestSuite) TestProcess_TrustedAdd_Exception() {
 		require.ErrorIs(s.T(), err, exception)
 		require.False(s.T(), model.IsInvalidVoteError(err))
 	})
-	s.Run("threshold-sig", func() {
+	s.Run("threshold-sig-aggregator", func() {
 		thresholdVote := unittest.VoteForBlockFixture(s.proposal.Block, unittest.VoteWithBeaconSig())
 		*s.rbSigAggregator = mockhotstuff.WeightedSignatureAggregator{}
-		*s.reconstructor = mockhotstuff.RandomBeaconReconstructor{}
 		s.rbSigAggregator.On("Verify", thresholdVote.SignerID, mock.Anything).Return(nil)
 		s.rbSigAggregator.On("TrustedAdd", thresholdVote.SignerID, mock.Anything).Return(uint64(0), exception).Once()
 		err := s.processor.Process(thresholdVote)
 		require.ErrorIs(s.T(), err, exception)
 		require.False(s.T(), model.IsInvalidVoteError(err))
-		// test also if reconstructor failed to add it
+	})
+	s.Run("threshold-sig-reconstructor", func() {
+		thresholdVote := unittest.VoteForBlockFixture(s.proposal.Block, unittest.VoteWithBeaconSig())
+		*s.rbSigAggregator = mockhotstuff.WeightedSignatureAggregator{}
+		*s.reconstructor = mockhotstuff.RandomBeaconReconstructor{}
+		s.rbSigAggregator.On("Verify", thresholdVote.SignerID, mock.Anything).Return(nil).Once()
 		s.rbSigAggregator.On("TrustedAdd", thresholdVote.SignerID, mock.Anything).Return(s.sigWeight, nil).Once()
 		s.reconstructor.On("TrustedAdd", thresholdVote.SignerID, mock.Anything).Return(false, exception).Once()
-		err = s.processor.Process(thresholdVote)
+		err := s.processor.Process(thresholdVote)
 		require.ErrorIs(s.T(), err, exception)
 		require.False(s.T(), model.IsInvalidVoteError(err))
 	})
@@ -292,6 +297,7 @@ func (s *CombinedVoteProcessorV3TestSuite) TestProcess_BuildQCError() {
 			onQCCreated:       s.onQCCreated,
 			packer:            packer,
 			minRequiredWeight: s.minRequiredWeight,
+			votesCache:        NewVotesCache(s.proposal.Block.View),
 			done:              *atomic.NewBool(false),
 		}
 	}
@@ -415,7 +421,9 @@ func (s *CombinedVoteProcessorV3TestSuite) TestProcess_ConcurrentCreatingQC() {
 			defer shutdownWg.Done()
 			startupWg.Wait()
 			err := s.processor.Process(vote)
-			require.NoError(s.T(), err)
+			if err != nil {
+				require.True(s.T(), model.IsDuplicatedSignerError(err))
+			}
 		}()
 	}
 
@@ -607,6 +615,7 @@ func TestCombinedVoteProcessorV3_PropertyCreatingQCCorrectness(testifyT *testing
 			onQCCreated:       onQCCreated,
 			packer:            pcker,
 			minRequiredWeight: minRequiredWeight,
+			votesCache:        NewVotesCache(block.View),
 			done:              *atomic.NewBool(false),
 		}
 
@@ -707,6 +716,7 @@ func TestCombinedVoteProcessorV3_OnlyRandomBeaconSigners(testifyT *testing.T) {
 		onQCCreated:       func(qc *flow.QuorumCertificate) { /* no op */ },
 		packer:            packer,
 		minRequiredWeight: 70,
+		votesCache:        NewVotesCache(block.View),
 		done:              *atomic.NewBool(false),
 	}
 
@@ -847,6 +857,7 @@ func TestCombinedVoteProcessorV3_PropertyCreatingQCLiveness(testifyT *testing.T)
 			onQCCreated:       onQCCreated,
 			packer:            pcker,
 			minRequiredWeight: minRequiredWeight,
+			votesCache:        NewVotesCache(block.View),
 			done:              *atomic.NewBool(false),
 		}
 
