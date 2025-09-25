@@ -60,8 +60,8 @@ func (vc *VotesCache) View() uint64 { return vc.view }
 // AddVote stores a vote in the cache. The method returns `nil`, if the vote was
 // successfully stored. When AddVote returns an error, the vote is _not_ stored.
 // Expected error returns during normal operations:
-//   - [VoteForIncompatibleViewError] is returned if the vote is for a different view.
-//   - [model.DoubleVoteError] indicates that the voter has emitted inconsistent
+//   - [VoteForIncompatibleViewError] - is returned if the vote is for a different view.
+//   - [model.DoubleVoteError] - indicates that the voter has emitted inconsistent
 //     votes within the same view. We consider two votes as inconsistent, if they
 //     are from the same signer for the same view, but have different IDs. Potential
 //     causes could be:

@@ -1050,6 +1050,7 @@ func TestCombinedVoteProcessorV3_BuildVerifyQC(t *testing.T) {
 // TestCombinedVoteProcessorV3_DoubleVoting tests that CombinedVoteProcessorV3 is able to
 // detect a situation where a consensus participant is sending two different votes, first vote is signed with the staking
 // key only and the other one is signed with the random beacon key.
+// This is a form of vote equivocation where a node sends a different vote from the one it has submitted previously.
 // CombinedVoteProcessorV3 has to detect that the vote from given participant has been already processed and return a respective error.
 func TestCombinedVoteProcessorV3_DoubleVoting(t *testing.T) {
 	proposerView := uint64(20)
@@ -1095,7 +1096,14 @@ func TestCombinedVoteProcessorV3_DoubleVoting(t *testing.T) {
 	require.NoError(t, err)
 	proposal := helper.MakeSignedProposal(helper.WithProposal(helper.MakeProposal(helper.WithBlock(block))), helper.WithSigData(leaderVote.SigData))
 
-	leaderDoubleVote, err := stakingSigner.CreateVote(block)
+	// construct another vote for this block but using staking key this time.
+	// this will result in inconsistent voting.
+	leaderDifferentVote, err := stakingSigner.CreateVote(block)
+	require.NoError(t, err)
+
+	// construct a double vote, same view, but different block ID
+	otherBlock := helper.MakeBlock(helper.WithBlockView(block.View))
+	leaderDoubleVote, err := rbSigner.CreateVote(otherBlock)
 	require.NoError(t, err)
 
 	onQCCreated := func(qc *flow.QuorumCertificate) {
@@ -1116,8 +1124,22 @@ func TestCombinedVoteProcessorV3_DoubleVoting(t *testing.T) {
 	voteProcessor, err := voteProcessorFactory.Create(unittest.Logger(), proposal)
 	require.NoError(t, err)
 
-	// process the double vote, this has to result in an error.
-	err = voteProcessor.Process(leaderDoubleVote)
-	require.Error(t, err)
-	require.True(t, model.IsDoubleVoteError(err))
+	t.Run("duplicated-vote", func(t *testing.T) {
+		// process the same vote again
+		err = voteProcessor.Process(leaderVote)
+		require.Error(t, err)
+		require.True(t, model.IsDuplicatedSignerError(err))
+	})
+	t.Run("different-vote", func(t *testing.T) {
+		// process the double vote, this has to result in an error.
+		err = voteProcessor.Process(leaderDifferentVote)
+		require.Error(t, err)
+		require.True(t, model.IsDoubleVoteError(err))
+	})
+	t.Run("double-vote", func(t *testing.T) {
+		// process the double vote, this has to result in an error.
+		err = voteProcessor.Process(leaderDoubleVote)
+		require.Error(t, err)
+		require.True(t, model.IsDoubleVoteError(err))
+	})
 }

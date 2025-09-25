@@ -153,11 +153,10 @@ func (p *CombinedVoteProcessorV3) Status() hotstuff.VoteCollectorStatus {
 // Design of this function is event driven: as soon as we collect enough signatures to create a QC we will immediately do so
 // and submit it via callback for further processing.
 // Expected error returns during normal operations:
-//   - VoteForIncompatibleBlockError - submitted vote for incompatible block
-//   - VoteForIncompatibleViewError - submitted vote for incompatible view
-//   - model.InvalidVoteError - submitted vote with invalid signature
-//   - model.DuplicatedSignerError - vote from a signer whose vote was previously already processed
-//   - model.DoubleVoteError is returned if the voter is equivocating
+//   - [VoteForIncompatibleViewError] - submitted vote for incompatible view
+//   - [model.InvalidVoteError] - submitted vote with invalid signature
+//   - [model.DuplicatedSignerError] - vote from a signer whose vote was previously already processed
+//   - [model.DoubleVoteError] - indicates that the voter has equivocated and submitted different votes for the same view.
 //     (i.e. voting in the same view for different blocks or using different voting schemas).
 //
 // All other errors should be treated as exceptions.
@@ -169,16 +168,6 @@ func (p *CombinedVoteProcessorV3) Status() hotstuff.VoteCollectorStatus {
 // `VerifyingVoteProcessor` (once as part of a cached vote, once as an individual vote). This can be exploited
 // by a byzantine proposer to be erroneously counted twice, which would lead to a safety fault.
 func (p *CombinedVoteProcessorV3) Process(vote *model.Vote) error {
-	err := EnsureVoteForBlock(vote, p.block)
-	if err != nil {
-		return fmt.Errorf("received incompatible vote %v: %w", vote.ID(), err)
-	}
-
-	// Vote Processing state machine
-	if p.done.Load() {
-		return nil
-	}
-
 	// Add vote to a local cache to track repeated and double votes before processing them by specific aggregators.
 	// Since consensus committee member can provide vote in two forms: a staking signature and a random beacon signature
 	// this leads to a situation where we first vote gets processed by the StakingSigAggregator and second one by RBSigAggregator.
@@ -203,6 +192,11 @@ func (p *CombinedVoteProcessorV3) Process(vote *model.Vote) error {
 			return model.NewDuplicatedSignerErrorf("vote from %s has been already added", vote.SignerID)
 		}
 		return fmt.Errorf("could not add vote %v: %w", vote.ID(), err)
+	}
+
+	// Vote Processing state machine
+	if p.done.Load() {
+		return nil
 	}
 
 	sigType, sig, err := msig.DecodeSingleSig(vote.SigData)
