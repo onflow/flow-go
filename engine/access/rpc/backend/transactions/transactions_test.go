@@ -618,9 +618,7 @@ func (s *Suite) TestGetSystemTransaction_Local_HappyPath() {
 
 	params := s.defaultTransactionsParams()
 	enabledProvider := provider.NewLocalTransactionProvider(
-		s.state,
 		s.collections,
-		s.blocks,
 		s.systemTx.ID(),
 		params.TxStatusDeriver,
 		params.ExecutionStateCache,
@@ -628,9 +626,7 @@ func (s *Suite) TestGetSystemTransaction_Local_HappyPath() {
 		true,
 	)
 	disabledProvider := provider.NewLocalTransactionProvider(
-		s.state,
 		s.collections,
-		s.blocks,
 		s.systemTx.ID(),
 		params.TxStatusDeriver,
 		params.ExecutionStateCache,
@@ -934,9 +930,7 @@ func (s *Suite) TestGetSystemTransactionResult_Local_HappyPath() {
 	snapshot.On("LightTransactionResults").Return(s.lightTxResults)
 
 	params.TxProvider = provider.NewLocalTransactionProvider(
-		params.State,
 		params.Collections,
-		params.Blocks,
 		params.SystemTxID,
 		params.TxStatusDeriver,
 		s.executionStateCache,
@@ -1117,9 +1111,7 @@ func (s *Suite) TestGetTransactionResult_FromStorage() {
 	s.executionStateCache.On("Snapshot", mock.Anything).Return(snapshot, nil)
 
 	params.TxProvider = provider.NewLocalTransactionProvider(
-		params.State,
 		params.Collections,
-		params.Blocks,
 		params.SystemTxID,
 		params.TxStatusDeriver,
 		s.executionStateCache,
@@ -1207,9 +1199,7 @@ func (s *Suite) TestTransactionByIndexFromStorage() {
 	snapshot.On("LightTransactionResults").Return(s.lightTxResults)
 	snapshot.On("TransactionResultErrorMessages").Return(s.txResultErrorMessages)
 	params.TxProvider = provider.NewLocalTransactionProvider(
-		params.State,
 		params.Collections,
-		params.Blocks,
 		params.SystemTxID,
 		params.TxStatusDeriver,
 		s.executionStateCache,
@@ -1312,9 +1302,7 @@ func (s *Suite) TestTransactionResultsByBlockIDFromStorage() {
 	snapshot.On("LightTransactionResults").Return(s.lightTxResults)
 	snapshot.On("TransactionResultErrorMessages").Return(s.txResultErrorMessages)
 	params.TxProvider = provider.NewLocalTransactionProvider(
-		params.State,
 		params.Collections,
-		params.Blocks,
 		params.SystemTxID,
 		params.TxStatusDeriver,
 		s.executionStateCache,
@@ -1385,9 +1373,7 @@ func (s *Suite) TestGetTransactionsByBlockID() {
 		params := s.defaultTransactionsParams()
 
 		params.TxProvider = provider.NewLocalTransactionProvider(
-			params.State,
 			params.Collections,
-			params.Blocks,
 			params.SystemTxID,
 			params.TxStatusDeriver,
 			params.ExecutionStateCache,

@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"slices"
 	"time"
 
 	lru "github.com/hashicorp/golang-lru/v2"
@@ -16,6 +15,7 @@ import (
 
 	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/access/validator"
+	"github.com/onflow/flow-go/engine/access/rpc/backend/common"
 	"github.com/onflow/flow-go/engine/access/rpc/backend/node_communicator"
 	"github.com/onflow/flow-go/engine/access/rpc/backend/transactions/provider"
 	"github.com/onflow/flow-go/engine/access/rpc/backend/transactions/retrier"
@@ -27,21 +27,22 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/executiondatasync/optimistic_sync"
-	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
 )
 
-// ErrTransactionNotInBlock represents an error indicating that the transaction is not found in the block.
+// ErrTransactionNotInBlock indicates that the transaction is not found in the block.
 var ErrTransactionNotInBlock = errors.New("transaction not in block")
+
+// ErrTransactionNotInCollection indicates that the transaction is not found in the collection provided in the request.
+var ErrTransactionNotInCollection = errors.New("transaction not found in collection")
 
 type Transactions struct {
 	log     zerolog.Logger
 	metrics module.TransactionMetrics
 
-	state   protocol.State
-	chainID flow.ChainID
-
+	state      protocol.State
+	chainID    flow.ChainID
 	systemTxID flow.Identifier
 
 	// RPC Clients & Network
@@ -120,6 +121,7 @@ func NewTransactionsBackend(params Params) (*Transactions, error) {
 		execResultProvider:          params.ExecResultProvider,
 		operatorCriteria:            params.OperatorCriteria,
 		scheduledCallbacksEnabled:   params.ScheduledCallbacksEnabled,
+		retrier:                     retrier.NewNoopRetrier(),
 	}
 
 	if params.EnableRetries {
@@ -130,35 +132,43 @@ func NewTransactionsBackend(params Params) (*Transactions, error) {
 			txs,
 			params.TxStatusDeriver,
 		)
-	} else {
-		txs.retrier = retrier.NewNoopRetrier()
 	}
 
 	return txs, nil
 }
 
 // SendTransaction forwards the transaction to the collection node
+//
+// CAUTION: this layer SIMPLIFIES the ERROR HANDLING convention
+//   - All errors returned are guaranteed to be benign. The node can continue normal operations after such errors.
+//   - To prevent delivering incorrect results to clients in case of an error, all other return values should be discarded.
+//
+// Expected sentinel errors providing details to clients about failed requests:
+//   - [access.InvalidRequestError] - if the transaction is invalid
+//   - [access.ServiceUnavailable] - if none of the collection nodes tried could be reached
+//   - [access.RequestCanceledError] - if the request was canceled
+//   - [access.RequestTimedOutError] - if the request timed out
+//   - [access.InternalError] - for all other errors returned by collection nodes
 func (t *Transactions) SendTransaction(ctx context.Context, tx *flow.TransactionBody) error {
 	now := time.Now().UTC()
 
+	// TODO: separate benign errors from internal errors
 	err := t.txValidator.Validate(ctx, tx)
 	if err != nil {
-		return status.Errorf(codes.InvalidArgument, "invalid transaction: %s", err.Error())
+		return access.NewInvalidRequestError(fmt.Errorf("transaction is invalid: %w", err))
 	}
 
-	// send the transaction to the collection node if valid
 	err = t.trySendTransaction(ctx, tx)
 	if err != nil {
 		t.metrics.TransactionSubmissionFailed()
-		return rpc.ConvertError(err, "failed to send transaction to a collection node", codes.Internal)
+		return access.RequireAccessError(ctx, err)
 	}
 
 	t.metrics.TransactionReceived(tx.ID(), now)
 
-	// store the transaction locally
 	err = t.transactions.Store(tx)
 	if err != nil {
-		return status.Errorf(codes.Internal, "failed to store transaction: %v", err)
+		return access.RequireNoError(ctx, fmt.Errorf("failed to store transaction: %w", err))
 	}
 
 	go t.registerTransactionForRetry(tx)
@@ -166,45 +176,74 @@ func (t *Transactions) SendTransaction(ctx context.Context, tx *flow.Transaction
 	return nil
 }
 
-// trySendTransaction tries to transaction to a collection node
+// SendRawTransaction sends a raw transaction to the collection node
+// This method is not part of the Access API
+//
+// Expected error returns during normal operations:
+//   - [access.InvalidRequestError] - if the transaction is invalid
+//   - [access.ServiceUnavailable] - if none of the collection nodes tried could be reached
+//   - [access.RequestCanceledError] - if the request was canceled
+//   - [access.RequestTimedOutError] - if the request timed out
+//   - [access.InternalError] - for all other errors returned by collection nodes
+func (t *Transactions) SendRawTransaction(ctx context.Context, tx *flow.TransactionBody) error {
+	return t.trySendTransaction(ctx, tx)
+}
+
+// trySendTransaction sends the provided transaction to a collection node.
+//
+// Expected error returns during normal operations:
+//   - [access.InvalidRequestError] - if the transaction is invalid
+//   - [access.ServiceUnavailable] - if none of the collection nodes tried could be reached
+//   - [access.RequestCanceledError] - if the request was canceled
+//   - [access.RequestTimedOutError] - if the request timed out
+//   - [access.InternalError] - for all other errors returned by collection nodes
 func (t *Transactions) trySendTransaction(ctx context.Context, tx *flow.TransactionBody) error {
-	// if a collection node rpc client was provided at startup, just use that
-	if t.collectionRPCClient != nil {
-		return t.grpcTxSend(ctx, t.collectionRPCClient, tx)
-	}
-
-	// otherwise choose all collection nodes to try
-	collNodes, err := t.chooseCollectionNodes(tx.ID())
-	if err != nil {
-		return fmt.Errorf("failed to determine collection node for tx %x: %w", tx, err)
-	}
-
-	var sendError error
-	logAnyError := func() {
-		if sendError != nil {
-			t.log.Info().Err(err).Msg("failed to send transactions to collector nodes")
+	parseGrpcError := func(err error, nodeAddress string) error {
+		wrappedErr := fmt.Errorf("failed to send transaction to collection node at %s: %w", nodeAddress, err)
+		switch status.Code(err) {
+		case codes.InvalidArgument,
+			codes.Unavailable,
+			codes.Internal,
+			codes.Canceled,
+			codes.DeadlineExceeded:
+			return access.ConvertGrpcError("send transaction", wrappedErr)
+		default:
+			return access.NewInternalError(wrappedErr)
 		}
 	}
-	defer logAnyError()
 
-	// try sending the transaction to one of the chosen collection nodes
-	sendError = t.nodeCommunicator.CallAvailableNode(
+	// if a collection node rpc client was provided at startup, just use that
+	if t.collectionRPCClient != nil {
+		err := t.grpcTxSend(ctx, t.collectionRPCClient, tx)
+		if err != nil {
+			return parseGrpcError(err, "static collection node")
+		}
+	}
+
+	collNodes, err := t.chooseCollectionNodes(tx.ID())
+	if err != nil {
+		return fmt.Errorf("failed to determine collection node for tx %s: %w", tx.ID(), err)
+	}
+
+	var executor *flow.IdentitySkeleton
+	executor, sendError := t.nodeCommunicator.CallAvailableNode(
 		collNodes,
 		func(node *flow.IdentitySkeleton) error {
-			err = t.sendTransactionToCollector(ctx, tx, node.Address)
-			if err != nil {
-				return err
-			}
-			return nil
+			return t.sendTransactionToCollector(ctx, tx, node.Address)
 		},
 		nil,
 	)
 
-	return sendError
+	if sendError != nil {
+		t.log.Info().Err(err).Msg("failed to send transactions to collector nodes")
+	}
+	return parseGrpcError(err, executor.Address)
 }
 
 // chooseCollectionNodes finds a random subset of size sampleSize of collection node addresses from the
 // collection node cluster responsible for the given tx
+//
+// No errors are expected during normal operations.
 func (t *Transactions) chooseCollectionNodes(txID flow.Identifier) (flow.IdentitySkeletonList, error) {
 	// retrieve the set of collector clusters
 	currentEpoch, err := t.state.Final().Epochs().Current()
@@ -219,13 +258,17 @@ func (t *Transactions) chooseCollectionNodes(txID flow.Identifier) (flow.Identit
 	// get the cluster responsible for the transaction
 	targetNodes, ok := clusters.ByTxID(txID)
 	if !ok {
-		return nil, fmt.Errorf("could not get local cluster by txID: %x", txID)
+		return nil, fmt.Errorf("could not get local cluster by txID: %s", txID)
 	}
 
 	return targetNodes, nil
 }
 
 // sendTransactionToCollection sends the transaction to the given collection node via grpc
+//
+// Expected error returns during normal operations:
+// - [access.ServiceUnavailable] - if the collection node could not be reached
+// - [status.Error] - any error returned by the grpc call
 func (t *Transactions) sendTransactionToCollector(
 	ctx context.Context,
 	tx *flow.TransactionBody,
@@ -233,17 +276,19 @@ func (t *Transactions) sendTransactionToCollector(
 ) error {
 	collectionRPC, closer, err := t.connectionFactory.GetCollectionAPIClient(collectionNodeAddr, nil)
 	if err != nil {
-		return fmt.Errorf("failed to connect to collection node at %s: %w", collectionNodeAddr, err)
+		// all errors getting the initial connection are benign and indicate an issue creating
+		// the connection
+		return access.NewServiceUnavailable(fmt.Errorf("failed to connect to collection node at %s: %w", collectionNodeAddr, err))
 	}
 	defer closer.Close()
 
-	err = t.grpcTxSend(ctx, collectionRPC, tx)
-	if err != nil {
-		return fmt.Errorf("failed to send transaction to collection node at %s: %w", collectionNodeAddr, err)
-	}
-	return nil
+	return t.grpcTxSend(ctx, collectionRPC, tx)
 }
 
+// grpcTxSend sends the transaction to the given collection node via grpc.
+// Returns any error returned by the grpc call.
+//
+// All errors returned by this method are benign and indicate issues connecting with external nodes.
 func (t *Transactions) grpcTxSend(
 	ctx context.Context,
 	client accessproto.AccessAPIClient,
@@ -261,34 +306,44 @@ func (t *Transactions) grpcTxSend(
 	return err
 }
 
-// SendRawTransaction sends a raw transaction to the collection node
-func (t *Transactions) SendRawTransaction(
-	ctx context.Context,
-	tx *flow.TransactionBody,
-) error {
-	// send the transaction to the collection node
-	return t.trySendTransaction(ctx, tx)
-}
-
-func (t *Transactions) GetTransaction(
-	ctx context.Context,
-	txID flow.Identifier,
-) (*flow.TransactionBody, error) {
-	// look up transaction from storage
+// GetTransaction returns the transaction for the provided transaction ID.
+//
+// CAUTION: this layer SIMPLIFIES the ERROR HANDLING convention
+//   - All errors returned are guaranteed to be benign. The node can continue normal operations after such errors.
+//   - To prevent delivering incorrect results to clients in case of an error, all other return values should be discarded.
+//
+// Expected sentinel errors providing details to clients about failed requests:
+//   - [access.DataNotFoundError] - if the transaction is not found
+//   - [access.InternalError] - if the transaction from the historical node cannot be converted
+//     to a TransactionBody
+//   - [access.RequestCanceledError] - if the request was canceled
+//   - [access.RequestTimedOutError] - if the request timed out
+func (t *Transactions) GetTransaction(ctx context.Context, txID flow.Identifier) (*flow.TransactionBody, error) {
 	tx, err := t.transactions.ByID(txID)
-	txErr := rpc.ConvertStorageError(err)
-
-	if txErr != nil {
-		if status.Code(txErr) == codes.NotFound {
-			return t.getHistoricalTransaction(ctx, txID, nil)
+	if err != nil {
+		if !errors.Is(err, storage.ErrNotFound) {
+			return nil, access.RequireNoError(ctx, fmt.Errorf("failed lookup transaction in storage: %w", err))
 		}
-		// Other Error trying to retrieve the transaction, return with err
-		return nil, txErr
+
+		tx, err = t.getHistoricalTransaction(ctx, txID)
+		if err != nil {
+			return nil, access.RequireAccessError(ctx, err)
+		}
+		return tx, nil
 	}
 
 	return tx, nil
 }
 
+// GetTransactionsByBlockID returns the transactions for the provided block ID.
+//
+// CAUTION: this layer SIMPLIFIES the ERROR HANDLING convention
+//   - All errors returned are guaranteed to be benign. The node can continue normal operations after such errors.
+//   - To prevent delivering incorrect results to clients in case of an error, all other return values should be discarded.
+//
+// Expected sentinel errors providing details to clients about failed requests:
+//   - [access.DataNotFoundError] - if the block or any of its collections are not found, or if there
+//     are insufficient execution receipts to lookup the system transactions.
 func (t *Transactions) GetTransactionsByBlockID(
 	ctx context.Context,
 	blockID flow.Identifier,
@@ -296,14 +351,18 @@ func (t *Transactions) GetTransactionsByBlockID(
 	// TODO: consider using storage.Index.ByBlockID, the index contains collection id and seals ID
 	block, err := t.blocks.ByID(blockID)
 	if err != nil {
-		return nil, rpc.ConvertStorageError(err)
+		err = access.RequireErrorIs(ctx, err, storage.ErrNotFound)
+		return nil, access.NewDataNotFoundError("block", fmt.Errorf("could not find block: %w", err))
 	}
 
 	// TODO: this method needs to accept userCriteria
 	criteria := t.operatorCriteria
 	execResultInfo, err := t.execResultProvider.ExecutionResultInfo(blockID, criteria)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get execution result for last block: %w", err)
+		if common.IsInsufficientExecutionReceipts(err) {
+			return nil, access.NewDataNotFoundError("transactions", err)
+		}
+		return nil, access.RequireNoError(ctx, fmt.Errorf("failed to get execution result for last block: %w", err))
 	}
 
 	// TODO: return executor metadata
@@ -311,133 +370,121 @@ func (t *Transactions) GetTransactionsByBlockID(
 	return transactions, err
 }
 
+// GetTransactionResult returns the transaction result for the provided transaction ID.
+// This method also optionally accepts a block ID and collection ID to narrow down the search.
+// When provided, the transaction must match the critera. Otherwise, the
+//
+// CAUTION: this layer SIMPLIFIES the ERROR HANDLING convention
+//   - All errors returned are guaranteed to be benign. The node can continue normal operations after such errors.
+//   - To prevent delivering incorrect results to clients in case of an error, all other return values should be discarded.
+//
+// Expected sentinel errors providing details to clients about failed requests:
+//   - [access.DataNotFoundError] - if data required to process the request was not found
+//   - [access.InternalError] - if the transaction results cannot be retrieved from the execution
+//     node or were invalid.
 func (t *Transactions) GetTransactionResult(
 	ctx context.Context,
 	txID flow.Identifier,
 	blockID flow.Identifier,
 	collectionID flow.Identifier,
-	requiredEventEncodingVersion entities.EventEncodingVersion,
+	encodingVersion entities.EventEncodingVersion,
 	userCriteria optimistic_sync.Criteria,
 ) (*accessmodel.TransactionResult, *accessmodel.ExecutorMetadata, error) {
-	// look up transaction from storage
 	start := time.Now()
 
-	// TODO: this should attempt to find the tx within the results forest
-	tx, err := t.transactions.ByID(txID)
+	// 1. lookup the the collection that contains the transaction. if it is not found, then the
+	// collection is not yet indexed and the transaction is either unknown or pending.
+	//
+	// BFT corner case: Only the first finalized collection to contain the transaction is indexed.
+	// If the transaction is included in multiple collections in the same or different blocks, the
+	// first collection to be indexed by the node is returned. This is not guaranteed to be the
+	// first collection in execution order!
+	lightCollection, err := t.collections.LightByTransactionID(txID)
 	if err != nil {
-		txErr := rpc.ConvertStorageError(err)
-		if status.Code(txErr) != codes.NotFound {
-			return nil, nil, txErr
+		if !errors.Is(err, storage.ErrNotFound) {
+			return nil, nil, access.RequireNoError(ctx, fmt.Errorf("failed to find collection for transaction: %w", err))
 		}
 
-		// Tx not found. If we have historical Sporks setup, lets look through those as well
-		if t.txResultCache != nil {
-			val, ok := t.txResultCache.Get(txID)
-			if ok {
-				return val, nil, nil
-			}
-		}
-		historicalTxResult, err := t.getHistoricalTransactionResult(ctx, txID)
+		result, err := t.getUnknownTransactionResult(ctx, txID, blockID, collectionID)
 		if err != nil {
-			// if tx not found in old access nodes either, then assume that the tx was submitted to a different AN
-			// and return status as unknown
-			txStatus := flow.TransactionStatusUnknown
-			result := &accessmodel.TransactionResult{
-				Status:     txStatus,
-				StatusCode: uint(txStatus),
+			if errors.Is(err, ErrTransactionNotInCollection) || errors.Is(err, txstatus.ErrReferenceBlockNotFound) {
+				return nil, nil, access.NewDataNotFoundError("transaction result", err)
 			}
-			if t.txResultCache != nil {
-				t.txResultCache.Add(txID, result)
-			}
-			return result, nil, nil
+			return nil, nil, access.RequireNoError(ctx, fmt.Errorf("failed to get unknown transaction result: %w", err))
 		}
 
-		if t.txResultCache != nil {
-			t.txResultCache.Add(txID, historicalTxResult)
-		}
-		return historicalTxResult, nil, nil
+		// no metadata because transaction is not executed yet
+		return result, nil, nil
+	}
+	if collectionID != flow.ZeroID && collectionID != lightCollection.ID() {
+		err := fmt.Errorf("transaction found in collection %s, but %s was provided", lightCollection.ID(), collectionID)
+		return nil, nil, access.NewDataNotFoundError("transaction result", err)
 	}
 
-	// TODO: lookups of collection and block to collection should query the for
-	block, err := t.retrieveBlock(blockID, collectionID, txID)
-
-	// an error occurred looking up the block or the requested block or collection was not found.
-	// If looking up the block based solely on the txID returns not found, then no error is
-	// returned since the block may not be finalized yet.
+	// 2. lookup the block containing the collection.
+	block, err := t.blocks.ByCollectionID(collectionID)
 	if err != nil {
-		return nil, nil, rpc.ConvertStorageError(err)
+		// this is an exception. the block/collection index must exist if the collection/tx is indexed,
+		// otherwise the stored state is inconsistent.
+		err = fmt.Errorf("failed to find block for collection %v: %w", collectionID, err)
+		return nil, nil, access.RequireNoError(ctx, err)
+	}
+	if blockID != flow.ZeroID && blockID != block.ID() {
+		err := fmt.Errorf("transaction found in block %s, but %s was provided", block.ID(), blockID)
+		return nil, nil, access.NewDataNotFoundError("transaction result", err)
 	}
 
-	var blockHeight uint64
-	var txResult *accessmodel.TransactionResult
-	var executorMetadata *accessmodel.ExecutorMetadata
-	// access node may not have the block if it hasn't yet been finalized, hence block can be nil at this point
-	if block != nil {
-		originalBlockID := blockID
-		resolvedBlockID := block.ID()
-		if blockID != flow.ZeroID && blockID != resolvedBlockID {
-			return nil, nil, status.Error(codes.InvalidArgument, "transaction not found in provided block")
-		}
-		blockID = resolvedBlockID
-		blockHeight = block.Height
+	// 3. lookup the actual transaction result. at this point, we know the tx exists in the db
+	// and we know the block and collection.
 
-		criteria := t.operatorCriteria.OverrideWith(userCriteria)
-		execResultInfo, err := t.execResultProvider.ExecutionResultInfo(blockID, criteria)
-		if err != nil {
-			return nil, nil, fmt.Errorf("failed to get execution result for last block: %w", err)
+	criteria := t.operatorCriteria.OverrideWith(userCriteria)
+	execResultInfo, err := t.execResultProvider.ExecutionResultInfo(blockID, criteria)
+	if err != nil {
+		if common.IsInsufficientExecutionReceipts(err) {
+			return nil, nil, access.NewDataNotFoundError("transaction result", err)
 		}
+		return nil, nil, access.RequireNoError(ctx, fmt.Errorf("failed to get execution result for block: %w", err))
+	}
 
-		txResult, executorMetadata, err = t.lookupTransactionResult(ctx, txID, block.ToHeader(), requiredEventEncodingVersion, execResultInfo)
-		if err != nil {
-			if _, ok := status.FromError(err); ok {
-				return nil, nil, rpc.ConvertError(err, "failed to retrieve result", codes.Internal)
-			}
-			return nil, nil, access.RequireNoError(ctx, fmt.Errorf("failed to retrieve result: %w", err))
-		}
-
-		// an additional check to ensure the correctness of the collection ID.
-		expectedCollectionID, err := t.lookupCollectionIDInBlock(block, txID)
-		if err != nil {
-			// if the collection has not been indexed yet, the lookup will return a not found error.
-			// if the request included a blockID or collectionID in its the search criteria, not found
-			// should result in an error because it's not possible to guarantee that the result found
-			// is the correct one.
-			if originalBlockID != flow.ZeroID || collectionID != flow.ZeroID {
-				return nil, nil, rpc.ConvertStorageError(err)
-			}
-		}
-
-		if collectionID == flow.ZeroID {
-			collectionID = expectedCollectionID
-		} else if collectionID != expectedCollectionID {
-			return nil, nil, status.Error(codes.InvalidArgument, "transaction not found in provided collection")
+	txResult, executorMetadata, err := t.txProvider.TransactionResult(ctx, block.ToHeader(), txID, collectionID, encodingVersion, execResultInfo)
+	if err != nil {
+		switch {
+		case errors.Is(err, optimistic_sync.ErrSnapshotNotFound):
+			err = fmt.Errorf("could not find snapshot for execution result: %w", err)
+			return nil, nil, access.NewDataNotFoundError("transaction result", err)
+		case common.IsInvalidDataFromExternalNodeError(err):
+			err = fmt.Errorf("invalid data from execution node: %w", err)
+			return nil, nil, access.NewInternalError(err)
+		case common.IsFailedToQueryExternalNodeError(err):
+			err = fmt.Errorf("failed to query execution node: %w", err)
+			return nil, nil, access.NewInternalError(err)
+		default:
+			err = fmt.Errorf("failed to get transaction result by index: %w", err)
+			return nil, nil, access.RequireNoError(ctx, err)
 		}
 	}
 
-	// If there is still no transaction result, provide one based on available information.
+	// If there is still no transaction result, provide placeholder based on available information.
 	if txResult == nil {
-		var txStatus flow.TransactionStatus
-		// Derive the status of the transaction.
-		if block == nil {
-			txStatus, err = t.txStatusDeriver.DeriveUnknownTransactionStatus(tx.ReferenceBlockID)
-		} else {
-			txStatus, err = t.txStatusDeriver.DeriveFinalizedTransactionStatus(blockHeight, false)
-		}
-
+		txStatus, err := t.txStatusDeriver.DeriveFinalizedTransactionStatus(block.Height, false)
 		if err != nil {
-			irrecoverable.Throw(ctx, fmt.Errorf("failed to derive transaction status: %w", err))
-			return nil, nil, err
+			return nil, executorMetadata, access.RequireNoError(ctx, fmt.Errorf("failed to derive finalized transaction status: %w", err))
 		}
 
 		txResult = &accessmodel.TransactionResult{
 			BlockID:       blockID,
-			BlockHeight:   blockHeight,
+			BlockHeight:   block.Height,
 			TransactionID: txID,
 			Status:        txStatus,
 			CollectionID:  collectionID,
 		}
-	} else {
-		txResult.CollectionID = collectionID
+	}
+
+	tx, err := t.transactions.ByID(txID)
+	if err != nil {
+		// since the previous lookups all succeeded, if this fails, the node's state is inconsistent,
+		// which is irrecoverable.
+		return nil, executorMetadata, access.RequireNoError(ctx, fmt.Errorf("failed to get transaction from storage: %w", err))
 	}
 
 	t.metrics.TransactionResultFetched(time.Since(start), len(tx.Script))
@@ -445,122 +492,134 @@ func (t *Transactions) GetTransactionResult(
 	return txResult, executorMetadata, nil
 }
 
-// lookupCollectionIDInBlock returns the collection ID based on the transaction ID. The lookup is performed in block
-// collections.
-func (t *Transactions) lookupCollectionIDInBlock(
-	block *flow.Block,
-	txID flow.Identifier,
-) (flow.Identifier, error) {
-	for _, guarantee := range block.Payload.Guarantees {
-		collection, err := t.collections.LightByID(guarantee.CollectionID)
-		if err != nil {
-			return flow.ZeroID, fmt.Errorf("failed to get collection %s in indexed block: %w", guarantee.CollectionID, err)
-		}
-		if slices.Contains(collection.Transactions, txID) {
-			return guarantee.CollectionID, nil
-		}
-	}
-	return flow.ZeroID, ErrTransactionNotInBlock
-}
-
-// retrieveBlock function returns a block based on the input arguments.
-// The block ID lookup has the highest priority, followed by the collection ID lookup.
-// If both are missing, the default lookup by transaction ID is performed.
+// GetTransactionResultByIndex returns the transaction results for a transaction identified by
+// blockID and index.
 //
-// If looking up the block based solely on the txID returns not found, then no error is returned.
+// CAUTION: this layer SIMPLIFIES the ERROR HANDLING convention
+//   - All errors returned are guaranteed to be benign. The node can continue normal operations after such errors.
+//   - To prevent delivering incorrect results to clients in case of an error, all other return values should be discarded.
 //
-// Expected errors:
-// - storage.ErrNotFound if the requested block or collection was not found.
-func (t *Transactions) retrieveBlock(
-	blockID flow.Identifier,
-	collectionID flow.Identifier,
-	txID flow.Identifier,
-) (*flow.Block, error) {
-	if blockID != flow.ZeroID {
-		return t.blocks.ByID(blockID)
-	}
-
-	if collectionID != flow.ZeroID {
-		return t.blocks.ByCollectionID(collectionID)
-	}
-
-	// find the block for the transaction
-	block, err := t.lookupBlock(txID)
-
-	if err != nil && !errors.Is(err, storage.ErrNotFound) {
-		return nil, err
-	}
-
-	return block, nil
-}
-
-func (t *Transactions) GetTransactionResultsByBlockID(
-	ctx context.Context,
-	blockID flow.Identifier,
-	requiredEventEncodingVersion entities.EventEncodingVersion,
-	userCriteria optimistic_sync.Criteria,
-) ([]*accessmodel.TransactionResult, *accessmodel.ExecutorMetadata, error) {
-	// TODO: consider using storage.Index.ByBlockID, the index contains collection id and seals ID
-	block, err := t.blocks.ByID(blockID)
-	if err != nil {
-		return nil, nil, rpc.ConvertStorageError(err)
-	}
-
-	criteria := t.operatorCriteria.OverrideWith(userCriteria)
-	execResultInfo, err := t.execResultProvider.ExecutionResultInfo(blockID, criteria)
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to get execution result for last block: %w", err)
-	}
-
-	results, executorMetadata, err := t.txProvider.TransactionResultsByBlockID(ctx, block, requiredEventEncodingVersion, execResultInfo)
-	if err != nil {
-		if errors.Is(err, storage.ErrNotFound) {
-			return nil, nil, status.Errorf(codes.NotFound, "could not find execution result for block %s: %v", blockID, err)
-		}
-		if _, ok := status.FromError(err); ok {
-			return nil, nil, rpc.ConvertError(err, "failed to retrieve result", codes.Internal)
-		}
-		return nil, nil, access.RequireNoError(ctx, fmt.Errorf("failed to retrieve result: %w", err))
-	}
-
-	return results, executorMetadata, nil
-}
-
-// GetTransactionResultByIndex returns transactions Results for an index in a block that is executed,
-// pending or finalized transactions  return errors
+// Expected sentinel errors providing details to clients about failed requests:
+//   - [access.DataNotFoundError] - if data required to process the request was not found
+//   - [access.InternalError] - if the transaction results cannot be retrieved from the execution
+//     node or were invalid.
 func (t *Transactions) GetTransactionResultByIndex(
 	ctx context.Context,
 	blockID flow.Identifier,
 	index uint32,
-	requiredEventEncodingVersion entities.EventEncodingVersion,
+	encodingVersion entities.EventEncodingVersion,
 	userCriteria optimistic_sync.Criteria,
 ) (*accessmodel.TransactionResult, *accessmodel.ExecutorMetadata, error) {
 	block, err := t.blocks.ByID(blockID)
 	if err != nil {
-		return nil, nil, rpc.ConvertStorageError(err)
+		err = access.RequireErrorIs(ctx, fmt.Errorf("could not find block: %w", err), storage.ErrNotFound)
+		return nil, nil, access.NewDataNotFoundError("transaction result", err)
 	}
 
 	criteria := t.operatorCriteria.OverrideWith(userCriteria)
 	execResultInfo, err := t.execResultProvider.ExecutionResultInfo(blockID, criteria)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to get execution result for last block: %w", err)
+		if common.IsInsufficientExecutionReceipts(err) {
+			return nil, nil, access.NewDataNotFoundError("transaction result", err)
+		}
+		return nil, nil, access.RequireNoError(ctx, fmt.Errorf("failed to get execution result for block: %w", err))
 	}
 
-	txResult, executorMetadata, err := t.txProvider.TransactionResultByIndex(ctx, block, index, requiredEventEncodingVersion, execResultInfo)
+	collectionID, err := t.lookupCollectionIDByBlockAndTxIndex(block, index)
 	if err != nil {
 		if errors.Is(err, storage.ErrNotFound) {
-			return nil, nil, status.Errorf(codes.NotFound, "could not find execution result for block %s: %v", blockID, err)
+			err = fmt.Errorf("could not find collection for transaction result: %w", err)
+			return nil, nil, access.NewDataNotFoundError("collection", err)
 		}
-		if _, ok := status.FromError(err); ok {
-			return nil, nil, rpc.ConvertError(err, "failed to retrieve result", codes.Internal)
+		return nil, nil, access.RequireNoError(ctx, fmt.Errorf("failed to lookup collection ID in block by index: %w", err))
+	}
+
+	txResult, executorMetadata, err := t.txProvider.TransactionResultByIndex(ctx, block.ToHeader(), index, collectionID, encodingVersion, execResultInfo)
+	if err != nil {
+		switch {
+		case errors.Is(err, optimistic_sync.ErrSnapshotNotFound):
+			err = fmt.Errorf("could not find snapshot for execution result: %w", err)
+			return nil, nil, access.NewDataNotFoundError("transaction result", err)
+		case common.IsInvalidDataFromExternalNodeError(err):
+			err = fmt.Errorf("invalid data from execution node: %w", err)
+			return nil, nil, access.NewInternalError(err)
+		case common.IsFailedToQueryExternalNodeError(err):
+			err = fmt.Errorf("failed to query execution node: %w", err)
+			return nil, nil, access.NewInternalError(err)
+		default:
+			err = fmt.Errorf("failed to get transaction result by index: %w", err)
+			return nil, nil, access.RequireNoError(ctx, err)
 		}
-		return nil, nil, access.RequireNoError(ctx, fmt.Errorf("failed to retrieve result: %w", err))
 	}
 
 	return txResult, executorMetadata, nil
 }
 
-// GetSystemTransaction returns system transaction
+// GetTransactionResultsByBlockID returns all transaction results for the provided block ID.
+//
+// CAUTION: this layer SIMPLIFIES the ERROR HANDLING convention
+//   - All errors returned are guaranteed to be benign. The node can continue normal operations after such errors.
+//   - To prevent delivering incorrect results to clients in case of an error, all other return values should be discarded.
+//
+// Expected sentinel errors providing details to clients about failed requests:
+//   - [access.DataNotFoundError] - if data required to process the request was not found
+//   - [access.InternalError] - if the transaction results cannot be retrieved from the execution
+//     node or were invalid.
+func (t *Transactions) GetTransactionResultsByBlockID(
+	ctx context.Context,
+	blockID flow.Identifier,
+	encodingVersion entities.EventEncodingVersion,
+	userCriteria optimistic_sync.Criteria,
+) ([]*accessmodel.TransactionResult, *accessmodel.ExecutorMetadata, error) {
+	// TODO: consider using storage.Index.ByBlockID, the index contains collection id and seals ID
+	block, err := t.blocks.ByID(blockID)
+	if err != nil {
+		err = access.RequireErrorIs(ctx, fmt.Errorf("could not find block: %w", err), storage.ErrNotFound)
+		return nil, nil, access.NewDataNotFoundError("transaction result", err)
+	}
+
+	criteria := t.operatorCriteria.OverrideWith(userCriteria)
+	execResultInfo, err := t.execResultProvider.ExecutionResultInfo(blockID, criteria)
+	if err != nil {
+		if common.IsInsufficientExecutionReceipts(err) {
+			return nil, nil, access.NewDataNotFoundError("transaction result", err)
+		}
+		return nil, nil, access.RequireNoError(ctx, fmt.Errorf("failed to get execution result for block: %w", err))
+	}
+
+	results, executorMetadata, err := t.txProvider.TransactionResultsByBlockID(ctx, block, encodingVersion, execResultInfo)
+	if err != nil {
+		switch {
+		case errors.Is(err, optimistic_sync.ErrSnapshotNotFound):
+			err = fmt.Errorf("could not find snapshot for execution result: %w", err)
+			return nil, nil, access.NewDataNotFoundError("transaction result", err)
+		case errors.Is(err, storage.ErrNotFound):
+			err = fmt.Errorf("could not find collection: %w", err)
+			return nil, nil, access.NewDataNotFoundError("collection", err)
+		case common.IsInvalidDataFromExternalNodeError(err):
+			err = fmt.Errorf("invalid data from execution node: %w", err)
+			return nil, nil, access.NewInternalError(err)
+		case common.IsFailedToQueryExternalNodeError(err):
+			err = fmt.Errorf("failed to query execution node: %w", err)
+			return nil, nil, access.NewInternalError(err)
+		default:
+			err = fmt.Errorf("failed to get transaction result by index: %w", err)
+			return nil, nil, access.RequireNoError(ctx, err)
+		}
+	}
+
+	return results, executorMetadata, nil
+}
+
+// GetSystemTransaction returns the system transaction for the provided block.
+//
+// CAUTION: this layer SIMPLIFIES the ERROR HANDLING convention
+//   - All errors returned are guaranteed to be benign. The node can continue normal operations after such errors.
+//   - To prevent delivering incorrect results to clients in case of an error, all other return values should be discarded.
+//
+// Expected sentinel errors providing details to clients about failed requests:
+//   - [access.DataNotFoundError] - if data required to process the request was not found
+//   - [access.InternalError] - if the transaction cannot be retrieved from the execution node or was invalid.
 func (t *Transactions) GetSystemTransaction(
 	ctx context.Context,
 	txID flow.Identifier,
@@ -569,7 +628,8 @@ func (t *Transactions) GetSystemTransaction(
 ) (*flow.TransactionBody, *accessmodel.ExecutorMetadata, error) {
 	block, err := t.blocks.ByID(blockID)
 	if err != nil {
-		return nil, nil, rpc.ConvertStorageError(err)
+		err = access.RequireErrorIs(ctx, err, storage.ErrNotFound)
+		return nil, nil, access.NewDataNotFoundError("transaction result", fmt.Errorf("could not find block: %w", err))
 	}
 
 	if txID == flow.ZeroID {
@@ -579,137 +639,311 @@ func (t *Transactions) GetSystemTransaction(
 	criteria := t.operatorCriteria.OverrideWith(userCriteria)
 	execResultInfo, err := t.execResultProvider.ExecutionResultInfo(blockID, criteria)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to get execution result for last block: %w", err)
+		if common.IsInsufficientExecutionReceipts(err) {
+			return nil, nil, access.NewDataNotFoundError("system transaction", err)
+		}
+		return nil, nil, access.RequireNoError(ctx, fmt.Errorf("failed to get execution result for block: %w", err))
 	}
 
-	return t.txProvider.SystemTransaction(ctx, block, txID, execResultInfo)
+	tx, executorMetadata, err := t.txProvider.SystemTransaction(ctx, block, txID, execResultInfo)
+	if err != nil {
+		switch {
+		case errors.Is(err, provider.ErrNotASystemTransaction):
+			err = fmt.Errorf("transaction %s is not a system transaction: %w", txID, err)
+			return nil, nil, access.NewDataNotFoundError("system transaction", err)
+		case errors.Is(err, optimistic_sync.ErrSnapshotNotFound):
+			err = fmt.Errorf("could not find snapshot for execution result: %w", err)
+			return nil, nil, access.NewDataNotFoundError("transaction result", err)
+		case common.IsInvalidDataFromExternalNodeError(err):
+			err = fmt.Errorf("invalid data from execution node: %w", err)
+			return nil, nil, access.NewInternalError(err)
+		case common.IsFailedToQueryExternalNodeError(err):
+			err = fmt.Errorf("failed to query execution node: %w", err)
+			return nil, nil, access.NewInternalError(err)
+		default:
+			err = fmt.Errorf("failed to get system transaction: %w", err)
+			return nil, nil, access.RequireNoError(ctx, err)
+		}
+	}
+	return tx, executorMetadata, nil
 }
 
-// GetSystemTransactionResult returns system transaction result
+// GetSystemTransactionResult returns the system transaction result for the provided block.
+//
+// CAUTION: this layer SIMPLIFIES the ERROR HANDLING convention
+//   - All errors returned are guaranteed to be benign. The node can continue normal operations after such errors.
+//   - To prevent delivering incorrect results to clients in case of an error, all other return values should be discarded.
+//
+// Expected sentinel errors providing details to clients about failed requests:
+//   - [access.DataNotFoundError] - if data required to process the request was not found
+//   - [access.InternalError] - if the transaction result cannot be retrieved from the execution node or was invalid.
 func (t *Transactions) GetSystemTransactionResult(
 	ctx context.Context,
 	txID flow.Identifier,
 	blockID flow.Identifier,
-	requiredEventEncodingVersion entities.EventEncodingVersion,
+	encodingVersion entities.EventEncodingVersion,
 	userCriteria optimistic_sync.Criteria,
 ) (*accessmodel.TransactionResult, *accessmodel.ExecutorMetadata, error) {
 	block, err := t.blocks.ByID(blockID)
 	if err != nil {
-		return nil, nil, rpc.ConvertStorageError(err)
-	}
-
-	if txID == flow.ZeroID {
-		txID = t.systemTxID
+		err = access.RequireErrorIs(ctx, err, storage.ErrNotFound)
+		return nil, nil, access.NewDataNotFoundError("transaction result", fmt.Errorf("could not find block: %w", err))
 	}
 
 	criteria := t.operatorCriteria.OverrideWith(userCriteria)
 	execResultInfo, err := t.execResultProvider.ExecutionResultInfo(blockID, criteria)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to get execution result for last block: %w", err)
+		if common.IsInsufficientExecutionReceipts(err) {
+			return nil, nil, access.NewDataNotFoundError("system transaction result", err)
+		}
+		return nil, nil, access.RequireNoError(ctx, fmt.Errorf("failed to get execution result for block: %w", err))
 	}
 
-	return t.txProvider.SystemTransactionResult(ctx, block, txID, requiredEventEncodingVersion, execResultInfo)
+	result, executorMetadata, err := t.txProvider.TransactionResult(ctx, block.ToHeader(), t.systemTxID, flow.ZeroID, encodingVersion, execResultInfo)
+	if err != nil {
+		switch {
+		case errors.Is(err, optimistic_sync.ErrSnapshotNotFound):
+			err = fmt.Errorf("could not find snapshot for execution result: %w", err)
+			return nil, nil, access.NewDataNotFoundError("transaction result", err)
+		case common.IsInvalidDataFromExternalNodeError(err):
+			err = fmt.Errorf("invalid data from execution node: %w", err)
+			return nil, nil, access.NewInternalError(err)
+		case common.IsFailedToQueryExternalNodeError(err):
+			err = fmt.Errorf("failed to query execution node: %w", err)
+			return nil, nil, access.NewInternalError(err)
+		default:
+			err = fmt.Errorf("failed to get transaction result by index: %w", err)
+			return nil, nil, access.RequireNoError(ctx, err)
+		}
+	}
+
+	return result, executorMetadata, nil
 }
 
-// lookupBlock returns a block based on the transaction ID.
-// Expected error returns during normal operations:
-//   - [storage.ErrNotFound] - collection referenced by transaction or block by a collection has not been found.
-func (t *Transactions) lookupBlock(txID flow.Identifier) (*flow.Block, error) {
-	collection, err := t.collections.LightByTransactionID(txID)
-	if err != nil {
-		return nil, err
-	}
-
-	block, err := t.blocks.ByCollectionID(collection.ID())
-	if err != nil {
-		return nil, err
-	}
-
-	return block, nil
-}
-
-func (t *Transactions) lookupTransactionResult(
+// getUnknownTransactionResult returns the transaction result for a transaction that is not yet
+// indexed in a finalized block.
+//
+// Expected errors during normal operations:
+//   - [ErrTransactionNotInCollection] - if transaction is not found in the collection provided in the request.
+//   - [status.ErrReferenceBlockNotFound] - if the transaction is found, but its reference block is not.
+func (t *Transactions) getUnknownTransactionResult(
 	ctx context.Context,
 	txID flow.Identifier,
-	header *flow.Header,
-	requiredEventEncodingVersion entities.EventEncodingVersion,
-	execResultInfo *optimistic_sync.ExecutionResultInfo,
-) (*accessmodel.TransactionResult, *accessmodel.ExecutorMetadata, error) {
-	txResult, executorMetadata, err := t.txProvider.TransactionResult(ctx, header, txID, requiredEventEncodingVersion, execResultInfo)
-	if err != nil {
-		// if either the storage or execution node reported no results or there were not enough execution results,
-		// indicate that it has not been executed
-		if errors.Is(err, storage.ErrNotFound) || status.Code(err) == codes.NotFound {
-			return nil, executorMetadata, nil
+	blockID flow.Identifier,
+	collectionID flow.Identifier,
+) (*accessmodel.TransactionResult, error) {
+	tx, err := t.transactions.ByID(txID)
+	if err == nil {
+		txStatus, err := t.txStatusDeriver.DeriveUnknownTransactionStatus(tx.ReferenceBlockID)
+		if err != nil {
+			return nil, fmt.Errorf("failed to derive transaction status: %w", err)
 		}
-		return nil, executorMetadata, err
+
+		return &accessmodel.TransactionResult{
+			TransactionID: txID,
+			Status:        txStatus,
+		}, nil
 	}
 
-	// considered executed as long as some result is returned, even if it's an error message
-	return txResult, executorMetadata, nil
+	if !errors.Is(err, storage.ErrNotFound) {
+		return nil, fmt.Errorf("failed to get transaction from storage: %w", err)
+	}
+
+	// the transaction does not exist locally, so check if the block or collection help identify its
+	// status.
+	if blockID != flow.ZeroID {
+		_, err := t.blocks.ByID(blockID)
+		if err == nil {
+			// the user's specified block exists locally, so assume the tx is not yet indexed
+			// but will be eventually
+			return &accessmodel.TransactionResult{
+				TransactionID: txID,
+				Status:        flow.TransactionStatusUnknown,
+			}, nil
+		}
+		if !errors.Is(err, storage.ErrNotFound) {
+			return nil, fmt.Errorf("failed to get block from storage: %w", err)
+		}
+		// search historical access nodes
+	}
+
+	if collectionID != flow.ZeroID {
+		_, err := t.collections.LightByID(collectionID)
+		if err == nil {
+			// the user's specified collection exists locally. since the tx is not indexed, this
+			// means the provided collection does not contain the tx
+			return nil, ErrTransactionNotInCollection
+		}
+		if !errors.Is(err, storage.ErrNotFound) {
+			return nil, fmt.Errorf("failed to get collection from storage: %w", err)
+		}
+		// search historical access nodes
+	}
+
+	historicalTxResult := t.searchHistoricalAccessNodes(ctx, txID)
+	return historicalTxResult, nil
 }
 
+// getHistoricalTransaction retrieves a transaction from the historical access nodes
+//
+// Expected error returns during normal operations:
+//   - [access.DataNotFoundError] - if the transaction is not found on any of the historical nodes.
+//     Note: requests to historical nodes may fail for various reasons, so this does not guarantee
+//     that the transaction does not exist on a historical node.
+//   - [common.InvalidDataFromExternalNodeError] - if the transaction from the historical node cannot
+//     be converted to a TransactionBody
+//   - [common.FailedToQueryExternalNodeError] - if the request to the historical node failed
+//
+// All returned errors are benign and indicate issues with external historical access nodes, not
+// with the local node.
 func (t *Transactions) getHistoricalTransaction(
 	ctx context.Context,
 	txID flow.Identifier,
-	executionStateQuery *entities.ExecutionStateQuery,
 ) (*flow.TransactionBody, error) {
-	for _, historicalNode := range t.historicalAccessNodeClients {
-		txResp, err := historicalNode.GetTransaction(ctx, &accessproto.GetTransactionRequest{Id: txID[:], ExecutionStateQuery: executionStateQuery})
-		if err == nil {
-			tx, err := convert.MessageToTransaction(txResp.Transaction, t.chainID.Chain())
-			if err != nil {
-				return nil, status.Errorf(codes.Internal, "could not convert transaction: %v", err)
+	for i, historicalNode := range t.historicalAccessNodeClients {
+		txResp, err := historicalNode.GetTransaction(ctx, &accessproto.GetTransactionRequest{Id: txID[:]})
+		if err != nil {
+			// TODO: provide better errors so we can differentiate between all networks searched and it
+			// wasn't found, from only some networks successfully searched.
+			switch status.Code(err) {
+			case codes.Canceled, codes.DeadlineExceeded:
+				wrappedErr := fmt.Errorf("could not get transaction result from historical node (%d): %w", i, err)
+				return nil, common.NewFailedToQueryExternalNodeError(wrappedErr)
+			default:
+				// continue searching on any other error
+				continue
 			}
+		}
 
-			// Found on a historical node. Report
-			return &tx, nil
+		tx, err := convert.MessageToTransaction(txResp.Transaction, t.chainID.Chain())
+		if err != nil {
+			err = fmt.Errorf("could not convert transaction from historical node (%d): %w", i, err)
+			return nil, common.NewInvalidDataFromExternalNodeError("transaction", flow.ZeroID, err)
 		}
-		// Otherwise, if not found, just continue
-		if status.Code(err) == codes.NotFound {
-			continue
-		}
-		// TODO should we do something if the error isn't not found?
+		return &tx, nil
 	}
-	return nil, status.Errorf(codes.NotFound, "no known transaction with ID %s", txID)
+	return nil, access.NewDataNotFoundError("transaction", fmt.Errorf("transaction with ID %s not found on historical nodes", txID))
 }
 
+// searchHistoricalAccessNodes searches the historical access nodes for the transaction result
+// and caches the result if enabled.
+func (t *Transactions) searchHistoricalAccessNodes(
+	ctx context.Context,
+	txID flow.Identifier,
+) (historicalTxResult *accessmodel.TransactionResult) {
+	// if the tx is not known locally, search the historical access nodes
+	if t.txResultCache != nil {
+		if result, ok := t.txResultCache.Get(txID); ok {
+			return result
+		}
+		// always cache the result even if it's an error to avoid unnecessary load on the nodes.
+		// the cache is limited so retries will happen eventually. users can also query the nodes
+		// directly for more precise results.
+		defer func() {
+			t.txResultCache.Add(txID, historicalTxResult)
+		}()
+	}
+
+	historicalTxResult, err := t.getHistoricalTransactionResult(ctx, txID)
+	if err != nil {
+		// if tx not found on historic access nodes either, then assume that the tx was
+		// submitted to a different AN and return status as unknown
+		historicalTxResult = &accessmodel.TransactionResult{
+			TransactionID: txID,
+			Status:        flow.TransactionStatusUnknown,
+		}
+	}
+
+	return historicalTxResult
+}
+
+// getHistoricalTransactionResult retrieves a transaction result from the historical access nodes
+//
+// Expected error returns during normal operations:
+//   - [access.DataNotFoundError] - if the transaction result is not found on any of the historical
+//     nodes. Note: requests to historical nodes may fail for various reasons, so this does not guarantee
+//     that the transaction result does not exist on a historical node.
+//   - [common.InvalidDataFromExternalNodeError] - if the transaction result from the historical node
+//     cannot be converted to a TransactionResult
+//     to a TransactionResult
+//   - [common.FailedToQueryExternalNodeError] - if the request to the historical node failed
+//
+// All returned errors are benign and indicate issues with external historical access nodes, not
+// with the local node.
 func (t *Transactions) getHistoricalTransactionResult(
 	ctx context.Context,
 	txID flow.Identifier,
 ) (*accessmodel.TransactionResult, error) {
-	for _, historicalNode := range t.historicalAccessNodeClients {
+	for i, historicalNode := range t.historicalAccessNodeClients {
 		result, err := historicalNode.GetTransactionResult(ctx, &accessproto.GetTransactionRequest{Id: txID[:]})
-		if err == nil {
-			// Found on a historical node. Report
-			if result.GetStatus() == entities.TransactionStatus_UNKNOWN {
-				// We've moved to returning Status UNKNOWN instead of an error with the NotFound status,
-				// Therefore we should continue and look at the next access node for answers.
+		if err != nil {
+			// TODO: provide better errors so we can differentiate between all networks searched and
+			// it wasn't found, from only some networks successfully searched.
+			switch status.Code(err) {
+			case codes.Canceled, codes.DeadlineExceeded:
+				wrappedErr := fmt.Errorf("could not get transaction result from historical node (%d): %w", i, err)
+				return nil, common.NewFailedToQueryExternalNodeError(wrappedErr)
+			default:
+				// continue searching on any other error
 				continue
 			}
-
-			if result.GetStatus() == entities.TransactionStatus_PENDING {
-				// This is on a historical node. No transactions from it will ever be
-				// executed, therefore we should consider this expired
-				result.Status = entities.TransactionStatus_EXPIRED
-			}
-
-			txResult, err := convert.MessageToTransactionResult(result)
-			if err != nil {
-				return nil, status.Errorf(codes.Internal, "could not convert transaction result: %v", err)
-			}
-
-			return txResult, nil
 		}
-		// Otherwise, if not found, just continue
-		if status.Code(err) == codes.NotFound {
+
+		// Found on a historical node. Report
+		if result.GetStatus() == entities.TransactionStatus_UNKNOWN {
+			// We've moved to returning Status UNKNOWN instead of an error with the NotFound status,
+			// Therefore we should continue and look at the next access node for answers.
 			continue
 		}
-		// TODO should we do something if the error isn't not found?
+
+		if result.GetStatus() == entities.TransactionStatus_PENDING {
+			// This is on a historical node. No transactions from it will ever be
+			// executed, therefore we should consider this expired
+			result.Status = entities.TransactionStatus_EXPIRED
+		}
+
+		txResult, err := convert.MessageToTransactionResult(result)
+		if err != nil {
+			err = fmt.Errorf("could not convert transaction result from historical node (%d): %w", i, err)
+			return nil, common.NewInvalidDataFromExternalNodeError("transaction result", flow.ZeroID, err)
+		}
+
+		return txResult, nil
 	}
-	return nil, status.Errorf(codes.NotFound, "no known transaction with ID %s", txID)
+
+	return nil, access.NewDataNotFoundError("transaction result", fmt.Errorf("transaction with ID %s not found on historical nodes", txID))
 }
 
+// lookupCollectionIDByBlockAndTxIndex returns the collection ID that contains the transasction with
+// the provided transaction index.
+//
+// If the index is larger that the number of user transactions, flow.ZeroID is returned, indicating
+// that the transaction is a system transaction. The caller should verify that the index does in fact
+// correspond to a system transaction.
+//
+// Expected errors during normal operations:
+//   - [storage.ErrNotFound] - if any of the collections in the block cannot be found.
+func (t *Transactions) lookupCollectionIDByBlockAndTxIndex(block *flow.Block, index uint32) (flow.Identifier, error) {
+	txIndex := uint32(0)
+	for _, guarantee := range block.Payload.Guarantees {
+		collection, err := t.collections.LightByID(guarantee.CollectionID)
+		if err != nil {
+			return flow.ZeroID, fmt.Errorf("could not find collection %s: %w", guarantee.CollectionID, err)
+		}
+
+		for range collection.Transactions {
+			if txIndex == index {
+				return guarantee.CollectionID, nil
+			}
+			txIndex++
+		}
+	}
+
+	// otherwise, assume it's a system transaction and return the ZeroID
+	return flow.ZeroID, nil
+}
+
+// registerTransactionForRetry registers the transaction for retry if it is not yet executed.
 func (t *Transactions) registerTransactionForRetry(tx *flow.TransactionBody) {
 	referenceBlock, err := t.state.AtBlockID(tx.ReferenceBlockID).Head()
 	if err != nil {
@@ -719,6 +953,8 @@ func (t *Transactions) registerTransactionForRetry(tx *flow.TransactionBody) {
 	t.retrier.RegisterTransaction(referenceBlock.Height, tx)
 }
 
+// ProcessFinalizedBlockHeight is called to notify the backend that a new block has been finalized.
+//
 // ATTENTION: might be a source of problems in future. We run this code on finalization gorotuine,
 // potentially lagging finalization events if operations take long time.
 // We might need to move this logic on dedicated goroutine and provide a way to skip finalization events if they are delivered

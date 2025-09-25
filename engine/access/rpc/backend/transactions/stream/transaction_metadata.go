@@ -209,7 +209,14 @@ func (t *TransactionMetadata) refreshTransactionResult(ctx context.Context) erro
 	// TODO: need a way to check if the result in execResultInfo is still valid.
 	// if it is ever abandoned, we need to trigger the streaming fork recovery process.
 
-	txResult, _, err := t.txProvider.TransactionResult(ctx, t.blockWithTx, t.txResult.TransactionID, t.eventEncodingVersion, t.execResultInfo)
+	txResult, _, err := t.txProvider.TransactionResult(
+		ctx,
+		t.blockWithTx,
+		t.txResult.TransactionID,
+		t.txResult.CollectionID,
+		t.eventEncodingVersion,
+		t.execResultInfo,
+	)
 	if err != nil {
 		// TODO: I don't like the fact we propagate this error from txProvider.
 		// Fix it during error handling polishing project

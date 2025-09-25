@@ -3,15 +3,14 @@ package convert_test
 import (
 	"testing"
 
-	"github.com/stretchr/testify/require"
+	"github.com/stretchr/testify/assert"
 
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/model/access"
+	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-// TestExecutorMetadata verifies round-trip conversion between the access-layer
-// ExecutorMetadata struct and its corresponding protobuf message representation
 func TestExecutorMetadata(t *testing.T) {
 	t.Parallel()
 
@@ -26,7 +25,7 @@ func TestExecutorMetadata(t *testing.T) {
 		msg := convert.ExecutorMetadataToMessage(metadata)
 		converted := convert.MessageToExecutorMetadata(msg)
 
-		require.Equal(t, metadata, converted)
+		assert.Equal(t, metadata, converted)
 	})
 
 	t.Run("convert nil executor metadata", func(t *testing.T) {
@@ -35,7 +34,7 @@ func TestExecutorMetadata(t *testing.T) {
 		msg := convert.ExecutorMetadataToMessage(nil)
 		converted := convert.MessageToExecutorMetadata(msg)
 
-		require.Nil(t, converted)
+		assert.Nil(t, converted)
 	})
 
 	t.Run("convert empty executor metadata", func(t *testing.T) {
@@ -47,7 +46,8 @@ func TestExecutorMetadata(t *testing.T) {
 
 		// cannot do a direct comparison to metadata because the MessageToIdentifiers converter always
 		// returns a slice, even if the input is nil
-		require.NotNil(t, converted)
-		require.True(t, converted.IsEmpty())
+		assert.NotNil(t, converted)
+		assert.Equal(t, flow.ZeroID, converted.ExecutionResultID)
+		assert.Empty(t, converted.ExecutorIDs)
 	})
 }

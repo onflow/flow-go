@@ -65,7 +65,7 @@ func (e *ENAccountProvider) GetAccountAtBlock(
 	}
 
 	var resp *execproto.GetAccountAtBlockIDResponse
-	errToReturn := e.nodeCommunicator.CallAvailableNode(
+	_, errToReturn := e.nodeCommunicator.CallAvailableNode(
 		execNodes,
 		func(node *flow.IdentitySkeleton) error {
 			var err error

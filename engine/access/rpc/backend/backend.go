@@ -224,9 +224,7 @@ func New(params Params) (*Backend, error) {
 	txStatusDeriver := status.NewTxStatusDeriver(params.State, params.LastFullBlockHeight)
 
 	localTxProvider := provider.NewLocalTransactionProvider(
-		params.State,
 		params.Collections,
-		params.Blocks,
 		systemTxID,
 		txStatusDeriver,
 		params.ExecutionStateCache,
