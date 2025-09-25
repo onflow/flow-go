@@ -138,8 +138,8 @@ endif
 
 .PHONY: generate-openapi
 generate-openapi:
-	swagger-codegen generate -l go -i https://raw.githubusercontent.com/onflow/flow/master/openapi/access.yaml -D packageName=models,modelDocs=false,models -o engine/access/rest/http/models;
-	go fmt ./engine/access/rest/http/models
+	swagger-codegen generate -l go -i https://raw.githubusercontent.com/onflow/flow/master/openapi/access.yaml -D packageName=models,modelDocs=false,models -o engine/access/api/resthttp/models;
+	go fmt ./engine/access/api/resthttp/models
 
 .PHONY: generate
 generate: generate-proto generate-mocks generate-fvm-env-wrappers
@@ -199,21 +199,21 @@ generate-mocks: install-mock-generators
 	mockery --name 'API' --dir="./access" --case=underscore --output="./access/mock" --outpkg="mock"
 	mockery --name 'Blocks' --dir="./access/validator" --case=underscore --output="./access/validator/mock" --outpkg="mock"
 	mockery --name 'API' --dir="./engine/protocol" --case=underscore --output="./engine/protocol/mock" --outpkg="mock"
-	mockery --name '.*' --dir="./engine/access/state_stream" --case=underscore --output="./engine/access/state_stream/mock" --outpkg="mock"
+	mockery --name '.*' --dir="./engine/access/api/state_stream" --case=underscore --output="./engine/access/api/state_stream/mock" --outpkg="mock"
 	mockery --name 'BlockTracker' --dir="./engine/access/subscription/tracker" --case=underscore --output="./engine/access/subscription/tracker/mock"  --outpkg="mock"
 	mockery --name 'ExecutionDataTracker' --dir="./engine/access/subscription/tracker" --case=underscore --output="./engine/access/subscription/tracker/mock"  --outpkg="mock"
-	mockery --name 'DataProvider' --dir="./engine/access/rest/websockets/data_providers" --case=underscore --output="./engine/access/rest/websockets/data_providers/mock"  --outpkg="mock"
-	mockery --name 'DataProviderFactory' --dir="./engine/access/rest/websockets/data_providers" --case=underscore --output="./engine/access/rest/websockets/data_providers/mock"  --outpkg="mock"
-	mockery --name 'LinkGenerator' --dir="./engine/access/rest/common/models" --case=underscore --output="./engine/access/rest/common/models/mock"  --outpkg="mock"
-	mockery --name 'WebsocketConnection' --dir="./engine/access/rest/websockets" --case=underscore --output="./engine/access/rest/websockets/mock"  --outpkg="mock"
-	mockery --name 'ConnectionFactory' --dir="./engine/access/rpc/connection" --case=underscore --output="./engine/access/rpc/connection/mock" --outpkg="mock"
-	mockery --name 'Communicator' --dir="./engine/access/rpc/backend/node_communicator" --case=underscore --output="./engine/access/rpc/backend/node_communicator/mock" --outpkg="mock"
-	mockery --name 'AccountProvider' --dir="./engine/access/rpc/backend/accounts/provider" --case=underscore --output="./engine/access/rpc/backend/accounts/provider/mock" --outpkg="mock"
-	mockery --name 'EventProvider' --dir="./engine/access/rpc/backend/events/provider" --case=underscore --output="./engine/access/rpc/backend/events/provider/mock" --outpkg="mock"
-	mockery --name 'TransactionProvider' --dir="./engine/access/rpc/backend/transactions/provider" --case=underscore --output="./engine/access/rpc/backend/transactions/provider/mock" --outpkg="mock"
-	mockery --name 'Provider' --dir="./engine/access/rpc/backend/transactions/error_messages" --case=underscore --output="./engine/access/rpc/backend/transactions/error_messages/mock" --outpkg="mock"
-	mockery --name 'TransactionSender' --dir="./engine/access/rpc/backend/transactions/retrier" --case=underscore --output="./engine/access/rpc/backend/transactions/retrier/mock" --outpkg="mock"
-	mockery --name 'Retrier' --dir="./engine/access/rpc/backend/transactions/retrier" --case=underscore --output="./engine/access/rpc/backend/transactions/retrier/mock" --outpkg="mock"
+	mockery --name 'DataProvider' --dir="./engine/access/api/rest/websockets/data_providers" --case=underscore --output="./engine/access/api/rest/websockets/data_providers/mock"  --outpkg="mock"
+	mockery --name 'DataProviderFactory' --dir="./engine/access/api/rest/websockets/data_providers" --case=underscore --output="./engine/access/api/rest/websockets/data_providers/mock"  --outpkg="mock"
+	mockery --name 'LinkGenerator' --dir="./engine/access/api/rest/common/models" --case=underscore --output="./engine/access/api/rest/common/models/mock"  --outpkg="mock"
+	mockery --name 'WebsocketConnection' --dir="./engine/access/api/rest/websockets" --case=underscore --output="./engine/access/api/rest/websockets/mock"  --outpkg="mock"
+	mockery --name 'ConnectionFactory' --dir="./engine/access/api/rpc/connection" --case=underscore --output="./engine/access/api/rpc/connection/mock" --outpkg="mock"
+	mockery --name 'Communicator' --dir="./engine/access/api/rpc/backend/node_communicator" --case=underscore --output="./engine/access/api/rpc/backend/node_communicator/mock" --outpkg="mock"
+	mockery --name 'AccountProvider' --dir="./engine/access/api/rpc/backend/accounts/provider" --case=underscore --output="./engine/access/api/rpc/backend/accounts/provider/mock" --outpkg="mock"
+	mockery --name 'EventProvider' --dir="./engine/access/api/rpc/backend/events/provider" --case=underscore --output="./engine/access/api/rpc/backend/events/provider/mock" --outpkg="mock"
+	mockery --name 'TransactionProvider' --dir="./engine/access/api/rpc/backend/transactions/provider" --case=underscore --output="./engine/access/api/rpc/backend/transactions/provider/mock" --outpkg="mock"
+	mockery --name 'Provider' --dir="./engine/access/api/rpc/backend/transactions/error_messages" --case=underscore --output="./engine/access/api/rpc/backend/transactions/error_messages/mock" --outpkg="mock"
+	mockery --name 'TransactionSender' --dir="./engine/access/api/rpc/backend/transactions/retrier" --case=underscore --output="./engine/access/api/rpc/backend/transactions/retrier/mock" --outpkg="mock"
+	mockery --name 'Retrier' --dir="./engine/access/api/rpc/backend/transactions/retrier" --case=underscore --output="./engine/access/api/rpc/backend/transactions/retrier/mock" --outpkg="mock"
 	mockery --name '.*' --dir=model/fingerprint --case=underscore --output="./model/fingerprint/mock" --outpkg="mock"
 	mockery --name 'ExecForkActor' --structname 'ExecForkActorMock' --dir=module/mempool/consensus/mock/ --case=underscore --output="./module/mempool/consensus/mock/" --outpkg="mock"
 	mockery --name '.*' --dir=engine/verification/fetcher/ --case=underscore --output="./engine/verification/fetcher/mock" --outpkg="mockfetcher"

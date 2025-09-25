@@ -12,7 +12,7 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
-	"github.com/onflow/flow-go/engine/access/rpc/backend/transactions/error_messages"
+	"github.com/onflow/flow-go/engine/access/api/rpc/backend/transactions/error_messages"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/utils/logging"
 

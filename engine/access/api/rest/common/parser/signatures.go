@@ -1,0 +1,116 @@
+package parser
+
+import (
+	"fmt"
+
+	"github.com/onflow/flow-go/engine/access/api/rest/common/models"
+	"github.com/onflow/flow-go/engine/access/api/rest/util"
+	"github.com/onflow/flow-go/model/flow"
+)
+
+type TransactionSignature flow.TransactionSignature
+
+func (s *TransactionSignature) Parse(
+	rawAddress string,
+	rawKeyIndex string,
+	rawSignature string,
+	rawExtensionData string,
+	chain flow.Chain,
+) error {
+	address, err := ParseAddress(rawAddress, chain)
+	if err != nil {
+		return err
+	}
+
+	keyIndex, err := util.ToUint32(rawKeyIndex)
+	if err != nil {
+		return fmt.Errorf("invalid key index: %w", err)
+	}
+
+	var signature Signature
+	err = signature.Parse(rawSignature)
+	if err != nil {
+		return fmt.Errorf("invalid signature: %w", err)
+	}
+
+	var extensionData ExtensionData
+	err = extensionData.Parse(rawExtensionData)
+	if err != nil {
+		return fmt.Errorf("invalid extension data: %w", err)
+	}
+
+	*s = TransactionSignature(flow.TransactionSignature{
+		Address:       address,
+		KeyIndex:      keyIndex,
+		Signature:     signature,
+		ExtensionData: extensionData,
+	})
+
+	return nil
+}
+
+func (s TransactionSignature) Flow() flow.TransactionSignature {
+	return flow.TransactionSignature(s)
+}
+
+type TransactionSignatures []TransactionSignature
+
+func (t *TransactionSignatures) Parse(rawSigs []models.TransactionSignature, chain flow.Chain) error {
+	signatures := make([]TransactionSignature, len(rawSigs))
+	for i, sig := range rawSigs {
+		var signature TransactionSignature
+		err := signature.Parse(sig.Address, sig.KeyIndex, sig.Signature, sig.ExtensionData, chain)
+		if err != nil {
+			return err
+		}
+		signatures[i] = signature
+	}
+
+	*t = signatures
+	return nil
+}
+
+func (t TransactionSignatures) Flow() []flow.TransactionSignature {
+	sigs := make([]flow.TransactionSignature, len(t))
+	for i, sig := range t {
+		sigs[i] = sig.Flow()
+	}
+	return sigs
+}
+
+type Signature []byte
+
+func (s *Signature) Parse(raw string) error {
+	if raw == "" {
+		return fmt.Errorf("missing value")
+	}
+
+	signatureBytes, err := util.FromBase64(raw)
+	if err != nil {
+		return fmt.Errorf("invalid encoding")
+	}
+
+	*s = signatureBytes
+	return nil
+}
+
+func (s Signature) Flow() []byte {
+	return s
+}
+
+type ExtensionData []byte
+
+func (s *ExtensionData) Parse(raw string) error {
+	// Allow empty
+	extensionDataBytes, err := util.FromBase64(raw)
+	if err != nil {
+		return fmt.Errorf("invalid encoding")
+	}
+
+	*s = extensionDataBytes
+	return nil
+}
+
+func (s ExtensionData) Flow() []byte {
+	return s
+}
