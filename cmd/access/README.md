@@ -71,7 +71,7 @@ As the collections arrive, it persists the collections and the transactions with
 
 The `requester` engine requests collections from the collection nodes on behalf of the `ingestion` engine.
 
-### [RPC](../../engine/access/rpc)
+### [RPC](../../engine/access/api/rpc)
 
 The `rpc` engine is the GRPC server which responds to the [Access API](https://docs.onflow.org/access-api/) requests from clients.
 It also supports GRPCWebproxy requests.

@@ -11,7 +11,7 @@ import (
 	"github.com/stretchr/testify/mock"
 
 	"github.com/onflow/flow-go/engine"
-	streammock "github.com/onflow/flow-go/engine/access/state_stream/mock"
+	streammock "github.com/onflow/flow-go/engine/access/api/state_stream/mock"
 	"github.com/onflow/flow-go/engine/access/subscription"
 	"github.com/onflow/flow-go/utils/unittest"
 )

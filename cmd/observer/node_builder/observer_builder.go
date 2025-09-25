@@ -36,20 +36,20 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/verification"
 	recovery "github.com/onflow/flow-go/consensus/recovery/protocol"
 	"github.com/onflow/flow-go/engine"
+	"github.com/onflow/flow-go/engine/access/api/rest"
+	restapiproxy "github.com/onflow/flow-go/engine/access/api/rest/apiproxy"
+	"github.com/onflow/flow-go/engine/access/api/rest/router"
+	"github.com/onflow/flow-go/engine/access/api/rest/websockets"
+	"github.com/onflow/flow-go/engine/access/api/rpc"
+	"github.com/onflow/flow-go/engine/access/api/rpc/backend"
+	"github.com/onflow/flow-go/engine/access/api/rpc/backend/events"
+	"github.com/onflow/flow-go/engine/access/api/rpc/backend/node_communicator"
+	"github.com/onflow/flow-go/engine/access/api/rpc/backend/query_mode"
+	rpcConnection "github.com/onflow/flow-go/engine/access/api/rpc/connection"
+	"github.com/onflow/flow-go/engine/access/api/state_stream"
+	statestreambackend "github.com/onflow/flow-go/engine/access/api/state_stream/backend"
 	"github.com/onflow/flow-go/engine/access/apiproxy"
 	"github.com/onflow/flow-go/engine/access/index"
-	"github.com/onflow/flow-go/engine/access/rest"
-	restapiproxy "github.com/onflow/flow-go/engine/access/rest/apiproxy"
-	"github.com/onflow/flow-go/engine/access/rest/router"
-	"github.com/onflow/flow-go/engine/access/rest/websockets"
-	"github.com/onflow/flow-go/engine/access/rpc"
-	"github.com/onflow/flow-go/engine/access/rpc/backend"
-	"github.com/onflow/flow-go/engine/access/rpc/backend/events"
-	"github.com/onflow/flow-go/engine/access/rpc/backend/node_communicator"
-	"github.com/onflow/flow-go/engine/access/rpc/backend/query_mode"
-	rpcConnection "github.com/onflow/flow-go/engine/access/rpc/connection"
-	"github.com/onflow/flow-go/engine/access/state_stream"
-	statestreambackend "github.com/onflow/flow-go/engine/access/state_stream/backend"
 	"github.com/onflow/flow-go/engine/access/subscription"
 	subscriptiontracker "github.com/onflow/flow-go/engine/access/subscription/tracker"
 	"github.com/onflow/flow-go/engine/common/follower"
@@ -72,6 +72,10 @@ import (
 	"github.com/onflow/flow-go/module/execution"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	execdatacache "github.com/onflow/flow-go/module/executiondatasync/execution_data/cache"
+	"github.com/onflow/flow-go/module/executiondatasync/optimistic_sync"
+	"github.com/onflow/flow-go/module/executiondatasync/optimistic_sync/execution_result"
+	"github.com/onflow/flow-go/module/executiondatasync/optimistic_sync/execution_state"
+	osyncsnapshot "github.com/onflow/flow-go/module/executiondatasync/optimistic_sync/snapshot"
 	"github.com/onflow/flow-go/module/executiondatasync/pruner"
 	edstorage "github.com/onflow/flow-go/module/executiondatasync/storage"
 	"github.com/onflow/flow-go/module/executiondatasync/tracker"
@@ -217,6 +221,7 @@ func DefaultObserverServiceConfig() *ObserverServiceConfig {
 			ResponseLimit:           subscription.DefaultResponseLimit,
 			HeartbeatInterval:       subscription.DefaultHeartbeatInterval,
 			RegisterIDsRequestLimit: state_stream.DefaultRegisterIDsRequestLimit,
+			OperatorCriteria:        optimistic_sync.DefaultCriteria,
 		},
 		stateStreamFilterConf:                nil,
 		rpcMetricsEnabled:                    false,
@@ -1555,7 +1560,7 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 
 			// use the events index for events if enabled and the node is configured to use it for
 			// regular event queries
-			useIndex := builder.executionDataIndexingEnabled &&
+			fetchFromLocalStorage := builder.executionDataIndexingEnabled &&
 				eventQueryMode != query_mode.IndexQueryModeExecutionNodesOnly
 
 			executionDataTracker := subscriptiontracker.NewExecutionDataTracker(
@@ -1566,8 +1571,47 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 				broadcaster,
 				highestAvailableHeight,
 				builder.EventsIndex,
-				useIndex,
+				fetchFromLocalStorage,
 			)
+
+			cfg := builder.rpcConf.BackendConfig
+			preferredENIdentifiers, err := flow.IdentifierListFromHex(cfg.PreferredExecutionNodeIDs)
+			if err != nil {
+				return nil, fmt.Errorf("failed to convert node id string to Flow Identifier for preferred EN map: %w", err)
+			}
+
+			fixedENIdentifiers, err := flow.IdentifierListFromHex(cfg.FixedExecutionNodeIDs)
+			if err != nil {
+				return nil, fmt.Errorf("failed to convert node id string to Flow Identifier for fixed EN map: %w", err)
+			}
+
+			execNodeSelector := execution_result.NewExecutionNodeSelector(
+				preferredENIdentifiers,
+				fixedENIdentifiers,
+			)
+
+			execResultInfoProvider, err := execution_result.NewExecutionResultInfoProvider(
+				node.Logger,
+				node.State,
+				node.Storage.Headers,
+				node.Storage.Receipts,
+				execNodeSelector,
+				optimistic_sync.DefaultCriteria,
+			)
+			if err != nil {
+				return nil, fmt.Errorf("failed to create execution result provider: %w", err)
+			}
+
+			// TODO: use real objects instead of mocks once they're implemented
+			snapshot := osyncsnapshot.NewSnapshotMock(
+				builder.events,
+				nil,
+				nil,
+				builder.lightTransactionResults,
+				nil,
+				nil,
+			)
+			execStateCache := execution_state.NewExecutionStateCacheMock(snapshot)
 
 			builder.stateStreamBackend, err = statestreambackend.New(
 				node.Logger,
@@ -1578,10 +1622,9 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 				builder.ExecutionDataStore,
 				executionDataStoreCache,
 				builder.RegistersAsyncStore,
-				builder.EventsIndex,
-				useIndex,
+				fetchFromLocalStorage,
 				int(builder.stateStreamConf.RegisterIDsRequestLimit),
-				subscription.NewSubscriptionHandler(
+				subscription.NewSubscriptionFactory(
 					builder.Logger,
 					broadcaster,
 					builder.stateStreamConf.ClientSendTimeout,
@@ -1589,6 +1632,8 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 					builder.stateStreamConf.ClientSendBufferSize,
 				),
 				executionDataTracker,
+				execResultInfoProvider,
+				execStateCache,
 			)
 			if err != nil {
 				return nil, fmt.Errorf("could not create state stream backend: %w", err)
@@ -1960,6 +2005,7 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 			return nil, fmt.Errorf("could not parse transaction result query mode: %w", err)
 		}
 
+		// TODO: this code duplicated in a couple of places. Can it be refactored?
 		execNodeIdentitiesProvider := commonrpc.NewExecutionNodeIdentitiesProvider(
 			node.Logger,
 			node.State,
@@ -1967,6 +2013,34 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 			preferredENIdentifiers,
 			fixedENIdentifiers,
 		)
+
+		execNodeSelector := execution_result.NewExecutionNodeSelector(
+			preferredENIdentifiers,
+			fixedENIdentifiers,
+		)
+
+		execResultInfoProvider, err := execution_result.NewExecutionResultInfoProvider(
+			node.Logger,
+			node.State,
+			node.Storage.Headers,
+			node.Storage.Receipts,
+			execNodeSelector,
+			optimistic_sync.DefaultCriteria,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create execution result provider: %w", err)
+		}
+
+		// TODO: use real objects instead of mocks once they're implemented
+		snapshot := osyncsnapshot.NewSnapshotMock(
+			builder.events,
+			nil,
+			nil,
+			builder.lightTransactionResults,
+			nil,
+			nil,
+		)
+		execStateCache := execution_state.NewExecutionStateCacheMock(snapshot)
 
 		backendParams := backend.Params{
 			State:                node.State,
@@ -1988,17 +2062,20 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 			ScriptExecutionMode:  scriptExecMode,
 			EventQueryMode:       eventQueryMode,
 			TxResultQueryMode:    txResultQueryMode,
-			SubscriptionHandler: subscription.NewSubscriptionHandler(
+			SubscriptionFactory: subscription.NewSubscriptionFactory(
 				builder.Logger,
 				broadcaster,
 				builder.stateStreamConf.ClientSendTimeout,
 				builder.stateStreamConf.ResponseLimit,
 				builder.stateStreamConf.ClientSendBufferSize,
 			),
-			IndexReporter:              indexReporter,
-			VersionControl:             builder.VersionControl,
-			ExecNodeIdentitiesProvider: execNodeIdentitiesProvider,
-			MaxScriptAndArgumentSize:   config.BackendConfig.AccessConfig.MaxRequestMsgSize,
+			IndexReporter:               indexReporter,
+			VersionControl:              builder.VersionControl,
+			ExecNodeIdentitiesProvider:  execNodeIdentitiesProvider,
+			MaxScriptAndArgumentSize:    config.BackendConfig.AccessConfig.MaxRequestMsgSize,
+			ExecutionResultInfoProvider: execResultInfoProvider,
+			ExecutionStateCache:         execStateCache,
+			OperatorCriteria:            optimistic_sync.DefaultCriteria,
 		}
 
 		if builder.localServiceAPIEnabled {

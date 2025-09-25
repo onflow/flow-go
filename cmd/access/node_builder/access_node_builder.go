@@ -39,22 +39,22 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/verification"
 	recovery "github.com/onflow/flow-go/consensus/recovery/protocol"
 	"github.com/onflow/flow-go/engine"
+	"github.com/onflow/flow-go/engine/access/api/rest"
+	"github.com/onflow/flow-go/engine/access/api/rest/router"
+	"github.com/onflow/flow-go/engine/access/api/rest/websockets"
+	"github.com/onflow/flow-go/engine/access/api/rpc"
+	"github.com/onflow/flow-go/engine/access/api/rpc/backend"
+	"github.com/onflow/flow-go/engine/access/api/rpc/backend/events"
+	"github.com/onflow/flow-go/engine/access/api/rpc/backend/node_communicator"
+	"github.com/onflow/flow-go/engine/access/api/rpc/backend/query_mode"
+	"github.com/onflow/flow-go/engine/access/api/rpc/backend/transactions/error_messages"
+	rpcConnection "github.com/onflow/flow-go/engine/access/api/rpc/connection"
+	"github.com/onflow/flow-go/engine/access/api/state_stream"
+	statestreambackend "github.com/onflow/flow-go/engine/access/api/state_stream/backend"
 	"github.com/onflow/flow-go/engine/access/index"
 	"github.com/onflow/flow-go/engine/access/ingestion"
 	"github.com/onflow/flow-go/engine/access/ingestion/tx_error_messages"
 	pingeng "github.com/onflow/flow-go/engine/access/ping"
-	"github.com/onflow/flow-go/engine/access/rest"
-	"github.com/onflow/flow-go/engine/access/rest/router"
-	"github.com/onflow/flow-go/engine/access/rest/websockets"
-	"github.com/onflow/flow-go/engine/access/rpc"
-	"github.com/onflow/flow-go/engine/access/rpc/backend"
-	"github.com/onflow/flow-go/engine/access/rpc/backend/events"
-	"github.com/onflow/flow-go/engine/access/rpc/backend/node_communicator"
-	"github.com/onflow/flow-go/engine/access/rpc/backend/query_mode"
-	"github.com/onflow/flow-go/engine/access/rpc/backend/transactions/error_messages"
-	rpcConnection "github.com/onflow/flow-go/engine/access/rpc/connection"
-	"github.com/onflow/flow-go/engine/access/state_stream"
-	statestreambackend "github.com/onflow/flow-go/engine/access/state_stream/backend"
 	"github.com/onflow/flow-go/engine/access/subscription"
 	subscriptiontracker "github.com/onflow/flow-go/engine/access/subscription/tracker"
 	followereng "github.com/onflow/flow-go/engine/common/follower"
@@ -79,6 +79,10 @@ import (
 	"github.com/onflow/flow-go/module/execution"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	execdatacache "github.com/onflow/flow-go/module/executiondatasync/execution_data/cache"
+	"github.com/onflow/flow-go/module/executiondatasync/optimistic_sync"
+	"github.com/onflow/flow-go/module/executiondatasync/optimistic_sync/execution_result"
+	"github.com/onflow/flow-go/module/executiondatasync/optimistic_sync/execution_state"
+	osyncsnapshot "github.com/onflow/flow-go/module/executiondatasync/optimistic_sync/snapshot"
 	"github.com/onflow/flow-go/module/executiondatasync/pruner"
 	edstorage "github.com/onflow/flow-go/module/executiondatasync/storage"
 	"github.com/onflow/flow-go/module/executiondatasync/tracker"
@@ -246,6 +250,7 @@ func DefaultAccessNodeConfig() *AccessNodeConfig {
 			RegisterIDsRequestLimit: state_stream.DefaultRegisterIDsRequestLimit,
 			ResponseLimit:           subscription.DefaultResponseLimit,
 			HeartbeatInterval:       subscription.DefaultHeartbeatInterval,
+			OperatorCriteria:        optimistic_sync.DefaultCriteria,
 		},
 		stateStreamFilterConf:        nil,
 		ExecutionNodeAddress:         "localhost:9000",
@@ -1046,7 +1051,7 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 
 			// use the events index for events if enabled and the node is configured to use it for
 			// regular event queries
-			useIndex := builder.executionDataIndexingEnabled &&
+			fetchFromLocalStorage := builder.executionDataIndexingEnabled &&
 				eventQueryMode != query_mode.IndexQueryModeExecutionNodesOnly
 
 			executionDataTracker := subscriptiontracker.NewExecutionDataTracker(
@@ -1057,8 +1062,47 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 				broadcaster,
 				highestAvailableHeight,
 				builder.EventsIndex,
-				useIndex,
+				fetchFromLocalStorage,
 			)
+
+			cfg := builder.rpcConf.BackendConfig
+			preferredENIdentifiers, err := flow.IdentifierListFromHex(cfg.PreferredExecutionNodeIDs)
+			if err != nil {
+				return nil, fmt.Errorf("failed to convert node id string to Flow Identifier for preferred EN map: %w", err)
+			}
+
+			fixedENIdentifiers, err := flow.IdentifierListFromHex(cfg.FixedExecutionNodeIDs)
+			if err != nil {
+				return nil, fmt.Errorf("failed to convert node id string to Flow Identifier for fixed EN map: %w", err)
+			}
+
+			execNodeSelector := execution_result.NewExecutionNodeSelector(
+				preferredENIdentifiers,
+				fixedENIdentifiers,
+			)
+
+			execResultInfoProvider, err := execution_result.NewExecutionResultInfoProvider(
+				node.Logger,
+				node.State,
+				node.Storage.Headers,
+				node.Storage.Receipts,
+				execNodeSelector,
+				optimistic_sync.DefaultCriteria,
+			)
+			if err != nil {
+				return nil, fmt.Errorf("failed to create execution result provider: %w", err)
+			}
+
+			// TODO: use real objects instead of mocks once they're implemented
+			snapshot := osyncsnapshot.NewSnapshotMock(
+				builder.events,
+				builder.collections,
+				builder.transactions,
+				builder.lightTransactionResults,
+				builder.transactionResultErrorMessages,
+				nil,
+			)
+			execStateCache := execution_state.NewExecutionStateCacheMock(snapshot)
 
 			builder.stateStreamBackend, err = statestreambackend.New(
 				node.Logger,
@@ -1069,10 +1113,9 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 				builder.ExecutionDataStore,
 				executionDataStoreCache,
 				builder.RegistersAsyncStore,
-				builder.EventsIndex,
-				useIndex,
+				fetchFromLocalStorage,
 				int(builder.stateStreamConf.RegisterIDsRequestLimit),
-				subscription.NewSubscriptionHandler(
+				subscription.NewSubscriptionFactory(
 					builder.Logger,
 					broadcaster,
 					builder.stateStreamConf.ClientSendTimeout,
@@ -1080,6 +1123,8 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 					builder.stateStreamConf.ClientSendBufferSize,
 				),
 				executionDataTracker,
+				execResultInfoProvider,
+				execStateCache,
 			)
 			if err != nil {
 				return nil, fmt.Errorf("could not create state stream backend: %w", err)
@@ -2109,6 +2154,34 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				notNil(builder.ExecNodeIdentitiesProvider),
 			)
 
+			execNodeSelector := execution_result.NewExecutionNodeSelector(
+				preferredENIdentifiers,
+				fixedENIdentifiers,
+			)
+
+			execResultInfoProvider, err := execution_result.NewExecutionResultInfoProvider(
+				node.Logger,
+				node.State,
+				node.Storage.Headers,
+				node.Storage.Receipts,
+				execNodeSelector,
+				optimistic_sync.DefaultCriteria,
+			)
+			if err != nil {
+				return nil, fmt.Errorf("failed to create execution result provider: %w", err)
+			}
+
+			// TODO: use real objects instead of mocks once they're implemented
+			snapshot := osyncsnapshot.NewSnapshotMock(
+				builder.events,
+				builder.collections,
+				builder.transactions,
+				builder.lightTransactionResults,
+				builder.transactionResultErrorMessages,
+				nil,
+			)
+			execStateCache := execution_state.NewExecutionStateCacheMock(snapshot)
+
 			builder.nodeBackend, err = backend.New(backend.Params{
 				State:                 node.State,
 				CollectionRPC:         builder.CollectionRPC, // might be nil
@@ -2134,23 +2207,26 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				CheckPayerBalanceMode: checkPayerBalanceMode,
 				EventQueryMode:        eventQueryMode,
 				BlockTracker:          blockTracker,
-				SubscriptionHandler: subscription.NewSubscriptionHandler(
+				SubscriptionFactory: subscription.NewSubscriptionFactory(
 					builder.Logger,
 					broadcaster,
 					builder.stateStreamConf.ClientSendTimeout,
 					builder.stateStreamConf.ResponseLimit,
 					builder.stateStreamConf.ClientSendBufferSize,
 				),
-				EventsIndex:                notNil(builder.EventsIndex),
-				TxResultQueryMode:          txResultQueryMode,
-				TxResultsIndex:             notNil(builder.TxResultsIndex),
-				LastFullBlockHeight:        lastFullBlockHeight,
-				IndexReporter:              indexReporter,
-				VersionControl:             notNil(builder.VersionControl),
-				ExecNodeIdentitiesProvider: notNil(builder.ExecNodeIdentitiesProvider),
-				TxErrorMessageProvider:     notNil(builder.txResultErrorMessageProvider),
-				MaxScriptAndArgumentSize:   config.BackendConfig.AccessConfig.MaxRequestMsgSize,
-				ScheduledCallbacksEnabled:  builder.scheduledCallbacksEnabled,
+				EventsIndex:                 notNil(builder.EventsIndex),
+				TxResultQueryMode:           txResultQueryMode,
+				TxResultsIndex:              notNil(builder.TxResultsIndex),
+				LastFullBlockHeight:         lastFullBlockHeight,
+				IndexReporter:               indexReporter,
+				VersionControl:              notNil(builder.VersionControl),
+				ExecNodeIdentitiesProvider:  notNil(builder.ExecNodeIdentitiesProvider),
+				TxErrorMessageProvider:      notNil(builder.txResultErrorMessageProvider),
+				ExecutionResultInfoProvider: execResultInfoProvider,
+				ExecutionStateCache:         execStateCache,
+				OperatorCriteria:            optimistic_sync.DefaultCriteria,
+				MaxScriptAndArgumentSize:    config.BackendConfig.AccessConfig.MaxRequestMsgSize,
+				ScheduledCallbacksEnabled:   builder.scheduledCallbacksEnabled,
 			})
 			if err != nil {
 				return nil, fmt.Errorf("could not initialize backend: %w", err)

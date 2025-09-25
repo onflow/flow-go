@@ -8,6 +8,7 @@ import (
 	"github.com/onflow/flow-go/engine/access/subscription"
 	accessmodel "github.com/onflow/flow-go/model/access"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/executiondatasync/optimistic_sync"
 )
 
 type AccountsAPI interface {
@@ -28,17 +29,19 @@ type EventsAPI interface {
 	GetEventsForHeightRange(
 		ctx context.Context,
 		eventType string,
-		startHeight,
+		startHeight uint64,
 		endHeight uint64,
-		requiredEventEncodingVersion entities.EventEncodingVersion,
-	) ([]flow.BlockEvents, error)
+		requiredEventEncodingVersion entities.EventEncodingVersion, // TODO: we should depend on access models instead of rpc models
+		criteria optimistic_sync.Criteria,
+	) ([]flow.BlockEvents, accessmodel.ExecutorMetadata, error)
 
 	GetEventsForBlockIDs(
 		ctx context.Context,
 		eventType string,
 		blockIDs []flow.Identifier,
-		requiredEventEncodingVersion entities.EventEncodingVersion,
-	) ([]flow.BlockEvents, error)
+		requiredEventEncodingVersion entities.EventEncodingVersion, // TODO: we should depend on access models instead of rpc models
+		criteria optimistic_sync.Criteria,
+	) ([]flow.BlockEvents, accessmodel.ExecutorMetadata, error)
 }
 
 type ScriptsAPI interface {
@@ -53,6 +56,7 @@ type TransactionsAPI interface {
 	GetTransaction(ctx context.Context, id flow.Identifier) (*flow.TransactionBody, error)
 	GetTransactionsByBlockID(ctx context.Context, blockID flow.Identifier) ([]*flow.TransactionBody, error)
 
+	// TODO: we should depend on access models instead of rpc models
 	GetTransactionResult(ctx context.Context, txID flow.Identifier, blockID flow.Identifier, collectionID flow.Identifier, encodingVersion entities.EventEncodingVersion) (*accessmodel.TransactionResult, error)
 	GetTransactionResultByIndex(ctx context.Context, blockID flow.Identifier, index uint32, encodingVersion entities.EventEncodingVersion) (*accessmodel.TransactionResult, error)
 	GetTransactionResultsByBlockID(ctx context.Context, blockID flow.Identifier, encodingVersion entities.EventEncodingVersion) ([]*accessmodel.TransactionResult, error)
@@ -72,7 +76,7 @@ type TransactionStreamAPI interface {
 	SubscribeTransactionStatuses(
 		ctx context.Context,
 		txID flow.Identifier,
-		requiredEventEncodingVersion entities.EventEncodingVersion,
+		requiredEventEncodingVersion entities.EventEncodingVersion, // TODO: we should depend on access models instead of rpc models
 	) subscription.Subscription
 
 	// SendAndSubscribeTransactionStatuses sends a transaction to the execution node and subscribes to its status updates.

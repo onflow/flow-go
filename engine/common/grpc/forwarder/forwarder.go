@@ -8,7 +8,7 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
-	"github.com/onflow/flow-go/engine/access/rpc/connection"
+	"github.com/onflow/flow-go/engine/access/api/rpc/connection"
 	"github.com/onflow/flow-go/model/flow"
 
 	"github.com/onflow/flow/protobuf/go/flow/access"
