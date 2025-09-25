@@ -418,9 +418,7 @@ func (s *state) saveExecutionResults(
 		}
 
 		// Save entire execution result (including all chunk data packs) within one batch to minimize
-		// the number of database interactions. This is a large batch of data, which might not be
-		// committed within a single operation (e.g. if using Badger DB as storage backend, which has
-		// a size limit for its transactions).
+		// the number of database interactions.
 		return s.db.WithReaderBatchWriter(func(batch storage.ReaderBatchWriter) error {
 			batch.AddCallback(func(err error) {
 				// Rollback if an error occurs during batch operations
