@@ -1,7 +1,6 @@
 package ingestion2
 
 import (
-	"errors"
 	"fmt"
 	"iter"
 	"sort"
@@ -320,11 +319,6 @@ type ResultsForest struct {
 	// specification denotes this quantity as 𝓹.
 	lowestSealedResult *ExecutionResultContainer
 
-	// lastSealedView is 𝓼.Level, i.e. the view of the latest sealed result that the forest
-	// can make progress on without further input from the consensus follower.
-	// Deprecated: use `latestSealedResult.Level()` instead.
-	lastSealedView counters.StrictMonotonicCounter
-
 	// latestSealedResult is the sealed result with the _greatest_ view, whose ancestry is known
 	// back to and including 𝓹. For brevity, the specification denotes this quantity as 𝓼.
 	// As per specification, the ResultsForest should be able to progress indexing results up to
@@ -406,7 +400,6 @@ func NewResultsForest(
 		maxViewDelta:                maxViewDelta,
 		lowestSealedResult:          latestSealedResultContainer, // at initialization 𝓹 = 𝓼
 		latestSealedResult:          latestSealedResultContainer,
-		lastSealedView:              counters.NewMonotonicCounter(sealedHeader.View),
 		lastFinalizedView:           counters.NewMonotonicCounter(sealedHeader.View),
 		latestPersistedSealedResult: latestPersistedSealedResult,
 	}, nil
@@ -450,6 +443,9 @@ func (rf *ResultsForest) ResetLowestRejectedView() (uint64, bool) {
 // which ENs specifically produced the result. Therefore, unsealed results must be added using
 // the `AddReceipt` method.
 //
+// The method is idempotent. Repeated insertion of the same sealed result is a noop until the result
+// falls below the pruning horizon, at which point [ErrPrunedView] is returned.
+//
 // If ErrMaxViewDeltaExceeded is returned, the provided result was not added to the forest, and
 // the caller must use `ResetLowestRejectedView` to perform the backfill process once the forest
 // has available capacity.
@@ -458,29 +454,37 @@ func (rf *ResultsForest) ResetLowestRejectedView() (uint64, bool) {
 //   - [ErrPrunedView]: if the result's block view is below the lowest view.
 //   - [ErrMaxViewDeltaExceeded]: if the result's block view is more than maxViewDelta views ahead of the last sealed view
 func (rf *ResultsForest) AddSealedResult(result *flow.ExecutionResult) error {
-	resultID := result.ID()
-
-	container, err := rf.getOrCreateContainer(result, ResultSealed)
+	container, existing, err := rf.getOrCreateContainer(result, ResultSealed)
 	if err != nil {
-		return fmt.Errorf("failed to get container for result (%s): %w", resultID, err)
+		return fmt.Errorf("failed to get container for result (%s): %w", result.ID(), err)
+	}
+
+	if existing && container.ResultStatus() == ResultSealed {
+		return nil // no-op
 	}
 
 	rf.mu.Lock()
 	defer rf.mu.Unlock()
 
-	rf.updateLastSealed(container)
+	err = rf.extendSealedFork(container)
+	if err != nil {
+		return fmt.Errorf("failed to extend sealed fork: %w", err)
+	}
 
 	return nil
 }
 
-// AddReceipt adds the given execution result to the forest. Furthermore, we track which Execution Node issued
-// receipts committing to this result. This method is idempotent.
+// AddReceipt adds the given execution result to the forest. Furthermore, we track which Execution
+// Node issued receipts committing to this result.
 // `resultStatus` is used initialize the status of new results added to the forest. If the result is
 // already known, `resultStatus` is ignored.
 //
 // IMPORTANT: The caller MUST provide sealed results in ancestor first order to allow the forest to
 // guarantee liveness. If a receipt is added for an unknown sealed result whose parent is either
 // missing or not sealed, an error is returned.
+//
+// The method is idempotent. Repeated insertion of the same receipt is a noop until the result falls
+// below the pruning horizon, at which point [ErrPrunedView] is returned.
 //
 // If ErrMaxViewDeltaExceeded is returned, the result for the provided receipt was not added to the
 // forest, and the caller must use `ResetLowestRejectedView` to perform the backfill process once
@@ -494,20 +498,47 @@ func (rf *ResultsForest) AddReceipt(receipt *flow.ExecutionReceipt, resultStatus
 		return false, fmt.Errorf("invalid result status: %s", resultStatus)
 	}
 
-	resultID := receipt.ExecutionResult.ID()
-
-	container, err := rf.getOrCreateContainer(&receipt.ExecutionResult, resultStatus)
+	container, existing, err := rf.getOrCreateContainer(&receipt.ExecutionResult, resultStatus)
 	if err != nil {
-		return false, fmt.Errorf("failed to get container for result (%s): %w", resultID, err)
-	}
-	if container == nil {
-		// noop if the result's block view is lower than the lowest view.
-		return false, nil
+		return false, fmt.Errorf("failed to get container for result (%s): %w", receipt.ExecutionResult.ID(), err)
 	}
 
 	added, err := container.AddReceipt(receipt)
 	if err != nil {
-		return false, fmt.Errorf("failed to add receipt to its container (%s): %w", resultID, err)
+		return false, fmt.Errorf("failed to add receipt to its container (%s): %w", container.ResultID(), err)
+	}
+
+	// OnBlockFinalized will handle all status updates for existing containers, so no further action
+	// is needed.
+	if existing {
+		return added > 0, nil
+	}
+
+	rf.mu.Lock()
+	defer rf.mu.Unlock()
+
+	if resultStatus == ResultSealed {
+		err = rf.extendSealedFork(container)
+		if err != nil {
+			return false, fmt.Errorf("failed to extend sealed fork: %w", err)
+		}
+		return added > 0, nil
+	}
+
+	if resultStatus == ResultForFinalizedBlock && container.BlockView() <= rf.lastFinalizedView.Value() {
+		// only set the result status to finalized for views already processed by OnBlockFinalized.
+		// Results with newer views will eventually be marked finalized by OnBlockFinalized.
+		// This ensures that there are no results within the forest that are marked as finalized
+		// and whose ancestors are not also all marked as finalized.
+		if err := container.SetResultStatus(ResultForFinalizedBlock); err != nil {
+			return false, fmt.Errorf("failed to set result status to finalized: %w", err)
+		}
+	}
+
+	// it's possible that the container extends an already abandoned fork. In that case, mark the
+	// container as abandoned and abandon all its descendants.
+	if rf.isAbandonedFork(container) {
+		rf.abandonFork(container)
 	}
 
 	return added > 0, nil
@@ -575,44 +606,15 @@ func (rf *ResultsForest) extendSealedFork(childResult *ExecutionResultContainer)
 	if err != nil {
 		return fmt.Errorf("failed to set status of child result to sealed: %w", err)
 	}
-	return nil
-}
 
-// extendsSealedChain checks if a result extends the chain from the latest persisted sealed result
-// to the latest sealed result.
-//
-// The result is considered to extend the chain if its PreviousResultID exists in the forest and is
-// sealed, and its executed block's parent view is less than or equal to the last sealed view.
-//
-// NOT CONCURRENCY SAFE!
-func (rf *ResultsForest) extendsSealedChain(container *ExecutionResultContainer) bool {
-	parentID, _ := container.Parent()
-	parent, found := rf.getContainer(parentID)
-	if !found || parent.ResultStatus() != ResultSealed {
-		return false // invariant violation
-	}
-
-	// This check is required if we allow results to be added with sealed status with views higher
-	// than the last sealed view.
-	return container.BlockHeader().ParentView <= rf.lastSealedView.Value()
-}
-
-// updateLastSealed updates the last sealed view and abandons all orphaned sibling forks.
-// This function is idempotent.
-//
-// NOT CONCURRENCY SAFE!
-func (rf *ResultsForest) updateLastSealed(container *ExecutionResultContainer) {
-	if !rf.lastSealedView.Set(container.BlockView()) {
-		return // duplicate event
-	}
-
-	// abandon all orphaned sibling forks
-	parentID, _ := container.Parent()
+	// abandon all forks orphaned by adding the new sealed result.
 	for sibling := range rf.iterateChildren(parentID) {
-		if sibling.ResultID() != container.ResultID() {
+		if sibling.ResultID() != childResult.ResultID() {
 			rf.abandonFork(sibling)
 		}
 	}
+
+	return nil
 }
 
 // getOrCreateContainer retrieves or creates the container for the given result within the forest.
@@ -621,17 +623,18 @@ func (rf *ResultsForest) updateLastSealed(container *ExecutionResultContainer) {
 // This method is optimized for the case of many concurrent reads compared to relatively few writes,
 // and rarely repeated calls.
 // It is idempotent and atomic: it always returns the first container created for the given result.
+// Returns the container, and a boolean indicating if the container already existed.
 //
 // Expected error returns during normal operations:
 //   - [ErrPrunedView]: if the result's block view is below the lowest view
 //   - [ErrMaxViewDeltaExceeded]: if the result's block view is more than maxViewDelta views ahead
 //     of the oldes stored result (lowest view) *and* the given result is not
-func (rf *ResultsForest) getOrCreateContainer(result *flow.ExecutionResult, resultStatus ResultStatus) (*ExecutionResultContainer, error) {
+func (rf *ResultsForest) getOrCreateContainer(result *flow.ExecutionResult, resultStatus ResultStatus) (*ExecutionResultContainer, bool, error) {
 	// First, try to get existing container - this will acquire read-lock only
 	resultID := result.ID()
 	container, found := rf.GetContainer(resultID)
 	if found {
-		return container, nil
+		return container, true, nil
 	}
 
 	// At this point, we know that the result is not *yet* in the forest. We are optimistically creating the
@@ -643,13 +646,13 @@ func (rf *ResultsForest) getOrCreateContainer(result *flow.ExecutionResult, resu
 	executedBlock, err := rf.headers.ByBlockID(result.BlockID)
 	if err != nil {
 		// this is an exception since only results for certified blocks should be added to the forest
-		return nil, fmt.Errorf("failed to get block header for result (%s): %w", resultID, err)
+		return nil, false, fmt.Errorf("failed to get block header for result (%s): %w", resultID, err)
 	}
 
 	pipeline := rf.pipelineFactory.NewPipeline(result, resultStatus == ResultSealed)
 	newContainer, err := NewExecutionResultContainer(result, executedBlock, pipeline)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create container for result (%s): %w", resultID, err)
+		return nil, false, fmt.Errorf("failed to create container for result (%s): %w", resultID, err)
 	}
 
 	// Now, we have the container ready to be inserted. Repeat check for the container's existence and
@@ -667,72 +670,17 @@ func (rf *ResultsForest) getOrCreateContainer(result *flow.ExecutionResult, resu
 	rf.mu.Lock()
 	defer rf.mu.Unlock()
 
-	container, found = rf.getContainer(resultID) // early exit in case some other thread already added the container
-	if found {
-		return container, nil
+	// early exit in case some other thread already added the container
+	if container, found = rf.getContainer(resultID); found {
+		return container, true, nil
 	}
-	container = newContainer
 
-	err = rf.ensureAdmissible(container)
+	err = rf.safeForestInsert(newContainer)
 	if err != nil {
-		// TODO: as mentioned in the context of function `ensureAdmissible`, I think it would be beneficial to
-		//       move this check into `ensureAdmissible` together with the insert into the forest.
-		if errors.Is(err, ErrMaxViewDeltaExceeded) {
-			rf.rejectedResults = true
-		}
-		return nil, err
+		return nil, false, err
 	}
 
-	// check invariant: there must always be a direct ancestoral connection from the latest persisted
-	// sealed result to the latest sealed result. this is guaranteed by never accepting a sealed result
-	// whose parent does not exist in the forest or is not sealed.
-	if resultStatus == ResultSealed && !rf.extendsSealedChain(container) {
-		return nil, fmt.Errorf("sealed result (%s) does not extend last sealed result (view: %d)", resultID, rf.lastSealedView.Value())
-	}
-
-	// verify and add to forest
-	err = rf.forest.VerifyVertex(container)
-	if err != nil {
-		return nil, fmt.Errorf("failed to store receipt's container: %w", err)
-	}
-	rf.forest.AddVertex(container)
-	// TODO: as mentioned in the context of function `ensureAdmissible`, I think it would be beneficial to
-	//       move the LevelledForest operation (above) inside our function `ensureAdmissible`, toge
-	//       However, this will require additional refactoring, to move modifications of the ResultStatus above
-	//       outside the scope of `getOrCreateContainer`. I think conceptually we are holding the lock `rf.mu` here
-	//       because we want to potentially add a container. We are done with that now. I think it would improve
-	//       code clarity and robustness if subsequent modifications of the container would be handled by a separate
-	//       method.
-	//       It should be noted that, for some updates of ResultStatus, we operate solely on the container may not require
-	//       holding the lock `rf.mu`. While this is of no performance concern, getting vertices from the forest is
-	//       still conceptually different than operating on the vertices itself. In other words, there are similar usage
-	//       patterns, but conceptually different operations.
-
-	switch resultStatus {
-	case ResultSealed:
-		if err := container.SetResultStatus(resultStatus); err != nil {
-			return nil, fmt.Errorf("failed to set result status to sealed: %w", err)
-		}
-
-	case ResultForFinalizedBlock:
-		// only set the result status to finalized for views already processed by OnBlockFinalized.
-		// Results with newer views will eventually be marked finalized by OnBlockFinalized.
-		// This ensures that there are no results within the forest that are marked as finalized
-		// and whose ancestors are not also all marked as finalized.
-		if executedBlock.View <= rf.lastFinalizedView.Value() {
-			if err := container.SetResultStatus(resultStatus); err != nil {
-				return nil, fmt.Errorf("failed to set result status to finalized: %w", err)
-			}
-		}
-
-	default:
-		// abandon all descendants if the container is already known to be abandoned.
-		if rf.isAbandonedFork(container) {
-			rf.abandonFork(container)
-		}
-	}
-
-	return container, nil
+	return newContainer, false, nil
 }
 
 // HasReceipt checks if a receipt exists in the forest.
@@ -838,7 +786,7 @@ func (rf *ResultsForest) OnBlockFinalized(finalized *flow.Block) error {
 	// that the receipt notifications are ahead of the finalization notifications. In this case,
 	// forest has already marked the sealed results and abandoned the conflicting forks. We can
 	// safely ignore the event.
-	if finalized.View <= rf.lastSealedView.Value() {
+	if finalized.View <= rf.latestSealedResult.BlockView() {
 		return nil
 	}
 
@@ -897,20 +845,16 @@ func (rf *ResultsForest) OnBlockFinalized(finalized *flow.Block) error {
 	// 3. process the seals -> mark the containers as sealed, update the last sealed view, and
 	// abandon all conflicting forks.
 	for _, container := range sealedContainers {
-		if !rf.extendsSealedChain(container) {
+		if err := rf.extendSealedFork(container); err != nil {
 			if rf.rejectedResults {
-				// if results have been rejected, then it's expected some sealed results are missing.
-				// abort after the first failure since all subsequent results will also fail.
+				// if any results have been rejected, then it's expected that some results are missing
+				// and extending the sealed fork is impossible until the backfill process is completed.
+				// do not continue processing seals since all subsequent results will also fail, but
+				// return without an error.
 				break
 			}
-			// otherwise, this is an invariant violation and the forest is in an inconsistent state.
-			return fmt.Errorf("failed to update last sealed view for result (%s): parent result not found in forest or is not sealed",
-				container.ResultID())
+			return fmt.Errorf("failed to extend sealed fork: %w", err)
 		}
-		if err := container.SetResultStatus(ResultSealed); err != nil {
-			return fmt.Errorf("failed to set result status to sealed: %w", err)
-		}
-		rf.updateLastSealed(container)
 	}
 	return nil
 }
@@ -966,12 +910,17 @@ func (rf *ResultsForest) processCompleted(resultID flow.Identifier) error {
 			container.ResultID(), latestResultID)
 	}
 
-	// finally, prune the forest up to the latest persisted result's block view
+	// prune the forest up to the latest persisted result's block view
 	latestPersistedView := container.BlockView()
 	err := rf.forest.PruneUpToLevel(latestPersistedView)
 	if err != nil {
+		// this indicates that `latestPersistedView` is below the forest's lowest view, which should
+		// never happen and indicates that the forest is in an inconsistent state.
 		return fmt.Errorf("failed to prune results forest (view: %d): %w", latestPersistedView, err)
 	}
+
+	// finally, adjust the forest's lowest view 𝓹 to match the latest persisted sealed result from storage
+	rf.lowestSealedResult = container
 
 	return nil
 }
@@ -1035,13 +984,16 @@ func (rf *ResultsForest) abandonFork(container *ExecutionResultContainer) {
 	}
 }
 
-// ensureAdmissible enforces that the given candidate result satisfies the criteria
-// to be included in the ResultsForest. As per specification:
+// safeForestInsert inserts the provided candidate result into the ResultsForest if and only if the
+// candidate result satisfies all of the criteria to be included. As per specification:
 //   - ResultsForest must *always* include the children (ancestry degree 1) of 𝓹.
 //   - For a result 𝒓 with larger ancestry degree or (partially) unknown ancestry,
 //     we include 𝒓 if and only if 𝒓.Level is in the closed interval [𝓹.Level, 𝓱].
 //
-// By limit the view range of results eligible to be stored in the forest, this function
+// The function is idempotent. Repeated insertion of the same candidate is a noop until the candidate
+// falls below the pruning horizon, at which point [ErrPrunedView] is returned.
+//
+// By limiting the view range of results eligible to be stored in the forest, this function
 // effectively prevents unbounded memory consumption on the happy path:
 //   - Assume that the forest is only fed with results for _known_ certified blocks. This has no
 //     performance implications in practise, but prevents flooding attacks by Execution Nodes
@@ -1061,12 +1013,7 @@ func (rf *ResultsForest) abandonFork(container *ExecutionResultContainer) {
 //   - [ErrPrunedView]: if the result's view is below the pruning horizon (lowest view in the )
 //   - [ErrMaxViewDeltaExceeded]: for results that are not direct children of the 𝙡𝙤𝙬𝙚𝙨𝙩
 //     𝘀𝗲𝗮𝗹𝗲𝗱 𝗿𝗲𝘀𝘂𝗹𝘁 𝓹, if their view is more than `maxViewDelta` ahead of 𝓹.Level
-//
-// TODO: I think it would strengthen the encapsulation if performed the insertion into the Levelled Forest
-//   - Document idempotency: repeated insertion of the same candidate is a noop -- this contract holds
-//     _until_ the candidate falls below pruning threshold, at which point, [ErrPrunedView] is returned.
-//   - the updated function could be called `safeForestInsert` or similar
-func (rf *ResultsForest) ensureAdmissible(candidate *ExecutionResultContainer) error {
+func (rf *ResultsForest) safeForestInsert(candidate *ExecutionResultContainer) error {
 	candidateView := candidate.BlockView()
 
 	// History cutoff - only results with views greater or equal are to this threshold are eligible for storage in ResultsForest
@@ -1081,7 +1028,7 @@ func (rf *ResultsForest) ensureAdmissible(candidate *ExecutionResultContainer) e
 		// Note: theoretically, we do not need to check that the view is consistent for the parent, because the LevelledForest already does
 		// this. Specifically, the LevelledForest inspects the parent-child relationship based on IDs and then confirms that the view matches.
 		// Otherwise, the LevelledForest errors when attempting to add the child vertex. Therefore, if the LevelledForest accepts the child,
-		// we can be sure that the view is consistent with its parent. Nevertheless, by also checking here, our function `ensureAdmissible`
+		// we can be sure that the view is consistent with its parent. Nevertheless, by also checking here, our function `safeForestInsert`
 		// is self-contained and does not rely on other components for its correctness, while repeating the check has negligible cost.
 		if rf.latestSealedResult.BlockView() != parentView {
 			return fmt.Errorf("candidate reports view %d of its parent %v, while parent itself declares its view to be %d", parentView, parentID, rf.latestSealedResult.BlockView())
@@ -1091,8 +1038,16 @@ func (rf *ResultsForest) ensureAdmissible(candidate *ExecutionResultContainer) e
 
 	// We reject results whose view above 𝓱 = 𝓹.Level + maxViewDelta
 	if candidateView > historyCutoffView+rf.maxViewDelta {
+		rf.rejectedResults = true
 		return ErrMaxViewDeltaExceeded
 	}
+
+	// verify and add to forest
+	err := rf.forest.VerifyVertex(candidate)
+	if err != nil {
+		return fmt.Errorf("failed to store result's container: %w", err)
+	}
+	rf.forest.AddVertex(candidate)
 
 	return nil
 }
