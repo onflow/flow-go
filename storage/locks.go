@@ -122,6 +122,7 @@ func WithLock(manager lockctx.Manager, lockID string, fn func(lctx lockctx.Conte
 }
 
 // WithLocks is a helper function that creates a new lock context, acquires the specified locks,
+// This function passes through any errors returned by fn.
 func WithLocks(manager lockctx.Manager, lockIDs []string, fn func(lctx lockctx.Context) error) error {
 	lctx := manager.NewContext()
 	for _, lockID := range lockIDs {

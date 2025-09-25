@@ -13,7 +13,7 @@ type ChunkDataPacks interface {
 
 	// Store stores multiple ChunkDataPacks cs keyed by their ChunkIDs in a batch.
 	// No errors are expected during normal operation, but it may return generic error
-	Store(lctx lockctx.Proof, cs []*flow.ChunkDataPack) error
+	StoreByChunkID(lctx lockctx.Proof, cs []*flow.ChunkDataPack) error
 
 	// Remove removes multiple ChunkDataPacks cs keyed by their ChunkIDs in a batch.
 	// No errors are expected during normal operation, but it may return generic error
@@ -75,7 +75,7 @@ func (c StoredChunkDataPack) Equals(other StoredChunkDataPack) error {
 	if !bytes.Equal(c.Proof, other.Proof) {
 		return ErrDataMismatch
 	}
-	if !c.SystemChunk && c.CollectionID != other.CollectionID {
+	if c.CollectionID != other.CollectionID {
 		return ErrDataMismatch
 	}
 	return nil

@@ -61,9 +61,9 @@ func (ch *ChunkDataPacks) Remove(chunkIDs []flow.Identifier) error {
 	})
 }
 
-// Store stores multiple ChunkDataPacks cs keyed by their ChunkIDs in a batch.
+// StoreByChunkID stores multiple ChunkDataPacks cs keyed by their ChunkIDs in a batch.
 // No errors are expected during normal operation, but it may return generic error
-func (ch *ChunkDataPacks) Store(lctx lockctx.Proof, cs []*flow.ChunkDataPack) error {
+func (ch *ChunkDataPacks) StoreByChunkID(lctx lockctx.Proof, cs []*flow.ChunkDataPack) error {
 	return ch.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 		for _, c := range cs {
 			sc := storage.ToStoredChunkDataPack(c)
