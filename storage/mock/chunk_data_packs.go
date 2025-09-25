@@ -82,12 +82,12 @@ func (_m *ChunkDataPacks) Remove(cs []flow.Identifier) error {
 	return r0
 }
 
-// Store provides a mock function with given fields: lctx, cs
-func (_m *ChunkDataPacks) Store(lctx lockctx.Proof, cs []*flow.ChunkDataPack) error {
+// StoreByChunkID provides a mock function with given fields: lctx, cs
+func (_m *ChunkDataPacks) StoreByChunkID(lctx lockctx.Proof, cs []*flow.ChunkDataPack) error {
 	ret := _m.Called(lctx, cs)
 
 	if len(ret) == 0 {
-		panic("no return value specified for Store")
+		panic("no return value specified for StoreByChunkID")
 	}
 
 	var r0 error
