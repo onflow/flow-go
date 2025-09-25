@@ -31,9 +31,9 @@ func TestChunkDataPackPruner(t *testing.T) {
 		// store the chunks
 		cdp1, result1 := unittest.ChunkDataPacksFixtureAndResult()
 		require.NoError(t, results.Store(result1))
-		unittest.WithLock(t, lockManager, storage.LockInsertChunkDataPack, func(lctx lockctx.Context) error {
+		require.NoError(t, unittest.WithLock(t, lockManager, storage.LockInsertChunkDataPack, func(lctx lockctx.Context) error {
 			return chunks.StoreByChunkID(lctx, cdp1)
-		})
+		}))
 
 		pruner := NewChunkDataPackPruner(chunks, results)
 

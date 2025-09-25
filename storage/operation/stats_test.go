@@ -36,9 +36,9 @@ func TestSummarizeKeysByFirstByteConcurrent(t *testing.T) {
 					Proof:        []byte{'p'},
 					CollectionID: collectionID,
 				}
-				unittest.WithLock(t, lockManager, storage.LockInsertChunkDataPack, func(lctx lockctx.Context) error {
+				require.NoError(t, unittest.WithLock(t, lockManager, storage.LockInsertChunkDataPack, func(lctx lockctx.Context) error {
 					return operation.InsertChunkDataPack(lctx, rw, cdp)
-				})
+				}))
 			}
 
 			// insert 20 results

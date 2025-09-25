@@ -41,11 +41,11 @@ func TestExecute(t *testing.T) {
 		// store the chunk data packs to be pruned later
 		for _, cdp := range cdps {
 			sc := storage.ToStoredChunkDataPack(cdp)
-			unittest.WithLock(t, lockManager, storage.LockInsertChunkDataPack, func(lctx lockctx.Context) error {
+			require.NoError(t, unittest.WithLock(t, lockManager, storage.LockInsertChunkDataPack, func(lctx lockctx.Context) error {
 				return pdb.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 					return operation.InsertChunkDataPack(lctx, rw, sc)
 				})
-			})
+			}))
 		}
 
 		// it's ok the chunk ids is used as block ids, because the iterator
@@ -92,11 +92,11 @@ func TestExecuteCanBeResumed(t *testing.T) {
 		// store the chunk data packs to be pruned later
 		for _, cdp := range cdps {
 			sc := storage.ToStoredChunkDataPack(cdp)
-			unittest.WithLock(t, lockManager, storage.LockInsertChunkDataPack, func(lctx lockctx.Context) error {
+			require.NoError(t, unittest.WithLock(t, lockManager, storage.LockInsertChunkDataPack, func(lctx lockctx.Context) error {
 				return pdb.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 					return operation.InsertChunkDataPack(lctx, rw, sc)
 				})
-			})
+			}))
 		}
 
 		// it's ok the chunk ids is used as block ids, because the iterator

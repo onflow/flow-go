@@ -21,10 +21,10 @@ import (
 // It also evaluates that re-inserting is idempotent.
 func TestChunkDataPacks_Store(t *testing.T) {
 	WithChunkDataPacks(t, 100, func(t *testing.T, chunkDataPacks []*flow.ChunkDataPack, chunkDataPackStore *store.ChunkDataPacks, _ *pebble.DB, lockManager storage.LockManager) {
-		unittest.WithLock(t, lockManager, storage.LockInsertChunkDataPack, func(lctx lockctx.Context) error {
+		require.NoError(t, unittest.WithLock(t, lockManager, storage.LockInsertChunkDataPack, func(lctx lockctx.Context) error {
 			require.NoError(t, chunkDataPackStore.StoreByChunkID(lctx, chunkDataPacks))
 			return chunkDataPackStore.StoreByChunkID(lctx, chunkDataPacks)
-		})
+		}))
 	})
 }
 
@@ -49,9 +49,9 @@ func TestChunkDataPack_Remove(t *testing.T) {
 			chunkIDs = append(chunkIDs, chunk.ChunkID)
 		}
 
-		unittest.WithLock(t, lockManager, storage.LockInsertChunkDataPack, func(lctx lockctx.Context) error {
+		require.NoError(t, unittest.WithLock(t, lockManager, storage.LockInsertChunkDataPack, func(lctx lockctx.Context) error {
 			return chunkDataPackStore.StoreByChunkID(lctx, chunkDataPacks)
-		})
+		}))
 		require.NoError(t, chunkDataPackStore.Remove(chunkIDs))
 
 		// verify it has been removed
@@ -85,7 +85,7 @@ func TestChunkDataPacks_StoreTwice(t *testing.T) {
 		transactions := store.NewTransactions(&metrics.NoopCollector{}, db)
 		collections := store.NewCollections(db, transactions)
 		store1 := store.NewChunkDataPacks(&metrics.NoopCollector{}, db, collections, 1)
-		unittest.WithLock(t, lockManager, storage.LockInsertChunkDataPack, func(lctx lockctx.Context) error {
+		require.NoError(t, unittest.WithLock(t, lockManager, storage.LockInsertChunkDataPack, func(lctx lockctx.Context) error {
 			require.NoError(t, store1.StoreByChunkID(lctx, chunkDataPacks))
 
 			for _, c := range chunkDataPacks {
@@ -95,7 +95,7 @@ func TestChunkDataPacks_StoreTwice(t *testing.T) {
 			}
 
 			return store1.StoreByChunkID(lctx, chunkDataPacks)
-		})
+		}))
 	})
 }
 
