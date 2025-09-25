@@ -13,8 +13,9 @@ import (
 
 // ExecutionResults implements persistent storage for execution results.
 type ExecutionResults struct {
-	db    storage.DB
-	cache *Cache[flow.Identifier, *flow.ExecutionResult]
+	db         storage.DB
+	cache      *Cache[flow.Identifier, *flow.ExecutionResult]
+	indexCache *Cache[flow.Identifier, flow.Identifier]
 }
 
 var _ storage.ExecutionResults = (*ExecutionResults)(nil)
@@ -31,12 +32,30 @@ func NewExecutionResults(collector module.CacheMetrics, db storage.DB) *Executio
 		return &result, err
 	}
 
+	indexByBlockID := func(lctx lockctx.Proof, rw storage.ReaderBatchWriter, blockID flow.Identifier, resultID flow.Identifier) error {
+		return operation.IndexOwnExecutionResult(lctx, rw, blockID, resultID)
+	}
+
+	retrieveByBlockID := func(r storage.Reader, blockID flow.Identifier) (flow.Identifier, error) {
+		var resultID flow.Identifier
+		err := operation.LookupExecutionResult(r, blockID, &resultID)
+		return resultID, err
+	}
+
 	res := &ExecutionResults{
 		db: db,
 		cache: newCache(collector, metrics.ResourceResult,
 			withLimit[flow.Identifier, *flow.ExecutionResult](flow.DefaultTransactionExpiry+100),
 			withStore(store),
 			withRetrieve(retrieve)),
+
+		indexCache: newCache(collector, metrics.ResourceResult,
+			// this API is only used to fetch result for last executed block, so in happy case, it only need to be 1,
+			// we use 100 here to be more resilient to forks
+			withLimit[flow.Identifier, flow.Identifier](100),
+			withStoreWithLock(indexByBlockID),
+			withRetrieve(retrieveByBlockID),
+		),
 	}
 
 	return res
@@ -55,48 +74,15 @@ func (r *ExecutionResults) byID(resultID flow.Identifier) (*flow.ExecutionResult
 }
 
 func (r *ExecutionResults) byBlockID(blockID flow.Identifier) (*flow.ExecutionResult, error) {
-	var resultID flow.Identifier
-	err := operation.LookupExecutionResult(r.db.Reader(), blockID, &resultID)
+	resultID, err := r.IDByBlockID(blockID)
 	if err != nil {
 		return nil, fmt.Errorf("could not lookup execution result ID: %w", err)
 	}
 	return r.byID(resultID)
 }
 
-func (r *ExecutionResults) index(lctx lockctx.Proof, w storage.Writer, blockID, resultID flow.Identifier, force bool) error {
-	if !force {
-		// when not forcing the index, check if the result is already indexed
-		exist, err := operation.ExistExecutionResult(r.db.Reader(), blockID)
-		if err != nil {
-			return fmt.Errorf("could not check if execution result exists: %w", err)
-		}
-
-		// if the result is already indexed, check if the stored result is the same
-		if exist {
-			var storedResultID flow.Identifier
-			err = operation.LookupExecutionResult(r.db.Reader(), blockID, &storedResultID)
-			if err != nil {
-				return fmt.Errorf("could not lookup execution result ID: %w", err)
-			}
-
-			if storedResultID != resultID {
-				return fmt.Errorf("storing result that is different from the already stored one for block: %v, storing result: %v, stored result: %v. %w",
-					blockID, resultID, storedResultID, storage.ErrDataMismatch)
-			}
-
-			// if the result is the same, we don't need to index it again
-			return nil
-		}
-
-		// if the result is not indexed, we can index it
-	}
-
-	err := operation.IndexExecutionResult(lctx, w, blockID, resultID)
-	if err == nil {
-		return nil
-	}
-
-	return nil
+func (r *ExecutionResults) BatchIndex(lctx lockctx.Proof, rw storage.ReaderBatchWriter, blockID flow.Identifier, resultID flow.Identifier) error {
+	return r.indexCache.PutWithLockTx(lctx, rw, blockID, resultID)
 }
 
 func (r *ExecutionResults) Store(result *flow.ExecutionResult) error {
@@ -109,10 +95,6 @@ func (r *ExecutionResults) BatchStore(result *flow.ExecutionResult, batch storag
 	return r.store(batch, result)
 }
 
-func (r *ExecutionResults) BatchIndex(lctx lockctx.Proof, blockID flow.Identifier, resultID flow.Identifier, batch storage.ReaderBatchWriter) error {
-	return r.index(lctx, batch.Writer(), blockID, resultID, false)
-}
-
 func (r *ExecutionResults) ByID(resultID flow.Identifier) (*flow.ExecutionResult, error) {
 	return r.byID(resultID)
 }
@@ -121,8 +103,15 @@ func (r *ExecutionResults) ByBlockID(blockID flow.Identifier) (*flow.ExecutionRe
 	return r.byBlockID(blockID)
 }
 
+func (r *ExecutionResults) IDByBlockID(blockID flow.Identifier) (flow.Identifier, error) {
+	return r.indexCache.Get(r.db.Reader(), blockID)
+}
+
 func (r *ExecutionResults) RemoveIndexByBlockID(blockID flow.Identifier) error {
 	return r.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+		storage.OnCommitSucceed(rw, func() {
+			r.indexCache.Remove(blockID)
+		})
 		return operation.RemoveExecutionResultIndex(rw.Writer(), blockID)
 	})
 }

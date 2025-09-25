@@ -356,11 +356,11 @@ func (s *state) GetExecutionResultID(ctx context.Context, blockID flow.Identifie
 	span, _ := s.tracer.StartSpanFromContext(ctx, trace.EXEGetExecutionResultID)
 	defer span.End()
 
-	result, err := s.results.ByBlockID(blockID)
+	resultID, err := s.results.IDByBlockID(blockID)
 	if err != nil {
 		return flow.ZeroID, err
 	}
-	return result.ID(), nil
+	return resultID, nil
 }
 
 func (s *state) SaveExecutionResults(
@@ -462,7 +462,7 @@ func (s *state) saveExecutionResults(
 				return fmt.Errorf("could not persist execution result: %w", err)
 			}
 
-			err = s.results.BatchIndex(lctx, blockID, executionResult.ID(), batch)
+			err = s.results.BatchIndex(lctx, batch, blockID, executionResult.ID())
 			if err != nil {
 				return fmt.Errorf("cannot index execution result: %w", err)
 			}

@@ -27,21 +27,37 @@ func RetrieveExecutionResult(r storage.Reader, resultID flow.Identifier, result 
 	return RetrieveByKey(r, MakePrefix(codeExecutionResult, resultID), result)
 }
 
-// IndexExecutionResult indexes the Execution Node's OWN Execution Result by the executed block's ID.
-//
-// CAUTION:
-//   - OVERWRITES existing data (potential for data corruption):
-//     This method silently overrides existing data without any sanity checks whether data for the same key already exits.
-//     Note that the Flow protocol mandates that for a previously persisted key, the data is never changed to a different
-//     value. Changing data could cause the node to publish inconsistent data and to be slashed, or the protocol to be
-//     compromised as a whole. This method does not contain any safeguards to prevent such data corruption.
+// IndexOwnExecutionResult indexes the result of the given block.
+// It is used by EN to index the result of a block to continue executing subsequent blocks.
+// The caller must acquire either [storage.LockInsertOwnReceipt] or [storage.LockBootstrapping]
 //
 // No errors are expected during normal operation.
-func IndexExecutionResult(lctx lockctx.Proof, w storage.Writer, blockID flow.Identifier, resultID flow.Identifier) error {
-	if !lctx.HoldsLock(storage.LockInsertOwnReceipt) {
-		return fmt.Errorf("IndexExecutionResult requires LockInsertOwnReceipt to be held")
+func IndexOwnExecutionResult(lctx lockctx.Proof, rw storage.ReaderBatchWriter, blockID flow.Identifier, resultID flow.Identifier) error {
+	held := lctx.HoldsLock(storage.LockInsertOwnReceipt) ||
+		// during bootstrapping, we index the sealed root block or the spork root block, which is not
+		// produced by the node itself, but we still need to index its execution result to be able to
+		// execute next block
+		lctx.HoldsLock(storage.LockBootstrapping)
+	if !held {
+		return fmt.Errorf("missing require locks: %s or %s", storage.LockInsertOwnReceipt, storage.LockBootstrapping)
 	}
-	return UpsertByKey(w, MakePrefix(codeIndexExecutionResultByBlock, blockID), resultID)
+
+	key := MakePrefix(codeIndexExecutionResultByBlock, blockID)
+	var existing flow.Identifier
+	err := RetrieveByKey(rw.GlobalReader(), key, &existing)
+	if err == nil {
+		if existing != resultID {
+			return fmt.Errorf("storing result that is different from the already stored one for block: %v, storing result: %v, stored result: %v. %w",
+				blockID, resultID, existing, storage.ErrDataMismatch)
+		}
+		// if the result is the same, we don't need to index it again
+		return nil
+	} else if err != storage.ErrNotFound {
+		return fmt.Errorf("could not check if execution result exists: %w", err)
+	}
+
+	// if the result is not indexed, we can index it
+	return UpsertByKey(rw.Writer(), key, resultID)
 }
 
 // LookupExecutionResult retrieves the Execution Node's OWN Execution Result ID for the specified block.
@@ -51,12 +67,6 @@ func IndexExecutionResult(lctx lockctx.Proof, w storage.Writer, blockID flow.Ide
 //   - [storage.ErrNotFound] if `blockID` does not refer to a block executed by this node
 func LookupExecutionResult(r storage.Reader, blockID flow.Identifier, resultID *flow.Identifier) error {
 	return RetrieveByKey(r, MakePrefix(codeIndexExecutionResultByBlock, blockID), resultID)
-}
-
-// ExistExecutionResult checks if the execution node has its OWN Execution Result for the specified block.
-// No errors are expected during normal operation.
-func ExistExecutionResult(r storage.Reader, blockID flow.Identifier) (bool, error) {
-	return KeyExists(r, MakePrefix(codeIndexExecutionResultByBlock, blockID))
 }
 
 // RemoveExecutionResultIndex removes Execution Node's OWN Execution Result for the given blockID.

@@ -11,6 +11,9 @@ type ExecutionResultsReader interface {
 
 	// ByBlockID retrieves an execution result by block ID.
 	ByBlockID(blockID flow.Identifier) (*flow.ExecutionResult, error)
+
+	// IDByBlockID retrieves an execution result ID by block ID.
+	IDByBlockID(blockID flow.Identifier) (flow.Identifier, error)
 }
 
 type ExecutionResults interface {
@@ -23,7 +26,7 @@ type ExecutionResults interface {
 	BatchStore(result *flow.ExecutionResult, batch ReaderBatchWriter) error
 
 	// BatchIndex indexes an execution result by block ID in a given batch
-	BatchIndex(lctx lockctx.Proof, blockID flow.Identifier, resultID flow.Identifier, batch ReaderBatchWriter) error
+	BatchIndex(lctx lockctx.Proof, rw ReaderBatchWriter, blockID flow.Identifier, resultID flow.Identifier) error
 
 	// BatchRemoveIndexByBlockID removes blockID-to-executionResultID index entries keyed by blockID in a provided batch.
 	// No errors are expected during normal operation, even if no entries are matched.
