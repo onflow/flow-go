@@ -6,7 +6,6 @@ import (
 	"sync"
 
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/module/counters"
 	"github.com/onflow/flow-go/module/executiondatasync/optimistic_sync"
 	"github.com/onflow/flow-go/module/forest"
 )
@@ -28,7 +27,7 @@ type ExecutionResultContainer struct {
 
 	// inherently concurrency-safe values; can be read without concurrency protection:
 	pipeline     optimistic_sync.Pipeline
-	resultStatus counters.StrictMonotonicCounter
+	resultStatus ResultStatusTracker
 
 	// values requiring concurrency protection
 	mu       sync.RWMutex
@@ -58,7 +57,7 @@ func NewExecutionResultContainer(
 		resultID:     result.ID(),
 		blockHeader:  header,
 		pipeline:     pipeline,
-		resultStatus: counters.NewMonotonicCounter(uint64(ResultForCertifiedBlock)),
+		resultStatus: NewResultStatusTracker(ResultForCertifiedBlock),
 	}, nil
 }
 
@@ -168,24 +167,18 @@ func (c *ExecutionResultContainer) Pipeline() optimistic_sync.Pipeline {
 
 // ResultStatus returns the status of this result.
 func (c *ExecutionResultContainer) ResultStatus() ResultStatus {
-	return ResultStatus(c.resultStatus.Value())
+	return c.resultStatus.Value()
 }
 
 // SetResultStatus sets the status of this result.
 func (c *ExecutionResultContainer) SetResultStatus(resultStatus ResultStatus) error {
-	if c.resultStatus.Set(uint64(resultStatus)) {
+	if c.resultStatus.Set(resultStatus) {
 		if resultStatus == ResultSealed {
 			c.pipeline.SetSealed()
 		}
 		return nil
 	}
-
-	// The update failed, so it was either a no-op or an invalid transition.
-	if c.ResultStatus().IsValidTransition(resultStatus) {
-		return nil
-	}
-
-	return fmt.Errorf("invalid result status transition: %s -> %s", c.ResultStatus(), resultStatus)
+	return fmt.Errorf("invalid result status transition: %s -> %s", c.resultStatus.Value(), resultStatus)
 }
 
 // Methods implementing LevelledForest's Vertex interface

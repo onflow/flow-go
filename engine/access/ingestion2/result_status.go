@@ -4,8 +4,9 @@ import "sync/atomic"
 
 // ResultStatus represents the [ResultsForest]'s *internal* status of processing a particular result.
 //
-// IMPORTANT: In general, the processing status of a result in the ResultsForest is expected to lag behind the
-// consensus follower's notion of the analogous quantities, due to our asynchronous, information-driven design.
+// IMPORTANT: In general, the processing status of a result in the ResultsForest is expected to lag
+// behind the consensus follower's notion of the analogous quantities, due to our asynchronous,
+// information-driven design.
 type ResultStatus uint64
 
 const (
