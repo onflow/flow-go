@@ -50,11 +50,14 @@ const (
 const (
 	ResourceUndefined                                        = "undefined"
 	ResourceProposal                                         = "proposal"
+	ResourceProposalSignature                                = "proposal_signature"
 	ResourceHeader                                           = "header"
 	ResourceFinalizedHeight                                  = "finalized_height"
+	ResourceCertifiedView                                    = "certified_view"
 	ResourceIndex                                            = "index"
 	ResourceIdentity                                         = "identity"
 	ResourceGuarantee                                        = "guarantee"
+	ResourceGuaranteeByCollectionID                          = "guarantee_by_collection_id"
 	ResourceResult                                           = "result"
 	ResourceResultApprovals                                  = "result_approvals"
 	ResourceChunkLocators                                    = "chunk_locators"
@@ -66,8 +69,8 @@ const (
 	ResourceProtocolStateByBlockID                           = "protocol_state_by_block_id"
 	ResourceProtocolKVStore                                  = "protocol_kv_store"
 	ResourceProtocolKVStoreByBlockID                         = "protocol_kv_store_by_block_id"
-	ResourceApproval                                         = "approval"
-	ResourceSeal                                             = "seal"
+	ResourceSeal                                             = "seal"           // block seals (including emergency seals)
+	ResourceEmergencySeal                                    = "emergency_seal" // any seal which does not include a verifier signature
 	ResourcePendingIncorporatedSeal                          = "pending_incorporated_seal"
 	ResourceCommit                                           = "commit"
 	ResourceTransaction                                      = "transaction"

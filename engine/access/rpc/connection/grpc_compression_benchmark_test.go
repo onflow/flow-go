@@ -14,7 +14,6 @@ import (
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
-	"github.com/onflow/flow-go/utils/grpcutils"
 	"github.com/onflow/flow-go/utils/unittest"
 
 	"github.com/onflow/flow/protobuf/go/flow/execution"
@@ -69,8 +68,9 @@ func runBenchmark(b *testing.B, compressorName string) {
 
 	// create the factory
 	connectionFactory := new(ConnectionFactoryImpl)
-	// set the execution grpc port
-	connectionFactory.ExecutionGRPCPort = en.port
+	// set the execution grpc config
+	connectionFactory.ExecutionConfig = DefaultExecutionConfig()
+	connectionFactory.ExecutionConfig.GRPCPort = en.port
 
 	// set metrics reporting
 	connectionFactory.AccessMetrics = metrics.NewNoopCollector()
@@ -78,7 +78,6 @@ func runBenchmark(b *testing.B, compressorName string) {
 		unittest.Logger(),
 		connectionFactory.AccessMetrics,
 		nil,
-		grpcutils.DefaultMaxMsgSize,
 		CircuitBreakerConfig{},
 		compressorName,
 	)
@@ -115,7 +114,7 @@ func getHeaders(n int) []*flow.Header {
 	headers := make([]*flow.Header, n)
 	for i := range headers {
 		b := unittest.BlockFixture()
-		headers[i] = b.Header
+		headers[i] = b.ToHeader()
 
 	}
 	return headers

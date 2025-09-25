@@ -3,6 +3,7 @@ package events
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/rs/zerolog"
 	"google.golang.org/grpc/codes"
@@ -13,7 +14,7 @@ import (
 	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/engine/access/index"
 	"github.com/onflow/flow-go/engine/access/rpc/backend/common"
-	"github.com/onflow/flow-go/engine/access/rpc/backend/events/retriever"
+	"github.com/onflow/flow-go/engine/access/rpc/backend/events/provider"
 	"github.com/onflow/flow-go/engine/access/rpc/backend/node_communicator"
 	"github.com/onflow/flow-go/engine/access/rpc/backend/query_mode"
 	"github.com/onflow/flow-go/engine/access/rpc/connection"
@@ -33,7 +34,7 @@ type Events struct {
 	state          protocol.State
 	chain          flow.Chain
 	maxHeightRange uint
-	retriever      retriever.EventRetriever
+	provider       provider.EventProvider
 }
 
 var _ access.EventsAPI = (*Events)(nil)
@@ -50,19 +51,19 @@ func NewEventsBackend(
 	eventsIndex *index.EventsIndex,
 	execNodeIdentitiesProvider *rpc.ExecutionNodeIdentitiesProvider,
 ) (*Events, error) {
-	var eventRetriever retriever.EventRetriever
+	var eventProvider provider.EventProvider
 
 	switch queryMode {
 	case query_mode.IndexQueryModeLocalOnly:
-		eventRetriever = retriever.NewLocalEventRetriever(eventsIndex)
+		eventProvider = provider.NewLocalEventProvider(eventsIndex)
 
 	case query_mode.IndexQueryModeExecutionNodesOnly:
-		eventRetriever = retriever.NewENEventRetriever(log, execNodeIdentitiesProvider, connFactory, nodeCommunicator)
+		eventProvider = provider.NewENEventProvider(log, execNodeIdentitiesProvider, connFactory, nodeCommunicator)
 
 	case query_mode.IndexQueryModeFailover:
-		local := retriever.NewLocalEventRetriever(eventsIndex)
-		execNode := retriever.NewENEventRetriever(log, execNodeIdentitiesProvider, connFactory, nodeCommunicator)
-		eventRetriever = retriever.NewFailoverEventRetriever(log, local, execNode)
+		local := provider.NewLocalEventProvider(eventsIndex)
+		execNode := provider.NewENEventProvider(log, execNodeIdentitiesProvider, connFactory, nodeCommunicator)
+		eventProvider = provider.NewFailoverEventProvider(log, local, execNode)
 
 	default:
 		return nil, fmt.Errorf("unknown execution mode: %v", queryMode)
@@ -73,7 +74,7 @@ func NewEventsBackend(
 		chain:          chain,
 		maxHeightRange: maxHeightRange,
 		headers:        headers,
-		retriever:      eventRetriever,
+		provider:       eventProvider,
 	}, nil
 }
 
@@ -129,7 +130,7 @@ func (e *Events) GetEventsForHeightRange(
 	}
 
 	// find the block headers for all the blocks between min and max height (inclusive)
-	blockHeaders := make([]retriever.BlockMetadata, 0, endHeight-startHeight+1)
+	blockHeaders := make([]provider.BlockMetadata, 0, endHeight-startHeight+1)
 
 	for i := startHeight; i <= endHeight; i++ {
 		// this looks inefficient, but is actually what's done under the covers by `headers.ByHeight`
@@ -143,14 +144,14 @@ func (e *Events) GetEventsForHeightRange(
 			return nil, rpc.ConvertStorageError(fmt.Errorf("failed to get block header for %d: %w", i, err))
 		}
 
-		blockHeaders = append(blockHeaders, retriever.BlockMetadata{
+		blockHeaders = append(blockHeaders, provider.BlockMetadata{
 			ID:        blockID,
 			Height:    header.Height,
-			Timestamp: header.Timestamp,
+			Timestamp: time.UnixMilli(int64(header.Timestamp)).UTC(),
 		})
 	}
 
-	resp, err := e.retriever.Events(ctx, blockHeaders, flow.EventType(eventType), requiredEventEncodingVersion)
+	resp, err := e.provider.Events(ctx, blockHeaders, flow.EventType(eventType), requiredEventEncodingVersion)
 	if err != nil {
 		return nil, err
 	}
@@ -174,21 +175,21 @@ func (e *Events) GetEventsForBlockIDs(
 	}
 
 	// find the block headers for all the block IDs
-	blockHeaders := make([]retriever.BlockMetadata, 0, len(blockIDs))
+	blockHeaders := make([]provider.BlockMetadata, 0, len(blockIDs))
 	for _, blockID := range blockIDs {
 		header, err := e.headers.ByBlockID(blockID)
 		if err != nil {
 			return nil, rpc.ConvertStorageError(fmt.Errorf("failed to get block header for %s: %w", blockID, err))
 		}
 
-		blockHeaders = append(blockHeaders, retriever.BlockMetadata{
+		blockHeaders = append(blockHeaders, provider.BlockMetadata{
 			ID:        blockID,
 			Height:    header.Height,
-			Timestamp: header.Timestamp,
+			Timestamp: time.UnixMilli(int64(header.Timestamp)).UTC(),
 		})
 	}
 
-	resp, err := e.retriever.Events(ctx, blockHeaders, flow.EventType(eventType), requiredEventEncodingVersion)
+	resp, err := e.provider.Events(ctx, blockHeaders, flow.EventType(eventType), requiredEventEncodingVersion)
 	if err != nil {
 		return nil, err
 	}

@@ -18,10 +18,10 @@ import (
 	"github.com/onflow/flow-go/engine/access/state_stream/backend"
 	ssmock "github.com/onflow/flow-go/engine/access/state_stream/mock"
 	"github.com/onflow/flow-go/engine/access/subscription"
+	submock "github.com/onflow/flow-go/engine/access/subscription/mock"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
-	"github.com/onflow/flow-go/utils/unittest/generator"
 )
 
 // EventsProviderSuite is a test suite for testing the events providers functionality.
@@ -32,7 +32,7 @@ type EventsProviderSuite struct {
 	api *ssmock.API
 
 	chain          flow.Chain
-	rootBlock      flow.Block
+	rootBlock      *flow.Block
 	finalizedBlock *flow.Header
 
 	factory *DataProviderFactoryImpl
@@ -45,12 +45,8 @@ func TestEventsProviderSuite(t *testing.T) {
 func (s *EventsProviderSuite) SetupTest() {
 	s.log = unittest.Logger()
 	s.api = ssmock.NewAPI(s.T())
-
 	s.chain = flow.Testnet.Chain()
-
-	s.rootBlock = unittest.BlockFixture()
-	s.rootBlock.Header.Height = 0
-
+	s.rootBlock = unittest.Block.Genesis(s.chain.ChainID())
 	s.factory = NewDataProviderFactory(
 		s.log,
 		s.api,
@@ -68,7 +64,7 @@ func (s *EventsProviderSuite) SetupTest() {
 // validates that events are correctly streamed to the channel and ensures
 // no unexpected errors occur.
 func (s *EventsProviderSuite) TestEventsDataProvider_HappyPath() {
-	eventGenerator := generator.EventGenerator(generator.WithEncoding(entities.EventEncodingVersion_CCF_V0))
+	eventGenerator := unittest.NewEventGenerator(unittest.EventGenerator.WithEncoding(entities.EventEncodingVersion_CCF_V0))
 	events := []flow.Event{
 		eventGenerator.New(),
 		eventGenerator.New(),
@@ -104,7 +100,7 @@ func (s *EventsProviderSuite) subscribeEventsDataProviderTestCases(backendRespon
 				"contracts":          []string{"A.0000000000000001.Contract1", "A.0000000000000001.Contract2"},
 				"heartbeat_interval": "3",
 			},
-			setupBackend: func(sub *ssmock.Subscription) {
+			setupBackend: func(sub *submock.Subscription) {
 				s.api.On(
 					"SubscribeEventsFromStartBlockID",
 					mock.Anything,
@@ -117,17 +113,17 @@ func (s *EventsProviderSuite) subscribeEventsDataProviderTestCases(backendRespon
 		{
 			name: "SubscribeEventsFromStartHeight happy path",
 			arguments: wsmodels.Arguments{
-				"start_block_height": strconv.FormatUint(s.rootBlock.Header.Height, 10),
+				"start_block_height": strconv.FormatUint(s.rootBlock.Height, 10),
 				"event_types":        []string{string(flow.EventAccountCreated)},
 				"addresses":          []string{unittest.AddressFixture().String()},
 				"contracts":          []string{"A.0000000000000001.Contract1", "A.0000000000000001.Contract2"},
 				"heartbeat_interval": "3",
 			},
-			setupBackend: func(sub *ssmock.Subscription) {
+			setupBackend: func(sub *submock.Subscription) {
 				s.api.On(
 					"SubscribeEventsFromStartHeight",
 					mock.Anything,
-					s.rootBlock.Header.Height,
+					s.rootBlock.Height,
 					mock.Anything,
 				).Return(sub).Once()
 			},
@@ -141,7 +137,7 @@ func (s *EventsProviderSuite) subscribeEventsDataProviderTestCases(backendRespon
 				"contracts":          []string{"A.0000000000000001.Contract1", "A.0000000000000001.Contract2"},
 				"heartbeat_interval": "3",
 			},
-			setupBackend: func(sub *ssmock.Subscription) {
+			setupBackend: func(sub *submock.Subscription) {
 				s.api.On(
 					"SubscribeEventsFromLatest",
 					mock.Anything,
@@ -169,10 +165,10 @@ func (s *EventsProviderSuite) backendEventsResponses(events []flow.Event) []*bac
 
 	for i := range events {
 		responses[i] = &backend.EventsResponse{
-			Height:         s.rootBlock.Header.Height,
+			Height:         s.rootBlock.Height,
 			BlockID:        s.rootBlock.ID(),
 			Events:         events,
-			BlockTimestamp: s.rootBlock.Header.Timestamp,
+			BlockTimestamp: time.UnixMilli(int64(s.rootBlock.Timestamp)).UTC(),
 		}
 	}
 
@@ -221,7 +217,7 @@ func (s *EventsProviderSuite) TestMessageIndexEventProviderResponse_HappyPath() 
 	eventChan := make(chan interface{})
 
 	// Create a mock subscription and mock the channel
-	sub := ssmock.NewSubscription(s.T())
+	sub := submock.NewSubscription(s.T())
 	sub.On("Channel").Return((<-chan interface{})(eventChan))
 	sub.On("Err").Return(nil).Once()
 
@@ -269,7 +265,7 @@ func (s *EventsProviderSuite) TestMessageIndexEventProviderResponse_HappyPath() 
 
 		for i := 0; i < eventsCount; i++ {
 			eventChan <- &backend.EventsResponse{
-				Height: s.rootBlock.Header.Height,
+				Height: s.rootBlock.Height,
 			}
 		}
 	}()
@@ -360,7 +356,7 @@ func invalidEventsArgumentsTestCases() []testErrType {
 			name: "provide both 'start_block_id' and 'start_block_height' arguments",
 			arguments: wsmodels.Arguments{
 				"start_block_id":     unittest.BlockFixture().ID().String(),
-				"start_block_height": fmt.Sprintf("%d", unittest.BlockFixture().Header.Height),
+				"start_block_height": fmt.Sprintf("%d", unittest.BlockFixture().Height),
 				"event_types":        []string{state_stream.CoreEventAccountCreated},
 				"addresses":          []string{unittest.AddressFixture().String()},
 				"contracts":          []string{"A.0000000000000001.Contract1", "A.0000000000000001.Contract2"},

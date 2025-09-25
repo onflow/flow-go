@@ -372,7 +372,7 @@ func (e *Engine) processFinalizedBlock(block *flow.Block) error {
 	// TODO: substitute an indexer module as layer between engine and storage
 
 	// index the block storage with each of the collection guarantee
-	err := e.blocks.IndexBlockForCollections(block.Header.ID(), flow.GetIDs(block.Payload.Guarantees))
+	err := e.blocks.IndexBlockContainingCollectionGuarantees(block.ID(), flow.GetIDs(block.Payload.Guarantees))
 	if err != nil {
 		return fmt.Errorf("could not index block for collections: %w", err)
 	}
@@ -385,7 +385,7 @@ func (e *Engine) processFinalizedBlock(block *flow.Block) error {
 		}
 	}
 
-	e.collectionSyncer.RequestCollectionsForBlock(block.Header.Height, block.Payload.Guarantees)
+	e.collectionSyncer.RequestCollectionsForBlock(block.Height, block.Payload.Guarantees)
 	e.collectionExecutedMetric.BlockFinalized(block)
 
 	return nil

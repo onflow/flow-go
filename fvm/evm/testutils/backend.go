@@ -24,6 +24,7 @@ import (
 	"github.com/onflow/flow-go/fvm/tracing"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/trace"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 var TestFlowEVMRootAddress = flow.Address{1, 2, 3, 4}
@@ -49,14 +50,6 @@ func RunWithTestBackend(t testing.TB, f func(*TestBackend)) {
 		TestLoggerProvider:          &TestLoggerProvider{},
 	}
 	f(tb)
-}
-
-func ConvertToCadence(data []byte) []cadence.Value {
-	ret := make([]cadence.Value, len(data))
-	for i, v := range data {
-		ret[i] = cadence.UInt8(v)
-	}
-	return ret
 }
 
 func fullKey(owner, key []byte) string {
@@ -169,11 +162,20 @@ func getSimpleEventEmitter() *testEventEmitter {
 			if err != nil {
 				return err
 			}
-			eventType := flow.EventType(event.EventType.ID())
-			events = append(events, flow.Event{
-				Type:    eventType,
-				Payload: payload,
-			})
+			e, err := flow.NewEvent(
+				flow.UntrustedEvent{
+					Type:             flow.EventType(event.EventType.ID()),
+					TransactionID:    unittest.IdentifierFixture(),
+					TransactionIndex: 0,
+					EventIndex:       0,
+					Payload:          payload,
+				},
+			)
+			if err != nil {
+				return fmt.Errorf("could not construct event: %w", err)
+			}
+
+			events = append(events, *e)
 			return nil
 		},
 		events: func() flow.EventsList {
@@ -372,11 +374,16 @@ type testMeter struct {
 	totalEmittedEventBytes func() uint64
 
 	interactionUsed func() (uint64, error)
+
+	disabled bool
 }
 
 var _ environment.Meter = &testMeter{}
 
 func (m *testMeter) MeterComputation(usage common.ComputationUsage) error {
+	if m.disabled {
+		return nil
+	}
 	meterComputation := m.meterComputation
 	if meterComputation == nil {
 		panic("method not set")
@@ -408,7 +415,17 @@ func (m *testMeter) ComputationUsed() (uint64, error) {
 	return computationUsed()
 }
 
+func (m *testMeter) RunWithMeteringDisabled(f func()) {
+	disabled := m.disabled
+	m.disabled = true
+	f()
+	m.disabled = disabled
+}
+
 func (m *testMeter) MeterMemory(usage common.MemoryUsage) error {
+	if m.disabled {
+		return nil
+	}
 	meterMemory := m.meterMemory
 	if meterMemory == nil {
 		panic("method not set")
@@ -433,6 +450,9 @@ func (m *testMeter) InteractionUsed() (uint64, error) {
 }
 
 func (m *testMeter) MeterEmittedEvent(byteSize uint64) error {
+	if m.disabled {
+		return nil
+	}
 	meterEmittedEvent := m.meterEmittedEvent
 	if meterEmittedEvent == nil {
 		panic("method not set")

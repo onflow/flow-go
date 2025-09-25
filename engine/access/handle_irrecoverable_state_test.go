@@ -29,12 +29,13 @@ import (
 	"github.com/onflow/flow-go/engine/access/rpc/backend/node_communicator"
 	"github.com/onflow/flow-go/engine/access/rpc/backend/query_mode"
 	statestreambackend "github.com/onflow/flow-go/engine/access/state_stream/backend"
+	commonrpc "github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/grpcserver"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
 	module "github.com/onflow/flow-go/module/mock"
-	"github.com/onflow/flow-go/network/mocknetwork"
+	mocknetwork "github.com/onflow/flow-go/network/mock"
 	protocol "github.com/onflow/flow-go/state/protocol/mock"
 	storagemock "github.com/onflow/flow-go/storage/mock"
 	"github.com/onflow/flow-go/utils/grpcutils"
@@ -64,8 +65,6 @@ type IrrecoverableStateTestSuite struct {
 	collections  *storagemock.Collections
 	transactions *storagemock.Transactions
 	receipts     *storagemock.ExecutionReceipts
-
-	ctx irrecoverable.SignalerContext
 
 	// grpc servers
 	secureGrpcServer   *grpcserver.GrpcServer
@@ -127,7 +126,8 @@ func (suite *IrrecoverableStateTestSuite) SetupTest() {
 
 	suite.secureGrpcServer = grpcserver.NewGrpcServerBuilder(suite.log,
 		config.SecureGRPCListenAddr,
-		grpcutils.DefaultMaxMsgSize,
+		commonrpc.DefaultAccessMaxRequestSize,
+		commonrpc.DefaultAccessMaxResponseSize,
 		false,
 		nil,
 		nil,
@@ -135,7 +135,8 @@ func (suite *IrrecoverableStateTestSuite) SetupTest() {
 
 	suite.unsecureGrpcServer = grpcserver.NewGrpcServerBuilder(suite.log,
 		config.UnsecureGRPCListenAddr,
-		grpcutils.DefaultMaxMsgSize,
+		commonrpc.DefaultAccessMaxRequestSize,
+		commonrpc.DefaultAccessMaxResponseSize,
 		false,
 		nil,
 		nil).Build()
@@ -233,11 +234,13 @@ func (suite *IrrecoverableStateTestSuite) TestGRPCInconsistentNodeState() {
 // TestRestInconsistentNodeState tests the behavior when the REST API encounters an inconsistent node state.
 func (suite *IrrecoverableStateTestSuite) TestRestInconsistentNodeState() {
 	collections := unittest.CollectionListFixture(1)
-	blockHeader := unittest.BlockWithGuaranteesFixture(
-		unittest.CollectionGuaranteesWithCollectionIDFixture(collections),
+	block := unittest.BlockFixture(
+		unittest.Block.WithPayload(
+			unittest.PayloadFixture(unittest.WithGuarantees(unittest.CollectionGuaranteesWithCollectionIDFixture(collections)...)),
+		),
 	)
-	suite.blocks.On("ByID", blockHeader.ID()).Return(blockHeader, nil)
-	suite.headers.On("BlockIDByHeight", blockHeader.Header.Height).Return(blockHeader.ID(), nil)
+	suite.blocks.On("ByID", block.ID()).Return(block, nil)
+	suite.headers.On("BlockIDByHeight", block.Height).Return(block.ID(), nil)
 
 	err := fmt.Errorf("inconsistent node's state")
 	suite.snapshot.On("Head").Return(nil, err)
@@ -249,7 +252,7 @@ func (suite *IrrecoverableStateTestSuite) TestRestInconsistentNodeState() {
 	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
 	defer cancel()
 
-	actual, _, err := client.BlocksApi.BlocksIdGet(ctx, []string{blockHeader.ID().String()}, optionsForBlocksIdGetOpts())
+	actual, _, err := client.BlocksApi.BlocksIdGet(ctx, []string{block.ID().String()}, optionsForBlocksIdGetOpts())
 	suite.Require().Error(err)
 	suite.Require().Nil(actual)
 }

@@ -18,6 +18,7 @@ import (
 	"github.com/onflow/flow/protobuf/go/flow/entities"
 	"github.com/onflow/flow/protobuf/go/flow/execution"
 
+	commonrpc "github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	mockEng "github.com/onflow/flow-go/engine/execution/mock"
 	"github.com/onflow/flow-go/engine/execution/state"
@@ -52,13 +53,7 @@ func (suite *Suite) SetupTest() {
 
 // TestExecuteScriptAtBlockID tests the ExecuteScriptAtBlockID API call
 func (suite *Suite) TestExecuteScriptAtBlockID() {
-	// setup handler
-	mockEngine := mockEng.NewScriptExecutor(suite.T())
-	handler := &handler{
-		engine:  mockEngine,
-		chain:   flow.Mainnet,
-		commits: suite.commits,
-	}
+	handler, mockEngine := suite.defaultHandler()
 
 	// setup dummy request/response
 	ctx := context.Background()
@@ -127,14 +122,19 @@ func (suite *Suite) TestGetEventsForBlockIDs() {
 
 	// setup the events storage mock
 	for i := range blockIDs {
-		block := unittest.BlockFixture()
-		block.Header.Height = uint64(i)
+		block := unittest.BlockFixture(
+			unittest.Block.WithHeight(uint64(i + 1)), // avoiding edge case of height = 0 (genesis block)
+		)
 		id := block.ID()
 		blockIDs[i] = id[:]
 		eventsForBlock := make([]flow.Event, eventsPerBlock)
 		eventMessages := make([]*entities.Event, eventsPerBlock)
 		for j := range eventsForBlock {
-			e := unittest.EventFixture(flow.EventAccountCreated, uint32(j), uint32(j), unittest.IdentifierFixture(), 0)
+			e := unittest.EventFixture(
+				unittest.Event.WithEventType(flow.EventAccountCreated),
+				unittest.Event.WithTransactionIndex(uint32(j)),
+				unittest.Event.WithEventIndex(uint32(j)),
+			)
 			eventsForBlock[j] = e
 			eventMessages[j] = convert.EventToMessage(e)
 		}
@@ -145,26 +145,18 @@ func (suite *Suite) TestGetEventsForBlockIDs() {
 		suite.events.On("ByBlockID", id).Return(eventsForBlock, nil).Once()
 
 		// expect one call to lookup each block
-		suite.headers.On("ByBlockID", id).Return(block.Header, nil).Once()
+		suite.headers.On("ByBlockID", id).Return(block.ToHeader(), nil).Once()
 
 		// create the expected result for this block
 		expectedResult[i] = &execution.GetEventsForBlockIDsResponse_Result{
 			BlockId:     id[:],
-			BlockHeight: block.Header.Height,
+			BlockHeight: block.Height,
 			Events:      eventMessages,
 		}
 	}
 
 	// create the handler
-	handler := &handler{
-		headers:            suite.headers,
-		events:             suite.events,
-		exeResults:         suite.exeResults,
-		transactionResults: suite.txResults,
-		commits:            suite.commits,
-		chain:              flow.Mainnet,
-		maxBlockRange:      DefaultMaxBlockRange,
-	}
+	handler, _ := suite.defaultHandler()
 
 	concoctReq := func(errType string, blockIDs [][]byte) *execution.GetEventsForBlockIDsRequest {
 		return &execution.GetEventsForBlockIDsRequest{
@@ -261,14 +253,7 @@ func (suite *Suite) TestGetAccountAtBlockID() {
 		Address: serviceAddress,
 	}
 
-	mockEngine := mockEng.NewScriptExecutor(suite.T())
-
-	// create the handler
-	handler := &handler{
-		engine:  mockEngine,
-		chain:   flow.Mainnet,
-		commits: suite.commits,
-	}
+	handler, mockEngine := suite.defaultHandler()
 
 	createReq := func(id []byte, address []byte) *execution.GetAccountAtBlockIDRequest {
 		return &execution.GetAccountAtBlockIDRequest{
@@ -358,13 +343,7 @@ func (suite *Suite) TestGetRegisterAtBlockID() {
 	serviceAddress := flow.Mainnet.Chain().ServiceAddress()
 	validKey := []byte("exists")
 
-	mockEngine := mockEng.NewScriptExecutor(suite.T())
-
-	// create the handler
-	handler := &handler{
-		engine: mockEngine,
-		chain:  flow.Mainnet,
-	}
+	handler, mockEngine := suite.defaultHandler()
 
 	createReq := func(id, owner, key []byte) *execution.GetRegisterAtBlockIDRequest {
 		return &execution.GetRegisterAtBlockIDRequest{
@@ -413,7 +392,11 @@ func (suite *Suite) TestGetTransactionResult() {
 	eventsForTx := make([]flow.Event, totalEvents)
 	eventMessages := make([]*entities.Event, totalEvents)
 	for j := range eventsForTx {
-		e := unittest.EventFixture(flow.EventAccountCreated, uint32(j), uint32(j), unittest.IdentifierFixture(), 0)
+		e := unittest.EventFixture(
+			unittest.Event.WithEventType(flow.EventAccountCreated),
+			unittest.Event.WithTransactionIndex(uint32(j)),
+			unittest.Event.WithEventIndex(uint32(j)),
+		)
 		eventsForTx[j] = e
 		eventMessages[j] = convert.EventToMessage(e)
 	}
@@ -423,13 +406,8 @@ func (suite *Suite) TestGetTransactionResult() {
 
 	// create the handler
 	createHandler := func(txResults *storage.TransactionResults) *handler {
-		handler := &handler{
-			headers:            suite.headers,
-			events:             suite.events,
-			transactionResults: txResults,
-			commits:            suite.commits,
-			chain:              flow.Mainnet,
-		}
+		handler, _ := suite.defaultHandler()
+		handler.transactionResults = txResults
 		return handler
 	}
 
@@ -749,13 +727,23 @@ func (suite *Suite) TestGetTransactionResultsByBlockID() {
 	convertedEventsForTx2 := make([]*entities.Event, len(eventsForTx2))
 
 	for j := 0; j < len(eventsForTx1); j++ {
-		e := unittest.EventFixture(flow.EventAccountCreated, uint32(0), uint32(j), tx1ID, 0)
+		e := unittest.EventFixture(
+			unittest.Event.WithEventType(flow.EventAccountCreated),
+			unittest.Event.WithTransactionIndex(0),
+			unittest.Event.WithEventIndex(uint32(j)),
+			unittest.Event.WithTransactionID(tx1ID),
+		)
 		eventsForTx1[j] = e
 		eventsForBlock[j] = e
 		convertedEventsForTx1[j] = convert.EventToMessage(e)
 	}
 	for j := 0; j < len(eventsForTx2); j++ {
-		e := unittest.EventFixture(flow.EventAccountCreated, uint32(1), uint32(j), tx2ID, 0)
+		e := unittest.EventFixture(
+			unittest.Event.WithEventType(flow.EventAccountCreated),
+			unittest.Event.WithTransactionIndex(1),
+			unittest.Event.WithEventIndex(uint32(j)),
+			unittest.Event.WithTransactionID(tx2ID),
+		)
 		eventsForTx2[j] = e
 		eventsForBlock[len(eventsForTx1)+j] = e
 		convertedEventsForTx2[j] = convert.EventToMessage(e)
@@ -763,13 +751,8 @@ func (suite *Suite) TestGetTransactionResultsByBlockID() {
 
 	// create the handler
 	createHandler := func(txResults *storage.TransactionResults) *handler {
-		handler := &handler{
-			headers:            suite.headers,
-			events:             suite.events,
-			transactionResults: txResults,
-			commits:            suite.commits,
-			chain:              flow.Mainnet,
-		}
+		handler, _ := suite.defaultHandler()
+		handler.transactionResults = txResults
 		return handler
 	}
 
@@ -943,13 +926,8 @@ func (suite *Suite) TestGetTransactionErrorMessage() {
 
 	// create the handler
 	createHandler := func(txResults *storage.TransactionResults) *handler {
-		handler := &handler{
-			headers:            suite.headers,
-			events:             suite.events,
-			transactionResults: txResults,
-			commits:            suite.commits,
-			chain:              flow.Mainnet,
-		}
+		handler, _ := suite.defaultHandler()
+		handler.transactionResults = txResults
 		return handler
 	}
 
@@ -1238,13 +1216,8 @@ func (suite *Suite) TestGetTransactionErrorMessagesByBlockID() {
 
 	// create the handler
 	createHandler := func(txResults *storage.TransactionResults) *handler {
-		handler := &handler{
-			headers:            suite.headers,
-			events:             suite.events,
-			transactionResults: txResults,
-			commits:            suite.commits,
-			chain:              flow.Mainnet,
-		}
+		handler, _ := suite.defaultHandler()
+		handler.transactionResults = txResults
 		return handler
 	}
 
@@ -1381,4 +1354,19 @@ func (suite *Suite) TestGetTransactionErrorMessagesByBlockID() {
 		suite.Require().Error(err)
 		errors.Is(err, status.Error(codes.NotFound, ""))
 	})
+}
+
+func (suite *Suite) defaultHandler() (*handler, *mockEng.ScriptExecutor) {
+	mockEngine := mockEng.NewScriptExecutor(suite.T())
+	return &handler{
+		engine:             mockEngine,
+		chain:              flow.Mainnet,
+		headers:            suite.headers,
+		events:             suite.events,
+		exeResults:         suite.exeResults,
+		transactionResults: suite.txResults,
+		commits:            suite.commits,
+		maxBlockRange:      DefaultMaxBlockRange,
+		maxScriptSize:      commonrpc.DefaultAccessMaxRequestSize,
+	}, mockEngine
 }

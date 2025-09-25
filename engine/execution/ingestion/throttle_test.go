@@ -10,6 +10,7 @@ import (
 
 	stateMock "github.com/onflow/flow-go/engine/execution/state/mock"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/utils/unittest"
 	"github.com/onflow/flow-go/utils/unittest/mocks"
 )
@@ -103,23 +104,23 @@ func TestThrottleFallBehindCatchUp(t *testing.T) {
 
 	// when 11 is received, verify block 11 is loaded
 	wg.Add(1)
-	require.NoError(t, throttle.OnBlock(allBlocks[11].ID(), allBlocks[11].Header.Height))
+	require.NoError(t, throttle.OnBlock(allBlocks[11].ID(), allBlocks[11].Height))
 	wg.Wait()
-	require.Equal(t, HeaderToBlockIDHeight(allBlocks[11].Header), consumer.LastProcessable())
+	require.Equal(t, HeaderToBlockIDHeight(allBlocks[11].ToHeader()), consumer.LastProcessable())
 
 	require.NoError(t, throttle.Done())
 }
 
 func makeBlocks(t *testing.T, start, count int) []*flow.Block {
-	genesis := unittest.GenesisFixture()
-	blocks := unittest.ChainFixtureFrom(count, genesis.Header)
+	genesis := unittest.Block.Genesis(flow.Emulator)
+	blocks := unittest.ChainFixtureFrom(count, genesis.ToHeader())
 	return append([]*flow.Block{genesis}, blocks...)
 }
 
 func toHeaders(blocks []*flow.Block) []*flow.Header {
 	headers := make([]*flow.Header, len(blocks))
 	for i, block := range blocks {
-		headers[i] = block.Header
+		headers[i] = block.ToHeader()
 	}
 	return headers
 }
@@ -186,6 +187,8 @@ type headerStore struct {
 	byHeight map[uint64]*flow.Header
 }
 
+var _ storage.Headers = (*headerStore)(nil)
+
 func newHeadersWithBlocks(headers []*flow.Header) *headerStore {
 	byID := make(map[flow.Identifier]*flow.Header, len(headers))
 	byHeight := make(map[uint64]*flow.Header, len(headers))
@@ -232,6 +235,20 @@ func (h *headerStore) ByParentID(parentID flow.Identifier) ([]*flow.Header, erro
 	return nil, nil
 }
 
-func (h *headerStore) Store(header *flow.Header) error {
+func (h *headerStore) Store(proposal *flow.ProposalHeader) error {
 	return nil
+}
+
+func (h *headerStore) ProposalByBlockID(blockID flow.Identifier) (*flow.ProposalHeader, error) {
+	return nil, nil
+}
+
+func (h *headerStore) ByView(view uint64) (*flow.Header, error) {
+	// Find header with matching view
+	for _, header := range h.byID {
+		if header.View == view {
+			return header, nil
+		}
+	}
+	return nil, fmt.Errorf("no header found for view %d", view)
 }

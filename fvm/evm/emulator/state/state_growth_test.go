@@ -7,9 +7,9 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core/tracing"
 	"github.com/holiman/uint256"
-	"github.com/onflow/go-ethereum/common"
-	"github.com/onflow/go-ethereum/core/tracing"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/fvm/evm/emulator/state"

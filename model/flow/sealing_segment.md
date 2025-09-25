@@ -17,16 +17,16 @@ is this snapshot's reference block (i.e. `head`) and the first (least height) is
 recently sealed block as of this snapshot.
 In other words, the most recently incorporated seal as of the highest block
 references the lowest block. The highest block does not need to contain this seal.
-* Example 1: block `E` seals `A`
+* Example 1: block `E` seals `B`
   ```
-  A <- B <- C <- D <- E(SA)
+  B <- C <- D <- E(SB)
   ```
-  Here, `SA` denotes the seal for block `A`.
-  In the sealing segment's last block (`E`) has a seal for block `A`, which is the first block of the sealing segment.
+  Here, `SB` denotes the seal for block `B`.
+  In the sealing segment's last block (`E`) has a seal for block `B`, which is the first block of the sealing segment.
 
-* Example 2: `E` contains no seals, but latest seal prior to `E` seals `A`
+* Example 2: `F` contains no seals, but latest seal prior to `F` seals `B`
   ```
-  A <- B <- C <- D(SA) <- E
+  B <- C <- D <- E(SB) <- F
   ```
 * Example 3: `E` contains multiple seals
   ```
@@ -49,6 +49,14 @@ lowest block in `SealingSegment.Blocks` must be `B`. Essentially, this is a mini
 requirement for the history: it shouldn't be longer than necessary. So
 extending the chain segment above to `A <- B <- C <- D <- E(SA, SB)` would
 be an invalid value for field `SealingSegment.Blocks`.
+
+
+**Nomenclature**:
+*  After bootstrapping, we refer to the latest sealed block in the sealing segment as `SealedRoot` block. This is
+   `SealingSegment.Blocks[0]` (block `B` in example 3).
+*  The highest finalized block in the sealing segment is called `FinalizedRoot`
+   This is always the last block in the `SealingSegment.Blocks` slice (block `E` in example 3).
+
 
 ### Part 2: `ExtraBlocks`
 
@@ -100,7 +108,7 @@ The descriptions from the previous section can be formalized as follows
   ```
   limitHeight := max(blockSealedAtHead.Height - flow.DefaultTransactionExpiry, SporkRootBlockHeight)
   ```
-   where blockSealedAtHead is the block sealed by `head` block.
+   where `blockSealedAtHead` is the block sealed by `head` block.
 Note that all three conditions have to be satisfied by a sealing segment. Therefore, it must contain the longest history
 required by any of the three conditions. The 'Spork Root Block' is the cutoff.
 
@@ -144,9 +152,7 @@ the segment. In particular:
 
 ## Outlook
 
-In its current state, the sealing segment has been evolving driven by different needs. Most likely, there is some room for simplifications
-and other improvements. However, an important aspect of the sealing segment is to allow newly-joining nodes to build an internal representation
-of the protocol state, in particular the identity table. There are large changes coming around when we move to the dynamic identity table.
-Therefore, we accept that the Sealing Segment currently has some technical debt and unnecessary complexity. Once we have implemented the
-dynamic identity table, we will have a much more solidified understanding of the data in the sealing segment.
+An important aspect of the sealing segment is to allow newly-joining nodes to build an internal representation
+of the protocol state, in particular the identity table. In its current state, the sealing segment has been evolving
+driven by different needs. Most likely, there is some room for simplifications and other improvements. 
 

@@ -14,7 +14,6 @@ import (
 	"github.com/rs/zerolog"
 	"google.golang.org/grpc"
 
-	"github.com/onflow/crypto"
 	"github.com/onflow/crypto/hash"
 
 	"github.com/onflow/flow-go/engine/execution/computation/computer"
@@ -23,12 +22,14 @@ import (
 	"github.com/onflow/flow-go/engine/verification/verifier"
 	"github.com/onflow/flow-go/insecure"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	flownet "github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/utils/logging"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 // Network is a wrapper around the original flow network, that allows a remote attack orchestrator
@@ -251,7 +252,11 @@ func (n *Network) processAttackerIngressMessage(msg *insecure.IngressMessage) er
 		lg.Fatal().Msg("corrupt network received ingress message for an unknown channel")
 	}
 
-	err = originalProcessor.(flownet.MessageProcessor).Process(channels.Channel(msg.ChannelID), senderId, event)
+	internal, err := event.ToInternal()
+	if err != nil {
+		lg.Fatal().Err(err).Msg("failed to convert event to internal")
+	}
+	err = originalProcessor.(flownet.MessageProcessor).Process(channels.Channel(msg.ChannelID), senderId, internal)
 	if err != nil {
 		lg.Fatal().Err(err).Msg("could not relay ingress message to original processor")
 	}
@@ -278,7 +283,7 @@ func (n *Network) processAttackerEgressMessage(msg *insecure.Message) error {
 		Str("flow_protocol_event_type", fmt.Sprintf("%T", event)).Logger()
 
 	switch e := event.(type) {
-	case *flow.ExecutionReceipt:
+	case *messages.ExecutionReceipt:
 		if len(e.ExecutorSignature) == 0 {
 			// empty signature field on execution receipt means attack orchestrator is dictating a result to
 			// CCF, and the receipt fields must be filled out locally.
@@ -289,10 +294,10 @@ func (n *Network) processAttackerEgressMessage(msg *insecure.Message) error {
 					Msg("could not generate receipt for attack orchestrator's dictated result")
 				return fmt.Errorf("could not generate execution receipt for attack orchestrator's result: %w", err)
 			}
-			event = receipt // swaps event with the receipt.
+			event = (*messages.ExecutionReceipt)(receipt) // swaps event with the receipt.
 		}
 
-	case *flow.ResultApproval:
+	case *messages.ResultApproval:
 		if len(e.VerifierSignature) == 0 {
 			// empty signature field on result approval means attack orchestrator is dictating an attestation to
 			// CCF, and the approval fields must be filled out locally.
@@ -305,7 +310,7 @@ func (n *Network) processAttackerEgressMessage(msg *insecure.Message) error {
 					Msg("could not generate result approval for attack orchestrator's dictated attestation")
 				return fmt.Errorf("could not generate result approval for attack orchestrator's attestation: %w", err)
 			}
-			event = approval // swaps event with the receipt.
+			event = (*messages.ResultApproval)(approval) // swaps event with the receipt.
 		}
 	}
 
@@ -425,7 +430,7 @@ func (n *Network) eventToIngressMessage(event interface{}, channel channels.Chan
 
 func (n *Network) generateExecutionReceipt(result *flow.ExecutionResult) (*flow.ExecutionReceipt, error) {
 	// TODO: fill spock secret with dictated spock data from attack orchestrator.
-	return computer.GenerateExecutionReceipt(n.me, n.receiptHasher, result, []crypto.Signature{})
+	return computer.GenerateExecutionReceipt(n.me, n.receiptHasher, result, unittest.SignaturesFixture(1))
 }
 
 func (n *Network) generateResultApproval(attestation *flow.Attestation) (*flow.ResultApproval, error) {

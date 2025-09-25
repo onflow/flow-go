@@ -3,7 +3,6 @@ package pebbleimpl
 import (
 	"bytes"
 	"fmt"
-	"sync"
 
 	"github.com/cockroachdb/pebble/v2"
 
@@ -22,9 +21,6 @@ type ReaderBatchWriter struct {
 
 	// for executing callbacks after the batch has been flushed, such as updating caches
 	callbacks *operation.Callbacks
-
-	// for repreventing re-entrant deadlock
-	locks *operation.BatchLocks
 
 	// values store value for this batch.
 	// NOTE: b.values is only initialized when needed.
@@ -52,14 +48,6 @@ func (b *ReaderBatchWriter) Writer() storage.Writer {
 
 func (b *ReaderBatchWriter) PebbleWriterBatch() *pebble.Batch {
 	return b.batch
-}
-
-// Lock tries to acquire the lock for the batch.
-// if the lock is already acquired by this same batch from other pending db operations,
-// then it will not be blocked and can continue updating the batch, which prevents a re-entrant deadlock.
-// CAUTION: The caller must ensure that no other references exist for the input lock.
-func (b *ReaderBatchWriter) Lock(lock *sync.Mutex) {
-	b.locks.Lock(lock, b.callbacks)
 }
 
 // AddCallback adds a callback to execute after the batch has been flush
@@ -117,7 +105,6 @@ func NewReaderBatchWriter(db *pebble.DB) *ReaderBatchWriter {
 		globalReader: ToReader(db),
 		batch:        db.NewBatch(),
 		callbacks:    operation.NewCallbacks(),
-		locks:        operation.NewBatchLocks(),
 	}
 }
 

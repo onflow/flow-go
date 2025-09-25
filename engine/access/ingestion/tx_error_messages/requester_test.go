@@ -42,7 +42,7 @@ type RequesterSuite struct {
 	execClient  *accessmock.ExecutionAPIClient
 	connFactory *connectionmock.ConnectionFactory
 
-	rootBlock      flow.Block
+	rootBlock      *flow.Block
 	finalizedBlock *flow.Header
 
 	txErrorMessages *storage.TransactionResultErrorMessages
@@ -64,6 +64,8 @@ func (s *RequesterSuite) SetupTest() {
 	s.execClient = accessmock.NewExecutionAPIClient(s.T())
 	s.connFactory = connectionmock.NewConnectionFactory(s.T())
 	s.receipts = storage.NewExecutionReceipts(s.T())
+	s.rootBlock = unittest.Block.Genesis(flow.Emulator)
+	s.finalizedBlock = unittest.BlockWithParentFixture(s.rootBlock.ToHeader()).ToHeader()
 
 	s.txErrorMessages = storage.NewTransactionResultErrorMessages(s.T())
 	s.lightTxResults = storage.NewLightTransactionResults(s.T())
@@ -73,11 +75,7 @@ func (s *RequesterSuite) SetupTest() {
 	s.Require().NoError(err)
 	s.txResultsIndex = index.NewTransactionResultsIndex(s.indexReporter, s.lightTxResults)
 
-	s.rootBlock = unittest.BlockFixture()
-	s.rootBlock.Header.Height = 0
-	s.finalizedBlock = unittest.BlockWithParentFixture(s.rootBlock.Header).Header
-
-	s.proto.params.On("FinalizedRoot").Return(s.rootBlock.Header, nil)
+	s.proto.params.On("FinalizedRoot").Return(s.rootBlock.ToHeader(), nil)
 	s.proto.state.On("Params").Return(s.proto.params)
 
 	s.proto.snapshot.On("Head").Return(

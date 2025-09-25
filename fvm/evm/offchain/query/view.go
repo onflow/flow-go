@@ -5,11 +5,11 @@ import (
 	"fmt"
 	"math/big"
 
+	gethCommon "github.com/ethereum/go-ethereum/common"
+	gethTypes "github.com/ethereum/go-ethereum/core/types"
+	gethCrypto "github.com/ethereum/go-ethereum/crypto"
+	gethTracers "github.com/ethereum/go-ethereum/eth/tracers"
 	"github.com/holiman/uint256"
-	gethCommon "github.com/onflow/go-ethereum/common"
-	gethTypes "github.com/onflow/go-ethereum/core/types"
-	gethCrypto "github.com/onflow/go-ethereum/crypto"
-	gethTracers "github.com/onflow/go-ethereum/eth/tracers"
 
 	"github.com/onflow/flow-go/fvm/evm/emulator"
 	"github.com/onflow/flow-go/fvm/evm/emulator/state"
@@ -277,9 +277,15 @@ func WithStateOverrideState(
 		if err != nil {
 			return err
 		}
+
+		// This forces the account of the slots to be created, otherwise we
+		// might add slots without its owner account being created.
+		if err := setupAccount(addr, baseView); err != nil {
+			return err
+		}
+
 		// purge all the slots
-		err = baseView.PurgeAllSlotsOfAnAccount(addr)
-		if err != nil {
+		if err = baseView.PurgeAllSlotsOfAnAccount(addr); err != nil {
 			return err
 		}
 		// no need to be sorted this is off-chain operation
@@ -307,6 +313,13 @@ func WithStateOverrideStateDiff(
 		if err != nil {
 			return err
 		}
+
+		// This forces the account of the slots to be created, otherwise we
+		// might add slots without its owner account being created.
+		if err := setupAccount(addr, baseView); err != nil {
+			return err
+		}
+
 		// no need to be sorted this is off-chain operation
 		for k, v := range slots {
 			err = baseView.UpdateSlot(types.SlotAddress{
@@ -343,4 +356,32 @@ func WithExtraPrecompiledContracts(pcs []types.PrecompiledContract) DryCallOptio
 		v.extraPCs = pcs
 		return nil
 	}
+}
+
+// setupAccount updates an account's metadata. If the account does not exist,
+// it will be created and initialized with the proper default values.
+func setupAccount(addr gethCommon.Address, baseView *state.BaseView) error {
+	balance, err := baseView.GetBalance(addr)
+	if err != nil {
+		return err
+	}
+	nonce, err := baseView.GetNonce(addr)
+	if err != nil {
+		return err
+	}
+	code, err := baseView.GetCode(addr)
+	if err != nil {
+		return err
+	}
+	codeHash := gethTypes.EmptyCodeHash
+	if len(code) > 0 {
+		codeHash = gethCrypto.Keccak256Hash(code)
+	}
+
+	err = baseView.UpdateAccount(addr, balance, nonce, code, codeHash)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }

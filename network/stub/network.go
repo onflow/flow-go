@@ -12,9 +12,10 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/channels"
-	"github.com/onflow/flow-go/network/mocknetwork"
+	mocknetwork "github.com/onflow/flow-go/network/mock"
 	"github.com/onflow/flow-go/network/p2p/conduit"
 )
 
@@ -24,7 +25,7 @@ import (
 // When an engine is attached on a Network instance, the mocked Network delivers
 // all engine's events to others using an in-memory delivery mechanism.
 type Network struct {
-	mocknetwork.Network
+	mocknetwork.EngineRegistry
 	ctx context.Context
 	sync.Mutex
 	myId           flow.Identifier                               // used to represent information of the attached node.
@@ -118,10 +119,14 @@ func (n *Network) UnRegisterChannel(channel channels.Channel) error {
 // submit is called when the attached Engine to the channel is sending an event to an
 // Engine attached to the same channel on another node or nodes.
 func (n *Network) submit(channel channels.Channel, event interface{}, targetIDs ...flow.Identifier) error {
+	e, ok := event.(messages.UntrustedMessage)
+	if !ok {
+		return fmt.Errorf("invalid message type: expected messages.UntrustedMessage, got %T", event)
+	}
 	m := &PendingMessage{
 		From:      n.GetID(),
 		Channel:   channel,
-		Event:     event,
+		Event:     e,
 		TargetIDs: targetIDs,
 	}
 
@@ -130,13 +135,17 @@ func (n *Network) submit(channel channels.Channel, event interface{}, targetIDs 
 	return nil
 }
 
-// unicast is called when the attached Engine to the channel is sending an event to a single target
+// UnicastOnChannel is called when the attached Engine to the channel is sending an event to a single target
 // Engine attached to the same channel on another node.
 func (n *Network) UnicastOnChannel(channel channels.Channel, event interface{}, targetID flow.Identifier) error {
+	msg, ok := event.(messages.UntrustedMessage)
+	if !ok {
+		return fmt.Errorf("invalid message type: expected messages.UntrustedMessage, got %T", event)
+	}
 	m := &PendingMessage{
 		From:      n.GetID(),
 		Channel:   channel,
-		Event:     event,
+		Event:     msg,
 		TargetIDs: []flow.Identifier{targetID},
 	}
 
@@ -264,15 +273,20 @@ func (n *Network) processWithEngine(syncOnProcess bool, key string, m *PendingMe
 		return fmt.Errorf("could find engine ID: %v", m.Channel)
 	}
 
+	internal, err := m.Event.ToInternal()
+	if err != nil {
+		return fmt.Errorf("could not convert message %T to internal: %v", m.Event, err)
+	}
+
 	if syncOnProcess {
 		// sender and receiver are synced over processing the message
-		if err := receiverEngine.Process(m.Channel, m.From, m.Event); err != nil {
-			return fmt.Errorf("receiver engine failed to process event (%v): %w", m.Event, err)
+		if err := receiverEngine.Process(m.Channel, m.From, internal); err != nil {
+			return fmt.Errorf("receiver engine failed to process event (%v): %w", internal, err)
 		}
 	} else {
 		// sender and receiver are synced over delivery of message
 		go func() {
-			_ = receiverEngine.Process(m.Channel, m.From, m.Event)
+			_ = receiverEngine.Process(m.Channel, m.From, internal)
 		}()
 	}
 	return nil

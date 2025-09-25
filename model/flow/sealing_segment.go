@@ -28,7 +28,7 @@ type SealingSegment struct {
 	// (see sealing_segment.md for details):
 	//   (i) The highest sealed block as of `head` needs to be included in the sealing segment.
 	//       This is relevant if `head` does not contain any seals.
-	Blocks []*Block
+	Blocks []*Proposal
 
 	// ExtraBlocks [optional] holds ancestors of `Blocks` in ascending height order.
 	// Formally, ExtraBlocks contains at least the additional history to satisfy conditions
@@ -38,7 +38,7 @@ type SealingSegment struct {
 	//       limitHeight := max(blockSealedAtHead.Height - flow.DefaultTransactionExpiry, SporkRootBlockHeight)
 	//       where blockSealedAtHead is the block sealed by `head` block.
 	// (Potentially longer history is permitted)
-	ExtraBlocks []*Block
+	ExtraBlocks []*Proposal
 
 	// ExecutionResults contain any results which are referenced by receipts
 	// or seals in the sealing segment, but not included in any segment block
@@ -55,10 +55,11 @@ type SealingSegment struct {
 	// the lowest one, are contained in the blocks of the sealing segment.
 	LatestSeals map[Identifier]Identifier
 
-	// FirstSeal contains the latest seal as of the first block in the segment.
-	// Per convention, this field holds a seal that was included _prior_ to the
-	// first block of the sealing segment. If the first block in the segment
-	// contains a seal, then this field is `nil`.
+	// FirstSeal contains the latest seal in the fork as of the first block in the
+	// segment, i.e. `Blocks[0]`. Per convention, this field is `nil` if and only if
+	// the first block in the segment contains a seal. In other words, `FirstSeal`
+	// holding a non-nil value indicates that `Blocks[0]` did not seal any blocks,
+	// i.e. the latest sealed block as of `Blocks[0]` is carried over from an ancestor.
 	// This information is needed for the `Commit` method of protocol snapshot
 	// to return the sealed state, when the first block contains no seal.
 	FirstSeal *Seal
@@ -66,6 +67,8 @@ type SealingSegment struct {
 	// ProtocolStateEntries contains every protocol state entry committed to
 	// by any block in the SealingSegment (including ExtraBlocks).
 	ProtocolStateEntries map[Identifier]*ProtocolStateEntryWrapper
+	// SporkRootBlock is the root block in the current spork
+	SporkRootBlock *Block
 }
 
 // ProtocolStateEntryWrapper is a wrapper coupling two data sources.
@@ -85,7 +88,7 @@ type ProtocolStateEntryWrapper struct {
 // Highest is the highest block in the sealing segment and the reference block from snapshot that was
 // used to produce this sealing segment.
 func (segment *SealingSegment) Highest() *Block {
-	return segment.Blocks[len(segment.Blocks)-1]
+	return &segment.Blocks[len(segment.Blocks)-1].Block
 }
 
 // Finalized returns the last finalized block, which is an alias of Highest
@@ -95,11 +98,11 @@ func (segment *SealingSegment) Finalized() *Block {
 
 // Sealed returns the most recently sealed block based on head of sealing segment(highest block).
 func (segment *SealingSegment) Sealed() *Block {
-	return segment.Blocks[0]
+	return &segment.Blocks[0].Block
 }
 
 // AllBlocks returns all blocks within the sealing segment, including extra blocks, in ascending height order.
-func (segment *SealingSegment) AllBlocks() []*Block {
+func (segment *SealingSegment) AllBlocks() []*Proposal {
 	return append(segment.ExtraBlocks, segment.Blocks...)
 }
 
@@ -152,7 +155,6 @@ func (segment *SealingSegment) LatestProtocolStateEntry() *ProtocolStateEntryWra
 // Errors expected during normal operation:
 //   - InvalidSealingSegmentError if `segment` is an invalid SealingSegment.
 func (segment *SealingSegment) Validate() error {
-
 	// populate lookup of seals and results in the segment to satisfy builder
 	seals := make(map[Identifier]*Seal)
 	results := segment.ExecutionResults.Lookup()
@@ -160,11 +162,11 @@ func (segment *SealingSegment) Validate() error {
 	if segment.FirstSeal != nil {
 		seals[segment.FirstSeal.ID()] = segment.FirstSeal
 	}
-	for _, block := range segment.Blocks {
-		for _, result := range block.Payload.Results {
+	for _, proposal := range segment.Blocks {
+		for _, result := range proposal.Block.Payload.Results {
 			results[result.ID()] = result
 		}
-		for _, seal := range block.Payload.Seals {
+		for _, seal := range proposal.Block.Payload.Seals {
 			seals[seal.ID()] = seal
 		}
 	}
@@ -195,9 +197,9 @@ func (segment *SealingSegment) Validate() error {
 		return entry, nil
 	}
 
-	builder := NewSealingSegmentBuilder(getResult, getSeal, getProtocolStateEntry)
-	for _, block := range segment.Blocks {
-		err := builder.AddBlock(block)
+	builder := NewSealingSegmentBuilder(getResult, getSeal, getProtocolStateEntry, segment.SporkRootBlock)
+	for _, proposal := range segment.Blocks {
+		err := builder.AddBlock(proposal)
 		if err != nil {
 			return fmt.Errorf("invalid segment: %w", err)
 		}
@@ -267,35 +269,37 @@ type SealingSegmentBuilder struct {
 	// keep track of resources included in payloads
 	includedResults map[Identifier]struct{}
 	// resources to include in the sealing segment
-	blocks               []*Block
+	blocks               []*Proposal
 	results              []*ExecutionResult
 	latestSeals          map[Identifier]Identifier
 	protocolStateEntries map[Identifier]*ProtocolStateEntryWrapper
 	firstSeal            *Seal
 	// extraBlocks included in sealing segment, must connect to the lowest block of segment
 	// stored in descending order for simpler population logic
-	extraBlocks []*Block
+	extraBlocks []*Proposal
+	// sporkRootBlock is the root block in the current spork
+	sporkRootBlock *Block
 }
 
 // AddBlock appends a block to the sealing segment under construction.
 // Errors expected during normal operation:
 //   - InvalidSealingSegmentError if the added block would cause an invalid resulting segment
-func (builder *SealingSegmentBuilder) AddBlock(block *Block) error {
+func (builder *SealingSegmentBuilder) AddBlock(block *Proposal) error {
 	// sanity check: all blocks have to be added before adding extra blocks
 	if len(builder.extraBlocks) > 0 {
 		return fmt.Errorf("cannot add sealing segment block after extra block is added")
 	}
 
 	// sanity check: block should be 1 height higher than current highest
-	if !builder.isValidHeight(block) {
-		return NewInvalidSealingSegmentError("invalid block height (%d)", block.Header.Height)
+	if !builder.isValidHeight(&block.Block) {
+		return NewInvalidSealingSegmentError("invalid block height (%d)", block.Block.Height)
 	}
-	blockID := block.ID()
+	blockID := block.Block.ID()
 
 	// for the first (lowest) block, if it contains no seal, store the latest
 	// seal incorporated prior to the first block
 	if len(builder.blocks) == 0 {
-		if len(block.Payload.Seals) == 0 {
+		if len(block.Block.Payload.Seals) == 0 {
 			seal, err := builder.sealByBlockIDLookup(blockID)
 			if err != nil {
 				return fmt.Errorf("could not look up seal: %w", err)
@@ -313,12 +317,12 @@ func (builder *SealingSegmentBuilder) AddBlock(block *Block) error {
 
 	// cache included results and seals
 	// they could be referenced in a future block in the segment
-	for _, result := range block.Payload.Results {
+	for _, result := range block.Block.Payload.Results {
 		builder.includedResults[result.ID()] = struct{}{}
 	}
 
 	// if the block commits to an unseen ProtocolStateID, add the corresponding data entry
-	err = builder.addProtocolStateEntryIfUnseen(block.Payload.ProtocolStateID)
+	err = builder.addProtocolStateEntryIfUnseen(block.Block.Payload.ProtocolStateID)
 	if err != nil {
 		return fmt.Errorf("could not check or add protocol state entry: %w", err)
 	}
@@ -350,21 +354,21 @@ func (builder *SealingSegmentBuilder) addProtocolStateEntryIfUnseen(protocolStat
 // of sealing segment, this way they form a continuous chain.
 // Errors expected during normal operation:
 //   - InvalidSealingSegmentError if the added block would cause an invalid resulting segment
-func (builder *SealingSegmentBuilder) AddExtraBlock(block *Block) error {
+func (builder *SealingSegmentBuilder) AddExtraBlock(block *Proposal) error {
 	if len(builder.extraBlocks) == 0 {
 		if len(builder.blocks) == 0 {
 			return fmt.Errorf("cannot add extra blocks before adding lowest sealing segment block")
 		}
 		// first extra block has to match the lowest block of sealing segment
-		if (block.Header.Height + 1) != builder.lowest().Header.Height {
-			return NewInvalidSealingSegmentError("invalid extra block height (%d), doesn't connect to sealing segment", block.Header.Height)
+		if (block.Block.Height + 1) != builder.lowest().Height {
+			return NewInvalidSealingSegmentError("invalid extra block height (%d), doesn't connect to sealing segment", block.Block.Height)
 		}
-	} else if (block.Header.Height + 1) != builder.extraBlocks[len(builder.extraBlocks)-1].Header.Height {
-		return NewInvalidSealingSegmentError("invalid extra block height (%d), doesn't connect to last extra block", block.Header.Height)
+	} else if (block.Block.Height + 1) != builder.extraBlocks[len(builder.extraBlocks)-1].Block.Height {
+		return NewInvalidSealingSegmentError("invalid extra block height (%d), doesn't connect to last extra block", block.Block.Height)
 	}
 
 	// if the block commits to an unseen ProtocolStateID, add the corresponding data entry
-	err := builder.addProtocolStateEntryIfUnseen(block.Payload.ProtocolStateID)
+	err := builder.addProtocolStateEntryIfUnseen(block.Block.Payload.ProtocolStateID)
 	if err != nil {
 		return fmt.Errorf("could not check or add protocol state entry: %w", err)
 	}
@@ -398,14 +402,14 @@ func (builder *SealingSegmentBuilder) SealingSegment() (*SealingSegment, error) 
 	}
 
 	for _, block := range append(builder.extraBlocks, builder.blocks...) {
-		for _, receipt := range block.Payload.Receipts {
+		for _, receipt := range block.Block.Payload.Receipts {
 			_, included := builder.includedResults[receipt.ResultID]
 			if included {
 				continue
 			}
 			missingExecutionResultMap[receipt.ResultID] = struct{}{}
 		}
-		for _, seal := range block.Payload.Seals {
+		for _, seal := range block.Block.Payload.Seals {
 			_, included := builder.includedResults[seal.ResultID]
 			if included {
 				continue
@@ -438,8 +442,8 @@ func (builder *SealingSegmentBuilder) SealingSegment() (*SealingSegment, error) 
 
 	// SealingSegment must store extra blocks in ascending order, builder stores them in descending.
 	// Apply a sort to reverse the slice and use correct ordering.
-	slices.SortFunc(builder.extraBlocks, func(lhs, rhs *Block) int {
-		return int(lhs.Header.Height) - int(rhs.Header.Height)
+	slices.SortFunc(builder.extraBlocks, func(lhs, rhs *Proposal) int {
+		return int(lhs.Block.Height) - int(rhs.Block.Height)
 	})
 
 	return &SealingSegment{
@@ -449,6 +453,7 @@ func (builder *SealingSegmentBuilder) SealingSegment() (*SealingSegment, error) 
 		ProtocolStateEntries: builder.protocolStateEntries,
 		LatestSeals:          builder.latestSeals,
 		FirstSeal:            builder.firstSeal,
+		SporkRootBlock:       builder.sporkRootBlock,
 	}, nil
 }
 
@@ -458,7 +463,7 @@ func (builder *SealingSegmentBuilder) isValidHeight(block *Block) bool {
 		return true
 	}
 
-	return block.Header.Height == builder.highest().Header.Height+1
+	return block.Height == builder.highest().Height+1
 }
 
 // validateRootSegment will check that the current builder state represents a valid
@@ -475,8 +480,8 @@ func (builder *SealingSegmentBuilder) validateRootSegment() error {
 	if len(builder.extraBlocks) > 0 {
 		return NewInvalidSealingSegmentError("root segment cannot have extra blocks")
 	}
-	if builder.lowest().Header.View != 0 {
-		return NewInvalidSealingSegmentError("root block has unexpected view (%d != 0)", builder.lowest().Header.View)
+	if builder.lowest().View != builder.sporkRootBlock.View {
+		return NewInvalidSealingSegmentError("root block has unexpected view (%d != %d)", builder.lowest().View, builder.sporkRootBlock.View)
 	}
 	if len(builder.results) != 1 {
 		return NewInvalidSealingSegmentError("expected %d results, got %d", 1, len(builder.results))
@@ -494,9 +499,9 @@ func (builder *SealingSegmentBuilder) validateRootSegment() error {
 		return NewInvalidSealingSegmentError("root seal (block_id=%x) references different block than root result (block_id=%x)", builder.firstSeal.BlockID, builder.results[0].BlockID)
 	}
 	for _, block := range builder.blocks {
-		if len(block.Payload.Seals) > 0 {
+		if len(block.Block.Payload.Seals) > 0 {
 			return NewInvalidSealingSegmentError("root segment cannot contain blocks with seals (minimality requirement) - block (height=%d,id=%x) has %d seals",
-				block.Header.Height, block.ID(), len(block.Payload.Seals))
+				block.Block.Height, block.Block.ID(), len(block.Block.Payload.Seals))
 		}
 	}
 	return nil
@@ -512,7 +517,7 @@ func (builder *SealingSegmentBuilder) validateSegment() error {
 	}
 
 	if len(builder.extraBlocks) > 0 {
-		if builder.extraBlocks[0].Header.Height+1 != builder.lowest().Header.Height {
+		if builder.extraBlocks[0].Block.Height+1 != builder.lowest().Height {
 			return NewInvalidSealingSegmentError("extra blocks don't connect to lowest block in segment")
 		}
 	}
@@ -541,16 +546,21 @@ func (builder *SealingSegmentBuilder) highest() *Block {
 		return nil
 	}
 
-	return builder.blocks[len(builder.blocks)-1]
+	return &builder.blocks[len(builder.blocks)-1].Block
 }
 
 // lowest returns the lowest block in segment.
 func (builder *SealingSegmentBuilder) lowest() *Block {
-	return builder.blocks[0]
+	return &builder.blocks[0].Block
 }
 
 // NewSealingSegmentBuilder returns *SealingSegmentBuilder
-func NewSealingSegmentBuilder(resultLookup GetResultFunc, sealLookup GetSealByBlockIDFunc, protocolStateLookup GetProtocolStateEntryFunc) *SealingSegmentBuilder {
+func NewSealingSegmentBuilder(
+	resultLookup GetResultFunc,
+	sealLookup GetSealByBlockIDFunc,
+	protocolStateLookup GetProtocolStateEntryFunc,
+	sporkRootBlock *Block,
+) *SealingSegmentBuilder {
 	return &SealingSegmentBuilder{
 		resultLookup:         resultLookup,
 		sealByBlockIDLookup:  sealLookup,
@@ -558,9 +568,10 @@ func NewSealingSegmentBuilder(resultLookup GetResultFunc, sealLookup GetSealByBl
 		includedResults:      make(map[Identifier]struct{}),
 		latestSeals:          make(map[Identifier]Identifier),
 		protocolStateEntries: make(map[Identifier]*ProtocolStateEntryWrapper),
-		blocks:               make([]*Block, 0, 10),
-		extraBlocks:          make([]*Block, 0, DefaultTransactionExpiry),
+		blocks:               make([]*Proposal, 0, 10),
+		extraBlocks:          make([]*Proposal, 0, DefaultTransactionExpiry),
 		results:              make(ExecutionResultList, 0, 3),
+		sporkRootBlock:       sporkRootBlock,
 	}
 }
 
@@ -584,16 +595,16 @@ func NewSealingSegmentBuilder(resultLookup GetResultFunc, sealLookup GetSealByBl
 //
 // The node logic requires a valid sealing segment to bootstrap.
 // No errors are expected during normal operations.
-func findLatestSealForLowestBlock(blocks []*Block, latestSeals map[Identifier]Identifier) (*Seal, error) {
-	lowestBlockID := blocks[0].ID()
-	highestBlockID := blocks[len(blocks)-1].ID()
+func findLatestSealForLowestBlock(blocks []*Proposal, latestSeals map[Identifier]Identifier) (*Seal, error) {
+	lowestBlockID := blocks[0].Block.ID()
+	highestBlockID := blocks[len(blocks)-1].Block.ID()
 
 	// get the ID of the latest seal for highest block
 	latestSealID := latestSeals[highestBlockID]
 
 	// find the seal within the block payloads
 	for i := len(blocks) - 1; i >= 0; i-- {
-		block := blocks[i]
+		block := blocks[i].Block
 		// look for latestSealID in the payload
 		for _, seal := range block.Payload.Seals {
 			// if we found the latest seal, confirm it seals lowest

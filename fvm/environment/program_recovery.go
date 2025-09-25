@@ -255,13 +255,13 @@ func importsAddressLocation(program *ast.Program, address common.Address, name s
 		}
 
 		// The import declaration imports all identifiers, so also the location
-		if len(importDeclaration.Identifiers) == 0 {
+		if len(importDeclaration.Imports) == 0 {
 			return true
 		}
 
 		// The import declaration imports specific identifiers, so check if the location is imported
-		for _, identifier := range importDeclaration.Identifiers {
-			if identifier.Identifier == name {
+		for _, imp := range importDeclaration.Imports {
+			if imp.Identifier.Identifier == name {
 				return true
 			}
 		}

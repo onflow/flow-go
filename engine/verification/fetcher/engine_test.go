@@ -22,7 +22,7 @@ import (
 	mempool "github.com/onflow/flow-go/module/mempool/mock"
 	module "github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/module/trace"
-	"github.com/onflow/flow-go/network/mocknetwork"
+	mocknetwork "github.com/onflow/flow-go/network/mock"
 	flowprotocol "github.com/onflow/flow-go/state/protocol"
 	protocol "github.com/onflow/flow-go/state/protocol/mock"
 	storage "github.com/onflow/flow-go/storage/mock"
@@ -34,15 +34,15 @@ type FetcherEngineTestSuite struct {
 	log                   zerolog.Logger
 	metrics               *module.VerificationMetrics
 	tracer                *trace.NoopTracer
-	verifier              *mocknetwork.Engine                 // the verifier engine
-	state                 *protocol.State                     // used to verify the request origin
-	pendingChunks         *mempool.ChunkStatuses              // used to store all the pending chunks that assigned to this node
-	blocks                *storage.Blocks                     // used to for verifying collection ID.
-	headers               *storage.Headers                    // used for building verifiable chunk data.
-	chunkConsumerNotifier *module.ProcessingNotifier          // to report a chunk has been processed
-	results               *storage.ExecutionResults           // to retrieve execution result of an assigned chunk
-	receipts              *storage.ExecutionReceipts          // used to find executor of the chunk
-	requester             *mockfetcher.ChunkDataPackRequester // used to request chunk data packs from network
+	verifier              *mocknetwork.Engine                                          // the verifier engine
+	state                 *protocol.State                                              // used to verify the request origin
+	pendingChunks         *mempool.Mempool[flow.Identifier, *verification.ChunkStatus] // used to store all the pending chunks that assigned to this node
+	blocks                *storage.Blocks                                              // used to for verifying collection ID.
+	headers               *storage.Headers                                             // used for building verifiable chunk data.
+	chunkConsumerNotifier *module.ProcessingNotifier                                   // to report a chunk has been processed
+	results               *storage.ExecutionResults                                    // to retrieve execution result of an assigned chunk
+	receipts              *storage.ExecutionReceipts                                   // used to find executor of the chunk
+	requester             *mockfetcher.ChunkDataPackRequester                          // used to request chunk data packs from network
 }
 
 // setupTest initiates a test suite prior to each test.
@@ -53,7 +53,7 @@ func setupTest() *FetcherEngineTestSuite {
 		tracer:                trace.NewNoopTracer(),
 		verifier:              &mocknetwork.Engine{},
 		state:                 &protocol.State{},
-		pendingChunks:         &mempool.ChunkStatuses{},
+		pendingChunks:         &mempool.Mempool[flow.Identifier, *verification.ChunkStatus]{},
 		headers:               &storage.Headers{},
 		blocks:                &storage.Blocks{},
 		chunkConsumerNotifier: &module.ProcessingNotifier{},
@@ -139,7 +139,7 @@ func testProcessAssignChunkHappyPath(t *testing.T, chunkNum int, assignedNum int
 	s.metrics.On("OnAssignedChunkReceivedAtFetcher").Return().Times(len(locators))
 
 	// the chunks belong to an unsealed block.
-	mockBlockSealingStatus(s.state, s.headers, block.Header, false)
+	mockBlockSealingStatus(s.state, s.headers, block.ToHeader(), false)
 
 	// mocks resources on fetcher engine side.
 	mockResultsByIDs(s.results, []*flow.ExecutionResult{result})
@@ -200,14 +200,14 @@ func TestChunkResponse_RemovingStatusFails(t *testing.T) {
 	// creates a result with specified 2 chunks and a single assigned chunk to this fetcher engine.
 	block, result, statuses, _, collMap := completeChunkStatusListFixture(t, 2, 1)
 	_, _, agrees, _ := mockReceiptsBlockID(t, block.ID(), s.receipts, result, 2, 2)
-	mockBlockSealingStatus(s.state, s.headers, block.Header, false)
+	mockBlockSealingStatus(s.state, s.headers, block.ToHeader(), false)
 
 	mockResultsByIDs(s.results, []*flow.ExecutionResult{result})
 	mockBlocksStorage(s.blocks, s.headers, block)
 	mockPendingChunksGet(s.pendingChunks, statuses)
 	mockStateAtBlockIDForIdentities(s.state, block.ID(), agrees)
 
-	chunkLocatorID := statuses[0].ChunkLocatorID()
+	chunkLocatorID := unittest.ChunkLocatorFixture(statuses[0].ExecutionResult.ID(), statuses[0].ChunkIndex).ID()
 	// trying to remove the pending status fails.
 	mockPendingChunksRemove(t, s.pendingChunks, statuses, false)
 
@@ -237,7 +237,7 @@ func TestProcessAssignChunkSealedAfterRequest(t *testing.T) {
 	// also the chunk belongs to an unsealed block.
 	block, result, statuses, locators, collMap := completeChunkStatusListFixture(t, 2, 1)
 	_, _, agrees, disagrees := mockReceiptsBlockID(t, block.ID(), s.receipts, result, 2, 2)
-	mockBlockSealingStatus(s.state, s.headers, block.Header, false)
+	mockBlockSealingStatus(s.state, s.headers, block.ToHeader(), false)
 	s.metrics.On("OnAssignedChunkReceivedAtFetcher").Return().Times(len(locators))
 
 	// mocks resources on fetcher engine side.
@@ -405,7 +405,7 @@ func testInvalidChunkDataResponse(t *testing.T,
 	mockPendingChunksGet(s.pendingChunks, statuses)
 	mockBlocksStorage(s.blocks, s.headers, block)
 
-	chunkLocatorID := statuses[0].ChunkLocatorID()
+	chunkLocatorID := unittest.ChunkLocatorFixture(statuses[0].ExecutionResult.ID(), statuses[0].ChunkIndex).ID()
 	responses, _ := verifiableChunksFixture(t, statuses, block, result, collMap)
 
 	// alters chunk data pack so that it become invalid.
@@ -442,10 +442,12 @@ func TestChunkResponse_MissingStatus(t *testing.T) {
 	status := statuses[0]
 	responses, _ := verifiableChunksFixture(t, statuses, block, result, collMap)
 
-	chunkLocatorID := statuses[0].ChunkLocatorID()
+	chunkLocatorID := unittest.ChunkLocatorFixture(statuses[0].ExecutionResult.ID(), statuses[0].ChunkIndex).ID()
 
+	var zero *verification.ChunkStatus
 	// mocks there is no pending status for this chunk at fetcher engine.
-	s.pendingChunks.On("Get", status.ChunkIndex, result.ID()).Return(nil, false)
+	locator := unittest.ChunkLocatorFixture(result.ID(), status.ChunkIndex)
+	s.pendingChunks.On("Get", locator.ID()).Return(zero, false)
 
 	s.metrics.On("OnChunkDataPackArrivedAtFetcher").Return().Times(len(responses))
 	e.HandleChunkDataPack(unittest.IdentifierFixture(), responses[chunkLocatorID])
@@ -465,7 +467,7 @@ func TestChunkResponse_MissingStatus(t *testing.T) {
 }
 
 // TestSkipChunkOfSealedBlock evaluates that if fetcher engine receives a chunk belonging to a sealed block,
-// it drops it without processing it any further and and notifies consumer
+// it drops it without processing it any further and notifies consumer
 // that it is done with processing that chunk.
 func TestSkipChunkOfSealedBlock(t *testing.T) {
 	s := setupTest()
@@ -474,11 +476,11 @@ func TestSkipChunkOfSealedBlock(t *testing.T) {
 	// creates a single chunk locator, and mocks its corresponding block sealed.
 	block := unittest.BlockFixture()
 	result := unittest.ExecutionResultFixture(unittest.WithExecutionResultBlockID(block.ID()))
-	statuses := unittest.ChunkStatusListFixture(t, block.Header.Height, result, 1)
+	statuses := unittest.ChunkStatusListFixture(t, block.Height, result, 1)
 	locators := unittest.ChunkStatusListToChunkLocatorFixture(statuses)
 	s.metrics.On("OnAssignedChunkReceivedAtFetcher").Return().Once()
 
-	mockBlockSealingStatus(s.state, s.headers, block.Header, true)
+	mockBlockSealingStatus(s.state, s.headers, block.ToHeader(), true)
 	mockResultsByIDs(s.results, []*flow.ExecutionResult{result})
 
 	// expects processing notifier being invoked upon sealed chunk detected,
@@ -522,37 +524,30 @@ func TestStopAtHeight(t *testing.T) {
 	mockBlockSealingStatus(s.state, s.headers, headerB, false)
 	mockResultsByIDs(s.results, []*flow.ExecutionResult{resultA, resultB})
 
-	locatorA := chunks.Locator{
-		ResultID: resultA.ID(),
-		Index:    0,
-	}
-	locatorB := chunks.Locator{
-		ResultID: resultB.ID(),
-		Index:    0,
-	}
+	locatorA := unittest.ChunkLocatorFixture(resultA.ID(), 0)
+	locatorB := unittest.ChunkLocatorFixture(resultB.ID(), 0)
 
 	// expects processing notifier being invoked upon sealed chunk detected,
 	// which means the termination of processing a sealed chunk on fetcher engine
 	// side.
 	mockChunkConsumerNotifier(t, s.chunkConsumerNotifier, flow.GetIDs([]flow.Entity{locatorA, locatorB}))
 
-	s.pendingChunks.On("Add", mock.Anything).Run(func(args mock.Arguments) {
-		spew.Dump(args[0].(*verification.ChunkStatus).BlockHeight)
+	s.pendingChunks.On("Add", mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
+		spew.Dump(args[1].(*verification.ChunkStatus).BlockHeight)
 	}).Return(false)
 
-	e.ProcessAssignedChunk(&locatorA)
-	e.ProcessAssignedChunk(&locatorB)
+	e.ProcessAssignedChunk(locatorA)
+	e.ProcessAssignedChunk(locatorB)
 
 	mock.AssertExpectationsForObjects(t, s.results, s.metrics)
 
 	// we should not request a duplicate chunk status.
 	s.requester.AssertNotCalled(t, "Request")
 
-	s.pendingChunks.AssertNotCalled(t, "Add", mock.MatchedBy(func(status *verification.ChunkStatus) bool {
+	s.pendingChunks.AssertNotCalled(t, "Add", mock.Anything, mock.MatchedBy(func(status *verification.ChunkStatus) bool {
 		return status.BlockHeight == headerB.Height
 	}))
-
-	s.pendingChunks.AssertCalled(t, "Add", mock.MatchedBy(func(status *verification.ChunkStatus) bool {
+	s.pendingChunks.AssertCalled(t, "Add", mock.Anything, mock.MatchedBy(func(status *verification.ChunkStatus) bool {
 		return status.BlockHeight == headerA.Height
 	}))
 }
@@ -634,23 +629,23 @@ func mockStateAtBlockIDForMissingIdentities(state *protocol.State, blockID flow.
 // mockPendingChunksAdd mocks the add method of pending chunks for expecting only the specified list of chunk statuses.
 // Each chunk status should be added only once.
 // It should return the specified added boolean variable as the result of mocking.
-func mockPendingChunksAdd(t *testing.T, pendingChunks *mempool.ChunkStatuses, list []*verification.ChunkStatus, added bool) {
+func mockPendingChunksAdd(t *testing.T, pendingChunks *mempool.Mempool[flow.Identifier, *verification.ChunkStatus], list []*verification.ChunkStatus, added bool) {
 	mu := &sync.Mutex{}
 
-	pendingChunks.On("Add", mock.Anything).
+	pendingChunks.On("Add", mock.Anything, mock.Anything).
 		Run(func(args mock.Arguments) {
 			// to provide mutual exclusion under concurrent invocations.
 			mu.Lock()
 			defer mu.Unlock()
 
-			actual, ok := args[0].(*verification.ChunkStatus)
+			actual, ok := args[1].(*verification.ChunkStatus)
 			require.True(t, ok)
 
 			// there should be a matching chunk status with the received one.
-			actualLocatorID := actual.ChunkLocatorID()
+			actualLocatorID := unittest.ChunkLocatorFixture(actual.ExecutionResult.ID(), actual.ChunkIndex).ID()
 
 			for _, expected := range list {
-				expectedLocatorID := expected.ChunkLocatorID()
+				expectedLocatorID := unittest.ChunkLocatorFixture(expected.ExecutionResult.ID(), expected.ChunkIndex).ID()
 				if expectedLocatorID == actualLocatorID {
 					require.Equal(t, expected.ExecutionResult, actual.ExecutionResult)
 					return
@@ -664,24 +659,22 @@ func mockPendingChunksAdd(t *testing.T, pendingChunks *mempool.ChunkStatuses, li
 // mockPendingChunksRemove mocks the remove method of pending chunks for expecting only the specified list of chunk statuses.
 // Each chunk status should be removed only once.
 // It should return the specified added boolean variable as the result of mocking.
-func mockPendingChunksRemove(t *testing.T, pendingChunks *mempool.ChunkStatuses, list []*verification.ChunkStatus, removed bool) {
+func mockPendingChunksRemove(t *testing.T, pendingChunks *mempool.Mempool[flow.Identifier, *verification.ChunkStatus], list []*verification.ChunkStatus, removed bool) {
 	mu := &sync.Mutex{}
 
-	pendingChunks.On("Remove", mock.Anything, mock.Anything).
+	pendingChunks.On("Remove", mock.Anything).
 		Run(func(args mock.Arguments) {
 			// to provide mutual exclusion under concurrent invocations.
 			mu.Lock()
 			defer mu.Unlock()
 
-			actualIndex, ok := args[0].(uint64)
-			require.True(t, ok)
-
-			actualResultID, ok := args[1].(flow.Identifier)
+			actualChunkLocatorID, ok := args[0].(flow.Identifier)
 			require.True(t, ok)
 
 			// there should be a matching chunk status with the received one.
 			for _, expected := range list {
-				if expected.ChunkIndex == actualIndex && expected.ExecutionResult.ID() == actualResultID {
+				expectedLocatorID := unittest.ChunkLocatorFixture(expected.ExecutionResult.ID(), expected.ChunkIndex).ID()
+				if actualChunkLocatorID == expectedLocatorID {
 					return
 				}
 			}
@@ -691,25 +684,27 @@ func mockPendingChunksRemove(t *testing.T, pendingChunks *mempool.ChunkStatuses,
 }
 
 // mockPendingChunksGet mocks the Get method of pending chunks for expecting only the specified list of chunk statuses.
-func mockPendingChunksGet(pendingChunks *mempool.ChunkStatuses, list []*verification.ChunkStatus) {
+func mockPendingChunksGet(pendingChunks *mempool.Mempool[flow.Identifier, *verification.ChunkStatus], list []*verification.ChunkStatus) {
 	mu := &sync.Mutex{}
 
-	pendingChunks.On("Get", mock.Anything, mock.Anything).Return(
-		func(chunkIndex uint64, resultID flow.Identifier) *verification.ChunkStatus {
+	pendingChunks.On("Get", mock.Anything).Return(
+		func(chunkLocatorID flow.Identifier) *verification.ChunkStatus {
 			// to provide mutual exclusion under concurrent invocations.
 			mu.Lock()
 			defer mu.Unlock()
 
 			for _, expected := range list {
-				if expected.ChunkIndex == chunkIndex && expected.ExecutionResult.ID() == resultID {
+				expectedLocatorID := unittest.ChunkLocatorFixture(expected.ExecutionResult.ID(), expected.ChunkIndex).ID()
+				if expectedLocatorID == chunkLocatorID {
 					return expected
 				}
 			}
 			return nil
 		},
-		func(chunkIndex uint64, resultID flow.Identifier) bool {
+		func(chunkLocatorID flow.Identifier) bool {
 			for _, expected := range list {
-				if expected.ChunkIndex == chunkIndex && expected.ExecutionResult.ID() == resultID {
+				expectedLocatorID := unittest.ChunkLocatorFixture(expected.ExecutionResult.ID(), expected.ChunkIndex).ID()
+				if expectedLocatorID == chunkLocatorID {
 					return true
 				}
 			}
@@ -737,12 +732,14 @@ func mockVerifierEngine(t *testing.T,
 			require.True(t, ok)
 
 			// verifiable chunk data should be distinct.
-			_, ok = seen[chunks.ChunkLocatorID(vc.Result.ID(), vc.Chunk.Index)]
+			locatorID := unittest.ChunkLocatorFixture(vc.Result.ID(), vc.Chunk.Index).ID()
+
+			_, ok = seen[locatorID]
 			require.False(t, ok, "duplicated verifiable chunk received")
-			seen[chunks.ChunkLocatorID(vc.Result.ID(), vc.Chunk.Index)] = struct{}{}
+			seen[locatorID] = struct{}{}
 
 			// we should expect this verifiable chunk and its fields should match our expectation
-			expected, ok := verifiableChunks[chunks.ChunkLocatorID(vc.Result.ID(), vc.Chunk.Index)]
+			expected, ok := verifiableChunks[locatorID]
 			require.True(t, ok, "verifier engine received an unknown verifiable chunk data")
 
 			if vc.IsSystemChunk {
@@ -805,9 +802,7 @@ func mockBlockSealingStatus(state *protocol.State, headers *storage.Headers, hea
 
 // mockBlocksStorage mocks blocks and headers storages for given block.
 func mockBlocksStorage(blocks *storage.Blocks, headers *storage.Headers, block *flow.Block) {
-	blockID := block.ID()
-	blocks.On("ByID", blockID).Return(block, nil)
-	headers.On("ByBlockID", blockID).Return(block.Header, nil)
+	blocks.On("ByID", block.ID()).Return(block, nil)
 }
 
 // mockRequester mocks the chunk data pack requester with the given chunk data pack requests.
@@ -860,7 +855,7 @@ func chunkDataPackResponsesFixture(t *testing.T,
 	responses := make(map[flow.Identifier]*verification.ChunkDataPackResponse)
 
 	for _, status := range statuses {
-		chunkLocatorID := status.ChunkLocatorID()
+		chunkLocatorID := unittest.ChunkLocatorFixture(status.ExecutionResult.ID(), status.ChunkIndex).ID()
 		responses[chunkLocatorID] = chunkDataPackResponseFixture(t, status.Chunk(), collMap[status.Chunk().ID()], result)
 	}
 
@@ -876,10 +871,7 @@ func chunkDataPackResponseFixture(t *testing.T,
 	require.Equal(t, collection != nil, !convert.IsSystemChunk(chunk.Index, result), "only non-system chunks must have a collection")
 
 	return &verification.ChunkDataPackResponse{
-		Locator: chunks.Locator{
-			ResultID: result.ID(),
-			Index:    chunk.Index,
-		},
+		Locator: *unittest.ChunkLocatorFixture(result.ID(), chunk.Index),
 		Cdp: unittest.ChunkDataPackFixture(
 			chunk.ID(),
 			unittest.WithStartState(chunk.StartState),
@@ -901,7 +893,7 @@ func verifiableChunksFixture(t *testing.T,
 
 	verifiableChunks := make(map[flow.Identifier]*verification.VerifiableChunkData)
 	for _, status := range statuses {
-		chunkLocatorID := status.ChunkLocatorID()
+		chunkLocatorID := unittest.ChunkLocatorFixture(status.ExecutionResult.ID(), status.ChunkIndex).ID()
 
 		response, ok := responses[chunkLocatorID]
 		require.True(t, ok, "missing chunk data response")
@@ -926,7 +918,7 @@ func verifiableChunkFixture(t *testing.T,
 	// TODO: add end state
 	return &verification.VerifiableChunkData{
 		Chunk:             chunk,
-		Header:            block.Header,
+		Header:            block.ToHeader(),
 		Result:            result,
 		ChunkDataPack:     chunkDataPack,
 		TransactionOffset: offsetForChunk,
@@ -944,7 +936,7 @@ func chunkRequestsFixture(
 
 	requests := make(map[flow.Identifier]*verification.ChunkDataPackRequest)
 	for _, status := range statuses {
-		chunkLocatorID := status.ChunkLocatorID()
+		chunkLocatorID := unittest.ChunkLocatorFixture(status.ExecutionResult.ID(), status.ChunkIndex).ID()
 		requests[chunkLocatorID] = chunkRequestFixture(resultID, status, agrees, disagrees)
 	}
 
@@ -962,10 +954,7 @@ func chunkRequestFixture(
 	disagrees flow.IdentityList,
 ) *verification.ChunkDataPackRequest {
 	return &verification.ChunkDataPackRequest{
-		Locator: chunks.Locator{
-			ResultID: resultID,
-			Index:    status.ChunkIndex,
-		},
+		Locator: *unittest.ChunkLocatorFixture(resultID, status.ChunkIndex),
 		ChunkDataPackRequestInfo: verification.ChunkDataPackRequestInfo{
 			ChunkID:   status.Chunk().ID(),
 			Height:    status.BlockHeight,
@@ -993,14 +982,16 @@ func completeChunkStatusListFixture(t *testing.T, chunkCount int, statusCount in
 
 	collections := unittest.CollectionListFixture(chunkCount)
 
-	block := unittest.BlockWithGuaranteesFixture(
-		unittest.CollectionGuaranteesWithCollectionIDFixture(collections),
+	block := unittest.BlockFixture(
+		unittest.Block.WithPayload(
+			unittest.PayloadFixture(unittest.WithGuarantees(unittest.CollectionGuaranteesWithCollectionIDFixture(collections)...)),
+		),
 	)
 
 	result := unittest.ExecutionResultFixture(
 		unittest.WithBlock(block),
 		unittest.WithChunks(uint(chunkCount)))
-	statuses := unittest.ChunkStatusListFixture(t, block.Header.Height, result, statusCount)
+	statuses := unittest.ChunkStatusListFixture(t, block.Height, result, statusCount)
 	locators := unittest.ChunkStatusListToChunkLocatorFixture(statuses)
 
 	for _, status := range statuses {

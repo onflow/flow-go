@@ -1,6 +1,7 @@
 package kvstore_test
 
 import (
+	"fmt"
 	"reflect"
 	"testing"
 
@@ -352,7 +353,7 @@ func TestNewDefaultKVStore(t *testing.T) {
 		require.GreaterOrEqual(t, store.GetEpochExtensionViewCount(), 2*safetyParams.FinalizationSafetyThreshold,
 			"extension view count should be at least 2*FinalizationSafetyThreshold")
 	})
-	t.Run("invalid-epoch-extension-view-count", func(t *testing.T) {
+	t.Run("invalid-kvstore-epoch-extension-view-count", func(t *testing.T) {
 		safetyParams, err := protocol.DefaultEpochSafetyParams(flow.Localnet)
 		require.NoError(t, err)
 		epochStateID := unittest.IdentifierFixture()
@@ -423,4 +424,85 @@ func TestKVStoreMutator_SetEpochExtensionViewCount(t *testing.T) {
 		require.ErrorIs(t, err, kvstore.ErrInvalidValue)
 		require.Equal(t, mutator.GetEpochExtensionViewCount(), oldValue, "value should be unchanged")
 	})
+}
+
+// TestMalleability verifies that the entities which implements the ID are not malleable.
+func TestMalleability(t *testing.T) {
+	t.Run("Modelv0", func(t *testing.T) {
+		unittest.RequireEntityNonMalleable(t,
+			&kvstore.Modelv0{
+				UpgradableModel: kvstore.UpgradableModel{
+					VersionUpgrade: unittest.ViewBasedActivatorFixture(),
+				},
+				EpochStateID: unittest.IdentifierFixture(),
+			},
+		)
+	})
+
+	t.Run("Modelv1", func(t *testing.T) {
+		unittest.RequireEntityNonMalleable(t,
+			&kvstore.Modelv1{
+				Modelv0: kvstore.Modelv0{
+					UpgradableModel: kvstore.UpgradableModel{
+						VersionUpgrade: unittest.ViewBasedActivatorFixture(),
+					},
+					EpochStateID: unittest.IdentifierFixture(),
+				},
+			},
+		)
+	})
+}
+
+// TestNewKVStore_SupportedVersions verifies that supported versions
+// construct the expected key-value store without error.
+func TestNewKVStore_SupportedVersions(t *testing.T) {
+	safetyParams, err := protocol.DefaultEpochSafetyParams(flow.Localnet)
+	require.NoError(t, err)
+	epochStateID := unittest.IdentifierFixture()
+
+	defaultKVStore, err := kvstore.NewDefaultKVStore(
+		safetyParams.FinalizationSafetyThreshold,
+		safetyParams.EpochExtensionViewCount,
+		epochStateID,
+	)
+	require.NoError(t, err)
+
+	defaultVersion := defaultKVStore.GetProtocolStateVersion()
+	for version := uint64(0); version <= defaultVersion; version++ {
+		t.Run(fmt.Sprintf("version %d", version), func(t *testing.T) {
+			store, err := kvstore.NewKVStore(
+				version,
+				safetyParams.FinalizationSafetyThreshold,
+				safetyParams.EpochExtensionViewCount,
+				epochStateID,
+			)
+
+			require.NoError(t, err)
+			require.NotNil(t, store)
+		})
+	}
+}
+
+// TestNewKVStore_UnsupportedVersion verifies that an unsupported version
+// returns a proper error and no store is constructed.
+func TestNewKVStore_UnsupportedVersion(t *testing.T) {
+	safetyParams, err := protocol.DefaultEpochSafetyParams(flow.Localnet)
+	require.NoError(t, err)
+	epochStateID := unittest.IdentifierFixture()
+
+	defaultKVStore, err := kvstore.NewDefaultKVStore(safetyParams.FinalizationSafetyThreshold, safetyParams.EpochExtensionViewCount, epochStateID)
+	require.NoError(t, err)
+	defaultVersion := defaultKVStore.GetProtocolStateVersion()
+	invalidVersion := defaultVersion + 1
+
+	store, err := kvstore.NewKVStore(
+		invalidVersion,
+		safetyParams.FinalizationSafetyThreshold,
+		safetyParams.EpochExtensionViewCount,
+		epochStateID,
+	)
+
+	require.Error(t, err)
+	require.Nil(t, store)
+	require.Contains(t, err.Error(), "unsupported protocol state version")
 }

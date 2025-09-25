@@ -621,6 +621,9 @@ type CollectionMetrics interface {
 
 	// ClusterBlockFinalized is called when a collection is finalized.
 	ClusterBlockFinalized(block *cluster.Block)
+
+	// CollectionMaxSize measures the current maximum size of a collection.
+	CollectionMaxSize(size uint)
 }
 
 type ConsensusMetrics interface {
@@ -1024,6 +1027,9 @@ type ExecutionMetrics interface {
 	// ExecutionScriptExecuted reports the time and memory spent on executing an script
 	ExecutionScriptExecuted(dur time.Duration, compUsed, memoryUsed, memoryEstimate uint64)
 
+	// ExecutionCallbacksExecuted reports the number of callbacks executed, computation used by process transaction, and total computation limits for execute transactions
+	ExecutionCallbacksExecuted(callbackCount int, processComputationUsed, executeComputationLimits uint64)
+
 	// ExecutionCollectionRequestSent reports when a request for a collection is sent to a collection node
 	ExecutionCollectionRequestSent()
 
@@ -1181,8 +1187,8 @@ type DHTMetrics interface {
 }
 
 type CollectionExecutedMetric interface {
-	CollectionFinalized(light flow.LightCollection)
-	CollectionExecuted(light flow.LightCollection)
+	CollectionFinalized(light *flow.LightCollection)
+	CollectionExecuted(light *flow.LightCollection)
 	BlockFinalized(block *flow.Block)
 	ExecutionReceiptReceived(r *flow.ExecutionReceipt)
 	UpdateLastFullBlockHeight(height uint64)

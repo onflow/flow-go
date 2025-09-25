@@ -17,7 +17,7 @@ import (
 	"github.com/onflow/flow-go/module/metrics"
 	mockmodule "github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/network/channels"
-	"github.com/onflow/flow-go/network/mocknetwork"
+	mocknetwork "github.com/onflow/flow-go/network/mock"
 	mockprotocol "github.com/onflow/flow-go/state/protocol/mock"
 	mockstorage "github.com/onflow/flow-go/storage/mock"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -43,7 +43,7 @@ type MatchingEngineSuite struct {
 func (s *MatchingEngineSuite) SetupTest() {
 	metrics := metrics.NewNoopCollector()
 	me := &mockmodule.Local{}
-	net := &mocknetwork.Network{}
+	net := &mocknetwork.EngineRegistry{}
 	s.core = &mockconsensus.MatchingCore{}
 	s.index = &mockstorage.Index{}
 	s.receipts = &mockstorage.ExecutionReceipts{}
@@ -99,7 +99,8 @@ func (s *MatchingEngineSuite) TestOnBlockIncorporated() {
 	resultsByID := payload.Results.Lookup()
 	for _, receipt := range payload.Receipts {
 		index.ReceiptIDs = append(index.ReceiptIDs, receipt.ID())
-		fullReceipt := flow.ExecutionReceiptFromMeta(*receipt, *resultsByID[receipt.ResultID])
+		fullReceipt, err := flow.ExecutionReceiptFromStub(*receipt, *resultsByID[receipt.ResultID])
+		s.Require().NoError(err)
 		s.receipts.On("ByID", receipt.ID()).Return(fullReceipt, nil).Once()
 		s.core.On("ProcessReceipt", fullReceipt).Return(nil).Once()
 	}
@@ -123,7 +124,7 @@ func (s *MatchingEngineSuite) TestMultipleProcessingItems() {
 	for i := range receipts {
 		receipt := unittest.ExecutionReceiptFixture(
 			unittest.WithExecutorID(originID),
-			unittest.WithResult(unittest.ExecutionResultFixture(unittest.WithBlock(&block))),
+			unittest.WithResult(unittest.ExecutionResultFixture(unittest.WithBlock(block))),
 		)
 		receipts[i] = receipt
 		s.core.On("ProcessReceipt", receipt).Return(nil).Once()

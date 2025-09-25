@@ -6,8 +6,8 @@ import (
 	"strings"
 	"testing"
 
+	gethABI "github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/onflow/atree"
-	gethABI "github.com/onflow/go-ethereum/accounts/abi"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/fvm/evm/emulator"
@@ -63,6 +63,13 @@ func GetFactoryTestContract(t testing.TB) *TestContract {
 	return &TestContract{
 		ABI:      contracts.FactoryContractABIJSON,
 		ByteCode: contracts.FactoryContractBytes,
+	}
+}
+
+func GetFileSystemContract(t testing.TB) *TestContract {
+	return &TestContract{
+		ABI:      contracts.FileSystemContractABIJSON,
+		ByteCode: contracts.FileSystemContractBytes,
 	}
 }
 

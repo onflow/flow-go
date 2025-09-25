@@ -3,7 +3,7 @@ package jobqueue_test
 import (
 	"testing"
 
-	"github.com/dgraph-io/badger/v2"
+	"github.com/cockroachdb/pebble/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -24,13 +24,13 @@ func TestSealedBlockHeaderReader(t *testing.T) {
 		// head of the reader is the last sealed block
 		head, err := reader.Head()
 		assert.NoError(t, err)
-		assert.Equal(t, lastSealedBlock.Header.Height, head, "head does not match last sealed block")
+		assert.Equal(t, lastSealedBlock.Height, head, "head does not match last sealed block")
 
 		// retrieved blocks from block reader should be the same as the original blocks stored in it.
 		// all except the last block should be sealed
 		lastIndex := len(blocks)
 		for _, expected := range blocks[:lastIndex-1] {
-			index := expected.Header.Height
+			index := expected.Height
 			job, err := reader.AtIndex(index)
 			assert.NoError(t, err)
 
@@ -55,13 +55,13 @@ func RunWithReader(
 	withBlockReader func(*jobqueue.SealedBlockHeaderReader, []*flow.Block),
 ) {
 	require.Equal(t, blockCount%2, 0, "block count for this test should be even")
-	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+	unittest.RunWithPebbleDB(t, func(pdb *pebble.DB) {
 
 		blocks := make([]*flow.Block, blockCount)
 		blocksByHeight := make(map[uint64]*flow.Block, blockCount)
 
 		var seals []*flow.Header
-		parent := unittest.GenesisFixture().Header
+		parent := unittest.Block.Genesis(flow.Emulator).ToHeader()
 		for i := 0; i < blockCount; i++ {
 			seals = []*flow.Header{parent}
 			height := uint64(i) + 1
@@ -69,7 +69,7 @@ func RunWithReader(
 			blocks[i] = unittest.BlockWithParentAndSeals(parent, seals)
 			blocksByHeight[height] = blocks[i]
 
-			parent = blocks[i].Header
+			parent = blocks[i].ToHeader()
 		}
 
 		snapshot := synctest.MockProtocolStateSnapshot(synctest.WithHead(seals[0]))

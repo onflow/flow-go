@@ -18,13 +18,11 @@ import (
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/util"
 	"github.com/onflow/flow-go/network/channels"
-	"github.com/onflow/flow-go/network/mocknetwork"
+	mocknetwork "github.com/onflow/flow-go/network/mock"
 	"github.com/onflow/flow-go/network/stub"
 	"github.com/onflow/flow-go/state/cluster"
 	bcluster "github.com/onflow/flow-go/state/cluster/badger"
 	"github.com/onflow/flow-go/state/protocol"
-	"github.com/onflow/flow-go/state/protocol/inmem"
-	"github.com/onflow/flow-go/state/protocol/protocol_state/kvstore"
 	protocol_state "github.com/onflow/flow-go/state/protocol/protocol_state/state"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -52,7 +50,6 @@ type ClusterSwitchoverTestCase struct {
 // NewClusterSwitchoverTestCase constructs a new cluster switchover test case
 // given the configuration, creating all dependencies and mock nodes.
 func NewClusterSwitchoverTestCase(t *testing.T, conf ClusterSwitchoverTestConf) *ClusterSwitchoverTestCase {
-
 	tc := &ClusterSwitchoverTestCase{
 		t:    t,
 		conf: conf,
@@ -89,28 +86,29 @@ func NewClusterSwitchoverTestCase(t *testing.T, conf ClusterSwitchoverTestConf) 
 	tc.sentTransactions = make(map[uint64]map[uint]flow.IdentifierList)
 	tc.hub = stub.NewNetworkHub()
 
-	// create a root snapshot with the given number of initial clusters
-	root, result, seal := unittest.BootstrapFixture(identities)
-	qc := unittest.QuorumCertificateFixture(unittest.QCWithRootBlockID(root.ID()))
-	setup := result.ServiceEvents[0].Event.(*flow.EpochSetup)
-	commit := result.ServiceEvents[1].Event.(*flow.EpochCommit)
+	rootHeaderBody := unittest.Block.Genesis(flow.Emulator).HeaderBody
+	counter := uint64(1)
 
-	setup.Assignments = unittest.ClusterAssignment(tc.conf.clusters, identities.ToSkeleton())
-	commit.ClusterQCs = rootClusterQCs
-
-	seal.ResultID = result.ID()
-	safetyParams, err := protocol.DefaultEpochSafetyParams(root.Header.ChainID)
-	require.NoError(t, err)
-	minEpochStateEntry, err := inmem.EpochProtocolStateFromServiceEvents(setup, commit)
-	require.NoError(t, err)
-	rootProtocolState, err := kvstore.NewDefaultKVStore(
-		safetyParams.FinalizationSafetyThreshold,
-		safetyParams.EpochExtensionViewCount,
-		minEpochStateEntry.ID(),
+	setup := unittest.EpochSetupFixture(
+		unittest.WithParticipants(identities.ToSkeleton()),
+		unittest.SetupWithCounter(counter),
+		unittest.WithFirstView(rootHeaderBody.View),
+		unittest.WithFinalView(rootHeaderBody.View+100_000),
+		unittest.WithAssignments(unittest.ClusterAssignment(tc.conf.clusters, identities.ToSkeleton())),
 	)
-	require.NoError(t, err)
-	root.Payload.ProtocolStateID = rootProtocolState.ID()
-	tc.root, err = inmem.SnapshotFromBootstrapState(root, result, seal, qc)
+	commit := unittest.EpochCommitFixture(
+		unittest.CommitWithCounter(counter),
+		unittest.WithClusterQCsFromAssignments(setup.Assignments),
+		unittest.WithDKGFromParticipants(identities.ToSkeleton()),
+		unittest.WithClusterQCs(rootClusterQCs),
+	)
+
+	// create a root snapshot with the given number of initial clusters
+	root, result, seal := unittest.BootstrapFixtureWithSetupAndCommit(rootHeaderBody, setup, commit)
+	seal.ResultID = result.ID()
+	qc := unittest.QuorumCertificateFixture(unittest.QCWithRootBlockID(root.ID()))
+
+	tc.root, err = unittest.SnapshotFromBootstrapState(root, result, seal, qc)
 	require.NoError(t, err)
 
 	// build a lookup table for node infos
@@ -175,7 +173,8 @@ func NewClusterSwitchoverTestCase(t *testing.T, conf ClusterSwitchoverTestConf) 
 			}
 
 			// generate root cluster block
-			rootClusterBlock := cluster.CanonicalRootBlock(commit.Counter, model.ToIdentityList(signers).ToSkeleton())
+			rootClusterBlock, err := cluster.CanonicalRootBlock(commit.Counter, model.ToIdentityList(signers).ToSkeleton())
+			require.NoError(tc.T(), err)
 			// generate cluster root qc
 			qc, err := run.GenerateClusterRootQC(signers, model.ToIdentityList(signers).ToSkeleton(), rootClusterBlock)
 			require.NoError(t, err)
@@ -276,11 +275,13 @@ func (tc *ClusterSwitchoverTestCase) ServiceAddress() flow.Address {
 // Transaction returns a transaction which is valid for ingestion by a
 // collection node in this test suite.
 func (tc *ClusterSwitchoverTestCase) Transaction(opts ...func(*flow.TransactionBody)) *flow.TransactionBody {
-	tx := flow.NewTransactionBody().
+	tx, err := flow.NewTransactionBodyBuilder().
 		AddAuthorizer(tc.ServiceAddress()).
 		SetPayer(tc.ServiceAddress()).
 		SetScript(unittest.NoopTxScript()).
-		SetReferenceBlockID(tc.RootBlock().ID())
+		SetReferenceBlockID(tc.RootBlock().ID()).
+		Build()
+	require.NoError(tc.T(), err)
 
 	for _, apply := range opts {
 		apply(tx)
@@ -383,7 +384,7 @@ func (tc *ClusterSwitchoverTestCase) SubmitTransactionToCluster(
 	// get any block within the target epoch as the transaction's reference block
 	refBlock := tc.BlockInEpoch(epochCounter)
 	tx := tc.Transaction(func(tx *flow.TransactionBody) {
-		tx.SetReferenceBlockID(refBlock.ID())
+		tx.ReferenceBlockID = refBlock.ID()
 	})
 	clusterTx := unittest.AlterTransactionForCluster(*tx, clustering, clusterMembers, nil)
 	tc.ExpectTransaction(epochCounter, clusterIndex, clusterTx.ID())

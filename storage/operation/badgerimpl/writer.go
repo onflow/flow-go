@@ -3,7 +3,6 @@ package badgerimpl
 import (
 	"fmt"
 	"slices"
-	"sync"
 
 	"github.com/dgraph-io/badger/v2"
 
@@ -22,9 +21,6 @@ type ReaderBatchWriter struct {
 
 	// for executing callbacks after the batch has been flushed, such as updating caches
 	callbacks *operation.Callbacks
-
-	// for repreventing re-entrant deadlock
-	locks *operation.BatchLocks
 
 	// values store value for this batch.
 	// NOTE: b.values is only initialized when needed.
@@ -53,14 +49,6 @@ func (b *ReaderBatchWriter) Writer() storage.Writer {
 // BadgerWriteBatch returns the badger write batch
 func (b *ReaderBatchWriter) BadgerWriteBatch() *badger.WriteBatch {
 	return b.batch
-}
-
-// Lock tries to acquire the lock for the batch.
-// if the lock is already acquired by this same batch from other pending db operations,
-// then it will not be blocked and can continue updating the batch, which prevents a re-entrant deadlock.
-// CAUTION: The caller must ensure that no other references exist for the input lock.
-func (b *ReaderBatchWriter) Lock(lock *sync.Mutex) {
-	b.locks.Lock(lock, b.callbacks)
 }
 
 // AddCallback adds a callback to execute after the batch has been flush
@@ -122,7 +110,6 @@ func NewReaderBatchWriter(db *badger.DB) *ReaderBatchWriter {
 		globalReader: ToReader(db),
 		batch:        db.NewWriteBatch(),
 		callbacks:    operation.NewCallbacks(),
-		locks:        operation.NewBatchLocks(),
 	}
 }
 
@@ -187,13 +174,13 @@ func (b *ReaderBatchWriter) Delete(key []byte) error {
 // It returns error if endPrefix < startPrefix
 // no other errors are expected during normal operation
 func (b *ReaderBatchWriter) DeleteByRange(globalReader storage.Reader, startPrefix, endPrefix []byte) error {
-	err := operation.Iterate(startPrefix, endPrefix, func(key []byte) error {
+	err := operation.IterateKeysByPrefixRange(globalReader, startPrefix, endPrefix, func(key []byte) error {
 		err := b.batch.Delete(key)
 		if err != nil {
 			return fmt.Errorf("could not add key to delete batch (%v): %w", key, err)
 		}
 		return nil
-	})(globalReader)
+	})
 
 	if err != nil {
 		return fmt.Errorf("could not find keys by range to be deleted: %w", err)

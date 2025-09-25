@@ -7,7 +7,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dgraph-io/badger/v2"
 	execproto "github.com/onflow/flow/protobuf/go/flow/execution"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/mock"
@@ -26,8 +25,9 @@ import (
 	"github.com/onflow/flow-go/module/irrecoverable"
 	syncmock "github.com/onflow/flow-go/module/state_synchronization/mock"
 	protocol "github.com/onflow/flow-go/state/protocol/mock"
-	storage "github.com/onflow/flow-go/storage/mock"
-	"github.com/onflow/flow-go/storage/operation/badgerimpl"
+	"github.com/onflow/flow-go/storage"
+	storagemock "github.com/onflow/flow-go/storage/mock"
+	"github.com/onflow/flow-go/storage/operation/pebbleimpl"
 	"github.com/onflow/flow-go/storage/store"
 	"github.com/onflow/flow-go/utils/unittest"
 	"github.com/onflow/flow-go/utils/unittest/mocks"
@@ -45,10 +45,10 @@ type TxErrorMessagesEngineSuite struct {
 		snapshot *protocol.Snapshot
 		params   *protocol.Params
 	}
-	headers         *storage.Headers
-	receipts        *storage.ExecutionReceipts
-	txErrorMessages *storage.TransactionResultErrorMessages
-	lightTxResults  *storage.LightTransactionResults
+	headers         *storagemock.Headers
+	receipts        *storagemock.ExecutionReceipts
+	txErrorMessages *storagemock.TransactionResultErrorMessages
+	lightTxResults  *storagemock.LightTransactionResults
 
 	reporter       *syncmock.IndexReporter
 	indexReporter  *index.Reporter
@@ -59,10 +59,10 @@ type TxErrorMessagesEngineSuite struct {
 	connFactory *connectionmock.ConnectionFactory
 
 	blockMap    map[uint64]*flow.Block
-	rootBlock   flow.Block
+	rootBlock   *flow.Block
 	sealedBlock *flow.Header
 
-	db    *badger.DB
+	db    storage.DB
 	dbDir string
 
 	ctx    context.Context
@@ -84,17 +84,19 @@ func (s *TxErrorMessagesEngineSuite) TearDownTest() {
 func (s *TxErrorMessagesEngineSuite) SetupTest() {
 	s.log = zerolog.New(os.Stderr)
 	s.ctx, s.cancel = context.WithCancel(context.Background())
-	s.db, s.dbDir = unittest.TempBadgerDB(s.T())
+	pdb, dbDir := unittest.TempPebbleDB(s.T())
+	s.db = pebbleimpl.ToDB(pdb)
+	s.dbDir = dbDir
 	// mock out protocol state
 	s.proto.state = protocol.NewFollowerState(s.T())
 	s.proto.snapshot = protocol.NewSnapshot(s.T())
 	s.proto.params = protocol.NewParams(s.T())
 	s.execClient = accessmock.NewExecutionAPIClient(s.T())
 	s.connFactory = connectionmock.NewConnectionFactory(s.T())
-	s.headers = storage.NewHeaders(s.T())
-	s.receipts = storage.NewExecutionReceipts(s.T())
-	s.txErrorMessages = storage.NewTransactionResultErrorMessages(s.T())
-	s.lightTxResults = storage.NewLightTransactionResults(s.T())
+	s.headers = storagemock.NewHeaders(s.T())
+	s.receipts = storagemock.NewExecutionReceipts(s.T())
+	s.txErrorMessages = storagemock.NewTransactionResultErrorMessages(s.T())
+	s.lightTxResults = storagemock.NewLightTransactionResults(s.T())
 	s.reporter = syncmock.NewIndexReporter(s.T())
 	s.indexReporter = index.NewReporter()
 	err := s.indexReporter.Initialize(s.reporter)
@@ -103,15 +105,14 @@ func (s *TxErrorMessagesEngineSuite) SetupTest() {
 
 	blockCount := 5
 	s.blockMap = make(map[uint64]*flow.Block, blockCount)
-	s.rootBlock = unittest.BlockFixture()
-	s.rootBlock.Header.Height = 0
-	parent := s.rootBlock.Header
+	s.rootBlock = unittest.Block.Genesis(flow.Emulator)
+	parent := s.rootBlock.ToHeader()
 
 	for i := 0; i < blockCount; i++ {
 		block := unittest.BlockWithParentFixture(parent)
 		// update for next iteration
-		parent = block.Header
-		s.blockMap[block.Header.Height] = block
+		parent = block.ToHeader()
+		s.blockMap[block.Height] = block
 	}
 
 	s.sealedBlock = parent
@@ -119,15 +120,15 @@ func (s *TxErrorMessagesEngineSuite) SetupTest() {
 	s.headers.On("ByHeight", mock.AnythingOfType("uint64")).Return(
 		mocks.ConvertStorageOutput(
 			mocks.StorageMapGetter(s.blockMap),
-			func(block *flow.Block) *flow.Header { return block.Header },
+			func(block *flow.Block) *flow.Header { return block.ToHeader() },
 		),
 	).Maybe()
 
 	s.proto.state.On("Params").Return(s.proto.params)
 
 	// Mock the finalized and sealed root block header with height 0.
-	s.proto.params.On("FinalizedRoot").Return(s.rootBlock.Header, nil)
-	s.proto.params.On("SealedRoot").Return(s.rootBlock.Header, nil)
+	s.proto.params.On("FinalizedRoot").Return(s.rootBlock.ToHeader(), nil)
+	s.proto.params.On("SealedRoot").Return(s.rootBlock.ToHeader(), nil)
 
 	s.proto.snapshot.On("Head").Return(
 		func() *flow.Header {
@@ -147,7 +148,7 @@ func (s *TxErrorMessagesEngineSuite) SetupTest() {
 // and waits for it to start. It initializes the engine with mocked components and state.
 func (s *TxErrorMessagesEngineSuite) initEngine(ctx irrecoverable.SignalerContext) *Engine {
 	processedTxErrorMessagesBlockHeight := store.NewConsumerProgress(
-		badgerimpl.ToDB(s.db),
+		s.db,
 		module.ConsumeProgressEngineTxErrorMessagesBlockHeight,
 	)
 
@@ -198,8 +199,8 @@ func (s *TxErrorMessagesEngineSuite) TestOnFinalizedBlockHandleTxErrorMessages()
 
 	block := unittest.BlockWithParentFixture(s.sealedBlock)
 
-	s.blockMap[block.Header.Height] = block
-	s.sealedBlock = block.Header
+	s.blockMap[block.Height] = block
+	s.sealedBlock = block.ToHeader()
 
 	hotstuffBlock := hotmodel.Block{
 		BlockID: block.ID(),

@@ -4,8 +4,6 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/dgraph-io/badger/v2"
-
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
@@ -15,8 +13,8 @@ import (
 	"github.com/onflow/flow-go/state/protocol/inmem"
 	"github.com/onflow/flow-go/state/protocol/protocol_state/kvstore"
 	"github.com/onflow/flow-go/storage"
-	"github.com/onflow/flow-go/storage/badger/operation"
-	"github.com/onflow/flow-go/storage/badger/procedure"
+	"github.com/onflow/flow-go/storage/operation"
+	"github.com/onflow/flow-go/storage/procedure"
 )
 
 // Snapshot implements the protocol.Snapshot interface.
@@ -66,8 +64,7 @@ func (s *FinalizedSnapshot) Head() (*flow.Header, error) {
 }
 
 func (s *Snapshot) Head() (*flow.Header, error) {
-	head, err := s.state.headers.ByBlockID(s.blockID)
-	return head, err
+	return s.state.headers.ByBlockID(s.blockID)
 }
 
 // QuorumCertificate (QC) returns a valid quorum certificate pointing to the
@@ -125,6 +122,11 @@ func (s *Snapshot) Commit() (flow.StateCommitment, error) {
 	return seal.FinalState, nil
 }
 
+// SealedResult returns the most recent included seal as of this block and
+// the corresponding execution result. The seal may have been included in a
+// parent block, if this block is empty. If this block contains multiple
+// seals, this returns the seal for the block with the greatest height.
+// TODO document error returns
 func (s *Snapshot) SealedResult() (*flow.ExecutionResult, *flow.Seal, error) {
 	seal, err := s.state.seals.HighestInFork(s.blockID)
 	if err != nil {
@@ -152,29 +154,29 @@ func (s *Snapshot) SealingSegment() (*flow.SealingSegment, error) {
 	//  enough history to satisfy _all_ of the following conditions:
 	//   (i) The highest sealed block as of `head` needs to be included in the sealing segment.
 	//       This is relevant if `head` does not contain any seals.
-	//  (ii) All blocks that are sealed by `head`. This is relevant if head` contains _multiple_ seals.
+	//  (ii) All blocks that are sealed by `head`. This is relevant if `head` contains _multiple_ seals.
 	// (iii) The sealing segment should contain the history back to (including):
-	//       limitHeight := max(blockSealedAtHead.Height - flow.DefaultTransactionExpiry, SporkRootBlockHeight)
+	//       limitHeight := max(blockSealedAtHead.Height - flow.DefaultTransactionExpiry, sporkRootBlock.Height)
 	// Per convention, we include the blocks for (i) in the `SealingSegment.Blocks`, while the
 	// additional blocks for (ii) and optionally (iii) are contained in as `SealingSegment.ExtraBlocks`.
 	head, err := s.state.blocks.ByID(s.blockID)
 	if err != nil {
 		return nil, fmt.Errorf("could not get snapshot's reference block: %w", err)
 	}
-	if head.Header.Height < s.state.finalizedRootHeight {
+	if head.Height < s.state.finalizedRootHeight {
 		return nil, protocol.ErrSealingSegmentBelowRootBlock
 	}
 
 	// Verify that head of sealing segment is finalized.
-	finalizedBlockAtHeight, err := s.state.headers.BlockIDByHeight(head.Header.Height)
+	finalizedBlockAtHeight, err := s.state.headers.BlockIDByHeight(head.Height)
 	if err != nil {
 		if errors.Is(err, storage.ErrNotFound) {
-			return nil, protocol.NewUnfinalizedSealingSegmentErrorf("head of sealing segment at height %d is not finalized: %w", head.Header.Height, err)
+			return nil, protocol.NewUnfinalizedSealingSegmentErrorf("head of sealing segment at height %d is not finalized: %w", head.Height, err)
 		}
 		return nil, fmt.Errorf("exception while retrieving finzalized bloc, by height: %w", err)
 	}
 	if finalizedBlockAtHeight != s.blockID { // comparison of fixed-length arrays
-		return nil, protocol.NewUnfinalizedSealingSegmentErrorf("head of sealing segment is orphaned, finalized block at height %d is %x", head.Header.Height, finalizedBlockAtHeight)
+		return nil, protocol.NewUnfinalizedSealingSegmentErrorf("head of sealing segment is orphaned, finalized block at height %d is %x", head.Height, finalizedBlockAtHeight)
 	}
 
 	// STEP (i): highest sealed block as of `head` must be included.
@@ -214,12 +216,17 @@ func (s *Snapshot) SealingSegment() (*flow.SealingSegment, error) {
 
 	// walk through the chain backward until we reach the block referenced by
 	// the latest seal - the returned segment includes this block
-	builder := flow.NewSealingSegmentBuilder(s.state.results.ByID, s.state.seals.HighestInFork, getProtocolStateEntry)
+	builder := flow.NewSealingSegmentBuilder(
+		s.state.results.ByID,
+		s.state.seals.HighestInFork,
+		getProtocolStateEntry,
+		s.state.sporkRootBlock,
+	)
 	scraper := func(header *flow.Header) error {
 		blockID := header.ID()
-		block, err := s.state.blocks.ByID(blockID)
+		block, err := s.state.blocks.ProposalByID(blockID)
 		if err != nil {
-			return fmt.Errorf("could not get block: %w", err)
+			return fmt.Errorf("could not get proposal: %w", err)
 		}
 
 		err = builder.AddBlock(block)
@@ -247,24 +254,24 @@ func (s *Snapshot) SealingSegment() (*flow.SealingSegment, error) {
 	}
 
 	// STEP (iii): extended history to allow checking for duplicated collections, i.e.
-	// limitHeight = max(blockSealedAtHead.Height - flow.DefaultTransactionExpiry, SporkRootBlockHeight)
-	limitHeight := s.state.sporkRootBlockHeight
-	if blockSealedAtHead.Height > s.state.sporkRootBlockHeight+flow.DefaultTransactionExpiry {
+	// limitHeight = max(blockSealedAtHead.Height - flow.DefaultTransactionExpiry, sporkRootBlock.Height)
+	limitHeight := s.state.sporkRootBlock.Height
+	if blockSealedAtHead.Height > s.state.sporkRootBlock.Height+flow.DefaultTransactionExpiry {
 		limitHeight = blockSealedAtHead.Height - flow.DefaultTransactionExpiry
 	}
 
 	// As we have to satisfy (ii) _and_ (iii), we have to take the longest history, i.e. the lowest height.
 	if lowestSealedByHead.Height < limitHeight {
 		limitHeight = lowestSealedByHead.Height
-		if limitHeight < s.state.sporkRootBlockHeight { // sanity check; should never happen
-			return nil, fmt.Errorf("unexpected internal error: calculated history-cutoff at height %d, which is lower than the spork's root height %d", limitHeight, s.state.sporkRootBlockHeight)
+		if limitHeight < s.state.sporkRootBlock.Height { // sanity check; should never happen
+			return nil, fmt.Errorf("unexpected internal error: calculated history-cutoff at height %d, which is lower than the spork's root height %d", limitHeight, s.state.sporkRootBlock.Height)
 		}
 	}
 	if limitHeight < blockSealedAtHead.Height {
 		// we need to include extra blocks in sealing segment
 		extraBlocksScraper := func(header *flow.Header) error {
 			blockID := header.ID()
-			block, err := s.state.blocks.ByID(blockID)
+			block, err := s.state.blocks.ProposalByID(blockID)
 			if err != nil {
 				return fmt.Errorf("could not get block: %w", err)
 			}
@@ -301,7 +308,7 @@ func (s *Snapshot) Descendants() ([]flow.Identifier, error) {
 
 func (s *Snapshot) lookupChildren(blockID flow.Identifier) ([]flow.Identifier, error) {
 	var children flow.IdentifierList
-	err := s.state.db.View(procedure.LookupBlockChildren(blockID, &children))
+	err := procedure.LookupBlockChildren(s.state.db.Reader(), blockID, &children)
 	if err != nil {
 		return nil, fmt.Errorf("could not get children of block %v: %w", blockID, err)
 	}
@@ -542,36 +549,32 @@ func (q *EpochQuery) retrieveEpochHeightBounds(epoch uint64) (
 	isFirstHeightKnown, isLastHeightKnown bool,
 	err error,
 ) {
-	err = q.snap.state.db.View(func(tx *badger.Txn) error {
-		// Retrieve the epoch's first height
-		err = operation.RetrieveEpochFirstHeight(epoch, &firstHeight)(tx)
-		if err != nil {
-			if errors.Is(err, storage.ErrNotFound) {
-				isFirstHeightKnown = false // unknown boundary
-			} else {
-				return err // unexpected error
-			}
-		} else {
-			isFirstHeightKnown = true // known boundary
-		}
 
-		var subsequentEpochFirstHeight uint64
-		err = operation.RetrieveEpochFirstHeight(epoch+1, &subsequentEpochFirstHeight)(tx)
-		if err != nil {
-			if errors.Is(err, storage.ErrNotFound) {
-				isLastHeightKnown = false // unknown boundary
-			} else {
-				return err // unexpected error
-			}
-		} else { // known boundary
-			isLastHeightKnown = true
-			finalHeight = subsequentEpochFirstHeight - 1
-		}
-
-		return nil
-	})
+	r := q.snap.state.db.Reader()
+	// Retrieve the epoch's first height
+	err = operation.RetrieveEpochFirstHeight(r, epoch, &firstHeight)
 	if err != nil {
-		return 0, 0, false, false, err
+		if errors.Is(err, storage.ErrNotFound) {
+			isFirstHeightKnown = false // unknown boundary
+		} else {
+			return 0, 0, false, false, err // unexpected error
+		}
+	} else {
+		isFirstHeightKnown = true // known boundary
 	}
+
+	var subsequentEpochFirstHeight uint64
+	err = operation.RetrieveEpochFirstHeight(r, epoch+1, &subsequentEpochFirstHeight)
+	if err != nil {
+		if errors.Is(err, storage.ErrNotFound) {
+			isLastHeightKnown = false // unknown boundary
+		} else {
+			return 0, 0, false, false, err // unexpected error
+		}
+	} else { // known boundary
+		isLastHeightKnown = true
+		finalHeight = subsequentEpochFirstHeight - 1
+	}
+
 	return firstHeight, finalHeight, isFirstHeightKnown, isLastHeightKnown, nil
 }

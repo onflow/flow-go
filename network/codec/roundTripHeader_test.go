@@ -22,23 +22,24 @@ import (
 // next developer who wants to add a new serialization format :-)
 func roundTripHeaderViaCodec(t *testing.T, codec network.Codec) {
 	block := unittest.BlockFixture()
-	message := messages.NewBlockProposal(&block)
-	encoded, err := codec.Encode(message)
+	proposal := unittest.ProposalFromBlock(block)
+	message := messages.Proposal(*proposal)
+	encoded, err := codec.Encode(&message)
 	assert.NoError(t, err)
 	decodedInterface, err := codec.Decode(encoded)
 	assert.NoError(t, err)
-	decoded := decodedInterface.(*messages.BlockProposal)
-	decodedBlock := decoded.Block.ToInternal()
+	decoded := decodedInterface.(*messages.Proposal)
+	decodedBlock := decoded.Block
 	// compare LastViewTC separately, because it is a pointer field
-	if decodedBlock.Header.LastViewTC == nil {
-		assert.Equal(t, block.Header.LastViewTC, decodedBlock.Header.LastViewTC)
+	if decodedBlock.LastViewTC == nil {
+		assert.Equal(t, block.LastViewTC, decodedBlock.LastViewTC)
 	} else {
-		assert.Equal(t, *block.Header.LastViewTC, *decodedBlock.Header.LastViewTC)
+		assert.Equal(t, *block.LastViewTC, *decodedBlock.LastViewTC)
 	}
 	// compare the rest of the header
 	// manually set LastViewTC fields to be equal to pass the Header pointer comparison
-	decodedBlock.Header.LastViewTC = block.Header.LastViewTC
-	assert.Equal(t, *block.Header, *decodedBlock.Header)
+	decodedBlock.LastViewTC = block.LastViewTC
+	assert.Equal(t, *block.ToHeader(), *decodedBlock.ToHeader())
 }
 
 func TestRoundTripHeaderViaCBOR(t *testing.T) {

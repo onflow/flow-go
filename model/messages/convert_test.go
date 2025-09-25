@@ -4,48 +4,42 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/model/cluster"
+	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-func TestBlockProposal(t *testing.T) {
-	block := unittest.FullBlockFixture()
-	proposal := messages.NewBlockProposal(&block)
-	converted := proposal.Block.ToInternal()
-	assert.Equal(t, &block, converted)
-}
-
-func TestClusterBlockProposal(t *testing.T) {
-	block := unittest.ClusterBlockFixture()
-	proposal := messages.NewClusterBlockProposal(&block)
-	converted := proposal.Block.ToInternal()
-	assert.Equal(t, &block, converted)
-}
-
 func TestBlockResponse(t *testing.T) {
-	expected := unittest.BlockFixtures(2)
+	expected := []flow.Proposal{*unittest.ProposalFixture(), *unittest.ProposalFixture()}
 	res := messages.BlockResponse{
-		Blocks: []messages.UntrustedBlock{
-			messages.UntrustedBlockFromInternal(expected[0]),
-			messages.UntrustedBlockFromInternal(expected[1]),
+		Blocks: []flow.UntrustedProposal{
+			flow.UntrustedProposal(expected[0]),
+			flow.UntrustedProposal(expected[1]),
 		},
 	}
-	converted := res.BlocksInternal()
-	assert.Equal(t, expected, converted)
+	internal, err := res.ToInternal()
+	require.NoError(t, err)
+	converted, ok := internal.(*flow.BlockResponse)
+	require.True(t, ok)
+	assert.Equal(t, expected, converted.Blocks)
 }
 
 func TestClusterBlockResponse(t *testing.T) {
 	b1 := unittest.ClusterBlockFixture()
 	b2 := unittest.ClusterBlockFixture()
-	expected := []*cluster.Block{&b1, &b2}
+	expected := []cluster.Proposal{*unittest.ClusterProposalFromBlock(b1), *unittest.ClusterProposalFromBlock(b2)}
 	res := messages.ClusterBlockResponse{
-		Blocks: []messages.UntrustedClusterBlock{
-			messages.UntrustedClusterBlockFromInternal(expected[0]),
-			messages.UntrustedClusterBlockFromInternal(expected[1]),
+		Blocks: []cluster.UntrustedProposal{
+			cluster.UntrustedProposal(expected[0]),
+			cluster.UntrustedProposal(expected[1]),
 		},
 	}
-	converted := res.BlocksInternal()
-	assert.Equal(t, expected, converted)
+	internal, err := res.ToInternal()
+	require.NoError(t, err)
+	converted, ok := internal.(*cluster.BlockResponse)
+	require.True(t, ok)
+	assert.Equal(t, expected, converted.Blocks)
 }

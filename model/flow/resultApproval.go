@@ -125,9 +125,18 @@ func (rab ResultApprovalBody) ID() Identifier {
 //
 //structwrite:immutable - mutations allowed only within the constructor
 type ResultApproval struct {
-	Body              ResultApprovalBody
-	VerifierSignature crypto.Signature // signature over all above fields
+	Body ResultApprovalBody
+	// VerifierSignature is a signature over all fields in the Body.
+	// This is a temporary measure intended to provide message attribution.
+	// In the long term, all messages should be attributable as a property of the networking layer.
+	// Currently, the networking layer only provides authentication, which we already check for this type in
+	// the Sealing Engine: https://github.com/onflow/flow-go/blob/6efcbb7e8fa1578a3dd8f3f7f9857eb920e510e0/engine/consensus/sealing/engine.go#L417-L421
+	// Although the attribution property is not currently used, the current structure makes it available in
+	// the absence of support in the networking layer.
+	VerifierSignature crypto.Signature
 }
+
+var _ Entity = (*ResultApproval)(nil)
 
 // UntrustedResultApproval is an untrusted input-only representation of an ResultApproval,
 // used for construction.
@@ -160,12 +169,29 @@ func NewResultApproval(untrusted UntrustedResultApproval) (*ResultApproval, erro
 	}, nil
 }
 
-// ID generates a unique identifier using result approval body
+// ID generates a unique identifier using result approval full content
 func (ra ResultApproval) ID() Identifier {
-	return MakeID(ra.Body)
+	return MakeID(ra)
 }
 
-// Checksum generates checksum using the result approval full content
-func (ra ResultApproval) Checksum() Identifier {
-	return MakeID(ra)
+// ApprovalRequest represents a request for a ResultApproval corresponding to
+// a specific chunk.
+//
+// It is created from the corresponding untrusted network message
+// (messages.ApprovalRequest) during decoding. Construction is only allowed
+// through validation logic, ensuring the fields have passed structural checks.
+type ApprovalRequest struct {
+	Nonce      uint64
+	ResultID   Identifier
+	ChunkIndex uint64
+}
+
+// ApprovalResponse contains a response to an approval request.
+//
+// It is created from the corresponding untrusted network message
+// (messages.ApprovalResponse) during decoding and validation. The embedded
+// ResultApproval is guaranteed to have passed all structural validity checks.
+type ApprovalResponse struct {
+	Nonce    uint64
+	Approval ResultApproval
 }

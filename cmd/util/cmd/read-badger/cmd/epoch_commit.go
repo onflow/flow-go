@@ -1,11 +1,14 @@
 package cmd
 
 import (
+	"fmt"
+
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 
 	"github.com/onflow/flow-go/cmd/util/cmd/common"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/storage"
 )
 
 var flagEpochCommitID string
@@ -20,25 +23,25 @@ func init() {
 var epochCommitCmd = &cobra.Command{
 	Use:   "epoch-commit",
 	Short: "get epoch commit by ID",
-	Run: func(cmd *cobra.Command, args []string) {
-		storages, db := InitStorages()
-		defer db.Close()
+	RunE: func(cmd *cobra.Command, args []string) error {
+		return common.WithStorage(flagDatadir, func(db storage.DB) error {
+			storages := common.InitStorages(db)
 
-		log.Info().Msgf("got flag commit id: %s", flagEpochCommitID)
-		commitID, err := flow.HexStringToIdentifier(flagEpochCommitID)
-		if err != nil {
-			log.Error().Err(err).Msg("malformed epoch commit id")
-			return
-		}
+			log.Info().Msgf("got flag commit id: %s", flagEpochCommitID)
+			commitID, err := flow.HexStringToIdentifier(flagEpochCommitID)
+			if err != nil {
+				return fmt.Errorf("malformed epoch commit id: %w", err)
+			}
 
-		log.Info().Msgf("getting epoch commit by id: %v", commitID)
-		epochCommit, err := storages.EpochCommits.ByID(commitID)
-		if err != nil {
-			log.Error().Err(err).Msgf("could not get epoch commit with id: %v", commitID)
-			return
-		}
+			log.Info().Msgf("getting epoch commit by id: %v", commitID)
+			epochCommit, err := storages.EpochCommits.ByID(commitID)
+			if err != nil {
+				return fmt.Errorf("could not get epoch commit with id: %v: %w", commitID, err)
+			}
 
-		log.Info().Msgf("epoch commit id: %v", epochCommit.ID())
-		common.PrettyPrint(epochCommit)
+			log.Info().Msgf("epoch commit id: %v", epochCommit.ID())
+			common.PrettyPrint(epochCommit)
+			return nil
+		})
 	},
 }

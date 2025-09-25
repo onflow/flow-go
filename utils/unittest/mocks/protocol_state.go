@@ -45,8 +45,12 @@ type Params struct {
 	state *ProtocolState
 }
 
+func (p *Params) SporkRootBlock() *flow.Block {
+	return p.state.root
+}
+
 func (p *Params) ChainID() flow.ChainID {
-	return p.state.root.Header.ChainID
+	return p.state.root.ChainID
 }
 
 func (p *Params) SporkID() flow.Identifier {
@@ -57,12 +61,16 @@ func (p *Params) SporkRootBlockHeight() uint64 {
 	return 0
 }
 
+func (p *Params) SporkRootBlockView() uint64 {
+	return 0
+}
+
 func (p *Params) EpochFallbackTriggered() (bool, error) {
 	return false, fmt.Errorf("not implemented")
 }
 
 func (p *Params) FinalizedRoot() *flow.Header {
-	return p.state.root.Header
+	return p.state.root.ToHeader()
 }
 
 func (p *Params) SealedRoot() *flow.Header {
@@ -86,7 +94,7 @@ func (ps *ProtocolState) AtBlockID(blockID flow.Identifier) protocol.Snapshot {
 	snapshot := new(protocolmock.Snapshot)
 	block, ok := ps.blocks[blockID]
 	if ok {
-		snapshot.On("Head").Return(block.Header, nil)
+		snapshot.On("Head").Return(block.ToHeader(), nil)
 	} else {
 		snapshot.On("Head").Return(nil, storage.ErrNotFound)
 	}
@@ -100,10 +108,10 @@ func (ps *ProtocolState) AtHeight(height uint64) protocol.Snapshot {
 	snapshot := new(protocolmock.Snapshot)
 	block, ok := ps.heights[height]
 	if ok {
-		snapshot.On("Head").Return(block.Header, nil)
+		snapshot.On("Head").Return(block.ToHeader(), nil)
 		mocked := snapshot.On("Descendants")
 		mocked.RunFn = func(args mock.Arguments) {
-			pendings := pending(ps, block.Header.ID())
+			pendings := pending(ps, block.ID())
 			mocked.ReturnArguments = mock.Arguments{pendings, nil}
 		}
 
@@ -123,7 +131,7 @@ func (ps *ProtocolState) Final() protocol.Snapshot {
 	}
 
 	snapshot := new(protocolmock.Snapshot)
-	snapshot.On("Head").Return(final.Header, nil)
+	snapshot.On("Head").Return(final.ToHeader(), nil)
 	finalID := final.ID()
 	mocked := snapshot.On("Descendants")
 	mocked.RunFn = func(args mock.Arguments) {
@@ -145,7 +153,7 @@ func (ps *ProtocolState) Sealed() protocol.Snapshot {
 	}
 
 	snapshot := new(protocolmock.Snapshot)
-	snapshot.On("Head").Return(sealed.Header, nil)
+	snapshot.On("Head").Return(sealed.ToHeader(), nil)
 	return snapshot
 }
 
@@ -177,8 +185,8 @@ func (m *ProtocolState) Bootstrap(root *flow.Block, result *flow.ExecutionResult
 	m.root = root
 	m.result = result
 	m.seal = seal
-	m.heights[root.Header.Height] = root
-	m.finalized = root.Header.Height
+	m.heights[root.Height] = root
+	m.finalized = root.Height
 	return nil
 }
 
@@ -191,20 +199,20 @@ func (m *ProtocolState) Extend(block *flow.Block) error {
 		return storage.ErrAlreadyExists
 	}
 
-	if _, ok := m.blocks[block.Header.ParentID]; !ok {
-		return fmt.Errorf("could not retrieve parent %v", block.Header.ParentID)
+	if _, ok := m.blocks[block.ParentID]; !ok {
+		return fmt.Errorf("could not retrieve parent %v", block.ParentID)
 	}
 
 	m.blocks[id] = block
 
 	// index children
-	children, ok := m.children[block.Header.ParentID]
+	children, ok := m.children[block.ParentID]
 	if !ok {
 		children = make([]flow.Identifier, 0)
 	}
 
 	children = append(children, id)
-	m.children[block.Header.ParentID] = children
+	m.children[block.ParentID] = children
 
 	return nil
 }
@@ -218,22 +226,22 @@ func (m *ProtocolState) Finalize(blockID flow.Identifier) error {
 		return fmt.Errorf("could not retrieve final header")
 	}
 
-	if block.Header.Height <= m.finalized {
+	if block.Height <= m.finalized {
 		return fmt.Errorf("could not finalize old blocks")
 	}
 
 	// update heights
 	cur := block
-	for height := cur.Header.Height; height > m.finalized; height-- {
-		parent, ok := m.blocks[cur.Header.ParentID]
+	for height := cur.Height; height > m.finalized; height-- {
+		parent, ok := m.blocks[cur.ParentID]
 		if !ok {
-			return fmt.Errorf("parent does not exist for block at height: %v, parentID: %v", cur.Header.Height, cur.Header.ParentID)
+			return fmt.Errorf("parent does not exist for block at height: %v, parentID: %v", cur.Height, cur.ParentID)
 		}
 		m.heights[height] = cur
 		cur = parent
 	}
 
-	m.finalized = block.Header.Height
+	m.finalized = block.Height
 
 	return nil
 }
@@ -247,14 +255,14 @@ func (m *ProtocolState) MakeSeal(blockID flow.Identifier) error {
 		return fmt.Errorf("could not retrieve final header")
 	}
 
-	if block.Header.Height <= m.sealed {
+	if block.Height <= m.sealed {
 		return fmt.Errorf("could not seal old blocks")
 	}
 
-	if block.Header.Height >= m.finalized {
-		return fmt.Errorf("incorrect sealed height sealed %v, finalized %v", block.Header.Height, m.finalized)
+	if block.Height >= m.finalized {
+		return fmt.Errorf("incorrect sealed height sealed %v, finalized %v", block.Height, m.finalized)
 	}
 
-	m.sealed = block.Header.Height
+	m.sealed = block.Height
 	return nil
 }

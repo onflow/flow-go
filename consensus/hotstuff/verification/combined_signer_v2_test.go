@@ -33,13 +33,13 @@ func TestCombinedSignWithBeaconKey(t *testing.T) {
 	proposerView := uint64(20)
 
 	proposerIdentity := identities[0]
-	fblock := unittest.BlockFixture()
-	fblock.Header.ProposerID = proposerIdentity.NodeID
-	fblock.Header.View = proposerView
-	fblock.Header.ParentView = proposerView - 1
-	fblock.Header.LastViewTC = nil
-	proposal := model.ProposalFromFlow(fblock.Header)
-	signerID := fblock.Header.ProposerID
+	fblock := unittest.BlockFixture(
+		unittest.Block.WithParent(unittest.IdentifierFixture(), proposerView-1, 0),
+		unittest.Block.WithProposerID(proposerIdentity.NodeID),
+		unittest.Block.WithLastViewTC(nil),
+	)
+	proposal := model.ProposalFromFlow(fblock.ToHeader())
+	signerID := fblock.ProposerID
 
 	beaconKeyStore := modulemock.NewRandomBeaconKeyStore(t)
 	beaconKeyStore.On("ByView", proposerView).Return(beaconKey, nil)
@@ -59,7 +59,7 @@ func TestCombinedSignWithBeaconKey(t *testing.T) {
 	committee := &mocks.DynamicCommittee{}
 	committee.On("DKG", mock.Anything).Return(dkg, nil)
 	committee.On("Self").Return(me.NodeID())
-	committee.On("IdentityByBlock", fblock.Header.ID(), fblock.Header.ProposerID).Return(proposerIdentity, nil)
+	committee.On("IdentityByBlock", fblock.ID(), fblock.ProposerID).Return(proposerIdentity, nil)
 	committee.On("LeaderForView", proposerView).Return(signerID, nil).Maybe()
 
 	packer := signature.NewConsensusSigDataPacker(committee)
@@ -67,8 +67,8 @@ func TestCombinedSignWithBeaconKey(t *testing.T) {
 
 	persist := mocks.NewPersister(t)
 	safetyData := &hotstuff.SafetyData{
-		LockedOneChainView:      fblock.Header.ParentView,
-		HighestAcknowledgedView: fblock.Header.ParentView,
+		LockedOneChainView:      fblock.ParentView,
+		HighestAcknowledgedView: fblock.ParentView,
 	}
 	persist.On("GetSafetyData", mock.Anything).Return(safetyData, nil).Once()
 	persist.On("PutSafetyData", mock.Anything).Return(nil)
@@ -142,12 +142,12 @@ func TestCombinedSignWithNoBeaconKey(t *testing.T) {
 	pk := beaconKey.PublicKey()
 	proposerView := uint64(20)
 
-	fblock := unittest.BlockFixture()
-	fblock.Header.View = proposerView
-	fblock.Header.ParentView = proposerView - 1
-	fblock.Header.LastViewTC = nil
-	proposal := model.ProposalFromFlow(fblock.Header)
-	signerID := fblock.Header.ProposerID
+	fblock := unittest.BlockFixture(
+		unittest.Block.WithParent(unittest.IdentifierFixture(), proposerView-1, 0),
+		unittest.Block.WithLastViewTC(nil),
+	)
+	proposal := model.ProposalFromFlow(fblock.ToHeader())
+	signerID := fblock.ProposerID
 
 	beaconKeyStore := modulemock.NewRandomBeaconKeyStore(t)
 	beaconKeyStore.On("ByView", proposerView).Return(nil, module.ErrNoBeaconKeyForEpoch)
@@ -171,7 +171,7 @@ func TestCombinedSignWithNoBeaconKey(t *testing.T) {
 	// this failed node.
 	committee.On("DKG", mock.Anything).Return(dkg, nil)
 	committee.On("Self").Return(me.NodeID())
-	committee.On("IdentityByBlock", fblock.Header.ID(), signerID).Return(ourIdentity, nil)
+	committee.On("IdentityByBlock", fblock.ID(), signerID).Return(ourIdentity, nil)
 	committee.On("LeaderForView", mock.Anything).Return(signerID, nil).Maybe()
 
 	packer := signature.NewConsensusSigDataPacker(committee)
@@ -179,8 +179,8 @@ func TestCombinedSignWithNoBeaconKey(t *testing.T) {
 
 	persist := mocks.NewPersister(t)
 	safetyData := &hotstuff.SafetyData{
-		LockedOneChainView:      fblock.Header.ParentView,
-		HighestAcknowledgedView: fblock.Header.ParentView,
+		LockedOneChainView:      fblock.ParentView,
+		HighestAcknowledgedView: fblock.ParentView,
 	}
 	persist.On("GetSafetyData", mock.Anything).Return(safetyData, nil).Once()
 	persist.On("PutSafetyData", mock.Anything).Return(nil)

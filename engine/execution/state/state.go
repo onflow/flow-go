@@ -7,6 +7,8 @@ import (
 	"math"
 	"sync"
 
+	"github.com/jordanschalm/lockctx"
+
 	"github.com/onflow/flow-go/engine/execution"
 	"github.com/onflow/flow-go/engine/execution/storehouse"
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
@@ -54,6 +56,10 @@ type ScriptExecutionState interface {
 	IsBlockExecuted(height uint64, blockID flow.Identifier) (bool, error)
 }
 
+// IsParentExecuted returns true if and only if the parent of the given block (header) is executed.
+// TODO: Check whether `header` is a root block is potentially flawed, because it only works for the genesis block.
+//
+//	Neither spork root blocks nor dynamically boostrapped Execution Nodes (with truncated history) are supported.
 func IsParentExecuted(state ReadOnlyExecutionState, header *flow.Header) (bool, error) {
 	// sanity check, caller should not pass a root block
 	if header.Height == 0 {
@@ -101,6 +107,7 @@ type state struct {
 	transactionResults storage.TransactionResults
 	db                 storage.DB
 	getLatestFinalized func() (uint64, error)
+	lockManager        lockctx.Manager
 
 	registerStore execution.RegisterStore
 	// when it is true, registers are stored in both register store and ledger
@@ -125,6 +132,7 @@ func NewExecutionState(
 	tracer module.Tracer,
 	registerStore execution.RegisterStore,
 	enableRegisterStore bool,
+	lockManager lockctx.Manager,
 ) ExecutionState {
 	return &state{
 		tracer:              tracer,
@@ -142,6 +150,7 @@ func NewExecutionState(
 		getLatestFinalized:  getLatestFinalized,
 		registerStore:       registerStore,
 		enableRegisterStore: enableRegisterStore,
+		lockManager:         lockManager,
 	}
 
 }
@@ -371,7 +380,7 @@ func (s *state) SaveExecutionResults(
 	if s.enableRegisterStore {
 		// save registers to register store
 		err = s.registerStore.SaveRegisters(
-			result.BlockExecutionResult.ExecutableBlock.Block.Header,
+			result.BlockExecutionResult.ExecutableBlock.Block.ToHeader(),
 			result.BlockExecutionResult.AllUpdatedRegisters(),
 		)
 
@@ -381,7 +390,7 @@ func (s *state) SaveExecutionResults(
 	}
 
 	//outside batch because it requires read access
-	err = s.UpdateLastExecutedBlock(childCtx, result.ExecutableBlock.ID())
+	err = s.UpdateLastExecutedBlock(childCtx, result.ExecutableBlock.BlockID())
 	if err != nil {
 		return fmt.Errorf("cannot update highest executed block: %w", err)
 	}
@@ -392,27 +401,36 @@ func (s *state) saveExecutionResults(
 	ctx context.Context,
 	result *execution.ComputationResult,
 ) (err error) {
-	blockID := result.ExecutableBlock.ID()
+	blockID := result.ExecutableBlock.BlockID()
 
-	err = s.chunkDataPacks.Store(result.AllChunkDataPacks())
+	chunks, err := result.AllChunkDataPacks()
+	if err != nil {
+		return fmt.Errorf("can not retrieve chunk data packs: %w", err)
+	}
+
+	err = s.chunkDataPacks.Store(chunks)
 	if err != nil {
 		return fmt.Errorf("can not store multiple chunk data pack: %w", err)
 	}
 
-	// Write Batch is BadgerDB feature designed for handling lots of writes
-	// in efficient and atomic manner, hence pushing all the updates we can
-	// as tightly as possible to let Badger manage it.
-	// Note, that it does not guarantee atomicity as transactions has size limit,
-	// but it's the closest thing to atomicity we could have
-	return s.db.WithReaderBatchWriter(func(batch storage.ReaderBatchWriter) error {
+	lctx := s.lockManager.NewContext()
+	defer lctx.Release()
+	err = lctx.AcquireLock(storage.LockInsertOwnReceipt)
+	if err != nil {
+		return err
+	}
 
+	// Save entire execution result (including all chunk data packs) within one batch to minimize
+	// the number of database interactions. This is a large batch of data, which might not be
+	// committed within a single operation (e.g. if using Badger DB as storage backend, which has
+	// a size limit for its transactions).
+	return s.db.WithReaderBatchWriter(func(batch storage.ReaderBatchWriter) error {
 		batch.AddCallback(func(err error) {
 			// Rollback if an error occurs during batch operations
 			if err != nil {
-				chunks := result.AllChunkDataPacks()
 				chunkIDs := make([]flow.Identifier, 0, len(chunks))
 				for _, chunk := range chunks {
-					chunkIDs = append(chunkIDs, chunk.ID())
+					chunkIDs = append(chunkIDs, chunk.ChunkID)
 				}
 				_ = s.chunkDataPacks.Remove(chunkIDs)
 			}
@@ -438,7 +456,7 @@ func (s *state) saveExecutionResults(
 
 		executionResult := &result.ExecutionReceipt.ExecutionResult
 		// saving my receipts will also save the execution result
-		err = s.myReceipts.BatchStoreMyReceipt(result.ExecutionReceipt, batch)
+		err = s.myReceipts.BatchStoreMyReceipt(lctx, result.ExecutionReceipt, batch)
 		if err != nil {
 			return fmt.Errorf("could not persist execution result: %w", err)
 		}
@@ -451,14 +469,13 @@ func (s *state) saveExecutionResults(
 		// the state commitment is the last data item to be stored, so that
 		// IsBlockExecuted can be implemented by checking whether state commitment exists
 		// in the database
-		err = s.commits.BatchStore(blockID, result.CurrentEndState(), batch)
+		err = s.commits.BatchStore(lctx, blockID, result.CurrentEndState(), batch)
 		if err != nil {
 			return fmt.Errorf("cannot store state commitment: %w", err)
 		}
 
 		return nil
 	})
-
 }
 
 func (s *state) UpdateLastExecutedBlock(ctx context.Context, executedID flow.Identifier) error {

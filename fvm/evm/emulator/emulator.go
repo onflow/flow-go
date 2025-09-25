@@ -4,16 +4,16 @@ import (
 	"errors"
 	"math/big"
 
+	gethCommon "github.com/ethereum/go-ethereum/common"
+	gethCore "github.com/ethereum/go-ethereum/core"
+	gethTracing "github.com/ethereum/go-ethereum/core/tracing"
+	gethTypes "github.com/ethereum/go-ethereum/core/types"
+	gethVM "github.com/ethereum/go-ethereum/core/vm"
+	gethCrypto "github.com/ethereum/go-ethereum/crypto"
+	gethParams "github.com/ethereum/go-ethereum/params"
 	"github.com/holiman/uint256"
 	"github.com/onflow/atree"
 	"github.com/onflow/crypto/hash"
-	gethCommon "github.com/onflow/go-ethereum/common"
-	gethCore "github.com/onflow/go-ethereum/core"
-	gethTracing "github.com/onflow/go-ethereum/core/tracing"
-	gethTypes "github.com/onflow/go-ethereum/core/types"
-	gethVM "github.com/onflow/go-ethereum/core/vm"
-	gethCrypto "github.com/onflow/go-ethereum/crypto"
-	gethParams "github.com/onflow/go-ethereum/params"
 
 	"github.com/onflow/flow-go/fvm/evm/emulator/state"
 	"github.com/onflow/flow-go/fvm/evm/types"
@@ -325,6 +325,10 @@ func (bl *BlockView) newProcedure() (*procedure, error) {
 		cfg.EVMConfig,
 	)
 	evm.SetTxContext(*cfg.TxContext)
+	// inject the applicable precompiled contracts for the current
+	// chain rules, as well as any extra precompiled contracts,
+	// such as Cadence Arch etc
+	evm.SetPrecompiles(cfg.PrecompiledContracts)
 
 	return &procedure{
 		config: cfg,
@@ -538,7 +542,6 @@ func (proc *procedure) deployAt(
 	// run code through interpreter
 	// this would check for errors and computes the final bytes to be stored under account
 	var err error
-	inter := gethVM.NewEVMInterpreter(proc.evm)
 	contract := gethVM.NewContract(
 		callerCommon,
 		addr,
@@ -551,7 +554,7 @@ func (proc *procedure) deployAt(
 	// update access list (Berlin)
 	proc.state.AddAddressToAccessList(addr)
 
-	ret, err := inter.Run(contract, nil, false)
+	ret, err := proc.evm.Run(contract, nil, false)
 	gasCost := uint64(len(ret)) * gethParams.CreateDataGas
 	res.GasConsumed = gasCost
 

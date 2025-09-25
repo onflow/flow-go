@@ -4,28 +4,36 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/dgraph-io/badger/v2"
+	"github.com/jordanschalm/lockctx"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/metrics"
-	storagebadger "github.com/onflow/flow-go/storage/badger"
-	"github.com/onflow/flow-go/storage/badger/operation"
+	"github.com/onflow/flow-go/storage"
+	"github.com/onflow/flow-go/storage/operation"
+	"github.com/onflow/flow-go/storage/operation/dbtest"
+	"github.com/onflow/flow-go/storage/store"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
 func TestIterateHeight(t *testing.T) {
-	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+	lockManager := storage.NewTestingLockManager()
+	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
 		// create blocks with siblings
-		b1 := &flow.Header{Height: 1}
-		b2 := &flow.Header{Height: 2}
-		b3 := &flow.Header{Height: 3}
+		b1 := &flow.Header{HeaderBody: flow.HeaderBody{Height: 1}}
+		b2 := &flow.Header{HeaderBody: flow.HeaderBody{Height: 2}}
+		b3 := &flow.Header{HeaderBody: flow.HeaderBody{Height: 3}}
 		bs := []*flow.Header{b1, b2, b3}
 
 		// index height
 		for _, b := range bs {
-			require.NoError(t, db.Update(operation.IndexBlockHeight(b.Height, b.ID())))
+			err := unittest.WithLock(t, lockManager, storage.LockFinalizeBlock, func(lctx lockctx.Context) error {
+				return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+					return operation.IndexFinalizedBlockByHeight(lctx, rw, b.Height, b.ID())
+				})
+			})
+			require.NoError(t, err)
 		}
 
 		progress := &saveNextHeight{}
@@ -33,7 +41,7 @@ func TestIterateHeight(t *testing.T) {
 		// create iterator
 		// b0 is the root block, iterate from b1 to b3
 		iterRange := module.IteratorRange{Start: b1.Height, End: b3.Height}
-		headers := storagebadger.NewHeaders(&metrics.NoopCollector{}, db)
+		headers := store.NewHeaders(&metrics.NoopCollector{}, db)
 		getBlockIDByIndex := func(height uint64) (flow.Identifier, bool, error) {
 			blockID, err := headers.BlockIDByHeight(height)
 			if err != nil {

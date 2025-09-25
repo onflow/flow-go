@@ -80,7 +80,7 @@ func TestGetTransactions(t *testing.T) {
 
 		backend.Mock.
 			On("GetTransaction", mocks.Anything, tx.ID()).
-			Return(&tx.TransactionBody, nil)
+			Return(&tx, nil)
 
 		expected := fmt.Sprintf(`
 			{
@@ -121,12 +121,12 @@ func TestGetTransactions(t *testing.T) {
 	t.Run("Get by ID with results", func(t *testing.T) {
 		backend := &mock.API{}
 
-		tx := unittest.TransactionFixture()
+		tx := unittest.TransactionBodyFixture()
 		txr := transactionResultFixture(tx)
 
 		backend.Mock.
 			On("GetTransaction", mocks.Anything, tx.ID()).
-			Return(&tx.TransactionBody, nil)
+			Return(&tx, nil)
 
 		backend.Mock.
 			On("GetTransactionResult", mocks.Anything, tx.ID(), flow.ZeroID, flow.ZeroID, entities.EventEncodingVersion_JSON_CDC_V0).
@@ -219,7 +219,12 @@ func TestGetTransactionResult(t *testing.T) {
 		Status:     flow.TransactionStatusSealed,
 		StatusCode: 10,
 		Events: []flow.Event{
-			unittest.EventFixture(flow.EventAccountCreated, 1, 0, id, 200),
+			unittest.EventFixture(
+				unittest.Event.WithEventType(flow.EventAccountCreated),
+				unittest.Event.WithTransactionIndex(1),
+				unittest.Event.WithEventIndex(0),
+				unittest.Event.WithTransactionID(id),
+			),
 		},
 		ErrorMessage: "",
 		BlockID:      bid,
@@ -425,13 +430,19 @@ func TestCreateTransaction(t *testing.T) {
 	})
 }
 
-func transactionResultFixture(tx flow.Transaction) *accessmodel.TransactionResult {
+func transactionResultFixture(tx flow.TransactionBody) *accessmodel.TransactionResult {
 	cid := unittest.IdentifierFixture()
 	return &accessmodel.TransactionResult{
 		Status:     flow.TransactionStatusSealed,
 		StatusCode: 1,
 		Events: []flow.Event{
-			unittest.EventFixture(flow.EventAccountCreated, 0, 0, tx.ID(), 255),
+			unittest.EventFixture(
+				unittest.Event.WithEventType(flow.EventAccountCreated),
+				unittest.Event.WithTransactionIndex(0),
+				unittest.Event.WithEventIndex(0),
+				unittest.Event.WithTransactionID(tx.ID()),
+				unittest.Event.WithPayload([]byte{}),
+			),
 		},
 		ErrorMessage: "",
 		BlockID:      tx.ReferenceBlockID,

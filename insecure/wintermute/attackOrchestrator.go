@@ -75,7 +75,7 @@ func (o *Orchestrator) HandleEgressEvent(event *insecure.EgressEvent) error {
 
 	switch event.FlowProtocolEvent.(type) {
 
-	case *flow.ExecutionReceipt:
+	case *messages.ExecutionReceipt:
 		// orchestrator received execution receipt from corrupted EN after EN executed a block.
 		if err := o.handleExecutionReceiptEvent(event); err != nil {
 			return fmt.Errorf("could not handle execution receipt event: %w", err)
@@ -90,7 +90,7 @@ func (o *Orchestrator) HandleEgressEvent(event *insecure.EgressEvent) error {
 		if err := o.handleChunkDataPackResponseEvent(event); err != nil {
 			return fmt.Errorf("could not handle chunk data pack response event: %w", err)
 		}
-	case *flow.ResultApproval:
+	case *messages.ResultApproval:
 		// orchestrator receives a result approval from corrupted VN. If it is an approval for the original result, it should
 		// be wintermuted, i.e., a corrupted VN must not approve any conflicting result with the corrupted result (otherwise, it
 		// causes a sealing halt at consensus nodes).
@@ -179,7 +179,7 @@ func (o *Orchestrator) handleExecutionReceiptEvent(receiptEvent *insecure.Egress
 		return fmt.Errorf("wrong sender role for execution receipt: %s", corruptedIdentity.Role.String())
 	}
 
-	receipt, ok := receiptEvent.FlowProtocolEvent.(*flow.ExecutionReceipt)
+	receipt, ok := receiptEvent.FlowProtocolEvent.(*messages.ExecutionReceipt)
 	if !ok {
 		return fmt.Errorf("protocol event is not an execution receipt: %T", receiptEvent.FlowProtocolEvent)
 	}
@@ -213,8 +213,13 @@ func (o *Orchestrator) handleExecutionReceiptEvent(receiptEvent *insecure.Egress
 		return nil
 	}
 
+	internalMsg, err := receipt.ToInternal()
+	if err != nil {
+		lg.Fatal().Err(err).Msg("failed to convert event to internal")
+	}
+
 	// replace honest receipt with corrupted receipt
-	corruptedResult := o.corruptExecutionResult(receipt)
+	corruptedResult := o.corruptExecutionResult(internalMsg.(*flow.ExecutionReceipt))
 
 	corruptedExecutionIds := o.allNodeIds.Filter(
 		filter.And(filter.HasRole[flow.Identity](flow.RoleExecution),
@@ -232,7 +237,7 @@ func (o *Orchestrator) handleExecutionReceiptEvent(receiptEvent *insecure.Egress
 			TargetIds:       receiptEvent.TargetIds,
 
 			// wrapping execution result in an execution receipt for sake of encoding and decoding.
-			FlowProtocolEvent: &flow.ExecutionReceipt{ExecutionResult: *corruptedResult},
+			FlowProtocolEvent: &messages.ExecutionReceipt{UnsignedExecutionReceipt: flow.UnsignedExecutionReceipt{ExecutionResult: *corruptedResult}},
 		})
 		if err != nil {
 			return fmt.Errorf("could not send rpc on channel: %w", err)
@@ -340,7 +345,7 @@ func (o *Orchestrator) handleChunkDataPackResponseEvent(chunkDataPackReplyEvent 
 	}
 	o.logger.Debug().
 		Hex("corrupted_id", logging.ID(chunkDataPackReplyEvent.CorruptOriginId)).
-		Hex("chunk_id", logging.ID(cdpRep.ChunkDataPack.ID())).
+		Hex("chunk_id", logging.ID(cdpRep.ChunkDataPack.ChunkID)).
 		Msg("chunk data pack response passed through")
 	return nil
 }
@@ -350,7 +355,7 @@ func (o *Orchestrator) handleChunkDataPackResponseEvent(chunkDataPackReplyEvent 
 func (o *Orchestrator) handleResultApprovalEvent(resultApprovalEvent *insecure.EgressEvent) error {
 	// non-nil state means a result has been corrupted, hence checking whether the approval
 	// belongs to the chunks of the original (non-corrupted) result.
-	approval := resultApprovalEvent.FlowProtocolEvent.(*flow.ResultApproval)
+	approval := resultApprovalEvent.FlowProtocolEvent.(*messages.ResultApproval)
 	lg := o.logger.With().
 		Hex("result_id", logging.ID(approval.Body.ExecutionResultID)).
 		Uint64("chunk_index", approval.Body.ChunkIndex).
@@ -403,7 +408,7 @@ func (o *Orchestrator) replyWithAttestation(chunkDataPackRequestEvent *insecure.
 			TargetIds:       consensusIds,
 
 			// wrapping attestation in a result approval for sake of encoding and decoding.
-			FlowProtocolEvent: &flow.ResultApproval{Body: flow.ResultApprovalBody{Attestation: *attestation}},
+			FlowProtocolEvent: &messages.ResultApproval{Body: flow.ResultApprovalBody{Attestation: *attestation}},
 		})
 		if err != nil {
 			return false, fmt.Errorf("could not send attestation for corrupted chunk: %w", err)

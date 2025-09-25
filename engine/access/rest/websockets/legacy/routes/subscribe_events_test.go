@@ -15,7 +15,6 @@ import (
 	"golang.org/x/exp/slices"
 
 	jsoncdc "github.com/onflow/cadence/encoding/json"
-	"github.com/onflow/flow/protobuf/go/flow/entities"
 	mocks "github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
@@ -24,10 +23,10 @@ import (
 	"github.com/onflow/flow-go/engine/access/rest/router"
 	"github.com/onflow/flow-go/engine/access/state_stream"
 	"github.com/onflow/flow-go/engine/access/state_stream/backend"
-	mockstatestream "github.com/onflow/flow-go/engine/access/state_stream/mock"
+	ssmock "github.com/onflow/flow-go/engine/access/state_stream/mock"
+	submock "github.com/onflow/flow-go/engine/access/subscription/mock"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
-	"github.com/onflow/flow-go/utils/unittest/generator"
 )
 
 type testType struct {
@@ -64,35 +63,32 @@ func TestSubscribeEventsSuite(t *testing.T) {
 
 func (s *SubscribeEventsSuite) SetupTest() {
 	rootBlock := unittest.BlockFixture()
-	parent := rootBlock.Header
+	parent := rootBlock.ToHeader()
 
 	blockCount := 5
 
 	s.blocks = make([]*flow.Block, 0, blockCount)
 	s.blockEvents = make(map[flow.Identifier]flow.EventsList, blockCount)
 
-	// by default, events are in CCF encoding
-	eventsGenerator := generator.EventGenerator(generator.WithEncoding(entities.EventEncodingVersion_CCF_V0))
-
 	for i := 0; i < blockCount; i++ {
 		block := unittest.BlockWithParentFixture(parent)
 		// update for next iteration
-		parent = block.Header
+		parent = block.ToHeader()
 
 		result := unittest.ExecutionResultFixture()
-		blockEvents := unittest.BlockEventsFixture(block.Header, (i%len(testEventTypes))*3+1, testEventTypes...)
-
-		// update payloads with valid CCF encoded data
-		for i := range blockEvents.Events {
-			blockEvents.Events[i].Payload = eventsGenerator.New().Payload
-
-			s.T().Logf("block events %d %v => %v", block.Header.Height, block.ID(), blockEvents.Events[i].Type)
-		}
 
 		s.blocks = append(s.blocks, block)
-		s.blockEvents[block.ID()] = blockEvents.Events
 
-		s.T().Logf("adding exec data for block %d %d %v => %v", i, block.Header.Height, block.ID(), result.ExecutionDataID)
+		var events []flow.Event
+		for j := 0; j < len(testEventTypes); j++ {
+			events = append(events, unittest.EventFixture(
+				unittest.Event.WithEventType(testEventTypes[j]),
+			))
+		}
+
+		s.blockEvents[block.ID()] = events
+
+		s.T().Logf("adding exec data for block %d %d %v => %v", i, block.Height, block.ID(), result.ExecutionDataID)
 	}
 }
 
@@ -122,7 +118,7 @@ func (s *SubscribeEventsSuite) TestSubscribeEvents() {
 		{
 			name:              "happy path - all events from startHeight",
 			startBlockID:      flow.ZeroID,
-			startHeight:       s.blocks[0].Header.Height,
+			startHeight:       s.blocks[0].Height,
 			heartbeatInterval: 1,
 		},
 		{
@@ -162,14 +158,14 @@ func (s *SubscribeEventsSuite) TestSubscribeEvents() {
 
 		t3 := test
 		t3.name = fmt.Sprintf("%s - non existing events", test.name)
-		t3.eventTypes = []string{fmt.Sprintf("%s_new", testEventTypes[0])}
+		t3.eventTypes = []string{fmt.Sprintf("%s_unknown", unittest.EventTypeFixture(chainID))}
 		tests = append(tests, t3)
 	}
 
 	for _, test := range tests {
 		s.Run(test.name, func() {
-			stateStreamBackend := mockstatestream.NewAPI(s.T())
-			subscription := mockstatestream.NewSubscription(s.T())
+			stateStreamBackend := ssmock.NewAPI(s.T())
+			subscription := submock.NewSubscription(s.T())
 
 			filter, err := state_stream.NewEventFilter(
 				state_stream.DefaultEventFilterConfig,
@@ -188,7 +184,7 @@ func (s *SubscribeEventsSuite) TestSubscribeEvents() {
 				blockID := block.ID()
 				if startBlockFound || blockID == test.startBlockID {
 					startBlockFound = true
-					if test.startHeight == request.EmptyHeight || block.Header.Height >= test.startHeight {
+					if test.startHeight == request.EmptyHeight || block.Height >= test.startHeight {
 						// track 2 lists, one for the expected results and one that is passed back
 						// from the subscription to the handler. These cannot be shared since the
 						// response struct is passed by reference from the mock to the handler, so
@@ -204,17 +200,17 @@ func (s *SubscribeEventsSuite) TestSubscribeEvents() {
 						}
 						if len(expectedEvents) > 0 || (i+1)%int(test.heartbeatInterval) == 0 {
 							expectedEventsResponses = append(expectedEventsResponses, &backend.EventsResponse{
-								Height:         block.Header.Height,
+								Height:         block.Height,
 								BlockID:        blockID,
 								Events:         expectedEvents,
-								BlockTimestamp: block.Header.Timestamp,
+								BlockTimestamp: time.UnixMilli(int64(block.Timestamp)).UTC(),
 							})
 						}
 						subscriptionEventsResponses = append(subscriptionEventsResponses, &backend.EventsResponse{
-							Height:         block.Header.Height,
+							Height:         block.Height,
 							BlockID:        blockID,
 							Events:         subscriptionEvents,
-							BlockTimestamp: block.Header.Timestamp,
+							BlockTimestamp: time.UnixMilli(int64(block.Timestamp)).UTC(),
 						})
 					}
 				}
@@ -260,8 +256,8 @@ func (s *SubscribeEventsSuite) TestSubscribeEvents() {
 
 func (s *SubscribeEventsSuite) TestSubscribeEventsHandlesErrors() {
 	s.Run("returns error for block id and height", func() {
-		stateStreamBackend := mockstatestream.NewAPI(s.T())
-		req, err := getSubscribeEventsRequest(s.T(), s.blocks[0].ID(), s.blocks[0].Header.Height, nil, nil, nil, 1, nil)
+		stateStreamBackend := ssmock.NewAPI(s.T())
+		req, err := getSubscribeEventsRequest(s.T(), s.blocks[0].ID(), s.blocks[0].Height, nil, nil, nil, 1, nil)
 		require.NoError(s.T(), err)
 		respRecorder := router.NewTestHijackResponseRecorder()
 		router.ExecuteLegacyWsRequest(req, stateStreamBackend, respRecorder, chainID.Chain())
@@ -269,9 +265,9 @@ func (s *SubscribeEventsSuite) TestSubscribeEventsHandlesErrors() {
 	})
 
 	s.Run("returns error for invalid block id", func() {
-		stateStreamBackend := mockstatestream.NewAPI(s.T())
+		stateStreamBackend := ssmock.NewAPI(s.T())
 		invalidBlock := unittest.BlockFixture()
-		subscription := mockstatestream.NewSubscription(s.T())
+		subscription := submock.NewSubscription(s.T())
 
 		ch := make(chan interface{})
 		var chReadOnly <-chan interface{}
@@ -294,7 +290,7 @@ func (s *SubscribeEventsSuite) TestSubscribeEventsHandlesErrors() {
 	})
 
 	s.Run("returns error for invalid event filter", func() {
-		stateStreamBackend := mockstatestream.NewAPI(s.T())
+		stateStreamBackend := ssmock.NewAPI(s.T())
 		req, err := getSubscribeEventsRequest(s.T(), s.blocks[0].ID(), request.EmptyHeight, []string{"foo"}, nil, nil, 1, nil)
 		require.NoError(s.T(), err)
 		respRecorder := router.NewTestHijackResponseRecorder()
@@ -303,8 +299,8 @@ func (s *SubscribeEventsSuite) TestSubscribeEventsHandlesErrors() {
 	})
 
 	s.Run("returns error when channel closed", func() {
-		stateStreamBackend := mockstatestream.NewAPI(s.T())
-		subscription := mockstatestream.NewSubscription(s.T())
+		stateStreamBackend := ssmock.NewAPI(s.T())
+		subscription := submock.NewSubscription(s.T())
 
 		ch := make(chan interface{})
 		var chReadOnly <-chan interface{}

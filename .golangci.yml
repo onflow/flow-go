@@ -3,9 +3,21 @@ run:
 
 linters-settings:
   goimports:
+    # enforced by linter
     # put imports beginning with prefix after 3rd-party packages;
     # it's a comma-separated list of prefixes
     local-prefixes: github.com/onflow/flow-go/
+
+  # used to generate canonical import ordering
+  # not enforced by linter
+  gci:
+    sections:
+      - standard                           # 1. standard library
+      - default                            # 2. external packages
+      - prefix(github.com/onflow/)         # 3. org packages
+      - prefix(github.com/onflow/flow-go/) # 4. project packages
+    skip-generated: true
+    custom-order: true
 
   gosec:
     # To select a subset of rules to run.
@@ -44,6 +56,12 @@ issues:
       linters:
         - structwrite
     - path: 'utils/unittest/*' # disable some linters on test files
+      linters:
+        - structwrite
+    - path: 'consensus/hotstuff/helper/*' # disable some linters on test files
+      linters:
+        - structwrite
+    - path: 'engine/execution/testutil/*' # disable some linters on test files
       linters:
         - structwrite
     # typecheck currently not handling the way we do function inheritance well

@@ -152,6 +152,10 @@ type ValidationStep struct {
 	failReason string
 }
 
+// TransactionValidator implements transaction validation logic for Access and Collection Nodes.
+// NOTE: This validation logic is a simplified interim approach: Collection/Access Nodes cannot reliably validate transaction signatures or payer balance.
+// The long-term design for extending validation to cover these cases is described in the Sweet Onion Plan
+// (https://flowfoundation.notion.site/Sweet-Onion-Plan-eae4db664feb459598879b49ccf2aa85).
 type TransactionValidator struct {
 	blocks                       Blocks     // for looking up blocks to check transaction expiry
 	chain                        flow.Chain // for checking validity of addresses
@@ -428,6 +432,20 @@ func (v *TransactionValidator) checkSignatureDuplications(tx *flow.TransactionBo
 }
 
 func (v *TransactionValidator) checkSignatureFormat(tx *flow.TransactionBody) error {
+	for _, signature := range tx.PayloadSignatures {
+		valid, _ := signature.ValidateExtensionDataAndReconstructMessage(tx.PayloadMessage())
+		if !valid {
+			return InvalidAuthenticationSchemeFormatError{Signature: signature}
+		}
+	}
+
+	for _, signature := range tx.EnvelopeSignatures {
+		valid, _ := signature.ValidateExtensionDataAndReconstructMessage(tx.EnvelopeMessage())
+		if !valid {
+			return InvalidAuthenticationSchemeFormatError{Signature: signature}
+		}
+	}
+
 	for _, signature := range append(tx.PayloadSignatures, tx.EnvelopeSignatures...) {
 		// check the format of the signature is valid.
 		// a valid signature is an ECDSA signature of either P-256 or secp256k1 curve.
@@ -451,7 +469,7 @@ func (v *TransactionValidator) checkSignatureFormat(tx *flow.TransactionBody) er
 			continue
 		}
 
-		return InvalidSignatureError{Signature: signature}
+		return InvalidRawSignatureError{Signature: signature}
 	}
 
 	return nil

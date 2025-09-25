@@ -8,6 +8,7 @@ import (
 
 	"github.com/onflow/flow-go/engine"
 	commonsync "github.com/onflow/flow-go/engine/common/synchronization"
+	clustermodel "github.com/onflow/flow-go/model/cluster"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module"
@@ -135,7 +136,7 @@ func (r *RequestHandlerEngine) setupRequestMessageHandler() {
 		engine.NewNotifier(),
 		engine.Pattern{
 			Match: func(msg *engine.Message) bool {
-				_, ok := msg.Payload.(*messages.SyncRequest)
+				_, ok := msg.Payload.(*flow.SyncRequest)
 				if ok {
 					r.metrics.MessageReceived(metrics.EngineClusterSynchronization, metrics.MessageSyncRequest)
 				}
@@ -145,7 +146,7 @@ func (r *RequestHandlerEngine) setupRequestMessageHandler() {
 		},
 		engine.Pattern{
 			Match: func(msg *engine.Message) bool {
-				_, ok := msg.Payload.(*messages.RangeRequest)
+				_, ok := msg.Payload.(*flow.RangeRequest)
 				if ok {
 					r.metrics.MessageReceived(metrics.EngineClusterSynchronization, metrics.MessageRangeRequest)
 				}
@@ -155,7 +156,7 @@ func (r *RequestHandlerEngine) setupRequestMessageHandler() {
 		},
 		engine.Pattern{
 			Match: func(msg *engine.Message) bool {
-				_, ok := msg.Payload.(*messages.BatchRequest)
+				_, ok := msg.Payload.(*flow.BatchRequest)
 				if ok {
 					r.metrics.MessageReceived(metrics.EngineClusterSynchronization, metrics.MessageBatchRequest)
 				}
@@ -169,7 +170,7 @@ func (r *RequestHandlerEngine) setupRequestMessageHandler() {
 // onSyncRequest processes an outgoing handshake; if we have a higher height, we
 // inform the other node of it, so they can organize their block downloads. If
 // we have a lower height, we add the difference to our own download queue.
-func (r *RequestHandlerEngine) onSyncRequest(originID flow.Identifier, req *messages.SyncRequest) error {
+func (r *RequestHandlerEngine) onSyncRequest(originID flow.Identifier, req *flow.SyncRequest) error {
 	final, err := r.state.Final().Head()
 	if err != nil {
 		return fmt.Errorf("could not get last finalized header: %w", err)
@@ -200,7 +201,7 @@ func (r *RequestHandlerEngine) onSyncRequest(originID flow.Identifier, req *mess
 }
 
 // onRangeRequest processes a request for a range of blocks by height.
-func (r *RequestHandlerEngine) onRangeRequest(originID flow.Identifier, req *messages.RangeRequest) error {
+func (r *RequestHandlerEngine) onRangeRequest(originID flow.Identifier, req *flow.RangeRequest) error {
 	r.log.Debug().Str("origin_id", originID.String()).Msg("received new range request")
 	// get the latest final state to know if we can fulfill the request
 	head, err := r.state.Final().Head()
@@ -234,9 +235,9 @@ func (r *RequestHandlerEngine) onRangeRequest(originID flow.Identifier, req *mes
 	}
 
 	// get all of the blocks, one by one
-	blocks := make([]messages.UntrustedClusterBlock, 0, req.ToHeight-req.FromHeight+1)
+	proposals := make([]clustermodel.UntrustedProposal, 0, req.ToHeight-req.FromHeight+1)
 	for height := req.FromHeight; height <= req.ToHeight; height++ {
-		block, err := r.blocks.ByHeight(height)
+		proposal, err := r.blocks.ProposalByHeight(height)
 		if errors.Is(err, storage.ErrNotFound) {
 			r.log.Error().Uint64("height", height).Msg("skipping unknown heights")
 			break
@@ -244,11 +245,11 @@ func (r *RequestHandlerEngine) onRangeRequest(originID flow.Identifier, req *mes
 		if err != nil {
 			return fmt.Errorf("could not get block for height (%d): %w", height, err)
 		}
-		blocks = append(blocks, messages.UntrustedClusterBlockFromInternal(block))
+		proposals = append(proposals, clustermodel.UntrustedProposal(*proposal))
 	}
 
 	// if there are no blocks to send, skip network message
-	if len(blocks) == 0 {
+	if len(proposals) == 0 {
 		r.log.Debug().Msg("skipping empty range response")
 		return nil
 	}
@@ -256,7 +257,7 @@ func (r *RequestHandlerEngine) onRangeRequest(originID flow.Identifier, req *mes
 	// send the response
 	res := &messages.ClusterBlockResponse{
 		Nonce:  req.Nonce,
-		Blocks: blocks,
+		Blocks: proposals,
 	}
 	err = r.con.Unicast(res, originID)
 	if err != nil {
@@ -269,7 +270,7 @@ func (r *RequestHandlerEngine) onRangeRequest(originID flow.Identifier, req *mes
 }
 
 // onBatchRequest processes a request for a specific block by block ID.
-func (r *RequestHandlerEngine) onBatchRequest(originID flow.Identifier, req *messages.BatchRequest) error {
+func (r *RequestHandlerEngine) onBatchRequest(originID flow.Identifier, req *flow.BatchRequest) error {
 	r.log.Debug().Str("origin_id", originID.String()).Msg("received new batch request")
 	// we should bail and send nothing on empty request
 	if len(req.BlockIDs) == 0 {
@@ -303,9 +304,9 @@ func (r *RequestHandlerEngine) onBatchRequest(originID flow.Identifier, req *mes
 	}
 
 	// try to get all the blocks by ID
-	blocks := make([]messages.UntrustedClusterBlock, 0, len(blockIDs))
+	proposals := make([]clustermodel.UntrustedProposal, 0, len(blockIDs))
 	for blockID := range blockIDs {
-		block, err := r.blocks.ByID(blockID)
+		proposal, err := r.blocks.ProposalByID(blockID)
 		if errors.Is(err, storage.ErrNotFound) {
 			r.log.Debug().Hex("block_id", blockID[:]).Msg("skipping unknown block")
 			continue
@@ -313,11 +314,11 @@ func (r *RequestHandlerEngine) onBatchRequest(originID flow.Identifier, req *mes
 		if err != nil {
 			return fmt.Errorf("could not get block by ID (%s): %w", blockID, err)
 		}
-		blocks = append(blocks, messages.UntrustedClusterBlockFromInternal(block))
+		proposals = append(proposals, clustermodel.UntrustedProposal(*proposal))
 	}
 
 	// if there are no blocks to send, skip network message
-	if len(blocks) == 0 {
+	if len(proposals) == 0 {
 		r.log.Debug().Msg("skipping empty batch response")
 		return nil
 	}
@@ -325,7 +326,7 @@ func (r *RequestHandlerEngine) onBatchRequest(originID flow.Identifier, req *mes
 	// send the response
 	res := &messages.ClusterBlockResponse{
 		Nonce:  req.Nonce,
-		Blocks: blocks,
+		Blocks: proposals,
 	}
 	err := r.con.Unicast(res, originID)
 	if err != nil {
@@ -348,7 +349,7 @@ func (r *RequestHandlerEngine) processAvailableRequests() error {
 
 		msg, ok := r.pendingSyncRequests.Get()
 		if ok {
-			err := r.onSyncRequest(msg.OriginID, msg.Payload.(*messages.SyncRequest))
+			err := r.onSyncRequest(msg.OriginID, msg.Payload.(*flow.SyncRequest))
 			if err != nil {
 				return fmt.Errorf("processing sync request failed: %w", err)
 			}
@@ -357,7 +358,7 @@ func (r *RequestHandlerEngine) processAvailableRequests() error {
 
 		msg, ok = r.pendingRangeRequests.Get()
 		if ok {
-			err := r.onRangeRequest(msg.OriginID, msg.Payload.(*messages.RangeRequest))
+			err := r.onRangeRequest(msg.OriginID, msg.Payload.(*flow.RangeRequest))
 			if err != nil {
 				return fmt.Errorf("processing range request failed: %w", err)
 			}
@@ -366,7 +367,7 @@ func (r *RequestHandlerEngine) processAvailableRequests() error {
 
 		msg, ok = r.pendingBatchRequests.Get()
 		if ok {
-			err := r.onBatchRequest(msg.OriginID, msg.Payload.(*messages.BatchRequest))
+			err := r.onBatchRequest(msg.OriginID, msg.Payload.(*flow.BatchRequest))
 			if err != nil {
 				return fmt.Errorf("processing batch request failed: %w", err)
 			}

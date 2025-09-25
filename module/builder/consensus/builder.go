@@ -16,6 +16,7 @@ import (
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/blocktimer"
 	"github.com/onflow/flow-go/storage"
+	"github.com/onflow/flow-go/storage/deferred"
 )
 
 // Builder is the builder for consensus block payloads. Upon providing a payload
@@ -55,7 +56,7 @@ func NewBuilder(
 	options ...func(*Config),
 ) (*Builder, error) {
 
-	blockTimer, err := blocktimer.NewBlockTimer(500*time.Millisecond, 10*time.Second)
+	blockTimer, err := blocktimer.NewBlockTimer(500, 10_000)
 	if err != nil {
 		return nil, fmt.Errorf("could not create default block timer: %w", err)
 	}
@@ -112,7 +113,7 @@ func NewBuilder(
 // However, it will pass through all errors returned by `setter` and `sign`.
 // Callers must be aware of possible error returns from the `setter` and `sign` arguments they provide,
 // and handle them accordingly when handling errors returned from BuildOn.
-func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) error, sign func(*flow.Header) error) (*flow.Header, error) {
+func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.HeaderBodyBuilder) error, sign func(*flow.Header) ([]byte, error)) (*flow.ProposalHeader, error) {
 
 	// since we don't know the blockID when building the block we track the
 	// time indirectly and insert the span directly at the end
@@ -138,7 +139,7 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 	}
 
 	// assemble the block proposal
-	proposal, err := b.createProposal(parentID,
+	blockProposal, err := b.createProposal(parentID,
 		insertableGuarantees,
 		insertableSeals,
 		insertableReceipts,
@@ -148,15 +149,15 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 		return nil, fmt.Errorf("could not assemble proposal: %w", err)
 	}
 
-	span, ctx := b.tracer.StartBlockSpan(context.Background(), proposal.ID(), trace.CONBuilderBuildOn, otelTrace.WithTimestamp(startTime))
+	span, ctx := b.tracer.StartBlockSpan(context.Background(), blockProposal.Block.ID(), trace.CONBuilderBuildOn, otelTrace.WithTimestamp(startTime))
 	defer span.End()
 
-	err = b.state.Extend(ctx, proposal)
+	err = b.state.Extend(ctx, blockProposal)
 	if err != nil {
 		return nil, fmt.Errorf("could not extend state with built proposal: %w", err)
 	}
 
-	return proposal.Header, nil
+	return blockProposal.ProposalHeader(), nil
 }
 
 // repopulateExecutionTree restores latest state of execution tree mempool based on local chain state information.
@@ -299,8 +300,8 @@ func (b *Builder) getInsertableGuarantees(parentID flow.Identifier) ([]*flow.Col
 			return fmt.Errorf("could not get ancestor payload (%x): %w", ancestorID, err)
 		}
 
-		for _, collID := range index.CollectionIDs {
-			receiptLookup[collID] = struct{}{}
+		for _, guaranteeID := range index.GuaranteeIDs {
+			receiptLookup[guaranteeID] = struct{}{}
 		}
 
 		return nil
@@ -320,10 +321,8 @@ func (b *Builder) getInsertableGuarantees(parentID flow.Identifier) ([]*flow.Col
 			break
 		}
 
-		collID := guarantee.ID()
-
 		// skip collections that are already included in a block on the fork
-		_, duplicated := receiptLookup[collID]
+		_, duplicated := receiptLookup[guarantee.ID()]
 		if duplicated {
 			continue
 		}
@@ -425,7 +424,7 @@ func (b *Builder) getInsertableSeals(parentID flow.Identifier) ([]*flow.Seal, er
 			// enforce condition (0): candidate seals are only constructed once sufficient
 			// approvals have been collected. Hence, any incorporated result for which we
 			// find a candidate seal satisfies condition (0)
-			irSeal, ok := b.sealPool.ByID(incorporatedResult.ID())
+			irSeal, ok := b.sealPool.Get(incorporatedResult.ID())
 			if !ok {
 				continue
 			}
@@ -489,12 +488,12 @@ func connectingSeal(sealsForNextBlock []*flow.IncorporatedResultSeal, lastSealed
 }
 
 type InsertableReceipts struct {
-	receipts []*flow.ExecutionReceiptMeta
+	receipts []*flow.ExecutionReceiptStub
 	results  []*flow.ExecutionResult
 }
 
 // getInsertableReceipts constructs:
-//   - (i)  the meta information of the ExecutionReceipts (i.e. ExecutionReceiptMeta)
+//   - (i)  the meta information of the ExecutionReceipts (i.e. ExecutionReceiptStub)
 //     that should be inserted in the next payload
 //   - (ii) the ExecutionResults the receipts from step (i) commit to
 //     (deduplicated w.r.t. the block under construction as well as ancestor blocks)
@@ -567,14 +566,14 @@ func (b *Builder) getInsertableReceipts(parentID flow.Identifier) (*InsertableRe
 	// TODO: we should probably remove this edge case by _synchronously_ populating
 	//       the Execution Tree in the Fork's finalizationCallback
 	if err != nil && !mempool.IsUnknownExecutionResultError(err) {
-		return nil, fmt.Errorf("failed to retrieve reachable receipts from memool: %w", err)
+		return nil, fmt.Errorf("failed to retrieve reachable receipts from mempool: %w", err)
 	}
 
 	insertables := toInsertables(receipts, includedResults, b.cfg.maxReceiptCount)
 	return insertables, nil
 }
 
-// toInsertables separates the provided receipts into ExecutionReceiptMeta and
+// toInsertables separates the provided receipts into ExecutionReceiptStub and
 // ExecutionResult. Results that are in includedResults are skipped.
 // We also limit the number of receipts to maxReceiptCount.
 func toInsertables(receipts []*flow.ExecutionReceipt, includedResults map[flow.Identifier]struct{}, maxReceiptCount uint) *InsertableReceipts {
@@ -586,11 +585,11 @@ func toInsertables(receipts []*flow.ExecutionReceipt, includedResults map[flow.I
 		count = maxReceiptCount
 	}
 
-	filteredReceipts := make([]*flow.ExecutionReceiptMeta, 0, count)
+	filteredReceipts := make([]*flow.ExecutionReceiptStub, 0, count)
 
 	for i := uint(0); i < count; i++ {
 		receipt := receipts[i]
-		meta := receipt.Meta()
+		meta := receipt.Stub()
 		resultID := meta.ResultID
 		if _, inserted := includedResults[resultID]; !inserted {
 			results = append(results, &receipt.ExecutionResult)
@@ -612,10 +611,9 @@ func (b *Builder) createProposal(parentID flow.Identifier,
 	guarantees []*flow.CollectionGuarantee,
 	seals []*flow.Seal,
 	insertableReceipts *InsertableReceipts,
-	setter func(*flow.Header) error,
-	sign func(*flow.Header) error,
-) (*flow.Block, error) {
-
+	setter func(*flow.HeaderBodyBuilder) error,
+	sign func(*flow.Header) ([]byte, error),
+) (*flow.Proposal, error) {
 	parent, err := b.headers.ByBlockID(parentID)
 	if err != nil {
 		return nil, fmt.Errorf("could not retrieve parent: %w", err)
@@ -624,43 +622,67 @@ func (b *Builder) createProposal(parentID flow.Identifier,
 	timestamp := b.cfg.blockTimer.Build(parent.Timestamp)
 
 	// construct default block on top of the provided parent
-	header := &flow.Header{
-		ChainID:     parent.ChainID,
-		ParentID:    parentID,
-		Height:      parent.Height + 1,
-		Timestamp:   timestamp,
-		PayloadHash: flow.ZeroID,
-	}
+	headerBodyBuilder := flow.NewHeaderBodyBuilder().
+		WithChainID(parent.ChainID).
+		WithParentID(parentID).
+		WithHeight(parent.Height + 1).
+		WithTimestamp(timestamp)
 
 	// apply the custom fields setter of the consensus algorithm, we must do this before applying service events
 	// since we need to know the correct view of the block.
-	err = setter(header)
+	err = setter(headerBodyBuilder)
 	if err != nil {
 		return nil, fmt.Errorf("could not apply setter: %w", err)
+	}
+	headerBody, err := headerBodyBuilder.Build()
+	if err != nil {
+		return nil, fmt.Errorf("could not build header: %w", err)
 	}
 
 	// Evolve the Protocol State starting from the parent block's state. Information that may change the state is:
 	// the candidate block's view and Service Events from execution results sealed in the candidate block.
-	protocolStateID, _, err := b.mutableProtocolState.EvolveState(header.ParentID, header.View, seals)
+	deferredBlockPersist := deferred.NewDeferredBlockPersist()
+	protocolStateID, err := b.mutableProtocolState.EvolveState(deferredBlockPersist, headerBody.ParentID, headerBody.View, seals)
 	if err != nil {
 		return nil, fmt.Errorf("evolving protocol state failed: %w", err)
 	}
 
-	proposal := &flow.Block{
-		Header: header,
+	payload, err := flow.NewPayload(
+		flow.UntrustedPayload{
+			Guarantees:      guarantees,
+			Seals:           seals,
+			Receipts:        insertableReceipts.receipts,
+			Results:         insertableReceipts.results,
+			ProtocolStateID: protocolStateID,
+		},
+	)
+	if err != nil {
+		return nil, fmt.Errorf("could not build the payload: %w", err)
 	}
-	proposal.SetPayload(flow.Payload{
-		Guarantees:      guarantees,
-		Seals:           seals,
-		Receipts:        insertableReceipts.receipts,
-		Results:         insertableReceipts.results,
-		ProtocolStateID: protocolStateID,
-	})
+
+	block, err := flow.NewBlock(
+		flow.UntrustedBlock{
+			HeaderBody: *headerBody,
+			Payload:    *payload,
+		},
+	)
+	if err != nil {
+		return nil, fmt.Errorf("could not build the block: %w", err)
+	}
 
 	// sign the proposal
-	err = sign(header)
+	sig, err := sign(block.ToHeader())
 	if err != nil {
-		return nil, fmt.Errorf("could not sign the proposal: %w", err)
+		return nil, fmt.Errorf("could not sign the block: %w", err)
+	}
+	proposal, err := flow.NewProposal(
+		flow.UntrustedProposal{
+			Block:           *block,
+			ProposerSigData: sig,
+		},
+	)
+	if err != nil {
+		return nil, fmt.Errorf("could not construct proposal: %w", err)
 	}
 
 	return proposal, nil

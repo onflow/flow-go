@@ -77,7 +77,7 @@ func (c CompleteExecutionReceiptList) ChunkDataResponseOf(t *testing.T, chunkID 
 
 	// publishes the chunk data pack response to the network
 	res := &messages.ChunkDataResponse{
-		ChunkDataPack: *receiptData.ChunkDataPacks[chunkIndex],
+		ChunkDataPack: flow.UntrustedChunkDataPack(*receiptData.ChunkDataPacks[chunkIndex]),
 		Nonce:         rand.Uint64(),
 	}
 
@@ -199,15 +199,21 @@ func ExecutionResultFixture(t *testing.T,
 ) (*flow.ExecutionResult, *ExecutionReceiptData) {
 
 	// setups up the first collection of block consists of three transactions
-	tx1 := testutil.DeployCounterContractTransaction(chain.ServiceAddress(), chain)
-	err := testutil.SignTransactionAsServiceAccount(tx1, 0, chain)
+	tx1Builder := testutil.DeployCounterContractTransaction(chain.ServiceAddress(), chain)
+	err := testutil.SignTransactionAsServiceAccount(tx1Builder, 0, chain)
 	require.NoError(t, err)
 
-	tx2 := testutil.CreateCounterTransaction(chain.ServiceAddress(), chain.ServiceAddress())
-	err = testutil.SignTransactionAsServiceAccount(tx2, 1, chain)
+	tx2Builder := testutil.CreateCounterTransaction(chain.ServiceAddress(), chain.ServiceAddress())
+	err = testutil.SignTransactionAsServiceAccount(tx2Builder, 1, chain)
 	require.NoError(t, err)
-	tx3 := testutil.CreateCounterPanicTransaction(chain.ServiceAddress(), chain.ServiceAddress())
-	err = testutil.SignTransactionAsServiceAccount(tx3, 2, chain)
+	tx3Builder := testutil.CreateCounterPanicTransaction(chain.ServiceAddress(), chain.ServiceAddress())
+	err = testutil.SignTransactionAsServiceAccount(tx3Builder, 2, chain)
+	require.NoError(t, err)
+	tx1, err := tx1Builder.Build()
+	require.NoError(t, err)
+	tx2, err := tx2Builder.Build()
+	require.NoError(t, err)
+	tx3, err := tx3Builder.Build()
 	require.NoError(t, err)
 	transactions := []*flow.TransactionBody{tx1, tx2, tx3}
 	collection := flow.Collection{Transactions: transactions}
@@ -215,7 +221,7 @@ func ExecutionResultFixture(t *testing.T,
 	clusterChainID := cluster.CanonicalClusterID(1, clusterCommittee.NodeIDs())
 
 	guarantee := unittest.CollectionGuaranteeFixture(unittest.WithCollection(&collection), unittest.WithCollRef(refBlkHeader.ParentID))
-	guarantee.ChainID = clusterChainID
+	guarantee.ClusterChainID = clusterChainID
 	indices, err := signature.EncodeSignersToIndices(clusterCommittee.NodeIDs(), clusterCommittee.NodeIDs())
 	require.NoError(t, err)
 	guarantee.SignerIndices = indices
@@ -225,7 +231,7 @@ func ExecutionResultFixture(t *testing.T,
 	log := zerolog.Nop()
 
 	// setups execution outputs:
-	var referenceBlock flow.Block
+	var referenceBlock *flow.Block
 	var spockSecrets [][]byte
 	var chunkDataPacks []*flow.ChunkDataPack
 	var result *flow.ExecutionResult
@@ -286,7 +292,7 @@ func ExecutionResultFixture(t *testing.T,
 
 		me := new(moduleMock.Local)
 		me.On("NodeID").Return(unittest.IdentifierFixture())
-		me.On("Sign", mock.Anything, mock.Anything).Return(nil, nil)
+		me.On("Sign", mock.Anything, mock.Anything).Return(unittest.SignatureFixture(), nil)
 		me.On("SignFunc", mock.Anything, mock.Anything, mock.Anything).
 			Return(nil, nil)
 
@@ -308,41 +314,48 @@ func ExecutionResultFixture(t *testing.T,
 		require.NoError(t, err)
 
 		completeColls := make(map[flow.Identifier]*entity.CompleteCollection)
-		completeColls[guarantee.ID()] = &entity.CompleteCollection{
-			Guarantee:    guarantee,
-			Transactions: collection.Transactions,
+		completeColls[guarantee.CollectionID] = &entity.CompleteCollection{
+			Guarantee:  guarantee,
+			Collection: &collection,
 		}
 
 		for i := 1; i < chunkCount; i++ {
-			tx := testutil.CreateCounterTransaction(chain.ServiceAddress(), chain.ServiceAddress())
-			err = testutil.SignTransactionAsServiceAccount(tx, 3+uint64(i), chain)
+			txBuilder := testutil.CreateCounterTransaction(chain.ServiceAddress(), chain.ServiceAddress())
+			err = testutil.SignTransactionAsServiceAccount(txBuilder, 3+uint64(i), chain)
+			require.NoError(t, err)
+			txBody, err := txBuilder.Build()
 			require.NoError(t, err)
 
-			collection := flow.Collection{Transactions: []*flow.TransactionBody{tx}}
+			collection := flow.Collection{Transactions: []*flow.TransactionBody{txBody}}
 			guarantee := unittest.CollectionGuaranteeFixture(unittest.WithCollection(&collection), unittest.WithCollRef(refBlkHeader.ParentID))
 			guarantee.SignerIndices = indices
-			guarantee.ChainID = clusterChainID
+			guarantee.ClusterChainID = clusterChainID
 
 			collections = append(collections, &collection)
 			guarantees = append(guarantees, guarantee)
 
-			completeColls[guarantee.ID()] = &entity.CompleteCollection{
-				Guarantee:    guarantee,
-				Transactions: collection.Transactions,
+			completeColls[guarantee.CollectionID] = &entity.CompleteCollection{
+				Guarantee:  guarantee,
+				Collection: &collection,
 			}
 		}
 
-		payload := flow.Payload{
-			Guarantees:      guarantees,
-			ProtocolStateID: protocolStateID,
-		}
-		referenceBlock = flow.Block{
-			Header: refBlkHeader,
-		}
-		referenceBlock.SetPayload(payload)
-
+		payload, err := flow.NewPayload(
+			flow.UntrustedPayload{
+				Guarantees:      guarantees,
+				ProtocolStateID: protocolStateID,
+			},
+		)
+		require.NoError(t, err)
+		referenceBlock, err = flow.NewBlock(
+			flow.UntrustedBlock{
+				HeaderBody: refBlkHeader.HeaderBody,
+				Payload:    *payload,
+			},
+		)
+		require.NoError(t, err)
 		executableBlock := &entity.ExecutableBlock{
-			Block:               &referenceBlock,
+			Block:               referenceBlock,
 			CompleteCollections: completeColls,
 			StartState:          &startStateCommitment,
 		}
@@ -358,12 +371,13 @@ func ExecutionResultFixture(t *testing.T,
 			spockSecrets = append(spockSecrets, snapshot.SpockSecret)
 		}
 
-		chunkDataPacks = computationResult.AllChunkDataPacks()
-		result = &computationResult.ExecutionResult
+		chunkDataPacks, err = computationResult.AllChunkDataPacks()
+		require.NoError(t, err)
+		result = &computationResult.ExecutionReceipt.ExecutionResult
 	})
 
 	return result, &ExecutionReceiptData{
-		ReferenceBlock: &referenceBlock,
+		ReferenceBlock: referenceBlock,
 		ChunkDataPacks: chunkDataPacks,
 		SpockSecrets:   spockSecrets,
 	}
@@ -419,7 +433,7 @@ func CompleteExecutionReceiptChainFixture(t *testing.T,
 			ReceiptsData:   allData,
 		})
 
-		parent = containerBlock.Header
+		parent = containerBlock.ToHeader()
 	}
 	return completeERs
 }
@@ -447,13 +461,17 @@ func ExecutionReceiptsFromParentBlockFixture(t *testing.T,
 		// makes several copies of the same result
 		for cp := 0; cp < builder.executorCount; cp++ {
 			allReceipts = append(allReceipts, &flow.ExecutionReceipt{
-				ExecutorID:      builder.executorIDs[cp],
-				ExecutionResult: *result,
+				UnsignedExecutionReceipt: flow.UnsignedExecutionReceipt{
+					ExecutorID:      builder.executorIDs[cp],
+					ExecutionResult: *result,
+					Spocks:          unittest.SignaturesFixture(1),
+				},
+				ExecutorSignature: unittest.SignatureFixture(),
 			})
 
 			allData = append(allData, data)
 		}
-		parent = data.ReferenceBlock.Header
+		parent = data.ReferenceBlock.ToHeader()
 	}
 
 	return allReceipts, allData, parent
@@ -475,12 +493,14 @@ func ExecutionResultFromParentBlockFixture(t *testing.T,
 // ContainerBlockFixture builds and returns a block that contains input execution receipts.
 func ContainerBlockFixture(parent *flow.Header, protocolStateID flow.Identifier, receipts []*flow.ExecutionReceipt, source []byte) *flow.Block {
 	// container block is the block that contains the execution receipt of reference block
-	containerBlock := unittest.BlockWithParentFixture(parent)
-	containerBlock.Header.ParentVoterSigData = unittest.QCSigDataWithSoRFixture(source)
-	containerBlock.SetPayload(unittest.PayloadFixture(
-		unittest.WithReceipts(receipts...),
-		unittest.WithProtocolStateID(protocolStateID),
-	))
+	containerBlock := unittest.BlockWithParentAndPayload(
+		parent,
+		unittest.PayloadFixture(
+			unittest.WithReceipts(receipts...),
+			unittest.WithProtocolStateID(protocolStateID),
+		),
+	)
+	containerBlock.ParentVoterSigData = unittest.QCSigDataWithSoRFixture(source)
 
 	return containerBlock
 }
@@ -492,8 +512,10 @@ func ContainerBlockFixture(parent *flow.Header, protocolStateID flow.Identifier,
 func ExecutionResultForkFixture(t *testing.T) (*flow.ExecutionResult, *flow.ExecutionResult, *flow.Collection, *flow.Block) {
 	// collection and block
 	collections := unittest.CollectionListFixture(1)
-	block := unittest.BlockWithGuaranteesFixture(
-		unittest.CollectionGuaranteesWithCollectionIDFixture(collections),
+	block := unittest.BlockFixture(
+		unittest.Block.WithPayload(
+			unittest.PayloadFixture(unittest.WithGuarantees(unittest.CollectionGuaranteesWithCollectionIDFixture(collections)...)),
+		),
 	)
 
 	// execution fork at block with resultA and resultB that share first chunk

@@ -65,6 +65,7 @@ import (
 	"github.com/onflow/flow-go/state/protocol"
 	badgerState "github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/state/protocol/blocktimer"
+	"github.com/onflow/flow-go/state/protocol/datastore"
 	"github.com/onflow/flow-go/state/protocol/events/gadgets"
 	protocol_state "github.com/onflow/flow-go/state/protocol/protocol_state/state"
 	bstorage "github.com/onflow/flow-go/storage/badger"
@@ -200,7 +201,7 @@ func main() {
 
 	nodeBuilder.
 		PreInit(cmd.DynamicStartPreInit).
-		ValidateRootSnapshot(badgerState.ValidRootSnapshotContainsEntityExpiryRange).
+		ValidateRootSnapshot(datastore.ValidRootSnapshotContainsEntityExpiryRange).
 		Module("machine account config", func(node *cmd.NodeConfig) error {
 			machineAccountInfo, err = cmd.LoadNodeMachineAccountInfoFile(node.BootstrapDir, node.NodeID)
 			return err
@@ -272,7 +273,7 @@ func main() {
 				getSealingConfigs,
 				conMetrics)
 
-			blockTimer, err = blocktimer.NewBlockTimer(minInterval, maxInterval)
+			blockTimer, err = blocktimer.NewBlockTimer(uint64(minInterval.Milliseconds()), uint64(maxInterval.Milliseconds()))
 			if err != nil {
 				return err
 			}
@@ -373,8 +374,8 @@ func main() {
 			return nil
 		}).
 		Module("collection guarantees mempool", func(node *cmd.NodeConfig) error {
-			guarantees, err = stdmap.NewGuarantees(guaranteeLimit)
-			return err
+			guarantees = stdmap.NewGuarantees(guaranteeLimit)
+			return nil
 		}).
 		Module("execution receipts mempool", func(node *cmd.NodeConfig) error {
 			receipts = consensusMempools.NewExecutionTree()
@@ -391,12 +392,10 @@ func main() {
 			rawMempool := stdmap.NewIncorporatedResultSeals(sealLimit)
 			multipleReceiptsFilterMempool := consensusMempools.NewIncorporatedResultSeals(rawMempool, node.Storage.Receipts)
 
-			dbStore := cmd.GetStorageMultiDBStoreIfNeeded(node)
-
 			seals, err = consensusMempools.NewExecStateForkSuppressor(
 				multipleReceiptsFilterMempool,
 				consensusMempools.LogForkAndCrash(node.Logger),
-				dbStore,
+				node.ProtocolDB,
 				node.Logger,
 			)
 			if err != nil {
@@ -498,7 +497,7 @@ func main() {
 				node.State,
 				channels.RequestReceiptsByBlockID,
 				filter.HasRole[flow.Identity](flow.RoleExecution),
-				func() flow.Entity { return &flow.ExecutionReceipt{} },
+				func() flow.Entity { return new(flow.ExecutionReceipt) },
 				requester.WithRetryInitial(2*time.Second),
 				requester.WithRetryMaximum(30*time.Second),
 			)
@@ -577,7 +576,7 @@ func main() {
 		Component("hotstuff modules", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			// initialize the block finalizer
 			finalize := finalizer.NewFinalizer(
-				node.DB,
+				node.ProtocolDB.Reader(),
 				node.Storage.Headers,
 				mutableState,
 				node.Tracer,
@@ -637,7 +636,7 @@ func main() {
 				node.Storage.Headers,
 				finalize,
 				notifier,
-				node.FinalizedRootBlock.Header,
+				node.FinalizedRootBlock.ToHeader(),
 				node.RootQC,
 			)
 			if err != nil {
@@ -740,6 +739,7 @@ func main() {
 			return ctl, nil
 		}).
 		Component("consensus participant", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+			// create different epochs setups
 			mutableProtocolState := protocol_state.NewMutableProtocolState(
 				node.Logger,
 				node.Storage.EpochProtocolStateEntries,

@@ -84,10 +84,13 @@ func mustFundAccounts(
 ) snapshot.SnapshotTree {
 	var err error
 	for _, acc := range accs.accounts {
-		transferTx := testutil.CreateTokenTransferTransaction(chain, 1_000_000, acc.address, chain.ServiceAddress())
-		err = testutil.SignTransactionAsServiceAccount(transferTx, accs.seq, chain)
+		transferTxBuilder := testutil.CreateTokenTransferTransaction(chain, 1_000_000, acc.address, chain.ServiceAddress())
+		err = testutil.SignTransactionAsServiceAccount(transferTxBuilder, accs.seq, chain)
 		require.NoError(b, err)
 		accs.seq++
+
+		transferTx, err := transferTxBuilder.Build()
+		require.NoError(b, err)
 
 		executionSnapshot, output, err := vm.Run(
 			execCtx,
@@ -174,8 +177,8 @@ func benchmarkComputeBlock(
 	snapshotTree = mustFundAccounts(b, vm, snapshotTree, execCtx, accs)
 
 	me := new(module.Local)
-	me.On("NodeID").Return(flow.ZeroID)
-	me.On("Sign", mock.Anything, mock.Anything).Return(nil, nil)
+	me.On("NodeID").Return(unittest.IdentifierFixture())
+	me.On("Sign", mock.Anything, mock.Anything).Return(unittest.SignatureFixture(), nil)
 	me.On("SignFunc", mock.Anything, mock.Anything, mock.Anything).
 		Return(nil, nil)
 
@@ -214,10 +217,7 @@ func benchmarkComputeBlock(
 		derivedChainData: derivedChainData,
 	}
 
-	parentBlock := &flow.Block{
-		Header:  &flow.Header{},
-		Payload: &flow.Payload{},
-	}
+	parentBlock := unittest.BlockFixture()
 
 	b.StopTimer()
 	b.ResetTimer()
@@ -275,24 +275,21 @@ func createBlock(b *testing.B, parentBlock *flow.Block, accs *testAccounts, colN
 
 		collections[c] = collection
 		guarantees[c] = guarantee
-		completeCollections[guarantee.ID()] = &entity.CompleteCollection{
-			Guarantee:    guarantee,
-			Transactions: transactions,
+		completeCollections[guarantee.CollectionID] = &entity.CompleteCollection{
+			Guarantee:  guarantee,
+			Collection: collection,
 		}
 	}
 
-	block := flow.Block{
-		Header: &flow.Header{
-			ParentID: parentBlock.ID(),
-			View:     parentBlock.Header.Height + 1,
-		},
-		Payload: &flow.Payload{
-			Guarantees: guarantees,
-		},
-	}
+	block := unittest.BlockFixture(
+		unittest.Block.WithParent(parentBlock.ID(), parentBlock.View, parentBlock.Height),
+		unittest.Block.WithPayload(
+			unittest.PayloadFixture(unittest.WithGuarantees(guarantees...)),
+		),
+	)
 
 	return &entity.ExecutableBlock{
-		Block:               &block,
+		Block:               block,
 		CompleteCollections: completeCollections,
 		StartState:          unittest.StateCommitmentPointerFixture(),
 	}
@@ -305,17 +302,20 @@ func createTokenTransferTransaction(b *testing.B, accs *testAccounts) *flow.Tran
 	src := accs.accounts[rnd]
 	dst := accs.accounts[(rnd+1)%len(accs.accounts)]
 
-	tx := testutil.CreateTokenTransferTransaction(chain, 1, dst.address, src.address)
-	tx.SetProposalKey(chain.ServiceAddress(), 0, accs.seq).
+	txBuilder := testutil.CreateTokenTransferTransaction(chain, 1, dst.address, src.address).
+		SetProposalKey(chain.ServiceAddress(), 0, accs.seq).
 		SetComputeLimit(1000).
 		SetPayer(chain.ServiceAddress())
 	accs.seq++
 
-	err = testutil.SignPayload(tx, src.address, src.privateKey)
+	err = testutil.SignPayload(txBuilder, src.address, src.privateKey)
 	require.NoError(b, err)
 
-	err = testutil.SignEnvelope(tx, chain.ServiceAddress(), unittest.ServiceAccountPrivateKey)
+	err = testutil.SignEnvelope(txBuilder, chain.ServiceAddress(), unittest.ServiceAccountPrivateKey)
 	require.NoError(b, err)
 
-	return tx
+	txBody, err := txBuilder.Build()
+	require.NoError(b, err)
+
+	return txBody
 }

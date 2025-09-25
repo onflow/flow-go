@@ -4,14 +4,14 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/dgraph-io/badger/v2"
 	"github.com/rs/zerolog/log"
 
 	"github.com/onflow/flow-go/admin"
 	"github.com/onflow/flow-go/admin/commands"
 	"github.com/onflow/flow-go/cmd/util/cmd/read-light-block"
 	"github.com/onflow/flow-go/model/flow"
-	storage "github.com/onflow/flow-go/storage/badger"
+	"github.com/onflow/flow-go/storage"
+	"github.com/onflow/flow-go/storage/store"
 )
 
 var _ commands.AdminCommand = (*ReadRangeClusterBlocksCommand)(nil)
@@ -21,12 +21,12 @@ var _ commands.AdminCommand = (*ReadRangeClusterBlocksCommand)(nil)
 const Max_Range_Cluster_Block_Limit = uint64(10001)
 
 type ReadRangeClusterBlocksCommand struct {
-	db       *badger.DB
-	headers  *storage.Headers
-	payloads *storage.ClusterPayloads
+	db       storage.DB
+	headers  *store.Headers
+	payloads *store.ClusterPayloads
 }
 
-func NewReadRangeClusterBlocksCommand(db *badger.DB, headers *storage.Headers, payloads *storage.ClusterPayloads) commands.AdminCommand {
+func NewReadRangeClusterBlocksCommand(db storage.DB, headers *store.Headers, payloads *store.ClusterPayloads) commands.AdminCommand {
 	return &ReadRangeClusterBlocksCommand{
 		db:       db,
 		headers:  headers,
@@ -51,7 +51,7 @@ func (c *ReadRangeClusterBlocksCommand) Handler(ctx context.Context, req *admin.
 		return nil, admin.NewInvalidAdminReqErrorf("getting for more than %v blocks at a time might have an impact to node's performance and is not allowed", Max_Range_Cluster_Block_Limit)
 	}
 
-	clusterBlocks := storage.NewClusterBlocks(
+	clusterBlocks := store.NewClusterBlocks(
 		c.db, flow.ChainID(chainID), c.headers, c.payloads,
 	)
 

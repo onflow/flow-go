@@ -13,6 +13,7 @@ import (
 	"github.com/onflow/flow-go/engine/common/fifoqueue"
 	commonsync "github.com/onflow/flow-go/engine/common/synchronization"
 	"github.com/onflow/flow-go/model/chainsync"
+	clustermodel "github.com/onflow/flow-go/model/cluster"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/model/messages"
@@ -138,7 +139,7 @@ func (e *Engine) setupResponseMessageHandler() error {
 		engine.NewNotifier(),
 		engine.Pattern{
 			Match: func(msg *engine.Message) bool {
-				_, ok := msg.Payload.(*messages.SyncResponse)
+				_, ok := msg.Payload.(*flow.SyncResponse)
 				if ok {
 					e.metrics.MessageReceived(metrics.EngineClusterSynchronization, metrics.MessageSyncResponse)
 				}
@@ -148,7 +149,7 @@ func (e *Engine) setupResponseMessageHandler() error {
 		},
 		engine.Pattern{
 			Match: func(msg *engine.Message) bool {
-				_, ok := msg.Payload.(*messages.ClusterBlockResponse)
+				_, ok := msg.Payload.(*clustermodel.BlockResponse)
 				if ok {
 					e.metrics.MessageReceived(metrics.EngineClusterSynchronization, metrics.MessageBlockResponse)
 				}
@@ -228,9 +229,9 @@ func (e *Engine) Process(channel channels.Channel, originID flow.Identifier, eve
 //   - All other errors are potential symptoms of internal state corruption or bugs (fatal).
 func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 	switch event.(type) {
-	case *messages.RangeRequest, *messages.BatchRequest, *messages.SyncRequest:
+	case *flow.RangeRequest, *flow.BatchRequest, *flow.SyncRequest:
 		return e.requestHandler.process(originID, event)
-	case *messages.SyncResponse, *messages.ClusterBlockResponse:
+	case *flow.SyncResponse, *clustermodel.BlockResponse:
 		return e.responseMessageHandler.Process(originID, event)
 	default:
 		return fmt.Errorf("received input with type %T from %x: %w", event, originID[:], engine.IncompatibleInputTypeError)
@@ -261,14 +262,14 @@ func (e *Engine) processAvailableResponses() {
 
 		msg, ok := e.pendingSyncResponses.Get()
 		if ok {
-			e.onSyncResponse(msg.OriginID, msg.Payload.(*messages.SyncResponse))
+			e.onSyncResponse(msg.OriginID, msg.Payload.(*flow.SyncResponse))
 			e.metrics.MessageHandled(metrics.EngineClusterSynchronization, metrics.MessageSyncResponse)
 			continue
 		}
 
 		msg, ok = e.pendingBlockResponses.Get()
 		if ok {
-			e.onBlockResponse(msg.OriginID, msg.Payload.(*messages.ClusterBlockResponse))
+			e.onBlockResponse(msg.OriginID, msg.Payload.(*clustermodel.BlockResponse))
 			e.metrics.MessageHandled(metrics.EngineClusterSynchronization, metrics.MessageBlockResponse)
 			continue
 		}
@@ -280,7 +281,7 @@ func (e *Engine) processAvailableResponses() {
 }
 
 // onSyncResponse processes a synchronization response.
-func (e *Engine) onSyncResponse(originID flow.Identifier, res *messages.SyncResponse) {
+func (e *Engine) onSyncResponse(_ flow.Identifier, res *flow.SyncResponse) {
 	final, err := e.state.Final().Head()
 	if err != nil {
 		e.log.Error().Err(err).Msg("could not get last finalized header")
@@ -289,19 +290,17 @@ func (e *Engine) onSyncResponse(originID flow.Identifier, res *messages.SyncResp
 	e.core.HandleHeight(final, res.Height)
 }
 
-// onBlockResponse processes a response containing a specifically requested block.
-func (e *Engine) onBlockResponse(originID flow.Identifier, res *messages.ClusterBlockResponse) {
+// onBlockResponse processes a slice of requested block proposals.
+// Input proposals are structurally validated.
+func (e *Engine) onBlockResponse(originID flow.Identifier, response *clustermodel.BlockResponse) {
 	// process the blocks one by one
-	for _, block := range res.Blocks {
-		header := block.Header
-		if !e.core.HandleBlock(&header) {
+	for _, proposal := range response.Blocks {
+		if !e.core.HandleBlock(proposal.Block.ToHeader()) {
 			continue
 		}
-		synced := flow.Slashable[*messages.ClusterBlockProposal]{
+		synced := flow.Slashable[*clustermodel.Proposal]{
 			OriginID: originID,
-			Message: &messages.ClusterBlockProposal{
-				Block: block,
-			},
+			Message:  &proposal,
 		}
 		// forward the block to the compliance engine for validation and processing
 		e.comp.OnSyncedClusterBlock(synced)
