@@ -3,7 +3,9 @@
 package mock
 
 import (
+	lockctx "github.com/jordanschalm/lockctx"
 	flow "github.com/onflow/flow-go/model/flow"
+
 	mock "github.com/stretchr/testify/mock"
 
 	storage "github.com/onflow/flow-go/storage"
@@ -14,17 +16,17 @@ type LightTransactionResults struct {
 	mock.Mock
 }
 
-// BatchStore provides a mock function with given fields: blockID, transactionResults, rw
-func (_m *LightTransactionResults) BatchStore(blockID flow.Identifier, transactionResults []flow.LightTransactionResult, rw storage.ReaderBatchWriter) error {
-	ret := _m.Called(blockID, transactionResults, rw)
+// BatchStore provides a mock function with given fields: lctx, blockID, transactionResults, rw
+func (_m *LightTransactionResults) BatchStore(lctx lockctx.Proof, blockID flow.Identifier, transactionResults []flow.LightTransactionResult, rw storage.ReaderBatchWriter) error {
+	ret := _m.Called(lctx, blockID, transactionResults, rw)
 
 	if len(ret) == 0 {
 		panic("no return value specified for BatchStore")
 	}
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(flow.Identifier, []flow.LightTransactionResult, storage.ReaderBatchWriter) error); ok {
-		r0 = rf(blockID, transactionResults, rw)
+	if rf, ok := ret.Get(0).(func(lockctx.Proof, flow.Identifier, []flow.LightTransactionResult, storage.ReaderBatchWriter) error); ok {
+		r0 = rf(lctx, blockID, transactionResults, rw)
 	} else {
 		r0 = ret.Error(0)
 	}
