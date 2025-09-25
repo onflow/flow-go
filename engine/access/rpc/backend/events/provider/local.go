@@ -36,9 +36,9 @@ func (l *LocalEventProvider) Events(
 	eventType flow.EventType,
 	encodingVersion entities.EventEncodingVersion,
 	result *optimistic_sync.ExecutionResultInfo,
-) (Response, access.ExecutorMetadata, error) {
+) (Response, *access.ExecutorMetadata, error) {
 	if len(blocks) == 0 {
-		return Response{}, access.ExecutorMetadata{}, nil
+		return Response{}, nil, nil
 	}
 
 	missingBlocks := make([]BlockMetadata, 0)
@@ -46,18 +46,13 @@ func (l *LocalEventProvider) Events(
 
 	snapshot, err := l.execStateCache.Snapshot(result.ExecutionResultID)
 	if err != nil {
-		return Response{}, access.ExecutorMetadata{},
+		return Response{}, nil,
 			fmt.Errorf("failed to get snapshot for execution result %s: %w", result.ExecutionResultID, err)
-	}
-
-	metadata := access.ExecutorMetadata{
-		ExecutionResultID: result.ExecutionResultID,
-		ExecutorIDs:       result.ExecutionNodes.NodeIDs(),
 	}
 
 	for _, blockInfo := range blocks {
 		if ctx.Err() != nil {
-			return Response{}, access.ExecutorMetadata{},
+			return Response{}, nil,
 				rpc.ConvertError(ctx.Err(), "failed to get events from storage", codes.Canceled)
 		}
 
@@ -71,7 +66,7 @@ func (l *LocalEventProvider) Events(
 			}
 
 			err = fmt.Errorf("failed to get events for block %s: %w", blockInfo.ID, err)
-			return Response{}, metadata, rpc.ConvertError(err, "failed to get events from storage", codes.Internal)
+			return Response{}, nil, rpc.ConvertError(err, "failed to get events from storage", codes.Internal)
 		}
 
 		filteredEvents := make([]flow.Event, 0)
@@ -85,7 +80,7 @@ func (l *LocalEventProvider) Events(
 				payload, err := convert.CcfPayloadToJsonPayload(event.Payload)
 				if err != nil {
 					err = fmt.Errorf("failed to convert event payload for block %s: %w", blockInfo.ID, err)
-					return Response{}, metadata, rpc.ConvertError(err, "failed to convert event payload", codes.Internal)
+					return Response{}, nil, rpc.ConvertError(err, "failed to convert event payload", codes.Internal)
 				}
 
 				filteredEvent, err := flow.NewEvent(
@@ -98,7 +93,7 @@ func (l *LocalEventProvider) Events(
 					},
 				)
 				if err != nil {
-					return Response{}, metadata, rpc.ConvertError(err, "could not construct event", codes.Internal)
+					return Response{}, nil, rpc.ConvertError(err, "could not construct event", codes.Internal)
 				}
 
 				event = *filteredEvent
@@ -115,8 +110,15 @@ func (l *LocalEventProvider) Events(
 		})
 	}
 
-	return Response{
+	metadata := &access.ExecutorMetadata{
+		ExecutionResultID: result.ExecutionResultID,
+		ExecutorIDs:       result.ExecutionNodes.NodeIDs(),
+	}
+
+	response := Response{
 		Events:        blockEvents,
 		MissingBlocks: missingBlocks,
-	}, metadata, nil
+	}
+
+	return response, metadata, nil
 }

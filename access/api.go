@@ -33,7 +33,7 @@ type EventsAPI interface {
 		endHeight uint64,
 		requiredEventEncodingVersion entities.EventEncodingVersion,
 		criteria optimistic_sync.Criteria,
-	) ([]flow.BlockEvents, accessmodel.ExecutorMetadata, error)
+	) ([]flow.BlockEvents, *accessmodel.ExecutorMetadata, error)
 
 	GetEventsForBlockIDs(
 		ctx context.Context,
@@ -41,13 +41,13 @@ type EventsAPI interface {
 		blockIDs []flow.Identifier,
 		requiredEventEncodingVersion entities.EventEncodingVersion,
 		criteria optimistic_sync.Criteria,
-	) ([]flow.BlockEvents, accessmodel.ExecutorMetadata, error)
+	) ([]flow.BlockEvents, *accessmodel.ExecutorMetadata, error)
 }
 
 type ScriptsAPI interface {
-	ExecuteScriptAtLatestBlock(ctx context.Context, script []byte, arguments [][]byte, criteria optimistic_sync.Criteria) ([]byte, accessmodel.ExecutorMetadata, error)
-	ExecuteScriptAtBlockHeight(ctx context.Context, blockHeight uint64, script []byte, arguments [][]byte, criteria optimistic_sync.Criteria) ([]byte, accessmodel.ExecutorMetadata, error)
-	ExecuteScriptAtBlockID(ctx context.Context, blockID flow.Identifier, script []byte, arguments [][]byte, criteria optimistic_sync.Criteria) ([]byte, accessmodel.ExecutorMetadata, error)
+	ExecuteScriptAtLatestBlock(ctx context.Context, script []byte, arguments [][]byte, criteria optimistic_sync.Criteria) ([]byte, *accessmodel.ExecutorMetadata, error)
+	ExecuteScriptAtBlockHeight(ctx context.Context, blockHeight uint64, script []byte, arguments [][]byte, criteria optimistic_sync.Criteria) ([]byte, *accessmodel.ExecutorMetadata, error)
+	ExecuteScriptAtBlockID(ctx context.Context, blockID flow.Identifier, script []byte, arguments [][]byte, criteria optimistic_sync.Criteria) ([]byte, *accessmodel.ExecutorMetadata, error)
 }
 
 type TransactionsAPI interface {

@@ -303,10 +303,10 @@ func (r *RestProxyHandler) GetAccountKeyByIndex(ctx context.Context, address flo
 }
 
 // ExecuteScriptAtLatestBlock executes script at latest block.
-func (r *RestProxyHandler) ExecuteScriptAtLatestBlock(ctx context.Context, script []byte, arguments [][]byte, criteria optimistic_sync.Criteria) ([]byte, accessmodel.ExecutorMetadata, error) {
+func (r *RestProxyHandler) ExecuteScriptAtLatestBlock(ctx context.Context, script []byte, arguments [][]byte, criteria optimistic_sync.Criteria) ([]byte, *accessmodel.ExecutorMetadata, error) {
 	upstream, closer, err := r.FaultTolerantClient()
 	if err != nil {
-		return nil, accessmodel.ExecutorMetadata{}, err
+		return nil, nil, err
 	}
 	defer closer.Close()
 
@@ -319,7 +319,7 @@ func (r *RestProxyHandler) ExecuteScriptAtLatestBlock(ctx context.Context, scrip
 	r.log("upstream", "ExecuteScriptAtLatestBlock", err)
 
 	if err != nil {
-		return nil, accessmodel.ExecutorMetadata{}, err
+		return nil, nil, err
 	}
 
 	metadata := getExecutorMetadata(executeScriptAtLatestBlockResponse.GetMetadata())
@@ -334,7 +334,7 @@ func (r *RestProxyHandler) ExecuteScriptAtBlockHeight(
 	script []byte,
 	arguments [][]byte,
 	criteria optimistic_sync.Criteria,
-) ([]byte, accessmodel.ExecutorMetadata, error) {
+) ([]byte, *accessmodel.ExecutorMetadata, error) {
 	upstream, closer, err := r.FaultTolerantClient()
 	if err != nil {
 		return nil, accessmodel.ExecutorMetadata{}, err
@@ -366,7 +366,7 @@ func (r *RestProxyHandler) ExecuteScriptAtBlockID(
 	script []byte,
 	arguments [][]byte,
 	criteria optimistic_sync.Criteria,
-) ([]byte, accessmodel.ExecutorMetadata, error) {
+) ([]byte, *accessmodel.ExecutorMetadata, error) {
 	upstream, closer, err := r.FaultTolerantClient()
 	if err != nil {
 		return nil, accessmodel.ExecutorMetadata{}, err
@@ -398,10 +398,10 @@ func (r *RestProxyHandler) GetEventsForHeightRange(
 	startHeight, endHeight uint64,
 	requiredEventEncodingVersion entities.EventEncodingVersion,
 	criteria optimistic_sync.Criteria,
-) ([]flow.BlockEvents, accessmodel.ExecutorMetadata, error) {
+) ([]flow.BlockEvents, *accessmodel.ExecutorMetadata, error) {
 	upstream, closer, err := r.FaultTolerantClient()
 	if err != nil {
-		return nil, accessmodel.ExecutorMetadata{}, err
+		return nil, nil, err
 	}
 	defer closer.Close()
 
@@ -415,13 +415,20 @@ func (r *RestProxyHandler) GetEventsForHeightRange(
 	eventsResponse, err := upstream.GetEventsForHeightRange(ctx, getEventsForHeightRangeRequest)
 	r.log("upstream", "GetEventsForHeightRange", err)
 	if err != nil {
-		return nil, accessmodel.ExecutorMetadata{}, err
+		return nil, nil, err
 	}
 
-	metadata := getExecutorMetadata(eventsResponse.GetMetadata())
 	res, err := convert.MessagesToBlockEvents(eventsResponse.Results)
+	if err != nil {
+		return nil, nil, err
+	}
 
-	return res, metadata, err
+	var metadata *accessmodel.ExecutorMetadata
+	if rawMetadata := eventsResponse.GetMetadata(); rawMetadata != nil {
+		metadata = convert.MessageToExecutorMetadata(rawMetadata.GetExecutorMetadata())
+	}
+
+	return res, metadata, nil
 }
 
 // GetEventsForBlockIDs returns events by their name in the specified block IDs.
@@ -431,10 +438,10 @@ func (r *RestProxyHandler) GetEventsForBlockIDs(
 	blockIDs []flow.Identifier,
 	requiredEventEncodingVersion entities.EventEncodingVersion,
 	criteria optimistic_sync.Criteria,
-) ([]flow.BlockEvents, accessmodel.ExecutorMetadata, error) {
+) ([]flow.BlockEvents, *accessmodel.ExecutorMetadata, error) {
 	upstream, closer, err := r.FaultTolerantClient()
 	if err != nil {
-		return nil, accessmodel.ExecutorMetadata{}, err
+		return nil, nil, err
 	}
 	defer closer.Close()
 
@@ -449,13 +456,20 @@ func (r *RestProxyHandler) GetEventsForBlockIDs(
 	eventsResponse, err := upstream.GetEventsForBlockIDs(ctx, getEventsForBlockIDsRequest)
 	r.log("upstream", "GetEventsForBlockIDs", err)
 	if err != nil {
-		return nil, accessmodel.ExecutorMetadata{}, err
+		return nil, nil, err
 	}
 
-	metadata := getExecutorMetadata(eventsResponse.GetMetadata())
 	res, err := convert.MessagesToBlockEvents(eventsResponse.Results)
+	if err != nil {
+		return nil, nil, err
+	}
 
-	return res, metadata, err
+	var metadata *accessmodel.ExecutorMetadata
+	if rawMetadata := eventsResponse.GetMetadata(); rawMetadata != nil {
+		metadata = convert.MessageToExecutorMetadata(rawMetadata.GetExecutorMetadata())
+	}
+
+	return res, metadata, nil
 }
 
 // convertError converts a serialized access error formatted as a grpc error returned from the upstream AN,
@@ -515,14 +529,6 @@ func splitOnPrefix(original, prefix string) (string, bool) {
 		return parts[1], true
 	}
 	return "", false
-}
-
-func getExecutorMetadata(metadata *entities.Metadata) accessmodel.ExecutorMetadata {
-	if executorMetadata := metadata.GetExecutorMetadata(); executorMetadata != nil {
-		return *convert.MessageToExecutorMetadata(executorMetadata)
-	}
-
-	return accessmodel.ExecutorMetadata{}
 }
 
 // executionStateQuery constructs an ExecutionStateQuery protobuf message from

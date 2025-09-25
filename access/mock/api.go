@@ -24,7 +24,7 @@ type API struct {
 }
 
 // ExecuteScriptAtBlockHeight provides a mock function with given fields: ctx, blockHeight, script, arguments, criteria
-func (_m *API) ExecuteScriptAtBlockHeight(ctx context.Context, blockHeight uint64, script []byte, arguments [][]byte, criteria optimistic_sync.Criteria) ([]byte, access.ExecutorMetadata, error) {
+func (_m *API) ExecuteScriptAtBlockHeight(ctx context.Context, blockHeight uint64, script []byte, arguments [][]byte, criteria optimistic_sync.Criteria) ([]byte, *access.ExecutorMetadata, error) {
 	ret := _m.Called(ctx, blockHeight, script, arguments, criteria)
 
 	if len(ret) == 0 {
@@ -32,9 +32,9 @@ func (_m *API) ExecuteScriptAtBlockHeight(ctx context.Context, blockHeight uint6
 	}
 
 	var r0 []byte
-	var r1 access.ExecutorMetadata
+	var r1 *access.ExecutorMetadata
 	var r2 error
-	if rf, ok := ret.Get(0).(func(context.Context, uint64, []byte, [][]byte, optimistic_sync.Criteria) ([]byte, access.ExecutorMetadata, error)); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, uint64, []byte, [][]byte, optimistic_sync.Criteria) ([]byte, *access.ExecutorMetadata, error)); ok {
 		return rf(ctx, blockHeight, script, arguments, criteria)
 	}
 	if rf, ok := ret.Get(0).(func(context.Context, uint64, []byte, [][]byte, optimistic_sync.Criteria) []byte); ok {
@@ -45,10 +45,12 @@ func (_m *API) ExecuteScriptAtBlockHeight(ctx context.Context, blockHeight uint6
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, uint64, []byte, [][]byte, optimistic_sync.Criteria) access.ExecutorMetadata); ok {
+	if rf, ok := ret.Get(1).(func(context.Context, uint64, []byte, [][]byte, optimistic_sync.Criteria) *access.ExecutorMetadata); ok {
 		r1 = rf(ctx, blockHeight, script, arguments, criteria)
 	} else {
-		r1 = ret.Get(1).(access.ExecutorMetadata)
+		if ret.Get(1) != nil {
+			r1 = ret.Get(1).(*access.ExecutorMetadata)
+		}
 	}
 
 	if rf, ok := ret.Get(2).(func(context.Context, uint64, []byte, [][]byte, optimistic_sync.Criteria) error); ok {
@@ -61,7 +63,7 @@ func (_m *API) ExecuteScriptAtBlockHeight(ctx context.Context, blockHeight uint6
 }
 
 // ExecuteScriptAtBlockID provides a mock function with given fields: ctx, blockID, script, arguments, criteria
-func (_m *API) ExecuteScriptAtBlockID(ctx context.Context, blockID flow.Identifier, script []byte, arguments [][]byte, criteria optimistic_sync.Criteria) ([]byte, access.ExecutorMetadata, error) {
+func (_m *API) ExecuteScriptAtBlockID(ctx context.Context, blockID flow.Identifier, script []byte, arguments [][]byte, criteria optimistic_sync.Criteria) ([]byte, *access.ExecutorMetadata, error) {
 	ret := _m.Called(ctx, blockID, script, arguments, criteria)
 
 	if len(ret) == 0 {
@@ -69,9 +71,9 @@ func (_m *API) ExecuteScriptAtBlockID(ctx context.Context, blockID flow.Identifi
 	}
 
 	var r0 []byte
-	var r1 access.ExecutorMetadata
+	var r1 *access.ExecutorMetadata
 	var r2 error
-	if rf, ok := ret.Get(0).(func(context.Context, flow.Identifier, []byte, [][]byte, optimistic_sync.Criteria) ([]byte, access.ExecutorMetadata, error)); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, flow.Identifier, []byte, [][]byte, optimistic_sync.Criteria) ([]byte, *access.ExecutorMetadata, error)); ok {
 		return rf(ctx, blockID, script, arguments, criteria)
 	}
 	if rf, ok := ret.Get(0).(func(context.Context, flow.Identifier, []byte, [][]byte, optimistic_sync.Criteria) []byte); ok {
@@ -82,10 +84,12 @@ func (_m *API) ExecuteScriptAtBlockID(ctx context.Context, blockID flow.Identifi
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, flow.Identifier, []byte, [][]byte, optimistic_sync.Criteria) access.ExecutorMetadata); ok {
+	if rf, ok := ret.Get(1).(func(context.Context, flow.Identifier, []byte, [][]byte, optimistic_sync.Criteria) *access.ExecutorMetadata); ok {
 		r1 = rf(ctx, blockID, script, arguments, criteria)
 	} else {
-		r1 = ret.Get(1).(access.ExecutorMetadata)
+		if ret.Get(1) != nil {
+			r1 = ret.Get(1).(*access.ExecutorMetadata)
+		}
 	}
 
 	if rf, ok := ret.Get(2).(func(context.Context, flow.Identifier, []byte, [][]byte, optimistic_sync.Criteria) error); ok {
@@ -98,7 +102,7 @@ func (_m *API) ExecuteScriptAtBlockID(ctx context.Context, blockID flow.Identifi
 }
 
 // ExecuteScriptAtLatestBlock provides a mock function with given fields: ctx, script, arguments, criteria
-func (_m *API) ExecuteScriptAtLatestBlock(ctx context.Context, script []byte, arguments [][]byte, criteria optimistic_sync.Criteria) ([]byte, access.ExecutorMetadata, error) {
+func (_m *API) ExecuteScriptAtLatestBlock(ctx context.Context, script []byte, arguments [][]byte, criteria optimistic_sync.Criteria) ([]byte, *access.ExecutorMetadata, error) {
 	ret := _m.Called(ctx, script, arguments, criteria)
 
 	if len(ret) == 0 {
@@ -106,9 +110,9 @@ func (_m *API) ExecuteScriptAtLatestBlock(ctx context.Context, script []byte, ar
 	}
 
 	var r0 []byte
-	var r1 access.ExecutorMetadata
+	var r1 *access.ExecutorMetadata
 	var r2 error
-	if rf, ok := ret.Get(0).(func(context.Context, []byte, [][]byte, optimistic_sync.Criteria) ([]byte, access.ExecutorMetadata, error)); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, []byte, [][]byte, optimistic_sync.Criteria) ([]byte, *access.ExecutorMetadata, error)); ok {
 		return rf(ctx, script, arguments, criteria)
 	}
 	if rf, ok := ret.Get(0).(func(context.Context, []byte, [][]byte, optimistic_sync.Criteria) []byte); ok {
@@ -119,10 +123,12 @@ func (_m *API) ExecuteScriptAtLatestBlock(ctx context.Context, script []byte, ar
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, []byte, [][]byte, optimistic_sync.Criteria) access.ExecutorMetadata); ok {
+	if rf, ok := ret.Get(1).(func(context.Context, []byte, [][]byte, optimistic_sync.Criteria) *access.ExecutorMetadata); ok {
 		r1 = rf(ctx, script, arguments, criteria)
 	} else {
-		r1 = ret.Get(1).(access.ExecutorMetadata)
+		if ret.Get(1) != nil {
+			r1 = ret.Get(1).(*access.ExecutorMetadata)
+		}
 	}
 
 	if rf, ok := ret.Get(2).(func(context.Context, []byte, [][]byte, optimistic_sync.Criteria) error); ok {
@@ -579,7 +585,7 @@ func (_m *API) GetCollectionByID(ctx context.Context, id flow.Identifier) (*flow
 }
 
 // GetEventsForBlockIDs provides a mock function with given fields: ctx, eventType, blockIDs, requiredEventEncodingVersion, criteria
-func (_m *API) GetEventsForBlockIDs(ctx context.Context, eventType string, blockIDs []flow.Identifier, requiredEventEncodingVersion entities.EventEncodingVersion, criteria optimistic_sync.Criteria) ([]flow.BlockEvents, access.ExecutorMetadata, error) {
+func (_m *API) GetEventsForBlockIDs(ctx context.Context, eventType string, blockIDs []flow.Identifier, requiredEventEncodingVersion entities.EventEncodingVersion, criteria optimistic_sync.Criteria) ([]flow.BlockEvents, *access.ExecutorMetadata, error) {
 	ret := _m.Called(ctx, eventType, blockIDs, requiredEventEncodingVersion, criteria)
 
 	if len(ret) == 0 {
@@ -587,9 +593,9 @@ func (_m *API) GetEventsForBlockIDs(ctx context.Context, eventType string, block
 	}
 
 	var r0 []flow.BlockEvents
-	var r1 access.ExecutorMetadata
+	var r1 *access.ExecutorMetadata
 	var r2 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, []flow.Identifier, entities.EventEncodingVersion, optimistic_sync.Criteria) ([]flow.BlockEvents, access.ExecutorMetadata, error)); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, string, []flow.Identifier, entities.EventEncodingVersion, optimistic_sync.Criteria) ([]flow.BlockEvents, *access.ExecutorMetadata, error)); ok {
 		return rf(ctx, eventType, blockIDs, requiredEventEncodingVersion, criteria)
 	}
 	if rf, ok := ret.Get(0).(func(context.Context, string, []flow.Identifier, entities.EventEncodingVersion, optimistic_sync.Criteria) []flow.BlockEvents); ok {
@@ -600,10 +606,12 @@ func (_m *API) GetEventsForBlockIDs(ctx context.Context, eventType string, block
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, string, []flow.Identifier, entities.EventEncodingVersion, optimistic_sync.Criteria) access.ExecutorMetadata); ok {
+	if rf, ok := ret.Get(1).(func(context.Context, string, []flow.Identifier, entities.EventEncodingVersion, optimistic_sync.Criteria) *access.ExecutorMetadata); ok {
 		r1 = rf(ctx, eventType, blockIDs, requiredEventEncodingVersion, criteria)
 	} else {
-		r1 = ret.Get(1).(access.ExecutorMetadata)
+		if ret.Get(1) != nil {
+			r1 = ret.Get(1).(*access.ExecutorMetadata)
+		}
 	}
 
 	if rf, ok := ret.Get(2).(func(context.Context, string, []flow.Identifier, entities.EventEncodingVersion, optimistic_sync.Criteria) error); ok {
@@ -616,7 +624,7 @@ func (_m *API) GetEventsForBlockIDs(ctx context.Context, eventType string, block
 }
 
 // GetEventsForHeightRange provides a mock function with given fields: ctx, eventType, startHeight, endHeight, requiredEventEncodingVersion, criteria
-func (_m *API) GetEventsForHeightRange(ctx context.Context, eventType string, startHeight uint64, endHeight uint64, requiredEventEncodingVersion entities.EventEncodingVersion, criteria optimistic_sync.Criteria) ([]flow.BlockEvents, access.ExecutorMetadata, error) {
+func (_m *API) GetEventsForHeightRange(ctx context.Context, eventType string, startHeight uint64, endHeight uint64, requiredEventEncodingVersion entities.EventEncodingVersion, criteria optimistic_sync.Criteria) ([]flow.BlockEvents, *access.ExecutorMetadata, error) {
 	ret := _m.Called(ctx, eventType, startHeight, endHeight, requiredEventEncodingVersion, criteria)
 
 	if len(ret) == 0 {
@@ -624,9 +632,9 @@ func (_m *API) GetEventsForHeightRange(ctx context.Context, eventType string, st
 	}
 
 	var r0 []flow.BlockEvents
-	var r1 access.ExecutorMetadata
+	var r1 *access.ExecutorMetadata
 	var r2 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, uint64, uint64, entities.EventEncodingVersion, optimistic_sync.Criteria) ([]flow.BlockEvents, access.ExecutorMetadata, error)); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, string, uint64, uint64, entities.EventEncodingVersion, optimistic_sync.Criteria) ([]flow.BlockEvents, *access.ExecutorMetadata, error)); ok {
 		return rf(ctx, eventType, startHeight, endHeight, requiredEventEncodingVersion, criteria)
 	}
 	if rf, ok := ret.Get(0).(func(context.Context, string, uint64, uint64, entities.EventEncodingVersion, optimistic_sync.Criteria) []flow.BlockEvents); ok {
@@ -637,10 +645,12 @@ func (_m *API) GetEventsForHeightRange(ctx context.Context, eventType string, st
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, string, uint64, uint64, entities.EventEncodingVersion, optimistic_sync.Criteria) access.ExecutorMetadata); ok {
+	if rf, ok := ret.Get(1).(func(context.Context, string, uint64, uint64, entities.EventEncodingVersion, optimistic_sync.Criteria) *access.ExecutorMetadata); ok {
 		r1 = rf(ctx, eventType, startHeight, endHeight, requiredEventEncodingVersion, criteria)
 	} else {
-		r1 = ret.Get(1).(access.ExecutorMetadata)
+		if ret.Get(1) != nil {
+			r1 = ret.Get(1).(*access.ExecutorMetadata)
+		}
 	}
 
 	if rf, ok := ret.Get(2).(func(context.Context, string, uint64, uint64, entities.EventEncodingVersion, optimistic_sync.Criteria) error); ok {
