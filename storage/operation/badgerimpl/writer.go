@@ -199,6 +199,7 @@ func (b *ReaderBatchWriter) SetValue(key string, value any) {
 	b.values[key] = value
 }
 
-func (b *ReaderBatchWriter) Value(key string) any {
-	return b.values[key]
+func (b *ReaderBatchWriter) Value(key string) (any, bool) {
+	v, exists := b.values[key]
+	return v, exists
 }

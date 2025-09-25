@@ -201,7 +201,7 @@ func (tr *TransactionResults) BatchRemoveByBlockID(blockID flow.Identifier, batc
 	const batchDataKey = "TransactionResults.BatchRemoveByBlockID"
 
 	storage.OnCommitSucceed(batch, func() {
-		batchData := batch.Value(batchDataKey)
+		batchData, _ := batch.Value(batchDataKey)
 
 		if batchData != nil {
 			batch.SetValue(batchDataKey, nil)
@@ -227,7 +227,7 @@ func (tr *TransactionResults) BatchRemoveByBlockID(blockID flow.Identifier, batc
 func saveBlockIDInBatchData(batch storage.ReaderBatchWriter, batchDataKey string, blockID flow.Identifier) {
 	var blockIDs map[flow.Identifier]struct{}
 
-	batchValue := batch.Value(batchDataKey)
+	batchValue, _ := batch.Value(batchDataKey)
 	if batchValue == nil {
 		blockIDs = make(map[flow.Identifier]struct{})
 	} else {

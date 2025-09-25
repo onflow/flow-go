@@ -588,8 +588,9 @@ func TestBatchValue(t *testing.T) {
 			callbackFunc := func(error) {
 				callbackInvocationCount++
 
-				value := b.Value(key)
+				value, exists := b.Value(key)
 				require.Nil(t, value)
+				require.False(t, exists)
 			}
 
 			const expectedCallbackInvocationCount = 2
@@ -624,8 +625,9 @@ func TestBatchValue(t *testing.T) {
 			callbackFunc := func(error) {
 				callbackInvocationCount++
 
-				data := b.Value(key)
+				data, exists := b.Value(key)
 				require.Equal(t, []string{"value2", "value3"}, data.([]string))
+				require.True(t, exists)
 			}
 
 			const expectedCallbackInvocationCount = 2
@@ -658,13 +660,15 @@ func TestBatchValue(t *testing.T) {
 			callbackFunc := func(error) {
 				callbackInvocationCount++
 
-				data := b.Value(key)
+				data, exists := b.Value(key)
 				if callbackInvocationCount == 1 {
 					require.Equal(t, []string{"value1", "value2"}, data.([]string))
+					require.True(t, exists)
 
 					b.SetValue(key, nil)
 				} else {
 					require.Nil(t, data)
+					require.False(t, exists)
 				}
 			}
 

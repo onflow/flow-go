@@ -17,12 +17,13 @@ func newGroupCache[G comparable, K comparable, V any](
 	options ...func(*Cache[K, V]),
 ) (*GroupCache[G, K, V], error) {
 	c := Cache[K, V]{
-		metrics:  collector,
-		limit:    1000,
-		store:    noStore[K, V],
-		retrieve: noRetrieve[K, V],
-		remove:   noRemove[K],
-		resource: resourceName,
+		metrics:       collector,
+		limit:         1000,
+		store:         noStore[K, V],
+		storeWithLock: noStoreWithLock[K, V],
+		retrieve:      noRetrieve[K, V],
+		remove:        noRemove[K],
+		resource:      resourceName,
 	}
 	for _, option := range options {
 		option(&c)

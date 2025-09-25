@@ -79,7 +79,7 @@ func (_m *Batch) SetValue(key string, value any) {
 }
 
 // Value provides a mock function with given fields: key
-func (_m *Batch) Value(key string) any {
+func (_m *Batch) Value(key string) (any, bool) {
 	ret := _m.Called(key)
 
 	if len(ret) == 0 {
@@ -87,6 +87,10 @@ func (_m *Batch) Value(key string) any {
 	}
 
 	var r0 any
+	var r1 bool
+	if rf, ok := ret.Get(0).(func(string) (any, bool)); ok {
+		return rf(key)
+	}
 	if rf, ok := ret.Get(0).(func(string) any); ok {
 		r0 = rf(key)
 	} else {
@@ -95,7 +99,13 @@ func (_m *Batch) Value(key string) any {
 		}
 	}
 
-	return r0
+	if rf, ok := ret.Get(1).(func(string) bool); ok {
+		r1 = rf(key)
+	} else {
+		r1 = ret.Get(1).(bool)
+	}
+
+	return r0, r1
 }
 
 // Writer provides a mock function with no fields

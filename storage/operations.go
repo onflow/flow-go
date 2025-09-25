@@ -152,9 +152,9 @@ type ReaderBatchWriter interface {
 	// Stored value can be retrieved by the same key via Value().
 	SetValue(key string, value any)
 
-	// Value returns the value associated with this batch for the given key,
-	// or nil if no value is associated with the key.
-	Value(key string) any
+	// Value returns the value associated with this batch for the given key and true if key exists,
+	// or nil and false if key doesn't exist.
+	Value(key string) (any, bool)
 }
 
 // DB is an interface for a database store that provides a reader and a writer.
