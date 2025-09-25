@@ -161,11 +161,13 @@ func (c *IndexerCore) IndexBlockData(data *execution_data.BlockExecutionDataEnti
 		}
 
 		err = c.protocolDB.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+			// Needs storage.LockInsertEvent
 			err := c.events.BatchStore(lctx, data.BlockID, []flow.EventsList{events}, rw)
 			if err != nil {
 				return fmt.Errorf("could not index events at height %d: %w", header.Height, err)
 			}
 
+			// Needs storage.LockInsertLightTransactionResult
 			err = c.results.BatchStore(lctx, data.BlockID, results, rw)
 			if err != nil {
 				return fmt.Errorf("could not index transaction results at height %d: %w", header.Height, err)
