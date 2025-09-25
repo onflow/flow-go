@@ -23,12 +23,6 @@ const (
 	// ResultSealed states that the result is sealed (specifically, seal for this result
 	// has been included in a finalized block).
 	ResultSealed
-
-	// ResultOrphaned indicates that a different result for the same block has been sealed or
-	// that the block itself has been orphaned. In either case, Access Nodes do not need to index
-	// the result's data. CAUTION: results with status `ResultSealed` cannot be orphaned.
-	// TODO: this is not (yet?) used
-	ResultOrphaned
 )
 
 // String returns the string representation of the result status
@@ -40,8 +34,6 @@ func (bs ResultStatus) String() string {
 		return "finalized"
 	case ResultSealed:
 		return "sealed"
-	case ResultOrphaned:
-		return "orphaned"
 	default:
 		return "unknown"
 	}
