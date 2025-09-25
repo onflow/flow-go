@@ -4,7 +4,9 @@ import (
 	"bytes"
 	"context"
 	"encoding/hex"
+	"fmt"
 	"os"
+	"strings"
 	"sync/atomic"
 
 	"github.com/kr/pretty"
@@ -27,9 +29,9 @@ var (
 	flagChain               string
 	flagComputeLimit        uint64
 	flagUseExecutionDataAPI bool
-	flagBlockID             string
+	flagBlockIDs            string
 	flagBlockCount          int
-	flagPrintTraces         bool
+	flagWriteTraces         bool
 	flagParallel            int
 )
 
@@ -58,12 +60,12 @@ func init() {
 
 	Cmd.Flags().BoolVar(&flagUseExecutionDataAPI, "use-execution-data-api", true, "use the execution data API (default: true)")
 
-	Cmd.Flags().StringVar(&flagBlockID, "block-id", "", "block ID")
+	Cmd.Flags().StringVar(&flagBlockIDs, "block-ids", "", "block IDs, comma-separated. if --block-count > 1 is used, provide a single block ID")
 	_ = Cmd.MarkFlagRequired("block-id")
 
-	Cmd.Flags().IntVar(&flagBlockCount, "block-count", 1, "number of blocks to process (default: 1)")
+	Cmd.Flags().IntVar(&flagBlockCount, "block-count", 1, "number of blocks to process (default: 1). if > 1, provide a single block ID with --block-ids")
 
-	Cmd.Flags().BoolVar(&flagPrintTraces, "print-traces", false, "print traces for mismatched transactions")
+	Cmd.Flags().BoolVar(&flagWriteTraces, "write-traces", false, "write traces for mismatched transactions")
 
 	Cmd.Flags().IntVar(&flagParallel, "parallel", 1, "number of blocks to process in parallel (default: 1)")
 }
@@ -96,9 +98,14 @@ func run(_ *cobra.Command, args []string) {
 	}
 	defer remoteClient.Close()
 
-	blockID, err := flow.HexStringToIdentifier(flagBlockID)
-	if err != nil {
-		log.Fatal().Err(err).Str("ID", flagBlockID).Msg("failed to parse block ID")
+	var blockIDs []flow.Identifier
+	for _, rawBlockID := range strings.Split(flagBlockIDs, ",") {
+		blockID, err := flow.HexStringToIdentifier(rawBlockID)
+		if err != nil {
+			log.Fatal().Err(err).Str("ID", rawBlockID).Msg("failed to parse block ID")
+		}
+
+		blockIDs = append(blockIDs, blockID)
 	}
 
 	type block struct {
@@ -108,15 +115,31 @@ func run(_ *cobra.Command, args []string) {
 
 	var blocks []block
 
-	for i := 0; i < flagBlockCount; i++ {
-		header := debug_tx.FetchBlockHeader(blockID, flowClient)
+	if flagBlockCount != 1 {
+		if len(blockIDs) > 1 {
+			log.Fatal().Msg("either provide a single block ID and use --block-count, or provide multiple block IDs and do not use --block-count")
+		}
 
-		blocks = append(blocks, block{
-			id:     blockID,
-			header: header,
-		})
+		blockID := blockIDs[0]
+		for i := 0; i < flagBlockCount; i++ {
+			header := debug_tx.FetchBlockHeader(blockID, flowClient)
 
-		blockID = header.ParentID
+			blocks = append(blocks, block{
+				id:     blockID,
+				header: header,
+			})
+
+			blockID = header.ParentID
+		}
+	} else {
+		for _, blockID := range blockIDs {
+			header := debug_tx.FetchBlockHeader(blockID, flowClient)
+
+			blocks = append(blocks, block{
+				id:     blockID,
+				header: header,
+			})
+		}
 	}
 
 	var (
@@ -258,22 +281,9 @@ func compareBlock(
 
 			result.mismatches++
 
-			if flagPrintTraces {
-				log.Info().Str("tx", txID.String()).Msg("Interpreter spans:")
-
-				interSpanExporter := interSpanExporters[i]
-				err := interSpanExporter.WriteSpans(os.Stdout)
-				if err != nil {
-					log.Fatal().Err(err).Msg("failed to write interpreter spans")
-				}
-
-				log.Info().Str("tx", txID.String()).Msg("VM spans:")
-
-				vmSpanExporter := vmSpanExporters[i]
-				err = vmSpanExporter.WriteSpans(os.Stdout)
-				if err != nil {
-					log.Fatal().Err(err).Msg("failed to write VM spans")
-				}
+			if flagWriteTraces {
+				writeTraces(txID, "inter", interSpanExporters[i])
+				writeTraces(txID, "vm", vmSpanExporters[i])
 			}
 		} else {
 			result.matches++
@@ -287,6 +297,20 @@ func compareBlock(
 	}
 
 	return result
+}
+
+func writeTraces(id flow.Identifier, kind string, exporter *debug.InterestingCadenceSpanExporter) {
+
+	f, err := os.Create(fmt.Sprintf("%s.%s.txt", id, kind))
+	if err != nil {
+		log.Fatal().Err(err).Msg("failed to create trace file")
+	}
+	defer f.Close()
+
+	err = exporter.WriteSpans(f)
+	if err != nil {
+		log.Fatal().Err(err).Msg("failed to write interpreter spans")
+	}
 }
 
 func compareResults(txID flow.Identifier, interResult debug.Result, vmResult debug.Result) bool {
@@ -421,7 +445,7 @@ func compareResults(txID flow.Identifier, interResult debug.Result, vmResult deb
 		} else if !bytes.Equal(interWrittenRegisterEntry.Value, vmWrittenRegisterEntry.Value) {
 			log.Error().Msgf(
 				"Written register value mismatch for register %s: interpreter %q vs VM %q",
-				key,
+				interWrittenRegisterEntry.Key,
 				hex.EncodeToString(interWrittenRegisterEntry.Value),
 				hex.EncodeToString(vmWrittenRegisterEntry.Value),
 			)
