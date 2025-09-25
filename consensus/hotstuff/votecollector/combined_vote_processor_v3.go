@@ -158,7 +158,7 @@ func (p *CombinedVoteProcessorV3) Status() hotstuff.VoteCollectorStatus {
 //   - model.InvalidVoteError - submitted vote with invalid signature
 //   - model.DuplicatedSignerError - vote from a signer whose vote was previously already processed
 //   - model.DoubleVoteError is returned if the voter is equivocating
-//     (i.e. voting in the same view for different blocks).
+//     (i.e. voting in the same view for different blocks or using different voting schemas).
 //
 // All other errors should be treated as exceptions.
 //

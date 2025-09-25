@@ -53,7 +53,7 @@ func (vc *VotesCache) View() uint64 { return vc.view }
 //   - nil: if the vote was successfully added
 //   - model.DoubleVoteError is returned if the voter is equivocating
 //     (i.e. voting in the same view for different blocks).
-//   - RepeatedVoteErr is returned when adding a vote for the same block from
+//   - RepeatedVoteErr is returned when adding the same vote from
 //     the same voter multiple times.
 //   - IncompatibleViewErr is returned if the vote is for a different view.
 //
@@ -73,10 +73,15 @@ func (vc *VotesCache) AddVote(vote *model.Vote) error {
 	//    we return a model.DoubleVoteError
 	firstVote, exists := vc.votes[vote.SignerID]
 	if exists {
-		if firstVote.BlockID != vote.BlockID {
-			return model.NewDoubleVoteErrorf(firstVote.Vote, vote, "detected vote equivocation at view: %d", vc.view)
+		if firstVote.ID() == vote.ID() {
+			return RepeatedVoteErr
 		}
-		return RepeatedVoteErr
+		if firstVote.BlockID != vote.BlockID {
+			// voting in the same view for different blocks => vote equivocation
+			return model.NewDoubleVoteErrorf(firstVote.Vote, vote, "replica %v voted for different blocks in view %d", vote.SignerID, vc.view)
+		}
+		// voting for the same block but supplying different signatures => vote equivocation
+		return model.NewDoubleVoteErrorf(firstVote.Vote, vote, "detected vote equivocation at view: %d", vc.view)
 	}
 
 	// previously unknown vote: (1) store and (2) forward to consumers

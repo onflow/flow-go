@@ -1119,5 +1119,5 @@ func TestCombinedVoteProcessorV3_DoubleVoting(t *testing.T) {
 	// process the double vote, this has to result in an error.
 	err = voteProcessor.Process(leaderDoubleVote)
 	require.Error(t, err)
-	require.True(t, model.IsDuplicatedSignerError(err))
+	require.True(t, model.IsDoubleVoteError(err))
 }
