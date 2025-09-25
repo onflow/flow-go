@@ -2,6 +2,7 @@ package votecollector
 
 import (
 	"errors"
+	"fmt"
 	"sync"
 
 	"github.com/onflow/flow-go/consensus/hotstuff"
@@ -26,11 +27,19 @@ type voteContainer struct {
 // VotesCache maintains a _concurrency safe_ cache of votes for one particular
 // view. The cache memorizes the order in which the votes were received. Votes
 // are de-duplicated based on the following rules:
-//   - Vor each voter (i.e. SignerID), we store the _first_ vote v0.
-//   - For any subsequent vote v, we check whether v.BlockID == v0.BlockID.
-//     If this is the case, we consider the vote a duplicate and drop it.
-//     If v and v0 have different BlockIDs, the voter is equivocating and
-//     we return a model.DoubleVoteError
+//
+//  1. The cache only ingests votes for the pre-configured view. Votes
+//     for other views are rejected with an [VoteForIncompatibleViewError].
+//
+//  2. For each voter (i.e. SignerID), we store the _first_ vote `v0`. For any subsequent
+//     vote `v1` from the _same_ replica, we check:
+//     2a. v1.ID() == v0.ID():
+//     Votes with the same ID are identical. No protocol violation. We reject `v1` with a [RepeatedVoteErr]
+//     2b. v1.ID() ≠ v0.ID():
+//     The consensus replica has emitted inconsistent votes within the same view, which
+//     is generally a protocol violation. This is a sign of vote equivocation which happen if
+//     replica is voting for different blocks at the same view or using different signing information.
+//     We reject `v1` with a [model.DoubleVoteError].
 type VotesCache struct {
 	lock          sync.RWMutex
 	view          uint64
@@ -48,19 +57,30 @@ func NewVotesCache(view uint64) *VotesCache {
 
 func (vc *VotesCache) View() uint64 { return vc.view }
 
-// AddVote stores a vote in the cache. The following errors are expected during
-// normal operations:
-//   - nil: if the vote was successfully added
-//   - model.DoubleVoteError is returned if the voter is equivocating
-//     (i.e. voting in the same view for different blocks).
-//   - RepeatedVoteErr is returned when adding the same vote from
-//     the same voter multiple times.
-//   - IncompatibleViewErr is returned if the vote is for a different view.
-//
-// When AddVote returns an error, the vote is _not_ stored.
+// AddVote stores a vote in the cache. The method returns `nil`, if the vote was
+// successfully stored. When AddVote returns an error, the vote is _not_ stored.
+// Expected error returns during normal operations:
+//   - [VoteForIncompatibleViewError] is returned if the vote is for a different view.
+//   - [model.DoubleVoteError] indicates that the voter has emitted inconsistent
+//     votes within the same view. We consider two votes as inconsistent, if they
+//     are from the same signer for the same view, but have different IDs. Potential
+//     causes could be:
+//   - The signer voted for different blocks in the same view.
+//   - The signer emitted votes for the same block, but included different
+//     signatures. This is only relevant for voting schemes where the signer has
+//     different options how to sign (e.g. sign with staking key and/or random
+//     beacon key). For such voting schemes, byzantine replicas could try to
+//     submit different votes for the same block, to exhaust the primary's
+//     resources or have multiple of their votes counted to undermine consensus
+//     safety (aka double-counting attack).
+//     Both are protocol violations and belong to the family of equivocation attacks.
+//     As part of the error, we return the internally-cached vote, which is conflicting
+//     with the input `vote`.
+//   - [RepeatedVoteErr] is returned when adding a vote that is _identical_ (same ID)
+//     to a previously added vote.
 func (vc *VotesCache) AddVote(vote *model.Vote) error {
 	if vote.View != vc.view {
-		return VoteForIncompatibleViewError
+		return fmt.Errorf("expected vote for view %d but vote's view is %d: %w", vc.view, vote.View, VoteForIncompatibleViewError)
 	}
 	vc.lock.Lock()
 	defer vc.lock.Unlock()
