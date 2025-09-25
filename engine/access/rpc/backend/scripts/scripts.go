@@ -117,9 +117,9 @@ func (b *Scripts) ExecuteScriptAtLatestBlock(
 	script []byte,
 	arguments [][]byte,
 	criteria optimistic_sync.Criteria,
-) ([]byte, accessmodel.ExecutorMetadata, error) {
+) ([]byte, *accessmodel.ExecutorMetadata, error) {
 	if !commonrpc.CheckScriptSize(script, arguments, b.maxScriptAndArgumentSize) {
-		return nil, accessmodel.ExecutorMetadata{}, status.Error(codes.InvalidArgument, commonrpc.ErrScriptTooLarge.Error())
+		return nil, nil, status.Error(codes.InvalidArgument, commonrpc.ErrScriptTooLarge.Error())
 	}
 
 	latestHeader, err := b.state.Sealed().Head()
@@ -127,7 +127,7 @@ func (b *Scripts) ExecuteScriptAtLatestBlock(
 		// the latest sealed header MUST be available
 		err := irrecoverable.NewExceptionf("failed to lookup sealed header: %w", err)
 		irrecoverable.Throw(ctx, err)
-		return nil, accessmodel.ExecutorMetadata{}, err
+		return nil, nil, err
 	}
 
 	executionResultInfo, err := b.executionResultProvider.ExecutionResultInfo(
@@ -135,12 +135,12 @@ func (b *Scripts) ExecuteScriptAtLatestBlock(
 		criteria,
 	)
 	if err != nil {
-		return nil, accessmodel.ExecutorMetadata{}, fmt.Errorf("failed to get execution result for block ID %s: %w", latestHeader.ID(), err)
+		return nil, nil, fmt.Errorf("failed to get execution result for block ID %s: %w", latestHeader.ID(), err)
 	}
 
-	executionResultID := executionResultInfo.ExecutionResult.ID()
+	executionResultID := executionResultInfo.ExecutionResultID
 	//TODO(Uliana): add constructor for ExecutorMetadata
-	metadata := accessmodel.ExecutorMetadata{
+	metadata := &accessmodel.ExecutorMetadata{
 		ExecutionResultID: executionResultID,
 		ExecutorIDs:       executionResultInfo.ExecutionNodes.NodeIDs(),
 	}
@@ -159,23 +159,23 @@ func (b *Scripts) ExecuteScriptAtBlockID(
 	script []byte,
 	arguments [][]byte,
 	criteria optimistic_sync.Criteria,
-) ([]byte, accessmodel.ExecutorMetadata, error) {
+) ([]byte, *accessmodel.ExecutorMetadata, error) {
 	if !commonrpc.CheckScriptSize(script, arguments, b.maxScriptAndArgumentSize) {
-		return nil, accessmodel.ExecutorMetadata{}, status.Error(codes.InvalidArgument, commonrpc.ErrScriptTooLarge.Error())
+		return nil, nil, status.Error(codes.InvalidArgument, commonrpc.ErrScriptTooLarge.Error())
 	}
 
 	header, err := b.headers.ByBlockID(blockID)
 	if err != nil {
-		return nil, accessmodel.ExecutorMetadata{}, commonrpc.ConvertStorageError(err)
+		return nil, nil, commonrpc.ConvertStorageError(err)
 	}
 
 	executionResultInfo, err := b.executionResultProvider.ExecutionResultInfo(blockID, criteria)
 	if err != nil {
-		return nil, accessmodel.ExecutorMetadata{}, fmt.Errorf("failed to get execution result for block ID %s: %w", blockID.String(), err)
+		return nil, nil, fmt.Errorf("failed to get execution result for block ID %s: %w", blockID.String(), err)
 	}
 
-	executionResultID := executionResultInfo.ExecutionResult.ID()
-	metadata := accessmodel.ExecutorMetadata{
+	executionResultID := executionResultInfo.ExecutionResultID
+	metadata := &accessmodel.ExecutorMetadata{
 		ExecutionResultID: executionResultID,
 		ExecutorIDs:       executionResultInfo.ExecutionNodes.NodeIDs(),
 	}
@@ -194,24 +194,23 @@ func (b *Scripts) ExecuteScriptAtBlockHeight(
 	script []byte,
 	arguments [][]byte,
 	criteria optimistic_sync.Criteria,
-) ([]byte, accessmodel.ExecutorMetadata, error) {
+) ([]byte, *accessmodel.ExecutorMetadata, error) {
 	if !commonrpc.CheckScriptSize(script, arguments, b.maxScriptAndArgumentSize) {
-		return nil, accessmodel.ExecutorMetadata{}, status.Error(codes.InvalidArgument, commonrpc.ErrScriptTooLarge.Error())
+		return nil, nil, status.Error(codes.InvalidArgument, commonrpc.ErrScriptTooLarge.Error())
 	}
 
 	header, err := b.headers.ByHeight(blockHeight)
 	if err != nil {
-		return nil, accessmodel.ExecutorMetadata{}, commonrpc.ConvertStorageError(common.ResolveHeightError(b.state.Params(), blockHeight, err))
+		return nil, nil, commonrpc.ConvertStorageError(common.ResolveHeightError(b.state.Params(), blockHeight, err))
 	}
 
 	executionResultInfo, err := b.executionResultProvider.ExecutionResultInfo(header.ID(), criteria)
 	if err != nil {
-		return nil, accessmodel.ExecutorMetadata{},
-			fmt.Errorf("failed to get execution result for block ID %s: %w", header.ID(), err)
+		return nil, nil, fmt.Errorf("failed to get execution result for block ID %s: %w", header.ID(), err)
 	}
 
-	executionResultID := executionResultInfo.ExecutionResult.ID()
-	metadata := accessmodel.ExecutorMetadata{
+	executionResultID := executionResultInfo.ExecutionResultID
+	metadata := &accessmodel.ExecutorMetadata{
 		ExecutionResultID: executionResultID,
 		ExecutorIDs:       executionResultInfo.ExecutionNodes.NodeIDs(),
 	}

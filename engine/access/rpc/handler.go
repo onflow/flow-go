@@ -846,7 +846,7 @@ func (h *Handler) ExecuteScriptAtLatestBlock(
 	}
 
 	if executionState.GetIncludeExecutorMetadata() {
-		metadata.ExecutorMetadata = convert.ExecutorMetadataToMessage(&executorMetadata)
+		metadata.ExecutorMetadata = convert.ExecutorMetadataToMessage(executorMetadata)
 	}
 
 	return &accessproto.ExecuteScriptResponse{
@@ -882,7 +882,7 @@ func (h *Handler) ExecuteScriptAtBlockHeight(
 	}
 
 	if executionState.GetIncludeExecutorMetadata() {
-		metadata.ExecutorMetadata = convert.ExecutorMetadataToMessage(&executorMetadata)
+		metadata.ExecutorMetadata = convert.ExecutorMetadataToMessage(executorMetadata)
 	}
 
 	return &accessproto.ExecuteScriptResponse{
@@ -917,7 +917,7 @@ func (h *Handler) ExecuteScriptAtBlockID(
 	}
 
 	if executionState.GetIncludeExecutorMetadata() {
-		metadata.ExecutorMetadata = convert.ExecutorMetadataToMessage(&executorMetadata)
+		metadata.ExecutorMetadata = convert.ExecutorMetadataToMessage(executorMetadata)
 	}
 
 	return &accessproto.ExecuteScriptResponse{
