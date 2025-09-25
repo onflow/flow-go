@@ -10,18 +10,13 @@ import (
 )
 
 // InsertProposalSignature inserts a proposal signature by block ID.
-// Returns storage.ErrAlreadyExists if a proposal signature has already been inserted for the block.
 //
 // CAUTION:
 //   - The caller must acquire either the lock [storage.LockInsertBlock] or [storage.LockInsertOrFinalizeClusterBlock] (but not both)
 //     and hold it until the database write has been committed.
-//   - OVERWRITES existing data (potential for data corruption):
-//     This method silently overrides existing data without any sanity checks whether data for the same key already exits.
-//     Note that the Flow protocol mandates that for a previously persisted key, the data is never changed to a different
-//     value. Changing data could cause the node to publish inconsistent data and to be slashed, or the protocol to be
-//     compromised as a whole. This method does not contain any safeguards to prevent such data corruption. The lock proof
-//     serves as a reminder that the CALLER is responsible to ensure that the DEDUPLICATION CHECK is done elsewhere
-//     ATOMICALLY with this write operation.
+//   - Since the signature is indexed by block ID, and the caller holding this lock has done the
+//     necessary checks to ensure that the block ID is new, and that no signature exists for it yet,
+//     so this function will not check for existing entries when inserting.
 //
 // No errors are expected during normal operation.
 func InsertProposalSignature(lctx lockctx.Proof, w storage.Writer, blockID flow.Identifier, sig *[]byte) error {
