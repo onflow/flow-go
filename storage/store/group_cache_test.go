@@ -34,7 +34,7 @@ func TestGroupCacheRemoveGroups(t *testing.T) {
 		cache := mustNewGroupCache(
 			metrics.NewNoopCollector(),
 			"test",
-			func(id TwoIdentifier) flow.Identifier { return flow.Identifier(id[:flow.IdentifierLen]) },
+			FirstIDFromTwoIdentifier, // cache records are grouped by first identifier of keys
 			withStore(store),
 			withRetrieve(retrieve),
 		)
@@ -52,8 +52,8 @@ func TestGroupCacheRemoveGroups(t *testing.T) {
 
 			for range itemCountPerGroup {
 				var itemID TwoIdentifier
-				_, _ = rand.Read(itemID[:])
-				copy(itemID[:], groupID[:])
+				n := copy(itemID[:], groupID[:])
+				_, _ = rand.Read(itemID[n:])
 
 				val := unittest.RandomBytes(128)
 
