@@ -454,7 +454,7 @@ func (rf *ResultsForest) ResetLowestRejectedView() (uint64, bool) {
 //   - [ErrPrunedView]: if the result's block view is below the lowest view.
 //   - [ErrMaxViewDeltaExceeded]: if the result's block view is more than maxViewDelta views ahead of the last sealed view
 func (rf *ResultsForest) AddSealedResult(result *flow.ExecutionResult) error {
-	container, existing, err := rf.getOrCreateContainer(result, ResultSealed)
+	container, existing, err := rf.getOrCreateContainer(result)
 	if err != nil {
 		return fmt.Errorf("failed to get container for result (%s): %w", result.ID(), err)
 	}
@@ -498,7 +498,7 @@ func (rf *ResultsForest) AddReceipt(receipt *flow.ExecutionReceipt, resultStatus
 		return false, fmt.Errorf("invalid result status: %s", resultStatus)
 	}
 
-	container, existing, err := rf.getOrCreateContainer(&receipt.ExecutionResult, resultStatus)
+	container, existing, err := rf.getOrCreateContainer(&receipt.ExecutionResult)
 	if err != nil {
 		return false, fmt.Errorf("failed to get container for result (%s): %w", receipt.ExecutionResult.ID(), err)
 	}
@@ -618,8 +618,6 @@ func (rf *ResultsForest) extendSealedFork(childResult *ExecutionResultContainer)
 }
 
 // getOrCreateContainer retrieves or creates the container for the given result within the forest.
-// When creating a new container, it is initialized with the given result status. `resultStatus` is
-// ignored if the container already exists.
 // This method is optimized for the case of many concurrent reads compared to relatively few writes,
 // and rarely repeated calls.
 // It is idempotent and atomic: it always returns the first container created for the given result.
@@ -629,7 +627,7 @@ func (rf *ResultsForest) extendSealedFork(childResult *ExecutionResultContainer)
 //   - [ErrPrunedView]: if the result's block view is below the lowest view
 //   - [ErrMaxViewDeltaExceeded]: if the result's block view is more than maxViewDelta views ahead
 //     of the oldes stored result (lowest view) *and* the given result is not
-func (rf *ResultsForest) getOrCreateContainer(result *flow.ExecutionResult, resultStatus ResultStatus) (*ExecutionResultContainer, bool, error) {
+func (rf *ResultsForest) getOrCreateContainer(result *flow.ExecutionResult) (*ExecutionResultContainer, bool, error) {
 	// First, try to get existing container - this will acquire read-lock only
 	resultID := result.ID()
 	container, found := rf.GetContainer(resultID)
@@ -649,7 +647,7 @@ func (rf *ResultsForest) getOrCreateContainer(result *flow.ExecutionResult, resu
 		return nil, false, fmt.Errorf("failed to get block header for result (%s): %w", resultID, err)
 	}
 
-	pipeline := rf.pipelineFactory.NewPipeline(result, resultStatus == ResultSealed)
+	pipeline := rf.pipelineFactory.NewPipeline(result)
 	newContainer, err := NewExecutionResultContainer(result, executedBlock, pipeline)
 	if err != nil {
 		return nil, false, fmt.Errorf("failed to create container for result (%s): %w", resultID, err)
