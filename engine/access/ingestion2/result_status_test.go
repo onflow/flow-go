@@ -12,8 +12,9 @@ var allStatuses = []ResultStatus{
 	ResultForCertifiedBlock,
 	ResultForFinalizedBlock,
 	ResultSealed,
+	ResultOrphaned,
 	ResultStatus(0),
-	ResultStatus(ResultSealed + 1),
+	ResultStatus(ResultOrphaned + 1),
 }
 
 type transitionTestCase struct {
@@ -45,6 +46,11 @@ func TestResultStatus_IsValid(t *testing.T) {
 			expected: true,
 		},
 		{
+			name:     "orphaned status is valid",
+			status:   ResultOrphaned,
+			expected: true,
+		},
+		{
 			name:     "zero status is invalid",
 			status:   ResultStatus(0),
 			expected: false,
@@ -71,6 +77,7 @@ func transitionTests() []transitionTestCase {
 				ResultForCertifiedBlock,
 				ResultForFinalizedBlock,
 				ResultSealed,
+				ResultOrphaned,
 			},
 		},
 		{
@@ -78,12 +85,21 @@ func transitionTests() []transitionTestCase {
 			valid: []ResultStatus{
 				ResultForFinalizedBlock,
 				ResultSealed,
+				ResultOrphaned,
 			},
 		},
 		{
 			from: ResultSealed,
 			valid: []ResultStatus{
 				ResultSealed,
+				// Sealed results cannot be orphaned
+			},
+		},
+		{
+			from: ResultOrphaned,
+			valid: []ResultStatus{
+				ResultOrphaned,
+				// cannot transition out of orphaned
 			},
 		},
 	}
@@ -109,10 +125,10 @@ func TestResultStatusTracker_Set(t *testing.T) {
 	for _, tt := range transitionTests() {
 		validTransition := slices.ToMap(tt.valid)
 
-		tracker := NewResultStatusTracker(tt.from)
 		for _, to := range allStatuses {
 			_, isValid := validTransition[to]
 
+			tracker := NewResultStatusTracker(tt.from)
 			t.Run(fmt.Sprintf("%s -> %s (valid: %t)", tt.from, to, isValid), func(t *testing.T) {
 				assert.Equal(t, isValid, tracker.Set(to))
 			})

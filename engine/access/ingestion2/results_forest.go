@@ -953,7 +953,7 @@ func (rf *ResultsForest) isAbandonedFork(container *ExecutionResultContainer) bo
 	}
 
 	// 1. the parent is abandoned
-	if parent.Pipeline().GetState() == optimistic_sync.StateAbandoned {
+	if parent.ResultStatus() == ResultOrphaned {
 		return true
 	}
 
@@ -976,7 +976,7 @@ func (rf *ResultsForest) isAbandonedFork(container *ExecutionResultContainer) bo
 // abandonFork recursively abandons a container and all its descendants.
 // NOT CONCURRENCY SAFE!
 func (rf *ResultsForest) abandonFork(container *ExecutionResultContainer) {
-	container.Pipeline().Abandon()
+	container.Abandon()
 	for child := range rf.iterateChildren(container.ResultID()) {
 		rf.abandonFork(child)
 	}

@@ -183,6 +183,17 @@ func (c *ExecutionResultContainer) SetResultStatus(resultStatus ResultStatus) er
 	return fmt.Errorf("invalid result status transition: %s -> %s", c.resultStatus.Value(), resultStatus)
 }
 
+// Abandon marks the result as orphaned and abandons the pipeline.
+//
+// No error returns expected during normal operations.
+func (c *ExecutionResultContainer) Abandon() error {
+	if err := c.SetResultStatus(ResultOrphaned); err != nil {
+		return fmt.Errorf("failed to abandon result: %w", err)
+	}
+	c.pipeline.Abandon()
+	return nil
+}
+
 // Methods implementing LevelledForest's Vertex interface
 
 // VertexID returns the execution ID's result. The ExecutionResultContainer is a vertex in
