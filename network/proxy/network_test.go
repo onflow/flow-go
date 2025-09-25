@@ -9,7 +9,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/channels"
-	"github.com/onflow/flow-go/network/mocknetwork"
+	mocknetwork "github.com/onflow/flow-go/network/mock"
 	"github.com/onflow/flow-go/network/proxy"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -36,7 +36,7 @@ func TestProxyNetwork(t *testing.T) {
 }
 
 func (suite *Suite) SetupTest() {
-	net := new(mocknetwork.Network)
+	net := new(mocknetwork.EngineRegistry)
 	suite.net = net
 	suite.con = new(mocknetwork.Conduit)
 	suite.targetNodeID = unittest.IdentifierFixture()

@@ -3,6 +3,7 @@ package operation_test
 import (
 	"testing"
 
+	"github.com/jordanschalm/lockctx"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -20,27 +21,25 @@ func TestBlockChildrenIndexUpdateLookup(t *testing.T) {
 		childrenIDs := unittest.IdentifierListFixture(8)
 		var retrievedIDs flow.IdentifierList
 
-		lctx := lockManager.NewContext()
-		err := lctx.AcquireLock(storage.LockInsertBlock)
-		require.NoError(t, err)
-
-		err = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			return operation.UpsertBlockChildren(lctx, rw.Writer(), blockID, childrenIDs)
+		err := unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
+			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+				return operation.UpsertBlockChildren(lctx, rw.Writer(), blockID, childrenIDs)
+			})
 		})
 		require.NoError(t, err)
-		lctx.Release()
+
 		err = operation.RetrieveBlockChildren(db.Reader(), blockID, &retrievedIDs)
 		require.NoError(t, err)
 		assert.Equal(t, childrenIDs, retrievedIDs)
 
 		altIDs := unittest.IdentifierListFixture(4)
-		lctx = lockManager.NewContext()
-		require.NoError(t, lctx.AcquireLock(storage.LockInsertBlock))
-		err = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			return operation.UpsertBlockChildren(lctx, rw.Writer(), blockID, altIDs)
+		err = unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
+			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+				return operation.UpsertBlockChildren(lctx, rw.Writer(), blockID, altIDs)
+			})
 		})
 		require.NoError(t, err)
-		lctx.Release()
+
 		err = operation.RetrieveBlockChildren(db.Reader(), blockID, &retrievedIDs)
 		require.NoError(t, err)
 		assert.Equal(t, altIDs, retrievedIDs)

@@ -39,7 +39,7 @@ func TestNewControlMsgValidationInspector(t *testing.T) {
 		sporkID := unittest.IdentifierFixture()
 		flowConfig, err := config.DefaultConfig()
 		require.NoError(t, err, "failed to get default flow config")
-		consumer := mockp2p.NewGossipSubInvalidControlMessageNotificationConsumer(t)
+		consumer := mockp2p.NewGossipSubInvCtrlMsgNotifConsumer(t)
 		idProvider := mockmodule.NewIdentityProvider(t)
 		topicProvider := p2ptest.NewUpdatableTopicProviderFixture()
 		inspector, err := validation.NewControlMsgValidationInspector(&validation.InspectorParams{
@@ -1769,7 +1769,7 @@ func checkNotificationFunc(t *testing.T,
 
 func inspectorFixture(t *testing.T, opts ...func(params *validation.InspectorParams)) (*validation.ControlMsgValidationInspector,
 	*irrecoverable.MockSignalerContext,
-	context.CancelFunc, *mockp2p.GossipSubInvalidControlMessageNotificationConsumer,
+	context.CancelFunc, *mockp2p.GossipSubInvCtrlMsgNotifConsumer,
 	*mockp2p.RpcControlTracking,
 	flow.Identifier,
 	*mockmodule.IdentityProvider,
@@ -1779,7 +1779,7 @@ func inspectorFixture(t *testing.T, opts ...func(params *validation.InspectorPar
 	flowConfig, err := config.DefaultConfig()
 	require.NoError(t, err)
 
-	consumer := mockp2p.NewGossipSubInvalidControlMessageNotificationConsumer(t)
+	consumer := mockp2p.NewGossipSubInvCtrlMsgNotifConsumer(t)
 	idProvider := mockmodule.NewIdentityProvider(t)
 	rpcTracker := mockp2p.NewRpcControlTracking(t)
 	topicProviderOracle := p2ptest.NewUpdatableTopicProviderFixture()

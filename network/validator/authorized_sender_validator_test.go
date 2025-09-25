@@ -19,7 +19,7 @@ import (
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/codec"
 	"github.com/onflow/flow-go/network/message"
-	"github.com/onflow/flow-go/network/mocknetwork"
+	mocknetwork "github.com/onflow/flow-go/network/mock"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/slashing"
 	"github.com/onflow/flow-go/utils/unittest"
