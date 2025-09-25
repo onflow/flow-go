@@ -174,11 +174,11 @@ func (r *RestProxyHandler) GetTransactionResult(
 	collectionID flow.Identifier,
 	requiredEventEncodingVersion entities.EventEncodingVersion,
 	criteria optimistic_sync.Criteria,
-) (*accessmodel.TransactionResult, accessmodel.ExecutorMetadata, error) {
+) (*accessmodel.TransactionResult, *accessmodel.ExecutorMetadata, error) {
 	upstream, closer, err := r.FaultTolerantClient()
 	if err != nil {
 
-		return nil, accessmodel.ExecutorMetadata{}, err
+		return nil, nil, err
 	}
 	defer closer.Close()
 
@@ -198,17 +198,20 @@ func (r *RestProxyHandler) GetTransactionResult(
 	r.log("upstream", "GetTransactionResult", err)
 
 	if err != nil {
-		return nil, accessmodel.ExecutorMetadata{}, err
+		return nil, nil, err
 	}
 
 	transactionResult, err := convert.MessageToTransactionResult(transactionResultResponse)
 	if err != nil {
-		return nil, accessmodel.ExecutorMetadata{}, err
+		return nil, nil, err
 	}
 
-	metadata := convert.MessageToExecutorMetadata(transactionResultResponse.Metadata.GetExecutorMetadata())
+	var metadata *accessmodel.ExecutorMetadata
+	if rawMetadata := transactionResultResponse.GetMetadata(); rawMetadata != nil {
+		metadata = convert.MessageToExecutorMetadata(rawMetadata.GetExecutorMetadata())
+	}
 
-	return transactionResult, *metadata, nil
+	return transactionResult, metadata, nil
 }
 
 // GetAccountAtBlockHeight returns account by account address and block height.
@@ -390,10 +393,10 @@ func (r *RestProxyHandler) GetEventsForHeightRange(
 	startHeight, endHeight uint64,
 	requiredEventEncodingVersion entities.EventEncodingVersion,
 	criteria optimistic_sync.Criteria,
-) ([]flow.BlockEvents, accessmodel.ExecutorMetadata, error) {
+) ([]flow.BlockEvents, *accessmodel.ExecutorMetadata, error) {
 	upstream, closer, err := r.FaultTolerantClient()
 	if err != nil {
-		return nil, accessmodel.ExecutorMetadata{}, err
+		return nil, nil, err
 	}
 	defer closer.Close()
 
@@ -409,15 +412,22 @@ func (r *RestProxyHandler) GetEventsForHeightRange(
 		},
 	}
 	eventsResponse, err := upstream.GetEventsForHeightRange(ctx, getEventsForHeightRangeRequest)
-	if err != nil {
-		return nil, accessmodel.ExecutorMetadata{}, err
-	}
 	r.log("upstream", "GetEventsForHeightRange", err)
-
-	metadata := convert.MessageToExecutorMetadata(eventsResponse.Metadata.ExecutorMetadata)
+	if err != nil {
+		return nil, nil, err
+	}
 
 	res, err := convert.MessagesToBlockEvents(eventsResponse.Results)
-	return res, *metadata, err
+	if err != nil {
+		return nil, nil, err
+	}
+
+	var metadata *accessmodel.ExecutorMetadata
+	if rawMetadata := eventsResponse.GetMetadata(); rawMetadata != nil {
+		metadata = convert.MessageToExecutorMetadata(rawMetadata.GetExecutorMetadata())
+	}
+
+	return res, metadata, nil
 }
 
 // GetEventsForBlockIDs returns events by their name in the specified block IDs.
@@ -427,10 +437,10 @@ func (r *RestProxyHandler) GetEventsForBlockIDs(
 	blockIDs []flow.Identifier,
 	requiredEventEncodingVersion entities.EventEncodingVersion,
 	criteria optimistic_sync.Criteria,
-) ([]flow.BlockEvents, accessmodel.ExecutorMetadata, error) {
+) ([]flow.BlockEvents, *accessmodel.ExecutorMetadata, error) {
 	upstream, closer, err := r.FaultTolerantClient()
 	if err != nil {
-		return nil, accessmodel.ExecutorMetadata{}, err
+		return nil, nil, err
 	}
 	defer closer.Close()
 
@@ -448,15 +458,21 @@ func (r *RestProxyHandler) GetEventsForBlockIDs(
 	}
 	eventsResponse, err := upstream.GetEventsForBlockIDs(ctx, getEventsForBlockIDsRequest)
 	r.log("upstream", "GetEventsForBlockIDs", err)
-
 	if err != nil {
-		return nil, accessmodel.ExecutorMetadata{}, err
+		return nil, nil, err
 	}
 
-	metadata := convert.MessageToExecutorMetadata(eventsResponse.Metadata.ExecutorMetadata)
-
 	res, err := convert.MessagesToBlockEvents(eventsResponse.Results)
-	return res, *metadata, err
+	if err != nil {
+		return nil, nil, err
+	}
+
+	var metadata *accessmodel.ExecutorMetadata
+	if rawMetadata := eventsResponse.GetMetadata(); rawMetadata != nil {
+		metadata = convert.MessageToExecutorMetadata(rawMetadata.GetExecutorMetadata())
+	}
+
+	return res, metadata, nil
 }
 
 // convertError converts a serialized access error formatted as a grpc error returned from the upstream AN,

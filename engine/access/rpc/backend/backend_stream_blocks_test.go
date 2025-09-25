@@ -22,6 +22,8 @@ import (
 	"github.com/onflow/flow-go/engine/access/subscription/tracker"
 	trackermock "github.com/onflow/flow-go/engine/access/subscription/tracker/mock"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/executiondatasync/optimistic_sync"
+	osyncmock "github.com/onflow/flow-go/module/executiondatasync/optimistic_sync/mock"
 	"github.com/onflow/flow-go/module/metrics"
 	protocol "github.com/onflow/flow-go/state/protocol/mock"
 	"github.com/onflow/flow-go/storage"
@@ -52,6 +54,10 @@ type BackendBlocksSuite struct {
 	blocksArray []*flow.Block
 	blockMap    map[uint64]*flow.Block
 	rootBlock   *flow.Block
+
+	executionResultInfoProvider *osyncmock.ExecutionResultInfoProvider
+	executionStateCache         *osyncmock.ExecutionStateCache
+	executionDataSnapshot       *osyncmock.Snapshot
 
 	backend *Backend
 }
@@ -145,6 +151,10 @@ func (s *BackendBlocksSuite) SetupTest() {
 		s.broadcaster,
 	)
 	require.NoError(s.T(), err)
+
+	s.executionResultInfoProvider = osyncmock.NewExecutionResultInfoProvider(s.T())
+	s.executionDataSnapshot = osyncmock.NewSnapshot(s.T())
+	s.executionStateCache = osyncmock.NewExecutionStateCache(s.T())
 }
 
 // backendParams returns the Params configuration for the backend.
@@ -165,10 +175,13 @@ func (s *BackendBlocksSuite) backendParams() Params {
 			subscription.DefaultResponseLimit,
 			subscription.DefaultSendBufferSize,
 		),
-		BlockTracker:        s.blockTracker,
-		EventQueryMode:      query_mode.IndexQueryModeExecutionNodesOnly,
-		ScriptExecutionMode: query_mode.IndexQueryModeExecutionNodesOnly,
-		TxResultQueryMode:   query_mode.IndexQueryModeExecutionNodesOnly,
+		BlockTracker:                s.blockTracker,
+		EventQueryMode:              query_mode.IndexQueryModeExecutionNodesOnly,
+		ScriptExecutionMode:         query_mode.IndexQueryModeExecutionNodesOnly,
+		TxResultQueryMode:           query_mode.IndexQueryModeExecutionNodesOnly,
+		ExecutionResultInfoProvider: s.executionResultInfoProvider,
+		ExecutionStateCache:         s.executionStateCache,
+		OperatorCriteria:            optimistic_sync.DefaultCriteria,
 	}
 }
 

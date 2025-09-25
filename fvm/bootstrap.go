@@ -799,18 +799,18 @@ func (b *bootstrapExecutor) deployNFTStorefrontV2(deployTo flow.Address, env *te
 }
 
 func (b *bootstrapExecutor) deployFlowCallbackScheduler(deployTo flow.Address, env *templates.Environment) {
-	contract := contracts.FlowCallbackScheduler(*env)
-	txBody, err := blueprints.DeployContractTransaction(deployTo, contract, "FlowCallbackScheduler").Build()
+	contract := contracts.FlowTransactionScheduler(*env)
+	txBody, err := blueprints.DeployContractTransaction(deployTo, contract, "FlowTransactionScheduler").Build()
 	if err != nil {
-		panic(fmt.Sprintf("failed to create FlowCallbackScheduler deploy transaction: %s", err))
+		panic(fmt.Sprintf("failed to create FlowTransactionScheduler deploy transaction: %s", err))
 	}
 	txError, err := b.invokeMetaTransaction(
 		b.ctx,
 		Transaction(txBody, 0),
 	)
 
-	env.FlowCallbackSchedulerAddress = deployTo.String()
-	panicOnMetaInvokeErrf("failed to deploy FlowCallbackScheduler contract: %s", txError, err)
+	env.FlowTransactionSchedulerAddress = deployTo.String()
+	panicOnMetaInvokeErrf("failed to deploy FlowTransactionScheduler contract: %s", txError, err)
 }
 
 func (b *bootstrapExecutor) mintInitialTokens(

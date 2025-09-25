@@ -7,8 +7,9 @@ import (
 	"time"
 
 	lru "github.com/hashicorp/golang-lru/v2"
-	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
 	"github.com/rs/zerolog"
+
+	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
 
 	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/access/validator"
@@ -28,7 +29,7 @@ import (
 	"github.com/onflow/flow-go/engine/access/rpc/connection"
 	"github.com/onflow/flow-go/engine/access/subscription"
 	"github.com/onflow/flow-go/engine/access/subscription/tracker"
-	commonrpc "github.com/onflow/flow-go/engine/common/rpc"
+	"github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/engine/common/version"
 	"github.com/onflow/flow-go/fvm/blueprints"
 	accessmodel "github.com/onflow/flow-go/model/access"
@@ -84,31 +85,32 @@ type Backend struct {
 }
 
 type Params struct {
-	State                 protocol.State
-	CollectionRPC         accessproto.AccessAPIClient
-	HistoricalAccessNodes []accessproto.AccessAPIClient
-	Blocks                storage.Blocks
-	Headers               storage.Headers
-	Collections           storage.Collections
-	Transactions          storage.Transactions
-	ExecutionReceipts     storage.ExecutionReceipts
-	ExecutionResults      storage.ExecutionResults
-	TxResultErrorMessages storage.TransactionResultErrorMessages
-	ChainID               flow.ChainID
-	AccessMetrics         module.AccessMetrics
-	ConnFactory           connection.ConnectionFactory
-	RetryEnabled          bool
-	MaxHeightRange        uint
-	Log                   zerolog.Logger
-	SnapshotHistoryLimit  int
-	Communicator          node_communicator.Communicator
-	TxResultCacheSize     uint
-	ScriptExecutor        execution.ScriptExecutor
-	ScriptExecutionMode   query_mode.IndexQueryMode
-	CheckPayerBalanceMode validator.PayerBalanceMode
-	EventQueryMode        query_mode.IndexQueryMode
-	BlockTracker          tracker.BlockTracker
-	SubscriptionHandler   *subscription.SubscriptionHandler
+	State                    protocol.State
+	CollectionRPC            accessproto.AccessAPIClient
+	HistoricalAccessNodes    []accessproto.AccessAPIClient
+	Blocks                   storage.Blocks
+	Headers                  storage.Headers
+	Collections              storage.Collections
+	Transactions             storage.Transactions
+	ExecutionReceipts        storage.ExecutionReceipts
+	ExecutionResults         storage.ExecutionResults
+	TxResultErrorMessages    storage.TransactionResultErrorMessages
+	ChainID                  flow.ChainID
+	AccessMetrics            module.AccessMetrics
+	ConnFactory              connection.ConnectionFactory
+	RetryEnabled             bool
+	MaxHeightRange           uint
+	Log                      zerolog.Logger
+	SnapshotHistoryLimit     int
+	Communicator             node_communicator.Communicator
+	TxResultCacheSize        uint
+	ScriptExecutor           execution.ScriptExecutor
+	ScriptExecutionMode      query_mode.IndexQueryMode
+	CheckPayerBalanceMode    validator.PayerBalanceMode
+	EventQueryMode           query_mode.IndexQueryMode
+	BlockTracker             tracker.BlockTracker
+	SubscriptionHandler      *subscription.SubscriptionHandler
+	MaxScriptAndArgumentSize uint
 
 	EventsIndex                *index.EventsIndex
 	TxResultQueryMode          query_mode.IndexQueryMode
@@ -116,12 +118,13 @@ type Params struct {
 	LastFullBlockHeight        *counters.PersistentStrictMonotonicCounter
 	IndexReporter              state_synchronization.IndexReporter
 	VersionControl             *version.VersionControl
-	ExecNodeIdentitiesProvider *commonrpc.ExecutionNodeIdentitiesProvider
+	ExecNodeIdentitiesProvider *rpc.ExecutionNodeIdentitiesProvider
 	TxErrorMessageProvider     error_messages.Provider
 
-	ExecutionResultProvider optimistic_sync.ExecutionResultProvider
-	ExecutionStateCache     optimistic_sync.ExecutionStateCache
-	OperatorCriteria        optimistic_sync.Criteria
+	ExecutionResultInfoProvider optimistic_sync.ExecutionResultInfoProvider
+	ExecutionStateCache         optimistic_sync.ExecutionStateCache
+	OperatorCriteria            optimistic_sync.Criteria
+	ScheduledCallbacksEnabled   bool
 }
 
 var _ access.API = (*Backend)(nil)
@@ -172,7 +175,7 @@ func New(params Params) (*Backend, error) {
 		params.Communicator,
 		params.EventQueryMode,
 		params.ExecNodeIdentitiesProvider,
-		params.ExecutionResultProvider,
+		params.ExecutionResultInfoProvider,
 		params.ExecutionStateCache,
 		params.OperatorCriteria,
 	)
@@ -191,6 +194,7 @@ func New(params Params) (*Backend, error) {
 		params.ScriptExecutionMode,
 		params.ExecNodeIdentitiesProvider,
 		loggedScripts,
+		params.MaxScriptAndArgumentSize,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create scripts: %w", err)
@@ -220,8 +224,12 @@ func New(params Params) (*Backend, error) {
 	txStatusDeriver := status.NewTxStatusDeriver(params.State, params.LastFullBlockHeight)
 
 	localTxProvider := provider.NewLocalTransactionProvider(
+		params.Collections,
+		systemTxID,
 		txStatusDeriver,
 		params.ExecutionStateCache,
+		params.ChainID,
+		params.ScheduledCallbacksEnabled,
 	)
 	execNodeTxProvider := provider.NewENTransactionProvider(
 		params.Log,
@@ -229,10 +237,10 @@ func New(params Params) (*Backend, error) {
 		params.Collections,
 		params.ConnFactory,
 		params.Communicator,
-		params.ExecutionResultProvider,
 		txStatusDeriver,
 		systemTxID,
-		systemTx,
+		params.ChainID,
+		params.ScheduledCallbacksEnabled,
 	)
 	failoverTxProvider := provider.NewFailoverTransactionProvider(localTxProvider, execNodeTxProvider)
 
@@ -241,7 +249,6 @@ func New(params Params) (*Backend, error) {
 		Metrics:                     params.AccessMetrics,
 		State:                       params.State,
 		ChainID:                     params.ChainID,
-		SystemTx:                    systemTx,
 		SystemTxID:                  systemTxID,
 		StaticCollectionRPCClient:   params.CollectionRPC,
 		HistoricalAccessNodeClients: params.HistoricalAccessNodes,
@@ -256,8 +263,9 @@ func New(params Params) (*Backend, error) {
 		TxValidator:                 txValidator,
 		TxStatusDeriver:             txStatusDeriver,
 		ExecutionStateCache:         params.ExecutionStateCache,
-		ExecResultProvider:          params.ExecutionResultProvider,
+		ExecResultProvider:          params.ExecutionResultInfoProvider,
 		OperatorCriteria:            params.OperatorCriteria,
+		ScheduledCallbacksEnabled:   params.ScheduledCallbacksEnabled,
 	}
 
 	switch params.TxResultQueryMode {
@@ -287,7 +295,7 @@ func New(params Params) (*Backend, error) {
 		params.Transactions,
 		failoverTxProvider,
 		txStatusDeriver,
-		params.ExecutionResultProvider,
+		params.ExecutionResultInfoProvider,
 	)
 
 	b := &Backend{

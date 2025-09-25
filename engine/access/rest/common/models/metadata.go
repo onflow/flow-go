@@ -15,13 +15,12 @@ func NewMetadata(metadata *access.ExecutorMetadata) *Metadata {
 }
 
 func NewExecutorMetadata(metadata *access.ExecutorMetadata) *ExecutorMetadata {
-	executorIDs := make([]string, len(metadata.ExecutorIDs))
-	for i, id := range metadata.ExecutorIDs {
-		executorIDs[i] = id.String()
+	if metadata == nil {
+		return nil
 	}
 
 	return &ExecutorMetadata{
 		ExecutionResultId: metadata.ExecutionResultID.String(),
-		ExecutorIds:       executorIDs,
+		ExecutorIds:       metadata.ExecutorIDs.Strings(),
 	}
 }

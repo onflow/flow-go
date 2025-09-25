@@ -28,7 +28,6 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/executiondatasync/optimistic_sync"
 	osyncmock "github.com/onflow/flow-go/module/executiondatasync/optimistic_sync/mock"
-
 	"github.com/onflow/flow-go/module/irrecoverable"
 	protocol "github.com/onflow/flow-go/state/protocol/mock"
 	"github.com/onflow/flow-go/storage"
@@ -68,9 +67,9 @@ type EventsSuite struct {
 	blockIDs        []flow.Identifier
 	blockEvents     []flow.Event
 
-	executionResultProvider *osyncmock.ExecutionResultProvider
+	executionResultProvider *osyncmock.ExecutionResultInfoProvider
 	executionStateCache     *osyncmock.ExecutionStateCache
-	resultForestSnapshot    *osyncmock.Snapshot
+	executionDataSnapshot   *osyncmock.Snapshot
 	criteria                optimistic_sync.Criteria
 
 	testCases []testCase
@@ -168,27 +167,9 @@ func (s *EventsSuite) SetupTest() {
 		return nil, storage.ErrNotFound
 	}).Maybe()
 
-	s.resultForestSnapshot = osyncmock.NewSnapshot(s.T())
-	s.resultForestSnapshot.
-		On("Events").
-		Return(s.events, nil).
-		Maybe()
-
-	s.executionResultProvider = osyncmock.NewExecutionResultProvider(s.T())
-	s.executionResultProvider.
-		On("ExecutionResult", mock.Anything, mock.Anything).
-		Return(&optimistic_sync.ExecutionResultInfo{
-			ExecutionResult: s.executionResult,
-			ExecutionNodes:  s.executionNodes.ToSkeleton(),
-		}, nil).
-		Maybe() // it is called only for local query mode
-
+	s.executionDataSnapshot = osyncmock.NewSnapshot(s.T())
+	s.executionResultProvider = osyncmock.NewExecutionResultInfoProvider(s.T())
 	s.executionStateCache = osyncmock.NewExecutionStateCache(s.T())
-	s.executionStateCache.
-		On("Snapshot", mock.Anything).
-		Return(s.resultForestSnapshot, nil).
-		Maybe() // it is called only for local query mode
-
 	s.criteria = optimistic_sync.Criteria{}
 
 	s.testCases = make([]testCase, 0)
@@ -215,6 +196,21 @@ func (s *EventsSuite) SetupTest() {
 func (s *EventsSuite) TestGetEvents_HappyPaths() {
 	ctx := context.Background()
 
+	s.executionResultProvider.
+		On("ExecutionResultInfo", mock.Anything, mock.Anything).
+		Return(&optimistic_sync.ExecutionResultInfo{
+			ExecutionResultID: s.executionResult.ID(),
+			ExecutionNodes:    s.executionNodes.ToSkeleton(),
+		}, nil)
+
+	s.executionStateCache.
+		On("Snapshot", mock.Anything).
+		Return(s.executionDataSnapshot, nil)
+
+	s.executionDataSnapshot.
+		On("Events").
+		Return(s.events, nil)
+
 	startHeight := s.blocks[0].Height
 	endHeight := s.sealedHead.Height
 
@@ -240,7 +236,7 @@ func (s *EventsSuite) TestGetEvents_HappyPaths() {
 	})
 
 	for _, tt := range s.testCases {
-		s.Run(fmt.Sprintf("with local query mode. encdoing: %s, query mode: %s", tt.encoding.String(), tt.queryMode), func() {
+		s.Run(fmt.Sprintf("with local query mode. encoding: %s, query mode: %s", tt.encoding.String(), tt.queryMode), func() {
 			if tt.queryMode != query_mode.IndexQueryModeLocalOnly {
 				return
 			}
@@ -261,7 +257,7 @@ func (s *EventsSuite) TestGetEvents_HappyPaths() {
 			s.assertResponse(response, tt.encoding)
 		})
 
-		s.Run(fmt.Sprintf("with execution node query mode. encdoing: %s, query mode: %s", tt.encoding.String(), tt.queryMode), func() {
+		s.Run(fmt.Sprintf("with execution node query mode. encoding: %s, query mode: %s", tt.encoding.String(), tt.queryMode), func() {
 			if tt.queryMode != query_mode.IndexQueryModeExecutionNodesOnly {
 				return
 			}
@@ -284,7 +280,7 @@ func (s *EventsSuite) TestGetEvents_HappyPaths() {
 			s.assertResponse(response, tt.encoding)
 		})
 
-		s.Run(fmt.Sprintf("with failover query mode. encdoing: %s, query mode: %s", tt.encoding.String(), tt.queryMode), func() {
+		s.Run(fmt.Sprintf("with failover query mode. encoding: %s, query mode: %s", tt.encoding.String(), tt.queryMode), func() {
 			if tt.queryMode != query_mode.IndexQueryModeFailover {
 				return
 			}

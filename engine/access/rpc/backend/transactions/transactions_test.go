@@ -8,8 +8,11 @@ import (
 	"os"
 	"testing"
 
-	"github.com/dgraph-io/badger/v2"
+	"github.com/cockroachdb/pebble/v2"
 	lru "github.com/hashicorp/golang-lru/v2"
+	"github.com/onflow/cadence"
+	cadenceCommon "github.com/onflow/cadence/common"
+	"github.com/onflow/cadence/encoding/ccf"
 	jsoncdc "github.com/onflow/cadence/encoding/json"
 	"github.com/onflow/flow/protobuf/go/flow/access"
 	"github.com/onflow/flow/protobuf/go/flow/entities"
@@ -32,6 +35,7 @@ import (
 	"github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/fvm/blueprints"
+	"github.com/onflow/flow-go/fvm/systemcontracts"
 	accessmodel "github.com/onflow/flow-go/model/access"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
@@ -39,7 +43,6 @@ import (
 	"github.com/onflow/flow-go/module/counters"
 	execmock "github.com/onflow/flow-go/module/execution/mock"
 	"github.com/onflow/flow-go/module/executiondatasync/optimistic_sync"
-	"github.com/onflow/flow-go/module/executiondatasync/optimistic_sync/execution_result_provider"
 	optimisticsyncmock "github.com/onflow/flow-go/module/executiondatasync/optimistic_sync/mock"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/state/protocol"
@@ -48,7 +51,7 @@ import (
 	"github.com/onflow/flow-go/state/protocol/util"
 	"github.com/onflow/flow-go/storage"
 	storagemock "github.com/onflow/flow-go/storage/mock"
-	"github.com/onflow/flow-go/storage/operation/badgerimpl"
+	"github.com/onflow/flow-go/storage/operation/pebbleimpl"
 	"github.com/onflow/flow-go/storage/store"
 	"github.com/onflow/flow-go/utils/unittest"
 	"github.com/onflow/flow-go/utils/unittest/mocks"
@@ -62,6 +65,7 @@ type Suite struct {
 	log      zerolog.Logger
 	state    *protocolmock.State
 	snapshot *protocolmock.Snapshot
+	params   *protocolmock.Params
 
 	blocks                *storagemock.Blocks
 	headers               *storagemock.Headers
@@ -74,7 +78,7 @@ type Suite struct {
 	txResultErrorMessages *storagemock.TransactionResultErrorMessages
 	txResultCache         *lru.Cache[flow.Identifier, *accessmodel.TransactionResult]
 
-	db                  *badger.DB
+	db                  *pebble.DB
 	dbDir               string
 	lastFullBlockHeight *counters.PersistentStrictMonotonicCounter
 
@@ -83,13 +87,17 @@ type Suite struct {
 
 	connectionFactory *connectionmock.ConnectionFactory
 
-	chainID  flow.ChainID
-	systemTx *flow.TransactionBody
+	chainID                           flow.ChainID
+	systemTx                          *flow.TransactionBody
+	systemCollection                  *flow.Collection
+	pendingExecutionEvents            []flow.Event
+	processScheduledCallbackEventType flow.EventType
+	scheduledCallbacksEnabled         bool
 
 	fixedExecutionNodeIDs     flow.IdentifierList
 	preferredExecutionNodeIDs flow.IdentifierList
 
-	execResultProvider  *optimisticsyncmock.ExecutionResultProvider
+	execResultProvider  *optimisticsyncmock.ExecutionResultInfoProvider
 	executionStateCache *optimisticsyncmock.ExecutionStateCache
 	operatorCriteria    optimistic_sync.Criteria
 
@@ -109,14 +117,14 @@ func (s *Suite) SetupTest() {
 
 	s.rootBlock = unittest.BlockFixture()
 	s.rootBlockHeader = s.rootBlock.ToHeader()
-	params := protocolmock.NewParams(s.T())
-	params.On("FinalizedRoot").Return(s.rootBlockHeader, nil).Maybe()
-	params.On("SporkID").Return(unittest.IdentifierFixture(), nil).Maybe()
-	params.On("SporkRootBlockHeight").Return(s.rootBlockHeader.Height, nil).Maybe()
-	params.On("SealedRoot").Return(s.rootBlockHeader, nil).Maybe()
+	s.params = protocolmock.NewParams(s.T())
+	s.params.On("FinalizedRoot").Return(s.rootBlockHeader, nil).Maybe()
+	s.params.On("SporkID").Return(unittest.IdentifierFixture(), nil).Maybe()
+	s.params.On("SporkRootBlockHeight").Return(s.rootBlockHeader.Height, nil).Maybe()
+	s.params.On("SealedRoot").Return(s.rootBlockHeader, nil).Maybe()
 
 	s.state = protocolmock.NewState(s.T())
-	s.state.On("Params").Return(params).Maybe()
+	s.state.On("Params").Return(s.params).Maybe()
 
 	s.blocks = storagemock.NewBlocks(s.T())
 	s.headers = storagemock.NewHeaders(s.T())
@@ -139,13 +147,22 @@ func (s *Suite) SetupTest() {
 	s.systemTx, err = blueprints.SystemChunkTransaction(flow.Testnet.Chain())
 	s.Require().NoError(err)
 
-	s.db, s.dbDir = unittest.TempBadgerDB(s.T())
-	progress, err := store.NewConsumerProgress(badgerimpl.ToDB(s.db), module.ConsumeProgressLastFullBlockHeight).Initialize(0)
-	require.NoError(s.T(), err)
+	s.systemTx, err = blueprints.SystemChunkTransaction(flow.Testnet.Chain())
+	s.Require().NoError(err)
+	s.scheduledCallbacksEnabled = true
+
+	s.pendingExecutionEvents = s.createPendingExecutionEvents(2) // 2 callbacks
+	s.systemCollection, err = blueprints.SystemCollection(s.chainID.Chain(), s.pendingExecutionEvents)
+	s.Require().NoError(err)
+	s.processScheduledCallbackEventType = s.pendingExecutionEvents[0].Type
+
+	s.db, s.dbDir = unittest.TempPebbleDB(s.T())
+	progress, err := store.NewConsumerProgress(pebbleimpl.ToDB(s.db), module.ConsumeProgressLastFullBlockHeight).Initialize(0)
+	s.Require().NoError(err)
 	s.lastFullBlockHeight, err = counters.NewPersistentStrictMonotonicCounter(progress)
 	s.Require().NoError(err)
 
-	s.execResultProvider = optimisticsyncmock.NewExecutionResultProvider(s.T())
+	s.execResultProvider = optimisticsyncmock.NewExecutionResultInfoProvider(s.T())
 	s.executionStateCache = optimisticsyncmock.NewExecutionStateCache(s.T())
 	s.operatorCriteria = optimistic_sync.Criteria{}
 
@@ -168,15 +185,6 @@ func (s *Suite) TearDownTest() {
 	s.Require().NoError(err)
 }
 
-func (s *Suite) defaultTransactionsParamsWithExecutionResultProviderMocks() Params {
-	executionResult := unittest.ExecutionResultFixture(unittest.WithExecutionResultBlockID(s.rootBlockHeader.ID()))
-	s.snapshot.On("SealedResult").Return(executionResult, nil, nil).Once()
-	s.state.On("AtBlockID", mock.AnythingOfType("flow.Identifier")).Return(s.snapshot).Once()
-	s.headers.On("BlockIDByHeight", mock.AnythingOfType("uint64")).Return(s.rootBlockHeader.ID(), nil).Once()
-
-	return s.defaultTransactionsParams()
-}
-
 func (s *Suite) defaultTransactionsParams() Params {
 	nodeProvider := rpc.NewExecutionNodeIdentitiesProvider(
 		s.log,
@@ -185,16 +193,6 @@ func (s *Suite) defaultTransactionsParams() Params {
 		s.preferredExecutionNodeIDs,
 		s.fixedExecutionNodeIDs,
 	)
-
-	executionResultProvider, err := execution_result_provider.NewExecutionResultProvider(
-		s.log,
-		s.state,
-		s.headers,
-		s.receipts,
-		execution_result_provider.NewExecutionNodes(s.preferredExecutionNodeIDs, s.fixedExecutionNodeIDs),
-		s.operatorCriteria,
-	)
-	s.Require().NoError(err)
 
 	txStatusDeriver := txstatus.NewTxStatusDeriver(
 		s.state,
@@ -218,10 +216,10 @@ func (s *Suite) defaultTransactionsParams() Params {
 		s.collections,
 		s.connectionFactory,
 		nodeCommunicator,
-		executionResultProvider,
 		txStatusDeriver,
 		s.systemTx.ID(),
-		s.systemTx,
+		s.chainID,
+		s.scheduledCallbacksEnabled,
 	)
 
 	return Params{
@@ -230,7 +228,6 @@ func (s *Suite) defaultTransactionsParams() Params {
 		State:                       s.state,
 		ChainID:                     flow.Testnet,
 		SystemTxID:                  s.systemTx.ID(),
-		SystemTx:                    s.systemTx,
 		StaticCollectionRPCClient:   s.historicalAccessAPIClient,
 		HistoricalAccessNodeClients: nil,
 		NodeCommunicator:            nodeCommunicator,
@@ -247,6 +244,7 @@ func (s *Suite) defaultTransactionsParams() Params {
 		ExecutionStateCache:         s.executionStateCache,
 		ExecResultProvider:          s.execResultProvider,
 		OperatorCriteria:            s.operatorCriteria,
+		ScheduledCallbacksEnabled:   s.scheduledCallbacksEnabled,
 	}
 }
 
@@ -262,7 +260,7 @@ func (s *Suite) TestGetTransactionResult_UnknownTx() {
 		On("ByID", tx.ID()).
 		Return(nil, storage.ErrNotFound)
 
-	params := s.defaultTransactionsParamsWithExecutionResultProviderMocks()
+	params := s.defaultTransactionsParams()
 	txBackend, err := NewTransactionsBackend(params)
 	require.NoError(s.T(), err)
 	res, _, err := txBackend.GetTransactionResult(
@@ -295,7 +293,7 @@ func (s *Suite) TestGetTransactionResult_TxLookupFailure() {
 		On("ByID", tx.ID()).
 		Return(nil, expectedErr)
 
-	params := s.defaultTransactionsParamsWithExecutionResultProviderMocks()
+	params := s.defaultTransactionsParams()
 	txBackend, err := NewTransactionsBackend(params)
 	require.NoError(s.T(), err)
 
@@ -335,7 +333,7 @@ func (s *Suite) TestGetTransactionResult_HistoricNodes_Success() {
 		Return(&transactionResultResponse, nil).
 		Once()
 
-	params := s.defaultTransactionsParamsWithExecutionResultProviderMocks()
+	params := s.defaultTransactionsParams()
 	params.HistoricalAccessNodeClients = []access.AccessAPIClient{s.historicalAccessAPIClient}
 	txBackend, err := NewTransactionsBackend(params)
 	require.NoError(s.T(), err)
@@ -377,7 +375,7 @@ func (s *Suite) TestGetTransactionResult_HistoricNodes_FromCache() {
 		Return(&transactionResultResponse, nil).
 		Once()
 
-	params := s.defaultTransactionsParamsWithExecutionResultProviderMocks()
+	params := s.defaultTransactionsParams()
 	params.HistoricalAccessNodeClients = []access.AccessAPIClient{s.historicalAccessAPIClient}
 	txBackend, err := NewTransactionsBackend(params)
 	require.NoError(s.T(), err)
@@ -427,7 +425,7 @@ func (s *Suite) TestGetTransactionResultUnknownFromCache() {
 		Return(nil, status.Errorf(codes.NotFound, "no known transaction with ID %s", tx.ID())).
 		Once()
 
-	params := s.defaultTransactionsParamsWithExecutionResultProviderMocks()
+	params := s.defaultTransactionsParams()
 	params.HistoricalAccessNodeClients = []access.AccessAPIClient{s.historicalAccessAPIClient}
 	txBackend, err := NewTransactionsBackend(params)
 	require.NoError(s.T(), err)
@@ -469,22 +467,305 @@ func (s *Suite) TestGetTransactionResultUnknownFromCache() {
 }
 
 // TestGetSystemTransaction_HappyPath tests that GetSystemTransaction call returns system chunk transaction.
-func (s *Suite) TestGetSystemTransaction_HappyPath() {
-	params := s.defaultTransactionsParamsWithExecutionResultProviderMocks()
-	txBackend, err := NewTransactionsBackend(params)
-	require.NoError(s.T(), err)
-
+func (s *Suite) TestGetSystemTransaction_ExecutionNode_HappyPath() {
 	block := unittest.BlockFixture()
-	res, err := txBackend.GetSystemTransaction(context.Background(), block.ID())
-	s.Require().NoError(err)
+	blockID := block.ID()
 
-	systemTx, err := blueprints.SystemChunkTransaction(s.chainID.Chain())
-	s.Require().NoError(err)
+	params := s.defaultTransactionsParams()
+	enabledProvider := provider.NewENTransactionProvider(
+		s.log,
+		s.state,
+		s.collections,
+		s.connectionFactory,
+		params.NodeCommunicator,
+		params.TxStatusDeriver,
+		s.systemTx.ID(),
+		s.chainID,
+		true,
+	)
+	disabledProvider := provider.NewENTransactionProvider(
+		s.log,
+		s.state,
+		s.collections,
+		s.connectionFactory,
+		params.NodeCommunicator,
+		params.TxStatusDeriver,
+		s.systemTx.ID(),
+		s.chainID,
+		false,
+	)
 
-	s.Require().Equal(systemTx, res)
+	s.params.On("FinalizedRoot").Unset()
+
+	s.execResultProvider.
+		On("ExecutionResultInfo", block.ID(), mock.AnythingOfType("optimistic_sync.Criteria")).
+		Return(&optimistic_sync.ExecutionResultInfo{
+			ExecutionResultID: s.receiptsList[0].ExecutionResult.ID(),
+			ExecutionNodes:    s.identities.ToSkeleton(),
+		}, nil)
+
+	s.Run("scheduled callbacks DISABLED - ZeroID", func() {
+		s.blocks.On("ByID", blockID).Return(block, nil).Once()
+
+		params.TxProvider = disabledProvider
+
+		txBackend, err := NewTransactionsBackend(params)
+		s.Require().NoError(err)
+
+		res, _, err := txBackend.GetSystemTransaction(context.Background(), flow.ZeroID, blockID, optimistic_sync.Criteria{})
+		s.Require().NoError(err)
+
+		s.Require().Equal(s.systemTx, res)
+	})
+
+	s.Run("scheduled callbacks DISABLED - system txID", func() {
+		s.blocks.On("ByID", blockID).Return(block, nil).Once()
+
+		params.TxProvider = disabledProvider
+
+		txBackend, err := NewTransactionsBackend(params)
+		s.Require().NoError(err)
+
+		res, _, err := txBackend.GetSystemTransaction(context.Background(), s.systemTx.ID(), blockID, optimistic_sync.Criteria{})
+		s.Require().NoError(err)
+
+		s.Require().Equal(s.systemTx, res)
+	})
+
+	s.Run("scheduled callbacks DISABLED - non-system txID fails", func() {
+		s.blocks.On("ByID", blockID).Return(block, nil).Once()
+
+		params.TxProvider = disabledProvider
+
+		txBackend, err := NewTransactionsBackend(params)
+		s.Require().NoError(err)
+
+		res, _, err := txBackend.GetSystemTransaction(context.Background(), unittest.IdentifierFixture(), blockID, optimistic_sync.Criteria{})
+
+		s.Require().Error(err)
+		s.Require().Nil(res)
+	})
+
+	s.Run("scheduled callbacks ENABLED - ZeroID", func() {
+		s.blocks.On("ByID", blockID).Return(block, nil).Once()
+
+		params.TxProvider = enabledProvider
+
+		txBackend, err := NewTransactionsBackend(params)
+		s.Require().NoError(err)
+
+		res, _, err := txBackend.GetSystemTransaction(context.Background(), flow.ZeroID, blockID, optimistic_sync.Criteria{})
+		s.Require().NoError(err)
+
+		s.Require().Equal(s.systemTx, res)
+	})
+
+	s.Run("scheduled callbacks ENABLED - system txID", func() {
+		s.blocks.On("ByID", blockID).Return(block, nil).Once()
+
+		params.TxProvider = enabledProvider
+
+		txBackend, err := NewTransactionsBackend(params)
+		s.Require().NoError(err)
+
+		res, _, err := txBackend.GetSystemTransaction(context.Background(), s.systemTx.ID(), blockID, optimistic_sync.Criteria{})
+		s.Require().NoError(err)
+
+		s.Require().Equal(s.systemTx, res)
+	})
+
+	s.Run("scheduled callbacks ENABLED - system collection TX", func() {
+		s.blocks.On("ByID", blockID).Return(block, nil).Once()
+
+		s.setupExecutionGetEventsRequest(blockID, block.Height, s.pendingExecutionEvents)
+
+		params.TxProvider = enabledProvider
+
+		txBackend, err := NewTransactionsBackend(params)
+		s.Require().NoError(err)
+
+		systemTx := s.systemCollection.Transactions[2]
+		res, _, err := txBackend.GetSystemTransaction(context.Background(), systemTx.ID(), blockID, optimistic_sync.Criteria{})
+		s.Require().NoError(err)
+
+		s.Require().Equal(systemTx, res)
+	})
+
+	s.Run("scheduled callbacks ENABLED - non-system txID fails", func() {
+		s.blocks.On("ByID", blockID).Return(block, nil).Once()
+
+		params.TxProvider = enabledProvider
+
+		s.setupExecutionGetEventsRequest(blockID, block.Height, s.pendingExecutionEvents)
+
+		txBackend, err := NewTransactionsBackend(params)
+		s.Require().NoError(err)
+
+		res, _, err := txBackend.GetSystemTransaction(context.Background(), unittest.IdentifierFixture(), blockID, optimistic_sync.Criteria{})
+
+		s.Require().Error(err)
+		s.Require().Nil(res)
+	})
 }
 
-func (s *Suite) TestGetSystemTransactionResult_HappyPath() {
+// TestGetSystemTransaction_HappyPath tests that GetSystemTransaction call returns system chunk transaction.
+func (s *Suite) TestGetSystemTransaction_Local_HappyPath() {
+	block := unittest.BlockFixture()
+	blockID := block.ID()
+
+	executionResult := s.receiptsList[0].ExecutionResult
+	executionResultID := executionResult.ID()
+
+	params := s.defaultTransactionsParams()
+	enabledProvider := provider.NewLocalTransactionProvider(
+		s.collections,
+		s.systemTx.ID(),
+		params.TxStatusDeriver,
+		params.ExecutionStateCache,
+		s.chainID,
+		true,
+	)
+	disabledProvider := provider.NewLocalTransactionProvider(
+		s.collections,
+		s.systemTx.ID(),
+		params.TxStatusDeriver,
+		params.ExecutionStateCache,
+		s.chainID,
+		false,
+	)
+
+	s.params.On("FinalizedRoot").Unset()
+
+	// this is called for all tests
+	s.execResultProvider.
+		On("ExecutionResultInfo", block.ID(), mock.AnythingOfType("optimistic_sync.Criteria")).
+		Return(&optimistic_sync.ExecutionResultInfo{
+			ExecutionResultID: executionResultID,
+			ExecutionNodes:    s.identities.ToSkeleton(),
+		}, nil)
+
+	s.Run("scheduled callbacks DISABLED - ZeroID", func() {
+		s.blocks.On("ByID", blockID).Return(block, nil).Once()
+
+		params.TxProvider = disabledProvider
+
+		txBackend, err := NewTransactionsBackend(params)
+		s.Require().NoError(err)
+
+		res, _, err := txBackend.GetSystemTransaction(context.Background(), flow.ZeroID, blockID, optimistic_sync.Criteria{})
+		s.Require().NoError(err)
+
+		s.Require().Equal(s.systemTx, res)
+	})
+
+	s.Run("scheduled callbacks DISABLED - system txID", func() {
+		s.blocks.On("ByID", blockID).Return(block, nil).Once()
+
+		params.TxProvider = disabledProvider
+
+		txBackend, err := NewTransactionsBackend(params)
+		s.Require().NoError(err)
+
+		res, _, err := txBackend.GetSystemTransaction(context.Background(), s.systemTx.ID(), blockID, optimistic_sync.Criteria{})
+		s.Require().NoError(err)
+
+		s.Require().Equal(s.systemTx, res)
+	})
+
+	s.Run("scheduled callbacks DISABLED - non-system txID fails", func() {
+		s.blocks.On("ByID", blockID).Return(block, nil).Once()
+
+		params.TxProvider = disabledProvider
+
+		txBackend, err := NewTransactionsBackend(params)
+		s.Require().NoError(err)
+
+		res, _, err := txBackend.GetSystemTransaction(context.Background(), unittest.IdentifierFixture(), blockID, optimistic_sync.Criteria{})
+
+		s.Require().Error(err)
+		s.Require().Nil(res)
+	})
+
+	s.Run("scheduled callbacks ENABLED - ZeroID", func() {
+		s.blocks.On("ByID", blockID).Return(block, nil).Once()
+
+		params.TxProvider = enabledProvider
+
+		txBackend, err := NewTransactionsBackend(params)
+		s.Require().NoError(err)
+
+		res, _, err := txBackend.GetSystemTransaction(context.Background(), flow.ZeroID, blockID, optimistic_sync.Criteria{})
+
+		s.Require().NoError(err)
+
+		s.Require().Equal(s.systemTx, res)
+	})
+
+	s.Run("scheduled callbacks ENABLED - system txID", func() {
+		s.blocks.On("ByID", blockID).Return(block, nil).Once()
+
+		params.TxProvider = enabledProvider
+
+		txBackend, err := NewTransactionsBackend(params)
+		s.Require().NoError(err)
+
+		res, _, err := txBackend.GetSystemTransaction(context.Background(), s.systemTx.ID(), blockID, optimistic_sync.Criteria{})
+
+		s.Require().NoError(err)
+
+		s.Require().Equal(s.systemTx, res)
+	})
+
+	s.Run("scheduled callbacks ENABLED - system collection TX", func() {
+		systemTx := s.systemCollection.Transactions[2]
+		systemTxID := systemTx.ID()
+		params.TxProvider = enabledProvider
+
+		s.blocks.On("ByID", blockID).Return(block, nil).Once()
+		s.events.On("ByBlockID", blockID).Return(s.pendingExecutionEvents, nil).Once()
+
+		snapshot := optimisticsyncmock.NewSnapshot(s.T())
+		snapshot.On("Events").Return(s.events)
+
+		s.executionStateCache.
+			On("Snapshot", executionResultID).
+			Return(snapshot, nil).
+			Once()
+
+		txBackend, err := NewTransactionsBackend(params)
+		s.Require().NoError(err)
+
+		res, _, err := txBackend.GetSystemTransaction(context.Background(), systemTxID, blockID, optimistic_sync.Criteria{})
+
+		s.Require().NoError(err)
+		s.Require().Equal(systemTx, res)
+	})
+
+	s.Run("scheduled callbacks ENABLED - non-system txID fails", func() {
+		params.TxProvider = enabledProvider
+
+		s.blocks.On("ByID", blockID).Return(block, nil).Once()
+		s.events.On("ByBlockID", blockID).Return(s.pendingExecutionEvents, nil).Once()
+
+		snapshot := optimisticsyncmock.NewSnapshot(s.T())
+		snapshot.On("Events").Return(s.events)
+
+		s.executionStateCache.
+			On("Snapshot", executionResultID).
+			Return(snapshot, nil).
+			Once()
+
+		txBackend, err := NewTransactionsBackend(params)
+		s.Require().NoError(err)
+
+		res, _, err := txBackend.GetSystemTransaction(context.Background(), unittest.IdentifierFixture(), blockID, optimistic_sync.Criteria{})
+
+		s.Require().Error(err)
+		s.Require().Nil(res)
+	})
+}
+
+func (s *Suite) TestGetSystemTransactionResult_ExecutionNode_HappyPath() {
 	test := func(snapshot protocol.Snapshot) {
 		s.state.
 			On("Sealed").
@@ -502,18 +783,11 @@ func (s *Suite) TestGetSystemTransactionResult_HappyPath() {
 
 		stateSnapshotForKnownBlock := unittest.StateSnapshotForKnownBlock(block.ToHeader(), identities.Lookup())
 
-		s.state.
-			On("AtBlockID", blockID).
-			Return(stateSnapshotForKnownBlock, nil).
-			Once()
-
 		// block storage returns the corresponding block
 		s.blocks.
 			On("ByID", blockID).
 			Return(block, nil).
 			Once()
-
-		s.headers.On("BlockIDByHeight", mock.AnythingOfType("uint64")).Return(blockID, nil)
 
 		stateSnapshotForKnownBlock.On("SealedResult").Return(&s.receiptsList[0].ExecutionResult, nil, nil)
 
@@ -522,20 +796,19 @@ func (s *Suite) TestGetSystemTransactionResult_HappyPath() {
 		events := unittest.EventGenerator.GetEventsWithEncoding(1, exeNodeEventEncodingVersion)
 		eventMessages := convert.EventsToMessages(events)
 
-		exeEventResp := &execproto.GetTransactionResultsResponse{
-			TransactionResults: []*execproto.GetTransactionResultResponse{{
-				Events:               eventMessages,
-				EventEncodingVersion: exeNodeEventEncodingVersion,
-			}},
+		systemTxID := s.systemTx.ID()
+		expectedRequest := &execproto.GetTransactionResultRequest{
+			BlockId:       blockID[:],
+			TransactionId: systemTxID[:],
+		}
+		exeEventResp := &execproto.GetTransactionResultResponse{
+			Events:               eventMessages,
 			EventEncodingVersion: exeNodeEventEncodingVersion,
 		}
 
 		s.executionAPIClient.
-			On("GetTransactionResult", mock.Anything, mock.MatchedBy(func(req *execproto.GetTransactionResultRequest) bool {
-				txID := s.systemTx.ID()
-				return bytes.Equal(txID[:], req.TransactionId)
-			})).
-			Return(exeEventResp.TransactionResults[0], nil).
+			On("GetTransactionResult", mock.Anything, expectedRequest).
+			Return(exeEventResp, nil).
 			Once()
 
 		s.connectionFactory.
@@ -549,14 +822,15 @@ func (s *Suite) TestGetSystemTransactionResult_HappyPath() {
 		s.Require().NoError(err)
 
 		s.execResultProvider.
-			On("ExecutionResult", block.ID(), mock.AnythingOfType("optimistic_sync.Criteria")).
+			On("ExecutionResultInfo", block.ID(), mock.AnythingOfType("optimistic_sync.Criteria")).
 			Return(&optimistic_sync.ExecutionResultInfo{
-				ExecutionResult: &s.receiptsList[0].ExecutionResult,
-				ExecutionNodes:  s.identities.ToSkeleton(),
+				ExecutionResultID: s.receiptsList[0].ExecutionResult.ID(),
+				ExecutionNodes:    s.identities.ToSkeleton(),
 			}, nil)
 
 		res, _, err := backend.GetSystemTransactionResult(
 			context.Background(),
+			flow.ZeroID,
 			block.ID(),
 			entities.EventEncodingVersion_JSON_CDC_V0,
 			optimistic_sync.Criteria{},
@@ -585,7 +859,7 @@ func (s *Suite) TestGetSystemTransactionResult_HappyPath() {
 	util.RunWithFullProtocolStateAndMutator(
 		s.T(),
 		rootSnapshot,
-		func(db *badger.DB, state *bprotocol.ParticipantState, mutableState protocol.MutableProtocolState) {
+		func(db storage.DB, state *bprotocol.ParticipantState, mutableState protocol.MutableProtocolState) {
 			epochBuilder := unittest.NewEpochBuilder(s.T(), mutableState, state)
 
 			epochBuilder.
@@ -602,7 +876,7 @@ func (s *Suite) TestGetSystemTransactionResult_HappyPath() {
 	)
 }
 
-func (s *Suite) TestGetSystemTransactionResultFromStorage() {
+func (s *Suite) TestGetSystemTransactionResult_Local_HappyPath() {
 	block := unittest.BlockFixture()
 	sysTx, err := blueprints.SystemChunkTransaction(s.chainID.Chain())
 	s.Require().NoError(err)
@@ -636,7 +910,7 @@ func (s *Suite) TestGetSystemTransactionResultFromStorage() {
 	s.events.On("ByBlockIDTransactionID", blockId, txId).Return(eventsForTx, nil)
 
 	// Set up the backend parameters and the backend instance
-	params := s.defaultTransactionsParamsWithExecutionResultProviderMocks()
+	params := s.defaultTransactionsParams()
 
 	// Set up optimistic sync mocks to provide snapshot-backed readers
 	snapshot := optimisticsyncmock.NewSnapshot(s.T())
@@ -645,8 +919,8 @@ func (s *Suite) TestGetSystemTransactionResultFromStorage() {
 	// ExecutionResultQuery can return any result with an ID; only ID is used to fetch snapshot
 	fakeRes := &flow.ExecutionResult{PreviousResultID: unittest.IdentifierFixture()}
 	s.execResultProvider.
-		On("ExecutionResult", blockId, reqCriteria).
-		Return(&optimistic_sync.ExecutionResultInfo{ExecutionResult: fakeRes}, nil)
+		On("ExecutionResultInfo", blockId, reqCriteria).
+		Return(&optimistic_sync.ExecutionResultInfo{ExecutionResultID: fakeRes.ID()}, nil)
 	s.executionStateCache.
 		On("Snapshot", fakeRes.ID()).
 		Return(snapshot, nil)
@@ -656,23 +930,26 @@ func (s *Suite) TestGetSystemTransactionResultFromStorage() {
 	snapshot.On("LightTransactionResults").Return(s.lightTxResults)
 
 	params.TxProvider = provider.NewLocalTransactionProvider(
-		params.State,
 		params.Collections,
-		params.Blocks,
 		params.SystemTxID,
 		params.TxStatusDeriver,
-		s.execResultProvider,
 		s.executionStateCache,
+		params.ChainID,
+		params.ScheduledCallbacksEnabled,
 	)
 
 	txBackend, err := NewTransactionsBackend(params)
 	s.Require().NoError(err)
-	response, _, err := txBackend.GetSystemTransactionResult(
+	response, metadata, err := txBackend.GetSystemTransactionResult(
 		context.Background(),
+		flow.ZeroID,
 		blockId,
 		entities.EventEncodingVersion_JSON_CDC_V0,
 		reqCriteria,
 	)
+
+	_ = metadata // TODO: validate metadata
+
 	s.assertTransactionResultResponse(err, response, *block, txId, lightResult.Failed, eventsForTx)
 }
 
@@ -684,11 +961,12 @@ func (s *Suite) TestGetSystemTransactionResult_BlockNotFound() {
 		Return(nil, storage.ErrNotFound).
 		Once()
 
-	params := s.defaultTransactionsParamsWithExecutionResultProviderMocks()
+	params := s.defaultTransactionsParams()
 	txBackend, err := NewTransactionsBackend(params)
 	s.Require().NoError(err)
 	res, _, err := txBackend.GetSystemTransactionResult(
 		context.Background(),
+		flow.ZeroID,
 		block.ID(),
 		entities.EventEncodingVersion_JSON_CDC_V0,
 		optimistic_sync.Criteria{},
@@ -718,19 +996,19 @@ func (s *Suite) TestGetSystemTransactionResult_FailedEncodingConversion() {
 	eventsPerBlock := 10
 	eventMessages := make([]*entities.Event, eventsPerBlock)
 
-	exeEventResp := &execproto.GetTransactionResultsResponse{
-		TransactionResults: []*execproto.GetTransactionResultResponse{{
-			Events:               eventMessages,
-			EventEncodingVersion: entities.EventEncodingVersion_JSON_CDC_V0,
-		}},
+	systemTxID := s.systemTx.ID()
+	expectedRequest := &execproto.GetTransactionResultRequest{
+		BlockId:       blockID[:],
+		TransactionId: systemTxID[:],
+	}
+	exeEventResp := &execproto.GetTransactionResultResponse{
+		Events:               eventMessages,
+		EventEncodingVersion: entities.EventEncodingVersion_JSON_CDC_V0,
 	}
 
 	s.executionAPIClient.
-		On("GetTransactionResult", mock.Anything, mock.MatchedBy(func(req *execproto.GetTransactionResultRequest) bool {
-			txID := s.systemTx.ID()
-			return bytes.Equal(txID[:], req.TransactionId)
-		})).
-		Return(exeEventResp.TransactionResults[0], nil).
+		On("GetTransactionResult", mock.Anything, expectedRequest).
+		Return(exeEventResp, nil).
 		Once()
 
 	s.connectionFactory.
@@ -738,19 +1016,20 @@ func (s *Suite) TestGetSystemTransactionResult_FailedEncodingConversion() {
 		Return(s.executionAPIClient, &mocks.MockCloser{}, nil).
 		Once()
 
-	params := s.defaultTransactionsParamsWithExecutionResultProviderMocks()
+	params := s.defaultTransactionsParams()
 	txBackend, err := NewTransactionsBackend(params)
 	s.Require().NoError(err)
 
 	s.execResultProvider.
-		On("ExecutionResult", block.ID(), mock.AnythingOfType("optimistic_sync.Criteria")).
+		On("ExecutionResultInfo", block.ID(), mock.AnythingOfType("optimistic_sync.Criteria")).
 		Return(&optimistic_sync.ExecutionResultInfo{
-			ExecutionResult: &s.receiptsList[0].ExecutionResult,
-			ExecutionNodes:  s.identities.ToSkeleton(),
+			ExecutionResultID: s.receiptsList[0].ExecutionResult.ID(),
+			ExecutionNodes:    s.identities.ToSkeleton(),
 		}, nil)
 
 	res, _, err := txBackend.GetSystemTransactionResult(
 		context.Background(),
+		flow.ZeroID,
 		block.ID(),
 		entities.EventEncodingVersion_CCF_V0,
 		optimistic_sync.Criteria{},
@@ -812,7 +1091,7 @@ func (s *Suite) TestGetTransactionResult_FromStorage() {
 			ExecutorID:    unittest.IdentifierFixture(),
 		}, nil)
 
-	params := s.defaultTransactionsParamsWithExecutionResultProviderMocks()
+	params := s.defaultTransactionsParams()
 
 	// Set up optimistic sync mocks to provide snapshot-backed readers
 	snapshot := optimisticsyncmock.NewSnapshot(s.T())
@@ -820,26 +1099,24 @@ func (s *Suite) TestGetTransactionResult_FromStorage() {
 	snapshot.On("Events").Return(s.events)
 	snapshot.On("LightTransactionResults").Return(s.lightTxResults)
 	snapshot.On("TransactionResultErrorMessages").Return(s.txResultErrorMessages)
-	snapshot.On("Collections").Return(s.collections)
 
 	// ExecutionResultQuery can return any result with an ID; only ID is used to fetch snapshot
 	fakeRes := &flow.ExecutionResult{PreviousResultID: unittest.IdentifierFixture()}
 	s.execResultProvider.
-		On("ExecutionResult", block.ID(), mock.AnythingOfType("optimistic_sync.Criteria")).
+		On("ExecutionResultInfo", block.ID(), mock.AnythingOfType("optimistic_sync.Criteria")).
 		Return(&optimistic_sync.ExecutionResultInfo{
-			ExecutionResult: fakeRes,
-			ExecutionNodes:  s.identities.ToSkeleton(),
+			ExecutionResultID: fakeRes.ID(),
+			ExecutionNodes:    s.identities.ToSkeleton(),
 		}, nil)
 	s.executionStateCache.On("Snapshot", mock.Anything).Return(snapshot, nil)
 
 	params.TxProvider = provider.NewLocalTransactionProvider(
-		params.State,
 		params.Collections,
-		params.Blocks,
 		params.SystemTxID,
 		params.TxStatusDeriver,
-		s.execResultProvider,
 		s.executionStateCache,
+		params.ChainID,
+		params.ScheduledCallbacksEnabled,
 	)
 
 	txBackend, err := NewTransactionsBackend(params)
@@ -904,7 +1181,7 @@ func (s *Suite) TestTransactionByIndexFromStorage() {
 			ExecutorID:    unittest.IdentifierFixture(),
 		}, nil)
 
-	params := s.defaultTransactionsParamsWithExecutionResultProviderMocks()
+	params := s.defaultTransactionsParams()
 
 	// Set up optimistic sync mocks to provide snapshot-backed readers
 	snapshot := optimisticsyncmock.NewSnapshot(s.T())
@@ -913,23 +1190,21 @@ func (s *Suite) TestTransactionByIndexFromStorage() {
 	// ExecutionResultQuery can return any result with an ID; only ID is used to fetch snapshot
 	fakeRes := &flow.ExecutionResult{PreviousResultID: unittest.IdentifierFixture()}
 	s.execResultProvider.
-		On("ExecutionResult", block.ID(), mock.AnythingOfType("optimistic_sync.Criteria")).
-		Return(&optimistic_sync.ExecutionResultInfo{ExecutionResult: fakeRes}, nil)
+		On("ExecutionResultInfo", block.ID(), mock.AnythingOfType("optimistic_sync.Criteria")).
+		Return(&optimistic_sync.ExecutionResultInfo{ExecutionResultID: fakeRes.ID()}, nil)
 	s.executionStateCache.On("Snapshot", mock.Anything).Return(snapshot, nil)
 
 	// Snapshot readers delegate to our storage mocks
 	snapshot.On("Events").Return(s.events)
 	snapshot.On("LightTransactionResults").Return(s.lightTxResults)
-	snapshot.On("Collections").Return(s.collections)
 	snapshot.On("TransactionResultErrorMessages").Return(s.txResultErrorMessages)
 	params.TxProvider = provider.NewLocalTransactionProvider(
-		params.State,
 		params.Collections,
-		params.Blocks,
 		params.SystemTxID,
 		params.TxStatusDeriver,
-		s.execResultProvider,
 		s.executionStateCache,
+		params.ChainID,
+		params.ScheduledCallbacksEnabled,
 	)
 
 	txBackend, err := NewTransactionsBackend(params)
@@ -1009,7 +1284,7 @@ func (s *Suite) TestTransactionResultsByBlockIDFromStorage() {
 
 	// Set up the state and snapshot mocks
 
-	params := s.defaultTransactionsParamsWithExecutionResultProviderMocks()
+	params := s.defaultTransactionsParams()
 
 	// Set up optimistic sync mocks to provide snapshot-backed readers
 	snapshot := optimisticsyncmock.NewSnapshot(s.T())
@@ -1018,23 +1293,21 @@ func (s *Suite) TestTransactionResultsByBlockIDFromStorage() {
 	// ExecutionResultQuery can return any result with an ID; only ID is used to fetch snapshot
 	fakeRes := &flow.ExecutionResult{PreviousResultID: unittest.IdentifierFixture()}
 	s.execResultProvider.
-		On("ExecutionResult", block.ID(), mock.AnythingOfType("optimistic_sync.Criteria")).
-		Return(&optimistic_sync.ExecutionResultInfo{ExecutionResult: fakeRes}, nil)
+		On("ExecutionResultInfo", block.ID(), mock.AnythingOfType("optimistic_sync.Criteria")).
+		Return(&optimistic_sync.ExecutionResultInfo{ExecutionResultID: fakeRes.ID()}, nil)
 	s.executionStateCache.On("Snapshot", mock.Anything).Return(snapshot, nil)
 
 	// Snapshot readers delegate to our storage mocks
 	snapshot.On("Events").Return(s.events)
 	snapshot.On("LightTransactionResults").Return(s.lightTxResults)
-	snapshot.On("Collections").Return(s.collections)
 	snapshot.On("TransactionResultErrorMessages").Return(s.txResultErrorMessages)
 	params.TxProvider = provider.NewLocalTransactionProvider(
-		params.State,
 		params.Collections,
-		params.Blocks,
 		params.SystemTxID,
 		params.TxStatusDeriver,
-		s.execResultProvider,
 		s.executionStateCache,
+		params.ChainID,
+		params.ScheduledCallbacksEnabled,
 	)
 	txBackend, err := NewTransactionsBackend(params)
 	s.Require().NoError(err)
@@ -1051,6 +1324,285 @@ func (s *Suite) TestTransactionResultsByBlockIDFromStorage() {
 	}
 }
 
+func (s *Suite) TestGetTransactionsByBlockID() {
+	// Create fixtures
+	col := unittest.CollectionFixture(3)
+	guarantee := &flow.CollectionGuarantee{CollectionID: col.ID()}
+	block := unittest.BlockFixture(
+		unittest.Block.WithPayload(unittest.PayloadFixture(unittest.WithGuarantees(guarantee))),
+	)
+	blockID := block.ID()
+
+	// Create PendingExecution events for scheduled callbacks
+	pendingExecutionEvents := s.createPendingExecutionEvents(2) // 2 callbacks
+
+	// Reconstruct expected system collection to get the actual transaction IDs
+	expectedSystemCollection, err := blueprints.SystemCollection(s.chainID.Chain(), pendingExecutionEvents)
+	s.Require().NoError(err)
+
+	// Expected transaction counts
+	expectedUserTxCount := len(col.Transactions)
+	expectedSystemTxCount := len(expectedSystemCollection.Transactions)
+	expectedTotalCount := expectedUserTxCount + expectedSystemTxCount
+
+	executionResult := s.receiptsList[0].ExecutionResult
+	executionResultID := executionResult.ID()
+
+	s.execResultProvider.
+		On("ExecutionResultInfo", block.ID(), mock.AnythingOfType("optimistic_sync.Criteria")).
+		Return(&optimistic_sync.ExecutionResultInfo{
+			ExecutionResultID: executionResultID,
+			ExecutionNodes:    s.identities.ToSkeleton(),
+		}, nil)
+
+	// Test with Local Provider
+	s.Run("LocalProvider", func() {
+		snapshot := optimisticsyncmock.NewSnapshot(s.T())
+		snapshot.On("Events").Return(s.events)
+
+		s.executionStateCache.
+			On("Snapshot", executionResultID).
+			Return(snapshot, nil).
+			Once()
+
+		s.blocks.On("ByID", blockID).Return(block, nil).Once()
+		s.collections.On("ByID", col.ID()).Return(&col, nil).Once()
+		s.events.On("ByBlockID", blockID).Return(pendingExecutionEvents, nil).Once()
+
+		// Set up the backend parameters with local transaction provider
+		params := s.defaultTransactionsParams()
+
+		params.TxProvider = provider.NewLocalTransactionProvider(
+			params.Collections,
+			params.SystemTxID,
+			params.TxStatusDeriver,
+			params.ExecutionStateCache,
+			params.ChainID,
+			params.ScheduledCallbacksEnabled,
+		)
+
+		txBackend, err := NewTransactionsBackend(params)
+		s.Require().NoError(err)
+
+		// Call GetTransactionsByBlockID
+		transactions, err := txBackend.GetTransactionsByBlockID(context.Background(), blockID)
+		s.Require().NoError(err)
+
+		// Verify transaction count
+		s.Require().Equal(expectedTotalCount, len(transactions), "expected %d transactions but got %d", expectedTotalCount, len(transactions))
+
+		// Verify user transactions
+		for i, tx := range col.Transactions {
+			s.Assert().Equal(tx.ID(), transactions[i].ID(), "user transaction %d mismatch", i)
+		}
+
+		// Verify system transactions
+		for i, expectedTx := range expectedSystemCollection.Transactions {
+			actualTx := transactions[expectedUserTxCount+i]
+			s.Assert().Equal(expectedTx.ID(), actualTx.ID(), "system transaction %d mismatch", i)
+		}
+	})
+
+	// Test with Execution Node Provider
+	s.Run("ExecutionNodeProvider", func() {
+		s.blocks.On("ByID", blockID).Return(block, nil).Once()
+		s.collections.On("ByID", col.ID()).Return(&col, nil).Once()
+
+		s.setupExecutionGetEventsRequest(blockID, block.Height, pendingExecutionEvents)
+
+		// Set up the backend parameters with EN transaction provider
+		params := s.defaultTransactionsParams()
+		params.TxProvider = provider.NewENTransactionProvider(
+			params.Log,
+			params.State,
+			params.Collections,
+			params.ConnFactory,
+			params.NodeCommunicator,
+			params.TxStatusDeriver,
+			params.SystemTxID,
+			params.ChainID,
+			params.ScheduledCallbacksEnabled,
+		)
+
+		txBackend, err := NewTransactionsBackend(params)
+		s.Require().NoError(err)
+
+		// Call GetTransactionsByBlockID
+		transactions, err := txBackend.GetTransactionsByBlockID(context.Background(), blockID)
+		s.Require().NoError(err)
+
+		// For empty events, we expect: user transactions + process tx + system chunk tx (no execute callback txs)
+		expectedSystemCollectionEmpty, err := blueprints.SystemCollection(s.chainID.Chain(), pendingExecutionEvents)
+		s.Require().NoError(err)
+		expectedTotalCountEmpty := len(col.Transactions) + len(expectedSystemCollectionEmpty.Transactions)
+
+		// Verify transaction count
+		s.Assert().Equal(expectedTotalCountEmpty, len(transactions))
+
+		// Verify user transactions
+		for i, tx := range col.Transactions {
+			s.Assert().Equal(tx.ID(), transactions[i].ID())
+		}
+
+		// Verify system transactions (process + system chunk only, no execute callbacks)
+		for i, expectedTx := range expectedSystemCollectionEmpty.Transactions {
+			actualTx := transactions[len(col.Transactions)+i]
+			s.Assert().Equal(expectedTx.ID(), actualTx.ID())
+		}
+	})
+}
+
+func (s *Suite) TestTransactionResultsByBlockIDFromExecutionNode() {
+	// Create fixtures for the block and collection
+	col := unittest.CollectionFixture(2)
+	guarantee := &flow.CollectionGuarantee{CollectionID: col.ID()}
+	block := unittest.BlockFixture(
+		unittest.Block.WithPayload(unittest.PayloadFixture(unittest.WithGuarantees(guarantee))),
+	)
+	blockId := block.ID()
+
+	// Mock the behavior of the blocks, collections and light transaction results objects
+	lightCol := col.Light()
+	s.blocks.On("ByID", blockId).Return(block, nil)
+	s.collections.On("LightByID", mock.Anything).Return(lightCol, nil).Once()
+
+	// Execute callback transactions will be reconstructed from PendingExecution events
+	// We don't create them manually - they'll be generated by blueprints.SystemCollection
+	// System collection will be reconstructed from events, so we don't need to pre-populate lightTxResults
+
+	lightTxResults := make([]flow.LightTransactionResult, len(lightCol.Transactions))
+	for i, txID := range lightCol.Transactions {
+		lightTxResults[i] = flow.LightTransactionResult{
+			TransactionID:   txID,
+			Failed:          false,
+			ComputationUsed: 0,
+		}
+	}
+
+	// Create PendingExecution events that would be emitted by the process callback transaction
+	pendingExecutionEvents := s.createPendingExecutionEvents(2) // 2 callbacks
+
+	// Convert PendingExecution events to protobuf messages for execution node response
+	pendingEventMessages := make([]*entities.Event, len(pendingExecutionEvents))
+	for i, event := range pendingExecutionEvents {
+		pendingEventMessages[i] = convert.EventToMessage(event)
+	}
+
+	// Reconstruct the expected system collection to get the actual transaction IDs
+	expectedSystemCollection, err := blueprints.SystemCollection(s.chainID.Chain(), pendingExecutionEvents)
+	s.Require().NoError(err)
+
+	// Extract the expected transaction IDs in order: process, execute callbacks, system chunk
+	expectedSystemTxIDs := make([]flow.Identifier, len(expectedSystemCollection.Transactions))
+	for i, tx := range expectedSystemCollection.Transactions {
+		expectedSystemTxIDs[i] = tx.ID()
+	}
+
+	s.Require().Equal(4, len(expectedSystemTxIDs), "should have 4 system transactions: process + 2 execute callbacks + system chunk")
+
+	// Build the execution response with all transaction results including proper events
+	userTxResults := make([]*execproto.GetTransactionResultResponse, len(lightCol.Transactions))
+	for i := 0; i < len(lightCol.Transactions); i++ {
+		userTxResults[i] = &execproto.GetTransactionResultResponse{
+			Events: []*entities.Event{},
+		}
+	}
+
+	// System transaction results: process (with events), execute callback txs, system chunk
+	systemTxResults := []*execproto.GetTransactionResultResponse{
+		// Process callback transaction with PendingExecution events
+		{Events: pendingEventMessages},
+		// Execute callback transaction 1
+		{Events: []*entities.Event{}},
+		// Execute callback transaction 2
+		{Events: []*entities.Event{}},
+		// System chunk transaction
+		{Events: []*entities.Event{}},
+	}
+
+	allTxResults := append(userTxResults, systemTxResults...)
+
+	// Set up execution node response with system transactions
+	// The execution node response should include: user txs + process tx (with PendingExecution events) + execute txs + system chunk tx
+	exeGetTxReq := &execproto.GetTransactionsByBlockIDRequest{
+		BlockId: blockId[:],
+	}
+	exeGetTxResp := &execproto.GetTransactionResultsResponse{
+		TransactionResults:   allTxResults,
+		EventEncodingVersion: entities.EventEncodingVersion_CCF_V0,
+	}
+	s.executionAPIClient.
+		On("GetTransactionResultsByBlockID", mock.Anything, exeGetTxReq).
+		Return(exeGetTxResp, nil).
+		Once()
+
+	s.connectionFactory.
+		On("GetExecutionAPIClient", mock.Anything).
+		Return(s.executionAPIClient, &mocks.MockCloser{}, nil).
+		Once()
+
+	executionResult := s.receiptsList[0].ExecutionResult
+
+	s.execResultProvider.
+		On("ExecutionResultInfo", block.ID(), mock.AnythingOfType("optimistic_sync.Criteria")).
+		Return(&optimistic_sync.ExecutionResultInfo{
+			ExecutionResultID: executionResult.ID(),
+			ExecutionNodes:    s.identities.ToSkeleton(),
+		}, nil)
+
+	// used to derive transaction status
+	s.state.On("Sealed").Return(s.snapshot, nil)
+	s.snapshot.On("Head").Return(block.ToHeader(), nil)
+
+	params := s.defaultTransactionsParams()
+	params.TxProvider = provider.NewENTransactionProvider(
+		params.Log,
+		params.State,
+		params.Collections,
+		params.ConnFactory,
+		params.NodeCommunicator,
+		params.TxStatusDeriver,
+		params.SystemTxID,
+		params.ChainID,
+		params.ScheduledCallbacksEnabled,
+	)
+	txBackend, err := NewTransactionsBackend(params)
+	s.Require().NoError(err)
+
+	response, metadata, err := txBackend.GetTransactionResultsByBlockID(context.Background(), blockId, entities.EventEncodingVersion_CCF_V0, optimistic_sync.Criteria{})
+
+	_ = metadata // TODO: validate metadata
+
+	s.Require().NoError(err)
+
+	// Expected total: user transactions + system transactions (process + 2 execute callbacks + system chunk)
+	expectedTotal := len(lightTxResults) + len(expectedSystemTxIDs)
+	s.Assert().Equal(expectedTotal, len(response), "should have user txs + system txs")
+
+	// Verify user transactions
+	userTxCount := len(lightCol.Transactions)
+	for i := 0; i < userTxCount; i++ {
+		s.Assert().Equal(lightTxResults[i].TransactionID, response[i].TransactionID)
+		s.Assert().Equal(block.Payload.Guarantees[0].CollectionID, response[i].CollectionID)
+		s.Assert().Equal(block.ID(), response[i].BlockID)
+		s.Assert().Equal(block.Height, response[i].BlockHeight)
+		s.Assert().Equal(flow.TransactionStatusSealed, response[i].Status)
+	}
+
+	// Verify system collection transactions (all should have ZeroID as collectionID)
+	systemTxCount := len(response) - userTxCount
+	s.Assert().Equal(len(expectedSystemTxIDs), systemTxCount, "should have 4 system transactions: process + 2 execute callbacks + system chunk")
+
+	for i := 0; i < systemTxCount; i++ {
+		systemTxIndex := userTxCount + i
+		s.Assert().Equal(flow.ZeroID, response[systemTxIndex].CollectionID)
+		s.Assert().Equal(block.ID(), response[systemTxIndex].BlockID)
+		s.Assert().Equal(block.Height, response[systemTxIndex].BlockHeight)
+		s.Assert().Equal(flow.TransactionStatusSealed, response[systemTxIndex].Status)
+		s.Assert().Equal(expectedSystemTxIDs[i], response[userTxCount+i].TransactionID, "system transaction %d should match reconstructed ID", i)
+	}
+}
+
 // TestTransactionRetry tests that the retry mechanism will send retries at specific times
 func (s *Suite) TestTransactionRetry() {
 	block := unittest.BlockFixture(
@@ -1058,12 +1610,6 @@ func (s *Suite) TestTransactionRetry() {
 		unittest.Block.WithHeight(flow.DefaultTransactionExpiry + 1),
 	)
 	transactionBody := unittest.TransactionBodyFixture(unittest.WithReferenceBlock(block.ID()))
-
-	// execution result provider bootstrap
-	s.headers.On("BlockIDByHeight", s.rootBlockHeader.Height).Return(s.rootBlockHeader.ID(), nil).Once()
-	snapshotAtRoot := protocolmock.NewSnapshot(s.T())
-	snapshotAtRoot.On("SealedResult").Return(unittest.ExecutionResultFixture(), nil, nil)
-	s.state.On("AtBlockID", s.rootBlockHeader.ID()).Return(snapshotAtRoot)
 
 	snapshotAtBlock := protocolmock.NewSnapshot(s.T())
 	s.state.On("Final").Return(snapshotAtBlock)
@@ -1136,7 +1682,7 @@ func (s *Suite) TestSuccessfulTransactionsDontRetry() {
 		Return(s.executionAPIClient, &mocks.MockCloser{}, nil).
 		Times(len(s.identities))
 
-	params := s.defaultTransactionsParamsWithExecutionResultProviderMocks()
+	params := s.defaultTransactionsParams()
 	client := accessmock.NewAccessAPIClient(s.T())
 	params.StaticCollectionRPCClient = client
 	txBackend, err := NewTransactionsBackend(params)
@@ -1151,18 +1697,12 @@ func (s *Suite) TestSuccessfulTransactionsDontRetry() {
 	)
 	retry.RegisterTransaction(block.Height, transactionBody)
 
-	snapshot := optimisticsyncmock.NewSnapshot(s.T())
-	snapshot.On("Collections").Return(s.collections)
-
 	s.execResultProvider.
-		On("ExecutionResult", block.ID(), mock.AnythingOfType("optimistic_sync.Criteria")).
+		On("ExecutionResultInfo", block.ID(), mock.AnythingOfType("optimistic_sync.Criteria")).
 		Return(&optimistic_sync.ExecutionResultInfo{
-			ExecutionResult: unittest.ExecutionResultFixture(),
-			ExecutionNodes:  s.identities.ToSkeleton(),
+			ExecutionResultID: unittest.IdentifierFixture(),
+			ExecutionNodes:    s.identities.ToSkeleton(),
 		}, nil)
-	s.executionStateCache.
-		On("Snapshot", mock.Anything).
-		Return(snapshot, nil)
 
 	// first call - when block under test is greater height than the sealed head, but execution node does not know about Tx
 	result, _, err := txBackend.GetTransactionResult(
@@ -1199,21 +1739,6 @@ func (s *Suite) TestSuccessfulTransactionsDontRetry() {
 	client.AssertNotCalled(s.T(), "SendTransaction", mock.Anything, mock.Anything)
 }
 
-func (s *Suite) setupReceipts(block *flow.Block) ([]*flow.ExecutionReceipt, flow.IdentityList) {
-	receipt1 := unittest.ReceiptForBlockFixture(block)
-	receipt1.ExecutorID = s.identities[0].NodeID
-	receipt2 := unittest.ReceiptForBlockFixture(block)
-	receipt2.ExecutorID = s.identities[1].NodeID
-	receipt1.ExecutionResult = receipt2.ExecutionResult
-
-	receipts := flow.ExecutionReceiptList{receipt1, receipt2}
-	s.receipts.
-		On("ByBlockID", block.ID()).
-		Return(receipts, nil)
-
-	return receipts, s.identities
-}
-
 func (s *Suite) assertTransactionResultResponse(
 	err error,
 	response *accessmodel.TransactionResult,
@@ -1241,4 +1766,98 @@ func (s *Suite) assertTransactionResultResponse(
 		s.Assert().Equal("", response.ErrorMessage)
 	}
 	s.Assert().Equal(flow.TransactionStatusSealed, response.Status)
+}
+
+// createPendingExecutionEvents creates properly formatted PendingExecution events
+// that blueprints.SystemCollection expects for reconstructing the system collection.
+func (s *Suite) createPendingExecutionEvents(numCallbacks int) []flow.Event {
+	events := make([]flow.Event, numCallbacks)
+
+	// Get system contracts for the test chain
+	env := systemcontracts.SystemContractsForChain(s.chainID).AsTemplateEnv()
+
+	for i := 0; i < numCallbacks; i++ {
+		// Create the PendingExecution event as it would be emitted by the process callback transaction
+		const processedEventTypeTemplate = "A.%v.FlowTransactionScheduler.PendingExecution"
+		eventTypeString := fmt.Sprintf(processedEventTypeTemplate, env.FlowTransactionSchedulerAddress)
+
+		// Create Cadence event type
+		loc, err := cadenceCommon.HexToAddress(env.FlowTransactionSchedulerAddress)
+		s.Require().NoError(err)
+		location := cadenceCommon.NewAddressLocation(nil, loc, "PendingExecution")
+
+		eventType := cadence.NewEventType(
+			location,
+			"PendingExecution",
+			[]cadence.Field{
+				{Identifier: "id", Type: cadence.UInt64Type},
+				{Identifier: "priority", Type: cadence.UInt8Type},
+				{Identifier: "executionEffort", Type: cadence.UInt64Type},
+				{Identifier: "fees", Type: cadence.UFix64Type},
+				{Identifier: "callbackOwner", Type: cadence.AddressType},
+			},
+			nil,
+		)
+
+		fees, err := cadence.NewUFix64("0.0")
+		s.Require().NoError(err)
+
+		// Create the Cadence event with proper values
+		event := cadence.NewEvent(
+			[]cadence.Value{
+				cadence.NewUInt64(uint64(i + 1)),           // id: unique callback ID
+				cadence.NewUInt8(1),                        // priority
+				cadence.NewUInt64(uint64((i+1)*100 + 100)), // executionEffort (200, 300, etc.)
+				fees,                          // fees: 0.0
+				cadence.NewAddress([8]byte{}), // callbackOwner
+			},
+		).WithType(eventType)
+
+		// Encode the event using CCF
+		payload, err := ccf.Encode(event)
+		s.Require().NoError(err)
+
+		// Create the Flow event
+		events[i] = flow.Event{
+			Type:             flow.EventType(eventTypeString),
+			TransactionID:    unittest.IdentifierFixture(), // Process callback transaction ID
+			TransactionIndex: 0,
+			EventIndex:       uint32(i),
+			Payload:          payload,
+		}
+	}
+
+	return events
+}
+
+func (s *Suite) setupExecutionGetEventsRequest(blockID flow.Identifier, blockHeight uint64, events []flow.Event) {
+	eventMessages := make([]*entities.Event, len(events))
+	for i, event := range events {
+		eventMessages[i] = convert.EventToMessage(event)
+	}
+
+	request := &execproto.GetEventsForBlockIDsRequest{
+		Type:     string(s.processScheduledCallbackEventType),
+		BlockIds: [][]byte{blockID[:]},
+	}
+	expectedResponse := &execproto.GetEventsForBlockIDsResponse{
+		Results: []*execproto.GetEventsForBlockIDsResponse_Result{
+			{
+				BlockId:     blockID[:],
+				BlockHeight: blockHeight,
+				Events:      eventMessages,
+			},
+		},
+		EventEncodingVersion: entities.EventEncodingVersion_CCF_V0,
+	}
+
+	s.executionAPIClient.
+		On("GetEventsForBlockIDs", mock.Anything, request).
+		Return(expectedResponse, nil).
+		Once()
+
+	s.connectionFactory.
+		On("GetExecutionAPIClient", mock.Anything).
+		Return(s.executionAPIClient, &mocks.MockCloser{}, nil).
+		Once()
 }

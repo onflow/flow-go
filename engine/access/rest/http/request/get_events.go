@@ -106,7 +106,7 @@ func parseGetEvents(
 		}
 	}
 
-	executionStateQuery, err := parser.NewExecutionDataQuery(
+	executionStateQuery, err := parser.NewExecutionStateQuery(
 		rawAgreeingExecutorsCount,
 		rawAgreeingExecutorsIds,
 		rawIncludeExecutorMetadata,

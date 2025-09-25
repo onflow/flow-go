@@ -1,21 +1,23 @@
 package evm_test
 
 import (
+	"bytes"
 	"encoding/binary"
 	"fmt"
 	"math"
 	"math/big"
 	"testing"
 
+	"github.com/ethereum/go-ethereum/common"
 	gethTypes "github.com/ethereum/go-ethereum/core/types"
 	gethParams "github.com/ethereum/go-ethereum/params"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/onflow/cadence/encoding/ccf"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/encoding/json"
-	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/engine/execution/testutil"
 	"github.com/onflow/flow-go/fvm"
@@ -3114,6 +3116,187 @@ func TestCadenceArch(t *testing.T) {
 	})
 }
 
+func TestEVMFileSystemContract(t *testing.T) {
+	chain := flow.Emulator.Chain()
+	sc := systemcontracts.SystemContractsForChain(chain.ChainID())
+
+	runFileSystemContract := func(
+		ctx fvm.Context,
+		vm fvm.VM,
+		snapshot snapshot.SnapshotTree,
+		testContract *TestContract,
+		testAccount *EOATestAccount,
+		computeLimit uint64,
+	) (
+		*snapshot.ExecutionSnapshot,
+		fvm.ProcedureOutput,
+	) {
+		code := []byte(fmt.Sprintf(
+			`
+					import EVM from %s
+
+					transaction(tx: [UInt8], coinbaseBytes: [UInt8; 20]){
+						prepare(account: &Account) {
+							let coinbase = EVM.EVMAddress(bytes: coinbaseBytes)
+							let res = EVM.run(tx: tx, coinbase: coinbase)
+						}
+					}
+					`,
+			sc.EVMContract.Address.HexWithPrefix(),
+		))
+
+		coinbaseAddr := types.Address{1, 2, 3}
+		coinbaseBalance := getEVMAccountBalance(t, ctx, vm, snapshot, coinbaseAddr)
+		require.Zero(t, types.BalanceToBigInt(coinbaseBalance).Uint64())
+
+		var buffer bytes.Buffer
+		address := common.HexToAddress("0xea02F564664A477286B93712829180be4764fAe2")
+		chunkHash := "0x2521660d04da85198d1cc71c20a69b7e875ebbf1682f6a5c6a3fec69068ccc13"
+		index := int64(0)
+		chunk := "T1ARYBYsPOJPVYoU7wVp+PYuXmdS6bgkLf2egcxa+1hP64wAxfkLXtnllU6DmEuj+Id4oWl1ZV4ftQ+ofQ3DQhOoxNlPZGOYbhoMLuzE"
+		for i := 0; i <= 500; i++ {
+			buffer.WriteString(chunk)
+		}
+		innerTxBytes := testAccount.PrepareSignAndEncodeTx(t,
+			testContract.DeployedAt.ToCommon(),
+			testContract.MakeCallData(
+				t,
+				"publishChunk",
+				address,
+				chunkHash,
+				big.NewInt(index),
+				buffer.String(),
+			),
+			big.NewInt(0),
+			uint64(2_132_171),
+			big.NewInt(1),
+		)
+
+		innerTx := cadence.NewArray(
+			unittest.BytesToCdcUInt8(innerTxBytes),
+		).WithType(stdlib.EVMTransactionBytesCadenceType)
+
+		coinbase := cadence.NewArray(
+			unittest.BytesToCdcUInt8(coinbaseAddr.Bytes()),
+		).WithType(stdlib.EVMAddressBytesCadenceType)
+
+		txBody, err := flow.NewTransactionBodyBuilder().
+			SetScript(code).
+			SetComputeLimit(computeLimit).
+			AddAuthorizer(sc.FlowServiceAccount.Address).
+			AddArgument(json.MustEncode(innerTx)).
+			AddArgument(json.MustEncode(coinbase)).
+			Build()
+		require.NoError(t, err)
+
+		tx := fvm.Transaction(
+			txBody,
+			0,
+		)
+
+		state, output, err := vm.Run(ctx, tx, snapshot)
+		require.NoError(t, err)
+		return state, output
+	}
+
+	t.Run("happy case", func(t *testing.T) {
+		RunContractWithNewEnvironment(
+			t,
+			chain,
+			GetFileSystemContract(t),
+			func(
+				ctx fvm.Context,
+				vm fvm.VM,
+				snapshot snapshot.SnapshotTree,
+				testContract *TestContract,
+				testAccount *EOATestAccount,
+			) {
+				state, output := runFileSystemContract(ctx, vm, snapshot, testContract, testAccount, 438)
+
+				require.NoError(t, output.Err)
+				require.NotEmpty(t, state.WriteSet)
+				snapshot = snapshot.Append(state)
+
+				// assert event fields are correct
+				require.Len(t, output.Events, 2)
+				txEvent := output.Events[0]
+				txEventPayload := TxEventToPayload(t, txEvent, sc.EVMContract.Address)
+
+				// fee transfer event
+				feeTransferEvent := output.Events[1]
+				feeTranferEventPayload := TxEventToPayload(t, feeTransferEvent, sc.EVMContract.Address)
+				require.Equal(t, uint16(types.ErrCodeNoError), feeTranferEventPayload.ErrorCode)
+				require.Equal(t, uint16(1), feeTranferEventPayload.Index)
+				require.Equal(t, uint64(21000), feeTranferEventPayload.GasConsumed)
+				//
+				//// commit block
+				blockEventPayload, _ := callEVMHeartBeat(t,
+					ctx,
+					vm,
+					snapshot,
+				)
+				//
+				require.NotEmpty(t, blockEventPayload.Hash)
+				require.Equal(t, uint64(2_132_170), blockEventPayload.TotalGasUsed)
+
+				txHashes := types.TransactionHashes{txEventPayload.Hash, feeTranferEventPayload.Hash}
+				require.Equal(t,
+					txHashes.RootHash(),
+					blockEventPayload.TransactionHashRoot,
+				)
+				require.NotEmpty(t, blockEventPayload.ReceiptRoot)
+
+				require.Equal(t, uint16(types.ErrCodeNoError), txEventPayload.ErrorCode)
+				require.Equal(t, uint16(0), txEventPayload.Index)
+				require.Equal(t, blockEventPayload.Height, txEventPayload.BlockHeight)
+				require.Equal(t, blockEventPayload.TotalGasUsed-feeTranferEventPayload.GasConsumed, txEventPayload.GasConsumed)
+				require.Empty(t, txEventPayload.ContractAddress)
+
+				require.Equal(t, 437, int(output.ComputationUsed))
+			},
+			fvm.WithExecutionEffortWeights(
+				environment.MainnetExecutionEffortWeights,
+			),
+		)
+	})
+
+	t.Run("insufficient FVM computation to execute EVM transaction", func(t *testing.T) {
+		RunContractWithNewEnvironment(
+			t,
+			chain,
+			GetFileSystemContract(t),
+			func(
+				ctx fvm.Context,
+				vm fvm.VM,
+				snapshot snapshot.SnapshotTree,
+				testContract *TestContract,
+				testAccount *EOATestAccount,
+			) {
+				state, output := runFileSystemContract(ctx, vm, snapshot, testContract, testAccount, 400)
+				snapshot = snapshot.Append(state)
+
+				require.Len(t, output.Events, 0)
+
+				//// commit block
+				blockEventPayload, _ := callEVMHeartBeat(t,
+					ctx,
+					vm,
+					snapshot,
+				)
+				//
+				require.NotEmpty(t, blockEventPayload.Hash)
+				require.Equal(t, uint64(0), blockEventPayload.TotalGasUsed)
+
+				// only a small amount of computation was used due to the EVM transaction never being executed
+				require.Equal(t, 8, int(output.ComputationUsed))
+			},
+			fvm.WithExecutionEffortWeights(
+				environment.MainnetExecutionEffortWeights,
+			),
+		)
+	})
+}
+
 func createAndFundFlowAccount(
 	t *testing.T,
 	ctx fvm.Context,
@@ -3413,11 +3596,9 @@ func RunWithNewEnvironment(
 	),
 ) {
 	rootAddr := evm.StorageAccountAddress(chain.ChainID())
-
 	RunWithTestBackend(t, func(backend *TestBackend) {
 		RunWithDeployedContract(t, GetStorageTestContract(t), backend, rootAddr, func(testContract *TestContract) {
 			RunWithEOATestAccount(t, backend, rootAddr, func(testAccount *EOATestAccount) {
-
 				blocks := new(envMock.Blocks)
 				block1 := unittest.BlockFixture()
 				blocks.On("ByHeightFrom",
@@ -3443,6 +3624,73 @@ func RunWithNewEnvironment(
 				baseBootstrapOpts := []fvm.BootstrapProcedureOption{
 					fvm.WithInitialTokenSupply(unittest.GenesisTokenSupply),
 				}
+
+				executionSnapshot, _, err := vm.Run(
+					ctx,
+					fvm.Bootstrap(unittest.ServiceAccountPublicKey, baseBootstrapOpts...),
+					snapshotTree)
+				require.NoError(t, err)
+
+				snapshotTree = snapshotTree.Append(executionSnapshot)
+
+				f(
+					fvm.NewContextFromParent(ctx, fvm.WithEVMEnabled(true)),
+					vm,
+					snapshotTree,
+					testContract,
+					testAccount,
+				)
+			})
+		})
+	})
+}
+
+func RunContractWithNewEnvironment(
+	t *testing.T,
+	chain flow.Chain,
+	tc *TestContract,
+	f func(
+		fvm.Context,
+		fvm.VM,
+		snapshot.SnapshotTree,
+		*TestContract,
+		*EOATestAccount,
+	),
+	bootstrapOpts ...fvm.BootstrapProcedureOption,
+) {
+	rootAddr := evm.StorageAccountAddress(chain.ChainID())
+
+	RunWithTestBackend(t, func(backend *TestBackend) {
+		RunWithDeployedContract(t, tc, backend, rootAddr, func(testContract *TestContract) {
+			RunWithEOATestAccount(t, backend, rootAddr, func(testAccount *EOATestAccount) {
+
+				blocks := new(envMock.Blocks)
+				block1 := unittest.BlockFixture()
+				header1 := block1.ToHeader()
+				blocks.On("ByHeightFrom",
+					header1.Height,
+					header1,
+				).Return(header1, nil)
+
+				opts := []fvm.Option{
+					fvm.WithChain(chain),
+					fvm.WithBlockHeader(header1),
+					fvm.WithAuthorizationChecksEnabled(false),
+					fvm.WithSequenceNumberCheckAndIncrementEnabled(false),
+					fvm.WithEntropyProvider(testutil.EntropyProviderFixture(nil)),
+					fvm.WithRandomSourceHistoryCallAllowed(true),
+					fvm.WithBlocks(blocks),
+					fvm.WithCadenceLogging(true),
+				}
+				ctx := fvm.NewContext(opts...)
+
+				vm := fvm.NewVirtualMachine()
+				snapshotTree := snapshot.NewSnapshotTree(backend)
+
+				baseBootstrapOpts := []fvm.BootstrapProcedureOption{
+					fvm.WithInitialTokenSupply(unittest.GenesisTokenSupply),
+				}
+				baseBootstrapOpts = append(baseBootstrapOpts, bootstrapOpts...)
 
 				executionSnapshot, _, err := vm.Run(
 					ctx,

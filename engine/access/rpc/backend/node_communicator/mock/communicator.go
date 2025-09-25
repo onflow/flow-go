@@ -13,21 +13,33 @@ type Communicator struct {
 }
 
 // CallAvailableNode provides a mock function with given fields: nodes, call, shouldTerminateOnError
-func (_m *Communicator) CallAvailableNode(nodes flow.GenericIdentityList[flow.IdentitySkeleton], call func(*flow.IdentitySkeleton) error, shouldTerminateOnError func(*flow.IdentitySkeleton, error) bool) error {
+func (_m *Communicator) CallAvailableNode(nodes flow.GenericIdentityList[flow.IdentitySkeleton], call func(*flow.IdentitySkeleton) error, shouldTerminateOnError func(*flow.IdentitySkeleton, error) bool) (*flow.IdentitySkeleton, error) {
 	ret := _m.Called(nodes, call, shouldTerminateOnError)
 
 	if len(ret) == 0 {
 		panic("no return value specified for CallAvailableNode")
 	}
 
-	var r0 error
-	if rf, ok := ret.Get(0).(func(flow.GenericIdentityList[flow.IdentitySkeleton], func(*flow.IdentitySkeleton) error, func(*flow.IdentitySkeleton, error) bool) error); ok {
+	var r0 *flow.IdentitySkeleton
+	var r1 error
+	if rf, ok := ret.Get(0).(func(flow.GenericIdentityList[flow.IdentitySkeleton], func(*flow.IdentitySkeleton) error, func(*flow.IdentitySkeleton, error) bool) (*flow.IdentitySkeleton, error)); ok {
+		return rf(nodes, call, shouldTerminateOnError)
+	}
+	if rf, ok := ret.Get(0).(func(flow.GenericIdentityList[flow.IdentitySkeleton], func(*flow.IdentitySkeleton) error, func(*flow.IdentitySkeleton, error) bool) *flow.IdentitySkeleton); ok {
 		r0 = rf(nodes, call, shouldTerminateOnError)
 	} else {
-		r0 = ret.Error(0)
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*flow.IdentitySkeleton)
+		}
 	}
 
-	return r0
+	if rf, ok := ret.Get(1).(func(flow.GenericIdentityList[flow.IdentitySkeleton], func(*flow.IdentitySkeleton) error, func(*flow.IdentitySkeleton, error) bool) error); ok {
+		r1 = rf(nodes, call, shouldTerminateOnError)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
 }
 
 // NewCommunicator creates a new instance of Communicator. It also registers a testing interface on the mock and a cleanup function to assert the mocks expectations.

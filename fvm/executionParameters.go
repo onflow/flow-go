@@ -127,7 +127,7 @@ func (computer ExecutionParametersComputer) Compute(
 ) {
 	var overrides derived.StateExecutionParameters
 	var err error
-	computer.txnState.RunWithAllLimitsDisabled(func() {
+	computer.txnState.RunWithMeteringDisabled(func() {
 		overrides, err = computer.getExecutionParameters()
 	})
 

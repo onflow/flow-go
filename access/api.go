@@ -29,11 +29,11 @@ type EventsAPI interface {
 	GetEventsForHeightRange(
 		ctx context.Context,
 		eventType string,
-		startHeight,
+		startHeight uint64,
 		endHeight uint64,
 		requiredEventEncodingVersion entities.EventEncodingVersion,
 		criteria optimistic_sync.Criteria,
-	) ([]flow.BlockEvents, accessmodel.ExecutorMetadata, error)
+	) ([]flow.BlockEvents, *accessmodel.ExecutorMetadata, error)
 
 	GetEventsForBlockIDs(
 		ctx context.Context,
@@ -41,7 +41,7 @@ type EventsAPI interface {
 		blockIDs []flow.Identifier,
 		requiredEventEncodingVersion entities.EventEncodingVersion,
 		criteria optimistic_sync.Criteria,
-	) ([]flow.BlockEvents, accessmodel.ExecutorMetadata, error)
+	) ([]flow.BlockEvents, *accessmodel.ExecutorMetadata, error)
 }
 
 type ScriptsAPI interface {
@@ -63,28 +63,34 @@ type TransactionsAPI interface {
 		collectionID flow.Identifier,
 		encodingVersion entities.EventEncodingVersion,
 		criteria optimistic_sync.Criteria,
-	) (*accessmodel.TransactionResult, accessmodel.ExecutorMetadata, error)
+	) (*accessmodel.TransactionResult, *accessmodel.ExecutorMetadata, error)
 	GetTransactionResultByIndex(
 		ctx context.Context,
 		blockID flow.Identifier,
 		index uint32,
 		encodingVersion entities.EventEncodingVersion,
 		criteria optimistic_sync.Criteria,
-	) (*accessmodel.TransactionResult, accessmodel.ExecutorMetadata, error)
+	) (*accessmodel.TransactionResult, *accessmodel.ExecutorMetadata, error)
 	GetTransactionResultsByBlockID(
 		ctx context.Context,
 		blockID flow.Identifier,
 		encodingVersion entities.EventEncodingVersion,
 		criteria optimistic_sync.Criteria,
-	) ([]*accessmodel.TransactionResult, accessmodel.ExecutorMetadata, error)
+	) ([]*accessmodel.TransactionResult, *accessmodel.ExecutorMetadata, error)
 
-	GetSystemTransaction(ctx context.Context, blockID flow.Identifier) (*flow.TransactionBody, error)
+	GetSystemTransaction(
+		ctx context.Context,
+		txID flow.Identifier,
+		blockID flow.Identifier,
+		criteria optimistic_sync.Criteria,
+	) (*flow.TransactionBody, *accessmodel.ExecutorMetadata, error)
 	GetSystemTransactionResult(
 		ctx context.Context,
+		txID flow.Identifier,
 		blockID flow.Identifier,
 		encodingVersion entities.EventEncodingVersion,
 		criteria optimistic_sync.Criteria,
-	) (*accessmodel.TransactionResult, accessmodel.ExecutorMetadata, error)
+	) (*accessmodel.TransactionResult, *accessmodel.ExecutorMetadata, error)
 }
 
 type TransactionStreamAPI interface {

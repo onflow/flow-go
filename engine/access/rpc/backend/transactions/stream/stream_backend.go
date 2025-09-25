@@ -5,10 +5,9 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/rs/zerolog"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
-
-	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow/protobuf/go/flow/entities"
 
@@ -48,7 +47,7 @@ type TransactionStream struct {
 
 	txProvider         *txprovider.FailoverTransactionProvider
 	txStatusDeriver    *txstatus.TxStatusDeriver
-	execResultProvider optimistic_sync.ExecutionResultProvider
+	execResultProvider optimistic_sync.ExecutionResultInfoProvider
 }
 
 var _ access.TransactionStreamAPI = (*TransactionStream)(nil)
@@ -64,7 +63,7 @@ func NewTransactionStreamBackend(
 	transactions storage.Transactions,
 	txProvider *txprovider.FailoverTransactionProvider,
 	txStatusDeriver *txstatus.TxStatusDeriver,
-	execResultProvider optimistic_sync.ExecutionResultProvider,
+	execResultProvider optimistic_sync.ExecutionResultInfoProvider,
 ) *TransactionStream {
 	return &TransactionStream{
 		log:                 log,

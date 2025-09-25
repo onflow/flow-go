@@ -140,7 +140,7 @@ func run(*cobra.Command, []string) {
 		registersByAccount.AccountCount(),
 	)
 
-	options := computation.DefaultFVMOptions(chainID, false, false, false)
+	options := computation.DefaultFVMOptions(chainID, false, false)
 	options = append(
 		options,
 		fvm.WithContractDeploymentRestricted(false),
@@ -320,8 +320,8 @@ func (*api) GetTransactionResult(
 	_ flow.Identifier,
 	_ entities.EventEncodingVersion,
 	_ optimistic_sync.Criteria,
-) (*accessmodel.TransactionResult, accessmodel.ExecutorMetadata, error) {
-	return nil, accessmodel.ExecutorMetadata{}, errors.New("unimplemented")
+) (*accessmodel.TransactionResult, *accessmodel.ExecutorMetadata, error) {
+	return nil, nil, errors.New("unimplemented")
 }
 
 func (*api) GetTransactionResultByIndex(
@@ -330,8 +330,8 @@ func (*api) GetTransactionResultByIndex(
 	_ uint32,
 	_ entities.EventEncodingVersion,
 	_ optimistic_sync.Criteria,
-) (*accessmodel.TransactionResult, accessmodel.ExecutorMetadata, error) {
-	return nil, accessmodel.ExecutorMetadata{}, errors.New("unimplemented")
+) (*accessmodel.TransactionResult, *accessmodel.ExecutorMetadata, error) {
+	return nil, nil, errors.New("unimplemented")
 }
 
 func (*api) GetTransactionResultsByBlockID(
@@ -339,24 +339,27 @@ func (*api) GetTransactionResultsByBlockID(
 	_ flow.Identifier,
 	_ entities.EventEncodingVersion,
 	_ optimistic_sync.Criteria,
-) ([]*accessmodel.TransactionResult, accessmodel.ExecutorMetadata, error) {
-	return nil, accessmodel.ExecutorMetadata{}, errors.New("unimplemented")
+) ([]*accessmodel.TransactionResult, *accessmodel.ExecutorMetadata, error) {
+	return nil, nil, errors.New("unimplemented")
 }
 
 func (*api) GetSystemTransaction(
 	_ context.Context,
 	_ flow.Identifier,
-) (*flow.TransactionBody, error) {
-	return nil, errors.New("unimplemented")
+	_ flow.Identifier,
+	_ optimistic_sync.Criteria,
+) (*flow.TransactionBody, *accessmodel.ExecutorMetadata, error) {
+	return nil, nil, errors.New("unimplemented")
 }
 
 func (*api) GetSystemTransactionResult(
 	_ context.Context,
 	_ flow.Identifier,
+	_ flow.Identifier,
 	_ entities.EventEncodingVersion,
 	_ optimistic_sync.Criteria,
-) (*accessmodel.TransactionResult, accessmodel.ExecutorMetadata, error) {
-	return nil, accessmodel.ExecutorMetadata{}, errors.New("unimplemented")
+) (*accessmodel.TransactionResult, *accessmodel.ExecutorMetadata, error) {
+	return nil, nil, errors.New("unimplemented")
 }
 
 func (*api) GetAccount(_ context.Context, _ flow.Address) (*flow.Account, error) {
@@ -453,8 +456,8 @@ func (a *api) GetEventsForHeightRange(
 	_, _ uint64,
 	_ entities.EventEncodingVersion,
 	_ optimistic_sync.Criteria,
-) ([]flow.BlockEvents, accessmodel.ExecutorMetadata, error) {
-	return nil, accessmodel.ExecutorMetadata{}, errors.New("unimplemented")
+) ([]flow.BlockEvents, *accessmodel.ExecutorMetadata, error) {
+	return nil, nil, errors.New("unimplemented")
 }
 
 func (a *api) GetEventsForBlockIDs(
@@ -463,8 +466,8 @@ func (a *api) GetEventsForBlockIDs(
 	_ []flow.Identifier,
 	_ entities.EventEncodingVersion,
 	_ optimistic_sync.Criteria,
-) ([]flow.BlockEvents, accessmodel.ExecutorMetadata, error) {
-	return nil, accessmodel.ExecutorMetadata{}, errors.New("unimplemented")
+) ([]flow.BlockEvents, *accessmodel.ExecutorMetadata, error) {
+	return nil, nil, errors.New("unimplemented")
 }
 
 func (*api) GetLatestProtocolStateSnapshot(_ context.Context) ([]byte, error) {

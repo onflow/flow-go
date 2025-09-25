@@ -32,26 +32,6 @@ func (_m *Snapshot) BlockStatus() flow.BlockStatus {
 	return r0
 }
 
-// Collections provides a mock function with no fields
-func (_m *Snapshot) Collections() storage.CollectionsReader {
-	ret := _m.Called()
-
-	if len(ret) == 0 {
-		panic("no return value specified for Collections")
-	}
-
-	var r0 storage.CollectionsReader
-	if rf, ok := ret.Get(0).(func() storage.CollectionsReader); ok {
-		r0 = rf()
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(storage.CollectionsReader)
-		}
-	}
-
-	return r0
-}
-
 // Events provides a mock function with no fields
 func (_m *Snapshot) Events() storage.EventsReader {
 	ret := _m.Called()
@@ -126,26 +106,6 @@ func (_m *Snapshot) TransactionResultErrorMessages() storage.TransactionResultEr
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(storage.TransactionResultErrorMessagesReader)
-		}
-	}
-
-	return r0
-}
-
-// Transactions provides a mock function with no fields
-func (_m *Snapshot) Transactions() storage.TransactionsReader {
-	ret := _m.Called()
-
-	if len(ret) == 0 {
-		panic("no return value specified for Transactions")
-	}
-
-	var r0 storage.TransactionsReader
-	if rf, ok := ret.Get(0).(func() storage.TransactionsReader); ok {
-		r0 = rf()
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(storage.TransactionsReader)
 		}
 	}
 

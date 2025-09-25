@@ -38,7 +38,7 @@ type TransactionMetadata struct {
 
 	txProvider         *txprovider.FailoverTransactionProvider
 	txStatusDeriver    *txstatus.TxStatusDeriver
-	execResultProvider optimistic_sync.ExecutionResultProvider
+	execResultProvider optimistic_sync.ExecutionResultInfoProvider
 
 	execResultInfo *optimistic_sync.ExecutionResultInfo
 	criteria       optimistic_sync.Criteria
@@ -54,7 +54,7 @@ func NewTransactionMetadata(
 	eventEncodingVersion entities.EventEncodingVersion,
 	txProvider *txprovider.FailoverTransactionProvider,
 	txStatusDeriver *txstatus.TxStatusDeriver,
-	execResultProvider optimistic_sync.ExecutionResultProvider,
+	execResultProvider optimistic_sync.ExecutionResultInfoProvider,
 ) *TransactionMetadata {
 	return &TransactionMetadata{
 		txResult:             &accessmodel.TransactionResult{TransactionID: txID},
@@ -164,7 +164,7 @@ func (t *TransactionMetadata) refreshBlock() error {
 	t.txResult.BlockID = block.ID()
 	t.txResult.BlockHeight = block.Height
 
-	execResultInfo, err := t.execResultProvider.ExecutionResult(t.txResult.BlockID, t.criteria)
+	execResultInfo, err := t.execResultProvider.ExecutionResultInfo(t.txResult.BlockID, t.criteria)
 	if err != nil {
 		if common.IsInsufficientExecutionReceipts(err) {
 			return nil
@@ -209,7 +209,14 @@ func (t *TransactionMetadata) refreshTransactionResult(ctx context.Context) erro
 	// TODO: need a way to check if the result in execResultInfo is still valid.
 	// if it is ever abandoned, we need to trigger the streaming fork recovery process.
 
-	txResult, _, err := t.txProvider.TransactionResult(ctx, t.blockWithTx, t.txResult.TransactionID, t.eventEncodingVersion, t.execResultInfo)
+	txResult, _, err := t.txProvider.TransactionResult(
+		ctx,
+		t.blockWithTx,
+		t.txResult.TransactionID,
+		t.txResult.CollectionID,
+		t.eventEncodingVersion,
+		t.execResultInfo,
+	)
 	if err != nil {
 		// TODO: I don't like the fact we propagate this error from txProvider.
 		// Fix it during error handling polishing project

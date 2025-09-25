@@ -79,11 +79,11 @@ func NewCoreImpl(
 	persistentRegisters storage.RegisterIndex,
 	persistentEvents storage.Events,
 	persistentCollections storage.Collections,
-	persistentTransactions storage.Transactions,
 	persistentResults storage.LightTransactionResults,
 	persistentTxResultErrMsg storage.TransactionResultErrorMessages,
 	latestPersistedSealedResult storage.LatestPersistedSealedResult,
 	protocolDB storage.DB,
+	lockManager storage.LockManager,
 ) *CoreImpl {
 	coreLogger := logger.With().
 		Str("component", "execution_data_core").
@@ -94,8 +94,8 @@ func NewCoreImpl(
 
 	inmemRegisters := unsynchronized.NewRegisters(header.Height)
 	inmemEvents := unsynchronized.NewEvents()
-	inmemCollections := unsynchronized.NewCollections()
 	inmemTransactions := unsynchronized.NewTransactions()
+	inmemCollections := unsynchronized.NewCollections(inmemTransactions)
 	inmemResults := unsynchronized.NewLightTransactionResults()
 	inmemTxResultErrMsgs := unsynchronized.NewTransactionResultErrorMessages()
 
@@ -104,18 +104,17 @@ func NewCoreImpl(
 		inmemRegisters,
 		inmemEvents,
 		inmemCollections,
-		inmemTransactions,
 		inmemResults,
 		inmemTxResultErrMsgs,
 		executionResult,
 		header,
+		lockManager,
 	)
 
 	persisterStores := []stores.PersisterStore{
 		stores.NewEventsStore(inmemEvents, persistentEvents, executionResult.BlockID),
 		stores.NewResultsStore(inmemResults, persistentResults, executionResult.BlockID),
-		stores.NewCollectionsStore(inmemCollections, persistentCollections),
-		stores.NewTransactionsStore(inmemTransactions, persistentTransactions),
+		stores.NewCollectionsStore(inmemCollections, persistentCollections, lockManager),
 		stores.NewTxResultErrMsgStore(inmemTxResultErrMsgs, persistentTxResultErrMsg, executionResult.BlockID),
 		stores.NewLatestSealedResultStore(latestPersistedSealedResult, executionResult.ID(), header.Height),
 	}
@@ -123,6 +122,7 @@ func NewCoreImpl(
 	blockPersister := persisters.NewBlockPersister(
 		coreLogger,
 		protocolDB,
+		lockManager,
 		executionResult,
 		header,
 		persisterStores,

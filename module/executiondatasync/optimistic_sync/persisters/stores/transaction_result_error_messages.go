@@ -3,6 +3,8 @@ package stores
 import (
 	"fmt"
 
+	"github.com/jordanschalm/lockctx"
+
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/store/inmemory/unsynchronized"
@@ -31,7 +33,7 @@ func NewTxResultErrMsgStore(
 
 // Persist adds transaction result error messages to the batch.
 // No errors are expected during normal operations
-func (t *TxResultErrMsgStore) Persist(batch storage.ReaderBatchWriter) error {
+func (t *TxResultErrMsgStore) Persist(lctx lockctx.Proof, batch storage.ReaderBatchWriter) error {
 	txResultErrMsgs, err := t.inMemoryTxResultErrMsg.ByBlockID(t.blockID)
 	if err != nil {
 		return fmt.Errorf("could not get transaction result error messages: %w", err)

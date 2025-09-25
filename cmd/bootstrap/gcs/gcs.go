@@ -96,14 +96,15 @@ func (g *googleBucket) DownloadFile(ctx context.Context, client *storage.Client,
 // UploadFile uploads a file to the google bucket
 func (g *googleBucket) UploadFile(ctx context.Context, client *storage.Client, destination, source string) error {
 
-	upload := client.Bucket(g.Name).Object(destination).NewWriter(ctx)
-	defer upload.Close()
-
+	// Validate source file exists before creating GCS writer to avoid creating empty files
 	file, err := os.Open(source)
 	if err != nil {
 		return fmt.Errorf("Error opening upload file: %w", err)
 	}
 	defer file.Close()
+
+	upload := client.Bucket(g.Name).Object(destination).NewWriter(ctx)
+	defer upload.Close()
 
 	_, err = io.Copy(upload, file)
 	if err != nil {

@@ -10,14 +10,17 @@ import (
 	commonmodels "github.com/onflow/flow-go/engine/access/rest/common/models"
 	"github.com/onflow/flow-go/engine/access/rest/http/models"
 	"github.com/onflow/flow-go/engine/access/rest/http/request"
-	"github.com/onflow/flow-go/module/executiondatasync/optimistic_sync"
 )
 
 const BlockQueryParam = "block_ids"
 const EventTypeQuery = "type"
 
 // GetEvents for the provided block range or list of block IDs filtered by type.
-func GetEvents(r *common.Request, backend access.API, _ commonmodels.LinkGenerator) (interface{}, error) {
+func GetEvents(
+	r *common.Request,
+	backend access.API,
+	_ commonmodels.LinkGenerator,
+) (interface{}, error) {
 	req, err := request.NewGetEvents(r)
 	if err != nil {
 		return nil, common.NewBadRequestError(err)
@@ -30,18 +33,25 @@ func GetEvents(r *common.Request, backend access.API, _ commonmodels.LinkGenerat
 			req.Type,
 			req.BlockIDs,
 			entitiesproto.EventEncodingVersion_JSON_CDC_V0,
-			NewCriteria(req.ExecutionState),
+			models.NewCriteria(req.ExecutionState),
 		)
 		if err != nil {
 			return nil, err
 		}
 
-		return commonmodels.NewBlockEventsList(events, &metadata, req.ExecutionState.IncludeExecutorMetadata), nil
+		return commonmodels.NewBlockEventsList(
+			events,
+			metadata,
+			req.ExecutionState.IncludeExecutorMetadata,
+		), nil
 	}
 
 	// if end height is provided with special values then load the height
 	if req.EndHeight == request.FinalHeight || req.EndHeight == request.SealedHeight {
-		latest, _, err := backend.GetLatestBlockHeader(r.Context(), req.EndHeight == request.SealedHeight)
+		latest, _, err := backend.GetLatestBlockHeader(
+			r.Context(),
+			req.EndHeight == request.SealedHeight,
+		)
 		if err != nil {
 			return nil, err
 		}
@@ -60,18 +70,15 @@ func GetEvents(r *common.Request, backend access.API, _ commonmodels.LinkGenerat
 		req.StartHeight,
 		req.EndHeight,
 		entitiesproto.EventEncodingVersion_JSON_CDC_V0,
-		NewCriteria(req.ExecutionState),
+		models.NewCriteria(req.ExecutionState),
 	)
 	if err != nil {
 		return nil, err
 	}
 
-	return commonmodels.NewBlockEventsList(events, &metadata, req.ExecutionState.IncludeExecutorMetadata), nil
-}
-
-func NewCriteria(query models.ExecutionStateQuery) optimistic_sync.Criteria {
-	return optimistic_sync.Criteria{
-		AgreeingExecutorsCount: uint(query.AgreeingExecutorsCount),
-		RequiredExecutors:      query.RequiredExecutorIds,
-	}
+	return commonmodels.NewBlockEventsList(
+		events,
+		metadata,
+		req.ExecutionState.IncludeExecutorMetadata,
+	), nil
 }
