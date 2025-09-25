@@ -63,7 +63,7 @@ func TestScripts_HappyPath(t *testing.T) {
 		backend := &mock.API{}
 		blockID := unittest.IdentifierFixture()
 		backend.On("ExecuteScriptAtBlockID", mocks.Anything, blockID, validCode, [][]byte{validArgs}, mocks.Anything).
-			Return([]byte("hello world"), access.ExecutorMetadata{}, nil).
+			Return([]byte("hello world"), &access.ExecutorMetadata{}, nil).
 			Once()
 
 		req := buildScriptRequest(
@@ -84,7 +84,7 @@ func TestScripts_HappyPath(t *testing.T) {
 		backend := &mock.API{}
 		height := uint64(1337)
 		backend.On("ExecuteScriptAtBlockHeight", mocks.Anything, height, validCode, [][]byte{validArgs}, mocks.Anything).
-			Return([]byte("hello world"), access.ExecutorMetadata{}, nil).
+			Return([]byte("hello world"), &access.ExecutorMetadata{}, nil).
 			Once()
 
 		req := buildScriptRequest(
@@ -104,7 +104,7 @@ func TestScripts_HappyPath(t *testing.T) {
 	t.Run("latest height (legacyParams)", func(t *testing.T) {
 		backend := &mock.API{}
 		backend.On("ExecuteScriptAtLatestBlock", mocks.Anything, validCode, [][]byte{validArgs}, mocks.Anything).
-			Return([]byte("hello world"), access.ExecutorMetadata{}, nil).
+			Return([]byte("hello world"), &access.ExecutorMetadata{}, nil).
 			Once()
 
 		req := buildScriptRequest(
@@ -128,7 +128,7 @@ func TestScripts_HappyPath(t *testing.T) {
 			Return(finalBlock, flow.BlockStatusFinalized, nil).
 			Once()
 		backend.On("ExecuteScriptAtBlockHeight", mocks.Anything, finalBlock.Height, validCode, [][]byte{validArgs}, mocks.Anything).
-			Return([]byte("hello world"), access.ExecutorMetadata{}, nil).
+			Return([]byte("hello world"), &access.ExecutorMetadata{}, nil).
 			Once()
 
 		req := buildScriptRequest(
@@ -154,7 +154,7 @@ func TestScripts_HappyPath(t *testing.T) {
 		backend := &mock.API{}
 
 		backend.On("ExecuteScriptAtLatestBlock", mocks.Anything, validCode, [][]byte{validArgs}, mocks.Anything).
-			Return([]byte("hello world"), *metadata, nil).
+			Return([]byte("hello world"), metadata, nil).
 			Once()
 
 		req := buildScriptRequest(
@@ -178,7 +178,7 @@ func TestScripts_HappyPath(t *testing.T) {
 		height := uint64(1337)
 
 		backend.On("ExecuteScriptAtBlockHeight", mocks.Anything, height, validCode, [][]byte{validArgs}, mocks.Anything).
-			Return([]byte("hello world"), *metadata, nil).
+			Return([]byte("hello world"), metadata, nil).
 			Once()
 
 		req := buildScriptRequest(
@@ -202,7 +202,7 @@ func TestScripts_HappyPath(t *testing.T) {
 
 		blockID := unittest.IdentifierFixture()
 		backend.On("ExecuteScriptAtBlockID", mocks.Anything, blockID, validCode, [][]byte{validArgs}, mocks.Anything).
-			Return([]byte("hello world"), *metadata, nil).
+			Return([]byte("hello world"), metadata, nil).
 			Once()
 
 		req := buildScriptRequest(
@@ -259,7 +259,7 @@ func TestScripts_Errors(t *testing.T) {
 		)
 
 		backend.On("ExecuteScriptAtBlockID", mocks.Anything, blockID, validCode, [][]byte{validArgs}, mocks.Anything).
-			Return(nil, access.ExecutorMetadata{}, status.Error(codes.Internal, "internal server error")).
+			Return(nil, &access.ExecutorMetadata{}, status.Error(codes.Internal, "internal server error")).
 			Once()
 
 		expectedResp := `{"code":400, "message":"Invalid Flow request: internal server error"}`
@@ -279,7 +279,7 @@ func TestScripts_Errors(t *testing.T) {
 		)
 
 		backend.On("ExecuteScriptAtBlockHeight", mocks.Anything, uint64(1337), validCode, [][]byte{validArgs}, mocks.Anything).
-			Return(nil, access.ExecutorMetadata{}, status.Error(codes.Internal, "internal server error")).
+			Return(nil, &access.ExecutorMetadata{}, status.Error(codes.Internal, "internal server error")).
 			Once()
 
 		expectedResp := `{"code":400, "message":"Invalid Flow request: internal server error"}`
@@ -298,7 +298,7 @@ func TestScripts_Errors(t *testing.T) {
 		)
 
 		backend.On("ExecuteScriptAtLatestBlock", mocks.Anything, validCode, [][]byte{validArgs}, mocks.Anything).
-			Return(nil, access.ExecutorMetadata{}, status.Error(codes.Internal, "internal server error")).
+			Return(nil, &access.ExecutorMetadata{}, status.Error(codes.Internal, "internal server error")).
 			Once()
 
 		expectedResp := `{"code":400, "message":"Invalid Flow request: internal server error"}`
@@ -342,10 +342,9 @@ func buildScriptRequest(
 // If metadata is empty, only the value is returned (legacy behavior).
 // Otherwise, the full ExecuteScriptResponse with executor metadata is returned.
 func buildScriptResponse(value []byte, metadata *access.ExecutorMetadata) string {
-	valueStr := base64.StdEncoding.EncodeToString(value)
 	if metadata == nil {
 		// legacyParams: only value is returned
-		return fmt.Sprintf("\"%s\"", valueStr)
+		return fmt.Sprintf(`"%s"`, base64.StdEncoding.EncodeToString(value))
 	}
 
 	// new unified ExecuteScriptResponse
@@ -354,5 +353,5 @@ func buildScriptResponse(value []byte, metadata *access.ExecutorMetadata) string
 		"executor_ids":        metadata.ExecutorIDs,
 	}
 	metadataJSON, _ := json.Marshal(expectedMetadata)
-	return fmt.Sprintf(`{"value":"%s","metadata":{"executor_metadata":%s}}`, valueStr, string(metadataJSON))
+	return fmt.Sprintf(`{"value":"%s","metadata":{"executor_metadata":%s}}`, value, string(metadataJSON))
 }
