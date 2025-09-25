@@ -8,7 +8,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	cborcodec "github.com/onflow/flow-go/model/encoding/cbor"
-	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/network/codec"
 	"github.com/onflow/flow-go/network/codec/cbor"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -17,7 +17,7 @@ import (
 func TestDecoder_Decode(t *testing.T) {
 	c := cbor.NewCodec()
 
-	blockProposal := flow.UntrustedProposal(*unittest.ProposalFixture())
+	blockProposal := messages.Proposal(*unittest.ProposalFixture())
 
 	t.Run("decodes message successfully", func(t *testing.T) {
 		var buf bytes.Buffer
@@ -27,7 +27,7 @@ func TestDecoder_Decode(t *testing.T) {
 
 		decoded, err := c.NewDecoder(&buf).Decode()
 		require.NoError(t, err)
-		require.Equal(t, &blockProposal, decoded)
+		require.Equal(t, &blockProposal, decoded.(*messages.Proposal))
 	})
 
 	t.Run("returns error when data is empty", func(t *testing.T) {

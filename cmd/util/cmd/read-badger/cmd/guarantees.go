@@ -1,11 +1,14 @@
 package cmd
 
 import (
+	"fmt"
+
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 
 	"github.com/onflow/flow-go/cmd/util/cmd/common"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/storage"
 )
 
 func init() {
@@ -18,24 +21,24 @@ func init() {
 var guaranteesCmd = &cobra.Command{
 	Use:   "guarantees",
 	Short: "get guarantees by collection ID",
-	Run: func(cmd *cobra.Command, args []string) {
-		storages, db := InitStorages()
-		defer db.Close()
+	RunE: func(cmd *cobra.Command, args []string) error {
+		return common.WithStorage(flagDatadir, func(db storage.DB) error {
+			storages := common.InitStorages(db)
 
-		log.Info().Msgf("got flag collection id: %s", flagCollectionID)
-		collectionID, err := flow.HexStringToIdentifier(flagCollectionID)
-		if err != nil {
-			log.Error().Err(err).Msg("malformed collection idenitifer")
-			return
-		}
+			log.Info().Msgf("got flag collection id: %s", flagCollectionID)
+			collectionID, err := flow.HexStringToIdentifier(flagCollectionID)
+			if err != nil {
+				return fmt.Errorf("malformed collection identifier: %w", err)
+			}
 
-		log.Info().Msgf("getting guarantee by collection id: %v", collectionID)
-		guarantee, err := storages.Guarantees.ByCollectionID(collectionID)
-		if err != nil {
-			log.Error().Err(err).Msgf("could not get guarantee for collection id: %v", collectionID)
-			return
-		}
+			log.Info().Msgf("getting guarantee by collection id: %v", collectionID)
+			guarantee, err := storages.Guarantees.ByCollectionID(collectionID)
+			if err != nil {
+				return fmt.Errorf("could not get guarantee for collection id: %v: %w", collectionID, err)
+			}
 
-		common.PrettyPrintEntity(guarantee)
+			common.PrettyPrintEntity(guarantee)
+			return nil
+		})
 	},
 }

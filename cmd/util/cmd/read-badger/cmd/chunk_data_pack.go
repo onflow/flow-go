@@ -25,8 +25,8 @@ func init() {
 var chunkDataPackCmd = &cobra.Command{
 	Use:   "chunk-data-packs",
 	Short: "get chunk data pack by chunk ID",
-	Run: func(cmd *cobra.Command, args []string) {
-		err := WithStorage(func(db storage.DB) error {
+	RunE: func(cmd *cobra.Command, args []string) error {
+		return common.WithStorage(flagDatadir, func(db storage.DB) error {
 			log.Info().Msgf("got flag chunk id: %s", flagChunkID)
 			chunkID, err := flow.HexStringToIdentifier(flagChunkID)
 			if err != nil {
@@ -41,16 +41,11 @@ var chunkDataPackCmd = &cobra.Command{
 			log.Info().Msgf("getting chunk data pack by chunk id: %v", chunkID)
 			chunkDataPack, err := chunkDataPacks.ByChunkID(chunkID)
 			if err != nil {
-				log.Error().Err(err).Msgf("could not get chunk data pack with chunk id: %v", chunkID)
-				return nil
+				return fmt.Errorf("could not get chunk data pack with chunk id: %v: %w", chunkID, err)
 			}
 
 			common.PrettyPrintEntity(chunkDataPack)
 			return nil
 		})
-
-		if err != nil {
-			log.Error().Err(err).Msg("could not get chunk data pack")
-		}
 	},
 }

@@ -20,7 +20,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/local"
-	"github.com/onflow/flow-go/network/mocknetwork"
+	mocknetwork "github.com/onflow/flow-go/network/mock"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -28,7 +28,7 @@ import (
 // By default, no attacker is registered on this corruptible network.
 // This function is not meant to be used by tests directly because it expects the corrupt network to be properly started and stopped.
 // Otherwise, it will throw mock expectations errors.
-func corruptNetworkFixture(t *testing.T, logger zerolog.Logger, corruptedID ...flow.Identifier) (*Network, *mocknetwork.Adapter, bootstrap.NodeInfo) {
+func corruptNetworkFixture(t *testing.T, logger zerolog.Logger, corruptedID ...flow.Identifier) (*Network, *mocknetwork.ConduitAdapter, bootstrap.NodeInfo) {
 	// create corruptible network with no attacker registered
 	codec := unittest.NetworkCodec()
 
@@ -38,7 +38,7 @@ func corruptNetworkFixture(t *testing.T, logger zerolog.Logger, corruptedID ...f
 		corruptedIdentity.NodeID = corruptedID[0]
 	}
 
-	flowNetwork := mocknetwork.NewNetwork(t)
+	flowNetwork := mocknetwork.NewEngineRegistry(t)
 	flowNetwork.On("Start", mock.Anything).Return()
 
 	// mock flow network will pretend to be ready when required
@@ -58,7 +58,7 @@ func corruptNetworkFixture(t *testing.T, logger zerolog.Logger, corruptedID ...f
 
 	// set up adapter, so we can check that it called the expected method.
 	// It will be checked automatically without having to remember to call mock.AssertExpectationsForObjects()
-	adapter := mocknetwork.NewAdapter(t)
+	adapter := mocknetwork.NewConduitAdapter(t)
 	err := ccf.RegisterAdapter(adapter)
 	require.NoError(t, err)
 
@@ -86,7 +86,7 @@ func runCorruptNetworkTest(t *testing.T, logger zerolog.Logger,
 	run func(
 		flow.Identity, // identity of ccf
 		*Network, // corruptible network
-		*mocknetwork.Adapter, // mock adapter that corrupted network uses to communicate with authorized flow nodes.
+		*mocknetwork.ConduitAdapter, // mock adapter that corrupted network uses to communicate with authorized flow nodes.
 		insecure.CorruptNetwork_ProcessAttackerMessageClient, // gRPC interface that orchestrator network uses to send messages to this ccf.
 	)) {
 

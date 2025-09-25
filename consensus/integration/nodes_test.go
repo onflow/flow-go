@@ -216,7 +216,7 @@ func createNodes(t *testing.T, participants *ConsensusParticipants, rootSnapshot
 			}
 		})
 
-	hub = NewNetworkHub()
+	hub = NewNetworkHub(unittest.Logger())
 	nodes = make([]*Node, 0, len(consensus))
 	for i, identity := range consensus {
 		consensusParticipant := participants.Lookup(identity.NodeID)
