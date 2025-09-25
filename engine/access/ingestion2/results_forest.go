@@ -104,7 +104,7 @@ var (
 //     𝓼; formally 𝓹.Level ≤ 𝓼.Level.
 //   - 𝓹.Level ≤ 𝓼.Level ≤ 𝓱
 //     with the additional constraint that 𝓹.Level < 𝓱 (required for liveness)
-//   - 𝓹.Level, 𝓼.Level, 𝓱, monotonically increase during the runtime of the ResultsForest
+//   - 𝓹.Level, 𝓼.Level, and 𝓱 monotonically increase during the runtime of the ResultsForest
 //   - [optional, simplifying convention] there exists no result 𝒓 in the forest with 𝒓.Level < 𝓹.Level
 //
 // Any honest protocol execution should satisfy the invariant. Hence, the invariant being violated is a
@@ -513,17 +513,19 @@ func (rf *ResultsForest) AddReceipt(receipt *flow.ExecutionReceipt, resultStatus
 	return added > 0, nil
 }
 
-// extendSealedFork extends the sealed fork 𝓹 ← … ← 𝓼, by a child result of 𝓼. The child result must already
-// be stored in the forest. CAUTION: This method is NOT IDEMPOTENT.
+// extendSealedFork extends the sealed fork 𝓹 ← … ← 𝓼, by a child result of 𝓼. The child result must
+// already be stored in the forest, be the direct child of 𝓼 (ie. `latestSealedResult`), but its
+// status should not yet be `ResultSealed`; otherwise an exception is raised.
+// CAUTION: This method is NOT IDEMPOTENT (for consistency, we could change this).
 //
 // IMPORTANT: This method is the only place with the authority to
 //   - update latest sealed result 𝓼, aka `latestSealedResult`
 //   - set the status of the result to sealed.
 //
-// extendSealedFork guarantees that thr following portion of our invariant is maintained:
+// extendSealedFork guarantees that the following portion of our invariant is maintained:
 //   - 𝓼 always exist in the forest
 //   - 𝓹 is an ancestor of 𝓼 and 𝓹.Level ≤ 𝓼.Level
-//   - 𝓼.Level, 𝓱, monotonically increase during the runtime of the ResultsForest
+//   - 𝓼.Level and 𝓱 monotonically increase during the runtime of the ResultsForest
 //
 // For maintaining our invariant, it is important to ensure that the fork 𝓹 ← … ← 𝓼 is correctly
 // extended in conjunction with the status `ResultSealed` being assigned to only results along
@@ -533,13 +535,19 @@ func (rf *ResultsForest) AddReceipt(receipt *flow.ExecutionReceipt, resultStatus
 //
 // NOT CONCURRENCY SAFE!
 //
-// The input must be the direct child of 𝓼, aka `latestSealedResult`, otherwise an exception is raised.
 // No error returns expected during normal operations.
 func (rf *ResultsForest) extendSealedFork(childResult *ExecutionResultContainer) error {
-	// Enforce that purported childResult has in fact the latest sealed result as its parent. The ResultsForest's correctness working critically
-	// depends on the integrity of the parent-child relationship. For our high-assurance system, we account for the possibility of bugs in other
-	// components to the extent easily possible. In other words, we explicitly check the parent-child relationship here, so the ResultsForest
-	// can provide intrinsic integrity guarantees, without relying on other components.
+	// Invariant check: 𝓼 always exist in the forest
+	if _, found := rf.getContainer(childResult.ResultID()); !found {
+		return fmt.Errorf("cannot extend sealed fork by child result that is not yet stored in the forest")
+	}
+
+	// Invariant check: 𝓹 is an ancestor of 𝓼 and 𝓹.Level ≤ 𝓼.Level
+	// At time of construction, this is satisfied because 𝓼 = 𝓹, with 𝓹 being stored in the forest.
+	// This method maintains the invariant, because it only updates 𝓼 to its child after confirming integrity of the parent-child relationship.
+	// Comment: theoretically, only the ID of the parent would need to be checked here, because the LevelledForest verifies consistency of the
+	// view. However, this has negligible runtime cost — by verifying the parent-child relationship here in its entirety, the ResultsForest
+	// provides intrinsic integrity guarantees, without relying on other components.
 	parentID, parentView := childResult.Parent()
 	if rf.latestSealedResult.ResultID() != parentID {
 		return fmt.Errorf("latest sealed result is %v, while its purported child reports %v as its parent ", rf.latestSealedResult.ResultID(), parentID)
@@ -548,16 +556,11 @@ func (rf *ResultsForest) extendSealedFork(childResult *ExecutionResultContainer)
 		return fmt.Errorf("latest sealed result has view %d, while its purported child reports its parent view as %d", rf.latestSealedResult.BlockView(), parentView)
 	}
 
-	// The following sanity check confirms the conceptual invariant that 𝓼 must monotonically increase during the runtime
-	// of the ResultsForest. A violation necessarily requires invalid inputs. Nevertheless, we check this here to ensure the
-	// ResultsForest's integrity. As 𝓼.Level strictly monotonically increases, the same holds for 𝓱 = 𝓼.Level + `maxViewDelta`.
+	// Invariant check: 𝓼.Level and 𝓱 monotonically increase during the runtime of the ResultsForest
+	// While a violation necessarily requires invalid inputs, we verify the invariant here to ensure the ResultsForest's
+	// integrity. As 𝓼.Level strictly monotonically increases, the same holds for 𝓱 = 𝓼.Level + `maxViewDelta`.
 	if !(rf.latestSealedResult.BlockView() < childResult.BlockView()) {
 		return fmt.Errorf("latest sealed result has view %d, while its purported child reports its parent view as %d", rf.latestSealedResult.BlockView(), parentView)
-	}
-
-	// Sanity check that the child is stored:
-	if _, found := rf.getContainer(childResult.ResultID()); !found {
-		return fmt.Errorf("cannot extend sealed fork by child result that is not yet stored in the forest")
 	}
 
 	// Sanity check that the child's current status is not sealed. This is expected, because `extendSealedFork` is the
@@ -566,7 +569,7 @@ func (rf *ResultsForest) extendSealedFork(childResult *ExecutionResultContainer)
 		return fmt.Errorf("sealed fork has not yet been extended by the child result, though the child is already marked as sealed")
 	}
 
-	// UPDATE INVARIANT: latest sealed result 𝓼, aka `latestSealedResult`, is updated to its child and the childs status is set to sealed.
+	// UPDATE INVARIANT: latest sealed result 𝓼, aka `latestSealedResult`, is updated to its child and the child's status is set to sealed
 	rf.latestSealedResult = childResult
 	err := childResult.SetResultStatus(ResultSealed)
 	if err != nil {
