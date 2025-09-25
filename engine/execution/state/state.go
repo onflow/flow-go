@@ -397,6 +397,8 @@ func (s *state) SaveExecutionResults(
 	return nil
 }
 
+// saveExecutionResults saves all data related to the execution of a block.
+// It is concurrent-safe
 func (s *state) saveExecutionResults(
 	ctx context.Context,
 	result *execution.ComputationResult,
@@ -408,15 +410,13 @@ func (s *state) saveExecutionResults(
 		return fmt.Errorf("can not retrieve chunk data packs: %w", err)
 	}
 
-	err = storage.WithLock(s.lockManager, storage.LockInsertChunkDataPack, func(lctx lockctx.Context) error {
-		return s.chunkDataPacks.Store(lctx, chunks)
-	})
+	// Acquire both locks to ensure it's concurrent safe when inserting the execution results and chunk data packs.
+	return storage.WithLocks(s.lockManager, []string{storage.LockInsertOwnReceipt, storage.LockInsertChunkDataPack}, func(lctx lockctx.Context) error {
+		err := s.chunkDataPacks.Store(lctx, chunks)
+		if err != nil {
+			return fmt.Errorf("can not store multiple chunk data pack: %w", err)
+		}
 
-	if err != nil {
-		return fmt.Errorf("can not store multiple chunk data pack: %w", err)
-	}
-
-	return storage.WithLock(s.lockManager, storage.LockInsertOwnReceipt, func(lctx lockctx.Context) error {
 		// Save entire execution result (including all chunk data packs) within one batch to minimize
 		// the number of database interactions. This is a large batch of data, which might not be
 		// committed within a single operation (e.g. if using Badger DB as storage backend, which has
@@ -424,6 +424,11 @@ func (s *state) saveExecutionResults(
 		return s.db.WithReaderBatchWriter(func(batch storage.ReaderBatchWriter) error {
 			batch.AddCallback(func(err error) {
 				// Rollback if an error occurs during batch operations
+				// Chunk data packs are saved in a separate database, there is a chance
+				// that execution result was failed to save, but chunk data packs was saved and
+				// didnt get removed.
+				// TODO(leo): when retrieving chunk data packs, we need to add a check to ensure the block
+				// has been executed before returning chunk data packs
 				if err != nil {
 					chunkIDs := make([]flow.Identifier, 0, len(chunks))
 					for _, chunk := range chunks {

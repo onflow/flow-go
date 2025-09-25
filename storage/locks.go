@@ -64,6 +64,7 @@ func makeLockPolicy() lockctx.Policy {
 	return lockctx.NewDAGPolicyBuilder().
 		Add(LockInsertBlock, LockFinalizeBlock).
 		Add(LockFinalizeBlock, LockBootstrapping).
+		Add(LockInsertOwnReceipt, LockInsertChunkDataPack).
 		Build()
 }
 
@@ -117,10 +118,18 @@ func NewTestingLockManager() lockctx.Manager {
 // WithLock is a helper function that creates a new lock context, acquires the specified lock,
 // and executes the provided function within that context.
 func WithLock(manager lockctx.Manager, lockID string, fn func(lctx lockctx.Context) error) error {
+	return WithLocks(manager, []string{lockID}, fn)
+}
+
+// WithLocks is a helper function that creates a new lock context, acquires the specified locks,
+func WithLocks(manager lockctx.Manager, lockIDs []string, fn func(lctx lockctx.Context) error) error {
 	lctx := manager.NewContext()
-	err := lctx.AcquireLock(lockID)
-	if err != nil {
-		return err
+	for _, lockID := range lockIDs {
+		err := lctx.AcquireLock(lockID)
+		if err != nil {
+			lctx.Release()
+			return err
+		}
 	}
 	defer lctx.Release()
 	return fn(lctx)
