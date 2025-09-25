@@ -322,7 +322,10 @@ func (r *RestProxyHandler) ExecuteScriptAtLatestBlock(ctx context.Context, scrip
 		return nil, nil, err
 	}
 
-	metadata := getExecutorMetadata(executeScriptAtLatestBlockResponse.GetMetadata())
+	var metadata *accessmodel.ExecutorMetadata
+	if rawMetadata := executeScriptAtLatestBlockResponse.GetMetadata(); rawMetadata != nil {
+		metadata = convert.MessageToExecutorMetadata(rawMetadata.GetExecutorMetadata())
+	}
 
 	return executeScriptAtLatestBlockResponse.Value, metadata, nil
 }
@@ -337,7 +340,7 @@ func (r *RestProxyHandler) ExecuteScriptAtBlockHeight(
 ) ([]byte, *accessmodel.ExecutorMetadata, error) {
 	upstream, closer, err := r.FaultTolerantClient()
 	if err != nil {
-		return nil, accessmodel.ExecutorMetadata{}, err
+		return nil, nil, err
 	}
 	defer closer.Close()
 
@@ -351,10 +354,13 @@ func (r *RestProxyHandler) ExecuteScriptAtBlockHeight(
 	r.log("upstream", "ExecuteScriptAtBlockHeight", err)
 
 	if err != nil {
-		return nil, accessmodel.ExecutorMetadata{}, err
+		return nil, nil, err
 	}
 
-	metadata := getExecutorMetadata(executeScriptAtBlockHeightResponse.GetMetadata())
+	var metadata *accessmodel.ExecutorMetadata
+	if rawMetadata := executeScriptAtBlockHeightResponse.GetMetadata(); rawMetadata != nil {
+		metadata = convert.MessageToExecutorMetadata(rawMetadata.GetExecutorMetadata())
+	}
 
 	return executeScriptAtBlockHeightResponse.Value, metadata, nil
 }
@@ -369,7 +375,7 @@ func (r *RestProxyHandler) ExecuteScriptAtBlockID(
 ) ([]byte, *accessmodel.ExecutorMetadata, error) {
 	upstream, closer, err := r.FaultTolerantClient()
 	if err != nil {
-		return nil, accessmodel.ExecutorMetadata{}, err
+		return nil, nil, err
 	}
 	defer closer.Close()
 
@@ -383,10 +389,13 @@ func (r *RestProxyHandler) ExecuteScriptAtBlockID(
 	r.log("upstream", "ExecuteScriptAtBlockID", err)
 
 	if err != nil {
-		return nil, accessmodel.ExecutorMetadata{}, err
+		return nil, nil, err
 	}
 
-	metadata := getExecutorMetadata(executeScriptAtBlockIDResponse.GetMetadata())
+	var metadata *accessmodel.ExecutorMetadata
+	if rawMetadata := executeScriptAtBlockIDResponse.GetMetadata(); rawMetadata != nil {
+		metadata = convert.MessageToExecutorMetadata(rawMetadata.GetExecutorMetadata())
+	}
 
 	return executeScriptAtBlockIDResponse.Value, metadata, nil
 }
