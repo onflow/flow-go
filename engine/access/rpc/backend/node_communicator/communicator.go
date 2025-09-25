@@ -1,10 +1,6 @@
 package node_communicator
 
 import (
-	"fmt"
-	"maps"
-
-	"github.com/hashicorp/go-multierror"
 	"github.com/sony/gobreaker"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -44,21 +40,17 @@ func NewNodeCommunicator(circuitBreakerEnabled bool) *NodeCommunicator {
 	}
 }
 
-// CallAvailableNode calls the provided function on the available nodes.
-// It iterates through the nodes and executes the function.
-// If an error occurs, it applies the custom error terminator (if provided) and keeps track of the errors.
-// If the error occurs in circuit breaker, it continues to the next node.
-// If the maximum failed request count is reached, it returns the accumulated errors.
-// Returns the last node used to execute the function. If the no error is returned, this is the node
-// that served the successful request.
+// CallAvailableNode calls the provided `callback` function passing nodes from the provided `nodes`
+// list until the function returns without error.
+// `nodes` is iterated in order.
+// If an error occurs, the provided `shouldTerminateOnError` function is called passing the error. If
+// the function returnes true, CallAvailableNode returns immediately without querying any other nodes.
+// If `maxFailedRequestCount` is reached, CallAvailableNode returns the accumulated errors.
+// Returns the last node passed to `callback`. If the no error is returned, this is the node that
+// served the successful request.
 func (b *NodeCommunicator) CallAvailableNode(
-	// List of node identifiers to execute callback on
 	nodes flow.IdentitySkeletonList,
-	// Callback function that determines whether an error should terminate further execution.
-	// It takes an error as input and returns a boolean value indicating whether the error should be considered terminal.
-	call func(id *flow.IdentitySkeleton) error,
-	// Callback function that determines whether an error should terminate further execution.
-	// It takes an error as input and returns a boolean value indicating whether the error should be considered terminal.
+	callback func(id *flow.IdentitySkeleton) error,
 	shouldTerminateOnError func(node *flow.IdentitySkeleton, err error) bool,
 ) (*flow.IdentitySkeleton, error) {
 	nodeSelector, err := b.nodeSelectorFactory.SelectNodes(nodes)
@@ -72,7 +64,7 @@ func (b *NodeCommunicator) CallAvailableNode(
 	for node := nodeSelector.Next(); node != nil; node = nodeSelector.Next() {
 		lastNode = node
 
-		err := call(node)
+		err := callback(node)
 		if err == nil {
 			return lastNode, nil
 		}
@@ -95,95 +87,4 @@ func (b *NodeCommunicator) CallAvailableNode(
 	}
 
 	return lastNode, errs.ErrorOrNil()
-}
-
-type MultiStatusError struct {
-	Errors []error
-	codes  map[codes.Code]struct{}
-}
-
-func newMultiStatusError() *MultiStatusError {
-	return &MultiStatusError{
-		codes: make(map[codes.Code]struct{}),
-	}
-}
-
-func (e *MultiStatusError) Add(err error) {
-	e.Errors = append(e.Errors, err)
-
-	if nodeErr, ok := err.(nodeGrpcError); ok {
-		err = nodeErr.err
-	}
-
-	e.codes[status.Code(err)] = struct{}{}
-}
-
-func (e *MultiStatusError) Code() codes.Code {
-	switch len(e.codes) {
-	case 0:
-		return codes.OK
-
-	case 1:
-		// return the first (only) code
-		for code := range e.codes {
-			return code
-		}
-
-	default:
-		codesCopy := make(map[codes.Code]struct{})
-		maps.Copy(codesCopy, e.codes)
-
-		remainder := make(map[codes.Code]struct{})
-		for code := range e.codes {
-			switch code {
-			case codes.Unavailable, codes.DeadlineExceeded:
-			default:
-				remainder[code] = struct{}{}
-			}
-		}
-		if len(remainder) == 1 {
-			// return the first (only) code
-			for code := range remainder {
-				return code
-			}
-		}
-		return codes.Internal
-	}
-
-	return codes.Internal
-}
-
-func (e *MultiStatusError) Unwrap() []error {
-	return e.Errors
-}
-
-func (e *MultiStatusError) Error() string {
-	return status.Error(e.Code(), multierror.ListFormatFunc(e.Errors)).Error()
-}
-
-func (e *MultiStatusError) ErrorOrNil() error {
-	if len(e.Errors) == 0 {
-		return nil
-	}
-	return e
-}
-
-type nodeGrpcError struct {
-	err         error
-	nodeAddress string
-}
-
-func newNodeGrpcError(err error, nodeAddress string) nodeGrpcError {
-	return nodeGrpcError{
-		err:         err,
-		nodeAddress: nodeAddress,
-	}
-}
-
-func (e nodeGrpcError) Error() string {
-	return fmt.Sprintf("%s: %v", e.nodeAddress, e.err)
-}
-
-func (e nodeGrpcError) Unwrap() error {
-	return e.err
 }

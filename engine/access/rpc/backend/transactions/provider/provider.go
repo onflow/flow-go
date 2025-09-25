@@ -13,7 +13,7 @@ import (
 // TransactionProvider defines an interface for retrieving transaction results
 // from various data sources, such as local storage and execution nodes.
 type TransactionProvider interface {
-	// TransactionResult retrieves a transaction result block ID and transaction ID.
+	// TransactionResult retrieves a transaction result by block ID and transaction ID.
 	//
 	// Expected error returns during normal operation:
 	//   - LocalProvider [optimistic_sync.ErrSnapshotNotFound] - when no snapshot is found for the execution result
@@ -43,13 +43,13 @@ type TransactionProvider interface {
 		executionResultInfo *optimistic_sync.ExecutionResultInfo,
 	) (*accessmodel.TransactionResult, *accessmodel.ExecutorMetadata, error)
 
-	// TransactionResultsByBlockID retrieves a transaction result by block ID.
+	// TransactionResultsByBlockID retrieves all transaction results for a block by block ID.
 	//
 	// Expected error returns during normal operation:
+	//   - All providers [ErrNotASystemTransaction] - when the requested transaction is not a system transaction
 	//   - LocalProvider [optimistic_sync.ErrSnapshotNotFound] - when no snapshot is found for the execution result
-	//   - ExecutionNodeProvider [storage.ErrNotFound] - when collection from block is not found
-	//   - ExecutionNodeProvider [InvalidDataFromExternalNodeError] - when data returned by execution node is invalid
-	//   - ExecutionNodeProvider [FailedToQueryExternalNodeError] - when the request to execution node failed
+	//   - ExecutionNodeProvider [common.InvalidDataFromExternalNodeError] - when data returned by execution node is invalid
+	//   - ExecutionNodeProvider [common.FailedToQueryExternalNodeError] - when the request to execution node failed
 	TransactionResultsByBlockID(
 		ctx context.Context,
 		block *flow.Block,
@@ -57,12 +57,28 @@ type TransactionProvider interface {
 		executionResultInfo *optimistic_sync.ExecutionResultInfo,
 	) ([]*accessmodel.TransactionResult, *accessmodel.ExecutorMetadata, error)
 
+	// TransactionsByBlockID retrieves all transactions for a block by block ID.
+	//
+	// Expected error returns during normal operation:
+	//   - LocalProvider [optimistic_sync.ErrSnapshotNotFound] - when no snapshot is found for the execution result
+	//   - ExecutionNodeProvider [ErrBlockCollectionNotFound] - when a collection from the block is not found
+	//   - ExecutionNodeProvider [NewIncorrectResultCountError] - when the number of transaction results returned by the execution
+	//     node is less than the number of transactions in the block
+	//   - ExecutionNodeProvider [common.InvalidDataFromExternalNodeError] - when data returned by execution node is invalid
+	//   - ExecutionNodeProvider [common.FailedToQueryExternalNodeError] - when the request to execution node failed
 	TransactionsByBlockID(
 		ctx context.Context,
 		block *flow.Block,
 		executionResultInfo *optimistic_sync.ExecutionResultInfo,
 	) ([]*flow.TransactionBody, *accessmodel.ExecutorMetadata, error)
 
+	// SystemTransaction retrieves a system transaction for a block by block ID and transaction ID.
+	//
+	// Expected error returns during normal operation:
+	//   - All providers [ErrNotASystemTransaction] - when the requested transaction is not a system transaction
+	//   - LocalProvider [optimistic_sync.ErrSnapshotNotFound] - when no snapshot is found for the execution result
+	//   - ExecutionNodeProvider [common.InvalidDataFromExternalNodeError] when events data returned by execution node is invalid
+	//   - ExecutionNodeProvider [common.FailedToQueryExternalNodeError] when the request to execution node failed
 	SystemTransaction(
 		ctx context.Context,
 		block *flow.Block,
@@ -70,6 +86,13 @@ type TransactionProvider interface {
 		executionResultInfo *optimistic_sync.ExecutionResultInfo,
 	) (*flow.TransactionBody, *accessmodel.ExecutorMetadata, error)
 
+	// SystemTransactionResult retrieves a system transaction result for a block by block ID and transaction ID.
+	//
+	// Expected error returns during normal operation:
+	//   - All providers [ErrNotASystemTransaction] - when the requested transaction is not a system transaction
+	//   - LocalProvider [optimistic_sync.ErrSnapshotNotFound] - when no snapshot is found for the execution result
+	//   - ExecutionNodeProvider [common.InvalidDataFromExternalNodeError] - when transaction result data returned by execution node is invalid
+	//   - ExecutionNodeProvider [common.FailedToQueryExternalNodeError] - when the request to execution node failed
 	SystemTransactionResult(
 		ctx context.Context,
 		block *flow.Block,

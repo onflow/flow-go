@@ -15,7 +15,6 @@ import (
 	"github.com/onflow/flow-go/engine/access/rpc/backend/node_communicator"
 	txstatus "github.com/onflow/flow-go/engine/access/rpc/backend/transactions/status"
 	"github.com/onflow/flow-go/engine/access/rpc/connection"
-	"github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/fvm/blueprints"
 	"github.com/onflow/flow-go/fvm/systemcontracts"
@@ -26,6 +25,8 @@ import (
 	"github.com/onflow/flow-go/storage"
 )
 
+// IncorrectResultCountError is returned when the number of transaction results returned by the
+// execution node does not match the expected number of transaction results in the block.
 type IncorrectResultCountError struct {
 	expected int
 	actual   int
@@ -45,56 +46,6 @@ func (e *IncorrectResultCountError) Error() string {
 
 func IsIncorrectResultCountError(err error) bool {
 	var target *IncorrectResultCountError
-	return errors.As(err, &target)
-}
-
-type InvalidDataFromExternalNodeError struct {
-	dataType string
-	err      error
-	nodeID   flow.Identifier
-}
-
-func NewInvalidDataFromExternalNodeError(dataType string, nodeID flow.Identifier, err error) *InvalidDataFromExternalNodeError {
-	return &InvalidDataFromExternalNodeError{
-		dataType: dataType,
-		nodeID:   nodeID,
-		err:      err,
-	}
-}
-
-func (e *InvalidDataFromExternalNodeError) Error() string {
-	return fmt.Sprintf("received invalid %s data from external node %s: %v", e.dataType, e.nodeID, e.err)
-}
-
-func (e *InvalidDataFromExternalNodeError) Unwrap() error {
-	return e.err
-}
-
-func IsInvalidDataFromExternalNodeError(err error) bool {
-	var target *InvalidDataFromExternalNodeError
-	return errors.As(err, &target)
-}
-
-type FailedToQueryExternalNodeError struct {
-	err error
-}
-
-func NewFailedToQueryExternalNodeError(err error) *FailedToQueryExternalNodeError {
-	return &FailedToQueryExternalNodeError{
-		err: err,
-	}
-}
-
-func (e *FailedToQueryExternalNodeError) Error() string {
-	return fmt.Sprintf("failed to query external node: %v", e.err)
-}
-
-func (e *FailedToQueryExternalNodeError) Unwrap() error {
-	return e.err
-}
-
-func IsFailedToQueryExternalNodeError(err error) bool {
-	var target *FailedToQueryExternalNodeError
 	return errors.As(err, &target)
 }
 
@@ -145,8 +96,8 @@ func NewENTransactionProvider(
 // TransactionResult retrieves a transaction result from execution nodes by block ID and transaction ID.
 //
 // Expected error returns during normal operation:
-//   - [InvalidDataFromExternalNodeError] when data returned by execution node is invalid
-//   - [FailedToQueryExternalNodeError] when the request to execution node failed
+//   - [common.InvalidDataFromExternalNodeError] - when transaction result data returned by execution node is invalid
+//   - [common.FailedToQueryExternalNodeError] - when the request to execution node failed
 func (e *ENTransactionProvider) TransactionResult(
 	ctx context.Context,
 	block *flow.Header,
@@ -163,7 +114,7 @@ func (e *ENTransactionProvider) TransactionResult(
 
 	resp, executorID, err := e.getTransactionResultFromAnyExeNode(ctx, executionResultInfo.ExecutionNodes, req)
 	if err != nil {
-		return nil, nil, NewFailedToQueryExternalNodeError(err)
+		return nil, nil, common.NewFailedToQueryExternalNodeError(err)
 	}
 
 	txStatus, err := e.txStatusDeriver.DeriveFinalizedTransactionStatus(block.Height, true)
@@ -174,7 +125,7 @@ func (e *ENTransactionProvider) TransactionResult(
 	events, err := convert.MessagesToEventsWithEncodingConversion(resp.GetEvents(), resp.GetEventEncodingVersion(), encodingVersion)
 	if err != nil {
 		err = fmt.Errorf("failed to convert event payloads: %w", err)
-		return nil, nil, NewInvalidDataFromExternalNodeError("events", executorID, err)
+		return nil, nil, common.NewInvalidDataFromExternalNodeError("events", executorID, err)
 	}
 
 	metadata := &accessmodel.ExecutorMetadata{
@@ -194,19 +145,151 @@ func (e *ENTransactionProvider) TransactionResult(
 	}, metadata, nil
 }
 
+// TransactionResultByIndex retrieves a transaction result from execution nodes by block ID and index.
+//
+// Expected error returns during normal operation:
+//   - [common.InvalidDataFromExternalNodeError] - when data returned by execution node is invalid
+//   - [common.FailedToQueryExternalNodeError] - when the request to execution node failed
+func (e *ENTransactionProvider) TransactionResultByIndex(
+	ctx context.Context,
+	header *flow.Header,
+	index uint32,
+	collectionID flow.Identifier,
+	encodingVersion entities.EventEncodingVersion,
+	executionResultInfo *optimistic_sync.ExecutionResultInfo,
+) (*accessmodel.TransactionResult, *accessmodel.ExecutorMetadata, error) {
+	blockID := header.ID()
+	req := &execproto.GetTransactionByIndexRequest{
+		BlockId: blockID[:],
+		Index:   index,
+	}
+
+	resp, executorID, err := e.getTransactionResultByIndexFromAnyExeNode(ctx, executionResultInfo.ExecutionNodes, req)
+	if err != nil {
+		return nil, nil, common.NewFailedToQueryExternalNodeError(err)
+	}
+
+	txStatus, err := e.txStatusDeriver.DeriveFinalizedTransactionStatus(header.Height, true)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to derive transaction status: %w", err)
+	}
+
+	events, err := convert.MessagesToEventsWithEncodingConversion(resp.GetEvents(), resp.GetEventEncodingVersion(), encodingVersion)
+	if err != nil {
+		err = fmt.Errorf("failed to convert event payloads: %w", err)
+		return nil, nil, common.NewInvalidDataFromExternalNodeError("events", executorID, err)
+	}
+
+	metadata := &accessmodel.ExecutorMetadata{
+		ExecutionResultID: executionResultInfo.ExecutionResultID,
+		ExecutorIDs:       executionResultInfo.ExecutionNodes.NodeIDs(),
+	}
+
+	return &accessmodel.TransactionResult{
+		Status:       txStatus,
+		StatusCode:   uint(resp.GetStatusCode()),
+		Events:       events,
+		ErrorMessage: resp.GetErrorMessage(),
+		BlockID:      blockID,
+		BlockHeight:  header.Height,
+		CollectionID: collectionID,
+	}, metadata, nil
+}
+
+// TransactionResultsByBlockID retrieves a transaction result from execution nodes by block ID.
+//
+// Expected error returns during normal operation:
+//   - [ErrBlockCollectionNotFound] - when a collection from the block is not found
+//   - [NewIncorrectResultCountError] - when the number of transaction results returned by the execution
+//     node is less than the number of transactions in the block
+//   - [common.InvalidDataFromExternalNodeError] - when data returned by execution node is invalid
+//   - [common.FailedToQueryExternalNodeError] - when the request to execution node failed
+func (e *ENTransactionProvider) TransactionResultsByBlockID(
+	ctx context.Context,
+	block *flow.Block,
+	encodingVersion entities.EventEncodingVersion,
+	executionResultInfo *optimistic_sync.ExecutionResultInfo,
+) ([]*accessmodel.TransactionResult, *accessmodel.ExecutorMetadata, error) {
+	blockID := block.ID()
+	req := &execproto.GetTransactionsByBlockIDRequest{
+		BlockId: blockID[:],
+	}
+
+	executionResponse, executorID, err := e.getTransactionResultsByBlockIDFromAnyExeNode(ctx, executionResultInfo.ExecutionNodes, req)
+	if err != nil {
+		return nil, nil, common.NewFailedToQueryExternalNodeError(err)
+	}
+
+	txStatus, err := e.txStatusDeriver.DeriveFinalizedTransactionStatus(block.Height, true)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to derive transaction status: %w", err)
+	}
+
+	userTxResults, err := e.userTransactionResults(
+		executionResponse,
+		executorID,
+		block,
+		blockID,
+		txStatus,
+		encodingVersion,
+	)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to process user transaction results: %w", err)
+	}
+
+	metadata := &accessmodel.ExecutorMetadata{
+		ExecutionResultID: executionResultInfo.ExecutionResultID,
+		ExecutorIDs:       common.OrderedExecutors(executorID, executionResultInfo.ExecutionNodes.NodeIDs()),
+	}
+
+	// root block has no system transaction result
+	if block.View == e.state.Params().SporkRootBlockView() {
+		return userTxResults, metadata, nil
+	}
+
+	// there must be at least one system transaction result
+	if len(userTxResults) >= len(executionResponse.TransactionResults) {
+		return nil, nil, NewIncorrectResultCountError(len(userTxResults)+1, len(executionResponse.TransactionResults))
+	}
+
+	remainingTxResults := executionResponse.TransactionResults[len(userTxResults):]
+
+	systemTxResults, err := e.systemTransactionResults(
+		remainingTxResults,
+		executorID,
+		block,
+		blockID,
+		txStatus,
+		executionResponse,
+		encodingVersion,
+	)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to process system transaction results: %w", err)
+	}
+
+	return append(userTxResults, systemTxResults...), metadata, nil
+}
+
+// TransactionsByBlockID retrieves transactions by block ID.
+//
+// Expected error returns during normal operation:
+//   - [ErrBlockCollectionNotFound] - when a collection from the block is not found
+//   - [common.InvalidDataFromExternalNodeError] - when data returned by execution node is invalid
+//   - [common.FailedToQueryExternalNodeError] - when the request to execution node failed
 func (e *ENTransactionProvider) TransactionsByBlockID(
 	ctx context.Context,
 	block *flow.Block,
 	executionResultInfo *optimistic_sync.ExecutionResultInfo,
 ) ([]*flow.TransactionBody, *accessmodel.ExecutorMetadata, error) {
-	var transactions []*flow.TransactionBody
-	blockID := block.ID()
-
 	// user transactions
+	var transactions []*flow.TransactionBody
 	for _, guarantee := range block.Payload.Guarantees {
 		collection, err := e.collections.ByID(guarantee.CollectionID)
 		if err != nil {
-			return nil, nil, rpc.ConvertStorageError(err)
+			if errors.Is(err, storage.ErrNotFound) {
+				return nil, nil, ErrBlockCollectionNotFound
+			}
+			return nil, nil, fmt.Errorf("failed to get collection: %w", err)
 		}
 
 		transactions = append(transactions, collection.Transactions...)
@@ -229,140 +312,29 @@ func (e *ENTransactionProvider) TransactionsByBlockID(
 		return append(transactions, systemTx), metadata, nil
 	}
 
-	events, err := e.getBlockEvents(ctx, blockID, e.processScheduledCallbackEventType, executionResultInfo)
+	events, executorID, err := e.getBlockEvents(ctx, block.ID(), e.processScheduledCallbackEventType, executionResultInfo)
 	if err != nil {
-		return nil, nil, rpc.ConvertError(err, "failed to retrieve events from any execution node", codes.Internal)
+		return nil, nil, fmt.Errorf("failed to get events for scheduled transaction parsing: %w", err)
 	}
 
 	sysCollection, err := blueprints.SystemCollection(e.chainID.Chain(), events)
 	if err != nil {
-		return nil, nil, status.Errorf(codes.Internal, "could not construct system collection: %v", err)
+		// this means either the execution node provided invalid event data, or there is a bug. Since
+		// we cannot determine easily from the error, assume that it was an issue with the execution
+		// response. If it was an issue with the software building the system collection, error details
+		// will be included in the response to the user, and can be surfaced to the operator.
+		return nil, nil, common.NewInvalidDataFromExternalNodeError("process scheduled transaction events", executorID, err)
 	}
 
 	return append(transactions, sysCollection.Transactions...), metadata, nil
 }
 
-// TransactionResultByIndex retrieves a transaction result from execution nodes by block ID and index.
+// SystemTransaction retrieves a system transaction from execution nodes.
 //
 // Expected error returns during normal operation:
-//   - [InvalidDataFromExternalNodeError] when data returned by execution node is invalid
-//   - [FailedToQueryExternalNodeError] when the request to execution node failed
-func (e *ENTransactionProvider) TransactionResultByIndex(
-	ctx context.Context,
-	header *flow.Header,
-	index uint32,
-	collectionID flow.Identifier,
-	encodingVersion entities.EventEncodingVersion,
-	executionResultInfo *optimistic_sync.ExecutionResultInfo,
-) (*accessmodel.TransactionResult, *accessmodel.ExecutorMetadata, error) {
-	blockID := header.ID()
-	req := &execproto.GetTransactionByIndexRequest{
-		BlockId: blockID[:],
-		Index:   index,
-	}
-
-	resp, executorID, err := e.getTransactionResultByIndexFromAnyExeNode(ctx, executionResultInfo.ExecutionNodes, req)
-	if err != nil {
-		return nil, nil, NewFailedToQueryExternalNodeError(err)
-	}
-
-	txStatus, err := e.txStatusDeriver.DeriveFinalizedTransactionStatus(header.Height, true)
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to derive transaction status: %w", err)
-	}
-
-	events, err := convert.MessagesToEventsWithEncodingConversion(resp.GetEvents(), resp.GetEventEncodingVersion(), encodingVersion)
-	if err != nil {
-		err = fmt.Errorf("failed to convert event payloads: %w", err)
-		return nil, nil, NewInvalidDataFromExternalNodeError("events", executorID, err)
-	}
-
-	metadata := &accessmodel.ExecutorMetadata{
-		ExecutionResultID: executionResultInfo.ExecutionResultID,
-		ExecutorIDs:       executionResultInfo.ExecutionNodes.NodeIDs(),
-	}
-
-	return &accessmodel.TransactionResult{
-		Status:       txStatus,
-		StatusCode:   uint(resp.GetStatusCode()),
-		Events:       events,
-		ErrorMessage: resp.GetErrorMessage(),
-		BlockID:      blockID,
-		BlockHeight:  header.Height,
-		CollectionID: collectionID,
-	}, metadata, nil
-}
-
-// TransactionResultsByBlockID retrieves a transaction result from execution nodes by block ID.
-//
-// Expected error returns during normal operation:
-//   - [storage.ErrNotFound] when collection from block is not found
-//   - [InvalidDataFromExternalNodeError] when data returned by execution node is invalid
-//   - [FailedToQueryExternalNodeError] when the request to execution node failed
-func (e *ENTransactionProvider) TransactionResultsByBlockID(
-	ctx context.Context,
-	block *flow.Block,
-	encodingVersion entities.EventEncodingVersion,
-	executionResultInfo *optimistic_sync.ExecutionResultInfo,
-) ([]*accessmodel.TransactionResult, *accessmodel.ExecutorMetadata, error) {
-	blockID := block.ID()
-	req := &execproto.GetTransactionsByBlockIDRequest{
-		BlockId: blockID[:],
-	}
-
-	executionResponse, executorID, err := e.getTransactionResultsByBlockIDFromAnyExeNode(ctx, executionResultInfo.ExecutionNodes, req)
-	if err != nil {
-		return nil, nil, NewFailedToQueryExternalNodeError(err)
-	}
-
-	txStatus, err := e.txStatusDeriver.DeriveFinalizedTransactionStatus(block.Height, true)
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to derive transaction status: %w", err)
-	}
-
-	userTxResults, err := e.userTransactionResults(
-		executionResponse,
-		block,
-		blockID,
-		txStatus,
-		encodingVersion,
-	)
-	if err != nil {
-		return nil, nil, rpc.ConvertError(err, "failed to construct user transaction results", codes.Internal)
-	}
-
-	metadata := &accessmodel.ExecutorMetadata{
-		ExecutionResultID: executionResultInfo.ExecutionResultID,
-		ExecutorIDs:       common.OrderedExecutors(executorID, executionResultInfo.ExecutionNodes.NodeIDs()),
-	}
-
-	// root block has no system transaction result
-	if block.View == e.state.Params().SporkRootBlockView() {
-		return userTxResults, metadata, nil
-	}
-
-	// there must be at least one system transaction result
-	if len(userTxResults) >= len(executionResponse.TransactionResults) {
-		return nil, nil, status.Errorf(codes.Internal, "no system transaction results")
-	}
-
-	remainingTxResults := executionResponse.TransactionResults[len(userTxResults):]
-
-	systemTxResults, err := e.systemTransactionResults(
-		remainingTxResults,
-		block,
-		blockID,
-		txStatus,
-		executionResponse,
-		encodingVersion,
-	)
-	if err != nil {
-		return nil, nil, rpc.ConvertError(err, "failed to construct system transaction results", codes.Internal)
-	}
-
-	return append(userTxResults, systemTxResults...), metadata, nil
-}
-
+//   - [ErrNotASystemTransaction] - when the requested transaction is not a system transaction
+//   - [common.InvalidDataFromExternalNodeError] - when events data returned by execution node is invalid
+//   - [common.FailedToQueryExternalNodeError] - when the request to execution node failed
 func (e *ENTransactionProvider) SystemTransaction(
 	ctx context.Context,
 	block *flow.Block,
@@ -379,7 +351,7 @@ func (e *ENTransactionProvider) SystemTransaction(
 	if txID == e.systemTxID || !e.scheduledCallbacksEnabled {
 		systemTx, err := blueprints.SystemChunkTransaction(e.chainID.Chain())
 		if err != nil {
-			return nil, nil, status.Errorf(codes.Internal, "failed to construct system chunk transaction: %v", err)
+			return nil, nil, fmt.Errorf("failed to construct system chunk transaction: %w", err)
 		}
 
 		if txID == systemTx.ID() {
@@ -388,14 +360,18 @@ func (e *ENTransactionProvider) SystemTransaction(
 		return nil, nil, fmt.Errorf("transaction %s not found in block %s", txID, blockID)
 	}
 
-	events, err := e.getBlockEvents(ctx, blockID, e.processScheduledCallbackEventType, executionResultInfo)
+	events, executorID, err := e.getBlockEvents(ctx, blockID, e.processScheduledCallbackEventType, executionResultInfo)
 	if err != nil {
-		return nil, nil, rpc.ConvertError(err, "failed to retrieve events from any execution node", codes.Internal)
+		return nil, nil, common.NewFailedToQueryExternalNodeError(err)
 	}
 
 	sysCollection, err := blueprints.SystemCollection(e.chainID.Chain(), events)
 	if err != nil {
-		return nil, nil, status.Errorf(codes.Internal, "could not construct system collection: %v", err)
+		// this means either the execution node provided invalid event data, or there is a bug. Since
+		// we cannot determine easily from the error, assume that it was an issue with the execution
+		// response. If it was an issue with the software building the system collection, error details
+		// will be included in the response to the user, and can be surfaced to the operator.
+		return nil, nil, common.NewInvalidDataFromExternalNodeError("process scheduled transaction events", executorID, err)
 	}
 
 	for _, tx := range sysCollection.Transactions {
@@ -404,9 +380,15 @@ func (e *ENTransactionProvider) SystemTransaction(
 		}
 	}
 
-	return nil, nil, status.Errorf(codes.NotFound, "system transaction not found")
+	return nil, nil, ErrNotASystemTransaction
 }
 
+// SystemTransactionResult retrieves a system transaction result from execution nodes.
+//
+// Expected error returns during normal operation:
+//   - [ErrNotASystemTransaction] - when the requested transaction is not a system transaction
+//   - [common.InvalidDataFromExternalNodeError] - when transaction result data returned by execution node is invalid
+//   - [common.FailedToQueryExternalNodeError] - when the request to execution node failed
 func (e *ENTransactionProvider) SystemTransactionResult(
 	ctx context.Context,
 	block *flow.Block,
@@ -414,10 +396,9 @@ func (e *ENTransactionProvider) SystemTransactionResult(
 	encodingVersion entities.EventEncodingVersion,
 	executionResultInfo *optimistic_sync.ExecutionResultInfo,
 ) (*accessmodel.TransactionResult, *accessmodel.ExecutorMetadata, error) {
-	// make sure the request is for a system transaction
 	if txID != e.systemTxID {
 		if _, metadata, err := e.SystemTransaction(ctx, block, txID, executionResultInfo); err != nil {
-			return nil, metadata, status.Errorf(codes.NotFound, "system transaction not found")
+			return nil, metadata, err
 		}
 	}
 	return e.TransactionResult(ctx, block.ToHeader(), txID, flow.ZeroID, encodingVersion, executionResultInfo)
@@ -425,10 +406,15 @@ func (e *ENTransactionProvider) SystemTransactionResult(
 
 // userTransactionResults constructs the user transaction results from the execution node response.
 //
-// It does so by iterating through all user collections (without system collection) in the block
-// and constructing the transaction results.
+// Expected error returns during normal operation:
+//   - [ErrBlockCollectionNotFound] - when a collection from the block is not found
+//   - [NewIncorrectResultCountError] - when the number of transaction results returned by the execution
+//     node is less than the number of transactions in the block
+//   - [common.InvalidDataFromExternalNodeError] - when data returned by execution node is invalid
+//   - [common.FailedToQueryExternalNodeError] - when the request to execution node failed
 func (e *ENTransactionProvider) userTransactionResults(
 	resp *execproto.GetTransactionResultsResponse,
+	executorID flow.Identifier,
 	block *flow.Block,
 	blockID flow.Identifier,
 	txStatus flow.TransactionStatus,
@@ -439,20 +425,22 @@ func (e *ENTransactionProvider) userTransactionResults(
 	for _, guarantee := range block.Payload.Guarantees {
 		collection, err := e.collections.LightByID(guarantee.CollectionID)
 		if err != nil {
-			return nil, rpc.ConvertStorageError(err)
+			if errors.Is(err, storage.ErrNotFound) {
+				return nil, ErrBlockCollectionNotFound
+			}
+			return nil, fmt.Errorf("failed to get collection: %w", err)
 		}
 
 		for _, txID := range collection.Transactions {
 			// bounds check. this means the EN returned fewer transaction results than the transactions  in the block
 			if i >= len(resp.TransactionResults) {
-				return nil, status.Error(codes.Internal,
-					"number of transaction results returned by execution node is less than the number of transactions in the block")
+				return nil, NewIncorrectResultCountError(i, len(resp.TransactionResults))
 			}
 			txResult := resp.TransactionResults[i]
 
 			events, err := convert.MessagesToEventsWithEncodingConversion(txResult.GetEvents(), resp.GetEventEncodingVersion(), encodingVersion)
 			if err != nil {
-				return nil, status.Errorf(codes.Internal, "failed to convert events to message in txID %x: %v", txID, err)
+				return nil, common.NewInvalidDataFromExternalNodeError("events", executorID, fmt.Errorf("failed to convert event payloads for txID %s: %v", txID, err))
 			}
 
 			results = append(results, &accessmodel.TransactionResult{
@@ -479,31 +467,38 @@ func (e *ENTransactionProvider) userTransactionResults(
 // System transactions are transactions that follow the user transactions from the execution node response.
 // We should always return transaction result for system chunk transaction, but if scheduled callbacks are enabled
 // we also return results for the process and execute callbacks transactions.
+//
+// Expected error returns during normal operation:
+//   - [NewIncorrectResultCountError] - when the number of system transactions returned by the execution
+//     node does not match the number of expected number of system transactions in the block
+//   - [common.InvalidDataFromExternalNodeError] - when the events data returned by execution node is invalid
+//   - [common.FailedToQueryExternalNodeError] - when the events request to execution node failed
 func (e *ENTransactionProvider) systemTransactionResults(
 	systemTxResults []*execproto.GetTransactionResultResponse,
+	executorID flow.Identifier,
 	block *flow.Block,
 	blockID flow.Identifier,
 	txStatus flow.TransactionStatus,
 	resp *execproto.GetTransactionResultsResponse,
 	encodingVersion entities.EventEncodingVersion,
 ) ([]*accessmodel.TransactionResult, error) {
-	systemTxIDs, err := e.systemTransactionIDs(systemTxResults, resp.GetEventEncodingVersion())
+	systemTxIDs, err := e.systemTransactionIDs(systemTxResults, executorID, resp.GetEventEncodingVersion())
 	if err != nil {
-		return nil, rpc.ConvertError(err, "failed to determine system transaction IDs", codes.Internal)
+		return nil, fmt.Errorf("failed to determine system transaction IDs: %w", err)
 	}
 
 	// systemTransactionIDs automatically detects if scheduled callbacks was enabled for the block
 	// based on the number of system transactions in the response. The resulting list should always
 	// have the same length as the number of system transactions in the response.
 	if len(systemTxIDs) != len(systemTxResults) {
-		return nil, status.Errorf(codes.Internal, "system transaction count mismatch: expected %d, got %d", len(systemTxResults), len(systemTxIDs))
+		return nil, fmt.Errorf("system transaction count mismatch: %w", NewIncorrectResultCountError(len(systemTxResults), len(systemTxIDs)))
 	}
 
 	results := make([]*accessmodel.TransactionResult, 0, len(systemTxResults))
 	for i, systemTxResult := range systemTxResults {
 		events, err := convert.MessagesToEventsWithEncodingConversion(systemTxResult.GetEvents(), resp.GetEventEncodingVersion(), encodingVersion)
 		if err != nil {
-			return nil, status.Errorf(codes.Internal, "failed to convert events from system tx result: %v", err)
+			return nil, common.NewInvalidDataFromExternalNodeError("events", executorID, err)
 		}
 
 		results = append(results, &accessmodel.TransactionResult{
@@ -521,9 +516,14 @@ func (e *ENTransactionProvider) systemTransactionResults(
 	return results, nil
 }
 
-// systemTransactionIDs determines the system transaction IDs upfront
+// systemTransactionIDs returns the list of system transaction IDs for the block.
+//
+// Expected error returns during normal operation:
+//   - [common.InvalidDataFromExternalNodeError] - when the events data returned by execution node is invalid
+//   - [common.FailedToQueryExternalNodeError] - when the events request to execution node failed
 func (e *ENTransactionProvider) systemTransactionIDs(
 	systemTxResults []*execproto.GetTransactionResultResponse,
+	executorID flow.Identifier,
 	actualEventEncodingVersion entities.EventEncodingVersion,
 ) ([]flow.Identifier, error) {
 	// TODO: implement system that allows this endpoint to dynamically determine if scheduled
@@ -543,12 +543,12 @@ func (e *ENTransactionProvider) systemTransactionIDs(
 		entities.EventEncodingVersion_CCF_V0,
 	)
 	if err != nil {
-		return nil, rpc.ConvertError(err, "failed to convert events", codes.Internal)
+		return nil, common.NewInvalidDataFromExternalNodeError("events", executorID, err)
 	}
 
 	sysCollection, err := blueprints.SystemCollection(e.chainID.Chain(), events)
 	if err != nil {
-		return nil, rpc.ConvertError(err, "failed to construct system collection", codes.Internal)
+		return nil, common.NewInvalidDataFromExternalNodeError("process scheduled transaction events", executorID, err)
 	}
 
 	var systemTxIDs []flow.Identifier
@@ -559,20 +559,26 @@ func (e *ENTransactionProvider) systemTransactionIDs(
 	return systemTxIDs, nil
 }
 
+// getBlockEvents retrieves the events for the given block ID and event type from execution nodes
+// included in the execution result info.
+//
+// Expected error returns during normal operation:
+//   - [common.InvalidDataFromExternalNodeError] - when data returned by execution node is invalid
+//   - [common.FailedToQueryExternalNodeError] - when the request to execution node failed
 func (e *ENTransactionProvider) getBlockEvents(
 	ctx context.Context,
 	blockID flow.Identifier,
 	eventType flow.EventType,
 	executionResultInfo *optimistic_sync.ExecutionResultInfo,
-) (flow.EventsList, error) {
+) (flow.EventsList, flow.Identifier, error) {
 	request := &execproto.GetEventsForBlockIDsRequest{
 		BlockIds: [][]byte{blockID[:]},
 		Type:     string(eventType),
 	}
 
-	resp, err := e.getBlockEventsByBlockIDsFromAnyExeNode(ctx, executionResultInfo.ExecutionNodes, request)
+	resp, executorID, err := e.getBlockEventsByBlockIDsFromAnyExeNode(ctx, executionResultInfo.ExecutionNodes, request)
 	if err != nil {
-		return nil, rpc.ConvertError(err, "failed to retrieve result from any execution node", codes.Internal)
+		return nil, flow.ZeroID, common.NewFailedToQueryExternalNodeError(err)
 	}
 
 	var events flow.EventsList
@@ -583,19 +589,19 @@ func (e *ENTransactionProvider) getBlockEvents(
 			entities.EventEncodingVersion_CCF_V0,
 		)
 		if err != nil {
-			return nil, rpc.ConvertError(err, "failed to convert events", codes.Internal)
+			return nil, flow.ZeroID, common.NewInvalidDataFromExternalNodeError("events", executorID, err)
 		}
 		events = append(events, resultEvents...)
 	}
 
-	return events, nil
+	return events, executorID, nil
 }
 
 // tryGetTransactionResultFromAnyExeNode retrieves a transaction result from execution nodes by block ID and transaction ID.
 //
-// Expected errors during normal operation:
-//   - [codes.Unavailable] when the connection to the execution node fails.
-//   - [status.Error] when the GRPC call failed.
+// Expected error returns during normal operation:
+//   - [codes.Unavailable] - when the connection to the execution node fails.
+//   - [status.Error] - when the GRPC call failed.
 func (e *ENTransactionProvider) getTransactionResultFromAnyExeNode(
 	ctx context.Context,
 	execNodes flow.IdentitySkeletonList,
@@ -617,9 +623,9 @@ func (e *ENTransactionProvider) getTransactionResultFromAnyExeNode(
 
 // tryGetTransactionResultsByBlockID retrieves a transaction result from execution nodes by block ID.
 //
-// Expected errors during normal operation:
-//   - [codes.Unavailable] when the connection to the execution node fails.
-//   - [status.Error] when the GRPC call failed.
+// Expected error returns during normal operation:
+//   - [codes.Unavailable] - when the connection to the execution node fails.
+//   - [status.Error] - when the GRPC call failed.
 func (e *ENTransactionProvider) getTransactionResultsByBlockIDFromAnyExeNode(
 	ctx context.Context,
 	execNodes flow.IdentitySkeletonList,
@@ -641,9 +647,9 @@ func (e *ENTransactionProvider) getTransactionResultsByBlockIDFromAnyExeNode(
 
 // tryGetTransactionResultByIndex retrieves a transaction result from execution nodes by block ID and index.
 //
-// Expected errors during normal operation:
-//   - [codes.Unavailable] when the connection to the execution node fails.
-//   - [status.Error] when the GRPC call failed.
+// Expected error returns during normal operation:
+//   - [codes.Unavailable] - when the connection to the execution node fails.
+//   - [status.Error] - when the GRPC call failed.
 func (e *ENTransactionProvider) getTransactionResultByIndexFromAnyExeNode(
 	ctx context.Context,
 	execNodes flow.IdentitySkeletonList,
@@ -662,13 +668,18 @@ func (e *ENTransactionProvider) getTransactionResultByIndexFromAnyExeNode(
 	return resp, executionNode.NodeID, errToReturn
 }
 
+// getBlockEventsByBlockIDsFromAnyExeNode retrieves events from execution nodes by block IDs.
+//
+// Expected error returns during normal operation:
+//   - [codes.Unavailable] - when the connection to the execution node fails.
+//   - [status.Error] - when the GRPC call failed.
 func (e *ENTransactionProvider) getBlockEventsByBlockIDsFromAnyExeNode(
 	ctx context.Context,
 	execNodes flow.IdentitySkeletonList,
 	req *execproto.GetEventsForBlockIDsRequest,
-) (*execproto.GetEventsForBlockIDsResponse, error) {
+) (*execproto.GetEventsForBlockIDsResponse, flow.Identifier, error) {
 	var resp *execproto.GetEventsForBlockIDsResponse
-	_, errToReturn := e.nodeCommunicator.CallAvailableNode(
+	executionNode, errToReturn := e.nodeCommunicator.CallAvailableNode(
 		execNodes,
 		func(node *flow.IdentitySkeleton) error {
 			var err error
@@ -677,14 +688,14 @@ func (e *ENTransactionProvider) getBlockEventsByBlockIDsFromAnyExeNode(
 		},
 		nil,
 	)
-	return resp, errToReturn
+	return resp, executionNode.NodeID, errToReturn
 }
 
 // tryGetTransactionResult retrieves a transaction result from execution nodes by block ID and transaction ID.
 //
-// Expected errors during normal operation:
-//   - [codes.Unavailable] when the connection to the execution node fails.
-//   - [status.Error] when the GRPC call failed.
+// Expected error returns during normal operation:
+//   - [codes.Unavailable] - when the connection to the execution node fails.
+//   - [status.Error] - when the GRPC call failed.
 func (e *ENTransactionProvider) tryGetTransactionResult(
 	ctx context.Context,
 	execNode *flow.IdentitySkeleton,
@@ -706,9 +717,9 @@ func (e *ENTransactionProvider) tryGetTransactionResult(
 
 // tryGetTransactionResultsByBlockID retrieves a transaction result from execution nodes by block ID.
 //
-// Expected errors during normal operation:
-//   - [codes.Unavailable] when the connection to the execution node fails.
-//   - [status.Error] when the GRPC call failed.
+// Expected error returns during normal operation:
+//   - [codes.Unavailable] - when the connection to the execution node fails.
+//   - [status.Error] - when the GRPC call failed.
 func (e *ENTransactionProvider) tryGetTransactionResultsByBlockID(
 	ctx context.Context,
 	execNode *flow.IdentitySkeleton,
@@ -730,9 +741,9 @@ func (e *ENTransactionProvider) tryGetTransactionResultsByBlockID(
 
 // tryGetTransactionResultByIndex retrieves a transaction result from execution nodes by block ID and index.
 //
-// Expected errors during normal operation:
-//   - [codes.Unavailable] when the connection to the execution node fails.
-//   - [status.Error] when the GRPC call failed.
+// Expected error returns during normal operation:
+//   - [codes.Unavailable] - when the connection to the execution node fails.
+//   - [status.Error] - when the GRPC call failed.
 func (e *ENTransactionProvider) tryGetTransactionResultByIndex(
 	ctx context.Context,
 	execNode *flow.IdentitySkeleton,
@@ -752,6 +763,11 @@ func (e *ENTransactionProvider) tryGetTransactionResultByIndex(
 	return resp, nil
 }
 
+// tryGetBlockEventsByBlockIDs retrieves events from execution nodes by block IDs.
+//
+// Expected error returns during normal operation:
+//   - [codes.Unavailable] - when the connection to the execution node fails.
+//   - [status.Error] - when the GRPC call failed.
 func (e *ENTransactionProvider) tryGetBlockEventsByBlockIDs(
 	ctx context.Context,
 	execNode *flow.IdentitySkeleton,
@@ -759,7 +775,7 @@ func (e *ENTransactionProvider) tryGetBlockEventsByBlockIDs(
 ) (*execproto.GetEventsForBlockIDsResponse, error) {
 	execRPCClient, closer, err := e.connFactory.GetExecutionAPIClient(execNode.Address)
 	if err != nil {
-		return nil, err
+		return nil, status.Errorf(codes.Unavailable, "failed to connect to execution node: %v", err)
 	}
 	defer closer.Close()
 
