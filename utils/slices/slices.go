@@ -79,3 +79,12 @@ func StringSliceContainsElement(a []string, v string) bool {
 
 	return false
 }
+
+// ToMap converts a slice of comparable elements to a map using elements as keys.
+func ToMap[T comparable](a []T) map[T]struct{} {
+	m := make(map[T]struct{}, len(a))
+	for _, x := range a {
+		m[x] = struct{}{}
+	}
+	return m
+}
