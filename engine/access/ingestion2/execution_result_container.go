@@ -40,7 +40,7 @@ var _ forest.Vertex = (*ExecutionResultContainer)(nil)
 // this is a set of execution receipts all committing to the *same* execution `result` for the
 // specified block.
 //
-// No errors are expected during normal operation.
+// No error returns are expected during normal operation.
 func NewExecutionResultContainer(
 	result *flow.ExecutionResult,
 	header *flow.Header,
@@ -171,6 +171,8 @@ func (c *ExecutionResultContainer) ResultStatus() ResultStatus {
 }
 
 // SetResultStatus sets the status of this result.
+//
+// No error returns expected during normal operations.
 func (c *ExecutionResultContainer) SetResultStatus(resultStatus ResultStatus) error {
 	if c.resultStatus.Set(resultStatus) {
 		if resultStatus == ResultSealed {
