@@ -512,7 +512,7 @@ func (s *ResultsForestSuite) TestAddSealedResult_ConcurrentWithAddReceipt() {
 		s.Equal(resultID, container.ResultID())
 		s.Equal(uint(1), container.Size())
 		s.True(container.Has(receipt.ID()))
-		s.Equal(ingestion2.ResultForCertifiedBlock, container.BlockStatus())
+		s.Equal(ingestion2.ResultForCertifiedBlock, container.ResultStatus())
 
 		// this is mocked, but should be abandoned for all conflicting results
 		s.Equal(optimistic_sync.StateAbandoned, container.Pipeline().GetState())
@@ -811,11 +811,11 @@ func (s *ResultsForestSuite) TestAddReceipt() {
 		s.Equal(uint(2), forest.Size())
 	})
 
-	s.Run("rejects invalid block status", func() {
+	s.Run("rejects invalid result status", func() {
 		forest := s.createForest()
 
-		added, err := forest.AddReceipt(receiptGen.Fixture(), ingestion2.BlockStatus(0))
-		s.ErrorContains(err, "invalid block status")
+		added, err := forest.AddReceipt(receiptGen.Fixture(), ingestion2.ResultStatus(0))
+		s.ErrorContains(err, "invalid result status")
 		s.False(added)
 		s.Equal(uint(1), forest.Size())
 	})
@@ -839,7 +839,7 @@ func (s *ResultsForestSuite) TestAddReceipt_ConcurrentInserts() {
 
 	receiptsPerResult := 100
 
-	// mark the first 2 blocks as finalized so we can use different block statuses
+	// mark the first 2 blocks as finalized so we can use different result statuses
 	for _, block := range s.blocks[:2] {
 		err := forest.OnBlockFinalized(block)
 		s.Require().NoError(err)
@@ -868,9 +868,9 @@ func (s *ResultsForestSuite) TestAddReceipt_ConcurrentInserts() {
 		s.Equal(result.ID(), container.ResultID())
 		s.Equal(uint(receiptsPerResult), container.Size())
 		if i < 2 {
-			s.Equal(ingestion2.ResultForFinalizedBlock, container.BlockStatus())
+			s.Equal(ingestion2.ResultForFinalizedBlock, container.ResultStatus())
 		} else {
-			s.Equal(ingestion2.ResultForCertifiedBlock, container.BlockStatus())
+			s.Equal(ingestion2.ResultForCertifiedBlock, container.ResultStatus())
 		}
 	}
 }
@@ -957,11 +957,11 @@ func (s *ResultsForestSuite) TestOnBlockFinalized() {
 
 		container, found := forest.GetContainer(mainResults[0].ID())
 		s.True(found)
-		err := container.SetBlockStatus(ingestion2.ResultSealed)
+		err := container.SetResultStatus(ingestion2.ResultSealed)
 		s.Require().NoError(err)
 
 		err = forest.OnBlockFinalized(s.blocks[1])
-		s.ErrorContains(err, "invalid block status transition: sealed -> finalized")
+		s.ErrorContains(err, "invalid result status transition: sealed -> finalized")
 	})
 
 	s.Run("returns an error if sibling with different view is already marked as finalized", func() {
@@ -971,7 +971,7 @@ func (s *ResultsForestSuite) TestOnBlockFinalized() {
 
 		container, found := forest.GetContainer(consensusFork1[0].ID())
 		s.True(found)
-		err := container.SetBlockStatus(ingestion2.ResultForFinalizedBlock)
+		err := container.SetResultStatus(ingestion2.ResultForFinalizedBlock)
 		s.Require().NoError(err)
 
 		err = forest.OnBlockFinalized(s.blocks[1])
@@ -1352,15 +1352,15 @@ func (s *ResultsForestSuite) createForest() *ingestion2.ResultsForest {
 }
 
 // assertContainer asserts that the container for the given result ID exists in the forest and has
-// the provided block status.
+// the provided result status.
 func (s *ResultsForestSuite) assertContainer(
 	forest *ingestion2.ResultsForest,
 	resultID flow.Identifier,
-	blockStatus ingestion2.BlockStatus,
+	resultStatus ingestion2.ResultStatus,
 ) {
 	container, found := forest.GetContainer(resultID)
 	s.Require().True(found)
-	s.Equal(blockStatus, container.BlockStatus())
+	s.Equal(resultStatus, container.ResultStatus())
 	s.Equal(resultID, container.ResultID())
 }
 

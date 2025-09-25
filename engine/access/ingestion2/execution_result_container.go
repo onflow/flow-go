@@ -27,8 +27,8 @@ type ExecutionResultContainer struct {
 	blockHeader *flow.Header          // header of the block which the result is for
 
 	// inherently concurrency-safe values; can be read without concurrency protection:
-	pipeline    optimistic_sync.Pipeline
-	blockStatus counters.StrictMonotonicCounter
+	pipeline     optimistic_sync.Pipeline
+	resultStatus counters.StrictMonotonicCounter
 
 	// values requiring concurrency protection
 	mu       sync.RWMutex
@@ -53,12 +53,12 @@ func NewExecutionResultContainer(
 	}
 
 	return &ExecutionResultContainer{
-		receipts:    make(map[flow.Identifier]*flow.ExecutionReceiptStub),
-		result:      result,
-		resultID:    result.ID(),
-		blockHeader: header,
-		pipeline:    pipeline,
-		blockStatus: counters.NewMonotonicCounter(uint64(ResultForCertifiedBlock)),
+		receipts:     make(map[flow.Identifier]*flow.ExecutionReceiptStub),
+		result:       result,
+		resultID:     result.ID(),
+		blockHeader:  header,
+		pipeline:     pipeline,
+		resultStatus: counters.NewMonotonicCounter(uint64(ResultForCertifiedBlock)),
 	}, nil
 }
 
@@ -166,26 +166,26 @@ func (c *ExecutionResultContainer) Pipeline() optimistic_sync.Pipeline {
 	return c.pipeline
 }
 
-// BlockStatus returns the block status of the block executed by this result.
-func (c *ExecutionResultContainer) BlockStatus() BlockStatus {
-	return BlockStatus(c.blockStatus.Value())
+// ResultStatus returns the status of this result.
+func (c *ExecutionResultContainer) ResultStatus() ResultStatus {
+	return ResultStatus(c.resultStatus.Value())
 }
 
-// SetBlockStatus sets the block status of the block executed by this result.
-func (c *ExecutionResultContainer) SetBlockStatus(blockStatus BlockStatus) error {
-	if c.blockStatus.Set(uint64(blockStatus)) {
-		if blockStatus == ResultSealed {
+// SetResultStatus sets the status of this result.
+func (c *ExecutionResultContainer) SetResultStatus(resultStatus ResultStatus) error {
+	if c.resultStatus.Set(uint64(resultStatus)) {
+		if resultStatus == ResultSealed {
 			c.pipeline.SetSealed()
 		}
 		return nil
 	}
 
 	// The update failed, so it was either a no-op or an invalid transition.
-	if c.BlockStatus().IsValidTransition(blockStatus) {
+	if c.ResultStatus().IsValidTransition(resultStatus) {
 		return nil
 	}
 
-	return fmt.Errorf("invalid block status transition: %s -> %s", c.BlockStatus(), blockStatus)
+	return fmt.Errorf("invalid result status transition: %s -> %s", c.ResultStatus(), resultStatus)
 }
 
 // Methods implementing LevelledForest's Vertex interface

@@ -104,7 +104,7 @@ var (
 //     𝓼; formally 𝓹.Level ≤ 𝓼.Level.
 //   - 𝓹.Level ≤ 𝓼.Level ≤ 𝓱
 //     with the additional constraint that 𝓹.Level < 𝓱 (required for liveness)
-//   - 𝓹, 𝓼, 𝓱, monotonically increase during the runtime of the ResultsForest
+//   - 𝓹.Level, 𝓼.Level, 𝓱, monotonically increase during the runtime of the ResultsForest
 //   - [optional, simplifying convention] there exists no result 𝒓 in the forest with 𝒓.Level < 𝓹.Level
 //
 // Any honest protocol execution should satisfy the invariant. Hence, the invariant being violated is a
@@ -295,7 +295,7 @@ var (
 //     finalized results.
 //   - Block finalization information is primarily delivered via the OnBlockFinalized event handler.
 //     The forest tracks the highest finalized view for which it has received a notification. Any
-//     receipt received with the block status set to ResultForFinalizedBlock, whose view is greater than
+//     receipt received with the result status set to ResultForFinalizedBlock, whose view is greater than
 //     the forest's highest finalized view, will be not be marked finalized. Instead, the forest will
 //     wait until OnBlockFinalized receives the notification for that block.
 //   - This ensures that there are no results within the forest that are marked as finalized and whose
@@ -385,9 +385,9 @@ func NewResultsForest(
 	if err != nil {
 		return nil, fmt.Errorf("failed to create container for latest persisted sealed result (%s): %w", sealedResultID, err)
 	}
-	err = latestSealedResultContainer.SetBlockStatus(ResultSealed)
+	err = latestSealedResultContainer.SetResultStatus(ResultSealed)
 	if err != nil {
-		return nil, fmt.Errorf("failed to set latest persisted sealed result block status to sealed (%s): %w", sealedResultID, err)
+		return nil, fmt.Errorf("failed to the status of result %v to sealed: %w", sealedResultID, err)
 	}
 
 	forest := forest.NewLevelledForest(sealedHeader.View)
@@ -475,8 +475,8 @@ func (rf *ResultsForest) AddSealedResult(result *flow.ExecutionResult) error {
 
 // AddReceipt adds the given execution result to the forest. Furthermore, we track which Execution Node issued
 // receipts committing to this result. This method is idempotent.
-// `blockStatus` is used initialize the status of new results added to the forest. If the result is
-// already known, `blockStatus` is ignored.
+// `resultStatus` is used initialize the status of new results added to the forest. If the result is
+// already known, `resultStatus` is ignored.
 //
 // IMPORTANT: The caller MUST provide sealed results in ancestor first order to allow the forest to
 // guarantee liveness. If a receipt is added for an unknown sealed result whose parent is either
@@ -489,14 +489,14 @@ func (rf *ResultsForest) AddSealedResult(result *flow.ExecutionResult) error {
 // Expected error returns during normal operations:
 //   - [ErrPrunedView]: if the result's block view is below the lowest view
 //   - [ErrMaxViewDeltaExceeded]: if the result's block view is more than maxViewDelta views ahead of the last sealed view
-func (rf *ResultsForest) AddReceipt(receipt *flow.ExecutionReceipt, blockStatus BlockStatus) (bool, error) {
-	if !blockStatus.IsValid() {
-		return false, fmt.Errorf("invalid block status: %s", blockStatus)
+func (rf *ResultsForest) AddReceipt(receipt *flow.ExecutionReceipt, resultStatus ResultStatus) (bool, error) {
+	if !resultStatus.IsValid() {
+		return false, fmt.Errorf("invalid result status: %s", resultStatus)
 	}
 
 	resultID := receipt.ExecutionResult.ID()
 
-	container, err := rf.getOrCreateContainer(&receipt.ExecutionResult, blockStatus)
+	container, err := rf.getOrCreateContainer(&receipt.ExecutionResult, resultStatus)
 	if err != nil {
 		return false, fmt.Errorf("failed to get container for result (%s): %w", resultID, err)
 	}
@@ -513,11 +513,17 @@ func (rf *ResultsForest) AddReceipt(receipt *flow.ExecutionReceipt, blockStatus 
 	return added > 0, nil
 }
 
-// extendSealedFork extends the sealed fork 𝓹 ← … ← 𝓼, by a child result of 𝓼.
+// extendSealedFork extends the sealed fork 𝓹 ← … ← 𝓼, by a child result of 𝓼. The child result must already
+// be stored in the forest. CAUTION: This method is NOT IDEMPOTENT.
 //
-// CAUTION: This method is the only place with the authority to
+// IMPORTANT: This method is the only place with the authority to
 //   - update latest sealed result 𝓼, aka `latestSealedResult`
 //   - set the status of the result to sealed.
+//
+// extendSealedFork guarantees that thr following portion of our invariant is maintained:
+//   - 𝓼 always exist in the forest
+//   - 𝓹 is an ancestor of 𝓼 and 𝓹.Level ≤ 𝓼.Level
+//   - 𝓼.Level, 𝓱, monotonically increase during the runtime of the ResultsForest
 //
 // For maintaining our invariant, it is important to ensure that the fork 𝓹 ← … ← 𝓼 is correctly
 // extended in conjunction with the status `ResultSealed` being assigned to only results along
@@ -538,24 +544,31 @@ func (rf *ResultsForest) extendSealedFork(childResult *ExecutionResultContainer)
 	if rf.latestSealedResult.ResultID() != parentID {
 		return fmt.Errorf("latest sealed result is %v, while its purported child reports %v as its parent ", rf.latestSealedResult.ResultID(), parentID)
 	}
-	if rf.latestSealedResult.BlockView() != parentView { // this is redundant
+	if rf.latestSealedResult.BlockView() != parentView {
+		return fmt.Errorf("latest sealed result has view %d, while its purported child reports its parent view as %d", rf.latestSealedResult.BlockView(), parentView)
+	}
+
+	// The following sanity check confirms the conceptual invariant that 𝓼 must monotonically increase during the runtime
+	// of the ResultsForest. A violation necessarily requires invalid inputs. Nevertheless, we check this here to ensure the
+	// ResultsForest's integrity. As 𝓼.Level strictly monotonically increases, the same holds for 𝓱 = 𝓼.Level + `maxViewDelta`.
+	if !(rf.latestSealedResult.BlockView() < childResult.BlockView()) {
 		return fmt.Errorf("latest sealed result has view %d, while its purported child reports its parent view as %d", rf.latestSealedResult.BlockView(), parentView)
 	}
 
 	// Sanity check that the child is stored:
 	if _, found := rf.getContainer(childResult.ResultID()); !found {
-		return fmt.Errorf("child result not found in forest")
+		return fmt.Errorf("cannot extend sealed fork by child result that is not yet stored in the forest")
 	}
 
 	// Sanity check that the child's current status is not sealed. This is expected, because `extendSealedFork` is the
 	// only place in the code that sets the status to sealed, if and only if the result is appended to the sealed fork.
-	if childResult.BlockStatus() == ResultSealed {
+	if childResult.ResultStatus() == ResultSealed {
 		return fmt.Errorf("sealed fork has not yet been extended by the child result, though the child is already marked as sealed")
 	}
 
 	// UPDATE INVARIANT: latest sealed result 𝓼, aka `latestSealedResult`, is updated to its child and the childs status is set to sealed.
 	rf.latestSealedResult = childResult
-	err := childResult.SetBlockStatus(ResultSealed)
+	err := childResult.SetResultStatus(ResultSealed)
 	if err != nil {
 		return fmt.Errorf("failed to set status of child result to sealed: %w", err)
 	}
@@ -572,7 +585,7 @@ func (rf *ResultsForest) extendSealedFork(childResult *ExecutionResultContainer)
 func (rf *ResultsForest) extendsSealedChain(container *ExecutionResultContainer) bool {
 	parentID, _ := container.Parent()
 	parent, found := rf.getContainer(parentID)
-	if !found || parent.BlockStatus() != ResultSealed {
+	if !found || parent.ResultStatus() != ResultSealed {
 		return false // invariant violation
 	}
 
@@ -600,19 +613,17 @@ func (rf *ResultsForest) updateLastSealed(container *ExecutionResultContainer) {
 }
 
 // getOrCreateContainer retrieves or creates the container for the given result within the forest.
-// When creating a new container, it is initialized with the given block status. `blockStatus` is
+// When creating a new container, it is initialized with the given result status. `resultStatus` is
 // ignored if the container already exists.
 // This method is optimized for the case of many concurrent reads compared to relatively few writes,
 // and rarely repeated calls.
 // It is idempotent and atomic: it always returns the first container created for the given result.
 //
-// NOT CONCURRENCY SAFE!
-//
 // Expected error returns during normal operations:
 //   - [ErrPrunedView]: if the result's block view is below the lowest view
 //   - [ErrMaxViewDeltaExceeded]: if the result's block view is more than maxViewDelta views ahead
 //     of the oldes stored result (lowest view) *and* the given result is not
-func (rf *ResultsForest) getOrCreateContainer(result *flow.ExecutionResult, blockStatus BlockStatus) (*ExecutionResultContainer, error) {
+func (rf *ResultsForest) getOrCreateContainer(result *flow.ExecutionResult, resultStatus ResultStatus) (*ExecutionResultContainer, error) {
 	// First, try to get existing container - this will acquire read-lock only
 	resultID := result.ID()
 	container, found := rf.GetContainer(resultID)
@@ -632,7 +643,7 @@ func (rf *ResultsForest) getOrCreateContainer(result *flow.ExecutionResult, bloc
 		return nil, fmt.Errorf("failed to get block header for result (%s): %w", resultID, err)
 	}
 
-	pipeline := rf.pipelineFactory.NewPipeline(result, blockStatus == ResultSealed)
+	pipeline := rf.pipelineFactory.NewPipeline(result, resultStatus == ResultSealed)
 	newContainer, err := NewExecutionResultContainer(result, executedBlock, pipeline)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create container for result (%s): %w", resultID, err)
@@ -672,7 +683,7 @@ func (rf *ResultsForest) getOrCreateContainer(result *flow.ExecutionResult, bloc
 	// check invariant: there must always be a direct ancestoral connection from the latest persisted
 	// sealed result to the latest sealed result. this is guaranteed by never accepting a sealed result
 	// whose parent does not exist in the forest or is not sealed.
-	if blockStatus == ResultSealed && !rf.extendsSealedChain(container) {
+	if resultStatus == ResultSealed && !rf.extendsSealedChain(container) {
 		return nil, fmt.Errorf("sealed result (%s) does not extend last sealed result (view: %d)", resultID, rf.lastSealedView.Value())
 	}
 
@@ -684,30 +695,30 @@ func (rf *ResultsForest) getOrCreateContainer(result *flow.ExecutionResult, bloc
 	rf.forest.AddVertex(container)
 	// TODO: as mentioned in the context of function `ensureAdmissible`, I think it would be beneficial to
 	//       move the LevelledForest operation (above) inside our function `ensureAdmissible`, toge
-	//       However, this will require additional refactoring, to move modifications of the BlockStatus above
+	//       However, this will require additional refactoring, to move modifications of the ResultStatus above
 	//       outside the scope of `getOrCreateContainer`. I think conceptually we are holding the lock `rf.mu` here
 	//       because we want to potentially add a container. We are done with that now. I think it would improve
 	//       code clarity and robustness if subsequent modifications of the container would be handled by a separate
 	//       method.
-	//       It should be noted that, for some updates of BlockStatus, we operate solely on the container may not require
+	//       It should be noted that, for some updates of ResultStatus, we operate solely on the container may not require
 	//       holding the lock `rf.mu`. While this is of no performance concern, getting vertices from the forest is
 	//       still conceptually different than operating on the vertices itself. In other words, there are similar usage
 	//       patterns, but conceptually different operations.
 
-	switch blockStatus {
+	switch resultStatus {
 	case ResultSealed:
-		if err := container.SetBlockStatus(blockStatus); err != nil {
-			return nil, fmt.Errorf("failed to set block status to sealed: %w", err)
+		if err := container.SetResultStatus(resultStatus); err != nil {
+			return nil, fmt.Errorf("failed to set result status to sealed: %w", err)
 		}
 
 	case ResultForFinalizedBlock:
-		// only set the block status to finalized for views already processed by OnBlockFinalized.
+		// only set the result status to finalized for views already processed by OnBlockFinalized.
 		// Results with newer views will eventually be marked finalized by OnBlockFinalized.
 		// This ensures that there are no results within the forest that are marked as finalized
 		// and whose ancestors are not also all marked as finalized.
 		if executedBlock.View <= rf.lastFinalizedView.Value() {
-			if err := container.SetBlockStatus(blockStatus); err != nil {
-				return nil, fmt.Errorf("failed to set block status to finalized: %w", err)
+			if err := container.SetResultStatus(resultStatus); err != nil {
+				return nil, fmt.Errorf("failed to set result status to finalized: %w", err)
 			}
 		}
 
@@ -842,15 +853,15 @@ func (rf *ResultsForest) OnBlockFinalized(finalized *flow.Block) error {
 	for parent := range rf.iterateView(finalized.ParentView) {
 		for container := range rf.iterateChildren(parent.ResultID()) {
 			if container.BlockView() == finalized.View {
-				if err := container.SetBlockStatus(ResultForFinalizedBlock); err != nil {
-					return fmt.Errorf("failed to set block status to finalized: %w", err)
+				if err := container.SetResultStatus(ResultForFinalizedBlock); err != nil {
+					return fmt.Errorf("failed to set result status to finalized: %w", err)
 				}
 				continue
 			}
 
 			// sanity check: this result's block conflicts with the latest finalized block. it must
 			// not be marked as finalized or the forest is in an inconsistent state.
-			if container.BlockStatus() == ResultForFinalizedBlock {
+			if container.ResultStatus() == ResultForFinalizedBlock {
 				return fmt.Errorf("result (%s) was marked finalized, but its block's view (%d) is different from the latest finalized block (%d)",
 					container.ResultID(), container.BlockView(), finalized.View)
 			}
@@ -893,8 +904,8 @@ func (rf *ResultsForest) OnBlockFinalized(finalized *flow.Block) error {
 			return fmt.Errorf("failed to update last sealed view for result (%s): parent result not found in forest or is not sealed",
 				container.ResultID())
 		}
-		if err := container.SetBlockStatus(ResultSealed); err != nil {
-			return fmt.Errorf("failed to set block status to sealed: %w", err)
+		if err := container.SetResultStatus(ResultSealed); err != nil {
+			return fmt.Errorf("failed to set result status to sealed: %w", err)
 		}
 		rf.updateLastSealed(container)
 	}
@@ -979,7 +990,7 @@ func (rf *ResultsForest) processCompleted(resultID flow.Identifier) error {
 // NOT CONCURRENCY SAFE!
 func (rf *ResultsForest) isAbandonedFork(container *ExecutionResultContainer) bool {
 	// optimization: if the container is sealed, it can't be in an abandoned fork
-	if container.BlockStatus() == ResultSealed {
+	if container.ResultStatus() == ResultSealed {
 		return false
 	}
 
@@ -1003,7 +1014,7 @@ func (rf *ResultsForest) isAbandonedFork(container *ExecutionResultContainer) bo
 		}
 
 		// 2. a sibling is sealed
-		if sibling.BlockStatus() == ResultSealed {
+		if sibling.ResultStatus() == ResultSealed {
 			isAbandoned = true
 			break
 		}

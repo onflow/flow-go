@@ -2,18 +2,18 @@ package ingestion2
 
 import "sync/atomic"
 
-// BlockStatus represents the [ResultsForest]'s *internal* status of processing a particular result.
+// ResultStatus represents the [ResultsForest]'s *internal* status of processing a particular result.
 //
 // IMPORTANT: In general, the processing status of a result in the ResultsForest is expected to lag behind the
 // consensus follower's notion of the analogous quantities, due to our asynchronous, information-driven design.
-type BlockStatus uint64
+type ResultStatus uint64
 
 const (
 	// ResultForCertifiedBlock indicates that the block the result pertains to is certified. The
 	// ResultsForest ingests only certified results. This guarantees that for every view, there is
 	// at most one block, which can have results. In other words, all results for a given view are
 	// for with the same block. Every result in the ResultsForest must be at least certified.
-	ResultForCertifiedBlock BlockStatus = iota + 1
+	ResultForCertifiedBlock ResultStatus = iota + 1
 
 	// ResultForFinalizedBlock states that the block the result pertains to is finalized.
 	// CAUTION: the result itself may still be orphaned later, if a conflicting result is sealed.
@@ -30,8 +30,8 @@ const (
 	ResultOrphaned
 )
 
-// String returns the string representation of the block status
-func (bs BlockStatus) String() string {
+// String returns the string representation of the result status
+func (bs ResultStatus) String() string {
 	switch bs {
 	case ResultForCertifiedBlock:
 		return "certified"
@@ -46,8 +46,8 @@ func (bs BlockStatus) String() string {
 	}
 }
 
-// IsValid returns true if the block status is a valid value.
-func (bs BlockStatus) IsValid() bool {
+// IsValid returns true if the result status is a valid value.
+func (bs ResultStatus) IsValid() bool {
 	switch bs {
 	case ResultForCertifiedBlock, ResultForFinalizedBlock, ResultSealed:
 		return true
@@ -56,8 +56,8 @@ func (bs BlockStatus) IsValid() bool {
 	}
 }
 
-// IsValidTransition returns true if the block status can be transitioned to the given status.
-func (bs BlockStatus) IsValidTransition(to BlockStatus) bool {
+// IsValidTransition returns true if the result status can be transitioned to the given status.
+func (bs ResultStatus) IsValidTransition(to ResultStatus) bool {
 	if to == bs {
 		return true
 	}
@@ -71,26 +71,26 @@ func (bs BlockStatus) IsValidTransition(to BlockStatus) bool {
 	}
 }
 
-// BlockStatusTracker is a concurrency-safe tracker for BlockStatus using atomic operations.
+// ResultStatusTracker is a concurrency-safe tracker for ResultStatus using atomic operations.
 // It is more efficient under moderate load, compared to a mutex-based approach.
 // Concurrent write-read establishes a 'happens before relation' as detailed in https://go.dev/ref/mem
-type BlockStatusTracker struct {
+type ResultStatusTracker struct {
 	status uint64
 }
 
-// NewBlockStatusTracker instantiates a concurrency-safe state machine with valid state transitions
-// as specified in function [BlockStatus.IsValidTransition] above. The intended use is to rack the
+// NewResultStatusTracker instantiates a concurrency-safe state machine with valid state transitions
+// as specified in function [ResultStatus.IsValidTransition] above. The intended use is to rack the
 // status of an execution result from the perspective of the ResultsForest.
 // Caution: for simplicity, we do not validate the initial value here.
-func NewBlockStatusTracker(initialValue BlockStatus) BlockStatusTracker {
-	return BlockStatusTracker{
+func NewResultStatusTracker(initialValue ResultStatus) ResultStatusTracker {
+	return ResultStatusTracker{
 		status: uint64(initialValue),
 	}
 }
 
 // Set the result status to the new value, if and only if this is a valid state transition as defined
-// in function [BlockStatus.IsValidTransition].
-func (t *BlockStatusTracker) Set(newValue BlockStatus) bool {
+// in function [ResultStatus.IsValidTransition].
+func (t *ResultStatusTracker) Set(newValue ResultStatus) bool {
 	for {
 		oldValue := t.Value()
 		if !oldValue.IsValidTransition(newValue) {
@@ -104,6 +104,6 @@ func (t *BlockStatusTracker) Set(newValue BlockStatus) bool {
 
 // Value returns the current status of the execution result from the perspective
 // of the ResultsForest.
-func (t *BlockStatusTracker) Value() BlockStatus {
-	return BlockStatus(atomic.LoadUint64(&t.status))
+func (t *ResultStatusTracker) Value() ResultStatus {
+	return ResultStatus(atomic.LoadUint64(&t.status))
 }
