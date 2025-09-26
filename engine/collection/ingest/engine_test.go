@@ -26,7 +26,7 @@ import (
 	"github.com/onflow/flow-go/module/metrics"
 	module "github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/network"
-	"github.com/onflow/flow-go/network/mocknetwork"
+	mocknetwork "github.com/onflow/flow-go/network/mock"
 	realprotocol "github.com/onflow/flow-go/state/protocol"
 	protocol "github.com/onflow/flow-go/state/protocol/mock"
 	"github.com/onflow/flow-go/storage"
@@ -74,7 +74,7 @@ func (suite *Suite) SetupTest() {
 	log := zerolog.New(io.Discard)
 	metrics := metrics.NewNoopCollector()
 
-	net := new(mocknetwork.Network)
+	net := new(mocknetwork.EngineRegistry)
 	suite.conduit = new(mocknetwork.Conduit)
 	net.On("Register", mock.Anything, mock.Anything).Return(suite.conduit, nil).Once()
 

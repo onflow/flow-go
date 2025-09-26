@@ -51,7 +51,7 @@ func (f headerFactory) WithParentView(view uint64) HeaderOption {
 	}
 }
 
-// WithParentHeader is an option that sets the the following fields of the block header based on the
+// WithParentHeader is an option that sets the following fields of the block header based on the
 // provided parent header:
 // - `View`
 // - `Height`

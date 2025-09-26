@@ -18,7 +18,7 @@ import (
 	module "github.com/onflow/flow-go/module/mock"
 	netint "github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/channels"
-	"github.com/onflow/flow-go/network/mocknetwork"
+	mocknetwork "github.com/onflow/flow-go/network/mock"
 	protocol "github.com/onflow/flow-go/state/protocol/mock"
 	storerr "github.com/onflow/flow-go/storage"
 	storage "github.com/onflow/flow-go/storage/mock"
@@ -36,7 +36,7 @@ type EngineSuite struct {
 	myID       flow.Identifier
 	cluster    flow.IdentityList
 	me         *module.Local
-	net        *mocknetwork.Network
+	net        *mocknetwork.EngineRegistry
 	payloads   *storage.ClusterPayloads
 	protoState *protocol.State
 	con        *mocknetwork.Conduit
@@ -124,7 +124,7 @@ func (cs *EngineSuite) SetupTest() {
 	cs.con.On("Unicast", mock.Anything, mock.Anything).Return(nil)
 
 	// set up network module mock
-	cs.net = &mocknetwork.Network{}
+	cs.net = &mocknetwork.EngineRegistry{}
 	cs.net.On("Register", mock.Anything, mock.Anything).Return(
 		func(channel channels.Channel, engine netint.MessageProcessor) netint.Conduit {
 			return cs.con
