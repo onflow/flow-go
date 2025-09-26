@@ -10,15 +10,15 @@ import (
 
 	mocks "github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 
+	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/access/mock"
 	"github.com/onflow/flow-go/engine/access/rest/common/middleware"
 	"github.com/onflow/flow-go/engine/access/rest/http/request"
 	"github.com/onflow/flow-go/engine/access/rest/router"
 	"github.com/onflow/flow-go/engine/access/rest/util"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -34,8 +34,8 @@ func prepareTestVectors(t *testing.T,
 	heights []string,
 	blocks []*flow.Block,
 	executionResults []*flow.ExecutionResult,
-	blkCnt int) []testVector {
-
+	blkCnt int,
+) []testVector {
 	singleBlockExpandedResponse := expectedBlockResponsesExpanded(blocks[:1], executionResults[:1], true, flow.BlockStatusSealed)
 	multipleBlockExpandedResponse := expectedBlockResponsesExpanded(blocks, executionResults, true, flow.BlockStatusSealed)
 
@@ -49,7 +49,7 @@ func prepareTestVectors(t *testing.T,
 	invalidID := unittest.IdentifierFixture().String()
 	invalidHeight := fmt.Sprintf("%d", blkCnt+1)
 
-	maxIDs := flow.IdentifierList(unittest.IdentifierListFixture(request.MaxBlockRequestHeightRange + 1))
+	maxIDs := unittest.IdentifierListFixture(request.MaxBlockRequestHeightRange + 1)
 
 	testVectors := []testVector{
 		{
@@ -168,7 +168,7 @@ func TestAccessGetBlocks(t *testing.T) {
 
 	for _, tv := range testVectors {
 		rr := router.ExecuteRequest(tv.request, backend)
-		require.Equal(t, tv.expectedStatus, rr.Code, "failed test %s: incorrect response code", tv.description)
+		require.Equal(t, tv.expectedStatus, rr.Code, "failed test %s: incorrect response code. response: %s", tv.description, rr.Body.String())
 		actualResp := rr.Body.String()
 		require.JSONEq(t, tv.expectedResponse, actualResp, "Failed: %s: incorrect response body", tv.description)
 	}
@@ -256,8 +256,8 @@ func generateMocks(backend *mock.API, count int) ([]string, []string, []*flow.Bl
 	}
 
 	// any other call to the backend should return a not found error
-	backend.Mock.On("GetBlockByID", mocks.Anything, mocks.Anything).Return(nil, flow.BlockStatusUnknown, status.Error(codes.NotFound, "not found"))
-	backend.Mock.On("GetBlockByHeight", mocks.Anything, mocks.Anything).Return(nil, flow.BlockStatusUnknown, status.Error(codes.NotFound, "not found"))
+	backend.Mock.On("GetBlockByID", mocks.Anything, mocks.Anything).Return(nil, flow.BlockStatusUnknown, access.NewDataNotFoundError("block", storage.ErrNotFound))
+	backend.Mock.On("GetBlockByHeight", mocks.Anything, mocks.Anything).Return(nil, flow.BlockStatusUnknown, access.NewDataNotFoundError("block", storage.ErrNotFound))
 
 	return blockIDs, heights, blocks, executionResults
 }

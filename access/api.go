@@ -68,10 +68,7 @@ type TransactionStreamAPI interface {
 	// sequentially. If the transaction is not in the final state, the subscription will stream status updates until the transaction
 	// reaches the final state. Once a final state is reached, the subscription will automatically terminate.
 	//
-	// Parameters:
-	//   - ctx: Context to manage the subscription's lifecycle, including cancellation.
-	//   - txID: The unique identifier of the transaction to monitor.
-	//   - requiredEventEncodingVersion: The version of event encoding required for the subscription.
+	// If the transaction cannot be sent, the subscription will fail and return a failed subscription.
 	SubscribeTransactionStatuses(
 		ctx context.Context,
 		txID flow.Identifier,
@@ -83,11 +80,6 @@ type TransactionStreamAPI interface {
 	// reaches the final state ([flow.TransactionStatusSealed] or [flow.TransactionStatusExpired]). Once the final status has been reached, the subscription
 	// automatically terminates.
 	//
-	// Parameters:
-	//   - ctx: The context to manage the transaction sending and subscription lifecycle, including cancellation.
-	//   - tx: The transaction body to be sent and monitored.
-	//   - requiredEventEncodingVersion: The version of event encoding required for the subscription.
-	//
 	// If the transaction cannot be sent, the subscription will fail and return a failed subscription.
 	SendAndSubscribeTransactionStatuses(
 		ctx context.Context,
@@ -97,6 +89,11 @@ type TransactionStreamAPI interface {
 }
 
 // API provides all public-facing functionality of the Flow Access API.
+//
+// CAUTION: SIMPLIFIED ERROR HANDLING
+//   - All endpoints must only return an access.accessSentinel error or nil.
+//   - All errors returned by this API are guaranteed to be benign. The node can continue normal operations after such errors.
+//   - To prevent delivering incorrect results to clients, in case of an error, all other return values should be discarded.
 type API interface {
 	AccountsAPI
 	EventsAPI
@@ -104,42 +101,160 @@ type API interface {
 	TransactionsAPI
 	TransactionStreamAPI
 
+	// Ping responds to requests when the server is up.
+	//
+	// CAUTION: this layer SIMPLIFIES the ERROR HANDLING convention
+	//   - All errors returned are guaranteed to be benign. The node can continue normal operations after such errors.
+	//   - To prevent delivering incorrect results to clients in case of an error, all other return values should be discarded.
+	//
+	// Expected sentinel errors providing details to clients about failed requests:
+	// - access.ServiceUnavailable if the configured static collection node does not respond to ping.
 	Ping(ctx context.Context) error
+
+	// GetNetworkParameters returns the network parameters for the current network.
 	GetNetworkParameters(ctx context.Context) accessmodel.NetworkParameters
+
+	// GetNodeVersionInfo returns node version information such as semver, commit, sporkID, protocolVersion, etc
+	//
+	// CAUTION: this layer SIMPLIFIES the ERROR HANDLING convention
+	//   - All errors returned are guaranteed to be benign. The node can continue normal operations after such errors.
+	//   - To prevent delivering incorrect results to clients in case of an error, all other return values should be discarded.
 	GetNodeVersionInfo(ctx context.Context) (*accessmodel.NodeVersionInfo, error)
 
+	// GetLatestBlockHeader returns the latest block header in the chain.
+	//
+	// CAUTION: this layer SIMPLIFIES the ERROR HANDLING convention
+	//   - All errors returned are guaranteed to be benign. The node can continue normal operations after such errors.
+	//   - To prevent delivering incorrect results to clients in case of an error, all other return values should be discarded.
 	GetLatestBlockHeader(ctx context.Context, isSealed bool) (*flow.Header, flow.BlockStatus, error)
+
+	// GetBlockHeaderByHeight returns the block header at the given height.
+	//
+	// CAUTION: this layer SIMPLIFIES the ERROR HANDLING convention
+	//   - All errors returned are guaranteed to be benign. The node can continue normal operations after such errors.
+	//   - To prevent delivering incorrect results to clients in case of an error, all other return values should be discarded.
+	//
+	// Expected sentinel errors providing details to clients about failed requests:
+	//   - access.DataNotFoundError - No header with the given height was found
 	GetBlockHeaderByHeight(ctx context.Context, height uint64) (*flow.Header, flow.BlockStatus, error)
+
+	// GetBlockHeaderByID returns the block header with the given ID.
+	//
+	// CAUTION: this layer SIMPLIFIES the ERROR HANDLING convention
+	//   - All errors returned are guaranteed to be benign. The node can continue normal operations after such errors.
+	//   - To prevent delivering incorrect results to clients in case of an error, all other return values should be discarded.
+	//
+	// Expected sentinel errors providing details to clients about failed requests:
+	//   - access.DataNotFoundError - No header with the given ID was found
 	GetBlockHeaderByID(ctx context.Context, id flow.Identifier) (*flow.Header, flow.BlockStatus, error)
 
+	// GetLatestBlock returns the latest block in the chain.
+	//
+	// CAUTION: this layer SIMPLIFIES the ERROR HANDLING convention
+	//   - All errors returned are guaranteed to be benign. The node can continue normal operations after such errors.
+	//   - To prevent delivering incorrect results to clients in case of an error, all other return values should be discarded.
 	GetLatestBlock(ctx context.Context, isSealed bool) (*flow.Block, flow.BlockStatus, error)
+
+	// GetBlockByHeight returns the block at the given height.
+	//
+	// CAUTION: this layer SIMPLIFIES the ERROR HANDLING convention
+	//   - All errors returned are guaranteed to be benign. The node can continue normal operations after such errors.
+	//   - To prevent delivering incorrect results to clients in case of an error, all other return values should be discarded.
+	//
+	// Expected sentinel errors providing details to clients about failed requests:
+	//   - access.DataNotFoundError - No block with the given height was found
 	GetBlockByHeight(ctx context.Context, height uint64) (*flow.Block, flow.BlockStatus, error)
+
+	// GetBlockByID returns the block with the given ID.
+	//
+	// CAUTION: this layer SIMPLIFIES the ERROR HANDLING convention
+	//   - All errors returned are guaranteed to be benign. The node can continue normal operations after such errors.
+	//   - To prevent delivering incorrect results to clients in case of an error, all other return values should be discarded.
+	//
+	// Expected sentinel errors providing details to clients about failed requests:
+	//   - access.DataNotFoundError - No block with the given ID was found
 	GetBlockByID(ctx context.Context, id flow.Identifier) (*flow.Block, flow.BlockStatus, error)
 
+	// GetCollectionByID returns a light collection by its ID.
+	//
+	// CAUTION: this layer SIMPLIFIES the ERROR HANDLING convention
+	//   - All errors returned are guaranteed to be benign. The node can continue normal operations after such errors.
+	//   - To prevent delivering incorrect results to clients in case of an error, all other return values should be discarded.
+	//
+	// Expected sentinel errors providing details to clients about failed requests:
+	//   - access.DataNotFoundError if the collection is not found.
 	GetCollectionByID(ctx context.Context, id flow.Identifier) (*flow.LightCollection, error)
+
+	// GetFullCollectionByID returns a full collection by its ID.
+	//
+	// CAUTION: this layer SIMPLIFIES the ERROR HANDLING convention
+	// As documented in the [access.API], which we partially implement with this function
+	//   - All errors returned are guaranteed to be benign. The node can continue normal operations after such errors.
+	//   - To prevent delivering incorrect results to clients in case of an error, all other return values should be discarded.
+	//
+	// Expected sentinel errors providing details to clients about failed requests:
+	//   - access.DataNotFoundError if the collection is not found.
 	GetFullCollectionByID(ctx context.Context, id flow.Identifier) (*flow.Collection, error)
 
+	// GetLatestProtocolStateSnapshot returns the latest finalized snapshot.
+	//
+	// CAUTION: this layer SIMPLIFIES the ERROR HANDLING convention
+	//   - All errors returned are guaranteed to be benign. The node can continue normal operations after such errors.
+	//   - To prevent delivering incorrect results to clients in case of an error, all other return values should be discarded.
 	GetLatestProtocolStateSnapshot(ctx context.Context) ([]byte, error)
+
+	// GetProtocolStateSnapshotByBlockID returns serializable Snapshot for a block, by blockID.
+	// The requested block must be finalized, otherwise an error is returned.
+	//
+	// CAUTION: this layer SIMPLIFIES the ERROR HANDLING convention
+	//   - All errors returned are guaranteed to be benign. The node can continue normal operations after such errors.
+	//   - To prevent delivering incorrect results to clients in case of an error, all other return values should be discarded.
+	//
+	// Expected sentinel errors providing details to clients about failed requests:
+	//   - access.DataNotFoundError - No block with the given ID was found
+	//   - access.InvalidRequestError - Block ID is for an orphaned block and will never have a valid snapshot
+	//   - access.PreconditionFailedError - A block was found, but it is not finalized and is above the finalized height.
 	GetProtocolStateSnapshotByBlockID(ctx context.Context, blockID flow.Identifier) ([]byte, error)
+
+	// GetProtocolStateSnapshotByHeight returns serializable Snapshot by block height.
+	// The block must be finalized (otherwise the by-height query is ambiguous).
+	//
+	// CAUTION: this layer SIMPLIFIES the ERROR HANDLING convention
+	//   - All errors returned are guaranteed to be benign. The node can continue normal operations after such errors.
+	//   - To prevent delivering incorrect results to clients in case of an error, all other return values should be discarded.
+	//
+	// Expected sentinel errors providing details to clients about failed requests:
+	//   - access.DataNotFoundError - No finalized block with the given height was found.
 	GetProtocolStateSnapshotByHeight(ctx context.Context, blockHeight uint64) ([]byte, error)
 
+	// GetExecutionResultForBlockID gets an execution result by its block ID.
+	//
+	// CAUTION: this layer SIMPLIFIES the ERROR HANDLING convention
+	//   - All errors returned are guaranteed to be benign. The node can continue normal operations after such errors.
+	//   - To prevent delivering incorrect results to clients in case of an error, all other return values should be discarded.
+	//
+	// Expected sentinel errors providing details to clients about failed requests:
+	//   - access.DataNotFoundError - No execution result with the given block ID was found
 	GetExecutionResultForBlockID(ctx context.Context, blockID flow.Identifier) (*flow.ExecutionResult, error)
+
+	// GetExecutionResultByID gets an execution result by its ID.
+	//
+	// CAUTION: this layer SIMPLIFIES the ERROR HANDLING convention
+	//   - All errors returned are guaranteed to be benign. The node can continue normal operations after such errors.
+	//   - To prevent delivering incorrect results to clients in case of an error, all other return values should be discarded.
+	//
+	// Expected sentinel errors providing details to clients about failed requests:
+	//   - access.DataNotFoundError - No execution result with the given ID was found
 	GetExecutionResultByID(ctx context.Context, id flow.Identifier) (*flow.ExecutionResult, error)
 
-	// SubscribeBlocksFromStartBlockID subscribes to the finalized or sealed blocks starting at the requested
-	// start block id, up until the latest available block. Once the latest is
-	// reached, the stream will remain open and responses are sent for each new
-	// block as it becomes available.
+	// SubscribeBlocksFromStartBlockID subscribes to the finalized or sealed blocks starting at the
+	// requested start block id, up until the latest available block. Once the latest is reached,
+	// the stream will remain open and responses are sent for each new block as it becomes available.
 	//
-	// Each block is filtered by the provided block status, and only
-	// those blocks that match the status are returned.
+	// Each block is filtered by the provided block status, and only blocks that match blockStatus
+	// are returned. blockStatus must be BlockStatusSealed or BlockStatusFinalized.
 	//
-	// Parameters:
-	// - ctx: Context for the operation.
-	// - startBlockID: The identifier of the starting block.
-	// - blockStatus: The status of the block, which could be only BlockStatusSealed or BlockStatusFinalized.
-	//
-	// If invalid parameters will be supplied SubscribeBlocksFromStartBlockID will return a failed subscription.
+	// If invalid parameters are supplied, a failed subscription is returned.
 	SubscribeBlocksFromStartBlockID(ctx context.Context, startBlockID flow.Identifier, blockStatus flow.BlockStatus) subscription.Subscription
 
 	// SubscribeBlocksFromStartHeight subscribes to the finalized or sealed blocks starting at the requested
@@ -147,15 +262,10 @@ type API interface {
 	// reached, the stream will remain open and responses are sent for each new
 	// block as it becomes available.
 	//
-	// Each block is filtered by the provided block status, and only
-	// those blocks that match the status are returned.
+	// Each block is filtered by the provided block status, and only blocks that match blockStatus
+	// are returned. blockStatus must be BlockStatusSealed or BlockStatusFinalized.
 	//
-	// Parameters:
-	// - ctx: Context for the operation.
-	// - startHeight: The height of the starting block.
-	// - blockStatus: The status of the block, which could be only BlockStatusSealed or BlockStatusFinalized.
-	//
-	// If invalid parameters will be supplied SubscribeBlocksFromStartHeight will return a failed subscription.
+	// If invalid parameters are supplied, a failed subscription is returned.
 	SubscribeBlocksFromStartHeight(ctx context.Context, startHeight uint64, blockStatus flow.BlockStatus) subscription.Subscription
 
 	// SubscribeBlocksFromLatest subscribes to the finalized or sealed blocks starting at the latest sealed block,
@@ -163,14 +273,10 @@ type API interface {
 	// reached, the stream will remain open and responses are sent for each new
 	// block as it becomes available.
 	//
-	// Each block is filtered by the provided block status, and only
-	// those blocks that match the status are returned.
+	// Each block is filtered by the provided block status, and only blocks that match blockStatus
+	// are returned. blockStatus must be BlockStatusSealed or BlockStatusFinalized.
 	//
-	// Parameters:
-	// - ctx: Context for the operation.
-	// - blockStatus: The status of the block, which could be only BlockStatusSealed or BlockStatusFinalized.
-	//
-	// If invalid parameters will be supplied SubscribeBlocksFromLatest will return a failed subscription.
+	// If invalid parameters are supplied, a failed subscription is returned.
 	SubscribeBlocksFromLatest(ctx context.Context, blockStatus flow.BlockStatus) subscription.Subscription
 
 	// SubscribeBlockHeadersFromStartBlockID streams finalized or sealed block headers starting at the requested
@@ -178,15 +284,10 @@ type API interface {
 	// reached, the stream will remain open and responses are sent for each new
 	// block header as it becomes available.
 	//
-	// Each block header are filtered by the provided block status, and only
-	// those block headers that match the status are returned.
+	// Each block is filtered by the provided block status, and only blocks that match blockStatus
+	// are returned. blockStatus must be BlockStatusSealed or BlockStatusFinalized.
 	//
-	// Parameters:
-	// - ctx: Context for the operation.
-	// - startBlockID: The identifier of the starting block.
-	// - blockStatus: The status of the block, which could be only BlockStatusSealed or BlockStatusFinalized.
-	//
-	// If invalid parameters will be supplied SubscribeBlockHeadersFromStartBlockID will return a failed subscription.
+	// If invalid parameters are supplied, a failed subscription is returned.
 	SubscribeBlockHeadersFromStartBlockID(ctx context.Context, startBlockID flow.Identifier, blockStatus flow.BlockStatus) subscription.Subscription
 
 	// SubscribeBlockHeadersFromStartHeight streams finalized or sealed block headers starting at the requested
@@ -194,15 +295,10 @@ type API interface {
 	// reached, the stream will remain open and responses are sent for each new
 	// block header as it becomes available.
 	//
-	// Each block header are filtered by the provided block status, and only
-	// those block headers that match the status are returned.
+	// Each block is filtered by the provided block status, and only blocks that match blockStatus
+	// are returned. blockStatus must be BlockStatusSealed or BlockStatusFinalized.
 	//
-	// Parameters:
-	// - ctx: Context for the operation.
-	// - startHeight: The height of the starting block.
-	// - blockStatus: The status of the block, which could be only BlockStatusSealed or BlockStatusFinalized.
-	//
-	// If invalid parameters will be supplied SubscribeBlockHeadersFromStartHeight will return a failed subscription.
+	// If invalid parameters are supplied, a failed subscription is returned.
 	SubscribeBlockHeadersFromStartHeight(ctx context.Context, startHeight uint64, blockStatus flow.BlockStatus) subscription.Subscription
 
 	// SubscribeBlockHeadersFromLatest streams finalized or sealed block headers starting at the latest sealed block,
@@ -210,32 +306,21 @@ type API interface {
 	// reached, the stream will remain open and responses are sent for each new
 	// block header as it becomes available.
 	//
-	// Each block header are filtered by the provided block status, and only
-	// those block headers that match the status are returned.
+	// Each block is filtered by the provided block status, and only blocks that match blockStatus
+	// are returned. blockStatus must be BlockStatusSealed or BlockStatusFinalized.
 	//
-	// Parameters:
-	// - ctx: Context for the operation.
-	// - blockStatus: The status of the block, which could be only BlockStatusSealed or BlockStatusFinalized.
-	//
-	// If invalid parameters will be supplied SubscribeBlockHeadersFromLatest will return a failed subscription.
+	// If invalid parameters are supplied, a failed subscription is returned.
 	SubscribeBlockHeadersFromLatest(ctx context.Context, blockStatus flow.BlockStatus) subscription.Subscription
-
-	// Subscribe digests
 
 	// SubscribeBlockDigestsFromStartBlockID streams finalized or sealed lightweight block starting at the requested
 	// start block id, up until the latest available block. Once the latest is
 	// reached, the stream will remain open and responses are sent for each new
 	// block as it becomes available.
 	//
-	// Each lightweight block are filtered by the provided block status, and only
-	// those blocks that match the status are returned.
+	// Each block is filtered by the provided block status, and only blocks that match blockStatus
+	// are returned. blockStatus must be BlockStatusSealed or BlockStatusFinalized.
 	//
-	// Parameters:
-	// - ctx: Context for the operation.
-	// - startBlockID: The identifier of the starting block.
-	// - blockStatus: The status of the block, which could be only BlockStatusSealed or BlockStatusFinalized.
-	//
-	// If invalid parameters will be supplied SubscribeBlockDigestsFromStartBlockID will return a failed subscription.
+	// If invalid parameters are supplied, a failed subscription is returned.
 	SubscribeBlockDigestsFromStartBlockID(ctx context.Context, startBlockID flow.Identifier, blockStatus flow.BlockStatus) subscription.Subscription
 
 	// SubscribeBlockDigestsFromStartHeight streams finalized or sealed lightweight block starting at the requested
@@ -243,15 +328,10 @@ type API interface {
 	// reached, the stream will remain open and responses are sent for each new
 	// block as it becomes available.
 	//
-	// Each lightweight block are filtered by the provided block status, and only
-	// those blocks that match the status are returned.
+	// Each block is filtered by the provided block status, and only blocks that match blockStatus
+	// are returned. blockStatus must be BlockStatusSealed or BlockStatusFinalized.
 	//
-	// Parameters:
-	// - ctx: Context for the operation.
-	// - startHeight: The height of the starting block.
-	// - blockStatus: The status of the block, which could be only BlockStatusSealed or BlockStatusFinalized.
-	//
-	// If invalid parameters will be supplied SubscribeBlockDigestsFromStartHeight will return a failed subscription.
+	// If invalid parameters are supplied, a failed subscription is returned.
 	SubscribeBlockDigestsFromStartHeight(ctx context.Context, startHeight uint64, blockStatus flow.BlockStatus) subscription.Subscription
 
 	// SubscribeBlockDigestsFromLatest streams finalized or sealed lightweight block starting at the latest sealed block,
@@ -259,13 +339,9 @@ type API interface {
 	// reached, the stream will remain open and responses are sent for each new
 	// block as it becomes available.
 	//
-	// Each lightweight block are filtered by the provided block status, and only
-	// those blocks that match the status are returned.
+	// Each block is filtered by the provided block status, and only blocks that match blockStatus
+	// are returned. blockStatus must be BlockStatusSealed or BlockStatusFinalized.
 	//
-	// Parameters:
-	// - ctx: Context for the operation.
-	// - blockStatus: The status of the block, which could be only BlockStatusSealed or BlockStatusFinalized.
-	//
-	// If invalid parameters will be supplied SubscribeBlockDigestsFromLatest will return a failed subscription.
+	// If invalid parameters are supplied, a failed subscription is returned.
 	SubscribeBlockDigestsFromLatest(ctx context.Context, blockStatus flow.BlockStatus) subscription.Subscription
 }
