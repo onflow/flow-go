@@ -146,6 +146,7 @@ func (suite *BackfillTxErrorMessagesSuite) SetupTest() {
 		suite.state,
 		suite.backend,
 		suite.receipts,
+		suite.transactionResults,
 		suite.txErrorMessages,
 		nil,
 		nil,

@@ -35,6 +35,7 @@ type TxErrorMessagesCoreSuite struct {
 	}
 
 	receipts        *storage.ExecutionReceipts
+	results         *storage.LightTransactionResults
 	txErrorMessages *storage.TransactionResultErrorMessages
 
 	enNodeIDs   flow.IdentityList
@@ -72,6 +73,7 @@ func (s *TxErrorMessagesCoreSuite) SetupTest() {
 	s.execClient = accessmock.NewExecutionAPIClient(s.T())
 	s.connFactory = connectionmock.NewConnectionFactory(s.T())
 	s.receipts = storage.NewExecutionReceipts(s.T())
+	s.results = storage.NewLightTransactionResults(s.T())
 	s.txErrorMessages = storage.NewTransactionResultErrorMessages(s.T())
 
 	s.rootBlock = unittest.BlockFixture()
@@ -130,6 +132,9 @@ func (s *TxErrorMessagesCoreSuite) TestHandleTransactionResultErrorMessages() {
 	s.txErrorMessages.On("Exists", blockId).
 		Return(false, nil).Once()
 
+	s.results.On("ByBlockID", blockId).
+		Return(resultsByBlockID, nil).Once()
+
 	// Prepare the expected transaction error messages that should be stored.
 	expectedStoreTxErrorMessages := createExpectedTxErrorMessages(resultsByBlockID, s.enNodeIDs.NodeIDs()[0])
 
@@ -151,6 +156,43 @@ func (s *TxErrorMessagesCoreSuite) TestHandleTransactionResultErrorMessages() {
 		Return(true, nil).Once()
 	s.proto.state.On("AtBlockID", blockId).Return(s.proto.snapshot).Once()
 	err = core.HandleTransactionResultErrorMessages(irrecoverableCtx, blockId)
+	require.NoError(s.T(), err)
+
+	// Verify that the mock expectations for storing the error messages were not met.
+	s.txErrorMessages.AssertExpectations(s.T())
+	s.execClient.AssertExpectations(s.T())
+	s.proto.state.AssertExpectations(s.T())
+}
+
+// TestHandleTransactionResultErrorMessages_NoErrors checks that transaction result error messages
+// lookup is skipped if there are no errors in the block.
+func (s *TxErrorMessagesCoreSuite) TestHandleTransactionResultErrorMessages_NoErrors() {
+	irrecoverableCtx := irrecoverable.NewMockSignalerContext(s.T(), s.ctx)
+
+	block := unittest.BlockWithParentFixture(s.finalizedBlock)
+	blockId := block.ID()
+
+	// Mock the protocol snapshot to return fixed execution node IDs.
+	setupReceiptsForBlock(s.receipts, block, s.enNodeIDs.NodeIDs()[0])
+	s.proto.snapshot.On("Identities", mock.Anything).Return(s.enNodeIDs, nil)
+	s.proto.state.On("AtBlockID", blockId).Return(s.proto.snapshot).Once()
+
+	// Create mock transaction results with a mix of failed and non-failed transactions.
+	resultsByBlockID := mockTransactionResultsByBlock(5)
+	for i := range resultsByBlockID {
+		resultsByBlockID[i].Failed = false
+	}
+
+	// 1. Mock the txErrorMessages storage to confirm that error messages do not exist yet.
+	s.txErrorMessages.On("Exists", blockId).
+		Return(false, nil).Once()
+
+	s.results.On("ByBlockID", blockId).
+		Return(resultsByBlockID, nil).Once()
+
+	// no calls to the execution node should be made
+	core := s.initCore()
+	err := core.HandleTransactionResultErrorMessages(irrecoverableCtx, blockId)
 	require.NoError(s.T(), err)
 
 	// Verify that the mock expectations for storing the error messages were not met.
@@ -183,6 +225,9 @@ func (s *TxErrorMessagesCoreSuite) TestHandleTransactionResultErrorMessages_Erro
 		// Mock the txErrorMessages storage to confirm that error messages do not exist yet.
 		s.txErrorMessages.On("Exists", blockId).Return(false, nil).Once()
 
+		s.results.On("ByBlockID", blockId).
+			Return(mockTransactionResultsByBlock(5), nil).Once()
+
 		// Simulate an error when fetching transaction error messages from the execution node.
 		exeEventReq := &execproto.GetTransactionErrorMessagesByBlockIDRequest{
 			BlockId: blockId[:],
@@ -209,6 +254,9 @@ func (s *TxErrorMessagesCoreSuite) TestHandleTransactionResultErrorMessages_Erro
 
 		// Create mock transaction results with a mix of failed and non-failed transactions.
 		resultsByBlockID := mockTransactionResultsByBlock(5)
+
+		s.results.On("ByBlockID", blockId).
+			Return(resultsByBlockID, nil).Once()
 
 		// Prepare a request to fetch transaction error messages by block ID from execution nodes.
 		exeEventReq := &execproto.GetTransactionErrorMessagesByBlockIDRequest{
@@ -258,6 +306,7 @@ func (s *TxErrorMessagesCoreSuite) initCore() *TxErrorMessagesCore {
 		s.proto.state,
 		backend,
 		s.receipts,
+		s.results,
 		s.txErrorMessages,
 		s.enNodeIDs.NodeIDs(),
 		nil,

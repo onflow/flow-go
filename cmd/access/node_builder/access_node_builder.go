@@ -293,43 +293,44 @@ type FlowAccessNodeBuilder struct {
 	*AccessNodeConfig
 
 	// components
-	FollowerState              protocol.FollowerState
-	SyncCore                   *chainsync.Core
-	RpcEng                     *rpc.Engine
-	FollowerDistributor        *consensuspubsub.FollowerDistributor
-	CollectionRPC              access.AccessAPIClient
-	TransactionTimings         *stdmap.TransactionTimings
-	CollectionsToMarkFinalized *stdmap.Times
-	CollectionsToMarkExecuted  *stdmap.Times
-	BlocksToMarkExecuted       *stdmap.Times
-	TransactionMetrics         *metrics.TransactionCollector
-	RestMetrics                *metrics.RestCollector
-	AccessMetrics              module.AccessMetrics
-	PingMetrics                module.PingMetrics
-	Committee                  hotstuff.DynamicCommittee
-	Finalized                  *flow.Header // latest finalized block that the node knows of at startup time
-	Pending                    []*flow.Header
-	FollowerCore               module.HotStuffFollower
-	Validator                  hotstuff.Validator
-	ExecutionDataDownloader    execution_data.Downloader
-	PublicBlobService          network.BlobService
-	ExecutionDataRequester     state_synchronization.ExecutionDataRequester
-	ExecutionDataStore         execution_data.ExecutionDataStore
-	ExecutionDataBlobstore     blobs.Blobstore
-	ExecutionDataCache         *execdatacache.ExecutionDataCache
-	ExecutionIndexer           *indexer.Indexer
-	ExecutionIndexerCore       *indexer.IndexerCore
-	ScriptExecutor             *backend.ScriptExecutor
-	RegistersAsyncStore        *execution.RegistersAsyncStore
-	Reporter                   *index.Reporter
-	EventsIndex                *index.EventsIndex
-	TxResultsIndex             *index.TransactionResultsIndex
-	IndexerDependencies        *cmd.DependencyList
-	collectionExecutedMetric   module.CollectionExecutedMetric
-	ExecutionDataPruner        *pruner.Pruner
-	ExecutionDatastoreManager  edstorage.DatastoreManager
-	ExecutionDataTracker       tracker.Storage
-	versionControl             *version.VersionControl
+	FollowerState                protocol.FollowerState
+	SyncCore                     *chainsync.Core
+	RpcEng                       *rpc.Engine
+	FollowerDistributor          *consensuspubsub.FollowerDistributor
+	CollectionRPC                access.AccessAPIClient
+	TransactionTimings           *stdmap.TransactionTimings
+	CollectionsToMarkFinalized   *stdmap.Times
+	CollectionsToMarkExecuted    *stdmap.Times
+	BlocksToMarkExecuted         *stdmap.Times
+	TransactionMetrics           *metrics.TransactionCollector
+	ExecutionStateIndexerMetrics module.ExecutionStateIndexerMetrics
+	RestMetrics                  *metrics.RestCollector
+	AccessMetrics                module.AccessMetrics
+	PingMetrics                  module.PingMetrics
+	Committee                    hotstuff.DynamicCommittee
+	Finalized                    *flow.Header // latest finalized block that the node knows of at startup time
+	Pending                      []*flow.Header
+	FollowerCore                 module.HotStuffFollower
+	Validator                    hotstuff.Validator
+	ExecutionDataDownloader      execution_data.Downloader
+	PublicBlobService            network.BlobService
+	ExecutionDataRequester       state_synchronization.ExecutionDataRequester
+	ExecutionDataStore           execution_data.ExecutionDataStore
+	ExecutionDataBlobstore       blobs.Blobstore
+	ExecutionDataCache           *execdatacache.ExecutionDataCache
+	ExecutionIndexer             *indexer.Indexer
+	ExecutionIndexerCore         *indexer.IndexerCore
+	ScriptExecutor               *backend.ScriptExecutor
+	RegistersAsyncStore          *execution.RegistersAsyncStore
+	Reporter                     *index.Reporter
+	EventsIndex                  *index.EventsIndex
+	TxResultsIndex               *index.TransactionResultsIndex
+	IndexerDependencies          *cmd.DependencyList
+	collectionExecutedMetric     module.CollectionExecutedMetric
+	ExecutionDataPruner          *pruner.Pruner
+	ExecutionDatastoreManager    edstorage.DatastoreManager
+	ExecutionDataTracker         tracker.Storage
+	versionControl               *version.VersionControl
 
 	// The sync engine participants provider is the libp2p peer store for the access node
 	// which is not available until after the network has started.
@@ -935,7 +936,7 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 
 				indexerCore, err := indexer.New(
 					builder.Logger,
-					metrics.NewExecutionStateIndexerCollector(),
+					builder.ExecutionStateIndexerMetrics,
 					builder.DB,
 					builder.Storage.RegisterIndex,
 					builder.Storage.Headers,
@@ -1674,6 +1675,10 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 			)
 			return nil
 		}).
+		Module("execution state indexer metrics", func(node *cmd.NodeConfig) error {
+			builder.ExecutionStateIndexerMetrics = metrics.NewExecutionStateIndexerCollector()
+			return nil
+		}).
 		Module("rest metrics", func(node *cmd.NodeConfig) error {
 			m, err := metrics.NewRestCollector(routes.URLToRoute, node.MetricsRegisterer)
 			if err != nil {
@@ -2013,6 +2018,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 					node.State,
 					builder.nodeBackend,
 					node.Storage.Receipts,
+					node.Storage.LightTransactionResults,
 					node.Storage.TransactionResultErrorMessages,
 					preferredENIdentifiers,
 					fixedENIdentifiers,
@@ -2070,6 +2076,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 		builder.Component("transaction result error messages engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			engine, err := tx_error_messages.New(
 				node.Logger,
+				builder.ExecutionStateIndexerMetrics,
 				node.State,
 				node.Storage.Headers,
 				processedTxErrorMessagesBlockHeight,
