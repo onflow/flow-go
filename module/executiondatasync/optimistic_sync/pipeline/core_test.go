@@ -1,4 +1,4 @@
-package optimistic_sync
+package pipeline
 
 import (
 	"context"
@@ -20,8 +20,8 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-// CoreImplSuite is a test suite for testing the CoreImpl.
-type CoreImplSuite struct {
+// CoreSuite is a test suite for testing the Core.
+type CoreSuite struct {
 	suite.Suite
 	logger                        zerolog.Logger
 	execDataRequester             *reqestermock.ExecutionDataRequester
@@ -38,12 +38,12 @@ type CoreImplSuite struct {
 	latestPersistedSealedResult   *storagemock.LatestPersistedSealedResult
 }
 
-func TestCoreImplSuiteSuite(t *testing.T) {
+func TestCoreSuiteSuite(t *testing.T) {
 	t.Parallel()
-	suite.Run(t, new(CoreImplSuite))
+	suite.Run(t, new(CoreSuite))
 }
 
-func (c *CoreImplSuite) SetupTest() {
+func (c *CoreSuite) SetupTest() {
 	c.lockManager = storage.NewTestingLockManager()
 	t := c.T()
 	c.logger = zerolog.Nop()
@@ -79,14 +79,14 @@ func (c *CoreImplSuite) SetupTest() {
 	c.latestPersistedSealedResult.On("BatchSet", mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
 }
 
-// createTestCoreImpl creates a CoreImpl instance with mocked dependencies for testing.
+// createTestCore creates a Core instance with mocked dependencies for testing.
 //
-// Returns a configured CoreImpl ready for testing.
-func (c *CoreImplSuite) createTestCoreImpl() *CoreImpl {
+// Returns a configured Core ready for testing.
+func (c *CoreSuite) createTestCore() *Core {
 	block := unittest.BlockFixture()
 	executionResult := unittest.ExecutionResultFixture(unittest.WithBlock(block))
 
-	return NewCoreImpl(
+	return NewCore(
 		c.logger,
 		executionResult,
 		block.ToHeader(),
@@ -104,10 +104,10 @@ func (c *CoreImplSuite) createTestCoreImpl() *CoreImpl {
 	)
 }
 
-// TestCoreImpl_Download tests the Download method which retrieves execution data and transaction error messages.
-func (c *CoreImplSuite) TestCoreImpl_Download() {
+// TestCore_Download tests the Download method which retrieves execution data and transaction error messages.
+func (c *CoreSuite) TestCore_Download() {
 	c.Run("successful download", func() {
-		core := c.createTestCoreImpl()
+		core := c.createTestCore()
 		ctx := context.Background()
 
 		expectedExecutionData := unittest.BlockExecutionDataFixture(unittest.WithBlockExecutionDataBlockID(core.header.ID()))
@@ -128,7 +128,7 @@ func (c *CoreImplSuite) TestCoreImpl_Download() {
 		c.txResultErrMsgsRequester.On("Request", mock.Anything).Return(([]flow.TransactionResultErrorMessage)(nil), nil).Once()
 
 		ctx := context.Background()
-		core := c.createTestCoreImpl()
+		core := c.createTestCore()
 		err := core.Download(ctx)
 		c.Require().Error(err)
 
@@ -144,7 +144,7 @@ func (c *CoreImplSuite) TestCoreImpl_Download() {
 		c.txResultErrMsgsRequester.On("Request", mock.Anything).Return(([]flow.TransactionResultErrorMessage)(nil), assert.AnError).Once()
 
 		ctx := context.Background()
-		core := c.createTestCoreImpl()
+		core := c.createTestCore()
 
 		err := core.Download(ctx)
 		c.Require().Error(err)
@@ -156,7 +156,7 @@ func (c *CoreImplSuite) TestCoreImpl_Download() {
 	})
 
 	c.Run("context cancellation", func() {
-		core := c.createTestCoreImpl()
+		core := c.createTestCore()
 		ctx, cancel := context.WithCancel(context.Background())
 		cancel()
 
@@ -195,7 +195,7 @@ func (c *CoreImplSuite) TestCoreImpl_Download() {
 			time.Sleep(2 * c.txResultErrMsgsRequestTimeout)
 		}).Return(([]flow.TransactionResultErrorMessage)(nil), context.DeadlineExceeded).Once()
 
-		core := c.createTestCoreImpl()
+		core := c.createTestCore()
 		ctx := context.Background()
 
 		var err error
@@ -209,10 +209,10 @@ func (c *CoreImplSuite) TestCoreImpl_Download() {
 	})
 }
 
-// TestCoreImpl_Index tests the Index method which processes downloaded data.
-func (c *CoreImplSuite) TestCoreImpl_Index() {
+// TestCore_Index tests the Index method which processes downloaded data.
+func (c *CoreSuite) TestCore_Index() {
 	c.Run("successful indexing", func() {
-		core := c.createTestCoreImpl()
+		core := c.createTestCore()
 
 		// Create execution data with the SAME block ID as the execution result
 		expectedExecutionData := unittest.BlockExecutionDataFixture(
@@ -232,7 +232,7 @@ func (c *CoreImplSuite) TestCoreImpl_Index() {
 	})
 
 	c.Run("block ID mismatch", func() {
-		core := c.createTestCoreImpl()
+		core := c.createTestCore()
 
 		// Create execution data with a DIFFERENT block ID than expected
 		executionData := unittest.BlockExecutionDataFixture()
@@ -249,7 +249,7 @@ func (c *CoreImplSuite) TestCoreImpl_Index() {
 	})
 
 	c.Run("execution data is empty", func() {
-		core := c.createTestCoreImpl()
+		core := c.createTestCore()
 
 		// Do not download data, just index it
 		err := core.Index()
@@ -259,8 +259,8 @@ func (c *CoreImplSuite) TestCoreImpl_Index() {
 	})
 }
 
-// TestCoreImpl_Persist tests the Persist method which persists indexed data to storages and database.
-func (c *CoreImplSuite) TestCoreImpl_Persist() {
+// TestCore_Persist tests the Persist method which persists indexed data to storages and database.
+func (c *CoreSuite) TestCore_Persist() {
 	t := c.T()
 
 	c.Run("successful persistence of empty data", func() {
@@ -268,7 +268,7 @@ func (c *CoreImplSuite) TestCoreImpl_Persist() {
 		c.db = storagemock.NewDB(t)
 		c.db.On("WithReaderBatchWriter", mock.Anything).Return(nil)
 
-		core := c.createTestCoreImpl()
+		core := c.createTestCore()
 		err := core.Persist()
 
 		c.Require().NoError(err)
@@ -279,8 +279,8 @@ func (c *CoreImplSuite) TestCoreImpl_Persist() {
 		c.db = storagemock.NewDB(t)
 		c.db.On("WithReaderBatchWriter", mock.Anything).Return(assert.AnError)
 
-		// Create CoreImpl with the failing DB
-		core := c.createTestCoreImpl()
+		// Create Core with the failing DB
+		core := c.createTestCore()
 
 		err := core.Persist()
 		c.Require().Error(err)
@@ -290,9 +290,9 @@ func (c *CoreImplSuite) TestCoreImpl_Persist() {
 	})
 }
 
-// TestCoreImpl_Abandon tests the Abandon method which clears all references for garbage collection.
-func (c *CoreImplSuite) TestCoreImpl_Abandon() {
-	core := c.createTestCoreImpl()
+// TestCore_Abandon tests the Abandon method which clears all references for garbage collection.
+func (c *CoreSuite) TestCore_Abandon() {
+	core := c.createTestCore()
 
 	core.workingData.executionData = unittest.BlockExecutionDatEntityFixture()
 	core.workingData.txResultErrMsgsData = unittest.TransactionResultErrorMessagesFixture(1)
@@ -303,8 +303,8 @@ func (c *CoreImplSuite) TestCoreImpl_Abandon() {
 	c.Assert().Nil(core.workingData)
 }
 
-// TestCoreImpl_IntegrationWorkflow tests the complete workflow of download -> index -> persist operations.
-func (c *CoreImplSuite) TestCoreImpl_IntegrationWorkflow() {
+// TestCore_IntegrationWorkflow tests the complete workflow of download -> index -> persist operations.
+func (c *CoreSuite) TestCore_IntegrationWorkflow() {
 	t := c.T()
 
 	// Set up mocks with proper expectations
@@ -315,7 +315,7 @@ func (c *CoreImplSuite) TestCoreImpl_IntegrationWorkflow() {
 		},
 	).Maybe()
 
-	core := c.createTestCoreImpl()
+	core := c.createTestCore()
 	ctx := context.Background()
 
 	// Create execution data with the SAME block ID as the execution result
