@@ -22,5 +22,5 @@ type Snapshot interface {
 	TransactionResultErrorMessages() storage.TransactionResultErrorMessagesReader
 
 	// Registers returns a reader for querying register data.
-	Registers() storage.RegisterIndexReader
+	Registers() storage.RegisterSnapshotReader
 }

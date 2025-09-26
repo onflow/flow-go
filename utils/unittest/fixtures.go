@@ -39,6 +39,7 @@ import (
 	"github.com/onflow/flow-go/model/verification"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
+	"github.com/onflow/flow-go/module/executiondatasync/optimistic_sync"
 	"github.com/onflow/flow-go/module/mempool/entity"
 	"github.com/onflow/flow-go/module/signature"
 	"github.com/onflow/flow-go/module/updatable_configs"
@@ -1384,6 +1385,15 @@ func IdentityListFixture(n int, opts ...func(*flow.Identity)) flow.IdentityList 
 	}
 
 	return identities
+}
+
+// ExecutionInfoFixture returns an ExecutionResultInfo object.
+func ExecutionInfoFixture(executionNodeCount int) *optimistic_sync.ExecutionResultInfo {
+	executionNodes := IdentityListFixture(executionNodeCount, WithRole(flow.RoleExecution))
+	return &optimistic_sync.ExecutionResultInfo{
+		ExecutionResultID: IdentifierFixture(),
+		ExecutionNodes:    executionNodes.ToSkeleton(),
+	}
 }
 
 // DynamicIdentityEntryFixture returns the DynamicIdentityEntry object. The dynamic identity entry
@@ -3134,16 +3144,20 @@ func CreateSendTxHttpPayload(tx flow.TransactionBody) map[string]interface{} {
 			"sequence_number": fmt.Sprintf("%d", tx.ProposalKey.SequenceNumber),
 		},
 		"authorizers": auth,
-		"payload_signatures": []map[string]interface{}{{
-			"address":   tx.PayloadSignatures[0].Address.String(),
-			"key_index": fmt.Sprintf("%d", tx.PayloadSignatures[0].KeyIndex),
-			"signature": util.ToBase64(tx.PayloadSignatures[0].Signature),
-		}},
-		"envelope_signatures": []map[string]interface{}{{
-			"address":   tx.EnvelopeSignatures[0].Address.String(),
-			"key_index": fmt.Sprintf("%d", tx.EnvelopeSignatures[0].KeyIndex),
-			"signature": util.ToBase64(tx.EnvelopeSignatures[0].Signature),
-		}},
+		"payload_signatures": []map[string]interface{}{
+			{
+				"address":   tx.PayloadSignatures[0].Address.String(),
+				"key_index": fmt.Sprintf("%d", tx.PayloadSignatures[0].KeyIndex),
+				"signature": util.ToBase64(tx.PayloadSignatures[0].Signature),
+			},
+		},
+		"envelope_signatures": []map[string]interface{}{
+			{
+				"address":   tx.EnvelopeSignatures[0].Address.String(),
+				"key_index": fmt.Sprintf("%d", tx.EnvelopeSignatures[0].KeyIndex),
+				"signature": util.ToBase64(tx.EnvelopeSignatures[0].Signature),
+			},
+		},
 	}
 }
 

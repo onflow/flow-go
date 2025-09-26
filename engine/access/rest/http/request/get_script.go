@@ -6,64 +6,85 @@ import (
 
 	"github.com/onflow/flow-go/engine/access/rest/common"
 	"github.com/onflow/flow-go/engine/access/rest/common/parser"
+	"github.com/onflow/flow-go/engine/access/rest/http/models"
 	"github.com/onflow/flow-go/model/flow"
 )
 
 const blockIDQuery = "block_id"
 
+// TODO(Uliana): add godoc
 type GetScript struct {
-	BlockID     flow.Identifier
-	BlockHeight uint64
-	Script      Script
+	BlockID        flow.Identifier
+	BlockHeight    uint64
+	Script         Script
+	ExecutionState models.ExecutionStateQuery
 }
 
-// GetScriptRequest extracts necessary variables from the provided request,
+// NewGetScript extracts necessary variables from the provided request,
 // builds a GetScript instance, and validates it.
 //
 // No errors are expected during normal operation.
-func GetScriptRequest(r *common.Request) (GetScript, error) {
-	var req GetScript
-	err := req.Build(r)
-	return req, err
-}
-
-func (g *GetScript) Build(r *common.Request) error {
-	return g.Parse(
+func NewGetScript(r *common.Request) (GetScript, error) {
+	return parseGetScripts(
 		r.GetQueryParam(blockHeightQuery),
 		r.GetQueryParam(blockIDQuery),
+		r.GetQueryParam(agreeingExecutorCountQuery),
+		r.GetQueryParams(requiredExecutorIdsQuery),
+		r.GetQueryParam(includeExecutorMetadataQuery),
 		r.Body,
 	)
 }
 
-func (g *GetScript) Parse(rawHeight string, rawID string, rawScript io.Reader) error {
+// TODO(Uliana): add godoc
+func parseGetScripts(
+	rawHeight string,
+	rawID string,
+	rawAgreeingExecutorsCount string,
+	rawAgreeingExecutorsIds []string,
+	rawIncludeExecutorMetadata string,
+	rawScript io.Reader,
+) (GetScript, error) {
 	var height Height
 	err := height.Parse(rawHeight)
 	if err != nil {
-		return err
+		return GetScript{}, err
 	}
-	g.BlockHeight = height.Flow()
+	blockHeight := height.Flow()
 
 	id, err := parser.NewID(rawID)
 	if err != nil {
-		return err
+		return GetScript{}, err
 	}
-	g.BlockID = id.Flow()
+	blockID := id.Flow()
 
 	var script Script
 	err = script.Parse(rawScript)
 	if err != nil {
-		return err
+		return GetScript{}, err
 	}
-	g.Script = script
 
 	// default to last sealed block
-	if g.BlockHeight == EmptyHeight && g.BlockID == flow.ZeroID {
-		g.BlockHeight = SealedHeight
+	if blockHeight == EmptyHeight && blockID == flow.ZeroID {
+		blockHeight = SealedHeight
 	}
 
-	if g.BlockID != flow.ZeroID && g.BlockHeight != EmptyHeight {
-		return fmt.Errorf("can not provide both block ID and block height")
+	if blockID != flow.ZeroID && blockHeight != EmptyHeight {
+		return GetScript{}, fmt.Errorf("can not provide both block ID and block height")
 	}
 
-	return nil
+	executionStateQuery, err := parser.NewExecutionStateQuery(
+		rawAgreeingExecutorsCount,
+		rawAgreeingExecutorsIds,
+		rawIncludeExecutorMetadata,
+	)
+	if err != nil {
+		return GetScript{}, err
+	}
+
+	return GetScript{
+		BlockHeight:    blockHeight,
+		BlockID:        blockID,
+		Script:         script,
+		ExecutionState: *executionStateQuery,
+	}, nil
 }

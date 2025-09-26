@@ -1,5 +1,7 @@
 package scripts
 
+//TODO(Uliana): this test needs to be updated
+
 import (
 	"context"
 	"crypto/md5" //nolint:gosec

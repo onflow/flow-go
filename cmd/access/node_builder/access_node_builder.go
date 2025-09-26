@@ -338,7 +338,7 @@ type FlowAccessNodeBuilder struct {
 	ExecutionDataCache           *execdatacache.ExecutionDataCache
 	ExecutionIndexer             *indexer.Indexer
 	ExecutionIndexerCore         *indexer.IndexerCore
-	ScriptExecutor               *backend.ScriptExecutor
+	ScriptExecutor               *execution.Scripts
 	RegistersAsyncStore          *execution.RegistersAsyncStore
 	Reporter                     *index.Reporter
 	EventsIndex                  *index.EventsIndex
@@ -357,6 +357,7 @@ type FlowAccessNodeBuilder struct {
 	transactionResultErrorMessages storage.TransactionResultErrorMessages
 	transactions                   storage.Transactions
 	collections                    storage.Collections
+	registers                      storage.RegisterSnapshotReader
 
 	// The sync engine participants provider is the libp2p peer store for the access node
 	// which is not available until after the network has started.
@@ -589,6 +590,85 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 			collections := store.NewCollections(node.ProtocolDB, transactions)
 			builder.transactions = transactions
 			builder.collections = collections
+
+			return nil
+		}).
+		Module("registers storage", func(node *cmd.NodeConfig) error {
+			pdb, err := pstorage.OpenRegisterPebbleDB(
+				node.Logger.With().Str("pebbledb", "registers").Logger(),
+				builder.registersDBPath)
+			if err != nil {
+				return fmt.Errorf("could not open registers db: %w", err)
+			}
+			builder.ShutdownFunc(func() error {
+				return pdb.Close()
+			})
+
+			bootstrapped, err := pstorage.IsBootstrapped(pdb)
+			if err != nil {
+				return fmt.Errorf("could not check if registers db is bootstrapped: %w", err)
+			}
+
+			if !bootstrapped {
+				checkpointFile := builder.checkpointFile
+				if checkpointFile == cmd.NotSet {
+					checkpointFile = path.Join(builder.BootstrapDir, bootstrap.PathRootCheckpoint)
+				}
+
+				// currently, the checkpoint must be from the root block.
+				// read the root hash from the provided checkpoint and verify it matches the
+				// state commitment from the root snapshot.
+				err := wal.CheckpointHasRootHash(
+					node.Logger,
+					"", // checkpoint file already full path
+					checkpointFile,
+					ledger.RootHash(node.RootSeal.FinalState),
+				)
+				if err != nil {
+					return fmt.Errorf("could not verify checkpoint file: %w", err)
+				}
+
+				checkpointHeight := builder.SealedRootBlock.Height
+
+				if builder.SealedRootBlock.ID() != builder.RootSeal.BlockID {
+					return fmt.Errorf("mismatching sealed root block and root seal: %v != %v",
+						builder.SealedRootBlock.ID(), builder.RootSeal.BlockID)
+				}
+
+				rootHash := ledger.RootHash(builder.RootSeal.FinalState)
+				bootstrap, err := pstorage.NewRegisterBootstrap(pdb, checkpointFile, checkpointHeight, rootHash, builder.Logger)
+				if err != nil {
+					return fmt.Errorf("could not create registers bootstrap: %w", err)
+				}
+
+				// TODO: find a way to hook a context up to this to allow a graceful shutdown
+				workerCount := 10
+				err = bootstrap.IndexCheckpointFile(context.Background(), workerCount)
+				if err != nil {
+					return fmt.Errorf("could not load checkpoint file: %w", err)
+				}
+			}
+			registers, err := pstorage.NewRegisters(pdb, builder.registerDBPruneThreshold)
+			if err != nil {
+				return fmt.Errorf("could not create registers storage: %w", err)
+			}
+
+			if builder.registerCacheSize > 0 {
+				cacheType, err := pstorage.ParseCacheType(builder.registerCacheType)
+				if err != nil {
+					return fmt.Errorf("could not parse register cache type: %w", err)
+				}
+				cacheMetrics := metrics.NewCacheCollector(builder.RootChainID)
+				registersCache, err := pstorage.NewRegistersCache(registers, cacheType, builder.registerCacheSize, cacheMetrics)
+				if err != nil {
+					return fmt.Errorf("could not create registers cache: %w", err)
+				}
+				builder.Storage.RegisterIndex = registersCache
+			} else {
+				builder.Storage.RegisterIndex = registers
+			}
+
+			builder.registers = pstorage.NewRegisterSnapshotReader(builder.Storage.RegisterIndex)
 
 			return nil
 		}).
@@ -847,7 +927,7 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 
 		builder.
 			AdminCommand("execute-script", func(config *cmd.NodeConfig) commands.AdminCommand {
-				return stateSyncCommands.NewExecuteScriptCommand(builder.ScriptExecutor)
+				return stateSyncCommands.NewExecuteScriptCommand(builder.ScriptExecutor, builder.registers)
 			}).
 			Module("indexed block height consumer progress", func(node *cmd.NodeConfig) error {
 				// Note: progress is stored in the MAIN db since that is where indexed execution data is stored.
@@ -863,84 +943,9 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 				// other components from starting while bootstrapping the register db since it may
 				// take hours to complete.
 
-				pdb, err := pstorage.OpenRegisterPebbleDB(
-					node.Logger.With().Str("pebbledb", "registers").Logger(),
-					builder.registersDBPath)
+				indexerDerivedChainData, err := builder.buildIndexerDerivedChainData()
 				if err != nil {
-					return nil, fmt.Errorf("could not open registers db: %w", err)
-				}
-				builder.ShutdownFunc(func() error {
-					return pdb.Close()
-				})
-
-				bootstrapped, err := pstorage.IsBootstrapped(pdb)
-				if err != nil {
-					return nil, fmt.Errorf("could not check if registers db is bootstrapped: %w", err)
-				}
-
-				if !bootstrapped {
-					checkpointFile := builder.checkpointFile
-					if checkpointFile == cmd.NotSet {
-						checkpointFile = path.Join(builder.BootstrapDir, bootstrap.PathRootCheckpoint)
-					}
-
-					// currently, the checkpoint must be from the root block.
-					// read the root hash from the provided checkpoint and verify it matches the
-					// state commitment from the root snapshot.
-					err := wal.CheckpointHasRootHash(
-						node.Logger,
-						"", // checkpoint file already full path
-						checkpointFile,
-						ledger.RootHash(node.RootSeal.FinalState),
-					)
-					if err != nil {
-						return nil, fmt.Errorf("could not verify checkpoint file: %w", err)
-					}
-
-					checkpointHeight := builder.SealedRootBlock.Height
-
-					if builder.SealedRootBlock.ID() != builder.RootSeal.BlockID {
-						return nil, fmt.Errorf("mismatching sealed root block and root seal: %v != %v",
-							builder.SealedRootBlock.ID(), builder.RootSeal.BlockID)
-					}
-
-					rootHash := ledger.RootHash(builder.RootSeal.FinalState)
-					bootstrap, err := pstorage.NewRegisterBootstrap(pdb, checkpointFile, checkpointHeight, rootHash, builder.Logger)
-					if err != nil {
-						return nil, fmt.Errorf("could not create registers bootstrap: %w", err)
-					}
-
-					// TODO: find a way to hook a context up to this to allow a graceful shutdown
-					workerCount := 10
-					err = bootstrap.IndexCheckpointFile(context.Background(), workerCount)
-					if err != nil {
-						return nil, fmt.Errorf("could not load checkpoint file: %w", err)
-					}
-				}
-
-				registers, err := pstorage.NewRegisters(pdb, builder.registerDBPruneThreshold)
-				if err != nil {
-					return nil, fmt.Errorf("could not create registers storage: %w", err)
-				}
-
-				if builder.registerCacheSize > 0 {
-					cacheType, err := pstorage.ParseCacheType(builder.registerCacheType)
-					if err != nil {
-						return nil, fmt.Errorf("could not parse register cache type: %w", err)
-					}
-					cacheMetrics := metrics.NewCacheCollector(builder.RootChainID)
-					registersCache, err := pstorage.NewRegistersCache(registers, cacheType, builder.registerCacheSize, cacheMetrics)
-					if err != nil {
-						return nil, fmt.Errorf("could not create registers cache: %w", err)
-					}
-					builder.Storage.RegisterIndex = registersCache
-				} else {
-					builder.Storage.RegisterIndex = registers
-				}
-
-				indexerDerivedChainData, queryDerivedChainData, err := builder.buildDerivedChainData()
-				if err != nil {
-					return nil, fmt.Errorf("could not create derived chain data: %w", err)
+					return nil, fmt.Errorf("could not create indexer derived chain data: %w", err)
 				}
 
 				indexerCore, err := indexer.New(
@@ -966,8 +971,8 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 				// execution state worker uses a jobqueue to process new execution data and indexes it by using the indexer.
 				builder.ExecutionIndexer, err = indexer.NewIndexer(
 					builder.Logger,
-					registers.FirstHeight(),
-					registers,
+					builder.Storage.RegisterIndex.FirstHeight(), //TODO(Uliana):check why we need FirstHeight() as separate param here
+					builder.Storage.RegisterIndex,
 					indexerCore,
 					executionDataStoreCache,
 					builder.ExecutionDataRequester.HighestConsecutiveHeight,
@@ -984,31 +989,12 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 				// setup requester to notify indexer when new execution data is received
 				execDataDistributor.AddOnExecutionDataReceivedConsumer(builder.ExecutionIndexer.OnExecutionData)
 
-				// create script execution module, this depends on the indexer being initialized and the
-				// having the register storage bootstrapped
-				scripts := execution.NewScripts(
-					builder.Logger,
-					metrics.NewExecutionCollector(builder.Tracer),
-					builder.RootChainID,
-					computation.NewProtocolStateWrapper(builder.State),
-					builder.Storage.Headers,
-					builder.ExecutionIndexerCore.RegisterValue,
-					builder.scriptExecutorConfig,
-					queryDerivedChainData,
-					builder.programCacheSize > 0,
-				)
-
-				err = builder.ScriptExecutor.Initialize(builder.ExecutionIndexer, scripts, builder.VersionControl)
-				if err != nil {
-					return nil, err
-				}
-
 				err = builder.Reporter.Initialize(builder.ExecutionIndexer)
 				if err != nil {
 					return nil, err
 				}
 
-				err = builder.RegistersAsyncStore.Initialize(registers)
+				err = builder.RegistersAsyncStore.Initialize(builder.Storage.RegisterIndex)
 				if err != nil {
 					return nil, err
 				}
@@ -1111,34 +1097,6 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 	}
 
 	return builder
-}
-
-// buildDerivedChainData creates the derived chain data for the indexer and the query engine
-// If program caching is disabled, the function will return nil for the indexer cache, and a
-// derived chain data object for the query engine cache.
-func (builder *FlowAccessNodeBuilder) buildDerivedChainData() (
-	indexerCache *derived.DerivedChainData,
-	queryCache *derived.DerivedChainData,
-	err error,
-) {
-	cacheSize := builder.programCacheSize
-
-	// the underlying cache requires size > 0. no data will be written so 1 is fine.
-	if cacheSize == 0 {
-		cacheSize = 1
-	}
-
-	derivedChainData, err := derived.NewDerivedChainData(cacheSize)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	// writes are done by the indexer. using a nil value effectively disables writes to the cache.
-	if builder.programCacheSize == 0 {
-		return nil, derivedChainData, nil
-	}
-
-	return derivedChainData, derivedChainData, nil
 }
 
 func FlowAccessNode(nodeBuilder *cmd.FlowNodeBuilder) *FlowAccessNodeBuilder {
@@ -1916,8 +1874,25 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 
 			return nil
 		}).
-		Module("backend script executor", func(node *cmd.NodeConfig) error {
-			builder.ScriptExecutor = backend.NewScriptExecutor(builder.Logger, builder.scriptExecMinBlock, builder.scriptExecMaxBlock)
+		Module("script executor", func(node *cmd.NodeConfig) error {
+			queryDerivedChainData, err := builder.buildQueryDerivedChainData()
+			if err != nil {
+				return fmt.Errorf("could not create query derived chain data: %w", err)
+			}
+
+			builder.ScriptExecutor = execution.NewScripts(
+				builder.Logger,
+				metrics.NewExecutionCollector(builder.Tracer),
+				builder.RootChainID,
+				computation.NewProtocolStateWrapper(builder.State),
+				builder.Storage.Headers,
+				builder.scriptExecutorConfig,
+				queryDerivedChainData,
+				builder.programCacheSize > 0,
+				builder.scriptExecMinBlock,
+				builder.scriptExecMaxBlock,
+				builder.VersionControl,
+			)
 			return nil
 		}).
 		Module("async register store", func(node *cmd.NodeConfig) error {
@@ -2137,7 +2112,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				builder.transactions,
 				builder.lightTransactionResults,
 				builder.transactionResultErrorMessages,
-				nil,
+				notNil(builder.registers),
 			)
 			execStateCache := execution_state.NewExecutionStateCacheMock(snapshot)
 
@@ -2152,6 +2127,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				ExecutionReceipts:     node.Storage.Receipts,
 				ExecutionResults:      node.Storage.Results,
 				TxResultErrorMessages: builder.transactionResultErrorMessages, // might be nil
+				Registers:             notNil(builder.registers),
 				ChainID:               node.RootChainID,
 				AccessMetrics:         notNil(builder.AccessMetrics),
 				ConnFactory:           connFactory,
@@ -2522,4 +2498,51 @@ func notNil[T any](dep T) T {
 		panic("dependency is nil")
 	}
 	return dep
+}
+
+// buildQueryDerivedChainData creates the derived chain data for the query engine.
+// If program caching is disabled, the function will return a derived chain data object for the query engine cache.
+func (builder *FlowAccessNodeBuilder) buildQueryDerivedChainData() (
+	queryCache *derived.DerivedChainData,
+	err error,
+) {
+	cacheSize := builder.programCacheSize
+
+	// the underlying cache requires size > 0. no data will be written so 1 is fine.
+	if cacheSize == 0 {
+		cacheSize = 1
+	}
+
+	derivedChainData, err := derived.NewDerivedChainData(cacheSize)
+	if err != nil {
+		return nil, err
+	}
+
+	return derivedChainData, nil
+}
+
+// buildIndexerDerivedChainData creates the derived chain data for the indexer engine
+// If program caching is disabled, the function will return nil for the indexer cache.
+func (builder *FlowAccessNodeBuilder) buildIndexerDerivedChainData() (
+	indexerCache *derived.DerivedChainData,
+	err error,
+) {
+	cacheSize := builder.programCacheSize
+
+	// the underlying cache requires size > 0. no data will be written so 1 is fine.
+	if cacheSize == 0 {
+		cacheSize = 1
+	}
+
+	derivedChainData, err := derived.NewDerivedChainData(cacheSize)
+	if err != nil {
+		return nil, err
+	}
+
+	// writes are done by the indexer. using a nil value effectively disables writes to the cache.
+	if builder.programCacheSize == 0 {
+		return nil, nil
+	}
+
+	return derivedChainData, nil
 }

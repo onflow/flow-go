@@ -77,6 +77,7 @@ type Suite struct {
 	lightTxResults        *storagemock.LightTransactionResults
 	events                *storagemock.Events
 	txResultErrorMessages *storagemock.TransactionResultErrorMessages
+	registers             *storagemock.RegisterSnapshotReader
 	txResultCache         *lru.Cache[flow.Identifier, *accessmodel.TransactionResult]
 
 	db                  *pebble.DB
@@ -131,6 +132,7 @@ func (suite *Suite) SetupTest() {
 	suite.receipts = storagemock.NewExecutionReceipts(suite.T())
 	suite.results = storagemock.NewExecutionResults(suite.T())
 	suite.txResultErrorMessages = storagemock.NewTransactionResultErrorMessages(suite.T())
+	suite.registers = storagemock.NewRegisterSnapshotReader(suite.T())
 	suite.executionAPIClient = accessmock.NewExecutionAPIClient(suite.T())
 	suite.lightTxResults = storagemock.NewLightTransactionResults(suite.T())
 	suite.events = storagemock.NewEvents(suite.T())
@@ -194,6 +196,7 @@ func (suite *Suite) defaultTransactionsParams() Params {
 		metrics.NewNoopCollector(),
 		validator.TransactionValidationOptions{},
 		execmock.NewScriptExecutor(suite.T()),
+		suite.registers,
 	)
 	suite.Require().NoError(err)
 

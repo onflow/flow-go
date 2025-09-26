@@ -8,6 +8,7 @@ import (
 	"google.golang.org/grpc/status"
 )
 
+// TODO(Uliana): add godoc to whole file
 type FailoverScriptExecutor struct {
 	localExecutor         ScriptExecutor
 	executionNodeExecutor ScriptExecutor

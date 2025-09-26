@@ -8,24 +8,34 @@ import (
 	"github.com/onflow/flow-go/admin"
 	"github.com/onflow/flow-go/admin/commands"
 	"github.com/onflow/flow-go/module/execution"
+	"github.com/onflow/flow-go/storage"
 )
 
 var _ commands.AdminCommand = (*ReadExecutionDataCommand)(nil)
 
+// scriptData holds the parsed input data for ExecuteScriptCommand.
 type scriptData struct {
 	height    uint64
 	script    []byte
 	arguments [][]byte
 }
 
+// ExecuteScriptCommand is an admin command that executes a Cadence script.
 type ExecuteScriptCommand struct {
 	scriptExecutor execution.ScriptExecutor
+	registers      storage.RegisterSnapshotReader
 }
 
-func (e *ExecuteScriptCommand) Handler(ctx context.Context, req *admin.CommandRequest) (interface{}, error) {
+// Handler executes the Cadence script against the blockchain state at the
+// specified block height.
+//
+// Expected errors:
+// - storage.ErrNotFound if block or registerSnapshot value at height was not found.
+// - storage.ErrHeightNotIndexed if the data for the block height is not available
+func (e *ExecuteScriptCommand) Handler(_ context.Context, req *admin.CommandRequest) (interface{}, error) {
 	d := req.ValidatorData.(*scriptData)
 
-	result, err := e.scriptExecutor.ExecuteAtBlockHeight(context.Background(), d.script, d.arguments, d.height)
+	result, err := e.scriptExecutor.ExecuteAtBlockHeight(context.Background(), d.script, d.arguments, d.height, e.registers)
 	if err != nil {
 		return nil, err
 	}
@@ -91,8 +101,9 @@ func (e *ExecuteScriptCommand) Validator(req *admin.CommandRequest) error {
 	return nil
 }
 
-func NewExecuteScriptCommand(scripts execution.ScriptExecutor) commands.AdminCommand {
+func NewExecuteScriptCommand(scripts execution.ScriptExecutor, registers storage.RegisterSnapshotReader) commands.AdminCommand {
 	return &ExecuteScriptCommand{
-		scripts,
+		scriptExecutor: scripts,
+		registers:      registers,
 	}
 }

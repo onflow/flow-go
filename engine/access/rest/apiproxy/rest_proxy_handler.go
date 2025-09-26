@@ -303,71 +303,101 @@ func (r *RestProxyHandler) GetAccountKeyByIndex(ctx context.Context, address flo
 }
 
 // ExecuteScriptAtLatestBlock executes script at latest block.
-func (r *RestProxyHandler) ExecuteScriptAtLatestBlock(ctx context.Context, script []byte, arguments [][]byte) ([]byte, error) {
+func (r *RestProxyHandler) ExecuteScriptAtLatestBlock(ctx context.Context, script []byte, arguments [][]byte, criteria optimistic_sync.Criteria) ([]byte, *accessmodel.ExecutorMetadata, error) {
 	upstream, closer, err := r.FaultTolerantClient()
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	defer closer.Close()
 
 	executeScriptAtLatestBlockRequest := &accessproto.ExecuteScriptAtLatestBlockRequest{
-		Script:    script,
-		Arguments: arguments,
+		Script:              script,
+		Arguments:           arguments,
+		ExecutionStateQuery: executionStateQuery(criteria),
 	}
 	executeScriptAtLatestBlockResponse, err := upstream.ExecuteScriptAtLatestBlock(ctx, executeScriptAtLatestBlockRequest)
 	r.log("upstream", "ExecuteScriptAtLatestBlock", err)
 
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
-	return executeScriptAtLatestBlockResponse.Value, nil
+	var metadata *accessmodel.ExecutorMetadata
+	if rawMetadata := executeScriptAtLatestBlockResponse.GetMetadata(); rawMetadata != nil {
+		metadata = convert.MessageToExecutorMetadata(rawMetadata.GetExecutorMetadata())
+	}
+
+	return executeScriptAtLatestBlockResponse.Value, metadata, nil
 }
 
 // ExecuteScriptAtBlockHeight executes script at the given block height .
-func (r *RestProxyHandler) ExecuteScriptAtBlockHeight(ctx context.Context, blockHeight uint64, script []byte, arguments [][]byte) ([]byte, error) {
+func (r *RestProxyHandler) ExecuteScriptAtBlockHeight(
+	ctx context.Context,
+	blockHeight uint64,
+	script []byte,
+	arguments [][]byte,
+	criteria optimistic_sync.Criteria,
+) ([]byte, *accessmodel.ExecutorMetadata, error) {
 	upstream, closer, err := r.FaultTolerantClient()
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	defer closer.Close()
 
 	executeScriptAtBlockHeightRequest := &accessproto.ExecuteScriptAtBlockHeightRequest{
-		BlockHeight: blockHeight,
-		Script:      script,
-		Arguments:   arguments,
+		BlockHeight:         blockHeight,
+		Script:              script,
+		Arguments:           arguments,
+		ExecutionStateQuery: executionStateQuery(criteria),
 	}
 	executeScriptAtBlockHeightResponse, err := upstream.ExecuteScriptAtBlockHeight(ctx, executeScriptAtBlockHeightRequest)
 	r.log("upstream", "ExecuteScriptAtBlockHeight", err)
 
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
-	return executeScriptAtBlockHeightResponse.Value, nil
+	var metadata *accessmodel.ExecutorMetadata
+	if rawMetadata := executeScriptAtBlockHeightResponse.GetMetadata(); rawMetadata != nil {
+		metadata = convert.MessageToExecutorMetadata(rawMetadata.GetExecutorMetadata())
+	}
+
+	return executeScriptAtBlockHeightResponse.Value, metadata, nil
 }
 
 // ExecuteScriptAtBlockID executes script at the given block id .
-func (r *RestProxyHandler) ExecuteScriptAtBlockID(ctx context.Context, blockID flow.Identifier, script []byte, arguments [][]byte) ([]byte, error) {
+func (r *RestProxyHandler) ExecuteScriptAtBlockID(
+	ctx context.Context,
+	blockID flow.Identifier,
+	script []byte,
+	arguments [][]byte,
+	criteria optimistic_sync.Criteria,
+) ([]byte, *accessmodel.ExecutorMetadata, error) {
 	upstream, closer, err := r.FaultTolerantClient()
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	defer closer.Close()
 
 	executeScriptAtBlockIDRequest := &accessproto.ExecuteScriptAtBlockIDRequest{
-		BlockId:   blockID[:],
-		Script:    script,
-		Arguments: arguments,
+		BlockId:             blockID[:],
+		Script:              script,
+		Arguments:           arguments,
+		ExecutionStateQuery: executionStateQuery(criteria),
 	}
 	executeScriptAtBlockIDResponse, err := upstream.ExecuteScriptAtBlockID(ctx, executeScriptAtBlockIDRequest)
 	r.log("upstream", "ExecuteScriptAtBlockID", err)
 
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
-	return executeScriptAtBlockIDResponse.Value, nil
+	var metadata *accessmodel.ExecutorMetadata
+	if rawMetadata := executeScriptAtBlockIDResponse.GetMetadata(); rawMetadata != nil {
+		metadata = convert.MessageToExecutorMetadata(rawMetadata.GetExecutorMetadata())
+	}
+
+	return executeScriptAtBlockIDResponse.Value, metadata, nil
 }
 
 // GetEventsForHeightRange returns events by their name in the specified blocks heights.
@@ -389,11 +419,7 @@ func (r *RestProxyHandler) GetEventsForHeightRange(
 		StartHeight:          startHeight,
 		EndHeight:            endHeight,
 		EventEncodingVersion: requiredEventEncodingVersion,
-		ExecutionStateQuery: &entities.ExecutionStateQuery{
-			AgreeingExecutorsCount:  uint64(criteria.AgreeingExecutorsCount),
-			RequiredExecutorIds:     convert.IdentifiersToMessages(criteria.RequiredExecutors),
-			IncludeExecutorMetadata: true,
-		},
+		ExecutionStateQuery:  executionStateQuery(criteria),
 	}
 	eventsResponse, err := upstream.GetEventsForHeightRange(ctx, getEventsForHeightRangeRequest)
 	r.log("upstream", "GetEventsForHeightRange", err)
@@ -434,11 +460,7 @@ func (r *RestProxyHandler) GetEventsForBlockIDs(
 		Type:                 eventType,
 		BlockIds:             blockIds,
 		EventEncodingVersion: requiredEventEncodingVersion,
-		ExecutionStateQuery: &entities.ExecutionStateQuery{
-			AgreeingExecutorsCount:  uint64(criteria.AgreeingExecutorsCount),
-			RequiredExecutorIds:     convert.IdentifiersToMessages(criteria.RequiredExecutors),
-			IncludeExecutorMetadata: true,
-		},
+		ExecutionStateQuery:  executionStateQuery(criteria),
 	}
 	eventsResponse, err := upstream.GetEventsForBlockIDs(ctx, getEventsForBlockIDsRequest)
 	r.log("upstream", "GetEventsForBlockIDs", err)
@@ -516,4 +538,16 @@ func splitOnPrefix(original, prefix string) (string, bool) {
 		return parts[1], true
 	}
 	return "", false
+}
+
+// executionStateQuery constructs an ExecutionStateQuery protobuf message from
+// the provided optimistic sync Criteria.
+// The IncludeExecutorMetadata field is set to true, allowing metadata to be included
+// in the response if needed.
+func executionStateQuery(criteria optimistic_sync.Criteria) *entities.ExecutionStateQuery {
+	return &entities.ExecutionStateQuery{
+		AgreeingExecutorsCount:  uint64(criteria.AgreeingExecutorsCount),
+		RequiredExecutorIds:     convert.IdentifiersToMessages(criteria.RequiredExecutors),
+		IncludeExecutorMetadata: true,
+	}
 }
