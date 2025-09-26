@@ -28,7 +28,7 @@ var (
 // process.
 var Cmd = &cobra.Command{
 	Use:   "backfill-tx-errors",
-	Short: "Backfill transaction error messages from Execution Node Protocol DB",
+	Short: "Backfill transaction error messages from an Execution Node's badger database to an Access Node's",
 	Run:   run,
 }
 
@@ -37,7 +37,7 @@ func init() {
 	Cmd.PersistentFlags().StringVar(&flagExecutionDatadir, "execution-badger-dir", "", "directory to the Execution Node's badger database")
 	Cmd.PersistentFlags().Uint64Var(&flagStartHeight, "start-height", 0, "start height to backfill from")
 	Cmd.PersistentFlags().Uint64Var(&flagEndHeight, "end-height", 0, "end height to backfill to")
-	Cmd.PersistentFlags().StringVar(&flagExecutionNodeID, "execution-node-id", "", "execution node id to backfill from")
+	Cmd.PersistentFlags().StringVar(&flagExecutionNodeID, "execution-node-id", "", "node id of the execution node whose badger database is used for backfilling")
 	_ = Cmd.MarkPersistentFlagRequired("access-badger-dir")
 	_ = Cmd.MarkPersistentFlagRequired("execution-badger-dir")
 	_ = Cmd.MarkPersistentFlagRequired("execution-node-id")
@@ -49,7 +49,7 @@ func run(*cobra.Command, []string) {
 	}
 
 	if flagExecutionNodeID == "" {
-		log.Fatal().Msg("Execution node id must be provided")
+		log.Fatal().Msg("--execution-node-id must be provided")
 	}
 
 	executionNodeID, err := flow.HexStringToIdentifier(flagExecutionNodeID)
@@ -74,7 +74,12 @@ func run(*cobra.Command, []string) {
 
 	accessState, err := common.InitProtocolState(accessDB, accessStorages)
 	if err != nil {
-		log.Fatal().Err(err).Msg("could not init protocol state")
+		log.Fatal().Err(err).Msg("could not init access protocol state")
+	}
+
+	executionState, err := common.InitProtocolState(executionDB, executionStorages)
+	if err != nil {
+		log.Fatal().Err(err).Msg("could not init execution protocol state")
 	}
 
 	root := accessState.Params().SealedRoot()
@@ -97,6 +102,11 @@ func run(*cobra.Command, []string) {
 			log.Fatal().Msgf("end height must be less than or equal to final height %d", final.Height)
 		}
 		endHeight = flagEndHeight
+	}
+
+	executionRoot := executionState.Params().SealedRoot()
+	if startHeight < executionRoot.Height {
+		log.Fatal().Msgf("start height must be greater than or equal to execution node's root height %d", executionRoot.Height)
 	}
 
 	progress := util.LogProgress(log.Logger,
