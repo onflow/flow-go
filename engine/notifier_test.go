@@ -102,7 +102,10 @@ func TestNotifier_ManyConsumers(t *testing.T) {
 
 			for range 100 {
 				notifier.Notify()
-				// we may need to add a sync.Wait() here if this gets flaky in CI
+
+				// wait for the previous notification to be consumed to ensure that the producer
+				// won't drop any notifications.
+				synctest.Wait()
 			}
 
 			// wait until all workers are done
@@ -129,9 +132,9 @@ func TestNotifier_AllWorkProcessed(t *testing.T) {
 
 			notifier := NewNotifier()
 
-			totalWork := int32(100)
-			pendingWorkQueue := make(chan struct{}, totalWork)
-			scheduledWork := atomic.NewInt32(0)
+			producerCount := int32(10)
+			producerJobs := int32(10)
+			pendingWorkQueue := make(chan struct{}, producerCount*producerJobs)
 			consumedWork := atomic.NewInt32(0)
 
 			// start the consumers first, otherwise we might finish pushing all jobs, before any of
@@ -165,12 +168,10 @@ func TestNotifier_AllWorkProcessed(t *testing.T) {
 			// wait for all consumers to block on the notifier channel
 			synctest.Wait()
 
-			// 10 routines pushing work
-			for range 10 {
+			for range producerCount {
 				go func() {
-					for scheduledWork.Load() <= totalWork {
+					for range producerJobs {
 						pendingWorkQueue <- struct{}{}
-						scheduledWork.Inc()
 						notifier.Notify()
 					}
 				}()
@@ -179,9 +180,8 @@ func TestNotifier_AllWorkProcessed(t *testing.T) {
 			// wait for all producers and consumers to block. at this point, all jobs should be consumed.
 			synctest.Wait()
 
-			// verify at least `totalWork` jobs were scheduled, and all scheduled jobs were consumed.
-			assert.GreaterOrEqual(t, scheduledWork.Load(), int32(totalWork))
-			assert.Equal(t, scheduledWork.Load(), consumedWork.Load())
+			// verify all scheduled jobs were consumed.
+			assert.Equal(t, producerCount*producerJobs, consumedWork.Load())
 
 			// shutdown blocked consumers and wait for them to complete
 			cancel()
