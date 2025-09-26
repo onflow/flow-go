@@ -149,7 +149,23 @@ type ReaderBatchWriter interface {
 	AddCallback(func(error))
 
 	// SetValue stores the given value by the given key in this batch.
-	// Stored value can be retrieved by the same key via Value().
+	// Value can be retrieved by the same key via Value(key).
+	//
+	// Saving data in ReaderBatchWriter can be useful when the store's operation
+	// is called repeatedly with the same ReaderBatchWriter and different data
+	// (e.g., block ID).  Aggregating different data (e.g., block ID) within
+	// the same ReaderBatchWriter can help store's operation to perform batch
+	// operation efficiently on commit success.
+	//
+	// For example, TransactionResults.BatchRemoveByBlockID() receives
+	// ReaderBatchWriter and block ID to remove the given block from the
+	// database and memory cache.  TransactionResults.BatchRemoveByBlockID()
+	// can be called repeatedly with the same ReaderBatchWriter and different
+	// block IDs to remove multiple blocks.  By saving all removed block IDs
+	// with the same ReaderBatchWriter, TransactionResults.BatchRemoveByBlockID()
+	// retrieves all block IDs and removes cached blocks by locking just once
+	// in OnCommitSucceed() callback, instead of locking TransactionResults cache
+	// for every removed block ID.
 	SetValue(key string, value any)
 
 	// Value returns the value associated with this batch for the given key and true if key exists,

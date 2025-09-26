@@ -196,9 +196,21 @@ func (tr *TransactionResults) RemoveByBlockID(blockID flow.Identifier) error {
 	})
 }
 
-// BatchRemoveByBlockID batch removes transaction results by block ID
+// BatchRemoveByBlockID batch removes transaction results by block ID.
 func (tr *TransactionResults) BatchRemoveByBlockID(blockID flow.Identifier, batch storage.ReaderBatchWriter) error {
 	const batchDataKey = "TransactionResults.BatchRemoveByBlockID"
+
+	// BatchRemoveByBlockID() receives ReaderBatchWriter and block ID to
+	// remove the given block from the database and memory cache.
+	// BatchRemoveByBlockID() can be called repeatedly with the same
+	// ReaderBatchWriter and different block IDs to remove multiple blocks.
+	//
+	// To avoid locking TransactionResults cache for every removed block ID,
+	// this function:
+	// - saves and aggregates the received blockID in the ReaderBatchWriter's scope data,
+	// - in the OnCommitSucceed callback, retrieves all saved block IDs and
+	//   removes all cached blocks by locking the cache just once
+	// After cache removal, the scoped block IDs in ReaderBatchWriter are removed.
 
 	storage.OnCommitSucceed(batch, func() {
 		batchData, _ := batch.Value(batchDataKey)

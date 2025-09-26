@@ -22,8 +22,15 @@ type ReaderBatchWriter struct {
 	// for executing callbacks after the batch has been flushed, such as updating caches
 	callbacks *operation.Callbacks
 
-	// values store value for this batch.
-	// NOTE: b.values is only initialized when needed.
+	// values contains the values for this batch.
+	// The values map is set using SetValue(key, value) and retrieved using Value(key).
+	// Initialization of the values map is deferred until it is needed, because
+	// ReaderBatchWriter is created frequently to update the database, but
+	// this values map is used infrequently to save data for batch operations.
+	// For example, store.TransactionResults.BatchRemoveByBlockID() saves batch
+	// removed block IDs in values map, and retrieves the batch removed block
+	// IDs in OnCommitSucceed() callback.  This allows locking just once,
+	// instead of locking TransactionResults cache for every removed block ID.
 	values map[string]any
 }
 
@@ -188,7 +195,13 @@ func (b *ReaderBatchWriter) DeleteByRange(globalReader storage.Reader, startPref
 	return nil
 }
 
+// SetValue stores the given value by the given key in this batch.
+// Stored value can be retrieved by the same key via Value().
 func (b *ReaderBatchWriter) SetValue(key string, value any) {
+	// Creation of b.values is deferred until needed, so b.values can be nil here.
+	// Deleting element from nil b.values (map[string]any) is no-op.
+	// Inserting element to b.values requires initializing b.values first.
+
 	if value == nil {
 		delete(b.values, key)
 		return
@@ -199,7 +212,12 @@ func (b *ReaderBatchWriter) SetValue(key string, value any) {
 	b.values[key] = value
 }
 
+// Value returns the value associated with this batch for the given key and true if key exists,
+// or nil and false if key doesn't exist.
 func (b *ReaderBatchWriter) Value(key string) (any, bool) {
+	// Creation of b.values is deferred until needed, so b.values can be nil here.
+	// Accessing nil b.values (map[string]any) always returns (nil, false).
+
 	v, exists := b.values[key]
 	return v, exists
 }
