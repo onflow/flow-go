@@ -27,15 +27,14 @@ type cache[K comparable, V any] interface {
 }
 
 func mustNewGroupCache[G comparable, K comparable, V any](
+	t testing.TB,
 	collector module.CacheMetrics,
 	resourceName string,
 	groupFromKey func(K) G,
 	options ...func(*Cache[K, V]),
 ) *GroupCache[G, K, V] {
 	cache, err := newGroupCache(collector, resourceName, groupFromKey, options...)
-	if err != nil {
-		panic(err)
-	}
+	require.NoError(t, err)
 	return cache
 }
 
@@ -47,6 +46,7 @@ func TestCacheExists(t *testing.T) {
 			"test",
 		),
 		mustNewGroupCache[string, flow.Identifier, any](
+			t,
 			metrics.NewNoopCollector(),
 			"test",
 			func(id flow.Identifier) string { return strconv.Itoa(int(id[0])) },
@@ -111,6 +111,7 @@ func TestCacheCachedHit(t *testing.T) {
 		),
 
 		mustNewGroupCache(
+			t,
 			metrics.NewNoopCollector(),
 			"test",
 			func(id flow.Identifier) string { return strconv.Itoa(int(id[0])) },
@@ -179,6 +180,7 @@ func TestCacheNotFoundReturned(t *testing.T) {
 		),
 
 		mustNewGroupCache(
+			t,
 			metrics.NewNoopCollector(),
 			"test",
 			func(id flow.Identifier) string { return strconv.Itoa(int(id[0])) },
@@ -240,6 +242,7 @@ func TestCacheExceptionNotCached(t *testing.T) {
 		),
 
 		mustNewGroupCache(
+			t,
 			metrics.NewNoopCollector(),
 			"test",
 			func(id flow.Identifier) string { return strconv.Itoa(int(id[0])) },

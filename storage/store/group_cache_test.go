@@ -32,6 +32,7 @@ func TestGroupCacheRemoveGroups(t *testing.T) {
 		}
 
 		cache := mustNewGroupCache(
+			t,
 			metrics.NewNoopCollector(),
 			"test",
 			FirstIDFromTwoIdentifier, // cache records are grouped by first identifier of keys
@@ -45,8 +46,7 @@ func TestGroupCacheRemoveGroups(t *testing.T) {
 		groupIDs := make([]flow.Identifier, 0, groupCount)
 		keyValuePairs := make(map[TwoIdentifier][]byte)
 		for range groupCount {
-			var groupID flow.Identifier
-			_, _ = rand.Read(groupID[:])
+			groupID := unittest.IdentifierFixture()
 
 			groupIDs = append(groupIDs, groupID)
 
@@ -192,6 +192,7 @@ func BenchmarkCacheRemoveGroup(b *testing.B) {
 				b.StopTimer()
 
 				cache := mustNewGroupCache(
+					b,
 					metrics.NewNoopCollector(),
 					metrics.ResourceTransactionResults,
 					func(key TwoIdentifier) flow.Identifier { return flow.Identifier(key[:flow.IdentifierLen]) },
