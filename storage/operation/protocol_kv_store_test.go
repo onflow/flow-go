@@ -36,11 +36,12 @@ func TestInsertProtocolKVStore(t *testing.T) {
 		assert.Equal(t, expected, &actual)
 
 		blockID := unittest.IdentifierFixture()
-		unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
+		err = unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
 			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 				return operation.IndexProtocolKVStore(lctx, rw, blockID, kvStoreStateID)
 			})
 		})
+		require.NoError(t, err)
 
 		var actualProtocolKVStoreID flow.Identifier
 		err = operation.LookupProtocolKVStore(db.Reader(), blockID, &actualProtocolKVStoreID)
