@@ -748,7 +748,8 @@ func (suite *Suite) TestGetSealedTransaction() {
 		require.NoError(suite.T(), err)
 
 		// create the ingest engine
-		processedHeight := store.NewConsumerProgress(db, module.ConsumeProgressIngestionEngineBlockHeight)
+		processedHeight, err := store.NewConsumerProgress(db, module.ConsumeProgressIngestionEngineBlockHeight).Initialize(suite.rootBlock.Height)
+		require.NoError(suite.T(), err)
 
 		collectionIndexer, err := ingestioncollections.NewIndexer(
 			suite.log,
@@ -1007,7 +1008,9 @@ func (suite *Suite) TestGetTransactionResult() {
 		)
 		require.NoError(suite.T(), err)
 
-		processedHeightInitializer := store.NewConsumerProgress(db, module.ConsumeProgressIngestionEngineBlockHeight)
+		processedHeight, err := store.NewConsumerProgress(db, module.ConsumeProgressIngestionEngineBlockHeight).
+			Initialize(suite.rootBlock.Height)
+		require.NoError(suite.T(), err)
 
 		lastFullBlockHeightProgress, err := store.NewConsumerProgress(db, module.ConsumeProgressLastFullBlockHeight).
 			Initialize(suite.rootBlock.Height)
@@ -1049,7 +1052,7 @@ func (suite *Suite) TestGetTransactionResult() {
 			all.Blocks,
 			all.Results,
 			all.Receipts,
-			processedHeightInitializer,
+			processedHeight,
 			collectionSyncer,
 			collectionIndexer,
 			collectionExecutedMetric,
@@ -1281,6 +1284,8 @@ func (suite *Suite) TestExecuteScript() {
 			Once()
 
 		processedHeightInitializer := store.NewConsumerProgress(db, module.ConsumeProgressIngestionEngineBlockHeight)
+		processedHeight, err := processedHeightInitializer.Initialize(suite.rootBlock.Height)
+		require.NoError(suite.T(), err)
 
 		lastFullBlockHeightInitializer := store.NewConsumerProgress(db, module.ConsumeProgressLastFullBlockHeight)
 		lastFullBlockHeightProgress, err := lastFullBlockHeightInitializer.Initialize(suite.rootBlock.Height)
@@ -1322,7 +1327,7 @@ func (suite *Suite) TestExecuteScript() {
 			all.Blocks,
 			all.Results,
 			all.Receipts,
-			processedHeightInitializer,
+			processedHeight,
 			collectionSyncer,
 			collectionIndexer,
 			collectionExecutedMetric,

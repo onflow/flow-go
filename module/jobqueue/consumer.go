@@ -50,18 +50,11 @@ type Consumer struct {
 func NewConsumer(
 	log zerolog.Logger,
 	jobs module.Jobs,
-	progressInitializer storage.ConsumerProgressInitializer,
+	progress storage.ConsumerProgress,
 	worker Worker,
 	maxProcessing uint64,
 	maxSearchAhead uint64,
-	defaultIndex uint64,
 ) (*Consumer, error) {
-
-	progress, err := progressInitializer.Initialize(defaultIndex)
-	if err != nil {
-		return nil, fmt.Errorf("could not initialize processed index: %w", err)
-	}
-
 	processedIndex, err := progress.ProcessedIndex()
 	if err != nil {
 		return nil, fmt.Errorf("could not read processed index: %w", err)

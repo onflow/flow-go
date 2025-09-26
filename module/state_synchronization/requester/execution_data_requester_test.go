@@ -412,8 +412,10 @@ func (suite *ExecutionDataRequesterSuite) prepareRequesterTest(cfg *fetchTestRun
 	edCache := cache.NewExecutionDataCache(suite.downloader, headers, seals, results, heroCache)
 
 	followerDistributor := pubsub.NewFollowerDistributor()
-	processedHeight := store.NewConsumerProgress(pebbleimpl.ToDB(suite.db), module.ConsumeProgressExecutionDataRequesterBlockHeight)
-	processedNotification := store.NewConsumerProgress(pebbleimpl.ToDB(suite.db), module.ConsumeProgressExecutionDataRequesterNotification)
+	processedHeight, err := store.NewConsumerProgress(pebbleimpl.ToDB(suite.db), module.ConsumeProgressExecutionDataRequesterBlockHeight).Initialize(cfg.startHeight - 1)
+	suite.Require().NoError(err)
+	processedNotification, err := store.NewConsumerProgress(pebbleimpl.ToDB(suite.db), module.ConsumeProgressExecutionDataRequesterNotification).Initialize(cfg.startHeight - 1)
+	suite.Require().NoError(err)
 
 	edr, err := New(
 		logger,
