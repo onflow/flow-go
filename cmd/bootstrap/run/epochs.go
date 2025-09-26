@@ -9,6 +9,8 @@ import (
 	"github.com/rs/zerolog"
 	"golang.org/x/exp/slices"
 
+	"github.com/onflow/flow-go/state/protocol/prg"
+
 	"github.com/onflow/flow-go/cmd/util/cmd/common"
 	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/model/bootstrap"
@@ -174,8 +176,12 @@ func GenerateRecoverTxArgsWithDKG(
 		}
 	}
 
+	csprg, err := prg.New(epoch.RandomSource(), nil, nil)
+	if err != nil {
+		return nil, fmt.Errorf("could not initialize PRNG: %w", err)
+	}
 	log.Info().Msgf("partitioning %d partners + %d internal nodes into %d collector clusters", len(partnerCollectors), len(internalCollectors), collectionClusters)
-	assignments, clusters, err := common.ConstructClusterAssignment(log, partnerCollectors, internalCollectors, collectionClusters)
+	assignments, clusters, err := common.ConstructClusterAssignment(log, partnerCollectors, internalCollectors, collectionClusters, csprg)
 	if err != nil {
 		return nil, fmt.Errorf("unable to generate cluster assignment: %w", err)
 	}
