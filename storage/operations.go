@@ -148,8 +148,8 @@ type ReaderBatchWriter interface {
 	// The error parameter is the error returned by the batch update.
 	AddCallback(func(error))
 
-	// SetValue stores the given value by the given key in this batch.
-	// Value can be retrieved by the same key via Value(key).
+	// SetScopedValue stores the given value by the given key in this batch.
+	// Value can be retrieved by the same key via ScopedValue(key).
 	//
 	// Saving data in ReaderBatchWriter can be useful when the store's operation
 	// is called repeatedly with the same ReaderBatchWriter and different data
@@ -166,11 +166,11 @@ type ReaderBatchWriter interface {
 	// retrieves all block IDs and removes cached blocks by locking just once
 	// in OnCommitSucceed() callback, instead of locking TransactionResults cache
 	// for every removed block ID.
-	SetValue(key string, value any)
+	SetScopedValue(key string, value any)
 
-	// Value returns the value associated with this batch for the given key and true if key exists,
-	// or nil and false if key doesn't exist.
-	Value(key string) (any, bool)
+	// ScopedValue returns the value associated with this batch for the given key
+	// and true if key exists, or nil and false if key doesn't exist.
+	ScopedValue(key string) (any, bool)
 }
 
 // DB is an interface for a database store that provides a reader and a writer.

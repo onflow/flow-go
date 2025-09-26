@@ -213,10 +213,10 @@ func (tr *TransactionResults) BatchRemoveByBlockID(blockID flow.Identifier, batc
 	// After cache removal, the scoped block IDs in ReaderBatchWriter are removed.
 
 	storage.OnCommitSucceed(batch, func() {
-		batchData, _ := batch.Value(batchDataKey)
+		batchData, _ := batch.ScopedValue(batchDataKey)
 
 		if batchData != nil {
-			batch.SetValue(batchDataKey, nil)
+			batch.SetScopedValue(batchDataKey, nil)
 
 			blockIDs := batchData.(map[flow.Identifier]struct{})
 
@@ -239,7 +239,7 @@ func (tr *TransactionResults) BatchRemoveByBlockID(blockID flow.Identifier, batc
 func saveBlockIDInBatchData(batch storage.ReaderBatchWriter, batchDataKey string, blockID flow.Identifier) {
 	var blockIDs map[flow.Identifier]struct{}
 
-	batchValue, _ := batch.Value(batchDataKey)
+	batchValue, _ := batch.ScopedValue(batchDataKey)
 	if batchValue == nil {
 		blockIDs = make(map[flow.Identifier]struct{})
 	} else {
@@ -248,5 +248,5 @@ func saveBlockIDInBatchData(batch storage.ReaderBatchWriter, batchDataKey string
 
 	blockIDs[blockID] = struct{}{}
 
-	batch.SetValue(batchDataKey, blockIDs)
+	batch.SetScopedValue(batchDataKey, blockIDs)
 }

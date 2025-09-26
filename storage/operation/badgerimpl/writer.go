@@ -195,9 +195,9 @@ func (b *ReaderBatchWriter) DeleteByRange(globalReader storage.Reader, startPref
 	return nil
 }
 
-// SetValue stores the given value by the given key in this batch.
-// Stored value can be retrieved by the same key via Value().
-func (b *ReaderBatchWriter) SetValue(key string, value any) {
+// SetScopedValue stores the given value by the given key in this batch.
+// Stored value can be retrieved by the same key via ScopedValue().
+func (b *ReaderBatchWriter) SetScopedValue(key string, value any) {
 	// Creation of b.values is deferred until needed, so b.values can be nil here.
 	// Deleting element from nil b.values (map[string]any) is no-op.
 	// Inserting element to b.values requires initializing b.values first.
@@ -212,9 +212,9 @@ func (b *ReaderBatchWriter) SetValue(key string, value any) {
 	b.values[key] = value
 }
 
-// Value returns the value associated with this batch for the given key and true if key exists,
+// ScopedValue returns the value associated with this batch for the given key and true if key exists,
 // or nil and false if key doesn't exist.
-func (b *ReaderBatchWriter) Value(key string) (any, bool) {
+func (b *ReaderBatchWriter) ScopedValue(key string) (any, bool) {
 	// Creation of b.values is deferred until needed, so b.values can be nil here.
 	// Accessing nil b.values (map[string]any) always returns (nil, false).
 

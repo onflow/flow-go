@@ -588,7 +588,7 @@ func TestBatchValue(t *testing.T) {
 			callbackFunc := func(error) {
 				callbackInvocationCount++
 
-				value, exists := b.Value(key)
+				value, exists := b.ScopedValue(key)
 				require.Nil(t, value)
 				require.False(t, exists)
 			}
@@ -616,16 +616,16 @@ func TestBatchValue(t *testing.T) {
 			b := db.NewBatch()
 			defer b.Close()
 
-			b.SetValue(key, []string{"value1", "value2"})
+			b.SetScopedValue(key, []string{"value1", "value2"})
 
-			b.SetValue(key, []string{"value2", "value3"})
+			b.SetScopedValue(key, []string{"value2", "value3"})
 
 			callbackInvocationCount := 0
 
 			callbackFunc := func(error) {
 				callbackInvocationCount++
 
-				data, exists := b.Value(key)
+				data, exists := b.ScopedValue(key)
 				require.Equal(t, []string{"value2", "value3"}, data.([]string))
 				require.True(t, exists)
 			}
@@ -653,19 +653,19 @@ func TestBatchValue(t *testing.T) {
 			b := db.NewBatch()
 			defer b.Close()
 
-			b.SetValue(key, []string{"value1", "value2"})
+			b.SetScopedValue(key, []string{"value1", "value2"})
 
 			callbackInvocationCount := 0
 
 			callbackFunc := func(error) {
 				callbackInvocationCount++
 
-				data, exists := b.Value(key)
+				data, exists := b.ScopedValue(key)
 				if callbackInvocationCount == 1 {
 					require.Equal(t, []string{"value1", "value2"}, data.([]string))
 					require.True(t, exists)
 
-					b.SetValue(key, nil)
+					b.SetScopedValue(key, nil)
 				} else {
 					require.Nil(t, data)
 					require.False(t, exists)
