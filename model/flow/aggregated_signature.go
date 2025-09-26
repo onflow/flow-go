@@ -4,7 +4,7 @@ import (
 	"github.com/onflow/crypto"
 )
 
-// AggregatedSignature contains a set of of signatures from verifiers attesting
+// AggregatedSignature contains a set of signatures from verifiers attesting
 // to the validity of an execution result chunk.
 // TODO: this will be replaced with BLS aggregation
 type AggregatedSignature struct {
