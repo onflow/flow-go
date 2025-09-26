@@ -240,6 +240,8 @@ func New(
 		return nil, fmt.Errorf("failed to create notification consumer: %w", err)
 	}
 
+	e.metrics.ExecutionDataFetchFinished(0, true, e.blockConsumer.LastProcessedIndex())
+
 	e.Component = component.NewComponentManagerBuilder().
 		AddWorker(e.runBlockConsumer).
 		AddWorker(e.runNotificationConsumer).
