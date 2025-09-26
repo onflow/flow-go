@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"math/rand"
-	"os"
 	"testing"
 
 	execproto "github.com/onflow/flow/protobuf/go/flow/execution"
@@ -64,8 +63,7 @@ func TestSuite(t *testing.T) {
 }
 
 func (suite *Suite) SetupTest() {
-	//suite.log = unittest.Logger()
-	suite.log = zerolog.New(zerolog.ConsoleWriter{Out: os.Stdout}).With().Timestamp().Logger()
+	suite.log = unittest.Logger()
 	suite.snapshot = protocolmock.NewSnapshot(suite.T())
 
 	header := unittest.BlockHeaderFixture()

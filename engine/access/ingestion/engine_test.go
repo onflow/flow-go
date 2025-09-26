@@ -92,7 +92,7 @@ func (s *Suite) TearDownTest() {
 }
 
 func (s *Suite) SetupTest() {
-	s.log = zerolog.New(os.Stderr)
+	s.log = unittest.Logger()
 	s.ctx, s.cancel = context.WithCancel(context.Background())
 	db, dbDir := unittest.TempPebbleDB(s.T())
 	s.db = pebbleimpl.ToDB(db)
