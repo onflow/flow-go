@@ -47,7 +47,9 @@ func indexBlockByParent(rw storage.ReaderBatchWriter, blockID flow.Identifier, p
 	var nonExist flow.IdentifierList
 	err := RetrieveBlockChildren(rw.GlobalReader(), blockID, &nonExist)
 	if err != nil {
-		return fmt.Errorf("could not check for existing children of new block: %w", err)
+		if !errors.Is(err, storage.ErrNotFound) {
+			return fmt.Errorf("could not check for existing children of new block: %w", err)
+		}
 	}
 
 	if len(nonExist) > 0 {
@@ -70,7 +72,9 @@ func indexBlockByParent(rw storage.ReaderBatchWriter, blockID flow.Identifier, p
 	var childrenIDs flow.IdentifierList
 	err = RetrieveBlockChildren(rw.GlobalReader(), parentID, &childrenIDs)
 	if err != nil {
-		return fmt.Errorf("could not look up block children: %w", err)
+		if !errors.Is(err, storage.ErrNotFound) {
+			return fmt.Errorf("could not look up block children: %w", err)
+		}
 	}
 
 	// check we don't add a duplicate
@@ -93,10 +97,11 @@ func indexBlockByParent(rw storage.ReaderBatchWriter, blockID flow.Identifier, p
 }
 
 // RetrieveBlockChildren retrieves the list of child block IDs for the specified parent block.
-// If the parent block has no children, the childrenIDs will be an empty list.
-// If the parent block does not exist in the index, the childrenIDs will be empty as well
 //
 // Expected errors during normal operations:
+// It returns [storage.ErrNotFound] if the block has no children.
+// Note, this would mean either the block does not exist or the block exists but has no children.
+// The caller has to check if the block exists by other means if needed.
 func RetrieveBlockChildren(r storage.Reader, blockID flow.Identifier, childrenIDs *flow.IdentifierList) error {
 	err := RetrieveByKey(r, MakePrefix(codeBlockChildren, blockID), childrenIDs)
 	if err != nil {
@@ -104,10 +109,15 @@ func RetrieveBlockChildren(r storage.Reader, blockID flow.Identifier, childrenID
 		// so we can't distinguish between a block that doesn't exist and a block that exists but has no children
 		// If the block doesn't have a children index yet, it means it has no children
 		if errors.Is(err, storage.ErrNotFound) {
-			*childrenIDs = flow.IdentifierList{} // empty (non-nil) list
-			return nil
+			return fmt.Errorf("the block has no children, but it might also be the case the block does not exist: %w", err)
 		}
-		return err
+
+		return fmt.Errorf("could not retrieve block children: %w", err)
 	}
+
+	if len(*childrenIDs) == 0 {
+		return fmt.Errorf("the block has no children: %w", storage.ErrNotFound)
+	}
+
 	return nil
 }

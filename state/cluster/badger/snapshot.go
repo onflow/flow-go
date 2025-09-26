@@ -1,11 +1,13 @@
 package badger
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/onflow/flow-go/model/cluster"
 	"github.com/onflow/flow-go/model/flow"
 	clusterState "github.com/onflow/flow-go/state/cluster"
+	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/operation"
 	"github.com/onflow/flow-go/storage/procedure"
 )
@@ -71,7 +73,16 @@ func (s *Snapshot) pending(blockID flow.Identifier) ([]flow.Identifier, error) {
 	var pendingIDs flow.IdentifierList
 	err := operation.RetrieveBlockChildren(s.state.db.Reader(), blockID, &pendingIDs)
 	if err != nil {
-		return nil, fmt.Errorf("could not get pending children: %w", err)
+		if !errors.Is(err, storage.ErrNotFound) {
+			return nil, fmt.Errorf("could not get pending block %v: %w", blockID, err)
+		}
+
+		// err not found means two case:
+		// 1. the block doesn't exist
+		// 2. the block exists but has no children
+		// since the snapshot is created only when s.err == nil, which means the block exists,
+		// so only case 2 is possible here. In this case, we just return
+		// empty children list.
 	}
 
 	for _, pendingID := range pendingIDs {

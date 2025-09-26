@@ -47,8 +47,8 @@ func TestIndexAndLookupChild(t *testing.T) {
 				// retrieving children of a non-existent block should return empty list
 				var retrievedIDs flow.IdentifierList
 				err := operation.RetrieveBlockChildren(db.Reader(), nonExist, &retrievedIDs)
-				require.NoError(t, err)
-				require.Empty(t, retrievedIDs)
+				require.Error(t, err)
+				require.ErrorIs(t, err, storage.ErrNotFound)
 
 				parentID := unittest.IdentifierFixture()
 				childID := unittest.IdentifierFixture()
@@ -67,9 +67,9 @@ func TestIndexAndLookupChild(t *testing.T) {
 				require.Equal(t, flow.IdentifierList{childID}, retrievedIDs)
 
 				err = operation.RetrieveBlockChildren(db.Reader(), childID, &retrievedIDs)
-				// verify new block has no children index (children is empty)
-				require.NoError(t, err)
-				require.Empty(t, retrievedIDs)
+				// verify new block has no children index (returning storage.ErrNotFound)
+				require.Error(t, err)
+				require.ErrorIs(t, err, storage.ErrNotFound)
 
 				// verify indexing again would hit storage.ErrAlreadyExists error
 				err = unittest.WithLock(t, lockManager, opPair.lockType, func(lctx lockctx.Context) error {
@@ -142,8 +142,8 @@ func TestIndexZeroParent(t *testing.T) {
 				// zero id should have no children
 				var retrievedIDs flow.IdentifierList
 				err = operation.RetrieveBlockChildren(db.Reader(), flow.ZeroID, &retrievedIDs)
-				require.NoError(t, err)
-				require.Empty(t, retrievedIDs)
+				require.Error(t, err)
+				require.ErrorIs(t, err, storage.ErrNotFound)
 			})
 		})
 	}
@@ -199,8 +199,8 @@ func TestDirectChildren(t *testing.T) {
 
 				err = operation.RetrieveBlockChildren(db.Reader(), b4, &retrievedIDs)
 				// verify b4 has no children index (not indexed yet)
-				require.NoError(t, err)
-				require.Empty(t, retrievedIDs)
+				require.Error(t, err)
+				require.ErrorIs(t, err, storage.ErrNotFound)
 			})
 		})
 	}

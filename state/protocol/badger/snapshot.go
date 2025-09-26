@@ -312,7 +312,16 @@ func (s *Snapshot) lookupChildren(blockID flow.Identifier) ([]flow.Identifier, e
 	var children flow.IdentifierList
 	err := operation.RetrieveBlockChildren(s.state.db.Reader(), blockID, &children)
 	if err != nil {
-		return nil, fmt.Errorf("could not get children of block %v: %w", blockID, err)
+		if !errors.Is(err, storage.ErrNotFound) {
+			return nil, fmt.Errorf("could not get children of block %v: %w", blockID, err)
+		}
+
+		// err not found means two case:
+		// 1. the block doesn't exist
+		// 2. the block exists but has no children
+		// since the snapshot is created only when the block exists,
+		// so only case 2 is possible here. In this case, we just return
+		// empty children list.
 	}
 	return children, nil
 }
