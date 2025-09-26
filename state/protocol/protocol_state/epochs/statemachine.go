@@ -242,8 +242,8 @@ func NewEpochStateMachine(
 func (e *EpochStateMachine) Build() (*deferred.DeferredBlockPersist, error) {
 	updatedEpochState, updatedStateID, hasChanges := e.activeStateMachine.Build()
 
-	e.pendingDBUpdates.AddNextOperation(func(_ lockctx.Proof, blockID flow.Identifier, rw storage.ReaderBatchWriter) error {
-		return e.epochProtocolStateDB.BatchIndex(rw, blockID, updatedStateID)
+	e.pendingDBUpdates.AddNextOperation(func(lctx lockctx.Proof, blockID flow.Identifier, rw storage.ReaderBatchWriter) error {
+		return e.epochProtocolStateDB.BatchIndex(lctx, rw, blockID, updatedStateID)
 	})
 
 	if hasChanges {
