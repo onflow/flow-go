@@ -101,7 +101,7 @@ func run(*cobra.Command, []string) {
 
 	var remoteClient debug.RemoteClient
 	if flagUseExecutionDataAPI {
-		remoteClient, err = debug.NewExecutionDataRemoteClient(flagAccessAddress)
+		remoteClient, err = debug.NewExecutionDataRemoteClient(flagAccessAddress, chain)
 	} else if flagExecutionAddress != "" {
 		remoteClient, err = debug.NewExecutionNodeRemoteClient(flagExecutionAddress)
 	} else {

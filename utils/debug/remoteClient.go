@@ -51,12 +51,13 @@ func (c *ExecutionNodeRemoteClient) Close() error {
 // ExecutionDataRemoteClient is a remote client that connects to an access node
 // and uses the execution data API to fetch execution data.
 type ExecutionDataRemoteClient struct {
-	conn *grpc.ClientConn
+	conn  *grpc.ClientConn
+	chain flow.Chain
 }
 
 var _ RemoteClient = &ExecutionDataRemoteClient{}
 
-func NewExecutionDataRemoteClient(address string) (*ExecutionDataRemoteClient, error) {
+func NewExecutionDataRemoteClient(address string, chain flow.Chain) (*ExecutionDataRemoteClient, error) {
 	accessConn, err := grpc.NewClient(
 		address,
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
@@ -66,7 +67,8 @@ func NewExecutionDataRemoteClient(address string) (*ExecutionDataRemoteClient, e
 	}
 
 	return &ExecutionDataRemoteClient{
-		conn: accessConn,
+		conn:  accessConn,
+		chain: chain,
 	}, nil
 }
 
@@ -75,7 +77,7 @@ func (c *ExecutionDataRemoteClient) StorageSnapshot(blockHeight uint64, _ flow.I
 
 	// The execution data API provides the *resulting* data,
 	// so fetch the data for the parent block for the *initial* data.
-	return NewExecutionDataStorageSnapshot(executionDataClient, blockHeight-1)
+	return NewExecutionDataStorageSnapshot(executionDataClient, c.chain, blockHeight-1)
 }
 
 func (c *ExecutionDataRemoteClient) Close() error {
