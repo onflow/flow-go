@@ -353,6 +353,8 @@ github.com/fxamacker/circlehash v0.3.0 h1:XKdvTtIJV9t7DDUtsf0RIpC1OcxZtPbmgIH7ek
 github.com/fxamacker/circlehash v0.3.0/go.mod h1:3aq3OfVvsWtkWMb6A1owjOQFA+TLsD5FgJflnaQwtMM=
 github.com/fxamacker/golang-lru/v2 v2.0.0-20250430153159-6f72f038a30f h1:/gqGg2NQVvwiLXs7ppw2uneC5AAd2Z9OTp0zgu42zNI=
 github.com/fxamacker/golang-lru/v2 v2.0.0-20250430153159-6f72f038a30f/go.mod h1:qnbgnNzfydwuHjSCApF4bdul+tZ8T3y1MkZG/OFczLA=
+github.com/fxamacker/golang-lru/v2 v2.0.0-20250716153046-22c8d17dc4ee h1:9RFHOj6xUdQRi1lz/BJXwi0IloXtv6Y2tp7rdSC7SQk=
+github.com/fxamacker/golang-lru/v2 v2.0.0-20250716153046-22c8d17dc4ee/go.mod h1:1FYBKLDzpfjjoWMTK1cIOxsTomg/n35DWNLu6FoYEb8=
 github.com/gabriel-vasile/mimetype v1.4.6 h1:3+PzJTKLkvgjeTbts6msPJt4DixhT4YtFNf1gtGe3zc=
 github.com/gabriel-vasile/mimetype v1.4.6/go.mod h1:JX1qVKqZd40hUPpAfiNTe0Sne7hdfKSbOqqmkq8GCXc=
 github.com/gammazero/deque v1.0.0 h1:LTmimT8H7bXkkCy6gZX7zNLtkbz4NdS2z8LZuor3j34=

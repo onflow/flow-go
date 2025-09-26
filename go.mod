@@ -95,6 +95,7 @@ require (
 	github.com/coreos/go-semver v0.3.0
 	github.com/docker/go-units v0.5.0
 	github.com/dustin/go-humanize v1.0.1
+	github.com/fxamacker/golang-lru/v2 v2.0.0-20250716153046-22c8d17dc4ee
 	github.com/go-playground/validator/v10 v10.19.0
 	github.com/golang/snappy v0.0.5-0.20231225225746-43d5d4cd4e0e
 	github.com/gorilla/websocket v1.5.3

@@ -1,8 +1,10 @@
 package store_test
 
 import (
+	"errors"
 	"fmt"
 	mathRand "math/rand"
+	"slices"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -21,7 +23,8 @@ import (
 func TestBatchStoringTransactionResults(t *testing.T) {
 	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
 		metrics := metrics.NewNoopCollector()
-		st := store.NewTransactionResults(metrics, db, 1000)
+		st, err := store.NewTransactionResults(metrics, db, 1000)
+		require.NoError(t, err)
 
 		blockID := unittest.IdentifierFixture()
 		txResults := make([]flow.TransactionResult, 0)
@@ -36,7 +39,7 @@ func TestBatchStoringTransactionResults(t *testing.T) {
 		writeBatch := db.NewBatch()
 		defer writeBatch.Close()
 
-		err := st.BatchStore(blockID, txResults, writeBatch)
+		err = st.BatchStore(blockID, txResults, writeBatch)
 		require.NoError(t, err)
 
 		err = writeBatch.Commit()
@@ -49,7 +52,8 @@ func TestBatchStoringTransactionResults(t *testing.T) {
 		}
 
 		// test loading from database
-		newst := store.NewTransactionResults(metrics, db, 1000)
+		newst, err := store.NewTransactionResults(metrics, db, 1000)
+		require.NoError(t, err)
 		for _, txResult := range txResults {
 			actual, err := newst.ByBlockIDTransactionID(blockID, txResult.TransactionID)
 			require.NoError(t, err)
@@ -69,59 +73,94 @@ func TestBatchStoringTransactionResults(t *testing.T) {
 	})
 }
 
-// For more info, see comment in TransactionResults.BatchRemoveByBlockID().
-/*
-	func TestBatchStoreAndBatchRemoveTransactionResults(t *testing.T) {
-		dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
-			metrics := metrics.NewNoopCollector()
-			st := store.NewTransactionResults(metrics, db, 1000)
+func TestBatchStoreAndBatchRemoveTransactionResults(t *testing.T) {
+	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
+		const blockCount = 10
+		const txCountPerBlock = 10
 
+		metrics := metrics.NewNoopCollector()
+		st, err := store.NewTransactionResults(metrics, db, 1000)
+		require.NoError(t, err)
+
+		blockIDs := make([]flow.Identifier, blockCount)
+		txResults := make(map[flow.Identifier][]flow.TransactionResult)
+		for i := range blockCount {
 			blockID := unittest.IdentifierFixture()
-			txResults := make([]flow.TransactionResult, 0)
-			for i := 0; i < 10; i++ {
+			blockIDs[i] = blockID
+
+			for j := range txCountPerBlock {
 				txID := unittest.IdentifierFixture()
 				expected := flow.TransactionResult{
 					TransactionID: txID,
-					ErrorMessage:  fmt.Sprintf("a runtime error %d", i),
+					ErrorMessage:  fmt.Sprintf("a runtime error %d", j),
 				}
-				txResults = append(txResults, expected)
+				txResults[blockID] = append(txResults[blockID], expected)
 			}
+		}
 
-			// Store transaction results
-			err := db.WithReaderBatchWriter(func(rbw storage.ReaderBatchWriter) error {
-				return st.BatchStore(blockID, txResults, rbw)
-			})
-			require.NoError(t, err)
-
-			// Retrieve transaction results
-			for _, txResult := range txResults {
-				actual, err := st.ByBlockIDTransactionID(blockID, txResult.TransactionID)
-				require.NoError(t, err)
-				assert.Equal(t, txResult, *actual)
+		// Store transaction results of multiple blocks
+		err = db.WithReaderBatchWriter(func(rbw storage.ReaderBatchWriter) error {
+			for _, blockID := range blockIDs {
+				err := st.BatchStore(blockID, txResults[blockID], rbw)
+				if err != nil {
+					return err
+				}
 			}
-
-			// Remove transaction results
-			err = st.RemoveByBlockID(blockID)
-			require.NoError(t, err)
-
-			// Retrieve transaction results
-			for _, txResult := range txResults {
-				_, err := st.ByBlockIDTransactionID(blockID, txResult.TransactionID)
-				require.True(t, errors.Is(err, storage.ErrNotFound))
-			}
+			return nil
 		})
-	}
-*/
+		require.NoError(t, err)
+
+		// Retrieve transaction results
+		for blockID, txResult := range txResults {
+			for _, result := range txResult {
+				actual, err := st.ByBlockIDTransactionID(blockID, result.TransactionID)
+				require.NoError(t, err)
+				assert.Equal(t, result, *actual)
+			}
+		}
+
+		// Remove 2 blocks of transaction results
+		removeBlockIDs := blockIDs[:2]
+
+		err = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+			for _, blockID := range removeBlockIDs {
+				err := st.BatchRemoveByBlockID(blockID, rw)
+				if err != nil {
+					return err
+				}
+			}
+			return nil
+		})
+		require.NoError(t, err)
+
+		// Retrieve transaction results
+		for blockID, txResult := range txResults {
+			removedBlock := slices.Contains(removeBlockIDs, blockID)
+
+			for _, result := range txResult {
+				actual, err := st.ByBlockIDTransactionID(blockID, result.TransactionID)
+				if removedBlock {
+					require.True(t, errors.Is(err, storage.ErrNotFound))
+				} else {
+					require.NoError(t, err)
+					assert.Equal(t, result, *actual)
+				}
+			}
+		}
+	})
+}
+
 func TestReadingNotstTransaction(t *testing.T) {
 	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
 		metrics := metrics.NewNoopCollector()
-		st := store.NewTransactionResults(metrics, db, 1000)
+		st, err := store.NewTransactionResults(metrics, db, 1000)
+		require.NoError(t, err)
 
 		blockID := unittest.IdentifierFixture()
 		txID := unittest.IdentifierFixture()
 		txIndex := rand.Uint32()
 
-		_, err := st.ByBlockIDTransactionID(blockID, txID)
+		_, err = st.ByBlockIDTransactionID(blockID, txID)
 		assert.ErrorIs(t, err, storage.ErrNotFound)
 
 		_, err = st.ByBlockIDTransactionIndex(blockID, txIndex)
