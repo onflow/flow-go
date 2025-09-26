@@ -83,7 +83,7 @@ func newIndexerTest(t *testing.T, availableBlocks int, lastIndexedIndex int) *in
 		indexerCoreTest.indexer,
 		exeCache,
 		test.latestHeight,
-		&mockProgressInitializer{progress: progress},
+		progress,
 	)
 	require.NoError(t, err)
 
@@ -120,14 +120,6 @@ func (w *indexerTest) run(ctx irrecoverable.SignalerContext, reachHeight uint64,
 	cancel()
 
 	unittest.RequireCloseBefore(w.t, w.worker.Done(), testTimeout, "timeout waiting for the consumer to be done")
-}
-
-type mockProgressInitializer struct {
-	progress *mockProgress
-}
-
-func (m *mockProgressInitializer) Initialize(defaultIndex uint64) (storage.ConsumerProgress, error) {
-	return m.progress, nil
 }
 
 var _ storage.ConsumerProgress = (*mockProgress)(nil)

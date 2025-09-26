@@ -201,7 +201,8 @@ func (s *Suite) TestComponentShutdown() {
 // initEngineAndSyncer create new instance of ingestion engine and collection collectionSyncer.
 // It waits until the ingestion engine starts.
 func (s *Suite) initEngineAndSyncer(ctx irrecoverable.SignalerContext) (*Engine, *CollectionSyncer) {
-	processedHeightInitializer := store.NewConsumerProgress(s.db, module.ConsumeProgressIngestionEngineBlockHeight)
+	processedHeightInitializer, err := store.NewConsumerProgress(s.db, module.ConsumeProgressIngestionEngineBlockHeight).Initialize(s.finalizedBlock.Height)
+	require.NoError(s.T(), err)
 
 	lastFullBlockHeight, err := store.NewConsumerProgress(s.db, module.ConsumeProgressLastFullBlockHeight).Initialize(s.finalizedBlock.Height)
 	require.NoError(s.T(), err)
