@@ -58,7 +58,6 @@ func TestNotifier_ManyNotifications(t *testing.T) {
 			notifier.Notify()
 		})
 	}
-
 	counter.Wait()
 
 	// attempt to consume first notification:
@@ -98,11 +97,12 @@ func TestNotifier_ManyConsumers(t *testing.T) {
 				}()
 			}
 
-			// wait until all workers are blocked on the channel
+			// wait until all workers are blocked on the notifier channel
 			synctest.Wait()
 
 			for range 100 {
 				notifier.Notify()
+				// we may need to add a sync.Wait() here if this gets flaky in CI
 			}
 
 			// wait until all workers are done
@@ -134,9 +134,8 @@ func TestNotifier_AllWorkProcessed(t *testing.T) {
 			scheduledWork := atomic.NewInt32(0)
 			consumedWork := atomic.NewInt32(0)
 
-			// starts the consumers first, because if we start the production first instead, then
-			// we might finish pushing all jobs, before any of our consumer has started listening
-			// to the queue.
+			// start the consumers first, otherwise we might finish pushing all jobs, before any of
+			// our consumer has started listening to the queue.
 
 			processAllPending := func() {
 				for {
@@ -163,7 +162,7 @@ func TestNotifier_AllWorkProcessed(t *testing.T) {
 				}()
 			}
 
-			// wait for all consumers to be ready for new notification.
+			// wait for all consumers to block on the notifier channel
 			synctest.Wait()
 
 			// 10 routines pushing work
@@ -177,11 +176,10 @@ func TestNotifier_AllWorkProcessed(t *testing.T) {
 				}()
 			}
 
-			// wait for all producers and consumers to block. at this point, all jobs should be completed.
+			// wait for all producers and consumers to block. at this point, all jobs should be consumed.
 			synctest.Wait()
 
-			// at least the expected number of jobs should have been scheduled, and all jobs that were
-			// scheduled should have been consumed.
+			// verify at least `totalWork` jobs were scheduled, and all scheduled jobs were consumed.
 			assert.GreaterOrEqual(t, scheduledWork.Load(), int32(totalWork))
 			assert.Equal(t, scheduledWork.Load(), consumedWork.Load())
 
