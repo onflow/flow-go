@@ -47,7 +47,7 @@ type ResultSummary struct {
 	ErrorCode               ErrorCode
 	ErrorMessage            string
 	GasConsumed             uint64
-	GasRefund               uint64
+	MaxGasConsumed          uint64
 	DeployedContractAddress *Address
 	ReturnedData            Data
 }
@@ -78,12 +78,12 @@ type Result struct {
 	// type of transaction defined by the evm package
 	// see DirectCallTxType as extra type we added type for direct calls.
 	TxType uint8
-	// total gas consumed during execution
+	// total gas consumed during execution, not including the refunded gas
 	GasConsumed uint64
+	// maximum gas consumed during execution, excluding gas refunds
+	MaxGasConsumed uint64
 	// total gas used by the block after this tx execution
 	CumulativeGasUsed uint64
-	// total gas refunds after transaction execution
-	GasRefund uint64
 	// the address where the contract is deployed (if any)
 	DeployedContractAddress *Address
 	// returned data from a function call
@@ -280,7 +280,7 @@ func (res *Result) LightReceipt() *LightReceipt {
 func (res *Result) ResultSummary() *ResultSummary {
 	rs := &ResultSummary{
 		GasConsumed:             res.GasConsumed,
-		GasRefund:               res.GasRefund,
+		MaxGasConsumed:          res.MaxGasConsumed,
 		DeployedContractAddress: res.DeployedContractAddress,
 		ReturnedData:            res.ReturnedData,
 		Status:                  StatusSuccessful,
