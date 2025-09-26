@@ -201,7 +201,7 @@ func (s *EngineSuite) TestProcessFinalizedBlock() {
 	s.core.On("OnFinalizedBlock", newFinalizedBlock).Run(func(_ mock.Arguments) {
 		close(done)
 	}).Return(nil).Once()
-	s.headers.On("ByBlockID", newFinalizedBlock.ID()).Return(newFinalizedBlock, nil).Once()
+	s.headers.On("ByBlockID", newFinalizedBlock.Hash()).Return(newFinalizedBlock, nil).Once()
 
 	s.engine.OnFinalizedBlock(model.BlockFromFlow(newFinalizedBlock))
 	unittest.RequireCloseBefore(s.T(), done, time.Millisecond*500, "expect to close before timeout")

@@ -118,7 +118,7 @@ func (c *Core) RepopulateAssignmentCollectorTree(payloads storage.Payloads) erro
 	if err != nil {
 		return fmt.Errorf("could not retrieve finalized block: %w", err)
 	}
-	finalizedID := finalized.ID()
+	finalizedID := finalized.Hash()
 
 	// Get the latest sealed block on this fork, ie the highest block for which
 	// there is a seal in this fork.
@@ -149,7 +149,7 @@ func (c *Core) RepopulateAssignmentCollectorTree(payloads storage.Payloads) erro
 
 	// resultProcessor adds _all known_ results for the given block to the assignment collector tree
 	resultProcessor := func(header *flow.Header) error {
-		blockID := header.ID()
+		blockID := header.Hash()
 		payload, err := payloads.ByBlockID(blockID)
 		if err != nil {
 			return fmt.Errorf("could not retrieve index for block (%x): %w", blockID, err)
@@ -161,7 +161,7 @@ func (c *Core) RepopulateAssignmentCollectorTree(payloads storage.Payloads) erro
 			if isOutdated {
 				c.log.Debug().
 					Hex("container_block_id", logging.ID(blockID)).
-					Hex("result_id", logging.ID(result.ID())).
+					Hex("result_id", logging.ID(result.Hash())).
 					Hex("executed_block_id", logging.ID(result.BlockID)).
 					Msg("skipping outdated block referenced in root sealing segment")
 				continue
@@ -310,7 +310,7 @@ func (c *Core) ProcessIncorporatedResult(result *flow.IncorporatedResult) error 
 	// We expect only engine.OutdatedInputError. If we encounter UnverifiableInputError or InvalidInputError, we
 	// have a serious problem, because these results are coming from the node's local HotStuff, which is trusted.
 	if engine.IsOutdatedInputError(err) {
-		c.log.Debug().Err(err).Msgf("dropping outdated incorporated result %v", result.ID())
+		c.log.Debug().Err(err).Msgf("dropping outdated incorporated result %v", result.Hash())
 		return nil
 	}
 
@@ -373,7 +373,7 @@ func (c *Core) ProcessApproval(approval *flow.ResultApproval) error {
 			Str("approver_id", approval.Body.ApproverID.String()).
 			Str("executed_block_id", approval.Body.BlockID.String()).
 			Str("result_id", approval.Body.ExecutionResultID.String()).
-			Str("approval_id", approval.ID().String()).
+			Str("approval_id", approval.Hash().String()).
 			Logger()
 		if engine.IsUnverifiableInputError(err) {
 			lg.Warn().Msg("received approval for unknown block (this node is potentially behind)")
@@ -385,7 +385,7 @@ func (c *Core) ProcessApproval(approval *flow.ResultApproval) error {
 		}
 		lg.Error().Msg("unexpected error processing result approval")
 
-		return fmt.Errorf("internal error processing result approval %x: %w", approval.ID(), err)
+		return fmt.Errorf("internal error processing result approval %x: %w", approval.Hash(), err)
 	}
 
 	return nil
@@ -485,7 +485,7 @@ func (c *Core) processPendingApprovals(collector approvals.AssignmentCollectorSt
 				c.log.Debug().
 					Hex("result_id", resultID[:]).
 					Err(err).
-					Msgf("invalid approval with id %s", approval.ID())
+					Msgf("invalid approval with id %s", approval.Hash())
 			} else {
 				return fmt.Errorf("could not process assignment: %w", err)
 			}
@@ -536,7 +536,7 @@ func (c *Core) ProcessFinalizedBlock(finalizedBlockID flow.Identifier) error {
 	c.log.Info().Msgf("processing finalized block %v at height %d, lastSealedHeight %d", finalizedBlockID, finalized.Height, lastBlockWithFinalizedSeal.Height)
 	err = c.prune(processFinalizedBlockSpan, finalized, lastBlockWithFinalizedSeal)
 	if err != nil {
-		return fmt.Errorf("updating to finalized block %v and sealed block %v failed: %w", finalizedBlockID, lastBlockWithFinalizedSeal.ID(), err)
+		return fmt.Errorf("updating to finalized block %v and sealed block %v failed: %w", finalizedBlockID, lastBlockWithFinalizedSeal.Hash(), err)
 	}
 
 	// STEP 2: Check emergency sealing and re-request missing approvals
@@ -654,7 +654,7 @@ func (c *Core) requestPendingApprovals(observation consensus.SealingObservation,
 //	     [  sealing segment       ]
 //	Z <- A <- B(RZ) <- C <- D <- E
 func (c *Core) getOutdatedBlockIDsFromRootSealingSegment(rootHeader *flow.Header) (map[flow.Identifier]struct{}, error) {
-	rootSealingSegment, err := c.state.AtBlockID(rootHeader.ID()).SealingSegment()
+	rootSealingSegment, err := c.state.AtBlockID(rootHeader.Hash()).SealingSegment()
 	if err != nil {
 		return nil, fmt.Errorf("could not get root sealing segment: %w", err)
 	}
@@ -662,7 +662,7 @@ func (c *Core) getOutdatedBlockIDsFromRootSealingSegment(rootHeader *flow.Header
 	knownBlockIDs := make(map[flow.Identifier]struct{}) // track block IDs in the sealing segment
 	outdatedBlockIDs := make(flow.IdentifierList, 0)
 	for _, proposal := range rootSealingSegment.Blocks { // We iterate over the blocks in the sealing segment with increasing height.
-		knownBlockIDs[proposal.Block.ID()] = struct{}{} // Hence, we are guaranteed to encounter a block B *first* before its results if and only if B is in the sealing segment.
+		knownBlockIDs[proposal.Block.Hash()] = struct{}{} // Hence, we are guaranteed to encounter a block B *first* before its results if and only if B is in the sealing segment.
 		for _, result := range proposal.Block.Payload.Results {
 			_, known := knownBlockIDs[result.BlockID]
 			if !known {

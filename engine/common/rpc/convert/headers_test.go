@@ -42,5 +42,5 @@ func TestConvertRootBlockHeader(t *testing.T) {
 	converted, err := convert.MessageToBlockHeader(msg)
 	require.NoError(t, err)
 
-	assert.Equal(t, header.ID(), converted.ID())
+	assert.Equal(t, header.Hash(), converted.Hash())
 }

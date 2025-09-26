@@ -18,7 +18,7 @@ func TestChunkLocatorConvert(t *testing.T) {
 
 	require.Equal(t, len(originalList), len(locatorMap))
 	for _, locator := range originalList {
-		_, ok := locatorMap[locator.ID()]
+		_, ok := locatorMap[locator.Hash()]
 		require.True(t, ok, "missing chunk locator in conversion from list to map")
 	}
 
@@ -26,7 +26,7 @@ func TestChunkLocatorConvert(t *testing.T) {
 	require.ElementsMatch(t, originalList, convertedList)
 }
 
-// TestChunkLocatorMalleability verifies that the chunk locator which implements the [flow.IDEntity] interface is not malleable.
+// TestChunkLocatorMalleability verifies that the chunk locator which implements the [flow.Hashable] interface is not malleable.
 func TestChunkLocatorMalleability(t *testing.T) {
 	unittest.RequireEntityNonMalleable(t, unittest.ChunkLocatorFixture(unittest.IdentifierFixture(), rand.Uint64()))
 }

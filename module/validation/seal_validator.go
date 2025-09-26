@@ -64,7 +64,7 @@ func (s *sealValidator) verifySealSignature(aggregatedSignatures *flow.Aggregate
 		return fmt.Errorf("could not build attestation: %w", err)
 	}
 
-	atstID := atst.ID()
+	atstID := atst.Hash()
 
 	for i, signature := range aggregatedSignatures.VerifierSignatures {
 		signerId := aggregatedSignatures.SignerIDs[i]
@@ -147,7 +147,7 @@ func (s *sealValidator) Validate(candidate *flow.Block) (*flow.Seal, error) {
 	// Traverse fork starting from the lowest unsealed block (included) up to the parent block (included).
 	// For each visited block collect: IncorporatedResults and block ID
 	forkCollector := func(header *flow.Header) error {
-		blockID := header.ID()
+		blockID := header.Hash()
 		if blockID == parentID {
 			// Important protocol edge case: There must be at least one block in between the block incorporating
 			// a result and the block sealing the result. This is because we need the Source of Randomness for
@@ -212,7 +212,7 @@ func (s *sealValidator) Validate(candidate *flow.Block) (*flow.Seal, error) {
 		// the sealed result must be previously incorporated in the fork:
 		incorporatedResult, ok := incorporatedResults[seal.ResultID]
 		if !ok {
-			return nil, engine.NewInvalidInputErrorf("seal %x does not correspond to a result on this fork", seal.ID())
+			return nil, engine.NewInvalidInputErrorf("seal %x does not correspond to a result on this fork", seal.Hash())
 		}
 
 		// check the integrity of the seal (by itself)
@@ -220,9 +220,9 @@ func (s *sealValidator) Validate(candidate *flow.Block) (*flow.Seal, error) {
 		if err != nil {
 			if !engine.IsInvalidInputError(err) {
 				return nil, fmt.Errorf("unexpected internal error while validating seal %x for result %x for block %x: %w",
-					seal.ID(), seal.ResultID, seal.BlockID, err)
+					seal.Hash(), seal.ResultID, seal.BlockID, err)
 			}
-			return nil, fmt.Errorf("invalid seal %x for result %x for block %x: %w", seal.ID(), seal.ResultID, seal.BlockID, err)
+			return nil, fmt.Errorf("invalid seal %x for result %x for block %x: %w", seal.Hash(), seal.ResultID, seal.BlockID, err)
 		}
 
 		// check that the sealed execution results form a chain
@@ -263,12 +263,12 @@ func (s *sealValidator) validateSeal(seal *flow.Seal, incorporatedResult *flow.I
 	assignments, err := s.assigner.Assign(executionResult, incorporatedResult.IncorporatedBlockID)
 	if err != nil {
 		return fmt.Errorf("failed to retrieve verifier assignment for result %x incorporated in block %x: %w",
-			executionResult.ID(), incorporatedResult.IncorporatedBlockID, err)
+			executionResult.Hash(), incorporatedResult.IncorporatedBlockID, err)
 	}
 
 	// Check that each AggregatedSignature has enough valid signatures from
 	// verifiers that were assigned to the corresponding chunk.
-	executionResultID := executionResult.ID()
+	executionResultID := executionResult.Hash()
 	emergencySealed := false
 	for _, chunk := range executionResult.Chunks {
 		chunkSigs := &seal.AggregatedApprovalSigs[chunk.Index]

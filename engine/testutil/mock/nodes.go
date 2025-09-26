@@ -277,18 +277,18 @@ func (en ExecutionNode) AssertHighestExecutedBlock(t *testing.T, header *flow.He
 	height, blockID, err := en.ExecutionState.GetLastExecutedBlockID(context.Background())
 	require.NoError(t, err)
 
-	require.Equal(t, header.ID(), blockID)
+	require.Equal(t, header.Hash(), blockID)
 	require.Equal(t, header.Height, height)
 }
 
 func (en ExecutionNode) AssertBlockIsExecuted(t *testing.T, header *flow.Header) {
-	executed, err := en.ExecutionState.IsBlockExecuted(header.Height, header.ID())
+	executed, err := en.ExecutionState.IsBlockExecuted(header.Height, header.Hash())
 	require.NoError(t, err)
 	require.True(t, executed)
 }
 
 func (en ExecutionNode) AssertBlockNotExecuted(t *testing.T, header *flow.Header) {
-	executed, err := en.ExecutionState.IsBlockExecuted(header.Height, header.ID())
+	executed, err := en.ExecutionState.IsBlockExecuted(header.Height, header.Hash())
 	require.NoError(t, err)
 	require.False(t, executed)
 }

@@ -559,14 +559,14 @@ func (suite *ExecutionDataRequesterSuite) finalizeBlocks(cfg *fetchTestRun, foll
 	for i := cfg.StartHeight(); i <= cfg.endHeight; i++ {
 		b := cfg.blocksByHeight[i]
 
-		suite.T().Log(">>>> Finalizing block", b.ID(), b.Height)
+		suite.T().Log(">>>> Finalizing block", b.Hash(), b.Height)
 
 		if len(b.Payload.Seals) > 0 {
 			seal := b.Payload.Seals[0]
 			sealedHeader := cfg.blocksByID[seal.BlockID].ToHeader()
 
 			suite.mockSnapshot.set(sealedHeader, nil)
-			suite.T().Log(">>>> Sealing block", sealedHeader.ID(), sealedHeader.Height)
+			suite.T().Log(">>>> Sealing block", sealedHeader.Hash(), sealedHeader.Height)
 		}
 
 		followerDistributor.OnFinalizedBlock(&model.Block{}) // actual block is unused
@@ -628,7 +628,7 @@ func (r *fetchTestRun) FetchedExecutionData() receivedExecutionData {
 func (r *fetchTestRun) IsLastSeal(blockID flow.Identifier) bool {
 	stopHeight := r.StopHeight()
 	lastSeal := r.blocksByHeight[stopHeight].Payload.Seals[0].BlockID
-	return lastSeal == r.blocksByID[blockID].ID()
+	return lastSeal == r.blocksByID[blockID].Hash()
 }
 
 func generateTestData(t *testing.T, blobstore blobs.Blobstore, blockCount int, specialHeightFuncs map[uint64]testExecutionDataCallback) *fetchTestRun {
@@ -662,9 +662,9 @@ func generateTestData(t *testing.T, blobstore blobs.Blobstore, blockCount int, s
 				sealedBlock.ToHeader(), // block 0 doesn't get sealed (it's pre-sealed in the genesis state)
 			}
 
-			sealsByBlockID[sealedBlock.ID()] = unittest.Seal.Fixture(
-				unittest.Seal.WithBlockID(sealedBlock.ID()),
-				unittest.Seal.WithResult(resultsByBlockID[sealedBlock.ID()]),
+			sealsByBlockID[sealedBlock.Hash()] = unittest.Seal.Fixture(
+				unittest.Seal.WithBlockID(sealedBlock.Hash()),
+				unittest.Seal.WithResult(resultsByBlockID[sealedBlock.Hash()]),
 			)
 
 			t.Logf("block %d has seals for %d", i, seals[0].Height)
@@ -673,7 +673,7 @@ func generateTestData(t *testing.T, blobstore blobs.Blobstore, blockCount int, s
 		height := uint64(i)
 		block := buildBlock(height, previousBlock, seals)
 
-		ed := unittest.BlockExecutionDataFixture(unittest.WithBlockExecutionDataBlockID(block.ID()))
+		ed := unittest.BlockExecutionDataFixture(unittest.WithBlockExecutionDataBlockID(block.Hash()))
 
 		cid, err := eds.Add(context.Background(), ed)
 		require.NoError(t, err)
@@ -681,19 +681,19 @@ func generateTestData(t *testing.T, blobstore blobs.Blobstore, blockCount int, s
 		result := buildResult(block, cid, previousResult)
 
 		blocksByHeight[height] = block
-		blocksByID[block.ID()] = block
-		resultsByBlockID[block.ID()] = result
-		resultsByID[result.ID()] = result
+		blocksByID[block.Hash()] = block
+		resultsByBlockID[block.Hash()] = result
+		resultsByID[result.Hash()] = result
 
 		// ignore all the data we don't need to verify the test
 		if i > 0 && i <= sealedCount {
-			executionDataByID[block.ID()] = ed
+			executionDataByID[block.Hash()] = ed
 			edsEntries[cid] = &testExecutionDataServiceEntry{ExecutionData: ed}
 			if fn, has := specialHeightFuncs[height]; has {
 				edsEntries[cid].fn = fn
 			}
 
-			executionDataIDByBlockID[block.ID()] = cid
+			executionDataIDByBlockID[block.Hash()] = cid
 		}
 
 		previousBlock = block
@@ -753,7 +753,7 @@ func verifyFetchedExecutionData(t *testing.T, actual receivedExecutionData, cfg 
 	for i := 0; i < cfg.sealedCount; i++ {
 		height := cfg.startHeight + uint64(i)
 		block := cfg.blocksByHeight[height]
-		blockID := block.ID()
+		blockID := block.Hash()
 
 		expectedED := expected[blockID]
 		actualED, has := actual[blockID]

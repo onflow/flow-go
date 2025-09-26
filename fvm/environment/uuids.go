@@ -175,7 +175,7 @@ func (generator *uUIDGenerator) maybeInitializePartition() {
 		generator.partition = 0
 	} else {
 		generator.partition = uuidPartition(
-			generator.blockHeader.ID(),
+			generator.blockHeader.Hash(),
 			generator.txnIndex)
 	}
 

@@ -83,8 +83,8 @@ func (s *IngestionSuite) TestSubmittingMultipleEntries() {
 	go func() {
 		for i := 0; i < int(count); i++ {
 			guarantee := s.validGuarantee()
-			s.pool.On("Has", guarantee.ID()).Return(false)
-			s.pool.On("Add", guarantee.ID(), guarantee).Run(func(args mock.Arguments) {
+			s.pool.On("Has", guarantee.Hash()).Return(false)
+			s.pool.On("Add", guarantee.Hash(), guarantee).Run(func(args mock.Arguments) {
 				processed.Add(1)
 			}).Return(true)
 

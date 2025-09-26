@@ -52,7 +52,7 @@ func (r *MockFinalizedReader) FinalizedBlockIDAtHeight(height uint64) (flow.Iden
 	if height < r.lowest {
 		return flow.ZeroID, fmt.Errorf("height %d is out of range [%d, %d]", height, r.lowest, r.highest)
 	}
-	return r.headerByHeight[height].ID(), nil
+	return r.headerByHeight[height].Hash(), nil
 }
 
 func (r *MockFinalizedReader) MockFinal(height uint64) error {

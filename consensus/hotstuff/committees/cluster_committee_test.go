@@ -87,7 +87,7 @@ func (suite *ClusterSuite) TestInvalidSigner() {
 
 	// hook up cluster->main chain connection for root and non-root cluster block
 	nonRootBlockID := unittest.IdentifierFixture()
-	rootBlockID := suite.root.ID()
+	rootBlockID := suite.root.Hash()
 
 	refID := unittest.IdentifierFixture()               // reference block on main chain
 	payload := cluster.NewEmptyPayload(refID)           // payload referencing main chain

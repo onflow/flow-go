@@ -41,7 +41,7 @@ func (suite *OneshotExecutionDataRequesterSuite) TestRequestExecutionData() {
 	suite.Run("Happy path. Raw setup", func() {
 		block := unittest.BlockFixture()
 		result := unittest.ExecutionResultFixture(unittest.WithBlock(block))
-		blockEd := unittest.BlockExecutionDataFixture(unittest.WithBlockExecutionDataBlockID(block.ID()))
+		blockEd := unittest.BlockExecutionDataFixture(unittest.WithBlockExecutionDataBlockID(block.Hash()))
 
 		execDataDownloader := edmock.NewDownloader(suite.T())
 		execDataDownloader.
@@ -118,7 +118,7 @@ func (suite *OneshotExecutionDataRequesterSuite) TestRequestExecution_ERCacheRet
 			Once()
 
 		// Eventually return execution data
-		blockEd := unittest.BlockExecutionDataFixture(unittest.WithBlockExecutionDataBlockID(block.ID()))
+		blockEd := unittest.BlockExecutionDataFixture(unittest.WithBlockExecutionDataBlockID(block.Hash()))
 		execDataDownloader.
 			On("Get", mock.Anything, executionResult.ExecutionDataID).
 			Return(blockEd, nil).
@@ -133,7 +133,7 @@ func (suite *OneshotExecutionDataRequesterSuite) TestRequestExecution_ERCacheRet
 		execData, err := requester.RequestExecutionData(ctx)
 		require.NoError(suite.T(), err)
 		require.NotNil(suite.T(), execData)
-		require.Equal(suite.T(), block.ID(), execData.BlockID)
+		require.Equal(suite.T(), block.Hash(), execData.BlockID)
 	})
 
 	suite.Run("deadline exceeded error", func() {

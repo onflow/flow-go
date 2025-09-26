@@ -84,8 +84,8 @@ func NewRootExecutionResult(untrusted UntrustedExecutionResult) (*ExecutionResul
 	}, nil
 }
 
-// ID returns the hash of the execution result body
-func (er ExecutionResult) ID() Identifier {
+// Hash returns the hash of the execution result body
+func (er ExecutionResult) Hash() Identifier {
 	return MakeID(er)
 }
 
@@ -149,7 +149,7 @@ func (er ExecutionResult) MarshalJSON() ([]byte, error) {
 		ID string
 	}{
 		Alias: Alias(er),
-		ID:    er.ID().String(),
+		ID:    er.Hash().String(),
 	})
 }
 
@@ -213,7 +213,7 @@ func (g ExecutionResultGroupedList) NumberGroups() int {
 func (l ExecutionResultList) Lookup() map[Identifier]*ExecutionResult {
 	resultsByID := make(map[Identifier]*ExecutionResult, len(l))
 	for _, result := range l {
-		resultsByID[result.ID()] = result
+		resultsByID[result.Hash()] = result
 	}
 	return resultsByID
 }

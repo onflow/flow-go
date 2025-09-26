@@ -1329,7 +1329,7 @@ func (fnb *FlowNodeBuilder) initState() error {
 
 		// set root snapshot field
 		rootBlock := state.Params().FinalizedRoot()
-		rootSnapshot := state.AtBlockID(rootBlock.ID())
+		rootSnapshot := state.AtBlockID(rootBlock.Hash())
 		if err := fnb.setRootSnapshot(rootSnapshot); err != nil {
 			return err
 		}

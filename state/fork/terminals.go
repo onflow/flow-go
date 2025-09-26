@@ -23,8 +23,8 @@ func (t IncludingBlock) LowestHeightToVisit(headers storage.Headers) (uint64, er
 // ConfirmTerminalReached is a self-consistency check that the lowest visited block is
 // in fact the expected terminal.
 func (t IncludingBlock) ConfirmTerminalReached(headers storage.Headers, lowestVisitedBlock *flow.Header) error {
-	if lowestVisitedBlock.ID() != flow.Identifier(t) {
-		return fmt.Errorf("last visited block has ID %x but expecting %x", lowestVisitedBlock.ID(), flow.Identifier(t))
+	if lowestVisitedBlock.Hash() != flow.Identifier(t) {
+		return fmt.Errorf("last visited block has ID %x but expecting %x", lowestVisitedBlock.Hash(), flow.Identifier(t))
 	}
 	return nil
 }

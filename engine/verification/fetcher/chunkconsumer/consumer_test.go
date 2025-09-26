@@ -74,7 +74,7 @@ func TestProduceConsume(t *testing.T) {
 			called = append(called, locator)
 			finishAll.Add(1)
 			go func() {
-				notifier.Notify(locator.ID())
+				notifier.Notify(locator.Hash())
 				finishAll.Done()
 			}()
 		}
@@ -109,7 +109,7 @@ func TestProduceConsume(t *testing.T) {
 			defer lock.Unlock()
 			called = append(called, locator)
 			go func() {
-				notifier.Notify(locator.ID())
+				notifier.Notify(locator.Hash())
 				finishAll.Done()
 			}()
 		}

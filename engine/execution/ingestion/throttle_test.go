@@ -38,7 +38,7 @@ func TestThrottleLoadAllBlocks(t *testing.T) {
 	total := consumer.Total()
 
 	// when 7-10 are executed, verify no more block is loaded
-	require.NoError(t, throttle.OnBlockExecuted(headers[6].ID(), headers[6].Height))
+	require.NoError(t, throttle.OnBlockExecuted(headers[6].Hash(), headers[6].Height))
 	require.Equal(t, total, consumer.Total())
 
 	require.NoError(t, throttle.Done())
@@ -73,30 +73,30 @@ func TestThrottleFallBehindCatchUp(t *testing.T) {
 
 	// when 2 is executed, verify block 5 is loaded
 	wg.Add(1)
-	require.NoError(t, throttle.OnBlockExecuted(headers[2].ID(), headers[2].Height))
+	require.NoError(t, throttle.OnBlockExecuted(headers[2].Hash(), headers[2].Height))
 	wg.Wait()
 	require.Equal(t, HeaderToBlockIDHeight(headers[5]), consumer.LastProcessable())
 
 	// when 10 is received, no block is loaded
-	require.NoError(t, throttle.OnBlock(headers[10].ID(), headers[10].Height))
+	require.NoError(t, throttle.OnBlock(headers[10].Hash(), headers[10].Height))
 	require.Equal(t, HeaderToBlockIDHeight(headers[5]), consumer.LastProcessable())
 
 	// when 3 is executed, verify block 6 is loaded
 	wg.Add(1)
-	require.NoError(t, throttle.OnBlockExecuted(headers[3].ID(), headers[3].Height))
+	require.NoError(t, throttle.OnBlockExecuted(headers[3].Hash(), headers[3].Height))
 	wg.Wait()
 	require.Equal(t, HeaderToBlockIDHeight(headers[6]), consumer.LastProcessable())
 
 	// when 4 is executed, verify block 7, 8, 9, 10 is loaded
 	wg.Add(4)
-	require.NoError(t, throttle.OnBlockExecuted(headers[4].ID(), headers[4].Height))
+	require.NoError(t, throttle.OnBlockExecuted(headers[4].Hash(), headers[4].Height))
 	wg.Wait()
 	require.Equal(t, HeaderToBlockIDHeight(headers[10]), consumer.LastProcessable())
 	require.Equal(t, 10, consumer.Total())
 
 	// when 5 to 10 is executed, no block is loaded
 	for i := 4; i <= 10; i++ {
-		require.NoError(t, throttle.OnBlockExecuted(headers[i].ID(), headers[i].Height))
+		require.NoError(t, throttle.OnBlockExecuted(headers[i].Hash(), headers[i].Height))
 	}
 	wg.Wait()
 	require.Equal(t, HeaderToBlockIDHeight(headers[10]), consumer.LastProcessable())
@@ -104,7 +104,7 @@ func TestThrottleFallBehindCatchUp(t *testing.T) {
 
 	// when 11 is received, verify block 11 is loaded
 	wg.Add(1)
-	require.NoError(t, throttle.OnBlock(allBlocks[11].ID(), allBlocks[11].Height))
+	require.NoError(t, throttle.OnBlock(allBlocks[11].Hash(), allBlocks[11].Height))
 	wg.Wait()
 	require.Equal(t, HeaderToBlockIDHeight(allBlocks[11].ToHeader()), consumer.LastProcessable())
 
@@ -134,7 +134,7 @@ func createThrottle(t *testing.T, blocks []*flow.Block, headers []*flow.Header, 
 	for i := 1; i < len(blocks); i++ {
 		require.NoError(t, state.Extend(blocks[i]))
 	}
-	require.NoError(t, state.Finalize(blocks[lastFinalized].ID()))
+	require.NoError(t, state.Finalize(blocks[lastFinalized].Hash()))
 
 	execState := stateMock.NewExecutionState(t)
 	execState.On("GetHighestFinalizedExecuted").Return(headers[lastExecuted].Height, nil)
@@ -193,7 +193,7 @@ func newHeadersWithBlocks(headers []*flow.Header) *headerStore {
 	byID := make(map[flow.Identifier]*flow.Header, len(headers))
 	byHeight := make(map[uint64]*flow.Header, len(headers))
 	for _, header := range headers {
-		byID[header.ID()] = header
+		byID[header.Hash()] = header
 		byHeight[header.Height] = header
 	}
 	return &headerStore{
@@ -207,7 +207,7 @@ func (h *headerStore) BlockIDByHeight(height uint64) (flow.Identifier, error) {
 	if !ok {
 		return flow.Identifier{}, fmt.Errorf("block %d not found", height)
 	}
-	return header.ID(), nil
+	return header.Hash(), nil
 }
 
 func (h *headerStore) ByBlockID(blockID flow.Identifier) (*flow.Header, error) {

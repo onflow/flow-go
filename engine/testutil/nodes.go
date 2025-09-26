@@ -307,7 +307,7 @@ func CollectionNode(t *testing.T, hub *stub.Hub, identity bootstrap.NodeInfo, ro
 	require.NoError(t, err)
 
 	selector := filter.HasRole[flow.Identity](flow.RoleAccess, flow.RoleVerification)
-	retrieve := func(collID flow.Identifier) (flow.Entity, error) {
+	retrieve := func(collID flow.Identifier) (flow.Hashable, error) {
 		coll, err := collections.ByID(collID)
 		return coll, err
 	}
@@ -459,7 +459,7 @@ func ConsensusNode(t *testing.T, hub *stub.Hub, identity bootstrap.NodeInfo, ide
 	require.NoError(t, err)
 
 	// request receipts from execution nodes
-	receiptRequester, err := requester.New(node.Log.With().Str("entity", "receipt").Logger(), node.Metrics, node.Net, node.Me, node.State, channels.RequestReceiptsByBlockID, filter.Any, func() flow.Entity { return new(flow.ExecutionReceipt) })
+	receiptRequester, err := requester.New(node.Log.With().Str("entity", "receipt").Logger(), node.Metrics, node.Net, node.Me, node.State, channels.RequestReceiptsByBlockID, filter.Any, func() flow.Hashable { return new(flow.ExecutionReceipt) })
 	require.NoError(t, err)
 
 	assigner, err := chunks.NewChunkAssigner(flow.DefaultChunkAssignmentAlpha, node.State)
@@ -618,7 +618,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity bootstrap.NodeInfo, ide
 	require.NoError(t, err)
 
 	require.Equal(t, fmt.Sprint(rootSeal.FinalState), fmt.Sprint(commit))
-	require.Equal(t, rootSeal.ResultID, rootResult.ID())
+	require.Equal(t, rootSeal.ResultID, rootResult.Hash())
 
 	err = bootstrapper.BootstrapExecutionDatabase(node.LockManager, db, rootSeal)
 	require.NoError(t, err)
@@ -664,7 +664,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity bootstrap.NodeInfo, ide
 		node.Log.With().Str("entity", "collection").Logger(), node.Metrics, node.Net, node.Me, node.State,
 		channels.RequestCollections,
 		filter.HasRole[flow.Identity](flow.RoleCollection),
-		func() flow.Entity { return new(flow.Collection) },
+		func() flow.Hashable { return new(flow.Collection) },
 	)
 	require.NoError(t, err)
 
@@ -864,7 +864,7 @@ func getRoot(t *testing.T, node *testmock.GenericNode) (*flow.Header, *flow.Quor
 
 	rootQC, err := flow.NewQuorumCertificate(flow.UntrustedQuorumCertificate{
 		View:          rootHead.View,
-		BlockID:       rootHead.ID(),
+		BlockID:       rootHead.Hash(),
 		SignerIndices: signerIndices,
 		SigData:       unittest.SignatureFixture(),
 	})

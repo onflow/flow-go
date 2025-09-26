@@ -68,7 +68,7 @@ func (f headerFactory) WithParentHeader(parent *flow.Header) HeaderOption {
 		header.Height = parent.Height + 1
 		header.ChainID = parent.ChainID
 		header.Timestamp = g.random.Uint64InRange(parent.Timestamp+1, parent.Timestamp+1000)
-		header.ParentID = parent.ID()
+		header.ParentID = parent.Hash()
 		header.ParentView = parent.View
 	}
 }

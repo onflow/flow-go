@@ -40,7 +40,7 @@ func (s *AssignmentCollectorStateMachineTestSuite) SetupTest() {
 		requiredApprovalsForSealConstruction: 5,
 		executedBlock:                        s.Block,
 		result:                               s.IncorporatedResult.Result,
-		resultID:                             s.IncorporatedResult.Result.ID(),
+		resultID:                             s.IncorporatedResult.Result.Hash(),
 	})
 }
 
@@ -54,9 +54,9 @@ func (s *AssignmentCollectorStateMachineTestSuite) TestChangeProcessingStatus_Ca
 
 	for i := range results {
 		block := unittest.BlockHeaderWithParentFixture(s.Block)
-		s.Blocks[block.ID()] = block
+		s.Blocks[block.Hash()] = block
 		result := unittest.IncorporatedResult.Fixture(
-			unittest.IncorporatedResult.WithIncorporatedBlockID(block.ID()),
+			unittest.IncorporatedResult.WithIncorporatedBlockID(block.Hash()),
 			unittest.IncorporatedResult.WithResult(s.IncorporatedResult.Result),
 		)
 		results[i] = result
@@ -66,10 +66,10 @@ func (s *AssignmentCollectorStateMachineTestSuite) TestChangeProcessingStatus_Ca
 
 	for i := range approvals {
 		approval := unittest.ResultApprovalFixture(
-			unittest.WithExecutionResultID(s.IncorporatedResult.Result.ID()),
+			unittest.WithExecutionResultID(s.IncorporatedResult.Result.Hash()),
 			unittest.WithChunk(uint64(i)),
 			unittest.WithApproverID(s.VerID),
-			unittest.WithBlockID(s.Block.ID()),
+			unittest.WithBlockID(s.Block.Hash()),
 		)
 		approvals[i] = approval
 	}

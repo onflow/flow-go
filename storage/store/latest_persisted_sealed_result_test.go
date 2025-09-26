@@ -43,7 +43,7 @@ func TestNewLatestPersistedSealedResult(t *testing.T) {
 
 			actualResultID, actualHeight := latest.Latest()
 
-			assert.Equal(t, initialResult.ID(), actualResultID)
+			assert.Equal(t, initialResult.Hash(), actualResultID)
 			assert.Equal(t, initialHeader.Height, actualHeight)
 		})
 
@@ -84,7 +84,7 @@ func TestNewLatestPersistedSealedResult(t *testing.T) {
 			header := unittest.BlockHeaderFixture(unittest.WithHeaderHeight(missingResultHeight))
 
 			mockHeaders.On("ByHeight", missingResultHeight).Return(header, nil)
-			mockResults.On("ByBlockID", header.ID()).Return(nil, expectedErr)
+			mockResults.On("ByBlockID", header.Hash()).Return(nil, expectedErr)
 
 			latest, err := NewLatestPersistedSealedResult(progress, mockHeaders, mockResults)
 
@@ -169,7 +169,7 @@ func TestLatestPersistedSealedResult_BatchSet(t *testing.T) {
 
 		actualResultID, actualHeight := latest.Latest()
 
-		assert.Equal(t, initialResult.ID(), actualResultID)
+		assert.Equal(t, initialResult.Hash(), actualResultID)
 		assert.Equal(t, initialHeader.Height, actualHeight)
 	})
 }
@@ -204,7 +204,7 @@ func TestLatestPersistedSealedResult_ConcurrentAccess(t *testing.T) {
 
 					actualResultID, actualHeight := latest.Latest()
 
-					assert.Equal(t, initialResult.ID(), actualResultID)
+					assert.Equal(t, initialResult.Hash(), actualResultID)
 					assert.Equal(t, initialHeader.Height, actualHeight)
 				}()
 			}
@@ -246,7 +246,7 @@ func TestLatestPersistedSealedResult_ConcurrentAccess(t *testing.T) {
 func getHeadersResults(t *testing.T, initialHeight uint64) (*flow.Header, *flow.ExecutionResult, *storagemock.Headers, *storagemock.ExecutionResults) {
 	header := unittest.BlockHeaderFixture(unittest.WithHeaderHeight(initialHeight))
 	result := unittest.ExecutionResultFixture(func(result *flow.ExecutionResult) {
-		result.BlockID = header.ID()
+		result.BlockID = header.Hash()
 	})
 
 	mockHeaders := storagemock.NewHeaders(t)

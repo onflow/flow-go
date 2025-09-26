@@ -92,7 +92,7 @@ func TestBlocks(t *testing.T) {
 		})
 
 		t.Run("BlockByID", func(t *testing.T) {
-			block, err := store.BlockByID(context.Background(), block1.ID())
+			block, err := store.BlockByID(context.Background(), block1.Hash())
 			assert.NoError(t, err)
 			assert.Equal(t, block1, block)
 		})
@@ -125,7 +125,7 @@ func TestCollections(t *testing.T) {
 	col := unittest.FullCollectionFixture(3)
 
 	t.Run("should return error for not found", func(t *testing.T) {
-		_, err := store.CollectionByID(context.Background(), col.ID())
+		_, err := store.CollectionByID(context.Background(), col.Hash())
 		if assert.Error(t, err) {
 			assert.Equal(t, emulator.ErrNotFound, err)
 		}
@@ -136,7 +136,7 @@ func TestCollections(t *testing.T) {
 		assert.NoError(t, err)
 
 		t.Run("should be able to get inserted collection", func(t *testing.T) {
-			storedCol, err := store.CollectionByID(context.Background(), col.ID())
+			storedCol, err := store.CollectionByID(context.Background(), col.Hash())
 			require.NoError(t, err)
 			assert.Equal(t, *col.Light(), storedCol)
 		})
@@ -152,20 +152,20 @@ func TestTransactions(t *testing.T) {
 	tx := unittest.TransactionFixture()
 
 	t.Run("should return error for not found", func(t *testing.T) {
-		_, err := store.TransactionByID(context.Background(), tx.ID())
+		_, err := store.TransactionByID(context.Background(), tx.Hash())
 		if assert.Error(t, err) {
 			assert.Equal(t, emulator.ErrNotFound, err)
 		}
 	})
 
 	t.Run("should be able to insert tx", func(t *testing.T) {
-		err := store.InsertTransaction(tx.ID(), tx)
+		err := store.InsertTransaction(tx.Hash(), tx)
 		assert.NoError(t, err)
 
 		t.Run("should be able to get inserted tx", func(t *testing.T) {
-			storedTx, err := store.TransactionByID(context.Background(), tx.ID())
+			storedTx, err := store.TransactionByID(context.Background(), tx.Hash())
 			require.NoError(t, err)
-			assert.Equal(t, tx.ID(), storedTx.ID())
+			assert.Equal(t, tx.Hash(), storedTx.Hash())
 		})
 	})
 }
@@ -177,21 +177,21 @@ func TestFullCollection(t *testing.T) {
 	col := unittest.FullCollectionFixture(3)
 
 	t.Run("should be able to insert full collection", func(t *testing.T) {
-		_, err := store.CollectionByID(context.Background(), col.ID())
+		_, err := store.CollectionByID(context.Background(), col.Hash())
 		require.Error(t, emulator.ErrNotFound, err)
 
-		_, err = store.FullCollectionByID(context.Background(), col.ID())
+		_, err = store.FullCollectionByID(context.Background(), col.Hash())
 		require.Error(t, emulator.ErrNotFound, err)
 
 		err = store.InsertCollection(col.Light())
 		require.NoError(t, err)
 
 		for _, tx := range col.Transactions {
-			err = store.InsertTransaction(tx.ID(), *tx)
+			err = store.InsertTransaction(tx.Hash(), *tx)
 			require.NoError(t, err)
 		}
 
-		c, err := store.FullCollectionByID(context.Background(), col.ID())
+		c, err := store.FullCollectionByID(context.Background(), col.Hash())
 		require.NoError(t, err)
 		require.Equal(t, col, c)
 	})

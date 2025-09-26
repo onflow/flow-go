@@ -25,7 +25,7 @@ func TestTransactionStoreRetrieve(t *testing.T) {
 		require.NoError(t, err)
 
 		// retrieve the transaction by ID
-		actual, err := store.ByID(expected.ID())
+		actual, err := store.ByID(expected.Hash())
 		require.NoError(t, err)
 		assert.Equal(t, &expected, actual)
 
@@ -57,18 +57,18 @@ func TestTransactionRemove(t *testing.T) {
 		require.NoError(t, err)
 
 		// Ensure it exists
-		tx, err := store.ByID(expected.ID())
+		tx, err := store.ByID(expected.Hash())
 		require.NoError(t, err)
 		assert.Equal(t, &expected, tx)
 
 		// Remove it
 		err = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			return store.RemoveBatch(rw, expected.ID())
+			return store.RemoveBatch(rw, expected.Hash())
 		})
 		require.NoError(t, err)
 
 		// Ensure it no longer exists
-		_, err = store.ByID(expected.ID())
+		_, err = store.ByID(expected.Hash())
 		assert.True(t, errors.Is(err, storage.ErrNotFound))
 	})
 }

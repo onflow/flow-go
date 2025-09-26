@@ -97,7 +97,7 @@ func (suite *Suite) SetupTest() {
 	suite.root = unittest.Block.Genesis(flow.Emulator)
 	suite.final = suite.root
 	suite.blocks = make(map[flow.Identifier]*flow.Block)
-	suite.blocks[suite.root.ID()] = suite.root
+	suite.blocks[suite.root.Hash()] = suite.root
 
 	suite.state = new(protocol.State)
 	suite.snapshot = new(protocol.Snapshot)
@@ -135,7 +135,7 @@ func (suite *Suite) TestInvalidTransaction() {
 
 	suite.Run("missing field", func() {
 		tx := unittest.TransactionBodyFixture()
-		tx.ReferenceBlockID = suite.root.ID()
+		tx.ReferenceBlockID = suite.root.Hash()
 		tx.Script = nil
 
 		err := suite.engine.ProcessTransaction(&tx)
@@ -146,7 +146,7 @@ func (suite *Suite) TestInvalidTransaction() {
 	suite.Run("gas limit exceeds the maximum allowed", func() {
 		tx := unittest.TransactionBodyFixture()
 		tx.Payer = unittest.RandomAddressFixture()
-		tx.ReferenceBlockID = suite.root.ID()
+		tx.ReferenceBlockID = suite.root.Hash()
 		tx.GasLimit = flow.DefaultMaxTransactionGasLimit + 1
 
 		err := suite.engine.ProcessTransaction(&tx)
@@ -165,7 +165,7 @@ func (suite *Suite) TestInvalidTransaction() {
 
 	suite.Run("un-parseable script", func() {
 		tx := unittest.TransactionBodyFixture()
-		tx.ReferenceBlockID = suite.root.ID()
+		tx.ReferenceBlockID = suite.root.Hash()
 		tx.Script = []byte("definitely a real transaction")
 
 		err := suite.engine.ProcessTransaction(&tx)
@@ -184,7 +184,7 @@ func (suite *Suite) TestInvalidTransaction() {
 		}
 
 		tx := unittest.TransactionBodyFixture()
-		tx.ReferenceBlockID = suite.root.ID()
+		tx.ReferenceBlockID = suite.root.Hash()
 		tx.Script = []byte("transaction { execute {" + script + "}}")
 
 		err := suite.engine.ProcessTransaction(&tx)
@@ -209,7 +209,7 @@ func (suite *Suite) TestInvalidTransaction() {
 		suite.Run("invalid format of an envelope signature", func() {
 			invalidSig := unittest.InvalidFormatSignature()
 			tx := unittest.TransactionBodyFixture()
-			tx.ReferenceBlockID = suite.root.ID()
+			tx.ReferenceBlockID = suite.root.Hash()
 			tx.EnvelopeSignatures[0] = invalidSig
 
 			err := suite.engine.ProcessTransaction(&tx)
@@ -220,7 +220,7 @@ func (suite *Suite) TestInvalidTransaction() {
 		suite.Run("invalid format of a payload signature", func() {
 			invalidSig := unittest.InvalidFormatSignature()
 			tx := unittest.TransactionBodyFixture()
-			tx.ReferenceBlockID = suite.root.ID()
+			tx.ReferenceBlockID = suite.root.Hash()
 			tx.PayloadSignatures = []flow.TransactionSignature{invalidSig}
 
 			err := suite.engine.ProcessTransaction(&tx)
@@ -230,7 +230,7 @@ func (suite *Suite) TestInvalidTransaction() {
 
 		suite.Run("duplicated signature (envelope only)", func() {
 			tx := unittest.TransactionBodyFixture()
-			tx.ReferenceBlockID = suite.root.ID()
+			tx.ReferenceBlockID = suite.root.Hash()
 			tx.EnvelopeSignatures = []flow.TransactionSignature{sig1, sig2}
 			err := suite.engine.ProcessTransaction(&tx)
 			suite.Assert().Error(err)
@@ -239,7 +239,7 @@ func (suite *Suite) TestInvalidTransaction() {
 
 		suite.Run("duplicated signature (payload only)", func() {
 			tx := unittest.TransactionBodyFixture()
-			tx.ReferenceBlockID = suite.root.ID()
+			tx.ReferenceBlockID = suite.root.Hash()
 			tx.PayloadSignatures = []flow.TransactionSignature{sig1, sig2}
 
 			err := suite.engine.ProcessTransaction(&tx)
@@ -249,7 +249,7 @@ func (suite *Suite) TestInvalidTransaction() {
 
 		suite.Run("duplicated signature (cross case)", func() {
 			tx := unittest.TransactionBodyFixture()
-			tx.ReferenceBlockID = suite.root.ID()
+			tx.ReferenceBlockID = suite.root.Hash()
 			tx.PayloadSignatures = []flow.TransactionSignature{sig1}
 			tx.EnvelopeSignatures = []flow.TransactionSignature{sig2}
 
@@ -267,7 +267,7 @@ func (suite *Suite) TestInvalidTransaction() {
 	suite.Run("invalid address", func() {
 		invalid := unittest.InvalidAddressFixture()
 		tx := unittest.TransactionBodyFixture()
-		tx.ReferenceBlockID = suite.root.ID()
+		tx.ReferenceBlockID = suite.root.Hash()
 		tx.Payer = invalid
 
 		err := suite.engine.ProcessTransaction(&tx)
@@ -282,7 +282,7 @@ func (suite *Suite) TestInvalidTransaction() {
 		)
 
 		tx := unittest.TransactionBodyFixture()
-		tx.ReferenceBlockID = suite.root.ID()
+		tx.ReferenceBlockID = suite.root.Hash()
 
 		err := suite.engine.ProcessTransaction(&tx)
 		suite.Assert().Error(err)
@@ -294,7 +294,7 @@ func (suite *Suite) TestInvalidTransaction() {
 // should return an error if the engine is shutdown and not processing transactions
 func (suite *Suite) TestComponentShutdown() {
 	tx := unittest.TransactionBodyFixture()
-	tx.ReferenceBlockID = suite.root.ID()
+	tx.ReferenceBlockID = suite.root.Hash()
 
 	// start then shut down the engine
 	parentCtx, cancel := context.WithCancel(context.Background())
@@ -316,7 +316,7 @@ func (suite *Suite) TestRoutingLocalCluster() {
 
 	// get a transaction that will be routed to local cluster
 	tx := unittest.TransactionBodyFixture()
-	tx.ReferenceBlockID = suite.root.ID()
+	tx.ReferenceBlockID = suite.root.Hash()
 	tx = unittest.AlterTransactionForCluster(tx, suite.clusters, local, func(transaction *flow.TransactionBody) {})
 
 	// should route to local cluster
@@ -330,7 +330,7 @@ func (suite *Suite) TestRoutingLocalCluster() {
 	// should be added to local mempool for the current epoch
 	currentEpoch, err := suite.epochQuery.Current()
 	suite.Assert().NoError(err)
-	suite.Assert().True(suite.pools.ForEpoch(currentEpoch.Counter()).Has(tx.ID()))
+	suite.Assert().True(suite.pools.ForEpoch(currentEpoch.Counter()).Has(tx.Hash()))
 	suite.conduit.AssertExpectations(suite.T())
 }
 
@@ -346,7 +346,7 @@ func (suite *Suite) TestRoutingRemoteCluster() {
 
 	// get a transaction that will be routed to remote cluster
 	tx := unittest.TransactionBodyFixture()
-	tx.ReferenceBlockID = suite.root.ID()
+	tx.ReferenceBlockID = suite.root.Hash()
 	tx = unittest.AlterTransactionForCluster(tx, suite.clusters, remote, func(transaction *flow.TransactionBody) {})
 
 	// should route to remote cluster
@@ -360,7 +360,7 @@ func (suite *Suite) TestRoutingRemoteCluster() {
 	// should not be added to local mempool
 	currentEpoch, err := suite.epochQuery.Current()
 	suite.Assert().NoError(err)
-	suite.Assert().False(suite.pools.ForEpoch(currentEpoch.Counter()).Has(tx.ID()))
+	suite.Assert().False(suite.pools.ForEpoch(currentEpoch.Counter()).Has(tx.Hash()))
 	suite.conduit.AssertExpectations(suite.T())
 }
 
@@ -379,7 +379,7 @@ func (suite *Suite) TestRoutingToRemoteClusterWithNoNodes() {
 
 	// get a transaction that will be routed to remote cluster
 	tx := unittest.TransactionBodyFixture()
-	tx.ReferenceBlockID = suite.root.ID()
+	tx.ReferenceBlockID = suite.root.Hash()
 	tx = unittest.AlterTransactionForCluster(tx, suite.clusters, emptyIdentityList, func(transaction *flow.TransactionBody) {})
 
 	// should attempt route to remote cluster without providing any node ids
@@ -393,7 +393,7 @@ func (suite *Suite) TestRoutingToRemoteClusterWithNoNodes() {
 	// should not be added to local mempool
 	currentEpoch, err := suite.epochQuery.Current()
 	suite.Assert().NoError(err)
-	suite.Assert().False(suite.pools.ForEpoch(currentEpoch.Counter()).Has(tx.ID()))
+	suite.Assert().False(suite.pools.ForEpoch(currentEpoch.Counter()).Has(tx.Hash()))
 	suite.conduit.AssertExpectations(suite.T())
 }
 
@@ -409,7 +409,7 @@ func (suite *Suite) TestRoutingLocalClusterFromOtherNode() {
 
 	// get a transaction that will be routed to local cluster
 	tx := unittest.TransactionBodyFixture()
-	tx.ReferenceBlockID = suite.root.ID()
+	tx.ReferenceBlockID = suite.root.Hash()
 	tx = unittest.AlterTransactionForCluster(tx, suite.clusters, local, func(transaction *flow.TransactionBody) {})
 
 	// should not route to any node
@@ -421,7 +421,7 @@ func (suite *Suite) TestRoutingLocalClusterFromOtherNode() {
 	// should be added to local mempool for current epoch
 	currentEpoch, err := suite.epochQuery.Current()
 	suite.Assert().NoError(err)
-	suite.Assert().True(suite.pools.ForEpoch(currentEpoch.Counter()).Has(tx.ID()))
+	suite.Assert().True(suite.pools.ForEpoch(currentEpoch.Counter()).Has(tx.Hash()))
 	suite.conduit.AssertExpectations(suite.T())
 }
 
@@ -449,7 +449,7 @@ func (suite *Suite) TestRoutingInvalidTransaction() {
 	// should not be added to local mempool
 	currentEpoch, err := suite.epochQuery.Current()
 	suite.Assert().NoError(err)
-	suite.Assert().False(suite.pools.ForEpoch(currentEpoch.Counter()).Has(tx.ID()))
+	suite.Assert().False(suite.pools.ForEpoch(currentEpoch.Counter()).Has(tx.Hash()))
 	suite.conduit.AssertExpectations(suite.T())
 }
 
@@ -476,7 +476,7 @@ func (suite *Suite) TestRouting_ClusterAssignmentChanged() {
 
 	// get a transaction that will be routed to local cluster
 	tx := unittest.TransactionBodyFixture()
-	tx.ReferenceBlockID = suite.root.ID()
+	tx.ReferenceBlockID = suite.root.Hash()
 	tx = unittest.AlterTransactionForCluster(tx, epoch2Clusters, epoch2Local, func(transaction *flow.TransactionBody) {})
 
 	// should route to local cluster
@@ -486,8 +486,8 @@ func (suite *Suite) TestRouting_ClusterAssignmentChanged() {
 	suite.Assert().NoError(err)
 
 	// should add to local mempool for epoch 2 only
-	suite.Assert().True(suite.pools.ForEpoch(2).Has(tx.ID()))
-	suite.Assert().False(suite.pools.ForEpoch(1).Has(tx.ID()))
+	suite.Assert().True(suite.pools.ForEpoch(2).Has(tx.Hash()))
+	suite.Assert().False(suite.pools.ForEpoch(1).Has(tx.Hash()))
 	suite.conduit.AssertExpectations(suite.T())
 }
 
@@ -512,14 +512,14 @@ func (suite *Suite) TestRouting_ClusterAssignmentRemoved() {
 
 	// any transaction is OK here, since we're not in any cluster
 	tx := unittest.TransactionBodyFixture()
-	tx.ReferenceBlockID = suite.root.ID()
+	tx.ReferenceBlockID = suite.root.Hash()
 
 	err = suite.engine.ProcessTransaction(&tx)
 	suite.Assert().Error(err)
 
 	// should not add to mempool
-	suite.Assert().False(suite.pools.ForEpoch(2).Has(tx.ID()))
-	suite.Assert().False(suite.pools.ForEpoch(1).Has(tx.ID()))
+	suite.Assert().False(suite.pools.ForEpoch(2).Has(tx.Hash()))
+	suite.Assert().False(suite.pools.ForEpoch(1).Has(tx.Hash()))
 	// should not propagate
 	suite.conduit.AssertNumberOfCalls(suite.T(), "Multicast", 0)
 }
@@ -551,14 +551,14 @@ func (suite *Suite) TestRouting_ClusterAssignmentAdded() {
 
 	// any transaction is OK here, since we're not in any cluster
 	tx := unittest.TransactionBodyFixture()
-	tx.ReferenceBlockID = suite.root.ID()
+	tx.ReferenceBlockID = suite.root.Hash()
 
 	err = suite.engine.ProcessTransaction(&tx)
 	suite.Assert().Error(err)
 
 	// should not add to mempool
-	suite.Assert().False(suite.pools.ForEpoch(2).Has(tx.ID()))
-	suite.Assert().False(suite.pools.ForEpoch(1).Has(tx.ID()))
+	suite.Assert().False(suite.pools.ForEpoch(2).Has(tx.Hash()))
+	suite.Assert().False(suite.pools.ForEpoch(1).Has(tx.Hash()))
 	// should not propagate
 	suite.conduit.AssertNumberOfCalls(suite.T(), "Multicast", 0)
 
@@ -583,7 +583,7 @@ func (suite *Suite) TestRouting_ClusterAssignmentAdded() {
 
 	// get a transaction that will be routed to local cluster
 	tx = unittest.TransactionBodyFixture()
-	tx.ReferenceBlockID = suite.root.ID()
+	tx.ReferenceBlockID = suite.root.Hash()
 	tx = unittest.AlterTransactionForCluster(tx, epoch3Clusters, epoch3Local, func(transaction *flow.TransactionBody) {})
 
 	// should route to local cluster

@@ -32,7 +32,7 @@ func TestSystemChunkTransactionHash(t *testing.T) {
 		txBody, err := blueprints.SystemChunkTransaction(chain.Chain())
 		require.NoError(t, err)
 
-		actualID := txBody.ID().String()
+		actualID := txBody.Hash().String()
 		actualHashes = append(actualHashes, chainHash{chainId: expected.chainId, expectedHash: actualID})
 	}
 

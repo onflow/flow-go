@@ -160,15 +160,15 @@ func demo() {
 			// memory pools
 			receipt := unittest.ExecutionReceiptFixture()
 			tryRandomCall(func() {
-				receipts.Add(receipt.ID(), receipt)
+				receipts.Add(receipt.Hash(), receipt)
 			})
 
 			tryRandomCall(func() {
-				receiptIDsByBlock.Append(receipt.ExecutionResult.BlockID, receipt.ID())
+				receiptIDsByBlock.Append(receipt.ExecutionResult.BlockID, receipt.Hash())
 			})
 
 			tryRandomCall(func() {
-				receiptIDsByResult.Append(receipt.ExecutionResult.BlockID, receipt.ExecutionResult.ID())
+				receiptIDsByResult.Append(receipt.ExecutionResult.BlockID, receipt.ExecutionResult.Hash())
 			})
 
 			tryRandomCall(func() {

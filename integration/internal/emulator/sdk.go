@@ -69,7 +69,7 @@ func (b *SDKAdapter) GetLatestBlockHeader(
 		return nil, sdk.BlockStatusUnknown, status.Error(codes.Internal, err.Error())
 	}
 	blockHeader := sdk.BlockHeader{
-		ID:        sdk.Identifier(block.ID()),
+		ID:        sdk.Identifier(block.Hash()),
 		ParentID:  sdk.Identifier(block.ParentID),
 		Height:    block.Height,
 		Timestamp: time.UnixMilli(int64(block.Timestamp)).UTC(),
@@ -91,7 +91,7 @@ func (b *SDKAdapter) GetBlockHeaderByHeight(
 		return nil, sdk.BlockStatusUnknown, status.Error(codes.Internal, err.Error())
 	}
 	blockHeader := sdk.BlockHeader{
-		ID:        sdk.Identifier(block.ID()),
+		ID:        sdk.Identifier(block.Hash()),
 		ParentID:  sdk.Identifier(block.ParentID),
 		Height:    block.Height,
 		Timestamp: time.UnixMilli(int64(block.Timestamp)).UTC(),
@@ -113,7 +113,7 @@ func (b *SDKAdapter) GetBlockHeaderByID(
 		return nil, sdk.BlockStatusUnknown, err
 	}
 	blockHeader := sdk.BlockHeader{
-		ID:        sdk.Identifier(block.ID()),
+		ID:        sdk.Identifier(block.Hash()),
 		ParentID:  sdk.Identifier(block.ParentID),
 		Height:    block.Height,
 		Timestamp: time.UnixMilli(int64(block.Timestamp)).UTC(),
@@ -136,7 +136,7 @@ func (b *SDKAdapter) GetLatestBlock(
 	}
 	block := sdk.Block{
 		BlockHeader: sdk.BlockHeader{
-			ID:        sdk.Identifier(flowBlock.ID()),
+			ID:        sdk.Identifier(flowBlock.Hash()),
 			ParentID:  sdk.Identifier(flowBlock.ParentID),
 			Height:    flowBlock.Height,
 			Timestamp: time.UnixMilli(int64(flowBlock.Timestamp)).UTC(),
@@ -161,7 +161,7 @@ func (b *SDKAdapter) GetBlockByHeight(
 	}
 	block := sdk.Block{
 		BlockHeader: sdk.BlockHeader{
-			ID:        sdk.Identifier(flowBlock.ID()),
+			ID:        sdk.Identifier(flowBlock.Hash()),
 			ParentID:  sdk.Identifier(flowBlock.ParentID),
 			Height:    flowBlock.Height,
 			Timestamp: time.UnixMilli(int64(flowBlock.Timestamp)).UTC(),
@@ -186,7 +186,7 @@ func (b *SDKAdapter) GetBlockByID(
 	}
 	block := sdk.Block{
 		BlockHeader: sdk.BlockHeader{
-			ID:        sdk.Identifier(flowBlock.ID()),
+			ID:        sdk.Identifier(flowBlock.Hash()),
 			ParentID:  sdk.Identifier(flowBlock.ParentID),
 			Height:    flowBlock.Height,
 			Timestamp: time.UnixMilli(int64(flowBlock.Timestamp)).UTC(),
@@ -497,7 +497,7 @@ func (b *SDKAdapter) CreateAccount(ctx context.Context, publicKeys []*sdk.Accoun
 	}
 
 	tx.SetComputeLimit(flowgo.DefaultMaxTransactionGasLimit).
-		SetReferenceBlockID(sdk.Identifier(latestBlock.ID())).
+		SetReferenceBlockID(sdk.Identifier(latestBlock.Hash())).
 		SetProposalKey(serviceAddress, serviceKey.Index, serviceKey.SequenceNumber).
 		SetPayer(serviceAddress)
 

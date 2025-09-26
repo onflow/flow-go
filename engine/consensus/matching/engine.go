@@ -120,7 +120,7 @@ func (e *Engine) addReceiptToQueue(receipt *flow.ExecutionReceipt) {
 }
 
 // HandleReceipt ingests receipts from the Requester module, adding them to the queue.
-func (e *Engine) HandleReceipt(originID flow.Identifier, receipt flow.Entity) {
+func (e *Engine) HandleReceipt(originID flow.Identifier, receipt flow.Hashable) {
 	e.log.Debug().Msg("received receipt from requester engine")
 	r, ok := receipt.(*flow.ExecutionReceipt)
 	if !ok {

@@ -100,7 +100,7 @@ func TestPrograms_TestContractUpdates(t *testing.T) {
 	col := flow.Collection{Transactions: transactions}
 
 	guarantee := &flow.CollectionGuarantee{
-		CollectionID: col.ID(),
+		CollectionID: col.Hash(),
 		Signature:    nil,
 	}
 
@@ -323,7 +323,7 @@ func TestPrograms_TestBlockForks(t *testing.T) {
 			col11,
 			block1Snapshot)
 		// cache should include value for this block
-		require.NotNil(t, derivedChainData.Get(block11.ID()))
+		require.NotNil(t, derivedChainData.Get(block11.Hash()))
 		// 1st event should be contract deployed
 
 		assert.EqualValues(t, "flow.AccountContractAdded", res.AllEvents()[0].Type)
@@ -351,7 +351,7 @@ func TestPrograms_TestBlockForks(t *testing.T) {
 			col111,
 			block11Snapshot)
 		// cache should include a program for this block
-		require.NotNil(t, derivedChainData.Get(block111.ID()))
+		require.NotNil(t, derivedChainData.Get(block111.Hash()))
 
 		events := res.AllEvents()
 		require.Equal(t, res.BlockExecutionResult.Size(), 2)
@@ -377,7 +377,7 @@ func TestPrograms_TestBlockForks(t *testing.T) {
 			col1111,
 			block111Snapshot)
 		// cache should include a program for this block
-		require.NotNil(t, derivedChainData.Get(block1111.ID()))
+		require.NotNil(t, derivedChainData.Get(block1111.Hash()))
 
 		events := res.AllEvents()
 		require.Equal(t, res.BlockExecutionResult.Size(), 2)
@@ -407,7 +407,7 @@ func TestPrograms_TestBlockForks(t *testing.T) {
 			col112,
 			block11Snapshot)
 		// cache should include a program for this block
-		require.NotNil(t, derivedChainData.Get(block112.ID()))
+		require.NotNil(t, derivedChainData.Get(block112.Hash()))
 
 		events := res.AllEvents()
 		require.Equal(t, res.BlockExecutionResult.Size(), 2)
@@ -433,7 +433,7 @@ func TestPrograms_TestBlockForks(t *testing.T) {
 			col1121,
 			block112Snapshot)
 		// cache should include a program for this block
-		require.NotNil(t, derivedChainData.Get(block1121.ID()))
+		require.NotNil(t, derivedChainData.Get(block1121.Hash()))
 
 		events := res.AllEvents()
 		require.Equal(t, res.BlockExecutionResult.Size(), 2)
@@ -456,7 +456,7 @@ func TestPrograms_TestBlockForks(t *testing.T) {
 			col12,
 			block1Snapshot)
 		// cache should include a program for this block
-		require.NotNil(t, derivedChainData.Get(block12.ID()))
+		require.NotNil(t, derivedChainData.Get(block12.Hash()))
 
 		events := res.AllEvents()
 		require.Equal(t, res.BlockExecutionResult.Size(), 2)
@@ -478,7 +478,7 @@ func TestPrograms_TestBlockForks(t *testing.T) {
 			col121,
 			block12Snapshot)
 		// cache should include a program for this block
-		require.NotNil(t, derivedChainData.Get(block121.ID()))
+		require.NotNil(t, derivedChainData.Get(block121.Hash()))
 
 		events := res.AllEvents()
 		require.Equal(t, res.BlockExecutionResult.Size(), 2)
@@ -501,9 +501,9 @@ func TestPrograms_TestBlockForks(t *testing.T) {
 			col1211,
 			block121Snapshot)
 		// cache should include a program for this block
-		require.NotNil(t, derivedChainData.Get(block1211.ID()))
+		require.NotNil(t, derivedChainData.Get(block1211.Hash()))
 		// had no change so cache should be equal to parent
-		require.Equal(t, derivedChainData.Get(block121.ID()), derivedChainData.Get(block1211.ID()))
+		require.Equal(t, derivedChainData.Get(block121.Hash()), derivedChainData.Get(block1211.Hash()))
 
 		events := res.AllEvents()
 		require.Equal(t, res.BlockExecutionResult.Size(), 2)
@@ -526,12 +526,12 @@ func createTestBlockAndRun(
 	snapshot.SnapshotTree,
 ) {
 	guarantee := &flow.CollectionGuarantee{
-		CollectionID: col.ID(),
+		CollectionID: col.Hash(),
 		Signature:    nil,
 	}
 
 	block := unittest.BlockFixture(
-		unittest.Block.WithParent(parentBlock.ID(), parentBlock.View, parentBlock.Height),
+		unittest.Block.WithParent(parentBlock.Hash(), parentBlock.View, parentBlock.Height),
 		unittest.Block.WithPayload(
 			unittest.PayloadFixture(unittest.WithGuarantees(guarantee)),
 		),

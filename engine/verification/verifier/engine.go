@@ -270,8 +270,8 @@ func (e *Engine) verify(ctx context.Context, originID flow.Identifier,
 	// Generate result approval
 	span, _ = e.tracer.StartSpanFromContext(ctx, trace.VERVerGenerateResultApproval)
 	attestation, err := flow.NewAttestation(flow.UntrustedAttestation{
-		BlockID:           vc.Header.ID(),
-		ExecutionResultID: vc.Result.ID(),
+		BlockID:           vc.Header.Hash(),
+		ExecutionResultID: vc.Result.Hash(),
 		ChunkIndex:        vc.Chunk.Index,
 	})
 	if err != nil {
@@ -351,7 +351,7 @@ func GenerateResultApproval(
 ) (*flow.ResultApproval, error) {
 
 	// generates a signature over the attestation part of approval
-	atstID := attestation.ID()
+	atstID := attestation.Hash()
 	atstSign, err := me.Sign(atstID[:], approvalHasher)
 	if err != nil {
 		return nil, fmt.Errorf("could not sign attestation: %w", err)
@@ -375,7 +375,7 @@ func GenerateResultApproval(
 	}
 
 	// generates a signature over result approval body
-	bodyID := body.ID()
+	bodyID := body.Hash()
 	bodySign, err := me.Sign(bodyID[:], approvalHasher)
 	if err != nil {
 		return nil, fmt.Errorf("could not sign result approval body: %w", err)
@@ -398,7 +398,7 @@ func (e *Engine) verifiableChunkHandler(originID flow.Identifier, ch *verificati
 	span, ctx := e.tracer.StartBlockSpan(context.Background(), ch.Chunk.BlockID, trace.VERVerVerifyWithMetrics)
 	span.SetAttributes(
 		attribute.Int64("chunk_index", int64(ch.Chunk.Index)),
-		attribute.String("result_id", ch.Result.ID().String()),
+		attribute.String("result_id", ch.Result.Hash().String()),
 		attribute.String("origin_id", originID.String()),
 	)
 	defer span.End()
@@ -408,8 +408,8 @@ func (e *Engine) verifiableChunkHandler(originID flow.Identifier, ch *verificati
 	e.metrics.OnVerifiableChunkReceivedAtVerifierEngine()
 
 	log := e.log.With().
-		Hex("result_id", logging.ID(ch.Result.ID())).
-		Hex("chunk_id", logging.ID(ch.Chunk.ID())).
+		Hex("result_id", logging.ID(ch.Result.Hash())).
+		Hex("chunk_id", logging.ID(ch.Chunk.Hash())).
 		Uint64("chunk_index", ch.Chunk.Index).Logger()
 
 	log.Info().Msg("verifiable chunk received")

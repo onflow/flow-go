@@ -124,6 +124,6 @@ func executionResultExpectedStr(result *flow.ExecutionResult) string {
 			"_links": {
 				"_self": "/v1/execution_results/%s"
 			}
-		}`, result.ID(), result.BlockID, chunksStr, result.PreviousResultID.String(), result.ID())
+		}`, result.Hash(), result.BlockID, chunksStr, result.PreviousResultID.String(), result.Hash())
 	return expected
 }

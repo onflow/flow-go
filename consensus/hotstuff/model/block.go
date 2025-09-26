@@ -19,7 +19,7 @@ type Block struct {
 // BlockFromFlow converts a flow header to a hotstuff block.
 func BlockFromFlow(header *flow.Header) *Block {
 	block := Block{
-		BlockID:    header.ID(),
+		BlockID:    header.Hash(),
 		View:       header.View,
 		QC:         header.ParentQC(),
 		ProposerID: header.ProposerID,
@@ -33,7 +33,7 @@ func BlockFromFlow(header *flow.Header) *Block {
 // block based on the given header.
 func GenesisBlockFromFlow(header *flow.Header) *Block {
 	genesis := &Block{
-		BlockID:    header.ID(),
+		BlockID:    header.Hash(),
 		View:       header.View,
 		ProposerID: header.ProposerID,
 		QC:         nil,

@@ -134,11 +134,11 @@ var _ herocache.Tracer[*flow.TransactionBody] = (*ejectionTracer)(nil)
 // EntityEjectionDueToEmergency calls removeFromIndex on the transactions to clean up the index. This is safe since
 // backdata is locked by the caller when this function is called.
 func (t *ejectionTracer) EntityEjectionDueToEmergency(txBody *flow.TransactionBody) {
-	t.transactions.removeFromIndex(txBody.ID(), txBody.Payer)
+	t.transactions.removeFromIndex(txBody.Hash(), txBody.Payer)
 }
 
 // EntityEjectionDueToFullCapacity calls removeFromIndex on the transactions to clean up the index. This is safe since
 // backdata is locked by the caller when this function is called.
 func (t *ejectionTracer) EntityEjectionDueToFullCapacity(txBody *flow.TransactionBody) {
-	t.transactions.removeFromIndex(txBody.ID(), txBody.Payer)
+	t.transactions.removeFromIndex(txBody.Hash(), txBody.Payer)
 }

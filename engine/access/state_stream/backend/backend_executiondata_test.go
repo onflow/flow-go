@@ -122,7 +122,7 @@ func (s *BackendExecutionDataSuite) SetupTest() {
 			chunkDatas = append(chunkDatas, unittest.ChunkExecutionDataFixture(s.T(), execution_data.DefaultMaxBlobSize/5, unittest.WithChunkEvents(events)))
 		}
 		execData := unittest.BlockExecutionDataFixture(
-			unittest.WithBlockExecutionDataBlockID(block.ID()),
+			unittest.WithBlockExecutionDataBlockID(block.Hash()),
 			unittest.WithChunkExecutionDatas(chunkDatas...),
 		)
 
@@ -130,13 +130,13 @@ func (s *BackendExecutionDataSuite) SetupTest() {
 		assert.NoError(s.T(), err)
 
 		s.blocks = append(s.blocks, block)
-		s.execDataMap[block.ID()] = execution_data.NewBlockExecutionDataEntity(result.ExecutionDataID, execData)
-		s.blockEvents[block.ID()] = blockEvents.Events
+		s.execDataMap[block.Hash()] = execution_data.NewBlockExecutionDataEntity(result.ExecutionDataID, execData)
+		s.blockEvents[block.Hash()] = blockEvents.Events
 		s.blockMap[block.Height] = block
-		s.sealMap[block.ID()] = seal
+		s.sealMap[block.Hash()] = seal
 		s.resultMap[seal.ResultID] = result
 
-		s.T().Logf("adding exec data for block %d %d %v => %v", i, block.Height, block.ID(), result.ExecutionDataID)
+		s.T().Logf("adding exec data for block %d %d %v => %v", i, block.Height, block.Hash(), result.ExecutionDataID)
 	}
 
 	s.SetupTestMocks()
@@ -174,7 +174,7 @@ func (s *BackendExecutionDataSuite) SetupTestSuite(blockCount int) {
 	s.blockMap[s.rootBlock.Height] = s.rootBlock
 	s.highestBlockHeader = s.rootBlock.ToHeader()
 
-	s.T().Logf("Generating %d blocks, root block: %d %s", blockCount, s.rootBlock.Height, s.rootBlock.ID())
+	s.T().Logf("Generating %d blocks, root block: %d %s", blockCount, s.rootBlock.Height, s.rootBlock.Hash())
 }
 
 func (s *BackendExecutionDataSuite) SetupTestMocks() {
@@ -201,7 +201,7 @@ func (s *BackendExecutionDataSuite) SetupTestMocks() {
 	s.state.On("Params").Return(s.params).Maybe()
 	s.params.On("SporkRootBlockHeight").Return(s.rootBlock.Height, nil).Maybe()
 	s.params.On("SporkRootBlock").Return(s.rootBlock, nil).Maybe()
-	s.headers.On("BlockIDByHeight", s.rootBlock.Height).Return(s.rootBlock.ID(), nil).Maybe()
+	s.headers.On("BlockIDByHeight", s.rootBlock.Height).Return(s.rootBlock.Hash(), nil).Maybe()
 
 	s.seals.On("FinalizedSealForBlock", mock.AnythingOfType("flow.Identifier")).Return(
 		mocks.StorageMapGetter(s.sealMap),
@@ -214,7 +214,7 @@ func (s *BackendExecutionDataSuite) SetupTestMocks() {
 	s.headers.On("ByBlockID", mock.AnythingOfType("flow.Identifier")).Return(
 		func(blockID flow.Identifier) (*flow.Header, error) {
 			for _, block := range s.blockMap {
-				if block.ID() == blockID {
+				if block.Hash() == blockID {
 					return block.ToHeader(), nil
 				}
 			}
@@ -232,7 +232,7 @@ func (s *BackendExecutionDataSuite) SetupTestMocks() {
 	s.headers.On("BlockIDByHeight", mock.AnythingOfType("uint64")).Return(
 		mocks.ConvertStorageOutput(
 			mocks.StorageMapGetter(s.blockMap),
-			func(block *flow.Block) flow.Identifier { return block.ID() },
+			func(block *flow.Block) flow.Identifier { return block.Hash() },
 		),
 	).Maybe()
 
@@ -316,7 +316,7 @@ func generateMockEvents(header *flow.Header, eventCount int) flow.BlockEvents {
 	}
 
 	return flow.BlockEvents{
-		BlockID:        header.ID(),
+		BlockID:        header.Hash(),
 		BlockHeight:    header.Height,
 		BlockTimestamp: time.UnixMilli(int64(header.Timestamp)).UTC(),
 		Events:         events,
@@ -328,9 +328,9 @@ func (s *BackendExecutionDataSuite) TestGetExecutionDataByBlockID() {
 	defer cancel()
 
 	block := s.blocks[0]
-	seal := s.sealMap[block.ID()]
+	seal := s.sealMap[block.Hash()]
 	result := s.resultMap[seal.ResultID]
-	execData := s.execDataMap[block.ID()]
+	execData := s.execDataMap[block.Hash()]
 
 	// notify backend block is available
 	s.highestBlockHeader = block.ToHeader()
@@ -340,7 +340,7 @@ func (s *BackendExecutionDataSuite) TestGetExecutionDataByBlockID() {
 		result.ExecutionDataID, err = s.eds.Add(ctx, execData.BlockExecutionData)
 		require.NoError(s.T(), err)
 
-		res, err := s.backend.GetExecutionDataByBlockID(ctx, block.ID())
+		res, err := s.backend.GetExecutionDataByBlockID(ctx, block.Hash())
 		assert.Equal(s.T(), execData.BlockExecutionData, res)
 		assert.NoError(s.T(), err)
 	})
@@ -350,7 +350,7 @@ func (s *BackendExecutionDataSuite) TestGetExecutionDataByBlockID() {
 	s.Run("missing exec data for TestGetExecutionDataByBlockID failure", func() {
 		result.ExecutionDataID = unittest.IdentifierFixture()
 
-		execDataRes, err := s.backend.GetExecutionDataByBlockID(ctx, block.ID())
+		execDataRes, err := s.backend.GetExecutionDataByBlockID(ctx, block.Hash())
 		assert.Nil(s.T(), execDataRes)
 		assert.Equal(s.T(), codes.NotFound, status.Code(err))
 	})
@@ -373,7 +373,7 @@ func (s *BackendExecutionDataSuite) TestSubscribeExecutionData() {
 		{
 			name:            "happy path - complete backfill",
 			highestBackfill: len(s.blocks) - 1, // backfill all blocks
-			startBlockID:    s.blocks[0].ID(),
+			startBlockID:    s.blocks[0].Hash(),
 			startHeight:     0,
 		},
 	}
@@ -390,17 +390,17 @@ func (s *BackendExecutionDataSuite) TestSubscribeExecutionDataFromStartBlockID()
 		{
 			name:            "happy path - all new blocks",
 			highestBackfill: -1, // no backfill
-			startBlockID:    s.blocks[0].ID(),
+			startBlockID:    s.blocks[0].Hash(),
 		},
 		{
 			name:            "happy path - partial backfill",
 			highestBackfill: 2, // backfill the first 3 blocks
-			startBlockID:    s.blocks[0].ID(),
+			startBlockID:    s.blocks[0].Hash(),
 		},
 		{
 			name:            "happy path - complete backfill",
 			highestBackfill: len(s.blocks) - 1, // backfill all blocks
-			startBlockID:    s.blocks[0].ID(),
+			startBlockID:    s.blocks[0].Hash(),
 		},
 	}
 
@@ -504,8 +504,8 @@ func (s *BackendExecutionDataSuite) subscribe(subscribeFunc func(ctx context.Con
 
 			// loop over of the all blocks
 			for i, b := range s.blocks {
-				execData := s.execDataMap[b.ID()]
-				s.T().Logf("checking block %d %v %v", i, b.Height, b.ID())
+				execData := s.execDataMap[b.Hash()]
+				s.T().Logf("checking block %d %v %v", i, b.Height, b.Hash())
 
 				// simulate new exec data received.
 				// exec data for all blocks with index <= highestBackfill were already received
@@ -517,14 +517,14 @@ func (s *BackendExecutionDataSuite) subscribe(subscribeFunc func(ctx context.Con
 				// consume execution data from subscription
 				unittest.RequireReturnsBefore(s.T(), func() {
 					v, ok := <-sub.Channel()
-					require.True(s.T(), ok, "channel closed while waiting for exec data for block %d %v: err: %v", b.Height, b.ID(), sub.Err())
+					require.True(s.T(), ok, "channel closed while waiting for exec data for block %d %v: err: %v", b.Height, b.Hash(), sub.Err())
 
 					resp, ok := v.(*ExecutionDataResponse)
 					require.True(s.T(), ok, "unexpected response type: %T", v)
 
 					assert.Equal(s.T(), b.Height, resp.Height)
 					assert.Equal(s.T(), execData.BlockExecutionData, resp.ExecutionData)
-				}, time.Second, fmt.Sprintf("timed out waiting for exec data for block %d %v", b.Height, b.ID()))
+				}, time.Second, fmt.Sprintf("timed out waiting for exec data for block %d %v", b.Height, b.Hash()))
 			}
 
 			// make sure there are no new messages waiting. the channel should be opened with nothing waiting
@@ -558,13 +558,13 @@ func (s *BackendExecutionDataSuite) TestSubscribeExecutionFromSporkRootBlock() {
 	rootEventResponse := &ExecutionDataResponse{
 		Height: s.rootBlock.Height,
 		ExecutionData: &execution_data.BlockExecutionData{
-			BlockID: s.rootBlock.ID(),
+			BlockID: s.rootBlock.Hash(),
 		},
 	}
 
 	firstEventResponse := &ExecutionDataResponse{
 		Height:        s.blocks[0].Height,
-		ExecutionData: s.execDataMap[s.blocks[0].ID()].BlockExecutionData,
+		ExecutionData: s.execDataMap[s.blocks[0].Hash()].BlockExecutionData,
 	}
 
 	assertExecutionDataResponse := func(v interface{}, expected *ExecutionDataResponse) {
@@ -620,12 +620,12 @@ func (s *BackendExecutionDataSuite) TestSubscribeExecutionFromSporkRootBlock() {
 		subCtx, subCancel := context.WithCancel(ctx)
 		defer subCancel()
 
-		s.executionDataTracker.On("GetStartHeightFromBlockID", s.rootBlock.ID()).
+		s.executionDataTracker.On("GetStartHeightFromBlockID", s.rootBlock.Hash()).
 			Return(func(startBlockID flow.Identifier) (uint64, error) {
 				return s.executionDataTrackerReal.GetStartHeightFromBlockID(startBlockID)
 			})
 
-		sub := s.backend.SubscribeExecutionDataFromStartBlockID(subCtx, s.rootBlock.ID())
+		sub := s.backend.SubscribeExecutionDataFromStartBlockID(subCtx, s.rootBlock.Hash())
 		assertSubscriptionResponses(sub, subCancel)
 	})
 
@@ -633,12 +633,12 @@ func (s *BackendExecutionDataSuite) TestSubscribeExecutionFromSporkRootBlock() {
 		subCtx, subCancel := context.WithCancel(ctx)
 		defer subCancel()
 
-		s.executionDataTracker.On("GetStartHeightFromBlockID", s.rootBlock.ID()).
+		s.executionDataTracker.On("GetStartHeightFromBlockID", s.rootBlock.Hash()).
 			Return(func(startBlockID flow.Identifier) (uint64, error) {
 				return s.executionDataTrackerReal.GetStartHeightFromBlockID(startBlockID)
 			})
 
-		sub := s.backend.SubscribeExecutionData(subCtx, s.rootBlock.ID(), 0)
+		sub := s.backend.SubscribeExecutionData(subCtx, s.rootBlock.Hash(), 0)
 		assertSubscriptionResponses(sub, subCancel)
 	})
 

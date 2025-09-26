@@ -98,7 +98,7 @@ func (suite *ReadResultsSuite) SetupTest() {
 	suite.state.On("AtBlockID", mock.Anything).Return(
 		func(blockID flow.Identifier) protocol.Snapshot {
 			for _, block := range blocks {
-				if block.ID() == blockID {
+				if block.Hash() == blockID {
 					return createSnapshot(suite.T(), block.ToHeader())
 				}
 			}
@@ -118,7 +118,7 @@ func (suite *ReadResultsSuite) SetupTest() {
 	suite.results.On("ByID", mock.Anything).Return(
 		func(resultID flow.Identifier) *flow.ExecutionResult {
 			for _, result := range results {
-				if result.ID() == resultID {
+				if result.Hash() == resultID {
 					return result
 				}
 			}
@@ -126,7 +126,7 @@ func (suite *ReadResultsSuite) SetupTest() {
 		},
 		func(resultID flow.Identifier) error {
 			for _, result := range results {
-				if result.ID() == resultID {
+				if result.Hash() == resultID {
 					return nil
 				}
 			}
@@ -232,7 +232,7 @@ func (suite *ReadResultsSuite) TestHandleBlockHeight() {
 func (suite *ReadResultsSuite) TestHandleBlockID() {
 	for i, result := range suite.allResults {
 		results := suite.getResults(map[string]interface{}{
-			"block": suite.allBlocks[i].ID().String(),
+			"block": suite.allBlocks[i].Hash().String(),
 		})
 		require.Len(suite.T(), results, 1)
 		require.EqualValues(suite.T(), results[0], result)
@@ -242,7 +242,7 @@ func (suite *ReadResultsSuite) TestHandleBlockID() {
 func (suite *ReadResultsSuite) TestHandleID() {
 	for _, result := range suite.allResults {
 		results := suite.getResults(map[string]interface{}{
-			"result": result.ID().String(),
+			"result": result.Hash().String(),
 		})
 		require.Len(suite.T(), results, 1)
 		require.EqualValues(suite.T(), results[0], result)
@@ -260,7 +260,7 @@ func (suite *ReadResultsSuite) TestHandleNExceedsRootBlock() {
 
 	// request by result ID
 	results = suite.getResults(map[string]interface{}{
-		"result": suite.finalResult.ID().String(),
+		"result": suite.finalResult.Hash().String(),
 		"n":      float64(len(suite.allResults) + 1),
 	})
 	require.Len(suite.T(), results, len(suite.allResults))

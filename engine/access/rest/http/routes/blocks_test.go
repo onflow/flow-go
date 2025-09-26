@@ -243,16 +243,16 @@ func generateMocks(backend *mock.API, count int) ([]string, []string, []*flow.Bl
 			unittest.Block.WithHeight(uint64(i + 1)), // avoiding edge case of height = 0 (genesis block)
 		)
 		blocks[i] = block
-		blockIDs[i] = block.ID().String()
+		blockIDs[i] = block.Hash().String()
 		heights[i] = fmt.Sprintf("%d", block.Height)
 
 		executionResult := unittest.ExecutionResultFixture()
-		executionResult.BlockID = block.ID()
+		executionResult.BlockID = block.Hash()
 		executionResults[i] = executionResult
 
-		backend.Mock.On("GetBlockByID", mocks.Anything, block.ID()).Return(block, flow.BlockStatusSealed, nil)
+		backend.Mock.On("GetBlockByID", mocks.Anything, block.Hash()).Return(block, flow.BlockStatusSealed, nil)
 		backend.Mock.On("GetBlockByHeight", mocks.Anything, block.Height).Return(block, flow.BlockStatusSealed, nil)
-		backend.Mock.On("GetExecutionResultForBlockID", mocks.Anything, block.ID()).Return(executionResults[i], nil)
+		backend.Mock.On("GetExecutionResultForBlockID", mocks.Anything, block.Hash()).Return(executionResults[i], nil)
 	}
 
 	// any other call to the backend should return a not found error
@@ -295,8 +295,8 @@ func expectedBlockResponse(
 	status flow.BlockStatus,
 	selectedFields ...string,
 ) string {
-	id := block.ID().String()
-	execResultID := execResult.ID().String()
+	id := block.Hash().String()
+	execResultID := execResult.Hash().String()
 	blockLink := fmt.Sprintf("/v1/blocks/%s", id)
 	payloadLink := fmt.Sprintf("/v1/blocks/%s/payload", id)
 	execLink := fmt.Sprintf("/v1/execution_results/%s", execResultID)

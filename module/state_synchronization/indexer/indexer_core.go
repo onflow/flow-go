@@ -272,7 +272,7 @@ func (c *IndexerCore) updateProgramCache(header *flow.Header, events []flow.Even
 	}
 
 	derivedBlockData := c.derivedChainData.GetOrCreateDerivedBlockData(
-		header.ID(),
+		header.Hash(),
 		header.ParentID,
 	)
 

@@ -72,7 +72,7 @@ func (cs *CommonSuite) SetupTest() {
 	cs.childrenDB = make(map[flow.Identifier][]flow.Slashable[*cluster.Proposal])
 
 	// store the head header and payload
-	cs.headerDB[block.ID()] = cs.head.Block.ToHeader()
+	cs.headerDB[block.Hash()] = cs.head.Block.ToHeader()
 
 	// set up header storage mock
 	cs.headers = &storage.Headers{}
@@ -231,8 +231,8 @@ func (cs *CoreSuite) TestOnBlockProposalValidAncestor() {
 	proposal := unittest.ClusterProposalFromBlock(block)
 
 	// store the data for retrieval
-	cs.headerDB[parent.ID()] = parent.ToHeader()
-	cs.headerDB[ancestor.ID()] = ancestor.ToHeader()
+	cs.headerDB[parent.Hash()] = parent.ToHeader()
+	cs.headerDB[ancestor.Hash()] = ancestor.ToHeader()
 
 	hotstuffProposal := model.SignedProposalFromClusterBlock(proposal)
 	cs.validator.On("ValidateProposal", hotstuffProposal).Return(nil)
@@ -291,8 +291,8 @@ func (cs *CoreSuite) TestOnBlockProposal_FailsHotStuffValidation() {
 	hotstuffProposal := model.SignedProposalFromClusterBlock(proposal)
 
 	// store the data for retrieval
-	cs.headerDB[parent.ID()] = parent.ToHeader()
-	cs.headerDB[ancestor.ID()] = ancestor.ToHeader()
+	cs.headerDB[parent.Hash()] = parent.ToHeader()
+	cs.headerDB[ancestor.Hash()] = ancestor.ToHeader()
 
 	cs.Run("invalid block error", func() {
 		// the block fails HotStuff validation
@@ -380,8 +380,8 @@ func (cs *CoreSuite) TestOnBlockProposal_FailsProtocolStateValidation() {
 	hotstuffProposal := model.SignedProposalFromClusterBlock(proposal)
 
 	// store the data for retrieval
-	cs.headerDB[parent.ID()] = parent.ToHeader()
-	cs.headerDB[ancestor.ID()] = ancestor.ToHeader()
+	cs.headerDB[parent.Hash()] = parent.ToHeader()
+	cs.headerDB[ancestor.Hash()] = ancestor.ToHeader()
 
 	// the block passes HotStuff validation
 	cs.validator.On("ValidateProposal", hotstuffProposal).Return(nil)
@@ -494,7 +494,7 @@ func (cs *CoreSuite) TestProcessBlockAndDescendants() {
 	pending3 := pendingFromProposal(proposal3)
 
 	// store the parent on disk
-	parentID := parent.ID()
+	parentID := parent.Hash()
 	cs.headerDB[parentID] = proposal0.Block.ToHeader()
 
 	// store the pending children in the cache
@@ -520,7 +520,7 @@ func (cs *CoreSuite) TestProcessBlockAndDescendants() {
 	cs.hotstuff.AssertExpectations(cs.T())
 
 	// make sure we drop the cache after trying to process
-	cs.pending.AssertCalled(cs.T(), "DropForParent", parent.ID())
+	cs.pending.AssertCalled(cs.T(), "DropForParent", parent.Hash())
 }
 
 func (cs *CoreSuite) TestProposalBufferingOrder() {
@@ -541,7 +541,7 @@ func (cs *CoreSuite) TestProposalBufferingOrder() {
 		)
 		proposal := unittest.ClusterProposalFromBlock(block)
 		proposals = append(proposals, proposal)
-		proposalsLookup[block.ID()] = proposal
+		proposalsLookup[block.Hash()] = proposal
 		parent = block
 	}
 
@@ -555,7 +555,7 @@ func (cs *CoreSuite) TestProposalBufferingOrder() {
 		cs.sync.On("RequestBlock", mock.Anything, mock.AnythingOfType("uint64")).Once().Run(
 			func(args mock.Arguments) {
 				ancestorID := args.Get(0).(flow.Identifier)
-				assert.Equal(cs.T(), missing.ID(), ancestorID, "should always request root block")
+				assert.Equal(cs.T(), missing.Hash(), ancestorID, "should always request root block")
 			},
 		)
 
@@ -574,10 +574,10 @@ func (cs *CoreSuite) TestProposalBufferingOrder() {
 	*cs.hotstuff = module.HotStuff{}
 	index := 0
 	order := []flow.Identifier{
-		missing.ID(),
-		proposals[0].Block.ToHeader().ID(),
-		proposals[1].Block.ToHeader().ID(),
-		proposals[2].Block.ToHeader().ID(),
+		missing.Hash(),
+		proposals[0].Block.ToHeader().Hash(),
+		proposals[1].Block.ToHeader().Hash(),
+		proposals[2].Block.ToHeader().Hash(),
 	}
 	cs.hotstuff.On("SubmitProposal", mock.Anything).Times(4).Run(
 		func(args mock.Arguments) {
@@ -592,7 +592,7 @@ func (cs *CoreSuite) TestProposalBufferingOrder() {
 
 	missingProposal := unittest.ClusterProposalFromBlock(missing)
 
-	proposalsLookup[missing.ID()] = missingProposal
+	proposalsLookup[missing.Hash()] = missingProposal
 
 	// process the root proposal
 	err := cs.core.OnBlockProposal(flow.Slashable[*cluster.Proposal]{

@@ -98,7 +98,7 @@ func (m *MutableState) getExtendCtx(candidate *cluster.Block) (extendContext, er
 //   - state.InvalidExtensionError if the candidate block is invalid
 func (m *MutableState) Extend(proposal *cluster.Proposal) error {
 	candidate := proposal.Block
-	parentSpan, ctx := m.tracer.StartCollectionSpan(context.Background(), candidate.ID(), trace.COLClusterStateMutatorExtend)
+	parentSpan, ctx := m.tracer.StartCollectionSpan(context.Background(), candidate.Hash(), trace.COLClusterStateMutatorExtend)
 	defer parentSpan.End()
 
 	span, _ := m.tracer.StartSpanFromContext(ctx, trace.COLClusterStateMutatorExtendCheckHeader)
@@ -191,7 +191,7 @@ func (m *MutableState) checkHeaderValidity(candidate *cluster.Block) error {
 //   - state.OutdatedExtensionError if the candidate extends an orphaned fork
 func (m *MutableState) checkConnectsToFinalizedState(ctx extendContext) error {
 	parentID := ctx.candidate.ParentID
-	finalizedID := ctx.finalizedClusterBlock.ID()
+	finalizedID := ctx.finalizedClusterBlock.Hash()
 	finalizedHeight := ctx.finalizedClusterBlock.Height
 
 	// start with the extending block's parent
@@ -290,7 +290,7 @@ func (m *MutableState) checkPayloadTransactions(lctx lockctx.Proof, ctx extendCo
 		refBlock, err := m.headers.ByBlockID(flowTx.ReferenceBlockID)
 		if errors.Is(err, storage.ErrNotFound) {
 			// unknown reference blocks are invalid
-			return state.NewUnverifiableExtensionError("collection contains tx (tx_id=%x) with unknown reference block (block_id=%x): %w", flowTx.ID(), flowTx.ReferenceBlockID, err)
+			return state.NewUnverifiableExtensionError("collection contains tx (tx_id=%x) with unknown reference block (block_id=%x): %w", flowTx.Hash(), flowTx.ReferenceBlockID, err)
 		}
 		if err != nil {
 			return fmt.Errorf("could not check reference block (id=%x): %w", flowTx.ReferenceBlockID, err)
@@ -323,7 +323,7 @@ func (m *MutableState) checkPayloadTransactions(lctx lockctx.Proof, ctx extendCo
 	// check for duplicate transactions in block's ancestry
 	txLookup := make(map[flow.Identifier]struct{})
 	for _, tx := range block.Payload.Collection.Transactions {
-		txID := tx.ID()
+		txID := tx.Hash()
 		if _, exists := txLookup[txID]; exists {
 			return state.NewInvalidExtensionErrorf("collection contains transaction (id=%x) more than once", txID)
 		}
@@ -360,13 +360,13 @@ func (m *MutableState) checkPayloadTransactions(lctx lockctx.Proof, ctx extendCo
 func (m *MutableState) checkDupeTransactionsInUnfinalizedAncestry(block *cluster.Block, includedTransactions map[flow.Identifier]struct{}, finalHeight uint64) ([]flow.Identifier, error) {
 	var duplicateTxIDs []flow.Identifier
 	err := fork.TraverseBackward(m.headers, block.ParentID, func(ancestor *flow.Header) error {
-		payload, err := m.payloads.ByBlockID(ancestor.ID())
+		payload, err := m.payloads.ByBlockID(ancestor.Hash())
 		if err != nil {
 			return fmt.Errorf("could not retrieve ancestor payload: %w", err)
 		}
 
 		for _, tx := range payload.Collection.Transactions {
-			txID := tx.ID()
+			txID := tx.Hash()
 			_, duplicated := includedTransactions[txID]
 			if duplicated {
 				duplicateTxIDs = append(duplicateTxIDs, txID)
@@ -421,7 +421,7 @@ func (m *MutableState) checkDupeTransactionsInFinalizedAncestry(lctx lockctx.Pro
 			return nil, fmt.Errorf("could not retrieve cluster payload (block_id=%x) to de-duplicate: %w", blockID, err)
 		}
 		for _, tx := range payload.Collection.Transactions {
-			txID := tx.ID()
+			txID := tx.Hash()
 			_, duplicated := includedTransactions[txID]
 			if duplicated {
 				duplicatedTxIDs = append(duplicatedTxIDs, txID)

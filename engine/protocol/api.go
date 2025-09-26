@@ -56,7 +56,7 @@ func (b *backend) GetLatestBlock(_ context.Context, isSealed bool) (*flow.Block,
 		return nil, err
 	}
 
-	block, err := b.blocks.ByID(header.ID())
+	block, err := b.blocks.ByID(header.Hash())
 	if err != nil {
 		err = rpc.ConvertStorageError(err)
 		return nil, err

@@ -17,12 +17,12 @@ func TestReceiptPool(t *testing.T) {
 	pool := stdmap.NewReceipts(1000)
 
 	t.Run("should be able to add first", func(t *testing.T) {
-		added := pool.Add(item1.ID(), item1)
+		added := pool.Add(item1.Hash(), item1)
 		assert.True(t, added)
 	})
 
 	t.Run("should be able to add second", func(t *testing.T) {
-		added := pool.Add(item2.ID(), item2)
+		added := pool.Add(item2.Hash(), item2)
 		assert.True(t, added)
 	})
 
@@ -32,20 +32,20 @@ func TestReceiptPool(t *testing.T) {
 	})
 
 	t.Run("should be able to get first", func(t *testing.T) {
-		got, exists := pool.Get(item1.ID())
+		got, exists := pool.Get(item1.Hash())
 		assert.True(t, exists)
 		assert.Equal(t, item1, got)
 	})
 
 	t.Run("should be able to remove second", func(t *testing.T) {
-		ok := pool.Remove(item2.ID())
+		ok := pool.Remove(item2.Hash())
 		assert.True(t, ok)
 	})
 
 	t.Run("should be able to retrieve all", func(t *testing.T) {
 		items := pool.All()
 		assert.Len(t, items, 1)
-		val, exists := items[item1.ID()]
+		val, exists := items[item1.Hash()]
 		require.True(t, exists)
 		assert.Equal(t, item1, val)
 	})

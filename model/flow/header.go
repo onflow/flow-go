@@ -264,13 +264,13 @@ func (h Header) Fingerprint() []byte {
 		ParentVoterIndices: h.ParentVoterIndices,
 		ParentVoterSigData: h.ParentVoterSigData,
 		ProposerID:         h.ProposerID,
-		LastViewTCID:       h.LastViewTC.ID(),
+		LastViewTCID:       h.LastViewTC.Hash(),
 	})
 }
 
-// ID returns a unique ID to singularly identify the header and its block
+// Hash returns a unique ID to singularly identify the header and its block
 // within the flow system.
-func (h Header) ID() Identifier {
+func (h Header) Hash() Identifier {
 	return MakeID(h)
 }
 
@@ -287,7 +287,7 @@ func (h Header) MarshalJSON() ([]byte, error) {
 		ID string
 	}{
 		Encodable: Encodable(h),
-		ID:        h.ID().String(),
+		ID:        h.Hash().String(),
 	})
 }
 

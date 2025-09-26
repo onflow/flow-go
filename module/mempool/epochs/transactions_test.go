@@ -49,12 +49,12 @@ func TestMultipleEpochs(t *testing.T) {
 				pool := pools.ForEpoch(epoch)
 				assert.Equal(t, uint(len(transactions)), pool.Size())
 				for _, tx := range transactions {
-					assert.True(t, pool.Has(tx.ID()))
+					assert.True(t, pool.Has(tx.Hash()))
 				}
 
 				tx := unittest.TransactionBodyFixture()
 				transactions = append(transactions, &tx)
-				pool.Add(tx.ID(), &tx)
+				pool.Add(tx.Hash(), &tx)
 			}
 		}()
 	}
@@ -76,7 +76,7 @@ func TestCombinedSize(t *testing.T) {
 		pool := pools.ForEpoch(epoch)
 		for i := 0; i < int(transactionsPerEpoch); i++ {
 			next := unittest.TransactionBodyFixture()
-			pool.Add(next.ID(), &next)
+			pool.Add(next.Hash(), &next)
 		}
 	}
 

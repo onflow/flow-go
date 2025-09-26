@@ -27,7 +27,7 @@ func TestBlockJob(t *testing.T) {
 	})
 
 	t.Run("job ID matches block ID", func(t *testing.T) {
-		jobID := jobqueue.JobID(block.ID())
+		jobID := jobqueue.JobID(block.Hash())
 		assert.Equal(t, job.ID(), jobID, "job ID is not the block ID")
 	})
 
@@ -53,7 +53,7 @@ func TestBlockHeaderJob(t *testing.T) {
 	})
 
 	t.Run("job ID matches block ID", func(t *testing.T) {
-		jobID := jobqueue.JobID(block.ID())
+		jobID := jobqueue.JobID(block.Hash())
 		assert.Equal(t, job.ID(), jobID, "job ID is not the block ID")
 	})
 

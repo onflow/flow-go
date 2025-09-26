@@ -21,7 +21,7 @@ func TestConvertCollection(t *testing.T) {
 	collection := unittest.CollectionFixture(5)
 	txIDs := make([]flow.Identifier, 0, len(collection.Transactions))
 	for _, tx := range collection.Transactions {
-		txIDs = append(txIDs, tx.ID())
+		txIDs = append(txIDs, tx.Hash())
 	}
 
 	t.Run("convert collection to message", func(t *testing.T) {

@@ -44,7 +44,7 @@ func (s *BaseApprovalsTestSuite) SetupTest() {
 	verifiers := make(flow.IdentifierList, 0)
 	s.AuthorizedVerifiers = make(map[flow.Identifier]*flow.Identity)
 	assignmentBuilder := chunks.NewAssignmentBuilder()
-	s.Chunks = unittest.ChunkListFixture(50, s.Block.ID(), unittest.StateCommitmentFixture())
+	s.Chunks = unittest.ChunkListFixture(50, s.Block.Hash(), unittest.StateCommitmentFixture())
 	// mock public key to mock signature verifications
 	s.PublicKey = &module.PublicKey{}
 
@@ -66,14 +66,14 @@ func (s *BaseApprovalsTestSuite) SetupTest() {
 
 	s.VerID = verifiers[0]
 	result := unittest.ExecutionResultFixture()
-	result.BlockID = s.Block.ID() //nolint:structwrite
-	result.Chunks = s.Chunks      //nolint:structwrite
+	result.BlockID = s.Block.Hash() //nolint:structwrite
+	result.Chunks = s.Chunks        //nolint:structwrite
 
 	s.IncorporatedBlock = unittest.BlockHeaderWithParentFixture(s.Block)
 
 	// compose incorporated result
 	incorporatedResult, err := flow.NewIncorporatedResult(flow.UntrustedIncorporatedResult{
-		IncorporatedBlockID: s.IncorporatedBlock.ID(),
+		IncorporatedBlockID: s.IncorporatedBlock.Hash(),
 		Result:              result,
 	})
 	require.NoError(s.T(), err)
@@ -116,9 +116,9 @@ func (s *BaseAssignmentCollectorTestSuite) SetupTest() {
 
 	// setup blocks cache for protocol state
 	s.Blocks = make(map[flow.Identifier]*flow.Header)
-	s.Blocks[s.ParentBlock.ID()] = s.ParentBlock
-	s.Blocks[s.Block.ID()] = s.Block
-	s.Blocks[s.IncorporatedBlock.ID()] = s.IncorporatedBlock
+	s.Blocks[s.ParentBlock.Hash()] = s.ParentBlock
+	s.Blocks[s.Block.Hash()] = s.Block
+	s.Blocks[s.IncorporatedBlock.Hash()] = s.IncorporatedBlock
 	s.Snapshots = make(map[flow.Identifier]*protocol.Snapshot)
 
 	// setup identities for each block
@@ -142,7 +142,7 @@ func (s *BaseAssignmentCollectorTestSuite) SetupTest() {
 	s.Headers.On("BlockIDByHeight", mock.Anything).Return(
 		func(height uint64) (flow.Identifier, error) {
 			if block, found := s.FinalizedAtHeight[height]; found {
-				return block.ID(), nil
+				return block.Hash(), nil
 			} else {
 				return flow.ZeroID, realstorage.ErrNotFound
 			}

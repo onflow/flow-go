@@ -282,7 +282,7 @@ func (h *Handler) SendTransaction(
 		return nil, err
 	}
 
-	txID := tx.ID()
+	txID := tx.Hash()
 
 	return &accessproto.SendTransactionResponse{
 		Id:       txID[:],
@@ -1529,7 +1529,7 @@ func (h *Handler) blockHeaderResponse(header *flow.Header, status flow.BlockStat
 //   - storage.ErrHeightNotIndexed when data is unavailable
 func (h *Handler) buildMetadataResponse() (*entities.Metadata, error) {
 	lastFinalizedHeader := h.finalizedHeaderCache.Get()
-	blockId := lastFinalizedHeader.ID()
+	blockId := lastFinalizedHeader.Hash()
 	nodeId := h.me.NodeID()
 
 	metadata := &entities.Metadata{

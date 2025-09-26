@@ -23,7 +23,7 @@ func AddVersionBeacon(t *testing.T, beacon *flow.VersionBeacon, state protocol.F
 
 	protocolState, err := state.Final().ProtocolState()
 	require.NoError(t, err)
-	protocolStateID := protocolState.ID()
+	protocolStateID := protocolState.Hash()
 
 	A := BlockWithParentAndPayload(
 		final,
@@ -63,7 +63,7 @@ func addToState(t *testing.T, state protocol.FollowerState, block *flow.Block, f
 	require.NoError(t, err)
 
 	if finalize {
-		err = state.Finalize(context.Background(), block.ID())
+		err = state.Finalize(context.Background(), block.Hash())
 		require.NoError(t, err)
 	}
 }

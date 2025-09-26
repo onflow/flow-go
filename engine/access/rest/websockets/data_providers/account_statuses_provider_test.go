@@ -121,7 +121,7 @@ func (s *AccountStatusesProviderSuite) subscribeAccountStatusesDataProviderTestC
 		{
 			name: "SubscribeAccountStatusesFromStartBlockID happy path",
 			arguments: wsmodels.Arguments{
-				"start_block_id":    s.rootBlock.ID().String(),
+				"start_block_id":    s.rootBlock.Hash().String(),
 				"event_types":       []string{string(flow.EventAccountCreated)},
 				"account_addresses": []string{unittest.AddressFixture().String()},
 			},
@@ -129,7 +129,7 @@ func (s *AccountStatusesProviderSuite) subscribeAccountStatusesDataProviderTestC
 				s.api.On(
 					"SubscribeAccountStatusesFromStartBlockID",
 					mock.Anything,
-					s.rootBlock.ID(),
+					s.rootBlock.Hash(),
 					mock.Anything,
 				).Return(sub).Once()
 			},
@@ -268,7 +268,7 @@ func (s *AccountStatusesProviderSuite) TestMessageIndexAccountStatusesProviderRe
 
 	arguments :=
 		map[string]interface{}{
-			"start_block_id":    s.rootBlock.ID().String(),
+			"start_block_id":    s.rootBlock.Hash().String(),
 			"event_types":       []string{string(flow.EventAccountCreated)},
 			"account_addresses": []string{unittest.AddressFixture().String()},
 		}
@@ -340,7 +340,7 @@ func (s *AccountStatusesProviderSuite) backendAccountStatusesResponses(events []
 	for i := range events {
 		responses[i] = &backend.AccountStatusesResponse{
 			Height:  s.rootBlock.Height,
-			BlockID: s.rootBlock.ID(),
+			BlockID: s.rootBlock.Hash(),
 			AccountEvents: map[string]flow.EventsList{
 				unittest.RandomAddressFixture().String(): events,
 			},
@@ -355,7 +355,7 @@ func invalidAccountStatusesArgumentsTestCases() []testErrType {
 		{
 			name: "provide both 'start_block_id' and 'start_block_height' arguments",
 			arguments: wsmodels.Arguments{
-				"start_block_id":     unittest.BlockFixture().ID().String(),
+				"start_block_id":     unittest.BlockFixture().Hash().String(),
 				"start_block_height": fmt.Sprintf("%d", unittest.BlockFixture().Height),
 				"event_types":        []string{state_stream.CoreEventAccountCreated},
 				"account_addresses":  []string{unittest.AddressFixture().String()},
@@ -383,7 +383,7 @@ func invalidAccountStatusesArgumentsTestCases() []testErrType {
 		{
 			name: "invalid 'heartbeat_interval' argument",
 			arguments: map[string]interface{}{
-				"start_block_id":     unittest.BlockFixture().ID().String(),
+				"start_block_id":     unittest.BlockFixture().Hash().String(),
 				"event_types":        []string{state_stream.CoreEventAccountCreated},
 				"account_addresses":  []string{unittest.AddressFixture().String()},
 				"heartbeat_interval": "-1",
@@ -393,7 +393,7 @@ func invalidAccountStatusesArgumentsTestCases() []testErrType {
 		{
 			name: "unexpected argument",
 			arguments: map[string]interface{}{
-				"start_block_id":      unittest.BlockFixture().ID().String(),
+				"start_block_id":      unittest.BlockFixture().Hash().String(),
 				"event_types":         []string{state_stream.CoreEventAccountCreated},
 				"account_addresses":   []string{unittest.AddressFixture().String()},
 				"unexpected_argument": "dummy",

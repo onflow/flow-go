@@ -18,39 +18,39 @@ import (
 
 func TestHeaderEncodingJSON(t *testing.T) {
 	header := unittest.BlockHeaderFixture()
-	headerID := header.ID()
+	headerID := header.Hash()
 	data, err := json.Marshal(header)
 	require.NoError(t, err)
 	var decoded flow.Header
 	err = json.Unmarshal(data, &decoded)
 	require.NoError(t, err)
-	decodedID := decoded.ID()
+	decodedID := decoded.Hash()
 	assert.Equal(t, headerID, decodedID)
 	assert.Equal(t, *header, decoded)
 }
 
 func TestHeaderEncodingMsgpack(t *testing.T) {
 	header := unittest.BlockHeaderFixture()
-	headerID := header.ID()
+	headerID := header.Hash()
 	data, err := msgpack.Marshal(header)
 	require.NoError(t, err)
 	var decoded flow.Header
 	err = msgpack.Unmarshal(data, &decoded)
 	require.NoError(t, err)
-	decodedID := decoded.ID()
+	decodedID := decoded.Hash()
 	assert.Equal(t, headerID, decodedID)
 	assert.Equal(t, *header, decoded)
 }
 
 func TestHeaderEncodingCBOR(t *testing.T) {
 	header := unittest.BlockHeaderFixture()
-	headerID := header.ID()
+	headerID := header.Hash()
 	data, err := cbor.Marshal(header)
 	require.NoError(t, err)
 	var decoded flow.Header
 	err = cbor.Unmarshal(data, &decoded)
 	require.NoError(t, err)
-	decodedID := decoded.ID()
+	decodedID := decoded.Hash()
 	assert.Equal(t, headerID, decodedID)
 	assert.Equal(t, *header, decoded)
 }

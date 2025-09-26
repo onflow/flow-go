@@ -40,8 +40,8 @@ func NewLocator(untrusted UntrustedLocator) (*Locator, error) {
 	}, nil
 }
 
-// ID returns a unique id for chunk locator.
-func (c Locator) ID() flow.Identifier {
+// Hash returns a unique id for chunk locator.
+func (c Locator) Hash() flow.Identifier {
 	return flow.MakeID(c)
 }
 
@@ -76,7 +76,7 @@ type LocatorList []*Locator
 func (l LocatorList) ToMap() LocatorMap {
 	locatorMap := make(LocatorMap)
 	for _, locator := range l {
-		locatorMap[locator.ID()] = locator
+		locatorMap[locator.Hash()] = locator
 	}
 	return locatorMap
 }

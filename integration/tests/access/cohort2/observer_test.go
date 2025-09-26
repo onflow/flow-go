@@ -428,12 +428,12 @@ func (s *ObserverSuite) getRestEndpoints() []RestEndpointTest {
 		{
 			name:   "getTransactionResultByID",
 			method: http.MethodGet,
-			path:   fmt.Sprintf("/transaction_results/%s?block_id=%s&collection_id=%s", transactionId, block.ID().String(), collection.ID().String()),
+			path:   fmt.Sprintf("/transaction_results/%s?block_id=%s&collection_id=%s", transactionId, block.Hash().String(), collection.Hash().String()),
 		},
 		{
 			name:   "getBlocksByIDs",
 			method: http.MethodGet,
-			path:   "/blocks/" + block.ID().String(),
+			path:   "/blocks/" + block.Hash().String(),
 		},
 		{
 			name:   "getBlocksByHeight",
@@ -443,22 +443,22 @@ func (s *ObserverSuite) getRestEndpoints() []RestEndpointTest {
 		{
 			name:   "getBlockPayloadByID",
 			method: http.MethodGet,
-			path:   "/blocks/" + block.ID().String() + "/payload",
+			path:   "/blocks/" + block.Hash().String() + "/payload",
 		},
 		{
 			name:   "getExecutionResultByID",
 			method: http.MethodGet,
-			path:   "/execution_results/" + executionResult.ID().String(),
+			path:   "/execution_results/" + executionResult.Hash().String(),
 		},
 		{
 			name:   "getExecutionResultByBlockID",
 			method: http.MethodGet,
-			path:   "/execution_results?block_id=" + block.ID().String(),
+			path:   "/execution_results?block_id=" + block.Hash().String(),
 		},
 		{
 			name:   "getCollectionByID",
 			method: http.MethodGet,
-			path:   "/collections/" + collection.ID().String(),
+			path:   "/collections/" + collection.Hash().String(),
 		},
 		{
 			name:   "executeScript",
@@ -503,7 +503,7 @@ func createTx(t *testing.T, net *testnet.FlowNetwork) interface{} {
 		AddAuthorizer(flowAddr).
 		SetPayer(flowAddr).
 		SetScript(unittest.NoopTxScript()).
-		SetReferenceBlockID(net.Root().ID()).
+		SetReferenceBlockID(net.Root().Hash()).
 		SetProposalKey(flowAddr, 1, 0).
 		Build()
 	require.NoError(t, err)

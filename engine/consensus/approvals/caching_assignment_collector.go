@@ -43,13 +43,13 @@ func (ac *CachingAssignmentCollector) RequestMissingApprovals(consensus.SealingO
 //     errors might be symptoms of bugs or internal state corruption (fatal)
 func (ac *CachingAssignmentCollector) ProcessIncorporatedResult(incorporatedResult *flow.IncorporatedResult) error {
 	// check that result is the one that this VerifyingAssignmentCollector manages
-	if resID := incorporatedResult.Result.ID(); resID != ac.ResultID() {
+	if resID := incorporatedResult.Result.Hash(); resID != ac.ResultID() {
 		return fmt.Errorf("this VerifyingAssignmentCollector manages result %x but got %x", ac.ResultID(), resID)
 	}
 
 	// In case the result is already cached, we first read the cache.
 	// This is much cheaper than attempting to write right away.
-	irID := incorporatedResult.ID()
+	irID := incorporatedResult.Hash()
 	if cached := ac.incResCache.Get(irID); cached != nil {
 		return nil
 	}

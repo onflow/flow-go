@@ -116,9 +116,9 @@ func (cl ClusterList) ByNodeID(nodeID Identifier) (IdentitySkeletonList, uint, b
 
 // IndexOf returns the index of the given cluster.
 func (cl ClusterList) IndexOf(cluster IdentitySkeletonList) (uint, bool) {
-	clusterFingerprint := cluster.ID()
+	clusterFingerprint := cluster.Hash()
 	for index, other := range cl {
-		if other.ID() == clusterFingerprint {
+		if other.Hash() == clusterFingerprint {
 			return uint(index), true
 		}
 	}

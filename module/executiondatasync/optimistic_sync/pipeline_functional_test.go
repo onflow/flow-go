@@ -109,14 +109,14 @@ func (p *PipelineFunctionalSuite) SetupTest() {
 
 	err = unittest.WithLock(t, p.lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
 		return p.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			return operation.InsertHeader(lctx, rw, rootBlock.ID(), rootBlock)
+			return operation.InsertHeader(lctx, rw, rootBlock.Hash(), rootBlock)
 		})
 	})
 	require.NoError(t, err)
 
 	err = unittest.WithLock(t, p.lockManager, storage.LockFinalizeBlock, func(lctx lockctx.Context) error {
 		return p.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			return operation.IndexFinalizedBlockByHeight(lctx, rw, rootBlock.Height, rootBlock.ID())
+			return operation.IndexFinalizedBlockByHeight(lctx, rw, rootBlock.Height, rootBlock.Hash())
 		})
 	})
 	require.NoError(t, err)
@@ -124,14 +124,14 @@ func (p *PipelineFunctionalSuite) SetupTest() {
 	// store and index the latest sealed block header
 	err = unittest.WithLock(t, p.lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
 		return p.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			return operation.InsertHeader(lctx, rw, sealedBlock.ID(), sealedBlock.ToHeader())
+			return operation.InsertHeader(lctx, rw, sealedBlock.Hash(), sealedBlock.ToHeader())
 		})
 	})
 	require.NoError(t, err)
 
 	err = unittest.WithLock(t, p.lockManager, storage.LockFinalizeBlock, func(lctx lockctx.Context) error {
 		return p.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			return operation.IndexFinalizedBlockByHeight(lctx, rw, sealedBlock.Height, sealedBlock.ID())
+			return operation.IndexFinalizedBlockByHeight(lctx, rw, sealedBlock.Height, sealedBlock.Hash())
 		})
 	})
 	require.NoError(t, err)
@@ -140,7 +140,7 @@ func (p *PipelineFunctionalSuite) SetupTest() {
 	err = p.results.Store(sealedExecutionResult)
 	p.Require().NoError(err)
 
-	err = p.results.Index(sealedBlock.ID(), sealedExecutionResult.ID())
+	err = p.results.Index(sealedBlock.Hash(), sealedExecutionResult.Hash())
 	p.Require().NoError(err)
 
 	p.persistentLatestSealedResult, err = store.NewLatestPersistedSealedResult(p.consumerProgress, p.headers, p.results)
@@ -249,7 +249,7 @@ func (p *PipelineFunctionalSuite) TestPipelineIndexingError() {
 
 	expectedIndexingError := fmt.Errorf(
 		"could not perform indexing: invalid block execution data. expected block_id=%s, actual block_id=%s",
-		p.block.ID().String(),
+		p.block.Hash().String(),
 		invalidBlockID.String(),
 	)
 
@@ -492,7 +492,7 @@ func (p *PipelineFunctionalSuite) createExecutionData() (*execution_data.BlockEx
 	}
 
 	expectedExecutionData := unittest.BlockExecutionDataFixture(
-		unittest.WithBlockExecutionDataBlockID(p.block.ID()),
+		unittest.WithBlockExecutionDataBlockID(p.block.Hash()),
 		unittest.WithChunkExecutionDatas(expectedChunkExecutionData, systemChunkData),
 	)
 	expectedTxResultErrMsgs := unittest.TransactionResultErrorMessagesFixture(5)
@@ -520,7 +520,7 @@ func (p *PipelineFunctionalSuite) verifyDataPersistence(
 // verifyEventsPersisted checks that events were stored correctly in the events storage.
 // It retrieves events by block ID and compares them with the expected events list.
 func (p *PipelineFunctionalSuite) verifyEventsPersisted(expectedEvents flow.EventsList) {
-	storedEvents, err := p.persistentEvents.ByBlockID(p.block.ID())
+	storedEvents, err := p.persistentEvents.ByBlockID(p.block.Hash())
 	p.Require().NoError(err)
 
 	p.Assert().Equal(expectedEvents, flow.EventsList(storedEvents))
@@ -530,7 +530,7 @@ func (p *PipelineFunctionalSuite) verifyEventsPersisted(expectedEvents flow.Even
 // collections storage. It verifies both the light collection data and its transaction
 // IDs are persisted correctly.
 func (p *PipelineFunctionalSuite) verifyCollectionPersisted(expectedCollection *flow.Collection) {
-	collectionID := expectedCollection.ID()
+	collectionID := expectedCollection.Hash()
 	expectedLightCollection := expectedCollection.Light()
 
 	storedLightCollection, err := p.persistentCollections.LightByID(collectionID)
@@ -543,7 +543,7 @@ func (p *PipelineFunctionalSuite) verifyCollectionPersisted(expectedCollection *
 // verifyTransactionResultsPersisted checks that transaction results were stored correctly
 // in the results storage. It retrieves results by block ID and compares them with expected results.
 func (p *PipelineFunctionalSuite) verifyTransactionResultsPersisted(expectedResults []flow.LightTransactionResult) {
-	storedResults, err := p.persistentResults.ByBlockID(p.block.ID())
+	storedResults, err := p.persistentResults.ByBlockID(p.block.Hash())
 	p.Require().NoError(err)
 
 	p.Assert().ElementsMatch(expectedResults, storedResults)
@@ -574,7 +574,7 @@ func (p *PipelineFunctionalSuite) verifyRegistersPersisted(expectedTrieUpdate *l
 func (p *PipelineFunctionalSuite) verifyTxResultErrorMessagesPersisted(
 	expectedTxResultErrMsgs []flow.TransactionResultErrorMessage,
 ) {
-	storedErrMsgs, err := p.persistentTxResultErrMsg.ByBlockID(p.block.ID())
+	storedErrMsgs, err := p.persistentTxResultErrMsg.ByBlockID(p.block.Hash())
 	p.Require().NoError(err, "Should be able to retrieve tx result error messages by block ID")
 
 	p.Assert().ElementsMatch(expectedTxResultErrMsgs, storedErrMsgs)

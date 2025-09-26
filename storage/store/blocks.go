@@ -34,7 +34,7 @@ func NewBlocks(db storage.DB, headers *Headers, payloads *Payloads) *Blocks {
 // Expected errors during normal operations:
 // - [storage.ErrAlreadyExists] if some block with the same ID has already been stored
 func (b *Blocks) BatchStore(lctx lockctx.Proof, rw storage.ReaderBatchWriter, proposal *flow.Proposal) error {
-	blockID := proposal.Block.ID()
+	blockID := proposal.Block.Hash()
 	err := b.headers.storeTx(lctx, rw, blockID, proposal.Block.ToHeader(), proposal.ProposerSigData)
 	if err != nil {
 		return fmt.Errorf("could not store header %v: %w", blockID, err)
@@ -208,7 +208,7 @@ func (b *Blocks) ByCollectionID(collID flow.Identifier) (*flow.Block, error) {
 		return nil, fmt.Errorf("could not look up guarantee: %w", err)
 	}
 	var blockID flow.Identifier
-	err = operation.LookupBlockContainingCollectionGuarantee(b.db.Reader(), guarantee.ID(), &blockID)
+	err = operation.LookupBlockContainingCollectionGuarantee(b.db.Reader(), guarantee.Hash(), &blockID)
 	if err != nil {
 		return nil, fmt.Errorf("could not look up block: %w", err)
 	}

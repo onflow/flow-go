@@ -463,7 +463,7 @@ func GenerateExecutionReceipt(
 	}
 
 	// generates a signature over the execution receipt's body
-	unsignedReceiptID := unsignedExecutionReceipt.ID()
+	unsignedReceiptID := unsignedExecutionReceipt.Hash()
 	sig, err := signer.Sign(unsignedReceiptID[:], receiptHasher)
 	if err != nil {
 		return nil, fmt.Errorf("could not sign execution result: %w", err)

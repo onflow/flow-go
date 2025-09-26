@@ -81,12 +81,12 @@ func New(log zerolog.Logger, config Config, metrics module.ChainSyncMetrics, cha
 func (c *Core) HandleBlock(header *flow.Header) bool {
 	log := c.log
 	if c.log.Debug().Enabled() {
-		log = c.log.With().Str("block_id", header.ID().String()).Uint64("block_height", header.Height).Logger()
+		log = c.log.With().Str("block_id", header.Hash().String()).Uint64("block_height", header.Height).Logger()
 	}
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	status := c.getRequestStatus(header.Height, header.ID())
+	status := c.getRequestStatus(header.Height, header.Hash())
 
 	// if we never asked for this block, discard it
 	if !status.WasQueued() {
@@ -104,7 +104,7 @@ func (c *Core) HandleBlock(header *flow.Header) bool {
 	status.Received = time.Now()
 
 	// track it by ID and by height so we don't accidentally request it again
-	c.blockIDs[header.ID()] = status
+	c.blockIDs[header.Hash()] = status
 	c.heights[header.Height] = status
 
 	log.Debug().Msg("handled block")
@@ -153,7 +153,7 @@ func (c *Core) RequestBlock(blockID flow.Identifier, height uint64) {
 	status := c.blockIDs[blockID]
 	if status.WasReceived() {
 		log.Debug().Msgf("requested block was already received")
-		delete(c.blockIDs, status.Header.ID())
+		delete(c.blockIDs, status.Header.Hash())
 		delete(c.heights, status.Header.Height)
 	}
 
@@ -175,7 +175,7 @@ func (c *Core) requeueHeight(height uint64) {
 	// if we already received this block, reset the status so we can re-queue
 	status := c.heights[height]
 	if status.WasReceived() {
-		delete(c.blockIDs, status.Header.ID())
+		delete(c.blockIDs, status.Header.Hash())
 		delete(c.heights, status.Header.Height)
 	}
 

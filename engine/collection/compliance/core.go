@@ -111,7 +111,7 @@ func (c *Core) OnBlockProposal(proposal flow.Slashable[*cluster.Proposal]) error
 
 	block := proposal.Message.Block
 	payload := proposal.Message.Block.Payload
-	blockID := proposal.Message.Block.ID()
+	blockID := proposal.Message.Block.Hash()
 	finalHeight := c.finalizedHeight.Value()
 	finalView := c.finalizedView.Value()
 
@@ -235,7 +235,7 @@ func (c *Core) OnBlockProposal(proposal flow.Slashable[*cluster.Proposal]) error
 // processed as well.
 func (c *Core) processBlockAndDescendants(proposal flow.Slashable[*cluster.Proposal]) error {
 	block := proposal.Message.Block
-	blockID := proposal.Message.Block.ID()
+	blockID := proposal.Message.Block.Hash()
 	log := c.log.With().
 		Str("block_id", blockID.String()).
 		Uint64("block_height", block.Height).
@@ -302,7 +302,7 @@ func (c *Core) processBlockAndDescendants(proposal flow.Slashable[*cluster.Propo
 //   - engine.UnverifiableInputError if the proposal cannot be validated
 func (c *Core) processBlockProposal(proposal *cluster.Proposal) error {
 	block := proposal.Block
-	blockID := proposal.Block.ID()
+	blockID := proposal.Block.Hash()
 	payloadHash := proposal.Block.Payload.Hash()
 	log := c.log.With().
 		Str("chain_id", block.ChainID.String()).

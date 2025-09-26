@@ -140,7 +140,7 @@ func runTransactionID(txID flow.Identifier, flowClient *client.Client, chain flo
 
 	log.Info().Msgf(
 		"Fetched block header: %s (height %d)",
-		header.ID(),
+		header.Hash(),
 		header.Height,
 	)
 

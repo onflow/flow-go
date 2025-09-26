@@ -33,7 +33,7 @@ func TestInMemoryIndexer_IndexBlockData(t *testing.T) {
 		lockManager := storage.NewTestingLockManager()
 		header := unittest.BlockHeaderFixture()
 		block := unittest.BlockWithParentFixture(header)
-		blockID := block.ID()
+		blockID := block.Hash()
 		exeResult := unittest.ExecutionResultFixture(unittest.WithBlock(block))
 		indexer, _ := createInMemoryIndexer(lockManager, exeResult, header)
 
@@ -76,7 +76,7 @@ func TestInMemoryIndexer_IndexBlockData(t *testing.T) {
 		lockManager := storage.NewTestingLockManager()
 		header := unittest.BlockHeaderFixture()
 		block := unittest.BlockWithParentFixture(header)
-		blockID := block.ID()
+		blockID := block.Hash()
 		exeResult := unittest.ExecutionResultFixture(unittest.WithBlock(block))
 		indexer, _ := createInMemoryIndexer(lockManager, exeResult, header)
 
@@ -121,7 +121,7 @@ func TestInMemoryIndexer_IndexBlockData(t *testing.T) {
 		lockManager := storage.NewTestingLockManager()
 		header := unittest.BlockHeaderFixture()
 		block := unittest.BlockWithParentFixture(header)
-		blockID := block.ID()
+		blockID := block.Hash()
 		exeResult := unittest.ExecutionResultFixture(unittest.WithBlock(block))
 		indexer, _ := createInMemoryIndexer(lockManager, exeResult, header)
 
@@ -157,7 +157,7 @@ func TestInMemoryIndexer_IndexBlockData(t *testing.T) {
 		lockManager := storage.NewTestingLockManager()
 		header := unittest.BlockHeaderFixture()
 		block := unittest.BlockWithParentFixture(header)
-		blockID := block.ID()
+		blockID := block.Hash()
 		exeResult := unittest.ExecutionResultFixture(unittest.WithBlock(block))
 		indexer, _ := createInMemoryIndexer(lockManager, exeResult, header)
 
@@ -194,7 +194,7 @@ func TestInMemoryIndexer_IndexBlockData(t *testing.T) {
 		lockManager := storage.NewTestingLockManager()
 		header := unittest.BlockHeaderFixture()
 		block := unittest.BlockWithParentFixture(header)
-		blockID := block.ID()
+		blockID := block.Hash()
 		exeResult := unittest.ExecutionResultFixture(unittest.WithBlock(block))
 		indexer, transactions := createInMemoryIndexer(lockManager, exeResult, header)
 
@@ -218,23 +218,23 @@ func TestInMemoryIndexer_IndexBlockData(t *testing.T) {
 
 		// Verify collections can be retrieved
 		for _, expectedCollection := range expectedCollections {
-			coll, err := indexer.collections.ByID(expectedCollection.ID())
+			coll, err := indexer.collections.ByID(expectedCollection.Hash())
 			require.NoError(t, err)
 			assert.Equal(t, expectedCollection.Transactions, coll.Transactions)
 
-			lightColl, err := indexer.collections.LightByID(expectedCollection.ID())
+			lightColl, err := indexer.collections.LightByID(expectedCollection.Hash())
 			require.NoError(t, err)
 			assert.Equal(t, expectedCollection.Light().Transactions, lightColl.Transactions)
 
 			// Verify transactions were indexed
 			for _, tx := range expectedCollection.Transactions {
-				storedTx, err := transactions.ByID(tx.ID())
+				storedTx, err := transactions.ByID(tx.Hash())
 				require.NoError(t, err)
-				assert.Equal(t, tx.ID(), storedTx.ID())
+				assert.Equal(t, tx.Hash(), storedTx.Hash())
 
-				storedLightTx, err := indexer.collections.LightByTransactionID(tx.ID())
+				storedLightTx, err := indexer.collections.LightByTransactionID(tx.Hash())
 				require.NoError(t, err)
-				assert.Equal(t, expectedCollection.Light().ID(), storedLightTx.ID())
+				assert.Equal(t, expectedCollection.Light().Hash(), storedLightTx.Hash())
 			}
 		}
 	})
@@ -243,7 +243,7 @@ func TestInMemoryIndexer_IndexBlockData(t *testing.T) {
 		lockManager := storage.NewTestingLockManager()
 		header := unittest.BlockHeaderFixture()
 		block := unittest.BlockWithParentFixture(header)
-		blockID := block.ID()
+		blockID := block.Hash()
 		exeResult := unittest.ExecutionResultFixture(unittest.WithBlock(block))
 		indexer, _ := createInMemoryIndexer(lockManager, exeResult, header)
 
@@ -291,7 +291,7 @@ func TestInMemoryIndexer_IndexBlockData(t *testing.T) {
 
 		// Verify collections were indexed
 		for _, expectedCollection := range expectedCollections {
-			lightColl, err := indexer.collections.LightByID(expectedCollection.ID())
+			lightColl, err := indexer.collections.LightByID(expectedCollection.Hash())
 			require.NoError(t, err)
 			assert.Equal(t, expectedCollection.Light().Transactions, lightColl.Transactions)
 		}
@@ -337,7 +337,7 @@ func TestInMemoryIndexer_IndexBlockData(t *testing.T) {
 		err := indexer.IndexTxResultErrorMessagesData(txResultErrMsgsData)
 		require.NoError(t, err)
 
-		results, err := indexer.txResultErrMsgs.ByBlockID(block.ID())
+		results, err := indexer.txResultErrMsgs.ByBlockID(block.Hash())
 		require.NoError(t, err)
 		assert.ElementsMatch(t, txResultErrMsgsData, results)
 	})

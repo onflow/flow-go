@@ -126,9 +126,9 @@ func (r RoleList) Swap(i, j int) {
 	r[i], r[j] = r[j], r[i]
 }
 
-// ID returns hash of the content of RoleList. It first sorts the RoleList and then takes its
+// Hash returns hash of the content of RoleList. It first sorts the RoleList and then takes its
 // hash value.
-func (r RoleList) ID() Identifier {
+func (r RoleList) Hash() Identifier {
 	sort.Sort(r)
 	return MakeID(r)
 }

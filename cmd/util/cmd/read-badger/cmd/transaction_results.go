@@ -49,7 +49,7 @@ var transactionResultsCmd = &cobra.Command{
 					return fmt.Errorf("could not get collection with id %v: %w", guarantee.CollectionID, err)
 				}
 				for _, tx := range collection.Transactions {
-					txIDs = append(txIDs, tx.ID())
+					txIDs = append(txIDs, tx.Hash())
 				}
 			}
 

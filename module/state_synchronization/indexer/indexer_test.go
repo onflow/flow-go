@@ -199,7 +199,7 @@ func TestIndexer_Success(t *testing.T) {
 		test.indexTest.setStoreRegisters(func(t *testing.T, entries flow.RegisterEntries, height uint64) error {
 			var blockHeight uint64
 			for _, b := range test.blocks {
-				if b.ID() == ID {
+				if b.Hash() == ID {
 					blockHeight = b.Height
 				}
 			}

@@ -307,7 +307,7 @@ func (s *ExecForkSuppressor) enforceValidChunks(irSeal *flow.IncorporatedResultS
 		s.log.Error().
 			Str("seal", string(scjson)).
 			Msg("seal's execution result has no chunks")
-		return engine.NewInvalidInputErrorf("seal's execution result has no chunks: %x", result.ID())
+		return engine.NewInvalidInputErrorf("seal's execution result has no chunks: %x", result.Hash())
 	}
 	return nil
 }
@@ -321,7 +321,7 @@ func (s *ExecForkSuppressor) enforceValidChunks(irSeal *flow.IncorporatedResultS
 // and executionForkErr (sentinel error) is returned
 // The function assumes the execution results in the seals have a non-zero number of chunks.
 func hasConsistentStateTransitions(irSeal, irSeal2 *flow.IncorporatedResultSeal) bool {
-	if irSeal.IncorporatedResult.Result.ID() == irSeal2.IncorporatedResult.Result.ID() {
+	if irSeal.IncorporatedResult.Result.Hash() == irSeal2.IncorporatedResult.Result.Hash() {
 		// happy case: candidate seals are for the same result
 		return true
 	}

@@ -45,7 +45,7 @@ func (suite *ProtocolStateProviderTestSuite) SetupTest() {
 	)
 	state.On("AtBlockID", mock.Anything).Return(
 		func(blockID flow.Identifier) protocol.Snapshot {
-			if suite.head.ID() == blockID {
+			if suite.head.Hash() == blockID {
 				return suite.snapshot
 			} else {
 				return unittest.StateSnapshotForUnknownBlock()

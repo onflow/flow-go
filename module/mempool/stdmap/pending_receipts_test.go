@@ -41,7 +41,7 @@ func TestPendingReceipts(t *testing.T) {
 		actual := pool.ByPreviousResultID(r.ExecutionResult.PreviousResultID)
 		require.Equal(t, []*flow.ExecutionReceipt{r}, actual)
 
-		deleted := pool.Remove(r.ID())
+		deleted := pool.Remove(r.Hash())
 		require.True(t, deleted)
 
 		actual = pool.ByPreviousResultID(r.ExecutionResult.PreviousResultID)
@@ -54,7 +54,7 @@ func TestPendingReceipts(t *testing.T) {
 		rs[0] = parent
 		for i := 1; i < n; i++ {
 			rs[i] = unittest.ExecutionReceiptFixture(func(receipt *flow.ExecutionReceipt) {
-				receipt.ExecutionResult.PreviousResultID = parent.ExecutionResult.ID()
+				receipt.ExecutionResult.PreviousResultID = parent.ExecutionResult.Hash()
 				parent = receipt
 			})
 		}
@@ -83,7 +83,7 @@ func TestPendingReceipts(t *testing.T) {
 
 		for i := 0; i < 100; i++ {
 			r := rs[i]
-			ok := pool.Remove(r.ID())
+			ok := pool.Remove(r.Hash())
 			require.True(t, ok)
 		}
 
@@ -98,7 +98,7 @@ func TestPendingReceipts(t *testing.T) {
 		pool := NewPendingReceipts(headers, 100)
 
 		parent := unittest.ExecutionReceiptFixture()
-		parentID := parent.ID()
+		parentID := parent.Hash()
 		rs := make([]*flow.ExecutionReceipt, 100)
 		for i := 0; i < 100; i++ {
 			rs[i] = unittest.ExecutionReceiptFixture(func(receipt *flow.ExecutionReceipt) {
@@ -145,7 +145,7 @@ func TestPendingReceipts(t *testing.T) {
 		// since there are 60 left, should remove 60 in total
 		total = 0
 		for i := 0; i < 100; i++ {
-			ok := pool.Remove(rs[i].ID())
+			ok := pool.Remove(rs[i].Hash())
 			if ok {
 				total++
 			}
@@ -175,7 +175,7 @@ func TestPendingReceipts(t *testing.T) {
 
 		unittest.Concurrently(100, func(i int) {
 			r := rs[i]
-			ok := pool.Remove(r.ID())
+			ok := pool.Remove(r.Hash())
 			require.True(t, ok)
 		})
 
@@ -192,13 +192,13 @@ func TestPendingReceipts(t *testing.T) {
 		executedBlock := unittest.BlockFixture()
 		nextExecutedBlock := unittest.BlockWithParentFixture(executedBlock.ToHeader())
 		er := unittest.ExecutionResultFixture(unittest.WithBlock(executedBlock))
-		headers.On("ByBlockID", executedBlock.ID()).Return(executedBlock.ToHeader(), nil)
-		headers.On("ByBlockID", nextExecutedBlock.ID()).Return(nextExecutedBlock.ToHeader(), nil)
+		headers.On("ByBlockID", executedBlock.Hash()).Return(executedBlock.ToHeader(), nil)
+		headers.On("ByBlockID", nextExecutedBlock.Hash()).Return(nextExecutedBlock.ToHeader(), nil)
 		ids := make(map[flow.Identifier]struct{})
 		for i := 0; i < 10; i++ {
 			receipt := unittest.ExecutionReceiptFixture(unittest.WithResult(er))
 			pool.Add(receipt)
-			ids[receipt.ID()] = struct{}{}
+			ids[receipt.Hash()] = struct{}{}
 		}
 
 		nextReceipt := unittest.ExecutionReceiptFixture(unittest.WithResult(
@@ -219,6 +219,6 @@ func TestPendingReceipts(t *testing.T) {
 		}
 
 		// receipt for this block should be still present
-		require.True(t, pool.Has(nextReceipt.ID()))
+		require.True(t, pool.Has(nextReceipt.Hash()))
 	})
 }

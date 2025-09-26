@@ -354,7 +354,7 @@ func TestTransactionAuthenticationSchemes(t *testing.T) {
 			t.Run(fmt.Sprintf("auth scheme (payloadExtensionData): %v", c.payloadExtensionData), func(t *testing.T) {
 				transactionBody.PayloadSignatures[0].ExtensionData = c.payloadExtensionData
 				transactionBody.EnvelopeSignatures[0].ExtensionData = c.payloadExtensionData
-				transactionID := transactionBody.ID()
+				transactionID := transactionBody.Hash()
 
 				// generate expected envelope data
 				sha3 := hash.NewSHA3_256()

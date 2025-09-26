@@ -203,7 +203,7 @@ func (s *TxErrorMessagesEngineSuite) TestOnFinalizedBlockHandleTxErrorMessages()
 	s.sealedBlock = block.ToHeader()
 
 	hotstuffBlock := hotmodel.Block{
-		BlockID: block.ID(),
+		BlockID: block.Hash(),
 	}
 
 	// mock the connection factory
@@ -217,7 +217,7 @@ func (s *TxErrorMessagesEngineSuite) TestOnFinalizedBlockHandleTxErrorMessages()
 	wg.Add(count)
 
 	for _, b := range s.blockMap {
-		blockID := b.ID()
+		blockID := b.Hash()
 
 		// Mock the protocol snapshot to return fixed execution node IDs.
 		setupReceiptsForBlock(s.receipts, b, s.enNodeIDs.NodeIDs()[0])

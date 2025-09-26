@@ -288,7 +288,7 @@ func verifyHeight(
 		return fmt.Errorf("could not get block header by height %d: %w", height, err)
 	}
 
-	blockID := header.ID()
+	blockID := header.Hash()
 
 	result, err := results.ByBlockID(blockID)
 	if err != nil {
@@ -302,9 +302,9 @@ func verifyHeight(
 	snapshot := state.AtBlockID(blockID)
 
 	for i, chunk := range result.Chunks {
-		chunkDataPack, err := chunkDataPacks.ByChunkID(chunk.ID())
+		chunkDataPack, err := chunkDataPacks.ByChunkID(chunk.Hash())
 		if err != nil {
-			return fmt.Errorf("could not get chunk data pack by chunk ID %s: %w", chunk.ID(), err)
+			return fmt.Errorf("could not get chunk data pack by chunk ID %s: %w", chunk.Hash(), err)
 		}
 
 		vcd, err := convert.FromChunkDataPack(chunk, chunkDataPack, header, snapshot, result)

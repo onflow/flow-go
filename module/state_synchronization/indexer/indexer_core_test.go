@@ -77,7 +77,7 @@ func (i *indexCoreTest) useDefaultBlockByHeight() *indexCoreTest {
 		Return(func(height uint64) (flow.Identifier, error) {
 			for _, b := range i.blocks {
 				if b.Height == height {
-					return b.ID(), nil
+					return b.Hash(), nil
 				}
 			}
 			return flow.ZeroID, fmt.Errorf("not found")
@@ -254,7 +254,7 @@ func TestExecutionState_IndexBlockData(t *testing.T) {
 	t.Run("Index Single Chunk and Single Register", func(t *testing.T) {
 		trie := TrieUpdateRandomLedgerPayloadsFixture(t)
 		ed := &execution_data.BlockExecutionData{
-			BlockID: block.ID(),
+			BlockID: block.Hash(),
 			ChunkExecutionDatas: []*execution_data.ChunkExecutionData{
 				{
 					Collection: &collection,
@@ -262,7 +262,7 @@ func TestExecutionState_IndexBlockData(t *testing.T) {
 				},
 			},
 		}
-		execData := execution_data.NewBlockExecutionDataEntity(block.ID(), ed)
+		execData := execution_data.NewBlockExecutionDataEntity(block.Hash(), ed)
 
 		err := newIndexCoreTest(t, blocks, execData).
 			initIndexer().
@@ -298,7 +298,7 @@ func TestExecutionState_IndexBlockData(t *testing.T) {
 		require.NoError(t, err)
 
 		ed := &execution_data.BlockExecutionData{
-			BlockID: block.ID(),
+			BlockID: block.Hash(),
 			ChunkExecutionDatas: []*execution_data.ChunkExecutionData{
 				{
 					Collection: &collection,
@@ -310,7 +310,7 @@ func TestExecutionState_IndexBlockData(t *testing.T) {
 				},
 			},
 		}
-		execData := execution_data.NewBlockExecutionDataEntity(block.ID(), ed)
+		execData := execution_data.NewBlockExecutionDataEntity(block.Hash(), ed)
 
 		testRegisterFound := false
 		err = newIndexCoreTest(t, blocks, execData).
@@ -340,7 +340,7 @@ func TestExecutionState_IndexBlockData(t *testing.T) {
 	t.Run("Index Events", func(t *testing.T) {
 		expectedEvents := unittest.EventsFixture(20)
 		ed := &execution_data.BlockExecutionData{
-			BlockID: block.ID(),
+			BlockID: block.Hash(),
 			ChunkExecutionDatas: []*execution_data.ChunkExecutionData{
 				// split events into 2 chunks
 				{
@@ -353,14 +353,14 @@ func TestExecutionState_IndexBlockData(t *testing.T) {
 				},
 			},
 		}
-		execData := execution_data.NewBlockExecutionDataEntity(block.ID(), ed)
+		execData := execution_data.NewBlockExecutionDataEntity(block.Hash(), ed)
 
 		err := newIndexCoreTest(t, blocks, execData).
 			initIndexer().
 			useDefaultStorageMocks().
 			// make sure all events are stored at once in order
 			setStoreEvents(func(t *testing.T, actualBlockID flow.Identifier, actualEvents []flow.EventsList) error {
-				assert.Equal(t, block.ID(), actualBlockID)
+				assert.Equal(t, block.Hash(), actualBlockID)
 				require.Len(t, actualEvents, 1)
 				require.Len(t, actualEvents[0], len(expectedEvents))
 				for i, expected := range expectedEvents {
@@ -370,7 +370,7 @@ func TestExecutionState_IndexBlockData(t *testing.T) {
 			}).
 			// make sure an empty set of transaction results were stored
 			setStoreTransactionResults(func(t *testing.T, actualBlockID flow.Identifier, actualResults []flow.LightTransactionResult) error {
-				assert.Equal(t, block.ID(), actualBlockID)
+				assert.Equal(t, block.Hash(), actualBlockID)
 				require.Len(t, actualResults, 0)
 				return nil
 			}).
@@ -388,7 +388,7 @@ func TestExecutionState_IndexBlockData(t *testing.T) {
 	t.Run("Index Tx Results", func(t *testing.T) {
 		expectedResults := unittest.LightTransactionResultsFixture(20)
 		ed := &execution_data.BlockExecutionData{
-			BlockID: block.ID(),
+			BlockID: block.Hash(),
 			ChunkExecutionDatas: []*execution_data.ChunkExecutionData{
 				// split events into 2 chunks
 				{
@@ -401,21 +401,21 @@ func TestExecutionState_IndexBlockData(t *testing.T) {
 				},
 			},
 		}
-		execData := execution_data.NewBlockExecutionDataEntity(block.ID(), ed)
+		execData := execution_data.NewBlockExecutionDataEntity(block.Hash(), ed)
 
 		err := newIndexCoreTest(t, blocks, execData).
 			initIndexer().
 			useDefaultStorageMocks().
 			// make sure an empty set of events were stored
 			setStoreEvents(func(t *testing.T, actualBlockID flow.Identifier, actualEvents []flow.EventsList) error {
-				assert.Equal(t, block.ID(), actualBlockID)
+				assert.Equal(t, block.Hash(), actualBlockID)
 				require.Len(t, actualEvents, 1)
 				require.Len(t, actualEvents[0], 0)
 				return nil
 			}).
 			// make sure all results are stored at once in order
 			setStoreTransactionResults(func(t *testing.T, actualBlockID flow.Identifier, actualResults []flow.LightTransactionResult) error {
-				assert.Equal(t, block.ID(), actualBlockID)
+				assert.Equal(t, block.Hash(), actualBlockID)
 				require.Len(t, actualResults, len(expectedResults))
 				for i, expected := range expectedResults {
 					assert.Equal(t, expected, actualResults[i])
@@ -436,26 +436,26 @@ func TestExecutionState_IndexBlockData(t *testing.T) {
 	t.Run("Index Collections", func(t *testing.T) {
 		expectedCollections := unittest.CollectionListFixture(2)
 		ed := &execution_data.BlockExecutionData{
-			BlockID: block.ID(),
+			BlockID: block.Hash(),
 			ChunkExecutionDatas: []*execution_data.ChunkExecutionData{
 				{Collection: expectedCollections[0]},
 				{Collection: expectedCollections[1]},
 			},
 		}
-		execData := execution_data.NewBlockExecutionDataEntity(block.ID(), ed)
+		execData := execution_data.NewBlockExecutionDataEntity(block.Hash(), ed)
 		err := newIndexCoreTest(t, blocks, execData).
 			initIndexer().
 			useDefaultStorageMocks().
 			// make sure an empty set of events were stored
 			setStoreEvents(func(t *testing.T, actualBlockID flow.Identifier, actualEvents []flow.EventsList) error {
-				assert.Equal(t, block.ID(), actualBlockID)
+				assert.Equal(t, block.Hash(), actualBlockID)
 				require.Len(t, actualEvents, 1)
 				require.Len(t, actualEvents[0], 0)
 				return nil
 			}).
 			// make sure an empty set of transaction results were stored
 			setStoreTransactionResults(func(t *testing.T, actualBlockID flow.Identifier, actualResults []flow.LightTransactionResult) error {
-				assert.Equal(t, block.ID(), actualBlockID)
+				assert.Equal(t, block.Hash(), actualBlockID)
 				require.Len(t, actualResults, 0)
 				return nil
 			}).
@@ -481,7 +481,7 @@ func TestExecutionState_IndexBlockData(t *testing.T) {
 		}
 
 		ed := &execution_data.BlockExecutionData{
-			BlockID: block.ID(),
+			BlockID: block.Hash(),
 			ChunkExecutionDatas: []*execution_data.ChunkExecutionData{
 				{
 					Collection:         expectedCollections[0],
@@ -497,13 +497,13 @@ func TestExecutionState_IndexBlockData(t *testing.T) {
 				},
 			},
 		}
-		execData := execution_data.NewBlockExecutionDataEntity(block.ID(), ed)
+		execData := execution_data.NewBlockExecutionDataEntity(block.Hash(), ed)
 		err := newIndexCoreTest(t, blocks, execData).
 			initIndexer().
 			useDefaultStorageMocks().
 			// make sure all events are stored at once in order
 			setStoreEvents(func(t *testing.T, actualBlockID flow.Identifier, actualEvents []flow.EventsList) error {
-				assert.Equal(t, block.ID(), actualBlockID)
+				assert.Equal(t, block.Hash(), actualBlockID)
 				require.Len(t, actualEvents, 1)
 				require.Len(t, actualEvents[0], len(expectedEvents))
 				for i, expected := range expectedEvents {
@@ -513,7 +513,7 @@ func TestExecutionState_IndexBlockData(t *testing.T) {
 			}).
 			// make sure all results are stored at once in order
 			setStoreTransactionResults(func(t *testing.T, actualBlockID flow.Identifier, actualResults []flow.LightTransactionResult) error {
-				assert.Equal(t, block.ID(), actualBlockID)
+				assert.Equal(t, block.Hash(), actualBlockID)
 				require.Len(t, actualResults, len(expectedResults))
 				for i, expected := range expectedResults {
 					assert.Equal(t, expected, actualResults[i])
@@ -539,9 +539,9 @@ func TestExecutionState_IndexBlockData(t *testing.T) {
 	t.Run("Invalid Heights", func(t *testing.T) {
 		last := blocks[len(blocks)-1]
 		ed := &execution_data.BlockExecutionData{
-			BlockID: last.ID(),
+			BlockID: last.Hash(),
 		}
-		execData := execution_data.NewBlockExecutionDataEntity(last.ID(), ed)
+		execData := execution_data.NewBlockExecutionDataEntity(last.Hash(), ed)
 		latestHeight := blocks[len(blocks)-3].Height
 
 		err := newIndexCoreTest(t, blocks, execData).
@@ -559,9 +559,9 @@ func TestExecutionState_IndexBlockData(t *testing.T) {
 	t.Run("Unknown block ID", func(t *testing.T) {
 		unknownBlock := unittest.BlockFixture()
 		ed := &execution_data.BlockExecutionData{
-			BlockID: unknownBlock.ID(),
+			BlockID: unknownBlock.Hash(),
 		}
-		execData := execution_data.NewBlockExecutionDataEntity(unknownBlock.ID(), ed)
+		execData := execution_data.NewBlockExecutionDataEntity(unknownBlock.Hash(), ed)
 
 		err := newIndexCoreTest(t, blocks, execData).runIndexBlockData()
 
@@ -595,7 +595,7 @@ func TestExecutionState_RegisterValues(t *testing.T) {
 func newBlockHeadersStorage(blocks []*flow.Block) storage.Headers {
 	blocksByID := make(map[flow.Identifier]*flow.Block, 0)
 	for _, b := range blocks {
-		blocksByID[b.ID()] = b
+		blocksByID[b.Hash()] = b
 	}
 
 	return synctest.MockBlockHeaderStorage(synctest.WithByID(blocksByID))

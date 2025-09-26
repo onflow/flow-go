@@ -49,17 +49,17 @@ func NewEmptyCollection() *Collection {
 func (c Collection) Light() *LightCollection {
 	txIDs := make([]Identifier, 0, len(c.Transactions))
 	for _, tx := range c.Transactions {
-		txIDs = append(txIDs, tx.ID())
+		txIDs = append(txIDs, tx.Hash())
 	}
 	return NewLightCollection(UntrustedLightCollection{
 		Transactions: txIDs,
 	})
 }
 
-// ID returns a cryptographic commitment to the Collection.
+// Hash returns a cryptographic commitment to the Collection.
 // The ID of a Collection is equivalent to the ID of its corresponding LightCollection.
-func (c Collection) ID() Identifier {
-	return c.Light().ID()
+func (c Collection) Hash() Identifier {
+	return c.Light().Hash()
 }
 
 // Len returns the number of transactions in the collection.
@@ -93,9 +93,9 @@ func NewLightCollection(untrusted UntrustedLightCollection) *LightCollection {
 	}
 }
 
-// ID returns a cryptographic commitment to the LightCollection.
+// Hash returns a cryptographic commitment to the LightCollection.
 // The ID of a LightCollection is equivalent to the ID for its corresponding Collection.
-func (lc LightCollection) ID() Identifier {
+func (lc LightCollection) Hash() Identifier {
 	return MakeID(lc)
 }
 

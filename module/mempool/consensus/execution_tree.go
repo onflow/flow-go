@@ -51,13 +51,13 @@ func (et *ExecutionTree) AddResult(result *flow.ExecutionResult, block *flow.Hea
 	}
 
 	// sanity check: initial result should be for block
-	if block.ID() != result.BlockID {
+	if block.Hash() != result.BlockID {
 		return fmt.Errorf("receipt is for different block")
 	}
 
 	_, err := et.getEquivalenceClass(result, block)
 	if err != nil {
-		return fmt.Errorf("failed to get equivalence class for result (%x): %w", result.ID(), err)
+		return fmt.Errorf("failed to get equivalence class for result (%x): %w", result.Hash(), err)
 	}
 	return nil
 }
@@ -65,7 +65,7 @@ func (et *ExecutionTree) AddResult(result *flow.ExecutionResult, block *flow.Hea
 // getEquivalenceClass retrieves the Equivalence class for the given result
 // or creates a new one and stores it into the levelled forest
 func (et *ExecutionTree) getEquivalenceClass(result *flow.ExecutionResult, block *flow.Header) (*ReceiptsOfSameResult, error) {
-	vertex, found := et.forest.GetVertex(result.ID())
+	vertex, found := et.forest.GetVertex(result.Hash())
 	var receiptsForResult *ReceiptsOfSameResult
 	if !found {
 		var err error
@@ -86,8 +86,8 @@ func (et *ExecutionTree) getEquivalenceClass(result *flow.ExecutionResult, block
 }
 
 func (et *ExecutionTree) HasReceipt(receipt *flow.ExecutionReceipt) bool {
-	resultID := receipt.ExecutionResult.ID()
-	receiptID := receipt.ID()
+	resultID := receipt.ExecutionResult.Hash()
+	receiptID := receipt.Hash()
 
 	et.RLock()
 	defer et.RUnlock()
@@ -112,13 +112,13 @@ func (et *ExecutionTree) AddReceipt(receipt *flow.ExecutionReceipt, block *flow.
 	}
 
 	// sanity check: initial result should be for block
-	if block.ID() != receipt.ExecutionResult.BlockID {
+	if block.Hash() != receipt.ExecutionResult.BlockID {
 		return false, fmt.Errorf("receipt is for different block")
 	}
 
 	receiptsForResult, err := et.getEquivalenceClass(&receipt.ExecutionResult, block)
 	if err != nil {
-		return false, fmt.Errorf("failed to get equivalence class for result (%x): %w", receipt.ExecutionResult.ID(), err)
+		return false, fmt.Errorf("failed to get equivalence class for result (%x): %w", receipt.ExecutionResult.Hash(), err)
 	}
 
 	added, err := receiptsForResult.AddReceipt(receipt)

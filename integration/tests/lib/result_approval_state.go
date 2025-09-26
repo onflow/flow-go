@@ -79,7 +79,7 @@ func (r *ResultApprovalState) WaitForTotalApprovalsFrom(
 				if chunkIndex != approval.Body.ChunkIndex {
 					continue // chunk indices do not match
 				}
-				approvalId := approval.ID()
+				approvalId := approval.Hash()
 				if !receivedApprovalIds.Contains(approvalId) {
 					receivedApprovalIds = append(receivedApprovalIds, approvalId)
 					receivedApprovals = append(receivedApprovals, approval)

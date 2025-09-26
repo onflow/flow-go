@@ -110,7 +110,7 @@ func (u *HappyPathStateMachine) ProcessEpochSetup(epochSetup *flow.EpochSetup) (
 	// construct data container specifying next epoch
 	nextEpoch, err := flow.NewEpochStateContainer(
 		flow.UntrustedEpochStateContainer{
-			SetupID:          epochSetup.ID(),
+			SetupID:          epochSetup.Hash(),
 			CommitID:         flow.ZeroID,
 			ActiveIdentities: nextEpochActiveIdentities,
 			EpochExtensions:  nil,
@@ -191,7 +191,7 @@ func (u *HappyPathStateMachine) ProcessEpochCommit(epochCommit *flow.EpochCommit
 	nextEpoch, err := flow.NewEpochStateContainer(
 		flow.UntrustedEpochStateContainer{
 			SetupID:          u.state.NextEpoch.SetupID,
-			CommitID:         epochCommit.ID(),
+			CommitID:         epochCommit.Hash(),
 			ActiveIdentities: u.state.NextEpoch.ActiveIdentities,
 			EpochExtensions:  u.state.NextEpoch.EpochExtensions,
 		},

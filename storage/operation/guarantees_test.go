@@ -23,13 +23,13 @@ func TestGuaranteeInsertRetrieve(t *testing.T) {
 
 		err := unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
 			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-				return operation.InsertGuarantee(rw.Writer(), g.ID(), g)
+				return operation.InsertGuarantee(rw.Writer(), g.Hash(), g)
 			})
 		})
 		require.NoError(t, err)
 
 		var retrieved flow.CollectionGuarantee
-		err = operation.RetrieveGuarantee(db.Reader(), g.ID(), &retrieved)
+		err = operation.RetrieveGuarantee(db.Reader(), g.Hash(), &retrieved)
 		require.NoError(t, err)
 
 		assert.Equal(t, g, &retrieved)
@@ -52,7 +52,7 @@ func TestIndexGuaranteedCollectionByBlockHashInsertRetrieve(t *testing.T) {
 		err := unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
 			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 				for _, guarantee := range guarantees {
-					if err := operation.InsertGuarantee(rw.Writer(), guarantee.ID(), guarantee); err != nil {
+					if err := operation.InsertGuarantee(rw.Writer(), guarantee.Hash(), guarantee); err != nil {
 						return err
 					}
 				}
@@ -92,7 +92,7 @@ func TestIndexGuaranteedCollectionByBlockHashMultipleBlocks(t *testing.T) {
 		err := unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
 			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 				for _, guarantee := range set1 {
-					if err := operation.InsertGuarantee(rw.Writer(), guarantee.ID(), guarantee); err != nil {
+					if err := operation.InsertGuarantee(rw.Writer(), guarantee.Hash(), guarantee); err != nil {
 						return err
 					}
 				}
@@ -105,7 +105,7 @@ func TestIndexGuaranteedCollectionByBlockHashMultipleBlocks(t *testing.T) {
 		err = unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
 			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 				for _, guarantee := range set2 {
-					if err := operation.InsertGuarantee(rw.Writer(), guarantee.ID(), guarantee); err != nil {
+					if err := operation.InsertGuarantee(rw.Writer(), guarantee.Hash(), guarantee); err != nil {
 						return err
 					}
 				}

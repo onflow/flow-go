@@ -234,7 +234,7 @@ func (suite *SameGRPCPortTestSuite) SetupTest() {
 	suite.headers.On("BlockIDByHeight", mock.AnythingOfType("uint64")).Return(
 		func(height uint64) flow.Identifier {
 			if block, ok := suite.blockMap[height]; ok {
-				return block.ID()
+				return block.Hash()
 			}
 			return flow.ZeroID
 		},

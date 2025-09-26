@@ -505,7 +505,7 @@ func main() {
 			return server, nil
 		}).
 		Component("collection provider engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-			retrieve := func(collID flow.Identifier) (flow.Entity, error) {
+			retrieve := func(collID flow.Identifier) (flow.Hashable, error) {
 				coll, err := node.Storage.Collections.ByID(collID)
 				return coll, err
 			}

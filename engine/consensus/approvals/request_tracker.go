@@ -104,7 +104,7 @@ func NewRequestTracker(headers storage.Headers, blackoutPeriodMin, blackoutPerio
 // If height of executed block pointed by execution result is smaller than the lowest height, sentinel mempool.BelowPrunedThresholdError is returned.
 // In case execution result points to unknown executed block exception will be returned.
 func (rt *RequestTracker) TryUpdate(result *flow.ExecutionResult, incorporatedBlockID flow.Identifier, chunkIndex uint64) (RequestTrackerItem, bool, error) {
-	resultID := result.ID()
+	resultID := result.Hash()
 	rt.lock.Lock()
 	defer rt.lock.Unlock()
 	item, ok := rt.index[resultID][incorporatedBlockID][chunkIndex]

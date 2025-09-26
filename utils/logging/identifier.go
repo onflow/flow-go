@@ -7,8 +7,8 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-func Entity(entity flow.Entity) []byte {
-	id := entity.ID()
+func Entity(entity flow.Hashable) []byte {
+	id := entity.Hash()
 	return id[:]
 }
 

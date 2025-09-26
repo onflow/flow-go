@@ -61,7 +61,7 @@ func (e *UnexecutedLoader) LoadUnexecuted(ctx context.Context) ([]flow.Identifie
 	rootBlock := e.state.Params().SealedRoot()
 
 	blockIDs := make([]flow.Identifier, 0)
-	isRoot := rootBlock.ID() == last.ID()
+	isRoot := rootBlock.Hash() == last.Hash()
 	if !isRoot {
 		executed, err := e.execState.IsBlockExecuted(lastExecutedHeight, lastExecutedID)
 		if err != nil {

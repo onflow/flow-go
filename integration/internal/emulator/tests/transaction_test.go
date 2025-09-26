@@ -362,7 +362,7 @@ func TestSubmitTransaction_Invalid(t *testing.T) {
 
 		tx := flowsdk.NewTransaction().
 			SetScript([]byte(addTwoScript)).
-			SetReferenceBlockID(flowsdk.Identifier(expiredBlock.ID())).
+			SetReferenceBlockID(flowsdk.Identifier(expiredBlock.Hash())).
 			SetComputeLimit(flowgo.DefaultMaxTransactionGasLimit).
 			SetProposalKey(serviceAccountAddress, b.ServiceKey().Index, b.ServiceKey().SequenceNumber).
 			SetPayer(serviceAccountAddress)
@@ -1458,11 +1458,11 @@ func TestGetTxByBlockIDMethods(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Len(t, expectedResults, len(submittedTx))
 
-	results, err := adapter.GetTransactionResultsByBlockID(context.Background(), flowsdk.Identifier(block.ID()))
+	results, err := adapter.GetTransactionResultsByBlockID(context.Background(), flowsdk.Identifier(block.Hash()))
 	require.NoError(t, err)
 	assert.Len(t, results, len(submittedTx))
 
-	transactions, err := adapter.GetTransactionsByBlockID(context.Background(), flowsdk.Identifier(block.ID()))
+	transactions, err := adapter.GetTransactionsByBlockID(context.Background(), flowsdk.Identifier(block.Hash()))
 	require.NoError(t, err)
 	assert.Len(t, transactions, len(submittedTx))
 

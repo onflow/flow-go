@@ -31,10 +31,10 @@ func (gs *ChunkDataPacksSuite) TestVerificationNodesRequestChunkDataPacks() {
 	// wait for next height finalized (potentially first height), called blockA
 	currentFinalized := gs.BlockState.HighestFinalizedHeight()
 	blockA := gs.BlockState.WaitForHighestFinalizedProgress(gs.T(), currentFinalized)
-	gs.T().Logf("got blockA height %v ID %v", blockA.Height, blockA.ID())
+	gs.T().Logf("got blockA height %v ID %v", blockA.Height, blockA.Hash())
 
 	// wait for execution receipt for blockA from execution node 1
-	erExe1BlockA := gs.ReceiptState.WaitForReceiptFrom(gs.T(), blockA.ID(), gs.exe1ID)
+	erExe1BlockA := gs.ReceiptState.WaitForReceiptFrom(gs.T(), blockA.Hash(), gs.exe1ID)
 	finalStateErExec1BlockA, err := erExe1BlockA.ExecutionResult.FinalStateCommitment()
 	require.NoError(gs.T(), err)
 	gs.T().Logf("got erExe1BlockA with SC %x", finalStateErExec1BlockA)
@@ -44,7 +44,7 @@ func (gs *ChunkDataPacksSuite) TestVerificationNodesRequestChunkDataPacks() {
 		"expected no ChunkDataRequest to be sent before a transaction existed")
 
 	// send transaction
-	tx, err := gs.AccessClient().DeployContract(context.Background(), sdk.Identifier(gs.net.Root().ID()), lib.CounterContract)
+	tx, err := gs.AccessClient().DeployContract(context.Background(), sdk.Identifier(gs.net.Root().Hash()), lib.CounterContract)
 	require.NoError(gs.T(), err, "could not deploy counter")
 
 	txRes, err := gs.AccessClient().WaitForExecuted(context.Background(), tx.ID())
@@ -59,7 +59,7 @@ func (gs *ChunkDataPacksSuite) TestVerificationNodesRequestChunkDataPacks() {
 	// extract chunk ID from execution receipt
 	// expecting the chunk itself plus the system chunk
 	require.Len(gs.T(), erExe1BlockB.ExecutionResult.Chunks, 2)
-	chunkID := erExe1BlockB.ExecutionResult.Chunks[0].ID()
+	chunkID := erExe1BlockB.ExecutionResult.Chunks[0].Hash()
 
 	// TODO the following is extremely flaky, investigate why and re-activate.
 	// wait for ChunkDataPack pushed from execution node

@@ -80,7 +80,7 @@ func (e *ENTransactionProvider) TransactionResult(
 	transactionID flow.Identifier,
 	requiredEventEncodingVersion entities.EventEncodingVersion,
 ) (*accessmodel.TransactionResult, error) {
-	blockID := block.ID()
+	blockID := block.Hash()
 	// create an execution API request for events at blockID and transactionID
 	req := &execproto.GetTransactionResultRequest{
 		BlockId:       blockID[:],
@@ -133,7 +133,7 @@ func (e *ENTransactionProvider) TransactionsByBlockID(
 	block *flow.Block,
 ) ([]*flow.TransactionBody, error) {
 	var transactions []*flow.TransactionBody
-	blockID := block.ID()
+	blockID := block.Hash()
 
 	// user transactions
 	for _, guarantee := range block.Payload.Guarantees {
@@ -176,7 +176,7 @@ func (e *ENTransactionProvider) TransactionResultByIndex(
 	index uint32,
 	encodingVersion entities.EventEncodingVersion,
 ) (*accessmodel.TransactionResult, error) {
-	blockID := block.ID()
+	blockID := block.Hash()
 	// create request and forward to EN
 	req := &execproto.GetTransactionByIndexRequest{
 		BlockId: blockID[:],
@@ -227,7 +227,7 @@ func (e *ENTransactionProvider) TransactionResultsByBlockID(
 	block *flow.Block,
 	requiredEventEncodingVersion entities.EventEncodingVersion,
 ) ([]*accessmodel.TransactionResult, error) {
-	blockID := block.ID()
+	blockID := block.Hash()
 	req := &execproto.GetTransactionsByBlockIDRequest{
 		BlockId: blockID[:],
 	}
@@ -298,7 +298,7 @@ func (e *ENTransactionProvider) SystemTransaction(
 	block *flow.Block,
 	txID flow.Identifier,
 ) (*flow.TransactionBody, error) {
-	blockID := block.ID()
+	blockID := block.Hash()
 
 	if txID == e.systemTxID || !e.scheduledCallbacksEnabled {
 		systemTx, err := blueprints.SystemChunkTransaction(e.chainID.Chain())
@@ -306,7 +306,7 @@ func (e *ENTransactionProvider) SystemTransaction(
 			return nil, status.Errorf(codes.Internal, "failed to construct system chunk transaction: %v", err)
 		}
 
-		if txID == systemTx.ID() {
+		if txID == systemTx.Hash() {
 			return systemTx, nil
 		}
 		return nil, fmt.Errorf("transaction %s not found in block %s", txID, blockID)
@@ -323,7 +323,7 @@ func (e *ENTransactionProvider) SystemTransaction(
 	}
 
 	for _, tx := range sysCollection.Transactions {
-		if tx.ID() == txID {
+		if tx.Hash() == txID {
 			return tx, nil
 		}
 	}
@@ -484,7 +484,7 @@ func (e *ENTransactionProvider) systemTransactionIDs(
 
 	var systemTxIDs []flow.Identifier
 	for _, tx := range sysCollection.Transactions {
-		systemTxIDs = append(systemTxIDs, tx.ID())
+		systemTxIDs = append(systemTxIDs, tx.Hash())
 	}
 
 	return systemTxIDs, nil

@@ -102,7 +102,7 @@ func TestExecutionStateWithTrieStorage(t *testing.T) {
 		validateUpdate(t, update, sc1, executionSnapshot)
 
 		header2 := unittest.BlockHeaderWithParentFixture(header1)
-		storageSnapshot := es.NewStorageSnapshot(sc2, header2.ID(), header2.Height)
+		storageSnapshot := es.NewStorageSnapshot(sc2, header2.Hash(), header2.Height)
 
 		b1, err := storageSnapshot.Get(reg1.Key)
 		require.NoError(t, err)
@@ -146,14 +146,14 @@ func TestExecutionStateWithTrieStorage(t *testing.T) {
 
 		header2 := unittest.BlockHeaderWithParentFixture(header1)
 		// create a view for previous state version
-		storageSnapshot3 := es.NewStorageSnapshot(sc2, header2.ID(), header2.Height)
+		storageSnapshot3 := es.NewStorageSnapshot(sc2, header2.Hash(), header2.Height)
 
 		header3 := unittest.BlockHeaderWithParentFixture(header1)
 		// create a view for new state version
-		storageSnapshot4 := es.NewStorageSnapshot(sc3, header3.ID(), header3.Height)
+		storageSnapshot4 := es.NewStorageSnapshot(sc3, header3.Hash(), header3.Height)
 
 		// header2 and header3 are different blocks
-		require.True(t, header2.ID() != (header3.ID()))
+		require.True(t, header2.Hash() != (header3.Hash()))
 
 		// fetch the value at both versions
 		b1, err := storageSnapshot3.Get(reg1.Key)
@@ -198,11 +198,11 @@ func TestExecutionStateWithTrieStorage(t *testing.T) {
 
 		header2 := unittest.BlockHeaderWithParentFixture(header1)
 		// create a view for previous state version
-		storageSnapshot3 := es.NewStorageSnapshot(sc2, header2.ID(), header2.Height)
+		storageSnapshot3 := es.NewStorageSnapshot(sc2, header2.Hash(), header2.Height)
 
 		header3 := unittest.BlockHeaderWithParentFixture(header2)
 		// create a view for new state version
-		storageSnapshot4 := es.NewStorageSnapshot(sc3, header3.ID(), header3.Height)
+		storageSnapshot4 := es.NewStorageSnapshot(sc3, header3.Hash(), header3.Height)
 
 		// fetch the value at both versions
 		b1, err := storageSnapshot3.Get(reg1.Key)
@@ -263,11 +263,11 @@ func TestExecutionStateWithTrieStorage(t *testing.T) {
 		require.NoError(t, err)
 
 		// test CreateStorageSnapshot for known and executed block
-		headers.On("ByBlockID", header2.ID()).Return(header2, nil)
-		stateCommitments.On("ByBlockID", header2.ID()).Return(sc2, nil)
-		snapshot2, h2, err := es.CreateStorageSnapshot(header2.ID())
+		headers.On("ByBlockID", header2.Hash()).Return(header2, nil)
+		stateCommitments.On("ByBlockID", header2.Hash()).Return(sc2, nil)
+		snapshot2, h2, err := es.CreateStorageSnapshot(header2.Hash())
 		require.NoError(t, err)
-		require.Equal(t, header2.ID(), h2.ID())
+		require.Equal(t, header2.Hash(), h2.Hash())
 
 		val, err := snapshot2.Get(reg1.Key)
 		require.NoError(t, err)
@@ -279,23 +279,23 @@ func TestExecutionStateWithTrieStorage(t *testing.T) {
 
 		// test CreateStorageSnapshot for unknown block
 		unknown := unittest.BlockHeaderFixture()
-		headers.On("ByBlockID", unknown.ID()).Return(nil, fmt.Errorf("unknown: %w", storageerr.ErrNotFound))
-		_, _, err = es.CreateStorageSnapshot(unknown.ID())
+		headers.On("ByBlockID", unknown.Hash()).Return(nil, fmt.Errorf("unknown: %w", storageerr.ErrNotFound))
+		_, _, err = es.CreateStorageSnapshot(unknown.Hash())
 		require.ErrorIs(t, err, storageerr.ErrNotFound)
 
 		// test CreateStorageSnapshot for known and unexecuted block
 		unexecuted := unittest.BlockHeaderFixture()
-		headers.On("ByBlockID", unexecuted.ID()).Return(unexecuted, nil)
-		stateCommitments.On("ByBlockID", unexecuted.ID()).Return(nil, fmt.Errorf("not found: %w", storageerr.ErrNotFound))
-		_, _, err = es.CreateStorageSnapshot(unexecuted.ID())
+		headers.On("ByBlockID", unexecuted.Hash()).Return(unexecuted, nil)
+		stateCommitments.On("ByBlockID", unexecuted.Hash()).Return(nil, fmt.Errorf("not found: %w", storageerr.ErrNotFound))
+		_, _, err = es.CreateStorageSnapshot(unexecuted.Hash())
 		require.ErrorIs(t, err, state.ErrNotExecuted)
 
 		// test CreateStorageSnapshot for pruned block
 		pruned := unittest.BlockHeaderFixture()
 		prunedState := unittest.StateCommitmentFixture()
-		headers.On("ByBlockID", pruned.ID()).Return(pruned, nil)
-		stateCommitments.On("ByBlockID", pruned.ID()).Return(prunedState, nil)
-		_, _, err = es.CreateStorageSnapshot(pruned.ID())
+		headers.On("ByBlockID", pruned.Hash()).Return(pruned, nil)
+		stateCommitments.On("ByBlockID", pruned.Hash()).Return(prunedState, nil)
+		_, _, err = es.CreateStorageSnapshot(pruned.Hash())
 		require.ErrorIs(t, err, state.ErrExecutionStatePruned)
 	}))
 

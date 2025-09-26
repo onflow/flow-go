@@ -102,7 +102,7 @@ func runSnapshotE(*cobra.Command, []string) error {
 			return fmt.Errorf("fail to get block of snapshot: %w", err)
 		}
 
-		log.Info().Msgf("creating snapshot for block height %v, id %v", head.Height, head.ID())
+		log.Info().Msgf("creating snapshot for block height %v, id %v", head.Height, head.Hash())
 
 		serializable, err := inmem.FromSnapshot(snapshot)
 		if err != nil {
@@ -115,10 +115,10 @@ func runSnapshotE(*cobra.Command, []string) error {
 		}
 
 		log.Info().Msgf("snapshot created, sealed height %v, id %v",
-			sealingSegment.Sealed().Height, sealingSegment.Sealed().ID())
+			sealingSegment.Sealed().Height, sealingSegment.Sealed().Hash())
 
 		log.Info().Msgf("highest finalized height %v, id %v",
-			sealingSegment.Highest().Height, sealingSegment.Highest().ID())
+			sealingSegment.Highest().Height, sealingSegment.Highest().Hash())
 
 		encoded := serializable.Encodable()
 		common.PrettyPrint(encoded)

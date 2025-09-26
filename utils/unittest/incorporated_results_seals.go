@@ -9,7 +9,7 @@ type incorporatedResultSealFactory struct{}
 func (f *incorporatedResultSealFactory) Fixture(opts ...func(*flow.IncorporatedResultSeal)) *flow.IncorporatedResultSeal {
 	result := ExecutionResultFixture()
 	header := BlockHeaderFixture()
-	incorporatedBlockID := header.ID()
+	incorporatedBlockID := header.Hash()
 
 	ir := IncorporatedResult.Fixture(
 		IncorporatedResult.WithResult(result),

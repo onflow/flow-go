@@ -242,14 +242,14 @@ func withNextEpoch(
 	minEpochStateEntry := &flow.MinEpochStateEntry{
 		PreviousEpoch: rootProtocolState.EpochEntry.PreviousEpoch,
 		CurrentEpoch: flow.EpochStateContainer{
-			SetupID:          currEpochSetup.ID(),
-			CommitID:         currEpochCommit.ID(),
+			SetupID:          currEpochSetup.Hash(),
+			CommitID:         currEpochCommit.Hash(),
 			ActiveIdentities: rootProtocolState.EpochEntry.CurrentEpoch.ActiveIdentities,
 			EpochExtensions:  rootProtocolState.EpochEntry.CurrentEpoch.EpochExtensions,
 		},
 		NextEpoch: &flow.EpochStateContainer{
-			SetupID:          nextEpochSetup.ID(),
-			CommitID:         nextEpochCommit.ID(),
+			SetupID:          nextEpochSetup.Hash(),
+			CommitID:         nextEpochCommit.Hash(),
 			ActiveIdentities: flow.DynamicIdentityEntryListFromIdentities(nextEpochIdentities),
 		},
 		EpochFallbackTriggered: false,
@@ -279,12 +279,12 @@ func withNextEpoch(
 	rootKVStore, err := kvstore.NewDefaultKVStore(
 		originalRootKVStore.GetFinalizationSafetyThreshold(),
 		originalRootKVStore.GetEpochExtensionViewCount(),
-		epochRichProtocolState.ID())
+		epochRichProtocolState.Hash())
 	require.NoError(t, err)
 	protocolVersion, encodedKVStore, err := rootKVStore.VersionedEncode()
 	require.NoError(t, err)
 	encodableSnapshot.SealingSegment.ProtocolStateEntries = map[flow.Identifier]*flow.ProtocolStateEntryWrapper{
-		rootKVStore.ID(): {
+		rootKVStore.Hash(): {
 			KVStore: flow.PSKeyValueStoreData{
 				Version: protocolVersion,
 				Data:    encodedKVStore,
@@ -294,15 +294,15 @@ func withNextEpoch(
 	}
 
 	// Since we modified the root protocol state, we need to update the root block's ProtocolStateID field.
-	encodableSnapshot.SealingSegment.Blocks[0].Block.Payload.ProtocolStateID = rootKVStore.ID()
+	encodableSnapshot.SealingSegment.Blocks[0].Block.Payload.ProtocolStateID = rootKVStore.Hash()
 	rootBlock := encodableSnapshot.SealingSegment.Blocks[0].Block
 	// Since we changed the root block, we need to update the QC, root result, and root seal.
 	// rootResult and rootSeal are pointers, so mutations apply to Snapshot
-	rootResult.BlockID = rootBlock.ID()
-	rootSeal.ResultID = rootResult.ID()
-	rootSeal.BlockID = rootBlock.ID()
+	rootResult.BlockID = rootBlock.Hash()
+	rootSeal.ResultID = rootResult.Hash()
+	rootSeal.BlockID = rootBlock.Hash()
 	encodableSnapshot.SealingSegment.LatestSeals = map[flow.Identifier]flow.Identifier{
-		rootBlock.ID(): rootSeal.ID(),
+		rootBlock.Hash(): rootSeal.Hash(),
 	}
 	encodableSnapshot.QuorumCertificate = createQC(&rootBlock)
 

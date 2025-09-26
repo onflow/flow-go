@@ -127,7 +127,7 @@ func (q *BlockQueue) HandleBlock(block *flow.Block, parentFinalState *flow.State
 	defer q.Unlock()
 
 	// check if the block already exists
-	blockID := block.ID()
+	blockID := block.Hash()
 	executable, ok := q.blocks[blockID]
 
 	q.log.Debug().
@@ -260,7 +260,7 @@ func (q *BlockQueue) HandleCollection(collection *flow.Collection) ([]*entity.Ex
 	// might trigger multiple blocks to be executable.
 
 	// check if the collection is for any block in the queue
-	colID := collection.ID()
+	colID := collection.Hash()
 	colInfo, ok := q.collections[colID]
 	if !ok {
 		// no block in the queue includes this collection

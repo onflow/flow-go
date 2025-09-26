@@ -51,5 +51,5 @@ func (t *Translator) Translate(blockID flow.Identifier) (flow.Identifier, error)
 	if err != nil {
 		return flow.ZeroID, fmt.Errorf("could not retrieve block: %w", err)
 	}
-	return head.ID(), nil
+	return head.Hash(), nil
 }

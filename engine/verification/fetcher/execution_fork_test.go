@@ -34,9 +34,9 @@ func TestExecutionForkWithDuplicateAssignedChunks(t *testing.T) {
 	assignedChunkStatuses := verification.ChunkStatusList{statusA, statusB}
 
 	// executorsA and executorsB are execution node identities that executed resultA and resultB, respectively.
-	_, _, executorsA, executorsB := mockReceiptsBlockIDForConflictingResults(t, block.ID(), s.receipts, resultA, resultB)
+	_, _, executorsA, executorsB := mockReceiptsBlockIDForConflictingResults(t, block.Hash(), s.receipts, resultA, resultB)
 	s.metrics.On("OnAssignedChunkReceivedAtFetcher").Return().Times(2)
-	mockStateAtBlockIDForIdentities(s.state, block.ID(), executorsA.Union(executorsB))
+	mockStateAtBlockIDForIdentities(s.state, block.Hash(), executorsA.Union(executorsB))
 
 	// the chunks belong to an unsealed block, so their chunk data pack is requested.
 	mockBlockSealingStatus(s.state, s.headers, block.ToHeader(), false)
@@ -49,19 +49,19 @@ func TestExecutionForkWithDuplicateAssignedChunks(t *testing.T) {
 	mockPendingChunksGet(s.pendingChunks, assignedChunkStatuses)
 
 	// fetcher engine must create a chunk data request for each of chunk statusA and statusB
-	requestA := chunkRequestFixture(resultA.ID(), statusA, executorsA, executorsB)
-	requestB := chunkRequestFixture(resultB.ID(), statusB, executorsB, executorsA)
+	requestA := chunkRequestFixture(resultA.Hash(), statusA, executorsA, executorsB)
+	requestB := chunkRequestFixture(resultB.Hash(), statusB, executorsB, executorsA)
 	requests := make(map[flow.Identifier]*verification.ChunkDataPackRequest)
-	requests[requestA.ID()] = requestA
-	requests[requestB.ID()] = requestB
+	requests[requestA.Hash()] = requestA
+	requests[requestB.Hash()] = requestB
 	s.metrics.On("OnChunkDataPackRequestSentByFetcher").Return().Times(len(assignedChunkStatuses))
 
 	// each chunk data request is answered by requester engine on a distinct chunk data response
-	chunkALocatorID := unittest.ChunkLocatorFixture(statusA.ExecutionResult.ID(), statusA.ChunkIndex).ID()
-	chunkBLocatorID := unittest.ChunkLocatorFixture(statusB.ExecutionResult.ID(), statusB.ChunkIndex).ID()
+	chunkALocatorID := unittest.ChunkLocatorFixture(statusA.ExecutionResult.Hash(), statusA.ChunkIndex).Hash()
+	chunkBLocatorID := unittest.ChunkLocatorFixture(statusB.ExecutionResult.Hash(), statusB.ChunkIndex).Hash()
 	chunkDataResponse := make(map[flow.Identifier]*verification.ChunkDataPackResponse)
-	chunkDataResponse[chunkALocatorID] = chunkDataPackResponseFixture(t, statusA.Chunk(), collMap[statusA.Chunk().ID()], resultA)
-	chunkDataResponse[chunkBLocatorID] = chunkDataPackResponseFixture(t, statusB.Chunk(), collMap[statusA.Chunk().ID()], resultB)
+	chunkDataResponse[chunkALocatorID] = chunkDataPackResponseFixture(t, statusA.Chunk(), collMap[statusA.Chunk().Hash()], resultA)
+	chunkDataResponse[chunkBLocatorID] = chunkDataPackResponseFixture(t, statusB.Chunk(), collMap[statusA.Chunk().Hash()], resultB)
 	s.metrics.On("OnChunkDataPackArrivedAtFetcher").Return().Times(len(assignedChunkStatuses))
 
 	// on receiving the chunk data responses, fetcher engine creates verifiable chunks
@@ -83,7 +83,7 @@ func TestExecutionForkWithDuplicateAssignedChunks(t *testing.T) {
 	processWG := &sync.WaitGroup{}
 	processWG.Add(len(assignedChunkStatuses))
 	for _, status := range assignedChunkStatuses {
-		locator := unittest.ChunkLocatorFixture(status.ExecutionResult.ID(), status.ChunkIndex)
+		locator := unittest.ChunkLocatorFixture(status.ExecutionResult.Hash(), status.ChunkIndex)
 
 		go func(l *chunks.Locator) {
 			e.ProcessAssignedChunk(l)
@@ -127,7 +127,7 @@ func executionResultForkFixture(t *testing.T) (*flow.Block,
 
 	// keeps collections of assigned chunks
 	collMap := make(map[flow.Identifier]*flow.Collection)
-	collMap[statusA.Chunk().ID()] = collection
+	collMap[statusA.Chunk().Hash()] = collection
 
 	return block, resultA, statusA, resultB, statusB, collMap
 }

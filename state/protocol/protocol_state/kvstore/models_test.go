@@ -120,7 +120,7 @@ func TestKVStoreAPI_Replicate(t *testing.T) {
 			cpy, err := model.Replicate(model.GetProtocolStateVersion())
 			require.NoError(t, err)
 			require.True(t, reflect.DeepEqual(model, cpy)) // expect the same model
-			require.Equal(t, cpy.ID(), model.ID())
+			require.Equal(t, cpy.Hash(), model.Hash())
 
 			model.VersionUpgrade.ActivationView++ // change
 			require.False(t, reflect.DeepEqual(model, cpy), "expect to have a deep copy")
@@ -137,7 +137,7 @@ func TestKVStoreAPI_Replicate(t *testing.T) {
 			newVersion, err := model.Replicate(1)
 			require.NoError(t, err)
 			require.Equal(t, uint64(1), newVersion.GetProtocolStateVersion())
-			require.NotEqual(t, newVersion.ID(), model.ID(), "two models with the same data but different version must have different ID")
+			require.NotEqual(t, newVersion.Hash(), model.Hash(), "two models with the same data but different version must have different ID")
 			_, ok := newVersion.(*kvstore.Modelv1)
 			require.True(t, ok, "expected Modelv1")
 			require.Equal(t, newVersion.GetVersionUpgrade(), model.GetVersionUpgrade())
@@ -195,7 +195,7 @@ func TestKVStoreAPI_Replicate(t *testing.T) {
 			newVersion, err := model.Replicate(2)
 			require.NoError(t, err)
 			require.Equal(t, uint64(2), newVersion.GetProtocolStateVersion())
-			require.NotEqual(t, newVersion.ID(), model.ID(), "two models with the same data but different version must have different ID")
+			require.NotEqual(t, newVersion.Hash(), model.Hash(), "two models with the same data but different version must have different ID")
 			_, ok := newVersion.(*kvstore.Modelv2)
 			require.True(t, ok, "expected Modelv2")
 			require.Equal(t, newVersion.GetVersionUpgrade(), model.GetVersionUpgrade())
@@ -251,7 +251,7 @@ func TestKVStoreAPI_Replicate(t *testing.T) {
 			upgradedKVStore, err := model.Replicate(3)
 			require.NoError(t, err)
 			require.Equal(t, uint64(3), upgradedKVStore.GetProtocolStateVersion())
-			require.NotEqual(t, upgradedKVStore.ID(), model.ID(), "two models with the same data but different version must have different ID")
+			require.NotEqual(t, upgradedKVStore.Hash(), model.Hash(), "two models with the same data but different version must have different ID")
 			_, ok := upgradedKVStore.(*kvstore.Modelv3)
 			require.True(t, ok, "expected Modelv3")
 			require.Equal(t, upgradedKVStore.GetVersionUpgrade(), model.GetVersionUpgrade())

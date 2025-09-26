@@ -64,7 +64,7 @@ func (r *ReadSealsCommand) Handler(ctx context.Context, req *admin.CommandReques
 		if err != nil {
 			return nil, fmt.Errorf("failed to get block header: %w", err)
 		}
-		blockID := header.ID()
+		blockID := header.Hash()
 
 		index, err := r.index.ByBlockID(blockID)
 		if err != nil {
@@ -84,7 +84,7 @@ func (r *ReadSealsCommand) Handler(ctx context.Context, req *admin.CommandReques
 			LastSeal: &sealInfo{
 				BlockID:     lastSeal.BlockID,
 				BlockHeight: lastSealed.Height,
-				SealID:      lastSeal.ID(),
+				SealID:      lastSeal.Hash(),
 			},
 		}
 

@@ -114,7 +114,7 @@ func TestReExecuteBlock(t *testing.T) {
 			myReceipts,
 			events,
 			serviceEvents,
-			header.ID(),
+			header.Hash(),
 		)
 
 		require.NoError(t, err)
@@ -130,7 +130,7 @@ func TestReExecuteBlock(t *testing.T) {
 			myReceipts,
 			events,
 			serviceEvents,
-			header.ID(),
+			header.Hash(),
 		)
 
 		require.NoError(t, err)
@@ -156,7 +156,7 @@ func TestReExecuteBlock(t *testing.T) {
 			myReceipts,
 			events,
 			serviceEvents,
-			header.ID(),
+			header.Hash(),
 		)
 		require.NoError(t, err)
 
@@ -240,7 +240,7 @@ func TestReExecuteBlockWithDifferentResult(t *testing.T) {
 			nil,
 			genesis.ToHeader(),
 			&unittest.GenesisStateCommitment)
-		blockID := executableBlock.Block.ID()
+		blockID := executableBlock.Block.Hash()
 
 		err = unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
 			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {

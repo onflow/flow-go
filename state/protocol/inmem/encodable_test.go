@@ -38,5 +38,5 @@ func TestEncodeDecode(t *testing.T) {
 	require.NoError(t, err)
 	decodedResult, err := decodedSnapshot.LatestSealedResult()
 	require.NoError(t, err)
-	assert.Equal(t, decodedResult.ID(), decodedSeal.ResultID)
+	assert.Equal(t, decodedResult.Hash(), decodedSeal.ResultID)
 }

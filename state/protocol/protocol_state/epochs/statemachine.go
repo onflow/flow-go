@@ -194,9 +194,9 @@ func NewEpochStateMachine(
 	}
 
 	// sanity check: the parent epoch state ID must be set in KV store
-	if parentEpochState.ID() != parentState.GetEpochStateID() {
+	if parentEpochState.Hash() != parentState.GetEpochStateID() {
 		return nil, irrecoverable.NewExceptionf("broken invariant: parent epoch state ID mismatch, expected %x, got %x",
-			parentState.GetEpochStateID(), parentEpochState.ID())
+			parentState.GetEpochStateID(), parentEpochState.Hash())
 	}
 
 	var stateMachine StateMachine

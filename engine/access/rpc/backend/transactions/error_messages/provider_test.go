@@ -86,7 +86,7 @@ func (suite *Suite) SetupTest() {
 	suite.nodeCommunicator = node_communicator.NewNodeCommunicator(false)
 
 	suite.block = unittest.BlockFixture()
-	suite.blockID = suite.block.ID()
+	suite.blockID = suite.block.Hash()
 	_, suite.fixedExecutionNodes = suite.setupReceipts(suite.block)
 	suite.fixedExecutionNodeIDs = suite.fixedExecutionNodes.NodeIDs()
 	suite.preferredExecutionNodeIDs = nil
@@ -108,7 +108,7 @@ func (suite *Suite) SetupTest() {
 
 func (suite *Suite) TestLookupByTxID_FromExecutionNode_HappyPath() {
 	failedTx := unittest.TransactionFixture()
-	failedTxId := failedTx.ID()
+	failedTxId := failedTx.Hash()
 
 	// Setup mock receipts and execution node identities.
 	suite.state.On("Final").Return(suite.snapshot, nil).Once()
@@ -163,7 +163,7 @@ func (suite *Suite) TestLookupByTxID_FromExecutionNode_HappyPath() {
 
 func (suite *Suite) TestLookupByTxID_FromStorage_HappyPath() {
 	failedTx := unittest.TransactionFixture()
-	failedTxId := failedTx.ID()
+	failedTxId := failedTx.Hash()
 	failedTxIndex := rand.Uint32()
 
 	errMessageProvider := NewTxErrorMessageProvider(
@@ -198,7 +198,7 @@ func (suite *Suite) TestLookupByTxID_FromStorage_HappyPath() {
 
 func (suite *Suite) TestLookupByTxID_ExecNodeError_UnknownTx() {
 	failedTx := unittest.TransactionFixture()
-	failedTxId := failedTx.ID()
+	failedTxId := failedTx.Hash()
 
 	suite.state.On("Final").Return(suite.snapshot, nil).Once()
 	suite.snapshot.On("Identities", mock.Anything).Return(suite.fixedExecutionNodes, nil).Once()
@@ -248,7 +248,7 @@ func (suite *Suite) TestLookupByTxID_ExecNodeError_UnknownTx() {
 
 func (suite *Suite) TestLookupByTxID_ExecNodeError_TxResultNotFailed() {
 	failedTx := unittest.TransactionFixture()
-	failedTxId := failedTx.ID()
+	failedTxId := failedTx.Hash()
 
 	suite.state.On("Final").Return(suite.snapshot, nil).Once()
 	suite.snapshot.On("Identities", mock.Anything).Return(suite.fixedExecutionNodes, nil).Once()
@@ -303,7 +303,7 @@ func (suite *Suite) TestLookupByTxID_ExecNodeError_TxResultNotFailed() {
 
 func (suite *Suite) TestLookupByTxID_ExecNodeError_TxResultFailed() {
 	failedTx := unittest.TransactionFixture()
-	failedTxId := failedTx.ID()
+	failedTxId := failedTx.Hash()
 
 	suite.state.On("Final").Return(suite.snapshot, nil).Once()
 	suite.snapshot.On("Identities", mock.Anything).Return(suite.fixedExecutionNodes, nil).Once()
@@ -358,7 +358,7 @@ func (suite *Suite) TestLookupByTxID_ExecNodeError_TxResultFailed() {
 
 func (suite *Suite) TestLookupByIndex_FromExecutionNode_HappyPath() {
 	failedTx := unittest.TransactionFixture()
-	failedTxId := failedTx.ID()
+	failedTxId := failedTx.Hash()
 	failedTxIndex := rand.Uint32()
 
 	suite.state.On("Final").Return(suite.snapshot, nil).Once()
@@ -416,7 +416,7 @@ func (suite *Suite) TestLookupByIndex_FromExecutionNode_HappyPath() {
 // 2. Happy path where the error message is served from the storage database if it exists.
 func (suite *Suite) TestLookupTransactionErrorMessageByIndex_HappyPath() {
 	failedTx := unittest.TransactionFixture()
-	failedTxId := failedTx.ID()
+	failedTxId := failedTx.Hash()
 	failedTxIndex := rand.Uint32()
 
 	suite.state.On("Final").Return(suite.snapshot, nil).Once()
@@ -543,7 +543,7 @@ func (suite *Suite) TestLookupByIndex_ExecutionNodeError_UnknownTx() {
 func (suite *Suite) TestLookupByIndex_ExecutionNodeError_TxResultNotFailed() {
 	failedTxIndex := rand.Uint32()
 	failedTx := unittest.TransactionFixture()
-	failedTxId := failedTx.ID()
+	failedTxId := failedTx.Hash()
 
 	suite.state.On("Final").Return(suite.snapshot, nil).Once()
 	suite.snapshot.On("Identities", mock.Anything).Return(suite.fixedExecutionNodes, nil).Once()
@@ -599,7 +599,7 @@ func (suite *Suite) TestLookupByIndex_ExecutionNodeError_TxResultNotFailed() {
 func (suite *Suite) TestLookupByIndex_ExecutionNodeError_TxResultFailed() {
 	failedTxIndex := rand.Uint32()
 	failedTx := unittest.TransactionFixture()
-	failedTxId := failedTx.ID()
+	failedTxId := failedTx.Hash()
 
 	suite.state.On("Final").Return(suite.snapshot, nil).Once()
 	suite.snapshot.On("Identities", mock.Anything).Return(suite.fixedExecutionNodes, nil).Once()
@@ -958,7 +958,7 @@ func (suite *Suite) setupReceipts(block *flow.Block) ([]*flow.ExecutionReceipt, 
 
 	receipts := flow.ExecutionReceiptList{receipt1, receipt2}
 	suite.receipts.
-		On("ByBlockID", block.ID()).
+		On("ByBlockID", block.Hash()).
 		Return(receipts, nil).
 		Maybe()
 

@@ -32,5 +32,5 @@ func (v *VerificationTestSuite) TestSealingAndVerificationHappyPath() {
 		v.exe1ID,
 		v.exe2ID,
 		v.verID,
-		v.net.Root().ID())
+		v.net.Root().Hash())
 }

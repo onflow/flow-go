@@ -30,10 +30,10 @@ func (s *FailingTxRevertedSuite) TestExecutionFailingTxReverted() {
 	// wait for next height finalized (potentially first height), called blockA
 	currentFinalized := s.BlockState.HighestFinalizedHeight()
 	blockA := s.BlockState.WaitForHighestFinalizedProgress(s.T(), currentFinalized)
-	s.T().Logf("got blockA height %v ID %v\n", blockA.Height, blockA.ID())
+	s.T().Logf("got blockA height %v ID %v\n", blockA.Height, blockA.Hash())
 
 	// send transaction
-	tx, err := s.AccessClient().DeployContract(context.Background(), sdk.Identifier(s.net.Root().ID()), lib.CounterContract)
+	tx, err := s.AccessClient().DeployContract(context.Background(), sdk.Identifier(s.net.Root().Hash()), lib.CounterContract)
 	require.NoError(s.T(), err, "could not deploy counter")
 
 	_, err = s.AccessClient().WaitForExecuted(context.Background(), tx.ID())
@@ -42,7 +42,7 @@ func (s *FailingTxRevertedSuite) TestExecutionFailingTxReverted() {
 	// send transaction that panics and should revert
 	failingTx := lib.SDKTransactionFixture(
 		lib.WithTransactionDSL(lib.CreateCounterPanicTx(chain)),
-		lib.WithReferenceBlock(sdk.Identifier(s.net.Root().ID())),
+		lib.WithReferenceBlock(sdk.Identifier(s.net.Root().Hash())),
 		lib.WithChainID(chainID),
 	)
 
@@ -64,7 +64,7 @@ func (s *FailingTxRevertedSuite) TestExecutionFailingTxReverted() {
 	// send transaction that has no sigs and should not execute
 	failingTx = lib.SDKTransactionFixture(
 		lib.WithTransactionDSL(lib.CreateCounterTx(sdk.Address(serviceAddress))),
-		lib.WithReferenceBlock(sdk.Identifier(s.net.Root().ID())),
+		lib.WithReferenceBlock(sdk.Identifier(s.net.Root().Hash())),
 		lib.WithChainID(chainID),
 	)
 	failingTx.PayloadSignatures = nil

@@ -11,7 +11,7 @@ import (
 )
 
 // TestExecutionResultID_Malleability confirms that the ExecutionResult struct, which implements
-// the [flow.IDEntity] interface, is resistant to tampering.
+// the [flow.Hashable] interface, is resistant to tampering.
 func TestExecutionResultID_Malleability(t *testing.T) {
 	unittest.RequireEntityNonMalleable(t,
 		unittest.ExecutionResultFixture(),
@@ -32,12 +32,12 @@ func TestExecutionResultGroupBy(t *testing.T) {
 	idA := unittest.IdentifierFixture()
 	idB := unittest.IdentifierFixture()
 	grouperFunc := func(er *flow.ExecutionResult) flow.Identifier {
-		switch er.ID() {
-		case er1.ID():
+		switch er.Hash() {
+		case er1.Hash():
 			return idA
-		case er2.ID():
+		case er2.Hash():
 			return idB
-		case er3.ID():
+		case er3.Hash():
 			return idA
 		default:
 			panic("unexpected ExecutionReceipt")

@@ -47,7 +47,7 @@ func TestSingleBlockBecomeReady(t *testing.T) {
 
 	// verify after the block (A) is executed, no more block is executable and
 	// nothing left in the queue
-	executables, err = q.OnBlockExecuted(blockA.ID(), *commitFor("A"))
+	executables, err = q.OnBlockExecuted(blockA.Hash(), *commitFor("A"))
 	require.NoError(t, err)
 	requireExecutableHas(t, executables)
 	requireQueueIsEmpty(t, q)
@@ -83,12 +83,12 @@ func TestHandleBlockChildCalledBeforeOnBlockExecutedParent(t *testing.T) {
 	require.Empty(t, missing)
 
 	// later block C is executed, which will make block D to be executable
-	executables, err = q.OnBlockExecuted(blockC.ID(), *commitFor("C"))
+	executables, err = q.OnBlockExecuted(blockC.Hash(), *commitFor("C"))
 	require.NoError(t, err)
 	requireExecutableHas(t, executables, blockD)
 
 	// once block D is executed, the queue should be empty
-	executables, err = q.OnBlockExecuted(blockD.ID(), *commitFor("D"))
+	executables, err = q.OnBlockExecuted(blockD.Hash(), *commitFor("D"))
 	require.NoError(t, err)
 	requireExecutableHas(t, executables)
 	requireQueueIsEmpty(t, q)
@@ -152,7 +152,7 @@ func TestMultipleBlockBecomesReady(t *testing.T) {
 
 	// verify when parent block (A) is executed, the child block (B) will not become executable if
 	// some collection (c3) is still missing
-	executables, err = q.OnBlockExecuted(blockA.ID(), *commitFor("A"))
+	executables, err = q.OnBlockExecuted(blockA.Hash(), *commitFor("A"))
 	require.NoError(t, err)
 	requireExecutableHas(t, executables) // because C3 is not received for B to be executable
 
@@ -176,15 +176,15 @@ func TestMultipleBlockBecomesReady(t *testing.T) {
 
 	// verify when parent block (E) is executed, all children block (F,G) will become executable if all
 	// collections (C6) have already received
-	executables, err = q.OnBlockExecuted(blockE.ID(), *commitFor("E"))
+	executables, err = q.OnBlockExecuted(blockE.Hash(), *commitFor("E"))
 	require.NoError(t, err)
 	requireExecutableHas(t, executables, blockF, blockG)
 
-	executables, err = q.OnBlockExecuted(blockB.ID(), *commitFor("B"))
+	executables, err = q.OnBlockExecuted(blockB.Hash(), *commitFor("B"))
 	require.NoError(t, err)
 	requireExecutableHas(t, executables, blockC)
 
-	executables, err = q.OnBlockExecuted(blockC.ID(), *commitFor("C"))
+	executables, err = q.OnBlockExecuted(blockC.Hash(), *commitFor("C"))
 	require.NoError(t, err)
 	requireExecutableHas(t, executables)
 
@@ -194,15 +194,15 @@ func TestMultipleBlockBecomesReady(t *testing.T) {
 	require.Empty(t, missing)
 	requireExecutableHas(t, executables, blockD)
 
-	executables, err = q.OnBlockExecuted(blockD.ID(), *commitFor("D"))
+	executables, err = q.OnBlockExecuted(blockD.Hash(), *commitFor("D"))
 	require.NoError(t, err)
 	requireExecutableHas(t, executables)
 
-	executables, err = q.OnBlockExecuted(blockF.ID(), *commitFor("F"))
+	executables, err = q.OnBlockExecuted(blockF.Hash(), *commitFor("F"))
 	require.NoError(t, err)
 	requireExecutableHas(t, executables)
 
-	executables, err = q.OnBlockExecuted(blockG.ID(), *commitFor("G"))
+	executables, err = q.OnBlockExecuted(blockG.Hash(), *commitFor("G"))
 	require.NoError(t, err)
 	requireExecutableHas(t, executables)
 
@@ -244,12 +244,12 @@ func TestOneReadyAndMultiplePending(t *testing.T) {
 	require.NoError(t, err)
 
 	// A is executed
-	executables, err = q.OnBlockExecuted(blockA.ID(), *commitFor("A"))
+	executables, err = q.OnBlockExecuted(blockA.Hash(), *commitFor("A"))
 	require.NoError(t, err)
 	requireExecutableHas(t, executables, blockB) // B is executable
 
 	// B is executed
-	executables, err = q.OnBlockExecuted(blockB.ID(), *commitFor("B"))
+	executables, err = q.OnBlockExecuted(blockB.Hash(), *commitFor("B"))
 	require.NoError(t, err)
 	requireExecutableHas(t, executables, blockC) // C is executable
 }
@@ -297,7 +297,7 @@ func TestOnForksWithSameCollections(t *testing.T) {
 	requireExecutableHas(t, executables)
 
 	// A is executed
-	executables, err = q.OnBlockExecuted(blockA.ID(), *commitFor("A"))
+	executables, err = q.OnBlockExecuted(blockA.Hash(), *commitFor("A"))
 	require.NoError(t, err)
 	requireExecutableHas(t, executables) // because C2 is not received
 
@@ -319,7 +319,7 @@ func TestOnForksWithSameCollections(t *testing.T) {
 	require.Empty(t, executables)
 	requireCollectionHas(t, missing)
 
-	executables, err = q.OnBlockExecuted(blockB.ID(), *commitFor("B"))
+	executables, err = q.OnBlockExecuted(blockB.Hash(), *commitFor("B"))
 	require.NoError(t, err)
 	requireExecutableHas(t, executables)
 
@@ -330,20 +330,20 @@ func TestOnForksWithSameCollections(t *testing.T) {
 	requireExecutableHas(t, executables, blockC, blockF)
 
 	// verify when D is executed, E becomes executable
-	executables, err = q.OnBlockExecuted(blockD.ID(), *commitFor("D"))
+	executables, err = q.OnBlockExecuted(blockD.Hash(), *commitFor("D"))
 	require.NoError(t, err)
 	requireExecutableHas(t, executables, blockE)
 
 	// verify the remaining blocks (C,E,F) are executed, the queue is empty
-	executables, err = q.OnBlockExecuted(blockE.ID(), *commitFor("E"))
+	executables, err = q.OnBlockExecuted(blockE.Hash(), *commitFor("E"))
 	require.NoError(t, err)
 	requireExecutableHas(t, executables)
 
-	executables, err = q.OnBlockExecuted(blockF.ID(), *commitFor("F"))
+	executables, err = q.OnBlockExecuted(blockF.Hash(), *commitFor("F"))
 	require.NoError(t, err)
 	requireExecutableHas(t, executables)
 
-	executables, err = q.OnBlockExecuted(blockC.ID(), *commitFor("C"))
+	executables, err = q.OnBlockExecuted(blockC.Hash(), *commitFor("C"))
 	require.NoError(t, err)
 	requireExecutableHas(t, executables)
 
@@ -376,7 +376,7 @@ func TestOnBlockWithMissingParentCommit(t *testing.T) {
 	// the following two calls create an edge case where A is executed,
 	// and B is received, however, due to race condition, the parent commit
 	// was not saved in the database yet
-	executables, err = q.OnBlockExecuted(blockA.ID(), *commitFor("A"))
+	executables, err = q.OnBlockExecuted(blockA.Hash(), *commitFor("A"))
 	require.NoError(t, err)
 	requireExecutableHas(t, executables)
 	requireQueueIsEmpty(t, q)
@@ -401,7 +401,7 @@ func TestOnBlockWithMissingParentCommit(t *testing.T) {
 	requireExecutableHas(t, executables, blockB)
 
 	// verify after B is executed, the queue is empty
-	executables, err = q.OnBlockExecuted(blockB.ID(), *commitFor("B"))
+	executables, err = q.OnBlockExecuted(blockB.Hash(), *commitFor("B"))
 	require.NoError(t, err)
 	requireExecutableHas(t, executables)
 	requireQueueIsEmpty(t, q)
@@ -620,13 +620,13 @@ func makeChainABCDEF() (GetBlock, GetCollection, GetCommit) {
 func requireExecutableHas(t *testing.T, executables []*entity.ExecutableBlock, bs ...*flow.Block) {
 	blocks := make(map[flow.Identifier]*flow.Block, len(bs))
 	for _, b := range bs {
-		blocks[b.ID()] = b
+		blocks[b.Hash()] = b
 	}
 
 	for _, e := range executables {
-		_, ok := blocks[e.Block.ID()]
+		_, ok := blocks[e.Block.Hash()]
 		require.True(t, ok)
-		delete(blocks, e.Block.ID())
+		delete(blocks, e.Block.Hash())
 	}
 
 	require.Equal(t, len(bs), len(executables))
@@ -636,7 +636,7 @@ func requireExecutableHas(t *testing.T, executables []*entity.ExecutableBlock, b
 func requireCollectionHas(t *testing.T, missing []*MissingCollection, cs ...*flow.Collection) {
 	collections := make(map[flow.Identifier]*flow.Collection, len(cs))
 	for _, c := range cs {
-		collections[c.ID()] = c
+		collections[c.Hash()] = c
 	}
 
 	for _, m := range missing {

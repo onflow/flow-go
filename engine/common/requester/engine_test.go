@@ -245,17 +245,17 @@ func TestOnEntityResponseValid(t *testing.T) {
 	now := time.Now()
 
 	iwanted1 := &Item{
-		EntityID:      wanted1.ID(),
+		EntityID:      wanted1.Hash(),
 		LastRequested: now,
 		ExtraSelector: filter.Any,
 	}
 	iwanted2 := &Item{
-		EntityID:      wanted2.ID(),
+		EntityID:      wanted2.Hash(),
 		LastRequested: now,
 		ExtraSelector: filter.Any,
 	}
 	iunavailable := &Item{
-		EntityID:      unavailable.ID(),
+		EntityID:      unavailable.Hash(),
 		LastRequested: now,
 		ExtraSelector: filter.Any,
 	}
@@ -266,13 +266,13 @@ func TestOnEntityResponseValid(t *testing.T) {
 
 	res := &flow.EntityResponse{
 		Nonce:     nonce,
-		EntityIDs: []flow.Identifier{wanted1.ID(), wanted2.ID(), unwanted.ID()},
+		EntityIDs: []flow.Identifier{wanted1.Hash(), wanted2.Hash(), unwanted.Hash()},
 		Blobs:     [][]byte{bwanted1, bwanted2, bunwanted},
 	}
 
 	req := &messages.EntityRequest{
 		Nonce:     nonce,
-		EntityIDs: []flow.Identifier{wanted1.ID(), wanted2.ID(), unavailable.ID()},
+		EntityIDs: []flow.Identifier{wanted1.Hash(), wanted2.Hash(), unavailable.Hash()},
 	}
 
 	done := make(chan struct{})
@@ -284,8 +284,8 @@ func TestOnEntityResponseValid(t *testing.T) {
 		items:    make(map[flow.Identifier]*Item),
 		requests: make(map[uint64]*messages.EntityRequest),
 		selector: filter.HasNodeID[flow.Identity](targetID),
-		create:   func() flow.Entity { return &flow.Collection{} },
-		handle: func(flow.Identifier, flow.Entity) {
+		create:   func() flow.Hashable { return &flow.Collection{} },
+		handle: func(flow.Identifier, flow.Hashable) {
 			if called.Inc() >= 2 {
 				close(done)
 			}
@@ -305,11 +305,11 @@ func TestOnEntityResponseValid(t *testing.T) {
 	assert.NotContains(t, request.requests, nonce)
 
 	// check that the provided items were removed
-	assert.NotContains(t, request.items, wanted1.ID())
-	assert.NotContains(t, request.items, wanted2.ID())
+	assert.NotContains(t, request.items, wanted1.Hash())
+	assert.NotContains(t, request.items, wanted2.Hash())
 
 	// check that the missing item is still there
-	assert.Contains(t, request.items, unavailable.ID())
+	assert.Contains(t, request.items, unavailable.Hash())
 
 	// make sure we processed two items
 	unittest.AssertClosesBefore(t, done, time.Second)
@@ -341,7 +341,7 @@ func TestOnEntityIntegrityCheck(t *testing.T) {
 	now := time.Now()
 
 	iwanted := &Item{
-		EntityID:       wanted.ID(),
+		EntityID:       wanted.Hash(),
 		LastRequested:  now,
 		ExtraSelector:  filter.Any,
 		checkIntegrity: true,
@@ -354,13 +354,13 @@ func TestOnEntityIntegrityCheck(t *testing.T) {
 
 	res := &flow.EntityResponse{
 		Nonce:     nonce,
-		EntityIDs: []flow.Identifier{wanted.ID()},
+		EntityIDs: []flow.Identifier{wanted.Hash()},
 		Blobs:     [][]byte{bwanted},
 	}
 
 	req := &messages.EntityRequest{
 		Nonce:     nonce,
-		EntityIDs: []flow.Identifier{wanted.ID()},
+		EntityIDs: []flow.Identifier{wanted.Hash()},
 	}
 
 	called := make(chan struct{})
@@ -371,8 +371,8 @@ func TestOnEntityIntegrityCheck(t *testing.T) {
 		items:    make(map[flow.Identifier]*Item),
 		requests: make(map[uint64]*messages.EntityRequest),
 		selector: filter.HasNodeID[flow.Identity](targetID),
-		create:   func() flow.Entity { return &flow.Collection{} },
-		handle:   func(flow.Identifier, flow.Entity) { close(called) },
+		create:   func() flow.Hashable { return &flow.Collection{} },
+		handle:   func(flow.Identifier, flow.Hashable) { close(called) },
 	}
 
 	request.items[iwanted.EntityID] = iwanted
@@ -386,7 +386,7 @@ func TestOnEntityIntegrityCheck(t *testing.T) {
 	assert.NotContains(t, request.requests, nonce)
 
 	// check that the provided item wasn't removed
-	assert.Contains(t, request.items, wanted.ID())
+	assert.Contains(t, request.items, wanted.Hash())
 
 	iwanted.checkIntegrity = false
 	request.items[iwanted.EntityID] = iwanted
@@ -428,7 +428,7 @@ func TestOriginValidation(t *testing.T) {
 	now := time.Now()
 
 	iwanted := &Item{
-		EntityID:       wanted.ID(),
+		EntityID:       wanted.Hash(),
 		LastRequested:  now,
 		ExtraSelector:  filter.HasNodeID[flow.Identity](targetID),
 		checkIntegrity: true,
@@ -439,13 +439,13 @@ func TestOriginValidation(t *testing.T) {
 
 	res := &flow.EntityResponse{
 		Nonce:     nonce,
-		EntityIDs: []flow.Identifier{wanted.ID()},
+		EntityIDs: []flow.Identifier{wanted.Hash()},
 		Blobs:     [][]byte{bwanted},
 	}
 
 	req := &messages.EntityRequest{
 		Nonce:     nonce,
-		EntityIDs: []flow.Identifier{wanted.ID()},
+		EntityIDs: []flow.Identifier{wanted.Hash()},
 	}
 
 	network := &mocknetwork.EngineRegistry{}
@@ -459,13 +459,13 @@ func TestOriginValidation(t *testing.T) {
 		state,
 		"",
 		filter.HasNodeID[flow.Identity](targetID),
-		func() flow.Entity { return &flow.Collection{} },
+		func() flow.Hashable { return &flow.Collection{} },
 	)
 	assert.NoError(t, err)
 
 	called := make(chan struct{})
 
-	e.WithHandle(func(origin flow.Identifier, _ flow.Entity) {
+	e.WithHandle(func(origin flow.Identifier, _ flow.Hashable) {
 		// we expect wrong origin to propagate here with validation disabled
 		assert.Equal(t, wrongID, origin)
 		close(called)

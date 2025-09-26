@@ -385,7 +385,7 @@ func (ss *SyncSuite) TestLoad_Process_BatchRequest_SometimesReportSpam() {
 }
 
 func repeatedBlockIDs(n int) []flow.Identifier {
-	blockID := unittest.BlockFixture().ID()
+	blockID := unittest.BlockFixture().Hash()
 
 	arr := make([]flow.Identifier, n)
 	for i := 0; i < n; i++ {

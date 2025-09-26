@@ -146,7 +146,7 @@ func (e *ReactorEngine) EpochCommittedPhaseStarted(currentEpochCounter uint64, f
 // query the DKG smart-contract and transition between phases at the specified views.
 func (e *ReactorEngine) startDKGForEpoch(currentEpochCounter uint64, first *flow.Header) {
 
-	firstID := first.ID()
+	firstID := first.Hash()
 	nextEpochCounter := currentEpochCounter + 1
 	log := e.log.With().
 		Uint64("cur_epoch", currentEpochCounter). // the epoch we are in the middle of
@@ -301,7 +301,7 @@ func (e *ReactorEngine) handleEpochCommittedPhaseStarted(currentEpochCounter uin
 	// Since epoch phase transitions are emitted when the first block of the new
 	// phase is finalized, the block's snapshot is guaranteed to already be
 	// accessible in the protocol state at this point
-	snapshot := e.State.AtBlockID(firstBlock.ID())
+	snapshot := e.State.AtBlockID(firstBlock.Hash())
 	nextEpoch, err := snapshot.Epochs().NextCommitted()
 	if err != nil {
 		// CAUTION: this should never happen, indicates a storage failure or state corruption
@@ -408,7 +408,7 @@ func (e *ReactorEngine) registerPoll(view uint64) {
 			e.unit.Lock()
 			defer e.unit.Unlock()
 
-			blockID := header.ID()
+			blockID := header.Hash()
 			log := e.log.With().
 				Uint64("view", view).
 				Uint64("height", header.Height).
@@ -416,7 +416,7 @@ func (e *ReactorEngine) registerPoll(view uint64) {
 				Logger()
 
 			log.Info().Msg("polling DKG smart-contract...")
-			err := e.controller.Poll(header.ID())
+			err := e.controller.Poll(header.Hash())
 			if err != nil {
 				log.Err(err).Msg("failed to poll DKG smart-contract")
 			}
@@ -432,7 +432,7 @@ func (e *ReactorEngine) registerPhaseTransition(view uint64, fromState dkgmodule
 			e.unit.Lock()
 			defer e.unit.Unlock()
 
-			blockID := header.ID()
+			blockID := header.Hash()
 			log := e.log.With().
 				Uint64("view", view).
 				Hex("block_id", blockID[:]).

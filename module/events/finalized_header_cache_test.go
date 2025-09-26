@@ -45,6 +45,6 @@ func TestFinalizedHeaderCache(t *testing.T) {
 
 	// the cache should be updated
 	assert.Eventually(t, func() bool {
-		return final.ID() == cache.Get().ID()
+		return final.Hash() == cache.Get().Hash()
 	}, time.Second, time.Millisecond*10)
 }

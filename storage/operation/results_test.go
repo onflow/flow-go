@@ -23,7 +23,7 @@ func TestResults_InsertRetrieve(t *testing.T) {
 		require.Nil(t, err)
 
 		var actual flow.ExecutionResult
-		err = operation.RetrieveExecutionResult(db.Reader(), expected.ID(), &actual)
+		err = operation.RetrieveExecutionResult(db.Reader(), expected.Hash(), &actual)
 		require.Nil(t, err)
 
 		assert.Equal(t, expected, &actual)

@@ -168,7 +168,7 @@ func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 func (e *Engine) handleChunkDataPackWithTracing(originID flow.Identifier, chunkDataPack *flow.ChunkDataPack) {
 	// TODO: change this to block level as well
 	if chunkDataPack.Collection != nil {
-		span, _ := e.tracer.StartCollectionSpan(e.unit.Ctx(), chunkDataPack.Collection.ID(), trace.VERRequesterHandleChunkDataResponse)
+		span, _ := e.tracer.StartCollectionSpan(e.unit.Ctx(), chunkDataPack.Collection.Hash(), trace.VERRequesterHandleChunkDataResponse)
 		span.SetAttributes(attribute.String("chunk_id", chunkDataPack.ChunkID.String()))
 		defer span.End()
 	}
@@ -183,7 +183,7 @@ func (e *Engine) handleChunkDataPack(originID flow.Identifier, chunkDataPack *fl
 		Logger()
 
 	if chunkDataPack.Collection != nil {
-		collectionID := chunkDataPack.Collection.ID()
+		collectionID := chunkDataPack.Collection.Hash()
 		lg = lg.With().Hex("collection_id", logging.ID(collectionID)).Logger()
 	}
 	lg.Debug().Msg("chunk data pack received")

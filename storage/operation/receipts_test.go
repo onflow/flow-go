@@ -19,12 +19,12 @@ func TestReceipts_InsertRetrieve(t *testing.T) {
 		expected := receipt.Stub()
 
 		err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			return operation.InsertExecutionReceiptStub(rw.Writer(), receipt.ID(), expected)
+			return operation.InsertExecutionReceiptStub(rw.Writer(), receipt.Hash(), expected)
 		})
 		require.Nil(t, err)
 
 		var actual flow.ExecutionReceiptStub
-		err = operation.RetrieveExecutionReceiptStub(db.Reader(), receipt.ID(), &actual)
+		err = operation.RetrieveExecutionReceiptStub(db.Reader(), receipt.Hash(), &actual)
 		require.Nil(t, err)
 
 		assert.Equal(t, expected, &actual)
@@ -34,7 +34,7 @@ func TestReceipts_InsertRetrieve(t *testing.T) {
 func TestReceipts_Index(t *testing.T) {
 	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
 		receipt := unittest.ExecutionReceiptFixture()
-		expected := receipt.ID()
+		expected := receipt.Hash()
 		blockID := receipt.ExecutionResult.BlockID
 
 		err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {

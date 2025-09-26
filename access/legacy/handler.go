@@ -55,7 +55,7 @@ func (h *Handler) SendTransaction(
 		return nil, err
 	}
 
-	txID := tx.ID()
+	txID := tx.Hash()
 
 	return &accessproto.SendTransactionResponse{
 		Id: txID[:],

@@ -108,7 +108,7 @@ func (s *RequesterSuite) TestRequest_HappyPath() {
 	)
 
 	block := unittest.BlockWithParentFixture(s.finalizedBlock)
-	blockId := block.ID()
+	blockId := block.Hash()
 	executionResult := &flow.ExecutionResult{
 		BlockID: blockId,
 		Chunks:  unittest.ChunkListFixture(1, blockId, unittest.StateCommitmentFixture()),
@@ -158,7 +158,7 @@ func (s *RequesterSuite) TestRequest_ErrorCases() {
 	)
 
 	block := unittest.BlockWithParentFixture(s.finalizedBlock)
-	blockId := block.ID()
+	blockId := block.Hash()
 	executionResult := &flow.ExecutionResult{
 		BlockID: blockId,
 		Chunks:  unittest.ChunkListFixture(1, blockId, unittest.StateCommitmentFixture()),

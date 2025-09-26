@@ -211,7 +211,7 @@ func RechainBlocks(blocks []*flow.Block) {
 	parent := blocks[0]
 
 	for _, block := range blocks[1:] {
-		block.ParentID = parent.ID()
+		block.ParentID = parent.Hash()
 		parent = block
 	}
 }
@@ -539,7 +539,7 @@ func BlockWithParentAndSeals(parent *flow.Header, seals []*flow.Header) *flow.Bl
 		payload.Seals = make([]*flow.Seal, len(seals))
 		for i, seal := range seals {
 			payload.Seals[i] = Seal.Fixture(
-				Seal.WithBlockID(seal.ID()),
+				Seal.WithBlockID(seal.Hash()),
 			)
 		}
 	}
@@ -646,7 +646,7 @@ func HeaderBodyWithParentFixture(parent *flow.Header) flow.HeaderBody {
 	}
 	return flow.HeaderBody{
 		ChainID:            parent.ChainID,
-		ParentID:           parent.ID(),
+		ParentID:           parent.Hash(),
 		Height:             height,
 		Timestamp:          uint64(time.Now().UnixMilli()),
 		View:               view,
@@ -703,14 +703,14 @@ func WithCollRef(refID flow.Identifier) func(*flow.CollectionGuarantee) {
 
 func WithCollection(collection *flow.Collection) func(guarantee *flow.CollectionGuarantee) {
 	return func(guarantee *flow.CollectionGuarantee) {
-		guarantee.CollectionID = collection.ID()
+		guarantee.CollectionID = collection.Hash()
 	}
 }
 
 func AddCollectionsToBlock(block *flow.Block, collections []*flow.Collection) {
 	gs := make([]*flow.CollectionGuarantee, 0, len(collections))
 	for _, collection := range collections {
-		gs = append(gs, &flow.CollectionGuarantee{CollectionID: collection.ID()})
+		gs = append(gs, &flow.CollectionGuarantee{CollectionID: collection.Hash()})
 	}
 
 	block.Payload.Guarantees = gs
@@ -794,7 +794,7 @@ func CompleteCollectionFixture() *entity.CompleteCollection {
 	txBody := TransactionBodyFixture()
 	return &entity.CompleteCollection{
 		Guarantee: &flow.CollectionGuarantee{
-			CollectionID:     flow.Collection{Transactions: []*flow.TransactionBody{&txBody}}.ID(),
+			CollectionID:     flow.Collection{Transactions: []*flow.TransactionBody{&txBody}}.Hash(),
 			Signature:        SignatureFixture(),
 			ReferenceBlockID: FixedReferenceBlockID(),
 			SignerIndices:    SignerIndicesFixture(1),
@@ -808,7 +808,7 @@ func CompleteCollectionFixture() *entity.CompleteCollection {
 func CompleteCollectionFromTransactions(txs []*flow.TransactionBody) *entity.CompleteCollection {
 	return &entity.CompleteCollection{
 		Guarantee: &flow.CollectionGuarantee{
-			CollectionID:     flow.Collection{Transactions: txs}.ID(),
+			CollectionID:     flow.Collection{Transactions: txs}.Hash(),
 			Signature:        SignatureFixture(),
 			ReferenceBlockID: IdentifierFixture(),
 			SignerIndices:    SignerIndicesFixture(3),
@@ -948,7 +948,7 @@ func ReceiptsForBlockFixture(
 
 func WithPreviousResult(prevResult flow.ExecutionResult) func(*flow.ExecutionResult) {
 	return func(result *flow.ExecutionResult) {
-		result.PreviousResultID = prevResult.ID()
+		result.PreviousResultID = prevResult.Hash()
 		finalState, err := prevResult.FinalStateCommitment()
 		if err != nil {
 			panic("missing final state commitment")
@@ -966,7 +966,7 @@ func WithPreviousResultID(previousResultID flow.Identifier) func(*flow.Execution
 func WithBlock(block *flow.Block) func(*flow.ExecutionResult) {
 	chunks := 1 // tailing chunk is always system chunk
 	chunks += len(block.Payload.Guarantees)
-	blockID := block.ID()
+	blockID := block.Hash()
 
 	return func(result *flow.ExecutionResult) {
 		startState := result.Chunks[0].StartState // retain previous start state in case it was user-defined
@@ -1067,7 +1067,7 @@ func WithApproverID(approverID flow.Identifier) func(*flow.ResultApproval) {
 
 func WithAttestationBlock(block *flow.Block) func(*flow.ResultApproval) {
 	return func(ra *flow.ResultApproval) {
-		ra.Body.Attestation.BlockID = block.ID()
+		ra.Body.Attestation.BlockID = block.Hash()
 	}
 }
 
@@ -1502,8 +1502,8 @@ func ChunkLocatorFixture(resultID flow.Identifier, index uint64) *chunks.Locator
 func ChunkStatusListToChunkLocatorFixture(statuses []*verification.ChunkStatus) chunks.LocatorMap {
 	locators := chunks.LocatorMap{}
 	for _, status := range statuses {
-		locator := ChunkLocatorFixture(status.ExecutionResult.ID(), status.ChunkIndex)
-		locators[locator.ID()] = locator
+		locator := ChunkLocatorFixture(status.ExecutionResult.Hash(), status.ChunkIndex)
+		locators[locator.Hash()] = locator
 	}
 
 	return locators
@@ -1665,7 +1665,7 @@ func VerifiableChunkDataFixture(chunkIndex uint64, opts ...func(*flow.HeaderBody
 
 	for i := 0; i <= int(chunkIndex); i++ {
 		col = CollectionFixture(1)
-		guarantees = append(guarantees, &flow.CollectionGuarantee{CollectionID: col.ID()})
+		guarantees = append(guarantees, &flow.CollectionGuarantee{CollectionID: col.Hash()})
 	}
 
 	payload := flow.Payload{
@@ -1691,7 +1691,7 @@ func VerifiableChunkDataFixture(chunkIndex uint64, opts ...func(*flow.HeaderBody
 			ChunkBody: flow.ChunkBody{
 				CollectionIndex: uint(i),
 				StartState:      StateCommitmentFixture(),
-				BlockID:         block.ID(),
+				BlockID:         block.Hash(),
 			},
 			Index: uint64(i),
 		}
@@ -1700,7 +1700,7 @@ func VerifiableChunkDataFixture(chunkIndex uint64, opts ...func(*flow.HeaderBody
 
 	result := flow.ExecutionResult{
 		PreviousResultID: IdentifierFixture(),
-		BlockID:          block.ID(),
+		BlockID:          block.Hash(),
 		Chunks:           chunks,
 	}
 
@@ -1715,7 +1715,7 @@ func VerifiableChunkDataFixture(chunkIndex uint64, opts ...func(*flow.HeaderBody
 		endState = result.Chunks[index+1].StartState
 	}
 
-	chunkDataPack := ChunkDataPackFixture(chunk.ID(), func(c *flow.ChunkDataPack) {
+	chunkDataPack := ChunkDataPackFixture(chunk.Hash(), func(c *flow.ChunkDataPack) {
 		c.Collection = &col
 	})
 
@@ -1905,7 +1905,7 @@ func ChunkDataPacksFixtureAndResult() ([]*flow.ChunkDataPack, *flow.ExecutionRes
 	result := ExecutionResultFixture()
 	cdps := make([]*flow.ChunkDataPack, 0, len(result.Chunks))
 	for _, c := range result.Chunks {
-		cdps = append(cdps, ChunkDataPackFixture(c.ID()))
+		cdps = append(cdps, ChunkDataPackFixture(c.Hash()))
 	}
 	return cdps, result
 }
@@ -1932,7 +1932,7 @@ func BlockEventsFixture(
 	n int,
 ) flow.BlockEvents {
 	return flow.BlockEvents{
-		BlockID:        header.ID(),
+		BlockID:        header.Hash(),
 		BlockHeight:    header.Height,
 		BlockTimestamp: time.UnixMilli(int64(header.Timestamp)).UTC(),
 		Events:         EventsFixture(n),
@@ -2005,7 +2005,7 @@ func BootstrapExecutionResultFixture(
 	commit flow.StateCommitment,
 ) *flow.ExecutionResult {
 	result := &flow.ExecutionResult{
-		BlockID:          block.ID(),
+		BlockID:          block.Hash(),
 		PreviousResultID: flow.ZeroID,
 		Chunks:           chunks.ChunkListFromCommit(commit),
 	}
@@ -2088,7 +2088,7 @@ func QuorumCertificateFixture(opts ...func(*flow.QuorumCertificate)) *flow.Quoru
 func CertifyBlock(header *flow.Header) *flow.QuorumCertificate {
 	qc := QuorumCertificateFixture(func(qc *flow.QuorumCertificate) {
 		qc.View = header.View
-		qc.BlockID = header.ID()
+		qc.BlockID = header.Hash()
 	})
 	return qc
 }
@@ -2416,14 +2416,14 @@ func BootstrapFixtureWithSetupAndCommit(
 	if err != nil {
 		panic(err)
 	}
-	rootProtocolState, err := kvstore.NewDefaultKVStore(safetyParams.FinalizationSafetyThreshold, safetyParams.EpochExtensionViewCount, rootEpochState.ID())
+	rootProtocolState, err := kvstore.NewDefaultKVStore(safetyParams.FinalizationSafetyThreshold, safetyParams.EpochExtensionViewCount, rootEpochState.Hash())
 	if err != nil {
 		panic(err)
 	}
 
 	root := &flow.Block{
 		HeaderBody: header,
-		Payload:    flow.Payload{ProtocolStateID: rootProtocolState.ID()},
+		Payload:    flow.Payload{ProtocolStateID: rootProtocolState.Hash()},
 	}
 
 	stateCommit := GenesisStateCommitmentByChainID(header.ChainID)
@@ -2454,7 +2454,7 @@ func RootSnapshotFixtureWithChainID(
 	opts ...func(*flow.Block),
 ) *inmem.Snapshot {
 	block, result, seal := BootstrapFixtureWithChainID(participants.Sort(flow.Canonical[flow.Identity]), chainID, opts...)
-	qc := QuorumCertificateFixture(QCWithRootBlockID(block.ID()))
+	qc := QuorumCertificateFixture(QCWithRootBlockID(block.Hash()))
 	root, err := SnapshotFromBootstrapState(block, result, seal, qc)
 	if err != nil {
 		panic(err)
@@ -2524,13 +2524,13 @@ func ReceiptChainFor(
 ) []*flow.ExecutionReceipt {
 	receipts := make([]*flow.ExecutionReceipt, len(blocks))
 	receipts[0] = ExecutionReceiptFixture(WithResult(result0))
-	receipts[0].ExecutionResult.BlockID = blocks[0].ID()
+	receipts[0].ExecutionResult.BlockID = blocks[0].Hash()
 
 	for i := 1; i < len(blocks); i++ {
 		b := blocks[i]
 		prevReceipt := receipts[i-1]
 		receipt := ReceiptForBlockFixture(b)
-		receipt.ExecutionResult.PreviousResultID = prevReceipt.ExecutionResult.ID()
+		receipt.ExecutionResult.PreviousResultID = prevReceipt.ExecutionResult.Hash()
 		prevLastChunk := prevReceipt.ExecutionResult.Chunks[len(prevReceipt.ExecutionResult.Chunks)-1]
 		receipt.ExecutionResult.Chunks[0].StartState = prevLastChunk.EndState
 		receipts[i] = receipt
@@ -2550,12 +2550,12 @@ func ReconnectBlocksAndReceipts(blocks []*flow.Block, receipts []*flow.Execution
 		if prev.Height+1 != b.Height {
 			panic(fmt.Sprintf("height has gap when connecting blocks: expect %v, but got %v", prev.Height+1, b.Height))
 		}
-		b.ParentID = prev.ID()
-		receipts[i].ExecutionResult.BlockID = b.ID()
+		b.ParentID = prev.Hash()
+		receipts[i].ExecutionResult.BlockID = b.Hash()
 		prevReceipt := receipts[p]
-		receipts[i].ExecutionResult.PreviousResultID = prevReceipt.ExecutionResult.ID()
+		receipts[i].ExecutionResult.PreviousResultID = prevReceipt.ExecutionResult.Hash()
 		for _, c := range receipts[i].ExecutionResult.Chunks {
-			c.BlockID = b.ID()
+			c.BlockID = b.Hash()
 		}
 	}
 
@@ -2563,7 +2563,7 @@ func ReconnectBlocksAndReceipts(blocks []*flow.Block, receipts []*flow.Execution
 	for _, block := range blocks {
 		if len(block.Payload.Results) > 0 {
 			for i := range block.Payload.Receipts {
-				block.Payload.Receipts[i].ResultID = block.Payload.Results[i].ID()
+				block.Payload.Receipts[i].ResultID = block.Payload.Results[i].Hash()
 			}
 		}
 	}
@@ -2807,7 +2807,7 @@ func ChunkExecutionDataFixture(t *testing.T, minSize int, opts ...func(*executio
 	results := make([]flow.LightTransactionResult, len(collection.Transactions))
 	for i, tx := range collection.Transactions {
 		results[i] = flow.LightTransactionResult{
-			TransactionID:   tx.ID(),
+			TransactionID:   tx.Hash(),
 			Failed:          false,
 			ComputationUsed: uint64(i * 100),
 		}
@@ -2928,8 +2928,8 @@ func RootEpochProtocolStateFixture() *flow.RichEpochStateEntry {
 			MinEpochStateEntry: &flow.MinEpochStateEntry{
 				PreviousEpoch: nil,
 				CurrentEpoch: flow.EpochStateContainer{
-					SetupID:          currentEpochSetup.ID(),
-					CommitID:         currentEpochCommit.ID(),
+					SetupID:          currentEpochSetup.Hash(),
+					CommitID:         currentEpochCommit.Hash(),
 					ActiveIdentities: flow.DynamicIdentityEntryListFromIdentities(allIdentities),
 				},
 				EpochFallbackTriggered: false,
@@ -2996,13 +2996,13 @@ func EpochStateFixture(options ...func(*flow.RichEpochStateEntry)) *flow.RichEpo
 		EpochStateEntry: &flow.EpochStateEntry{
 			MinEpochStateEntry: &flow.MinEpochStateEntry{
 				CurrentEpoch: flow.EpochStateContainer{
-					SetupID:          currentEpochSetup.ID(),
-					CommitID:         currentEpochCommit.ID(),
+					SetupID:          currentEpochSetup.Hash(),
+					CommitID:         currentEpochCommit.Hash(),
 					ActiveIdentities: flow.DynamicIdentityEntryListFromIdentities(currentEpochIdentities),
 				},
 				PreviousEpoch: &flow.EpochStateContainer{
-					SetupID:          prevEpochSetup.ID(),
-					CommitID:         prevEpochCommit.ID(),
+					SetupID:          prevEpochSetup.Hash(),
+					CommitID:         prevEpochCommit.Hash(),
 					ActiveIdentities: flow.DynamicIdentityEntryListFromIdentities(prevEpochIdentities),
 				},
 				EpochFallbackTriggered: false,
@@ -3068,8 +3068,8 @@ func WithNextEpochProtocolState() func(entry *flow.RichEpochStateEntry) {
 			currentEpochParticipants.Map(mapfunc.WithEpochParticipationStatus(flow.EpochParticipationStatusLeaving)))
 
 		entry.NextEpoch = &flow.EpochStateContainer{
-			SetupID:          nextEpochSetup.ID(),
-			CommitID:         nextEpochCommit.ID(),
+			SetupID:          nextEpochSetup.Hash(),
+			CommitID:         nextEpochCommit.Hash(),
 			ActiveIdentities: flow.DynamicIdentityEntryListFromIdentities(nextEpochParticipants),
 		}
 		entry.NextEpochSetup = nextEpochSetup
@@ -3089,7 +3089,7 @@ func WithValidDKG() func(*flow.RichEpochStateEntry) {
 			commit.DKGIndexMap[nodeID] = index
 		}
 		// update CommitID according to new CurrentEpochCommit object
-		entry.MinEpochStateEntry.CurrentEpoch.CommitID = entry.CurrentEpochCommit.ID()
+		entry.MinEpochStateEntry.CurrentEpoch.CommitID = entry.CurrentEpochCommit.Hash()
 	}
 }
 

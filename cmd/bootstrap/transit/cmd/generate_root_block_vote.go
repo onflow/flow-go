@@ -124,5 +124,5 @@ func generateVote(c *cobra.Command, args []string) {
 		log.Fatal().Err(err).Msg("could not write vote to file")
 	}
 
-	log.Info().Msgf("node %v successfully generated vote file for block %v", nodeID, rootBlock.ID())
+	log.Info().Msgf("node %v successfully generated vote file for block %v", nodeID, rootBlock.Hash())
 }

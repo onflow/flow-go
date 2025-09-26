@@ -330,7 +330,7 @@ func (lookup *EpochLookup) EpochExtended(epochCounter uint64, _ *flow.Header, ex
 // No errors are expected to be returned by the process callback during normal operation.
 func (lookup *EpochLookup) EpochCommittedPhaseStarted(_ uint64, first *flow.Header) {
 	lookup.epochEvents <- func() error {
-		epoch, err := lookup.state.AtBlockID(first.ID()).Epochs().NextCommitted()
+		epoch, err := lookup.state.AtBlockID(first.Hash()).Epochs().NextCommitted()
 		if err != nil {
 			return fmt.Errorf("could not get next committed epoch: %w", err)
 		}

@@ -26,7 +26,7 @@ func TestPayloadStoreRetrieve(t *testing.T) {
 		block := unittest.BlockWithParentAndPayload(unittest.BlockHeaderWithHeight(10), expected)
 		proposal := unittest.ProposalFromBlock(block)
 		require.Equal(t, expected, block.Payload)
-		blockID := block.ID()
+		blockID := block.Hash()
 
 		err := unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
 			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {

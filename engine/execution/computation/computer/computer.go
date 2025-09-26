@@ -64,7 +64,7 @@ func newTransactionRequest(
 	txnBody *flow.TransactionBody,
 	lastTransactionInCollection bool,
 ) TransactionRequest {
-	txnId := txnBody.ID()
+	txnId := txnBody.Hash()
 	txnIdStr := txnId.String()
 
 	return TransactionRequest{

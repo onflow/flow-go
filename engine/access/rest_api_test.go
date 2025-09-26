@@ -250,14 +250,14 @@ func (suite *RestAPITestSuite) TestGetBlock() {
 				unittest.PayloadFixture(unittest.WithGuarantees(unittest.CollectionGuaranteesWithCollectionIDFixture(collections)...)),
 			),
 		)
-		suite.blocks.On("ByID", block.ID()).Return(block, nil)
+		suite.blocks.On("ByID", block.Hash()).Return(block, nil)
 		suite.blocks.On("ByHeight", block.Height).Return(block, nil)
-		suite.headers.On("BlockIDByHeight", block.Height).Return(block.ID(), nil)
+		suite.headers.On("BlockIDByHeight", block.Height).Return(block.Hash(), nil)
 		testBlocks[i] = block
-		testBlockIDs[i] = block.ID().String()
+		testBlockIDs[i] = block.Hash().String()
 
 		execResult := unittest.ExecutionResultFixture()
-		suite.executionResults.On("ByBlockID", block.ID()).Return(execResult, nil)
+		suite.executionResults.On("ByBlockID", block.Hash()).Return(execResult, nil)
 	}
 
 	suite.sealedBlock = testBlocks[len(testBlocks)-1].ToHeader()
@@ -268,16 +268,16 @@ func (suite *RestAPITestSuite) TestGetBlock() {
 	suite.Run("GetBlockByID for a single ID - happy path", func() {
 
 		testBlock := testBlocks[0]
-		suite.blocks.On("ByID", testBlock.ID()).Return(testBlock, nil).Once()
+		suite.blocks.On("ByID", testBlock.Hash()).Return(testBlock, nil).Once()
 
 		ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 		defer cancel()
 
-		respBlocks, resp, err := client.BlocksApi.BlocksIdGet(ctx, []string{testBlock.ID().String()}, optionsForBlockByID())
+		respBlocks, resp, err := client.BlocksApi.BlocksIdGet(ctx, []string{testBlock.Hash().String()}, optionsForBlockByID())
 		require.NoError(suite.T(), err)
 		require.Equal(suite.T(), http.StatusOK, resp.StatusCode)
 		require.Len(suite.T(), respBlocks, 1)
-		assert.Equal(suite.T(), testBlock.ID().String(), testBlock.ID().String())
+		assert.Equal(suite.T(), testBlock.Hash().String(), testBlock.Hash().String())
 
 		require.Nil(suite.T(), respBlocks[0].ExecutionResult)
 	})
@@ -296,7 +296,7 @@ func (suite *RestAPITestSuite) TestGetBlock() {
 		assert.Equal(suite.T(), http.StatusOK, resp.StatusCode)
 		assert.Len(suite.T(), actualBlocks, parser.MaxIDsLength)
 		for i, b := range testBlocks {
-			assert.Equal(suite.T(), b.ID().String(), actualBlocks[i].Header.Id)
+			assert.Equal(suite.T(), b.Hash().String(), actualBlocks[i].Header.Id)
 		}
 	})
 
@@ -314,7 +314,7 @@ func (suite *RestAPITestSuite) TestGetBlock() {
 		assert.Equal(suite.T(), http.StatusOK, resp.StatusCode)
 		assert.Len(suite.T(), actualBlocks, blkCnt)
 		for i := 0; i < blkCnt; i++ {
-			assert.Equal(suite.T(), testBlocks[i].ID().String(), actualBlocks[i].Header.Id)
+			assert.Equal(suite.T(), testBlocks[i].Hash().String(), actualBlocks[i].Header.Id)
 			assert.Equal(suite.T(), fmt.Sprintf("%d", testBlocks[i].Height), actualBlocks[i].Header.Height)
 		}
 	})
@@ -335,7 +335,7 @@ func (suite *RestAPITestSuite) TestGetBlock() {
 		assert.Equal(suite.T(), http.StatusOK, resp.StatusCode)
 		assert.Len(suite.T(), actualBlocks, lastIndex)
 		for i := 0; i < lastIndex; i++ {
-			assert.Equal(suite.T(), testBlocks[i].ID().String(), actualBlocks[i].Header.Id)
+			assert.Equal(suite.T(), testBlocks[i].Hash().String(), actualBlocks[i].Header.Id)
 			assert.Equal(suite.T(), fmt.Sprintf("%d", testBlocks[i].Height), actualBlocks[i].Header.Height)
 		}
 	})
@@ -349,7 +349,7 @@ func (suite *RestAPITestSuite) TestGetBlock() {
 		require.NoError(suite.T(), err)
 		assert.Equal(suite.T(), http.StatusOK, resp.StatusCode)
 		assert.Len(suite.T(), actualBlocks, 1)
-		assert.Equal(suite.T(), suite.finalizedBlock.ID().String(), actualBlocks[0].Header.Id)
+		assert.Equal(suite.T(), suite.finalizedBlock.Hash().String(), actualBlocks[0].Header.Id)
 	})
 
 	suite.Run("GetBlockByHeight for height=sealed happy path", func() {
@@ -361,7 +361,7 @@ func (suite *RestAPITestSuite) TestGetBlock() {
 		require.NoError(suite.T(), err)
 		assert.Equal(suite.T(), http.StatusOK, resp.StatusCode)
 		assert.Len(suite.T(), actualBlocks, 1)
-		assert.Equal(suite.T(), suite.sealedBlock.ID().String(), actualBlocks[0].Header.Id)
+		assert.Equal(suite.T(), suite.sealedBlock.Hash().String(), actualBlocks[0].Header.Id)
 	})
 
 	suite.Run("GetBlockByID with a non-existing block ID", func() {

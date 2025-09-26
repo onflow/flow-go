@@ -188,7 +188,7 @@ func (va *VoteAggregator) processQueuedMessages(ctx context.Context) error {
 			va.engineMetrics.MessageHandled(metrics.EngineVoteAggregator, metrics.MessageBlockVote)
 
 			if err != nil {
-				return fmt.Errorf("could not process pending vote %v for block %v: %w", vote.ID(), vote.BlockID, err)
+				return fmt.Errorf("could not process pending vote %v for block %v: %w", vote.Hash(), vote.BlockID, err)
 			}
 
 			continue
@@ -225,7 +225,7 @@ func (va *VoteAggregator) processQueuedVote(vote *model.Vote) error {
 	va.log.Debug().
 		Uint64("view", vote.View).
 		Hex("block_id", vote.BlockID[:]).
-		Str("vote_id", vote.ID().String()).
+		Str("vote_id", vote.Hash().String()).
 		Msg("vote has been processed successfully")
 
 	return nil
@@ -282,7 +282,7 @@ func (va *VoteAggregator) AddVote(vote *model.Vote) {
 	log := va.log.With().Uint64("block_view", vote.View).
 		Hex("block_id", vote.BlockID[:]).
 		Hex("voter", vote.SignerID[:]).
-		Str("vote_id", vote.ID().String()).Logger()
+		Str("vote_id", vote.Hash().String()).Logger()
 	// drop stale votes
 	if vote.View < va.lowestRetainedView.Value() {
 		log.Debug().Msg("drop stale votes")

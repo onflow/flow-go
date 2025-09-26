@@ -176,7 +176,7 @@ func (c *Collections) BatchStoreAndIndexByTransaction(lctx lockctx.Proof, collec
 	}
 
 	light := collection.Light()
-	collectionID := light.ID()
+	collectionID := light.Hash()
 
 	err := operation.UpsertCollection(rw.Writer(), light)
 	if err != nil {

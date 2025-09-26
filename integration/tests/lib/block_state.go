@@ -78,7 +78,7 @@ func (bs *BlockState) Add(t *testing.T, proposal *flow.Proposal) error {
 	defer bs.Unlock()
 
 	b := &proposal.Block
-	bs.blocksByID[b.ID()] = b
+	bs.blocksByID[b.Hash()] = b
 	bs.blocksByHeight[b.Height] = append(bs.blocksByHeight[b.Height], b)
 	if bs.highestProposed == nil {
 		bs.highestProposed = b

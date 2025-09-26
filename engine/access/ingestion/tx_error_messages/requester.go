@@ -77,7 +77,7 @@ func (r *RequesterImpl) Request(ctx context.Context) ([]flow.TransactionResultEr
 	backoff = retry.WithJitterPercent(15, backoff)
 
 	blockID := r.executionResult.BlockID
-	resultID := r.executionResult.ID()
+	resultID := r.executionResult.Hash()
 
 	var errorMessages []flow.TransactionResultErrorMessage
 

@@ -24,7 +24,7 @@ func TestClusterBlocks(t *testing.T) {
 		// add parent and mark its height as the latest finalized block
 		err := unittest.WithLock(t, lockManager, storage.LockInsertOrFinalizeClusterBlock, func(lctx lockctx.Context) error {
 			err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-				return operation.IndexClusterBlockHeight(lctx, rw.Writer(), parent.ChainID, parent.Height, parent.ID())
+				return operation.IndexClusterBlockHeight(lctx, rw.Writer(), parent.ChainID, parent.Height, parent.Hash())
 			})
 			require.NoError(t, err)
 
@@ -47,7 +47,7 @@ func TestClusterBlocks(t *testing.T) {
 			// FinalizeClusterBlock only needs LockInsertOrFinalizeClusterBlock
 			err = unittest.WithLock(t, lockManager, storage.LockInsertOrFinalizeClusterBlock, func(lctx2 lockctx.Context) error {
 				return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-					return procedure.FinalizeClusterBlock(lctx2, rw, block.ID())
+					return procedure.FinalizeClusterBlock(lctx2, rw, block.Hash())
 				})
 			})
 			require.NoError(t, err)
@@ -65,16 +65,16 @@ func TestClusterBlocks(t *testing.T) {
 			for _, block := range blocks {
 				retrievedBlock, err := clusterBlocks.ProposalByHeight(block.Height)
 				require.NoError(t, err)
-				require.Equal(t, block.ID(), retrievedBlock.Block.ID())
+				require.Equal(t, block.Hash(), retrievedBlock.Block.Hash())
 			}
 		})
 
 		t.Run("ByID", func(t *testing.T) {
 			// check if the block can be retrieved by ID
 			for _, block := range blocks {
-				retrievedBlock, err := clusterBlocks.ProposalByID(block.ID())
+				retrievedBlock, err := clusterBlocks.ProposalByID(block.Hash())
 				require.NoError(t, err)
-				require.Equal(t, block.ID(), retrievedBlock.Block.ID())
+				require.Equal(t, block.Hash(), retrievedBlock.Block.Hash())
 			}
 		})
 	})

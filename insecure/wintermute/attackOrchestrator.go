@@ -185,9 +185,9 @@ func (o *Orchestrator) handleExecutionReceiptEvent(receiptEvent *insecure.Egress
 	}
 
 	lg := o.logger.With().
-		Hex("receipt_id", logging.ID(receipt.ID())).
+		Hex("receipt_id", logging.ID(receipt.Hash())).
 		Hex("executor_id", logging.ID(receipt.ExecutorID)).
-		Hex("result_id", logging.ID(receipt.ExecutionResult.ID())).
+		Hex("result_id", logging.ID(receipt.ExecutionResult.Hash())).
 		Hex("block_id", logging.ID(receipt.ExecutionResult.BlockID)).
 		Hex("corrupted_id", logging.ID(receiptEvent.CorruptOriginId)).
 		Str("protocol", insecure.ProtocolStr(receiptEvent.Protocol)).
@@ -197,7 +197,7 @@ func (o *Orchestrator) handleExecutionReceiptEvent(receiptEvent *insecure.Egress
 
 	if _, _, conducted := o.AttackState(); conducted {
 		// an attack has already been conducted
-		if receipt.ExecutionResult.ID() == o.state.originalResult.ID() {
+		if receipt.ExecutionResult.Hash() == o.state.originalResult.Hash() {
 			// receipt contains the original result that has been corrupted.
 			// corrupted result must have already been sent to this node, so
 			// just discard it.
@@ -243,7 +243,7 @@ func (o *Orchestrator) handleExecutionReceiptEvent(receiptEvent *insecure.Egress
 			return fmt.Errorf("could not send rpc on channel: %w", err)
 		}
 		lg.Debug().
-			Hex("corrupted_result_id", logging.ID(corruptedResult.ID())).
+			Hex("corrupted_result_id", logging.ID(corruptedResult.Hash())).
 			Hex("corrupted_execution_id", logging.ID(corruptedExecutionId)).
 			Msg("corrupted result successfully sent to corrupted execution node")
 	}
@@ -251,7 +251,7 @@ func (o *Orchestrator) handleExecutionReceiptEvent(receiptEvent *insecure.Egress
 	// saves state of attack for further replies
 	o.updateAttackState(&receipt.ExecutionResult, corruptedResult)
 	lg.Info().
-		Hex("corrupted_result_id", logging.ID(corruptedResult.ID())).
+		Hex("corrupted_result_id", logging.ID(corruptedResult.Hash())).
 		Msg("result successfully corrupted")
 
 	return nil
@@ -365,7 +365,7 @@ func (o *Orchestrator) handleResultApprovalEvent(resultApprovalEvent *insecure.E
 
 	if _, _, conducted := o.AttackState(); conducted {
 		// an attack has already been conducted
-		if o.state.originalResult.ID() == approval.Body.ExecutionResultID {
+		if o.state.originalResult.Hash() == approval.Body.ExecutionResultID {
 			lg.Info().Msg("wintermuting result approval for original un-corrupted execution result")
 			return nil
 		}
@@ -394,7 +394,7 @@ func (o *Orchestrator) replyWithAttestation(chunkDataPackRequestEvent *insecure.
 
 		attestation := &flow.Attestation{
 			BlockID:           o.state.corruptedResult.BlockID,
-			ExecutionResultID: o.state.corruptedResult.ID(),
+			ExecutionResultID: o.state.corruptedResult.Hash(),
 			ChunkIndex:        corruptedChunkIndex,
 		}
 

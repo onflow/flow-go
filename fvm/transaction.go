@@ -10,7 +10,7 @@ func Transaction(
 	txn *flow.TransactionBody,
 	txnIndex uint32,
 ) *TransactionProcedure {
-	return NewTransaction(txn.ID(), txnIndex, txn)
+	return NewTransaction(txn.Hash(), txnIndex, txn)
 }
 
 func NewTransaction(

@@ -110,7 +110,7 @@ func (c *CoreImplSuite) TestCoreImpl_Download() {
 		core := c.createTestCoreImpl()
 		ctx := context.Background()
 
-		expectedExecutionData := unittest.BlockExecutionDataFixture(unittest.WithBlockExecutionDataBlockID(core.header.ID()))
+		expectedExecutionData := unittest.BlockExecutionDataFixture(unittest.WithBlockExecutionDataBlockID(core.header.Hash()))
 		c.execDataRequester.On("RequestExecutionData", mock.Anything).Return(expectedExecutionData, nil).Once()
 
 		expectedTxResultErrMsgs := unittest.TransactionResultErrorMessagesFixture(1)

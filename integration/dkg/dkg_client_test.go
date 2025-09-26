@@ -127,7 +127,7 @@ func (s *ClientSuite) TestBroadcastReadSingle() {
 	require.NoError(s.T(), err)
 
 	// verify the data recieved with data sent
-	messages, err := clients[0].ReadBroadcast(0, block.ID())
+	messages, err := clients[0].ReadBroadcast(0, block.Hash())
 	require.NoError(s.T(), err)
 	assert.Len(s.T(), messages, 1)
 

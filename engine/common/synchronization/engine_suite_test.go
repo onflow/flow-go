@@ -96,7 +96,7 @@ func (ss *SyncSuite) SetupTest() {
 	)
 	ss.state.On("AtBlockID", mock.Anything).Return(
 		func(blockID flow.Identifier) protocolint.Snapshot {
-			if ss.head.ID() == blockID {
+			if ss.head.Hash() == blockID {
 				return ss.snapshot
 			} else {
 				return unittest.StateSnapshotForUnknownBlock()

@@ -52,13 +52,13 @@ func NewLatestPersistedSealedResult(
 
 	// Note: the result-to-block relationship is indexed by the Access ingestion engine when a
 	// result is sealed.
-	result, err := results.ByBlockID(header.ID())
+	result, err := results.ByBlockID(header.Hash())
 	if err != nil {
 		return nil, fmt.Errorf("could not get result: %w", err)
 	}
 
 	return &LatestPersistedSealedResult{
-		resultID: result.ID(),
+		resultID: result.Hash(),
 		height:   height,
 		progress: progress,
 	}, nil

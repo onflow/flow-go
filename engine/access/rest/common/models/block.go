@@ -17,7 +17,7 @@ func NewBlock(
 	blockStatus flow.BlockStatus,
 	expand map[string]bool,
 ) (*Block, error) {
-	self, err := SelfLink(block.ID(), link.BlockLink)
+	self, err := SelfLink(block.Hash(), link.BlockLink)
 	if err != nil {
 		return nil, err
 	}
@@ -36,7 +36,7 @@ func NewBlock(
 		result.Payload = &payload
 	} else {
 		// else add the payload expandable link
-		payloadExpandable, err := link.PayloadLink(block.ID())
+		payloadExpandable, err := link.PayloadLink(block.Hash())
 		if err != nil {
 			return nil, err
 		}
@@ -55,7 +55,7 @@ func NewBlock(
 			result.ExecutionResult = &exeResult
 		} else {
 			// else add the execution result expandable link
-			executionResultExpandable, err := link.ExecutionResultLink(execResult.ID())
+			executionResultExpandable, err := link.ExecutionResultLink(execResult.Hash())
 			if err != nil {
 				return nil, err
 			}
@@ -79,7 +79,7 @@ func (b *Block) Build(
 	blockStatus flow.BlockStatus,
 	expand map[string]bool,
 ) error {
-	self, err := SelfLink(block.ID(), link.BlockLink)
+	self, err := SelfLink(block.Hash(), link.BlockLink)
 	if err != nil {
 		return err
 	}
@@ -99,7 +99,7 @@ func (b *Block) Build(
 		b.Payload = &payload
 	} else {
 		// else add the payload expandable link
-		payloadExpandable, err := link.PayloadLink(block.ID())
+		payloadExpandable, err := link.PayloadLink(block.Hash())
 		if err != nil {
 			return err
 		}
@@ -118,7 +118,7 @@ func (b *Block) Build(
 			b.ExecutionResult = &exeResult
 		} else {
 			// else add the execution result expandable link
-			executionResultExpandable, err := link.ExecutionResultLink(execResult.ID())
+			executionResultExpandable, err := link.ExecutionResultLink(execResult.Hash())
 			if err != nil {
 				return err
 			}
@@ -165,7 +165,7 @@ func (b *BlockPayload) Build(payload *flow.Payload) error {
 
 func NewBlockHeader(header *flow.Header) *BlockHeader {
 	return &BlockHeader{
-		Id:                   header.ID().String(),
+		Id:                   header.Hash().String(),
 		ParentId:             header.ParentID.String(),
 		Height:               util.FromUint(header.Height),
 		Timestamp:            time.UnixMilli(int64(header.Timestamp)).UTC(),
@@ -174,7 +174,7 @@ func NewBlockHeader(header *flow.Header) *BlockHeader {
 }
 
 func (b *BlockHeader) Build(header *flow.Header) {
-	b.Id = header.ID().String()
+	b.Id = header.Hash().String()
 	b.ParentId = header.ParentID.String()
 	b.Height = util.FromUint(header.Height)
 	b.Timestamp = time.UnixMilli(int64(header.Timestamp)).UTC()

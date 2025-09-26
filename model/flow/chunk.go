@@ -124,8 +124,8 @@ func NewRootChunk(
 	}
 }
 
-// ID returns the unique identifier of the Chunk
-func (ch *Chunk) ID() Identifier {
+// Hash returns the unique identifier of the Chunk
+func (ch *Chunk) Hash() Identifier {
 	return MakeID(ch)
 }
 
@@ -203,8 +203,8 @@ func NewChunkDataPack(untrusted UntrustedChunkDataPack) (*ChunkDataPack, error) 
 	}, nil
 }
 
-// ID returns a collision-resistant hash of the ChunkDataPack struct.
-func (c *ChunkDataPack) ID() Identifier {
+// Hash returns a collision-resistant hash of the ChunkDataPack struct.
+func (c *ChunkDataPack) Hash() Identifier {
 	return MakeID(c)
 }
 

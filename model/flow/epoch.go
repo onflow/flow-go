@@ -223,8 +223,8 @@ func (setup *EpochSetup) ServiceEvent() ServiceEvent {
 	}
 }
 
-// ID returns the hash of the event contents.
-func (setup *EpochSetup) ID() Identifier {
+// Hash returns the hash of the event contents.
+func (setup *EpochSetup) Hash() Identifier {
 	return MakeID(setup)
 }
 
@@ -317,8 +317,8 @@ func (er *EpochRecover) ServiceEvent() ServiceEvent {
 	}
 }
 
-// ID returns the hash of the event contents.
-func (er *EpochRecover) ID() Identifier {
+// Hash returns the hash of the event contents.
+func (er *EpochRecover) Hash() Identifier {
 	return MakeID(er)
 }
 
@@ -601,8 +601,8 @@ func (commit *EpochCommit) EncodeRLP(w io.Writer) error {
 	return rlp.Encode(w, rlpEncodable)
 }
 
-// ID returns the hash of the event contents.
-func (commit *EpochCommit) ID() Identifier {
+// Hash returns the hash of the event contents.
+func (commit *EpochCommit) Hash() Identifier {
 	return MakeID(commit)
 }
 

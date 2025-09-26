@@ -36,7 +36,7 @@ func TestSealedBlockHeaderReader(t *testing.T) {
 
 			retrieved, err := jobqueue.JobToBlockHeader(job)
 			assert.NoError(t, err)
-			assert.Equal(t, expected.ID(), retrieved.ID())
+			assert.Equal(t, expected.Hash(), retrieved.Hash())
 		}
 
 		// ensure the last block returns a NotFound error

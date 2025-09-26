@@ -97,7 +97,7 @@ func (s *SealingEngineSuite) TearDownTest() {
 func (s *SealingEngineSuite) TestOnFinalizedBlock() {
 
 	finalizedBlock := unittest.BlockHeaderFixture()
-	finalizedBlockID := finalizedBlock.ID()
+	finalizedBlockID := finalizedBlock.Hash()
 
 	s.state.On("Final").Return(unittest.StateSnapshotForKnownBlock(finalizedBlock, nil))
 	s.core.On("ProcessFinalizedBlock", finalizedBlockID).Return(nil).Once()
@@ -114,23 +114,23 @@ func (s *SealingEngineSuite) TestOnFinalizedBlock() {
 func (s *SealingEngineSuite) TestOnBlockIncorporated() {
 	parentBlock := unittest.BlockHeaderFixture()
 	incorporatedBlock := unittest.BlockHeaderWithParentFixture(parentBlock)
-	incorporatedBlockID := incorporatedBlock.ID()
+	incorporatedBlockID := incorporatedBlock.Hash()
 	// setup payload fixture
 	payload := unittest.PayloadFixture(unittest.WithAllTheFixins)
 	index := &flow.Index{}
 
 	for _, result := range payload.Results {
-		index.ResultIDs = append(index.ResultIDs, result.ID())
-		s.results.On("ByID", result.ID()).Return(result, nil).Once()
+		index.ResultIDs = append(index.ResultIDs, result.Hash())
+		s.results.On("ByID", result.Hash()).Return(result, nil).Once()
 
 		IR, err := flow.NewIncorporatedResult(flow.UntrustedIncorporatedResult{
-			IncorporatedBlockID: parentBlock.ID(),
+			IncorporatedBlockID: parentBlock.Hash(),
 			Result:              result,
 		})
 		require.NoError(s.T(), err)
 		s.core.On("ProcessIncorporatedResult", IR).Return(nil).Once()
 	}
-	s.index.On("ByBlockID", parentBlock.ID()).Return(index, nil)
+	s.index.On("ByBlockID", parentBlock.Hash()).Return(index, nil)
 
 	// setup headers storage
 	headers := &mockstorage.Headers{}
@@ -167,7 +167,7 @@ func (s *SealingEngineSuite) TestMultipleProcessingItems() {
 	for _, receipt := range receipts {
 		for j := 0; j < numApprovalsPerReceipt; j++ {
 			approval := unittest.ResultApprovalFixture(
-				unittest.WithExecutionResultID(receipt.ExecutionResult.ID()),
+				unittest.WithExecutionResultID(receipt.ExecutionResult.Hash()),
 				unittest.WithApproverID(approverID),
 			)
 

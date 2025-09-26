@@ -305,7 +305,7 @@ func rootBlock(cmd *cobra.Command, args []string) {
 			kvStoreVersion,
 			flagFinalizationSafetyThreshold,
 			flagEpochExtensionViewCount,
-			minEpochStateEntry.ID(),
+			minEpochStateEntry.Hash(),
 		)
 		if err != nil {
 			log.Fatal().Err(err).Msgf("failed to construct root kvstore with version: %d", kvStoreVersion)
@@ -314,13 +314,13 @@ func rootBlock(cmd *cobra.Command, args []string) {
 		rootProtocolState, err = kvstore.NewDefaultKVStore(
 			flagFinalizationSafetyThreshold,
 			flagEpochExtensionViewCount,
-			minEpochStateEntry.ID(),
+			minEpochStateEntry.Hash(),
 		)
 		if err != nil {
 			log.Fatal().Err(err).Msg("failed to construct default root kvstore")
 		}
 	}
-	block, err := constructRootBlock(headerBody, rootProtocolState.ID())
+	block, err := constructRootBlock(headerBody, rootProtocolState.Hash())
 	if err != nil {
 		log.Fatal().Err(err).Msg("failed to construct root block")
 	}

@@ -126,7 +126,7 @@ func TestHandleChunkDataPack_HappyPath(t *testing.T) {
 	// we remove pending request on receiving this response
 	locators := chunks.LocatorMap{}
 	locator := unittest.ChunkLocatorFixture(request.ResultID, request.Index)
-	locators[locator.ID()] = locator
+	locators[locator.Hash()] = locator
 	s.pendingRequests.On("PopAll", responseMsg.ChunkDataPack.ChunkID).Return(locators, true).Once()
 
 	s.handler.On("HandleChunkDataPack", originID, &verification.ChunkDataPackResponse{
@@ -363,7 +363,7 @@ func TestReceivingChunkDataResponseForDuplicateChunkRequests(t *testing.T) {
 
 	resultA, _, _, _ := vertestutils.ExecutionResultForkFixture(t)
 
-	duplicateChunkID := resultA.Chunks[0].ID()
+	duplicateChunkID := resultA.Chunks[0].Hash()
 	responseMsgA := unittest.ChunkDataResponseMsgFixture(duplicateChunkID)
 	responseInternalA, err := responseMsgA.ToInternal()
 	require.NoError(t, err)
@@ -401,7 +401,7 @@ func TestHandleChunkDataPack_DuplicateChunkIDs_Sealed(t *testing.T) {
 	vertestutils.MockLastSealedHeight(s.state, sealedHeight)
 
 	resultA, _, _, _ := vertestutils.ExecutionResultForkFixture(t)
-	duplicateChunkID := resultA.Chunks[0].ID()
+	duplicateChunkID := resultA.Chunks[0].Hash()
 	requestA := unittest.ChunkDataPackRequestFixture(unittest.WithChunkID(duplicateChunkID), unittest.WithHeight(uint64(sealedHeight-1)))
 	requestB := unittest.ChunkDataPackRequestFixture(unittest.WithChunkID(duplicateChunkID), unittest.WithHeight(uint64(sealedHeight-1)))
 	requests := verification.ChunkDataPackRequestList{requestA, requestB}
@@ -633,7 +633,7 @@ func mockChunkDataPackHandler(t *testing.T, handler *mockfetcher.ChunkDataPackHa
 			require.True(t, requests.ContainsChunkID(response.Cdp.ChunkID))
 
 			// invocation should be distinct per chunk ID
-			locatorID := unittest.ChunkLocatorFixture(response.ResultID, response.Index).ID()
+			locatorID := unittest.ChunkLocatorFixture(response.ResultID, response.Index).Hash()
 			_, ok = handledLocators[locatorID]
 			require.False(t, ok)
 
@@ -664,7 +664,7 @@ func mockNotifyBlockSealedHandler(t *testing.T, handler *mockfetcher.ChunkDataPa
 			require.True(t, requests.ContainsLocator(resultID, chunkIndex))
 
 			// invocation should be distinct per chunk ID
-			locatorID := unittest.ChunkLocatorFixture(resultID, chunkIndex).ID()
+			locatorID := unittest.ChunkLocatorFixture(resultID, chunkIndex).Hash()
 			_, ok = seen[locatorID]
 			require.False(t, ok)
 			seen[locatorID] = struct{}{}
@@ -693,7 +693,7 @@ func mockPendingRequestsPopAll(t *testing.T, pendingRequests *mempool.ChunkReque
 				for _, request := range requests {
 					if request.ChunkID == chunkID {
 						locator := request.Locator
-						locators[locator.ID()] = &locator
+						locators[locator.Hash()] = &locator
 					}
 				}
 

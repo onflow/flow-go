@@ -18,7 +18,7 @@ func TestInsertEpochProtocolState(t *testing.T) {
 	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
 		expected := unittest.EpochStateFixture().MinEpochStateEntry
 
-		epochProtocolStateEntryID := expected.ID()
+		epochProtocolStateEntryID := expected.Hash()
 		err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 			return operation.InsertEpochProtocolState(rw.Writer(), epochProtocolStateEntryID, expected)
 		})

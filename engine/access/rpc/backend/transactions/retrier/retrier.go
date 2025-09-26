@@ -96,7 +96,7 @@ func (r *RetrierImpl) RegisterTransaction(height uint64, tx *flow.TransactionBod
 	if r.pendingTransactions[height] == nil {
 		r.pendingTransactions[height] = make(map[flow.Identifier]*flow.TransactionBody)
 	}
-	r.pendingTransactions[height][tx.ID()] = tx
+	r.pendingTransactions[height][tx.Hash()] = tx
 }
 
 func (r *RetrierImpl) prune(height uint64) {
@@ -172,7 +172,7 @@ func (r *RetrierImpl) lookupBlock(txID flow.Identifier) (*flow.Block, error) {
 		return nil, err
 	}
 
-	block, err := r.blocks.ByCollectionID(collection.ID())
+	block, err := r.blocks.ByCollectionID(collection.Hash())
 	if err != nil {
 		return nil, err
 	}

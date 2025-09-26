@@ -386,7 +386,7 @@ func (s *CollectionSyncer) findLowestBlockHeightWithMissingCollections(
 
 // OnCollectionDownloaded indexes and persists a downloaded collection.
 // This is a callback intended to be used with the requester engine.
-func (s *CollectionSyncer) OnCollectionDownloaded(_ flow.Identifier, entity flow.Entity) {
+func (s *CollectionSyncer) OnCollectionDownloaded(_ flow.Identifier, entity flow.Hashable) {
 	collection, ok := entity.(*flow.Collection)
 	if !ok {
 		s.logger.Error().Msgf("invalid entity type (%T)", entity)

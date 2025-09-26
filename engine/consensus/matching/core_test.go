@@ -248,7 +248,7 @@ func (ms *MatchingSuite) TestRequestPendingReceipts() {
 
 	// Expecting all blocks to be requested: from sealed height + 1 up to (incl.) latest finalized
 	for i := 1; i < n; i++ {
-		id := orderedBlocks[i].ID()
+		id := orderedBlocks[i].Hash()
 		ms.requester.On("Query", id, mock.Anything).Return().Once()
 	}
 	ms.SealsPL.On("All").Return([]*flow.IncorporatedResultSeal{}).Maybe()
@@ -285,14 +285,14 @@ func (ms *MatchingSuite) TestRequestSecondPendingReceipt() {
 	ms.ReceiptsPL.On("AddReceipt", receipt2, ms.LatestFinalizedBlock.ToHeader()).Return(false, nil).Maybe()
 
 	// Situation A: we have _once_ receipt for an unsealed finalized block in storage
-	ms.ReceiptsDB.On("ByBlockID", ms.LatestFinalizedBlock.ID()).Return(flow.ExecutionReceiptList{receipt1}, nil).Once()
-	ms.requester.On("Query", ms.LatestFinalizedBlock.ID(), mock.Anything).Return().Once() // Core should trigger requester to re-request a second receipt
+	ms.ReceiptsDB.On("ByBlockID", ms.LatestFinalizedBlock.Hash()).Return(flow.ExecutionReceiptList{receipt1}, nil).Once()
+	ms.requester.On("Query", ms.LatestFinalizedBlock.Hash(), mock.Anything).Return().Once() // Core should trigger requester to re-request a second receipt
 	_, _, err := ms.core.requestPendingReceipts()
 	ms.Require().NoError(err, "should request results for pending blocks")
 	ms.requester.AssertExpectations(ms.T()) // asserts that requester.Query(<blockID>, filter.Any) was called
 
 	// Situation B: we have _two_ receipts for an unsealed finalized block storage
-	ms.ReceiptsDB.On("ByBlockID", ms.LatestFinalizedBlock.ID()).Return(flow.ExecutionReceiptList{receipt1, receipt2}, nil).Once()
+	ms.ReceiptsDB.On("ByBlockID", ms.LatestFinalizedBlock.Hash()).Return(flow.ExecutionReceiptList{receipt1, receipt2}, nil).Once()
 	_, _, err = ms.core.requestPendingReceipts()
 	ms.Require().NoError(err, "should request results for pending blocks")
 	ms.requester.AssertExpectations(ms.T()) // asserts that requester.Query(<blockID>, filter.Any) was called

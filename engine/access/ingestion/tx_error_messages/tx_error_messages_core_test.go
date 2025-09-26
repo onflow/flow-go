@@ -115,7 +115,7 @@ func (s *TxErrorMessagesCoreSuite) TestHandleTransactionResultErrorMessages() {
 	irrecoverableCtx := irrecoverable.NewMockSignalerContext(s.T(), s.ctx)
 
 	block := unittest.BlockWithParentFixture(s.finalizedBlock)
-	blockId := block.ID()
+	blockId := block.Hash()
 
 	s.connFactory.On("GetExecutionAPIClient", mock.Anything).Return(s.execClient, &mockCloser{}, nil)
 
@@ -180,7 +180,7 @@ func (s *TxErrorMessagesCoreSuite) TestHandleTransactionResultErrorMessages_Erro
 	irrecoverableCtx := irrecoverable.NewMockSignalerContext(s.T(), s.ctx)
 
 	block := unittest.BlockWithParentFixture(s.finalizedBlock)
-	blockId := block.ID()
+	blockId := block.Hash()
 
 	s.connFactory.On("GetExecutionAPIClient", mock.Anything).Return(s.execClient, &mockCloser{}, nil)
 
@@ -322,7 +322,7 @@ func setupReceiptsForBlock(receipts *storage.ExecutionReceipts, block *flow.Bloc
 	receiptsList := flow.ExecutionReceiptList{receipt1, receipt2}
 
 	receipts.
-		On("ByBlockID", block.ID()).
+		On("ByBlockID", block.Hash()).
 		Return(func(flow.Identifier) flow.ExecutionReceiptList {
 			return receiptsList
 		}, nil)

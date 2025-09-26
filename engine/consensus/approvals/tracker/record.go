@@ -60,9 +60,9 @@ func (r *SealingRecord) Generate() (Rec, error) {
 		rec[k] = v
 	}
 
-	irID := r.IncorporatedResult.ID()
+	irID := r.IncorporatedResult.Hash()
 	result := r.IncorporatedResult.Result
-	resultID := result.ID()
+	resultID := result.Hash()
 	executedBlock, err := r.headersDB.ByBlockID(result.BlockID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to retrieve executed block %v: %w", result.BlockID, err)
@@ -117,7 +117,7 @@ func (r *SealingRecord) assignmentFinalizationStatus(incorporatingBlock *flow.He
 		return nil, fmt.Errorf("failed to retrieve incorporating block %v: %w", r.IncorporatedResult.IncorporatedBlockID, err)
 	}
 	var stat string
-	if finalizedBlockAtSameHeight.ID() == r.IncorporatedResult.IncorporatedBlockID {
+	if finalizedBlockAtSameHeight.Hash() == r.IncorporatedResult.IncorporatedBlockID {
 		stat = "finalized"
 	} else {
 		stat = "orphaned"

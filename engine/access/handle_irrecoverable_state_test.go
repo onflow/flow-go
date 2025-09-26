@@ -239,8 +239,8 @@ func (suite *IrrecoverableStateTestSuite) TestRestInconsistentNodeState() {
 			unittest.PayloadFixture(unittest.WithGuarantees(unittest.CollectionGuaranteesWithCollectionIDFixture(collections)...)),
 		),
 	)
-	suite.blocks.On("ByID", block.ID()).Return(block, nil)
-	suite.headers.On("BlockIDByHeight", block.Height).Return(block.ID(), nil)
+	suite.blocks.On("ByID", block.Hash()).Return(block, nil)
+	suite.headers.On("BlockIDByHeight", block.Height).Return(block.Hash(), nil)
 
 	err := fmt.Errorf("inconsistent node's state")
 	suite.snapshot.On("Head").Return(nil, err)
@@ -252,7 +252,7 @@ func (suite *IrrecoverableStateTestSuite) TestRestInconsistentNodeState() {
 	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
 	defer cancel()
 
-	actual, _, err := client.BlocksApi.BlocksIdGet(ctx, []string{block.ID().String()}, optionsForBlocksIdGetOpts())
+	actual, _, err := client.BlocksApi.BlocksIdGet(ctx, []string{block.Hash().String()}, optionsForBlocksIdGetOpts())
 	suite.Require().Error(err)
 	suite.Require().Nil(actual)
 }

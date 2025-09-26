@@ -29,7 +29,7 @@ func (f *clusterBlockFactory) WithParent(parent *cluster.Block) func(*cluster.Bl
 		block.View = parent.View + 1
 		block.ChainID = parent.ChainID
 		block.Timestamp = uint64(time.Now().UnixMilli())
-		block.ParentID = parent.ID()
+		block.ParentID = parent.Hash()
 		block.ParentView = parent.View
 	}
 }

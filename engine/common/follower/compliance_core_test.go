@@ -102,7 +102,7 @@ func (s *CoreSuite) TestProcessingSingleBlock() {
 
 	err := s.core.OnBlockRange(s.originID, []*flow.Proposal{proposal})
 	require.NoError(s.T(), err)
-	require.NotNil(s.T(), s.core.pendingCache.Peek(block.ID()))
+	require.NotNil(s.T(), s.core.pendingCache.Peek(block.Hash()))
 
 	err = s.core.OnBlockRange(s.originID, []*flow.Proposal{proposal})
 	require.NoError(s.T(), err)
@@ -122,7 +122,7 @@ func (s *CoreSuite) TestAddFinalizedBlock() {
 
 	err := s.core.OnBlockRange(s.originID, []*flow.Proposal{proposal})
 	require.NoError(s.T(), err)
-	require.Nil(s.T(), s.core.pendingCache.Peek(block.ID()))
+	require.Nil(s.T(), s.core.pendingCache.Peek(block.Hash()))
 }
 
 // TestProcessingRangeHappyPath tests processing range of blocks with length > 1, which should result
@@ -144,7 +144,7 @@ func (s *CoreSuite) TestProcessingRangeHappyPath() {
 			CertifyingQC: proposals[i].Block.ParentQC(),
 		}
 		s.state.On("ExtendCertified", mock.Anything, expectCertified).Return(nil).Once()
-		s.follower.On("AddCertifiedBlock", blockWithID(proposals[i-1].Block.ID())).Run(func(args mock.Arguments) {
+		s.follower.On("AddCertifiedBlock", blockWithID(proposals[i-1].Block.Hash())).Run(func(args mock.Arguments) {
 			wg.Done()
 		}).Return().Once()
 	}
@@ -217,7 +217,7 @@ func (s *CoreSuite) TestProcessingConnectedRangesOutOfOrder() {
 	var wg sync.WaitGroup
 	wg.Add(len(blocks) - 1)
 	for _, block := range blocks[:len(blocks)-1] {
-		s.follower.On("AddCertifiedBlock", blockWithID(block.Block.ID())).Return().Run(func(args mock.Arguments) {
+		s.follower.On("AddCertifiedBlock", blockWithID(block.Block.Hash())).Return().Run(func(args mock.Arguments) {
 			wg.Done()
 		}).Once()
 	}
@@ -231,7 +231,7 @@ func (s *CoreSuite) TestProcessingConnectedRangesOutOfOrder() {
 					"blocks submitted to protocol state are not sequential at height %d", certified.Proposal.Block.Height)
 			}
 		}
-		lastSubmittedBlockID = certified.Proposal.Block.ID()
+		lastSubmittedBlockID = certified.Proposal.Block.Hash()
 	}).Return(nil).Times(len(blocks) - 1)
 
 	s.validator.On("ValidateProposal", mock.Anything).Return(nil).Once()
@@ -275,7 +275,7 @@ func (s *CoreSuite) TestConcurrentAdd() {
 	blocksPerBatch := 10
 	blocksPerWorker := blocksPerBatch * batchesPerWorker
 	blocks := unittest.ProposalChainFixtureFrom(workers*blocksPerWorker, s.finalizedBlock)
-	targetSubmittedBlockID := blocks[len(blocks)-2].Block.ID()
+	targetSubmittedBlockID := blocks[len(blocks)-2].Block.Hash()
 	require.Lessf(s.T(), len(blocks), defaultPendingBlocksCacheCapacity, "this test works under assumption that we operate under cache upper limit")
 
 	s.validator.On("ValidateProposal", mock.Anything).Return(nil) // any proposal is valid
@@ -297,7 +297,7 @@ func (s *CoreSuite) TestConcurrentAdd() {
 					"blocks submitted to protocol state are not sequential at height %d", certified.Proposal.Block.Height)
 			}
 		}
-		lastSubmittedBlockID = certified.Proposal.Block.ID()
+		lastSubmittedBlockID = certified.Proposal.Block.Hash()
 	}).Return(nil).Times(len(blocks) - 1)
 
 	var wg sync.WaitGroup

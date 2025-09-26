@@ -71,7 +71,7 @@ func TestOrderedSeals(t *testing.T) {
 		blocks := unittest.ChainFixtureFrom(10, unittest.BlockHeaderFixture())
 		seals := unittest.Seal.Fixtures(10)
 		for i, seal := range seals {
-			seal.BlockID = blocks[i].ID()
+			seal.BlockID = blocks[i].Hash()
 			headers.On("ByBlockID", seal.BlockID).Return(blocks[i].ToHeader(), nil)
 		}
 		payload := unittest.PayloadFixture(unittest.WithSeals(seals...))
@@ -86,7 +86,7 @@ func TestOrderedSeals(t *testing.T) {
 		blocks := unittest.ChainFixtureFrom(10, genesisBlock.ToHeader())
 		orderedSeals := unittest.Seal.Fixtures(len(blocks))
 		for i, seal := range orderedSeals {
-			seal.BlockID = blocks[i].ID()
+			seal.BlockID = blocks[i].Hash()
 			headers.On("ByBlockID", seal.BlockID).Return(blocks[i].ToHeader(), nil)
 		}
 		unorderedSeals := make([]*flow.Seal, len(orderedSeals))

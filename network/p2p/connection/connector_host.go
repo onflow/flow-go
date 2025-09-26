@@ -75,12 +75,12 @@ func (c *ConnectorHost) ClosePeer(id peer.ID) error {
 	return c.h.Network().ClosePeer(id)
 }
 
-// ID returns the peer.ID of the underlying host.
+// Hash returns the peer.ID of the underlying host.
 // Returns:
 //
 //	peer.ID of the underlying host.
 //
-// ID returns the peer.ID of the underlying host.
+// Hash returns the peer.ID of the underlying host.
 func (c *ConnectorHost) ID() peer.ID {
 	return c.h.ID()
 }
