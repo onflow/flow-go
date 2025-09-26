@@ -31,8 +31,8 @@ func (c *NoopProcessor) Status() hotstuff.VoteCollectorStatus { return c.status 
 
 // EnsureVoteForBlock verifies that the vote is for the given block.
 // Returns nil on success and sentinel errors:
-//   - model.VoteForIncompatibleViewError if the vote is from a different view than block
-//   - model.VoteForIncompatibleBlockError if the vote is from the same view as block
+//   - [VoteForIncompatibleViewError] if the vote is from a different view than block
+//   - [VoteForIncompatibleBlockError] if the vote is from the same view as block
 //     but for a different blockID
 func EnsureVoteForBlock(vote *model.Vote, block *model.Block) error {
 	if vote.View != block.View {
