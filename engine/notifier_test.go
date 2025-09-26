@@ -52,7 +52,6 @@ func TestNotifier_ManyNotifications(t *testing.T) {
 	t.Parallel()
 	notifier := NewNotifier()
 
-	// send 10 notifications
 	var counter sync.WaitGroup
 	for range 10 {
 		counter.Go(func() {
@@ -60,7 +59,6 @@ func TestNotifier_ManyNotifications(t *testing.T) {
 		})
 	}
 
-	// wait for all gorountines to complete
 	counter.Wait()
 
 	// attempt to consume first notification:
@@ -165,7 +163,7 @@ func TestNotifier_AllWorkProcessed(t *testing.T) {
 				}()
 			}
 
-			// wait for all consumer to be ready for new notification.
+			// wait for all consumers to be ready for new notification.
 			synctest.Wait()
 
 			// 10 routines pushing work
