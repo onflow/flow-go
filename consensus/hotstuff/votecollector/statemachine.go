@@ -123,7 +123,15 @@ func (m *VoteCollector) AddVote(vote *model.Vote) error {
 	return nil
 }
 
-// processVote uses compare-and-repeat pattern to process vote with underlying vote processor
+// processVote uses compare-and-repeat pattern to process vote with underlying vote processor.
+// All expected errors are handled internally. Under normal execution only exceptions are
+// propagated to caller.
+//
+// PREREQUISITE: This method should only be called for votes that were successfully added to
+// `votesCache` (identical duplicates are ok). Therefore, we don't have to deal here with
+// equivocation (same replica voting for different blocks) or inconsistent votes (replica
+// emitting votes with inconsistent signatures for the same block), because such votes were
+// already filtered out by the cache.
 func (m *VoteCollector) processVote(vote *model.Vote) error {
 	for {
 		processor := m.atomicLoadProcessor()
@@ -131,17 +139,34 @@ func (m *VoteCollector) processVote(vote *model.Vote) error {
 		err := processor.Process(vote)
 		if err != nil {
 			if invalidVoteErr, ok := model.AsInvalidVoteError(err); ok {
+				// vote is invalid, which we only notice once we try to add it to the [VerifyingVoteProcessor]
 				m.notifier.OnInvalidVoteDetected(*invalidVoteErr)
 				return nil
 			}
 			if doubleVoteErr, ok := model.AsDoubleVoteError(err); ok {
+				// This error is returned when votes equivocation has been detected. Such behavior can be detected
+				// in our concurrent implementation. When the block proposal for the view arrives:
+				//  (A1) `votesProcessor` transitions from [VoteCollectorStatusCaching] to [VoteCollectorStatusVerifying]
+				//  (A2) the cached votes are fed into the [VerifyingVoteProcessor]
+				// However, to increase concurrency, step (A1) and (A2) are _not_ atomically happening together.
+				// Therefore, the following event (B) might happen _in between_:
+				//  (B) A newly-arriving vote V is first cached and then processed by the [VerifyingVoteProcessor].
+				// In this scenario, vote V is already included in the [VerifyingVoteProcessor]. Nevertheless, step (A2)
+				// will attempt to add V again to the [VerifyingVoteProcessor], because the vote is in the cache and in case
+				// those votes are not identical then it's a proof of equivocation.
 				m.notifier.OnDoubleVotingDetected(doubleVoteErr.FirstVote, doubleVoteErr.ConflictingVote)
 				return nil
 			}
-			// ATTENTION: due to how our logic is designed this situation is only possible
-			// where we receive the same vote twice, this is not a case of double voting.
-			// This scenario is possible if leader submits his vote additionally to the vote in proposal.
 			if model.IsDuplicatedSignerError(err) {
+				// This error is returned for repetitions of exactly the same vote. Such repetitions can occur (as race
+				// condition) in our concurrent implementation. When the block proposal for the view arrives:
+				//  (A1) `votesProcessor` transitions from [VoteCollectorStatusCaching] to [VoteCollectorStatusVerifying]
+				//  (A2) the cached votes are fed into the [VerifyingVoteProcessor]
+				// However, to increase concurrency, step (A1) and (A2) are _not_ atomically happening together.
+				// Therefore, the following event (B) might happen _in between_:
+				//  (B) A newly-arriving vote V is first cached and then processed by the [VerifyingVoteProcessor].
+				// In this scenario, vote V is already included in the [VerifyingVoteProcessor]. Nevertheless, step (A2)
+				// will attempt to add V again to the [VerifyingVoteProcessor], because the vote is in the cache.
 				m.log.Debug().Msgf("duplicated signer %x", vote.SignerID)
 				return nil
 			}
