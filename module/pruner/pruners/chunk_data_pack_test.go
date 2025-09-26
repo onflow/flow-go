@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/cockroachdb/pebble/v2"
+	"github.com/jordanschalm/lockctx"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/module/metrics"
@@ -18,6 +19,7 @@ import (
 func TestChunkDataPackPruner(t *testing.T) {
 
 	unittest.RunWithPebbleDB(t, func(pebbleDB *pebble.DB) {
+		lockManager := storage.NewTestingLockManager()
 		m := metrics.NewNoopCollector()
 		db := pebbleimpl.ToDB(pebbleDB)
 		results := store.NewExecutionResults(m, db)
@@ -29,7 +31,9 @@ func TestChunkDataPackPruner(t *testing.T) {
 		// store the chunks
 		cdp1, result1 := unittest.ChunkDataPacksFixtureAndResult()
 		require.NoError(t, results.Store(result1))
-		require.NoError(t, chunks.Store(cdp1))
+		require.NoError(t, unittest.WithLock(t, lockManager, storage.LockInsertChunkDataPack, func(lctx lockctx.Context) error {
+			return chunks.StoreByChunkID(lctx, cdp1)
+		}))
 
 		pruner := NewChunkDataPackPruner(chunks, results)
 

@@ -397,6 +397,8 @@ func (s *state) SaveExecutionResults(
 	return nil
 }
 
+// saveExecutionResults saves all data related to the execution of a block.
+// It is concurrent-safe
 func (s *state) saveExecutionResults(
 	ctx context.Context,
 	result *execution.ComputationResult,
@@ -408,73 +410,72 @@ func (s *state) saveExecutionResults(
 		return fmt.Errorf("can not retrieve chunk data packs: %w", err)
 	}
 
-	err = s.chunkDataPacks.Store(chunks)
-	if err != nil {
-		return fmt.Errorf("can not store multiple chunk data pack: %w", err)
-	}
+	// Acquire both locks to ensure it's concurrent safe when inserting the execution results and chunk data packs.
+	return storage.WithLocks(s.lockManager, []string{storage.LockInsertOwnReceipt, storage.LockInsertChunkDataPack}, func(lctx lockctx.Context) error {
+		err := s.chunkDataPacks.StoreByChunkID(lctx, chunks)
+		if err != nil {
+			return fmt.Errorf("can not store multiple chunk data pack: %w", err)
+		}
 
-	lctx := s.lockManager.NewContext()
-	defer lctx.Release()
-	err = lctx.AcquireLock(storage.LockInsertOwnReceipt)
-	if err != nil {
-		return err
-	}
-
-	// Save entire execution result (including all chunk data packs) within one batch to minimize
-	// the number of database interactions. This is a large batch of data, which might not be
-	// committed within a single operation (e.g. if using Badger DB as storage backend, which has
-	// a size limit for its transactions).
-	return s.db.WithReaderBatchWriter(func(batch storage.ReaderBatchWriter) error {
-		batch.AddCallback(func(err error) {
-			// Rollback if an error occurs during batch operations
-			if err != nil {
-				chunkIDs := make([]flow.Identifier, 0, len(chunks))
-				for _, chunk := range chunks {
-					chunkIDs = append(chunkIDs, chunk.ChunkID)
+		// Save entire execution result (including all chunk data packs) within one batch to minimize
+		// the number of database interactions.
+		return s.db.WithReaderBatchWriter(func(batch storage.ReaderBatchWriter) error {
+			batch.AddCallback(func(err error) {
+				// Rollback if an error occurs during batch operations
+				// Chunk data packs are saved in a separate database, there is a chance
+				// that execution result was failed to save, but chunk data packs was saved and
+				// didnt get removed.
+				// TODO(leo): when retrieving chunk data packs, we need to add a check to ensure the block
+				// has been executed before returning chunk data packs
+				if err != nil {
+					chunkIDs := make([]flow.Identifier, 0, len(chunks))
+					for _, chunk := range chunks {
+						chunkIDs = append(chunkIDs, chunk.ChunkID)
+					}
+					_ = s.chunkDataPacks.Remove(chunkIDs)
 				}
-				_ = s.chunkDataPacks.Remove(chunkIDs)
+			})
+
+			err = s.events.BatchStore(blockID, []flow.EventsList{result.AllEvents()}, batch)
+			if err != nil {
+				return fmt.Errorf("cannot store events: %w", err)
 			}
+
+			err = s.serviceEvents.BatchStore(blockID, result.AllServiceEvents(), batch)
+			if err != nil {
+				return fmt.Errorf("cannot store service events: %w", err)
+			}
+
+			err = s.transactionResults.BatchStore(
+				blockID,
+				result.AllTransactionResults(),
+				batch)
+			if err != nil {
+				return fmt.Errorf("cannot store transaction result: %w", err)
+			}
+
+			executionResult := &result.ExecutionReceipt.ExecutionResult
+			// saving my receipts will also save the execution result
+			err = s.myReceipts.BatchStoreMyReceipt(lctx, result.ExecutionReceipt, batch)
+			if err != nil {
+				return fmt.Errorf("could not persist execution result: %w", err)
+			}
+
+			err = s.results.BatchIndex(blockID, executionResult.ID(), batch)
+			if err != nil {
+				return fmt.Errorf("cannot index execution result: %w", err)
+			}
+
+			// the state commitment is the last data item to be stored, so that
+			// IsBlockExecuted can be implemented by checking whether state commitment exists
+			// in the database
+			err = s.commits.BatchStore(lctx, blockID, result.CurrentEndState(), batch)
+			if err != nil {
+				return fmt.Errorf("cannot store state commitment: %w", err)
+			}
+
+			return nil
 		})
-
-		err = s.events.BatchStore(blockID, []flow.EventsList{result.AllEvents()}, batch)
-		if err != nil {
-			return fmt.Errorf("cannot store events: %w", err)
-		}
-
-		err = s.serviceEvents.BatchStore(blockID, result.AllServiceEvents(), batch)
-		if err != nil {
-			return fmt.Errorf("cannot store service events: %w", err)
-		}
-
-		err = s.transactionResults.BatchStore(
-			blockID,
-			result.AllTransactionResults(),
-			batch)
-		if err != nil {
-			return fmt.Errorf("cannot store transaction result: %w", err)
-		}
-
-		executionResult := &result.ExecutionReceipt.ExecutionResult
-		// saving my receipts will also save the execution result
-		err = s.myReceipts.BatchStoreMyReceipt(lctx, result.ExecutionReceipt, batch)
-		if err != nil {
-			return fmt.Errorf("could not persist execution result: %w", err)
-		}
-
-		err = s.results.BatchIndex(blockID, executionResult.ID(), batch)
-		if err != nil {
-			return fmt.Errorf("cannot index execution result: %w", err)
-		}
-
-		// the state commitment is the last data item to be stored, so that
-		// IsBlockExecuted can be implemented by checking whether state commitment exists
-		// in the database
-		err = s.commits.BatchStore(lctx, blockID, result.CurrentEndState(), batch)
-		if err != nil {
-			return fmt.Errorf("cannot store state commitment: %w", err)
-		}
-
-		return nil
 	})
 }
 

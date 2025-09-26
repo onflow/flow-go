@@ -3,6 +3,7 @@ package operation_test
 import (
 	"testing"
 
+	"github.com/jordanschalm/lockctx"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -14,6 +15,7 @@ import (
 
 func TestChunkDataPack(t *testing.T) {
 	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
+		lockManager := storage.NewTestingLockManager()
 		collectionID := unittest.IdentifierFixture()
 		expected := &storage.StoredChunkDataPack{
 			ChunkID:      unittest.IdentifierFixture(),
@@ -29,13 +31,14 @@ func TestChunkDataPack(t *testing.T) {
 		})
 
 		t.Run("Save", func(t *testing.T) {
-			err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-				return operation.InsertChunkDataPack(rw.Writer(), expected)
-			})
-			require.NoError(t, err)
+			require.NoError(t, unittest.WithLock(t, lockManager, storage.LockInsertChunkDataPack, func(lctx lockctx.Context) error {
+				return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+					return operation.InsertChunkDataPack(lctx, rw, expected)
+				})
+			}))
 
 			var actual storage.StoredChunkDataPack
-			err = operation.RetrieveChunkDataPack(db.Reader(), expected.ChunkID, &actual)
+			err := operation.RetrieveChunkDataPack(db.Reader(), expected.ChunkID, &actual)
 			assert.NoError(t, err)
 
 			assert.Equal(t, *expected, actual)
