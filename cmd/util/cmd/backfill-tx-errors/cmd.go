@@ -23,6 +23,9 @@ var (
 	flagExecutionNodeID  string
 )
 
+// this command backfills transaction error messages in an Access Node's badger database from an
+// Execution Node's badger database. This is much more efficient than using the typical grpc backfill
+// process.
 var Cmd = &cobra.Command{
 	Use:   "backfill-tx-errors",
 	Short: "Backfill transaction error messages from Execution Node Protocol DB",
