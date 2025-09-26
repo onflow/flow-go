@@ -107,40 +107,34 @@ func (p *PipelineFunctionalSuite) SetupTest() {
 	// store and index the root header
 	p.headers = store.NewHeaders(p.metrics, p.db)
 
-	insertLctx := p.lockManager.NewContext()
-	err = insertLctx.AcquireLock(storage.LockInsertBlock)
-	p.Require().NoError(err)
-
-	err = p.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-		return operation.InsertHeader(insertLctx, rw, rootBlock.ID(), rootBlock)
+	err = unittest.WithLock(t, p.lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
+		return p.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+			return operation.InsertHeader(lctx, rw, rootBlock.ID(), rootBlock)
+		})
 	})
-	p.Require().NoError(err)
-	insertLctx.Release()
+	require.NoError(t, err)
 
-	lctx := p.lockManager.NewContext()
-	require.NoError(t, lctx.AcquireLock(storage.LockFinalizeBlock))
-	err = p.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-		return operation.IndexFinalizedBlockByHeight(lctx, rw, rootBlock.Height, rootBlock.ID())
+	err = unittest.WithLock(t, p.lockManager, storage.LockFinalizeBlock, func(lctx lockctx.Context) error {
+		return p.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+			return operation.IndexFinalizedBlockByHeight(lctx, rw, rootBlock.Height, rootBlock.ID())
+		})
 	})
-	p.Require().NoError(err)
-	lctx.Release()
+	require.NoError(t, err)
 
 	// store and index the latest sealed block header
-	insertLctx2 := p.lockManager.NewContext()
-	require.NoError(t, insertLctx2.AcquireLock(storage.LockInsertBlock))
-	err = p.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-		return operation.InsertHeader(insertLctx2, rw, sealedBlock.ID(), sealedBlock.ToHeader())
+	err = unittest.WithLock(t, p.lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
+		return p.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+			return operation.InsertHeader(lctx, rw, sealedBlock.ID(), sealedBlock.ToHeader())
+		})
 	})
-	p.Require().NoError(err)
-	insertLctx2.Release()
+	require.NoError(t, err)
 
-	lctx = p.lockManager.NewContext()
-	require.NoError(t, lctx.AcquireLock(storage.LockFinalizeBlock))
-	err = p.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-		return operation.IndexFinalizedBlockByHeight(lctx, rw, sealedBlock.Height, sealedBlock.ID())
+	err = unittest.WithLock(t, p.lockManager, storage.LockFinalizeBlock, func(lctx lockctx.Context) error {
+		return p.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+			return operation.IndexFinalizedBlockByHeight(lctx, rw, sealedBlock.Height, sealedBlock.ID())
+		})
 	})
-	p.Require().NoError(err)
-	lctx.Release()
+	require.NoError(t, err)
 
 	// Store and index sealed block execution result
 	err = p.results.Store(sealedExecutionResult)

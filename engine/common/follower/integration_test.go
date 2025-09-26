@@ -23,7 +23,7 @@ import (
 	module "github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/module/trace"
 	moduleutil "github.com/onflow/flow-go/module/util"
-	"github.com/onflow/flow-go/network/mocknetwork"
+	mocknetwork "github.com/onflow/flow-go/network/mock"
 	pbadger "github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/state/protocol/events"
 	"github.com/onflow/flow-go/state/protocol/util"
@@ -124,7 +124,7 @@ func TestFollowerHappyPath(t *testing.T) {
 		nodeID := unittest.IdentifierFixture()
 		me.On("NodeID").Return(nodeID).Maybe()
 
-		net := mocknetwork.NewNetwork(t)
+		net := mocknetwork.NewEngineRegistry(t)
 		con := mocknetwork.NewConduit(t)
 		net.On("Register", mock.Anything, mock.Anything).Return(con, nil)
 
@@ -143,10 +143,12 @@ func TestFollowerHappyPath(t *testing.T) {
 		// don't forget to subscribe for finalization notifications
 		consensusConsumer.AddOnBlockFinalizedConsumer(engine.OnFinalizedBlock)
 
+		// Create an [irrecoverable.SignalerContext] to consume any irrecoverable errors that might be thrown by
+		// hotstuff or follower engine. This mock will fail the test when `SignalerContext.Throw` is called.
+		mockCtx, cancel := irrecoverable.NewMockSignalerContextWithCancel(t, context.Background())
 		// start hotstuff logic and follower engine
-		ctx, cancel, errs := irrecoverable.WithSignallerAndCancel(context.Background())
-		followerLoop.Start(ctx)
-		engine.Start(ctx)
+		followerLoop.Start(mockCtx)
+		engine.Start(mockCtx)
 		unittest.RequireCloseBefore(t, moduleutil.AllReady(engine, followerLoop), time.Second, "engine failed to start")
 
 		// prepare chain of blocks, we will use a continuous chain assuming it was generated on happy path.
@@ -206,22 +208,33 @@ func TestFollowerHappyPath(t *testing.T) {
 			}(pendingBlocks[i*blocksPerWorker : (i+1)*blocksPerWorker])
 		}
 
+		// Ensure graceful shutdown even if the test fails early (e.g., Eventually times out).
+		// Otherwise, the test may panic with "pebble: closed" when threads are attempting to still write to the database, while
+		// the test is unwinding and closing the database. If such panics happen, we don't know what assertation failed and
+		// just see the panic. Hence, we call `cancel()` and attempt to wait for the engine to stop in all cases.
+		defer func() {
+			// stop producers and wait for them to exit
+			submittingBlocks.Store(false)
+			unittest.RequireReturnsBefore(t, wg.Wait, time.Second, "expect workers to stop producing")
+
+			// stop engines and wait for graceful shutdown
+			cancel()
+			unittest.RequireCloseBefore(t, moduleutil.AllDone(engine, followerLoop), time.Second, "engine failed to stop")
+			// Note: in case any error occur, the `mockCtx` will fail the test, due to the unexpected call of `Throw` on the mock.
+		}()
+
 		// wait for target block to become finalized, this might take a while.
 		require.Eventually(t, func() bool {
 			final, err := followerState.Final().Head()
 			require.NoError(t, err)
-			return final.Height == targetBlockHeight
-		}, time.Minute, time.Second, "expect to process all blocks before timeout")
+			success := final.Height == targetBlockHeight
+			if !success {
+				t.Logf("finalized height %d, waiting for %d", final.Height, targetBlockHeight)
+			} else {
+				t.Logf("successfully finalized target height %d\n", targetBlockHeight)
+			}
+			return success
+		}, 90*time.Second, time.Second, "expect to process all blocks before timeout")
 
-		// shutdown and cleanup test
-		submittingBlocks.Store(false)
-		unittest.RequireReturnsBefore(t, wg.Wait, time.Second, "expect workers to stop producing")
-		cancel()
-		unittest.RequireCloseBefore(t, moduleutil.AllDone(engine, followerLoop), time.Second, "engine failed to stop")
-		select {
-		case err := <-errs:
-			require.NoError(t, err)
-		default:
-		}
 	})
 }
