@@ -25,7 +25,7 @@ func NewMockTracerSpan() TracerSpan {
 	}
 }
 
-func (tracer TracerSpan) isTraceable() bool {
+func (tracer TracerSpan) IsTraceable() bool {
 	return tracer.Tracer != nil && tracer.Span != nil
 }
 
@@ -34,7 +34,7 @@ func (tracer TracerSpan) StartChildSpan(
 	options ...otelTrace.SpanStartOption,
 ) TracerSpan {
 	child := trace.NoopSpan
-	if tracer.isTraceable() {
+	if tracer.IsTraceable() {
 		child = tracer.Tracer.StartSpanFromParent(tracer.Span, name, options...)
 	}
 
@@ -50,7 +50,7 @@ func (tracer TracerSpan) StartExtensiveTracingChildSpan(
 	options ...otelTrace.SpanStartOption,
 ) TracerSpan {
 	child := trace.NoopSpan
-	if tracer.isTraceable() && tracer.ExtensiveTracing {
+	if tracer.IsTraceable() && tracer.ExtensiveTracing {
 		child = tracer.Tracer.StartSpanFromParent(tracer.Span, name, options...)
 	}
 
