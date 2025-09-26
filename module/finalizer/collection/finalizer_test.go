@@ -20,7 +20,6 @@ import (
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/operation"
 	"github.com/onflow/flow-go/storage/operation/pebbleimpl"
-	"github.com/onflow/flow-go/storage/procedure"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -54,7 +53,7 @@ func TestFinalizer(t *testing.T) {
 	insert := func(db storage.DB, lockManager lockctx.Manager, block *model.Block) {
 		err := unittest.WithLock(t, lockManager, storage.LockInsertOrFinalizeClusterBlock, func(lctx lockctx.Context) error {
 			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-				return procedure.InsertClusterBlock(lctx, rw, unittest.ClusterProposalFromBlock(block))
+				return operation.InsertClusterBlock(lctx, rw, unittest.ClusterProposalFromBlock(block))
 			})
 		})
 		require.NoError(t, err)

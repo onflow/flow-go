@@ -9,7 +9,6 @@ import (
 	clusterState "github.com/onflow/flow-go/state/cluster"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/operation"
-	"github.com/onflow/flow-go/storage/procedure"
 )
 
 // Snapshot represents a snapshot of chain state anchored at a particular
@@ -29,7 +28,7 @@ func (s *Snapshot) Collection() (*flow.Collection, error) {
 
 	// get the payload
 	var payload cluster.Payload
-	err := procedure.RetrieveClusterPayload(s.state.db.Reader(), s.blockID, &payload)
+	err := operation.RetrieveClusterPayload(s.state.db.Reader(), s.blockID, &payload)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get snapshot payload: %w", err)
 	}
