@@ -8,7 +8,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/channels"
-	"github.com/onflow/flow-go/network/mocknetwork"
+	mocknetwork "github.com/onflow/flow-go/network/mock"
 )
 
 type EngineProcessFunc func(channels.Channel, flow.Identifier, interface{}) error
@@ -18,7 +18,7 @@ type PublishFunc func(channels.Channel, interface{}, ...flow.Identifier) error
 
 // Network represents a mock network. The implementation is not concurrency-safe.
 type Network struct {
-	mocknetwork.Network
+	mocknetwork.EngineRegistry
 	conduits    map[channels.Channel]*Conduit
 	engines     map[channels.Channel]network.MessageProcessor
 	publishFunc PublishFunc
@@ -29,9 +29,9 @@ var _ network.EngineRegistry = (*Network)(nil)
 // NewNetwork returns a new mock network.
 func NewNetwork() *Network {
 	return &Network{
-		Network:  mocknetwork.Network{},
-		conduits: make(map[channels.Channel]*Conduit),
-		engines:  make(map[channels.Channel]network.MessageProcessor),
+		EngineRegistry: mocknetwork.EngineRegistry{},
+		conduits:       make(map[channels.Channel]*Conduit),
+		engines:        make(map[channels.Channel]network.MessageProcessor),
 	}
 }
 

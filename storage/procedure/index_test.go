@@ -3,6 +3,7 @@ package procedure
 import (
 	"testing"
 
+	"github.com/jordanschalm/lockctx"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/model/flow"
@@ -17,13 +18,10 @@ func TestInsertRetrieveIndex(t *testing.T) {
 		blockID := unittest.IdentifierFixture()
 		index := unittest.IndexFixture()
 
-		lctx := lockManager.NewContext()
-		err := lctx.AcquireLock(storage.LockInsertBlock)
-		require.NoError(t, err)
-		defer lctx.Release()
-
-		err = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			return InsertIndex(lctx, rw, blockID, index)
+		err := unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
+			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+				return InsertIndex(lctx, rw, blockID, index)
+			})
 		})
 		require.NoError(t, err)
 
