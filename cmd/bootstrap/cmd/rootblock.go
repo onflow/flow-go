@@ -250,7 +250,7 @@ func rootBlock(cmd *cobra.Command, args []string) {
 	if err != nil {
 		log.Fatal().Err(err).Msg("unable to generate random seed")
 	}
-	csprg, err := prg.New(randomSeed[:], nil, nil)
+	csprg, err := prg.New(randomSeed[:], prg.BootstrapClusterAssignment, nil)
 	if err != nil {
 		log.Fatal().Err(err).Msg("unable to initialize pseudorandom generator")
 	}
@@ -277,8 +277,12 @@ func rootBlock(cmd *cobra.Command, args []string) {
 	log.Info().Msg("")
 
 	// use the same randomness for the RandomSource of the new epoch
+	randomSourcePrg, err := prg.New(randomSeed[:], prg.BootstrapEpochRandomSource, nil)
+	if err != nil {
+		log.Fatal().Err(err).Msg("failed to initialize pseudorandom generator")
+	}
 	log.Info().Msg("constructing intermediary bootstrapping data")
-	epochSetup, epochCommit, err := constructRootEpochEvents(headerBody.View, participants, assignments, clusterQCs, randomBeaconData, dkgIndexMap, csprg)
+	epochSetup, epochCommit, err := constructRootEpochEvents(headerBody.View, participants, assignments, clusterQCs, randomBeaconData, dkgIndexMap, randomSourcePrg)
 	if err != nil {
 		log.Fatal().Err(err).Msg("failed to construct root epoch events")
 	}

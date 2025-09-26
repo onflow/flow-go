@@ -122,7 +122,7 @@ func TestClusterAssignment(t *testing.T) {
 	seed := make([]byte, 32)
 	_, err := cryptoRand.Read(seed)
 	require.NoError(t, err)
-	prng, err := prg.New(seed, nil, nil)
+	prng, err := prg.New(seed, prg.BootstrapClusterAssignment, nil)
 	require.NoError(t, err)
 
 	log := zerolog.Nop()

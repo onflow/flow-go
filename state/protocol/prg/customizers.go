@@ -25,6 +25,10 @@ var (
 	// ExecutionRandomSourceHistory is the customizer for Flow's transaction execution environment
 	// (used for the source of randomness history core-contract)
 	ExecutionRandomSourceHistory = customizerFromIndices(1, 1)
+	// BootstrapClusterAssignment is the customizer for assignment of collectors to clusters during bootstrapping
+	BootstrapClusterAssignment = customizerFromIndices(2, 0)
+	// BootstrapEpochRandomSource is the customizer for the RandomSource of the new epoch during bootstrapping
+	BootstrapEpochRandomSource = customizerFromIndices(2, 1)
 	//
 	// clusterLeaderSelectionPrefix is the prefix used for CollectorClusterLeaderSelection
 	clusterLeaderSelectionPrefix = []uint16{3}

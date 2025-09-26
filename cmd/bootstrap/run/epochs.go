@@ -176,7 +176,7 @@ func GenerateRecoverTxArgsWithDKG(
 		}
 	}
 
-	csprg, err := prg.New(epoch.RandomSource(), nil, nil)
+	csprg, err := prg.New(epoch.RandomSource(), prg.BootstrapClusterAssignment, nil)
 	if err != nil {
 		return nil, fmt.Errorf("could not initialize PRNG: %w", err)
 	}
