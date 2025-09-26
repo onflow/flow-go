@@ -4,6 +4,7 @@ import (
 	"github.com/fxamacker/cbor/v2"
 
 	cborcodec "github.com/onflow/flow-go/model/encoding/cbor"
+	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/network/codec"
 	_ "github.com/onflow/flow-go/utils/binstat"
 )
@@ -18,8 +19,7 @@ type Decoder struct {
 //   - codec.ErrInvalidEncoding if message encoding is invalid.
 //   - codec.ErrUnknownMsgCode if message code byte does not match any of the configured message codes.
 //   - codec.ErrMsgUnmarshal if the codec fails to unmarshal the data to the message type denoted by the message code.
-func (d *Decoder) Decode() (interface{}, error) {
-
+func (d *Decoder) Decode() (messages.UntrustedMessage, error) {
 	// read from stream and extract code
 	var data []byte
 	//bs1 := binstat.EnterTime(binstat.BinNet + ":strm>1(cbor)iowriter2payload2envelope")

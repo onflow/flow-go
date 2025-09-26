@@ -5,7 +5,6 @@ import (
 	"os"
 	"testing"
 
-	"github.com/dgraph-io/badger/v2"
 	"github.com/jordanschalm/lockctx"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -20,7 +19,7 @@ import (
 	pbadger "github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/operation"
-	"github.com/onflow/flow-go/storage/operation/badgerimpl"
+	"github.com/onflow/flow-go/storage/operation/pebbleimpl"
 	"github.com/onflow/flow-go/storage/procedure"
 	"github.com/onflow/flow-go/storage/store"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -30,7 +29,6 @@ type SnapshotSuite struct {
 	suite.Suite
 
 	db          storage.DB
-	badgerdb    *badger.DB
 	dbdir       string
 	lockManager lockctx.Manager
 
@@ -52,8 +50,8 @@ func (suite *SnapshotSuite) SetupTest() {
 	suite.chainID = suite.genesis.ChainID
 
 	suite.dbdir = unittest.TempDir(suite.T())
-	suite.badgerdb = unittest.BadgerDB(suite.T(), suite.dbdir)
-	suite.db = badgerimpl.ToDB(suite.badgerdb)
+	pdb := unittest.PebbleDB(suite.T(), suite.dbdir)
+	suite.db = pebbleimpl.ToDB(pdb)
 	suite.lockManager = storage.NewTestingLockManager()
 
 	metrics := metrics.NewNoopCollector()
@@ -93,7 +91,7 @@ func (suite *SnapshotSuite) SetupTest() {
 
 // runs after each test finishes
 func (suite *SnapshotSuite) TearDownTest() {
-	err := suite.badgerdb.Close()
+	err := suite.db.Close()
 	suite.Assert().Nil(err)
 	err = os.RemoveAll(suite.dbdir)
 	suite.Assert().Nil(err)
@@ -149,14 +147,12 @@ func (suite *SnapshotSuite) Proposal() model.Proposal {
 }
 
 func (suite *SnapshotSuite) InsertBlock(proposal model.Proposal) {
-	lctx := suite.lockManager.NewContext()
-	defer lctx.Release()
-	err := lctx.AcquireLock(storage.LockInsertOrFinalizeClusterBlock)
-	suite.Assert().Nil(err)
-	err = suite.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-		return procedure.InsertClusterBlock(lctx, rw, &proposal)
+	err := unittest.WithLock(suite.T(), suite.lockManager, storage.LockInsertOrFinalizeClusterBlock, func(lctx lockctx.Context) error {
+		return suite.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+			return procedure.InsertClusterBlock(lctx, rw, &proposal)
+		})
 	})
-	suite.Assert().Nil(err)
+	suite.Require().NoError(err)
 }
 
 // InsertSubtree recursively inserts chain state as a subtree of the parent
@@ -241,13 +237,12 @@ func (suite *SnapshotSuite) TestFinalizedBlock() {
 	assert.NoError(t, err)
 
 	// finalize the block
-	lctx := suite.lockManager.NewContext()
-	defer lctx.Release()
-	require.NoError(suite.T(), lctx.AcquireLock(storage.LockInsertOrFinalizeClusterBlock))
-	err = suite.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-		return procedure.FinalizeClusterBlock(lctx, rw, finalizedProposal1.Block.ID())
+	err = unittest.WithLock(suite.T(), suite.lockManager, storage.LockInsertOrFinalizeClusterBlock, func(lctx lockctx.Context) error {
+		return suite.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+			return procedure.FinalizeClusterBlock(lctx, rw, finalizedProposal1.Block.ID())
+		})
 	})
-	assert.NoError(t, err)
+	suite.Require().NoError(err)
 
 	// get the final snapshot, should map to finalizedProposal1
 	snapshot := suite.state.Final()

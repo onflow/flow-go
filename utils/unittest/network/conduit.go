@@ -4,7 +4,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/channels"
-	"github.com/onflow/flow-go/network/mocknetwork"
+	mocknetwork "github.com/onflow/flow-go/network/mock"
 )
 
 type Conduit struct {

@@ -60,7 +60,7 @@ import (
 	"github.com/onflow/flow-go/state/protocol/util"
 	fstorage "github.com/onflow/flow-go/storage"
 	storagemock "github.com/onflow/flow-go/storage/mock"
-	"github.com/onflow/flow-go/storage/operation/badgerimpl"
+	"github.com/onflow/flow-go/storage/operation/pebbleimpl"
 	"github.com/onflow/flow-go/storage/store"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -216,7 +216,7 @@ func createNodes(t *testing.T, participants *ConsensusParticipants, rootSnapshot
 			}
 		})
 
-	hub = NewNetworkHub()
+	hub = NewNetworkHub(unittest.Logger())
 	nodes = make([]*Node, 0, len(consensus))
 	for i, identity := range consensus {
 		consensusParticipant := participants.Lookup(identity.NodeID)
@@ -381,10 +381,10 @@ func createNode(
 	epochLookup module.EpochLookup,
 ) *Node {
 
-	badgerdb, dbDir := unittest.TempBadgerDB(t)
+	pdb, dbDir := unittest.TempPebbleDB(t)
 	metricsCollector := metrics.NewNoopCollector()
 	tracer := trace.NewNoopTracer()
-	db := badgerimpl.ToDB(badgerdb)
+	db := pebbleimpl.ToDB(pdb)
 	lockManager := fstorage.NewTestingLockManager()
 
 	headersDB := store.NewHeaders(metricsCollector, db)
@@ -717,7 +717,7 @@ func createNode(
 
 	hotstuffDistributor.AddConsumer(messageHub)
 
-	node.dbCloser = badgerdb
+	node.dbCloser = db
 	node.compliance = comp
 	node.sync = sync
 	node.state = fullState

@@ -109,10 +109,10 @@ func New(
 		engine.NewNotifier(),
 		engine.Pattern{
 			// Match is called on every new message coming to this engine.
-			// Provider enigne only expects ChunkDataRequests.
+			// Provider engine only expects ChunkDataRequests.
 			// Other message types are discarded by Match.
 			Match: func(message *engine.Message) bool {
-				chdpReq, ok := message.Payload.(*messages.ChunkDataRequest)
+				chdpReq, ok := message.Payload.(*flow.ChunkDataRequest)
 				if ok {
 					log.Info().
 						Hex("chunk_id", logging.ID(chdpReq.ChunkID)).
@@ -125,7 +125,7 @@ func New(
 			// ChunkDataRequests.
 			// It replaces the payload of message with requested chunk id.
 			Map: func(message *engine.Message) (*engine.Message, bool) {
-				chdpReq := message.Payload.(*messages.ChunkDataRequest)
+				chdpReq := message.Payload.(*flow.ChunkDataRequest)
 				return &engine.Message{
 					OriginID: message.OriginID,
 					Payload:  chdpReq.ChunkID,
@@ -184,7 +184,7 @@ func (e *Engine) processQueuedChunkDataPackRequestsShovelerWorker(ctx irrecovera
 		select {
 		case <-e.chdpRequestHandler.GetNotifier():
 			// there is at list a single chunk data pack request queued up.
-			e.processAvailableMesssages(ctx)
+			e.processAvailableMessages(ctx)
 		case <-ctx.Done():
 			// close the internal channel, the workers will drain the channel before exiting
 			close(e.chdpRequestChannel)
@@ -197,7 +197,7 @@ func (e *Engine) processQueuedChunkDataPackRequestsShovelerWorker(ctx irrecovera
 // processAvailableMesssages is a blocking method that reads all queued ChunkDataRequests till the queue gets empty.
 // Each ChunkDataRequest is processed by a single concurrent worker. However, there are limited number of such workers.
 // If there is no worker available for a request, the method blocks till one is available.
-func (e *Engine) processAvailableMesssages(ctx irrecoverable.SignalerContext) {
+func (e *Engine) processAvailableMessages(ctx irrecoverable.SignalerContext) {
 	for {
 		select {
 		case <-ctx.Done():
@@ -217,7 +217,6 @@ func (e *Engine) processAvailableMesssages(ctx irrecoverable.SignalerContext) {
 			// if it does happen, it means there is a bug in the queue implementation.
 			ctx.Throw(fmt.Errorf("invalid chunk id type in chunk data pack request queue: %T", msg.Payload))
 		}
-
 		request := &mempool.ChunkDataPackRequest{
 			RequesterId: msg.OriginID,
 			ChunkId:     chunkId,
@@ -342,7 +341,7 @@ func (e *Engine) deliverChunkDataResponse(chunkDataPack *flow.ChunkDataPack, req
 	}
 
 	response := &messages.ChunkDataResponse{
-		ChunkDataPack: *chunkDataPack,
+		ChunkDataPack: flow.UntrustedChunkDataPack(*chunkDataPack),
 		Nonce:         nonce,
 	}
 
@@ -419,7 +418,7 @@ func (e *Engine) BroadcastExecutionReceipt(ctx context.Context, height uint64, r
 		return false, fmt.Errorf("could not get consensus and verification identities: %w", err)
 	}
 
-	err = e.receiptCon.Publish(receipt, identities.NodeIDs()...)
+	err = e.receiptCon.Publish((*messages.ExecutionReceipt)(receipt), identities.NodeIDs()...)
 	if err != nil {
 		return false, fmt.Errorf("could not submit execution receipts: %w", err)
 	}

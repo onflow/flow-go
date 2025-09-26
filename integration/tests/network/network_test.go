@@ -121,7 +121,7 @@ func launchReadLoop(
 			}
 
 			switch v := event.(type) {
-			case *message.TestMessage:
+			case *flow.TestMessage:
 				t.Logf("%s: %s: %s\n", id.String(), actualOriginID.String(), v.Text)
 				assert.Equal(t, expectedOrigin, actualOriginID)
 				assert.Equal(t, expectedMsg, v.Text)

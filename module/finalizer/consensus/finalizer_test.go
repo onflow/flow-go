@@ -4,7 +4,8 @@ import (
 	"math/rand"
 	"testing"
 
-	"github.com/dgraph-io/badger/v2"
+	"github.com/cockroachdb/pebble/v2"
+	"github.com/jordanschalm/lockctx"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -15,7 +16,7 @@ import (
 	mockprot "github.com/onflow/flow-go/state/protocol/mock"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/operation"
-	"github.com/onflow/flow-go/storage/operation/badgerimpl"
+	"github.com/onflow/flow-go/storage/operation/pebbleimpl"
 	"github.com/onflow/flow-go/storage/store"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -63,53 +64,50 @@ func TestMakeFinalValidChain(t *testing.T) {
 	// this will hold the IDs of blocks clean up
 	var list []flow.Identifier
 
-	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
-		dbImpl := badgerimpl.ToDB(db)
-
+	unittest.RunWithPebbleDB(t, func(pdb *pebble.DB) {
 		// set up lock context
 		lockManager := storage.NewTestingLockManager()
-		lctx := lockManager.NewContext()
-		err := lctx.AcquireLock(storage.LockFinalizeBlock)
-		require.NoError(t, err)
+		dbImpl := pebbleimpl.ToDB(pdb)
 
-		// insert the latest finalized height
-		err = dbImpl.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			return operation.UpsertFinalizedHeight(lctx, rw.Writer(), final.Height)
+		err := unittest.WithLock(t, lockManager, storage.LockFinalizeBlock, func(lctx lockctx.Context) error {
+			// insert the latest finalized height
+			err := dbImpl.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+				return operation.UpsertFinalizedHeight(lctx, rw.Writer(), final.Height)
+			})
+			require.NoError(t, err)
+
+			// map the finalized height to the finalized block ID
+			err = dbImpl.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+				return operation.IndexFinalizedBlockByHeight(lctx, rw, final.Height, final.ID())
+			})
+			require.NoError(t, err)
+			return nil
 		})
 		require.NoError(t, err)
-
-		// map the finalized height to the finalized block ID
-		err = dbImpl.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			return operation.IndexFinalizedBlockByHeight(lctx, rw, final.Height, final.ID())
-		})
-		require.NoError(t, err)
-		lctx.Release()
 
 		// insert the finalized block header into the DB
-		insertLctx := lockManager.NewContext()
-		require.NoError(t, insertLctx.AcquireLock(storage.LockInsertBlock))
-		err = dbImpl.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			return operation.InsertHeader(insertLctx, rw, final.ID(), final)
+		err = unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
+			return dbImpl.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+				return operation.InsertHeader(lctx, rw, final.ID(), final)
+			})
 		})
 		require.NoError(t, err)
-		insertLctx.Release()
 
 		// insert all of the pending blocks into the DB
 		for _, header := range pending {
-			insertLctx2 := lockManager.NewContext()
-			require.NoError(t, insertLctx2.AcquireLock(storage.LockInsertBlock))
-			err = dbImpl.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-				return operation.InsertHeader(insertLctx2, rw, header.ID(), header)
+			err := unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
+				return dbImpl.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+					return operation.InsertHeader(lctx, rw, header.ID(), header)
+				})
 			})
 			require.NoError(t, err)
-			insertLctx2.Release()
 		}
 
 		// initialize the finalizer with the dependencies and make the call
 		metrics := metrics.NewNoopCollector()
 		fin := Finalizer{
-			dbReader: badgerimpl.ToDB(db).Reader(),
-			headers:  store.NewHeaders(metrics, badgerimpl.ToDB(db)),
+			dbReader: pebbleimpl.ToDB(pdb).Reader(),
+			headers:  store.NewHeaders(metrics, pebbleimpl.ToDB(pdb)),
 			state:    state,
 			tracer:   trace.NewNoopTracer(),
 			cleanup:  LogCleanup(&list),
@@ -143,51 +141,43 @@ func TestMakeFinalInvalidHeight(t *testing.T) {
 	// this will hold the IDs of blocks clean up
 	var list []flow.Identifier
 
-	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
-		dbImpl := badgerimpl.ToDB(db)
-
-		// set up lock context
+	unittest.RunWithPebbleDB(t, func(pdb *pebble.DB) {
+		dbImpl := pebbleimpl.ToDB(pdb)
 		lockManager := storage.NewTestingLockManager()
-		lctx := lockManager.NewContext()
-		err := lctx.AcquireLock(storage.LockFinalizeBlock)
-		require.NoError(t, err)
 
-		// insert the latest finalized height
-		err = dbImpl.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			return operation.UpsertFinalizedHeight(lctx, rw.Writer(), final.Height)
+		// Insert the latest finalized height and map the finalized height to the finalized block ID.
+		err := unittest.WithLock(t, lockManager, storage.LockFinalizeBlock, func(lctx lockctx.Context) error {
+			return dbImpl.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+				err := operation.IndexFinalizedBlockByHeight(lctx, rw, final.Height, final.ID())
+				if err != nil {
+					return err
+				}
+				return operation.UpsertFinalizedHeight(lctx, rw.Writer(), final.Height)
+			})
 		})
 		require.NoError(t, err)
-
-		// map the finalized height to the finalized block ID
-		err = dbImpl.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			return operation.IndexFinalizedBlockByHeight(lctx, rw, final.Height, final.ID())
-		})
-		require.NoError(t, err)
-		lctx.Release()
 
 		// insert the finalized block header into the DB
-		insertLctx := lockManager.NewContext()
-		require.NoError(t, insertLctx.AcquireLock(storage.LockInsertBlock))
-		err = dbImpl.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			return operation.InsertHeader(insertLctx, rw, final.ID(), final)
+		err = unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(insertLctx lockctx.Context) error {
+			return dbImpl.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+				return operation.InsertHeader(insertLctx, rw, final.ID(), final)
+			})
 		})
 		require.NoError(t, err)
-		insertLctx.Release()
 
-		// insert all of the pending header into DB
-		insertLctx = lockManager.NewContext()
-		require.NoError(t, insertLctx.AcquireLock(storage.LockInsertBlock))
-		err = dbImpl.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			return operation.InsertHeader(insertLctx, rw, pending.ID(), pending)
+		// insert pending header into DB, which has the same height as the finalized header
+		err = unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(insertLctx lockctx.Context) error {
+			return dbImpl.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+				return operation.InsertHeader(insertLctx, rw, pending.ID(), pending)
+			})
 		})
 		require.NoError(t, err)
-		insertLctx.Release()
 
 		// initialize the finalizer with the dependencies and make the call
 		metrics := metrics.NewNoopCollector()
 		fin := Finalizer{
-			dbReader: badgerimpl.ToDB(db).Reader(),
-			headers:  store.NewHeaders(metrics, badgerimpl.ToDB(db)),
+			dbReader: pebbleimpl.ToDB(pdb).Reader(),
+			headers:  store.NewHeaders(metrics, pebbleimpl.ToDB(pdb)),
 			state:    state,
 			tracer:   trace.NewNoopTracer(),
 			cleanup:  LogCleanup(&list),
@@ -217,41 +207,36 @@ func TestMakeFinalDuplicate(t *testing.T) {
 	// this will hold the IDs of blocks clean up
 	var list []flow.Identifier
 
-	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
-		dbImpl := badgerimpl.ToDB(db)
-		// set up lock context
+	unittest.RunWithPebbleDB(t, func(pdb *pebble.DB) {
 		lockManager := storage.NewTestingLockManager()
-		lctx := lockManager.NewContext()
-		err := lctx.AcquireLock(storage.LockFinalizeBlock)
-		require.NoError(t, err)
+		dbImpl := pebbleimpl.ToDB(pdb)
 
 		// insert the latest finalized height
-		err = dbImpl.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			return operation.UpsertFinalizedHeight(lctx, rw.Writer(), final.Height)
-		})
-		require.NoError(t, err)
+		err := unittest.WithLock(t, lockManager, storage.LockFinalizeBlock, func(lctx lockctx.Context) error {
+			return dbImpl.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+				err := operation.UpsertFinalizedHeight(lctx, rw.Writer(), final.Height)
+				if err != nil {
+					return err
+				}
 
-		// map the finalized height to the finalized block ID
-		err = dbImpl.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			return operation.IndexFinalizedBlockByHeight(lctx, rw, final.Height, final.ID())
+				return operation.IndexFinalizedBlockByHeight(lctx, rw, final.Height, final.ID())
+			})
 		})
 		require.NoError(t, err)
-		lctx.Release()
 
 		// insert the finalized block header into the DB
-		insertLctx := lockManager.NewContext()
-		require.NoError(t, insertLctx.AcquireLock(storage.LockInsertBlock))
-		err = dbImpl.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			return operation.InsertHeader(insertLctx, rw, final.ID(), final)
+		err = unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(insertLctx lockctx.Context) error {
+			return dbImpl.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+				return operation.InsertHeader(insertLctx, rw, final.ID(), final)
+			})
 		})
 		require.NoError(t, err)
-		insertLctx.Release()
 
 		// initialize the finalizer with the dependencies and make the call
 		metrics := metrics.NewNoopCollector()
 		fin := Finalizer{
-			dbReader: badgerimpl.ToDB(db).Reader(),
-			headers:  store.NewHeaders(metrics, badgerimpl.ToDB(db)),
+			dbReader: pebbleimpl.ToDB(pdb).Reader(),
+			headers:  store.NewHeaders(metrics, pebbleimpl.ToDB(pdb)),
 			state:    state,
 			tracer:   trace.NewNoopTracer(),
 			cleanup:  LogCleanup(&list),

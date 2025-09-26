@@ -6,7 +6,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/dgraph-io/badger/v2"
+	"github.com/jordanschalm/lockctx"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -20,11 +20,12 @@ import (
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/trace"
 	realproto "github.com/onflow/flow-go/state/protocol"
+	"github.com/onflow/flow-go/state/protocol/datastore"
 	protocol "github.com/onflow/flow-go/state/protocol/mock"
 	"github.com/onflow/flow-go/storage"
 	storagemock "github.com/onflow/flow-go/storage/mock"
 	"github.com/onflow/flow-go/storage/operation"
-	"github.com/onflow/flow-go/storage/operation/badgerimpl"
+	"github.com/onflow/flow-go/storage/operation/pebbleimpl"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -66,7 +67,7 @@ type BuilderSuite struct {
 
 	// real dependencies
 	dir      string
-	db       *badger.DB
+	db       storage.DB
 	sentinel uint64
 	setter   func(*flow.HeaderBodyBuilder) error
 	sign     func(*flow.Header) ([]byte, error)
@@ -247,23 +248,32 @@ func (bs *BuilderSuite) SetupTest() {
 	bs.parentID = parent.ID()
 
 	// set up temporary database for tests
-	bs.db, bs.dir = unittest.TempBadgerDB(bs.T())
+	pdb, dir := unittest.TempPebbleDB(bs.T())
+	bs.db = pebbleimpl.ToDB(pdb)
+	bs.dir = dir
+
 	lockManager := storage.NewTestingLockManager()
 
-	lctx := lockManager.NewContext()
-	require.NoError(bs.T(), lctx.AcquireLock(storage.LockFinalizeBlock))
-	defer lctx.Release()
-
 	// insert finalized height and root height
-	db := badgerimpl.ToDB(bs.db)
-	require.NoError(bs.T(), db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-		require.NoError(bs.T(), operation.InsertRootHeight(rw.Writer(), 13))
-		require.NoError(bs.T(), operation.UpsertFinalizedHeight(lctx, rw.Writer(), final.Height))
-		require.NoError(bs.T(), operation.IndexFinalizedBlockByHeight(lctx, rw, final.Height, bs.finalID))
-		require.NoError(bs.T(), operation.UpsertSealedHeight(lctx, rw.Writer(), first.Height))
-		require.NoError(bs.T(), operation.IndexFinalizedBlockByHeight(lctx, rw, first.Height, first.ID()))
-		return nil
-	}))
+	db := bs.db
+	err := unittest.WithLocks(bs.T(), lockManager, []string{storage.LockFinalizeBlock, storage.LockBootstrapping}, func(lctx lockctx.Context) error {
+		return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+			enc, err := datastore.NewVersionedInstanceParams(
+				datastore.DefaultInstanceParamsVersion,
+				unittest.IdentifierFixture(),
+				unittest.IdentifierFixture(),
+				unittest.IdentifierFixture(),
+			)
+			require.NoError(bs.T(), err)
+			require.NoError(bs.T(), operation.InsertInstanceParams(lctx, rw, *enc))
+			require.NoError(bs.T(), operation.UpsertFinalizedHeight(lctx, rw.Writer(), final.Height))
+			require.NoError(bs.T(), operation.IndexFinalizedBlockByHeight(lctx, rw, final.Height, bs.finalID))
+			require.NoError(bs.T(), operation.UpsertSealedHeight(lctx, rw.Writer(), first.Height))
+			require.NoError(bs.T(), operation.IndexFinalizedBlockByHeight(lctx, rw, first.Height, first.ID()))
+			return nil
+		})
+	})
+	require.NoError(bs.T(), err)
 
 	bs.sentinel = 1337
 	bs.setter = func(h *flow.HeaderBodyBuilder) error {
@@ -437,7 +447,6 @@ func (bs *BuilderSuite) SetupTest() {
 	bs.stateMutator.On("EvolveState", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(unittest.IdentifierFixture(), nil).Maybe()
 
 	// initialize the builder
-	var err error
 	bs.build, err = NewBuilder(
 		noopMetrics,
 		bs.state,

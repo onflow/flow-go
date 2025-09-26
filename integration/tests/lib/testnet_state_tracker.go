@@ -10,7 +10,6 @@ import (
 
 	"github.com/onflow/flow-go/engine/ghost/client"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/model/messages"
 )
 
 type TestnetStateTracker struct {
@@ -81,13 +80,11 @@ func (tst *TestnetStateTracker) Track(t *testing.T, ctx context.Context, ghost *
 			tst.MsgState.Add(sender, msg)
 
 			switch m := msg.(type) {
-			case *flow.UntrustedProposal:
-				proposal, err := flow.NewProposal(*m)
-				require.NoError(t, err)
-				err = tst.BlockState.Add(t, proposal)
+			case *flow.Proposal:
+				err = tst.BlockState.Add(t, m)
 				require.NoError(t, err)
 
-				block := proposal.Block
+				block := m.Block
 				t.Logf("%v block proposal received from %s at height %v, view %v: %x\n",
 					time.Now().UTC(),
 					sender,
@@ -114,7 +111,7 @@ func (tst *TestnetStateTracker) Track(t *testing.T, ctx context.Context, ghost *
 					finalState,
 					m.ExecutionResult.ID(),
 					len(m.ExecutionResult.Chunks))
-			case *messages.ChunkDataResponse:
+			case *flow.ChunkDataResponse:
 				// consuming this explicitly to avoid logging full msg which is usually very large because of proof
 				t.Logf("%x chunk data pack received from %x\n",
 					m.ChunkDataPack.ChunkID,

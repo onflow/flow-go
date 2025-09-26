@@ -8,7 +8,6 @@ import (
 	"os"
 	"testing"
 
-	"github.com/dgraph-io/badger/v2"
 	"github.com/jordanschalm/lockctx"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
@@ -34,7 +33,7 @@ import (
 	"github.com/onflow/flow-go/state/protocol/util"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/operation"
-	"github.com/onflow/flow-go/storage/operation/badgerimpl"
+	"github.com/onflow/flow-go/storage/operation/pebbleimpl"
 	"github.com/onflow/flow-go/storage/procedure"
 	"github.com/onflow/flow-go/storage/store"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -57,7 +56,6 @@ var setter = func(h *flow.HeaderBodyBuilder) error {
 type BuilderSuite struct {
 	suite.Suite
 	db          storage.DB
-	badgerDB    *badger.DB
 	dbdir       string
 	lockManager lockctx.Manager
 
@@ -91,8 +89,8 @@ func (suite *BuilderSuite) SetupTest() {
 	suite.pool = herocache.NewTransactions(1000, unittest.Logger(), metrics.NewNoopCollector())
 
 	suite.dbdir = unittest.TempDir(suite.T())
-	suite.badgerDB = unittest.BadgerDB(suite.T(), suite.dbdir)
-	suite.db = badgerimpl.ToDB(suite.badgerDB)
+	pdb := unittest.PebbleDB(suite.T(), suite.dbdir)
+	suite.db = pebbleimpl.ToDB(pdb)
 
 	metrics := metrics.NewNoopCollector()
 	tracer := trace.NewNoopTracer()
@@ -197,42 +195,37 @@ func (suite *BuilderSuite) SetupTest() {
 
 // runs after each test finishes
 func (suite *BuilderSuite) TearDownTest() {
-	err := suite.badgerDB.Close()
+	err := suite.db.Close()
 	suite.Assert().NoError(err)
 	err = os.RemoveAll(suite.dbdir)
 	suite.Assert().NoError(err)
 }
 
 func (suite *BuilderSuite) InsertBlock(block *model.Block) {
-	lctx := suite.lockManager.NewContext()
-	defer lctx.Release()
-	err := lctx.AcquireLock(storage.LockInsertOrFinalizeClusterBlock)
-	suite.Assert().NoError(err)
-	err = suite.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-		return procedure.InsertClusterBlock(lctx, rw, unittest.ClusterProposalFromBlock(block))
+	err := unittest.WithLock(suite.T(), suite.lockManager, storage.LockInsertOrFinalizeClusterBlock, func(lctx lockctx.Context) error {
+		return suite.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+			return procedure.InsertClusterBlock(lctx, rw, unittest.ClusterProposalFromBlock(block))
+		})
 	})
-	suite.Assert().NoError(err)
+	suite.Require().NoError(err)
 }
 
 func (suite *BuilderSuite) FinalizeBlock(block model.Block) {
-	lctx := suite.lockManager.NewContext()
-	defer lctx.Release()
-	err := lctx.AcquireLock(storage.LockInsertOrFinalizeClusterBlock)
-	suite.Assert().NoError(err)
-
-	err = suite.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-		var refBlock flow.Header
-		err := operation.RetrieveHeader(rw.GlobalReader(), block.Payload.ReferenceBlockID, &refBlock)
-		if err != nil {
-			return err
-		}
-		err = procedure.FinalizeClusterBlock(lctx, rw, block.ID())
-		if err != nil {
-			return err
-		}
-		return operation.IndexClusterBlockByReferenceHeight(lctx, rw.Writer(), refBlock.Height, block.ID())
+	err := unittest.WithLock(suite.T(), suite.lockManager, storage.LockInsertOrFinalizeClusterBlock, func(lctx lockctx.Context) error {
+		return suite.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+			var refBlock flow.Header
+			err := operation.RetrieveHeader(rw.GlobalReader(), block.Payload.ReferenceBlockID, &refBlock)
+			if err != nil {
+				return err
+			}
+			err = procedure.FinalizeClusterBlock(lctx, rw, block.ID())
+			if err != nil {
+				return err
+			}
+			return operation.IndexClusterBlockByReferenceHeight(lctx, rw.Writer(), refBlock.Height, block.ID())
+		})
 	})
-	suite.Assert().NoError(err)
+	suite.Require().NoError(err)
 }
 
 // Payload returns a payload containing the given transactions, with a valid
@@ -1485,10 +1478,10 @@ func benchmarkBuildOn(b *testing.B, size int) {
 		suite.pool = herocache.NewTransactions(1000, unittest.Logger(), metrics.NewNoopCollector())
 
 		suite.dbdir = unittest.TempDir(b)
-		suite.badgerDB = unittest.BadgerDB(b, suite.dbdir)
-		suite.db = badgerimpl.ToDB(suite.badgerDB)
+		pdb := unittest.PebbleDB(suite.T(), suite.dbdir)
+		suite.db = pebbleimpl.ToDB(pdb)
 		defer func() {
-			err = suite.badgerDB.Close()
+			err = suite.db.Close()
 			assert.NoError(b, err)
 			err = os.RemoveAll(suite.dbdir)
 			assert.NoError(b, err)
@@ -1541,21 +1534,19 @@ func benchmarkBuildOn(b *testing.B, size int) {
 		block := unittest.ClusterBlockFixture(
 			unittest.ClusterBlock.WithParent(final),
 		)
-		lctx := suite.lockManager.NewContext()
-		require.NoError(b, lctx.AcquireLock(storage.LockInsertOrFinalizeClusterBlock))
-		err := suite.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			return procedure.InsertClusterBlock(lctx, rw, unittest.ClusterProposalFromBlock(block))
+		err := unittest.WithLock(b, suite.lockManager, storage.LockInsertOrFinalizeClusterBlock, func(lctx lockctx.Context) error {
+			return suite.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+				return procedure.InsertClusterBlock(lctx, rw, unittest.ClusterProposalFromBlock(block))
+			})
 		})
 		require.NoError(b, err)
-		lctx.Release()
 
 		// finalize the block 80% of the time, resulting in a fork-rate of 20%
 		if rand.Intn(100) < 80 {
-			lctx := suite.lockManager.NewContext()
-			defer lctx.Release()
-			require.NoError(suite.T(), lctx.AcquireLock(storage.LockInsertOrFinalizeClusterBlock))
-			err = suite.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-				return procedure.FinalizeClusterBlock(lctx, rw, block.ID())
+			err = unittest.WithLock(b, suite.lockManager, storage.LockInsertOrFinalizeClusterBlock, func(lctx lockctx.Context) error {
+				return suite.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+					return procedure.FinalizeClusterBlock(lctx, rw, block.ID())
+				})
 			})
 			require.NoError(b, err)
 			final = block
