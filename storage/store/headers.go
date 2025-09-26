@@ -83,7 +83,7 @@ func (h *Headers) storeTx(
 		return err
 	}
 
-	return h.sigs.storeTx(rw, blockID, proposalSig)
+	return h.sigs.storeTx(lctx, rw, blockID, proposalSig)
 }
 
 func (h *Headers) retrieveTx(blockID flow.Identifier) (*flow.Header, error) {
