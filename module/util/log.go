@@ -8,68 +8,77 @@ import (
 	"github.com/rs/zerolog"
 )
 
-// LogProgressFunc is a function that can be called to add to the progress
-type LogProgressFunc func(addProgress int)
+// LogProgressFunc is a function that can be called to add to the progress.
+// The function can be called concurrently. addProgress is the amount to add to the progress.
+// It is any integer number type, but all negative values are ignored.
+type LogProgressFunc[T int | uint | int32 | uint32 | uint64 | int64] func(addProgress T)
 
-type LogProgressConfig struct {
+type LogProgressConfig[T int | uint | int32 | uint32 | uint64 | int64] struct {
+	// Message is part of the messages that will be logged.
+	// The full template is: `%s progress %d/%d (%.1f%%) total time %s`.
 	Message string
-	Total   int
-	Sampler zerolog.Sampler
+	// Total is the total value of progress expected.
+	// When Total is added to LogProgressFunc the progress is considered to be 100%.
+	Total T
+	// NoDataLogDuration. If the last log line was more than this duration ago and a new data point is added, a new log line is logged.
+	// No line is logged if no data is received. The minimum resolution for NoDataLogDuration is 1 millisecond.
+	NoDataLogDuration time.Duration
+	// Ticks is the number of increments to log at. If Total is > 0 there will be at least 2 ticks. One at 0 and one at Total.
+	// If you want to log at every 10% set Ticks to 11 (one is at 0%).
+	// If the number of ticks is more than Total, it will be set to Total + 1.
+	Ticks uint64
 }
 
-func DefaultLogProgressConfig(
+// DefaultLogProgressConfig returns a LogProgressConfig with default values.
+// The default values will log every 10% and will log an additional line if new data is received
+// after no data has been received for 1 minute.
+func DefaultLogProgressConfig[T int | uint | int32 | uint32 | uint64 | int64](
 	message string,
-	total int,
-) LogProgressConfig {
-	nth := uint32(total / 10) // sample every 10% by default
-	if nth == 0 {
-		nth = 1
+	total T,
+) LogProgressConfig[T] {
+	return LogProgressConfig[T]{
+		Message:           message,
+		Total:             total,
+		Ticks:             11,
+		NoDataLogDuration: 60 * time.Second,
 	}
-
-	sampler := newProgressLogsSampler(nth, 60*time.Second)
-	return NewLogProgressConfig(
-		message,
-		total,
-		sampler,
-	)
 }
 
-func NewLogProgressConfig(
-	message string,
-	total int,
-	sampler zerolog.Sampler) LogProgressConfig {
-	return LogProgressConfig{
-		Message: message,
-		Total:   total,
-		Sampler: sampler,
-	}
+type LogProgressOption[T int | uint | int32 | uint32 | uint64 | int64] func(config *LogProgressConfig[T])
 
-}
-
-type LogProgressOption func(config *LogProgressConfig)
-
-// LogProgress takes a total and return function such that when called adds the given
-// number to the progress and logs the progress every 10% or every 60 seconds whichever
-// comes first.
+// LogProgress takes a LogProgressConfig and return function such that when called adds the given
+// number to the progress and logs the progress in defined increments or there is a time gap between progress
+// updates.
 // The returned function can be called concurrently.
 // An eta is also logged, but it assumes that the progress is linear.
-func LogProgress(
+func LogProgress[T int | uint | int32 | uint32 | uint64 | int64](
 	log zerolog.Logger,
-	config LogProgressConfig,
-) LogProgressFunc {
-	sampler := log.Sample(config.Sampler)
+	config LogProgressConfig[T],
+) LogProgressFunc[T] {
 
-	start := time.Now()
-	currentIndex := uint64(0)
-	return func(add int) {
-		current := atomic.AddUint64(&currentIndex, uint64(add))
+	start := time.Now().UnixMilli()
+	var lastDataTime atomic.Int64
+	lastDataTime.Store(start)
+	var currentIndex atomic.Uint64
+
+	// mutex to protect logProgress from concurrent calls
+	// mutex is technically only needed for when the underlying io.Writer for the provider zerolog.Logger
+	// is not thread safe. However we lock conservatively because we intend to call logProgress infrequently in normal
+	// usage anyway.
+	var mux sync.Mutex
+
+	total := uint64(config.Total)
+	logProgress := func(current uint64) {
+		mux.Lock()
+		defer mux.Unlock()
+
+		elapsed := time.Since(time.UnixMilli(start))
+		elapsedString := elapsed.Round(1 * time.Second).String()
 
 		percentage := float64(100)
 		if config.Total > 0 {
 			percentage = (float64(current) / float64(config.Total)) * 100.
 		}
-		elapsed := time.Since(start)
-		elapsedString := elapsed.Round(1 * time.Second).String()
 
 		etaString := "unknown"
 		if percentage > 0 {
@@ -78,72 +87,61 @@ func LogProgress(
 				eta = 0
 			}
 			etaString = eta.Round(1 * time.Second).String()
-
 		}
 
-		if current != uint64(config.Total) {
-			sampler.Info().Msgf("%s progress %d/%d (%.1f%%) elapsed: %s, eta %s", config.Message, current, config.Total, percentage, elapsedString, etaString)
+		if current < total {
+			log.Info().Msgf("%s progress %d/%d (%.1f%%) elapsed: %s, eta %s", config.Message, current, config.Total, percentage, elapsedString, etaString)
 		} else {
 			log.Info().Msgf("%s progress %d/%d (%.1f%%) total time %s", config.Message, current, config.Total, percentage, elapsedString)
 		}
 	}
-}
 
-type TimedSampler struct {
-	start    time.Time
-	Duration time.Duration
-	mu       sync.Mutex
-}
+	// log 0% progress
+	logProgress(0)
 
-var _ zerolog.Sampler = (*TimedSampler)(nil)
-
-func NewTimedSampler(duration time.Duration) *TimedSampler {
-	return &TimedSampler{
-		start:    time.Now(),
-		Duration: duration,
-		mu:       sync.Mutex{},
+	// sanitize inputs and calculate increment
+	ticksIncludingZero := config.Ticks
+	if ticksIncludingZero < 2 {
+		ticksIncludingZero = 2
 	}
-}
+	ticks := ticksIncludingZero - 1
 
-func (s *TimedSampler) Sample(_ zerolog.Level) bool {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	if time.Since(s.start) > s.Duration {
-		s.start = time.Now()
-		return true
+	increment := total / ticks
+	if increment == 0 {
+		increment = 1
 	}
-	return false
-}
 
-func (s *TimedSampler) Reset() {
-	s.mu.Lock()
-	defer s.mu.Unlock()
+	// increment doesn't necessarily divide config.Total
+	// Because we want 100% to mean 100% we need to deduct this overflow from the current value
+	// before checking if it is a multiple of the increment.
+	incrementsOverflow := total % increment
+	noLogDurationMillis := config.NoDataLogDuration.Milliseconds()
 
-	s.start = time.Now()
-}
+	return func(add T) {
+		if add < 0 {
+			return
+		}
+		diff := uint64(add)
+		now := time.Now().UnixMilli()
 
-type progressLogsSampler struct {
-	basicSampler *zerolog.BasicSampler
-	timedSampler *TimedSampler
-}
+		current := currentIndex.Add(diff)
+		lastTime := lastDataTime.Swap(now)
 
-var _ zerolog.Sampler = (*progressLogsSampler)(nil)
+		// if the diff went over one or more increments, log the progress for each increment
+		fromTick := (current - diff - incrementsOverflow) / increment
+		toTick := (current - incrementsOverflow) / increment
 
-// newProgressLogsSampler returns a sampler that samples every nth log
-// and also samples a log if the last log was more than duration ago
-func newProgressLogsSampler(nth uint32, duration time.Duration) zerolog.Sampler {
-	return &progressLogsSampler{
-		basicSampler: &zerolog.BasicSampler{N: nth},
-		timedSampler: NewTimedSampler(duration),
+		if fromTick == toTick && now-lastTime > noLogDurationMillis {
+			// no data for a while, log whatever we are at now
+			logProgress(current)
+			return
+		}
+
+		for t := fromTick; t < toTick; t++ {
+			// (t+1) because we want to log the progress for the increment reached
+			// not the increment past
+			current := increment*(t+1) + incrementsOverflow
+			logProgress(current)
+		}
 	}
-}
-
-func (s *progressLogsSampler) Sample(lvl zerolog.Level) bool {
-	sample := s.basicSampler.Sample(lvl)
-	if sample {
-		s.timedSampler.Reset()
-		return true
-	}
-	return s.timedSampler.Sample(lvl)
 }
