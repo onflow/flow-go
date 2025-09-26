@@ -3,14 +3,12 @@ package votecollector
 import (
 	"errors"
 	"fmt"
-	"testing"
-	"time"
-
 	"github.com/gammazero/workerpool"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
+	"testing"
 
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/helper"
@@ -217,7 +215,7 @@ func (s *StateMachineTestSuite) TestProcessBlock_ProcessingOfCachedVotes() {
 	err := s.collector.ProcessBlock(proposal)
 	require.NoError(s.T(), err)
 
-	time.Sleep(100 * time.Millisecond)
+	s.workerPool.StopWait()
 	processor.AssertExpectations(s.T())
 }
 
@@ -255,7 +253,7 @@ func (s *StateMachineTestSuite) TestProcessBlock_ErrorHandlingOfCachedVotes() {
 	err := s.collector.ProcessBlock(proposal)
 	require.NoError(s.T(), err)
 
-	time.Sleep(100 * time.Millisecond)
+	s.workerPool.StopWait()
 	processor.AssertExpectations(s.T())
 }
 
