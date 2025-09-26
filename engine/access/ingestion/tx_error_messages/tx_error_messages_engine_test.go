@@ -22,6 +22,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/irrecoverable"
+	"github.com/onflow/flow-go/module/metrics"
 	protocol "github.com/onflow/flow-go/state/protocol/mock"
 	storage "github.com/onflow/flow-go/storage/mock"
 	"github.com/onflow/flow-go/storage/operation/badgerimpl"
@@ -36,8 +37,9 @@ import (
 type TxErrorMessagesEngineSuite struct {
 	suite.Suite
 
-	log   zerolog.Logger
-	proto struct {
+	log     zerolog.Logger
+	metrics module.ExecutionStateIndexerMetrics
+	proto   struct {
 		state    *protocol.FollowerState
 		snapshot *protocol.Snapshot
 		params   *protocol.Params
@@ -76,6 +78,7 @@ func (s *TxErrorMessagesEngineSuite) TearDownTest() {
 
 func (s *TxErrorMessagesEngineSuite) SetupTest() {
 	s.log = zerolog.New(os.Stderr)
+	s.metrics = metrics.NewNoopCollector()
 	s.ctx, s.cancel = context.WithCancel(context.Background())
 	s.db, s.dbDir = unittest.TempBadgerDB(s.T())
 	// mock out protocol state
@@ -174,6 +177,7 @@ func (s *TxErrorMessagesEngineSuite) initEngine(ctx irrecoverable.SignalerContex
 
 	eng, err := New(
 		s.log,
+		s.metrics,
 		s.proto.state,
 		s.headers,
 		processedTxErrorMessagesBlockHeight,
