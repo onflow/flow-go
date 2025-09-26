@@ -161,7 +161,10 @@ func run(*cobra.Command, []string) {
 			})
 		}
 		if len(txErrorMessages) > 0 {
-			accessTxErrorMessages.Store(blockID, txErrorMessages)
+			err = accessTxErrorMessages.Store(blockID, txErrorMessages)
+			if err != nil {
+				log.Fatal().Err(err).Msgf("could not store transaction error messages at height %d", h)
+			}
 		}
 		progress(1)
 	}
