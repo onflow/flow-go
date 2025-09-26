@@ -11,6 +11,7 @@ import (
 	"github.com/onflow/flow-go/cmd/util/cmd/common"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
+	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/store"
 )
 
@@ -28,59 +29,57 @@ type event struct {
 func ExportEvents(blockID flow.Identifier, dbPath string, outputPath string) error {
 
 	// traverse backward from the given block (parent block) and fetch by blockHash
-	db, err := common.InitStorage(dbPath)
-	if err != nil {
-		return fmt.Errorf("could not initialize storage: %w", err)
-	}
-	defer db.Close()
+	return common.WithStorage(dbPath, func(db storage.DB) error {
 
-	cacheMetrics := &metrics.NoopCollector{}
-	headers := store.NewHeaders(cacheMetrics, db)
-	events := store.NewEvents(cacheMetrics, db)
-	activeBlockID := blockID
+		cacheMetrics := &metrics.NoopCollector{}
+		headers := store.NewHeaders(cacheMetrics, db)
+		events := store.NewEvents(cacheMetrics, db)
+		activeBlockID := blockID
 
-	outputFile := filepath.Join(outputPath, "events.jsonl")
-	fi, err := os.Create(outputFile)
-	if err != nil {
-		return fmt.Errorf("could not create event output file %w", err)
-	}
-	defer fi.Close()
-
-	eventWriter := bufio.NewWriter(fi)
-	defer eventWriter.Flush()
-
-	for {
-		header, err := headers.ByBlockID(activeBlockID)
+		outputFile := filepath.Join(outputPath, "events.jsonl")
+		fi, err := os.Create(outputFile)
 		if err != nil {
-			// no more header is available
-			return nil
+			return fmt.Errorf("could not create event output file %w", err)
+		}
+		defer fi.Close()
+
+		eventWriter := bufio.NewWriter(fi)
+		defer eventWriter.Flush()
+
+		for {
+			header, err := headers.ByBlockID(activeBlockID)
+			if err != nil {
+				// no more header is available
+				return nil
+			}
+
+			evs, err := events.ByBlockID(activeBlockID)
+			if err != nil {
+				return fmt.Errorf("could not fetch events %w", err)
+			}
+
+			for _, ev := range evs {
+				e := event{
+					TxID:        hex.EncodeToString(ev.TransactionID[:]),
+					TxIndex:     ev.TransactionIndex,
+					EventIndex:  ev.EventIndex,
+					EventType:   string(ev.Type),
+					PayloadHex:  hex.EncodeToString(ev.Payload),
+					BlockID:     hex.EncodeToString(activeBlockID[:]),
+					BlockHeight: header.Height,
+				}
+				jsonData, err := json.Marshal(e)
+				if err != nil {
+					return fmt.Errorf("could not create a json obj for an event: %w", err)
+				}
+				_, err = eventWriter.WriteString(string(jsonData) + "\n")
+				if err != nil {
+					return fmt.Errorf("could not write event json to the file: %w", err)
+				}
+				eventWriter.Flush()
+			}
+			activeBlockID = header.ParentID
 		}
 
-		evs, err := events.ByBlockID(activeBlockID)
-		if err != nil {
-			return fmt.Errorf("could not fetch events %w", err)
-		}
-
-		for _, ev := range evs {
-			e := event{
-				TxID:        hex.EncodeToString(ev.TransactionID[:]),
-				TxIndex:     ev.TransactionIndex,
-				EventIndex:  ev.EventIndex,
-				EventType:   string(ev.Type),
-				PayloadHex:  hex.EncodeToString(ev.Payload),
-				BlockID:     hex.EncodeToString(activeBlockID[:]),
-				BlockHeight: header.Height,
-			}
-			jsonData, err := json.Marshal(e)
-			if err != nil {
-				return fmt.Errorf("could not create a json obj for an event: %w", err)
-			}
-			_, err = eventWriter.WriteString(string(jsonData) + "\n")
-			if err != nil {
-				return fmt.Errorf("could not write event json to the file: %w", err)
-			}
-			eventWriter.Flush()
-		}
-		activeBlockID = header.ParentID
-	}
+	})
 }

@@ -9,7 +9,7 @@ import (
 
 	"github.com/stretchr/testify/mock"
 
-	"github.com/onflow/flow-go/network/mocknetwork"
+	mocknetwork "github.com/onflow/flow-go/network/mock"
 
 	"github.com/stretchr/testify/require"
 
@@ -86,19 +86,25 @@ func TestCorruptNetworkFrameworkHappyPath(t *testing.T) {
 				wg := &sync.WaitGroup{}
 				wg.Add(2) // wait for both egress and ingress events to be received.
 
+				internalCorruptedEgressEvent, err := corruptedEgressEvent.ToInternal()
+				require.NoError(t, err)
+
 				// we expect to receive the corrupted egress event on the honest node.
 				// event must arrive at the channel set by orchestrator.
 				// origin id of the message must be the corrupted node.
 				// content of event must be swapped with corrupted event.
-				honestEngine.On("Process", testChannel, corruptedIdentity.NodeID, corruptedEgressEvent).Return(nil).Run(func(args mock.Arguments) {
+				honestEngine.On("Process", testChannel, corruptedIdentity.NodeID, internalCorruptedEgressEvent).Return(nil).Run(func(args mock.Arguments) {
 					wg.Done()
 				})
+
+				internalCorruptedIngressEvent, err := corruptedIngressEvent.ToInternal()
+				require.NoError(t, err)
 
 				// we expect to receive the corrupted ingress event on the corrupted node.
 				// event must arrive at the channel set by orchestrator.
 				// origin id of the message must be the honest node.
 				// content of event must be swapped with corrupted event.
-				corruptedEngine.On("Process", testChannel, honestIdentity.NodeID, corruptedIngressEvent).Return(nil).Run(func(args mock.Arguments) {
+				corruptedEngine.On("Process", testChannel, honestIdentity.NodeID, internalCorruptedIngressEvent).Return(nil).Run(func(args mock.Arguments) {
 					// simulate the Process logic of the corrupted engine on reception of message from underlying network.
 					wg.Done()
 				})

@@ -2371,7 +2371,7 @@ func TestScriptExecutionLimit(t *testing.T) {
 				require.ErrorContains(t, output.Err, "computation exceeds limit (10000)")
 				require.GreaterOrEqual(t, output.ComputationUsed, uint64(10000))
 				if *testWithVMScriptExecution {
-					require.GreaterOrEqual(t, output.MemoryEstimate, uint64(540012179))
+					require.GreaterOrEqual(t, output.MemoryEstimate, uint64(540000979))
 				} else {
 					require.GreaterOrEqual(t, output.MemoryEstimate, uint64(548020260))
 				}
@@ -2396,7 +2396,7 @@ func TestScriptExecutionLimit(t *testing.T) {
 				require.NoError(t, output.Err)
 				require.GreaterOrEqual(t, output.ComputationUsed, uint64(17955))
 				if *testWithVMScriptExecution {
-					require.GreaterOrEqual(t, output.MemoryEstimate, uint64(969629012))
+					require.GreaterOrEqual(t, output.MemoryEstimate, uint64(969617812))
 				} else {
 					require.GreaterOrEqual(t, output.MemoryEstimate, uint64(984017413))
 				}
