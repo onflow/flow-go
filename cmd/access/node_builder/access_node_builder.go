@@ -315,6 +315,7 @@ type FlowAccessNodeBuilder struct {
 	BlockTransactions            *stdmap.IdentifierMap
 	TransactionMetrics           *metrics.TransactionCollector
 	TransactionValidationMetrics *metrics.TransactionValidationCollector
+	ExecutionStateIndexerMetrics module.ExecutionStateIndexerMetrics
 	RestMetrics                  *metrics.RestCollector
 	AccessMetrics                module.AccessMetrics
 	PingMetrics                  module.PingMetrics
@@ -967,7 +968,7 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 
 				indexerCore, err := indexer.New(
 					builder.Logger,
-					metrics.NewExecutionStateIndexerCollector(),
+					builder.ExecutionStateIndexerMetrics,
 					notNil(builder.ProtocolDB),
 					notNil(builder.Storage.RegisterIndex),
 					notNil(builder.Storage.Headers),
@@ -1776,6 +1777,10 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 			builder.TransactionValidationMetrics = metrics.NewTransactionValidationCollector()
 			return nil
 		}).
+		Module("execution state indexer metrics", func(node *cmd.NodeConfig) error {
+			builder.ExecutionStateIndexerMetrics = metrics.NewExecutionStateIndexerCollector()
+			return nil
+		}).
 		Module("rest metrics", func(node *cmd.NodeConfig) error {
 			m, err := metrics.NewRestCollector(router.URLToRoute, node.MetricsRegisterer)
 			if err != nil {
@@ -2150,6 +2155,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				builder.TxResultErrorMessagesCore = tx_error_messages.NewTxErrorMessagesCore(
 					node.Logger,
 					notNil(builder.nodeBackend),
+					builder.lightTransactionResults,
 					builder.transactionResultErrorMessages,
 					notNil(builder.ExecNodeIdentitiesProvider),
 				)
@@ -2189,6 +2195,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 		}).
 		AdminCommand("backfill-tx-error-messages", func(config *cmd.NodeConfig) commands.AdminCommand {
 			return storageCommands.NewBackfillTxErrorMessagesCommand(
+				builder.Logger,
 				builder.State,
 				builder.TxResultErrorMessagesCore,
 			)
@@ -2205,6 +2212,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 		builder.Component("transaction result error messages engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			engine, err := tx_error_messages.New(
 				node.Logger,
+				builder.ExecutionStateIndexerMetrics,
 				node.State,
 				node.Storage.Headers,
 				processedTxErrorMessagesBlockHeight,

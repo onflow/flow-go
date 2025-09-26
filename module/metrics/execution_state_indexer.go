@@ -12,8 +12,9 @@ import (
 var _ module.ExecutionStateIndexerMetrics = (*ExecutionStateIndexerCollector)(nil)
 
 type ExecutionStateIndexerCollector struct {
-	indexDuration        prometheus.Histogram
-	highestIndexedHeight prometheus.Gauge
+	indexDuration         prometheus.Histogram
+	highestIndexedHeight  prometheus.Gauge
+	txErrorsIndexedHeight prometheus.Gauge
 
 	indexedEvents             prometheus.Counter
 	indexedRegisters          prometheus.Counter
@@ -65,6 +66,13 @@ func NewExecutionStateIndexerCollector() module.ExecutionStateIndexerMetrics {
 		Help:      "number of times a previously indexed height is reindexed",
 	})
 
+	txErrorsIndexedHeight := promauto.NewGauge(prometheus.GaugeOpts{
+		Namespace: namespaceAccess,
+		Subsystem: subsystemExecutionStateIndexer,
+		Name:      "tx_errors_indexed_height",
+		Help:      "highest consecutive finalized block height with all transaction errors indexed",
+	})
+
 	return &ExecutionStateIndexerCollector{
 		indexDuration:             indexDuration,
 		highestIndexedHeight:      highestIndexedHeight,
@@ -72,6 +80,7 @@ func NewExecutionStateIndexerCollector() module.ExecutionStateIndexerMetrics {
 		indexedRegisters:          indexedRegisters,
 		indexedTransactionResults: indexedTransactionResults,
 		reindexedHeightCount:      reindexedHeightCount,
+		txErrorsIndexedHeight:     txErrorsIndexedHeight,
 	}
 }
 
@@ -94,4 +103,10 @@ func (c *ExecutionStateIndexerCollector) BlockIndexed(height uint64, duration ti
 // BlockReindexed records that a previously indexed block was indexed again.
 func (c *ExecutionStateIndexerCollector) BlockReindexed() {
 	c.reindexedHeightCount.Inc()
+}
+
+// TransactionErrorsIndexedHeight records the highest consecutive finalized block height with all
+// transaction errors indexed.
+func (c *ExecutionStateIndexerCollector) TransactionErrorsIndexedHeight(height uint64) {
+	c.txErrorsIndexedHeight.Set(float64(height))
 }

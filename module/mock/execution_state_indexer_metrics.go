@@ -28,6 +28,11 @@ func (_m *ExecutionStateIndexerMetrics) InitializeLatestHeight(height uint64) {
 	_m.Called(height)
 }
 
+// TransactionErrorsIndexedHeight provides a mock function with given fields: height
+func (_m *ExecutionStateIndexerMetrics) TransactionErrorsIndexedHeight(height uint64) {
+	_m.Called(height)
+}
+
 // NewExecutionStateIndexerMetrics creates a new instance of ExecutionStateIndexerMetrics. It also registers a testing interface on the mock and a cleanup function to assert the mocks expectations.
 // The first argument is typically a *testing.T value.
 func NewExecutionStateIndexerMetrics(t interface {

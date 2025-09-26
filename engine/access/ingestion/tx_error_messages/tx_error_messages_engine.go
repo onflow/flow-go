@@ -23,7 +23,7 @@ import (
 const (
 	// processTxErrorMessagesWorkersCount defines the number of workers that
 	// concurrently process transaction error messages in the job queue.
-	processTxErrorMessagesWorkersCount = 3
+	processTxErrorMessagesWorkersCount = 5
 
 	// defaultRetryDelay specifies the initial delay for the exponential backoff
 	// when the process of fetching transaction error messages fails.
@@ -49,6 +49,7 @@ type Engine struct {
 	*component.ComponentManager
 
 	log     zerolog.Logger
+	metrics module.ExecutionStateIndexerMetrics
 	state   protocol.State
 	headers storage.Headers
 
@@ -67,6 +68,7 @@ type Engine struct {
 // No errors are expected during normal operation.
 func New(
 	log zerolog.Logger,
+	metrics module.ExecutionStateIndexerMetrics,
 	state protocol.State,
 	headers storage.Headers,
 	txErrorMessagesProcessedHeight storage.ConsumerProgressInitializer,
@@ -74,6 +76,7 @@ func New(
 ) (*Engine, error) {
 	e := &Engine{
 		log:                     log.With().Str("engine", "tx_error_messages_engine").Logger(),
+		metrics:                 metrics,
 		state:                   state,
 		headers:                 headers,
 		txErrorMessagesCore:     txErrorMessagesCore,
@@ -108,6 +111,8 @@ func New(
 		return nil, fmt.Errorf("error creating transaction result error messages jobqueue: %w", err)
 	}
 
+	e.metrics.TransactionErrorsIndexedHeight(e.txErrorMessagesConsumer.LastProcessedIndex())
+
 	// Add workers
 	e.ComponentManager = component.NewComponentManagerBuilder().
 		AddWorker(e.runTxResultErrorMessagesConsumer).
@@ -128,6 +133,7 @@ func (e *Engine) processTxResultErrorMessagesJob(ctx irrecoverable.SignalerConte
 	err = e.processErrorMessagesForBlock(ctx, header.ID())
 	if err == nil {
 		done()
+		e.metrics.TransactionErrorsIndexedHeight(header.Height)
 		return
 	}
 
@@ -144,6 +150,11 @@ func (e *Engine) runTxResultErrorMessagesConsumer(ctx irrecoverable.SignalerCont
 	err := util.WaitClosed(ctx, e.txErrorMessagesConsumer.Ready())
 	if err == nil {
 		ready()
+
+		// In the case where this component is started for the first time after a spork, we need to
+		// manually trigger the first check since OnFinalizedBlock will never be called.
+		// If this is started on a live network, an eary check will be a no-op.
+		e.txErrorMessagesNotifier.Notify()
 	}
 
 	<-e.txErrorMessagesConsumer.Done()
@@ -166,15 +177,16 @@ func (e *Engine) processErrorMessagesForBlock(ctx context.Context, blockID flow.
 
 	attempt := 0
 	return retry.Do(ctx, backoff, func(context.Context) error {
+		err := e.txErrorMessagesCore.HandleTransactionResultErrorMessages(ctx, blockID)
+
 		if attempt > 0 {
 			e.log.Debug().
+				Err(err).
 				Str("block_id", blockID.String()).
 				Uint64("attempt", uint64(attempt)).
 				Msgf("retrying process transaction result error messages")
-
 		}
 		attempt++
-		err := e.txErrorMessagesCore.HandleTransactionResultErrorMessages(ctx, blockID)
 
 		return retry.RetryableError(err)
 	})
