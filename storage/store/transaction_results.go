@@ -57,7 +57,7 @@ func IDFromIdentifierAndUint32(key IdentifierAndUint32) flow.Identifier {
 	return flow.Identifier(key[:flow.IdentifierLen])
 }
 
-func NewTransactionResults(collector module.CacheMetrics, db storage.DB, transactionResultsCacheSize uint) *TransactionResults {
+func NewTransactionResults(collector module.CacheMetrics, db storage.DB, transactionResultsCacheSize uint) (*TransactionResults, error) {
 	retrieve := func(r storage.Reader, key TwoIdentifier) (flow.TransactionResult, error) {
 		blockID, txID := KeyToBlockIDTransactionID(key)
 
@@ -98,7 +98,7 @@ func NewTransactionResults(collector module.CacheMetrics, db storage.DB, transac
 		withRetrieve(retrieve),
 	)
 	if err != nil {
-		panic(err)
+		return nil, err
 	}
 
 	indexCache, err := newGroupCache(
@@ -124,7 +124,7 @@ func NewTransactionResults(collector module.CacheMetrics, db storage.DB, transac
 			withStore(noopStore[flow.Identifier, []flow.TransactionResult]),
 			withRetrieve(retrieveForBlock),
 		),
-	}
+	}, nil
 }
 
 // BatchStore will store the transaction results for the given block ID in a batch

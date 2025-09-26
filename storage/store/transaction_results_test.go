@@ -23,7 +23,8 @@ import (
 func TestBatchStoringTransactionResults(t *testing.T) {
 	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
 		metrics := metrics.NewNoopCollector()
-		st := store.NewTransactionResults(metrics, db, 1000)
+		st, err := store.NewTransactionResults(metrics, db, 1000)
+		require.NoError(t, err)
 
 		blockID := unittest.IdentifierFixture()
 		txResults := make([]flow.TransactionResult, 0)
@@ -38,7 +39,7 @@ func TestBatchStoringTransactionResults(t *testing.T) {
 		writeBatch := db.NewBatch()
 		defer writeBatch.Close()
 
-		err := st.BatchStore(blockID, txResults, writeBatch)
+		err = st.BatchStore(blockID, txResults, writeBatch)
 		require.NoError(t, err)
 
 		err = writeBatch.Commit()
@@ -51,7 +52,8 @@ func TestBatchStoringTransactionResults(t *testing.T) {
 		}
 
 		// test loading from database
-		newst := store.NewTransactionResults(metrics, db, 1000)
+		newst, err := store.NewTransactionResults(metrics, db, 1000)
+		require.NoError(t, err)
 		for _, txResult := range txResults {
 			actual, err := newst.ByBlockIDTransactionID(blockID, txResult.TransactionID)
 			require.NoError(t, err)
@@ -77,7 +79,8 @@ func TestBatchStoreAndBatchRemoveTransactionResults(t *testing.T) {
 		const txCountPerBlock = 10
 
 		metrics := metrics.NewNoopCollector()
-		st := store.NewTransactionResults(metrics, db, 1000)
+		st, err := store.NewTransactionResults(metrics, db, 1000)
+		require.NoError(t, err)
 
 		blockIDs := make([]flow.Identifier, blockCount)
 		txResults := make(map[flow.Identifier][]flow.TransactionResult)
@@ -96,7 +99,7 @@ func TestBatchStoreAndBatchRemoveTransactionResults(t *testing.T) {
 		}
 
 		// Store transaction results of multiple blocks
-		err := db.WithReaderBatchWriter(func(rbw storage.ReaderBatchWriter) error {
+		err = db.WithReaderBatchWriter(func(rbw storage.ReaderBatchWriter) error {
 			for _, blockID := range blockIDs {
 				err := st.BatchStore(blockID, txResults[blockID], rbw)
 				if err != nil {
@@ -150,13 +153,14 @@ func TestBatchStoreAndBatchRemoveTransactionResults(t *testing.T) {
 func TestReadingNotstTransaction(t *testing.T) {
 	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
 		metrics := metrics.NewNoopCollector()
-		st := store.NewTransactionResults(metrics, db, 1000)
+		st, err := store.NewTransactionResults(metrics, db, 1000)
+		require.NoError(t, err)
 
 		blockID := unittest.IdentifierFixture()
 		txID := unittest.IdentifierFixture()
 		txIndex := rand.Uint32()
 
-		_, err := st.ByBlockIDTransactionID(blockID, txID)
+		_, err = st.ByBlockIDTransactionID(blockID, txID)
 		assert.ErrorIs(t, err, storage.ErrNotFound)
 
 		_, err = st.ByBlockIDTransactionIndex(blockID, txIndex)

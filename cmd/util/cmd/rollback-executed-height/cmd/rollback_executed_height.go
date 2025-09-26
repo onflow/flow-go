@@ -67,7 +67,10 @@ func runE(*cobra.Command, []string) error {
 
 		metrics := &metrics.NoopCollector{}
 
-		transactionResults := store.NewTransactionResults(metrics, db, badger.DefaultCacheSize)
+		transactionResults, err := store.NewTransactionResults(metrics, db, badger.DefaultCacheSize)
+		if err != nil {
+			return err
+		}
 		commits := store.NewCommits(metrics, db)
 		results := store.NewExecutionResults(metrics, db)
 		receipts := store.NewExecutionReceipts(metrics, db, results, badger.DefaultCacheSize)

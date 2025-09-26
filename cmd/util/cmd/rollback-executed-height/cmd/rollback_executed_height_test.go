@@ -41,7 +41,8 @@ func TestReExecuteBlock(t *testing.T) {
 		all := store.InitAll(metrics, db)
 		headers := all.Headers
 		blocks := all.Blocks
-		txResults := store.NewTransactionResults(metrics, db, store.DefaultCacheSize)
+		txResults, err := store.NewTransactionResults(metrics, db, store.DefaultCacheSize)
+		require.NoError(t, err)
 		commits := store.NewCommits(metrics, db)
 		chunkDataPacks := store.NewChunkDataPacks(metrics, pebbleimpl.ToDB(pdb), store.NewCollections(db, store.NewTransactions(metrics, db)), store.DefaultCacheSize)
 		results := all.Results
@@ -201,7 +202,8 @@ func TestReExecuteBlockWithDifferentResult(t *testing.T) {
 		transactions := store.NewTransactions(metrics, db)
 		collections := store.NewCollections(db, transactions)
 		chunkDataPacks := store.NewChunkDataPacks(metrics, pebbleimpl.ToDB(pdb), collections, bstorage.DefaultCacheSize)
-		txResults := store.NewTransactionResults(metrics, db, bstorage.DefaultCacheSize)
+		txResults, err := store.NewTransactionResults(metrics, db, bstorage.DefaultCacheSize)
+		require.NoError(t, err)
 
 		err = unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
 			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
