@@ -7,10 +7,10 @@ import (
 	"github.com/stretchr/testify/assert"
 	testifymock "github.com/stretchr/testify/mock"
 
-	"google.golang.org/grpc/encoding/gzip"
-
 	"github.com/onflow/flow-go/engine/common/grpc/compressor/deflate"
+	"github.com/onflow/flow-go/engine/common/grpc/compressor/gzip"
 	"github.com/onflow/flow-go/engine/common/grpc/compressor/snappy"
+	"github.com/onflow/flow-go/engine/common/grpc/compressor/zstd"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
@@ -32,6 +32,11 @@ func BenchmarkWithSnappyCompression(b *testing.B) {
 // BenchmarkWithDeflateCompression benchmarks the gRPC request to execution nodes using deflate compressor.
 func BenchmarkWithDeflateCompression(b *testing.B) {
 	runBenchmark(b, deflate.Name)
+}
+
+// BenchmarkWithDeflateCompression benchmarks the gRPC request to execution nodes using deflate compressor.
+func BenchmarkWithZSTDCompression(b *testing.B) {
+	runBenchmark(b, zstd.Name)
 }
 
 // runBenchmark is a helper function that performs the benchmarking for different compressors.

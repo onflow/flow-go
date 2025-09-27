@@ -1,13 +1,13 @@
 package generate_authorization_fixes
 
 import (
-	"compress/gzip"
 	"encoding/json"
 	"io"
 	"os"
 	"strings"
 	"sync"
 
+	"github.com/klauspost/compress/gzip"
 	"github.com/onflow/cadence/common"
 	"github.com/onflow/cadence/interpreter"
 	"github.com/onflow/cadence/sema"
