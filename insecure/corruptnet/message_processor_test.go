@@ -3,13 +3,12 @@ package corruptnet
 import (
 	"testing"
 
-	"github.com/onflow/flow-go/network/mocknetwork"
-
 	"github.com/stretchr/testify/require"
 
 	mockinsecure "github.com/onflow/flow-go/insecure/mock"
 	"github.com/onflow/flow-go/model/libp2p/message"
 	"github.com/onflow/flow-go/network/channels"
+	mocknetwork "github.com/onflow/flow-go/network/mock"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -28,7 +27,10 @@ func TestProcess_AttackerRegistered(t *testing.T) {
 	ingressController.On("HandleIncomingEvent", msg, channel, originId).Return(true)
 	messageProcessor := NewCorruptMessageProcessor(unittest.Logger(), originalProcessor, ingressController)
 
-	err := messageProcessor.Process(channel, originId, msg)
+	internal, err := msg.ToInternal()
+	require.NoError(t, err)
+
+	err = messageProcessor.Process(channel, originId, internal)
 	require.NoError(t, err)
 }
 
@@ -48,11 +50,14 @@ func TestProcess_AttackerNotRegistered(t *testing.T) {
 	corruptChannel := channels.TestNetworkChannel
 	ingressMsg := &message.TestMessage{Text: "this is a test msg"}
 
+	internalIngress, err := ingressMsg.ToInternal()
+	require.NoError(t, err)
+
 	// this simulates the corrupt message processor sending the message on the original message processor when an attacker is not registered
-	originalProcessor.On("Process", corruptChannel, originId, ingressMsg).Return(nil)
+	originalProcessor.On("Process", corruptChannel, originId, internalIngress).Return(nil)
 
 	messageProcessor := NewCorruptMessageProcessor(unittest.Logger(), originalProcessor, ingressController)
 
-	err := messageProcessor.Process(corruptChannel, originId, ingressMsg)
+	err = messageProcessor.Process(corruptChannel, originId, internalIngress)
 	require.NoError(t, err)
 }
