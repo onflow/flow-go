@@ -7,7 +7,7 @@ require (
 	cloud.google.com/go/profiler v0.3.0
 	cloud.google.com/go/storage v1.50.0
 	github.com/antihax/optional v1.0.0
-	github.com/aws/aws-sdk-go-v2/config v1.31.2
+	github.com/aws/aws-sdk-go-v2/config v1.31.8
 	github.com/aws/aws-sdk-go-v2/feature/s3/manager v1.5.1
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.15.0
 	github.com/btcsuite/btcd/btcec/v2 v2.3.4
@@ -50,9 +50,9 @@ require (
 	github.com/onflow/cadence v1.7.0
 	github.com/onflow/crypto v0.25.3
 	github.com/onflow/flow v0.4.15
-	github.com/onflow/flow-core-contracts/lib/go/contracts v1.8.1
-	github.com/onflow/flow-core-contracts/lib/go/templates v1.8.1
-	github.com/onflow/flow-go-sdk v1.8.1
+	github.com/onflow/flow-core-contracts/lib/go/contracts v1.9.0
+	github.com/onflow/flow-core-contracts/lib/go/templates v1.9.0
+	github.com/onflow/flow-go-sdk v1.8.2
 	github.com/onflow/flow/protobuf/go/flow v0.4.16
 	github.com/pbnjay/memory v0.0.0-20210728143218-7b4eea64cf58
 	github.com/pierrec/lz4 v2.6.1+incompatible
@@ -86,7 +86,7 @@ require (
 	google.golang.org/genproto v0.0.0-20250603155806-513f23925822
 	google.golang.org/grpc v1.75.0
 	google.golang.org/grpc/cmd/protoc-gen-go-grpc v1.2.0
-	google.golang.org/protobuf v1.36.7
+	google.golang.org/protobuf v1.36.9
 	gotest.tools v2.2.0+incompatible
 	pgregory.net/rapid v1.1.0
 )
@@ -142,19 +142,19 @@ require (
 	github.com/SaveTheRbtz/mph v0.1.1-0.20240117162131-4166ec7869bc // indirect
 	github.com/StackExchange/wmi v1.2.1 // indirect
 	github.com/VictoriaMetrics/fastcache v1.12.2 // indirect
-	github.com/aws/aws-sdk-go-v2 v1.38.1 // indirect
-	github.com/aws/aws-sdk-go-v2/credentials v1.18.6 // indirect
-	github.com/aws/aws-sdk-go-v2/feature/ec2/imds v1.18.4 // indirect
-	github.com/aws/aws-sdk-go-v2/internal/configsources v1.4.4 // indirect
-	github.com/aws/aws-sdk-go-v2/internal/endpoints/v2 v2.7.4 // indirect
+	github.com/aws/aws-sdk-go-v2 v1.39.0 // indirect
+	github.com/aws/aws-sdk-go-v2/credentials v1.18.12 // indirect
+	github.com/aws/aws-sdk-go-v2/feature/ec2/imds v1.18.7 // indirect
+	github.com/aws/aws-sdk-go-v2/internal/configsources v1.4.7 // indirect
+	github.com/aws/aws-sdk-go-v2/internal/endpoints/v2 v2.7.7 // indirect
 	github.com/aws/aws-sdk-go-v2/internal/ini v1.8.3 // indirect
-	github.com/aws/aws-sdk-go-v2/service/internal/accept-encoding v1.13.0 // indirect
-	github.com/aws/aws-sdk-go-v2/service/internal/presigned-url v1.13.4 // indirect
+	github.com/aws/aws-sdk-go-v2/service/internal/accept-encoding v1.13.1 // indirect
+	github.com/aws/aws-sdk-go-v2/service/internal/presigned-url v1.13.7 // indirect
 	github.com/aws/aws-sdk-go-v2/service/internal/s3shared v1.7.0 // indirect
-	github.com/aws/aws-sdk-go-v2/service/sso v1.28.2 // indirect
-	github.com/aws/aws-sdk-go-v2/service/ssooidc v1.33.2 // indirect
-	github.com/aws/aws-sdk-go-v2/service/sts v1.38.0 // indirect
-	github.com/aws/smithy-go v1.22.5 // indirect
+	github.com/aws/aws-sdk-go-v2/service/sso v1.29.3 // indirect
+	github.com/aws/aws-sdk-go-v2/service/ssooidc v1.34.4 // indirect
+	github.com/aws/aws-sdk-go-v2/service/sts v1.38.4 // indirect
+	github.com/aws/smithy-go v1.23.0 // indirect
 	github.com/benbjohnson/clock v1.3.5 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/bits-and-blooms/bitset v1.24.0 // indirect

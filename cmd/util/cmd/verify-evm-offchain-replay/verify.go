@@ -43,65 +43,65 @@ func Verify(
 
 	lg.Info().Msgf("verifying range from %d to %d", from, to)
 
-	db, storages, executionDataStore, dsStore, err := initStorages(dataDir, executionDataDir)
-	if err != nil {
-		return fmt.Errorf("could not initialize storages: %w", err)
-	}
-
-	defer db.Close()
-	defer dsStore.Close()
-
-	var store *testutils.TestValueStore
-
-	// root block require the account status registers to be saved
-	isRoot := utils.IsEVMRootHeight(chainID, from)
-	if isRoot {
-		store = testutils.GetSimpleValueStore()
-	} else {
-		prev := from - 1
-		store, err = loadState(prev, evmStateGobDir)
+	return common.WithStorage(dataDir, func(db storage.DB) error {
+		storages, executionDataStore, dsStore, err := initStorages(db, executionDataDir)
 		if err != nil {
-			return fmt.Errorf("could not load EVM state from previous height %d: %w", prev, err)
+			return fmt.Errorf("could not initialize storages: %w", err)
 		}
-	}
+		defer dsStore.Close()
 
-	// save state every N blocks
-	onHeightReplayed := func(height uint64) error {
-		log.Info().Msgf("replayed height %d", height)
-		if height%saveEveryNBlocks == 0 {
-			err := saveState(store, height, evmStateGobDir)
+		var store *testutils.TestValueStore
+
+		// root block require the account status registers to be saved
+		isRoot := utils.IsEVMRootHeight(chainID, from)
+		if isRoot {
+			store = testutils.GetSimpleValueStore()
+		} else {
+			prev := from - 1
+			store, err = loadState(prev, evmStateGobDir)
 			if err != nil {
-				return err
+				return fmt.Errorf("could not load EVM state from previous height %d: %w", prev, err)
 			}
 		}
+
+		// save state every N blocks
+		onHeightReplayed := func(height uint64) error {
+			log.Info().Msgf("replayed height %d", height)
+			if height%saveEveryNBlocks == 0 {
+				err := saveState(store, height, evmStateGobDir)
+				if err != nil {
+					return err
+				}
+			}
+			return nil
+		}
+
+		// replay blocks
+		err = utils.OffchainReplayBackwardCompatibilityTest(
+			log,
+			chainID,
+			from,
+			to,
+			storages.Headers,
+			storages.Results,
+			executionDataStore,
+			store,
+			onHeightReplayed,
+		)
+
+		if err != nil {
+			return err
+		}
+
+		err = saveState(store, to, evmStateGobDir)
+		if err != nil {
+			return err
+		}
+
+		lg.Info().Msgf("successfully verified range from %d to %d", from, to)
+
 		return nil
-	}
-
-	// replay blocks
-	err = utils.OffchainReplayBackwardCompatibilityTest(
-		log,
-		chainID,
-		from,
-		to,
-		storages.Headers,
-		storages.Results,
-		executionDataStore,
-		store,
-		onHeightReplayed,
-	)
-
-	if err != nil {
-		return err
-	}
-
-	err = saveState(store, to, evmStateGobDir)
-	if err != nil {
-		return err
-	}
-
-	lg.Info().Msgf("successfully verified range from %d to %d", from, to)
-
-	return nil
+	})
 }
 
 func saveState(store *testutils.TestValueStore, height uint64, gobDir string) error {
@@ -138,34 +138,28 @@ func loadState(height uint64, gobDir string) (*testutils.TestValueStore, error) 
 	return store, nil
 }
 
-func initStorages(dataDir string, executionDataDir string) (
-	storage.DB,
+func initStorages(db storage.DB, executionDataDir string) (
 	*store.All,
 	execution_data.ExecutionDataGetter,
 	io.Closer,
 	error,
 ) {
-	db, err := common.InitStorage(dataDir)
-	if err != nil {
-		return nil, nil, nil, nil, fmt.Errorf("could not initialize storage: %w", err)
-	}
-
 	storages := common.InitStorages(db)
 
 	datastoreDir := filepath.Join(executionDataDir, "blobstore")
-	err = os.MkdirAll(datastoreDir, 0700)
+	err := os.MkdirAll(datastoreDir, 0700)
 	if err != nil {
-		return nil, nil, nil, nil, err
+		return nil, nil, nil, err
 	}
 	ds, err := pebbleds.NewDatastore(datastoreDir, nil)
 	if err != nil {
-		return nil, nil, nil, nil, err
+		return nil, nil, nil, err
 	}
 
 	executionDataBlobstore := blobs.NewBlobstore(ds)
 	executionDataStore := execution_data.NewExecutionDataStore(executionDataBlobstore, execution_data.DefaultSerializer)
 
-	return db, storages, executionDataStore, ds, nil
+	return storages, executionDataStore, ds, nil
 }
 
 func evmStateGobFileNamesByEndHeight(evmStateGobDir string, endHeight uint64) (string, string) {

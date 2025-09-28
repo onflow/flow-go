@@ -3,8 +3,6 @@ package codec
 import (
 	"fmt"
 
-	"github.com/onflow/flow-go/model/cluster"
-	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/libp2p/message"
 	"github.com/onflow/flow-go/model/messages"
 )
@@ -38,7 +36,7 @@ const (
 
 	// collections, guarantees & transactions
 	CodeCollectionGuarantee
-	CodeTransaction
+	_ // DEPRECATED as of Mainnet 27; previously used for essentially an executed transaction
 	CodeTransactionBody
 
 	// core messages for execution & verification
@@ -71,7 +69,7 @@ func MessageCodeFromInterface(v interface{}) (MessageCode, string, error) {
 	s := what(v)
 	switch v.(type) {
 	// consensus
-	case *flow.UntrustedProposal:
+	case *messages.Proposal:
 		return CodeBlockProposal, s, nil
 	case *messages.BlockVote:
 		return CodeBlockVote, s, nil
@@ -79,7 +77,7 @@ func MessageCodeFromInterface(v interface{}) (MessageCode, string, error) {
 		return CodeTimeoutObject, s, nil
 
 	// cluster consensus
-	case *cluster.UntrustedProposal:
+	case *messages.ClusterProposal:
 		return CodeClusterBlockProposal, s, nil
 	case *messages.ClusterBlockVote:
 		return CodeClusterBlockVote, s, nil
@@ -101,17 +99,15 @@ func MessageCodeFromInterface(v interface{}) (MessageCode, string, error) {
 		return CodeBlockResponse, s, nil
 
 	// collections, guarantees & transactions
-	case *flow.CollectionGuarantee:
+	case *messages.CollectionGuarantee:
 		return CodeCollectionGuarantee, s, nil
-	case *flow.TransactionBody:
+	case *messages.TransactionBody:
 		return CodeTransactionBody, s, nil
-	case *flow.Transaction:
-		return CodeTransaction, s, nil
 
 	// core messages for execution & verification
-	case *flow.ExecutionReceipt:
+	case *messages.ExecutionReceipt:
 		return CodeExecutionReceipt, s, nil
-	case *flow.ResultApproval:
+	case *messages.ResultApproval:
 		return CodeResultApproval, s, nil
 
 	// data exchange for execution of blocks
@@ -149,11 +145,11 @@ func MessageCodeFromInterface(v interface{}) (MessageCode, string, error) {
 // of the message code represents.
 // Expected error returns during normal operations:
 //   - ErrUnknownMsgCode if message code does not match any of the configured message codes above.
-func InterfaceFromMessageCode(code MessageCode) (interface{}, string, error) {
+func InterfaceFromMessageCode(code MessageCode) (messages.UntrustedMessage, string, error) {
 	switch code {
 	// consensus
 	case CodeBlockProposal:
-		return &flow.UntrustedProposal{}, what(&flow.UntrustedProposal{}), nil
+		return &messages.Proposal{}, what(&messages.Proposal{}), nil
 	case CodeBlockVote:
 		return &messages.BlockVote{}, what(&messages.BlockVote{}), nil
 	case CodeTimeoutObject:
@@ -161,7 +157,7 @@ func InterfaceFromMessageCode(code MessageCode) (interface{}, string, error) {
 
 	// cluster consensus
 	case CodeClusterBlockProposal:
-		return &cluster.UntrustedProposal{}, what(&cluster.UntrustedProposal{}), nil
+		return &messages.ClusterProposal{}, what(&messages.ClusterProposal{}), nil
 	case CodeClusterBlockVote:
 		return &messages.ClusterBlockVote{}, what(&messages.ClusterBlockVote{}), nil
 	case CodeClusterBlockResponse:
@@ -181,23 +177,17 @@ func InterfaceFromMessageCode(code MessageCode) (interface{}, string, error) {
 	case CodeBlockResponse:
 		return &messages.BlockResponse{}, what(&messages.BlockResponse{}), nil
 
-	// collections, guarantees & transactions
+	// collection guarantees & transactions
 	case CodeCollectionGuarantee:
-		var guarantee flow.CollectionGuarantee
-		return &guarantee, what(&guarantee), nil
+		return &messages.CollectionGuarantee{}, what(&messages.CollectionGuarantee{}), nil
 	case CodeTransactionBody:
-		var transactionBody flow.TransactionBody
-		return &transactionBody, what(&transactionBody), nil
-	case CodeTransaction:
-		var transaction flow.Transaction
-		return &transaction, what(&transaction), nil
+		return &messages.TransactionBody{}, what(&messages.TransactionBody{}), nil
 
 	// core messages for execution & verification
 	case CodeExecutionReceipt:
-		return new(flow.ExecutionReceipt), what(new(flow.ExecutionReceipt)), nil
+		return &messages.ExecutionReceipt{}, what(&messages.ExecutionReceipt{}), nil
 	case CodeResultApproval:
-		var approval flow.ResultApproval
-		return &approval, what(&approval), nil
+		return &messages.ResultApproval{}, what(&messages.ResultApproval{}), nil
 
 	// data exchange for execution of blocks
 	case CodeChunkDataRequest:

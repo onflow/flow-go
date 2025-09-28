@@ -1,6 +1,8 @@
 package cmd
 
 import (
+	"fmt"
+
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 
@@ -8,6 +10,7 @@ import (
 
 	"github.com/onflow/flow-go/cmd/util/cmd/common"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/storage"
 )
 
 var flagDecodeData bool
@@ -25,41 +28,40 @@ func init() {
 var protocolStateKVStore = &cobra.Command{
 	Use:   "protocol-kvstore",
 	Short: "get protocol state kvstore by block ID",
-	Run: func(cmd *cobra.Command, args []string) {
-		storages, db := InitStorages()
-		defer db.Close()
+	RunE: func(cmd *cobra.Command, args []string) error {
+		return common.WithStorage(flagDatadir, func(db storage.DB) error {
+			storages := common.InitStorages(db)
 
-		log.Info().Msgf("got flag block id: %s", flagBlockID)
-		blockID, err := flow.HexStringToIdentifier(flagBlockID)
-		if err != nil {
-			log.Error().Err(err).Msg("malformed block id")
-			return
-		}
+			log.Info().Msgf("got flag block id: %s", flagBlockID)
+			blockID, err := flow.HexStringToIdentifier(flagBlockID)
+			if err != nil {
+				return fmt.Errorf("malformed block id: %w", err)
+			}
 
-		log.Info().Msgf("getting protocol state kvstore by block id: %v", blockID)
-		protocolState, err := storages.ProtocolKVStore.ByBlockID(blockID)
-		if err != nil {
-			log.Error().Err(err).Msgf("could not get protocol state kvstore for block id: %v", blockID)
-			return
-		}
-		if !flagDecodeData {
-			common.PrettyPrint(protocolState)
-			return
-		}
+			log.Info().Msgf("getting protocol state kvstore by block id: %v", blockID)
+			protocolState, err := storages.ProtocolKVStore.ByBlockID(blockID)
+			if err != nil {
+				return fmt.Errorf("could not get protocol state kvstore for block id: %v: %w", blockID, err)
+			}
+			if !flagDecodeData {
+				common.PrettyPrint(protocolState)
+				return nil
+			}
 
-		kvstoreAPI, err := kvstore.VersionedDecode(protocolState.Version, protocolState.Data)
-		if err != nil {
-			log.Error().Err(err).Msgf("could not get protocol state kvstore for block id: %v", blockID)
-			return
-		}
+			kvstoreAPI, err := kvstore.VersionedDecode(protocolState.Version, protocolState.Data)
+			if err != nil {
+				return fmt.Errorf("could not decode protocol state kvstore for block id: %v: %w", blockID, err)
+			}
 
-		var model any
-		switch kvstoreAPI.GetProtocolStateVersion() {
-		case 0:
-			model = kvstoreAPI.(*kvstore.Modelv0)
-		case 1:
-			model = kvstoreAPI.(*kvstore.Modelv1)
-		}
-		common.PrettyPrint(model)
+			var model any
+			switch kvstoreAPI.GetProtocolStateVersion() {
+			case 0:
+				model = kvstoreAPI.(*kvstore.Modelv0)
+			case 1:
+				model = kvstoreAPI.(*kvstore.Modelv1)
+			}
+			common.PrettyPrint(model)
+			return nil
+		})
 	},
 }

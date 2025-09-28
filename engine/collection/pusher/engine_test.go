@@ -13,11 +13,12 @@ import (
 	"github.com/onflow/flow-go/engine/collection/pusher"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
+	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
 	module "github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/network/channels"
-	"github.com/onflow/flow-go/network/mocknetwork"
+	mocknetwork "github.com/onflow/flow-go/network/mock"
 	protocol "github.com/onflow/flow-go/state/protocol/mock"
 	storage "github.com/onflow/flow-go/storage/mock"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -55,7 +56,7 @@ func (suite *Suite) SetupTest() {
 
 	metrics := metrics.NewNoopCollector()
 
-	net := new(mocknetwork.Network)
+	net := new(mocknetwork.EngineRegistry)
 	suite.conduit = new(mocknetwork.Conduit)
 	net.On("Register", mock.Anything, mock.Anything).Return(suite.conduit, nil)
 
@@ -87,7 +88,7 @@ func (suite *Suite) TestSubmitCollectionGuarantee() {
 	defer cancel()
 	done := make(chan struct{})
 
-	guarantee := unittest.CollectionGuaranteeFixture()
+	guarantee := (*messages.CollectionGuarantee)(unittest.CollectionGuaranteeFixture())
 
 	// should submit the collection to consensus nodes
 	consensus := suite.identities.Filter(filter.HasRole[flow.Identity](flow.RoleConsensus))
@@ -104,7 +105,7 @@ func (suite *Suite) TestSubmitCollectionGuarantee() {
 // should be able to submit collection guarantees to consensus nodes
 func (suite *Suite) TestSubmitCollectionGuaranteeNonLocal() {
 
-	guarantee := unittest.CollectionGuaranteeFixture()
+	guarantee := (*messages.CollectionGuarantee)(unittest.CollectionGuaranteeFixture())
 
 	// verify that pusher.Engine handles any (potentially byzantine) input:
 	// A byzantine peer could target the collector node's pusher engine with messages
