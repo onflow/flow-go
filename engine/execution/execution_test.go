@@ -20,13 +20,13 @@ import (
 	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module/signature"
 	"github.com/onflow/flow-go/network/channels"
-	"github.com/onflow/flow-go/network/mocknetwork"
+	mocknetwork "github.com/onflow/flow-go/network/mock"
 	"github.com/onflow/flow-go/network/stub"
 	"github.com/onflow/flow-go/state/cluster"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-func sendBlock(exeNode *testmock.ExecutionNode, from flow.Identifier, proposal *flow.UntrustedProposal) error {
+func sendBlock(exeNode *testmock.ExecutionNode, from flow.Identifier, proposal *flow.Proposal) error {
 	return exeNode.FollowerEngine.Process(channels.ReceiveBlocks, from, proposal)
 }
 
@@ -154,7 +154,7 @@ func TestExecutionFlow(t *testing.T) {
 	providerEngine.On("Process", mock.AnythingOfType("channels.Channel"), exeID.NodeID, mock.Anything).
 		Run(func(args mock.Arguments) {
 			originID := args.Get(1).(flow.Identifier)
-			req := args.Get(2).(*messages.EntityRequest)
+			req := args.Get(2).(*flow.EntityRequest)
 
 			var entities []flow.Entity
 			for _, entityID := range req.EntityIDs {
@@ -221,12 +221,12 @@ func TestExecutionFlow(t *testing.T) {
 		Once()
 
 	// submit block from consensus node
-	err = sendBlock(&exeNode, conID.NodeID, (*flow.UntrustedProposal)(unittest.ProposalFromBlock(block)))
+	err = sendBlock(&exeNode, conID.NodeID, unittest.ProposalFromBlock(block))
 	require.NoError(t, err)
 
 	// submit the child block from consensus node, which trigger the parent block
 	// to be passed to BlockProcessable
-	err = sendBlock(&exeNode, conID.NodeID, (*flow.UntrustedProposal)(unittest.ProposalFromBlock(child)))
+	err = sendBlock(&exeNode, conID.NodeID, unittest.ProposalFromBlock(child))
 	require.NoError(t, err)
 
 	require.Eventually(t, func() bool {
@@ -267,7 +267,7 @@ func deployContractBlock(
 	parent *flow.Block,
 	ref *flow.Header,
 ) (
-	*flow.TransactionBody, *flow.Collection, *flow.Block, *flow.UntrustedProposal, uint64) {
+	*flow.TransactionBody, *flow.Collection, *flow.Block, *flow.Proposal, uint64) {
 	// make tx
 	txBodyBuilder := execTestutil.DeployCounterContractTransaction(chain.ServiceAddress(), chain)
 	err := execTestutil.SignTransactionAsServiceAccount(txBodyBuilder, seq, chain)
@@ -305,12 +305,12 @@ func deployContractBlock(
 	require.NoError(t, err)
 
 	// make proposal
-	proposal := (*flow.UntrustedProposal)(unittest.ProposalFromBlock(block))
+	proposal := unittest.ProposalFromBlock(block)
 	return txBody, col, block, proposal, seq + 1
 }
 
 func makePanicBlock(t *testing.T, conID *flow.Identity, colID *flow.Identity, chain flow.Chain, seq uint64, parent *flow.Block, ref *flow.Header) (
-	*flow.TransactionBody, *flow.Collection, *flow.Block, *flow.UntrustedProposal, uint64) {
+	*flow.TransactionBody, *flow.Collection, *flow.Block, *flow.Proposal, uint64) {
 	// make tx
 	txBodyBuilder := execTestutil.CreateCounterPanicTransaction(chain.ServiceAddress(), chain.ServiceAddress())
 	err := execTestutil.SignTransactionAsServiceAccount(txBodyBuilder, seq, chain)
@@ -342,13 +342,13 @@ func makePanicBlock(t *testing.T, conID *flow.Identity, colID *flow.Identity, ch
 	)
 	require.NoError(t, err)
 
-	proposal := (*flow.UntrustedProposal)(unittest.ProposalFromBlock(block))
+	proposal := unittest.ProposalFromBlock(block)
 
 	return txBody, col, block, proposal, seq + 1
 }
 
 func makeSuccessBlock(t *testing.T, conID *flow.Identity, colID *flow.Identity, chain flow.Chain, seq uint64, parent *flow.Block, ref *flow.Header) (
-	*flow.TransactionBody, *flow.Collection, *flow.Block, *flow.UntrustedProposal, uint64) {
+	*flow.TransactionBody, *flow.Collection, *flow.Block, *flow.Proposal, uint64) {
 	txBodyBuilder := execTestutil.AddToCounterTransaction(chain.ServiceAddress(), chain.ServiceAddress())
 	err := execTestutil.SignTransactionAsServiceAccount(txBodyBuilder, seq, chain)
 	require.NoError(t, err)
@@ -375,7 +375,7 @@ func makeSuccessBlock(t *testing.T, conID *flow.Identity, colID *flow.Identity, 
 	)
 	require.NoError(t, err)
 
-	proposal := (*flow.UntrustedProposal)(unittest.ProposalFromBlock(block))
+	proposal := unittest.ProposalFromBlock(block)
 
 	return txBody, col, block, proposal, seq + 1
 }
@@ -531,7 +531,7 @@ func mockCollectionEngineToReturnCollections(t *testing.T, collectionNode *testm
 	collectionEngine.On("Process", mock.AnythingOfType("channels.Channel"), mock.Anything, mock.Anything).
 		Run(func(args mock.Arguments) {
 			originID := args[1].(flow.Identifier)
-			req := args[2].(*messages.EntityRequest)
+			req := args[2].(*flow.EntityRequest)
 			blob, ok := colMap[req.EntityIDs[0]]
 			if !ok {
 				assert.FailNow(t, "requesting unexpected collection", req.EntityIDs[0])
@@ -606,7 +606,6 @@ func TestBroadcastToMultipleVerificationNodes(t *testing.T) {
 		},
 	)
 	require.NoError(t, err)
-	untrustedProposal := flow.UntrustedProposal(*unittest.ProposalFromBlock(block))
 
 	child := unittest.BlockWithParentAndProposerFixture(t, block.ToHeader(), conID.NodeID)
 	child.ParentVoterIndices = voterIndices
@@ -631,10 +630,10 @@ func TestBroadcastToMultipleVerificationNodes(t *testing.T) {
 		}).
 		Return(nil)
 
-	err = sendBlock(&exeNode, exeID.NodeID, &untrustedProposal)
+	err = sendBlock(&exeNode, exeID.NodeID, unittest.ProposalFromBlock(block))
 	require.NoError(t, err)
 
-	err = sendBlock(&exeNode, conID.NodeID, (*flow.UntrustedProposal)(unittest.ProposalFromBlock(child)))
+	err = sendBlock(&exeNode, conID.NodeID, unittest.ProposalFromBlock(child))
 	require.NoError(t, err)
 
 	hub.DeliverAllEventually(t, func() bool {

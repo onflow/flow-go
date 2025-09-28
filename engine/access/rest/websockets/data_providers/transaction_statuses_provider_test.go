@@ -15,8 +15,8 @@ import (
 	"github.com/onflow/flow-go/engine/access/rest/websockets/data_providers/models"
 	wsmodels "github.com/onflow/flow-go/engine/access/rest/websockets/models"
 	"github.com/onflow/flow-go/engine/access/state_stream"
-	ssmock "github.com/onflow/flow-go/engine/access/state_stream/mock"
 	"github.com/onflow/flow-go/engine/access/subscription"
+	submock "github.com/onflow/flow-go/engine/access/subscription/mock"
 	accessmodel "github.com/onflow/flow-go/model/access"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -94,7 +94,7 @@ func (s *TransactionStatusesProviderSuite) subscribeTransactionStatusesDataProvi
 			arguments: wsmodels.Arguments{
 				"tx_id": unittest.IdentifierFixture().String(),
 			},
-			setupBackend: func(sub *ssmock.Subscription) {
+			setupBackend: func(sub *submock.Subscription) {
 				s.api.On(
 					"SubscribeTransactionStatuses",
 					mock.Anything,
@@ -168,7 +168,7 @@ func (s *TransactionStatusesProviderSuite) TestMessageIndexTransactionStatusesPr
 	txStatusesChan := make(chan interface{})
 
 	// Create a mock subscription and mock the channel
-	sub := ssmock.NewSubscription(s.T())
+	sub := submock.NewSubscription(s.T())
 	sub.On("Channel").Return((<-chan interface{})(txStatusesChan))
 	sub.On("Err").Return(nil).Once()
 
