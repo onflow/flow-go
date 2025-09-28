@@ -1,7 +1,6 @@
 package node_communicator
 
 import (
-	"github.com/hashicorp/go-multierror"
 	"github.com/sony/gobreaker"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -14,15 +13,17 @@ const maxFailedRequestCount = 3
 
 type Communicator interface {
 	CallAvailableNode(
-		//List of node identifiers to execute callback on
+		// List of node identifiers to execute callback on
 		nodes flow.IdentitySkeletonList,
-		//Callback function that represents an action to be performed on a node.
-		//It takes a node as input and returns an error indicating the result of the action.
+
+		// Callback function that represents an action to be performed on a node.
+		// It takes a node as input and returns an error indicating the result of the action.
 		call func(node *flow.IdentitySkeleton) error,
+
 		// Callback function that determines whether an error should terminate further execution.
 		// It takes an error as input and returns a boolean value indicating whether the error should be considered terminal.
 		shouldTerminateOnError func(node *flow.IdentitySkeleton, err error) bool,
-	) error
+	) (*flow.IdentitySkeleton, error)
 }
 
 var _ Communicator = (*NodeCommunicator)(nil)
@@ -39,49 +40,51 @@ func NewNodeCommunicator(circuitBreakerEnabled bool) *NodeCommunicator {
 	}
 }
 
-// CallAvailableNode calls the provided function on the available nodes.
-// It iterates through the nodes and executes the function.
-// If an error occurs, it applies the custom error terminator (if provided) and keeps track of the errors.
-// If the error occurs in circuit breaker, it continues to the next node.
-// If the maximum failed request count is reached, it returns the accumulated errors.
+// CallAvailableNode calls the provided `callback` function passing nodes from the provided `nodes`
+// list until the function returns without error.
+// `nodes` is iterated in order.
+// If an error occurs, the provided `shouldTerminateOnError` function is called passing the error. If
+// the function returnes true, CallAvailableNode returns immediately without querying any other nodes.
+// If `maxFailedRequestCount` is reached, CallAvailableNode returns the accumulated errors.
+// Returns the last node passed to `callback`. If the no error is returned, this is the node that
+// served the successful request.
 func (b *NodeCommunicator) CallAvailableNode(
-	//List of node identifiers to execute callback on
 	nodes flow.IdentitySkeletonList,
-	//Callback function that determines whether an error should terminate further execution.
-	// It takes an error as input and returns a boolean value indicating whether the error should be considered terminal.
-	call func(id *flow.IdentitySkeleton) error,
-	// Callback function that determines whether an error should terminate further execution.
-	// It takes an error as input and returns a boolean value indicating whether the error should be considered terminal.
+	callback func(id *flow.IdentitySkeleton) error,
 	shouldTerminateOnError func(node *flow.IdentitySkeleton, err error) bool,
-) error {
-	var errs *multierror.Error
+) (*flow.IdentitySkeleton, error) {
 	nodeSelector, err := b.nodeSelectorFactory.SelectNodes(nodes)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
+	var lastNode *flow.IdentitySkeleton
+
+	errs := newMultiStatusError()
 	for node := nodeSelector.Next(); node != nil; node = nodeSelector.Next() {
-		err := call(node)
+		lastNode = node
+
+		err := callback(node)
 		if err == nil {
-			return nil
+			return lastNode, nil
 		}
 
 		if shouldTerminateOnError != nil && shouldTerminateOnError(node, err) {
-			return err
+			return lastNode, err
 		}
 
 		if err == gobreaker.ErrOpenState {
 			if !nodeSelector.HasNext() && errs == nil {
-				errs = multierror.Append(errs, status.Error(codes.Unavailable, "there are no available nodes"))
+				errs.Add(status.Error(codes.Unavailable, "there are no available nodes"))
 			}
 			continue
 		}
 
-		errs = multierror.Append(errs, err)
+		errs.Add(newNodeGrpcError(err, node.Address))
 		if len(errs.Errors) >= maxFailedRequestCount {
-			return errs.ErrorOrNil()
+			return lastNode, errs.ErrorOrNil()
 		}
 	}
 
-	return errs.ErrorOrNil()
+	return lastNode, errs.ErrorOrNil()
 }

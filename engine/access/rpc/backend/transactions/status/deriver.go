@@ -1,11 +1,17 @@
 package status
 
 import (
+	"errors"
+	"fmt"
+
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/counters"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/state/protocol"
+	"github.com/onflow/flow-go/storage"
 )
+
+var ErrReferenceBlockNotFound = errors.New("reference block not found")
 
 type TxStatusDeriver struct {
 	state               protocol.State
@@ -22,11 +28,15 @@ func NewTxStatusDeriver(state protocol.State, lastFullBlockHeight *counters.Pers
 // DeriveUnknownTransactionStatus is used to determine the status of transaction who's block is not
 // yet known, based on the transaction's reference block.
 //
-// No errors expected during normal operations.
+// Expected error returns during normal operations:
+//   - [ErrReferenceBlockNotFound] - if the provided reference block is not found.
 func (t *TxStatusDeriver) DeriveUnknownTransactionStatus(refBlockID flow.Identifier) (flow.TransactionStatus, error) {
 	refBlock, err := t.state.AtBlockID(refBlockID).Head()
 	if err != nil {
-		return flow.TransactionStatusUnknown, err
+		if errors.Is(err, storage.ErrNotFound) {
+			return flow.TransactionStatusUnknown, ErrReferenceBlockNotFound
+		}
+		return flow.TransactionStatusUnknown, fmt.Errorf("failed to lookup reference block: %w", err)
 	}
 
 	finalized, err := t.state.Final().Head()

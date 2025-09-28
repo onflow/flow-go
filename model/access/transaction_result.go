@@ -4,6 +4,13 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
+const (
+	// TransactionStatusCodeSuccess is the status code for a successful transaction
+	TransactionStatusCodeSuccess = uint(0)
+	// TransactionStatusCodeFailed is the status code for a failed transaction
+	TransactionStatusCodeFailed = uint(1)
+)
+
 // TransactionResult represents a flow.TransactionResult with additional fields required for the Access API
 type TransactionResult struct {
 	Status        flow.TransactionStatus

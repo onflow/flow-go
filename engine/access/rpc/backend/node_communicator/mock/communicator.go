@@ -24,10 +24,18 @@ func (_m *Communicator) CallAvailableNode(nodes flow.IdentitySkeletonList, call 
 	if rf, ok := ret.Get(0).(func(flow.IdentitySkeletonList, func(*flow.IdentitySkeleton) error, func(*flow.IdentitySkeleton, error) bool) error); ok {
 		r0 = rf(nodes, call, shouldTerminateOnError)
 	} else {
-		r0 = ret.Error(0)
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*flow.IdentitySkeleton)
+		}
 	}
 
-	return r0
+	if rf, ok := ret.Get(1).(func(flow.GenericIdentityList[flow.IdentitySkeleton], func(*flow.IdentitySkeleton) error, func(*flow.IdentitySkeleton, error) bool) error); ok {
+		r1 = rf(nodes, call, shouldTerminateOnError)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
 }
 
 // NewCommunicator creates a new instance of Communicator. It also registers a testing interface on the mock and a cleanup function to assert the mocks expectations.
