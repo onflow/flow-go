@@ -38,7 +38,6 @@ import (
 	badgerState "github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/state/protocol/blocktimer"
 	"github.com/onflow/flow-go/storage"
-	"github.com/onflow/flow-go/storage/dbops"
 	"github.com/onflow/flow-go/storage/store"
 )
 
@@ -170,20 +169,14 @@ func (v *VerificationNodeBuilder) LoadComponentsAndModules() {
 			var ok bool
 			var err error
 
-			if dbops.IsBadgerTransaction(v.DBOps) {
-				return fmt.Errorf("badger transaction is not supported for chunks queue")
-			} else if dbops.IsBatchUpdate(node.DBOps) {
-				queue := store.NewChunkQueue(node.Metrics.Cache, node.ProtocolDB)
-				ok, err = queue.Init(chunkconsumer.DefaultJobIndex)
-				if err != nil {
-					return fmt.Errorf("could not initialize default index in chunks queue: %w", err)
-				}
-
-				chunkQueue = queue
-				node.Logger.Info().Msgf("chunks queue index has been initialized with protocol db batch updates")
-			} else {
-				return fmt.Errorf(dbops.UsageErrMsg, v.DBOps)
+			queue := store.NewChunkQueue(node.Metrics.Cache, node.ProtocolDB)
+			ok, err = queue.Init(chunkconsumer.DefaultJobIndex)
+			if err != nil {
+				return fmt.Errorf("could not initialize default index in chunks queue: %w", err)
 			}
+
+			chunkQueue = queue
+			node.Logger.Info().Msgf("chunks queue index has been initialized with protocol db batch updates")
 
 			node.Logger.Info().
 				Str("component", "node-builder").
@@ -225,14 +218,7 @@ func (v *VerificationNodeBuilder) LoadComponentsAndModules() {
 
 			chunkVerifier := chunks.NewChunkVerifier(vm, vmCtx, node.Logger)
 
-			var approvalStorage storage.ResultApprovals
-			if dbops.IsBadgerTransaction(v.DBOps) {
-				return nil, fmt.Errorf("badger transaction is not supported for approval storage")
-			} else if dbops.IsBatchUpdate(v.DBOps) {
-				approvalStorage = store.NewResultApprovals(node.Metrics.Cache, node.ProtocolDB, node.StorageLockMgr)
-			} else {
-				return nil, fmt.Errorf("invalid db opts type: %v", v.DBOps)
-			}
+			approvalStorage := store.NewResultApprovals(node.Metrics.Cache, node.ProtocolDB, node.StorageLockMgr)
 
 			verifierEng, err = verifier.New(
 				node.Logger,

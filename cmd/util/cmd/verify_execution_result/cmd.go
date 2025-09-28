@@ -8,6 +8,7 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 
+	"github.com/onflow/flow-go/cmd/util/cmd/common"
 	"github.com/onflow/flow-go/engine/verification/verifier"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/model/flow"
@@ -40,9 +41,7 @@ func init() {
 	Cmd.Flags().StringVar(&flagChain, "chain", "", "Chain name")
 	_ = Cmd.MarkFlagRequired("chain")
 
-	Cmd.Flags().StringVar(&flagDatadir, "datadir", "/var/flow/data/protocol",
-		"directory that stores the protocol state")
-	_ = Cmd.MarkFlagRequired("datadir")
+	common.InitDataDirFlag(Cmd, &flagDatadir)
 
 	Cmd.Flags().StringVar(&flagChunkDataPackDir, "chunk_data_pack_dir", "/var/flow/data/chunk_data_pack",
 		"directory that stores the protocol state")

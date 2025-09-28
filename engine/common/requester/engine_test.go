@@ -19,7 +19,7 @@ import (
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module/metrics"
-	"github.com/onflow/flow-go/network/mocknetwork"
+	mocknetwork "github.com/onflow/flow-go/network/mock"
 	protocol "github.com/onflow/flow-go/state/protocol/mock"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -264,7 +264,7 @@ func TestOnEntityResponseValid(t *testing.T) {
 	bwanted2, _ := msgpack.Marshal(wanted2)
 	bunwanted, _ := msgpack.Marshal(unwanted)
 
-	res := &messages.EntityResponse{
+	res := &flow.EntityResponse{
 		Nonce:     nonce,
 		EntityIDs: []flow.Identifier{wanted1.ID(), wanted2.ID(), unwanted.ID()},
 		Blobs:     [][]byte{bwanted1, bwanted2, bunwanted},
@@ -352,7 +352,7 @@ func TestOnEntityIntegrityCheck(t *testing.T) {
 	// prepare payload from different entity
 	bwanted, _ := msgpack.Marshal(wanted2)
 
-	res := &messages.EntityResponse{
+	res := &flow.EntityResponse{
 		Nonce:     nonce,
 		EntityIDs: []flow.Identifier{wanted.ID()},
 		Blobs:     [][]byte{bwanted},
@@ -437,7 +437,7 @@ func TestOriginValidation(t *testing.T) {
 	// prepare payload
 	bwanted, _ := msgpack.Marshal(wanted)
 
-	res := &messages.EntityResponse{
+	res := &flow.EntityResponse{
 		Nonce:     nonce,
 		EntityIDs: []flow.Identifier{wanted.ID()},
 		Blobs:     [][]byte{bwanted},
@@ -448,7 +448,7 @@ func TestOriginValidation(t *testing.T) {
 		EntityIDs: []flow.Identifier{wanted.ID()},
 	}
 
-	network := &mocknetwork.Network{}
+	network := &mocknetwork.EngineRegistry{}
 	network.On("Register", mock.Anything, mock.Anything).Return(nil, nil)
 
 	e, err := New(

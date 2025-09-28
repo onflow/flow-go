@@ -61,10 +61,12 @@ func (m *MyExecutionReceipts) myReceipt(blockID flow.Identifier) (*flow.Executio
 }
 
 // BatchStoreMyReceipt stores blockID-to-my-receipt index entry keyed by blockID in a provided batch.
-// No errors are expected during normal operation
+//
 // If entity fails marshalling, the error is wrapped in a generic error and returned.
-// If Badger unexpectedly fails to process the request, the error is wrapped in a generic error and returned.
-// If a different my receipt has been indexed for the same block, the error is wrapped in a generic error and returned.
+// If database unexpectedly fails to process the request, the error is wrapped in a generic error and returned.
+//
+// Expected error returns during *normal* operations:
+//   - `storage.ErrDataMismatch` if a *different* receipt has already been indexed for the same block
 func (m *MyExecutionReceipts) BatchStoreMyReceipt(lctx lockctx.Proof, receipt *flow.ExecutionReceipt, rw storage.ReaderBatchWriter) error {
 	receiptID := receipt.ID()
 	blockID := receipt.ExecutionResult.BlockID
@@ -86,7 +88,7 @@ func (m *MyExecutionReceipts) BatchStoreMyReceipt(lctx lockctx.Proof, receipt *f
 		if savedReceiptID == receiptID {
 			return nil // no-op we are storing *same* receipt
 		}
-		return fmt.Errorf("indexing my receipt %v failed: different receipt %v for the same block %v is already indexed", receiptID, savedReceiptID, blockID)
+		return fmt.Errorf("indexing my receipt %v failed: different receipt %v for the same block %v is already indexed: %w", receiptID, savedReceiptID, blockID, storage.ErrDataMismatch)
 	}
 	if !errors.Is(err, storage.ErrNotFound) { // `storage.ErrNotFound` is expected, as this indicates that no receipt is indexed yet; anything else is an exception
 		return irrecoverable.NewException(err)

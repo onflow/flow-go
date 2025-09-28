@@ -246,13 +246,7 @@ func (h *MessageHub) sendOwnTimeout(timeout *model.TimeoutObject) error {
 	}
 
 	// create the timeout message
-	msg := &messages.TimeoutObject{
-		View:        timeout.View,
-		NewestQC:    timeout.NewestQC,
-		LastViewTC:  timeout.LastViewTC,
-		SigData:     timeout.SigData,
-		TimeoutTick: timeout.TimeoutTick,
-	}
+	msg := (*messages.TimeoutObject)(timeout)
 	err = h.con.Publish(msg, recipients.NodeIDs()...)
 	if err != nil {
 		if !errors.Is(err, network.EmptyTargetList) {
@@ -361,8 +355,9 @@ func (h *MessageHub) sendOwnProposal(proposal *flow.ProposalHeader) error {
 		return fmt.Errorf("could not build proposal: %w", err)
 	}
 
+	message := (*messages.Proposal)(blockProposal)
 	// broadcast the proposal to consensus nodes
-	err = h.con.Publish(blockProposal, consRecipients.NodeIDs()...)
+	err = h.con.Publish(message, consRecipients.NodeIDs()...)
 	if err != nil {
 		if !errors.Is(err, network.EmptyTargetList) {
 			log.Err(err).Msg("could not send proposal message")
@@ -372,7 +367,7 @@ func (h *MessageHub) sendOwnProposal(proposal *flow.ProposalHeader) error {
 	log.Info().Msg("block proposal was broadcast")
 
 	// submit proposal to non-consensus nodes
-	h.provideProposal(blockProposal, allIdentities.Filter(filter.Not(filter.HasRole[flow.Identity](flow.RoleConsensus))))
+	h.provideProposal(message, allIdentities.Filter(filter.Not(filter.HasRole[flow.Identity](flow.RoleConsensus))))
 	h.engineMetrics.MessageSent(metrics.EngineConsensusMessageHub, metrics.MessageBlockProposal)
 
 	return nil
@@ -380,7 +375,7 @@ func (h *MessageHub) sendOwnProposal(proposal *flow.ProposalHeader) error {
 
 // provideProposal is used when we want to broadcast a local block to the rest  of the
 // network (non-consensus nodes).
-func (h *MessageHub) provideProposal(proposal *flow.UntrustedProposal, recipients flow.IdentityList) {
+func (h *MessageHub) provideProposal(proposal *messages.Proposal, recipients flow.IdentityList) {
 	header := proposal.Block.ToHeader()
 	blockID := header.ID()
 	log := h.log.With().
@@ -477,24 +472,12 @@ func (h *MessageHub) OnOwnProposal(proposal *flow.ProposalHeader, targetPublicat
 // messages. These cases must be logged and routed to a dedicated violation reporting consumer.
 func (h *MessageHub) Process(channel channels.Channel, originID flow.Identifier, message interface{}) error {
 	switch msg := message.(type) {
-	case *flow.UntrustedProposal:
-		proposal, err := flow.NewProposal(*msg)
-		if err != nil {
-			// TODO(BFT, #7620): Replace this log statement with a call to the protocol violation consumer.
-			h.log.Warn().
-				Hex("origin_id", originID[:]).
-				Hex("block_id", logging.ID(msg.Block.ID())).
-				Uint64("block_height", msg.Block.Height).
-				Uint64("block_view", msg.Block.View).
-				Err(err).Msgf("received invalid proposal message")
-			return nil
-		}
-
+	case *flow.Proposal:
 		h.compliance.OnBlockProposal(flow.Slashable[*flow.Proposal]{
 			OriginID: originID,
-			Message:  proposal,
+			Message:  msg,
 		})
-	case *messages.BlockVote:
+	case *flow.BlockVote:
 		vote, err := model.NewVote(model.UntrustedVote{
 			View:     msg.View,
 			BlockID:  msg.BlockID,
@@ -512,32 +495,8 @@ func (h *MessageHub) Process(channel channels.Channel, originID flow.Identifier,
 		}
 
 		h.forwardToOwnVoteAggregator(vote)
-	case *messages.TimeoutObject:
-		t, err := model.NewTimeoutObject(
-			model.UntrustedTimeoutObject{
-				View:        msg.View,
-				NewestQC:    msg.NewestQC,
-				LastViewTC:  msg.LastViewTC,
-				SignerID:    originID,
-				SigData:     msg.SigData,
-				TimeoutTick: msg.TimeoutTick,
-			},
-		)
-		if err != nil {
-			// TODO(BFT, #7620): Replace this log statement with a call to the protocol violation consumer.
-			h.log.Warn().
-				Hex("origin_id", originID[:]).
-				Uint64("view", msg.View).
-				Uint64("newest_qc_view", msg.NewestQC.View).
-				Hex("newest_qc_block_id", logging.ID(msg.NewestQC.BlockID)).
-				Uint64("last_view_tc_view", msg.LastViewTC.View).
-				Uint64("last_view_tc_newest_qc_view", msg.LastViewTC.NewestQC.View).
-				Hex("last_view_tc_newest_qc_block_id", logging.ID(msg.LastViewTC.NewestQC.BlockID)).
-				Uint64("timeout_tick", msg.TimeoutTick).
-				Err(err).Msgf("received invalid timeout object message")
-			return nil
-		}
-		h.forwardToOwnTimeoutAggregator(t)
+	case *model.TimeoutObject:
+		h.forwardToOwnTimeoutAggregator(msg)
 	default:
 		h.log.Warn().
 			Bool(logging.KeySuspicious, true).
