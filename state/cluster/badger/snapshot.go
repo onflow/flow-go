@@ -14,7 +14,7 @@ import (
 )
 
 // Snapshot represents a snapshot of chain state anchored at a particular
-// reference block.
+// KNOWN reference BLOCK.
 type Snapshot struct {
 	state   *State
 	blockID flow.Identifier

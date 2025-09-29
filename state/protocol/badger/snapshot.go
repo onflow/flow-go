@@ -16,7 +16,7 @@ import (
 	"github.com/onflow/flow-go/storage/operation"
 )
 
-// Snapshot implements the protocol.Snapshot interface.
+// Snapshot implements the [protocol.Snapshot] interface for KNOWN BLOCKS.
 // It represents a read-only immutable snapshot of the protocol state at the
 // block it is constructed with. It allows efficient access to data associated directly
 // with blocks at a given state (finalized, sealed), such as the related header, commit,
@@ -39,6 +39,7 @@ var _ protocol.Snapshot = (*FinalizedSnapshot)(nil)
 
 // newSnapshotWithIncorporatedReferenceBlock creates a new state snapshot with the given reference block.
 // CAUTION: The caller is responsible for ensuring that the reference block has been incorporated.
+// For unknown blocks, please use `invalid.NewSnapshot` or `invalid.NewSnapshotf`.
 func newSnapshotWithIncorporatedReferenceBlock(state *State, blockID flow.Identifier) *Snapshot {
 	return &Snapshot{
 		state:   state,
@@ -316,12 +317,12 @@ func (s *Snapshot) lookupChildren(blockID flow.Identifier) ([]flow.Identifier, e
 			return nil, fmt.Errorf("could not get children of block %v: %w", blockID, err)
 		}
 
-		// err not found means two case:
-		// 1. the block doesn't exist
-		// 2. the block exists but has no children
-		// since the snapshot is created only when the block exists,
-		// so only case 2 is possible here. In this case, we just return
-		// empty children list.
+		// The low-level storage returns `storage.ErrNotFound` in two cases:
+		// 1. the block/collection is unknown
+		// 2. the block/collection is known but no children have been indexed yet
+		// By contract of the constructor, the blockID must correspond to a known collection in the database.
+		// A snapshot with s.err == nil is only created for known blocks. Hence, only case 2 is
+		// possible here, and we just return an empty list.
 	}
 	return children, nil
 }
