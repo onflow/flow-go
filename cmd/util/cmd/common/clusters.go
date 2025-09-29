@@ -52,7 +52,6 @@ func ConstructClusterAssignment(log zerolog.Logger, partnerNodes, internalNodes 
 			nCollectors, numCollectionClusters)
 	}
 
-	//random := rand.New(randomSource)
 	// shuffle partner nodes in-place using the provided randomness
 	_ = randomSource.Shuffle(len(partnerCollectors), func(i, j int) {
 		partnerCollectors[i], partnerCollectors[j] = partnerCollectors[j], partnerCollectors[i]
