@@ -16,17 +16,17 @@ type ChunkDataPacks struct {
 	mock.Mock
 }
 
-// BatchRemove provides a mock function with given fields: chunkID, batch
-func (_m *ChunkDataPacks) BatchRemove(chunkID flow.Identifier, batch storage.ReaderBatchWriter) error {
-	ret := _m.Called(chunkID, batch)
+// BatchRemove provides a mock function with given fields: chunkIDs, batch
+func (_m *ChunkDataPacks) BatchRemove(chunkIDs []flow.Identifier, batch storage.ReaderBatchWriter) error {
+	ret := _m.Called(chunkIDs, batch)
 
 	if len(ret) == 0 {
 		panic("no return value specified for BatchRemove")
 	}
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(flow.Identifier, storage.ReaderBatchWriter) error); ok {
-		r0 = rf(chunkID, batch)
+	if rf, ok := ret.Get(0).(func([]flow.Identifier, storage.ReaderBatchWriter) error); ok {
+		r0 = rf(chunkIDs, batch)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -64,40 +64,34 @@ func (_m *ChunkDataPacks) ByChunkID(chunkID flow.Identifier) (*flow.ChunkDataPac
 	return r0, r1
 }
 
-// Remove provides a mock function with given fields: cs
-func (_m *ChunkDataPacks) Remove(cs []flow.Identifier) error {
+// Store provides a mock function with given fields: cs
+func (_m *ChunkDataPacks) Store(cs []*flow.ChunkDataPack) (func(lockctx.Proof, storage.ReaderBatchWriter) error, error) {
 	ret := _m.Called(cs)
 
 	if len(ret) == 0 {
-		panic("no return value specified for Remove")
+		panic("no return value specified for Store")
 	}
 
-	var r0 error
-	if rf, ok := ret.Get(0).(func([]flow.Identifier) error); ok {
+	var r0 func(lockctx.Proof, storage.ReaderBatchWriter) error
+	var r1 error
+	if rf, ok := ret.Get(0).(func([]*flow.ChunkDataPack) (func(lockctx.Proof, storage.ReaderBatchWriter) error, error)); ok {
+		return rf(cs)
+	}
+	if rf, ok := ret.Get(0).(func([]*flow.ChunkDataPack) func(lockctx.Proof, storage.ReaderBatchWriter) error); ok {
 		r0 = rf(cs)
 	} else {
-		r0 = ret.Error(0)
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(func(lockctx.Proof, storage.ReaderBatchWriter) error)
+		}
 	}
 
-	return r0
-}
-
-// StoreByChunkID provides a mock function with given fields: lctx, cs
-func (_m *ChunkDataPacks) StoreByChunkID(lctx lockctx.Proof, cs []*flow.ChunkDataPack) error {
-	ret := _m.Called(lctx, cs)
-
-	if len(ret) == 0 {
-		panic("no return value specified for StoreByChunkID")
-	}
-
-	var r0 error
-	if rf, ok := ret.Get(0).(func(lockctx.Proof, []*flow.ChunkDataPack) error); ok {
-		r0 = rf(lctx, cs)
+	if rf, ok := ret.Get(1).(func([]*flow.ChunkDataPack) error); ok {
+		r1 = rf(cs)
 	} else {
-		r0 = ret.Error(0)
+		r1 = ret.Error(1)
 	}
 
-	return r0
+	return r0, r1
 }
 
 // NewChunkDataPacks creates a new instance of ChunkDataPacks. It also registers a testing interface on the mock and a cleanup function to assert the mocks expectations.

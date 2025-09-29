@@ -410,7 +410,7 @@ func (s *state) saveExecutionResults(
 		return fmt.Errorf("can not retrieve chunk data packs: %w", err)
 	}
 
-	err := s.chunkDataPacks.Store(chunks)
+	storeFunc, err := s.chunkDataPacks.Store(chunks)
 	if err != nil {
 		return fmt.Errorf("can not store chunk data packs for block ID: %v: %w", blockID, err)
 	}
@@ -420,21 +420,10 @@ func (s *state) saveExecutionResults(
 		// Save entire execution result (including all chunk data packs) within one batch to minimize
 		// the number of database interactions.
 		return s.db.WithReaderBatchWriter(func(batch storage.ReaderBatchWriter) error {
-			batch.AddCallback(func(err error) {
-				// Rollback if an error occurs during batch operations
-				// Chunk data packs are saved in a separate database, there is a chance
-				// that execution result was failed to save, but chunk data packs was saved and
-				// didnt get removed.
-				// TODO(leo): when retrieving chunk data packs, we need to add a check to ensure the block
-				// has been executed before returning chunk data packs
-				if err != nil {
-					chunkIDs := make([]flow.Identifier, 0, len(chunks))
-					for _, chunk := range chunks {
-						chunkIDs = append(chunkIDs, chunk.ChunkID)
-					}
-					_ = s.chunkDataPacks.Remove(chunkIDs)
-				}
-			})
+			err := storeFunc(lctx, batch)
+			if err != nil {
+				return fmt.Errorf("cannot store chunk data packs: %w", err)
+			}
 
 			err = s.events.BatchStore(blockID, []flow.EventsList{result.AllEvents()}, batch)
 			if err != nil {
