@@ -24,6 +24,8 @@ type State struct {
 	epoch     uint64       // the operating epoch for the cluster
 }
 
+var _ cluster.State = (*State)(nil)
+
 // Bootstrap initializes the persistent cluster state with a genesis block.
 // The genesis block must have height 0, a parent hash of 32 zero bytes,
 // and an empty collection as payload.
@@ -133,34 +135,21 @@ func (s *State) Params() cluster.Params {
 }
 
 func (s *State) Final() cluster.Snapshot {
-	// get the finalized block ID
-	var blockID flow.Identifier
-	err := (func(r storage.Reader) error {
-		var boundary uint64
-		err := operation.RetrieveClusterFinalizedHeight(r, s.clusterID, &boundary)
-		if err != nil {
-			return fmt.Errorf("could not retrieve finalized boundary: %w", err)
-		}
-
-		err = operation.LookupClusterBlockHeight(r, s.clusterID, boundary, &blockID)
-		if err != nil {
-			return fmt.Errorf("could not retrieve finalized ID: %w", err)
-		}
-
-		return nil
-	})(s.db.Reader())
-
+	// get height of latest finalized collection and then the ID of the collection with the corresponding height
+	r := s.db.Reader()
+	var latestFinalizedClusterHeight uint64
+	err := operation.RetrieveClusterFinalizedHeight(r, s.clusterID, &latestFinalizedClusterHeight)
 	if err != nil {
-		return &Snapshot{
-			err: err,
-		}
+		return invalid.NewSnapshotf("could not retrieve finalized boundary: %w", err)
 	}
 
-	snapshot := &Snapshot{
-		state:   s,
-		blockID: blockID,
+	var blockID flow.Identifier
+	err = operation.LookupClusterBlockHeight(r, s.clusterID, latestFinalizedClusterHeight, &blockID)
+	if err != nil {
+		return invalid.NewSnapshotf("could not retrieve finalized ID: %w", err)
 	}
-	return snapshot
+
+	return newSnapshot(s, blockID)
 }
 
 // AtBlockID returns the snapshot of the persistent cluster at the given
@@ -177,12 +166,7 @@ func (s *State) AtBlockID(blockID flow.Identifier) cluster.Snapshot {
 	if !exists {
 		return invalid.NewSnapshotf("unknown block %x: %w", blockID, state.ErrUnknownSnapshotReference)
 	}
-
-	snapshot := &Snapshot{
-		state:   s,
-		blockID: blockID,
-	}
-	return snapshot
+	return newSnapshot(s, blockID)
 }
 
 // IsBootstrapped returns whether the database contains a bootstrapped state.
