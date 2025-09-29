@@ -13,8 +13,11 @@ import (
 	"github.com/onflow/flow-go/storage/procedure"
 )
 
-// Snapshot represents a snapshot of chain state anchored at a particular
-// KNOWN reference BLOCK.
+// Snapshot pertains to a specific fork of the collector cluster consensus. Specifically,
+// it references one block denoted as the `Head`. This Snapshot type is for collector
+// clusters, so we are referencing a cluster block, aka collection, here.
+//
+// This implementation must be used for KNOWN reference BLOCKs only.
 type Snapshot struct {
 	state   *State
 	blockID flow.Identifier

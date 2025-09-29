@@ -16,9 +16,9 @@ import (
 	"github.com/onflow/flow-go/storage/operation"
 )
 
-// A Snapshot represents a read-only immutable snapshot of the protocol state at the
-// block it is constructed with. It allows efficient access to data associated directly
-// with blocks at a given state (finalized, sealed), such as the related header, commit,
+// Snapshot pertains to a specific fork of the main consensus. Specifically, it references
+// one block denoted as the `Head`. It allows efficient access to the protocol state directly
+// that was active at a specific block (finalized, sealed), such as the related header, commit,
 // seed or descending blocks. A block snapshot can lazily convert to an epoch snapshot in
 // order to make data associated directly with epochs accessible through its API.
 //
