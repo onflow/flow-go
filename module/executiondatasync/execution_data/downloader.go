@@ -171,7 +171,11 @@ func (d *downloader) getExecutionDataRoot(
 		return nil, &BlobSizeLimitExceededError{blob.Cid()}
 	}
 
-	v, err := d.serializer.Deserialize(bytes.NewBuffer(blob.RawData()))
+	rawData := blob.RawData()
+	data := make([]byte, len(rawData))
+	copy(data, rawData)
+
+	v, err := d.serializer.Deserialize(bytes.NewBuffer(data))
 	if err != nil {
 		return nil, NewMalformedDataError(err)
 	}

@@ -174,9 +174,13 @@ func (br *BlobChannelReader) receiveNewBlob() bool {
 		return false
 	}
 
-	br.buf = bytes.NewBuffer(blob.RawData())
+	rawData := blob.RawData()
+	data := make([]byte, len(rawData))
+	copy(data, rawData)
+
+	br.buf = bytes.NewBuffer(data)
 	br.cids = append(br.cids, blob.Cid())
-	br.bytesReceived += uint64(len(blob.RawData()))
+	br.bytesReceived += uint64(len(data))
 
 	return true
 }
