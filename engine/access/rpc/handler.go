@@ -350,9 +350,22 @@ func (h *Handler) GetTransactionResult(
 	}
 
 	eventEncodingVersion := req.GetEventEncodingVersion()
-	result, err := h.api.GetTransactionResult(ctx, transactionID, blockId, collectionId, eventEncodingVersion)
+	query := req.GetExecutionStateQuery()
+
+	result, executorMetadata, err := h.api.GetTransactionResult(
+		ctx,
+		transactionID,
+		blockId,
+		collectionId,
+		eventEncodingVersion,
+		convert.NewCriteria(query),
+	)
 	if err != nil {
 		return nil, err
+	}
+
+	if query.GetIncludeExecutorMetadata() {
+		metadata.ExecutorMetadata = convert.ExecutorMetadataToMessage(executorMetadata)
 	}
 
 	message := convert.TransactionResultToMessage(result)
@@ -376,10 +389,20 @@ func (h *Handler) GetTransactionResultsByBlockID(
 	}
 
 	eventEncodingVersion := req.GetEventEncodingVersion()
+	query := req.GetExecutionStateQuery()
 
-	results, err := h.api.GetTransactionResultsByBlockID(ctx, id, eventEncodingVersion)
+	results, executorMetadata, err := h.api.GetTransactionResultsByBlockID(
+		ctx,
+		id,
+		eventEncodingVersion,
+		convert.NewCriteria(query),
+	)
 	if err != nil {
 		return nil, err
+	}
+
+	if query.GetIncludeExecutorMetadata() {
+		metadata.ExecutorMetadata = convert.ExecutorMetadataToMessage(executorMetadata)
 	}
 
 	message := convert.TransactionResultsToMessage(results)
@@ -402,19 +425,22 @@ func (h *Handler) GetSystemTransaction(
 		return nil, status.Errorf(codes.InvalidArgument, "invalid block id: %v", err)
 	}
 
-	var txID flow.Identifier
-	if id := req.GetId(); id == nil {
-		txID = flow.ZeroID
-	} else {
+	txID := flow.ZeroID
+	if id := req.GetId(); id != nil {
 		txID, err = convert.TransactionID(id)
 		if err != nil {
 			return nil, status.Errorf(codes.InvalidArgument, "invalid transaction id: %v", err)
 		}
 	}
+	query := req.GetExecutionStateQuery()
 
-	tx, err := h.api.GetSystemTransaction(ctx, txID, blockID)
+	tx, executorMetadata, err := h.api.GetSystemTransaction(ctx, txID, blockID, convert.NewCriteria(query))
 	if err != nil {
 		return nil, err
+	}
+
+	if query.GetIncludeExecutorMetadata() {
+		metadata.ExecutorMetadata = convert.ExecutorMetadataToMessage(executorMetadata)
 	}
 
 	return &accessproto.TransactionResponse{
@@ -437,19 +463,30 @@ func (h *Handler) GetSystemTransactionResult(
 		return nil, status.Errorf(codes.InvalidArgument, "invalid block id: %v", err)
 	}
 
-	var txID flow.Identifier
-	if id := req.GetId(); id == nil {
-		txID = flow.ZeroID
-	} else {
+	txID := flow.ZeroID
+	if id := req.GetId(); id != nil {
 		txID, err = convert.TransactionID(id)
 		if err != nil {
 			return nil, status.Errorf(codes.InvalidArgument, "invalid transaction id: %v", err)
 		}
 	}
 
-	result, err := h.api.GetSystemTransactionResult(ctx, txID, blockID, req.GetEventEncodingVersion())
+	eventEncodingVersion := req.GetEventEncodingVersion()
+	query := req.GetExecutionStateQuery()
+
+	result, executorMetadata, err := h.api.GetSystemTransactionResult(
+		ctx,
+		txID,
+		blockID,
+		eventEncodingVersion,
+		convert.NewCriteria(query),
+	)
 	if err != nil {
 		return nil, err
+	}
+
+	if query.GetIncludeExecutorMetadata() {
+		metadata.ExecutorMetadata = convert.ExecutorMetadataToMessage(executorMetadata)
 	}
 
 	message := convert.TransactionResultToMessage(result)
@@ -500,10 +537,21 @@ func (h *Handler) GetTransactionResultByIndex(
 	}
 
 	eventEncodingVersion := req.GetEventEncodingVersion()
+	query := req.GetExecutionStateQuery()
 
-	result, err := h.api.GetTransactionResultByIndex(ctx, blockID, req.GetIndex(), eventEncodingVersion)
+	result, executorMetadata, err := h.api.GetTransactionResultByIndex(
+		ctx,
+		blockID,
+		req.GetIndex(),
+		eventEncodingVersion,
+		convert.NewCriteria(query),
+	)
 	if err != nil {
 		return nil, err
+	}
+
+	if query.GetIncludeExecutorMetadata() {
+		metadata.ExecutorMetadata = convert.ExecutorMetadataToMessage(executorMetadata)
 	}
 
 	message := convert.TransactionResultToMessage(result)
@@ -914,6 +962,7 @@ func (h *Handler) GetEventsForHeightRange(
 
 	eventEncodingVersion := req.GetEventEncodingVersion()
 	query := req.GetExecutionStateQuery()
+
 	results, executorMetadata, err := h.api.GetEventsForHeightRange(
 		ctx,
 		eventType,

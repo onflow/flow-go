@@ -7,8 +7,9 @@ import (
 	"time"
 
 	lru "github.com/hashicorp/golang-lru/v2"
-	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
 	"github.com/rs/zerolog"
+
+	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
 
 	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/access/validator"
@@ -225,11 +226,9 @@ func New(params Params) (*Backend, error) {
 		params.State,
 		params.Collections,
 		params.Blocks,
-		params.EventsIndex,
-		params.TxResultsIndex,
-		params.TxErrorMessageProvider,
 		systemTxID,
 		txStatusDeriver,
+		params.ExecutionStateCache,
 		params.ChainID,
 		params.ScheduledCallbacksEnabled,
 	)
@@ -239,7 +238,6 @@ func New(params Params) (*Backend, error) {
 		params.Collections,
 		params.ConnFactory,
 		params.Communicator,
-		params.ExecNodeIdentitiesProvider,
 		txStatusDeriver,
 		systemTxID,
 		params.ChainID,
@@ -262,12 +260,12 @@ func New(params Params) (*Backend, error) {
 		Blocks:                      params.Blocks,
 		Collections:                 params.Collections,
 		Transactions:                params.Transactions,
-		TxErrorMessageProvider:      params.TxErrorMessageProvider,
 		TxResultCache:               txResCache,
 		TxValidator:                 txValidator,
 		TxStatusDeriver:             txStatusDeriver,
-		EventsIndex:                 params.EventsIndex,
-		TxResultsIndex:              params.TxResultsIndex,
+		ExecutionStateCache:         params.ExecutionStateCache,
+		ExecResultProvider:          params.ExecutionResultInfoProvider,
+		OperatorCriteria:            params.OperatorCriteria,
 		ScheduledCallbacksEnabled:   params.ScheduledCallbacksEnabled,
 	}
 
@@ -298,6 +296,7 @@ func New(params Params) (*Backend, error) {
 		params.Transactions,
 		failoverTxProvider,
 		txStatusDeriver,
+		params.ExecutionResultInfoProvider,
 	)
 
 	b := &Backend{

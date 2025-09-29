@@ -7,6 +7,7 @@ import (
 
 	accessmodel "github.com/onflow/flow-go/model/access"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/executiondatasync/optimistic_sync"
 )
 
 // TransactionProvider defines an interface for retrieving transaction results
@@ -17,36 +18,42 @@ type TransactionProvider interface {
 		header *flow.Header,
 		txID flow.Identifier,
 		encodingVersion entities.EventEncodingVersion,
-	) (*accessmodel.TransactionResult, error)
+		executionResultInfo *optimistic_sync.ExecutionResultInfo,
+	) (*accessmodel.TransactionResult, *accessmodel.ExecutorMetadata, error)
 
 	TransactionResultByIndex(
 		ctx context.Context,
 		block *flow.Block,
 		index uint32,
 		encodingVersion entities.EventEncodingVersion,
-	) (*accessmodel.TransactionResult, error)
+		executionResultInfo *optimistic_sync.ExecutionResultInfo,
+	) (*accessmodel.TransactionResult, *accessmodel.ExecutorMetadata, error)
 
 	TransactionResultsByBlockID(
 		ctx context.Context,
 		block *flow.Block,
 		encodingVersion entities.EventEncodingVersion,
-	) ([]*accessmodel.TransactionResult, error)
+		executionResultInfo *optimistic_sync.ExecutionResultInfo,
+	) ([]*accessmodel.TransactionResult, *accessmodel.ExecutorMetadata, error)
 
 	TransactionsByBlockID(
 		ctx context.Context,
 		block *flow.Block,
-	) ([]*flow.TransactionBody, error)
+		executionResultInfo *optimistic_sync.ExecutionResultInfo,
+	) ([]*flow.TransactionBody, *accessmodel.ExecutorMetadata, error)
 
 	SystemTransaction(
 		ctx context.Context,
 		block *flow.Block,
 		txID flow.Identifier,
-	) (*flow.TransactionBody, error)
+		executionResultInfo *optimistic_sync.ExecutionResultInfo,
+	) (*flow.TransactionBody, *accessmodel.ExecutorMetadata, error)
 
 	SystemTransactionResult(
 		ctx context.Context,
 		block *flow.Block,
 		txID flow.Identifier,
-		requiredEventEncodingVersion entities.EventEncodingVersion,
-	) (*accessmodel.TransactionResult, error)
+		encodingVersion entities.EventEncodingVersion,
+		executionResultInfo *optimistic_sync.ExecutionResultInfo,
+	) (*accessmodel.TransactionResult, *accessmodel.ExecutorMetadata, error)
 }

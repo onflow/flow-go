@@ -8,15 +8,17 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
+	"github.com/onflow/flow/protobuf/go/flow/entities"
+
+	"github.com/onflow/flow-go/engine/access/rpc/backend/common"
 	txprovider "github.com/onflow/flow-go/engine/access/rpc/backend/transactions/provider"
 	txstatus "github.com/onflow/flow-go/engine/access/rpc/backend/transactions/status"
 	"github.com/onflow/flow-go/engine/access/subscription"
 	accessmodel "github.com/onflow/flow-go/model/access"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/executiondatasync/optimistic_sync"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/storage"
-
-	"github.com/onflow/flow/protobuf/go/flow/entities"
 )
 
 // TransactionMetadata manages the state of a transaction subscription.
@@ -34,24 +36,15 @@ type TransactionMetadata struct {
 
 	eventEncodingVersion entities.EventEncodingVersion
 
-	txProvider      *txprovider.FailoverTransactionProvider
-	txStatusDeriver *txstatus.TxStatusDeriver
+	txProvider         *txprovider.FailoverTransactionProvider
+	txStatusDeriver    *txstatus.TxStatusDeriver
+	execResultProvider optimistic_sync.ExecutionResultInfoProvider
+
+	execResultInfo *optimistic_sync.ExecutionResultInfo
+	criteria       optimistic_sync.Criteria
 }
 
 // NewTransactionMetadata initializes a new metadata object for a transaction subscription.
-//
-// This function constructs a transaction metadata object used for tracking the transaction's progress
-// and maintaining its state throughout execution.
-//
-// Parameters:
-//   - ctx: Context for managing the lifecycle of the operation.
-//   - backendTransactions: A reference to the txStreamBackend transaction manager.
-//   - txID: The unique identifier of the transaction.
-//   - txReferenceBlockID: The ID of the transaction’s reference block.
-//   - eventEncodingVersion: The required version of event encoding.
-//
-// Returns:
-//   - *TransactionMetadata: The initialized transaction metadata object.
 func NewTransactionMetadata(
 	blocks storage.Blocks,
 	collections storage.Collections,
@@ -61,6 +54,7 @@ func NewTransactionMetadata(
 	eventEncodingVersion entities.EventEncodingVersion,
 	txProvider *txprovider.FailoverTransactionProvider,
 	txStatusDeriver *txstatus.TxStatusDeriver,
+	execResultProvider optimistic_sync.ExecutionResultInfoProvider,
 ) *TransactionMetadata {
 	return &TransactionMetadata{
 		txResult:             &accessmodel.TransactionResult{TransactionID: txID},
@@ -71,20 +65,15 @@ func NewTransactionMetadata(
 		txReferenceBlockID:   txReferenceBlockID,
 		txProvider:           txProvider,
 		txStatusDeriver:      txStatusDeriver,
+		execResultProvider:   execResultProvider,
 	}
 }
 
 // Refresh updates the transaction subscription metadata to reflect the latest state.
 //
-// Parameters:
-//   - ctx: Context for managing the operation lifecycle.
-//
-// Expected errors during normal operation:
-//   - [ErrBlockNotReady] if the block at the given height is not found.
-//   - codes.Internal if impossible to get transaction result due to event payload conversion failed
-//
-// All other errors are considered as state corruption (fatal) or internal errors in the refreshing transaction result
-// or when refreshing transaction status.
+// Expected error returns during normal operation:
+//   - [ErrBlockNotReady] - if the block at the given height is not found.
+//   - codes.Internal - if impossible to get transaction result due to event payload conversion failed
 func (t *TransactionMetadata) Refresh(ctx context.Context) error {
 	if err := t.refreshCollection(); err != nil {
 		return err
@@ -102,11 +91,7 @@ func (t *TransactionMetadata) Refresh(ctx context.Context) error {
 }
 
 // refreshTransactionReferenceBlockID sets the reference block ID for the transaction.
-//
 // If the reference block ID is unset, it attempts to retrieve it from storage.
-//
-// Parameters:
-//   - txReferenceBlockID: The reference block ID of the transaction.
 //
 // No errors expected during normal operations.
 func (t *TransactionMetadata) refreshTransactionReferenceBlockID() error {
@@ -124,9 +109,6 @@ func (t *TransactionMetadata) refreshTransactionReferenceBlockID() error {
 }
 
 // refreshStatus updates the transaction's status based on its execution result.
-//
-// Parameters:
-//   - ctx: Context for managing the operation lifecycle.
 //
 // No errors expected during normal operations.
 func (t *TransactionMetadata) refreshStatus(ctx context.Context) error {
@@ -162,10 +144,8 @@ func (t *TransactionMetadata) refreshStatus(ctx context.Context) error {
 
 // refreshBlock updates the block metadata if the transaction has been included in a block.
 //
-// Expected errors during normal operation:
-//   - [ErrBlockNotReady] if the block for collection ID is not found.
-//
-// All other errors should be treated as exceptions.
+// Expected error returns during normal operation:
+//   - [ErrBlockNotReady] - if the block for collection ID is not found.
 func (t *TransactionMetadata) refreshBlock() error {
 	if t.txResult.CollectionID == flow.ZeroID || t.blockWithTx != nil {
 		return nil
@@ -183,15 +163,23 @@ func (t *TransactionMetadata) refreshBlock() error {
 	t.blockWithTx = block.ToHeader()
 	t.txResult.BlockID = block.ID()
 	t.txResult.BlockHeight = block.Height
+
+	execResultInfo, err := t.execResultProvider.ExecutionResultInfo(t.txResult.BlockID, t.criteria)
+	if err != nil {
+		if common.IsInsufficientExecutionReceipts(err) {
+			return nil
+		}
+		return fmt.Errorf("failed to get execution result for block %s: %w", t.txResult.BlockID, err)
+	}
+	t.execResultInfo = execResultInfo
+
 	return nil
 }
 
 // refreshCollection updates the collection metadata if the transaction is included in a block.
 //
-// Expected errors during normal operation:
-//   - [ErrTransactionNotInBlock] if the transaction is not found in the block.
-//
-// All other errors should be treated as exceptions.
+// Expected error returns during normal operation:
+//   - [ErrTransactionNotInBlock] - if the transaction is not found in the block.
 func (t *TransactionMetadata) refreshCollection() error {
 	if t.txResult.CollectionID != flow.ZeroID {
 		return nil
@@ -210,25 +198,18 @@ func (t *TransactionMetadata) refreshCollection() error {
 
 // refreshTransactionResult attempts to retrieve the transaction result from storage or an execution node.
 //
-// Parameters:
-//   - ctx: Context for managing the operation lifecycle.
-//
-// Expected errors during normal operation:
-//   - [codes.NotFound] if the transaction result is unavailable.
-//
-// All other errors should be treated as exceptions.
+// Expected error returns during normal operation:
+//   - [codes.NotFound] - if the transaction result is unavailable.
 func (t *TransactionMetadata) refreshTransactionResult(ctx context.Context) error {
 	// skip check if we already have the result, or if we don't know which block it is in yet
 	if t.blockWithTx == nil || t.txResult.IsExecuted() {
 		return nil
 	}
 
-	txResult, err := t.txProvider.TransactionResult(
-		ctx,
-		t.blockWithTx,
-		t.txResult.TransactionID,
-		t.eventEncodingVersion,
-	)
+	// TODO: need a way to check if the result in execResultInfo is still valid.
+	// if it is ever abandoned, we need to trigger the streaming fork recovery process.
+
+	txResult, _, err := t.txProvider.TransactionResult(ctx, t.blockWithTx, t.txResult.TransactionID, t.eventEncodingVersion, t.execResultInfo)
 	if err != nil {
 		// TODO: I don't like the fact we propagate this error from txProvider.
 		// Fix it during error handling polishing project
