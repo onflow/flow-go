@@ -98,7 +98,7 @@ func NewTransactionResults(collector module.CacheMetrics, db storage.DB, transac
 		withRetrieve(retrieve),
 	)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to create transaction results group cache: %w", err)
 	}
 
 	indexCache, err := newGroupCache(
@@ -110,7 +110,7 @@ func NewTransactionResults(collector module.CacheMetrics, db storage.DB, transac
 		withRetrieve(retrieveIndex),
 	)
 	if err != nil {
-		panic(err)
+		return nil, fmt.Errorf("failed to create transaction index group cache: %w", err)
 	}
 
 	return &TransactionResults{
