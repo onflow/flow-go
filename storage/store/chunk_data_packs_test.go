@@ -34,8 +34,9 @@ func TestChunkDataPack_Remove(t *testing.T) {
 		db := pebbleimpl.ToDB(pdb)
 		transactions := store.NewTransactions(&metrics.NoopCollector{}, db)
 		collections := store.NewCollections(db, transactions)
+		stored := store.NewStoredChunkDataPacks(&metrics.NoopCollector{}, db, 10)
 		// keep the cache size at 1 to make sure that entries are written and read from storage itself.
-		chunkDataPackStore := store.NewChunkDataPacksSimple(&metrics.NoopCollector{}, db, collections, 1)
+		chunkDataPackStore := store.NewChunkDataPacks(&metrics.NoopCollector{}, db, stored, collections, 1)
 
 		chunkDataPacks := unittest.ChunkDataPacksFixture(10)
 		for _, chunkDataPack := range chunkDataPacks {
@@ -69,7 +70,8 @@ func TestChunkDataPacks_MissingItem(t *testing.T) {
 		db := pebbleimpl.ToDB(pdb)
 		transactions := store.NewTransactions(&metrics.NoopCollector{}, db)
 		collections := store.NewCollections(db, transactions)
-		store1 := store.NewChunkDataPacksSimple(&metrics.NoopCollector{}, db, collections, 1)
+		stored := store.NewStoredChunkDataPacks(&metrics.NoopCollector{}, db, 10)
+		store1 := store.NewChunkDataPacks(&metrics.NoopCollector{}, db, stored, collections, 1)
 
 		// attempt to get an invalid
 		_, err := store1.ByChunkID(unittest.IdentifierFixture())
@@ -84,7 +86,8 @@ func TestChunkDataPacks_StoreTwice(t *testing.T) {
 		db := pebbleimpl.ToDB(pdb)
 		transactions := store.NewTransactions(&metrics.NoopCollector{}, db)
 		collections := store.NewCollections(db, transactions)
-		store1 := store.NewChunkDataPacksSimple(&metrics.NoopCollector{}, db, collections, 1)
+		stored := store.NewStoredChunkDataPacks(&metrics.NoopCollector{}, db, 10)
+		store1 := store.NewChunkDataPacks(&metrics.NoopCollector{}, db, stored, collections, 1)
 		require.NoError(t, unittest.WithLock(t, lockManager, storage.LockInsertOwnReceipt, func(lctx lockctx.Context) error {
 			require.NoError(t, store1.StoreByChunkID(lctx, chunkDataPacks))
 
@@ -108,7 +111,8 @@ func WithChunkDataPacks(t *testing.T, chunks int, storeFunc func(*testing.T, []*
 		transactions := store.NewTransactions(&metrics.NoopCollector{}, db)
 		collections := store.NewCollections(db, transactions)
 		// keep the cache size at 1 to make sure that entries are written and read from storage itself.
-		store1 := store.NewChunkDataPacksSimple(&metrics.NoopCollector{}, db, collections, 1)
+		stored := store.NewStoredChunkDataPacks(&metrics.NoopCollector{}, db, 10)
+		store1 := store.NewChunkDataPacks(&metrics.NoopCollector{}, db, stored, collections, 1)
 
 		chunkDataPacks := unittest.ChunkDataPacksFixture(chunks)
 		for _, chunkDataPack := range chunkDataPacks {

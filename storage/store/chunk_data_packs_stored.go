@@ -25,7 +25,7 @@ func NewStoredChunkDataPacks(collector module.CacheMetrics, db storage.DB, byIDC
 		return &c, err
 	}
 
-	cache := newCache(collector, metrics.ResourceChunkDataPack,
+	cache := newCache(collector, metrics.ResourceStoredChunkDataPack,
 		withLimit[flow.Identifier, *storage.StoredChunkDataPack](byIDCacheSize),
 		withStore(operation.InsertStoredChunkDataPack),
 		withRetrieve(retrieve),

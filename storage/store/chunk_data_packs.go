@@ -49,13 +49,6 @@ func NewChunkDataPacks(collector module.CacheMetrics, db storage.DB, stored stor
 	return &ch
 }
 
-// NewChunkDataPacksSimple creates a ChunkDataPacks instance with a simple constructor for backward compatibility.
-// This constructor creates its own StoredChunkDataPacks instance internally.
-func NewChunkDataPacksSimple(collector module.CacheMetrics, db storage.DB, collections storage.Collections, byChunkIDCacheSize uint) *ChunkDataPacks {
-	stored := NewStoredChunkDataPacks(collector, db, byChunkIDCacheSize)
-	return NewChunkDataPacks(collector, db, stored, collections, byChunkIDCacheSize)
-}
-
 // Remove removes multiple ChunkDataPacks cs keyed by their ChunkIDs in a batch.
 // No errors are expected during normal operation, even if no entries are matched.
 func (ch *ChunkDataPacks) Remove(chunkIDs []flow.Identifier) error {
