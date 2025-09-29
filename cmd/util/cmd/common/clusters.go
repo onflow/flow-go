@@ -53,13 +53,19 @@ func ConstructClusterAssignment(log zerolog.Logger, partnerNodes, internalNodes 
 	}
 
 	// shuffle partner nodes in-place using the provided randomness
-	_ = randomSource.Shuffle(len(partnerCollectors), func(i, j int) {
+	err := randomSource.Shuffle(len(partnerCollectors), func(i, j int) {
 		partnerCollectors[i], partnerCollectors[j] = partnerCollectors[j], partnerCollectors[i]
 	})
+	if err != nil {
+		log.Fatal().Err(err).Msg("could not shuffle partners")
+	}
 	// shuffle internal nodes in-place using the provided randomness
-	_ = randomSource.Shuffle(len(internalCollectors), func(i, j int) {
+	err = randomSource.Shuffle(len(internalCollectors), func(i, j int) {
 		internalCollectors[i], internalCollectors[j] = internalCollectors[j], internalCollectors[i]
 	})
+	if err != nil {
+		log.Fatal().Err(err).Msg("could not shuffle internals")
+	}
 
 	// capture first reference weight to validate that all collectors have equal weight
 	refWeight := internalCollectors[0].InitialWeight
