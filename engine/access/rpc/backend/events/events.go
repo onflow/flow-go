@@ -38,7 +38,6 @@ type Events struct {
 	provider           provider.EventProvider
 	queryMode          query_mode.IndexQueryMode
 	execResultProvider optimistic_sync.ExecutionResultInfoProvider
-	operatorCriteria   optimistic_sync.Criteria
 }
 
 var _ access.EventsAPI = (*Events)(nil)
@@ -55,7 +54,6 @@ func NewEventsBackend(
 	execNodeIdentitiesProvider *rpc.ExecutionNodeIdentitiesProvider,
 	executionResultProvider optimistic_sync.ExecutionResultInfoProvider,
 	executionStateCache optimistic_sync.ExecutionStateCache,
-	operatorCriteria optimistic_sync.Criteria,
 ) (*Events, error) {
 	var eventProvider provider.EventProvider
 
@@ -92,7 +90,6 @@ func NewEventsBackend(
 		headers:            headers,
 		provider:           eventProvider,
 		queryMode:          queryMode,
-		operatorCriteria:   operatorCriteria,
 		execResultProvider: executionResultProvider,
 	}, nil
 }

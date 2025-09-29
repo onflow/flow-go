@@ -23,6 +23,9 @@ import (
 	"github.com/onflow/flow-go/module/executiondatasync/optimistic_sync"
 )
 
+// ENEventProvider retrieves events by querying remote Execution Nodes (ENs).
+// It selects from available executors for a given execution result and
+// aggregates responses, converting them into the Access API format.
 type ENEventProvider struct {
 	log              zerolog.Logger
 	nodeProvider     *rpc.ExecutionNodeIdentitiesProvider

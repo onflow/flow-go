@@ -209,7 +209,7 @@ func (s *EventsSuite) TestGetEvents_HappyPaths() {
 
 	s.executionDataSnapshot.
 		On("Events").
-		Return(s.events, nil)
+		Return(s.events)
 
 	startHeight := s.blocks[0].Height
 	endHeight := s.sealedHead.Height
@@ -523,7 +523,6 @@ func (s *EventsSuite) defaultBackend(mode query_mode.IndexQueryMode) *Events {
 		),
 		s.executionResultProvider,
 		s.executionStateCache,
-		optimistic_sync.DefaultCriteria,
 	)
 	require.NoError(s.T(), err)
 

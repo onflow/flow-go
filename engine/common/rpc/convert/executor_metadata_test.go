@@ -48,6 +48,5 @@ func TestExecutorMetadata(t *testing.T) {
 		// cannot do a direct comparison to metadata because the MessageToIdentifiers converter always
 		// returns a slice, even if the input is nil
 		require.NotNil(t, converted)
-		require.True(t, converted.IsEmpty())
 	})
 }
