@@ -39,6 +39,9 @@ type Headers interface {
 	// might be unfinalized; if there is more than one, at least one of them has to
 	// be unfinalized.
 	// CAUTION: this method is not backed by a cache and therefore comparatively slow!
+	//
+	// Expected error returns during normal operations:
+	//   - [storage.ErrNotFound] if no block with the given parentID is known
 	ByParentID(parentID flow.Identifier) ([]*flow.Header, error)
 
 	// ProposalByBlockID returns the header with the given ID, along with the corresponding proposer signature.
