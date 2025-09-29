@@ -82,7 +82,7 @@ func (s *TxErrorMessagesEngineSuite) TearDownTest() {
 }
 
 func (s *TxErrorMessagesEngineSuite) SetupTest() {
-	s.log = zerolog.New(os.Stderr)
+	s.log = unittest.Logger()
 	s.ctx, s.cancel = context.WithCancel(context.Background())
 	pdb, dbDir := unittest.TempPebbleDB(s.T())
 	s.db = pebbleimpl.ToDB(pdb)

@@ -3,7 +3,6 @@ package tx_error_messages
 import (
 	"context"
 	"fmt"
-	"os"
 	"testing"
 
 	execproto "github.com/onflow/flow/protobuf/go/flow/execution"
@@ -72,7 +71,7 @@ type mockCloser struct{}
 func (mc *mockCloser) Close() error { return nil }
 
 func (s *TxErrorMessagesCoreSuite) SetupTest() {
-	s.log = zerolog.New(os.Stderr)
+	s.log = unittest.Logger()
 	s.ctx, s.cancel = context.WithCancel(context.Background())
 	// mock out protocol state
 	s.proto.state = protocol.NewFollowerState(s.T())
