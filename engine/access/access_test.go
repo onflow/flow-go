@@ -3,7 +3,6 @@ package access_test
 import (
 	"context"
 	"encoding/json"
-	"os"
 	"testing"
 
 	"github.com/cockroachdb/pebble/v2"
@@ -93,7 +92,7 @@ func TestAccess(t *testing.T) {
 
 func (suite *Suite) SetupTest() {
 	suite.lockManager = storage.NewTestingLockManager()
-	suite.log = zerolog.New(os.Stderr)
+	suite.log = unittest.Logger()
 	suite.net = new(mocknetwork.EngineRegistry)
 	suite.state = new(protocol.State)
 	suite.finalSnapshot = new(protocol.Snapshot)
@@ -775,6 +774,10 @@ func (suite *Suite) TestGetSealedTransaction() {
 		ctx := irrecoverable.NewMockSignalerContext(suite.T(), background)
 		ingestEng.Start(ctx)
 		<-ingestEng.Ready()
+		defer func() {
+			cancel()
+			<-ingestEng.Done()
+		}()
 
 		// 2. Ingest engine was notified by the follower engine about a new block.
 		// Follower engine --> Ingest engine
