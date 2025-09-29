@@ -84,7 +84,8 @@ func runE(*cobra.Command, []string) error {
 			return fmt.Errorf("could not open chunk data pack DB at %v: %w", flagChunkDataPackDir, err)
 		}
 		chunkDataPacksDB := pebbleimpl.ToDB(chunkDataPacksPebbleDB)
-		chunkDataPacks := store.NewChunkDataPacks(metrics, chunkDataPacksDB, collections, 1000)
+		storedChunkDataPacks := store.NewStoredChunkDataPacks(metrics, chunkDataPacksDB, 1000)
+		chunkDataPacks := store.NewChunkDataPacks(metrics, chunkDataPacksDB, storedChunkDataPacks, collections, 1000)
 		chunkBatch := chunkDataPacksDB.NewBatch()
 		defer chunkBatch.Close()
 
@@ -238,14 +239,17 @@ func removeForBlockID(
 		return fmt.Errorf("could not find result for block %v: %w", blockID, err)
 	}
 
+	chunkIDs := make([]flow.Identifier, 0, len(result.Chunks))
 	for _, chunk := range result.Chunks {
 		chunkID := chunk.ID()
-		// remove chunk data pack
-		err := chunks.BatchRemove(chunkID, chunkBatch)
-		if err != nil {
-			return fmt.Errorf("could not remove chunk id %v for block id %v: %w", chunkID, blockID, err)
-		}
+		chunkIDs = append(chunkIDs, chunkID)
+	}
 
+	if len(chunkIDs) > 0 {
+		err := chunks.BatchRemove(chunkIDs, chunkBatch)
+		if err != nil {
+			return fmt.Errorf("could not remove chunk data packs for block id %v: %w", blockID, err)
+		}
 	}
 
 	// remove commits

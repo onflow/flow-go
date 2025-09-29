@@ -40,7 +40,8 @@ func TestLoopPruneExecutionDataFromRootToLatestSealed(t *testing.T) {
 
 		transactions := store.NewTransactions(metrics, db)
 		collections := store.NewCollections(db, transactions)
-		chunkDataPacks := store.NewChunkDataPacks(metrics, pebbleimpl.ToDB(pdb), collections, 1000)
+		storedChunkDataPacks := store.NewStoredChunkDataPacks(metrics, pebbleimpl.ToDB(pdb), 1000)
+		chunkDataPacks := store.NewChunkDataPacks(metrics, pebbleimpl.ToDB(pdb), storedChunkDataPacks, collections, 1000)
 
 		lastSealedHeight := 30
 		lastFinalizedHeight := lastSealedHeight + 2 // 2 finalized but unsealed
@@ -75,7 +76,7 @@ func TestLoopPruneExecutionDataFromRootToLatestSealed(t *testing.T) {
 			require.NoError(t, err)
 			require.NoError(t, results.Store(chunk.Result))
 			require.NoError(t, results.Index(chunk.Result.BlockID, chunk.Result.ID()))
-			require.NoError(t, unittest.WithLock(t, lockManager, storage.LockInsertChunkDataPack, func(lctx lockctx.Context) error {
+			require.NoError(t, unittest.WithLock(t, lockManager, storage.LockInsertOwnReceipt, func(lctx lockctx.Context) error {
 				return chunkDataPacks.StoreByChunkID(lctx, []*flow.ChunkDataPack{chunk.ChunkDataPack})
 			}))
 			_, storeErr := collections.Store(chunk.ChunkDataPack.Collection)

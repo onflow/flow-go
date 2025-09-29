@@ -758,8 +758,9 @@ func (exeNode *ExecutionNode) LoadExecutionState(
 		}
 		return nil
 	})
+	storedChunkDataPacks := store.NewStoredChunkDataPacks(node.Metrics.Cache, pebbleimpl.ToDB(chunkDataPackDB), exeNode.exeConf.chunkDataPackCacheSize)
 	chunkDataPacks := store.NewChunkDataPacks(node.Metrics.Cache,
-		pebbleimpl.ToDB(chunkDataPackDB), exeNode.collections, exeNode.exeConf.chunkDataPackCacheSize)
+		pebbleimpl.ToDB(chunkDataPackDB), storedChunkDataPacks, exeNode.collections, exeNode.exeConf.chunkDataPackCacheSize)
 
 	getLatestFinalized := func() (uint64, error) {
 		final, err := node.State.Final().Head()
