@@ -79,6 +79,15 @@ CAUTION: Unlike Badger transactions, reads here observe the **latest committed s
 - Reads DO observe writes committed concurrently by other threads
 - Subsequent reads of the same key DO NOT always observe the same value
 
+### Badger Transaction (for reference only - no longer supported)
+Badger (**no longer supported**) transactions read their own writes and read a consistent prior snapshot for the duration of the transaction.
+![Badger transaction](./../docs/images/Badger_SSI_Transaction.png)
+
+### Pebble Write Batch
+Pebble reads the latest committed state, which may change between subsequent reads.
+![Pebble write batch](./../docs/images/Pebble_Read_Committed_WriteBatch.png)
+
+
 ## Synchronization with Lock Context Manager
 The storage package exposes a `LockManager`, which must be a process-wide singleton.
 All synchronized functions in the storage package should register their locks in [`storage/locks.go`](locks.go).
