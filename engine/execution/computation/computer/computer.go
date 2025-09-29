@@ -313,29 +313,38 @@ func (e *blockComputer) queueSystemTransactions(
 	txnIndex uint32,
 	systemLogger zerolog.Logger,
 ) chan TransactionRequest {
-	allTxs := append(executeCallbackTxs, systemTxn)
-	systemTxs := systemColection.CompleteCollection.Collection.Transactions
-	systemLogger = systemLogger.With().Uint32("num_txs", uint32(len(systemTxs))).Logger()
+	var logger zerolog.Logger
 
+	systemChunkTxLogger := systemLogger.With().
+		Uint32("num_txs", uint32(len(systemColection.CompleteCollection.Collection.Transactions))).
+		Logger()
+
+	scheduledTxLogger := systemChunkTxLogger.With().
+		Bool("scheduled_transaction", true).
+		Bool("critical_error", false).
+		Logger()
+
+	allTxs := append(executeCallbackTxs, systemTxn)
 	txQueue := make(chan TransactionRequest, len(allTxs))
 	defer close(txQueue)
 
 	for i, txBody := range allTxs {
-		last := i == len(allTxs)-1 // Is this last tx in collection
-
+		systemChunkTx := i == len(allTxs)-1 // last tx in collection is system chunk
 		ctx := callbackCtx
-		// last transaction is system chunk and has own context
-		if last {
+		logger = scheduledTxLogger
+
+		if systemChunkTx {
 			ctx = systemChunkCtx
+			logger = systemChunkTxLogger
 		}
 
 		txQueue <- newTransactionRequest(
 			systemColection,
 			ctx,
-			systemLogger,
+			logger,
 			txnIndex,
 			txBody,
-			last,
+			systemChunkTx,
 		)
 
 		txnIndex++
@@ -485,14 +494,6 @@ func (e *blockComputer) executeSystemTransactions(
 		fvm.WithProtocolStateSnapshot(e.protocolState.AtBlockID(block.BlockID())),
 	)
 
-	systemLogger := callbackCtx.Logger.With().
-		Str("block_id", block.BlockID().String()).
-		Uint64("height", block.Block.Height).
-		Bool("system_chunk", true).
-		Bool("system_transaction", true).
-		Int("num_collections", userCollectionCount).
-		Logger()
-
 	systemCollectionInfo := collectionInfo{
 		blockId:             block.BlockID(),
 		blockIdStr:          block.BlockID().String(),
@@ -501,6 +502,15 @@ func (e *blockComputer) executeSystemTransactions(
 		CompleteCollection:  nil, // We do not yet know all the scheduled callbacks, so postpone construction of the collection.
 		isSystemTransaction: true,
 	}
+
+	systemLogger := callbackCtx.Logger.With().
+		Str("block_id", block.BlockID().String()).
+		Uint64("height", block.Block.Height).
+		Bool("system_chunk", true).
+		Bool("system_transaction", true).
+		Bool("critical_error", true).
+		Int("num_collections", userCollectionCount).
+		Logger()
 
 	var callbackTxs []*flow.TransactionBody
 
@@ -547,12 +557,6 @@ func (e *blockComputer) executeSystemTransactions(
 			Collection: finalCollection,
 		}
 	}
-
-	// Update logger with number of transactions once they've become known
-	// (user tx + callbacks + 2 (process, system)
-	systemLogger = systemLogger.With().
-		Uint32("num_txs", uint32(userTxCount+len(callbackTxs)+2)).
-		Logger()
 
 	txQueue := e.queueSystemTransactions(
 		callbackCtx,
@@ -611,10 +615,14 @@ func (e *blockComputer) executeProcessCallback(
 	txnIndex uint32,
 	systemLogger zerolog.Logger,
 ) ([]*flow.TransactionBody, uint32, error) {
+	callbackLogger := systemLogger.With().
+		Bool("scheduled_transaction", true).
+		Logger()
+
 	request := newTransactionRequest(
 		systemCollectionInfo,
 		systemCtx,
-		systemLogger,
+		callbackLogger,
 		txnIndex,
 		e.processCallbackTxn,
 		false)
